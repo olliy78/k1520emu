@@ -29,6 +29,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
 
 from app.ui.screen_widget import CRTParams
+from app.ui.bildschirm_schalter import BildschirmSchalter
 from app import drive_types as dt
 from app import profil as profile
 from app import takt
@@ -53,6 +54,8 @@ class SettingsWidget(QWidget):
     modelChanged = Signal(str)
     # Hardwarevariante (Profil.hardware) geaendert: Schluessel, Wert.
     hardwareChanged = Signal(str, str)
+    # Schiebeschalter der Bildschirmkarten umgelegt (``"k7024"``/``"k7023"``), wirkt sofort.
+    bildschirmSchalterChanged = Signal(str)
     # RAM-Disk-Auswahl geaendert (``"none"``/``"raf128"``/``"raf512"``/``"raf2m"``,
     # `app/raf.py`) — wie der Modellwechsel ein Neuaufbau der Maschine.
     rafChanged = Signal(str)
@@ -289,6 +292,7 @@ class SettingsWidget(QWidget):
 
         # Hardwarevarianten des Programms (Profil.hardware, z. B. PC 1715: Zeichensatz, Tastatur)
         self.hardware_combos = {}
+        self.bildschirm_schalter = None        # nur mit dem Hardwarefeld „bildschirm“
         for schluessel, beschriftung, tipp, werte, _modelle in self.profil.hardware:
             box = QComboBox(inner)
             for wert, anzeige in werte:
@@ -298,6 +302,12 @@ class SettingsWidget(QWidget):
                 lambda _i, s=schluessel: self._on_hardware_combo(s))
             self.hardware_combos[schluessel] = box
             form.addRow(beschriftung, box)
+            if schluessel == "bildschirm":
+                # Entwurf 33 §3.3: der Schiebeschalter sitzt unter der Kartenwahl.
+                self.bildschirm_schalter = BildschirmSchalter(inner)
+                self.bildschirm_schalter.stellungGeaendert.connect(
+                    self.bildschirmSchalterChanged)
+                form.addRow("", self.bildschirm_schalter)
         self._hardware_guard = False
         self._hardware_gesperrt_nach_modell()
 
@@ -414,6 +424,15 @@ class SettingsWidget(QWidget):
             return
         self.hardwareChanged.emit(schluessel, self.hardware_combos[schluessel].currentData())
 
+    def bildschirm_schalter_value(self) -> str:
+        """Stellung des Schiebeschalters (``"k7024"``/``"k7023"``; ``""`` ohne Schalter)."""
+        return self.bildschirm_schalter.stellung() if self.bildschirm_schalter else ""
+
+    def set_bildschirm_schalter_value(self, karte: str):
+        """Stellung setzen, ohne Signal."""
+        if self.bildschirm_schalter is not None:
+            self.bildschirm_schalter.set_stellung(karte)
+
     def hardware_value(self) -> dict:
         """Gewählte Hardwarevarianten ``{Schlüssel: Wert}`` (leer ohne Profil.hardware)."""
         return {k: b.currentData() for k, b in self.hardware_combos.items()}
@@ -439,6 +458,11 @@ class SettingsWidget(QWidget):
         modell = self.model_value()
         for k, box in self.hardware_combos.items():
             box.setEnabled(self.profil.hardware_wirkt(k, modell, self.hardware_value()))
+        # Der Schiebeschalter ist nur mit BEIDEN Bildschirmkarten aktiv.
+        if self.bildschirm_schalter is not None:
+            box = self.hardware_combos["bildschirm"]
+            self.bildschirm_schalter.setEnabled(
+                box.isEnabled() and box.currentData() == "beide")
         # MC80.2x: die Kassette (MBI) ist eingebaut — das Kaestchen steckt nichts.
         fest = self.profil.modell_normalisieren(modell) in self.profil.tape_fest
         if not hasattr(self, "tape_box"):      # beim ersten Aufruf (Aufbau) noch nicht da

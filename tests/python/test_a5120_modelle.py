@@ -183,14 +183,14 @@ def test_vorgaben_je_modell():
     assert b["tastatur"] == "k7636" and b["laufwerke"] == ["K5601"] * 4
     c = p.modell_vorgabe("k8924")
     assert c["tastatur"] == "k7637" and c["laufwerke"] == ["K5601"] * 3 + ["none"]
-    assert p.hardware_standard("a5130") == {"ram": "k3526", "tastatur": "k7636",
+    assert p.hardware_standard("a5130") == {"ram": "k3526", "bildschirm": "k7024", "tastatur": "k7636",
                                             "laderom": "v09_2", "erweiterungsmodul": "none"}
 
 
 def test_optionsfelder_und_beschriftungen():
     p = _profil()
     felder = {h[0]: h for h in p.hardware}
-    assert list(felder) == ["ram", "tastatur", "laderom", "erweiterungsmodul"]
+    assert list(felder) == ["ram", "bildschirm", "tastatur", "laderom", "erweiterungsmodul"]
     assert [a for _w, a in felder["ram"][3]] == \
         ["1x K3525 16KB", "2x K3525 32KB", "4x K3525 64KB", "K3526 64KB"]
     assert [w for w, _a in felder["tastatur"][3]] == ["k7636", "k7637"]
@@ -248,7 +248,8 @@ def profil_k8915():
 def test_hardware_normalisieren_prueft_jede_option_einzeln():
     p = _profil()
     n = p.hardware_normalisieren({"ram": "k3525_4", "tastatur": "quatsch", "laderom": "v06"}, "a5130")
-    assert n == {"ram": "k3525_4", "tastatur": "k7636", "laderom": "v06", "erweiterungsmodul": "none"}
+    assert n == {"ram": "k3525_4", "bildschirm": "k7024", "tastatur": "k7636", "laderom": "v06",
+                 "erweiterungsmodul": "none"}
     assert p.hardware_normalisieren({}, "k8924")["tastatur"] == "k7637"
 
 
@@ -297,7 +298,8 @@ def test_modellfeld_zeigt_genau_die_drei_modelle(qapp, konfig_ordner):
     try:
         combo = w.settings_widget.model_combo
         assert [combo.itemText(i) for i in range(combo.count())] == ["A5120", "A5130", "K8924"]
-        assert set(w.settings_widget.hardware_combos) == {"ram", "tastatur", "laderom", "erweiterungsmodul"}
+        assert set(w.settings_widget.hardware_combos) == {"ram", "bildschirm", "tastatur", "laderom",
+                                                           "erweiterungsmodul"}
         ram = w.settings_widget.hardware_combos["ram"]
         assert [ram.itemText(i) for i in range(ram.count())] == \
             ["1x K3525 16KB", "2x K3525 32KB", "4x K3525 64KB", "K3526 64KB"]

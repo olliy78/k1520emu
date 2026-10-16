@@ -250,7 +250,7 @@ class Programmprofil:
             return "pc1715-tast618"
         return art
 
-    def kern_parameter(self, modell, hardware=None) -> dict:
+    def kern_parameter(self, modell, hardware=None, schalter=None) -> dict:
         """Zusatzargumente für ``K1520Emulator(…)`` aus Modell und Hardwarewahl.
 
         Ohne :attr:`modell_kern` (alle Maschinen außer dem P8000) sind es die
@@ -263,16 +263,18 @@ class Programmprofil:
         if self.modell_vorgaben:
             # A5120/A5130/K8924: alles als Einzeloptionen in EIN Woerterbuch ``konfig`` (Entwurf 33
             # N4: nicht mit ausfuehrung/tastatur/laderom/em/tape kombinierbar).  ``kassette``
-            # fuegt die Maschinenerzeugung aus dem Kaestchen dazu; ``bildschirm`` kommt bis zum
-            # Auswahlfeld (N6) aus der Vorgabe des Modells.
-            vorgabe = self.modell_vorgabe(modell)
-            return {"konfig": {
+            # fuegt die Maschinenerzeugung aus dem Kaestchen dazu; ``bildschirm`` ist ein Auswahlfeld (N6).
+            konfig = {
                 "ram": hardware["ram"],
-                "bildschirm": vorgabe.get("bildschirm", "k7024"),
+                "bildschirm": hardware["bildschirm"],
                 "tastatur": hardware["tastatur"],
                 "laderom": hardware["laderom"],
                 "em": self.modell_em(modell, hardware) or "none",
-            }}
+            }
+            # Anfangsstellung des Schiebeschalters: nur mit zwei Karten (sonst Fehler im Kern).
+            if hardware["bildschirm"] == "beide":
+                konfig["schalter"] = schalter if schalter in ("k7024", "k7023") else "k7024"
+            return {"konfig": konfig}
         if not self.modell_kern:
             aus = dict(hardware)
             schluessel = self.modell_normalisieren(modell)
@@ -433,6 +435,11 @@ A5120 = Programmprofil(
          "Software, die mehr braucht (CP/A will den oberen Bereich), läuft mit weniger nicht.",
          (("k3525_1", "1x K3525 16KB"), ("k3525_2", "2x K3525 32KB"),
           ("k3525_4", "4x K3525 64KB"), ("k3526", "K3526 64KB")), ()),
+        ("bildschirm", "Bildschirmkarte:",
+         "K7024 (80x24, Zeichen 8x12) und/oder K7023 (64x16).  Mit beiden Karten wählt der "
+         "Schiebeschalter darunter, welche das Bild liefert; er wirkt sofort.",
+         (("k7024", "K7024 Auflösung 24x80"), ("k7023", "K7023 Auflösung 16x64"),
+          ("beide", "K7024 und K7023 mit Umschalter")), ()),
         ("tastatur", "Tastatur:",
          "K7636 parallel am U-Bus der K2526, K7637 seriell am Kanal der K8025.",
          (("k7636", "K7636 (parallel)"), ("k7637", "K7637 (seriell)")), ()),
