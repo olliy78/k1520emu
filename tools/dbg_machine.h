@@ -27,6 +27,7 @@
  */
 #pragma once
 #include "core/machines/a5120/a5120.h"
+#include "core/machines/a5120/a5120_konfig_text.h"
 #include "core/machines/k8915/k8915.h"
 #include "core/machines/prg710/prg710.h"
 #include "core/machines/pc1715/pc1715.h"
@@ -120,7 +121,8 @@ inline bool steckeK5020(K1520Machine& m, bool an, const std::string& d1, const s
  */
 inline bool parseAusfuehrung(const char* ausf, const char* lw, A5120Machine::Config& cfg,
                              std::string& err, const char* laderom = nullptr,
-                             const char* tastatur = nullptr) {
+                             const char* tastatur = nullptr, const char* ram = nullptr,
+                             const char* bildschirm = nullptr, const char* schalter = nullptr) {
     // `--laderom v06|v09_1|v09_2` (AP A7, doc/a5120_alt/laderom.md): gestecktes Lade-ROM.
     K2526::Laderom lr = cfg.laderom;
     if (laderom) {
@@ -154,6 +156,12 @@ inline bool parseAusfuehrung(const char* ausf, const char* lw, A5120Machine::Con
     }
     cfg.laderom  = lr;   // nach fuerAusfuehrung, die die Config neu aufsetzt
     if (tastatur) cfg.tastatur = ta;
+    // `--ram`, `--bildschirm`, `--schalter` (Entwurf 33 N4): Einzeloptionen, gleiche Namen und
+    // Meldungen wie der Konfigurationstext der C-ABI (a5120_konfig_text.h).
+    if (ram        && !a5120konfig::wert(cfg, "ram", ram, err)) { err = "--" + err; return false; }
+    if (bildschirm && !a5120konfig::wert(cfg, "bildschirm", bildschirm, err)) { err = "--" + err; return false; }
+    if (schalter   && !a5120konfig::wert(cfg, "schalter", schalter, err)) { err = "--" + err; return false; }
+    if (!a5120konfig::pruefe(cfg, schalter != nullptr, err)) { err = "--" + err; return false; }
     if (lw) {
         std::string s = lw;
         size_t i = 0, p = 0;

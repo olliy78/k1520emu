@@ -1,0 +1,5 @@
+# boot_trace --schalter ohne --bildschirm beide: Abbruch mit Grund (der Schalter existiert nicht).
+tool:    boot_trace
+run:     -L /dev/null --schalter k7023
+expect:  --schalter: nur mit bildschirm=beide
+exit:    2

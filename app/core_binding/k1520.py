@@ -510,6 +510,18 @@ _lib.k1520_create_a5120_konfig.argtypes = [
     ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p
 ]
 _lib.k1520_create_a5120_konfig.restype = K1520Handle
+# k1520_create_a5120_text(konfig, d0..d3) -> K1520Handle (Entwurf 33 N4: Einzeloptionen als Text)
+_lib.k1520_create_a5120_text.argtypes = [
+    ctypes.c_char_p,
+    ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p
+]
+_lib.k1520_create_a5120_text.restype = K1520Handle
+_lib.k1520_a5120_bildschirm.argtypes = [K1520Handle]
+_lib.k1520_a5120_bildschirm.restype = ctypes.c_int
+_lib.k1520_screen_select.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_screen_select.restype = ctypes.c_int
+_lib.k1520_screen_selected.argtypes = [K1520Handle]
+_lib.k1520_screen_selected.restype = ctypes.c_int
 _lib.k1520_a5120_laderom.argtypes = [K1520Handle]
 _lib.k1520_a5120_laderom.restype = ctypes.c_int
 _lib.k1520_a5120_tastatur.argtypes = [K1520Handle]
@@ -777,6 +789,44 @@ A5120_AUSFUEHRUNG_MASCHINE = {"a5120-alt": "alt", "a5120-kmbg": "kmbg"}
 # der Ausfuehrung (neu: K7637, alt/kmbg: K7636).
 A5120_LADEROME = {"v09_2": 0, "v09_1": 1, "v06": 2}
 A5120_TASTATUREN = {"vorgabe": 0, "k7637": 1, "k7636": 2}
+# Einzeloptionen des A5120 fuer K1520Emulator(konfig={...}) (Entwurf 33 N4); die Werte sind die
+# des Konfigurationstexts von k1520_create_a5120_text.  Schluessel "ausfuehrung" ist die Huelle
+# (wird im Kern zuerst ausgewertet).
+A5120_KONFIG_WERTE = {
+    "ausfuehrung": ("neu", "alt", "kmbg"),
+    "ram": ("k3526", "k3525_1", "k3525_2", "k3525_4"),
+    "bildschirm": ("k7024", "k7023", "beide"),
+    "schalter": ("k7024", "k7023"),
+    "tastatur": ("k7637", "k7636"),
+    "laderom": ("v09_2", "v09_1", "v06"),
+    "kassette": ("0", "1"),
+    "em": ("none", "em064", "em256"),
+}
+# Reihenfolge der Kartenzahl, wie k1520_a5120_bildschirm sie meldet.
+A5120_BILDSCHIRME = ("k7024", "k7023", "beide")
+
+
+def a5120_konfig_text(konfig: dict) -> str:
+    """Wörterbuch -> Konfigurationstext des Kerns (``ram=k3525_4;bildschirm=beide``).
+
+    Prüft Schlüssel und Werte (``ValueError``) vor dem Kern; Wahrheitswerte für
+    ``kassette`` werden zu ``0``/``1``.  Die Reihenfolge ist gleichgültig (der Kern
+    wertet ``ausfuehrung`` zuerst aus).
+    """
+    teile = []
+    for k, v in konfig.items():
+        schluessel = str(k).lower()
+        if schluessel not in A5120_KONFIG_WERTE:
+            raise ValueError(f"unbekannter A5120-Konfigurationsschlüssel {k!r} "
+                             f"(bekannt: {', '.join(A5120_KONFIG_WERTE)})")
+        if isinstance(v, bool):
+            v = "1" if v else "0"
+        wert = str(v).lower()
+        if wert not in A5120_KONFIG_WERTE[schluessel]:
+            raise ValueError(f"A5120-Konfiguration {schluessel}={v!r} unbekannt "
+                             f"(bekannt: {', '.join(A5120_KONFIG_WERTE[schluessel])})")
+        teile.append(f"{schluessel}={wert}")
+    return ";".join(teile)
 # Bildschirm der fruehen Ausfuehrungen: K7023 64×16 (BAB1 ab FC00H).
 K7023_COLS, K7023_ROWS = 64, 16
 # Variante fuer k1520_create_prg710 (nur die PRG-Namen).
@@ -1044,7 +1094,8 @@ class K1520Emulator:
                  em: Optional[str] = None, raf: Optional[str] = None,
                  ptape: bool = False, tape: bool = False, zeichensatz: str = "deutsch",
                  tastatur: Optional[str] = None, p8000: Optional[dict] = None,
-                 ausfuehrung: Optional[str] = None, spe=1, laderom: Optional[str] = None):
+                 ausfuehrung: Optional[str] = None, spe=1, laderom: Optional[str] = None,
+                 konfig: Optional[dict] = None):
         """Initialize emulator instance.
 
         Args:
@@ -1085,6 +1136,13 @@ class K1520Emulator:
                 Bei der Ausführung ``"kmbg"`` steckt sie ohnehin (dann ohne Wirkung).
             spe: nur MC80 (``"mc80"`` = MC80.30, ``"mc80-31"`` = MC80.31) — Zahl der
                 Speichererweiterungen SPE 2, ``1`` (Vorgabe) oder ``2`` (auch als Text).
+            konfig: nur A5120 — Einzeloptionen als Wörterbuch (Entwurf 33), Schlüssel
+                ``ram`` (``k3526`` | ``k3525_1``/``_2``/``_4``), ``bildschirm`` (``k7024`` |
+                ``k7023`` | ``beide``), ``schalter`` (Anfangsstellung bei ``beide``),
+                ``tastatur`` (``k7637``/``k7636``), ``laderom``, ``kassette`` (bool), ``em``,
+                ``ausfuehrung`` (Hülle).  Nicht zusammen mit den Parametern ``ausfuehrung``,
+                ``tastatur``, ``laderom``, ``em``, ``tape`` — sonst ``ValueError``.
+                Fehler im Kern (z. B. ``em`` mit ``ram=k3525_*``) → ``RuntimeError``.
             ausfuehrung: nur A5120 — ``None``/``"neu"`` (Vorgabe), ``"alt"`` (K7023.01 16×64,
                 4× K3525, K7636; Vorgabelaufwerke 3× K5600.10), ``"kmbg"`` (wie ``"alt"`` mit
                 fest gesteckter K5020); ``"acht"`` lehnt der Kern noch ab.  Gleichwertig:
@@ -1134,12 +1192,27 @@ class K1520Emulator:
         self._ausfuehrung = ausf
         if ausf in ("alt", "kmbg"):
             self._machine = "a5120-" + ausf
+        self._konfig_text = None
+        if konfig is not None:
+            if not ist_a5120:
+                raise ValueError(f"Einzeloptionen (konfig=) gibt es nur am A5120, nicht am {machine!r}")
+            if ausfuehrung or tastatur or laderom or em or tape or machine in A5120_AUSFUEHRUNG_MASCHINE:
+                raise ValueError("konfig= nicht zusammen mit ausfuehrung/tastatur/laderom/em/tape "
+                                 "und nicht mit a5120-alt/-kmbg (alles gehört in konfig)")
+            self._konfig_text = a5120_konfig_text(konfig)
         a5120_konfig = ist_a5120 and ((laderom or "v09_2") != "v09_2"
                                       or (tastatur or "vorgabe") != "vorgabe")
         if a5120_konfig and self._em:
             raise ValueError("Lade-ROM/Tastatur sind mit einem Erweiterungsmodul nicht wählbar")
         try:
-            if ausf != "neu" or a5120_konfig:
+            if self._konfig_text is not None:
+                names = (self._drive_types or [])[:4]
+                names = names + [None] * (4 - len(names))
+                enc = lambda n: n.encode("utf-8") if n else None
+                handle = _lib.k1520_create_a5120_text(
+                    self._konfig_text.encode("ascii"),
+                    enc(names[0]), enc(names[1]), enc(names[2]), enc(names[3]))
+            elif ausf != "neu" or a5120_konfig:
                 names = (self._drive_types or [])[:4]
                 names = names + [None] * (4 - len(names))
                 enc = lambda n: n.encode("utf-8") if n else None
@@ -1262,6 +1335,32 @@ class K1520Emulator:
             if n > 0 and wert == n:
                 return name
         return self._tastatur
+
+    @property
+    def bildschirm(self) -> str:
+        """A5120: Bildschirmbestückung laut Kern — ``"k7024"``, ``"k7023"`` oder ``"beide"``
+        (zwei Karten mit Umschalter); sonst ``""``."""
+        n = _lib.k1520_a5120_bildschirm(self._handle)
+        return A5120_BILDSCHIRME[n] if 0 <= n < len(A5120_BILDSCHIRME) else ""
+
+    @property
+    def bildschirm_schalter(self) -> str:
+        """A5120: angezeigte Karte (``"k7024"``/``"k7023"``), jedes Mal aus dem Kern gelesen —
+        ein geladener Zwischenstand (``loadState``, Debugger-``restore``) kann sie umgesetzt
+        haben.  Setzen nur bei ``bildschirm == "beide"`` (sonst ``ValueError``); geht über die
+        Kernsperre, darf also aus dem GUI-Faden kommen, während die Maschine rechnet."""
+        n = _lib.k1520_screen_selected(self._handle)
+        return A5120_BILDSCHIRME[n] if n in (0, 1) else ""
+
+    @bildschirm_schalter.setter
+    def bildschirm_schalter(self, karte: str):
+        k = str(karte).lower()
+        if k not in ("k7024", "k7023"):
+            raise ValueError(f"unbekannte Bildschirmkarte {karte!r} (k7024|k7023)")
+        if self.bildschirm != "beide":
+            raise ValueError("ein Bildschirm-Umschalter gibt es nur mit bildschirm=beide")
+        if _lib.k1520_screen_select(self._handle, A5120_BILDSCHIRME.index(k)) != 0:
+            raise ValueError("Umschalter nicht umgelegt")
 
     @property
     def laderom(self) -> str:
@@ -1800,8 +1899,9 @@ class K1520Emulator:
     
     def framebuffer_size(self) -> tuple:
         """Bildgröße ``(Breite, Höhe)`` in Pixeln, wie der Kern sie meldet."""
-        return (int(_lib.k1520_fb_width(self._handle)),
-                int(_lib.k1520_fb_height(self._handle)))
+        with kern_sperre():
+            return (int(_lib.k1520_fb_width(self._handle)),
+                    int(_lib.k1520_fb_height(self._handle)))
 
     def get_framebuffer(self) -> bytearray:
         """
@@ -1810,16 +1910,16 @@ class K1520Emulator:
         Returns:
             bytearray of pixels
         """
-        width = _lib.k1520_fb_width(self._handle)
-        height = _lib.k1520_fb_height(self._handle)
-        
-        fb_ptr = _lib.k1520_framebuffer(self._handle)
-        if not fb_ptr:
-            return bytearray(width * height if width and height else 1920)
-        
-        # Copy framebuffer
-        size = width * height if (width and height) else 1920
-        return bytearray(ctypes.string_at(fb_ptr, size))
+        # Zeiger und Groesse unter EINER Kernsperre: ein Umschalten K7024/K7023 dazwischen
+        # (640x288 <-> 512x256) liesse sonst ueber das Ende des kleineren Puffers lesen.
+        with kern_sperre():
+            width = _lib.k1520_fb_width(self._handle)
+            height = _lib.k1520_fb_height(self._handle)
+            fb_ptr = _lib.k1520_framebuffer(self._handle)
+            if not fb_ptr:
+                return bytearray(width * height if width and height else 1920)
+            size = width * height if (width and height) else 1920
+            return bytearray(ctypes.string_at(fb_ptr, size))
     
     def is_framebuffer_dirty(self) -> bool:
         """Check if framebuffer was updated since last clear."""
@@ -2160,8 +2260,10 @@ class K1520Emulator:
         Beim K8915 über ``k1520_screen_char`` von der Karte: die CPU-Sicht
         (``mem_read``) zeigt bei 1000H je nach Port A8H das RAM der ZRE.
         """
-        if self._ausfuehrung in ("alt", "kmbg"):
-            # K7023: 16 Zeilen à 64 Zeichen (BAB1), Kursor in Bit 7.
+        if self._ausfuehrung in ("alt", "kmbg") or (
+                self._machine == "a5120" and _lib.k1520_screen_selected(self._handle) == 1):
+            # K7023: 16 Zeilen à 64 Zeichen (BAB1), Kursor in Bit 7.  Auch bei einer Maschine
+            # mit konfig={"bildschirm": "k7023"|"beide"} und umgelegtem Schalter.
             return "\n".join(
                 "".join(chr(_lib.k1520_screen_char(self._handle, c, r) & 0x7F)
                         for c in range(K7023_COLS))

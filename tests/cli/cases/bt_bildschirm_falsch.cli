@@ -1,0 +1,5 @@
+# boot_trace --bildschirm mit unbekanntem Wert: Abbruch mit Grund.
+tool:    boot_trace
+run:     -L /dev/null --bildschirm drei
+expect:  --bildschirm: unbekannt 'drei' (k7024|k7023|beide)
+exit:    2

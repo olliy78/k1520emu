@@ -1,0 +1,5 @@
+# boot_trace --ram mit unbekanntem Wert: Abbruch mit Grund.
+tool:    boot_trace
+run:     -L /dev/null --ram k3525_8
+expect:  --ram: unbekannt 'k3525_8' (k3526|k3525_1|k3525_2|k3525_4)
+exit:    2

@@ -37,6 +37,12 @@
  *                    v06 startet BCU 880 „SYL auf Spur 1“, doc/a5120_alt/laderom.md, AP A7)
  *     --tastatur k7636|k7637  Tastatur abweichend von der Ausfuehrung (BCU 880 V1.2:
  *                    neu + k7636 = K7024 80×24 + K7636 am U-Bus)
+ *     --ram k3526|k3525_1|k3525_2|k3525_4  RAM-Bestueckung (Entwurf 33 N4; Vorgabe k3526 = 64 KB;
+ *                    k3525_N = N K3525 a 16 KB ab 0000H; mit --em nur k3526)
+ *     --bildschirm k7024|k7023|beide  Bildschirmkarte(n) (Vorgabe k7024 80×24; beide = K7024 + K7023
+ *                    mit Umschalter, Anfangsstellung --schalter k7024|k7023).  Die Textausgabe
+ *                    (--until screen, Screen-Bericht) folgt der Stellung beim START — boot_trace
+ *                    legt den Schalter nicht um (dazu: k1520dbg, `screen select`)
  *     --format NAME  Katalogformat, mit dem die Diskette zuerst gemountet wird (bei .img
  *                    massgeblich, z. B. k5601_ss40_26x128; sonst cpa780, dann cpa800)
  *
@@ -311,6 +317,9 @@ int main(int argc, char** argv) {
     const char* laderom_opt = nullptr;        // --laderom v06|v09_1|v09_2 (AP A7)
     const char* format_opt  = nullptr;        // --format NAME: Katalogformat fuer .img (AP A7)
     const char* tastatur_opt = nullptr;       // --tastatur k7636|k7637 (AP A7)
+    const char* ram_opt = nullptr;            // --ram k3526|k3525_1|k3525_2|k3525_4 (Entwurf 33 N4)
+    const char* bildschirm_opt = nullptr;     // --bildschirm k7024|k7023|beide
+    const char* schalter_opt = nullptr;       // --schalter k7024|k7023: Anfangsstellung bei beide
     // Disk-mount mode (§6): COW default → the disk is copied to a temp file and that copy
     // is mounted, so a committed fixture is never modified (no more `mktemp; cp` ritual).
     // --rw mounts the original writable; --read-only/--ro mounts it write-protected.
@@ -440,6 +449,9 @@ int main(int argc, char** argv) {
         else if (!strcmp(argv[i], "--laderom") && i+1 < argc) { laderom_opt = argv[++i]; nur_a5120.push_back("--laderom"); }
         else if (!strcmp(argv[i], "--format") && i+1 < argc) { format_opt = argv[++i]; nur_a5120.push_back("--format"); }
         else if (!strcmp(argv[i], "--tastatur") && i+1 < argc) { tastatur_opt = argv[++i]; nur_a5120.push_back("--tastatur"); }
+        else if (!strcmp(argv[i], "--ram") && i+1 < argc) { ram_opt = argv[++i]; nur_a5120.push_back("--ram"); }
+        else if (!strcmp(argv[i], "--bildschirm") && i+1 < argc) { bildschirm_opt = argv[++i]; nur_a5120.push_back("--bildschirm"); }
+        else if (!strcmp(argv[i], "--schalter") && i+1 < argc) { schalter_opt = argv[++i]; nur_a5120.push_back("--schalter"); }
         else if (!strcmp(argv[i], "--em")) {
             em_variant = "em256";
             if (i+1 < argc && (!strcmp(argv[i+1],"em256") || !strcmp(argv[i+1],"em064")))
@@ -617,7 +629,7 @@ int main(int argc, char** argv) {
     if (em_variant) mcfg.em = !strcmp(em_variant,"em064") ? A5120Machine::Config::Em::em064
                                                           : A5120Machine::Config::Em::em256;
     { std::string err;
-      if (!dbgm::parseAusfuehrung(ausf_opt, lw_opt, mcfg, err, laderom_opt, tastatur_opt)) { fprintf(stderr, "%s\n", err.c_str()); return 2; } }
+      if (!dbgm::parseAusfuehrung(ausf_opt, lw_opt, mcfg, err, laderom_opt, tastatur_opt, ram_opt, bildschirm_opt, schalter_opt)) { fprintf(stderr, "%s\n", err.c_str()); return 2; } }
     std::unique_ptr<A5120Machine> machine_p;
     try { machine_p = std::make_unique<A5120Machine>(mcfg); }
     catch (const std::exception& e) { fprintf(stderr, "Maschine: %s\n", e.what()); return 2; }
@@ -630,6 +642,9 @@ int main(int argc, char** argv) {
         if (machine.zeigtK7023()) return (uint8_t)(machine.screenChar(c, r) & 0x7F);
         return machine.memReadDebug((uint16_t)(0xF800 + r*80 + c));
     };
+    if (!quiet && machine.bildschirm() == A5120Machine::Config::Bildschirm::Beide)
+        fprintf(stderr, "Bildschirm:  beide (K7024 + K7023), angezeigt: %s\n",
+                machine.zeigtK7023() ? "K7023 64x16" : "K7024 80x24");
     if (!quiet && machine.k7023())
         fprintf(stderr, "Ausfuehrung: %s (K7023 64x16, %s), Laufwerke %s/%s/%s/%s\n",
                 machine.ausfuehrung() == A5120Machine::Config::Ausfuehrung::Kmbg ? "KMBG" : "alt",

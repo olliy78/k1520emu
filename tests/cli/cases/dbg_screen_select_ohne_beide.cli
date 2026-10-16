@@ -1,0 +1,9 @@
+# k1520dbg `screen select` an der Vorgabemaschine (nur K7024): Hinweis statt Umschalten.
+tool:    k1520dbg
+disk:    cpa_cpa780_k5601_noclock.hfe
+run:     %DISK%
+stdin:
+  screen select k7023
+  q
+expect:  screen select: kein Umschalter (Bildschirm ist K7024; --bildschirm beide)
+forbid:  unknown command
