@@ -527,6 +527,19 @@ _lib.k1520_a5120_laderom.restype = ctypes.c_int
 _lib.k1520_a5120_tastatur.argtypes = [K1520Handle]
 _lib.k1520_a5120_tastatur.restype = ctypes.c_int
 
+# K3521.30, akkugepuffertes 4-KB-RAM (Entwurf 33 N10b)
+_lib.k1520_k3521_basis.argtypes = [K1520Handle]
+_lib.k1520_k3521_basis.restype = ctypes.c_int
+_lib.k1520_k3521_datei.argtypes = [K1520Handle, ctypes.c_char_p]
+_lib.k1520_k3521_datei.restype = ctypes.c_bool
+_lib.k1520_k3521_flush.argtypes = [K1520Handle]
+_lib.k1520_k3521_flush.restype = ctypes.c_bool
+_lib.k1520_k3521_peek.argtypes = [K1520Handle, ctypes.c_uint16]
+_lib.k1520_k3521_peek.restype = ctypes.c_uint8
+_lib.k1520_k3521_sue.argtypes = [K1520Handle]
+_lib.k1520_k3521_sue.restype = ctypes.c_int
+_lib.k1520_k3521_akku_leer.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_k3521_akku_leer.restype = ctypes.c_bool
 # RAM-Floppy RAF (doc/design/22_raf512.md §6)
 _lib.k1520_raf_install.argtypes = [K1520Handle, ctypes.c_char_p]
 _lib.k1520_raf_install.restype = ctypes.c_bool
@@ -801,6 +814,9 @@ A5120_KONFIG_WERTE = {
     "laderom": ("v09_2", "v09_1", "v06"),
     "kassette": ("0", "1"),
     "em": ("none", "em064", "em256"),
+    # K3521.30 (N10b): "aus" oder die Startadresse als 4-stellige Hex-Zahl im 4-KB-Raster.
+    "k3521": ("aus",) + tuple(f"{i * 0x1000:04x}" for i in range(16)),
+    "k3521_memdi": ("bus", "memdi1", "memdi2"),
 }
 # Reihenfolge der Kartenzahl, wie k1520_a5120_bildschirm sie meldet.
 A5120_BILDSCHIRME = ("k7024", "k7023", "beide")
@@ -1139,7 +1155,7 @@ class K1520Emulator:
             konfig: nur A5120 — Einzeloptionen als Wörterbuch (Entwurf 33), Schlüssel
                 ``ram`` (``k3526`` | ``k3525_1``/``_2``/``_4``), ``bildschirm`` (``k7024`` |
                 ``k7023`` | ``beide``), ``schalter`` (Anfangsstellung bei ``beide``),
-                ``tastatur`` (``k7637``/``k7636``), ``laderom``, ``kassette`` (bool), ``em``,
+                ``tastatur`` (``k7637``/``k7636``), ``laderom``, ``kassette`` (bool), ``em``, ``k3521``/``k3521_memdi`` (akkugepuffertes RAM),
                 ``ausfuehrung`` (Hülle).  Nicht zusammen mit den Parametern ``ausfuehrung``,
                 ``tastatur``, ``laderom``, ``em``, ``tape`` — sonst ``ValueError``.
                 Fehler im Kern (z. B. ``em`` mit ``ram=k3525_*``) → ``RuntimeError``.
@@ -2206,6 +2222,36 @@ class K1520Emulator:
     def raf_save(self, pfad) -> bool:
         """Inhalt als Rohdatei sichern; False ohne RAF."""
         return bool(_lib.k1520_raf_save(self._handle, os.fsencode(pfad)))
+
+    # ─── K3521.30 (akkugepuffertes 4-KB-RAM, Option des A5120) ─────────────
+    @property
+    def k3521_basis(self) -> int:
+        """Startadresse der K3521 (0..0xF000) oder -1 ohne Karte (``konfig={"k3521": "4000"}``)."""
+        return int(_lib.k1520_k3521_basis(self._handle))
+
+    def k3521_datei(self, pfad) -> None:
+        """Ablagedatei binden (lädt sie, falls vorhanden); ``ValueError`` ohne Karte/bei falscher Größe."""
+        if not _lib.k1520_k3521_datei(self._handle, os.fsencode(pfad)):
+            reason = _lib.k1520_last_init_error()
+            raise ValueError(reason.decode("utf-8", "replace") if reason else "K3521-Datei nicht bindbar")
+
+    def k3521_flush(self) -> bool:
+        """Gebundene Datei sofort zurückschreiben."""
+        return bool(_lib.k1520_k3521_flush(self._handle))
+
+    def k3521_peek(self, offset: int) -> int:
+        """Byte des K3521-Inhalts (0xFF ohne Karte/außerhalb)."""
+        return int(_lib.k1520_k3521_peek(self._handle, offset))
+
+    @property
+    def k3521_sue(self):
+        """/SUE (Akku leer) als Zustand: True/False, ``None`` ohne Karte.  Nicht verdrahtet."""
+        v = int(_lib.k1520_k3521_sue(self._handle))
+        return None if v < 0 else bool(v)
+
+    def k3521_akku_leer(self, leer: bool) -> bool:
+        """/SUE setzen/löschen (Test); der Inhalt bleibt."""
+        return bool(_lib.k1520_k3521_akku_leer(self._handle, 1 if leer else 0))
 
     # ─── A5120.16 ──────────────────────────────────────────────────────────
     def em_variant(self) -> str:

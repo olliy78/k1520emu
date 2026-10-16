@@ -15,6 +15,7 @@
 #include "core/cards/k7024/k7024.h"
 #include "core/cards/k7023/k7023.h"
 #include "core/cards/k3525/k3525.h"
+#include "core/cards/k3521/k3521.h"
 #include "core/peripherals/k7636/k7636.h"
 #include "core/cards/k8025/k8025.h"
 #include "core/cards/k5122/k5122.h"
@@ -126,6 +127,19 @@ public:
          */
         enum class Tastatur { Vorgabe = 0, K7637 = 1, K7636 = 2 };
         Tastatur tastatur = Tastatur::Vorgabe;
+
+        /**
+         * @brief Akkugepufferte RAM-Karte K3521.30 (Entwurf 33 N10b, doc/a5130_k8924/aup_analyse.md §2).
+         *
+         * @ref k3521_basis = Startadresse im 4-KB-Raster (0000H … F000H), -1 = nicht gesteckt
+         * (Vorgabe, bitgleich zu bisher).  4 KB, ueberdeckt beim Lesen das RAM darunter (Schreiben
+         * trifft beide).  @ref k3521_memdi = /MEMDI-Wahl, @ref k3521_datei = dauerhafte Ablage
+         * (Rohdatei, 4096 Byte; leer = nur im Speicher, ueberlebt dann Reset/Netz-Aus, aber nicht
+         * das Ende der Maschine).  Details und Annahmen: core/cards/k3521/k3521.h.
+         */
+        int                k3521_basis = -1;
+        K3521::Memdi       k3521_memdi = K3521::Memdi::Bus;
+        std::string        k3521_datei;
 
         /// Vorgabekonfiguration einer Ausfuehrung (Huelle, Entwurf 33 N1): setzt nur die
         /// Einzelfelder.  Laufwerke laut Entwurf 30 §1.
@@ -374,6 +388,9 @@ public:
     K7636*       k7636()       { return k7636_.get(); }
     const K7636* k7636() const { return k7636_.get(); }
     K3525*       k3525(int i)  { return (i >= 0 && i < 4) ? k3525_[i].get() : nullptr; }
+    /// Akkugepufferte RAM-Karte K3521.30 (nur mit Config::k3521_basis >= 0, sonst nullptr).
+    K3521*       k3521()       { return k3521_.get(); }
+    const K3521* k3521() const { return k3521_.get(); }
 
     // Framebuffer
     // Das Bild kommt von der angezeigten Karte (@ref zeigtK7023): K7023 512×256 (64×16
@@ -635,6 +652,7 @@ private:
     Config::Ram         ram_ = Config::Ram::K3526;
     Config::Bildschirm  bildschirm_ = Config::Bildschirm::K7024;
     std::array<std::unique_ptr<K3525>, 4> k3525_;
+    std::unique_ptr<K3521> k3521_;   // Option (Entwurf 33 N10b); nach dem Bus angemeldet, ueber Reset/Netz-Aus erhalten
     std::unique_ptr<K7023> k7023_;
     std::unique_ptr<K7636> k7636_;
 

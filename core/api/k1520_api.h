@@ -134,6 +134,9 @@ K1520_API K1520Handle k1520_create_a5120_konfig(int ausfuehrung, int laderom, in
  *               - `laderom`    v09_2 | v09_1 | v06
  *               - `kassette`   0 | 1 (K5020 fest gesteckt)
  *               - `em`         none | em064 | em256 (nur mit ram=k3526)
+ *               - `k3521`      aus (Vorgabe) | Hex-Adresse im 4-KB-Raster 0..f000 (akkugepuffertes
+ *                              4-KB-RAM K3521.30; Ablagedatei: k1520_k3521_datei)
+ *               - `k3521_memdi` bus (Vorgabe) | memdi1 | memdi2 (nur mit k3521)
  * @param drive0..3 wie bei k1520_create_configured; NULL/"" = Vorgabe der Ausfuehrung.
  * Unbekannter Schluessel/Wert oder unzulaessige Kombination → NULL mit Grund in
  * k1520_last_init_error.  Die Zahlen-Fassung k1520_create_a5120_konfig bleibt daneben bestehen.
@@ -618,6 +621,25 @@ K1520_API uint8_t     k1520_raf_peek(K1520Handle h, uint32_t adr);
 K1520_API bool        k1520_raf_load(K1520Handle h, const char* pfad);
 /** @brief Inhalt als Rohdatei sichern; false ohne RAF. */
 K1520_API bool        k1520_raf_save(K1520Handle h, const char* pfad);
+
+/* ─── K3521.30, akkugepuffertes 4-KB-RAM (Entwurf 33 N10b) ───────────────────
+ * Gesteckt ueber den Konfigurationstext von k1520_create_a5120_text (k3521=…).  Ohne Karte
+ * (und an anderen Maschinen): basis -1, peek 0xFF, die Schreibaufrufe false. */
+
+/** @brief Startadresse der K3521 (0000H..F000H) oder -1 ohne Karte. */
+K1520_API int         k1520_k3521_basis(K1520Handle h);
+/** @brief Ablagedatei binden: existiert sie, wird sie geladen (genau 4096 Byte, sonst false +
+ *  k1520_last_init_error), sonst entsteht sie beim Zurueckschreiben (nach 0,5 s Schreibpause
+ *  Maschinenzeit, bei k1520_k3521_flush und beim Zerstoeren des Handles). */
+K1520_API bool        k1520_k3521_datei(K1520Handle h, const char* pfad);
+/** @brief Sofort zurueckschreiben; true auch, wenn nichts zu tun ist; false ohne Karte/bei Fehler. */
+K1520_API bool        k1520_k3521_flush(K1520Handle h);
+/** @brief Byte des Karteninhalts (Offset 0..4095); 0xFF ohne Karte/ausserhalb. */
+K1520_API uint8_t     k1520_k3521_peek(K1520Handle h, uint16_t offset);
+/** @brief /SUE (Akku leer): 1/0, -1 ohne Karte.  Nur ein Zustand, nirgends verdrahtet. */
+K1520_API int         k1520_k3521_sue(K1520Handle h);
+/** @brief /SUE setzen/loeschen (Test/Oberflaeche); false ohne Karte.  Der Inhalt bleibt. */
+K1520_API bool        k1520_k3521_akku_leer(K1520Handle h, int leer);
 
 /* ─── Debug ──────────────────────────────────────────────────────────────── */
 /** @brief Read memory through the machine bus for diagnostics. */

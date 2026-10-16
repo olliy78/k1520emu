@@ -122,7 +122,9 @@ inline bool steckeK5020(K1520Machine& m, bool an, const std::string& d1, const s
 inline bool parseAusfuehrung(const char* ausf, const char* lw, A5120Machine::Config& cfg,
                              std::string& err, const char* laderom = nullptr,
                              const char* tastatur = nullptr, const char* ram = nullptr,
-                             const char* bildschirm = nullptr, const char* schalter = nullptr) {
+                             const char* bildschirm = nullptr, const char* schalter = nullptr,
+                             const char* k3521 = nullptr, const char* k3521_memdi = nullptr,
+                             const char* k3521_datei = nullptr) {
     // `--laderom v06|v09_1|v09_2` (AP A7, doc/a5120_alt/laderom.md): gestecktes Lade-ROM.
     K2526::Laderom lr = cfg.laderom;
     if (laderom) {
@@ -161,6 +163,12 @@ inline bool parseAusfuehrung(const char* ausf, const char* lw, A5120Machine::Con
     if (ram        && !a5120konfig::wert(cfg, "ram", ram, err)) { err = "--" + err; return false; }
     if (bildschirm && !a5120konfig::wert(cfg, "bildschirm", bildschirm, err)) { err = "--" + err; return false; }
     if (schalter   && !a5120konfig::wert(cfg, "schalter", schalter, err)) { err = "--" + err; return false; }
+    // `--k3521 ADR|aus`, `--k3521-memdi bus|memdi1|memdi2`, `--k3521-datei PFAD` (N10b): Datei
+    // unveraendert uebernehmen (der Konfigurationstext wuerde Gross-/Kleinschreibung ueberfahren).
+    if (k3521      && !a5120konfig::wert(cfg, "k3521", k3521, err)) { err = "--" + err; return false; }
+    if (k3521_memdi && !a5120konfig::wert(cfg, "k3521_memdi", k3521_memdi, err)) { err = "--" + err; return false; }
+    if (k3521_datei) cfg.k3521_datei = k3521_datei;
+    if (k3521_datei && cfg.k3521_basis < 0) { err = "--k3521-datei: nur mit --k3521"; return false; }
     if (!a5120konfig::pruefe(cfg, schalter != nullptr, err)) { err = "--" + err; return false; }
     if (lw) {
         std::string s = lw;

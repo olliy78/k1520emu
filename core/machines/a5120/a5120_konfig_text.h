@@ -18,6 +18,10 @@
  *   laderom     = v09_2 | v09_1 | v06
  *   kassette    = 0 | 1
  *   em          = none | em064 | em256
+ *   k3521       = aus | <Hex-Adresse im 4-KB-Raster, 0 .. f000>   akkugepuffertes RAM K3521.30
+ *   k3521_memdi = bus | memdi1 | memdi2   (S1:02, nur mit k3521)
+ *   (die Ablagedatei der K3521 steht NICHT im Text — Werte werden kleingeschrieben und
+ *    Leerraum entfernt; Pfad ueber k1520_k3521_datei bzw. --k3521-datei)
  */
 #include "core/machines/a5120/a5120.h"
 #include <algorithm>
@@ -80,9 +84,26 @@ inline bool wert(A5120Machine::Config& cfg, const std::string& schluessel_in,
         else if (v == "em064") cfg.em = C::Em::em064;
         else if (v == "em256") cfg.em = C::Em::em256;
         else { err = "em: unbekannt '" + v + "' (none|em064|em256)"; return false; }
+    } else if (k == "k3521") {
+        if (v == "aus" || v == "none") { cfg.k3521_basis = -1; return true; }
+        if (v.size() > 4 || v.find_first_not_of("0123456789abcdef") != std::string::npos) {
+            err = "k3521: unbekannt '" + v + "' (aus|Hex-Adresse 0..f000 im 4-KB-Raster)";
+            return false;
+        }
+        const long a = std::stol(v, nullptr, 16);
+        if (a % 0x1000 != 0) {
+            err = "k3521: '" + v + "' liegt nicht im 4-KB-Raster (0, 1000, 2000 ... f000)";
+            return false;
+        }
+        cfg.k3521_basis = static_cast<int>(a);
+    } else if (k == "k3521_memdi") {
+        if      (v == "bus")    cfg.k3521_memdi = K3521::Memdi::Bus;
+        else if (v == "memdi1") cfg.k3521_memdi = K3521::Memdi::Memdi1;
+        else if (v == "memdi2") cfg.k3521_memdi = K3521::Memdi::Memdi2;
+        else { err = "k3521_memdi: unbekannt '" + v + "' (bus|memdi1|memdi2)"; return false; }
     } else {
         err = "A5120-Konfiguration: unbekannter Schluessel '" + k +
-              "' (ausfuehrung|ram|bildschirm|schalter|tastatur|laderom|kassette|em)";
+              "' (ausfuehrung|ram|bildschirm|schalter|tastatur|laderom|kassette|em|k3521|k3521_memdi)";
         return false;
     }
     return true;
@@ -92,6 +113,10 @@ inline bool wert(A5120Machine::Config& cfg, const std::string& schluessel_in,
 inline bool pruefe(const A5120Machine::Config& cfg, bool schalter_gesetzt, std::string& err) {
     if (schalter_gesetzt && cfg.bildschirm != A5120Machine::Config::Bildschirm::Beide) {
         err = "schalter: nur mit bildschirm=beide";
+        return false;
+    }
+    if (cfg.k3521_basis < 0 && cfg.k3521_memdi != K3521::Memdi::Bus) {
+        err = "k3521_memdi: nur mit k3521";
         return false;
     }
     return true;

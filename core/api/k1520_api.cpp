@@ -1627,6 +1627,48 @@ bool k1520_raf_save(K1520Handle h, const char* pfad) {
     return r && r->speichereInhalt(pfad);
 }
 
+// ─── K3521.30 (Entwurf 33 N10b) ──────────────────────────────────────────────
+namespace {
+K3521* k3521Karte(K1520Handle h) {
+    auto* a = h ? dynamic_cast<A5120Machine*>(toMachine(h)) : nullptr;
+    return a ? a->k3521() : nullptr;
+}
+}  // namespace
+
+int k1520_k3521_basis(K1520Handle h) {
+    const K3521* k = k3521Karte(h);
+    return k ? k->config().base_addr : -1;
+}
+
+bool k1520_k3521_datei(K1520Handle h, const char* pfad) {
+    K3521* k = (h && pfad && pfad[0]) ? k3521Karte(h) : nullptr;
+    if (!k) { g_init_error = "keine K3521 gesteckt (k3521=… im Konfigurationstext)"; return false; }
+    g_init_error.clear();
+    return k->dateiBinden(pfad, g_init_error);
+}
+
+bool k1520_k3521_flush(K1520Handle h) {
+    K3521* k = k3521Karte(h);
+    return k && k->flush();
+}
+
+uint8_t k1520_k3521_peek(K1520Handle h, uint16_t offset) {
+    const K3521* k = k3521Karte(h);
+    return k ? k->peek(offset) : 0xFF;
+}
+
+int k1520_k3521_sue(K1520Handle h) {
+    const K3521* k = k3521Karte(h);
+    return k ? (k->sue() ? 1 : 0) : -1;
+}
+
+bool k1520_k3521_akku_leer(K1520Handle h, int leer) {
+    K3521* k = k3521Karte(h);
+    if (!k) return false;
+    k->setzeAkkuLeer(leer != 0);
+    return true;
+}
+
 // ─── Terminals des P8000 (Entwurf 25 §10.9, P20d) ───────────────────────────
 // Genau ein Terminal je Handle: am P8000 die Konsole tty1 (Kern- oder Originalterminal), an
 // „P8000 Terminal" das Originalterminal selbst.  Index i ≠ 0 und andere Maschinen → Ruhewerte.

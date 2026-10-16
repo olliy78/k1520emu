@@ -43,6 +43,8 @@
  *                    mit Umschalter, Anfangsstellung --schalter k7024|k7023).  Die Textausgabe
  *                    (--until screen, Screen-Bericht) folgt der Stellung beim START — boot_trace
  *                    legt den Schalter nicht um (dazu: k1520dbg, `screen select`)
+ *     --k3521 ADR|aus  akkugepuffertes 4-KB-RAM K3521.30 an der 4-KB-Adresse ADR (Hex, N10b);
+ *                    --k3521-memdi bus|memdi1|memdi2, --k3521-datei PFAD (Inhalt dauerhaft)
  *     --format NAME  Katalogformat, mit dem die Diskette zuerst gemountet wird (bei .img
  *                    massgeblich, z. B. k5601_ss40_26x128; sonst cpa780, dann cpa800)
  *
@@ -320,6 +322,9 @@ int main(int argc, char** argv) {
     const char* ram_opt = nullptr;            // --ram k3526|k3525_1|k3525_2|k3525_4 (Entwurf 33 N4)
     const char* bildschirm_opt = nullptr;     // --bildschirm k7024|k7023|beide
     const char* schalter_opt = nullptr;       // --schalter k7024|k7023: Anfangsstellung bei beide
+    const char* k3521_opt = nullptr;          // --k3521 ADR|aus: akkugepuffertes RAM (N10b)
+    const char* k3521_memdi_opt = nullptr;    // --k3521-memdi bus|memdi1|memdi2
+    const char* k3521_datei_opt = nullptr;    // --k3521-datei PFAD: Ablage des Inhalts
     // Disk-mount mode (§6): COW default → the disk is copied to a temp file and that copy
     // is mounted, so a committed fixture is never modified (no more `mktemp; cp` ritual).
     // --rw mounts the original writable; --read-only/--ro mounts it write-protected.
@@ -452,6 +457,9 @@ int main(int argc, char** argv) {
         else if (!strcmp(argv[i], "--ram") && i+1 < argc) { ram_opt = argv[++i]; nur_a5120.push_back("--ram"); }
         else if (!strcmp(argv[i], "--bildschirm") && i+1 < argc) { bildschirm_opt = argv[++i]; nur_a5120.push_back("--bildschirm"); }
         else if (!strcmp(argv[i], "--schalter") && i+1 < argc) { schalter_opt = argv[++i]; nur_a5120.push_back("--schalter"); }
+        else if (!strcmp(argv[i], "--k3521") && i+1 < argc) { k3521_opt = argv[++i]; nur_a5120.push_back("--k3521"); }
+        else if (!strcmp(argv[i], "--k3521-memdi") && i+1 < argc) { k3521_memdi_opt = argv[++i]; nur_a5120.push_back("--k3521-memdi"); }
+        else if (!strcmp(argv[i], "--k3521-datei") && i+1 < argc) { k3521_datei_opt = argv[++i]; nur_a5120.push_back("--k3521-datei"); }
         else if (!strcmp(argv[i], "--em")) {
             em_variant = "em256";
             if (i+1 < argc && (!strcmp(argv[i+1],"em256") || !strcmp(argv[i+1],"em064")))
@@ -629,7 +637,7 @@ int main(int argc, char** argv) {
     if (em_variant) mcfg.em = !strcmp(em_variant,"em064") ? A5120Machine::Config::Em::em064
                                                           : A5120Machine::Config::Em::em256;
     { std::string err;
-      if (!dbgm::parseAusfuehrung(ausf_opt, lw_opt, mcfg, err, laderom_opt, tastatur_opt, ram_opt, bildschirm_opt, schalter_opt)) { fprintf(stderr, "%s\n", err.c_str()); return 2; } }
+      if (!dbgm::parseAusfuehrung(ausf_opt, lw_opt, mcfg, err, laderom_opt, tastatur_opt, ram_opt, bildschirm_opt, schalter_opt, k3521_opt, k3521_memdi_opt, k3521_datei_opt)) { fprintf(stderr, "%s\n", err.c_str()); return 2; } }
     std::unique_ptr<A5120Machine> machine_p;
     try { machine_p = std::make_unique<A5120Machine>(mcfg); }
     catch (const std::exception& e) { fprintf(stderr, "Maschine: %s\n", e.what()); return 2; }

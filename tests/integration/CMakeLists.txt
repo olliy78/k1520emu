@@ -265,6 +265,10 @@ k1520_add_test(a5120_ausfuehrungen SRC test_a5120_ausfuehrungen.cpp
 # dazu CP/A bis A> auf K7023 + 4× K3525 mit der K7637.
 k1520_add_test(a5120_optionen SRC test_a5120_optionen.cpp LIBS ${_libs}
                               LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 120)
+# K3521.30, akkugepuffertes 4-KB-RAM (Entwurf 33 N10b): Adresswahl, /MEMDI, Inhalt ueber RESET/Netz-Aus,
+# Ablage ueber zwei Maschineninstanzen, Konfigurationstext.
+k1520_add_test(k3521_maschine SRC test_k3521.cpp LIBS ${_libs} k1520_fs
+                              LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 240)
 # Bildschirm = Beide (Entwurf 33 N2): K7024 + K7023 am Bus, Umschalter fuer Bild und Bruecke
 # 0AH Bit 6, Zwischenstand v9, CP/A bis A> in beiden Schalterstellungen.
 k1520_add_test(a5120_bildschirm SRC test_a5120_bildschirm.cpp LIBS ${_libs}

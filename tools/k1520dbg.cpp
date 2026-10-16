@@ -33,6 +33,8 @@
  * `--ram k3526|k3525_1|k3525_2|k3525_4`, `--bildschirm k7024|k7023|beide`, `--schalter k7024|k7023`
  * (A5120, Entwurf 33 N4): Einzeloptionen; bei `beide` legt `screen select k7024|k7023` den
  * Bildschirm-Umschalter zur Laufzeit um.
+ * `--k3521 ADR|aus`, `--k3521-memdi bus|memdi1|memdi2`, `--k3521-datei PFAD` (A5120, N10b): akkugepuffertes
+ * 4-KB-RAM K3521.30 an einer 4-KB-Adresse (Hex), Inhalt dauerhaft in PFAD.
  * `--laderom v06|v09_1|v09_2` (A5120, AP A7): gestecktes Lade-ROM (Vorgabe v09_2 = zre.rom;
  * v06 startet BCU 880 „SYL auf Spur 1“, doc/a5120_alt/laderom.md).
  * `--tastatur k7636|k7637` (A5120, AP A7): Tastatur abweichend von der Ausfuehrung.
@@ -219,6 +221,9 @@ int main(int argc, char** argv){
     const char* ram_opt = nullptr;        // --ram k3526|k3525_1|k3525_2|k3525_4 (Entwurf 33 N4)
     const char* bildschirm_opt = nullptr; // --bildschirm k7024|k7023|beide
     const char* schalter_opt = nullptr;   // --schalter k7024|k7023: Anfangsstellung bei beide
+    const char* k3521_opt = nullptr;      // --k3521 ADR|aus: akkugepuffertes RAM (N10b)
+    const char* k3521_memdi_opt = nullptr; // --k3521-memdi bus|memdi1|memdi2
+    const char* k3521_datei_opt = nullptr; // --k3521-datei PFAD: Ablage des Inhalts
     const char* raf_opt = nullptr; // --raf none|raf128|raf512|raf2m: RAM-Floppy auf 88H/89H
     const char* wdc_opt = nullptr; // --wdc 4.2|4.0.05|3.4.05: WDC an der 16-Bit-PIO2 (P8000, P13d)
     const char* konsole_opt = nullptr; // --konsole kern|original: Terminal an tty1 (P8000, P20c)
@@ -253,6 +258,9 @@ int main(int argc, char** argv){
         else if (!strcmp(argv[i],"--ram") && i+1<argc) ram_opt=argv[++i];
         else if (!strcmp(argv[i],"--bildschirm") && i+1<argc) bildschirm_opt=argv[++i];
         else if (!strcmp(argv[i],"--schalter") && i+1<argc) schalter_opt=argv[++i];
+        else if (!strcmp(argv[i],"--k3521") && i+1<argc) k3521_opt=argv[++i];
+        else if (!strcmp(argv[i],"--k3521-memdi") && i+1<argc) k3521_memdi_opt=argv[++i];
+        else if (!strcmp(argv[i],"--k3521-datei") && i+1<argc) k3521_datei_opt=argv[++i];
         else if (!strcmp(argv[i],"--raf") && i+1<argc) raf_opt=argv[++i];
         else if (!strcmp(argv[i],"--wdc") && i+1<argc) wdc_opt=argv[++i];
         else if (!strcmp(argv[i],"--konsole") && i+1<argc) konsole_opt=argv[++i];
@@ -296,10 +304,10 @@ int main(int argc, char** argv){
         else if (e=="em064") mcfg.em = A5120Machine::Config::Em::em064;
         else if (e!="none"){ fprintf(stderr,"--em: unbekanntes Modul '%s' (none|em064|em256)\n",em_opt); return 2; }
     }
-    if (ausf_opt || lw_opt || laderom_opt || tastatur_opt || ram_opt || bildschirm_opt || schalter_opt){
-        if (art!=dbgm::Art::A5120){ fprintf(stderr,"--ausfuehrung/--laufwerke gibt es nur am A5120 (ebenso --laderom/--tastatur/--ram/--bildschirm/--schalter)\n"); return 2; }
+    if (ausf_opt || lw_opt || laderom_opt || tastatur_opt || ram_opt || bildschirm_opt || schalter_opt || k3521_opt || k3521_memdi_opt || k3521_datei_opt){
+        if (art!=dbgm::Art::A5120){ fprintf(stderr,"--ausfuehrung/--laufwerke gibt es nur am A5120 (ebenso --laderom/--tastatur/--ram/--bildschirm/--schalter/--k3521*)\n"); return 2; }
         std::string err;
-        if (!dbgm::parseAusfuehrung(ausf_opt, lw_opt, mcfg, err, laderom_opt, tastatur_opt, ram_opt, bildschirm_opt, schalter_opt)){ fprintf(stderr,"%s\n",err.c_str()); return 2; }
+        if (!dbgm::parseAusfuehrung(ausf_opt, lw_opt, mcfg, err, laderom_opt, tastatur_opt, ram_opt, bildschirm_opt, schalter_opt, k3521_opt, k3521_memdi_opt, k3521_datei_opt)){ fprintf(stderr,"%s\n",err.c_str()); return 2; }
     }
     // P8000-WDC (P13d): --wdc/--hd nur mit p8000-16.  Die Platte wird wie die Disketten im
     // Vorgabemodus als Kopie gemountet (COW: Temp-Datei, am Ende geloescht), mit --rw direkt.

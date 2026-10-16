@@ -366,6 +366,11 @@ if(BUILD_K1520)
     target_link_libraries(k1520_raf PUBLIC k1520_bus k1520_logger)
     target_include_directories(k1520_raf PUBLIC ${CMAKE_SOURCE_DIR})
 
+    # K3521.30 – akkugepuffertes 4-KB-RAM (Entwurf 33 N10b)
+    add_library(k1520_k3521 STATIC core/cards/k3521/k3521.cpp)
+    target_link_libraries(k1520_k3521 PUBLIC k1520_bus)
+    target_include_directories(k1520_k3521 PUBLIC ${CMAKE_SOURCE_DIR})
+
     # A5120 machine (wires all cards + Z80 CPU)
     add_library(k1520_a5120 STATIC
         core/machines/a5120/a5120.cpp
@@ -373,7 +378,7 @@ if(BUILD_K1520)
     target_link_libraries(k1520_a5120 PUBLIC
         k1520_z80
         k1520_k2526 k1520_k3526 k1520_k7024 k1520_k8025 k1520_k5122 k1520_laufwerke k1520_em k1520_raf k1520_k6022 k1520_k5020
-        k1520_k3525 k1520_k7023 k1520_k7636
+        k1520_k3525 k1520_k3521 k1520_k7023 k1520_k7636
         k1520_k7637 k1520_floppy k1520_floppy2 k1520_geometry k1520_bus k1520_logger k1520_serial
     )
     target_include_directories(k1520_a5120 PUBLIC ${CMAKE_SOURCE_DIR})
