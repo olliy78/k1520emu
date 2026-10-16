@@ -30,6 +30,9 @@
  * `--raf raf128|raf512|raf2m` steckt eine RAM-Floppy (alle Maschinen); Befehl `raf`.
  * `--ausfuehrung neu|alt|kmbg` / `--laufwerke P0,P1,…` (A5120, AP A6): altes Geraet mit
  * K7023 64×16 + K7636; Bildschirmbefehle lesen dann die K7023 (tools/dbg_machine.h).
+ * `--ram k3526|k3525_1|k3525_2|k3525_4`, `--bildschirm k7024|k7023|beide`, `--schalter k7024|k7023`
+ * (A5120, Entwurf 33 N4): Einzeloptionen; bei `beide` legt `screen select k7024|k7023` den
+ * Bildschirm-Umschalter zur Laufzeit um.
  * `--laderom v06|v09_1|v09_2` (A5120, AP A7): gestecktes Lade-ROM (Vorgabe v09_2 = zre.rom;
  * v06 startet BCU 880 „SYL auf Spur 1“, doc/a5120_alt/laderom.md).
  * `--tastatur k7636|k7637` (A5120, AP A7): Tastatur abweichend von der Ausfuehrung.
@@ -213,6 +216,9 @@ int main(int argc, char** argv){
     const char* laderom_opt = nullptr; // --laderom v06|v09_1|v09_2: Lade-ROM der K2526 (AP A7)
     const char* format_opt = nullptr;  // --format NAME: Katalogformat fuer .img (zuerst versucht)
     const char* tastatur_opt = nullptr; // --tastatur k7636|k7637: Tastatur (A5120, AP A7)
+    const char* ram_opt = nullptr;        // --ram k3526|k3525_1|k3525_2|k3525_4 (Entwurf 33 N4)
+    const char* bildschirm_opt = nullptr; // --bildschirm k7024|k7023|beide
+    const char* schalter_opt = nullptr;   // --schalter k7024|k7023: Anfangsstellung bei beide
     const char* raf_opt = nullptr; // --raf none|raf128|raf512|raf2m: RAM-Floppy auf 88H/89H
     const char* wdc_opt = nullptr; // --wdc 4.2|4.0.05|3.4.05: WDC an der 16-Bit-PIO2 (P8000, P13d)
     const char* konsole_opt = nullptr; // --konsole kern|original: Terminal an tty1 (P8000, P20c)
@@ -244,6 +250,9 @@ int main(int argc, char** argv){
         else if (!strcmp(argv[i],"--laderom") && i+1<argc) laderom_opt=argv[++i];
         else if (!strcmp(argv[i],"--format") && i+1<argc) format_opt=argv[++i];
         else if (!strcmp(argv[i],"--tastatur") && i+1<argc) tastatur_opt=argv[++i];
+        else if (!strcmp(argv[i],"--ram") && i+1<argc) ram_opt=argv[++i];
+        else if (!strcmp(argv[i],"--bildschirm") && i+1<argc) bildschirm_opt=argv[++i];
+        else if (!strcmp(argv[i],"--schalter") && i+1<argc) schalter_opt=argv[++i];
         else if (!strcmp(argv[i],"--raf") && i+1<argc) raf_opt=argv[++i];
         else if (!strcmp(argv[i],"--wdc") && i+1<argc) wdc_opt=argv[++i];
         else if (!strcmp(argv[i],"--konsole") && i+1<argc) konsole_opt=argv[++i];
@@ -287,10 +296,10 @@ int main(int argc, char** argv){
         else if (e=="em064") mcfg.em = A5120Machine::Config::Em::em064;
         else if (e!="none"){ fprintf(stderr,"--em: unbekanntes Modul '%s' (none|em064|em256)\n",em_opt); return 2; }
     }
-    if (ausf_opt || lw_opt || laderom_opt || tastatur_opt){
-        if (art!=dbgm::Art::A5120){ fprintf(stderr,"--ausfuehrung/--laufwerke gibt es nur am A5120 (ebenso --laderom/--tastatur)\n"); return 2; }
+    if (ausf_opt || lw_opt || laderom_opt || tastatur_opt || ram_opt || bildschirm_opt || schalter_opt){
+        if (art!=dbgm::Art::A5120){ fprintf(stderr,"--ausfuehrung/--laufwerke gibt es nur am A5120 (ebenso --laderom/--tastatur/--ram/--bildschirm/--schalter)\n"); return 2; }
         std::string err;
-        if (!dbgm::parseAusfuehrung(ausf_opt, lw_opt, mcfg, err, laderom_opt, tastatur_opt)){ fprintf(stderr,"%s\n",err.c_str()); return 2; }
+        if (!dbgm::parseAusfuehrung(ausf_opt, lw_opt, mcfg, err, laderom_opt, tastatur_opt, ram_opt, bildschirm_opt, schalter_opt)){ fprintf(stderr,"%s\n",err.c_str()); return 2; }
     }
     // P8000-WDC (P13d): --wdc/--hd nur mit p8000-16.  Die Platte wird wie die Disketten im
     // Vorgabemodus als Kopie gemountet (COW: Temp-Datei, am Ende geloescht), mit --rw direkt.
@@ -3228,6 +3237,7 @@ int main(int argc, char** argv){
               "                    @auto = Ladeversatz aus den Objektbytes im RAM bestimmen\n"
               "                    @labels/@noanchor (nur .MAC): Mxxxx-Adressanker erzwingen/abschalten\n"
               "          keys <text> (\\r \\t \\e \\s \\xNN) ; screen [find \"txt\"] ; reset ; q\n"
+              "          screen select k7024|k7023   Bildschirm-Umschalter (A5120 mit --bildschirm beide)\n"
               "          console [tempo]  Maschine LIVE bedienen (Ctrl-] zurueck; Haltepunkte bleiben scharf)\n"
               "          gscreen \"txt\"|/re/ [maxcyc]   run until screen shows txt (deterministic menus)\n"
               "          bscreen \"txt\"|/re/ | off      arm: any g/gu/n stops on screen match\n"
@@ -3696,6 +3706,17 @@ int main(int argc, char** argv){
                 int r=-1,c=-1;
                 if(screenFind(pat,&r,&c)) fprintf(stderr,"  found at row %d col %d\n",r,c);
                 else fprintf(stderr,"  not found\n"); }
+            else if (t.size()>=2 && t[1]=="select"){   // Entwurf 33 N4: Umschalter K7024/K7023
+                A5120Machine* a5 = m.a5120();
+                if (!a5) fprintf(stderr,"  screen select: nur am A5120\n");
+                else if (a5->bildschirm()!=A5120Machine::Config::Bildschirm::Beide)
+                    fprintf(stderr,"  screen select: kein Umschalter (Bildschirm ist %s; --bildschirm beide)\n",
+                            a5->zeigtK7023() ? "K7023" : "K7024");
+                else if (t.size()<3 || (t[2]!="k7024" && t[2]!="k7023"))
+                    fprintf(stderr,"  screen select k7024|k7023   (angezeigt: %s)\n", a5->zeigtK7023() ? "k7023" : "k7024");
+                else { a5->setBildschirmSchalter(t[2]=="k7023" ? A5120Machine::Config::Bildschirm::K7023
+                                                               : A5120Machine::Config::Bildschirm::K7024);
+                    fprintf(stderr,"  Bildschirm: %s (%dx%d)\n", t[2].c_str(), m.screenCols(), m.screenRows()); } }
             else screen(); }
         // #1 screen-conditioned run / breakpoint (deterministic menu navigation)
         else if (cmd=="gscreen"){

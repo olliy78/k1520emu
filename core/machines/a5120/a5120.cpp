@@ -42,12 +42,14 @@ static std::array<DriveProfile, 4> profilesFromConfig(const A5120Machine::Config
              builtinDriveProfile(cfg.drive_profiles[3]) };
 }
 
-// K2526-Bruecken je Ausfuehrung: die fruehen Geraete haben die Wickelbruecke Port 0AH Bit 6
-// (BS-PIO B6 = config_bridges Bit 1) gesetzt — CP/A 25.09.89 waehlt damit BAB1 (K7023,
-// 16×64 ab FC00H) statt BAB2 (doc/design/30 §3.1, doc/a5120_alt/k7023.md).  `Neu`: 00H wie bisher.
+// K2526-Bruecken aus der Bildschirmkarte (Entwurf 33 N1, §3.5): nur Port 0AH Bit 6
+// (BS-PIO B6 = config_bridges Bit 1) ist massgeblich — gesetzt = BAB1 (K7023, 16×64 ab FC00H),
+// offen = BAB2 (K7024).  CP/A 25.09.89 waehlt danach beim Kaltstart (doc/a5120_alt/k7023.md).
+// Bit 5/7 bleiben unveraendert, K7024 allein = 00H wie bisher (bitgleich).  Bei `Beide`
+// liefert der Umschalter die Bruecke zur Laufzeit (K2526::setBrueckenQuelle, Konstruktor).
 static K2526::A5120Config zreKonfig(const A5120Machine::Config& cfg) {
     K2526::A5120Config z;
-    if (cfg.ausfuehrung != A5120Machine::Config::Ausfuehrung::Neu)
+    if (cfg.bildschirm == A5120Machine::Config::Bildschirm::K7023)
         z.config_bridges = 0x02;
     z.laderom = cfg.laderom;   // AP A7: Lade-ROM-Fassung (Vorgabe V0.9_2 = zre.rom)
     return z;
@@ -67,30 +69,43 @@ A5120Machine::A5120Machine(const Config& cfg)
     // Laufwerksverwaltung + Formatkatalog (wirft, wenn data/formats.yaml fehlt).
     , lw_(afs_, profilesFromConfig(cfg))
 {
-    using A = Config::Ausfuehrung;
-    ausf_ = cfg.ausfuehrung;
-    if (ausf_ == A::Acht)
+    using R = Config::Ram;
+    using B = Config::Bildschirm;
+    ausf_       = cfg.ausfuehrung;   // nur Huelle (C-ABI-Abfrage); entschieden wird unten
+    ram_        = cfg.ram;
+    bildschirm_ = cfg.bildschirm;
+    if (ausf_ == Config::Ausfuehrung::Acht)
         throw std::invalid_argument("A5120 8 Zoll (K5602) ist noch nicht umgesetzt");
-    if (ausf_ != A::Neu && cfg.em != Config::Em::none)
-        throw std::invalid_argument("Ein Erweiterungsmodul gibt es nur am A5120 \u201e5\u00bc\u2033 neu\u201c");
-    if (ausf_ != A::Neu) {
-        // Kartenreihe „5¼″ alt“ (Entwurf 30 §1): vier K3525 zu je 16 KB, K7023.01 bei FC00H,
-        // K7636 an Stecker X1 der K2526 (vor powerOn anschliessen, sie wird dort eingeschaltet).
-        for (int i = 0; i < 4; ++i) {
-            K3525::Config rc;
-            rc.base_addr = static_cast<uint16_t>(i * K3525::kGroesse);
-            k3525_[i] = std::make_unique<K3525>(rc);
-        }
+    if (bildschirm_ == B::Beide) {
+        if (cfg.bildschirm_schalter == B::Beide)
+            throw std::invalid_argument("Umschalter K7024/K7023: Stellung muss K7024 oder K7023 sein");
+        schalter_.store(cfg.bildschirm_schalter == B::K7023 ? kSchalterK7023 : kSchalterK7024);
+        // Wickelbruecke B6 folgt dem Schalter (Modellentscheidung §3.3/§3.5): bei jedem IN 0AH.
+        zre_.setBrueckenQuelle([this]() -> uint8_t {
+            return schalter_.load(std::memory_order_relaxed) == kSchalterK7023 ? 0x02 : 0x00;
+        });
+    }
+    if (cfg.em != Config::Em::none && ram_ != R::K3526)
+        throw std::invalid_argument("Ein Erweiterungsmodul braucht die K3526 (64 KB) als RAM");
+
+    // RAM (Entwurf 33 §3a Regel 4): K3525-Karten ab 0000H im 4000H-Raster, sonst die K3526.
+    const int k3525_anzahl = ram_ == R::K3525_1x ? 1 : ram_ == R::K3525_2x ? 2
+                           : ram_ == R::K3525_4x ? 4 : 0;
+    for (int i = 0; i < k3525_anzahl; ++i) {
+        K3525::Config rc;
+        rc.base_addr = static_cast<uint16_t>(i * K3525::kGroesse);
+        k3525_[i] = std::make_unique<K3525>(rc);
+    }
+    // Bildschirm: K7023.01 bei FC00H statt der K7024 (die bleibt als Objekt, ungesteckt),
+    // bei `Beide` zusaetzlich zur K7024.
+    if (bildschirm_ == B::K7023 || bildschirm_ == B::Beide) {
         K7023::Config vc;
         vc.variante_01 = true;
         k7023_ = std::make_unique<K7023>(bus_, vc);
     }
-    // Tastatur (AP A7): Vorgabe der Ausfuehrung, am `Neu` wahlweise die K7636 (BCU 880 V1.2:
-    // K7024 + K7636).  Ohne K7636 bleibt die K7637 an der K8025 wie bisher (bitgleich).
-    using T = Config::Tastatur;
-    if (ausf_ != A::Neu && cfg.tastatur == T::K7637)
-        throw std::invalid_argument("K7637 gibt es nur am A5120 „5¼″ neu“");
-    if (ausf_ != A::Neu || cfg.tastatur == T::K7636) {
+    // Tastatur (Regel 5): K7636 am U-Bus der K2526 (vor powerOn anschliessen, sie wird dort
+    // eingeschaltet), sonst die K7637 an der K8025 (Vorgabe, bitgleich).  Frei kombinierbar.
+    if (cfg.tastatur == Config::Tastatur::K7636) {
         k7636_ = std::make_unique<K7636>();
         zre_.setUBusGeraet(k7636_.get());
     }
@@ -107,24 +122,39 @@ A5120Machine::A5120Machine(const Config& cfg)
     // Verdrahtung mit dem Bus erfolgt im K2526-Konstruktor.
     wireBackplane();
 
-    // KMBG: die Kassettenkarte K5020 ist fest eingebaut (30H–37H, zwei K5200).
-    if (ausf_ == A::Kmbg && !installK5020())
-        throw std::runtime_error("K5020 der KMBG-Ausfuehrung: " + k5020Fehler());
+    // Kassette (Option): die K5020 fest gesteckt (30H–37H, zwei K5200).  Ein spaeteres
+    // installK5020() lehnt dann wegen „bereits gesteckt“ ab — kein doppeltes Stecken.
+    if (cfg.kassette && !installK5020())
+        throw std::runtime_error("K5020 (Kassette): " + k5020Fehler());
 }
 
 void A5120Machine::wireBackplane() {
     // Register all cards on K1520 bus in slot order
-    if (k7023_) {
-        // Fruehe Ausfuehrung: RAM = 4× K3525, darueber der Bildspeicher der K7023 (FC00H);
-        // das Lade-ROM der K2526 kommt wie sonst danach (doc/design/32 §3, A1/A2).
-        for (auto& k : k3525_) k->attachToBus(bus_);
+    // Reihenfolge (K1520Bus::registerMem: Lesen = zuletzt registrierte Karte, Schreiben an
+    // alle): zuerst das RAM, darueber der Bildspeicher, danach das Lade-ROM der K2526
+    // (doc/design/32 §3, A1/A2; doc/merkposten/a5120_alt.md Nr. 2/4).
+    // Slot 1: OPS — K3526 (64 KB) oder K3525-Karten (je 16 KB), niedrigste Prioritaet.
+    if (ram_ == Config::Ram::K3526)
+        ops_.attachToBus(bus_);
+    else
+        for (auto& k : k3525_) if (k) k->attachToBus(bus_);
+
+    // Slot 5: ABS — K7024 (VRAM F800H-FFFFH) oder K7023 (FC00H-FFFFH), ueberdeckt das RAM.
+    if (bildschirm_ == Config::Bildschirm::Beide) {
+        // Beide Karten (Entwurf 33 §3.2): ihre Konstruktoren haben sich schon VOR dem RAM
+        // angemeldet — abmelden und in der Reihenfolge K7024, K7023 neu anmelden.  Folge der
+        // Bus-Regel (Lesen = zuletzt registriert, Schreiben an alle): FC00–FFFFH liest die
+        // K7023, F800–FBFFH die K7024, jeder Schreibzugriff trifft beide (Waechter
+        // A5120Bildschirm.Ueberlappung*).  Nur je EINE Anmeldung, damit die Seitentabelle des
+        // Busses gueltig bleibt (hoechstens kMaxWriteFanout Schreiber je Seite).
+        bus_.unregisterMem(&screen_);
+        bus_.unregisterMem(k7023_.get());
+        screen_.attachToBus(bus_);
+        k7023_->attachToBus(bus_);
+    } else if (k7023_) {
         k7023_->attachToBus(bus_);
     } else {
-    // Slot 1: OPS (K3526) — full 64KB RAM, registered first (lowest priority)
-    ops_.attachToBus(bus_);
-
-    // Slot 5: ABS (K7024) — VRAM F800H-FFFFH, overlays OPS
-    screen_.attachToBus(bus_);
+        screen_.attachToBus(bus_);
     }
 
     // Slot 4: ZRE (K2526) — I/O ports 00H-0FH, boot ROM 0000H-03FFH
@@ -192,8 +222,8 @@ void A5120Machine::wireBackplane() {
             ass_.ctcA34().clkTrg(i, lvl);
     });
 
-    // Connect keyboard to K8025 SIO A32, Channel A — nur am `Neu`; die fruehen Geraete
-    // haben die parallele K7636 an der K2526 und keine K7637.
+    // K7637 an der K8025 SIO A32, Kanal A — immer, wenn keine K7636 am U-Bus steckt,
+    // unabhaengig von RAM und Bildschirm (Entwurf 33 §3a Regel 5).
     if (!k7636_) kbd_.connect(ass_.sioA32(), 0);
 
     // Schnittstellen nach aussen (Entwurf 19 §3.1, AP-S5).  Taktquelle der Bruecken W1:7
@@ -374,11 +404,13 @@ static void loadZ80(Z80& z, const A5120Machine::MachineSnapshot::Z80Regs& r) {
 }
 
 void A5120Machine::captureState(MachineSnapshot& s, bool raf_inhalt) const {
-    if (k7023_) {
-        for (const auto& k : k3525_)
-            std::memcpy(s.ram.data() + k->config().base_addr, k->rawPtr(), K3525::kGroesse);
-    } else {
+    if (ram_ == Config::Ram::K3526) {
         std::memcpy(s.ram.data(), ops_.rawPtr(), s.ram.size());
+    } else {
+        // K3525: nur die gesteckten Karten; unbelegte Bereiche wie der offene Bus (FFH).
+        s.ram.fill(0xFF);
+        for (const auto& k : k3525_)
+            if (k) std::memcpy(s.ram.data() + k->config().base_addr, k->rawPtr(), K3525::kGroesse);
     }
     saveZ80(zre_.cpu(),  s.zve1);
     saveZ80(zre_.zve2(), s.zve2);
@@ -408,11 +440,15 @@ void A5120Machine::captureState(MachineSnapshot& s, bool raf_inhalt) const {
     // (DRAM, Attributspeicher, PIO, Register, U8001 mit Ablaufzustand).
     s.device_state.push_back(em_ ? 1 : 0);
     if (em_) em_->serialize(s.device_state);
-    // Fruehe Ausfuehrung: Kennbyte 1 + Bildspeicher der K7023 (die K7636 ist nicht im Stand).
-    // Am `Neu` fehlt das Byte ganz — dessen Stand bleibt bitgleich.
+    // Bildschirm::K7023: Kennbyte 1 + Bildspeicher der K7023 (die K7636 ist nicht im Stand).
+    // v9, Bildschirm::Beide: Kennbyte 2 + Bildspeicher der K7023 + Schalterstellung (0 = K7024,
+    // 1 = K7023); der Bildspeicher der K7024 steht schon oben.  Mit der K7024 allein fehlt das
+    // Byte ganz — dieser Stand bleibt bitgleich.
     if (k7023_) {
-        s.device_state.push_back(1);
+        const bool beide = bildschirm_ == Config::Bildschirm::Beide;
+        s.device_state.push_back(beide ? 2 : 1);
         k7023_->serialize(s.device_state);
+        if (beide) s.device_state.push_back(schalter_.load(std::memory_order_relaxed));
     }
     // v8: RAF — eigenes Feld, s. MachineSnapshot::raf_state.
     s.raf_state.assign(1, raf_ ? 1 : 0);
@@ -462,10 +498,10 @@ bool A5120Machine::restoreState(const MachineSnapshot& s) {
         LOG_WARN("A5120", "Zustand abgelehnt: %s", state_error_.c_str());
         return false;
     }
-    if (k7023_) {
-        for (auto& k : k3525_) k->restore(s.ram.data() + k->config().base_addr);
-    } else {
+    if (ram_ == Config::Ram::K3526) {
         ops_.restore(s.ram.data());
+    } else {
+        for (auto& k : k3525_) if (k) k->restore(s.ram.data() + k->config().base_addr);
     }
     loadZ80(zre_.cpu(),  s.zve1);
     loadZ80(zre_.zve2(), s.zve2);
@@ -497,9 +533,18 @@ bool A5120Machine::restoreState(const MachineSnapshot& s) {
             const uint8_t mit_em = *p++;
             if (mit_em && em_) em_->deserialize(p, end);
         }
-        if (p < end && *p == 1 && k7023_) {
-            ++p;
+        // K7023 (Kennbyte 1) bzw. beide Karten mit Umschalter (Kennbyte 2, v9).  Ein Stand
+        // der anderen Bestueckung uebernimmt nur, was die Maschine hat; ohne K7023 entfaellt
+        // der Block (wie bisher), die Schalterstellung gilt nur bei `Beide`.
+        if (p < end && (*p == 1 || *p == 2) && k7023_) {
+            const bool mit_schalter = *p++ == 2;
             k7023_->deserialize(p, end);
+            if (mit_schalter && p < end) {
+                const uint8_t st = *p++;
+                if (bildschirm_ == Config::Bildschirm::Beide)
+                    setBildschirmSchalter(st == kSchalterK7023 ? Config::Bildschirm::K7023
+                                                               : Config::Bildschirm::K7024);
+            }
         }
     }
     return true;
@@ -526,9 +571,13 @@ bool A5120Machine::restoreState(const MachineSnapshot& s) {
 //       HINTER dem Geraeteteil (MachineSnapshot::raf_state, immer mit Inhalt).  Ein
 //       v7-Stand laedt ohne RAF-Angabe (die RAF bleibt); ein Stand mit RAF in eine
 //       Maschine ohne bzw. mit anderer RAF wird abgelehnt (stateError()).
+//   9 = Bildschirm::Beide (Entwurf 33 N2): am Ende des Geraeteteils Kennbyte 2 + K7023-
+//       Bildspeicher + Schalterstellung (Kennbyte 1 = K7023 allein wie bisher).  Fuer
+//       K7024 allein bzw. K7023 allein ist der Inhalt gleich v8; ein v8-Stand laedt
+//       unveraendert (doc/merkposten/a5130_k8924.md Nr. 2).
 namespace {
 const char    kStateMagicPrefix[7] = {'K','1','5','2','0','S','S'};
-constexpr uint8_t kStateVersion    = 8;
+constexpr uint8_t kStateVersion    = 9;
 }
 
 uint8_t A5120Machine::keyboardLeds() const {
@@ -869,7 +918,7 @@ int A5120Machine::run(int max_cycles) {
         // which floods the keyboard buffer and drops real keystrokes at the CCP.
         // Tastatur-Service kann ein Empfangsbyte an den SIO zustellen (irq_rx) oder
         // ein Kommando verarbeiten (irq_tx) — beides aendert den Interruptzustand.
-        // Fruehe Ausfuehrung: die K7636 am U-Bus (abgefragt, kein Interrupt).
+        // Tastatur::K7636: die K7636 am U-Bus (abgefragt, kein Interrupt).
         if (k7636_) k7636_->service(total_cycles_);
         else if (kbd_.service(total_cycles_)) bus_.markIntDirty();
 
@@ -935,7 +984,31 @@ void A5120Machine::keyRelease(uint32_t kc) {
 }
 
 const uint8_t* A5120Machine::framebuffer() const {
-    return k7023_ ? k7023_->getFramebuffer() : screen_.getFramebuffer();
+    return zeigtK7023() ? k7023_->getFramebuffer() : screen_.getFramebuffer();
+}
+
+void A5120Machine::setBildschirmSchalter(Config::Bildschirm s) {
+    if (bildschirm_ != Config::Bildschirm::Beide)
+        throw std::logic_error("Umschalter K7024/K7023 gibt es nur mit beiden Bildschirmkarten");
+    if (s == Config::Bildschirm::Beide)
+        throw std::invalid_argument("Umschalter K7024/K7023: Stellung muss K7024 oder K7023 sein");
+    const uint8_t neu = s == Config::Bildschirm::K7023 ? kSchalterK7023 : kSchalterK7024;
+    if (schalter_.exchange(neu) != neu)
+        bild_gewechselt_.store(true, std::memory_order_relaxed);   // anderes Bild → neu zeichnen
+}
+
+A5120Machine::Config::Bildschirm A5120Machine::bildschirmSchalter() const {
+    if (bildschirm_ != Config::Bildschirm::Beide) return bildschirm_;
+    return schalter_.load(std::memory_order_relaxed) == kSchalterK7023
+         ? Config::Bildschirm::K7023 : Config::Bildschirm::K7024;
+}
+
+bool A5120Machine::consolePoll(int& x, int& y, char& ch) {
+    if (bildschirm_ == Config::Bildschirm::K7023) return false;
+    if (!zeigtK7023()) return screen_.pollTextChange(x, y, ch);
+    // Beide, K7023 angezeigt: die Aenderungen der K7024 verwerfen, damit die Schlange nicht waechst.
+    while (screen_.pollTextChange(x, y, ch)) {}
+    return false;
 }
 
 void A5120Machine::setDFUECallback(SerialCb cb) {

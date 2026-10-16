@@ -76,6 +76,12 @@ class Programmprofil:
     #: ``Modelle`` = die Modellschluessel, an denen die Wahl wirkt; sonst ist das Feld
     #: ausgegraut (PC 1715W: der Zeichensatz kommt von Diskette).  ``()`` = alle.
     hardware: Tuple[Tuple[str, str, str, Tuple[Tuple[str, str], ...], Tuple[str, ...]], ...] = ()
+    #: Modelle als VORGABEN (A5120/A5130/K8924, Entwurf 33 §3a): ``(Schluessel, ((Option, Wert), …))``
+    #: mit den Optionen ``ram``, ``bildschirm``, ``tastatur``, ``laderom``, ``erweiterungsmodul``,
+    #: ``kassette`` und ``laufwerke`` (Tupel der Steckplaetze).  Die Modellwahl UEBERNIMMT diese
+    #: Werte; danach ist jede Option einzeln aenderbar.  Leer = Modelle sind Maschinen (alle anderen
+    #: Programme).  Optionen mit Auswahlfeld stehen zusaetzlich in :attr:`hardware`.
+    modell_vorgaben: Tuple[Tuple[str, Tuple[Tuple[str, object], ...]], ...] = ()
     #: Terminal-Maschine (P8000): statt der Bildroehre ein Textbildschirm je Kern-Terminal
     #: (`app/ui/p8000_terminal.py`), Funktionstastenleiste statt Bildschirmtastatur.
     terminal: bool = False
@@ -162,8 +168,30 @@ class Programmprofil:
         z = self._modell_zeile(modell)
         return z[1] if z else self.maschine
 
-    def modell_em(self, modell) -> Optional[str]:
-        """``em=``-Parameter des Kerns (``None`` = ohne Erweiterungsmodul)."""
+    def modell_vorgabe(self, modell) -> dict:
+        """Vorgaben des Modells (leer ohne :attr:`modell_vorgaben`): Optionen -> Wert,
+        ``laufwerke`` als Liste der Kernprofile."""
+        schluessel = self.modell_normalisieren(modell)
+        for k, paare in self.modell_vorgaben:
+            if k == schluessel:
+                aus = dict(paare)
+                if "laufwerke" in aus:
+                    aus["laufwerke"] = list(aus["laufwerke"])
+                return aus
+        return {}
+
+    def modell_em(self, modell, hardware=None) -> Optional[str]:
+        """``em=``-Parameter des Kerns (``None`` = ohne Erweiterungsmodul).
+
+        Mit :attr:`modell_vorgaben` ist das Erweiterungsmodul eine OPTION: wirksam nur am
+        A5120 und nur mit der K3526 (64 KB) — sonst ``None``, auch wenn das Feld etwas anderes
+        zeigt (es ist dann ausgegraut, :meth:`hardware_wirkt`)."""
+        if self.modell_vorgaben:
+            hw = self.hardware_normalisieren(hardware or {}, modell)
+            em = hw.get("erweiterungsmodul", "none")
+            if em == "none" or not self.hardware_wirkt("erweiterungsmodul", modell, hw):
+                return None
+            return em
         z = self._modell_zeile(modell)
         return z[2] if z else None
 
@@ -175,15 +203,20 @@ class Programmprofil:
                 return hz, text
         return self.nenntakt_hz, self.nenntakt_text
 
-    def hardware_standard(self) -> dict:
-        """Vorgabe jeder Hardwarevariante (``{}`` ohne :attr:`hardware`)."""
-        return {k: werte[0][0] for k, _b, _t, werte, _m in self.hardware}
+    def hardware_standard(self, modell=None) -> dict:
+        """Vorgabe jeder Hardwarevariante (``{}`` ohne :attr:`hardware`).  Mit
+        :attr:`modell_vorgaben` die des Modells *modell* (ohne Angabe: des Standardmodells),
+        sonst der erste Wert jeder Auswahl."""
+        vorgabe = self.modell_vorgabe(modell or self.standard_modell())
+        return {k: str(vorgabe.get(k, werte[0][0]))
+                for k, _b, _t, werte, _m in self.hardware}
 
-    def hardware_normalisieren(self, daten) -> dict:
+    def hardware_normalisieren(self, daten, modell=None) -> dict:
         """Hardwarewahl aus einem Konfigurationsabschnitt: fehlende oder unbekannte
-        Werte werden zur Vorgabe (ältere Konfigurationen)."""
+        Werte werden zur Vorgabe (ältere Konfigurationen) — mit :attr:`modell_vorgaben`
+        zur Vorgabe des Modells *modell*.  Jede Option wird einzeln geprüft."""
         daten = daten if isinstance(daten, dict) else {}
-        aus = self.hardware_standard()
+        aus = self.hardware_standard(modell)
         for k, _b, _t, werte, _m in self.hardware:
             v = str(daten.get(k, "")).strip().lower()
             for w, _a in werte:        # Gross-/Kleinschreibung egal ("1M@0"), Wert wie im Profil
@@ -194,22 +227,35 @@ class Programmprofil:
                 aus[k] = _p8000_ram.normalisieren(daten.get(k))
         return aus
 
-    def hardware_wirkt(self, schluessel: str, modell) -> bool:
-        """Wirkt die Wahl *schluessel* am Modell?  (Sonst im Feld ausgegraut.)"""
+    def hardware_wirkt(self, schluessel: str, modell, hardware=None) -> bool:
+        """Wirkt die Wahl *schluessel* am Modell?  (Sonst im Feld ausgegraut.)
+
+        Das Erweiterungsmodul (A5120.16, Entwurf 33 §3a) wirkt nur am A5120 UND nur mit der
+        K3526 als RAM; *hardware* ist die aktuelle Wahl (fehlt sie: Vorgabe des Modells)."""
         for k, _b, _t, _w, modelle in self.hardware:
             if k == schluessel:
-                return not modelle or self.modell_normalisieren(modell) in modelle
+                if modelle and self.modell_normalisieren(modell) not in modelle:
+                    return False
+                if k == "erweiterungsmodul" and self.modell_vorgaben:
+                    hw = hardware if hardware is not None else self.hardware_standard(modell)
+                    return hw.get("ram") == "k3526"
+                return True
         return False
 
     def tastatur_bauart(self, modell, hardware=None) -> str:
         """Bauart der Bildschirmtastatur: :meth:`modell_tastatur`, beim PC 1715 mit dem
         QWERTZ-ROM ``"pc1715-tast618"``."""
+        if self.modell_vorgaben:
+            # A5120/A5130/K8924 (Entwurf 33 N7): die Bauart folgt der OPTION ``tastatur``
+            # (k7636 | k7637), nicht dem Modell; die Modellzeile traegt nur die Vorgabe.
+            hw = self.hardware_normalisieren(hardware or {}, modell)
+            return hw["tastatur"]
         art = self.modell_tastatur(modell)
         if art == "pc1715" and (hardware or {}).get("tastatur") == "tast618":
             return "pc1715-tast618"
         return art
 
-    def kern_parameter(self, modell, hardware=None) -> dict:
+    def kern_parameter(self, modell, hardware=None, schalter=None) -> dict:
         """Zusatzargumente für ``K1520Emulator(…)`` aus Modell und Hardwarewahl.
 
         Ohne :attr:`modell_kern` (alle Maschinen außer dem P8000) sind es die
@@ -218,7 +264,22 @@ class Programmprofil:
         ``k1520_create_p8000`` (Entwurf 25 §10.9): das Modell setzt ``karte16``/``wdc``,
         die Hardwarewahl ROM-Fassungen, Platinenindex und DRAM.
         """
-        hardware = self.hardware_normalisieren(hardware or {})
+        hardware = self.hardware_normalisieren(hardware or {}, modell)
+        if self.modell_vorgaben:
+            # A5120/A5130/K8924: alles als Einzeloptionen in EIN Woerterbuch ``konfig`` (Entwurf 33
+            # N4: nicht mit ausfuehrung/tastatur/laderom/em/tape kombinierbar).  ``kassette``
+            # fuegt die Maschinenerzeugung aus dem Kaestchen dazu; ``bildschirm`` ist ein Auswahlfeld (N6).
+            konfig = {
+                "ram": hardware["ram"],
+                "bildschirm": hardware["bildschirm"],
+                "tastatur": hardware["tastatur"],
+                "laderom": hardware["laderom"],
+                "em": self.modell_em(modell, hardware) or "none",
+            }
+            # Anfangsstellung des Schiebeschalters: nur mit zwei Karten (sonst Fehler im Kern).
+            if hardware["bildschirm"] == "beide":
+                konfig["schalter"] = schalter if schalter in ("k7024", "k7023") else "k7024"
+            return {"konfig": konfig}
         if not self.modell_kern:
             aus = dict(hardware)
             schluessel = self.modell_normalisieren(modell)
@@ -313,6 +374,8 @@ class Programmprofil:
 
     def modell_titel(self, modell) -> str:
         """Fenstertitel des Modells: die eigenständige Terminaleinheit heißt „P8000 Terminal“."""
+        if self.modell_vorgaben:
+            return _modell.titel(self.modell_normalisieren(modell))
         if self.modell_art(modell) == "einheit":
             return "P8000 Terminal"
         return "P8000 Emulator" if self.modell_arten else self.titel
@@ -363,25 +426,39 @@ A5120 = Programmprofil(
     nenntakt_text="2,45 MHz",
     tastatur="k7637",
     modellwahl=True,
-    modelle=tuple((k, "a5120", em, label, "k7637") for k, em, label in _modell.MODELS) + (
-        # Fruehe Ausfuehrungen (Entwurf 30, AP A5): K7023.01 16×64, 4× K3525, Tastatur K7636.
-        (_modell.A5120_ALT, "a5120-alt", None, "A5120 (64×16, K7636)", "k7636"),
-        (_modell.A5120_KMBG, "a5120-kmbg", None, "A5120 Kassette", "k7636"),
-        # BCU 880 V1.2 von den Disketten „SYL auf Spur 1“ (doc/a5120_alt/bcu.md): Ausfuehrung
-        # „alt“ (K7023 64×16 = Satz 2), Lade-ROM V0.6 (liest Zylinder 1), Tastatur K7636.
-        (_modell.A5120_BCU, "a5120-alt", None, "A5120 BCU 880 (Lade-ROM V0.6)", "k7636"),
+    # Drei Rechner (Entwurf 33 §3a): A5120, A5130, K8924.  Ein Modell ist nur eine Sammlung von
+    # Vorgaben (`modell_vorgaben`); die Spalte „Tastatur“ ist die Bauart der Bildschirmtastatur
+    # (folgt der Tastaturoption erst mit N7).  Alte Schluessel (a5120.16, a5120-alt …) sind unbekannt.
+    modelle=tuple((k, "a5120", None, lbl, "k7637") for k, lbl, _t in _modell.MODELS),
+    modell_vorgaben=tuple((k, tuple(v.items())) for k, v in _modell.VORGABEN.items()),
+    # Optionen unter *Einstellungen ▸ Allgemein*.  Kaltstart noetig wie bei der Modellwahl.
+    # Die Kassette ist das vorhandene Kaestchen (`tape_wahl`).  Das Lade-ROM „K8924 V0.9a
+    # (handgepatcht)“ fehlt, bis der Kern es kennt (kein `v09a_k8924` in `A5120_KONFIG_WERTE`).
+    hardware=(
+        ("ram", "RAM:",
+         "Speicherkarten: K3525 (je 16 KB) ab 0000H im 4000H-Raster oder die K3526 mit 64 KB.  "
+         "Software, die mehr braucht (CP/A will den oberen Bereich), läuft mit weniger nicht.",
+         (("k3525_1", "1x K3525 16KB"), ("k3525_2", "2x K3525 32KB"),
+          ("k3525_4", "4x K3525 64KB"), ("k3526", "K3526 64KB")), ()),
+        ("bildschirm", "Bildschirmkarte:",
+         "K7024 (80x24, Zeichen 8x12) und/oder K7023 (64x16).  Mit beiden Karten wählt der "
+         "Schiebeschalter darunter, welche das Bild liefert; er wirkt sofort.",
+         (("k7024", "K7024 Auflösung 24x80"), ("k7023", "K7023 Auflösung 16x64"),
+          ("beide", "K7024 und K7023 mit Umschalter")), ()),
+        ("tastatur", "Tastatur:",
+         "K7636 parallel am U-Bus der K2526, K7637 seriell am Kanal der K8025.",
+         (("k7636", "K7636 (parallel)"), ("k7637", "K7637 (seriell)")), ()),
+        ("laderom", "Lade-ROM:",
+         "Lade-ROM der K2526.  V0.6 liest die BCU-Disketten „SYL auf Spur 1“.",
+         (("v09_2", "V0.9_2"), ("v09_1", "V0.9_1"), ("v06", "V0.6")), ()),
+        ("erweiterungsmodul", "Erweiterungsmodul:",
+         "EM064/EM256 mit dem U8001 (A5120.16): nur am A5120 und nur mit der K3526 (64 KB) als RAM.",
+         (("none", "keines"), ("em064", "EM064"), ("em256", "EM256 + U8001")), ("a5120",)),
     ),
-    modell_kernwahl=((_modell.A5120_BCU, (("laderom", "v06"), ("tastatur", "k7636"))),),
-    gesperrte_modelle=((_modell.A5120_ACHT, "A5120 8″ (K5602)",
-                        "Die 8″-Ausführung mit der Floppy-Einheit K5602 ist noch nicht "
-                        "nachgebildet."),),
-    modell_tipp=("A5120.16 fügt dem A5120 die Steuerkarte und das Erweiterungsmodul "
-                 "EM256 mit dem U8001 hinzu.  „A5120 (64×16, K7636)“ ist die frühe "
-                 "Ausführung mit dem Bildschirm K7023 und der Tastatur K7636, "
-                 "„A5120 Kassette“ dieselbe mit der Kassettenkarte K5020 (KMBG), "
-                 "„A5120 BCU 880“ die frühe Ausführung mit dem Lade-ROM V0.6 für die "
-                 "BCU-Disketten „SYL auf Spur 1“ (Laufwerke K5600.10).  "
-                 "Ein Wechsel erzeugt die Maschine neu (wie ein Kaltstart)."),
+    modell_tipp=("Das Modell setzt Vorgaben für Bildschirm, RAM, Tastatur, Lade-ROM, Erweiterungsmodul, "
+                 "Kassette und Laufwerke; danach lässt sich jede Einzelheit ändern.  Wählt man das "
+                 "Modell erneut, gelten wieder seine Vorgaben.  Ein Wechsel erzeugt die Maschine "
+                 "neu (wie ein Kaltstart)."),
     ueber_rechner="des Bürocomputers <b>robotron A5120</b>",
     andere="k8915",
     weitere=("prg710", "pc1715", "p8000", "mc80"),

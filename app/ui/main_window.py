@@ -102,7 +102,10 @@ class MainWindow(QMainWindow):
         self._rechner_war_da = True
         # Hardwarevarianten des Programms (PC 1715: Zeichensatz, Tastatur-ROM; AP-6) —
         # Konstruktorparameter des Kerns wie das Modell, ein Wechsel ist ein Kaltstart.
-        self._hardware = self.profil.hardware_standard()
+        self._hardware = self.profil.hardware_standard(self._model)
+        # Stellung des Bildschirm-Schiebeschalters (Entwurf 33 §3.3, N6): nur mit
+        # ``bildschirm == "beide"`` wirksam, sonst bloss gemerkt.
+        self._schalter = "k7024"
         # Bauart der Bildschirmtastatur (haengt am Modell: PRG 710 K7609, 710-1 K7672;
         # PC 1715 mit QWERTZ-ROM eigene Beschriftung).
         self._tastatur_art = self.profil.tastatur_bauart(self._model, self._hardware)
@@ -224,6 +227,7 @@ class MainWindow(QMainWindow):
         self.serial_widget.statuszeile.connect(self.status_widget.set_seriell)
         self.settings_widget.modelChanged.connect(self._on_model_selected)
         self.settings_widget.hardwareChanged.connect(self._on_hardware_selected)
+        self.settings_widget.bildschirmSchalterChanged.connect(self._on_bildschirm_schalter)
         self.settings_widget.rafChanged.connect(self._on_raf_selected)
         self.settings_widget.rafStandbyChanged.connect(self._on_raf_standby_changed)
         self.settings_widget.ptapeChanged.connect(self._on_ptape_selected)
@@ -1116,6 +1120,9 @@ class MainWindow(QMainWindow):
                 # Die Rechnerausstattung bleibt auch im Betrieb „nur Terminal“ gemerkt.
                 general["ausstattung"] = self.settings_widget.ausstattung_value()
         general.update(self._hardware)          # PC 1715: zeichensatz, tastatur
+        if "bildschirm" in self._hardware:
+            self._schalter_nachlesen()
+            general["bildschirm_schalter"] = self._schalter
         general["ptape"] = bool(self._ptape)
         general["tape"] = bool(self._tape)
         if self.profil.terminal:
@@ -1358,8 +1365,13 @@ class MainWindow(QMainWindow):
                     general.get("ausstattung") or self._model)
             self.settings_widget.set_model_value(self._model)
             # Hardwarevarianten: fehlender Schluessel = Vorgabe (aeltere Konfigurationen).
-            self._hardware = self.profil.hardware_normalisieren(general)
+            self._hardware = self.profil.hardware_normalisieren(general, self._model)
             self.settings_widget.set_hardware_value(self._hardware)
+            # Schiebeschalter: fehlend oder unbekannt = K7024.  Die Maschine bekommt die Stellung
+            # beim Erzeugen (``konfig["schalter"]``), das Feld zeigt sie hier.
+            self._schalter = ("k7023" if str(general.get("bildschirm_schalter", "")).strip().lower()
+                              == "k7023" else "k7024")
+            self.settings_widget.set_bildschirm_schalter_value(self._schalter)
             if self.platten_widget is not None:
                 self.platten_widget.set_firmware(self._hardware.get("wdc", "4.2"))
 
@@ -1724,7 +1736,7 @@ class MainWindow(QMainWindow):
         Reine Abfrage im selben Sekundentakt wie der Rest der Statuszeile
         (``em_leds()``/``em_mode16()``, kein Rückruf) — Anschluss aus S5.
         """
-        if not self.profil.modell_em(self._model):
+        if not self.profil.modell_em(self._model, self._hardware):
             return
         try:
             v1, v2 = self.emulator.em_leds()
@@ -1853,7 +1865,19 @@ class MainWindow(QMainWindow):
             self.settings_widget.set_model_value(self._model)
             return
         self._model = neu
-        self._apply_drive_types(self._drive_types, cold_restart=True)
+        types = self._drive_types
+        if self.profil.modell_vorgaben:
+            # Entwurf 33 §3a Regel 1: die Modellwahl UEBERNIMMT die Vorgaben (Optionen, Kassette,
+            # Laufwerke), ohne Rueckfrage — auch beim erneuten Waehlen desselben Modells.
+            vorgabe = self.profil.modell_vorgabe(neu)
+            self._hardware = self.profil.hardware_standard(neu)
+            self._schalter = "k7024"            # Modellwechsel: auch der Schalter zurueck
+            self.settings_widget.set_bildschirm_schalter_value(self._schalter)
+            self._tape = bool(int(vorgabe.get("kassette", 0))) and self.profil.tape_wahl
+            types = dt.normalize_list(vorgabe.get("laufwerke") or self._drive_types)
+            self.settings_widget.set_hardware_value(self._hardware)
+            self.settings_widget.set_tape_value(self._tape)
+        self._apply_drive_types(types, cold_restart=True)
         self._schedule_autosave()
 
     def _betriebsart_vorwahl(self):
@@ -1873,7 +1897,7 @@ class MainWindow(QMainWindow):
     def _on_hardware_selected(self, schluessel: str, wert: str):
         """Eine Hardwarevariante (Zeichensatz, Tastatur-ROM) geändert → neue Maschine, wie
         beim Modellwechsel (die ROMs sind am Kern Konstruktorparameter)."""
-        neu = self.profil.hardware_normalisieren({**self._hardware, schluessel: wert})
+        neu = self.profil.hardware_normalisieren({**self._hardware, schluessel: wert}, self._model)
         if neu == self._hardware:
             return
         if schluessel == "wdc" and not self._platte_rueckfrage(neu.get("wdc", "4.2")):
@@ -1890,6 +1914,30 @@ class MainWindow(QMainWindow):
             self.settings_widget.set_hardware_value(vorher)
             return
         self._schedule_autosave()
+
+    def _on_bildschirm_schalter(self, karte: str):
+        """Schiebeschalter umgelegt: sofort in den Kern (unter der Kernsperre, die Maschine
+        rechnet im eigenen Faden), ohne Neustart.  Ohne zwei Karten ist er gesperrt und
+        hat keine Wirkung."""
+        self._schalter = karte
+        if self._hardware.get("bildschirm") == "beide":
+            with kern_sperre():
+                self.emulator.bildschirm_schalter = karte
+        self._schedule_autosave()
+
+    def _schalter_nachlesen(self):
+        """Stellung aus dem Kern uebernehmen: ein geladener Zwischenstand kann sie umgesetzt
+        haben.  Ohne zwei Karten gilt die gemerkte."""
+        if self._hardware.get("bildschirm") != "beide":
+            return
+        try:
+            with kern_sperre():
+                karte = self.emulator.bildschirm_schalter
+        except Exception:
+            return
+        if karte in ("k7024", "k7023"):
+            self._schalter = karte
+            self.settings_widget.set_bildschirm_schalter_value(karte)
 
     def _platte_rueckfrage(self, firmware: str) -> bool:
         """P24: passt die angeschlossene Platte nicht zur neuen WDC-Firmware (bis 4.0 legt das EPROM
@@ -1913,12 +1961,19 @@ class MainWindow(QMainWindow):
         (:meth:`_raf_laden`) — beim Einschalten noch einmal, denn ``power_on``
         verwirft den Inhalt wie ein Netz-Ein ohne Pufferung.
         """
+        kern = self.profil.kern_parameter(self._model, self._hardware, self._schalter)
+        if "konfig" in kern:
+            # Einzeloptionen (A5120/A5130/K8924): Erweiterungsmodul und Kassette gehoeren ins
+            # Woerterbuch, ``em=``/``tape=`` waeren daneben ein Fehler (Entwurf 33 N4).
+            kern["konfig"] = {**kern["konfig"], "kassette": bool(self._tape)}
+            einzel = {}
+        else:
+            einzel = {"em": self.profil.modell_em(self._model, self._hardware),
+                      "tape": bool(self._tape)}
         emu = K1520Emulator(types, machine=self.profil.modell_maschine(self._model),
-                            em=self.profil.modell_em(self._model),
                             raf=raf.core_param(self._raf) if self.profil.raf_wahl else None,
                             ptape=bool(self._ptape),
-                            tape=bool(self._tape),
-                            **self.profil.kern_parameter(self._model, self._hardware))
+                            **einzel, **kern)
         # Die Tastatur hat ihren eigenen Quarz — bei 10 × Rechnertakt darf sie
         # nicht zehnmal so frueh wiederholen (core/peripherals/tasten_uhr.h).
         emu.set_key_repeat_realtime(True)
@@ -2124,7 +2179,7 @@ class MainWindow(QMainWindow):
         restore it is ``False`` (power-on happens once, later).
         """
         types = dt.normalize_list(types)
-        em = self.profil.modell_em(self._model)
+        em = self.profil.modell_em(self._model, self._hardware)
         # Stand-by: der Inhalt der ALTEN Maschine geht in die Ablage, bevor die neue
         # sie laedt (*sichern* = False, wenn der Aufrufer das schon mit der alten
         # Einstellung getan hat — _apply_config).
@@ -2198,6 +2253,7 @@ class MainWindow(QMainWindow):
         self.settings_widget.set_drive_types(types)         # keep dropdowns in sync (no re-emit)
         self.settings_widget.set_model_value(self._model)   # dito
         self.settings_widget.set_hardware_value(self._hardware)
+        self.settings_widget.set_bildschirm_schalter_value(self._schalter)
         # Der Takt haengt am Modell (PC 1715W: 3,9936 MHz).
         self.CPU_HZ, nenntakt = self.profil.modell_nenntakt(self._model)
         self.settings_widget.set_nenntakt(nenntakt)
@@ -2362,6 +2418,7 @@ class MainWindow(QMainWindow):
         """Einen Zwischenstand laden; bei abweichender Konfiguration bleibt die Maschine, wie sie ist."""
         ok = self.emulator.state_load(pfad)
         if ok:
+            self._schalter_nachlesen()
             self.statusBar().showMessage(
                 f"Zwischenstand geladen: {os.path.basename(pfad)}", 6000)
         else:

@@ -187,6 +187,27 @@ TEST(K1520Bus, MemDispatch_OverlapLaterWins) {
 }
 
 /**
+ * @test K1520Bus/MemDispatch_UeberlappungLesenLetzteSchreibenAlle
+ * @brief Zwei SCHREIBBARE Speicher auf derselben Adresse (K7024 + K7023 bei `Beide`,
+ *        Entwurf 33 §3.2): Schreiben trifft beide, Lesen liefert den zuletzt registrierten.
+ * @details Waechter fuer das Bus-Verhalten, auf dem A5120 `Bildschirm::Beide` aufbaut —
+ *          im Schnellpfad (Seitentabelle) wie im linearen Fallback (nicht ausgerichtete Region).
+ */
+TEST(K1520Bus, MemDispatch_UeberlappungLesenLetzteSchreibenAlle) {
+    for (bool ausgerichtet : {true, false}) {
+        K1520Bus bus;
+        MockMem erste(0x1000), zweite(0x1000);
+        bus.registerMem(&erste, 0x1000, 256);
+        bus.registerMem(&zweite, 0x1000, ausgerichtet ? 256 : 255);
+        bus.memWrite(0x1010, 0x41);
+        EXPECT_EQ(erste.buf[0x10], 0x41) << ausgerichtet;
+        EXPECT_EQ(zweite.buf[0x10], 0x41) << ausgerichtet;
+        zweite.buf[0x10] = 0x42;   // Inhalte nur zum Unterscheiden auseinanderlaufen lassen
+        EXPECT_EQ(bus.memRead(0x1010), 0x42) << "Lesen = zuletzt registrierte Karte";
+    }
+}
+
+/**
  * @test K1520Bus/MemDispatch_ROMIgnoresWrite
  * @brief Write accesses to a read-only memory region (ROM) are silently discarded.
  * @par Pass criterion  rom.buf[0] == 0xEE (original value) after memWrite(0x0000, 0x42).

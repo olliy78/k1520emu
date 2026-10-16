@@ -207,7 +207,7 @@ TEST(RafMaschine, SaveStateMitRafWirdOhnePassendeRafAbgelehnt) {
 /**
  * @test RafMaschine/SaveStateV7LaedtOhneRafAngabe
  * @brief Ein Stand v7 (vor der RAF) laedt weiter; eine gesteckte RAF behaelt ihren Inhalt.
- *        Der v7-Stand entsteht aus einem v8-Stand ohne RAF: Versionsbyte 7, RAF-Teil
+ *        Der v7-Stand entsteht aus einem v9-Stand ohne RAF: Versionsbyte 7, RAF-Teil
  *        (Laenge 4 B + Kennbyte 0) abgeschnitten.
  */
 TEST(RafMaschine, SaveStateV7LaedtOhneRafAngabe) {
@@ -222,7 +222,7 @@ TEST(RafMaschine, SaveStateV7LaedtOhneRafAngabe) {
         d.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
     }
     ASSERT_GT(d.size(), 13u);
-    ASSERT_EQ(d[7], 8);                                 // nach "K1520SS"
+    ASSERT_EQ(d[7], 9);   // nach "K1520SS"; v9 (Entwurf 33 N2) aendert am K7024-Stand nichts
     d[7] = 7;
     d.resize(d.size() - 5);
     {

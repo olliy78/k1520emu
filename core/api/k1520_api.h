@@ -112,13 +112,47 @@ K1520_API int k1520_a5120_ausfuehrung(K1520Handle h);
  * @param laderom   0 = V0.9_2 (`zre.rom`, Vorgabe aller Ausfuehrungen), 1 = V0.9_1,
  *                  2 = V0.6 (liest Zylinder 1 — BCU 880 von den Disketten „SYL auf Spur 1“).
  * @param tastatur  0 = Vorgabe der Ausfuehrung (neu: K7637, alt/KMBG: K7636), 1 = K7637
- *                  (am alt/KMBG abgelehnt), 2 = K7636 (am „neu“: K7024 80×24 + K7636).
+ *                  (seit Entwurf 33 N1 auch am alt/KMBG: K7023 + K7637 an der K8025),
+ *                  2 = K7636 (am „neu“: K7024 80×24 + K7636).
  * Unbekannte Werte → NULL mit Grund in k1520_last_init_error.  Mit (a, 0, 0, …) bitgleich zu
  * k1520_create_a5120_ausfuehrung(a, …).
  */
 K1520_API K1520Handle k1520_create_a5120_konfig(int ausfuehrung, int laderom, int tastatur,
                                                 const char* drive0, const char* drive1,
                                                 const char* drive2, const char* drive3);
+/**
+ * @brief A5120 aus einem Konfigurationstext (Entwurf 33 §8 N4, Einzeloptionen RAM/Bildschirm/…).
+ *
+ * @param konfig `schluessel=wert` getrennt durch `;` oder `,` (Gross-/Kleinschreibung egal);
+ *               NULL/"" = Vorgabe (wie k1520_create).  Schluessel:
+ *               - `ausfuehrung` neu|alt|kmbg — Huelle, wird zuerst ausgewertet, der Rest ueberschreibt
+ *               - `ram`        k3526 (Vorgabe) | k3525_1 | k3525_2 | k3525_4 (16/32/64 KB K3525)
+ *               - `bildschirm` k7024 (Vorgabe) | k7023 | beide (zwei Karten + Umschalter,
+ *                              k1520_screen_select)
+ *               - `schalter`   k7024 | k7023 — Anfangsstellung, nur mit bildschirm=beide
+ *               - `tastatur`   k7637 | k7636
+ *               - `laderom`    v09_2 | v09_1 | v06
+ *               - `kassette`   0 | 1 (K5020 fest gesteckt)
+ *               - `em`         none | em064 | em256 (nur mit ram=k3526)
+ * @param drive0..3 wie bei k1520_create_configured; NULL/"" = Vorgabe der Ausfuehrung.
+ * Unbekannter Schluessel/Wert oder unzulaessige Kombination → NULL mit Grund in
+ * k1520_last_init_error.  Die Zahlen-Fassung k1520_create_a5120_konfig bleibt daneben bestehen.
+ */
+K1520_API K1520Handle k1520_create_a5120_text(const char* konfig,
+                                              const char* d0, const char* d1,
+                                              const char* d2, const char* d3);
+/** @brief Bildschirmbestueckung eines A5120: 0 = K7024, 1 = K7023, 2 = beide; -1 bei einer anderen Maschine. */
+K1520_API int k1520_a5120_bildschirm(K1520Handle h);
+/**
+ * @brief Umschalter K7024/K7023 (nur bei bildschirm=beide) umlegen: 0 = K7024, 1 = K7023.
+ * @return 0 = umgelegt; -1 = keine A5120 mit zwei Bildschirmkarten oder ungueltige Karte.
+ * Wirkt sofort auf Bild (k1520_framebuffer, k1520_fb_width/height, k1520_screen_char) und
+ * Bruecke Port 0AH Bit 6.  Zeiger UND Groesse des Bildes unter EINER Kernsperre holen.
+ */
+K1520_API int k1520_screen_select(K1520Handle h, int karte);
+/** @brief Angezeigte Karte: 0 = K7024, 1 = K7023; -1 bei einer anderen Maschine.  Nach einem
+ *         Zwischenstand laden (k1520_state_load/loadState) neu lesen — er setzt den Schalter. */
+K1520_API int k1520_screen_selected(K1520Handle h);
 /** @brief Gestecktes Lade-ROM eines A5120 (0 V0.9_2, 1 V0.9_1, 2 V0.6); -1 bei einer anderen Maschine. */
 K1520_API int k1520_a5120_laderom(K1520Handle h);
 /** @brief Tastatur eines A5120, wie gebaut: 1 = K7637, 2 = K7636; -1 bei einer anderen Maschine. */

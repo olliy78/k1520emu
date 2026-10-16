@@ -1,6 +1,7 @@
 #include "k1520_api.h"
 #include "core/api/k1520_sync_internal.h"
 #include "core/machines/a5120/a5120.h"
+#include "core/machines/a5120/a5120_konfig_text.h"
 #include "core/machines/k8915/k8915.h"
 #include "core/machines/prg710/prg710.h"
 #include "core/machines/pc1715/pc1715.h"
@@ -508,7 +509,8 @@ K1520Handle k1520_create_a5120_konfig(int ausfuehrung, int laderom, int tastatur
     try {
         A5120Machine::Config cfg = A5120Machine::Config::fuerAusfuehrung(static_cast<A>(ausfuehrung));
         cfg.laderom  = static_cast<K2526::Laderom>(laderom);
-        cfg.tastatur = static_cast<T>(tastatur);   // K7637 am alt/KMBG: der Konstruktor wirft
+        // 0 = Vorgabe der Ausfuehrung: was fuerAusfuehrung gesetzt hat (alt/KMBG: K7636) bleibt.
+        if (tastatur != 0) cfg.tastatur = static_cast<T>(tastatur);
         const char* names[4] = { d0, d1, d2, d3 };
         for (int i = 0; i < 4; ++i)
             if (names[i] && names[i][0]) cfg.drive_profiles[i] = names[i];
@@ -522,6 +524,50 @@ K1520Handle k1520_create_a5120_konfig(int ausfuehrung, int laderom, int tastatur
         g_init_error = "Unbekannter Fehler beim Erzeugen der Maschine";
         return nullptr;
     }
+}
+
+K1520Handle k1520_create_a5120_text(const char* konfig,
+                                    const char* d0, const char* d1,
+                                    const char* d2, const char* d3) {
+    g_init_error.clear();
+    setup_logging();
+    try {
+        A5120Machine::Config cfg;
+        // Erst der Text (er kann die Ausfuehrung und damit die Vorgabelaufwerke setzen) ...
+        if (!a5120konfig::text(cfg, konfig ? konfig : "", g_init_error)) return nullptr;
+        // ... dann die ausdruecklich genannten Laufwerke darueber.
+        const char* names[4] = { d0, d1, d2, d3 };
+        for (int i = 0; i < 4; ++i)
+            if (names[i] && names[i][0]) cfg.drive_profiles[i] = names[i];
+        K1520Machine* m = new A5120Machine(cfg);   // Handle = K1520Machine* (s. toMachine)
+        return m;
+    } catch (const std::exception& ex) {
+        g_init_error = ex.what();
+        std::fprintf(stderr, "k1520: %s\n", g_init_error.c_str());
+        return nullptr;
+    } catch (...) {
+        g_init_error = "Unbekannter Fehler beim Erzeugen der Maschine";
+        return nullptr;
+    }
+}
+
+int k1520_a5120_bildschirm(K1520Handle h) {
+    auto* a = dynamic_cast<A5120Machine*>(toMachine(h));
+    return a ? static_cast<int>(a->bildschirm()) : -1;
+}
+
+int k1520_screen_select(K1520Handle h, int karte) {
+    auto* a = dynamic_cast<A5120Machine*>(toMachine(h));
+    if (!a || a->bildschirm() != A5120Machine::Config::Bildschirm::Beide) return -1;
+    if (karte != 0 && karte != 1) return -1;
+    a->setBildschirmSchalter(karte == 1 ? A5120Machine::Config::Bildschirm::K7023
+                                        : A5120Machine::Config::Bildschirm::K7024);
+    return 0;
+}
+
+int k1520_screen_selected(K1520Handle h) {
+    auto* a = dynamic_cast<A5120Machine*>(toMachine(h));
+    return a ? (a->zeigtK7023() ? 1 : 0) : -1;
 }
 
 int k1520_a5120_ausfuehrung(K1520Handle h) {

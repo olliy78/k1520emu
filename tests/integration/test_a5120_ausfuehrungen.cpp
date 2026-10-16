@@ -207,10 +207,13 @@ TEST(A5120Ausfuehrung, TastaturVorgabeFolgtDerAusfuehrung) {
     A5120Machine neu;
     EXPECT_EQ(neu.k7636(), nullptr) << "Neu: K7637 an der K8025 wie bisher";
     auto alt = A5120Machine::Config::fuerAusfuehrung(A::Alt);
-    alt.tastatur = A5120Machine::Config::Tastatur::K7636;   // ausdruecklich = Vorgabe
+    EXPECT_EQ(alt.tastatur, A5120Machine::Config::Tastatur::K7636) << "Huelle setzt die K7636";
     EXPECT_NO_THROW(A5120Machine{alt});
+    // Entwurf 33 N1 Regel 5: die Sperre „K7637 nur am Neu“ ist entfallen.
     alt.tastatur = A5120Machine::Config::Tastatur::K7637;
-    EXPECT_THROW(A5120Machine{alt}, std::invalid_argument) << "keine SIO-Tastatur am alten Geraet";
+    A5120Machine m(alt);
+    EXPECT_EQ(m.k7636(), nullptr);
+    EXPECT_NE(m.k7023(), nullptr);
 }
 
 TEST(A5120Ausfuehrung, LaderomIstUnabhaengigVonDerAusfuehrung) {

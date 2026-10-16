@@ -85,8 +85,9 @@ add_test(NAME cli_bandtest_bin_passt_zur_quelle
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/kassette/bandtest/build.py" --check)
 set_tests_properties(cli_bandtest_bin_passt_zur_quelle PROPERTIES
     TIMEOUT 180 SKIP_RETURN_CODE 77 LABELS "cli;fast")
+# Cross-Bau: die .exe laeuft nur ueber den Starter (wine); sonst probiert die Shell sie als Skript.
 add_test(NAME cli_bandtest_bootband
-    COMMAND "${CMAKE_COMMAND}" -DTOOL=$<TARGET_FILE:k1520tape>
+    COMMAND "${CMAKE_COMMAND}" "-DEMULATOR=${CMAKE_CROSSCOMPILING_EMULATOR}" -DTOOL=$<TARGET_FILE:k1520tape>
             -DBIN=${CMAKE_SOURCE_DIR}/tools/kassette/bandtest/bandtest.bin
             -DSOLL=${CMAKE_SOURCE_DIR}/tests/fixtures/kassette/bandtest_boot.k52
             -DTMP=${CMAKE_CURRENT_BINARY_DIR}/bandtest_boot_neu.k52

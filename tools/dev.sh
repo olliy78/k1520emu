@@ -130,7 +130,11 @@ configure_if_needed() {
     # einem LINUX-Python — eine .dll kann sie nicht laden.
     if [ "$dir" = build_win ]; then
         extra=(-DCMAKE_TOOLCHAIN_FILE="$PROJECT_DIR/cmake/toolchain-mingw64.cmake"
-               -DBUILD_PYTHON_TESTS=OFF)
+               -DBUILD_PYTHON_TESTS=OFF
+               # Unter wine kostet jeder Prozessstart ~0,5 s und die Faelle laufen bei
+               # -j16 mit ~3000 anderen: die Zeitgrenzen des Linux-Laufs (Faktor 2) reichen
+               # dort nicht (FsRecoverCpm.EineGeloeschte...: Timeout nur im Volllauf).
+               -DK1520_TEST_ZEIT_FAKTOR="${K1520_TEST_ZEIT_FAKTOR_WIN:-6}")
     fi
     # build_oracle/ = eigenes Verzeichnis fuer das MAME-Orakel der U8001-Primitive
     # (laedt MAME-Quellen beim Konfigurieren; build/ bleibt davon unberuehrt).
