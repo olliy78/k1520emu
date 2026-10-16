@@ -1,4 +1,4 @@
-# boot_trace --bildschirm beide --schalter k7023: Brücke Bit 6 = BAB1, CP/A startet im 16x64-Format,
+# boot_trace --bildschirm beide --schalter k7023: Bruecke Bit 6 = BAB1, CP/A startet im 16x64-Format,
 # der Bildschirmbericht kommt von der K7023 (64 Spalten).
 tool:    boot_trace
 disk:    cpa_cpa780_k5601_noclock.hfe

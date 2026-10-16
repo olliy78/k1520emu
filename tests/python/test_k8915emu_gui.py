@@ -96,7 +96,7 @@ def test_only_the_a5120_offers_the_a5120_16_model(qapp, konfig_ordner):
     try:
         assert w.profil.modellwahl
         assert not w.settings_widget.model_combo.isHidden()
-        assert w.settings_widget.model_combo.findData("a5120.16") >= 0
+        assert w.settings_widget.model_combo.findData("a5130") >= 0
     finally:
         _zu(w, qapp)
 

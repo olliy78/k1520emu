@@ -102,7 +102,7 @@ class MainWindow(QMainWindow):
         self._rechner_war_da = True
         # Hardwarevarianten des Programms (PC 1715: Zeichensatz, Tastatur-ROM; AP-6) —
         # Konstruktorparameter des Kerns wie das Modell, ein Wechsel ist ein Kaltstart.
-        self._hardware = self.profil.hardware_standard()
+        self._hardware = self.profil.hardware_standard(self._model)
         # Bauart der Bildschirmtastatur (haengt am Modell: PRG 710 K7609, 710-1 K7672;
         # PC 1715 mit QWERTZ-ROM eigene Beschriftung).
         self._tastatur_art = self.profil.tastatur_bauart(self._model, self._hardware)
@@ -1358,7 +1358,7 @@ class MainWindow(QMainWindow):
                     general.get("ausstattung") or self._model)
             self.settings_widget.set_model_value(self._model)
             # Hardwarevarianten: fehlender Schluessel = Vorgabe (aeltere Konfigurationen).
-            self._hardware = self.profil.hardware_normalisieren(general)
+            self._hardware = self.profil.hardware_normalisieren(general, self._model)
             self.settings_widget.set_hardware_value(self._hardware)
             if self.platten_widget is not None:
                 self.platten_widget.set_firmware(self._hardware.get("wdc", "4.2"))
@@ -1724,7 +1724,7 @@ class MainWindow(QMainWindow):
         Reine Abfrage im selben Sekundentakt wie der Rest der Statuszeile
         (``em_leds()``/``em_mode16()``, kein Rückruf) — Anschluss aus S5.
         """
-        if not self.profil.modell_em(self._model):
+        if not self.profil.modell_em(self._model, self._hardware):
             return
         try:
             v1, v2 = self.emulator.em_leds()
@@ -1853,7 +1853,17 @@ class MainWindow(QMainWindow):
             self.settings_widget.set_model_value(self._model)
             return
         self._model = neu
-        self._apply_drive_types(self._drive_types, cold_restart=True)
+        types = self._drive_types
+        if self.profil.modell_vorgaben:
+            # Entwurf 33 §3a Regel 1: die Modellwahl UEBERNIMMT die Vorgaben (Optionen, Kassette,
+            # Laufwerke), ohne Rueckfrage — auch beim erneuten Waehlen desselben Modells.
+            vorgabe = self.profil.modell_vorgabe(neu)
+            self._hardware = self.profil.hardware_standard(neu)
+            self._tape = bool(int(vorgabe.get("kassette", 0))) and self.profil.tape_wahl
+            types = dt.normalize_list(vorgabe.get("laufwerke") or self._drive_types)
+            self.settings_widget.set_hardware_value(self._hardware)
+            self.settings_widget.set_tape_value(self._tape)
+        self._apply_drive_types(types, cold_restart=True)
         self._schedule_autosave()
 
     def _betriebsart_vorwahl(self):
@@ -1873,7 +1883,7 @@ class MainWindow(QMainWindow):
     def _on_hardware_selected(self, schluessel: str, wert: str):
         """Eine Hardwarevariante (Zeichensatz, Tastatur-ROM) geändert → neue Maschine, wie
         beim Modellwechsel (die ROMs sind am Kern Konstruktorparameter)."""
-        neu = self.profil.hardware_normalisieren({**self._hardware, schluessel: wert})
+        neu = self.profil.hardware_normalisieren({**self._hardware, schluessel: wert}, self._model)
         if neu == self._hardware:
             return
         if schluessel == "wdc" and not self._platte_rueckfrage(neu.get("wdc", "4.2")):
@@ -1913,12 +1923,19 @@ class MainWindow(QMainWindow):
         (:meth:`_raf_laden`) — beim Einschalten noch einmal, denn ``power_on``
         verwirft den Inhalt wie ein Netz-Ein ohne Pufferung.
         """
+        kern = self.profil.kern_parameter(self._model, self._hardware)
+        if "konfig" in kern:
+            # Einzeloptionen (A5120/A5130/K8924): Erweiterungsmodul und Kassette gehoeren ins
+            # Woerterbuch, ``em=``/``tape=`` waeren daneben ein Fehler (Entwurf 33 N4).
+            kern["konfig"] = {**kern["konfig"], "kassette": bool(self._tape)}
+            einzel = {}
+        else:
+            einzel = {"em": self.profil.modell_em(self._model, self._hardware),
+                      "tape": bool(self._tape)}
         emu = K1520Emulator(types, machine=self.profil.modell_maschine(self._model),
-                            em=self.profil.modell_em(self._model),
                             raf=raf.core_param(self._raf) if self.profil.raf_wahl else None,
                             ptape=bool(self._ptape),
-                            tape=bool(self._tape),
-                            **self.profil.kern_parameter(self._model, self._hardware))
+                            **einzel, **kern)
         # Die Tastatur hat ihren eigenen Quarz — bei 10 × Rechnertakt darf sie
         # nicht zehnmal so frueh wiederholen (core/peripherals/tasten_uhr.h).
         emu.set_key_repeat_realtime(True)
@@ -2124,7 +2141,7 @@ class MainWindow(QMainWindow):
         restore it is ``False`` (power-on happens once, later).
         """
         types = dt.normalize_list(types)
-        em = self.profil.modell_em(self._model)
+        em = self.profil.modell_em(self._model, self._hardware)
         # Stand-by: der Inhalt der ALTEN Maschine geht in die Ablage, bevor die neue
         # sie laedt (*sichern* = False, wenn der Aufrufer das schon mit der alten
         # Einstellung getan hat — _apply_config).

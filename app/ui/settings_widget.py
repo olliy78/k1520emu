@@ -257,7 +257,14 @@ class SettingsWidget(QWidget):
             i = self.model_combo.count() - 1
             self.model_combo.model().item(i).setEnabled(False)
             self.model_combo.setItemData(i, grund, Qt.ToolTipRole)
-        self.model_combo.currentIndexChanged.connect(self._on_model_combo)
+        if self.profil.modell_vorgaben:
+            # Modell = Vorgaben (Entwurf 33 §3a): auch das ERNEUTE Waehlen desselben Eintrags muss
+            # sie uebernehmen, und dort schweigt currentIndexChanged — daher `activated`
+            # (kommt bei jeder Bedienung, nicht bei set_model_value()).
+            self.model_combo.currentIndexChanged.connect(self._on_model_index)
+            self.model_combo.activated.connect(self._on_model_combo)
+        else:
+            self.model_combo.currentIndexChanged.connect(self._on_model_combo)
         self.model_combo.setToolTip(self.profil.modell_tipp)
         # Betriebsart (P8000): Computer mit Terminal | nur Terminal
         self.betriebsart_combo = QComboBox(inner)
@@ -402,6 +409,7 @@ class SettingsWidget(QWidget):
         self._mitschrift_guard = False
 
     def _on_hardware_combo(self, schluessel: str):
+        self._hardware_gesperrt_nach_modell()      # Erweiterungsmodul haengt am RAM
         if self._hardware_guard:
             return
         self.hardwareChanged.emit(schluessel, self.hardware_combos[schluessel].currentData())
@@ -424,12 +432,13 @@ class SettingsWidget(QWidget):
                 box.setCurrentIndex(i if i >= 0 else 0)
         finally:
             self._hardware_guard = False
+        self._hardware_gesperrt_nach_modell()
 
     def _hardware_gesperrt_nach_modell(self):
         """Felder ausgrauen, die am gewählten Modell nichts bewirken (PC 1715W: Zeichensatz)."""
         modell = self.model_value()
         for k, box in self.hardware_combos.items():
-            box.setEnabled(self.profil.hardware_wirkt(k, modell))
+            box.setEnabled(self.profil.hardware_wirkt(k, modell, self.hardware_value()))
         # MC80.2x: die Kassette (MBI) ist eingebaut — das Kaestchen steckt nichts.
         fest = self.profil.modell_normalisieren(modell) in self.profil.tape_fest
         if not hasattr(self, "tape_box"):      # beim ersten Aufruf (Aufbau) noch nicht da
@@ -506,6 +515,10 @@ class SettingsWidget(QWidget):
         self._raf_guard = True
         self.raf_standby_box.setChecked(bool(an))
         self._raf_guard = False
+
+    def _on_model_index(self, _idx: int):
+        """Nur Anzeige nachziehen (Modelle als Vorgaben melden ueber ``activated``)."""
+        self._modus_anpassen()
 
     def _on_model_combo(self, _idx: int):
         self._modus_anpassen()

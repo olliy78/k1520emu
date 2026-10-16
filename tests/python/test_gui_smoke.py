@@ -1296,7 +1296,7 @@ def test_reset_to_default_restarts_only_when_the_drive_bay_changed(window, qapp,
     assert len(kaltstarts) == 1, "die neue Maschine bliebe sonst ausgeschaltet"
 
 
-# ─── Modellwahl A5120/A5120.16 (S6, doc/design/17_a5120_16.md) ───────────────
+# ─── Erweiterungsmodul EM256 (S6, doc/design/17_a5120_16.md; seit Entwurf 33 N5 eine OPTION) ───────────────
 #
 # Das Erweiterungsmodul ist am Kern ein Konstruktorparameter
 # (``K1520Emulator(em=…)``), ein Modellwechsel bedeutet also — wie ein
@@ -1304,6 +1304,13 @@ def test_reset_to_default_restarts_only_when_the_drive_bay_changed(window, qapp,
 # erzeugt wirklich eine EM-Maschine, die Leuchten erscheinen nur dann, eine
 # alte Konfiguration ohne den Eintrag bleibt beim A5120, und *Standard
 # zuruecksetzen* dreht ein zwischenzeitlich gewaehltes A5120.16 zurueck.
+
+def _em256_waehlen(window, qapp):
+    """Das Erweiterungsmodul EM256 wie der Anwender im Auswahlfeld waehlen."""
+    box = window.settings_widget.hardware_combos["erweiterungsmodul"]
+    box.setCurrentIndex(box.findData("em256"))
+    qapp.processEvents()
+
 
 def test_window_starts_as_plain_a5120_without_em(window):
     import app.modell as modell
@@ -1317,18 +1324,15 @@ def test_selecting_a5120_16_rebuilds_the_machine_with_the_em(window, qapp):
     """Die Modellwahl im Auswahlfeld erzeugt die Maschine neu — wie ein Kaltstart."""
     import app.modell as modell
 
-    idx = window.settings_widget.model_combo.findData(modell.A5120_16)
-    assert idx >= 0, "A5120.16 fehlt im Auswahlfeld"
-    window.settings_widget.model_combo.setCurrentIndex(idx)
-    qapp.processEvents()
+    _em256_waehlen(window, qapp)
 
-    assert window._model == modell.A5120_16
+    assert window._model == modell.A5120
     assert window.emulator.em_variant() == "em256"
     assert window.status_widget.em_sichtbar()
 
     # Zurueck zum A5120 — die Leuchten verschwinden wieder.
-    idx0 = window.settings_widget.model_combo.findData(modell.A5120)
-    window.settings_widget.model_combo.setCurrentIndex(idx0)
+    box = window.settings_widget.hardware_combos["erweiterungsmodul"]
+    box.setCurrentIndex(box.findData("none"))
     qapp.processEvents()
     assert window.emulator.em_variant() == ""
     assert not window.status_widget.em_sichtbar()
@@ -1344,9 +1348,7 @@ def test_em_status_reads_v1_v2_and_mode_from_the_core(window, qapp, monkeypatch)
     """V1/V2 und der Modus kommen aus `em_leds()`/`em_mode16()` — reine Abfrage."""
     import app.modell as modell
 
-    idx = window.settings_widget.model_combo.findData(modell.A5120_16)
-    window.settings_widget.model_combo.setCurrentIndex(idx)
-    qapp.processEvents()
+    _em256_waehlen(window, qapp)
 
     monkeypatch.setattr(window.emulator, "em_leds", lambda: (True, False))
     monkeypatch.setattr(window.emulator, "em_mode16", lambda: True)
@@ -1368,19 +1370,18 @@ def test_em_status_reads_v1_v2_and_mode_from_the_core(window, qapp, monkeypatch)
 def test_old_configuration_without_model_key_falls_back_to_the_plain_a5120(window, qapp):
     """Eine Konfiguration von vor S6 hat kein `general.model` — laeuft als A5120.
 
-    Angewandt wird sie ausgehend von einem Fenster, das GERADE auf A5120.16
-    steht: erst das zeigt, dass das fehlende Feld tatsaechlich auf die Vorgabe
+    Angewandt wird sie ausgehend von einem Fenster, das GERADE mit EM256
+    laeuft: erst das zeigt, dass das fehlende Feld tatsaechlich auf die Vorgabe
     zurueckfaellt, statt bloss den Ausgangszustand zu wiederholen.
     """
     import app.modell as modell
 
-    idx = window.settings_widget.model_combo.findData(modell.A5120_16)
-    window.settings_widget.model_combo.setCurrentIndex(idx)
-    qapp.processEvents()
+    _em256_waehlen(window, qapp)
     assert window.emulator.em_variant() == "em256"
 
     data = window._gather_config()
     del data["general"]["model"]           # eine Konfiguration von vor S6
+    del data["general"]["erweiterungsmodul"]
 
     window._apply_config(data)
 
@@ -1390,27 +1391,26 @@ def test_old_configuration_without_model_key_falls_back_to_the_plain_a5120(windo
 
 
 def test_config_roundtrip_carries_the_model(window, qapp, tmp_path):
-    """Modell A5120.16 uebersteht Speichern und Laden."""
+    """Das Erweiterungsmodul EM256 uebersteht Speichern und Laden."""
     import app.config_io as cfg
     import app.modell as modell
 
-    idx = window.settings_widget.model_combo.findData(modell.A5120_16)
-    window.settings_widget.model_combo.setCurrentIndex(idx)
-    qapp.processEvents()
+    _em256_waehlen(window, qapp)
 
     path = tmp_path / "config.yaml"
     cfg.save_config(str(path), window._gather_config())
     geladen = cfg.load_config(str(path))
-    assert geladen["general"]["model"] == modell.A5120_16
+    assert geladen["general"]["model"] == modell.A5120
+    assert geladen["general"]["erweiterungsmodul"] == "em256"
 
     window._apply_config(geladen)
-    assert window._model == modell.A5120_16
+    assert window._model == modell.A5120
     assert window.emulator.em_variant() == "em256"
 
 
 def test_reset_to_default_switches_the_model_back_and_restarts(window, qapp,
                                                                 monkeypatch, tmp_path):
-    """*Standard zuruecksetzen* dreht ein zwischenzeitlich gewaehltes A5120.16 zurueck.
+    """*Standard zuruecksetzen* dreht ein zwischenzeitlich gewaehltes EM256 zurueck.
 
     Die Auslieferung ist der A5120 ohne Erweiterung (`data/default_config.yaml`):
     ein geaendertes MODELL zaehlt genauso als "die Bestueckung hat sich geaendert"
@@ -1426,10 +1426,8 @@ def test_reset_to_default_switches_the_model_back_and_restarts(window, qapp,
     monkeypatch.setattr(QMessageBox, "question",
                         staticmethod(lambda *a, **k: QMessageBox.Yes))
 
-    idx = window.settings_widget.model_combo.findData(modell.A5120_16)
-    window.settings_widget.model_combo.setCurrentIndex(idx)
-    qapp.processEvents()
-    assert window._model == modell.A5120_16
+    _em256_waehlen(window, qapp)
+    assert window.emulator.em_variant() == "em256"
 
     kaltstarts = []
     monkeypatch.setattr(window, "_cold_restart", lambda: kaltstarts.append(True))

@@ -47,7 +47,9 @@ crt:
   offset_y: 0.0
 
 # Tempo als Vielfaches des Nenntakts (app/takt.py: 1,0 = 2,45 MHz)
-# und Modell (app/modell.py: "a5120" = ohne Erweiterung, "a5120.16" = EM256+U8001).
+# und Modell (app/modell.py: a5120 | a5130 | k8924).  Das Modell sind nur VORGABEN; die
+# Optionen ram | tastatur | laderom | erweiterungsmodul stehen hier bewusst NICHT —
+# fehlt ein Schluessel, gilt die Vorgabe des Modells (Entwurf 33 §3a).
 general:
   speed: 10.0
   model: a5120

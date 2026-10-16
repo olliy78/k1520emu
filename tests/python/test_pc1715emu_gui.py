@@ -146,7 +146,7 @@ def test_rom_varianten_zeichensatz_und_tastatur(qapp, konfig_ordner):
     assert p.hardware_normalisieren({}) == p.hardware_standard()
     assert p.hardware_normalisieren({"zeichensatz": "klingonisch", "tastatur": "tast618"}) == {
         "zeichensatz": "deutsch", "tastatur": "tast618"}
-    assert profil.profil("a5120").hardware_standard() == {}
+    assert profil.profil("k8915").hardware_standard() == {}
 
     w = _fenster(qapp)
     try:
