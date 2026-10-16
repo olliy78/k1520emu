@@ -245,6 +245,11 @@ class Programmprofil:
     def tastatur_bauart(self, modell, hardware=None) -> str:
         """Bauart der Bildschirmtastatur: :meth:`modell_tastatur`, beim PC 1715 mit dem
         QWERTZ-ROM ``"pc1715-tast618"``."""
+        if self.modell_vorgaben:
+            # A5120/A5130/K8924 (Entwurf 33 N7): die Bauart folgt der OPTION ``tastatur``
+            # (k7636 | k7637), nicht dem Modell; die Modellzeile traegt nur die Vorgabe.
+            hw = self.hardware_normalisieren(hardware or {}, modell)
+            return hw["tastatur"]
         art = self.modell_tastatur(modell)
         if art == "pc1715" and (hardware or {}).get("tastatur") == "tast618":
             return "pc1715-tast618"

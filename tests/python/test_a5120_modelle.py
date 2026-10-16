@@ -450,3 +450,54 @@ def test_ausgelieferte_vorgabe_traegt_modell_aber_keine_optionen():
     allg = config_io.standard_konfiguration(p)["general"]
     assert allg["model"] == "a5120"
     assert not (set(allg) & {"ram", "tastatur", "laderom", "erweiterungsmodul", "bildschirm"})
+
+
+# ── Bildschirmtastatur folgt der Option (Entwurf 33 N7) ──────────────────────
+
+@pytest.mark.parametrize("modell", ["a5120", "a5130", "k8924"])
+@pytest.mark.parametrize("art", ["k7636", "k7637"])
+def test_bildschirmtastatur_folgt_der_option_und_nicht_dem_modell(qapp, konfig_ordner, modell, art):
+    from app.ui.keyboard import KeyboardWidget
+    from app.ui.keyboard_k7636 import KeyboardK7636Widget
+    w = _fenster(qapp)
+    try:
+        _waehle(w, qapp, modell)
+        _option(w, "tastatur", art)
+        qapp.processEvents()
+        assert w.emulator.tastatur == art
+        assert w.profil.tastatur_bauart(w._model, w._hardware) == art
+        kb = w.keyboard_widget
+        assert isinstance(kb, KeyboardK7636Widget) == (art == "k7636")
+        assert isinstance(kb, KeyboardWidget)
+        # Die Wirtstasten gehen an dieselbe Tastatur (Bild und Zuordnung bleiben beisammen).
+        assert w.screen_widget.key_sink is kb
+        # Lampen der K7636 (Wahllampe 0 = Bit 0): nur dort gezeichnet UND vom Kern geliefert;
+        # die K7637 meldet ihre eigene Maske, das K7636-Widget zeigt sie nicht an.
+        if art == "k7636":
+            assert kb._leds == w.emulator.keyboard_leds() & 0xFF
+    finally:
+        _zu(w, qapp)
+
+
+def test_vorgabetastatur_je_modell_und_wechsel_der_option_tauscht_das_widget(qapp, konfig_ordner):
+    from app.ui.keyboard_k7636 import KeyboardK7636Widget
+    w = _fenster(qapp)
+    try:
+        assert not isinstance(w.keyboard_widget, KeyboardK7636Widget)     # A5120: K7637
+        _waehle(w, qapp, "a5130")
+        assert isinstance(w.keyboard_widget, KeyboardK7636Widget)         # A5130: K7636
+        _option(w, "tastatur", "k7637")
+        qapp.processEvents()
+        assert not isinstance(w.keyboard_widget, KeyboardK7636Widget)
+        _waehle(w, qapp, "k8924")
+        assert not isinstance(w.keyboard_widget, KeyboardK7636Widget)
+    finally:
+        _zu(w, qapp)
+
+
+def test_tastatur_bauart_ohne_hardware_nimmt_die_modellvorgabe():
+    from app import profil
+    p = profil.profil("a5120")
+    assert p.tastatur_bauart("a5130") == "k7636"
+    assert p.tastatur_bauart("a5120") == "k7637"
+    assert p.tastatur_bauart("k8924", {"tastatur": "k7636"}) == "k7636"
