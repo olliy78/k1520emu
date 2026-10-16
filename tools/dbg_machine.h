@@ -133,7 +133,7 @@ inline bool parseAusfuehrung(const char* ausf, const char* lw, A5120Machine::Con
     // `--tastatur k7636|k7637` (AP A7): Tastatur abweichend von der Ausfuehrung (BCU 880 V1.2:
     // `neu` + K7636).
     using T = A5120Machine::Config::Tastatur;
-    T ta = cfg.tastatur;
+    T ta = cfg.tastatur;   // nur uebernommen, wenn --tastatur angegeben (sonst gilt die Ausfuehrung)
     if (tastatur) {
         const std::string s = tastatur;
         if      (s == "k7636") ta = T::K7636;
@@ -153,7 +153,7 @@ inline bool parseAusfuehrung(const char* ausf, const char* lw, A5120Machine::Con
         cfg.em = em;
     }
     cfg.laderom  = lr;   // nach fuerAusfuehrung, die die Config neu aufsetzt
-    cfg.tastatur = ta;
+    if (tastatur) cfg.tastatur = ta;
     if (lw) {
         std::string s = lw;
         size_t i = 0, p = 0;

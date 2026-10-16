@@ -631,8 +631,9 @@ int main(int argc, char** argv) {
         return machine.memReadDebug((uint16_t)(0xF800 + r*80 + c));
     };
     if (!quiet && machine.k7023())
-        fprintf(stderr, "Ausfuehrung: %s (K7023 64x16, K7636), Laufwerke %s/%s/%s/%s\n",
+        fprintf(stderr, "Ausfuehrung: %s (K7023 64x16, %s), Laufwerke %s/%s/%s/%s\n",
                 machine.ausfuehrung() == A5120Machine::Config::Ausfuehrung::Kmbg ? "KMBG" : "alt",
+                machine.k7636() ? "K7636" : "K7637",
                 mcfg.drive_profiles[0].c_str(), mcfg.drive_profiles[1].c_str(),
                 mcfg.drive_profiles[2].c_str(), mcfg.drive_profiles[3].c_str());
     { std::string err;

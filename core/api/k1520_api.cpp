@@ -508,7 +508,8 @@ K1520Handle k1520_create_a5120_konfig(int ausfuehrung, int laderom, int tastatur
     try {
         A5120Machine::Config cfg = A5120Machine::Config::fuerAusfuehrung(static_cast<A>(ausfuehrung));
         cfg.laderom  = static_cast<K2526::Laderom>(laderom);
-        cfg.tastatur = static_cast<T>(tastatur);   // K7637 am alt/KMBG: der Konstruktor wirft
+        // 0 = Vorgabe der Ausfuehrung: was fuerAusfuehrung gesetzt hat (alt/KMBG: K7636) bleibt.
+        if (tastatur != 0) cfg.tastatur = static_cast<T>(tastatur);
         const char* names[4] = { d0, d1, d2, d3 };
         for (int i = 0; i < 4; ++i)
             if (names[i] && names[i][0]) cfg.drive_profiles[i] = names[i];

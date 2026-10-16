@@ -112,7 +112,8 @@ K1520_API int k1520_a5120_ausfuehrung(K1520Handle h);
  * @param laderom   0 = V0.9_2 (`zre.rom`, Vorgabe aller Ausfuehrungen), 1 = V0.9_1,
  *                  2 = V0.6 (liest Zylinder 1 — BCU 880 von den Disketten „SYL auf Spur 1“).
  * @param tastatur  0 = Vorgabe der Ausfuehrung (neu: K7637, alt/KMBG: K7636), 1 = K7637
- *                  (am alt/KMBG abgelehnt), 2 = K7636 (am „neu“: K7024 80×24 + K7636).
+ *                  (seit Entwurf 33 N1 auch am alt/KMBG: K7023 + K7637 an der K8025),
+ *                  2 = K7636 (am „neu“: K7024 80×24 + K7636).
  * Unbekannte Werte → NULL mit Grund in k1520_last_init_error.  Mit (a, 0, 0, …) bitgleich zu
  * k1520_create_a5120_ausfuehrung(a, …).
  */

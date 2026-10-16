@@ -53,21 +53,52 @@ public:
         EM::A22Lesart em_a22_lesart = EM::A22Lesart::ZyklusAdresse;
 
         /**
-         * @brief Ausfuehrung des Geraets (doc/design/30_a5120_fruehe_varianten.md, AP A5).
+         * @brief Ausfuehrung des Geraets — seit Entwurf 33 (N1) nur noch eine HUELLE.
          *
-         * - `Neu`  — A5120 „5¼″ neu“ (K3526, K7024 24×80, K7637 an der K8025): Vorgabe,
-         *            bitgleich der Maschine vor AP A5.
-         * - `Alt`  — A5120 „5¼″ alt“: 4× K3525 (0000/4000/8000/C000H), K7023.01 16×64 ab
-         *            FC00H (BAB1), K7636 am U-Bus der K2526, Wickelbruecke Port 0AH Bit 6 = 1
-         *            (`config_bridges` Bit 1: CP/A waehlt damit BAB1).  Keine K7637.
-         * - `Kmbg` — wie `Alt`, dazu die K5020 fest gesteckt (30H–37H, 2× K5200).
+         * Die Bestueckung entscheiden allein die Einzelfelder @ref ram, @ref bildschirm,
+         * @ref tastatur, @ref kassette, @ref laderom und @ref drive_profiles
+         * (doc/design/33_a5130_k8924.md §3a).  Das Feld bleibt fuer die bestehende C-ABI
+         * (`k1520_create_a5120_ausfuehrung`, `k1520_a5120_ausfuehrung`) und die Tests;
+         * @ref fuerAusfuehrung setzt die Einzelfelder einer Ausfuehrung:
+         *
+         * - `Neu`  — K3526, K7024 24×80, K7637 an der K8025, 4× K5601 (= `Config{}`).
+         * - `Alt`  — 4× K3525, K7023.01 16×64 ab FC00H (BAB1), K7636 am U-Bus, 3× K5600.10.
+         * - `Kmbg` — wie `Alt`, dazu die K5020 (@ref kassette).
          * - `Acht` — A5120 8″ (K5602): noch nicht umgesetzt, der Konstruktor lehnt ab.
          *
-         * Die Laufwerke stehen weiter in @ref drive_profiles; die Ausfuehrungsvorgabe
-         * (3× K5600.10 an der K5122) liefert @ref fuerAusfuehrung.  Ein EM gibt es nur am `Neu`.
+         * Wer das Feld direkt setzt, ohne @ref fuerAusfuehrung, aendert an der Maschine nichts
+         * (ausser `Acht` → Ablehnung).
          */
         enum class Ausfuehrung { Neu = 0, Alt = 1, Kmbg = 2, Acht = 3 };
         Ausfuehrung ausfuehrung = Ausfuehrung::Neu;
+
+        /**
+         * @brief RAM-Bestueckung (Entwurf 33 §3a).
+         *
+         * - `K3526`    — eine K3526, 64 KB (Vorgabe, bitgleich zu bisher).
+         * - `K3525_1x` — eine K3525 ab 0000H (16 KB, bis 3FFFH).
+         * - `K3525_2x` — zwei K3525 ab 0000H/4000H (32 KB, bis 7FFFH).
+         * - `K3525_4x` — vier K3525 ab 0000/4000/8000/C000H (64 KB).
+         *
+         * Ohne Sperre: Software, die mehr Speicher braucht (CP/A will den oberen Bereich),
+         * scheitert eben (Regel 4).  Unbelegte Adressen lesen den offenen Bus (FFH).
+         */
+        enum class Ram { K3526 = 0, K3525_1x = 1, K3525_2x = 2, K3525_4x = 3 };
+        Ram ram = Ram::K3526;
+
+        /**
+         * @brief Bildschirmkarte (Entwurf 33 §3.3).
+         *
+         * - `K7024` — K7024 24×80 ab F800H, Wickelbruecke Port 0AH Bit 6 = 0 (BAB2); Vorgabe.
+         * - `K7023` — K7023.01 16×64 ab FC00H, Bruecke Bit 6 = 1 (BAB1, `config_bridges` 02H).
+         * - `Beide` — beide Karten mit Umschalter: erst AP N2, der Konstruktor lehnt bis dahin ab.
+         */
+        enum class Bildschirm { K7024 = 0, K7023 = 1, Beide = 2 };
+        Bildschirm bildschirm = Bildschirm::K7024;
+
+        /// Kassettenkarte K5020 fest gesteckt (30H–37H, 2× K5200).  Vorgabe aus; die
+        /// nachtraegliche Installation ueber @ref installK5020 bleibt davon unberuehrt.
+        bool kassette = false;
 
         /**
          * @brief Gestecktes Lade-ROM der K2526 (doc/a5120_alt/laderom.md, AP A7).
@@ -79,22 +110,27 @@ public:
         K2526::Laderom laderom = K2526::Laderom::V09_2;
 
         /**
-         * @brief Tastatur (AP A7).  `Vorgabe` = die der Ausfuehrung: `Neu` → K7637 an der
-         *        K8025, `Alt`/`Kmbg` → K7636 am U-Bus der K2526.
+         * @brief Tastatur (AP A7, Entwurf 33 §3a).  `Vorgabe` = K7637 an der K8025 (wie
+         *        `K7637`); `K7636` haengt am U-Bus der K2526.
          *
-         * `K7636` am `Neu` ergibt K3526 + K7024 (80×24 ab F800H) + K7636 — so erwartet es
-         * BCU 880 V1.2 (FZW/BL) von den Disketten „SYL auf Spur 1“: Bildtreiber fuer
-         * 80×24 ab F800H, Tastatur ueber die Tore 01H/06H (doc/a5120_alt/bcu.md).
-         * `K7637` an `Alt`/`Kmbg` lehnt der Konstruktor ab (dort ist die SIO-Tastatur nicht
-         * verdrahtet, doc/design/32 §3 A5).
+         * Frei kombinierbar mit RAM und Bildschirm (Regel 5): die K7637 haengt immer am
+         * Kanal A der SIO A32 der K8025, die K7636 immer am U-Bus.  `K7636` mit K3526 + K7024
+         * erwartet z. B. BCU 880 V1.2 von den Disketten „SYL auf Spur 1“ (doc/a5120_alt/bcu.md).
          */
         enum class Tastatur { Vorgabe = 0, K7637 = 1, K7636 = 2 };
         Tastatur tastatur = Tastatur::Vorgabe;
 
-        /// Vorgabekonfiguration einer Ausfuehrung (Laufwerke laut Entwurf 30 §1).
+        /// Vorgabekonfiguration einer Ausfuehrung (Huelle, Entwurf 33 N1): setzt nur die
+        /// Einzelfelder.  Laufwerke laut Entwurf 30 §1.
         static Config fuerAusfuehrung(Ausfuehrung a) {
             Config c;
             c.ausfuehrung = a;
+            if (a == Ausfuehrung::Alt || a == Ausfuehrung::Kmbg) {
+                c.ram        = Ram::K3525_4x;
+                c.bildschirm = Bildschirm::K7023;
+                c.tastatur   = Tastatur::K7636;
+                c.kassette   = (a == Ausfuehrung::Kmbg);
+            }
             if (a != Ausfuehrung::Neu)
                 c.drive_profiles = {"K5600.10", "K5600.10", "K5600.10", "none"};
             return c;
@@ -294,12 +330,16 @@ public:
      */
     uint8_t keyboardLeds() const override;
 
-    /// Ausfuehrung, mit der die Maschine gebaut wurde (Config::ausfuehrung).
+    /// Ausfuehrung, mit der die Maschine gebaut wurde (Config::ausfuehrung; nur Huelle).
     Config::Ausfuehrung ausfuehrung() const { return ausf_; }
+    /// RAM-Bestueckung, mit der die Maschine gebaut wurde (Config::ram).
+    Config::Ram ram() const { return ram_; }
+    /// Bildschirmkarte(n), mit der die Maschine gebaut wurde (Config::bildschirm).
+    Config::Bildschirm bildschirm() const { return bildschirm_; }
     /// Gestecktes Lade-ROM (Config::laderom).
     K2526::Laderom laderom() const { return zre_.laderom(); }
-    /// Bildschirmkarte K7023.01 / Tastatur K7636 / RAM-Karte K3525 Nr. @p i der fruehen
-    /// Ausfuehrungen (nullptr am `Neu`).
+    /// Bildschirmkarte K7023.01 / Tastatur K7636 / RAM-Karte K3525 Nr. @p i — nur, wenn
+    /// die Option sie steckt (sonst nullptr).
     K7023*       k7023()       { return k7023_.get(); }
     const K7023* k7023() const { return k7023_.get(); }
     K7636*       k7636()       { return k7636_.get(); }
@@ -307,7 +347,7 @@ public:
     K3525*       k3525(int i)  { return (i >= 0 && i < 4) ? k3525_[i].get() : nullptr; }
 
     // Framebuffer
-    // Am `Alt`/`Kmbg` kommt das Bild von der K7023 (512×256, 64×16 Zeichen).
+    // Mit Bildschirm::K7023 kommt das Bild von der K7023 (512×256, 64×16 Zeichen).
     const uint8_t* framebuffer() const override;
     int  fbWidth()  const override { return k7023_ ? K7023::kFbW : 640; }
     int  fbHeight() const override { return k7023_ ? K7023::kFbH : 288; }
@@ -554,9 +594,12 @@ private:
 
     K7637         kbd_;
 
-    // Fruehe Ausfuehrungen (Config::Ausfuehrung Alt/Kmbg): statt K3526/K7024/K7637 am Bus.
-    // Die K2526 haelt nur einen Zeiger auf die K7636 (U-Bus-Geraet).
+    // Einzeloptionen (Entwurf 33 N1): K3525 statt K3526 (Config::ram), K7023 statt K7024
+    // (Config::bildschirm), K7636 statt K7637 (Config::tastatur).  Die K2526 haelt nur einen
+    // Zeiger auf die K7636 (U-Bus-Geraet).  ausf_ ist nur noch die Huelle fuer die C-ABI-Abfrage.
     Config::Ausfuehrung ausf_ = Config::Ausfuehrung::Neu;
+    Config::Ram         ram_ = Config::Ram::K3526;
+    Config::Bildschirm  bildschirm_ = Config::Bildschirm::K7024;
     std::array<std::unique_ptr<K3525>, 4> k3525_;
     std::unique_ptr<K7023> k7023_;
     std::unique_ptr<K7636> k7636_;

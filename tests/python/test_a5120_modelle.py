@@ -113,8 +113,10 @@ def test_laderom_und_tastatur_falsch():
         _emu(laderom="v06", em="em256")
     with pytest.raises(ValueError):
         _emu(machine="k8915", laderom="v06")
-    with pytest.raises(RuntimeError, match="K7637"):   # Kern: am „alt“ keine SIO-Tastatur
-        _emu(ausfuehrung="alt", tastatur="k7637")
+    # Seit Entwurf 33 N1 ist die Tastatur frei: K7637 am „alt“ (K7023) haengt an der K8025.
+    e = _emu(ausfuehrung="alt", tastatur="k7637")
+    assert (e.ausfuehrung, e.tastatur) == ("alt", "k7637")
+    assert e.framebuffer_size() == (512, 256)
 
 
 def test_c_abi_lehnt_unbekannte_werte_mit_grund_ab():
