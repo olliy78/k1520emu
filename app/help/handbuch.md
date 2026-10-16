@@ -576,17 +576,136 @@ Kaltstart abzukürzen; wer die Uhr braucht, bleibt beim Nenntakt.
 Der eingestellte Takt steht links in der Statuszeile, der **gemessene** in
 dessen Tooltip.
 
-## Modell: A5120 oder A5120.16
+## Modell und Optionen
 
-*Einstellungen ▸ Allgemein ▸ Modell*: **A5120** (die Vorgabe, ohne Erweiterung)
-oder **A5120.16** — der A5120 mit der Erweiterungskarte EM256 und dem
-16-Bit-Prozessor U8001 zusätzlich zum U880.
+*Einstellungen ▸ Allgemein ▸ Modell* kennt drei Rechner: **A5120**, **A5130** und
+**K8924**. Ein Modell ist nur eine Sammlung von **Vorgaben** — die Wahl trägt Werte
+in die Optionsfelder darunter, in das Feld *Kassette* und in die Laufwerke ein,
+**ohne Rückfrage**. Danach lässt sich jede Einzelheit ändern; wer das Modell erneut
+wählt, bekommt wieder dessen Vorgaben. Im Modellfeld steht dafür kein „(angepasst)“.
+Der Fenstertitel folgt dem Modell („A5120 Emulator“, „A5130 Emulator“,
+„K8924 Emulator“); das Programm heißt weiter `a5120emu`.
 
-Ein Wechsel erzeugt die Maschine neu — wie ein Kaltstart: das Erweiterungsmodul
-ist eine echte Steckkarte, keine Betriebsart, die sich während des Laufs an-
-oder abschalten liesse.
+| | A5120 | A5130 | K8924 |
+|---|---|---|---|
+| RAM | K3526 64 KB | K3526 64 KB | K3526 64 KB |
+| Bildschirmkarte | K7024 24x80 | K7024 24x80 | K7024 24x80 |
+| Tastatur | K7637 | K7636 | K7637 |
+| Lade-ROM | V0.9_2 | V0.9_2 | V0.9_2 |
+| Laufwerke | 3 × K5601 | 4 × K5601 | 3 × K5601 |
+| Kassette | aus | aus | aus |
 
-Bei **A5120.16** zeigt die Statuszeile zwei zusätzliche Leuchten und den
+Die Optionen stehen unter *Einstellungen ▸ Allgemein*: *RAM*, *Bildschirmkarte*,
+*Tastatur*, *Lade-ROM* und *Erweiterungsmodul*, dazu *Kassette* (Abschnitt
+*Kassette*) und die Laufwerke (*Einstellungen ▸ Laufwerke*). **Jede Änderung baut
+die Maschine neu auf** — wie ein Kaltstart: es sind Steckkarten und Brücken, keine
+Betriebsarten, die sich im Lauf umlegen ließen. (Einzige Ausnahme: der
+Bildschirm-Umschalter, siehe unten.)
+
+**Ein Konfigurationsstand aus einer früheren Fassung** (Modelle „A5120.16“,
+„A5120 (64×16, K7636)“, „A5120 Kassette“, „A5120 BCU 880“) wird **nicht
+umgesetzt**: der unbekannte Modellname gilt als nicht gesetzt, es greift die Vorgabe
+des A5120. Die Kombinationen von früher sind jetzt Optionen — etwa „64×16 mit K7636“
+als *K7023* + *4x K3525* + *K7636* und Laufwerke K5600.10 —, und wer sie neu
+zusammenstellt, speichert damit die neue Konfiguration. Gültige einzelne Optionen aus
+dem alten Stand bleiben erhalten.
+
+**Laufwerke:** das Modell setzt sie nur im Augenblick der Modellwahl. Die alten
+Geräte hatten drei Laufwerke K5600.10 (5¼″, 40 Spuren, einseitig); wer eines
+nachstellt, stellt sie selbst ein (*Einstellungen ▸ Laufwerke*). Das
+Doppelschritt-Verfahren (40-Spur-Diskette im 80-Spur-Laufwerk und umgekehrt) steht im
+Abschnitt *Wenn die Diskette nicht zum Laufwerk passt*. **Viele alte Geräte sind
+später auf K5601/K5122 umgerüstet worden**; wer Disketten aus einem solchen Gerät
+hat, nimmt eher die 80-Spur-Laufwerke. Das Modell **A5120 8″** (K5602) gibt es nicht.
+
+### Bildschirmkarte und Umschalter
+
+*Bildschirmkarte* hat drei Einträge:
+
+* **K7024 Auflösung 24x80** — nur die K7024 steckt (80 Zeichen × 24 Zeilen).
+* **K7023 Auflösung 16x64** — nur die K7023 steckt (64 × 16, Zelle 8×16 Punkte, Bild
+  512×256; der Kursor ist ein Balken in den untersten Zeilen der Zelle; die
+  Helligkeitsmarken 04H–0FH der K7023.01 stellt der Emulator nicht dar).
+* **K7024 und K7023 mit Umschalter** — beide Karten stecken, wie im A5130 und im
+  K8924, in denen ein Schalter zwischen ihnen wählt.
+
+Bei diesem dritten Eintrag wird der **Schiebeschalter** unter dem Feld bedienbar
+(links *K7024 24x80*, rechts *K7023 16x64*), sonst ist er ausgegraut. Er schaltet
+zwei Dinge zugleich:
+
+* das **Videosignal** — welche Karte auf dem Bild erscheint. Das wirkt **sofort**,
+  ohne Neustart, auch im laufenden Programm;
+* die **Wickelbrücke** der Zentralen Recheneinheit (Port 0AH, Bit 6), an der das
+  Betriebssystem erkennt, welches Format es schreiben soll. CP/A liest sie **nur beim
+  Kaltstart** — nach dem Umlegen muss man den Rechner neu starten, damit CP/A das
+  andere Format nimmt, genau wie am Gerät.
+
+Beide Karten hängen immer am Bus; ein Schreibzugriff auf den Bildbereich
+(FC00H–FFFFH) trifft beide. Das heißt: **ein Fehlbild auf der nicht passenden Karte
+ist gewollt.** Läuft CP/A im Format 24x80 und der Schalter steht auf K7023, zeigt
+diese Karte dieselben Bytes anders gedeutet — Müll. Ein Programm, das selbst im
+16x64-Format nach FC00H schreibt, ist dagegen auf der K7023 richtig zu lesen und
+zerstört nebenbei den unteren Teil von CP/As 24x80-Bild. Umschalten stellt das
+richtige Bild her; ein Fehler des Emulators ist es nicht.
+
+Dass der Schalter auch die Wickelbrücke umlegt, ist eine **Modellannahme**: Nach den
+Schaltplänen führt kein Anschluss die Brücke aus dem Rechner heraus, am Gerät ist das
+nicht belegt. Mit nur einer Karte gibt es keinen Schalter; die Brücke ergibt sich aus
+der Karte. Der Schalterzustand wird gemerkt (`general.bildschirm_schalter`) und
+steht auch im Zwischenstand. Es gibt dafür kein Tastenkürzel.
+
+### Tastatur
+
+*Tastatur* wählt die Bauart — bei **allen drei Modellen**, unabhängig von der
+Bildschirmkarte und vom RAM:
+
+* **K7637** (seriell, am Kanal der K8025) — Vorgabe bei A5120 und K8924.
+* **K7636** (parallel am U-Bus der Zentralen Recheneinheit) — Vorgabe beim A5130. Das
+  Tastenbild des A5130 ist das der K7636.01; eine eigene Bildschirmtastatur gibt es
+  dafür nicht.
+
+Die Bildschirmtastatur wechselt mit dieser Option, nicht mit dem Modell. Zur K7636:
+
+* Kleinschrift ist die Grundstellung; SHIFT und LOCK liefern selbst keinen Code und
+  schalten auf Großschrift (anders als an der K7634).
+* **ET2** ist die Steuertaste (Control-Ersatz), **ET1** liefert FFH — ob daraus ein
+  Zeilenende wird, hängt vom System ab (BCU 880 Satz 2: nur die Taste ↵).
+* **DEL LINE** (13H) liefert ESC-Code, **INS LINE** (03H) ein eigenes Zeichen;
+  die Tasten S…S9 sind PF0…PF9, INS MODE ist das numerische Minus.
+* Die Lampen (Wahl 0–3, INS MODE, Fehler) setzt der Gast per Kommando; nur die
+  K7636 hat sie.
+* Nach dem Einschalten schickt die Tastatur ein Typzeichen (80H); BCU 880 holt es
+  nicht ab — es erscheint als erstes Zeichen der ersten Eingabezeile. Erst eine
+  leere Zeile eingeben.
+
+### RAM
+
+*RAM* wählt die Speicherkarten: **1x K3525 16KB**, **2x K3525 32KB**, **4x K3525
+64KB** (je 16 KB ab 0000H im 4000H-Raster) oder **K3526 64KB**. Gesperrt ist nichts:
+Software, die mehr Speicher braucht (CP/A will den oberen Bereich), läuft mit
+weniger nicht. Die K3525-Karten stehen vor dem
+Einschalten mit FFH im Speicher. Ein Erweiterungsmodul geht nur mit der K3526.
+
+### Lade-ROM
+
+*Lade-ROM* wählt das Programm in der Zentralen Recheneinheit, das nach dem
+Einschalten die Diskette lädt:
+
+* **V0.9_2** — die Vorgabe; startet CP/A, SCPX, UDOS und die übrigen Systeme.
+* **V0.9_1** — die ältere Fassung desselben Programms.
+* **V0.6** — ein anderes Programm: es liest Zylinder 1 und startet die BCU-880-
+  Disketten „SYL auf Spur 1“ (Abschnitt *BCU 880*).
+
+Das Lade-ROM des K8924 (V0.9a) ist ein handgepatchter Abzug und fehlt in der
+Auswahl.
+
+### Erweiterungsmodul (A5120.16)
+
+*Erweiterungsmodul* steckt **EM064** oder **EM256** mit dem 16-Bit-Prozessor U8001
+zusätzlich zum U880 — das ist der A5120.16. Es geht **nur am A5120** und nur mit
+der K3526 als RAM; sonst ist das Feld ausgegraut (der gespeicherte Wert bleibt).
+
+Mit Erweiterungsmodul zeigt die Statuszeile zwei zusätzliche Leuchten und den
 Modus:
 
 | Leuchte | Bedeutung |
@@ -597,64 +716,19 @@ Modus:
 **V1 zeigt nicht den Paritätsfehler**, auch wenn die Leuchte auf der Karte
 dafür Platz hätte — nach dem Schaltplan hängt sie an RAMEN. Daneben steht
 `Modus: 8-Bit` oder `Modus: 16-Bit`, je nachdem, welcher Prozessor gerade den
-Bus hat. Beim schlichten A5120 fehlen beide Leuchten.
+Bus hat. Ohne Erweiterungsmodul fehlen beide Leuchten.
 
-## Frühe A5120
-
-Neben dem A5120 „neu“ (K7024 mit 80×24 Zeichen, K7637) kennt das Programm zwei
-ältere Ausführungen. Sie stehen unter *Einstellungen ▸ Allgemein ▸ Modell*:
-
-* **A5120 (64×16, K7636)** — Bildschirmkarte K7023 mit 16 Zeilen zu 64 Zeichen,
-  Tastatur K7636 parallel an der Zentralen Recheneinheit, vier RAM-Karten K3525
-  (je 16 KB).
-* **A5120 Kassette** — wie vorstehend, dazu fest die Kassettenkarte K5020 mit
-  zwei Laufwerken K5200 (Geräte 1 und 2; unter BCU 880 sind das E: und F:). Das
-  Feld *Kassette* in den Einstellungen entfällt, die Karte ist Teil des Modells.
-* **A5120 BCU 880 (Lade-ROM V0.6)** — die Ausführung „64×16, K7636“ mit dem
-  älteren Lade-ROM V0.6, das die BCU-Disketten „SYL auf Spur 1“ startet
-  (Abschnitt *BCU 880*).
-
-Ein Wechsel baut die Maschine neu auf (Kaltstart). Eine Konfiguration ohne Modell
-bleibt der A5120 „neu“. Das Modell **A5120 8″** (K5602) steht im Auswahlfeld
-ausgegraut: es ist nicht nachgebildet.
-
-**Laufwerke werden beim Modellwechsel nicht umgestellt.** Die alten Geräte hatten
-drei Laufwerke K5600.10 (5¼″, 40 Spuren, einseitig), die Vorgabe der Ausführung
-beim Anlegen. Ein Wechsel im laufenden Programm lässt die gewählte Bestückung
-(*Einstellungen ▸ Laufwerke*) und die eingelegten Disketten aber stehen — sie
-gehören dem Anwender. Wer ein altes Gerät nachstellen will, stellt die Laufwerke
-selbst ein. Auch das Doppelschritt-Verfahren (40-Spur-Diskette im 80-Spur-Laufwerk
-und umgekehrt) kommt aus dem Abschnitt *Wenn die Diskette nicht zum Laufwerk
-passt*. **Viele alte Geräte sind später auf K5601/K5122 umgerüstet worden**; wer
-Disketten aus einem solchen Gerät hat, nimmt eher die 80-Spur-Laufwerke.
-
-**Bild:** 64×16 Zeichen, die Zelle ist 8×16 Punkte groß, das Bild 512×256. Der
-Kursor ist ein Balken in den untersten Zeilen der Zelle. Die K7023.01 kennt
-Helligkeitsmarken (04H–0FH), die der Emulator nicht darstellt.
-
-**Tastatur K7636** (Bildschirmtastatur wechselt mit dem Modell):
-
-* Kleinschrift ist die Grundstellung; SHIFT und LOCK liefern selbst keinen Code und
-  schalten auf Großschrift (anders als an der K7634).
-* **ET2** ist die Steuertaste (Control-Ersatz), **ET1** liefert FFH — ob daraus ein
-  Zeilenende wird, hängt vom System ab (BCU 880 Satz 2: nur die Taste ↵).
-* **DEL LINE** (13H) liefert ESC-Code, **INS LINE** (03H) ein eigenes Zeichen;
-  die Tasten S…S9 sind PF0…PF9, INS MODE ist das numerische Minus.
-* Die Lampen (Wahl 0–3, INS MODE, Fehler) setzt der Gast per Kommando.
-* Nach dem Einschalten schickt die Tastatur ein Typzeichen (80H); BCU 880 holt es
-  nicht ab — es erscheint als erstes Zeichen der ersten Eingabezeile. Erst eine
-  leere Zeile eingeben.
-
-**CP/A** (die vorhandenen Disketten von 1989) läuft auf dem Modell unverändert bis
-`A>`; es erkennt die K7023 an einer Brücke der Zentralen Recheneinheit und die
-K7636 selbst.
+**CP/A** (die vorhandenen Disketten von 1989) läuft mit K7023 und K7636 unverändert
+bis `A>`; es erkennt die K7023 an der Wickelbrücke der Zentralen Recheneinheit und
+die K7636 selbst.
 
 ### BCU 880
 
 Das Betriebssystem BCU 880 (V1.2) bootet von den Disketten „SYL auf Spur 1“ bis
-`A>`. Sie brauchen das Lade-ROM V0.6 — das Modell **A5120 BCU 880 (Lade-ROM
-V0.6)** unter *Einstellungen ▸ Allgemein ▸ Modell* steckt es zusammen mit dem
-Bildschirm K7023 (64×16) und der Tastatur K7636. Im Ordner der
+`A>`. Sie brauchen das Lade-ROM V0.6. Dafür unter *Einstellungen ▸ Allgemein*
+einstellen: *Lade-ROM* **V0.6**, *Bildschirmkarte* **K7023 Auflösung 16x64**,
+*Tastatur* **K7636** und *RAM* **4x K3525 64KB** (ein eigenes Modell dafür gibt es
+nicht). Im Ordner der
 Beispieldisketten liegen dafür unter `a5120_bcu/`:
 
 | Datei | Inhalt |
@@ -669,8 +743,8 @@ So geht es:
    **K5600.10** (5¼″, 40 Spuren, einseitig). Die Disketten haben 40 Spuren; in
    einem 80-Spur-Laufwerk K5601 (der Laufwerkskasten meldet dann den
    Doppelschritt) findet das Lade-ROM den Lader auf Spur 1 nicht, der Rechner
-   bleibt stehen. Der Modellwechsel stellt die Laufwerke nicht selbst um (siehe
-   oben).
+   bleibt stehen. Das Modell stellt die Laufwerke nur bei der Modellwahl um, nicht
+   bei einer einzelnen Option (siehe oben).
 2. Startdiskette nach A:, Arbeitsdiskette nach B:, Kaltstart. Nach einigen
    Sekunden meldet sich `BCU 880 VERS 1.2` mit `A>`.
 3. Zuerst eine **leere Zeile** eingeben (Typzeichen der K7636, siehe oben). Eine
@@ -682,7 +756,7 @@ So geht es:
   der SYL-Diskette also die Arbeitsdiskette einlegen, bevor ^C oder ein Programm
   endet, sonst stürzt das System ab.
 * **Kassette:** dazu unter *Einstellungen ▸ Allgemein* das Feld *Kassette*
-  einschalten (das ergibt dieselbe Karte K5020 wie das Modell *A5120 Kassette*)
+  einschalten (das ergibt die Karte K5020 mit zwei Laufwerken K5200)
   und im Kasten *Kassette* ein Band in Gerät 2 legen, etwa
   `bcu_kassette_formatiert.k52` (vorher kopieren: der Emulator schreibt in die
   Datei zurück). `OPEN B:KMBG` lädt den Treiber (Meldung „kmbg opened“, `KMBG.REL`
