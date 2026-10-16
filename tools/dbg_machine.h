@@ -381,15 +381,15 @@ public:
         if (p8_) return (uint8_t)(p8_->screenChar(col, row) & 0x7F);   // Kern-Terminal tty1 (80 × 24)
         if (mc_) return (uint8_t)(mc_->screenChar(col, row) & 0x7F);   // MC80: Mustervergleich des VIS-Bilds, nie mem_read
         if (m2_) return (uint8_t)(m2_->screenChar(col, row) & 0x7F);   // MC80.2x: Zelle der DPL (32 × 8), nie mem_read
-        if (a5_->k7023()) {   // altes Geraet (AP A6): K7023 64×16 ab FC00H; ausserhalb = Leerzeichen
+        if (a5_->zeigtK7023()) {   // altes Geraet (AP A6): K7023 64×16 ab FC00H; ausserhalb = Leerzeichen
             if (row >= 16 || col >= 64) return 0x20;
             return (uint8_t)(a5_->screenChar(col, row) & 0x7F);
         }
         return a5_->memReadDebug((uint16_t)(0xF800 + row * 80 + col));
     }
     /// Sichtbares Textbild: 64×16 an der K7023 (A5120 alt), sonst 80×24.
-    int screenCols() const { return (a5_ && a5_->k7023()) ? 64 : m2_ ? 32 : 80; }
-    int screenRows() const { return (a5_ && a5_->k7023()) ? 16 : mc_ ? 25 : m2_ ? 8 : 24; }
+    int screenCols() const { return (a5_ && a5_->zeigtK7023()) ? 64 : m2_ ? 32 : 80; }
+    int screenRows() const { return (a5_ && a5_->zeigtK7023()) ? 16 : mc_ ? 25 : m2_ ? 8 : 24; }
 
     // ─── CPU ─────────────────────────────────────────────────────────────────
     Z80& cpuDebug() {

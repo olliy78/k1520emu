@@ -90,6 +90,7 @@
 #include "core/cards/k2526/laderom_v09_1_data.h"
 #include <array>
 #include <cstdint>
+#include <functional>
 
 /**
  * @class MemIOProtect
@@ -695,6 +696,17 @@ public:
     void setUBusGeraet(UBusGeraet* g) { ubus_geraet_ = g; }
     UBusGeraet* ubusGeraet() const    { return ubus_geraet_; }
 
+    /**
+     * @brief Wickelbruecken B5–B7 der BS-PIO zur Laufzeit liefern (Entwurf 33 N2, §3.3/§3.5).
+     *
+     * Vorgabe leer: es gilt das feste @ref A5120Config::config_bridges (bitgleich zu bisher).
+     * Mit Quelle wird ihr Wert (Kodierung wie `config_bridges`, Bit 0–2 → B5–B7) bei JEDEM
+     * `IN 0AH` gelesen und — nur bei einer Aenderung — in die BS-PIO eingespeist; die
+     * Hardware kennt keinen Zwischenspeicher.  Die Quelle wird aus dem Rechenfaden gerufen
+     * und muss ohne Sperre auskommen (z. B. ein `std::atomic` lesen).  Vor @ref powerOn setzen.
+     */
+    void setBrueckenQuelle(std::function<uint8_t()> q) { bruecken_quelle_ = std::move(q); }
+
 private:
     /**
      * @brief BS-PIO Port B output callback – decodes all output signals.
@@ -790,4 +802,5 @@ private:
     uint8_t ubus_lamp_       = 0x00;  ///< Port 05H OUT: status lamp output  (/UCS3)
     uint8_t ubus_error_lamp_ = 0x00;  ///< Port 03H OUT: error  lamp output  (/UCS4)
     UBusGeraet* ubus_geraet_ = nullptr; ///< optionales Geraet an X1 (K7636); nullptr = Standard
+    std::function<uint8_t()> bruecken_quelle_;  ///< Laufzeitbruecken (leer = config_bridges)
 };

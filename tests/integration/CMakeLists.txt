@@ -265,6 +265,10 @@ k1520_add_test(a5120_ausfuehrungen SRC test_a5120_ausfuehrungen.cpp
 # dazu CP/A bis A> auf K7023 + 4× K3525 mit der K7637.
 k1520_add_test(a5120_optionen SRC test_a5120_optionen.cpp LIBS ${_libs}
                               LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 120)
+# Bildschirm = Beide (Entwurf 33 N2): K7024 + K7023 am Bus, Umschalter fuer Bild und Bruecke
+# 0AH Bit 6, Zwischenstand v9, CP/A bis A> in beiden Schalterstellungen.
+k1520_add_test(a5120_bildschirm SRC test_a5120_bildschirm.cpp LIBS ${_libs}
+                                LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 180)
 # CP/A auf dem A5120 „5¼″ alt“ bis A> (AP A6): K7023 BAB1 FC00H, K7636, dir getippt.
 k1520_add_test(boot_alt SRC test_boot_alt.cpp LIBS ${_libs}
                         LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 120)

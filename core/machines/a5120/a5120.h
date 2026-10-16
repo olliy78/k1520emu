@@ -91,10 +91,17 @@ public:
          *
          * - `K7024` — K7024 24×80 ab F800H, Wickelbruecke Port 0AH Bit 6 = 0 (BAB2); Vorgabe.
          * - `K7023` — K7023.01 16×64 ab FC00H, Bruecke Bit 6 = 1 (BAB1, `config_bridges` 02H).
-         * - `Beide` — beide Karten mit Umschalter: erst AP N2, der Konstruktor lehnt bis dahin ab.
+         * - `Beide` — K7024 und K7023 stecken zugleich (Entwurf 33 §3.2, N2): Schreiben in
+         *   FC00–FFFFH trifft beide Karten, Lesen dort liefert die K7023 (zuletzt registriert),
+         *   F800–FBFFH die K7024.  Der Umschalter (@ref bildschirm_schalter,
+         *   @ref setBildschirmSchalter) waehlt das angezeigte Bild UND die Bruecke Bit 6.
          */
         enum class Bildschirm { K7024 = 0, K7023 = 1, Beide = 2 };
         Bildschirm bildschirm = Bildschirm::K7024;
+
+        /// Anfangsstellung des Umschalters bei `bildschirm == Beide` (`K7024` | `K7023`);
+        /// sonst ohne Bedeutung.  Zur Laufzeit: @ref setBildschirmSchalter.
+        Bildschirm bildschirm_schalter = Bildschirm::K7024;
 
         /// Kassettenkarte K5020 fest gesteckt (30H–37H, 2× K5200).  Vorgabe aus; die
         /// nachtraegliche Installation ueber @ref installK5020 bleibt davon unberuehrt.
@@ -336,10 +343,32 @@ public:
     Config::Ram ram() const { return ram_; }
     /// Bildschirmkarte(n), mit der die Maschine gebaut wurde (Config::bildschirm).
     Config::Bildschirm bildschirm() const { return bildschirm_; }
+    /**
+     * @brief Umschalter K7024/K7023 (nur bei `Config::bildschirm == Beide`, Entwurf 33 §3.3).
+     *
+     * Wirkt sofort auf das angezeigte Bild (@ref framebuffer, @ref fbWidth/@ref fbHeight,
+     * @ref screenChar) und auf die Wickelbruecke Port 0AH Bit 6 (K7023 → 1 = BAB1, K7024 → 0
+     * = BAB2), die die K2526 bei jedem `IN 0AH` neu liest; CP/A wertet sie nur beim Kaltstart
+     * aus.  Der Bildspeicher bleibt unberuehrt.  Darf aus einem anderen Faden als dem
+     * Rechenfaden gerufen werden (atomar, keine Sperre); Bild-Abfragen, die Zeiger UND Groesse
+     * brauchen, muessen sich trotzdem gegen einen Wechsel dazwischen schuetzen (Kernsperre).
+     * @throws std::logic_error ohne `Beide`; std::invalid_argument bei @p s == `Beide`.
+     */
+    void setBildschirmSchalter(Config::Bildschirm s);
+    /// Stellung des Umschalters (`K7024` | `K7023`); ohne `Beide` die gesteckte Karte.
+    Config::Bildschirm bildschirmSchalter() const;
+    /// Zeigt die Maschine das Bild der K7023 (64×16)?  Sonst das der K7024 (80×24).
+    bool zeigtK7023() const {
+        return bildschirm_ == Config::Bildschirm::K7023 ||
+               (bildschirm_ == Config::Bildschirm::Beide &&
+                schalter_.load(std::memory_order_relaxed) == kSchalterK7023);
+    }
     /// Gestecktes Lade-ROM (Config::laderom).
     K2526::Laderom laderom() const { return zre_.laderom(); }
     /// Bildschirmkarte K7023.01 / Tastatur K7636 / RAM-Karte K3525 Nr. @p i — nur, wenn
     /// die Option sie steckt (sonst nullptr).
+    /// Die K7024 (Objekt besteht immer; am Bus nur mit `K7024` oder `Beide`).
+    const K7024& k7024() const { return screen_; }
     K7023*       k7023()       { return k7023_.get(); }
     const K7023* k7023() const { return k7023_.get(); }
     K7636*       k7636()       { return k7636_.get(); }
@@ -347,23 +376,28 @@ public:
     K3525*       k3525(int i)  { return (i >= 0 && i < 4) ? k3525_[i].get() : nullptr; }
 
     // Framebuffer
-    // Mit Bildschirm::K7023 kommt das Bild von der K7023 (512×256, 64×16 Zeichen).
+    // Das Bild kommt von der angezeigten Karte (@ref zeigtK7023): K7023 512×256 (64×16
+    // Zeichen), K7024 640×288.  Bei `Beide` wechselt die Groesse mit dem Umschalter.
     const uint8_t* framebuffer() const override;
-    int  fbWidth()  const override { return k7023_ ? K7023::kFbW : 640; }
-    int  fbHeight() const override { return k7023_ ? K7023::kFbH : 288; }
-    bool fbDirty()  const override { return k7023_ ? k7023_->fbDirty() : screen_.fbDirty(); }
+    int  fbWidth()  const override { return zeigtK7023() ? K7023::kFbW : 640; }
+    int  fbHeight() const override { return zeigtK7023() ? K7023::kFbH : 288; }
+    bool fbDirty()  const override {
+        return bild_gewechselt_.load(std::memory_order_relaxed) ||
+               (zeigtK7023() ? k7023_->fbDirty() : screen_.fbDirty());
+    }
     void fbClearDirty() override {
-        if (k7023_) k7023_->fbClearDirty(); else screen_.fbClearDirty();
+        bild_gewechselt_.store(false, std::memory_order_relaxed);
+        if (zeigtK7023()) k7023_->fbClearDirty(); else screen_.fbClearDirty();
     }
 
     // Console (CLI) mode — nur die K7024 kennt ihn; an der K7023 ohne Wirkung.
-    void setConsoleMode(bool on) override { if (!k7023_) screen_.setConsoleMode(on); }
-    bool consolePoll(int& x, int& y, char& ch) override {
-        return k7023_ ? false : screen_.pollTextChange(x, y, ch);
+    void setConsoleMode(bool on) override {
+        if (bildschirm_ != Config::Bildschirm::K7023) screen_.setConsoleMode(on);
     }
-    /// Bildspeicher der K7024 bzw. K7023 direkt (Bereichspruefung in der C-ABI/Karte).
+    bool consolePoll(int& x, int& y, char& ch) override;
+    /// Bildspeicher der angezeigten Karte direkt (Bereichspruefung in der C-ABI/Karte).
     uint8_t screenChar(int col, int row) const override {
-        return k7023_ ? k7023_->vramRead(col, row) : screen_.vramRead(col, row);
+        return zeigtK7023() ? k7023_->vramRead(col, row) : screen_.vramRead(col, row);
     }
 
     // ─── Serielle Schnittstellen (Entwurf 19 §3.1, AP-S5) ─────────────────────
@@ -603,6 +637,12 @@ private:
     std::array<std::unique_ptr<K3525>, 4> k3525_;
     std::unique_ptr<K7023> k7023_;
     std::unique_ptr<K7636> k7636_;
+
+    // Umschalter bei Bildschirm::Beide (Entwurf 33 N2): aus dem GUI-Faden gesetzt, im
+    // Rechenfaden gelesen (Bruecken-Quelle der K2526, Bild-Abfragen) — atomar, kein Mutex.
+    static constexpr uint8_t kSchalterK7024 = 0, kSchalterK7023 = 1;
+    std::atomic<uint8_t> schalter_{kSchalterK7024};
+    std::atomic<bool> bild_gewechselt_{false};   ///< erzwingt ein fbDirty nach dem Umschalten
 
     Laufwerke     lw_;        // Laufwerksverwaltung (gemeinsamer Baustein, laufwerke.h)
 

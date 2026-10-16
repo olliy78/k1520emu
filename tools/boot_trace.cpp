@@ -624,10 +624,10 @@ int main(int argc, char** argv) {
     A5120Machine& machine = *machine_p;
     // Textbild: am `Neu` der Bildspeicher F800H in CPU-Sicht (80×24, wie bisher), am alten
     // Geraet die K7023 (64×16 ab FC00H, Bit 7 = Kursor ausgeblendet).
-    const int scr_cols = machine.k7023() ? 64 : 80;
-    const int scr_rows = machine.k7023() ? 16 : 24;
+    const int scr_cols = machine.zeigtK7023() ? 64 : 80;
+    const int scr_rows = machine.zeigtK7023() ? 16 : 24;
     auto scrByte = [&](int r, int c) -> uint8_t {
-        if (machine.k7023()) return (uint8_t)(machine.screenChar(c, r) & 0x7F);
+        if (machine.zeigtK7023()) return (uint8_t)(machine.screenChar(c, r) & 0x7F);
         return machine.memReadDebug((uint16_t)(0xF800 + r*80 + c));
     };
     if (!quiet && machine.k7023())

@@ -200,16 +200,14 @@ TEST(A5120Optionen, KassetteAlsOption) {
     EXPECT_TRUE(ohne.installK5020()) << "nachtraegliche Installation bleibt";
 }
 
-TEST(A5120Optionen, EmNurMitK3526UndBeideErstN2) {
+TEST(A5120Optionen, EmNurMitK3526) {
     for (R r : {R::K3525_1x, R::K3525_2x, R::K3525_4x}) {
         C c;
         c.ram = r;
         c.em = C::Em::em256;
         EXPECT_THROW(A5120Machine{c}, std::invalid_argument) << static_cast<int>(r);
     }
-    C beide;
-    beide.bildschirm = B::Beide;
-    EXPECT_THROW(A5120Machine{beide}, std::invalid_argument);
+    // `Beide` gibt es seit N2 (test_a5120_bildschirm.cpp).
 }
 
 TEST(A5120Optionen, ZwischenstandMitZweiK3525) {
