@@ -921,6 +921,29 @@ k1520disktool tar-satz ariane1.cqm ariane2.cqm --to aus/   # vollstaendig entpac
 Die Datenstroeme werden in der angegebenen Reihenfolge verkettet; die Reihenfolge
 bestimmt der Aufrufer (Satznamen). Exit 1 nur bei einem Befund `Fehler`.
 
+### `tar-export`, `tar-put` und die leere tar-Diskette `tar720_leer`
+
+```
+k1520disktool tar-export <abbild> <ziel.tar>   # Rohinhalt der Diskette als .tar
+k1520disktool create x.cqm --fs tar720_leer    # leere 720K-tar-Diskette (img|hfe|dmk|cqm)
+k1520disktool tar-put x.cqm quelle.tar         # .tar hinein (einmal), --dry-run nur pruefen
+```
+`tar-export`: die 512-Byte-Bloecke des Stroms 1:1. Beginnt die Diskette mit einem gueltigen
+tar-Kopf, wird die Struktur abgelaufen und der Export endet hinter der Endmarke (zwei
+Nullbloecke an einer Kopfposition); sonst — auch bei einem Folgeteil, dessen Dateidaten
+Nullbloecke enthalten koennen — der ganze Strom. Geht an tar-Disketten und an roh geoeffneten
+(kein Dateisystem erkannt), nicht an Disketten mit Dateisystem, nicht an der leeren, nicht
+an einem `tar-satz`.
+
+`tar720_leer` ist ganz Null und wird nur dann so erkannt (VOR der CP/A-Regel, die eine
+Null-Diskette sonst als „CP/A, Fuellbyte 0x00“ liest; `--fs cpa…` uebersteuert). `tar-put`
+prueft vor dem Schreiben: Diskette leer und beschreibbar, Datei <= 737280 Byte und Vielfaches
+von 512 (sonst Ablehnung, bei Ueberlaenge mit Hinweis auf `split -b 737280`); ein erster Kopf
+ohne V7 (ustar-Magic, pax, GNU-Langname, 100-Zeichen-Name, binaere Groesse) ergibt eine
+**Warnung auf stderr**, geschrieben wird trotzdem. Danach ist die Diskette `tar720`
+(nur lesbar), ein zweites `tar-put` scheitert. Rundlauf: siehe Handbuch („tar-Archive
+herausholen, bearbeiten und zurueckschreiben“).
+
 ## Dateisysteme ergänzen
 
 `data/formats.yaml` hat zwei Sektionen: `formats:` (Physik) und `filesystems:`

@@ -1072,3 +1072,10 @@ Was beim Weiterarbeiten zu wissen ist:
   (führendes `/` weg, `..` → `__`, sonst Zip-Slip); je Name gilt die LETZTE Fassung.  Es
   kommt nur tar vor (cpio an keinem der 142 Abbilder).  Wächter `TarFs.*`, `CqmDiskVolume.*`,
   `TarEchtdaten.*` (mit `K1520_CQM_DIR`, Gegenprobe GNU `tar -tvf`), `test_disktool_tar.py`.
+- **tar-Export / leere tar-Diskette / `.tar` schreiben (2026-10-17):** `tar-export`, `tar-put`, Profil
+  `tar720_leer`, C-ABI `k1520d_tar_*`/`k1520d_fs_leer`, Aktionen „Diskette als .tar exportieren…“ und
+  „tar-Datei auf Diskette schreiben…“ (ohne Kürzel).  Alle Festlegungen mit Wächtern in
+  `doc/merkposten/cqm.md` Nr. 13.  Oberfläche: die Datei-Wege (Einfügen, Löschen, Alles einfügen) sind auf der
+  leeren tar-Diskette zu (`datei_schreibbar = schreibbar and not ist_tar`), der Neu-Dialog bietet nur
+  `tar720_leer` (nicht `tar720`).  Wächter `py_disktool_tar_schreiben`, `dt_tar_*.cli`.
+

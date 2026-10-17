@@ -26,6 +26,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <map>
 #include <sstream>
 
@@ -1119,6 +1120,9 @@ constexpr const char* kNurBoot =
 constexpr const char* kSchreibschutz =
     "Die Diskette ist schreibgeschuetzt geoeffnet. Zum Aendern den Schreibschutz "
     "aufheben (in der Oberflaeche den Haken \"Nur lesen\" entfernen).";
+constexpr const char* kLeerTar =
+    "Auf eine leere tar-Diskette gehoert genau EIN .tar-Archiv (tar-put bzw. „tar-Datei auf "
+    "Diskette schreiben“), keine einzelnen Dateien.";
 constexpr const char* kNurLesbarTar =
     "Diese Diskette traegt einen tar-Strom ohne Dateisystem und ist nur lesbar "
     "(put/rm/attr gibt es dort nicht).  Zum Weiterverarbeiten mit get/tar-satz "
@@ -1387,6 +1391,8 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
         std::map<const FsProfile*, int> belegte_plaetze;   // nur CP/M: belegte Plaetze
         // tar-Disketten: LETZTER Versuch, nach der CP/A-Regel (siehe unten)
         std::vector<std::pair<const FsProfile*, const DiskFormat*>> tar_kandidaten;
+        // … und die LEERE tar-Diskette (ganz Null): VOR der CP/A-Regel, siehe unten
+        std::vector<std::pair<const FsProfile*, const DiskFormat*>> tar_leer_kandidaten;
         auto besterRang = [&](const DiskFormat* f) {
             int r = std::numeric_limits<int>::max();
             for (const FsProfile* p : fs_cat.forFormat(f->name))
@@ -1403,7 +1409,10 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
                 // unterscheidet (leere SCPX-8915-Diskette ≡ leere CP/A-Datendiskette);
                 // in der Erkennung machten sie nur jede dieser Disketten mehrdeutig.
                 if (!p->detect) continue;
-                if (p->type == FsType::Tar) { tar_kandidaten.emplace_back(p, f); continue; }
+                if (p->type == FsType::Tar) {
+                    (p->leer ? tar_leer_kandidaten : tar_kandidaten).emplace_back(p, f);
+                    continue;
+                }
 
                 // Der Grund einer Ablehnung wird EINGESAMMELT, nicht weggeworfen
                 // (Ebene 0, §11): bleibt die Erkennung am Ende ohne Ergebnis, ist
@@ -1476,6 +1485,31 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
                                    + "; Systemspuren leer, Verzeichnis ab " + wo;
                 dv->detection_.remarks =
                     zusammen(dv->detection_.remarks, dv->befund_zusatz_);
+            }
+        }
+
+        // ── Die LEERE tar-Diskette (`tar720_leer`) ───────────────────────────
+        // Eine Diskette, die ganz aus Nullen besteht, liest die CP/A-Regel sonst als
+        // „CP/A, Verzeichnis nicht angelegt (Fuellbyte 0x00)".  Eine formatierte CP/A-
+        // Diskette ist aber 0xE5 gefuellt; ganz Null ist die frisch angelegte tar-Diskette
+        // (`create --fs tar720_leer`) oder ein Medium, auf dem nichts steht.  Beides ist
+        // verlustfrei: wer in die Diskette ein .tar schreibt, ueberschreibt nur Nullen.
+        // Der Preis ist ausdruecklich in Kauf genommen: eine mit Nullen gefuellte
+        // CP/A-Diskette erscheint als „tar720_leer"; `--fs cpa…` stellt es richtig.
+        // Eine nur teilweise geladene physische Diskette wird NICHT geprueft (ganz Null
+        // laesst sich erst nach dem vollen Lesen sagen).
+        if (passend.empty() && !dv->abgeleitet_ && !tar_leer_kandidaten.empty()) {
+            DiskMedium& med = dv->disk_->medium();
+            if (!(med.loader() != nullptr && !med.complete())) {
+                for (const auto& [p, f] : tar_leer_kandidaten) {
+                    SectorSpace probe(med, *f);
+                    const TarSpaceQuelle quelle(probe);
+                    if (probe.size() > 0 && TarFileSystem::istLeer(quelle, nullptr)) {
+                        passend.push_back(p);
+                        dv->format_ = f;
+                        break;
+                    }
+                }
             }
         }
 
@@ -1617,6 +1651,12 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
             auto w = WegaFileSystem::mount(std::make_unique<WegaSpaceDev>(*v.space), warum);
             if (!w) { err = warum; return roh(warum); }
             v.fs = std::move(w);
+        } else if (dv->profile_->type == FsType::Tar && dv->profile_->leer) {
+            // Die leere tar-Diskette bleibt beschreibbar (mit genau einem .tar); ob
+            // geschrieben wird, entscheidet der Schreibschutz wie bei jeder Diskette.
+            auto t = TarFileSystem::mountLeer(std::make_unique<TarSpaceQuelle>(*v.space), warum);
+            if (!t) { err = warum; return roh(warum); }
+            v.fs = std::move(t);
         } else if (dv->profile_->type == FsType::Tar) {
             auto t = TarFileSystem::mount(std::make_unique<TarSpaceQuelle>(*v.space), warum);
             if (!t) { err = warum; return roh(warum); }
@@ -1653,12 +1693,19 @@ std::string DiskVolume::containerName() const {
 }
 
 std::string DiskVolume::schreibschutzText() const {
+    if (tarLeer()) return kLeerTar;
     if (profile_ && profile_->type == FsType::Tar) return kNurLesbarTar;
     return kSchreibschutz;
 }
 
 bool DiskVolume::readOnlyForced() const {
-    return nur_lesen_erzwungen_ || (profile_ && profile_->type == FsType::Tar);
+    return nur_lesen_erzwungen_ || (profile_ && profile_->type == FsType::Tar && !tarLeer());
+}
+
+bool DiskVolume::tarLeer() const {
+    if (!profile_ || profile_->type != FsType::Tar || !profile_->leer || volumes_.empty()) return false;
+    const auto* t = dynamic_cast<const TarFileSystem*>(volumes_[0].fs.get());
+    return t && t->leer();
 }
 
 const DiskFormat* DiskVolume::rohFormat() const {
@@ -1690,7 +1737,7 @@ std::unique_ptr<DiskVolume> DiskVolume::openTarSatz(const std::vector<std::strin
     if (pfade.empty()) { err = "kein Abbild angegeben"; return nullptr; }
     const FsProfile* prof = nullptr;
     for (const FsProfile& p : fs_cat.profiles())
-        if (p.type == FsType::Tar) { prof = &p; break; }
+        if (p.type == FsType::Tar && !p.leer) { prof = &p; break; }
     if (!prof) { err = "Im Katalog steht kein Dateisystem vom Typ tar"; return nullptr; }
 
     std::unique_ptr<DiskVolume> erste;
@@ -1720,6 +1767,7 @@ std::unique_ptr<DiskVolume> DiskVolume::openTarSatz(const std::vector<std::strin
     erste->volumes_.push_back(std::move(v));
     erste->profile_ = prof;
     erste->format_  = f;
+    erste->tar_satz_ = true;
     erste->detection_ = DetectionResult{};
     erste->detection_.format     = f->name;
     erste->detection_.filesystem = prof->name;
@@ -1729,6 +1777,109 @@ std::unique_ptr<DiskVolume> DiskVolume::openTarSatz(const std::vector<std::strin
     erste->disk_->setWriteProtect(true);
     erste->check(FsCheckLevel::Schnell, false);
     return erste;
+}
+
+// ─── tar-Disketten: Export und Schreiben ─────────────────────────────────────
+
+namespace {
+
+bool leseGanz(const std::string& pfad, std::vector<uint8_t>& d, std::string& err) {
+    std::ifstream f(pfad, std::ios::binary);
+    if (!f) { err = "Datei nicht lesbar: " + pfad; return false; }
+    d.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+    if (f.bad()) { err = "Lesefehler: " + pfad; return false; }
+    return true;
+}
+
+}  // namespace
+
+bool DiskVolume::tarExport(const std::string& ziel, uint64_t* bytes) const {
+    if (!disk_) return fail("keine Diskette geoeffnet");
+    if (tar_satz_)
+        return fail("Ein tar-Satz ist schon EIN Strom — fuer den Export die Disketten des Satzes "
+                    "einzeln oeffnen (jede ergibt ihr Teilstueck, mit `cat` setzt man sie zusammen); "
+                    "zum Auspacken genuegt `tar-satz --to`.");
+    if (tarLeer())
+        return fail("Die Diskette ist leer (tar720 leer) — es gibt nichts zu exportieren.");
+    if (profile_ && !istTar())
+        return fail("Diese Diskette traegt ein Dateisystem (" + profile_->name + "), keinen tar-Strom.");
+    std::vector<uint8_t> strom;
+    if (!linearBytes(strom)) return false;
+    bool marke = false;
+    const uint64_t n = tar::exportLaenge(strom.data(), strom.size(), &marke);
+    std::ofstream f(ziel, std::ios::binary | std::ios::trunc);
+    if (!f) return fail("Zieldatei nicht schreibbar: " + ziel);
+    f.write(reinterpret_cast<const char*>(strom.data()), static_cast<std::streamsize>(n));
+    f.close();
+    if (!f) return fail("Schreibfehler: " + ziel);
+    if (bytes) *bytes = n;
+    return true;
+}
+
+bool DiskVolume::tarPruefen(const std::string& quelle, std::string* warnung) const {
+    tar_warnung_.clear();
+    if (warnung) warnung->clear();
+    if (!disk_) return fail("keine Diskette geoeffnet");
+    if (!tarLeer()) {
+        if (tar_satz_) return fail("Auf einen tar-Satz laesst sich nicht schreiben.");
+        if (istTar())
+            return fail("Diese Diskette traegt schon ein tar-Archiv (tar720) und ist nur lesbar — "
+                        "ein tar-Archiv wird nur in eine LEERE tar-Diskette geschrieben "
+                        "(`create --fs tar720_leer`), und nur einmal.");
+        if (profile_)
+            return fail("Diese Diskette traegt ein Dateisystem (" + profile_->name + "); ein tar-Archiv "
+                        "gehoert nur auf eine leere tar-Diskette (`create --fs tar720_leer`).");
+        return fail("Die Diskette ist nicht leer: ein tar-Archiv wird nur auf eine Diskette "
+                    "geschrieben, die ganz aus Nullen besteht (`create --fs tar720_leer`).");
+    }
+    if (read_only_) return fail(kSchreibschutz);
+    std::vector<uint8_t> d;
+    std::string err;
+    if (!leseGanz(quelle, d, err)) return fail(err);
+    const tar::QuellBefund b = tar::quelleBeurteilen(d, volumes_[0].space->size());
+    if (!b.fehler.empty()) return fail(b.fehler);
+    tar_warnung_ = b.warnung;
+    if (warnung) *warnung = b.warnung;
+    return true;
+}
+
+bool DiskVolume::tarSchreiben(const std::string& quelle) {
+    if (!tarPruefen(quelle)) return false;
+    std::vector<uint8_t> d;
+    std::string err;
+    if (!leseGanz(quelle, d, err)) return fail(err);
+
+    SectorSpace& raum = *volumes_[0].space;
+    const DiskMedium sicherung = disk_->medium();
+    // Ab Sektor 0 in Lesereihenfolge (SectorSpace ist dieselbe Folge wie beim Lesen); der Rest
+    // war Null (tarLeer) und bleibt es.
+    if (!raum.write(0, d.data(), d.size())) {
+        const std::string grund = raum.lastError();
+        disk_->medium().restoreFrom(sicherung);
+        return fail("Schreiben fehlgeschlagen: " + grund + " — die Diskette wurde nicht veraendert.");
+    }
+    // Zurueckschreiben, SOLANGE die Diskette noch beschreibbar ist: danach ist sie tar720.
+    // Eine Sicherungskopie (`<abbild>~`) lohnt nicht: die Diskette war ganz Null, es geht
+    // keine Information verloren.
+    backup_getan_ = true;
+    if (!flush()) {
+        const std::string grund = last_error_;
+        disk_->medium().restoreFrom(sicherung);
+        return fail(grund + " — die Diskette wurde nicht veraendert.");
+    }
+
+    std::string warum;
+    auto t = TarFileSystem::mount(std::make_unique<TarSpaceQuelle>(raum), warum);
+    if (!t) t = TarFileSystem::mountRoh(std::make_unique<TarSpaceQuelle>(raum), warum);   // Folgeteil
+    volumes_[0].fs = std::move(t);
+    // Die Diskette heisst jetzt tar720 (die Profile tragen die Namen `<x>_leer` / `<x>`).
+    std::string neu = profile_->name;
+    if (neu.size() > 5 && neu.compare(neu.size() - 5, 5, "_leer") == 0) neu.resize(neu.size() - 5);
+    detection_.filesystem = neu;
+    read_only_ = true;
+    disk_->setWriteProtect(true);
+    check(FsCheckLevel::Schnell, false);
+    return true;
 }
 
 void DiskVolume::merkeAblehnung(const std::string& kandidat, const std::string& format,
@@ -1905,7 +2056,7 @@ int rang(const std::string& kind) {
 }  // namespace
 
 int DiskVolume::applyRepairs(const std::vector<std::pair<int, int>>& auswahl) {
-    if (read_only_) { fail(schreibschutzText()); return -1; }
+    if (read_only_ || tarLeer()) { fail(schreibschutzText()); return -1; }
     if (profile_ && profile_->nur_boot) { fail(kNurBoot); return -1; }
     if (auswahl.empty()) { fail("Es wurde keine Reparatur ausgewaehlt"); return -1; }
     if (!disk_) { fail("keine Diskette geoeffnet"); return -1; }
@@ -2053,7 +2204,7 @@ bool DiskVolume::recoverExtract(int fnr, const std::string& dest_path) {
 }
 
 bool DiskVolume::recoverRestore(int fnr, const std::string& name) {
-    if (read_only_) return fail(schreibschutzText());
+    if (read_only_ || tarLeer()) return fail(schreibschutzText());
     if (profile_ && profile_->nur_boot) return fail(kNurBoot);
     const FsRecoverFind* f = fund(recover_, fnr);
     if (!f) return fail("Fund " + std::to_string(fnr) + " gibt es im letzten Suchlauf nicht");
@@ -2262,7 +2413,7 @@ bool DiskVolume::extractMit(const FileRef& ref, const std::string& dest_path,
 bool DiskVolume::insert(const std::string& src_path, const FileRef& ref,
                         const TransferOptions& opt) {
     insert_hindernis_ = InsertHindernis::Kein;
-    if (read_only_) return fail(schreibschutzText());
+    if (read_only_ || tarLeer()) return fail(schreibschutzText());
     if (profile_ && profile_->nur_boot) return fail(kNurBoot);
     if (!valid(ref.volume)) return fail("Seite " + std::to_string(ref.volume)
                                         + " gibt es auf dieser Diskette nicht");
@@ -2515,7 +2666,7 @@ bool DiskVolume::insert(const std::string& src_path, const FileRef& ref,
 }
 
 bool DiskVolume::setAttributes(const FileRef& ref, const UdosAttrs& attrs) {
-    if (read_only_) return fail(schreibschutzText());
+    if (read_only_ || tarLeer()) return fail(schreibschutzText());
     if (profile_ && profile_->nur_boot) return fail(kNurBoot);
     if (!valid(ref.volume)) return fail("Seite " + std::to_string(ref.volume)
                                         + " gibt es auf dieser Diskette nicht");
@@ -2525,7 +2676,7 @@ bool DiskVolume::setAttributes(const FileRef& ref, const UdosAttrs& attrs) {
 }
 
 bool DiskVolume::setAttributes(const FileRef& ref, const CpmAttrs& attrs) {
-    if (read_only_) return fail(schreibschutzText());
+    if (read_only_ || tarLeer()) return fail(schreibschutzText());
     if (profile_ && profile_->nur_boot) return fail(kNurBoot);
     if (!valid(ref.volume)) return fail("Seite " + std::to_string(ref.volume)
                                         + " gibt es auf dieser Diskette nicht");
@@ -2535,7 +2686,7 @@ bool DiskVolume::setAttributes(const FileRef& ref, const CpmAttrs& attrs) {
 }
 
 bool DiskVolume::setAttributes(const FileRef& ref, const UnixAttrs& attrs) {
-    if (read_only_) return fail(schreibschutzText());
+    if (read_only_ || tarLeer()) return fail(schreibschutzText());
     if (profile_ && profile_->nur_boot) return fail(kNurBoot);
     if (!valid(ref.volume)) return fail("Seite " + std::to_string(ref.volume)
                                         + " gibt es auf dieser Diskette nicht");
@@ -2550,7 +2701,7 @@ std::string DiskVolume::blockList(const FileRef& ref) const {
 }
 
 bool DiskVolume::makeDirectory(const FileRef& ref) {
-    if (read_only_) return fail(schreibschutzText());
+    if (read_only_ || tarLeer()) return fail(schreibschutzText());
     if (profile_ && profile_->nur_boot) return fail(kNurBoot);
     if (!valid(ref.volume)) return fail("Seite " + std::to_string(ref.volume)
                                         + " gibt es auf dieser Diskette nicht");
@@ -2560,7 +2711,7 @@ bool DiskVolume::makeDirectory(const FileRef& ref) {
 }
 
 bool DiskVolume::erase(const FileRef& ref) {
-    if (read_only_) return fail(schreibschutzText());
+    if (read_only_ || tarLeer()) return fail(schreibschutzText());
     if (profile_ && profile_->nur_boot) return fail(kNurBoot);
     if (!valid(ref.volume)) return fail("Seite " + std::to_string(ref.volume)
                                         + " gibt es auf dieser Diskette nicht");
@@ -2781,7 +2932,7 @@ bool DiskVolume::sectorCrcFor(uint8_t cyl, uint8_t head, int index,
 bool DiskVolume::writeSectorAt(uint8_t cyl, uint8_t head, int index,
                                const std::vector<uint8_t>& data,
                                const uint16_t* crc_woertlich) {
-    if (read_only_) return fail(schreibschutzText());
+    if (read_only_ || tarLeer()) return fail(schreibschutzText());
     if (!disk_)     return fail("keine Diskette geoeffnet");
     if (index < 0)  return fail("Diesen Sektor gibt es auf der Spur nicht (mehr)");
 
@@ -2810,7 +2961,7 @@ bool DiskVolume::readSectorTail(uint8_t cyl, uint8_t head, int index,
 
 bool DiskVolume::writeSectorTail(uint8_t cyl, uint8_t head, int index,
                                  const std::vector<uint8_t>& tail) {
-    if (read_only_) return fail(schreibschutzText());
+    if (read_only_ || tarLeer()) return fail(schreibschutzText());
     if (!disk_)     return fail("keine Diskette geoeffnet");
     if (index < 0)  return fail("Diesen Sektor gibt es auf der Spur nicht (mehr)");
     if (tail.size() > kSectorTailBytes)
@@ -2835,7 +2986,7 @@ bool DiskVolume::writeSectorTail(uint8_t cyl, uint8_t head, int index,
 
 bool DiskVolume::eraseSectorAt(uint8_t cyl, uint8_t head, int index,
                                uint16_t tail_bytes) {
-    if (read_only_) return fail(schreibschutzText());
+    if (read_only_ || tarLeer()) return fail(schreibschutzText());
     if (!disk_)     return fail("keine Diskette geoeffnet");
     if (index < 0)  return fail("Diesen Sektor gibt es auf der Spur nicht (mehr)");
 
@@ -2848,7 +2999,7 @@ bool DiskVolume::eraseSectorAt(uint8_t cyl, uint8_t head, int index,
 
 bool DiskVolume::createSector(uint8_t cyl, uint8_t head, const TrackCodec::NewSectorSpec& spec,
                               bool mfm) {
-    if (read_only_) return fail(schreibschutzText());
+    if (read_only_ || tarLeer()) return fail(schreibschutzText());
     if (!disk_)     return fail("keine Diskette geoeffnet");
 
     TrackImage spur = disk_->medium().track(cyl, head);
@@ -3117,7 +3268,7 @@ bool DiskVolume::checkFit(const std::string& src_dir, std::string& bericht) cons
 bool DiskVolume::insertAll(const std::string& src_dir, const TransferOptions& opt) {
     insert_hindernis_ = InsertHindernis::Kein;
     zubehoer_gezaehlt_ = 0;
-    if (read_only_) return fail(schreibschutzText());
+    if (read_only_ || tarLeer()) return fail(schreibschutzText());
     if (profile_ && profile_->nur_boot) return fail(kNurBoot);
     std::vector<std::vector<std::string>> je_volume;
     if (!sammleQuelldateien(src_dir, je_volume, &zubehoer_gezaehlt_)) return false;
@@ -3231,7 +3382,7 @@ void DiskVolume::setReadOnly(bool ro) {
     // Eine nur GEMESSENE Geometrie laesst sich nicht freigeben: wir haben sie geraten,
     // nicht belegt.  Ein Schreibvorgang wuerde beim geringsten Irrtum an der falschen
     // Stelle landen — und die Diskette ist in aller Regel ein Einzelstueck.
-    if (!ro && profile_ && profile_->type == FsType::Tar) {
+    if (!ro && profile_ && profile_->type == FsType::Tar && !tarLeer()) {
         last_error_ = kNurLesbarTar;
         return;
     }
@@ -3299,7 +3450,7 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
     const DiskFormat* fmt = formats.find(profil->format);
     if (!fmt) { err = "Format '" + profil->format + "' steht nicht im Katalog"; return nullptr; }
 
-    if (profil->type == FsType::Tar) { err = kNurLesbarTar; return nullptr; }
+    if (profil->type == FsType::Tar && !profil->leer) { err = kNurLesbarTar; return nullptr; }
 
     const std::string ext = endung(path);
     if (!profil->allowsContainer(ext)) {
@@ -3398,7 +3549,19 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
         Vol v;
         v.head  = SectorSpace::kAllHeads;
         v.space = std::make_unique<SectorSpace>(dv->disk_->medium(), *fmt);
-        if (profil->type == FsType::Udos) {
+        if (profil->type == FsType::Tar) {
+            // tar720_leer: ganz Null (DiskImage::create fuellt mit 0xE5 wie eine CP/M-Diskette).
+            // tar braucht keinen UDOS-Gap, also geht auch .img/.cqm; das Medium bleibt gueltig
+            // formatiert (Adressmarken, CRCs), nur die Nutzdaten sind Null.
+            const std::vector<uint8_t> nullen(static_cast<size_t>(v.space->size()), 0);
+            if (!v.space->write(0, nullen.data(), nullen.size())) {
+                err = "Nullfuellung nicht schreibbar: " + v.space->lastError();
+                return nullptr;
+            }
+            auto t = TarFileSystem::mountLeer(std::make_unique<TarSpaceQuelle>(*v.space), err);
+            if (!t) return nullptr;
+            v.fs = std::move(t);
+        } else if (profil->type == FsType::Udos) {
             auto u = UdosFileSystem::format(*v.space, *profil, 0, label, err);
             if (!u) return nullptr;
             v.fs = std::move(u);

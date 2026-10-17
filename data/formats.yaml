@@ -905,3 +905,15 @@ filesystems:
     format:      k5601_9x512
     type:        tar
     detect_rank: 900
+
+  # Die LEERE tar-Diskette: ganz aus Nullen, nimmt genau EIN `.tar` auf (`tar-put`, in der
+  # Oberflaeche „tar-Datei auf Diskette schreiben"); danach ist sie ein gewoehnliches
+  # `tar720`, nur lesbar.  Erkannt wird sie nur, wenn ALLE 720 KiB Null sind — und dann VOR
+  # der CP/A-Regel (eine Null-Diskette liest die sonst als „CP/A, Verzeichnis nicht angelegt").
+  # Wer sie als CP/A will: `--fs cpa780` bzw. Dateisystem-Menue.  Anlegen: `create --fs tar720_leer`.
+  - name:        tar720_leer
+    description: "tar-Diskette, leer (720K) — nimmt genau ein .tar auf"
+    format:      k5601_9x512
+    type:        tar
+    leer:        true
+    detect_rank: 901

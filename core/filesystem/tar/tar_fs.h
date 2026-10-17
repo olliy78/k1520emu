@@ -51,6 +51,46 @@ struct Kopf {
 /// @brief Ist @p b (512 Byte) ein gueltiger Kopfblock?  Prueft Summe, Name, Groesse.
 bool kopfLesen(const uint8_t* b, Kopf& k, std::string* warum = nullptr);
 
+/// @brief Besteht der Block ganz aus Nullen?
+bool nullblock(const uint8_t* b);
+
+/// @brief Besteht @p n Byte ab @p d ganz aus Nullen?
+bool alleNull(const uint8_t* d, size_t n);
+
+/**
+ * @brief Wie viele Bytes eines Diskettenstroms gehoeren zum `.tar` (Export, `tar-export`)?
+ *
+ * Regel (doc/design/33_cqm.md, tar-Export):
+ *  - Beginnt der Strom mit einem gueltigen Kopfblock, wird die Struktur abgelaufen (Kopf,
+ *    Daten auf 512 gerundet, naechster Kopf).  Steht an einer KOPFPOSITION die Endmarke
+ *    (zwei Nullbloecke), endet der Export hinter ihr — die zwei Nullbloecke gehoeren dazu.
+ *  - Jede andere Lage — kein gueltiger Kopf an der Kopfposition, eine Datei, die ueber das
+ *    Stromende reicht, kein Ende vor dem Stromende — ergibt den GANZEN Strom.
+ *  - Beginnt der Strom nicht mit einem gueltigen Kopf (Folgeteil eines Satzes), ebenfalls
+ *    der ganze Strom: zwei Nullbloecke INNERHALB von Dateidaten sind keine Endmarke, und
+ *    Abschneiden zerstoerte das Archiv beim `cat`.
+ * @param endmarke  (optional) true, wenn der Export an einer Endmarke endet.
+ */
+uint64_t exportLaenge(const uint8_t* strom, uint64_t n, bool* endmarke = nullptr);
+
+/// @brief Urteil ueber eine `.tar`-Datei, die auf eine leere tar-Diskette soll.
+struct QuellBefund {
+    std::string fehler;     ///< nicht leer = abgelehnt (Datei wird nicht geschrieben)
+    std::string warnung;    ///< nicht leer = darf geschrieben werden, der Anwender soll es wissen
+    bool        mit_kopf = false;   ///< beginnt mit einem gueltigen Kopfblock (sonst Folgeteil)
+};
+
+/**
+ * @brief Beurteilt eine `.tar`-Datei fuer @ref DiskVolume::tarSchreiben.
+ *
+ * Abgelehnt wird: leer, kein Vielfaches von 512, groesser als @p kapazitaet (mit dem
+ * Hinweis auf `split -b`).  Gewarnt wird vor allem, was kein V7-tar ist — der P8000-/WEGA-
+ * `tar` kennt weder ustar-Kopf noch pax-/GNU-Langnamen noch binaere Groessenfelder.
+ * Geprueft werden ALLE Koepfe, die sich vom Anfang her ablaufen lassen; beginnt die Datei
+ * nicht mit einem Kopf (Folgeteil), gibt es keine Warnung — dort ist nichts zu sehen.
+ */
+QuellBefund quelleBeurteilen(const std::vector<uint8_t>& d, uint64_t kapazitaet);
+
 } // namespace tar
 
 /**
@@ -94,6 +134,17 @@ private:
 class TarFileSystem : public FileSystem {
 public:
     static std::unique_ptr<TarFileSystem> mount(std::unique_ptr<TarQuelle> q, std::string& why);
+    /// @brief Die LEERE tar-Diskette: der Strom besteht ganz aus Nullen.  Das Dateisystem ist
+    ///        leer und bleibt lesend; @ref leer sagt, dass hier noch ein `.tar` hinein darf.
+    static std::unique_ptr<TarFileSystem> mountLeer(std::unique_ptr<TarQuelle> q, std::string& why);
+    /// @brief Wie @ref mount, nimmt aber auch einen Strom OHNE jeden Kopfblock (Folgeteil
+    ///        ohne Dateigrenze): er erscheint ganz als `_fortsetzung_anfang.bin`.  Nur fuer
+    ///        eine Diskette, die gerade selbst mit `tar-put` beschrieben wurde.
+    static std::unique_ptr<TarFileSystem> mountRoh(std::unique_ptr<TarQuelle> q, std::string& why);
+    /// @brief Besteht der Strom ganz aus Nullen?  (Die Probe der Erkennung; @p why nennt sonst die Stelle.)
+    static bool istLeer(const TarQuelle& q, std::string* why);
+    /// @brief Ist das die leere tar-Diskette (noch nichts geschrieben)?
+    bool leer() const { return leer_; }
     /// @brief Traegt der Strom ein tar-Archiv (Anfang oder Fortsetzung)?
     static bool looksLikeTar(const TarQuelle& q, std::string* why);
 
@@ -133,9 +184,13 @@ private:
     };
     static Scan scanAb(const TarQuelle& q, uint64_t start);
     static Scan scanAlles(const TarQuelle& q);
+    /// @brief scanAlles mit den Sonderlagen leer / roh dieses Objekts.
+    Scan scan() const;
     /// @brief Wirksamer Eintrag zu @p name (der letzte gleichen Namens).
     const Eintrag* finde(const Scan& s, const std::string& name) const;
     bool lies(const Scan& s, const Eintrag& e, std::vector<uint8_t>& out, int tiefe) const;
 
     std::unique_ptr<TarQuelle> q_;
+    bool leer_ = false;     ///< Strom ganz Null: leeres Archiv, beschreibbar mit einem .tar
+    bool roh_  = false;     ///< Strom ohne Kopfblock als Fortsetzung zulassen
 };

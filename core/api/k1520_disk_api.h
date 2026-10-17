@@ -201,6 +201,9 @@ K1520_API K1520Disk k1520d_create_bootable(const char* path, const char* fs_name
 
 /* ─── Bootabbild (Systemspuren) ───────────────────────────────────────────── */
 
+/// @brief Ist das Profil die LEERE tar-Diskette (`tar720_leer`; nur Anlegen/Schreiben eines .tar)?
+K1520_API bool k1520d_fs_leer(const char* name);
+
 /**
  * @brief Wie viele Byte fassen die Systemspuren dieses Dateisystems?
  *
@@ -270,6 +273,25 @@ K1520_API const char* k1520d_detected_fs(K1520Disk h);
  * zutreffend: "".  Zeiger gilt bis zum naechsten Aufruf fuer diese Diskette.
  */
 K1520_API const char* k1520d_container_info(K1520Disk h, const char* key);
+
+/* ─── tar-Disketten: Export, leere Diskette, Schreiben (additiv) ──────────────
+ * Regeln: DiskVolume::tarExport / tarPruefen / tarSchreiben (core/filesystem/disk_volume.h). */
+
+/// @brief Ist das die LEERE tar-Diskette (`tar720_leer`, ganz Null, beschreibbar mit einem .tar)?
+K1520_API bool k1520d_tar_leer(K1520Disk h);
+/// @brief Den tar-Strom als `.tar` nach @p path schreiben (Bloecke 1:1, bis hinter die Endmarke
+///        bzw. der ganze Strom).  Nur an tar-Disketten und roh geoeffneten; aendert nichts.
+K1520_API bool k1520d_tar_export(K1520Disk h, const char* path);
+/// @brief `.tar`-Datei fuer @ref k1520d_tar_put beurteilen, ohne etwas zu schreiben.
+/// @return -1 abgelehnt (@ref k1520d_last_error); 0 in Ordnung; 1 in Ordnung, aber mit
+///         Warnung (kein reines V7-tar), Text in @ref k1520d_tar_warning.
+K1520_API int k1520d_tar_put_pruefen(K1520Disk h, const char* path);
+/// @brief Warnung der letzten Pruefung bzw. des letzten @ref k1520d_tar_put; "" = keine.
+K1520_API const char* k1520d_tar_warning(K1520Disk h);
+/// @brief `.tar` auf die leere tar-Diskette schreiben und das Abbild zurueckschreiben.  Danach ist
+///        die Diskette `tar720` (nur lesbar); ein zweites Schreiben wird abgelehnt.
+K1520_API bool k1520d_tar_put(K1520Disk h, const char* path);
+
 /// @brief false = mehrere gleich gute Kandidaten (Alternativen in @ref k1520d_detection_alternatives).
 K1520_API bool        k1520d_detection_unambiguous(K1520Disk h);
 K1520_API const char* k1520d_detection_alternatives(K1520Disk h);

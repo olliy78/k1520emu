@@ -16,12 +16,15 @@
 #include <map>
 
 namespace tar {
-namespace {
 
-bool nullblock(const uint8_t* b) {
-    for (uint32_t i = 0; i < kBlock; ++i) if (b[i]) return false;
+bool nullblock(const uint8_t* b) { return alleNull(b, kBlock); }
+
+bool alleNull(const uint8_t* d, size_t n) {
+    for (size_t i = 0; i < n; ++i) if (d[i]) return false;
     return true;
 }
+
+namespace {
 
 /// Oktalfeld: fuehrende Leerzeichen/Nullen, Ende bei NUL oder Leerzeichen.
 bool oktal(const uint8_t* f, size_t n, uint64_t& out) {
@@ -93,6 +96,87 @@ bool kopfLesen(const uint8_t* b, Kopf& k, std::string* warum) {
     t.linkname = text(b + 157, 100);
     k = t;
     return true;
+}
+
+namespace {
+
+/// Hat der Eintrag nach seinem Kopf Datenbloecke?  (Wie in TarFileSystem::scanAb.)
+bool mitDaten(char typ) {
+    return typ == '0' || typ == '7' || typ == 'L' || typ == 'K' || typ == 'x' || typ == 'g';
+}
+
+} // namespace
+
+uint64_t exportLaenge(const uint8_t* strom, uint64_t n, bool* endmarke) {
+    if (endmarke) *endmarke = false;
+    Kopf k;
+    if (n < kBlock || !kopfLesen(strom, k)) return n;       // Folgeteil: alles
+    uint64_t p = 0;
+    for (;;) {
+        if (p + kBlock > n) return n;                        // Strom endet ohne Endmarke
+        if (nullblock(strom + p)) {
+            if (p + 2 * kBlock <= n && nullblock(strom + p + kBlock)) {
+                if (endmarke) *endmarke = true;
+                return p + 2 * kBlock;
+            }
+            return n;                                        // ein einzelner Nullblock: Struktur unklar
+        }
+        if (!kopfLesen(strom + p, k)) return n;              // kein Kopf an der Kopfposition
+        const uint64_t daten = mitDaten(k.typ) ? k.size : 0;
+        const uint64_t next = p + kBlock + (daten + kBlock - 1) / kBlock * kBlock;
+        if (next > n) return n;                              // Datei ragt ueber das Stromende
+        p = next;
+    }
+}
+
+QuellBefund quelleBeurteilen(const std::vector<uint8_t>& d, uint64_t kapazitaet) {
+    QuellBefund b;
+    if (d.empty()) { b.fehler = "Die Datei ist leer."; return b; }
+    if (d.size() % kBlock) {
+        b.fehler = "Die Dateigroesse (" + std::to_string(d.size()) + " Byte) ist kein Vielfaches von "
+                   "512 — ein tar-Strom besteht aus 512-Byte-Bloecken.  Mit `tar` erzeugte "
+                   "Archive und Teile von `split -b 737280` sind es immer; wurde die Datei "
+                   "anders geteilt, fehlt Auffuellung bis zum Blockrand.";
+        return b;
+    }
+    if (d.size() > kapazitaet) {
+        b.fehler = "Die Datei ist " + std::to_string(d.size()) + " Byte gross, die Diskette fasst "
+                   + std::to_string(kapazitaet) + " Byte (720 KiB).  Ein groesseres Archiv laesst sich "
+                   "mit `split -b " + std::to_string(kapazitaet) + " archiv.tar teil_` auf mehrere "
+                   "Disketten verteilen; jedes Teil wird einzeln geschrieben.";
+        return b;
+    }
+    Kopf k;
+    b.mit_kopf = kopfLesen(d.data(), k);
+    if (!b.mit_kopf) return b;                               // Folgeteil: nichts zu sehen
+
+    std::vector<std::string> arten;
+    auto merke = [&](const std::string& a) {
+        if (std::find(arten.begin(), arten.end(), a) == arten.end()) arten.push_back(a);
+    };
+    uint64_t p = 0;
+    while (p + kBlock <= d.size()) {
+        const uint8_t* h = d.data() + p;
+        if (nullblock(h) || !kopfLesen(h, k)) break;
+        if (std::memcmp(h + 257, "ustar", 5) == 0)
+            merke(std::memcmp(h + 257, "ustar  ", 7) == 0 ? "GNU-tar-Kopf (Magic \"ustar  \")"
+                                                         : "POSIX-ustar-Kopf (Magic \"ustar\")");
+        if (k.typ == 'x' || k.typ == 'g') merke("pax-Erweiterungskopf (Typ x/g)");
+        if (k.typ == 'L' || k.typ == 'K') merke("GNU-Langname (Typ L/K)");
+        if (k.typ == '3' || k.typ == '4' || k.typ == '6' || k.typ == '7')
+            merke(std::string("Sondertyp '") + k.typ + "' (Geraet/FIFO/zusammenhaengend)");
+        if (h[99] != 0) merke("Name mit 100 Zeichen oder laenger");
+        if (h[124] & 0x80) merke("binaeres Groessenfeld (GNU)");
+        p += kBlock + ((mitDaten(k.typ) ? k.size : 0) + kBlock - 1) / kBlock * kBlock;
+    }
+    if (!arten.empty()) {
+        std::string w = "Das Archiv ist kein reines V7-tar (wie es der P8000-/WEGA-tar kennt): ";
+        for (size_t i = 0; i < arten.size(); ++i) w += (i ? "; " : "") + arten[i];
+        w += ".  Das Zielsystem kann es womoeglich nicht lesen.  Mit `tar --format=v7` erzeugt "
+             "GNU tar ein V7-Archiv (Namen bis 99 Zeichen).";
+        b.warnung = w;
+    }
+    return b;
 }
 
 } // namespace tar
@@ -258,6 +342,47 @@ std::unique_ptr<TarFileSystem> TarFileSystem::mount(std::unique_ptr<TarQuelle> q
     return std::unique_ptr<TarFileSystem>(new TarFileSystem(std::move(q)));
 }
 
+bool TarFileSystem::istLeer(const TarQuelle& q, std::string* why) {
+    std::vector<uint8_t> b(tar::kBlock);
+    for (uint64_t off = 0; off + kBlock <= q.size(); off += kBlock) {
+        if (!q.read(off, b.data(), kBlock)) { if (why) *why = "Datenstrom nicht lesbar"; return false; }
+        if (!tar::nullblock(b.data())) {
+            if (why) *why = "die Diskette ist nicht leer (Byte " + std::to_string(off) + " ist nicht 0)";
+            return false;
+        }
+    }
+    return q.size() >= kBlock;
+}
+
+std::unique_ptr<TarFileSystem> TarFileSystem::mountLeer(std::unique_ptr<TarQuelle> q, std::string& why) {
+    if (!q) { why = "kein Datenstrom"; return nullptr; }
+    if (!istLeer(*q, &why)) return nullptr;
+    std::unique_ptr<TarFileSystem> t(new TarFileSystem(std::move(q)));
+    t->leer_ = true;
+    return t;
+}
+
+std::unique_ptr<TarFileSystem> TarFileSystem::mountRoh(std::unique_ptr<TarQuelle> q, std::string& why) {
+    if (!q) { why = "kein Datenstrom"; return nullptr; }
+    std::unique_ptr<TarFileSystem> t(new TarFileSystem(std::move(q)));
+    t->roh_ = true;
+    (void)why;
+    return t;
+}
+
+TarFileSystem::Scan TarFileSystem::scan() const {
+    if (leer_) { Scan s; s.ok = true; s.ende = Ende::Nullblock; return s; }
+    Scan s = scanAlles(*q_);
+    if (!s.ok && roh_) {            // kein Kopfblock irgendwo: der ganze Strom ist Fortsetzung
+        s = Scan{};
+        s.ok = true;
+        s.anfang = q_->size();
+        s.ende = Ende::Streamende;
+        s.ende_off = q_->size();
+    }
+    return s;
+}
+
 bool TarFileSystem::looksLikeTar(const TarQuelle& q, std::string* why) {
     const Scan s = scanAlles(q);
     if (s.ok) return true;
@@ -265,7 +390,7 @@ bool TarFileSystem::looksLikeTar(const TarQuelle& q, std::string* why) {
     return false;
 }
 
-uint64_t TarFileSystem::fortsetzungAnfang() const { return scanAlles(*q_).anfang; }
+uint64_t TarFileSystem::fortsetzungAnfang() const { return scan().anfang; }
 
 const TarFileSystem::Eintrag* TarFileSystem::finde(const Scan& s, const std::string& name) const {
     const Eintrag* r = nullptr;
@@ -275,7 +400,7 @@ const TarFileSystem::Eintrag* TarFileSystem::finde(const Scan& s, const std::str
 
 std::vector<FileEntry> TarFileSystem::list() const {
     std::vector<FileEntry> out;
-    const Scan s = scanAlles(*q_);
+    const Scan s = scan();
     if (!s.ok) return out;
     if (s.anfang > 0) {
         FileEntry f;
@@ -343,7 +468,7 @@ bool TarFileSystem::lies(const Scan& s, const Eintrag& e, std::vector<uint8_t>& 
 }
 
 bool TarFileSystem::read(const std::string& name, std::vector<uint8_t>& out) {
-    const Scan s = scanAlles(*q_);
+    const Scan s = scan();
     if (!s.ok) return fail("kein tar-Strom");
     if (s.anfang > 0 && name == tar::kFortsetzungName) {
         out.resize(static_cast<size_t>(s.anfang));
@@ -356,27 +481,35 @@ bool TarFileSystem::read(const std::string& name, std::vector<uint8_t>& out) {
 }
 
 bool TarFileSystem::firstSector(const std::string& name, FsRecoverOrt& out) const {
-    const Scan s = scanAlles(*q_);
+    const Scan s = scan();
     if (s.anfang > 0 && name == tar::kFortsetzungName) return q_->ort(0, out);
     bool g = false;
     const Eintrag* e = finde(s, bereinige(name, g));
     return e && q_->ort(e->kopf_off, out);
 }
 
+namespace {
+constexpr const char* kLeerText =
+    "Auf eine leere tar-Diskette gehoert genau EIN .tar-Archiv (tar-put bzw. „tar-Datei auf "
+    "Diskette schreiben“), keine einzelnen Dateien.";
+}  // namespace
+
 bool TarFileSystem::write(const std::string&, const std::vector<uint8_t>&, const WriteOptions&) {
-    return fail("tar-Disketten sind nur lesbar");
+    return fail(leer_ ? kLeerText : "tar-Disketten sind nur lesbar");
 }
-bool TarFileSystem::erase(const std::string&) { return fail("tar-Disketten sind nur lesbar"); }
+bool TarFileSystem::erase(const std::string&) {
+    return fail(leer_ ? kLeerText : "tar-Disketten sind nur lesbar");
+}
 bool TarFileSystem::wouldFit(const std::vector<PlannedFile>&, FitReport& out) const {
     out = FitReport{};
-    out.detail = "tar-Disketten sind nur lesbar";
+    out.detail = leer_ ? kLeerText : "tar-Disketten sind nur lesbar";
     return true;
 }
-bool TarFileSystem::mkfs() { return fail("tar-Disketten sind nur lesbar"); }
+bool TarFileSystem::mkfs() { return fail(leer_ ? kLeerText : "tar-Disketten sind nur lesbar"); }
 
 FsInfo TarFileSystem::info() const {
     FsInfo i;
-    const Scan s = scanAlles(*q_);
+    const Scan s = scan();
     i.total_bytes = q_->size();
     uint64_t belegt = s.anfang;
     for (const Eintrag& e : s.e) belegt += kBlock + (e.ist + kBlock - 1) / kBlock * kBlock;
@@ -394,7 +527,7 @@ FsCheckReport TarFileSystem::check(FsCheckLevel level, bool nachladen) const {
     r.level = level;
     FsFindings f(r);
     r.schritt("tar.schritt.kopfbloecke", "Kopfbloecke, Pruefsummen und Strom");
-    const Scan s = scanAlles(*q_);
+    const Scan s = scan();
     if (!s.ok) {
         f.add("tar.kein_strom", FsSeverity::Fehler, FsLayer::Verwaltung, "(Strom)",
               "Kein tar-Strom gefunden");

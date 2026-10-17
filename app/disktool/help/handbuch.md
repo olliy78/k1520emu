@@ -182,6 +182,55 @@ nur lesbar. Das Dateisystem heißt in der Anzeige „tar-Archiv (UNIX)“; die B
 `tar.fortsetzung` (die Diskette beginnt mitten in einer Datei) und `tar.abgeschnitten`
 (die letzte Datei setzt sich auf der nächsten Diskette fort) stehen im Protokoll.
 
+### tar-Archive herausholen, bearbeiten und zurückschreiben
+
+Ein Archiv, das sich über mehrere Disketten erstreckt, zeigt jede Einzeldiskette nur
+abgeschnitten. Wer es bearbeiten will, holt die **Rohinhalte** als `.tar` heraus, setzt sie mit
+`cat` zusammen, ändert das Archiv, teilt es mit `split` wieder und schreibt die Teile auf leere
+Disketten:
+
+1. **Diskette ▸ Diskette als .tar exportieren…** (ohne Tastenkürzel; in der Kommandozeile
+   `tar-export`). Ausgabe sind die 512-Byte-Blöcke des Stroms unverändert. Beginnt die Diskette
+   mit einem gültigen tar-Kopf, endet der Export hinter der **Endmarke** (zwei Nullblöcke an
+   einer Kopfposition); ohne Endmarke — auch mitten in einer Datei — wird bis zum
+   Diskettenende ausgegeben. Eine **Folgediskette** (sie beginnt mitten in einer Datei) wird
+   **immer ganz** ausgegeben, auch wenn in den Dateidaten zwei Nullblöcke stehen: das wäre keine
+   Endmarke, und Abschneiden zerstörte das Archiv beim `cat`. Das gilt für jeden Container
+   (`.cqm`, `.hfe`, `.img`, `.dmk`) und auch für eine Diskette, an der gar kein Dateisystem
+   erkannt wurde (ein Folgeteil ohne einen einzigen Kopf). Ein geöffneter tar-**Satz** ist schon
+   EIN Strom und wird nicht exportiert — die Disketten des Satzes einzeln öffnen.
+2. Zusammensetzen, bearbeiten, teilen (Beispiel mit den sieben Disketten `w11data1…7`):
+
+       k1520disktool tar-export w11data1.cqm teil1.tar          # … bis w11data7.cqm
+       cat teil1.tar teil2.tar teil3.tar teil4.tar teil5.tar teil6.tar teil7.tar > w11data.tar
+       tar tvf w11data.tar                                      # bearbeiten: tar rf / tar --delete …
+       split -b 737280 -d w11data.tar neu_                      # neu_00 … neu_06, je höchstens 720 KiB
+
+3. **Datei ▸ Neue Diskette…** mit dem Dateisystem `tar720_leer` (Kommandozeile
+   `create x.cqm --fs tar720_leer`) legt eine **leere tar-Diskette** an: 720 KiB (80 × 2 × 9 × 512), ganz Null, in jedem
+   Container (`.img`, `.hfe`, `.dmk`, `.cqm`). Sie wird beim Öffnen als „tar-Diskette, leer“ erkannt
+   (nur wenn **alle** Bytes Null sind; eine mit Nullen gefüllte CP/A-Diskette erscheint ebenfalls so —
+   *Diskette ▸ Dateisystem übersteuern* stellt es richtig).
+4. **Diskette ▸ tar-Datei auf Diskette schreiben…** (Kommandozeile `tar-put`) schreibt die Datei ab Sektor 0 und
+   macht die Diskette zu einer gewöhnlichen, **nur lesbaren** tar-Diskette (`tar720`). Es geht
+   **genau einmal**; ein zweites Schreiben wird abgelehnt. Die Datei-Wege (Einfügen, Ziehen und
+   Ablegen, `put`) bleiben auf tar-Disketten gesperrt. Vorher geprüft wird: höchstens 720 KiB
+   (sonst mit `split -b 737280` teilen) und ein Vielfaches von 512 Byte. Beginnt die Datei mit
+   einem tar-Kopf, der **nicht V7** ist (`ustar`-Magic, also GNU- oder POSIX-Format; pax-Kopf;
+   GNU-Langname; Name mit 100 Zeichen; binäres Größenfeld), erscheint die Rückfrage **„Trotzdem
+   schreiben?“** (in der Kommandozeile eine Warnung auf stderr, geschrieben wird trotzdem): die
+   P8000-/WEGA-Werkzeuge verstehen nur V7. `tar --format=v7` erzeugt ein solches Archiv (Namen
+   bis 99 Zeichen). Eine Datei ohne Kopf am Anfang (Folgeteil) wird kommentarlos übernommen.
+
+       k1520disktool create diskette00.cqm --fs tar720_leer
+       k1520disktool tar-put diskette00.cqm neu_00              # … für jedes Teil eine neue Diskette
+
+**Rundlauf.** `tar-export` einer mit `tar-put` beschriebenen Diskette liefert: bei einer Datei
+mit Kopf und Endmarke genau die Datei; bei einer Datei mit Kopf **ohne** Endmarke die Datei plus
+zwei Nullblöcke (die Auffüllung der Diskette hat dann eine); bei einem Folgeteil die Datei,
+mit Nullen auf 720 KiB aufgefüllt — ein volles Teil kommt bitgleich zurück. Nach dem `cat` der
+exportierten Teile bleibt daher höchstens Nullauffüllung am Ende des Archivs übrig, die `tar` ignoriert.
+
 ## CopyQM-Abbilder
 
 Viele Abbilder alter Rechner liegen als `.cqm` (Programm CopyQM). Das Werkzeug **liest und

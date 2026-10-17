@@ -64,7 +64,7 @@ struct Handle {
     // Puffer je Getter — die Rueckgabe gilt bis zum naechsten Aufruf DERSELBEN Funktion.
     std::string s_error, s_name, s_type, s_attrs, s_date, s_dir, s_label, s_created,
                 s_segments, s_blocks;
-    std::string s_fmt, s_fs, s_alt, s_remarks, s_fit, s_check, s_container;
+    std::string s_fmt, s_fs, s_alt, s_remarks, s_fit, s_check, s_container, s_tarwarn;
     std::string s_bid, s_bobj, s_btext, s_bsum;   ///< Puffer der Pruefung
     std::string s_sid, s_stitel, s_swarum;        ///< Puffer der Checkliste (§5a)
     std::string s_rid, s_rtext, s_rwhy;           ///< Puffer der Reparatur
@@ -337,6 +337,11 @@ extern "C" const char* k1520d_fs_type(const char* name) {
     return p ? fsTypeName(p->type) : "";
 }
 
+extern "C" bool k1520d_fs_leer(const char* name) {
+    const FsProfile* p = name ? kataloge().dateisysteme.find(name) : nullptr;
+    return p && p->leer;
+}
+
 extern "C" uint64_t k1520d_fs_boot_capacity(const char* fs_name) {
     const FsProfile* p = fs_name ? kataloge().dateisysteme.find(fs_name) : nullptr;
     if (!p) return 0;
@@ -390,6 +395,36 @@ extern "C" const char* k1520d_container_info(K1520Disk h, const char* key) {
         w = CqmCodec::infoField(*c, k);
     }
     return halte(H(h)->s_container, std::move(w));
+}
+
+// ─── tar-Disketten: Export, leere Diskette, Schreiben ────────────────────────
+
+extern "C" bool k1520d_tar_leer(K1520Disk h) {
+    return h && H(h)->vol->tarLeer();
+}
+
+extern "C" bool k1520d_tar_export(K1520Disk h, const char* path) {
+    return h && path && H(h)->vol->tarExport(path);
+}
+
+extern "C" int k1520d_tar_put_pruefen(K1520Disk h, const char* path) {
+    if (!h || !path) return -1;
+    std::string w;
+    if (!H(h)->vol->tarPruefen(path, &w)) return -1;
+    halte(H(h)->s_tarwarn, std::move(w));
+    return H(h)->s_tarwarn.empty() ? 0 : 1;
+}
+
+extern "C" const char* k1520d_tar_warning(K1520Disk h) {
+    if (!h) return "";
+    return halte(H(h)->s_tarwarn, H(h)->vol->lastTarWarnung());
+}
+
+extern "C" bool k1520d_tar_put(K1520Disk h, const char* path) {
+    if (!h || !path) return false;
+    const bool ok = H(h)->vol->tarSchreiben(path);
+    halte(H(h)->s_tarwarn, H(h)->vol->lastTarWarnung());
+    return ok;
 }
 
 extern "C" bool k1520d_detection_unambiguous(K1520Disk h) {

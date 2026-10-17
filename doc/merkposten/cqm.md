@@ -68,3 +68,38 @@ Voller Befund an 142 Abbildern: `doc/design/33_cqm.md`.
    Saetze, Webseiten-Herkunft als `provenance:`; siehe `disktool.md`, „Archiv mit Herkunft").
    Die `*.crdownload` der Sammlung sind **vollstaendige** CQM-Abbilder (Strom komplett, Pruefwert ok)
    — nur umbenennen; das Skript berichtet es, archiviert sie nicht.
+13. **tar-Export, leere tar-Diskette, `.tar` schreiben (2026-10-17, `tar-export`/`tar-put`,
+   `tar720_leer`).**  Rohinhalte einer tar-Diskette als `.tar` heraus (Stücke eines Satzes setzt
+   `cat` zusammen) und in neue Disketten zurück.  Festlegungen mit Wächter:
+   **(1) Exportregel** `tar::exportLaenge`: gültiger Kopf bei Sektor 0 → Struktur ablaufen,
+   Ende hinter der Endmarke (zwei Nullblöcke an einer KOPFPOSITION); jede andere Lage (kein
+   gültiger Kopf an einer Kopfposition, einzelner Nullblock, Datei über das Stromende, kein Ende)
+   → der GANZE Strom.  Ein Folgeteil (kein Kopf bei 0) immer ganz — zwei Nullblöcke in Dateidaten
+   sind keine Endmarke.  Wächter `TarExport.*`.  **(2) Erkennung der leeren Diskette:**
+   Profil `tar720_leer` (`type: tar`, `leer: true`); erkannt, wenn ALLE Bytes Null sind, **vor**
+   der CP/A-Regel (die ganz Null als `cpa_auto` mit „Füllbyte 0x00“ liest).  Begründung:
+   eine formatierte CP/A-Diskette ist 0xE5 gefüllt; ganz Null ist nur die frisch angelegte tar-
+   Diskette; Schreiben überschreibt nur Nullen.  Preis: eine mit Nullen gefüllte CP/A-Diskette
+   erscheint als „tar720_leer“ (`--fs`/Dateisystem übersteuern stellt es richtig).  Kein Hinweis
+   im Container (.img hat keinen Platz dafür).  Eine nur teilweise geladene physische Diskette
+   wird nicht geprüft.  Wächter `TarLeer.ErkennungNurBeiGanzNull`.  **(3) Verriegelung:**
+   `DiskVolume::tarSchreiben` nur bei `tarLeer()` (Dateisystem-Objekt im Leer-Zustand, Schreibschutz
+   aufgehoben); danach ersetzt ein frisch gemountetes `TarFileSystem` (oder `mountRoh` für ein
+   Folgeteil ohne einen Kopf — nur in dieser Sitzung, beim Wiederöffnen ist es „kein Dateisystem“,
+   Export geht trotzdem) das leere, `readOnlyForced`, `detection_.filesystem = tar720`, Abbild
+   sofort zurückgeschrieben (flush), Medium bei Fehler zurückgerollt, keine `~`-Sicherung (nur Nullen
+   überschrieben).  Datei-Wege (`insert`/`erase`/…) melden auf der leeren Diskette „genau EIN
+   .tar“.  Wächter `TarLeer.SchreibenRundlaufUndVerriegelung`, `NurInEineLeereDiskette`.
+   **(4) V7-Urteil** `tar::quelleBeurteilen`: ALLE vom Anfang her ablaufbaren Köpfe;
+   Warnung (nie Sperre) bei `ustar`-Magic, Typ x/g, L/K, 3/4/6/7, Name ohne NUL (100 Zeichen), binärem
+   Größenfeld; Folgeteil → keine Warnung; Ablehnung: leer, nicht 512-Vielfaches, > 720 KiB
+   (Hinweis `split -b 737280`).  GUI fragt „Trotzdem schreiben?“, CLI warnt auf stderr.  Wächter
+   `TarPruefen.*` (inkl. mit System-`tar --format=v7|gnu|posix|ustar`).  **(5) Rundlauf:**
+   Datei mit Kopf+Endmarke → Export == Datei; Kopf ohne Endmarke → Datei + 2 Nullblöcke;
+   Folgeteil → Datei + Nullen bis 720 KiB (ein volles Teil bitgleich).  Wächter
+   `TarLeer.RundlaufRegelnFuerFolgeteileUndTeileOhneEndmarke`, `TarEchtdaten.ExportCatUndRueckschreiben`
+   (w11data1–7: `cat` der Exporte == `w11data.tar`, jeder Teil bitgleich zurück).  **(6) Bewusst
+   nicht umgesetzt:** Export aus einem geöffneten tar-Satz (der Strom ist schon EINER; Position
+   der Einzeldiskette im Satz wird nicht geführt) — die Disketten einzeln exportieren; die letzte Diskette
+   behält dann die Auffüllung bis zum Diskettenende, `tar` ignoriert sie.
+

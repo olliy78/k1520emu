@@ -36,5 +36,5 @@ def schutz_text(tool) -> str:
 def dateisystem_anzeige(tool) -> str:
     """Name des Dateisystems in der Form, die man dem Anwender zeigt."""
     if tool.ist_tar:
-        return "tar-Archiv (UNIX)"
+        return "tar-Diskette, leer" if tool.tar_leer else "tar-Archiv (UNIX)"
     return tool.filesystem

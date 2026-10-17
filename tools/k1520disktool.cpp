@@ -18,6 +18,8 @@
  * k1520disktool info   <abbild> [--fs NAME]
  * k1520disktool check  <abbild>
  * k1520disktool tar-satz <abbild…> [--to ordner] [-l]  # Mehrdisketten-tar-Strom
+ * k1520disktool tar-export <abbild> <ziel.tar>          # den tar-Strom einer Diskette als .tar
+ * k1520disktool tar-put <abbild> <quelle.tar>           # .tar in eine LEERE tar-Diskette
  * k1520disktool formats
  * ```
  *
@@ -161,6 +163,13 @@ void gebrauch() {
         "                                           Disketten mit rohem tar-Strom (ohne Dateisystem):\n"
         "                                           Strome in dieser Reihenfolge verketten, auflisten\n"
         "                                           bzw. mit --to vollstaendig entpacken\n"
+        "  tar-export <abbild> <ziel.tar>           den tar-Strom einer Diskette (Bloecke 1:1, bis hinter\n"
+        "                                           die Endmarke; Folgeteile ganz) als .tar herausschreiben;\n"
+        "                                           die Teile eines Satzes setzt `cat` zusammen\n"
+        "  tar-put <abbild> <quelle.tar>            .tar (<= 720 KiB, Vielfaches von 512) in eine LEERE\n"
+        "                                           tar-Diskette schreiben (`create x.img --fs tar720_leer`),\n"
+        "                                           einmal; danach ist sie tar720 und nur lesbar.\n"
+        "                                           Gewarnt wird vor Nicht-V7-tar (Schreiben geht trotzdem)\n"
         "  formats                                  bekannte Dateisysteme auflisten\n\n"
         "P8000-Plattenabbild (WEGA, PAR in Zylinder 0): ls/info/check/get/put/rm/mkdir;\n"
         "  Namen mit Partition vorn (md0 = /usr, md2 = /, md3 = /tmp, md4 = /z):\n"
@@ -517,6 +526,43 @@ int cmd_tar_satz(const Optionen& o) {
             std::cout << e.name << "\n";
     }
     return fehler ? kFehler : kOk;
+}
+
+int cmd_tar_export(const Optionen& o) {
+    if (o.rest.size() != 3) {
+        std::cerr << "Fehler: tar-export <abbild> <ziel.tar>\n";
+        return kFehler;
+    }
+    int rc = kOk;
+    auto v = oeffne(o, o.rest[1], rc, /*schreibend=*/false, /*roh_erlaubt=*/true);
+    if (!v) return rc;
+    uint64_t n = 0;
+    if (!v->tarExport(o.rest[2], &n)) { std::cerr << "Fehler: " << v->lastError() << "\n"; return kFehler; }
+    std::cout << o.rest[2] << ": " << n << " Byte (" << n / 512 << " Bloecke)\n";
+    return kOk;
+}
+
+int cmd_tar_put(const Optionen& o) {
+    if (o.rest.size() != 3) {
+        std::cerr << "Fehler: tar-put <abbild> <quelle.tar>\n";
+        return kFehler;
+    }
+    int rc = kOk;
+    auto v = oeffne(o, o.rest[1], rc, /*schreibend=*/true, /*roh_erlaubt=*/true);
+    if (!v) return rc;
+    if (o.dry_run) {
+        std::string w;
+        if (!v->tarPruefen(o.rest[2], &w)) { std::cerr << "Fehler: " << v->lastError() << "\n"; return kFehler; }
+        if (!w.empty()) std::cerr << "Warnung: " << w << "\n";
+        std::cout << "tar-put (Probelauf): " << o.rest[2] << " passt\n";
+        return kOk;
+    }
+    if (!v->tarSchreiben(o.rest[2])) { std::cerr << "Fehler: " << v->lastError() << "\n"; return kFehler; }
+    // Eine Warnung hindert das Schreiben nicht (kein Blockieren in der Kommandozeile).
+    if (!v->lastTarWarnung().empty()) std::cerr << "Warnung: " << v->lastTarWarnung() << "\n";
+    std::cout << "geschrieben: " << o.rest[2] << " → " << o.rest[1]
+              << " (die Diskette ist jetzt tar720, nur lesbar)\n";
+    return kOk;
 }
 
 int cmd_info(const Optionen& o) {
@@ -1910,6 +1956,8 @@ int main(int argc, char** argv) {
     if (befehl == "boot-scpx") return cmd_boot_scpx(o);
     if (befehl == "info")    return cmd_info(o);
     if (befehl == "tar-satz") return cmd_tar_satz(o);
+    if (befehl == "tar-export") return cmd_tar_export(o);
+    if (befehl == "tar-put")  return cmd_tar_put(o);
     if (befehl == "save-as") return cmd_save_as(o);
     if (befehl == "measure") return cmd_measure(o);
     if (befehl == "check")   return cmd_check(o);

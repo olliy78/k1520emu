@@ -131,6 +131,29 @@ Typen `0–7`, GNU `L`/`K`, `x`/`g` werden übersprungen.  `DiskVolume::openTarS
 verkettet die linearen Ströme; CLI `k1520disktool tar-satz`.  Befunde `tar.abgeschnitten`,
 `tar.fortsetzung`, `tar.pruefsumme`, `tar.doppelt`, `tar.pfad`.
 
+### 4b. tar exportieren, leere tar-Diskette, `.tar` zurückschreiben (2026-10-17)
+
+Anlass: ein Archiv über mehrere Disketten zeigt jede Einzeldiskette abgeschnitten.  Der Anwender
+holt die Rohinhalte als `.tar` (`tar-export`), setzt sie mit `cat` zusammen, bearbeitet, teilt mit
+`split -b 737280` und schreibt die Teile in neue Disketten (`create --fs tar720_leer`, `tar-put`).
+
+* **Export** (`tar::exportLaenge`): Strom ab Sektor 0, die 512-Byte-Blöcke 1:1.  Gültiger Kopf bei 0 →
+  ablaufen, Ende hinter der Endmarke an einer Kopfposition; sonst ganz.  Folgeteil immer ganz.
+  Aus einem tar-Satz wird nicht exportiert (Position der Einzeldiskette im Strom wird nicht geführt;
+  vertretbar, weil die Einzeldisketten ohnehin einzeln exportiert werden).
+* **Leere Diskette** `tar720_leer` (`leer: true` im Profil): ganz Null, 80 × 2 × 9 × 512, in allen vier
+  Containern (tar braucht keinen UDOS-Gap, `rawCompatible` ist erfüllt).  Erkennung nur bei ALLEN Bytes
+  Null und VOR der CP/A-Regel; Begründung und Preis in `doc/merkposten/cqm.md` Nr. 13.  Alternative
+  „nur über einen Hinweis im Anlegen“ scheidet aus: `.img`/`.hfe`/`.dmk` haben keinen Platz dafür,
+  und die Erkennung soll auch nach dem Wiederöffnen stimmen.
+* **Schreiben** (`DiskVolume::tarSchreiben`): vorab Größe (≤ 737280, Vielfaches von 512), Zustand (leer,
+  beschreibbar), V7-Urteil (`tar::quelleBeurteilen`: Warnung, nie Sperre).  Dann Blöcke ab Sektor 0
+  in Lesereihenfolge (`SectorSpace`), Medium bei Fehler zurückgerollt, sofort `flush`, danach `tar720`
+  und unaufhebbar nur lesbar — ein zweites Schreiben scheitert.
+* **Rundlauf** `export(put(x))`: Kopf+Endmarke → `x` genau; Kopf ohne Endmarke → `x` + 2 Nullblöcke;
+  Folgeteil → `x` + Nullen bis 720 KiB (voll: bitgleich).  Echtdaten: `w11data1…7` →
+  Export → `cat` == `w11data.tar` (5 160 960 Byte); jeder Teil in eine neue `.cqm`/`.img` und bitgleich zurück.
+
 ## 5. Entscheidungen
 
 1. ~~Nur lesen.~~  **Ueberholt (2026-10-17): schreibbar, siehe Abschnitt 7.**

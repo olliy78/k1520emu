@@ -94,6 +94,8 @@ TEST(FsCatalog, ProfilnamenSindEinStabilerVertrag) {
         // tar-Disketten (P8000-Lieferungen ohne Dateisystem, nur lesbar): letzter
         // Erkennungsversuch hinter allen echten Dateisystemen (disk_volume.cpp).
         "tar720",
+        // … und die LEERE tar-Diskette (ganz Null; nimmt genau ein .tar auf, `leer: true`).
+        "tar720_leer",
         // BCU 880: Arbeitsdiskette „ohne SYL“ (Name, `detect: false`) und die Startdiskette
         // „SYL auf Spur 1“ (erkannt am Lader; `nur_boot`).
         "bcu880", "bcu880_syl", "bcu880_kombi", "bcu880_kombi80", "bcu880_80",

@@ -80,6 +80,12 @@ struct FsProfile {
     ///        K8915 darauf geschrieben hat, findet es die CP/A-Regel ohnehin selbst.
     bool detect = true;
 
+    /// @brief Nur `type: tar`: die **leere** tar-Diskette (`tar720_leer`) — beschreibbar mit
+    ///        genau EINEM `.tar` (@ref DiskVolume::tarSchreiben), danach ein gewoehnliches
+    ///        `tar720`.  Erkannt wird sie nur an einer Diskette, die ganz aus Nullen besteht
+    ///        (siehe disk_volume.cpp, Erkennung).
+    bool leer = false;
+
     /// @brief Bauart des **Ladekopfs** in Sektor 1 der Systemspuren, den ein Bootabbild
     ///        tragen muss; "" = keine Pruefung.  `k8915` (AP-E5c): die ersten
     ///        16 Byte mit CRC-CCITT (Startwert FFFFH, Ergebnis 0) — ein CP/A-Bootabbild

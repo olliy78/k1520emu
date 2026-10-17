@@ -105,6 +105,16 @@ _lib.k1520d_set_read_only.argtypes = [_H, ctypes.c_bool]
 _lib.k1520d_set_read_only.restype = None
 _lib.k1520d_read_only_forced.argtypes = [_H]
 _lib.k1520d_read_only_forced.restype = ctypes.c_bool
+_lib.k1520d_tar_leer.argtypes = [_H]
+_lib.k1520d_tar_leer.restype = ctypes.c_bool
+_lib.k1520d_tar_export.argtypes = [_H, _CS]
+_lib.k1520d_tar_export.restype = ctypes.c_bool
+_lib.k1520d_tar_put_pruefen.argtypes = [_H, _CS]
+_lib.k1520d_tar_put_pruefen.restype = ctypes.c_int
+_lib.k1520d_tar_warning.argtypes = [_H]
+_lib.k1520d_tar_warning.restype = _CS
+_lib.k1520d_tar_put.argtypes = [_H, _CS]
+_lib.k1520d_tar_put.restype = ctypes.c_bool
 _lib.k1520d_set_backup.argtypes = [_H, ctypes.c_bool]
 _lib.k1520d_set_backup.restype = None
 _lib.k1520d_close.argtypes = [_H]
@@ -129,6 +139,8 @@ _lib.k1520d_catalog_report.argtypes = []
 _lib.k1520d_catalog_report.restype = _CS
 
 # ── Bootabbild (Systemspuren) ───────────────────────────────────────────────
+_lib.k1520d_fs_leer.argtypes = [_CS]
+_lib.k1520d_fs_leer.restype = ctypes.c_bool
 _lib.k1520d_fs_boot_capacity.argtypes = [_CS]
 _lib.k1520d_fs_boot_capacity.restype = _U64
 _lib.k1520d_boot_area_size.argtypes = [_H, ctypes.c_int]
@@ -559,6 +571,7 @@ class FileSystemInfo:
     format: str        # Geometrie
     description: str
     boot_capacity: int = 0   # Byte in den Systemspuren; 0 = nicht bootfaehig
+    leer: bool = False       # nur tar: die LEERE tar-Diskette (nimmt genau ein .tar auf)
 
     @property
     def bootable(self) -> bool:
@@ -577,6 +590,7 @@ def filesystems() -> List[FileSystemInfo]:
             format=_s(_lib.k1520d_fs_format(_b(name))),
             description=_s(_lib.k1520d_fs_description(_b(name))),
             boot_capacity=int(_lib.k1520d_fs_boot_capacity(_b(name))),
+            leer=bool(_lib.k1520d_fs_leer(_b(name))),
         ))
     return out
 
@@ -1986,6 +2000,31 @@ class DiskTool:
     def read_only_forced(self) -> bool:
         """Schreibschutz unaufhebbar (``.cqm``, tar-Diskette, nur gemessene Geometrie)?"""
         return bool(_lib.k1520d_read_only_forced(self._h))
+
+    @property
+    def tar_leer(self) -> bool:
+        """Die LEERE tar-Diskette (``tar720_leer``): ganz Null, nimmt genau ein ``.tar`` auf."""
+        return bool(_lib.k1520d_tar_leer(self._h))
+
+    def tar_export(self, ziel) -> None:
+        """Den tar-Strom der Diskette als ``.tar`` schreiben (``K1520DiskError`` mit dem Grund)."""
+        if not _lib.k1520d_tar_export(self._h, _b(str(ziel))):
+            raise K1520DiskError(self._fail())
+
+    def tar_put_pruefen(self, quelle) -> str:
+        """``.tar`` für :meth:`tar_put` beurteilen.  Rückgabe: Warnung (``""`` = keine);
+        ``K1520DiskError`` mit dem Grund, wenn abgelehnt."""
+        r = _lib.k1520d_tar_put_pruefen(self._h, _b(str(quelle)))
+        if r < 0:
+            raise K1520DiskError(self._fail())
+        return _s(_lib.k1520d_tar_warning(self._h)) if r else ""
+
+    def tar_put(self, quelle) -> str:
+        """``.tar`` auf die leere tar-Diskette schreiben und das Abbild zurückschreiben.
+        Rückgabe: Warnung (``""`` = keine); ``K1520DiskError`` mit dem Grund bei Ablehnung."""
+        if not _lib.k1520d_tar_put(self._h, _b(str(quelle))):
+            raise K1520DiskError(self._fail())
+        return _s(_lib.k1520d_tar_warning(self._h))
 
     @property
     def ist_cqm(self) -> bool:

@@ -1,0 +1,10 @@
+# Eine Datei, die kein Vielfaches von 512 Byte ist, wird vor dem Schreiben abgelehnt;
+# die Diskette bleibt leer.
+tool:   k1520disktool
+tmpfile neu.img:
+file krumm.tar:
+  das ist kein tar-Strom
+setup_run: create %neu.img% --fs tar720_leer
+run:    tar-put %neu.img% %krumm.tar%
+expect: Vielfaches von 512
+exit:   1

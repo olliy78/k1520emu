@@ -507,6 +507,46 @@ public:
     }
     /// @brief Archiv aus einem tar-Strom (nur lesbar, kein Dateisystem)?
     bool istTar() const { return profile_ && profile_->type == FsType::Tar; }
+    /// @brief Die LEERE tar-Diskette (`tar720_leer`): ganz aus Nullen, beschreibbar mit genau
+    ///        einem `.tar` (@ref tarSchreiben).  Nach dem Schreiben false, @ref istTar bleibt true.
+    bool tarLeer() const;
+
+    /**
+     * @brief Den tar-Strom der Diskette als `.tar` herausschreiben (`tar-export`).
+     *
+     * Ausgabe sind die 512-Byte-Bloecke des Stroms 1:1; wie viele, regelt
+     * @ref tar::exportLaenge (Kopf + Endmarke: bis hinter die Endmarke; sonst der ganze
+     * Strom, ein Folgeteil immer ganz).  Geht an einer tar-Diskette und an einer roh
+     * geoeffneten (kein Dateisystem erkannt, z. B. ein Folgeteil ohne einen Kopfblock);
+     * nicht an einer mit Dateisystem, nicht an der leeren und nicht an einem tar-Satz
+     * (der ist schon EIN Strom — die Teile einzeln exportieren).  Aendert nichts.
+     * @param bytes  (optional) Zahl der geschriebenen Bytes.
+     */
+    bool tarExport(const std::string& ziel, uint64_t* bytes = nullptr) const;
+
+    /**
+     * @brief Beurteilt eine `.tar`-Datei fuer @ref tarSchreiben, ohne etwas zu aendern.
+     *
+     * @return false = abgelehnt (Grund in @ref lastError).  true = darf geschrieben werden;
+     *         @p warnung ist dann nicht leer, wenn die Datei kein reines V7-tar ist (der
+     *         Aufrufer fragt zurueck bzw. gibt sie aus; geschrieben wird trotzdem).
+     */
+    bool tarPruefen(const std::string& quelle, std::string* warnung = nullptr) const;
+
+    /**
+     * @brief Eine `.tar`-Datei auf die LEERE tar-Diskette schreiben (`tar-put`).
+     *
+     * Verriegelt: nur an @ref tarLeer; danach ist die Diskette `tar720` (nur lesbar), ein
+     * zweites Schreiben wird abgelehnt.  Geprueft wird VOR dem Schreiben (@ref tarPruefen),
+     * geschrieben ab Sektor 0 in Lesereihenfolge, der Rest bleibt Null; bei einem Fehler
+     * wird das Medium zurueckgerollt.  Das Abbild wird sofort zurueckgeschrieben (flush),
+     * solange es noch beschreibbar ist.  Warnungen siehe @ref lastTarWarnung.
+     * Rundlauf: der Export des Ergebnisses ist die Datei selbst, wenn sie mit Kopf und
+     * Endmarke endet, sonst die Datei plus Nullen bis zum Diskettenende (doc/design/33_cqm.md).
+     */
+    bool tarSchreiben(const std::string& quelle);
+    /// @brief Warnung (kein V7-tar) des letzten @ref tarSchreiben / @ref tarPruefen; sonst leer.
+    const std::string& lastTarWarnung() const { return tar_warnung_; }
 
     /**
      * @brief Mehrere Abbilder als EINEN tar-Strom oeffnen (Mehrdisketten-Satz).
@@ -786,6 +826,8 @@ private:
     };
 
     bool fail(const std::string& why) const { last_error_ = why; return false; }
+    bool tar_satz_ = false;                 ///< aus @ref openTarSatz: ein verketteter Strom
+    mutable std::string tar_warnung_;
     /// @brief Meldung fuer eine abgewiesene Schreibanforderung (tar eigener Text).
     std::string schreibschutzText() const;
     /// @brief Geometrie der Diskette, auch wenn kein Dateisystem gemountet ist; nullptr = unbekannt.

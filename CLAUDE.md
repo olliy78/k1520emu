@@ -606,6 +606,12 @@ Emulatoren zeigen beim Einlegen profilabhängige Hinweise `Programmprofil.cqm_hi
 PRG 710: UDOS));
 P8000-Disketten ohne Dateisystem sind
 `tar720` (`core/filesystem/tar/`, Mehrdisketten-Strom über `tar-satz`/„tar-Satz öffnen…“).
+**tar herausholen und zurückschreiben (2026-10-17):** `tar-export` gibt den Strom einer tar-Diskette als `.tar`
+aus (Kopf+Endmarke → bis dahinter, sonst/Folgeteil ganz; die Teile eines Satzes setzt `cat` zusammen); `create --fs
+tar720_leer` legt eine ganz Null gefüllte 720K-Diskette an (alle vier Container; Erkennung nur bei ALLEN Bytes Null,
+vor der CP/A-Regel), `tar-put` schreibt GENAU EIN `.tar` hinein (≤ 720 KiB, Vielfaches von 512, Warnung bei Nicht-V7),
+danach ist sie `tar720` und nur lesbar.  Aktionen „Diskette als .tar exportieren…“/„tar-Datei auf Diskette schreiben…“.
+**`doc/merkposten/cqm.md` Nr. 13 lesen.**
 WEGA/tar tragen UNIX-Angaben statt UDOS-Kopfsektor (`FsType`, `istUnix()`).  Archive der
 pofo.de-Sammlung: `tools/p8000/pofo_archive.py`.
 **Vor Arbeiten daran: `doc/merkposten/cqm.md` lesen** (CRC-Tabellenfehler `& 0x3F`, Offsets);

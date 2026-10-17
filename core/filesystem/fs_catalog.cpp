@@ -80,7 +80,7 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
     const std::string where = file + ":" + std::to_string(node.line);
     collectUnknownKeys(node,
                        {"name", "description", "format", "type", "data_start",
-                        "containers", "detect_rank", "detect", "boot_header", "dir_boot", "nur_boot",
+                        "containers", "detect_rank", "detect", "leer", "boot_header", "dir_boot", "nur_boot",
                         "block_size", "dir_entries", "skew", "max_blocks", "os",
                         "sides_separate", "boot_track", "directory_track",
                         "bitmap_track", "usable_tracks"},
@@ -159,6 +159,14 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
         if (!n->isScalar() || !yaml::toBool(n->scalar, b))
             { why = "'detect' muss true/false sein"; return false; }
         out.detect = b;
+    }
+    if (const yaml::Node* n = node.find("leer")) {
+        bool b = false;
+        if (!n->isScalar() || !yaml::toBool(n->scalar, b))
+            { why = "'leer' muss true/false sein"; return false; }
+        if (b && out.type != FsType::Tar)
+            { why = "'leer' gibt es nur fuer type: tar"; return false; }
+        out.leer = b;
     }
     if (const yaml::Node* n = node.find("boot_header")) {
         if (!n->isScalar() || (n->scalar != "k8915" && n->scalar != "pc1715"
