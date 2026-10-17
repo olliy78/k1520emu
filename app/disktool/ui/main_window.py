@@ -644,7 +644,9 @@ class MainWindow(QMainWindow):
         self.act_datei_im_editor.setEnabled(
             mit_fs and len(self.disk_view.selected_refs()) == 1)
         self.act_loeschen.setEnabled(datei_schreibbar and disk_auswahl)
-        self.act_schreiben.setEnabled(datei_schreibbar and ordner_auswahl)
+        # Auf der leeren tar-Diskette fuehrt derselbe Weg (|←) das EINE .tar zum Schreiben.
+        self.act_schreiben.setEnabled(
+            (datei_schreibbar or (schreibbar and self.tool.tar_leer)) and ordner_auswahl)
 
         # Die beiden Ordner-Aktionen haengen NICHT an der Diskette: sie arbeiten im
         # Wirtsystem und gelten auch dann, wenn gar keine Diskette offen ist.
@@ -696,9 +698,13 @@ class MainWindow(QMainWindow):
             a.setToolTip(f"{tipps[a]}\n\nGesperrt: {grund}" if grund else tipps[a])
         # Die leere tar-Diskette: die Datei-Wege sind zu, weil dort genau EIN .tar hingehoert.
         if offen and self.tool.tar_leer:
-            for a in (self.act_schreiben, self.act_loeschen, self.act_alles_rein):
+            for a in (self.act_loeschen, self.act_alles_rein):
                 a.setToolTip(f"{tipps[a]}\n\nGesperrt: auf die leere tar-Diskette gehört "
                              "genau ein .tar — „tar-Datei auf Diskette schreiben…“.")
+            self.act_schreiben.setToolTip(
+                f"{tipps[self.act_schreiben]}\n\nAuf der leeren tar-Diskette: genau EINE "
+                "ausgewählte .tar-Datei wird als Archiv geschrieben (wie „tar-Datei auf "
+                "Diskette schreiben…“); Ordner und mehrere Dateien nicht.")
         if offen and self.tool.tar_leer and self.tool.read_only:
             self.act_tar_schreiben.setToolTip(
                 f"{tipps[self.act_tar_schreiben]}\n\nGesperrt: erst den Schreibschutz aufheben.")
@@ -1759,6 +1765,8 @@ class MainWindow(QMainWindow):
         """
         if self.tool is None or not paths:
             return False
+        if self.tool.tar_leer:
+            return self._tar_leer_einfuegen(paths)
 
         pfade, uebersprungen = self._zubehoer_aussortieren(paths)
         if pfade is None:
@@ -2120,6 +2128,31 @@ class MainWindow(QMainWindow):
         self.log(f"tar-Datei geschrieben: {quelle} — die Diskette ist jetzt tar720 und nur lesbar",
                  stufe="warnung" if warnung else "")
         return True
+
+    def _tar_leer_einfuegen(self, paths) -> bool:
+        """Einfügen-Wege (``|←``, Strg+←, Ziehen und Ablegen) auf der LEEREN tar-Diskette.
+
+        Dort gehört genau EIN ``.tar`` hin: die eine Datei geht denselben Prüf- und
+        Schreibweg wie „tar-Datei auf Diskette schreiben…“ (samt V7-Rückfrage).  Mehrere
+        Dateien, Ordner und Dateien mit Abbild-Endung werden mit Hinweis abgelehnt.
+        """
+        if len(paths) != 1:
+            self.log("Leere tar-Diskette: es lässt sich nur EINE .tar-Datei auf einmal schreiben "
+                     f"({len(paths)} gewählt)", stufe="warnung")
+            return False
+        p = Path(paths[0])
+        if p.is_dir():
+            self.log(f"Leere tar-Diskette: „{p.name}“ ist ein Ordner — erwartet wird genau eine "
+                     ".tar-Datei", stufe="warnung")
+            return False
+        if p.suffix.lower() in (".hfe", ".dmk", ".img", ".cqm"):
+            self.log(f"Leere tar-Diskette: „{p.name}“ ist ein Diskettenabbild, kein tar-Archiv "
+                     "(Abbilder öffnet Datei ▸ Abbild öffnen…)", stufe="warnung")
+            return False
+        if self.tool.read_only:
+            self.log("Leere tar-Diskette: erst den Schreibschutz aufheben", stufe="warnung")
+            return False
+        return self.tar_schreiben(str(p))
 
     def _tar_schreiben_dialog(self) -> None:
         if self.tool is None or not self.tool.tar_leer:

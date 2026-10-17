@@ -80,7 +80,7 @@ Voller Befund an 142 Abbildern: `doc/design/33_cqm.md`.
    der CP/A-Regel (die ganz Null als `cpa_auto` mit „Füllbyte 0x00“ liest).  Begründung:
    eine formatierte CP/A-Diskette ist 0xE5 gefüllt; ganz Null ist nur die frisch angelegte tar-
    Diskette; Schreiben überschreibt nur Nullen.  Preis: eine mit Nullen gefüllte CP/A-Diskette
-   erscheint als „tar720_leer“ (`--fs`/Dateisystem übersteuern stellt es richtig).  Kein Hinweis
+   erscheint als „tar720_leer“ (`--fs cpa_auto` bzw. Dateisystem übersteuern stellt es richtig).  Kein Hinweis
    im Container (.img hat keinen Platz dafür).  Eine nur teilweise geladene physische Diskette
    wird nicht geprüft.  Wächter `TarLeer.ErkennungNurBeiGanzNull`.  **(3) Verriegelung:**
    `DiskVolume::tarSchreiben` nur bei `tarLeer()` (Dateisystem-Objekt im Leer-Zustand, Schreibschutz

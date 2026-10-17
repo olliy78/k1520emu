@@ -963,8 +963,9 @@ TEST(TarLeer, ErkennungNurBeiGanzNull) {
     // Mit --fs bleibt die Null-Diskette als CP/A lesbar (Uebersteuerung gewinnt)
     const std::string r = imgMit("k1520_test_tarl_d.img", std::vector<uint8_t>(kDisk, 0));
     std::string err;
-    auto c = DiskVolume::open(r, "cpa780", formate(), dateisysteme(), err, true, true);
-    if (c) EXPECT_FALSE(c->tarLeer());
+    auto c = DiskVolume::open(r, "cpa_auto", formate(), dateisysteme(), err, true, true);
+    ASSERT_TRUE(c) << err;
+    EXPECT_FALSE(c->tarLeer());
     fs::remove(r);
 
     // eine formatierte CP/A-Diskette (0xE5) wird nie leer-tar

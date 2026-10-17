@@ -113,6 +113,10 @@ Dinge von außen an — und sonst nichts (überall sonst zeigt der Mauszeiger
   Datei auf die Diskette bringen, wählt man sie in der Ordneransicht (rechts)
   aus und benutzt `|←` bzw. dem entsprechenden Menüpunkt (Strg+←).
 
+- **Leere tar-Diskette:** Auf eine `tar720_leer`-Diskette (Schreibschutz aufgehoben) wird eine
+  abgelegte oder in der Ordneransicht gewählte **`.tar`-Datei** als Archiv geschrieben — genau EINE;
+  mehrere Dateien, Ordner und Abbild-Endungen weist die Statuszeile ab. Näheres bei den tar-Disketten.
+
 **Binär oder Text?** Im Menü *Übertragung*. Bei *Text* werden die Zeilenenden
 umgesetzt (CR LF ↔ LF) — richtig für Quelltexte und Dokumente, **falsch für
 Programme**. Was gerade gilt, steht rechts in der Statuszeile. Einzelne Dateien
@@ -210,11 +214,15 @@ Disketten:
    `create x.cqm --fs tar720_leer`) legt eine **leere tar-Diskette** an: 720 KiB (80 × 2 × 9 × 512), ganz Null, in jedem
    Container (`.img`, `.hfe`, `.dmk`, `.cqm`). Sie wird beim Öffnen als „tar-Diskette, leer“ erkannt
    (nur wenn **alle** Bytes Null sind; eine mit Nullen gefüllte CP/A-Diskette erscheint ebenfalls so —
-   *Diskette ▸ Dateisystem übersteuern* stellt es richtig).
+   *Diskette ▸ Dateisystem übersteuern* ▸ `cpa_auto` stellt es richtig).
 4. **Diskette ▸ tar-Datei auf Diskette schreiben…** (Kommandozeile `tar-put`) schreibt die Datei ab Sektor 0 und
    macht die Diskette zu einer gewöhnlichen, **nur lesbaren** tar-Diskette (`tar720`). Es geht
-   **genau einmal**; ein zweites Schreiben wird abgelehnt. Die Datei-Wege (Einfügen, Ziehen und
-   Ablegen, `put`) bleiben auf tar-Disketten gesperrt. Vorher geprüft wird: höchstens 720 KiB
+   **genau einmal**; ein zweites Schreiben wird abgelehnt. Dieselbe Datei lässt sich auch über
+   **`|←` / Strg+←** (Datei in der Ordneransicht gewählt) oder durch **Ziehen und Ablegen** auf die
+   Diskettenansicht schreiben — es muss genau EINE Datei sein (kein Ordner, keine Diskettenabbild-
+   Endung; sonst Hinweis in der Statuszeile), sie geht denselben Prüfweg samt Rückfrage. Alle
+   anderen Datei-Wege (Löschen, *Alles einfügen*, `put`) und jeder Weg auf eine belegte tar-Diskette
+   bleiben gesperrt. Vorher geprüft wird: höchstens 720 KiB
    (sonst mit `split -b 737280` teilen) und ein Vielfaches von 512 Byte. Beginnt die Datei mit
    einem tar-Kopf, der **nicht V7** ist (`ustar`-Magic, also GNU- oder POSIX-Format; pax-Kopf;
    GNU-Langname; Name mit 100 Zeichen; binäres Größenfeld), erscheint die Rückfrage **„Trotzdem

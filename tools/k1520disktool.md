@@ -936,7 +936,7 @@ Nullbloecke enthalten koennen — der ganze Strom. Geht an tar-Disketten und an 
 an einem `tar-satz`.
 
 `tar720_leer` ist ganz Null und wird nur dann so erkannt (VOR der CP/A-Regel, die eine
-Null-Diskette sonst als „CP/A, Fuellbyte 0x00“ liest; `--fs cpa…` uebersteuert). `tar-put`
+Null-Diskette sonst als „CP/A, Fuellbyte 0x00“ liest; `--fs cpa_auto` uebersteuert). `tar-put`
 prueft vor dem Schreiben: Diskette leer und beschreibbar, Datei <= 737280 Byte und Vielfaches
 von 512 (sonst Ablehnung, bei Ueberlaenge mit Hinweis auf `split -b 737280`); ein erster Kopf
 ohne V7 (ustar-Magic, pax, GNU-Langname, 100-Zeichen-Name, binaere Groesse) ergibt eine

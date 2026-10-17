@@ -1495,7 +1495,7 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
         // (`create --fs tar720_leer`) oder ein Medium, auf dem nichts steht.  Beides ist
         // verlustfrei: wer in die Diskette ein .tar schreibt, ueberschreibt nur Nullen.
         // Der Preis ist ausdruecklich in Kauf genommen: eine mit Nullen gefuellte
-        // CP/A-Diskette erscheint als „tar720_leer"; `--fs cpa…` stellt es richtig.
+        // CP/A-Diskette erscheint als „tar720_leer"; `--fs cpa_auto` stellt es richtig.
         // Eine nur teilweise geladene physische Diskette wird NICHT geprueft (ganz Null
         // laesst sich erst nach dem vollen Lesen sagen).
         if (passend.empty() && !dv->abgeleitet_ && !tar_leer_kandidaten.empty()) {
