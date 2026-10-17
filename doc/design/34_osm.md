@@ -1,6 +1,6 @@
 # 34 — OS/M-Disketten (P8000, 8-Bit-Teil)
 
-Stand 2026-10-17, Zweig `cqm`.  Analyse und Plan; **AP 1, AP 2 und AP 3 sind umgesetzt** (§11).
+Stand 2026-10-17, Zweig `cqm`.  Analyse und Plan; **AP 1, AP 2, AP 3 und AP 6 sind umgesetzt** (§11).
 Bezug: `doc/design/33_cqm.md` (Container), `doc/merkposten/disktool.md`, `doc/merkposten/cqm.md`,
 Sammlung `~/projects/robotron/P8000/discs/` (pofo.de), Übersicht
 `~/projects/robotron/P8000/archive/UEBERSICHT.md`.
@@ -380,4 +380,19 @@ Minimalplan, falls nur das Nötigste gewollt ist: **AP 1 + AP 2 + AP 6** (ohne f
   als `.cqm` vor, `rempc172` fehlt zeitweise): einzige Änderungen osm30/osmsys/osm_org scpx640 →
   `osm640`, osmspiel/osmut/bsosm3/osmdb/osmredab cpa_auto → `osm800`, alle eindeutig, Dateizahlen und
   `check`-Befunde unverändert.  Wächter `OsmEchtdaten.*` (`K1520_CQM_DIR`).
-- Offen: AP 4–6 (Referenzdisketten, `osm720`, Oberfläche/Archiv/Übersicht).
+- Offen: **AP 4** (Referenzdisketten aus dem Original) und **AP 5** (`osm720`) — ausdrücklich zurückgestellt:
+  es gibt kein echtes Format-6-Abbild (9×512), und ohne ein solches ist der DRM von Typ 6 (127 oder 63)
+  nicht zu entscheiden (§8).
+
+**AP 6 — Oberfläche, Archiv, Handbuch** (2026-10-17):
+
+- *Neue Diskette* zeigt „Name — Beschreibung des Katalogs" (`neu_eintraege()`); vorher stand nur `osm800`.
+  Die Katalogbeschreibung („OS/M (P8000) 800K, Format 7 (5×1024) …") blieb unverändert.
+- Der Wortlaut von `remarks` („ebenso gut osm800 …") steht jetzt auch im **Protokoll** (`Medium: …`);
+  der Streifen kürzt ihn und verschwindet.  Statuszeile, Eigenschaften und Prüfdialog zeigen `osm640`/`osm800`
+  und `osm.fdconf` ohne Änderung (CP/M-Anzeige, R/O-Attribute und Nutzerbereiche wie bei jeder CP/M-Diskette).
+- Wächter `tests/python/test_disktool_osm.py` (Bytes-Abbilder, kein Echtabbild nötig).
+- `tools/p8000/pofo_archive.py`: `pofo_format_angabe` (Originalangabe) + `berichtigung` für `c-beschr`/`rempc171`
+  in `provenance`; bei `osm640`/`osm800` Hinweise aus Urlader (FDCONF), Systemkennung, BS1715, README-Anfang;
+  Datendisketten, die pofo „OSM" nennt, bekommen den Vermerk „ohne Urlader nicht belegt"; `UEBERSICHT.md` mit
+  Spalte „Profil" und Zusammenfassung.  Die Archive der Sammlung wurden damit neu erzeugt (außerhalb des Repos).

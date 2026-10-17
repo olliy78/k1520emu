@@ -187,13 +187,18 @@ bzw. `cpa_auto` — gelesen wird sie genauso richtig, nur der Name sagt nicht �
 eine leere CP/A-Datendiskette, deren Verzeichnis schon auf Zylinder 0 beginnt. Wer sie
 für OS/M füllen will, wählt im Dateisystem-Menü `osm800` (oder legt sie gleich als
 `osm800` an); sonst landen die ersten Dateien dort, wo OS/M sein System erwartet, und
-OS/M sieht sie nicht. Die Erkennung erinnert daran mit „ebenso gut osm800“. Eine
+OS/M sieht sie nicht. Die Erkennung erinnert daran mit „ebenso gut osm800“ — in der
+Meldung über der Dateiliste und, im vollen Wortlaut, im Protokoll. Unter *Neue
+Diskette* heißen die Einträge „osm640 — OS/M (P8000) 640K, Format 5 …“ und
+„osm800 — OS/M (P8000) 800K, Format 7 …“. Eine
 Bootdiskette entsteht wie bei den anderen Systemen: Systemspuren einer OS/M-Diskette
 herausholen und beim Anlegen mitgeben. Das Werkzeug prüft dabei, dass es wirklich ein
 OS/M-Urlader für dasselbe Format ist.
 
 Die Prüfung meldet **`osm.fdconf`**, wenn der Laufwerkstyp im Urlader nicht zum Format
-der Diskette passt — sie sähe heil aus und startete am P8000 falsch.
+der Diskette passt — sie sähe heil aus und startete am P8000 falsch. Die Statuszeile
+zeigt sie als Warnung, das Protokoll nennt sie, und der Prüfdialog (Strg+F) führt sie
+mit den übrigen Befunden.
 
 **Namen mit `/`** wie `GW/ZSID.DOC` stammen aus Übertragungen vom WEGA-Teil des P8000.
 CP/M erlaubt den Schrägstrich im Namen nicht; die Prüfung nennt ihn deshalb als Warnung.

@@ -118,6 +118,17 @@ class _AblageFilter(QObject):
         return False
 
 
+def neu_eintraege():
+    """(Name, Beschriftung) fuer „Neue Diskette": Katalogname plus Beschreibung.
+
+    Der blosse Name (`osm800`) sagt dem Anwender nichts; die Beschreibung des
+    Katalogs („OS/M (P8000) 800K, Format 7 ...") steht dabei.  tar720 mit Inhalt
+    laesst sich nicht anlegen - angeboten wird nur die LEERE tar-Diskette.
+    """
+    return [(f.name, f"{f.name} \u2014 {f.description}" if f.description else f.name)
+            for f in filesystems() if f.type != "tar" or f.leer]
+
+
 class MainWindow(QMainWindow):
     """Fenster des Diskettenwerkzeugs."""
 
@@ -1057,6 +1068,10 @@ class MainWindow(QMainWindow):
         self.act_schreibschutz.blockSignals(False)
         self._reload()
         self._medium_meldungen()
+        if self.tool.remarks:
+            # Der Streifen kuerzt und verschwindet; das Protokoll behaelt den vollen
+            # Wortlaut (z. B. „ebenso gut osm800 ... --fs osm800" auf einer leeren 800K).
+            self.log_dock.append("Medium: " + self.tool.remarks.strip())
         if not self.tool.has_filesystem:
             self._roh_melden()
         if not satz:
@@ -2175,10 +2190,12 @@ class MainWindow(QMainWindow):
         if not self._darf_verwerfen():
             return
         # tar720 (mit Inhalt) laesst sich nicht anlegen — angeboten wird die LEERE tar-Diskette.
-        namen = [f.name for f in filesystems() if f.type != "tar" or f.leer]
-        fs, ok = QInputDialog.getItem(self, "Neue Diskette", "Dateisystem:", namen, 0, False)
+        eintraege = neu_eintraege()
+        gewaehlt, ok = QInputDialog.getItem(
+            self, "Neue Diskette", "Dateisystem:", [t for _, t in eintraege], 0, False)
         if not ok:
             return
+        fs = next(n for n, t in eintraege if t == gewaehlt)
         pfad, _ = QFileDialog.getSaveFileName(
             self, "Neue Diskette anlegen", self._disketten_ordner(),
             "HFE-Abbild (*.hfe);;DMK-Abbild (*.dmk);;Sektorabbild (*.img);;"

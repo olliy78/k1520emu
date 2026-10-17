@@ -78,6 +78,18 @@ ANMERKUNGEN = {
                "Freiliste): Dateisystem-Eigenheit der Diskette, Dateien ausgelesen",
 }
 
+#: Berichtigungen zu den Angaben der Webseite (doc/design/34_osm.md §2, am Medium gemessen).
+#: Die Originalangabe der Seite bleibt in `file_format`/`pofo_format_angabe` unveraendert
+#: stehen; die Berichtigung kommt als eigenes Feld DAZU.
+BERICHTIGUNGEN = {
+    "c-beschr": "Nicht OS/M, sondern eine PC-1715-Diskette mit SCPX (Bootkopf 03 F0, 'SCPX V0/2', "
+                "SCP-Format 5: 80x2x16x256); 'P8000/PC1715 remote' ist die PC-Seite von "
+                "WEGA-Remote.  Die Namen '/Z/...' sind UNIX-Pfade aus der WEGA-Uebertragung.",
+    "rempc171": "Nicht OS/M, sondern eine SCP-1715-Diskette (Bootkopf 03 F0, "
+                "'CCP/BDOS-V0/4 ... Soemmerda', SCP-Format 7: 80x2x5x1024), Profil scp1715.  "
+                "'P8000/PC1715 remote' ist die PC-Seite von WEGA-Remote.",
+}
+
 SCHWERE = {0: "Hinweis", 1: "Warnung", 2: "Fehler", 3: "Gefahr"}
 
 
@@ -131,6 +143,12 @@ def provenance_von(meta: Meta, cqm_name: str, quelle: Path) -> dict:
         "web_label": m.get("label", ""),
         "source_sha256": sha256_datei(quelle),
     }
+    # Originalangabe der Seite (Format-Spalte) unveraendert; Berichtigung nur als Zusatz.
+    if m.get("fileformat"):
+        prov["pofo_format_angabe"] = m["fileformat"]
+    ber = BERICHTIGUNGEN.get(cqm_name[:-4] if cqm_name.endswith(".cqm") else cqm_name)
+    if ber:
+        prov["berichtigung"] = ber
     if sid is not None:
         prov["note_url"] = f"{WEB_URL}?action=display_note&set_id={sid}"
         prov["set_members"] = sorted(meta.satzglieder.get(sid, []))
@@ -168,6 +186,55 @@ def auszug(meta: Meta, sid, zeilen=4) -> str:
 def befunde_von(d: DiskTool) -> list:
     r = d.check(voll=True)
     return [(f.id, f.severity, f.object, f.text) for f in r.findings]
+
+
+def osm_hinweise(d: DiskTool, name: str, pofo_format: str) -> list:
+    """Angaben zu OS/M-Disketten, soweit sauber aus dem Medium ableitbar.
+
+    Systemdiskette (Profil osm640/osm800): Urlader-Typ (FDCONF), Systemkennung in den
+    Systemspuren, Bildschirmtreiber, Anfang der README.  Datendiskette, die die Seite als
+    OS/M fuehrt, aber ohne Urlader ist: nur der Vermerk, dass das Medium es nicht belegt.
+    """
+    fs = d.filesystem or ""
+    if not fs.startswith("osm"):
+        if pofo_format.endswith("/OSM") and name not in BERICHTIGUNGEN:
+            return ["Datendiskette ohne OS/M-Urlader: die Webseite fuehrt sie als OS/M, das "
+                    f"Medium belegt es nicht (gelesen als {fs or 'unbekannt'}, SCP-Format)"]
+        return []
+    z = []
+    with tempfile.TemporaryDirectory(prefix="pofo_osm_") as tmp:
+        boot = Path(tmp) / "boot.bin"
+        try:
+            d.read_boot_image(boot)
+            b = boot.read_bytes()
+        except (K1520DiskError, OSError):
+            b = b""
+        fd = b[0x7E] if len(b) > 0x80 else None
+        typ = {0x55: "Format 5 (80x2x16x256, 640K)", 0x77: "Format 7 (80x2x5x1024, 800K)"}
+        z.append(f"OS/M-Systemdiskette (Profil {fs}): Urlader P8000SYS"
+                 + (f", FDCONF {fd:02X} = {typ.get(fd, 'Typ ' + format(fd, '02X'))}"
+                    if fd is not None else ""))
+        m = re.search(rb"OS/M P8000 \(C\)ZFT/KEAW[ -~]{0,60}", b)
+        if m:
+            z.append("Systemkennung in den Systemspuren: " + m.group().decode("latin-1").strip())
+        m = re.search(rb"P8000 OS/M +[0-9.]+", b)
+        if m:
+            z.append("Startmeldung: " + m.group().decode("latin-1"))
+        if b"BS1715" in b:
+            z.append("Bildschirmtreiber BS1715 mitgeneriert")
+        for e in d.list():
+            if re.match(r"(?i)^(readme|liesmich)", e.name) and e.size < 20000:
+                ziel = Path(tmp) / "readme.txt"
+                try:
+                    d.extract(e.name, ziel, text=True)
+                    zl = [x.strip() for x in ziel.read_text(encoding="latin-1").splitlines()
+                          if x.strip()]
+                except (K1520DiskError, OSError):
+                    zl = []
+                if zl:
+                    z.append(f"{e.name} beginnt: \"{zl[0][:80]}\"")
+                break
+    return z
 
 
 def hinweise_aus(befunde, satz_info: str = "") -> list:
@@ -303,6 +370,10 @@ def archiviere_einzel(quelle: Path, name: str, ziel: Path, meta: Meta, satz_info
             prov["tar_satz"] = s
             prov["disk_index"] = i
         hinweise = hinweise_aus(befunde, info)
+        if d.has_filesystem:
+            hinweise += osm_hinweise(d, name, prov.get("pofo_format_angabe", ""))
+        if "berichtigung" in prov:
+            hinweise.append("Berichtigung zur Webseite: " + prov["berichtigung"])
         if name in satz_info and satz_info[name][0] in ABGELEITET:
             hinweise.append("Zugehoerigkeit zum Satz aus dem Befund abgeleitet (tar.abgeschnitten/"
                             "tar.fortsetzung passen zusammen); kein .tar-Gegenstueck")
@@ -534,7 +605,7 @@ def inhalt_blick(zp: Path) -> str:
 
 def schreibe_uebersicht(ziel: Path, ergebnisse: list, saetze: list, meta: Meta,
                         dubletten: list, unbekannt_web: list, crd: list, quelle: Path,
-                        pruef: dict, beschr: dict):
+                        pruef: dict, beschr: dict, fehlend_quelle=()):
     L = ["# Uebersicht P8000-CopyQM-Sammlung (pofo.de)", "",
          f"Erzeugt {datetime.date.today().isoformat()} mit `tools/p8000/pofo_archive.py`; "
          f"Webseite {WEB_URL}, abgerufen {meta.abruf}.  Quelle: `{quelle}` (nur gelesen).", ""]
@@ -542,6 +613,22 @@ def schreibe_uebersicht(ziel: Path, ergebnisse: list, saetze: list, meta: Meta,
              "Spalte Befunde = Pruefung des Dateisystems (Anzahl je Schwere), "
              "Archiv-Pruefung = ZIP entpackt, sha256 aller Eintraege gegen `diskarchive.yaml`.")
     L.append("")
+    # ---- Zusammenfassung
+    profile = collections.Counter(r["fs"] for r in ergebnisse)
+    osm = sorted(r["name"] for r in ergebnisse if r["fs"].startswith("osm"))
+    sev = collections.Counter(SCHWERE.get(b[1], "?") for r in ergebnisse + saetze
+                              for b in r["befunde"])
+    L += ["## Zusammenfassung", "",
+          f"- Abbilder: {len(ergebnisse)} (dazu {len(saetze)} Satzarchive)",
+          "- Profile: " + ", ".join(f"{k} {v}" for k, v in sorted(profile.items())),
+          "- Befunde der Dateisystempruefung: "
+          + (", ".join(f"{v} {k}" for k, v in sev.items()) or "keine"),
+          f"- OS/M-Systemdisketten (Profil osm640/osm800, am Urlader erkannt): {len(osm)}"
+          + (f" -- {', '.join(osm)}" if osm else ""),
+          "- Berichtigt (pofo fuehrt sie als OS/M, es sind PC-1715-Disketten): "
+          + (", ".join(n for n in sorted(BERICHTIGUNGEN) if any(r["name"] == n for r in ergebnisse))
+             or "keine"),
+          ""]
     gruppen = collections.defaultdict(list)
     for r in ergebnisse:
         p = r["prov"]
@@ -555,7 +642,7 @@ def schreibe_uebersicht(ziel: Path, ergebnisse: list, saetze: list, meta: Meta,
         a = auszug(meta, sid if sid != 10**6 else None)
         if a:
             L += [f"Beschreibung (Webseite, Auszug): {a}", ""]
-        L += ["| Abbild | Etikett | Dateisystem | Dateien | Groesse | Befunde | Besonderheiten |",
+        L += ["| Abbild | Etikett | Profil | Dateien | Groesse | Befunde | Besonderheiten |",
               "|---|---|---|---|---|---|---|"]
         for r in sorted(rs, key=lambda x: x["name"]):
             i = pruef[r["name"]][1]
@@ -632,6 +719,9 @@ def schreibe_uebersicht(ziel: Path, ergebnisse: list, saetze: list, meta: Meta,
         A.append(f"{len(ohne_satz)} Disketten ohne Satz/Beschreibung auf der Webseite "
                  f"(set_id fehlt; nur Etikett/Dateiname bekannt): {', '.join(ohne_satz)}")
     A.extend(dubletten)
+    if fehlend_quelle:
+        A.append("Auf der Webseite gefuehrt, in der Sammlung nicht vorhanden (nicht archiviert): "
+                 + ", ".join(fehlend_quelle))
     for n in unbekannt_web:
         A.append(f"{n}: nicht in pofo_meta.json (Webseite kennt das Abbild nicht)")
     A += [f"crdownload (nicht archiviert, nur Befund): {z}" for z in crd]
@@ -725,7 +815,9 @@ def main(argv=None) -> int:
             beschr[r["name"]] = f"MS-DOS-FAT12-Diskette, {r['fat']} Dateien aus dem Abbild gelesen (dateien_fat/)"
     crd = crdownload_bericht(quelle)
     A = schreibe_uebersicht(ziel, ergebnisse, satzergebnisse, meta, dubletten, unbekannt_web,
-                            crd, quelle, pruef, beschr)
+                            crd, quelle, pruef, beschr,
+                            [] if waehle else sorted(k[:-4] + ".cqm" for k in meta.eintraege
+                                                     if k.endswith(".cqm") and k[:-4] not in cqms))
     schlecht = [(n, p[0]) for n, p in pruef.items() if p[0]]
     print(f"\n{len(ergebnisse)} Einzel- und {len(satzergebnisse)} Satzarchive, "
           f"{len(fehler)} Fehlschlaege, {len(schlecht)} mit Pruefproblemen, "
