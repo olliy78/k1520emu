@@ -204,20 +204,25 @@ TEST(TarFs, LiestInhaltUndLinks) {
     fs::remove_all(z);
     TransferOptions t;
     ASSERT_TRUE(v->extractAll(z, t)) << v->lastError();
-    std::ifstream f(fs::path(z) / "dir" / "hallo.txt");
-    std::stringstream ss; ss << f.rdbuf();
-    EXPECT_EQ(ss.str(), "Hallo Welt\n");
-    std::ifstream f2(fs::path(z) / "dir" / "zweitname");
-    std::stringstream s2; s2 << f2.rdbuf();
-    EXPECT_EQ(s2.str(), "Hallo Welt\n");
+    // Datenstroeme VOR remove_all schliessen: Windows loescht keine offene Datei (Sharing violation).
+    {
+        std::ifstream f(fs::path(z) / "dir" / "hallo.txt");
+        std::stringstream ss; ss << f.rdbuf();
+        EXPECT_EQ(ss.str(), "Hallo Welt\n");
+        std::ifstream f2(fs::path(z) / "dir" / "zweitname");
+        std::stringstream s2; s2 << f2.rdbuf();
+        EXPECT_EQ(s2.str(), "Hallo Welt\n");
+    }
     EXPECT_EQ(fs::file_size(fs::path(z) / "gross.bin"), 1300u);
     // .fileinfo: fs=tar plus UNIX-Angaben
-    std::ifstream fi(fs::path(z) / "dir" / "hallo.txt.fileinfo");
-    std::stringstream si; si << fi.rdbuf();
-    EXPECT_NE(si.str().find("fs=tar"), std::string::npos);
-    EXPECT_NE(si.str().find("mode=0100640"), std::string::npos);
-    EXPECT_NE(si.str().find("uid=25"), std::string::npos);
-    EXPECT_EQ(si.str().find("\nteilstueck="), std::string::npos);
+    {
+        std::ifstream fi(fs::path(z) / "dir" / "hallo.txt.fileinfo");
+        std::stringstream si; si << fi.rdbuf();
+        EXPECT_NE(si.str().find("fs=tar"), std::string::npos);
+        EXPECT_NE(si.str().find("mode=0100640"), std::string::npos);
+        EXPECT_NE(si.str().find("uid=25"), std::string::npos);
+        EXPECT_EQ(si.str().find("\nteilstueck="), std::string::npos);
+    }
     fs::remove_all(z);
     fs::remove(p);
 }
@@ -269,9 +274,11 @@ TEST(TarFs, AbgeschnittenIstTeilstueckKeinFehler) {
     TransferOptions to;
     ASSERT_TRUE(v->extractAll(z, to)) << v->lastError();
     EXPECT_EQ(fs::file_size(fs::path(z) / "gross.dat"), e->size);
-    std::ifstream fi(fs::path(z) / "gross.dat.fileinfo");
-    std::stringstream si; si << fi.rdbuf();
-    EXPECT_NE(si.str().find("\nteilstueck="), std::string::npos);
+    {   // Strom vor remove_all schliessen (Windows: Sharing violation)
+        std::ifstream fi(fs::path(z) / "gross.dat.fileinfo");
+        std::stringstream si; si << fi.rdbuf();
+        EXPECT_NE(si.str().find("\nteilstueck="), std::string::npos);
+    }
     fs::remove_all(z);
     fs::remove(p3);
 }
@@ -464,9 +471,11 @@ TEST(TarFs, SatzVerkettetDieStroeme) {
     const std::string z = k1520test::tempPath("k1520_test_tar_k_aus");
     fs::remove_all(z);
     ASSERT_TRUE(v->extractAll(z, TransferOptions{})) << v->lastError();
-    std::ifstream f(fs::path(z) / "gross.dat", std::ios::binary);
-    std::stringstream ss; ss << f.rdbuf();
-    EXPECT_EQ(ss.str(), gross);
+    {   // Strom vor remove_all schliessen (Windows: Sharing violation)
+        std::ifstream f(fs::path(z) / "gross.dat", std::ios::binary);
+        std::stringstream ss; ss << f.rdbuf();
+        EXPECT_EQ(ss.str(), gross);
+    }
     fs::remove_all(z);
     fs::remove(p1); fs::remove(p2);
 
