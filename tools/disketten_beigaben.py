@@ -20,6 +20,8 @@ Emulator wie am Geraet ohne eigenen Kopierschritt bereitstehen:
   KMBGTEST.COM  tools/kassette/kmbgtest/  A5120 SCPX 1.7 — Kassette K5020 ueber die Robotron-Bibliothek
   KMBG.REL      doc/kassette/fex/   die Bibliothek selbst (zum Binden eigener Programme, M80/LINKMT);
                 CP/A und SCPX haben keinen Kassettentreiber im BIOS (doc/a5120_alt/bcu.md §10)
+  AUPTEST.COM   tools/auptest/   A5120/K8924 — AUP 062-8531 Tastaturteil (E/A 40H-43H, N10c)
+  AUPTSIO.COM   tools/auptest/   dieselbe Karte, Sonderschnittstelle CTC/SIO B0H-B7H (N10d)
 
 Ausserdem legt ``ORDNER`` die Unterordner aller Abbilder in ``disks/`` fest, auch der Abbilder,
 die kein CP/M-Bauskript erzeugt: BCU 880 (tools/bcu_a5120/build.py, Waechter ``cli_bcu_a5120``:
@@ -67,6 +69,8 @@ PROGRAMME = {
     'LBPUNCH.COM':  os.path.join(TOOLS, 'lochband', 'lbpunch.com'),
     'KMBGTEST.COM': os.path.join(TOOLS, 'kassette', 'kmbgtest', 'kmbgtest.com'),
     'KMBG.REL':     os.path.join(REPO, 'doc', 'kassette', 'fex', 'KMBG.REL'),
+    'AUPTEST.COM':  os.path.join(TOOLS, 'auptest', 'auptest.com'),
+    'AUPTSIO.COM':  os.path.join(TOOLS, 'auptest', 'auptsio.com'),
 }
 LOCHBAND = ['LBREAD.COM', 'LBPUNCH.COM']   # K6022/SIF1000 auf E0H-E7H; A5120, K8915, PRG (SCPX und CP/A getestet)
 PC1715 = ['PCTEST.COM']      # SERTEST V0.2 kennt den 1715, steht aber nur auf der CP/A-Systemdiskette (tools/cpa_pc1715); LB* nur mechanisch

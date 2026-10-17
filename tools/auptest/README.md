@@ -17,8 +17,7 @@ Am Gerät ungeprüft — der Serviceschaltplan fehlt (`doc/a5130_k8924/aup_analy
 
 Bau: `python3 tools/auptest/build.py` (M80 + LINKMT über `tools/cpm_bau.py`); die `.com` ist
 eingecheckt, Wächter `cli_auptest_com_passt_zur_quelle`.  Gastlauf: `AupMaschine.CpaGast*`.
-**Noch nicht auf den Bootdisketten** (`tools/disketten_beigaben.py`): das zöge den Neubau der
-CP/A-/SCPX-Systemdisketten in `disks/` nach sich (offen).
+Beide Programme liegen auf den A5120-Bootdisketten (CP/A und SCPX 1.7, `tools/disketten_beigaben.py`).
 
 ## auptsio — Sonderschnittstelle (N10d)
 
