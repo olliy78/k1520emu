@@ -46,6 +46,7 @@ from app.ui.keyboard import KeyboardWidget
 from app.ui.focus import release_focus, ScreenFocusGuard
 from app.ui.help_window import HelpWindow
 from app.ui.kassette_widget import KassetteWidget
+from app.ui.keyboard_k7633 import AupWidget
 from app.ui.lochstreifen_widget import LochstreifenWidget
 from app.ui import status_bar
 from app.ui.status_bar import MachineStatus
@@ -121,6 +122,11 @@ class MainWindow(QMainWindow):
         # Kassette K5020 (doc/design/29_kassette.md): dasselbe Muster.
         self._tape = False
         self._tape_zustand = {}
+        # AUP 062-8531 (Entwurf 33 N10e): Option, Vorgabe aus; Sonderschnittstelle und die
+        # Annahme zur Alpha-Tabelle (led|ohne|mit) gehoeren dazu.
+        self._aup = False
+        self._aup_sonder = False
+        self._aup_alpha = "led"
 
         # Create emulator (powered on only AFTER the config restored the disks,
         # so a cold start boots from the last-mounted images).
@@ -235,6 +241,7 @@ class MainWindow(QMainWindow):
         if hasattr(self.screen_widget, "mitschriftFehler"):
             self.screen_widget.mitschriftFehler.connect(self._mitschrift_fehler)
         self.settings_widget.tapeChanged.connect(self._on_tape_selected)
+        self.settings_widget.aupChanged.connect(self._on_aup_selected)
         self.kassette_widget.geaendert.connect(self._schedule_autosave)
         self.kassette_widget.meldung.connect(
             lambda text: self.statusBar().showMessage(text, 5000))
@@ -259,7 +266,7 @@ class MainWindow(QMainWindow):
         # ergibt und nicht fuenfzig.
         for dock in (self.screen_dock, self.keyboard_dock,
                      self.drives_dock, self.settings_dock, self.eprom_dock,
-                     self.lochstreifen_dock, self.kassette_dock):
+                     self.lochstreifen_dock, self.kassette_dock, self.aup_dock):
             if dock is None:
                 continue
             dock.visibilityChanged.connect(lambda *_: self._kasten_sichtbarkeit())
@@ -487,6 +494,16 @@ class MainWindow(QMainWindow):
         self.kassette_dock.visibilityChanged.connect(
             lambda sichtbar: sichtbar and self.kassette_widget.aktualisieren())
 
+        # ── AUP-Dock (Entwurf 33 N10e): wie die Kassette nur bei gesteckter Karte ──
+        self.aup_widget = AupWidget(self.emulator)
+        self.aup_dock = QDockWidget("AUP", self)
+        self.aup_dock.setObjectName("aup_dock")
+        self.aup_dock.setWidget(self.aup_widget)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.aup_dock)
+        self.tabifyDockWidget(self.drives_dock, self.aup_dock)
+        self.aup_dock.visibilityChanged.connect(
+            lambda sichtbar: sichtbar and self.aup_widget.aktualisieren())
+
         # ── Kastenschalter ───────────────────────────────────────────────────
         # Sie kommen von Qt (``toggleViewAction``) und sind damit immer richtig
         # herum angehakt.  Beschriftung, Symbol und Kurzwort bekommen sie hier —
@@ -500,7 +517,8 @@ class MainWindow(QMainWindow):
                 ("eprom", self.eprom_dock, "E&PROMmer", "eprom", "EPROMmer"),
                 ("lochstreifen", self.lochstreifen_dock, "L&ochstreifen", "lochstreifen",
                  "Lochstreifen"),
-                ("kassette", self.kassette_dock, "&Kassette", "kassette", "Kassette")):
+                ("kassette", self.kassette_dock, "&Kassette", "kassette", "Kassette"),
+                ("aup", self.aup_dock, "&AUP", "keyboard", "AUP")):
             if dock is None:
                 continue
             a = dock.toggleViewAction()
@@ -519,6 +537,7 @@ class MainWindow(QMainWindow):
         self.settings_dock.raise_()
         self._lochstreifen_kasten()
         self._kassette_kasten()
+        self._aup_kasten()
 
         # Startaufteilung: rechte Spalte (Laufwerke) so schmal wie moeglich, ohne
         # horizontales Scrollen; Bildschirm breit.  Tastatur auf Minimalhoehe.
@@ -895,7 +914,7 @@ class MainWindow(QMainWindow):
         view_menu.addAction(self.act_vollbild)
         view_menu.addSeparator()
         for name in ("screen", "keyboard", "drives", "settings", "eprom", "lochstreifen",
-                     "kassette"):
+                     "kassette", "aup"):
             if hasattr(self, f"act_dock_{name}"):
                 view_menu.addAction(getattr(self, f"act_dock_{name}"))
         view_menu.addSeparator()
@@ -1125,6 +1144,10 @@ class MainWindow(QMainWindow):
             general["bildschirm_schalter"] = self._schalter
         general["ptape"] = bool(self._ptape)
         general["tape"] = bool(self._tape)
+        if self.profil.aup_wahl:
+            general["aup"] = bool(self._aup)
+            general["aup_sonder"] = bool(self._aup and self._aup_sonder)
+            general["aup_alpha"] = self._aup_alpha
         if self.profil.terminal:
             general["mitschrift"] = self.settings_widget.mitschrift_value()
         data = config_io.build_config(
@@ -1399,6 +1422,13 @@ class MainWindow(QMainWindow):
             # Kassette K5020: dasselbe (fehlend = aus).
             self._tape = general.get("tape") is True and self.profil.tape_wahl
             self.settings_widget.set_tape_value(self._tape)
+            # AUP: dasselbe (fehlend = aus; Sonderschnittstelle/Alpha nur mit gesteckter AUP).
+            self._aup = general.get("aup") is True and self.profil.aup_wahl
+            self._aup_sonder = self._aup and general.get("aup_sonder") is True
+            self._aup_alpha = (general.get("aup_alpha")
+                               if self._aup and general.get("aup_alpha") in ("led", "ohne", "mit")
+                               else "led")
+            self.settings_widget.set_aup_value(self._aup, self._aup_sonder, self._aup_alpha)
 
             # Mitschrift des Terminals: ein FEHLENDER Schluessel heisst „nicht anfassen“ (die
             # Ansichts-Vorgabe traegt keinen Dateinamen), ein leerer „aus“.
@@ -1451,6 +1481,7 @@ class MainWindow(QMainWindow):
             # obwohl die Karte nicht (mehr) steckt.
             self._lochstreifen_kasten()
             self._kassette_kasten()
+            self._aup_kasten()
         finally:
             self._loading_config = False
 
@@ -1539,6 +1570,7 @@ class MainWindow(QMainWindow):
         raf_vorher = self._raf
         ptape_vorher = self._ptape
         tape_vorher = self._tape
+        aup_vorher = (self._aup, self._aup_sonder, self._aup_alpha)
         self._apply_config(vorgabe)
         # Ein geaenderter Laufwerksschacht ODER ein geaendertes Modell bedeutet
         # eine NEUE Maschine (:meth:`_apply_drive_types`), und die ist noch
@@ -1549,7 +1581,8 @@ class MainWindow(QMainWindow):
         if (self._drive_types != vorher or self._model != modell_vorher
                 or self._hardware != hardware_vorher
                 or self._raf != raf_vorher or self._ptape != ptape_vorher
-                or self._tape != tape_vorher):
+                or self._tape != tape_vorher
+                or (self._aup, self._aup_sonder, self._aup_alpha) != aup_vorher):
             self._cold_restart()
         # Sofort schreiben, nicht ueber den sammelnden Autosave: der Anwender hat
         # das Ueberschreiben eben bestaetigt, es darf nicht an einem Absturz in den
@@ -1729,6 +1762,8 @@ class MainWindow(QMainWindow):
             self.lochstreifen_widget.aktualisieren()
         if self.kassette_dock.isVisible():
             self.kassette_widget.aktualisieren()
+        if self.aup_dock.isVisible():
+            self.aup_widget.aktualisieren()
 
     def _update_em_status(self):
         """Die EM-Leuchten (V1/V2) und den Modus — nur wenn das Modell eins hat.
@@ -1877,6 +1912,11 @@ class MainWindow(QMainWindow):
             types = dt.normalize_list(vorgabe.get("laufwerke") or self._drive_types)
             self.settings_widget.set_hardware_value(self._hardware)
             self.settings_widget.set_tape_value(self._tape)
+            # Die AUP ist Teil der Vorgaben (bei allen drei Modellen aus): ein Modellwechsel
+            # setzt auch sie zurueck.
+            self._aup = bool(int(vorgabe.get("aup", 0))) and self.profil.aup_wahl
+            self._aup_sonder, self._aup_alpha = False, "led"
+            self.settings_widget.set_aup_value(self._aup)
         self._apply_drive_types(types, cold_restart=True)
         self._schedule_autosave()
 
@@ -1966,6 +2006,10 @@ class MainWindow(QMainWindow):
             # Einzeloptionen (A5120/A5130/K8924): Erweiterungsmodul und Kassette gehoeren ins
             # Woerterbuch, ``em=``/``tape=`` waeren daneben ein Fehler (Entwurf 33 N4).
             kern["konfig"] = {**kern["konfig"], "kassette": bool(self._tape)}
+            if self._aup:
+                kern["konfig"].update(aup=True, aup_alpha=self._aup_alpha)
+                if self._aup_sonder:
+                    kern["konfig"]["aup_sonder"] = True
             einzel = {}
         else:
             einzel = {"em": self.profil.modell_em(self._model, self._hardware),
@@ -2113,6 +2157,34 @@ class MainWindow(QMainWindow):
         self._kassette_kasten(zeigen=an)
         self._schedule_autosave()
 
+    def _on_aup_selected(self, an: bool, sonder: bool, alpha: str):
+        """Option „AUP (Sparkasse)" -> neue Maschine (wie die Kassette)."""
+        neu = (bool(an), bool(an and sonder), alpha if an else "led")
+        if neu == (self._aup, self._aup_sonder, self._aup_alpha):
+            return
+        if not self._eprom_rueckfrage("Wechsel der AUP-Karte"):
+            self.settings_widget.set_aup_value(self._aup, self._aup_sonder, self._aup_alpha)
+            return
+        zeigen = neu[0] and not self._aup
+        self._aup, self._aup_sonder, self._aup_alpha = neu
+        self._apply_drive_types(self._drive_types, cold_restart=True)
+        self._aup_kasten(zeigen=zeigen)
+        self._schedule_autosave()
+
+    def _aup_kasten(self, zeigen: bool = False):
+        """Kasten und Menueeintrag nur bei gesteckter AUP; *zeigen* holt ihn nach vorn."""
+        dock = getattr(self, "aup_dock", None)
+        if dock is None:
+            return
+        gesteckt = bool(self.emulator.aup_installed)
+        dock.toggleViewAction().setVisible(gesteckt)
+        if not gesteckt:
+            dock.hide()
+        elif zeigen:
+            dock.show()
+            dock.raise_()
+        self.aup_widget.aktualisieren()
+
     def _kassette_kasten(self, zeigen: bool = False):
         """Kasten und Menüeintrag nur bei gesteckter Karte; *zeigen* holt ihn nach vorn."""
         dock = getattr(self, "kassette_dock", None)
@@ -2205,6 +2277,9 @@ class MainWindow(QMainWindow):
             self.settings_widget.set_ptape_value(self._ptape)
             self._tape = bool(self.emulator.tape_installed())
             self.settings_widget.set_tape_value(self._tape)
+            self._aup = bool(self.emulator.aup_installed)
+            self._aup_sonder = bool(self.emulator.aup_sonder)
+            self.settings_widget.set_aup_value(self._aup, self._aup_sonder, self._aup_alpha)
             return False
 
         # Die Schnittstellen gehoeren zur Maschine (der Kern haengt den Hub an sie):
@@ -2222,6 +2297,7 @@ class MainWindow(QMainWindow):
         # Kassette: gebundene .k52 zurueckschreiben, Dateien merken.
         self._tape_zustand_lesen()
         self.kassette_widget.sichern()
+        self.aup_widget.alle_loslassen()
 
         try:
             self.emulator.stop()
@@ -2242,6 +2318,7 @@ class MainWindow(QMainWindow):
         self._ptape_zustand_anwenden(self._ptape_zustand)
         self.kassette_widget.set_emulator(new_emu)
         self._tape_zustand_anwenden(self._tape_zustand)
+        self.aup_widget.set_emulator(new_emu)
         self.drives_widget.set_drive_types(types, new_emu)  # rebuild panels, clear mounts
         self.drives_widget.load_mounts(surviving)           # remount into new machine
         if self.platten_widget is not None:
@@ -2263,6 +2340,8 @@ class MainWindow(QMainWindow):
         self._lochstreifen_kasten()
         self.settings_widget.set_tape_value(self._tape)
         self._kassette_kasten()
+        self.settings_widget.set_aup_value(self._aup, self._aup_sonder, self._aup_alpha)
+        self._aup_kasten()
         # Die Statuszeile fuehrt je bestuecktem Steckplatz ein Feld — ein
         # abgemeldetes Laufwerk muss auch dort verschwinden.  Die EM-Leuchten
         # (V1/V2) erscheinen nur, wenn das neue Modell ein Erweiterungsmodul hat.

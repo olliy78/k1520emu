@@ -175,7 +175,7 @@ def test_profil_kennt_genau_drei_modelle_mit_titeln():
 def test_vorgaben_je_modell():
     p = _profil()
     gemeinsam = {"ram": "k3526", "bildschirm": "k7024", "laderom": "v09_2",
-                 "erweiterungsmodul": "none", "kassette": "0"}
+                 "erweiterungsmodul": "none", "kassette": "0", "aup": "0"}
     a = p.modell_vorgabe("a5120")
     assert {k: a[k] for k in gemeinsam} == gemeinsam
     assert a["tastatur"] == "k7637" and a["laufwerke"] == ["K5601"] * 3 + ["none"]

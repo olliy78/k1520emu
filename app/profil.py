@@ -107,6 +107,8 @@ class Programmprofil:
     #: Kaestchen „Kassette (K5221, AKB K5020)" unter *Allgemein*: wie der Lochstreifen
     #: nicht am P8000 (kein K1520-Bus).
     tape_wahl: bool = True
+    #: Option „AUP (Sparkasse)" unter *Allgemein* (AUP 062-8531, Entwurf 33 N10e): nur A5120-Profil.
+    aup_wahl: bool = False
     #: Modelle mit fest eingebauter Kassette: das Kaestchen „Kassette“ ist dort ohne Wirkung
     #: (ausgegraut, der Kasten steht immer da) — MC80.21/.22 (MBI).
     tape_fest: Tuple[str, ...] = ()
@@ -431,6 +433,7 @@ A5120 = Programmprofil(
     # (folgt der Tastaturoption erst mit N7).  Alte Schluessel (a5120.16, a5120-alt …) sind unbekannt.
     modelle=tuple((k, "a5120", None, lbl, "k7637") for k, lbl, _t in _modell.MODELS),
     modell_vorgaben=tuple((k, tuple(v.items())) for k, v in _modell.VORGABEN.items()),
+    aup_wahl=True,
     # Optionen unter *Einstellungen ▸ Allgemein*.  Kaltstart noetig wie bei der Modellwahl.
     # Die Kassette ist das vorhandene Kaestchen (`tape_wahl`).  Das Lade-ROM „K8924 V0.9a
     # (handgepatcht)“ fehlt, bis der Kern es kennt (kein `v09a_k8924` in `A5120_KONFIG_WERTE`).
