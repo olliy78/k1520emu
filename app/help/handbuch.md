@@ -2045,6 +2045,282 @@ Installationsprotokoll von WEGA 3.1 steht und im Emulator geprüft ist.
 * Die Platte schreibt der Emulator beim Abtrennen, bei einem Zwischenstand und beim Beenden von selbst
   zurück.
 
+### Arbeiten mit Disketten unter WEGA
+
+Dieser Abschnitt spielt den ganzen Weg durch: eine Diskette unter WEGA **formatieren und mit einem
+Dateisystem beschreiben**, zwei weitere mit **`tar` auf dem Raw-Gerät** füllen, alle drei mit dem **DiskTool**
+auslesen, auf einem Linux-Rechner bearbeiten und wieder auf Disketten bringen. Der Ablauf ist im Emulator
+durchgespielt und als Systemtest hinterlegt (`P8000WegaDiskette.FormatMountTarUndDiskTool`, Label
+`wega_install`, `tools/dev.sh test-wega`); die Bildschirmauszüge unten stammen aus diesem Lauf. Die
+Oberflächenschritte des DiskTool (GUI) sind beschrieben, aber nicht Schritt für Schritt abgenommen.
+
+**Voraussetzungen.**
+
+* Das Vollgerät mit **installiertem WEGA** läuft im Mehrbenutzerbetrieb (Abschnitt *WEGA starten, anmelden,
+  beenden*), angemeldet als `wega` an der **Konsole**. Die Diskettenbefehle (`format`, die `fd`-Treiber) gehen
+  in WEGA **nur an der Systemkonsole** und nur, wenn WEGA über die **WEGA-Startdiskette** gestartet wurde
+  (nicht über das U880-Monitorkommando `X`) — sonst „unable to work with floppy".
+* Die Startdiskette steckt in **A:** (`fd0`). Alle hier beschriebenen Disketten kommen nach **B:**, also `fd1`.
+* Die Geräte: `/dev/fd1` ist das **Blockgerät** (für Dateisysteme, mit Puffer), `/dev/rfd1` das **Raw-Gerät**
+  (für `tar`, `dd`; auch `/dev/tardev`). Die Namen tragen das Format: `fd1` = `fd196ds9` (80 Spuren,
+  zweiseitig, 9 Sektoren zu 512 Byte = **720 KiB**, das Standardformat), daneben `fd148ds9`, `fd196ss9`,
+  `fd148ss9` und `fd196ds16` (16 × 256 Byte). Diese Beschreibung bleibt beim Standardformat.
+
+#### 1  Leere Diskette bereitstellen
+
+Im Laufwerkskasten von **B:** auf *Leere Diskette* drücken und einen Namen mit der Endung `.hfe` (oder
+`.dmk`) wählen, z. B. `wega_fs.hfe`. Das ist eine **echte Leerdiskette**: unformatiert, in der Geometrie des
+Laufwerks — das Formatieren erledigt WEGA selbst. Sie ist danach in B: eingelegt (sonst *Datei ▸ Diskette
+einlegen ▸ Laufwerk B:*). Ein `.img` kennt „unformatiert" nicht und taugt hier nicht.
+
+#### 2  Diskette mit Dateisystem: formatieren, mounten, beschreiben
+
+Ein Dateisystem entsteht in zwei Schritten: `format` schreibt die Spuren (Sektorköpfe), `mkfs` das
+Dateisystem darauf. `1440` ist die Größe in Blöcken zu 512 Byte (= 720 KiB).
+
+    #1 format fd1
+    ready? y
+    #2 /etc/mkfs /dev/fd1 1440
+    isize = 472
+    m/n = 1 72
+    #3 mkdir /dsk
+    #4 /etc/mount /dev/fd1 /dsk
+    WARNING!! - mounting: <> as </dsk>
+
+* `format fd1` fragt `ready? ` — mit **`y`** und RETURN quittieren. Es dauert rund 30 Sekunden Maschinenzeit
+  (126 Mio. Takte bei 4 MHz), `mkfs` rund 5.
+* Das Verzeichnis, auf das gemountet wird, muss **vorher da sein** (`mkdir /dsk`). Fehlt es, meldet `mount`
+  „No such file or directory" und bindet nichts ein.
+* Die Warnzeile `WARNING!! - mounting: <> as </dsk>` ist normal: das Dateisystem hat keinen Namen (`<>`).
+* Ohne Argumente zeigt `/etc/mount` die Tabelle der eingebundenen Dateisysteme, `df` den freien Platz.
+
+Jetzt wie auf jedem UNIX: eine Textdatei mit `echo`, ein Verzeichnis, eine Handbuchseite hineinkopieren.
+
+    #5 echo "Hallo von WEGA" > /dsk/hallo.txt
+    #6 mkdir /dsk/man
+    #7 cp /usr/man/man1/tar.1 /dsk/man/tar.1
+    #8 ls -lR /dsk
+    total 2
+    -rw-rw-rw- 1 wega     system       15 May 30 20:56 hallo.txt
+    drwxrwxrwx 2 wega     system       48 May 30 20:56 man
+    /dsk/man:
+    total 12
+    -rw-r--r-- 1 wega     system     5801 May 30 20:56 tar.1
+    #9 cat /dsk/hallo.txt
+    Hallo von WEGA
+
+Abschluss: **aushängen, prüfen, Puffer schreiben**, erst dann auswerfen.
+
+    #10 /etc/umount /dev/fd1
+    #11 /etc/fsck /dev/fd1
+    /dev/fd1
+    ** Phase 1 - Check Blocks and Sizes
+    ** Phase 2 - Check Pathnames
+    ** Phase 3 - Check Connectivity
+    ** Phase 4 - Check Reference Counts
+    ** Phase 5 - Check Free List
+    5 files 16 blocks 1365 free
+    #12 sync
+
+`fsck` meldet nichts Auffälliges (fünf i-nodes belegt, 16 Blöcke). Erst jetzt die Diskette auswerfen (*Datei ▸ Diskette auswerfen ▸ Laufwerk B:*
+bzw. der Knopf im Laufwerkskasten) — der Emulator schreibt die Datei dabei zurück.
+
+#### 3  Zwei Disketten mit `tar` auf dem Raw-Gerät
+
+Für jede Diskette: neue **Leere Diskette** (`tar_a.hfe`, `tar_b.hfe`), in B: einlegen, `format fd1`, dann `tar`
+auf `/dev/rfd1`. Es gibt **kein Dateisystem**; die Diskette trägt den `tar`-Strom ab Sektor 0. Gewählt sind
+Handbuchseiten aus `/usr/man`, zusammen rund 0,9 MB:
+
+    #1 format fd1
+    ready? y
+    #2 cd /usr/man; tar cvf /dev/rfd1 man2 man3 manM
+    a man2/INTRO.2 ...
+    ...
+    a manM/acct.M 7 blocks
+    tar: allocated space on disk 1256 blocks with 512 bytes
+    tar:   free    space on disk  184 blocks from 1440 blocks
+
+Auf die zweite Diskette: `cd /usr/man; tar cvf /dev/rfd1 man0 man4 man5 man6 man7` (600 Blöcke, 840 frei).
+`tar tvf /dev/rfd1` listet den Inhalt zur Probe auf und endet mit denselben zwei Platzzeilen.
+
+* Die letzte Zeile sagt, wie viel Platz bleibt. **Eine Diskette fasst 1440 Blöcke** (737 280 Byte); was
+  darüber hinausgeht, passt nicht; solche Archive teilt man selbst (unten: *Ein großes Archiv auf mehrere
+  Disketten*).
+* Mit `tar cvf` laufen die Dateinamen über den Bildschirm (`a …`); bei großen Archiven dauert es: die 643 KB
+  der ersten Diskette brauchten rund 80 Sekunden Maschinenzeit.
+* Pfade **relativ** angeben (`cd /usr/man; tar … man2`), damit man sie anderswo auspacken kann.
+
+#### 4  Mit dem DiskTool auslesen
+
+Das DiskTool (Menü *Werkzeuge* des Emulators, oder `bash run_disktool.sh`; Kommandozeile `k1520disktool`, im
+Projekt über `tools/dev.sh tool k1520disktool …`) erkennt alle drei Disketten selbst:
+
+    $ k1520disktool info wega_fs.hfe
+    Format:      k5601_9x512
+    Dateisystem: wega720
+    Datentraeger: 2 Dateien, 7 KB belegt, 683 KB frei
+    $ k1520disktool info tar_a.hfe
+    Dateisystem: tar720
+    Datentraeger: 215 Dateien, 626 KB belegt, 93 KB frei
+
+    $ k1520disktool ls -l wega_fs.hfe
+    -rw-rw-rw-   1     0     0       15 1989-05-30 18:56 hallo.txt
+    drwxrwxrwx   2     0     0       48 1989-05-30 18:56 man
+    -rw-r--r--   1     0     0     5801 1989-05-30 18:56 man/tar.1
+    $ k1520disktool fsck wega_fs.hfe --full       # und ebenso tar_a.hfe, tar_b.hfe
+    ohne Befund
+
+* Die Uhrzeiten liegen zwei Stunden vor denen, die WEGA zeigt (20:56 → 18:56); WEGA rechnet in der Zeitzone
+  „MES", das DiskTool in UTC.
+* `fsck` des DiskTool prüft ohne zu schreiben; auch die `tar`-Disketten haben eine Prüfung (Kopfblöcke,
+  Prüfsummen, Strom).
+
+**Dateien holen:**
+
+    $ k1520disktool get wega_fs.hfe --to auszug/fs          # hallo.txt, man/tar.1 (+ .fileinfo-Dateien)
+    $ k1520disktool get tar_a.hfe --to auszug/a             # die einzelnen Dateien der Diskette
+
+**Das `tar`-Archiv selbst** — der Weg für alles Folgende — holt `tar-export` heraus (die 512-Byte-Blöcke
+unverändert, bis hinter die Endmarke):
+
+    $ k1520disktool tar-export tar_a.hfe teil_a.tar
+    teil_a.tar: 642560 Byte (1255 Bloecke)
+    $ k1520disktool tar-export tar_b.hfe teil_b.tar
+
+**In der Oberfläche (GUI):** `Datei ▸ Abbild öffnen` (`Strg+O`) — oder die `.hfe` auf das Fenster ziehen. Im
+Kopf steht das erkannte Dateisystem (`wega720` bzw. `tar720`); links die Dateien mit Modus, Besitzer und Zeit.
+Dateien markieren und mit `→|` in den Ordner rechts holen. Die `tar`-Datei der Diskette entsteht mit `Diskette ▸
+Diskette als .tar exportieren…`. Ausführlich: Handbuch des DiskTool, Abschnitt *tar-Archive herausholen,
+bearbeiten und zurückschreiben*.
+
+#### 5  Auf dem Linux-Rechner entpacken
+
+Die beiden Teile sind **eigenständige** Archive (jedes beginnt mit seinem Kopf und endet mit der Endmarke) —
+sie lassen sich einzeln und in dasselbe Verzeichnis auspacken:
+
+    $ mkdir lokal
+    $ tar -xvf teil_a.tar -C lokal
+    $ tar -xvf teil_b.tar -C lokal
+    $ ls lokal
+    man0  man2  man3  man4  man5  man7  manM
+
+Danach liegen 262 Dateien (zusammen rund 0,9 MB) im Ordner. Als normaler Benutzer setzt `tar` die
+Besitzer nicht um (UID 0 der Diskette); mit `--numeric-owner` und `sudo` bleiben sie. Leere Verzeichnisse
+(`man6`) legt WEGA-`tar` nicht ins Archiv.
+
+#### 6  Der Weg zurück
+
+**a) Archive für WEGA erzeugen.** Zwei **V7**-Archive, jedes höchstens 720 KiB (737 280 Byte) groß. Wichtig sind
+`--format=v7` (GNU- und ustar-Köpfe versteht WEGA nicht) und die Beschränkung auf **Dateien** — die
+Verzeichniseinträge, die GNU-`tar` sonst mitschreibt, quittiert WEGA-`tar` beim Auspacken mit „cannot create":
+
+    $ cd lokal
+    $ echo "Neu von Linux" > man2/NEU.TXT                       # irgendeine Änderung
+    $ find man2 man3 manM -type f | sort | tar --format=v7 -cf ../rueck_a.tar -T -
+    $ find man0 man4 man5 man7 -type f | sort | tar --format=v7 -cf ../rueck_b.tar -T -
+    $ cd ..; ls -l rueck_*.tar
+    -rw-rw-r-- 1 olliy olliy 645120 ... rueck_a.tar
+    -rw-rw-r-- 1 olliy olliy 317440 ... rueck_b.tar
+
+Die Pfade stehen ohne führendes `./` im Archiv. Pfadnamen sind auf 99 Zeichen begrenzt.
+
+**b) Auf zwei Disketten schreiben.** Je eine neue, **ganz leere** `tar`-Diskette anlegen und das Archiv
+einmal hineinschreiben:
+
+    $ k1520disktool create neu_a.hfe --fs tar720_leer
+    $ k1520disktool tar-put neu_a.hfe rueck_a.tar
+    geschrieben: rueck_a.tar → neu_a.hfe (die Diskette ist jetzt tar720, nur lesbar)
+    $ k1520disktool create neu_b.hfe --fs tar720_leer
+    $ k1520disktool tar-put neu_b.hfe rueck_b.tar
+
+`tar-put` prüft vorher: höchstens 737 280 Byte, ein Vielfaches von 512, und warnt (stderr), wenn der erste Kopf
+nicht V7 ist. Es geht **genau einmal** je Diskette; die Diskette ist danach „nur lesbar" im DiskTool — für
+WEGA ist sie eine gewöhnliche `tar`-Diskette. In der GUI: `Datei ▸ Neue Diskette…` mit dem Dateisystem
+`tar720_leer`, dann `Diskette ▸ tar-Datei auf Diskette schreiben…` (oder die `.tar` auf die Diskettenansicht
+ziehen).
+
+**c) Datei auf der WEGA-Dateisystemdiskette austauschen.** Das DiskTool schreibt in die WEGA-Diskette, als
+wäre es das Betriebssystem:
+
+    $ k1520disktool rm  wega_fs.hfe hallo.txt
+    geloescht: hallo.txt
+    $ echo "Datei vom Linux-Rechner" > neu.txt
+    $ k1520disktool put wega_fs.hfe neu.txt
+    $ k1520disktool ls -l wega_fs.hfe
+    drwxrwxrwx   2     0     0       48 1989-05-30 18:56 man
+    -rw-r--r--   1     0     0     5801 1989-05-30 18:56 man/tar.1
+    -rw-r--r--   1     0     0       24 ...             neu.txt
+    $ k1520disktool fsck wega_fs.hfe --full
+    ohne Befund
+
+(In der GUI: erst den Schreibschutz aufheben (`Diskette ▸ Schreibschutz`, `Strg+R`), die Datei links markieren
+und löschen, `neu.txt` rechts markieren und mit `|←` einfügen, dann `Datei ▸ Speichern` (`Strg+S`).)
+
+**d) Zurück in WEGA.** Die Dateisystemdiskette zuerst in B: einlegen, **prüfen**, mounten, lesen. Die
+Prüfung ist die Gegenprobe, dass das DiskTool ein Dateisystem geschrieben hat, das WEGA ohne Beanstandung
+liest:
+
+    #1 /etc/fsck /dev/fd1
+    ** Phase 1 - Check Blocks and Sizes
+    ...
+    5 files 16 blocks 1365 free
+    #2 /etc/mount /dev/fd1 /dsk
+    #3 ls /dsk
+    man     neu.txt
+    #4 cat /dsk/neu.txt
+    Datei vom Linux-Rechner
+    #5 /etc/umount /dev/fd1
+
+(`mkdir /dsk` wird nur gebraucht, wenn es das Verzeichnis noch nicht gibt.) Danach die Diskette auswerfen und
+nacheinander die **beiden `tar`-Disketten** in B: einlegen und in ein temporäres Verzeichnis auf der großen
+Platte `/z` entpacken (`/tmp` ist nur 2 MB groß):
+
+    #6 mkdir /z/tmp
+    #7 cd /z/tmp; tar xvf /dev/rfd1          ← rueck_a, Diskette 1
+    x man2/NEU.TXT, 14 bytes, 1 archiv blocks
+    ...
+    #8 tar xvf /dev/rfd1                     ← Diskette wechseln, rueck_b
+    #9 ls /z/tmp
+    man0 man2 man3 man4 man5 man7 manM
+    #10 cat /z/tmp/man2/NEU.TXT
+    Neu von Linux
+
+`tar xvf` legt die Verzeichnisse selbst an. Zum Aufräumen später `rm -r /z/tmp`.
+
+#### Ein großes Archiv auf mehrere Disketten
+
+Ist der Ordner größer, als in zwei unabhängige Archive passt, schneidet man **einen** V7-Strom in Stücke zu je
+einer Diskette (wie im DiskTool-Handbuch, Abschnitt *Passende tar-Dateien unter Linux erzeugen und entpacken*):
+
+    $ find man0 man2 man3 man4 man5 man7 manM -type f | sort | tar --format=v7 -cf alles.tar -T -
+    $ split -b 737280 -d -a 2 --additional-suffix=.tar alles.tar teil     # teil00.tar, teil01.tar
+    $ k1520disktool create teil00.hfe --fs tar720_leer; k1520disktool tar-put teil00.hfe teil00.tar   # … und teil01
+
+Die Teile ab dem zweiten beginnen mitten in einer Datei, **WEGA-`tar` kann sie nicht einzeln lesen**.
+Auf WEGA werden die Disketten daher erst im Ganzen auf die Platte kopiert, dann hintereinandergelegt
+(getestet mit zwei Teilen, 952 320 Byte):
+
+    #1 dd if=/dev/rfd1 of=/z/p1 bs=4608 count=160       ← Diskette 1 (160 × 4608 = 737 280 Byte)
+    #2 dd if=/dev/rfd1 of=/z/p2 bs=4608 count=160       ← Diskette 2
+    #3 mkdir /z/t4; cd /z/t4; cat /z/p1 /z/p2 | tar xf -
+
+(`bs=4608` ist eine Spur zu 9 × 512; das Raw-Gerät verlangt Vielfache von 512.) Nach dem Entpacken die
+Zwischendateien `/z/p1`, `/z/p2` löschen. In die umgekehrte Richtung macht `tar-satz` des DiskTool
+(`k1520disktool tar-satz teil00.hfe teil01.hfe --to ziel`) dasselbe auf dem Linux-Rechner.
+
+#### Stolpersteine
+
+* **Immer erst `umount`, dann auswerfen** — und `sync`. Solange ein Dateisystem gemountet ist, liegen
+  Änderungen noch im Puffer des Systems und fehlen auf der Diskette. `tar` auf dem Raw-Gerät schreibt dagegen
+  sofort.
+* **Dieselbe Diskette nie gleichzeitig im DiskTool und im Emulator offen halten.** Der Emulator schreibt
+  beim Auswerfen zurück; das DiskTool arbeitet auf der Datei.
+* `format` löscht alles. Es gibt keine Rückfrage außer `ready? `.
+* Lange Ausgaben (`tar xvf`) laufen über den Bildschirm; für die Kontrolle in eine Datei umleiten
+  (`> /z/log`) und mit `tail`/`wc` ansehen — wie in den Beispielen.
+* `tar`-Disketten, die das DiskTool geschrieben hat, sind dort danach nur lesbar. Soll eine geändert werden:
+  Archiv mit `tar-export` holen, auf dem Linux-Rechner ändern, auf eine neue Leerdiskette schreiben.
+
 ### Terminal und Tastatur
 
 Das Terminal ist ein Terminal **ADM31** (VT100 wählbar), 80 × 24, 9600 Baud. Beim Einschalten gilt ADM31;

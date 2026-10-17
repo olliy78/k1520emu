@@ -21,7 +21,7 @@ KAPITEL = "Bedienung des P8000"
 ABSCHNITTE = (
     "Überblick: was ist was", "Einschalten und Selbsttest", "Der U880-Monitor (MON8)",
     "Der U8000-Monitor (MON16)", "UDOS booten (8-Bit-Teil)", "WEGA: die Platte vorbereiten und installieren",
-    "WEGA starten, anmelden, beenden", "Terminal und Tastatur", "Fehlersuche",
+    "WEGA starten, anmelden, beenden", "Arbeiten mit Disketten unter WEGA", "Terminal und Tastatur", "Fehlersuche",
 )
 
 

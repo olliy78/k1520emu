@@ -202,5 +202,11 @@ k1520_add_test(p8000_wega_mehrplatz SRC test_p8000_wega_mehrplatz.cpp
                             LIBS k1520_p8000 k1520_logger k1520_testsupport
                             LABELS "system;slow;wega_install" DEFS LOG_LEVEL=2 TIMEOUT 7200 RUN_SERIAL)
 
+# ─── P8000/WEGA: Disketten formatieren (format/mkfs), mounten, mit tar beschreiben und im DiskTool
+# lesen.  Startet aus dem eingefrorenen Zustand p15_6_login (kein Boot); ohne ihn uebersprungen.
+k1520_add_test(p8000_wega_diskette SRC test_p8000_wega_diskette.cpp
+                            LIBS k1520_p8000 k1520_fs k1520_logger k1520_testsupport
+                            LABELS "system;slow;wega_install" DEFS LOG_LEVEL=2 TIMEOUT 3600 RUN_SERIAL)
+
 # Zeitgrenzen der add_test()-Faelle × K1520_TEST_ZEIT_FAKTOR (tests/cmake/K1520AddTest.cmake)
 k1520_test_zeiten_skalieren()
