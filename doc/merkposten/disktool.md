@@ -1079,3 +1079,10 @@ Was beim Weiterarbeiten zu wissen ist:
   leeren tar-Diskette zu (`datei_schreibbar = schreibbar and not ist_tar`), der Neu-Dialog bietet nur
   `tar720_leer` (nicht `tar720`).  Wächter `py_disktool_tar_schreiben`, `dt_tar_*.cli`.
 
+- **OS/M-Disketten (P8000, 8-Bit-Teil; Analyse 2026-10-17, Entwurf `doc/design/34_osm.md`).**  OS/M ist
+  CP/M 2.2 auf den **SCP-Formaten des PC 1715** — kein eigenes Dateisystem.  Format 5 (640K, 16×256) =
+  `scpx640`, Format 7 (800K, 5×1024) = OFF 2 Zylinder / 2K / 128 (heute `cpa_auto`); beide werden
+  richtig gelesen (15 Abbilder gegen einen unabhängigen Leser geprüft).  Offen und geplant: Profile
+  `osm640`/`osm800` (Name, leere 800K-Diskette liest sonst als `cpa800`, Ladekopf „P8000SYS“ + FDCONF),
+  `osm720` (Format 6, 9×512 — die CP/A-Regel kann es nicht), und der Pfadausbruch von
+  `get <abbild> <muster>` bei Namen mit `/` (`/Z/HOFFM` → absoluter Pfad).
