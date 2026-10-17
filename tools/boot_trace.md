@@ -38,6 +38,8 @@ boot_trace [DISK] [optionen]
 | `-p <zyklen>` | **nach** dem Boot weiterlaufen (`0x0437`+) — aktiviert den Post-Boot-Report (Port-/Loaded-code-Histogramm, VRAM-Schreibzähler, 80-Spalten-VRAM-Textdump) |
 | `--raf <typ>` | RAM-Floppy (`raf128`\|`raf512`\|`raf2m`\|`none`) vor dem ersten Lauf stecken, an allen Maschinen (§10) |
 | `--ptape` | Lochstreifen-Karte K6022 (SIF1000, E0H–E7H) vor dem ersten Lauf stecken, an allen Maschinen (§10a) |
+| `--k3521 <adr\|aus>` / `--k3521-memdi bus\|memdi1\|memdi2` / `--k3521-datei <pfad>` | A5120: akkugepuffertes 4-KB-RAM K3521.30 an der 4-KB-Adresse (Hex, Raster 0..f000), /MEMDI-Quelle (nur mit `--k3521`), Ablagedatei genau 4096 B (nur mit `--k3521`); Merkposten `a5130_k8924` Nr. 16/17 |
+| `--aup` / `--aup-alpha led\|ohne\|mit` / `--aup-sonder` | A5120: AUP 062-8531 (Tastaturteil auf E/A 40H–43H) stecken; `--aup-alpha` = Annahme A3 (nur mit `--aup`); `--aup-sonder` steckt sie MIT Sonderschnittstelle (CTC B0H–B3H, SIO B4H–B7H, Kanal B nach außen, Kette hinter der K8025), impliziert `--aup`. Merkposten `a5130_k8924` Nr. 18/19 |
 | `--tape <k52>` / `--tape2 <k52>` / `--tape-card` | Kassettenkarte K5020 (zwei K5200; A5120/PRG 710/MC80 30H, K8915 D0H) vor dem ersten Lauf stecken; `.k52` an Gerät 1 bzw. 2 binden (fehlende Datei = leere Kassette), `--tape-card` nur die Karte (`doc/merkposten/kassette.md`) |
 | `--machine mc80\|mc80-30\|mc80-31` / `--spe 1\|2` | MC80 (.30/.31) mit 1 oder 2 SPE 2; `-c` 60 Mio., Stillstand 8 Mio. Takte (§9b) |
 | `--machine mc80-21\|mc80-22` | MC80.21/.22: DPL-Bild 8 × 32, Ziel = BSYS-Menü, Stillstand 4 Mio. Takte (§9c) |

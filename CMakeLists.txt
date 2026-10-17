@@ -373,7 +373,7 @@ if(BUILD_K1520)
 
     # AUP 062-8531, Tastaturteil (Entwurf 33 N10c)
     add_library(k1520_aup STATIC core/cards/aup/aup.cpp)
-    target_link_libraries(k1520_aup PUBLIC k1520_bus)
+    target_link_libraries(k1520_aup PUBLIC k1520_sio k1520_ctc k1520_bus k1520_serial)
     target_include_directories(k1520_aup PUBLIC ${CMAKE_SOURCE_DIR})
 
     # A5120 machine (wires all cards + Z80 CPU)

@@ -150,6 +150,12 @@ public:
          */
         bool               aup = false;
         AUP::Alpha         aup_alpha = AUP::Alpha::NachLed;
+        /**
+         * @brief AUP-Sonderschnittstelle (N10d): CTC B0H-B3H + SIO B4H-B7H, Kanal B nach aussen als
+         *        vierte Schnittstelle des SerialHub (hinter DFUE/V.24, DFUE/IFSS, Drucker), Karte in der
+         *        Interruptkette hinter der K8025.  Nur mit @ref aup; Vorgabe aus (bitgleich).
+         */
+        bool               aup_sonder = false;
 
         /// Vorgabekonfiguration einer Ausfuehrung (Huelle, Entwurf 33 N1): setzt nur die
         /// Einzelfelder.  Laufwerke laut Entwurf 30 §1.
@@ -404,9 +410,10 @@ public:
     /**
      * @brief AUP 062-8531 (Tastaturteil) auf 40H-43H stecken — nach dem Anlegen, VOR dem ersten
      *        run()/reset() (wie installK5020).  false + @ref aupFehler bei doppeltem Stecken,
-     *        belegtem Tor oder nach dem ersten Lauf.
+     *        belegtem Tor oder nach dem ersten Lauf.  @p sonder steckt zusaetzlich die
+     *        Sonderschnittstelle (CTC/SIO B0H-B7H, Kette hinter der K8025, vierter serieller Anschluss).
      */
-    bool installAup(AUP::Alpha alpha = AUP::Alpha::NachLed);
+    bool installAup(AUP::Alpha alpha = AUP::Alpha::NachLed, bool sonder = false);
     AUP*       aup()       { return aup_.get(); }
     const AUP* aup() const { return aup_.get(); }
     const std::string& aupFehler() const { return aup_fehler_; }
@@ -673,6 +680,7 @@ private:
     std::array<std::unique_ptr<K3525>, 4> k3525_;
     std::unique_ptr<AUP>   aup_;     // Option (Entwurf 33 N10c); liest total_cycles_ als Uhr
     std::string            aup_fehler_;
+    bool                   aup_sonder_ = false;   // Sonderschnittstelle gesteckt: Takt im Laufweg (N10d)
     std::unique_ptr<K3521> k3521_;   // Option (Entwurf 33 N10b); nach dem Bus angemeldet, ueber Reset/Netz-Aus erhalten
     std::unique_ptr<K7023> k7023_;
     std::unique_ptr<K7636> k7636_;

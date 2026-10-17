@@ -139,6 +139,8 @@ K1520_API K1520Handle k1520_create_a5120_konfig(int ausfuehrung, int laderom, in
  *               - `k3521_memdi` bus (Vorgabe) | memdi1 | memdi2 (nur mit k3521)
  *               - `aup`        0 (Vorgabe) | 1 (AUP 062-8531 Tastaturteil auf 40H-43H, k1520_aup_*)
  *               - `aup_alpha`  led (Vorgabe) | ohne | mit (Annahme zur Alpha-Umschaltung, nur mit aup)
+ *               - `aup_sonder` 0 (Vorgabe) | 1 (AUP-Sonderschnittstelle: CTC B0H-B3H, SIO B4H-B7H,
+ *                              vierter serieller Anschluss; nur mit aup=1)
  * @param drive0..3 wie bei k1520_create_configured; NULL/"" = Vorgabe der Ausfuehrung.
  * Unbekannter Schluessel/Wert oder unzulaessige Kombination → NULL mit Grund in
  * k1520_last_init_error.  Die Zahlen-Fassung k1520_create_a5120_konfig bleibt daneben bestehen.
@@ -654,6 +656,11 @@ K1520_API bool        k1520_k3521_akku_leer(K1520Handle h, int leer);
 /** @brief AUP stecken; false + Grund in k1520_last_init_error (Maschine, Zeitpunkt, Tor belegt). */
 K1520_API bool        k1520_aup_install(K1520Handle h);
 K1520_API bool        k1520_aup_installed(K1520Handle h);
+/** @brief Wie k1520_aup_install, mit Sonderschnittstelle (N10d): CTC B0H-B3H + SIO B4H-B7H, Kette
+ *  hinter der K8025, SIO-Kanal B als vierter serieller Anschluss (k1520_serial_*, Index 3). */
+K1520_API bool        k1520_aup_install_sonder(K1520Handle h);
+/** @brief Steckt die AUP MIT Sonderschnittstelle?  false ohne Karte. */
+K1520_API bool        k1520_aup_sonder(K1520Handle h);
 /** @brief Taste druecken (@p gedrueckt != 0) oder loesen (fadensicher); false ohne Karte oder
  *  wenn an der Position keine Taste ist. */
 K1520_API bool        k1520_aup_taste(K1520Handle h, int tastatur, int pos, int gedrueckt);

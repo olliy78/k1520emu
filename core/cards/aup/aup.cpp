@@ -4,17 +4,121 @@
  */
 #include "core/cards/aup/aup.h"
 
+#include <utility>
+
 #include "core/cards/aup/aup_tabelle.h"
+#include "core/serial/sio_format.h"
+
+// ─── Sonderschnittstelle: SIO-Kanal B als SerialAnschluss (N10d) ─────────────
+// Muster K8025::Anschluss.  TTL-Pegel, keine V.24-Steuerleitungen (v24() = false).
+class AUP::Sonder : public k1520::serial::SerialAnschluss {
+public:
+    explicit Sonder(AUP& k) : k_(k) {}
+
+    // Name nach Beleg: der Beleg nennt "Sonderschnittstelle" und X2; das Wort SIMO kommt nicht vor.
+    const char* name() const override { return "Sonderschnittstelle"; }
+    const char* stecker() const override { return "X2"; }
+    bool v24() const override { return false; }
+
+    k1520::serial::SerialFormat format() const override {
+        return k1520::serial::serialFormatAusSio(kanal(), *k_.ctc_, 0);   // Takt: CTC-Kanal 0
+    }
+    bool senderHatZeichen() const override { return kanal().senderHatZeichen(); }
+    uint8_t senderNimm() override {
+        uint8_t b = kanal().txGet();
+        const uint8_t bits = kanal().format().tx_bits;
+        if (bits < 8) b &= static_cast<uint8_t>((1u << bits) - 1);
+        k_.seriell_geaendert_ = true;   // Tx leer -> Tx-Interrupt moeglich
+        return b;
+    }
+    bool empfaengerFrei() const override { return kanal().empfaengerFrei(); }
+    void empfange(uint8_t b) override {
+        kanal().rxByte(b);
+        k_.kette();
+        k_.seriell_geaendert_ = true;
+    }
+    bool rts() const override { return kanal().rts(); }
+    bool dtr() const override { return kanal().dtr(); }
+    bool breakGesendet() const override { return kanal().breakSenden(); }
+    void breakEmpfang(bool aktiv) override {
+        kanal().setzeBreakEmpfang(aktiv);
+        k_.kette();
+        k_.seriell_geaendert_ = true;
+    }
+
+private:
+    Z80SIO::Channel& kanal() const { return k_.sio_->channelB(); }
+    AUP& k_;
+};
 
 AUP::AUP() : AUP(Config{}) {}
 
-AUP::AUP(const Config& cfg) : cfg_(cfg) {}
+AUP::AUP(const Config& cfg) : cfg_(cfg) {
+    if (cfg_.sonder) {
+        ctc_ = std::make_unique<Z80CTC>("AUP-CTC-A12");
+        sio_ = std::make_unique<Z80SIO>("AUP-SIO-A13");
+        anschluss_ = std::make_unique<Sonder>(*this);
+    }
+}
 
-void AUP::attachToBus(K1520Bus& bus) { bus.registerIO(this, cfg_.basis, 4); }
+AUP::~AUP() = default;
+
+k1520::serial::SerialAnschluss* AUP::anschluss() { return anschluss_.get(); }
+
+void AUP::attachToBus(K1520Bus& bus) {
+    bus.registerIO(this, cfg_.basis, 4);
+    if (cfg_.sonder) bus.registerIO(this, cfg_.basis_sonder, 8);
+}
 
 void AUP::reset() {
     allesLoeschen();      // [A6] /RESET wirkt wie FFH
     kommando_ = 0xFF;
+    if (cfg_.sonder) {    // systemweiter /RESET: Baustein-Reset (wie K8025::reset)
+        ctc_->reset();
+        sio_->reset();
+        kette();
+    }
+}
+
+// ─── Interruptkette (nur Sonderschnittstelle) ───────────────────────────────
+
+void AUP::kette() {
+    if (!sio_) return;
+    sio_->setIEI(iei_);                 // [A10] SIO vor CTC
+    ctc_->setIEI(sio_->getIEO());
+}
+
+void AUP::setIEI(bool iei) { iei_ = iei; kette(); }
+
+bool AUP::getIEO() const {
+    if (!sio_) return iei_;             // ohne Sonderschnittstelle: durchgereicht
+    if (!iei_) return false;
+    return !sio_->hasInterrupt() && !ctc_->hasInterrupt();
+}
+
+bool AUP::hasInterrupt() const {
+    if (!sio_ || !iei_) return false;
+    return sio_->hasInterrupt() || ctc_->hasInterrupt();
+}
+
+uint8_t AUP::getVector() const {
+    if (!sio_) return 0xFF;
+    if (sio_->hasInterrupt()) return sio_->getVector();
+    if (ctc_->hasInterrupt()) return ctc_->getVector();
+    return 0xFF;
+}
+
+void AUP::onRETI() {
+    if (!sio_) return;
+    sio_->onRETI();
+    ctc_->onRETI();
+    kette();
+}
+
+const char* AUP::intDeviceName() const {
+    if (sio_ && sio_->hasInterrupt()) return "AUP SIO-A13 (Sonderschnittstelle)";
+    if (ctc_ && ctc_->hasInterrupt()) return "AUP CTC-A12";
+    return "AUP";
 }
 
 // ─── Tabellen ───────────────────────────────────────────────────────────────
@@ -140,6 +244,12 @@ void AUP::kommandoAusfuehren(uint8_t d) {
 // ─── Bus ────────────────────────────────────────────────────────────────────
 
 uint8_t AUP::ioRead(uint8_t port) {
+    if (cfg_.sonder && static_cast<uint8_t>(port - cfg_.basis_sonder) < 8) {
+        const uint8_t rel = static_cast<uint8_t>(port - cfg_.basis_sonder);
+        const uint8_t r = rel < 4 ? ctc_->ioRead(rel & 3) : sio_->ioRead(rel & 3);   // [A9]
+        kette();
+        return r;
+    }
     switch (static_cast<uint8_t>(port - cfg_.basis)) {
         case 1:
             aktualisieren();
@@ -156,6 +266,13 @@ uint8_t AUP::ioRead(uint8_t port) {
 }
 
 void AUP::ioWrite(uint8_t port, uint8_t d) {
+    if (cfg_.sonder && static_cast<uint8_t>(port - cfg_.basis_sonder) < 8) {
+        const uint8_t rel = static_cast<uint8_t>(port - cfg_.basis_sonder);
+        if (rel < 4) ctc_->ioWrite(rel & 3, d);
+        else         sio_->ioWrite(rel & 3, d);
+        kette();
+        return;
+    }
     if (static_cast<uint8_t>(port - cfg_.basis) != 3) return;   // [A2] 40H..42H wirkungslos
     aktualisieren();   // Tasten vor dem Kommando einarbeiten (FFH verwirft sie dann)
     kommandoAusfuehren(d);

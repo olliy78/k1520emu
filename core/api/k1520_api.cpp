@@ -1692,6 +1692,19 @@ bool k1520_aup_install(K1520Handle h) {
 
 bool k1520_aup_installed(K1520Handle h) { return aupKarte(h) != nullptr; }
 
+bool k1520_aup_install_sonder(K1520Handle h) {
+    auto* a = h ? dynamic_cast<A5120Machine*>(toMachine(h)) : nullptr;
+    if (!a) { g_init_error = "AUP nur am A5120"; return false; }
+    g_init_error.clear();
+    if (!a->installAup(AUP::Alpha::NachLed, true)) { g_init_error = a->aupFehler(); return false; }
+    return true;
+}
+
+bool k1520_aup_sonder(K1520Handle h) {
+    const AUP* k = aupKarte(h);
+    return k && k->sonder();
+}
+
 bool k1520_aup_taste(K1520Handle h, int tastatur, int pos, int gedrueckt) {
     AUP* k = aupKarte(h);
     AUP::Tastatur t;

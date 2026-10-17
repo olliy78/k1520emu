@@ -25,7 +25,7 @@ core/cards/k8025, k7028   je Schnittstelle ein SerialAnschluss (Kartenlogik dort
 
 Maschinen-API: `K1520Machine::serialHub()` (Index = Anmeldereihenfolge = C-ABI-Index),
 `serielleAnschluesse()`, `festeSchnittstellen()`. Reihenfolge A5120: DFÜ/V.24, DFÜ/IFSS,
-Drucker; K8915: Drucker/IFSS1 (X3, SIO1-B), V.24 (X4, SIO1-A), DFÜ/IFSS2 (X5, SIO2-A) —
+Drucker, mit der AUP-Sonderschnittstelle (`aup_sonder`, N10d) als vierte „Sonderschnittstelle“ (X2, SIO-Kanal B der AUP, Merkposten `a5130_k8924` Nr. 19); K8915: Drucker/IFSS1 (X3, SIO1-B), V.24 (X4, SIO1-A), DFÜ/IFSS2 (X5, SIO2-A) —
 nach den Steckern am Gerät (AP-S12; bis dahin „V.24, IFS 1, IFS 2" in SIO-Reihenfolge).
 Konfigurationen sind über den NAMEN verschlüsselt; alte Namen bildet
 `Programmprofil.alte_schnittstellen` beim Laden ab (`app/profil.py`).

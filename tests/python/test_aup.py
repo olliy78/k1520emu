@@ -94,3 +94,57 @@ def test_schluessel_stand():
     assert e.aup_schluessel_stand(2) is True
     assert not e.aup_schluessel(3, True)
     assert e.aup_schluessel_stand(3) is None
+
+
+# ─── Sonderschnittstelle (N10d) ─────────────────────────────────────────────
+
+@pytest.mark.parametrize("art", ["konfig", "parameter", "install"])
+def test_sonderschnittstelle_stecken(art):
+    if art == "konfig":
+        e = _emu(konfig={"aup": True, "aup_sonder": True})
+    elif art == "parameter":
+        e = _emu(aup_sonder=True)       # steckt die AUP mit
+    else:
+        e = _emu()
+        e.aup_install(sonder=True)
+    assert e.aup_installed
+    assert e.aup_sonder
+    assert e.serial_count() == 4
+    info = e.serial_info(3)
+    assert info.name == "Sonderschnittstelle" and info.stecker == "X2" and not info.v24
+    # CTC/SIO antworten auf B0H-B7H (RR0 von Kanal B: Tx-Puffer leer).
+    assert e.io_read(0xB7) & 0x04
+    assert e.io_read(0x41) == 0x00           # Tastaturteil daneben unberuehrt
+
+
+def test_ohne_sonderschnittstelle_drei_schnittstellen():
+    e = _emu(aup=True)
+    assert e.aup_installed and not e.aup_sonder
+    assert e.serial_count() == 3
+    for port in range(0xB0, 0xB8):
+        assert e.io_read(port) == 0xFF
+    assert not _emu().aup_sonder
+
+
+def test_aup_sonder_ohne_aup_wird_abgelehnt():
+    with pytest.raises(RuntimeError, match="aup_sonder"):
+        _emu(konfig={"aup_sonder": True})
+
+
+def test_sonder_install_ohne_tastaturteil_nach_dem_lauf_wird_abgelehnt():
+    e = _emu()
+    e.run(1000)
+    with pytest.raises(ValueError, match="vor dem ersten Lauf"):
+        e.aup_install(sonder=True)
+
+
+def test_sonder_nur_am_a5120():
+    with pytest.raises(ValueError, match="A5120"):
+        _emu(machine="k8915", aup_sonder=True)
+
+
+def test_sonderschnittstelle_im_hub_einstellbar():
+    e = _emu(aup_sonder=True)
+    assert e.serial_configure(3, loop=True)
+    assert e.serial_config(3).loop
+    assert e.serial_status(3) is not None

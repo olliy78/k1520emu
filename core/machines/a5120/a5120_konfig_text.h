@@ -22,6 +22,8 @@
  *   k3521_memdi = bus | memdi1 | memdi2   (S1:02, nur mit k3521)
  *   aup         = 0 | 1           AUP 062-8531, Tastaturteil auf 40H-43H (Entwurf 33 N10c)
  *   aup_alpha   = led | ohne | mit   Annahme A3: wer die K7633-Tabelle waehlt (nur mit aup=1)
+ *   aup_sonder  = 0 | 1           AUP-Sonderschnittstelle: CTC B0H-B3H + SIO B4H-B7H, Kanal B nach aussen
+ *                                 (vierte Schnittstelle des SerialHub), nur mit aup=1 (Entwurf 33 N10d)
  *   (die Ablagedatei der K3521 steht NICHT im Text — Werte werden kleingeschrieben und
  *    Leerraum entfernt; Pfad ueber k1520_k3521_datei bzw. --k3521-datei)
  */
@@ -112,9 +114,13 @@ inline bool wert(A5120Machine::Config& cfg, const std::string& schluessel_in,
         else if (v == "ohne") cfg.aup_alpha = AUP::Alpha::Ohne;
         else if (v == "mit")  cfg.aup_alpha = AUP::Alpha::Mit;
         else { err = "aup_alpha: unbekannt '" + v + "' (led|ohne|mit)"; return false; }
+    } else if (k == "aup_sonder") {
+        if      (v == "1" || v == "ja")   cfg.aup_sonder = true;
+        else if (v == "0" || v == "nein") cfg.aup_sonder = false;
+        else { err = "aup_sonder: unbekannt '" + v + "' (0|1)"; return false; }
     } else {
         err = "A5120-Konfiguration: unbekannter Schluessel '" + k +
-              "' (ausfuehrung|ram|bildschirm|schalter|tastatur|laderom|kassette|em|k3521|k3521_memdi|aup|aup_alpha)";
+              "' (ausfuehrung|ram|bildschirm|schalter|tastatur|laderom|kassette|em|k3521|k3521_memdi|aup|aup_alpha|aup_sonder)";
         return false;
     }
     return true;
@@ -132,6 +138,10 @@ inline bool pruefe(const A5120Machine::Config& cfg, bool schalter_gesetzt, std::
     }
     if (!cfg.aup && cfg.aup_alpha != AUP::Alpha::NachLed) {
         err = "aup_alpha: nur mit aup=1";
+        return false;
+    }
+    if (!cfg.aup && cfg.aup_sonder) {
+        err = "aup_sonder: nur mit aup=1";
         return false;
     }
     return true;

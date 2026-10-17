@@ -1,0 +1,10 @@
+# k1520dbg --aup-sonder (Entwurf 33 N10d): `aup` zeigt zusaetzlich die Sonderschnittstelle (CTC B0H-B3H, SIO B4H-B7H, Kanal B).
+tool:    k1520dbg
+disk:    cpa_cpa780_k5601_noclock.hfe
+run:     --aup-sonder %DISK%
+stdin:
+  aup
+  q
+expect:  AUP 40H-43H  Kommando FFH
+expect:  Sonderschnittstelle: CTC B0H-B3H, SIO B4H-B7H, Kanal B: (Format ungueltig)
+forbid:  unknown command

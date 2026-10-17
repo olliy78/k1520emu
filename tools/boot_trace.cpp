@@ -47,6 +47,7 @@
  *                    --k3521-memdi bus|memdi1|memdi2, --k3521-datei PFAD (Inhalt dauerhaft)
  *     --aup          AUP 062-8531 Tastaturteil (K7633 + Kundentastatur) auf 40H-43H (A5120, N10c);
  *                    --aup-alpha led|ohne|mit (Annahme zur Alpha-Umschaltung)
+ *     --aup-sonder   AUP mit Sonderschnittstelle (CTC B0H-B3H, SIO B4H-B7H, Kanal B nach aussen; N10d), steckt die AUP mit
  *     --format NAME  Katalogformat, mit dem die Diskette zuerst gemountet wird (bei .img
  *                    massgeblich, z. B. k5601_ss40_26x128; sonst cpa780, dann cpa800)
  *
@@ -329,6 +330,7 @@ int main(int argc, char** argv) {
     const char* k3521_datei_opt = nullptr;    // --k3521-datei PFAD: Ablage des Inhalts
     bool        aup_opt = false;              // --aup: AUP-Tastaturteil auf 40H-43H (N10c)
     const char* aup_alpha_opt = nullptr;      // --aup-alpha led|ohne|mit
+    bool        aup_sonder_opt = false;       // --aup-sonder: Sonderschnittstelle (N10d)
     // Disk-mount mode (§6): COW default → the disk is copied to a temp file and that copy
     // is mounted, so a committed fixture is never modified (no more `mktemp; cp` ritual).
     // --rw mounts the original writable; --read-only/--ro mounts it write-protected.
@@ -465,6 +467,7 @@ int main(int argc, char** argv) {
         else if (!strcmp(argv[i], "--k3521-memdi") && i+1 < argc) { k3521_memdi_opt = argv[++i]; nur_a5120.push_back("--k3521-memdi"); }
         else if (!strcmp(argv[i], "--k3521-datei") && i+1 < argc) { k3521_datei_opt = argv[++i]; nur_a5120.push_back("--k3521-datei"); }
         else if (!strcmp(argv[i], "--aup")) { aup_opt = true; nur_a5120.push_back("--aup"); }
+        else if (!strcmp(argv[i], "--aup-sonder")) { aup_opt = aup_sonder_opt = true; nur_a5120.push_back("--aup-sonder"); }
         else if (!strcmp(argv[i], "--aup-alpha") && i+1 < argc) { aup_opt = true; aup_alpha_opt = argv[++i]; nur_a5120.push_back("--aup-alpha"); }
         else if (!strcmp(argv[i], "--em")) {
             em_variant = "em256";
@@ -645,7 +648,8 @@ int main(int argc, char** argv) {
     { std::string err;
       if (!dbgm::parseAusfuehrung(ausf_opt, lw_opt, mcfg, err, laderom_opt, tastatur_opt, ram_opt, bildschirm_opt, schalter_opt, k3521_opt, k3521_memdi_opt, k3521_datei_opt)) { fprintf(stderr, "%s\n", err.c_str()); return 2; }
       if (aup_opt && (!a5120konfig::wert(mcfg, "aup", "1", err) ||
-                      (aup_alpha_opt && !a5120konfig::wert(mcfg, "aup_alpha", aup_alpha_opt, err)))) {
+                      (aup_alpha_opt && !a5120konfig::wert(mcfg, "aup_alpha", aup_alpha_opt, err)) ||
+                      (aup_sonder_opt && !a5120konfig::wert(mcfg, "aup_sonder", "1", err)))) {
           fprintf(stderr, "--%s\n", err.c_str()); return 2; } }
     std::unique_ptr<A5120Machine> machine_p;
     try { machine_p = std::make_unique<A5120Machine>(mcfg); }

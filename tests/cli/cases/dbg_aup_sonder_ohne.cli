@@ -1,0 +1,9 @@
+# k1520dbg --aup ohne --aup-sonder: `aup` nennt die Sonderschnittstelle nicht.
+tool:    k1520dbg
+disk:    cpa_cpa780_k5601_noclock.hfe
+run:     --aup %DISK%
+stdin:
+  aup
+  q
+expect:  AUP 40H-43H  Kommando FFH
+forbid:  Sonderschnittstelle

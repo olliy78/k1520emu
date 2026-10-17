@@ -140,7 +140,9 @@ A5120Machine::A5120Machine(const Config& cfg)
     if (cfg.kassette && !installK5020())
         throw std::runtime_error("K5020 (Kassette): " + k5020Fehler());
     // AUP (Option, Entwurf 33 N10c): Tastaturteil auf 40H-43H.
-    if (cfg.aup && !installAup(cfg.aup_alpha))
+    if (cfg.aup_sonder && !cfg.aup)
+        throw std::runtime_error("AUP: aup_sonder nur mit aup");
+    if (cfg.aup && !installAup(cfg.aup_alpha, cfg.aup_sonder))
         throw std::runtime_error("AUP: " + aup_fehler_);
 }
 
@@ -261,12 +263,14 @@ void A5120Machine::wireBackplane() {
 void A5120Machine::serielleSchnittstellen() {
     serial_naechst_ = hub_.takt(total_cycles_);
     if (ass_.nimmSeriellGeaendert()) bus_.markIntDirty();
+    if (aup_sonder_ && aup_->nimmSeriellGeaendert()) bus_.markIntDirty();
 }
 
 std::vector<k1520::serial::SerialAnschluss*> A5120Machine::serielleAnschluesse() {
     std::vector<k1520::serial::SerialAnschluss*> v;
     for (int i = 0; i < K8025::SchnittstellenAnzahl; ++i)
         v.push_back(&ass_.anschluss(static_cast<K8025::Schnittstelle>(i)));
+    if (aup_sonder_) v.push_back(aup_->anschluss());   // Index 3 (N10d)
     return v;
 }
 
@@ -280,7 +284,7 @@ std::vector<k1520::serial::SerialAnschluss*> A5120Machine::serielleAnschluesse()
 // gesendete Tastaturbytes, IUS in der Daisy-Chain) und den K5122 (offener
 // Lesetransfer + gehaltenes /BUSRQ).  Auf echter Hardware raeumt die /RESET-
 // Leitung des Backplane genau das ab.
-bool A5120Machine::installAup(AUP::Alpha alpha) {
+bool A5120Machine::installAup(AUP::Alpha alpha, bool sonder) {
     aup_fehler_.clear();
     if (!bestueckbar()) { aup_fehler_ = "AUP nur vor dem ersten Lauf/Reset steckbar"; return false; }
     if (aup_)           { aup_fehler_ = "Es steckt bereits eine AUP"; return false; }
@@ -292,12 +296,30 @@ bool A5120Machine::installAup(AUP::Alpha alpha) {
             return false;
         }
     }
+    if (sonder) {
+        for (int p = AUP::kBasisSonder; p < AUP::kBasisSonder + 8; ++p) {
+            if (const BusDevice* d = bus_.ioOwner(static_cast<uint8_t>(p))) {
+                char buf[96];
+                std::snprintf(buf, sizeof buf, "E/A-Tor %02XH belegt (%s)", p, d->deviceName());
+                aup_fehler_ = buf;
+                return false;
+            }
+        }
+    }
     AUP::Config c;
+    c.sonder = sonder;
     c.uhr = &total_cycles_;
     c.takt_hz = 2'457'600;   // ZRE-Takt (wie k6022TaktHz)
     c.alpha = alpha;
     aup_ = std::make_unique<AUP>(c);
     aup_->attachToBus(bus_);
+    if (sonder) {
+        // [A10] Kette: hinter der K8025.  Takt im Laufweg nur ab hier (aup_sonder_).
+        bus_.insertInterruptChainAfter(&ass_, aup_.get());
+        hub_.registriere(*aup_->anschluss());
+        aup_sonder_ = true;
+        bus_.markIntDirty();
+    }
     return true;
 }
 
@@ -428,6 +450,10 @@ std::vector<A5120Machine::IntSource> A5120Machine::interruptSources() const {
     addSio(ass_.sioA33(),  "K8025 SIO-A33 (DFUE)");
     addSio(ass_.sioA32(),  "K8025 SIO-A32 (Tastatur)");
     addCtc(ass_.ctcA34(),  "K8025 CTC-A34");
+    if (aup_sonder_) {
+        addSio(*aup_->sio(), "AUP SIO-A13 (Sonderschnittstelle)");
+        addCtc(*aup_->ctc(), "AUP CTC-A12");
+    }
     if (em_) addPio(em_->pio(), "EM PIO-A32");
     addCtc(zre_.ctc(),     "K2526 CTC");
     addPio(zre_.bsPio(),   "K2526 BS-PIO");
@@ -951,6 +977,7 @@ int A5120Machine::run(int max_cycles) {
         // Interrupt-Chain neu berechnet werden.
         bool ctc_fired = zre_.clockTick(used);
         ctc_fired      = ass_.clockTick(used) || ctc_fired;
+        if (aup_sonder_) ctc_fired = aup_->clockTick(used) || ctc_fired;   // AUP-Sonderschnittstelle
         ctc_fired      = k6022Takt(used) || ctc_fired;   // Lochstreifen (gesteckt?)
         ctc_fired      = k5020Takt(used) || ctc_fired;   // Kassette (gesteckt?)
         if (ctc_fired) bus_.markIntDirty();

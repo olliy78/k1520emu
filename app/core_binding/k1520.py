@@ -545,6 +545,10 @@ _lib.k1520_aup_install.argtypes = [K1520Handle]
 _lib.k1520_aup_install.restype = ctypes.c_bool
 _lib.k1520_aup_installed.argtypes = [K1520Handle]
 _lib.k1520_aup_installed.restype = ctypes.c_bool
+_lib.k1520_aup_install_sonder.argtypes = [K1520Handle]
+_lib.k1520_aup_install_sonder.restype = ctypes.c_bool
+_lib.k1520_aup_sonder.argtypes = [K1520Handle]
+_lib.k1520_aup_sonder.restype = ctypes.c_bool
 _lib.k1520_aup_taste.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 _lib.k1520_aup_taste.restype = ctypes.c_bool
 _lib.k1520_aup_schluessel.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_int]
@@ -841,6 +845,8 @@ A5120_KONFIG_WERTE = {
     # AUP 062-8531, Tastaturteil (N10c); aup_alpha = Annahme zur Alpha-Umschaltung.
     "aup": ("0", "1"),
     "aup_alpha": ("led", "ohne", "mit"),
+    # AUP-Sonderschnittstelle (N10d): CTC B0H-B3H + SIO B4H-B7H, vierter serieller Anschluss.
+    "aup_sonder": ("0", "1"),
 }
 # Reihenfolge der Kartenzahl, wie k1520_a5120_bildschirm sie meldet.
 A5120_BILDSCHIRME = ("k7024", "k7023", "beide")
@@ -1135,7 +1141,8 @@ class K1520Emulator:
                  ptape: bool = False, tape: bool = False, zeichensatz: str = "deutsch",
                  tastatur: Optional[str] = None, p8000: Optional[dict] = None,
                  ausfuehrung: Optional[str] = None, spe=1, laderom: Optional[str] = None,
-                 konfig: Optional[dict] = None, aup: bool = False):
+                 konfig: Optional[dict] = None, aup: bool = False,
+                 aup_sonder: bool = False):
         """Initialize emulator instance.
 
         Args:
@@ -1173,6 +1180,9 @@ class K1520Emulator:
                 Maschine, wie ``raf`` direkt nach dem Anlegen.  Fehler → ValueError.
             aup: nur A5120 — AUP 062-8531 (Tastaturteil K7633 + Kundentastatur, E/A 40H–43H)
                 direkt nach dem Anlegen stecken (gleichwertig ``konfig={"aup": True}``).
+            aup_sonder: nur A5120 — AUP MIT Sonderschnittstelle (CTC B0H–B3H, SIO B4H–B7H, SIO-Kanal B
+                als vierter serieller Anschluss, Index 3); steckt die AUP mit (gleichwertig
+                ``konfig={"aup": True, "aup_sonder": True}``).
                 Fehler → ValueError.
             tape: Kassettenkarte K5020 (zwei K5200; A5120 30H, K8915 D0H, PRG 710 30H,
                 PC 1715 D0H) stecken, wie ``ptape`` direkt nach dem Anlegen.  Fehler → ValueError.
@@ -1328,7 +1338,8 @@ class K1520Emulator:
             _lib.k1520_destroy(handle)
             self._handle = None
             raise ValueError(reason or "K5020 nicht steckbar")
-        if aup and not _lib.k1520_aup_installed(handle) and not _lib.k1520_aup_install(handle):
+        if (aup or aup_sonder) and not _lib.k1520_aup_installed(handle) and not (
+                _lib.k1520_aup_install_sonder(handle) if aup_sonder else _lib.k1520_aup_install(handle)):
             reason = _lib.k1520_last_init_error()
             reason = reason.decode("utf-8", "replace") if reason else ""
             _lib.k1520_destroy(handle)
@@ -2293,15 +2304,22 @@ class K1520Emulator:
     #: Lampenbits von :meth:`aup_lampen`.
     AUP_LAMPE_SEL, AUP_LAMPE_ALPHA, AUP_LAMPE_GET, AUP_LAMPE_FEHLER = 0x01, 0x02, 0x04, 0x08
 
-    def aup_install(self) -> None:
-        """AUP nach dem Anlegen stecken (vor dem ersten Lauf); ``ValueError`` mit Grund."""
-        if not _lib.k1520_aup_install(self._handle):
+    def aup_install(self, sonder: bool = False) -> None:
+        """AUP nach dem Anlegen stecken (vor dem ersten Lauf), ``sonder=True`` mit Sonderschnittstelle
+        (N10d); ``ValueError`` mit Grund."""
+        if not (_lib.k1520_aup_install_sonder(self._handle) if sonder
+                else _lib.k1520_aup_install(self._handle)):
             reason = _lib.k1520_last_init_error()
             raise ValueError(reason.decode("utf-8", "replace") if reason else "AUP nicht steckbar")
 
     @property
     def aup_installed(self) -> bool:
         return bool(_lib.k1520_aup_installed(self._handle))
+
+    @property
+    def aup_sonder(self) -> bool:
+        """Steckt die AUP mit Sonderschnittstelle (vierter serieller Anschluss)?"""
+        return bool(_lib.k1520_aup_sonder(self._handle))
 
     def aup_taste(self, tastatur: int, pos: int, gedrueckt: bool = True) -> bool:
         """Taste drücken/lösen; False ohne Karte oder ohne Taste an der Position."""
@@ -2422,7 +2440,7 @@ class K1520Emulator:
     # ─── Serielle Schnittstellen nach aussen (Entwurf 19 §8) ──────────────────
 
     def serial_count(self) -> int:
-        """Zahl der einstellbaren Schnittstellen (A5120, K8915 und PRG 710: 3; PRG 710-1: 2)."""
+        """Zahl der einstellbaren Schnittstellen (A5120, K8915 und PRG 710: 3; PRG 710-1: 2; A5120 mit AUP-Sonderschnittstelle: 4)."""
         return int(_lib.k1520_serial_count(self._handle))
 
     def serial_info(self, i: int) -> Optional[SerialInfo]:

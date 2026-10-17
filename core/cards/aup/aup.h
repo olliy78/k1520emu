@@ -39,6 +39,24 @@
  *         @ref kSchlange), bis die ZRE den vorigen Code abgeholt hat.  Am Geraet wartet die AUP-CPU
  *         ebenfalls (Eingang DI3 "A6 noch nicht abgeholt"); ob sie dabei Tasten verliert, ist offen.
  *
+ * SONDERSCHNITTSTELLE (N10d, @ref Config::sonder; Beleg doc/a5130_k8924/aup_analyse.md §1.6):
+ *  - CTC U857 (A12) auf E/A B0H-B3H, SIO U856 (A13) auf B4H-B7H (Basis @ref Config::basis_sonder),
+ *    beide Bausteine unveraendert (Z80CTC/Z80SIO).  Nur SIO-Kanal B geht nach aussen (X2 A16 /CTSB,
+ *    A17 RXDB, A18 /DTRB, A19 /RTSB, A20 TXDB, TTL-Pegel, kein Pegelwandler), getaktet von CTC-Kanal 0.
+ *    Die Karte haengt in der IEI/IEO-Kette; der Vektor kommt vom SIO (A22-08 -> DIEN).
+ *  - Nach aussen als @ref anschluss (`SerialAnschluss` "Sonderschnittstelle", Stecker X2) am SerialHub
+ *    der Maschine.  Kanal A der SIO ist nicht herausgefuehrt (kein Anschluss).
+ *  - [A9]  Registerordnung wie K8025: B4H = Daten A, B5H = Steuer A, B6H = Daten B, B7H = Steuer B
+ *          (A0 = Daten/Steuer, A1 = Kanal; Z80SIO::ioRead(port & 3)); CTC-Kanaele B0H-B3H.  Der Beleg nennt sie nicht.
+ *  - [A10] Platz in der Interruptkette: DIREKT HINTER der K8025 (Vorschlag der Analyse); die
+ *          Wickelverdrahtung der Kette liegt nicht vor.  Innerhalb der Karte SIO vor CTC.
+ *  - [A11] CTC-Interrupts sind im Beleg nicht erwaehnt; sie werden wie bei jeder CTC der Kette
+ *          ausgeliefert (CTC-Kanal 0 laeuft ohnehin als Baudratentakt, ohne INT-Freigabe).
+ *  - [A12] CTC-Eingang CLK/TRG0..3 unbeschaltet (Zeitgeber vom Systemtakt); /CTSB/DCD-Eingang inaktiv
+ *          wie an der IFSS der K8025 (RR0 D5/D3 = 0), RTS/DTR nur als Ausgang gemeldet.
+ *  - Takt im Laufweg NUR mit Sonderschnittstelle (@ref clockTick, die Maschine ruft es dann je
+ *    Instruktion); ohne bleibt der Tastaturteil ohne Takt und die Maschine bitgleich.
+ *
  * Zeit: die Karte liest die Maschinenzeit ueber einen Zeiger (@ref Config::uhr, Taktzyklen) erst
  * beim Zugriff des Gastes — kein Takt im Laufweg.  Ein Tastendruck von aussen erhaelt seinen
  * Zeitstempel beim naechsten Zugriff des Gastes (die Entprellzeit zaehlt ab dort).
@@ -58,12 +76,19 @@
 #include <mutex>
 #include <vector>
 
-#include "core/bus/k1520_bus.h"
+#include <memory>
+#include <string>
 
-class AUP : public BusDevice {
+#include "core/bus/k1520_bus.h"
+#include "core/primitives/z80_ctc.h"
+#include "core/primitives/z80_sio.h"
+#include "core/serial/anschluss.h"
+
+class AUP : public BusDevice, public InterruptSlave {
 public:
     static constexpr uint8_t kBasis    = 0x40;  ///< Vorgabe fuer SIOS 1526
     static constexpr int     kSchlange = 32;    ///< Tastendruecke, die auf Abholung warten
+    static constexpr uint8_t kBasisSonder = 0xB0; ///< Sonderschnittstelle (N10d)
 
     enum class Tastatur : uint8_t { K7633 = 0, Kunde = 1 };
     /// [A3] Wer zwischen den K7633-Tabellen umschaltet.
@@ -79,6 +104,8 @@ public:
         uint32_t entprell_us     = 16'000;      ///< [A4]
         uint32_t wiederhol_ab_us = 500'000;     ///< [A4] erste Wiederholung einer Dauerfunktionstaste
         uint32_t wiederhol_us    = 100'000;     ///< [A4] Abstand der Wiederholungen
+        bool     sonder = false;                ///< N10d: CTC + SIO auf basis_sonder..+7
+        uint8_t  basis_sonder = 0xB0;           ///< CTC B0H-B3H, SIO B4H-B7H
     };
 
     // Lampenbits von @ref lampen (1 = leuchtet) — Vertrag der C-ABI k1520_aup_lampen.
@@ -90,7 +117,9 @@ public:
     AUP();
     explicit AUP(const Config& cfg);
 
-    /** @brief Meldet 40H..43H (ab @ref Config::basis) an; wirft bei belegtem Tor (Bus). */
+    ~AUP();
+
+    /** @brief Meldet 40H..43H (ab @ref Config::basis) an, mit Sonderschnittstelle auch B0H..B7H. */
     void attachToBus(K1520Bus& bus);
     /** @brief Systemweiter /RESET: wie Kommando FFH [A6]; gehaltene Tasten bleiben gehalten. */
     void reset();
@@ -98,6 +127,28 @@ public:
     uint8_t ioRead(uint8_t port) override;
     void    ioWrite(uint8_t port, uint8_t d) override;
     const char* deviceName() const override { return "AUP 062-8531 (Tastaturen)"; }
+
+    // ─── Sonderschnittstelle (N10d) ──────────────────────────────────────────
+    bool sonder() const { return cfg_.sonder; }
+    /// CTC U857 / SIO U856 (nullptr ohne Sonderschnittstelle).
+    Z80CTC* ctc() { return ctc_.get(); }
+    Z80SIO* sio() { return sio_.get(); }
+    const Z80CTC* ctc() const { return ctc_.get(); }
+    const Z80SIO* sio() const { return sio_.get(); }
+    /// Anschluss fuer den SerialHub (nullptr ohne Sonderschnittstelle).
+    k1520::serial::SerialAnschluss* anschluss();
+    /// CTC um @p ticks Systemtakte weiter; true = ZC/TO-Flanke (Kette neu bewerten).
+    bool clockTick(int ticks) { return ctc_ && ctc_->clockTick(ticks); }
+    /// Ein Anschluss hat SIO-Zustand geaendert — liest und loescht (wie K8025).
+    bool nimmSeriellGeaendert() { const bool g = seriell_geaendert_; seriell_geaendert_ = false; return g; }
+
+    // InterruptSlave (nur mit Sonderschnittstelle wirksam; sonst nie anfordernd, IEO = IEI).
+    void    setIEI(bool iei) override;
+    bool    getIEO() const override;
+    bool    hasInterrupt() const override;
+    uint8_t getVector() const override;
+    void    onRETI() override;
+    const char* intDeviceName() const override;
 
     // ─── Von aussen ──────────────────────────────────────────────────────────
     /**
@@ -137,7 +188,15 @@ private:
     void kommandoAusfuehren(uint8_t d);
     void allesLoeschen();
 
+    class Sonder;   // SerialAnschluss von SIO-Kanal B (aup.cpp)
+    void kette();   ///< IEI durch SIO -> CTC reichen
+
     Config cfg_;
+    std::unique_ptr<Z80CTC> ctc_;
+    std::unique_ptr<Z80SIO> sio_;
+    std::unique_ptr<Sonder> anschluss_;
+    bool iei_ = false;
+    bool seriell_geaendert_ = false;
 
     std::mutex            mutex_;      ///< schuetzt nur eingang_
     std::vector<Ereignis> eingang_;

@@ -35,6 +35,8 @@
  * Bildschirm-Umschalter zur Laufzeit um.
  * `--k3521 ADR|aus`, `--k3521-memdi bus|memdi1|memdi2`, `--k3521-datei PFAD` (A5120, N10b): akkugepuffertes
  * 4-KB-RAM K3521.30 an einer 4-KB-Adresse (Hex), Inhalt dauerhaft in PFAD.
+ * `--aup-sonder` (A5120, N10d): AUP MIT Sonderschnittstelle (CTC B0H-B3H, SIO B4H-B7H, Kanal B nach aussen,
+ *   Kette hinter der K8025); `aup` zeigt dann SIO/CTC, `ivt`/`dev` fuehren AUP SIO-A13 / CTC-A12.
  * `--aup [--aup-alpha led|ohne|mit]` (A5120, N10c): AUP 062-8531 Tastaturteil auf 40H-43H; Befehl `aup`
  *   (Zustand), `aup taste T POS` (druecken + loesen, T 0 = K7633, 1 = Kundentastatur, POS hex),
  *   `aup schluessel 1|2 an|aus`.
@@ -229,6 +231,7 @@ int main(int argc, char** argv){
     const char* k3521_datei_opt = nullptr; // --k3521-datei PFAD: Ablage des Inhalts
     bool aup_opt = false;                  // --aup: AUP-Tastaturteil auf 40H-43H (N10c)
     const char* aup_alpha_opt = nullptr;   // --aup-alpha led|ohne|mit
+    bool aup_sonder_opt = false;           // --aup-sonder: Sonderschnittstelle (N10d)
     const char* raf_opt = nullptr; // --raf none|raf128|raf512|raf2m: RAM-Floppy auf 88H/89H
     const char* wdc_opt = nullptr; // --wdc 4.2|4.0.05|3.4.05: WDC an der 16-Bit-PIO2 (P8000, P13d)
     const char* konsole_opt = nullptr; // --konsole kern|original: Terminal an tty1 (P8000, P20c)
@@ -267,6 +270,7 @@ int main(int argc, char** argv){
         else if (!strcmp(argv[i],"--k3521-memdi") && i+1<argc) k3521_memdi_opt=argv[++i];
         else if (!strcmp(argv[i],"--k3521-datei") && i+1<argc) k3521_datei_opt=argv[++i];
         else if (!strcmp(argv[i],"--aup")) aup_opt=true;
+        else if (!strcmp(argv[i],"--aup-sonder")) aup_opt=aup_sonder_opt=true;
         else if (!strcmp(argv[i],"--aup-alpha") && i+1<argc) { aup_opt=true; aup_alpha_opt=argv[++i]; }
         else if (!strcmp(argv[i],"--raf") && i+1<argc) raf_opt=argv[++i];
         else if (!strcmp(argv[i],"--wdc") && i+1<argc) wdc_opt=argv[++i];
@@ -320,7 +324,8 @@ int main(int argc, char** argv){
         if (art!=dbgm::Art::A5120){ fprintf(stderr,"--aup gibt es nur am A5120\n"); return 2; }
         std::string err;
         if (!a5120konfig::wert(mcfg,"aup","1",err) ||
-            (aup_alpha_opt && !a5120konfig::wert(mcfg,"aup_alpha",aup_alpha_opt,err))){ fprintf(stderr,"--%s\n",err.c_str()); return 2; }
+            (aup_alpha_opt && !a5120konfig::wert(mcfg,"aup_alpha",aup_alpha_opt,err)) ||
+            (aup_sonder_opt && !a5120konfig::wert(mcfg,"aup_sonder","1",err))){ fprintf(stderr,"--%s\n",err.c_str()); return 2; }
     }
     // P8000-WDC (P13d): --wdc/--hd nur mit p8000-16.  Die Platte wird wie die Disketten im
     // Vorgabemodus als Kopie gemountet (COW: Temp-Datei, am Ende geloescht), mit --rw direkt.
@@ -4217,6 +4222,14 @@ int main(int argc, char** argv){
                 fprintf(stderr,"  SS1 %s  SS2 %s  Tabelle: %s (Alpha %s)\n", au->schluesselAn(1)?"an":"aus",
                         au->schluesselAn(2)?"an":"aus", au->alphaAktiv()?"mit Alpha":"ohne Alpha",
                         alpha_quelle[(int)au->config().alpha]);
+                if (au->sonder()){
+                    const auto f = au->anschluss()->format();
+                    fprintf(stderr,"  Sonderschnittstelle: CTC %02XH-%02XH, SIO %02XH-%02XH, Kanal B: %s%u Bd %u Datenbits  RTS %s DTR %s  Int %s\n",
+                            au->config().basis_sonder, au->config().basis_sonder+3, au->config().basis_sonder+4,
+                            au->config().basis_sonder+7, f.gueltig?"":"(Format ungueltig) ", f.baud_nenn, f.daten,
+                            au->anschluss()->rts()?"an":"aus", au->anschluss()->dtr()?"an":"aus",
+                            au->hasInterrupt()?au->intDeviceName():"-");
+                }
             }
         }
         else if (cmd=="tape"){   // Kassette K5020/K5200 (--tape): Status, Blockliste, Blockinhalt

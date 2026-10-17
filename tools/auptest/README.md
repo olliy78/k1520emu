@@ -19,3 +19,13 @@ Bau: `python3 tools/auptest/build.py` (M80 + LINKMT über `tools/cpm_bau.py`); d
 eingecheckt, Wächter `cli_auptest_com_passt_zur_quelle`.  Gastlauf: `AupMaschine.CpaGast*`.
 **Noch nicht auf den Bootdisketten** (`tools/disketten_beigaben.py`): das zöge den Neubau der
 CP/A-/SCPX-Systemdisketten in `disks/` nach sich (offen).
+
+## auptsio — Sonderschnittstelle (N10d)
+
+`auptsio.com` prüft die **Sonderschnittstelle** der AUP (CTC B0H–B3H, SIO B4H–B7H, Kanal B): es
+programmiert CTC-Kanal 0 (Vorteiler 16, Konstante 1) und SIO-Kanal B (x16, 8N1) auf 9600 Bd, sendet
+`HALLO` und liest zurück, was ankommt.  Ausgabe `EMPF HALLO` + `AUPTSIO OK` (z. B. im Loop des
+Reiters *Schnittstellen*), `AUPTSIO KEIN EMPFANG` ohne Gegenstelle, `Keine Sonderschnittstelle (IN B7H = FFH)`
+ohne Option.  Gepollt, kein Interrupt.  Registerordnung ist Annahme A9 (B4 Daten A, B5 Steuer A,
+B6 Daten B, B7 Steuer B).  Gastlauf: `AupSonder.CpaGast*`; derselbe `build.py` baut/prüft beide Programme.
+

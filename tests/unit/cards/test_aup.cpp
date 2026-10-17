@@ -325,3 +325,228 @@ TEST(AUPTabelle, DauerfunktionstastenLautEprom) {
         EXPECT_EQ(AUP::dauerfunktion(T::K7633, p), p == 0x1A || p == 0x16 || p == 0x0E) << p;
     EXPECT_FALSE(AUP::dauerfunktion(T::Kunde, 0x40));
 }
+
+// ─── Sonderschnittstelle (N10d): CTC B0H-B3H, SIO B4H-B7H ────────────────────
+namespace {
+struct SonderStand {
+    uint64_t uhr = 0;
+    K1520Bus bus;
+    AUP aup;
+    SonderStand() : aup(cfg()) { aup.attachToBus(bus); bus.setInterruptChain({&aup}); }
+    static AUP::Config cfg() {
+        AUP::Config c;
+        c.sonder = true;
+        return c;
+    }
+    uint8_t in(uint8_t p) { return bus.ioRead(p); }
+    void out(uint8_t p, uint8_t d) { bus.ioWrite(p, d); }
+    void sioB(uint8_t reg, uint8_t wert) { out(0xB7, reg); out(0xB7, wert); }
+};
+}  // namespace
+
+TEST(AUPSonder, OhneOptionSindDieToreB0bisB7Frei) {
+    Pruefstand p;
+    EXPECT_FALSE(p.aup.sonder());
+    EXPECT_EQ(p.aup.anschluss(), nullptr);
+    EXPECT_EQ(p.aup.ctc(), nullptr);
+    EXPECT_FALSE(p.aup.clockTick(1000));
+    for (int port = 0xB0; port <= 0xB7; ++port) EXPECT_EQ(p.bus.ioOwner(uint8_t(port)), nullptr) << port;
+    EXPECT_FALSE(p.aup.hasInterrupt());
+    EXPECT_TRUE(p.aup.getVector() == 0xFF);
+}
+
+TEST(AUPSonder, MeldetAchtToreAn) {
+    SonderStand s;
+    for (int port = 0xB0; port <= 0xB7; ++port) EXPECT_EQ(s.bus.ioOwner(uint8_t(port)), &s.aup) << port;
+    for (int port = 0x40; port <= 0x43; ++port) EXPECT_EQ(s.bus.ioOwner(uint8_t(port)), &s.aup) << port;
+    EXPECT_EQ(s.bus.ioOwner(0xB8), nullptr);
+    EXPECT_EQ(s.bus.ioOwner(0xAF), nullptr);
+}
+
+TEST(AUPSonder, CtcAufB0BisB3) {
+    SonderStand s;
+    // Kanal 1 (B1): Zeitgeber, Vorteiler 16, Zeitkonstante folgt; Konstante 9.
+    s.out(0xB1, 0x05);
+    s.out(0xB1, 0x09);
+    EXPECT_TRUE(s.aup.ctc()->isTimerMode(1));
+    EXPECT_EQ(s.aup.ctc()->teilerTakte(1), 16u * 9u);
+    // Die anderen Kanaele sind unberuehrt (kein Zeitgeber, nicht laufend).
+    EXPECT_EQ(s.aup.ctc()->teilerTakte(0), 0u);
+    // Kanal 0 (B0): Konstante 1 -> 16 Takte je ZC/TO; die Karte hat KEINE zweite CTC auf anderen Toren.
+    s.out(0xB0, 0x05);
+    s.out(0xB0, 0x01);
+    EXPECT_EQ(s.aup.ctc()->teilerTakte(0), 16u);
+}
+
+TEST(AUPSonder, SioAufB4BisB7) {
+    SonderStand s;
+    // B7 = Steuer B (B6 Daten B): WR4 setzen, am Baustein ablesbar; RR0 liest Tx-leer (Bit 2).
+    s.sioB(4, 0x44);
+    EXPECT_EQ(s.aup.sio()->channelB().format().teiler, 16);
+    EXPECT_EQ(s.aup.sio()->channelB().format().stopp_halbe, 2);
+    EXPECT_EQ(s.in(0xB7) & 0x04, 0x04);
+    // B5 = Steuer A: Kanal A bleibt davon unberuehrt.
+    EXPECT_EQ(s.aup.sio()->channelA().format().teiler, 1);
+    s.out(0xB5, 4);
+    s.out(0xB5, 0xC4);   // x64
+    EXPECT_EQ(s.aup.sio()->channelA().format().teiler, 64);
+    EXPECT_EQ(s.aup.sio()->channelB().format().teiler, 16);
+    // B6 = Daten B: ein Empfangsbyte (Kanal B) kommt dort an, nicht an B4.
+    s.sioB(3, 0xC1);
+    s.aup.anschluss()->empfange(0x5A);
+    EXPECT_EQ(s.in(0xB7) & 1, 1);
+    EXPECT_EQ(s.in(0xB6), 0x5A);
+    EXPECT_EQ(s.in(0xB7) & 1, 0);
+}
+
+TEST(AUPSonder, TastaturtoreBleibenUnberuehrt) {
+    SonderStand s;
+    EXPECT_EQ(s.in(0x41), 0x00);
+    EXPECT_EQ(s.in(0x40), 0xFF);
+    s.out(0x43, 0xCC);
+    EXPECT_EQ(s.aup.kommando(), 0xCC);
+    EXPECT_EQ(s.aup.sio()->channelB().format().teiler, 1);
+}
+
+TEST(AUPSonder, AnschlussNameUndFormatAusSioUndCtc) {
+    SonderStand s;
+    auto* a = s.aup.anschluss();
+    ASSERT_NE(a, nullptr);
+    EXPECT_STREQ(a->name(), "Sonderschnittstelle");
+    EXPECT_STREQ(a->stecker(), "X2");
+    EXPECT_FALSE(a->v24());
+    EXPECT_TRUE(a->taktquellen().empty());
+    EXPECT_FALSE(a->format().gueltig) << "CTC noch nicht programmiert";
+    // 9600 Bd 8N1: CTC Kanal 0 Vorteiler 16 x TC 1, SIO x16.
+    s.out(0xB0, 0x05);
+    s.out(0xB0, 0x01);
+    s.sioB(4, 0x44);
+    s.sioB(3, 0xC1);
+    s.sioB(5, 0x68);
+    const auto f = a->format();
+    EXPECT_TRUE(f.gueltig);
+    EXPECT_EQ(f.baud_nenn, 9600u);
+    EXPECT_EQ(f.daten, 8);
+    EXPECT_EQ(f.paritaet, 0);
+    EXPECT_EQ(f.stopp_halbe, 2);
+    EXPECT_EQ(f.zeichen_takte, 10u * 16u * 16u);
+}
+
+TEST(AUPSonder, SendenLiefertAmAnschlussDieProgrammiertenBits) {
+    SonderStand s;
+    s.sioB(3, 0xC1);
+    s.sioB(5, 0x68);   // 8 Bit, Senden frei
+    s.out(0xB6, 0xA7);
+    auto* a = s.aup.anschluss();
+    ASSERT_TRUE(a->senderHatZeichen());
+    EXPECT_EQ(a->senderNimm(), 0xA7);
+    EXPECT_TRUE(s.aup.nimmSeriellGeaendert());
+    EXPECT_FALSE(s.aup.nimmSeriellGeaendert()) << "liest und loescht";
+    s.sioB(5, 0x28);   // 7 Bit
+    s.out(0xB6, 0xA7);
+    EXPECT_EQ(a->senderNimm(), 0x27);
+}
+
+TEST(AUPSonder, RtsDtrUndBreakAmAnschluss) {
+    SonderStand s;
+    auto* a = s.aup.anschluss();
+    EXPECT_FALSE(a->rts());
+    EXPECT_FALSE(a->dtr());
+    s.sioB(5, 0xEA);   // DTR + 8 Bit + Senden + RTS
+    EXPECT_TRUE(a->rts());
+    EXPECT_TRUE(a->dtr());
+    EXPECT_FALSE(a->breakGesendet());
+    s.sioB(5, 0xFA);
+    EXPECT_TRUE(a->breakGesendet());
+}
+
+// Interrupt-Auslieferung: Vektor vom SIO, CTC dahinter, RETI gibt frei.
+TEST(AUPSonder, SioInterruptWirdMitVektorAusgeliefert) {
+    SonderStand s;
+    s.sioB(2, 0x20);   // WR2 Kanal B: Basisvektor
+    s.sioB(1, 0x18);   // WR1: Rx-Interrupt bei jedem Zeichen
+    s.sioB(3, 0xC1);
+    s.bus.markIntDirty();
+    s.bus.updateInterruptChain();
+    EXPECT_FALSE(s.bus.isINT());
+    s.aup.anschluss()->empfange(0x41);
+    s.bus.markIntDirty();
+    s.bus.updateInterruptChain();
+    EXPECT_TRUE(s.aup.hasInterrupt());
+    EXPECT_TRUE(s.bus.isINT());
+    EXPECT_STREQ(s.aup.intDeviceName(), "AUP SIO-A13 (Sonderschnittstelle)");
+    const uint8_t vec = s.bus.interruptAcknowledge();
+    EXPECT_EQ(vec & 0xF1, 0x20) << std::hex << int(vec);
+    EXPECT_EQ(s.in(0xB6), 0x41);          // Zeichen lesen
+    s.bus.signalRETI();
+    s.bus.markIntDirty();
+    s.bus.updateInterruptChain();
+    EXPECT_FALSE(s.aup.hasInterrupt());
+    EXPECT_TRUE(s.aup.getIEO()) << "nach RETI frei";
+    EXPECT_TRUE(s.bus.isINT() == false);
+}
+
+TEST(AUPSonder, CtcInterruptHinterDemSio) {
+    SonderStand s;
+    s.out(0xB0, 0x40);   // CTC-Vektor-Basis 40H (Bit 0 = 0)
+    s.out(0xB1, 0x85);   // Kanal 1: Interrupt frei, Zeitgeber, Vorteiler 16, Konstante folgt
+    s.out(0xB1, 0x02);
+    s.sioB(2, 0x20);
+    s.sioB(1, 0x18);
+    s.sioB(3, 0xC1);
+    EXPECT_TRUE(s.aup.clockTick(64));    // ZC/TO-Flanke gemeldet
+    s.bus.markIntDirty();
+    s.bus.updateInterruptChain();
+    EXPECT_TRUE(s.aup.hasInterrupt());
+    EXPECT_STREQ(s.aup.intDeviceName(), "AUP CTC-A12");
+    // SIO meldet sich zusaetzlich: hat Vorrang (SIO vor CTC).
+    s.aup.anschluss()->empfange(0x42);
+    s.bus.markIntDirty();
+    s.bus.updateInterruptChain();
+    EXPECT_STREQ(s.aup.intDeviceName(), "AUP SIO-A13 (Sonderschnittstelle)");
+    EXPECT_EQ(s.bus.interruptAcknowledge() & 0xF1, 0x20);   // getVector() quittiert: nur einmal rufen
+    s.in(0xB6);
+    s.bus.signalRETI();
+    s.bus.markIntDirty();
+    s.bus.updateInterruptChain();
+    // Jetzt ist die CTC dran: Basis 40H | Kanal 1 << 1.
+    EXPECT_TRUE(s.aup.hasInterrupt());
+    EXPECT_EQ(s.bus.interruptAcknowledge(), 0x42);
+    s.bus.signalRETI();
+    s.bus.markIntDirty();
+    s.bus.updateInterruptChain();
+    EXPECT_FALSE(s.aup.hasInterrupt());
+}
+
+TEST(AUPSonder, IeiSperrtDieKarte) {
+    SonderStand s;
+    s.sioB(2, 0x20);
+    s.sioB(1, 0x18);
+    s.sioB(3, 0xC1);
+    s.aup.anschluss()->empfange(0x41);
+    s.aup.setIEI(false);
+    EXPECT_FALSE(s.aup.hasInterrupt()) << "ohne /IEI keine Anforderung";
+    EXPECT_FALSE(s.aup.getIEO());
+    s.aup.setIEI(true);
+    EXPECT_TRUE(s.aup.hasInterrupt());
+}
+
+TEST(AUPSonder, OhneSonderschnittstelleIstDieKarteInDerKetteDurchsichtig) {
+    Pruefstand p;
+    p.aup.setIEI(true);
+    EXPECT_TRUE(p.aup.getIEO());
+    p.aup.setIEI(false);
+    EXPECT_FALSE(p.aup.getIEO());
+    EXPECT_FALSE(p.aup.hasInterrupt());
+}
+
+TEST(AUPSonder, ResetSetztCtcUndSioZurueck) {
+    SonderStand s;
+    s.sioB(4, 0x44);
+    s.out(0xB0, 0x05);
+    s.out(0xB0, 0x01);
+    s.aup.reset();
+    EXPECT_EQ(s.aup.sio()->channelB().format().teiler, 1);
+    EXPECT_FALSE(s.aup.ctc()->isTimerMode(0) && s.aup.ctc()->teilerTakte(0) != 0);
+    EXPECT_EQ(s.aup.kommando(), 0xFF);
+}
