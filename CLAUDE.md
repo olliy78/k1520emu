@@ -599,6 +599,33 @@ Vertrag; der Stanzer wird an seine Datei **gebunden** und schreibt nach 0,5 s St
 Maschinenzeit zurück.  Kasten „Lochstreifen“ nur mit Karte, kein Kürzel, nicht im Save-State.
 **Vor Arbeiten daran: `doc/merkposten/lochstreifen.md` lesen**; Entwurf `doc/design/23_lochstreifen.md`.
 
+## CopyQM (.cqm) und tar-Disketten (Stand 2026-10-17, Zweig `cqm`)
+
+`.cqm` ist ein Container wie `.img` (`core/peripherals/floppy_drive/cqm_codec.*`, **lesen UND schreiben**,
+Grenze = `rawCompatible()` + einheitliche MFM-Geometrie, Kopffelder des Originals bleiben; kein erzwungener
+Schreibschutz; die Oberflächen behandeln `.cqm` seit 2026-10-17 als schreibbar, nur tar bleibt gesperrt;
+Ablehnungsgründe stehen ausdrücklich im Kern („CopyQM unterstuetzt keine gemischten Formate…“); die
+Emulatoren zeigen beim Einlegen profilabhängige Hinweise `Programmprofil.cqm_hinweise` (A5120: UDOS+Boot,
+PRG 710: UDOS));
+P8000-Disketten ohne Dateisystem sind
+`tar720` (`core/filesystem/tar/`, Mehrdisketten-Strom über `tar-satz`/„tar-Satz öffnen…“).
+**tar herausholen und zurückschreiben (2026-10-17):** `tar-export` gibt den Strom einer tar-Diskette als `.tar`
+aus (Kopf+Endmarke → bis dahinter, sonst/Folgeteil ganz; die Teile eines Satzes setzt `cat` zusammen); `create --fs
+tar720_leer` legt eine ganz Null gefüllte 720K-Diskette an (alle vier Container; Erkennung nur bei ALLEN Bytes Null,
+vor der CP/A-Regel), `tar-put` schreibt GENAU EIN `.tar` hinein (≤ 720 KiB, Vielfaches von 512, Warnung bei Nicht-V7),
+danach ist sie `tar720` und nur lesbar.  Aktionen „Diskette als .tar exportieren…“/„tar-Datei auf Diskette schreiben…“.
+**`doc/merkposten/cqm.md` Nr. 13 lesen.**
+WEGA/tar tragen UNIX-Angaben statt UDOS-Kopfsektor (`FsType`, `istUnix()`).  Archive der
+pofo.de-Sammlung: `tools/p8000/pofo_archive.py`.
+**Vor Arbeiten daran: `doc/merkposten/cqm.md` lesen** (CRC-Tabellenfehler `& 0x3F`, Offsets);
+Entwurf `doc/design/33_cqm.md`.
+
+**OS/M (P8000, 8-Bit) = CP/M 2.2 auf den SCP-Formaten** (Entwurf `doc/design/34_osm.md`): Profile `osm640`/`osm800`
+(`boot_header: osm`) werden NUR mit OS/M-Urlader in c0h0 Sektor 1 erkannt (Code `FD 21 48 0C …` UND `P8000SYS`);
+Datendisketten bleiben `scpx640`/`cpa_auto`/`cpa800`.  **Deckungsgleiche Profile sind keine Mehrdeutigkeit** (das mit
+positivem Nachweis gewinnt), leere 800K nennt nur „ebenso gut osm800“, fsck `osm.fdconf` bei unpassendem FDCONF.
+Festlegungen + Wächter: `doc/merkposten/disktool.md` (OS/M).
+
 ## Kassette K5020/K5200 (alle Maschinen außer P8000; PC 1715 nur mechanisch)
 
 AKB K5020 (zwei Z80-PIOs) mit zwei Laufwerken K5200 als steckbare Option auf **E/A 30H–37H**

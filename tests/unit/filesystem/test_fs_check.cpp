@@ -27,11 +27,13 @@
 #include <fstream>
 #include <map>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "core/filesystem/check/fs_check.h"
 #include "core/filesystem/disk_volume.h"
 #include "core/filesystem/udos/udos_bitmap.h"
+#include "tests/support/osm_urlader.h"
 #include "tests/support/temp_path.h"
 
 namespace fs = std::filesystem;
@@ -965,6 +967,27 @@ TEST(FsCheckGegenprobe, DerAusgelieferteKatalogIstEindeutig) {
         ASSERT_TRUE(v) << name;
         EXPECT_TRUE(v->detection().unambiguous)
             << name << ": auch moeglich " << v->detection().alternatives.size();
+    }
+    // OS/M (Entwurf 34): eine 640K-Systemdiskette passt auf `osm640` UND `scpx640` —
+    // deckungsgleich, also KEINE Mehrdeutigkeit; 800K liegt allein auf `osm800`.
+    // Synthetisch (Urlader-Merkmale, tests/support/osm_urlader.h).
+    for (const auto& [profil, fdconf, groesse] :
+         {std::tuple<const char*, uint8_t, size_t>{"osm640", 0x55, 16384},
+          std::tuple<const char*, uint8_t, size_t>{"osm800", 0x77, 20480}}) {
+        const std::string d = k1520test::tempPath((std::string("fscheck_eindeutig_") + profil + ".img").c_str());
+        const std::string b = d + ".bin";
+        k1520test::schreibeDatei(b, k1520test::osmBootabbild(fdconf, groesse));
+        std::string err;
+        ASSERT_TRUE(DiskVolume::create(d, profil, "", formate(), dateisysteme(), err, b)) << err;
+        auto v = oeffne(d);
+        ASSERT_TRUE(v) << profil;
+        EXPECT_EQ(v->detection().filesystem, profil);
+        EXPECT_TRUE(v->detection().unambiguous)
+            << profil << ": auch moeglich " << v->detection().alternatives.size();
+        v.reset();
+        std::error_code ec;
+        fs::remove(d, ec);
+        fs::remove(b, ec);
     }
 }
 

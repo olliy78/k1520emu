@@ -1,0 +1,9 @@
+# Eine leere tar-Diskette hat nichts zu exportieren — das Werkzeug sagt es, statt
+# 720 KiB Nullen als "Archiv" auszugeben.
+tool:   k1520disktool
+tmpfile leer.img:
+tmpfile aus.tar:
+setup_run: create %leer.img% --fs tar720_leer
+run:    tar-export %leer.img% %aus.tar%
+expect: leer
+exit:   1

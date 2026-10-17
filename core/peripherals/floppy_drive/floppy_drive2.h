@@ -167,4 +167,7 @@ private:
     bool                     side0_only_ = false;
     std::vector<std::string> notices_;
     mutable int              last_lost_write_ = -1;  ///< (pos<<1|head) der letzten Warnung
+
+    /// Haelt den Hinweis "Abbild nicht speicherbar: …" in notices_ aktuell.
+    void meldeSpeicherfehler();
 };

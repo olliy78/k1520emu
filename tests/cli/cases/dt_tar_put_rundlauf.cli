@@ -1,0 +1,15 @@
+# tar-put -> tar-export: Datei mit Kopf und Endmarke kommt Byte fuer Byte wieder heraus
+# (3584 Byte = 7 Bloecke; der Rest der Diskette bleibt Null und gehoert nicht zum Archiv).
+# Danach ist die Diskette tar720 und listet die Dateien des Archivs.
+tool:   k1520disktool
+tmpfile neu.hfe:
+tmpfile aus.tar:
+setup_run: create %neu.hfe% --fs tar720_leer
+setup_run: tar-put %neu.hfe% %CLI_DIR%/../fixtures/p8000/tar_v7_klein.tar
+setup_run: tar-export %neu.hfe% %aus.tar%
+run:    ls %neu.hfe%
+expect: tar720
+expect: a.txt
+expect: b.txt
+forbid: Warnung
+exit:   0

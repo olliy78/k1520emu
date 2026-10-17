@@ -56,8 +56,30 @@ Was beim Weiterarbeiten zu wissen ist:
   `<abbild>~` vor dem ersten Zurückschreiben.  Die installierte P15-Platte prüft mit
   `--full` ohne Befund (4 Partitionen, ~1240 Dateien).
   **(7) Rechte**: neue Dateien 0644, ausführbare Linux-Datei ⇒ 0755, uid/gid 0 (`wega`);
-  Überschreiben behält Inode, Besitzer und Rechte.  Besitzer/Zeiten tragen `get`→`put`
-  (noch) nicht — `.fileinfo` für WEGA ist offen (Entwurf §6).
+  Überschreiben behält die Inode.  **(8) UNIX-Dateiangaben (2026-10-17)**: Das DiskTool
+  schloss bisher „Typfeld gefüllt ⇒ UDOS" (`any(e.type)`, `bool(entry.type)`) — bei WEGA
+  steht dort aber eine Dateiart (`-`/`d`/`c`).  **Die Dateisystemart wird gefragt, nie
+  am Typfeld erraten**: C++ `DiskVolume::fsType()`/`istWega()`, Python
+  `DiskTool.ist_wega/ist_udos/ist_cpm` (aus `k1520d_fs_type`), `Entry.ist_unix`.
+  Schreibseite: `UnixAttrs` + `FileSystem::setAttributes(name, UnixAttrs)` (nur WEGA,
+  Modus nur die unteren 12 Bit — die Dateiart ist Struktur —, uid/gid 0…65535, mtime;
+  `ctime` setzt jede Änderung auf „jetzt" wie `chmod`, vorgeben lässt sie sich nicht;
+  Prüfung VOR dem ersten Blockzugriff, eine `Tx`), C-ABI `k1520d_set_unix_attrs`,
+  `k1520d_entry_unix_*`, `k1520d_unix_blocks` (additiv, ctypes nachgezogen, CLI
+  `attr --mode/--uid/--gid/--mtime`).  `.fileinfo` mit `fs=wega` entsteht für WEGA
+  **immer**, auch für Verzeichnisse (`<ordner>.fileinfo` NEBEN dem Ordner; `put <ordner>`
+  wendet es erst NACH dem Einfügen an — jede Datei darin ändert die mtime des
+  Verzeichnisses), dazu `wega-dateiangaben.txt` mit allen Inodes (Gerätedateien nur dort).
+  Zurückgespielt werden `mode`&07777, `uid`, `gid`, `mtime`; `nlink`/`inode`/`atime`/`ctime`/
+  `art`/`rdev` sind Auskunft.  Ein fremdes `.fileinfo` (udos/cpm) wird bei WEGA
+  **überlesen** (Kopieren von UDOS nach WEGA darf nicht scheitern), umgekehrt weist
+  UDOS/CP/M ein `fs=wega` ab.  Archiv: `.txt` im `ls -l`-Stil mit WEGA-Legende,
+  `diskarchive.yaml` bekommt je Datei `unix: {mode, uid, gid, mtime}` (Fassung bleibt 1).
+  Eigenschaften-Dialog: nur Inode-Felder, Kästchen ⇄ Oktalzahl.  Symlinks gibt es in
+  System III nicht (kein IFLNK).  Die Plattenabbild-CLI (`wega_platte`) schreibt weiter
+  nur 0644/0755 und bewusst noch kein `.fileinfo`.  Wächter: `WegaFs.SetAttributes*`,
+  `WegaFs.BlockListe*`, `WegaDiskVolume.Fileinfo*`/`Fremdes*`/`UnixAngaben*`,
+  `test_disktool_wega.py`, `cli_dt_wega_attr_get_put`.
   Gegenproben: die Python-Vorstufe `tools/p8000/wega_s3fs.py` liest, was der Kern schreibt
   (`py_wega_gegenprobe`); alle Lieferdisketten (`~/Documents/K1520emu/Disketten/P8000/
   WEGA3.0`, `K1520_WEGA_IMG`) und die Platte (`K1520_WEGA_PLATTE`) prüfen ohne Befund —
@@ -884,6 +906,44 @@ Was beim Weiterarbeiten zu wissen ist:
   `test_archive_traegt_ein_maschinenlesbares_verzeichnis` (rechnet `size`/`sha256`
   gegen den wirklichen ZIP-Eintrag nach und verlangt, dass jedes Mitglied der `.zip`
   genau einmal erklärt ist).
+- **Archiv mit Herkunft: `provenance=`, `beilagen=`, `ohne_abbild=`** (2026-10-17,
+  `create_archive`; Aufrufer: `tools/p8000/pofo_archive.py`, Sammlung pofo.de).  Drei
+  optionale Parameter, ohne sie bleibt das Archiv bytegleich wie vorher (Wächter
+  `test_archiv_herkunft.py`).  **(1) `provenance`** (Dict, freie Schlüssel) wird als
+  Abschnitt `provenance:` in die `diskarchive.yaml` übernommen (additiv, `diskarchive: 1`)
+  und im `.txt` als „HERKUNFT / BESCHREIBUNG" gedruckt; der Schlüssel `hinweise` ist eine
+  Zeilenliste (z. B. „Datei X endet auf Diskette 1 abgeschnitten, Fortsetzung auf 2").
+  Das Archiv wertet nichts davon aus.  **(2) `beilagen`** (`{Pfad: Text|Bytes}`) liegen an
+  der **Wurzel** der `.zip` und stehen unter `attachments` — **nie unter `dateien/`**, sonst
+  fügte `put <ordner>` sie als Datei der Diskette ein (`istBeiblatt()` kennt sie nicht).
+  Lange Beschreibungstexte gehören hierher, nicht ins `.txt`.  Fremde Texte (Webseite)
+  werden nur kopiert.  **(3) `ohne_abbild`** für ein Archiv über einen **tar-Satz**
+  (`DiskTool.open_tar_satz`): es gibt kein einzelnes Abbild (`export_image` lieferte nur
+  die ERSTE Diskette); dann entfallen `.hfe`, `image:` und `source_container` (die
+  Metadaten gälten nur für die erste Diskette), das `.txt` sagt es.  Die Abbilder des
+  Satzes sind seine Einzelarchive.
+- **`provenance`/`beilagen` ohne Skript befüllbar** (2026-10-17, `app/disktool/archiv_meta.py`).
+  **Die Prüfregeln stehen NUR dort** (Schlüssel `[a-z][a-z0-9_]*`; Beilagenname ohne Pfadanteile/`..`/
+  `dateien/`/Namen, die das Archiv selbst vergibt; 4 MiB; Doppelte; Latin-1/UTF-8-Erkennung, NUL = keine
+  Textdatei) und werden von `create_archive` selbst durchgesetzt — also auch für `pofo_archive.py`
+  (das mit `unterordner=True` seine `dateien_fat/…` behält). Wege: `python3 -m app.disktool.archive`
+  und `k1520disktool --physical archive` (`--herkunft-datei`, `--herkunft k=v`, `--beilage datei[=name]`,
+  `--beilage-kodierung`; Eingabefehler Exit 2, VOR dem Laufwerk geprüft; das C++-`k1520disktool` hat
+  keinen `archive`-Befehl) und der Archiv-Dialog (`ui/archiv_dialog.py`, ersetzt die Beschriftungsfrage;
+  einklappbarer Bereich, Fehler als Zeile im Dialog, nie Meldungsfenster; Werte ausser Beilagen unter
+  `archiv/herkunft` in den Einstellungen, „Zurück auf leer" vergisst sie). Leere Felder = kein Schlüssel;
+  nichts angegeben = Archiv bitgleich wie vorher. Feste Felder: `source_url`, `set_name`, `version`,
+  `web_label`, `note`; `hinweise` ist stets eine Liste. Die `source_container`-Angaben einer `.cqm`
+  bleiben daneben stehen. Wächter: `test_archiv_meta.py` (`py_archiv_meta`), darunter der Rundlauf
+  „Beilage nie auf der Diskette".
+- **Zwei Auszugs-Fallen aus der P8000-Sammlung** (2026-10-17): **(1)** CP/M-Namen sind
+  beliebige Bytes (OS/M-Disketten tragen UNIX-Namen `/Z/HOFFM`, `GW/ZSID.DOC`); `extractAll`
+  macht außerhalb von UNIX-Dateisystemen `/` zu `_` (wie `:`), sonst bricht der Auszug ab bzw.
+  der Name wäre ein absoluter Pfad aus dem Zielordner.  `_erwartete_namen()` wiederholt die
+  Regel.  Wächter `test_cpm_name_mit_schraegstrich_…`.  **(2)** tar-Hartlink, dessen Ziel auf
+  einer ANDEREN Diskette des Satzes liegt: leere, `damaged`-markierte Datei + Befund
+  `tar.linkziel` statt Abbruch des ganzen Auszugs (`TarFs.HartlinkOhneZiel…`); im
+  `tar-satz` ist das Ziel da und der Link wird zur vollen Kopie.
 - **`.fileinfo` — die Angaben JE DATEI** (2026-08-22, Entwurf §13d, Befund
   `doc/bug_disktool_Programmdatei.md`).  Die Sammelbeiblätter entstehen nur beim
   **Vollexport**; eine einzeln herausgeholte UDOS-Programmdatei kam deshalb ohne
@@ -995,3 +1055,63 @@ Was beim Weiterarbeiten zu wissen ist:
   schon berücksichtigt war.  Wächter:
   `UdosFileSystemWrite.VersionstextImAenderungsfeldUeberlebt` (prüft mit derselben
   Probe, dass ein LEERES Feld weiterhin „heute" heisst und nicht sechs Leerzeichen).
+- **tar-Disketten (`tar720`, `FsType::Tar`, 2026-10-17, `core/filesystem/tar/`, Entwurf
+  `doc/design/33_cqm.md` §4a).**  Ein roher `tar`-Strom ab Sektor 0, kein Dateisystem, **nur
+  lesbar** (`put`/`rm`/`attr`/`create` sagen es; `setReadOnly(false)` wirkt nicht,
+  `readOnlyForced()`).  Vier Festlegungen: **(1) Die Erkennung kommt ZULETZT** — hinter der
+  CP/A-Regel, nicht über `detect_rank`: ein tar-Kopf mit gültiger Prüfsumme auf einer
+  CP/M-/WEGA-/NDOS-Diskette ist Dateiinhalt, nie der Datenträger (Wächter
+  `TarFs.EchteDateisystemeGehenVor`).  **(2) Diskette 2…n beginnt mitten in einer Datei**:
+  erkannt wird sie am ersten 512-ausgerichteten Kopf, hinter dem der Strom sauber ausläuft
+  (Nullblock/abgeschnitten/Ende) — das Anfangsstück ist `_fortsetzung_anfang.bin`.
+  **(3) Abgeschnitten ist ein Befund, kein Fehler** (`tar.abgeschnitten`, Warnung): die Datei
+  bleibt als Teilstück lesbar, `FileEntry::damaged` + `declared_size`, `.fileinfo`
+  `teilstueck=ist/soll`.  **(4) `tar-satz`/`DiskVolume::openTarSatz` verkettet die linearen
+  Ströme** (die Reihenfolge bestimmt der Aufrufer) und ist ein normales, schreibgeschütztes
+  Volume — `extractAll`, `check`, `.fileinfo` gehen unverändert.  Namen werden relativ gemacht
+  (führendes `/` weg, `..` → `__`, sonst Zip-Slip); je Name gilt die LETZTE Fassung.  Es
+  kommt nur tar vor (cpio an keinem der 142 Abbilder).  Wächter `TarFs.*`, `CqmDiskVolume.*`,
+  `TarEchtdaten.*` (mit `K1520_CQM_DIR`, Gegenprobe GNU `tar -tvf`), `test_disktool_tar.py`.
+- **tar-Export / leere tar-Diskette / `.tar` schreiben (2026-10-17):** `tar-export`, `tar-put`, Profil
+  `tar720_leer`, C-ABI `k1520d_tar_*`/`k1520d_fs_leer`, Aktionen „Diskette als .tar exportieren…“ und
+  „tar-Datei auf Diskette schreiben…“ (ohne Kürzel).  Alle Festlegungen mit Wächtern in
+  `doc/merkposten/cqm.md` Nr. 13.  Oberfläche: die Datei-Wege (Einfügen, Löschen, Alles einfügen) sind auf der
+  leeren tar-Diskette zu (`datei_schreibbar = schreibbar and not ist_tar`), der Neu-Dialog bietet nur
+  `tar720_leer` (nicht `tar720`).  Wächter `py_disktool_tar_schreiben`, `dt_tar_*.cli`.
+
+- **OS/M-Disketten (P8000, 8-Bit-Teil; Entwurf `doc/design/34_osm.md`, AP 1–3 umgesetzt 2026-10-17).**
+  OS/M ist CP/M 2.2 auf den **SCP-Formaten des PC 1715** — kein eigenes Dateisystem, kein
+  `FsType::Osm`.  Fünf Festlegungen:
+  **(1) `osm640`/`osm800` erkennt nur der Urlader** (`boot_header: osm`, `CpmFileSystem::osmUrlader`):
+  c0h0 Sektor 1 mit Code `FD 21 48 0C 31 00 40 3A 7E 0C` UND `P8000SYS` bei 0x80 — die Kennung allein
+  trägt auch der UDOS-Urlader des P8000 (`udos_org`, `w30start` …).  Datendisketten ohne Urlader bleiben
+  `scpx640`/`cpa_auto`/`cpa800`; „OS/M" nach Herkunft wäre geraten.  Der FDCONF-Typ entscheidet die
+  Erkennung NICHT (die Geometrie wählt das Profil), er ist Gegenstand von (4).
+  **(2) Deckungsgleiche Profile sind keine Mehrdeutigkeit** (`disk_volume.cpp`, vor der Wahl): hat
+  ein Treffer einen positiven Nachweis (`osm`, `dir_boot`, `bcu_syl/kombi*`, `bcu` mit Erkennung) und
+  liegt ein anderer Treffer genau gleich (Format, Lage, Blockgröße, Plätze, Versatz, `max_blocks`,
+  `dir_boot`, `nur_boot`), fällt der andere weg — `osm640` schlägt `scpx640` eindeutig, die Gegenprobe
+  läuft nicht.  Fällt nichts weg, bleibt die Reihenfolge unverändert (keine Verschiebung bestehender
+  Erkennungen).  Wächter `FsCheckGegenprobe.DerAusgelieferteKatalogIstEindeutig` (synthetische
+  osm640/osm800), `OsmProfile.Systemdiskette640WirdOsm640Eindeutig`.
+  **(3) Leere 800K-Diskette: Hinweis, kein Befund.**  Sie ist Sektor für Sektor eine leere `cpa800`
+  (ab c0h0, 192 Plätze) und bleibt das; die Erkennung schreibt „ebenso gut osm800 … --fs osm800" in die
+  Bemerkung (wie bei `scpx8915`), nur wenn die Lage ABWEICHT (auf 640K wäre `osm640` Rauschen).
+  Bewusst KEIN `erkennung.*`-Befund: auf einer erkannten Diskette gibt es keine Befunde der Ebene 0,
+  und die Diskette ist in Ordnung.  `create --fs osm800` ohne `--boot` legt eine 0xE5-Diskette an;
+  `put` darauf schreibt ab c2h0, die Systemzylinder bleiben frei, und beim Wiederöffnen liest die
+  CP/A-Regel sie richtig (`cpa_auto`, ab c2h0) — einen Urlader ohne System zu schreiben wäre eine
+  Diskette, die bootet und abstürzt.  Wächter `OsmProfile.Leere800NenntOsm800AlsAusweg`,
+  `OsmProfile.LeereOsm800SchuetztDieSystemzylinder`, `cli_dt_info_leer800_osm_hinweis`.
+  **(4) `osm.fdconf` (Vertrag, Warnung, Ebene Verwaltung, `cpm_check.cpp`)**: nur auf einer Diskette,
+  die den Urlader TRÄGT (gleich unter welchem Profil), wenn das A:-Nibble von Byte 0x7E nicht zur
+  Geometrie passt (`osmTypenFuer`: 16×256 DS80 = 5, SS80 = 4, SS40 = 2/3, 9×512 DS = 6, 5×1024 DS = 7);
+  c0h0 wird nur gelesen, wenn er da ist oder nachgeladen werden darf.  Keine Falschmeldung an den
+  8 Systemdisketten.  Wächter `FsCheckOsm.*`, `OsmEchtdaten.SystemdiskettenOhneFalschmeldung`.
+  **(5) Bootabbild-Prüfung** (`osmBootabbildproblem`, bei `create --boot` und `boot-put`, auch unter
+  `--fs scpx640`, sobald die Diskette den Urlader trägt): Urlader-Merkmale, FDCONF-Typ der Geometrie,
+  mindestens 28H × 256 B.  Wächter `OsmProfile.BootabbildWirdGeprueft`, `cli_dt_create_boot_osm*`;
+  am p8000emu nachgeprüft (`create --fs osm800 --boot` aus osmspiel → `boot_trace` bis `A:`).
+  Echtdaten: `OsmEchtdaten.ErkennungUeberDieGanzeSammlung` (`K1520_CQM_DIR`) — genau die 8
+  Systemdisketten wechseln (3 × osm640, 5 × osm800), alle übrigen behalten ihr Profil.  Offen: `osm720`
+  (Format 6, AP 4/5), Oberfläche/Archiv (AP 6).

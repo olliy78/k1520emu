@@ -232,6 +232,42 @@ bool CpmFileSystem::bootKopf(const uint8_t* p, size_t n) {
     return n >= 2 && (p[0] == 0x02 || p[0] == 0x03) && p[1] == 0xF0;
 }
 
+bool CpmFileSystem::osmUrlader(const uint8_t* p, size_t n) {
+    static const uint8_t kAnfang[10] = {0xFD, 0x21, 0x48, 0x0C, 0x31, 0x00, 0x40, 0x3A, 0x7E, 0x0C};
+    static const char    kKennung[8] = {'P', '8', '0', '0', '0', 'S', 'Y', 'S'};
+    return n >= 0x88 && std::equal(kAnfang, kAnfang + 10, p)
+        && std::equal(kKennung, kKennung + 8, p + 0x80);
+}
+
+bool CpmFileSystem::osmUrladerVon(const SectorSpace& raum, uint8_t* fdconf) {
+    if (raum.trackCount() == 0) return false;
+    const int i = raum.trackIndexOf(0, 0);
+    if (i < 0) return false;
+    const SectorSpace::TrackRef t = raum.trackAt(static_cast<size_t>(i));
+    SectorData s;
+    if (!raum.readSector(t.cyl, t.head, t.first_id, s)
+        || !osmUrlader(s.data.data(), s.data.size()))
+        return false;
+    if (fdconf) *fdconf = s.data[kOsmFdconf];
+    return true;
+}
+
+uint16_t CpmFileSystem::osmTypenFuer(const SectorSpace& raum) {
+    if (raum.trackCount() == 0) return 0;
+    const SectorSpace::TrackRef t = raum.trackAt(raum.trackCount() - 1);   // eine Datenspur
+    const bool    zweiseitig = raum.trackIndexOf(0, 1) >= 0;
+    const unsigned zylinder  = static_cast<unsigned>(t.cyl) + 1;
+    if (t.sector_size == 256 && t.sectors == 16) {
+        if (zweiseitig) return zylinder >= 70 ? (1u << 5) : 0;
+        return zylinder >= 70 ? (1u << 4) : ((1u << 2) | (1u << 3));
+    }
+    if (zweiseitig && zylinder >= 70) {
+        if (t.sector_size == 512 && t.sectors == 9) return 1u << 6;
+        if (t.sector_size == 1024 && t.sectors == 5) return 1u << 7;
+    }
+    return 0;
+}
+
 bool CpmFileSystem::bootPlatz(int index, const uint8_t* p) const {
     if (!prof_.dir_boot) return false;
     if (index == 0) return bootKopf(p, 32);

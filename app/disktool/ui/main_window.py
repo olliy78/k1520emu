@@ -38,7 +38,7 @@ import tempfile
 from pathlib import Path
 from typing import List, Optional
 
-from PySide6.QtCore import QCoreApplication, QSettings, Qt, QTimer
+from PySide6.QtCore import QCoreApplication, QEvent, QObject, QSettings, Qt, QTimer
 from PySide6.QtGui import QAction, QActionGroup, QKeySequence
 from PySide6.QtWidgets import (
     QApplication, QDialog, QFileDialog, QFrame, QInputDialog, QLabel, QMainWindow,
@@ -46,6 +46,7 @@ from PySide6.QtWidgets import (
 )
 
 from app import paths
+from app.disktool.ui.archiv_dialog import ArchivDialog
 from app.disktool.archive import NAMENLOS, create_archive, dateiname
 
 from app.core_binding.k1520disk import (
@@ -55,6 +56,8 @@ from app.disktool.ui.actions import erzeuge_aktionen
 from app.disktool.ui.disk_editor import DiskEditorWindow
 from app.disktool.ui.disk_header import DiskHeader, auswahlliste
 from app.disktool.ui.disk_info_dialog import DiskInfoDialog
+from app.disktool.ui.schreibsperre import dateisystem_anzeige, schutz_text, sperrgrund
+from app.disktool.ui.tar_satz_dialog import TarSatzDialog
 from app.disktool.ui.fileinfo_dialog import FileinfoDialog, schreibe_fileinfo
 from app.disktool.ui.fsck_dialog import FsckDialog
 from app.disktool.ui.recover_dialog import RecoverDialog
@@ -83,6 +86,47 @@ ZULETZT_MAX = 8
 SCHREIBT_STIL = ("background: #c0504d; color: white; font-weight: bold;"
                  " padding: 1px 6px; border-radius: 3px;")
 
+
+
+class _AblageFilter(QObject):
+    """Lehnt Ablagen auf alles ausser den beiden Ansichten ab.
+
+    Textfelder (Protokoll, Dialoge, Diskeditor) nehmen von sich aus Text und
+    mancherorts Dateipfade an; der Filter sitzt an der Anwendung und macht daraus
+    ueberall den "verboten"-Zeiger.  Er stirbt mit dem Fenster (Elternobjekt).
+    """
+
+    _ARTEN = (QEvent.DragEnter, QEvent.DragMove, QEvent.Drop)
+
+    def __init__(self, fenster, erlaubt):
+        super().__init__(fenster)
+        self._fenster = fenster
+        self._erlaubt = erlaubt
+
+    def _gehoert_zu_uns(self, obj) -> bool:
+        """Fenster selbst oder ein Dialog/Editor, dessen Elternfenster es ist."""
+        if not isinstance(obj, QWidget):
+            return False
+        oben = obj.window()
+        return oben is self._fenster or oben.parentWidget() is self._fenster
+
+    def eventFilter(self, obj, ev):  # noqa: N802
+        if (ev.type() in self._ARTEN and obj not in self._erlaubt
+                and self._gehoert_zu_uns(obj)):
+            ev.ignore()
+            return True
+        return False
+
+
+def neu_eintraege():
+    """(Name, Beschriftung) fuer „Neue Diskette": Katalogname plus Beschreibung.
+
+    Der blosse Name (`osm800`) sagt dem Anwender nichts; die Beschreibung des
+    Katalogs („OS/M (P8000) 800K, Format 7 ...") steht dabei.  tar720 mit Inhalt
+    laesst sich nicht anlegen - angeboten wird nur die LEERE tar-Diskette.
+    """
+    return [(f.name, f"{f.name} \u2014 {f.description}" if f.description else f.name)
+            for f in filesystems() if f.type != "tar" or f.leer]
 
 
 class MainWindow(QMainWindow):
@@ -219,6 +263,7 @@ class MainWindow(QMainWindow):
         m.addAction(self.act_oeffnen)
         self.menue_zuletzt = m.addMenu("&Zuletzt geöffnet")
         m.addAction(self.act_neu)
+        m.addAction(self.act_tar_satz)
         m.addSeparator()
         m.addAction(self.act_speichern)
         m.addAction(self.act_speichern_unter)
@@ -249,6 +294,9 @@ class MainWindow(QMainWindow):
         m.addSeparator()
         m.addAction(self.act_alles_raus)
         m.addAction(self.act_alles_rein)
+        m.addSeparator()
+        m.addAction(self.act_tar_export)
+        m.addAction(self.act_tar_schreiben)
         m.addSeparator()
         # Eigenes Untermenue: das sind Eingriffe ins ABBILD, nicht in die Diskette —
         # der Unterschied gehoert sichtbar gemacht.
@@ -413,6 +461,15 @@ class MainWindow(QMainWindow):
         self.folder_view.folder_changed.connect(lambda _: self._aktionen_pruefen())
         self.folder_view.disk_files_dropped.connect(self._extrahieren_refs)
         self.disk_view.files_dropped.connect(self._einfuegen_pfade)
+        # Ziehen und Ablegen von aussen: Abbild links, Ordner rechts; alles andere
+        # wird abgelehnt (Hinweis in der Statuszeile, kein Meldungsfenster).
+        self.disk_view.image_dropped.connect(self._abbild_abgelegt)
+        self.folder_view.folder_dropped.connect(self._ordner_abgelegt)
+        self.disk_view.abgelehnt.connect(self._ablage_abgelehnt)
+        self.folder_view.abgelehnt.connect(self._ablage_abgelehnt)
+        self._ablage_filter = _AblageFilter(
+            self, (self.disk_view.tree.viewport(), self.folder_view.tree.viewport()))
+        QApplication.instance().installEventFilter(self._ablage_filter)
         self.disk_view.properties_requested.connect(self._eigenschaften_ref)
         self.disk_view.extract_requested.connect(self._extrahieren_refs)
         self.disk_view.erase_requested.connect(self._loeschen_refs)
@@ -581,7 +638,15 @@ class MainWindow(QMainWindow):
         # sich „frei, aber beschrieben" bestimmen liesse.
         self.act_wiederherstellen.setEnabled(mit_fs)
         self.act_speichern.setEnabled(schreibbar)
-        self.act_alles_rein.setEnabled(schreibbar and mit_fs)
+        # Die leere tar-Diskette ist beschreibbar, aber nur mit EINEM .tar (tar_schreiben):
+        # die Datei-Wege (Einfuegen, Loeschen, Alles einfuegen) bleiben dort zu.
+        datei_schreibbar = schreibbar and not self.tool.ist_tar
+        self.act_alles_rein.setEnabled(datei_schreibbar and mit_fs)
+        # tar-Export: tar-Disketten (nicht die leere) und roh geoeffnete Disketten, an denen
+        # kein Dateisystem erkannt wurde (z. B. ein Folgeteil ohne einen einzigen Kopfblock).
+        self.act_tar_export.setEnabled(
+            offen and ((self.tool.ist_tar and not self.tool.tar_leer) or not mit_fs))
+        self.act_tar_schreiben.setEnabled(schreibbar and self.tool.tar_leer)
 
         self.act_holen.setEnabled(offen and disk_auswahl)
         self.act_eigenschaften.setEnabled(offen and len(
@@ -589,8 +654,10 @@ class MainWindow(QMainWindow):
         # Genau EINE Datei — ein Sprung fuehrt an einen Ort, nicht an drei.
         self.act_datei_im_editor.setEnabled(
             mit_fs and len(self.disk_view.selected_refs()) == 1)
-        self.act_loeschen.setEnabled(schreibbar and disk_auswahl)
-        self.act_schreiben.setEnabled(schreibbar and ordner_auswahl)
+        self.act_loeschen.setEnabled(datei_schreibbar and disk_auswahl)
+        # Auf der leeren tar-Diskette fuehrt derselbe Weg (|←) das EINE .tar zum Schreiben.
+        self.act_schreiben.setEnabled(
+            (datei_schreibbar or (schreibbar and self.tool.tar_leer)) and ordner_auswahl)
 
         # Die beiden Ordner-Aktionen haengen NICHT an der Diskette: sie arbeiten im
         # Wirtsystem und gelten auch dann, wenn gar keine Diskette offen ist.
@@ -629,6 +696,30 @@ class MainWindow(QMainWindow):
         # zu bekommen; nur waehrend des Schreibens ist das Laufwerk belegt.
         self.act_physisch.setEnabled(not laeuft)
 
+        # Unaufhebbar gesperrt (tar): die Schreibbefehle bleiben zu, und der
+        # Tooltip sagt WARUM — sonst sucht man den Schreibschutz, den es nicht gibt.
+        grund = sperrgrund(self.tool)
+        if grund:
+            self.act_schreibschutz.setEnabled(False)
+        tipps = self.__dict__.setdefault("_tipps_ohne_sperre", {})
+        for a in (self.act_speichern, self.act_schreiben, self.act_loeschen,
+                  self.act_alles_rein, self.act_neu_beschreiben, self.act_schreibschutz,
+                  self.act_tar_schreiben):
+            tipps.setdefault(a, a.toolTip())
+            a.setToolTip(f"{tipps[a]}\n\nGesperrt: {grund}" if grund else tipps[a])
+        # Die leere tar-Diskette: die Datei-Wege sind zu, weil dort genau EIN .tar hingehoert.
+        if offen and self.tool.tar_leer:
+            for a in (self.act_loeschen, self.act_alles_rein):
+                a.setToolTip(f"{tipps[a]}\n\nGesperrt: auf die leere tar-Diskette gehört "
+                             "genau ein .tar — „tar-Datei auf Diskette schreiben…“.")
+            self.act_schreiben.setToolTip(
+                f"{tipps[self.act_schreiben]}\n\nAuf der leeren tar-Diskette: genau EINE "
+                "ausgewählte .tar-Datei wird als Archiv geschrieben (wie „tar-Datei auf "
+                "Diskette schreiben…“); Ordner und mehrere Dateien nicht.")
+        if offen and self.tool.tar_leer and self.tool.read_only:
+            self.act_tar_schreiben.setToolTip(
+                f"{tipps[self.act_tar_schreiben]}\n\nGesperrt: erst den Schreibschutz aufheben.")
+
         self._schutz_anzeigen()
 
     def _schutz_anzeigen(self) -> None:
@@ -647,10 +738,12 @@ class MainWindow(QMainWindow):
         if self.tool is None:
             self.st_schloss.clear()
             self.st_schutz.setText("")
+            self.st_schutz.setToolTip("")
         else:
             self.st_schloss.setPixmap(icon(bild).pixmap(16, 16))
-            self.st_schutz.setText("R/W  schreibbar" if schreibbar
-                                   else "R/O  nur lesen")
+            self.st_schutz.setText(schutz_text(self.tool) or (
+                "R/W  schreibbar" if schreibbar else "R/O  nur lesen"))
+            self.st_schutz.setToolTip(sperrgrund(self.tool))
 
     #: Alter Name — das Freigeben haengt nicht mehr an einem Argument.
     def _enable_write(self, offen: bool = True) -> None:
@@ -838,6 +931,10 @@ class MainWindow(QMainWindow):
         Erste, was im Kopf stehen muss (sonst bliebe die Zeile leer).
         """
         if self._physisch is None:
+            satz = getattr(self, "_satz", None)
+            if satz and self.tool is not None:
+                return (f"tar-Satz aus {len(satz)} Abbildern: "
+                        + ", ".join(Path(s).name for s in satz))
             return ""
         art = "schreibend" if self.tool is not None and not self.tool.read_only \
             else "nur lesen"
@@ -916,7 +1013,10 @@ class MainWindow(QMainWindow):
 
         for f in bericht.findings:
             wo = f"c{f.cyl}h{f.head} " if f.ortbar else ""
-            self.log_dock.append(f"Befund {f.schwere}: {wo}{f.object} — {f.text}"
+            # tar-Befunde verweisen auf den Kommandozeilenweg; im Fenster heisst er
+            # „Datei ▸ tar-Satz oeffnen…".
+            text = f.text.replace("tar-satz", "Datei ▸ tar-Satz öffnen…")
+            self.log_dock.append(f"Befund {f.schwere}: {wo}{f.object} — {text}"
                                  f"  [{f.id}]")
 
         schwerster = max(bericht.findings, key=lambda f: f.severity)
@@ -931,7 +1031,7 @@ class MainWindow(QMainWindow):
     # Diskette oeffnen / anlegen / schliessen
     # ════════════════════════════════════════════════════════════════════════
 
-    def open_image(self, path, filesystem: str = "") -> bool:
+    def open_image(self, path, filesystem: str = "", *, satz=None) -> bool:
         """Abbild öffnen — **roh, wenn nichts erkannt wird** (§12.6).
 
         Eine gemischte oder unbekannte Geometrie ist kein Grund, das Abbild gar
@@ -941,8 +1041,14 @@ class MainWindow(QMainWindow):
         dieselbe ist.
         """
         self._close_tool()
+        # Ein tar-Satz sind mehrere Abbilder, die EIN Strom sind (`satz` in Lesereihenfolge);
+        # `path` ist dann das erste.
+        self._satz = list(satz) if satz else None
         try:
-            self.tool = DiskTool.open_raw(path, filesystem or None)
+            if satz:
+                self.tool = DiskTool.open_tar_satz(satz)
+            else:
+                self.tool = DiskTool.open_raw(path, filesystem or None)
         except (K1520DiskError, FileNotFoundError) as e:
             self.tool = None
             self.disk_view.clear()
@@ -962,12 +1068,18 @@ class MainWindow(QMainWindow):
         self.act_schreibschutz.blockSignals(False)
         self._reload()
         self._medium_meldungen()
+        if self.tool.remarks:
+            # Der Streifen kuerzt und verschwindet; das Protokoll behaelt den vollen
+            # Wortlaut (z. B. „ebenso gut osm800 ... --fs osm800" auf einer leeren 800K).
+            self.log_dock.append("Medium: " + self.tool.remarks.strip())
         if not self.tool.has_filesystem:
             self._roh_melden()
-        self._zuletzt_merken(str(path))
-        self.log_dock.append(f"Geöffnet: {path} — {self.tool.filesystem}")
+        if not satz:
+            self._zuletzt_merken(str(path))
+        anzeige = dateisystem_anzeige(self.tool)
+        self.log_dock.append(f"Geöffnet: {path} — {anzeige}")
         self.statusBar().showMessage(
-            f"Geöffnet: {Path(path).name} — {self.tool.filesystem}", STATUS_DAUER)
+            f"Geöffnet: {Path(path).name} — {anzeige}", STATUS_DAUER)
         return True
 
     def open_physical(self, *, filesystem: str = "", **optionen) -> bool:
@@ -1557,6 +1669,7 @@ class MainWindow(QMainWindow):
         if self.tool is not None:
             self.tool.close()
             self.tool = None
+        self._satz = None
         # Der Befund gehoert zur geschlossenen Diskette und darf nicht stehenbleiben.
         if hasattr(self, "st_befund"):
             self.st_befund.hide()
@@ -1636,12 +1749,20 @@ class MainWindow(QMainWindow):
         ziel = Path(dest_dir)
         ziel.mkdir(parents=True, exist_ok=True)
         try:
+            # Zielname = die EINE Regel des Kerns (DiskVolume::zielNamen): ohne
+            # Pfadanteil und je Seite eindeutig.  Ein Name wie '/Z/HOFFM' darf weder
+            # aus dem Ordner ausbrechen noch auf 'HOFFM' verkuerzt mit einem anderen
+            # kollidieren.
+            eintraege = {e.ref: e for e in self.tool.list_names()}
             for ref in refs:
                 unter = ziel
                 if "/" in ref and self.tool.volume_count > 1:
                     unter = ziel / ref.split("/", 1)[0]
                     unter.mkdir(parents=True, exist_ok=True)
-                name = ref.split("/")[-1].replace(":", "_")
+                e = eintraege.get(ref)
+                name = (e.target_name if e else "") or ref.split("/")[-1].replace(":", "_")
+                if e is not None and e.ist_unix:
+                    name = name.split("/")[-1]       # WEGA/tar: '/' ist ein Pfad, wie bisher
                 self.tool.extract(ref, unter / name, text=self.text_mode)
         except K1520DiskError as e:
             self._fehler("Extrahieren", str(e))
@@ -1667,6 +1788,8 @@ class MainWindow(QMainWindow):
         """
         if self.tool is None or not paths:
             return False
+        if self.tool.tar_leer:
+            return self._tar_leer_einfuegen(paths)
 
         pfade, uebersprungen = self._zubehoer_aussortieren(paths)
         if pfade is None:
@@ -1798,6 +1921,10 @@ class MainWindow(QMainWindow):
         """
         if self.tool is None:
             return False
+        grund = self._container_grund(path, self.tool.filesystem)
+        if grund:
+            self._fehler("Speichern unter", grund)
+            return False
         try:
             self.tool.save_as(path)
         except K1520DiskError as e:
@@ -1808,7 +1935,30 @@ class MainWindow(QMainWindow):
         self.log(f"Gespeichert unter {path}")
         return True
 
-    def archive(self, zip_path, bezeichnung: str = "") -> bool:
+    @staticmethod
+    def _container_grund(path, filesystem: str) -> str:
+        """Warum das Dateisystem nicht in diesen Container passt ("" = darf versucht werden).
+
+        ``.img`` und ``.cqm`` tragen nur Sektordaten: UDOS/ZDOS verkettet hinter der
+        Daten-CRC und scheitert daran.  Ob die GEOMETRIE des Mediums reicht (einheitlich,
+        MFM — gemischte Systemspuren wie bei CP/A-Boot, FM, unformatierte Lücken tragen
+        sie nicht), entscheidet der Kern; er lehnt dann mit Grund ab und lässt die Datei
+        unverändert.
+        """
+        ext = str(path).lower().rsplit(".", 1)[-1]
+        if ext in ("img", "cqm") and any(f.name == filesystem and f.type == "udos"
+                                        for f in filesystems()):
+            if ext == "cqm":
+                return ("CopyQM kann die Sektorkontrollblöcke von UDOS nicht speichern: "
+                        "die Dateiverkettung steht dort hinter der Daten-CRC jedes Sektors "
+                        "und ginge verloren.\n\nBitte .hfe oder .dmk wählen.")
+            return (f"{filesystem} lässt sich nicht als Sektorabbild (.img) ablegen: die "
+                    "Dateiverkettung steht dort hinter der Daten-CRC jedes Sektors und "
+                    "ginge verloren.\n\nBitte .hfe oder .dmk wählen.")
+        return ""
+
+    def archive(self, zip_path, bezeichnung: str = "", provenance: dict = None,
+                beilagen: dict = None) -> bool:
         """Abbild (.hfe), alle Dateien und ein Inhaltsverzeichnis in eine `.zip`.
 
         Reine Leseoperation — auch mit gesetztem Schreibschutz benutzbar.
@@ -1818,6 +1968,9 @@ class MainWindow(QMainWindow):
         **physischen** Diskette ist sie die einzige Auskunft darüber, welche
         Diskette das war — es gibt keinen Dateinamen, aus dem sich etwas ableiten
         liesse.
+
+        `provenance`/`beilagen`: Herkunftsangaben und Beschreibungsdateien aus dem
+        Archiv-Dialog (``archiv_meta``); leer = das Archiv wie ohne sie.
         """
         if self.tool is None:
             return False
@@ -1829,8 +1982,10 @@ class MainWindow(QMainWindow):
         try:
             ziel = create_archive(self.tool, zip_path, text_mode=self.text_mode,
                                   bezeichnung=bezeichnung,
-                                  herkunft=self._bezeichnung())
-        except (K1520DiskError, OSError) as e:
+                                  herkunft=self._bezeichnung(),
+                                  provenance=provenance or None,
+                                  beilagen=beilagen or None)
+        except (K1520DiskError, OSError, ValueError) as e:
             self._fehler("Archivieren", str(e))
             return False
         self.log(f"Archiviert: {ziel}")
@@ -1900,26 +2055,156 @@ class MainWindow(QMainWindow):
     # Dialoge (Klick-Behandler)
     # ════════════════════════════════════════════════════════════════════════
 
+    def _abbild_abgelegt(self, pfad: str) -> None:
+        """Abbild von aussen auf die Diskettenansicht gezogen = *Datei ▸ Öffnen*."""
+        if self._darf_verwerfen():
+            self.open_image(pfad)
+
+    def _ordner_abgelegt(self, pfad: str) -> None:
+        """Ordner von aussen auf die Ordneransicht gezogen = Ordnerwahl."""
+        self.folder_view.set_folder(pfad)
+        self.statusBar().showMessage(f"Arbeitsordner: {pfad}", STATUS_DAUER)
+
+    def _ablage_abgelehnt(self, grund: str) -> None:
+        self.statusBar().showMessage(f"Nicht abgelegt: {grund}", STATUS_DAUER)
+
     def _oeffnen_dialog(self) -> None:
         if not self._darf_verwerfen():
             return
         pfad, _ = QFileDialog.getOpenFileName(
             self, "Diskettenabbild öffnen", self._disketten_ordner(),
-            "Diskettenabbilder (*.hfe *.dmk *.img);;Alle Dateien (*)")
+            self.OEFFNEN_FILTER)
         if pfad:
             self.open_image(pfad)
+
+    #: Dateifilter „Abbild oeffnen"; .cqm ist auch als Ziel erlaubt (wie .img, soweit darstellbar).
+    OEFFNEN_FILTER = "Diskettenabbilder (*.hfe *.dmk *.img *.cqm);;Alle Dateien (*)"
+
+    def _tar_satz_dialog(self) -> None:
+        """Mehrere Abbilder in gewählter Reihenfolge als einen tar-Strom öffnen."""
+        if not self._darf_verwerfen():
+            return
+        pfade, _ = QFileDialog.getOpenFileNames(
+            self, "Abbilder des tar-Satzes wählen", self._disketten_ordner(),
+            self.OEFFNEN_FILTER)
+        if not pfade:
+            return
+        dlg = TarSatzDialog(pfade, self)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        geordnet = dlg.pfade()
+        self.open_image(geordnet[0], satz=geordnet)
+
+    # ── tar-Disketten: Archiv herausholen / hineinschreiben ──────────────────
+
+    def tar_export(self, ziel) -> bool:
+        """Den tar-Strom der Diskette als ``.tar`` schreiben (Regeln: Kern, ``tar-export``)."""
+        if self.tool is None:
+            return False
+        try:
+            self.tool.tar_export(ziel)
+        except K1520DiskError as e:
+            self._fehler("Als .tar exportieren", str(e))
+            return False
+        groesse = Path(ziel).stat().st_size
+        self.log(f"Als .tar exportiert: {ziel} ({groesse} Byte, {groesse // 512} Blöcke)")
+        return True
+
+    def _tar_export_dialog(self) -> None:
+        if self.tool is None:
+            return
+        stamm = Path(self.tool.path).stem or "diskette"
+        pfad, _ = QFileDialog.getSaveFileName(
+            self, "Diskette als .tar exportieren",
+            str(Path(self._neben_der_diskette()) / (stamm + ".tar")), "tar-Archiv (*.tar)")
+        if pfad:
+            self.tar_export(pfad)
+
+    def tar_schreiben(self, quelle) -> bool:
+        """Eine ``.tar``-Datei auf die LEERE tar-Diskette schreiben.
+
+        Abgelehnt (Größe, kein Vielfaches von 512, Diskette nicht leer) wird mit
+        Meldung.  Ist das Archiv kein reines V7-tar, kommt die Rückfrage „Trotzdem
+        schreiben?“ — bei Nein bleibt die Diskette unverändert.
+        """
+        if self.tool is None:
+            return False
+        try:
+            warnung = self.tool.tar_put_pruefen(quelle)
+        except K1520DiskError as e:
+            self._fehler("tar-Datei schreiben", str(e))
+            return False
+        if warnung:
+            antwort = QMessageBox.question(
+                self, "tar-Datei schreiben",
+                f"{warnung}\n\nTrotzdem schreiben?",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if antwort != QMessageBox.Yes:
+                self.log("tar-Datei schreiben: abgebrochen (kein reines V7-tar)")
+                return False
+        try:
+            self.tool.tar_put(quelle)
+        except K1520DiskError as e:
+            self._fehler("tar-Datei schreiben", str(e))
+            return False
+        self._reload()
+        self.log(f"tar-Datei geschrieben: {quelle} — die Diskette ist jetzt tar720 und nur lesbar",
+                 stufe="warnung" if warnung else "")
+        return True
+
+    def _tar_leer_einfuegen(self, paths) -> bool:
+        """Einfügen-Wege (``|←``, Strg+←, Ziehen und Ablegen) auf der LEEREN tar-Diskette.
+
+        Dort gehört genau EIN ``.tar`` hin: die eine Datei geht denselben Prüf- und
+        Schreibweg wie „tar-Datei auf Diskette schreiben…“ (samt V7-Rückfrage).  Mehrere
+        Dateien, Ordner und Dateien mit Abbild-Endung werden mit Hinweis abgelehnt.
+        """
+        if len(paths) != 1:
+            self.log("Leere tar-Diskette: es lässt sich nur EINE .tar-Datei auf einmal schreiben "
+                     f"({len(paths)} gewählt)", stufe="warnung")
+            return False
+        p = Path(paths[0])
+        if p.is_dir():
+            self.log(f"Leere tar-Diskette: „{p.name}“ ist ein Ordner — erwartet wird genau eine "
+                     ".tar-Datei", stufe="warnung")
+            return False
+        if p.suffix.lower() in (".hfe", ".dmk", ".img", ".cqm"):
+            self.log(f"Leere tar-Diskette: „{p.name}“ ist ein Diskettenabbild, kein tar-Archiv "
+                     "(Abbilder öffnet Datei ▸ Abbild öffnen…)", stufe="warnung")
+            return False
+        if self.tool.read_only:
+            self.log("Leere tar-Diskette: erst den Schreibschutz aufheben", stufe="warnung")
+            return False
+        return self.tar_schreiben(str(p))
+
+    def _tar_schreiben_dialog(self) -> None:
+        if self.tool is None or not self.tool.tar_leer:
+            return
+        pfad, _ = QFileDialog.getOpenFileName(
+            self, "tar-Datei auf Diskette schreiben", self._neben_der_diskette(),
+            "tar-Archiv (*.tar);;Alle Dateien (*)")
+        if pfad:
+            self.tar_schreiben(pfad)
 
     def _neu_dialog(self) -> None:
         if not self._darf_verwerfen():
             return
-        namen = [f.name for f in filesystems()]
-        fs, ok = QInputDialog.getItem(self, "Neue Diskette", "Dateisystem:", namen, 0, False)
+        # tar720 (mit Inhalt) laesst sich nicht anlegen — angeboten wird die LEERE tar-Diskette.
+        eintraege = neu_eintraege()
+        gewaehlt, ok = QInputDialog.getItem(
+            self, "Neue Diskette", "Dateisystem:", [t for _, t in eintraege], 0, False)
         if not ok:
             return
+        fs = next(n for n, t in eintraege if t == gewaehlt)
         pfad, _ = QFileDialog.getSaveFileName(
             self, "Neue Diskette anlegen", self._disketten_ordner(),
-            "HFE-Abbild (*.hfe);;DMK-Abbild (*.dmk);;Sektorabbild (*.img)")
+            "HFE-Abbild (*.hfe);;DMK-Abbild (*.dmk);;Sektorabbild (*.img);;"
+            "CopyQM-Abbild (*.cqm)")
         if not pfad:
+            return
+        grund = self._container_grund(pfad, fs)
+        if grund:
+            self._fehler("Neue Diskette", grund)
             return
 
         # Bootfaehig? — nur, wo es Systemspuren gibt (eine Datendiskette wie cpa800
@@ -1966,30 +2251,11 @@ class MainWindow(QMainWindow):
         filter_ = "HFE-Abbild (*.hfe);;DMK-Abbild (*.dmk)"
         if not any(f.name == self.tool.filesystem and f.type == "udos"
                    for f in filesystems()):
-            filter_ += ";;Sektorabbild (*.img)"
+            filter_ += ";;Sektorabbild (*.img);;CopyQM-Abbild (*.cqm)"
         pfad, _ = QFileDialog.getSaveFileName(
             self, "Speichern unter", self._neben_der_diskette(), filter_)
         if pfad:
             self.save_as(pfad)
-
-    def _beschriftung_erfragen(self) -> str | None:
-        """Nach der Beschriftung der Diskette fragen — der Text auf dem Aufkleber.
-
-        Sie ist der Name, unter dem das Archiv abgelegt wird.  Bei einer
-        physischen Diskette gibt es sonst gar keinen: `tool.path` ist leer, und
-        `Path("").with_suffix(".zip")` warf hier bis 2026-08-18 einen
-        `ValueError` mitten in den Klickweg.
-
-        Returns:
-            Die Beschriftung, oder ``None``, wenn abgebrochen wurde.
-        """
-        text, ok = QInputDialog.getText(
-            self, "Diskette benennen",
-            "Beschriftung der Diskette (z. B. der Text auf dem Aufkleber).\n"
-            "Daraus entstehen der Dateiname des Archivs und der Eintrag im\n"
-            "Inhaltsverzeichnis:",
-            text=self._beschriftung_vorschlag())
-        return text.strip() if ok else None
 
     def _beschriftung_vorschlag(self) -> str:
         """Was in der Frage nach der Beschriftung schon dortsteht.
@@ -2013,15 +2279,20 @@ class MainWindow(QMainWindow):
     def _archivieren_dialog(self) -> None:
         if self.tool is None:
             return
-        bezeichnung = self._beschriftung_erfragen()
-        if bezeichnung is None:
+        dlg = ArchivDialog(
+            self._beschriftung_vorschlag(), self, self._einstellungen(),
+            stamm_fn=lambda b: dateiname(b) or Path(self.tool.path).stem or NAMENLOS,
+            start_ordner=self._neben_der_diskette())
+        if dlg.exec() != QDialog.Accepted:
             return
+        bezeichnung = dlg.bezeichnung()
         vorschlag = str(Path(self._neben_der_diskette())
                         / ((dateiname(bezeichnung) or NAMENLOS) + ".zip"))
         pfad, _ = QFileDialog.getSaveFileName(
             self, "Archivieren", vorschlag, "ZIP-Archiv (*.zip)")
         if pfad:
-            self.archive(pfad, bezeichnung=bezeichnung)
+            self.archive(pfad, bezeichnung=bezeichnung,
+                         provenance=dlg.provenance(), beilagen=dlg.beilagen())
 
     def _bootabbild_sichern_dialog(self) -> None:
         if self.tool is None or self.tool.boot_area_size(0) == 0:

@@ -1,0 +1,10 @@
+# Die LEERE 800K-Diskette ist Sektor fuer Sektor eine leere cpa800 — auch die frisch mit
+# OS/M formatierte.  Sie bleibt cpa800, nennt aber den Ausweg `--fs osm800`; mit ihm liegt
+# das Verzeichnis ab Zylinder 2 und die Systemzylinder bleiben frei.
+tool:   k1520disktool
+tmpfile leer.img:
+setup_run: create %leer.img% --fs cpa800
+run:    info %leer.img%
+expect: Dateisystem: cpa800
+expect: --fs osm800
+exit:   0

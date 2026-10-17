@@ -1,0 +1,13 @@
+# Ein OS/M-Urlader fuer Typ 7 (800K) auf einer 640K-Diskette luede das System mit falscher
+# Spurlaenge — `create` weist das Bootabbild VOR dem Anlegen ab.
+tool:   k1520disktool
+tmpfile neu.img:
+file boot.bin:
+  x
+poke:   %boot.bin% 0 fd21480c3100403a7e0c
+poke:   %boot.bin% 7e 7700
+poke:   %boot.bin% 80 5038303030535953
+poke:   %boot.bin% 3fff 00
+run:    create %neu.img% --fs osm640 --boot %boot.bin%
+expect: Laufwerkstyp 7
+exit:   1

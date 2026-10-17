@@ -2,7 +2,7 @@
 
 Holt Dateien von CP/A-, SCPX-, **UDOS**-, **UDOS1715**- und **SCP1700**-Disketten
 (CP/M-86 des A7100) und schreibt sie zurück —
-auf `.img`, `.hfe` und `.dmk`.  Dieselbe Bibliothek treibt die Oberfläche
+auf `.img`, `.hfe`, `.dmk` und `.cqm` (CopyQM).  Dieselbe Bibliothek treibt die Oberfläche
 (`run_disktool.sh`); Feinentwurf: `doc/design/13_k1520disktool.md`.
 
 Aufruf im Projekt immer über `tools/dev.sh tool k1520disktool …` — nie direkt aus
@@ -34,6 +34,16 @@ k1520disktool formats                                  bekannte Dateisysteme
 
 Schalter: `--fs NAME` (Erkennung übersteuern), `--volume N` (Seite),
 `--text`/`--binary`, `--as NAME`, `--force`, `--dry-run`, `--no-backup`.
+
+### Namen beim Auszug (`get`)
+
+Eine Regel für `get` mit und ohne Muster, `recover`, die Oberfläche und das
+Archiv (`DiskVolume::zielNamen`): in den Zielnamen kommt kein Pfadanteil.  Bei
+CP/M/UDOS-artigen Dateisystemen werden `/`, `\`, `:` und Steuerzeichen zu `_`
+(`/Z/HOFFM` → `_Z_HOFFM`, `GW/ZSID.DOC` → `GW_ZSID.DOC`), ein führender Punkt
+bekommt ein `_` davor (`..` → `_..`).  Fallen zwei Dateien auf denselben Namen
+(`A/B` und `A_B`), behält die unveränderte ihren Namen, die andere heißt `A_B~1`;
+auf stderr steht `Hinweis: …`.  Bei WEGA/tar ist `/` ein echter Pfad und bleibt.
 
 ## Ausgabe weiterverarbeiten
 
@@ -480,6 +490,23 @@ einen 1715-Kopf trägt (auch unter dem abgeleiteten Profil `cpa_auto`).
 
 Wächter: `DisktoolPc1715.*` (8), `cli_dt_*cpa1715*`, `cli_dt_boot_put_pc1715_a5120_abbild`.
 
+### OS/M (P8000, `osm640`, `osm800`)
+
+Entwurf `doc/design/34_osm.md`.  Beide Profile haben `boot_header: osm`: das Bootabbild muss
+den **OS/M-Urlader** tragen (Sektor 1: Code `FD 21 48 0C 31 00 40 3A 7E 0C`, Kennung
+`P8000SYS` bei 0x80), sein FDCONF-Typ (Byte 0x7E, Bits 0–3) muss zur Geometrie passen
+(640K = Typ 5, 800K = Typ 7) und es muss die 28H Sätze zu 256 B (10 KB) enthalten, die der
+Urlader lädt.  Ein UDOS-, SCP- oder CP/A-Abbild wird VOR dem Schreiben abgewiesen, ebenso bei
+`boot-put` auf eine Diskette, die den OS/M-Urlader schon trägt (auch unter `--fs scpx640`).
+
+```
+$ k1520disktool boot-get osmspiel.cqm osm800.bin          # 20480 B Systemzylinder 0-1
+$ k1520disktool create neu.img --fs osm800 --boot osm800.bin
+$ k1520disktool put neu.img datei.txt                      # landet ab Zylinder 2
+```
+
+Wächter: `OsmProfile.*`, `cli_dt_create_boot_osm800`, `cli_dt_create_boot_osm_falscher_typ`.
+
 ### PRG 710 / PRG 710-1
 
 Systemdisketten des Robotron PRG 710 und 710-1 (`doc/design/20_prg710.md` §5, AP-P6):
@@ -728,6 +755,33 @@ $ k1520disktool create neu.hfe --fs scp1700
 
 Hintergrund und Messwerte: `doc/scp1700_diskettenformat.md`.
 
+## OS/M — das CP/M des P8000 (`osm640`, `osm800`)
+
+OS/M 3.0 (8-Bit-Teil des P8000) ist **CP/M 2.2** auf den SCP-Formaten des PC 1715:
+Zylinder 0–1 System, Verzeichnis ab c2h0, 2-KB-Blöcke, 128 Plätze, kein Versatz —
+Format 5 (16×256, 640K) und Format 7 (5×1024, 800K).  Gelesen wurden solche Disketten
+schon immer richtig (als `scpx640` bzw. `cpa_auto`); die Profile bringen den Namen, die
+Bootabbild-Prüfung und die leere 800K-Diskette.
+
+* **Erkannt wird nur mit Urlader** in c0h0 Sektor 1 (s. o.).  Eine Datendiskette ohne
+  Urlader bleibt `scpx640`/`cpa_auto`/`cpa800` — das Medium unterscheidet sie nicht von
+  einer SCP-Diskette, „OS/M" wäre geraten.  Der UDOS-Urlader des P8000 trägt dieselbe
+  Kennung `P8000SYS`, aber anderen Code; er zählt nicht.
+* **Deckungsgleich ist nicht mehrdeutig**: eine 640K-Systemdiskette passt auf `osm640`
+  UND `scpx640` (gleiche Lage, Blöcke, Plätze).  Es gewinnt das Profil mit positivem
+  Nachweis, eindeutig; die Gegenprobe läuft nicht.
+* **Die leere 800K-Diskette** (OS/M-`FORMAT` schreibt nur 0xE5) ist Sektor für Sektor eine
+  leere `cpa800` (Verzeichnis ab c0h0, 192 Plätze).  `info` nennt dann „ebenso gut osm800 …
+  dafür --fs osm800".  Wer sie für OS/M füllt, sagt `--fs osm800` bzw. legt sie mit
+  `create --fs osm800` an — sonst landet das erste `put` in den Systemzylindern.  Danach
+  (Dateien ab c2h0, Systemzylinder leer) liest die CP/A-Regel sie von selbst richtig
+  (`cpa_auto`, Verzeichnis ab c2h0).
+* **Prüfung**: `osm.fdconf` (Warnung), wenn der FDCONF-Typ des Urladers (A:) nicht zur
+  Geometrie passt — die Diskette sähe heil aus und startete am P8000 falsch.
+* **Namen mit `/`** (`GW/ZSID.DOC`, aus WEGA übertragen) sind echte Befunde
+  (`cpm.dir.name`); `get` macht daraus `GW_ZSID.DOC`.
+* **Format 6 (9×512, 720K)** gibt es noch nicht (`osm720`, AP 5 des Entwurfs).
+
 ## SCPX 8915 — Disketten des K8915
 
 Das BIOS des K8915 hat einen **festen** DPB: Verzeichnis ab Zylinder 2 (OFF 2),
@@ -810,6 +864,14 @@ Sitzungsschalter: `--drive a|b|0…3`, `--cyls`, `--heads`, `--rate`, `--rpm`,
   das maschinenlesbare `diskarchive.yaml`. `--label` ist der **Aufkleber** (ohne ihn
   gilt der Datenträgername); er benennt auch die Dateien im Archiv, denn eine
   physische Diskette hat keinen Dateinamen.
+* **Herkunft und Beschreibung im Archiv** (`archive`, ebenso `python3 -m app.disktool.archive
+  <abbild> <archiv.zip> [--bezeichnung T] [--ohne-abbild] [--text] [--force]`):
+  `--herkunft-datei meta.yaml|json` (Schlüssel/Wert -> `provenance:` in `diskarchive.yaml`),
+  `--herkunft schluessel=wert` (mehrfach, überschreibt die Datei; Schlüssel nur `a-z0-9_`;
+  `hinweise=` hängt eine Zeile an), `--beilage datei.txt[=name]` (mehrfach; Beiblatt an der
+  Wurzel der `.zip`, nie unter `dateien/`; Text bis 4 MiB, Latin-1/UTF-8 wird erkannt, sonst
+  `--beilage-kodierung`). Ungültige Angaben (Pfadanteile, `..`, Namenskollision, Binärdatei,
+  zu groß, schlechter Schlüssel) enden mit Exit 2, bevor das Laufwerk angefasst wird.
 * **`save-as` und `archive` ersetzen keine vorhandene Datei** — dafür `--force`.
   Der Aufruf bricht ab und erfindet keinen Ausweichnamen; geprüft wird, **bevor**
   das Laufwerk anläuft (sonst kämen zwei Minuten Einlesen und danach der Abbruch).
@@ -876,6 +938,72 @@ Zwei Dinge, die dabei auffallen können:
   nie eingerichtet worden.  Sie gilt als leer, was sie auch ist.
 * *„die Diskette trägt ein MS-DOS-Dateisystem (FAT)"* — FORMAT.COM kann DOS-Disketten
   anlegen (Menüpunkte `{MSDOS}`).  Die liest das Wirtssystem, nicht dieses Werkzeug.
+
+## CopyQM (`.cqm`) lesen und schreiben
+
+`.cqm` verhaelt sich wie `.img`: `put`/`rm`/`mkdir`/`repair`/`create`/`save-as` gehen, beim
+Oeffnen ist die Diskette (wie immer) geschuetzt, `put`/`rm` heben es auf.  Geometrie kommt aus
+dem Abbild, nicht aus einem Format; geschrieben wird nur, was sich als gleichmaessiger
+MFM-Sektorstrom darstellen laesst (`rawCompatible`, einheitliche Sektorzahl/-groesse, keine
+unformatierte Luecke).  Sonst bricht der Befehl mit ausdruecklicher Begruendung ab ("CopyQM unterstuetzt keine gemischten
+Formate", "… Sektorkontrollbloecke von UDOS …", "… nur MFM …", "… unformatierte …") und die Datei bleibt
+unveraendert.  Kommentar, Bezeichnung, Etikett, Interleave/Skew eines geladenen Abbilds
+bleiben erhalten (auch bei `save-as x.cqm y.cqm`); ueber `.hfe` und zurueck gehen sie
+verloren (neuer Standardkopf).  Nicht moeglich: UDOS (Gap-Verkettung), CP/A-Disketten mit
+128-B-Systemspuren (gemischte Geometrie, z. B. `create … --fs cpa780`), FM-Disketten.
+
+```
+k1520disktool create neu.cqm --fs scpx640
+k1520disktool put neu.cqm PIP.COM
+k1520disktool save-as alt.hfe kopie.cqm      # und zurueck: save-as kopie.cqm neu.hfe
+```
+
+## tar-Disketten und `tar-satz`
+
+84 der 142 P8000-Abbilder (`doc/design/33_cqm.md` §4a) tragen einen rohen `tar`-Strom ab
+Sektor 0 statt eines Dateisystems. Profil `tar720` (nur lesbar, auch in einer `.cqm`; `put`/`rm`/`attr`/`create`
+melden das ausdrücklich), Erkennung zuletzt, nach CP/A-Regel und allen echten
+Dateisystemen. `ls -l`, `get`, `info`, `check` wie bei WEGA (UNIX-Spalten, `.fileinfo`
+mit `fs=tar`). Befunde: `tar.abgeschnitten` (Warnung; Teilstück bleibt lesbar),
+`tar.fortsetzung`, `tar.pruefsumme` (Fehler), `tar.doppelt`, `tar.pfad` (Hinweis).
+
+```
+k1520disktool tar-satz ariane1.cqm ariane2.cqm            # Namen des ganzen Stroms
+k1520disktool tar-satz -l w11data1.cqm … w11data7.cqm      # ls -l
+k1520disktool tar-satz ariane1.cqm ariane2.cqm --to aus/   # vollstaendig entpacken
+```
+Die Datenstroeme werden in der angegebenen Reihenfolge verkettet; die Reihenfolge
+bestimmt der Aufrufer (Satznamen). Exit 1 nur bei einem Befund `Fehler`.
+
+### `tar-export`, `tar-put` und die leere tar-Diskette `tar720_leer`
+
+```
+k1520disktool tar-export <abbild> <ziel.tar>   # Rohinhalt der Diskette als .tar
+k1520disktool create x.cqm --fs tar720_leer    # leere 720K-tar-Diskette (img|hfe|dmk|cqm)
+k1520disktool tar-put x.cqm quelle.tar         # .tar hinein (einmal), --dry-run nur pruefen
+```
+`tar-export`: die 512-Byte-Bloecke des Stroms 1:1. Beginnt die Diskette mit einem gueltigen
+tar-Kopf, wird die Struktur abgelaufen und der Export endet hinter der Endmarke (zwei
+Nullbloecke an einer Kopfposition); sonst — auch bei einem Folgeteil, dessen Dateidaten
+Nullbloecke enthalten koennen — der ganze Strom. Geht an tar-Disketten und an roh geoeffneten
+(kein Dateisystem erkannt), nicht an Disketten mit Dateisystem, nicht an der leeren, nicht
+an einem `tar-satz`.
+
+`tar720_leer` ist ganz Null und wird nur dann so erkannt (VOR der CP/A-Regel, die eine
+Null-Diskette sonst als „CP/A, Fuellbyte 0x00“ liest; `--fs cpa_auto` uebersteuert). `tar-put`
+prueft vor dem Schreiben: Diskette leer und beschreibbar, Datei <= 737280 Byte und Vielfaches
+von 512 (sonst Ablehnung, bei Ueberlaenge mit Hinweis auf `split -b 737280`); ein erster Kopf
+ohne V7 (ustar-Magic, pax, GNU-Langname, 100-Zeichen-Name, binaere Groesse) ergibt eine
+**Warnung auf stderr**, geschrieben wird trotzdem. Danach ist die Diskette `tar720`
+(nur lesbar), ein zweites `tar-put` scheitert. Rundlauf: siehe Handbuch („tar-Archive
+herausholen, bearbeiten und zurueckschreiben“).
+
+Passende Archive unter Linux: `tar --format=v7 -b 20 -cf wega.tar -C ordner .`, danach
+`split -b 737280 -d -a 2 --additional-suffix=.tar wega.tar wega_part`; Zusammensetzen und
+Entpacken: `cat wega_part*.tar | tar -xvf - -C ziel`.  **Nicht** `tar --format=v7 -M -L 720K`:
+GNU tar bricht damit ab („GNU features wanted on incompatible archive format“), und mit einem
+GNU-Format schreibt `-M` Fortsetzungsköpfe (Typ `M`), die kein V7 sind.  Die Rezepte stehen
+mit Begründung im Handbuch (Abschnitt „Passende tar-Dateien unter Linux erzeugen und entpacken“).
 
 ## Dateisysteme ergänzen
 

@@ -1,0 +1,11 @@
+# `create --fs tar720_leer` legt eine ganz mit Nullen gefuellte 720K-Diskette an; beim
+# Wiederoeffnen erkennt die Erkennung sie als leere tar-Diskette (nicht als "CP/A mit
+# Fuellbyte 0x00").
+tool:   k1520disktool
+tmpfile leer.cqm:
+setup_run: create %leer.cqm% --fs tar720_leer
+run:    info %leer.cqm%
+expect: tar720_leer
+expect: CopyQM
+forbid: cpa_auto
+exit:   0

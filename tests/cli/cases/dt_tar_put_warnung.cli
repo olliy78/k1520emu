@@ -1,0 +1,10 @@
+# Ein GNU-tar-Archiv (Magic "ustar  ") ist kein reines V7-tar: die Kommandozeile warnt,
+# schreibt aber trotzdem (kein Blockieren).
+tool:   k1520disktool
+tmpfile neu.img:
+setup_run: create %neu.img% --fs tar720_leer
+run:    tar-put %neu.img% %CLI_DIR%/../fixtures/p8000/tar_gnu_klein.tar
+expect: Warnung:
+expect: kein reines V7-tar
+expect: geschrieben
+exit:   0

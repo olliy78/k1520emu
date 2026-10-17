@@ -198,6 +198,7 @@ if(BUILD_K1520)
         core/peripherals/floppy_drive/img_codec.cpp
         core/peripherals/floppy_drive/hfe_codec.cpp
         core/peripherals/floppy_drive/dmk_codec.cpp
+        core/peripherals/floppy_drive/cqm_codec.cpp
         core/peripherals/floppy_drive/image_codec.cpp
         core/peripherals/floppy_drive/disk_image.cpp
         core/peripherals/floppy_drive/track_sync.cpp
@@ -244,6 +245,7 @@ if(BUILD_K1520)
         core/filesystem/udos/udos_fs.cpp
         core/filesystem/udos/udos1715_fs.cpp
         core/filesystem/wega/wega_fs.cpp
+        core/filesystem/tar/tar_fs.cpp
         core/filesystem/wega/wega_platte.cpp
         core/filesystem/disk_volume.cpp
         core/filesystem/prg_boot.cpp

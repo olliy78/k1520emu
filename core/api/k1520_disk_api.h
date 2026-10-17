@@ -43,7 +43,8 @@ typedef enum {
 
 /**
  * @brief Diskette oeffnen.
- * @param path       `.img`, `.hfe` oder `.dmk`
+ * @param path       `.img`, `.hfe`, `.dmk` oder `.cqm` (CopyQM; schreibbar, soweit das
+ *                   Medium als Sektorstrom darstellbar ist)
  * @param fs_name    Dateisystem erzwingen; NULL oder "" = erkennen
  * @param read_only  **so oeffnen, dass nichts kaputtgehen kann.**  Beim blossen
  *                   Lesen ist das die richtige Wahl; Aendern verlangt danach den
@@ -64,6 +65,13 @@ K1520_API K1520Disk k1520d_open(const char* path, const char* fs_name, bool read
  */
 K1520_API K1520Disk k1520d_open_raw(const char* path, const char* fs_name,
                                     bool read_only);
+
+/**
+ * @brief Mehrere Abbilder als EINEN tar-Strom oeffnen (Mehrdisketten-tar-Satz).
+ * @param paths  Pfade in Lesereihenfolge, durch '\n' getrennt.  Das Ergebnis ist immer
+ *               schreibgeschuetzt.  nullptr + @ref k1520d_last_open_error bei Fehler.
+ */
+K1520_API K1520Disk k1520d_open_tar_satz(const char* paths);
 
 /**
  * @brief **Physische Diskette** in einem echten Laufwerk oeffnen.
@@ -193,6 +201,9 @@ K1520_API K1520Disk k1520d_create_bootable(const char* path, const char* fs_name
 
 /* ─── Bootabbild (Systemspuren) ───────────────────────────────────────────── */
 
+/// @brief Ist das Profil die LEERE tar-Diskette (`tar720_leer`; nur Anlegen/Schreiben eines .tar)?
+K1520_API bool k1520d_fs_leer(const char* name);
+
 /**
  * @brief Wie viele Byte fassen die Systemspuren dieses Dateisystems?
  *
@@ -223,6 +234,8 @@ K1520_API bool k1520d_export_image(K1520Disk h, const char* path);
 /// @brief Schreibschutz abfragen bzw. setzen (Vorgabe beim Oeffnen: geschuetzt).
 K1520_API bool k1520d_read_only(K1520Disk h);
 K1520_API void k1520d_set_read_only(K1520Disk h, bool ro);
+/// @brief Ist der Schreibschutz UNAUFHEBBAR (tar-Diskette, nur gemessene Geometrie)?
+K1520_API bool k1520d_read_only_forced(K1520Disk h);
 /// @brief Sicherungskopie beim ersten Schreiben an-/abschalten (Vorgabe: an).
 K1520_API void k1520d_set_backup(K1520Disk h, bool on);
 /// @brief Handle schliessen (schreibt NICHT selbsttaetig — vorher @ref k1520d_flush).
@@ -240,7 +253,7 @@ K1520_API const char* k1520d_fs_name(int i);
 K1520_API const char* k1520d_fs_description(const char* name);
 /// @brief Geometrie, auf der dieses Dateisystem liegt.
 K1520_API const char* k1520d_fs_format(const char* name);
-/// @brief "cpm" | "udos" | "udos1715"
+/// @brief "cpm" | "udos" | "udos1715" | "wega"
 K1520_API const char* k1520d_fs_type(const char* name);
 /// @brief Geladene Katalogdateien (mehrzeilig) + Beanstandungen.
 K1520_API const char* k1520d_catalog_report(void);
@@ -250,6 +263,35 @@ K1520_API const char* k1520d_detect(const char* path);
 
 K1520_API const char* k1520d_detected_format(K1520Disk h);
 K1520_API const char* k1520d_detected_fs(K1520Disk h);
+/**
+ * @brief Auskunft ueber den Container der Datei (additiv, ABI-stabil).
+ *
+ * @p key: "type" (img|hfe|dmk|cqm; bei tar-satz der des ersten Abbilds); nur bei
+ * `.cqm`: "description" (Bezeichnung), "label" (Etikett, leer bei "** NONE **"),
+ * "comment" (Kommentartext), "interleave", "skew", "cylinders" ("gespeichert/gesamt"),
+ * "crc" ("ok" | "falsch" | "nicht geprueft").  Unbekannter Schluessel oder nicht
+ * zutreffend: "".  Zeiger gilt bis zum naechsten Aufruf fuer diese Diskette.
+ */
+K1520_API const char* k1520d_container_info(K1520Disk h, const char* key);
+
+/* ─── tar-Disketten: Export, leere Diskette, Schreiben (additiv) ──────────────
+ * Regeln: DiskVolume::tarExport / tarPruefen / tarSchreiben (core/filesystem/disk_volume.h). */
+
+/// @brief Ist das die LEERE tar-Diskette (`tar720_leer`, ganz Null, beschreibbar mit einem .tar)?
+K1520_API bool k1520d_tar_leer(K1520Disk h);
+/// @brief Den tar-Strom als `.tar` nach @p path schreiben (Bloecke 1:1, bis hinter die Endmarke
+///        bzw. der ganze Strom).  Nur an tar-Disketten und roh geoeffneten; aendert nichts.
+K1520_API bool k1520d_tar_export(K1520Disk h, const char* path);
+/// @brief `.tar`-Datei fuer @ref k1520d_tar_put beurteilen, ohne etwas zu schreiben.
+/// @return -1 abgelehnt (@ref k1520d_last_error); 0 in Ordnung; 1 in Ordnung, aber mit
+///         Warnung (kein reines V7-tar), Text in @ref k1520d_tar_warning.
+K1520_API int k1520d_tar_put_pruefen(K1520Disk h, const char* path);
+/// @brief Warnung der letzten Pruefung bzw. des letzten @ref k1520d_tar_put; "" = keine.
+K1520_API const char* k1520d_tar_warning(K1520Disk h);
+/// @brief `.tar` auf die leere tar-Diskette schreiben und das Abbild zurueckschreiben.  Danach ist
+///        die Diskette `tar720` (nur lesbar); ein zweites Schreiben wird abgelehnt.
+K1520_API bool k1520d_tar_put(K1520Disk h, const char* path);
+
 /// @brief false = mehrere gleich gute Kandidaten (Alternativen in @ref k1520d_detection_alternatives).
 K1520_API bool        k1520d_detection_unambiguous(K1520Disk h);
 K1520_API const char* k1520d_detection_alternatives(K1520Disk h);
@@ -313,6 +355,9 @@ K1520_API bool        k1520d_entry_details_ready(K1520Disk h, int i);
 K1520_API bool        k1520d_entry_load_details(K1520Disk h, int i);
 K1520_API int         k1520d_entry_volume(K1520Disk h, int i);
 K1520_API const char* k1520d_entry_name(K1520Disk h, int i);
+/// Dateiname des Eintrags im Wirtsdateisystem (DiskVolume::zielNamen): ohne
+/// Pfadanteil, auf der Seite eindeutig.  Gilt fuer jeden Auszug.
+K1520_API const char* k1520d_entry_target_name(K1520Disk h, int i);
 K1520_API int         k1520d_entry_user(K1520Disk h, int i);
 K1520_API uint64_t    k1520d_entry_size(K1520Disk h, int i);
 K1520_API const char* k1520d_entry_type(K1520Disk h, int i);
@@ -394,6 +439,42 @@ K1520_API bool k1520d_set_cpm_attrs(K1520Disk h, const char* name,
                                     bool set_system,    bool system,
                                     bool set_archived,  bool archived,
                                     bool set_user,      int  user);
+
+/* ─── WEGA-(UNIX-)Dateiangaben ─────────────────────────────────────────────────
+ * Nur bei einer Diskette mit Dateisystemart "wega" (@ref k1520d_fs_type); sonst
+ * liefern die Getter 0 bzw. "" und @ref k1520d_set_unix_attrs scheitert.
+ */
+/// @brief di_mode samt Dateiart (z. B. 0100755); 0 = kein UNIX-Eintrag.
+K1520_API uint16_t    k1520d_entry_unix_mode(K1520Disk h, int i);
+K1520_API int         k1520d_entry_unix_uid(K1520Disk h, int i);
+K1520_API int         k1520d_entry_unix_gid(K1520Disk h, int i);
+K1520_API int         k1520d_entry_unix_nlink(K1520Disk h, int i);
+K1520_API uint32_t    k1520d_entry_unix_inode(K1520Disk h, int i);
+/// @brief Sekunden seit 1970 (GMT).
+K1520_API uint32_t    k1520d_entry_unix_mtime(K1520Disk h, int i);
+K1520_API uint32_t    k1520d_entry_unix_atime(K1520Disk h, int i);
+K1520_API uint32_t    k1520d_entry_unix_ctime(K1520Disk h, int i);
+/// @brief Geraetedatei (c/b): major<<8 | minor, sonst 0.
+K1520_API uint16_t    k1520d_entry_unix_rdev(K1520Disk h, int i);
+/// @brief Belegte Bloecke als Text (`"120-125 130 | indirekt: 140"`); leer bei Geraeten.
+///        Liest den Inode neu — nur fuer die Einzelansicht gedacht, nicht fuer die Liste.
+K1520_API const char* k1520d_unix_blocks(K1520Disk h, const char* name);
+
+/**
+ * @brief Modus, Besitzer und Aenderungszeit einer WEGA-Datei aendern (`chmod`/`chown`/`touch`).
+ *
+ * Eine Transaktion im Dateisystem; die Dateiart (obere Modusbits), Inode, Groesse und
+ * Linkzahl bleiben unberuehrt.  `set_* = false` laesst das Feld unveraendert.
+ *
+ * @param mode   nur die unteren 12 Bit (setuid/setgid/sticky + rwx); darueber = Fehler
+ * @param uid    0…65535
+ * @param mtime  Sekunden seit 1970
+ */
+K1520_API bool k1520d_set_unix_attrs(K1520Disk h, const char* name,
+                                     bool set_mode,  uint16_t mode,
+                                     bool set_uid,   int uid,
+                                     bool set_gid,   int gid,
+                                     bool set_mtime, uint32_t mtime);
 
 /* ─── Sektoransicht (Diskeditor) ───────────────────────────────────────────────
  * Eine Ebene UNTER dem Dateisystem: Spuren, Sektoren, Gaps und CRCs.  Fuer einen

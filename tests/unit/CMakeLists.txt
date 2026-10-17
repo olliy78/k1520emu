@@ -174,6 +174,8 @@ k1520_add_test(img_codec      SRC peripherals/test_img_codec.cpp      LIBS k1520
 k1520_add_test(hfe_codec      SRC peripherals/test_hfe_codec.cpp      LIBS k1520_floppy2 LABELS "${_lbl}")
 k1520_add_test(dmk_codec      SRC peripherals/test_dmk_codec.cpp      LIBS k1520_floppy2 LABELS "${_lbl}")
 k1520_add_test(disk_image     SRC peripherals/test_disk_image.cpp     LIBS k1520_floppy2 LABELS "${_lbl}")
+# CopyQM (.cqm, Lesen und Schreiben).  Echtdaten-Gegenprobe nur mit K1520_CQM_DIR (sonst uebersprungen).
+k1520_add_test(cqm_codec      SRC peripherals/test_cqm_codec.cpp      LIBS k1520_floppy2 LABELS "${_lbl}")
 # Physische Diskette am Greaseweazle: Spurzustaende + Auftragswarteschlange (§14).
 # Braucht KEINE Hardware — ein Ersatz-Arbeitsfaden bedient die Auftraege aus dem RAM.
 k1520_add_test(track_sync     SRC peripherals/test_track_sync.cpp     LIBS k1520_floppy2 LABELS "${_lbl}")
@@ -231,7 +233,16 @@ k1520_add_test(wega_fs       SRC filesystem/test_wega_fs.cpp
                              DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
 k1520_add_test(wega_platte   SRC filesystem/test_wega_platte.cpp
                              LIBS k1520_fs LABELS "${_lbl}")
+# Tar-Disketten (rohe tar-Stroeme ohne Dateisystem, nur lesbar) — Echtdaten mit K1520_CQM_DIR
+k1520_add_test(tar_fs        SRC filesystem/test_tar_fs.cpp
+                             LIBS k1520_fs LABELS "${_lbl}"
+                             DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
 k1520_add_test(disk_volume   SRC filesystem/test_disk_volume.cpp
+                             LIBS k1520_fs LABELS "${_lbl}"
+                             DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
+# OS/M des P8000 (doc/design/34_osm.md): Profile osm640/osm800, Urlader, osm.fdconf —
+# Echtdaten-Gegenprobe ueber die ganze pofo-Sammlung nur mit K1520_CQM_DIR.
+k1520_add_test(osm           SRC filesystem/test_osm.cpp
                              LIBS k1520_fs LABELS "${_lbl}"
                              DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
 # Dateisystempruefung (doc/design/15_dateisystempruefung.md) — Etappe 1: CP/M.

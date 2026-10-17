@@ -66,6 +66,8 @@ _lib.k1520d_open.argtypes = [_CS, _CS, ctypes.c_bool]
 _lib.k1520d_open.restype = _H
 _lib.k1520d_open_raw.argtypes = [_CS, _CS, ctypes.c_bool]
 _lib.k1520d_open_raw.restype = _H
+_lib.k1520d_open_tar_satz.argtypes = [_CS]
+_lib.k1520d_open_tar_satz.restype = _H
 # Physische Diskette am Greaseweazle (doc/design/14_physische_diskette.md)
 _lib.k1520d_open_physical.argtypes = [ctypes.c_void_p, _CS, ctypes.c_bool]
 _lib.k1520d_open_physical.restype = _H
@@ -101,6 +103,18 @@ _lib.k1520d_read_only.argtypes = [_H]
 _lib.k1520d_read_only.restype = ctypes.c_bool
 _lib.k1520d_set_read_only.argtypes = [_H, ctypes.c_bool]
 _lib.k1520d_set_read_only.restype = None
+_lib.k1520d_read_only_forced.argtypes = [_H]
+_lib.k1520d_read_only_forced.restype = ctypes.c_bool
+_lib.k1520d_tar_leer.argtypes = [_H]
+_lib.k1520d_tar_leer.restype = ctypes.c_bool
+_lib.k1520d_tar_export.argtypes = [_H, _CS]
+_lib.k1520d_tar_export.restype = ctypes.c_bool
+_lib.k1520d_tar_put_pruefen.argtypes = [_H, _CS]
+_lib.k1520d_tar_put_pruefen.restype = ctypes.c_int
+_lib.k1520d_tar_warning.argtypes = [_H]
+_lib.k1520d_tar_warning.restype = _CS
+_lib.k1520d_tar_put.argtypes = [_H, _CS]
+_lib.k1520d_tar_put.restype = ctypes.c_bool
 _lib.k1520d_set_backup.argtypes = [_H, ctypes.c_bool]
 _lib.k1520d_set_backup.restype = None
 _lib.k1520d_close.argtypes = [_H]
@@ -125,6 +139,8 @@ _lib.k1520d_catalog_report.argtypes = []
 _lib.k1520d_catalog_report.restype = _CS
 
 # ── Bootabbild (Systemspuren) ───────────────────────────────────────────────
+_lib.k1520d_fs_leer.argtypes = [_CS]
+_lib.k1520d_fs_leer.restype = ctypes.c_bool
 _lib.k1520d_fs_boot_capacity.argtypes = [_CS]
 _lib.k1520d_fs_boot_capacity.restype = _U64
 _lib.k1520d_boot_area_size.argtypes = [_H, ctypes.c_int]
@@ -137,6 +153,8 @@ _lib.k1520d_detect.argtypes = [_CS]
 _lib.k1520d_detect.restype = _CS
 _lib.k1520d_detected_format.argtypes = [_H]
 _lib.k1520d_detected_format.restype = _CS
+_lib.k1520d_container_info.argtypes = [_H, _CS]
+_lib.k1520d_container_info.restype = _CS
 _lib.k1520d_detected_fs.argtypes = [_H]
 _lib.k1520d_detected_fs.restype = _CS
 _lib.k1520d_detection_unambiguous.argtypes = [_H]
@@ -180,6 +198,8 @@ _lib.k1520d_entry_volume.argtypes = [_H, ctypes.c_int]
 _lib.k1520d_entry_volume.restype = ctypes.c_int
 _lib.k1520d_entry_name.argtypes = [_H, ctypes.c_int]
 _lib.k1520d_entry_name.restype = _CS
+_lib.k1520d_entry_target_name.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_entry_target_name.restype = _CS
 _lib.k1520d_entry_user.argtypes = [_H, ctypes.c_int]
 _lib.k1520d_entry_user.restype = ctypes.c_int
 _lib.k1520d_entry_size.argtypes = [_H, ctypes.c_int]
@@ -241,6 +261,36 @@ _lib.k1520d_set_cpm_attrs.argtypes = [
     ctypes.c_bool, ctypes.c_int,
 ]
 _lib.k1520d_set_cpm_attrs.restype = ctypes.c_bool
+
+# ── WEGA-(UNIX-)Dateiangaben ─────────────────────────────────────────────────
+_lib.k1520d_entry_unix_mode.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_entry_unix_mode.restype = ctypes.c_uint16
+_lib.k1520d_entry_unix_uid.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_entry_unix_uid.restype = ctypes.c_int
+_lib.k1520d_entry_unix_gid.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_entry_unix_gid.restype = ctypes.c_int
+_lib.k1520d_entry_unix_nlink.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_entry_unix_nlink.restype = ctypes.c_int
+_lib.k1520d_entry_unix_inode.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_entry_unix_inode.restype = ctypes.c_uint32
+_lib.k1520d_entry_unix_mtime.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_entry_unix_mtime.restype = ctypes.c_uint32
+_lib.k1520d_entry_unix_atime.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_entry_unix_atime.restype = ctypes.c_uint32
+_lib.k1520d_entry_unix_ctime.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_entry_unix_ctime.restype = ctypes.c_uint32
+_lib.k1520d_entry_unix_rdev.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_entry_unix_rdev.restype = ctypes.c_uint16
+_lib.k1520d_unix_blocks.argtypes = [_H, _CS]
+_lib.k1520d_unix_blocks.restype = _CS
+_lib.k1520d_set_unix_attrs.argtypes = [
+    _H, _CS,
+    ctypes.c_bool, ctypes.c_uint16,
+    ctypes.c_bool, ctypes.c_int,
+    ctypes.c_bool, ctypes.c_int,
+    ctypes.c_bool, ctypes.c_uint32,
+]
+_lib.k1520d_set_unix_attrs.restype = ctypes.c_bool
 
 # ── Sektoransicht (Diskeditor) ──────────────────────────────────────────────
 _lib.k1520d_medium_cylinders.argtypes = [_H]
@@ -523,6 +573,7 @@ class FileSystemInfo:
     format: str        # Geometrie
     description: str
     boot_capacity: int = 0   # Byte in den Systemspuren; 0 = nicht bootfaehig
+    leer: bool = False       # nur tar: die LEERE tar-Diskette (nimmt genau ein .tar auf)
 
     @property
     def bootable(self) -> bool:
@@ -541,6 +592,7 @@ def filesystems() -> List[FileSystemInfo]:
             format=_s(_lib.k1520d_fs_format(_b(name))),
             description=_s(_lib.k1520d_fs_description(_b(name))),
             boot_capacity=int(_lib.k1520d_fs_boot_capacity(_b(name))),
+            leer=bool(_lib.k1520d_fs_leer(_b(name))),
         ))
     return out
 
@@ -590,6 +642,8 @@ class Entry:
     #: erst, wenn der Kopfsektor der Datei gelesen ist (siehe DiskTool.list_names).
     details_loaded: bool = True
     side_dir: str = ""    # 'Side0'/'Side1' — leer bei einseitigen Dateisystemen
+    #: Dateiname im Wirtsdateisystem (ohne Pfadanteil, je Seite eindeutig) — fuer JEDEN Auszug.
+    target_name: str = ""
 
     # ── UDOS-Kopfsektorangaben (bei CP/M alle 0 bzw. leer) ──────────────────
     # Sie stehen NICHT in den Bytes der Datei, steuern aber, wie UDOS sie laedt
@@ -606,6 +660,32 @@ class Entry:
     extra: int = 0          # Kopfsektor 44…47 = die vier Bytes hinter Segment 1
     segments: str = ""      # ALLE Segmente, "4400+0041 8442+0026"
     created: str = ""       # Erstellungsvermerk (Datum ODER Versionstext)
+
+    # ── WEGA-(UNIX-)Angaben (bei CP/M und UDOS alle 0) ───────────────────────
+    # ``type`` ist hier die Dateiart: ``-`` Datei · ``d`` Verzeichnis · ``c``/``b``
+    # Geraet · ``p`` FIFO; ``attrs`` der ``ls -l``-Modusstring.
+    unix_mode: int = 0      # di_mode samt Dateiart (0 = kein UNIX-Eintrag)
+    unix_uid: int = 0
+    unix_gid: int = 0
+    unix_nlink: int = 0
+    unix_inode: int = 0
+    unix_mtime: int = 0     # Sekunden seit 1970 (GMT)
+    unix_atime: int = 0
+    unix_ctime: int = 0
+    unix_rdev: int = 0      # Geraetedatei: major<<8 | minor
+
+    @property
+    def ist_unix(self) -> bool:
+        """Trägt der Eintrag eine UNIX-Inode?  (Nicht aus ``type`` zu erraten:
+        ``type`` ist bei UDOS ein Dateityp, bei WEGA eine Dateiart.)"""
+        return self.unix_mode != 0
+
+    @property
+    def unix_rdev_text(self) -> str:
+        """``'major,minor'`` bei Geräten, sonst leer."""
+        if self.type not in ("c", "b"):
+            return ""
+        return f"{self.unix_rdev >> 8},{self.unix_rdev & 0xFF}"
 
     # ── CP/M-Attribute, aus ``attrs`` aufgeschluesselt ───────────────────────
 
@@ -969,6 +1049,16 @@ class DiskTool:
         return cls(h, "")
 
     @classmethod
+    def open_tar_satz(cls, paths) -> "DiskTool":
+        """Mehrere Abbilder (``.cqm``/``.img``…) als EINEN tar-Strom öffnen — in der
+        gegebenen Reihenfolge.  Immer schreibgeschützt; ``path`` ist das erste Abbild."""
+        liste = [os.fspath(p) for p in paths]
+        h = _lib.k1520d_open_tar_satz(_b("\n".join(liste)))
+        if not h:
+            raise K1520DiskError(_s(_lib.k1520d_last_open_error()))
+        return cls(h, liste[0] if liste else "")
+
+    @classmethod
     def open_raw(cls, path, filesystem: Optional[str] = None,
                  read_only: bool = True) -> "DiskTool":
         """Wie :meth:`open`, **öffnet aber auch ohne Erkennung**.
@@ -1154,6 +1244,17 @@ class DiskTool:
     def filesystem(self) -> str:
         return _s(_lib.k1520d_detected_fs(self._h))
 
+    def container_info(self) -> dict:
+        """Auskunft über den Container der Datei: ``type`` (``img``/``hfe``/``dmk``/``cqm``);
+        bei ``.cqm`` zusätzlich ``description``, ``label``, ``comment``, ``interleave``,
+        ``skew``, ``cylinders`` (``gespeichert/gesamt``) und ``crc`` (``ok``/``falsch``/
+        ``nicht geprueft``).  Bei anderen Containern nur ``type``."""
+        keys = ["type"]
+        if _s(_lib.k1520d_container_info(self._h, _b("type"))) == "cqm":
+            keys += ["description", "label", "comment", "interleave", "skew",
+                     "cylinders", "crc"]
+        return {k: _s(_lib.k1520d_container_info(self._h, _b(k))) for k in keys}
+
     @property
     def filesystem_type(self) -> str:
         """``'cpm'`` | ``'udos'`` | ``'udos1715'`` | ``''`` — die Familie.
@@ -1166,6 +1267,26 @@ class DiskTool:
         if typ:
             return typ
         return "cpm" if self.filesystem.startswith("cpa") else ""
+
+    @property
+    def ist_wega(self) -> bool:
+        """UNIX-Dateisystem (WEGA): Modus/uid/gid statt UDOS- oder CP/M-Angaben."""
+        return self.filesystem_type == "wega"
+
+    @property
+    def ist_tar(self) -> bool:
+        """Roher ``tar``-Strom auf der Diskette (kein Dateisystem, nur lesbar):
+        UNIX-Angaben (Modus/uid/gid) wie bei WEGA, aber ohne Schreib- und Änderungsfunktionen."""
+        return self.filesystem_type == "tar"
+
+    @property
+    def ist_udos(self) -> bool:
+        """UDOS-Familie (ZDOS, NDOS): Kopfsektorangaben."""
+        return self.filesystem_type.startswith("udos")
+
+    @property
+    def ist_cpm(self) -> bool:
+        return self.filesystem_type == "cpm"
 
     @property
     def unambiguous(self) -> bool:
@@ -1264,6 +1385,7 @@ class DiskTool:
             hidden=bool(_lib.k1520d_entry_hidden(self._h, i)),
             damaged=bool(_lib.k1520d_entry_damaged(self._h, i)),
             side_dir=self.volume_dir(v),
+            target_name=_s(_lib.k1520d_entry_target_name(self._h, i)),
             entry=int(_lib.k1520d_entry_start(self._h, i)),
             record_len=int(_lib.k1520d_entry_record_len(self._h, i)),
             block_len=int(_lib.k1520d_entry_block_len(self._h, i)),
@@ -1277,6 +1399,15 @@ class DiskTool:
             segments=_s(_lib.k1520d_entry_segments(self._h, i)),
             created=_s(_lib.k1520d_entry_created(self._h, i)),
             details_loaded=bool(_lib.k1520d_entry_details_loaded(self._h, i)),
+            unix_mode=int(_lib.k1520d_entry_unix_mode(self._h, i)),
+            unix_uid=int(_lib.k1520d_entry_unix_uid(self._h, i)),
+            unix_gid=int(_lib.k1520d_entry_unix_gid(self._h, i)),
+            unix_nlink=int(_lib.k1520d_entry_unix_nlink(self._h, i)),
+            unix_inode=int(_lib.k1520d_entry_unix_inode(self._h, i)),
+            unix_mtime=int(_lib.k1520d_entry_unix_mtime(self._h, i)),
+            unix_atime=int(_lib.k1520d_entry_unix_atime(self._h, i)),
+            unix_ctime=int(_lib.k1520d_entry_unix_ctime(self._h, i)),
+            unix_rdev=int(_lib.k1520d_entry_unix_rdev(self._h, i)),
         )
 
     def check_report(self) -> str:
@@ -1637,6 +1768,31 @@ class DiskTool:
                 user is not None, int(user or 0)):
             raise K1520DiskError(self._fail())
 
+    def set_unix_attrs(self, name: str, *, mode: Optional[int] = None,
+                       uid: Optional[int] = None, gid: Optional[int] = None,
+                       mtime: Optional[int] = None) -> None:
+        """Modus, Besitzer und Änderungszeit einer WEGA-Datei ändern (`chmod`/`chown`/`touch`).
+
+        ``mode`` sind nur die unteren 12 Bit (setuid/setgid/sticky + rwx); die
+        Dateiart lässt sich nicht ändern.  Nicht angegebene Felder bleiben stehen.
+        Der Kern prüft vor dem ersten Schreiben und arbeitet als Transaktion.
+
+        Raises:
+            K1520DiskError: schreibgeschützt, Datei unbekannt, Wert außerhalb des
+                Bereichs, oder kein WEGA-Dateisystem.
+        """
+        if not _lib.k1520d_set_unix_attrs(
+                self._h, _b(name),
+                mode is not None, int(mode or 0) & 0xFFFF,
+                uid is not None, int(uid or 0),
+                gid is not None, int(gid or 0),
+                mtime is not None, int(mtime or 0)):
+            raise K1520DiskError(self._fail())
+
+    def unix_blocks(self, name: str) -> str:
+        """Belegte Blöcke einer WEGA-Datei als Text (``'120-125 130 | indirekt: 140'``)."""
+        return _s(_lib.k1520d_unix_blocks(self._h, _b(name)))
+
     # ── Sektoransicht (Diskeditor) ──────────────────────────────────────────
 
     @property
@@ -1844,6 +2000,41 @@ class DiskTool:
     def read_only(self) -> bool:
         """Schreibgeschützt?  Vorgabe beim Öffnen: ja."""
         return bool(_lib.k1520d_read_only(self._h))
+
+    @property
+    def read_only_forced(self) -> bool:
+        """Schreibschutz unaufhebbar (``.cqm``, tar-Diskette, nur gemessene Geometrie)?"""
+        return bool(_lib.k1520d_read_only_forced(self._h))
+
+    @property
+    def tar_leer(self) -> bool:
+        """Die LEERE tar-Diskette (``tar720_leer``): ganz Null, nimmt genau ein ``.tar`` auf."""
+        return bool(_lib.k1520d_tar_leer(self._h))
+
+    def tar_export(self, ziel) -> None:
+        """Den tar-Strom der Diskette als ``.tar`` schreiben (``K1520DiskError`` mit dem Grund)."""
+        if not _lib.k1520d_tar_export(self._h, _b(str(ziel))):
+            raise K1520DiskError(self._fail())
+
+    def tar_put_pruefen(self, quelle) -> str:
+        """``.tar`` für :meth:`tar_put` beurteilen.  Rückgabe: Warnung (``""`` = keine);
+        ``K1520DiskError`` mit dem Grund, wenn abgelehnt."""
+        r = _lib.k1520d_tar_put_pruefen(self._h, _b(str(quelle)))
+        if r < 0:
+            raise K1520DiskError(self._fail())
+        return _s(_lib.k1520d_tar_warning(self._h)) if r else ""
+
+    def tar_put(self, quelle) -> str:
+        """``.tar`` auf die leere tar-Diskette schreiben und das Abbild zurückschreiben.
+        Rückgabe: Warnung (``""`` = keine); ``K1520DiskError`` mit dem Grund bei Ablehnung."""
+        if not _lib.k1520d_tar_put(self._h, _b(str(quelle))):
+            raise K1520DiskError(self._fail())
+        return _s(_lib.k1520d_tar_warning(self._h))
+
+    @property
+    def ist_cqm(self) -> bool:
+        """Quelle ist ein CopyQM-Abbild (``.cqm``; lesbar und, soweit darstellbar, schreibbar)."""
+        return self.container_info().get("type") == "cqm"
 
     def set_read_only(self, ro: bool) -> None:
         _lib.k1520d_set_read_only(self._h, ro)
