@@ -31,18 +31,23 @@ MODELS = [
 #: Bestueckung der Vorgaben, ein Eintrag je Schluessel der Optionen (Werte wie im
 #: Konfigurationstext des Kerns, `A5120_KONFIG_WERTE` in `app/core_binding/k1520.py`):
 #: ``ram``, ``bildschirm``, ``tastatur``, ``laderom``, ``erweiterungsmodul`` (``none``/
-#: ``em064``/``em256``), ``kassette`` (``0``/``1``) und ``laufwerke`` (K5122-Steckplaetze).
+#: ``em064``/``em256``), ``kassette`` (``0``/``1``), ``aup`` (``0``/``1``: AUP 062-8531, N10e; bei allen drei
+#: Modellen aus — kein viertes Modell, sondern eine Option), ``k3521_anzahl`` (``0``..``4``: K3521.30,
+#: N10h; die Startadresse ist keine Vorgabe des Modells, sondern ``general.k3521_start``) und ``laufwerke`` (K5122-Steckplaetze).
 _K5601 = "K5601"
 _LEER = "none"
 VORGABEN = {
     A5120: {"ram": "k3526", "bildschirm": "k7024", "tastatur": "k7637", "laderom": "v09_2",
-            "erweiterungsmodul": "none", "kassette": "0",
+            "erweiterungsmodul": "none", "kassette": "0", "aup": "0",
+            "k3521_anzahl": "0",
             "laufwerke": (_K5601, _K5601, _K5601, _LEER)},
     A5130: {"ram": "k3526", "bildschirm": "k7024", "tastatur": "k7636", "laderom": "v09_2",
-            "erweiterungsmodul": "none", "kassette": "0",
+            "erweiterungsmodul": "none", "kassette": "0", "aup": "0",
+            "k3521_anzahl": "0",
             "laufwerke": (_K5601, _K5601, _K5601, _K5601)},
     K8924: {"ram": "k3526", "bildschirm": "k7024", "tastatur": "k7637", "laderom": "v09_2",
-            "erweiterungsmodul": "none", "kassette": "0",
+            "erweiterungsmodul": "none", "kassette": "0", "aup": "0",
+            "k3521_anzahl": "0",
             "laufwerke": (_K5601, _K5601, _K5601, _LEER)},
 }
 

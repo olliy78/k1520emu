@@ -1,0 +1,9 @@
+# k1520dbg ohne --aup: der Befehl `aup` meldet die fehlende Karte.
+tool:    k1520dbg
+disk:    cpa_cpa780_k5601_noclock.hfe
+run:     %DISK%
+stdin:
+  aup
+  q
+expect:  keine AUP gesteckt (--aup)
+forbid:  unknown command

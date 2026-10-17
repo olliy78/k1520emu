@@ -15,6 +15,8 @@
 #include "core/cards/k7024/k7024.h"
 #include "core/cards/k7023/k7023.h"
 #include "core/cards/k3525/k3525.h"
+#include "core/cards/k3521/k3521.h"
+#include "core/cards/aup/aup.h"
 #include "core/peripherals/k7636/k7636.h"
 #include "core/cards/k8025/k8025.h"
 #include "core/cards/k5122/k5122.h"
@@ -126,6 +128,42 @@ public:
          */
         enum class Tastatur { Vorgabe = 0, K7637 = 1, K7636 = 2 };
         Tastatur tastatur = Tastatur::Vorgabe;
+
+        /**
+         * @brief Akkugepufferte RAM-Karte K3521.30 (Entwurf 33 N10b, doc/a5130_k8924/aup_analyse.md §2).
+         *
+         * @ref k3521_basis = Startadresse im 4-KB-Raster (0000H … F000H), -1 = nicht gesteckt
+         * (Vorgabe, bitgleich zu bisher).  4 KB, ueberdeckt beim Lesen das RAM darunter (Schreiben
+         * trifft beide).  @ref k3521_memdi = /MEMDI-Wahl, @ref k3521_datei = dauerhafte Ablage
+         * (Rohdatei, 4096 Byte; leer = nur im Speicher, ueberlebt dann Reset/Netz-Aus, aber nicht
+         * das Ende der Maschine).  Details und Annahmen: core/cards/k3521/k3521.h.
+         */
+        int                k3521_basis = -1;
+        K3521::Memdi       k3521_memdi = K3521::Memdi::Bus;
+        std::string        k3521_datei;
+        /**
+         * @brief Weitere K3521-Karten (N10h, bis zu 3 neben der ersten, insgesamt 4).  Die erste
+         * Karte bleibt k3521_basis/_datei (rueckwaertskompatibel); /MEMDI-Wahl (k3521_memdi) gilt
+         * fuer alle.  Alle Basen muessen 4-KB-ausgerichtet sein und duerfen sich nicht
+         * ueberdecken (sonst std::invalid_argument); weitere Karten setzen eine erste voraus.
+         */
+        struct K3521Weitere { int basis = 0; std::string datei; };
+        std::vector<K3521Weitere> k3521_weitere;
+
+        /**
+         * @brief AUP 062-8531, Tastaturteil (Entwurf 33 N10c, doc/a5130_k8924/aup_analyse.md §1):
+         *        K7633 + Kundentastatur auf E/A 40H-43H, abgefragt (kein Interrupt).  Vorgabe aus
+         *        (bitgleich).  Gleichwertig: @ref installAup nach dem Anlegen, vor dem ersten Lauf.
+         *        @ref aup_alpha = Annahme [A3] zur Alpha-Umschaltung (core/cards/aup/aup.h).
+         */
+        bool               aup = false;
+        AUP::Alpha         aup_alpha = AUP::Alpha::NachLed;
+        /**
+         * @brief AUP-Sonderschnittstelle (N10d): CTC B0H-B3H + SIO B4H-B7H, Kanal B nach aussen als
+         *        vierte Schnittstelle des SerialHub (hinter DFUE/V.24, DFUE/IFSS, Drucker), Karte in der
+         *        Interruptkette hinter der K8025.  Nur mit @ref aup; Vorgabe aus (bitgleich).
+         */
+        bool               aup_sonder = false;
 
         /// Vorgabekonfiguration einer Ausfuehrung (Huelle, Entwurf 33 N1): setzt nur die
         /// Einzelfelder.  Laufwerke laut Entwurf 30 §1.
@@ -374,6 +412,23 @@ public:
     K7636*       k7636()       { return k7636_.get(); }
     const K7636* k7636() const { return k7636_.get(); }
     K3525*       k3525(int i)  { return (i >= 0 && i < 4) ? k3525_[i].get() : nullptr; }
+    /// Akkugepufferte RAM-Karte K3521.30 (nur mit Config::k3521_basis >= 0, sonst nullptr).
+    K3521*       k3521()       { return k3521_.empty() ? nullptr : k3521_[0].get(); }
+    const K3521* k3521() const { return k3521_.empty() ? nullptr : k3521_[0].get(); }
+    /// Anzahl gesteckter K3521-Karten (0..4) und Karte @p n (nullptr ausserhalb), N10h.
+    int          k3521Anzahl() const { return static_cast<int>(k3521_.size()); }
+    K3521*       k3521(int n)       { return (n >= 0 && n < k3521Anzahl()) ? k3521_[n].get() : nullptr; }
+    const K3521* k3521(int n) const { return (n >= 0 && n < k3521Anzahl()) ? k3521_[n].get() : nullptr; }
+    /**
+     * @brief AUP 062-8531 (Tastaturteil) auf 40H-43H stecken — nach dem Anlegen, VOR dem ersten
+     *        run()/reset() (wie installK5020).  false + @ref aupFehler bei doppeltem Stecken,
+     *        belegtem Tor oder nach dem ersten Lauf.  @p sonder steckt zusaetzlich die
+     *        Sonderschnittstelle (CTC/SIO B0H-B7H, Kette hinter der K8025, vierter serieller Anschluss).
+     */
+    bool installAup(AUP::Alpha alpha = AUP::Alpha::NachLed, bool sonder = false);
+    AUP*       aup()       { return aup_.get(); }
+    const AUP* aup() const { return aup_.get(); }
+    const std::string& aupFehler() const { return aup_fehler_; }
 
     // Framebuffer
     // Das Bild kommt von der angezeigten Karte (@ref zeigtK7023): K7023 512×256 (64×16
@@ -635,6 +690,10 @@ private:
     Config::Ram         ram_ = Config::Ram::K3526;
     Config::Bildschirm  bildschirm_ = Config::Bildschirm::K7024;
     std::array<std::unique_ptr<K3525>, 4> k3525_;
+    std::unique_ptr<AUP>   aup_;     // Option (Entwurf 33 N10c); liest total_cycles_ als Uhr
+    std::string            aup_fehler_;
+    bool                   aup_sonder_ = false;   // Sonderschnittstelle gesteckt: Takt im Laufweg (N10d)
+    std::vector<std::unique_ptr<K3521>> k3521_;   // Option (Entwurf 33 N10b); nach dem Bus angemeldet, ueber Reset/Netz-Aus erhalten
     std::unique_ptr<K7023> k7023_;
     std::unique_ptr<K7636> k7636_;
 

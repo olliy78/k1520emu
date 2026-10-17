@@ -1,0 +1,5 @@
+# boot_trace --aup-alpha mit unbekanntem Wert: Abbruch mit der Meldung des Konfigurationstexts.
+tool:    boot_trace
+run:     -L /dev/null --aup-alpha xyz
+expect:  --aup_alpha: unbekannt 'xyz' (led|ohne|mit)
+exit:    2

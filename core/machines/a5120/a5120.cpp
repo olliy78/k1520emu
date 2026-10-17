@@ -96,6 +96,31 @@ A5120Machine::A5120Machine(const Config& cfg)
         rc.base_addr = static_cast<uint16_t>(i * K3525::kGroesse);
         k3525_[i] = std::make_unique<K3525>(rc);
     }
+    // K3521.30 (Option, Entwurf 33 N10b): akkugepuffertes 4-KB-RAM an wahlbarer 4-KB-Adresse.
+    if (cfg.k3521_basis < 0 && !cfg.k3521_weitere.empty())
+        throw std::invalid_argument("K3521: weitere Karten setzen die erste (k3521_basis) voraus");
+    if (cfg.k3521_basis >= 0) {
+        if (cfg.k3521_weitere.size() > 3)
+            throw std::invalid_argument("K3521: hoechstens 4 Karten");
+        std::vector<std::pair<int, std::string>> alle{{cfg.k3521_basis, cfg.k3521_datei}};
+        for (const auto& w : cfg.k3521_weitere) alle.emplace_back(w.basis, w.datei);
+        for (size_t n = 0; n < alle.size(); ++n) {
+            const int b = alle[n].first;
+            if (b < 0 || b > 0xF000 || b % K3521::kRaster != 0)
+                throw std::invalid_argument("K3521: Basisadresse muss im 4-KB-Raster 0000H..F000H liegen");
+            for (size_t m = 0; m < n; ++m)
+                if (alle[m].first == b)   // 4-KB-Raster: gleiche Basis = Ueberdeckung
+                    throw std::invalid_argument("K3521: Karten ueberdecken sich (gleiche Basisadresse)");
+            K3521::Config kc;
+            kc.base_addr = static_cast<uint16_t>(b);
+            kc.memdi     = cfg.k3521_memdi;
+            k3521_.push_back(std::make_unique<K3521>(kc));
+            if (!alle[n].second.empty()) {
+                std::string fehler;
+                if (!k3521_.back()->dateiBinden(alle[n].second, fehler)) throw std::runtime_error(fehler);
+            }
+        }
+    }
     // Bildschirm: K7023.01 bei FC00H statt der K7024 (die bleibt als Objekt, ungesteckt),
     // bei `Beide` zusaetzlich zur K7024.
     if (bildschirm_ == B::K7023 || bildschirm_ == B::Beide) {
@@ -126,6 +151,11 @@ A5120Machine::A5120Machine(const Config& cfg)
     // installK5020() lehnt dann wegen „bereits gesteckt“ ab — kein doppeltes Stecken.
     if (cfg.kassette && !installK5020())
         throw std::runtime_error("K5020 (Kassette): " + k5020Fehler());
+    // AUP (Option, Entwurf 33 N10c): Tastaturteil auf 40H-43H.
+    if (cfg.aup_sonder && !cfg.aup)
+        throw std::runtime_error("AUP: aup_sonder nur mit aup");
+    if (cfg.aup && !installAup(cfg.aup_alpha, cfg.aup_sonder))
+        throw std::runtime_error("AUP: " + aup_fehler_);
 }
 
 void A5120Machine::wireBackplane() {
@@ -138,6 +168,9 @@ void A5120Machine::wireBackplane() {
         ops_.attachToBus(bus_);
     else
         for (auto& k : k3525_) if (k) k->attachToBus(bus_);
+
+    // K3521.30 (Option): direkt ueber dem RAM, aber unter Bildspeicher und Lade-ROM.
+    for (auto& k : k3521_) k->attachToBus(bus_);
 
     // Slot 5: ABS — K7024 (VRAM F800H-FFFFH) oder K7023 (FC00H-FFFFH), ueberdeckt das RAM.
     if (bildschirm_ == Config::Bildschirm::Beide) {
@@ -187,6 +220,12 @@ void A5120Machine::wireBackplane() {
         koppel_.memdi1.drive(!asserted);
         koppel_.memdi2.drive(!asserted);
     });
+    for (auto& k : k3521_) {
+        if (k->config().memdi == K3521::Memdi::Bus) continue;
+        auto& leitung = k->config().memdi == K3521::Memdi::Memdi1 ? koppel_.memdi1 : koppel_.memdi2;
+        K3521* kp = k.get();
+        leitung.connect([kp](bool level) { kp->setMemDI(!level); });
+    }
     for (int g = 0; g < 4; ++g)
         if (ops_.config().groups[g].memdi_source)
             koppel_.memdi1.connect([this, g](bool level) { ops_.setMemDI(g, !level); });
@@ -238,12 +277,14 @@ void A5120Machine::wireBackplane() {
 void A5120Machine::serielleSchnittstellen() {
     serial_naechst_ = hub_.takt(total_cycles_);
     if (ass_.nimmSeriellGeaendert()) bus_.markIntDirty();
+    if (aup_sonder_ && aup_->nimmSeriellGeaendert()) bus_.markIntDirty();
 }
 
 std::vector<k1520::serial::SerialAnschluss*> A5120Machine::serielleAnschluesse() {
     std::vector<k1520::serial::SerialAnschluss*> v;
     for (int i = 0; i < K8025::SchnittstellenAnzahl; ++i)
         v.push_back(&ass_.anschluss(static_cast<K8025::Schnittstelle>(i)));
+    if (aup_sonder_) v.push_back(aup_->anschluss());   // Index 3 (N10d)
     return v;
 }
 
@@ -257,6 +298,45 @@ std::vector<k1520::serial::SerialAnschluss*> A5120Machine::serielleAnschluesse()
 // gesendete Tastaturbytes, IUS in der Daisy-Chain) und den K5122 (offener
 // Lesetransfer + gehaltenes /BUSRQ).  Auf echter Hardware raeumt die /RESET-
 // Leitung des Backplane genau das ab.
+bool A5120Machine::installAup(AUP::Alpha alpha, bool sonder) {
+    aup_fehler_.clear();
+    if (!bestueckbar()) { aup_fehler_ = "AUP nur vor dem ersten Lauf/Reset steckbar"; return false; }
+    if (aup_)           { aup_fehler_ = "Es steckt bereits eine AUP"; return false; }
+    for (int p = AUP::kBasis; p < AUP::kBasis + 4; ++p) {   // erst pruefen, dann anmelden
+        if (const BusDevice* d = bus_.ioOwner(static_cast<uint8_t>(p))) {
+            char buf[96];
+            std::snprintf(buf, sizeof buf, "E/A-Tor %02XH belegt (%s)", p, d->deviceName());
+            aup_fehler_ = buf;
+            return false;
+        }
+    }
+    if (sonder) {
+        for (int p = AUP::kBasisSonder; p < AUP::kBasisSonder + 8; ++p) {
+            if (const BusDevice* d = bus_.ioOwner(static_cast<uint8_t>(p))) {
+                char buf[96];
+                std::snprintf(buf, sizeof buf, "E/A-Tor %02XH belegt (%s)", p, d->deviceName());
+                aup_fehler_ = buf;
+                return false;
+            }
+        }
+    }
+    AUP::Config c;
+    c.sonder = sonder;
+    c.uhr = &total_cycles_;
+    c.takt_hz = 2'457'600;   // ZRE-Takt (wie k6022TaktHz)
+    c.alpha = alpha;
+    aup_ = std::make_unique<AUP>(c);
+    aup_->attachToBus(bus_);
+    if (sonder) {
+        // [A10] Kette: hinter der K8025.  Takt im Laufweg nur ab hier (aup_sonder_).
+        bus_.insertInterruptChainAfter(&ass_, aup_.get());
+        hub_.registriere(*aup_->anschluss());
+        aup_sonder_ = true;
+        bus_.markIntDirty();
+    }
+    return true;
+}
+
 void A5120Machine::resetHardware() {
     stop_.store(false);
     // Ausstehende Disketten-Aenderungen zuerst wegschreiben: der /RESET raeumt den
@@ -271,6 +351,8 @@ void A5120Machine::resetHardware() {
     serial_naechst_ = 0;
     kbd_.reset();       // K7637: Tastenwiederholung/LEDs/serielle Warteschlange
     if (em_) em_->reset();  // EM: PIO hochohmig ⇒ RESET16/Pull-ups; DRAM + A22 bleiben
+    for (auto& k : k3521_) k->reset();   // K3521: nur der /SUE-Merker faellt, der Inhalt bleibt
+    if (aup_) aup_->reset();       // AUP: wie Kommando FFH (Annahme A6), gehaltene Tasten bleiben
     rafReset();             // RAF (gesteckt?): nur das Latch sperrt, der Inhalt bleibt
     k6022Reset();           // K6022 (gesteckt?): PIOs zurueck, Band und Stanzband bleiben
     k5020Reset();             // K5020 (gesteckt?): PIOs zurueck, Baender bleiben liegen
@@ -302,6 +384,7 @@ void A5120Machine::powerOn() {
     ops_.fill(0xFF);
     for (auto& k : k3525_) if (k) k->fill(0xFF);
     if (em_) em_->powerOn();
+    // K3521 (Akkupufferung): Inhalt bleibt auch ueber Netz-Aus/Ein; /SUE faellt im resetHardware().
     rafPowerOn();       // RAF ohne Stand-by-Pufferung: Inhalt weg (Entwurf 22 §3.4)
     resetHardware();
     LOG_INFO("A5120", "Power on: ZVE1 Reset, Lade-ROM aktiv");
@@ -381,6 +464,10 @@ std::vector<A5120Machine::IntSource> A5120Machine::interruptSources() const {
     addSio(ass_.sioA33(),  "K8025 SIO-A33 (DFUE)");
     addSio(ass_.sioA32(),  "K8025 SIO-A32 (Tastatur)");
     addCtc(ass_.ctcA34(),  "K8025 CTC-A34");
+    if (aup_sonder_) {
+        addSio(*aup_->sio(), "AUP SIO-A13 (Sonderschnittstelle)");
+        addCtc(*aup_->ctc(), "AUP CTC-A12");
+    }
     if (em_) addPio(em_->pio(), "EM PIO-A32");
     addCtc(zre_.ctc(),     "K2526 CTC");
     addPio(zre_.bsPio(),   "K2526 BS-PIO");
@@ -904,6 +991,7 @@ int A5120Machine::run(int max_cycles) {
         // Interrupt-Chain neu berechnet werden.
         bool ctc_fired = zre_.clockTick(used);
         ctc_fired      = ass_.clockTick(used) || ctc_fired;
+        if (aup_sonder_) ctc_fired = aup_->clockTick(used) || ctc_fired;   // AUP-Sonderschnittstelle
         ctc_fired      = k6022Takt(used) || ctc_fired;   // Lochstreifen (gesteckt?)
         ctc_fired      = k5020Takt(used) || ctc_fired;   // Kassette (gesteckt?)
         if (ctc_fired) bus_.markIntDirty();
@@ -932,6 +1020,7 @@ int A5120Machine::run(int max_cycles) {
     lw_.autoFlush(total_cycles_);
     k6022AutoFlush();   // Stanzdatei nach der Stanzpause (Entwurf 23 §5)
     k5020AutoFlush();   // Kassettendateien nach der Schreibpause
+    for (auto& k : k3521_) k->autoFlush(total_cycles_);   // K3521-Datei nach der Schreibpause
 
     return max_cycles - remaining;
 }

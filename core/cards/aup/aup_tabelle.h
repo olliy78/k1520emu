@@ -1,0 +1,59 @@
+/**
+ * @file aup_tabelle.h
+ * @brief Codetabellen des AUP-EPROMs (U555, 1 K) fuer K7633 und Kundentastatur.
+ *
+ * Woertlich aus der Betriebsdokumentation AUP 062-8531 S. 6-7 (doc/a5130_k8924/aup_analyse.md §1.5):
+ * EPROM 349H-390H = K7633.51/52 ohne Alpha, 391H-3D8H = mit Alpha (je Position 00H-47H),
+ * 339H-348H = Kundentastatur (Positionen 38H-47H), 331H-338H = Dauerfunktionstasten.
+ * Name = Tastenposition aus dem Beleg (Zeile A-F, Spalte 01-13); "" = keine Taste an der Position.
+ */
+#pragma once
+#include <cstdint>
+
+namespace aup_tabelle {
+
+struct K7633Eintrag {
+    const char* name;
+    uint8_t ohne;   ///< Code ohne Alpha
+    uint8_t mit;    ///< Code mit Alpha
+};
+
+/// K7633, Index = Matrixposition 00H..47H.
+inline constexpr K7633Eintrag kK7633[0x48] = {
+    {"SS1", 0xAA, 0xAA}, {"SS2", 0xA9, 0xA9}, {"A10", 0x12, 0x12}, {"B10", 0x33, 0x33},  // 00
+    {"C10", 0x36, 0x36}, {"D10", 0x39, 0x39}, {"E10", 0x0A, 0x0A}, {"F10", 0xA0, 0xA0},  // 04
+    {"A13", 0xFC, 0xFC}, {"C13", 0xFA, 0xFA}, {"A09", 0x11, 0x11}, {"B09", 0x32, 0x32},  // 08
+    {"C09", 0x35, 0x35}, {"D09", 0x38, 0x38}, {"E09", 0x07, 0x07}, {"F09", 0x01, 0x01},  // 0C
+    {"",    0x00, 0x00}, {"F12", 0xAF, 0xAF}, {"A08", 0x30, 0x30}, {"B08", 0x31, 0x31},  // 10
+    {"C08", 0x34, 0x34}, {"D08", 0x37, 0x37}, {"E08", 0x06, 0x06}, {"F08", 0x0B, 0x0B},  // 14
+    {"E13", 0xF8, 0xF8}, {"E12", 0xDD, 0xDD}, {"A07", 0x20, 0x20}, {"B07", 0x00, 0x00},  // 18
+    {"C07", 0x2D, 0x2D}, {"D07", 0x19, 0x19}, {"E07", 0x0C, 0x0C}, {"F07", 0x10, 0x10},  // 1C
+    {"D13", 0xF9, 0xF9}, {"D12", 0xFD, 0xFD}, {"A05", 0xDC, 0xDC}, {"B05", 0xD7, 0x55},  // 20
+    {"C05", 0xD2, 0x2C}, {"D05", 0xCD, 0x2E}, {"E05", 0xC8, 0x2F}, {"F05", 0xA1, 0xA1},  // 24
+    {"B13", 0xFB, 0xFB}, {"B12", 0x00, 0x00}, {"A04", 0xDB, 0x59}, {"B04", 0xD6, 0x54},  // 28
+    {"C04", 0xD1, 0x50}, {"D04", 0xCC, 0x4C}, {"E04", 0xC7, 0x48}, {"F04", 0xC3, 0x44},  // 2C
+    {"",    0x00, 0x00}, {"",    0x00, 0x00}, {"A03", 0xDA, 0x58}, {"B03", 0xD5, 0x53},  // 30
+    {"C03", 0xD0, 0x4F}, {"D03", 0xCB, 0x4B}, {"E03", 0xC6, 0x47}, {"F03", 0xC2, 0x43},  // 34
+    {"",    0x00, 0x00}, {"",    0x00, 0x00}, {"A02", 0xD9, 0x57}, {"B02", 0xD4, 0x52},  // 38
+    {"C02", 0xCF, 0x4E}, {"D02", 0xCA, 0x4A}, {"E02", 0xC5, 0x46}, {"F02", 0xC1, 0x42},  // 3C
+    {"A12", 0xFF, 0xFF}, {"C12", 0xFE, 0xFE}, {"A01", 0xD8, 0x56}, {"B01", 0xD3, 0x51},  // 40
+    {"C01", 0xCE, 0x4D}, {"D01", 0xC9, 0x49}, {"E01", 0xC4, 0x45}, {"F01", 0xC0, 0x41},  // 44
+};
+
+/// Kundentastatur: erste Position und Codes der Positionen 38H..47H.  38H-3BH tragen 00H
+/// (keine Taste); die beiden 19H (3DH, 3FH) sind Funktionstasten unbekannter Beschriftung.
+inline constexpr int kKundeErste = 0x38;
+inline constexpr uint8_t kKunde[16] = {
+    0x00, 0x00, 0x00, 0x00, 0x36, 0x19, 0x30, 0x19,   // 38..3F
+    0x35, 0x32, 0x31, 0x34, 0x33, 0x39, 0x38, 0x37,   // 40..47
+};
+/// Namen der Kundentastatur: Ziffer bzw. "F3D"/"F3F" fuer die beiden 19H-Tasten [Beschriftung ?].
+inline constexpr const char* kKundeName[16] = {
+    "", "", "", "", "6", "F3D", "0", "F3F",
+    "5", "2", "1", "4", "3", "9", "8", "7",
+};
+
+/// Dauerfunktionstasten (EPROM 331H-338H): Positionen der K7633, Rest 00 = leer.
+inline constexpr uint8_t kDauer[3] = {0x1A, 0x16, 0x0E};
+
+}  // namespace aup_tabelle

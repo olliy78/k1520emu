@@ -62,7 +62,10 @@ Speichern unter und für die echte Diskette.
 **Kassette** — die beiden Kassettenlaufwerke, nur solange die Kassetten-Karte steckt
 (siehe *Kassette* unten).
 
-**Einstellungen** — vier Reiter: *Allgemein* (Modell, Takt, RAM-Disk, Lochstreifen, Kassette), *Laufwerke*
+**AUP** — Sparkassentastatur K7633, Kundentastatur, Schlüsselschalter und Lampen,
+nur solange die AUP steckt (siehe *AUP (Sparkasse)* unten; nur im A5120 Emulator).
+
+**Einstellungen** — vier Reiter: *Allgemein* (Modell, Takt, RAM-Disk, Lochstreifen, Kassette, AUP), *Laufwerke*
 (welcher Laufwerkstyp in welchem Steckplatz steckt), *Schnittstellen* (die seriellen
 Anschlüsse des Rechners nach außen, ein Block je Schnittstelle — siehe *Serielle
 Schnittstellen* unten) und *CRT* (das Aussehen der Bildröhre).
@@ -939,6 +942,62 @@ Arbeitsdiskette „ohne SYL“ in B:. Was belegt ist:
   V0.6 wie das Original. Die Disketten „ohne SYL“ starten mit keinem vorhandenen
   Lade-ROM (`doc/a5120_alt/laderom.md` §5.2) — sie sind Arbeitsdisketten.
 
+## AUP (Sparkasse)
+
+*Einstellungen ▸ Allgemein ▸ AUP (Sparkasse)* steckt den Adapter Universelle Ports
+**AUP 062-8531** in den A5120 (nur im A5120 Emulator, bei allen drei Modellen ab Werk
+aus; **ein Modell „K8924 Sparkasse“ gibt es nicht**, es ist diese Option). Ein
+Wechsel schaltet die Maschine aus und baut sie neu auf. Die Karte belegt E/A
+**40H–43H**; die Tastatur des Modells (K7636/K7637) bleibt, wie sie ist — die AUP
+bringt die Sparkassentastatur **K7633** und die **Kundentastatur** zusätzlich.
+
+Die Unterfelder: *mit Sonderschnittstelle* steckt CTC B0H–B3H und SIO B4H–B7H mit;
+SIO-Kanal B erscheint im Reiter *Schnittstellen* als vierter Anschluss
+(*Sonderschnittstelle*). *Alpha-Tabelle* wählt, welche Codetabelle der K7633 gilt:
+*folgt der ALPHA-Lampe* (Vorgabe), *immer ohne* oder *immer mit Alpha*. Das ist eine
+**Annahme** — die Unterlagen sagen nicht, wer zwischen den Tabellen umschaltet.
+
+Mit gesteckter Karte erscheint der Kasten **AUP** (neben *Laufwerke*, *Ansicht ▸ AUP*
+holt ihn zurück):
+
+* **SS1 / SS2** sind die beiden Schlüsselschalter; Einschalten sendet AAH bzw. A9H an
+  den Rechner. Die Stellung wird nach jedem Neuaufbau aus der Maschine gelesen.
+* **Lampen** SEL, ALPHA, GET (LED der Kundentastatur) und Fehler. Die Fehlerlampe
+  blinkt, solange der Rechner sie eingeschaltet hat. **Hupe** blitzt kurz auf und
+  gibt, wo das System es zulässt, einen kurzen Ton.
+* **Tastatur K7633:** ein Raster nach den Positionsnamen der Unterlagen
+  (Zeile A–F, Spalte 01–13) — **nicht** die Geometrie der Tastatur: die Beschriftung
+  der Kappen steht nur auf einem Foto. Jede Taste zeigt ihren Positionsnamen und den
+  Code ohne Alpha; der Hinweistext nennt Position und beide Codes.
+* **Kundentastatur:** der Ziffernblock; die zwei Tasten *F3D* und *F3F* senden beide
+  den Code 19H, ihre Bedeutung ist offen.
+
+Bedient wird mit der Maus (gedrückt halten wirkt wie eine gehaltene Taste). **Die
+Tasten des PCs sind der AUP nicht zugeordnet** — die Unterlagen geben keine
+Zuordnung her, und es gibt wie überall kein Tastenkürzel. Die Karte gehört nicht in
+den Zwischenstand. Ob der Rechner die Karte abfragt, hängt von seiner Software ab
+(das Prüfprogramm `AUPTEST.COM` zeigt die Codes am Bildschirm).
+
+## K3521 (batteriegepuffertes RAM)
+
+*Einstellungen ▸ Allgemein ▸ K3521 (batteriegepuffertes RAM)* steckt bis zu **vier**
+Karten **K3521.30** in den A5120 (nur im A5120 Emulator, bei allen drei Modellen ab Werk
+*keine*). Jede Karte ist ein 4-KB-CMOS-RAM mit Akkupufferung; ein Wechsel schaltet die
+Maschine aus und baut sie neu auf. Das Auswahlfeld nennt die Anzahl, daneben steht die
+**Startadresse** der ersten Karte (Hex, Vorgabe **8000**). Die Karten liegen lückenlos
+hintereinander: Karte *i* bei *Start + i · 1000H*, also mit 2 Karten und Start 8000 bei
+8000H und 9000H. Eine Eingabe, die kein Hex ist, nicht im 4-KB-Raster liegt (0000, 1000
+… F000) oder deren Karten über FFFFH hinausreichen, wird mit einer roten Meldung
+abgewiesen; das Feld springt auf den letzten gültigen Wert zurück.
+
+Die Karte verdeckt beim Lesen das RAM darunter. Ihr Inhalt bleibt über **Reset und
+Aus-/Einschalten** und wird je Karte in einer Datei (`k3521_<Programm>_<Nr>.bin`, 4096
+Byte, im Konfigurationsordner) über das Ende des Programms hinaus aufbewahrt. Der
+CP/A-Kaltstart überschreibt je nach Lage Speicher; die Vorgabe 8000 liegt dort, wo er den
+Inhalt in Ruhe lässt (7000H–AFFFH). Zum Prüfen der Karte und zum Eintippen von Text
+dient das Programm `K3521TST.COM` auf den Systemdisketten (`K3521TST 8000 T` für den
+Speichertest, `K3521TST 8000 E` für den Editor; ohne Parameter erscheint die Hilfe).
+
 ## Kassette
 
 *Einstellungen ▸ Allgemein ▸ Kassette (K5221, AKB K5020)* steckt den
@@ -1071,7 +1130,7 @@ Alles, was man einstellt, landet fortlaufend in
 kann also den A5120 mit drei Laufwerken und sichtbarer Tastatur und den K8915 mit
 zwei Laufwerken ohne Tastatur nebeneinander führen. Gemerkt werden Bildröhre,
 Takt, Modell, RAM-Disk (samt Stand-by), Lochstreifen-Karte samt Leser- und
-Stanzerdatei, Kassetten-Karte samt den Dateien beider Laufwerke, Laufwerksbestückung, eingelegte Disketten, die seriellen Schnittstellen
+Stanzerdatei, Kassetten-Karte samt den Dateien beider Laufwerke, AUP-Option (A5120), Laufwerksbestückung, eingelegte Disketten, die seriellen Schnittstellen
 (samt dem, was lief), Größe und Lage des Fensters
 (auch „maximiert"), die Lage und Breite der Kästen samt der Trennlinien
 dazwischen, und der Inhalt der Symbolleiste.

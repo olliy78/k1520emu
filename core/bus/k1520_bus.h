@@ -14,6 +14,7 @@
  */
 
 #pragma once
+#include <algorithm>
 #include <cstdint>
 #include <array>
 #include <vector>
@@ -272,6 +273,16 @@ public:
      */
     void appendInterruptChain(InterruptSlave* dev) {
         int_chain_.push_back(dev);
+        int_dirty_ = true;
+    }
+    /**
+     * @brief Ein Geraet unmittelbar HINTER @p nach in die Kette einfuegen (nachtraeglich gesteckte
+     *        Karte mit fester Lage, AUP-Sonderschnittstelle Entwurf 33 N10d).  Steht @p nach nicht
+     *        in der Kette, haengt das Geraet hinten an.
+     */
+    void insertInterruptChainAfter(InterruptSlave* nach, InterruptSlave* dev) {
+        auto it = std::find(int_chain_.begin(), int_chain_.end(), nach);
+        int_chain_.insert(it == int_chain_.end() ? it : it + 1, dev);
         int_dirty_ = true;
     }
     /** @brief Inhaber des E/A-Tors @p port (nullptr = frei). */

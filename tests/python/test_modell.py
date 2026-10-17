@@ -26,7 +26,7 @@ def test_normalize_is_case_insensitive_for_known_keys():
 
 def test_every_model_has_label_title_and_complete_defaults():
     optionen = {"ram", "bildschirm", "tastatur", "laderom", "erweiterungsmodul",
-                "kassette", "laufwerke"}
+                "kassette", "aup", "k3521_anzahl", "laufwerke"}
     for schluessel, beschriftung, titel in modell.MODELS:
         assert modell.label(schluessel) == beschriftung
         assert modell.titel(schluessel) == titel == f"{beschriftung} Emulator"

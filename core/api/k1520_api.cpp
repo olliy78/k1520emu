@@ -1627,6 +1627,160 @@ bool k1520_raf_save(K1520Handle h, const char* pfad) {
     return r && r->speichereInhalt(pfad);
 }
 
+// ─── K3521.30 (Entwurf 33 N10b) ──────────────────────────────────────────────
+namespace {
+K3521* k3521Karte(K1520Handle h, int n = 0) {
+    auto* a = h ? dynamic_cast<A5120Machine*>(toMachine(h)) : nullptr;
+    return a ? a->k3521(n) : nullptr;
+}
+}  // namespace
+
+int k1520_k3521_basis(K1520Handle h) {
+    const K3521* k = k3521Karte(h);
+    return k ? k->config().base_addr : -1;
+}
+
+bool k1520_k3521_datei(K1520Handle h, const char* pfad) {
+    K3521* k = (h && pfad && pfad[0]) ? k3521Karte(h) : nullptr;
+    if (!k) { g_init_error = "keine K3521 gesteckt (k3521=… im Konfigurationstext)"; return false; }
+    g_init_error.clear();
+    return k->dateiBinden(pfad, g_init_error);
+}
+
+bool k1520_k3521_flush(K1520Handle h) {
+    K3521* k = k3521Karte(h);
+    return k && k->flush();
+}
+
+uint8_t k1520_k3521_peek(K1520Handle h, uint16_t offset) {
+    const K3521* k = k3521Karte(h);
+    return k ? k->peek(offset) : 0xFF;
+}
+
+int k1520_k3521_sue(K1520Handle h) {
+    const K3521* k = k3521Karte(h);
+    return k ? (k->sue() ? 1 : 0) : -1;
+}
+
+bool k1520_k3521_akku_leer(K1520Handle h, int leer) {
+    K3521* k = k3521Karte(h);
+    if (!k) return false;
+    k->setzeAkkuLeer(leer != 0);
+    return true;
+}
+
+// Mehrere Karten (N10h): Index n, Karte 0 ist die der Funktionen ohne Index.
+int k1520_k3521_anzahl(K1520Handle h) {
+    auto* a = h ? dynamic_cast<A5120Machine*>(toMachine(h)) : nullptr;
+    return a ? a->k3521Anzahl() : 0;
+}
+int k1520_k3521_basis_n(K1520Handle h, int n) {
+    const K3521* k = k3521Karte(h, n);
+    return k ? k->config().base_addr : -1;
+}
+bool k1520_k3521_datei_n(K1520Handle h, int n, const char* pfad) {
+    K3521* k = (h && pfad && pfad[0]) ? k3521Karte(h, n) : nullptr;
+    if (!k) { g_init_error = "keine K3521 mit diesem Index gesteckt"; return false; }
+    g_init_error.clear();
+    return k->dateiBinden(pfad, g_init_error);
+}
+bool k1520_k3521_flush_n(K1520Handle h, int n) {
+    K3521* k = k3521Karte(h, n);
+    return k && k->flush();
+}
+uint8_t k1520_k3521_peek_n(K1520Handle h, int n, uint16_t offset) {
+    const K3521* k = k3521Karte(h, n);
+    return k ? k->peek(offset) : 0xFF;
+}
+int k1520_k3521_sue_n(K1520Handle h, int n) {
+    const K3521* k = k3521Karte(h, n);
+    return k ? (k->sue() ? 1 : 0) : -1;
+}
+bool k1520_k3521_akku_leer_n(K1520Handle h, int n, int leer) {
+    K3521* k = k3521Karte(h, n);
+    if (!k) return false;
+    k->setzeAkkuLeer(leer != 0);
+    return true;
+}
+
+// ─── AUP 062-8531, Tastaturteil (Entwurf 33 N10c) ────────────────────────────
+namespace {
+AUP* aupKarte(K1520Handle h) {
+    auto* a = h ? dynamic_cast<A5120Machine*>(toMachine(h)) : nullptr;
+    return a ? a->aup() : nullptr;
+}
+bool aupTastatur(int t, AUP::Tastatur& out) {
+    if (t != 0 && t != 1) return false;
+    out = static_cast<AUP::Tastatur>(t);
+    return true;
+}
+}  // namespace
+
+bool k1520_aup_install(K1520Handle h) {
+    auto* a = h ? dynamic_cast<A5120Machine*>(toMachine(h)) : nullptr;
+    if (!a) { g_init_error = "AUP nur am A5120"; return false; }
+    g_init_error.clear();
+    if (!a->installAup()) { g_init_error = a->aupFehler(); return false; }
+    return true;
+}
+
+bool k1520_aup_installed(K1520Handle h) { return aupKarte(h) != nullptr; }
+
+bool k1520_aup_install_sonder(K1520Handle h) {
+    auto* a = h ? dynamic_cast<A5120Machine*>(toMachine(h)) : nullptr;
+    if (!a) { g_init_error = "AUP nur am A5120"; return false; }
+    g_init_error.clear();
+    if (!a->installAup(AUP::Alpha::NachLed, true)) { g_init_error = a->aupFehler(); return false; }
+    return true;
+}
+
+bool k1520_aup_sonder(K1520Handle h) {
+    const AUP* k = aupKarte(h);
+    return k && k->sonder();
+}
+
+bool k1520_aup_taste(K1520Handle h, int tastatur, int pos, int gedrueckt) {
+    AUP* k = aupKarte(h);
+    AUP::Tastatur t;
+    return k && aupTastatur(tastatur, t) && k->taste(t, pos, gedrueckt != 0);
+}
+
+bool k1520_aup_schluessel(K1520Handle h, int n, int an) {
+    AUP* k = aupKarte(h);
+    return k && k->schluessel(n, an != 0);
+}
+
+int k1520_aup_schluessel_stand(K1520Handle h, int n) {
+    const AUP* k = aupKarte(h);
+    if (!k || (n != 1 && n != 2)) return -1;
+    return k->schluesselAn(n) ? 1 : 0;
+}
+
+int k1520_aup_kommando(K1520Handle h) {
+    const AUP* k = aupKarte(h);
+    return k ? k->kommando() : -1;
+}
+
+int k1520_aup_lampen(K1520Handle h) {
+    const AUP* k = aupKarte(h);
+    return k ? k->lampen() : -1;
+}
+
+uint32_t k1520_aup_hupe(K1520Handle h) {
+    const AUP* k = aupKarte(h);
+    return k ? k->hupe() : 0;
+}
+
+int k1520_aup_code(int tastatur, int pos, int alpha) {
+    AUP::Tastatur t;
+    return aupTastatur(tastatur, t) ? AUP::code(t, pos, alpha != 0) : -1;
+}
+
+const char* k1520_aup_tastenname(int tastatur, int pos) {
+    AUP::Tastatur t;
+    return aupTastatur(tastatur, t) ? AUP::name(t, pos) : "";
+}
+
 // ─── Terminals des P8000 (Entwurf 25 §10.9, P20d) ───────────────────────────
 // Genau ein Terminal je Handle: am P8000 die Konsole tty1 (Kern- oder Originalterminal), an
 // „P8000 Terminal" das Originalterminal selbst.  Index i ≠ 0 und andere Maschinen → Ruhewerte.

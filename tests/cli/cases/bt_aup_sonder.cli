@@ -1,0 +1,6 @@
+# boot_trace --aup-sonder (Entwurf 33 N10d): steckt die AUP mit Sonderschnittstelle (impliziert --aup); kurzer Lauf ohne Fehler.
+tool:    boot_trace
+disk:    cpa_cpa780_k5601_clock.img
+run:     -L /dev/null --aup-sonder -c 2000000 --quiet --json %DISK%
+forbid:  --aup
+forbid:  Maschine:

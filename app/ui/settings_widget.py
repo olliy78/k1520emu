@@ -34,6 +34,7 @@ from app import drive_types as dt
 from app import profil as profile
 from app import takt
 from app import raf
+from app import k3521
 from app import p8000_ram
 from app.ui_icons import icon
 
@@ -67,6 +68,12 @@ class SettingsWidget(QWidget):
     # Kaestchen „Kassette (K5221, AKB K5020)" umgeschaltet — Neuaufbau wie beim Lochstreifen
     # (doc/design/29_kassette.md).
     tapeChanged = Signal(bool)
+    # Option „AUP (Sparkasse)" geaendert: (an, mit Sonderschnittstelle, Alpha-Annahme
+    # ``led``/``ohne``/``mit``) — Neuaufbau der Maschine (Entwurf 33 N10e).
+    aupChanged = Signal(bool, bool, str)
+    # Option „K3521 (batteriegepuffertes RAM)" geaendert: (Anzahl 0..4, Startadresse) —
+    # Neuaufbau der Maschine (Entwurf 33 N10h).  Nur gueltige Werte werden gemeldet.
+    k3521Changed = Signal(int, int)
     # Mitschrift des Terminals: Dateiname geaendert (leer = aus).  Nur Profile mit Terminal.
     mitschriftChanged = Signal(str)
 
@@ -95,6 +102,9 @@ class SettingsWidget(QWidget):
         self._raf_guard = False
         self._ptape_guard = False
         self._tape_guard = False
+        self._aup_guard = False
+        self._k3521_guard = False
+        self._k3521_stand = (0, k3521.START_VORGABE)   # zuletzt uebernommener, gueltiger Wert
         self._mitschrift_guard = False
 
         layout = QVBoxLayout(self)
@@ -363,6 +373,72 @@ class SettingsWidget(QWidget):
         else:
             self.tape_box.setVisible(False)        # P8000: gibt es die Karte nicht
 
+        # AUP 062-8531 (Sparkasse): Tastaturteil mit K7633 und Kundentastatur, optional mit
+        # Sonderschnittstelle.  Option, Vorgabe aus bei allen Modellen (Entwurf 33 N10e).
+        self.aup_box = QCheckBox("AUP (Sparkasse)", inner)
+        self.aup_box.setToolTip(
+            "Steckt den Adapter Universelle Ports AUP 062-8531 (E/A 40H–43H) mit der "
+            "Sparkassentastatur K7633 und der Kundentastatur.  Bedient wird sie im Kasten "
+            "„AUP“.  Ein Wechsel schaltet die Maschine aus und neu ein.")
+        self.aup_sonder_box = QCheckBox("mit Sonderschnittstelle (CTC B0H, SIO B4H)", inner)
+        self.aup_sonder_box.setToolTip(
+            "Steckt die Sonderschnittstelle der AUP mit (CTC B0H–B3H, SIO B4H–B7H); SIO-Kanal B "
+            "erscheint im Reiter „Schnittstellen“ als vierter Anschluss.")
+        self.aup_alpha_combo = QComboBox(inner)
+        for wert, text in (("led", "folgt der ALPHA-Lampe"), ("ohne", "immer ohne Alpha"),
+                           ("mit", "immer mit Alpha")):
+            self.aup_alpha_combo.addItem(text, wert)
+        self.aup_alpha_combo.setToolTip(
+            "Welche Codetabelle der K7633 gilt (Annahme: der Beleg sagt nicht, wer zwischen "
+            "„ohne“ und „mit Alpha“ umschaltet).")
+        self.aup_box.toggled.connect(self._on_aup_box)
+        self.aup_sonder_box.toggled.connect(self._on_aup_box)
+        self.aup_alpha_combo.currentIndexChanged.connect(self._on_aup_box)
+        if self.profil.aup_wahl:
+            form.addRow("", self.aup_box)
+            form.addRow("", self.aup_sonder_box)
+            form.addRow("Alpha-Tabelle:", self.aup_alpha_combo)
+        else:
+            for w in (self.aup_box, self.aup_sonder_box, self.aup_alpha_combo):
+                w.setVisible(False)
+        self._aup_abhaengig()
+
+        # K3521.30: bis zu vier Karten (je 4 KB, batteriegepuffert) lueckenlos ab einer Startadresse
+        # (Entwurf 33 N10h).  Option, Vorgabe „keine" bei allen Modellen.
+        self.k3521_combo = QComboBox(inner)
+        for text, wert in (("keine", 0), ("1", 1), ("2", 2), ("3", 3), ("4", 4)):
+            self.k3521_combo.addItem(text, wert)
+        self.k3521_combo.setToolTip(
+            "Anzahl der Karten K3521.30 (je 4 KB CMOS-RAM mit Akkupufferung).  Der Inhalt bleibt "
+            "über Reset, Aus- und Einschalten und – in einer Datei je Karte – über das Ende des "
+            "Programms.  Ein Wechsel schaltet die Maschine aus und neu ein.")
+        self.k3521_start_edit = QLineEdit(inner)
+        self.k3521_start_edit.setText(f"{k3521.START_VORGABE:04X}")
+        self.k3521_start_edit.setMaximumWidth(70)
+        self.k3521_start_edit.setToolTip(
+            "Startadresse der ersten Karte (Hex, im 4-KB-Raster 0000–F000); weitere Karten folgen "
+            "lückenlos im Abstand 1000H.  Vorgabe 8000: der CP/A-Kaltstart lässt 7000H–AFFFH in Ruhe.")
+        self.k3521_hinweis = QLabel("", inner)
+        self.k3521_hinweis.setStyleSheet("color: #c00;")
+        self.k3521_hinweis.setWordWrap(True)
+        self.k3521_hinweis.setVisible(False)
+        self.k3521_combo.currentIndexChanged.connect(self._on_k3521)
+        self.k3521_start_edit.editingFinished.connect(self._on_k3521)
+        k3521_zeile = QWidget(inner)
+        zl = QHBoxLayout(k3521_zeile)
+        zl.setContentsMargins(0, 0, 0, 0)
+        zl.addWidget(self.k3521_combo)
+        zl.addWidget(QLabel("Startadresse:", inner))
+        zl.addWidget(self.k3521_start_edit)
+        zl.addStretch(1)
+        self._k3521_widgets = (self.k3521_combo, self.k3521_start_edit, self.k3521_hinweis, k3521_zeile)
+        if self.profil.k3521_wahl:
+            form.addRow("K3521 (batteriegepuffertes RAM):", k3521_zeile)
+            form.addRow("", self.k3521_hinweis)
+        else:
+            for w in self._k3521_widgets:
+                w.setVisible(False)
+
         # Mitschrift des Terminals (nur Profil mit Terminal): Dateiname + Ordnerknopf.
         self.mitschrift_edit = QLineEdit(inner)
         self.mitschrift_edit.setPlaceholderText("leer = keine Mitschrift")
@@ -476,6 +552,73 @@ class SettingsWidget(QWidget):
             self.tape_box.setToolTip(
                 "Beim MC80.21/.22 ist das Magnetbandinterface (MBI) mit dem Laufwerk SK 1200 "
                 "fest eingebaut; bedient wird es im Kasten „Kassette“.")
+
+    # ── K3521 (batteriegepuffertes RAM) ──────────────────────────────────────
+
+    def _on_k3521(self, *_):
+        """Anzahl oder Startadresse geaendert: pruefen; ungueltig = sichtbar abweisen und den
+        letzten gueltigen Wert zurueckholen, gueltig = melden (Neuaufbau)."""
+        if self._k3521_guard:
+            return
+        anzahl = int(self.k3521_combo.currentData())
+        start, grund = k3521.pruefe(anzahl, self.k3521_start_edit.text())
+        if start is None:
+            alt_anzahl, alt_start = self._k3521_stand
+            self.k3521_hinweis.setText(
+                f"Eingabe abgewiesen: {grund}.  Bleibt bei {alt_anzahl or 'keine'} / {alt_start:04X}H.")
+            self.k3521_hinweis.setVisible(True)
+            self.set_k3521_value(alt_anzahl, alt_start)
+            return
+        self.k3521_hinweis.setVisible(False)
+        self.k3521_start_edit.setText(f"{start:04X}")
+        if (anzahl, start) == self._k3521_stand:
+            return
+        self._k3521_stand = (anzahl, start)
+        self.k3521Changed.emit(anzahl, start)
+
+    def k3521_value(self):
+        """``(Anzahl, Startadresse)`` des zuletzt uebernommenen Stands."""
+        return self._k3521_stand
+
+    def set_k3521_value(self, anzahl: int, start: int = k3521.START_VORGABE):
+        """Felder setzen, ohne ``k3521Changed`` auszuloesen."""
+        self._k3521_guard = True
+        i = self.k3521_combo.findData(int(anzahl))
+        self.k3521_combo.setCurrentIndex(i if i >= 0 else 0)
+        self.k3521_start_edit.setText(f"{int(start):04X}")
+        self._k3521_guard = False
+        self._k3521_stand = (self.k3521_combo.currentData(), int(start))
+
+    # ── AUP (Sparkasse) ──────────────────────────────────────────────────────
+
+    def _aup_abhaengig(self):
+        """Unteroptionen nur mit gesteckter AUP bedienbar."""
+        an = self.aup_box.isChecked()
+        self.aup_sonder_box.setEnabled(an)
+        self.aup_alpha_combo.setEnabled(an)
+
+    def _on_aup_box(self, *_):
+        self._aup_abhaengig()
+        if self._aup_guard:
+            return
+        self.aupChanged.emit(*self.aup_value())
+
+    def aup_value(self):
+        """``(an, sonder, alpha)``; ohne AUP sind Sonder und Alpha die Vorgabe (aus, ``led``)."""
+        an = self.aup_box.isChecked()
+        if not an:
+            return False, False, "led"
+        return True, self.aup_sonder_box.isChecked(), str(self.aup_alpha_combo.currentData())
+
+    def set_aup_value(self, an: bool, sonder: bool = False, alpha: str = "led"):
+        """Felder setzen, ohne ``aupChanged`` auszuloesen."""
+        self._aup_guard = True
+        self.aup_box.setChecked(bool(an))
+        self.aup_sonder_box.setChecked(bool(an) and bool(sonder))
+        i = self.aup_alpha_combo.findData(alpha)
+        self.aup_alpha_combo.setCurrentIndex(i if i >= 0 else 0)
+        self._aup_guard = False
+        self._aup_abhaengig()
 
     # ── Lochstreifen (K6022) ─────────────────────────────────────────────────
 

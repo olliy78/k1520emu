@@ -1,0 +1,6 @@
+# boot_trace --aup (Entwurf 33 N10c): AUP-Tastaturteil vor dem ersten Lauf stecken; kurzer Lauf ohne Fehlermeldung.
+tool:    boot_trace
+disk:    cpa_cpa780_k5601_clock.img
+run:     -L /dev/null --aup --aup-alpha mit -c 2000000 --quiet --json %DISK%
+forbid:  --aup
+forbid:  Maschine:

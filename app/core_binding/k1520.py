@@ -527,6 +527,59 @@ _lib.k1520_a5120_laderom.restype = ctypes.c_int
 _lib.k1520_a5120_tastatur.argtypes = [K1520Handle]
 _lib.k1520_a5120_tastatur.restype = ctypes.c_int
 
+# K3521.30, akkugepuffertes 4-KB-RAM (Entwurf 33 N10b)
+_lib.k1520_k3521_basis.argtypes = [K1520Handle]
+_lib.k1520_k3521_basis.restype = ctypes.c_int
+_lib.k1520_k3521_datei.argtypes = [K1520Handle, ctypes.c_char_p]
+_lib.k1520_k3521_datei.restype = ctypes.c_bool
+_lib.k1520_k3521_flush.argtypes = [K1520Handle]
+_lib.k1520_k3521_flush.restype = ctypes.c_bool
+_lib.k1520_k3521_peek.argtypes = [K1520Handle, ctypes.c_uint16]
+_lib.k1520_k3521_peek.restype = ctypes.c_uint8
+_lib.k1520_k3521_sue.argtypes = [K1520Handle]
+_lib.k1520_k3521_sue.restype = ctypes.c_int
+_lib.k1520_k3521_akku_leer.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_k3521_akku_leer.restype = ctypes.c_bool
+# Mehrere Karten (N10h)
+_lib.k1520_k3521_anzahl.argtypes = [K1520Handle]
+_lib.k1520_k3521_anzahl.restype = ctypes.c_int
+_lib.k1520_k3521_basis_n.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_k3521_basis_n.restype = ctypes.c_int
+_lib.k1520_k3521_datei_n.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_char_p]
+_lib.k1520_k3521_datei_n.restype = ctypes.c_bool
+_lib.k1520_k3521_flush_n.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_k3521_flush_n.restype = ctypes.c_bool
+_lib.k1520_k3521_peek_n.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_uint16]
+_lib.k1520_k3521_peek_n.restype = ctypes.c_uint8
+_lib.k1520_k3521_sue_n.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_k3521_sue_n.restype = ctypes.c_int
+_lib.k1520_k3521_akku_leer_n.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_int]
+_lib.k1520_k3521_akku_leer_n.restype = ctypes.c_bool
+# AUP 062-8531, Tastaturteil (Entwurf 33 N10c)
+_lib.k1520_aup_install.argtypes = [K1520Handle]
+_lib.k1520_aup_install.restype = ctypes.c_bool
+_lib.k1520_aup_installed.argtypes = [K1520Handle]
+_lib.k1520_aup_installed.restype = ctypes.c_bool
+_lib.k1520_aup_install_sonder.argtypes = [K1520Handle]
+_lib.k1520_aup_install_sonder.restype = ctypes.c_bool
+_lib.k1520_aup_sonder.argtypes = [K1520Handle]
+_lib.k1520_aup_sonder.restype = ctypes.c_bool
+_lib.k1520_aup_taste.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+_lib.k1520_aup_taste.restype = ctypes.c_bool
+_lib.k1520_aup_schluessel.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_int]
+_lib.k1520_aup_schluessel.restype = ctypes.c_bool
+_lib.k1520_aup_schluessel_stand.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_aup_schluessel_stand.restype = ctypes.c_int
+_lib.k1520_aup_kommando.argtypes = [K1520Handle]
+_lib.k1520_aup_kommando.restype = ctypes.c_int
+_lib.k1520_aup_lampen.argtypes = [K1520Handle]
+_lib.k1520_aup_lampen.restype = ctypes.c_int
+_lib.k1520_aup_hupe.argtypes = [K1520Handle]
+_lib.k1520_aup_hupe.restype = ctypes.c_uint32
+_lib.k1520_aup_code.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int]
+_lib.k1520_aup_code.restype = ctypes.c_int
+_lib.k1520_aup_tastenname.argtypes = [ctypes.c_int, ctypes.c_int]
+_lib.k1520_aup_tastenname.restype = ctypes.c_char_p
 # RAM-Floppy RAF (doc/design/22_raf512.md §6)
 _lib.k1520_raf_install.argtypes = [K1520Handle, ctypes.c_char_p]
 _lib.k1520_raf_install.restype = ctypes.c_bool
@@ -801,6 +854,15 @@ A5120_KONFIG_WERTE = {
     "laderom": ("v09_2", "v09_1", "v06"),
     "kassette": ("0", "1"),
     "em": ("none", "em064", "em256"),
+    # K3521.30 (N10b): "aus" oder die Startadresse als 4-stellige Hex-Zahl im 4-KB-Raster;
+    # bis zu vier Basen mit '+' verbunden (N10h, a5120_konfig_text prueft jeden Teil).
+    "k3521": ("aus",) + tuple(f"{i * 0x1000:04x}" for i in range(16)),
+    "k3521_memdi": ("bus", "memdi1", "memdi2"),
+    # AUP 062-8531, Tastaturteil (N10c); aup_alpha = Annahme zur Alpha-Umschaltung.
+    "aup": ("0", "1"),
+    "aup_alpha": ("led", "ohne", "mit"),
+    # AUP-Sonderschnittstelle (N10d): CTC B0H-B3H + SIO B4H-B7H, vierter serieller Anschluss.
+    "aup_sonder": ("0", "1"),
 }
 # Reihenfolge der Kartenzahl, wie k1520_a5120_bildschirm sie meldet.
 A5120_BILDSCHIRME = ("k7024", "k7023", "beide")
@@ -822,7 +884,11 @@ def a5120_konfig_text(konfig: dict) -> str:
         if isinstance(v, bool):
             v = "1" if v else "0"
         wert = str(v).lower()
-        if wert not in A5120_KONFIG_WERTE[schluessel]:
+        # k3521 darf bis zu vier Basen mit '+' verbinden (N10h): "8000+9000".
+        teile_w = wert.split("+") if schluessel == "k3521" else [wert]
+        if (schluessel == "k3521" and len(teile_w) > 4) or \
+                any(t not in A5120_KONFIG_WERTE[schluessel] for t in teile_w) or \
+                (len(teile_w) > 1 and "aus" in teile_w):
             raise ValueError(f"A5120-Konfiguration {schluessel}={v!r} unbekannt "
                              f"(bekannt: {', '.join(A5120_KONFIG_WERTE[schluessel])})")
         teile.append(f"{schluessel}={wert}")
@@ -1095,7 +1161,8 @@ class K1520Emulator:
                  ptape: bool = False, tape: bool = False, zeichensatz: str = "deutsch",
                  tastatur: Optional[str] = None, p8000: Optional[dict] = None,
                  ausfuehrung: Optional[str] = None, spe=1, laderom: Optional[str] = None,
-                 konfig: Optional[dict] = None):
+                 konfig: Optional[dict] = None, aup: bool = False,
+                 aup_sonder: bool = False):
         """Initialize emulator instance.
 
         Args:
@@ -1131,6 +1198,12 @@ class K1520Emulator:
                 gesteckt (vor dem ersten Lauf); Fehler → ValueError.
             ptape: Lochstreifen-Karte K6022 (SIF1000, E0H–E7H) stecken; an jeder
                 Maschine, wie ``raf`` direkt nach dem Anlegen.  Fehler → ValueError.
+            aup: nur A5120 — AUP 062-8531 (Tastaturteil K7633 + Kundentastatur, E/A 40H–43H)
+                direkt nach dem Anlegen stecken (gleichwertig ``konfig={"aup": True}``).
+            aup_sonder: nur A5120 — AUP MIT Sonderschnittstelle (CTC B0H–B3H, SIO B4H–B7H, SIO-Kanal B
+                als vierter serieller Anschluss, Index 3); steckt die AUP mit (gleichwertig
+                ``konfig={"aup": True, "aup_sonder": True}``).
+                Fehler → ValueError.
             tape: Kassettenkarte K5020 (zwei K5200; A5120 30H, K8915 D0H, PRG 710 30H,
                 PC 1715 D0H) stecken, wie ``ptape`` direkt nach dem Anlegen.  Fehler → ValueError.
                 Bei der Ausführung ``"kmbg"`` steckt sie ohnehin (dann ohne Wirkung).
@@ -1139,7 +1212,7 @@ class K1520Emulator:
             konfig: nur A5120 — Einzeloptionen als Wörterbuch (Entwurf 33), Schlüssel
                 ``ram`` (``k3526`` | ``k3525_1``/``_2``/``_4``), ``bildschirm`` (``k7024`` |
                 ``k7023`` | ``beide``), ``schalter`` (Anfangsstellung bei ``beide``),
-                ``tastatur`` (``k7637``/``k7636``), ``laderom``, ``kassette`` (bool), ``em``,
+                ``tastatur`` (``k7637``/``k7636``), ``laderom``, ``kassette`` (bool), ``em``, ``k3521``/``k3521_memdi`` (akkugepuffertes RAM),
                 ``ausfuehrung`` (Hülle).  Nicht zusammen mit den Parametern ``ausfuehrung``,
                 ``tastatur``, ``laderom``, ``em``, ``tape`` — sonst ``ValueError``.
                 Fehler im Kern (z. B. ``em`` mit ``ram=k3525_*``) → ``RuntimeError``.
@@ -1285,6 +1358,13 @@ class K1520Emulator:
             _lib.k1520_destroy(handle)
             self._handle = None
             raise ValueError(reason or "K5020 nicht steckbar")
+        if (aup or aup_sonder) and not _lib.k1520_aup_installed(handle) and not (
+                _lib.k1520_aup_install_sonder(handle) if aup_sonder else _lib.k1520_aup_install(handle)):
+            reason = _lib.k1520_last_init_error()
+            reason = reason.decode("utf-8", "replace") if reason else ""
+            _lib.k1520_destroy(handle)
+            self._handle = None
+            raise ValueError(reason or "AUP nicht steckbar")
         self._running = False
         self._thread: Optional[threading.Thread] = None
 
@@ -2207,6 +2287,121 @@ class K1520Emulator:
         """Inhalt als Rohdatei sichern; False ohne RAF."""
         return bool(_lib.k1520_raf_save(self._handle, os.fsencode(pfad)))
 
+    # ─── K3521.30 (akkugepuffertes 4-KB-RAM, Option des A5120) ─────────────
+    @property
+    def k3521_basis(self) -> int:
+        """Startadresse der K3521 (0..0xF000) oder -1 ohne Karte (``konfig={"k3521": "4000"}``)."""
+        return int(_lib.k1520_k3521_basis(self._handle))
+
+    def k3521_datei(self, pfad) -> None:
+        """Ablagedatei binden (lädt sie, falls vorhanden); ``ValueError`` ohne Karte/bei falscher Größe."""
+        if not _lib.k1520_k3521_datei(self._handle, os.fsencode(pfad)):
+            reason = _lib.k1520_last_init_error()
+            raise ValueError(reason.decode("utf-8", "replace") if reason else "K3521-Datei nicht bindbar")
+
+    def k3521_flush(self) -> bool:
+        """Gebundene Datei sofort zurückschreiben."""
+        return bool(_lib.k1520_k3521_flush(self._handle))
+
+    def k3521_peek(self, offset: int) -> int:
+        """Byte des K3521-Inhalts (0xFF ohne Karte/außerhalb)."""
+        return int(_lib.k1520_k3521_peek(self._handle, offset))
+
+    @property
+    def k3521_anzahl(self) -> int:
+        """Anzahl gesteckter K3521-Karten (0..4; ``konfig={"k3521": "8000+9000"}``)."""
+        return int(_lib.k1520_k3521_anzahl(self._handle))
+
+    def k3521_basis_n(self, n: int) -> int:
+        """Startadresse der Karte ``n`` oder -1."""
+        return int(_lib.k1520_k3521_basis_n(self._handle, n))
+
+    def k3521_datei_n(self, n: int, pfad) -> None:
+        """Ablagedatei der Karte ``n`` binden (wie :meth:`k3521_datei`)."""
+        if not _lib.k1520_k3521_datei_n(self._handle, n, os.fsencode(pfad)):
+            reason = _lib.k1520_last_init_error()
+            raise ValueError(reason.decode("utf-8", "replace") if reason else "K3521-Datei nicht bindbar")
+
+    def k3521_flush_n(self, n: int) -> bool:
+        return bool(_lib.k1520_k3521_flush_n(self._handle, n))
+
+    def k3521_peek_n(self, n: int, offset: int) -> int:
+        """Byte des Inhalts der Karte ``n`` (0xFF ohne Karte/außerhalb)."""
+        return int(_lib.k1520_k3521_peek_n(self._handle, n, offset))
+
+    @property
+    def k3521_sue(self):
+        """/SUE (Akku leer) als Zustand: True/False, ``None`` ohne Karte.  Nicht verdrahtet."""
+        v = int(_lib.k1520_k3521_sue(self._handle))
+        return None if v < 0 else bool(v)
+
+    def k3521_akku_leer(self, leer: bool) -> bool:
+        """/SUE setzen/löschen (Test); der Inhalt bleibt."""
+        return bool(_lib.k1520_k3521_akku_leer(self._handle, 1 if leer else 0))
+
+    # ─── AUP 062-8531, Tastaturteil (Option des A5120, Entwurf 33 N10c) ─────
+    # Kennungen: tastatur 0 = K7633 (Terminaltastatur), 1 = Kundentastatur; pos = Matrixposition
+    # des Belegs (K7633 0x00-0x47, Kundentastatur 0x38-0x47).  Annahmen: core/cards/aup/aup.h.
+    AUP_K7633, AUP_KUNDE = 0, 1
+    #: Lampenbits von :meth:`aup_lampen`.
+    AUP_LAMPE_SEL, AUP_LAMPE_ALPHA, AUP_LAMPE_GET, AUP_LAMPE_FEHLER = 0x01, 0x02, 0x04, 0x08
+
+    def aup_install(self, sonder: bool = False) -> None:
+        """AUP nach dem Anlegen stecken (vor dem ersten Lauf), ``sonder=True`` mit Sonderschnittstelle
+        (N10d); ``ValueError`` mit Grund."""
+        if not (_lib.k1520_aup_install_sonder(self._handle) if sonder
+                else _lib.k1520_aup_install(self._handle)):
+            reason = _lib.k1520_last_init_error()
+            raise ValueError(reason.decode("utf-8", "replace") if reason else "AUP nicht steckbar")
+
+    @property
+    def aup_installed(self) -> bool:
+        return bool(_lib.k1520_aup_installed(self._handle))
+
+    @property
+    def aup_sonder(self) -> bool:
+        """Steckt die AUP mit Sonderschnittstelle (vierter serieller Anschluss)?"""
+        return bool(_lib.k1520_aup_sonder(self._handle))
+
+    def aup_taste(self, tastatur: int, pos: int, gedrueckt: bool = True) -> bool:
+        """Taste drücken/lösen; False ohne Karte oder ohne Taste an der Position."""
+        return bool(_lib.k1520_aup_taste(self._handle, tastatur, pos, 1 if gedrueckt else 0))
+
+    def aup_schluessel(self, n: int, an: bool) -> bool:
+        """Schlüsselschalter SS1 (n=1) / SS2 (n=2); Einschalten sendet AAH bzw. A9H."""
+        return bool(_lib.k1520_aup_schluessel(self._handle, n, 1 if an else 0))
+
+    def aup_schluessel_stand(self, n: int):
+        """Stellung True/False; ``None`` ohne Karte."""
+        v = int(_lib.k1520_aup_schluessel_stand(self._handle, n))
+        return None if v < 0 else bool(v)
+
+    @property
+    def aup_kommando(self) -> int:
+        """Zuletzt angenommenes Kommandobyte (OUT 43H); -1 ohne Karte."""
+        return int(_lib.k1520_aup_kommando(self._handle))
+
+    @property
+    def aup_lampen(self) -> int:
+        """Lampenbits (``AUP_LAMPE_*``, 1 = leuchtet); -1 ohne Karte."""
+        return int(_lib.k1520_aup_lampen(self._handle))
+
+    @property
+    def aup_hupe(self) -> int:
+        """Fortlaufender Zähler der Hupensignale."""
+        return int(_lib.k1520_aup_hupe(self._handle))
+
+    @staticmethod
+    def aup_code(tastatur: int, pos: int, alpha: bool = False) -> int:
+        """Code laut EPROM-Tabelle; -1 = keine Taste, 0 = Taste ohne Code."""
+        return int(_lib.k1520_aup_code(tastatur, pos, 1 if alpha else 0))
+
+    @staticmethod
+    def aup_tastenname(tastatur: int, pos: int) -> str:
+        """Positionsname ("A10", "SS1", "5" …); "" = keine Taste."""
+        v = _lib.k1520_aup_tastenname(tastatur, pos)
+        return v.decode("ascii", "replace") if v else ""
+
     # ─── A5120.16 ──────────────────────────────────────────────────────────
     def em_variant(self) -> str:
         """Bestückung des Erweiterungsmoduls: "" (keins), "em064" oder "em256"."""
@@ -2287,7 +2482,7 @@ class K1520Emulator:
     # ─── Serielle Schnittstellen nach aussen (Entwurf 19 §8) ──────────────────
 
     def serial_count(self) -> int:
-        """Zahl der einstellbaren Schnittstellen (A5120, K8915 und PRG 710: 3; PRG 710-1: 2)."""
+        """Zahl der einstellbaren Schnittstellen (A5120, K8915 und PRG 710: 3; PRG 710-1: 2; A5120 mit AUP-Sonderschnittstelle: 4)."""
         return int(_lib.k1520_serial_count(self._handle))
 
     def serial_info(self, i: int) -> Optional[SerialInfo]:
