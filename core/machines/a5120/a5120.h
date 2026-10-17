@@ -141,6 +141,14 @@ public:
         int                k3521_basis = -1;
         K3521::Memdi       k3521_memdi = K3521::Memdi::Bus;
         std::string        k3521_datei;
+        /**
+         * @brief Weitere K3521-Karten (N10h, bis zu 3 neben der ersten, insgesamt 4).  Die erste
+         * Karte bleibt k3521_basis/_datei (rueckwaertskompatibel); /MEMDI-Wahl (k3521_memdi) gilt
+         * fuer alle.  Alle Basen muessen 4-KB-ausgerichtet sein und duerfen sich nicht
+         * ueberdecken (sonst std::invalid_argument); weitere Karten setzen eine erste voraus.
+         */
+        struct K3521Weitere { int basis = 0; std::string datei; };
+        std::vector<K3521Weitere> k3521_weitere;
 
         /**
          * @brief AUP 062-8531, Tastaturteil (Entwurf 33 N10c, doc/a5130_k8924/aup_analyse.md §1):
@@ -405,8 +413,12 @@ public:
     const K7636* k7636() const { return k7636_.get(); }
     K3525*       k3525(int i)  { return (i >= 0 && i < 4) ? k3525_[i].get() : nullptr; }
     /// Akkugepufferte RAM-Karte K3521.30 (nur mit Config::k3521_basis >= 0, sonst nullptr).
-    K3521*       k3521()       { return k3521_.get(); }
-    const K3521* k3521() const { return k3521_.get(); }
+    K3521*       k3521()       { return k3521_.empty() ? nullptr : k3521_[0].get(); }
+    const K3521* k3521() const { return k3521_.empty() ? nullptr : k3521_[0].get(); }
+    /// Anzahl gesteckter K3521-Karten (0..4) und Karte @p n (nullptr ausserhalb), N10h.
+    int          k3521Anzahl() const { return static_cast<int>(k3521_.size()); }
+    K3521*       k3521(int n)       { return (n >= 0 && n < k3521Anzahl()) ? k3521_[n].get() : nullptr; }
+    const K3521* k3521(int n) const { return (n >= 0 && n < k3521Anzahl()) ? k3521_[n].get() : nullptr; }
     /**
      * @brief AUP 062-8531 (Tastaturteil) auf 40H-43H stecken — nach dem Anlegen, VOR dem ersten
      *        run()/reset() (wie installK5020).  false + @ref aupFehler bei doppeltem Stecken,
@@ -681,7 +693,7 @@ private:
     std::unique_ptr<AUP>   aup_;     // Option (Entwurf 33 N10c); liest total_cycles_ als Uhr
     std::string            aup_fehler_;
     bool                   aup_sonder_ = false;   // Sonderschnittstelle gesteckt: Takt im Laufweg (N10d)
-    std::unique_ptr<K3521> k3521_;   // Option (Entwurf 33 N10b); nach dem Bus angemeldet, ueber Reset/Netz-Aus erhalten
+    std::vector<std::unique_ptr<K3521>> k3521_;   // Option (Entwurf 33 N10b); nach dem Bus angemeldet, ueber Reset/Netz-Aus erhalten
     std::unique_ptr<K7023> k7023_;
     std::unique_ptr<K7636> k7636_;
 

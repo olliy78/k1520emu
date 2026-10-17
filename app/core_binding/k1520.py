@@ -540,6 +540,21 @@ _lib.k1520_k3521_sue.argtypes = [K1520Handle]
 _lib.k1520_k3521_sue.restype = ctypes.c_int
 _lib.k1520_k3521_akku_leer.argtypes = [K1520Handle, ctypes.c_int]
 _lib.k1520_k3521_akku_leer.restype = ctypes.c_bool
+# Mehrere Karten (N10h)
+_lib.k1520_k3521_anzahl.argtypes = [K1520Handle]
+_lib.k1520_k3521_anzahl.restype = ctypes.c_int
+_lib.k1520_k3521_basis_n.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_k3521_basis_n.restype = ctypes.c_int
+_lib.k1520_k3521_datei_n.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_char_p]
+_lib.k1520_k3521_datei_n.restype = ctypes.c_bool
+_lib.k1520_k3521_flush_n.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_k3521_flush_n.restype = ctypes.c_bool
+_lib.k1520_k3521_peek_n.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_uint16]
+_lib.k1520_k3521_peek_n.restype = ctypes.c_uint8
+_lib.k1520_k3521_sue_n.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_k3521_sue_n.restype = ctypes.c_int
+_lib.k1520_k3521_akku_leer_n.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_int]
+_lib.k1520_k3521_akku_leer_n.restype = ctypes.c_bool
 # AUP 062-8531, Tastaturteil (Entwurf 33 N10c)
 _lib.k1520_aup_install.argtypes = [K1520Handle]
 _lib.k1520_aup_install.restype = ctypes.c_bool
@@ -839,7 +854,8 @@ A5120_KONFIG_WERTE = {
     "laderom": ("v09_2", "v09_1", "v06"),
     "kassette": ("0", "1"),
     "em": ("none", "em064", "em256"),
-    # K3521.30 (N10b): "aus" oder die Startadresse als 4-stellige Hex-Zahl im 4-KB-Raster.
+    # K3521.30 (N10b): "aus" oder die Startadresse als 4-stellige Hex-Zahl im 4-KB-Raster;
+    # bis zu vier Basen mit '+' verbunden (N10h, a5120_konfig_text prueft jeden Teil).
     "k3521": ("aus",) + tuple(f"{i * 0x1000:04x}" for i in range(16)),
     "k3521_memdi": ("bus", "memdi1", "memdi2"),
     # AUP 062-8531, Tastaturteil (N10c); aup_alpha = Annahme zur Alpha-Umschaltung.
@@ -868,7 +884,11 @@ def a5120_konfig_text(konfig: dict) -> str:
         if isinstance(v, bool):
             v = "1" if v else "0"
         wert = str(v).lower()
-        if wert not in A5120_KONFIG_WERTE[schluessel]:
+        # k3521 darf bis zu vier Basen mit '+' verbinden (N10h): "8000+9000".
+        teile_w = wert.split("+") if schluessel == "k3521" else [wert]
+        if (schluessel == "k3521" and len(teile_w) > 4) or \
+                any(t not in A5120_KONFIG_WERTE[schluessel] for t in teile_w) or \
+                (len(teile_w) > 1 and "aus" in teile_w):
             raise ValueError(f"A5120-Konfiguration {schluessel}={v!r} unbekannt "
                              f"(bekannt: {', '.join(A5120_KONFIG_WERTE[schluessel])})")
         teile.append(f"{schluessel}={wert}")
@@ -2286,6 +2306,28 @@ class K1520Emulator:
     def k3521_peek(self, offset: int) -> int:
         """Byte des K3521-Inhalts (0xFF ohne Karte/außerhalb)."""
         return int(_lib.k1520_k3521_peek(self._handle, offset))
+
+    @property
+    def k3521_anzahl(self) -> int:
+        """Anzahl gesteckter K3521-Karten (0..4; ``konfig={"k3521": "8000+9000"}``)."""
+        return int(_lib.k1520_k3521_anzahl(self._handle))
+
+    def k3521_basis_n(self, n: int) -> int:
+        """Startadresse der Karte ``n`` oder -1."""
+        return int(_lib.k1520_k3521_basis_n(self._handle, n))
+
+    def k3521_datei_n(self, n: int, pfad) -> None:
+        """Ablagedatei der Karte ``n`` binden (wie :meth:`k3521_datei`)."""
+        if not _lib.k1520_k3521_datei_n(self._handle, n, os.fsencode(pfad)):
+            reason = _lib.k1520_last_init_error()
+            raise ValueError(reason.decode("utf-8", "replace") if reason else "K3521-Datei nicht bindbar")
+
+    def k3521_flush_n(self, n: int) -> bool:
+        return bool(_lib.k1520_k3521_flush_n(self._handle, n))
+
+    def k3521_peek_n(self, n: int, offset: int) -> int:
+        """Byte des Inhalts der Karte ``n`` (0xFF ohne Karte/außerhalb)."""
+        return int(_lib.k1520_k3521_peek_n(self._handle, n, offset))
 
     @property
     def k3521_sue(self):

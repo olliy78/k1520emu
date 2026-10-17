@@ -978,6 +978,26 @@ Zuordnung her, und es gibt wie überall kein Tastenkürzel. Die Karte gehört ni
 den Zwischenstand. Ob der Rechner die Karte abfragt, hängt von seiner Software ab
 (das Prüfprogramm `AUPTEST.COM` zeigt die Codes am Bildschirm).
 
+## K3521 (batteriegepuffertes RAM)
+
+*Einstellungen ▸ Allgemein ▸ K3521 (batteriegepuffertes RAM)* steckt bis zu **vier**
+Karten **K3521.30** in den A5120 (nur im A5120 Emulator, bei allen drei Modellen ab Werk
+*keine*). Jede Karte ist ein 4-KB-CMOS-RAM mit Akkupufferung; ein Wechsel schaltet die
+Maschine aus und baut sie neu auf. Das Auswahlfeld nennt die Anzahl, daneben steht die
+**Startadresse** der ersten Karte (Hex, Vorgabe **8000**). Die Karten liegen lückenlos
+hintereinander: Karte *i* bei *Start + i · 1000H*, also mit 2 Karten und Start 8000 bei
+8000H und 9000H. Eine Eingabe, die kein Hex ist, nicht im 4-KB-Raster liegt (0000, 1000
+… F000) oder deren Karten über FFFFH hinausreichen, wird mit einer roten Meldung
+abgewiesen; das Feld springt auf den letzten gültigen Wert zurück.
+
+Die Karte verdeckt beim Lesen das RAM darunter. Ihr Inhalt bleibt über **Reset und
+Aus-/Einschalten** und wird je Karte in einer Datei (`k3521_<Programm>_<Nr>.bin`, 4096
+Byte, im Konfigurationsordner) über das Ende des Programms hinaus aufbewahrt. Der
+CP/A-Kaltstart überschreibt je nach Lage Speicher; die Vorgabe 8000 liegt dort, wo er den
+Inhalt in Ruhe lässt (7000H–AFFFH). Zum Prüfen der Karte und zum Eintippen von Text
+dient das Programm `K3521TST.COM` auf den Systemdisketten (`K3521TST 8000 T` für den
+Speichertest, `K3521TST 8000 E` für den Editor; ohne Parameter erscheint die Hilfe).
+
 ## Kassette
 
 *Einstellungen ▸ Allgemein ▸ Kassette (K5221, AKB K5020)* steckt den

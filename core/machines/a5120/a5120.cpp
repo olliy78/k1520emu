@@ -97,16 +97,28 @@ A5120Machine::A5120Machine(const Config& cfg)
         k3525_[i] = std::make_unique<K3525>(rc);
     }
     // K3521.30 (Option, Entwurf 33 N10b): akkugepuffertes 4-KB-RAM an wahlbarer 4-KB-Adresse.
+    if (cfg.k3521_basis < 0 && !cfg.k3521_weitere.empty())
+        throw std::invalid_argument("K3521: weitere Karten setzen die erste (k3521_basis) voraus");
     if (cfg.k3521_basis >= 0) {
-        if (cfg.k3521_basis > 0xF000 || cfg.k3521_basis % K3521::kRaster != 0)
-            throw std::invalid_argument("K3521: Basisadresse muss im 4-KB-Raster 0000H..F000H liegen");
-        K3521::Config kc;
-        kc.base_addr = static_cast<uint16_t>(cfg.k3521_basis);
-        kc.memdi     = cfg.k3521_memdi;
-        k3521_ = std::make_unique<K3521>(kc);
-        if (!cfg.k3521_datei.empty()) {
-            std::string fehler;
-            if (!k3521_->dateiBinden(cfg.k3521_datei, fehler)) throw std::runtime_error(fehler);
+        if (cfg.k3521_weitere.size() > 3)
+            throw std::invalid_argument("K3521: hoechstens 4 Karten");
+        std::vector<std::pair<int, std::string>> alle{{cfg.k3521_basis, cfg.k3521_datei}};
+        for (const auto& w : cfg.k3521_weitere) alle.emplace_back(w.basis, w.datei);
+        for (size_t n = 0; n < alle.size(); ++n) {
+            const int b = alle[n].first;
+            if (b < 0 || b > 0xF000 || b % K3521::kRaster != 0)
+                throw std::invalid_argument("K3521: Basisadresse muss im 4-KB-Raster 0000H..F000H liegen");
+            for (size_t m = 0; m < n; ++m)
+                if (alle[m].first == b)   // 4-KB-Raster: gleiche Basis = Ueberdeckung
+                    throw std::invalid_argument("K3521: Karten ueberdecken sich (gleiche Basisadresse)");
+            K3521::Config kc;
+            kc.base_addr = static_cast<uint16_t>(b);
+            kc.memdi     = cfg.k3521_memdi;
+            k3521_.push_back(std::make_unique<K3521>(kc));
+            if (!alle[n].second.empty()) {
+                std::string fehler;
+                if (!k3521_.back()->dateiBinden(alle[n].second, fehler)) throw std::runtime_error(fehler);
+            }
         }
     }
     // Bildschirm: K7023.01 bei FC00H statt der K7024 (die bleibt als Objekt, ungesteckt),
@@ -158,7 +170,7 @@ void A5120Machine::wireBackplane() {
         for (auto& k : k3525_) if (k) k->attachToBus(bus_);
 
     // K3521.30 (Option): direkt ueber dem RAM, aber unter Bildspeicher und Lade-ROM.
-    if (k3521_) k3521_->attachToBus(bus_);
+    for (auto& k : k3521_) k->attachToBus(bus_);
 
     // Slot 5: ABS — K7024 (VRAM F800H-FFFFH) oder K7023 (FC00H-FFFFH), ueberdeckt das RAM.
     if (bildschirm_ == Config::Bildschirm::Beide) {
@@ -208,9 +220,11 @@ void A5120Machine::wireBackplane() {
         koppel_.memdi1.drive(!asserted);
         koppel_.memdi2.drive(!asserted);
     });
-    if (k3521_ && k3521_->config().memdi != K3521::Memdi::Bus) {
-        auto& leitung = k3521_->config().memdi == K3521::Memdi::Memdi1 ? koppel_.memdi1 : koppel_.memdi2;
-        leitung.connect([this](bool level) { k3521_->setMemDI(!level); });
+    for (auto& k : k3521_) {
+        if (k->config().memdi == K3521::Memdi::Bus) continue;
+        auto& leitung = k->config().memdi == K3521::Memdi::Memdi1 ? koppel_.memdi1 : koppel_.memdi2;
+        K3521* kp = k.get();
+        leitung.connect([kp](bool level) { kp->setMemDI(!level); });
     }
     for (int g = 0; g < 4; ++g)
         if (ops_.config().groups[g].memdi_source)
@@ -337,7 +351,7 @@ void A5120Machine::resetHardware() {
     serial_naechst_ = 0;
     kbd_.reset();       // K7637: Tastenwiederholung/LEDs/serielle Warteschlange
     if (em_) em_->reset();  // EM: PIO hochohmig ⇒ RESET16/Pull-ups; DRAM + A22 bleiben
-    if (k3521_) k3521_->reset();   // K3521: nur der /SUE-Merker faellt, der Inhalt bleibt
+    for (auto& k : k3521_) k->reset();   // K3521: nur der /SUE-Merker faellt, der Inhalt bleibt
     if (aup_) aup_->reset();       // AUP: wie Kommando FFH (Annahme A6), gehaltene Tasten bleiben
     rafReset();             // RAF (gesteckt?): nur das Latch sperrt, der Inhalt bleibt
     k6022Reset();           // K6022 (gesteckt?): PIOs zurueck, Band und Stanzband bleiben
@@ -1006,7 +1020,7 @@ int A5120Machine::run(int max_cycles) {
     lw_.autoFlush(total_cycles_);
     k6022AutoFlush();   // Stanzdatei nach der Stanzpause (Entwurf 23 §5)
     k5020AutoFlush();   // Kassettendateien nach der Schreibpause
-    if (k3521_) k3521_->autoFlush(total_cycles_);   // K3521-Datei nach der Schreibpause
+    for (auto& k : k3521_) k->autoFlush(total_cycles_);   // K3521-Datei nach der Schreibpause
 
     return max_cycles - remaining;
 }

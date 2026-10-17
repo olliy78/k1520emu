@@ -1629,9 +1629,9 @@ bool k1520_raf_save(K1520Handle h, const char* pfad) {
 
 // ─── K3521.30 (Entwurf 33 N10b) ──────────────────────────────────────────────
 namespace {
-K3521* k3521Karte(K1520Handle h) {
+K3521* k3521Karte(K1520Handle h, int n = 0) {
     auto* a = h ? dynamic_cast<A5120Machine*>(toMachine(h)) : nullptr;
-    return a ? a->k3521() : nullptr;
+    return a ? a->k3521(n) : nullptr;
 }
 }  // namespace
 
@@ -1664,6 +1664,40 @@ int k1520_k3521_sue(K1520Handle h) {
 
 bool k1520_k3521_akku_leer(K1520Handle h, int leer) {
     K3521* k = k3521Karte(h);
+    if (!k) return false;
+    k->setzeAkkuLeer(leer != 0);
+    return true;
+}
+
+// Mehrere Karten (N10h): Index n, Karte 0 ist die der Funktionen ohne Index.
+int k1520_k3521_anzahl(K1520Handle h) {
+    auto* a = h ? dynamic_cast<A5120Machine*>(toMachine(h)) : nullptr;
+    return a ? a->k3521Anzahl() : 0;
+}
+int k1520_k3521_basis_n(K1520Handle h, int n) {
+    const K3521* k = k3521Karte(h, n);
+    return k ? k->config().base_addr : -1;
+}
+bool k1520_k3521_datei_n(K1520Handle h, int n, const char* pfad) {
+    K3521* k = (h && pfad && pfad[0]) ? k3521Karte(h, n) : nullptr;
+    if (!k) { g_init_error = "keine K3521 mit diesem Index gesteckt"; return false; }
+    g_init_error.clear();
+    return k->dateiBinden(pfad, g_init_error);
+}
+bool k1520_k3521_flush_n(K1520Handle h, int n) {
+    K3521* k = k3521Karte(h, n);
+    return k && k->flush();
+}
+uint8_t k1520_k3521_peek_n(K1520Handle h, int n, uint16_t offset) {
+    const K3521* k = k3521Karte(h, n);
+    return k ? k->peek(offset) : 0xFF;
+}
+int k1520_k3521_sue_n(K1520Handle h, int n) {
+    const K3521* k = k3521Karte(h, n);
+    return k ? (k->sue() ? 1 : 0) : -1;
+}
+bool k1520_k3521_akku_leer_n(K1520Handle h, int n, int leer) {
+    K3521* k = k3521Karte(h, n);
     if (!k) return false;
     k->setzeAkkuLeer(leer != 0);
     return true;

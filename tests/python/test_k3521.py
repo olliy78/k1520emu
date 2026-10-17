@@ -83,3 +83,30 @@ def test_falsche_dateigroesse(tmp_path):
     e = _emu(konfig={"k3521": "4000"})
     with pytest.raises(ValueError, match="4096"):
         e.k3521_datei(pfad)
+
+
+# ─── Mehrere Karten (N10h) ───────────────────────────────────────────────────
+
+def test_zwei_karten_ueber_den_konfigurationstext(tmp_path):
+    e = _emu(konfig={"k3521": "8000+9000"})
+    assert e.k3521_anzahl == 2
+    assert e.k3521_basis == 0x8000            # Karte 0 = bisheriges Verhalten
+    assert (e.k3521_basis_n(0), e.k3521_basis_n(1), e.k3521_basis_n(2)) == (0x8000, 0x9000, -1)
+    assert e.k3521_peek_n(1, 0) == 0xFF and e.k3521_peek_n(2, 0) == 0xFF
+    e.k3521_datei_n(1, tmp_path / "k1.bin")
+    assert e.k3521_flush_n(1)
+    assert (tmp_path / "k1.bin").stat().st_size == 4096
+    with pytest.raises(ValueError):
+        e.k3521_datei_n(2, tmp_path / "k2.bin")
+
+
+def test_ohne_option_anzahl_null():
+    assert _emu(konfig={}).k3521_anzahl == 0
+    assert _emu(konfig={"k3521": "4000"}).k3521_anzahl == 1
+
+
+@pytest.mark.parametrize("wert", ["8000+8000", "8000+9800", "8000+aus", "0000+1000+2000+3000+4000", "8000+"])
+def test_mehrkartenwerte_werden_abgelehnt(wert):
+    from app.core_binding import k1520
+    with pytest.raises(Exception):
+        k1520.K1520Emulator(konfig={"k3521": wert})

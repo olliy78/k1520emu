@@ -623,7 +623,7 @@ Brücke Port 0AH Bit 6 folgt ihm) · `tastatur` (K7636 | K7637, an jeder Bestüc
 `em`; Modellwahl übernimmt sie samt Laufwerken ohne Rückfrage, alte Modellschlüssel (`a5120.16`, `a5120-alt`, `-kmbg`, `-bcu`)
 werden **nicht umgesetzt**.  `Config::ausfuehrung` (`Neu/Alt/Kmbg`) ist nur noch Hülle der C-ABI
 `k1520_create_a5120_ausfuehrung`; Konfigurationstext `k1520_create_a5120_text`, Werkzeuge `--ram/--bildschirm/--schalter/--tastatur/--laderom`.
-Fehlbild auf der nicht passenden Karte ist **gewollt**.  **BCU 880 V1.2** bootet (Lade-ROM V0.6, „SYL auf Spur 1“, Kassette als F:);
+Fehlbild auf der nicht passenden Karte ist **gewollt**.  Option **bis zu vier K3521** (`k3521=8000+9000`, N10h).  **BCU 880 V1.2** bootet (Lade-ROM V0.6, „SYL auf Spur 1“, Kassette als F:);
 V2.1 nur als Eigenbau.  Zwei Kernfehler dabei behoben (`Z80`-EI-Schatten, `Z80PIO::onRETI`), in K8915/PRG 710/PC 1715/CTC/SIO/Bus
 **nicht** nachgezogen (A8b, riskant, vorgemerkt).  Pläne: `doc/design/33_a5130_k8924.md` (maßgeblich), `30_…`, `32_…`.
 **Vor Arbeiten daran: `doc/merkposten/a5130_k8924.md` und `doc/merkposten/a5120_alt.md` lesen.**

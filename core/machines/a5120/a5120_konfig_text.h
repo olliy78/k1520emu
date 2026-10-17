@@ -18,7 +18,8 @@
  *   laderom     = v09_2 | v09_1 | v06
  *   kassette    = 0 | 1
  *   em          = none | em064 | em256
- *   k3521       = aus | <Hex-Adresse im 4-KB-Raster, 0 .. f000>   akkugepuffertes RAM K3521.30
+ *   k3521       = aus | <Hex-Adresse im 4-KB-Raster, 0 .. f000>[+<Hex>...]   akkugepuffertes RAM K3521.30
+ *                 (bis zu 4 Karten mit '+' verbunden, z. B. k3521=8000+9000 — das Komma trennt schon die Paare; N10h; Basen duerfen sich nicht ueberdecken)
  *   k3521_memdi = bus | memdi1 | memdi2   (S1:02, nur mit k3521)
  *   aup         = 0 | 1           AUP 062-8531, Tastaturteil auf 40H-43H (Entwurf 33 N10c)
  *   aup_alpha   = led | ohne | mit   Annahme A3: wer die K7633-Tabelle waehlt (nur mit aup=1)
@@ -89,17 +90,31 @@ inline bool wert(A5120Machine::Config& cfg, const std::string& schluessel_in,
         else if (v == "em256") cfg.em = C::Em::em256;
         else { err = "em: unbekannt '" + v + "' (none|em064|em256)"; return false; }
     } else if (k == "k3521") {
-        if (v == "aus" || v == "none") { cfg.k3521_basis = -1; return true; }
-        if (v.size() > 4 || v.find_first_not_of("0123456789abcdef") != std::string::npos) {
-            err = "k3521: unbekannt '" + v + "' (aus|Hex-Adresse 0..f000 im 4-KB-Raster)";
-            return false;
+        // Liste kommagetrennter Hex-Basen (bis 4 Karten, N10h): "8000" oder "8000,9000".
+        cfg.k3521_basis = -1;
+        cfg.k3521_weitere.clear();
+        if (v == "aus" || v == "none") return true;
+        size_t pos = 0;
+        int n = 0;
+        while (true) {
+            const size_t komma = v.find('+', pos);
+            const std::string t = v.substr(pos, komma == std::string::npos ? std::string::npos : komma - pos);
+            if (t.empty() || t.size() > 4 || t.find_first_not_of("0123456789abcdef") != std::string::npos) {
+                err = "k3521: unbekannt '" + t + "' (aus|Hex-Adresse 0..f000 im 4-KB-Raster, bis zu 4 mit '+' verbunden)";
+                return false;
+            }
+            const long a = std::stol(t, nullptr, 16);
+            if (a % 0x1000 != 0) {
+                err = "k3521: '" + t + "' liegt nicht im 4-KB-Raster (0, 1000, 2000 ... f000)";
+                return false;
+            }
+            if (n >= 4) { err = "k3521: hoechstens 4 Karten"; return false; }
+            if (n == 0) cfg.k3521_basis = static_cast<int>(a);
+            else cfg.k3521_weitere.push_back({static_cast<int>(a), {}});
+            ++n;
+            if (komma == std::string::npos) break;
+            pos = komma + 1;
         }
-        const long a = std::stol(v, nullptr, 16);
-        if (a % 0x1000 != 0) {
-            err = "k3521: '" + v + "' liegt nicht im 4-KB-Raster (0, 1000, 2000 ... f000)";
-            return false;
-        }
-        cfg.k3521_basis = static_cast<int>(a);
     } else if (k == "k3521_memdi") {
         if      (v == "bus")    cfg.k3521_memdi = K3521::Memdi::Bus;
         else if (v == "memdi1") cfg.k3521_memdi = K3521::Memdi::Memdi1;

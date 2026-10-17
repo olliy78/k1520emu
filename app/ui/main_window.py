@@ -62,6 +62,7 @@ from app import profil as profile
 from app import takt
 from app.emulationstakt import Emulationstakt
 from app import raf
+from app import k3521
 
 
 def ladeadresse_aus_namen(pfad: str) -> str:
@@ -127,6 +128,8 @@ class MainWindow(QMainWindow):
         self._aup = False
         self._aup_sonder = False
         self._aup_alpha = "led"
+        # K3521.30 (Entwurf 33 N10h): (Anzahl 0..4, Startadresse); Vorgabe keine Karte.
+        self._k3521 = (0, k3521.START_VORGABE)
 
         # Create emulator (powered on only AFTER the config restored the disks,
         # so a cold start boots from the last-mounted images).
@@ -242,6 +245,7 @@ class MainWindow(QMainWindow):
             self.screen_widget.mitschriftFehler.connect(self._mitschrift_fehler)
         self.settings_widget.tapeChanged.connect(self._on_tape_selected)
         self.settings_widget.aupChanged.connect(self._on_aup_selected)
+        self.settings_widget.k3521Changed.connect(self._on_k3521_selected)
         self.kassette_widget.geaendert.connect(self._schedule_autosave)
         self.kassette_widget.meldung.connect(
             lambda text: self.statusBar().showMessage(text, 5000))
@@ -1148,6 +1152,9 @@ class MainWindow(QMainWindow):
             general["aup"] = bool(self._aup)
             general["aup_sonder"] = bool(self._aup and self._aup_sonder)
             general["aup_alpha"] = self._aup_alpha
+        if self.profil.k3521_wahl:
+            general["k3521_anzahl"] = int(self._k3521[0])
+            general["k3521_start"] = f"{self._k3521[1]:04X}"
         if self.profil.terminal:
             general["mitschrift"] = self.settings_widget.mitschrift_value()
         data = config_io.build_config(
@@ -1429,6 +1436,14 @@ class MainWindow(QMainWindow):
                                if self._aup and general.get("aup_alpha") in ("led", "ohne", "mit")
                                else "led")
             self.settings_widget.set_aup_value(self._aup, self._aup_sonder, self._aup_alpha)
+            # K3521: fehlend/ungueltig = keine Karte, Startadresse 8000 (Pruefung wie im Feld).
+            anzahl = general.get("k3521_anzahl")
+            anzahl = anzahl if isinstance(anzahl, int) and not isinstance(anzahl, bool) and 0 <= anzahl <= k3521.MAX_KARTEN else 0
+            start, _grund = k3521.pruefe(anzahl, general.get("k3521_start", f"{k3521.START_VORGABE:04X}"))
+            if start is None or not self.profil.k3521_wahl:
+                anzahl, start = 0, k3521.START_VORGABE
+            self._k3521 = (anzahl, start)
+            self.settings_widget.set_k3521_value(*self._k3521)
 
             # Mitschrift des Terminals: ein FEHLENDER Schluessel heisst „nicht anfassen“ (die
             # Ansichts-Vorgabe traegt keinen Dateinamen), ein leerer „aus“.
@@ -1571,6 +1586,7 @@ class MainWindow(QMainWindow):
         ptape_vorher = self._ptape
         tape_vorher = self._tape
         aup_vorher = (self._aup, self._aup_sonder, self._aup_alpha)
+        k3521_vorher = self._k3521
         self._apply_config(vorgabe)
         # Ein geaenderter Laufwerksschacht ODER ein geaendertes Modell bedeutet
         # eine NEUE Maschine (:meth:`_apply_drive_types`), und die ist noch
@@ -1582,6 +1598,7 @@ class MainWindow(QMainWindow):
                 or self._hardware != hardware_vorher
                 or self._raf != raf_vorher or self._ptape != ptape_vorher
                 or self._tape != tape_vorher
+                or self._k3521 != k3521_vorher
                 or (self._aup, self._aup_sonder, self._aup_alpha) != aup_vorher):
             self._cold_restart()
         # Sofort schreiben, nicht ueber den sammelnden Autosave: der Anwender hat
@@ -1917,6 +1934,10 @@ class MainWindow(QMainWindow):
             self._aup = bool(int(vorgabe.get("aup", 0))) and self.profil.aup_wahl
             self._aup_sonder, self._aup_alpha = False, "led"
             self.settings_widget.set_aup_value(self._aup)
+            # Auch die K3521 gehoert zu den Vorgaben (bei allen Modellen keine Karte).
+            self._k3521 = (int(vorgabe.get("k3521_anzahl", 0)) if self.profil.k3521_wahl else 0,
+                           self._k3521[1])
+            self.settings_widget.set_k3521_value(*self._k3521)
         self._apply_drive_types(types, cold_restart=True)
         self._schedule_autosave()
 
@@ -2010,6 +2031,9 @@ class MainWindow(QMainWindow):
                 kern["konfig"].update(aup=True, aup_alpha=self._aup_alpha)
                 if self._aup_sonder:
                     kern["konfig"]["aup_sonder"] = True
+            wert = k3521.konfig_wert(*self._k3521) if self.profil.k3521_wahl else None
+            if wert:
+                kern["konfig"]["k3521"] = wert
             einzel = {}
         else:
             einzel = {"em": self.profil.modell_em(self._model, self._hardware),
@@ -2025,7 +2049,17 @@ class MainWindow(QMainWindow):
         # nichts (_raf_sichern schreibt dann nicht).
         self._raf_frisch = True
         self._raf_laden(emu)
+        self._k3521_binden(emu)
         return emu
+
+    def _k3521_binden(self, emu) -> None:
+        """Ablagedatei je K3521-Karte binden (Inhalt dauerhaft, Entwurf 33 N10h).  Ein Fehler
+        (falsche Dateigroesse) laesst die Karte im Speicher und meldet sich in der Statuszeile."""
+        for n in range(int(getattr(emu, "k3521_anzahl", 0))):
+            try:
+                emu.k3521_datei_n(n, k3521.ablage_pfad(self.profil.programm, n))
+            except ValueError as e:
+                self.statusBar().showMessage(f"K3521 Karte {n + 1}: {e}", 10000)
 
     # ── RAM-Disk RAF: Auswahl und Stand-by (doc/design/22_raf512.md §7) ──────
 
@@ -2171,6 +2205,17 @@ class MainWindow(QMainWindow):
         self._aup_kasten(zeigen=zeigen)
         self._schedule_autosave()
 
+    def _on_k3521_selected(self, anzahl: int, start: int):
+        """Option „K3521" -> neue Maschine (wie die AUP)."""
+        if (anzahl, start) == self._k3521:
+            return
+        if not self._eprom_rueckfrage("Wechsel der K3521-Karten"):
+            self.settings_widget.set_k3521_value(*self._k3521)
+            return
+        self._k3521 = (anzahl, start)
+        self._apply_drive_types(self._drive_types, cold_restart=True)
+        self._schedule_autosave()
+
     def _aup_kasten(self, zeigen: bool = False):
         """Kasten und Menueeintrag nur bei gesteckter AUP; *zeigen* holt ihn nach vorn."""
         dock = getattr(self, "aup_dock", None)
@@ -2280,6 +2325,8 @@ class MainWindow(QMainWindow):
             self._aup = bool(self.emulator.aup_installed)
             self._aup_sonder = bool(self.emulator.aup_sonder)
             self.settings_widget.set_aup_value(self._aup, self._aup_sonder, self._aup_alpha)
+            self._k3521 = (int(getattr(self.emulator, "k3521_anzahl", 0)), self._k3521[1])
+            self.settings_widget.set_k3521_value(*self._k3521)
             return False
 
         # Die Schnittstellen gehoeren zur Maschine (der Kern haengt den Hub an sie):

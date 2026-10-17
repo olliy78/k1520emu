@@ -645,6 +645,17 @@ K1520_API int         k1520_k3521_sue(K1520Handle h);
 /** @brief /SUE setzen/loeschen (Test/Oberflaeche); false ohne Karte.  Der Inhalt bleibt. */
 K1520_API bool        k1520_k3521_akku_leer(K1520Handle h, int leer);
 
+/* Mehrere Karten (N10h): bis zu 4 K3521, im Konfigurationstext mit '+' verbunden
+ * (`k3521=8000+9000`; das Komma trennt dort schon die Schluessel).  Die Funktionen oben meinen
+ * Karte 0; die mit `_n` nehmen den Index 0..anzahl-1 (ausserhalb: -1 / 0xFF / false). */
+K1520_API int         k1520_k3521_anzahl(K1520Handle h);
+K1520_API int         k1520_k3521_basis_n(K1520Handle h, int n);
+K1520_API bool        k1520_k3521_datei_n(K1520Handle h, int n, const char* pfad);
+K1520_API bool        k1520_k3521_flush_n(K1520Handle h, int n);
+K1520_API uint8_t     k1520_k3521_peek_n(K1520Handle h, int n, uint16_t offset);
+K1520_API int         k1520_k3521_sue_n(K1520Handle h, int n);
+K1520_API bool        k1520_k3521_akku_leer_n(K1520Handle h, int n, int leer);
+
 /* ─── AUP 062-8531, Tastaturteil (Entwurf 33 N10c, core/cards/aup/aup.h) ─────────────────────
  * Nur A5120: E/A 40H-43H, vom Gast abgefragt (kein Interrupt).  Gesteckt ueber `aup=1` im
  * Konfigurationstext von k1520_create_a5120_text oder k1520_aup_install (nach dem Anlegen, VOR

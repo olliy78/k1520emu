@@ -145,6 +145,78 @@ TEST(K3521Maschine, DateiMitFalscherGroesseLaesstDenBauScheitern) {
     std::filesystem::remove(p);
 }
 
+// ─── Mehrere Karten (N10h) ───────────────────────────────────────────────────
+TEST(K3521Maschine, ZweiKartenHabenEigenenInhaltUndAnzahl) {
+    C c = mitK3521(0x8000);
+    c.k3521_weitere.push_back({0x9000, {}});
+    auto m = baue(c);
+    ASSERT_EQ(m->k3521Anzahl(), 2);
+    EXPECT_EQ(m->k3521(0), m->k3521());   // Karte 0 = bisheriger Zugriff
+    EXPECT_EQ(m->k3521(1)->config().base_addr, 0x9000);
+    EXPECT_EQ(m->k3521(2), nullptr);
+    m->memWriteDebug(0x8010, 0x11);
+    m->memWriteDebug(0x9010, 0x22);
+    EXPECT_EQ(m->k3521(0)->peek(0x10), 0x11);
+    EXPECT_EQ(m->k3521(1)->peek(0x10), 0x22);
+    EXPECT_EQ(m->memReadDebug(0x9010), 0x22);
+    m->reset();   // Inhalt beider Karten bleibt
+    EXPECT_EQ(m->k3521(1)->peek(0x10), 0x22);
+}
+
+TEST(K3521Maschine, UeberlappendeOderUnzulaessigeKartenWerfen) {
+    C c = mitK3521(0x8000);
+    c.k3521_weitere.push_back({0x8000, {}});
+    EXPECT_THROW(A5120Machine{c}, std::invalid_argument);
+    C d = mitK3521(0x8000);
+    d.k3521_weitere.push_back({0x9800, {}});   // nicht im Raster
+    EXPECT_THROW(A5120Machine{d}, std::invalid_argument);
+    C e = mitK3521(0x0000);
+    for (int i = 1; i <= 4; ++i) e.k3521_weitere.push_back({i * 0x1000, {}});   // 5 Karten
+    EXPECT_THROW(A5120Machine{e}, std::invalid_argument);
+    C f;   // weitere ohne erste
+    f.k3521_weitere.push_back({0x9000, {}});
+    EXPECT_THROW(A5120Machine{f}, std::invalid_argument);
+}
+
+TEST(K3521Maschine, VierKartenKonfigurationstextMitPlus) {
+    C c;
+    std::string err;
+    ASSERT_TRUE(a5120konfig::text(c, "k3521=8000+9000+A000+b000", err)) << err;
+    EXPECT_EQ(c.k3521_basis, 0x8000);
+    ASSERT_EQ(c.k3521_weitere.size(), 3u);
+    EXPECT_EQ(c.k3521_weitere[2].basis, 0xB000);
+    EXPECT_FALSE(a5120konfig::text(c, "k3521=8000+9000+a000+b000+c000", err));
+    EXPECT_NE(err.find("hoechstens 4"), std::string::npos) << err;
+    EXPECT_FALSE(a5120konfig::text(c, "k3521=8000+9800", err));
+    EXPECT_FALSE(a5120konfig::text(c, "k3521=8000+", err));
+    ASSERT_TRUE(a5120konfig::text(c, "k3521=aus", err)) << err;   // setzt auch die weiteren zurueck
+    EXPECT_EQ(c.k3521_basis, -1);
+    EXPECT_TRUE(c.k3521_weitere.empty());
+}
+
+TEST(K3521Maschine, JedeKarteHatIhreDatei) {
+    const std::string p0 = k1520test::tempPath("k3521_mk0.bin"), p1 = k1520test::tempPath("k3521_mk1.bin");
+    std::filesystem::remove(p0);
+    std::filesystem::remove(p1);
+    C c = mitK3521(0x4000);
+    c.k3521_datei = p0;
+    c.k3521_weitere.push_back({0x5000, p1});
+    {
+        auto m = baue(c);
+        m->memWriteDebug(0x4001, 0xA1);
+        m->memWriteDebug(0x5002, 0xB2);
+    }
+    ASSERT_TRUE(std::filesystem::exists(p0));
+    ASSERT_TRUE(std::filesystem::exists(p1));
+    auto m2 = baue(c);
+    EXPECT_EQ(m2->k3521(0)->peek(1), 0xA1);
+    EXPECT_EQ(m2->k3521(0)->peek(2), 0xFF);
+    EXPECT_EQ(m2->k3521(1)->peek(2), 0xB2);
+    EXPECT_EQ(m2->k3521(1)->peek(1), 0xFF);
+    std::filesystem::remove(p0);
+    std::filesystem::remove(p1);
+}
+
 // ─── CP/A-Gastlauf ───────────────────────────────────────────────────────────
 // SCHREIB.COM fuellt 8000H..8FFFH mit (3 + 7·i) mod 256, LESE.COM kopiert 8000H..8FFFH nach
 // 4000H.  Die Karte steckt bei 8000H, weil der CP/A-Kaltstart (Messung 2026-10-17, Karte
@@ -242,4 +314,37 @@ TEST(K3521Maschine, CpaGastSchreibtUndLiestNachNeustartDerMaschine) {
                 << "vom Gast gelesen bei " << i;
     }
     std::filesystem::remove(datei);
+}
+
+// Zwei Karten (N10h) unter CP/A: ein .COM schreibt 8000H..9FFFH, jede Karte behaelt ihre Haelfte.
+TEST(K3521Maschine, CpaGastZweiKartenJedeMitEigenerDatei) {
+    k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::ERROR);
+    k1520test::TempDisk disk("cpa_cpa780_k5601_noclock.img", "k1520_k3521_cpa2.img");
+    std::vector<uint8_t> schreib2 = kSchreib;
+    schreib2[5] = 0x20;   // LD DE,2000H
+    ASSERT_TRUE(comAufDiskette(disk.path(), "SCHREIB2.COM", schreib2));
+    const std::string d0 = k1520test::tempPath("k3521_cpa2_0.bin"), d1 = k1520test::tempPath("k3521_cpa2_1.bin");
+    std::filesystem::remove(d0);
+    std::filesystem::remove(d1);
+    C c = mitK3521(0x8000);
+    c.k3521_datei = d0;
+    c.k3521_weitere.push_back({0x9000, d1});
+    {
+        A5120Machine m(c);
+        ASSERT_TRUE(m.mountDisk(0, disk.path(), "cpa780", false)) << m.lastError();
+        ASSERT_NO_FATAL_FAILURE(kaltstart(m));
+        kommando(m, "SCHREIB2");
+        for (int i = 0; i < 4096; ++i) {
+            ASSERT_EQ(m.k3521(0)->peek(static_cast<uint16_t>(i)), (3 + 7 * i) & 0xFF) << "Karte 0 bei " << i;
+            ASSERT_EQ(m.k3521(1)->peek(static_cast<uint16_t>(i)), (3 + 7 * (0x1000 + i)) & 0xFF) << "Karte 1 bei " << i;
+        }
+    }
+    EXPECT_EQ(std::filesystem::file_size(d0), 4096u);
+    EXPECT_EQ(std::filesystem::file_size(d1), 4096u);
+    {
+        A5120Machine m(c);
+        EXPECT_EQ(m.k3521(1)->peek(7), (3 + 7 * (0x1000 + 7)) & 0xFF) << "aus der Datei der zweiten Karte";
+    }
+    std::filesystem::remove(d0);
+    std::filesystem::remove(d1);
 }
