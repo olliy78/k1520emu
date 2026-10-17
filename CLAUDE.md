@@ -618,7 +618,7 @@ danach ist sie `tar720` und nur lesbar.  Aktionen „Diskette als .tar exportier
 WEGA/tar tragen UNIX-Angaben statt UDOS-Kopfsektor (`FsType`, `istUnix()`).  Archive der
 pofo.de-Sammlung: `tools/p8000/pofo_archive.py`.
 **Vor Arbeiten daran: `doc/merkposten/cqm.md` lesen** (CRC-Tabellenfehler `& 0x3F`, Offsets);
-Entwurf `doc/design/33_cqm.md`.
+Entwurf `doc/design/35_cqm.md`.
 
 **OS/M (P8000, 8-Bit) = CP/M 2.2 auf den SCP-Formaten** (Entwurf `doc/design/34_osm.md`): Profile `osm640`/`osm800`
 (`boot_header: osm`) werden NUR mit OS/M-Urlader in c0h0 Sektor 1 erkannt (Code `FD 21 48 0C …` UND `P8000SYS`);

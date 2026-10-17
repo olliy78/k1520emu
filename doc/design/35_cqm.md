@@ -1,4 +1,4 @@
-# 33 — CopyQM-Abbilder (`.cqm`) als vierter Container
+# 35 — CopyQM-Abbilder (`.cqm`) als vierter Container
 
 Stand 2026-10-17, Zweig `cqm`.  Kern: `core/peripherals/floppy_drive/cqm_codec.{h,cpp}`,
 Tests `tests/unit/peripherals/test_cqm_codec.cpp`, Merkposten `doc/merkposten/cqm.md`.

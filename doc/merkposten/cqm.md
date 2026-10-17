@@ -1,10 +1,10 @@
 <!-- Merkposten wie doc/merkposten/disktool.md: gilt WIE CLAUDE.md, sobald an diesem
-     Teilsystem gearbeitet wird.  Entwurf: doc/design/33_cqm.md -->
+     Teilsystem gearbeitet wird.  Entwurf: doc/design/35_cqm.md -->
 
 # CopyQM (`.cqm`) — Merkposten
 
 Vierter Container (`ContainerType::Cqm`), **lesen und schreiben** (seit 2026-10-17); `core/peripherals/floppy_drive/cqm_codec.*`.
-Voller Befund an 142 Abbildern: `doc/design/33_cqm.md`.
+Voller Befund an 142 Abbildern: `doc/design/35_cqm.md`.
 
 1. **Der Pruefwert ist CRC-32 mit Tabellenfehler** (`& 0x3F` statt `& 0xFF`, Startwert 0,
    kein Endxor).  Wer "mal eben" auf ein normales CRC-32 umstellt, bekommt 142 abgelehnte

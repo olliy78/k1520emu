@@ -960,7 +960,7 @@ k1520disktool save-as alt.hfe kopie.cqm      # und zurueck: save-as kopie.cqm ne
 
 ## tar-Disketten und `tar-satz`
 
-84 der 142 P8000-Abbilder (`doc/design/33_cqm.md` §4a) tragen einen rohen `tar`-Strom ab
+84 der 142 P8000-Abbilder (`doc/design/35_cqm.md` §4a) tragen einen rohen `tar`-Strom ab
 Sektor 0 statt eines Dateisystems. Profil `tar720` (nur lesbar, auch in einer `.cqm`; `put`/`rm`/`attr`/`create`
 melden das ausdrücklich), Erkennung zuletzt, nach CP/A-Regel und allen echten
 Dateisystemen. `ls -l`, `get`, `info`, `check` wie bei WEGA (UNIX-Spalten, `.fileinfo`

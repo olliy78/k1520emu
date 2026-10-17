@@ -252,7 +252,7 @@ bool CqmCodec::loadBuffer(const std::vector<uint8_t>& datei, DiskMedium& out,
     const uint8_t nheads = static_cast<uint8_t>(si.heads);
     out = DiskMedium(ncyls, nheads, Encoding::MFM);
     // 5,25″-HD (15 x 512) dreht mit 360 U/min, alles andere hier mit 300 (siehe
-    // doc/design/33_cqm.md); nur fuer die Zellenzahl einer spaeteren .hfe von Belang.
+    // doc/design/35_cqm.md); nur fuer die Zellenzahl einer spaeteren .hfe von Belang.
     out.setNominalRpm((si.density == 1 && si.secs_per_track == 15 && si.sector_size == 512)
                           ? 360 : 300);
 

@@ -542,7 +542,7 @@ public:
      * wird das Medium zurueckgerollt.  Das Abbild wird sofort zurueckgeschrieben (flush),
      * solange es noch beschreibbar ist.  Warnungen siehe @ref lastTarWarnung.
      * Rundlauf: der Export des Ergebnisses ist die Datei selbst, wenn sie mit Kopf und
-     * Endmarke endet, sonst die Datei plus Nullen bis zum Diskettenende (doc/design/33_cqm.md).
+     * Endmarke endet, sonst die Datei plus Nullen bis zum Diskettenende (doc/design/35_cqm.md).
      */
     bool tarSchreiben(const std::string& quelle);
     /// @brief Warnung (kein V7-tar) des letzten @ref tarSchreiben / @ref tarPruefen; sonst leer.

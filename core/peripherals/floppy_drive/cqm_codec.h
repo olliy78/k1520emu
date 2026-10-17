@@ -48,7 +48,7 @@
  * der des Originals (Datei1 → Medium → Datei2 ist nicht byteidentisch, wohl aber
  * inhaltsgleich).
  *
- * @see doc/design/33_cqm.md, doc/merkposten/cqm.md
+ * @see doc/design/35_cqm.md, doc/merkposten/cqm.md
  * @author Olaf Krieger
  * @date 2026
  * @license MIT License

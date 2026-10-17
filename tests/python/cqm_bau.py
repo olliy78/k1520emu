@@ -1,4 +1,4 @@
-"""Testhilfe: baut CopyQM-Abbilder (.cqm) in Python nach doc/design/33_cqm.md.
+"""Testhilfe: baut CopyQM-Abbilder (.cqm) in Python nach doc/design/35_cqm.md.
 
 Gegenstueck zu ``tests/unit/peripherals/test_cqm_codec.cpp``.  Die Besonderheit, die man
 nicht "reparieren" darf: der Pruefwert ist CRC-32 (0xEDB88320, Start 0, kein Endxor) mit

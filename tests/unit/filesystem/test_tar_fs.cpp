@@ -7,7 +7,7 @@
  * (`K1520_CQM_DIR` = Ordner mit den P8000-`.cqm`/`.tar`) wird sonst uebersprungen und
  * vergleicht mit dem `tar` des Systems — als Gegenprobe, nicht als Abhaengigkeit.
  *
- * @see core/filesystem/tar/tar_fs.h, doc/design/33_cqm.md
+ * @see core/filesystem/tar/tar_fs.h, doc/design/35_cqm.md
  */
 
 #include <gtest/gtest.h>

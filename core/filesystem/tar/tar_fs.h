@@ -19,7 +19,7 @@
  * plausible Groesse.  Sie steht in der Erkennungsreihenfolge HINTER allen echten
  * Dateisystemen (siehe disk_volume.cpp).
  *
- * @see doc/design/33_cqm.md (Abschnitt tar-Disketten)
+ * @see doc/design/35_cqm.md (Abschnitt tar-Disketten)
  * @author Olaf Krieger
  * @date 2026
  * @license MIT License
@@ -60,7 +60,7 @@ bool alleNull(const uint8_t* d, size_t n);
 /**
  * @brief Wie viele Bytes eines Diskettenstroms gehoeren zum `.tar` (Export, `tar-export`)?
  *
- * Regel (doc/design/33_cqm.md, tar-Export):
+ * Regel (doc/design/35_cqm.md, tar-Export):
  *  - Beginnt der Strom mit einem gueltigen Kopfblock, wird die Struktur abgelaufen (Kopf,
  *    Daten auf 512 gerundet, naechster Kopf).  Steht an einer KOPFPOSITION die Endmarke
  *    (zwei Nullbloecke), endet der Export hinter ihr — die zwei Nullbloecke gehoeren dazu.

@@ -1,7 +1,7 @@
 # 34 — OS/M-Disketten (P8000, 8-Bit-Teil)
 
 Stand 2026-10-17, Zweig `cqm`.  Analyse und Plan; **AP 1, AP 2, AP 3 und AP 6 sind umgesetzt** (§11).
-Bezug: `doc/design/33_cqm.md` (Container), `doc/merkposten/disktool.md`, `doc/merkposten/cqm.md`,
+Bezug: `doc/design/35_cqm.md` (Container), `doc/merkposten/disktool.md`, `doc/merkposten/cqm.md`,
 Sammlung `~/projects/robotron/P8000/discs/` (pofo.de), Übersicht
 `~/projects/robotron/P8000/archive/UEBERSICHT.md`.
 

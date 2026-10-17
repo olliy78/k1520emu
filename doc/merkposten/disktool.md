@@ -1056,7 +1056,7 @@ Was beim Weiterarbeiten zu wissen ist:
   `UdosFileSystemWrite.VersionstextImAenderungsfeldUeberlebt` (prüft mit derselben
   Probe, dass ein LEERES Feld weiterhin „heute" heisst und nicht sechs Leerzeichen).
 - **tar-Disketten (`tar720`, `FsType::Tar`, 2026-10-17, `core/filesystem/tar/`, Entwurf
-  `doc/design/33_cqm.md` §4a).**  Ein roher `tar`-Strom ab Sektor 0, kein Dateisystem, **nur
+  `doc/design/35_cqm.md` §4a).**  Ein roher `tar`-Strom ab Sektor 0, kein Dateisystem, **nur
   lesbar** (`put`/`rm`/`attr`/`create` sagen es; `setReadOnly(false)` wirkt nicht,
   `readOnlyForced()`).  Vier Festlegungen: **(1) Die Erkennung kommt ZULETZT** — hinter der
   CP/A-Regel, nicht über `detect_rank`: ein tar-Kopf mit gültiger Prüfsumme auf einer

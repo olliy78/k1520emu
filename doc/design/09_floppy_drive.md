@@ -279,7 +279,7 @@ Spuren in der Reihenfolge (0,0) (0,1) (1,0) (1,1) …, je Spur:
 
 RLE-gepackter Sektorstrom wie ein `.img`, Geometrie aus dem 133-Byte-Kopf, Pruefwert mit
 Tabellenfehler.  Die `DiskImage`-Bindung ist nie beschreibbar.  Voller Entwurf:
-`doc/design/33_cqm.md`, Merkposten `doc/merkposten/cqm.md`.
+`doc/design/35_cqm.md`, Merkposten `doc/merkposten/cqm.md`.
 
 ### 4.4 Erkennung beim Öffnen
 
