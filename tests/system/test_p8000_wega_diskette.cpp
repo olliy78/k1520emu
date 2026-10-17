@@ -13,7 +13,9 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <algorithm>
 #include <cstring>
+#include <regex>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -36,6 +38,10 @@ void stumm() { k1520::logging::Logger::instance().setBaseLevel(k1520::logging::L
 struct Sitzung {
     WegaLauf l;
     int n = 1;   ///< Nummer des NAECHSTEN Prompts
+    /// Disketten fuer `insert next disk :` (Mehrdisketten-tar), der Reihe nach; vorformatiert, Laufwerk 1.
+    std::vector<std::string> folge;
+    size_t naechste = 0;
+    int gewechselt = 0;   ///< wie oft WEGA nach der naechsten Diskette gefragt hat
 
     P8000Machine& m() { return *l.m; }
 
@@ -55,9 +61,20 @@ struct Sitzung {
         tippeZeile(m(), cmd);
         const std::string prompt = "#" + std::to_string(n);
         for (;;) {
-            const int i = warteAufFrage(m(), {prompt, "ready?"}, grenze);
+            const int i = warteAufFrage(m(), {prompt, "ready?", "insert next disk :"}, grenze);
             if (i < 0) return false;
             if (i == 0) break;
+            if (i == 2) {   // Mehrdisketten-tar: Diskette wechseln, RETURN
+                if (naechste >= folge.size()) return false;
+                m().flushDisks();
+                m().unmountDisk(1);
+                if (!m().mountDisk(1, folge[naechste++], kWegaFormat, false)) return false;
+                ++gewechselt;
+                laufe(m(), 1'000'000);
+                tippeZeile(m(), "");
+                laufe(m(), 1'000'000);
+                continue;
+            }
             tippeZeile(m(), "y");
             laufe(m(), 1'000'000);
         }
@@ -169,6 +186,7 @@ TEST(P8000WegaDiskette, DISABLED_Skript) {
                 << s.m().lastError();
             continue;
         }
+        if (zl.rfind("@folge ", 0) == 0) { s.folge.push_back(zl.substr(7)); continue; }   // Diskette fuer `insert next disk`
         if (zl == "@auswerfen") { s.m().flushDisks(); s.m().unmountDisk(1); continue; }
         const std::string kopf = "#" + std::to_string(s.n - 1) + " ";
         const bool ok = s.kommando(zl);
@@ -226,10 +244,11 @@ bool fsckSauber(const std::string& a) {
 /**
  * @test Der Diskettenweg von WEGA, durchgespielt wie im Handbuch („Arbeiten mit Disketten unter WEGA"):
  *       (1) Diskette mit `format` + `mkfs` anlegen, mounten, beschreiben, `umount`, `fsck`;
- *       (2) zwei Disketten mit `tar` auf dem Raw-Geraet beschreiben (~0,9 MB);
- *       (3) das DiskTool liest alle drei fehlerfrei (Dateisystem erkannt, Vollpruefung ohne Befund, Inhalt);
- *       (4) Rueckweg: Datei auf der WEGA-Diskette loeschen + neue schreiben, zwei V7-tar-Archive per `tar-put`
- *           auf leere Disketten, WEGA-`fsck`/`mount`/`cat`, `tar x` in ein temporaeres Verzeichnis.
+ *       (2) ein **Mehrdisketten-Archiv**: `tar cvf /dev/rfd1` ueber 1,2 MB, WEGA fragt `insert next disk :`;
+ *       (3) das DiskTool liest alle Disketten fehlerfrei (Dateisystem erkannt, Vollpruefung ohne Befund, `tar-satz`);
+ *       (4) Rueckweg: Datei auf der WEGA-Diskette loeschen + neue schreiben, ein V7-Strom vom Linux-Rechner mit `split`
+ *           auf zwei Disketten (`tar-put`), WEGA-`fsck`/`mount`/`cat`, `tar x` ueber beide Disketten in ein
+ *           temporaeres Verzeichnis, Inhalt bitgleich zu /usr/man.
  *       Startet aus dem eingefrorenen Zustand p15_6_login (kein Boot).
  */
 TEST(P8000WegaDiskette, FormatMountTarUndDiskTool) {
@@ -265,29 +284,30 @@ TEST(P8000WegaDiskette, FormatMountTarUndDiskTool) {
     fuehre(s, "sync");
     auswerfen(s);
 
-    // ── 2  Zwei tar-Disketten auf dem Raw-Geraet ─────────────────────────────────────────────────
-    const std::string tarpfade[2] = {tara, tarb};
-    const char* tarkdo[2] = {"cd /usr/man; tar cvf /dev/rfd1 man2 man3 manM",
-                             "cd /usr/man; tar cvf /dev/rfd1 man0 man4 man5 man6 man7"};
-    for (int i = 0; i < 2; ++i) {
-        ASSERT_TRUE(leerdisketteEinlegen(s, tarpfade[i])) << s.m().lastError();
+    // ── 2  Mehrdisketten-tar auf dem Raw-Geraet ──────────────────────────────────────────────────
+    // Beide Disketten werden VORHER formatiert: waehrend tar auf die naechste wartet, ist die Konsole belegt.
+    for (const std::string& p : {tara, tarb}) {
+        ASSERT_TRUE(leerdisketteEinlegen(s, p)) << s.m().lastError();
         fuehre(s, "format fd1");
-        const std::string t = fuehre(s, tarkdo[i]);
-        EXPECT_TRUE(enthaelt(t, "tar: allocated space on disk")) << t;
-        const std::string tv = fuehre(s, "tar tvf /dev/rfd1 > /z/inhalt.txt; tail -2 /z/inhalt.txt");
-        EXPECT_TRUE(enthaelt(tv, "tar:   free    space on disk")) << tv;
         auswerfen(s);
     }
+    ASSERT_TRUE(diskEinlegen(s, tara)) << s.m().lastError();
+    s.folge = {tarb};
+    s.naechste = 0;
+    s.gewechselt = 0;
+    const std::string t = fuehre(s, "cd /usr/man; tar cvf /dev/rfd1 man1 man2 man3 manM > /z/tar.log; tail -2 /z/tar.log");
+    EXPECT_EQ(s.gewechselt, 1) << t;   // WEGA hat nach der zweiten Diskette gefragt
+    EXPECT_TRUE(enthaelt(t, "tar: allocated space on disk")) << t;
+    auswerfen(s);
 
-    // ── 3  Das DiskTool liest alle drei ───────────────────────────────────────────────────────────
+    // ── 3  Das DiskTool liest alles ───────────────────────────────────────────────────────────────
     {
         auto v = oeffne(fsd);
         ASSERT_TRUE(v);
         EXPECT_EQ(v->detection().filesystem, "wega720");
         EXPECT_EQ(pruefe(*v), "");
-        const auto l = v->list();
         bool hallo = false, tar1 = false;
-        for (const FileEntry& e : l) {
+        for (const FileEntry& e : v->list()) {
             if (e.name == "hallo.txt") { hallo = true; EXPECT_EQ(e.size, 15u); }
             if (e.name == "man/tar.1") { tar1 = true; EXPECT_EQ(e.size, 5801u); }
         }
@@ -296,24 +316,29 @@ TEST(P8000WegaDiskette, FormatMountTarUndDiskTool) {
         ASSERT_TRUE(v->extract(FileRef::parse("hallo.txt"), aus, TransferOptions{})) << v->lastError();
         EXPECT_EQ(leseDatei(aus), "Hallo von WEGA\n");
     }
-    for (int i = 0; i < 2; ++i) {
-        auto v = oeffne(tarpfade[i]);
+    for (const std::string& p : {tara, tarb}) {   // jede Diskette ist voll und einzeln als tar-Diskette erkannt
+        auto v = oeffne(p);
         ASSERT_TRUE(v);
         EXPECT_EQ(v->detection().filesystem, "tar720");
-        EXPECT_EQ(pruefe(*v), "");
-        EXPECT_GT(v->list().size(), 40u);
-        const std::string ziel = dir + "/export" + std::to_string(i) + ".tar";
         uint64_t n = 0;
-        ASSERT_TRUE(v->tarExport(ziel, &n)) << v->lastError();
-        EXPECT_GT(n, 300'000u);
-        EXPECT_LE(n, 737'280u);
+        ASSERT_TRUE(v->tarExport(dir + "/export.tar", &n)) << v->lastError();
+        EXPECT_EQ(n, 737'280u);
     }
-    {   // Stichproben: Namen und Groessen, wie sie `tar tvf` auf dem Linux-Rechner zeigt
-        auto a = oeffne(tara);
-        bool intro = false;
-        for (const FileEntry& e : a->list())
-            if (e.name == "man2/INTRO.2") { intro = true; EXPECT_EQ(e.size, 10042u); }
-        EXPECT_TRUE(intro);
+    const std::string lokal = dir + "/lokal";
+    {
+        std::string err;
+        auto satz = DiskVolume::openTarSatz({tara, tarb}, formate(), dateisysteme(), err);
+        ASSERT_TRUE(satz) << err;
+        EXPECT_EQ(pruefe(*satz), "");
+        bool adb = false;
+        size_t dateien = 0;
+        for (const FileEntry& e : satz->list()) {
+            ++dateien;
+            if (e.name == "man1/adb.1") { adb = true; EXPECT_EQ(e.size, 16360u); }
+        }
+        EXPECT_TRUE(adb);
+        EXPECT_EQ(dateien, 451u);   // man1 236 + man2 53 + man3 99 + manM 63
+        ASSERT_TRUE(satz->extractAll(lokal, TransferOptions{})) << satz->lastError();
     }
 
     // ── 4  Rueckweg ────────────────────────────────────────────────────────────────────────────────
@@ -327,28 +352,30 @@ TEST(P8000WegaDiskette, FormatMountTarUndDiskTool) {
         ASSERT_TRUE(v->insert(quelle, FileRef::parse("neu.txt"), TransferOptions{})) << v->lastError();
         ASSERT_TRUE(v->flush()) << v->lastError();
     }
-    // Zwei V7-tar-Archive vom Linux-Rechner, je auf eine leere tar-Diskette (DiskTool: `create` + `tar-put`).
-    std::string gross;
-    for (int i = 1; i <= 20000; ++i) {
-        char z[32];
-        std::snprintf(z, sizeof z, "Zeile %05d\n", i);
-        gross += z;
+    // Linux: eine Datei hinzufuegen, EIN V7-Strom (nur Dateien), in Stuecke zu 737280 Byte, je auf eine leere tar-Diskette.
+    { std::ofstream(lokal + "/man2/NEU.TXT") << "Neu vom Linux-Rechner\n"; }
+    std::vector<std::pair<std::string, std::string>> dateien;
+    for (const auto& e : stdfs::recursive_directory_iterator(lokal)) {
+        if (!e.is_regular_file() || e.path().extension() == ".fileinfo") continue;
+        dateien.emplace_back(stdfs::relative(e.path(), lokal).generic_string(), leseDatei(e.path().string()));
     }
-    const std::string rueck[2] = {dir + "/rueck_a.hfe", dir + "/rueck_b.hfe"};
-    const std::vector<std::pair<std::string, std::string>> inhalt[2] = {
-        {{"extra/NEU.TXT", "Neu vom Linux-Rechner\n"}, {"extra/LIESMICH", "zweite Datei\n"}},
-        {{"extra/tief/gross.txt", gross}}};
-    for (int i = 0; i < 2; ++i) {
-        const std::string tarf = dir + "/rueck" + std::to_string(i) + ".tar";
-        { std::ofstream(tarf, std::ios::binary) << v7Archiv(inhalt[i]); }
+    std::sort(dateien.begin(), dateien.end());
+    ASSERT_EQ(dateien.size(), 452u);
+    const std::string strom = v7Archiv(dateien);
+    std::vector<std::string> teile;
+    for (size_t ab = 0, i = 0; ab < strom.size(); ab += 737'280, ++i) {
+        const std::string tarf = dir + "/teil" + std::to_string(i) + ".tar";
+        { std::ofstream(tarf, std::ios::binary) << strom.substr(ab, 737'280); }
+        const std::string hfe = dir + "/teil" + std::to_string(i) + ".hfe";
         std::string err;
-        stdfs::remove(rueck[i]);
-        auto v = DiskVolume::create(rueck[i], "tar720_leer", "", formate(), dateisysteme(), err);
+        auto v = DiskVolume::create(hfe, "tar720_leer", "", formate(), dateisysteme(), err);
         ASSERT_TRUE(v) << err;
         ASSERT_TRUE(v->tarSchreiben(tarf)) << v->lastError();
         ASSERT_TRUE(v->flush()) << v->lastError();
         EXPECT_TRUE(v->lastTarWarnung().empty()) << v->lastTarWarnung();   // V7: keine Rueckfrage
+        teile.push_back(hfe);
     }
+    ASSERT_EQ(teile.size(), 2u) << strom.size();
 
     // Auf WEGA: veraenderte Dateisystemdiskette pruefen, mounten, cat.
     ASSERT_TRUE(diskEinlegen(s, fsd)) << s.m().lastError();
@@ -362,19 +389,30 @@ TEST(P8000WegaDiskette, FormatMountTarUndDiskTool) {
     fuehre(s, "/etc/umount /dev/fd1");
     auswerfen(s);
 
-    // Beide tar-Disketten in ein temporaeres Verzeichnis entpacken.
+    // Beide tar-Disketten (ein Archiv ueber zwei Disketten) in ein temporaeres Verzeichnis entpacken.
     fuehre(s, "mkdir /z/tmp");
-    for (int i = 0; i < 2; ++i) {
-        ASSERT_TRUE(diskEinlegen(s, rueck[i])) << s.m().lastError();
-        const std::string x = fuehre(s, "cd /z/tmp; tar xvf /dev/rfd1 > /z/entpackt.txt; cat /z/entpackt.txt");
-        EXPECT_FALSE(enthaelt(x, "cannot")) << x;
-        auswerfen(s);
+    ASSERT_TRUE(diskEinlegen(s, teile[0])) << s.m().lastError();
+    s.folge = {teile[1]};
+    s.naechste = 0;
+    s.gewechselt = 0;
+    const std::string x = fuehre(s, "cd /z/tmp; tar xvf /dev/rfd1 > /z/entpackt.txt; tail -1 /z/entpackt.txt");
+    EXPECT_EQ(s.gewechselt, 1) << x;
+    EXPECT_FALSE(enthaelt(x, "cannot")) << x;
+    auswerfen(s);
+    EXPECT_TRUE(enthaelt(fuehre(s, "find /z/tmp -type f -print | wc -l"), "452"));
+    EXPECT_TRUE(enthaelt(fuehre(s, "cat /z/tmp/man2/NEU.TXT"), "Neu vom Linux-Rechner"));
+    // Inhalt bitgleich zum Original (die Grenze zwischen den Disketten liegt mitten in einer Datei).
+    for (const char* d : {"man1", "man3"}) {
+        const auto summe = [&](const std::string& wurzel) {
+            const std::string a = fuehre(s, "cd " + wurzel + "; cat " + d + "/* | sum");
+            std::smatch m;
+            const std::string rest = a.substr(a.find('\n') == std::string::npos ? 0 : a.find('\n'));
+            return std::regex_search(rest, m, std::regex("\n(\\d+ \\d+)")) ? m[1].str() : std::string();
+        };
+        const std::string neu = summe("/z/tmp"), alt = summe("/usr/man");
+        EXPECT_FALSE(neu.empty());
+        EXPECT_EQ(neu, alt) << d;
     }
-    EXPECT_TRUE(enthaelt(fuehre(s, "cat /z/tmp/extra/NEU.TXT /z/tmp/extra/LIESMICH"), "Neu vom Linux-Rechner"));
-    const std::string wc = fuehre(s, "wc /z/tmp/extra/tief/gross.txt; tail -1 /z/tmp/extra/tief/gross.txt");
-    EXPECT_TRUE(enthaelt(wc, "20000")) << wc;
-    EXPECT_TRUE(enthaelt(wc, "Zeile 20000")) << wc;
-    EXPECT_TRUE(enthaelt(wc, std::to_string(gross.size()))) << wc;
 
     if (const char* o = std::getenv("K1520_WEGA_DISKETTEN_AUS"); o && *o) {   // fuer das Handbuch von Hand nachsehen
         stdfs::create_directories(o);
