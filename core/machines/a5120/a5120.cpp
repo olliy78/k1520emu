@@ -139,6 +139,9 @@ A5120Machine::A5120Machine(const Config& cfg)
     // installK5020() lehnt dann wegen „bereits gesteckt“ ab — kein doppeltes Stecken.
     if (cfg.kassette && !installK5020())
         throw std::runtime_error("K5020 (Kassette): " + k5020Fehler());
+    // AUP (Option, Entwurf 33 N10c): Tastaturteil auf 40H-43H.
+    if (cfg.aup && !installAup(cfg.aup_alpha))
+        throw std::runtime_error("AUP: " + aup_fehler_);
 }
 
 void A5120Machine::wireBackplane() {
@@ -277,6 +280,27 @@ std::vector<k1520::serial::SerialAnschluss*> A5120Machine::serielleAnschluesse()
 // gesendete Tastaturbytes, IUS in der Daisy-Chain) und den K5122 (offener
 // Lesetransfer + gehaltenes /BUSRQ).  Auf echter Hardware raeumt die /RESET-
 // Leitung des Backplane genau das ab.
+bool A5120Machine::installAup(AUP::Alpha alpha) {
+    aup_fehler_.clear();
+    if (!bestueckbar()) { aup_fehler_ = "AUP nur vor dem ersten Lauf/Reset steckbar"; return false; }
+    if (aup_)           { aup_fehler_ = "Es steckt bereits eine AUP"; return false; }
+    for (int p = AUP::kBasis; p < AUP::kBasis + 4; ++p) {   // erst pruefen, dann anmelden
+        if (const BusDevice* d = bus_.ioOwner(static_cast<uint8_t>(p))) {
+            char buf[96];
+            std::snprintf(buf, sizeof buf, "E/A-Tor %02XH belegt (%s)", p, d->deviceName());
+            aup_fehler_ = buf;
+            return false;
+        }
+    }
+    AUP::Config c;
+    c.uhr = &total_cycles_;
+    c.takt_hz = 2'457'600;   // ZRE-Takt (wie k6022TaktHz)
+    c.alpha = alpha;
+    aup_ = std::make_unique<AUP>(c);
+    aup_->attachToBus(bus_);
+    return true;
+}
+
 void A5120Machine::resetHardware() {
     stop_.store(false);
     // Ausstehende Disketten-Aenderungen zuerst wegschreiben: der /RESET raeumt den
@@ -292,6 +316,7 @@ void A5120Machine::resetHardware() {
     kbd_.reset();       // K7637: Tastenwiederholung/LEDs/serielle Warteschlange
     if (em_) em_->reset();  // EM: PIO hochohmig ⇒ RESET16/Pull-ups; DRAM + A22 bleiben
     if (k3521_) k3521_->reset();   // K3521: nur der /SUE-Merker faellt, der Inhalt bleibt
+    if (aup_) aup_->reset();       // AUP: wie Kommando FFH (Annahme A6), gehaltene Tasten bleiben
     rafReset();             // RAF (gesteckt?): nur das Latch sperrt, der Inhalt bleibt
     k6022Reset();           // K6022 (gesteckt?): PIOs zurueck, Band und Stanzband bleiben
     k5020Reset();             // K5020 (gesteckt?): PIOs zurueck, Baender bleiben liegen

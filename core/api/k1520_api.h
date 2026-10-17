@@ -137,6 +137,8 @@ K1520_API K1520Handle k1520_create_a5120_konfig(int ausfuehrung, int laderom, in
  *               - `k3521`      aus (Vorgabe) | Hex-Adresse im 4-KB-Raster 0..f000 (akkugepuffertes
  *                              4-KB-RAM K3521.30; Ablagedatei: k1520_k3521_datei)
  *               - `k3521_memdi` bus (Vorgabe) | memdi1 | memdi2 (nur mit k3521)
+ *               - `aup`        0 (Vorgabe) | 1 (AUP 062-8531 Tastaturteil auf 40H-43H, k1520_aup_*)
+ *               - `aup_alpha`  led (Vorgabe) | ohne | mit (Annahme zur Alpha-Umschaltung, nur mit aup)
  * @param drive0..3 wie bei k1520_create_configured; NULL/"" = Vorgabe der Ausfuehrung.
  * Unbekannter Schluessel/Wert oder unzulaessige Kombination → NULL mit Grund in
  * k1520_last_init_error.  Die Zahlen-Fassung k1520_create_a5120_konfig bleibt daneben bestehen.
@@ -640,6 +642,37 @@ K1520_API uint8_t     k1520_k3521_peek(K1520Handle h, uint16_t offset);
 K1520_API int         k1520_k3521_sue(K1520Handle h);
 /** @brief /SUE setzen/loeschen (Test/Oberflaeche); false ohne Karte.  Der Inhalt bleibt. */
 K1520_API bool        k1520_k3521_akku_leer(K1520Handle h, int leer);
+
+/* ─── AUP 062-8531, Tastaturteil (Entwurf 33 N10c, core/cards/aup/aup.h) ─────────────────────
+ * Nur A5120: E/A 40H-43H, vom Gast abgefragt (kein Interrupt).  Gesteckt ueber `aup=1` im
+ * Konfigurationstext von k1520_create_a5120_text oder k1520_aup_install (nach dem Anlegen, VOR
+ * dem ersten k1520_run/k1520_reset).  Kennungen (Vertrag): @p tastatur 0 = K7633
+ * (Terminaltastatur), 1 = Kundentastatur; @p pos = Matrixposition des Belegs (K7633 00H-47H,
+ * Kundentastatur 38H-47H).  Schluesselschalter SS1/SS2 = K7633-Position 00H/01H (Code AAH/A9H).
+ * Ohne Karte: false / -1 / 0. */
+
+/** @brief AUP stecken; false + Grund in k1520_last_init_error (Maschine, Zeitpunkt, Tor belegt). */
+K1520_API bool        k1520_aup_install(K1520Handle h);
+K1520_API bool        k1520_aup_installed(K1520Handle h);
+/** @brief Taste druecken (@p gedrueckt != 0) oder loesen (fadensicher); false ohne Karte oder
+ *  wenn an der Position keine Taste ist. */
+K1520_API bool        k1520_aup_taste(K1520Handle h, int tastatur, int pos, int gedrueckt);
+/** @brief Schluesselschalter @p n (1 = SS1, 2 = SS2) ein/aus; Einschalten sendet seinen Code. */
+K1520_API bool        k1520_aup_schluessel(K1520Handle h, int n, int an);
+/** @brief Stellung des Schluesselschalters: 1/0; -1 ohne Karte oder bei falschem @p n. */
+K1520_API int         k1520_aup_schluessel_stand(K1520Handle h, int n);
+/** @brief Zuletzt angenommenes Kommandobyte (OUT 43H; FFH nach Reset); -1 ohne Karte. */
+K1520_API int         k1520_aup_kommando(K1520Handle h);
+/** @brief Lampen, 1 = leuchtet: Bit 0 SEL, Bit 1 ALPHA, Bit 2 GET, Bit 3 Fehler (blinkend);
+ *  -1 ohne Karte. */
+K1520_API int         k1520_aup_lampen(K1520Handle h);
+/** @brief Fortlaufender Zaehler der Hupensignale (Oberflaeche bildet die Differenz); 0 ohne Karte. */
+K1520_API uint32_t    k1520_aup_hupe(K1520Handle h);
+/** @brief Code einer Position laut AUP-EPROM-Tabelle (@p alpha != 0: K7633 "mit Alpha");
+ *  -1 = keine Taste, 0 = Taste ohne Code.  Ohne Handle. */
+K1520_API int         k1520_aup_code(int tastatur, int pos, int alpha);
+/** @brief Positionsname (K7633 "A10", "SS1"; Kundentastatur "0".."9", "F3D"/"F3F"); "" = keine Taste. */
+K1520_API const char* k1520_aup_tastenname(int tastatur, int pos);
 
 /* ─── Debug ──────────────────────────────────────────────────────────────── */
 /** @brief Read memory through the machine bus for diagnostics. */

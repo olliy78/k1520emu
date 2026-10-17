@@ -62,7 +62,7 @@ message(STATUS "CLI-Tests: ${_cli_count} Faelle aus cases/*.cli")
 # em256 braucht fuer die U8001-Firmware das z8kasm DIESES Baus — im Cross-Bau
 # (MinGW) waere das eine .exe, die der Bau nicht ausfuehren kann; dort fehlt der
 # Abgleich (der native Lauf hat ihn).
-set(_cpm_programme sertest romread)
+set(_cpm_programme sertest romread auptest)
 if(NOT CMAKE_CROSSCOMPILING)
     list(APPEND _cpm_programme em256)
 endif()

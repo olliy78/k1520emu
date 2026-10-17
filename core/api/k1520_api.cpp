@@ -1669,6 +1669,71 @@ bool k1520_k3521_akku_leer(K1520Handle h, int leer) {
     return true;
 }
 
+// ─── AUP 062-8531, Tastaturteil (Entwurf 33 N10c) ────────────────────────────
+namespace {
+AUP* aupKarte(K1520Handle h) {
+    auto* a = h ? dynamic_cast<A5120Machine*>(toMachine(h)) : nullptr;
+    return a ? a->aup() : nullptr;
+}
+bool aupTastatur(int t, AUP::Tastatur& out) {
+    if (t != 0 && t != 1) return false;
+    out = static_cast<AUP::Tastatur>(t);
+    return true;
+}
+}  // namespace
+
+bool k1520_aup_install(K1520Handle h) {
+    auto* a = h ? dynamic_cast<A5120Machine*>(toMachine(h)) : nullptr;
+    if (!a) { g_init_error = "AUP nur am A5120"; return false; }
+    g_init_error.clear();
+    if (!a->installAup()) { g_init_error = a->aupFehler(); return false; }
+    return true;
+}
+
+bool k1520_aup_installed(K1520Handle h) { return aupKarte(h) != nullptr; }
+
+bool k1520_aup_taste(K1520Handle h, int tastatur, int pos, int gedrueckt) {
+    AUP* k = aupKarte(h);
+    AUP::Tastatur t;
+    return k && aupTastatur(tastatur, t) && k->taste(t, pos, gedrueckt != 0);
+}
+
+bool k1520_aup_schluessel(K1520Handle h, int n, int an) {
+    AUP* k = aupKarte(h);
+    return k && k->schluessel(n, an != 0);
+}
+
+int k1520_aup_schluessel_stand(K1520Handle h, int n) {
+    const AUP* k = aupKarte(h);
+    if (!k || (n != 1 && n != 2)) return -1;
+    return k->schluesselAn(n) ? 1 : 0;
+}
+
+int k1520_aup_kommando(K1520Handle h) {
+    const AUP* k = aupKarte(h);
+    return k ? k->kommando() : -1;
+}
+
+int k1520_aup_lampen(K1520Handle h) {
+    const AUP* k = aupKarte(h);
+    return k ? k->lampen() : -1;
+}
+
+uint32_t k1520_aup_hupe(K1520Handle h) {
+    const AUP* k = aupKarte(h);
+    return k ? k->hupe() : 0;
+}
+
+int k1520_aup_code(int tastatur, int pos, int alpha) {
+    AUP::Tastatur t;
+    return aupTastatur(tastatur, t) ? AUP::code(t, pos, alpha != 0) : -1;
+}
+
+const char* k1520_aup_tastenname(int tastatur, int pos) {
+    AUP::Tastatur t;
+    return aupTastatur(tastatur, t) ? AUP::name(t, pos) : "";
+}
+
 // ─── Terminals des P8000 (Entwurf 25 §10.9, P20d) ───────────────────────────
 // Genau ein Terminal je Handle: am P8000 die Konsole tty1 (Kern- oder Originalterminal), an
 // „P8000 Terminal" das Originalterminal selbst.  Index i ≠ 0 und andere Maschinen → Ruhewerte.

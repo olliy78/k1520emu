@@ -316,6 +316,8 @@ protected:
     virtual K1520Bus& systemBus() = 0;
     /** @brief Aus run() und reset(): ab hier ist die Bestueckung fest. */
     void bestueckungAbschliessen() { bestueckbar_ = false; }
+    /** @brief Noch vor dem ersten run()/reset() (Zusatzkarten einer einzelnen Maschine, AUP). */
+    bool bestueckbar() const { return bestueckbar_; }
     /** @brief Netz-Ein der RAF: Inhalt verworfen (ohne Stand-by-Pufferung, §3.4). */
     void rafPowerOn() { if (raf_) raf_->powerOn(); }
     /** @brief Systemweiter /RESET: nur das Latch sperrt, der Inhalt bleibt (§3.4). */

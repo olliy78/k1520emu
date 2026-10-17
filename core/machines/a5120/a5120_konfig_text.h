@@ -20,6 +20,8 @@
  *   em          = none | em064 | em256
  *   k3521       = aus | <Hex-Adresse im 4-KB-Raster, 0 .. f000>   akkugepuffertes RAM K3521.30
  *   k3521_memdi = bus | memdi1 | memdi2   (S1:02, nur mit k3521)
+ *   aup         = 0 | 1           AUP 062-8531, Tastaturteil auf 40H-43H (Entwurf 33 N10c)
+ *   aup_alpha   = led | ohne | mit   Annahme A3: wer die K7633-Tabelle waehlt (nur mit aup=1)
  *   (die Ablagedatei der K3521 steht NICHT im Text — Werte werden kleingeschrieben und
  *    Leerraum entfernt; Pfad ueber k1520_k3521_datei bzw. --k3521-datei)
  */
@@ -101,9 +103,18 @@ inline bool wert(A5120Machine::Config& cfg, const std::string& schluessel_in,
         else if (v == "memdi1") cfg.k3521_memdi = K3521::Memdi::Memdi1;
         else if (v == "memdi2") cfg.k3521_memdi = K3521::Memdi::Memdi2;
         else { err = "k3521_memdi: unbekannt '" + v + "' (bus|memdi1|memdi2)"; return false; }
+    } else if (k == "aup") {
+        if      (v == "1" || v == "ja")   cfg.aup = true;
+        else if (v == "0" || v == "nein") cfg.aup = false;
+        else { err = "aup: unbekannt '" + v + "' (0|1)"; return false; }
+    } else if (k == "aup_alpha") {
+        if      (v == "led")  cfg.aup_alpha = AUP::Alpha::NachLed;
+        else if (v == "ohne") cfg.aup_alpha = AUP::Alpha::Ohne;
+        else if (v == "mit")  cfg.aup_alpha = AUP::Alpha::Mit;
+        else { err = "aup_alpha: unbekannt '" + v + "' (led|ohne|mit)"; return false; }
     } else {
         err = "A5120-Konfiguration: unbekannter Schluessel '" + k +
-              "' (ausfuehrung|ram|bildschirm|schalter|tastatur|laderom|kassette|em|k3521|k3521_memdi)";
+              "' (ausfuehrung|ram|bildschirm|schalter|tastatur|laderom|kassette|em|k3521|k3521_memdi|aup|aup_alpha)";
         return false;
     }
     return true;
@@ -117,6 +128,10 @@ inline bool pruefe(const A5120Machine::Config& cfg, bool schalter_gesetzt, std::
     }
     if (cfg.k3521_basis < 0 && cfg.k3521_memdi != K3521::Memdi::Bus) {
         err = "k3521_memdi: nur mit k3521";
+        return false;
+    }
+    if (!cfg.aup && cfg.aup_alpha != AUP::Alpha::NachLed) {
+        err = "aup_alpha: nur mit aup=1";
         return false;
     }
     return true;

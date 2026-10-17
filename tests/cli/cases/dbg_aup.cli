@@ -1,0 +1,17 @@
+# k1520dbg --aup (Entwurf 33 N10c): Befehl `aup` zeigt Kommando/Lampen/Schluessel, `aup taste`
+# drueckt und loest eine Taste, `aup schluessel` legt einen Schluesselschalter um.
+tool:    k1520dbg
+disk:    cpa_cpa780_k5601_noclock.hfe
+run:     --aup %DISK%
+stdin:
+  aup
+  aup taste 0 47
+  aup taste 1 38
+  aup schluessel 1 an
+  aup
+  q
+expect:  AUP 40H-43H  Kommando FFH  Lampen: -  Hupe 0  verworfen 0
+expect:  K7633 47H (F01) gedrueckt und geloest, Code C0H
+expect:  keine Taste Kunde an Position 38H
+expect:  SS1 an  SS2 aus  Tabelle: ohne Alpha (Alpha nach ALPHA-LED)
+forbid:  unknown command

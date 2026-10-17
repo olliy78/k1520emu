@@ -540,6 +540,27 @@ _lib.k1520_k3521_sue.argtypes = [K1520Handle]
 _lib.k1520_k3521_sue.restype = ctypes.c_int
 _lib.k1520_k3521_akku_leer.argtypes = [K1520Handle, ctypes.c_int]
 _lib.k1520_k3521_akku_leer.restype = ctypes.c_bool
+# AUP 062-8531, Tastaturteil (Entwurf 33 N10c)
+_lib.k1520_aup_install.argtypes = [K1520Handle]
+_lib.k1520_aup_install.restype = ctypes.c_bool
+_lib.k1520_aup_installed.argtypes = [K1520Handle]
+_lib.k1520_aup_installed.restype = ctypes.c_bool
+_lib.k1520_aup_taste.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+_lib.k1520_aup_taste.restype = ctypes.c_bool
+_lib.k1520_aup_schluessel.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_int]
+_lib.k1520_aup_schluessel.restype = ctypes.c_bool
+_lib.k1520_aup_schluessel_stand.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_aup_schluessel_stand.restype = ctypes.c_int
+_lib.k1520_aup_kommando.argtypes = [K1520Handle]
+_lib.k1520_aup_kommando.restype = ctypes.c_int
+_lib.k1520_aup_lampen.argtypes = [K1520Handle]
+_lib.k1520_aup_lampen.restype = ctypes.c_int
+_lib.k1520_aup_hupe.argtypes = [K1520Handle]
+_lib.k1520_aup_hupe.restype = ctypes.c_uint32
+_lib.k1520_aup_code.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int]
+_lib.k1520_aup_code.restype = ctypes.c_int
+_lib.k1520_aup_tastenname.argtypes = [ctypes.c_int, ctypes.c_int]
+_lib.k1520_aup_tastenname.restype = ctypes.c_char_p
 # RAM-Floppy RAF (doc/design/22_raf512.md §6)
 _lib.k1520_raf_install.argtypes = [K1520Handle, ctypes.c_char_p]
 _lib.k1520_raf_install.restype = ctypes.c_bool
@@ -817,6 +838,9 @@ A5120_KONFIG_WERTE = {
     # K3521.30 (N10b): "aus" oder die Startadresse als 4-stellige Hex-Zahl im 4-KB-Raster.
     "k3521": ("aus",) + tuple(f"{i * 0x1000:04x}" for i in range(16)),
     "k3521_memdi": ("bus", "memdi1", "memdi2"),
+    # AUP 062-8531, Tastaturteil (N10c); aup_alpha = Annahme zur Alpha-Umschaltung.
+    "aup": ("0", "1"),
+    "aup_alpha": ("led", "ohne", "mit"),
 }
 # Reihenfolge der Kartenzahl, wie k1520_a5120_bildschirm sie meldet.
 A5120_BILDSCHIRME = ("k7024", "k7023", "beide")
@@ -1111,7 +1135,7 @@ class K1520Emulator:
                  ptape: bool = False, tape: bool = False, zeichensatz: str = "deutsch",
                  tastatur: Optional[str] = None, p8000: Optional[dict] = None,
                  ausfuehrung: Optional[str] = None, spe=1, laderom: Optional[str] = None,
-                 konfig: Optional[dict] = None):
+                 konfig: Optional[dict] = None, aup: bool = False):
         """Initialize emulator instance.
 
         Args:
@@ -1147,6 +1171,9 @@ class K1520Emulator:
                 gesteckt (vor dem ersten Lauf); Fehler → ValueError.
             ptape: Lochstreifen-Karte K6022 (SIF1000, E0H–E7H) stecken; an jeder
                 Maschine, wie ``raf`` direkt nach dem Anlegen.  Fehler → ValueError.
+            aup: nur A5120 — AUP 062-8531 (Tastaturteil K7633 + Kundentastatur, E/A 40H–43H)
+                direkt nach dem Anlegen stecken (gleichwertig ``konfig={"aup": True}``).
+                Fehler → ValueError.
             tape: Kassettenkarte K5020 (zwei K5200; A5120 30H, K8915 D0H, PRG 710 30H,
                 PC 1715 D0H) stecken, wie ``ptape`` direkt nach dem Anlegen.  Fehler → ValueError.
                 Bei der Ausführung ``"kmbg"`` steckt sie ohnehin (dann ohne Wirkung).
@@ -1301,6 +1328,12 @@ class K1520Emulator:
             _lib.k1520_destroy(handle)
             self._handle = None
             raise ValueError(reason or "K5020 nicht steckbar")
+        if aup and not _lib.k1520_aup_installed(handle) and not _lib.k1520_aup_install(handle):
+            reason = _lib.k1520_last_init_error()
+            reason = reason.decode("utf-8", "replace") if reason else ""
+            _lib.k1520_destroy(handle)
+            self._handle = None
+            raise ValueError(reason or "AUP nicht steckbar")
         self._running = False
         self._thread: Optional[threading.Thread] = None
 
@@ -2252,6 +2285,62 @@ class K1520Emulator:
     def k3521_akku_leer(self, leer: bool) -> bool:
         """/SUE setzen/löschen (Test); der Inhalt bleibt."""
         return bool(_lib.k1520_k3521_akku_leer(self._handle, 1 if leer else 0))
+
+    # ─── AUP 062-8531, Tastaturteil (Option des A5120, Entwurf 33 N10c) ─────
+    # Kennungen: tastatur 0 = K7633 (Terminaltastatur), 1 = Kundentastatur; pos = Matrixposition
+    # des Belegs (K7633 0x00-0x47, Kundentastatur 0x38-0x47).  Annahmen: core/cards/aup/aup.h.
+    AUP_K7633, AUP_KUNDE = 0, 1
+    #: Lampenbits von :meth:`aup_lampen`.
+    AUP_LAMPE_SEL, AUP_LAMPE_ALPHA, AUP_LAMPE_GET, AUP_LAMPE_FEHLER = 0x01, 0x02, 0x04, 0x08
+
+    def aup_install(self) -> None:
+        """AUP nach dem Anlegen stecken (vor dem ersten Lauf); ``ValueError`` mit Grund."""
+        if not _lib.k1520_aup_install(self._handle):
+            reason = _lib.k1520_last_init_error()
+            raise ValueError(reason.decode("utf-8", "replace") if reason else "AUP nicht steckbar")
+
+    @property
+    def aup_installed(self) -> bool:
+        return bool(_lib.k1520_aup_installed(self._handle))
+
+    def aup_taste(self, tastatur: int, pos: int, gedrueckt: bool = True) -> bool:
+        """Taste drücken/lösen; False ohne Karte oder ohne Taste an der Position."""
+        return bool(_lib.k1520_aup_taste(self._handle, tastatur, pos, 1 if gedrueckt else 0))
+
+    def aup_schluessel(self, n: int, an: bool) -> bool:
+        """Schlüsselschalter SS1 (n=1) / SS2 (n=2); Einschalten sendet AAH bzw. A9H."""
+        return bool(_lib.k1520_aup_schluessel(self._handle, n, 1 if an else 0))
+
+    def aup_schluessel_stand(self, n: int):
+        """Stellung True/False; ``None`` ohne Karte."""
+        v = int(_lib.k1520_aup_schluessel_stand(self._handle, n))
+        return None if v < 0 else bool(v)
+
+    @property
+    def aup_kommando(self) -> int:
+        """Zuletzt angenommenes Kommandobyte (OUT 43H); -1 ohne Karte."""
+        return int(_lib.k1520_aup_kommando(self._handle))
+
+    @property
+    def aup_lampen(self) -> int:
+        """Lampenbits (``AUP_LAMPE_*``, 1 = leuchtet); -1 ohne Karte."""
+        return int(_lib.k1520_aup_lampen(self._handle))
+
+    @property
+    def aup_hupe(self) -> int:
+        """Fortlaufender Zähler der Hupensignale."""
+        return int(_lib.k1520_aup_hupe(self._handle))
+
+    @staticmethod
+    def aup_code(tastatur: int, pos: int, alpha: bool = False) -> int:
+        """Code laut EPROM-Tabelle; -1 = keine Taste, 0 = Taste ohne Code."""
+        return int(_lib.k1520_aup_code(tastatur, pos, 1 if alpha else 0))
+
+    @staticmethod
+    def aup_tastenname(tastatur: int, pos: int) -> str:
+        """Positionsname ("A10", "SS1", "5" …); "" = keine Taste."""
+        v = _lib.k1520_aup_tastenname(tastatur, pos)
+        return v.decode("ascii", "replace") if v else ""
 
     # ─── A5120.16 ──────────────────────────────────────────────────────────
     def em_variant(self) -> str:
