@@ -577,6 +577,7 @@ public:
 
     /// @brief Wie viele Zubehoerdateien das letzte @ref insertAll ausgewertet und
     ///        uebersprungen hat („24 Dateien eingefuegt, 24 `.fileinfo` ausgewertet").
+    // (Hinweise: siehe lastTargetNotices)
     int lastAccessoryCount() const { return zubehoer_gezaehlt_; }
 
     /// @brief Legt @ref extract auch bei **CP/M** ein `.fileinfo` an?  Vorgabe: nein.
@@ -737,6 +738,26 @@ public:
     bool extractAll(const std::string& dest_dir, const TransferOptions&);
 
     /**
+     * @brief Die EINE Namensregel fuer jeden Auszug auf das Wirtsdateisystem.
+     *
+     * Liefert zu jedem Eintrag von @p eintraege (gleiche Reihenfolge) den Dateinamen,
+     * unter dem er im Zielordner (bzw. `SideN/`) landet.  Flache Dateisysteme (CP/M,
+     * UDOS, NDOS ...) kennen beliebige Bytes im Namen: `/Z/HOFFM`, `GW/ZSID.DOC`,
+     * `..`.  Deshalb: kein Pfadanteil (`/`, Backslash, `:`, Steuerzeichen werden `_`),
+     * ein fuehrender Punkt bekommt ein `_` davor (kein `..`, keine versteckte Datei,
+     * kein `.fileinfo`), ein leerer Name wird `_`.  Fallen zwei Eintraege derselben
+     * Seite auf denselben Namen (ohne Gross/Klein), bekommt der spaetere `~1`, `~2` ...;
+     * ein Eintrag, dessen Name unveraendert bleibt, behaelt ihn immer.  Unter UNIX
+     * (WEGA, tar) ist `/` der Verzeichnistrenner des Dateisystems — dort unveraendert.
+     * @param hinweise optional: je umgeschriebenem Namen eine Zeile fuers Protokoll.
+     */
+    std::vector<std::string> zielNamen(const std::vector<FileEntry>& eintraege,
+                                       std::vector<std::string>* hinweise = nullptr) const;
+
+    /// @brief Hinweise zu umgeschriebenen Namen des letzten @ref extractAll.
+    const std::vector<std::string>& lastTargetNotices() const { return ziel_hinweise_; }
+
+    /**
      * @brief Den Inhalt von @p src_dir einfuegen.
      *
      * Bei mehreren Volumes MUSS der Ordner genau die `SideN/`-Unterverzeichnisse
@@ -802,6 +823,7 @@ public:
     void noteError(const std::string& why) const { last_error_ = why; }
 
 private:
+    std::vector<std::string> ziel_hinweise_;   ///< @ref lastTargetNotices
     DiskVolume() = default;
 
     /// @brief Gemeinsamer Kern von @ref open und @ref openPhysical (§ Erkennung).

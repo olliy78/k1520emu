@@ -35,6 +35,16 @@ k1520disktool formats                                  bekannte Dateisysteme
 Schalter: `--fs NAME` (Erkennung übersteuern), `--volume N` (Seite),
 `--text`/`--binary`, `--as NAME`, `--force`, `--dry-run`, `--no-backup`.
 
+### Namen beim Auszug (`get`)
+
+Eine Regel für `get` mit und ohne Muster, `recover`, die Oberfläche und das
+Archiv (`DiskVolume::zielNamen`): in den Zielnamen kommt kein Pfadanteil.  Bei
+CP/M/UDOS-artigen Dateisystemen werden `/`, `\`, `:` und Steuerzeichen zu `_`
+(`/Z/HOFFM` → `_Z_HOFFM`, `GW/ZSID.DOC` → `GW_ZSID.DOC`), ein führender Punkt
+bekommt ein `_` davor (`..` → `_..`).  Fallen zwei Dateien auf denselben Namen
+(`A/B` und `A_B`), behält die unveränderte ihren Namen, die andere heißt `A_B~1`;
+auf stderr steht `Hinweis: …`.  Bei WEGA/tar ist `/` ein echter Pfad und bleibt.
+
 ## Ausgabe weiterverarbeiten
 
 `ls` gibt **ohne `-l` nur die Namen** aus, einen je Zeile — bei mehreren Seiten mit

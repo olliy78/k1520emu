@@ -1009,6 +1009,10 @@ int cmd_recover(const Optionen& o) {
             }
             std::string datei = r.funde[i].vorschlag;
             std::replace(datei.begin(), datei.end(), ':', '_');
+            // Vorschlag stammt aus Diskettenbytes: kein Pfadanteil, kein fuehrender Punkt.
+            std::replace(datei.begin(), datei.end(), '/', '_');
+            std::replace(datei.begin(), datei.end(), '\\', '_');
+            if (datei.empty() || datei[0] == '.') datei.insert(datei.begin(), '_');
             ziel /= datei;
             if (!v->recoverExtract(static_cast<int>(i), ziel.string())) {
                 std::cerr << "Fehler: " << v->lastError() << "\n";
@@ -1052,6 +1056,7 @@ int cmd_get(const Optionen& o) {
     if (o.rest.size() == 2) {
         if (!v->extractAll(o.ziel, t)) { std::cerr << "Fehler: " << v->lastError() << "\n";
                                          return kFehler; }
+        for (const std::string& h : v->lastTargetNotices()) std::cerr << "Hinweis: " << h << "\n";
         std::cout << v->list().size() << " Dateien nach " << o.ziel << "\n";
         return kOk;
     }
@@ -1059,19 +1064,24 @@ int cmd_get(const Optionen& o) {
     std::error_code ec;
     fs::create_directories(o.ziel, ec);
 
+    const std::vector<FileEntry> alle = v->list();
+    std::vector<std::string> hinweise;
+    const std::vector<std::string> zielnamen = v->zielNamen(alle, &hinweise);
+    for (const std::string& h : hinweise) std::cerr << "Hinweis: " << h << "\n";
     int n = 0;
     for (size_t i = 2; i < o.rest.size(); ++i) {
         const FileRef muster = FileRef::parse(o.rest[i], o.volume);
         const bool mit_seite = o.rest[i].find('/') != std::string::npos;
 
-        for (const FileEntry& e : v->list()) {
+        for (size_t ei = 0; ei < alle.size(); ++ei) {
+            const FileEntry& e = alle[ei];
             if (mit_seite && e.volume != muster.volume) continue;
             if (!passt(muster.name, e.qualifiedName())) continue;
             // WEGA: nur gewoehnliche Dateien haben Inhalt (Ordner entstehen mit)
             if (v->istUnix() && e.type != "-") continue;
 
-            std::string datei = e.qualifiedName();
-            std::replace(datei.begin(), datei.end(), ':', '_');
+            // DiskVolume::zielNamen: kein Pfadanteil, je Seite eindeutig.
+            const std::string& datei = zielnamen[ei];
             fs::path ziel = fs::path(o.ziel);
             if (v->volumeCount() > 1) {
                 ziel /= v->volumeDir(e.volume);

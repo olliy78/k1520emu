@@ -36,6 +36,10 @@ dieselbe Bibliothek und kommen deshalb immer zum selben Ergebnis.
    einem unpassenden Format geöffnet —, steht das in der linken Hälfte:
    *Keine Dateien gefunden*.
 3. **Holen** — Dateien links markieren, dann `→|`. Ganze Diskette: `→→|`.
+   Enthält ein CP/M-Name ein `/` oder `\` (Disketten aus WEGA-Übertragungen:
+   `/Z/HOFFM`, `GW/ZSID.DOC`), wird es zu `_`, ein führender Punkt bekommt ein `_`
+   davor; fallen zwei Namen zusammen, erhält der spätere `~1` (Hinweis im Protokoll).
+   Der Zielordner wird nie verlassen.
 4. **Ändern erlaubt?** Eine geöffnete Diskette ist zunächst **schreibgeschützt**.
    Wer schreiben will, hebt den Schutz bewusst auf: *Diskette ▸ Schreibschutz*
    (Strg+R) — der Knopf rechts in der Symbolleiste wechselt dann von 🔒 `R/O`

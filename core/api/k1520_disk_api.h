@@ -355,6 +355,9 @@ K1520_API bool        k1520d_entry_details_ready(K1520Disk h, int i);
 K1520_API bool        k1520d_entry_load_details(K1520Disk h, int i);
 K1520_API int         k1520d_entry_volume(K1520Disk h, int i);
 K1520_API const char* k1520d_entry_name(K1520Disk h, int i);
+/// Dateiname des Eintrags im Wirtsdateisystem (DiskVolume::zielNamen): ohne
+/// Pfadanteil, auf der Seite eindeutig.  Gilt fuer jeden Auszug.
+K1520_API const char* k1520d_entry_target_name(K1520Disk h, int i);
 K1520_API int         k1520d_entry_user(K1520Disk h, int i);
 K1520_API uint64_t    k1520d_entry_size(K1520Disk h, int i);
 K1520_API const char* k1520d_entry_type(K1520Disk h, int i);

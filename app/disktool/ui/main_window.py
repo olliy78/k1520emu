@@ -1734,12 +1734,20 @@ class MainWindow(QMainWindow):
         ziel = Path(dest_dir)
         ziel.mkdir(parents=True, exist_ok=True)
         try:
+            # Zielname = die EINE Regel des Kerns (DiskVolume::zielNamen): ohne
+            # Pfadanteil und je Seite eindeutig.  Ein Name wie '/Z/HOFFM' darf weder
+            # aus dem Ordner ausbrechen noch auf 'HOFFM' verkuerzt mit einem anderen
+            # kollidieren.
+            eintraege = {e.ref: e for e in self.tool.list_names()}
             for ref in refs:
                 unter = ziel
                 if "/" in ref and self.tool.volume_count > 1:
                     unter = ziel / ref.split("/", 1)[0]
                     unter.mkdir(parents=True, exist_ok=True)
-                name = ref.split("/")[-1].replace(":", "_")
+                e = eintraege.get(ref)
+                name = (e.target_name if e else "") or ref.split("/")[-1].replace(":", "_")
+                if e is not None and e.ist_unix:
+                    name = name.split("/")[-1]       # WEGA/tar: '/' ist ein Pfad, wie bisher
                 self.tool.extract(ref, unter / name, text=self.text_mode)
         except K1520DiskError as e:
             self._fehler("Extrahieren", str(e))

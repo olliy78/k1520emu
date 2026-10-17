@@ -522,9 +522,11 @@ def _erwartete_namen(eintraege) -> dict:
             continue
         if e.ist_unix and e.type != "-":
             continue            # WEGA: Verzeichnisse/Geraete sind keine Dateien des Auszugs
-        datei = e.name.replace(":", "_")
-        if not e.ist_unix:
-            datei = datei.replace("/", "_")      # wie DiskVolume::extractAll (CP/M-Namen)
+        # Die Regel des Kerns (DiskVolume::zielNamen) — nicht nachrechnen: sie
+        # entscheidet auch Kollisionen (`~1`).
+        datei = e.target_name or e.name.replace(":", "_")
+        if not e.target_name and not e.ist_unix:
+            datei = datei.replace("/", "_")
         erwartet[f"{e.side_dir}/{datei}" if e.side_dir else datei] = e
     return erwartet
 

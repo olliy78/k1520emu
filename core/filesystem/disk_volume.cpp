@@ -28,6 +28,7 @@
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <set>
 #include <sstream>
 
 namespace fs = std::filesystem;
@@ -3026,11 +3027,72 @@ bool DiskVolume::planSector(uint8_t cyl, uint8_t head, const TrackCodec::NewSect
 
 // ─── Stapeloperationen ───────────────────────────────────────────────────────
 
+std::vector<std::string> DiskVolume::zielNamen(const std::vector<FileEntry>& eintraege,
+                                               std::vector<std::string>* hinweise) const {
+    const bool unix_ = istUnix();
+    std::vector<std::string> roh, orig;
+    for (const FileEntry& e : eintraege) {
+        std::string n = e.qualifiedName();
+        std::replace(n.begin(), n.end(), ':', '_');       // Nutzerbereich-Praefix "3:NAME"
+        orig.push_back(n);
+        if (!unix_) {
+            // CP/M-Namen sind beliebige Bytes: "/Z/HOFFM" (OS/M-Diskette mit UNIX-Namen)
+            // bricht als absoluter Pfad aus dem Zielordner aus, "GW/ZSID.DOC" schriebe in
+            // einen nicht vorhandenen Unterordner.
+            for (char& c : n)
+                if (c == '/' || c == '\\' || static_cast<unsigned char>(c) < 0x20) c = '_';
+            if (n.empty() || n[0] == '.') n.insert(n.begin(), '_');   // "..", ".", ".fileinfo"
+        }
+        roh.push_back(std::move(n));
+    }
+    if (unix_) return roh;
+
+    auto klein = [](std::string s) {
+        for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        return s;
+    };
+    // Zwei Durchgaenge: wessen Name nicht umgeschrieben werden musste, behaelt ihn;
+    // erst danach bekommen die Umgeschriebenen (und Kollidierenden) ihre Nummer.
+    std::vector<std::string> aus(eintraege.size());
+    std::set<std::string> belegt;                          // "<seite>\n<name klein>"
+    auto schluessel = [&](size_t i, const std::string& n) {
+        return std::to_string(eintraege[i].volume) + "\n" + klein(n);
+    };
+    for (int durchgang = 0; durchgang < 2; ++durchgang) {
+        for (size_t i = 0; i < eintraege.size(); ++i) {
+            const bool unveraendert = (roh[i] == orig[i]);
+            if ((durchgang == 0) != unveraendert) continue;
+            std::string n = roh[i];
+            if (!belegt.insert(schluessel(i, n)).second) {
+                for (int k = 1;; ++k) {
+                    const std::string cand = roh[i] + "~" + std::to_string(k);
+                    if (belegt.insert(schluessel(i, cand)).second) { n = cand; break; }
+                }
+                if (hinweise)
+                    hinweise->push_back("Name '" + eintraege[i].qualifiedName()
+                                        + "' kollidiert im Zielordner, gespeichert als '" + n + "'");
+            } else if (!unveraendert && hinweise) {
+                hinweise->push_back("Name '" + eintraege[i].qualifiedName()
+                                    + "' enthaelt Pfadzeichen, gespeichert als '" + n + "'");
+            }
+            aus[i] = std::move(n);
+        }
+    }
+    return aus;
+}
+
 bool DiskVolume::extractAll(const std::string& dest_dir, const TransferOptions& opt) {
     std::error_code ec;
     fs::create_directories(dest_dir, ec);
     if (ec) return fail("Zielordner nicht anlegbar: " + dest_dir);
 
+    // Zielnamen EINMAL fuer die ganze Diskette (Kollisionen gelten je Seite).
+    const std::vector<FileEntry> alle = list();
+    ziel_hinweise_.clear();
+    const std::vector<std::string> zn = zielNamen(alle, &ziel_hinweise_);
+    std::map<std::pair<int, std::string>, std::string> zielname;
+    for (size_t i = 0; i < alle.size(); ++i)
+        zielname[{alle[i].volume, alle[i].qualifiedName()}] = zn[i];
     for (int v = 0; v < volumeCount(); ++v) {
         const std::string unter = volumeDir(v);
         const fs::path    ziel  = unter.empty() ? fs::path(dest_dir)
@@ -3057,13 +3119,7 @@ bool DiskVolume::extractAll(const std::string& dest_dir, const TransferOptions& 
             }
             FileRef r{v, e.qualifiedName()};
             // Nutzerbereich-Praefix ("3:NAME") ist im Dateinamen unbrauchbar.
-            std::string datei = e.qualifiedName();
-            std::replace(datei.begin(), datei.end(), ':', '_');
-            // CP/M-Namen sind beliebige Bytes: "/Z/HOFFM" (OS/M-Diskette mit UNIX-Namen)
-            // wuerde als absoluter Pfad aus dem Zielordner ausbrechen, "GW/ZSID.DOC" in
-            // einen nicht vorhandenen Unterordner schreiben.  Unter UNIX ist '/' dagegen
-            // der Verzeichnistrenner des Dateisystems selbst.
-            if (!istUnix()) std::replace(datei.begin(), datei.end(), '/', '_');
+            const std::string datei = zielname[{v, e.qualifiedName()}];   // zielNamen
             // Der Eintrag ist hier schon vollstaendig gelesen — durchreichen, sonst
             // holte `extract` das Verzeichnis JE DATEI erneut (bei UDOS heisst das:
             // jeden Kopfsektor der Seite, an einer physischen Diskette Spur um Spur).
@@ -3080,7 +3136,8 @@ bool DiskVolume::extractAll(const std::string& dest_dir, const TransferOptions& 
             const std::string unter = volumeDir(v);
             for (const FileEntry& e : volumes_[static_cast<size_t>(v)].fs->list()) {
                 if (e.type == "D") continue;
-                eintraege.emplace_back(unter.empty() ? e.name : unter + "/" + e.name,
+                const std::string zn_ = zielname[{v, e.qualifiedName()}];
+                eintraege.emplace_back(unter.empty() ? zn_ : unter + "/" + zn_,
                                        angabeAus(e));
             }
         }
@@ -3122,13 +3179,7 @@ bool DiskVolume::extractAll(const std::string& dest_dir, const TransferOptions& 
             // Nur was von der Vorgabe abweicht, ist ueberhaupt eine Angabe wert;
             // eine gewoehnliche Datei im Bereich 0 braucht keine Zeile.
             if (a.name == e.name && !a.read_only && !a.system && !a.archived) continue;
-            std::string datei = e.qualifiedName();
-            std::replace(datei.begin(), datei.end(), ':', '_');
-            // CP/M-Namen sind beliebige Bytes: "/Z/HOFFM" (OS/M-Diskette mit UNIX-Namen)
-            // wuerde als absoluter Pfad aus dem Zielordner ausbrechen, "GW/ZSID.DOC" in
-            // einen nicht vorhandenen Unterordner schreiben.  Unter UNIX ist '/' dagegen
-            // der Verzeichnistrenner des Dateisystems selbst.
-            if (!istUnix()) std::replace(datei.begin(), datei.end(), '/', '_');
+            const std::string datei = zielname[{0, e.qualifiedName()}];
             eintraege.emplace_back(datei, a);
         }
         if (!eintraege.empty()

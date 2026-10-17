@@ -198,6 +198,8 @@ _lib.k1520d_entry_volume.argtypes = [_H, ctypes.c_int]
 _lib.k1520d_entry_volume.restype = ctypes.c_int
 _lib.k1520d_entry_name.argtypes = [_H, ctypes.c_int]
 _lib.k1520d_entry_name.restype = _CS
+_lib.k1520d_entry_target_name.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_entry_target_name.restype = _CS
 _lib.k1520d_entry_user.argtypes = [_H, ctypes.c_int]
 _lib.k1520d_entry_user.restype = ctypes.c_int
 _lib.k1520d_entry_size.argtypes = [_H, ctypes.c_int]
@@ -640,6 +642,8 @@ class Entry:
     #: erst, wenn der Kopfsektor der Datei gelesen ist (siehe DiskTool.list_names).
     details_loaded: bool = True
     side_dir: str = ""    # 'Side0'/'Side1' — leer bei einseitigen Dateisystemen
+    #: Dateiname im Wirtsdateisystem (ohne Pfadanteil, je Seite eindeutig) — fuer JEDEN Auszug.
+    target_name: str = ""
 
     # ── UDOS-Kopfsektorangaben (bei CP/M alle 0 bzw. leer) ──────────────────
     # Sie stehen NICHT in den Bytes der Datei, steuern aber, wie UDOS sie laedt
@@ -1381,6 +1385,7 @@ class DiskTool:
             hidden=bool(_lib.k1520d_entry_hidden(self._h, i)),
             damaged=bool(_lib.k1520d_entry_damaged(self._h, i)),
             side_dir=self.volume_dir(v),
+            target_name=_s(_lib.k1520d_entry_target_name(self._h, i)),
             entry=int(_lib.k1520d_entry_start(self._h, i)),
             record_len=int(_lib.k1520d_entry_record_len(self._h, i)),
             block_len=int(_lib.k1520d_entry_block_len(self._h, i)),

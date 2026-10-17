@@ -227,8 +227,10 @@ def _cmd_get(d, o) -> int:
         name = e.side_prefix + e.name
         if not _passt(name, o.rest):
             continue
-        d.extract(e.ref, ziel / name.replace("/", "_"), text=o.text)
-        print(f"{name} → {ziel / name.replace('/', '_')}")
+        # Zielname des Kerns (DiskVolume::zielNamen): ohne Pfadanteil, eindeutig.
+        ziel_name = e.side_prefix.replace("/", "_") + (e.target_name or e.name.replace("/", "_"))
+        d.extract(e.ref, ziel / ziel_name, text=o.text)
+        print(f"{name} → {ziel / ziel_name}")
         n += 1
     if n == 0:
         print("Fehler: kein Eintrag passt", file=sys.stderr)

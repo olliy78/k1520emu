@@ -60,10 +60,11 @@ const Kataloge& kataloge() {
 struct Handle {
     std::unique_ptr<DiskVolume> vol;
     std::vector<FileEntry>      eintraege;   ///< Stand des letzten k1520d_list
+    std::vector<std::string>    zielnamen;   ///< DiskVolume::zielNamen dazu (parallel)
     TrackView                   spur;        ///< Stand des letzten k1520d_track_scan
     // Puffer je Getter — die Rueckgabe gilt bis zum naechsten Aufruf DERSELBEN Funktion.
     std::string s_error, s_name, s_type, s_attrs, s_date, s_dir, s_label, s_created,
-                s_segments, s_blocks;
+                s_segments, s_blocks, s_ziel;
     std::string s_fmt, s_fs, s_alt, s_remarks, s_fit, s_check, s_container, s_tarwarn;
     std::string s_bid, s_bobj, s_btext, s_bsum;   ///< Puffer der Pruefung
     std::string s_sid, s_stitel, s_swarum;        ///< Puffer der Checkliste (§5a)
@@ -476,12 +477,14 @@ extern "C" uint64_t k1520d_volume_used(K1520Disk h, int v) {
 extern "C" int k1520d_list(K1520Disk h) {
     if (!h) return 0;
     H(h)->eintraege = H(h)->vol->list();
+    H(h)->zielnamen = H(h)->vol->zielNamen(H(h)->eintraege);
     return static_cast<int>(H(h)->eintraege.size());
 }
 
 extern "C" int k1520d_list_names(K1520Disk h) {
     if (!h) return 0;
     H(h)->eintraege = H(h)->vol->listNames();
+    H(h)->zielnamen = H(h)->vol->zielNamen(H(h)->eintraege);
     return static_cast<int>(H(h)->eintraege.size());
 }
 
@@ -508,6 +511,12 @@ extern "C" int k1520d_entry_volume(K1520Disk h, int i) {
 extern "C" const char* k1520d_entry_name(K1520Disk h, int i) {
     const FileEntry* e = eintrag(h, i);
     return e ? halte(H(h)->s_name, e->qualifiedName()) : "";
+}
+
+extern "C" const char* k1520d_entry_target_name(K1520Disk h, int i) {
+    if (!eintrag(h, i)) return "";
+    const auto& z = H(h)->zielnamen;
+    return i < static_cast<int>(z.size()) ? halte(H(h)->s_ziel, z[static_cast<size_t>(i)]) : "";
 }
 
 extern "C" int k1520d_entry_user(K1520Disk h, int i) {
