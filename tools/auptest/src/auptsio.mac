@@ -1,0 +1,121 @@
+	TITLE	'AUPTSIO - Pruefprogramm AUP-Sonderschnittstelle (CTC/SIO B0H-B7H)'
+	.Z80
+;
+; auptsio.mac - sendet "HALLO" ueber SIO-Kanal B der AUP 062-8531 (Sonderschnittstelle)
+;               und liest zurueck, was am Stecker X2 ankommt (Entwurf 33 N10d).
+;
+; Registermodell (ANNAHME A9 im Emulator, core/cards/aup/aup.h):
+;   B0H-B3H  CTC U857 (Kanal 0..3);  B4H Daten A, B5H Steuer A, B6H Daten B, B7H Steuer B
+;   SIO-Kanal B wird von CTC-Kanal 0 getaktet (Zeitgeber, ZC/TO0 -> TxCB/RxCB).
+; 9600 Bd bei 2,4576 MHz: SIO x16, CTC Zeitgeber Vorteiler 16, Zeitkonstante 1.
+; Gepollt, kein Interrupt.
+;
+; Ausgabe:  "AUPTSIO V0.1 ..."  /  "SENDE HALLO"  /  "EMPF xxxxx" + "AUPTSIO OK"
+;           oder "AUPTSIO KEIN EMPFANG" (kein Loop / keine Gegenstelle) / "Keine
+;           Sonderschnittstelle (IN B7H = FFH)".
+;
+; Bau: python3 tools/auptest/build.py   (M80 + LINKMT ueber cparun, tools/cpm_bau.py)
+; Lizenz: MIT
+;
+BDOS	EQU	0005H
+WBOOT	EQU	0000H
+F_DCIO	EQU	6
+F_PRINT	EQU	9
+
+CTC0	EQU	0B0H
+SIOCB	EQU	0B7H		; Steuer B
+SIODB	EQU	0B6H		; Daten B
+ANZ	EQU	5		; Zeichen
+
+	ORG	100H
+START:
+	LD	SP,STAPEL
+	LD	DE,M_KOPF
+	CALL	PUTS
+	IN	A,(SIOCB)
+	CP	0FFH
+	JP	Z,KEINE
+	; CTC Kanal 0: Zeitgeber, Vorteiler 16, Zeitkonstante folgt, Zeitkonstante 1
+	LD	A,05H
+	OUT	(CTC0),A
+	LD	A,01H
+	OUT	(CTC0),A
+	; SIO Kanal B: WR4 x16/1 Stopp/keine Paritaet, WR3 Empfang 8 Bit frei, WR5 Senden 8 Bit, RTS
+	LD	A,18H		; WR0: Kanal-Reset
+	OUT	(SIOCB),A
+	LD	A,04H
+	OUT	(SIOCB),A
+	LD	A,44H
+	OUT	(SIOCB),A
+	LD	A,03H
+	OUT	(SIOCB),A
+	LD	A,0C1H
+	OUT	(SIOCB),A
+	LD	A,05H
+	OUT	(SIOCB),A
+	LD	A,6AH
+	OUT	(SIOCB),A
+	LD	DE,M_SENDE
+	CALL	PUTS
+	LD	HL,TEXT
+	LD	B,ANZ
+SEND:	IN	A,(SIOCB)
+	BIT	2,A		; Sendepuffer leer
+	JR	Z,SEND
+	LD	A,(HL)
+	OUT	(SIODB),A
+	INC	HL
+	DJNZ	SEND
+	; Empfang: bis ANZ Zeichen oder Frist
+	LD	HL,PUFFER
+	LD	C,ANZ
+	LD	DE,0
+EMPF:	IN	A,(SIOCB)
+	BIT	0,A		; Zeichen da
+	JR	NZ,DA
+	DEC	DE
+	LD	A,D
+	OR	E
+	JR	NZ,EMPF
+	JR	FERTIG		; Frist (65536 Abfragen) abgelaufen
+DA:	IN	A,(SIODB)
+	LD	(HL),A
+	INC	HL
+	LD	DE,0		; Frist neu
+	DEC	C
+	JR	NZ,EMPF
+FERTIG:	LD	A,'$'
+	LD	(HL),A		; Puffer abschliessen
+	LD	A,C
+	OR	A
+	JR	NZ,NIX
+	LD	DE,M_EMPF
+	CALL	PUTS
+	LD	DE,PUFFER
+	CALL	PUTS
+	LD	DE,M_OK
+	CALL	PUTS
+	JP	WBOOT
+NIX:	LD	DE,M_NIX
+	CALL	PUTS
+	JP	WBOOT
+
+KEINE:	LD	DE,M_KEINE
+	CALL	PUTS
+	JP	WBOOT
+
+PUTS:	LD	C,F_PRINT
+	JP	BDOS
+
+M_KOPF:	DB	'AUPTSIO V0.1  AUP-Sonderschnittstelle (B0H-B7H)',0DH,0AH,'$'
+M_SENDE: DB	'SENDE HALLO',0DH,0AH,'$'
+M_EMPF:	DB	'EMPF $'
+M_OK:	DB	0DH,0AH,'AUPTSIO OK',0DH,0AH,'$'
+M_NIX:	DB	'AUPTSIO KEIN EMPFANG',0DH,0AH,'$'
+M_KEINE: DB	'Keine Sonderschnittstelle (IN B7H = FFH)',0DH,0AH,'$'
+TEXT:	DB	'HALLO'
+PUFFER:	DS	ANZ+1
+	DS	64
+STAPEL	EQU	$
+
+	END	START

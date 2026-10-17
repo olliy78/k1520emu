@@ -1,0 +1,188 @@
+	TITLE	'AUPTEST - Pruefprogramm AUP 062-8531 Tastaturteil'
+	.Z80
+;
+; auptest.mac - zeigt die Tastencodes der AUP 062-8531 (K7633 und Kundentastatur)
+;               an und schaltet deren Lampen/Hupe (Entwurf 33 N10c).
+;
+; Registermodell (doc/a5130_k8924/aup_analyse.md §1.3):
+;   IN  41H  Gueltigkeitsregister: ein Code steht bereit (je Tastatur ein Bit)
+;   IN  42H  Tastencode; das Lesen loescht die Gueltigkeit
+;   OUT 43H  Kommando: Bit7 = 1 (Kennung), Bit6 Hupe (0 = ein), Bit5 Fehlerlampe,
+;            Bit4 GET-LED, Bit1 ALPHA-LED, Bit0 SEL-LED (jeweils 0 = an); FFH = Reset
+; Kein Interrupt: das Programm fragt ab.
+;
+; ANNAHME (wie im Emulator, core/cards/aup/aup.h A1): Bit 0 = K7633, Bit 1 =
+; Kundentastatur, die uebrigen Bits 0.  Ohne Karte liest IN 41H FFH -> "keine AUP".
+;
+; Ausgabe je Taste eine Zeile:  "TT xx" (K7633) bzw. "KT xx" (Kundentastatur),
+; bei druckbarem Code dahinter das Zeichen in Hochkommas.  Bedienung an der
+; Rechnertastatur:  S/A/G/F schalten SEL/ALPHA/GET/Fehlerlampe um, H = ein
+; Hupensignal, R = Reset der AUP (FFH), Q oder ^C = Ende.  Nach jedem Kommando
+; "KMD xx".
+;
+; Bau: python3 tools/auptest/build.py   (M80 + LINKMT ueber cparun, tools/cpm_bau.py)
+; Lizenz: MIT
+;
+BDOS	EQU	0005H
+WBOOT	EQU	0000H
+F_DCIO	EQU	6		; direkte Konsolein-/ausgabe (E=0FFH: Zeichen holen, 0 = keins)
+F_PRINT	EQU	9		; Text bis '$'
+
+AUPGUE	EQU	41H		; Gueltigkeitsregister
+AUPCOD	EQU	42H		; Tastencoderegister
+AUPKMD	EQU	43H		; Kommandobyte
+
+	ORG	100H
+START:
+	LD	SP,STAPEL
+	LD	DE,M_KOPF
+	CALL	PUTS
+	IN	A,(AUPGUE)
+	LD	B,A
+	AND	0FCH		; Annahme A1: Bits 2..7 sind 0
+	JP	NZ,KEINE
+	LD	A,0FFH		; Reset der AUP, alle Lampen aus
+	LD	(KMD),A
+	OUT	(AUPKMD),A
+	LD	DE,M_HILFE
+	CALL	PUTS
+
+SCHLEIFE:
+	IN	A,(AUPGUE)
+	LD	B,A
+	AND	03H
+	JR	Z,KONSOLE
+	IN	A,(AUPCOD)	; holt den Code und loescht die Gueltigkeit
+	LD	(CODE),A
+	LD	DE,M_TT
+	LD	A,B
+	AND	01H
+	JR	NZ,TT
+	LD	DE,M_KT
+TT:	CALL	PUTS
+	LD	A,(CODE)
+	CALL	HEX2
+	LD	A,(CODE)
+	CP	20H
+	JR	C,ZEILE
+	CP	7FH
+	JR	NC,ZEILE
+	LD	E,' '
+	CALL	PUTC
+	LD	E,27H
+	CALL	PUTC
+	LD	A,(CODE)
+	LD	E,A
+	CALL	PUTC
+	LD	E,27H
+	CALL	PUTC
+ZEILE:	CALL	CRLF
+
+KONSOLE:
+	LD	C,F_DCIO
+	LD	E,0FFH
+	CALL	BDOS
+	OR	A
+	JR	Z,SCHLEIFE
+	CP	03H		; ^C
+	JP	Z,ENDE
+	AND	5FH		; Grossbuchstabe
+	CP	'Q'
+	JP	Z,ENDE
+	LD	B,01H
+	CP	'S'
+	JR	Z,KIPPE
+	LD	B,02H
+	CP	'A'
+	JR	Z,KIPPE
+	LD	B,10H
+	CP	'G'
+	JR	Z,KIPPE
+	LD	B,20H
+	CP	'F'
+	JR	Z,KIPPE
+	CP	'H'
+	JR	Z,HUPE
+	CP	'R'
+	JR	Z,RESET
+	JR	SCHLEIFE
+
+KIPPE:	LD	A,(KMD)
+	XOR	B
+	OR	80H		; Kennung
+	OR	40H		; Hupe aus
+	LD	(KMD),A
+	JR	SENDE
+HUPE:	LD	A,(KMD)
+	AND	0BFH		; einmal mit Hupe ein; gemerkt bleibt der Stand ohne
+	JR	SENDE1
+RESET:	LD	A,0FFH
+	LD	(KMD),A
+SENDE:	LD	A,(KMD)
+SENDE1:	OUT	(AUPKMD),A
+	PUSH	AF
+	LD	DE,M_KMD
+	CALL	PUTS
+	POP	AF
+	CALL	HEX2
+	CALL	CRLF
+	JP	SCHLEIFE
+
+ENDE:	LD	A,0FFH
+	OUT	(AUPKMD),A
+	LD	DE,M_ENDE
+	CALL	PUTS
+	JP	WBOOT
+
+KEINE:	PUSH	BC		; B = gelesener Wert (BDOS veraendert BC)
+	LD	DE,M_KEINE
+	CALL	PUTS
+	POP	BC
+	LD	A,B
+	CALL	HEX2
+	LD	DE,M_KEINE2
+	CALL	PUTS
+	JP	WBOOT
+
+; --- Ausgabe --------------------------------------------------------------
+PUTS:	LD	C,F_PRINT
+	JP	BDOS
+
+PUTC:	LD	C,F_DCIO	; E = Zeichen
+	JP	BDOS
+
+CRLF:	LD	E,0DH
+	CALL	PUTC
+	LD	E,0AH
+	JP	PUTC
+
+HEX2:	PUSH	AF		; A als zwei Hexziffern
+	RRCA
+	RRCA
+	RRCA
+	RRCA
+	CALL	HEX1
+	POP	AF
+HEX1:	AND	0FH
+	ADD	A,90H
+	DAA
+	ADC	A,40H
+	DAA
+	LD	E,A
+	JP	PUTC
+
+M_KOPF:	DB	'AUPTEST V0.1  AUP 062-8531 Tastaturteil (40H-43H)',0DH,0AH,'$'
+M_HILFE: DB	'S/A/G/F = SEL/ALPHA/GET/FEHLER, H = HUPE, R = RESET, Q = ENDE',0DH,0AH,'$'
+M_TT:	DB	'TT $'
+M_KT:	DB	'KT $'
+M_KMD:	DB	'KMD $'
+M_ENDE:	DB	'AUPTEST ENDE',0DH,0AH,'$'
+M_KEINE: DB	'Keine AUP auf 40H-43H (IN 41H = $'
+M_KEINE2: DB	'H)',0DH,0AH,'$'
+
+KMD:	DB	0FFH
+CODE:	DB	0
+	DS	64
+STAPEL	EQU	$
+
+	END	START

@@ -1,0 +1,8 @@
+# boot_trace --bildschirm beide (Entwurf 33 N4): K7024 + K7023 stecken, Anfangsstellung K7024;
+# CP/A bootet bis A>, der Bildschirmbericht kommt von der K7024 (80 Spalten).
+tool:    boot_trace
+disk:    cpa_cpa780_k5601_noclock.hfe
+run:     -L /dev/null --bildschirm beide --until "screen ~ \"A>\"" -c 80000000 -p 1 %DISK%
+expect:  Bildschirm:  beide (K7024 + K7023), angezeigt: K7024 80x24
+expect:  Screen (VRAM as text, 80 cols
+forbid:  not met

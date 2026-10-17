@@ -1,0 +1,897 @@
+	TITLE	'K3521TST - Pruefprogramm K3521.30 (batteriegepuffertes RAM)'
+	.Z80
+;
+; k3521tst.mac - Pruefprogramm fuer die K3521.30 (4 KB CMOS-RAM mit Akkupufferung)
+;                unter CP/A.  Teil des Projekts K1520emu, Autor olliy78 (Entwurf 33 N10i).
+;
+; Aufruf:  K3521TST <hexadresse> <modus>        (modus T = Test, E = Editor)
+;
+; Das 4-KB-Fenster ab <hexadresse> (4-KB-Raster) muss im freien TPA liegen: hinter
+; Programm und Stapel, unter dem BDOS (Wort bei 0006H).  Sonst "Adresse nicht
+; zulaessig" mit Hilfetext.
+;
+; Modus T (zerstoerungsfrei): der Inhalt des Fensters wird in einen Puffer AUSSERHALB
+;   des Fensters gesichert, dann laufen die Muster 00, FF, 55, AA, Adressmuster (und
+;   invers), Wanderbit 1 und 0 (je 8 Durchlaeufe) und March C-, zuletzt wird der
+;   Inhalt zurueckgeschrieben und gegen die Sicherung geprueft.  Je Muster eine Zeile
+;   OK bzw. FEHLER n mit Adresse/Soll/Ist des ersten Fehlers; am Ende "K3521TST OK"
+;   bzw. "K3521TST FEHLER n".
+;
+; Modus E (Editor): der Bildschirm (K7024, 80 x 24 Zeichen ab F800H; BIOS-Quelle
+;   bioscrt.mac) zeigt den Inhalt des Fensters als Text, nichtdruckbare Bytes als '.'.
+;   Druckbare Zeichen (20H-7EH) gehen SOFORT an der Cursorposition in den Speicher.
+;   ANNAHMEN zu den Tasten (CP/A-Standardstrings der Kursortasten, bios.mac "costs"):
+;   links ^H (08H), rechts ^D (04H), hoch ^E (05H), runter ^X (18H); zusaetzlich ^S
+;   (13H) = links.  08H ist zugleich Backspace und nur Kursor-links.  DEL (7FH)
+;   schreibt ein Leerzeichen an die Cursorstelle und geht eine Stelle zurueck.
+;   ESC (1BH) oder ^C (03H) beendet (^C ist zugleich "Seite runter" der K7637: die
+;   Seitentasten sind deshalb nicht belegt).  Der Bildschirm wird direkt beschrieben;
+;   den sichtbaren Cursor stellt der BIOS-Bildschirmtreiber: Steuerzeichen 0CH
+;   (loeschen, links oben), 02H (Cursor an), ESC zeile spalte (je binaer ab 0,
+;   "geht auch bei CP/A").  Bild und Cursor laufen mit, der Ausschnitt scrollt zeilenweise.
+;
+; Bau: python3 tools/k3521tst/build.py   (M80 + LINKMT ueber cparun, tools/cpm_bau.py)
+; Lizenz: MIT
+;
+BDOS	EQU	0005H
+WBOOT	EQU	0000H
+F_DCIO	EQU	6		; direkte Konsolein-/ausgabe (E=0FFH: Zeichen holen, 0 = keins)
+F_PRINT	EQU	9		; Text bis '$'
+VRAM	EQU	0F800H		; K7024: 80 x 24 Zeichen
+WINLEN	EQU	1000H		; 4 KB
+
+	ORG	100H
+START:
+	LD	SP,STAPEL
+	CALL	ARGS		; Carry: Fehler, DE = Meldung
+	JP	C,HILFE
+	LD	A,(MODUS)
+	CP	'E'
+	JP	Z,EDIT
+	JP	TEST
+
+; --- Kommandozeile --------------------------------------------------------
+; Rueckgabe: NC = in Ordnung (ADR, MODUS gesetzt); C = Fehler, DE = Meldung.
+ARGS:	LD	HL,0
+	LD	(ADR),HL
+	XOR	A
+	LD	(ANZ),A
+	LD	A,(0080H)
+	OR	A
+	JP	Z,AKEINE
+	LD	B,A
+	LD	HL,0081H
+	CALL	SKIPSP
+	JP	Z,AKEINE
+AH1:	LD	A,B
+	OR	A
+	JR	Z,AH2
+	LD	A,(HL)
+	CALL	HEXDIG		; C = kein Hex, sonst A = 0..15
+	JR	C,AH2
+	PUSH	HL
+	LD	HL,(ADR)
+	ADD	HL,HL
+	ADD	HL,HL
+	ADD	HL,HL
+	ADD	HL,HL
+	OR	L
+	LD	L,A
+	LD	(ADR),HL
+	POP	HL
+	LD	A,(ANZ)
+	INC	A
+	LD	(ANZ),A
+	INC	HL
+	DEC	B
+	JR	AH1
+AH2:	LD	A,(ANZ)
+	OR	A
+	JP	Z,AKEINHX
+	CP	5
+	JP	NC,AKEINHX
+	LD	A,B		; hinter der Zahl muss Leerraum oder Ende folgen
+	OR	A
+	JP	Z,AKEINM
+	CALL	SKIPSP
+	JP	Z,AKEINM	; keine Modusangabe
+	LD	A,(HL)
+	CP	'a'
+	JR	C,AM1
+	AND	5FH
+AM1:	LD	(MODUS),A
+	INC	HL
+	DEC	B
+	CALL	SKIPSP
+	JP	NZ,AMEHR	; noch etwas dahinter
+	LD	A,(MODUS)
+	CP	'T'
+	JR	Z,AM2
+	CP	'E'
+	JP	NZ,AMODUS
+AM2:	CALL	LIMITS
+	LD	HL,(ADR)
+	LD	A,L
+	OR	A
+	JP	NZ,AUNZUL
+	LD	A,H
+	AND	0FH
+	JP	NZ,AUNZUL
+	LD	DE,(LIMLO)
+	OR	A
+	SBC	HL,DE		; ADR < LIMLO ?
+	JP	C,AUNZUL
+	LD	HL,(LIMHI)
+	LD	DE,(ADR)
+	OR	A
+	SBC	HL,DE		; LIMHI < ADR ?
+	JP	C,AUNZUL
+	CALL	WAEHLBUF
+	OR	A		; NC
+	RET
+AKEINE:	LD	DE,M_KEINE
+	SCF
+	RET
+AKEINHX: LD	DE,M_KEINHX
+	SCF
+	RET
+AKEINM:	LD	DE,M_KEINM
+	SCF
+	RET
+AMEHR:	LD	DE,M_MEHR
+	SCF
+	RET
+AMODUS:	LD	DE,M_MODUS
+	SCF
+	RET
+AUNZUL:	LD	DE,M_UNZUL
+	SCF
+	RET
+
+; Leerraum ueberspringen: HL/B nachfuehren; Z = Zeilenende, NZ = Zeichen in (HL)
+SKIPSP:	LD	A,B
+	OR	A
+	RET	Z
+	LD	A,(HL)
+	CP	' '
+	JR	Z,SK1
+	CP	09H
+	JR	Z,SK1
+	OR	1		; NZ
+	RET
+SK1:	INC	HL
+	DEC	B
+	JR	SKIPSP
+
+; Hexziffer: A = Zeichen -> A = Wert 0..15 (NC) oder C
+HEXDIG:	CP	'a'
+	JR	C,HD0
+	AND	5FH
+HD0:	SUB	'0'
+	RET	C
+	CP	10
+	JR	C,HDOK
+	SUB	7
+	CP	10
+	RET	C		; Zeichen zwischen '9' und 'A'
+	CP	16
+	CCF
+	RET
+HDOK:	OR	A
+	RET
+
+; Zulaessiger Bereich der Fensteradresse:
+;   LIMLO = erster 4-KB-Rasterwert ab Programmende (PEND)
+;   LIMHI = letzter, dessen Fenster noch unter dem BDOS-Einsprung (Wort bei 0006H) endet
+LIMITS:	LD	HL,PEND
+	LD	DE,0FFFH
+	ADD	HL,DE
+	LD	A,H
+	AND	0F0H
+	LD	H,A
+	LD	L,0
+	LD	(LIMLO),HL
+	LD	HL,(0006H)
+	LD	DE,WINLEN
+	OR	A
+	SBC	HL,DE
+	JR	NC,LI1
+	LD	HL,0
+LI1:	LD	A,H
+	AND	0F0H
+	LD	H,A
+	LD	L,0
+	LD	(LIMHI),HL
+	RET
+
+; Sicherungspuffer (4 KB) ausserhalb des Fensters: bevorzugt hinter dem Programm,
+; sonst unter dem BDOS.  Ein 4-KB-Fenster kann nie beide treffen.
+WAEHLBUF:
+	LD	HL,PEND
+	LD	DE,0FFH
+	ADD	HL,DE
+	LD	L,0		; BUF = naechste Seitengrenze
+	LD	(BUF),HL
+	LD	DE,WINLEN
+	ADD	HL,DE		; HL = BUF + 1000H
+	LD	DE,(ADR)
+	OR	A
+	SBC	HL,DE		; BUF+1000H - ADR
+	JR	C,WB1		; Fenster liegt ganz hinter dem Puffer: gut
+	JR	Z,WB1
+	; ADR < BUF+1000H: ueberlappt, wenn auch ADR+1000H > BUF
+	LD	HL,(ADR)
+	LD	DE,WINLEN
+	ADD	HL,DE
+	LD	DE,(BUF)
+	OR	A
+	SBC	HL,DE		; ADR+1000H - BUF
+	JR	C,WB1		; Fenster endet vor dem Puffer: gut
+	JR	Z,WB1
+	LD	HL,(0006H)
+	LD	L,0
+	LD	DE,WINLEN
+	OR	A
+	SBC	HL,DE
+	LD	(BUF),HL
+WB1:	RET
+
+; --- Hilfetext --------------------------------------------------------------
+HILFE:	PUSH	DE
+	LD	DE,M_HILFE
+	CALL	PUTS
+	POP	DE
+	CALL	PUTS		; die Meldung steht zuletzt, damit sie sichtbar bleibt
+	LD	A,(ANZ)
+	OR	A
+	JP	Z,WBOOT
+	LD	HL,(LIMLO)
+	LD	A,H
+	OR	L
+	JP	Z,WBOOT
+	LD	DE,M_ERLAUBT
+	CALL	PUTS
+	LD	HL,(LIMLO)
+	CALL	HEX4
+	LD	DE,M_BIS
+	CALL	PUTS
+	LD	HL,(LIMHI)
+	CALL	HEX4
+	LD	DE,M_ERLEND
+	CALL	PUTS
+	JP	WBOOT
+
+; ===========================================================================
+; Modus T: Speichertest
+; ===========================================================================
+TEST:	LD	DE,M_TKOPF
+	CALL	PUTS
+	LD	HL,(ADR)
+	CALL	HEX4
+	LD	DE,M_TPUFF
+	CALL	PUTS
+	LD	HL,(BUF)
+	CALL	HEX4
+	LD	DE,M_CRLF
+	CALL	PUTS
+	LD	HL,0
+	LD	(ERRALL),HL
+	LD	HL,(ADR)	; Sichern
+	LD	DE,(BUF)
+	LD	BC,WINLEN
+	LDIR
+	LD	DE,N_00
+	LD	A,00H
+	CALL	STGV
+	LD	DE,N_FF
+	LD	A,0FFH
+	CALL	STGV
+	LD	DE,N_55
+	LD	A,55H
+	CALL	STGV
+	LD	DE,N_AA
+	LD	A,0AAH
+	CALL	STGV
+	LD	DE,N_ADR
+	LD	A,00H
+	CALL	STGA
+	LD	DE,N_ADRI
+	LD	A,0FFH
+	CALL	STGA
+	LD	DE,N_WB1
+	LD	A,00H
+	CALL	STGW
+	LD	DE,N_WB0
+	LD	A,0FFH
+	CALL	STGW
+	LD	DE,N_MARCH
+	CALL	STGM
+	CALL	STGR		; Inhalt zurueckschreiben und pruefen
+	LD	HL,(ERRALL)
+	LD	A,H
+	OR	L
+	JR	NZ,TFEHL
+	LD	DE,M_TOK
+	CALL	PUTS
+	JP	WBOOT
+TFEHL:	LD	DE,M_TFEHL
+	CALL	PUTS
+	LD	HL,(ERRALL)
+	CALL	DEC16
+	LD	DE,M_CRLF
+	CALL	PUTS
+	JP	WBOOT
+
+; Stufe beginnen: DE = Name
+STBEG:	LD	C,F_PRINT
+	CALL	BDOS
+	LD	HL,0
+	LD	(STERR),HL
+	RET
+
+; Stufe beenden: OK oder FEHLER n + erster Fehler
+STEND:	LD	HL,(STERR)
+	LD	A,H
+	OR	L
+	JR	NZ,SE1
+	LD	DE,M_OK
+	JP	PUTS
+SE1:	LD	DE,M_FEHL
+	CALL	PUTS
+	LD	HL,(STERR)
+	CALL	DEC16
+	LD	DE,M_ERST
+	CALL	PUTS
+	LD	HL,(E_ADR)
+	CALL	HEX4
+	LD	DE,M_SOLL
+	CALL	PUTS
+	LD	A,(E_SOLL)
+	CALL	HEX2
+	LD	DE,M_IST
+	CALL	PUTS
+	LD	A,(E_IST)
+	CALL	HEX2
+	LD	DE,M_CRLF
+	JP	PUTS
+
+; Fehler melden: HL = Zelle, D = Soll, A = Ist.  Erhaelt alle Register.
+ERR:	PUSH	HL
+	PUSH	AF
+	LD	HL,(STERR)
+	LD	A,H
+	OR	L
+	INC	HL
+	LD	(STERR),HL
+	LD	HL,(ERRALL)
+	INC	HL
+	LD	(ERRALL),HL
+	JR	NZ,ER9		; nicht der erste Fehler dieser Stufe
+	POP	AF
+	POP	HL
+	LD	(E_ADR),HL
+	LD	(E_IST),A
+	PUSH	AF
+	LD	A,D
+	LD	(E_SOLL),A
+	POP	AF
+	RET
+ER9:	POP	AF
+	POP	HL
+	RET
+
+; Fenster mit A fuellen
+FILLA:	LD	HL,(ADR)
+	LD	BC,WINLEN
+FA1:	LD	(HL),A
+	INC	HL
+	DEC	BC
+	LD	E,A
+	LD	A,B
+	OR	C
+	LD	A,E
+	JR	NZ,FA1
+	RET
+
+; Fenster gegen A (Soll) pruefen
+VERA:	LD	HL,(ADR)
+	LD	BC,WINLEN
+	LD	D,A
+VA1:	LD	A,(HL)
+	CP	D
+	CALL	NZ,ERR
+	INC	HL
+	DEC	BC
+	LD	A,B
+	OR	C
+	JR	NZ,VA1
+	RET
+
+; Konstantes Muster A
+STGV:	LD	(PATV),A
+	CALL	STBEG
+	LD	A,(PATV)
+	CALL	FILLA
+	LD	A,(PATV)
+	CALL	VERA
+	JP	STEND
+
+; Adressmuster: Zelle = H xor L xor Maske (A)
+STGA:	LD	(MASK),A
+	CALL	STBEG
+	LD	HL,(ADR)
+	LD	BC,WINLEN
+	LD	A,(MASK)
+	LD	D,A
+GA1:	LD	A,H
+	XOR	L
+	XOR	D
+	LD	(HL),A
+	INC	HL
+	DEC	BC
+	LD	A,B
+	OR	C
+	JR	NZ,GA1
+	LD	HL,(ADR)
+	LD	BC,WINLEN
+GA2:	LD	A,H
+	XOR	L
+	LD	D,A
+	LD	A,(MASK)
+	XOR	D
+	LD	D,A
+	LD	A,(HL)
+	CP	D
+	CALL	NZ,ERR
+	INC	HL
+	DEC	BC
+	LD	A,B
+	OR	C
+	JR	NZ,GA2
+	JP	STEND
+
+; Wanderbit: A = 00H (eine 1 wandert) oder FFH (eine 0 wandert), 8 Durchlaeufe
+STGW:	LD	(MASK),A
+	CALL	STBEG
+	LD	A,1
+	LD	(WBV),A
+GW1:	LD	A,(WBV)
+	LD	D,A
+	LD	A,(MASK)
+	XOR	D
+	LD	(PATV),A
+	CALL	FILLA
+	LD	A,(PATV)
+	CALL	VERA
+	LD	A,(WBV)
+	ADD	A,A
+	LD	(WBV),A
+	JR	NZ,GW1
+	JP	STEND
+
+; March C-: w0 / up r0 w1 / up r1 w0 / down r0 w1 / down r1 w0 / r0
+STGM:	CALL	STBEG
+	XOR	A
+	CALL	FILLA
+	LD	DE,00FFH
+	CALL	MUP
+	LD	DE,0FF00H
+	CALL	MUP
+	LD	DE,00FFH
+	CALL	MDN
+	LD	DE,0FF00H
+	CALL	MDN
+	LD	DE,0000H
+	CALL	MUP
+	JP	STEND
+
+; aufsteigend: je Zelle lesen (Soll D), dann E schreiben
+MUP:	LD	HL,(ADR)
+	LD	BC,WINLEN
+MU1:	LD	A,(HL)
+	CP	D
+	CALL	NZ,ERR
+	LD	(HL),E
+	INC	HL
+	DEC	BC
+	LD	A,B
+	OR	C
+	JR	NZ,MU1
+	RET
+
+; absteigend
+MDN:	LD	HL,(ADR)
+	LD	BC,WINLEN-1
+	ADD	HL,BC
+	INC	BC
+MD1:	LD	A,(HL)
+	CP	D
+	CALL	NZ,ERR
+	LD	(HL),E
+	DEC	HL
+	DEC	BC
+	LD	A,B
+	OR	C
+	JR	NZ,MD1
+	RET
+
+; Inhalt zurueckschreiben, gegen die Sicherung pruefen
+STGR:	LD	DE,N_RUECK
+	CALL	STBEG
+	LD	HL,(BUF)
+	LD	DE,(ADR)
+	LD	BC,WINLEN
+	LDIR
+	LD	HL,(ADR)
+	LD	DE,(BUF)
+	LD	BC,WINLEN
+RV1:	LD	A,(DE)
+	CP	(HL)
+	JR	Z,RV2
+	PUSH	DE
+	LD	D,A
+	LD	A,(HL)
+	CALL	ERR
+	POP	DE
+RV2:	INC	HL
+	INC	DE
+	DEC	BC
+	LD	A,B
+	OR	C
+	JR	NZ,RV1
+	JP	STEND
+
+; ===========================================================================
+; Modus E: Editor
+; ===========================================================================
+EDIT:	LD	HL,0
+	LD	(CUR),HL
+	LD	(TOP),HL
+	LD	E,0CH		; Bildschirm loeschen, Cursor links oben
+	CALL	PUTC
+	LD	E,02H		; Cursor an
+	CALL	PUTC
+	CALL	DRAW
+	CALL	POSCUR
+EKEY:	LD	C,F_DCIO
+	LD	E,0FFH
+	CALL	BDOS
+	OR	A
+	JR	Z,EKEY
+	CP	1BH		; ESC
+	JP	Z,ENDE
+	CP	03H		; ^C
+	JP	Z,ENDE
+	CP	08H
+	JR	Z,ELINKS
+	CP	13H
+	JR	Z,ELINKS
+	CP	04H
+	JR	Z,ERECHTS
+	CP	05H
+	JR	Z,EHOCH
+	CP	18H
+	JR	Z,ERUNTER
+	CP	7FH
+	JR	Z,EDEL
+	CP	20H
+	JR	C,EKEY
+	JR	NC,ECHAR
+
+ECHAR:	CALL	SCHREIBE	; A = Zeichen an CUR schreiben
+	CALL	RECHTS
+	JR	EFERTIG
+EDEL:	LD	A,' '
+	CALL	SCHREIBE
+	CALL	LINKS
+	JR	EFERTIG
+ELINKS:	CALL	LINKS
+	JR	EFERTIG
+ERECHTS: CALL	RECHTS
+	JR	EFERTIG
+EHOCH:	LD	HL,(CUR)
+	LD	DE,80
+	OR	A
+	SBC	HL,DE
+	JR	C,EFERTIG
+	LD	(CUR),HL
+	JR	EFERTIG
+ERUNTER: LD	HL,(CUR)
+	LD	DE,80
+	ADD	HL,DE
+	LD	A,H
+	CP	10H		; >= 4096 ?
+	JR	NC,EFERTIG
+	LD	(CUR),HL
+EFERTIG: CALL	ADJ
+	CALL	C,DRAW
+	CALL	POSCUR
+	JR	EKEY
+
+ENDE:	LD	E,0CH
+	CALL	PUTC
+	LD	DE,M_EENDE
+	CALL	PUTS
+	JP	WBOOT
+
+LINKS:	LD	HL,(CUR)
+	LD	A,H
+	OR	L
+	RET	Z
+	DEC	HL
+	LD	(CUR),HL
+	RET
+RECHTS:	LD	HL,(CUR)
+	INC	HL
+	LD	A,H
+	CP	10H
+	RET	NC		; am Ende stehen bleiben
+	LD	(CUR),HL
+	RET
+
+; A in den Speicher an CUR und in die Anzeige
+SCHREIBE:
+	LD	(CHV),A
+	LD	HL,(CUR)
+	LD	DE,(ADR)
+	ADD	HL,DE
+	LD	A,(CHV)
+	LD	(HL),A
+	LD	A,(HL)		; zurueckgelesen anzeigen (zeigt auch Fehler der Karte)
+	CALL	DRUCKB
+	PUSH	AF
+	LD	HL,(CUR)
+	LD	DE,(TOP)
+	OR	A
+	SBC	HL,DE
+	LD	DE,VRAM
+	ADD	HL,DE
+	POP	AF
+	LD	(HL),A
+	RET
+
+; A -> druckbares Zeichen ('.' fuer alles ausserhalb 20H-7EH)
+DRUCKB:	CP	20H
+	JR	C,DB1
+	CP	7FH
+	RET	C
+DB1:	LD	A,'.'
+	RET
+
+; HL / 80: B = Quotient, HL = Rest
+DIV80:	LD	B,0
+	LD	DE,80
+DV1:	OR	A
+	SBC	HL,DE
+	JR	C,DV2
+	INC	B
+	JR	DV1
+DV2:	ADD	HL,DE
+	RET
+
+; HL = Anfang der Zeile, in der CUR steht
+RSTART:	LD	HL,(CUR)
+	CALL	DIV80
+	LD	HL,0
+	LD	DE,80
+	LD	A,B
+	OR	A
+	RET	Z
+RS1:	ADD	HL,DE
+	DJNZ	RS1
+	RET
+
+; Ausschnitt (TOP) so nachfuehren, dass CUR sichtbar ist; C = TOP geaendert
+ADJ:	CALL	RSTART
+	LD	DE,(TOP)
+	PUSH	HL
+	OR	A
+	SBC	HL,DE		; Zeilenanfang - TOP
+	JR	C,ADJHI
+	LD	DE,0731H	; letzte sichtbare Zeile hat Abstand 23 * 80 = 1840
+	OR	A
+	SBC	HL,DE
+	JR	C,ADJOK
+	POP	HL
+	LD	DE,1840
+	OR	A
+	SBC	HL,DE
+	LD	(TOP),HL
+	SCF
+	RET
+ADJHI:	POP	HL
+	LD	(TOP),HL
+	SCF
+	RET
+ADJOK:	POP	HL
+	OR	A
+	RET
+
+; Ausschnitt in den Bildschirmspeicher zeichnen (1920 Zellen)
+DRAW:	LD	HL,(TOP)
+	LD	(OFFV),HL
+	LD	DE,VRAM
+	LD	BC,1920
+DR1:	PUSH	BC
+	PUSH	DE
+	LD	HL,(OFFV)
+	LD	A,H
+	CP	10H
+	JR	NC,DRBL		; hinter dem Fenster: leer
+	LD	DE,(ADR)
+	ADD	HL,DE
+	LD	A,(HL)
+	CALL	DRUCKB
+	JR	DR2
+DRBL:	LD	A,' '
+DR2:	POP	DE
+	LD	(DE),A
+	INC	DE
+	LD	HL,(OFFV)
+	INC	HL
+	LD	(OFFV),HL
+	POP	BC
+	DEC	BC
+	LD	A,B
+	OR	C
+	JR	NZ,DR1
+	RET
+
+; Cursor des BIOS-Treibers auf die Stelle CUR setzen (ESC zeile spalte)
+POSCUR:	LD	HL,(CUR)
+	LD	DE,(TOP)
+	OR	A
+	SBC	HL,DE
+	CALL	DIV80
+	LD	A,L
+	LD	(PCOL),A
+	LD	A,B
+	LD	(PROW),A
+	LD	E,1BH
+	CALL	PUTC
+	LD	A,(PROW)
+	LD	E,A
+	CALL	PUTC
+	LD	A,(PCOL)
+	LD	E,A
+	JP	PUTC
+
+; --- Ausgabe ---------------------------------------------------------------
+PUTS:	LD	C,F_PRINT
+	JP	BDOS
+
+PUTC:	LD	C,F_DCIO	; E = Zeichen
+	JP	BDOS
+
+HEX4:	PUSH	HL		; HL als vier Hexziffern
+	LD	A,H
+	CALL	HEX2
+	POP	HL
+	LD	A,L
+HEX2:	PUSH	AF		; A als zwei Hexziffern
+	RRCA
+	RRCA
+	RRCA
+	RRCA
+	CALL	HEX1
+	POP	AF
+HEX1:	AND	0FH
+	ADD	A,90H
+	DAA
+	ADC	A,40H
+	DAA
+	LD	E,A
+	JP	PUTC
+
+; HL dezimal (ohne fuehrende Nullen)
+DEC16:	XOR	A
+	LD	(ZFLAG),A
+	LD	DE,10000
+	CALL	DDIG
+	LD	DE,1000
+	CALL	DDIG
+	LD	DE,100
+	CALL	DDIG
+	LD	DE,10
+	CALL	DDIG
+	LD	A,L
+	ADD	A,'0'
+	LD	E,A
+	JP	PUTC
+DDIG:	LD	B,0
+DD1:	OR	A
+	SBC	HL,DE
+	JR	C,DD2
+	INC	B
+	JR	DD1
+DD2:	ADD	HL,DE
+	LD	A,B
+	OR	A
+	JR	NZ,DD3
+	LD	A,(ZFLAG)
+	OR	A
+	RET	Z
+	XOR	A
+DD3:	LD	C,A
+	LD	A,1
+	LD	(ZFLAG),A
+	LD	A,C
+	ADD	A,'0'
+	LD	E,A
+	PUSH	HL
+	CALL	PUTC
+	POP	HL
+	RET
+
+; --- Texte ----------------------------------------------------------------
+M_HILFE: DB	'K3521TST V0.1 - Pruefprogramm fuer die K3521.30 (batteriegepuffertes 4-KB-RAM)',0DH,0AH
+	DB	'Teil des Projekts K1520emu, Autor olliy78.',0DH,0AH
+	DB	'Aufruf:   K3521TST <adresse> <modus>        Beispiel: K3521TST 8000 T',0DH,0AH
+	DB	'adresse   Anfang des 4-KB-Fensters, hex, im 4-KB-Raster (z. B. 8000); es muss',0DH,0AH
+	DB	'          im freien TPA liegen (hinter dem Programm, unter dem BDOS).',0DH,0AH
+	DB	'modus T   Speichertest, ZERSTOERUNGSFREI: Inhalt wird gesichert, dann laufen',0DH,0AH
+	DB	'          00, FF, 55, AA, Adressmuster, Wanderbit, March C-; zuletzt wird der',0DH,0AH
+	DB	'          Inhalt zurueckgeschrieben (nur bei Reset mitten im Test waere er',0DH,0AH
+	DB	'          weg).  Ausgabe je Muster OK/FEHLER mit Adresse, Soll, Ist; am Ende',0DH,0AH
+	DB	'          K3521TST OK bzw. K3521TST FEHLER n.',0DH,0AH
+	DB	'modus E   Editor: das Fenster erscheint als Text (nichtdruckbar = ''.''), Zeichen',0DH,0AH
+	DB	'          tippen schreibt SOFORT in die Karte.  Pfeile (^H ^D ^E ^X) bewegen,',0DH,0AH
+	DB	'          DEL = Leerzeichen und zurueck, ESC oder ^C beendet.',0DH,0AH,'$'
+M_KEINE: DB	'Keine Parameter.',0DH,0AH,'$'
+M_KEINHX: DB	'Adresse ist keine Hex-Zahl (1 bis 4 Stellen).',0DH,0AH,'$'
+M_KEINM: DB	'Modus fehlt (T oder E).',0DH,0AH,'$'
+M_MEHR:	DB	'Zu viele Parameter.',0DH,0AH,'$'
+M_MODUS: DB	'Modus nicht zulaessig (nur T oder E).',0DH,0AH,'$'
+M_UNZUL: DB	'Adresse nicht zulaessig (4-KB-Raster, im freien TPA hinter dem Programm).',0DH,0AH,'$'
+M_ERLAUBT: DB	'Erlaubt: $'
+M_BIS:	DB	'H bis $'
+M_ERLEND: DB	'H',0DH,0AH,'$'
+M_TKOPF: DB	'K3521TST V0.1  Fenster $'
+M_TPUFF: DB	'H, Sicherung bei $'
+M_CRLF:	DB	'H',0DH,0AH,'$'
+M_OK:	DB	'OK',0DH,0AH,'$'
+M_FEHL:	DB	'FEHLER $'
+M_ERST:	DB	', erster bei $'
+M_SOLL:	DB	'H Soll $'
+M_IST:	DB	' Ist $'
+M_TOK:	DB	'K3521TST OK',0DH,0AH,'$'
+M_TFEHL: DB	'K3521TST FEHLER $'
+M_EENDE: DB	'K3521TST ENDE',0DH,0AH,'$'
+N_00:	DB	'  Muster 00          $'
+N_FF:	DB	'  Muster FF          $'
+N_55:	DB	'  Muster 55          $'
+N_AA:	DB	'  Muster AA          $'
+N_ADR:	DB	'  Adressmuster       $'
+N_ADRI:	DB	'  Adressmuster inv.  $'
+N_WB1:	DB	'  Wanderbit 1        $'
+N_WB0:	DB	'  Wanderbit 0        $'
+N_MARCH: DB	'  March C-          $'
+N_RUECK: DB	'  Rueckschreiben     $'
+
+; --- Daten ----------------------------------------------------------------
+ADR:	DW	0		; Fensteranfang
+BUF:	DW	0		; Sicherungspuffer
+LIMLO:	DW	0
+LIMHI:	DW	0
+CUR:	DW	0
+TOP:	DW	0
+OFFV:	DW	0
+STERR:	DW	0
+ERRALL:	DW	0
+E_ADR:	DW	0
+E_SOLL:	DB	0
+E_IST:	DB	0
+MODUS:	DB	0
+ANZ:	DB	0
+PATV:	DB	0
+MASK:	DB	0
+WBV:	DB	0
+CHV:	DB	0
+PROW:	DB	0
+PCOL:	DB	0
+ZFLAG:	DB	0
+	DS	96
+STAPEL	EQU	$
+PEND	EQU	$
+
+	END	START

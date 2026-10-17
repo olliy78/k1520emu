@@ -37,6 +37,17 @@
  *                    v06 startet BCU 880 „SYL auf Spur 1“, doc/a5120_alt/laderom.md, AP A7)
  *     --tastatur k7636|k7637  Tastatur abweichend von der Ausfuehrung (BCU 880 V1.2:
  *                    neu + k7636 = K7024 80×24 + K7636 am U-Bus)
+ *     --ram k3526|k3525_1|k3525_2|k3525_4  RAM-Bestueckung (Entwurf 33 N4; Vorgabe k3526 = 64 KB;
+ *                    k3525_N = N K3525 a 16 KB ab 0000H; mit --em nur k3526)
+ *     --bildschirm k7024|k7023|beide  Bildschirmkarte(n) (Vorgabe k7024 80×24; beide = K7024 + K7023
+ *                    mit Umschalter, Anfangsstellung --schalter k7024|k7023).  Die Textausgabe
+ *                    (--until screen, Screen-Bericht) folgt der Stellung beim START — boot_trace
+ *                    legt den Schalter nicht um (dazu: k1520dbg, `screen select`)
+ *     --k3521 ADR|aus  akkugepuffertes 4-KB-RAM K3521.30 an der 4-KB-Adresse ADR (Hex, N10b);
+ *                    --k3521-memdi bus|memdi1|memdi2, --k3521-datei PFAD (Inhalt dauerhaft)
+ *     --aup          AUP 062-8531 Tastaturteil (K7633 + Kundentastatur) auf 40H-43H (A5120, N10c);
+ *                    --aup-alpha led|ohne|mit (Annahme zur Alpha-Umschaltung)
+ *     --aup-sonder   AUP mit Sonderschnittstelle (CTC B0H-B3H, SIO B4H-B7H, Kanal B nach aussen; N10d), steckt die AUP mit
  *     --format NAME  Katalogformat, mit dem die Diskette zuerst gemountet wird (bei .img
  *                    massgeblich, z. B. k5601_ss40_26x128; sonst cpa780, dann cpa800)
  *
@@ -311,6 +322,15 @@ int main(int argc, char** argv) {
     const char* laderom_opt = nullptr;        // --laderom v06|v09_1|v09_2 (AP A7)
     const char* format_opt  = nullptr;        // --format NAME: Katalogformat fuer .img (AP A7)
     const char* tastatur_opt = nullptr;       // --tastatur k7636|k7637 (AP A7)
+    const char* ram_opt = nullptr;            // --ram k3526|k3525_1|k3525_2|k3525_4 (Entwurf 33 N4)
+    const char* bildschirm_opt = nullptr;     // --bildschirm k7024|k7023|beide
+    const char* schalter_opt = nullptr;       // --schalter k7024|k7023: Anfangsstellung bei beide
+    const char* k3521_opt = nullptr;          // --k3521 ADR|aus: akkugepuffertes RAM (N10b)
+    const char* k3521_memdi_opt = nullptr;    // --k3521-memdi bus|memdi1|memdi2
+    const char* k3521_datei_opt = nullptr;    // --k3521-datei PFAD: Ablage des Inhalts
+    bool        aup_opt = false;              // --aup: AUP-Tastaturteil auf 40H-43H (N10c)
+    const char* aup_alpha_opt = nullptr;      // --aup-alpha led|ohne|mit
+    bool        aup_sonder_opt = false;       // --aup-sonder: Sonderschnittstelle (N10d)
     // Disk-mount mode (§6): COW default → the disk is copied to a temp file and that copy
     // is mounted, so a committed fixture is never modified (no more `mktemp; cp` ritual).
     // --rw mounts the original writable; --read-only/--ro mounts it write-protected.
@@ -440,6 +460,15 @@ int main(int argc, char** argv) {
         else if (!strcmp(argv[i], "--laderom") && i+1 < argc) { laderom_opt = argv[++i]; nur_a5120.push_back("--laderom"); }
         else if (!strcmp(argv[i], "--format") && i+1 < argc) { format_opt = argv[++i]; nur_a5120.push_back("--format"); }
         else if (!strcmp(argv[i], "--tastatur") && i+1 < argc) { tastatur_opt = argv[++i]; nur_a5120.push_back("--tastatur"); }
+        else if (!strcmp(argv[i], "--ram") && i+1 < argc) { ram_opt = argv[++i]; nur_a5120.push_back("--ram"); }
+        else if (!strcmp(argv[i], "--bildschirm") && i+1 < argc) { bildschirm_opt = argv[++i]; nur_a5120.push_back("--bildschirm"); }
+        else if (!strcmp(argv[i], "--schalter") && i+1 < argc) { schalter_opt = argv[++i]; nur_a5120.push_back("--schalter"); }
+        else if (!strcmp(argv[i], "--k3521") && i+1 < argc) { k3521_opt = argv[++i]; nur_a5120.push_back("--k3521"); }
+        else if (!strcmp(argv[i], "--k3521-memdi") && i+1 < argc) { k3521_memdi_opt = argv[++i]; nur_a5120.push_back("--k3521-memdi"); }
+        else if (!strcmp(argv[i], "--k3521-datei") && i+1 < argc) { k3521_datei_opt = argv[++i]; nur_a5120.push_back("--k3521-datei"); }
+        else if (!strcmp(argv[i], "--aup")) { aup_opt = true; nur_a5120.push_back("--aup"); }
+        else if (!strcmp(argv[i], "--aup-sonder")) { aup_opt = aup_sonder_opt = true; nur_a5120.push_back("--aup-sonder"); }
+        else if (!strcmp(argv[i], "--aup-alpha") && i+1 < argc) { aup_opt = true; aup_alpha_opt = argv[++i]; nur_a5120.push_back("--aup-alpha"); }
         else if (!strcmp(argv[i], "--em")) {
             em_variant = "em256";
             if (i+1 < argc && (!strcmp(argv[i+1],"em256") || !strcmp(argv[i+1],"em064")))
@@ -617,22 +646,30 @@ int main(int argc, char** argv) {
     if (em_variant) mcfg.em = !strcmp(em_variant,"em064") ? A5120Machine::Config::Em::em064
                                                           : A5120Machine::Config::Em::em256;
     { std::string err;
-      if (!dbgm::parseAusfuehrung(ausf_opt, lw_opt, mcfg, err, laderom_opt, tastatur_opt)) { fprintf(stderr, "%s\n", err.c_str()); return 2; } }
+      if (!dbgm::parseAusfuehrung(ausf_opt, lw_opt, mcfg, err, laderom_opt, tastatur_opt, ram_opt, bildschirm_opt, schalter_opt, k3521_opt, k3521_memdi_opt, k3521_datei_opt)) { fprintf(stderr, "%s\n", err.c_str()); return 2; }
+      if (aup_opt && (!a5120konfig::wert(mcfg, "aup", "1", err) ||
+                      (aup_alpha_opt && !a5120konfig::wert(mcfg, "aup_alpha", aup_alpha_opt, err)) ||
+                      (aup_sonder_opt && !a5120konfig::wert(mcfg, "aup_sonder", "1", err)))) {
+          fprintf(stderr, "--%s\n", err.c_str()); return 2; } }
     std::unique_ptr<A5120Machine> machine_p;
     try { machine_p = std::make_unique<A5120Machine>(mcfg); }
     catch (const std::exception& e) { fprintf(stderr, "Maschine: %s\n", e.what()); return 2; }
     A5120Machine& machine = *machine_p;
     // Textbild: am `Neu` der Bildspeicher F800H in CPU-Sicht (80×24, wie bisher), am alten
     // Geraet die K7023 (64×16 ab FC00H, Bit 7 = Kursor ausgeblendet).
-    const int scr_cols = machine.k7023() ? 64 : 80;
-    const int scr_rows = machine.k7023() ? 16 : 24;
+    const int scr_cols = machine.zeigtK7023() ? 64 : 80;
+    const int scr_rows = machine.zeigtK7023() ? 16 : 24;
     auto scrByte = [&](int r, int c) -> uint8_t {
-        if (machine.k7023()) return (uint8_t)(machine.screenChar(c, r) & 0x7F);
+        if (machine.zeigtK7023()) return (uint8_t)(machine.screenChar(c, r) & 0x7F);
         return machine.memReadDebug((uint16_t)(0xF800 + r*80 + c));
     };
+    if (!quiet && machine.bildschirm() == A5120Machine::Config::Bildschirm::Beide)
+        fprintf(stderr, "Bildschirm:  beide (K7024 + K7023), angezeigt: %s\n",
+                machine.zeigtK7023() ? "K7023 64x16" : "K7024 80x24");
     if (!quiet && machine.k7023())
-        fprintf(stderr, "Ausfuehrung: %s (K7023 64x16, K7636), Laufwerke %s/%s/%s/%s\n",
+        fprintf(stderr, "Ausfuehrung: %s (K7023 64x16, %s), Laufwerke %s/%s/%s/%s\n",
                 machine.ausfuehrung() == A5120Machine::Config::Ausfuehrung::Kmbg ? "KMBG" : "alt",
+                machine.k7636() ? "K7636" : "K7637",
                 mcfg.drive_profiles[0].c_str(), mcfg.drive_profiles[1].c_str(),
                 mcfg.drive_profiles[2].c_str(), mcfg.drive_profiles[3].c_str());
     { std::string err;

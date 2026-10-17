@@ -1,0 +1,17 @@
+# k1520dbg --bildschirm beide (Entwurf 33 N4): `screen select` legt den Umschalter zur Laufzeit um;
+# `screen` zeigt danach die andere Karte (K7023: 16 Zeilen a 64, K7024: 24 a 80).
+tool:    k1520dbg
+disk:    cpa_cpa780_k5601_noclock.hfe
+run:     --bildschirm beide %DISK%
+stdin:
+  gscreen "A>" 100000000
+  screen select k7023
+  screen
+  screen select k7024
+  screen
+  screen select
+  q
+expect:  Bildschirm: k7023 (64x16)
+expect:  Bildschirm: k7024 (80x24)
+expect:  screen select k7024|k7023   (angezeigt: k7024)
+forbid:  unknown command

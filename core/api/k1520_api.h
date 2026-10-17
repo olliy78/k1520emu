@@ -112,13 +112,54 @@ K1520_API int k1520_a5120_ausfuehrung(K1520Handle h);
  * @param laderom   0 = V0.9_2 (`zre.rom`, Vorgabe aller Ausfuehrungen), 1 = V0.9_1,
  *                  2 = V0.6 (liest Zylinder 1 — BCU 880 von den Disketten „SYL auf Spur 1“).
  * @param tastatur  0 = Vorgabe der Ausfuehrung (neu: K7637, alt/KMBG: K7636), 1 = K7637
- *                  (am alt/KMBG abgelehnt), 2 = K7636 (am „neu“: K7024 80×24 + K7636).
+ *                  (seit Entwurf 33 N1 auch am alt/KMBG: K7023 + K7637 an der K8025),
+ *                  2 = K7636 (am „neu“: K7024 80×24 + K7636).
  * Unbekannte Werte → NULL mit Grund in k1520_last_init_error.  Mit (a, 0, 0, …) bitgleich zu
  * k1520_create_a5120_ausfuehrung(a, …).
  */
 K1520_API K1520Handle k1520_create_a5120_konfig(int ausfuehrung, int laderom, int tastatur,
                                                 const char* drive0, const char* drive1,
                                                 const char* drive2, const char* drive3);
+/**
+ * @brief A5120 aus einem Konfigurationstext (Entwurf 33 §8 N4, Einzeloptionen RAM/Bildschirm/…).
+ *
+ * @param konfig `schluessel=wert` getrennt durch `;` oder `,` (Gross-/Kleinschreibung egal);
+ *               NULL/"" = Vorgabe (wie k1520_create).  Schluessel:
+ *               - `ausfuehrung` neu|alt|kmbg — Huelle, wird zuerst ausgewertet, der Rest ueberschreibt
+ *               - `ram`        k3526 (Vorgabe) | k3525_1 | k3525_2 | k3525_4 (16/32/64 KB K3525)
+ *               - `bildschirm` k7024 (Vorgabe) | k7023 | beide (zwei Karten + Umschalter,
+ *                              k1520_screen_select)
+ *               - `schalter`   k7024 | k7023 — Anfangsstellung, nur mit bildschirm=beide
+ *               - `tastatur`   k7637 | k7636
+ *               - `laderom`    v09_2 | v09_1 | v06
+ *               - `kassette`   0 | 1 (K5020 fest gesteckt)
+ *               - `em`         none | em064 | em256 (nur mit ram=k3526)
+ *               - `k3521`      aus (Vorgabe) | Hex-Adresse im 4-KB-Raster 0..f000 (akkugepuffertes
+ *                              4-KB-RAM K3521.30; Ablagedatei: k1520_k3521_datei)
+ *               - `k3521_memdi` bus (Vorgabe) | memdi1 | memdi2 (nur mit k3521)
+ *               - `aup`        0 (Vorgabe) | 1 (AUP 062-8531 Tastaturteil auf 40H-43H, k1520_aup_*)
+ *               - `aup_alpha`  led (Vorgabe) | ohne | mit (Annahme zur Alpha-Umschaltung, nur mit aup)
+ *               - `aup_sonder` 0 (Vorgabe) | 1 (AUP-Sonderschnittstelle: CTC B0H-B3H, SIO B4H-B7H,
+ *                              vierter serieller Anschluss; nur mit aup=1)
+ * @param drive0..3 wie bei k1520_create_configured; NULL/"" = Vorgabe der Ausfuehrung.
+ * Unbekannter Schluessel/Wert oder unzulaessige Kombination → NULL mit Grund in
+ * k1520_last_init_error.  Die Zahlen-Fassung k1520_create_a5120_konfig bleibt daneben bestehen.
+ */
+K1520_API K1520Handle k1520_create_a5120_text(const char* konfig,
+                                              const char* d0, const char* d1,
+                                              const char* d2, const char* d3);
+/** @brief Bildschirmbestueckung eines A5120: 0 = K7024, 1 = K7023, 2 = beide; -1 bei einer anderen Maschine. */
+K1520_API int k1520_a5120_bildschirm(K1520Handle h);
+/**
+ * @brief Umschalter K7024/K7023 (nur bei bildschirm=beide) umlegen: 0 = K7024, 1 = K7023.
+ * @return 0 = umgelegt; -1 = keine A5120 mit zwei Bildschirmkarten oder ungueltige Karte.
+ * Wirkt sofort auf Bild (k1520_framebuffer, k1520_fb_width/height, k1520_screen_char) und
+ * Bruecke Port 0AH Bit 6.  Zeiger UND Groesse des Bildes unter EINER Kernsperre holen.
+ */
+K1520_API int k1520_screen_select(K1520Handle h, int karte);
+/** @brief Angezeigte Karte: 0 = K7024, 1 = K7023; -1 bei einer anderen Maschine.  Nach einem
+ *         Zwischenstand laden (k1520_state_load/loadState) neu lesen — er setzt den Schalter. */
+K1520_API int k1520_screen_selected(K1520Handle h);
 /** @brief Gestecktes Lade-ROM eines A5120 (0 V0.9_2, 1 V0.9_1, 2 V0.6); -1 bei einer anderen Maschine. */
 K1520_API int k1520_a5120_laderom(K1520Handle h);
 /** @brief Tastatur eines A5120, wie gebaut: 1 = K7637, 2 = K7636; -1 bei einer anderen Maschine. */
@@ -590,6 +631,72 @@ K1520_API uint8_t     k1520_raf_peek(K1520Handle h, uint32_t adr);
 K1520_API bool        k1520_raf_load(K1520Handle h, const char* pfad);
 /** @brief Inhalt als Rohdatei sichern; false ohne RAF. */
 K1520_API bool        k1520_raf_save(K1520Handle h, const char* pfad);
+
+/* ─── K3521.30, akkugepuffertes 4-KB-RAM (Entwurf 33 N10b) ───────────────────
+ * Gesteckt ueber den Konfigurationstext von k1520_create_a5120_text (k3521=…).  Ohne Karte
+ * (und an anderen Maschinen): basis -1, peek 0xFF, die Schreibaufrufe false. */
+
+/** @brief Startadresse der K3521 (0000H..F000H) oder -1 ohne Karte. */
+K1520_API int         k1520_k3521_basis(K1520Handle h);
+/** @brief Ablagedatei binden: existiert sie, wird sie geladen (genau 4096 Byte, sonst false +
+ *  k1520_last_init_error), sonst entsteht sie beim Zurueckschreiben (nach 0,5 s Schreibpause
+ *  Maschinenzeit, bei k1520_k3521_flush und beim Zerstoeren des Handles). */
+K1520_API bool        k1520_k3521_datei(K1520Handle h, const char* pfad);
+/** @brief Sofort zurueckschreiben; true auch, wenn nichts zu tun ist; false ohne Karte/bei Fehler. */
+K1520_API bool        k1520_k3521_flush(K1520Handle h);
+/** @brief Byte des Karteninhalts (Offset 0..4095); 0xFF ohne Karte/ausserhalb. */
+K1520_API uint8_t     k1520_k3521_peek(K1520Handle h, uint16_t offset);
+/** @brief /SUE (Akku leer): 1/0, -1 ohne Karte.  Nur ein Zustand, nirgends verdrahtet. */
+K1520_API int         k1520_k3521_sue(K1520Handle h);
+/** @brief /SUE setzen/loeschen (Test/Oberflaeche); false ohne Karte.  Der Inhalt bleibt. */
+K1520_API bool        k1520_k3521_akku_leer(K1520Handle h, int leer);
+
+/* Mehrere Karten (N10h): bis zu 4 K3521, im Konfigurationstext mit '+' verbunden
+ * (`k3521=8000+9000`; das Komma trennt dort schon die Schluessel).  Die Funktionen oben meinen
+ * Karte 0; die mit `_n` nehmen den Index 0..anzahl-1 (ausserhalb: -1 / 0xFF / false). */
+K1520_API int         k1520_k3521_anzahl(K1520Handle h);
+K1520_API int         k1520_k3521_basis_n(K1520Handle h, int n);
+K1520_API bool        k1520_k3521_datei_n(K1520Handle h, int n, const char* pfad);
+K1520_API bool        k1520_k3521_flush_n(K1520Handle h, int n);
+K1520_API uint8_t     k1520_k3521_peek_n(K1520Handle h, int n, uint16_t offset);
+K1520_API int         k1520_k3521_sue_n(K1520Handle h, int n);
+K1520_API bool        k1520_k3521_akku_leer_n(K1520Handle h, int n, int leer);
+
+/* ─── AUP 062-8531, Tastaturteil (Entwurf 33 N10c, core/cards/aup/aup.h) ─────────────────────
+ * Nur A5120: E/A 40H-43H, vom Gast abgefragt (kein Interrupt).  Gesteckt ueber `aup=1` im
+ * Konfigurationstext von k1520_create_a5120_text oder k1520_aup_install (nach dem Anlegen, VOR
+ * dem ersten k1520_run/k1520_reset).  Kennungen (Vertrag): @p tastatur 0 = K7633
+ * (Terminaltastatur), 1 = Kundentastatur; @p pos = Matrixposition des Belegs (K7633 00H-47H,
+ * Kundentastatur 38H-47H).  Schluesselschalter SS1/SS2 = K7633-Position 00H/01H (Code AAH/A9H).
+ * Ohne Karte: false / -1 / 0. */
+
+/** @brief AUP stecken; false + Grund in k1520_last_init_error (Maschine, Zeitpunkt, Tor belegt). */
+K1520_API bool        k1520_aup_install(K1520Handle h);
+K1520_API bool        k1520_aup_installed(K1520Handle h);
+/** @brief Wie k1520_aup_install, mit Sonderschnittstelle (N10d): CTC B0H-B3H + SIO B4H-B7H, Kette
+ *  hinter der K8025, SIO-Kanal B als vierter serieller Anschluss (k1520_serial_*, Index 3). */
+K1520_API bool        k1520_aup_install_sonder(K1520Handle h);
+/** @brief Steckt die AUP MIT Sonderschnittstelle?  false ohne Karte. */
+K1520_API bool        k1520_aup_sonder(K1520Handle h);
+/** @brief Taste druecken (@p gedrueckt != 0) oder loesen (fadensicher); false ohne Karte oder
+ *  wenn an der Position keine Taste ist. */
+K1520_API bool        k1520_aup_taste(K1520Handle h, int tastatur, int pos, int gedrueckt);
+/** @brief Schluesselschalter @p n (1 = SS1, 2 = SS2) ein/aus; Einschalten sendet seinen Code. */
+K1520_API bool        k1520_aup_schluessel(K1520Handle h, int n, int an);
+/** @brief Stellung des Schluesselschalters: 1/0; -1 ohne Karte oder bei falschem @p n. */
+K1520_API int         k1520_aup_schluessel_stand(K1520Handle h, int n);
+/** @brief Zuletzt angenommenes Kommandobyte (OUT 43H; FFH nach Reset); -1 ohne Karte. */
+K1520_API int         k1520_aup_kommando(K1520Handle h);
+/** @brief Lampen, 1 = leuchtet: Bit 0 SEL, Bit 1 ALPHA, Bit 2 GET, Bit 3 Fehler (blinkend);
+ *  -1 ohne Karte. */
+K1520_API int         k1520_aup_lampen(K1520Handle h);
+/** @brief Fortlaufender Zaehler der Hupensignale (Oberflaeche bildet die Differenz); 0 ohne Karte. */
+K1520_API uint32_t    k1520_aup_hupe(K1520Handle h);
+/** @brief Code einer Position laut AUP-EPROM-Tabelle (@p alpha != 0: K7633 "mit Alpha");
+ *  -1 = keine Taste, 0 = Taste ohne Code.  Ohne Handle. */
+K1520_API int         k1520_aup_code(int tastatur, int pos, int alpha);
+/** @brief Positionsname (K7633 "A10", "SS1"; Kundentastatur "0".."9", "F3D"/"F3F"); "" = keine Taste. */
+K1520_API const char* k1520_aup_tastenname(int tastatur, int pos);
 
 /* ─── Debug ──────────────────────────────────────────────────────────────── */
 /** @brief Read memory through the machine bus for diagnostics. */

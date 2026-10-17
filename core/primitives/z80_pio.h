@@ -240,6 +240,11 @@ public:
      * @see portARead
      */
     uint8_t portBRead() const;
+
+    /// Zuletzt per @ref portBWrite eingespeister Pegel der Port-B-Eingaenge (Eingangslatch).
+    /// Erlaubt der Karte, nur bei einer Aenderung neu einzuspeisen (Modus 3 werte sonst die
+    /// Interruptbedingung erneut aus).
+    uint8_t portBEingang() const { return portb_.input_latch; }
     
     /**
      * @brief Strobe input for Port B handshake.

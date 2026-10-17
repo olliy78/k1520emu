@@ -3312,6 +3312,9 @@ bool DiskVolume::sammleQuelldateien(const std::string& src_dir,
             if (ist_zubehoer(e.path())) continue;
             je_volume[0].push_back(e.path().string());
         }
+        // Die Reihenfolge des Dateisystems ist unter Linux und Windows/wine verschieden und
+        // bestimmt die Lage der Eintraege im Verzeichnis: sortiert ist das Abbild reproduzierbar.
+        std::sort(je_volume[0].begin(), je_volume[0].end());
         return true;
     }
 
@@ -3365,6 +3368,7 @@ bool DiskVolume::sammleQuelldateien(const std::string& src_dir,
             if (ist_zubehoer(e.path())) continue;
             je_volume[static_cast<size_t>(v)].push_back(e.path().string());
         }
+        std::sort(je_volume[static_cast<size_t>(v)].begin(), je_volume[static_cast<size_t>(v)].end());
     }
     return true;
 }

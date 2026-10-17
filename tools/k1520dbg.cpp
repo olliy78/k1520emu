@@ -30,6 +30,16 @@
  * `--raf raf128|raf512|raf2m` steckt eine RAM-Floppy (alle Maschinen); Befehl `raf`.
  * `--ausfuehrung neu|alt|kmbg` / `--laufwerke P0,P1,…` (A5120, AP A6): altes Geraet mit
  * K7023 64×16 + K7636; Bildschirmbefehle lesen dann die K7023 (tools/dbg_machine.h).
+ * `--ram k3526|k3525_1|k3525_2|k3525_4`, `--bildschirm k7024|k7023|beide`, `--schalter k7024|k7023`
+ * (A5120, Entwurf 33 N4): Einzeloptionen; bei `beide` legt `screen select k7024|k7023` den
+ * Bildschirm-Umschalter zur Laufzeit um.
+ * `--k3521 ADR|aus`, `--k3521-memdi bus|memdi1|memdi2`, `--k3521-datei PFAD` (A5120, N10b): akkugepuffertes
+ * 4-KB-RAM K3521.30 an einer 4-KB-Adresse (Hex), Inhalt dauerhaft in PFAD.
+ * `--aup-sonder` (A5120, N10d): AUP MIT Sonderschnittstelle (CTC B0H-B3H, SIO B4H-B7H, Kanal B nach aussen,
+ *   Kette hinter der K8025); `aup` zeigt dann SIO/CTC, `ivt`/`dev` fuehren AUP SIO-A13 / CTC-A12.
+ * `--aup [--aup-alpha led|ohne|mit]` (A5120, N10c): AUP 062-8531 Tastaturteil auf 40H-43H; Befehl `aup`
+ *   (Zustand), `aup taste T POS` (druecken + loesen, T 0 = K7633, 1 = Kundentastatur, POS hex),
+ *   `aup schluessel 1|2 an|aus`.
  * `--laderom v06|v09_1|v09_2` (A5120, AP A7): gestecktes Lade-ROM (Vorgabe v09_2 = zre.rom;
  * v06 startet BCU 880 „SYL auf Spur 1“, doc/a5120_alt/laderom.md).
  * `--tastatur k7636|k7637` (A5120, AP A7): Tastatur abweichend von der Ausfuehrung.
@@ -213,6 +223,15 @@ int main(int argc, char** argv){
     const char* laderom_opt = nullptr; // --laderom v06|v09_1|v09_2: Lade-ROM der K2526 (AP A7)
     const char* format_opt = nullptr;  // --format NAME: Katalogformat fuer .img (zuerst versucht)
     const char* tastatur_opt = nullptr; // --tastatur k7636|k7637: Tastatur (A5120, AP A7)
+    const char* ram_opt = nullptr;        // --ram k3526|k3525_1|k3525_2|k3525_4 (Entwurf 33 N4)
+    const char* bildschirm_opt = nullptr; // --bildschirm k7024|k7023|beide
+    const char* schalter_opt = nullptr;   // --schalter k7024|k7023: Anfangsstellung bei beide
+    const char* k3521_opt = nullptr;      // --k3521 ADR|aus: akkugepuffertes RAM (N10b)
+    const char* k3521_memdi_opt = nullptr; // --k3521-memdi bus|memdi1|memdi2
+    const char* k3521_datei_opt = nullptr; // --k3521-datei PFAD: Ablage des Inhalts
+    bool aup_opt = false;                  // --aup: AUP-Tastaturteil auf 40H-43H (N10c)
+    const char* aup_alpha_opt = nullptr;   // --aup-alpha led|ohne|mit
+    bool aup_sonder_opt = false;           // --aup-sonder: Sonderschnittstelle (N10d)
     const char* raf_opt = nullptr; // --raf none|raf128|raf512|raf2m: RAM-Floppy auf 88H/89H
     const char* wdc_opt = nullptr; // --wdc 4.2|4.0.05|3.4.05: WDC an der 16-Bit-PIO2 (P8000, P13d)
     const char* konsole_opt = nullptr; // --konsole kern|original: Terminal an tty1 (P8000, P20c)
@@ -244,6 +263,15 @@ int main(int argc, char** argv){
         else if (!strcmp(argv[i],"--laderom") && i+1<argc) laderom_opt=argv[++i];
         else if (!strcmp(argv[i],"--format") && i+1<argc) format_opt=argv[++i];
         else if (!strcmp(argv[i],"--tastatur") && i+1<argc) tastatur_opt=argv[++i];
+        else if (!strcmp(argv[i],"--ram") && i+1<argc) ram_opt=argv[++i];
+        else if (!strcmp(argv[i],"--bildschirm") && i+1<argc) bildschirm_opt=argv[++i];
+        else if (!strcmp(argv[i],"--schalter") && i+1<argc) schalter_opt=argv[++i];
+        else if (!strcmp(argv[i],"--k3521") && i+1<argc) k3521_opt=argv[++i];
+        else if (!strcmp(argv[i],"--k3521-memdi") && i+1<argc) k3521_memdi_opt=argv[++i];
+        else if (!strcmp(argv[i],"--k3521-datei") && i+1<argc) k3521_datei_opt=argv[++i];
+        else if (!strcmp(argv[i],"--aup")) aup_opt=true;
+        else if (!strcmp(argv[i],"--aup-sonder")) aup_opt=aup_sonder_opt=true;
+        else if (!strcmp(argv[i],"--aup-alpha") && i+1<argc) { aup_opt=true; aup_alpha_opt=argv[++i]; }
         else if (!strcmp(argv[i],"--raf") && i+1<argc) raf_opt=argv[++i];
         else if (!strcmp(argv[i],"--wdc") && i+1<argc) wdc_opt=argv[++i];
         else if (!strcmp(argv[i],"--konsole") && i+1<argc) konsole_opt=argv[++i];
@@ -287,10 +315,17 @@ int main(int argc, char** argv){
         else if (e=="em064") mcfg.em = A5120Machine::Config::Em::em064;
         else if (e!="none"){ fprintf(stderr,"--em: unbekanntes Modul '%s' (none|em064|em256)\n",em_opt); return 2; }
     }
-    if (ausf_opt || lw_opt || laderom_opt || tastatur_opt){
-        if (art!=dbgm::Art::A5120){ fprintf(stderr,"--ausfuehrung/--laufwerke gibt es nur am A5120 (ebenso --laderom/--tastatur)\n"); return 2; }
+    if (ausf_opt || lw_opt || laderom_opt || tastatur_opt || ram_opt || bildschirm_opt || schalter_opt || k3521_opt || k3521_memdi_opt || k3521_datei_opt){
+        if (art!=dbgm::Art::A5120){ fprintf(stderr,"--ausfuehrung/--laufwerke gibt es nur am A5120 (ebenso --laderom/--tastatur/--ram/--bildschirm/--schalter/--k3521*)\n"); return 2; }
         std::string err;
-        if (!dbgm::parseAusfuehrung(ausf_opt, lw_opt, mcfg, err, laderom_opt, tastatur_opt)){ fprintf(stderr,"%s\n",err.c_str()); return 2; }
+        if (!dbgm::parseAusfuehrung(ausf_opt, lw_opt, mcfg, err, laderom_opt, tastatur_opt, ram_opt, bildschirm_opt, schalter_opt, k3521_opt, k3521_memdi_opt, k3521_datei_opt)){ fprintf(stderr,"%s\n",err.c_str()); return 2; }
+    }
+    if (aup_opt){
+        if (art!=dbgm::Art::A5120){ fprintf(stderr,"--aup gibt es nur am A5120\n"); return 2; }
+        std::string err;
+        if (!a5120konfig::wert(mcfg,"aup","1",err) ||
+            (aup_alpha_opt && !a5120konfig::wert(mcfg,"aup_alpha",aup_alpha_opt,err)) ||
+            (aup_sonder_opt && !a5120konfig::wert(mcfg,"aup_sonder","1",err))){ fprintf(stderr,"--%s\n",err.c_str()); return 2; }
     }
     // P8000-WDC (P13d): --wdc/--hd nur mit p8000-16.  Die Platte wird wie die Disketten im
     // Vorgabemodus als Kopie gemountet (COW: Temp-Datei, am Ende geloescht), mit --rw direkt.
@@ -3180,6 +3215,7 @@ int main(int argc, char** argv){
             fprintf(stderr,
               "  RUN     g/c [N]   run to breakpoint (or N MASCHINEN-Takte; Ctrl-C bricht ab)\n"
               "          clock [zve1|machine]   welche Uhr die Lauf-Budgets zaehlt\n"
+              "  AUP      aup      (mit --aup) Kommando, Lampen, Hupe, Schluessel;  aup taste <0|1> <pos>  aup schluessel <1|2> <an|aus>\n"
               "  KASSETTE tape     (mit --tape) K5020: Karte, je Geraet Kassette/Seite/Kopf/Bloecke/Bindung\n"
               "          tape <1|2> [A|B]       Blockliste einer Seite;  tape <1|2> <A|B> <i>  Rohbytes von Block i\n"
               "  RAF     raf       (mit --raf) Typ, Kapazitaet, Latch, gesperrt, Sektor aus dem Latch\n"
@@ -3228,6 +3264,7 @@ int main(int argc, char** argv){
               "                    @auto = Ladeversatz aus den Objektbytes im RAM bestimmen\n"
               "                    @labels/@noanchor (nur .MAC): Mxxxx-Adressanker erzwingen/abschalten\n"
               "          keys <text> (\\r \\t \\e \\s \\xNN) ; screen [find \"txt\"] ; reset ; q\n"
+              "          screen select k7024|k7023   Bildschirm-Umschalter (A5120 mit --bildschirm beide)\n"
               "          console [tempo]  Maschine LIVE bedienen (Ctrl-] zurueck; Haltepunkte bleiben scharf)\n"
               "          gscreen \"txt\"|/re/ [maxcyc]   run until screen shows txt (deterministic menus)\n"
               "          bscreen \"txt\"|/re/ | off      arm: any g/gu/n stops on screen match\n"
@@ -3696,6 +3733,17 @@ int main(int argc, char** argv){
                 int r=-1,c=-1;
                 if(screenFind(pat,&r,&c)) fprintf(stderr,"  found at row %d col %d\n",r,c);
                 else fprintf(stderr,"  not found\n"); }
+            else if (t.size()>=2 && t[1]=="select"){   // Entwurf 33 N4: Umschalter K7024/K7023
+                A5120Machine* a5 = m.a5120();
+                if (!a5) fprintf(stderr,"  screen select: nur am A5120\n");
+                else if (a5->bildschirm()!=A5120Machine::Config::Bildschirm::Beide)
+                    fprintf(stderr,"  screen select: kein Umschalter (Bildschirm ist %s; --bildschirm beide)\n",
+                            a5->zeigtK7023() ? "K7023" : "K7024");
+                else if (t.size()<3 || (t[2]!="k7024" && t[2]!="k7023"))
+                    fprintf(stderr,"  screen select k7024|k7023   (angezeigt: %s)\n", a5->zeigtK7023() ? "k7023" : "k7024");
+                else { a5->setBildschirmSchalter(t[2]=="k7023" ? A5120Machine::Config::Bildschirm::K7023
+                                                               : A5120Machine::Config::Bildschirm::K7024);
+                    fprintf(stderr,"  Bildschirm: %s (%dx%d)\n", t[2].c_str(), m.screenCols(), m.screenRows()); } }
             else screen(); }
         // #1 screen-conditioned run / breakpoint (deterministic menu navigation)
         else if (cmd=="gscreen"){
@@ -4148,6 +4196,42 @@ int main(int argc, char** argv){
                         for (int i=0;i<16;++i){ uint8_t v=r->peek((uint32_t)sek*128u+127u-(uint32_t)(o+i));
                             fprintf(stderr,"%02X ",v); asc[i]=(v>=0x20&&v<0x7F)?(char)v:'.'; }
                         asc[16]=0; fprintf(stderr," |%s|\n",asc); } } } }
+        else if (cmd=="aup"){    // AUP 062-8531 Tastaturteil (--aup, N10c): Zustand, Taste, Schluessel
+            AUP* au = m.a5120() ? m.a5120()->aup() : nullptr;
+            if (!au){ fprintf(stderr,"  keine AUP gesteckt (--aup)\n"); }
+            else if (t.size()>=4 && t[1]=="taste"){
+                const int tt = (int)strtol(t[2].c_str(),nullptr,10), pos = (int)strtol(t[3].c_str(),nullptr,16);
+                const auto ta = tt==1 ? AUP::Tastatur::Kunde : AUP::Tastatur::K7633;
+                if ((tt!=0 && tt!=1) || !au->taste(ta,pos,true)) fprintf(stderr,"  keine Taste %s an Position %02XH\n", tt==1?"Kunde":"K7633", pos&0xFF);
+                else { au->taste(ta,pos,false);
+                       fprintf(stderr,"  %s %02XH (%s) gedrueckt und geloest, Code %02XH\n", tt==1?"Kunde":"K7633", pos,
+                               AUP::name(ta,pos), AUP::code(ta,pos,au->alphaAktiv())); }
+            }
+            else if (t.size()>=4 && t[1]=="schluessel" && (t[2]=="1"||t[2]=="2") && (t[3]=="an"||t[3]=="aus")){
+                au->schluessel(t[2]=="1"?1:2, t[3]=="an");
+                fprintf(stderr,"  SS%s %s\n", t[2].c_str(), t[3].c_str());
+            }
+            else if (t.size()>=2){ fprintf(stderr,"  ? aup [taste <0|1> <pos-hex> | schluessel <1|2> <an|aus>]\n"); }
+            else {
+                const uint8_t l = au->lampen();
+                static const char* alpha_quelle[] = {"nach ALPHA-LED","ohne","mit"};
+                fprintf(stderr,"  AUP %02XH-%02XH  Kommando %02XH  Lampen:%s%s%s%s%s  Hupe %u  verworfen %u\n",
+                        au->config().basis, au->config().basis+3, au->kommando(),
+                        l&AUP::kLampeSel?" SEL":"", l&AUP::kLampeAlpha?" ALPHA":"", l&AUP::kLampeGet?" GET":"",
+                        l&AUP::kLampeFehler?" FEHLER":"", l?"":" -", au->hupe(), au->verworfen());
+                fprintf(stderr,"  SS1 %s  SS2 %s  Tabelle: %s (Alpha %s)\n", au->schluesselAn(1)?"an":"aus",
+                        au->schluesselAn(2)?"an":"aus", au->alphaAktiv()?"mit Alpha":"ohne Alpha",
+                        alpha_quelle[(int)au->config().alpha]);
+                if (au->sonder()){
+                    const auto f = au->anschluss()->format();
+                    fprintf(stderr,"  Sonderschnittstelle: CTC %02XH-%02XH, SIO %02XH-%02XH, Kanal B: %s%u Bd %u Datenbits  RTS %s DTR %s  Int %s\n",
+                            au->config().basis_sonder, au->config().basis_sonder+3, au->config().basis_sonder+4,
+                            au->config().basis_sonder+7, f.gueltig?"":"(Format ungueltig) ", f.baud_nenn, f.daten,
+                            au->anschluss()->rts()?"an":"aus", au->anschluss()->dtr()?"an":"aus",
+                            au->hasInterrupt()?au->intDeviceName():"-");
+                }
+            }
+        }
         else if (cmd=="tape"){   // Kassette K5020/K5200 (--tape): Status, Blockliste, Blockinhalt
             K5020* kk = m.base().k5020();
             if (!kk && KM2){   // MC80.2x: das fest eingebaute Laufwerk SK 1200 der MBI

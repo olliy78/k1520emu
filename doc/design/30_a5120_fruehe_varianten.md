@@ -3,6 +3,8 @@
 Stand: 2026-10-15 — **umgesetzt (A0–A8, A7b, A9); zurückgestellt: A4 (eigene K5120-Karte), 8″; vorgemerkt: A8b.
 Festlegungen und Wächter: `doc/merkposten/a5120_alt.md`.**  Entscheidungen des Anwenders vom 2026-10-13 (§2).  Kassette selbst: Entwurf 29.  Legende wie dort.
 
+> **Nachtrag 2026-10-16 (Entwurf 33):** „Ausführung“ ist kein Begriff der Oberfläche mehr, sondern ein **Vorgabe-Satz**: Modelle sind `a5120`/`a5130`/`k8924`, jede Einzelheit (Bildschirmkarte, RAM, Tastatur, Lade-ROM, Erweiterungsmodul, Kassette) ist eine eigene Option; „5¼″ alt“ und „KMBG“ ergeben sich als Kombination (K7023 + 4x K3525 + K7636 + Laufwerke K5600.10 [+ Kassette]).  `Config::ausfuehrung` bleibt nur als Hülle der C-ABI.  Die Sperre „K7637 am Alt-Modell“ entfiel.  Maßgeblich: `33_a5130_k8924.md` §3a.
+
 ---
 
 ## 1. Ziel

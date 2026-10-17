@@ -46,6 +46,7 @@ from app.ui.keyboard import KeyboardWidget
 from app.ui.focus import release_focus, ScreenFocusGuard
 from app.ui.help_window import HelpWindow
 from app.ui.kassette_widget import KassetteWidget
+from app.ui.keyboard_k7633 import AupWidget
 from app.ui.lochstreifen_widget import LochstreifenWidget
 from app.ui import status_bar
 from app.ui.status_bar import MachineStatus
@@ -61,6 +62,7 @@ from app import profil as profile
 from app import takt
 from app.emulationstakt import Emulationstakt
 from app import raf
+from app import k3521
 
 
 def ladeadresse_aus_namen(pfad: str) -> str:
@@ -102,7 +104,10 @@ class MainWindow(QMainWindow):
         self._rechner_war_da = True
         # Hardwarevarianten des Programms (PC 1715: Zeichensatz, Tastatur-ROM; AP-6) —
         # Konstruktorparameter des Kerns wie das Modell, ein Wechsel ist ein Kaltstart.
-        self._hardware = self.profil.hardware_standard()
+        self._hardware = self.profil.hardware_standard(self._model)
+        # Stellung des Bildschirm-Schiebeschalters (Entwurf 33 §3.3, N6): nur mit
+        # ``bildschirm == "beide"`` wirksam, sonst bloss gemerkt.
+        self._schalter = "k7024"
         # Bauart der Bildschirmtastatur (haengt am Modell: PRG 710 K7609, 710-1 K7672;
         # PC 1715 mit QWERTZ-ROM eigene Beschriftung).
         self._tastatur_art = self.profil.tastatur_bauart(self._model, self._hardware)
@@ -118,6 +123,13 @@ class MainWindow(QMainWindow):
         # Kassette K5020 (doc/design/29_kassette.md): dasselbe Muster.
         self._tape = False
         self._tape_zustand = {}
+        # AUP 062-8531 (Entwurf 33 N10e): Option, Vorgabe aus; Sonderschnittstelle und die
+        # Annahme zur Alpha-Tabelle (led|ohne|mit) gehoeren dazu.
+        self._aup = False
+        self._aup_sonder = False
+        self._aup_alpha = "led"
+        # K3521.30 (Entwurf 33 N10h): (Anzahl 0..4, Startadresse); Vorgabe keine Karte.
+        self._k3521 = (0, k3521.START_VORGABE)
 
         # Create emulator (powered on only AFTER the config restored the disks,
         # so a cold start boots from the last-mounted images).
@@ -224,6 +236,7 @@ class MainWindow(QMainWindow):
         self.serial_widget.statuszeile.connect(self.status_widget.set_seriell)
         self.settings_widget.modelChanged.connect(self._on_model_selected)
         self.settings_widget.hardwareChanged.connect(self._on_hardware_selected)
+        self.settings_widget.bildschirmSchalterChanged.connect(self._on_bildschirm_schalter)
         self.settings_widget.rafChanged.connect(self._on_raf_selected)
         self.settings_widget.rafStandbyChanged.connect(self._on_raf_standby_changed)
         self.settings_widget.ptapeChanged.connect(self._on_ptape_selected)
@@ -231,6 +244,8 @@ class MainWindow(QMainWindow):
         if hasattr(self.screen_widget, "mitschriftFehler"):
             self.screen_widget.mitschriftFehler.connect(self._mitschrift_fehler)
         self.settings_widget.tapeChanged.connect(self._on_tape_selected)
+        self.settings_widget.aupChanged.connect(self._on_aup_selected)
+        self.settings_widget.k3521Changed.connect(self._on_k3521_selected)
         self.kassette_widget.geaendert.connect(self._schedule_autosave)
         self.kassette_widget.meldung.connect(
             lambda text: self.statusBar().showMessage(text, 5000))
@@ -255,7 +270,7 @@ class MainWindow(QMainWindow):
         # ergibt und nicht fuenfzig.
         for dock in (self.screen_dock, self.keyboard_dock,
                      self.drives_dock, self.settings_dock, self.eprom_dock,
-                     self.lochstreifen_dock, self.kassette_dock):
+                     self.lochstreifen_dock, self.kassette_dock, self.aup_dock):
             if dock is None:
                 continue
             dock.visibilityChanged.connect(lambda *_: self._kasten_sichtbarkeit())
@@ -484,6 +499,16 @@ class MainWindow(QMainWindow):
         self.kassette_dock.visibilityChanged.connect(
             lambda sichtbar: sichtbar and self.kassette_widget.aktualisieren())
 
+        # ── AUP-Dock (Entwurf 33 N10e): wie die Kassette nur bei gesteckter Karte ──
+        self.aup_widget = AupWidget(self.emulator)
+        self.aup_dock = QDockWidget("AUP", self)
+        self.aup_dock.setObjectName("aup_dock")
+        self.aup_dock.setWidget(self.aup_widget)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.aup_dock)
+        self.tabifyDockWidget(self.drives_dock, self.aup_dock)
+        self.aup_dock.visibilityChanged.connect(
+            lambda sichtbar: sichtbar and self.aup_widget.aktualisieren())
+
         # ── Kastenschalter ───────────────────────────────────────────────────
         # Sie kommen von Qt (``toggleViewAction``) und sind damit immer richtig
         # herum angehakt.  Beschriftung, Symbol und Kurzwort bekommen sie hier —
@@ -497,7 +522,8 @@ class MainWindow(QMainWindow):
                 ("eprom", self.eprom_dock, "E&PROMmer", "eprom", "EPROMmer"),
                 ("lochstreifen", self.lochstreifen_dock, "L&ochstreifen", "lochstreifen",
                  "Lochstreifen"),
-                ("kassette", self.kassette_dock, "&Kassette", "kassette", "Kassette")):
+                ("kassette", self.kassette_dock, "&Kassette", "kassette", "Kassette"),
+                ("aup", self.aup_dock, "&AUP", "keyboard", "AUP")):
             if dock is None:
                 continue
             a = dock.toggleViewAction()
@@ -516,6 +542,7 @@ class MainWindow(QMainWindow):
         self.settings_dock.raise_()
         self._lochstreifen_kasten()
         self._kassette_kasten()
+        self._aup_kasten()
 
         # Startaufteilung: rechte Spalte (Laufwerke) so schmal wie moeglich, ohne
         # horizontales Scrollen; Bildschirm breit.  Tastatur auf Minimalhoehe.
@@ -892,7 +919,7 @@ class MainWindow(QMainWindow):
         view_menu.addAction(self.act_vollbild)
         view_menu.addSeparator()
         for name in ("screen", "keyboard", "drives", "settings", "eprom", "lochstreifen",
-                     "kassette"):
+                     "kassette", "aup"):
             if hasattr(self, f"act_dock_{name}"):
                 view_menu.addAction(getattr(self, f"act_dock_{name}"))
         view_menu.addSeparator()
@@ -1117,8 +1144,18 @@ class MainWindow(QMainWindow):
                 # Die Rechnerausstattung bleibt auch im Betrieb „nur Terminal“ gemerkt.
                 general["ausstattung"] = self.settings_widget.ausstattung_value()
         general.update(self._hardware)          # PC 1715: zeichensatz, tastatur
+        if "bildschirm" in self._hardware:
+            self._schalter_nachlesen()
+            general["bildschirm_schalter"] = self._schalter
         general["ptape"] = bool(self._ptape)
         general["tape"] = bool(self._tape)
+        if self.profil.aup_wahl:
+            general["aup"] = bool(self._aup)
+            general["aup_sonder"] = bool(self._aup and self._aup_sonder)
+            general["aup_alpha"] = self._aup_alpha
+        if self.profil.k3521_wahl:
+            general["k3521_anzahl"] = int(self._k3521[0])
+            general["k3521_start"] = f"{self._k3521[1]:04X}"
         if self.profil.terminal:
             general["mitschrift"] = self.settings_widget.mitschrift_value()
         data = config_io.build_config(
@@ -1359,8 +1396,13 @@ class MainWindow(QMainWindow):
                     general.get("ausstattung") or self._model)
             self.settings_widget.set_model_value(self._model)
             # Hardwarevarianten: fehlender Schluessel = Vorgabe (aeltere Konfigurationen).
-            self._hardware = self.profil.hardware_normalisieren(general)
+            self._hardware = self.profil.hardware_normalisieren(general, self._model)
             self.settings_widget.set_hardware_value(self._hardware)
+            # Schiebeschalter: fehlend oder unbekannt = K7024.  Die Maschine bekommt die Stellung
+            # beim Erzeugen (``konfig["schalter"]``), das Feld zeigt sie hier.
+            self._schalter = ("k7023" if str(general.get("bildschirm_schalter", "")).strip().lower()
+                              == "k7023" else "k7024")
+            self.settings_widget.set_bildschirm_schalter_value(self._schalter)
             if self.platten_widget is not None:
                 self.platten_widget.set_firmware(self._hardware.get("wdc", "4.2"))
 
@@ -1388,6 +1430,21 @@ class MainWindow(QMainWindow):
             # Kassette K5020: dasselbe (fehlend = aus).
             self._tape = general.get("tape") is True and self.profil.tape_wahl
             self.settings_widget.set_tape_value(self._tape)
+            # AUP: dasselbe (fehlend = aus; Sonderschnittstelle/Alpha nur mit gesteckter AUP).
+            self._aup = general.get("aup") is True and self.profil.aup_wahl
+            self._aup_sonder = self._aup and general.get("aup_sonder") is True
+            self._aup_alpha = (general.get("aup_alpha")
+                               if self._aup and general.get("aup_alpha") in ("led", "ohne", "mit")
+                               else "led")
+            self.settings_widget.set_aup_value(self._aup, self._aup_sonder, self._aup_alpha)
+            # K3521: fehlend/ungueltig = keine Karte, Startadresse 8000 (Pruefung wie im Feld).
+            anzahl = general.get("k3521_anzahl")
+            anzahl = anzahl if isinstance(anzahl, int) and not isinstance(anzahl, bool) and 0 <= anzahl <= k3521.MAX_KARTEN else 0
+            start, _grund = k3521.pruefe(anzahl, general.get("k3521_start", f"{k3521.START_VORGABE:04X}"))
+            if start is None or not self.profil.k3521_wahl:
+                anzahl, start = 0, k3521.START_VORGABE
+            self._k3521 = (anzahl, start)
+            self.settings_widget.set_k3521_value(*self._k3521)
 
             # Mitschrift des Terminals: ein FEHLENDER Schluessel heisst „nicht anfassen“ (die
             # Ansichts-Vorgabe traegt keinen Dateinamen), ein leerer „aus“.
@@ -1440,6 +1497,7 @@ class MainWindow(QMainWindow):
             # obwohl die Karte nicht (mehr) steckt.
             self._lochstreifen_kasten()
             self._kassette_kasten()
+            self._aup_kasten()
         finally:
             self._loading_config = False
 
@@ -1528,6 +1586,8 @@ class MainWindow(QMainWindow):
         raf_vorher = self._raf
         ptape_vorher = self._ptape
         tape_vorher = self._tape
+        aup_vorher = (self._aup, self._aup_sonder, self._aup_alpha)
+        k3521_vorher = self._k3521
         self._apply_config(vorgabe)
         # Ein geaenderter Laufwerksschacht ODER ein geaendertes Modell bedeutet
         # eine NEUE Maschine (:meth:`_apply_drive_types`), und die ist noch
@@ -1538,7 +1598,9 @@ class MainWindow(QMainWindow):
         if (self._drive_types != vorher or self._model != modell_vorher
                 or self._hardware != hardware_vorher
                 or self._raf != raf_vorher or self._ptape != ptape_vorher
-                or self._tape != tape_vorher):
+                or self._tape != tape_vorher
+                or self._k3521 != k3521_vorher
+                or (self._aup, self._aup_sonder, self._aup_alpha) != aup_vorher):
             self._cold_restart()
         # Sofort schreiben, nicht ueber den sammelnden Autosave: der Anwender hat
         # das Ueberschreiben eben bestaetigt, es darf nicht an einem Absturz in den
@@ -1718,6 +1780,8 @@ class MainWindow(QMainWindow):
             self.lochstreifen_widget.aktualisieren()
         if self.kassette_dock.isVisible():
             self.kassette_widget.aktualisieren()
+        if self.aup_dock.isVisible():
+            self.aup_widget.aktualisieren()
 
     def _update_em_status(self):
         """Die EM-Leuchten (V1/V2) und den Modus — nur wenn das Modell eins hat.
@@ -1725,7 +1789,7 @@ class MainWindow(QMainWindow):
         Reine Abfrage im selben Sekundentakt wie der Rest der Statuszeile
         (``em_leds()``/``em_mode16()``, kein Rückruf) — Anschluss aus S5.
         """
-        if not self.profil.modell_em(self._model):
+        if not self.profil.modell_em(self._model, self._hardware):
             return
         try:
             v1, v2 = self.emulator.em_leds()
@@ -1854,7 +1918,28 @@ class MainWindow(QMainWindow):
             self.settings_widget.set_model_value(self._model)
             return
         self._model = neu
-        self._apply_drive_types(self._drive_types, cold_restart=True)
+        types = self._drive_types
+        if self.profil.modell_vorgaben:
+            # Entwurf 33 §3a Regel 1: die Modellwahl UEBERNIMMT die Vorgaben (Optionen, Kassette,
+            # Laufwerke), ohne Rueckfrage — auch beim erneuten Waehlen desselben Modells.
+            vorgabe = self.profil.modell_vorgabe(neu)
+            self._hardware = self.profil.hardware_standard(neu)
+            self._schalter = "k7024"            # Modellwechsel: auch der Schalter zurueck
+            self.settings_widget.set_bildschirm_schalter_value(self._schalter)
+            self._tape = bool(int(vorgabe.get("kassette", 0))) and self.profil.tape_wahl
+            types = dt.normalize_list(vorgabe.get("laufwerke") or self._drive_types)
+            self.settings_widget.set_hardware_value(self._hardware)
+            self.settings_widget.set_tape_value(self._tape)
+            # Die AUP ist Teil der Vorgaben (bei allen drei Modellen aus): ein Modellwechsel
+            # setzt auch sie zurueck.
+            self._aup = bool(int(vorgabe.get("aup", 0))) and self.profil.aup_wahl
+            self._aup_sonder, self._aup_alpha = False, "led"
+            self.settings_widget.set_aup_value(self._aup)
+            # Auch die K3521 gehoert zu den Vorgaben (bei allen Modellen keine Karte).
+            self._k3521 = (int(vorgabe.get("k3521_anzahl", 0)) if self.profil.k3521_wahl else 0,
+                           self._k3521[1])
+            self.settings_widget.set_k3521_value(*self._k3521)
+        self._apply_drive_types(types, cold_restart=True)
         self._schedule_autosave()
 
     def _betriebsart_vorwahl(self):
@@ -1874,7 +1959,7 @@ class MainWindow(QMainWindow):
     def _on_hardware_selected(self, schluessel: str, wert: str):
         """Eine Hardwarevariante (Zeichensatz, Tastatur-ROM) geändert → neue Maschine, wie
         beim Modellwechsel (die ROMs sind am Kern Konstruktorparameter)."""
-        neu = self.profil.hardware_normalisieren({**self._hardware, schluessel: wert})
+        neu = self.profil.hardware_normalisieren({**self._hardware, schluessel: wert}, self._model)
         if neu == self._hardware:
             return
         if schluessel == "wdc" and not self._platte_rueckfrage(neu.get("wdc", "4.2")):
@@ -1891,6 +1976,30 @@ class MainWindow(QMainWindow):
             self.settings_widget.set_hardware_value(vorher)
             return
         self._schedule_autosave()
+
+    def _on_bildschirm_schalter(self, karte: str):
+        """Schiebeschalter umgelegt: sofort in den Kern (unter der Kernsperre, die Maschine
+        rechnet im eigenen Faden), ohne Neustart.  Ohne zwei Karten ist er gesperrt und
+        hat keine Wirkung."""
+        self._schalter = karte
+        if self._hardware.get("bildschirm") == "beide":
+            with kern_sperre():
+                self.emulator.bildschirm_schalter = karte
+        self._schedule_autosave()
+
+    def _schalter_nachlesen(self):
+        """Stellung aus dem Kern uebernehmen: ein geladener Zwischenstand kann sie umgesetzt
+        haben.  Ohne zwei Karten gilt die gemerkte."""
+        if self._hardware.get("bildschirm") != "beide":
+            return
+        try:
+            with kern_sperre():
+                karte = self.emulator.bildschirm_schalter
+        except Exception:
+            return
+        if karte in ("k7024", "k7023"):
+            self._schalter = karte
+            self.settings_widget.set_bildschirm_schalter_value(karte)
 
     def _platte_rueckfrage(self, firmware: str) -> bool:
         """P24: passt die angeschlossene Platte nicht zur neuen WDC-Firmware (bis 4.0 legt das EPROM
@@ -1914,12 +2023,26 @@ class MainWindow(QMainWindow):
         (:meth:`_raf_laden`) — beim Einschalten noch einmal, denn ``power_on``
         verwirft den Inhalt wie ein Netz-Ein ohne Pufferung.
         """
+        kern = self.profil.kern_parameter(self._model, self._hardware, self._schalter)
+        if "konfig" in kern:
+            # Einzeloptionen (A5120/A5130/K8924): Erweiterungsmodul und Kassette gehoeren ins
+            # Woerterbuch, ``em=``/``tape=`` waeren daneben ein Fehler (Entwurf 33 N4).
+            kern["konfig"] = {**kern["konfig"], "kassette": bool(self._tape)}
+            if self._aup:
+                kern["konfig"].update(aup=True, aup_alpha=self._aup_alpha)
+                if self._aup_sonder:
+                    kern["konfig"]["aup_sonder"] = True
+            wert = k3521.konfig_wert(*self._k3521) if self.profil.k3521_wahl else None
+            if wert:
+                kern["konfig"]["k3521"] = wert
+            einzel = {}
+        else:
+            einzel = {"em": self.profil.modell_em(self._model, self._hardware),
+                      "tape": bool(self._tape)}
         emu = K1520Emulator(types, machine=self.profil.modell_maschine(self._model),
-                            em=self.profil.modell_em(self._model),
                             raf=raf.core_param(self._raf) if self.profil.raf_wahl else None,
                             ptape=bool(self._ptape),
-                            tape=bool(self._tape),
-                            **self.profil.kern_parameter(self._model, self._hardware))
+                            **einzel, **kern)
         # Die Tastatur hat ihren eigenen Quarz — bei 10 × Rechnertakt darf sie
         # nicht zehnmal so frueh wiederholen (core/peripherals/tasten_uhr.h).
         emu.set_key_repeat_realtime(True)
@@ -1927,7 +2050,17 @@ class MainWindow(QMainWindow):
         # nichts (_raf_sichern schreibt dann nicht).
         self._raf_frisch = True
         self._raf_laden(emu)
+        self._k3521_binden(emu)
         return emu
+
+    def _k3521_binden(self, emu) -> None:
+        """Ablagedatei je K3521-Karte binden (Inhalt dauerhaft, Entwurf 33 N10h).  Ein Fehler
+        (falsche Dateigroesse) laesst die Karte im Speicher und meldet sich in der Statuszeile."""
+        for n in range(int(getattr(emu, "k3521_anzahl", 0))):
+            try:
+                emu.k3521_datei_n(n, k3521.ablage_pfad(self.profil.programm, n))
+            except ValueError as e:
+                self.statusBar().showMessage(f"K3521 Karte {n + 1}: {e}", 10000)
 
     # ── RAM-Disk RAF: Auswahl und Stand-by (doc/design/22_raf512.md §7) ──────
 
@@ -2059,6 +2192,45 @@ class MainWindow(QMainWindow):
         self._kassette_kasten(zeigen=an)
         self._schedule_autosave()
 
+    def _on_aup_selected(self, an: bool, sonder: bool, alpha: str):
+        """Option „AUP (Sparkasse)" -> neue Maschine (wie die Kassette)."""
+        neu = (bool(an), bool(an and sonder), alpha if an else "led")
+        if neu == (self._aup, self._aup_sonder, self._aup_alpha):
+            return
+        if not self._eprom_rueckfrage("Wechsel der AUP-Karte"):
+            self.settings_widget.set_aup_value(self._aup, self._aup_sonder, self._aup_alpha)
+            return
+        zeigen = neu[0] and not self._aup
+        self._aup, self._aup_sonder, self._aup_alpha = neu
+        self._apply_drive_types(self._drive_types, cold_restart=True)
+        self._aup_kasten(zeigen=zeigen)
+        self._schedule_autosave()
+
+    def _on_k3521_selected(self, anzahl: int, start: int):
+        """Option „K3521" -> neue Maschine (wie die AUP)."""
+        if (anzahl, start) == self._k3521:
+            return
+        if not self._eprom_rueckfrage("Wechsel der K3521-Karten"):
+            self.settings_widget.set_k3521_value(*self._k3521)
+            return
+        self._k3521 = (anzahl, start)
+        self._apply_drive_types(self._drive_types, cold_restart=True)
+        self._schedule_autosave()
+
+    def _aup_kasten(self, zeigen: bool = False):
+        """Kasten und Menueeintrag nur bei gesteckter AUP; *zeigen* holt ihn nach vorn."""
+        dock = getattr(self, "aup_dock", None)
+        if dock is None:
+            return
+        gesteckt = bool(self.emulator.aup_installed)
+        dock.toggleViewAction().setVisible(gesteckt)
+        if not gesteckt:
+            dock.hide()
+        elif zeigen:
+            dock.show()
+            dock.raise_()
+        self.aup_widget.aktualisieren()
+
     def _kassette_kasten(self, zeigen: bool = False):
         """Kasten und Menüeintrag nur bei gesteckter Karte; *zeigen* holt ihn nach vorn."""
         dock = getattr(self, "kassette_dock", None)
@@ -2125,7 +2297,7 @@ class MainWindow(QMainWindow):
         restore it is ``False`` (power-on happens once, later).
         """
         types = dt.normalize_list(types)
-        em = self.profil.modell_em(self._model)
+        em = self.profil.modell_em(self._model, self._hardware)
         # Stand-by: der Inhalt der ALTEN Maschine geht in die Ablage, bevor die neue
         # sie laedt (*sichern* = False, wenn der Aufrufer das schon mit der alten
         # Einstellung getan hat — _apply_config).
@@ -2151,6 +2323,11 @@ class MainWindow(QMainWindow):
             self.settings_widget.set_ptape_value(self._ptape)
             self._tape = bool(self.emulator.tape_installed())
             self.settings_widget.set_tape_value(self._tape)
+            self._aup = bool(self.emulator.aup_installed)
+            self._aup_sonder = bool(self.emulator.aup_sonder)
+            self.settings_widget.set_aup_value(self._aup, self._aup_sonder, self._aup_alpha)
+            self._k3521 = (int(getattr(self.emulator, "k3521_anzahl", 0)), self._k3521[1])
+            self.settings_widget.set_k3521_value(*self._k3521)
             return False
 
         # Die Schnittstellen gehoeren zur Maschine (der Kern haengt den Hub an sie):
@@ -2168,6 +2345,7 @@ class MainWindow(QMainWindow):
         # Kassette: gebundene .k52 zurueckschreiben, Dateien merken.
         self._tape_zustand_lesen()
         self.kassette_widget.sichern()
+        self.aup_widget.alle_loslassen()
 
         try:
             self.emulator.stop()
@@ -2188,6 +2366,7 @@ class MainWindow(QMainWindow):
         self._ptape_zustand_anwenden(self._ptape_zustand)
         self.kassette_widget.set_emulator(new_emu)
         self._tape_zustand_anwenden(self._tape_zustand)
+        self.aup_widget.set_emulator(new_emu)
         self.drives_widget.set_drive_types(types, new_emu)  # rebuild panels, clear mounts
         self.drives_widget.load_mounts(surviving)           # remount into new machine
         if self.platten_widget is not None:
@@ -2199,6 +2378,7 @@ class MainWindow(QMainWindow):
         self.settings_widget.set_drive_types(types)         # keep dropdowns in sync (no re-emit)
         self.settings_widget.set_model_value(self._model)   # dito
         self.settings_widget.set_hardware_value(self._hardware)
+        self.settings_widget.set_bildschirm_schalter_value(self._schalter)
         # Der Takt haengt am Modell (PC 1715W: 3,9936 MHz).
         self.CPU_HZ, nenntakt = self.profil.modell_nenntakt(self._model)
         self.settings_widget.set_nenntakt(nenntakt)
@@ -2208,6 +2388,8 @@ class MainWindow(QMainWindow):
         self._lochstreifen_kasten()
         self.settings_widget.set_tape_value(self._tape)
         self._kassette_kasten()
+        self.settings_widget.set_aup_value(self._aup, self._aup_sonder, self._aup_alpha)
+        self._aup_kasten()
         # Die Statuszeile fuehrt je bestuecktem Steckplatz ein Feld — ein
         # abgemeldetes Laufwerk muss auch dort verschwinden.  Die EM-Leuchten
         # (V1/V2) erscheinen nur, wenn das neue Modell ein Erweiterungsmodul hat.
@@ -2363,6 +2545,7 @@ class MainWindow(QMainWindow):
         """Einen Zwischenstand laden; bei abweichender Konfiguration bleibt die Maschine, wie sie ist."""
         ok = self.emulator.state_load(pfad)
         if ok:
+            self._schalter_nachlesen()
             self.statusBar().showMessage(
                 f"Zwischenstand geladen: {os.path.basename(pfad)}", 6000)
         else:

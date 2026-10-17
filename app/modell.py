@@ -1,67 +1,82 @@
 """
-K1520 Emulator - Modellwahl (A5120 / A5120.16)
-================================================
+K1520 Emulator - Modellwahl des A5120 Emulators (A5120 / A5130 / K8924)
+=======================================================================
 
-Single source of truth für das wählbare Maschinenmodell, geteilt von der
-Einstellungen-Dropdown (:class:`~app.ui.settings_widget.SettingsWidget`) und
-der Konfiguration (`app/config_io.py`, Abschnitt ``general.model``) — nach
-demselben Schnitt wie :mod:`app.drive_types` und :mod:`app.takt`.
+Single source of truth fuer die wahlbaren Modelle, geteilt vom Programmprofil
+(`app/profil.py`), der Einstellungen-Auswahl und der Konfiguration (Abschnitt
+``general.model``).  Entwurf: doc/design/33_a5130_k8924.md §3a.
 
-Der A5120.16 (`doc/design/17_a5120_16.md`) ist am Kern nur ein weiterer
-Konstruktorparameter von ``K1520Emulator``: ``em="em256"`` steckt die
-Steuerkarte 062-9005 samt Speicherkarte EM256 (062-9000) auf den K1520-Bus.
-``em=None``/``"none"`` ist der unveränderte A5120 — die Vorgabe, auch in
-``data/default_config.yaml``.  EM064 (062-9001) ist am Kern schon als Variante
-angelegt (§6 des Plans), hat hier aber bewusst noch keinen eigenen Eintrag:
-geprüft ist bislang nur EM256.
+Ein Modell ist NUR eine Sammlung von Vorgaben: die Wahl uebernimmt Werte fuer
+Bildschirmkarte, RAM, Tastatur, Lade-ROM, Erweiterungsmodul, Kassette und
+Laufwerke; danach ist jede Option einzeln aenderbar.  Die frueheren Schluessel
+(``a5120.16``, ``a5120-alt``, ``a5120-kmbg``, ``a5120-bcu``) gibt es nicht mehr; ein
+gespeicherter unbekannter Wert wird zur Vorgabe, nicht umgesetzt.
 """
 
 #: Interne Modellschluessel — stehen so in der Konfiguration (``general.model``).
 A5120 = "a5120"
-A5120_16 = "a5120.16"
+A5130 = "a5130"
+K8924 = "k8924"
 
-#: Vorgabe: der unveraenderte A5120, ohne Erweiterungsmodul.
+#: Vorgabe: der A5120.
 DEFAULT_MODEL = A5120
 
-#: (Schluessel, core-``em``-Parameter oder ``None``, Anzeigename fuer die Auswahl)
+#: (Schluessel, Anzeigename, Fenstertitel)
 MODELS = [
-    (A5120, None, "A5120 (ohne Erweiterung)"),
-    (A5120_16, "em256", "A5120.16 (EM256 + U8001)"),
+    (A5120, "A5120", "A5120 Emulator"),
+    (A5130, "A5130", "A5130 Emulator"),
+    (K8924, "K8924", "K8924 Emulator"),
 ]
 
-#: Fruehe Ausfuehrungen (doc/design/30_a5120_fruehe_varianten.md, AP A5) — eigene Kern-
-#: Maschine (``K1520Emulator(machine="a5120-alt")`` = ``ausfuehrung="alt"``), kein EM.
-#: Stehen nicht in :data:`MODELS` (dort nur die EM-Bestueckung), sondern als Zeilen im
-#: Programmprofil (`app/profil.py`).  Fehlt ``general.model``, bleibt es der A5120 „neu“.
-A5120_ALT = "a5120-alt"
-A5120_KMBG = "a5120-kmbg"
-#: BCU 880 (doc/a5120_alt/bcu.md): Kern-Maschine ``a5120-alt`` mit ``laderom="v06"`` und
-#: ``tastatur="k7636"`` (``Programmprofil.modell_kernwahl``).
-A5120_BCU = "a5120-bcu"
-A5120_ACHT = "a5120-8"
+#: Bestueckung der Vorgaben, ein Eintrag je Schluessel der Optionen (Werte wie im
+#: Konfigurationstext des Kerns, `A5120_KONFIG_WERTE` in `app/core_binding/k1520.py`):
+#: ``ram``, ``bildschirm``, ``tastatur``, ``laderom``, ``erweiterungsmodul`` (``none``/
+#: ``em064``/``em256``), ``kassette`` (``0``/``1``), ``aup`` (``0``/``1``: AUP 062-8531, N10e; bei allen drei
+#: Modellen aus — kein viertes Modell, sondern eine Option), ``k3521_anzahl`` (``0``..``4``: K3521.30,
+#: N10h; die Startadresse ist keine Vorgabe des Modells, sondern ``general.k3521_start``) und ``laufwerke`` (K5122-Steckplaetze).
+_K5601 = "K5601"
+_LEER = "none"
+VORGABEN = {
+    A5120: {"ram": "k3526", "bildschirm": "k7024", "tastatur": "k7637", "laderom": "v09_2",
+            "erweiterungsmodul": "none", "kassette": "0", "aup": "0",
+            "k3521_anzahl": "0",
+            "laufwerke": (_K5601, _K5601, _K5601, _LEER)},
+    A5130: {"ram": "k3526", "bildschirm": "k7024", "tastatur": "k7636", "laderom": "v09_2",
+            "erweiterungsmodul": "none", "kassette": "0", "aup": "0",
+            "k3521_anzahl": "0",
+            "laufwerke": (_K5601, _K5601, _K5601, _K5601)},
+    K8924: {"ram": "k3526", "bildschirm": "k7024", "tastatur": "k7637", "laderom": "v09_2",
+            "erweiterungsmodul": "none", "kassette": "0", "aup": "0",
+            "k3521_anzahl": "0",
+            "laufwerke": (_K5601, _K5601, _K5601, _LEER)},
+}
 
-_EM_FOR = {schluessel: em for schluessel, em, _ in MODELS}
-_LABEL_FOR = {schluessel: label for schluessel, _, label in MODELS}
+_LABEL_FOR = {schluessel: label for schluessel, label, _t in MODELS}
+_TITEL_FOR = {schluessel: titel for schluessel, _l, titel in MODELS}
 
 
 def normalize(model) -> str:
-    """Ein bekannter Modellschlüssel — alles Unbekannte/Fehlende wird die Vorgabe.
+    """Ein bekannter Modellschluessel — alles Unbekannte/Fehlende wird die Vorgabe.
 
-    Trägt das auch ältere/fremde Konfigurationen ohne den Eintrag: die laufen
-    unverändert als A5120 weiter.
+    Auch die frueheren Schluessel (``a5120.16`` …) sind unbekannt: keine Umsetzung.
     """
     model = str(model).strip().lower() if model else ""
-    return model if model in _EM_FOR else DEFAULT_MODEL
-
-
-def em_for(model) -> str:
-    """Der core-``em=``-Parameter für *model* (``None`` = kein Erweiterungsmodul)."""
-    return _EM_FOR.get(normalize(model))
+    return model if model in VORGABEN else DEFAULT_MODEL
 
 
 def label(model) -> str:
-    """Anzeigename für die Auswahl."""
-    return _LABEL_FOR.get(normalize(model), _LABEL_FOR[DEFAULT_MODEL])
+    """Anzeigename fuer die Auswahl."""
+    return _LABEL_FOR[normalize(model)]
+
+
+def titel(model) -> str:
+    """Fenstertitel des Modells („K8924 Emulator“)."""
+    return _TITEL_FOR[normalize(model)]
+
+
+def vorgabe(model) -> dict:
+    """Kopie der Vorgaben des Modells."""
+    return dict(VORGABEN[normalize(model)])
 
 
 # ── PRG 710 / PRG 710-1 (prg710emu) ─────────────────────────────────────────

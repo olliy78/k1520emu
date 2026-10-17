@@ -138,6 +138,8 @@ bt
 bt scan
 screen
 screen find "x"
+screen select k7024
+screen select
 # console: im Pipe-Betrieb gibt es kein Terminal -> Hinweis statt Rohmodus.
 # Genau so muss es sein; der lebende Pfad haengt an py_dbg_konsole.
 console

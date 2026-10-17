@@ -27,6 +27,7 @@
  */
 #pragma once
 #include "core/machines/a5120/a5120.h"
+#include "core/machines/a5120/a5120_konfig_text.h"
 #include "core/machines/k8915/k8915.h"
 #include "core/machines/prg710/prg710.h"
 #include "core/machines/pc1715/pc1715.h"
@@ -120,7 +121,10 @@ inline bool steckeK5020(K1520Machine& m, bool an, const std::string& d1, const s
  */
 inline bool parseAusfuehrung(const char* ausf, const char* lw, A5120Machine::Config& cfg,
                              std::string& err, const char* laderom = nullptr,
-                             const char* tastatur = nullptr) {
+                             const char* tastatur = nullptr, const char* ram = nullptr,
+                             const char* bildschirm = nullptr, const char* schalter = nullptr,
+                             const char* k3521 = nullptr, const char* k3521_memdi = nullptr,
+                             const char* k3521_datei = nullptr) {
     // `--laderom v06|v09_1|v09_2` (AP A7, doc/a5120_alt/laderom.md): gestecktes Lade-ROM.
     K2526::Laderom lr = cfg.laderom;
     if (laderom) {
@@ -133,7 +137,7 @@ inline bool parseAusfuehrung(const char* ausf, const char* lw, A5120Machine::Con
     // `--tastatur k7636|k7637` (AP A7): Tastatur abweichend von der Ausfuehrung (BCU 880 V1.2:
     // `neu` + K7636).
     using T = A5120Machine::Config::Tastatur;
-    T ta = cfg.tastatur;
+    T ta = cfg.tastatur;   // nur uebernommen, wenn --tastatur angegeben (sonst gilt die Ausfuehrung)
     if (tastatur) {
         const std::string s = tastatur;
         if      (s == "k7636") ta = T::K7636;
@@ -153,7 +157,19 @@ inline bool parseAusfuehrung(const char* ausf, const char* lw, A5120Machine::Con
         cfg.em = em;
     }
     cfg.laderom  = lr;   // nach fuerAusfuehrung, die die Config neu aufsetzt
-    cfg.tastatur = ta;
+    if (tastatur) cfg.tastatur = ta;
+    // `--ram`, `--bildschirm`, `--schalter` (Entwurf 33 N4): Einzeloptionen, gleiche Namen und
+    // Meldungen wie der Konfigurationstext der C-ABI (a5120_konfig_text.h).
+    if (ram        && !a5120konfig::wert(cfg, "ram", ram, err)) { err = "--" + err; return false; }
+    if (bildschirm && !a5120konfig::wert(cfg, "bildschirm", bildschirm, err)) { err = "--" + err; return false; }
+    if (schalter   && !a5120konfig::wert(cfg, "schalter", schalter, err)) { err = "--" + err; return false; }
+    // `--k3521 ADR|aus`, `--k3521-memdi bus|memdi1|memdi2`, `--k3521-datei PFAD` (N10b): Datei
+    // unveraendert uebernehmen (der Konfigurationstext wuerde Gross-/Kleinschreibung ueberfahren).
+    if (k3521      && !a5120konfig::wert(cfg, "k3521", k3521, err)) { err = "--" + err; return false; }
+    if (k3521_memdi && !a5120konfig::wert(cfg, "k3521_memdi", k3521_memdi, err)) { err = "--" + err; return false; }
+    if (k3521_datei) cfg.k3521_datei = k3521_datei;
+    if (k3521_datei && cfg.k3521_basis < 0) { err = "--k3521-datei: nur mit --k3521"; return false; }
+    if (!a5120konfig::pruefe(cfg, schalter != nullptr, err)) { err = "--" + err; return false; }
     if (lw) {
         std::string s = lw;
         size_t i = 0, p = 0;
@@ -381,15 +397,15 @@ public:
         if (p8_) return (uint8_t)(p8_->screenChar(col, row) & 0x7F);   // Kern-Terminal tty1 (80 × 24)
         if (mc_) return (uint8_t)(mc_->screenChar(col, row) & 0x7F);   // MC80: Mustervergleich des VIS-Bilds, nie mem_read
         if (m2_) return (uint8_t)(m2_->screenChar(col, row) & 0x7F);   // MC80.2x: Zelle der DPL (32 × 8), nie mem_read
-        if (a5_->k7023()) {   // altes Geraet (AP A6): K7023 64×16 ab FC00H; ausserhalb = Leerzeichen
+        if (a5_->zeigtK7023()) {   // altes Geraet (AP A6): K7023 64×16 ab FC00H; ausserhalb = Leerzeichen
             if (row >= 16 || col >= 64) return 0x20;
             return (uint8_t)(a5_->screenChar(col, row) & 0x7F);
         }
         return a5_->memReadDebug((uint16_t)(0xF800 + row * 80 + col));
     }
     /// Sichtbares Textbild: 64×16 an der K7023 (A5120 alt), sonst 80×24.
-    int screenCols() const { return (a5_ && a5_->k7023()) ? 64 : m2_ ? 32 : 80; }
-    int screenRows() const { return (a5_ && a5_->k7023()) ? 16 : mc_ ? 25 : m2_ ? 8 : 24; }
+    int screenCols() const { return (a5_ && a5_->zeigtK7023()) ? 64 : m2_ ? 32 : 80; }
+    int screenRows() const { return (a5_ && a5_->zeigtK7023()) ? 16 : mc_ ? 25 : m2_ ? 8 : 24; }
 
     // ─── CPU ─────────────────────────────────────────────────────────────────
     Z80& cpuDebug() {

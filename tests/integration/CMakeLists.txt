@@ -260,6 +260,31 @@ k1520_add_test(kassette_boot SRC test_kassette_boot.cpp
 k1520_add_test(a5120_ausfuehrungen SRC test_a5120_ausfuehrungen.cpp
                                    LIBS k1520_a5120 k1520_logger
                                    LABELS "${_lbl}" DEFS LOG_LEVEL=2)
+# Einzeloptionen des A5120 (doc/design/33_a5130_k8924.md §3a, AP N1): RAM 1×/2×/4× K3525 | K3526,
+# Bildschirm K7024 | K7023 (Bruecke 0AH Bit 6), Tastatur frei, Kassette, EM nur mit K3526;
+# dazu CP/A bis A> auf K7023 + 4× K3525 mit der K7637.
+k1520_add_test(a5120_optionen SRC test_a5120_optionen.cpp LIBS ${_libs}
+                              LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 120)
+# K3521.30, akkugepuffertes 4-KB-RAM (Entwurf 33 N10b): Adresswahl, /MEMDI, Inhalt ueber RESET/Netz-Aus,
+# Ablage ueber zwei Maschineninstanzen, Konfigurationstext.
+k1520_add_test(k3521_maschine SRC test_k3521.cpp LIBS ${_libs} k1520_fs
+                              LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 240)
+# AUP 062-8531, Tastaturteil (Entwurf 33 N10c): Option aus = Tore frei, Stecken, Konfigurationstext,
+# CP/A-Gastlauf mit dem eingecheckten AUPTEST.COM; Sonderschnittstelle (N10d): Hub, Kette, Loop/Datei,
+# CP/A-Gastlauf mit AUPTSIO.COM.
+k1520_add_test(aup_maschine SRC test_aup.cpp LIBS ${_libs} k1520_fs
+                            LABELS "${_lbl}" TIMEOUT 240
+                            DEFS LOG_LEVEL=2 K1520_AUPTEST_COM="${CMAKE_SOURCE_DIR}/tools/auptest/auptest.com"
+                                 K1520_AUPTSIO_COM="${CMAKE_SOURCE_DIR}/tools/auptest/auptsio.com")
+# K3521TST.COM (Entwurf 33 N10i): CP/A-Gastlauf mit dem eingecheckten Pruefprogramm — Hilfetext,
+# Modus T (zerstoerungsfrei, FEHLER bei gesperrter Karte), Modus E (Editor, Cursor, Persistenz).
+k1520_add_test(k3521tst SRC test_k3521tst.cpp LIBS ${_libs} k1520_fs
+                        LABELS "${_lbl}" TIMEOUT 300
+                        DEFS LOG_LEVEL=2 K1520_K3521TST_COM="${CMAKE_SOURCE_DIR}/tools/k3521tst/k3521tst.com")
+# Bildschirm = Beide (Entwurf 33 N2): K7024 + K7023 am Bus, Umschalter fuer Bild und Bruecke
+# 0AH Bit 6, Zwischenstand v9, CP/A bis A> in beiden Schalterstellungen.
+k1520_add_test(a5120_bildschirm SRC test_a5120_bildschirm.cpp LIBS ${_libs}
+                                LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 180)
 # CP/A auf dem A5120 „5¼″ alt“ bis A> (AP A6): K7023 BAB1 FC00H, K7636, dir getippt.
 k1520_add_test(boot_alt SRC test_boot_alt.cpp LIBS ${_libs}
                         LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 120)

@@ -38,6 +38,8 @@ boot_trace [DISK] [optionen]
 | `-p <zyklen>` | **nach** dem Boot weiterlaufen (`0x0437`+) — aktiviert den Post-Boot-Report (Port-/Loaded-code-Histogramm, VRAM-Schreibzähler, 80-Spalten-VRAM-Textdump) |
 | `--raf <typ>` | RAM-Floppy (`raf128`\|`raf512`\|`raf2m`\|`none`) vor dem ersten Lauf stecken, an allen Maschinen (§10) |
 | `--ptape` | Lochstreifen-Karte K6022 (SIF1000, E0H–E7H) vor dem ersten Lauf stecken, an allen Maschinen (§10a) |
+| `--k3521 <adr\|aus>` / `--k3521-memdi bus\|memdi1\|memdi2` / `--k3521-datei <pfad>` | A5120: akkugepuffertes 4-KB-RAM K3521.30 an der 4-KB-Adresse (Hex, Raster 0..f000), /MEMDI-Quelle (nur mit `--k3521`), Ablagedatei genau 4096 B (nur mit `--k3521`); Merkposten `a5130_k8924` Nr. 16/17 |
+| `--aup` / `--aup-alpha led\|ohne\|mit` / `--aup-sonder` | A5120: AUP 062-8531 (Tastaturteil auf E/A 40H–43H) stecken; `--aup-alpha` = Annahme A3 (nur mit `--aup`); `--aup-sonder` steckt sie MIT Sonderschnittstelle (CTC B0H–B3H, SIO B4H–B7H, Kanal B nach außen, Kette hinter der K8025), impliziert `--aup`. Merkposten `a5130_k8924` Nr. 18/19 |
 | `--tape <k52>` / `--tape2 <k52>` / `--tape-card` | Kassettenkarte K5020 (zwei K5200; A5120/PRG 710/MC80 30H, K8915 D0H) vor dem ersten Lauf stecken; `.k52` an Gerät 1 bzw. 2 binden (fehlende Datei = leere Kassette), `--tape-card` nur die Karte (`doc/merkposten/kassette.md`) |
 | `--machine mc80\|mc80-30\|mc80-31` / `--spe 1\|2` | MC80 (.30/.31) mit 1 oder 2 SPE 2; `-c` 60 Mio., Stillstand 8 Mio. Takte (§9b) |
 | `--machine mc80-21\|mc80-22` | MC80.21/.22: DPL-Bild 8 × 32, Ziel = BSYS-Menü, Stillstand 4 Mio. Takte (§9c) |
@@ -64,6 +66,9 @@ boot_trace [DISK] [optionen]
 | `--laufwerke P0,P1,…` | Laufwerksprofile ab A: ersetzen (Katalognamen, z. B. `K5601,K5601` für ein umgerüstetes altes Gerät, `none` = kein Laufwerk); auch ohne `--ausfuehrung` |
 | `--laderom v06\|v09_1\|v09_2` | **Lade-ROM der K2526** (AP A7, `doc/a5120_alt/laderom.md`): Vorgabe `v09_2` = `zre.rom`; `v06` liest Zylinder 1 und startet BCU 880 von den Disketten „SYL auf Spur 1“; `v09_1` = ältere V0.9 (kürzere Zeitgrenze) |
 | `--tastatur k7636\|k7637` | Tastatur abweichend von der Ausführung (AP A7): `--ausfuehrung neu --tastatur k7636` = K7024 80×24 + K7636 am U-Bus (BCU 880 V1.2) |
+| `--ram k3526\|k3525_1\|k3525_2\|k3525_4` | **RAM-Bestückung** (Entwurf 33 N4): Vorgabe `k3526` (64 KB); `k3525_N` = N Karten K3525 à 16 KB ab 0000H. Mit `--em` nur `k3526` |
+| `--bildschirm k7024\|k7023\|beide` | **Bildschirmkarte(n)**: Vorgabe `k7024` (80×24); `beide` = K7024 + K7023 mit Umschalter. Bericht/`--until screen` folgen der Stellung beim Start; `boot_trace` legt den Schalter nicht um (das kann `k1520dbg`, `screen select`) |
+| `--schalter k7024\|k7023` | Anfangsstellung des Umschalters, nur mit `--bildschirm beide` (sonst Abbruch, Exit 2); Stellung `k7023` = Brücke Port 0AH Bit 6 = 1 (CP/A startet im 16×64-Format) |
 | `--format NAME` | Katalogformat, mit dem die Diskette zuerst gemountet wird (bei `.img` maßgeblich, z. B. `k5601_ss40_26x128` für die BCU-Abbilder; Vorgabe `cpa780`, dann `cpa800`) |
 | `--cpu u8000` | **jeden U8001-Befehl** als Zeile `[#n U8 cZYKLUS] <<seg>>%off BEFEHL FCW=… R0..R3 SP` (disassembliert über die Segmentweiche, Deckel `-W`); impliziert `--em`. Am sinnvollsten ab einem Zustand im 16-Bit-Lauf (`--load-state`, z. B. aus `k1520dbg … bmode 16 … savestate`) |
 | `-l <f.prn>[@off]` | `.prn`-Listing → Trace-Zeilen & Histogramme mit kommentiertem Original-Quelltext annotieren (wiederholbar, §4) |

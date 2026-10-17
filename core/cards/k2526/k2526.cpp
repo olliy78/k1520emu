@@ -261,6 +261,12 @@ uint8_t K2526::ioRead(uint8_t port)
         return result;
     } else if (port <= 0x0B) {
         // ── BS-PIO (Ports 08H–0BH) ─────────────────────────────────────────
+        // Laufzeitbruecken (Umschalter K7024/K7023, Entwurf 33 N2): bei jedem Lesen von
+        // Port B den aktuellen Bruecken-Pegel anlegen, eingespeist nur bei Aenderung.
+        if (port == 0x0A && bruecken_quelle_) {
+            const uint8_t v = buildPortBInputs();
+            if (v != bs_pio_.portBEingang()) bs_pio_.portBWrite(v);
+        }
         uint8_t result = bs_pio_.ioRead(port);
         LOG_DEBUG("K2526", "BS-PIO IN  port=0x%02X (sub=%u) => 0x%02X",
                   port, port & 0x03u, result);
@@ -503,7 +509,8 @@ void K2526::pulseWriteStrobe()
  */
 uint8_t K2526::buildPortBInputs() const
 {
-    uint8_t val = static_cast<uint8_t>((cfg_.config_bridges & 0x07) << 5);
+    const uint8_t bruecken = bruecken_quelle_ ? bruecken_quelle_() : cfg_.config_bridges;
+    uint8_t val = static_cast<uint8_t>((bruecken & 0x07) << 5);
     if (!int_bs_active_)
         val |= 0x02;   // B1=1 when /INT-BS inactive (pull-up)
     // B1=0 when int_bs_active_ (latch pulled low by port 00H write)

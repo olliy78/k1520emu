@@ -146,6 +146,9 @@ bash run_a5120emu.sh      # sets LD_LIBRARY_PATH=build and runs app/main.py
 bash run_k8915emu.sh      # the same with --machine k8915 (K8915 Emulator)
 ```
 
+> **Drei Rechner, ein Programm `a5120emu`** (2026-10-16, Entwurf 33): A5120/A5130/K8924 über `general.model` als Vorgabe-Sätze für Optionsfelder
+> (Bildschirmkarte mit Schiebeschalter, RAM, Tastatur, Lade-ROM, Erweiterungsmodul), siehe Abschnitt „A5120, A5130, K8924 als Optionen“.
+
 > **Vier Programme, eine Oberfläche** (2026-09-30, AP-UI1; drittes Programm 2026-10-02, AP-P5d, viertes 2026-10-04, AP-5a; seither auch `p8000emu` und **`mc80emu`**
 > (MC80 Emulator, `--machine mc80`, Modelle MC80.30/.31/.21/.22 über `general.model`, `mc80emu.yaml`, `data/default_config_mc80.yaml`, Profilfeld `laufwerke=False`, `app/ui/keyboard_mc80.py`, `app/ui/keyboard_mc80_2x.py`),
 > `doc/design/18_k8915emu_oberflaeche.md`, `doc/design/11_python_app.md` §10.9):
@@ -638,17 +641,19 @@ Frist 2,45 s — offen [?]).  Stand 2026-10-14: K0–K9 fertig.
 `Z80PIO::setExtern`-Befund, UMS-Flanke); **am MC80** fest auf 30H, nur Laufwerk 1, Kompaktkassette
 (80 mm Vorspann, `doc/merkposten/mc80.md` Nr. 14/15); Entwurf `doc/design/29_kassette_k5020_k5200.md`.
 
-## Frühe A5120 (Ausführungen Alt/Kmbg) + BCU 880
+## A5120, A5130, K8924 als Optionen + frühe A5120 / BCU 880
 
-`A5120Machine::Config::ausfuehrung` = `Neu` (Vorgabe, bitgleich) | `Alt` (K7023 16×64 + 4× K3525 + K7636,
-K2526-Brücke Port 0AH Bit 6 = BAB1, 3× K5600.10 an der K5122) | `Kmbg` (= `Alt` + K5020 fest); `Acht` gesperrt.
-C-ABI `k1520_create_a5120_ausfuehrung`, Python `ausfuehrung="alt"|"kmbg"`, GUI-Modelle „A5120 (64×16, K7636)“ /
-„A5120 Kassette“, Werkzeuge `--ausfuehrung/--laderom/--tastatur`.  CP/A 25.09.89 läuft unverändert bis `A>`;
-**BCU 880 V1.2** bootet (Lade-ROM V0.6, „SYL auf Spur 1“) und formatiert/beschreibt die Kassette als F:.
-**V2.1 gibt es nur als Eigenbau** (kein Original, kein Beleg).  Zwei Kernfehler dabei behoben (`Z80`-EI-Schatten,
-`Z80PIO::onRETI`) — in K8915/PRG 710/PC 1715/CTC/SIO/Bus **nicht** nachgezogen (A8b, riskant, vorgemerkt).
-Plan: `doc/design/30_a5120_fruehe_varianten.md`, Stand `doc/design/32_...`.
-**Vor Arbeiten daran: `doc/merkposten/a5120_alt.md` lesen.**
+Drei Rechner im **einen** Programm `a5120emu` (`general.model` = `a5120`|`a5130`|`k8924`, Fenstertitel folgt dem Modell,
+Programmname bleibt): ein Modell ist nur ein **Vorgabe-Satz** (`app/modell.py::VORGABEN`) für die Einzeloptionen
+`A5120Machine::Config::ram` (K3525 1/2/4× | K3526) · `bildschirm` (K7024 | K7023 | **Beide** mit Laufzeit-Umschalter,
+Brücke Port 0AH Bit 6 folgt ihm) · `tastatur` (K7636 | K7637, an jeder Bestückung) · `laderom` (V0.9_2/V0.9_1/V0.6) · `kassette` ·
+`em`; Modellwahl übernimmt sie samt Laufwerken ohne Rückfrage, alte Modellschlüssel (`a5120.16`, `a5120-alt`, `-kmbg`, `-bcu`)
+werden **nicht umgesetzt**.  `Config::ausfuehrung` (`Neu/Alt/Kmbg`) ist nur noch Hülle der C-ABI
+`k1520_create_a5120_ausfuehrung`; Konfigurationstext `k1520_create_a5120_text`, Werkzeuge `--ram/--bildschirm/--schalter/--tastatur/--laderom`.
+Fehlbild auf der nicht passenden Karte ist **gewollt**.  Option **bis zu vier K3521** (`k3521=8000+9000`, N10h; Prüfprogramm `K3521TST.COM`, N10i).  **BCU 880 V1.2** bootet (Lade-ROM V0.6, „SYL auf Spur 1“, Kassette als F:);
+V2.1 nur als Eigenbau.  Zwei Kernfehler dabei behoben (`Z80`-EI-Schatten, `Z80PIO::onRETI`), in K8915/PRG 710/PC 1715/CTC/SIO/Bus
+**nicht** nachgezogen (A8b, riskant, vorgemerkt).  Pläne: `doc/design/33_a5130_k8924.md` (maßgeblich), `30_…`, `32_…`.
+**Vor Arbeiten daran: `doc/merkposten/a5130_k8924.md` und `doc/merkposten/a5120_alt.md` lesen.**
 
 ## Sechste Maschine: MC80 (VEB Elektronik Gera) → `mc80emu`
 

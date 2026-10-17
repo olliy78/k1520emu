@@ -7,7 +7,7 @@ added over time.  Sections carried today:
 
 * ``crt``     — picture-tube look (see :class:`~app.ui.screen_widget.CRTParams`)
 * ``general`` — general emulator settings: emulation ``speed`` and the machine
-  ``model`` (``"a5120"``/``"a5120.16"``, ``app/modell.py``; missing = ``"a5120"``,
+  ``model`` (``"a5120"``/``"a5130"``/``"k8924"``, ``app/modell.py``; missing = ``"a5120"``,
   so older configurations keep running unchanged)
 * ``machine`` — Bestückung jenseits von Modell und Laufwerken: ``raf``
   (``none``/``raf128``/``raf512``/``raf2m``, RAM-Floppy, `app/raf.py`) und
