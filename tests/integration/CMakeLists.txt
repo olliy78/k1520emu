@@ -276,6 +276,11 @@ k1520_add_test(aup_maschine SRC test_aup.cpp LIBS ${_libs} k1520_fs
                             LABELS "${_lbl}" TIMEOUT 240
                             DEFS LOG_LEVEL=2 K1520_AUPTEST_COM="${CMAKE_SOURCE_DIR}/tools/auptest/auptest.com"
                                  K1520_AUPTSIO_COM="${CMAKE_SOURCE_DIR}/tools/auptest/auptsio.com")
+# K3521TST.COM (Entwurf 33 N10i): CP/A-Gastlauf mit dem eingecheckten Pruefprogramm — Hilfetext,
+# Modus T (zerstoerungsfrei, FEHLER bei gesperrter Karte), Modus E (Editor, Cursor, Persistenz).
+k1520_add_test(k3521tst SRC test_k3521tst.cpp LIBS ${_libs} k1520_fs
+                        LABELS "${_lbl}" TIMEOUT 300
+                        DEFS LOG_LEVEL=2 K1520_K3521TST_COM="${CMAKE_SOURCE_DIR}/tools/k3521tst/k3521tst.com")
 # Bildschirm = Beide (Entwurf 33 N2): K7024 + K7023 am Bus, Umschalter fuer Bild und Bruecke
 # 0AH Bit 6, Zwischenstand v9, CP/A bis A> in beiden Schalterstellungen.
 k1520_add_test(a5120_bildschirm SRC test_a5120_bildschirm.cpp LIBS ${_libs}

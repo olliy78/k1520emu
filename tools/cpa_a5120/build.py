@@ -56,7 +56,8 @@ BOOT = os.path.join(REPO, 'disks', 'bootsektoren', 'boot_cpa780.bin')
 RAF_FIXTURES = os.path.join(REPO, 'tests', 'fixtures', 'raf')
 # Die Beigaben des A5120, die auf CP/A-Disketten gehoeren (ohne PCTEST: PC 1715)
 BEIGABEN = ['SERTEST.COM', 'ROMREAD.COM', 'EM256ADR.COM', 'EM16ABL.COM', 'EM256FUL.COM',
-            'RAFCPM.COM', 'RAF512.COM', 'LBREAD.COM', 'LBPUNCH.COM', 'AUPTEST.COM', 'AUPTSIO.COM']
+            'RAFCPM.COM', 'RAF512.COM', 'LBREAD.COM', 'LBPUNCH.COM', 'AUPTEST.COM', 'AUPTSIO.COM',
+            'K3521TST.COM']
 LIESMICH = 'LIESMICH.TXT'
 
 
