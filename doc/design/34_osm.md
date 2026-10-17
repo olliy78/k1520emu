@@ -1,6 +1,6 @@
 # 34 — OS/M-Disketten (P8000, 8-Bit-Teil)
 
-Stand 2026-10-17, Zweig `cqm`.  Reine Analyse und Plan — im Kern ist noch nichts geändert.
+Stand 2026-10-17, Zweig `cqm`.  Analyse und Plan; **AP 1, AP 2 und AP 3 sind umgesetzt** (§11).
 Bezug: `doc/design/33_cqm.md` (Container), `doc/merkposten/disktool.md`, `doc/merkposten/cqm.md`,
 Sammlung `~/projects/robotron/P8000/discs/` (pofo.de), Übersicht
 `~/projects/robotron/P8000/archive/UEBERSICHT.md`.
@@ -348,3 +348,36 @@ markieren); Handbuch `app/help/` + `tools/k1520disktool.md` („OS/M ist CP/M; F
 Wächter: `py_disktool_*` (Neu-Dialog-Liste), `py_help`.  Aufwand ½ Tag.  Modell: Sonnet.
 
 Minimalplan, falls nur das Nötigste gewollt ist: **AP 1 + AP 2 + AP 6** (ohne fsck, ohne 720K).
+
+## 11. Umsetzung (Stand 2026-10-17)
+
+**AP 1** — Commit 36fb41f (`DiskVolume::zielNamen`, `/` → `_`, kein Pfadausbruch).
+
+**AP 2 + AP 3** — umgesetzt wie in §6/§10, mit diesen Festlegungen und Abweichungen:
+
+- **Urlader-Merkmale** an allen 8 Systemdisketten nachgeprüft: Bytes 0x00–0x09
+  `FD 21 48 0C 31 00 40 3A 7E 0C`, `P8000SYS` bei 0x80, Byte 0x7E = `55` (osm30, osmsys, osm_org)
+  bzw. `77` (osmspiel, osmut, bsosm3, osmdb, osmredab); 0x7B/0x7C = `42 80` bzw. `48 50`.  Unter allen
+  übrigen Abbildern trägt keines diesen Code; `P8000SYS` allein tragen die 7 UDOS-Startdisketten
+  (`udos_org`, `udossys`, `w30start`, `w30strt2`, `w31start`, `w31star2`, `wgaend12`, Code `97 32 B4 0F …`).
+  Geprüft wird deshalb Code UND Kennung (`CpmFileSystem::osmUrlader`).
+- **Abweichung von §6:** die Erkennung verlangt den Urlader, aber NICHT den passenden FDCONF-Typ.
+  Die Geometrie wählt das Profil ohnehin; ein unpassender Typ ist ein Befund (`osm.fdconf`, AP 3),
+  kein Grund, die Diskette als SCP-Diskette auszugeben.  Befundkennung `osm.fdconf` statt des in §10
+  genannten `osm.urlader.typ`; Schwere **Warnung** (die Diskette startet falsch), Ebene Verwaltung,
+  damit sie auch die Schnellprüfung beim Öffnen sieht.
+- **Deckungsgleich** (§6) ist allgemein umgesetzt: Profil mit positivem Nachweis gegen Profile
+  gleicher Lage; nur wenn ein Doppel wegfällt, ändert sich die Liste.
+- **„ebenso gut osm800“** ist eine Bemerkung der Erkennung (wie `scpx8915`), **kein**
+  `erkennung.*`-Befund — Ebene 0 bleibt auf erkannten Disketten leer
+  (`FsCheckKeineFalschmeldungen.EineErkannteDisketteHatKeineBefundeDerEbene0`).
+- **Leere OS/M-Diskette:** `create --fs osm800|osm640` ohne `--boot` schreibt keinen Urlader (ein
+  Urlader ohne System bootete ins Leere).  Die Diskette hat Verzeichnis ab c2h0; nach dem ersten
+  `put` erkennt die CP/A-Regel sie von selbst als `cpa_auto` ab c2h0 (Systemzylinder leer).
+- **Bootfähig** (`create --fs osm800 --boot <boot-get von osmspiel>` + `put`) im p8000emu bis `A:`
+  nachgeprüft (boot_trace).
+- **Erkennungsmatrix** über die Sammlung (151 Abbilder; die früheren `*.crdownload` liegen inzwischen
+  als `.cqm` vor, `rempc172` fehlt zeitweise): einzige Änderungen osm30/osmsys/osm_org scpx640 →
+  `osm640`, osmspiel/osmut/bsosm3/osmdb/osmredab cpa_auto → `osm800`, alle eindeutig, Dateizahlen und
+  `check`-Befunde unverändert.  Wächter `OsmEchtdaten.*` (`K1520_CQM_DIR`).
+- Offen: AP 4–6 (Referenzdisketten, `osm720`, Oberfläche/Archiv/Übersicht).

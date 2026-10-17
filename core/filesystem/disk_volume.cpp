@@ -112,6 +112,12 @@ bool cpmVerzeichnisPlausibel(DiskMedium& medium, const DiskFormat& f, const FsPr
     if (p.boot_header == "bcu" && p.detect && !bcuSystemspuren(raum))
         return nein("die Systemspuren tragen keine BCU-880-Kennung");
 
+    // `osm` (OS/M des P8000): der Urlader in c0h0 ist der POSITIVE Nachweis.  Ohne ihn
+    // ist eine OS/M-Datendiskette Sektor fuer Sektor eine SCP-/CP/A-Diskette, und die
+    // Anzeige „OS/M" waere geraten (doc/design/34_osm.md §6).
+    if (p.boot_header == "osm" && !CpmFileSystem::osmUrladerVon(raum))
+        return nein("c0h0 Sektor 1 traegt keinen OS/M-Urlader (FD 21 48 0C …, Kennung P8000SYS)");
+
     // `dir_boot`: der Bootkopf ist hier der POSITIVE Nachweis.  Ohne ihn waere jede
     // Datendiskette zugleich `cpa800` und `cpa1715` — und damit „nicht eindeutig".
     if (p.dir_boot) {
@@ -371,6 +377,39 @@ bool pc1715HatKopf(const SectorSpace& raum) {
     SectorData s;
     return raum.readSector(t.cyl, t.head, t.first_id, s)
         && CpmFileSystem::bootKopf(s.data.data(), s.data.size());
+}
+
+// ─── OS/M (P8000): Urlader in c0h0 Sektor 1 (doc/design/34_osm.md §3.2) ──────
+//
+// Der 8-Bit-Anfangslader holt c0h0 Sektor 1 nach 0C00H; der Urlader laedt von dort
+// 28H Saetze zu 256 B (10 KB: CCP+BDOS+BIOS, ab Sektor 1 gezaehlt) mit der Spurlaenge
+// seines FDCONF-Typs.  Ein Abbild ohne diesen Urlader (A5120-SYL, PC-1715-Kopf, UDOS-
+// Urlader des P8000) oder mit dem Typ einer anderen Geometrie sieht geschrieben heil aus
+// und startet nicht.  Geprueft wird, wenn das Profil es verlangt ODER die Diskette den
+// OS/M-Urlader schon traegt (dann ist sie eine OS/M-Systemdiskette, auch unter --fs).
+
+constexpr size_t kOsmSystemBytes = 0x28 * 256;   ///< OSMLEN Saetze zu 256 B
+
+std::string osmBootabbildproblem(const FsProfile& p, const SectorSpace& raum,
+                                 const std::vector<uint8_t>& img) {
+    if (p.type != FsType::Cpm) return {};
+    if (p.boot_header != "osm" && !CpmFileSystem::osmUrladerVon(raum)) return {};
+    if (!CpmFileSystem::osmUrlader(img.data(), img.size()))
+        return "Das Bootabbild traegt keinen OS/M-Urlader (Sektor 1: FD 21 48 0C …, Kennung "
+               "P8000SYS bei 0x80) — es stammt nicht von einer OS/M-Systemdiskette.  Ein "
+               "UDOS-, SCP- oder CP/A-Bootabbild startet unter OS/M nicht.";
+    const uint16_t passend = CpmFileSystem::osmTypenFuer(raum);
+    const unsigned typ     = img[CpmFileSystem::kOsmFdconf] & 0x0F;
+    if (passend != 0 && !(passend & (1u << typ)))
+        return "Der OS/M-Urlader des Bootabbilds ist fuer Laufwerkstyp " + std::to_string(typ)
+             + " eingestellt (FDCONF), diese Diskette hat aber eine andere Geometrie — er "
+               "luede das System mit falscher Spurlaenge.  Bootabbild einer Systemdiskette "
+               "desselben Formats nehmen (640K = Typ 5, 800K = Typ 7).";
+    if (img.size() < kOsmSystemBytes)
+        return "Das Bootabbild ist " + std::to_string(img.size()) + " Byte gross, der OS/M-"
+               "Urlader laedt aber " + std::to_string(kOsmSystemBytes) + " Byte (28H Saetze) — "
+               "er bliebe mitten im System stehen.";
+    return {};
 }
 
 std::string pc1715Bootabbildproblem(const FsProfile& p, const SectorSpace& raum,
@@ -1589,6 +1628,41 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
                        + " erkannt, aber kein Dateisystem darauf");
         }
 
+        // ── Deckungsgleiche Profile sind keine Mehrdeutigkeit (Entwurf 34 §6) ─
+        // Eine OS/M-640K-Systemdiskette passt auf `osm640` UND `scpx640`: gleiche
+        // Geometrie, gleiche Lage, gleiche Bloecke, gleiches Verzeichnis — beide lesen
+        // Byte fuer Byte dasselbe.  Das ist keine zweite Deutung, sondern derselbe
+        // Datentraeger mit einem genaueren Namen; ohne diese Regel hiesse jede solche
+        // Diskette „nicht eindeutig", und die Gegenprobe oeffnete sie fuer nichts ein
+        // zweites Mal.  Es gewinnt das Profil mit POSITIVEM Nachweis (Urlader, Bootkopf,
+        // SYL-Lader); deckungsgleiche Mitbewerber fallen weg.  Profile mit ANDERER Lage
+        // bleiben Alternativen — dort entscheidet weiter die Gegenprobe (§11a).
+        if (passend.size() > 1) {
+            auto nachweis = [](const FsProfile* p) {
+                return p->boot_header == "osm" || p->dir_boot
+                    || p->boot_header == "bcu_syl" || p->boot_header == "bcu_kombi"
+                    || p->boot_header == "bcu_kombi80" || (p->boot_header == "bcu" && p->detect);
+            };
+            auto deckungsgleich = [](const FsProfile* a, const FsProfile* b) {
+                return a->type == FsType::Cpm && b->type == FsType::Cpm
+                    && a->format == b->format
+                    && a->data_cyl == b->data_cyl && a->data_head == b->data_head
+                    && a->block_size == b->block_size && a->dir_entries == b->dir_entries
+                    && a->skew == b->skew && a->max_blocks == b->max_blocks
+                    && a->dir_boot == b->dir_boot && a->nur_boot == b->nur_boot;
+            };
+            const auto it = std::find_if(passend.begin(), passend.end(), nachweis);
+            if (it != passend.end()) {
+                const FsProfile* sieger = *it;
+                std::vector<const FsProfile*> rest{sieger};
+                for (const FsProfile* p : passend)
+                    if (p != sieger && !deckungsgleich(sieger, p)) rest.push_back(p);
+                // Nur wenn wirklich ein Doppel wegfiel — sonst bleibt die Reihenfolge,
+                // wie sie war (keine Verschiebung bestehender Erkennungen).
+                if (rest.size() < passend.size()) passend = std::move(rest);
+            }
+        }
+
         if (passend.empty()) passend.push_back(&*dv->abgeleitet_);
         dv->profile_ = passend.front();
         dv->detection_.format      = dv->format_->name;
@@ -1605,8 +1679,21 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
         // `scp1715` ist keine Lesart einer leeren Datendiskette, sondern eine Systemdiskette.
         if (dv->profile_->type == FsType::Cpm && !dv->abgeleitet_ && !dv->profile_->dir_boot
             && belegte_plaetze[dv->profile_] == 0) {
+            // `osm800` ist erkennbar, aber nur MIT Urlader — eine leere OS/M-Diskette
+            // (OS/M-FORMAT schreibt nur 0xE5) traegt keinen und ist von einer leeren
+            // `cpa800` nicht zu unterscheiden.  Wer sie fuer OS/M fuellt, muss es sagen,
+            // sonst landet das erste `put` in den Systemzylindern (Entwurf 34 §4.3).
+            // Nur, wenn die Lage ABWEICHT: auf 640K ist `osm640` deckungsgleich mit
+            // `scpx640`, ein Hinweis waere dort blosses Rauschen.
+            auto andereLage = [&](const FsProfile* p) {
+                return p->data_cyl != dv->profile_->data_cyl
+                    || p->data_head != dv->profile_->data_head
+                    || p->dir_entries != dv->profile_->dir_entries
+                    || p->block_size != dv->profile_->block_size;
+            };
             for (const FsProfile* p : fs_cat.forFormat(dv->format_->name))
-                if (!p->detect && p->type == FsType::Cpm && p->allowsContainer(ext)
+                if ((!p->detect || p->boot_header == "osm") && andereLage(p)
+                    && p->type == FsType::Cpm && p->allowsContainer(ext)
                     && p->boot_header != "pc1715" && p->boot_header != "bcu")
                     dv->detection_.remarks = zusammen(
                         dv->detection_.remarks,
@@ -3534,6 +3621,8 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
             if (!err.empty()) return nullptr;
             err = pc1715Bootabbildproblem(*profil, raum, boot);
             if (!err.empty()) return nullptr;
+            err = osmBootabbildproblem(*profil, raum, boot);
+            if (!err.empty()) return nullptr;
         }
         err = bcuBootabbildproblem(*profil, boot);
         if (!err.empty()) return nullptr;
@@ -3724,6 +3813,8 @@ bool DiskVolume::writeBootImage(const std::vector<uint8_t>& img, int volume) {
         return fail(problem);
     if (const std::string problem = pc1715Bootabbildproblem(*profile_, raum, img);
         !problem.empty())
+        return fail(problem);
+    if (const std::string problem = osmBootabbildproblem(*profile_, raum, img); !problem.empty())
         return fail(problem);
     if (const std::string problem = bcuBootabbildproblem(*profile_, img); !problem.empty())
         return fail(problem);

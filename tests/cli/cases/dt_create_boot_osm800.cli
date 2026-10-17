@@ -1,0 +1,16 @@
+# OS/M (P8000, Entwurf 34): eine 800K-Systemdiskette mit Urlader wird `osm800` — eindeutig,
+# Verzeichnis ab c2h0.  Das Bootabbild ist synthetisch: die drei Merkmale des Urladers
+# (Code FD 21 48 0C …, FDCONF 77 bei 0x7E, P8000SYS bei 0x80), 20 KB lang.
+tool:   k1520disktool
+tmpfile neu.img:
+file boot.bin:
+  x
+poke:   %boot.bin% 0 fd21480c3100403a7e0c
+poke:   %boot.bin% 7e 7700
+poke:   %boot.bin% 80 5038303030535953
+poke:   %boot.bin% 4fff 00
+setup_run: create %neu.img% --fs osm800 --boot %boot.bin%
+run:    info %neu.img%
+expect: Dateisystem: osm800
+forbid: nicht eindeutig
+exit:   0

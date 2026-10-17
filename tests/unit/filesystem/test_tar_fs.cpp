@@ -613,8 +613,11 @@ TEST(TarEchtdaten, AlleTarDisketten) {
         if (!v->hasFileSystem()) nichts.insert(e.path().stem().string());
         else if (v->istTar()) ++tarN;
     }
-    EXPECT_EQ(tarN, 84);
-    EXPECT_EQ(nichts, (std::set<std::string>{"wdos_dcp"}));
+    // Seit 2026-10-17 liegen die frueher nur als `*.cqm.crdownload` vorhandenen Abbilder
+    // als `.cqm` in der Sammlung: vier tar-Teile mehr (84 → 88) und `wegrem33`, eine
+    // 360K-FAT-Diskette (MS-DOS 3.1) wie `wdos_dcp`.
+    EXPECT_EQ(tarN, 88);
+    EXPECT_EQ(nichts, (std::set<std::string>{"wdos_dcp", "wegrem33"}));
 }
 
 /// @test Einzelabbilder stimmen mit GNU `tar -tvf` der .tar-Gegenstuecke ueberein.

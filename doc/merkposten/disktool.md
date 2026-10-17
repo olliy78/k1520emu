@@ -1079,10 +1079,39 @@ Was beim Weiterarbeiten zu wissen ist:
   leeren tar-Diskette zu (`datei_schreibbar = schreibbar and not ist_tar`), der Neu-Dialog bietet nur
   `tar720_leer` (nicht `tar720`).  Wächter `py_disktool_tar_schreiben`, `dt_tar_*.cli`.
 
-- **OS/M-Disketten (P8000, 8-Bit-Teil; Analyse 2026-10-17, Entwurf `doc/design/34_osm.md`).**  OS/M ist
-  CP/M 2.2 auf den **SCP-Formaten des PC 1715** — kein eigenes Dateisystem.  Format 5 (640K, 16×256) =
-  `scpx640`, Format 7 (800K, 5×1024) = OFF 2 Zylinder / 2K / 128 (heute `cpa_auto`); beide werden
-  richtig gelesen (15 Abbilder gegen einen unabhängigen Leser geprüft).  Offen und geplant: Profile
-  `osm640`/`osm800` (Name, leere 800K-Diskette liest sonst als `cpa800`, Ladekopf „P8000SYS“ + FDCONF),
-  `osm720` (Format 6, 9×512 — die CP/A-Regel kann es nicht), und der Pfadausbruch von
-  `get <abbild> <muster>` bei Namen mit `/` (`/Z/HOFFM` → absoluter Pfad).
+- **OS/M-Disketten (P8000, 8-Bit-Teil; Entwurf `doc/design/34_osm.md`, AP 1–3 umgesetzt 2026-10-17).**
+  OS/M ist CP/M 2.2 auf den **SCP-Formaten des PC 1715** — kein eigenes Dateisystem, kein
+  `FsType::Osm`.  Fünf Festlegungen:
+  **(1) `osm640`/`osm800` erkennt nur der Urlader** (`boot_header: osm`, `CpmFileSystem::osmUrlader`):
+  c0h0 Sektor 1 mit Code `FD 21 48 0C 31 00 40 3A 7E 0C` UND `P8000SYS` bei 0x80 — die Kennung allein
+  trägt auch der UDOS-Urlader des P8000 (`udos_org`, `w30start` …).  Datendisketten ohne Urlader bleiben
+  `scpx640`/`cpa_auto`/`cpa800`; „OS/M" nach Herkunft wäre geraten.  Der FDCONF-Typ entscheidet die
+  Erkennung NICHT (die Geometrie wählt das Profil), er ist Gegenstand von (4).
+  **(2) Deckungsgleiche Profile sind keine Mehrdeutigkeit** (`disk_volume.cpp`, vor der Wahl): hat
+  ein Treffer einen positiven Nachweis (`osm`, `dir_boot`, `bcu_syl/kombi*`, `bcu` mit Erkennung) und
+  liegt ein anderer Treffer genau gleich (Format, Lage, Blockgröße, Plätze, Versatz, `max_blocks`,
+  `dir_boot`, `nur_boot`), fällt der andere weg — `osm640` schlägt `scpx640` eindeutig, die Gegenprobe
+  läuft nicht.  Fällt nichts weg, bleibt die Reihenfolge unverändert (keine Verschiebung bestehender
+  Erkennungen).  Wächter `FsCheckGegenprobe.DerAusgelieferteKatalogIstEindeutig` (synthetische
+  osm640/osm800), `OsmProfile.Systemdiskette640WirdOsm640Eindeutig`.
+  **(3) Leere 800K-Diskette: Hinweis, kein Befund.**  Sie ist Sektor für Sektor eine leere `cpa800`
+  (ab c0h0, 192 Plätze) und bleibt das; die Erkennung schreibt „ebenso gut osm800 … --fs osm800" in die
+  Bemerkung (wie bei `scpx8915`), nur wenn die Lage ABWEICHT (auf 640K wäre `osm640` Rauschen).
+  Bewusst KEIN `erkennung.*`-Befund: auf einer erkannten Diskette gibt es keine Befunde der Ebene 0,
+  und die Diskette ist in Ordnung.  `create --fs osm800` ohne `--boot` legt eine 0xE5-Diskette an;
+  `put` darauf schreibt ab c2h0, die Systemzylinder bleiben frei, und beim Wiederöffnen liest die
+  CP/A-Regel sie richtig (`cpa_auto`, ab c2h0) — einen Urlader ohne System zu schreiben wäre eine
+  Diskette, die bootet und abstürzt.  Wächter `OsmProfile.Leere800NenntOsm800AlsAusweg`,
+  `OsmProfile.LeereOsm800SchuetztDieSystemzylinder`, `cli_dt_info_leer800_osm_hinweis`.
+  **(4) `osm.fdconf` (Vertrag, Warnung, Ebene Verwaltung, `cpm_check.cpp`)**: nur auf einer Diskette,
+  die den Urlader TRÄGT (gleich unter welchem Profil), wenn das A:-Nibble von Byte 0x7E nicht zur
+  Geometrie passt (`osmTypenFuer`: 16×256 DS80 = 5, SS80 = 4, SS40 = 2/3, 9×512 DS = 6, 5×1024 DS = 7);
+  c0h0 wird nur gelesen, wenn er da ist oder nachgeladen werden darf.  Keine Falschmeldung an den
+  8 Systemdisketten.  Wächter `FsCheckOsm.*`, `OsmEchtdaten.SystemdiskettenOhneFalschmeldung`.
+  **(5) Bootabbild-Prüfung** (`osmBootabbildproblem`, bei `create --boot` und `boot-put`, auch unter
+  `--fs scpx640`, sobald die Diskette den Urlader trägt): Urlader-Merkmale, FDCONF-Typ der Geometrie,
+  mindestens 28H × 256 B.  Wächter `OsmProfile.BootabbildWirdGeprueft`, `cli_dt_create_boot_osm*`;
+  am p8000emu nachgeprüft (`create --fs osm800 --boot` aus osmspiel → `boot_trace` bis `A:`).
+  Echtdaten: `OsmEchtdaten.ErkennungUeberDieGanzeSammlung` (`K1520_CQM_DIR`) — genau die 8
+  Systemdisketten wechseln (3 × osm640, 5 × osm800), alle übrigen behalten ihr Profil.  Offen: `osm720`
+  (Format 6, AP 4/5), Oberfläche/Archiv (AP 6).

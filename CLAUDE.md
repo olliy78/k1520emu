@@ -617,6 +617,12 @@ pofo.de-Sammlung: `tools/p8000/pofo_archive.py`.
 **Vor Arbeiten daran: `doc/merkposten/cqm.md` lesen** (CRC-Tabellenfehler `& 0x3F`, Offsets);
 Entwurf `doc/design/33_cqm.md`.
 
+**OS/M (P8000, 8-Bit) = CP/M 2.2 auf den SCP-Formaten** (Entwurf `doc/design/34_osm.md`): Profile `osm640`/`osm800`
+(`boot_header: osm`) werden NUR mit OS/M-Urlader in c0h0 Sektor 1 erkannt (Code `FD 21 48 0C …` UND `P8000SYS`);
+Datendisketten bleiben `scpx640`/`cpa_auto`/`cpa800`.  **Deckungsgleiche Profile sind keine Mehrdeutigkeit** (das mit
+positivem Nachweis gewinnt), leere 800K nennt nur „ebenso gut osm800“, fsck `osm.fdconf` bei unpassendem FDCONF.
+Festlegungen + Wächter: `doc/merkposten/disktool.md` (OS/M).
+
 ## Kassette K5020/K5200 (alle Maschinen außer P8000; PC 1715 nur mechanisch)
 
 AKB K5020 (zwei Z80-PIOs) mit zwei Laufwerken K5200 als steckbare Option auf **E/A 30H–37H**

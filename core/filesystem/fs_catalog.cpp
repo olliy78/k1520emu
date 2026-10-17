@@ -171,8 +171,12 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
     if (const yaml::Node* n = node.find("boot_header")) {
         if (!n->isScalar() || (n->scalar != "k8915" && n->scalar != "pc1715"
                                && n->scalar != "bcu" && n->scalar != "bcu_syl" && n->scalar != "bcu_kombi" && n->scalar != "bcu_kombi80"
-                               && !n->scalar.empty()))
-            { why = "'boot_header' muss k8915, pc1715, bcu, bcu_syl, bcu_kombi oder bcu_kombi80 sein (oder fehlen)"; return false; }
+                               && n->scalar != "osm" && !n->scalar.empty()))
+            { why = "'boot_header' muss k8915, pc1715, bcu, bcu_syl, bcu_kombi, bcu_kombi80 oder osm sein (oder fehlen)"; return false; }
+        // `osm` (OS/M des P8000): der Urlader ist der POSITIVE Nachweis der Erkennung —
+        // das gibt es nur auf einer CP/M-Diskette mit Systemzylindern.
+        if (n->scalar == "osm" && out.type != FsType::Cpm)
+            { why = "'boot_header: osm' gilt nur fuer type: cpm"; return false; }
         out.boot_header = n->scalar;
     }
     if (const yaml::Node* n = node.find("dir_boot")) {

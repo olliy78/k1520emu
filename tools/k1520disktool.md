@@ -490,6 +490,23 @@ einen 1715-Kopf trägt (auch unter dem abgeleiteten Profil `cpa_auto`).
 
 Wächter: `DisktoolPc1715.*` (8), `cli_dt_*cpa1715*`, `cli_dt_boot_put_pc1715_a5120_abbild`.
 
+### OS/M (P8000, `osm640`, `osm800`)
+
+Entwurf `doc/design/34_osm.md`.  Beide Profile haben `boot_header: osm`: das Bootabbild muss
+den **OS/M-Urlader** tragen (Sektor 1: Code `FD 21 48 0C 31 00 40 3A 7E 0C`, Kennung
+`P8000SYS` bei 0x80), sein FDCONF-Typ (Byte 0x7E, Bits 0–3) muss zur Geometrie passen
+(640K = Typ 5, 800K = Typ 7) und es muss die 28H Sätze zu 256 B (10 KB) enthalten, die der
+Urlader lädt.  Ein UDOS-, SCP- oder CP/A-Abbild wird VOR dem Schreiben abgewiesen, ebenso bei
+`boot-put` auf eine Diskette, die den OS/M-Urlader schon trägt (auch unter `--fs scpx640`).
+
+```
+$ k1520disktool boot-get osmspiel.cqm osm800.bin          # 20480 B Systemzylinder 0-1
+$ k1520disktool create neu.img --fs osm800 --boot osm800.bin
+$ k1520disktool put neu.img datei.txt                      # landet ab Zylinder 2
+```
+
+Wächter: `OsmProfile.*`, `cli_dt_create_boot_osm800`, `cli_dt_create_boot_osm_falscher_typ`.
+
 ### PRG 710 / PRG 710-1
 
 Systemdisketten des Robotron PRG 710 und 710-1 (`doc/design/20_prg710.md` §5, AP-P6):
@@ -737,6 +754,33 @@ $ k1520disktool create neu.hfe --fs scp1700
 ```
 
 Hintergrund und Messwerte: `doc/scp1700_diskettenformat.md`.
+
+## OS/M — das CP/M des P8000 (`osm640`, `osm800`)
+
+OS/M 3.0 (8-Bit-Teil des P8000) ist **CP/M 2.2** auf den SCP-Formaten des PC 1715:
+Zylinder 0–1 System, Verzeichnis ab c2h0, 2-KB-Blöcke, 128 Plätze, kein Versatz —
+Format 5 (16×256, 640K) und Format 7 (5×1024, 800K).  Gelesen wurden solche Disketten
+schon immer richtig (als `scpx640` bzw. `cpa_auto`); die Profile bringen den Namen, die
+Bootabbild-Prüfung und die leere 800K-Diskette.
+
+* **Erkannt wird nur mit Urlader** in c0h0 Sektor 1 (s. o.).  Eine Datendiskette ohne
+  Urlader bleibt `scpx640`/`cpa_auto`/`cpa800` — das Medium unterscheidet sie nicht von
+  einer SCP-Diskette, „OS/M" wäre geraten.  Der UDOS-Urlader des P8000 trägt dieselbe
+  Kennung `P8000SYS`, aber anderen Code; er zählt nicht.
+* **Deckungsgleich ist nicht mehrdeutig**: eine 640K-Systemdiskette passt auf `osm640`
+  UND `scpx640` (gleiche Lage, Blöcke, Plätze).  Es gewinnt das Profil mit positivem
+  Nachweis, eindeutig; die Gegenprobe läuft nicht.
+* **Die leere 800K-Diskette** (OS/M-`FORMAT` schreibt nur 0xE5) ist Sektor für Sektor eine
+  leere `cpa800` (Verzeichnis ab c0h0, 192 Plätze).  `info` nennt dann „ebenso gut osm800 …
+  dafür --fs osm800".  Wer sie für OS/M füllt, sagt `--fs osm800` bzw. legt sie mit
+  `create --fs osm800` an — sonst landet das erste `put` in den Systemzylindern.  Danach
+  (Dateien ab c2h0, Systemzylinder leer) liest die CP/A-Regel sie von selbst richtig
+  (`cpa_auto`, Verzeichnis ab c2h0).
+* **Prüfung**: `osm.fdconf` (Warnung), wenn der FDCONF-Typ des Urladers (A:) nicht zur
+  Geometrie passt — die Diskette sähe heil aus und startete am P8000 falsch.
+* **Namen mit `/`** (`GW/ZSID.DOC`, aus WEGA übertragen) sind echte Befunde
+  (`cpm.dir.name`); `get` macht daraus `GW_ZSID.DOC`.
+* **Format 6 (9×512, 720K)** gibt es noch nicht (`osm720`, AP 5 des Entwurfs).
 
 ## SCPX 8915 — Disketten des K8915
 

@@ -522,6 +522,35 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
               " lesbaren Eintrag — dort stehen geloeschte Dateien, die sich"
               " wiederherstellen lassen");
 
+    // ── OS/M-Urlader: passt sein Laufwerkstyp zur Diskette? (AP 3, Entwurf 34) ──
+    //
+    // Der Urlader (c0h0 Sektor 1) laedt das System mit der Spurlaenge aus FDCONF
+    // (Byte 0x7E, Bits 0-3 = A:), und das BIOS liest A: mit dem DPB dieses Typs.  Passt
+    // der Typ nicht zur Geometrie (Typ 7 auf einer 640K-Diskette, Typ 8/9 auf 800K), sieht
+    // die Diskette hier heil aus und startet am P8000 falsch.  Nur bei einer Diskette, die
+    // den Urlader TRAEGT — eine Datendiskette hat keinen Typ zu melden.  Ein Sektor, und
+    // nur, wenn c0h0 schon gelesen ist oder nachgeladen werden darf (E2).
+    uint8_t fdconf = 0;
+    if ((nachladen || space_.trackKnown(0, 0)) && osmUrladerVon(space_, &fdconf)) {
+        bericht.schritt("cpm.schritt.urlader",
+                        "OS/M-Urlader: Laufwerkstyp (FDCONF) passend zur Geometrie");
+        const uint16_t passend = osmTypenFuer(space_);
+        const unsigned typ     = fdconf & 0x0F;
+        if (passend != 0 && !(passend & (1u << typ))) {
+            std::string soll;
+            for (unsigned n = 0; n < 16; ++n)
+                if (passend & (1u << n)) soll += (soll.empty() ? "" : " oder ") + std::to_string(n);
+            char hex[8];
+            std::snprintf(hex, sizeof hex, "%02XH", fdconf);
+            b.addAt("osm.fdconf", FsSeverity::Warnung, FsLayer::Verwaltung, "Urlader",
+                    "Der OS/M-Urlader traegt FDCONF " + std::string(hex) + " (Laufwerk A: Typ "
+                    + std::to_string(typ) + "), die Geometrie dieser Diskette ist aber Typ "
+                    + soll + " — sie startet am P8000 nicht richtig (System mit falscher "
+                    "Spurlaenge geladen bzw. A: mit falschem DPB gelesen)",
+                    0, 0, space_.trackAt(0).first_id);
+        }
+    }
+
     // ── Ebene Medium: der Datenbereich (nur Vollpruefung) ────────────────────
     if (level == FsCheckLevel::Voll) {
         bericht.schritt("cpm.schritt.datenbereich",

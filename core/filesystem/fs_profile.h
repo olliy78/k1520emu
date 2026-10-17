@@ -95,6 +95,10 @@ struct FsProfile {
     ///        als Einziges prueft — ein A5120-Lader (`SYL`) besteht es nicht.
     ///        `bcu` / `bcu_syl` / `bcu_kombi` / `bcu_kombi80` (BCU 880): Bootabbild einer BCU-Diskette — Kennung
     ///        „BCU 880“ im System bzw. SYL-Lader auf Zylinder 1 mit gueltiger CRC.
+    ///        `osm` (OS/M des P8000, doc/design/34_osm.md): OS/M-Urlader in c0h0 Sektor 1
+    ///        (Code `FD 21 48 0C …`, Kennung `P8000SYS` bei 0x80) mit einem FDCONF-Typ, der
+    ///        zur Geometrie passt.  Zugleich der POSITIVE Nachweis der Erkennung: ohne
+    ///        Urlader ist eine OS/M-Datendiskette Sektor fuer Sektor eine SCP-Diskette.
     std::string boot_header;
 
     /// @brief Nur CP/M: der **Bootbereich steht im Verzeichnis** (CP/A 1715 ohne

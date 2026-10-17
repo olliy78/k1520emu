@@ -731,6 +731,45 @@ filesystems:
     detect:      false
     boot_header: pc1715
 
+  # ══ OS/M (P8000, 8-Bit-Teil; doc/design/34_osm.md) ═════════════════════════
+  # OS/M 3.0 ist CP/M 2.2 auf den SCP-Formaten des PC 1715 (BIOS.L, TYPTAB/DPBLK5/7):
+  # Zylinder 0-1 System, Verzeichnis ab c2h0, 2-KB-Bloecke, 128 Plaetze, kein Versatz —
+  # Zahl fuer Zahl, was die CP/A-Regel ausrechnet.  Der Urlader (OSM.URLADER.S, ORG 0C00H)
+  # steht in c0h0 Sektor 1: Code `FD 21 48 0C 31 00 40 3A 7E 0C`, FDCONF bei 0x7E,
+  # Kennung `P8000SYS` bei 0x80 (an allen 8 Systemdisketten der pofo-Sammlung gleich).
+  # Erkannt wird NUR mit Urlader (`boot_header: osm` ist der positive Nachweis); eine
+  # Datendiskette ohne Urlader bleibt scpx640 / cpa_auto / cpa800 — das Medium
+  # unterscheidet sie nicht, und „OS/M" waere geraten.
+  #
+  # `osm640` — Format 5 (16×256, Auslieferungsformat).  EIGENER GRUND: der Name (Anzeige,
+  # `create --fs osm640`) und die Pruefung des Bootabbilds (OS/M-Urlader mit FDCONF-Typ 5
+  # statt beliebiger Bytes).  Deckungsgleich mit `scpx640` — bei Urlader gewinnt `osm640`
+  # ohne Mehrdeutigkeit (disk_volume.cpp, „Deckungsgleiche Profile").
+  - name:        osm640
+    description: "OS/M (P8000) 640K, Format 5 (16×256) — Systemzylinder 0-1, Dateisystem ab Zylinder 2"
+    format:      cpa640
+    type:        cpm
+    data_start:  { cyl: 2, head: 0 }
+    block_size:  2048
+    dir_entries: 128
+    boot_header: osm
+
+  # `osm800` — Format 7 (5×1024).  EIGENER GRUND neben Name und Bootabbild-Pruefung (Typ 7):
+  # die LEERE OS/M-Diskette (OS/M-FORMAT schreibt nur 0xE5) ist Sektor fuer Sektor eine
+  # leere `cpa800` (Verzeichnis ab c0h0, 192 Plaetze) — ein `put` dorthin laege in den
+  # Systemzylindern, OS/M saehe nichts.  Mit `--fs osm800` / `create --fs osm800` liegt
+  # das Verzeichnis richtig; beim Oeffnen der leeren Diskette nennt die Erkennung es als
+  # „ebenso gut osm800".  Nicht deckungsgleich mit `cpa800`, wohl aber mit `scp1715`/`scpx8915`
+  # (beide `detect: false`).
+  - name:        osm800
+    description: "OS/M (P8000) 800K, Format 7 (5×1024) — Systemzylinder 0-1, Dateisystem ab Zylinder 2"
+    format:      cpa800
+    type:        cpm
+    data_start:  { cyl: 2, head: 0 }
+    block_size:  2048
+    dir_entries: 128
+    boot_header: osm
+
   # ══ BCU 880 (frueher A5120, doc/a5120_alt/bcu.md) ═════════════════════════
   # 40 Zylinder einseitig, 26×128, DPB der BCU V1.2 (EC73H): 1-KB-Bloecke, 64 Plaetze, OFF 2,
   # Sektorversatz 6 — deckungsgleich mit dem, was die CP/A-Regel fuer diese Geometrie rechnet.

@@ -238,6 +238,11 @@ k1520_add_test(tar_fs        SRC filesystem/test_tar_fs.cpp
 k1520_add_test(disk_volume   SRC filesystem/test_disk_volume.cpp
                              LIBS k1520_fs LABELS "${_lbl}"
                              DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
+# OS/M des P8000 (doc/design/34_osm.md): Profile osm640/osm800, Urlader, osm.fdconf —
+# Echtdaten-Gegenprobe ueber die ganze pofo-Sammlung nur mit K1520_CQM_DIR.
+k1520_add_test(osm           SRC filesystem/test_osm.cpp
+                             LIBS k1520_fs LABELS "${_lbl}"
+                             DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
 # Dateisystempruefung (doc/design/15_dateisystempruefung.md) — Etappe 1: CP/M.
 k1520_add_test(fs_check      SRC filesystem/test_fs_check.cpp
                              LIBS k1520_fs LABELS "${_lbl}"

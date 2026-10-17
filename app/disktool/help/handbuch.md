@@ -170,6 +170,35 @@ halber Geschwindigkeit in einem anderen Aufzeichnungsverfahren geschrieben als d
 Rest. Das Werkzeug führt das mit, auch beim Zurückschreiben; zu sehen ist es im
 Diskeditor und in der Formatzeile.
 
+## OS/M-Disketten — das CP/M des P8000
+
+**OS/M** ist das 8-Bit-Betriebssystem des P8000 — und es ist **CP/M 2.2**. Auf der
+Diskette benutzt es genau die SCP-Formate des PC 1715: Format 5 (16 × 256 Byte je
+Sektor, 640K) und Format 7 (5 × 1024 Byte, 800K), Zylinder 0 und 1 für das System,
+das Verzeichnis ab Zylinder 2. Lesen, Schreiben, Löschen und Attribute verhalten sich
+wie bei jeder CP/A- oder SCP-Diskette.
+
+**Erkannt wird OS/M am Urlader.** Eine Systemdiskette trägt im ersten Sektor den
+OS/M-Urlader; dann heißt sie `osm640` bzw. `osm800`. Eine **Datendiskette** ohne System
+ist von einer SCP-Diskette nicht zu unterscheiden und erscheint deshalb als `scpx640`
+bzw. `cpa_auto` — gelesen wird sie genauso richtig, nur der Name sagt nicht „OS/M“.
+
+**Eine leere 800K-Diskette** — auch eine frisch unter OS/M formatierte — sieht aus wie
+eine leere CP/A-Datendiskette, deren Verzeichnis schon auf Zylinder 0 beginnt. Wer sie
+für OS/M füllen will, wählt im Dateisystem-Menü `osm800` (oder legt sie gleich als
+`osm800` an); sonst landen die ersten Dateien dort, wo OS/M sein System erwartet, und
+OS/M sieht sie nicht. Die Erkennung erinnert daran mit „ebenso gut osm800“. Eine
+Bootdiskette entsteht wie bei den anderen Systemen: Systemspuren einer OS/M-Diskette
+herausholen und beim Anlegen mitgeben. Das Werkzeug prüft dabei, dass es wirklich ein
+OS/M-Urlader für dasselbe Format ist.
+
+Die Prüfung meldet **`osm.fdconf`**, wenn der Laufwerkstyp im Urlader nicht zum Format
+der Diskette passt — sie sähe heil aus und startete am P8000 falsch.
+
+**Namen mit `/`** wie `GW/ZSID.DOC` stammen aus Übertragungen vom WEGA-Teil des P8000.
+CP/M erlaubt den Schrägstrich im Namen nicht; die Prüfung nennt ihn deshalb als Warnung.
+Beim Herausholen wird daraus `GW_ZSID.DOC`.
+
 ## tar-Disketten — ein Archiv statt eines Dateisystems
 
 Viele P8000-Lieferdisketten tragen **kein Dateisystem**: jemand hat mit `tar` direkt auf

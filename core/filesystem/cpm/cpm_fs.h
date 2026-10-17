@@ -143,6 +143,30 @@ public:
     bool writeBootSlots(const std::vector<uint8_t>& img);
     /// @}
 
+    /// @name OS/M-Urlader (P8000, `boot_header: osm`, doc/design/34_osm.md §3.2)
+    /// @{
+    /// @brief Traegt @p p den OS/M-Urlader (`OSM.URLADER.S`, ORG 0C00H)?  Merkmale: die
+    ///        ersten zehn Bytes `FD 21 48 0C 31 00 40 3A 7E 0C` (LD IY,VEKTOR / LD SP,4000H /
+    ///        LD A,(FDCONF)) und die Kennung `P8000SYS` bei 0x80.  Die Kennung allein reicht
+    ///        nicht — der UDOS-Urlader des P8000 traegt sie auch.
+    static bool osmUrlader(const uint8_t* p, size_t n);
+    /// @brief Byte 0x7E des Urladers: FDCONF (Laufwerkstyp; Bits 0-3 = A:).
+    static constexpr size_t kOsmFdconf = 0x7E;
+    /// @brief Liest c0h0 Sektor 1 von @p raum; true + @p fdconf, wenn dort der OS/M-Urlader steht.
+    static bool osmUrladerVon(const SectorSpace& raum, uint8_t* fdconf = nullptr);
+    /**
+     * @brief Welche FDCONF-Typen passen zur Geometrie von @p raum?  Bitmaske (Bit n =
+     *        Typ n); 0 = die Geometrie ist kein OS/M-Format, dann gibt es nichts zu urteilen.
+     *
+     * Aus `TYPTAB` (BIOS.L, OS/M 3.0): 16×256 doppelseitig 80 Zyl. = 5, einseitig 80 = 4,
+     * einseitig 40 = 2 oder 3 (Doppelschritt ist am Abbild nicht zu sehen), 9×512
+     * doppelseitig = 6, 5×1024 doppelseitig = 7.  Die Typen 8/9 (ebenfalls 5×1024) sind
+     * Nutzerformate ohne Systemdiskette — der Urlader laedt sie als 7, das BIOS liest A:
+     * aber mit einem anderen DPB.
+     */
+    static uint16_t osmTypenFuer(const SectorSpace& raum);
+    /// @}
+
     /// @brief Ist @p name ein gueltiger CP/M-Name (8.3, Grossschrift, ohne Sonderzeichen)?
     ///        Liefert bei false den Grund in @p why.
     static bool validName(const std::string& name, std::string* why);
