@@ -944,6 +944,13 @@ ohne V7 (ustar-Magic, pax, GNU-Langname, 100-Zeichen-Name, binaere Groesse) ergi
 (nur lesbar), ein zweites `tar-put` scheitert. Rundlauf: siehe Handbuch („tar-Archive
 herausholen, bearbeiten und zurueckschreiben“).
 
+Passende Archive unter Linux: `tar --format=v7 -b 20 -cf wega.tar -C ordner .`, danach
+`split -b 737280 -d -a 2 --additional-suffix=.tar wega.tar wega_part`; Zusammensetzen und
+Entpacken: `cat wega_part*.tar | tar -xvf - -C ziel`.  **Nicht** `tar --format=v7 -M -L 720K`:
+GNU tar bricht damit ab („GNU features wanted on incompatible archive format“), und mit einem
+GNU-Format schreibt `-M` Fortsetzungsköpfe (Typ `M`), die kein V7 sind.  Die Rezepte stehen
+mit Begründung im Handbuch (Abschnitt „Passende tar-Dateien unter Linux erzeugen und entpacken“).
+
 ## Dateisysteme ergänzen
 
 `data/formats.yaml` hat zwei Sektionen: `formats:` (Physik) und `filesystems:`

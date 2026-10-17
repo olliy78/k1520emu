@@ -233,6 +233,47 @@ Disketten:
        k1520disktool create diskette00.cqm --fs tar720_leer
        k1520disktool tar-put diskette00.cqm neu_00              # … für jedes Teil eine neue Diskette
 
+#### Passende tar-Dateien unter Linux erzeugen und entpacken
+
+**Archiv für WEGA erzeugen** (V7-Format, in Teile zu je einer Diskette geschnitten):
+
+    tar --format=v7 -b 20 -cf wega.tar -C /ihre/daten .
+    split -b 737280 -d -a 2 --additional-suffix=.tar wega.tar wega_part
+                                    # wega_part00.tar, wega_part01.tar, … je höchstens 720 KiB
+
+- `--format=v7` ist wichtig: das Standardformat von GNU `tar` (`gnu`) und `posix`/`ustar`
+  tragen die Kennung `ustar` im Kopf, und WEGA versteht sie nicht. V7 erlaubt Pfadnamen bis
+  99 Zeichen; längere lehnt `tar` ab.
+- `-b 20` ist der übliche Blockungsfaktor (10 KiB); er füllt nur das Ende des Archivs mit Nullen auf.
+- Geteilt wird mit `split`, **nicht** mit `tar -M -L 720K`. Der Aufruf
+  `tar --format=v7 -M -L 720K …` bricht mit „GNU features wanted on incompatible archive format“
+  ab, weil GNU-Mehrbandarchive ein GNU-Format brauchen. Mit einem GNU-Format
+  (`--format=oldgnu -M`) beginnt jedes Folgeteil mit einem GNU-Fortsetzungskopf (Typ `M`),
+  den WEGA nicht kennt. `split` schneidet dagegen den einen V7-Strom nur an den Diskettengrenzen;
+  die Teile ergeben, hintereinandergelegt, wieder genau das V7-Archiv.
+- Die Teile 2 bis n beginnen mitten in einer Datei und sind einzeln für `tar tf` nicht lesbar
+  („This does not look like a tar archive“). Das ist richtig so; erst zusammen ergeben sie das Archiv.
+- Jedes Teil auf eine eigene leere Diskette schreiben (`tar-put`, siehe oben). Das DiskTool prüft
+  nur, ob ein Kopf am Anfang V7 ist; ein Folgeteil nimmt es ohne Meldung an.
+
+**Mehrere `.tar`-Teile zu einem Archiv zusammensetzen und in ein Verzeichnis entpacken:**
+
+    mkdir ziel
+    cat wega_part*.tar | tar -xvf - -C ziel          # in der Reihenfolge der Namen: part00, part01, …
+    # oder erst zusammensetzen und ansehen:
+    cat wega_part*.tar > wega.tar
+    tar -tvf wega.tar                                # Inhalt auflisten
+    tar -xvf wega.tar -C ziel                        # in das Verzeichnis „ziel“ entpacken
+
+- Die Teile müssen in der richtigen Reihenfolge stehen. Bei zwei oder mehr Ziffern mit festen
+  Stellen (`part00` … `part10`) sortiert die Shell richtig, bei `part1` … `part10` nicht.
+- Die Nullauffüllung am Ende der letzten Diskette stört nicht, `tar` hört an der Endmarke auf.
+- Als normaler Benutzer setzt `tar` Besitzer nicht um, Rechte nur mit `-p`. Mit `sudo` oder
+  `--numeric-owner` bleiben die Besitzer der Diskette erhalten.
+- Bearbeiten im zusammengesetzten Archiv: `tar --format=v7 -rf wega.tar datei` hängt an,
+  `tar --delete -f wega.tar pfad` entfernt. Danach wieder mit `split` teilen. Beim Anhängen
+  `--format=v7` mitgeben, sonst mischt `tar` GNU-Köpfe hinein.
+
 **Rundlauf.** `tar-export` einer mit `tar-put` beschriebenen Diskette liefert: bei einer Datei
 mit Kopf und Endmarke genau die Datei; bei einer Datei mit Kopf **ohne** Endmarke die Datei plus
 zwei Nullblöcke (die Auffüllung der Diskette hat dann eine); bei einem Folgeteil die Datei,
