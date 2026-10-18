@@ -8,7 +8,7 @@ die Tests benutzen diese Dateien nicht, und der Emulator schreibt zurück.
 
 | Datei | Inhalt |
 |-------|--------|
-| `p8000_wega31_platte.avr.img.gz` | **Fertig installierte Platte**, Geometrie 1380/10/18 (127 MB → 5,9 MB gepackt), Typkürzel `avr` = `WEGA31-AVR` |
+| `p8000_wega31_platte.avr.img.gz` | **Fertig installierte Platte**, Geometrie 1380/10/18 (127 MB → 5,9 MB gepackt), Typkürzel `avr` = `WEGA31-AVR`; **seit 2026-10-18 mit Kermit** (s. u.) |
 | `p8000_wega31_udos_boot.dmk` | UDOS-Startdiskette.  Dieselbe Datei wie `../wega30/p8000_wega30_udos_boot.dmk`: sie bringt nur UDOS und die Koppelsoftware für den 8-Bit-Teil, WEGA selbst kommt von der Platte |
 
 ## Herkunft
@@ -29,3 +29,21 @@ Wie bei WEGA 3.0 (`../wega30/README.md`): WDC-Firmware 4.2, Platte anschließen,
 Laufwerk 0, *Rechner ein* → RETURN → RETURN → NMI.  Geprüft 2026-10-09: der Kern meldet
 „WEGA Kernel -- Release 3.2 -- Generated 06/29/116", danach `WEGA login:` (≈ 3 min Wirtszeit).
 Die Kennwörter dieser Installation sind nicht dokumentiert.
+
+## Kermit (seit 2026-10-18, Entwurf 36 AP K1)
+
+Auf der Platte stehen C-Kermit 4.2(030) und ein Anmeldekonto, das einen **Kermit-Server** startet:
+
+- `/usr/bin/kermit` (Modus 4755 root, das fertige Z8000-Binary der Kermit-Diskette `kermit.cqm`/`kermit.tar`,
+  Stand 1988-02-04), Handbuchseite `man kermit`.
+- Benutzer **`kermit`**, Kennwort **`kermit`** (uid 7, gid 1, Home `/usr/kermit`, Shell `/usr/bin/kermit`).
+  **Kennwortlos geht nicht** — der WEGA-`login` erzwingt bei leerem Kennwortfeld ein neues Kennwort.
+  Laborrechner: Kennwort mit `passwd` ändern, wenn die Maschine am Netz hängt.
+- Anmeldung auf tty0/tty2/tty4 (nicht tty3, kein getty): nach dem Kennwort liest Kermit `/usr/kermit/.kermrc`
+  (`set file type binary`, `set file names literal`, `server`, `exit`) und läuft als Server; `FINISH` oder
+  `LOGOUT` beendet die Sitzung, getty meldet sich wieder.
+- Als **Client** am WEGA: als `wega` anmelden, `kermit`, `set line /dev/tty3`, `set baud 9600`,
+  `send`/`get`/`remote dir` gegen einen Kermit-Server am PC (tty3 = Druckerleitung des P8000).
+- Eingespielt mit dem DiskTool (`put`, `mkdir`, `attr`, `md2/etc/passwd` um eine Zeile ergänzt), `check --full`
+  ohne Befund.  Ablauf, Bildschirmtexte, Fallen: `doc/p8000/kermit_wega.md`; Test
+  `P8000WegaKermit.ServerHinterGetty` (`tools/dev.sh test-wega`).
