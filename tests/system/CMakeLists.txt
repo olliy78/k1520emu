@@ -208,5 +208,13 @@ k1520_add_test(p8000_wega_diskette SRC test_p8000_wega_diskette.cpp
                             LIBS k1520_p8000 k1520_fs k1520_logger k1520_testsupport
                             LABELS "system;slow;wega_install" DEFS LOG_LEVEL=2 TIMEOUT 3600 RUN_SERIAL)
 
+# ─── Kermit auf WEGA 3.1 (Entwurf 36 AP K1): Kaltstart von der ausgelieferten Platte
+# (disks/p8000_wega31, /usr/bin/kermit + Benutzer `kermit`), Konsole `kermit`, tty0 per Telnet als
+# Kermit-Server hinter getty.  Ohne Startdiskette/Platte uebersprungen; `K1520_WEGA31_PLATTE` uebersteuert.
+k1520_add_test(p8000_wega_kermit SRC test_p8000_wega_kermit.cpp
+                            LIBS k1520_p8000 k1520_gzip k1520_serial k1520_logger k1520_testsupport
+                            LABELS "system;slow;wega_install"
+                            DEFS LOG_LEVEL=2 "P8000_WEGA31_DIR=\"${CMAKE_SOURCE_DIR}/disks/p8000_wega31\"" TIMEOUT 7200 RUN_SERIAL)
+
 # Zeitgrenzen der add_test()-Faelle × K1520_TEST_ZEIT_FAKTOR (tests/cmake/K1520AddTest.cmake)
 k1520_test_zeiten_skalieren()
