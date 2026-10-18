@@ -253,3 +253,13 @@ set_tests_properties(cli_mc80_egos_prn_passt_zur_quelle PROPERTIES
 
 # Zeitgrenzen der add_test()-Faelle × K1520_TEST_ZEIT_FAKTOR (tests/cmake/K1520AddTest.cmake)
 k1520_test_zeiten_skalieren()
+
+# k1520kermit (Entwurf 36, AP K5): die Kommandozeile als Prozess — serve gegen Client ueber Loopback
+# (Telnet/RFC 2217 x Lauscher Server/Client, Port 0), Fehlerausgang, Ausgabekonvention, Login, Strg+C.
+# Setzt das gebaute Werkzeug voraus (add_dependencies); kein ctest-Label ausser cli.
+k1520_add_test(kermit_cli SRC test_kermit_cli.cpp
+                          LIBS k1520kermit_core
+                          LABELS "cli;fast"
+                          DEFS "K1520KERMIT_EXE=\"$<TARGET_FILE:k1520kermit_cli>\""
+                          TIMEOUT 240)
+add_dependencies(k1520_test_kermit_cli k1520kermit_cli)

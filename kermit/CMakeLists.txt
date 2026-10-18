@@ -42,3 +42,15 @@ set_target_properties(k1520kermit PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
+
+# AP K5: Kommandozeile k1520kermit (tools/k1520kermit.cpp) — wie k1520disktool direkt gegen die
+# statische Bibliothek gelinkt (keine DLL noetig); landet im Wurzel-build/.
+# Zielname k1520kermit ist die DLL; die Datei k1520kermit(.exe) kollidiert nicht damit.
+add_executable(k1520kermit_cli ${CMAKE_SOURCE_DIR}/tools/k1520kermit.cpp)
+target_link_libraries(k1520kermit_cli PRIVATE k1520kermit_core)
+target_include_directories(k1520kermit_cli PRIVATE ${CMAKE_SOURCE_DIR})
+set_target_properties(k1520kermit_cli PROPERTIES
+    OUTPUT_NAME k1520kermit
+    CXX_STANDARD 17
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+)

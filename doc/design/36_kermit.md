@@ -311,6 +311,39 @@ Abweichungen/Festlegungen mit Grund:
 Offen: Windows-Bau/CI-Lauf der DLL (`tools/dev.sh win` siehe Stand unten), K5 (Kommandozeile) und K6 (Oberfläche)
 benutzen die Bibliothek bzw. die Bindung; `k1520kermit` ist noch nicht im Paket (K9).
 
+### 6.3 Stand K5 (2026-10-18)
+
+**K5 — Kommandozeile (fertig).**  `tools/k1520kermit.cpp`, Ziel `k1520kermit_cli` in `kermit/CMakeLists.txt` mit
+`OUTPUT_NAME k1520kermit` (der Zielname `k1520kermit` gehört der DLL; die Dateien kollidieren nicht), landet im
+Wurzel-`build/`.  Wie `k1520disktool` bindet es die **statische** Bibliothek (`k1520kermit_core`) direkt, nicht die
+DLL — kein Ladeweg, MSVC/MinGW wie der Rest.  Bedienung, Ausgabekonvention und Rückgabewerte: `tools/k1520kermit.md`.
+Tests: `tests/cli/test_kermit_cli.cpp` (`k1520_test_kermit_cli`, 51 Fälle, `cli;fast`, ~3 s): die CLI als **Prozess**
+(`std::system` mit Umleitung; Hintergrundprozess = Faden um `std::system`), `serve` gegen Client-Kommandos über
+Loopback in beiden Leitungsarten und beiden Lauscher-Rollen, Port 0 (`Port: N` von stderr gelesen), Binärdatei 100 KB,
+Namensfallen (`../x`, absolut), `--nur-lesen`, `--max-namen`, Rückgabewerte, JSON-Gültigkeit (eigener Syntaxprüfer),
+Login gegen eine getty-Attrappe, Strg+C (SIGINT, POSIX): wartender Server und **mitten in einer Übertragung** (keine halbe
+Datei).
+
+Festlegungen und Abweichungen vom Entwurf:
+1. **Quelle in `tools/`** (Auftrag), nicht `kermit/cli/` wie in §4.1 skizziert.
+2. **Ein Lauscher nimmt EINE Verbindung an** (Eigenschaft von `NetzLeitung::annehmen`): jedes Kommando und jeder
+   `serve` ist ein Verbindungsleben.  Ein lauschender `serve` endet also mit `finish`/`logout` **oder mit der
+   Trennung** — das ist für `serve` Rückgabe 0 („Gegenstelle hat die Leitung getrennt"), kein Fehler.  Mehrere
+   Kommandos über EINE Verbindung gibt es nicht (nur `put`/`get`/`rm` mit mehreren Namen); die Oberfläche (K6) hält das
+   Handle über die C-ABI offen.
+3. **Strg+C = Rückgabe 1** auch bei `serve` (Abbruch ist kein „Ende durch die Gegenstelle").  Der Signalbehandler setzt
+   nur ein Flag; ein Beobachterfaden ruft `Sitzung::abbrechen()` (alle 0,5 s bis zum Ende, weil die Sitzung ihren
+   Schalter beim Start einer Operation zurücksetzt) und `Leitung::wecken()`; vor dem Protokollstart (Annehmen, Login)
+   nur Wecken + Login-Schalter.
+4. **Anmeldefehler = 2** (Verbindungsebene), Fehlerpaket/Abweisung der Gegenstelle = 1.
+5. **`--json` immer gültiges JSON**: Erfolg wie in der Doku, Fehler als `{"ok":false,"fehler":…}` auf stdout (und
+   Text auf stderr), auch bei Rückgabe 2.
+6. **Zusätze zum Entwurf:** `--warte S` (Annehmen), `--cd PFAD` (vor dem Kommando `G C`), `-v` (Ereignisse eines
+   Clients; ein `serve` meldet immer), `--fortschritt`, `-l`.  `--frist` gilt je Paket **und** für den Verbindungsaufbau;
+   die Anmeldung hat eigene Vorgaben (60 s je Schritt).
+7. **Schalter an beliebiger Stelle**, `--schalter=wert` erlaubt; Aufruf-/Pfadprüfung (`--as` bei mehr als einer Datei,
+   lokale Datei fehlt, Ordner fehlt) passiert **vor** dem Verbindungsaufbau (Rückgabe 2, kein halber Austausch).
+
 ## 7. Risiken
 
 - **Binary läuft nicht unter WEGA 3.1** (gebaut 1988 für WEGA 3.0?) → Selbstbau aus den Quellen auf WEGA (langsam im

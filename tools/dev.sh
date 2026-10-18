@@ -39,7 +39,7 @@
 #                                     cli|system|python) — entspricht `ctest -L <ebene>`
 #   tools/dev.sh trace [boot_trace…]  build_trace/ bauen, dann boot_trace starten
 #   tools/dev.sh tool  <name> [args]  build/ bauen, dann build/<name> starten
-#                                     (floppy_diag, k1520dbg, kbd_test, boot_trace…)
+#                                     (floppy_diag, k1520dbg, k1520kermit, kbd_test, boot_trace…)
 #   tools/dev.sh win   [ctest-args]   Cross-Bau nach Windows (MinGW) + Tests unter
 #                                     wine — lokale Vorpruefung der Portierung
 #   tools/dev.sh check                build/ + build_trace/ bauen + Frische melden
@@ -297,7 +297,7 @@ case "$cmd" in
         build_dir build_trace
         c_ylw ">> build_trace/boot_trace$EXE $*"; exec "build_trace/boot_trace$EXE" "$@" ;;
     tool)
-        name="${1:?Tool-Name fehlt (z.B. floppy_diag, k1520dbg, kbd_test)}"; shift
+        name="${1:?Tool-Name fehlt (z.B. floppy_diag, k1520dbg, k1520kermit, kbd_test)}"; shift
         build_dir build
         c_ylw ">> build/$name$EXE $*"; exec "build/$name$EXE" "$@" ;;
     win)
