@@ -76,8 +76,9 @@ Was beim Weiterarbeiten zu wissen ist:
   UDOS/CP/M ein `fs=wega` ab.  Archiv: `.txt` im `ls -l`-Stil mit WEGA-Legende,
   `diskarchive.yaml` bekommt je Datei `unix: {mode, uid, gid, mtime}` (Fassung bleibt 1).
   Eigenschaften-Dialog: nur Inode-Felder, Kästchen ⇄ Oktalzahl.  Symlinks gibt es in
-  System III nicht (kein IFLNK).  Die Plattenabbild-CLI (`wega_platte`) schreibt weiter
-  nur 0644/0755 und bewusst noch kein `.fileinfo`.  Wächter: `WegaFs.SetAttributes*`,
+  System III nicht (kein IFLNK).  Die Plattenabbild-CLI (`wega_platte`) schreibt mit `put`
+  weiter nur 0644/0755 und bewusst noch kein `.fileinfo`; Modus/Besitzer setzt dort `attr <platte> md<N>/pfad --mode 4755
+  --uid N --gid N` (2026-10-18, AP K1: setuid-`kermit`, Besitzer des Home).  Wächter: `WegaFs.SetAttributes*`,
   `WegaFs.BlockListe*`, `WegaDiskVolume.Fileinfo*`/`Fremdes*`/`UnixAngaben*`,
   `test_disktool_wega.py`, `cli_dt_wega_attr_get_put`.
   Gegenproben: die Python-Vorstufe `tools/p8000/wega_s3fs.py` liest, was der Kern schreibt

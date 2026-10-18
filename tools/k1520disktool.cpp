@@ -171,7 +171,7 @@ void gebrauch() {
         "                                           einmal; danach ist sie tar720 und nur lesbar.\n"
         "                                           Gewarnt wird vor Nicht-V7-tar (Schreiben geht trotzdem)\n"
         "  formats                                  bekannte Dateisysteme auflisten\n\n"
-        "P8000-Plattenabbild (WEGA, PAR in Zylinder 0): ls/info/check/get/put/rm/mkdir;\n"
+        "P8000-Plattenabbild (WEGA, PAR in Zylinder 0): ls/info/check/get/put/rm/mkdir/attr;\n"
         "  Namen mit Partition vorn (md0 = /usr, md2 = /, md3 = /tmp, md4 = /z):\n"
         "  get platte.img 'md2/etc/*' --to x ·  put platte.img datei --as md2/etc/datei\n\n"
         "Gemeinsam: --fs NAME (Erkennung uebersteuern), --volume N (Seite),\n"
@@ -1719,7 +1719,10 @@ int platte(const std::string& befehl, const Optionen& o) {
         std::cerr << "Fehler: fuer WEGA gibt es noch keine Reparaturen (nur pruefen)\n";
         return kFehler;
     }
-    const bool schreibend = befehl == "put" || befehl == "rm" || befehl == "mkdir";
+    const bool attr_aendert = o.unix_mode_gesetzt || o.unix_uid_gesetzt || o.unix_gid_gesetzt
+                              || o.unix_mtime_gesetzt;
+    const bool schreibend = befehl == "put" || befehl == "rm" || befehl == "mkdir"
+                            || (befehl == "attr" && attr_aendert);
     std::string err;
     // Schreibschutz ist die Vorgabe; nur die schreibenden Befehle heben ihn auf.
     auto p = WegaPlatte::open(o.rest[1], err, /*read_only=*/!schreibend || o.dry_run);
@@ -1832,7 +1835,29 @@ int platte(const std::string& befehl, const Optionen& o) {
         std::cout << n << " Dateien nach " << o.ziel << "\n";
         return kOk;
     }
-    if (befehl == "mkdir") {
+    if (befehl == "attr") {
+        // chmod/chown/touch an einer Datei der Platte (Name `md<N>/pfad`); ohne Schalter nur Anzeige.
+        if (o.rest.size() != 3) { std::cerr << "Fehler: attr <abbild> md<N>/pfad [--mode … --uid … --gid …]\n"; return kFehler; }
+        const auto [v, name] = platteName(*p, o.rest[2]);
+        if (v < 0 || name.empty()) {
+            std::cerr << "Fehler: Partition fehlt (md0/…, md2/…): " << o.rest[2] << "\n";
+            return kFehler;
+        }
+        if (o.unix_mode > 07777) { std::cerr << "Fehler: --mode muss zwischen 0 und 7777 (oktal) liegen\n"; return kFehler; }
+        if (attr_aendert && !o.dry_run) {
+            UnixAttrs u;
+            u.set_mode  = o.unix_mode_gesetzt;  u.mode  = static_cast<uint16_t>(o.unix_mode);
+            u.set_uid   = o.unix_uid_gesetzt;   u.uid   = o.unix_uid;
+            u.set_gid   = o.unix_gid_gesetzt;   u.gid   = o.unix_gid;
+            u.set_mtime = o.unix_mtime_gesetzt; u.mtime = static_cast<uint32_t>(o.unix_mtime);
+            if (!p->fs(v).setAttributes(name, u)) { std::cerr << "Fehler: " << p->fs(v).lastError() << "\n"; return kFehler; }
+        }
+        for (const FileEntry& e : p->fs(v).list())
+            if (e.name == name)
+                std::printf("%-10s %3d %5d %5d %8llu %-16s %s\n", e.attributes.c_str(), e.unix_nlink, e.unix_uid,
+                            e.unix_gid, static_cast<unsigned long long>(e.size), e.date.c_str(), o.rest[2].c_str());
+        if (!attr_aendert) return kOk;
+    } else if (befehl == "mkdir") {
         for (size_t i = 2; i < o.rest.size(); ++i) {
             const auto [v, name] = platteName(*p, o.rest[i]);
             if (v < 0) {
@@ -1921,7 +1946,7 @@ int platte(const std::string& befehl, const Optionen& o) {
         }
     } else {
         std::cerr << "Fehler: '" << befehl << "' gibt es fuer Plattenabbilder nicht "
-                     "(ls, info, check, get, put, rm, mkdir)\n";
+                     "(ls, info, check, get, put, rm, mkdir, attr)\n";
         return kFehler;
     }
     if (o.dry_run) return kOk;
