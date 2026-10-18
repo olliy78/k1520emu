@@ -710,6 +710,11 @@ if(BUILD_K1520)
     target_link_libraries(k1520dbg PRIVATE isocline)
 
 
+    # ─── Kermit (doc/design/36_kermit.md) ────────────────────────────────────
+    # Eigene Bibliothek neben libk1520core/libk1520disk; kennt keinen Z80, keine
+    # Karten, kein k1520_fs.  AP K2: k1520kermit_core (statisch).
+    add_subdirectory(kermit)
+
     # ─── Testsystem ───────────────────────────────────────────────────────────
     # Die gesamte Testregistrierung liegt in tests/ (eine CMakeLists.txt je
     # Testebene, Helfer tests/cmake/K1520AddTest.cmake).  MUSS nach den

@@ -192,6 +192,63 @@ anfassen, laufen nacheinander oder im eigenen Worktree.
 
 Reihenfolge: **K1 ‖ K2** (K2 im Worktree) → K3 → K4 → K5 ‖ K6 → K7 → K8 → K9.
 
+### 6.1 Stand K2 (2026-10-18)
+
+**Fertig:** statische Bibliothek `k1520kermit_core` (`kermit/CMakeLists.txt`, im Haupt-CMake per
+`add_subdirectory(kermit)` vor dem Testsystem; PIC, C++17, nur `Threads` + Standardbibliothek, kein POSIX —
+Dateien über `std::filesystem`).  Namensraum `k1520::kermit`, Dateien `kermit/src/`:
+
+- `paket.*` — Blockprüfung 1/2/3 (CRC-16/KERMIT, gegen Katalogwert 0x2189 **und** gegen die Rechenwege
+  `chk1/chk2/chk3/spack` aus ckfns2.c geprüft), Rahmen normal/Langpaket (LENX + HCHECK), byteweiser
+  `PaketZerleger` (Neusynchronisation an MARK, Steuerzeichen im Datenteil = sofort beschädigt, NAK-Länge
+  heuristisch wie C-Kermit), Init-Felder S/I/Y (9 Felder oder mit CAPAS/WINDO/MAXLX), Aushandlung,
+  Präfixkodierung (QCTL, QBIN, REPT ab 3, max. 94), Attribute (`1 ! # "`).
+- `leitung.*` — abstrakte `Leitung` (lesen mit Frist, schreiben, schliessen, `wecken`, **`jetztMs` als
+  Zeitquelle**) und `SpeicherLeitungPaar` mit virtueller Uhr (springt nur, wenn alle beteiligten Enden
+  warten), Verzögerung, 7-Bit-Abschneiden, Störfunktion je Block, stumme Gegenstelle.
+- `dateien.*` — `Freigabe` (Pfadprüfung, `G C`-Navigation, Muster `*`/`?`, Löschen, Anlegen mit
+  Namensgrenze und simuliertem Platz), Quellen/Senken, Namensumsetzung (`zrtol`/`zltor`), `ls -l` im
+  System-III-Format erzeugen, `zerlegeLs`/`zerlegeLsListe` (System III inkl. angeklebter Linkzahl und
+  `-is`-Vorspalten, V7 ohne Gruppe, Linux inkl. long-/full-iso, SELinux-Punkt, Geräte, Symlinks).
+- `protokoll.*` / `server.cpp` — `Sitzung` mit `senden`, `sendenGruppe`, `holen`, `empfangen`,
+  `entferntVerzeichnis/Wechseln/Loeschen/Hilfe/Beenden/Abmelden`, `serve(Freigabe&)`;
+  `abbrechen()` (E-Paket), `abbrechenDatei()` (X), `abbrechenGruppe()` (Z); Rückrufe Fortschritt/Ereignis;
+  `Fehlerart` + `fehlerText`.
+
+**Tests:** `tests/unit/kermit/` — `kermit_paket`, `kermit_dateien`, `kermit_sitzung` (Label `unit;fast`);
+Client↔Server in zwei Fäden über die Speicherleitung, keine Echtzeitwartezeit.
+
+**Festlegungen/Abweichungen vom Entwurf, mit Grund:**
+
+1. **Zeitquelle ist die Leitung** (`Leitung::jetztMs`) statt einer eigenen Uhr-Klasse: die Frist hängt ohnehin
+   am `lesen` der Leitung, eine zweite Quelle könnte auseinanderlaufen.
+2. **Blockprüfung:** der Empfänger **spiegelt** die des Senders (C-Kermit 4.2 übernimmt als Sender, was im Y
+   steht); der Sender nimmt bei Uneinigkeit 1.  S/I und ihre Quittungen immer Typ 1; nach B wieder 1, so dass
+   Serverbefehle und Kurzantworten jede Gegenstelle lesen kann.
+3. **Quittung des F-Pakets bleibt leer:** C-Kermit 4.2 prüft das erste Zeichen JEDER Quittung auf `X`/`Z`
+   (`canned()`); ein zurückgemeldeter Name wie „Zeta…" bräche dort ab.
+4. **Antwort auf ein S/I ohne CAPAS hat genau 9 Felder** (Befund K1: der WEGA-Server antwortet mit MAXL 94,
+   TIME 10, EOL CR, `#`, `Y`, 1, `~`; Folgenummer nach I wieder 0 — so auch hier, Wächter
+   `KermitSitzung.Ck42AntwortetMitNeunFeldern`).
+5. **Server-Leerlauf ohne NAK:** ein N mitten im I→Y→G-Austausch eines C-Kermit-4.2-Clients würde dort mit
+   NAK beantwortet.  Vor I/R/G leert der Client den Eingang (wie `ttflui`), weil der C-Kermit-Server bei jedem
+   Wiedereintritt ein N(0) schickt.
+6. **`..` innerhalb der Freigabe ist erlaubt** (Navigation `G C ..`); abgewiesen wird `..`, das hinausführt.
+   Rückstriche, `X:`, Windows-reservierte Namen werden auf ALLEN Systemen abgewiesen; ein Name mit Punkt/
+   Leerzeichen am Ende nur unter Windows.  Ein Symlink mit fehlendem Ziel wird verfolgt (sonst legte das
+   Schreiben die Datei außerhalb an).
+7. **`K` (Kermit-Befehl) wird wie `C` mit E abgewiesen** — eine Ordnerfreigabe führt keine Befehle aus.
+8. **Attribute:** Datenfeld unkodiert (wie C-Kermit 5A); ein `"`-Typ des Senders überstimmt den Textmodus des
+   Empfängers; ist `1` größer als der freie (simulierte) Platz, antwortet der Empfänger `N1`.
+9. **Textmodus:** lokal LF ↔ CR LF auf der Leitung; ein einzelnes CR bleibt erhalten (Rundweg verlustfrei).
+   C-Kermit 4.2 verwirft dagegen beim Empfang im Textmodus JEDES CR.
+10. **Langpaketgrenze:** Datenbudget = MAXLX − Prüflänge − 7 (vorsichtig), normal MAXL − 2 − Prüflänge.
+
+**Offen (für K3/K7):** C-Kermit 4.2 rechnet `chk1/chk2` über `char` — auf einem Übersetzer mit
+vorzeichenbehaftetem `char` (Z8000-`cc`?) weichen Typ 1/2 bei 8-Bit-Rohdaten ab; Typ 3 ist unberührt.
+Deshalb Vorschlag 3 oder QBIN `&` beibehalten und in K7 messen.  Schiebefenster, `G T/U`, Wiederaufnahme
+(K2b) nicht umgesetzt.
+
 ## 7. Risiken
 
 - **Binary läuft nicht unter WEGA 3.1** (gebaut 1988 für WEGA 3.0?) → Selbstbau aus den Quellen auf WEGA (langsam im

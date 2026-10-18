@@ -258,5 +258,12 @@ k1520_add_test(pc1715_zre SRC cards/test_pc1715_zre.cpp LIBS k1520_pc1715_zre LA
 # Speicher des PC 1715W: BR 24H, 74S287, Bank 0, Bildquelle (doc/design/21_pc1715.md AP-W1)
 k1520_add_test(pc1715w_speicher SRC cards/test_pc1715w_speicher.cpp LIBS k1520_pc1715w_speicher LABELS "${_lbl}")
 
+# ── kermit/ (doc/design/36_kermit.md, AP K2) ────────────────────────────────
+# Protokollbibliothek k1520kermit_core: Paketschicht, Freigabe/ls, Sitzung
+# Client<->Server ueber SpeicherLeitungPaar (virtuelle Uhr, kein Echtzeitwarten).
+k1520_add_test(kermit_paket   SRC kermit/test_kermit_paket.cpp   LIBS k1520kermit_core LABELS "${_lbl}")
+k1520_add_test(kermit_dateien SRC kermit/test_kermit_dateien.cpp LIBS k1520kermit_core LABELS "${_lbl}")
+k1520_add_test(kermit_sitzung SRC kermit/test_kermit_sitzung.cpp LIBS k1520kermit_core LABELS "${_lbl}")
+
 # Zeitgrenzen der add_test()-Faelle × K1520_TEST_ZEIT_FAKTOR (tests/cmake/K1520AddTest.cmake)
 k1520_test_zeiten_skalieren()
