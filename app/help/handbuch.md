@@ -1228,6 +1228,8 @@ gehören und dieselben Disketten anfassen:
   in einen Ordner holen und wieder zurückschreiben, Disketten anlegen, prüfen,
   reparieren. Es startet als eigenes Programm und läuft neben dem Emulator
   weiter; das Diskettenwerkzeug hat sein eigenes Handbuch.
+* **K1520 Kermit starten** — Dateiaustausch mit der WEGA oder einem anderen Kermit über Telnet
+  oder RFC 2217 (Client und Server); eigenes Programm mit eigenem Handbuch.
 * **Werkzeugkonsole öffnen** — ein Konsolenfenster, in dem der Debugger
   `k1520dbg` und die Kommandozeile des DiskTool **ohne Pfadangabe** laufen. Es
   steht bereits im Diskettenordner, und beim Öffnen steht ein Beispielaufruf

@@ -84,6 +84,7 @@ def test_handbuch_des_debuggers_wird_gefunden():
 @pytest.mark.parametrize("kennung,skript", [
     (programme.EMULATOR, "app/main.py"),
     (programme.DISKTOOL, "app/disktool/main.py"),
+    (programme.KERMIT, "app/kermittool/main.py"),
 ])
 def test_das_andere_programm_startet_mit_dem_eigenen_interpreter(
         kennung, skript, aufrufe, eigener_ordner):
@@ -260,6 +261,7 @@ def test_der_emulator_hat_beide_eintraege_im_werkzeugmenue(monkeypatch):
         assert fenster.act_konsole in eintraege
         assert fenster.act_disktool.shortcut().isEmpty()
         assert fenster.act_konsole.shortcut().isEmpty()
+        assert fenster.act_kermit in eintraege and fenster.act_kermit.shortcut().isEmpty()
 
         gerufen = []
         monkeypatch.setattr(programme, "programm_starten",
@@ -268,7 +270,8 @@ def test_der_emulator_hat_beide_eintraege_im_werkzeugmenue(monkeypatch):
                             lambda: gerufen.append("konsole"))
         fenster.act_disktool.trigger()
         fenster.act_konsole.trigger()
-        assert gerufen == [programme.DISKTOOL, "konsole"]
+        fenster.act_kermit.trigger()
+        assert gerufen == [programme.DISKTOOL, "konsole", programme.KERMIT]
     finally:
         fenster.close()
         app.processEvents()
@@ -288,12 +291,15 @@ def test_das_disktool_hat_den_emulator_im_werkzeugmenue(monkeypatch):
     try:
         assert fenster.act_emulator in _menueeintraege(fenster, "&Werkzeuge")
         assert fenster.act_emulator.shortcut().isEmpty()
+        assert fenster.act_kermit in _menueeintraege(fenster, "&Werkzeuge")
+        assert fenster.act_kermit.shortcut().isEmpty()
 
         gerufen = []
         monkeypatch.setattr(programme, "programm_starten",
                             lambda k, *a, **kw: gerufen.append(k))
         fenster.act_emulator.trigger()
-        assert gerufen == [programme.EMULATOR]
+        fenster.act_kermit.trigger()
+        assert gerufen == [programme.EMULATOR, programme.KERMIT]
     finally:
         fenster._close_tool()
         app.processEvents()
@@ -303,8 +309,10 @@ def test_beide_handbuecher_erklaeren_das_werkzeugmenue():
     """Ein Bedienweg, den das Handbuch nicht kennt, ist einer zu wenig."""
     emu = (PROJECT_ROOT / "app" / "help" / "handbuch.md").read_text(encoding="utf-8")
     assert "Werkzeugkonsole" in emu and "k1520DiskTool starten" in emu
+    assert "K1520 Kermit starten" in emu
 
     dt = (PROJECT_ROOT / "app" / "disktool" / "help" / "handbuch.md"
           ).read_text(encoding="utf-8")
     assert "A5120 Emulator starten" in dt
     assert "K8915 Emulator starten" in dt
+    assert "K1520 Kermit starten" in dt

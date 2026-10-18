@@ -1077,7 +1077,10 @@ Arbeitsplatzcomputers K8915, die von einer Diskette booten und das Betriebssyste
 lassen. Jeder startet als eigenes Programm und läuft neben dem
 Diskettenwerkzeug weiter.
 
-Beide Programme lesen dieselbe Datei, aber jedes für sich. Hat die Diskette hier
+*K1520 Kermit starten* öffnet das Kermit-Werkzeug: Dateien mit der WEGA des P8000-Emulators
+(oder einem anderen Kermit) über Telnet bzw. RFC 2217 austauschen. Es hat ein eigenes Handbuch.
+
+Beide Emulatoren lesen dieselbe Datei, aber jedes für sich. Hat die Diskette hier
 ungespeicherte Änderungen, wird vor dem Start danach gefragt — der Emulator
 sieht sonst den Stand der **Datei**, nicht den auf dem Bildschirm. Und umgekehrt:
 was der Emulator auf die Diskette schreibt, kommt hier erst an, wenn das Abbild

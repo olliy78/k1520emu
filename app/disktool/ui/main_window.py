@@ -330,6 +330,7 @@ class MainWindow(QMainWindow):
         m = leiste.addMenu("&Werkzeuge")
         m.addAction(self.act_emulator)
         m.addAction(self.act_k8915emu)
+        m.addAction(self.act_kermit)
 
         m = leiste.addMenu("&Hilfe")
         m.addAction(self.act_hilfe)
@@ -2451,6 +2452,14 @@ class MainWindow(QMainWindow):
         self._hilfe = HelpWindow(self)
         self._hilfe.show()
         return self._hilfe
+
+    def _kermit_starten(self) -> None:
+        """K1520 Kermit als eigenes Programm daneben öffnen."""
+        from app import programme
+        try:
+            programme.programm_starten(programme.KERMIT)
+        except RuntimeError as e:
+            QMessageBox.warning(self, "K1520 Kermit", str(e))
 
     def _k8915emu_starten(self) -> None:
         """Den K8915 Emulator daneben öffnen (siehe :meth:`_emulator_starten`)."""

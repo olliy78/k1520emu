@@ -136,6 +136,10 @@ _SPEC: List[Tuple] = [
      "Das Diskettenwerkzeug öffnen — Dateien von einer Diskette holen und auf "
      "sie schreiben; es läuft neben dem Emulator weiter",
      "_disktool_starten", False),
+    ("kermit", "K1520 &Kermit starten", None, None,
+     "K1520 Kermit öffnen — Dateien mit der WEGA (P8000) oder einem anderen Kermit über Telnet/RFC 2217 "
+     "austauschen; es läuft neben diesem Programm weiter",
+     "_kermit_starten", False),
     # Der jeweils andere Emulator — dasselbe Programm mit dem anderen Profil.
     ("k8915emu", "K&8915 Emulator starten", None, None,
      "Den K8915 Emulator öffnen — ein eigenes Programm mit eigener "
@@ -201,6 +205,7 @@ KURZ = {
     "vollbild": "Vollbild",
     "standard": "Standard",
     "disktool": "DiskTool",
+    "kermit": "Kermit",
     "konsole": "Konsole",
     "hilfe": "Hilfe",
 }

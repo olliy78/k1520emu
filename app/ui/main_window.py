@@ -957,6 +957,7 @@ class MainWindow(QMainWindow):
         # Programm gestartet, das neben diesem weiterlaeuft.
         tools_menu = menu_bar.addMenu("&Werkzeuge")
         tools_menu.addAction(self.act_disktool)
+        tools_menu.addAction(self.act_kermit)
         # Der jeweils andere Emulator (dasselbe Programm, anderes Profil).
         for maschine in (self.profil.andere,) + tuple(self.profil.weitere):
             tools_menu.addAction(getattr(self, f"act_{maschine}emu"))
@@ -2428,6 +2429,13 @@ class MainWindow(QMainWindow):
             programme.programm_starten(programme.DISKTOOL)
         except RuntimeError as e:
             QMessageBox.warning(self, "k1520DiskTool", str(e))
+
+    def _kermit_starten(self):
+        """K1520 Kermit als eigenständiges Programm daneben öffnen (eigener Prozess, eigene Bibliothek)."""
+        try:
+            programme.programm_starten(programme.KERMIT)
+        except RuntimeError as e:
+            QMessageBox.warning(self, "K1520 Kermit", str(e))
 
     def _emulator_starten(self, maschine: str):
         """Einen der ANDEREN Emulatoren starten (A5120, K8915, PRG710).

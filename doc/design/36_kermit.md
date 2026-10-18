@@ -344,6 +344,66 @@ Festlegungen und Abweichungen vom Entwurf:
 7. **Schalter an beliebiger Stelle**, `--schalter=wert` erlaubt; Aufruf-/Pfadprüfung (`--as` bei mehr als einer Datei,
    lokale Datei fehlt, Ordner fehlt) passiert **vor** dem Verbindungsaufbau (Rückgabe 2, kein halber Austausch).
 
+### 6.4 Stand K6 (2026-10-18)
+
+**K6 — Oberfläche (fertig).**  `app/kermittool/` (PySide6), Starter `run_kermit.sh`, Programmname in der
+Oberfläche „K1520 Kermit", Handbuch `app/kermittool/help/handbuch.md` (mit `{{VERSION}}`, Fenster
+`app/ui_help.py`).  Aufbau: `main.py` · `arbeiter.py` (Arbeitsfaden) · `konfig.py` (`kermit.yaml`) ·
+`ui/{main_window,actions,fern_view,lokal_view,server_view,verbindung_dialog,einstellungen_dialog,fortschritt_dialog,ablage}.py`.
+Wiederverwendet statt neu gebaut: `app/ui_help.py`, `app/ui_icons.py` (Symbole `folder/in/out/serial/…`),
+`app/disktool/ui/{log_dock,info_bar}.py`, `app/config_io.py` (Laden, Schreiben, Schutz vor neuerer Formatversion).
+
+Tests: `tests/python/test_kermit_gui.py` (`py_kermit_gui`, 26 Fälle, offscreen, ~1 s): Fenster/Aktionen,
+Symbolleistenliste, Kürzelwächter, Handbuchtabelle in beiden Richtungen, Handbuchabschnitte (u. a. „Kermit Einrichtung
+unter WEGA") und Hilfemenü, Drag&Drop-Auswertung, Rundlauf GUI-Client ↔ Bibliotheks-Server (Verzeichnis, Holen,
+Schreiben, Doppelklick, Löschen mit Rückfrage, Finish), Abbruch einer 8-MB-Übertragung (Verbindung bleibt),
+Server-Modus (Start ohne Freigabe verweigert, Rundlauf, nur lesen, wieder lauschen, Stopp), Konfiguration ohne Kennwort
+(Lesen/Schreiben, neuere Formatversion bleibt unberührt, defekte Datei). `test_programme.py` um `KERMIT` erweitert.
+
+Festlegungen und Abweichungen vom Entwurf, mit Grund:
+1. **Ein Arbeitsfaden (`QThread`) mit Warteschlange** besitzt die Sitzung; Rückrufe der Bibliothek werden dort in
+   Qt-Signale umgesetzt (Fortschritt höchstens alle 50 ms, sonst kämen auf Loopback tausende je Sekunde), das
+   Fenster verbindet mit `Qt.QueuedConnection`.  Der Zähler „beschäftigt" läuft im GUI-Faden und wird im ersten
+   Empfänger von `auftrag_fertig` zurückgezählt — so stimmt er in jedem späteren Empfänger.
+2. **Abbrechen ist zweistufig:** der Dialog-Knopf löst `abort_group` (geordnet, Verbindung bleibt; am Loopback
+   gemessen: Rückgabe `E_ABORTED`, danach weiter benutzbar), der zweite Klick `abort` (hart, Leitung weg).
+   `Trennen`/`Stopp` rufen immer `abort`.  Das Handbuch sagt beides.
+3. **Server-Modus ist ein einziger langer Auftrag** mit Schleife (lauschen → bedienen → bei „wieder lauschen"
+   neu); ein Fehler der Gegenseite (Trennung) beendet ihn nicht, Stopp/Abbruch schon.  `nur lesen` gilt ab dem
+   nächsten Start (die Bibliothek nimmt es in `serve`).  Client mit Lauschen und „wieder lauschen" verbindet bei
+   `E_DISCONNECTED` neu.
+4. **Start ohne Freigabe** ist kein Meldungsfenster, sondern eine Warnung im Streifen (`InfoBar`) + Protokoll; `server_starten()`
+   liefert `False`.  Kein modales Fenster außer der Löschrückfrage.
+5. **Kennwort nur in `self._kennwort`**; `konfig.schreiben` entfernt rekursiv jeden Schlüssel `kennwort*` (Wächter:
+   Datei enthält weder den Wert noch das Wort).  Die WEGA-Voreinstellung trägt das dokumentierte Laborkennwort im
+   Programmtext (`konfig.VOREINSTELLUNGEN`), nie in der Datei.
+6. **Konfiguration `kermit.yaml`:** Abschnitte `uebertragung`, `client`, `server` (inkl. `ordner`, `nur_lesen`),
+   `optionen`, `zuletzt`, `lokal`, `window` (Geometrie wie beim Emulator: `restoreGeometry` + eigenes Feld
+   `maximized`, im `showEvent` nachgeholt; Symbolleiste als Namensliste, unbekannte Namen werden übergangen, Umbau per
+   `removeAction`, nie `clear()`).  `K1520_KERMIT_CONFIG` biegt den Pfad um (Tests, Mehrfachbetrieb).  `QSettings`
+   wird nicht benutzt.
+7. **Kürzel nur `Strg+Umschalt+…`**, keine mit F-Tasten (auch kein F1/F5/F8): Handbuchtabelle ist ein Vertrag, beide
+   Richtungen geprüft.  Eine **allgemeine** Prüfung über alle Programme gab es nicht (der Wächter
+   `test_no_shortcut_steals_a_key_from_the_emulated_machine` gilt nur dem Emulatorfenster; das DiskTool hat
+   `Strg+O` u. a. und wäre durchgefallen) — K6 bringt die Prüfung für das eigene Programm
+   (`test_no_shortcut_takes_a_plain_key`), nicht für die anderen.
+8. **Programm starten:** `programme.KERMIT` (Skript `app/kermittool/main.py`, wie die Nachbarn relativ zu
+   `paths.base_dir()`; kein eigener Eintrag in `app/paths.py`, weil dort nur Dateien außerhalb von `app/` stehen);
+   Menüpunkt „K1520 Kermit starten" im Menü Werkzeuge des Emulators (alle Profile) und des DiskTool, ohne Kürzel;
+   `py_programme` erweitert.
+9. **Geschwindigkeit der Gegenstelle** (`k1520k_set_tempo`, additiv durch K7): Eintrag im Einstellungsdialog
+   („Automatisch" = 0, 0,1x … 20x), Schlüssel `tempo` in `kermit.yaml`, der Arbeitsfaden setzt ihn vor jedem Auftrag.
+10. **Dateien**, nicht Ordner: Ordner lassen sich weder ziehen noch holen/senden (Protokoll kennt keine Rekursion);
+    die Anzeige der Server-Dateigröße kommt aus `parse_ls`.
+11. **Handbuch** ausführlich (Was ist Kermit, Bedienung, Server-Modus, Kommandozeile, „Kermit Einrichtung unter WEGA"
+    a–e, Fehlersuche).  Nicht auf der WEGA selbst geprüft und im Text so gekennzeichnet: `tar x` der Kermit-Diskette unter
+    WEGA mit den genannten Dateinamen, die Befehlsform für `chown`/`cat > .kermrc`, `passwd kermit` (geprüft ist der
+    Weg über das DiskTool, K1).
+
+**Offen:** keine Pixel-/Drag&Drop-Ereignisprüfung (offscreen nicht möglich; nur Auswertung und Annahmemethoden);
+Login-Skript in der GUI nur über die CLI/C++-Tests gegen eine getty-Attrappe belegt, nicht in `test_kermit_gui`;
+Paket/Windows (K9); Gegenprobe am echten C-Kermit im Emulator (K7).
+
 ## 7. Risiken
 
 - **Binary läuft nicht unter WEGA 3.1** (gebaut 1988 für WEGA 3.0?) → Selbstbau aus den Quellen auf WEGA (langsam im

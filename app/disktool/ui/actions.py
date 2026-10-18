@@ -161,6 +161,9 @@ _SPEC: List[Tuple] = [
     # Die Nachbarprogramme derselben Installation — die beiden Emulatoren.  Sie
     # fassen dieselben Disketten an, also gehoeren sie aus dem laufenden
     # Programm heraus erreichbar.
+    ("kermit", "K1520 &Kermit starten", None, None,
+     "K1520 Kermit öffnen — Dateien mit der WEGA (P8000) über Telnet/RFC 2217 austauschen; "
+     "es läuft neben dem DiskTool weiter", "_kermit_starten", False),
     ("emulator", "&A5120 Emulator starten", None, None,
      "Den A5120 Emulator öffnen — er bootet von einer Diskette und läuft neben "
      "dem DiskTool weiter", "_emulator_starten", False),
@@ -210,6 +213,7 @@ KURZ = {'oeffnen': 'Öffnen',
     'aktualisieren': 'Neu lesen',
     'emulator': 'A5120',
     'k8915emu': 'K8915',
+    'kermit': 'Kermit',
     'hilfe': 'Handbuch',
     'ueber': 'Über'}
 
