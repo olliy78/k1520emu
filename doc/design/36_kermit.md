@@ -249,6 +249,68 @@ vorzeichenbehaftetem `char` (Z8000-`cc`?) weichen Typ 1/2 bei 8-Bit-Rohdaten ab;
 Deshalb Vorschlag 3 oder QBIN `&` beibehalten und in K7 messen.  Schiebefenster, `G T/U`, Wiederaufnahme
 (K2b) nicht umgesetzt.
 
+### 6.2 Stand K3/K4 (2026-10-18)
+
+**K3 — Transport (fertig).**  `kermit/src/leitung_netz.{h,cpp}`: `NetzLeitung` mit den Fabriken
+`TelnetLeitung`/`Rfc2217Leitung` `::verbinden(host, port, frist)` und `::lauschen(port)` + `annehmen(frist)`
+(Port 0 frei, `port()` fragt ihn ab; der Lauscher schliesst nach EINER Verbindung), blockierend mit Frist
+(`lesen`: Anzahl / 0 / −1), `wecken()` klebrig aus jedem Faden (auch während `annehmen`).  Aufgesetzt auf
+`k1520_serial_codec` + `k1520_serial_net` (Dual-Stack-Lauscher, `Wecker`), nicht auf Wandler/Hub.
+`loginskript.{h,cpp}`: RETURN-Wiederholung bis `login:`, Name, bei `Password:` Kennwort, dann auf
+`server starting` warten und `ruhe_ms` Stille abwarten; Bit 7 vor dem Vergleich gelöscht; Fehlschlag mit dem
+zuletzt Gelesenen (sichtbar gemacht, `<1B>`), Fristen je Schritt einstellbar, `abbruch`-Schalter.
+Tests: `tests/integration/test_kermit_netz.cpp` (Label `integration;fast`, ~2 s): 8-Bit-Binär (alle 256
+Werte, IAC-Folgen, CR/NUL, 50 KB) × 4 Kombinationen (Telnet/RFC 2217 × A verbindet/lauscht), Frist/wecken/
+Trennung (Reste vor dem −1), voller Kermit-Austausch mit 100 KB binär × 4, Trennung mitten in der Datei
+(→ `LeitungGetrennt`), Login gegen eine getty-Attrappe mit gerader Parität (virtuelle Zeit), und die
+**Gegenprobe gegen einen echten `SerialHub`-Kanal** (Attrappe `SerialAnschluss`, Telnet-Server Port 0; ein
+Kermit-Server als „Gast" im Faden, der die Maschinenzeit selbst taktet) mit 6 KB aller Bytewerte hin und zurück.
+
+Befunde zum Hub-Telnet:
+1. **Der Hub verhandelt Binär von sich aus** (Server: `WILL ECHO/SGA/BINARY`, `DO BINARY`); ein Client, der nur
+   antwortet, ist nach einer Aushandlung in beide Richtungen binär.  Die Leitung wartet deshalb nach dem
+   Verbinden/Annehmen bis `aushandeln_ms` (1,5 s) auf BINARY in beiden Richtungen; geht es nicht, läuft sie
+   weiter (CR → CR NUL im Codec) und `hinweis()` sagt es.
+2. **Der Telnet-Client bietet BINARY selbst an** (`WILL`/`DO BINARY`), der RFC-2217-Client nicht — `Rfc2217Codec`
+   gibt den darunterliegenden Telnet-Automaten nur lesend heraus; dort kommt BINARY vom Server (Hub, ser2net).
+3. Als RFC-2217-Server **antwortet** die Leitung auf jede Anfrage des Clients (Baud, Format, Steuerung, Maske,
+   Leeren, Signatur) mit ihren eigenen Werten und stellt nichts um; als Client merkt sie nur die Antwort
+   (`gegenBaud()`; Test: Wunsch 9600, Gast 19200 → Bytes laufen trotzdem).  Es werden **kein RTS/DTR** gesendet:
+   der Hub-Wandler hält erst nach dem ersten gesetzten RTS an („CP/A/SCPX setzen es nie").
+4. Der Hub liefert an den Gast in Maschinentakten: ein Gast-Faden, der nicht mehr takten lässt, sendet nichts
+   mehr — im Test blieb die Schlussquittung (`G L`) liegen, bis der Gast-Faden nachtaktete (Testartefakt, kein Fehler).
+
+**K4 — C-ABI + Python-Bindung (fertig).**  `kermit/include/k1520kermit.h` + `k1520kermit_export.h`
+(`K1520K_API`, `K1520K_BUILD_SHARED`/`K1520K_USE_SHARED`), `kermit/src/api.cpp`, SHARED-Ziel `k1520kermit`
+(`libk1520kermit.so`/`k1520kermit.dll`, im Wurzel-`build/` wie `libk1520disk`), 35 Funktionen
+(`k1520k_*`).  Python: `app/kermittool/{__init__,binding}.py` (keine Qt-Abhängigkeit, lädt die Bibliothek beim
+ersten Aufruf), `app/paths.py::kermit_library()` (`K1520_KERMIT_LIB`), `--paths` zeigt „Kermit-Bibliothek".
+Wächter `tests/python/test_kermit_api.py` (`py_kermit_api`, 15 Fälle).
+
+Abweichungen/Festlegungen mit Grund:
+1. **Ergebnis = `int` (0 = ok), Fehlertext über `k1520k_last_error`**; die Codes 1–12 sind die `Fehlerart`
+   der Sitzung (unverändert durchgereicht), 100/101/102 = Verwendung/Leitung/Anmeldung.  Beim Öffnen gibt es kein
+   Handle für den Fehlertext: `k1520k_last_open_error` (je Faden).
+2. **Ein Handle = Leitung + Sitzung**, die Sitzung entsteht mit dem Handle (die Leitung kennt sie nur als
+   Referenz) — Einstellungen wirken also auch vor `accept`.  Server-Handle: `open_*_server` lauscht,
+   `accept` nimmt an; danach `serve` bzw. Client-Operationen (beide Rollen sind unabhängig von der Leitungsrolle).
+3. **`k1520k_set_paketlaenge(n)`** ist EIN Wert: ≤ 94 = normale Pakete dieser Länge ohne Langpakete,
+   > 94 = Langpakete bis n (bis 9024); `k1520k_set_namen` nimmt Senden/Empfang einzeln.
+4. **Text-Ergebnisse** (Verzeichnis, Dateinamen, Login-Verlauf) stehen im Handle (`k1520k_result_string`);
+   `k1520k_remote_dir` kann zusätzlich in einen Aufrufer-Puffer kopieren.  `k1520k_send` liefert die gesendeten
+   LOKALEN Pfade (nicht den Namen beim Empfänger — den kennt der Aufrufer).
+5. **`k1520k_parse_ls` liefert JSON** (gültiges UTF-8 bleibt, sonst Latin-1 als `\u00XX`; WEGA-Namen sind ASCII),
+   Puffer je Faden.
+6. **Abbruch:** `k1520k_abort` setzt Sitzungs- und Login-Schalter und weckt die Leitung (wirkt auch in
+   `accept`/`login`/`serve`); `abort_file`/`abort_group` bilden `X`/`Z` ab.  Ein Abbruch VOR dem Start der
+   Operation geht verloren (die Sitzung setzt ihre Schalter beim Start zurück).
+7. **Wächter vergleicht Typen**, nicht nur Namen: die Prototypen des Headers werden gelesen und gegen
+   `argtypes`/`restype` der geladenen Bibliothek (samt Rückruf-Zeigern) gehalten; `K1520K_API` an jeder Funktion
+   ist ein eigener Fall.
+
+Offen: Windows-Bau/CI-Lauf der DLL (`tools/dev.sh win` siehe Stand unten), K5 (Kommandozeile) und K6 (Oberfläche)
+benutzen die Bibliothek bzw. die Bindung; `k1520kermit` ist noch nicht im Paket (K9).
+
 ## 7. Risiken
 
 - **Binary läuft nicht unter WEGA 3.1** (gebaut 1988 für WEGA 3.0?) → Selbstbau aus den Quellen auf WEGA (langsam im

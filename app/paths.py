@@ -42,6 +42,7 @@ from typing import List, Optional
 
 ENV_HOME = "K1520_HOME"        # Wurzel der Installation bzw. des Quellbaums
 ENV_LIB = "K1520_LIB"          # Kernbibliothek (Datei oder Verzeichnis)
+ENV_KERMIT_LIB = "K1520_KERMIT_LIB"   # Kermit-Bibliothek (Datei oder Verzeichnis)
 ENV_FORMATS = "K1520_FORMATS"  # Formatkatalog (Datei oder Verzeichnis)
 ENV_DATA = "K1520_DATA"        # Datenordner des Anwenders (enthaelt Disketten/)
 ENV_DISKS = "K1520_DISKS"      # Verzeichnis der Arbeitsdisketten
@@ -101,6 +102,8 @@ def _is_macos() -> bool:
 #: siehe doc/design/13_k1520disktool.md §2.
 CORE_STEM = "k1520core"
 DISK_STEM = "k1520disk"
+#: ``k1520kermit`` das Kermit-Werkzeug (Entwurf 36) — wie das DiskTool eine eigene Bibliothek.
+KERMIT_STEM = "k1520kermit"
 
 
 def library_filenames(stem: str = CORE_STEM) -> List[str]:
@@ -148,9 +151,11 @@ def library_candidates(stem: str = CORE_STEM) -> List[Path]:
     out: List[Path] = []
 
     # 1) explizite Vorgabe — Datei oder Verzeichnis.  Sie gilt nur fuer den
-    #    Emulatorkern; eine Vorgabe fuer BEIDE Bibliotheken zugleich waere
-    #    zweideutig (dieselbe Datei kann nicht beides sein).
-    env = os.environ.get(ENV_LIB) if stem == CORE_STEM else None
+    #    Emulatorkern (K1520_LIB) bzw. die Kermit-Bibliothek (K1520_KERMIT_LIB);
+    #    eine Vorgabe fuer ALLE Bibliotheken zugleich waere zweideutig (dieselbe
+    #    Datei kann nicht mehrere sein).
+    env_name = {CORE_STEM: ENV_LIB, KERMIT_STEM: ENV_KERMIT_LIB}.get(stem)
+    env = os.environ.get(env_name) if env_name else None
     if env:
         p = Path(env).expanduser()
         out.extend([p / n for n in names] if p.is_dir() else [p])
@@ -181,8 +186,9 @@ def library(stem: str = CORE_STEM) -> Path:
             return path.resolve()
 
     listing = "\n".join(f"  {p}" for p in candidates)
-    hinweis = (f"Oder Pfad vorgeben:  {ENV_LIB}=/pfad/zur/bibliothek"
-               if stem == CORE_STEM else "")
+    env_name = {CORE_STEM: ENV_LIB, KERMIT_STEM: ENV_KERMIT_LIB}.get(stem)
+    hinweis = (f"Oder Pfad vorgeben:  {env_name}=/pfad/zur/bibliothek"
+               if env_name else "")
     raise FileNotFoundError(
         f"Bibliothek ({' / '.join(library_filenames(stem))}) nicht gefunden.\n"
         f"Gesucht in:\n{listing}\n\n"
@@ -198,6 +204,11 @@ def core_library() -> Path:
 def disk_library() -> Path:
     """Pfad der Bibliothek des k1520DiskTool."""
     return library(DISK_STEM)
+
+
+def kermit_library() -> Path:
+    """Pfad der Bibliothek des Kermit-Werkzeugs (``K1520_KERMIT_LIB`` hat Vorrang)."""
+    return library(KERMIT_STEM)
 
 
 def prepare_library_load() -> None:
@@ -724,6 +735,10 @@ def describe() -> str:
         lib = str(core_library())
     except FileNotFoundError:
         lib = "NICHT GEFUNDEN"
+    try:
+        kermit_lib = str(kermit_library())
+    except FileNotFoundError:
+        kermit_lib = "NICHT GEFUNDEN"
     fmt = formats_file()
     vorgabe = default_config_file()
     vorgabe_k8915 = default_config_file("default_config_k8915.yaml")
@@ -739,6 +754,7 @@ def describe() -> str:
         f"Layout:            {layout}",
         f"Wurzel:            {base_dir()}",
         f"Kernbibliothek:    {lib}",
+        f"Kermit-Bibliothek: {kermit_lib}",
         f"Formatkatalog:     {fmt if fmt else 'NICHT GEFUNDEN (der Kern sucht weiter selbst)'}",
         f"Disketten (Paket): {bundled if bundled else '—'}",
         f"Disketten (Nutzer):{user_disks_dir()}",

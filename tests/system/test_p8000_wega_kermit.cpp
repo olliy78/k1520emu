@@ -347,7 +347,7 @@ TEST(P8000WegaKermit, ServerHinterGetty) {
     a.tippeZeile("exit");
     ASSERT_TRUE(a.bisPrompt(400'000'000)) << a.bild();
 
-    // Handbuchseite (nur Befund, kein Wächter: man/nroff haengen vom Terminaltyp ab)
+    // Handbuchseite (nur Befund, kein Waechter: man/nroff haengen vom Terminaltyp ab)
     a.tippeZeile("man kermit | head -8");
     a.bisPrompt(800'000'000);
     std::fprintf(stderr, "--- man kermit\n%s", a.bild().c_str());

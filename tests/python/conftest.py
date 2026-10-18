@@ -92,6 +92,18 @@ requires_disk = pytest.mark.skipif(
 )
 
 
+def _kermit_lib():
+    """`libk1520kermit.so` — die C-ABI des Kermit-Werkzeugs (eigene Bibliothek, Entwurf 36)."""
+    p = PROJECT_ROOT / "build" / "libk1520kermit.so"
+    return p if p.exists() else None
+
+
+requires_kermit = pytest.mark.skipif(
+    _kermit_lib() is None,
+    reason="libk1520kermit.so nicht gebaut — vorher `tools/dev.sh build` ausführen",
+)
+
+
 # ─── Fixtures ────────────────────────────────────────────────────────────────
 
 @pytest.fixture(scope="session")

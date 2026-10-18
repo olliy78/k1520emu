@@ -174,6 +174,9 @@ TEST_P(KermitNetz, FristWeckenUndTrennung) {
 
     // Reste vor der Trennung kommen noch an, danach -1.
     ASSERT_TRUE(schreibeText(*p.b, "rest"));
+    // Erst den eigenen Eingang leeren (Reste der Verhandlung): ein close() mit ungelesenen Daten
+    // sendet unter Windows ein RST und die Gegenseite verliert dabei noch unterwegs befindliche Bytes.
+    p.b->lesen(b, 8, 100);
     p.b->schliessen();
     EXPECT_EQ(leseGenau(*p.a, 4), "rest");
     EXPECT_EQ(p.a->lesen(b, 8, 5000), -1);

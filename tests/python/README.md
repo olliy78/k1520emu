@@ -46,6 +46,7 @@ System-Interpreter.
 |-------|--------|
 | `conftest.py` | Pfade, Fixtures (`emulator`, `booted`, `temp_disk`, `qapp`), Headless-Qt, `run_until_text` |
 | `test_c_api.py` | Header ↔ `.so` ↔ Bindung: jede Funktion exportiert **und** mit `argtypes` deklariert; Handle-Lebenszyklus; Framebuffer-Geometrie; Fehlerpfade; Formatkatalog |
+| `test_kermit_api.py` | Kermit-C-ABI (Entwurf 36, AP K4): Header ↔ `libk1520kermit` ↔ ctypes **mechanisch inkl. Typen** (Prototypen aus dem Header gegen `argtypes`/`restype`), `K1520K_API` an jeder Funktion, Fehlercodes, Pfadauflösung (`K1520_KERMIT_LIB`); Rundlauf Python-Client ↔ Python-Server in zwei Fäden über Loopback (Telnet/RFC 2217 × beide Leitungsrollen) mit echten Dateien, `abort()`, `parse_ls` |
 | `test_binding.py` | Semantik der `K1520Emulator`-Methoden: Mount/Unmount, Schreibschutz, `create_disk`, Laufwerksstatus, `run()`-Rückgabe |
 | `test_boot_smoke.py` | Kaltboot durch die Bindung bis Bootloader/CP/A-Banner/Uhrzeit-Abfrage, `.img` **und** `.hfe`, Reset, Tastatureingabe |
 | `test_drive_types.py` | Laufwerkskatalog, `normalize()`, Migration alter Profilnamen |
