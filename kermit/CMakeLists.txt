@@ -6,6 +6,8 @@
 find_package(Threads REQUIRED)
 
 add_library(k1520kermit_core STATIC
+    src/leitung_netz.cpp
+    src/loginskript.cpp
     src/paket.cpp
     src/leitung.cpp
     src/dateien.cpp
@@ -13,7 +15,7 @@ add_library(k1520kermit_core STATIC
     src/server.cpp
 )
 target_include_directories(k1520kermit_core PUBLIC ${CMAKE_SOURCE_DIR})
-target_link_libraries(k1520kermit_core PUBLIC Threads::Threads)
+target_link_libraries(k1520kermit_core PUBLIC Threads::Threads k1520_serial_codec k1520_serial_net)
 # K4 baut daraus eine gemeinsame Bibliothek: lageunabhaengiger Code von Anfang an.
 set_target_properties(k1520kermit_core PROPERTIES
     CXX_STANDARD 17

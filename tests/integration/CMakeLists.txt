@@ -388,3 +388,10 @@ k1520_add_test(mc80_spiele SRC test_mc80_spiele.cpp
                           LIBS k1520_mc80 k1520_logger
                           LABELS "${_lbl}" DEFS LOG_LEVEL=2
                           "MC80_SPIELE_DIR=\"${CMAKE_SOURCE_DIR}/doc/mc80/spiele\"")
+
+# Kermit-Netzleitungen (doc/design/36_kermit.md AP K3): Telnet/RFC 2217 x Client/Server ueber
+# Loopback-Sockets (Port 0), voller Kermit-Austausch, Login-Skript, Gegenprobe gegen einen
+# echten SerialHub-Kanal (Attrappe SerialAnschluss).  Keine Maschine.
+k1520_add_test(kermit_netz SRC test_kermit_netz.cpp
+                           LIBS k1520kermit_core k1520_serial
+                           LABELS "${_lbl}" TIMEOUT 180)
