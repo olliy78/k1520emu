@@ -155,6 +155,7 @@ void FloppyDriveV2::setWriteProtect(bool wp) {
 
 bool FloppyDriveV2::step(bool inward) {
     if (!profile_.present) return false;
+    if (image_) image_->medium().noteAccess();
     if (inward) {
         if (cur_cyl_ < profile_.num_cyls - 1) ++cur_cyl_;
     } else {
@@ -165,6 +166,7 @@ bool FloppyDriveV2::step(bool inward) {
 
 bool FloppyDriveV2::seek(uint8_t cyl) {
     if (!profile_.present) return false;
+    if (image_) image_->medium().noteAccess();
     cur_cyl_ = (cyl < profile_.num_cyls) ? cyl
                                          : static_cast<uint8_t>(profile_.num_cyls - 1);
     return true;
@@ -199,6 +201,7 @@ void FloppyDriveV2::warnLostWrite(uint8_t head) const {
 
 const TrackImage& FloppyDriveV2::track(uint8_t head) const {
     if (!image_ || !headReachable(head)) return kLeer;
+    image_->medium().noteAccess();      // Gastzugriff: Vorauslesen zurueckstellen
     const int cyl = mediumCylinder(cur_cyl_);
     if (cyl < 0) return kLeer;
     return image_->readTrack(static_cast<uint8_t>(cyl), head);
@@ -220,6 +223,7 @@ TrackImage& FloppyDriveV2::mutableTrack(uint8_t head) {
         g_dummy = {};
         return g_dummy;
     }
+    image_->medium().noteAccess();
     return image_->medium().mutableTrack(static_cast<uint8_t>(cyl), head);
 }
 

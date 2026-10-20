@@ -53,6 +53,9 @@
  * @struct TrackSyncSpec
  * @brief Was der Synchronisierer ueber Laufwerk und Diskette wissen muss.
  */
+/// Vorgabe der Ruhefrist vor dem Vorauslesen (Wirtszeit, Hardwarezugriff).
+constexpr uint32_t kReadaheadRuheMs = 4000;
+
 struct TrackSyncSpec {
     uint8_t  num_cyls  = 80;   ///< Reichweite des Laufwerks (K5601 80, K5600.10 40, …)
     uint8_t  num_heads = 2;
@@ -70,6 +73,16 @@ struct TrackSyncSpec {
     /// Frist fuer @ref ensureLoaded, bevor der Wartende aufgibt.
     uint32_t request_timeout_ms = 30000;
     bool     read_ahead = true;      ///< unbekannte Spuren in Ruhephasen vorauslesen
+    /**
+     * @brief Ruhefrist (Wirtszeit, ms) nach dem letzten Gastzugriff, vor der das
+     *        Vorauslesen NICHT beginnt (Issue #14).
+     *
+     * Jeder echte Zugriff (Seek, Lesen, Schreiben, Anforderung) setzt die Frist neu.
+     * Sonst faehrt der Kopf zwischen zwei Spuren, die das Gastsystem gerade bearbeitet
+     * (FORMAT), zu fremden Spuren und zurueck.  Ein bereits laufender Auftrag wird
+     * nicht abgebrochen.  0 = keine Frist.
+     */
+    uint32_t readahead_quiet_ms = kReadaheadRuheMs;
 
     /**
      * @brief Jede geschriebene Spur zuruecklesen und vergleichen (§7.1).
@@ -185,6 +198,7 @@ public:
 
     /// @brief Meldung des Mediums: diese Spur wurde geaendert → Rueckfuehrung anmelden.
     void trackChanged(uint8_t cyl, uint8_t head) override;
+    void accessed() override;
 
     /**
      * @brief Alle noch unbekannten Spuren lesen (Prioritaet 1, der Reihe nach).
@@ -337,6 +351,10 @@ private:
         bool         defect = false;
     };
 
+    /// Ende der Ruhefrist nach dem letzten Gastzugriff (Epoche = keine Frist).
+    std::chrono::steady_clock::time_point vorauslesenFreiAb() const;
+    bool vorauslesenZurueckgestellt(std::chrono::steady_clock::time_point jetzt) const;
+
     size_t   idx(uint8_t cyl, uint8_t head) const {
         return static_cast<size_t>(cyl) * spec_.num_heads + head;
     }
@@ -371,6 +389,9 @@ private:
     /// Einmal bestimmter Ueberabtastfaktor der Quelle (0 = noch unbekannt, §8.1).
     /// Ausserhalb der Sperre gelesen — daher atomar.
     std::atomic<uint32_t> ueberabtastung_{0};
+    /// Zeitpunkt des letzten Gastzugriffs (steady_clock, Ticks; 0 = nie).  Atomar,
+    /// weil @ref accessed je Spurzugriff aus dem Emulationsfaden kommt.
+    std::atomic<int64_t>  letzter_zugriff_{0};
     SyncStats zaehler_{};
     std::string letzter_fehler_;
 };
