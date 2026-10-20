@@ -684,6 +684,7 @@ regelmässig ein zweites.  Beide Oberflächen haben deshalb ein Menü
 | Emulator | *k1520DiskTool starten* | `act_disktool` → `MainWindow._disktool_starten` |
 | Emulator | *Werkzeugkonsole öffnen* | `act_konsole` → `MainWindow._konsole_starten` |
 | DiskTool | *A5120-Emulator starten* | `act_emulator` → `MainWindow._emulator_starten` |
+| Emulator, DiskTool | *K1520 Kermit starten* (seit 2026-10-18, Entwurf 36 AP K6) | `act_kermit` → `MainWindow._kermit_starten` (`programme.KERMIT`, Handbuch `app/kermittool/help/handbuch.md`) |
 
 Das Wie steht an **einer** Stelle: `app/programme.py`
 (`programm_starten()`, `konsole_starten()`).  Die Pfade der Konsolenwerkzeuge

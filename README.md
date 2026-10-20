@@ -72,6 +72,9 @@ Z80-Programme.
 - **k1520DiskTool** —
   **[Handbuch des DiskTools](app/disktool/help/handbuch.md)** ·
   [Kommandozeile](tools/k1520disktool.md)
+- **K1520 Kermit** — Dateiaustausch mit der WEGA des P8000 (oder jedem Kermit) über Telnet/RFC 2217 —
+  **[Handbuch](app/kermittool/help/handbuch.md)** (mit der Einrichtung unter WEGA) ·
+  [Kommandozeile](tools/k1520kermit.md)
 - **Debugger `k1520dbg`** —
   **[Handbuch des Debuggers](doc/handbuch_k1520dbg.md)** ·
   [Kommandoreferenz](tools/k1520dbg.md) ·
@@ -90,7 +93,7 @@ python3 -m pip install -r requirements.txt -r requirements-dev.txt
 tools/dev.sh build           # C++-Kern bauen
 tools/dev.sh test            # Regressionsrunde
 bash run_a5120emu.sh         # bzw. run_k8915emu.sh, run_prg710emu.sh, run_pc1715emu.sh,
-                             #      run_p8000emu.sh, run_disktool.sh
+                             #      run_p8000emu.sh, run_disktool.sh, run_kermit.sh
 ```
 
 Voraussetzungen: C++17-Compiler, CMake ≥ 3.16, Python ≥ 3.8; gebaut und geprüft auf Linux

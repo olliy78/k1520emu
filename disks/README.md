@@ -85,7 +85,7 @@ die Wächter `cli_*` melden eine alte Fassung). `python3 tools/disketten_beigabe
 | Ordner | Inhalt |
 |--------|--------|
 | `p8000_wega30/` | WEGA 3.0: UDOS-Startdiskette, 15 Installationsdisketten (`p8000_wega30_root1…5`, `usr1…9`, `doc1`, als `.dmk`) und eine **fertig installierte Platte** `p8000_wega30_platte.k5504.img.gz` |
-| `p8000_wega31/` | WEGA 3.1: fertig installierte Platte `p8000_wega31_platte.avr.img.gz` (Abbild von pofo.de, Sektor 0 mit Parametersatz) + Startdiskette; keine Installationsdisketten vorhanden |
+| `p8000_wega31/` | WEGA 3.1: fertig installierte Platte `p8000_wega31_platte.avr.img.gz` (Abbild von pofo.de, Sektor 0 mit Parametersatz) + Startdiskette; keine Installationsdisketten vorhanden; mit C-Kermit 4.2 als Server hinter `login` (Benutzer/Kennwort `kermit`, Entwurf 36) |
 
 Beide Platten starten im `p8000emu` bis `WEGA login:` — Bedienung und Herkunft in der README des Ordners.
 Platten sind **gzip-gepackt** (`.img.gz`); der Emulator liest und schreibt sie so (Merkposten p8000 Nr. 56).

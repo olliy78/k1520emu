@@ -1,6 +1,7 @@
 # 36 — Kermit: Datenaustausch Host-PC ↔ WEGA (P8000)
 
-Stand 2026-10-18, Zweig `kermit` (von `P8000`).  Zwei Teile: **(A)** Kermit auf der WEGA-3.1-Platte
+Stand 2026-10-20 (AP K8), Zweig `kermit` (von `P8000`): **K0–K8 fertig**, offen K9 (Paket/CI) und das
+optionale K2b; offene Einzelpunkte in §7.  Zwei Teile: **(A)** Kermit auf der WEGA-3.1-Platte
 einrichten (Server hinter `getty`, Client in der Shell), **(B)** ein eigenes Kermit für den PC
 (C++-Bibliothek + Kommandozeile + Python/Qt-Oberfläche), Client **und** Server.
 Merkposten (seit AP K7): `doc/merkposten/kermit.md`.
@@ -53,7 +54,7 @@ Merkposten (seit AP K7): `doc/merkposten/kermit.md`.
 | Ort | `/usr/bin/kermit` (md0, PATH enthält `/usr/bin`), Rechte `4755 root` wie auf der Diskette (Sperrdateien); Handbuch `ckermi.man` → `/usr/man/man1/kermit.1`; Quellen nicht auf die Platte (Platz). |
 | Server-Benutzer | `kermit` in `/etc/passwd`: uid ≠ 0 bevorzugt (Prüfen: Kermit braucht root nur für Sperrdateien; uid 7 `kermit`, gid 1), Kennwort **`kermit`** (Stand K1: ein leeres Kennwort geht nicht — System-III-`login` verlangt dann „Choose one“; das Login-Skript sendet Name und Kennwort; getty meldet sich nach der Sitzung mit gerader Parität, Bit 7 vor dem Vergleich löschen), Home `/usr/kermit`, Shell **`/bin/sh`** mit `.profile` = `exec /usr/bin/kermit` (K7: C-Kermit führt `G D/E/T` über die Login-Shell aus — mit Shell `/usr/bin/kermit` kam die Gebrauchsanweisung statt `ls -l`). |
 | Start | `/usr/kermit/.kermrc`: `set file type binary`, `server`, `exit` (K7: **kein** `set file names literal` — damit gibt C-Kermit 4.2 keine Datei her, §6.5). |
-| Client am WEGA | Anmelden wie gewohnt (Konsole/tty0/tty2), `kermit`, `set line /dev/tty3`, `set baud 9600`, `send`/`get`/`remote dir` gegen den PC-Server — als Text in `README`/Handbuch `Kermit` beschreiben, kein Gastcode. |
+| Client am WEGA | Anmelden wie gewohnt (Konsole/tty0/tty2), `kermit`, `set line /dev/tty3`, `set speed 9600`, `set file type binary`, `send`/`get`/`remote dir` gegen den PC-Server — als Text in `README`/Handbuch `Kermit` beschreiben, kein Gastcode. |
 | Platte | `disks/p8000_wega31/p8000_wega31_platte.avr.img.gz` **einmal** neu packen, nachdem K1 grün ist (jede Fassung ≈ 6 MB in der Git-Historie); `disks/p8000_wega31/README.md` und `doc/p8000/` ergänzen.  Das Paket zieht die Datei automatisch mit. |
 | Einspielen | über das DiskTool (`k1520disktool put <abbild> --as md0/bin/kermit`, `attr` für Rechte/Besitzer; Platte ist schreibgeschützt bis `--force`/Freigabe, vorher `<abbild>~`-Sicherung), **nicht** über einen Emulatorlauf — reproduzierbar und billig. Anschließend Probe am laufenden WEGA (Test, s. K1/K7). |
 
@@ -178,19 +179,19 @@ Aufbau wie das DiskTool (`doc/design/13_k1520disktool.md`, `doc/design/11_python
 Je AP ein Agent, danach Doku + Commit in `kermit` (nicht pushen).  Build-Kollision: Agenten, die `build/`
 anfassen, laufen nacheinander oder im eigenen Worktree.
 
-| AP | Inhalt | Ergebnis / Wächter | Modell |
-|----|--------|--------------------|--------|
-| **K0** | Befund bestätigen (Binary-Kennung, Magic, Z8000-Lauffähigkeit) — **in K1 enthalten** | — | — |
-| **K1** | **WEGA-Installation:** Binary + `.kermrc` + Benutzer `kermit` + Handbuchseite in die Platte (DiskTool `put/attr`), Probe am laufenden WEGA (Anmeldung als `kermit` auf tty0 über Telnet am Hub: Server meldet sich; Konsole: `kermit` startet), bei Misserfolg Rückfall `kermitd`/Selbstbau; Platte neu packen; README. | Systemtest `P8000WegaKermit.ServerHinterGetty` (aus eingefrorenem Zustand, Label `wega_install`), Platte im Git | sonnet |
-| **K2** | **Bibliothek Stufe 1:** Paketschicht, Zustandsautomaten Senden/Empfangen/Server, Ordnerfreigabe, Attrappenleitung, C++-Unit-Tests (Kodierung, CRC, QBIN/REPT-Aushandlung, Fehlerfälle, Verlust/Verfälschung, Pfadfalle). | `tests/unit/kermit/*`, Loopback Client↔Server in-process | opus |
-| **K3** | **Transport:** `Leitung`, Telnet/RFC 2217 × Client/Server über die Emulator-Codecs, Login-Skript; Test mit Loopback-Sockets (nie feste Ports); Telnet-Binärverhalten gegen den Hub geprüft. | `tests/integration/test_kermit_netz.cpp` | sonnet |
-| **K4** | **C-ABI + Python-Bindung** (`binding.py`), CMake-Ziel `k1520kermit`, Windows-Export, mechanischer Signaturwächter. | `py_kermit_api` | sonnet |
-| **K5** | **Kommandozeile** `k1520kermit` + `tools/k1520kermit.md`. | `tests/cli/test_kermit_cli.cpp` | sonnet |
-| **K6** | **Oberfläche** `app/kermittool/` (beide Modi, Verbindungsdialog, Fortschritt, Drag&Drop, Handbuch, Konfiguration). | `py_kermit_gui` (offscreen), Kürzelwächter | sonnet |
-| **K7** | **Gegenprobe am echten C-Kermit 4.2:** beide Richtungen im Emulator (Fall 1 und Fall 2), Messung der 8-Bit-Sauberkeit, Durchsatz, Fristen; Befunde in Vorgaben §5 einarbeiten. | `P8000WegaKermit.*` (Label `wega_install`), `tools/dev.sh test-wega` | opus |
-| **K8** | **Doku:** Handbuch, `doc/merkposten/kermit.md` (+ README-Eintrag), `CLAUDE.md`-Kurzabsatz, `disks/…/README.md`, Entwurf 36 auf Stand. | — | sonnet |
-| **K9** | *(wenn K1–K8 grün)* **Paket/CI:** Linux-Paket (`build_payload.sh`), Inno-Setup, `windows-ci.yml`, Starter `k1520kermit`. | `py_packaging`, `py_programme` | sonnet |
-| K2b | *(optional)* Schiebefenster, `G T`/`G U`, Wiederaufnahme. | — | — |
+| AP | Inhalt | Ergebnis / Wächter | Modell | Status |
+|----|--------|--------------------|--------|--------|
+| **K0** | Befund bestätigen (Binary-Kennung, Magic, Z8000-Lauffähigkeit) — **in K1 enthalten** | — | — | fertig (in K1) |
+| **K1** | **WEGA-Installation:** Binary + `.kermrc` + Benutzer `kermit` + Handbuchseite in die Platte (DiskTool `put/attr`), Probe am laufenden WEGA (Anmeldung als `kermit` auf tty0 über Telnet am Hub: Server meldet sich; Konsole: `kermit` startet), bei Misserfolg Rückfall `kermitd`/Selbstbau; Platte neu packen; README. | Systemtest `P8000WegaKermit.ServerHinterGetty` (aus eingefrorenem Zustand, Label `wega_install`), Platte im Git | sonnet | fertig — `7e40c40`, `4e5c0a5`, `65352e4`; zweite Plattenfassung `cda77bb` (K7) |
+| **K2** | **Bibliothek Stufe 1:** Paketschicht, Zustandsautomaten Senden/Empfangen/Server, Ordnerfreigabe, Attrappenleitung, C++-Unit-Tests (Kodierung, CRC, QBIN/REPT-Aushandlung, Fehlerfälle, Verlust/Verfälschung, Pfadfalle). | `tests/unit/kermit/*`, Loopback Client↔Server in-process | opus | fertig — `23980c9` (Merge `2987495`) |
+| **K3** | **Transport:** `Leitung`, Telnet/RFC 2217 × Client/Server über die Emulator-Codecs, Login-Skript; Test mit Loopback-Sockets (nie feste Ports); Telnet-Binärverhalten gegen den Hub geprüft. | `tests/integration/test_kermit_netz.cpp` | sonnet | fertig — `0d27d6d` |
+| **K4** | **C-ABI + Python-Bindung** (`binding.py`), CMake-Ziel `k1520kermit`, Windows-Export, mechanischer Signaturwächter. | `py_kermit_api` | sonnet | fertig — `3933bac` |
+| **K5** | **Kommandozeile** `k1520kermit` + `tools/k1520kermit.md`. | `tests/cli/test_kermit_cli.cpp` | sonnet | fertig — `ee32146` |
+| **K6** | **Oberfläche** `app/kermittool/` (beide Modi, Verbindungsdialog, Fortschritt, Drag&Drop, Handbuch, Konfiguration). | `py_kermit_gui` (offscreen), Kürzelwächter | sonnet | fertig — `01786b1` |
+| **K7** | **Gegenprobe am echten C-Kermit 4.2:** beide Richtungen im Emulator (Fall 1 und Fall 2), Messung der 8-Bit-Sauberkeit, Durchsatz, Fristen; Befunde in Vorgaben §5 einarbeiten. | `P8000WegaKermit.*` (Label `wega_install`), `tools/dev.sh test-wega` | opus | fertig — `d52bdd2`, `cda77bb` |
+| **K8** | **Doku:** Handbuch, `doc/merkposten/kermit.md` (+ README-Eintrag), `CLAUDE.md`-Kurzabsatz, `disks/…/README.md`, Entwurf 36 auf Stand. | — | sonnet | fertig (§6.6) |
+| **K9** | *(wenn K1–K8 grün)* **Paket/CI:** Linux-Paket (`build_payload.sh`), Inno-Setup, `windows-ci.yml`, Starter `k1520kermit`. | `py_packaging`, `py_programme` | sonnet | offen |
+| K2b | *(optional)* Schiebefenster, `G T`/`G U`, Wiederaufnahme. | — | — | offen (optional) |
 
 Reihenfolge: **K1 ‖ K2** (K2 im Worktree) → K3 → K4 → K5 ‖ K6 → K7 → K8 → K9.
 
@@ -474,7 +475,51 @@ filtert solche Namen nicht); Verhalten bei Parität ≠ none.
 **Offen:** echte 10×-Messung (Maschine zu langsam im Test); tty3 ohne Präfix nicht vermessen; Namensfilter gegen
 Steuer-/8-Bit-Bytes im empfangenen Dateinamen; Windows-Lauf der neuen Tests.
 
-## 7. Risiken
+### 6.6 Stand K8 (2026-10-20) — Dokumentation
+
+**Fertig.**  Handbuch `app/kermittool/help/handbuch.md` sprachlich neu geschrieben (kurze Sätze, unpersönliche
+Anrede wie Emulator- und DiskTool-Handbuch, Schritte als nummerierte Listen) und inhaltlich auf den Stand K7
+gebracht: Benutzer `kermit` mit Shell `/bin/sh` + `.profile`, `.kermrc` ohne `set file names literal` (beides
+mit Begründung), QBIN `&`, C-Kermit 4.2 spiegelt die Prüfsumme (die alte Aussage „nur Typ 1" ist entfernt),
+Messwerte zu Tempo und Anmeldung, *Trennen* beendet den WEGA-Server NICHT (nur *Finish*), Fall 2 mit
+`set speed` (nicht `set baud`, so im Test getippt).  Neuer Unterabschnitt **Schnellstart** (beide Fälle) vor der
+Einrichtung; der DiskTool-Weg ist als Befehlsfolge ausgeschrieben und an einer Plattenkopie nachgefahren
+(`get` von `kermit.cqm`, `put`/`mkdir`/`attr`, `put --force` für `/etc/passwd`, `check --full` ohne Befund;
+Befund dabei: `put --force` setzt den Modus auf 0644 zurück → danach `attr`).  Als **nicht geprüft**
+gekennzeichnet: der ganze Weg unter WEGA selbst (`tar xvf /dev/rfd1 …`, `echo … >> /etc/passwd`,
+`passwd kermit`, `chown`/`chgrp`, `cat > .kermrc`), Fall 2 an anderen Leitungen als der Konsole, das
+Wiederverbinden ohne Anmeldung nach bloßem *Trennen* in der Oberfläche (nur an der Bibliothek belegt), tty3
+ohne 8-Bit-Präfix.  Dazu: `CLAUDE.md`-Kurzabsatz, §6-Statusspalte, §7.  Merkposten (`doc/merkposten/kermit.md`,
+README-Eintrag) und `disks/p8000_wega31/README.md` waren seit K7 aktuell.
+
+## 7. Offene Aufgaben
+
+Zusammengetragen aus den „Offen"-Listen von §6.1–§6.6, nach Dringlichkeit:
+
+1. **K9 — Paket und CI:** `libk1520kermit`, `k1520kermit` und `app/kermittool` ins Linux-Paket
+   (`build_payload.sh`) und ins Inno-Setup, Starter, `windows-ci.yml` (`dumpbin /exports` auch für
+   `k1520kermit.dll`); Wächter `py_packaging`, `py_programme`.
+2. **Windows:** MinGW-Vorprüfung (`tools/dev.sh win`) und MSVC-Gegenprobe der CI für Bibliothek, CLI und
+   die neuen Tests (Tempo, Austausch, Strg+C nur POSIX geprüft) — bisher nicht gelaufen.
+3. **Empfangsnamen filtern:** Steuer- und 8-Bit-Bytes im Dateinamen eines F-Pakets (beobachtet nach einem
+   abgebrochenen Senden des C-Kermit: `leftover`-Rest in `getpkt()`) werden nicht abgefangen.
+4. **Echte 10×-Messung:** im Test schafft die Maschine frei nur ≈ 5,5×; 10× und 0,1× sind nur mit der
+   virtuellen Uhr nachgebildet (`KermitTempo.*`).
+5. **tty3 ohne 8-Bit-Präfix** nicht vermessen (Fall 2 lief mit `&` des PC-Servers).
+6. **Nachlauf 2 s gegen den eigenen Server:** die Wartezeit auf das Leerlauf-N(0) nach einem B kostet gegen
+   einen Server, der keins schickt (die eigene Bibliothek), 2 s je Befehl nach einem Empfang — ggf. am
+   Init-Austausch erkennen und abschalten.
+7. **Oberfläche:** Login-Skript nur über CLI/C++-Tests belegt, nicht in `py_kermit_gui`; Drag&Drop nur über
+   die Auswertung der Mime-Daten (offscreen keine echten Ereignisse); Wiederverbinden ohne Anmeldung nach
+   bloßem *Trennen* nicht eigens geprüft.
+8. **Kennwort:** das Laborkennwort `kermit` steht in der Voreinstellung (`konfig.VOREINSTELLUNGEN`) und auf
+   der ausgelieferten Platte; ob eine Abfrage beim ersten Verbinden oder ein anderes Konto für das Paket
+   besser ist, entscheidet der Anwender.
+9. **Nur aus den Quellen gelesen**, nicht ausgelöst: Speicherfehler bei `G C` ohne Feld, Verhalten bei
+   Parität ≠ none.
+10. **K2b (optional):** Schiebefenster, `G T`/`G U`, Wiederaufnahme.
+
+## 8. Risiken
 
 - **Binary läuft nicht unter WEGA 3.1** (gebaut 1988 für WEGA 3.0?) → Selbstbau aus den Quellen auf WEGA (langsam im
   Emulator, aber machbar), notfalls Quellen 070.

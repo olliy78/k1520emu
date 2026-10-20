@@ -875,6 +875,22 @@ app/disktool/               PySide6-Oberfläche  →  bash run_disktool.sh
 >   verschränkt (`NOTE.TO.SD`: Sektor 6, 7, 12, 23, 1, 8, …) — den zweiten fände von Hand
 >   niemand, und einen Namen zum Wiedererkennen gibt es dort auch nicht.
 
+## Kermit (WEGA-Datenaustausch) (`kermit/`, `tools/k1520kermit.cpp`, `app/kermittool/`)
+
+Drittes Anwenderprogramm **K1520 Kermit**: Dateiaustausch mit dem C-Kermit 4.2 der WEGA im `p8000emu` (oder jedem
+Kermit) über Telnet/RFC 2217, als Client **und** als Server (Ordnerfreigabe).  Eigene Bibliothek `kermit/`
+(`k1520::kermit`, statisch `k1520kermit_core`, C-ABI `k1520k_*` → **`libk1520kermit`**, ohne Z80/Karten), CLI
+`k1520kermit`, Oberfläche `bash run_kermit.sh` (Handbuch `app/kermittool/help/handbuch.md`), WEGA-Seite fertig auf
+`disks/p8000_wega31/` (Benutzer/Kennwort `kermit`).  Entwurf: `doc/design/36_kermit.md` (Offenes §7).
+
+> **Vor Arbeiten daran: `doc/merkposten/kermit.md` lesen.** Die teuersten Festlegungen (alle am echten C-Kermit gemessen):
+> - **QBIN-Vorgabe `&`, nicht `Y`** — tty0 löscht Bit 7 auf dem Weg PC → WEGA; mit `Y` schaltet C-Kermit 4.2 kein Präfix ein.
+> - **Fristen adaptiv in der Zeit der Gegenstelle** (Hub taktet in Maschinenzeit), eine schnelle Gegenstelle bekommt **keine
+>   kürzere** Frist; Login-Fristen sind Fristen der Stille.
+> - **Wiederholungsregeln/Leerlauf-N(0)/Nachlauf** gegen C-Kermit 4.2 nicht „vereinfachen" — jede steht für einen gemessenen Hänger.
+> - **WEGA-Konto `kermit`: Shell `/bin/sh` + `.profile` `exec /usr/bin/kermit`, `.kermrc` OHNE `set file names literal`**
+>   (sonst `G D` = Gebrauchsanweisung bzw. jedes `R` „Can't open file").
+
 ## Serielle Schnittstellen nach außen (`core/serial/`, `app/ui/serial_widget.py`)
 
 Die seriellen Kanäle der K8025 (A5120: DFÜ/V.24, DFÜ/IFSS, Drucker) und der K7028 (K8915:

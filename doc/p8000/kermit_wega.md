@@ -95,7 +95,8 @@ Druckerleitung des P8000, Hub-Kanal als Telnet-Client):
 
 ```
 C-Kermit>set line /dev/tty3
-C-Kermit>set baud 9600
+C-Kermit>set speed 9600
+C-Kermit>set file type binary
 C-Kermit>send datei
 C-Kermit>get datei
 C-Kermit>remote directory
