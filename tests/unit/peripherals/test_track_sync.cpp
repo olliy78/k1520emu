@@ -424,13 +424,22 @@ TEST(TrackSync, VorauslesenBeginntBeimZuletztGebrauchtenZylinder) {
     faden.start();
 
     (void)abbild.track(6, 0);            // Kopf steht jetzt bei 6
-    ASSERT_TRUE(warteBis([&] { return faden.verlauf().size() >= 4; }));
+    // Warten, bis die Anforderung UND die drei Folgespuren im Verlauf stehen (die
+    // Anforderung liegt nicht zwingend vorn; unter Last kam der Test sonst zu frueh).
+    auto indexDerAnforderung = [](const auto& verlauf) {
+        size_t n = 0;
+        while (n < verlauf.size() && !(verlauf[n].cyl == 6 && verlauf[n].head == 0)) ++n;
+        return n;
+    };
+    ASSERT_TRUE(warteBis([&] {
+        const auto v = faden.verlauf();
+        return indexDerAnforderung(v) + 3 < v.size();
+    }));
     faden.stop();
 
     // Die drei Spuren nach der Anforderung muessen in ihrer Naehe liegen, nicht bei 0.
     const auto v = faden.verlauf();
-    size_t i = 0;
-    while (i < v.size() && !(v[i].cyl == 6 && v[i].head == 0)) ++i;
+    const size_t i = indexDerAnforderung(v);
     ASSERT_LT(i + 3, v.size());
     for (size_t k = i + 1; k <= i + 3; ++k)
         EXPECT_LE(std::abs(static_cast<int>(v[k].cyl) - 6), 2)
