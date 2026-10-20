@@ -132,8 +132,16 @@ K1520K_API int k1520k_set_paketlaenge(K1520Kermit h, int laenge);
 K1520K_API int k1520k_set_namen(K1520Kermit h, int senden_konvertiert, int empfang_konvertiert);
 /// Textmodus (LF lokal <-> CR LF auf der Leitung): 1 an, 0 binaer (Vorgabe 0).
 K1520K_API int k1520k_set_textmodus(K1520Kermit h, int an);
-/// Frist je Paket in ms (Vorgabe 10000) und Wiederholungen je Paket (Vorgabe 10).
+/// Frist je Paket in ms in der Zeit der Gegenstelle (Vorgabe 10000; wirksam adaptiv, siehe
+/// @ref k1520k_set_tempo) und Wiederholungen je Paket (Vorgabe 10).
 K1520K_API int k1520k_set_fristen(K1520Kermit h, int paket_ms, int max_wiederholungen);
+/// Tempo der Gegenstelle gegenueber Echtzeit (Emulator mit 10x Takt = 10, unter Last 0.5);
+/// 0 = Automatik (Vorgabe: aus Zeichenrate und Umlaufzeit geschaetzt).  Die Paketfrist von
+/// @ref k1520k_set_fristen gilt in der Zeit der Gegenstelle und wird durch das Tempo geteilt;
+/// gilt auch fuer die Anmeldung.  Bereich 0 oder 0.01 .. 1000.
+K1520K_API int k1520k_set_tempo(K1520Kermit h, double tempo);
+/// Wirksames Tempo (Einstellung, sonst Schaetzung, sonst 1.0); 0.0 bei ungueltigem Handle.
+K1520K_API double k1520k_tempo(K1520Kermit h);
 /// Hoechstlaenge eines Zielnamens (WEGA: 14); 0 = keine Grenze.  Laengere werden ABGELEHNT.
 K1520K_API int k1520k_set_max_namenslaenge(K1520Kermit h, int n);
 /// Vorhandene Dateien beim Empfang ersetzen (1, Vorgabe) oder umbenennen/ablehnen (0).

@@ -790,3 +790,202 @@ TEST(KermitSitzung, FehlerTexte) {
     for (int i = 0; i <= static_cast<int>(Fehlerart::NichtUnterstuetzt); ++i)
         EXPECT_STRNE(fehlerText(static_cast<Fehlerart>(i)), "?");
 }
+
+// ─── Befunde K7 (Entwurf 36 §6.5): Wiederholungsregeln ───────────────────────
+
+// Ein N fuer Paket 1 auf unser S(0) ist KEINE Quittung: die Quittung des S traegt die Parameter der
+// Gegenstelle.  Frueher galt es als leeres Y → Blockpruefung 1, waehrend die Gegenstelle schon die
+// ausgehandelte (3) fuhr: jedes weitere Paket „beschaedigt" (VerfaelschteBytes rot).
+TEST(KermitSitzung, NakAufSendInitIstKeineQuittung) {
+    SpeicherLeitungPaar l;
+    TempOrdner lokal;
+    schreibe(lokal.p / "q", "inhalt");
+    std::thread t([&] {
+        Sitzung c(l.ende(0), client());
+        c.senden((lokal.p / "q").u8string(), "q");
+    });
+    Roh r{l.ende(1)};
+    Paket p;
+    ASSERT_TRUE(r.lies(p));
+    ASSERT_EQ(p.typ, 'S');
+    r.sende('N', 1, "");   // wie ein Empfaenger, dessen Y verloren ging und der nun Paket 1 erwartet
+    ASSERT_TRUE(r.lies(p));
+    EXPECT_EQ(p.typ, 'S') << "S muss wiederholt werden, nicht F mit Pruefung 1";
+    EXPECT_EQ(p.seq, 0);
+    l.ende(1).schliessen();
+    t.join();
+}
+
+// Der Server wiederholt seine Schlussquittung, wenn das B der eben beendeten Transaktion noch einmal
+// kommt (Quittung verloren) — auch wenn die Transaktion Pruefung 3 fuhr und der Server im Leerlauf
+// schon wieder mit Pruefung 1 liest.  Frueher: N(0) bzw. E, der Sender lief in „Zu viele Wiederholungen".
+TEST(KermitSitzung, ServerWiederholtQuittungDesB) {
+    Aufbau a;
+    a.starte();
+    Roh r{a.leitung.ende(0)};
+    Paket p;
+    r.sende('S', 0, "~* @-#Y3~");
+    ASSERT_TRUE(r.lies(p));
+    ASSERT_EQ(p.typ, 'Y');
+    r.chkt = 3;
+    r.sende('F', 1, "b.dat");
+    ASSERT_TRUE(r.lies(p));
+    r.sende('D', 2, "abc");
+    ASSERT_TRUE(r.lies(p));
+    r.sende('Z', 3, "");
+    ASSERT_TRUE(r.lies(p));
+    r.sende('B', 4, "");
+    ASSERT_TRUE(r.lies(p));
+    ASSERT_EQ(p.typ, 'Y');
+    ASSERT_EQ(p.seq, 4);
+    r.sende('B', 4, "");   // „Quittung verloren": dasselbe B noch einmal
+    ASSERT_TRUE(r.lies(p)) << "keine Antwort auf das wiederholte B";
+    EXPECT_EQ(p.typ, 'Y');
+    EXPECT_EQ(p.seq, 4);
+    EXPECT_EQ(lies(a.wurzel.p / "b.dat"), "abc");
+}
+
+// Wiederholt die Gegenstelle ihr Paket (hier das R), waehrend wir auf die Quittung unseres S warten,
+// ging unser S verloren: sofort wiederholen, nicht erst nach der eigenen (laengeren) Frist — sonst
+// wartet ein Sender mit langer Frist, bis die Gegenstelle mit kurzer Frist aufgibt.
+TEST(KermitSitzung, SenderWiederholtAufWiederholtesPaketDerGegenstelle) {
+    Aufbau a;
+    schreibe(a.wurzel.p / "r.dat", "x");
+    Einstellungen e = server();
+    e.frist_ms = 60000;   // eigene Frist lang
+    a.starte(e);
+    Roh r{a.leitung.ende(0)};
+    Paket p;
+    r.sende('R', 0, "r.dat");
+    ASSERT_TRUE(r.lies(p));
+    ASSERT_EQ(p.typ, 'S');
+    const int64_t t0 = a.leitung.jetzt();
+    r.sende('R', 0, "r.dat");   // als haette uns das S nicht erreicht
+    ASSERT_TRUE(r.lies(p));
+    EXPECT_EQ(p.typ, 'S');
+    EXPECT_LT(a.leitung.jetzt() - t0, 1000) << "S erst nach der eigenen Frist wiederholt";
+}
+
+// `G C` ohne Pfad traegt ein Feld der Laenge 0 (" "), nicht gar keines: C-Kermit 4.2 liest die
+// Feldlaenge ungeprueft (cwd(): vdir[unchar(*vdir)+1] = 0) — ohne Feld schriebe es VOR seinen
+// Befehlspuffer.  Mit Laenge 0 wechselt es nach $HOME; unser Server zur Wurzel.
+TEST(KermitSitzung, LeererVerzeichniswechselTraegtLeeresFeld) {
+    SpeicherLeitungPaar l;
+    std::thread t([&] {
+        Sitzung c(l.ende(0), client());
+        c.entferntWechseln("");
+    });
+    Roh r{l.ende(1)};
+    Paket p;
+    ASSERT_TRUE(r.lies(p));
+    ASSERT_EQ(p.typ, 'I');
+    r.sende('Y', 0, "~* @-#Y1~");
+    ASSERT_TRUE(r.lies(p));
+    ASSERT_EQ(p.typ, 'G');
+    EXPECT_EQ(p.daten, "C ");
+    r.sende('Y', 0, "/");
+    t.join();
+    // Gegen den eigenen Server: zurueck zur Wurzel.
+    Aufbau a;
+    fs::create_directories(a.wurzel.p / "u");
+    a.starte();
+    Sitzung c(a.leitung.ende(0), client());
+    ASSERT_TRUE(c.entferntWechseln("u").ok());
+    const Ergebnis e = c.entferntWechseln("");
+    ASSERT_TRUE(e.ok()) << e.text;
+    EXPECT_EQ(e.ausgabe, "/");
+}
+
+// Nachbildung C-Kermit 4.2 als Empfaenger: auf ein beschaedigtes Paket wiederholt es seine LETZTE
+// Quittung (Y n-1) statt eines NAK.  Der Sender muss darauf das laufende Paket wiederholen — frueher
+// wartete er bis „Zu viele Wiederholungen" (Befund K7 am echten C-Kermit: elf Y1 auf ein D2).
+TEST(KermitSitzung, QuittungDesVorigenPaketsLoestWiederholungAus) {
+    SpeicherLeitungPaar l;
+    TempOrdner lokal;
+    schreibe(lokal.p / "q", "inhalt");
+    Ergebnis erg;
+    std::thread t([&] {
+        Sitzung c(l.ende(0), client());
+        erg = c.senden((lokal.p / "q").u8string(), "q");
+    });
+    Roh r{l.ende(1)};
+    Paket p;
+    ASSERT_TRUE(r.lies(p));
+    ASSERT_EQ(p.typ, 'S');
+    r.sende('Y', 0, "~* @-#Y1~");
+    ASSERT_TRUE(r.lies(p));
+    ASSERT_EQ(p.typ, 'F');
+    r.sende('Y', 1, "");
+    ASSERT_TRUE(r.lies(p));
+    ASSERT_EQ(p.typ, 'D');
+    const int64_t t0 = l.jetzt();
+    r.sende('Y', 1, "");   // „D2 kam verstuemmelt an": letzte Quittung noch einmal
+    ASSERT_TRUE(r.lies(p));
+    EXPECT_EQ(p.typ, 'D');
+    EXPECT_EQ(p.seq, 2);
+    EXPECT_LT(l.jetzt() - t0, 1000) << "erst nach der Frist wiederholt";
+    // Rest normal quittieren
+    r.sende('Y', 2, "");
+    while (r.lies(p)) {
+        r.sende('Y', p.seq, "");
+        if (p.typ == 'B') break;
+    }
+    t.join();
+    EXPECT_TRUE(erg.ok()) << erg.text;
+}
+
+// Nachbildung C-Kermit-4.2-Server: bei jedem Wiedereintritt in die Serverschleife schickt er von
+// sich aus N(0) (tinit → nack).  Kommt es nach unserem I an, darf das I NICHT wiederholt werden —
+// sonst antwortet der Server zweimal mit Y(0), und das zweite galt als Antwort auf das folgende G
+// (Befund K7: G D lieferte "~* @-#&3~").
+TEST(KermitSitzung, LeerlaufNakDesServersWiederholtDasInitNicht) {
+    SpeicherLeitungPaar l;
+    Ergebnis erg;
+    std::thread t([&] {
+        Sitzung c(l.ende(0), client());
+        erg = c.entferntVerzeichnis("");
+    });
+    Roh r{l.ende(1)};
+    Paket p;
+    ASSERT_TRUE(r.lies(p));
+    ASSERT_EQ(p.typ, 'I');
+    r.sende('N', 0, "");                 // Leerlauf-NAK, ueberholt das I
+    r.sende('Y', 0, "~* @-#&1~");        // Antwort auf das I
+    ASSERT_TRUE(r.lies(p));
+    EXPECT_EQ(p.typ, 'G') << "I nach dem Leerlauf-NAK wiederholt";
+    r.sende('Y', 0, "verzeichnis");
+    t.join();
+    EXPECT_TRUE(erg.ok());
+    EXPECT_EQ(erg.ausgabe, "verzeichnis");
+}
+
+// Nach einer Trennung mitten in der Datei steckt ein C-Kermit-Server noch in der alten Transaktion und
+// NAKt deren naechstes Paket (gemessen: N25).  Der neue Client bricht sie mit einem E-Paket ab und
+// wiederholt sein I, sobald der Server mit N(0) in die Serverschleife zurueckkehrt (Befund K7).
+TEST(KermitSitzung, AlteTransaktionDerGegenstelleWirdAbgebrochen) {
+    SpeicherLeitungPaar l;
+    Ergebnis erg;
+    std::thread t([&] {
+        Sitzung c(l.ende(0), client());
+        erg = c.entferntVerzeichnis("");
+    });
+    Roh r{l.ende(1)};
+    Paket p;
+    ASSERT_TRUE(r.lies(p));
+    ASSERT_EQ(p.typ, 'I');
+    r.chkt = 3;                      // die alte Transaktion lief mit Pruefung 3
+    r.sende('N', 25, "");            // „ich warte auf Datenpaket 25"
+    ASSERT_TRUE(r.lies(p)) << "E nicht mit der Pruefung der alten Transaktion";
+    EXPECT_EQ(p.typ, 'E');
+    EXPECT_EQ(p.seq, 25);
+    r.chkt = 1;
+    r.sende('N', 0, "");             // zurueck in der Serverschleife
+    ASSERT_TRUE(r.lies(p));
+    EXPECT_EQ(p.typ, 'I') << "I nach dem Leerlauf-NAK nicht wiederholt";
+    r.sende('Y', 0, "~* @-#&1~");
+    ASSERT_TRUE(r.lies(p));
+    EXPECT_EQ(p.typ, 'G');
+    r.sende('Y', 0, "ok");
+    t.join();
+    EXPECT_TRUE(erg.ok()) << erg.text;
+}

@@ -75,7 +75,8 @@ struct Optionen {
     bool text = false;
     std::string namen;                           ///< "" = Vorgabe, sonst literal|konvertiert
     int max_namen = 0;
-    int frist_s = 10;                            ///< je Paket und Verbindungsaufbau
+    int frist_s = 10;                            ///< je Paket (Zeit der Gegenstelle) und Verbindungsaufbau
+    double tempo = 0.0;                          ///< --tempo: 0 = auto
     int warte_s = 300;                           ///< Annehmen einer Verbindung (Lauschen)
     // Kommandos
     std::string ziel = ".";                      ///< --to
@@ -104,7 +105,8 @@ void gebrauch(std::ostream& os) {
         "  --warte S               Lauschen: so lange auf die Verbindung warten (Vorgabe 300)\n\n"
         "Uebertragung:\n"
         "  --pruefsumme 1|2|3  --paket N  --binaer|--text  --namen literal|konvertiert\n"
-        "  --max-namen N  --frist S (je Paket, Vorgabe 10)  --cd PFAD (vor dem Kommando wechseln)\n\n"
+        "  --max-namen N  --frist S (je Paket, Vorgabe 10)  --cd PFAD (vor dem Kommando wechseln)\n"
+        "  --tempo auto|F  Tempo der Gegenstelle (Emulator mit 10x Takt: 10; Vorgabe auto = gemessen)\n\n"
         "Ausgabe: --json  --fortschritt (sonst nur an einem Terminal)  -v (Ereignisse)  -l\n"
         "Rueckgabe: 0 ok · 1 Fehler der Uebertragung/Gegenstelle/Abbruch · 2 Aufruf-, Verbindungs-, Anmeldefehler\n";
 }
@@ -223,6 +225,17 @@ int lies(int argc, char** argv, Optionen& o, bool& fertig) {
             if (!hole(v) || !zahl(v, o.max_namen, 0, 255)) return fehl("--max-namen braucht eine Zahl (0 = keine Grenze)");
         } else if (a == "--frist") {
             if (!hole(v) || !zahl(v, o.frist_s, 1, 3600)) return fehl("--frist braucht Sekunden (1-3600)");
+        } else if (a == "--tempo") {
+            if (!hole(v)) return fehl("--tempo braucht auto oder eine Zahl");
+            if (v == "auto") {
+                o.tempo = 0.0;
+            } else {
+                char* ende = nullptr;
+                const double t = std::strtod(v.c_str(), &ende);
+                if (!ende || *ende != '\0' || !(t >= 0.01 && t <= 1000.0))
+                    return fehl("--tempo muss auto oder eine Zahl von 0.01 bis 1000 sein");
+                o.tempo = t;
+            }
         } else if (a == "--warte") {
             if (!hole(v) || !zahl(v, o.warte_s, 1, 86400)) return fehl("--warte braucht Sekunden");
         } else if (a == "--to") { if (!hole(o.ziel)) return fehl("--to braucht einen Ordner"); }
@@ -389,6 +402,8 @@ int main(int argc, char** argv) {
     }
     e.textmodus = o.text;
     e.frist_ms = o.frist_s * 1000;
+    e.tempo = o.tempo;
+    e.baud = o.baud;
     e.max_namenslaenge = o.max_namen;
     if (!o.namen.empty()) {
         e.namen_senden = e.namen_empfang = o.namen == "literal" ? Namen::Literal : Namen::Konvertiert;
@@ -460,7 +475,11 @@ int main(int argc, char** argv) {
         if (lo.mit_kennwort) lo.kennwort = o.login.substr(dp + 1);
         if (lo.name.empty()) return meldeFehler(o, "--login: Name fehlt", kAufruf);
         lo.abbruch = &loginAbbruch;
+        lo.tempo = o.tempo;
+        lo.baud = o.baud;
         const LoginErgebnis lr = loginSkript(*leitung, lo);
+        if (lr.ok && lr.tempo > 0) sitzung.setzeTempoSchaetzung(lr.tempo);
+        if (o.laut && lr.tempo > 0) std::cerr << "Tempo der Gegenstelle (Zeichenrate): " << lr.tempo << "\n";
         if (!lr.ok) {
             if (g_strgC) return abbruchMeldung();
             return meldeFehler(o, "Anmeldung: " + lr.text, kAufruf);

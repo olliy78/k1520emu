@@ -358,6 +358,12 @@ TEST_P(KermitCli, LsMitPfadUndCdSchalter) {
     EXPECT_EQ(p.client.rc, 0) << p.client.err;
     p = paar(art(), lauscher(), tmp / "frei", {"cd", "gibtsnicht"});
     EXPECT_EQ(p.client.rc, 1) << p.client.err;
+    // --tempo (K7) wird angenommen und aendert am Ergebnis nichts
+    p = paar(art(), lauscher(), tmp / "frei", {"ls", "unter", "--tempo", "10"});
+    EXPECT_EQ(p.client.rc, 0) << p.client.err;
+    EXPECT_EQ(zeilen(p.client.out), std::vector<std::string>{"tief.txt"}) << p.client.out;
+    p = paar(art(), lauscher(), tmp / "frei", {"ls", "unter", "--tempo", "auto"});
+    EXPECT_EQ(p.client.rc, 0) << p.client.err;
 }
 
 TEST_P(KermitCli, RmLoeschtUndMeldetFehlendes) {
@@ -494,6 +500,9 @@ TEST(KermitCliFehler, AufrufFehlerGebenZwei) {
     EXPECT_EQ(starte({"ls", "--telnet", lt, "--gibtsnicht"}).rc, 2);                        // Schalter
     EXPECT_EQ(starte({"ls", "--telnet", lt, "--pruefsumme", "7"}).rc, 2);
     EXPECT_EQ(starte({"ls", "--telnet", lt, "--namen", "komisch"}).rc, 2);
+    EXPECT_EQ(starte({"ls", "--telnet", lt, "--tempo", "schnell"}).rc, 2);                  // K7: --tempo auto|Zahl
+    EXPECT_EQ(starte({"ls", "--telnet", lt, "--tempo", "0"}).rc, 2);
+    EXPECT_EQ(starte({"ls", "--telnet", lt, "--tempo", "5000"}).rc, 2);
     EXPECT_EQ(starte({"put", "--telnet", lt, (tmp / "fehlt.txt").string()}).rc, 2);         // lokale Datei fehlt
     EXPECT_EQ(starte({"put", "--telnet", lt, (tmp / "a.txt").string(), (tmp / "b.txt").string(), "--as", "x"}).rc, 2);
     EXPECT_EQ(starte({"serve", "--telnet", lt, (tmp / "gibtsnicht").string()}).rc, 2);      // kein Ordner

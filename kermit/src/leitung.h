@@ -65,6 +65,9 @@ public:
 
     /// Richtung `von` → andere Seite.
     void setzeVerzoegerung(int von, int64_t ms);
+    /// Zeichenzeit in ms je Byte (0 = sofort): Bytes kommen hintereinander wie auf einer
+    /// seriellen Leitung (9600 Bd = 1.04 ms; eine 10x schnelle Gegenstelle = 0.104 ms).
+    void setzeZeichenzeit(int von, double ms);
     void setzeSiebenBit(int von, bool an);
     void setzeStoerung(int von, Stoerung s);
     /// Ein nicht beteiligtes Ende haelt die virtuelle Uhr nicht an (stumme
@@ -86,6 +89,8 @@ private:
     struct Richtung {
         std::deque<Eintrag> q;
         int64_t verzoegerung = 0;
+        double zeichenzeit = 0;   ///< ms je Byte
+        double frei = 0;          ///< Zeitpunkt, ab dem die Leitung wieder frei ist
         bool siebenBit = false;
         Stoerung stoerung;
         int bloecke = 0;

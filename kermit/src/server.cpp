@@ -178,6 +178,13 @@ Ergebnis Sitzung::serve(Freigabe& f) {
             continue;
         case Lesen::Ok: break;
         }
+        // Wiederholtes B (oder Z) der eben beendeten Transaktion: unsere Schlussquittung ging
+        // verloren — sie noch einmal schicken (gleiche Pruefung wie damals), statt abzuweisen.
+        if ((p.typ == 'B' || p.typ == 'Z') && letzterTyp_ == 'Y' && p.seq == letzteSeq_ && !letztes_.empty()) {
+            ++st_.wiederholungen;
+            sendeRoh(letztes_);
+            continue;
+        }
         bool ende = false;
         Ergebnis r = serverBefehl(p, f, ende);
         gesamt.dateien.insert(gesamt.dateien.end(), r.dateien.begin(), r.dateien.end());

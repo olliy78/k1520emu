@@ -96,6 +96,8 @@ SIGNATUREN: Dict[str, tuple] = {
     "k1520k_set_namen": (_I, [_H, _I, _I]),
     "k1520k_set_textmodus": (_I, [_H, _I]),
     "k1520k_set_fristen": (_I, [_H, _I, _I]),
+    "k1520k_set_tempo": (_I, [_H, ctypes.c_double]),
+    "k1520k_tempo": (ctypes.c_double, [_H]),
     "k1520k_set_max_namenslaenge": (_I, [_H, _I]),
     "k1520k_set_ueberschreiben": (_I, [_H, _I]),
     "k1520k_set_callbacks": (_I, [_H, PROGRESS_CB, EVENT_CB, ctypes.c_void_p]),
@@ -261,6 +263,14 @@ class Kermit:
 
     def set_fristen(self, paket_ms: int, max_wiederholungen: int = 10) -> None:
         self._pruefe(lib().k1520k_set_fristen(self._handle(), paket_ms, max_wiederholungen))
+
+    def set_tempo(self, tempo: float) -> None:
+        """Tempo der Gegenstelle (10 = Emulator mit 10x Takt); 0 = Automatik."""
+        self._pruefe(lib().k1520k_set_tempo(self._handle(), float(tempo)))
+
+    def tempo(self) -> float:
+        """Wirksames Tempo (Einstellung, sonst Schaetzung, sonst 1.0)."""
+        return float(lib().k1520k_tempo(self._handle()))
 
     def set_max_namenslaenge(self, n: int) -> None:
         self._pruefe(lib().k1520k_set_max_namenslaenge(self._handle(), n))

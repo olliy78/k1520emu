@@ -71,12 +71,32 @@ struct Einstellungen {
     bool attribute = true;       ///< CAPAS-Bit Attribute anbieten
     bool capas_senden = true;    ///< false: genau 9 Init-Felder (wie C-Kermit 4.2)
     int fenster = 1;             ///< angebotenes WINDO (0/1); gefahren wird immer 1
-    char qbin = 'Y';             ///< 'Y' bereit, 'N' nie, oder Praefix ('&')
+    /// 'Y' bereit, 'N' nie, oder Praefix ('&').  Vorgabe '&' (Befund K7): C-Kermit 4.2 schaltet das
+    /// 8-Bit-Praefix nur ein, wenn WIR ein Zeichen nennen, und die WEGA-Leitung tty0 loescht Bit 7
+    /// auf dem Weg PC → WEGA (getty-Einstellung) — mit 'Y' scheitert jedes Senden binaerer Daten.
+    char qbin = '&';
     char rept = '~';             ///< Wiederholungspraefix, 0 = aus
     char qctl = '#';
     int maxl = 94;               ///< angebotene Grenze normaler Pakete
-    int frist_ms = 10000;        ///< eigene Frist je Paket
-    bool frist_fest = false;     ///< true: TIME der Gegenstelle ignorieren
+    /// Paketfrist in der ZEIT DER GEGENSTELLE (bei Tempo 1 = Wirtszeit).  Die tatsaechliche
+    /// Wartezeit ist adaptiv (siehe `Sitzung::aktuelleFrist`): frist_ms / min(Tempo, 1) (eine
+    /// langsame Gegenstelle bekommt mehr Zeit, eine schnelle nicht weniger), mindestens
+    /// 4 x geglaettete Umlaufzeit, dieser Zuschlag hoechstens bis TIME der Gegenstelle (in ihrer
+    /// Zeit); begrenzt auf [frist_min_ms, frist_max_ms] Wirtszeit.  Jedes empfangene Byte
+    /// verlaengert die laufende Frist.
+    int frist_ms = 10000;
+    bool frist_fest = false;     ///< true: genau frist_ms Wirtszeit, keine Anpassung (alter Weg)
+    /// Geschwindigkeit der Gegenstelle gegenueber Echtzeit (Emulator mit 10x Takt = 10, unter
+    /// Last 0.5).  0 = Automatik: aus der Zeichenrate der Leitung geschaetzt (der Hub des
+    /// Emulators taktet die Gast-Baudrate in MASCHINENZEIT, Zeichen kommen also tempo-mal so
+    /// schnell wie die Baudrate) und aus der Umlaufzeit.
+    double tempo = 0.0;
+    int baud = 9600;             ///< Nenn-Baudrate der Gegenstelle (Grundlage der Tempo-Schaetzung)
+    int frist_min_ms = 1000;     ///< untere Grenze der adaptiven Frist (Wirtszeit)
+    int frist_max_ms = 600000;   ///< obere Grenze der adaptiven Frist (Wirtszeit)
+    /// Nach einer Transaktion, deren B WIR quittiert haben, vor dem naechsten Befehl so lange (Zeit der
+    /// Gegenstelle) auf das Leerlauf-N(0) eines C-Kermit-Servers warten; 0 = nicht warten.
+    int nachlauf_ms = 2000;
     int max_wiederholungen = 10;
     uint8_t eol = '\r';
     int npad = 0;
@@ -92,6 +112,21 @@ struct Einstellungen {
 struct Rueckrufe {
     std::function<void(const std::string& datei, int64_t bytes, int64_t gesamt)> fortschritt;
     std::function<void(const std::string& text)> ereignis;
+    /// Jedes Paket (Protokollfenster, Fehlersuche): gesendet/empfangen, Typ, Folgenummer, Datenfeld
+    /// (kodiert, wie auf der Leitung).  Wiederholungen erscheinen erneut.
+    std::function<void(bool gesendet, char typ, int seq, const std::string& daten)> paket;
+};
+
+/// Zaehler einer Sitzung (Messung K7: Wiederholungen, Verluste, Durchsatz).
+struct Statistik {
+    int pakete_gesendet = 0;     ///< alle Rahmen (auch Wiederholungen, NAKs)
+    int wiederholungen = 0;      ///< erneut gesendete Rahmen (Frist, NAK, Duplikat)
+    int naks_gesendet = 0;
+    int naks_empfangen = 0;
+    int fristen = 0;             ///< abgelaufene Paketfristen
+    int fehlerhaft = 0;          ///< verworfene Pakete (Pruefung, Form)
+    int64_t bytes_gesendet = 0;  ///< Leitungsbytes
+    int64_t bytes_empfangen = 0;
 };
 
 struct Ergebnis {
@@ -135,6 +170,22 @@ public:
 
     Einstellungen& einstellungen() { return e_; }
 
+    // --- Zeitverhalten (adaptive Fristen, Entwurf 36 §6.5) -------------------
+    /// Wirksames Tempo der Gegenstelle: Einstellung, sonst Schaetzung, sonst 1.
+    double tempo() const;
+    /// Geschaetztes Tempo aus der Zeichenrate (0 = noch keine Messung).
+    double tempoSchaetzung() const { return tempoSchaetzung_; }
+    /// Schaetzung vorbelegen (z. B. aus der Zeichenrate des Login-Textes).
+    void setzeTempoSchaetzung(double t) { if (t > 0) tempoSchaetzung_ = t; }
+    /// Geglaettete Umlaufzeit Paket → Quittung in ms Wirtszeit (0 = noch keine Messung).
+    double umlaufzeit() const { return srtt_; }
+    /// Aktuelle Paketfrist in ms Wirtszeit.
+    int64_t aktuelleFrist() const { return wartefrist(); }
+    /// Ausgehandelte Parameter der laufenden/letzten Transaktion.
+    const Vereinbarung& vereinbarung() const { return v_; }
+    const Statistik& statistik() const { return st_; }
+    void statistikZuruecksetzen() { st_ = {}; }
+
 private:
     // Paket-E/A
     enum class Lesen { Ok, Frist, Fehlerhaft, Getrennt, Abbruch };
@@ -177,6 +228,7 @@ private:
     Ergebnis iAustausch();
     Ergebnis befehl(char typ, const std::string& klartext, Ziel z);
     Ergebnis generisch(char unter, const std::vector<std::string>& args);
+    Ergebnis befehlG(const std::string& klartext);
 
     // Server
     Ergebnis serverBefehl(const Paket& p, Freigabe& f, bool& ende);
@@ -193,6 +245,20 @@ private:
     std::string letztes_;           ///< zuletzt gesendeter Rahmen (fuer Wiederholung)
     char letzterTyp_ = 0;
     int letzteSeq_ = -1;
+    // Zeitmessung
+    void tempoMessung(uint8_t b);   ///< je zugefuehrtem Byte (Rate innerhalb eines Pakets)
+    void umlaufMessung(int64_t gesendetMs);
+    double tempoSchaetzung_ = 0;
+    double srtt_ = 0;
+    int64_t pufZeit_ = 0;           ///< Ankunftszeit des aktuellen Lesepuffers
+    uint64_t pufNr_ = 0;            ///< laufende Nummer des Lesepuffers
+    bool messAktiv_ = false;
+    uint64_t messNr_ = 0;
+    int64_t messStart_ = 0, messEnde_ = 0;
+    int messBytes_ = 0;
+    double messSummeBytes_ = 0, messSummeMs_ = 0;   ///< gleitende Summen der Ratenmessung
+    Statistik st_;
+    bool nachlauf_ = false;         ///< zuletzt ein B quittiert (siehe leereEingang)
     std::atomic<bool> abbruch_{false};
     std::atomic<bool> abbruchDatei_{false};
     std::atomic<bool> abbruchGruppe_{false};

@@ -117,7 +117,9 @@ PaketZerleger::Ergebnis PaketZerleger::zufuehren(uint8_t b) {
         chkl_ = chktFuerTyp(paket_.typ, chkt_);
         if (len_ == 0) { z_ = Z::Lx1; return Ergebnis::Weiter; }
         // NAK: keine Daten, die Pruefungslaenge folgt aus LEN (C-Kermit-Heuristik)
-        if (paket_.typ == 'N' && len_ - 2 >= 1 && len_ - 2 <= 3) chkl_ = len_ - 2;
+        // B traegt ebenfalls nie Daten: so liest ein Server im Leerlauf (Pruefung 1) auch das
+        // wiederholte B einer Transaktion mit Pruefung 2/3, deren Schlussquittung verloren ging.
+        if ((paket_.typ == 'N' || paket_.typ == 'B') && len_ - 2 >= 1 && len_ - 2 <= 3) chkl_ = len_ - 2;
         if (len_ < 2 + chkl_) return fehler();
         datenLen_ = len_ - 2 - chkl_;
         z_ = datenLen_ > 0 ? Z::Daten : Z::Pruef;
@@ -151,6 +153,7 @@ PaketZerleger::Ergebnis PaketZerleger::zufuehren(uint8_t b) {
         if (static_cast<int>(pruef_.size()) < chkl_) return Ergebnis::Weiter;
         z_ = Z::Suche;
         if (pruef_ != blockpruefung(chkl_, bytes(roh_), roh_.size())) return Ergebnis::Fehlerhaft;
+        paket_.chkl = chkl_;
         return Ergebnis::Paket;
     }
     return Ergebnis::Weiter;

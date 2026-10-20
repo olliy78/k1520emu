@@ -22,6 +22,7 @@ sind nur nicht mehr in jeder einzelnen Anfrage geladen.
 | `kassette.md` | `core/cards/k5020/` + `core/peripherals/kassette/` + `installK5020` in allen Maschinen, `k1520_tape_*`, `--tape`, Debugger-Befehl `tape` — Kassette K5020/K5200 |
 | `lochstreifen.md` | `core/cards/k6022/` + `core/peripherals/lochstreifen/` + `installK6022` in allen Maschinen, `k1520_ptape_*`, Kasten „Lochstreifen“ — Lochstreifen K6022/SIF1000 (direkt hier angelegt; `CLAUDE.md` trägt nur den Kurzabsatz) |
 | `mc80.md` | `core/machines/mc80/` + `core/cards/mc80/`, `peripherals/mc80_tastatur`, `Z80CTC::setIntAusVerwirftAnforderung`, Programm `mc80emu` — sechste Maschine MC80.3x (direkt hier angelegt; `CLAUDE.md` trägt nur den Kurzabsatz „Sechste Maschine: MC80“) |
+| `kermit.md` | `kermit/` (Bibliothek `libk1520kermit`, C-ABI `k1520k_*`), `tools/k1520kermit.cpp`, `app/kermittool/`, WEGA-Gegenstelle C-Kermit 4.2 auf `disks/p8000_wega31` — Protokollregeln gegen C-Kermit 4.2, adaptive Fristen, Platteneinrichtung (direkt hier angelegt, AP K7) |
 
 ## Warum ausgelagert
 

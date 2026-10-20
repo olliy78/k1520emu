@@ -26,6 +26,14 @@ struct Lauf {
     std::string fenster;   ///< noch nicht ausgewertet (Kleinschrift)
     bool getrennt = false;
     bool abgebrochen = false;
+    // Ratenmessung: Bytes, die in einem zusammenhaengenden Strom NACH dem ersten Puffer kamen.
+    int64_t letzter = -1;
+    double messBytes = 0, messMs = 0;
+
+    /// Zeit in ms, geteilt durch ein ausdrueckliches Tempo.
+    int64_t z(int64_t ms) const {
+        return o.tempo > 0 ? std::max<int64_t>(1, static_cast<int64_t>(static_cast<double>(ms) / o.tempo)) : ms;
+    }
 
     bool stop() {
         if (o.abbruch && o.abbruch->load()) abgebrochen = true;
@@ -39,6 +47,16 @@ struct Lauf {
         if (n < 0) {
             getrennt = true;
             return false;
+        }
+        if (n > 0) {
+            const int64_t t = l.jetztMs();
+            // Luecke unter 50 ms (5 Zeichenzeiten bei 9600 Bd und Tempo 1): derselbe Strom.
+            // Rechenpausen des Gastes darin senken die Rate — die Schaetzung bleibt vorsichtig.
+            if (letzter >= 0 && t - letzter < z(50) && t > letzter) {
+                messBytes += n;
+                messMs += static_cast<double>(t - letzter);
+            }
+            letzter = t;
         }
         for (int i = 0; i < n; ++i) {
             const char c = static_cast<char>(buf[i] & 0x7F);   // Bit 7 VOR dem Vergleich
@@ -66,10 +84,42 @@ struct Lauf {
     bool sende(const std::string& s) {
         return l.schreiben(reinterpret_cast<const uint8_t*>(s.data()), s.size());
     }
+
+    /// Liest, bis eines der Muster kommt; die Frist ist eine Frist der STILLE (jedes Zeichen
+    /// setzt sie neu).  -1 = Frist, -2 = Abbruch/getrennt.
+    int warte(const std::vector<std::string>& m, int64_t stilleMs) {
+        int64_t ende = l.jetztMs() + stilleMs;
+        for (;;) {
+            if (stop() || getrennt) return -2;
+            const int w = suche(m);
+            if (w >= 0) return w;
+            const int64_t rest = ende - l.jetztMs();
+            if (rest <= 0) return -1;
+            if (lies(rest)) ende = l.jetztMs() + stilleMs;
+        }
+    }
+
+    /// Liest, bis die Leitung `stilleMs` still war (hoechstens `maxMs`).  false = Abbruch/getrennt.
+    bool ruhe(int64_t stilleMs, int64_t maxMs) {
+        const int64_t ende = l.jetztMs() + maxMs;
+        while (l.jetztMs() < ende) {
+            if (stop()) return false;
+            if (!lies(std::min<int64_t>(stilleMs, std::max<int64_t>(1, ende - l.jetztMs())))) break;
+        }
+        return !getrennt && !abgebrochen;
+    }
+
+    void messung(LoginErgebnis& e) const {
+        if (messBytes >= 64 && messMs > 0) {
+            e.zeichen_pro_s = messBytes * 1000.0 / messMs;
+            if (o.baud > 0) e.tempo = std::clamp(e.zeichen_pro_s / (o.baud / 10.0), 0.01, 1000.0);
+        }
+    }
 };
 
 LoginErgebnis fehler(Lauf& r, const std::string& grund) {
     LoginErgebnis e;
+    r.messung(e);
     e.gelesen = sichtbarMachen(r.alles, std::string::npos);
     e.text = "Anmeldung fehlgeschlagen: " + grund + "; zuletzt gelesen: \"" + sichtbarMachen(r.alles) + "\"";
     return e;
@@ -97,34 +147,39 @@ std::string sichtbarMachen(const std::string& roh, std::size_t max) {
 
 LoginErgebnis loginSkript(Leitung& l, const LoginOptionen& o) {
     Lauf r{l, o, {}, {}, false, false};
-    const int64_t t0 = l.jetztMs();
-
     auto grundAbbruch = [&](const char* was) -> LoginErgebnis {
         if (r.getrennt) return fehler(r, std::string("Leitung getrennt (") + was + ")");
         return fehler(r, std::string("abgebrochen (") + was + ")");
     };
+    auto fertig = [&]() {
+        LoginErgebnis e;
+        e.ok = true;
+        r.messung(e);
+        e.gelesen = sichtbarMachen(r.alles, std::string::npos);
+        return e;
+    };
 
-    // 1. RETURN, bis „login:" erscheint.
+    // 1. RETURN, bis „login:" erscheint.  Wiederholt wird nur, wenn die Leitung
+    //    `return_abstand_ms` still war; die Gesamtfrist zaehlt nur stille Zeit.
     {
-        const int64_t ende = t0 + o.frist_login_ms;
+        int64_t still = 0;
         bool da = false;
         while (!da) {
             if (r.stop() || r.getrennt) return grundAbbruch("warte auf login:");
-            if (l.jetztMs() >= ende) return fehler(r, "kein \"login:\" innerhalb der Frist");
+            if (still >= r.z(o.frist_login_ms)) return fehler(r, "kein \"login:\" innerhalb der Frist");
             if (!r.sende("\r")) {
                 r.getrennt = true;
                 return grundAbbruch("warte auf login:");
             }
-            const int64_t bis = std::min<int64_t>(ende, l.jetztMs() + o.return_abstand_ms);
-            while (l.jetztMs() < bis) {
-                r.lies(std::max<int64_t>(1, bis - l.jetztMs()));
-                if (r.stop() || r.getrennt) return grundAbbruch("warte auf login:");
-                if (r.suche({"login:"}) >= 0) {
-                    da = true;
-                    break;
-                }
-            }
+            const int64_t t0 = l.jetztMs();
+            const int w = r.warte({"login:"}, r.z(o.return_abstand_ms));
+            if (w == -2) return grundAbbruch("warte auf login:");
+            if (w >= 0) da = true;
+            else still += std::max<int64_t>(1, l.jetztMs() - t0);
         }
+        // Weitere Antworten auf gestaute RETURN abwarten (ein zweites „login:" nach dem
+        // Namen saehe sonst wie eine Ablehnung aus).
+        if (!r.ruhe(r.z(o.ruhe_ms), r.z(o.ruhe_max_ms))) return grundAbbruch("warte auf login:");
     }
 
     // 2. Name senden, „Password:" abwarten.
@@ -135,15 +190,9 @@ LoginErgebnis loginSkript(Leitung& l, const LoginOptionen& o) {
     }
     const std::vector<std::string> nachName = {"password:", o.server_text, "login incorrect", "login:"};
     if (o.mit_kennwort) {
-        const int64_t ende = l.jetztMs() + o.frist_kennwort_ms;
-        int w = -1;
-        while (w < 0) {
-            if (r.stop() || r.getrennt) return grundAbbruch("warte auf Password:");
-            const int64_t rest = ende - l.jetztMs();
-            if (rest <= 0) return fehler(r, "kein \"Password:\" nach dem Namen innerhalb der Frist");
-            r.lies(rest);
-            w = r.suche(nachName);
-        }
+        const int w = r.warte(nachName, r.z(o.frist_kennwort_ms));
+        if (w == -2) return grundAbbruch("warte auf Password:");
+        if (w == -1) return fehler(r, "kein \"Password:\" nach dem Namen innerhalb der Frist");
         if (w == 2 || w == 3) return fehler(r, "Name \"" + o.name + "\" abgelehnt (login: erscheint erneut)");
         if (w == 0) {
             r.fenster.clear();
@@ -157,44 +206,21 @@ LoginErgebnis loginSkript(Leitung& l, const LoginOptionen& o) {
         }
     }
 
-    if (!o.auf_server_warten) {
-        LoginErgebnis e;
-        e.ok = true;
-        e.gelesen = sichtbarMachen(r.alles, std::string::npos);
-        return e;
-    }
+    if (!o.auf_server_warten) return fertig();
 
     // 3. Auf den Serverbeginn warten.  „Choose one"/„New password" = Benutzer ohne Kennwort.
     {
-        const int64_t ende = l.jetztMs() + o.frist_server_ms;
         const std::vector<std::string> m = {o.server_text, "login incorrect", "choose one", "new password", "login:"};
-        int w = -1;
-        while (w < 0) {
-            if (r.stop() || r.getrennt) return grundAbbruch("warte auf den Serverbeginn");
-            const int64_t rest = ende - l.jetztMs();
-            if (rest <= 0) return fehler(r, "kein Serverbeginn (\"" + o.server_text + "\") innerhalb der Frist");
-            r.lies(rest);
-            w = r.suche(m);
-        }
+        const int w = r.warte(m, r.z(o.frist_server_ms));
+        if (w == -2) return grundAbbruch("warte auf den Serverbeginn");
+        if (w == -1) return fehler(r, "kein Serverbeginn (\"" + o.server_text + "\") innerhalb der Frist");
         if (w == 1 || w == 4) return fehler(r, "Kennwort abgelehnt (Login incorrect)");
         if (w == 2 || w == 3) return fehler(r, "Benutzer hat kein Kennwort (System fordert ein neues)");
     }
 
     // 4. Ruhe: den Rest des Banners lesen, bis die Leitung `ruhe_ms` still war.
-    {
-        const int64_t ende = l.jetztMs() + o.ruhe_max_ms;
-        while (l.jetztMs() < ende) {
-            if (r.stop()) return grundAbbruch("warte auf Ruhe");
-            if (!r.lies(o.ruhe_ms)) break;
-            if (r.getrennt) return grundAbbruch("warte auf Ruhe");
-        }
-        if (r.getrennt) return grundAbbruch("warte auf Ruhe");
-    }
-
-    LoginErgebnis e;
-    e.ok = true;
-    e.gelesen = sichtbarMachen(r.alles, std::string::npos);
-    return e;
+    if (!r.ruhe(r.z(o.ruhe_ms), r.z(o.ruhe_max_ms))) return grundAbbruch("warte auf Ruhe");
+    return fertig();
 }
 
 }  // namespace k1520::kermit

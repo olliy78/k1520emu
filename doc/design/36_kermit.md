@@ -3,7 +3,7 @@
 Stand 2026-10-18, Zweig `kermit` (von `P8000`).  Zwei Teile: **(A)** Kermit auf der WEGA-3.1-Platte
 einrichten (Server hinter `getty`, Client in der Shell), **(B)** ein eigenes Kermit für den PC
 (C++-Bibliothek + Kommandozeile + Python/Qt-Oberfläche), Client **und** Server.
-Merkposten (nach AP K8): `doc/merkposten/kermit.md`.
+Merkposten (seit AP K7): `doc/merkposten/kermit.md`.
 
 ## 1. Befund (2026-10-18, gemessen)
 
@@ -51,8 +51,8 @@ Merkposten (nach AP K8): `doc/merkposten/kermit.md`.
 |---|---|
 | Binary | zuerst das mitgelieferte (`kermit`) — Probe im Emulator (startet es, `?`-Hilfe, `show`). Läuft es nicht: aus den Quellen mit `make sys3` auf WEGA bauen (`cc` vorhanden), sonst Quellenstand 070 versuchen. |
 | Ort | `/usr/bin/kermit` (md0, PATH enthält `/usr/bin`), Rechte `4755 root` wie auf der Diskette (Sperrdateien); Handbuch `ckermi.man` → `/usr/man/man1/kermit.1`; Quellen nicht auf die Platte (Platz). |
-| Server-Benutzer | `kermit` in `/etc/passwd`: uid ≠ 0 bevorzugt (Prüfen: Kermit braucht root nur für Sperrdateien; uid 7 `kermit`, gid 1), Kennwort **`kermit`** (Stand K1: ein leeres Kennwort geht nicht — System-III-`login` verlangt dann „Choose one“; das Login-Skript sendet Name und Kennwort; getty meldet sich nach der Sitzung mit gerader Parität, Bit 7 vor dem Vergleich löschen), Home `/usr/kermit`, Shell `/usr/bin/kermit`. |
-| Start | `/usr/kermit/.kermrc`: `set ...` (Baud/Parität/Dateinamen wie in §5) dann `server`, danach `exit`.  Wenn `.kermrc` nicht gelesen wird oder `server` Ende nicht abmeldet: Rückfall `kermitd`. |
+| Server-Benutzer | `kermit` in `/etc/passwd`: uid ≠ 0 bevorzugt (Prüfen: Kermit braucht root nur für Sperrdateien; uid 7 `kermit`, gid 1), Kennwort **`kermit`** (Stand K1: ein leeres Kennwort geht nicht — System-III-`login` verlangt dann „Choose one“; das Login-Skript sendet Name und Kennwort; getty meldet sich nach der Sitzung mit gerader Parität, Bit 7 vor dem Vergleich löschen), Home `/usr/kermit`, Shell **`/bin/sh`** mit `.profile` = `exec /usr/bin/kermit` (K7: C-Kermit führt `G D/E/T` über die Login-Shell aus — mit Shell `/usr/bin/kermit` kam die Gebrauchsanweisung statt `ls -l`). |
+| Start | `/usr/kermit/.kermrc`: `set file type binary`, `server`, `exit` (K7: **kein** `set file names literal` — damit gibt C-Kermit 4.2 keine Datei her, §6.5). |
 | Client am WEGA | Anmelden wie gewohnt (Konsole/tty0/tty2), `kermit`, `set line /dev/tty3`, `set baud 9600`, `send`/`get`/`remote dir` gegen den PC-Server — als Text in `README`/Handbuch `Kermit` beschreiben, kein Gastcode. |
 | Platte | `disks/p8000_wega31/p8000_wega31_platte.avr.img.gz` **einmal** neu packen, nachdem K1 grün ist (jede Fassung ≈ 6 MB in der Git-Historie); `disks/p8000_wega31/README.md` und `doc/p8000/` ergänzen.  Das Paket zieht die Datei automatisch mit. |
 | Einspielen | über das DiskTool (`k1520disktool put <abbild> --as md0/bin/kermit`, `attr` für Rechte/Besitzer; Platte ist schreibgeschützt bis `--force`/Freigabe, vorher `<abbild>~`-Sicherung), **nicht** über einen Emulatorlauf — reproduzierbar und billig. Anschließend Probe am laufenden WEGA (Test, s. K1/K7). |
@@ -157,9 +157,11 @@ Aufbau wie das DiskTool (`doc/design/13_k1520disktool.md`, `doc/design/11_python
 
 ## 5. Festlegungen (Vorgaben, begründet)
 
-1. **Prüfsumme:** Vorschlag 3 (CRC-16); Rückfall durch Aushandlung.  C-Kermit 4.2 beherrscht 1–3.
-2. **8-Bit:** QBIN `Y`-Aushandlung; ist die Leitung nicht 8-bit-sauber, einigt man sich auf `&` (Präfix).  Im Emulator
-   gemessen (K7), nicht angenommen.
+1. **Prüfsumme:** Vorschlag 3 (CRC-16); Rückfall durch Aushandlung.  C-Kermit 4.2 beherrscht 1–3 und spiegelt den
+   Vorschlag (gemessen K7, §6.5).
+2. **8-Bit:** QBIN-Vorschlag **`&`** (seit K7; vorher `Y`).  C-Kermit 4.2 präfixt nur, wenn die Gegenseite ein
+   Zeichen nennt, und tty0 des WEGA löscht Bit 7 auf dem Weg PC → WEGA — mit `Y` scheitert jedes binäre Senden
+   (gemessen K7, §6.5).
 3. **Paketlänge:** 94 (Grundprotokoll) bis 1000 (Langpaket) je nach Gegenstelle; C-Kermit 4.2 kann keine
    Langpakete — erwartet wird 94.
 4. **Namen:** Senden literal (`readme` bleibt `readme`), Empfangen **konvertiert** wie C-Kermit (`README` → `readme`),
@@ -403,6 +405,74 @@ Festlegungen und Abweichungen vom Entwurf, mit Grund:
 **Offen:** keine Pixel-/Drag&Drop-Ereignisprüfung (offscreen nicht möglich; nur Auswertung und Annahmemethoden);
 Login-Skript in der GUI nur über die CLI/C++-Tests gegen eine getty-Attrappe belegt, nicht in `test_kermit_gui`;
 Paket/Windows (K9); Gegenprobe am echten C-Kermit im Emulator (K7).
+
+### 6.5 Stand K7 (2026-10-19) — Gegenprobe am echten C-Kermit 4.2
+
+**Test:** `tests/system/test_p8000_wega_kermit_austausch.cpp` (Label `wega_install`; `tools/dev.sh test-wega -R Kermit`):
+`P8000WegaKermit.PcClientGegenWegaServer` (Fall 1), `.WegaClientGegenPcServer` (Fall 2), `.PruefsummenUnd8Bit`,
+`.VerbindungsabbruchUndWiederaufnahme`, `Takt/P8000WegaKermitTempo.AdaptiveFristen/{frei,echtzeit,last}`, Werkzeug
+`.DISABLED_SendenEinzeln`.  Start aus einem eigenen eingefrorenen Zustand `kermit31_k7_vN` (Plattenkopie + Testdateien
+per DiskTool + Kaltstart; baut sich beim ersten Lauf in ~60 s Rechenzeit, ein Stempel erzwingt den Neubau, wenn sich die
+Platte ändert); danach kostet jeder Fall 30–250 s Wirtszeit statt 87 s Boot.  Fall 1: Maschine im eigenen Faden
+(`Motor`, frei oder gedrosselt), Bibliothek im Testfaden; Fall 2 umgekehrt.
+
+**Bewiesen (grün):** Fall 1 — Login-Skript gegen getty, `G D` (WEGA-`ls -l`, `zerlegeLsListe` liest alle Testdateien mit
+richtiger Größe), `G C`, `R` von 0 B/1 B/94 B/95 B/Text/4 KB (alle 256 Werte)/100 KB zufällig, `S` 100 KB nach `/tmp` und
+byte­gleich zurück, `G E`, Name > 14 Zeichen (Bibliothek lehnt ab; ohne Grenze kürzt WEGA stumm auf 14), Namensumsetzung
+(Server sendet groß, Empfang konvertiert → klein, literal → groß; gesendete Namen schreibt C-Kermit klein), Abbruch mitten
+in der Datei beim Holen (X, keine halbe Datei beim PC) und beim Senden (Z „D", C-Kermit verwirft die Datei), `G F` und
+`G L` (getty meldet sich wieder), zweite Anmeldung auf derselben Verbindung.  Fall 2 — `kermit` an der Konsole,
+`set line /dev/tty3` (Hub-Kanal als Telnet-**Client** zum `Sitzung::serve` der Bibliothek: geht), `send` Text (kommt mit
+CR LF an, C-Kermit-Vorgabe Text) und binär, `get`, Rücksendung bytegleich, `remote directory`, `remote cwd` (fragt nach
+einem Kennwort), `finish` beendet den PC-Server.
+
+**Messwerte** (P8000 Vollgerät, tty0 bzw. tty3 am Hub, 9600 Bd, Paketlänge 94 — C-Kermit 4.2 kennt keine Langpakete):
+
+| | Befund |
+|---|---|
+| (a) 8-Bit | **WEGA → PC sauber**, **PC → WEGA nicht** (tty0 löscht Bit 7 — getty-Einstellung bleibt nach `login`; 4 Wiederholungen, dann „Zu viele Wiederholungen").  Aushandlung real: unser `Y` + C-Kermits `Y` ⇒ kein Präfix (C-Kermit präfixt ohne eigene Parität nur, wenn die Gegenseite ein Zeichen nennt); unser `&` ⇒ C-Kermit antwortet `&`, Präfix aktiv.  tty3 (Fall 2): mit `&` des PC-Servers gefahren, nicht roh geprüft. |
+| (b) Prüfsumme | C-Kermit 4.2 spiegelt 1/2/3.  Mit QBIN `&`: 1, 2, 3 in beiden Richtungen grün.  Ohne Präfix WEGA → PC: 1 und 3 grün, **2 scheitert** (5 beschädigte Pakete) — gemessen bestätigt: das WEGA-`cc` hat vorzeichenbehaftetes `char`, `chk2()` summiert `char`; Typ 1 und 3 sind rechnerisch unberührt (Nachbildung `KermitPaket.Ck42VorzeichenbehaftetesCharTrifftNurTyp2`).  Vorgabe der Bibliothek bleibt **3**. |
+| (c) Durchsatz | Maschinenzeit: R 100 KB zufällig 269 B/s, S 100 KB 328 B/s, R 4 KB roh 393 B/s, R Text 434 B/s (Grenze 9600 Bd ≈ 960 B/s; der Rest ist Rechenzeit des U8001 je Stop-and-Wait-Paket).  Wirtszeit bei freier Maschine (≈ 5,5×): 1384 / 1564 B/s.  `G D` (fork + `ls -l`): 3,9 s Maschinenzeit. |
+| (d) Fristen/Tempo | Tempo-Schätzung aus der Zeichenrate: frei 5,26 (Ist ≈ 5,7), 1× (gedrosselt) 0,87, 0,3× 0,26; Login-Schätzung vorsichtig zu klein (1,0 / 0,38 / 0,13, Rechenpausen des Gastes im Text).  Wirksame Paketfrist 10 s / 11,5 s / 38,5 s Wirtszeit, Umlaufzeit 12 / 65 / 216 ms, **0 Wiederholungen** in allen drei.  Anmeldung ≈ 12 s Maschinenzeit bis zum Serverbeginn.  10× ist im Test nicht einstellbar (die Maschine schafft frei ≈ 5,5×) — 10×/0,1× sind mit der virtuellen Uhr nachgebildet (`KermitTempo.*`). |
+| (e) Trennung | Socket mitten in `R` geschlossen: Bibliothek meldet `LeitungGetrennt`, keine halbe Datei.  C-Kermit bleibt in der Transaktion und NAKt das nächste Datenpaket (N25), ohne Eingriff bis MAXTRY × (TIME + Leerpause) > 120 s Maschinenzeit; kein SIGHUP über den Hub.  Neuer Client: bricht sie mit einem E-Paket (in der Prüfung der alten Transaktion) ab, danach sofort bedienbereit, ohne neue Anmeldung. |
+| (f) Zeichenverlust | Keiner: 0 beschädigte Pakete über je 100 KB in beide Richtungen bei freier Maschine; alle Wiederholungen ließen sich auf Protokollursachen zurückführen (unten). |
+
+**Gefundene Fehler und Eigenheiten — behoben:**
+
+1. WEGA-Platte (zweite Fassung): Shell des Benutzers `kermit` `/bin/sh` + `.profile` `exec /usr/bin/kermit`, weil
+   C-Kermit `G D/E/T/U/W` über die Login-Shell aus `passwd` ausführt (sonst Gebrauchsanweisung statt `ls -l`); `set file
+   names literal` aus `.kermrc` gestrichen, weil `sfile()` dann den uninitialisierten Paketnamen in den Dateinamen kopiert
+   (jedes `R`: „Can't open file").  `doc/p8000/kermit_wega.md` §6.
+2. Bibliothek, Vorgabe **QBIN `&`** statt `Y` (a).
+3. Sender wiederholt sofort bei einer Quittung für das VORIGE Paket (C-Kermits Antwort auf ein beschädigtes Paket) und bei
+   einem wiederholten Paket der Gegenstelle; N(n+1) ist für S/I keine Quittung.
+4. Leerlauf-NAK: das erste N(0) auf I/S/G/R wird nicht beantwortet (sonst doppeltes Y(0), als Antwort auf das nächste
+   Paket missdeutet), ab dem zweiten wiederholt.  **Nachlauf:** hat der Client zuletzt ein B quittiert, wartet er vor dem
+   nächsten Befehl (auch vor S) auf dieses N(0), höchstens `nachlauf_ms` = 2 s Zeit der Gegenstelle — C-Kermit leert nach
+   jedem guten Paket seinen Eingang (`rpack` → `ttflui`) und verschluckte sonst das sofort folgende I/S.
+5. Server wiederholt die Schlussquittung auf ein wiederholtes B (auch bei Prüfung 2/3; B wird über die Länge gelesen).
+6. `G C` ohne Pfad trägt ein leeres Feld (C-Kermit `cwd()` liest die Feldlänge ungeprüft).
+7. Alte Transaktion der Gegenstelle nach Trennung: E-Paket mit ihrer Prüfungslänge (e).
+
+**Zeitverhalten (Anforderung „übertaktete Gegenstellen"):** `Einstellungen::tempo` (0 = Automatik), `baud`,
+`frist_min_ms`/`frist_max_ms`, `nachlauf_ms`; `frist_ms` gilt in der Zeit der Gegenstelle.  Wirksam: `frist_ms /
+min(Tempo, 1)`, mindestens 4 × geglättete Umlaufzeit (Karn: nur unwiederholte Pakete), dieser Zuschlag höchstens bis TIME
+der Gegenstelle / Tempo; jedes empfangene Byte verlängert die laufende Frist.  Eine schnelle Gegenstelle bekommt **keine
+kürzere** Frist — sie heilt mit ihrer eigenen; gleich lange Fristen kreuzten die Wiederholungen (virtuelle Uhr: 122 statt
+0).  TIME der Gegenstelle ist nur noch Obergrenze (früher direkt die Wirtszeitfrist).  Login: Fristen der Stille, RETURN
+nur bei stiller Leitung, Ruhe nach `login:`, ausdrückliches Tempo teilt alle Zeiten, Zeichenrate → `LoginErgebnis::tempo`
+→ Startwert der Sitzung.  C-ABI additiv `k1520k_set_tempo`/`k1520k_tempo` (Bindung `set_tempo`/`tempo`), CLI `--tempo
+auto|F`, Paketrückruf `Rueckrufe::paket` (Protokollfenster, Fehlersuche `K1520_KERMIT_PAKETE=1`), Zähler `Statistik`.
+Unit-Tests `tests/unit/kermit/test_kermit_tempo.cpp` (10× und 0,1× mit `SpeicherLeitungPaar::setzeZeichenzeit`).
+
+**Gemessen vs. angenommen:** gemessen ist alles in der Tabelle und in den Punkten 1–7 (je ein Wächter, Liste in
+`doc/merkposten/kermit.md`).  Nur aus den Quellen gelesen, nicht im Emulator ausgelöst: der Speicherfehler bei `G C` ohne
+Feld; die `leftover`-Reste in `getpkt()` nach einem abgebrochenen Senden des C-Kermit (einmal beobachtet: Dateiname mit
+fremdem Byte davor, nach einem gescheiterten Roh-Transfer; die Messung schaltet ihn mit einem `G D` ab, die Bibliothek
+filtert solche Namen nicht); Verhalten bei Parität ≠ none.
+
+**Offen:** echte 10×-Messung (Maschine zu langsam im Test); tty3 ohne Präfix nicht vermessen; Namensfilter gegen
+Steuer-/8-Bit-Bytes im empfangenen Dateinamen; Windows-Lauf der neuen Tests.
 
 ## 7. Risiken
 

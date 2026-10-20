@@ -35,34 +35,107 @@ Sitzung::Sitzung(Leitung& l, Einstellungen e, Rueckrufe r) : l_(l), e_(std::move
 // ─── Paket-E/A ─────────────────────────────────────────────────────────────
 
 Sitzung::Lesen Sitzung::lesePaket(Paket& p, int64_t fristMs) {
-    const int64_t ende = l_.jetztMs() + fristMs;
+    // Die Frist laeuft ab dem letzten EMPFANGENEN Byte: solange Zeichen kommen, ist die
+    // Gegenstelle am Werk (eine langsame Gegenstelle braucht fuer ein langes Paket laenger).
+    int64_t ende = l_.jetztMs() + fristMs;
     zerleger_.setzeChkt(chkt_);
     for (;;) {
         if (abbruch_) return Lesen::Abbruch;
         while (pufPos_ < puffer_.size()) {
-            const auto r = zerleger_.zufuehren(puffer_[pufPos_++]);
+            const uint8_t b = puffer_[pufPos_++];
+            tempoMessung(b);
+            const auto r = zerleger_.zufuehren(b);
             if (r == PaketZerleger::Ergebnis::Paket) {
                 p = zerleger_.paket();
+                if (r_.paket) r_.paket(false, p.typ, p.seq, p.daten);
+                if (messAktiv_) {
+                    messAktiv_ = false;
+                    const int64_t dauer = messEnde_ - messStart_;
+                    // Rate nur aus Bytes, die NACH dem Puffer mit dem Paketanfang kamen:
+                    // so kostet ein gebuendelt geliefertes Paket keine falsche (zu hohe) Rate.
+                    if (messBytes_ >= 16 && dauer >= 5 && e_.baud > 0) {
+                        messSummeBytes_ = 0.7 * messSummeBytes_ + messBytes_;
+                        messSummeMs_ = 0.7 * messSummeMs_ + static_cast<double>(dauer);
+                        const double rate = messSummeBytes_ * 1000.0 / messSummeMs_;   // Bytes/s Wirtszeit
+                        tempoSchaetzung_ = std::clamp(rate / (e_.baud / 10.0), 0.01, 1000.0);
+                    }
+                }
                 return Lesen::Ok;
             }
-            if (r == PaketZerleger::Ergebnis::Fehlerhaft) return Lesen::Fehlerhaft;
+            if (r == PaketZerleger::Ergebnis::Fehlerhaft) {
+                if (r_.paket) r_.paket(false, '?', -1, "");
+                messAktiv_ = false;
+                ++st_.fehlerhaft;
+                return Lesen::Fehlerhaft;
+            }
         }
         puffer_.clear();
         pufPos_ = 0;
         const int64_t rest = ende - l_.jetztMs();
         if (rest <= 0) {
             zerleger_.zuruecksetzen();
+            messAktiv_ = false;
+            ++st_.fristen;
             return Lesen::Frist;
         }
         uint8_t b[512];
         const int n = l_.lesen(b, sizeof b, rest);
         if (abbruch_) return Lesen::Abbruch;
         if (n < 0) return Lesen::Getrennt;
+        if (n > 0) {
+            pufZeit_ = l_.jetztMs();
+            ++pufNr_;
+            st_.bytes_empfangen += n;
+            ende = std::max(ende, pufZeit_ + fristMs);
+        }
         puffer_.assign(b, b + n);
     }
 }
 
+void Sitzung::tempoMessung(uint8_t b) {
+    if (b == SOH) {
+        messAktiv_ = true;
+        messNr_ = pufNr_;
+        messStart_ = messEnde_ = pufZeit_;
+        messBytes_ = 0;
+        return;
+    }
+    if (messAktiv_ && pufNr_ != messNr_) {
+        ++messBytes_;
+        messEnde_ = pufZeit_;
+    }
+}
+
+void Sitzung::umlaufMessung(int64_t gesendetMs) {
+    const double r = static_cast<double>(std::max<int64_t>(0, l_.jetztMs() - gesendetMs));
+    srtt_ = srtt_ <= 0 ? r : 0.875 * srtt_ + 0.125 * r;
+}
+
+double Sitzung::tempo() const {
+    if (e_.tempo > 0) return e_.tempo;
+    if (tempoSchaetzung_ > 0) return tempoSchaetzung_;
+    return 1.0;
+}
+
 void Sitzung::leereEingang() {
+    // Nachlauf (Befund K7): C-Kermit 4.2 leert nach JEDEM guten Paket seinen Eingang (rpack:
+    // ttflui).  Haben wir eben das B quittiert, liest es unser Y(B), leert den Eingang und
+    // meldet sich dann mit seinem Leerlauf-N(0) — ein sofort hinterhergeschicktes I geriet in
+    // dieses Leeren und ging verloren.  Deshalb auf das N warten (hoechstens nachlauf_ms in der
+    // Zeit der Gegenstelle).
+    if (nachlauf_ && e_.nachlauf_ms > 0) {
+        nachlauf_ = false;
+        const int64_t ende = l_.jetztMs() + static_cast<int64_t>(e_.nachlauf_ms / tempo());
+        for (;;) {
+            const int64_t rest = ende - l_.jetztMs();
+            if (rest <= 0) break;
+            Paket p;
+            const Lesen r = lesePaket(p, rest);
+            if (r == Lesen::Getrennt || r == Lesen::Abbruch || r == Lesen::Frist) break;
+            if (r == Lesen::Ok && p.typ == 'N') break;
+        }
+    }
+    nachlauf_ = false;
     puffer_.clear();
     pufPos_ = 0;
     zerleger_.zuruecksetzen();
@@ -72,6 +145,20 @@ void Sitzung::leereEingang() {
 }
 
 bool Sitzung::sendeRoh(const std::string& rahmen) {
+    ++st_.pakete_gesendet;
+    if (r_.paket) {
+        const std::size_t i = rahmen.find(static_cast<char>(SOH));
+        if (i != std::string::npos && i + 3 < rahmen.size()) {
+            const bool lang = unchar(rahmen[i + 1]) == 0;
+            const std::size_t d0 = i + (lang ? 7 : 4);
+            const int len = unchar(rahmen[i + 1]);
+            const std::size_t chkl = static_cast<std::size_t>(chktFuerTyp(rahmen[i + 3], chkt_));
+            std::string daten;
+            if (!lang && len >= 2 && d0 <= rahmen.size()) daten = rahmen.substr(d0, std::max(0, len - 2 - static_cast<int>(chkl)));
+            r_.paket(true, rahmen[i + 3], unchar(rahmen[i + 2]), daten);
+        }
+    }
+    st_.bytes_gesendet += static_cast<int64_t>(rahmen.size());
     return l_.schreiben(reinterpret_cast<const uint8_t*>(rahmen.data()), rahmen.size());
 }
 
@@ -90,8 +177,20 @@ void Sitzung::sendeFehler(const std::string& text) {
 }
 
 int64_t Sitzung::wartefrist() const {
-    if (!e_.frist_fest && v_.time > 0) return static_cast<int64_t>(v_.time) * 1000;
-    return e_.frist_ms;
+    if (e_.frist_fest) return e_.frist_ms;
+    const double t = tempo();
+    // Das Tempo VERLAENGERT die Frist bei einer langsamen Gegenstelle (frist_ms gilt in ihrer
+    // Zeit), verkuerzt sie aber nicht bei einer schnellen: die heilt mit ihrer eigenen Frist
+    // (TIME in ihrer Zeit) ohnehin schneller, und gleich lange Fristen auf beiden Seiten
+    // kreuzen ihre Wiederholungen (gemessen: 122 statt 0 Wiederholungen, test_kermit_tempo).
+    const double basis = e_.frist_ms / std::min(t, 1.0);
+    double f = basis;
+    if (srtt_ > 0) f = std::max(f, 4.0 * srtt_);
+    // TIME der Gegenstelle (in IHRER Zeit) ist nur eine Obergrenze — fuer den Zuschlag aus der
+    // Umlaufzeit; laenger als sie selbst wartet, bringt das Warten nichts.
+    if (v_.time > 0) f = std::min(f, std::max(v_.time * 1000.0 / t, basis));
+    const double lo = std::max(1, e_.frist_min_ms), hi = std::max(e_.frist_min_ms, e_.frist_max_ms);
+    return static_cast<int64_t>(std::clamp(f, lo, hi));
 }
 
 InitParameter Sitzung::meineParameter() const {
@@ -133,19 +232,23 @@ Ergebnis Sitzung::ausAntwort(const Antwort& a) {
 
 Sitzung::Antwort Sitzung::sendeUndWarte(char typ, int seq, const std::string& daten) {
     Antwort a;
+    const int64_t gesendet = l_.jetztMs();
     if (!sende(typ, seq, daten)) {
         a.art = Fehlerart::LeitungGetrennt;
         a.text = "Leitung getrennt";
         return a;
     }
-    int versuche = 0;
+    int versuche = 0, naks0 = 0;
     auto nochmal = [&](bool wiederholen) {
         if (++versuche > e_.max_wiederholungen) {
             a.art = Fehlerart::Zeitueberschreitung;
             a.text = "Zu viele Wiederholungen";
             return false;
         }
-        if (wiederholen) sendeRoh(letztes_);
+        if (wiederholen) {
+            ++st_.wiederholungen;
+            sendeRoh(letztes_);
+        }
         return true;
     };
     for (;;) {
@@ -165,15 +268,35 @@ Sitzung::Antwort Sitzung::sendeUndWarte(char typ, int seq, const std::string& da
             return a;
         }
         if (p.typ == 'Y' && p.seq == (seq & 63)) {
+            if (versuche == 0) umlaufMessung(gesendet);   // nur ohne Wiederholung (Karn)
             a.paket = p;
             return a;
         }
-        if (p.typ == 'N' && p.seq == ((seq + 1) & 63)) {   // NAK fuer das naechste = Quittung
+        if (p.typ == 'N') ++st_.naks_empfangen;
+        // NAK fuer das naechste = Quittung — nur nicht fuer S/I: deren Quittung traegt die
+        // Parameter der Gegenstelle; ein leeres Ersatz-Y stellte die Blockpruefung auf 1, waehrend
+        // die Gegenstelle schon die ausgehandelte faehrt (Befund K7: endlos „beschaedigt").
+        if (p.typ == 'N' && p.seq == ((seq + 1) & 63) && typ != 'S' && typ != 'I') {
             a.paket = Paket{'Y', seq & 63, ""};
             return a;
         }
         if (p.typ == typ && p.seq == (seq & 63)) continue;   // Echo der Leitung
-        if (!nochmal(p.typ == 'N')) return a;                 // NAK: wiederholen; alte Quittung: weiter warten
+        // NAK oder ein wiederholtes Paket der Gegenstelle (z. B. ihr R/G, auf das unser S die
+        // Antwort war): unseres kam nicht an — wiederholen.  Eine alte Quittung: weiter warten.
+        // Ohne das wartete ein Sender mit der laengeren Frist ewig auf die Quittung, waehrend die
+        // Gegenstelle (kuerzere Frist) ihr Paket wiederholt (K7: KermitVerlust).
+        // Ebenso eine Quittung fuer das VORIGE Paket: C-Kermit 4.2 beantwortet ein beschaedigtes
+        // Paket mit der Wiederholung seiner letzten Quittung statt mit einem NAK (Befund K7: elf Y1
+        // auf ein verstuemmeltes D2, der Sender wartete bis „Zu viele Wiederholungen").
+        const bool vorige = p.typ == 'Y' && p.seq == ((seq + 63) & 63);
+        // Ausnahme N(0) auf unser S(0)/I(0): das ist meist der NAK, mit dem ein C-Kermit-Server bei
+        // jedem Wiedereintritt in die Serverschleife von sich aus wartet (tinit → nack), nicht die
+        // Antwort auf unser Paket.  Darauf zu wiederholen, ergibt ein doppeltes Y(0), das wir
+        // spaeter als Antwort auf das NAECHSTE Paket missdeuten (Befund K7: G D lieferte die
+        // Init-Parameter).  Ist unser Paket wirklich verloren, wiederholt die eigene Frist.
+        const bool leerlaufNak =
+            p.typ == 'N' && p.seq == 0 && (seq & 63) == 0 && (typ == 'S' || typ == 'I') && ++naks0 < 2;
+        if (!nochmal((p.typ != 'Y' || vorige) && !leerlaufNak)) return a;
     }
 }
 
@@ -189,6 +312,7 @@ Sitzung::Antwort Sitzung::warteAuf(int erw) {
         }
         // Das NAK ersetzt NICHT das zuletzt Gesendete: kommt das vorige Paket
         // noch einmal, muss die alte Quittung wiederholt werden.
+        ++st_.naks_gesendet;
         sendeRoh(baueRahmen(Paket{'N', erw, ""}, chkt_, v_.rahmen));
         return true;
     };
@@ -226,6 +350,7 @@ Sitzung::Antwort Sitzung::warteAuf(int erw) {
                 a.text = "Zu viele Wiederholungen";
                 return a;
             }
+            ++st_.wiederholungen;
             sendeRoh(letztes_);
             continue;
         }
@@ -369,6 +494,7 @@ Ergebnis Sitzung::sendenGruppe(const std::vector<SendeAuftrag>& auftraege) {
         q.anzeige = au.lokal;
         qs.push_back(std::move(q));
     }
+    leereEingang();   // Nachlauf abwarten wie vor I/R/G (sonst verschluckt C-Kermit unser S)
     return sendeTransaktion(qs);
 }
 
@@ -529,6 +655,7 @@ Ergebnis Sitzung::empfangeTransaktion(const Paket& s, Ziel z) {
             sende('Y', erw, "");
             chkt_ = 1;
             abbruchGruppe_ = false;
+            nachlauf_ = true;
             return erg;
         default:
             if (senke) senke->verwerfen();
@@ -546,13 +673,14 @@ Ergebnis Sitzung::empfangen(const std::string& zielOrdner) {
     int versuche = 0;
     for (;;) {
         Paket p;
-        switch (lesePaket(p, e_.frist_ms)) {
+        switch (lesePaket(p, wartefrist())) {
         case Lesen::Abbruch: return fehler(Fehlerart::Abgebrochen, "Abbruch durch den Anwender", false);
         case Lesen::Getrennt: return fehler(Fehlerart::LeitungGetrennt, "Leitung getrennt", false);
         case Lesen::Frist:
         case Lesen::Fehlerhaft:
             if (++versuche > e_.max_wiederholungen)
                 return fehler(Fehlerart::Zeitueberschreitung, "Kein Send-Init empfangen", false);
+            ++st_.naks_gesendet;
             sendeRoh(baueRahmen(Paket{'N', 0, ""}, 1, v_.rahmen));
             continue;
         case Lesen::Ok: break;
@@ -573,31 +701,58 @@ Ergebnis Sitzung::iAustausch() {
     leereEingang();
     chkt_ = 1;
     const InitParameter mein = meineParameter();
+    v_.time = 0;   // TIME der vorigen Transaktion gilt nicht mehr
+    const int64_t gesendet = l_.jetztMs();
     if (!sende('I', 0, initDaten(mein, e_.capas_senden)))
         return fehler(Fehlerart::LeitungGetrennt, "Leitung getrennt", false);
-    int versuche = 0;
+    int versuche = 0, naks0 = 0;
+    bool altAbgebrochen = false;
     for (;;) {
         Paket p;
-        switch (lesePaket(p, e_.frist_ms)) {
+        switch (lesePaket(p, wartefrist())) {
         case Lesen::Abbruch: return fehler(Fehlerart::Abgebrochen, "Abbruch durch den Anwender", false);
         case Lesen::Getrennt: return fehler(Fehlerart::LeitungGetrennt, "Leitung getrennt", false);
         case Lesen::Frist:
         case Lesen::Fehlerhaft:
             if (++versuche > e_.max_wiederholungen)
                 return fehler(Fehlerart::Zeitueberschreitung, "Server antwortet nicht", true);
+            ++st_.wiederholungen;
             sendeRoh(letztes_);
             continue;
         case Lesen::Ok: break;
         }
         if (p.typ == 'Y' && p.seq == 0) {
+            if (versuche == 0) umlaufMessung(gesendet);
             v_ = verhandle(mein, zerlegeInit(p.daten), e_.max_paket);
             return {};
         }
-        if (p.typ == 'E') return {};   // Server kennt kein I: Vorgaben behalten
-        if (p.typ == 'N') {
+        if (p.typ == 'E') {
+            if (altAbgebrochen) continue;   // Quittung unseres E, falls der Server sie schickt
+            return {};                      // Server kennt kein I: Vorgaben behalten
+        }
+        if (p.seq != 0) {
+            // Paket einer ALTEN Transaktion (Befund K7): nach einer Trennung mitten in der Datei
+            // steckt der C-Kermit-Server noch in ihr und NAKt das naechste Datenpaket (N25) —
+            // ohne Eingriff bis zu MAXTRY × (TIME + Leerpause), ueber 120 s Maschinenzeit.  Ein
+            // E-Paket bricht sie ab; danach meldet er sich mit N(0), und das I wird wiederholt.
             if (++versuche > e_.max_wiederholungen)
                 return fehler(Fehlerart::Zeitueberschreitung, "Server antwortet nicht", true);
-            sendeRoh(letztes_);
+            // Mit der Blockpruefung der alten Transaktion — die steht in der Laenge ihres NAK; ein E
+            // mit Pruefung 1 verwirft der Server dort als beschaedigt (gemessen).
+            sendeRoh(baueRahmen(Paket{'E', p.seq, kodiere(v_.kod, "Neue Sitzung")}, p.chkl > 0 ? p.chkl : 1, v_.rahmen));
+            if (r_.ereignis) r_.ereignis("Alte Transaktion der Gegenstelle abgebrochen (Paket " + std::to_string(p.seq) + ")");
+            altAbgebrochen = true;
+            continue;
+        }
+        if (p.typ == 'N') {   // Leerlauf-NAK: das erste nicht beantworten, ab dem zweiten wiederholen
+            ++st_.naks_empfangen;
+            if (++versuche > e_.max_wiederholungen)
+                return fehler(Fehlerart::Zeitueberschreitung, "Server antwortet nicht", true);
+            if (++naks0 >= 2 || altAbgebrochen) {
+                altAbgebrochen = false;
+                ++st_.wiederholungen;
+                sendeRoh(letztes_);
+            }
         }
     }
 }
@@ -613,8 +768,9 @@ Ergebnis Sitzung::befehl(char typ, const std::string& klartext, Ziel z) {
         leereEingang();
     }
     chkt_ = 1;
+    const int64_t gesendet = l_.jetztMs();
     if (!sende(typ, 0, kodiere(v_.kod, klartext))) return fehler(Fehlerart::LeitungGetrennt, "Leitung getrennt", false);
-    int versuche = 0;
+    int versuche = 0, naks0 = 0;
     for (;;) {
         Paket p;
         switch (lesePaket(p, wartefrist())) {
@@ -624,10 +780,12 @@ Ergebnis Sitzung::befehl(char typ, const std::string& klartext, Ziel z) {
         case Lesen::Fehlerhaft:
             if (++versuche > e_.max_wiederholungen)
                 return fehler(Fehlerart::Zeitueberschreitung, "Zu viele Wiederholungen", true);
+            ++st_.wiederholungen;
             sendeRoh(letztes_);
             continue;
         case Lesen::Ok: break;
         }
+        if (versuche == 0 && p.typ != 'N') umlaufMessung(gesendet);
         if (p.typ == 'E') return fehler(Fehlerart::Gegenstelle, dekodiereText(v_.kod, p.daten), false);
         if (p.typ == 'Y' && p.seq == 0) {
             Ergebnis r;
@@ -635,10 +793,14 @@ Ergebnis Sitzung::befehl(char typ, const std::string& klartext, Ziel z) {
             return r;
         }
         if (p.typ == 'S') return empfangeTransaktion(p, z);
-        if (p.typ == 'N' && p.seq == 0) {
+        if (p.typ == 'N' && p.seq == 0) {   // Leerlauf-NAK: das erste nicht beantworten, ab dem zweiten wiederholen
+            ++st_.naks_empfangen;
             if (++versuche > e_.max_wiederholungen)
                 return fehler(Fehlerart::Zeitueberschreitung, "Zu viele Wiederholungen", true);
-            sendeRoh(letztes_);
+            if (++naks0 >= 2) {
+                ++st_.wiederholungen;
+                sendeRoh(letztes_);
+            }
         }
     }
 }
@@ -646,11 +808,19 @@ Ergebnis Sitzung::befehl(char typ, const std::string& klartext, Ziel z) {
 Ergebnis Sitzung::generisch(char unter, const std::vector<std::string>& args) {
     // Wie C-Kermit setgen(): Felder nur, solange sie nicht leer sind.
     std::string k(1, unter);
+    // `G C` ohne Pfad: ein Feld der Laenge 0 statt gar keines.  C-Kermit 4.2 (ckfns.c cwd()) liest
+    // die Feldlaenge ungeprueft (`vdir[unchar(*vdir)+1] = 0`) — ohne Feld ist das unchar('\0') = -32,
+    // ein Schreibzugriff VOR den Befehlspuffer.  Mit Laenge 0 wechselt es nach $HOME (zchdir("")).
+    if (unter == 'C' && (args.empty() || args[0].empty())) return befehlG(k + tochar(0));
     for (const auto& a : args) {
         if (a.empty()) break;
         k += tochar(static_cast<int>(std::min<std::size_t>(a.size(), 94)));
         k += a.substr(0, 94);
     }
+    return befehlG(k);
+}
+
+Ergebnis Sitzung::befehlG(const std::string& k) {
     std::string aus;
     Ergebnis r = befehl('G', k, Ziel{nullptr, &aus});
     if (!aus.empty()) r.ausgabe = aus + r.ausgabe;

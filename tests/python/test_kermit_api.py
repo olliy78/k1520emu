@@ -73,6 +73,7 @@ def header_callbacks() -> dict:
 _C2CTYPES = {
     "int": ctypes.c_int,
     "int64_t": ctypes.c_int64,
+    "double": ctypes.c_double,
     "void*": ctypes.c_void_p,
     "K1520Kermit": ctypes.c_void_p,
     "const char*": ctypes.c_char_p,
@@ -209,6 +210,13 @@ def test_errors_are_exceptions_with_codes(tmp_path):
         assert not s.connected
         with pytest.raises(KermitError) as ei:
             s.set_pruefsumme(9)
+        assert ei.value.code == E_USAGE
+        assert s.tempo() == 1.0                 # Automatik ohne Messung (K7)
+        s.set_tempo(10)
+        assert s.tempo() == 10.0
+        s.set_tempo(0)
+        with pytest.raises(KermitError) as ei:
+            s.set_tempo(5000)
         assert ei.value.code == E_USAGE
         with pytest.raises(KermitError) as ei:
             s.accept(150)                       # Frist

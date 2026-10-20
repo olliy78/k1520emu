@@ -63,6 +63,7 @@ struct Paket {
     char typ = 0;
     int seq = 0;
     std::string daten;   ///< Datenfeld, wie es auf der Leitung steht (kodiert)
+    int chkl = 0;        ///< Laenge der Blockpruefung, mit der es gelesen wurde (0 = unbekannt)
 };
 
 struct RahmenParameter {

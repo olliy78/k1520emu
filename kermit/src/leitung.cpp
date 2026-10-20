@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <limits>
 
 namespace k1520::kermit {
@@ -37,6 +38,11 @@ int64_t SpeicherLeitungPaar::uhr() const { return virtuell_ ? jetzt_ : monotonMs
 void SpeicherLeitungPaar::setzeVerzoegerung(int von, int64_t ms) {
     std::lock_guard<std::mutex> lk(m_);
     r_[static_cast<std::size_t>(von & 1)].verzoegerung = ms;
+}
+
+void SpeicherLeitungPaar::setzeZeichenzeit(int von, double ms) {
+    std::lock_guard<std::mutex> lk(m_);
+    r_[static_cast<std::size_t>(von & 1)].zeichenzeit = std::max(0.0, ms);
 }
 
 void SpeicherLeitungPaar::setzeSiebenBit(int von, bool an) {
@@ -147,8 +153,20 @@ bool SpeicherLeitung::schreiben(const uint8_t* buf, std::size_t n) {
         p.cv_.notify_all();
         return true;   // verloren — fuer den Sender nicht erkennbar
     }
-    const int64_t ab = p.uhr() + aus.verzoegerung;
-    for (uint8_t b : blk) aus.q.push_back({ab, aus.siebenBit ? static_cast<uint8_t>(b & 0x7F) : b});
+    int64_t ab = p.uhr() + aus.verzoegerung;
+    if (aus.zeichenzeit > 0) {
+        // Serielle Leitung: ein Byte nach dem anderen, frueheste Ankunft nach der Verzoegerung.
+        double t = std::max(aus.frei, static_cast<double>(ab));
+        const int64_t erstes = static_cast<int64_t>(std::ceil(t + aus.zeichenzeit));
+        for (uint8_t b : blk) {
+            t += aus.zeichenzeit;
+            aus.q.push_back({static_cast<int64_t>(std::ceil(t)), aus.siebenBit ? static_cast<uint8_t>(b & 0x7F) : b});
+        }
+        aus.frei = t;
+        ab = erstes;
+    } else {
+        for (uint8_t b : blk) aus.q.push_back({ab, aus.siebenBit ? static_cast<uint8_t>(b & 0x7F) : b});
+    }
     // Die Gegenseite ist ab jetzt lauffaehig (sofern die Daten schon faellig
     // sind) — auch wenn ihr Faden noch nicht aufgewacht ist.  Sonst saehe ein
     // gleich danach lesendes Ende „alle warten" und liesse die Uhr springen.

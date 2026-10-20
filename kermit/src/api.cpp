@@ -268,7 +268,10 @@ extern "C" K1520K_API int k1520k_login(K1520Kermit h, const char* name, const ch
     }
     H_->abbruch = false;
     o.abbruch = &H_->abbruch;
+    o.tempo = H_->sitzung->einstellungen().tempo;
+    o.baud = H_->sitzung->einstellungen().baud;
     const LoginErgebnis r = loginSkript(*H_->leitung, o);
+    if (r.ok && r.tempo > 0) H_->sitzung->setzeTempoSchaetzung(r.tempo);
     H_->ergebnis = r.gelesen;
     H_->fehler = r.ok ? std::string() : r.text;
     return r.ok ? K1520K_OK : K1520K_E_LOGIN;
@@ -325,6 +328,24 @@ extern "C" K1520K_API int k1520k_set_fristen(K1520Kermit h, int paket_ms, int ma
     e.max_wiederholungen = max_wiederholungen;
     return K1520K_OK;
     K_END
+}
+
+extern "C" K1520K_API int k1520k_set_tempo(K1520Kermit h, double tempo) {
+    K_BEGIN(h)
+    if (!(tempo == 0.0 || (tempo >= 0.01 && tempo <= 1000.0)))
+        return usage(H_, "Tempo muss 0 (Automatik) oder 0.01 bis 1000 sein");
+    H_->sitzung->einstellungen().tempo = tempo;
+    return K1520K_OK;
+    K_END
+}
+
+extern "C" K1520K_API double k1520k_tempo(K1520Kermit h) {
+    if (!h) return 0.0;
+    try {
+        return static_cast<Handle*>(h)->sitzung->tempo();
+    } catch (...) {
+        return 0.0;
+    }
 }
 
 extern "C" K1520K_API int k1520k_set_max_namenslaenge(K1520Kermit h, int n) {

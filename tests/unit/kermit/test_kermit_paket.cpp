@@ -490,3 +490,49 @@ TEST(KermitAttribute, UnbekannteUndKaputte) {
     EXPECT_EQ(zerlegeAttribute(std::string("1") + tochar(2) + "4x").laenge, -1);
     EXPECT_EQ(zerlegeAttribute(std::string("\"") + tochar(1) + "I").typ, 'B');
 }
+
+// ─── Befund K7: C-Kermit 4.2 rechnet die Blockpruefung ueber `char` ─────────
+// ckfns2.c: chk2() summiert `*pkt` (char), chk1() faltet diese Summe, chk3() nimmt `c = *s++` in ein
+// unsigned int.  Bei vorzeichenbehaftetem char (Z8000-cc?) zaehlt ein Byte >= 0x80 als b - 256.
+// Nachbildung beider Rechenwege; Ergebnis: Typ 1 und Typ 3 sind UNBERUEHRT (Typ 1 haengt nur an den
+// unteren 8 Bit der Summe, Typ 3 nur an den Halbbytes), Typ 2 weicht um 256 x (Anzahl hoher Bytes)
+// mod 4096 ab.  Welche Fassung auf WEGA laeuft, misst P8000WegaKermit.PruefsummenUnd8Bit.
+namespace {
+unsigned ck42Summe(const std::string& s, bool vorzeichen) {
+    uint16_t chk = 0;   // `unsigned int` auf dem Z8000: 16 Bit
+    for (unsigned char c : s) chk = static_cast<uint16_t>(chk + (vorzeichen ? static_cast<int>(static_cast<signed char>(c)) : c));
+    return chk;
+}
+int ck42Chk1(const std::string& s, bool v) {
+    const int chk = static_cast<int16_t>(ck42Summe(s, v));
+    return ((((chk & 0300) >> 6) + chk) & 077);
+}
+int ck42Chk2(const std::string& s, bool v) { return static_cast<int>(ck42Summe(s, v) & 07777); }
+unsigned ck42Chk3(const std::string& s, bool v) {
+    uint32_t crc = 0;
+    for (unsigned char b : s) {
+        const unsigned c = v ? static_cast<unsigned>(static_cast<int>(static_cast<signed char>(b))) & 0xFFFF : b;
+        unsigned q = (crc ^ c) & 017;
+        crc = (crc >> 4) ^ (q * 010201);
+        q = (crc ^ (c >> 4)) & 017;
+        crc = (crc >> 4) ^ (q * 010201);
+    }
+    return crc & 0xFFFF;
+}
+}  // namespace
+
+TEST(KermitPaket, Ck42VorzeichenbehaftetesCharTrifftNurTyp2) {
+    std::string paket = "~!D";   // LEN SEQ TYPE + 8-Bit-Rohdaten (ohne QBIN)
+    for (int i = 0xA0; i < 0xFF; ++i) paket += static_cast<char>(i);
+    const auto* b = reinterpret_cast<const uint8_t*>(paket.data());
+    for (bool v : {false, true}) {
+        EXPECT_EQ(ck42Chk1(paket, v), pruefsumme1(b, paket.size())) << "Typ 1, vorzeichen=" << v;
+        EXPECT_EQ(ck42Chk3(paket, v), crc16Kermit(b, paket.size())) << "Typ 3, vorzeichen=" << v;
+    }
+    EXPECT_EQ(ck42Chk2(paket, false), pruefsumme2(b, paket.size()));
+    EXPECT_NE(ck42Chk2(paket, true), pruefsumme2(b, paket.size())) << "Typ 2 weicht bei signed char ab";
+    // Mit QBIN '&' stehen nur druckbare 7-Bit-Zeichen im Paket: alle drei Typen stimmen.
+    const std::string sieben = "~!D&!&\"&#abc";
+    const auto* s7 = reinterpret_cast<const uint8_t*>(sieben.data());
+    EXPECT_EQ(ck42Chk2(sieben, true), pruefsumme2(s7, sieben.size()));
+}

@@ -52,7 +52,9 @@ PORT=$(sed -n 's/^Port: //p' serve.err)
 `--pruefsumme 1|2|3` (Vorgabe 3, wird ausgehandelt) · `--paket N` (Vorgabe 1000; ≤ 94 = normale Pakete ohne
 Langpakete) · `--binaer` (Vorgabe) | `--text` (LF ↔ CR LF) · `--namen literal|konvertiert` (beide Richtungen;
 ohne den Schalter: senden literal, empfangen konvertiert wie C-Kermit) · `--max-namen N` (Zielnamen länger als N
-werden **abgelehnt**, WEGA: 14) · `--frist S` (je Paket und für den Verbindungsaufbau, Vorgabe 10 s) ·
+werden **abgelehnt**, WEGA: 14) · `--frist S` (je Paket in der Zeit der Gegenstelle und für den
+Verbindungsaufbau, Vorgabe 10 s) · `--tempo auto|F` (Tempo der Gegenstelle gegenüber Echtzeit: ein P8000 mit
+10x Takt = `10`, unter Last `0.5`; Vorgabe `auto` = aus der Zeichenrate gemessen, Startwert aus dem Login-Text) ·
 `--cd PFAD` (vor dem Kommando auf dem Server wechseln) · `--nur-lesen` (nur `serve`: Schreiben und Löschen
 werden abgewiesen).
 
@@ -113,12 +115,22 @@ k1520kermit --telnet 127.0.0.1:5000 --login kermit:kermit --max-namen 14 put lan
 k1520kermit --telnet 127.0.0.1:5000 --login kermit:kermit logout
 ```
 
-Eine getty meldet sich erst nach Eingabe: das Login-Skript sendet RETURN bis `login:` erscheint.  Die
-Anmeldung braucht auf dem Emulator Maschinenzeit (Sekunden bis zum Serverbeginn); `--frist` ändert nur die
+Eine getty meldet sich erst nach Eingabe: das Login-Skript sendet RETURN bis `login:` erscheint (nur bei
+stiller Leitung).  Die Anmeldung braucht auf dem Emulator Maschinenzeit (≈ 10 s bis zum Serverbeginn); ihre
+Fristen sind Fristen der **Stille** (jedes Zeichen setzt sie neu, Vorgabe 60 s), `--frist` ändert nur die
 Paketfrist.
 
-**Fall 2 — WEGA ist Client** (Shell: `kermit`, `set line /dev/tty3`, `set baud 9600`, `send`/`get`/`remote
-dir`): der PC ist Server, der Emulator verbindet tty3 als Telnet-Client zu ihm.
+**Zeitverhalten (K7, `doc/merkposten/kermit.md` Nr. 3–5).**  Der Emulator taktet die serielle Leitung in
+Maschinenzeit: läuft er 6× schneller als Echtzeit, kommen die Zeichen 6× so schnell wie 9600 Bd; unter Last
+langsamer.  Die Paketfrist ist deshalb adaptiv: `frist / min(Tempo, 1)` Wirtszeit (eine langsame Gegenstelle
+bekommt mehr Zeit, eine schnelle nicht weniger), mindestens 4 × Umlaufzeit, jedes empfangene Zeichen verlängert
+sie.  `--tempo` braucht man nur, wenn die Automatik daneben liegt (z. B. Emulator stark gedrosselt und kaum
+Text vor dem ersten Paket).
+
+**Fall 2 — WEGA ist Client** (Shell: `kermit`, `set line /dev/tty3`, `set speed 9600`, `set file type binary`,
+`send`/`get`/`remote dir`; `remote cwd` fragt nach einem Kennwort — RETURN): der PC ist Server, der Emulator
+verbindet tty3 als Telnet-Client zu ihm.  Ohne `set file type binary` sendet C-Kermit 4.2 Text (CR LF auf der
+Leitung, ohne Attribute) und verwirft beim Empfang jedes CR.
 
 ```sh
 k1520kermit serve --listen-telnet 5003 ~/austausch                 # blockiert bis finish/Trennung/Strg+C

@@ -216,5 +216,15 @@ k1520_add_test(p8000_wega_kermit SRC test_p8000_wega_kermit.cpp
                             LABELS "system;slow;wega_install"
                             DEFS LOG_LEVEL=2 "P8000_WEGA31_DIR=\"${CMAKE_SOURCE_DIR}/disks/p8000_wega31\"" TIMEOUT 7200 RUN_SERIAL)
 
+# ─── Kermit-Gegenprobe (Entwurf 36 AP K7): die Bibliothek kermit/ gegen den echten C-Kermit 4.2 unter
+# WEGA 3.1, beide Richtungen + Messungen.  Startet aus einem eingefrorenen Zustand (baut ihn beim ersten
+# Lauf: Plattenkopie + Testdateien per DiskTool + Kaltstart); ohne Startdiskette/Platte uebersprungen.
+k1520_add_test(p8000_wega_kermit_austausch SRC test_p8000_wega_kermit_austausch.cpp
+                            LIBS k1520_p8000 k1520_gzip k1520_serial k1520kermit_core k1520_logger k1520_testsupport
+                            LABELS "system;slow;wega_install"
+                            DEFS LOG_LEVEL=2 "P8000_WEGA31_DIR=\"${CMAKE_SOURCE_DIR}/disks/p8000_wega31\""
+                                 "K1520_DISKTOOL=\"$<TARGET_FILE:k1520disktool>\"" TIMEOUT 7200 RUN_SERIAL)
+add_dependencies(k1520_test_p8000_wega_kermit_austausch k1520disktool)
+
 # Zeitgrenzen der add_test()-Faelle × K1520_TEST_ZEIT_FAKTOR (tests/cmake/K1520AddTest.cmake)
 k1520_test_zeiten_skalieren()
