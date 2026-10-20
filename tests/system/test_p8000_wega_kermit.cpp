@@ -2,8 +2,9 @@
  * @file test_p8000_wega_kermit.cpp
  * @brief Kermit auf WEGA 3.1 (Entwurf 36 AP K1): C-Kermit 4.2(030) steht auf der ausgelieferten Platte
  *        `disks/p8000_wega31/p8000_wega31_platte.avr.img.gz` (/usr/bin/kermit, setuid root) und der
- *        Benutzer `kermit` (Kennwort `kermit`, Shell `/usr/bin/kermit`, Home `/usr/kermit` mit `.kermrc`:
- *        `server`, `exit`) macht aus einem getty-Anschluss einen Kermit-Server.
+ *        Benutzer `kermit` (Kennwort `kermit`, Shell `/bin/sh` mit `.profile` = `exec /usr/bin/kermit` seit
+ *        K7, Home `/usr/kermit` mit `.kermrc`: `server`, `exit`) macht aus einem getty-Anschluss einen
+ *        Kermit-Server.
  *
  * Kaltstart wie am Geraet (Netz ein -> MON8 -> Koppelsoftware -> MON16 -> NMI -> boot -> WEGA), Konsole am
  * Originalterminal (tty1).  Geprueft wird

@@ -36,14 +36,23 @@ Auf der Platte stehen C-Kermit 4.2(030) und ein Anmeldekonto, das einen **Kermit
 
 - `/usr/bin/kermit` (Modus 4755 root, das fertige Z8000-Binary der Kermit-Diskette `kermit.cqm`/`kermit.tar`,
   Stand 1988-02-04), Handbuchseite `man kermit`.
-- Benutzer **`kermit`**, Kennwort **`kermit`** (uid 7, gid 1, Home `/usr/kermit`, Shell `/usr/bin/kermit`).
-  **Kennwortlos geht nicht** — der WEGA-`login` erzwingt bei leerem Kennwortfeld ein neues Kennwort.
-  Laborrechner: Kennwort mit `passwd` ändern, wenn die Maschine am Netz hängt.
-- Anmeldung auf tty0/tty2/tty4 (nicht tty3, kein getty): nach dem Kennwort liest Kermit `/usr/kermit/.kermrc`
-  (`set file type binary`, `set file names literal`, `server`, `exit`) und läuft als Server; `FINISH` oder
+- Benutzer **`kermit`**, Kennwort **`kermit`** (uid 7, gid 1, Home `/usr/kermit`, Shell `/bin/sh`;
+  `/usr/kermit/.profile` = `exec /usr/bin/kermit`).  **Kennwortlos geht nicht** — der WEGA-`login` erzwingt bei
+  leerem Kennwortfeld ein neues Kennwort.  Laborrechner: Kennwort mit `passwd` ändern, wenn die Maschine am Netz
+  hängt.
+- Anmeldung auf tty0/tty2/tty4 (nicht tty3, kein getty): nach dem Kennwort startet `.profile` Kermit, das
+  `/usr/kermit/.kermrc` liest (`set file type binary`, `server`, `exit`) und als Server läuft; `FINISH` oder
   `LOGOUT` beendet die Sitzung, getty meldet sich wieder.
-- Als **Client** am WEGA: als `wega` anmelden, `kermit`, `set line /dev/tty3`, `set baud 9600`,
-  `send`/`get`/`remote dir` gegen einen Kermit-Server am PC (tty3 = Druckerleitung des P8000).
+- **Stand K7 (2026-10-18, zweite Fassung der Platte):** Shell `/bin/sh` statt `/usr/bin/kermit`, weil
+  C-Kermit `REMOTE DIRECTORY`/`DELETE`/`TYPE` über die Login-Shell aus `/etc/passwd` ausführt (sonst kam die
+  Gebrauchsanweisung von kermit als Verzeichnis); `set file names literal` gestrichen, weil C-Kermit 4.2 damit
+  keine Datei mehr hergibt (Fehler in `sfile()`, „Can't open file").  Namen gehen deshalb in Großschrift
+  hinaus, ankommende werden klein geschrieben.  Empfangene Dateien gehören `wega` (kermit ist setuid root),
+  Modus 666.
+- Als **Client** am WEGA: als `wega` anmelden, `kermit`, `set line /dev/tty3`, `set speed 9600`,
+  `set file type binary`, `send`/`get`/`remote dir` gegen einen Kermit-Server am PC (tty3 = Druckerleitung
+  des P8000, im Emulator ein Hub-Kanal als Telnet-Client); `remote cwd` fragt nach einem Kennwort (RETURN).
 - Eingespielt mit dem DiskTool (`put`, `mkdir`, `attr`, `md2/etc/passwd` um eine Zeile ergänzt), `check --full`
-  ohne Befund.  Ablauf, Bildschirmtexte, Fallen: `doc/p8000/kermit_wega.md`; Test
-  `P8000WegaKermit.ServerHinterGetty` (`tools/dev.sh test-wega`).
+  ohne Befund.  Ablauf, Bildschirmtexte, Fallen: `doc/p8000/kermit_wega.md`, `doc/merkposten/kermit.md`; Tests
+  `P8000WegaKermit.ServerHinterGetty` und die Gegenprobe der PC-Bibliothek `P8000WegaKermit.*` in
+  `tests/system/test_p8000_wega_kermit_austausch.cpp` (`tools/dev.sh test-wega`).

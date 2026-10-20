@@ -25,12 +25,13 @@ Stand 2026-10-18.  Test: `tests/system/test_p8000_wega_kermit.cpp`
 | `md0/bin/kermit` | `/usr/bin/kermit` | 4755, 0:0 (`wega`/`system`) |
 | `md0/man/man1/kermit.1` | `man kermit` (Quelle `ckermi.nr`, nroff-man) | 0644 |
 | `md0/kermit/` | Home `/usr/kermit` | 0755, 7:1 |
-| `md0/kermit/.kermrc` | `set file type binary` / `set file names literal` / `server` / `exit` | 0644, 7:1 |
-| `md2/etc/passwd` | eine Zeile angehängt: `kermit:KmhrRNsdxD7LY:7:1::/usr/kermit:/usr/bin/kermit` | Rest byteweise unverändert |
+| `md0/kermit/.kermrc` | `set file type binary` / `server` / `exit` (K1 zusätzlich `set file names literal`, in K7 gestrichen) | 0644, 7:1 |
+| `md0/kermit/.profile` | `exec /usr/bin/kermit` (seit K7) | 0644, 7:1 |
+| `md2/etc/passwd` | eine Zeile angehängt: `kermit:KmhrRNsdxD7LY:7:1::/usr/kermit:/bin/sh` (K1: Shell `/usr/bin/kermit`) | Rest byteweise unverändert |
 
 uid 7 war frei (belegt: 0–6, 10, 24), gid 1 = `other` (`/etc/group` kennt `system:0`, `other:1`, `adm:4`).
-`.kermrc`: binär + literale Namen, damit der Server Dateien unverändert (LF, Kleinschrift) liefert; die Vorgaben
-von C-Kermit 4.2 wären Text (CR LF auf der Leitung) und Namen in Großschrift.  Platz danach: md0 443 KB, md2
+`.kermrc`: binär, damit der Server Dateien unverändert (LF) liefert; die Vorgabe von C-Kermit 4.2 wäre Text
+(CR LF auf der Leitung, beim Empfang jedes CR verworfen).  Literale Namen (K1) gehen NICHT: siehe §6.  Platz danach: md0 443 KB, md2
 379 KB frei; `k1520disktool check --full` ohne Befund.  Eingespielt mit `k1520disktool put/mkdir/attr`
 (`attr` an Platten seit diesem AP).
 
@@ -101,3 +102,24 @@ C-Kermit>remote directory
 ```
 
 Hinweis: `kermit` ist setuid root für die Sperrdateien (`/usr/spool/uucp`).
+
+## 6. Gegenprobe der PC-Bibliothek (AP K7, 2026-10-18)
+
+Test `tests/system/test_p8000_wega_kermit_austausch.cpp` (`P8000WegaKermit.*`, Label `wega_install`), Messwerte
+und Folgerungen: `doc/design/36_kermit.md` §6.5, Festlegungen `doc/merkposten/kermit.md`.  Zwei Fehler der
+K1-Einrichtung, beide nur mit dem echten Austausch sichtbar und auf der Platte behoben (zweite Fassung):
+
+1. **`REMOTE DIRECTORY` lieferte die Gebrauchsanweisung von kermit.**  C-Kermit führt `G D`/`G E`/`G T`/`G U`/
+   `G W` über die **Login-Shell aus `/etc/passwd`** aus (`ckzunx.c` `zxcmd()`: `execl(pw_shell, "-c", "ls -l
+   …")`) — mit Shell `/usr/bin/kermit` also `kermit -c "ls -l "`.  Jetzt: Shell `/bin/sh`, `.profile` startet
+   kermit mit `exec` (Abmelden nach `exit`/`FINISH` wie vorher).
+2. **Mit `set file names literal` gibt der Server keine Datei her** („Can't open file").  `ckfns.c` `sfile()`:
+   ohne Sendenamen und bei `fncnv == 0` steht `strcpy(filnam,pktnam)` statt `strcpy(pktnam,filnam)` — der
+   UNINITIALISIERTE Paketname überschreibt den Dateinamen.  Gestrichen; die Namen gehen nun konvertiert hinaus
+   (`MixedCase.Txt` → `MIXEDCASE.TXT`), ankommende schreibt C-Kermit klein (`zrtol`).
+
+Weitere Beobachtungen am laufenden Server: die Leitung tty0 löscht Bit 7 auf dem Weg PC → WEGA (8-Bit-Präfix
+`&` nötig), WEGA → PC ist 8-Bit-sauber; empfangene Dateien gehören `wega` (setuid root, kein `setuid(getuid())`
+vor `creat`), Modus 666; WEGA kürzt Namen über 14 Zeichen stumm (`einsehrlangername.bin` → `einsehrlangern`);
+ein abgebrochenes Senden (Z mit „D") hinterlässt keine Datei; `remote cwd` am Client fragt nach einem Kennwort.
+
