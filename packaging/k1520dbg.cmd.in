@@ -38,6 +38,7 @@ echo.
 echo     k1520dbg DISKETTE.hfe          Debugger  (Handbuch: siehe share\doc)
 echo     k1520disktool-cli ls DISK.hfe  Dateien auf der Diskette
 echo     k1520disktool-cli put DISK.hfe PROG.COM
+echo     k1520kermit-cli --help         Kermit-Kommandozeile (WEGA/P8000)
 echo.
 echo   Installation: %K1520_ROOT%
 echo   Arbeitsordner: %CD%

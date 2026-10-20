@@ -234,6 +234,7 @@ Source: "{#Paket}\slim.py";                Flags: dontcopy
 Source: "{#Paket}\requirements.lock";      Flags: dontcopy
 Source: "{#Paket}\launcher.cmd";           Flags: dontcopy
 Source: "{#Paket}\disktool_launcher.cmd";  Flags: dontcopy
+Source: "{#Paket}\kermit_launcher.cmd";    Flags: dontcopy
 ; Die Eingabeaufforderung fuer die Konsolenwerkzeuge (Debugger,
 ; k1520disktool-cli).  Wie die uebrigen Starter eine VORLAGE — der
 ; Installationsordner wird beim Einrichten eingetragen.
@@ -277,6 +278,9 @@ Name: "{group}\{#Programm6}"; Filename: "{app}\venv\Scripts\pythonw.exe"; \
 Name: "{group}\k1520DiskTool"; Filename: "{app}\venv\Scripts\pythonw.exe"; \
   Parameters: """{app}\app\disktool\main.py"""; WorkingDir: "{app}"; Comment: "Dateiaustausch mit K1520-Disketten"; \
   IconFilename: "{app}\share\icons\a5120emu.ico"
+Name: "{group}\K1520 Kermit"; Filename: "{app}\venv\Scripts\pythonw.exe"; \
+  Parameters: """{app}\app\kermittool\main.py"""; WorkingDir: "{app}"; Comment: "Dateiaustausch mit der WEGA (P8000) ueber Kermit"; \
+  IconFilename: "{app}\share\icons\a5120emu.ico"
 ; Die Werkzeug-Eingabeaufforderung — NICHT der Debugger.  Der Unterschied ist
 ; der Grund, warum dieser Eintrag den Zuschnitt aus §10a.2 nicht bricht: ein
 ; Symbol auf k1520dbg.exe selbst oeffnete ein Fenster, das mangels Diskette
@@ -286,7 +290,7 @@ Name: "{group}\k1520DiskTool"; Filename: "{app}\venv\Scripts\pythonw.exe"; \
 ; Die Datei entsteht erst im Nachlauf (StarterSchreiben); die Verknuepfung
 ; darauf darf trotzdem hier stehen, Inno prueft das Ziel nicht.
 Name: "{group}\K1520-Werkzeuge (Eingabeaufforderung)"; Filename: "{app}\bin\k1520dbg.cmd"; \
-  WorkingDir: "{app}"; Comment: "Debugger k1520dbg und k1520disktool-cli in der Konsole"; \
+  WorkingDir: "{app}"; Comment: "Debugger k1520dbg, k1520disktool-cli und k1520kermit-cli in der Konsole"; \
   IconFilename: "{app}\share\icons\a5120emu.ico"
 Name: "{group}\{cm:UninstallProgram,{#Produkt}}"; Filename: "{uninstallexe}"
 
@@ -689,6 +693,7 @@ begin
   MeldeImNachlauf('Starter schreiben');
   ExtractTemporaryFile('launcher.cmd');
   ExtractTemporaryFile('disktool_launcher.cmd');
+  ExtractTemporaryFile('kermit_launcher.cmd');
   CreateDir(ExpandConstant('{app}\bin'));
   VorlageSchreiben(ExpandConstant('{tmp}\launcher.cmd'),
                    ExpandConstant('{app}\bin\a5120emu.cmd'));
@@ -709,6 +714,10 @@ begin
                    ExpandConstant('{app}\bin\mc80emu.cmd'));
   VorlageSchreiben(ExpandConstant('{tmp}\disktool_launcher.cmd'),
                    ExpandConstant('{app}\bin\k1520disktool.cmd'));
+  { K1520 Kermit: eigene Vorlage wie das DiskTool (Kommandozeile liegt als
+    bin\k1520kermit-cli.exe in der Payload). }
+  VorlageSchreiben(ExpandConstant('{tmp}\kermit_launcher.cmd'),
+                   ExpandConstant('{app}\bin\k1520kermit.cmd'));
 
   { Der Debugger bekommt KEIN Symbol und keinen Doppelklick-Starter: er ist
     kein Programm, das man oeffnet und wieder schliesst, sondern eines, das
@@ -750,7 +759,7 @@ begin
   Daten := AbweichenderDatenOrdner;
   StringChangeEx(Daten, '\', '\\', True);
 
-  SetArrayLength(Zeilen, 44);
+  SetArrayLength(Zeilen, 47);
   Zeilen[0]  := 'import ctypes, os, sys';
   Zeilen[1]  := 'os.environ["QT_QPA_PLATFORM"] = "offscreen"';
   Zeilen[2]  := 'sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))';
@@ -802,7 +811,11 @@ begin
   Zeilen[40] := 'print("Oberflaeche P8000: baut auf")';
   Zeilen[41] := 'MainWindow(profil=profil.profil("mc80")).close()';
   Zeilen[42] := 'print("Oberflaeche MC80: baut auf")';
-  Zeilen[43] := 'sys.stdout.flush()';
+  { K1520 Kermit: eigene Bibliothek, geladen und nach ihrer Fassung gefragt. }
+  Zeilen[43] := 'klib = ctypes.CDLL(str(paths.kermit_library()))';
+  Zeilen[44] := 'klib.k1520k_version.restype = ctypes.c_char_p';
+  Zeilen[45] := 'print("Kermit:     ", klib.k1520k_version().decode())';
+  Zeilen[46] := 'sys.stdout.flush()';
 
   Datei := ExpandConstant('{app}\.rauchtest.py');
   if not SaveStringsToFile(Datei, Zeilen, False) then
@@ -958,7 +971,8 @@ begin
     '  Handbuch:  <Installation>\share\doc\handbuch_k1520dbg.md' + #13#10 +
     '  Dazu:      <Installation>\share\tools\z80_disasm2.py' + #13#10 + #13#10 +
     'Am einfachsten über bin\k1520dbg.cmd: das öffnet eine Eingabe-' + #13#10 +
-    'aufforderung, in der k1520dbg und k1520disktool-cli ohne Pfadangabe' + #13#10 +
+    'aufforderung, in der k1520dbg, k1520disktool-cli und k1520kermit-cli' + #13#10 +
+    'ohne Pfadangabe' + #13#10 +
     'laufen. Die Datei ist zum Kopieren und Anpassen gedacht — Arbeitsordner' + #13#10 +
     'und eigener Assembler stehen als Beispielzeilen darin.' + #13#10 + #13#10 +
     'ECHTE DISKETTEN' + #13#10 +

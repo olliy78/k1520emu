@@ -28,6 +28,7 @@ Bibliothek sie kennt — :class:`Kermit` haelt sie in ``_cb_refs`` fest.
 from __future__ import annotations
 
 import ctypes
+import threading
 import json
 import sys
 from pathlib import Path
@@ -165,6 +166,10 @@ class Kermit:
 
     def __init__(self, handle: int):
         self._h = ctypes.c_void_p(handle)
+        # abort*() kommt aus dem GUI-Faden, close() aus dem Arbeitsfaden: ohne diese Sperre
+        # gibt close() das Handle frei, waehrend abort() es noch benutzt (Segfault in
+        # test_server_lauscht_nach_der_trennung..., sporadisch).  abort* blockieren nicht.
+        self._abbruchsperre = threading.Lock()
         self._cb_refs: list = []
 
     # ── Oeffnen ──────────────────────────────────────────────────────────
@@ -196,9 +201,10 @@ class Kermit:
 
     # ── Lebenszyklus ─────────────────────────────────────────────────────
     def close(self) -> None:
-        if self._h:
-            lib().k1520k_close(self._h)
-            self._h = ctypes.c_void_p(0)
+        with self._abbruchsperre:
+            if self._h:
+                lib().k1520k_close(self._h)
+                self._h = ctypes.c_void_p(0)
             self._cb_refs = []
 
     def __enter__(self) -> "Kermit":
@@ -334,16 +340,19 @@ class Kermit:
 
     # ── Abbruch (jeder Faden) ────────────────────────────────────────────
     def abort(self) -> None:
-        if self._h:
-            lib().k1520k_abort(self._h)
+        with self._abbruchsperre:
+            if self._h:
+                lib().k1520k_abort(self._h)
 
     def abort_file(self) -> None:
-        if self._h:
-            lib().k1520k_abort_file(self._h)
+        with self._abbruchsperre:
+            if self._h:
+                lib().k1520k_abort_file(self._h)
 
     def abort_group(self) -> None:
-        if self._h:
-            lib().k1520k_abort_group(self._h)
+        with self._abbruchsperre:
+            if self._h:
+                lib().k1520k_abort_group(self._h)
 
     # ── Auskunft ─────────────────────────────────────────────────────────
     @property

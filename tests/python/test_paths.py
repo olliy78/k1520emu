@@ -436,6 +436,7 @@ def test_describe_nennt_layout_und_alle_pfade(tmp_path, at_root):
     # Dialog am falschen Ort aufgeht.
     assert str(paths.user_disks_dir()) in text
     assert str(paths.user_files_dir()) in text
+    assert "Kermit (CLI):" in text      # AP K9: auch die Kermit-Kommandozeile steht in `--paths`
     # Und die Auslieferungskonfiguration: bleibt sie unauffindbar, geht der
     # Emulator in anderen Vorgaben auf als gewollt — das muss `--paths` sagen.
     assert "Vorgabe-Konfig." in text

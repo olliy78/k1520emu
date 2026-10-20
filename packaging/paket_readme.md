@@ -111,6 +111,19 @@ k1520disktool-cli ls disk.hfe # Kommandozeile
 Beim Öffnen ist eine Diskette **schreibgeschützt** — Ändern verlangt, den Haken
 „Nur lesen" zu entfernen. So kann beim bloßen Ansehen nichts kaputtgehen.
 
+Ein drittes Programm ist **K1520 Kermit**: es tauscht Dateien zwischen Ihrem Rechner
+und der WEGA des P8000 (oder einem anderen Kermit) über Telnet oder RFC 2217 aus,
+als Client und als Server. Startmenü-Eintrag „K1520 Kermit" oder:
+
+```sh
+k1520kermit                   # Oberfläche
+k1520kermit-cli --help        # Kommandozeile
+```
+
+Die mitgelieferte WEGA-3.1-Platte (`p8000_wega31/`, im Beispielordner) trägt den
+Benutzer `kermit` samt C-Kermit; Einrichtung und Bedienung stehen im Handbuch
+des Programms (F1) und in `share/doc/k1520kermit.md`.
+
 ### Echte Disketten am Greaseweazle
 
 Beide Programme können statt einer Datei ein **echtes Laufwerk** benutzen, wenn ein
@@ -143,7 +156,7 @@ k1520dbg meine_diskette.hfe        # Sitzung öffnen, `help` zeigt die Befehle
 Einen Startmenü-Eintrag hat er bewusst nicht — er wird in einen vorhandenen
 Arbeitsablauf aus Editor, Assembler und Konsole eingebunden. Unter **Windows** öffnet
 der Eintrag *„K1520-Werkzeuge (Eingabeaufforderung)"* eine Konsole, in der `k1520dbg`
-und `k1520disktool-cli` ohne Pfadangabe laufen; die Datei `bin\k1520dbg.cmd` dahinter
+`k1520disktool-cli` und `k1520kermit-cli` ohne Pfadangabe laufen; die Datei `bin\k1520dbg.cmd` dahinter
 ist ausdrücklich **zum Kopieren und Anpassen** gedacht (Arbeitsordner und eigener
 Assembler stehen als Beispielzeilen darin).
 

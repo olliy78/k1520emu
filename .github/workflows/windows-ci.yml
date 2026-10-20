@@ -205,14 +205,18 @@ jobs:
         shell: pwsh
         run: |
           # dumpbin liegt dank vcvars (erster Schritt) im PATH.
-          foreach ($name in 'k1520core.dll','k1520disk.dll') {
+          foreach ($name in 'k1520core.dll','k1520disk.dll','k1520kermit.dll') {
             $dll = Get-ChildItem -Recurse -Filter $name build -ErrorAction SilentlyContinue |
                    Select-Object -First 1
             if (-not $dll) { throw "$name wurde nicht gebaut" }
             $exports = & dumpbin /exports $dll.FullName
-            $anzahl = ($exports | Select-String 'k1520d?_[a-z0-9_]+').Count
+            # Die Kermit-ABI heisst k1520k_* (37 Funktionen, AP K4/K9); die beiden
+            # anderen k1520_* bzw. k1520d_*.
+            $muster = if ($name -eq 'k1520kermit.dll') { 'k1520k_[a-z0-9_]+' } else { 'k1520d?_[a-z0-9_]+' }
+            $schwelle = if ($name -eq 'k1520kermit.dll') { 20 } else { 30 }
+            $anzahl = ($exports | Select-String $muster).Count
             Write-Host "$name : $anzahl exportierte k1520-Funktionen"
-            if ($anzahl -lt 30) {
+            if ($anzahl -lt $schwelle) {
               throw "$name exportiert nur $anzahl Funktionen — Export-Makros fehlen (§6.1)"
             }
           }
@@ -248,6 +252,7 @@ jobs:
           path: |
             build/k1520core.dll
             build/k1520disk.dll
+            build/k1520kermit.dll
           if-no-files-found: ignore
           retention-days: 7
 
@@ -327,7 +332,7 @@ jobs:
                 -DK1520_MSVC_STATIC_CRT=ON \
                 -DBUILD_K1520_TESTS=OFF \
                 -DK1520_FORMATS_DEFAULT=
-          cmake --build build_dist -j --target k1520core k1520disk
+          cmake --build build_dist -j --target k1520core k1520disk k1520kermit
 
       # Der eigentliche Beweis.  Ein erfolgreicher Bau sagt NICHTS darueber, ob
       # die CRT wirklich drin steckt — das steht nur in der Importtabelle.
@@ -335,7 +340,7 @@ jobs:
         shell: pwsh
         run: |
           $verboten = 'msvcp\d+\.dll|vcruntime\d+\.dll|ucrtbase\.dll|api-ms-win-crt-'
-          foreach ($name in 'k1520core.dll','k1520disk.dll') {
+          foreach ($name in 'k1520core.dll','k1520disk.dll','k1520kermit.dll') {
             $dll = Get-ChildItem -Recurse -Filter $name build_dist | Select-Object -First 1
             if (-not $dll) { throw "$name wurde nicht gebaut" }
             $abh = (& dumpbin /dependents $dll.FullName) |
@@ -458,12 +463,12 @@ jobs:
           # laedt der Assistent Python selbst (uv legt einen Junction an, den
           # der OneDrive-Filtertreiber verweigert — os error 448), uv ist dort
           # also gar nicht mehr beteiligt.  `install.ps1` gibt es nicht mehr.
-          for verboten in install.sh launcher.sh disktool_launcher.sh lib install.ps1 uv_pins.txt; do
+          for verboten in install.sh launcher.sh disktool_launcher.sh kermit_launcher.sh lib install.ps1 uv_pins.txt; do
               if [ -e "$paket/$verboten" ]; then
                   echo "FEHLER: $verboten gehoert nicht ins Windows-Paket" >&2; exit 1
               fi
           done
-          for noetig in launcher.cmd disktool_launcher.cmd k1520dbg.cmd slim.py requirements.lock; do
+          for noetig in launcher.cmd disktool_launcher.cmd kermit_launcher.cmd k1520dbg.cmd slim.py requirements.lock; do
               [ -f "$paket/$noetig" ] || { echo "FEHLER: $noetig fehlt" >&2; exit 1; }
           done
           # Die Greaseweazle-Anbindung liegt als fertiges wheel BEI der Payload,
@@ -473,11 +478,12 @@ jobs:
           ls "$paket"/wheels/greaseweazle-*-py3-none-any.whl >/dev/null 2>&1 \
               || { echo "FEHLER: kein plattformunabhaengiges Greaseweazle-wheel" >&2; exit 1; }
           for noetig in bin/k1520core.dll bin/k1520disk.dll bin/k1520disktool-cli.exe \
+                        bin/k1520kermit.dll bin/k1520kermit-cli.exe share/doc/k1520kermit.md \
                         bin/k1520dbg.exe \
                         share/doc/handbuch_k1520dbg.md share/tools/z80_disasm2.py \
                         share/doc/lizenzen/isocline-LICENSE.txt \
                         share/doc/lizenzen/greaseweazle-COPYING.txt \
-                        app/main.py app/disktool/main.py share/k1520emu/formats.yaml; do
+                        app/main.py app/disktool/main.py app/kermittool/main.py share/k1520emu/formats.yaml; do
               [ -f "$paket/payload/$noetig" ] || { echo "FEHLER: payload/$noetig fehlt" >&2; exit 1; }
           done
           echo "$paket" > paket_pfad.txt
@@ -546,7 +552,8 @@ jobs:
           # Was danach dastehen MUSS.  Der Rauchtest hat den Kern schon geladen
           # und das Hauptfenster gebaut; hier geht es um das Ergebnis auf der
           # Platte.
-          foreach ($f in @('bin\a5120emu.cmd', 'bin\k1520disktool.cmd', 'bin\k1520dbg.cmd',
+          foreach ($f in @('bin\a5120emu.cmd', 'bin\k1520disktool.cmd', 'bin\k1520kermit.cmd',
+                           'bin\k1520kermit.dll', 'bin\k1520kermit-cli.exe', 'bin\k1520dbg.cmd',
                            'bin\k1520dbg.exe', 'share\doc\handbuch_k1520dbg.md',
                            'share\tools\z80_disasm2.py',
                            'share\doc\lizenzen\isocline-LICENSE.txt',
@@ -598,7 +605,7 @@ jobs:
           # COM) — und sie zeigen auf pythonw.exe, nicht auf die .cmd: eine
           # Verknuepfung auf eine Batchdatei oeffnet immer ein Konsolenfenster.
           $menue = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\K1520emu'
-          foreach ($lnk in @('A5120-Emulator.lnk', 'k1520DiskTool.lnk')) {
+          foreach ($lnk in @('A5120-Emulator.lnk', 'k1520DiskTool.lnk', 'K1520 Kermit.lnk')) {
             if (-not (Test-Path -LiteralPath (Join-Path $menue $lnk))) { throw "Verknuepfung fehlt: $lnk" }
           }
           $sh = New-Object -ComObject WScript.Shell

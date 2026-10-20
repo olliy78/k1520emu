@@ -103,6 +103,10 @@ Combo-Disketten mit Fremdlaufwerkstypen. Sie landen beim ersten Start im Diskett
   sie liegen außerhalb der Installation, im Diskettenordner.
 - **Mitgeliefert ist außerdem das `k1520DiskTool`** — damit holt man Dateien von CP/A-,
   SCPX- und UDOS-Disketten heraus und schreibt sie zurück (`.img`, `.hfe`, `.dmk`).
+- **Und `K1520 Kermit`** — Dateiaustausch mit der WEGA des P8000 (oder einem anderen
+  Kermit) über Telnet oder RFC 2217, als Client und als Server; mit Oberfläche
+  (Startmenü) und Kommandozeile (`k1520kermit-cli`). Die mitgelieferte
+  WEGA-3.1-Platte hat den Benutzer `kermit` schon eingerichtet.
 - **Und der Debugger `k1520dbg`** — ein Werkzeug für die Konsole, mit dem sich fremde
   Programme Schritt für Schritt untersuchen lassen (Haltepunkte, Register, Speicher,
   Rückwärtslaufen). Er hat bewusst kein eigenes Symbol; unter Windows führt der

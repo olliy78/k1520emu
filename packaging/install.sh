@@ -55,7 +55,8 @@ MASCHINEN="a5120emu k8915emu prg710emu pc1715emu p8000emu mc80emu"
 # Startmenue-Eintrag: das k1520DiskTool tauscht Dateien mit Disketten aus
 # (doc/design/13_k1520disktool.md).  Wie bei den Maschinen gilt: ein neuer Name
 # gehoert hier hinein UND braucht eine <name>.desktop.in.
-WERKZEUGE="k1520disktool"
+# `k1520kermit` (AP K9, Entwurf 36) tauscht Dateien mit der WEGA (P8000) aus.
+WERKZEUGE="k1520disktool k1520kermit"
 
 # Werkzeuge OHNE Oberflaeche: sie bekommen einen Verweis in ~/.local/bin, aber
 # keinen Startmenue-Eintrag und kein Symbol.  `k1520dbg` ist der Debugger — ein
@@ -63,7 +64,8 @@ WERKZEUGE="k1520disktool"
 # Doppelklick startet (doc/design/13_distribution.md §10a.2).  `k1520disktool-cli`
 # ist die Kommandozeile des Diskettenwerkzeugs; sie stand bis 2026-08-18 in
 # KEINER Liste und blieb beim Deinstallieren als toter Verweis liegen.
-KONSOLENWERKZEUGE="k1520dbg k1520disktool-cli"
+# `k1520kermit-cli` ist die Kommandozeile von K1520 Kermit, gleich geschnitten.
+KONSOLENWERKZEUGE="k1520dbg k1520disktool-cli k1520kermit-cli"
 
 # Alles, was einen Starter/Eintrag bekommt — nur fuer das Aufraeumen gedacht.
 STARTER="$MASCHINEN $WERKZEUGE"
@@ -469,6 +471,13 @@ ersetze_platzhalter "$SELF_DIR/disktool_launcher.sh" "$PREFIX" "$DATEN" > "$PREF
 chmod +x "$PREFIX/bin/k1520disktool"
 [ -f "$PREFIX/bin/k1520disktool-cli" ] && chmod +x "$PREFIX/bin/k1520disktool-cli"
 
+# K1520 Kermit: ebenso — Kommandozeile bin/k1520kermit-cli aus der Payload, hier der
+# Starter der Oberflaeche (eigene Vorlage wie beim DiskTool; der Name der Datei in
+# bin/ ist ein Eintrag im Inventar von `bin`, es braucht keine eigene Zeile im Ausweis).
+ersetze_platzhalter "$SELF_DIR/kermit_launcher.sh" "$PREFIX" "$DATEN" > "$PREFIX/bin/k1520kermit"
+chmod +x "$PREFIX/bin/k1520kermit"
+[ -f "$PREFIX/bin/k1520kermit-cli" ] && chmod +x "$PREFIX/bin/k1520kermit-cli"
+
 if [ "$SHORTCUTS" = yes ]; then
     mkdir -p "$BINDIR" "$APPDIR" "$ICONDIR"
     ln -sf "$PREFIX/bin/a5120emu" "$BINDIR/a5120emu"
@@ -495,6 +504,10 @@ if [ "$SHORTCUTS" = yes ]; then
     ersetze_platzhalter "$SELF_DIR/k1520disktool.desktop.in" "$PREFIX" \
         > "$APPDIR/k1520disktool.desktop"
 
+    ln -sf "$PREFIX/bin/k1520kermit" "$BINDIR/k1520kermit"
+    ersetze_platzhalter "$SELF_DIR/k1520kermit.desktop.in" "$PREFIX" \
+        > "$APPDIR/k1520kermit.desktop"
+
     # Die Konsolenwerkzeuge: nur ein Verweis, kein Eintrag im Startmenue.  Ein
     # Debugger, der per Doppelklick startet, oeffnete ein Fenster, das mangels
     # Diskette sofort wieder zuginge (§10a.2 des Entwurfs).
@@ -505,7 +518,7 @@ if [ "$SHORTCUTS" = yes ]; then
     if have update-desktop-database; then
         update-desktop-database "$APPDIR" >/dev/null 2>&1 || true
     fi
-    ok "Startmenue-Eintraege und $BINDIR/{a5120emu,k8915emu,prg710emu,pc1715emu,p8000emu,mc80emu,k1520disktool}"
+    ok "Startmenue-Eintraege und $BINDIR/{a5120emu,k8915emu,prg710emu,pc1715emu,p8000emu,mc80emu,k1520disktool,k1520kermit}"
     case ":$PATH:" in
         *":$BINDIR:"*) ;;
         *) warn "$BINDIR liegt nicht im PATH — der Emulator startet trotzdem ueber das Startmenue" ;;
@@ -538,6 +551,10 @@ from app import paths
 lib = ctypes.CDLL(str(paths.core_library()))
 lib.k1520_version.restype = ctypes.c_char_p
 print("     Kern:      ", lib.k1520_version().decode())
+# K1520 Kermit: eigene Bibliothek; geladen und nach ihrer Fassung gefragt.
+klib = ctypes.CDLL(str(paths.kermit_library()))
+klib.k1520k_version.restype = ctypes.c_char_p
+print("     Kermit:    ", klib.k1520k_version().decode())
 # Die Bibliothek und die mitgelieferte VERSION-Datei sollen dieselbe Bauversion
 # nennen (doc/ci_pipeline.md §7.2) — sonst zeigte das Ueber-Fenster zweierlei.
 # Nur eine Warnung: mit `build_payload.sh --skip-build --version X` von Hand
@@ -621,6 +638,8 @@ printf "     Installiert:  %s (%s)\n" "$PREFIX" \
 printf "     Starten:      %s  (K8915: %s, PRG710: %s, PC1715: %s, P8000: %s, MC80: %s)\n" "$PREFIX/bin/a5120emu" "$PREFIX/bin/k8915emu" "$PREFIX/bin/prg710emu" "$PREFIX/bin/pc1715emu" "$PREFIX/bin/p8000emu" "$PREFIX/bin/mc80emu"
 printf "     Diskettenwerkzeug: %s  (Kommandozeile: %s)\n" \
     "$PREFIX/bin/k1520disktool" "$PREFIX/bin/k1520disktool-cli"
+printf "     Kermit (WEGA/P8000): %s  (Kommandozeile: %s)\n" \
+    "$PREFIX/bin/k1520kermit" "$PREFIX/bin/k1520kermit-cli"
 if [ "$SHORTCUTS" = yes ]; then
     printf "     oder einfach: a5120emu / k8915emu / prg710emu / pc1715emu / p8000emu / mc80emu   (bzw. ueber das Startmenue)\n"
 fi

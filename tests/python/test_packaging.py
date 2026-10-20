@@ -30,8 +30,12 @@ from conftest import PROJECT_ROOT, ausgelieferte_diskette, requires_core
 
 PACKAGING = PROJECT_ROOT / "packaging"
 SCRIPTS = ["install.sh", "build_payload.sh", "launcher.sh",
-           "disktool_launcher.sh", "lib/common.sh"]
-MAX_INSTALL_MB = 160   # frisch geschlankt sind es ~146 MB (§8 des Entwurfs)
+           "disktool_launcher.sh", "kermit_launcher.sh", "lib/common.sh"]
+# Frisch geschlankt sind es ~146 MB OHNE Disketten (§8 des Entwurfs).  Mit der Vorgabeauswahl
+# kamen die P8000-WEGA-Saetze dazu (~13 MB, seit 2026-10-11) und K1520 Kermit (~2,4 MB,
+# AP K9); gemessen 2026-10-20: 179 MB.  Die alte Schranke 160 war dadurch unbemerkt
+# gerissen, weil dieser Fall hinter K1520_PACKAGING_FULL=1 steht.
+MAX_INSTALL_MB = 185
 
 
 def _sh(*args, **kw):
@@ -99,6 +103,7 @@ def test_disktool_launcher_hat_den_platzhalter():
 @pytest.mark.parametrize("starter,einstieg", [
     ("launcher.sh", "app/main.py"),
     ("disktool_launcher.sh", "app/disktool/main.py"),
+    ("kermit_launcher.sh", "app/kermittool/main.py"),
 ])
 def test_starter_haben_ihre_platzhalter(starter, einstieg):
     """@ROOT@/@DATEN@ setzt der Installer ein — bleibt einer stehen, startet nichts.
@@ -150,6 +155,7 @@ def test_lock_nagelt_mit_hashes_fest():
     ("p8000emu.desktop.in", "p8000emu"),
     ("mc80emu.desktop.in", "mc80emu"),
     ("k1520disktool.desktop.in", "k1520disktool"),
+    ("k1520kermit.desktop.in", "k1520kermit"),
 ])
 def test_desktop_eintrag_ist_gueltig(datei, starter):
     text = (PACKAGING / datei).read_text(encoding="utf-8")
@@ -533,6 +539,7 @@ def test_dokumentenordner_shell_und_python_stimmen_ueberein(tmp_path, aufbau):
     ("k8915emu.desktop.in", "k8915emu"),
     ("prg710emu.desktop.in", "prg710emu"),
     ("k1520disktool.desktop.in", "k1520disktool"),
+    ("k1520kermit.desktop.in", "k1520kermit"),
 ])
 def test_desktop_exec_ist_gequotet(datei, starter):
     """Ein Pfad mit Leerzeichen macht ein ungequotetes ``Exec=`` unbrauchbar."""
@@ -747,7 +754,7 @@ def test_cmd_starter_sind_reines_ascii():
     stuende damit ausgerechnet in der Fehlermeldung, die ein Anwender zu sehen
     bekommt, wenn etwas schiefgeht.
     """
-    for name in ("launcher.cmd", "disktool_launcher.cmd"):
+    for name in ("launcher.cmd", "disktool_launcher.cmd", "kermit_launcher.cmd"):
         text = (PACKAGING / name).read_bytes()
         unerlaubt = [b for b in text if b > 0x7F]
         assert not unerlaubt, (
@@ -1026,6 +1033,7 @@ def test_iss_baut_die_adresse_aus_den_pins():
 @pytest.mark.parametrize("starter,einstieg", [
     ("launcher.cmd", r"app\main.py"),
     ("disktool_launcher.cmd", r"app\disktool\main.py"),
+    ("kermit_launcher.cmd", r"app\kermittool\main.py"),
 ])
 def test_windows_starter_haben_ihre_platzhalter(starter, einstieg):
     """Wie bei den .sh-Startern: beide Platzhalter, sonst startet nichts."""
@@ -1129,7 +1137,7 @@ def test_windows_starter_nennen_kein_verschwundenes_skript():
     fehlt — ein Hinweis auf eine Datei, die es nicht mehr gibt, schickt ihn in
     die Irre.
     """
-    for name in ("launcher.cmd", "disktool_launcher.cmd"):
+    for name in ("launcher.cmd", "disktool_launcher.cmd", "kermit_launcher.cmd"):
         text = (PACKAGING / name).read_text(encoding="utf-8")
         assert "install.ps1" not in text, f"{name} verweist noch auf install.ps1"
 
@@ -1421,6 +1429,18 @@ def test_payload_enthaelt_alles_zum_starten(payload):
         "payload/app/disktool/ui/main_window.py",
         "payload/app/core_binding/k1520disk.py",
         "disktool_launcher.sh", "k1520disktool.desktop.in",
+        # K1520 Kermit (Entwurf 36, AP K9): Bibliothek, Kommandozeile, Oberflaeche
+        # samt Handbuch, Starter, Eintrag.  Ohne die Bibliothek starte die Oberflaeche
+        # beim Anwender mit „libk1520kermit.so nicht gefunden"; ohne `-cli` stuende unter
+        # `bin/k1520kermit` nur der Starter.
+        "payload/bin/libk1520kermit.so",
+        "payload/bin/k1520kermit-cli",
+        "payload/share/doc/k1520kermit.md",
+        "payload/app/kermittool/main.py",
+        "payload/app/kermittool/binding.py",
+        "payload/app/kermittool/help/handbuch.md",
+        "payload/app/kermittool/ui/main_window.py",
+        "kermit_launcher.sh", "k1520kermit.desktop.in",
     ]:
         assert (stage / pflicht).exists(), f"{pflicht} fehlt im Paket"
 
@@ -1541,8 +1561,8 @@ def test_installation_laeuft_durch_und_startet(tmp_path):
     inst = subprocess.run(["sh", str(stage / "install.sh"), "--prefix", str(ziel)],
                           capture_output=True, text=True, env=umgebung, timeout=1800)
     assert inst.returncode == 0, inst.stdout + inst.stderr
-    assert "läuft" in inst.stdout, "Rauchtest des Installers hat nicht bestätigt"
-    assert "Oberfläche: baut auf" in inst.stdout, \
+    assert "laeuft" in inst.stdout, "Rauchtest des Installers hat nicht bestätigt"
+    assert "Oberflaeche: baut auf" in inst.stdout, \
         "Rauchtest hat das Fenster nicht gebaut — Qt-Plugins ungeprüft"
     # Der Rauchtest muss die INSTALLATION geprueft haben, nicht zufaellig den
     # Baum, aus dem heraus er gestartet wurde (sys.path[0] = Arbeitsverzeichnis).
@@ -1561,12 +1581,22 @@ def test_installation_laeuft_durch_und_startet(tmp_path):
     assert (heim / ".local" / "share" / "applications" / "p8000emu.desktop").is_file()
     assert os.access(ziel / "bin" / "mc80emu", os.X_OK)
     assert (heim / ".local" / "share" / "applications" / "mc80emu.desktop").is_file()
+    # K1520 Kermit (AP K9): Starter, Kommandozeile, Eintrag, Verweise — und der
+    # Rauchtest hat die Bibliothek geladen und nach ihrer Fassung gefragt.
+    assert os.access(ziel / "bin" / "k1520kermit", os.X_OK)
+    assert os.access(ziel / "bin" / "k1520kermit-cli", os.X_OK)
+    assert (heim / ".local" / "share" / "applications" / "k1520kermit.desktop").is_file()
+    assert (heim / ".local" / "bin" / "k1520kermit").is_symlink()
+    assert (heim / ".local" / "bin" / "k1520kermit-cli").is_symlink()
+    assert "Kermit:" in inst.stdout, "Rauchtest hat die Kermit-Bibliothek nicht geladen"
     # Beispieldisketten liegen beim Anwender, nicht in der Installation — und
     # kommen dort AUSGEPACKT und bitgleich an (im Paket liegen sie gepackt).
     nutzer_disks = heim / "Dokumente" / "K1520emu" / "Disketten"
     ausgepackt = sorted(nutzer_disks.glob("Beispieldisketten_*/*/*.hfe"))
     assert ausgepackt
-    assert not list(nutzer_disks.rglob("*.gz")), "gepackte Datei blieb beim Anwender liegen"
+    # Platten `*.img.gz` bleiben gepackt (Merkposten p8000 Nr. 56) — der Emulator schliesst sie so an.
+    assert not [g for g in nutzer_disks.rglob("*.gz") if not g.name.endswith(".img.gz")], \
+        "gepackte Datei blieb beim Anwender liegen"
     for f in ausgepackt:
         assert f.read_bytes() == ausgelieferte_diskette(f.name).read_bytes(), \
             f"{f.name} kam beschädigt beim Anwender an"
@@ -1634,13 +1664,17 @@ def test_installation_laeuft_durch_und_startet(tmp_path):
     assert str(ziel) in erneut.stdout, "Update fand die bestehende Installation nicht"
     assert not (heim / "K1520emu").exists(), "Update legte eine zweite Installation an"
     assert "erneuert" in erneut.stdout, "bestehende Laufzeitumgebung nicht erneuert"
-    assert "läuft" in erneut.stdout
+    assert "laeuft" in erneut.stdout
 
     # Deinstallieren OHNE --prefix: der Pfad kommt aus dem Starter-Symlink.
     deinst = subprocess.run(["sh", str(stage / "install.sh"), "--uninstall"],
                             capture_output=True, text=True, env=umgebung, timeout=300)
     assert deinst.returncode == 0, deinst.stderr
     assert not ziel.exists(), "Deinstallieren fand die Installation nicht"
+    for rest in ("k1520kermit", "k1520kermit-cli"):
+        assert not os.path.lexists(heim / ".local" / "bin" / rest), \
+            f"Deinstallieren liess den Verweis {rest} liegen"
+    assert not (heim / ".local" / "share" / "applications" / "k1520kermit.desktop").exists()
     assert any(nutzer_disks.rglob("*.hfe")), "Deinstallieren hat Anwenderdisketten gelöscht"
     assert not (heim / ".local" / "bin" / "python3.12").exists(), \
         "uv hat einen Python-Symlink im PATH des Anwenders hinterlassen"
@@ -1723,10 +1757,151 @@ def test_deinstallieren_raeumt_auch_das_werkzeug_weg():
     zurueck und zeigte auf ein geloeschtes Verzeichnis.
     """
     text = (PACKAGING / "install.sh").read_text(encoding="utf-8")
-    assert 'WERKZEUGE="k1520disktool"' in text
+    assert 'WERKZEUGE="k1520disktool k1520kermit"' in text
     assert 'STARTER="$MASCHINEN $WERKZEUGE"' in text
     assert 'for _m in $STARTER; do' in text, \
         "die Aufräumschleife läuft noch über $MASCHINEN und übersieht das Werkzeug"
+
+
+# ─── K1520 Kermit im Paket (Entwurf 36, AP K9) ───────────────────────────────
+#
+# Geschnitten wie das DiskTool: eigene Bibliothek, Kommandozeile unter `-cli`, eigener
+# Starter.  Der Name `k1520kermit` ist doppelt belegt (Quellbaum: Kommandozeile,
+# Installation: Starter) — genau daran haengen die Faelle.
+
+def test_kermit_ist_in_allen_paketwegen():
+    """Bauen, Nutzlast, Starter, Eintrag, Aufraeumliste, Rauchtests — in jedem Weg."""
+    bp = (PACKAGING / "build_payload.sh").read_text(encoding="utf-8")
+    assert "k1520dbg k1520kermit k1520kermit_cli" in bp, "Kermit fehlt in der Zielliste des Bauschritts"
+    assert '"$BUILD_DIR/$K1520_KERMIT_LIB" "$STAGE/payload/bin/$K1520_KERMIT_LIB"' in bp
+    assert '"$STAGE/payload/bin/$_kcli_ziel"' in bp and 'k1520kermit-cli.exe' in bp, \
+        "die Kommandozeile muss unter -cli abgelegt werden (bin/k1520kermit ist der Starter)"
+    assert '[ -f "$BUILD_DIR/$K1520_KERMIT_LIB" ]' in bp and '[ -f "$BUILD_DIR/$K1520_KERMIT_CLI" ]' in bp, \
+        "ohne Pruefung schnuert ein Fehlbau klaglos ein Paket ohne Kermit"
+    assert "kermit_launcher.sh" in bp and "kermit_launcher.cmd" in bp and "k1520kermit.desktop.in" in bp
+    assert 'tools/k1520kermit.md' in bp
+    common = (PACKAGING / "lib" / "common.sh").read_text(encoding="utf-8")
+    assert "libk1520kermit.so" in common and "k1520kermit.dll" in common
+
+    inst = (PACKAGING / "install.sh").read_text(encoding="utf-8")
+    assert 'WERKZEUGE="k1520disktool k1520kermit"' in inst
+    assert 'KONSOLENWERKZEUGE="k1520dbg k1520disktool-cli k1520kermit-cli"' in inst
+    assert 'ersetze_platzhalter "$SELF_DIR/kermit_launcher.sh"' in inst
+    assert '> "$PREFIX/bin/k1520kermit"' in inst
+    assert "k1520kermit.desktop.in" in inst
+    assert "k1520k_version" in inst and "paths.kermit_library()" in inst
+
+    iss = (PACKAGING / "k1520emu.iss").read_text(encoding="utf-8")
+    assert 'kermit_launcher.cmd";    Flags: dontcopy' in iss, "Vorlage muss dontcopy sein (PrepareToInstall)"
+    assert r"{app}\bin\k1520kermit.cmd" in iss
+    assert r"{app}\app\kermittool\main.py" in iss and 'Name: "{group}\\K1520 Kermit"' in iss
+    assert "k1520k_version" in iss and "paths.kermit_library()" in iss
+
+    wf = PROJECT_ROOT / ".github" / "workflows"
+    rel = (wf / "release.yml").read_text(encoding="utf-8")
+    assert rel.count("k1520k_version") >= 2, "beide Release-Jobs muessen k1520k_version pruefen"
+    assert "libk1520kermit.so" in rel and "k1520kermit.dll" in rel and "k1520kermit-cli" in rel
+    win = (wf / "windows-ci.yml").read_text(encoding="utf-8")
+    assert win.count("k1520kermit.dll") >= 4, "dumpbin /exports, /dependents, Bau und Paketpruefung"
+    assert "k1520k_[a-z0-9_]+" in win
+    assert "--target k1520core k1520disk k1520kermit" in win
+    assert "kermit_launcher.cmd" in win and "kermit_launcher.sh" in win
+
+
+def test_kermit_cli_name_im_installationslayout(tmp_path):
+    """`bin/k1520kermit` ist dort der Starter — die Kommandozeile wird als `-cli` gefunden."""
+    wurzel = tmp_path / "installation"
+    (wurzel / "bin").mkdir(parents=True)
+    (wurzel / "app").mkdir()
+    (wurzel / "bin" / "k1520kermit").write_text("#!/bin/sh\n")          # der Starter
+    (wurzel / "bin" / "k1520kermit-cli").write_text("#!/bin/sh\n")      # die Kommandozeile
+    for name in (wurzel / "bin" / "k1520kermit", wurzel / "bin" / "k1520kermit-cli"):
+        name.chmod(0o755)
+    umgebung = dict(os.environ, K1520_HOME=str(wurzel))
+    out = _sh(sys.executable, "-c",
+              "import sys; sys.path.insert(0, sys.argv[1]);"
+              "from app import paths; print(paths.kermit_cli())", str(PROJECT_ROOT), env=umgebung)
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.strip() == str(wurzel / "bin" / "k1520kermit-cli"), \
+        "die Kommandozeile wurde mit dem Starter verwechselt"
+
+
+@requires_core
+def test_kermit_findet_seine_bibliothek_im_installationslayout(tmp_path):
+    """Dieselbe Aufloesung wie beim DiskTool: ``<wurzel>/bin``, nicht nur ``build/``."""
+    wurzel = tmp_path / "installation"
+    (wurzel / "bin").mkdir(parents=True)
+    (wurzel / "app").mkdir()
+    for name in ("libk1520core.so", "libk1520kermit.so"):
+        (wurzel / "bin" / name).write_bytes(b"\x7fELF-attrappe")
+    umgebung = dict(os.environ, K1520_HOME=str(wurzel))
+    out = _sh(sys.executable, "-c",
+              "import sys; sys.path.insert(0, sys.argv[1]);"
+              "from app import paths;"
+              "print(paths.kermit_library()); print(paths.describe())",
+              str(PROJECT_ROOT), env=umgebung)
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.splitlines()[0] == str(wurzel / "bin" / "libk1520kermit.so")
+    assert f"Kermit-Bibliothek: {wurzel / 'bin' / 'libk1520kermit.so'}" in out.stdout
+
+
+@requires_core
+def test_kermit_aus_dem_paket_laeuft_und_ist_sauber(payload):
+    """Der geschnuerte Stand, nicht ``build/``: Kommandozeile startet, Bibliothek laedt,
+    der Einstieg der Oberflaeche loest seine Pfade im Installationslayout auf, und im
+    Binaerabbild steht kein Pfad des Baurechners."""
+    import ctypes
+
+    stage = _stage(payload)
+    bin_ = stage / "payload" / "bin"
+    cli = bin_ / "k1520kermit-cli"
+    assert os.access(cli, os.X_OK), "die Kommandozeile ist nicht ausführbar"
+    hilfe = _sh(str(cli), "--help")
+    assert hilfe.returncode == 0, hilfe.stderr
+    assert "k1520kermit" in hilfe.stdout
+
+    lib = ctypes.CDLL(str(bin_ / "libk1520kermit.so"))
+    lib.k1520k_version.restype = ctypes.c_char_p
+    assert lib.k1520k_version().decode(), "k1520k_version() meldet nichts"
+
+    # Wie der Rauchtest in release.yml: --paths steht vor allen Qt-Importen.
+    umgebung = dict(os.environ, K1520_HOME=str(stage / "payload"))
+    pfade = _sh(sys.executable, str(stage / "payload" / "app" / "kermittool" / "main.py"),
+                "--paths", env=umgebung)
+    assert pfade.returncode == 0, pfade.stderr
+    assert "NICHT GEFUNDEN" not in pfade.stdout, pfade.stdout
+    assert str(bin_ / "libk1520kermit.so") in pfade.stdout
+    assert str(cli) in pfade.stdout, "Kermit (CLI) loest im Paket nicht auf"
+
+    for datei in (bin_ / "libk1520kermit.so", cli):
+        roh = datei.read_bytes()
+        for ordner in ("data", "disks", "doc"):
+            assert bytes(str(PROJECT_ROOT / ordner), "utf-8") not in roh, \
+                f"Datenordner des Baurechners ({ordner}/) in {datei.name}"
+
+
+@requires_core
+def test_die_wega_platte_mit_kermit_benutzer_liegt_im_paket(payload):
+    """`p8000_wega31/` bringt die Platte MIT dem Benutzer `kermit` (Shell /bin/sh).
+
+    Im Paket liegt sie doppelt gepackt (`*.img.gz.gz`, Merkposten p8000 Nr. 56); der
+    Passwd-Eintrag steht im Abbild im Klartext.
+    """
+    import gzip
+
+    stage = _stage(payload)
+    ordner = stage / "payload" / "share" / "disks" / "p8000_wega31"
+    platte = ordner / "p8000_wega31_platte.avr.img.gz.gz"
+    assert platte.is_file(), "die WEGA-3.1-Platte fehlt im Paket"
+    assert (ordner / "README.md").is_file(), "das README des Plattenordners reist nicht mit"
+    with gzip.open(platte, "rb") as aussen:
+        abbild = gzip.decompress(aussen.read())     # innen noch einmal .img.gz
+    assert b"\nkermit:" in abbild and b":/usr/kermit:/bin/sh" in abbild, \
+        "der Benutzer kermit fehlt auf der ausgelieferten Platte"
+    # Und sie ist die eingecheckte (nicht eine veraltete Fassung).
+    original = PROJECT_ROOT / "disks" / "p8000_wega31" / "p8000_wega31_platte.avr.img.gz"
+    with gzip.open(platte, "rb") as f:
+        assert f.read() == original.read_bytes()
 
 
 # ─── Der Debugger im Paket (Entwurf §10a) ────────────────────────────────────

@@ -1,7 +1,7 @@
 # 36 — Kermit: Datenaustausch Host-PC ↔ WEGA (P8000)
 
-Stand 2026-10-20 (AP K8), Zweig `kermit` (von `P8000`): **K0–K8 fertig**, offen K9 (Paket/CI) und das
-optionale K2b; offene Einzelpunkte in §7.  Zwei Teile: **(A)** Kermit auf der WEGA-3.1-Platte
+Stand 2026-10-20 (AP K9), Zweig `kermit` (von `P8000`): **K0–K9 fertig** (K9: Paket lokal belegt, Inno/MSVC nur
+in der CI), offen nur das optionale K2b; offene Einzelpunkte in §7.  Zwei Teile: **(A)** Kermit auf der WEGA-3.1-Platte
 einrichten (Server hinter `getty`, Client in der Shell), **(B)** ein eigenes Kermit für den PC
 (C++-Bibliothek + Kommandozeile + Python/Qt-Oberfläche), Client **und** Server.
 Merkposten (seit AP K7): `doc/merkposten/kermit.md`.
@@ -190,7 +190,7 @@ anfassen, laufen nacheinander oder im eigenen Worktree.
 | **K6** | **Oberfläche** `app/kermittool/` (beide Modi, Verbindungsdialog, Fortschritt, Drag&Drop, Handbuch, Konfiguration). | `py_kermit_gui` (offscreen), Kürzelwächter | sonnet | fertig — `01786b1` |
 | **K7** | **Gegenprobe am echten C-Kermit 4.2:** beide Richtungen im Emulator (Fall 1 und Fall 2), Messung der 8-Bit-Sauberkeit, Durchsatz, Fristen; Befunde in Vorgaben §5 einarbeiten. | `P8000WegaKermit.*` (Label `wega_install`), `tools/dev.sh test-wega` | opus | fertig — `d52bdd2`, `cda77bb` |
 | **K8** | **Doku:** Handbuch, `doc/merkposten/kermit.md` (+ README-Eintrag), `CLAUDE.md`-Kurzabsatz, `disks/…/README.md`, Entwurf 36 auf Stand. | — | sonnet | fertig (§6.6) |
-| **K9** | *(wenn K1–K8 grün)* **Paket/CI:** Linux-Paket (`build_payload.sh`), Inno-Setup, `windows-ci.yml`, Starter `k1520kermit`. | `py_packaging`, `py_programme` | sonnet | offen |
+| **K9** | *(wenn K1–K8 grün)* **Paket/CI:** Linux-Paket (`build_payload.sh`), Inno-Setup, `windows-ci.yml`, Starter `k1520kermit`. | `py_packaging`, `py_programme` | sonnet | fertig (§6.7) — `0f78cfc` |
 | K2b | *(optional)* Schiebefenster, `G T`/`G U`, Wiederaufnahme. | — | — | offen (optional) |
 
 Reihenfolge: **K1 ‖ K2** (K2 im Worktree) → K3 → K4 → K5 ‖ K6 → K7 → K8 → K9.
@@ -312,7 +312,7 @@ Abweichungen/Festlegungen mit Grund:
    ist ein eigener Fall.
 
 Offen: Windows-Bau/CI-Lauf der DLL (`tools/dev.sh win` siehe Stand unten), K5 (Kommandozeile) und K6 (Oberfläche)
-benutzen die Bibliothek bzw. die Bindung; `k1520kermit` ist noch nicht im Paket (K9).
+benutzen die Bibliothek bzw. die Bindung; `k1520kermit` ist seit K9 im Paket (§6.7).
 
 ### 6.3 Stand K5 (2026-10-18)
 
@@ -492,15 +492,40 @@ Wiederverbinden ohne Anmeldung nach bloßem *Trennen* in der Oberfläche (nur an
 ohne 8-Bit-Präfix.  Dazu: `CLAUDE.md`-Kurzabsatz, §6-Statusspalte, §7.  Merkposten (`doc/merkposten/kermit.md`,
 README-Eintrag) und `disks/p8000_wega31/README.md` waren seit K7 aktuell.
 
+### 6.7 Stand K9 (2026-10-20) — Paket und CI
+
+**Fertig, lokal belegt:** das Linux-Paket schnürt (`packaging/build_payload.sh`, Bau in `build_dist/`) und enthält
+`bin/libk1520kermit.so`, `bin/k1520kermit-cli`, `share/doc/k1520kermit.md`, `app/kermittool/` samt `help/handbuch.md`,
+`kermit_launcher.sh` und `k1520kermit.desktop.in`.  Geschnitten **wie das DiskTool**, nicht wie ein Emulator:
+`launcher.*` wählt am Namen ein Maschinenprofil (`app/profil.py`), Kermit hat keines — also eigene Vorlage
+`kermit_launcher.sh/.cmd`.  `bin/k1520kermit` ist in der Installation der **Starter**, die Kommandozeile heißt dort
+`bin/k1520kermit-cli` (im Quellbaum bleibt `build/k1520kermit` die Kommandozeile; `paths.kermit_cli()` fragt erst den
+`-cli`-Namen).  `app/paths.py::kermit_library()` löste im Installationslayout schon vorher auf (`--paths` zeigt
+`Kermit-Bibliothek` und neu `Kermit (CLI)`); die einzige Änderung dort ist `kermit_cli()`.  Weder Bibliothek noch
+Kommandozeile tragen einen Pfad des Baurechners (kein Formatkatalog), geprüft in `py_packaging`
+(`test_kermit_aus_dem_paket_laeuft_und_ist_sauber`) und im Rauchtest von `release.yml`.
+`install.sh`: Starter, Verweis, `.desktop`, Rauchtest (`k1520k_version`), Schlussmeldung; Deinstallieren über
+`WERKZEUGE`/`KONSOLENWERKZEUGE` (Ausweis unverändert — alles liegt unter `bin app share`).  Die WEGA-3.1-Platte mit dem
+Benutzer `kermit` (`p8000_wega31/`) kommt über die bestehende `p8000_*`-Regel mit (Wächter
+`test_die_wega_platte_mit_kermit_benutzer_liegt_im_paket`: Passwd-Zeile im Abbild, bitgleich zur eingecheckten Platte).
+Wächter: `test_kermit_ist_in_allen_paketwegen` (Skripte, `.iss`, beide Workflows), `test_kermit_cli_name_im_installationslayout`,
+`test_kermit_findet_seine_bibliothek_im_installationslayout`, dazu die erweiterten Listen (Starter, Desktop-Einträge, ASCII-Starter,
+Nutzlast).  Merkposten: `doc/merkposten/paketierung.md`, Entwurf 13 §10c.
+
+**Nur durch die CI prüfbar (Dateien angepasst, Workflows NICHT ausgelöst):** Inno-Setup-Lauf (`k1520emu.iss`: Symbol *K1520 Kermit*,
+`bin\k1520kermit.cmd`, Rauchtest-Feld 47 Zeilen), MSVC-Bau und `dumpbin /exports` (`k1520k_*`, Schwelle 20, 37 Funktionen) und
+`/dependents` für `k1520kermit.dll`, Paket- und Setup-Prüfung in `windows-ci.yml`, beide Rauchtests in `release.yml`
+(Bibliothek lädt, `k1520k_version` = Bauversion, `--help` der Kommandozeile, `--paths` des Einstiegs).  Die Größenschranke der
+Setup-Probe (136 MB) wurde nicht angefasst; Kermit bringt ~1 MB mit.
+
 ## 7. Offene Aufgaben
 
 Zusammengetragen aus den „Offen"-Listen von §6.1–§6.6, nach Dringlichkeit:
 
-1. **K9 — Paket und CI:** `libk1520kermit`, `k1520kermit` und `app/kermittool` ins Linux-Paket
-   (`build_payload.sh`) und ins Inno-Setup, Starter, `windows-ci.yml` (`dumpbin /exports` auch für
-   `k1520kermit.dll`); Wächter `py_packaging`, `py_programme`.
-2. **Windows:** MinGW-Vorprüfung (`tools/dev.sh win`) und MSVC-Gegenprobe der CI für Bibliothek, CLI und
-   die neuen Tests (Tempo, Austausch, Strg+C nur POSIX geprüft) — bisher nicht gelaufen.
+1. ~~**K9 — Paket und CI**~~ erledigt (§6.7); offen bleibt dort nur der erste echte Lauf von `release.yml`/`windows-ci.yml`
+   (Paketjob mit `-f paket=true`) — siehe 2.
+2. **Windows:** MinGW-Vorpruefung gruen (`tools/dev.sh win -R kermit`, 192/192 unter wine, K9).  Offen: MSVC-Gegenprobe der CI für Bibliothek, CLI, die neuen Tests (Tempo, Austausch, Strg+C nur POSIX
+   geprüft) **und das Paket** (Inno-Setup, Kermit-Symbol, Rauchtest) — bisher nicht gelaufen.
 3. **Empfangsnamen filtern:** Steuer- und 8-Bit-Bytes im Dateinamen eines F-Pakets (beobachtet nach einem
    abgebrochenen Senden des C-Kermit: `leftover`-Rest in `getpkt()`) werden nicht abgefangen.
 4. **Echte 10×-Messung:** im Test schafft die Maschine frei nur ≈ 5,5×; 10× und 0,1× sind nur mit der

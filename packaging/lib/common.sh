@@ -82,6 +82,22 @@ disk_cli_name() {
     if ist_windows; then echo "k1520disktool.exe"; else echo "k1520disktool"; fi
 }
 
+# kermit_lib_name — Bibliothek des K1520 Kermit (Datenaustausch mit der WEGA/P8000,
+# doc/design/36_kermit.md).  Wie das DiskTool eine EIGENE Bibliothek: weder Z80 noch
+# Dateisysteme, dafuer Telnet/RFC 2217.
+kermit_lib_name() {
+    case "$(uname -s)" in
+        Darwin)               echo "libk1520kermit.dylib" ;;
+        MINGW*|MSYS*|CYGWIN*) echo "k1520kermit.dll" ;;
+        *)                    echo "libk1520kermit.so" ;;
+    esac
+}
+
+# kermit_cli_name — Kommandozeile des K1520 Kermit (unter Windows mit .exe).
+kermit_cli_name() {
+    if ist_windows; then echo "k1520kermit.exe"; else echo "k1520kermit"; fi
+}
+
 # kerne — Anzahl der Prozessorkerne fuers parallele Bauen.
 # `getconf` gibt es in der Git-Bash nicht; Windows setzt NUMBER_OF_PROCESSORS.
 kerne() {

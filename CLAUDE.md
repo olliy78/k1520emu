@@ -881,7 +881,8 @@ Drittes Anwenderprogramm **K1520 Kermit**: Dateiaustausch mit dem C-Kermit 4.2 d
 Kermit) über Telnet/RFC 2217, als Client **und** als Server (Ordnerfreigabe).  Eigene Bibliothek `kermit/`
 (`k1520::kermit`, statisch `k1520kermit_core`, C-ABI `k1520k_*` → **`libk1520kermit`**, ohne Z80/Karten), CLI
 `k1520kermit`, Oberfläche `bash run_kermit.sh` (Handbuch `app/kermittool/help/handbuch.md`), WEGA-Seite fertig auf
-`disks/p8000_wega31/` (Benutzer/Kennwort `kermit`).  Entwurf: `doc/design/36_kermit.md` (Offenes §7).
+`disks/p8000_wega31/` (Benutzer/Kennwort `kermit`).  **Im Paket seit K9** (wie das DiskTool: Starter `bin/k1520kermit` =
+Oberfläche, Kommandozeile `bin/k1520kermit-cli`, eigene Vorlage `kermit_launcher.*`; Entwurf 36 §6.7).  Entwurf: `doc/design/36_kermit.md` (Offenes §7).
 
 > **Vor Arbeiten daran: `doc/merkposten/kermit.md` lesen.** Die teuersten Festlegungen (alle am echten C-Kermit gemessen):
 > - **QBIN-Vorgabe `&`, nicht `Y`** — tty0 löscht Bit 7 auf dem Weg PC → WEGA; mit `Y` schaltet C-Kermit 4.2 kein Präfix ein.

@@ -211,6 +211,15 @@ def kermit_library() -> Path:
     return library(KERMIT_STEM)
 
 
+def kermit_cli() -> Optional[Path]:
+    """Pfad der Kermit-Kommandozeile — oder ``None``.
+
+    Installation: ``bin/k1520kermit-cli`` (``bin/k1520kermit`` ist dort der Starter der
+    Oberfläche); Quellbaum: ``build/k1520kermit``.
+    """
+    return tool(*KERMIT_CLI_NAMEN)
+
+
 def prepare_library_load() -> None:
     """Vorbereitung, damit ``ctypes`` die Bibliothek samt Abhängigkeiten lädt.
 
@@ -663,6 +672,8 @@ DEBUGGER_NAMEN = ("k1520dbg",)
 #: OBERFLAECHE ist; im Quellbaum gibt es nur das eine gebaute Programm.  Die
 #: Reihenfolge ist deshalb bindend — andersherum startete die Konsole eine GUI.
 DISKTOOL_CLI_NAMEN = ("k1520disktool-cli", "k1520disktool")
+#: Wie beim DiskTool: erst der -cli-Name der Installation, dann der Dateiname im Quellbaum.
+KERMIT_CLI_NAMEN = ("k1520kermit-cli", "k1520kermit")
 
 
 def tools_dir() -> Path:
@@ -749,6 +760,7 @@ def describe() -> str:
     bundled = bundled_disks_dir()
     dbg = debugger()
     cli = disktool_cli()
+    kcli = kermit_cli()
     layout = "Installation" if is_installed_layout() else "Quellbaum"
     return "\n".join([
         f"Layout:            {layout}",
@@ -768,5 +780,6 @@ def describe() -> str:
         f"Vorgabe (MC80):    {vorgabe_mc80 if vorgabe_mc80 else 'NICHT GEFUNDEN'}",
         f"Debugger:          {dbg if dbg else '— (nicht mitgeliefert)'}",
         f"DiskTool (CLI):    {cli if cli else '— (nicht mitgeliefert)'}",
+        f"Kermit (CLI):      {kcli if kcli else '— (nicht mitgeliefert)'}",
         f"Handbücher:        {doc_dir() if doc_dir() else '—'}",
     ])
