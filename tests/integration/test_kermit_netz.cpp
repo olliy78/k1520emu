@@ -818,3 +818,89 @@ TEST(KermitNetzHub, KermitGegenEinenEchtenSerialHubKanal) {
     EXPECT_EQ(seite.a.ueberlauf, 0u);
     seite.hub.stop(0);
 }
+
+// ─── Server mit Anmeldezwang (K12): das eigene Login-Skript gegen den eigenen Server ─────────────
+
+namespace {
+
+void serverMitPflichtKopplung(Art art) {
+    Paar p = baue(art, true);
+    ASSERT_TRUE(p.a && p.b) << p.fehler;
+    TempOrdner wurzel, lokal, hol;
+    Freigabe freigabe(wurzel.p);
+    schreibe(wurzel.p / "vorhanden.txt", "auf dem Server");
+    Ergebnis serverErgebnis;
+    std::thread server([&] {
+        Einstellungen e;
+        e.frist_ms = 10000;
+        e.login_pflicht = true;
+        e.login_name = "olli";
+        e.login_kennwort = "geheim";
+        Sitzung s(*p.b, e);
+        serverErgebnis = s.serve(freigabe);
+    });
+
+    // 1. Mit festen Daten.
+    LoginOptionen o = schnell();
+    o.name = "olli";
+    o.kennwort = "geheim";
+    LoginErgebnis lr = loginSkript(*p.a, o);
+    ASSERT_TRUE(lr.ok) << lr.text;
+    {
+        Einstellungen e;
+        e.frist_ms = 10000;
+        Sitzung c(*p.a, e);
+        Ergebnis r = c.holen("vorhanden.txt", hol.s());
+        ASSERT_TRUE(r.ok()) << r.text;
+        EXPECT_EQ(lies(hol.p / "vorhanden.txt"), "auf dem Server");
+        schreibe(lokal.p / "neu.bin", zufall(5000, 7));
+        r = c.senden((lokal.p / "neu.bin").u8string(), "neu.bin");
+        ASSERT_TRUE(r.ok()) << r.text;
+        EXPECT_EQ(lies(wurzel.p / "neu.bin"), zufall(5000, 7));
+        ASSERT_TRUE(c.entferntBeenden().ok());   // FINISH: der Server meldet sich wieder mit login:
+    }
+
+    // 2. Nach FINISH auf Abruf (K10): erst falsches Kennwort -> abgelehnt -> Rueckruf erneut -> richtig.
+    LoginOptionen oa = schnell();
+    std::vector<int> versuche;
+    oa.abfrage = [&](const AnmeldeAnfrage& a, std::string& n, std::string& k) {
+        versuche.push_back(a.versuch);
+        n = "olli";
+        k = a.versuch == 0 ? "falsch" : "geheim";
+        return true;
+    };
+    lr = loginSkript(*p.a, oa);
+    ASSERT_TRUE(lr.ok) << lr.text;
+    EXPECT_EQ(versuche, (std::vector<int>{0, 1}));
+    {
+        Einstellungen e;
+        e.frist_ms = 10000;
+        Sitzung c(*p.a, e);
+        Ergebnis r = c.entferntVerzeichnis("");
+        ASSERT_TRUE(r.ok()) << r.text;
+        EXPECT_NE(r.ausgabe.find("neu.bin"), std::string::npos) << r.ausgabe;
+        ASSERT_TRUE(c.entferntAbmelden().ok());
+    }
+
+    // 3. Ohne Rueckruf und mit falschem Kennwort: Art Abgelehnt.
+    LoginOptionen of = schnell();
+    of.name = "olli";
+    of.kennwort = "nein";
+    lr = loginSkript(*p.a, of);
+    EXPECT_FALSE(lr.ok);
+    EXPECT_EQ(lr.art, LoginArt::Abgelehnt) << lr.text;
+
+    p.a->schliessen();
+    server.join();
+    EXPECT_EQ(serverErgebnis.art, Fehlerart::LeitungGetrennt);
+}
+
+}  // namespace
+
+TEST(KermitServerLoginKopplung, LoginSkriptUndProtokollGegenDenServerMitPflichtTelnet) {
+    serverMitPflichtKopplung(Art::Telnet);
+}
+
+TEST(KermitServerLoginKopplung, LoginSkriptUndProtokollGegenDenServerMitPflichtRfc2217) {
+    serverMitPflichtKopplung(Art::Rfc2217);
+}

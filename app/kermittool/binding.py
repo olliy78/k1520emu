@@ -108,6 +108,7 @@ SIGNATUREN: Dict[str, tuple] = {
     "k1520k_tempo": (ctypes.c_double, [_H]),
     "k1520k_set_max_namenslaenge": (_I, [_H, _I]),
     "k1520k_set_ueberschreiben": (_I, [_H, _I]),
+    "k1520k_set_server_login": (_I, [_H, _I, _CS, _CS]),
     "k1520k_set_callbacks": (_I, [_H, PROGRESS_CB, EVENT_CB, ctypes.c_void_p]),
     "k1520k_send": (_I, [_H, _CS, _CS]),
     "k1520k_get": (_I, [_H, _CS, _CS]),
@@ -315,6 +316,12 @@ class Kermit:
 
     def set_ueberschreiben(self, an: bool) -> None:
         self._pruefe(lib().k1520k_set_ueberschreiben(self._handle(), int(an)))
+
+    def set_server_login(self, pflicht: bool, name: Optional[str] = None, kennwort: Optional[str] = None) -> None:
+        """Server mit Anmeldezwang (wie getty + login der WEGA); None = Name/Kennwort unveraendert."""
+        self._pruefe(lib().k1520k_set_server_login(
+            self._handle(), int(pflicht), None if name is None else _b(name),
+            None if kennwort is None else _b(kennwort)))
 
     def set_callbacks(self, fortschritt: Optional[Callable[[str, int, int], None]] = None,
                       ereignis: Optional[Callable[[str], None]] = None) -> None:

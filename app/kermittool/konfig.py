@@ -5,10 +5,19 @@ Gleicher Aufbau und gleiche Schutzregeln wie bei den Nachbarprogrammen
 FORMATversion, ``geschrieben_von`` nur Auskunft; eine Datei mit hoeherer
 Formatversion wird nicht ueberschrieben.
 
-**Kennwoerter stehen NIE in der Datei.**  Ein Kennwort lebt nur im Verbindungsdialog
-und in der laufenden Sitzung; :func:`ohne_kennwort` entfernt jeden Schluessel
-dieses Namens, bevor etwas geschrieben wird — auch aus der Liste der zuletzt
-benutzten Verbindungen.
+**Zwei Zweige, zwei Regeln fuer Kennwoerter.**
+
+* **CLIENT-Zweig** (``client``, ``zuletzt``): Kennwoerter stehen NIE in der Datei.  Ein
+  Kennwort lebt nur im Verbindungsdialog und in der laufenden Sitzung;
+  :func:`ohne_kennwort` entfernt jeden Schluessel dieses Namens, bevor etwas geschrieben
+  wird — auch aus der Liste der zuletzt benutzten Verbindungen.  (K11 kehrt das fuer
+  den Client um.)
+* **SERVER-Zweig** (``server.login``, K12): der Anmeldezwang des eigenen Servers —
+  ``{pflicht, name, kennwort}`` — wird samt Kennwort im **KLARTEXT** gespeichert.
+  Entscheidung des Anwenders (2026-10-22): kein Schutz der Datei, keine
+  Verschleierung, keine Dateirechte; das Kennwort hat nur eine funktionale Aufgabe
+  (getty + login nachbilden), keine Schutzfunktion.  Der Dialog sagt es offen.
+  :func:`schreiben` filtert diesen einen Schluessel darum NICHT.
 """
 
 from __future__ import annotations
@@ -60,6 +69,9 @@ VERBINDUNG_VORGABE = {
     "login_name": "",
 }
 
+#: Anmeldezwang des eigenen Servers (``server.login`` in ``kermit.yaml``; Klartext, siehe Kopf).
+SERVER_LOGIN_VORGABE = {"pflicht": False, "name": "kermit", "kennwort": "kermit"}
+
 #: Eingebaute Voreinstellungen: (Anzeigename, Verbindung, Kennwort der Sitzung, Uebertragungsaenderungen).
 #: Das Kennwort der WEGA-Voreinstellung ist das dokumentierte des Laborrechners
 #: (doc/p8000/kermit_wega.md §1) — es steht nur hier, nie in der Konfigurationsdatei.
@@ -97,6 +109,19 @@ def ohne_kennwort(daten):
     if isinstance(daten, list):
         return [ohne_kennwort(v) for v in daten]
     return copy.deepcopy(daten)
+
+
+def server_login_aus(daten: Optional[dict]) -> dict:
+    """Anmeldezwang des Servers aus einem Abschnitt; Fehlendes/Unbrauchbares = Vorgabe (kermit/kermit, aus)."""
+    v = dict(SERVER_LOGIN_VORGABE)
+    if not isinstance(daten, dict):
+        return v
+    v["pflicht"] = bool(daten.get("pflicht", v["pflicht"]))
+    for k in ("name", "kennwort"):
+        w = daten.get(k)
+        if isinstance(w, (str, int, float)) and not isinstance(w, bool) and str(w) != "":
+            v[k] = str(w)
+    return v
 
 
 def einstellungen_aus(daten: Optional[dict]) -> dict:
@@ -178,12 +203,19 @@ def laden(datei: Optional[str] = None) -> dict:
 
 
 def schreiben(daten: dict, datei: Optional[str] = None) -> bool:
-    """Schreibt *daten* (Kennwoerter entfernt) mit ``version``/``geschrieben_von``; ``False`` = nichts geschrieben."""
+    """Schreibt *daten* mit ``version``/``geschrieben_von``; ``False`` = nichts geschrieben.
+
+    Kennwoerter werden entfernt (:func:`ohne_kennwort`) — AUSSER dem des Server-Anmeldezwangs
+    ``server.login`` (Klartext, siehe Kopf der Datei).
+    """
     from app import version as _version
     datei = datei or pfad()
     ganz = {"version": config_io.CONFIG_VERSION,
             "geschrieben_von": _version.fassung()}
     ganz.update(ohne_kennwort(daten))
+    srv = daten.get("server")
+    if isinstance(srv, dict) and isinstance(srv.get("login"), dict):
+        ganz.setdefault("server", {})["login"] = server_login_aus(srv["login"])
     try:
         return config_io.save_config(datei, ganz)
     except OSError as e:

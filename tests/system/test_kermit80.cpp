@@ -48,6 +48,7 @@
 #include "tests/support/p8000_input.h"
 #include "tests/support/screen.h"
 #include "tests/support/temp_path.h"
+#include "tests/system/kermit80_hilfen.h"
 #include "tests/system/sertest_hilfen.h"
 
 #ifndef K1520_OSM_P8000_DISK
@@ -653,4 +654,112 @@ TEST(Kermit80Bau, EingechecktesComIstDasErgebnisVonBauPy) {
             << r << ": neu bauen mit python3 tools/kermit80/bau.py " << r << " --out tools/kermit80/kermit_" << r << ".com";
         fs::remove(out);
     }
+}
+
+
+// ─── Kermit-80 meldet sich im Terminalmodus an UNSEREM Server mit Anmeldezwang an (K12) ───────
+// Gegenstueck zu Kermit80Wega: dort spricht getty + login der WEGA, hier `Sitzung::serve` mit
+// `login_pflicht`.  Ablauf wie am Geraet: CONNECT, RETURN bis `login:`, Name, `Password:`, Kennwort, dann
+// Strg-\ `c` zurueck zum Kermit-80-Prompt, REMOTE DIRECTORY, GET, SEND, FINISH.
+
+TEST(Kermit80Pc, MeldetSichAmServerMitAnmeldezwangAn) {
+    stumm();
+    KERMIT80_COM_ODER_SKIP("a5120");
+    const std::string sende = recordAuffuellen("Sendezeile von Kermit-80 an den PC-Server mit Anmeldung.\r\n", 0x1A);
+    Lauf l(com, {{"SENDTEST.TXT", sende}});
+    l.srv.einst.login_pflicht = true;
+    l.srv.einst.login_name = "olli";
+    l.srv.einst.login_kennwort = "geheim";
+    const std::string holtext = "Datei auf dem PC-Server, 7 Bit, mit Anmeldung geholt.\r\n";
+    schreibe(l.srv.frei.p / "holen.txt", holtext);
+    ASSERT_TRUE(l.bereit({"set file-mode binary"}));
+
+    const double scheibe = double(k1520test::kSmallBatch) / 2.4576e6;
+    auto bisText = [&](const std::string& t, double sek) {
+        for (double n = 0; n < sek; n += scheibe) {
+            l.a.schritt();
+            if (l.a.bild().find(t) != std::string::npos) return true;
+        }
+        return false;
+    };
+    auto bisPrompt = [&](double sek, bool aenderung = false, const std::string& vor = "") {
+        return k80h::wartePrompt([&] { l.a.schritt(); }, [&] { return l.a.bild(); }, scheibe, sek, aenderung, vor);
+    };
+    auto befehl = [&](const std::string& cmd, double sek = 600) {
+        k1520test::wipeVram(l.a.m());
+        const std::string vor = l.a.bild();
+        l.a.tippe(cmd + "\r");
+        const bool ok = bisPrompt(sek, true, vor);
+        if (l.b.laut) std::fprintf(stderr, "--- Kermit-80> %s\n%s", cmd.c_str(), l.a.bild().c_str());
+        return ok;
+    };
+    auto anmelden = [&](const std::string& name, const std::string& kennwort) {
+        k1520test::wipeVram(l.a.m());
+        l.a.tippe(name + "\r");
+        if (!bisText("Password:", 30)) return false;
+        l.a.tippe(kennwort + "\r");
+        return true;
+    };
+
+    // ── CONNECT: der Server hat sein erstes `login:` schon gesendet (vor dem CONNECT, ungelesen); ein RETURN ruft es ──
+    l.a.tippe("connect\r");
+    l.a.lauf(2 * 2'457'600);
+    l.a.tippe("\r");
+    ASSERT_TRUE(bisText("login:", 60)) << l.a.bild();
+
+    // ── falsches Kennwort: Login incorrect, danach wieder login: ──
+    ASSERT_TRUE(anmelden("olli", "falsch")) << l.a.bild();
+    ASSERT_TRUE(bisText("Login incorrect", 60)) << l.a.bild();
+    l.a.lauf(2'457'600);
+    EXPECT_NE(l.a.bild().find("login:"), std::string::npos) << "kein erneutes login: nach Login incorrect\n" << l.a.bild();
+    // das Kennwort wurde nicht zurueckgeechot
+    EXPECT_EQ(l.a.bild().find("falsch"), std::string::npos) << l.a.bild();
+
+    // ── richtig anmelden ──
+    ASSERT_TRUE(anmelden("olli", "geheim")) << l.a.bild();
+    ASSERT_TRUE(bisText("server starting", 120)) << l.a.bild();
+    EXPECT_EQ(l.a.bild().find("geheim"), std::string::npos) << "Kennwort im Bild\n" << l.a.bild();
+    l.a.lauf(2'457'600);
+
+    // ── zurueck zu Kermit-80 mit Strg-\ c (nicht Strg-]) ──
+    k1520test::wipeVram(l.a.m());
+    k1520test::typeCtrl(l.a.m(), '\\');
+    l.a.lauf(2'457'600);
+    k1520test::typeKey(l.a.m(), 'c');
+    ASSERT_TRUE(bisPrompt(120)) << "kein Kermit-80> nach Strg-\\ c\n" << l.a.bild();
+
+    ASSERT_TRUE(befehl("remote directory")) << l.a.bild();
+    EXPECT_NE(l.a.bild().find("holen.txt"), std::string::npos) << l.a.bild();
+    ASSERT_TRUE(befehl("get holen.txt", 1800)) << l.a.bild();
+    ASSERT_TRUE(befehl("send sendtest.txt", 1800)) << l.a.bild();
+    ASSERT_TRUE(befehl("finish")) << l.a.bild();
+
+    // gehoert der Server nach FINISH wieder der Anmeldung?  Ein neues CONNECT zeigt `login:` (kein Protokollende).
+    EXPECT_FALSE(l.srv.fertig) << "mit Anmeldezwang endet serve nach FINISH nicht";
+    k1520test::wipeVram(l.a.m());
+    l.a.tippe("connect\r");
+    l.a.lauf(2 * 2'457'600);
+    l.a.tippe("\r");
+    EXPECT_TRUE(bisText("login:", 60)) << l.a.bild();
+
+    // ── Inhalte: geholte Datei auf der Diskette, gesendete im Server-Ordner ──
+    const auto auf = l.a.diskDateien();
+    ASSERT_TRUE(auf.count("HOLEN.TXT")) << "HOLEN.TXT fehlt auf der Diskette";
+    EXPECT_EQ(auf.at("HOLEN.TXT").substr(0, holtext.size()), holtext);
+    const fs::path ges = l.srv.frei.p / "sendtest.txt";
+    ASSERT_TRUE(fs::exists(ges)) << "Server hat sendtest.txt nicht bekommen";
+    EXPECT_EQ(lies(ges).substr(0, sende.size()), sende);
+    bool angemeldet = false, abgelehnt = false, beendet = false;
+    {
+        std::lock_guard<std::mutex> lk(l.srv.em);
+        for (const auto& e : l.srv.ereignisse) {
+            angemeldet |= e == "Angemeldet: olli";
+            abgelehnt |= e.rfind("Anmeldung abgelehnt", 0) == 0;
+            beendet |= e.find("Server beendet (FINISH)") != std::string::npos;
+        }
+    }
+    EXPECT_TRUE(angemeldet);
+    EXPECT_TRUE(abgelehnt);
+    EXPECT_TRUE(beendet);
+    l.a.m().serialHub()->stopAlle();
 }

@@ -470,3 +470,48 @@ def test_login_kind_tells_a_rejection_from_a_timeout():
     finally:
         k.close()
         stumm.close()
+
+
+# ─── Server mit Anmeldezwang (K12) ───────────────────────────────────────────
+
+def test_server_login_enforces_the_login_and_returns_to_login_after_finish(tmp_path):
+    from app.kermittool.binding import Kermit, KermitError, E_DISCONNECTED, E_LOGIN
+
+    client, server = _paar("telnet", True)
+    freigabe = tmp_path / "freigabe"
+    freigabe.mkdir()
+    (freigabe / "da.txt").write_bytes(b"da")
+    ziel = tmp_path / "ziel"
+    ziel.mkdir()
+    server.set_server_login(True, "olli", "geheim")
+    fehler = []
+    t = threading.Thread(target=lambda: _serve_sammeln(server, freigabe, fehler))
+    t.start()
+    try:
+        client.login("olli", "geheim", 30000)
+        assert client.get("da.txt", str(ziel)) == ["da.txt"]
+        client.remote_finish()                   # der Server meldet sich wieder mit login:
+        assert t.is_alive(), "mit Anmeldezwang endet serve() nach FINISH nicht"
+        with pytest.raises(KermitError) as ei:   # falsches Kennwort
+            client.login("olli", "falsch", 3000)
+        assert ei.value.code == E_LOGIN
+        client.login("olli", "geheim", 30000)    # derselbe Server, naechste Anmeldung
+        assert client.get("da.txt", str(ziel)) == ["da.txt"]
+    finally:
+        client.close()
+        t.join(30)
+        server.close()
+    assert not t.is_alive()
+    assert len(fehler) == 1 and fehler[0].code == E_DISCONNECTED
+
+
+def test_server_login_defaults_are_off_and_keep_names_when_none(tmp_path):
+    from app.kermittool.binding import Kermit
+
+    client, server = _paar("telnet", True)
+    try:
+        server.set_server_login(False)           # Aufruf ohne Namen/Kennwort ist erlaubt
+        server.set_server_login(True, None, None)
+    finally:
+        client.close()
+        server.close()

@@ -13,7 +13,7 @@
  * k1520kermit cd     <leitung> <pfad>
  * k1520kermit rm     <leitung> <name…>
  * k1520kermit finish|logout <leitung>
- * k1520kermit serve  <leitung> <ordner> [--nur-lesen]
+ * k1520kermit serve  <leitung> <ordner> [--nur-lesen] [--login-pflicht NAME[:KENNWORT]]
  * Leitung: --telnet host:port | --rfc2217 host:port | --listen-telnet port | --listen-rfc2217 port
  *          [--login NAME[:KENNWORT]] [--baud 9600]
  * ```
@@ -68,6 +68,8 @@ struct Optionen {
     int listen_telnet = -1, listen_rfc2217 = -1; ///< -1 = nicht verlangt, 0 = freier Port
     std::string login;
     bool login_gesetzt = false;
+    std::string login_pflicht;                   ///< serve: Anmeldezwang NAME[:KENNWORT]
+    bool login_pflicht_gesetzt = false;
     int baud = 9600;
     // Uebertragung
     int pruefsumme = 3;
@@ -101,6 +103,8 @@ void gebrauch(std::ostream& os) {
         "  --listen-telnet PORT    --listen-rfc2217 PORT      lauschen, EINE Verbindung annehmen\n"
         "                          (Port 0 = freier Port; er steht auf stderr als `Port: N`)\n"
         "  --login NAME[:KENNWORT] Anmeldung an einer getty vor dem Protokollstart\n"
+        "  --login-pflicht NAME[:KENNWORT]  nur serve: Anmeldung erzwingen wie getty+login der WEGA\n"
+        "                          (Kennwort Vorgabe kermit); nach finish/logout wieder `login:`, Ende nur durch Strg+C/Trennung\n"
         "  --baud N                RFC 2217: Wunsch (Vorgabe 9600; die Gegenstelle ist massgeblich)\n"
         "  --warte S               Lauschen: so lange auf die Verbindung warten (Vorgabe 300)\n\n"
         "Uebertragung:\n"
@@ -212,6 +216,10 @@ int lies(int argc, char** argv, Optionen& o, bool& fertig) {
         } else if (a == "--login") {
             if (!hole(o.login)) return fehl("--login braucht NAME[:KENNWORT]");
             o.login_gesetzt = true;
+        } else if (a == "--login-pflicht") {
+            if (!hole(o.login_pflicht) || o.login_pflicht.empty() || o.login_pflicht[0] == ':')
+                return fehl("--login-pflicht braucht NAME[:KENNWORT]");
+            o.login_pflicht_gesetzt = true;
         } else if (a == "--baud") {
             if (!hole(v) || !zahl(v, o.baud, 50, 4000000)) return fehl("--baud braucht eine Zahl");
         } else if (a == "--pruefsumme") {
@@ -335,6 +343,10 @@ int main(int argc, char** argv) {
     }
     if (!o.als.empty() && (k != "put" || r.size() != 1)) {
         std::cerr << "Fehler: --as gilt nur fuer `put` mit genau einer Datei\n";
+        return kAufruf;
+    }
+    if (o.login_pflicht_gesetzt && k != "serve") {
+        std::cerr << "Fehler: --login-pflicht gilt nur fuer `serve`\n";
         return kAufruf;
     }
     if (o.nur_lesen && k != "serve") std::cerr << "Hinweis: --nur-lesen wirkt nur bei `serve`\n";
@@ -495,6 +507,14 @@ int main(int argc, char** argv) {
         Freigabe fr(serveOrdner, o.nur_lesen);
         if (!fr.gueltig()) return meldeFehler(o, "Ordner nicht freigebbar: " + r[0], kAufruf);
         fr.setzeMaxNamenslaenge(o.max_namen);
+        if (o.login_pflicht_gesetzt) {
+            const auto dp = o.login_pflicht.find(':');
+            auto& e = sitzung.einstellungen();
+            e.login_pflicht = true;
+            e.login_name = o.login_pflicht.substr(0, dp);
+            if (dp != std::string::npos) e.login_kennwort = o.login_pflicht.substr(dp + 1);
+            std::cerr << "Anmeldung erzwungen (Benutzer " << e.login_name << ")\n";
+        }
         std::cerr << "Freigabe: " << serveOrdner.u8string() << (o.nur_lesen ? " (nur lesen)" : "") << "\n";
         const Ergebnis er = sitzung.serve(fr);
         anzeige.schliesse();

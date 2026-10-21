@@ -19,7 +19,7 @@ k1520kermit cd     <leitung> <pfad>                     Verzeichnis des Servers 
 k1520kermit rm     <leitung> <name…>                    Dateien auf dem Server löschen (G E)
 k1520kermit finish <leitung>                            Server beenden, das Programm bleibt (G F)
 k1520kermit logout <leitung>                            Server beenden und abmelden (G L)
-k1520kermit serve  <leitung> <ordner> [--nur-lesen]     Ordner freigeben
+k1520kermit serve  <leitung> <ordner> [--nur-lesen] [--login-pflicht NAME[:KENNWORT]]   Ordner freigeben
 ```
 
 Jedes Kommando baut **eine** Verbindung auf, tut seine Sache und trennt.  Die Schalter dürfen an jeder
@@ -33,6 +33,7 @@ Stelle stehen (`--telnet 127.0.0.1:5000 --login kermit:kermit ls` ist dasselbe w
 | `--telnet HOST:PORT` / `--rfc2217 HOST:PORT` | verbinden (z. B. zum Hub-Kanal des Emulators) |
 | `--listen-telnet PORT` / `--listen-rfc2217 PORT` | lauschen, **eine** Verbindung annehmen (der Emulator verbindet als Client) |
 | `--login NAME[:KENNWORT]` | Anmeldung an einer getty vor dem Protokollstart (RETURN bis `login:`, Name, Kennwort, Serverbeginn abwarten) |
+| `--login-pflicht NAME[:KENNWORT]` | nur `serve`: **Anmeldung erzwingen** wie getty + login der WEGA — `login:` / `Password:` (ohne Echo) / `Login incorrect`; erst mit passendem Paar beginnt die Serverschleife (Kopfzeile „C-Kermit server starting …“).  Kennwort ohne Angabe `kermit`.  Nach `finish`/`logout` des Clients meldet sich der Server **wieder mit `login:`** und bedient die nächste Anmeldung; er endet dann nur durch Trennung oder Strg+C (Rückgabe 0 bei Trennung).  Der Client meldet sich mit `--login NAME:KENNWORT` an.  Das Kennwort steht auf der Kommandozeile — kein Schutz, nur die Nachbildung der WEGA |
 | `--baud N` | RFC 2217: Wunsch (Vorgabe 9600); der Gast ist maßgeblich |
 | `--warte S` | Lauschen: so lange auf die Verbindung warten (Vorgabe 300 s) |
 

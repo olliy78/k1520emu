@@ -438,6 +438,28 @@ TEST_P(KermitCli, NurLesenWeistSchreibenUndLoeschenAb) {
     EXPECT_EQ(p.client.rc, 0) << p.client.err;
 }
 
+TEST_P(KermitCli, ServerMitAnmeldezwangNimmtNurDieRichtigenDatenAn) {
+    fs::create_directories(tmp / "frei");
+    schreibe(tmp / "frei" / "da.txt", "da");
+    schreibe(tmp / "a.txt", "alpha");
+    // richtige Daten: Anmeldung, dann ganz normale Uebertragung; das Ende ist die Trennung (rc 0)
+    Paar p = paar(art(), lauscher(), tmp / "frei", {"put", (tmp / "a.txt").string(), "--login", "olli:geheim"},
+                  {"--login-pflicht", "olli:geheim"});
+    EXPECT_EQ(p.client.rc, 0) << p.client.err;
+    EXPECT_EQ(p.server.rc, 0) << p.server.err;
+    EXPECT_NE(p.server.err.find("Anmeldung erzwungen"), std::string::npos) << p.server.err;
+    EXPECT_EQ(lies(tmp / "frei" / "a.txt"), "alpha");
+    // falsches Kennwort: Anmeldefehler des Clients (2), nichts uebertragen
+    fs::remove(tmp / "frei" / "a.txt");
+    p = paar(art(), lauscher(), tmp / "frei", {"put", (tmp / "a.txt").string(), "--login", "olli:falsch"},
+             {"--login-pflicht", "olli:geheim"});
+    EXPECT_EQ(p.client.rc, 2) << p.client.err;
+    EXPECT_FALSE(fs::exists(tmp / "frei" / "a.txt"));
+    // ohne Angabe von Name/Kennwort der Server selbst: Vorgabe kermit
+    p = paar(art(), lauscher(), tmp / "frei", {"ls", "--login", "kermit:kermit"}, {"--login-pflicht", "kermit"});
+    EXPECT_EQ(p.client.rc, 0) << p.client.err;
+}
+
 TEST_P(KermitCli, ZuLangerZielnameWirdAbgelehntNichtGekuerzt) {
     fs::create_directories(tmp / "frei");
     schreibe(tmp / "a.txt", "alpha");
@@ -507,6 +529,8 @@ TEST(KermitCliFehler, AufrufFehlerGebenZwei) {
     EXPECT_EQ(starte({"put", "--telnet", lt, (tmp / "a.txt").string(), (tmp / "b.txt").string(), "--as", "x"}).rc, 2);
     EXPECT_EQ(starte({"serve", "--telnet", lt, (tmp / "gibtsnicht").string()}).rc, 2);      // kein Ordner
     EXPECT_EQ(starte({"rm", "--telnet", lt}).rc, 2);                                        // Argument fehlt
+    EXPECT_EQ(starte({"ls", "--telnet", lt, "--login-pflicht", "a:b"}).rc, 2);              // K12: nur serve
+    EXPECT_EQ(starte({"serve", "--telnet", lt, (tmp / "frei").string(), "--login-pflicht", ":b"}).rc, 2);  // Name fehlt
     EXPECT_EQ(starte({"--help"}).rc, 0);
 }
 

@@ -539,7 +539,12 @@ def test_konfiguration_schreibt_kein_kennwort_und_liest_alles_zurueck(qapp, tmp_
     f.close()
 
     text = pfad.read_text(encoding="utf-8")
-    assert "geheim-xyz-123" not in text and "kennwort" not in text.lower()
+    assert "geheim-xyz-123" not in text
+    # Client-Zweig und Liste: kein Kennwortschluessel; der Server-Zweig traegt seinen Anmeldezwang (Klartext)
+    import yaml
+    roh = yaml.safe_load(text)
+    assert "kennwort" not in str({k: v for k, v in roh.items() if k != "server"}).lower()
+    assert roh["server"]["login"] == {"pflicht": False, "name": "kermit", "kennwort": "kermit"}
     assert "geschrieben_von" in text and "version: 1" in text
 
     g = MainWindow(konfig_pfad=str(pfad))
@@ -609,3 +614,77 @@ def test_hilfe_menue_laedt_das_handbuch_mit_dem_wega_abschnitt(fenster):
     h.suchfeld.setText(".kermrc")
     assert h.weitersuchen()
     h.close()
+
+
+# ─── Server mit Anmeldezwang (K12) ───────────────────────────────────────────
+
+def test_server_dialog_hat_anmeldung_erzwingen_mit_vorgabe_und_klartexthinweis(qapp, fenster):
+    from app.kermittool.ui.verbindung_dialog import KLARTEXT_HINWEIS, VerbindungDialog
+    d = VerbindungDialog(fenster, "server", fenster.server_verb, [], server_login=fenster.server_login)
+    assert not d.srv_pflicht.isChecked()
+    assert d.srv_name.text() == "kermit" and d.srv_kennwort.text() == "kermit"      # Vorgabe
+    assert not d.srv_name.isEnabled() and not d.srv_kennwort.isEnabled()            # nur mit Haken aktiv
+    d.srv_pflicht.setChecked(True)
+    assert d.srv_name.isEnabled() and d.srv_kennwort.isEnabled()
+    assert "Klartext" in d.srv_hinweis.text() and d.srv_hinweis.text() == KLARTEXT_HINWEIS
+    assert "Klartext" in d.srv_kennwort.toolTip()
+    d.srv_name.setText("olli")
+    d.srv_kennwort.setText("geheim")
+    assert d.server_login() == {"pflicht": True, "name": "olli", "kennwort": "geheim"}
+    d.srv_kennwort.setText("")
+    d._annehmen()
+    assert d.result() == 0 and "Kennwort" in d.meldung.text()                        # leer wird nicht angenommen
+    d.srv_kennwort.setText("geheim")
+    d._annehmen()
+    assert d.result() == VerbindungDialog.Accepted
+    # Der Client-Dialog kennt die Felder nicht
+    c = VerbindungDialog(fenster, "client", konfig.VERBINDUNG_VORGABE, [])
+    assert c.srv_pflicht.parent() is None and not c.srv_pflicht.isVisibleTo(c)     # nicht im Client-Dialog
+
+
+def test_server_anmeldezwang_wird_im_klartext_gespeichert_und_gelesen(qapp, tmp_path, lokal):
+    import yaml
+    from app.kermittool.ui.main_window import MainWindow
+    pfad = tmp_path / "kermit.yaml"
+    f = MainWindow(konfig_pfad=str(pfad), ordner=str(lokal))
+    f.server_login = {"pflicht": True, "name": "olli", "kennwort": "geheim-xyz-123"}
+    f.verbindung = {**f.verbindung, "login": True, "login_name": "kermit"}
+    f._kennwort = "client-geheim-456"
+    assert f.konfig_sichern()
+    f.close()
+    text = pfad.read_text(encoding="utf-8")
+    assert "geheim-xyz-123" in text                                   # Klartext, Entscheidung des Anwenders
+    assert "client-geheim-456" not in text                            # der Client-Zweig bleibt ohne Kennwort
+    assert yaml.safe_load(text)["server"]["login"] == {"pflicht": True, "name": "olli", "kennwort": "geheim-xyz-123"}
+    g = MainWindow(konfig_pfad=str(pfad), ordner=str(lokal))
+    try:
+        assert g.server_login == {"pflicht": True, "name": "olli", "kennwort": "geheim-xyz-123"}
+    finally:
+        g.close()
+
+
+def test_server_mit_anmeldezwang_zeigt_es_in_der_statuszeile_und_verlangt_die_anmeldung(qapp, fenster, tmp_path):
+    frei = tmp_path / "frei"
+    frei.mkdir()
+    (frei / "a.txt").write_bytes(b"hallo")
+    _server_vorbereiten(fenster, frei)
+    fenster.server_login = {"pflicht": True, "name": "olli", "kennwort": "geheim"}
+    assert fenster.server_starten() is True
+    assert warte(qapp, lambda: fenster.st_zustand.text().startswith("Server: Lauscht auf Port"))
+    assert fenster.st_zustand.text().endswith("(mit Anmeldung)")
+    assert "mit Anmeldung" in fenster.server_kopf.text()
+    port = _lausch_port(qapp, fenster)
+    ziel = tmp_path / "ziel"
+    ziel.mkdir()
+    with Kermit.telnet_client("127.0.0.1", port) as c:
+        assert warte(qapp, lambda: fenster.zustand_art == "verbunden")
+        assert "(mit Anmeldung)" in fenster.st_zustand.text()
+        with pytest.raises(KermitError):
+            c.login("olli", "falsch", 3000)
+        c.login("olli", "geheim", 30000)
+        assert c.get("a.txt", str(ziel)) == ["a.txt"]
+        c.remote_finish()                               # Server bleibt (Anmeldung folgt wieder)
+        assert fenster._server_laeuft
+    assert warte(qapp, lambda: any("Angemeldet: olli" in z[2] for z in fenster.server_view.zeilen()))
+    fenster._server_stopp()
+    assert warte(qapp, lambda: not fenster._server_laeuft)

@@ -5,8 +5,11 @@ Eine Klasse fuer beide Betriebsarten: ``betriebsart`` blendet weg, was nicht gil
 (verbinden/lauschen) ist davon unabhaengig — auch ein Server darf zum Emulator
 verbinden, und ein Client darf lauschen.
 
-Das **Kennwort** steht nur im Eingabefeld (verdeckt) und im Rueckgabewert von
-:meth:`kennwort`; es wird nie in die Konfiguration uebernommen.
+Das **Kennwort der Client-Anmeldung** steht nur im Eingabefeld (verdeckt) und im
+Rueckgabewert von :meth:`kennwort`; es wird nie in die Konfiguration uebernommen.
+Das Kennwort des **Server-Anmeldezwangs** (:meth:`server_login`) ist etwas anderes: es
+geht im Klartext in den Zweig ``server.login`` der ``kermit.yaml`` (Entscheidung des
+Anwenders 2026-10-22); der Dialog sagt das neben dem Feld.
 """
 
 from __future__ import annotations
@@ -22,9 +25,14 @@ from PySide6.QtWidgets import QLineEdit as _QLE
 from app.kermittool import konfig
 
 
+#: Text neben dem Kennwortfeld des Server-Anmeldezwangs (auch als Tooltip).
+KLARTEXT_HINWEIS = ("Achtung: Das Kennwort wird im Klartext in der Konfigurationsdatei (kermit.yaml) gespeichert. "
+                    "Es dient nur der Anmeldung an diesem Server, nicht dem Schutz von Daten.")
+
+
 class VerbindungDialog(QDialog):
     def __init__(self, parent, betriebsart: str, vorgabe: dict, zuletzt: List[dict],
-                 ordner: str = "", nur_lesen: bool = False):
+                 ordner: str = "", nur_lesen: bool = False, server_login: Optional[dict] = None):
         super().__init__(parent)
         self.betriebsart = betriebsart
         server = betriebsart == "server"
@@ -79,6 +87,21 @@ class VerbindungDialog(QDialog):
         self.nur_lesen = QCheckBox("Nur lesen (Gegenstelle darf nichts schreiben oder löschen)")
         self.nur_lesen.setChecked(nur_lesen)
 
+        # Anmeldezwang des eigenen Servers (K12): nur im Server-Dialog sichtbar.
+        sl = konfig.server_login_aus(server_login)
+        self.srv_pflicht = QCheckBox("Anmeldung erzwingen (wie getty und login der WEGA)")
+        self.srv_pflicht.setToolTip("Die Gegenstelle muss sich mit Benutzername und Kennwort anmelden, bevor der "
+                                    "Server antwortet; nach „Finish“ meldet er sich wieder mit „login:“.")
+        self.srv_pflicht.setChecked(sl["pflicht"])
+        self.srv_pflicht.toggled.connect(self._sichtbarkeit)
+        self.srv_name = QLineEdit(sl["name"])
+        self.srv_kennwort = QLineEdit(sl["kennwort"])
+        self.srv_kennwort.setEchoMode(_QLE.Password)
+        self.srv_kennwort.setToolTip(KLARTEXT_HINWEIS)
+        self.srv_hinweis = QLabel(KLARTEXT_HINWEIS)
+        self.srv_hinweis.setWordWrap(True)
+        self.srv_hinweis.setStyleSheet("color: #886600;")
+
         self.form = QFormLayout()
         self.form.addRow("Voreinstellung", self.voreinst)
         self.form.addRow("Leitung", self.leitung)
@@ -89,6 +112,10 @@ class VerbindungDialog(QDialog):
         if server:
             self.form.addRow("Freigegebener Ordner", self._ordner_zeile)
             self.form.addRow("", self.nur_lesen)
+            self.form.addRow("", self.srv_pflicht)
+            self.form.addRow("Benutzername", self.srv_name)
+            self.form.addRow("Kennwort", self.srv_kennwort)
+            self.form.addRow("", self.srv_hinweis)
         else:
             self.form.addRow("", self.login)
             self.form.addRow("Benutzername", self.login_name)
@@ -134,6 +161,11 @@ class VerbindungDialog(QDialog):
                 "login": self.login.isChecked() and self.betriebsart == "client",
                 "login_name": self.login_name.text().strip()}
 
+    def server_login(self) -> dict:
+        """Anmeldezwang des Servers (``pflicht``, ``name``, ``kennwort``) — wird im Klartext gespeichert."""
+        return {"pflicht": self.srv_pflicht.isChecked(), "name": self.srv_name.text().strip(),
+                "kennwort": self.srv_kennwort.text()}
+
     def kennwort(self) -> str:
         return self.login_kennwort.text()
 
@@ -156,6 +188,9 @@ class VerbindungDialog(QDialog):
         an = self.login.isChecked()
         self.login_name.setEnabled(an)
         self.login_kennwort.setEnabled(an)
+        srv = self.srv_pflicht.isChecked()
+        self.srv_name.setEnabled(srv)
+        self.srv_kennwort.setEnabled(srv)
 
     def _ordner_waehlen(self) -> None:
         d = QFileDialog.getExistingDirectory(self, "Ordner freigeben", self.ordner.text() or "")
@@ -173,4 +208,12 @@ class VerbindungDialog(QDialog):
         if v["login"] and not v["login_name"]:
             self.meldung.setText("Bitte einen Benutzernamen eintragen.")
             return
+        if self.betriebsart == "server" and self.srv_pflicht.isChecked():
+            sl = self.server_login()
+            if not sl["name"] or not sl["kennwort"]:
+                self.meldung.setText("Bitte Benutzername und Kennwort für die Anmeldung eintragen.")
+                return
+            if any(c.isspace() or ord(c) < 32 for c in sl["name"] + sl["kennwort"]):
+                self.meldung.setText("Benutzername und Kennwort dürfen keine Leerzeichen enthalten.")
+                return
         self.accept()

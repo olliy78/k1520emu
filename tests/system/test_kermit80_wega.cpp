@@ -35,6 +35,7 @@
 #include "tests/support/machine_run.h"
 #include "tests/support/screen.h"
 #include "tests/support/temp_path.h"
+#include "tests/system/kermit80_hilfen.h"
 #include "tests/system/wega_kermit_stand.h"
 
 #ifndef K1520_KERMIT80_DIR
@@ -61,19 +62,7 @@ std::string aufspielen(const std::string& pfad, const std::string& quelle, const
     return {};
 }
 
-std::string letzteZeile(const std::string& bild) {
-    std::string l;
-    size_t a = 0;
-    while (a <= bild.size()) {
-        size_t e = bild.find('\n', a);
-        if (e == std::string::npos) e = bild.size();
-        std::string z = bild.substr(a, e - a);
-        while (!z.empty() && (z.back() == ' ' || z.back() == '\0')) z.pop_back();
-        if (!z.empty()) l = z;
-        a = e + 1;
-    }
-    return l;
-}
+using k80h::letzteZeile;
 
 /// Der A5120 mit CP/A, KERMIT.COM und einer Sendedatei auf A:.
 class A5120Seite {
@@ -178,43 +167,11 @@ struct Kopplung {
         }
         return fertig();
     }
-    /// Steht irgendwo eine nackte Kermit-80-Eingabeaufforderung ("Kermit-80   0A:>" ohne Befehl dahinter) im Bild?
-    /// Nach CONNECT laeuft der Cursor der einfachen Datensichtstation ueber den Bildrand, die Eingabeaufforderung
-    /// steht danach nicht mehr in der LETZTEN Zeile.
-    bool nackterPrompt() {
-        const std::string b = a.bild();
-        size_t p = 0;
-        while (p <= b.size()) {
-            size_t e = b.find('\n', p);
-            if (e == std::string::npos) e = b.size();
-            std::string z = b.substr(p, e - p);
-            while (!z.empty() && (z.back() == ' ' || z.back() == '\0')) z.pop_back();
-            if (z.rfind("Kermit-80", 0) == 0 && !z.empty() && z.back() == '>') return true;
-            p = e + 1;
-        }
-        return false;
-    }
-    /// Wartet auf eine nackte Eingabeaufforderung, die @p ruhe Sekunden Maschinenzeit unveraendert im Bild steht
-    /// (waehrend einer Uebertragung zaehlt Kermit-80 laufend Pakete; ein alter nackter Prompt im Bild genuegt
-    /// deshalb nicht).  @p aenderung: das Bild muss sich seit dem Aufruf geaendert haben (das Echo des Befehls).
+    /// Siehe kermit80_hilfen.h: nackte Eingabeaufforderung irgendwo im Bild; Warten auf eine ruhige.
+    bool nackterPrompt() { return k80h::nackterPrompt(a.bild()); }
     bool wartePrompt(double max_sekunden, bool aenderung = true, std::string start = "", double ruhe = 1.5) {
-        if (start.empty()) start = a.bild();
-        std::string zuletzt = start;
-        double seit = 0;
-        bool geaendert = !aenderung;
-        for (double n = 0; n < max_sekunden; n += double(kScheibeW) / 4e6) {
-            scheibe();
-            const std::string jetzt = a.bild();
-            if (jetzt != zuletzt) {
-                zuletzt = jetzt;
-                seit = 0;
-                if (jetzt != start) geaendert = true;
-            } else {
-                seit += double(kScheibeW) / 4e6;
-            }
-            if (geaendert && seit >= ruhe && nackterPrompt()) return true;
-        }
-        return false;
+        return k80h::wartePrompt([&] { scheibe(); }, [&] { return a.bild(); }, double(kScheibeW) / 4e6, max_sekunden,
+                                 aenderung, std::move(start), ruhe);
     }
     bool bisKermit(double sek) { return wartePrompt(sek, false); }
     bool bisText(const std::string& t, double sek) {

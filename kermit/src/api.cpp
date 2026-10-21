@@ -419,6 +419,17 @@ extern "C" K1520K_API int k1520k_set_ueberschreiben(K1520Kermit h, int an) {
     K_END
 }
 
+extern "C" K1520K_API int k1520k_set_server_login(K1520Kermit h, int pflicht, const char* name,
+                                                  const char* kennwort) {
+    K_BEGIN(h)
+    auto& e = H_->sitzung->einstellungen();
+    e.login_pflicht = pflicht != 0;
+    if (name) e.login_name = name;
+    if (kennwort) e.login_kennwort = kennwort;
+    return K1520K_OK;
+    K_END
+}
+
 extern "C" K1520K_API int k1520k_set_callbacks(K1520Kermit h, K1520KProgress fortschritt, K1520KEvent ereignis,
                                                void* user) {
     K_BEGIN(h)

@@ -193,7 +193,7 @@ anfassen, laufen nacheinander oder im eigenen Worktree.
 | **K9** | *(wenn K1–K8 grün)* **Paket/CI:** Linux-Paket (`build_payload.sh`), Inno-Setup, `windows-ci.yml`, Starter `k1520kermit`. | `py_packaging`, `py_programme` | sonnet | fertig (§6.7) — `0f78cfc` |
 | **K10** | **Bibliothek: Anmeldung des Clients auf Abruf** (§6.10 a): das Login-Skript meldet „Anmeldung verlangt“ und fragt Name/Kennwort über einen Rückruf ab, statt sie vorab zu verlangen; es unterscheidet **abgelehnt** (zweites `login:` / `Login incorrect`) von Frist und Leitungsfehler.  C-ABI additiv + Python-Bindung. | `KermitLogin*` (Unit), `py_kermit_api` (Signaturwächter), Kopplungstest gegen den Server aus K12 | sonnet | **fertig** (2026-10-22, Zweig `kermit`; Stand §6.11) |
 | **K11** | **Oberfläche, Client: Anmeldedialog** (§6.10 b): Popup mit Benutzername, Kennwort, Hinweis „möglicherweise einfach kermit / kermit“ und Haken *Zugangsdaten für diese Verbindung speichern*; erscheint bei verlangter Anmeldung und **erneut bei Ablehnung**; gespeichert wird **im Klartext in der Konfigurationsdatei, im Eintrag der Verbindung**, Neuspeichern überschreibt die alten Werte.  Kehrt die Regel „Kennwörter nie in die Datei“ um (Handbuch, Merkposten, `konfig.ohne_kennwort`, Wächter). | `py_kermit_gui` (Dialog mit Ersatz, Wiederholung, Speichern/Überschreiben, Konfig-Roundtrip) | sonnet | **offen** (nach K10) |
-| **K12** | **Server mit Anmeldezwang** (§6.10 c): Bibliothek (`Sitzung::serve` mit Anmeldephase wie getty der WEGA: `login:` / `Password:` / `Login incorrect` / Wiederholung / nach `finish` zurück zu `login:`) **und** Oberfläche (Haken *Anmeldung erzwingen*, Name/Kennwort mit Vorgabe `kermit`/`kermit`, änderbar, in der Serverkonfiguration im Klartext). | `KermitServerLogin*` (Unit), `py_kermit_gui`, **Kermit-80 meldet sich im Terminalmodus an unserem Server an** (`Kermit80Pc.*`, Gegenstück zu `Kermit80Wega`) | opus (Protokoll) / sonnet (Oberfläche) | **offen** (parallel zu K11 möglich) |
+| **K12** | **Server mit Anmeldezwang** (§6.10 c): Bibliothek (`Sitzung::serve` mit Anmeldephase wie getty der WEGA: `login:` / `Password:` / `Login incorrect` / Wiederholung / nach `finish` zurück zu `login:`) **und** Oberfläche (Haken *Anmeldung erzwingen*, Name/Kennwort mit Vorgabe `kermit`/`kermit`, änderbar, in der Serverkonfiguration im Klartext). | `KermitServerLogin*` (Unit), `py_kermit_gui`, **Kermit-80 meldet sich im Terminalmodus an unserem Server an** (`Kermit80Pc.*`, Gegenstück zu `Kermit80Wega`) | opus (Protokoll) / sonnet (Oberfläche) | **fertig** (2026-10-22, Zweig `kermit`; Stand §6.12) |
 | **K13** | **Doku und Abnahme:** Handbuch (Client-Anmeldung, Server mit Anmeldezwang, Kermit-80 gegen unseren Server mit Anmeldung), Merkposten (Umkehr der Kennwortregel, Reihenfolge der Dialoge), Entwurf 36 auf Stand, Login-Skript in `py_kermit_gui` belegt (war offen, §7 Nr. 7). | — | sonnet | **offen** (nach K10–K12) |
 | K2b | *(optional)* Schiebefenster, `G T`/`G U`, Wiederaufnahme. | — | — | offen (optional) |
 
@@ -665,6 +665,34 @@ schreiben; der Signaturwächter kennt nur `void`-Rückrufe); keine Antwort = Abb
   Nach der Ausnahme `KermitError(E_LOGIN)` `k.login_kind` lesen: nur `LOGIN_ABGELEHNT` (kommt hier nur, wenn `frage`
   selbst nach einer Ablehnung abbricht oder der Benutzer ohne Kennwort ist) ist eine Ablehnung; `login_ask` fragt bei
   Ablehnung von selbst erneut.
+
+### 6.12 Stand K12 (2026-10-22) — Server mit Anmeldezwang
+
+**Bibliothek.**  `Einstellungen::login_pflicht`/`login_name`/`login_kennwort` (Vorgabe aus, `kermit`/`kermit`);
+`Sitzung::serve` bekommt eine äußere Schleife: Anmeldung (`anmeldung()`), dann die bisherige Serverschleife, nach
+FINISH/BYE `C-Kermit server done` und wieder `login:` — `serve` endet mit Pflicht nur durch Abbruch/Trennung, ohne
+Pflicht unverändert nach FINISH.  Verhalten wie getty + login der WEGA (Texte aus `doc/p8000/kermit_wega.md` §3):
+`\r\nlogin: ` beim Start und nach jedem Durchlauf; Name im Zeilenmodus (CR, LF, CR LF; Bit 7 zuerst gelöscht;
+Backspace/DEL; Steuerzeichen und NUL überlesen; höchstens 64 Zeichen) mit **Echo**; leere Zeile = nur erneut
+`login:`; `Password:` **ohne Echo**; Treffer → Kopfzeile `k1520kermit` + `C-Kermit server starting …` (vom Login-Skript
+des Clients erkannt); sonst `Login incorrect` und `login:`, nach 3 Fehlversuchen von vorn, ohne Sperre.  Das Echo wird
+je Lesestoß gesammelt und vor dem Blockieren geschrieben.  Der Restpuffer der Sitzung (`puffer_`) wird mitbenutzt,
+sodass Bytes hinter der Kennwortzeile dem Protokoll bleiben.  Angenommen/offen: kein Zeitlimit der Eingabe (getty hat
+eins), keine Telnet-Option-Behandlung außerhalb der Leitung.
+
+**Schnittstellen.**  C-ABI `k1520k_set_server_login(h, pflicht, name, kennwort)` (NULL = unverändert), Python
+`Kermit.set_server_login`; CLI `serve --login-pflicht NAME[:KENNWORT]` (`tools/k1520kermit.md`).  Oberfläche:
+*Server einrichten* hat *Anmeldung erzwingen*, Benutzername, Kennwort (Vorgabe `kermit`/`kermit`, Felder nur mit Haken
+aktiv, Eingabe verdeckt) und den Hinweis auf Klartext; gespeichert im Zweig `server.login` der `kermit.yaml` im
+Klartext (Merkposten 11/12); der Arbeiter setzt es je angenommener Verbindung; Statuszeile `Server: … (mit Anmeldung)`.
+Der Client-Zweig der Konfiguration ist unverändert (K11).
+
+**Abnahme.**  `KermitServerLogin.*` (10 Fälle, Speicherleitung/virtuelle Uhr), `KermitServerLoginKopplung.*`
+(Login-Skript fest und auf Abruf gegen den Server, Telnet und RFC 2217, `holen`/`senden`/FINISH/zweite Anmeldung),
+`KermitCli.ServerMitAnmeldezwang…`, `py_kermit_api`/`py_kermit_gui`, und **`Kermit80Pc.MeldetSichAmServerMitAnmeldezwangAn`**
+(`tests/system/test_kermit80.cpp`, Label `format_integration`): Kermit-80 am A5120 meldet sich im Terminalmodus an, erst mit
+falschem Kennwort (`Login incorrect`), dann richtig, Strg-\ `c`, `remote directory`, `get`, `send`, `finish`, danach zeigt ein
+neues `connect` wieder `login:`.  Gemeinsame Bildhilfen: `tests/system/kermit80_hilfen.h` (auch `Kermit80Wega`).
 
 ## 7. Offene Aufgaben
 

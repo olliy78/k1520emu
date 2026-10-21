@@ -26,7 +26,7 @@
  *   k1520k_remote_finish(h);  k1520k_close(h);
  * @endcode
  * Ablauf Server (PC gibt einen Ordner frei): Leitung oeffnen/annehmen, dann
- * `k1520k_serve(h, wurzel, nur_lesen)` (blockiert bis G F/G L, Abbruch, Trennung).
+ * `k1520k_serve(h, wurzel, nur_lesen)` (blockiert bis G F/G L, Abbruch, Trennung; mit Anmeldezwang nur bis Abbruch/Trennung).
  *
  * @see doc/design/36_kermit.md
  */
@@ -174,6 +174,12 @@ K1520K_API double k1520k_tempo(K1520Kermit h);
 K1520K_API int k1520k_set_max_namenslaenge(K1520Kermit h, int n);
 /// Vorhandene Dateien beim Empfang ersetzen (1, Vorgabe) oder umbenennen/ablehnen (0).
 K1520K_API int k1520k_set_ueberschreiben(K1520Kermit h, int an);
+/// Server mit Anmeldezwang (K12): `pflicht` = 1 laesst @ref k1520k_serve wie getty + login der WEGA
+/// `login:` / `Password:` abfragen (nur mit passendem Namen/Kennwort beginnt die Serverschleife, sonst
+/// `Login incorrect`); nach FINISH/BYE kehrt der Server zu `login:` zurueck, @ref k1520k_serve endet dann nur
+/// noch durch Abbruch oder Trennung.  NULL fuer name/kennwort = unveraendert (Vorgabe kermit/kermit).
+/// Ohne Pflicht (Vorgabe) endet der Server wie bisher nach FINISH/BYE.
+K1520K_API int k1520k_set_server_login(K1520Kermit h, int pflicht, const char* name, const char* kennwort);
 /// Rueckrufe; NULL schaltet einen ab.  Nicht waehrend einer laufenden Operation aufrufen.
 K1520K_API int k1520k_set_callbacks(K1520Kermit h, K1520KProgress fortschritt, K1520KEvent ereignis,
                                     void* user);

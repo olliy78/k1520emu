@@ -300,9 +300,14 @@ class Arbeiter(QObject):
                 k = self._oeffnen(p)
                 self._anwenden(k)
                 self._rueckrufe(k)
+                sl = p.get("server_login") or {}
+                if sl.get("pflicht"):
+                    # Wie getty + login der WEGA; serve endet dann nur durch Trennung oder Stopp.
+                    k.set_server_login(True, sl.get("name"), sl.get("kennwort"))
                 self.zustand.emit("verbunden", f"Verbunden mit {k.peer}")
                 self.ereignis.emit(f"Verbunden mit {k.peer} — Freigabe {wurzel}"
-                                   + (" (nur lesen)" if nur_lesen else ""))
+                                   + (" (nur lesen)" if nur_lesen else "")
+                                   + (" (mit Anmeldung)" if sl.get("pflicht") else ""))
                 k.serve(wurzel, nur_lesen)
                 letztes = "Gegenstelle hat den Server beendet"
             except KermitError as e:
