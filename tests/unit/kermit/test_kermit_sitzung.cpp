@@ -721,6 +721,38 @@ TEST(KermitSitzung, VollerDatentraeger) {
     EXPECT_TRUE(c2.entferntBeenden().ok());
 }
 
+// Das Leerlauf-N(0) nach dem B schickt nur C-Kermit 4.2 (9 Init-Felder).  Eine Gegenstelle mit CAPAS —
+// unser eigener Server — schickt keins; dort darf der Nachlauf nicht 2 s kosten.
+namespace {
+/// Leitungszeit (ms) vom Ende eines `holen` bis zum Ende des naechsten Befehls.
+int64_t nachHolenBisNaechsterBefehl(const Einstellungen& serverEinst) {
+    Aufbau a;
+    schreibe(a.wurzel.p / "q", "inhalt");
+    a.starte(serverEinst);
+    Einstellungen ce = client();
+    ce.nachlauf_ms = 600;
+    ce.tempo = 1.0;   // sonst verkuerzt die geschaetzte Leitungsgeschwindigkeit (Speicherleitung: sehr schnell) die Wartezeit
+    Sitzung c(a.leitung.ende(0), ce, {});
+    TempOrdner hol;
+    EXPECT_TRUE(c.holen("q", hol.s()).ok());
+    // Zeit der Speicherleitung (virtuell: eine Frist, auf die alle warten, laeuft ohne Wartezeit ab)
+    const int64_t t0 = a.leitung.ende(0).jetztMs();
+    EXPECT_TRUE(c.entferntHilfe().ok());
+    const int64_t dt = a.leitung.ende(0).jetztMs() - t0;
+    EXPECT_TRUE(c.entferntAbmelden().ok());
+    return dt;
+}
+}  // namespace
+
+TEST(KermitSitzung, NachlaufEntfaelltGegenDenEigenenServer) {
+    EXPECT_LT(nachHolenBisNaechsterBefehl(server()), 300);
+}
+
+TEST(KermitSitzung, NachlaufBleibtGegenEineGegenstelleOhneCapas) {
+    // Server, der wie C-Kermit 4.2 nur 9 Init-Felder schickt: der Client wartet (hier 600 ms) auf das N
+    EXPECT_GE(nachHolenBisNaechsterBefehl(ck42()), 500);
+}
+
 TEST(KermitSitzung, PfadfallenUeberDasProtokoll) {
     TempOrdner draussen;
     schreibe(draussen.p / "geheim", "x");

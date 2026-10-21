@@ -540,12 +540,32 @@ eine Beigabe zum Ausprobieren der V.24-Schnittstelle: A5120 (CP/A und SCPX 1.7),
   bis 100 KB), Parität none/even/mark/space/odd mit Prüfsumme 1/2/3; `Kermit80Rechner.*` — K8915, PC 1715, PC 1715W,
   PRG 710, 710-1 und P8000 mit OS/M (ausgelieferte Diskette, Temp-Kopie, `kermit.com` von der Diskette) schicken die `.com` an den PC-Server, bytegleich; `Kermit80Bau.*` — die eingecheckten `.com` sind das
   Ergebnis von `bau.py` (übersprungen ohne Werkzeugkette).  `tools/dev.sh test-format -R Kermit80`.
+- **Gegen den echten C-Kermit 4.2 der WEGA** (`Kermit80Wega.ClientGegenC_Kermit42Server`, Label `wega_install`,
+  `tools/dev.sh test-wega -R Kermit80Wega`): zwei gekoppelte Emulatoren — A5120 mit CP/A und Kermit-80 als Client, P8000 mit
+  WEGA 3.1 als Server hinter getty (tty0 Telnet-Server, V.24 des A5120 Telnet-Client, beide in einem Faden in Scheiben
+  gleicher Maschinenzeit).  Wie am Gerät: `connect`, Anmeldung `kermit`/`kermit` im Terminalmodus, **Ctrl-\ `c`** zurück (das
+  Fluchtzeichen dieser Fassung; Kermit-80 meldet es beim `connect`), dann `remote directory`, `get`, `send`, `finish` — alles
+  ohne Fehl.  Nur 7-Bit-Text: Kermit-80 bietet kein 8-Bit-Präfix an, tty0 löscht Bit 7.  Die anderen Rechner sind nicht eigens
+  gegen die WEGA geprüft (gleiches Programm, nur die Überlagerung unterscheidet sich).
 - **Befund, Bibliothek:** Kermit-80 mit `set parity even|mark|odd` sendet jedes Byte mit Paritätsbit, auch MARK
   (SOH = 81H).  Der `PaketZerleger` suchte nur 01H und schwieg (Kermit-80 hing bei `Starting …`).  Jetzt erkennt er
   Parität (81H beim Suchen oder Bit 7 in LEN/SEQ/TYPE), rastet ein und streift danach Bit 7 ab; ohne Parität bleiben
   rohe 8-Bit-Daten unberührt (`KermitParitaet.*`).  Offener Punkt 9 aus §7 ist damit für den Empfang gelöst.
 - **Nicht belegt:** ein Kermit-Server für CP/M-80 (Kermit-80 hat keinen; eine Websuche nach Alternativen fand keinen),
   Kermit-80 an CP/Z 2.2.
+
+### 6.9 Stand 2026-10-21 — Empfangsnamen und Nachlauf
+
+- **Empfangsnamen:** `Freigabe::normalisiere` (läuft für jeden Pfad, auch beim Anlegen) wies Steuerzeichen schon ab;
+  die Offen-Liste war hier zu pessimistisch.  Neu: ein Name muss **gültiges UTF-8** sein (streng: keine Kurzformen,
+  keine Ersatzzeichen, bis U+10FFFF), sonst `PfadAbgewiesen` mit „Ungueltige Zeichen im Namen (kein UTF-8)“.
+  Umlaute vom PC bleiben erlaubt.  Grund: Müll aus einem abgebrochenen Senden würde unter Windows in `fs::u8path()`
+  scheitern und unter Linux eine Datei mit unlesbarem Namen anlegen.  Wächter `KermitFreigabe.NamenMussUtf8Sein…`.
+- **Nachlauf:** das Leerlauf-N(0) nach dem B kommt vom C-Kermit 4.2 (9 Init-Felder, kein CAPAS).  Der Empfänger merkt
+  sich am S des Senders, ob es so einer ist (`nachlaufNoetig_ = dein.felder <= 9`); meldet die Gegenstelle CAPAS —
+  unser eigener Server —, entfällt das Warten (vorher 2 s je Befehl nach einem Empfang).  Gegen 9-Felder-Gegenstellen
+  bleibt es unverändert.  Wächter `KermitSitzung.NachlaufEntfaelltGegenDenEigenenServer`/`…BleibtGegenEineGegenstelleOhneCapas`
+  (gemessen in Leitungszeit — die Speicherleitung lässt eine Frist, auf die alle warten, ohne Wartezeit ablaufen).
 
 ## 7. Offene Aufgaben
 
@@ -555,14 +575,12 @@ Zusammengetragen aus den „Offen"-Listen von §6.1–§6.6, nach Dringlichkeit:
    (Paketjob mit `-f paket=true`) — siehe 2.
 2. **Windows:** MinGW-Vorpruefung gruen (`tools/dev.sh win -R kermit`, 192/192 unter wine, K9).  Offen: MSVC-Gegenprobe der CI für Bibliothek, CLI, die neuen Tests (Tempo, Austausch, Strg+C nur POSIX
    geprüft) **und das Paket** (Inno-Setup, Kermit-Symbol, Rauchtest) — bisher nicht gelaufen.
-3. **Empfangsnamen filtern:** Steuer- und 8-Bit-Bytes im Dateinamen eines F-Pakets (beobachtet nach einem
-   abgebrochenen Senden des C-Kermit: `leftover`-Rest in `getpkt()`) werden nicht abgefangen.
+3. ~~**Empfangsnamen filtern**~~ erledigt (§6.9): Steuerzeichen wies `Freigabe::normalisiere` schon immer ab; neu auch Namen, die
+   kein gültiges UTF-8 sind.
 4. **Echte 10×-Messung:** im Test schafft die Maschine frei nur ≈ 5,5×; 10× und 0,1× sind nur mit der
    virtuellen Uhr nachgebildet (`KermitTempo.*`).
 5. **tty3 ohne 8-Bit-Präfix** nicht vermessen (Fall 2 lief mit `&` des PC-Servers).
-6. **Nachlauf 2 s gegen den eigenen Server:** die Wartezeit auf das Leerlauf-N(0) nach einem B kostet gegen
-   einen Server, der keins schickt (die eigene Bibliothek), 2 s je Befehl nach einem Empfang — ggf. am
-   Init-Austausch erkennen und abschalten.
+6. ~~**Nachlauf 2 s gegen den eigenen Server**~~ erledigt (§6.9): entfällt, wenn die Gegenstelle CAPAS meldet.
 7. **Oberfläche:** Login-Skript nur über CLI/C++-Tests belegt, nicht in `py_kermit_gui`; Drag&Drop nur über
    die Auswertung der Mime-Daten (offscreen keine echten Ereignisse); Wiederverbinden ohne Anmeldung nach
    bloßem *Trennen* nicht eigens geprüft.

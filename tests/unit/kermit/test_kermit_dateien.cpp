@@ -82,6 +82,29 @@ TEST(KermitFreigabe, PfadfallenWerdenAbgewiesen) {
     EXPECT_TRUE(f.aufloesen("com10", p, fe));   // nur COM1–9 sind reserviert
 }
 
+TEST(KermitFreigabe, NamenMussUtf8SeinUmlauteBleibenErlaubt) {
+    TempOrdner t;
+    Freigabe f(t.p);
+    fs::path p;
+    std::string fe;
+    // Rest eines abgebrochenen Sendens / 8-Bit-Muell: kein gueltiges UTF-8
+    for (const std::string& kaputt : {std::string("a\xff"), std::string("a\x80" "b"), std::string("\xC0\xAF"),
+                                      std::string("\xE0\x80\xAF"), std::string("\xED\xA0\x80"),
+                                      std::string("\xF4\x90\x80\x80"), std::string("x\xC3"), std::string("\xC3\x28")}) {
+        fe.clear();
+        EXPECT_FALSE(f.aufloesen(kaputt, p, fe)) << kaputt;
+        EXPECT_NE(fe.find("UTF-8"), std::string::npos) << fe;
+        std::string g;
+        EXPECT_EQ(f.anlegen(kaputt, true, g, fe), nullptr) << kaputt;
+    }
+    // Umlaute und andere gueltige Mehrbytefolgen (PC-Namen) bleiben erlaubt
+    for (const std::string& gut : {std::string("\xC3\xA4.txt"), std::string("\xE2\x82\xAC"), std::string("\xF0\x9F\x98\x80"),
+                                   std::string("sub/\xC3\xBC")}) {
+        fe.clear();
+        EXPECT_TRUE(f.aufloesen(gut, p, fe)) << gut << ": " << fe;
+    }
+}
+
 TEST(KermitFreigabe, AusbrechenderSymlink) {
     TempOrdner t, draussen;
     schreibe(draussen.p / "geheim", "x");

@@ -259,6 +259,7 @@ private:
     double messSummeBytes_ = 0, messSummeMs_ = 0;   ///< gleitende Summen der Ratenmessung
     Statistik st_;
     bool nachlauf_ = false;         ///< zuletzt ein B quittiert (siehe leereEingang)
+    bool nachlaufNoetig_ = true;    ///< die Gegenstelle sendet wie C-Kermit 4.2 (9 Init-Felder, kein CAPAS)
     std::atomic<bool> abbruch_{false};
     std::atomic<bool> abbruchDatei_{false};
     std::atomic<bool> abbruchGruppe_{false};
