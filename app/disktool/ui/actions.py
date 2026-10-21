@@ -55,6 +55,11 @@ _SPEC: List[Tuple] = [
      "_einfuegen_auswahl", False),
     ("loeschen", "&Löschen", "delete", "Del",
      "Die ausgewählten Dateien von der Diskette löschen", "_loeschen_auswahl", False),
+    # Nur an einer P8000-Platte sichtbar (Entwurf 37).  Bewusst OHNE Tastenkuerzel (die
+    # Kuerzeltabelle des Handbuchs ist ein Vertrag).
+    ("platte_ordner", "Ordner auf der &Platte anlegen…", None, None,
+     "Auf der Platte im angeklickten Ordner (oder der Partition) einen neuen Ordner "
+     "anlegen", "_platte_ordner_anlegen", False),
     # Der Weg von der Datei zu ihren Bytes: er gehoert neben „Eigenschaften",
     # weil beides dieselbe Frage beantwortet — was steht da eigentlich?
     ("datei_im_editor", "Im Disk&editor öffnen", "disk-editor", None,
@@ -195,6 +200,7 @@ KURZ = {'oeffnen': 'Öffnen',
     'holen': 'Holen',
     'schreiben': 'Schreiben',
     'loeschen': 'Löschen',
+    'platte_ordner': 'Neuer Plattenordner',
     'datei_im_editor': 'Sektor',
     'eigenschaften': 'Angaben',
     'schreibschutz': 'R/O',

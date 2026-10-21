@@ -28,15 +28,24 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
+from app.disktool.ui.schreibsperre import ist_platte
+
 #: Eigener MIME-Typ fuer das Ziehen von der Diskette in einen Ordner.
 #: Endungen, die das DiskTool als Abbild oeffnet (Gross-/Kleinschreibung egal).
-ABBILD_ENDUNGEN = (".hfe", ".dmk", ".img", ".cqm")
+# `.img.gz`: P8000-Plattenabbilder liegen als `.img.gz` vor (Entwurf 37).
+ABBILD_ENDUNGEN = (".hfe", ".dmk", ".img", ".cqm", ".img.gz")
 
 DISK_MIME = "application/x-k1520-diskfiles"
 
 #: Rolle, unter der die eindeutige Bezeichnung („Side1/NAME") am Eintrag haengt.
 REF_ROLE = Qt.UserRole + 1
 VOLUME_ROLE = Qt.UserRole + 2
+#: Gesetzt (True) an Ordnern einer Platte — dort kann man etwas hineinlegen.
+DIR_ROLE = Qt.UserRole + 3
+
+#: Spaltenkoepfe der Diskettenansicht und der Plattenansicht (UNIX-Angaben).
+DISK_SPALTEN = ["Name", "Typ", "Größe", "Eigensch.", "Datum"]
+PLATTE_SPALTEN = ["Name", "Art", "Größe", "Rechte", "uid", "gid", "Geändert"]
 
 
 class _Tree(QTreeWidget):
@@ -48,6 +57,8 @@ class _Tree(QTreeWidget):
 
     #: Satz fuer die leere Liste — gesetzt von :meth:`DiskView.set_disk`.
     leer_text = ""
+    #: Ordner einer Platte (Referenz), auf den zuletzt abgelegt wurde ("" = auf keinen).
+    drop_ziel = ""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -138,6 +149,15 @@ class _Tree(QTreeWidget):
         # entscheidet; ohne Treffer die erste Seite.
         ziel = 0
         item = self.itemAt(event.position().toPoint())
+        # Bei einer Platte zaehlt der Ordner unter dem Mauszeiger (oder der naechste
+        # darueber), nicht nur die Partition.
+        self.drop_ziel = ""
+        probe = item
+        while probe is not None:
+            if probe.data(0, DIR_ROLE):
+                self.drop_ziel = probe.data(0, REF_ROLE) or ""
+                break
+            probe = probe.parent()
         while item is not None:
             v = item.data(0, VOLUME_ROLE)
             if v is not None:
@@ -169,14 +189,11 @@ class DiskView(QWidget):
         self.titel.setFont(schrift)
 
         self.tree = _Tree()
-        self.tree.setHeaderLabels(["Name", "Typ", "Größe", "Eigensch.", "Datum"])
+        self.tree.setHeaderLabels(DISK_SPALTEN)
         # Der Name nimmt, was uebrig ist; die vier schmalen Spalten richten sich
         # nach ihrem Inhalt — sonst wird das Datum abgeschnitten und die Liste
         # bekommt einen waagerechten Rollbalken, obwohl Platz da waere.
-        kopfzeile = self.tree.header()
-        kopfzeile.setSectionResizeMode(0, QHeaderView.Stretch)
-        for spalte in (1, 2, 3, 4):
-            kopfzeile.setSectionResizeMode(spalte, QHeaderView.ResizeToContents)
+        self._spaltenbreiten()
         self.tree.setTextElideMode(Qt.ElideMiddle)
         self.tree.files_dropped.connect(self.files_dropped)
         self.tree.image_dropped.connect(self.image_dropped)
@@ -191,6 +208,12 @@ class DiskView(QWidget):
         lay.addWidget(self.titel)
         lay.addWidget(self.tree, 1)
 
+    def _spaltenbreiten(self) -> None:
+        kopfzeile = self.tree.header()
+        kopfzeile.setSectionResizeMode(0, QHeaderView.Stretch)
+        for spalte in range(1, self.tree.columnCount()):
+            kopfzeile.setSectionResizeMode(spalte, QHeaderView.ResizeToContents)
+
     # ── Inhalt setzen ───────────────────────────────────────────────────────
 
     def setze_aktionen(self, *aktionen) -> None:
@@ -204,6 +227,13 @@ class DiskView(QWidget):
         self.tree.clear()
         self.tree.leer_text = ""     # ohne Diskette ist leer keine Auskunft
         self.titel.setText("Diskette")
+        self._spalten_setzen(DISK_SPALTEN)
+
+    def _spalten_setzen(self, koepfe) -> None:
+        if [self.tree.headerItem().text(i)
+                for i in range(self.tree.columnCount())] != list(koepfe):
+            self.tree.setHeaderLabels(list(koepfe))
+            self._spaltenbreiten()
 
     def set_disk(self, tool, entries) -> None:
         """Baum aus einer geöffneten Diskette füllen.
@@ -217,6 +247,10 @@ class DiskView(QWidget):
             self.clear()
             return
 
+        if ist_platte(tool):
+            self._set_platte(tool, entries)
+            return
+        self._spalten_setzen(DISK_SPALTEN)
         self.titel.setText(f"Diskette — {tool.filesystem}")
         # Leer formatiert oder mit unpassendem Format geoeffnet: beides sieht hier
         # gleich aus, und beides muss beim Namen genannt werden.
@@ -245,6 +279,63 @@ class DiskView(QWidget):
             # Bibliothek beim Nachtragen (`load_entry_details(i)`), und Namen sind
             # bei UDOS ueber beide Seiten hinweg nicht eindeutig.
             self._zeilen[nr] = item
+
+    def _set_platte(self, tool, entries) -> None:
+        """Plattenbaum: die Partitionen md0… als oberste Ordner, darunter echte Ordner.
+
+        Die Namen des Kerns sind volle Pfade (``md2/etc/passwd``); der Baum wird aus
+        ihnen gebaut.  Die Wurzelzeile einer Partition traegt Rolle, Datentraegername
+        und freien Platz — wie die Gruppenzeile einer zweiseitigen Diskette.
+        """
+        self._spalten_setzen(PLATTE_SPALTEN)
+        self.titel.setText("Platte — WEGA (P8000)")
+        self.tree.leer_text = "" if entries else "Keine Dateien gefunden"
+        volumes = {v.dir: v for v in tool.volumes()}
+        self._zeilen = {}
+        knoten = {}
+        # Eltern vor Kindern: nach Pfadteilen sortieren (die Reihenfolge des Kerns
+        # ist nicht zugesichert).
+        geordnet = sorted(enumerate(entries),
+                          key=lambda p: [t.casefold() for t in p[1].name.split("/")])
+        for nr, e in geordnet:
+            teile = e.name.split("/")
+            eltern = knoten.get("/".join(teile[:-1])) if len(teile) > 1 else None
+            spalten = self._platte_spalten(e, teile[-1], volumes.get(e.name), tool)
+            item = QTreeWidgetItem(eltern if eltern is not None else self.tree, spalten)
+            item.setData(0, REF_ROLE, e.ref)
+            item.setData(0, VOLUME_ROLE, e.volume)
+            if e.type == "d":
+                item.setData(0, DIR_ROLE, True)
+                knoten[e.name] = item
+                if len(teile) == 1:
+                    item.setExpanded(True)
+            if e.damaged:
+                item.setText(1, "DEFEKT")
+            self._zeilen[nr] = item
+
+    @staticmethod
+    def _platte_spalten(e, kurz: str, volume, tool) -> List[str]:
+        """Name, Art, Groesse, Rechte, uid, gid, Zeit — wie ``ls -l``."""
+        if volume is not None:
+            rolle = tool.volume_role(volume.index)
+            kopf = f"{kurz}   {rolle} {volume.label}".rstrip()
+            return [kopf, e.type, "", e.attrs, str(e.unix_uid), str(e.unix_gid),
+                    f"{volume.free // 1024} KB frei"]
+        return [kurz, e.type, "" if e.type == "d" else f"{e.size}", e.attrs,
+                str(e.unix_uid), str(e.unix_gid), e.date]
+
+    def platte_ziel(self) -> str:
+        """Ordner der Platte, in den „Schreiben" legt: der angeklickte Ordner, bei einer
+        Datei deren Ordner.  Leer, wenn nichts Passendes ausgewaehlt ist."""
+        item = self.tree.currentItem()
+        if item is None or not item.isSelected():
+            gewaehlt = self.tree.selectedItems()
+            item = gewaehlt[0] if len(gewaehlt) == 1 else None
+        while item is not None:
+            if item.data(0, DIR_ROLE):
+                return item.data(0, REF_ROLE) or ""
+            item = item.parent()
+        return ""
 
     @staticmethod
     def _spalten(e) -> List[str]:

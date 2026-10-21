@@ -50,13 +50,17 @@ from app.disktool.ui.archiv_dialog import ArchivDialog
 from app.disktool.archive import NAMENLOS, create_archive, dateiname
 
 from app.core_binding.k1520disk import (
-    EBENE_ERKENNUNG, FEHLER, GEFAHR, WARNUNG, DiskTool, K1520DiskError, filesystems,
+    EBENE_ERKENNUNG, FEHLER, GEFAHR, WARNUNG, DiskTool, K1520DiskError, PlatteTool,
+    filesystems, ist_platte as ist_plattendatei,
 )
 from app.disktool.ui.actions import erzeuge_aktionen
 from app.disktool.ui.disk_editor import DiskEditorWindow
 from app.disktool.ui.disk_header import DiskHeader, auswahlliste
 from app.disktool.ui.disk_info_dialog import DiskInfoDialog
-from app.disktool.ui.schreibsperre import dateisystem_anzeige, schutz_text, sperrgrund
+from app.disktool.ui.schreibsperre import (
+    PLATTE_FORMAT_FEST, PLATTE_GESPERRT, dateisystem_anzeige, ist_platte, schutz_text,
+    sperrgrund,
+)
 from app.disktool.ui.tar_satz_dialog import TarSatzDialog
 from app.disktool.ui.fileinfo_dialog import FileinfoDialog, schreibe_fileinfo
 from app.disktool.ui.fsck_dialog import FsckDialog
@@ -278,6 +282,7 @@ class MainWindow(QMainWindow):
         m.addAction(self.act_holen)
         m.addAction(self.act_schreiben)
         m.addAction(self.act_loeschen)
+        m.addAction(self.act_platte_ordner)
         m.addSeparator()
         m.addAction(self.act_datei_im_editor)
         m.addAction(self.act_eigenschaften)
@@ -479,7 +484,8 @@ class MainWindow(QMainWindow):
 
         # Beide Listen zeigen dieselben Aktionen im Kontextmenue.
         self.disk_view.setze_aktionen(self.act_eigenschaften, self.act_datei_im_editor,
-                                      None, self.act_holen, self.act_loeschen)
+                                      None, self.act_holen, self.act_loeschen,
+                                      self.act_platte_ordner)
         self.folder_view.setze_aktionen(self.act_schreiben, None,
                                         self.act_neuer_ordner, self.act_umbenennen,
                                         None, self.act_ordner)
@@ -667,7 +673,8 @@ class MainWindow(QMainWindow):
 
         # Systemspuren gibt es nicht ueberall — eine Datendiskette (cpa800) beginnt
         # auf Zylinder 0 und hat nichts zu sichern.
-        self.act_bootabbild.setEnabled(mit_fs and self.tool.boot_area_size(0) > 0)
+        self.act_bootabbild.setEnabled(mit_fs and not ist_platte(self.tool)
+                                       and self.tool.boot_area_size(0) > 0)
         self.act_schreibschutz.setEnabled(offen)
         # Auch ohne offene Diskette waehlbar, wenn ein physisches Laufwerk im Spiel
         # ist: bei einer nicht erkannten Diskette ist das Uebersteuern der einzige Weg
@@ -721,7 +728,75 @@ class MainWindow(QMainWindow):
             self.act_tar_schreiben.setToolTip(
                 f"{tipps[self.act_tar_schreiben]}\n\nGesperrt: erst den Schreibschutz aufheben.")
 
+        self._platte_pruefen()
         self._schutz_anzeigen()
+
+    def _platte_pruefen(self) -> None:
+        """Was an einer Platte keinen Sinn hat, wird gesperrt — MIT Begruendung im Tooltip.
+
+        Wie bei tar: ein stummes Grau liesse den Anwender nach einem Schalter suchen.
+        Die Begruendungen stehen an einer Stelle (``schreibsperre.PLATTE_GESPERRT``).
+        Ausserhalb einer Platte wird der urspruengliche Tooltip wiederhergestellt; die
+        Freigabe selbst bleibt der Logik von :meth:`_aktionen_pruefen`.
+        """
+        platte = self.tool is not None and ist_platte(self.tool)
+        tipps = self.__dict__.setdefault("_tipps_platte", {})
+        veraendert = self.__dict__.setdefault("_platte_getippt", set())
+        for name, grund in PLATTE_GESPERRT.items():
+            a = getattr(self, f"act_{name}")
+            if platte:
+                if a not in veraendert:
+                    tipps[a] = a.toolTip()
+                    veraendert.add(a)
+                a.setEnabled(False)
+                a.setToolTip(f"{tipps[a]}\n\nGesperrt: {grund}")
+            elif a in veraendert:
+                # Nur zurueckstellen, was WIR veraendert haben: andere Stellen setzen
+                # an denselben Aktionen eigene Tooltips (tar, Schreibschutz).
+                a.setToolTip(tipps[a])
+                veraendert.discard(a)
+
+        # Menue und Radiogruppen, die keine Aktion aus der Tabelle sind.
+        for obj, grund in ((self.menue_fs.menuAction(), PLATTE_FORMAT_FEST),
+                           (self.menue_schnitt.menuAction(),
+                            "Eine Platte hat keine Spuren oder Seiten, die sich "
+                            "entfernen liessen."),
+                           (self.act_text, "Platten werden Byte für Byte übertragen; "
+                                           "es gibt keinen Textmodus."),
+                           (self.act_cpm_fileinfo, "Gilt nur für CP/M-Disketten; die "
+                                                   "Platte schreibt immer ein .fileinfo "
+                                                   "mit den UNIX-Angaben.")):
+            if platte:
+                if obj not in veraendert:
+                    tipps[obj] = obj.toolTip()
+                    veraendert.add(obj)
+                obj.setEnabled(False)
+                obj.setToolTip(f"{tipps[obj]}\n\nGesperrt: {grund}".strip())
+            elif obj in veraendert:
+                obj.setToolTip(tipps[obj])
+                veraendert.discard(obj)
+                if obj in (self.act_text, self.act_cpm_fileinfo):
+                    obj.setEnabled(True)
+        if platte:
+            self.menue_fs.setEnabled(False)
+            self.menue_schnitt.setEnabled(False)
+        else:
+            self.menue_schnitt.setEnabled(self.tool is not None)
+
+        # Die eine Aktion, die es NUR an der Platte gibt.
+        a = self.act_platte_ordner
+        a.setVisible(platte)
+        schreibbar = platte and not self.tool.read_only
+        ziel = platte and bool(self.disk_view.platte_ziel())
+        a.setEnabled(schreibbar and ziel)
+        tipps.setdefault(a, a.toolTip())      # eigene Aktion: nie von anderen Stellen veraendert
+        if platte and not schreibbar:
+            a.setToolTip(f"{tipps[a]}\n\nGesperrt: erst den Schreibschutz aufheben.")
+        elif platte and not ziel:
+            a.setToolTip(f"{tipps[a]}\n\nGesperrt: erst den Ordner (oder die Partition) "
+                         "anklicken, in dem er entstehen soll.")
+        else:
+            a.setToolTip(tipps[a])
 
     def _schutz_anzeigen(self) -> None:
         """Der Schutzknopf ZEIGT den Zustand, statt ihn nur zu schalten.
@@ -959,6 +1034,10 @@ class MainWindow(QMainWindow):
         if self.tool is None:
             return
 
+        if ist_platte(self.tool):
+            self._platte_hinweis()
+            return
+
         befund = self._befund_melden()          # Statuszeile + Protokoll, immer
 
         teile = []
@@ -982,6 +1061,19 @@ class MainWindow(QMainWindow):
             self._befund_streifen(befund)
         else:
             self.info_bar.verbergen()
+
+    def _platte_hinweis(self) -> None:
+        """Meldungsstreifen einer Platte: Schreibschutz-Vorgabe bzw. Sicherungskopie."""
+        self.st_befund.hide()                   # keine Dateisystempruefung fuer Platten
+        if self.tool.read_only:
+            self.info_bar.zeige(
+                "Plattenabbild schreibgeschützt geöffnet.  Zum Ändern den Schreibschutz "
+                "aufheben (Strg+R); vor dem ersten Speichern entsteht eine Sicherung "
+                f"„{Path(self.tool.path).name}~“.", "hinweis")
+        else:
+            self.info_bar.zeige(
+                "Plattenabbild beschreibbar.  Geändert wird erst beim Speichern (Strg+S); "
+                f"vorher entsteht einmalig „{Path(self.tool.path).name}~“.", "warnung")
 
     def _befund_streifen(self, befund) -> None:
         """Den schwersten Befund in den Streifen setzen — mit Weg zum Ganzen."""
@@ -1048,6 +1140,10 @@ class MainWindow(QMainWindow):
         try:
             if satz:
                 self.tool = DiskTool.open_tar_satz(satz)
+            elif self._ist_platte_datei(path):
+                # Eine Platte ist kein Diskettenformat: kein Formatdialog, kein
+                # Katalogname.  Schreibschutz ist die Vorgabe (Entwurf 37, Nr. 12).
+                self.tool = PlatteTool.open(path, read_only=True)
             else:
                 self.tool = DiskTool.open_raw(path, filesystem or None)
         except (K1520DiskError, FileNotFoundError) as e:
@@ -1063,7 +1159,10 @@ class MainWindow(QMainWindow):
             self.info_bar.zeige(f"{path} wurde nicht geöffnet: {e}", "fehler")
             return False
 
-        self._fs_setzen(filesystem, neu_oeffnen=False)
+        self._fs_setzen("" if ist_platte(self.tool) else filesystem, neu_oeffnen=False)
+        if ist_platte(self.tool):
+            # Die Platte kennt keinen Textmodus (Bytes unveraendert, wie beim echten tar).
+            self.act_binaer.setChecked(True)
         self.act_schreibschutz.blockSignals(True)
         self.act_schreibschutz.setChecked(self.tool.read_only)
         self.act_schreibschutz.blockSignals(False)
@@ -1082,6 +1181,15 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(
             f"Geöffnet: {Path(path).name} — {anzeige}", STATUS_DAUER)
         return True
+
+    @staticmethod
+    def _ist_platte_datei(path) -> bool:
+        """Traegt die Datei einen Plattenkopf?  Nicht lesbar/fehlt = nein (das Oeffnen
+        als Diskette meldet dann den eigentlichen Grund)."""
+        try:
+            return bool(ist_plattendatei(path))
+        except Exception:                                   # noqa: BLE001
+            return False
 
     def open_physical(self, *, filesystem: str = "", **optionen) -> bool:
         """**Echte Diskette** in einem echten Laufwerk am Greaseweazle öffnen.
@@ -1702,7 +1810,11 @@ class MainWindow(QMainWindow):
             return False
         self._fileinfo_anwenden()
         try:
-            self.tool.extract_all(dest_dir, text=self.text_mode)
+            if ist_platte(self.tool):
+                # Alle Partitionen als md0/, md2/ … samt .fileinfo je Datei.
+                self.tool.extract("", dest_dir, overwrite=True)
+            else:
+                self.tool.extract_all(dest_dir, text=self.text_mode)
         except K1520DiskError as e:
             self._fehler("Extrahieren", str(e))
             return False
@@ -1749,6 +1861,8 @@ class MainWindow(QMainWindow):
         self._fileinfo_anwenden()
         ziel = Path(dest_dir)
         ziel.mkdir(parents=True, exist_ok=True)
+        if ist_platte(self.tool):
+            return self._platte_holen(refs, ziel)
         try:
             # Zielname = die EINE Regel des Kerns (DiskVolume::zielNamen): ohne
             # Pfadanteil und je Seite eindeutig.  Ein Name wie '/Z/HOFFM' darf weder
@@ -1772,6 +1886,83 @@ class MainWindow(QMainWindow):
         self.log(f"{len(refs)} Dateien nach {dest_dir}")
         return True
 
+    def _platte_holen(self, refs: List[str], ziel: Path) -> bool:
+        """Dateien/Ordner der Platte holen: unter ``ziel`` entsteht ``md2/etc/…`` samt
+        ``.fileinfo`` (Modus, Besitzer, Zeit) — dieselbe Form wie beim Kommandozeilenweg."""
+        try:
+            for ref in refs:
+                self.tool.extract(ref, ziel, overwrite=True)
+        except K1520DiskError as e:
+            self._fehler("Extrahieren", str(e))
+            return False
+        self.folder_view.refresh()
+        self.log(f"{len(refs)} Einträge nach {ziel} (mit .fileinfo)")
+        return True
+
+    def _platte_zielordner(self, vorgabe: str = "") -> str:
+        """Ordner der Platte, in den eingefuegt wird; leer = keiner bestimmbar.
+
+        Es wird NIE geraten (etwa „erste Partition"): in md0 (/usr) gelandete Dateien
+        faende niemand wieder.
+        """
+        return vorgabe or self.disk_view.platte_ziel()
+
+    def _platte_einfuegen(self, paths: List[str], ziel: str) -> bool:
+        """Linux-Dateien/-Ordner in einen Ordner der Platte legen (``.fileinfo`` wird
+        gelesen: Modus, uid/gid, Zeit; sonst 0644/0755, Besitzer 0, jetzt)."""
+        if self.tool.read_only:
+            self._fehler("Einfügen", "Die Platte ist schreibgeschützt.  Den Schreibschutz "
+                                     "aufheben (Strg+R), dann noch einmal.")
+            return False
+        if not ziel:
+            self._fehler("Einfügen", "Es ist kein Zielordner auf der Platte bestimmt.  "
+                                     "Den Ordner (oder die Partition md…) anklicken, in "
+                                     "den die Dateien sollen — oder dorthin ziehen.")
+            return False
+        pfade = [p for p in paths if not p.endswith(".fileinfo")]
+        uebersprungen = len(paths) - len(pfade)
+        if not pfade:
+            self._fehler("Einfügen", "Es sind nur Angabendateien (.fileinfo) ausgewählt — "
+                                     "sie gehören zu ihrer Datei und werden dort gelesen.")
+            return False
+        geschrieben = 0
+        try:
+            for p in pfade:
+                self.tool.insert(p, f"{ziel}/{Path(p).name}", overwrite=True)
+                geschrieben += 1
+        except K1520DiskError as e:
+            self._fehler("Einfügen", str(e))
+            self._reload()
+            return False
+        self._reload()
+        self.log(f"{geschrieben} Einträge nach {ziel} auf der Platte"
+                 + (f" ({uebersprungen} .fileinfo ausgewertet)" if uebersprungen else ""))
+        return True
+
+    def platte_mkdir(self, name: str) -> bool:
+        """Ordner auf der Platte anlegen (``name`` = voller Pfad, ``md3/neu``)."""
+        if self.tool is None or not ist_platte(self.tool):
+            return False
+        try:
+            self.tool.mkdir(name)
+        except K1520DiskError as e:
+            self._fehler("Ordner anlegen", str(e))
+            return False
+        self._reload()
+        self.log(f"Ordner angelegt: {name}")
+        return True
+
+    def _platte_ordner_anlegen(self) -> None:
+        ziel = self.disk_view.platte_ziel()
+        if not ziel:
+            self._leere_auswahl("Ordner anlegen")
+            return
+        name, ok = QInputDialog.getText(self, "Ordner auf der Platte anlegen",
+                                        f"Name des neuen Ordners in {ziel}:")
+        name = name.strip().strip("/")
+        if ok and name:
+            self.platte_mkdir(f"{ziel}/{name}")
+
     def insert_paths(self, paths: List[str], volume: int = 0) -> bool:
         """Einzelne Dateien auf eine Seite schreiben.
 
@@ -1789,6 +1980,8 @@ class MainWindow(QMainWindow):
         """
         if self.tool is None or not paths:
             return False
+        if ist_platte(self.tool):
+            return self._platte_einfuegen(paths, self._platte_zielordner())
         if self.tool.tar_leer:
             return self._tar_leer_einfuegen(paths)
 
@@ -1902,6 +2095,10 @@ class MainWindow(QMainWindow):
 
     def erase_refs(self, refs: List[str]) -> bool:
         if self.tool is None or not refs:
+            return False
+        if ist_platte(self.tool) and any("/" not in r for r in refs):
+            self._fehler("Löschen", "Eine Partition (md0, md2 …) lässt sich nicht löschen — "
+                                    "nur Dateien und Ordner darin.")
             return False
         try:
             for ref in refs:
@@ -2018,6 +2215,11 @@ class MainWindow(QMainWindow):
         self.act_schreibschutz.blockSignals(False)
         self._aktionen_pruefen()
         self.log("Schreibschutz " + ("gesetzt" if ro else "aufgehoben"))
+        if ist_platte(self.tool):
+            self._platte_hinweis()
+            if not ro:
+                self.log("Plattenabbild: geschrieben wird erst beim Speichern; vorher "
+                         "entsteht einmalig die Sicherung „<abbild>~“")
 
     def save(self) -> bool:
         """Änderungen festschreiben.
@@ -2079,7 +2281,10 @@ class MainWindow(QMainWindow):
             self.open_image(pfad)
 
     #: Dateifilter „Abbild oeffnen"; .cqm ist auch als Ziel erlaubt (wie .img, soweit darstellbar).
-    OEFFNEN_FILTER = "Diskettenabbilder (*.hfe *.dmk *.img *.cqm);;Alle Dateien (*)"
+    #: Plattenabbilder (P8000, WEGA) heissen `.img.gz` oder `.img`; ob eine Datei eine Platte
+    #: ist, entscheidet ihr Plattenkopf, nicht der Name (`open_image`).
+    OEFFNEN_FILTER = ("Diskettenabbilder und Platten (*.hfe *.dmk *.img *.img.gz *.cqm);;"
+                      "Alle Dateien (*)")
 
     def _tar_satz_dialog(self) -> None:
         """Mehrere Abbilder in gewählter Reihenfolge als einen tar-Strom öffnen."""
@@ -2687,6 +2892,12 @@ class MainWindow(QMainWindow):
         self.insert_paths(pfade, seite)
 
     def _einfuegen_pfade(self, pfade: List[str], volume: int) -> None:
+        if self.tool is not None and ist_platte(self.tool):
+            # Abgelegt wird in den Ordner UNTER dem Mauszeiger, nicht in „die Seite".
+            ziel = self.disk_view.tree.drop_ziel
+            self.disk_view.tree.drop_ziel = ""
+            self._platte_einfuegen(pfade, ziel)
+            return
         self.insert_paths(pfade, volume)
 
     def _alles_extrahieren(self) -> None:
@@ -2706,9 +2917,10 @@ class MainWindow(QMainWindow):
         if not refs:
             self._leere_auswahl("Löschen")
             return
+        wovon = "der Platte" if ist_platte(self.tool) else "der Diskette"
         antwort = QMessageBox.question(
             self, "Löschen",
-            f"{len(refs)} Datei(en) von der Diskette löschen?\n" + "\n".join(refs[:10]))
+            f"{len(refs)} Datei(en) von {wovon} löschen?\n" + "\n".join(refs[:10]))
         if antwort == QMessageBox.Yes:
             self.erase_refs(refs)
 

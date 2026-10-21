@@ -8,8 +8,10 @@ Dateisysteme von **CP/A**, **SCPX**, **UDOS/ZDOS**, **UDOS1715/NDOS** und
 **SCP1700** (CP/M-86 des A7100) in den
 Abbildformaten `.hfe`, `.dmk`, `.img` und `.cqm` (CopyQM; soweit das Medium darstellbar ist).
 Dazu kommen die UNIX-Disketten des P8000: **WEGA** (mit Modus, Besitzer und Zeit je
-Datei) und **tar-Disketten** ohne Dateisystem, beide ohne UDOS-Angaben. Alles
+Datei), **tar-Disketten** ohne Dateisystem und **Plattenabbilder** (`.img.gz`) mit ihren
+Partitionen — alle ohne UDOS-Angaben. Alles
 Wesentliche zu den neueren Funktionen steht in den Abschnitten *tar-Disketten*,
+*P8000-Platten (WEGA)*,
 *CopyQM-Abbilder*, *Containerformate im Vergleich*, *Was eine Datei außer ihren Bytes hat* und *Archivieren*
 (einschließlich *Archive auf der Kommandozeile*).
 
@@ -317,6 +319,37 @@ mit Kopf und Endmarke genau die Datei; bei einer Datei mit Kopf **ohne** Endmark
 zwei Nullblöcke (die Auffüllung der Diskette hat dann eine); bei einem Folgeteil die Datei,
 mit Nullen auf 720 KiB aufgefüllt — ein volles Teil kommt bitgleich zurück. Nach dem `cat` der
 exportierten Teile bleibt daher höchstens Nullauffüllung am Ende des Archivs übrig, die `tar` ignoriert.
+
+## P8000-Platten (WEGA)
+
+Ein **Plattenabbild** des P8000 (`.img` oder gepackt `.img.gz`, etwa `…k5504.img.gz`) öffnet
+man wie eine Diskette: *Datei ▸ Abbild öffnen…* oder die Datei auf die linke Hälfte ziehen. Ob
+es eine Platte ist, entscheidet ihr Plattenkopf, nicht der Name — und es erscheint **kein
+Formatdialog**: Format und Dateisystem (WEGA) stehen fest.
+
+* **Ansicht.** Die Partitionen `md0`, `md2`, `md3`, `md4` stehen als oberste Ordner (mit
+  Verwendung, Datenträgername und freiem Platz), darunter der Verzeichnisbaum. Je Zeile: Art,
+  Größe, Rechte (wie `ls -l`), uid, gid und Änderungszeit.
+* **Eigenschaften** (Doppelklick, `Alt+Return`) zeigen und ändern Modus, Besitzer und Zeit wie
+  bei einer WEGA-Diskette.
+* **Holen** legt Datei oder Ordner mit ihrem Pfad in den Ordner (`md2/etc/passwd`) und schreibt
+  neben jede Datei ein `.fileinfo` (Modus, uid/gid, Zeit). **Alles extrahieren** holt alle
+  Partitionen.
+* **Hinzufügen** (*Auf die Platte schreiben*, `Strg+←`, oder Ziehen) legt in den angeklickten
+  Ordner der Platte — beim Ziehen in den Ordner unter dem Mauszeiger. Ein `.fileinfo` neben der
+  Datei liefert Modus, Besitzer und Zeit; sonst gelten 0644/0755, uid/gid 0 und „jetzt“. Ist
+  kein Zielordner bestimmt, wird **nichts geraten**. *Löschen* entfernt Dateien und Ordner (keine
+  Partition); *Ordner auf der Platte anlegen…* (Menü *Bearbeiten*, auch im Kontextmenü) legt
+  einen Ordner im angeklickten Ordner an.
+* **Schreibschutz.** Wie bei jedem Datenträger ist er beim Öffnen gesetzt; *Diskette ▸
+  Schreibschutz* (`Strg+R`) hebt ihn auf. Geschrieben wird erst beim Speichern (`Strg+S`), und
+  zwar in der Art der Quelle (`.img.gz` bleibt gepackt). Vor dem ersten Zurückschreiben entsteht
+  einmalig eine Sicherung `<abbild>~`.
+* **Gesperrt** sind Aktionen, die an einer Platte keinen Sinn haben — mit Begründung im
+  Tooltip: Diskeditor, Bootabbild, Dateisystemwahl und Spurschnitte (die Platte hat keine
+  Spuren, Seiten oder Systemspuren), Greaseweazle, Diskettenangaben, Dateisystemprüfung,
+  Wiederherstellen, Archivieren, *Speichern unter* (für eine Arbeitskopie die Datei im
+  Dateimanager kopieren) und *Alles einfügen* (dafür Ziehen oder *Auf die Platte schreiben*).
 
 ## CopyQM-Abbilder
 

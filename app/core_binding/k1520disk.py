@@ -2219,6 +2219,27 @@ class PlatteTool:
     ist_cpm = False
     ist_cqm = False
     read_only_forced = False
+    #: Kennung fuer die Oberflaeche (``ist_platte`` ist die statische Pruefung einer Datei).
+    ist_plattenabbild = True
+
+    # Was die gemeinsamen Teile der Oberflaeche (Kopf, Meldungsstreifen, Sperrlogik)
+    # an einem ``DiskTool`` abfragen und eine Platte nicht kennt: neutrale Werte statt
+    # Sonderfaelle an jeder Stelle.  Eine Platte hat weder Spuren noch eine
+    # mehrdeutige Erkennung noch einen Medienkommentar.
+    unambiguous = True
+    alternatives: List[str] = []
+    remarks = ""
+    tar_leer = False
+    medium_cylinders = 0
+    medium_heads = 0
+    examined_tracks = 0
+
+    def container_info(self) -> dict:
+        return {}
+
+    def unix_blocks(self, name: str) -> str:
+        """Blockliste einer Datei — fuer Platten nicht ausgegeben (leer)."""
+        return ""
 
     @property
     def volume_count(self) -> int:
