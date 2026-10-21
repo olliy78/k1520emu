@@ -70,7 +70,7 @@ Die Ketten sind unabhängig, laufen aber **nacheinander** (gemeinsamer `build/`,
 
 | AP | Inhalt | Wächter (neu) | Status |
 |----|--------|---------------|--------|
-| **P1** | Kern: `.fileinfo`-Code aus `DiskVolume` herauslösen (`core/filesystem/fileinfo.*`), `PlattenVolume` (list/read/write/erase/mkdir/setAttributes/extract/insert, flush, Backup), CLI `platte()` darauf umstellen | `PlattenVolume.*` (C++) | offen |
+| **P1** | Kern: `.fileinfo`-Code aus `DiskVolume` herauslösen (`core/filesystem/fileinfo.*`), `PlattenVolume` (list/read/write/erase/mkdir/setAttributes/extract/insert, flush, Backup), CLI `platte()` darauf umstellen | `PlattenVolume.*` (C++) | fertig 2026-10-21 |
 | **P2** | C-ABI `k1520d_platte_*` + ctypes `PlatteTool` + `test_c_api`-Abgleich | `py_disktool_platte` | offen |
 | **P3** | GUI: Öffnen/Drop, Ordneransicht md0…, Schreibschutz, Eigenschaften, gesperrte Aktionen, Handbuch | `py_disktool_platte_gui` | offen |
 | **T1** | Kern: `TarArchiv` + schreibbares `TarFileSystem` (abgeschlossene Archive), Attribute, `.fileinfo` | `TarWrite.*` | offen |
@@ -94,3 +94,4 @@ der `.fileinfo`-Umbau in P1 nützt dem tar-Weg T1).
 ## 4. Verlauf
 
 - 2026-10-20: Plan geschrieben, Tickets auf `in progress`.
+- 2026-10-21: P1 abgenommen (7 PlattenVolume-Tests, Volllauf 3697/3697 gruen).
