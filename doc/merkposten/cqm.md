@@ -88,8 +88,11 @@ Voller Befund an 142 Abbildern: `doc/design/35_cqm.md`.
    Folgeteil ohne einen Kopf — nur in dieser Sitzung, beim Wiederöffnen ist es „kein Dateisystem“,
    Export geht trotzdem) das leere, `readOnlyForced`, `detection_.filesystem = tar720`, Abbild
    sofort zurückgeschrieben (flush), Medium bei Fehler zurückgerollt, keine `~`-Sicherung (nur Nullen
-   überschrieben).  Datei-Wege (`insert`/`erase`/…) melden auf der leeren Diskette „genau EIN
-   .tar“.  Wächter `TarLeer.SchreibenRundlaufUndVerriegelung`, `NurInEineLeereDiskette`.
+   überschrieben).  **Seit Entwurf 37 T1 (2026-10-22) überholt:** Datei-Wege (`insert`/`erase`/`mkdir`/`setAttributes`) sind auf der leeren
+   Diskette und an einem ABGESCHLOSSENEN Archiv (Kopf bei Sektor 0 + Endmarke) erlaubt (`TarArchiv`, `tar_archiv.*`: Strom
+   wird jedes Mal neu gebaut, V7, kein Patchen; `readOnlyForced` nur noch für Folgeteil/abgeschnitten/ohne Endmarke,
+   Grund in `TarFileSystem::nurLesbarGrund`); `tar-put` bleibt Einmalwurf und lässt die Diskette schreibgeschützt,
+   aufhebbar.  Wächter `TarWrite.*`.  Wächter `TarLeer.SchreibenRundlaufUndVerriegelung`, `NurInEineLeereDiskette`.
    **(4) V7-Urteil** `tar::quelleBeurteilen`: ALLE vom Anfang her ablaufbaren Köpfe;
    Warnung (nie Sperre) bei `ustar`-Magic, Typ x/g, L/K, 3/4/6/7, Name ohne NUL (100 Zeichen), binärem
    Größenfeld; Folgeteil → keine Warnung; Ablehnung: leer, nicht 512-Vielfaches, > 720 KiB

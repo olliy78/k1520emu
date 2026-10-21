@@ -73,7 +73,7 @@ Die Ketten sind unabhängig, laufen aber **nacheinander** (gemeinsamer `build/`,
 | **P1** | Kern: `.fileinfo`-Code aus `DiskVolume` herauslösen (`core/filesystem/fileinfo.*`), `PlattenVolume` (list/read/write/erase/mkdir/setAttributes/extract/insert, flush, Backup), CLI `platte()` darauf umstellen | `PlattenVolume.*` (C++) | fertig 2026-10-21 |
 | **P2** | C-ABI `k1520d_platte_*` + ctypes `PlatteTool` + `test_c_api`-Abgleich | `py_disktool_platte` | fertig 2026-10-22 |
 | **P3** | GUI: Öffnen/Drop, Ordneransicht md0…, Schreibschutz, Eigenschaften, gesperrte Aktionen, Handbuch | `py_disktool_platte_gui` | fertig 2026-10-22 |
-| **T1** | Kern: `TarArchiv` + schreibbares `TarFileSystem` (abgeschlossene Archive), Attribute, `.fileinfo` | `TarWrite.*` | offen |
+| **T1** | Kern: `TarArchiv` + schreibbares `TarFileSystem` (abgeschlossene Archive), Attribute, `.fileinfo` | `TarWrite.*` | umgesetzt 2026-10-22 (Abnahme offen) |
 | **T2** | Kern: Satzmodus (Verteilen auf N Abbilder, Nummerierung, Überlauf Einzeldiskette → Satz), `tar-satz` schreibend; CLI `tar-satz-save`/`tar-satz-neu` | `TarSatz.*`, `dt_tar_satz_*.cli` | offen |
 | **T3** | Neu-Anlegen mit Format (leere Diskette/Satz), `.tar` als Datei vs. fertiger Container, C-ABI + `DiskTool` | `TarNeu.*`, `py_disktool_tar_satz` | offen |
 | **T4** | GUI: Satz bearbeiten (Drag&Drop, Löschen), Speichern → mehrere Abbilder, Popup `.tar`, Hinweis Folgediskette, GW-Sperre, Python-`fileinfo.py` | `py_disktool_tar_satz_gui` | offen |
@@ -98,3 +98,4 @@ der `.fileinfo`-Umbau in P1 nützt dem tar-Weg T1).
 - 2026-10-22: P2 abgenommen (43 `k1520d_platte_*`, `PlatteTool`, 14 Faelle `py_disktool_platte`). Bekannt rot, vorbestehend (auch ohne P2): `py_kermit_gui` SEGFAULT unter Last (`kermittool/binding.py abort`).
 - 2026-10-22: P3 umgesetzt (GUI: Oeffnen/Drop `.img.gz`, Plattenbaum md0..md4 mit Rechten/uid/gid/Zeit, Eigenschaften, Holen/Einfuegen mit `.fileinfo`, Ordner anlegen, Loeschen, Schreibschutz-Vorgabe, gesperrte Aktionen mit Begruendung in `schreibsperre.PLATTE_GESPERRT`, Handbuch-Abschnitt; 18 Faelle `py_disktool_platte_gui`).
 - 2026-10-22: `py_kermit_gui`-SEGFAULT behoben (Use-after-free Kermit.close()/abort*(), Sperre, 2474dc8); Python-Ebene 78/78 gruen.
+- 2026-10-22: T1 umgesetzt (`core/filesystem/tar/tar_archiv.*`, schreibbares `TarFileSystem`, `DiskVolume` ohne Dauer-Schreibsperre fuer abgeschlossene Archive, 10 Faelle `TarWrite.*`; alte Regel 'tar720 nur lesbar' in `TarFs.NurLesbar`, `CqmDiskVolume.*`, `TarLeer.*`, `py_disktool_tar_schreiben`, `py_cqm_disktool_gui` gezielt auf 'ohne Endmarke' bzw. 'schreibbar' umgestellt).

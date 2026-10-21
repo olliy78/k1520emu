@@ -246,6 +246,7 @@ if(BUILD_K1520)
         core/filesystem/udos/udos1715_fs.cpp
         core/filesystem/wega/wega_fs.cpp
         core/filesystem/tar/tar_fs.cpp
+        core/filesystem/tar/tar_archiv.cpp
         core/filesystem/wega/wega_platte.cpp
         core/filesystem/wega/platten_volume.cpp
         core/filesystem/fileinfo.cpp

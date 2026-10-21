@@ -36,10 +36,13 @@ def _kopf(name: str, daten: bytes) -> bytes:
 
 
 def _tar_roh() -> bytes:
+    # OHNE Endmarke: ein abgeschlossenes Archiv (Kopf + Endmarke) ist seit Entwurf 37 T1 im
+    # Kern schreibbar; die Oberflaeche kennt das erst mit T4 und prueft hier noch die Sperre,
+    # die weiterhin fuer unabgeschlossene Archive (Folgeteil einer Diskettenfolge) gilt.
     s = b""
     for name, daten in (("a.txt", b"Hallo\n"), ("dir/b.bin", bytes(range(200)))):
         s += _kopf(name, daten) + daten + bytes(-len(daten) % 512)
-    return (s + bytes(1024)).ljust(DISK, b"\xe5")
+    return s.ljust(DISK, b"\xe5")
 
 
 @pytest.fixture(scope="module")

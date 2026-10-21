@@ -66,7 +66,8 @@ def test_empty_tar_disk_roundtrip_through_the_abi(tmp_path, leere):
             d.tar_export(tmp_path / "nichts.tar")
         assert d.tar_put_pruefen(quelle) == ""
         assert d.tar_put(quelle) == ""
-        assert not d.tar_leer and d.read_only and d.read_only_forced
+        # abgeschlossenes Archiv (Kopf + Endmarke): schreibbar (T1), tar-put schuetzt es aber einmalig
+        assert not d.tar_leer and d.read_only and not d.read_only_forced
         assert d.filesystem == "tar720"
         assert [e.name for e in d.list()] == ["a.txt", "dir/b.bin"]
         with pytest.raises(K1520DiskError, match="tar-Archiv"):
@@ -162,7 +163,8 @@ def test_write_a_v7_tar_then_locked_and_exportable(window, leere, tmp_path, monk
     # V7: keine Rueckfrage (die Sperre der Tests wuerde sie sonst als Fehlschlag melden)
     assert window.tar_schreiben(quelle)
     t = window.tool
-    assert t.ist_tar and not t.tar_leer and t.read_only_forced
+    # abgeschlossenes Archiv: im Kern schreibbar (Entwurf 37 T1); tar-put schuetzt es einmalig
+    assert t.ist_tar and not t.tar_leer and t.read_only and not t.read_only_forced
     assert "tar-Archiv (UNIX)" in window.kopf.angaben.text()
     assert not window.act_tar_schreiben.isEnabled()
     assert window.act_tar_export.isEnabled()
@@ -300,5 +302,5 @@ def test_multiple_folders_images_and_locked_are_refused_with_a_message(window, l
     assert window.insert_paths([str(t1)])
     assert not window.act_schreiben.isEnabled()
     monkeypatch.setattr(QMessageBox, "critical", staticmethod(lambda *a, **k: None))
-    assert not window.insert_paths([str(t2)])
-    assert window.tool.read_only_forced
+    assert not window.insert_paths([str(t2)])       # ein zweites .tar wird abgelehnt
+    assert not window.tool.tar_leer

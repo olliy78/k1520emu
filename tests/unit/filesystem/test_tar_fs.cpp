@@ -159,6 +159,14 @@ std::vector<uint8_t> beispiel() {
     return s;
 }
 
+/// Dasselbe Archiv OHNE Endmarke: nicht abgeschlossen, bleibt lesbar, aber nicht schreibbar
+/// (ein abgeschlossenes Archiv ist seit Entwurf 37 T1 schreibbar, siehe test_tar_write.cpp).
+std::vector<uint8_t> beispielOffen() {
+    auto s = beispiel();
+    s.resize(s.size() - 1024);
+    return s;
+}
+
 }  // namespace
 
 // ─── Erkennung und Lesen ─────────────────────────────────────────────────────
@@ -409,9 +417,10 @@ TEST(TarFs, EchteDateisystemeGehenVor) {
     fs::remove(c);
 }
 
-/// @test Nur lesbar: put/rm/mkdir scheitern mit klarer Meldung, setReadOnly(false) wirkt nicht.
+/// @test Nur lesbar (Archiv ohne Endmarke): put/rm/mkdir scheitern mit klarer Meldung,
+///       setReadOnly(false) wirkt nicht.  Das abgeschlossene Archiv ist schreibbar: TarWrite.*
 TEST(TarFs, NurLesbar) {
-    const std::string p = imgMit("k1520_test_tar_j.img", aufDisk(beispiel()));
+    const std::string p = imgMit("k1520_test_tar_j.img", aufDisk(beispielOffen()));
     auto v = oeffne(p, /*schreibend=*/true);
     ASSERT_TRUE(v);
     EXPECT_TRUE(v->readOnly());
@@ -522,12 +531,12 @@ std::vector<uint8_t> baueCqm(const std::vector<uint8_t>& raw, const std::string&
 ///       nur lesbar); eine leere .cqm laesst sich schreibbar oeffnen.
 TEST(CqmDiskVolume, SchreibschutzKommtVomTarProfilNichtVomContainer) {
     const std::string p = k1520test::tempPath("k1520_test_cqmvol.cqm");
-    schreibeDatei(p, baueCqm(aufDisk(beispiel()), "Kommentar"));
+    schreibeDatei(p, baueCqm(aufDisk(beispielOffen()), "Kommentar"));
     auto v = oeffne(p, /*schreibend=*/true);
     ASSERT_TRUE(v);
     ASSERT_TRUE(v->hasFileSystem());
     EXPECT_EQ(v->detection().filesystem, "tar720");
-    EXPECT_TRUE(v->readOnlyForced());          // tar: unaufhebbar
+    EXPECT_TRUE(v->readOnlyForced());          // tar ohne Endmarke: unaufhebbar
     EXPECT_EQ(v->containerName(), "cqm");
     v->setReadOnly(false);
     EXPECT_TRUE(v->readOnly());
@@ -946,11 +955,13 @@ TEST(TarLeer, AnlegenInAllenContainernUndWiederErkennen) {
         EXPECT_FALSE(w->readOnlyForced());            // aber aufhebbar
         w->setReadOnly(false);
         EXPECT_FALSE(w->readOnly());
-        // Einzeldateien gehoeren nicht auf die leere tar-Diskette
+        // Einzeldateien gehoeren seit Entwurf 37 T1 auch auf die leere tar-Diskette
+        // (vorher: "genau EIN .tar"); sie wird damit zum Archiv.
         const std::string q = k1520test::tempPath("k1520_test_tarl_a.txt");
         schreibeDatei(q, {'a'});
-        EXPECT_FALSE(w->insert(q, FileRef{0, "neu.txt"}, TransferOptions{}));
-        EXPECT_NE(w->lastError().find("EIN .tar"), std::string::npos) << w->lastError();
+        EXPECT_TRUE(w->insert(q, FileRef{0, "neu.txt"}, TransferOptions{})) << w->lastError();
+        EXPECT_FALSE(w->tarLeer());
+        EXPECT_TRUE(finde(w->list(), "neu.txt"));
         fs::remove(q);
         fs::remove(p);
     }
@@ -1006,8 +1017,8 @@ TEST(TarLeer, SchreibenRundlaufUndVerriegelung) {
         EXPECT_TRUE(v->lastTarWarnung().empty());
         // sofort danach: tar720, nur lesbar, Archiv sichtbar
         EXPECT_FALSE(v->tarLeer());
-        EXPECT_TRUE(v->readOnly());
-        EXPECT_TRUE(v->readOnlyForced());
+        EXPECT_TRUE(v->readOnly());                // tar-put schuetzt einmalig ...
+        EXPECT_FALSE(v->readOnlyForced());         // ... aber das abgeschlossene Archiv ist aufhebbar (T1)
         EXPECT_EQ(v->detection().filesystem, "tar720");
         ASSERT_TRUE(finde(v->list(), "dir/b.bin"));
         EXPECT_FALSE(v->tarSchreiben(src));
@@ -1021,7 +1032,7 @@ TEST(TarLeer, SchreibenRundlaufUndVerriegelung) {
         ASSERT_TRUE(w) << err;
         EXPECT_TRUE(w->istTar());
         EXPECT_FALSE(w->tarLeer());
-        EXPECT_TRUE(w->readOnlyForced());
+        EXPECT_FALSE(w->readOnlyForced());         // Kopf + Endmarke: schreibbar (T1)
         EXPECT_EQ(w->detection().filesystem, "tar720");
         std::vector<uint8_t> aus;
         ASSERT_EQ(exportiere(*w, "k1520_test_tarl_f_aus.tar", aus), "");

@@ -104,6 +104,10 @@ public:
     virtual bool read(uint64_t off, uint8_t* dst, size_t n) const = 0;
     /// @brief Ort des Sektors, der @p off enthaelt (fuer den Diskeditor); Vorgabe: unbekannt.
     virtual bool ort(uint64_t off, FsRecoverOrt& out) const { (void)off; (void)out; return false; }
+    /// @brief Laesst sich in den Strom schreiben?  (Diskette ja, Satz im Speicher nein — T2.)
+    virtual bool beschreibbar() const { return false; }
+    /// @brief @p n Byte ab @p off in den Strom schreiben (nur wenn @ref beschreibbar).
+    virtual bool schreibe(uint64_t off, const uint8_t* src, size_t n) { (void)off; (void)src; (void)n; return false; }
 };
 
 /// @brief Strom ueber der linearen Sektorfolge einer Diskette.
@@ -113,6 +117,8 @@ public:
     uint64_t size() const override { return s_.size(); }
     bool read(uint64_t off, uint8_t* dst, size_t n) const override { return s_.read(off, dst, n); }
     bool ort(uint64_t off, FsRecoverOrt& out) const override;
+    bool beschreibbar() const override { return true; }
+    bool schreibe(uint64_t off, const uint8_t* src, size_t n) override { return s_.write(off, src, n); }
 private:
     SectorSpace& s_;
 };
@@ -127,9 +133,19 @@ private:
     std::vector<uint8_t> d_;
 };
 
+namespace tar { class TarArchiv; }
+
 /**
  * @class TarFileSystem
- * @brief Schreibgeschuetztes Archiv-Dateisystem ueber einem @ref TarQuelle.
+ * @brief Archiv-Dateisystem ueber einem @ref TarQuelle.
+ *
+ * Lesbar ist jeder tar-Strom.  **Schreibbar** (Entwurf 37, AP T1) ist nur ein ABGESCHLOSSENES
+ * Archiv: Kopf bei Sektor 0 UND Endmarke (zwei Nullbloecke), oder die leere tar-Diskette.
+ * Jede Aenderung baut den ganzen Strom aus einem @ref tar::TarArchiv neu (V7-Koepfe, kein
+ * Patchen) und schreibt ihn ab Byte 0; was vom alten Archiv hinten uebrig bleibt, wird auf
+ * Null gesetzt.  Folgeteil, abgeschnittenes und ein Archiv ohne Endmarke bleiben lesbar,
+ * nicht schreibbar — @ref nurLesbarGrund sagt warum.  Passt der neue Strom nicht mehr auf
+ * den Datentraeger, scheitert die Aenderung mit klarer Meldung (der Satzmodus folgt in T2).
  */
 class TarFileSystem : public FileSystem {
 public:
@@ -141,6 +157,10 @@ public:
     ///        ohne Dateigrenze): er erscheint ganz als `_fortsetzung_anfang.bin`.  Nur fuer
     ///        eine Diskette, die gerade selbst mit `tar-put` beschrieben wurde.
     static std::unique_ptr<TarFileSystem> mountRoh(std::unique_ptr<TarQuelle> q, std::string& why);
+    /// @brief Darf in dieses Archiv geschrieben werden?  (abgeschlossen oder leer, Quelle beschreibbar)
+    bool schreibbar() const { return schreibbar_; }
+    /// @brief Warum nicht (Klartext mit dem Weg daraus); leer, wenn @ref schreibbar.
+    const std::string& nurLesbarGrund() const { return grund_; }
     /// @brief Besteht der Strom ganz aus Nullen?  (Die Probe der Erkennung; @p why nennt sonst die Stelle.)
     static bool istLeer(const TarQuelle& q, std::string* why);
     /// @brief Ist das die leere tar-Diskette (noch nichts geschrieben)?
@@ -151,9 +171,16 @@ public:
     std::vector<FileEntry> list() const override;
     bool firstSector(const std::string& name, FsRecoverOrt& out) const override;
     bool read(const std::string& name, std::vector<uint8_t>& out) override;
-    bool write(const std::string&, const std::vector<uint8_t>&, const WriteOptions&) override;
-    bool erase(const std::string&) override;
-    bool wouldFit(const std::vector<PlannedFile>&, FitReport& out) const override;
+    /// @brief Datei einfuegen/ersetzen.  Modus/Besitzer/Zeit aus den `wega_*`-Feldern der
+    ///        @ref WriteOptions (Vorgabe 0644, uid/gid 0, mtime jetzt).
+    bool write(const std::string& name, const std::vector<uint8_t>& data, const WriteOptions& opt) override;
+    /// @brief Datei oder LEERES Verzeichnis entfernen.
+    bool erase(const std::string& name) override;
+    /// @brief Verzeichnis (samt fehlender Zwischenverzeichnisse) anlegen, Modus 0755.
+    bool makeDirectory(const std::string& name) override;
+    /// @brief Modus, Besitzer, Zeit aendern (`chmod`/`chown`/`touch`).
+    bool setAttributes(const std::string& name, const UnixAttrs& a) override;
+    bool wouldFit(const std::vector<PlannedFile>& files, FitReport& out) const override;
     bool mkfs() override;
     FsInfo info() const override;
     FsCheckReport check(FsCheckLevel level, bool nachladen) const override;
@@ -163,6 +190,7 @@ public:
 
 private:
     explicit TarFileSystem(std::unique_ptr<TarQuelle> q) : q_(std::move(q)) {}
+    using FileSystem::setAttributes;     // die UDOS-/CP/M-Fassungen bleiben sichtbar (melden "nicht fuer tar")
 
     struct Eintrag {
         tar::Kopf k;
@@ -190,7 +218,16 @@ private:
     const Eintrag* finde(const Scan& s, const std::string& name) const;
     bool lies(const Scan& s, const Eintrag& e, std::vector<uint8_t>& out, int tiefe) const;
 
+    /// @brief Beurteilt nach dem Mounten, ob der Strom ein abgeschlossenes Archiv ist.
+    void bewerte();
+    /// @brief Das Archivmodell aus dem Strom laden (nur fuer schreibbare Archive).
+    bool ladeArchiv(tar::TarArchiv& a) const;
+    /// @brief Strom aus @p a neu bauen und ab Byte 0 schreiben (Rest des alten Archivs -> Null).
+    bool speichere(const tar::TarArchiv& a);
+
     std::unique_ptr<TarQuelle> q_;
+    bool schreibbar_ = false;
+    std::string grund_;
     bool leer_ = false;     ///< Strom ganz Null: leeres Archiv, beschreibbar mit einem .tar
     bool roh_  = false;     ///< Strom ohne Kopfblock als Fortsetzung zulassen
 };

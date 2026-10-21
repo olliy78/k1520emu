@@ -43,6 +43,8 @@
 #include <string>
 #include <vector>
 
+class TarFileSystem;
+
 /**
  * @struct FileRef
  * @brief Eindeutige Bezeichnung einer Datei ueber die ganze Diskette.
@@ -505,11 +507,14 @@ public:
     bool istUnix() const {
         return profile_ && (profile_->type == FsType::Wega || profile_->type == FsType::Tar);
     }
-    /// @brief Archiv aus einem tar-Strom (nur lesbar, kein Dateisystem)?
+    /// @brief Archiv aus einem tar-Strom (kein Dateisystem)?  Schreibbar nur, wenn es abgeschlossen
+    ///        ist (Kopf + Endmarke) — sonst @ref readOnlyForced.
     bool istTar() const { return profile_ && profile_->type == FsType::Tar; }
     /// @brief Die LEERE tar-Diskette (`tar720_leer`): ganz aus Nullen, beschreibbar mit genau
     ///        einem `.tar` (@ref tarSchreiben).  Nach dem Schreiben false, @ref istTar bleibt true.
     bool tarLeer() const;
+    /// @brief Das tar-Dateisystem dieser Diskette; nullptr, wenn es keine tar-Diskette ist.
+    const TarFileSystem* tarFs() const;
 
     /**
      * @brief Den tar-Strom der Diskette als `.tar` herausschreiben (`tar-export`).
@@ -536,8 +541,9 @@ public:
     /**
      * @brief Eine `.tar`-Datei auf die LEERE tar-Diskette schreiben (`tar-put`).
      *
-     * Verriegelt: nur an @ref tarLeer; danach ist die Diskette `tar720` (nur lesbar), ein
-     * zweites Schreiben wird abgelehnt.  Geprueft wird VOR dem Schreiben (@ref tarPruefen),
+     * Verriegelt: nur an @ref tarLeer; danach ist die Diskette `tar720`, ein zweites Schreiben
+     * eines .tar wird abgelehnt (Einzeldateien kommen per insert/erase; bleibt hier bis zum
+     * ausdruecklichen Aufheben schreibgeschuetzt).  Geprueft wird VOR dem Schreiben (@ref tarPruefen),
      * geschrieben ab Sektor 0 in Lesereihenfolge, der Rest bleibt Null; bei einem Fehler
      * wird das Medium zurueckgerollt.  Das Abbild wird sofort zurueckgeschrieben (flush),
      * solange es noch beschreibbar ist.  Warnungen siehe @ref lastTarWarnung.

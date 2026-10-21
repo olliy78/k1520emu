@@ -961,8 +961,13 @@ k1520disktool save-as alt.hfe kopie.cqm      # und zurueck: save-as kopie.cqm ne
 ## tar-Disketten und `tar-satz`
 
 84 der 142 P8000-Abbilder (`doc/design/35_cqm.md` §4a) tragen einen rohen `tar`-Strom ab
-Sektor 0 statt eines Dateisystems. Profil `tar720` (nur lesbar, auch in einer `.cqm`; `put`/`rm`/`attr`/`create`
-melden das ausdrücklich), Erkennung zuletzt, nach CP/A-Regel und allen echten
+Sektor 0 statt eines Dateisystems. Profil `tar720` (auch in einer `.cqm`). **Schreibbar ist ein abgeschlossenes Archiv** (Kopf bei
+Sektor 0 UND Endmarke) und die leere tar-Diskette: `put`/`rm`/`mkdir`/`attr` bauen den Strom aus dem
+Archivmodell (`TarArchiv`) jedes Mal NEU (V7-Köpfe, Namen ≤ 100, Verzeichnisse als Typ `5`, `.fileinfo`
+`fs=tar` wird gelesen, sonst 0644/0755, uid/gid 0, Zeit jetzt). Folgeteil, abgeschnittenes Archiv und
+Archiv ohne Endmarke bleiben nur lesbar (die Meldung nennt den Weg); passt der neue Strom nicht auf
+EINE Diskette, scheitert die Änderung (der Satzmodus folgt, Entwurf 37 T2). `create` eines belegten
+`tar720` bleibt unmöglich, Erkennung zuletzt, nach CP/A-Regel und allen echten
 Dateisystemen. `ls -l`, `get`, `info`, `check` wie bei WEGA (UNIX-Spalten, `.fileinfo`
 mit `fs=tar`). Befunde: `tar.abgeschnitten` (Warnung; Teilstück bleibt lesbar),
 `tar.fortsetzung`, `tar.pruefsumme` (Fehler), `tar.doppelt`, `tar.pfad` (Hinweis).
@@ -995,7 +1000,7 @@ prueft vor dem Schreiben: Diskette leer und beschreibbar, Datei <= 737280 Byte u
 von 512 (sonst Ablehnung, bei Ueberlaenge mit Hinweis auf `split -b 737280`); ein erster Kopf
 ohne V7 (ustar-Magic, pax, GNU-Langname, 100-Zeichen-Name, binaere Groesse) ergibt eine
 **Warnung auf stderr**, geschrieben wird trotzdem. Danach ist die Diskette `tar720`
-(nur lesbar), ein zweites `tar-put` scheitert. Rundlauf: siehe Handbuch („tar-Archive
+(zunächst schreibgeschützt; bei abgeschlossenem Archiv aufhebbar), ein zweites `tar-put` scheitert. Rundlauf: siehe Handbuch („tar-Archive
 herausholen, bearbeiten und zurueckschreiben“).
 
 Passende Archive unter Linux: `tar --format=v7 -b 20 -cf wega.tar -C ordner .`, danach
