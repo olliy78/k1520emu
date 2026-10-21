@@ -501,6 +501,69 @@ public:
     bool makeDirectory(const FileRef& ref);
     /// @brief Liegt ein WEGA-Dateisystem (Verzeichnisbaum, UNIX) vor?
     bool istWega() const { return profile_ && profile_->type == FsType::Wega; }
+    /// @brief UNIX-Sicht (Modus/uid/gid, Pfade, `ls -l`): WEGA oder tar-Diskette.
+    bool istUnix() const {
+        return profile_ && (profile_->type == FsType::Wega || profile_->type == FsType::Tar);
+    }
+    /// @brief Archiv aus einem tar-Strom (nur lesbar, kein Dateisystem)?
+    bool istTar() const { return profile_ && profile_->type == FsType::Tar; }
+    /// @brief Die LEERE tar-Diskette (`tar720_leer`): ganz aus Nullen, beschreibbar mit genau
+    ///        einem `.tar` (@ref tarSchreiben).  Nach dem Schreiben false, @ref istTar bleibt true.
+    bool tarLeer() const;
+
+    /**
+     * @brief Den tar-Strom der Diskette als `.tar` herausschreiben (`tar-export`).
+     *
+     * Ausgabe sind die 512-Byte-Bloecke des Stroms 1:1; wie viele, regelt
+     * @ref tar::exportLaenge (Kopf + Endmarke: bis hinter die Endmarke; sonst der ganze
+     * Strom, ein Folgeteil immer ganz).  Geht an einer tar-Diskette und an einer roh
+     * geoeffneten (kein Dateisystem erkannt, z. B. ein Folgeteil ohne einen Kopfblock);
+     * nicht an einer mit Dateisystem, nicht an der leeren und nicht an einem tar-Satz
+     * (der ist schon EIN Strom — die Teile einzeln exportieren).  Aendert nichts.
+     * @param bytes  (optional) Zahl der geschriebenen Bytes.
+     */
+    bool tarExport(const std::string& ziel, uint64_t* bytes = nullptr) const;
+
+    /**
+     * @brief Beurteilt eine `.tar`-Datei fuer @ref tarSchreiben, ohne etwas zu aendern.
+     *
+     * @return false = abgelehnt (Grund in @ref lastError).  true = darf geschrieben werden;
+     *         @p warnung ist dann nicht leer, wenn die Datei kein reines V7-tar ist (der
+     *         Aufrufer fragt zurueck bzw. gibt sie aus; geschrieben wird trotzdem).
+     */
+    bool tarPruefen(const std::string& quelle, std::string* warnung = nullptr) const;
+
+    /**
+     * @brief Eine `.tar`-Datei auf die LEERE tar-Diskette schreiben (`tar-put`).
+     *
+     * Verriegelt: nur an @ref tarLeer; danach ist die Diskette `tar720` (nur lesbar), ein
+     * zweites Schreiben wird abgelehnt.  Geprueft wird VOR dem Schreiben (@ref tarPruefen),
+     * geschrieben ab Sektor 0 in Lesereihenfolge, der Rest bleibt Null; bei einem Fehler
+     * wird das Medium zurueckgerollt.  Das Abbild wird sofort zurueckgeschrieben (flush),
+     * solange es noch beschreibbar ist.  Warnungen siehe @ref lastTarWarnung.
+     * Rundlauf: der Export des Ergebnisses ist die Datei selbst, wenn sie mit Kopf und
+     * Endmarke endet, sonst die Datei plus Nullen bis zum Diskettenende (doc/design/35_cqm.md).
+     */
+    bool tarSchreiben(const std::string& quelle);
+    /// @brief Warnung (kein V7-tar) des letzten @ref tarSchreiben / @ref tarPruefen; sonst leer.
+    const std::string& lastTarWarnung() const { return tar_warnung_; }
+
+    /**
+     * @brief Mehrere Abbilder als EINEN tar-Strom oeffnen (Mehrdisketten-Satz).
+     *
+     * Die linearen Datenstroeme werden in der angegebenen Reihenfolge verkettet; so
+     * werden Dateien ueber die Diskettengrenze vollstaendig.  Das Ergebnis ist ein
+     * schreibgeschuetztes Volume (Medium und Pfad des ersten Abbilds), `list`,
+     * `extract`, `extractAll`, `check` gehen wie bei jeder anderen Diskette.
+     */
+    static std::unique_ptr<DiskVolume> openTarSatz(const std::vector<std::string>& pfade,
+                                                   const FormatCatalog& formats,
+                                                   const FsCatalog& fs_cat,
+                                                   std::string& err);
+
+    /// @brief Die ganze lineare Sektorfolge (Zylinder, Kopf, Sektor) — auch einer roh
+    ///        geoeffneten Diskette, sofern ihre Geometrie bekannt ist.
+    bool linearBytes(std::vector<uint8_t>& out) const;
 
     /// @brief Warum das letzte @ref insert / @ref insertAll abgelehnt wurde.
     ///        Nur aussagekraeftig, wenn der Aufruf `false` lieferte.
@@ -514,6 +577,7 @@ public:
 
     /// @brief Wie viele Zubehoerdateien das letzte @ref insertAll ausgewertet und
     ///        uebersprungen hat („24 Dateien eingefuegt, 24 `.fileinfo` ausgewertet").
+    // (Hinweise: siehe lastTargetNotices)
     int lastAccessoryCount() const { return zubehoer_gezaehlt_; }
 
     /// @brief Legt @ref extract auch bei **CP/M** ein `.fileinfo` an?  Vorgabe: nein.
@@ -555,6 +619,17 @@ public:
      * verlangt eine beschreibbare Diskette.
      */
     bool setAttributes(const FileRef& ref, const CpmAttrs& attrs);
+
+    /// @brief Modus, Besitzer und Aenderungszeit einer WEGA-Datei aendern (`chmod`/`chown`/`touch`).
+    ///        UDOS und CP/M melden das als Fehler.  Eine Transaktion im Dateisystem.
+    bool setAttributes(const FileRef& ref, const UnixAttrs& attrs);
+
+    /// @brief Belegte Bloecke als Text (nur WEGA, sonst leer) — fuer den Eigenschaften-Dialog.
+    std::string blockList(const FileRef& ref) const;
+
+    /// @brief Die Art des Dateisystems — die EINE Frage, nach der Oberflaeche und
+    ///        Archiv Dateiangaben unterscheiden (kein Rueckschluss aus `type`-Strings).
+    FsType fsType() const { return profile_ ? profile_->type : FsType::Cpm; }
 
     // ─── Sektoransicht (Diskeditor, §19) ─────────────────────────────────────
     //
@@ -663,6 +738,26 @@ public:
     bool extractAll(const std::string& dest_dir, const TransferOptions&);
 
     /**
+     * @brief Die EINE Namensregel fuer jeden Auszug auf das Wirtsdateisystem.
+     *
+     * Liefert zu jedem Eintrag von @p eintraege (gleiche Reihenfolge) den Dateinamen,
+     * unter dem er im Zielordner (bzw. `SideN/`) landet.  Flache Dateisysteme (CP/M,
+     * UDOS, NDOS ...) kennen beliebige Bytes im Namen: `/Z/HOFFM`, `GW/ZSID.DOC`,
+     * `..`.  Deshalb: kein Pfadanteil (`/`, Backslash, `:`, Steuerzeichen werden `_`),
+     * ein fuehrender Punkt bekommt ein `_` davor (kein `..`, keine versteckte Datei,
+     * kein `.fileinfo`), ein leerer Name wird `_`.  Fallen zwei Eintraege derselben
+     * Seite auf denselben Namen (ohne Gross/Klein), bekommt der spaetere `~1`, `~2` ...;
+     * ein Eintrag, dessen Name unveraendert bleibt, behaelt ihn immer.  Unter UNIX
+     * (WEGA, tar) ist `/` der Verzeichnistrenner des Dateisystems — dort unveraendert.
+     * @param hinweise optional: je umgeschriebenem Namen eine Zeile fuers Protokoll.
+     */
+    std::vector<std::string> zielNamen(const std::vector<FileEntry>& eintraege,
+                                       std::vector<std::string>* hinweise = nullptr) const;
+
+    /// @brief Hinweise zu umgeschriebenen Namen des letzten @ref extractAll.
+    const std::vector<std::string>& lastTargetNotices() const { return ziel_hinweise_; }
+
+    /**
      * @brief Den Inhalt von @p src_dir einfuegen.
      *
      * Bei mehreren Volumes MUSS der Ordner genau die `SideN/`-Unterverzeichnisse
@@ -677,6 +772,11 @@ public:
     // ─── Dateibindung ────────────────────────────────────────────────────────
 
     bool dirty() const;
+
+    /// @brief Kopfdaten (inkl. Kommentartext) eines CopyQM-Abbilds; nullptr bei anderen Containern.
+    /// @brief Container der gebundenen Datei: "img" | "hfe" | "dmk" | "cqm".
+    std::string containerName() const;
+    const CqmCodec::SourceInfo* cqmInfo() const { return disk_ ? disk_->cqmInfo() : nullptr; }
 
     /**
      * @brief Aenderungen in die gebundene Datei schreiben.
@@ -700,8 +800,9 @@ public:
     /// @brief Schreibgeschuetzt?  Vorgabe beim Oeffnen: **ja**.
     bool readOnly() const { return read_only_; }
 
-    /// @brief Ist der Schreibschutz UNAUFHEBBAR (nur gemessene Geometrie)?
-    bool readOnlyForced() const { return nur_lesen_erzwungen_; }
+    /// @brief Ist der Schreibschutz UNAUFHEBBAR (nur gemessene Geometrie,
+    ///        tar-Diskette)?
+    bool readOnlyForced() const;
 
     /**
      * @brief Schreibschutz setzen/aufheben.
@@ -722,6 +823,7 @@ public:
     void noteError(const std::string& why) const { last_error_ = why; }
 
 private:
+    std::vector<std::string> ziel_hinweise_;   ///< @ref lastTargetNotices
     DiskVolume() = default;
 
     /// @brief Gemeinsamer Kern von @ref open und @ref openPhysical (§ Erkennung).
@@ -746,6 +848,12 @@ private:
     };
 
     bool fail(const std::string& why) const { last_error_ = why; return false; }
+    bool tar_satz_ = false;                 ///< aus @ref openTarSatz: ein verketteter Strom
+    mutable std::string tar_warnung_;
+    /// @brief Meldung fuer eine abgewiesene Schreibanforderung (tar eigener Text).
+    std::string schreibschutzText() const;
+    /// @brief Geometrie der Diskette, auch wenn kein Dateisystem gemountet ist; nullptr = unbekannt.
+    const DiskFormat* rohFormat() const;
     bool valid(int v) const { return v >= 0 && v < static_cast<int>(volumes_.size()); }
 
     /// @brief Erwartete Unterverzeichnisse pruefen und Dateien je Volume einsammeln.

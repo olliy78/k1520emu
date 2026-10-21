@@ -232,12 +232,37 @@ TrackImage& FloppyDriveV2::mutableTrack(uint8_t head) {
 bool FloppyDriveV2::flush() {
     if (!image_)        return true;
     if (write_protect_) return true;   // nichts zurueckzuschreiben
-    return image_->flush();
+    const bool ok = image_->flush();
+    meldeSpeicherfehler();
+    return ok;
 }
 
 bool FloppyDriveV2::autoFlush(uint64_t now_cycles) {
     if (!image_ || write_protect_) return false;
-    return image_->autoFlush(now_cycles);
+    const bool geschrieben = image_->autoFlush(now_cycles);
+    meldeSpeicherfehler();
+    return geschrieben;
+}
+
+void FloppyDriveV2::meldeSpeicherfehler() {
+    // Ein Abbild, das sich nicht in seinen Container zurueckschreiben laesst (z. B. eine
+    // vom Gast umformatierte Diskette in einer .img/.cqm), laeuft im Speicher weiter —
+    // die Datei bleibt unveraendert.  Das muss der Bediener am Laufwerk erfahren.
+    const std::string praefix = "Abbild nicht speicherbar: ";
+    auto it = std::find_if(notices_.begin(), notices_.end(), [&](const std::string& n) {
+        return n.compare(0, praefix.size(), praefix) == 0;
+    });
+    if (image_ && image_->saveFailed()) {
+        const std::string text = praefix + image_->lastError();
+        if (it == notices_.end()) {
+            notices_.push_back(text);
+            LOG_WARN("Floppy", "%s", text.c_str());
+        } else {
+            *it = text;
+        }
+    } else if (it != notices_.end()) {
+        notices_.erase(it);
+    }
 }
 
 bool FloppyDriveV2::writeTrackAt(uint8_t cyl, uint8_t head, const TrackImage& track) {

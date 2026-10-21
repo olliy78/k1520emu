@@ -17,6 +17,9 @@
  * k1520disktool boot-scpx <SYL17> <CCPBD17> <BIOS> <aus.bin> # SCPX-Systemspuren des PRG
  * k1520disktool info   <abbild> [--fs NAME]
  * k1520disktool check  <abbild>
+ * k1520disktool tar-satz <abbild…> [--to ordner] [-l]  # Mehrdisketten-tar-Strom
+ * k1520disktool tar-export <abbild> <ziel.tar>          # den tar-Strom einer Diskette als .tar
+ * k1520disktool tar-put <abbild> <quelle.tar>           # .tar in eine LEERE tar-Diskette
  * k1520disktool formats
  * ```
  *
@@ -83,6 +86,11 @@ struct Optionen {
     bool cpm_sys_gesetzt = false, cpm_sys = false;   ///< --sys / --no-sys
     bool cpm_arc_gesetzt = false, cpm_arc = false;   ///< --arc / --no-arc
     bool cpm_user_gesetzt = false; int cpm_user = 0; ///< --user N
+    // WEGA (UNIX): chmod/chown/touch an einer Datei — `attr --mode 0755 --uid 0 …`
+    bool unix_mode_gesetzt = false;  int unix_mode = 0;             ///< --mode (oktal)
+    bool unix_uid_gesetzt  = false;  int unix_uid  = 0;             ///< --uid
+    bool unix_gid_gesetzt  = false;  int unix_gid  = 0;             ///< --gid
+    bool unix_mtime_gesetzt = false; unsigned long unix_mtime = 0;  ///< --mtime (Sekunden seit 1970)
     int         volume  = 0; ///< --volume
     bool        text    = false;
     bool        binaer  = false;
@@ -129,6 +137,7 @@ void gebrauch() {
         "  create <abbild> --fs NAME [--label N]    leere Diskette anlegen\n"
         "         [--boot abbild.bin]               … mit Bootabbild in den Systemspuren\n"
         "  attr   <abbild> <datei> [--type …]       Dateiangaben zeigen/aendern\n"
+        "         [--mode 0755 --uid N --gid N --mtime S]  … WEGA: chmod/chown/touch\n"
         "         [--ro|--no-ro --sys|--no-sys]     … CP/M-Attribute\n"
         "         [--arc|--no-arc] [--user 3]       … und Nutzerbereich\n"
         "         [--prg 710|710-1]                 … Bootabbild muss fuer dieses PRG-Geraet sein\n"
@@ -150,6 +159,17 @@ void gebrauch() {
         "                                             Verzeichnisplatz; --restore traegt\n"
         "                                             den Fund auf der Diskette ein\n"
         "  measure <abbild>                         Geometrie messen (auch ohne Dateisystem)\n"
+        "  tar-satz <abbild1> <abbild2>… [--to ordner] [-l]\n"
+        "                                           Disketten mit rohem tar-Strom (ohne Dateisystem):\n"
+        "                                           Strome in dieser Reihenfolge verketten, auflisten\n"
+        "                                           bzw. mit --to vollstaendig entpacken\n"
+        "  tar-export <abbild> <ziel.tar>           den tar-Strom einer Diskette (Bloecke 1:1, bis hinter\n"
+        "                                           die Endmarke; Folgeteile ganz) als .tar herausschreiben;\n"
+        "                                           die Teile eines Satzes setzt `cat` zusammen\n"
+        "  tar-put <abbild> <quelle.tar>            .tar (<= 720 KiB, Vielfaches von 512) in eine LEERE\n"
+        "                                           tar-Diskette schreiben (`create x.img --fs tar720_leer`),\n"
+        "                                           einmal; danach ist sie tar720 und nur lesbar.\n"
+        "                                           Gewarnt wird vor Nicht-V7-tar (Schreiben geht trotzdem)\n"
         "  formats                                  bekannte Dateisysteme auflisten\n\n"
         "P8000-Plattenabbild (WEGA, PAR in Zylinder 0): ls/info/check/get/put/rm/mkdir;\n"
         "  Namen mit Partition vorn (md0 = /usr, md2 = /, md3 = /tmp, md4 = /z):\n"
@@ -212,6 +232,19 @@ bool zerlege(int argc, char** argv, int ab, Optionen& o, std::string& err) {
         else if (a == "--no-sys")  { o.cpm_sys_gesetzt = true; o.cpm_sys = false; }
         else if (a == "--arc")     { o.cpm_arc_gesetzt = true; o.cpm_arc = true; }
         else if (a == "--no-arc")  { o.cpm_arc_gesetzt = true; o.cpm_arc = false; }
+        else if (a == "--mode")    { if (!wert("--mode"))   return false;
+                                     o.unix_mode_gesetzt = true;
+                                     o.unix_mode = static_cast<int>(
+                                         std::strtol(argv[++i], nullptr, 8)); }
+        else if (a == "--uid")     { if (!wert("--uid"))    return false;
+                                     o.unix_uid_gesetzt = true;
+                                     o.unix_uid = std::atoi(argv[++i]); }
+        else if (a == "--gid")     { if (!wert("--gid"))    return false;
+                                     o.unix_gid_gesetzt = true;
+                                     o.unix_gid = std::atoi(argv[++i]); }
+        else if (a == "--mtime")   { if (!wert("--mtime"))  return false;
+                                     o.unix_mtime_gesetzt = true;
+                                     o.unix_mtime = std::strtoul(argv[++i], nullptr, 10); }
         else if (a == "--user")    { if (!wert("--user"))   return false;
                                      o.cpm_user_gesetzt = true;
                                      o.cpm_user = std::atoi(argv[++i]); }
@@ -430,7 +463,7 @@ int cmd_ls(const Optionen& o) {
         for (const FileEntry& e : liste)
             std::cout << (seiten ? v->volumeDir(e.volume) + "/" : "")
                       << e.qualifiedName() << "\n";
-    } else if (v->istWega()) {
+    } else if (v->istUnix()) {
         // UNIX-Sicht wie `ls -l`: Rechte, Links, Besitzer, Gruppe, Groesse, Zeit, Pfad
         for (const FileEntry& e : liste) {
             std::string groesse = std::to_string(e.size);
@@ -462,6 +495,73 @@ int cmd_ls(const Optionen& o) {
                  << menschlich(info.free_bytes) << " frei";
     }
     info_aus << "\n";
+    return kOk;
+}
+
+int cmd_tar_satz(const Optionen& o) {
+    if (o.rest.size() < 2) { std::cerr << "Fehler: kein Abbild angegeben\n"; return kFehler; }
+    const std::vector<std::string> pfade(o.rest.begin() + 1, o.rest.end());
+    std::string err;
+    auto v = DiskVolume::openTarSatz(pfade, formate(), dateisysteme(), err);
+    if (!v) { std::cerr << "Fehler: " << err << "\n"; return kNichtErkannt; }
+
+    const std::string bericht = v->checkReport().alsText();
+    if (!bericht.empty()) std::cerr << bericht;
+    const bool fehler = v->checkReport().zaehlerAb(FsSeverity::Fehler) > 0;
+
+    if (!o.ziel.empty()) {
+        TransferOptions t;
+        t.overwrite = o.force;
+        if (!v->extractAll(o.ziel, t)) { std::cerr << "Fehler: " << v->lastError() << "\n";
+                                         return kFehler; }
+        std::cout << v->list().size() << " Eintraege nach " << o.ziel << "\n";
+        return fehler ? kFehler : kOk;
+    }
+    for (const FileEntry& e : v->list()) {
+        if (o.lang)
+            std::printf("%-10s %5d %5d %9llu %-16s %s%s\n", e.attributes.c_str(), e.unix_uid,
+                        e.unix_gid, static_cast<unsigned long long>(e.size), e.date.c_str(),
+                        e.name.c_str(), e.damaged ? "  [DEFEKT]" : "");
+        else
+            std::cout << e.name << "\n";
+    }
+    return fehler ? kFehler : kOk;
+}
+
+int cmd_tar_export(const Optionen& o) {
+    if (o.rest.size() != 3) {
+        std::cerr << "Fehler: tar-export <abbild> <ziel.tar>\n";
+        return kFehler;
+    }
+    int rc = kOk;
+    auto v = oeffne(o, o.rest[1], rc, /*schreibend=*/false, /*roh_erlaubt=*/true);
+    if (!v) return rc;
+    uint64_t n = 0;
+    if (!v->tarExport(o.rest[2], &n)) { std::cerr << "Fehler: " << v->lastError() << "\n"; return kFehler; }
+    std::cout << o.rest[2] << ": " << n << " Byte (" << n / 512 << " Bloecke)\n";
+    return kOk;
+}
+
+int cmd_tar_put(const Optionen& o) {
+    if (o.rest.size() != 3) {
+        std::cerr << "Fehler: tar-put <abbild> <quelle.tar>\n";
+        return kFehler;
+    }
+    int rc = kOk;
+    auto v = oeffne(o, o.rest[1], rc, /*schreibend=*/true, /*roh_erlaubt=*/true);
+    if (!v) return rc;
+    if (o.dry_run) {
+        std::string w;
+        if (!v->tarPruefen(o.rest[2], &w)) { std::cerr << "Fehler: " << v->lastError() << "\n"; return kFehler; }
+        if (!w.empty()) std::cerr << "Warnung: " << w << "\n";
+        std::cout << "tar-put (Probelauf): " << o.rest[2] << " passt\n";
+        return kOk;
+    }
+    if (!v->tarSchreiben(o.rest[2])) { std::cerr << "Fehler: " << v->lastError() << "\n"; return kFehler; }
+    // Eine Warnung hindert das Schreiben nicht (kein Blockieren in der Kommandozeile).
+    if (!v->lastTarWarnung().empty()) std::cerr << "Warnung: " << v->lastTarWarnung() << "\n";
+    std::cout << "geschrieben: " << o.rest[2] << " → " << o.rest[1]
+              << " (die Diskette ist jetzt tar720, nur lesbar)\n";
     return kOk;
 }
 
@@ -512,6 +612,11 @@ int cmd_info(const Optionen& o) {
     std::cout << "\n";
     if (!v->detection().remarks.empty())
         std::cout << "Medium:      " << v->detection().remarks << "\n";
+    if (const CqmCodec::SourceInfo* cq = v->cqmInfo()) {
+        std::cout << "CopyQM:      " << cq->description;
+        if (!cq->comment.empty()) std::cout << " — Kommentar: " << cq->comment;
+        std::cout << "\n";
+    }
 
     for (int i = 0; i < v->volumeCount(); ++i) {
         const FsInfo info = v->volumeInfo(i);
@@ -904,6 +1009,10 @@ int cmd_recover(const Optionen& o) {
             }
             std::string datei = r.funde[i].vorschlag;
             std::replace(datei.begin(), datei.end(), ':', '_');
+            // Vorschlag stammt aus Diskettenbytes: kein Pfadanteil, kein fuehrender Punkt.
+            std::replace(datei.begin(), datei.end(), '/', '_');
+            std::replace(datei.begin(), datei.end(), '\\', '_');
+            if (datei.empty() || datei[0] == '.') datei.insert(datei.begin(), '_');
             ziel /= datei;
             if (!v->recoverExtract(static_cast<int>(i), ziel.string())) {
                 std::cerr << "Fehler: " << v->lastError() << "\n";
@@ -947,6 +1056,7 @@ int cmd_get(const Optionen& o) {
     if (o.rest.size() == 2) {
         if (!v->extractAll(o.ziel, t)) { std::cerr << "Fehler: " << v->lastError() << "\n";
                                          return kFehler; }
+        for (const std::string& h : v->lastTargetNotices()) std::cerr << "Hinweis: " << h << "\n";
         std::cout << v->list().size() << " Dateien nach " << o.ziel << "\n";
         return kOk;
     }
@@ -954,19 +1064,24 @@ int cmd_get(const Optionen& o) {
     std::error_code ec;
     fs::create_directories(o.ziel, ec);
 
+    const std::vector<FileEntry> alle = v->list();
+    std::vector<std::string> hinweise;
+    const std::vector<std::string> zielnamen = v->zielNamen(alle, &hinweise);
+    for (const std::string& h : hinweise) std::cerr << "Hinweis: " << h << "\n";
     int n = 0;
     for (size_t i = 2; i < o.rest.size(); ++i) {
         const FileRef muster = FileRef::parse(o.rest[i], o.volume);
         const bool mit_seite = o.rest[i].find('/') != std::string::npos;
 
-        for (const FileEntry& e : v->list()) {
+        for (size_t ei = 0; ei < alle.size(); ++ei) {
+            const FileEntry& e = alle[ei];
             if (mit_seite && e.volume != muster.volume) continue;
             if (!passt(muster.name, e.qualifiedName())) continue;
             // WEGA: nur gewoehnliche Dateien haben Inhalt (Ordner entstehen mit)
-            if (v->istWega() && e.type != "-") continue;
+            if (v->istUnix() && e.type != "-") continue;
 
-            std::string datei = e.qualifiedName();
-            std::replace(datei.begin(), datei.end(), ':', '_');
+            // DiskVolume::zielNamen: kein Pfadanteil, je Seite eindeutig.
+            const std::string& datei = zielnamen[ei];
             fs::path ziel = fs::path(o.ziel);
             if (v->volumeCount() > 1) {
                 ziel /= v->volumeDir(e.volume);
@@ -1299,7 +1414,9 @@ int cmd_attr(const Optionen& o) {
                       || !o.udos_erst.empty() || !o.udos_geaend.empty();
     const bool aendern_cpm = o.cpm_ro_gesetzt || o.cpm_sys_gesetzt
                           || o.cpm_arc_gesetzt || o.cpm_user_gesetzt;
-    const bool aendern = aendern_udos || aendern_cpm;
+    const bool aendern_unix = o.unix_mode_gesetzt || o.unix_uid_gesetzt
+                           || o.unix_gid_gesetzt || o.unix_mtime_gesetzt;
+    const bool aendern = aendern_udos || aendern_cpm || aendern_unix;
 
     int rc = kOk;
     auto v = oeffne(o, o.rest[1], rc, /*schreibend=*/aendern);
@@ -1322,6 +1439,26 @@ int cmd_attr(const Optionen& o) {
     if (!suche(-1)) {
         std::cerr << "Fehler: '" << o.rest[2] << "' steht nicht im Verzeichnis\n";
         return kFehler;
+    }
+
+    if (aendern_unix) {
+        if (!v->istWega()) {
+            std::cerr << "Fehler: --mode/--uid/--gid/--mtime gibt es nur bei WEGA-Disketten\n";
+            return kFehler;
+        }
+        UnixAttrs u;
+        u.set_mode  = o.unix_mode_gesetzt;  u.mode  = static_cast<uint16_t>(o.unix_mode);
+        u.set_uid   = o.unix_uid_gesetzt;   u.uid   = o.unix_uid;
+        u.set_gid   = o.unix_gid_gesetzt;   u.gid   = o.unix_gid;
+        u.set_mtime = o.unix_mtime_gesetzt; u.mtime = static_cast<uint32_t>(o.unix_mtime);
+        if (o.unix_mode > 07777) {      // vor dem uint16-Abschneiden melden
+            std::cerr << "Fehler: --mode muss zwischen 0 und 7777 (oktal) liegen\n";
+            return kFehler;
+        }
+        if (!v->setAttributes(ref, u) || !v->flush()) {
+            std::cerr << "Fehler: " << v->lastError() << "\n";
+            return kFehler;
+        }
     }
 
     if (aendern_cpm) {
@@ -1377,6 +1514,24 @@ int cmd_attr(const Optionen& o) {
 
     const FileEntry* e = suche(o.cpm_user_gesetzt ? o.cpm_user : -1);
     if (!e) { std::cerr << "Fehler: Eintrag nach dem Aendern nicht mehr lesbar\n"; return kFehler; }
+    if (o.json && v->istWega()) {
+        char m[16];
+        std::snprintf(m, sizeof m, "0%06o", static_cast<unsigned>(e->unix_mode));
+        std::cout << "{\"name\":" << jsonText(e->name)
+                  << ",\"type\":" << jsonText(e->type)
+                  << ",\"attrs\":" << jsonText(e->attributes)
+                  << ",\"mode\":\"" << m << "\""
+                  << ",\"uid\":" << e->unix_uid
+                  << ",\"gid\":" << e->unix_gid
+                  << ",\"nlink\":" << e->unix_nlink
+                  << ",\"inode\":" << e->unix_inode
+                  << ",\"size\":" << e->size
+                  << ",\"mtime\":" << e->unix_mtime
+                  << ",\"atime\":" << e->unix_atime
+                  << ",\"ctime\":" << e->unix_ctime
+                  << ",\"blocks\":" << jsonText(v->blockList(ref)) << "}\n";
+        return kOk;
+    }
     if (o.json) {
         std::cout << "{\"name\":" << jsonText(e->name)
                   << ",\"type\":" << jsonText(e->type)
@@ -1396,6 +1551,23 @@ int cmd_attr(const Optionen& o) {
                   << ",\"extra\":" << e->extra
                   << ",\"created\":" << jsonText(e->created)
                   << ",\"date\":" << jsonText(e->date) << "}\n";
+        return kOk;
+    }
+    // WEGA: eine Inode, keine Kopfsektorangaben — und der `type` ist eine Dateiart
+    // (-/d/c), kein UDOS-Typ.  Die Art wird nach dem Dateisystem gefragt, nie am
+    // Typfeld erraten.
+    if (v->istWega()) {
+        std::printf("%-20s %s  %llu Byte\n", e->name.c_str(), e->attributes.c_str(),
+                    static_cast<unsigned long long>(e->size));
+        std::printf("  Modus 0%06o   uid %d   gid %d   Links %d   Inode %u\n",
+                    static_cast<unsigned>(e->unix_mode), e->unix_uid, e->unix_gid,
+                    e->unix_nlink, e->unix_inode);
+        std::printf("  mtime %u   atime %u   ctime %u   (Sekunden seit 1970, GMT)  %s\n",
+                    e->unix_mtime, e->unix_atime, e->unix_ctime, e->date.c_str());
+        if (e->type == "c" || e->type == "b")
+            std::printf("  Geraet major,minor %u,%u\n", e->unix_rdev >> 8, e->unix_rdev & 0xFF);
+        const std::string bl = v->blockList(ref);
+        if (!bl.empty()) std::printf("  Bloecke %s\n", bl.c_str());
         return kOk;
     }
     // CP/M fuehrt keine Kopfsektorangaben — dort waeren zehn Nullzeilen keine
@@ -1443,7 +1615,7 @@ int cmd_measure(const Optionen& o) {
     auto disk = DiskImage::open(o.rest[1], std::nullopt, /*write_protect=*/true);
     if (!disk) {
         std::cerr << "Fehler: Abbild nicht ladbar (selbstbeschreibend muss es sein — "
-                     ".hfe oder .dmk): " << o.rest[1] << "\n";
+                     ".hfe, .dmk oder .cqm): " << o.rest[1] << "\n";
         return kFehler;
     }
     const std::vector<MeasuredTrack> gemessen = GeometryProbe::measure(disk->medium());
@@ -1778,7 +1950,7 @@ int main(int argc, char** argv) {
     }
 
     // P8000-Plattenabbild (PAR in Z0/K0/S1): eigener Weg, mehrere WEGA-Partitionen
-    if (o.rest.size() >= 2 && befehl != "create" && befehl != "formats"
+    if (o.rest.size() >= 2 && befehl != "create" && befehl != "formats" && befehl != "tar-satz"
         && WegaPlatte::istPlatte(o.rest[1]))
         return platte(befehl, o);
 
@@ -1793,6 +1965,9 @@ int main(int argc, char** argv) {
     if (befehl == "boot-put") return cmd_boot_put(o);
     if (befehl == "boot-scpx") return cmd_boot_scpx(o);
     if (befehl == "info")    return cmd_info(o);
+    if (befehl == "tar-satz") return cmd_tar_satz(o);
+    if (befehl == "tar-export") return cmd_tar_export(o);
+    if (befehl == "tar-put")  return cmd_tar_put(o);
     if (befehl == "save-as") return cmd_save_as(o);
     if (befehl == "measure") return cmd_measure(o);
     if (befehl == "check")   return cmd_check(o);

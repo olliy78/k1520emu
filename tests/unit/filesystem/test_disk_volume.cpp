@@ -16,6 +16,7 @@
 #include <filesystem>
 #include <map>
 #include <fstream>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -909,6 +910,52 @@ TEST(DiskVolume, NeuAngelegteDisketteIstBeschreibbar) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Speichern unter / Exportieren
 // ─────────────────────────────────────────────────────────────────────────────
+
+/// @test CopyQM ist wie .img beschreibbar: create(.cqm) → put → flush → neu oeffnen;
+///       Schreibschutz ist frei setzbar (kein Zwang); save-as .hfe → .cqm verlustfrei
+TEST(DiskVolume, CopyQmAnlegenSchreibenUndNeuLaden) {
+    const std::string pfad = k1520test::tempPath("k1520_test_dv_cqm.cqm");
+    fs::remove(pfad);
+    TempOrdner q("k1520_test_dv_cqm_q");
+    schreibe(q / "HALLO.TXT", std::string(3000, 'x') + "ende");
+    std::string err;
+    {
+        auto dv = DiskVolume::create(pfad, "scpx640", "", formate(), dateisysteme(), err);
+        ASSERT_NE(dv, nullptr) << err;
+        EXPECT_EQ(dv->containerName(), "cqm");
+        EXPECT_FALSE(dv->readOnly());
+        EXPECT_FALSE(dv->readOnlyForced());
+        ASSERT_TRUE(dv->insertAll(q.path(), TransferOptions{})) << dv->lastError();
+        ASSERT_TRUE(dv->flush()) << dv->lastError();
+    }
+    {
+        auto dv = oeffne(pfad, "", err);
+        ASSERT_NE(dv, nullptr) << err;
+        EXPECT_EQ(dv->containerName(), "cqm");
+        EXPECT_TRUE(dv->readOnly());           // Vorgabe beim Oeffnen: geschuetzt …
+        EXPECT_FALSE(dv->readOnlyForced());    // … aber frei aufhebbar
+        dv->setReadOnly(false);
+        EXPECT_FALSE(dv->readOnly()) << dv->lastError();
+        ASSERT_NE(dv->cqmInfo(), nullptr);
+        bool gefunden = false;
+        for (const auto& e : dv->list()) gefunden |= (e.name.find("HALLO") != std::string::npos);
+        EXPECT_TRUE(gefunden);
+
+        // save-as in .hfe und zurueck in .cqm: gleiche Dateiliste
+        const std::string hfe = k1520test::tempPath("k1520_test_dv_cqm.hfe");
+        const std::string cqm2 = k1520test::tempPath("k1520_test_dv_cqm2.cqm");
+        ASSERT_TRUE(dv->exportImage(hfe)) << dv->lastError();
+        auto h = oeffne(hfe, "", err);
+        ASSERT_NE(h, nullptr) << err;
+        ASSERT_TRUE(h->exportImage(cqm2)) << h->lastError();
+        auto c2 = oeffne(cqm2, "", err);
+        ASSERT_NE(c2, nullptr) << err;
+        EXPECT_EQ(c2->list().size(), dv->list().size());
+        h.reset(); c2.reset();
+        fs::remove(hfe); fs::remove(cqm2);
+    }
+    fs::remove(pfad);
+}
 
 TEST(DiskVolume, ExportSchreibtEineKopieOhneUmzubinden) {
     std::string err;
@@ -1872,4 +1919,74 @@ TEST(DiskVolume, Scpx8915SechzehnMal256HatDenBiosDpb) {
     EXPECT_EQ(dv->volumeInfo(0).total_bytes, (312u - 2u) * 2048u)
         << "DSM 311, ohne die zwei Verzeichnisbloecke";
     EXPECT_TRUE(dv->detection().unambiguous);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Zielnamen des Auszugs: kein Pfadanteil, kein Ausbruch, keine Ueberschreibung
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// @test CP/M-Namen aus WEGA-Uebertragungen (`/Z/HOFFM`, `GW/ZSID.DOC`) tragen
+///       `/` — der Auszug darf weder den Zielordner verlassen noch zwei Dateien
+///       auf denselben Namen legen (`A/B` und `A_B`).
+TEST(DiskVolume, AuszugErsetztSchraegstricheUndBleibtImZielordner) {
+    Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_dv_zielname.img");
+    std::string err;
+    auto dv = oeffneSchreibbar(k.path(), "cpa780", err);
+    ASSERT_NE(dv, nullptr) << err;
+
+    TempOrdner quelle("k1520_test_dv_zn_q");
+    schreibe(quelle / "inhalt.bin", std::string(300, 'x'));
+    // `insert` lehnt '/' in CP/M-Namen ab (zu Recht) — solche Disketten kommen von
+    // Fremdrechnern.  Also legale Platzhalter anlegen und die Verzeichnisbytes im
+    // Abbild umschreiben.
+    const std::vector<std::pair<std::string, std::string>> namen = {
+        {"P1", "/Z/HOFFM"}, {"P2", "/TMP/X"}, {"P3", "A/B"},
+        {"P4", "A_B"},      {"P5", ".HID"},   {"P6", "OK.TXT"}};
+    for (const auto& n : namen)
+        ASSERT_TRUE(dv->insert((quelle / "inhalt.bin").string(), FileRef{0, n.first},
+                               TransferOptions{})) << n.first << ": " << dv->lastError();
+    dv.reset();
+    {
+        std::string abb;
+        { std::ifstream f(k.path(), std::ios::binary);
+          abb.assign(std::istreambuf_iterator<char>(f), {}); }
+        auto feld = [](const std::string& n) {          // "NAME    EXT" (8 + 3, blank)
+            const size_t punkt = n.find('.', 1);
+            std::string nm = punkt == std::string::npos ? n : n.substr(0, punkt);
+            std::string ex = punkt == std::string::npos ? "" : n.substr(punkt + 1);
+            nm.resize(8, ' '); ex.resize(3, ' ');
+            return nm + ex;
+        };
+        for (const auto& n : namen) {
+            const std::string alt = std::string(1, '\0') + feld(n.first);
+            const size_t pos = abb.find(alt);
+            ASSERT_NE(pos, std::string::npos) << n.first;
+            abb.replace(pos + 1, 11, feld(n.second));
+        }
+        std::ofstream(k.path(), std::ios::binary | std::ios::trunc) << abb;
+    }
+    dv = oeffne(k.path(), "cpa780", err);
+    ASSERT_NE(dv, nullptr) << err;
+
+    // Der Elternordner des Zielordners muss nach dem Auszug unveraendert sein.
+    TempOrdner eltern("k1520_test_dv_zn_e");
+    const std::string ziel = (eltern / "ziel").string();
+    ASSERT_TRUE(dv->extractAll(ziel, TransferOptions{})) << dv->lastError();
+
+    std::set<std::string> im_ziel;
+    for (const auto& e : fs::recursive_directory_iterator(ziel)) {
+        ASSERT_TRUE(e.is_regular_file()) << "Unterordner entstanden: " << e.path();
+        EXPECT_EQ(e.path().parent_path(), fs::path(ziel));
+        im_ziel.insert(e.path().filename().string());
+    }
+    std::set<std::string> im_eltern;
+    for (const auto& e : fs::directory_iterator(eltern.path()))
+        im_eltern.insert(e.path().filename().string());
+    EXPECT_EQ(im_eltern, std::set<std::string>{"ziel"}) << "etwas ausserhalb des Zielordners";
+
+    // Gewinner der Kollision: der Name, der nicht umgeschrieben werden musste.
+    for (const char* erwartet : {"_Z_HOFFM", "_TMP_X", "A_B", "A_B~1", "_.HID", "OK.TXT"})
+        EXPECT_TRUE(im_ziel.count(erwartet)) << erwartet;
+    EXPECT_FALSE(im_ziel.count(".HID")) << "fuehrender Punkt bleibt nicht stehen";
+    EXPECT_FALSE(dv->lastTargetNotices().empty()) << "Kollision gehoert ins Protokoll";
 }

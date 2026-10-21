@@ -108,10 +108,12 @@ bool Laufwerke::createDisk(int drive, const std::string& path,
         // formatiert — inklusive Fremdformaten, die Nutzdaten hinter die Daten-CRC
         // haengen (UDOS-Sektorkontrollblock), was ein .img nicht speichern koennte.
         if (!path.empty()
-            && ImageCodec::fromExtension(path) == ContainerType::Img) {
+            && (ImageCodec::fromExtension(path) == ContainerType::Img
+                || ImageCodec::fromExtension(path) == ContainerType::Cqm)) {
             last_error_ = "Eine leere Diskette kann nicht als rohes Sektorimage (.img) "
-                          "angelegt werden — bitte .hfe oder .dmk waehlen (oder ein "
-                          "Diskettenformat angeben, um vorformatiert anzulegen).";
+                          "oder CopyQM-Abbild (.cqm) angelegt werden — bitte .hfe oder "
+                          ".dmk waehlen (oder ein Diskettenformat angeben, um "
+                          "vorformatiert anzulegen).";
             return false;
         }
 
@@ -214,6 +216,15 @@ std::string Laufwerke::diskContainer(int drive) const {
     const DiskImage* img = afs_.drive(drive).image();
     if (!img || !img->hasFile()) return "";
     return ImageCodec::name(img->container());
+}
+
+std::string Laufwerke::diskContainerInfo(int drive, const std::string& key) const {
+    if (drive < 0 || drive > 3) return "";
+    const DiskImage* img = afs_.drive(drive).image();
+    if (!img) return "";
+    if (key == "type") return ImageCodec::name(img->container());
+    const CqmCodec::SourceInfo* c = img->cqmInfo();
+    return c ? CqmCodec::infoField(*c, key) : "";
 }
 
 std::string Laufwerke::diskNotice(int drive) const {

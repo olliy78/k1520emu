@@ -410,6 +410,7 @@ class MainWindow(QMainWindow):
         self.drives_dock = QDockWidget("Laufwerke", self)
         self.drives_dock.setObjectName("drives_dock")
         self.drives_widget = DriveWidget(self.emulator, self._drive_types)
+        self.drives_widget.cqm_hinweise = self.profil.cqm_hinweise
         drives_scroll = QScrollArea()
         drives_scroll.setWidgetResizable(True)
         self.platten_widget = None
@@ -985,7 +986,7 @@ class MainWindow(QMainWindow):
             if einlegen:
                 text = f"Laufwerk &{chr(ord('A') + drive)}:"
                 tipp = (f"{name} liegt schon darin — erst auswerfen" if belegt
-                        else "Ein Abbild (.hfe, .dmk, .img) in dieses Laufwerk legen")
+                        else "Ein Abbild (.hfe, .dmk, .img, .cqm) in dieses Laufwerk legen")
             else:
                 text = (f"Laufwerk &{chr(ord('A') + drive)}:  ({name})" if name
                         else f"Laufwerk &{chr(ord('A') + drive)}:")

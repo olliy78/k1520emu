@@ -114,19 +114,33 @@ class DriveWidget(QWidget):
         self._format_timer.timeout.connect(self._refresh_format_labels)
         self._format_timer.start(1000)
 
-    # Dateifilter fuer Oeffnen: alle drei Container.
-    DISK_FILTER = "Disk Images (*.img *.hfe *.dmk);;All Files (*)"
+    # Dateifilter fuer Oeffnen: alle Container.  .cqm (CopyQM) ist wie .img ein Sektorstrom:
+    # schreibbar, aber nur Ziel, wenn das Medium es traegt (doc/merkposten/cqm.md Nr. 4/11).
+    DISK_FILTER = "Disk Images (*.img *.hfe *.dmk *.cqm);;All Files (*)"
     # Neue Leerdiskette: nur self-describing Container — ein rohes Sektorimage
     # kann "nicht formatiert" nicht ausdruecken (doc/design/09_floppy_drive.md §5).
     BLANK_FILTER = ("Bitstrom-Images (*.hfe *.dmk);;"
-                    "Vorformatiertes Sektorimage (*.img);;All Files (*)")
+                    "Vorformatiertes Sektorimage (*.img);;"
+                    "Vorformatiertes CopyQM-Abbild (*.cqm);;All Files (*)")
     # Speichern unter: .img nur, wenn das Medium sektorweise darstellbar ist.
-    SAVE_FILTER_ALL = "Disk Images (*.hfe *.dmk *.img);;All Files (*)"
+    SAVE_FILTER_ALL = "Disk Images (*.hfe *.dmk *.img *.cqm);;All Files (*)"
+    # Nur .cqm darstellbar (kein erkanntes Katalogformat, also kein .img).
+    SAVE_FILTER_CQM = "Disk Images (*.hfe *.dmk *.cqm);;All Files (*)"
     SAVE_FILTER_BITSTREAM = "Bitstrom-Images (*.hfe *.dmk);;All Files (*)"
 
     def present_drives(self) -> list:
         """Indices of the K5122 slots that carry a drive (in slot order)."""
         return [i for i, t in enumerate(self.drive_types) if dt.is_present(t)]
+
+    WP_TOOLTIP = (
+        "Der Schreibschutz des LAUFWERKS — wie die Kerbe am Rand der Diskette.\n"
+        "Das Gastsystem sieht ihn und meldet „schreibgeschützt“, statt in einen "
+        "Fehler zu laufen.\n"
+        "Bei einer echten Diskette am Greaseweazle ist er das zweite Schloss: "
+        "die Sitzung darf auf die Scheibe schreiben, die Maschine trotzdem nicht "
+        "— dann geht auch nichts an den Adapter.")
+    SAVEAS_TOOLTIP = ("Die eingelegte Diskette unter neuem Namen/Format "
+                      "speichern; ab dann folgen alle Schreibzugriffe dorthin.")
 
     #: Anzeige, wenn die Formaterkennung nichts Eindeutiges liefert.
     FORMAT_UNBEKANNT = "unbekannt"
@@ -290,13 +304,7 @@ class DriveWidget(QWidget):
             QLabel(f"<b>Laufwerk {chr(ord('A') + drive)}:</b> — {type_label}"))
         head_layout.addStretch()
         wp_check = QCheckBox("Write-Protect")
-        wp_check.setToolTip(
-            "Der Schreibschutz des LAUFWERKS — wie die Kerbe am Rand der Diskette.\n"
-            "Das Gastsystem sieht ihn und meldet „schreibgeschützt“, statt in einen "
-            "Fehler zu laufen.\n"
-            "Bei einer echten Diskette am Greaseweazle ist er das zweite Schloss: "
-            "die Sitzung darf auf die Scheibe schreiben, die Maschine trotzdem nicht "
-            "— dann geht auch nichts an den Adapter.")
+        wp_check.setToolTip(self.WP_TOOLTIP)
         # Er wirkt SOFORT, nicht erst beim naechsten Einlegen: sonst zeigte die
         # Statuszeile „R/O", waehrend die Maschine weiter schreiben darf.
         wp_check.toggled.connect(lambda an, d=drive: self._wp_umgeschaltet(d, an))
@@ -366,8 +374,7 @@ class DriveWidget(QWidget):
             "Nur bereits gelesene Spuren werden geschrieben; nie gelesene tragen "
             "keinen gültigen Inhalt.")
         saveas_btn.setEnabled(False)
-        saveas_btn.setToolTip("Die eingelegte Diskette unter neuem Namen/Format "
-                              "speichern; ab dann folgen alle Schreibzugriffe dorthin.")
+        saveas_btn.setToolTip(self.SAVEAS_TOOLTIP)
 
         def set_mounted(path: str, fmt: str, wp: bool):
             """UI-Zustand nach erfolgreichem Mount setzen."""
@@ -451,7 +458,10 @@ class DriveWidget(QWidget):
             # Ohne Endung → .hfe (Leerdiskette).
             if not os.path.splitext(path)[1]:
                 path += ".hfe"
-            if path.lower().endswith(".img"):
+            if path.lower().endswith((".img", ".cqm")):
+                # Wie .img: ein Sektorstrom kennt "unformatiert" nicht, es entsteht eine
+                # VORFORMATIERTE Diskette; passt deren Geometrie nicht (gemischte
+                # Systemspuren, FM), lehnt der Kern mit Grund ab.
                 fmt = self._frage_img_format(drive, anlegen=True)
                 if not fmt:
                     return
@@ -478,8 +488,10 @@ class DriveWidget(QWidget):
             # `.img` braucht ausserdem ein ERKANNTES Format — ohne das waere die
             # Sektorreihenfolge geraten (siehe _update_format_label).
             erkannt = self._erkanntes_format(drive)
+            cqm_ok = raw_ok          # .cqm braucht kein Katalogformat, die Geometrie steht im Kopf
             raw_ok = raw_ok and bool(erkannt)
-            flt = self.SAVE_FILTER_ALL if raw_ok else self.SAVE_FILTER_BITSTREAM
+            flt = (self.SAVE_FILTER_ALL if raw_ok else
+                   self.SAVE_FILTER_CQM if cqm_ok else self.SAVE_FILTER_BITSTREAM)
             path, _ = QFileDialog.getSaveFileName(
                 self, f"Diskette speichern unter — Laufwerk {chr(65 + drive)}:",
                 self._default_disk_dir(), flt
@@ -488,6 +500,14 @@ class DriveWidget(QWidget):
                 return
             if not os.path.splitext(path)[1]:
                 path += ".hfe"
+            if path.lower().endswith(".cqm") and not cqm_ok:
+                QMessageBox.critical(
+                    self, "Nicht möglich",
+                    "Diese Diskette lässt sich nicht als CopyQM-Abbild (.cqm) speichern:\n"
+                    "unformatierte Spuren oder Nutzdaten hinter der Daten-CRC (z. B. "
+                    "UDOS-Sektorkontrollblock) gingen dabei verloren.\n\n"
+                    "Bitte .hfe oder .dmk wählen.")
+                return
             is_img = path.lower().endswith(".img")
             if is_img and not raw_ok:
                 grund = ("Das Format dieser Diskette ist unbekannt — die "
@@ -657,6 +677,17 @@ class DriveWidget(QWidget):
             "Kopf. Lesezugriffe dorthin liefern nichts, Schreibzugriffe gehen ins Leere.",
     }
 
+    NICHT_SPEICHERBAR = "Abbild nicht speicherbar:"
+    #: Rechnerabhaengige Hinweise zu .cqm (aus dem Programmprofil, vom Hauptfenster gesetzt).
+    cqm_hinweise: tuple = ()
+
+    def _notice_help(self, zeile: str) -> str:
+        if zeile.startswith(self.NICHT_SPEICHERBAR):
+            return (zeile + "\n\nDie Datei bleibt unverändert; die Änderungen leben nur im "
+                    "Speicher weiter. Mit „Speichern unter…“ als .hfe oder .dmk lassen sie "
+                    "sich sichern.")
+        return self.NOTICE_HELP.get(zeile, zeile)
+
     def _update_notice(self, drive: int):
         """Hinweiszeilen des Kerns unter den Dateinamen setzen (leer = ausblenden)."""
         panel = self._panels.get(drive)
@@ -666,10 +697,52 @@ class DriveWidget(QWidget):
             lines = [l for l in self.emulator.disk_notice(drive).splitlines() if l]
         except Exception:
             lines = []
+        try:
+            if drive in self._mounts and self.emulator.disk_container(drive) == "cqm":
+                lines += list(self.cqm_hinweise)
+        except Exception:
+            pass
         label = panel._notice_label
         label.setText("\n".join("⚠ " + l for l in lines))
-        label.setToolTip("\n\n".join(self.NOTICE_HELP.get(l, l) for l in lines))
+        label.setToolTip("\n\n".join(self._notice_help(l) for l in lines))
         label.setVisible(bool(lines))
+        self._update_container(drive)
+
+    #: Schluessel der CopyQM-Metadaten und ihre Beschriftung im Tooltip.
+    CQM_FELDER = (("description", "Bezeichnung"), ("label", "Etikett"),
+                  ("interleave", "Interleave"), ("skew", "Skew"),
+                  ("cylinders", "Zylinder"), ("crc", "Prüfwert"))
+
+    def _update_container(self, drive: int):
+        """Abbildkommentar und CopyQM-Kopfdaten als Tooltip am Abbildnamen.  Der
+        Schreibschutz-Haken bleibt frei setzbar (auch bei ``.cqm``)."""
+        panel = self._panels.get(drive)
+        if panel is None or not hasattr(panel, "_wp_check"):
+            return
+        try:
+            cqm = (drive in self._mounts and
+                   self.emulator.disk_container(drive) == "cqm")
+        except Exception:
+            cqm = False
+        if not cqm:
+            panel._path_display.setToolTip("")
+            return
+        zeilen = []
+        for schluessel, name in self.CQM_FELDER:
+            try:
+                wert = self.emulator.disk_container_info(drive, schluessel)
+            except Exception:
+                wert = ""
+            if wert:
+                zeilen.append(f"{name}: {wert}")
+        try:
+            kommentar = self.emulator.disk_container_info(drive, "comment").strip()
+        except Exception:
+            kommentar = ""
+        text = "CopyQM-Abbild\n" + "\n".join(zeilen)
+        if kommentar:
+            text += "\n\nKommentar:\n" + kommentar
+        panel._path_display.setToolTip(text)
 
     # ── Erkanntes Diskettenformat ────────────────────────────────────────────
 

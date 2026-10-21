@@ -91,9 +91,18 @@ TEST(FsCatalog, ProfilnamenSindEinStabilerVertrag) {
         // WEGA (P8000, UNIX System III): andere Familie, beschreibt sich selbst
         // (doc/design/27_wega_dateisystem.md) — ein Eintrag fuer die 720-K-Diskette.
         "wega720",
+        // tar-Disketten (P8000-Lieferungen ohne Dateisystem, nur lesbar): letzter
+        // Erkennungsversuch hinter allen echten Dateisystemen (disk_volume.cpp).
+        "tar720",
+        // … und die LEERE tar-Diskette (ganz Null; nimmt genau ein .tar auf, `leer: true`).
+        "tar720_leer",
         // BCU 880: Arbeitsdiskette „ohne SYL“ (Name, `detect: false`) und die Startdiskette
         // „SYL auf Spur 1“ (erkannt am Lader; `nur_boot`).
         "bcu880", "bcu880_syl", "bcu880_kombi", "bcu880_kombi80", "bcu880_80",
+        // OS/M (P8000, doc/design/34_osm.md): Name, Bootabbild-Pruefung (`boot_header: osm`)
+        // und — bei 800K — die leere Diskette, die sonst `cpa800` ab c0h0 waere.  Erkannt nur
+        // mit Urlader; `osm640` ist deckungsgleich mit `scpx640`.
+        "osm640", "osm800",
     };
     for (const auto& n : erwartet)
         EXPECT_NE(cat.find(n), nullptr) << "Dateisystem '" << n << "' fehlt";
@@ -129,8 +138,11 @@ TEST(FsCatalog, Cpa780BeginntBeiZylinder2) {
 }
 
 /**
- * @test Auf der 16×256-Geometrie liegt GENAU EIN Profil — und es beginnt bei c2h0.
- * @par Kriterium  `forFormat("cpa640")` liefert nur `scpx640`, mit `data_cyl == 2`.
+ * @test Auf der 16×256-Geometrie liegt GENAU EIN Profil OHNE positiven Nachweis — und es
+ *       beginnt bei c2h0.
+ * @par Kriterium  `forFormat("cpa640")` liefert `scpx640` (data_cyl 2) und sonst nur
+ *                 `osm640`, das ausschliesslich mit OS/M-Urlader erkannt wird und
+ *                 deckungsgleich liegt (Entwurf 34 §6: keine Mehrdeutigkeit).
  * @par Warum      Bis 2026-08-11 stand daneben ein `cpa640` mit `data_cyl == 0`,
  *                 gedacht als Beispiel fuer „mehrere Dateisysteme je Geometrie".  Das
  *                 Beispiel war falsch: CP/A kann so eine Diskette nicht erzeugen, denn
@@ -145,10 +157,17 @@ TEST(FsCatalog, SechzehnMalZweihundertsechsundfuenfzigHatNurEinProfilAbZylinderZ
     ASSERT_TRUE(fatal.empty()) << fatal;
 
     const auto auf640 = cat.forFormat("cpa640");
-    ASSERT_EQ(auf640.size(), 1u) << "ein zweites Profil auf dieser Geometrie macht jede "
-                                    "16×256-Diskette wieder mehrdeutig";
-    EXPECT_EQ(auf640.front()->name, "scpx640");
-    EXPECT_EQ(auf640.front()->data_cyl, 2);
+    std::vector<const FsProfile*> ohne_nachweis;
+    for (const FsProfile* p : auf640) {
+        EXPECT_EQ(p->data_cyl, 2) << p->name;
+        EXPECT_EQ(p->dir_entries, 128) << p->name;
+        EXPECT_EQ(p->block_size, 2048u) << p->name;
+        if (p->boot_header != "osm") ohne_nachweis.push_back(p);
+    }
+    ASSERT_EQ(ohne_nachweis.size(), 1u) << "ein zweites Profil ohne Nachweis auf dieser "
+                                           "Geometrie macht jede 16×256-Diskette wieder mehrdeutig";
+    EXPECT_EQ(ohne_nachweis.front()->name, "scpx640");
+    EXPECT_EQ(auf640.size(), 2u);
     EXPECT_EQ(cat.find("cpa640"), nullptr);
 }
 

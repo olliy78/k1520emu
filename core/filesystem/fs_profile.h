@@ -41,7 +41,10 @@ enum class FsType : uint8_t {
     /// @brief WEGA (UNIX System III des P8000): 512-B-Bloecke, Superblock in Block 1,
     ///        Inodes ab Block 2, Verzeichnisbaum.  Kein Magic — die Erkennung ist eine
     ///        Plausibilitaetspruefung.  @see doc/design/27_wega_dateisystem.md
-    Wega
+    Wega,
+    /// @brief Tar-Strom direkt auf der Diskette (kein Dateisystem), nur lesbar.
+    ///        @see core/filesystem/tar/tar_fs.h
+    Tar
 };
 
 /// @brief Gehoert der Typ zur UDOS-Familie? (gemeinsame Kopfsektorfelder, Typ/Props)
@@ -77,6 +80,12 @@ struct FsProfile {
     ///        K8915 darauf geschrieben hat, findet es die CP/A-Regel ohnehin selbst.
     bool detect = true;
 
+    /// @brief Nur `type: tar`: die **leere** tar-Diskette (`tar720_leer`) — beschreibbar mit
+    ///        genau EINEM `.tar` (@ref DiskVolume::tarSchreiben), danach ein gewoehnliches
+    ///        `tar720`.  Erkannt wird sie nur an einer Diskette, die ganz aus Nullen besteht
+    ///        (siehe disk_volume.cpp, Erkennung).
+    bool leer = false;
+
     /// @brief Bauart des **Ladekopfs** in Sektor 1 der Systemspuren, den ein Bootabbild
     ///        tragen muss; "" = keine Pruefung.  `k8915` (AP-E5c): die ersten
     ///        16 Byte mit CRC-CCITT (Startwert FFFFH, Ergebnis 0) — ein CP/A-Bootabbild
@@ -86,6 +95,10 @@ struct FsProfile {
     ///        als Einziges prueft — ein A5120-Lader (`SYL`) besteht es nicht.
     ///        `bcu` / `bcu_syl` / `bcu_kombi` / `bcu_kombi80` (BCU 880): Bootabbild einer BCU-Diskette — Kennung
     ///        „BCU 880“ im System bzw. SYL-Lader auf Zylinder 1 mit gueltiger CRC.
+    ///        `osm` (OS/M des P8000, doc/design/34_osm.md): OS/M-Urlader in c0h0 Sektor 1
+    ///        (Code `FD 21 48 0C …`, Kennung `P8000SYS` bei 0x80) mit einem FDCONF-Typ, der
+    ///        zur Geometrie passt.  Zugleich der POSITIVE Nachweis der Erkennung: ohne
+    ///        Urlader ist eine OS/M-Datendiskette Sektor fuer Sektor eine SCP-Diskette.
     std::string boot_header;
 
     /// @brief Nur CP/M: der **Bootbereich steht im Verzeichnis** (CP/A 1715 ohne
@@ -135,6 +148,9 @@ struct FsProfile {
         if (ext_lower == "img") return allow_img;
         if (ext_lower == "hfe") return allow_hfe;
         if (ext_lower == "dmk") return allow_dmk;
+        // CopyQM legt nur Sektor-Nutzdaten ab (wie .img): kein Gap-Anhang, keine
+        // Sonderspuren — was ein .img nicht traegt, traegt auch ein .cqm nicht.
+        if (ext_lower == "cqm") return allow_img;
         return false;
     }
 };

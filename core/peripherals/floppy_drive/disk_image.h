@@ -26,6 +26,7 @@
 
 #pragma once
 #include "disk_format.h"
+#include "cqm_codec.h"
 #include "disk_medium.h"
 #include "image_codec.h"
 #include "track_image.h"
@@ -64,9 +65,11 @@ public:
     /**
      * @brief Vorhandene Image-Datei laden und binden.
      *
-     * Der Container wird per @ref ImageCodec::detect bestimmt (HFE-Signatur, DMK-Header,
-     * sonst `.img`).  @p fmt ist **nur** fuer `.img` noetig — `.hfe`/`.dmk` sind
-     * self-describing.
+     * Der Container wird per @ref ImageCodec::detect bestimmt (HFE-Signatur, CQM-Kopf,
+     * DMK-Header, sonst `.img`).  @p fmt ist **nur** fuer `.img` noetig — `.hfe`/`.dmk`/
+     * `.cqm` sind self-describing.  Ein `.cqm` ist wie ein `.img` beschreibbar, soweit das
+     * Medium sich als Sektorstrom darstellen laesst (@ref rawCompatible, einheitliche
+     * Geometrie); sonst bleibt die Datei unveraendert (@ref saveFailed).
      *
      * @return DiskImage oder nullptr bei Fehler (Datei/Format/Signatur).
      */
@@ -104,7 +107,8 @@ public:
     static std::unique_ptr<DiskImage> create(const std::string& path,
                                              std::optional<DiskFormat> fmt,
                                              bool write_protect,
-                                             Encoding enc = Encoding::MFM);
+                                             Encoding enc = Encoding::MFM,
+                                             std::string* fehler = nullptr);
 
     /**
      * @brief **Physische Diskette** in einem echten Laufwerk — spurweise nachgeladen.
@@ -161,6 +165,12 @@ public:
     ///        (ueberabgetasteter Flux-Mitschnitt, schreibgeschuetzte Datei).
     bool bindingWritable() const { return binding_writable_; }
 
+    /// @brief Kopfdaten eines geladenen CopyQM-Abbilds (nullptr bei anderen Containern).
+    ///        Der Kommentartext des Abbilds steht in `cqmInfo()->comment`.
+    const CqmCodec::SourceInfo* cqmInfo() const {
+        return cqm_info_.has_value() ? &cqm_info_.value() : nullptr;
+    }
+
     /**
      * @brief Geaenderte Spuren in die gebundene Datei schreiben.
      * @return true auch dann, wenn nichts zu tun war (keine Bindung / nicht schmutzig).
@@ -203,7 +213,20 @@ public:
 
     const char* lastError() const { return last_error_.c_str(); }
 
+    /// @brief Scheiterte das letzte Zurueckschreiben (z. B. Medium nicht als .cqm/.img
+    ///        darstellbar)?  Die Datei ist dann unveraendert, die Maschine laeuft weiter;
+    ///        der Grund steht in @ref lastError.  Wird vom naechsten erfolgreichen
+    ///        flush()/saveAs() zurueckgesetzt.
+    bool saveFailed() const { return save_failed_; }
+
 private:
+    /// Medium in @p ziel schreiben; bei .cqm mit den Kopfdaten der Quelle als Vorlage,
+    /// die der neuen Datei kommen nach @p info_neu.
+    bool speichere(const std::string& path, ContainerType ziel, const DiskFormat* fmt,
+                   std::optional<CqmCodec::SourceInfo>* info_neu, std::string& err) const;
+    bool exportImpl(const std::string& path, std::optional<DiskFormat> fmt,
+                    std::optional<CqmCodec::SourceInfo>* info_neu);
+
     DiskMedium    medium_;
     /// Physische Bindung (nullptr = Datei/Speicher).  `shared_ptr`, weil die C-ABI dem
     /// Arbeitsfaden ein eigenes Handle darauf gibt, das die Diskette ueberleben darf.
@@ -213,7 +236,10 @@ private:
     std::optional<DiskFormat> disk_format_;           ///< nur bei .img
     bool          write_protect_   = false;
     bool          binding_writable_ = true;
+    std::optional<CqmCodec::SourceInfo> cqm_info_;    ///< nur bei geladenem .cqm
     std::string   last_error_;
+    bool          save_failed_     = false;   ///< letztes flush() scheiterte
+    uint64_t      failed_revision_ = 0;       ///< … bei dieser Medium-Revision
 
     /// Maschinentakt der zuletzt BEOBACHTETEN Spuraenderung (0 = sauber) …
     uint64_t      dirty_since_        = 0;

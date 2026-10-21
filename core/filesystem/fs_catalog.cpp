@@ -24,6 +24,7 @@ const char* fsTypeName(FsType t) {
         case FsType::Udos:     return "udos";
         case FsType::Udos1715: return "udos1715";
         case FsType::Wega:     return "wega";
+        case FsType::Tar:      return "tar";
     }
     return "?";
 }
@@ -79,7 +80,7 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
     const std::string where = file + ":" + std::to_string(node.line);
     collectUnknownKeys(node,
                        {"name", "description", "format", "type", "data_start",
-                        "containers", "detect_rank", "detect", "boot_header", "dir_boot", "nur_boot",
+                        "containers", "detect_rank", "detect", "leer", "boot_header", "dir_boot", "nur_boot",
                         "block_size", "dir_entries", "skew", "max_blocks", "os",
                         "sides_separate", "boot_track", "directory_track",
                         "bitmap_track", "usable_tracks"},
@@ -111,12 +112,13 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
     // ── type (Pflicht) ──
     const yaml::Node* n_type = node.find("type");
     if (!n_type || !n_type->isScalar())
-        { why = "Pflichtfeld 'type' fehlt (cpm | udos | udos1715 | wega)"; return false; }
+        { why = "Pflichtfeld 'type' fehlt (cpm | udos | udos1715 | wega | tar)"; return false; }
     if      (n_type->scalar == "cpm")      out.type = FsType::Cpm;
     else if (n_type->scalar == "udos")     out.type = FsType::Udos;
     else if (n_type->scalar == "udos1715") out.type = FsType::Udos1715;
     else if (n_type->scalar == "wega")     out.type = FsType::Wega;
-    else { why = "'type': '" + n_type->scalar + "' — erlaubt sind cpm | udos | udos1715 | wega";
+    else if (n_type->scalar == "tar")      out.type = FsType::Tar;
+    else { why = "'type': '" + n_type->scalar + "' — erlaubt sind cpm | udos | udos1715 | wega | tar";
            return false; }
 
     // ── data_start ──
@@ -158,11 +160,23 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
             { why = "'detect' muss true/false sein"; return false; }
         out.detect = b;
     }
+    if (const yaml::Node* n = node.find("leer")) {
+        bool b = false;
+        if (!n->isScalar() || !yaml::toBool(n->scalar, b))
+            { why = "'leer' muss true/false sein"; return false; }
+        if (b && out.type != FsType::Tar)
+            { why = "'leer' gibt es nur fuer type: tar"; return false; }
+        out.leer = b;
+    }
     if (const yaml::Node* n = node.find("boot_header")) {
         if (!n->isScalar() || (n->scalar != "k8915" && n->scalar != "pc1715"
                                && n->scalar != "bcu" && n->scalar != "bcu_syl" && n->scalar != "bcu_kombi" && n->scalar != "bcu_kombi80"
-                               && !n->scalar.empty()))
-            { why = "'boot_header' muss k8915, pc1715, bcu, bcu_syl, bcu_kombi oder bcu_kombi80 sein (oder fehlen)"; return false; }
+                               && n->scalar != "osm" && !n->scalar.empty()))
+            { why = "'boot_header' muss k8915, pc1715, bcu, bcu_syl, bcu_kombi, bcu_kombi80 oder osm sein (oder fehlen)"; return false; }
+        // `osm` (OS/M des P8000): der Urlader ist der POSITIVE Nachweis der Erkennung —
+        // das gibt es nur auf einer CP/M-Diskette mit Systemzylindern.
+        if (n->scalar == "osm" && out.type != FsType::Cpm)
+            { why = "'boot_header: osm' gilt nur fuer type: cpm"; return false; }
         out.boot_header = n->scalar;
     }
     if (const yaml::Node* n = node.find("dir_boot")) {
@@ -223,7 +237,7 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
             if (node.has(feld))
                 issues.push_back(where + ": '" + feld + "' gilt nur fuer die UDOS-Familie"
                                                         " — ignoriert");
-    } else if (out.type == FsType::Wega) {
+    } else if (out.type == FsType::Wega || out.type == FsType::Tar) {
         // WEGA beschreibt sich selbst (Superblock): Blockgroesse 512, Inode-Liste und
         // Groesse stehen auf dem Datentraeger.  Eine Diskette = EIN Dateisystem ueber
         // beide Seiten, ab Block 0 (doc/design/27_wega_dateisystem.md §2).

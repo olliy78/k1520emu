@@ -6,7 +6,12 @@ Dieses Werkzeug holt Dateien von Disketten der K1520-Rechner (A5120, A5130, PC 1
 auf den heutigen Rechner und schreibt sie zurück. Es liest und schreibt die
 Dateisysteme von **CP/A**, **SCPX**, **UDOS/ZDOS**, **UDOS1715/NDOS** und
 **SCP1700** (CP/M-86 des A7100) in den
-Abbildformaten `.hfe`, `.dmk` und `.img`.
+Abbildformaten `.hfe`, `.dmk`, `.img` und `.cqm` (CopyQM; soweit das Medium darstellbar ist).
+Dazu kommen die UNIX-Disketten des P8000: **WEGA** (mit Modus, Besitzer und Zeit je
+Datei) und **tar-Disketten** ohne Dateisystem, beide ohne UDOS-Angaben. Alles
+Wesentliche zu den neueren Funktionen steht in den Abschnitten *tar-Disketten*,
+*CopyQM-Abbilder*, *Containerformate im Vergleich*, *Was eine Datei außer ihren Bytes hat* und *Archivieren*
+(einschließlich *Archive auf der Kommandozeile*).
 
 Es gibt dasselbe auch als Kommandozeilenwerkzeug (`k1520disktool`); beide benutzen
 dieselbe Bibliothek und kommen deshalb immer zum selben Ergebnis.
@@ -31,6 +36,10 @@ dieselbe Bibliothek und kommen deshalb immer zum selben Ergebnis.
    einem unpassenden Format geöffnet —, steht das in der linken Hälfte:
    *Keine Dateien gefunden*.
 3. **Holen** — Dateien links markieren, dann `→|`. Ganze Diskette: `→→|`.
+   Enthält ein CP/M-Name ein `/` oder `\` (Disketten aus WEGA-Übertragungen:
+   `/Z/HOFFM`, `GW/ZSID.DOC`), wird es zu `_`, ein führender Punkt bekommt ein `_`
+   davor; fallen zwei Namen zusammen, erhält der spätere `~1` (Hinweis im Protokoll).
+   Der Zielordner wird nie verlassen.
 4. **Ändern erlaubt?** Eine geöffnete Diskette ist zunächst **schreibgeschützt**.
    Wer schreiben will, hebt den Schutz bewusst auf: *Diskette ▸ Schreibschutz*
    (Strg+R) — der Knopf rechts in der Symbolleiste wechselt dann von 🔒 `R/O`
@@ -46,7 +55,7 @@ nicht dort, wo das Programm installiert ist:
 
 | Ordner | Wofür |
 |--------|-------|
-| `K1520emu/Disketten` | die Abbilder (`.hfe`, `.dmk`, `.img`) |
+| `K1520emu/Disketten` | die Abbilder (`.hfe`, `.dmk`, `.img`, `.cqm`) |
 | `K1520emu/Dateien` | was von den Disketten geholt und auf sie geschrieben wird |
 
 Dort gehen die Dateidialoge auf, und die rechte Hälfte zeigt beim Start den
@@ -90,6 +99,27 @@ Vier Knöpfe zwischen den Listen — außen die Stapel, innen die Auswahl:
 
 Dasselbe geht mit der Maus: Dateien von einer Hälfte in die andere ziehen. Und
 über *Bearbeiten* mit Strg+→ und Strg+←.
+
+**Ziehen und Ablegen aus dem Dateimanager.** Die Fensterhälften nehmen auch
+Dinge von außen an — und sonst nichts (überall sonst zeigt der Mauszeiger
+„verboten"; die Statuszeile nennt den Grund):
+
+- **Links (Diskette):** ein **Abbild** (`.hfe`, `.dmk`, `.img`, `.cqm`, Groß-/Kleinschreibung
+  egal) wird **geöffnet**, genau wie *Datei ▸ Öffnen* (mit Rückfrage bei
+  ungespeicherten Änderungen). Es darf nur **ein** Abbild auf einmal sein, und
+  nicht zusammen mit anderen Dateien. Andere Dateien und Ordner werden wie bisher
+  **auf die Diskette geschrieben**.
+- **Rechts (Ordner):** **ein** Verzeichnis wird zum **Arbeitsordner**, wie über die
+  Ordnerwahl. Dateien oder mehrere Verzeichnisse werden abgelehnt. Das Ziehen von
+  der Diskette in den Ordner holt weiter Dateien heraus.
+- **Vorrang der Abbild-Endung:** eine Datei mit Abbild-Endung, die von außen auf
+  die linke Seite fällt, wird nie als Datei geschrieben. Will man eine solche
+  Datei auf die Diskette bringen, wählt man sie in der Ordneransicht (rechts)
+  aus und benutzt `|←` bzw. dem entsprechenden Menüpunkt (Strg+←).
+
+- **Leere tar-Diskette:** Auf eine `tar720_leer`-Diskette (Schreibschutz aufgehoben) wird eine
+  abgelegte oder in der Ordneransicht gewählte **`.tar`-Datei** als Archiv geschrieben — genau EINE;
+  mehrere Dateien, Ordner und Abbild-Endungen weist die Statuszeile ab. Näheres bei den tar-Disketten.
 
 **Binär oder Text?** Im Menü *Übertragung*. Bei *Text* werden die Zeilenenden
 umgesetzt (CR LF ↔ LF) — richtig für Quelltexte und Dokumente, **falsch für
@@ -140,6 +170,213 @@ halber Geschwindigkeit in einem anderen Aufzeichnungsverfahren geschrieben als d
 Rest. Das Werkzeug führt das mit, auch beim Zurückschreiben; zu sehen ist es im
 Diskeditor und in der Formatzeile.
 
+## OS/M-Disketten — das CP/M des P8000
+
+**OS/M** ist das 8-Bit-Betriebssystem des P8000 — und es ist **CP/M 2.2**. Auf der
+Diskette benutzt es genau die SCP-Formate des PC 1715: Format 5 (16 × 256 Byte je
+Sektor, 640K) und Format 7 (5 × 1024 Byte, 800K), Zylinder 0 und 1 für das System,
+das Verzeichnis ab Zylinder 2. Lesen, Schreiben, Löschen und Attribute verhalten sich
+wie bei jeder CP/A- oder SCP-Diskette.
+
+**Erkannt wird OS/M am Urlader.** Eine Systemdiskette trägt im ersten Sektor den
+OS/M-Urlader; dann heißt sie `osm640` bzw. `osm800`. Eine **Datendiskette** ohne System
+ist von einer SCP-Diskette nicht zu unterscheiden und erscheint deshalb als `scpx640`
+bzw. `cpa_auto` — gelesen wird sie genauso richtig, nur der Name sagt nicht „OS/M“.
+
+**Eine leere 800K-Diskette** — auch eine frisch unter OS/M formatierte — sieht aus wie
+eine leere CP/A-Datendiskette, deren Verzeichnis schon auf Zylinder 0 beginnt. Wer sie
+für OS/M füllen will, wählt im Dateisystem-Menü `osm800` (oder legt sie gleich als
+`osm800` an); sonst landen die ersten Dateien dort, wo OS/M sein System erwartet, und
+OS/M sieht sie nicht. Die Erkennung erinnert daran mit „ebenso gut osm800“ — in der
+Meldung über der Dateiliste und, im vollen Wortlaut, im Protokoll. Unter *Neue
+Diskette* heißen die Einträge „osm640 — OS/M (P8000) 640K, Format 5 …“ und
+„osm800 — OS/M (P8000) 800K, Format 7 …“. Eine
+Bootdiskette entsteht wie bei den anderen Systemen: Systemspuren einer OS/M-Diskette
+herausholen und beim Anlegen mitgeben. Das Werkzeug prüft dabei, dass es wirklich ein
+OS/M-Urlader für dasselbe Format ist.
+
+Die Prüfung meldet **`osm.fdconf`**, wenn der Laufwerkstyp im Urlader nicht zum Format
+der Diskette passt — sie sähe heil aus und startete am P8000 falsch. Die Statuszeile
+zeigt sie als Warnung, das Protokoll nennt sie, und der Prüfdialog (Strg+F) führt sie
+mit den übrigen Befunden.
+
+**Namen mit `/`** wie `GW/ZSID.DOC` stammen aus Übertragungen vom WEGA-Teil des P8000.
+CP/M erlaubt den Schrägstrich im Namen nicht; die Prüfung nennt ihn deshalb als Warnung.
+Beim Herausholen wird daraus `GW_ZSID.DOC`.
+
+## tar-Disketten — ein Archiv statt eines Dateisystems
+
+Viele P8000-Lieferdisketten tragen **kein Dateisystem**: jemand hat mit `tar` direkt auf
+die rohe Diskette geschrieben. Das Werkzeug erkennt das als `tar720` (nur lesbar, immer
+als letzter Versuch hinter allen echten Dateisystemen) und zeigt Modus, Besitzer und
+Zeit wie bei WEGA. Mehrere Disketten eines Satzes sind **ein** Strom: die letzte Datei
+einer Diskette ist dann abgeschnitten (`tar.abgeschnitten`, in der Liste `[DEFEKT]`,
+das `.fileinfo` trägt `teilstueck=ist/soll`), und Diskette 2…n beginnt mitten in einer
+Datei (`tar.fortsetzung`, das Anfangsstück liegt als `_fortsetzung_anfang.bin` bei).
+Vollständig werden die Dateien mit `k1520disktool tar-satz abbild1 abbild2 … --to ordner`
+(Reihenfolge wie in den Namen, `ariane1`, `ariane2`).
+
+Im Fenster heißt der Weg **Datei ▸ tar-Satz öffnen…** (ohne Tastenkürzel): man wählt
+alle Abbilder des Satzes (`.cqm` oder `.img`), ordnet sie in der Liste mit *Auf* und *Ab*
+— der Vorschlag sortiert nach den Zahlen in den Dateinamen, `ariane2` vor `ariane10` — und
+bekommt EINE Diskette mit den vollständigen Dateien. Ein tar-Satz ist wie jede tar-Diskette
+nur lesbar. Das Dateisystem heißt in der Anzeige „tar-Archiv (UNIX)“; die Befunde
+`tar.fortsetzung` (die Diskette beginnt mitten in einer Datei) und `tar.abgeschnitten`
+(die letzte Datei setzt sich auf der nächsten Diskette fort) stehen im Protokoll.
+
+### tar-Archive herausholen, bearbeiten und zurückschreiben
+
+Ein Archiv, das sich über mehrere Disketten erstreckt, zeigt jede Einzeldiskette nur
+abgeschnitten. Wer es bearbeiten will, holt die **Rohinhalte** als `.tar` heraus, setzt sie mit
+`cat` zusammen, ändert das Archiv, teilt es mit `split` wieder und schreibt die Teile auf leere
+Disketten:
+
+1. **Diskette ▸ Diskette als .tar exportieren…** (ohne Tastenkürzel; in der Kommandozeile
+   `tar-export`). Ausgabe sind die 512-Byte-Blöcke des Stroms unverändert. Beginnt die Diskette
+   mit einem gültigen tar-Kopf, endet der Export hinter der **Endmarke** (zwei Nullblöcke an
+   einer Kopfposition); ohne Endmarke — auch mitten in einer Datei — wird bis zum
+   Diskettenende ausgegeben. Eine **Folgediskette** (sie beginnt mitten in einer Datei) wird
+   **immer ganz** ausgegeben, auch wenn in den Dateidaten zwei Nullblöcke stehen: das wäre keine
+   Endmarke, und Abschneiden zerstörte das Archiv beim `cat`. Das gilt für jeden Container
+   (`.cqm`, `.hfe`, `.img`, `.dmk`) und auch für eine Diskette, an der gar kein Dateisystem
+   erkannt wurde (ein Folgeteil ohne einen einzigen Kopf). Ein geöffneter tar-**Satz** ist schon
+   EIN Strom und wird nicht exportiert — die Disketten des Satzes einzeln öffnen.
+2. Zusammensetzen, bearbeiten, teilen (Beispiel mit den sieben Disketten `w11data1…7`):
+
+       k1520disktool tar-export w11data1.cqm teil1.tar          # … bis w11data7.cqm
+       cat teil1.tar teil2.tar teil3.tar teil4.tar teil5.tar teil6.tar teil7.tar > w11data.tar
+       tar tvf w11data.tar                                      # bearbeiten: tar rf / tar --delete …
+       split -b 737280 -d w11data.tar neu_                      # neu_00 … neu_06, je höchstens 720 KiB
+
+3. **Datei ▸ Neue Diskette…** mit dem Dateisystem `tar720_leer` (Kommandozeile
+   `create x.cqm --fs tar720_leer`) legt eine **leere tar-Diskette** an: 720 KiB (80 × 2 × 9 × 512), ganz Null, in jedem
+   Container (`.img`, `.hfe`, `.dmk`, `.cqm`). Sie wird beim Öffnen als „tar-Diskette, leer“ erkannt
+   (nur wenn **alle** Bytes Null sind; eine mit Nullen gefüllte CP/A-Diskette erscheint ebenfalls so —
+   *Diskette ▸ Dateisystem übersteuern* ▸ `cpa_auto` stellt es richtig).
+4. **Diskette ▸ tar-Datei auf Diskette schreiben…** (Kommandozeile `tar-put`) schreibt die Datei ab Sektor 0 und
+   macht die Diskette zu einer gewöhnlichen, **nur lesbaren** tar-Diskette (`tar720`). Es geht
+   **genau einmal**; ein zweites Schreiben wird abgelehnt. Dieselbe Datei lässt sich auch über
+   **`|←` / Strg+←** (Datei in der Ordneransicht gewählt) oder durch **Ziehen und Ablegen** auf die
+   Diskettenansicht schreiben — es muss genau EINE Datei sein (kein Ordner, keine Diskettenabbild-
+   Endung; sonst Hinweis in der Statuszeile), sie geht denselben Prüfweg samt Rückfrage. Alle
+   anderen Datei-Wege (Löschen, *Alles einfügen*, `put`) und jeder Weg auf eine belegte tar-Diskette
+   bleiben gesperrt. Vorher geprüft wird: höchstens 720 KiB
+   (sonst mit `split -b 737280` teilen) und ein Vielfaches von 512 Byte. Beginnt die Datei mit
+   einem tar-Kopf, der **nicht V7** ist (`ustar`-Magic, also GNU- oder POSIX-Format; pax-Kopf;
+   GNU-Langname; Name mit 100 Zeichen; binäres Größenfeld), erscheint die Rückfrage **„Trotzdem
+   schreiben?“** (in der Kommandozeile eine Warnung auf stderr, geschrieben wird trotzdem): die
+   P8000-/WEGA-Werkzeuge verstehen nur V7. `tar --format=v7` erzeugt ein solches Archiv (Namen
+   bis 99 Zeichen). Eine Datei ohne Kopf am Anfang (Folgeteil) wird kommentarlos übernommen.
+
+       k1520disktool create diskette00.cqm --fs tar720_leer
+       k1520disktool tar-put diskette00.cqm neu_00              # … für jedes Teil eine neue Diskette
+
+#### Passende tar-Dateien unter Linux erzeugen und entpacken
+
+**Archiv für WEGA erzeugen** (V7-Format, in Teile zu je einer Diskette geschnitten):
+
+    tar --format=v7 -b 20 -cf wega.tar -C /ihre/daten .
+    split -b 737280 -d -a 2 --additional-suffix=.tar wega.tar wega_part
+                                    # wega_part00.tar, wega_part01.tar, … je höchstens 720 KiB
+
+- `--format=v7` ist wichtig: das Standardformat von GNU `tar` (`gnu`) und `posix`/`ustar`
+  tragen die Kennung `ustar` im Kopf, und WEGA versteht sie nicht. V7 erlaubt Pfadnamen bis
+  99 Zeichen; längere lehnt `tar` ab.
+- `-b 20` ist der übliche Blockungsfaktor (10 KiB); er füllt nur das Ende des Archivs mit Nullen auf.
+- Geteilt wird mit `split`, **nicht** mit `tar -M -L 720K`. Der Aufruf
+  `tar --format=v7 -M -L 720K …` bricht mit „GNU features wanted on incompatible archive format“
+  ab, weil GNU-Mehrbandarchive ein GNU-Format brauchen. Mit einem GNU-Format
+  (`--format=oldgnu -M`) beginnt jedes Folgeteil mit einem GNU-Fortsetzungskopf (Typ `M`),
+  den WEGA nicht kennt. `split` schneidet dagegen den einen V7-Strom nur an den Diskettengrenzen;
+  die Teile ergeben, hintereinandergelegt, wieder genau das V7-Archiv.
+- Die Teile 2 bis n beginnen mitten in einer Datei und sind einzeln für `tar tf` nicht lesbar
+  („This does not look like a tar archive“). Das ist richtig so; erst zusammen ergeben sie das Archiv.
+- Jedes Teil auf eine eigene leere Diskette schreiben (`tar-put`, siehe oben). Das DiskTool prüft
+  nur, ob ein Kopf am Anfang V7 ist; ein Folgeteil nimmt es ohne Meldung an.
+
+**Mehrere `.tar`-Teile zu einem Archiv zusammensetzen und in ein Verzeichnis entpacken:**
+
+    mkdir ziel
+    cat wega_part*.tar | tar -xvf - -C ziel          # in der Reihenfolge der Namen: part00, part01, …
+    # oder erst zusammensetzen und ansehen:
+    cat wega_part*.tar > wega.tar
+    tar -tvf wega.tar                                # Inhalt auflisten
+    tar -xvf wega.tar -C ziel                        # in das Verzeichnis „ziel“ entpacken
+
+- Die Teile müssen in der richtigen Reihenfolge stehen. Bei zwei oder mehr Ziffern mit festen
+  Stellen (`part00` … `part10`) sortiert die Shell richtig, bei `part1` … `part10` nicht.
+- Die Nullauffüllung am Ende der letzten Diskette stört nicht, `tar` hört an der Endmarke auf.
+- Als normaler Benutzer setzt `tar` Besitzer nicht um, Rechte nur mit `-p`. Mit `sudo` oder
+  `--numeric-owner` bleiben die Besitzer der Diskette erhalten.
+- Bearbeiten im zusammengesetzten Archiv: `tar --format=v7 -rf wega.tar datei` hängt an,
+  `tar --delete -f wega.tar pfad` entfernt. Danach wieder mit `split` teilen. Beim Anhängen
+  `--format=v7` mitgeben, sonst mischt `tar` GNU-Köpfe hinein.
+
+**Rundlauf.** `tar-export` einer mit `tar-put` beschriebenen Diskette liefert: bei einer Datei
+mit Kopf und Endmarke genau die Datei; bei einer Datei mit Kopf **ohne** Endmarke die Datei plus
+zwei Nullblöcke (die Auffüllung der Diskette hat dann eine); bei einem Folgeteil die Datei,
+mit Nullen auf 720 KiB aufgefüllt — ein volles Teil kommt bitgleich zurück. Nach dem `cat` der
+exportierten Teile bleibt daher höchstens Nullauffüllung am Ende des Archivs übrig, die `tar` ignoriert.
+
+## CopyQM-Abbilder
+
+Viele Abbilder alter Rechner liegen als `.cqm` (Programm CopyQM). Das Werkzeug **liest und
+schreibt** sie wie ein `.img`: Öffnen, Dateien holen, Speichern, Löschen, *Alles einfügen*,
+Reparieren, Dateiangaben ändern und der Schreibschutz-Schalter arbeiten wie bei jedem
+anderen Abbild. *Speichern unter…* und *Neue Diskette* bieten `.cqm` als Ziel an.
+Nur **tar-Disketten** bleiben gesperrt (auch in einer `.cqm`; der Tooltip nennt den Grund).
+
+Bezeichnung, Etikett, Interleave/Skew, Prüfwert und der **Kommentar** des Abbilds stehen unter
+*Diskettenangaben…*; der Kommentar außerdem als Tooltip am Dateinamen. Beim Zurückschreiben
+und bei *Speichern unter…* nach `.cqm` bleiben sie erhalten, solange die Geometrie gleich
+bleibt (Kommentar und Etikett auch sonst); der Umweg über `.hfe` und zurück erzeugt einen
+neuen Standardkopf („Image file created by k1520emu“). Datei → Medium → Datei ist
+inhaltsgleich, aber nicht byteidentisch (anderer Packschnitt).
+
+**Was abgelehnt wird.** Ein Medium, das CopyQM nicht darstellen kann, wird vor dem Schreiben
+abgewiesen; die Datei bleibt unverändert, die Meldung nennt den Grund:
+
+* *„CopyQM unterstützt keine gemischten Formate: die Spuren haben unterschiedliche
+  Sektorgrößen oder Sektorzahlen“* — z. B. CP/A-Bootdisketten (128-Byte-Systemspuren),
+* *„CopyQM kann die Sektorkontrollblöcke von UDOS nicht speichern“* — UDOS/ZDOS (die
+  Verkettung steht hinter der Daten-CRC),
+* *„CopyQM kennt nur MFM mit voller Datenrate“* — FM-Spuren,
+* *„CopyQM kann unformatierte Disketten/Spuren nicht speichern“*.
+
+Dasselbe gilt in der Kommandozeile (`save-as`, `create`, `export`). Beim Archivieren liegt das
+Abbild als `.hfe` im Archiv (wie bei jeder Quelle); das Inhaltsverzeichnis nennt die `.cqm`
+als Quelle samt Kommentar, das maschinenlesbare Verzeichnis führt unter `source_container` die
+Angaben und die Prüfsumme der `.cqm`-Datei. Beispiel Konvertieren (Aufnahme → CopyQM, wo es
+passt): `k1520disktool save-as scheibe.hfe scheibe.cqm`.
+
+## Containerformate im Vergleich
+
+Dasselbe Dateisystem kann in vier Behältern liegen. Sie unterscheiden sich darin, **wie nah
+an der Scheibe** sie sind:
+
+| | `.img` | `.cqm` | `.dmk` | `.hfe` |
+|---|---|---|---|---|
+| speichert | nur Sektorbytes | Sektorbytes, RLE-gepackt | Spurbytes + Tabelle der Adressmarken | Bitzellen der ganzen Spur |
+| Geometrie | nicht in der Datei: kommt aus dem Formatkatalog (`formats.yaml`) | im Kopf, **eine** (Sektorgröße, -zahl, Seiten, Zylinder) | je Spur | je Spur |
+| selbstbeschreibend | nein | ja | ja | ja |
+| gemischte Geometrie (128-B-Systemspuren) | ja, über das Katalogformat | **nein** | ja | ja |
+| Lücken, Sync, Daten hinter der CRC (UDOS) | nein | nein | ja | ja |
+| FM / MFM | je Katalogformat | nur MFM | beides | beides |
+| unformatierte Spuren | nein | nein (Enden nur als „nicht gespeichert“) | ja | ja |
+| Kommentar / Etikett | nein | ja | nein | nein |
+| Komprimierung | nein | ja | nein | nein |
+
+Daraus folgt:
+
+* **Bootdisketten** (CP/A: 128-Byte-Systemspuren, sonst 512 B): gemischte Geometrie —
+  als `.cqm` nicht darstellbar. UDOS auf A5120 und PRG 710: Sektorkontrollblöcke und
+  Gap-Verkettung hinter der CRC — weder als `.cqm` noch als `.img`. FM-Disketten und
+  unformatierte Leerdisketten: nicht als `.cqm` (`.img` kennt „unformatiert“ ebenfalls nicht).
+  UDOS1715/NDOS (Zeigersektoren) geht in jedem Behälter.
+* **Empfehlung:** Bootdisketten und UDOS als **`.hfe`** (verlustfrei, auch physisch
+  schreibbar); Austausch und Archiv *einheitlicher* Disketten als **`.cqm`** (klein, trägt
+  Kommentar) oder **`.img`**; `.dmk` für Werkzeuge, die es erwarten.
+
 ## UDOS1715 — dasselbe UDOS, anderes Dateisystem
 
 Disketten vom **PC 1715** tragen UDOS mit dem Treiber **NDOS** statt ZDOS. Das
@@ -180,6 +417,13 @@ zeigt die Angaben, die ein Linux-Dateisystem nicht tragen kann:
   Das Feld **Segmente** trägt sie alle, durch Leerzeichen getrennt
   (`4000+06A7 62A7+0002 …`): ein Programm kann mehrere Speicherbereiche belegen.
 * **CP/M** — Nutzerbereich (0–15) und die Attribute R/O, SYS, ARC.
+* **WEGA** (UNIX des P8000) — die Inode: Dateiart, Modus (als Kästchen für
+  Besitzer/Gruppe/Andere, die Sonderbits setuid/setgid/sticky und als Oktalzahl wie bei
+  `chmod`), Besitzer (uid), Gruppe (gid), Änderungszeit (mtime, GMT), dazu als reine
+  Anzeige Inode-Nummer, Links, Zugriffs- und Inode-Zeit und die belegten Blöcke. Änderbar
+  sind Modus, uid, gid und mtime; Dateiart, Inode, Größe und Links sind Struktur. Das
+  Übernehmen ist **eine** Transaktion im Dateisystem. Die Inode-Zeit (ctime) setzt jede
+  Änderung auf „jetzt“, wie im echten System.
 
 Der Nutzerbereich gehört zur **Identität** einer CP/M-Datei: ihn zu ändern
 benennt die Datei um (`3:PIP.COM`).
@@ -207,6 +451,15 @@ wird: ohne die Angaben wüsste UDOS nicht, dass es ein Programm ist, wohin es ge
 gehört und wo es anfängt. Fehlen sie beim Zurückschreiben, wird deshalb **gefragt
 statt geraten** — ein Fenster erhebt Typ, Satzlänge und, bei einem Programm,
 Einsprung und Speicherangaben. Bei mehreren Dateien genügt „Für alle übernehmen".
+
+**Bei WEGA entsteht es immer** (`fs=wega`): `mode` (oktal, samt Dateiart), `uid`, `gid`,
+`mtime`, dazu zur Auskunft `art`, `nlink`, `inode`, `atime`, `ctime` und bei Geräten
+`rdev`. Beim Zurückschreiben gelten Modus (untere 12 Bit), uid, gid und mtime; Links und
+Inode-Nummer vergibt das Dateisystem neu. Auch jedes **Verzeichnis** bekommt eines
+(`usr.fileinfo` neben dem Ordner `usr`) — ohne Rechte wäre `/tmp` danach nicht mehr
+für alle beschreibbar. Das Sammelbeiblatt heißt `wega-dateiangaben.txt` und führt
+**alle** Inodes, auch Gerätedateien, die als Datei nicht existieren können; sie werden nicht
+ausgelesen. Ein `.fileinfo` anderer Herkunft (UDOS/CP/M) wird bei WEGA überlesen.
 
 **Bei CP/M entsteht es nur auf Wunsch** — *Übertragung ▸ Bei CP/M je Datei ein
 .fileinfo anlegen*. Dort gibt es nichts zu retten, was sonst verloren ginge:
@@ -630,6 +883,19 @@ Gedacht als Langzeitablage: aus dem Textteil allein lässt sich in zwanzig Jahre
 noch nachvollziehen, was auf der Diskette stand. Archivieren ist eine reine
 Leseoperation und geht auch mit gesetztem Schreibschutz.
 
+**Herkunft und Beschreibung (optional).** Im Archivieren-Dialog klappt der Bereich
+*Herkunft und Beschreibung* auf: Quelle/URL, Satz/Titel, Version, Etikett und eine
+Bemerkung, dazu eine Tabelle *Weitere Angaben* (freie Schlüssel aus Kleinbuchstaben,
+Ziffern und Unterstrich) und die Liste *Beschreibungsdateien*. Die Angaben stehen im
+Inhaltsverzeichnis und unter `provenance:` in der `diskarchive.yaml`; die
+Beschreibungsdateien (Text, höchstens 4 MiB, Latin-1 oder UTF-8 wird erkannt und nach
+UTF-8 übernommen) liegen an der Wurzel der `.zip` – **nicht** unter `dateien/` und
+damit nie auf der Diskette. Leere Felder erzeugen nichts; bleibt alles leer, ist das
+Archiv wie ohne den Bereich. Die zuletzt benutzten Angaben (nicht die Dateien) merkt sich
+das Programm; *Zurück auf leer* vergisst sie. Auf der Kommandozeile:
+`python3 -m app.disktool.archive abbild.img archiv.zip --herkunft-datei meta.yaml
+--herkunft version=2 --beilage beschreibung.txt`.
+
 **`diskarchive.yaml` — für die Inventur einer Sammlung.** Dieselbe Auskunft für
 Programme: je Datei ihr Pfad im Archiv, Verzeichnis und Name, die Größe und eine
 SHA-256-Prüfsumme, dazu die Prüfsumme des Abbilds als Kennzeichen der Diskette
@@ -646,16 +912,90 @@ for archiv in Path("archive").glob("*.zip"):
             fassungen[f["name"].upper()].add((f["sha256"], archiv.name))
 ```
 
-**Auf der Kommandozeile** — für eine ganze Sammlung, Diskette für Diskette:
+### Archive auf der Kommandozeile
+
+Das C++-Werkzeug `k1520disktool` hat keinen eigenen `archive`-Befehl für Abbilddateien.
+Archive entstehen auf zwei Wegen, beide mit demselben Ergebnis wie *Datei ▸ Archivieren*:
 
 ```sh
+# 1. eine Abbilddatei (.hfe .dmk .img .cqm)
 python3 -m app.disktool.archive abbild.hfe archiv.zip "CP/A Arbeit 7"
+
+# 2. die Diskette im echten Laufwerk (Greaseweazle)
 k1520disktool --physical archive archiv.zip --label "UDOS 4.3 Nr. 7"
 ```
 
-Der zweite Weg archiviert die Diskette im **echten Laufwerk**; `--label` ist dort
-der Aufkleber (ohne ihn gilt der Datenträgername). Ein vorhandenes Archiv wird
-nicht überschrieben — dafür braucht es `--force`.
+Der erste Weg läuft im Quellbaum bzw. mit dem Python der Installation. Beim zweiten ist
+`--label` der Aufkleber (ohne ihn gilt der Datenträgername). **Ein vorhandenes Archiv wird
+nicht überschrieben** — Ausgang 2, es sei denn, man gibt `--force` an.
+
+**Schalter von `python3 -m app.disktool.archive`:**
+
+| Schalter | Wirkung |
+|----------|---------|
+| `abbild archiv.zip [beschriftung]` | Quelle, Ziel, optional der Aufkleber als dritter Wert |
+| `--bezeichnung TEXT` | dasselbe wie die Beschriftung; benennt die Dateien im Archiv |
+| `--ohne-abbild` | kein `.hfe` ins Archiv, nur Dateien und Verzeichnisse |
+| `--text` | Zeilenenden umsetzen (Textauszug) |
+| `--force` | vorhandenes Archiv ersetzen |
+| `--herkunft-datei DATEI` | YAML- oder JSON-Datei mit Herkunftsangaben → `provenance:` |
+| `--herkunft SCHLUESSEL=WERT` | einzelne Angabe, mehrfach möglich, überschreibt die Datei; `hinweise=…` hängt eine Zeile an |
+| `--beilage DATEI[=NAME]` | Beschreibungsdatei an die Wurzel der `.zip`, mehrfach möglich |
+| `--beilage-kodierung K` | Kodierung der Beilagen; Vorgabe `auto` (UTF-8, sonst Latin-1) |
+
+**Herkunft und Beschreibung — ein vollständiges Beispiel.** Die Datei `meta.yaml`:
+
+```yaml
+source_url: http://www.pofo.de/P8000/arch/
+set_name: Ariane
+version: "2.0"
+web_label: ARIANE I 20.12.89
+note: Von der Webseite geladen, CQM-Abbild unverändert.
+```
+
+```sh
+python3 -m app.disktool.archive ariane1.cqm ariane1.zip "ARIANE I" \
+    --herkunft-datei meta.yaml \
+    --herkunft version=2.0b \
+    --beilage ReadMe.txt=beschreibung_ariane.txt
+```
+
+Die Angaben stehen danach im lesbaren Inhaltsverzeichnis und unter `provenance:` in der
+`diskarchive.yaml`; bei einer `.cqm`-Quelle ergänzt das Werkzeug **selbst** `source_container`
+(Kommentar, Bezeichnung, Prüfsumme der `.cqm`), ohne die eigenen Angaben zu überschreiben.
+Die Beilage `beschreibung_ariane.txt` liegt an der Wurzel der `.zip`, nicht unter `dateien/`
+und kommt deshalb nie auf eine Diskette, wenn man den Ordner `dateien/` später mit `put`
+zurückschreibt.
+
+**Regeln, die das Werkzeug prüft** (bei einem Verstoß Ausgang 2, **bevor** die Diskette oder
+das Laufwerk angefasst wird):
+
+* Schlüssel bestehen nur aus Kleinbuchstaben, Ziffern und Unterstrich und beginnen mit einem
+  Buchstaben.
+* Beilagennamen haben keine Pfadanteile und kein `..`, kollidieren nicht mit Namen, die das
+  Archiv selbst vergibt (`diskarchive.yaml`, `<name>.txt`, `<name>.hfe`, `dateien/`) und sind
+  untereinander verschieden (Groß-/Kleinschreibung zählt nicht).
+* Beilagen sind Text bis höchstens 4 MiB; eine Datei mit NUL-Bytes gilt als Binärdatei und wird
+  abgewiesen.
+
+**Eine ganze Sammlung archivieren** — ein Archiv je Abbild, mit einer Schleife:
+
+```sh
+for f in discs/*.cqm; do
+    n=$(basename "$f" .cqm)
+    python3 -m app.disktool.archive "$f" "archive/$n.zip" "$n" \
+        --herkunft quelle=pofo.de --herkunft datei="$n.cqm"
+done
+```
+
+Zur Inventur dient danach die `diskarchive.yaml` jedes Archivs (siehe oben).
+
+**Mehrdisketten-Sätze (tar).** Gehören mehrere Disketten zu *einem* tar-Strom (`ariane1`,
+`ariane2`), sind die Dateien an den Diskettengrenzen abgeschnitten. Vollständig herausholen
+lassen sie sich mit `k1520disktool tar-satz ariane1.cqm ariane2.cqm --to ordner`; ein
+komplettes **Satzarchiv** samt Einzelarchiven je Diskette erzeugt das Skript
+`tools/p8000/pofo_archive.py` (`--quelle`, `--meta`, `--ziel`, `--nur NAME`, `--trocken`).
+Es verwendet dieselben Prüfregeln wie die Kommandozeile.
 
 Angaben des Dateisystems stehen dort bewusst nicht — die führen das
 Inhaltsverzeichnis und die Beiblätter. Der Kopf der Datei erklärt jedes Feld;

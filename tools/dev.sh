@@ -134,7 +134,9 @@ configure_if_needed() {
                # Unter wine kostet jeder Prozessstart ~0,5 s und die Faelle laufen bei
                # -j16 mit ~3000 anderen: die Zeitgrenzen des Linux-Laufs (Faktor 2) reichen
                # dort nicht (FsRecoverCpm.EineGeloeschte...: Timeout nur im Volllauf).
-               -DK1520_TEST_ZEIT_FAKTOR="${K1520_TEST_ZEIT_FAKTOR_WIN:-6}")
+               # 2026-10-18: 6 -> 12; mit ~3400 Faellen laufen die Sertest*-Faelle (Basis 20 s)
+               # im Volllauf sporadisch in die 120 s, einzeln brauchen alle 76 zusammen 26 s.
+               -DK1520_TEST_ZEIT_FAKTOR="${K1520_TEST_ZEIT_FAKTOR_WIN:-12}")
     fi
     # build_oracle/ = eigenes Verzeichnis fuer das MAME-Orakel der U8001-Primitive
     # (laedt MAME-Quellen beim Konfigurieren; build/ bleibt davon unberuehrt).

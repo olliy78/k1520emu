@@ -65,6 +65,17 @@ std::unique_ptr<DiskImage> DiskImage::open(const std::string& path,
             img->binding_writable_ = info.write_allowed;
             break;
         }
+        case ContainerType::Cqm: {
+            // Schreibbar wie ein .img: Autosave/flush() kodieren das Medium neu, soweit es
+            // sich als Sektorstrom darstellen laesst (sonst bleibt die Datei, wie sie
+            // ist, und die Maschine laeuft weiter; Grund in lastError()/saveFailed()).
+            // Die Kopfdaten der Quelle (Kommentar, Etikett, …) bleiben dabei erhalten.
+            CqmCodec::SourceInfo info;
+            ok = CqmCodec::load(path, img->medium_, &info, err);
+            img->cqm_info_         = info;
+            img->binding_writable_ = true;
+            break;
+        }
         default:
             if (!fmt.has_value()) return nullptr;   // .img braucht die Geometrie
             ok = ImageCodec::load(path, ContainerType::Img, &fmt.value(), img->medium_, err);
@@ -89,7 +100,8 @@ std::unique_ptr<DiskImage> DiskImage::createBlank(uint8_t num_cyls, uint8_t num_
 
 std::unique_ptr<DiskImage> DiskImage::create(const std::string& path,
                                              std::optional<DiskFormat> fmt,
-                                             bool write_protect, Encoding enc) {
+                                             bool write_protect, Encoding enc,
+                                             std::string* fehler) {
     if (!fmt.has_value()) return nullptr;
 
     const uint8_t num_cyls  = fmt->numCylinders();
@@ -123,8 +135,10 @@ std::unique_ptr<DiskImage> DiskImage::create(const std::string& path,
     if (img->container_ == ContainerType::Img) img->disk_format_ = fmt;
 
     std::string err;
-    if (!ImageCodec::save(path, img->container_, img->diskFormat(), img->medium_, err))
+    if (!img->speichere(path, img->container_, img->diskFormat(), &img->cqm_info_, err)) {
+        if (fehler) *fehler = err;     // z. B. Grund, warum das Medium nicht als .cqm/.img darstellbar ist
         return nullptr;
+    }
 
     img->medium_.clearDirty();
     img->path_          = path;
@@ -160,6 +174,20 @@ bool DiskImage::writeTrack(uint8_t cyl, uint8_t head, const TrackImage& track) {
 
 // ─── Persistenz ──────────────────────────────────────────────────────────────
 
+bool DiskImage::speichere(const std::string& path, ContainerType ziel, const DiskFormat* fmt,
+                          std::optional<CqmCodec::SourceInfo>* info_neu, std::string& err) const {
+    if (ziel != ContainerType::Cqm)
+        return ImageCodec::save(path, ziel, fmt, medium_, err);
+    // CopyQM: die Kopfdaten der Quelle (falls es eine gab) mitgeben und die der neuen
+    // Datei zurueckmelden — der Kommentar muss ein Umspeichern ueberleben.
+    CqmCodec::SourceInfo neu;
+    if (!CqmCodec::save(path, medium_, cqm_info_.has_value() ? &cqm_info_.value() : nullptr,
+                        &neu, err))
+        return false;
+    if (info_neu) *info_neu = std::move(neu);
+    return true;
+}
+
 bool DiskImage::flush() {
     // Physische Diskette: „speichern" heisst, auf die Rueckfuehrung zu warten — und
     // die gilt erst als geglueckt, wenn jede Spur zurueckGELESEN wurde (§7.1).  Der
@@ -181,10 +209,13 @@ bool DiskImage::flush() {
     }
 
     std::string err;
-    if (!ImageCodec::save(path_, container_, diskFormat(), medium_, err)) {
+    if (!speichere(path_, container_, diskFormat(), &cqm_info_, err)) {
         last_error_ = err;
+        save_failed_ = true;
+        failed_revision_ = medium_.revision();
         return false;
     }
+    save_failed_ = false;
     medium_.clearDirty();
     dirty_since_ = 0;
     return true;
@@ -193,6 +224,10 @@ bool DiskImage::flush() {
 bool DiskImage::autoFlush(uint64_t now_cycles) {
     if (!hasFile() || !binding_writable_) return false;
     if (!medium_.dirty()) { dirty_since_ = 0; return false; }
+    // Ein Speichern, das an der Darstellbarkeit scheiterte, wird erst nach der naechsten
+    // Aenderung wieder versucht (der Grund bleibt in lastError()); ein ausdrueckliches
+    // flush() versucht es immer.
+    if (save_failed_ && medium_.revision() == failed_revision_) return false;
 
     // Auf eine SCHREIBPAUSE warten, nicht bloss auf Ablauf einer Frist: solange das
     // Gastsystem weiterschreibt (FORMAT/COPY fassen hunderte Spuren an), steigt die
@@ -210,6 +245,11 @@ bool DiskImage::autoFlush(uint64_t now_cycles) {
 }
 
 bool DiskImage::exportTo(const std::string& path, std::optional<DiskFormat> fmt) {
+    return exportImpl(path, fmt, nullptr);
+}
+
+bool DiskImage::exportImpl(const std::string& path, std::optional<DiskFormat> fmt,
+                           std::optional<CqmCodec::SourceInfo>* info_neu) {
     const ContainerType ziel = ImageCodec::fromExtension(path);
 
     // Eine Abbilddatei ist eine Aussage ueber die GANZE Diskette.  Bei einer physischen
@@ -242,8 +282,7 @@ bool DiskImage::exportTo(const std::string& path, std::optional<DiskFormat> fmt)
     }
 
     std::string err;
-    if (!ImageCodec::save(path, ziel, fmt.has_value() ? &fmt.value() : nullptr,
-                          medium_, err)) {
+    if (!speichere(path, ziel, fmt.has_value() ? &fmt.value() : nullptr, info_neu, err)) {
         last_error_ = err;
         return false;
     }
@@ -252,13 +291,16 @@ bool DiskImage::exportTo(const std::string& path, std::optional<DiskFormat> fmt)
 }
 
 bool DiskImage::saveAs(const std::string& path, std::optional<DiskFormat> fmt) {
-    if (!exportTo(path, fmt)) return false;
+    std::optional<CqmCodec::SourceInfo> info_neu;
+    if (!exportImpl(path, fmt, &info_neu)) return false;
 
     // Ab jetzt zeigt die Bindung auf die neue Datei — Autosave folgt dorthin.
     path_             = path;
     container_        = ImageCodec::fromExtension(path);
     disk_format_      = (container_ == ContainerType::Img) ? fmt : std::nullopt;
     binding_writable_ = true;
+    cqm_info_         = std::move(info_neu);   // nur bei .cqm gesetzt
+    save_failed_      = false;
     medium_.clearDirty();
     dirty_since_      = 0;
     return true;
