@@ -1,5 +1,5 @@
 # boot_trace --machine k8915 (§8a AP-E4d): ohne Diskette und ohne CR bleibt der Lader
-# an der Coldstart-Meldung stehen — Abbruch als Stillstand, Exit 1.
+# an der Coldstart-Meldung stehen - Abbruch als Stillstand, Exit 1.
 tool:    boot_trace
 disk:    k8915scpx_boot1.hfe
 run:     --machine k8915 --skip-selftest --no-cr --stall 5000000 --quiet --json %DISK%

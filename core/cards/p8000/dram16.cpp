@@ -27,14 +27,14 @@ std::string P8000Dram16::Karte::text() const {
 
 std::string P8000Dram16::pruefe(const Config& cfg) {
     if (cfg.karten.size() > size_t(MAX_KARTEN))
-        return "hoechstens " + std::to_string(MAX_KARTEN) + " DRAM-Karten (Speicherbus X10–X13)";
+        return "hoechstens " + std::to_string(MAX_KARTEN) + " DRAM-Karten (Speicherbus X10-X13)";
     for (size_t i = 0; i < cfg.karten.size(); ++i) {
         const Karte& k = cfg.karten[i];
         if (uint8_t(k.typ) > uint8_t(Karte::Typ::R16)) return "unbekannter DRAM-Kartentyp";
         const int max = k.ramKarte() ? 0 : k.typ == Karte::Typ::M1 ? 15 : 63;
         if (k.modul > max)
             return k.ramKarte() ? std::string("die RAM-Karte 16 MB hat keine Moduladresse (liegt immer ab 0)")
-                                : "Moduladresse " + std::to_string(k.modul) + " ausserhalb 0…" + std::to_string(max);
+                                : "Moduladresse " + std::to_string(k.modul) + " ausserhalb 0..." + std::to_string(max);
         for (size_t j = 0; j < i; ++j) {
             const Karte& o = cfg.karten[j];
             const uint64_t a0 = k.basis(), a1 = a0 + k.groesse(), b0 = o.basis(), b1 = b0 + o.groesse();
@@ -76,9 +76,9 @@ const char* typName(KTyp t) {
 
 std::string P8000Dram16::parse(const std::string& text, std::vector<Karte>& karten) {
     std::string v = gross(text);
-    for (size_t p; (p = v.find("\xC3\x97")) != std::string::npos;) v.replace(p, 2, "X");   // „×"
+    for (size_t p; (p = v.find("\xC3\x97")) != std::string::npos;) v.replace(p, 2, "X");   // 'x"
     static const std::string hilfe =
-        " (Langform 1M@n | 256K@n | 16M@0 …, mit '+' verbunden; Kurzform 4x256K | 4x1M | 2M | 4M | 8M | 16M)";
+        " (Langform 1M@n | 256K@n | 16M@0 ..., mit '+' verbunden; Kurzform 4x256K | 4x1M | 2M | 4M | 8M | 16M)";
     if (v.empty()) return "dram leer" + hilfe;
     std::vector<Karte> neu;
     const size_t x = v.find('X');
@@ -108,8 +108,8 @@ std::string P8000Dram16::parse(const std::string& text, std::vector<Karte>& kart
             const int max = k.ramKarte() ? 0 : k.typ == Karte::Typ::M1 ? 15 : 63;
             if (!zahl(s.substr(at + 1), max, m))
                 return "dram-Moduladresse in '" + s + "' ungueltig" +
-                       (k.ramKarte() ? std::string(" (RAM-Karte 16 MB nur @0 — sie hat keine Moduladresse)")
-                                     : " (0–" + std::to_string(max) + ")");
+                       (k.ramKarte() ? std::string(" (RAM-Karte 16 MB nur @0 - sie hat keine Moduladresse)")
+                                     : " (0-" + std::to_string(max) + ")");
             k.modul = uint8_t(m);
             neu.push_back(k);
         }

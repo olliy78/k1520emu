@@ -111,7 +111,7 @@ bool Laufwerke::createDisk(int drive, const std::string& path,
             && (ImageCodec::fromExtension(path) == ContainerType::Img
                 || ImageCodec::fromExtension(path) == ContainerType::Cqm)) {
             last_error_ = "Eine leere Diskette kann nicht als rohes Sektorimage (.img) "
-                          "oder CopyQM-Abbild (.cqm) angelegt werden — bitte .hfe oder "
+                          "oder CopyQM-Abbild (.cqm) angelegt werden - bitte .hfe oder "
                           ".dmk waehlen (oder ein Diskettenformat angeben, um "
                           "vorformatiert anzulegen).";
             return false;

@@ -1,4 +1,4 @@
-# `lst quelle.mac@auto` bestimmt den Ladeversatz selbst — und lehnt ihn ab,
+# `lst quelle.mac@auto` bestimmt den Ladeversatz selbst - und lehnt ihn ab,
 # wenn die Passung zu unsicher ist.
 tool:   k1520dbg
 disk:   cpa_cpa780_k5601_clock.img

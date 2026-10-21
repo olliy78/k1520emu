@@ -107,7 +107,7 @@ K2526::K2526(K1520Bus& bus, const A5120Config& cfg)
     bs_pio_.setPortAOutputCallback([this](uint8_t data) {
         memdi12_ = (data >> 7) & 1;
         if (memdi12_cb_) memdi12_cb_(memdi12_);
-        LOG_DEBUG("K2526", "BS-PIO PortA out=0x%02X → MEMDI1/2=%d", data, (int)memdi12_);
+        LOG_DEBUG("K2526", "BS-PIO PortA out=0x%02X -> MEMDI1/2=%d", data, (int)memdi12_);
     });
 
     // ── BS-PIO Port-B-Ausgangs-Callback: alle Ausgangsbits dekodieren ────────
@@ -434,7 +434,7 @@ void K2526::onBSPIOPortBOut(uint8_t data)
     // B4=0 (active low): OS fordert Systemabschaltung an.
     if (!(data & 0x10) && !shutdown_req_) {
         shutdown_req_ = true;
-        LOG_WARN("K2526", "BS-PIO B4=/SA aktiv (0x%02X) – Netzausschaltung!", data);
+        LOG_WARN("K2526", "BS-PIO B4=/SA aktiv (0x%02X) - Netzausschaltung!", data);
     }
 }
 
@@ -538,7 +538,7 @@ void K2526::setIEI(bool iei)
     iei_in_ = iei;
     ctc_.setIEI(iei);
     bs_pio_.setIEI(ctc_.getIEO());
-    LOG_TRACE("K2526", "setIEI(%d): CTC.IEI=%d → BS-PIO.IEI=%d",
+    LOG_TRACE("K2526", "setIEI(%d): CTC.IEI=%d -> BS-PIO.IEI=%d",
               (int)iei, (int)iei, (int)ctc_.getIEO());
 }
 

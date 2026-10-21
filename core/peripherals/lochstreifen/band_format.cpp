@@ -238,7 +238,7 @@ std::optional<std::vector<uint8_t>> artLesen(const std::vector<uint8_t>& inhalt,
         while (a < s.size() && leer(s[a])) ++a;
         if (a == s.size() || s[a] == ';') continue;               // leer oder Kommentar
         if (s[a] != '|') {
-            fehler = zeileFehler(nr, "weder Kommentar (;) noch Lochbild (|…|)");
+            fehler = zeileFehler(nr, "weder Kommentar (;) noch Lochbild (|...|)");
             return std::nullopt;
         }
         const std::size_t e = s.find('|', a + 1);

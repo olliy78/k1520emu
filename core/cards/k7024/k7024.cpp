@@ -26,12 +26,12 @@
  */
 
 #include "core/cards/k7024/k7024.h"
-#include "core/cards/k7024/chargen_zg1.h"      // obere Zeilen 0–7  (EPROM A103 / v171, A5120)
-#include "core/cards/k7024/chargen_zg2.h"      // untere Zeilen 8–11 (EPROM A123 / v172, A5120)
-#include "core/cards/k7024/chargen_k8915_zg1.h" // obere Zeilen 0–7  (EPROM Y411, K8915 012-6820)
-#include "core/cards/k7024/chargen_k8915_zg2.h" // untere Zeilen 8–11 (EPROM Y412, K8915 012-6820)
-#include "core/cards/k7024/chargen_prg710_zg1.h" // obere Zeilen 0–7  (EPROM A103, PRG 710/710-1)
-#include "core/cards/k7024/chargen_prg710_zg2.h" // untere Zeilen 8–11 (EPROM A123, PRG 710/710-1)
+#include "core/cards/k7024/chargen_zg1.h"      // obere Zeilen 0-7  (EPROM A103 / v171, A5120)
+#include "core/cards/k7024/chargen_zg2.h"      // untere Zeilen 8-11 (EPROM A123 / v172, A5120)
+#include "core/cards/k7024/chargen_k8915_zg1.h" // obere Zeilen 0-7  (EPROM Y411, K8915 012-6820)
+#include "core/cards/k7024/chargen_k8915_zg2.h" // untere Zeilen 8-11 (EPROM Y412, K8915 012-6820)
+#include "core/cards/k7024/chargen_prg710_zg1.h" // obere Zeilen 0-7  (EPROM A103, PRG 710/710-1)
+#include "core/cards/k7024/chargen_prg710_zg2.h" // untere Zeilen 8-11 (EPROM A123, PRG 710/710-1)
 #include <algorithm>
 #include <cstring>
 

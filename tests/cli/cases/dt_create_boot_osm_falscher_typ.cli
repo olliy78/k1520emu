@@ -1,5 +1,5 @@
 # Ein OS/M-Urlader fuer Typ 7 (800K) auf einer 640K-Diskette luede das System mit falscher
-# Spurlaenge — `create` weist das Bootabbild VOR dem Anlegen ab.
+# Spurlaenge - `create` weist das Bootabbild VOR dem Anlegen ab.
 tool:   k1520disktool
 tmpfile neu.img:
 file boot.bin:

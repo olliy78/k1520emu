@@ -1,4 +1,4 @@
-# Beidseitige Diskette, Quellordner ohne Side1/ → Fehler MIT Nennung des Fehlenden,
+# Beidseitige Diskette, Quellordner ohne Side1/ -> Fehler MIT Nennung des Fehlenden,
 # und die Diskette bleibt unveraendert (§9.1).  Exit 4 = Ordnerstruktur.
 tool:   k1520disktool
 disk:   udos_boot_scp.hfe

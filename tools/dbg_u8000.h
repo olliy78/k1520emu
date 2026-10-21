@@ -390,7 +390,7 @@ inline std::vector<std::string> diffEm(const EmSnap& a, const EmSnap& b, int max
     std::string regs;
     auto reg = [&](const char* n, unsigned va, unsigned vb, int w) {
         if (va == vb) return;
-        std::snprintf(buf, sizeof buf, " %s %0*X→%0*X", n, w, va, w, vb);
+        std::snprintf(buf, sizeof buf, " %s %0*X->%0*X", n, w, va, w, vb);
         regs += buf;
     };
     for (int i = 0; i < 16; ++i) { char n[8]; std::snprintf(n, sizeof n, "R%d", i); reg(n, a.r[i], b.r[i], 4); }
@@ -398,11 +398,11 @@ inline std::vector<std::string> diffEm(const EmSnap& a, const EmSnap& b, int max
     reg("FCW", a.fcw, b.fcw, 4); reg("PCSEG", a.pcSeg, b.pcSeg, 2); reg("PC", a.pc, b.pc, 4);
     reg("PSAPSEG", a.psapSeg, b.psapSeg, 4); reg("PSAP", a.psapOff, b.psapOff, 4);
     if (!regs.empty()) out.push_back("U8001:" + regs);
-    if (a.state != b.state) out.push_back("U8001: Zustand " + a.state + "→" + b.state);
+    if (a.state != b.state) out.push_back("U8001: Zustand " + a.state + "->" + b.state);
     std::string k;
     auto kv = [&](const char* n, unsigned va, unsigned vb) {
         if (va == vb) return;
-        std::snprintf(buf, sizeof buf, " %s %X→%X", n, va, vb);
+        std::snprintf(buf, sizeof buf, " %s %X->%X", n, va, vb);
         k += buf;
     };
     kv("A33", a.a33, b.a33); kv("A34", a.a34, b.a34); kv("A35", a.a35, b.a35); kv("A36", a.a36, b.a36);
@@ -415,13 +415,13 @@ inline std::vector<std::string> diffEm(const EmSnap& a, const EmSnap& b, int max
     if (!k.empty()) out.push_back("EM:" + k);
     std::string at;
     for (int p = 0; p < 16; ++p)
-        if (a.attr[p] != b.attr[p]) { std::snprintf(buf, sizeof buf, " %X:%X→%X", p, a.attr[p], b.attr[p]); at += buf; }
+        if (a.attr[p] != b.attr[p]) { std::snprintf(buf, sizeof buf, " %X:%X->%X", p, a.attr[p], b.attr[p]); at += buf; }
     if (!at.empty()) out.push_back("A22:" + at);
     for (int t = 0; t < 2; ++t) {
         static const char* const nm[6] = {"mode", "out", "in", "dir", "vec", "int"};
         std::string ps;
         for (int f = 0; f < 6; ++f)
-            if (a.pio[t][f] != b.pio[t][f]) { std::snprintf(buf, sizeof buf, " %s %02X→%02X", nm[f], a.pio[t][f], b.pio[t][f]); ps += buf; }
+            if (a.pio[t][f] != b.pio[t][f]) { std::snprintf(buf, sizeof buf, " %s %02X->%02X", nm[f], a.pio[t][f], b.pio[t][f]); ps += buf; }
         if (!ps.empty()) out.push_back(std::string("PIO-A32 ") + (t ? "B:" : "A:") + ps);
     }
     const size_t n = std::min(a.dram.size(), b.dram.size());
@@ -438,7 +438,7 @@ inline std::vector<std::string> diffEm(const EmSnap& a, const EmSnap& b, int max
         }
     }
     if (changed) {
-        std::snprintf(buf, sizeof buf, "→ %ld EM-DRAM-Byte(s) in %d Bereich(en)%s", changed, runs,
+        std::snprintf(buf, sizeof buf, "-> %ld EM-DRAM-Byte(s) in %d Bereich(en)%s", changed, runs,
                       runs > maxRanges ? "  (nur die ersten gelistet)" : "");
         out.push_back(buf);
     }
@@ -473,8 +473,8 @@ inline std::string pinsText(const Z8000& z) {
     pin("SEGT", z.segtLine());
     pin("VI", z.viLine());
     pin("NVI", z.nviLine());
-    pin("µI", z.miLine());
-    pin("µ0", z.moActive());
+    pin("uI", z.miLine());
+    pin("u0", z.moActive());
     pin("STOP", z.stopLine());
     pin("BUSREQ", z.busReqLine());
     pin("BUSAK", z.busAck());

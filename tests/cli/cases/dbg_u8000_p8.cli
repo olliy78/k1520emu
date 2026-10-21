@@ -1,5 +1,5 @@
 # AP P8: neue Kommandos des U8001-Kontexts (btrap, trap, status) und die Pins-/Buszeile
-# in `r`/`rj` — Dispatch am stehenden U8001 (RESET16); am laufenden: dbg_u8000_em16abl.
+# in `r`/`rj` - Dispatch am stehenden U8001 (RESET16); am laufenden: dbg_u8000_em16abl.
 tool:    k1520dbg
 run:     --em em256 -x %CLI_DIR%/scripts/u8000_p8.dbg
 timeout: 120

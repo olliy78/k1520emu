@@ -111,7 +111,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    std::printf("OK: %s (%d Spuren; %s %d×%dB Sys Sp.0-%d, %s %d×%dB Daten Sp.%d-%d)\n",
+    std::printf("OK: %s (%d Spuren; %s %dx%dB Sys Sp.0-%d, %s %dx%dB Daten Sp.%d-%d)\n",
                 out.c_str(), num_cyls,
                 sys_fm ? "FM" : "MFM", sys_nsec, sys_size, sys_cyls - 1,
                 data_fm ? "FM" : "MFM", data_nsec, data_size, sys_cyls, num_cyls - 1);

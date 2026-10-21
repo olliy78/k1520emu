@@ -1648,7 +1648,7 @@ int k1520_k3521_basis(K1520Handle h) {
 
 bool k1520_k3521_datei(K1520Handle h, const char* pfad) {
     K3521* k = (h && pfad && pfad[0]) ? k3521Karte(h) : nullptr;
-    if (!k) { g_init_error = "keine K3521 gesteckt (k3521=… im Konfigurationstext)"; return false; }
+    if (!k) { g_init_error = "keine K3521 gesteckt (k3521=... im Konfigurationstext)"; return false; }
     g_init_error.clear();
     return k->dateiBinden(pfad, g_init_error);
 }

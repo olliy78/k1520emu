@@ -1,6 +1,6 @@
 # Zaehlen ist nicht dasselbe wie auswaehlen: es gibt EINE moegliche Reparatur,
 # ausgefuehrt wuerde ohne `=alle` aber keine.  Die Fusszeile muss beides
-# auseinanderhalten — sonst liest man „0 Reparatur(en)" ueber einer Zeile, die
+# auseinanderhalten - sonst liest man '0 Reparatur(en)" ueber einer Zeile, die
 # eine anbietet.
 tool:   k1520disktool
 disk:   cpa_cpa780_k5601_noclock.img

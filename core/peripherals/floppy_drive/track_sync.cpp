@@ -687,7 +687,7 @@ void TrackSync::verifyAbschliessen(Eintrag& e, uint8_t cyl, uint8_t head,
         // Noch ein Versuch — sofort faellig, der Kopf steht ohnehin dort.
         e.dirty_pending = spec_.writable;
         e.dirty_since   = Uhr::now() - std::chrono::hours(1);
-        letzter_fehler_ = wo + " kam falsch zurueck (" + grund + ") — neuer Versuch";
+        letzter_fehler_ = wo + " kam falsch zurueck (" + grund + ") - neuer Versuch";
         cv_arbeit_.notify_all();
         return;
     }

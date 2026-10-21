@@ -976,7 +976,7 @@ void K5122::startReadTransfer() {
         stream_has_marks_ = false;   // kein MKE → keine DMA-Anforderung (§5.6.1)
         write_mode_       = false;
         locked_           = false;
-        LOG_INFO("K5122", ">>> READ D%d C=%u H=%u UNFORMATIERT → %zu B Gap-Flux (%s, Index-Timeout)",
+        LOG_INFO("K5122", ">>> READ D%d C=%u H=%u UNFORMATIERT -> %zu B Gap-Flux (%s, Index-Timeout)",
                  selected_drive_, static_cast<unsigned>(drv.currentCylinder()),
                  static_cast<unsigned>(current_head_), read_stream_track_.size(),
                  eff_enc == Encoding::FM ? "FM" : "MFM");
@@ -1026,7 +1026,7 @@ void K5122::startReadTransfer() {
     for (const auto& s : sektoren)
         if (!s.id_crc_ok || !s.data_crc_ok) ++crc_bad;
 
-    LOG_INFO("K5122", ">>> READ D%d C=%u H=%u Spur=%zu Bytes (%s%s) — %zu Sekt, %d CRC-Fehler",
+    LOG_INFO("K5122", ">>> READ D%d C=%u H=%u Spur=%zu Bytes (%s%s) - %zu Sekt, %d CRC-Fehler",
              selected_drive_,
              static_cast<unsigned>(drv.currentCylinder()),
              static_cast<unsigned>(current_head_),
@@ -1076,14 +1076,14 @@ void K5122::resyncToNextMark() {
         if (effReadEnc() == Encoding::MFM && m != SIZE_MAX
             && (m + sz - head_pos_ % sz) % sz < backoff) {
             LOG_DEBUG("K5122", "resync: Sync-Gruppe der Marke @%zu schon unter dem Kopf "
-                      "(pos=%zu) — verpasst, naechste Marke", m, head_pos_);
+                      "(pos=%zu) - verpasst, naechste Marke", m, head_pos_);
             t = TrackCodec::romReadResyncTarget(*cur_track_, (m + 1) % sz, effReadEnc());
         }
     }
     if (t != SIZE_MAX) {
         head_pos_ = t;
         locked_   = true;
-        LOG_TRACE("K5122", "resync → pos=%zu (0x%02X)", t, cur_track_->bytes[t]);
+        LOG_TRACE("K5122", "resync -> pos=%zu (0x%02X)", t, cur_track_->bytes[t]);
     }
 }
 
@@ -1286,7 +1286,7 @@ void K5122::commitFormatTrack() {
         // Spur codierungstreu → der anschliessende Verify-Read (FM-Steuerwort) findet sie.
         TrackImage trk = TrackCodec::buildTrack(sektoren, fmt_enc);
         bool ok = drives_[selected_drive_].writeTrackAt(fmt_cyl_, fmt_head_, trk);
-        LOG_INFO("K5122", ">>> FORMAT-WRITE D%d C=%u H=%u: %zu Sektoren à %uB %s %s",
+        LOG_INFO("K5122", ">>> FORMAT-WRITE D%d C=%u H=%u: %zu Sektoren a %uB %s %s",
                  selected_drive_, static_cast<unsigned>(fmt_cyl_),
                  static_cast<unsigned>(fmt_head_), sektoren.size(),
                  sektoren.empty() ? 0u : sektoren.front().size,

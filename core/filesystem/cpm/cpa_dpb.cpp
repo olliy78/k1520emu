@@ -224,7 +224,7 @@ bool CpaDpbRule::derive(const DiskFormat& fmt, const SectorSpace& space,
         ++out.sys_tracks;
     if (out.sys_tracks >= space.trackCount())
         return fehler("Datenbereich beginnt nicht auf einer "
-                    + std::to_string(daten.sectors) + "×"
+                    + std::to_string(daten.sectors) + "x"
                     + std::to_string(daten.sector_size) + "-Spur");
 
     // `selddr`: eine Diskette MIT Systemspuren bekommt hoechstens 128 Eintraege —
@@ -250,7 +250,7 @@ bool CpaDpbRule::profile(const DiskFormat& fmt, const SectorSpace& space,
 
     out             = FsProfile{};
     out.name        = kName;
-    out.description = "nach der CP/A-Regel abgeleitet — " + describe(d);
+    out.description = "nach der CP/A-Regel abgeleitet - " + describe(d);
     out.format      = fmt.name;
     out.type        = FsType::Cpm;
     out.data_cyl    = d.data_cyl;

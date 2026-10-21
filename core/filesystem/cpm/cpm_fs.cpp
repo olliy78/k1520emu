@@ -87,8 +87,8 @@ std::unique_ptr<CpmFileSystem> CpmFileSystem::mount(SectorSpace& space,
         if (t.sectors != fs->secs_per_track_ || t.sector_size != fs->sector_size_) {
             err = "Datenbereich ist nicht einheitlich: Spur c" + std::to_string(t.cyl)
                 + "h" + std::to_string(t.head) + " hat " + std::to_string(t.sectors)
-                + "×" + std::to_string(t.sector_size) + ", erwartet "
-                + std::to_string(fs->secs_per_track_) + "×"
+                + "x" + std::to_string(t.sector_size) + ", erwartet "
+                + std::to_string(fs->secs_per_track_) + "x"
                 + std::to_string(fs->sector_size_);
             return nullptr;
         }
@@ -292,7 +292,7 @@ bool CpmFileSystem::writeBootSlots(const std::vector<uint8_t>& img) {
     for (int i : ziele) {
         const uint8_t* a = alt.data() + static_cast<size_t>(i) * 32;
         if (a[0] != 0xE5 && !bootPlatz(i, a))
-            return fail("Verzeichnisplatz " + std::to_string(i) + " traegt einen Dateieintrag — "
+            return fail("Verzeichnisplatz " + std::to_string(i) + " traegt einen Dateieintrag - "
                         "der Bootbereich wuerde ihn ueberschreiben");
     }
     for (int i : ziele)
@@ -625,7 +625,7 @@ bool CpmFileSystem::write(const std::string& name, const std::vector<uint8_t>& d
         if (!d.free() && d.user == ziel_user && upper(d.name) == ziel_name) vorhanden = true;
     if (vorhanden) {
         if (!opt.overwrite)
-            return fail("'" + name + "' existiert bereits — Ueberschreiben nicht erlaubt");
+            return fail("'" + name + "' existiert bereits - Ueberschreiben nicht erlaubt");
         if (!erase(ziel_user == 0 ? ziel_name : std::to_string(ziel_user) + ":" + ziel_name))
             return false;
     }
@@ -826,7 +826,7 @@ FsInfo CpmFileSystem::info() const {
     }
     if (wild)
         i.warnings.push_back(std::to_string(wild) + " Blockzeiger zeigen hinter den "
-                             "Datenbereich — vermutlich das falsche Dateisystemprofil");
+                             "Datenbereich - vermutlich das falsche Dateisystemprofil");
     return i;
 }
 

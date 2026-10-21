@@ -1,5 +1,5 @@
-# K8915 (§8a AP-E4d, Waechter „Haltepunkt 0406H nach Strg+C trifft"): Kaltstart ohne
-# Selbsttest bis zum Prompt, dann ^C — das BIOS ruft den ROM-Lader bei 0406H, der
+# K8915 (§8a AP-E4d, Waechter 'Haltepunkt 0406H nach Strg+C trifft"): Kaltstart ohne
+# Selbsttest bis zum Prompt, dann ^C - das BIOS ruft den ROM-Lader bei 0406H, der
 # CCP+BDOS nachlaedt.  Der Haltepunkt greift VOR dem Befehl, A8H steht auf 06H (ROM an),
 # und die Annotation kommt aus dem ROM-Listing, weil dessen Bytes dort stehen.
 tool:    k1520dbg

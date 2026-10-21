@@ -1,4 +1,4 @@
-# Der Dateisystemkatalog maschinenlesbar — fuer Skripte und die Oberflaeche.
+# Der Dateisystemkatalog maschinenlesbar - fuer Skripte und die Oberflaeche.
 tool:   k1520disktool
 disk_path: /dev/null
 run:    formats --json

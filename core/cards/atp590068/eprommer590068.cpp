@@ -43,7 +43,7 @@ const char* Eprommer590068::name(Typ t)
     switch (t) {
         case Typ::U555:  return "U555";
         case Typ::U2716: return "U2716";
-        default:         return "—";
+        default:         return "-";
     }
 }
 
@@ -190,7 +190,7 @@ void Eprommer590068::impulsEnde()
     if (!spannung) {
         if (!brenn_gewarnt_) {
             brenn_gewarnt_ = true;
-            log("Impuls ohne Versorgung/Programmierspannung — ohne Wirkung");
+            log("Impuls ohne Versorgung/Programmierspannung - ohne Wirkung");
         }
         return;
     }
@@ -206,7 +206,7 @@ void Eprommer590068::impulsEnde()
         if (!brenn_gewarnt_) {
             brenn_gewarnt_ = true;
             log(std::string("Brennen mit falschem Typ: eingestellt ") + name(eingestellt)
-                + ", gesteckt " + name(typ_) + " — ohne Wirkung [?]");
+                + ", gesteckt " + name(typ_) + " - ohne Wirkung [?]");
         }
         return;
     }
@@ -216,7 +216,7 @@ void Eprommer590068::impulsEnde()
     if (!passt && !breite_gewarnt_) {
         breite_gewarnt_ = true;
         log("Hinweis: Impulsbreite " + ms1(d) + " ausserhalb des Datenblatts ("
-            + (typ_ == Typ::U555 ? "0,1–1 ms" : "45–55 ms") + "), gebrannt wird trotzdem");
+            + (typ_ == Typ::U555 ? "0,1-1 ms" : "45-55 ms") + "), gebrannt wird trotzdem");
     }
     const uint16_t a = uint16_t(adresseLocked() & (groesse(typ_) - 1));
     if (a < impulse_je_adresse_.size() && impulse_je_adresse_[a] < 0xFFFF) ++impulse_je_adresse_[a];
@@ -243,9 +243,9 @@ void Eprommer590068::brennphaseEnde()
     std::string t = "Programmierphase: " + std::to_string(brenn_n_) + " Impulse ("
                   + std::to_string(brenn_wirksam_) + " wirksam) an " + std::to_string(adressen)
                   + " Adressen";
-    if (adressen) t += ", je Adresse " + std::to_string(jmin) + (jmin == jmax ? "" : "–" + std::to_string(jmax));
+    if (adressen) t += ", je Adresse " + std::to_string(jmin) + (jmin == jmax ? "" : "-" + std::to_string(jmax));
     t += ", Impuls " + ms1(ms(brenn_min_));
-    if (brenn_max_ != brenn_min_) t += "–" + ms1(ms(brenn_max_));
+    if (brenn_max_ != brenn_min_) t += "-" + ms1(ms(brenn_max_));
     t += ", " + std::to_string(geaendert) + " Byte geaendert";
     log(t);
 }
@@ -253,7 +253,7 @@ void Eprommer590068::brennphaseEnde()
 void Eprommer590068::lesephaseEnde()
 {
     if (lese_n_ == 0) return;
-    log("Gelesen: " + std::to_string(lese_n_) + " Zugriffe, Adressen " + hex(lese_min_, 3) + "–"
+    log("Gelesen: " + std::to_string(lese_n_) + " Zugriffe, Adressen " + hex(lese_min_, 3) + "-"
         + hex(lese_max_, 3));
     lese_n_ = 0;
 }
@@ -282,7 +282,7 @@ bool Eprommer590068::einlegen(const std::vector<uint8_t>& daten, Typ typ, const 
     }
     log(std::string("Sockel: ") + name(typ) + " eingelegt"
         + (datei.empty() ? std::string(" (leer)") : " (" + datei + ")")
-        + (d4_ & (BIT_VERS | BIT_VPP) ? " — bei anliegender Spannung" : ""));
+        + (d4_ & (BIT_VERS | BIT_VPP) ? " - bei anliegender Spannung" : ""));
     return true;
 }
 

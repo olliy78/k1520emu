@@ -1,4 +1,4 @@
-# Eine einzeln angegebene Angabendatei ist fast sicher ein Versehen — jemand hat
+# Eine einzeln angegebene Angabendatei ist fast sicher ein Versehen - jemand hat
 # die falsche der beiden gleichnamigen Zeilen erwischt (§2.5).  Verweigerung MIT
 # Ausweg; mit --force geht es durch (es gibt einen zulaessigen Grund dafuer).
 tool:   k1520disktool

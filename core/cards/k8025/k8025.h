@@ -377,10 +377,10 @@ private:
     friend class Anschluss;
 
     A5120Config    cfg_;                              ///< Hardware configuration
-    Z80SIO         sio_dfue_        {"K8025-SIO-A33"}; ///< DFUE SIO (ports 0x50–0x53)
-    Z80SIO         sio_kbd_printer_ {"K8025-SIO-A32"}; ///< Keyboard/printer SIO (ports 0x5C–0x5F)
-    Z80CTC         ctc_a34_         {"K8025-CTC-A34"}; ///< Baud-rate CTC (ports 0x58–0x5B)
-    Z80PIO         pio_a31_         {"K8025-PIO-A31"}; ///< DIL-switch PIO (ports 0x54–0x57)
+    Z80SIO         sio_dfue_        {"K8025-SIO-A33"}; ///< DFUE SIO (ports 0x50-0x53)
+    Z80SIO         sio_kbd_printer_ {"K8025-SIO-A32"}; ///< Keyboard/printer SIO (ports 0x5C-0x5F)
+    Z80CTC         ctc_a34_         {"K8025-CTC-A34"}; ///< Baud-rate CTC (ports 0x58-0x5B)
+    Z80PIO         pio_a31_         {"K8025-PIO-A31"}; ///< DIL-switch PIO (ports 0x54-0x57)
     bool           iei_in_  = false;                   ///< Last IEI from upstream chain
     Z80CTC::PeriodenQuelle zre_takt_;                  ///< ZRE-CTC K0 (W1:7, X7–X8)
     bool           seriell_geaendert_ = false;

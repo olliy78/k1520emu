@@ -1,4 +1,4 @@
-# Ohne -l gibt `ls` NUR die Namen aus — je Zeile einen, bei mehreren Seiten mit
+# Ohne -l gibt `ls` NUR die Namen aus - je Zeile einen, bei mehreren Seiten mit
 # ihrem Praefix, sodass die Ausgabe als Argument wieder brauchbar ist.  Kopf- und
 # Fusszeile gehen dabei nach stderr (hier zusammengefasst geprueft).
 tool:   k1520disktool

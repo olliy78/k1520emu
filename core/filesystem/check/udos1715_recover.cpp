@@ -51,7 +51,7 @@ constexpr size_t kFirstbl = 0x80;
 constexpr const char* kWegZurueck =
     "NDOS fuehrt den Dateinamen nur im Verzeichnis; er ist beim Loeschen"
     " verlorengegangen. Der Fund laesst sich herausholen, benennen und mit `put`"
-    " wieder einspielen — Typ, Eigenschaften und Segmente bringt das Beiblatt"
+    " wieder einspielen - Typ, Eigenschaften und Segmente bringt das Beiblatt"
     " udos-dateiangaben.txt mit.";
 
 std::string ort(UdosPointer p) {
@@ -145,7 +145,7 @@ FsRecoverReport Udos1715FileSystem::recoverScan(FsRecoverLevel level, bool nachl
     };
 
     bericht.schritt("udos.suche.lebend",
-                    "Lebende Dateien einlesen — ihre Sektoren sind tabu");
+                    "Lebende Dateien einlesen - ihre Sektoren sind tabu");
     // ── 1. Was LEBT? ─────────────────────────────────────────────────────────
     if (!brauche(prof_.directory_track)) { abschluss(); return bericht; }
     brauche(prof_.bitmap_track);
@@ -179,7 +179,7 @@ FsRecoverReport Udos1715FileSystem::recoverScan(FsRecoverLevel level, bool nachl
 
     // ── 2. Namensreste im Verzeichnis (§13, Kasten) ──────────────────────────
     bericht.schritt("udos.suche.namensreste",
-                    "Namensreste im Verzeichnis — der Name ist das einzige, was fehlt");
+                    "Namensreste im Verzeichnis - der Name ist das einzige, was fehlt");
     //
     // Wie bei ZDOS: `removeDirEntry` kompaktiert, der Name ist damit ueberschrieben.
     // Was hinter dem Endebyte noch wie ein Eintrag aussieht, gilt als **Vorschlag**.
@@ -392,11 +392,11 @@ FsRecoverReport Udos1715FileSystem::recoverScan(FsRecoverLevel level, bool nachl
                           static_cast<unsigned>(lauf.back().sector_index));
             f.vorschlag = wo;
             f.origin    = "Bereich ohne Descriptor, " + ort(lauf.front())
-                        + (lauf.size() > 1 ? "…" + std::to_string(lauf.back().sector_index) : "");
-            f.detail    = "Kein Descriptor — Name, Typ und Laenge sind unbekannt;"
+                        + (lauf.size() > 1 ? "..." + std::to_string(lauf.back().sector_index) : "");
+            f.detail    = "Kein Descriptor - Name, Typ und Laenge sind unbekannt;"
                           " gerettet wird der Rohinhalt (" + f.type + ")";
             f.warum_nicht = "Ein Rohbereich hat keinen Descriptor, aus dem sich eine Datei"
-                            " bauen liesse — herausholen laesst er sich aber";
+                            " bauen liesse - herausholen laesst er sich aber";
             bericht.hinzu(std::move(f));
             lauf.clear();
             lauf_daten.clear();

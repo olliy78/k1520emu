@@ -95,7 +95,7 @@ void collectUnknownKeys(const yaml::Node& map,
                         std::vector<std::string>& issues) {
     for (const auto& e : map.entries)
         if (std::find(known.begin(), known.end(), e.first) == known.end())
-            issues.push_back(where + ": unbekanntes Feld '" + e.first + "' — ignoriert");
+            issues.push_back(where + ": unbekanntes Feld '" + e.first + "' - ignoriert");
 }
 
 // ─── Eine Formatdefinition uebersetzen ────────────────────────────────────────
@@ -209,7 +209,7 @@ bool buildFormat(const yaml::Node& node, DiskFormat& out, std::string& why,
         if (!n_size->isScalar() || !yaml::toInt(n_size->scalar, v))
             { why = "'size': ungueltige Sektorgroesse '" + n_size->scalar + "'"; return false; }
         if (v != 128 && v != 256 && v != 512 && v != 1024)
-            { why = "'size': " + std::to_string(v) + " — erlaubt sind 128, 256, 512, 1024"; return false; }
+            { why = "'size': " + std::to_string(v) + " - erlaubt sind 128, 256, 512, 1024"; return false; }
         tf.bytes_per_sec = static_cast<uint16_t>(v);
 
         // Verfahren: Spur → Format → (spaeter) Laufwerks-Default.
@@ -450,7 +450,7 @@ FormatCatalog FormatCatalog::load(const std::vector<std::string>& paths,
             // Syntaxfehler in einer vorhandenen Datei ist FATAL: sonst liefe der
             // Emulator stillschweigend mit einem halben Katalog weiter.
             if (fatal_error)
-                *fatal_error = "Formatkatalog fehlerhaft — " + err.format(path);
+                *fatal_error = "Formatkatalog fehlerhaft - " + err.format(path);
             return FormatCatalog{};
         }
 
@@ -458,7 +458,7 @@ FormatCatalog FormatCatalog::load(const std::vector<std::string>& paths,
 
         if (!root.isMap()) {
             if (fatal_error)
-                *fatal_error = "Formatkatalog fehlerhaft — " + path + ": erwartet eine Map "
+                *fatal_error = "Formatkatalog fehlerhaft - " + path + ": erwartet eine Map "
                                "mit dem Schluessel 'formats'";
             return FormatCatalog{};
         }
@@ -467,7 +467,7 @@ FormatCatalog FormatCatalog::load(const std::vector<std::string>& paths,
             long ver = 0;
             if (!v->isScalar() || !yaml::toInt(v->scalar, ver) || ver != 1) {
                 if (fatal_error)
-                    *fatal_error = "Formatkatalog fehlerhaft — " + path + ":"
+                    *fatal_error = "Formatkatalog fehlerhaft - " + path + ":"
                                    + std::to_string(v->line)
                                    + ": nicht unterstuetzte Schema-Version '" + v->scalar
                                    + "' (unterstuetzt: 1)";
@@ -478,7 +478,7 @@ FormatCatalog FormatCatalog::load(const std::vector<std::string>& paths,
         const yaml::Node* list = root.find("formats");
         if (!list || !list->isList()) {
             if (fatal_error)
-                *fatal_error = "Formatkatalog fehlerhaft — " + path
+                *fatal_error = "Formatkatalog fehlerhaft - " + path
                                + ": Schluessel 'formats' fehlt oder ist keine Liste";
             return FormatCatalog{};
         }
@@ -494,12 +494,12 @@ FormatCatalog FormatCatalog::load(const std::vector<std::string>& paths,
                 const std::string what = fmt.name.empty()
                                              ? std::string("Format")
                                              : ("Format '" + fmt.name + "'");
-                cat.issues_.push_back(where + ": " + what + " uebersprungen — " + why);
+                cat.issues_.push_back(where + ": " + what + " uebersprungen - " + why);
                 continue;
             }
             if (!validateDrives(fmt, why)) {
                 cat.issues_.push_back(where + ": Format '" + fmt.name
-                                      + "' uebersprungen — " + why);
+                                      + "' uebersprungen - " + why);
                 continue;
             }
 

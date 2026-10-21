@@ -1,6 +1,6 @@
-# OS/M (P8000, Entwurf 34): eine 800K-Systemdiskette mit Urlader wird `osm800` — eindeutig,
+# OS/M (P8000, Entwurf 34): eine 800K-Systemdiskette mit Urlader wird `osm800` - eindeutig,
 # Verzeichnis ab c2h0.  Das Bootabbild ist synthetisch: die drei Merkmale des Urladers
-# (Code FD 21 48 0C …, FDCONF 77 bei 0x7E, P8000SYS bei 0x80), 20 KB lang.
+# (Code FD 21 48 0C ..., FDCONF 77 bei 0x7E, P8000SYS bei 0x80), 20 KB lang.
 tool:   k1520disktool
 tmpfile neu.img:
 file boot.bin:

@@ -1,4 +1,4 @@
-# break-before-execute: der Halt liegt VOR der Instruktion — Haltezeile und die
+# break-before-execute: der Halt liegt VOR der Instruktion - Haltezeile und die
 # Folgeabfrage `r` zeigen denselben PC und dieselbe Instruktion (vorher lief sie
 # noch zu Ende: Haltezeile 0135, `r` dann 0136).
 tool:   k1520dbg

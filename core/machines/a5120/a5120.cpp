@@ -809,7 +809,7 @@ int A5120Machine::run(int max_cycles) {
         // Waehrend des Boots (os_running_==false) ist dieser Block komplett inert → keine Regression.
         if (!os_running_ && zre_.cpuPC() == kScpxPromptPC) {
             os_running_ = true;
-            LOG_INFO("A5120", "SCPX: Prompt E079 erreicht → gehaltener Bus fuer Laufzeit-Reads aktiv");
+            LOG_INFO("A5120", "SCPX: Prompt E079 erreicht -> gehaltener Bus fuer Laufzeit-Reads aktiv");
         }
         if (os_running_) {
             const uint16_t contVec = (uint16_t)(bus_.memRead(kScpxContVecAddr) |
@@ -835,7 +835,7 @@ int A5120Machine::run(int max_cycles) {
                     held_read_watchdog_ = true;
                     afs_.releaseHeldRead();
                     LOG_INFO("A5120", "SCPX gehaltener Read: kein Fortschritt nach %lld Takten "
-                             "→ Bus frei, ZVE1 nimmt Index-Timeout (FM/MFM-Retry)", held_read_cycles_);
+                             "-> Bus frei, ZVE1 nimmt Index-Timeout (FM/MFM-Retry)", held_read_cycles_);
                 } else {
                     bus_.assertBUSRQ();   // Bus gehalten → ZVE1 bleibt eingefroren (nur ZVE2)
                 }
@@ -879,7 +879,7 @@ int A5120Machine::run(int max_cycles) {
             // aus — das /BUSRQ startet ZVE2 ab PC=0 (holt das aktuelle [0x0000]),
             // bevor ZVE1 [0x0000] restauriert.
             if (zre_.isZVE2InReset()) {   // also clears any /WAIT-ZVE2
-                LOG_DEBUG("A5120", "ZVE2-Start aus Reset bei /BUSRQ: PC=0 → [0x0000]");
+                LOG_DEBUG("A5120", "ZVE2-Start aus Reset bei /BUSRQ: PC=0 -> [0x0000]");
                 zre_.zve2StartFromReset();
             }
             if (!zre_.isZVE2InReset() && !zre_.isZVE2Waiting()) {

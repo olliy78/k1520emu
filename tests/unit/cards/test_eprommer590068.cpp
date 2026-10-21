@@ -172,7 +172,7 @@ TEST(Eprommer590068, U555HundertDurchlaeufeUndImpulsbreite) {
     EXPECT_EQ(z[3], 0x13);
     EXPECT_EQ(z[0x3FF], 0x00);
     const std::string p = alles(a.e);
-    EXPECT_NE(p.find("401 Impulse (401 wirksam) an 5 Adressen, je Adresse 1–100"), std::string::npos) << p;
+    EXPECT_NE(p.find("401 Impulse (401 wirksam) an 5 Adressen, je Adresse 1-100"), std::string::npos) << p;
     EXPECT_NE(p.find("Hinweis: Impulsbreite 0.04 ms"), std::string::npos) << p;
 }
 

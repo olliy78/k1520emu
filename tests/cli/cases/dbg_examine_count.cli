@@ -1,4 +1,4 @@
-#  ohne /N-Spec muss N Bytes ausgeben — der behobene #4-Fehler gab nur eines.
+#  ohne /N-Spec muss N Bytes ausgeben - der behobene #4-Fehler gab nur eines.
 tool:   k1520dbg
 disk:   cpa_cpa780_k5601_clock.img
 run:    %DISK%
