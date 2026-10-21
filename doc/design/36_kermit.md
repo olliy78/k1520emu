@@ -598,15 +598,19 @@ einfacher.
   Zugangsdaten gespeichert sind, **und wieder nach einer Ablehnung** (Name und Kennwort mit den eben eingegebenen Werten
   vorbelegt, Hinweis „Anmeldung abgelehnt“).
 - Inhalt: Benutzername, Kennwort (Eingabe verdeckt), Hinweis **„Möglicherweise ist es einfach kermit / kermit.“**, Haken
-  *Zugangsdaten für diese Verbindung speichern*, *Anmelden* / *Abbrechen*.
+  *Zugangsdaten für diese Verbindung speichern* mit dem **Hinweis im Dialog, dass das Kennwort dabei im Klartext in
+  der Konfigurationsdatei gespeichert wird** (am Haken selbst oder direkt darunter, auch als Tooltip), *Anmelden* /
+  *Abbrechen*.
 - Gespeichert wird **nur bei gesetztem Haken**, im **Klartext in der Konfigurationsdatei** (`kermit.yaml`), **im Eintrag
   dieser Verbindung** (Schlüssel für Name und Kennwort).  Ein erneutes Speichern — auch nach einer Ablehnung mit geänderten
   Eingaben — **überschreibt die alten Werte**.  Gespeicherte Zugangsdaten werden beim nächsten Verbinden ohne Popup
   benutzt; schlagen sie fehl, kommt das Popup (siehe oben).
 - Das **kehrt eine bisherige Festlegung um** („Kennwörter stehen nie in der Datei“, `konfig.py::ohne_kennwort`,
   Verbindungsdialog-Tooltip, Handbuch *So arbeitet K1520 Kermit*, `py_kermit_gui`).  Der Bearbeiter zieht alle Stellen
-  nach; die Datei soll unter POSIX nur für den Besitzer lesbar angelegt werden (Vorschlag, Modus 0600 — vom Anwender
-  nicht verlangt, aber bei Klartext naheliegend).  Die Verbindungsliste („zuletzt benutzt“) darf Kennwörter nur dann
+  nach.  **Entscheidung des Anwenders (2026-10-22): kein Schutz der Datei** — keine Dateirechte, keine Verschleierung.
+  Begründung: Das Programm dient nicht vertraulichen Daten, die Platte des P8000-Emulators ist mit dem DiskTool ohnehin
+  lesbar, und das Kennwort hat nur eine **funktionale** Aufgabe (getty/login der WEGA), keine Schutzfunktion.  Das
+  Handbuch sagt es offen, der Dialog trägt den Hinweis (siehe oben).  Die Verbindungsliste („zuletzt benutzt“) darf Kennwörter nur dann
   tragen, wenn der Haken gesetzt war.
 - Die Voreinstellung *WEGA 3.1 (Benutzer kermit)* bleibt, und mit ihr das Laborkennwort (`kermit`/`kermit`): die
   Popup-Vorbelegung ist `kermit`/`kermit`.  Die Kommandozeile `k1520kermit` ändert sich nicht.
