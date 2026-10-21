@@ -24,7 +24,8 @@ Emulator wie am Geraet ohne eigenen Kopierschritt bereitstehen:
   AUPTSIO.COM   tools/auptest/   dieselbe Karte, Sonderschnittstelle CTC/SIO B0H-B7H (N10d)
   K3521TST.COM  tools/k3521tst/  A5120/K8924 — Pruefprogramm K3521.30: Speichertest und Editor (N10i)
   KERMIT.COM    tools/kermit80/  Kermit-80 4.11, je Rechner eine Ueberlagerung (KERMIT80): A5120 (CP/A, SCPX),
-                K8915, PC 1715 (SCP 1715) und PRG 710/710-1 (SCPX) — Beigabe zum Ausprobieren der V.24-Schnittstelle
+                K8915, PC 1715 (SCP 1715, CP/A 1715), PC 1715W (SCP 3.0) und PRG 710/710-1 (SCPX) — Beigabe zum Ausprobieren
+                der V.24-Schnittstelle (die Ueberlagerung 'p8000' fuer OS/M liegt keiner Diskette bei)
 
 Ausserdem legt ``ORDNER`` die Unterordner aller Abbilder in ``disks/`` fest, auch der Abbilder,
 die kein CP/M-Bauskript erzeugt: BCU 880 (tools/bcu_a5120/build.py, Waechter ``cli_bcu_a5120``:
@@ -78,7 +79,7 @@ PROGRAMME = {
 }
 # Kermit-80 (CP/M-Kermit) als Beigabe zum Ausprobieren der V.24-Schnittstelle: je Rechner eine eigene
 # Ueberlagerung (Anschluss und Zeitgeber, tools/kermit80/bau.py), auf der Diskette immer KERMIT.COM.
-KERMIT80 = {r: os.path.join(TOOLS, 'kermit80', f'kermit_{r}.com') for r in ('a5120', 'k8915', 'pc1715', 'prg710')}
+KERMIT80 = {r: os.path.join(TOOLS, 'kermit80', f'kermit_{r}.com') for r in ('a5120', 'k8915', 'pc1715', 'pc1715w', 'prg710', 'p8000')}
 LOCHBAND = ['LBREAD.COM', 'LBPUNCH.COM']   # K6022/SIF1000 auf E0H-E7H; A5120, K8915, PRG (SCPX und CP/A getestet)
 PC1715 = ['PCTEST.COM']      # SERTEST V0.2 kennt den 1715, steht aber nur auf der CP/A-Systemdiskette (tools/cpa_pc1715); LB* nur mechanisch
 A5120 = [n for n in PROGRAMME if n not in PC1715]

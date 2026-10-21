@@ -891,7 +891,7 @@ Oberfläche, Kommandozeile `bin/k1520kermit-cli`, eigene Vorlage `kermit_launche
 > - **Wiederholungsregeln/Leerlauf-N(0)/Nachlauf** gegen C-Kermit 4.2 nicht „vereinfachen" — jede steht für einen gemessenen Hänger.
 > - **WEGA-Konto `kermit`: Shell `/bin/sh` + `.profile` `exec /usr/bin/kermit`, `.kermrc` OHNE `set file names literal`**
 >   (sonst `G D` = Gebrauchsanweisung bzw. jedes `R` „Can't open file").
-> - **Kermit-80 (CP/M, nur Client) ist Beigabe auf den Disketten** (`KERMIT.COM`: A5120 CP/A+SCPX, K8915, PC 1715 SCP 1715, PRG 710/-1):
+> - **Kermit-80 (CP/M, nur Client) ist Beigabe auf den Disketten** (`KERMIT.COM`: A5120 CP/A+SCPX, K8915, PC 1715 SCP 1715+CP/A 1715, PC 1715W SCP 3.0, PRG 710/-1; für P8000/OS/M nur Überlagerung+Test):
 >   eine Überlagerung je Rechner, `tools/kermit80/` (`bau.py`, eingecheckte `kermit_*.com`, Wächter `Kermit80*`, Entwurf 36 §6.8);
 >   der Zerleger erkennt Parität selbst.
 

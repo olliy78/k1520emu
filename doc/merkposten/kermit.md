@@ -38,8 +38,8 @@ bei Parität ≠ none, Langpakete/Attribute (4.2 kennt sie nicht, nur 9 Init-Fel
 
 - **Nur Client.**  Es gibt kein CP/M-Kermit-Gegenstück zum Server der Bibliothek; Kermit-80 spricht gegen
   `Sitzung::serve` (PC-Server).
-- **Eine Überlagerung je Rechner** (`tools/kermit80/kermit_{a5120,k8915,pc1715,prg710}.com`, PRG 710 und 710-1
-  teilen sich eine).  Anschluss und Anfangsfolge stehen in `bau.py` (`RECHNER`) und kommen aus `tools/sertest/src/sertest.mac`
+- **Eine Überlagerung je Rechner** (`tools/kermit80/kermit_{a5120,k8915,pc1715,pc1715w,prg710,p8000}.com`, PRG 710 und
+  710-1 teilen sich eine; der 1715W zählt mit dem CTC im Zählerbetrieb 57H/ZK 13, der P8000 mit CTC1 K0 ZK 4).  Anschluss und Anfangsfolge stehen in `bau.py` (`RECHNER`) und kommen aus `tools/sertest/src/sertest.mac`
   — **ändert sich dort etwas, neu bauen** (`python3 tools/kermit80/bau.py <rechner> --out tools/kermit80/kermit_<rechner>.com`,
   `CPA_TOOLS` nötig) und die Disketten nachziehen.  Wächter `Kermit80Bau.EingechecktesComIstDasErgebnisVonBauPy`.
 - **Der Zerleger erkennt Parität selbst** (81H als Paketbeginn oder Bit 7 in LEN/SEQ/TYPE) und streift danach Bit 7

@@ -37,6 +37,7 @@
 #include "core/filesystem/fs_catalog.h"
 #include "core/logger.h"
 #include "core/machines/a5120/a5120.h"
+#include "core/machines/p8000/p8000.h"
 #include "core/peripherals/floppy_drive/format_catalog.h"
 #include "core/serial/hub.h"
 #include "kermit/src/leitung_netz.h"
@@ -44,6 +45,7 @@
 #include "tests/support/fixtures.h"
 #include "tests/support/keyboard.h"
 #include "tests/support/machine_run.h"
+#include "tests/support/p8000_input.h"
 #include "tests/support/screen.h"
 #include "tests/support/temp_path.h"
 #include "tests/system/sertest_hilfen.h"
@@ -479,6 +481,9 @@ struct FremdLauf {
     S s;
     PcServer srv;
     std::string com;
+    std::string kanalName = "V.24";        ///< Teil des Hub-Kanalnamens
+    std::string start = "sertest";         ///< Kermit-80 liegt in den Tests als SERTEST.COM auf der Diskette
+    std::string datei = "sertest.com";
     template <class... A>
     FremdLauf(std::string c, A&&... a) : s(std::forward<A>(a)...), com(std::move(c)) {}
 
@@ -504,7 +509,7 @@ struct FremdLauf {
         std::string namen;
         for (int i = 0; i < hub->anzahl(); ++i) namen += " [" + hub->info(i).name + "]";
         for (int i = 0; i < hub->anzahl(); ++i) {
-            if (hub->info(i).name.find("V.24") == std::string::npos) continue;
+            if (hub->info(i).name.find(kanalName) == std::string::npos) continue;
             SerialKonfig k = hub->konfig(i);
             k.betriebsart = Betriebsart::Telnet;
             k.rolle = Rolle::Client;
@@ -524,10 +529,10 @@ struct FremdLauf {
         std::string f;
         if (!srv.start(&f)) return ::testing::AssertionFailure() << f;
         if (const std::string e = kanalClient(srv.port()); !e.empty()) return ::testing::AssertionFailure() << e;
-        s.tippe("sertest\r");
+        s.tippe(start + "\r");
         if (!bisKermit(600'000'000)) return ::testing::AssertionFailure() << "kein Kermit-80>\n" << s.bild();
         if (!befehl("set file-mode binary")) return ::testing::AssertionFailure() << "set\n" << s.bild();
-        if (!befehl("send sertest.com p0")) return ::testing::AssertionFailure() << "send\n" << s.bild();
+        if (!befehl("send " + datei + " p0")) return ::testing::AssertionFailure() << "send\n" << s.bild();
         const fs::path p = srv.frei.p / "p0";
         if (!fs::exists(p)) return ::testing::AssertionFailure() << "nicht angekommen\n" << s.bild();
         if (lies(p) != lies(com)) return ::testing::AssertionFailure() << "Inhalt weicht ab (" << lies(p).size() << " B)";
@@ -556,6 +561,13 @@ TEST(Kermit80Rechner, Pc1715) {
     EXPECT_TRUE(l.pruefe());
 }
 
+TEST(Kermit80Rechner, Pc1715W) {
+    stumm();
+    KERMIT80_RECHNER_COM("pc1715w");
+    FremdLauf<sertest::SertestPc1715W> l(com, com);
+    EXPECT_TRUE(l.pruefe());
+}
+
 TEST(Kermit80Rechner, Prg710) {
     stumm();
     KERMIT80_RECHNER_COM("prg710");
@@ -570,6 +582,60 @@ TEST(Kermit80Rechner, Prg710_1) {
     EXPECT_TRUE(l.pruefe());
 }
 
+// ─── P8000 (8-Bit-Teil) mit OS/M ──────────────────────────────────────────────────────────────
+//
+// Es gibt keine ausgelieferte OS/M-Diskette; der Fall braucht die Systemdiskette `osm30.cqm` der
+// pofo-Sammlung (`K1520_CQM_DIR`) und wird sonst uebersprungen.  Kermit-80 geht an tty0 (SIO0-A);
+// tty1 ist das Terminal.
+
+namespace {
+
+class K80P8000 {
+public:
+    explicit K80P8000(const std::string& cqm, const std::string& com)
+        : pfad_(k1520test::tempPath("k1520_k80_osm30.cqm")) {
+        fs::copy_file(cqm, pfad_, fs::copy_options::overwrite_existing);
+        fehler_ = aufspielen(pfad_, com, "SERTEST.COM");
+        if (fehler_.empty() && !m_.mountDisk(0, pfad_, m_.defaultFormatName(0), false)) fehler_ = "mountDisk: " + m_.lastError();
+    }
+    ~K80P8000() { std::error_code ec; fs::remove(pfad_, ec); }
+    const std::string& fehler() const { return fehler_; }
+    bool kaltstart() {
+        if (!fehler_.empty()) return false;
+        m_.powerOn();
+        namespace p = k1520test::p8000;
+        if (!p::laufeBisText(m_, "Press RETURN", 200'000'000)) return false;
+        p::tippe(m_, "\r");
+        if (!p::laufeBisPrompt(m_, ">", 4'000'000)) return false;
+        p::tippe(m_, "\r");
+        return p::laufeBisText(m_, "OS/M", 400'000'000) && p::laufeBisPrompt(m_, "A:", 200'000'000);
+    }
+    void tippe(const std::string& t) {
+        for (char c : t) k1520test::p8000::tippe(m_, std::string(1, c));
+    }
+    std::string bild() { return k1520test::p8000::bild(m_); }
+    long long schritt() { return m_.run(int(k1520test::p8000::kBatch)); }
+    P8000Machine& maschine() { return m_; }
+
+private:
+    std::string  pfad_;
+    P8000Machine m_;
+    std::string  fehler_;
+};
+
+}  // namespace
+
+TEST(Kermit80Rechner, P8000MitOsm) {
+    stumm();
+    KERMIT80_RECHNER_COM("p8000");
+    const char* dir = std::getenv("K1520_CQM_DIR");
+    const std::string cqm = dir ? std::string(dir) + "/osm30.cqm" : "";
+    if (cqm.empty() || !fs::exists(cqm)) GTEST_SKIP() << "osm30.cqm (K1520_CQM_DIR) fehlt";
+    FremdLauf<K80P8000> l(com, cqm, com);
+    l.kanalName = "tty0";
+    EXPECT_TRUE(l.pruefe());
+}
+
 // ─── Die eingecheckten Ueberlagerungen gehoeren zu den Quellen ────────────────────────────────
 
 TEST(Kermit80Bau, EingechecktesComIstDasErgebnisVonBauPy) {
@@ -577,7 +643,7 @@ TEST(Kermit80Bau, EingechecktesComIstDasErgebnisVonBauPy) {
     const fs::path tools = cpa ? fs::path(cpa) : fs::path(std::getenv("HOME") ? std::getenv("HOME") : "") /
                                                      "projects/CPA_Workbench/tools";
     if (!fs::exists(tools / "m80.com")) GTEST_SKIP() << "CP/M-Werkzeugkette fehlt (CPA_TOOLS): " << tools;
-    for (const char* r : {"a5120", "k8915", "pc1715", "prg710"}) {
+    for (const char* r : {"a5120", "k8915", "pc1715", "pc1715w", "prg710", "p8000"}) {
         const std::string out = k1520test::tempPath(std::string("k1520_kermit80_bau_") + r + ".com");
         const std::string cmd = std::string("python3 \"") + K1520_KERMIT80_DIR + "/bau.py\" " + r + " --out \"" + out +
                                 "\" >/dev/null 2>&1";

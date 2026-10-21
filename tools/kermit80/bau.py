@@ -13,7 +13,7 @@ Systemklasse "inout" (Z80-SIO ueber IN/OUT, wie fuer andere Rechner im Quelltext
 und der Anschlusswahl des Zielrechners; eine Anfangsfolge programmiert Zeitgeber und SIO
 auf 9600 8N1.
 
-  bau.py <rechner> [--out DATEI]   rechner: a5120 | k8915 | pc1715 | prg710
+  bau.py <rechner> [--out DATEI]   rechner: a5120 | k8915 | pc1715 | pc1715w | prg710 | p8000
   bau.py --selbsttest              Werkzeugkette pruefen: die Uebersetzung der GENERISCHEN
                                    Ueberlagerung muss CPVGEN.HEX bytegleich nachbilden
 Voraussetzung: tools/kermit80/holen.sh gelaufen (quelle/), CP/M-Werkzeugkette wie
@@ -51,8 +51,15 @@ RECHNER = {
     'k8915': (0x40, 0x41, [(0x48, 0x07), (0x48, 1)] + _sio(0x41), 'K8915 (K7028 SIO1-A)'),
     # PC 1715, ZRE SIO0 Kanal B (V.24 X5), CTC0 K1 (09H) 17H
     'pc1715': (0x0D, 0x0F, [(0x09, 0x17), (0x09, 1)] + _sio(0x0F), 'PC 1715 (SIO0-B)'),
+    # PC 1715W: SIO0 wie am 1715, aber der CTC zaehlt (57H, Zeitkonstante 13): 1,9968 MHz / 13 = 16 x 9600
+    # (so programmiert es das SCP-3.0-BIOS; Quelle wie oben: IF_W in sertest.mac)
+    'pc1715w': (0x0D, 0x0F, [(0x09, 0x57), (0x09, 13)] + _sio(0x0F), 'PC 1715W (SIO0-B)'),
     # PRG 710 / 710-1, K8025 A33 Kanal A, Takt CTC A34 K2 (5AH)
     'prg710': (0x50, 0x51, [(0x5A, 0x07), (0x5A, 1)] + _sio(0x51), 'PRG 710 (K8025 A33-A)'),
+    # P8000 (8-Bit-Teil, OS/M): SIO0 Kanal A = tty0 (24H Daten, 25H Steuerung; A0 = C/D, A1 = B/A).
+    # Baudtakt: CTC1 K0 (2CH) zaehlt den Systemtakt CPBAUD 1,2288 MHz (9,832 MHz / 8), ZC/TO / 2 -> SIO-Takt x16:
+    # 1,2288 MHz / (ZK 4 * 2 * 16) = 9600 Bd (core/cards/p8000/karte8.h).  Control 47H = Zaehler, Reset, ZK folgt.
+    'p8000': (0x24, 0x25, [(0x2C, 0x47), (0x2C, 4)] + _sio(0x25), 'P8000 (SIO0-A tty0)'),
 }
 
 

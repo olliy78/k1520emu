@@ -230,7 +230,7 @@ add_dependencies(k1520_test_p8000_wega_kermit_austausch k1520disktool)
 # Kermit-80 ist nur Client; die Bibliothek serviert.  Die Ueberlagerungen je Rechner liegen unter
 # tools/kermit80/ (kermit_<rechner>.com); der Bau-Waechter braucht CPA_TOOLS und wird sonst uebersprungen.
 k1520_add_test(kermit80 SRC test_kermit80.cpp
-                        LIBS k1520_a5120 k1520_k8915 k1520_pc1715 k1520_prg710 k1520_fs k1520_serial k1520kermit_core
+                        LIBS k1520_a5120 k1520_k8915 k1520_pc1715 k1520_prg710 k1520_p8000 k1520_fs k1520_serial k1520kermit_core
                              k1520_logger k1520_testsupport
                         LABELS "system;slow;format_integration"
                         DEFS LOG_LEVEL=2 "K1520_KERMIT80_DIR=\"${CMAKE_SOURCE_DIR}/tools/kermit80\""
