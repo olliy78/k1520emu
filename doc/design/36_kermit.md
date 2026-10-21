@@ -191,9 +191,13 @@ anfassen, laufen nacheinander oder im eigenen Worktree.
 | **K7** | **Gegenprobe am echten C-Kermit 4.2:** beide Richtungen im Emulator (Fall 1 und Fall 2), Messung der 8-Bit-Sauberkeit, Durchsatz, Fristen; Befunde in Vorgaben §5 einarbeiten. | `P8000WegaKermit.*` (Label `wega_install`), `tools/dev.sh test-wega` | opus | fertig — `d52bdd2`, `cda77bb` |
 | **K8** | **Doku:** Handbuch, `doc/merkposten/kermit.md` (+ README-Eintrag), `CLAUDE.md`-Kurzabsatz, `disks/…/README.md`, Entwurf 36 auf Stand. | — | sonnet | fertig (§6.6) |
 | **K9** | *(wenn K1–K8 grün)* **Paket/CI:** Linux-Paket (`build_payload.sh`), Inno-Setup, `windows-ci.yml`, Starter `k1520kermit`. | `py_packaging`, `py_programme` | sonnet | fertig (§6.7) — `0f78cfc` |
+| **K10** | **Bibliothek: Anmeldung des Clients auf Abruf** (§6.10 a): das Login-Skript meldet „Anmeldung verlangt“ und fragt Name/Kennwort über einen Rückruf ab, statt sie vorab zu verlangen; es unterscheidet **abgelehnt** (zweites `login:` / `Login incorrect`) von Frist und Leitungsfehler.  C-ABI additiv + Python-Bindung. | `KermitLogin*` (Unit), `py_kermit_api` (Signaturwächter), Kopplungstest gegen den Server aus K12 | sonnet | **offen** |
+| **K11** | **Oberfläche, Client: Anmeldedialog** (§6.10 b): Popup mit Benutzername, Kennwort, Hinweis „möglicherweise einfach kermit / kermit“ und Haken *Zugangsdaten für diese Verbindung speichern*; erscheint bei verlangter Anmeldung und **erneut bei Ablehnung**; gespeichert wird **im Klartext in der Konfigurationsdatei, im Eintrag der Verbindung**, Neuspeichern überschreibt die alten Werte.  Kehrt die Regel „Kennwörter nie in die Datei“ um (Handbuch, Merkposten, `konfig.ohne_kennwort`, Wächter). | `py_kermit_gui` (Dialog mit Ersatz, Wiederholung, Speichern/Überschreiben, Konfig-Roundtrip) | sonnet | **offen** (nach K10) |
+| **K12** | **Server mit Anmeldezwang** (§6.10 c): Bibliothek (`Sitzung::serve` mit Anmeldephase wie getty der WEGA: `login:` / `Password:` / `Login incorrect` / Wiederholung / nach `finish` zurück zu `login:`) **und** Oberfläche (Haken *Anmeldung erzwingen*, Name/Kennwort mit Vorgabe `kermit`/`kermit`, änderbar, in der Serverkonfiguration im Klartext). | `KermitServerLogin*` (Unit), `py_kermit_gui`, **Kermit-80 meldet sich im Terminalmodus an unserem Server an** (`Kermit80Pc.*`, Gegenstück zu `Kermit80Wega`) | opus (Protokoll) / sonnet (Oberfläche) | **offen** (parallel zu K11 möglich) |
+| **K13** | **Doku und Abnahme:** Handbuch (Client-Anmeldung, Server mit Anmeldezwang, Kermit-80 gegen unseren Server mit Anmeldung), Merkposten (Umkehr der Kennwortregel, Reihenfolge der Dialoge), Entwurf 36 auf Stand, Login-Skript in `py_kermit_gui` belegt (war offen, §7 Nr. 7). | — | sonnet | **offen** (nach K10–K12) |
 | K2b | *(optional)* Schiebefenster, `G T`/`G U`, Wiederaufnahme. | — | — | offen (optional) |
 
-Reihenfolge: **K1 ‖ K2** (K2 im Worktree) → K3 → K4 → K5 ‖ K6 → K7 → K8 → K9.
+Reihenfolge: **K1 ‖ K2** (K2 im Worktree) → K3 → K4 → K5 ‖ K6 → K7 → K8 → K9; danach (2026-10-22) **K10 → K11 ‖ K12 → K13**.
 
 ### 6.1 Stand K2 (2026-10-18)
 
@@ -571,6 +575,68 @@ eine Beigabe zum Ausprobieren der V.24-Schnittstelle: A5120 (CP/A und SCPX 1.7),
   bleibt es unverändert.  Wächter `KermitSitzung.NachlaufEntfaelltGegenDenEigenenServer`/`…BleibtGegenEineGegenstelleOhneCapas`
   (gemessen in Leitungszeit — die Speicherleitung lässt eine Frist, auf die alle warten, ohne Wartezeit ablaufen).
 
+### 6.10 Neue Arbeitspakete K10–K13 — Anmeldung (Auftrag vom 2026-10-22)
+
+**Anlass.** Heute braucht der Client die Zugangsdaten vorab (Verbindungsdialog, Voreinstellung *WEGA 3.1 (Benutzer
+kermit)*), das Kennwort lebt nur in der Sitzung und steht **nie** in der Konfiguration; ein Server ohne Anmeldung
+gibt es nur als Ordnerfreigabe.  Der Anwender will: (a) die GUI fragt nach, wenn die Gegenstelle eine Anmeldung
+verlangt, (b) kann die Zugangsdaten für die Verbindung merken, (c) der eigene Server kann eine Anmeldung erzwingen
+und verhält sich dann wie die WEGA-Installation.
+
+**a) Bibliothek, Client (K10).**  `loginSkript` bekommt zwei Dinge, die es heute nicht hat: einen **Rückruf**, der bei
+verlangter Anmeldung Name und Kennwort holt (Aufruf aus dem Arbeitsfaden; die Oberfläche zeigt den Dialog im GUI-Faden und
+antwortet), und ein **Ergebnis mit Art** (`Ok`, `Abgelehnt`, `Frist`, `Leitung`, `Abbruch`).  *Abgelehnt* heißt: nach dem
+Kennwort erscheint wieder `login:` bzw. `Login incorrect` — nur dann soll die Oberfläche erneut fragen; bei Frist oder
+Leitungsfehler nicht.  Die Frist der Stille (§6.5) gilt weiter; **das Warten auf die Eingabe des Anwenders zählt nicht als
+Frist** (der Rückruf läuft außerhalb der Fristen, der Abbruch bleibt möglich).  C-ABI additiv (neue Funktion mit
+Rückruf; die vorhandene `k1520k_login` bleibt), Python-Bindung, Signaturwächter `py_kermit_api`.  Offene Entscheidung für den
+Bearbeiter: Rückruf oder zweistufige Schnittstelle (`erkennen` → `antworten`); wegen des GUI-Fadens ist die zweistufige oft
+einfacher.
+
+**b) Oberfläche, Client (K11).**
+- Das Popup erscheint beim Verbinden, wenn die Gegenstelle eine Anmeldung verlangt und für die Verbindung keine
+  Zugangsdaten gespeichert sind, **und wieder nach einer Ablehnung** (Name und Kennwort mit den eben eingegebenen Werten
+  vorbelegt, Hinweis „Anmeldung abgelehnt“).
+- Inhalt: Benutzername, Kennwort (Eingabe verdeckt), Hinweis **„Möglicherweise ist es einfach kermit / kermit.“**, Haken
+  *Zugangsdaten für diese Verbindung speichern*, *Anmelden* / *Abbrechen*.
+- Gespeichert wird **nur bei gesetztem Haken**, im **Klartext in der Konfigurationsdatei** (`kermit.yaml`), **im Eintrag
+  dieser Verbindung** (Schlüssel für Name und Kennwort).  Ein erneutes Speichern — auch nach einer Ablehnung mit geänderten
+  Eingaben — **überschreibt die alten Werte**.  Gespeicherte Zugangsdaten werden beim nächsten Verbinden ohne Popup
+  benutzt; schlagen sie fehl, kommt das Popup (siehe oben).
+- Das **kehrt eine bisherige Festlegung um** („Kennwörter stehen nie in der Datei“, `konfig.py::ohne_kennwort`,
+  Verbindungsdialog-Tooltip, Handbuch *So arbeitet K1520 Kermit*, `py_kermit_gui`).  Der Bearbeiter zieht alle Stellen
+  nach; die Datei soll unter POSIX nur für den Besitzer lesbar angelegt werden (Vorschlag, Modus 0600 — vom Anwender
+  nicht verlangt, aber bei Klartext naheliegend).  Die Verbindungsliste („zuletzt benutzt“) darf Kennwörter nur dann
+  tragen, wenn der Haken gesetzt war.
+- Die Voreinstellung *WEGA 3.1 (Benutzer kermit)* bleibt, und mit ihr das Laborkennwort (`kermit`/`kermit`): die
+  Popup-Vorbelegung ist `kermit`/`kermit`.  Die Kommandozeile `k1520kermit` ändert sich nicht.
+
+**c) Server mit Anmeldezwang (K12).**
+- **Bibliothek:** `Einstellungen` bekommt `login_pflicht`, `login_name`, `login_kennwort`.  Ist `login_pflicht` gesetzt,
+  verhält sich `Sitzung::serve` **wie getty + `login` der WEGA**: nach dem Verbindungsaufbau `login:`; Name lesen; `Password:`
+  (ohne Echo); stimmt beides, erscheint die Kopfzeile des Servers (wie C-Kermit: *C-Kermit server starting …*) und die
+  Server-Schleife beginnt; sonst `Login incorrect` und wieder `login:`.  **Nach `finish`/`logout` kehrt der Server zu
+  `login:` zurück** (wie die WEGA).  Das eigene Login-Skript (K3) und Kermit-80 im Terminalmodus müssen sich so anmelden
+  können.  Die Anmeldung läuft vor dem Protokoll; Paketbytes davor sind kein Fehler.  Zeichenverhalten wie getty:
+  RETURN oder CR LF beenden eine Eingabe, Bit 7 wird vor dem Vergleich gelöscht (§3, Parität).
+- **Oberfläche:** im Server-Dialog der Haken *Anmeldung erzwingen*, darunter *Benutzername* und *Kennwort* mit
+  **Vorgabe `kermit` / `kermit`**, vom Anwender änderbar; gespeichert in der **Serverkonfiguration** (`kermit.yaml`,
+  Klartext, wie in K11).  Der Server zeigt in der Statuszeile *mit Anmeldung*.
+- **Abnahme:** `KermitServerLogin.*` (Unit: richtig, falsch mit Wiederholung, nach Finish wieder `login:`, Bit 7 am
+  Namen), Kopplungstest Client (K10/K11-Pfad) gegen den Server, und ein System-Fall `Kermit80Pc.*`: Kermit-80 (A5120)
+  meldet sich im Terminalmodus an unserem Server an, geht mit Strg+\ `c` zurück und holt/sendet Dateien — das
+  Gegenstück zu `Kermit80Wega`.
+
+**d) Doku und Abnahme (K13).**  Handbuch: *Verbindung herstellen (Client)* (Popup, Speichern), *Server-Modus* (Anmeldung
+erzwingen), *Kermit-80 auf den CP/M-Rechnern* (gegen unseren Server mit Anmeldung: Ablauf wie bei der WEGA); Merkposten
+`kermit.md`: die Umkehr der Kennwortregel mit Grund, Wächter.  Zusätzlich gehört hierher der bisher offene Punkt aus §7
+Nr. 7: **das Login-Skript wird in `py_kermit_gui` belegt** (mit einer Attrappenleitung, die `login:` / `Password:` spielt).
+
+**Reihenfolge und Risiken.**  K10 zuerst (die Schnittstelle trägt K11).  K11 und K12 sind unabhängig (K12-Bibliothek
+braucht K10 nur für den Kopplungstest).  Offen bleiben: Drag&Drop (offscreen nur über die Mime-Daten belegt, §7 Nr. 7).
+Risiko: Der Rückruf läuft im Arbeitsfaden, der Dialog im GUI-Faden — die Kernsperre (§10.11 in `11_python_app.md`) und das
+Abbrechen während der Eingabe müssen zusammen gedacht werden (`Kern`-Sperre nicht über den Dialog halten).
+
 ## 7. Offene Aufgaben
 
 Zusammengetragen aus den „Offen"-Listen von §6.1–§6.6, nach Dringlichkeit:
@@ -585,12 +651,11 @@ Zusammengetragen aus den „Offen"-Listen von §6.1–§6.6, nach Dringlichkeit:
    virtuellen Uhr nachgebildet (`KermitTempo.*`).
 5. **tty3 ohne 8-Bit-Präfix** nicht vermessen (Fall 2 lief mit `&` des PC-Servers).
 6. ~~**Nachlauf 2 s gegen den eigenen Server**~~ erledigt (§6.9): entfällt, wenn die Gegenstelle CAPAS meldet.
-7. **Oberfläche:** Login-Skript nur über CLI/C++-Tests belegt, nicht in `py_kermit_gui`; Drag&Drop nur über
+7. **Oberfläche:** Login-Skript nur über CLI/C++-Tests belegt, nicht in `py_kermit_gui` (→ K13); Drag&Drop nur über
    die Auswertung der Mime-Daten (offscreen keine echten Ereignisse); Wiederverbinden ohne Anmeldung nach
    bloßem *Trennen* nicht eigens geprüft.
-8. **Kennwort:** das Laborkennwort `kermit` steht in der Voreinstellung (`konfig.VOREINSTELLUNGEN`) und auf
-   der ausgelieferten Platte; ob eine Abfrage beim ersten Verbinden oder ein anderes Konto für das Paket
-   besser ist, entscheidet der Anwender.
+8. **Kennwort:** entschieden am 2026-10-22: das Laborkennwort bleibt Vorgabe, die Oberfläche fragt bei verlangter
+   Anmeldung nach und kann die Zugangsdaten im Klartext in der Konfiguration merken (→ K10–K12, §6.10).
 9. **Nur aus den Quellen gelesen**, nicht ausgelöst: Speicherfehler bei `G C` ohne Feld.  (Parität ≠ none beim
    Empfang ist seit §6.8 gelöst; gesendet wird weiter ohne Paritätsbit.)
 10. **K2b (optional):** Schiebefenster, `G T`/`G U`, Wiederaufnahme.
