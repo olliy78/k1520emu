@@ -191,7 +191,7 @@ anfassen, laufen nacheinander oder im eigenen Worktree.
 | **K7** | **Gegenprobe am echten C-Kermit 4.2:** beide Richtungen im Emulator (Fall 1 und Fall 2), Messung der 8-Bit-Sauberkeit, Durchsatz, Fristen; Befunde in Vorgaben §5 einarbeiten. | `P8000WegaKermit.*` (Label `wega_install`), `tools/dev.sh test-wega` | opus | fertig — `d52bdd2`, `cda77bb` |
 | **K8** | **Doku:** Handbuch, `doc/merkposten/kermit.md` (+ README-Eintrag), `CLAUDE.md`-Kurzabsatz, `disks/…/README.md`, Entwurf 36 auf Stand. | — | sonnet | fertig (§6.6) |
 | **K9** | *(wenn K1–K8 grün)* **Paket/CI:** Linux-Paket (`build_payload.sh`), Inno-Setup, `windows-ci.yml`, Starter `k1520kermit`. | `py_packaging`, `py_programme` | sonnet | fertig (§6.7) — `0f78cfc` |
-| **K10** | **Bibliothek: Anmeldung des Clients auf Abruf** (§6.10 a): das Login-Skript meldet „Anmeldung verlangt“ und fragt Name/Kennwort über einen Rückruf ab, statt sie vorab zu verlangen; es unterscheidet **abgelehnt** (zweites `login:` / `Login incorrect`) von Frist und Leitungsfehler.  C-ABI additiv + Python-Bindung. | `KermitLogin*` (Unit), `py_kermit_api` (Signaturwächter), Kopplungstest gegen den Server aus K12 | sonnet | **offen** |
+| **K10** | **Bibliothek: Anmeldung des Clients auf Abruf** (§6.10 a): das Login-Skript meldet „Anmeldung verlangt“ und fragt Name/Kennwort über einen Rückruf ab, statt sie vorab zu verlangen; es unterscheidet **abgelehnt** (zweites `login:` / `Login incorrect`) von Frist und Leitungsfehler.  C-ABI additiv + Python-Bindung. | `KermitLogin*` (Unit), `py_kermit_api` (Signaturwächter), Kopplungstest gegen den Server aus K12 | sonnet | **fertig** (2026-10-22, Zweig `kermit`; Stand §6.11) |
 | **K11** | **Oberfläche, Client: Anmeldedialog** (§6.10 b): Popup mit Benutzername, Kennwort, Hinweis „möglicherweise einfach kermit / kermit“ und Haken *Zugangsdaten für diese Verbindung speichern*; erscheint bei verlangter Anmeldung und **erneut bei Ablehnung**; gespeichert wird **im Klartext in der Konfigurationsdatei, im Eintrag der Verbindung**, Neuspeichern überschreibt die alten Werte.  Kehrt die Regel „Kennwörter nie in die Datei“ um (Handbuch, Merkposten, `konfig.ohne_kennwort`, Wächter). | `py_kermit_gui` (Dialog mit Ersatz, Wiederholung, Speichern/Überschreiben, Konfig-Roundtrip) | sonnet | **offen** (nach K10) |
 | **K12** | **Server mit Anmeldezwang** (§6.10 c): Bibliothek (`Sitzung::serve` mit Anmeldephase wie getty der WEGA: `login:` / `Password:` / `Login incorrect` / Wiederholung / nach `finish` zurück zu `login:`) **und** Oberfläche (Haken *Anmeldung erzwingen*, Name/Kennwort mit Vorgabe `kermit`/`kermit`, änderbar, in der Serverkonfiguration im Klartext). | `KermitServerLogin*` (Unit), `py_kermit_gui`, **Kermit-80 meldet sich im Terminalmodus an unserem Server an** (`Kermit80Pc.*`, Gegenstück zu `Kermit80Wega`) | opus (Protokoll) / sonnet (Oberfläche) | **offen** (parallel zu K11 möglich) |
 | **K13** | **Doku und Abnahme:** Handbuch (Client-Anmeldung, Server mit Anmeldezwang, Kermit-80 gegen unseren Server mit Anmeldung), Merkposten (Umkehr der Kennwortregel, Reihenfolge der Dialoge), Entwurf 36 auf Stand, Login-Skript in `py_kermit_gui` belegt (war offen, §7 Nr. 7). | — | sonnet | **offen** (nach K10–K12) |
@@ -640,6 +640,31 @@ Nr. 7: **das Login-Skript wird in `py_kermit_gui` belegt** (mit einer Attrappenl
 braucht K10 nur für den Kopplungstest).  Offen bleiben: Drag&Drop (offscreen nur über die Mime-Daten belegt, §7 Nr. 7).
 Risiko: Der Rückruf läuft im Arbeitsfaden, der Dialog im GUI-Faden — die Kernsperre (§10.11 in `11_python_app.md`) und das
 Abbrechen während der Eingabe müssen zusammen gedacht werden (`Kern`-Sperre nicht über den Dialog halten).
+
+### 6.11 Stand K10 (2026-10-22) — Anmeldung auf Abruf
+
+**Gewählt: Rückruf (A)**, nicht die zweistufige Schnittstelle.  Grund: `loginSkript` hält seinen Lesezustand (Fenster,
+Ratenmessung) in einer Funktion; eine Zweiteilung bräuchte ein zustandsbehaftetes Objekt über C-ABI-Aufrufe hinweg.
+Der Arbeitsfaden der Oberfläche blockiert ohnehin in der Bibliothek — der Rückruf wartet dort auf den GUI-Faden
+(Signal + Ereignis) wie jede andere Rückfrage.  Die C-ABI-Fläche bleibt klein: `k1520k_login_ask` (+ Rückruftyp
+`K1520KLoginAsk`), `k1520k_login_answer` (nur im Rückruf), `k1520k_login_kind`.  Der Rückruf antwortet **nicht über
+Rückgabewert/Puffer**, sondern ruft `k1520k_login_answer(h, name, kennwort)` (ctypes kann in ein `c_char_p`-Argument nicht
+schreiben; der Signaturwächter kennt nur `void`-Rückrufe); keine Antwort = Abbruch.
+
+- Kern: `LoginOptionen::abfrage` (`std::function<bool(const AnmeldeAnfrage&, name&, kennwort&)>`), `LoginErgebnis::art`
+  (`LoginArt`: `Ok`/`Abgelehnt`/`Frist`/`Leitung`/`Abbruch`) und `::versuche`.  Der Rückruf kommt erst NACH `login:` und
+  der Ruhe; danach wird noch einmal Stille abgewartet (Gestautes gehört nicht zur Antwort).  Nach `Login incorrect`/
+  zweitem `login:` fragt das Skript auf derselben Leitung erneut (`versuch + 1`, `gelesen` enthält die Ablehnung).
+- Die Zeit im Rückruf ist keine Frist (dort wird nicht gelesen); `abbruch`-Flag wirkt nach der Rückkehr, `false` im Rückruf
+  = `Abbruch`.  Ohne Rückruf unverändert (`k1520k_login`, CLI); nur das Ergebnis trägt jetzt die Art.
+- Python: `Kermit.login_ask(frage, frist_ms)` mit `frage(versuch, gelesen) -> (name, kennwort) | None`,
+  `Kermit.login_kind` und `LOGIN_*`.  Wächter: `KermitLoginAbruf.*` (`test_kermit_netz.cpp`), `py_kermit_api`
+  (`test_login_on_demand_*`, `test_login_kind_*`).
+- **Für K11:** im Arbeiter `k.login_ask(frage)` rufen; `frage` läuft im Arbeitsfaden, stellt das Popup im GUI-Faden und
+  wartet dort (ohne Kernsperre/Lock); Abbruch durch `k.abort()` aus dem GUI-Faden UND anschließendes `None` aus `frage`.
+  Nach der Ausnahme `KermitError(E_LOGIN)` `k.login_kind` lesen: nur `LOGIN_ABGELEHNT` (kommt hier nur, wenn `frage`
+  selbst nach einer Ablehnung abbricht oder der Benutzer ohne Kennwort ist) ist eine Ablehnung; `login_ask` fragt bei
+  Ablehnung von selbst erneut.
 
 ## 7. Offene Aufgaben
 

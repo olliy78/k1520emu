@@ -117,8 +117,9 @@ struct Lauf {
     }
 };
 
-LoginErgebnis fehler(Lauf& r, const std::string& grund) {
+LoginErgebnis fehler(Lauf& r, const std::string& grund, LoginArt art = LoginArt::Frist) {
     LoginErgebnis e;
+    e.art = art;
     r.messung(e);
     e.gelesen = sichtbarMachen(r.alles, std::string::npos);
     e.text = "Anmeldung fehlgeschlagen: " + grund + "; zuletzt gelesen: \"" + sichtbarMachen(r.alles) + "\"";
@@ -147,15 +148,23 @@ std::string sichtbarMachen(const std::string& roh, std::size_t max) {
 
 LoginErgebnis loginSkript(Leitung& l, const LoginOptionen& o) {
     Lauf r{l, o, {}, {}, false, false};
+    int versuche = 0;
     auto grundAbbruch = [&](const char* was) -> LoginErgebnis {
-        if (r.getrennt) return fehler(r, std::string("Leitung getrennt (") + was + ")");
-        return fehler(r, std::string("abgebrochen (") + was + ")");
+        if (r.getrennt) return fehler(r, std::string("Leitung getrennt (") + was + ")", LoginArt::Leitung);
+        return fehler(r, std::string("abgebrochen (") + was + ")", LoginArt::Abbruch);
     };
     auto fertig = [&]() {
         LoginErgebnis e;
         e.ok = true;
+        e.art = LoginArt::Ok;
+        e.versuche = versuche;
         r.messung(e);
         e.gelesen = sichtbarMachen(r.alles, std::string::npos);
+        return e;
+    };
+    auto abgelehnt = [&](const std::string& grund) {
+        LoginErgebnis e = fehler(r, grund, LoginArt::Abgelehnt);
+        e.versuche = versuche;
         return e;
     };
 
@@ -182,40 +191,82 @@ LoginErgebnis loginSkript(Leitung& l, const LoginOptionen& o) {
         if (!r.ruhe(r.z(o.ruhe_ms), r.z(o.ruhe_max_ms))) return grundAbbruch("warte auf login:");
     }
 
-    // 2. Name senden, „Password:" abwarten.
-    r.fenster.clear();
-    if (!r.sende(o.name + "\r")) {
-        r.getrennt = true;
-        return grundAbbruch("sende Namen");
-    }
-    const std::vector<std::string> nachName = {"password:", o.server_text, "login incorrect", "login:"};
-    if (o.mit_kennwort) {
-        const int w = r.warte(nachName, r.z(o.frist_kennwort_ms));
-        if (w == -2) return grundAbbruch("warte auf Password:");
-        if (w == -1) return fehler(r, "kein \"Password:\" nach dem Namen innerhalb der Frist");
-        if (w == 2 || w == 3) return fehler(r, "Name \"" + o.name + "\" abgelehnt (login: erscheint erneut)");
-        if (w == 0) {
-            r.fenster.clear();
-            if (!r.sende(o.kennwort + "\r")) {
-                r.getrennt = true;
-                return grundAbbruch("sende Kennwort");
+    // 2./3. Name, Kennwort, Serverbeginn.  Ohne Rueckruf genau einmal; mit Rueckruf so oft, wie der
+    //    Anwender es nach einer Ablehnung noch einmal versucht (dieselbe Leitung, kein neues RETURN).
+    std::string name = o.name, kennwort = o.kennwort;
+    for (int versuch = 0;; ++versuch) {
+        if (o.abfrage) {
+            // Die Eingabezeit des Anwenders ist keine Frist: hier wird nicht gelesen, keine Uhr laeuft.
+            AnmeldeAnfrage a;
+            a.versuch = versuch;
+            a.gelesen = sichtbarMachen(r.alles);
+            if (!o.abfrage(a, name, kennwort) || r.stop()) {
+                r.abgebrochen = true;
+                return grundAbbruch("Anwender hat die Anmeldung abgebrochen");
             }
-        } else {
-            // Serverbeginn ohne Kennwort: fertig mit Schritt 3, Ruhe unten.
-            r.fenster = o.server_text + " ";
+            // Was die Gegenstelle waehrend der Eingabe noch schrieb (Zeitablauf-Meldung, zweites
+            // „login:"), gehoert nicht in die Auswertung der Antwort.
+            if (!r.ruhe(r.z(o.ruhe_ms), r.z(o.ruhe_max_ms))) return grundAbbruch("warte nach der Eingabe");
         }
-    }
 
-    if (!o.auf_server_warten) return fertig();
+        r.fenster.clear();
+        ++versuche;
+        if (!r.sende(name + "\r")) {
+            r.getrennt = true;
+            return grundAbbruch("sende Namen");
+        }
+        const std::vector<std::string> nachName = {"password:", o.server_text, "login incorrect", "login:"};
+        // 0: weiter zum Serverbeginn, 1: abgelehnt (Rueckruf erneut)
+        bool nochmal = false;
+        bool loginDa = false;   // „login:" der naechsten Runde steht schon im Fenster (verbraucht)
+        if (o.mit_kennwort) {
+            const int w = r.warte(nachName, r.z(o.frist_kennwort_ms));
+            if (w == -2) return grundAbbruch("warte auf Password:");
+            if (w == -1) return fehler(r, "kein \"Password:\" nach dem Namen innerhalb der Frist");
+            if (w == 2 || w == 3) {
+                if (!o.abfrage) return abgelehnt("Name \"" + name + "\" abgelehnt (login: erscheint erneut)");
+                nochmal = true;
+                loginDa = (w == 3);
+            } else if (w == 0) {
+                r.fenster.clear();
+                if (!r.sende(kennwort + "\r")) {
+                    r.getrennt = true;
+                    return grundAbbruch("sende Kennwort");
+                }
+            } else {
+                // Serverbeginn ohne Kennwort: fertig mit Schritt 3, Ruhe unten.
+                r.fenster = o.server_text + " ";
+            }
+        }
 
-    // 3. Auf den Serverbeginn warten.  „Choose one"/„New password" = Benutzer ohne Kennwort.
-    {
-        const std::vector<std::string> m = {o.server_text, "login incorrect", "choose one", "new password", "login:"};
-        const int w = r.warte(m, r.z(o.frist_server_ms));
-        if (w == -2) return grundAbbruch("warte auf den Serverbeginn");
-        if (w == -1) return fehler(r, "kein Serverbeginn (\"" + o.server_text + "\") innerhalb der Frist");
-        if (w == 1 || w == 4) return fehler(r, "Kennwort abgelehnt (Login incorrect)");
-        if (w == 2 || w == 3) return fehler(r, "Benutzer hat kein Kennwort (System fordert ein neues)");
+        if (!nochmal) {
+            if (!o.auf_server_warten) return fertig();
+
+            // Auf den Serverbeginn warten.  „Choose one"/„New password" = Benutzer ohne Kennwort.
+            const std::vector<std::string> m = {o.server_text, "login incorrect", "choose one", "new password", "login:"};
+            const int w = r.warte(m, r.z(o.frist_server_ms));
+            if (w == -2) return grundAbbruch("warte auf den Serverbeginn");
+            if (w == -1) return fehler(r, "kein Serverbeginn (\"" + o.server_text + "\") innerhalb der Frist");
+            if (w == 2 || w == 3) return fehler(r, "Benutzer hat kein Kennwort (System fordert ein neues)", LoginArt::Abgelehnt);
+            if (w == 1 || w == 4) {
+                if (!o.abfrage) return abgelehnt("Kennwort abgelehnt (Login incorrect)");
+                nochmal = true;
+                loginDa = (w == 4);
+            }
+        }
+
+        if (nochmal) {
+            // Die Gegenstelle fragt von vorn: erst das neue „login:" abwarten (nach „Login incorrect"
+            // kommt es gleich danach, bei einer getty nach einer Zeitsperre), dann die Stille.
+            if (!loginDa) {
+                const int w = r.warte({"login:"}, r.z(o.frist_kennwort_ms));
+                if (w == -2) return grundAbbruch("warte auf erneutes login:");
+                if (w == -1) return fehler(r, "nach der Ablehnung kein erneutes \"login:\" innerhalb der Frist");
+            }
+            if (!r.ruhe(r.z(o.ruhe_ms), r.z(o.ruhe_max_ms))) return grundAbbruch("warte auf erneutes login:");
+            continue;
+        }
+        break;
     }
 
     // 4. Ruhe: den Rest des Banners lesen, bis die Leitung `ruhe_ms` still war.

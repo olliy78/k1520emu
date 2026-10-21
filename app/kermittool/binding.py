@@ -71,6 +71,10 @@ class KermitError(RuntimeError):
 # Rueckrufe: (Datei, Bytes, Gesamt, user) bzw. (Text, user).
 PROGRESS_CB = ctypes.CFUNCTYPE(None, ctypes.c_char_p, ctypes.c_int64, ctypes.c_int64, ctypes.c_void_p)
 EVENT_CB = ctypes.CFUNCTYPE(None, ctypes.c_char_p, ctypes.c_void_p)
+LOGIN_ASK_CB = ctypes.CFUNCTYPE(None, ctypes.c_int, ctypes.c_char_p, ctypes.c_void_p)
+
+#: Art des Ausgangs einer Anmeldung (``Kermit.login_kind``), gleich ``K1520K_LOGIN_*`` im Header.
+LOGIN_OK, LOGIN_ABGELEHNT, LOGIN_FRIST, LOGIN_LEITUNG, LOGIN_ABBRUCH = 0, 1, 2, 3, 4
 
 _H = ctypes.c_void_p
 _CS = ctypes.c_char_p
@@ -92,6 +96,9 @@ SIGNATUREN: Dict[str, tuple] = {
     "k1520k_peer": (_CS, [_H]),
     "k1520k_line_notice": (_CS, [_H]),
     "k1520k_login": (_I, [_H, _CS, _CS, _I]),
+    "k1520k_login_ask": (_I, [_H, LOGIN_ASK_CB, ctypes.c_void_p, _I]),
+    "k1520k_login_answer": (_I, [_H, _CS, _CS]),
+    "k1520k_login_kind": (_I, [_H]),
     "k1520k_set_pruefsumme": (_I, [_H, _I]),
     "k1520k_set_paketlaenge": (_I, [_H, _I]),
     "k1520k_set_namen": (_I, [_H, _I, _I]),
@@ -253,6 +260,31 @@ class Kermit:
         """Anmeldung an einer getty; liefert den gelesenen Text (Banner)."""
         self._pruefe(lib().k1520k_login(self._handle(), _b(name), _b(kennwort), frist_ms))
         return self.result
+
+    def login_ask(self, frage, frist_ms: int = 60000) -> str:
+        """Anmeldung auf Abruf (K10).  ``frage(versuch, gelesen)`` wird IM aufrufenden Faden gerufen, sobald
+        die Gegenstelle ``login:`` zeigt, und liefert ``(name, kennwort)`` oder ``None`` (= Abbruch).
+        Bei ``login_kind == LOGIN_ABGELEHNT`` (Ausnahme ``KermitFehler``) darf man erneut aufrufen --
+        ``login_ask`` selbst fragt nach einer Ablehnung schon von sich aus erneut, solange ``frage`` antwortet.
+        Die Zeit in ``frage`` ist keine Frist; ``abort()`` aus einem anderen Faden wirkt nach deren Rueckkehr."""
+        h = self._handle()
+
+        def _cb(versuch, gelesen, _user):
+            try:
+                antwort = frage(int(versuch), _s(gelesen))
+            except BaseException:   # eine Ausnahme darf nicht durch C laufen: wie Abbruch behandeln
+                antwort = None
+            if antwort:
+                lib().k1520k_login_answer(h, _b(antwort[0]), _b(antwort[1]))
+
+        cb = LOGIN_ASK_CB(_cb)   # bis zur Rueckkehr referenziert halten
+        self._pruefe(lib().k1520k_login_ask(h, cb, None, frist_ms))
+        return self.result
+
+    @property
+    def login_kind(self) -> int:
+        """Art des Ausgangs der letzten Anmeldung (``LOGIN_*``)."""
+        return lib().k1520k_login_kind(self._handle())
 
     # ── Einstellungen ────────────────────────────────────────────────────
     def set_pruefsumme(self, typ: int) -> None:

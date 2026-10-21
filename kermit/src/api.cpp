@@ -35,6 +35,13 @@ struct Handle {
     K1520KProgress cbFortschritt = nullptr;
     K1520KEvent cbEreignis = nullptr;
     void* user = nullptr;
+    // Anmeldung (K10): Art des letzten Ausgangs und die Antwort, die der Abfrage-Rueckruf gibt.
+    int loginArt = 0;
+    struct LoginAntwort {
+        bool gesetzt = false;
+        std::string name, kennwort;
+    };
+    LoginAntwort* loginAntwort = nullptr;   ///< nur WAEHREND des Abfrage-Rueckrufs (im Faden von login_ask)
 };
 
 thread_local std::string tl_openFehler;
@@ -254,13 +261,9 @@ extern "C" K1520K_API const char* k1520k_line_notice(K1520Kermit h) {
 
 // ─── Anmeldung ──────────────────────────────────────────────────────────────
 
-extern "C" K1520K_API int k1520k_login(K1520Kermit h, const char* name, const char* kennwort, int frist_ms) {
-    K_BEGIN(h)
-    if (!lokalGueltig(name)) return usage(H_, "Anmeldename fehlt");
-    LoginOptionen o;
-    o.name = name;
-    o.mit_kennwort = kennwort != nullptr;
-    if (kennwort) o.kennwort = kennwort;
+namespace {
+
+int loginIntern(Handle* H_, LoginOptionen o, int frist_ms) {
     if (frist_ms > 0) {
         o.frist_login_ms = frist_ms;
         o.frist_kennwort_ms = frist_ms;
@@ -274,8 +277,61 @@ extern "C" K1520K_API int k1520k_login(K1520Kermit h, const char* name, const ch
     if (r.ok && r.tempo > 0) H_->sitzung->setzeTempoSchaetzung(r.tempo);
     H_->ergebnis = r.gelesen;
     H_->fehler = r.ok ? std::string() : r.text;
+    H_->loginArt = static_cast<int>(r.art);   // LoginArt und K1520K_LOGIN_* sind deckungsgleich (Header)
     return r.ok ? K1520K_OK : K1520K_E_LOGIN;
+}
+
+}  // namespace
+
+extern "C" K1520K_API int k1520k_login(K1520Kermit h, const char* name, const char* kennwort, int frist_ms) {
+    K_BEGIN(h)
+    if (!lokalGueltig(name)) return usage(H_, "Anmeldename fehlt");
+    LoginOptionen o;
+    o.name = name;
+    o.mit_kennwort = kennwort != nullptr;
+    if (kennwort) o.kennwort = kennwort;
+    return loginIntern(H_, std::move(o), frist_ms);
     K_END
+}
+
+extern "C" K1520K_API int k1520k_login_ask(K1520Kermit h, K1520KLoginAsk ask, void* user, int frist_ms) {
+    K_BEGIN(h)
+    if (!ask) return usage(H_, "Abfrage-Rueckruf fehlt");
+    LoginOptionen o;
+    o.mit_kennwort = true;
+    o.abfrage = [H_, ask, user](const AnmeldeAnfrage& a, std::string& name, std::string& kennwort) {
+        Handle::LoginAntwort antwort;
+        H_->loginAntwort = &antwort;
+        try {
+            ask(a.versuch, a.gelesen.c_str(), user);
+        } catch (...) {
+            H_->loginAntwort = nullptr;
+            throw;
+        }
+        H_->loginAntwort = nullptr;
+        if (!antwort.gesetzt) return false;   // keine Antwort = der Anwender bricht ab
+        name = antwort.name;
+        kennwort = antwort.kennwort;
+        return true;
+    };
+    return loginIntern(H_, std::move(o), frist_ms);
+    K_END
+}
+
+extern "C" K1520K_API int k1520k_login_answer(K1520Kermit h, const char* name, const char* kennwort) {
+    K_BEGIN(h)
+    if (!H_->loginAntwort) return usage(H_, "k1520k_login_answer ausserhalb des Abfrage-Rueckrufs");
+    if (!lokalGueltig(name)) return usage(H_, "Anmeldename fehlt");
+    H_->loginAntwort->name = name;
+    H_->loginAntwort->kennwort = kennwort ? kennwort : "";
+    H_->loginAntwort->gesetzt = true;
+    return K1520K_OK;
+    K_END
+}
+
+extern "C" K1520K_API int k1520k_login_kind(K1520Kermit h) {
+    Handle* H_ = H(h);
+    return H_ ? H_->loginArt : -1;
 }
 
 // ─── Einstellungen ──────────────────────────────────────────────────────────

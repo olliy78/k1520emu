@@ -120,6 +120,34 @@ K1520K_API const char* k1520k_line_notice(K1520Kermit h);
 ///         in @ref k1520k_result_string.
 K1520K_API int k1520k_login(K1520Kermit h, const char* name, const char* kennwort, int frist_ms);
 
+/// Ausgang der letzten Anmeldung (@ref k1520k_login, @ref k1520k_login_ask) — nur diese Art sagt der
+/// Oberflaeche, ob sie erneut fragen soll: nur bei ABGELEHNT.  Werte deckungsgleich mit `LoginArt`.
+enum {
+    K1520K_LOGIN_OK = 0,
+    K1520K_LOGIN_ABGELEHNT = 1,   ///< wieder `login:` / `Login incorrect`: erneut fragen
+    K1520K_LOGIN_FRIST = 2,       ///< Stille ohne Fortschritt
+    K1520K_LOGIN_LEITUNG = 3,     ///< Leitung getrennt
+    K1520K_LOGIN_ABBRUCH = 4      ///< @ref k1520k_abort oder keine Antwort im Rueckruf
+};
+
+/// Abfrage-Rueckruf der Anmeldung auf Abruf.  Wird erst gerufen, wenn die Gegenstelle `login:` zeigt,
+/// IM FADEN von @ref k1520k_login_ask.  `versuch` 0 = erste Frage, ab 1 wurde der vorige Versuch
+/// abgelehnt; `gelesen` = zuletzt Gelesenes (sichtbar gemacht).  Der Rueckruf antwortet mit
+/// @ref k1520k_login_answer; ohne Antwort gilt die Anmeldung als abgebrochen.  Er darf beliebig lange
+/// blockieren (die Eingabezeit ist keine Frist); @ref k1520k_abort wirkt, sobald er zurueckkehrt.
+typedef void (*K1520KLoginAsk)(int versuch, const char* gelesen, void* user);
+
+/// Anmeldung auf Abruf: wie @ref k1520k_login, aber Name und Kennwort kommen aus `ask`, und bei
+/// ABGELEHNT wird `ask` erneut gerufen (dieselbe Leitung).  `frist_ms` wie bei k1520k_login.
+/// @return 0 oder K1520K_E_LOGIN; die Art danach ueber @ref k1520k_login_kind.
+K1520K_API int k1520k_login_ask(K1520Kermit h, K1520KLoginAsk ask, void* user, int frist_ms);
+
+/// Nur INNERHALB des Abfrage-Rueckrufs (im selben Faden) rufen: setzt Name und Kennwort (`kennwort` NULL = leer).
+K1520K_API int k1520k_login_answer(K1520Kermit h, const char* name, const char* kennwort);
+
+/// Art des Ausgangs der letzten Anmeldung (K1520K_LOGIN_*); -1 bei ungueltigem Handle.
+K1520K_API int k1520k_login_kind(K1520Kermit h);
+
 /* ─── Einstellungen (jederzeit zwischen den Operationen) ──────────────────── */
 
 /// Gewuenschte Blockpruefung 1..3 (Vorgabe 3; ausgehandelt, die Gegenstelle kann herunterstufen).
