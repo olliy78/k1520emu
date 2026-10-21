@@ -17,6 +17,8 @@ Wo was steht:
 
 * Die ersten Schritte stehen in *Der übliche Weg*.
 * Was Kermit ist und wie es arbeitet, erklärt *Was ist Kermit*.
+* Wie ein CP/M-Rechner mit seinem Kermit-80 Dateien austauscht (mit diesem Programm oder mit der WEGA),
+  steht in *Kermit-80 auf den CP/M-Rechnern*.
 * Wie man Kermit auf der WEGA einrichtet, beschreibt *Kermit Einrichtung unter WEGA*. Auf der
   mitgelieferten WEGA-3.1-Platte ist das schon erledigt.
 * Wenn etwas nicht klappt, hilft *Fehlersuche*.
@@ -336,6 +338,187 @@ Hinweise:
   Kennwort; einfach RETURN drücken.
 * Geprüft ist dieser Ablauf an der Konsole. An tty0, tty2 oder tty4 bis tty7 sollte er genauso gehen;
   das ist nicht geprüft.
+
+## Kermit-80 auf den CP/M-Rechnern
+
+Auf den mitgelieferten Systemdisketten liegt die Datei **`KERMIT.COM`**. Das ist *Kermit-80*, das
+Kermit-Programm für CP/M. Damit tauscht ein emulierter CP/M-Rechner Dateien mit diesem Programm oder mit
+der WEGA aus. Kermit-80 ist nur **Client**: Es sendet Dateien, holt Dateien und fragt einen Server, aber es
+kann selbst keinen Server abgeben. Auf der Gegenseite braucht es also immer einen Server.
+
+Wo `KERMIT.COM` liegt, und welche Schnittstelle es benutzt:
+
+| Rechner (Diskette) | Schnittstelle im Emulator |
+|---|---|
+| A5120 (CP/A und SCPX) | **DFÜ/V.24** |
+| K8915 (SCPX 8915) | **V.24** (X4) |
+| PC 1715 (SCP 1715, CP/A 1715) | **V.24** (X5) |
+| PC 1715W (SCP 3.0) | **V.24** (X5) |
+| PRG 710 und 710-1 (SCPX) | **V.24** (X4) |
+| P8000, 8-Bit-Teil (OS/M) | **tty0** |
+
+Jeder Rechner hat seine eigene Fassung. Sie stellt die Leitung selbst auf **9600 Baud, 8 Bit, keine Parität,
+1 Stoppbit** ein; einstellen muss man nichts. Auf CP/Z und UDOS gibt es Kermit-80 nicht.
+
+**Starten.** Am Prompt des Betriebssystems:
+
+```
+A>kermit
+Kermit-80 v4.11 configured for A5120 (K8025 A33-A) with Generic (Dumb) CRT Terminal type selected
+Kermit-80   0A:>
+```
+
+`Kermit-80   0A:>` ist die Eingabeaufforderung; die Laufwerkskennung davor kann anders lauten. Alle
+Befehle unten tippt man dort. Mit `?` zeigt Kermit-80 an jeder Stelle, was möglich ist. Beenden mit `exit`.
+
+### Mit dem PC-Server von K1520 Kermit
+
+Dieses Programm ist der Server, der CP/M-Rechner der Client. Die Leitung läuft über Telnet, wie in
+*Fall 2 — die WEGA ist der Client*.
+
+1. In K1520 Kermit *Verbindung ▸ Ordner freigeben…* wählen und einen Ordner bestimmen.
+2. *Verbindung ▸ Als Server einrichten…* wählen. Die Voreinstellung *WEGA als Client (hier lauschen,
+   Kermit auf tty3)* passt: Telnet, Lauschen, Port **5001**.
+3. *Verbindung ▸ Server starten* (Strg+Umschalt+S).
+4. Im Emulator *Einstellungen ▸ Schnittstellen* öffnen. Beim Block der Schnittstelle aus der Tabelle oben
+   (A5120: **DFÜ/V.24**) *Telnet* und *Client* wählen, Host `127.0.0.1`, Port **5001**, *Starten*.
+5. Im CP/M-Rechner `kermit` aufrufen und die Befehle von unten eingeben.
+
+Die Leitung dieses Wegs ist **8-Bit-rein**. Kermit-80 braucht deshalb keine besondere Einstellung der
+Parität (Vorgabe `none`).
+
+**Textdateien (7 Bit).** Eine CP/M-Textdatei endet mit einem Ctrl-Z (1AH); der Rest des letzten
+128-Byte-Satzes ist mit Ctrl-Z aufgefüllt.
+
+```
+Kermit-80   0A:>set file-mode ascii
+Kermit-80   0A:>send brief.txt
+```
+
+`set file-mode ascii` sendet nur bis zum ersten Ctrl-Z. Die Zeilenenden CR LF bleiben unverändert. Der
+Server legt die Datei im freigegebenen Ordner an, mit kleinen Buchstaben (`brief.txt`).
+
+**Binärdateien (8 Bit).**
+
+```
+Kermit-80   0A:>set file-mode binary
+Kermit-80   0A:>send programm.com
+Kermit-80   0A:>get daten.bin
+```
+
+`set file-mode binary` schickt alle 128-Byte-Sätze einer Datei vollständig, auch den letzten. Alle 256
+Bytewerte kommen unverändert an. Holt Kermit-80 eine Datei, deren Länge kein Vielfaches von 128 ist,
+füllt es den Rest des letzten Satzes mit Ctrl-Z auf, weil CP/M keine Bytelänge kennt. Die Füllbytes
+gehören nicht zur Datei.
+
+Weitere Befehle am Prompt:
+
+| Befehl | Wirkung |
+|---|---|
+| `send datei` | Datei zum Server schicken. Mit Platzhaltern: `send *.com` |
+| `get datei` | Datei vom Server holen. Sie landet auf dem Laufwerk des Prompts |
+| `remote directory` | Verzeichnis des freigegebenen Ordners anzeigen |
+| `remote delete datei` | Datei auf dem Server löschen (nicht bei *Nur lesen*) |
+| `set block-check-type 3-character-crc-ccitt` | die stärkste Blockprüfung einstellen (auch `1-character-checksum`, `2-character-checksum`) |
+| `finish` | den Server beenden |
+| `exit` | Kermit-80 verlassen |
+
+Dateinamen kommen in Großbuchstaben aus CP/M. Mit der Vorgabe *Namen beim Empfangen: konvertiert* legt der
+Server sie klein an, zum Beispiel `programm.com`.
+
+### Mit der WEGA als Server
+
+Hier ist der P8000 mit WEGA der Server, der CP/M-Rechner der Client. Man braucht zwei Emulatoren
+nebeneinander: den P8000 (`p8000emu`) und den CP/M-Rechner. Die Platte `p8000_wega31` hat den Benutzer
+`kermit` schon (siehe *Fall 1 — die WEGA ist der Server*).
+
+1. Im `p8000emu` WEGA starten, bis `WEGA login:` an der Konsole steht.
+2. Im `p8000emu` *Einstellungen ▸ Schnittstellen*: Block **tty0** auf *Telnet* und *Server*, Port **5000**,
+   *Starten*.
+3. Im Emulator des CP/M-Rechners *Einstellungen ▸ Schnittstellen*: bei der Schnittstelle aus der Tabelle
+   oben *Telnet* und *Client*, Host `127.0.0.1`, Port **5000**, *Starten*.
+4. Im CP/M-Rechner `kermit` aufrufen und anmelden. Kermit-80 kennt kein Login-Skript.
+   Man meldet sich im Terminalmodus von Hand an:
+
+```
+Kermit-80   0A:>set file-mode binary
+Kermit-80   0A:>connect
+[Connected to remote host.  Type Control-\C to return;
+ type Control-\? for command list]
+```
+
+   Jetzt gehen alle Tasten an die WEGA. RETURN drücken, bis `login:` erscheint. Dann `kermit` und RETURN,
+   bei `Password:` wieder `kermit` und RETURN. Nach einigen Sekunden meldet sich der Server:
+
+```
+C-Kermit server starting.  Return to your local machine by typing
+its escape sequence for closing the connection, and issue further
+commands from there.  To shut down the C-Kermit server, issue the
+FINISH command and then reconnect.
+```
+
+5. Zurück zu Kermit-80: **Strg+\** drücken (die Taste Strg gedrückt halten und das Zeichen `\` tippen),
+   dann den Buchstaben **`c`**. Kermit-80 meldet `[Connection closed, back at micro]` und zeigt wieder
+   die Eingabeaufforderung. Das **Fluchtzeichen** ist in dieser Fassung Strg+\; Strg+] geht **nicht**.
+   Zweimal hintereinander gedrückt, geht das Fluchtzeichen selbst an die WEGA.
+6. Der Server der WEGA läuft jetzt. Befehle wie oben, mit den Besonderheiten unten.
+7. Zum Schluss `finish`. Der Server der WEGA endet, getty meldet sich wieder mit `login:`.
+
+```
+Kermit-80   0A:>remote directory
+Kermit-80   0A:>get text.txt
+Kermit-80   0A:>send brief.txt
+Kermit-80   0A:>finish
+```
+
+`remote directory` zeigt das Verzeichnis `/usr/kermit` der WEGA im Format von `ls -l`. Die WEGA
+legt empfangene Dateien dort mit kleinen Buchstaben an.
+
+**Textdateien (7 Bit) mit der WEGA.** Die Leitung tty0 der WEGA löscht auf dem Weg zur WEGA das achte
+Bit. Reiner Text kommt trotzdem an:
+
+```
+Kermit-80   0A:>set file-mode binary
+Kermit-80   0A:>get text.txt
+```
+
+Mit `set file-mode binary` bleibt jedes Byte, wie es die WEGA liefert. Die WEGA beendet Zeilen mit LF
+allein, nicht mit CR LF. Ein CP/M-Editor erwartet CR LF; eine so geholte Datei muss also bei Bedarf
+umgewandelt werden. Beim Senden zur WEGA bleiben die CR LF der CP/M-Datei stehen. Mit `set file-mode ascii` gehen nur die Zeichen bis
+zum ersten Ctrl-Z hinaus, ohne die Füllbytes des letzten Satzes (gegen den PC-Server geprüft).
+
+**Binärdateien (8 Bit) mit der WEGA.** Wegen des gelöschten achten Bits muss Kermit-80 das Bit **in das
+Datenpaket verpacken** („8th bit prefixing“). Das tut es nur, wenn eine Parität eingestellt ist. Vor der
+Übertragung also:
+
+```
+Kermit-80   0A:>set parity space
+Kermit-80   0A:>set file-mode binary
+Kermit-80   0A:>get programm.bin
+Kermit-80   0A:>send programm.com
+```
+
+Mit eingestellter Parität setzt Kermit-80 das achte Bit jedes gesendeten Zeichens selbst (bei `space` auf 0)
+und verpackt Datenbytes ab 80H in ein Präfix. Auch `mark`, `even` und `odd` lösen die Verpackung aus; gegen die
+WEGA geprüft ist `space`. Dann kommen alle 256 Bytewerte unverändert an, in beiden Richtungen. **Ohne**
+eingestellte Parität verliert jedes Byte ab 80H sein achtes Bit; die Datei ist danach unbrauchbar. Hat die
+Gegenseite die Verpackung nicht eingeschaltet, warnt Kermit-80 am Bildschirm.
+
+Die Parität gilt auch für die Terminalverbindung (`connect`). Wer sie für die Übertragung einstellt, kann sie
+danach mit `set parity none` zurücknehmen.
+
+### Wenn etwas nicht klappt
+
+* **Kermit-80 meldet sofort einen Fehler oder wartet endlos bei `Starting ...`:** Die Leitung steht nicht.
+  Im Emulator *Einstellungen ▸ Schnittstellen* prüfen: Block gestartet, Host und Port richtig, Status
+  *Verbunden*. Bei der WEGA zuerst `connect` und prüfen, ob `login:` erscheint.
+* **Nach `connect` passiert nichts:** Bei der WEGA RETURN drücken; getty antwortet erst auf einen
+  Zeilenumbruch.
+* **Strg+\ kommt nicht an:** Ob das Zeichen `\` mit gedrückter Strg-Taste im Emulator ankommt, hängt von der
+  Tastaturbelegung ab (an der deutschen Tastatur liegt `\` auf AltGr+ß). Das ist nicht geprüft.
+* **Binärdatei von der WEGA ist beschädigt:** `set parity space` vor `get` und `send` vergessen.
+* **Eine Datei mit dem Namen gibt es auf dem CP/M-Rechner schon:** `set collision` legt fest, was Kermit-80
+  mit einer ankommenden Datei gleichen Namens tut: `backup`, `discard`, `overwrite` oder `rename`.
 
 ## Kermit Einrichtung unter WEGA
 

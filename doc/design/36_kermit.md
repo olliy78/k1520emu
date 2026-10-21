@@ -549,6 +549,8 @@ eine Beigabe zum Ausprobieren der V.24-Schnittstelle: A5120 (CP/A und SCPX 1.7),
   8-Bit-Präfix, C-Kermit 4.2 schaltet es ein (`get` von `alle256`/`b94`/`b95`, `send` von `sendbin.bin` — alle 256 Bytewerte —,
   lokal löschen, wieder holen, bytegleich).  Mit `set parity none` (Vorgabe) käme jedes Byte ≥ 80H verstümmelt an.  Die anderen Rechner sind nicht eigens
   gegen die WEGA geprüft (gleiches Programm, nur die Überlagerung unterscheidet sich).
+- **Handbuch:** `app/kermittool/help/handbuch.md`, Abschnitt *Kermit-80 auf den CP/M-Rechnern* — Start, Leitungen je Rechner,
+  die genauen Befehle für den PC-Server und die WEGA (Anmeldung mit `connect`, Ctrl-\\ `c`, 7-Bit-Text, 8-Bit-Binär mit `set parity space`).
 - **Befund, Bibliothek:** Kermit-80 mit `set parity even|mark|odd` sendet jedes Byte mit Paritätsbit, auch MARK
   (SOH = 81H).  Der `PaketZerleger` suchte nur 01H und schwieg (Kermit-80 hing bei `Starting …`).  Jetzt erkennt er
   Parität (81H beim Suchen oder Bit 7 in LEN/SEQ/TYPE), rastet ein und streift danach Bit 7 ab; ohne Parität bleiben
