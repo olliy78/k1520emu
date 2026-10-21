@@ -62,6 +62,7 @@ def soll_fuer(schluessel):
             'PASCAL.COM', 'PASCAL.TXT', 'PASCAL.RES', 'M80.COM', 'LINKMT.COM',
             'MLOAD.COM', 'Z1.COM', 'ZSID.COM', 'RAMTEST.COM', 'DIMA.COM', 'UNERA.COM', 'DISKCOPY.COM'))
         d.update(db.beigaben('SERTEST.COM', 'RAFCPM.COM', 'RAF512.COM', 'LBREAD.COM', 'LBPUNCH.COM'))
+        d.update(db.kermit80('prg710'))
         d['RAFTEST.COM'] = db.raftest()
         d.update(db.aus_fixture(os.path.join('tests', 'fixtures', 'raf'), 'RAFQUICK.COM'))
         return d

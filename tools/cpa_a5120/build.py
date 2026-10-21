@@ -112,6 +112,7 @@ def soll():
     inhalt[LIESMICH] = _cpm_text(inhalt[LIESMICH])
     for n in BEIGABEN:
         inhalt[n] = _lies(beigaben.PROGRAMME[n])
+    inhalt['KERMIT.COM'] = _lies(beigaben.KERMIT80['a5120'])
     inhalt['RAFTEST.COM'] = _raftest()
     inhalt['RAFQUICK.COM'] = _lies(RAF_FIXTURES, 'RAFQUICK.COM')
     return inhalt

@@ -1,7 +1,7 @@
 # 36 — Kermit: Datenaustausch Host-PC ↔ WEGA (P8000)
 
-Stand 2026-10-20 (AP K9), Zweig `kermit` (von `P8000`): **K0–K9 fertig** (K9: Paket lokal belegt, Inno/MSVC nur
-in der CI), offen nur das optionale K2b; offene Einzelpunkte in §7.  Zwei Teile: **(A)** Kermit auf der WEGA-3.1-Platte
+Stand 2026-10-21, Zweig `kermit` (von `P8000`): **K0–K9 fertig** (K9: Paket lokal belegt, Inno/MSVC nur
+in der CI), dazu Kermit-80 als Beigabe auf den Disketten (§6.8); offen nur das optionale K2b; offene Einzelpunkte in §7.  Zwei Teile: **(A)** Kermit auf der WEGA-3.1-Platte
 einrichten (Server hinter `getty`, Client in der Shell), **(B)** ein eigenes Kermit für den PC
 (C++-Bibliothek + Kommandozeile + Python/Qt-Oberfläche), Client **und** Server.
 Merkposten (seit AP K7): `doc/merkposten/kermit.md`.
@@ -518,6 +518,34 @@ Nutzlast).  Merkposten: `doc/merkposten/paketierung.md`, Entwurf 13 §10c.
 (Bibliothek lädt, `k1520k_version` = Bauversion, `--help` der Kommandozeile, `--paths` des Einstiegs).  Die Größenschranke der
 Setup-Probe (136 MB) wurde nicht angefasst; Kermit bringt ~1 MB mit.
 
+### 6.8 Stand 2026-10-21 — Kermit-80 als Gegenprobe und Beigabe
+
+**Kermit-80 4.11 (CP/M-Kermit) läuft auf A5120, K8915, PC 1715 und PRG 710/710-1** und tauscht Dateien mit der
+Bibliothek aus.  Es ist **nur Client** (Handbuch: „Act as server: No“): `SEND`, `GET`, `REMOTE DIRECTORY`, `FINISH`
+gegen den Server der Bibliothek (`Sitzung::serve`).  Auf den ausgelieferten Disketten liegt es als `KERMIT.COM` —
+eine Beigabe zum Ausprobieren der V.24-Schnittstelle: A5120 (CP/A und SCPX 1.7), K8915 (SCPX 8915), PC 1715
+(SCP 1715 V0006/V0007) und PRG 710/710-1 (SCPX).  Nicht darauf: CP/Z, CP/A 1715, SCP 3.0 (1715W), UDOS.
+
+- **Eine Überlagerung je Rechner.**  Kermit-80 besteht aus dem rechnerunabhängigen Teil (`CPSKER.HEX`) und einer
+  Überlagerung ab 7000H mit dem Anschluss.  `tools/kermit80/bau.py <rechner>` übersetzt sie mit M80 neu (Systemklasse
+  `inout`, Z80-SIO über IN/OUT, Anfangsfolge programmiert Zeitgeber und SIO auf 9600 8N1).  Quellen
+  (`tools/kermit80/quelle/`) und die vier fertigen `kermit_<rechner>.com` (a5120, k8915, pc1715, prg710) sind
+  eingecheckt; Bau braucht die CP/M-Werkzeugkette (`CPA_TOOLS`), der Selbsttest (`bau.py --selbsttest`) bildet die
+  generische Überlagerung `CPVGEN.HEX` bytegleich nach.
+- **Auf die Disketten** kommt die `.com` über die Bauskripte (`db.kermit80(<rechner>)` in `tools/diskbau.py`,
+  `disketten_beigaben.KERMIT80`); die LIESMICH-Dateien nennen sie.  Neu bauen: `tools/{cpa_a5120,scpx_a5120,scpx_k8915,
+  scpx_prg,scp_pc1715}/build.py --tool build/k1520disktool`.
+- **Wächter** (`tests/system/test_kermit80.cpp`, `format_integration`): A5120 — Größen und Inhalt (`GET`/`SEND` von 0
+  bis 100 KB), Parität none/even/mark/space/odd mit Prüfsumme 1/2/3; `Kermit80Rechner.*` — K8915, PC 1715, PRG 710
+  und 710-1 schicken die `.com` an den PC-Server, bytegleich; `Kermit80Bau.*` — die eingecheckten `.com` sind das
+  Ergebnis von `bau.py` (übersprungen ohne Werkzeugkette).  `tools/dev.sh test-format -R Kermit80`.
+- **Befund, Bibliothek:** Kermit-80 mit `set parity even|mark|odd` sendet jedes Byte mit Paritätsbit, auch MARK
+  (SOH = 81H).  Der `PaketZerleger` suchte nur 01H und schwieg (Kermit-80 hing bei `Starting …`).  Jetzt erkennt er
+  Parität (81H beim Suchen oder Bit 7 in LEN/SEQ/TYPE), rastet ein und streift danach Bit 7 ab; ohne Parität bleiben
+  rohe 8-Bit-Daten unberührt (`KermitParitaet.*`).  Offener Punkt 9 aus §7 ist damit für den Empfang gelöst.
+- **Nicht belegt:** ein Kermit-Server für CP/M-80 (Kermit-80 hat keinen; eine Suche nach Alternativen läuft), Kermit-80
+  an CP/Z, CP/A 1715, SCP 3.0 und am P8000-OS/M.
+
 ## 7. Offene Aufgaben
 
 Zusammengetragen aus den „Offen"-Listen von §6.1–§6.6, nach Dringlichkeit:
@@ -540,8 +568,8 @@ Zusammengetragen aus den „Offen"-Listen von §6.1–§6.6, nach Dringlichkeit:
 8. **Kennwort:** das Laborkennwort `kermit` steht in der Voreinstellung (`konfig.VOREINSTELLUNGEN`) und auf
    der ausgelieferten Platte; ob eine Abfrage beim ersten Verbinden oder ein anderes Konto für das Paket
    besser ist, entscheidet der Anwender.
-9. **Nur aus den Quellen gelesen**, nicht ausgelöst: Speicherfehler bei `G C` ohne Feld, Verhalten bei
-   Parität ≠ none.
+9. **Nur aus den Quellen gelesen**, nicht ausgelöst: Speicherfehler bei `G C` ohne Feld.  (Parität ≠ none beim
+   Empfang ist seit §6.8 gelöst; gesendet wird weiter ohne Paritätsbit.)
 10. **K2b (optional):** Schiebefenster, `G T`/`G U`, Wiederaufnahme.
 
 ## 8. Risiken

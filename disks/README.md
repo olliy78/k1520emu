@@ -69,6 +69,7 @@ spielen sie über `tools/disketten_beigaben.py` und `tools/diskbau.py` ein):
 | Programm | Quelle | Disketten |
 |----------|--------|-----------|
 | `SERTEST.COM` V0.3 — serielle Schnittstellen | `tools/sertest/` | alle Systemdisketten außer UDOS |
+| `KERMIT.COM` — Kermit-80 4.11 (nur Client), V.24 mit 9600 Bd; je Rechner eine Überlagerung | `tools/kermit80/` | A5120 (CP/A, SCPX), K8915, PC 1715 (SCP 1715), PRG 710/710-1 (SCPX) |
 | `ROMREAD.COM` — liest das Boot-EPROM der ZRE nach `ROM.BIN` | `tools/romread/` | A5120 (CP/A, SCPX) |
 | `EM256ADR.COM`, `EM16ABL.COM`, `EM256FUL.COM`, `EM256TST.COM` — Prüfprogramme der A5120.16 (EM064/EM256, U8001) | `tools/em256/` | A5120 (CP/A, SCPX) |
 | `RAFCPM.COM` (M:), `RAF512.COM` (P:), `RAFTEST.COM`, `RAFQUICK.COM` — RAM-Floppy RAF (ZWG der AdW, Fremdsoftware, freigegeben; Entwurf 22) | `doc/raf512/`, `tests/fixtures/raf/` | A5120, K8915, PRG 710/710-1 |

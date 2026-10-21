@@ -226,5 +226,15 @@ k1520_add_test(p8000_wega_kermit_austausch SRC test_p8000_wega_kermit_austausch.
                                  "K1520_DISKTOOL=\"$<TARGET_FILE:k1520disktool>\"" TIMEOUT 7200 RUN_SERIAL)
 add_dependencies(k1520_test_p8000_wega_kermit_austausch k1520disktool)
 
+# ─── Kermit-80 4.11 unter CP/A und den uebrigen Systemen gegen die eigene Kermit-Bibliothek (Entwurf 36 §6.8).
+# Kermit-80 ist nur Client; die Bibliothek serviert.  Die Ueberlagerungen je Rechner liegen unter
+# tools/kermit80/ (kermit_<rechner>.com); der Bau-Waechter braucht CPA_TOOLS und wird sonst uebersprungen.
+k1520_add_test(kermit80 SRC test_kermit80.cpp
+                        LIBS k1520_a5120 k1520_k8915 k1520_pc1715 k1520_prg710 k1520_fs k1520_serial k1520kermit_core
+                             k1520_logger k1520_testsupport
+                        LABELS "system;slow;format_integration"
+                        DEFS LOG_LEVEL=2 "K1520_KERMIT80_DIR=\"${CMAKE_SOURCE_DIR}/tools/kermit80\""
+                             K1520_SERTEST_COM="${CMAKE_SOURCE_DIR}/tools/sertest/sertest.com" TIMEOUT 1800)
+
 # Zeitgrenzen der add_test()-Faelle × K1520_TEST_ZEIT_FAKTOR (tests/cmake/K1520AddTest.cmake)
 k1520_test_zeiten_skalieren()

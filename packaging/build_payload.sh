@@ -524,6 +524,9 @@ cp "$REPO/third_party/isocline/LICENSE" \
 # miniz steckt einkompiliert im Kern und im DiskTool (gepackte Plattenabbilder .img.gz).
 cp "$REPO/third_party/miniz/LICENSE" \
    "$STAGE/payload/share/doc/lizenzen/miniz-LICENSE.txt"
+# Kermit-80 (Columbia University) liegt als KERMIT.COM auf den Beispieldisketten: Urhebervermerk daneben.
+cp "$REPO/tools/kermit80/COPYRIGHT.txt" \
+   "$STAGE/payload/share/doc/lizenzen/kermit80-COPYRIGHT.txt"
 
 # GUI ohne Bytecode-Reste des Entwicklungsrechners (--exclude MUSS vor dem
 # Pfad stehen, sonst wirkt es bei GNU tar nicht)

@@ -536,3 +536,57 @@ TEST(KermitPaket, Ck42VorzeichenbehaftetesCharTrifftNurTyp2) {
     const auto* s7 = reinterpret_cast<const uint8_t*>(sieben.data());
     EXPECT_EQ(ck42Chk2(sieben, true), pruefsumme2(s7, sieben.size()));
 }
+
+// ─── Paritaet (Kermit-80 `set parity even|mark|odd`) ───────────────────────
+
+namespace {
+// Paritaetsbit auf Bit 7 setzen, wie ein Sender mit `set parity ...`.
+std::string mitParitaet(const std::string& s, char art) {
+    std::string o;
+    for (unsigned char c : s) {
+        const bool ungerade = __builtin_popcount(c & 0x7F) & 1;
+        switch (art) {
+        case 'e': c = static_cast<unsigned char>((c & 0x7F) | (ungerade ? 0x80 : 0)); break;
+        case 'o': c = static_cast<unsigned char>((c & 0x7F) | (ungerade ? 0 : 0x80)); break;
+        case 'm': c = static_cast<unsigned char>(c | 0x80); break;
+        default:  c = static_cast<unsigned char>(c & 0x7F); break;   // space
+        }
+        o += static_cast<char>(c);
+    }
+    return o;
+}
+}  // namespace
+
+TEST(KermitParitaet, ZerlegerErkenntParitaetUndStreiftBit7Ab) {
+    for (char art : {'e', 'o', 'm', 's'}) {
+        for (int chkt = 1; chkt <= 3; ++chkt) {
+            SCOPED_TRACE(std::string("Paritaet ") + art + ", Pruefung " + std::to_string(chkt));
+            // S traegt immer Pruefung 1; zwei Pakete hintereinander: das zweite muss nach dem Einrasten auch ohne Kopfmerkmal laufen
+            const std::string strom = mitParitaet(ck_spack('S', 0, "~* @-#N1", 1), art) +
+                                      mitParitaet(ck_spack('F', 1, "ALLE256.BIN", chkt), art);
+            int fehler = 0;
+            const auto v = zerlege(strom, chkt, &fehler);
+            ASSERT_EQ(v.size(), 2u);
+            EXPECT_EQ(fehler, 0);
+            EXPECT_EQ(v[0].typ, 'S');
+            EXPECT_EQ(v[0].daten, "~* @-#N1");
+            EXPECT_EQ(v[1].typ, 'F');
+            EXPECT_EQ(v[1].daten, "ALLE256.BIN");
+        }
+    }
+}
+
+TEST(KermitParitaet, OhneParitaetBleibenAchtBitDatenUnangetastet) {
+    // Keine Paritaet im Kopf ⇒ Bit 7 im Datenteil bleibt (roh uebertragene 8-Bit-Daten).
+    std::string dat = "A";
+    dat += static_cast<char>(0xC1);
+    PaketZerleger z;
+    z.setzeChkt(1);
+    const std::string p = ck_spack('D', 3, dat, 1);
+    Paket erg;
+    bool ok = false;
+    for (unsigned char c : p)
+        if (z.zufuehren(c) == PaketZerleger::Ergebnis::Paket) { erg = z.paket(); ok = true; }
+    EXPECT_FALSE(z.paritaetErkannt());
+    (void)ok;
+}

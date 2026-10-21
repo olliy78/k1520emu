@@ -66,6 +66,11 @@ def beigaben(*namen):
     return {n: lies(_beigaben.PROGRAMME[n]) for n in namen}
 
 
+def kermit80(rechner):
+    """Kermit-80 mit der Ueberlagerung des Rechners (disketten_beigaben.KERMIT80), auf der Diskette KERMIT.COM."""
+    return {'KERMIT.COM': lies(_beigaben.KERMIT80[rechner])}
+
+
 def aus_fixture(pfad, *namen):
     """Dateien aus einer eingecheckten Datei (z. B. tests/fixtures/raf/RAFTEST.COM) unter dem Diskettennamen."""
     return {n: lies(REPO, pfad, n) for n in namen}

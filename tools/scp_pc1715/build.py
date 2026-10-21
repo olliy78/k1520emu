@@ -74,6 +74,7 @@ def _scp_soll(schluessel):
         d['WM.HLP'] = db.wm_hlp()
         d.update(db.gemeinsam(*GEMEINSAM_SCP))
         d.update(db.beigaben('SERTEST.COM'))
+        d.update(db.kermit80('pc1715'))
         return d
     return soll
 

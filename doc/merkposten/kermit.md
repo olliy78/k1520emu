@@ -34,6 +34,20 @@ des Hubs bzw. tty3 als Telnet-Client): alles in den Wächtern oben.  **Nur aus d
 (nicht im Emulator ausgelöst): `G C` ohne Feld (Speicherfehler, nicht provoziert), C-Kermit-Verhalten
 bei Parität ≠ none, Langpakete/Attribute (4.2 kennt sie nicht, nur 9 Init-Felder).
 
+## Kermit-80 (Beigabe `KERMIT.COM` auf den Disketten) — Entwurf 36 §6.8
+
+- **Nur Client.**  Es gibt kein CP/M-Kermit-Gegenstück zum Server der Bibliothek; Kermit-80 spricht gegen
+  `Sitzung::serve` (PC-Server).
+- **Eine Überlagerung je Rechner** (`tools/kermit80/kermit_{a5120,k8915,pc1715,prg710}.com`, PRG 710 und 710-1
+  teilen sich eine).  Anschluss und Anfangsfolge stehen in `bau.py` (`RECHNER`) und kommen aus `tools/sertest/src/sertest.mac`
+  — **ändert sich dort etwas, neu bauen** (`python3 tools/kermit80/bau.py <rechner> --out tools/kermit80/kermit_<rechner>.com`,
+  `CPA_TOOLS` nötig) und die Disketten nachziehen.  Wächter `Kermit80Bau.EingechecktesComIstDasErgebnisVonBauPy`.
+- **Der Zerleger erkennt Parität selbst** (81H als Paketbeginn oder Bit 7 in LEN/SEQ/TYPE) und streift danach Bit 7
+  ab.  Nicht auf „immer abstreifen“ vereinfachen: ohne Parität sind rohe 8-Bit-Daten gültig.  `KermitParitaet.*`.
+- **Im Test läuft Kermit-80 als `SERTEST.COM`** (die Hilfen aus `sertest_hilfen.h` legen immer diesen Namen an) und
+  wird mit `sertest` gestartet — nur eine Abkürzung; auf den ausgelieferten Disketten heißt es `KERMIT.COM`.
+- Ein Lauf mit Parität ≠ none und QBIN `&` setzt voraus, dass der Server das Präfix annimmt (Kermit-80 schlägt bei Parität `Y` vor).
+
 ## Tests schreiben
 
 - Gegenprobe im Emulator: `tests/system/test_p8000_wega_kermit_austausch.cpp` (Label `wega_install`,

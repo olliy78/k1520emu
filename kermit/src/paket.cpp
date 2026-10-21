@@ -87,6 +87,16 @@ std::string baueRahmen(const Paket& p, int chkt, const RahmenParameter& rp) {
 // ─── Zerleger ──────────────────────────────────────────────────────────────
 
 PaketZerleger::Ergebnis PaketZerleger::zufuehren(uint8_t b) {
+    // Paritaet erkennen (wie C-Kermit/Kermit-80): Eine Gegenstelle mit `set parity even|mark|odd`
+    // sendet jedes Byte mit gesetztem Paritaetsbit, auch MARK/LEN/SEQ/TYPE (SOH gerade = 81H).
+    // Diese Kopffelder sind sonst nie >= 80H; ein gesetztes Bit 7 dort (oder ein 81H, wo ein
+    // Paketbeginn gesucht wird) ist daher Paritaet.  Danach gilt die Leitung als 7-Bit: alles
+    // ankommende Bit 7 faellt weg (8-Bit-Daten kommen ueber das QBIN-Praefix).  Die Erkennung
+    // rastet ein und bleibt stehen (`par_`): bei ungerader Paritaet haben die ersten drei
+    // Kopfbytes auch mal alle Bit 7 = 0.
+    if (par_) b &= 0x7F;
+    else if (z_ == Z::Suche && b == static_cast<uint8_t>(mark_ | 0x80)) { par_ = true; b &= 0x7F; }
+    else if ((z_ == Z::Len || z_ == Z::Seq || z_ == Z::Typ) && (b & 0x80)) { par_ = true; b &= 0x7F; }
     if (b == mark_) {   // Beginn oder Neusynchronisation
         z_ = Z::Len;
         roh_.clear();
