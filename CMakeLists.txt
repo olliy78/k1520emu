@@ -247,6 +247,8 @@ if(BUILD_K1520)
         core/filesystem/wega/wega_fs.cpp
         core/filesystem/tar/tar_fs.cpp
         core/filesystem/wega/wega_platte.cpp
+        core/filesystem/wega/platten_volume.cpp
+        core/filesystem/fileinfo.cpp
         core/filesystem/disk_volume.cpp
         core/filesystem/prg_boot.cpp
         core/filesystem/check/fs_check.cpp

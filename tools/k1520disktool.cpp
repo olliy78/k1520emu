@@ -36,7 +36,7 @@
 #include "core/filesystem/disk_volume.h"
 #include "core/filesystem/prg_boot.h"
 #include "core/filesystem/geometry_probe.h"
-#include "core/filesystem/wega/wega_platte.h"
+#include "core/filesystem/wega/platten_volume.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -1725,9 +1725,10 @@ int platte(const std::string& befehl, const Optionen& o) {
                             || (befehl == "attr" && attr_aendert);
     std::string err;
     // Schreibschutz ist die Vorgabe; nur die schreibenden Befehle heben ihn auf.
-    auto p = WegaPlatte::open(o.rest[1], err, /*read_only=*/!schreibend || o.dry_run);
-    if (!p) { std::cerr << "Fehler: " << err << "\n"; return kNichtErkannt; }
-    if (o.nobackup) p->setBackup(false);
+    auto pv = PlattenVolume::open(o.rest[1], err, /*read_only=*/!schreibend || o.dry_run);
+    if (!pv) { std::cerr << "Fehler: " << err << "\n"; return kNichtErkannt; }
+    if (o.nobackup) pv->setBackup(false);
+    WegaPlatte* p = &pv->platte();
 
     auto kopf = [&](std::ostream& aus) {
         aus << "Plattenabbild: " << p->laufwerk() << " (" << p->zylinder() << " Zyl. x "
@@ -1770,17 +1771,7 @@ int platte(const std::string& befehl, const Optionen& o) {
     }
     if (befehl == "check" || befehl == "fsck") {
         const FsCheckLevel stufe = o.voll ? FsCheckLevel::Voll : FsCheckLevel::Schnell;
-        FsCheckReport gesamt;
-        gesamt.level = stufe;
-        for (int v = 0; v < p->volumeCount(); ++v) {
-            FsCheckReport r = p->fs(v).check(stufe, true);
-            for (FsFinding& f : r.findings) {
-                f.volume = v;
-                f.object = p->volumeDir(v) + ":" + f.object;
-            }
-            gesamt.uebernimm(r);
-        }
-        gesamt.sortieren();
+        const FsCheckReport gesamt = pv->check(stufe);
         if (o.json) {
             std::cout << "{\"findings\":[";
             for (size_t i = 0; i < gesamt.findings.size(); ++i) {
@@ -1812,24 +1803,18 @@ int platte(const std::string& befehl, const Optionen& o) {
                 for (const std::string& m : muster) if (passt(m, name)) treffer = true;
                 if (!treffer) continue;
                 const fs::path ziel = fs::path(o.ziel) / name;
+                // Ordner und Dateien samt `.fileinfo`; Geraete/FIFOs haben keinen Inhalt.
+                if (e.type != "d" && e.type != "-") continue;
                 std::error_code ec;
-                if (e.type == "d") { fs::create_directories(ziel, ec); continue; }
-                if (e.type != "-") continue;            // Geraetedateien haben keinen Inhalt
-                std::vector<uint8_t> d;
-                if (!p->fs(v).read(e.name, d)) {
-                    std::cerr << "Fehler: " << p->fs(v).lastError() << "\n";
-                    return kFehler;
-                }
-                if (o.dry_run) { ++n; continue; }
-                if (!o.force && fs::exists(ziel, ec)) {
+                if (e.type == "-" && !o.force && !o.dry_run && fs::exists(ziel, ec)) {
                     std::cerr << "Fehler: Zieldatei existiert bereits: " << ziel.string() << "\n";
                     return kFehler;
                 }
-                fs::create_directories(ziel.parent_path(), ec);
-                std::ofstream f(ziel, std::ios::binary);
-                f.write(reinterpret_cast<const char*>(d.data()),
-                        static_cast<std::streamsize>(d.size()));
-                ++n;
+                if (!pv->extractEintrag(name, o.ziel, o.force, o.dry_run)) {
+                    std::cerr << "Fehler: " << pv->lastError() << "\n";
+                    return kFehler;
+                }
+                if (e.type == "-") ++n;
             }
         if (n == 0) { std::cerr << "Fehler: kein Eintrag passt auf das Muster\n"; return kFehler; }
         std::cout << n << " Dateien nach " << o.ziel << "\n";
@@ -1850,7 +1835,7 @@ int platte(const std::string& befehl, const Optionen& o) {
             u.set_uid   = o.unix_uid_gesetzt;   u.uid   = o.unix_uid;
             u.set_gid   = o.unix_gid_gesetzt;   u.gid   = o.unix_gid;
             u.set_mtime = o.unix_mtime_gesetzt; u.mtime = static_cast<uint32_t>(o.unix_mtime);
-            if (!p->fs(v).setAttributes(name, u)) { std::cerr << "Fehler: " << p->fs(v).lastError() << "\n"; return kFehler; }
+            if (!pv->setAttributes(o.rest[2], u)) { std::cerr << "Fehler: " << pv->lastError() << "\n"; return kFehler; }
         }
         for (const FileEntry& e : p->fs(v).list())
             if (e.name == name)
@@ -1865,8 +1850,8 @@ int platte(const std::string& befehl, const Optionen& o) {
                 return kFehler;
             }
             if (o.dry_run) continue;
-            if (!p->fs(v).makeDirectory(name)) {
-                std::cerr << "Fehler: " << p->fs(v).lastError() << "\n";
+            if (!pv->makeDirectory(o.rest[i])) {
+                std::cerr << "Fehler: " << pv->lastError() << "\n";
                 return kFehler;
             }
             std::cout << "angelegt: " << o.rest[i] << "\n";
@@ -1887,8 +1872,8 @@ int platte(const std::string& befehl, const Optionen& o) {
                 std::cout << "wuerde loeschen: " << p->volumeDir(v) << "/" << name << "\n";
                 continue;
             }
-            if (!p->fs(v).erase(name)) {
-                std::cerr << "Fehler: " << p->fs(v).lastError() << "\n";
+            if (!pv->erase(p->volumeDir(v) + "/" + name)) {
+                std::cerr << "Fehler: " << pv->lastError() << "\n";
                 return kFehler;
             }
             std::cout << "geloescht: " << p->volumeDir(v) << "/" << name << "\n";
@@ -1902,46 +1887,28 @@ int platte(const std::string& befehl, const Optionen& o) {
                          "(md0 = /usr, md2 = /)\n";
             return kFehler;
         }
-        auto schreibe = [&, v = v](const fs::path& quelle, const std::string& ziel) -> bool {
-            std::ifstream f(quelle, std::ios::binary);
-            std::vector<uint8_t> d((std::istreambuf_iterator<char>(f)),
-                                   std::istreambuf_iterator<char>());
-            WriteOptions w;
-            w.overwrite = o.force;
-            std::error_code ec;
-            const bool x = (fs::status(quelle, ec).permissions() & fs::perms::owner_exec)
-                           != fs::perms::none;
-            w.wega_mode = x ? 0755 : 0644;
-            w.wega_mode_gesetzt = true;
+        const PlattenVolume::Fortschritt zeige = [](const std::string& q, const std::string& z) {
+            std::cout << q << " → " << z << "\n";
+        };
+        auto einfuegen = [&](const std::string& quelle, const std::string& ziel) -> bool {
             if (o.dry_run) return true;
-            if (!p->fs(v).write(ziel, d, w)) {
-                std::cerr << "Fehler: " << p->fs(v).lastError() << "\n";
+            if (!pv->insert(quelle, ziel, o.force, zeige)) {
+                std::cerr << "Fehler: " << pv->lastError() << "\n";
                 return false;
             }
-            std::cout << quelle.string() << " → " << p->volumeDir(v) << "/" << ziel << "\n";
             return true;
         };
+        const std::string md = p->volumeDir(v);
         std::error_code ec;
         if (o.rest.size() == 3 && fs::is_directory(o.rest[2], ec)) {
-            for (const auto& e : fs::recursive_directory_iterator(o.rest[2], ec)) {
-                const std::string rel = e.path().lexically_relative(o.rest[2]).generic_string();
-                const std::string ziel = basis.empty() ? rel : basis + "/" + rel;
-                if (e.is_directory()) {
-                    if (!o.dry_run && !p->fs(v).makeDirectory(ziel)) {
-                        std::cerr << "Fehler: " << p->fs(v).lastError() << "\n";
-                        return kFehler;
-                    }
-                    continue;
-                }
-                if (!schreibe(e.path(), ziel)) return kFehler;
-            }
+            if (!einfuegen(o.rest[2], md + (basis.empty() ? "" : "/" + basis))) return kFehler;
         } else if (o.rest.size() == 3) {
             if (basis.empty()) { std::cerr << "Fehler: --as md<N>/pfad/name\n"; return kFehler; }
-            if (!schreibe(o.rest[2], basis)) return kFehler;
+            if (!einfuegen(o.rest[2], md + "/" + basis)) return kFehler;
         } else {
             for (size_t i = 2; i < o.rest.size(); ++i)
-                if (!schreibe(o.rest[i], (basis.empty() ? "" : basis + "/")
-                                         + fs::path(o.rest[i]).filename().string()))
+                if (!einfuegen(o.rest[i], md + "/" + (basis.empty() ? "" : basis + "/")
+                                          + fs::path(o.rest[i]).filename().string()))
                     return kFehler;
         }
     } else {
@@ -1950,7 +1917,7 @@ int platte(const std::string& befehl, const Optionen& o) {
         return kFehler;
     }
     if (o.dry_run) return kOk;
-    if (!p->flush()) { std::cerr << "Fehler: " << p->lastError() << "\n"; return kFehler; }
+    if (!pv->flush()) { std::cerr << "Fehler: " << pv->lastError() << "\n"; return kFehler; }
     return kOk;
 }
 

@@ -233,6 +233,8 @@ k1520_add_test(wega_fs       SRC filesystem/test_wega_fs.cpp
                              DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
 k1520_add_test(wega_platte   SRC filesystem/test_wega_platte.cpp
                              LIBS k1520_fs LABELS "${_lbl}")
+k1520_add_test(platten_volume SRC filesystem/test_platten_volume.cpp
+                             LIBS k1520_fs LABELS "${_lbl}")
 # Tar-Disketten (rohe tar-Stroeme ohne Dateisystem, nur lesbar) — Echtdaten mit K1520_CQM_DIR
 k1520_add_test(tar_fs        SRC filesystem/test_tar_fs.cpp
                              LIBS k1520_fs LABELS "${_lbl}"
