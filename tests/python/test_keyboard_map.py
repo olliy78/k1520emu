@@ -134,3 +134,26 @@ def test_printable_and_raw_codes_pass_through():
     # Ein Steuerzeichen als BLANKER Tastencode kommt nicht durch — genau daran
     # war die ESC-Taste der Bildschirmtastatur wirkungslos.
     assert E.translate_key(0x1B) == 0x00
+
+
+ALTGR = Qt.ControlModifier | Qt.AltModifier   # so meldet Windows AltGr
+
+
+@pytest.mark.parametrize("key,zeichen", [
+    (Qt.Key_At, "@"), (Qt.Key_BracketLeft, "["), (Qt.Key_BracketRight, "]"),
+    (Qt.Key_BraceLeft, "{"), (Qt.Key_Bar, "|"), (Qt.Key_Backslash, "\\"),
+    (Qt.Key_AsciiTilde, "~"),
+])
+def test_altgr_character_is_not_ctrl(key, zeichen):
+    """Windows-AltGr (Strg+Alt) + Zeichen: das Zeichen kommt ohne Strg an.
+
+    Mit ctrl=True machte der Kern aus '@' ein NUL und aus '[' ein ESC (Issue #4).
+    """
+    assert qt_event_to_core_key(FakeKeyEvent(key, zeichen, ALTGR)) == (ord(zeichen), False, False)
+
+
+def test_real_ctrl_alt_letter_stays_ctrl():
+    """Strg+Alt+A ohne druckbares Zeichen bleibt Strg."""
+    assert qt_event_to_core_key(
+        FakeKeyEvent(Qt.Key_A, "\x01", ALTGR)) == (ord("a"), False, True)
+
