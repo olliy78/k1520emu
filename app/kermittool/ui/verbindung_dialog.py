@@ -5,8 +5,12 @@ Eine Klasse fuer beide Betriebsarten: ``betriebsart`` blendet weg, was nicht gil
 (verbinden/lauschen) ist davon unabhaengig — auch ein Server darf zum Emulator
 verbinden, und ein Client darf lauschen.
 
-Das **Kennwort der Client-Anmeldung** steht nur im Eingabefeld (verdeckt) und im
-Rueckgabewert von :meth:`kennwort`; es wird nie in die Konfiguration uebernommen.
+Das **Kennwort der Client-Anmeldung** steht im Eingabefeld (verdeckt) und im Rueckgabewert von
+:meth:`kennwort`; in die Konfiguration kommt es NUR mit dem Haken *Zugangsdaten fuer diese
+Verbindung speichern* (:meth:`speichern`; dann traegt :meth:`verbindung` das Kennwort im Schluessel
+``kennwort``, sonst ist er leer), im Klartext und ohne Dateischutz (Entscheidung des Anwenders
+2026-10-22).  Bleiben Name und Kennwort leer und die Gegenstelle verlangt ``login:``, fragt das
+Popup (:mod:`app.kermittool.ui.anmelde_dialog`).
 Das Kennwort des **Server-Anmeldezwangs** (:meth:`server_login`) ist etwas anderes: es
 geht im Klartext in den Zweig ``server.login`` der ``kermit.yaml`` (Entscheidung des
 Anwenders 2026-10-22); der Dialog sagt das neben dem Feld.
@@ -23,6 +27,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtWidgets import QLineEdit as _QLE
 
 from app.kermittool import konfig
+from app.kermittool.ui.anmelde_dialog import KLARTEXT_HINWEIS as KLARTEXT_HINWEIS_CLIENT, SPEICHERN_TEXT
 
 
 #: Text neben dem Kennwortfeld des Server-Anmeldezwangs (auch als Tooltip).
@@ -73,7 +78,14 @@ class VerbindungDialog(QDialog):
         self.login_name = QLineEdit()
         self.login_kennwort = QLineEdit()
         self.login_kennwort.setEchoMode(_QLE.Password)
-        self.login_kennwort.setToolTip("Wird nur für diese Sitzung gehalten und nie gespeichert.")
+        self.login_kennwort.setToolTip("Wird nur gespeichert, wenn „" + SPEICHERN_TEXT + "“ gesetzt ist "
+                                       "(dann im Klartext in der kermit.yaml); sonst nur für diese Sitzung gehalten.")
+        self.login_name.setToolTip("Leer lassen: dann fragt ein Fenster nach, sobald die Gegenstelle „login:“ zeigt.")
+        self.login_speichern = QCheckBox(SPEICHERN_TEXT)
+        self.login_speichern.setToolTip(KLARTEXT_HINWEIS_CLIENT)
+        self.login_hinweis = QLabel(KLARTEXT_HINWEIS_CLIENT)
+        self.login_hinweis.setWordWrap(True)
+        self.login_hinweis.setStyleSheet("color: #886600;")
 
         self.ordner = QLineEdit(ordner)
         self.ordner_knopf = QPushButton("Wählen …")
@@ -120,6 +132,8 @@ class VerbindungDialog(QDialog):
             self.form.addRow("", self.login)
             self.form.addRow("Benutzername", self.login_name)
             self.form.addRow("Kennwort", self.login_kennwort)
+            self.form.addRow("", self.login_speichern)
+            self.form.addRow("", self.login_hinweis)
 
         self.knoepfe = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         self.knoepfe.button(QDialogButtonBox.Ok).setText("Server einrichten" if server else "Verbinden")
@@ -145,6 +159,8 @@ class VerbindungDialog(QDialog):
         self.baud.setCurrentText(str(v["baud"]))
         self.login.setChecked(v["login"])
         self.login_name.setText(v["login_name"])
+        self.login_kennwort.setText(v["kennwort"])
+        self.login_speichern.setChecked(bool(v["kennwort"]))
         self._sichtbarkeit()
 
     def verbindung(self) -> dict:
@@ -159,7 +175,9 @@ class VerbindungDialog(QDialog):
                 "port": self.port.value(),
                 "baud": baud,
                 "login": self.login.isChecked() and self.betriebsart == "client",
-                "login_name": self.login_name.text().strip()}
+                "login_name": self.login_name.text().strip(),
+                # Klartext, NUR mit Haken (siehe Kopf der Datei); sonst leer = nicht speichern
+                "kennwort": self.login_kennwort.text() if self.speichern() else ""}
 
     def server_login(self) -> dict:
         """Anmeldezwang des Servers (``pflicht``, ``name``, ``kennwort``) — wird im Klartext gespeichert."""
@@ -168,6 +186,11 @@ class VerbindungDialog(QDialog):
 
     def kennwort(self) -> str:
         return self.login_kennwort.text()
+
+    def speichern(self) -> bool:
+        """Haken *Zugangsdaten fuer diese Verbindung speichern* (nur Client mit Anmeldung)."""
+        return (self.betriebsart == "client" and self.login.isChecked()
+                and self.login_speichern.isChecked())
 
     def freigabe(self) -> str:
         return self.ordner.text().strip()
@@ -178,7 +201,8 @@ class VerbindungDialog(QDialog):
             return
         _art, v, kw, aend = d
         self.setzen(v)
-        self.login_kennwort.setText(kw)
+        if kw:
+            self.login_kennwort.setText(kw)         # Voreinstellung: Laborkennwort, nur Sitzung (kein Haken)
         self.einstellungsaenderung = dict(aend)
 
     def _sichtbarkeit(self) -> None:
@@ -188,6 +212,7 @@ class VerbindungDialog(QDialog):
         an = self.login.isChecked()
         self.login_name.setEnabled(an)
         self.login_kennwort.setEnabled(an)
+        self.login_speichern.setEnabled(an)
         srv = self.srv_pflicht.isChecked()
         self.srv_name.setEnabled(srv)
         self.srv_kennwort.setEnabled(srv)
@@ -205,8 +230,8 @@ class VerbindungDialog(QDialog):
         if v["aufbau"] == "verbinden" and v["port"] <= 0:
             self.meldung.setText("Bitte einen Port eintragen.")
             return
-        if v["login"] and not v["login_name"]:
-            self.meldung.setText("Bitte einen Benutzernamen eintragen.")
+        if self.speichern() and not v["login_name"]:
+            self.meldung.setText("Zum Speichern bitte einen Benutzernamen eintragen.")
             return
         if self.betriebsart == "server" and self.srv_pflicht.isChecked():
             sl = self.server_login()

@@ -192,7 +192,7 @@ anfassen, laufen nacheinander oder im eigenen Worktree.
 | **K8** | **Doku:** Handbuch, `doc/merkposten/kermit.md` (+ README-Eintrag), `CLAUDE.md`-Kurzabsatz, `disks/…/README.md`, Entwurf 36 auf Stand. | — | sonnet | fertig (§6.6) |
 | **K9** | *(wenn K1–K8 grün)* **Paket/CI:** Linux-Paket (`build_payload.sh`), Inno-Setup, `windows-ci.yml`, Starter `k1520kermit`. | `py_packaging`, `py_programme` | sonnet | fertig (§6.7) — `0f78cfc` |
 | **K10** | **Bibliothek: Anmeldung des Clients auf Abruf** (§6.10 a): das Login-Skript meldet „Anmeldung verlangt“ und fragt Name/Kennwort über einen Rückruf ab, statt sie vorab zu verlangen; es unterscheidet **abgelehnt** (zweites `login:` / `Login incorrect`) von Frist und Leitungsfehler.  C-ABI additiv + Python-Bindung. | `KermitLogin*` (Unit), `py_kermit_api` (Signaturwächter), Kopplungstest gegen den Server aus K12 | sonnet | **fertig** (2026-10-22, Zweig `kermit`; Stand §6.11) |
-| **K11** | **Oberfläche, Client: Anmeldedialog** (§6.10 b): Popup mit Benutzername, Kennwort, Hinweis „möglicherweise einfach kermit / kermit“ und Haken *Zugangsdaten für diese Verbindung speichern*; erscheint bei verlangter Anmeldung und **erneut bei Ablehnung**; gespeichert wird **im Klartext in der Konfigurationsdatei, im Eintrag der Verbindung**, Neuspeichern überschreibt die alten Werte.  Kehrt die Regel „Kennwörter nie in die Datei“ um (Handbuch, Merkposten, `konfig.ohne_kennwort`, Wächter). | `py_kermit_gui` (Dialog mit Ersatz, Wiederholung, Speichern/Überschreiben, Konfig-Roundtrip) | sonnet | **offen** (nach K10) |
+| **K11** | **Oberfläche, Client: Anmeldedialog** (§6.10 b): Popup mit Benutzername, Kennwort, Hinweis „möglicherweise einfach kermit / kermit“ und Haken *Zugangsdaten für diese Verbindung speichern*; erscheint bei verlangter Anmeldung und **erneut bei Ablehnung**; gespeichert wird **im Klartext in der Konfigurationsdatei, im Eintrag der Verbindung**, Neuspeichern überschreibt die alten Werte.  Kehrt die Regel „Kennwörter nie in die Datei“ um (Handbuch, Merkposten, `konfig.ohne_kennwort`, Wächter). | `py_kermit_gui` (Dialog mit Ersatz, Wiederholung, Speichern/Überschreiben, Konfig-Roundtrip) | sonnet | **fertig** (2026-10-22, Zweig `kermit`; Stand §6.13) |
 | **K12** | **Server mit Anmeldezwang** (§6.10 c): Bibliothek (`Sitzung::serve` mit Anmeldephase wie getty der WEGA: `login:` / `Password:` / `Login incorrect` / Wiederholung / nach `finish` zurück zu `login:`) **und** Oberfläche (Haken *Anmeldung erzwingen*, Name/Kennwort mit Vorgabe `kermit`/`kermit`, änderbar, in der Serverkonfiguration im Klartext). | `KermitServerLogin*` (Unit), `py_kermit_gui`, **Kermit-80 meldet sich im Terminalmodus an unserem Server an** (`Kermit80Pc.*`, Gegenstück zu `Kermit80Wega`) | opus (Protokoll) / sonnet (Oberfläche) | **fertig** (2026-10-22, Zweig `kermit`; Stand §6.12) |
 | **K13** | **Doku und Abnahme:** Handbuch (Client-Anmeldung, Server mit Anmeldezwang, Kermit-80 gegen unseren Server mit Anmeldung), Merkposten (Umkehr der Kennwortregel, Reihenfolge der Dialoge), Entwurf 36 auf Stand, Login-Skript in `py_kermit_gui` belegt (war offen, §7 Nr. 7). | — | sonnet | **offen** (nach K10–K12) |
 | K2b | *(optional)* Schiebefenster, `G T`/`G U`, Wiederaufnahme. | — | — | offen (optional) |
@@ -685,7 +685,7 @@ eins), keine Telnet-Option-Behandlung außerhalb der Leitung.
 *Server einrichten* hat *Anmeldung erzwingen*, Benutzername, Kennwort (Vorgabe `kermit`/`kermit`, Felder nur mit Haken
 aktiv, Eingabe verdeckt) und den Hinweis auf Klartext; gespeichert im Zweig `server.login` der `kermit.yaml` im
 Klartext (Merkposten 11/12); der Arbeiter setzt es je angenommener Verbindung; Statuszeile `Server: … (mit Anmeldung)`.
-Der Client-Zweig der Konfiguration ist unverändert (K11).
+Der Client-Zweig der Konfiguration ist unverändert (K11; umgekehrt in §6.13).
 
 **Abnahme.**  `KermitServerLogin.*` (10 Fälle, Speicherleitung/virtuelle Uhr), `KermitServerLoginKopplung.*`
 (Login-Skript fest und auf Abruf gegen den Server, Telnet und RFC 2217, `holen`/`senden`/FINISH/zweite Anmeldung),
@@ -693,6 +693,32 @@ Der Client-Zweig der Konfiguration ist unverändert (K11).
 (`tests/system/test_kermit80.cpp`, Label `format_integration`): Kermit-80 am A5120 meldet sich im Terminalmodus an, erst mit
 falschem Kennwort (`Login incorrect`), dann richtig, Strg-\ `c`, `remote directory`, `get`, `send`, `finish`, danach zeigt ein
 neues `connect` wieder `login:`.  Gemeinsame Bildhilfen: `tests/system/kermit80_hilfen.h` (auch `Kermit80Wega`).
+
+### 6.13 Stand K11 (2026-10-22) — Anmeldedialog des Clients
+
+**Ablauf.**  `Arbeiter._anmelden` ruft `Kermit.login_ask`.  Beim ersten Versuch gehen vorab bekannte Zugangsdaten
+(Name vorhanden: gespeichert, aus dem Verbindungsdialog oder der Voreinstellung *WEGA 3.1*) ohne Popup raus; sonst
+und **nach jeder Ablehnung** fragt das Popup *Anmeldung* (`ui/anmelde_dialog.py`: Benutzername, Kennwort verdeckt, Hinweis
+„Möglicherweise ist es einfach kermit / kermit.“ — nur Hinweis, keine Vorbelegung —, Haken *Zugangsdaten für diese
+Verbindung speichern* mit Klartext-Hinweis darunter und als Tooltip, *Anmelden*/*Abbrechen*; nach einer Ablehnung
+„Anmeldung abgelehnt“, Felder mit der letzten Eingabe).  Voraussetzung bleibt der Haken *Anmelden* im Verbindungsdialog
+(`login`); der Name darf dort jetzt leer sein.  *Abbrechen* ist still (`E_ABORTED`, „Verbinden abgebrochen“);
+`Abgelehnt` ohne weitere Frage (Benutzer ohne Kennwort) zeigt „Anmeldung abgelehnt“; Frist/Leitung wie bisher.
+
+**Speichern — Wahl.**  Erst NACH gelungener Anmeldung (`Arbeiter.zugang_gemerkt` → `MainWindow._zugang_merken`) und nur
+bei gesetztem Haken; dann sofort in die Datei: `client.login_name`/`client.kennwort` und derselbe Eintrag in `zuletzt`
+(Klartext, **kein Schutz der Datei**, Entscheidung des Anwenders).  Eine abgelehnte Eingabe ändert nichts; erneutes
+Speichern überschreibt.  Der Verbindungsdialog trägt denselben Haken (Schlüssel `kennwort` des Verbindungsdicts nur mit
+Haken belegt; ohne Haken räumt das Neumerken ein altes Kennwort aus `zuletzt`).
+
+**Konfiguration.**  Kennwörter nur an `konfig.KENNWORT_ORTE` (`client.kennwort`, `zuletzt[*].kennwort`,
+`server.login.kennwort`); `ohne_kennwort` räumt alles andere.  Fäden: die Frage wartet ohne Sperre auf ein Event,
+`abbrechen()` antwortet `None`.  Test-Ersatz des Popups: `MainWindow._anmeldefrage`.  Merkposten 12/13.
+
+**Abnahme.**  `py_kermit_gui` (Popup-Inhalt, Verbindungsdialog-Haken, Frage/Wiederholung/Abbruch/gespeicherte Daten/
+Speichern und Überschreiben gegen den Server mit Anmeldezwang aus K12, Benutzer-ohne-Kennwort-Attrappe, Wächter der
+erlaubten Kennwortorte samt Gegentest ohne Haken).  Offen für K13: Handbuch (der Satz „Das Kennwort … schreibt es nie in
+seine Konfigurationsdatei“ unter *Anmeldung* ist überholt).
 
 ## 7. Offene Aufgaben
 

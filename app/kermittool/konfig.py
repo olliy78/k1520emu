@@ -5,19 +5,19 @@ Gleicher Aufbau und gleiche Schutzregeln wie bei den Nachbarprogrammen
 FORMATversion, ``geschrieben_von`` nur Auskunft; eine Datei mit hoeherer
 Formatversion wird nicht ueberschrieben.
 
-**Zwei Zweige, zwei Regeln fuer Kennwoerter.**
+**Wo Kennwoerter in der Datei stehen duerfen — und nur dort** (K11/K12, Entscheidung des
+Anwenders 2026-10-22: KEIN Schutz der Datei, keine Dateirechte, keine Verschleierung; das
+Kennwort hat nur eine funktionale Aufgabe, es ersetzt das Tippen bei getty/login):
 
-* **CLIENT-Zweig** (``client``, ``zuletzt``): Kennwoerter stehen NIE in der Datei.  Ein
-  Kennwort lebt nur im Verbindungsdialog und in der laufenden Sitzung;
-  :func:`ohne_kennwort` entfernt jeden Schluessel dieses Namens, bevor etwas geschrieben
-  wird — auch aus der Liste der zuletzt benutzten Verbindungen.  (K11 kehrt das fuer
-  den Client um.)
-* **SERVER-Zweig** (``server.login``, K12): der Anmeldezwang des eigenen Servers —
-  ``{pflicht, name, kennwort}`` — wird samt Kennwort im **KLARTEXT** gespeichert.
-  Entscheidung des Anwenders (2026-10-22): kein Schutz der Datei, keine
-  Verschleierung, keine Dateirechte; das Kennwort hat nur eine funktionale Aufgabe
-  (getty + login nachbilden), keine Schutzfunktion.  Der Dialog sagt es offen.
-  :func:`schreiben` filtert diesen einen Schluessel darum NICHT.
+* ``client.kennwort`` und ``zuletzt[i].kennwort`` — NUR wenn der Anwender fuer diese Verbindung
+  den Haken *Zugangsdaten fuer diese Verbindung speichern* gesetzt hat (dann auch
+  ``login_name``).  Ohne Haken traegt das Verbindungsdict gar keinen Kennwortschluessel.
+* ``server.login.kennwort`` — der Anmeldezwang des eigenen Servers.
+
+Jeder andere Schluessel ``kennwort*`` (Einstellungen, Fensterzustand, Server-Verbindung
+selbst ...) wird von :func:`schreiben` entfernt (:func:`ohne_kennwort`); die erlaubten Orte
+nennt :data:`KENNWORT_ORTE`, der Waechter ``test_kennwoerter_stehen_nur_an_den_erlaubten_orten``
+prueft sie.
 """
 
 from __future__ import annotations
@@ -67,7 +67,11 @@ VERBINDUNG_VORGABE = {
     "baud": 9600,
     "login": False,
     "login_name": "",
+    "kennwort": "",                 # NUR mit dem Haken "Zugangsdaten speichern" belegt (Klartext), sonst leer
 }
+
+#: Die einzigen Orte einer Konfigurationsdatei, an denen ein Kennwort stehen darf (Pfade; ``*`` = Listenindex).
+KENNWORT_ORTE = (("client", "kennwort"), ("zuletzt", "*", "kennwort"), ("server", "login", "kennwort"))
 
 #: Anmeldezwang des eigenen Servers (``server.login`` in ``kermit.yaml``; Klartext, siehe Kopf).
 SERVER_LOGIN_VORGABE = {"pflicht": False, "name": "kermit", "kennwort": "kermit"}
@@ -205,14 +209,24 @@ def laden(datei: Optional[str] = None) -> dict:
 def schreiben(daten: dict, datei: Optional[str] = None) -> bool:
     """Schreibt *daten* mit ``version``/``geschrieben_von``; ``False`` = nichts geschrieben.
 
-    Kennwoerter werden entfernt (:func:`ohne_kennwort`) — AUSSER dem des Server-Anmeldezwangs
-    ``server.login`` (Klartext, siehe Kopf der Datei).
+    Kennwoerter werden entfernt (:func:`ohne_kennwort`) — AUSSER an den Orten von
+    :data:`KENNWORT_ORTE` (Klartext, kein Dateischutz: Entscheidung des Anwenders, siehe Kopf).
+    Ein Verbindungseintrag traegt sein Kennwort nur, wenn das Dict es traegt; das tut die
+    Oberflaeche nur bei gesetztem Haken.
     """
     from app import version as _version
     datei = datei or pfad()
     ganz = {"version": config_io.CONFIG_VERSION,
             "geschrieben_von": _version.fassung()}
     ganz.update(ohne_kennwort(daten))
+    cl = daten.get("client")
+    if isinstance(cl, dict) and cl.get("kennwort") and isinstance(ganz.get("client"), dict):
+        ganz["client"]["kennwort"] = str(cl["kennwort"])        # Klartext, Haken gesetzt
+    zl, zg = daten.get("zuletzt"), ganz.get("zuletzt")
+    if isinstance(zl, list) and isinstance(zg, list) and len(zl) == len(zg):
+        for roh, ziel in zip(zl, zg):
+            if isinstance(roh, dict) and roh.get("kennwort") and roh.get("betriebsart", "client") == "client":
+                ziel["kennwort"] = str(roh["kennwort"])
     srv = daten.get("server")
     if isinstance(srv, dict) and isinstance(srv.get("login"), dict):
         ganz.setdefault("server", {})["login"] = server_login_aus(srv["login"])
@@ -224,8 +238,12 @@ def schreiben(daten: dict, datei: Optional[str] = None) -> bool:
 
 
 def zuletzt_merken(liste: List[dict], verbindung: dict) -> List[dict]:
-    """*verbindung* (ohne Kennwort) nach vorn in die Liste; gleiche Gegenstelle ersetzt den alten Eintrag."""
+    """*verbindung* nach vorn in die Liste; gleiche Gegenstelle ersetzt den alten Eintrag (samt altem Kennwort).
+
+    Das Kennwort bleibt nur bei einer Client-Verbindung, deren Dict es traegt (= Haken gesetzt)."""
     neu = ohne_kennwort(verbindung)
+    if verbindung.get("kennwort") and verbindung.get("betriebsart", "client") == "client":
+        neu["kennwort"] = str(verbindung["kennwort"])
 
     def schluessel(v):
         return (v.get("betriebsart"), v.get("leitung"), v.get("aufbau"), v.get("host"), v.get("port"))
