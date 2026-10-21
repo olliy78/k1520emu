@@ -1,5 +1,5 @@
 # Bootbereich im Verzeichnis (cpa1715) wird von der Pruefung weder angeklagt noch gemeldet:
-# keine Befunde zu Platz 0/3, keine „Nutzerbyte F0"-Meldung (Falschmeldungen sind schlimmer
+# keine Befunde zu Platz 0/3, keine 'Nutzerbyte F0"-Meldung (Falschmeldungen sind schlimmer
 # als fehlende).  Uebrig bleibt allein der Hinweis auf drei GELOESCHTE Plaetze der Quelldiskette
 # (Info, Exit 1 wie bei jedem Befund).
 tool:   k1520disktool

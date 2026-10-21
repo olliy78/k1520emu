@@ -262,7 +262,7 @@ extern "C" K1520Disk k1520d_create_bootable(const char* path, const char* fs_nam
                                             const char* label, const char* boot_image) {
     g_open_error.clear();
     if (!path || !*path)       { g_open_error = "kein Pfad angegeben"; return nullptr; }
-    if (!fs_name || !*fs_name) { g_open_error = "kein Dateisystem angegeben — beim "
+    if (!fs_name || !*fs_name) { g_open_error = "kein Dateisystem angegeben - beim "
                                                 "Anlegen gibt es nichts zu erkennen";
                                  return nullptr; }
     auto h = std::make_unique<Handle>();

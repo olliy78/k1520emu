@@ -593,7 +593,7 @@ bool WegaFileSystem::looksLikeWega(const WegaBlockDev& dev, std::string* why) {
         return nein("Superblock: s_fsize " + std::to_string(sb.fsize) + " > "
                     + std::to_string(dev.blocks()) + " Bloecke des Datentraegers");
     if (sb.nfree < 0 || sb.nfree > kNicFree || sb.ninode < 0 || sb.ninode > kNicInod)
-        return nein("Superblock: s_nfree/s_ninode ausserhalb 0…50/0…100");
+        return nein("Superblock: s_nfree/s_ninode ausserhalb 0...50/0...100");
     if (sb.tfree > sb.fsize - sb.isize || sb.tinode > sb.inodes())
         return nein("Superblock: Zaehler s_tfree/s_tinode zu gross");
     for (int i = 0; i < sb.nfree; ++i) {
@@ -925,12 +925,12 @@ bool WegaFileSystem::setAttributes(const std::string& name, const UnixAttrs& a) 
     // Erst urteilen, dann schreiben: jede Eingabe wird vor dem ersten Blockzugriff
     // geprueft, damit ein Fehler nichts hinterlaesst (wie bei den anderen Operationen).
     if (a.set_mode && (a.mode & ~07777))
-        return fail("Modus 0" + oktal(a.mode) + " hat Bits ausserhalb von 07777 — "
+        return fail("Modus 0" + oktal(a.mode) + " hat Bits ausserhalb von 07777 - "
                     "die Dateiart laesst sich nicht aendern");
     if (a.set_uid && (a.uid < 0 || a.uid > 65535))
-        return fail("uid " + std::to_string(a.uid) + " liegt ausserhalb von 0…65535");
+        return fail("uid " + std::to_string(a.uid) + " liegt ausserhalb von 0...65535");
     if (a.set_gid && (a.gid < 0 || a.gid > 65535))
-        return fail("gid " + std::to_string(a.gid) + " liegt ausserhalb von 0…65535");
+        return fail("gid " + std::to_string(a.gid) + " liegt ausserhalb von 0...65535");
     if (!a.set_mode && !a.set_uid && !a.set_gid && !a.set_mtime) return true;
 
     Tx tx(*this);
@@ -1147,17 +1147,17 @@ FsCheckReport WegaFileSystem::check(FsCheckLevel level, bool nachladen) const {
     }
     if (sb.nfree < 0 || sb.nfree > kNicFree)
         f.add("wega.super.nfree", FsSeverity::Fehler, FsLayer::Verwaltung, "Superblock",
-              "s_nfree = " + std::to_string(sb.nfree) + " (erlaubt 0…50) — der Kern meldet "
+              "s_nfree = " + std::to_string(sb.nfree) + " (erlaubt 0...50) - der Kern meldet "
               "'Bad free count' und vergibt nichts mehr");
     if (sb.ninode < 0 || sb.ninode > kNicInod)
         f.add("wega.super.ninode", FsSeverity::Fehler, FsLayer::Verwaltung, "Superblock",
-              "s_ninode = " + std::to_string(sb.ninode) + " (erlaubt 0…100)");
+              "s_ninode = " + std::to_string(sb.ninode) + " (erlaubt 0...100)");
     for (int i = 0; i < std::clamp<int>(sb.ninode, 0, kNicInod); ++i) {
         const uint16_t x = sb.inode[static_cast<size_t>(i)];
         if (x < 1 || x > n_ino)
             f.add("wega.super.inodeliste", FsSeverity::Warnung, FsLayer::Verwaltung, "Superblock",
                   "s_inode[" + std::to_string(i) + "] = " + std::to_string(x)
-                  + " liegt ausserhalb der Inode-Liste (1…" + std::to_string(n_ino) + ")");
+                  + " liegt ausserhalb der Inode-Liste (1..." + std::to_string(n_ino) + ")");
     }
 
     r.schritt("wega.schritt.inodes", "Inode-Liste (" + std::to_string(n_ino) + " Inodes)");
@@ -1233,7 +1233,7 @@ FsCheckReport WegaFileSystem::check(FsCheckLevel level, bool nachladen) const {
                 if (!frei.insert(bn).second)
                     f.add("wega.frei.doppelt", FsSeverity::Gefahr, FsLayer::Dateien,
                           "Block " + std::to_string(bn),
-                          "Block " + std::to_string(bn) + " steht zweimal in der Freiliste — "
+                          "Block " + std::to_string(bn) + " steht zweimal in der Freiliste - "
                           "er wuerde zweimal vergeben");
             }
             const uint32_t naechster = n > 0 ? liste[0] : 0;
@@ -1336,7 +1336,7 @@ FsCheckReport WegaFileSystem::check(FsCheckLevel level, bool nachladen) const {
             if (bn < sb.isize || bn >= sb.fsize) {
                 f.add("wega.block.ausserhalb", FsSeverity::Fehler, FsLayer::Dateien, wer,
                       "Block " + std::to_string(bn) + " liegt ausserhalb des Datenbereichs ("
-                      + std::to_string(sb.isize) + "…" + std::to_string(sb.fsize - 1) + ")");
+                      + std::to_string(sb.isize) + "..." + std::to_string(sb.fsize - 1) + ")");
                 continue;
             }
             auto [it, neu] = besitzer.emplace(bn, i);
@@ -1349,7 +1349,7 @@ FsCheckReport WegaFileSystem::check(FsCheckLevel level, bool nachladen) const {
             } else if (frei.count(bn)) {
                 auto& x = f.add("wega.block.frei_belegt", FsSeverity::Gefahr, FsLayer::Dateien, wer,
                                 "Block " + std::to_string(bn) + " gehoert der Datei und steht "
-                                "zugleich in der Freiliste — der naechste Schreibvorgang "
+                                "zugleich in der Freiliste - der naechste Schreibvorgang "
                                 "ueberschreibt ihn");
                 ortVon(x, bn);
             }
@@ -1363,7 +1363,7 @@ FsCheckReport WegaFileSystem::check(FsCheckLevel level, bool nachladen) const {
             auto& x = f.add("wega.block.verloren", FsSeverity::Warnung, FsLayer::Dateien,
                             "Block " + std::to_string(erster),
                             std::to_string(verloren) + " Bloecke sind weder belegt noch frei "
-                            "(erster: " + std::to_string(erster) + ") — Platz geht verloren");
+                            "(erster: " + std::to_string(erster) + ") - Platz geht verloren");
             ortVon(x, erster);
         }
     }

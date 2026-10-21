@@ -179,7 +179,7 @@ bool ImgCodec::save(const std::string& path, const DiskFormat& fmt,
     const std::string grund = in.rawIncompatibleReason();
     if (!grund.empty()) {
         err = "Diskette laesst sich nicht als .img speichern (" + grund
-              + ") — Gap-Anhaenge/unformatierte Spuren gehen dabei verloren. "
+              + ") - Gap-Anhaenge/unformatierte Spuren gehen dabei verloren. "
                 "Bitte .hfe oder .dmk waehlen.";
         return false;
     }

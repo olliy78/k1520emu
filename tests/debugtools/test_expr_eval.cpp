@@ -134,7 +134,7 @@ TEST(ExprEval, ProzentHexUndSegmentLiteral){
     Env e;
     EXPECT_EQ(e.ev("%1A"), 0x1A);                  // % an Operandenstelle = hex
     EXPECT_EQ(e.ev("17 % %5"), 2);                 // dazwischen weiter der Rest
-    EXPECT_EQ(e.ev("<<3>>%1234"), 0x31234);        // seg·2^16 + off
+    EXPECT_EQ(e.ev("<<3>>%1234"), 0x31234);        // seg*2^16 + off
     EXPECT_EQ(e.ev("1 << 4"), 16);                 // Schieben unveraendert
     bool ok; e.evOk("<<200>>%0", ok); EXPECT_FALSE(ok);   // Segment > 127
 }

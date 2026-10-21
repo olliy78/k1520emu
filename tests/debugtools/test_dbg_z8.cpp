@@ -82,10 +82,10 @@ TEST(DbgZ8, PeripherieSichten) {
     s.k.maxSchritte = 3000;
     s.run("g");
     EXPECT_TRUE(hat(s.run("t"), "T1: zaehlt"));
-    EXPECT_TRUE(hat(s.run("t"), "÷3"));
+    EXPECT_TRUE(hat(s.run("t"), "/3"));
     EXPECT_TRUE(hat(s.run("irq"), "Rangfolge"));
     EXPECT_TRUE(hat(s.run("irqlog"), "IRQ5"));
-    EXPECT_TRUE(hat(s.run("ports"), "A12–A15"));
+    EXPECT_TRUE(hat(s.run("ports"), "A12-A15"));
     EXPECT_TRUE(hat(s.run("uart"), "UART: aus"));
     EXPECT_TRUE(hat(s.run("sicht"), "letzter Buszyklus"));
     EXPECT_TRUE(hat(s.run("dr 0F0H 0FFH"), "F0:"));

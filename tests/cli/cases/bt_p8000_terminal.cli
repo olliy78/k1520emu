@@ -1,4 +1,4 @@
-# boot_trace --machine p8000-terminal (AP P20d): Originalterminal Typ 2 ohne Rechner — Netz-Ein bis
+# boot_trace --machine p8000-terminal (AP P20d): Originalterminal Typ 2 ohne Rechner - Netz-Ein bis
 # zur Einschaltmeldung der Firmware P8T 5.0, dann `ab<CR>` ueber die K7673; die Leitung XB5 traegt
 # das 00H des Starts (Merkposten 30) und die getippten Bytes.
 tool:    boot_trace

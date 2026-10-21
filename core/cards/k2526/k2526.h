@@ -777,8 +777,8 @@ private:
 
     Z80    cpu_;                            ///< ZVE1: Haupt-Z80-CPU (U880D, 2.4576 MHz)
     Z80    zve2_;                           ///< ZVE2: DMA-CPU (second Z80, shares bus_)
-    Z80PIO bs_pio_{"K2526-BS-PIO"};        ///< Q301: BS-PIO (Betriebssystem-PIO), ports 08H–0BH
-    Z80CTC ctc_   {"K2526-CTC"};           ///< Q302: CTC (Zaehler/Zeitgeber),       ports 0CH–0FH
+    Z80PIO bs_pio_{"K2526-BS-PIO"};        ///< Q301: BS-PIO (Betriebssystem-PIO), ports 08H-0BH
+    Z80CTC ctc_   {"K2526-CTC"};           ///< Q302: CTC (Zaehler/Zeitgeber),       ports 0CH-0FH
 
     EPROMDevice<1024> rom_{laderomDaten(cfg_.laderom)};  ///< 1 KB boot EPROM at 0x0000–0x03FF
 

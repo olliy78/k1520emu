@@ -4,7 +4,7 @@
 #
 # `--type A` weil die Quelle eine NEUE Datei ist: bei der UDOS-Familie raet das
 # Werkzeug die Kopfsektorangaben nicht mehr (doc/bug_disktool_Programmdatei.md
-# §2.2).  Ohne den Schalter scheiterte es an den fehlenden Angaben statt am Platz —
+# §2.2).  Ohne den Schalter scheiterte es an den fehlenden Angaben statt am Platz -
 # und der Fall pruefte nicht mehr, was er prueft.
 tool:   k1520disktool
 disk:   udos_boot_scp.hfe

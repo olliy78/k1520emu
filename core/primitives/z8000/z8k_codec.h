@@ -223,7 +223,7 @@ inline bool encode(const Insn& in, const Operand* ops, int nops, bool seg,
             if (o.reg == 0) return fail("R0 als Basis nicht kodierbar");
             if (!put(s.f, o.reg, "Basis") || !put(s.g, o.reg2, "Index")) return false; break;
         case Kind::RA16:
-            if (o.disp < -32768 || o.disp > 32767) return fail("relatives Ziel ausser Reichweite (±32 KB)");
+            if (o.disp < -32768 || o.disp > 32767) return fail("relatives Ziel ausser Reichweite (+/-32 KB)");
             ext.push_back(uint16_t(o.disp)); break;
         case Kind::RA8:
             if ((o.disp & 1) || o.disp < -256 || o.disp > 254) return fail("JR-Ziel ausser Reichweite (-256..+254)");

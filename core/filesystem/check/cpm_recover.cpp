@@ -137,7 +137,7 @@ FsRecoverReport CpmFileSystem::recoverScan(FsRecoverLevel level, bool nachladen)
     if (!directoryRaw(roh)) return bericht;
 
     bericht.schritt("cpm.suche.lebend",
-                    "Lebende Dateien einlesen — ihre Bloecke sind tabu");
+                    "Lebende Dateien einlesen - ihre Bloecke sind tabu");
     // ── Was LEBT?  Bloecke und Namen ─────────────────────────────────────────
     std::map<uint16_t, std::string> lebend;      // Block → Datei, die ihn hat
     std::set<std::string>           lebt_name;   // Name (gross) einer lebenden Datei
@@ -310,7 +310,7 @@ FsRecoverReport CpmFileSystem::recoverScan(FsRecoverLevel level, bool nachladen)
             // und wirft ihn weg.
             hinweise.push_back("Es gibt " + std::to_string(gruppen.size())
                                + " geloeschte Eintraege namens '" + name
-                               + "' — verschiedene Dateien; dies ist die "
+                               + "' - verschiedene Dateien; dies ist die "
                                + std::to_string(gi + 1) + ".");
             if (!zuordnung_sicher)
                 karies.push_back("Bei mehreren gleichnamigen Eintraegen steht nicht"
@@ -361,7 +361,7 @@ FsRecoverReport CpmFileSystem::recoverScan(FsRecoverLevel level, bool nachladen)
             karies.push_back(std::to_string(schadhaft)
                              + " Sektor(en) tragen eine falsche Pruefsumme");
         if (luecke)
-            wild.push_back("es fehlen Verzeichnisplaetze — der Fund hat Loecher");
+            wild.push_back("es fehlen Verzeichnisplaetze - der Fund hat Loecher");
 
         fsRecoverBelege(f.detail, hinweise, "Hinweise");
         fsRecoverBelege(f.detail, streit, "Bloecke");
@@ -375,10 +375,10 @@ FsRecoverReport CpmFileSystem::recoverScan(FsRecoverLevel level, bool nachladen)
         // Auf die Diskette zurueck darf nur, was keiner lebenden Datei ins Gehege
         // kommt — weder ueber die Bloecke noch ueber den Namen.
         if (!streit.empty())
-            f.warum_nicht = "Bloecke des Fundes gehoeren inzwischen einer anderen Datei —"
+            f.warum_nicht = "Bloecke des Fundes gehoeren inzwischen einer anderen Datei -"
                             " ein Eintrag darauf erzeugte eine Kreuzbelegung";
         else if (lebt_name.count(name))
-            f.warum_nicht = "Eine Datei '" + name + "' steht bereits im Verzeichnis —"
+            f.warum_nicht = "Eine Datei '" + name + "' steht bereits im Verzeichnis -"
                             " unter einem anderen Namen geht es";
         f.wiederherstellbar = f.warum_nicht.empty();
 
@@ -423,11 +423,11 @@ FsRecoverReport CpmFileSystem::recoverScan(FsRecoverLevel level, bool nachladen)
                           static_cast<unsigned>(lauf.back()));
             f.vorschlag = wo;
             f.origin    = "freier Bereich, Block " + std::to_string(lauf.front())
-                        + (lauf.size() > 1 ? "…" + std::to_string(lauf.back()) : "");
-            f.detail    = "Kein Verzeichnisplatz — Name und Laenge sind unbekannt;"
+                        + (lauf.size() > 1 ? "..." + std::to_string(lauf.back()) : "");
+            f.detail    = "Kein Verzeichnisplatz - Name und Laenge sind unbekannt;"
                           " gerettet wird der Rohinhalt (" + f.type + ")";
             f.warum_nicht = "Ein Rohbereich hat keinen Verzeichnisplatz, den man"
-                            " zurueckholen koennte — herausholen laesst er sich aber";
+                            " zurueckholen koennte - herausholen laesst er sich aber";
             bericht.hinzu(std::move(f));
             lauf.clear();
             lauf_daten.clear();
@@ -522,7 +522,7 @@ bool CpmFileSystem::recoverRead(const FsRecoverFind& f, std::vector<uint8_t>& ou
 
 bool CpmFileSystem::recoverRestore(const FsRecoverFind& f, const std::string& name) {
     if (f.a != 0)
-        return fail("Ein Rohbereich laesst sich nicht wieder eintragen — er hat keinen"
+        return fail("Ein Rohbereich laesst sich nicht wieder eintragen - er hat keinen"
                     " Verzeichnisplatz.  Herausholen geht.");
 
     const std::string ziel = name.empty() ? f.name : name;
@@ -561,7 +561,7 @@ bool CpmFileSystem::recoverRestore(const FsRecoverFind& f, const std::string& na
             const auto it = lebend.find(blk);
             if (it != lebend.end())
                 return fail("Block " + std::to_string(blk) + " gehoert inzwischen zu '"
-                            + it->second + "' — ein Eintrag darauf erzeugte eine"
+                            + it->second + "' - ein Eintrag darauf erzeugte eine"
                               " Kreuzbelegung");
         }
     }

@@ -508,7 +508,7 @@ TEST(K8025Seriell, Kanalzuordnung)
     ASSERT_EQ(v24.taktquellen().size(), 2u);
     EXPECT_EQ(v24.taktquellen()[0].name, "ZRE-CTC K0 (W1:7)");
     ASSERT_EQ(ifss.taktquellen().size(), 2u);
-    EXPECT_EQ(ifss.taktquellen()[1].name, "CTC A34 K1 (X8–X9)");
+    EXPECT_EQ(ifss.taktquellen()[1].name, "CTC A34 K1 (X8-X9)");
     EXPECT_TRUE(dr.taktquellen().empty());
 
     sio8N1(card, 0x51);

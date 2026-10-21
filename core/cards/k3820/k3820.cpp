@@ -78,7 +78,7 @@ uint8_t K3820::memRead(uint16_t addr)
 void K3820::setChip(int idx, const uint8_t* data, std::size_t len)
 {
     if (idx < 0 || idx >= kChips || len > kChipSize)
-        throw std::out_of_range("K3820::setChip: Sockel 0…15, hoechstens 1 KB");
+        throw std::out_of_range("K3820::setChip: Sockel 0...15, hoechstens 1 KB");
     chip_[idx].fill(0xFF);
     if (data && len) std::copy(data, data + len, chip_[idx].begin());
     belegt_[idx] = true;
@@ -86,7 +86,7 @@ void K3820::setChip(int idx, const uint8_t* data, std::size_t len)
 
 void K3820::leereChip(int idx)
 {
-    if (idx < 0 || idx >= kChips) throw std::out_of_range("K3820::leereChip: Sockel 0…15");
+    if (idx < 0 || idx >= kChips) throw std::out_of_range("K3820::leereChip: Sockel 0...15");
     chip_[idx].fill(0xFF);
     belegt_[idx] = false;
 }

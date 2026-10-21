@@ -106,7 +106,7 @@ P8000TerminalMachine::P8000TerminalMachine(const Config& cfg) : cfg_(cfg), einhe
     if (!hub.konfigurieren(0, cfg.leitung))
         throw std::invalid_argument("P8000-Terminal: Leitungseinstellung abgewiesen (Port/Datei?)");
     if (cfg.verbinden && !hub.start(0))
-        throw std::invalid_argument("P8000-Terminal: Verbindung nicht startbar — " + hub.status(0).meldung);
+        throw std::invalid_argument("P8000-Terminal: Verbindung nicht startbar - " + hub.status(0).meldung);
 }
 
 P8000TerminalMachine::~P8000TerminalMachine() {

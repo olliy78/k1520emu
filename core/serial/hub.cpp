@@ -221,7 +221,7 @@ bool SerialHub::starten(int i, bool automatisch) {
                 const net::PortPruefung neu = pp.frei ? net::portPruefen(k.port) : pp;
                 e.portVorschlag = static_cast<uint16_t>(neu.vorschlag);
                 e.zustand = Zustand::Aus;
-                e.meldung = "Port " + std::to_string(k.port) + " belegt — " +
+                e.meldung = "Port " + std::to_string(k.port) + " belegt - " +
                             (neu.vorschlag ? std::to_string(neu.vorschlag) +
                                                  " ist frei, bitte von Hand starten"
                                            : std::string("kein freier Port darueber"));

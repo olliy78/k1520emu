@@ -7,7 +7,7 @@ run:     --machine k8915 %DISK% -x %CLI_DIR%/scripts/all_commands_smoke_k8915.db
 timeout: 300
 exit:    0
 forbid:  unknown command
-# AP-T1a: JEDES Kommando aus dbgm::nurA5120Kommando einzeln — mit nur drei
+# AP-T1a: JEDES Kommando aus dbgm::nurA5120Kommando einzeln - mit nur drei
 # Stichproben blieb der Fall gruen, als "snap" aus der Liste fiel (lief dann am
 # K8915 auf dem Platzhalter-Z80 statt "nicht vorhanden" zu melden).
 expect:  's2' gibt es am K8915 nicht

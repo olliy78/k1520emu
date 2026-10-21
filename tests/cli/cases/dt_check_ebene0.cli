@@ -1,7 +1,7 @@
 # Ebene 0 (Entwurf §11): auf einer Diskette, auf der NICHTS erkannt wird, ist der
 # Bericht die Begruendung.  `check` bricht dort nicht mehr mit einem Satz ab,
-# sondern oeffnet roh und nennt jeden geprueften Kandidaten mit seinem Grund —
-# genau die Frage („welche Probe sagt Nein und mit welcher Zahl"), die bei den
+# sondern oeffnet roh und nennt jeden geprueften Kandidaten mit seinem Grund -
+# genau die Frage ('welche Probe sagt Nein und mit welcher Zahl"), die bei den
 # drei zuletzt geloesten Fremdformaten die entscheidende war.
 #
 # Der Schaden: Verzeichnisplatz 0 bekommt einen Nutzerbereich > 15; damit weist

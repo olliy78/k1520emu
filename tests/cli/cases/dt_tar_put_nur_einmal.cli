@@ -1,4 +1,4 @@
-# Verriegelung: nach dem ersten tar-put ist die Diskette tar720 und nur lesbar — ein
+# Verriegelung: nach dem ersten tar-put ist die Diskette tar720 und nur lesbar - ein
 # zweites Schreiben wird mit klarer Meldung abgelehnt.
 tool:   k1520disktool
 tmpfile neu.img:

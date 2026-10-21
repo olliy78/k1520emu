@@ -300,7 +300,7 @@ TEST(MacListing, RoundTripsEveryDecodableInstruction){
         ++tested;
         std::string back = got.empty()? std::string("<nichts>") : disasmOf(got);
         if (a.res.unknown || got.empty() || back != text)
-            failures.push_back(text + " → \"" + back + "\"");
+            failures.push_back(text + " -> \"" + back + "\"");
     };
     for (int op=0; op<256; ++op){
         if (op==0xCB||op==0xED||op==0xDD||op==0xFD) continue;
