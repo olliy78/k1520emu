@@ -1,0 +1,20 @@
+# Der Satz schrumpft von 5 auf 1 Abbild: s1 wird ersetzt (Sicherung s1.hfe~), s2..s5 werden NICHT
+# geloescht — der Hinweis nennt sie, und das erneute Oeffnen von s2 zeigt, dass sie noch da sind.
+tool:   k1520disktool
+file k.txt:
+  kleine Datei
+tmpfile s.hfe:
+tmpfile s1.hfe:
+tmpfile s2.hfe:
+tmpfile s3.hfe:
+tmpfile s4.hfe:
+tmpfile s5.hfe:
+setup_run: tar-satz-neu --format k5601_ss40_16x256 %s.hfe% --put %CLI_DIR%/../fixtures/disks/cpa_cpa780_combo5zoll_noclock.img=gross.img --put %k.txt%=klein.txt
+run:    tar-satz-save %s1.hfe% %s2.hfe% %s3.hfe% %s4.hfe% %s5.hfe% --rm gross.img
+expect: Satz: 1 Abbild
+expect: Hinweis
+expect: s2.hfe
+expect: s5.hfe
+expect: gehoert nicht mehr zum Satz
+expect: gespeichert: 1 Abbild
+exit:   0

@@ -307,7 +307,10 @@ def test_tar_satz_opens_split_stream_as_one(window, tmp_path):
     assert "gross.bin" in namen
     e = next(x for x in window.tool.list() if x.name == "gross.bin")
     assert e.size == len(gross) and not e.damaged
-    assert window.tool.read_only_forced
+    # Entwurf 37 T2: ein VOLLSTAENDIGER Satz ist bearbeitbar (kein erzwungener Schutz mehr), bleibt
+    # aber wie jedes fremde Abbild beim Oeffnen schreibgeschuetzt; die GUI-Bedienung folgt in T4.
+    assert window.tool.read_only
+    assert not window.tool.read_only_forced
     assert "tar-Satz aus 2 Abbildern" in window.kopf.pfad.text()
 
 

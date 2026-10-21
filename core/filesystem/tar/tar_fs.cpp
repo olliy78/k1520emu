@@ -204,6 +204,19 @@ bool TarSpeicherQuelle::read(uint64_t off, uint8_t* dst, size_t n) const {
     return true;
 }
 
+bool TarSatzQuelle::read(uint64_t off, uint8_t* dst, size_t n) const {
+    if (off + n > s_->bytes.size()) return false;
+    std::memcpy(dst, s_->bytes.data() + off, n);
+    return true;
+}
+
+bool TarSatzQuelle::schreibe(uint64_t off, const uint8_t* src, size_t n) {
+    if (off + n > s_->bytes.size()) s_->bytes.resize(static_cast<size_t>(off + n), 0);
+    std::memcpy(s_->bytes.data() + off, src, n);
+    ++s_->revision;
+    return true;
+}
+
 namespace {
 
 /// Pfad bereinigen (gemeinsame Regel mit dem Archivmodell, siehe tar_archiv.h).
@@ -550,7 +563,7 @@ bool TarFileSystem::speichere(const tar::TarArchiv& a) {
     std::vector<uint8_t> strom;
     std::string err;
     if (!a.strom(strom, err)) return fail(err);
-    if (strom.size() > q_->size())
+    if (!q_->wachsend() && strom.size() > q_->size())
         return fail("Das Archiv wuerde " + std::to_string(strom.size()) + " Byte belegen (Koepfe, Daten, "
                     "Endmarke), der Datentraeger fasst nur " + std::to_string(q_->size())
                     + " Byte.  Ein tar-Satz ueber mehrere Disketten ist hier noch nicht moeglich.");
@@ -558,9 +571,14 @@ bool TarFileSystem::speichere(const tar::TarArchiv& a) {
     // die ganz-Null-Diskette und wird so auch beim Oeffnen als leer erkannt.
     uint64_t alt_ende = leer_ ? 0 : std::min<uint64_t>(q_->size(), alt.ende_off + 2 * kBlock);
     if (a.eintraege().empty()) alt_ende = q_->size();
+    // Ein wachsender Strom (tar-Satz) hat danach genau die Laenge des Archivs, mindestens
+    // aber die einer Diskette; die Nullen dahinter fuellt erst das Speichern auf Abbilder.
+    const uint64_t soll = std::max<uint64_t>(strom.size(), q_->mindestGroesse());
     strom.resize(static_cast<size_t>(std::max<uint64_t>(strom.size(), alt_ende)), 0);
     if (!q_->schreibe(0, strom.data(), strom.size()))
         return fail("Schreiben in den tar-Strom fehlgeschlagen");
+    if (q_->wachsend() && !q_->groesseSetzen(soll))
+        return fail("tar-Strom laesst sich nicht auf die neue Laenge setzen");
     leer_ = a.eintraege().empty();
     return true;
 }
@@ -640,8 +658,8 @@ bool TarFileSystem::wouldFit(const std::vector<PlannedFile>& files, FitReport& o
         }
     }
     out.needed    = n;
-    out.available = q_->size();
-    out.fits      = n <= q_->size();
+    out.available = q_->wachsend() ? std::max(n, q_->size()) : q_->size();
+    out.fits      = q_->wachsend() || n <= q_->size();
     if (!out.fits)
         out.detail = "Das Archiv wuerde " + std::to_string(n) + " Byte belegen, der Datentraeger fasst "
                      + std::to_string(q_->size()) + " Byte.  Ein tar-Satz ueber mehrere Disketten ist "

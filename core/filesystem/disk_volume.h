@@ -40,10 +40,29 @@
 
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
 class TarFileSystem;
+struct TarSatzSpeicher;
+
+/**
+ * @struct TarSatzPlan
+ * @brief Was @ref DiskVolume::tarSatzSpeichern tun wird (Entwurf 37, AP T2) — fuer die Rueckfrage.
+ */
+struct TarSatzPlan {
+    bool                     ok = false;       ///< false: @ref fehler sagt warum
+    std::string              fehler;
+    int                      abbilder = 0;     ///< Anzahl der Abbilder (mindestens 1)
+    uint64_t                 strom = 0;        ///< Laenge des tar-Stroms in Byte
+    uint64_t                 kapazitaet = 0;   ///< Nutzbytes EINES Abbilds
+    std::string              basisname;        ///< der Basisname, der geplant wurde (mit Endung)
+    std::vector<std::string> namen;            ///< die Abbilddateien: name1.ext, name2.ext, …
+    std::vector<std::string> ueberschreibt;    ///< davon schon vorhanden (werden ersetzt, Sicherung `~`)
+    std::vector<std::string> altlasten;        ///< vorhandene hoehere Nummern, die NICHT mehr zum Satz gehoeren
+    bool                     einzel = false;   ///< der Inhalt passt auf EINE Diskette
+};
 
 /**
  * @struct FileRef
@@ -567,6 +586,64 @@ public:
                                                    const FsCatalog& fs_cat,
                                                    std::string& err);
 
+    // ─── tar-Satz bearbeiten (Entwurf 37, AP T2) ─────────────────────────────
+
+    /// @brief Ist das Volume im Satzmodus (ein tar-Strom im Speicher ueber N gleichformatige Abbilder)?
+    bool tarSatz() const { return tar_satz_; }
+
+    /**
+     * @brief Einen LEEREN tar-Satz mit dem Katalogformat @p format anlegen (nichts auf der Platte).
+     *
+     * Das Format muss einheitlich sein (eine Sektorgroesse/-zahl/Kodierung ueber alle Spuren).
+     * @p basisname (mit Endung `.img|.hfe|.dmk|.cqm`) bestimmt die Container-Art und den Namen beim
+     * Speichern (`name1.ext`, …).  Das Volume ist beschreibbar, @ref dirty ist erst nach einer
+     * Aenderung wahr.
+     */
+    static std::unique_ptr<DiskVolume> tarSatzNeu(const std::string& format,
+                                                  const std::string& basisname,
+                                                  const FormatCatalog& formats,
+                                                  const FsCatalog& fs_cat, std::string& err);
+
+    /**
+     * @brief Eine tar-Einzeldiskette (abgeschlossenes Archiv) in den Satzmodus ueberfuehren.
+     *
+     * Danach wirken Aenderungen ohne Diskettengrenze auf den Strom im Speicher; die Datei der
+     * Diskette bleibt unberuehrt, bis @ref tarSatzSpeichern sie (oder einen Satz) schreibt.
+     * Eine Diskette mit ungespeicherten Aenderungen wird vorher geschrieben (flush).
+     */
+    bool tarZuSatz(const std::string& basisname = "");
+
+    /// @brief Der Basisname zu einem Abbildpfad: abschliessende Ziffern vor der Endung entfallen
+    ///        (`/x/ariane1.cqm` → `/x/ariane.cqm`; ohne Ziffern unveraendert).
+    static std::string tarSatzBasisname(const std::string& abbildpfad);
+
+    /**
+     * @brief Planung des Speicherns (ohne etwas zu schreiben): Anzahl, Namen, was ueberschrieben
+     *        wird und welche hoeheren Nummern liegenbleiben.  @p basisname leer = der des Satzes.
+     */
+    TarSatzPlan tarSatzPlanen(const std::string& basisname = "") const;
+
+    /**
+     * @brief Den Strom auf Abbilder GLEICHEN Formats verteilen und schreiben.
+     *
+     * Nummer ans Ende des Basisnamens VOR der Endung, letztes Abbild mit Nullen aufgefuellt.
+     * Alles-oder-nichts (erst temporaer, dann umbenennen); vorhandene Dateien gleichen Namens
+     * werden einmal je Sitzung als `<name>~` gesichert.  Alte, nicht mehr gebrauchte Nummern
+     * werden NIE geloescht: @p hinweise bekommt je eine Zeile (und @ref tarSatzPlanen listet sie).
+     * Auch bei Schreibschutz erlaubt (es wird nicht in das Volume geschrieben).
+     */
+    bool tarSatzSpeichern(const std::string& basisname = "",
+                          std::vector<std::string>* hinweise = nullptr,
+                          std::vector<std::string>* geschrieben = nullptr);
+
+    /// @brief Der beim Speichern vorgesehene Basisname des Satzes (leer, wenn keiner).
+    const std::string& tarSatzBasis() const { return satz_basis_; }
+
+    /// @brief Laesst sich dieses Volume direkt auf eine PHYSISCHE Diskette schreiben?  Leer = ja;
+    ///        sonst die Begruendung (ein tar-Satz hat keine einzelne Diskette; Weg: speichern,
+    ///        Einzelabbilder oeffnen, je Abbild schreiben).
+    std::string physischSchreibenGrund() const;
+
     /// @brief Die ganze lineare Sektorfolge (Zylinder, Kopf, Sektor) — auch einer roh
     ///        geoeffneten Diskette, sofern ihre Geometrie bekannt ist.
     bool linearBytes(std::vector<uint8_t>& out) const;
@@ -855,6 +932,12 @@ private:
 
     bool fail(const std::string& why) const { last_error_ = why; return false; }
     bool tar_satz_ = false;                 ///< aus @ref openTarSatz: ein verketteter Strom
+    std::shared_ptr<TarSatzSpeicher> satz_;   ///< der Strom im Satzmodus (geteilt mit dem TarFileSystem)
+    std::string  satz_basis_;               ///< Basisname fuer das Speichern (mit Endung)
+    uint64_t     satz_rev_gespeichert_ = 0; ///< Revision des Stroms beim Oeffnen/letzten Speichern
+    std::set<std::string> satz_gesichert_;  ///< Pfade, deren `~`-Sicherung in dieser Sitzung schon liegt
+    /// @brief TarFileSystem frisch ueber dem Satzstrom aufsetzen (nach Rollback, Anlegen).
+    bool satzNeuMounten();
     mutable std::string tar_warnung_;
     /// @brief Meldung fuer eine abgewiesene Schreibanforderung (tar eigener Text).
     std::string schreibschutzText() const;

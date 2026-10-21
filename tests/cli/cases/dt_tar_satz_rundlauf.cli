@@ -1,0 +1,13 @@
+# Rundlauf: neu angelegter Satz (5 Abbilder) wird als Satz wieder geoeffnet und listet seine Eintraege.
+tool:   k1520disktool
+tmpfile s.hfe:
+tmpfile s1.hfe:
+tmpfile s2.hfe:
+tmpfile s3.hfe:
+tmpfile s4.hfe:
+tmpfile s5.hfe:
+setup_run: tar-satz-neu --format k5601_ss40_16x256 %s.hfe% --mkdir ordner --put %CLI_DIR%/../fixtures/disks/cpa_cpa780_combo5zoll_noclock.img=ordner/gross.img
+run:    tar-satz -l %s1.hfe% %s2.hfe% %s3.hfe% %s4.hfe% %s5.hfe%
+expect: ordner/gross.img
+expect: 813824
+exit:   0

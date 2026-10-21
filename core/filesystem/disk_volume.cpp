@@ -1530,7 +1530,7 @@ const TarFileSystem* DiskVolume::tarFs() const {
 }
 
 bool DiskVolume::tarLeer() const {
-    if (!profile_ || profile_->type != FsType::Tar || !profile_->leer || volumes_.empty()) return false;
+    if (tar_satz_ || !profile_ || profile_->type != FsType::Tar || !profile_->leer || volumes_.empty()) return false;
     const auto* t = dynamic_cast<const TarFileSystem*>(volumes_[0].fs.get());
     return t && t->leer();
 }
@@ -1542,6 +1542,7 @@ const DiskFormat* DiskVolume::rohFormat() const {
 }
 
 bool DiskVolume::linearBytes(std::vector<uint8_t>& out) const {
+    if (tar_satz_ && satz_) { out = satz_->bytes; return true; }     // der Strom, nicht das erste Abbild
     std::unique_ptr<SectorSpace> eigen;
     const SectorSpace* raum = volumes_.empty() ? nullptr : volumes_[0].space.get();
     if (!raum && disk_) {
@@ -1588,13 +1589,27 @@ std::unique_ptr<DiskVolume> DiskVolume::openTarSatz(const std::vector<std::strin
     v.head  = SectorSpace::kAllHeads;
     v.space = std::make_unique<SectorSpace>(erste->disk_->medium(), *f);
     std::string warum;
-    auto t = TarFileSystem::mount(std::make_unique<TarSpeicherQuelle>(std::move(strom)), warum);
+    // Der Strom liegt in einem geteilten Speicher: das Dateisystem schreibt hinein (Satzmodus),
+    // das Volume sichert, verteilt und speichert ihn.  Schreibschutz bleibt Vorgabe (read_only_).
+    auto satz = std::make_shared<TarSatzSpeicher>();
+    satz->bytes   = std::move(strom);
+    satz->mindest = v.space->size();
+    auto t = TarFileSystem::mount(std::make_unique<TarSatzQuelle>(satz), warum);
+    if (!t && TarSatzQuelle(satz).size() > 0) {
+        // Ein leer gespeicherter Satz (alles Null) ist ein gueltiger, leerer Satz.
+        TarSatzQuelle q(satz);
+        std::string w2;
+        if (TarFileSystem::istLeer(q, &w2)) t = TarFileSystem::mountLeer(std::make_unique<TarSatzQuelle>(satz), w2);
+    }
     if (!t) { err = "Der verkettete Strom ist kein tar-Archiv: " + warum; return nullptr; }
     v.fs = std::move(t);
     erste->volumes_.push_back(std::move(v));
     erste->profile_ = prof;
     erste->format_  = f;
     erste->tar_satz_ = true;
+    erste->satz_ = satz;
+    erste->satz_rev_gespeichert_ = satz->revision;
+    erste->satz_basis_ = tarSatzBasisname(pfade.front());
     erste->detection_ = DetectionResult{};
     erste->detection_.format     = f->name;
     erste->detection_.filesystem = prof->name;
@@ -1604,6 +1619,283 @@ std::unique_ptr<DiskVolume> DiskVolume::openTarSatz(const std::vector<std::strin
     erste->disk_->setWriteProtect(true);
     erste->check(FsCheckLevel::Schnell, false);
     return erste;
+}
+
+// ─── tar-Satz bearbeiten (Entwurf 37, AP T2) ─────────────────────────────────
+
+namespace {
+
+/// Kleingeschriebene Endung mit Punkt-Verlust, nur die vier Container.
+bool satzContainer(const std::string& pfad, std::string& ext_klein) {
+    ext_klein = endung(pfad);
+    for (char& c : ext_klein) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return ext_klein == "img" || ext_klein == "hfe" || ext_klein == "dmk" || ext_klein == "cqm";
+}
+
+/// Ist die Geometrie einheitlich (ein Spurformat fuer jede Spur)?  Nur dann ist "gleiches Format
+/// fuer alle Abbilder" ohne Sonderfall eine einzige Kapazitaet.
+bool formatEinheitlich(const DiskFormat& f, std::string& warum) {
+    if (f.tracks.empty()) { warum = "das Format hat keine Spuren"; return false; }
+    const TrackFormat& t0 = f.tracks.front();
+    for (uint8_t c = 0; c < f.numCylinders(); ++c)
+        for (uint8_t h = 0; h < f.numHeads(); ++h) {
+            const TrackFormat* t = f.findTrack(c, h);
+            if (!t) { warum = "Spur " + std::to_string(c) + "/" + std::to_string(h) + " fehlt"; return false; }
+            if (t->secs_per_track != t0.secs_per_track || t->bytes_per_sec != t0.bytes_per_sec
+                || t->encoding != t0.encoding || t->cell_factor != t0.cell_factor) {
+                warum = "gemischte Spurformate (Systemspuren/Datenspuren)";
+                return false;
+            }
+        }
+    return true;
+}
+
+}  // namespace
+
+std::string DiskVolume::tarSatzBasisname(const std::string& abbildpfad) {
+    const fs::path p(abbildpfad);
+    std::string stem = p.stem().string();
+    size_t n = stem.size();
+    while (n > 0 && std::isdigit(static_cast<unsigned char>(stem[n - 1]))) --n;
+    if (n == 0 || n == stem.size()) return abbildpfad;      // keine Ziffern (oder nur Ziffern: Name behalten)
+    return (p.parent_path() / (stem.substr(0, n) + p.extension().string())).string();
+}
+
+std::string DiskVolume::physischSchreibenGrund() const {
+    if (!tar_satz_) return {};
+    return "Ein tar-Satz ist ein Strom ueber mehrere Disketten und laesst sich nicht direkt auf EINE "
+           "physische Diskette schreiben.  Weg: Satz speichern (tarSatzSpeichern), die Einzelabbilder "
+           "(name1, name2, …) oeffnen und jedes Abbild fuer sich auf eine Diskette schreiben.";
+}
+
+bool DiskVolume::satzNeuMounten() {
+    if (!satz_ || volumes_.empty()) return false;
+    std::string w;
+    auto q = std::make_unique<TarSatzQuelle>(satz_);
+    std::unique_ptr<TarFileSystem> t;
+    if (TarFileSystem::istLeer(*q, nullptr)) t = TarFileSystem::mountLeer(std::move(q), w);
+    else                                     t = TarFileSystem::mount(std::move(q), w);
+    if (!t) return fail("tar-Strom nicht mehr lesbar: " + w);
+    volumes_[0].fs = std::move(t);
+    return true;
+}
+
+std::unique_ptr<DiskVolume> DiskVolume::tarSatzNeu(const std::string& format,
+                                                   const std::string& basisname,
+                                                   const FormatCatalog& formats,
+                                                   const FsCatalog& fs_cat, std::string& err) {
+    const DiskFormat* fmt = formats.find(format);
+    if (!fmt) { err = "Format '" + format + "' steht nicht im Katalog"; return nullptr; }
+    std::string warum;
+    if (!formatEinheitlich(*fmt, warum)) {
+        err = "Format '" + format + "' ist fuer einen tar-Satz nicht geeignet: " + warum;
+        return nullptr;
+    }
+    std::string ext;
+    if (!satzContainer(basisname, ext)) {
+        err = "Der Basisname braucht die Endung .img, .hfe, .dmk oder .cqm: " + basisname;
+        return nullptr;
+    }
+    if ((ext == "img" || ext == "cqm") && !fmt->allow_img) {
+        err = "Format '" + format + "' ist nicht als ." + ext + " darstellbar";
+        return nullptr;
+    }
+    if (ext == "hfe" && !fmt->allow_hfe) { err = "Format '" + format + "' ist nicht als .hfe darstellbar"; return nullptr; }
+    const FsProfile* prof = nullptr;
+    for (const FsProfile& p : fs_cat.profiles())
+        if (p.type == FsType::Tar && !p.leer) { prof = &p; break; }
+    if (!prof) { err = "Im Katalog steht kein Dateisystem vom Typ tar"; return nullptr; }
+
+    std::unique_ptr<DiskVolume> dv(new DiskVolume);
+    dv->disk_ = DiskImage::createBlank(fmt->physicalCylinders(), fmt->numHeads(), fmt->predominantEncoding());
+    if (!dv->disk_) { err = "Medium nicht anlegbar"; return nullptr; }
+    Vol v;
+    v.head  = SectorSpace::kAllHeads;
+    v.space = std::make_unique<SectorSpace>(dv->disk_->medium(), *fmt);
+    auto satz = std::make_shared<TarSatzSpeicher>();
+    satz->mindest = v.space->size();
+    satz->bytes.assign(static_cast<size_t>(satz->mindest), 0);
+    auto t = TarFileSystem::mountLeer(std::make_unique<TarSatzQuelle>(satz), err);
+    if (!t) return nullptr;
+    v.fs = std::move(t);
+    dv->volumes_.push_back(std::move(v));
+    dv->path_     = basisname;
+    dv->format_   = fmt;
+    dv->profile_  = prof;
+    dv->tar_satz_ = true;
+    dv->satz_     = satz;
+    dv->satz_rev_gespeichert_ = satz->revision;
+    dv->satz_basis_ = basisname;
+    dv->read_only_ = false;                 // das eigene frische Werkstueck
+    dv->backup_getan_ = true;
+    dv->disk_->setWriteProtect(true);       // das Medium ist nur Geometrie-Halter
+    dv->detection_.format     = fmt->name;
+    dv->detection_.filesystem = prof->name;
+    dv->detection_.remarks    = "neuer, leerer tar-Satz";
+    dv->check(FsCheckLevel::Schnell, false);
+    return dv;
+}
+
+bool DiskVolume::tarZuSatz(const std::string& basisname) {
+    if (tar_satz_) return true;
+    if (!disk_ || volumes_.empty() || !istTar())
+        return fail("Nur eine tar-Diskette laesst sich in einen tar-Satz ueberfuehren.");
+    const TarFileSystem* t = tarFs();
+    if (!t || !t->schreibbar())
+        return fail(t ? t->nurLesbarGrund() : std::string("kein tar-Archiv"));
+    // Ein bisher ungeschriebener Stand gehoert in die Datei der Diskette, bevor der Strom in
+    // den Speicher geht — danach schreibt nur noch tarSatzSpeichern.
+    if (!read_only_ && dirty() && !flush()) return false;
+    std::vector<uint8_t> strom;
+    if (!linearBytes(strom)) return false;
+    auto satz = std::make_shared<TarSatzSpeicher>();
+    satz->bytes   = std::move(strom);
+    satz->mindest = volumes_[0].space->size();
+    std::string w;
+    std::unique_ptr<TarFileSystem> neu;
+    {
+        auto q = std::make_unique<TarSatzQuelle>(satz);
+        neu = TarFileSystem::istLeer(*q, nullptr) ? TarFileSystem::mountLeer(std::move(q), w)
+                                                  : TarFileSystem::mount(std::move(q), w);
+    }
+    if (!neu) return fail("tar-Strom nicht uebernehmbar: " + w);
+    volumes_[0].fs = std::move(neu);
+    tar_satz_ = true;
+    satz_ = satz;
+    satz_rev_gespeichert_ = satz->revision;
+    satz_basis_ = basisname.empty() ? tarSatzBasisname(path_) : basisname;
+    disk_->setWriteProtect(true);
+    check(FsCheckLevel::Schnell, false);
+    return true;
+}
+
+TarSatzPlan DiskVolume::tarSatzPlanen(const std::string& basisname) const {
+    TarSatzPlan p;
+    auto nein = [&](const std::string& why) { p.fehler = why; return p; };
+    if (!tar_satz_ || !satz_) return nein("Das Volume ist kein tar-Satz.");
+    const DiskFormat* f = rohFormat();
+    if (!f || volumes_.empty()) return nein("Die Geometrie des Satzes ist unbekannt.");
+    p.basisname = basisname.empty() ? satz_basis_ : basisname;
+    if (p.basisname.empty()) return nein("Kein Basisname angegeben.");
+    std::string ext;
+    if (!satzContainer(p.basisname, ext))
+        return nein("Der Basisname braucht die Endung .img, .hfe, .dmk oder .cqm: " + p.basisname);
+    if ((ext == "img" || ext == "cqm") && !f->allow_img) return nein("Das Format ist nicht als ." + ext + " darstellbar.");
+    if (ext == "hfe" && !f->allow_hfe) return nein("Das Format ist nicht als .hfe darstellbar.");
+
+    // Nutzlaenge: der Strom ohne die Nullen hinter der Endmarke (das fuellt das letzte Abbild).
+    p.kapazitaet = volumes_[0].space->size();
+    if (p.kapazitaet == 0) return nein("Die Kapazitaet eines Abbilds ist 0.");
+    uint64_t laenge = satz_->bytes.size();
+    if (const TarFileSystem* t = tarFs(); t && t->schreibbar() && !t->leer()) {
+        const uint64_t n = tar::exportLaenge(satz_->bytes.data(), satz_->bytes.size());
+        laenge = std::min<uint64_t>(laenge, n);
+    } else if (t && t->leer()) {
+        laenge = 0;
+    }
+    p.strom    = laenge;
+    p.abbilder = static_cast<int>(std::max<uint64_t>(1, (laenge + p.kapazitaet - 1) / p.kapazitaet));
+    p.einzel   = p.abbilder == 1;
+
+    const fs::path bp(p.basisname);
+    const std::string stem = bp.stem().string(), endg = bp.extension().string();
+    const fs::path dir = bp.parent_path();
+    for (int i = 1; i <= p.abbilder; ++i) {
+        const std::string name = (dir / (stem + std::to_string(i) + endg)).string();
+        p.namen.push_back(name);
+        std::error_code ec;
+        if (fs::exists(name, ec)) p.ueberschreibt.push_back(name);
+    }
+    // Hoehere Nummern desselben Satzes bleiben liegen: sie zu loeschen waere ein Eingriff, den
+    // niemand verlangt hat.  Wir nennen sie nur.
+    std::vector<std::pair<unsigned long, std::string>> alt;
+    std::error_code ec;
+    for (const auto& e : fs::directory_iterator(dir.empty() ? fs::path(".") : dir, ec)) {
+        const std::string fn = e.path().filename().string();
+        if (fn.size() <= stem.size() + endg.size() || fn.compare(0, stem.size(), stem) != 0) continue;
+        if (fn.compare(fn.size() - endg.size(), endg.size(), endg) != 0) continue;
+        const std::string mitte = fn.substr(stem.size(), fn.size() - stem.size() - endg.size());
+        if (mitte.empty() || mitte.size() > 6
+            || !std::all_of(mitte.begin(), mitte.end(), [](char c) { return std::isdigit(static_cast<unsigned char>(c)); }))
+            continue;
+        const unsigned long num = std::stoul(mitte);
+        if (num > static_cast<unsigned long>(p.abbilder)) alt.emplace_back(num, e.path().string());
+    }
+    std::sort(alt.begin(), alt.end());
+    for (const auto& a : alt) p.altlasten.push_back(a.second);
+    p.ok = true;
+    return p;
+}
+
+bool DiskVolume::tarSatzSpeichern(const std::string& basisname, std::vector<std::string>* hinweise,
+                                  std::vector<std::string>* geschrieben) {
+    if (hinweise) hinweise->clear();
+    if (geschrieben) geschrieben->clear();
+    const TarSatzPlan p = tarSatzPlanen(basisname);
+    if (!p.ok) return fail(p.fehler);
+    const DiskFormat* f = rohFormat();
+    const fs::path bp(p.basisname);
+    const std::string endg = bp.extension().string();
+
+    // Phase 1: alle Abbilder unter Hilfsnamen im Zielordner schreiben (gleiche Endung, damit der
+    // Container stimmt).  Erst wenn alle fertig sind, wird umbenannt — ein Fehler laesst
+    // vorhandene Dateien unberuehrt.
+    std::vector<std::string> tmp;
+    auto aufraeumen = [&]() { std::error_code ec; for (const auto& t : tmp) fs::remove(t, ec); };
+    for (int i = 0; i < p.abbilder; ++i) {
+        const fs::path ziel(p.namen[static_cast<size_t>(i)]);
+        const std::string hilfsname = (ziel.parent_path() / ("~satz" + std::to_string(i + 1) + "_" + ziel.filename().string())).string();
+        tmp.push_back(hilfsname);
+        std::string grund;
+        {
+            auto img = DiskImage::create(hilfsname, *f, false, f->predominantEncoding(), &grund);
+            if (!img) { aufraeumen(); return fail("Abbild nicht anlegbar: " + p.namen[static_cast<size_t>(i)] + (grund.empty() ? "" : " (" + grund + ")")); }
+            std::vector<uint8_t> scheibe(static_cast<size_t>(p.kapazitaet), 0);
+            const uint64_t von = static_cast<uint64_t>(i) * p.kapazitaet;
+            if (von < satz_->bytes.size()) {
+                const uint64_t n = std::min<uint64_t>(p.kapazitaet, satz_->bytes.size() - von);
+                std::copy_n(satz_->bytes.begin() + static_cast<std::ptrdiff_t>(von), n, scheibe.begin());
+            }
+            // Was hinter der Archivlaenge liegt, ist Null (Auffuellung des letzten Abbilds).
+            if (von + p.kapazitaet > p.strom) {
+                const uint64_t ab = von >= p.strom ? 0 : p.strom - von;
+                std::fill(scheibe.begin() + static_cast<std::ptrdiff_t>(ab), scheibe.end(), 0);
+            }
+            SectorSpace raum(img->medium(), *f);
+            if (!raum.write(0, scheibe.data(), scheibe.size())) {
+                aufraeumen();
+                return fail("Abbild " + std::to_string(i + 1) + " nicht beschreibbar: " + raum.lastError());
+            }
+            if (!img->flush()) { const std::string e = img->lastError(); aufraeumen(); return fail("Abbild " + std::to_string(i + 1) + ": " + e); }
+        }
+    }
+    // Phase 2: umbenennen, vorhandene Datei einmal je Sitzung als `~` sichern.
+    for (int i = 0; i < p.abbilder; ++i) {
+        const std::string& ziel = p.namen[static_cast<size_t>(i)];
+        std::error_code ec;
+        if (fs::exists(ziel, ec) && !satz_gesichert_.count(ziel)) {
+            fs::copy_file(ziel, ziel + "~", fs::copy_options::overwrite_existing, ec);
+            if (ec) { aufraeumen(); return fail("Sicherungskopie " + ziel + "~ nicht anlegbar: " + ec.message()); }
+            satz_gesichert_.insert(ziel);
+        }
+        fs::rename(tmp[static_cast<size_t>(i)], ziel, ec);
+        if (ec) {
+            std::error_code e2;
+            fs::remove(ziel, e2);
+            fs::rename(tmp[static_cast<size_t>(i)], ziel, ec);
+        }
+        if (ec) { aufraeumen(); return fail("Umbenennen nach " + ziel + " fehlgeschlagen: " + ec.message()); }
+        tmp[static_cast<size_t>(i)].clear();
+        if (geschrieben) geschrieben->push_back(ziel);
+    }
+    satz_rev_gespeichert_ = satz_->revision;
+    satz_basis_ = p.basisname;
+    path_ = p.namen.front();
+    if (hinweise)
+        for (const std::string& a : p.altlasten)
+            hinweise->push_back("'" + a + "' gehoert nicht mehr zum Satz (er hat jetzt " + std::to_string(p.abbilder)
+                                + " Abbild(er)) und blieb unveraendert liegen — bei Bedarf selbst loeschen.");
+    return true;
 }
 
 // ─── tar-Disketten: Export und Schreiben ─────────────────────────────────────
@@ -3174,6 +3466,13 @@ bool DiskVolume::insertAll(const std::string& src_dir, const TransferOptions& op
     // Schritt 3: ausfuehren, mit Ruecknahme.  Die Momentaufnahme des Mediums kostet
     // ~1 MB je Diskette — billig gegenueber einer halb beschriebenen Diskette.
     const DiskMedium sicherung = disk_->medium();
+    // Im Satzmodus liegt der Stand im Speicher-Strom, nicht im Medium: den mitsichern.
+    const std::vector<uint8_t> satz_sicherung = (tar_satz_ && satz_) ? satz_->bytes : std::vector<uint8_t>{};
+    const uint64_t satz_rev = (tar_satz_ && satz_) ? satz_->revision : 0;
+    auto zurueck = [&]() {
+        disk_->medium() = sicherung;
+        if (tar_satz_ && satz_) { satz_->bytes = satz_sicherung; satz_->revision = satz_rev; satzNeuMounten(); }
+    };
     // WEGA: auch die LEEREN Unterordner gehoeren zum Baum.
     if (istUnix()) {
         std::error_code ec;
@@ -3181,7 +3480,7 @@ bool DiskVolume::insertAll(const std::string& src_dir, const TransferOptions& op
             if (!e.is_directory()) continue;
             if (!volumes_[0].fs->makeDirectory(wegaZielName(src_dir, e.path().string()))) {
                 const std::string grund = volumes_[0].fs->lastError();
-                disk_->medium() = sicherung;
+                zurueck();
                 return fail(grund + " — die Diskette wurde nicht veraendert.");
             }
         }
@@ -3226,7 +3525,7 @@ bool DiskVolume::insertAll(const std::string& src_dir, const TransferOptions& op
             }
             if (!insert(quelle, FileRef{static_cast<int>(v), name}, o)) {
                 const std::string grund = last_error_;
-                disk_->medium() = sicherung;         // Ruecknahme
+                zurueck();         // Ruecknahme
                 return fail(grund + " — die Diskette wurde nicht veraendert.");
             }
         }
@@ -3249,7 +3548,7 @@ bool DiskVolume::insertAll(const std::string& src_dir, const TransferOptions& op
             if (ein.x.mtime)    { ua.set_mtime = true; ua.mtime = ein.x.mtime; }
             if (!volumes_[0].fs->setAttributes(wegaZielName(src_dir, e.path().string()), ua)) {
                 const std::string grund = volumes_[0].fs->lastError();
-                disk_->medium() = sicherung;
+                zurueck();
                 return fail(grund + " — die Diskette wurde nicht veraendert.");
             }
         }
@@ -3259,7 +3558,10 @@ bool DiskVolume::insertAll(const std::string& src_dir, const TransferOptions& op
 
 // ─── Dateibindung ────────────────────────────────────────────────────────────
 
-bool DiskVolume::dirty() const { return disk_ && disk_->medium().dirty(); }
+bool DiskVolume::dirty() const {
+    if (tar_satz_ && satz_) return satz_->revision != satz_rev_gespeichert_;
+    return disk_ && disk_->medium().dirty();
+}
 
 void DiskVolume::setReadOnly(bool ro) {
     // Eine nur GEMESSENE Geometrie laesst sich nicht freigeben: wir haben sie geraten,
@@ -3280,11 +3582,13 @@ void DiskVolume::setReadOnly(bool ro) {
     // Zweite Sperre eine Ebene tiefer: ein schreibgeschuetztes DiskImage schreibt
     // seine Datei auch dann nicht, wenn hier etwas durchrutscht — einschliesslich
     // des flush() aus seinem Destruktor.
-    if (disk_) disk_->setWriteProtect(ro);
+    // Im Satzmodus bleibt das erste Abbild IMMER geschuetzt: geschrieben wird nur ueber tarSatzSpeichern.
+    if (disk_) disk_->setWriteProtect(ro || tar_satz_);
 }
 
 bool DiskVolume::exportImage(const std::string& path) const {
     if (!disk_) return fail("keine Diskette geoeffnet");
+    if (tar_satz_) return fail("Ein tar-Satz besteht aus mehreren Abbildern — mit tarSatzSpeichern speichern.");
     std::optional<DiskFormat> of;
     const std::string zielEndung = endung(path);
     if (zielEndung == "img" || zielEndung == "cqm") {
@@ -3300,6 +3604,9 @@ bool DiskVolume::exportImage(const std::string& path) const {
 
 bool DiskVolume::flush() {
     if (!disk_) return fail("keine Diskette geoeffnet");
+    // Im Satzmodus gibt es keine Datei, in die sich ein Aenderungsstand zurueckschreiben liesse:
+    // gespeichert wird ausdruecklich mit tarSatzSpeichern (auf N Abbilder).
+    if (tar_satz_) return true;
     if (read_only_) {
         if (!dirty()) return true;          // nichts zu tun — kein Grund zu klagen
         return fail(schreibschutzText());
@@ -3616,6 +3923,7 @@ bool DiskVolume::writeBootImageFile(const std::string& path, int volume) {
 
 bool DiskVolume::saveAs(const std::string& path) {
     if (!disk_) return fail("keine Diskette geoeffnet");
+    if (tar_satz_) return fail("Ein tar-Satz besteht aus mehreren Abbildern — mit tarSatzSpeichern speichern.");
     std::optional<DiskFormat> of;
     const std::string zielEndung = endung(path);
     if (zielEndung == "img" || zielEndung == "cqm") {

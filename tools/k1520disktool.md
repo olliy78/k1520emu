@@ -980,6 +980,28 @@ k1520disktool tar-satz ariane1.cqm ariane2.cqm --to aus/   # vollstaendig entpac
 Die Datenstroeme werden in der angegebenen Reihenfolge verkettet; die Reihenfolge
 bestimmt der Aufrufer (Satznamen). Exit 1 nur bei einem Befund `Fehler`.
 
+### `tar-satz-save` und `tar-satz-neu` — einen Satz bearbeiten (Entwurf 37, T2)
+
+```
+k1520disktool tar-satz-neu --format k5601_ss40_16x256 satz.hfe --put datei=ziel/name --mkdir ordner
+k1520disktool tar-satz-save satz1.hfe satz2.hfe satz3.hfe --rm alt.bin --put neu.bin       # zurueck unter den eigenen Namen
+k1520disktool tar-satz-save e.img -o gross.hfe --put riesig.bin    # Einzeldiskette laeuft ueber -> Satz gross1.hfe, gross2.hfe, …
+k1520disktool tar-satz-save satz1.hfe satz2.hfe -o neu.cqm --dry-run   # nur den Plan zeigen
+```
+Der Satz wird als Ganzes geoeffnet (ein Strom im Speicher); die Schritte `--put QUELLE[=ZIEL]` (Ordner =
+`insertAll`), `--rm NAME`, `--mkdir NAME`, `--attr NAME` (mit `--mode/--uid/--gid/--mtime`) laufen in der
+Reihenfolge der Kommandozeile, ohne Diskettengroessen-Grenze.  Gespeichert wird auf Abbilder GLEICHEN Formats
+(einheitliche Katalogformate: `tar-satz-neu` lehnt gemischte wie `cpa780` ab): die Nummer steht am Ende des
+Basisnamens **vor** der Endung (`name1.hfe`, `name2.hfe`, …; Container je Endung `.img|.hfe|.dmk|.cqm`), das letzte
+Abbild ist mit Nullen aufgefuellt.  Ohne `-o` gelten die Namen des Satzes (Ziffern am Ende des ersten Abbilds
+entfallen: `ariane1.cqm` → `ariane.cqm`).  Gespeichert wird alles-oder-nichts (erst Hilfsdateien, dann
+Umbenennen); ein vorhandenes Abbild gleichen Namens wird einmal als `<name>~` gesichert.  **Alte, nicht mehr
+gebrauchte Nummern werden nie geloescht** (`Hinweis:` auf stderr nennt sie).  Satz-Volumes lassen sich nicht direkt
+auf eine physische Diskette schreiben (`DiskVolume::physischSchreibenGrund`); Weg: speichern, Einzelabbilder
+oeffnen, je Abbild schreiben.  Kern-API: `DiskVolume::tarSatzNeu/tarZuSatz/tarSatzPlanen/tarSatzSpeichern`.
+Ein `.img` mit kleiner, mehrdeutiger Geometrie wird beim Oeffnen geraten (Abbild hat keine Geometrie) — fuer
+Saetze `.hfe/.dmk/.cqm` bevorzugen.
+
 ### `tar-export`, `tar-put` und die leere tar-Diskette `tar720_leer`
 
 ```

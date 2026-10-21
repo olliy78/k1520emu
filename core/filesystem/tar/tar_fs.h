@@ -108,6 +108,13 @@ public:
     virtual bool beschreibbar() const { return false; }
     /// @brief @p n Byte ab @p off in den Strom schreiben (nur wenn @ref beschreibbar).
     virtual bool schreibe(uint64_t off, const uint8_t* src, size_t n) { (void)off; (void)src; (void)n; return false; }
+    /// @brief Waechst der Strom mit dem Archiv (tar-Satz im Speicher, Entwurf 37 T2)?  Dann
+    ///        gibt es keine Groessengrenze; @ref groesseSetzen legt die Laenge nach dem Schreiben fest.
+    virtual bool wachsend() const { return false; }
+    /// @brief Kleinste Laenge eines wachsenden Stroms (eine Diskette), auch fuer ein leeres Archiv.
+    virtual uint64_t mindestGroesse() const { return 0; }
+    /// @brief Strom auf genau @p n Byte kuerzen bzw. mit Nullen verlaengern (nur wenn @ref wachsend).
+    virtual bool groesseSetzen(uint64_t n) { (void)n; return false; }
 };
 
 /// @brief Strom ueber der linearen Sektorfolge einer Diskette.
@@ -131,6 +138,29 @@ public:
     bool read(uint64_t off, uint8_t* dst, size_t n) const override;
 private:
     std::vector<uint8_t> d_;
+};
+
+/// @brief Die Bytes eines tar-Satzes im Speicher; geteilt zwischen Dateisystem und DiskVolume,
+///        damit dieses den Strom sichern (Rollback), verteilen und speichern kann.
+struct TarSatzSpeicher {
+    std::vector<uint8_t> bytes;
+    uint64_t             mindest = 0;     ///< Kapazitaet EINER Diskette
+    uint64_t             revision = 0;    ///< zaehlt jede Aenderung (fuer dirty/Rollback)
+};
+
+/// @brief Wachsender, beschreibbarer Strom im Speicher — der tar-Satz im Bearbeitungsmodus (T2).
+class TarSatzQuelle : public TarQuelle {
+public:
+    explicit TarSatzQuelle(std::shared_ptr<TarSatzSpeicher> s) : s_(std::move(s)) {}
+    uint64_t size() const override { return s_->bytes.size(); }
+    bool read(uint64_t off, uint8_t* dst, size_t n) const override;
+    bool beschreibbar() const override { return true; }
+    bool schreibe(uint64_t off, const uint8_t* src, size_t n) override;
+    bool wachsend() const override { return true; }
+    uint64_t mindestGroesse() const override { return s_->mindest; }
+    bool groesseSetzen(uint64_t n) override { s_->bytes.resize(static_cast<size_t>(n), 0); ++s_->revision; return true; }
+private:
+    std::shared_ptr<TarSatzSpeicher> s_;
 };
 
 namespace tar { class TarArchiv; }
