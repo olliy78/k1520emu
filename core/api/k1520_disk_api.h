@@ -33,6 +33,9 @@ extern "C" {
 /// @brief Opakes Handle einer geoeffneten Diskette.
 typedef void* K1520Disk;
 
+/// @brief Opakes Handle eines geoeffneten P8000-Plattenabbilds (@ref k1520d_platte_open).
+typedef void* K1520Platte;
+
 /// @brief Uebertragungsmodus fuer @ref k1520d_extract / @ref k1520d_insert.
 typedef enum {
     K1520D_BINARY = 0,   ///< Bytes unveraendert
@@ -930,6 +933,103 @@ K1520_API bool k1520d_recover_extract(K1520Disk h, int i, const char* pfad);
 /// @brief Den Fund auf der Diskette wieder eintragen.  @p name leer = der
 ///        ueberlieferte.  Danach wird neu gesucht UND neu geprueft.
 K1520_API bool k1520d_recover_restore(K1520Disk h, int i, const char* name);
+
+/* ─── P8000-Platte (WEGA, md0 ... md4) ────────────────────────────────────────
+ * Eigener Handle neben der Diskette: eine Platte hat Partitionen statt Seiten und
+ * kein Diskettenformat.  Die Partitionen erscheinen als oberste Ordner einer
+ * virtuellen Wurzel, Pfade lauten `md2/etc/passwd` (Entwurf 37, Festlegungen 10-13).
+ * Die Fehlertexte des Oeffnens liefert @ref k1520d_last_open_error.
+ *
+ * Schreibschutz ist die Vorgabe; vor dem ersten Zurueckschreiben entsteht `<abbild>~`.
+ * Wie bei der Diskette gilt: @ref k1520d_platte_close schreibt NICHT selbsttaetig.
+ */
+
+/// @brief Traegt die Datei einen PAR-Sektor (ist es ein Plattenabbild)?  Liest nur 512 Byte.
+K1520_API bool k1520d_platte_ist(const char* path);
+
+/// @brief Platte oeffnen (`.img` oder `.img.gz`); NULL + @ref k1520d_last_open_error.
+K1520_API K1520Platte k1520d_platte_open(const char* path, bool read_only);
+K1520_API void        k1520d_platte_close(K1520Platte h);
+K1520_API const char* k1520d_platte_last_error(K1520Platte h);
+
+/// @brief Pfad der geoeffneten Datei.
+K1520_API const char* k1520d_platte_path(K1520Platte h);
+K1520_API bool k1520d_platte_read_only(K1520Platte h);
+K1520_API void k1520d_platte_set_read_only(K1520Platte h, bool ro);
+K1520_API void k1520d_platte_set_backup(K1520Platte h, bool on);
+K1520_API bool k1520d_platte_dirty(K1520Platte h);
+/// @brief Geaenderte Platte zurueckschreiben (in der Art der Quelle, `.gz` bleibt `.gz`).
+K1520_API bool k1520d_platte_flush(K1520Platte h);
+
+/// @brief Zahl der eingehaengten Partitionen mit WEGA-Dateisystem.
+K1520_API int         k1520d_platte_volume_count(K1520Platte h);
+/// @brief "md2" — Ordnername der Partition @p v (0 ... Anzahl-1, NICHT die md-Nummer).
+K1520_API const char* k1520d_platte_volume_dir(K1520Platte h, int v);
+/// @brief Rolle laut Standardtabelle: "/usr", "/", "/tmp" ...
+K1520_API const char* k1520d_platte_volume_role(K1520Platte h, int v);
+K1520_API const char* k1520d_platte_volume_label(K1520Platte h, int v);
+K1520_API uint64_t    k1520d_platte_volume_total(K1520Platte h, int v);
+K1520_API uint64_t    k1520d_platte_volume_free(K1520Platte h, int v);
+K1520_API uint64_t    k1520d_platte_volume_used(K1520Platte h, int v);
+
+/// @brief Verzeichnis lesen (immer frisch); die Eintraege tragen den vollen Pfad
+///        (`md2/etc/passwd`), die Partitionsordner selbst sind Eintraege vom Typ "d".
+K1520_API int         k1520d_platte_list(K1520Platte h);
+K1520_API int         k1520d_platte_entry_volume(K1520Platte h, int i);
+K1520_API const char* k1520d_platte_entry_name(K1520Platte h, int i);
+K1520_API uint64_t    k1520d_platte_entry_size(K1520Platte h, int i);
+/// @brief Dateiart: "-" Datei, "d" Ordner, "c"/"b" Geraet, "p" FIFO.
+K1520_API const char* k1520d_platte_entry_type(K1520Platte h, int i);
+/// @brief `ls -l`-Modusstring.
+K1520_API const char* k1520d_platte_entry_attrs(K1520Platte h, int i);
+K1520_API const char* k1520d_platte_entry_date(K1520Platte h, int i);
+K1520_API uint16_t    k1520d_platte_entry_unix_mode(K1520Platte h, int i);
+K1520_API int         k1520d_platte_entry_unix_uid(K1520Platte h, int i);
+K1520_API int         k1520d_platte_entry_unix_gid(K1520Platte h, int i);
+K1520_API int         k1520d_platte_entry_unix_nlink(K1520Platte h, int i);
+K1520_API uint32_t    k1520d_platte_entry_unix_inode(K1520Platte h, int i);
+K1520_API uint32_t    k1520d_platte_entry_unix_mtime(K1520Platte h, int i);
+K1520_API uint32_t    k1520d_platte_entry_unix_atime(K1520Platte h, int i);
+K1520_API uint32_t    k1520d_platte_entry_unix_ctime(K1520Platte h, int i);
+K1520_API uint16_t    k1520d_platte_entry_unix_rdev(K1520Platte h, int i);
+K1520_API bool        k1520d_platte_entry_damaged(K1520Platte h, int i);
+
+/**
+ * @brief Eine Datei lesen — Teil 1: laden und die Groesse liefern (-1 = Fehler).
+ *
+ * Der Inhalt bleibt im Handle, bis das naechste @c read_size ihn ersetzt (oder die
+ * Platte geschlossen wird); @ref k1520d_platte_read_data holt ihn ab, auch mehrfach.
+ */
+K1520_API int64_t k1520d_platte_read_size(K1520Platte h, const char* path);
+/// @brief Teil 2: den geladenen Inhalt nach @p buf kopieren (hoechstens @p cap Byte);
+///        liefert die kopierten Bytes, -1 ohne vorheriges @c read_size.
+K1520_API int64_t k1520d_platte_read_data(K1520Platte h, uint8_t* buf, uint64_t cap);
+
+/**
+ * @brief Eine Datei schreiben (anlegen oder, mit @p overwrite, ersetzen).
+ *
+ * @param mode  Modus (untere 12 Bit); negativ = Vorgabe des Dateisystems.
+ * @param uid/gid  Besitzer; beide negativ = Vorgabe.  Eine Angabe setzt beide.
+ * @param mtime Sekunden seit 1970; 0 = jetzt.
+ */
+K1520_API bool k1520d_platte_write(K1520Platte h, const char* path,
+                                   const uint8_t* buf, uint64_t len, bool overwrite,
+                                   int mode, int uid, int gid, uint32_t mtime);
+K1520_API bool k1520d_platte_erase(K1520Platte h, const char* path);
+K1520_API bool k1520d_platte_mkdir(K1520Platte h, const char* path);
+/// @brief `chmod`/`chown`/`touch` — wie @ref k1520d_set_unix_attrs.
+K1520_API bool k1520d_platte_set_unix_attrs(K1520Platte h, const char* path,
+                                            bool set_mode,  uint16_t mode,
+                                            bool set_uid,   int uid,
+                                            bool set_gid,   int gid,
+                                            bool set_mtime, uint32_t mtime);
+
+/// @brief Datei oder Ordner (rekursiv) samt `.fileinfo` herausholen; @p path leer = alles.
+K1520_API bool k1520d_platte_extract(K1520Platte h, const char* path, const char* dest_dir,
+                                     bool overwrite);
+/// @brief Linux-Datei oder -Ordner (rekursiv) einfuegen; @p dest = voller Zielpfad.
+K1520_API bool k1520d_platte_insert(K1520Platte h, const char* src, const char* dest,
+                                    bool overwrite);
 
 #ifdef __cplusplus
 }

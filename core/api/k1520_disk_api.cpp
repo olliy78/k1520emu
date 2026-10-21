@@ -19,6 +19,7 @@
 
 #include "core/filesystem/disk_volume.h"
 #include "core/filesystem/geometry_probe.h"
+#include "core/filesystem/wega/platten_volume.h"
 
 #include <algorithm>
 #include <memory>
@@ -1333,4 +1334,215 @@ extern "C" bool k1520d_recover_extract(K1520Disk h, int i, const char* pfad) {
 extern "C" bool k1520d_recover_restore(K1520Disk h, int i, const char* name) {
     if (!h) return false;
     return H(h)->vol->recoverRestore(i, name ? name : "");
+}
+
+// ─── P8000-Platte (PlattenVolume) ────────────────────────────────────────────
+
+namespace {
+
+struct PlattenHandle {
+    std::unique_ptr<PlattenVolume> vol;
+    std::vector<FileEntry>         eintraege;   ///< Stand des letzten k1520d_platte_list
+    std::vector<uint8_t>           gelesen;     ///< Inhalt des letzten k1520d_platte_read_size
+    bool                           gelesen_da = false;
+    std::string s_error, s_path, s_dir, s_role, s_label, s_name, s_type, s_attrs, s_date;
+};
+
+PlattenHandle* P(K1520Platte h) { return static_cast<PlattenHandle*>(h); }
+
+const FileEntry* peintrag(K1520Platte h, int i) {
+    if (!h) return nullptr;
+    PlattenHandle* p = P(h);
+    if (i < 0 || i >= static_cast<int>(p->eintraege.size())) return nullptr;
+    return &p->eintraege[static_cast<size_t>(i)];
+}
+
+bool pvolume_ok(K1520Platte h, int v) {
+    return h && v >= 0 && v < P(h)->vol->platte().volumeCount();
+}
+
+}  // namespace
+
+extern "C" bool k1520d_platte_ist(const char* path) {
+    return path && *path && WegaPlatte::istPlatte(path);
+}
+
+extern "C" K1520Platte k1520d_platte_open(const char* path, bool read_only) {
+    g_open_error.clear();
+    if (!path || !*path) { g_open_error = "kein Pfad angegeben"; return nullptr; }
+    auto h = std::make_unique<PlattenHandle>();
+    std::string err;
+    h->vol = PlattenVolume::open(path, err, read_only);
+    if (!h->vol) { g_open_error = err; return nullptr; }
+    return h.release();
+}
+
+extern "C" void k1520d_platte_close(K1520Platte h) { delete P(h); }
+
+extern "C" const char* k1520d_platte_last_error(K1520Platte h) {
+    if (!h) return g_open_error.c_str();
+    return halte(P(h)->s_error, P(h)->vol->lastError());
+}
+
+extern "C" const char* k1520d_platte_path(K1520Platte h) {
+    return h ? halte(P(h)->s_path, P(h)->vol->path()) : "";
+}
+
+extern "C" bool k1520d_platte_read_only(K1520Platte h) { return h && P(h)->vol->readOnly(); }
+extern "C" void k1520d_platte_set_read_only(K1520Platte h, bool ro) {
+    if (h) P(h)->vol->setReadOnly(ro);
+}
+extern "C" void k1520d_platte_set_backup(K1520Platte h, bool on) {
+    if (h) P(h)->vol->setBackup(on);
+}
+extern "C" bool k1520d_platte_dirty(K1520Platte h) { return h && P(h)->vol->dirty(); }
+extern "C" bool k1520d_platte_flush(K1520Platte h) { return h && P(h)->vol->flush(); }
+
+extern "C" int k1520d_platte_volume_count(K1520Platte h) {
+    return h ? P(h)->vol->platte().volumeCount() : 0;
+}
+
+extern "C" const char* k1520d_platte_volume_dir(K1520Platte h, int v) {
+    return pvolume_ok(h, v) ? halte(P(h)->s_dir, P(h)->vol->platte().volumeDir(v)) : "";
+}
+
+extern "C" const char* k1520d_platte_volume_role(K1520Platte h, int v) {
+    return pvolume_ok(h, v) ? halte(P(h)->s_role, P(h)->vol->platte().partition(v).rolle) : "";
+}
+
+extern "C" const char* k1520d_platte_volume_label(K1520Platte h, int v) {
+    return pvolume_ok(h, v) ? halte(P(h)->s_label, P(h)->vol->info(v).label) : "";
+}
+
+extern "C" uint64_t k1520d_platte_volume_total(K1520Platte h, int v) {
+    return pvolume_ok(h, v) ? P(h)->vol->info(v).total_bytes : 0;
+}
+extern "C" uint64_t k1520d_platte_volume_free(K1520Platte h, int v) {
+    return pvolume_ok(h, v) ? P(h)->vol->info(v).free_bytes : 0;
+}
+extern "C" uint64_t k1520d_platte_volume_used(K1520Platte h, int v) {
+    return pvolume_ok(h, v) ? P(h)->vol->info(v).used_bytes : 0;
+}
+
+extern "C" int k1520d_platte_list(K1520Platte h) {
+    if (!h) return 0;
+    P(h)->eintraege = P(h)->vol->list();
+    return static_cast<int>(P(h)->eintraege.size());
+}
+
+extern "C" int k1520d_platte_entry_volume(K1520Platte h, int i) {
+    const FileEntry* e = peintrag(h, i);
+    return e ? e->volume : 0;
+}
+extern "C" const char* k1520d_platte_entry_name(K1520Platte h, int i) {
+    const FileEntry* e = peintrag(h, i);
+    return e ? halte(P(h)->s_name, e->name) : "";
+}
+extern "C" uint64_t k1520d_platte_entry_size(K1520Platte h, int i) {
+    const FileEntry* e = peintrag(h, i);
+    return e ? e->size : 0;
+}
+extern "C" const char* k1520d_platte_entry_type(K1520Platte h, int i) {
+    const FileEntry* e = peintrag(h, i);
+    return e ? halte(P(h)->s_type, e->type) : "";
+}
+extern "C" const char* k1520d_platte_entry_attrs(K1520Platte h, int i) {
+    const FileEntry* e = peintrag(h, i);
+    return e ? halte(P(h)->s_attrs, e->attributes) : "";
+}
+extern "C" const char* k1520d_platte_entry_date(K1520Platte h, int i) {
+    const FileEntry* e = peintrag(h, i);
+    return e ? halte(P(h)->s_date, e->date) : "";
+}
+extern "C" bool k1520d_platte_entry_damaged(K1520Platte h, int i) {
+    const FileEntry* e = peintrag(h, i);
+    return e && e->damaged;
+}
+
+#define K1520D_PLATTE_UNIX(name, typ, feld) \
+    extern "C" typ name(K1520Platte h, int i) { \
+        const FileEntry* e = peintrag(h, i); \
+        return e ? static_cast<typ>(e->feld) : static_cast<typ>(0); \
+    }
+K1520D_PLATTE_UNIX(k1520d_platte_entry_unix_mode,  uint16_t, unix_mode)
+K1520D_PLATTE_UNIX(k1520d_platte_entry_unix_uid,   int,      unix_uid)
+K1520D_PLATTE_UNIX(k1520d_platte_entry_unix_gid,   int,      unix_gid)
+K1520D_PLATTE_UNIX(k1520d_platte_entry_unix_nlink, int,      unix_nlink)
+K1520D_PLATTE_UNIX(k1520d_platte_entry_unix_inode, uint32_t, unix_inode)
+K1520D_PLATTE_UNIX(k1520d_platte_entry_unix_mtime, uint32_t, unix_mtime)
+K1520D_PLATTE_UNIX(k1520d_platte_entry_unix_atime, uint32_t, unix_atime)
+K1520D_PLATTE_UNIX(k1520d_platte_entry_unix_ctime, uint32_t, unix_ctime)
+K1520D_PLATTE_UNIX(k1520d_platte_entry_unix_rdev,  uint16_t, unix_rdev)
+#undef K1520D_PLATTE_UNIX
+
+extern "C" int64_t k1520d_platte_read_size(K1520Platte h, const char* path) {
+    if (!h || !path) return -1;
+    PlattenHandle* p = P(h);
+    p->gelesen.clear();
+    p->gelesen_da = false;
+    if (!p->vol->read(path, p->gelesen)) return -1;
+    p->gelesen_da = true;
+    return static_cast<int64_t>(p->gelesen.size());
+}
+
+extern "C" int64_t k1520d_platte_read_data(K1520Platte h, uint8_t* buf, uint64_t cap) {
+    if (!h || !P(h)->gelesen_da) return -1;
+    const auto& d = P(h)->gelesen;
+    const size_t n = static_cast<size_t>(std::min<uint64_t>(cap, d.size()));
+    if (buf && n) std::copy(d.begin(), d.begin() + static_cast<std::ptrdiff_t>(n), buf);
+    return static_cast<int64_t>(n);
+}
+
+extern "C" bool k1520d_platte_write(K1520Platte h, const char* path,
+                                    const uint8_t* buf, uint64_t len, bool overwrite,
+                                    int mode, int uid, int gid, uint32_t mtime) {
+    if (!h || !path || (len && !buf)) return false;
+    WriteOptions w;
+    w.overwrite = overwrite;
+    if (mode >= 0) {
+        w.wega_mode = static_cast<uint16_t>(mode & 07777);
+        w.wega_mode_gesetzt = true;
+    }
+    if (uid >= 0 || gid >= 0) {
+        w.wega_uid = static_cast<uint16_t>(uid < 0 ? 0 : uid);
+        w.wega_gid = static_cast<uint16_t>(gid < 0 ? 0 : gid);
+        w.wega_owner_gesetzt = true;
+    }
+    w.wega_mtime = mtime;
+    const std::vector<uint8_t> d(buf, buf + len);
+    return P(h)->vol->write(path, d, w);
+}
+
+extern "C" bool k1520d_platte_erase(K1520Platte h, const char* path) {
+    return h && path && P(h)->vol->erase(path);
+}
+
+extern "C" bool k1520d_platte_mkdir(K1520Platte h, const char* path) {
+    return h && path && P(h)->vol->makeDirectory(path);
+}
+
+extern "C" bool k1520d_platte_set_unix_attrs(K1520Platte h, const char* path,
+                                             bool set_mode,  uint16_t mode,
+                                             bool set_uid,   int uid,
+                                             bool set_gid,   int gid,
+                                             bool set_mtime, uint32_t mtime) {
+    if (!h || !path) return false;
+    UnixAttrs a;
+    a.set_mode  = set_mode;  a.mode  = mode;
+    a.set_uid   = set_uid;   a.uid   = uid;
+    a.set_gid   = set_gid;   a.gid   = gid;
+    a.set_mtime = set_mtime; a.mtime = mtime;
+    return P(h)->vol->setAttributes(path, a);
+}
+
+extern "C" bool k1520d_platte_extract(K1520Platte h, const char* path, const char* dest_dir,
+                                      bool overwrite) {
+    if (!h || !dest_dir) return false;
+    return P(h)->vol->extract(path ? path : "", dest_dir, overwrite);
+}
+
+extern "C" bool k1520d_platte_insert(K1520Platte h, const char* src, const char* dest,
+                                     bool overwrite) {
+    if (!h || !src || !dest) return false;
+    return P(h)->vol->insert(src, dest, overwrite);
 }

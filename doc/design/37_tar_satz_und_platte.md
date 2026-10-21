@@ -71,7 +71,7 @@ Die Ketten sind unabhängig, laufen aber **nacheinander** (gemeinsamer `build/`,
 | AP | Inhalt | Wächter (neu) | Status |
 |----|--------|---------------|--------|
 | **P1** | Kern: `.fileinfo`-Code aus `DiskVolume` herauslösen (`core/filesystem/fileinfo.*`), `PlattenVolume` (list/read/write/erase/mkdir/setAttributes/extract/insert, flush, Backup), CLI `platte()` darauf umstellen | `PlattenVolume.*` (C++) | fertig 2026-10-21 |
-| **P2** | C-ABI `k1520d_platte_*` + ctypes `PlatteTool` + `test_c_api`-Abgleich | `py_disktool_platte` | offen |
+| **P2** | C-ABI `k1520d_platte_*` + ctypes `PlatteTool` + `test_c_api`-Abgleich | `py_disktool_platte` | fertig 2026-10-22 |
 | **P3** | GUI: Öffnen/Drop, Ordneransicht md0…, Schreibschutz, Eigenschaften, gesperrte Aktionen, Handbuch | `py_disktool_platte_gui` | offen |
 | **T1** | Kern: `TarArchiv` + schreibbares `TarFileSystem` (abgeschlossene Archive), Attribute, `.fileinfo` | `TarWrite.*` | offen |
 | **T2** | Kern: Satzmodus (Verteilen auf N Abbilder, Nummerierung, Überlauf Einzeldiskette → Satz), `tar-satz` schreibend; CLI `tar-satz-save`/`tar-satz-neu` | `TarSatz.*`, `dt_tar_satz_*.cli` | offen |
@@ -95,3 +95,4 @@ der `.fileinfo`-Umbau in P1 nützt dem tar-Weg T1).
 
 - 2026-10-20: Plan geschrieben, Tickets auf `in progress`.
 - 2026-10-21: P1 abgenommen (7 PlattenVolume-Tests, Volllauf 3697/3697 gruen).
+- 2026-10-22: P2 abgenommen (43 `k1520d_platte_*`, `PlatteTool`, 14 Faelle `py_disktool_platte`). Bekannt rot, vorbestehend (auch ohne P2): `py_kermit_gui` SEGFAULT unter Last (`kermittool/binding.py abort`).
