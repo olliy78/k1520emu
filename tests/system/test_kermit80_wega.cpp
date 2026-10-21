@@ -79,10 +79,11 @@ std::string letzteZeile(const std::string& bild) {
 class A5120Seite {
 public:
     static constexpr const char* kFixture = "cpa_cpa780_k5601_noclock.img";
-    A5120Seite(const std::string& com, const std::string& sendedatei)
+    A5120Seite(const std::string& com, const std::map<std::string, std::string>& dateien)
         : disk_(kFixture, std::string("kermit80_wega_") + kFixture) {
         fehler_ = aufspielen(disk_.path(), com, "KERMIT.COM");
-        if (fehler_.empty()) fehler_ = aufspielen(disk_.path(), sendedatei, "SENDTEST.TXT");
+        for (const auto& [name, pfad] : dateien)
+            if (fehler_.empty()) fehler_ = aufspielen(disk_.path(), pfad, name);
         if (fehler_.empty() && !m_.mountDisk(0, disk_.path(), "cpa780", false)) fehler_ = "mountDisk: " + m_.lastError();
     }
     const std::string& fehler() const { return fehler_; }
@@ -248,6 +249,11 @@ TEST(Kermit80Wega, ClientGegenC_Kermit42Server) {
     while (sende.size() % 128) sende += '\x1a';
     const std::string sdatei = k1520test::tempPath("k1520_k80w_sende.txt");
     schreibe(sdatei, sende);
+    // Binaerdatei zum Senden: jeder Bytewert 16x (4096 B = 32 Records, kein Auffuellen)
+    std::string bin(4096, '\0');
+    for (size_t i = 0; i < bin.size(); ++i) bin[i] = char(i & 0xFF);
+    const std::string bdatei = k1520test::tempPath("k1520_k80w_sende.bin");
+    schreibe(bdatei, bin);
 
     Anlage w;
     std::string grund;
@@ -258,7 +264,7 @@ TEST(Kermit80Wega, ClientGegenC_Kermit42Server) {
     const int port = w.kanal("tty0", Rolle::Server);
     ASSERT_GT(port, 0);
 
-    A5120Seite a(com, sdatei);
+    A5120Seite a(com, {{"SENDTEST.TXT", sdatei}, {"SENDBIN.BIN", bdatei}});
     ASSERT_EQ(a.fehler(), "");
     Kopplung k{w, a};
     a.m().powerOn();
@@ -298,6 +304,16 @@ TEST(Kermit80Wega, ClientGegenC_Kermit42Server) {
     ASSERT_TRUE(k.befehl("send sendtest.txt", 1800)) << a.bild();
     ASSERT_TRUE(k.befehl("remote directory")) << a.bild();
     EXPECT_NE(a.bild().find("sendtest.txt"), std::string::npos) << a.bild();
+
+    // ── Binaerdateien ueber die 7-Bit-Leitung: Paritaet gesetzt => Kermit-80 versucht das 8-Bit-Praefix ──
+    // (tty0 loescht Bit 7; ohne Praefix kaeme jedes Byte >= 80H verstuemmelt an.  C-Kermit 4.2 schaltet das
+    // Praefix nur ein, wenn die Gegenseite ein Zeichen nennt.)
+    ASSERT_TRUE(k.befehl("set parity space")) << a.bild();
+    for (const char* n : {"alle256", "b94", "b95"}) ASSERT_TRUE(k.befehl(std::string("get ") + n, 1800)) << n << "\n" << a.bild();
+    // Hinweg und zurueck: senden, lokal loeschen, wieder holen — nur so ist der Inhalt auf der WEGA-Seite belegt
+    ASSERT_TRUE(k.befehl("send sendbin.bin", 1800)) << a.bild();
+    ASSERT_TRUE(k.befehl("erase sendbin.bin")) << a.bild();
+    ASSERT_TRUE(k.befehl("get sendbin.bin", 1800)) << a.bild();
     ASSERT_TRUE(k.befehl("finish")) << a.bild();
 
     const auto auf = a.dateien();
@@ -307,8 +323,16 @@ TEST(Kermit80Wega, ClientGegenC_Kermit42Server) {
     std::fprintf(stderr, "  TEXT.TXT: WEGA %zu B, CP/M %zu B\n", soll.size(), ist.size());
     EXPECT_EQ(ist.substr(0, soll.size()), soll);
     EXPECT_EQ(ist.size() % 128, 0u);
+    for (const char* n : {"ALLE256", "B94", "B95", "SENDBIN.BIN"}) {
+        const std::string klein = [&] { std::string t = n; for (auto& c : t) c = char(std::tolower((unsigned char)c)); return t; }();
+        const std::string erw = n == std::string("SENDBIN.BIN") ? bin : testdateien().at(klein);
+        ASSERT_TRUE(auf.count(n)) << n << " fehlt auf der Diskette";
+        std::fprintf(stderr, "  %-12s erwartet %zu B, CP/M %zu B\n", n, erw.size(), auf.at(n).size());
+        EXPECT_EQ(auf.at(n).substr(0, erw.size()), erw) << n << " (Bytes mit Bit 7?)";
+    }
     std::error_code ec;
     fs::remove(sdatei, ec);
+    fs::remove(bdatei, ec);
     w.m().serialHub()->stopAlle();
     a.m().serialHub()->stopAlle();
 }

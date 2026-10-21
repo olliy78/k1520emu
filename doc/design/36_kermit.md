@@ -545,7 +545,9 @@ eine Beigabe zum Ausprobieren der V.24-Schnittstelle: A5120 (CP/A und SCPX 1.7),
   WEGA 3.1 als Server hinter getty (tty0 Telnet-Server, V.24 des A5120 Telnet-Client, beide in einem Faden in Scheiben
   gleicher Maschinenzeit).  Wie am Gerät: `connect`, Anmeldung `kermit`/`kermit` im Terminalmodus, **Ctrl-\ `c`** zurück (das
   Fluchtzeichen dieser Fassung; Kermit-80 meldet es beim `connect`), dann `remote directory`, `get`, `send`, `finish` — alles
-  ohne Fehl.  Nur 7-Bit-Text: Kermit-80 bietet kein 8-Bit-Präfix an, tty0 löscht Bit 7.  Die anderen Rechner sind nicht eigens
+  ohne Fehl.  **Binärdateien gehen über die 7-Bit-Leitung (tty0 löscht Bit 7) mit `set parity space`**: dann nennt Kermit-80 das
+  8-Bit-Präfix, C-Kermit 4.2 schaltet es ein (`get` von `alle256`/`b94`/`b95`, `send` von `sendbin.bin` — alle 256 Bytewerte —,
+  lokal löschen, wieder holen, bytegleich).  Mit `set parity none` (Vorgabe) käme jedes Byte ≥ 80H verstümmelt an.  Die anderen Rechner sind nicht eigens
   gegen die WEGA geprüft (gleiches Programm, nur die Überlagerung unterscheidet sich).
 - **Befund, Bibliothek:** Kermit-80 mit `set parity even|mark|odd` sendet jedes Byte mit Paritätsbit, auch MARK
   (SOH = 81H).  Der `PaketZerleger` suchte nur 01H und schwieg (Kermit-80 hing bei `Starting …`).  Jetzt erkennt er

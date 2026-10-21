@@ -49,6 +49,8 @@ bei Parität ≠ none, Langpakete/Attribute (4.2 kennt sie nicht, nur 9 Init-Fel
   zurück zum Prompt mit dem **Fluchtzeichen Ctrl-\** (nicht Ctrl-]) und `c`.  Die einfache Datensichtstation lässt den Cursor
   nach `connect` über den Bildrand laufen: der Prompt steht dann nicht mehr in der letzten Zeile und mit Resten des alten Bildes
   dahinter.  `Kermit80Wega` löscht deshalb das Bild vor jedem Befehl und wartet auf einen nackten, ruhigen Prompt.
+- **Binärdateien über die WEGA-Leitung (tty0 löscht Bit 7) brauchen `set parity space|mark|even|odd`** an Kermit-80: nur dann
+  nennt es das 8-Bit-Präfix, das C-Kermit 4.2 einschaltet.  Mit `parity none` kommt alles ≥ 80H verstümmelt an (`Kermit80Wega`).
 - **Im Test läuft Kermit-80 als `SERTEST.COM`** (ausser am P8000: die ausgelieferte OS/M-Diskette `disks/p8000_osm30/` trägt `KERMIT.COM`, der Test mountet eine Temp-Kopie und startet `kermit`) (die Hilfen aus `sertest_hilfen.h` legen immer diesen Namen an) und
   wird mit `sertest` gestartet — nur eine Abkürzung; auf den ausgelieferten Disketten heißt es `KERMIT.COM`.
 - Ein Lauf mit Parität ≠ none und QBIN `&` setzt voraus, dass der Server das Präfix annimmt (Kermit-80 schlägt bei Parität `Y` vor).
