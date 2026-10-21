@@ -30,6 +30,7 @@ from __future__ import annotations
 import ctypes
 import json
 import sys
+import threading
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
@@ -166,6 +167,10 @@ class Kermit:
     def __init__(self, handle: int):
         self._h = ctypes.c_void_p(handle)
         self._cb_refs: list = []
+        # close() loescht das C-Handle; abort*() kommen aus einem ANDEREN Faden (GUI) und pruefen
+        # `_h` nur, um es danach zu benutzen.  Ohne die Sperre gibt es dazwischen ein Use-after-free
+        # (SEGFAULT in k1520k_abort unter Last).  Kurz gehalten: abort* kehrt sofort zurueck.
+        self._sperre = threading.Lock()
 
     # ── Oeffnen ──────────────────────────────────────────────────────────
     @staticmethod
@@ -196,10 +201,11 @@ class Kermit:
 
     # ── Lebenszyklus ─────────────────────────────────────────────────────
     def close(self) -> None:
-        if self._h:
-            lib().k1520k_close(self._h)
-            self._h = ctypes.c_void_p(0)
-            self._cb_refs = []
+        with self._sperre:
+            if self._h:
+                lib().k1520k_close(self._h)
+                self._h = ctypes.c_void_p(0)
+                self._cb_refs = []
 
     def __enter__(self) -> "Kermit":
         return self
@@ -334,16 +340,19 @@ class Kermit:
 
     # ── Abbruch (jeder Faden) ────────────────────────────────────────────
     def abort(self) -> None:
-        if self._h:
-            lib().k1520k_abort(self._h)
+        with self._sperre:
+            if self._h:
+                lib().k1520k_abort(self._h)
 
     def abort_file(self) -> None:
-        if self._h:
-            lib().k1520k_abort_file(self._h)
+        with self._sperre:
+            if self._h:
+                lib().k1520k_abort_file(self._h)
 
     def abort_group(self) -> None:
-        if self._h:
-            lib().k1520k_abort_group(self._h)
+        with self._sperre:
+            if self._h:
+                lib().k1520k_abort_group(self._h)
 
     # ── Auskunft ─────────────────────────────────────────────────────────
     @property
