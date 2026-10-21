@@ -133,8 +133,18 @@ Benutzernamen und das Kennwort. Danach wartet es, bis der Kermit-Server startet.
 WEGA kommt manchmal mit gesetztem achtem Bit an (Parität). Das Skript vergleicht deshalb nur die
 unteren sieben Bit.
 
-**Das Kennwort** gilt nur für die laufende Sitzung. Das Programm schreibt es nie in seine
-Konfigurationsdatei, auch nicht in die Liste der zuletzt benutzten Verbindungen.
+**Das Kennwort** gilt ohne weiteres nur für die laufende Sitzung. Nur mit dem Haken *Zugangsdaten für
+diese Verbindung speichern* schreibt das Programm Benutzername und Kennwort **im Klartext** in die
+Konfigurationsdatei `kermit.yaml`, und zwar in den Eintrag dieser Verbindung (`client.login_name` und
+`client.kennwort`, ebenso in der Liste `zuletzt`). Die Datei ist **nicht geschützt**. Das Kennwort dient
+nur der Anmeldung an dieser Gegenstelle (der getty der WEGA), nicht dem Schutz von Daten.
+
+Für das Speichern gilt:
+
+* Es geschieht nur mit gesetztem Haken und erst, nachdem die Anmeldung gelungen ist.
+* Ein späteres Speichern überschreibt die alten Werte.
+* Die Voreinstellung *WEGA 3.1 (Benutzer kermit)* trägt `kermit` / `kermit` nur für die Sitzung ein.
+  Gespeichert wird erst, wenn der Haken gesetzt ist.
 
 **Maschinenzeit.** Der Emulator schickt die Zeichen einer seriellen Leitung in **Maschinenzeit**,
 also im Takt der nachgebildeten Maschine. Läuft der Emulator fünfmal so schnell wie das echte Gerät,
@@ -197,8 +207,29 @@ Fehlertext der Gegenstelle.
 * **Host** und **Port:** die Adresse des Emulators. Der Host gilt nur beim Verbinden.
 * **Baud-Vorschlag:** nur bei RFC 2217. Maßgeblich bleibt die Baudrate, die das Betriebssystem im
   Emulator eingestellt hat.
-* **Anmelden:** Haken setzen, wenn vor dem Kermit-Server eine Anmeldung wartet. Dazu Benutzername und
-  Kennwort eintragen.
+* **Anmelden (Login-Skript für eine getty):** Haken setzen, wenn vor dem Kermit-Server eine Anmeldung
+  wartet. **Ohne diesen Haken meldet sich das Programm nicht an und zeigt auch das Fenster
+  *Anmeldung* nicht.**
+* **Benutzername** und **Kennwort:** Beides kann hier schon stehen. Bleibt der Benutzername leer, fragt
+  das Fenster *Anmeldung*, sobald die Gegenstelle `login:` zeigt.
+* **Zugangsdaten für diese Verbindung speichern:** speichert Name und Kennwort im Klartext in der
+  `kermit.yaml` (siehe *So arbeitet K1520 Kermit*). Darunter steht ein Hinweis dazu.
+
+**Das Fenster „Anmeldung“.** Verlangt die Gegenstelle eine Anmeldung und sind keine Zugangsdaten bekannt,
+öffnet sich das Fenster. Seine Kopfzeile lautet „<Host:Port> verlangt eine Anmeldung.“ Es enthält:
+
+1. **Benutzername** und **Kennwort** (die Eingabe des Kennworts bleibt verdeckt). Darüber steht der
+   Hinweis „Möglicherweise ist es einfach kermit / kermit.“ Es ist nur ein Hinweis, die Felder sind leer.
+2. Den Haken **Zugangsdaten für diese Verbindung speichern** mit dem Hinweis auf den Klartext.
+3. Die Knöpfe **Anmelden** und **Abbrechen**.
+
+Lehnt die Gegenstelle die Eingabe ab, erscheint das Fenster erneut. Es zeigt rot „Anmeldung abgelehnt.
+Bitte erneut versuchen.“, und die Felder enthalten die letzte Eingabe. Gespeicherte oder im Verbindungsdialog
+eingetragene Zugangsdaten gelten beim ersten Versuch ohne Fenster. Schlagen sie fehl, kommt das Fenster.
+
+*Abbrechen* beendet das Verbinden still und schließt die Leitung. Die Statuszeile zeigt „Verbinden
+abgebrochen.“ Ist ein Benutzer ohne Kennwort eingetragen und lehnt die Gegenstelle ab, fragt das Programm
+nicht neu, sondern meldet „Verbindung fehlgeschlagen: Anmeldung abgelehnt“.
 
 Ein lauschendes Programm nimmt genau **eine** Verbindung an. Soll es danach weiter warten, *Verbindung ▸
 Nach der Trennung wieder lauschen* einschalten.
@@ -220,6 +251,21 @@ diesen Ordner und seine Unterordner.
    Port 5001.
 3. *Verbindung ▸ Server starten* (Strg+Umschalt+S) wählen.
 4. Zum Beenden *Verbindung ▸ Server stoppen* wählen. Das schließt auch die Leitung.
+
+**Anmeldung erzwingen.** Im Dialog *Als Server einrichten…* lässt sich der Server wie die WEGA
+absichern:
+
+1. Den Haken **Anmeldung erzwingen** setzen.
+2. **Benutzername** und **Kennwort** eintragen. Vorgabe ist `kermit` / `kermit`; beides lässt sich ändern.
+   Beide stehen im Klartext in der `kermit.yaml` (Zweig `server.login`). Der Dialog weist darauf hin.
+
+Der Server verhält sich dann wie getty und `login` der WEGA. Nach dem Verbindungsaufbau sendet er `login:`
+und danach `Password:` (die Eingabe wird nicht zurückgesendet). Stimmt das Paar, meldet er sich mit „C-Kermit
+server starting“ und beginnt zu arbeiten. Sonst folgt `Login incorrect`, und `login:` erscheint wieder.
+Nach `finish` oder `logout` des Clients meldet sich der Server erneut mit `login:`. Die Statuszeile zeigt
+„Server: … (mit Anmeldung)“.
+
+Auf der Kommandozeile: `k1520kermit serve --login-pflicht NAME[:KENNWORT] …` (ohne Kennwort gilt `kermit`).
 
 Weitere Schalter im Menü *Verbindung*:
 
@@ -425,6 +471,19 @@ Weitere Befehle am Prompt:
 
 Dateinamen kommen in Großbuchstaben aus CP/M. Mit der Vorgabe *Namen beim Empfangen: konvertiert* legt der
 Server sie klein an, zum Beispiel `programm.com`.
+
+**Mit Anmeldung.** Der Server kann wie die WEGA eine Anmeldung verlangen (siehe *Server-Modus*, *Anmeldung
+erzwingen*). Kermit-80 hat keinen Anmeldeablauf; man meldet sich im Terminalmodus von Hand an, wie im
+Abschnitt *Mit der WEGA als Server*:
+
+1. In K1520 Kermit den Server mit gesetztem Haken *Anmeldung erzwingen* starten.
+2. Am CP/M-Rechner `kermit` aufrufen und `set file-mode binary` eingeben.
+3. `connect` eingeben und RETURN drücken, bis `login:` erscheint.
+4. Den Benutzernamen eingeben. Bei `Password:` das Kennwort eingeben; es wird nicht angezeigt.
+5. Nach der Meldung „C-Kermit server starting“ mit **Strg+\** und dann `c` zum Prompt zurückkehren.
+6. `remote directory`, `get`, `send` und zuletzt `finish` wie oben.
+
+Nach `finish` zeigt ein neues `connect` wieder `login:`.
 
 ### Mit der WEGA als Server
 
@@ -847,6 +906,11 @@ k1520kermit serve --listen-telnet 5003 ~/austausch
 * **„Verbindung fehlgeschlagen".** Unter dieser Adresse wartet niemand. Im `p8000emu` den Kanal als
   Telnet-Server freigeben und den Port vergleichen. Oder umgekehrt: hier *Lauschen* wählen und den
   Kanal im Emulator als Telnet-Client einstellen.
+* **Das Fenster *Anmeldung* erscheint nicht.** Im Verbindungsdialog fehlt der Haken *Anmelden (Login-Skript
+  für eine getty)*. Ohne ihn meldet sich das Programm nicht an.
+* **Die Gegenstelle meldet `Login incorrect`.** Benutzername oder Kennwort stimmen nicht. Beim eigenen
+  Server stehen sie im Dialog *Als Server einrichten…*. Nach mehreren falschen Eingaben beginnt der Server
+  einfach wieder mit `login:`.
 * **Die Anmeldung scheitert.** *Ansicht ▸ Protokoll* öffnen. Dort stehen die Schritte des
   Login-Skripts und der zuletzt empfangene Text. Steuerzeichen erscheinen darin als `<1B>` usw.
 * **Nach *Trennen* zeigt die WEGA kein `login:` mehr.** *Trennen* schließt nur die Leitung; der

@@ -194,7 +194,7 @@ anfassen, laufen nacheinander oder im eigenen Worktree.
 | **K10** | **Bibliothek: Anmeldung des Clients auf Abruf** (§6.10 a): das Login-Skript meldet „Anmeldung verlangt“ und fragt Name/Kennwort über einen Rückruf ab, statt sie vorab zu verlangen; es unterscheidet **abgelehnt** (zweites `login:` / `Login incorrect`) von Frist und Leitungsfehler.  C-ABI additiv + Python-Bindung. | `KermitLogin*` (Unit), `py_kermit_api` (Signaturwächter), Kopplungstest gegen den Server aus K12 | sonnet | **fertig** (2026-10-22, Zweig `kermit`; Stand §6.11) |
 | **K11** | **Oberfläche, Client: Anmeldedialog** (§6.10 b): Popup mit Benutzername, Kennwort, Hinweis „möglicherweise einfach kermit / kermit“ und Haken *Zugangsdaten für diese Verbindung speichern*; erscheint bei verlangter Anmeldung und **erneut bei Ablehnung**; gespeichert wird **im Klartext in der Konfigurationsdatei, im Eintrag der Verbindung**, Neuspeichern überschreibt die alten Werte.  Kehrt die Regel „Kennwörter nie in die Datei“ um (Handbuch, Merkposten, `konfig.ohne_kennwort`, Wächter). | `py_kermit_gui` (Dialog mit Ersatz, Wiederholung, Speichern/Überschreiben, Konfig-Roundtrip) | sonnet | **fertig** (2026-10-22, Zweig `kermit`; Stand §6.13) |
 | **K12** | **Server mit Anmeldezwang** (§6.10 c): Bibliothek (`Sitzung::serve` mit Anmeldephase wie getty der WEGA: `login:` / `Password:` / `Login incorrect` / Wiederholung / nach `finish` zurück zu `login:`) **und** Oberfläche (Haken *Anmeldung erzwingen*, Name/Kennwort mit Vorgabe `kermit`/`kermit`, änderbar, in der Serverkonfiguration im Klartext). | `KermitServerLogin*` (Unit), `py_kermit_gui`, **Kermit-80 meldet sich im Terminalmodus an unserem Server an** (`Kermit80Pc.*`, Gegenstück zu `Kermit80Wega`) | opus (Protokoll) / sonnet (Oberfläche) | **fertig** (2026-10-22, Zweig `kermit`; Stand §6.12) |
-| **K13** | **Doku und Abnahme:** Handbuch (Client-Anmeldung, Server mit Anmeldezwang, Kermit-80 gegen unseren Server mit Anmeldung), Merkposten (Umkehr der Kennwortregel, Reihenfolge der Dialoge), Entwurf 36 auf Stand, Login-Skript in `py_kermit_gui` belegt (war offen, §7 Nr. 7). | — | sonnet | **offen** (nach K10–K12) |
+| **K13** | **Doku und Abnahme:** Handbuch (Client-Anmeldung, Server mit Anmeldezwang, Kermit-80 gegen unseren Server mit Anmeldung), Merkposten (Umkehr der Kennwortregel, Reihenfolge der Dialoge), Entwurf 36 auf Stand, Login-Skript in `py_kermit_gui` belegt (war offen, §7 Nr. 7). | `py_help`, `py_kermit_gui`, Abnahme §6.14 | sonnet | **fertig** (2026-10-22; Stand §6.14) — Commit siehe `git log` |
 | K2b | *(optional)* Schiebefenster, `G T`/`G U`, Wiederaufnahme. | — | — | offen (optional) |
 
 Reihenfolge: **K1 ‖ K2** (K2 im Worktree) → K3 → K4 → K5 ‖ K6 → K7 → K8 → K9; danach (2026-10-22) **K10 → K11 ‖ K12 → K13**.
@@ -720,6 +720,17 @@ Speichern und Überschreiben gegen den Server mit Anmeldezwang aus K12, Benutzer
 erlaubten Kennwortorte samt Gegentest ohne Haken).  Offen für K13: Handbuch (der Satz „Das Kennwort … schreibt es nie in
 seine Konfigurationsdatei“ unter *Anmeldung* ist überholt).
 
+### 6.14 Stand K13 (2026-10-22) — Handbuch, Merkposten, Abnahme
+
+**Handbuch** (`app/kermittool/help/handbuch.md`): *So arbeitet K1520 Kermit* (Kennwortabsatz neu: Klartext nur mit Haken, kein
+Dateischutz, Speicherregel), *Verbindung herstellen (Client)* (Felder, Fenster *Anmeldung*, Abbrechen, Ablehnung),
+*Server-Modus* (Anmeldung erzwingen), *Kermit-80 …* ▸ *Mit dem PC-Server* ▸ „Mit Anmeldung“, *Fehlersuche*.  Kein neues
+Tastenkürzel.  **Offen benannt:** das Fenster erscheint nur bei gesetztem Haken *Anmelden* (Merkposten Nr. 14; Auto-Erkennung
+ohne Haken wäre eine spätere Entscheidung).  **Merkposten:** Nr. 12 ist „überholt“ markiert, Nr. 13 gilt; neu Nr. 14.
+
+**Login-Skript in `py_kermit_gui`:** belegt durch `test_gespeicherte_daten_brauchen_kein_popup_und_falsche_loesen_es_aus`
+(Name und Kennwort vorab ⇒ keine Frage, gegen den Server mit Anmeldezwang aus K12) und die Popup-Fälle; kein weiterer Test nötig.
+
 ## 7. Offene Aufgaben
 
 Zusammengetragen aus den „Offen"-Listen von §6.1–§6.6, nach Dringlichkeit:
@@ -734,11 +745,12 @@ Zusammengetragen aus den „Offen"-Listen von §6.1–§6.6, nach Dringlichkeit:
    virtuellen Uhr nachgebildet (`KermitTempo.*`).
 5. **tty3 ohne 8-Bit-Präfix** nicht vermessen (Fall 2 lief mit `&` des PC-Servers).
 6. ~~**Nachlauf 2 s gegen den eigenen Server**~~ erledigt (§6.9): entfällt, wenn die Gegenstelle CAPAS meldet.
-7. **Oberfläche:** Login-Skript nur über CLI/C++-Tests belegt, nicht in `py_kermit_gui` (→ K13); Drag&Drop nur über
+7. **Oberfläche:** ~~Login-Skript nur über CLI/C++-Tests belegt~~ erledigt (K13, §6.14); Drag&Drop nur über
    die Auswertung der Mime-Daten (offscreen keine echten Ereignisse); Wiederverbinden ohne Anmeldung nach
    bloßem *Trennen* nicht eigens geprüft.
-8. **Kennwort:** entschieden am 2026-10-22: das Laborkennwort bleibt Vorgabe, die Oberfläche fragt bei verlangter
-   Anmeldung nach und kann die Zugangsdaten im Klartext in der Konfiguration merken (→ K10–K12, §6.10).
+8. ~~**Kennwort**~~ abgeschlossen (K10–K13): entschieden am 2026-10-22: das Laborkennwort bleibt Vorgabe, die Oberfläche fragt bei verlangter
+   Anmeldung nach und kann die Zugangsdaten im Klartext in der Konfiguration merken (→ K10–K13, §6.10).
+   Neu offen: Popup nur bei gesetztem Haken *Anmelden* (Merkposten Nr. 14).
 9. **Nur aus den Quellen gelesen**, nicht ausgelöst: Speicherfehler bei `G C` ohne Feld.  (Parität ≠ none beim
    Empfang ist seit §6.8 gelöst; gesendet wird weiter ohne Paritätsbit.)
 10. **K2b (optional):** Schiebefenster, `G T`/`G U`, Wiederaufnahme.
