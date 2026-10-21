@@ -50,6 +50,9 @@
 #include "tests/support/temp_path.h"
 #include "tests/system/sertest_hilfen.h"
 
+#ifndef K1520_OSM_P8000_DISK
+#error "K1520_OSM_P8000_DISK fehlt (disks/p8000_osm30/p8000_osm30_system.hfe)"
+#endif
 #ifndef K1520_KERMIT80_DIR
 #error "K1520_KERMIT80_DIR fehlt (tools/kermit80/)"
 #endif
@@ -584,18 +587,17 @@ TEST(Kermit80Rechner, Prg710_1) {
 
 // ─── P8000 (8-Bit-Teil) mit OS/M ──────────────────────────────────────────────────────────────
 //
-// Es gibt keine ausgelieferte OS/M-Diskette; der Fall braucht die Systemdiskette `osm30.cqm` der
-// pofo-Sammlung (`K1520_CQM_DIR`) und wird sonst uebersprungen.  Kermit-80 geht an tty0 (SIO0-A);
-// tty1 ist das Terminal.
+// Die ausgelieferte OS/M-Systemdiskette (disks/p8000_osm30/, tools/osm_p8000/) traegt KERMIT.COM schon;
+// sie wird als Temp-Kopie gemountet.  Kermit-80 geht an tty0 (SIO0-A); tty1 ist das Terminal.
 
 namespace {
 
 class K80P8000 {
 public:
-    explicit K80P8000(const std::string& cqm, const std::string& com)
-        : pfad_(k1520test::tempPath("k1520_k80_osm30.cqm")) {
-        fs::copy_file(cqm, pfad_, fs::copy_options::overwrite_existing);
-        fehler_ = aufspielen(pfad_, com, "SERTEST.COM");
+    K80P8000() : pfad_(k1520test::tempPath("k1520_k80_osm30.hfe")) {
+        std::error_code ec;
+        fs::copy_file(K1520_OSM_P8000_DISK, pfad_, fs::copy_options::overwrite_existing, ec);
+        if (ec) fehler_ = "Diskette kopieren: " + ec.message();
         if (fehler_.empty() && !m_.mountDisk(0, pfad_, m_.defaultFormatName(0), false)) fehler_ = "mountDisk: " + m_.lastError();
     }
     ~K80P8000() { std::error_code ec; fs::remove(pfad_, ec); }
@@ -628,10 +630,9 @@ private:
 TEST(Kermit80Rechner, P8000MitOsm) {
     stumm();
     KERMIT80_RECHNER_COM("p8000");
-    const char* dir = std::getenv("K1520_CQM_DIR");
-    const std::string cqm = dir ? std::string(dir) + "/osm30.cqm" : "";
-    if (cqm.empty() || !fs::exists(cqm)) GTEST_SKIP() << "osm30.cqm (K1520_CQM_DIR) fehlt";
-    FremdLauf<K80P8000> l(com, cqm, com);
+    FremdLauf<K80P8000> l(com);
+    l.start = "kermit";
+    l.datei = "kermit.com";
     l.kanalName = "tty0";
     EXPECT_TRUE(l.pruefe());
 }

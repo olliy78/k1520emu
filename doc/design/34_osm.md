@@ -1,6 +1,10 @@
 # 34 — OS/M-Disketten (P8000, 8-Bit-Teil)
 
 Stand 2026-10-17, Zweig `cqm`.  Analyse und Plan; **AP 1, AP 2, AP 3 und AP 6 sind umgesetzt** (§11).
+**Ausgelieferte Systemdiskette (2026-10-21, Zweig `kermit`):** `disks/p8000_osm30/p8000_osm30_system.hfe` = `osm30` der Sammlung (die
+Original-Auslieferung 3.0; `osmsys`/`osm_org` tragen dieselben Systemspuren, aber zusätzlich `PW.COM` bzw. `SC`/`REMOTE`; die Reinfassung ist die Wahl), 32 Dateien + `LIESMICH.TXT` +
+`KERMIT.COM`, Systemspuren unverändert; gebaut aus `tools/osm_p8000/` mit `create --fs osm640 --boot` (Wächter `cli_osm_p8000`), HFE wie die
+übrigen 5¼″-Disketten.
 Bezug: `doc/design/35_cqm.md` (Container), `doc/merkposten/disktool.md`, `doc/merkposten/cqm.md`,
 Sammlung `~/projects/robotron/P8000/discs/` (pofo.de), Übersicht
 `~/projects/robotron/P8000/archive/UEBERSICHT.md`.

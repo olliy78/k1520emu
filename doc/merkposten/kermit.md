@@ -44,7 +44,7 @@ bei Parität ≠ none, Langpakete/Attribute (4.2 kennt sie nicht, nur 9 Init-Fel
   `CPA_TOOLS` nötig) und die Disketten nachziehen.  Wächter `Kermit80Bau.EingechecktesComIstDasErgebnisVonBauPy`.
 - **Der Zerleger erkennt Parität selbst** (81H als Paketbeginn oder Bit 7 in LEN/SEQ/TYPE) und streift danach Bit 7
   ab.  Nicht auf „immer abstreifen“ vereinfachen: ohne Parität sind rohe 8-Bit-Daten gültig.  `KermitParitaet.*`.
-- **Im Test läuft Kermit-80 als `SERTEST.COM`** (die Hilfen aus `sertest_hilfen.h` legen immer diesen Namen an) und
+- **Im Test läuft Kermit-80 als `SERTEST.COM`** (ausser am P8000: die ausgelieferte OS/M-Diskette `disks/p8000_osm30/` trägt `KERMIT.COM`, der Test mountet eine Temp-Kopie und startet `kermit`) (die Hilfen aus `sertest_hilfen.h` legen immer diesen Namen an) und
   wird mit `sertest` gestartet — nur eine Abkürzung; auf den ausgelieferten Disketten heißt es `KERMIT.COM`.
 - Ein Lauf mit Parität ≠ none und QBIN `&` setzt voraus, dass der Server das Präfix annimmt (Kermit-80 schlägt bei Parität `Y` vor).
 

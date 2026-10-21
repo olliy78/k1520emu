@@ -24,8 +24,8 @@ Emulator wie am Geraet ohne eigenen Kopierschritt bereitstehen:
   AUPTSIO.COM   tools/auptest/   dieselbe Karte, Sonderschnittstelle CTC/SIO B0H-B7H (N10d)
   K3521TST.COM  tools/k3521tst/  A5120/K8924 — Pruefprogramm K3521.30: Speichertest und Editor (N10i)
   KERMIT.COM    tools/kermit80/  Kermit-80 4.11, je Rechner eine Ueberlagerung (KERMIT80): A5120 (CP/A, SCPX),
-                K8915, PC 1715 (SCP 1715, CP/A 1715), PC 1715W (SCP 3.0) und PRG 710/710-1 (SCPX) — Beigabe zum Ausprobieren
-                der V.24-Schnittstelle (die Ueberlagerung 'p8000' fuer OS/M liegt keiner Diskette bei)
+                K8915, PC 1715 (SCP 1715, CP/A 1715), PC 1715W (SCP 3.0), PRG 710/710-1 (SCPX) und P8000 (OS/M) — Beigabe
+                zum Ausprobieren der V.24-Schnittstelle
 
 Ausserdem legt ``ORDNER`` die Unterordner aller Abbilder in ``disks/`` fest, auch der Abbilder,
 die kein CP/M-Bauskript erzeugt: BCU 880 (tools/bcu_a5120/build.py, Waechter ``cli_bcu_a5120``:
@@ -134,6 +134,7 @@ ORDNER = {
     'pc1715_scp1715_v0006_system.hfe': 'pc1715_scp1715_v0006',
     'pc1715_scp1715_v0007_system.hfe': 'pc1715_scp1715_v0007',
     'pc1715w_scp30_system.hfe': 'pc1715w_scp30',
+    'p8000_osm30_system.hfe': 'p8000_osm30',
     'udos1715_640k_pc1715_system.hfe': 'pc1715_udos1715',
     'prg710_scpx15_system.hfe': 'prg710_scpx15',
     'prg710-1_scpx17_system.hfe': 'prg710-1_scpx17',

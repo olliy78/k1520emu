@@ -1,0 +1,39 @@
+OS/M 3.0 fuer den P8000 (8-Bit-Teil) - Systemdiskette des k1520emu
+===================================================================
+
+Betriebssystem: OS/M 3.0 (P8000, ZFT/KEAW, Version vom 15.01.1988), ein
+CP/M 2.2. Diskettenformat 5: 80 Spuren, beidseitig, 16 x 256 Byte (640K);
+vier Systemspuren mit dem Urlader. Start im Emulator: Diskette in
+Laufwerk A: einlegen, Kaltstart, am Monitor zweimal RETURN.
+Die Datei README beschreibt die Diskette in der Fassung der Auslieferung.
+
+SYSTEM
+------
+  SYSGEN        System auf eine andere Diskette schreiben
+  SETFD         Diskettenformat der Laufwerke einstellen
+  SETLP         Druckerparameter einstellen
+  FORMAT        Diskette formatieren
+  COPYDISK      Disketteninhalte kopieren
+  ERRORS        Diskettenzugriffsfehler anzeigen
+  PIP, STAT, SUBMIT, XSUB, DUMP   Standardkommandos von CP/M 2.2
+  BS1715        Bildschirmtreiber fuer Programme des PC 1715 / A5120
+
+ENTWICKLUNG
+-----------
+  ASM, LOAD, GENHEX, DDT, ED   Assembler, Lader, Hex-Erzeuger, Debugger,
+                               Editor
+  BIOS.L, BS1715.S             Quelltexte des BIOS bzw. des Bildschirmtreibers
+
+ANWENDUNG
+---------
+  TP, TP52      Textprogramm (Overlays TPOVLY0.OVR, TPHT.OVR, TPDRUCK.OVR),
+                Beschreibung TP.DOC
+  POWER         Dateiverwaltung, Beschreibung POWER.DOC
+  REDABAS       Datenbank, Beschreibung REDABAS.DOC (Hilfen RDBASMSG.TXT,
+                RDBASOVR.COM)
+
+UEBERTRAGUNG
+------------
+  KERMIT     Kermit-80 4.11 (CP/M): Dateiuebertragung ueber V.24 (tty0,
+             SIO0-A), 9600 Bd 8N1 (Beigabe zum Ausprobieren der
+             Schnittstelle; Gegenstelle ist K1520 Kermit)

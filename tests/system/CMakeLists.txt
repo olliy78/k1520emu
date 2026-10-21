@@ -234,6 +234,7 @@ k1520_add_test(kermit80 SRC test_kermit80.cpp
                              k1520_logger k1520_testsupport
                         LABELS "system;slow;format_integration"
                         DEFS LOG_LEVEL=2 "K1520_KERMIT80_DIR=\"${CMAKE_SOURCE_DIR}/tools/kermit80\""
+                             "K1520_OSM_P8000_DISK=\"${CMAKE_SOURCE_DIR}/disks/p8000_osm30/p8000_osm30_system.hfe\""
                              K1520_SERTEST_COM="${CMAKE_SOURCE_DIR}/tools/sertest/sertest.com" TIMEOUT 1800)
 
 # Zeitgrenzen der add_test()-Faelle × K1520_TEST_ZEIT_FAKTOR (tests/cmake/K1520AddTest.cmake)

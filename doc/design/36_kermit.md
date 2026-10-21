@@ -524,9 +524,8 @@ Setup-Probe (136 MB) wurde nicht angefasst; Kermit bringt ~1 MB mit.
 Bibliothek aus.  Es ist **nur Client** (Handbuch: „Act as server: No“): `SEND`, `GET`, `REMOTE DIRECTORY`, `FINISH`
 gegen den Server der Bibliothek (`Sitzung::serve`).  Auf den ausgelieferten Disketten liegt es als `KERMIT.COM` —
 eine Beigabe zum Ausprobieren der V.24-Schnittstelle: A5120 (CP/A und SCPX 1.7), K8915 (SCPX 8915), PC 1715
-(SCP 1715 V0006/V0007 und CP/A 1715), PC 1715W (SCP 3.0) und PRG 710/710-1 (SCPX).  Nicht darauf: CP/Z, UDOS.  **OS/M** (P8000):
-es gibt keine ausgelieferte OS/M-Diskette; die Überlagerung `kermit_p8000.com` (tty0 = SIO0-A, 24H/25H, Takt CTC1 K0)
-ist am echten OS/M 3.0 (`osm30.cqm` der pofo-Sammlung) belegt, liegt aber keiner Diskette bei.
+(SCP 1715 V0006/V0007 und CP/A 1715), PC 1715W (SCP 3.0), PRG 710/710-1 (SCPX) und **P8000 mit OS/M 3.0** (`disks/p8000_osm30/p8000_osm30_system.hfe`, gebaut aus
+`tools/osm_p8000/`, Wächter `cli_osm_p8000`; Überlagerung `kermit_p8000.com`: tty0 = SIO0-A, 24H/25H, Takt CTC1 K0).  Nicht darauf: CP/Z, UDOS.
 
 - **Eine Überlagerung je Rechner.**  Kermit-80 besteht aus dem rechnerunabhängigen Teil (`CPSKER.HEX`) und einer
   Überlagerung ab 7000H mit dem Anschluss.  `tools/kermit80/bau.py <rechner>` übersetzt sie mit M80 neu (Systemklasse
@@ -536,10 +535,10 @@ ist am echten OS/M 3.0 (`osm30.cqm` der pofo-Sammlung) belegt, liegt aber keiner
   generische Überlagerung `CPVGEN.HEX` bytegleich nach.
 - **Auf die Disketten** kommt die `.com` über die Bauskripte (`db.kermit80(<rechner>)` in `tools/diskbau.py`,
   `disketten_beigaben.KERMIT80`); die LIESMICH-Dateien nennen sie.  Neu bauen: `tools/{cpa_a5120,scpx_a5120,scpx_k8915,
-  scpx_prg,scp_pc1715}/build.py --tool build/k1520disktool`.
+  scpx_prg,scp_pc1715,scp_pc1715w,osm_p8000}/build.py --tool build/k1520disktool`.
 - **Wächter** (`tests/system/test_kermit80.cpp`, `format_integration`): A5120 — Größen und Inhalt (`GET`/`SEND` von 0
   bis 100 KB), Parität none/even/mark/space/odd mit Prüfsumme 1/2/3; `Kermit80Rechner.*` — K8915, PC 1715, PC 1715W,
-  PRG 710, 710-1 und P8000 mit OS/M (`K1520_CQM_DIR`, sonst übersprungen) schicken die `.com` an den PC-Server, bytegleich; `Kermit80Bau.*` — die eingecheckten `.com` sind das
+  PRG 710, 710-1 und P8000 mit OS/M (ausgelieferte Diskette, Temp-Kopie, `kermit.com` von der Diskette) schicken die `.com` an den PC-Server, bytegleich; `Kermit80Bau.*` — die eingecheckten `.com` sind das
   Ergebnis von `bau.py` (übersprungen ohne Werkzeugkette).  `tools/dev.sh test-format -R Kermit80`.
 - **Befund, Bibliothek:** Kermit-80 mit `set parity even|mark|odd` sendet jedes Byte mit Paritätsbit, auch MARK
   (SOH = 81H).  Der `PaketZerleger` suchte nur 01H und schwieg (Kermit-80 hing bei `Starting …`).  Jetzt erkennt er

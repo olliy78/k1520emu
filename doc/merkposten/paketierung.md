@@ -153,6 +153,7 @@ Neben Emulator und DiskTool liefert das Paket den **Debugger `k1520dbg`** aus, d
   in `KONSOLENWERKZEUGE` (sonst bleibt der Verweis beim Deinstallieren liegen).
 - **Rauchtests laden die Bibliothek und prüfen `k1520k_version` == Bauversion** (beide
   `release.yml`-Jobs, `install.sh`, `.iss` — dort wächst das Zeilenfeld auf 47).
+- Die `p8000_*`-Regel nimmt neben `*.dmk`/`*.img.gz` auch `*.hfe` mit (OS/M-Systemdiskette `p8000_osm30/`, 2026-10-21).
 - Die P8000-WEGA-3.1-Platte mit dem Benutzer `kermit` ist Teil der `p8000_*`-Regel
   (kein Sonderweg).  Wächter: `test_kermit_ist_in_allen_paketwegen`,
   `test_kermit_findet_seine_bibliothek_im_installationslayout`,

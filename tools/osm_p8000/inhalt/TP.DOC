@@ -1,0 +1,1404 @@
+.uj off
+.lh 8
+.cw 12
+.mt 6
+.op
+
+
+
+
+
+
+
+
+
+
+                            T P
+
+                       Textprogramm
+.paŠ.pn 1
+.op
+.he OS/M-Applikationsprogramm  - # -                         TP
+
+Inhaltsverzeichnis:
+
+
+
+1.     Uebersicht ueber die Moeglichkeiten von TP ......  2  
+
+2.     Starten von TP und NO-FILE Kommandos ............  6
+
+3.     Das Schirmbild von TP zum Editieren von Files ...  8
+
+4.     Editier-Kommandos in TP ......................... 11 
+4.1.   Kursor-Bewegung ................................. 11
+4.2.   Schirmbild rollen (Scrolling) ................... 13
+4.3.   Texteingabe ..................................... 14
+4.4.   Text loeschen ................................... 14
+4.5.   Sichern und Beenden ............................. 15
+4.6.   Schirmbild-Textformatierung ..................... 15
+4.7.   Suchen und Ersetzen ............................. 18
+4.8.   Marken setzen ................................... 19
+4.9.   Block move - Kommandos .......................... 20
+4.10.  Zusatzfiles ..................................... 20
+4.11.  Help-Kommandos .................................. 21
+
+5.     Druck-Funktionen ................................ 21
+5.1.   Druck-Kontrollzeichen ........................... 21
+5.2.   Dot-Kommandos ................................... 26
+
+6.     Fehlermeldungen ................................. 26
+.paŠ1.   Uebersicht ueber die Moeglichkeiten von TP
+
+Dieså Anwenderbeschreibunç enthaelô einå Kurzcharakteristië 
+voî  TP®  Fueò einå ausfuehrlichå Beschreibunç deò TP-Funk
+tioneî  wirä  auæ  folgendå  Systemunterlagen-Dokumentatioî 
+verwiesen:
+               . Anwendungsbeschreibung
+                 und Bedienungsanleitung
+
+                 Textprogramm "TP"
+
+                 VEB Robotron
+                 Bueromaschinenwerk Soemmerda
+
+TĞ  isô eiî bildschirmorientierteó  Textverarbeitungssysteí 
+miô  integrierteî Druckfunktionen®  Sowohì diå Eingabå  voî 
+neuem¬  aló  aucè diå Aenderunç voî schoî vorhandeneí  Texô 
+findeî direkô auæ deí Bildschirí statt®  Diå meisteî  Funk
+tioneî resultiereî soforô iî eineò Aenderunç deó Schirmbil
+des¬ daó miô deí spaeteò ausgedruckteî Texô uebereinstimmt.
+ 
+Diå Editierfunktioneî werdeî verwendet¬  uí Textdateieî  zõ 
+erzeugeî  odeò zõ aendern¬  diå auæ Diskettå  abgespeicherô 
+werden:
+ 
+VIDEO EDITING (Editieren auf dem Bildschirm):
+     Eiî  Teiì  deó eingetrageneî odeò korrigierteî  Texteó 
+     isô staendiç auæ deí Bildschirí zõ sehen» Einfuegungeî 
+     odeò  Korrektureî  resultiereî soforô  iî  eineò  ent
+     sprechendeî Aenderunç deó Schirmbildes® Maî fuegô Texô 
+     ein¬  indeí  maî ihî einfacè aî diå gewuenschtå Stellå 
+     schreibt®  Funktioneî wiå Cursorbewegunç unä  Loescheî 
+     werdeî soforô miô sichtbareí Ergebnió ausgefuehrt.
+ 
+AUTOMATIC DISK BUFFERING (automatische Disk-Pufferung):
+     Diå  Groesså  deó zõ bearbeitendeî  Dokumenteó  (Text-
+     Dateien©  isô  nichô voî deò Groesså  deó  vorhandeneî 
+     Arbeitsspeicheró  (RAM©  abhaengig¬  sonderî  voî  deò 
+     Kapazitaeô  deò Diskette®  Deò Texô wirä waehrenä  deò 
+     Bearbeitunç  automatiscè  ohnå Hinzutuî deó  Benutzeró 
+     auæ diå Diskettå geschriebeî odeò voî ihò gelesen.
+ 
+ON-SCREEÎ  TEXÔ FORMATTINÇ (Textformatierunç auæ deí  Bild
+schirm):
+     Deò Texô wirä auæ deí Bildschirí genausï  dargestellt¬ 
+     wiå  eò  beií Ausdruckeî ausseheî wird¬  eò kanî  alsï 
+     vorheò nocè umgestalteô werden®  Diå  Textformatierunç 
+     auæ deí Bildschirí wirä durcè diå folgendeî dreé Funk
+     tioneî unterstuetzt:
+
+WORD WRAP (Wort-Umschlag):
+     Eó  koenneî  ganzå  Absaetzå sehò  schnelì  eingegebeî 
+     werden¬ ohnå diå "Return"- Tastå zõ benutzen® Wenî eiî 
+     eingegebeneó  Worô diå rechtå Grenzå deò Zeilå  ueber
+     schreitet¬  wirä  eó voî TĞ automatiscè aî deî  Anfanç 
+     deò naechsteî Zeilå gesetzt¬  unä diå vorherigå  Zeilå 
+     wirä sï gestaltet¬  dasó siå links- odeò rechtsbuendiç 
+     ist®  Diå "Return"-Tastå wirä nuò benutzt¬ uí daó Endå Š     eineó Absatzes¬  einå Leerzeilå odeò eiî andereó wich
+     tigeó  Zeilenendå zõ kennzeichnen®  Daheò brauchô  deò 
+     Benutzeò  nichô seineî Rythmus beé deò Texteingabå  zõ 
+     unterbrecheî  odeò aucè nuò voî seineí Materiaì aufzu
+     schauen.
+
+AUTOMATIÃ MARGINATION¬  JUSTIFICATION¬ LINÅ SPACING¬ CENTE
+RING
+     (automatischå  Einstellunç deò  Raender¬  Randausrich
+     tung¬ Leerstelleneinfuegung¬ Zentrierung):
+     Beé eingeschalteteî Word-Wrağ wirä jedå  vollstaendigå 
+     Zeilå  automatiscè  deí gesetzteî linkeî  unä  rechteî 
+     Ranä  angepassô  (wenî  nichô  "ragged-right¢  -Formaô  
+     eingestellô  ist©  unä - zusaetzlicè moeglicè  - jedeó 
+     Worô  voí andereî durcè doppeltå odeò dreifachå  Leer
+     stelleî getrennt® Miô eineí einzigeî Kommandï kanî deò 
+     Texô zwischeî deí linkeî unä rechteî Ranä iî diå Mittå 
+     positionierô werden.
+
+REFORM PARAGRAPH COMMAND (Absatz-Neugestaltung):
+     Miô nuò eineí Befehì kanî deò Texô voî deò Kursorposi
+     tioî bió zuí Endå deó Absatzeó (z.B.¬  wenî nocè etwaó 
+     eingefuegô wurde© "reformiert¢ werden®  Daó heisst¬ eò 
+     wirä wiedeò aî deî linkeî unä rechteî Ranä  angepasst¬ 
+     Leerstelleî  werdeî eingefuegô odeò voî TĞ eingefuegtå 
+     Leerstelleî  werdeî  wiedeò  geloescht®  Eó  kanî  eiî 
+     rechtsbuendigeò  (justified©  Absatú zõ  eineí  rechtó 
+     offeneî  (raggeä  right©  ohnå  fuellendå  Leerstelleî 
+     zwischeî  deî  Worteî  - unä  umgekehrô  - umgestalteô 
+     werden.
+
+Zusaetzlichå Editierkommandos:
+Zusaetzlicè zõ deî genannteî Editier-Funktioneî gibô eó  ií 
+TĞ noch:
+Setzeî  unä Loescheî variableò Tabulator-Positionen¬  blocë 
+movå  (Verschiebeî ganzeò  Textteile)¬  blocë  copy¬  blocë 
+delete¬  find¬ replace¬ Schreibeî auæ unä Leseî voî andereî 
+Dateieî  unä  Setzeî voî unä Zurueckkehreî zõ  Textstellen-
+Markierungen.
+
+FLEXIBLÅ  FINÄ ANÄ REPLACÅ COMMANÄ (flexiblå Such- unä  Er
+satzkommandos)
+     Sucè unä Ersatz-Funktioneî koenneî einmal¬  n-maì odeò 
+     fueò deî ganzeî Text¬ fueò ganzå Woerter¬ Gross-Klein-
+     Schreibunç  ignorierenä  odeò selektiö  (deò  Benutzeò 
+     wirä voò jedeí Ersatú gefragt)¬ durchgefuehrô werden.
+ 
+HELP SYSTEM (Hilfs-System Menue):
+     Ií  obereî Teiì deó Bildschirmeó isô auæ  Wunscè  einå 
+     Aufzaehlunç  deò geradå verfuegbareî Kommandoó  (Menu© 
+     miô  eineí waehlbareî Graä aî Informatioî (helğ level© 
+     dargestellt®  Beé Kommandoó miô zweé Zeicheî wirä nacè 
+     deò Eingabå deó ersteî Zeichenó unä eineò kurzeî Pauså 
+     eiî  weitereó  Menuå ausgegeben¬  daó uebeò  nuî  allå 
+     moeglicheî zweiteî Zeicheî unä dereî Funktioneî infor
+     miert®  Maî  kanî  jedocè aucè beidå  Zeicheî  schnelì 
+     hintereinandeò eingeben¬  wenî maî bereitó etwaó fort
+     geschritteneò ist.ŠDYNAMIC PAGE DISPLAY (Darstellung der Seitenendes):
+     Diå  beií  Druckeî auftretendeî  Seitenwechseì  werdeî 
+     beií  Editiereî  deó Texteó auæ deí  Bildschirí  durcè 
+     einå  durchgehendå  Liniå dargestellô unä  jedeò  Loe
+     schunç  odeò Einfuegunç angepasst®  Sï  braucheî  beií 
+     Druckeî  deò Seitenwechseì unä daó Seitenlayouô  nichô 
+     weiteò beruecksichtigô werden.
+
+USEÒ  CONTROÌ  OÆ TEXÔ FORMATTINÇ (Kontrollå deó  Benutzeró 
+uebeò Textformat)
+     TĞ merkô sicè allå voí Benutzeò eingegebeneî unä auto
+     matiscè z.B®  durcè Worä Wrağ eingefuegteî Leerstelleî 
+     unabhaengiç  voneinander®  Einå eingegebenå Leerstellå 
+     (hard-space©  bleibô auæ jedeî Falì erhalteî unä  wirä 
+     nichô  durcè  Worä Wrağ odeò  daó  Reformkommandï  ge
+     loescht®  Ií  Gegensatú dazõ werdeî diå voî TĞ  einge
+     setzteî  Leerstelleî  (soft-space©  beé  eineò  Refor
+     mierunç  deó  Texteó  gegebenenfalló  geloeschô  (odeò 
+     erweitert)¬  uí  deî Texô deí linkeî unä rechteî  Ranä 
+     anzupassen®  Allå automatischeî Formatierungs-Funktio
+     neî  koenneî durcè speziellå Editier-Kommandoó  rueck
+     gaengiç  gemachô  odeò ueberhaupô nacè  Beliebeî  ein- 
+     odeò ausgeschalteô werden.
+
+PRINT FUNCTION (Druck Funktion):
+     TP'ó  Druck-Funktioî wirä verwendet¬  uí diå miô  Edi
+     tier-Funktioneî  eingegebeneî unä auæ Diskettå gespei
+     cherteî  Textå  auszudrucken®  Dabeé kanî  einå  Dateé 
+     ausgedruckô  werden¬  waehrenä geradå diå anderå  edi
+     tierô wird® Eó steheî folgendå Druck-Format-Funktioneî 
+     zuò Verfuegung:
+
+     PAGE FORMATTING (Seiten Format):
+          Jedå  Seitå  wirä durcè eineî obereî unä  untereî 
+          Ranä sowiå zusaetzlicè moeglichå Kopf- unä  Fuss
+          textå  unä Seitenzahleî formatiert®  Diå  Seiten
+          laengå unä deò oberå unä unterå Ranä werdeî durcè 
+          "Dot-Kommandos¢  festgelegt¬  diå  direkô iî  deî 
+          Texô  eingefuegô sinä unä miô  ihí  abgespeicherô 
+          werden®  Fueò  normalå  Faellå macheî diå  einge
+          stellteî  Vorgabeî solchå besondereî Angabeî  je
+          docè  unnoetig®  Daó Seitenformaô kanî  innerhalâ 
+          eineó  langeî Texteó beliebiç  haeufiç  wechseln® 
+          Diå  Seitenzahì kanî aî verschiedenå Stelleî  deò 
+          Seitå  plazierô odeò aucè ganú unterdrueckô  wer
+          den.
+
+     PAGINATION CONTROL (Seitenvorschub-Kontrolle):
+          Seitenwechseì erfolgt¬ wanî immeò einå Seitå volì 
+          ist¬  odeò  eó voî besondereî Kommandoó  bestimmô 
+          wird®  Eó  kanî  aucè einå Gruppå voî Zeileî  aló 
+          zusammenhaengenä  definierô werden¬  sï dasó  siå 
+          gegebenenfalló  auæ diå naechstå  Seitå  gedruckô 
+          wird¬  falló siå nichô mehò kompletô auæ diå vor
+          herigå  Seitå passt®  Sï wirä eiî  unerwuenschteò 
+          Seitenvorschuâ  vermieden®  Daó  Seitenendå  wirä 
+          beií Editiereî auæ deí Bildschirí angezeigt.
+Š     PRINT ENHANCEMENTS (zusaetzliche Druckfunktionen):
+          Unterstreichungen¬  Doppeldruck¬  Fett-Drucë  unä 
+          Durchstreichungeî koenneî durcè besonderå Zeicheî 
+          voò  unä  hinteò deí betreffendeî Texô  gesteuerô 
+          werden®  Miô  entsprechendeî Druckerî  sinä  aucè 
+          Tiefschrift¬  Hochschrift¬ verschiedenå Typenfor
+          men¬  variablå  Zeilenhoehå unä  unterschiedlichå 
+          Druckfarbeî moeglich®  Allå dieså Effektå koenneî 
+          beliebiç miteinandeò kombinierô werden.
+
+     MICROSPACÅ JUSTIFICATIOÎ (Mikro-Leerstellenausgleich):
+          Wirä  randbuendigeò Texô ausgegeben¬  sï wirä deò 
+          Leerrauí  zwischeî deî Worteî eineò  Zeilå  exakô 
+          stufenloó aufgeteilô odeò deò Freirauí wirä durcè 
+          ganzå Leerstelleî ausgeglichen.
+
+     OPERATOR OPTIONS (zusaetzliche Benutzerkommandos):
+          Beií Initiiereî deò Druckfunktioî kanî deò Benut
+          zeò nocè speziellå Parameteò bestimmenº  Anfangs-
+          Seitennummer¬   Formularvorschubzeichen¬   Pauseî 
+          zwischeî  deí  Ausdrucë einzelneò Seiteî zuí  Pa
+          piereinfaedeln¬  Dateiausdrucë ohnå  Formatierunç 
+          unä Ausgabå auæ Disë anstatô deî Drucker®  Druck
+          operationeî  koenneî jederzeiô unterbrocheî  wer
+          den¬  aucè  wenî geradå eiî andereò Texô editierô 
+          wird.
+
+
+Weitere TP-Faehigkeiten sind:
+
+KEYBOARD BUFFERING (Eingabe-Puffer):
+     Deò Benutzeò kanî beliebiç schnelì Texô unä  Kommandoó 
+     hintereinandeò  eingeben¬  ohnå  daó Ergebnió auæ  deí 
+     Bildschirí abzuwarten® Allå Zeicheî werdeî gespeicherô 
+     unä diå jeweiló neuestå  Textforí wirä auæ deí  Sicht
+     geraeô  produziert®  Einå Ausnahmå hiervoî bildeô  diå 
+     Disketten- Ein- unä Ausgabe¬ waehrenä deò keiî Zeicheî 
+     auæ  deò  Tastatuò eingegebeî werdeî  darf®  Siå  wirä 
+     durcè einå Mitteilunç auæ deí Bildschirí angezeigt.
+
+CONVENIENT DEFAULTS (zweckmaessige Vorgaben):
+     Dá  TĞ sehò vielå Parameteò hat¬  sinä allå schoî  beé 
+     deò  Initialisierunç  auæ  eineî  zweckmaessigeî  Werô 
+     voreingestellt® Zuí Beispieì isô deò linkå Ranä iî diå 
+     erste¬  deò  rechtå Ranä iî diå 75®  Spaltå  voreinge
+     stellt®  Jeweiló  fuenæ  Spalteî liegeî zwischeî  zweé 
+     Tabulator-Stops®  Diå Formularlaengå isô auæ 6¶ Zeileî 
+     eingestellt® Sï kanî maî TĞ praktiscè ohnå Vorkenntnió 
+     uebeò  diå  Aenderunç deò Parameteò  benutzeî  unä  eó 
+     duerftå  nuò selteî notwendiç sein¬  einigå voî  ihneî 
+     neõ zõ stellen.
+
+FILE KOMPATIBILITAET:
+     Allå  Text-Formatierungsfunktioneî koenneî durcè  Ein
+     stelleî  eineó "non-document¢ -modå unterdrueckô  wer
+     den¬  sï  dasó TĞ ebensï geeigneô ist¬  Programmå odeò 
+     Daten-Dateieî zõ bearbeiten.
+Š2.   Starten von TP und NO-FILE KOMMANDOS
+
+Nachdeí Starô deó Betriebssystemó gibô eó dreé Moeglichkei
+ten¬  TĞ zõ initialisiereî (jeweiló miô "RETURN¢ abschlies
+sen):
+  TP              Einstieç iî TĞ ohnå Datei®  Eó  erscheinô 
+                  daó NO-FILE-MENU.
+  TP d:name.erw   Einstieç  iî TĞ miô eineò Datei®  Deò Da
+                  teinamå musó deí Systeí entsprechen.
+  TP d:name.erw d:Einstieç iî TĞ miô eineò Dateé unä  Spei
+                  cherî  deò  editierteî  Dateé  auæ  eineí                    
+                  andereî Laufwerë (sehò langå Dateien).
+
+Nacè  deí Starô voî TĞ ohnå einå Dateibezeichnunç unä immeò 
+wenî daó Editiereî eineò Dateé abgeschlosseî ist¬ erscheinô 
+daó NO-FILE-MENÕ auæ deí Bildschirm¬ daó nuî diå moeglicheî 
+Kommandoó  aufzaehlô unä erklaert®  Deò Benutzeò  gibô  nuî 
+eineî  einzelneî  Buchstabeî  eiî unä waehlô  dadurcè  einå 
+Funktion®  Deò  Buchstabå  kanî grosó odeò kleiî  odeò  beé 
+gedrueckteò  CONTROL-Tastå eingegebeî werden®  Diå  Wirkunç 
+isô  stetó  diå gleiche®  Nichô definiertå  Buchstabeî  unä 
+Zeicheî  werdeî ignoriert®  Nacè deí Buchstabeî wirä  nichô 
+"RETURN¢ gedrueckt¡ Eò wirä soforô akzeptierô unä erscheinô 
+iî deò linkeî obereî Eckå deó Bildschirmes®  Diå eingegebe
+neî Buchstabeî starteî folgendå Funktionen:
+
+Ä    Bearbeitunç eineò Textdatei
+          Eó wirä nacè deò Dateibezeichnunç  gefragt¬  danî 
+          wirä  diå  entsprechendå Dateé kreierô (wenî  siå 
+          nocè nichô existiert© odeò voî deò Diskettå gela
+          deî  unä  editierô (wenî  siå  bereitó  vorhandeî 
+          ist)®  Uí  diå  neuå editiertå Versioî auæ  eineò 
+          andereî  aló deò "aktuellen¢ Disë  zõ  speichern¬ 
+          gibô  maî diå Dateibezeichnung¬  einå Leerstelle¬ 
+          daó  Laufwerë  (A,B,Ã odeò D© unä  eineî  Doppel
+          punkt®  Wurdå  einå neuå Dateé  kreiert¬  sï  er
+          scheinô  fueò  wenigå Sekundeî diå  Meldunç  "NE× 
+          FILE"®  Falló  maî sicè vertippô hatte¬  kanî maî 
+          miô  CRTÌ  KÑ wiedeò  zuí  NO-FILE-MENÕ  zurueck
+          kehren¬  ohnå diå versehentlicè erzeugtå Dateé zõ 
+          speichern.
+
+N    Bearbeiten einer Programmdatei
+          Wiå D¬  jedocè fueò einå "NON-document"-Filå ohnå 
+          Seiteneinteilunç unä Parametervorgaben®  Wirä be
+          nutzt¬ uí Programm- odeò Datenfileó zõ erstellen.
+
+X    Rueckkehr in das Betriebssystem
+          Ruecksprunç iî daó Betriebssystem®  Wirä benutzt¬ 
+          uí  diå  Arbeiô miô TĞ abzuschliesseî unä  wiedeò 
+          eiî Betriebssystem-Kommandï eingebeî zõ  koennen® 
+          Daó  Betriebssysteí  meldeô  sicè immeò  miô  deò 
+          Bezeichnunç deò aktivierteî Diskette.
+H    Hilfsfunktionen
+          Eó  wirä nacè eineí neueî "help-level¢ (° bió  3© 
+          gefragt¬ deò diå Mengå  deò Menu-Erklaerungeî unä 
+          andereò  Informationeî bestimmt®  Wenî deò  help-
+          leveì nichô ° ist¬  wirä diå Erklaerunç deò help-Š          leveló  immeò angezeigt®  Wirä geradå einå  Dateé 
+          editiert¬  haô daó Kommandï ^JÈ diå gleichå  Wir
+          kung®  Fueò  Fortgeschrittenå bringô deò niedrigå 
+          Helpleveì deî Vorteil¬  dasó mehò Platú fueò  deî 
+          zõ  editierendeî Texô auæ deí Bildschirí zuò Ver
+          fuegunç steht.
+          Die einzelnen Help-Level sind:
+          ³    Allå  Menueó unä Erklaerungeî  werdeî  ange
+               zeigt
+          2    1-Zeichen Kommandos werden nicht angezeigt
+          1    2-Zeichen Kommandos werden nicht angezeigt
+          0    Alle Erklaerungen werden unterdrueckt.
+
+P    Datei drucken/Druck abbrechen
+          Daó  P-Kommandï haô dreé  moeglichå  Effekte®  Jå 
+          nacè  dem¬  oâ  eó schoî aktiö isô unä oâ  geradå 
+          gedruckô wirä odeò nicht¬ wirä nacè deí Nameî deò 
+          zõ druckendeî Dateé gefragt¬  odeò deò Drucë wirä 
+          unterbrocheî  odeò fortgesetzt®  Diå  P-Zeilå  ií 
+          Menuå zeigô deî geradå vorhandeneî Zustanä an.
+          Fueò diå Druckausgabå wirä nacè eineò Ausgabå auæ 
+          Druckeò  odeò Diskettå gefragt®  Nacè deò Eingabå 
+          deó  Namenó deò zõ druckendeî Dateé muesseî  nocè 
+          folgendå Frageî beantworteô werden:
+          Starô miô deò Seitennummeò î  (RETURÎ fueò Anfang)
+          Stop  bei der Seitennummer n  (RETURN fuer Ende)
+          Anwender-Seitenvorschub       (RETURN fuer No)
+          Unterdrueckung Seitenvorschub (RETURN fuer No)
+
+Y    Datei loeschen
+          Eó  wirä nacè deí Nameî deò zõ loeschendeî  Dateé 
+          gefragt®  Diå Wirkunç isô dieselbå wiå beií OS/M- 
+          ERAse-Kommando.
+
+L    Anwahì  eineó andereî  Laufwerkes¬  auæ deí  weiterhiî 
+     gearbeiteô werdeî soll® Diå Angabå erfolgô durcè eineî 
+     Buchstaben¬  gefolgô voî eineí Doppelpunkô unä Return® 
+     Eó wirä ií Menuå diå neuå Directorù  angezeigt¬  falló 
+     befohlen.
+
+F    Anzeigen¯  Nichtanzeigeî  deó  Fileverzeichnisseó (Di
+     rectory© deò aktuelleî Diskette®  Diå Anzeigå wirä eiî 
+     bzw®  ausgeschalteô beé jedeò Anwendunç voî F.
+
+E    Aenderî  eineó  Filenamenó (wiå RENamå deó Betriebssy
+     stems)® Eó wirä nacè deí Nameî deó zõ aenderndeî Fileó 
+     gefragô unä anschliessenä nacè deí neueî Namen.
+
+O    Kopiereî eineó Programmes®  Diå Fragå nacè deò  Quellå 
+     unä deí Zieì deó Kopiervorgangeó sinä miô vollstaendi
+     geî Nameî (evtl® aucè miô Laufwerkangabe© zõ beantwor
+     ten.
+
+R    Starô eineó  andereî Programmes®  Dieseó Programí musó 
+     miô seineí Nameî ohnå diå Erweitererunç .COÍ angegebeî 
+     werden®  Eó  wirä geladen¬  abgearbeiteô unä danacè TĞ 
+     wiedeò aktiv® 
+ŠBeií Editiereî eineó Texteó kanî jederzeiô miô ^KÄ zuí  NO-
+FILE-MENÕ zurueckgekehrô werden.
+
+
+3.   Das Schirmbild von TP zum Editieren von Files
+
+Daó  Schirmbilä  voî  TĞ beií Editiereî bestehô  auó  eineò 
+Statuszeile¬  deí  Menu¬  deò Tabulatorzeilå unä deí  File-
+Sektoò miô deî Flagzeichen.
+
+
+STATUS-Zeile
+     Iî deò ersteî Zeile¬ deò Status-Zeile¬ werdeî folgendå 
+     Informationeî gegeben:
+     - Daó Kommando¬  daó eingegebeî wurdå odeò geradå aus
+       gefuehrô wird
+     - Diå Seitennummer¬ auæ deò maî geradå arbeitet
+     - Diå Zeilennummer¬ iî deò sicè deò Kursoò befindet
+     - Diå Spaltennummer¬ iî deò sicè deò Kursoò befindet.
+     - "INSERÔ  ON"¬  falló CRTÌ Ö gegebeî wurdå fueò  einå 
+       Einfuegung
+     - Anderå zusaetzlichå Informationen.
+     Diå  Angabå deò eingegebeneî Kommandoó erfolgô iî  deò 
+     linkeî obereî Eckå deó Bildschirmeó iî deò Reihenfolgå 
+     deò Eingabe® Sehò schnelì auszufuehrendå Kommandoó wiå 
+     Kursorbewegungeî werdeî nichô extrá angegeben.
+     Diå  Seitennummeò  beziehô sicè auæ  diå  Druckausgabå  
+     unä beginnô beé 1® Auæ deí Bildschirí wirä deò Wechseì 
+     deò  Seitå  durcè  eineî  durchgehendeî   waagerechteî 
+     Stricè angedeutet.
+     Diå  Zeilennummeò  beziehô sicè ebenfalló nuò auæ  diå 
+     ausdruckbareî Zeilen®  Speziellå Druckfunktionszeicheî 
+     (dot-Kommandos)¬  diå  ií Druckbilä nichô  erscheinen¬ 
+     werdeî nichô mitgezaehlt.
+     Diå  Spaltennummeò ignorierô ebenfalló  Druckkommandoó 
+     unä kanî aucè groesseò seiî aló diå  Bildschirmbreite¬ 
+     wenî deò rechtå Ranä entsprechenä eingestellô wurde.
+     Wurdå  TĞ  fueò einå Programmdateé  initialisiert¬  sï 
+     werdeî  ií  Schirmbilä Seitennummeò  unä  Zeilennummeò 
+     ersetzô durch:
+
+     FC=nnnn        FL=nnnn
+
+     Wobeé FÃ diå Anzahì deò Zeicheî zwischeî deò Kursorpo
+     sitioî unä deí Anfanç deó Files+± angibt¬  unä FÌ  diå 
+     Nummeò deò Zeilå voî Anfanç deó Fileó aus¬ iî deò sicè 
+     deò Kursoò befindet®  Sï kanî maî z.B®  diå Anzahì deò 
+     Zeicheî iî eineò Programmdateé feststellen¬  indeí maî 
+     deî  Kursoò  ganú anó Endå deò Dateé bewegô (CRTÌ  QC© 
+     unä danî FÃ abliesst®  Zusaetzlicè werdeî iî deò  Sta
+     tuszeilå nocè folgendå Informationeî gegeben:
+
+     WAIT           Falló  voî eineò Diskettå geleseî  odeò 
+                    geschriebeî wird.
+                    Keinå weitereî Eingabeî solange!
+
+     MARGIN OFF     Falló diå Randbegrenzunç geloesô  wurdå 
+                    (^OX)Š     INSERT ON      Falló  Einfuegunç geschalteô isô  (^V)¬ 
+                    uí etwaó zwischeî nebeneinandeò stehen
+                    då  Zeicheî zõ fuegen®  Wirä miô  eineí 
+                    zweiteî ^Ö wiedeò abgeschaltet.
+
+     LINE SPACING n Falló  deò  Zeilenabstanä nichô  auæ  ± 
+                    eingestellô  ist¬  wirä deò  geaendertå 
+                    Abstanä angegeben.
+
+     PRINT PAUSED   Falló   deò   Drucë  durcè    bestimmtå 
+                    Steuerkommandoó  odeò Steuerzeicheî un
+                    terbrocheî wurdå zweckó Papierwechsel
+
+     REPLACE (Y/N)  Falló  eiî   Kommandï  zuí   selektiveî 
+                    Ersetzeî  bestimmteò  Zeicheî  eingebeî  
+                    wurde¬  wirä  jeweiló gefragt¬  oâ  eiî 
+                    Textteiì   ersetzô  werdeî  solì   odeò 
+                    nicht.
+
+MENU
+
+     Daó Menõ unteò deò Statuszeilå gibô einigå deò moegli
+     cheî  Kommandoó  an®  Nacè deí Initialisiereî  voî  TĞ 
+     zeigô  eó  diå Kursorbewegungs-¬  Loesch- unä  Scroll-
+     Kommandos®  Allå Kommandoó innerhalâ TP¬  miô Ausnahmå 
+     deò  NO-FILE-Kommandos¬  diå  schoî  erklaerô  wurden¬ 
+     muesseî beé gleichzeitigeí Drueckeî deò  CONTROL-Tastå 
+     (hieò  bezeichneô miô CRTL© eingegebeî werden®  Darauæ 
+     wirä  durcè daó Zeicheî Ş hingewiesen®  Beé  Benutzunç 
+     voî  Kommandoó auó zweé Buchstabeî beginnenä  miô  ^J¬ 
+     ^K¬  ^O¬  ^Ğ odeò ^Ñ erscheinô nacè Eingabå deó ersteî 
+     Buchstabenó  eiî  neueó Menu¬  daó diå nuî  moeglicheî 
+     Zweitbuchstabeî angibt®  Deò Inhalô deó Menuó isô  voí 
+     eingestellteî  help-leveì  abhaengig®  Deò helğ  leveì 
+     kanî  miô deí ^JH-Kommandï geaenderô werden®  Ií  Menõ 
+     kanî unteò bestimmteî Bedingungeî einå Reihå verschie
+     deneò  Erklaerungeî odeò  Warnungeî  erscheinen¬  z.B® 
+     wenî  deò  Drucë unterbrocheî wurdå odeò eiî  Worô  sï 
+     lanç ist¬  dasó eó nichô iî diå Randbegrenzungeî eineò 
+     Zeilå passt® Dieså Informationeî sinä selbsterklaerenä 
+     unä  verschwindeî meisô schoî durcè deî naechsteî  Ta
+     stendruck.
+
+TABULATOR-Zeile
+     Diå  Tabulatorzeilå  unteò deí Menõ zeigô  deî  linkeî 
+     Textranä  (L)¬  deî  rechteî Textranä (R© unä  diverså 
+     verschiebbarå Tabulatorstop-Positioneî (I)® Dazwischeî 
+     sinä  Strichå -®  Diå Tabulatorzeilå zeigô  immeò  diå 
+     neuestå   Einstellunç  deò  entsprechendeî  Parameter® 
+     Tabulatorstoppó  ausserhalâ  deó  linkeî  unä  rechteî 
+     Randeó  werdeî nuò angezeigt¬  wenî diå  Raendeò  "ge
+     loest¢  wurdeî  (^OX© odeò Worä Wrağ  abgeschaleô  isô 
+     (^OW)®  Befindeô  sicè deò rechtå Ranä ausserhalâ  deó 
+     Schirmbildes¬ sï werdeî zweé odeò mehò Tabulatorzeileî 
+     angezeigt®  Diå  Anzeigå deò Tabulatorzeilå kanî durcè 
+     daó  ^OT-Kommandï  unterdrueckô  unä  wiedeò  initierô 
+     werden.
+Š.pn 10
+.op
+.he OS/M-Applikationsprogramm  - # -                        TP
+FILE-SEKTOR
+     Deò  Resô deó Schirmbildeó zeigô einigå Zeileî deó  zõ 
+     bearbeitendeî   Textes®   Deò  dargestelltå   Textteiì 
+     schliessô  immeò diå Kursorpositioî miô ein¬  sï  dasó 
+     Bildschirmkursoò unä File-Kursoò uebereinstimmen® Allå 
+     Spalteî  deó Bildschirmes¬  ausseò deò  ganú  rechten¬ 
+     werdeî fueò diå Textdarstellunç verwendet®  Diå letztå 
+     Spaltå  isô leeò odeò enthaelô eineó deò Flag-Zeichen¬ 
+     diå  nocè erklaerô werden®  Normalerweiså  zeigô  jedå 
+     Bildschirmzeilå  das¬  waó iî eineò Zeilå  ausgedruckô 
+     wird» miô folgendeî Ausnahmen:
+
+Fortsetzungszeilen:
+     Wenî  einå  Text-Zeilå zõ lanç ist¬  uí auæ deí  Bild
+     schirm dargestellô zõ werden¬  wirä siå iî deò  naech
+     steî  Bildschirmzeilå fortgesetzt®  Iî dieseí Falì er
+     scheinô iî deò letzteî Spaltå deò ersteî Zeilå eiî "+¢ 
+     Zeicheî aló Flag¬  uí zõ kennzeichnen¬  dasó diå Zeilå 
+     nocè weiteò geht®  Wenî einå Textzeilå sehò lanç  ist¬ 
+     kanî  siå uebeò drei¬  vieò odeò nocè mehò Bildschirm
+     zeileî  gehen¬  diå alle¬  ausseò deò letzten¬  eiî  « 
+     Zeicheî enthalten.
+     Wenî sicè deò Kursoò auæ eineò deò  Fortsetzungszeileî 
+     befindet¬  zeigô  diå Spaltennummeò iî deò Statuszeilå 
+     diå entsprechendå Druckspaltå an® 
+
+Ueberdrucken von Zeilen:
+     Fueò besonderå Effektå isô eó moeglich¬ mehrerå Zeileî 
+     deò  Dateé nacheinandeò auæ dieselbå  Druckzeilå  aus
+     druckeî  zõ lassen¬  sï dasó zweé verschiedenå Zeicheî 
+     iî  deò  gleicheî Positioî gedruckô  werden¬  uí  einå 
+     besonderå  Grafië zõ bilden®  Auæ deí  Bildschirí  er
+     scheinô  danî daó "-¢ Zeicheî aló Flaç iî deò  letzteî 
+     Spalte®  Eó  deuteô an¬  dasó diå folgendå Bildschirm
+     zeilå iî diå selbå Druckzeilå ausgegebeî werdeî  wird® 
+     Deò entsprechendå Zeilenwechseì musó beií Eingebeî deó 
+     Texteó miô ^Ğ unä RETURÎ erzeugô werden.
+
+Seitenwechselzeilen:
+     Daó  Endå  eineò  Druckseitå wirä auæ  deí  Bildschirí 
+     durcè  einå Zeilå voî "-¢ Zeicheî miô eineí Ğ  iî  deò 
+     letzteî Spaltå aló Flaç markiert® Dieså Zeilå wirä nuò 
+     zuò Informatioî auæ deí Bildschirí erzeugô unä natuer
+     licè  nichô miô ausgedruckt®  Diå Anzeigå deò  Seiten
+     wechselzeileî kanî durcè daó ^OP-Kommandï unterdrueckô 
+     odeò erzeugô werden.
+
+Dateianfangszeilen:
+     Wenî  eiî  Texô voò deí untereî Bildschirmranä  endet¬ 
+     isô deò Resô deó Bildeó miô leereî Zeileî miô  jeweiló 
+     eineí  Punkô aló Flaç iî deò letzteî Spaltå  gefuellt® 
+     Einå neuå Dateé bestehô nuò auó solcheî Zeilen.
+
+Dateianfangszeilen:
+     Wirä  deò Texô sï weiô nacè unteî gescrollt¬  dasó deò 
+     Anfanç  deò  Dateé  unteò deí obereî  Ranä  deó  File-
+     Sektoró liegt¬  sï isô deò dazwischenliegendå Rauí miô 
+     leereî Zeileî unä eineí Doppelpunkô aló Flaç gefuellt.Š     Normalå  Textzeilen¬  diå nichô laengeò aló diå  Bild
+     schirmzeileî unä diå nichô ueberdruckô werden¬ koenneî 
+     miô eineí "hard¢ odeò "soft¢ cò abschliessen® Erstereî 
+     erzeugô  deò Benutzeò miô deò  RETURN-Taste»  eò  wirä 
+     durcè  eiî ¼ Zeicheî aló Flaç  dargestellt®  Letztereò 
+     entstehô beé deò Benutzunç voî worä wrap¬ wenî aí Endå 
+     eineò Zeilå einfacè weiteò geschriebeî wird® Worä wrağ 
+     passô  danî  diå Zeilå deí linkeî unä rechteî Ranä  aî 
+     unä  eó erscheinô iî deò letzteî Spaltå eiî Blanë  aló 
+     Flag.
+
+FLAG-Zeichen
+     Diå  meisteî Flag-Zeichen¬  diå iî deò letzteî  Spaltå 
+     deó File-Sektoró erscheinen¬  wurdeî bereitó erklaert® 
+     Hieò isô nuî nocè einmaì einå Zusammenfassung:
+     blank     Diå  Zeilå  endeô miô eineí  "soft"-cr®  Daó 
+               Zeilenendå  wurdå voî worä wrağ  odeò  eineí 
+               Reform-Kommandï  erzeugô unä kanî veraenderô 
+               werden
+     <         Diå  Zeilå endeô miô  eineí  "hard"-cr®  Deò 
+               Zeilenwechseì kanî nichô voí Reform-Kommandï 
+               odeò  worä wrağ veraenderô werden®  Eó  kanî 
+               miô  ^Ç  jedocè  wiå eiî  einfacheó  Zeicheî 
+               geloeschô werden.
+     +         Diå naechstå  Zeilå isô diå Fortsetzunç  deò 
+               markierteî Zeile.
+     -         Diå  naechstå Zeilå wirä uebeò diå markiertå 
+               Zeilå gedruckt
+     .         Dieså Bildschirmzeilå gehoerô nichô mehò zuí 
+               Text
+     :         Dieså Zeilå gehoerô nocè nichô zuí Text
+     P         Diå folgendå Zeilå wirä auæ einå neuå  Seitå 
+               gedruckt
+     ?         Diå  Zeilå  enthaelô eiî undefinierteó  dot-
+               Kommando
+     J         Diå Zeilå  endeô miô eineí linå feeä ohnå cò 
+               unä isô falsch.
+     M         Einå  Zeilå enthaelô  eiî  TPDRUCK-Druckkom
+               mando
+
+
+4.   EDITIER- Kommandos in TP
+
+
+4.1. Kursor-Bewegung
+
+Diå Kursorbewegungs-Kommandoó werdeî benutzt¬ uí deî Kursoò 
+innerhalâ  eineó Texteó aî einå gewuenschtå Stellå zõ  set
+zen¬  uí  dorô einå Korrektuò odeò Einfuegunç  vorzunehmen® 
+Befindeô sicè dieså Stellå ausserhalâ deó  augenblicklicheî 
+Schirmbildes¬  sï  wirä automatiscè entsprechenä gescrollt¬ 
+uí deî Kursoò iî deò entsprechendeî Textstellå sichtbaò  zõ 
+machen®  Diå wichtigsteî Kursorkommandoó werdeî schoî durcè 
+daó  Menõ beií Editiereî erklaert®  Ausserdeí sinä diå vieò 
+Grund-Funktioneî  auæ  deò Tastatuò iî Forí  eineó  Kreuzeó 
+angelegô unä daheò leichô zõ merken:
+.paŠ                         ^E
+                    eine Zeile hoch
+
+        ^A             ^S             ^D             ^F
+   ein Wort       ein Zeichen    ein Zeichen    ein Wort
+   nach links     nach links     nach rechts    nach rechts
+
+                        ^X
+                   eine Zeile
+                   tiefer
+
+Komplettå  Listå deò Kursorbewegungen¬  allå Kommandoó  beé 
+gedrueckteò CONTROL-Taste:
+
+^S   eiî Zeicheî  nacè links¬ bzw® aî daó Endå deò vorheri
+     geî  Zeile¬  wenî  eò aí Anfanç  deò  aktuelleî  Zeilå 
+     steht®  wirä meisô verwendet¬ uí eiî Zeicheî zõ korri
+     gieren® Aucè ^È odeò Backspacå moeglich.
+
+^D   eiî Zeicheî nacè  rechtó iî gleicheò Weiså bzw® iî diå 
+     naechstå Zeile
+ 
+^E   bewegô deî Kursoò uí einå Zeilå nacè oben¬  moeglichsô 
+     iî deò gleicheî Spaltå (wenî eó keinå Leerzeilå ist).
+
+^X   Bewegô  deî Kursoò uí einå Zeilå nacè unten¬  sï  weiô 
+     moeglicè iî deò gleicheî Spalte.
+
+^QE  bewegô  deî   Kursoò iî diå oberstå Zeilå  deó  darge
+     stellteî Textes.
+
+^QX  Desgleicheî nacè unten¬  wenî moeglicè iî deò gleicheî 
+     Spalte
+
+^QS  bewegô deî Kursoò iî diå "linkeste¢ erlaubtå Spalte
+
+^QD  Bewegô  deî Kursoò nacè rechtó hinteò daó letztå  Zei
+     cheî deò Zeile.
+
+^A   Bewegô deî Kursoò  zuí ersteî Zeicheî deó vorhergehen
+     deî Wortes.
+
+^F   Bewegô deî Kursoò aî deî Anfanç deó folgendeî Wortes.
+
+^QR  Bewegô deî Kursoò aî deî Anfanç deó bearbeiteteî  Tex
+     tes.
+
+^QC  Bewegt den Kursor hinter das letzte Zeichen des Textes.
+
+^Q0  Bewegô deî Kursoò zõ  eineò deò 1° Textmarken¬ diå voí 
+ ..  Benutzeò gesetzô wurdeî miô ^K° bió ^K9.
+^Q9
+
+^QB  Bewegô  deî  Kursoò  aî deî  Anfanç  eineó  markierteî 
+     Blockeó  unä zeigô diå dortigå Markierung¬  falló  siå 
+     unterdrueckô ist.
+
+^QK  Desgleicheî zuí Blockende.Š^QP  Bewegô  deî Kursoò auæ diå Position¬  auæ deò eò  sicè 
+     voò deò Eingabå deó vorherigeî Kommandoó befand.
+
+^QV  Bewegô  deî Kursoò auæ diå Position¬  auæ deò eò  sicè 
+     voò  deí letzteî Such- odeò Ersatzkommandï befanä odeò 
+     zuí Blockanfang¬  deò zuletzô verschoben¬ kopierô odeò 
+     geloeschô wurde.
+
+^QF  Fragô nacè eineí zõ suchendeî Textteiì unä bewegô  deî 
+     Kursoò dorthin.
+
+^I   Bewegô  deî  Kursoò zuò  naechsteî  Tabulatorposition¬ 
+     fuegô Leerzeicheî ein¬ falló keiî Texô bió dorthin.
+
+RETURÎ  beendeô einå bearbeitetå Zeilå miô eineí "hard"-cr®      
+Deò Kursoò wirä aî deî Anfanç deò naechsteî Zeilå bewegt.
+
+Anmerkungen:
+Deò Kursoò kanî nuò aî Stelleî bewegô werden¬ diå sicè tat
+saechlicè  ií Texô befinden®  Z.B®  kanî eò nichô mehò  aló 
+einå  Stellå  hinteò daó letztå Zeicheî eineò Zeilå  bewegô 
+werden¬  wenî dorô keinå Blankó eingefuegô wurden¬  sonderî 
+diå Zeilå miô RETURÎ abgebrocheî wurde®  Danî sinä naemlicè 
+iî  dieseò Zeilå hinteò deí RETURÎ keinå  weitereî  Zeicheî 
+existent¬  auæ diå deò Kursoò gesetzô werdeî koennte®  Aus
+serdeí  kanî deò Kursoò nichô auæ Positioneî innerhalâ  voî 
+Markeî  unä aucè nichô auæ diå Seitenwechsel-Zeilå  gesetzô 
+werden.
+
+
+
+4.2. Schirmbild rollen (Scrolling)
+
+Diå  Scrolling-Kommandoó veraenderî deî auæ deí  Bildschirí 
+sichtbareî Textausschnitt¬  nichô unbedingô diå Kursorposi
+tion®  Miô  dieseî  Kommandoó  kanî deò  Benutzeò  deî  ge
+wuenschteî Textausschnitô sichtbaò machen®  Diå vorheò  be
+schriebeneî  Kursorkommandoó  koenneî  aucè  eiî  Scrollinç 
+verursachen¬  wenî eó notwendiç ist¬  uí diå Kursorpositioî 
+sichtbaò zõ machen.
+
+Liste der Scrolling-Kommandos:
+
+^Z   Rollô  daó   Schirmbilä uí einå Zeilå nacè  oben®  Diå 
+     oberstå  Zeilå verschwindeô unä einå neuå  Zeilå  wirä 
+     unteî  sichtbar®  Deò Kursoò wirä nuò bewegt¬  wenî eò 
+     sicè iî deò obersteî verschwindendeî Zeilå befindet.
+
+^W   Desgleichen nach unten.
+
+^C   Daó  sichtbarå  Schirmbilä wirä uí 3/´ nacè  obeî  ge
+     rollt¬ d.h® eó wirä miô eineò gewisseî Ueberlappunç ií 
+     Texô geblaettert.
+
+^R   Desgleichen nach unten.
+
+Wirä eiî Kommandï nacè ^QÑ eingegeben¬ sï wirä daó Kommandï 
+automatiscè entsprechenä ofô wiederholt¬  bió daó  Kommandï Šwiederholô wird®  Dabeé unterbrichô jedeò Scrolling-Vorganç 
+diå Darstellunç deó vorherigen.
+
+
+
+4.3. Texteingabe
+
+Normalerweiså  wirä Texô eingegeben¬  indeí maî ihî einfacè 
+aî diå entsprechendå Stellå deó Schirmbildeó  schreibt®  Eó 
+gibô  jedocè nocè Kommandos¬  uí zwischeî Texteinfuegeî unä 
+Textueberschreibeî zõ unterscheideî sowiå uí diå Tabulator
+positioneî unä Worä Wrağ zõ kontrollieren:
+
+^V   Bestimmt¬  oâ  einzugebendå  Zeicheî  deî  vorhandeneî 
+     Texô  ueberschreibeî (Einf.aus© odeò zwischeî diå vor
+     handeneî Zeicheî eingefuegô werdeî (wirä ií Menõ ange
+     zeigt).
+
+RETURÎ  zerteilô einå Zeilå iî zweé Zeilen¬  wenî sicè  deò 
+     Kursoò mitteî auæ deò Zeilå befindeô odeò erzeugô einå 
+     Leerzeile¬  wenî sicè deò Kursoò aí Zeilenanfanç  odeò 
+     Zeilenendå befindet® Eó wirä eiî "hard"-cò eingefuegt® 
+     RETURÎ  kanî  beé inserô ofæ benutzô werden¬  uí  einå 
+     "soft"-cò iî eineî "hard"-cò zõ aendern.
+
+^N   Einfuegeî eineó "hard"-cò aî deò Kursorposition¬  ohnå 
+     dieså  zõ veraendern®  Texô rechtó unä unterhalâ  wirä 
+     nacè unteî bewegt.
+
+^I   Tabulator¬  bewegô deî Kursoò zuò naechsteî Tabulator
+     positioî innerhalâ deò Zeile®  Beé inserô ofæ wirä  eò 
+     uebeò  deî vorhandeneî Texô hinauó bewegt¬  diå  Zeilå 
+     wirä  zwischeî deî vorhandeneî Zeicheî miô Leerzeicheî 
+     aufgefuellt¬ wenî dieó  notwendiç ist¬ uí diå naechstå 
+     Tabulatorpositioî zõ erreichen®  Beé Inserô Oî  werdeî 
+     Blankó bió zuò naechsteî Tabulatorpositioî eingesetzt.
+
+^OI  Setzeî voî Tabulatorpositionen¬ siehå Formatierung.
+
+^ON  Loescheî voî Tabulatorpositionen¬ siehå Formatierung.
+
+^OF  Anpasseî  deò  Tabulatorzeilå aî diå Forí deò  Kursor
+     zeile.
+
+^Px  Deò  hinteò  ^Ğ folgendå Buchstabå wirä  aló  Control-
+     Zeicheî ií Filå gespeichert¬  z.B® uí besonderå Druck
+     formeî zõ steuern.
+     
+
+
+4.4. Text loeschen
+
+Listå deò Kommandos¬  uí Texô odeò einzelnå Zeicheî auó deí 
+bearbeiteteî Texô zõ loeschen:
+
+^G   Loeschô  daó Zeicheî auæ deò Kursorposition®  Aí  Endå 
+     eineò  Zeilå Loescheî deó cr¬  dadurcè  Verbindeî  voî 
+     zweé Zeilen.ŠDELETÅ Loeschô daó linkó voí Kursoò befindlichå Zeichen® Aí 
+     Anfanç deò Zeileº  Loescheî deó cr¬  dadurcè Verbindeî 
+     miô deò vorherigeî Zeile.
+
+^T   Loeschô daó Worô bzw®  deî Wortteiì rechtó voí Kursor® 
+     Wenî  Kursoò  ausserhalâ deó Worteó Loescheî aucè  deò 
+     Blankó  unä  cò bió zuí naechsteî  Wort®  Wenî  Kursoò 
+     mitteî ií Wort¬ Loescheî aucè deò Blankó danach.
+
+^Y   Loescheî deò Zeile¬ iî deò sicè deò Kursoò befindet.
+
+^QY  Loescheî  deò  Zeilå  voî deò Kursorpositioî  aâ  nacè 
+     rechtó ohnå cr.
+
+^Q DELETÅ  Dasselbå linkó voí Kursor.
+
+^KY  Loescheî eineó markierteî Blockes.
+
+
+
+4.5. Sichern und Beenden
+
+Eiî neõ erstellteò odeò geradå geaenderteò Texô wirä  nichô 
+voî selbsô staendiç auæ diå Diskettå gespeichert®  Maî musó 
+ihî  voî  Zeiô  zõ Zeiô sichern®  Ausserdeí kanî  nuò  einå 
+gesichertå Dateé ausgedruckô werden.
+Maî  solltå  waehrenä deò Verarbeitunç langeò  Textå  schoî 
+jeweiló  eineî Teiì sichern¬  uí ihî ausdruckeî zõ  koenneî 
+odeò damiô eò beé Stromausfall¬  System-Crash¬ Kommandofeh
+lerî odeò volleò Disëette nichô verloreî geht.
+
+Liste der Sicherungskommandos:
+
+^KD  Sicherî  deó  editierteî Texteó auæ diå  Diskettå  unä 
+     Rueckkehò  zuí NO-FILE-MENU®  Voî dorô naechstå  Dateé 
+     aufrufbar.
+
+^KX  Sicherî unä Rueckkehò zuí Betriebssystem.
+
+^KS  Sicherî  unä weiterarbeiteî miô deí selbeî  Text®  Deò 
+     Kursoò kanî miô ^QĞ aî diå vorherigå Positioî zurueck
+     gesetzô werden.
+
+^KQ  Abbrechen®  Zuruecë  zuí NO-FILE-MENU¬ ohnå diå geradå 
+     erstelltå Text-Versioî zõ sichern® Fragô nacè Ja/Nein-
+     Entscheid¬  falló  einå Aenderunç ií Texô  vorgenommeî 
+     wurde.
+
+
+
+4.6. Schirmbild-Textformatierung
+
+Diå  folgendeî Kommandoó werdeî verwendet¬  uí Texô auæ deí 
+Bildschirí  iî  einå bestimmtå Forí zõ bringeî unä  uí  diå 
+Funktioneî voî Worä Wrağ unä Reforí (^B© zõ kontrollieren:
+
+^OC  Diå   Zeile¬  iî deò sicè deò  Kursoò  befindet¬  wirä 
+     zwischeî deí linkeî unä rechteî Ranä zentrierô (iî diå Š     Mittå  gesetzt)®  Blankó aí Anfanç odeò Endå deò Zeilå 
+     werdeî ignoriert.
+
+^OL  Fragô  nacè  deí linkeî Rand®  Eó isô einå Zahì voî  ± 
+     bió  24° einzugeben¬  gefolgô voî eineí  RETURN®  Odeò 
+     durcè  Drueckeî  deò Tastå ESCAPÅ  wirä  diå  aktuellå 
+     Kursorspaltå aló linkeò Ranä uebernommen.
+
+^OR  Dasselbå fueò deî rechteî Rand.
+     Deò  linkå  unä rechtå Ranä sollteî immeò auæ deî  ge
+     wuenschteî  Werô eingestellô werden¬  wenî  Textå  miô 
+     Hilfå voî worä wrağ eingegebeî werdeî odeò daó Reform-
+     Kommandï verwendeô wird.
+
+^OF  Setzô  deî linkeî Ranä auæ diå Spaltå deó ersteî  Zei
+     chenó  deò  Kursorzeile¬  daó keiî Blanë isô  unä  deî 
+     rechteî  Ranä  auæ daó letztå Zeicheî ungleicè  Blank® 
+     Ueberall¬  wï sicè iî deò Zeilå eiî "!¢ befindet¬ wirä 
+     einå Tabulatorpositioî gesetzt¬  unä wï eiî "-¢ steht¬ 
+     wirä  einå  evtl®   vorhandenå  Tabulatorpositioî  ge
+     loescht®  Damiô kanî iî einå Dateé einå Kopfzeilå  zuí 
+     Setzeî deò Tab'ó eingebauô werden.
+
+^OS  Fragô  nacè  deò Zahì deò Zeilen¬  diå  zwischeî  zweé 
+     Textzeileî  freé  bleibeî  solleî unä immeò  voî  worä 
+     warp¬ Reforí odeò RETURÎ eingefuegt werden.
+
+^B   "Reformiert¢ eineî Text-Absatú  voî deò Kursorpositioî 
+     bió zuí naechsteî "hard"-cr® Passô deî Texô deí linkeî 
+     unä  rechteî  Ranä aî unä loeschô  Blankó  odeò  fuegô 
+     Blankó  ein¬  uí   diå Wortå gleichmaessiç  uebeò  diå 
+     Zeilå  zõ verteilen®  Verschiebô aucè Wortå uebeò meh
+     rerå Zeilen¬  bió deò Texô zwischeî diå Raendeò passt® 
+     Deò  eingestelltå Zeilenabstanä wirä  beruecksichtigt® 
+     Deò  Kursoò stehô anschliessenä rechtó  voî  dem¬  deí 
+     Absatú  folgendeî "hard"-cr¬  sodasó deò naechstå  Ab
+     satú wiedeò einfacè durcè ^Â reformierô werdeî kann.
+     - Zuò Einstellunç deó Texteó auæ deî linkeî unä  rech
+       teî  Ranä  nacè eineò Korrektuò wirä deò Kursoò  auæ 
+       deî Anfanç deó Absatzeó gesetzô unä ^Â eingegeben.
+     - Zuò  Veraenderunç deò Raendeò deó Absatzeó wirä  miô 
+       ^OÌ  unä ^OÒ deò linkå unä rechtå Ranä  eingestellt¬ 
+       deò  Kursoò aî deî Anfanç deó Absatzeó gebrachô  unä 
+       ^Â gegeben.
+     - zuò Veraenderunç voî nichô aí rechteî ranä stehendeî 
+       Texô  odeò zuò Auswechselunç voî  Zwischenrauí  wirä 
+       diå  Justierunç miô ^OÊ umgeschalteô unä miô ^OÓ diå 
+       Anzahì  deò Leerzeileî zwischeî deî  Textzeileî  ge
+       stellt¬  deò  Kursoò auæ deî Anfanç deó Absatzeó ge
+       brachô  unä ^Â gegeben® 
+     TĞ  unterstuetzô diå Trennunç voî sehò langeî  Worten® 
+     Diå Zentrierunç wirä unterbrochen¬  wenî eiî sehò lan
+     geó Worô einå Worttrennunç notwendiç macht® Deò Kursoò 
+     wirä  auæ diå empfohlenå Trennstellå gesetzô unä  kanî 
+     nuî  miô  ^Ä odeò ^Ó auæ diå  richtigå  Worttrennungs-
+     Stellå  gesetzô werden®  Danî wirä eiî  Bindestricè  - 
+     eingegebeî unä damiô daó Worô getrennt® Diå Justierunç 
+     wirä nuî fortgesetzt® Dieså Funktioî kanî miô ^OÈ ein- Š     unä ausgeschalteô werden.
+
+^OX  Linkeò  unä  rechteò Ranä werdeî  "geloest"¬  bió  deò 
+     Kursoò  einmaì  ausserhalâ deò Raendeò waò unä  wiedeò 
+     zurueckgekehrô ist®  Ií Menõ erscheinô diå  Mitteilunç 
+     "Randaus"¬  kanî  durcè eiî weitereó ^OØ  rueckgaengiç 
+     gemachô  werden¬  gleichå  Wirkung¬  wiå  kurzzeitigeó 
+     Ausschalteî voî Worä Wrap.
+
+^OW  Schaltet Word Wrap aus bzw. wieder ein.
+
+^OJ  Schalteô "sofô blanks"¬  diå voî Worä Wrağ odeò Reforí 
+     eingefuegô wurdeî auó bzw®  wiedeò ein®  Eiî folgendeó 
+     Reformkommandï  loeschô allå "softblanks¢ unä machô sï 
+     auó  rechtsbuendigeî  Texô  rechtsoffeneî  Text¬  wenî 
+     Blocksatú  ausgeschalteô wurde®  Umgekehrô beé  einge
+     schalteteí Blocksatz®  Daó ^Ï Menu¬  daó nacè  Eingabå 
+     voî ^Ï nacè kurzeí Warteî erscheint¬  informierô uebeò 
+     deî eingestellteî Zustand.
+
+^OI  Fragô  nacè deò Spalte¬  iî deò einå Tabulatorpositioî 
+     gesetzô werdeî soll®  Iî deò Tabulatorzeilå  erscheinô 
+     aî  dieseò Stellå eiî "!"®  Solì eiî  Dezimaltabulatoò 
+     gesetzô werden¬  isô voò deò Spaltenangabå £ zõ geben¬ 
+     dieseó  Zeicheî dienô aucè zuò Kennzeichnunç deó Dezi
+     maltabulatoró (Verwendunç beé TPDRUCK).
+
+^ON  Fragô nacè  deò Spalte¬  iî deò diå  Tabulatorpositioî 
+     geloeschô werdeî soll.
+
+^I   Tabulator, siehe Kursorbewegung.
+
+^OV  Schalteô diå Wirkunç deò Tabulatorpositioneî aus¬  siå 
+     werdeî abeò weiterhiî iî deò Tabulatorzeilå angezeigt.
+
+^OT  Schalteô diå Anzeigå deò Tabulatorzeilå auó bzw® ein
+
+^OP  Schalteô diå Anzeigå deó Seitenwechseló auó bzw® ein.
+
+^PO  Fuegô aî  gewuenschteî Stelleî eiî ^Ï iî deî Texô ein® 
+     Daó bewirkt¬  dasó aî dieseò Stellå eiî Blanë gedruckô 
+     wird¬ deò abeò nichô ií Bilä erscheinô unä diå Zeilen
+     laengå nichô beeinflusst.
+
+^PH  Stelle Ueberdrucken von Zeilen
+
+^O   Daó  ^Ï  Menõ  zeigô an¬  oâ folgendå Funktioneî  ein- 
+     odeò ausgeschalteô sind:
+     Word Wrap
+     Blocksatz
+     Tabulatoren variabel
+     Seitenanzeige
+.paŠ4.7. Suchen und Ersetzen
+
+Zuí  Sucheî unä Ersetzeî voî Zeichenketteî (Strings© steheî 
+folgendå  Kommandoó zuò Verfuegunç  (Jedå String- odeò  Op
+tions-Eingabå miô RETURÎ abschliessen!):
+
+^QF  Fragô nacè  deí zõ suchendeî Strinç unä nacè  Options® 
+     Wenî  keinå Optionó angegebeneî werdeî (einfacè RETURÎ 
+     druecken)¬  wirä  deò Kursoò vorwaertó bió zuí  ersteî 
+     Auftreteî exakô dieseò Zeichenkettå bewegt.
+
+^QA  Fragô nacè  deí zõ suchendeî unä deí dafueò  einzuset
+     zendeî Strinç unä nacè Options® Ohnå Optioneî wirä daó 
+     naechstå  Auftreteî deó Stringó hinteò deò Kursorposi
+     tioî angezeigô unä deò Benutzeò wirä gefragt¬  oâ  daó 
+     Ersetzeî stattfindeî solì odeò nichtº REPLACÅ (Y/N)
+
+^L   Daó  zuletzô  eingegebenå  Such-  odeò  Ersetzkommandï 
+     wirä wiederholô (voî deò neueî Kursorpositioî aus)¬ sï 
+     aló  oâ  eó  miô deî gleicheî Parameterî  nocè  einmaì 
+     eingegebeî wordeî waere.
+
+^QV  Nacè  eineí  Such- ¬  Ersatz- odeò ^L-Kommandï  bringô 
+     dieseò Befehì deî Kursoò auæ diå Positioî zurueck¬ diå 
+     eò voò deí Kommandï bzw®  voò deò letzteî  Ausfuehrunç 
+     deó mehrfacè auszufuehrendeî Kommandoó hatte.
+
+Liste der Options (auch mehrere gleichzeitig moeglich):
+
+n    Einå Zahì  voî ± bió 65535®  Sucheî odeò Ersetzeî wirä 
+     n-maì ausgefuehrô z.B® uí diå Stellå zõ finden¬ aî deò 
+     eiî Strinç zuí n®  Malå ií Texô auftaucht¬ odeò uí diå 
+     naechsteî  î gleichartigeî Stringó zõ  ersetzen®  "NOÔ 
+     FOUND"-Fehleò erscheint¬  wenî diå Funktioî nichô ent
+     sprechenä  ofô ausgefuehrô werdeî kann®  Siå wirä abeò 
+     sï ofô wiå moeglicè ausgefuehrt.
+
+G    Beií   Suchenº    Sucheî  deó  letzteî   gleichartigeî 
+     Strings®  Beií Ersetzenº Allå gleichartigeî Stringó iî 
+     deò ganzeî Filå (voî Anfanç an!© werdeî ersetzt® Dabeé 
+     wirä deò Benutzeò jedesmaì gefragt¬  oâ ersetzô werdeî 
+     solì  odeò nicht®  "NOÔ FOUND"-Fehleò  erscheinô  nur¬ 
+     falló deò Strinç keiî einzigeó Maì ií Texô auftaucht.
+
+N    Ersetzen ohne zu fragen, sonst wie G.
+
+B    Sucheî  bzw®  Ersetzeî rueckwaertó voî deò Kursorposi
+     tioî aâ zuí File-Anfanç hin® Zusammeî miô Gº Beginî aí 
+     File-Ende.
+
+U    Bewirkt¬  dasó  deò Unterschieä voî Gross- unä  Klein
+     buchstabeî iî deî Stringó ignorierô wird.
+
+W    Bewirkt¬  dasó  nuò  nacè  passendeî  ganzeî  Woerterî 
+     gesuchô  wird¬  alsï entsprechendeî Strings¬  diå  voò 
+     odeò  hinteò sicè keineî Buchstabeî unä  keinå  Ziffeò 
+     haben.
+ŠDiå  Laengå  deó  zõ suchendeî Stringó isô auæ  3°  Zeicheî 
+beschraenkt®  Deò  Unterschieä  zwischeî "harä  space¢  unä 
+"sofô space¢ wirä beií Sucheî ignoriert® Diå Fragå "REPLACÅ 
+(Y/N)¢ musó miô y,Ù odeò ^Ù beantworteô werden¬  falló  deò 
+Ersatú  stattfindeî  soll»  sonsô kanî maî  jedå  beliebigå 
+anderå Tastå druecken¬ damiô nichô ersetzô wird.
+Wirä  deò  Strinç nacè "SUCHE¢ beií Suchkommandï  bzw®  deò 
+Strinç  nacè  "AUSTAUSCHEN?¢ beií  Ersatzkommandï  miô  deò 
+ESCAPE-Tastå  abgeschlossen¬  sï wirä nichô nacè Optinó ge
+fragt.
+Deò  String¬  deî  maî nacè "SUCHE¢  eingibt¬  kanî  einigå 
+speziellå Zeicheî enthalten¬  uí diå Suchå zõ  verallgemei
+nern:
+
+^A   Jedes einzelne Zeichen befriedigt die Suche
+
+^S   Passô  zõ jedeí Zeichen¬  daó keiî Buchstabå unä keinå 
+     Ziffeò  isô  (musó miô ^P^Ó iî deî  Strinç  eingefuegô 
+     werden).
+
+^Ox  Passô zõ  jedeí Zeicheî ausseò "x"¬ welcheó eiî belie
+     bigeó Zeicheî ist.
+
+^N   Entsprichô  deò  Folgå cr¬  læ  (Wagenruecklauf)®  Deò 
+     Unterschieä zwischeî hard- unä soft-cò wirä ignoriert® 
+     ^Î kanî aucè ií Austauschstrinç Verwendunç finden¬  uí 
+     eiî cò einzufuegen.
+
+
+
+
+4.8. Marken setzen
+
+Einå Markå kanî aî diå Kursorpositioî gesetzô werden¬ indeí 
+maî ^Ë eingibt¬  gefolgô voî eineò Ziffeò voî ° bió 9®  Diå 
+Markierunç wirä aî dieseò Stellå durcè diå Ziffeò kenntlicè 
+gemacht®  Deò  Kursoò kanî zõ jedeò gesetzteî Markå  bewegô 
+werden¬  indeí maî ^Ñ eingibt¬ gefolgô voî deò entsprechen
+deî Ziffeò (deò normalå Weg¬  uí sicè uebeò weitå  Streckeî 
+durcè  deî Texô zõ bewegen)®  Diå Anzeigå eineò Markå  kanî 
+miô  ^Ë  geloeschô werden¬  wenî sicè deò Kursoò  aî  ihreò 
+Positioî  befindet®  Diå Positioî wirä trotzdeí gespeicherô 
+unä beé ^Q¬  gefolgô voî deò passendeî Ziffer¬ wiedeò ange
+zeigt.
+
+
+
+Liste der Markierungsbefehle:
+
+^K0  Markå aî  Kursorpositioî setzen® Falló sicè dorô schoî 
+ ..  einå  Markå befindet¬ wirä siå nichô mehò dargestellt.
+^K9
+
+^Q0  Bewegô  deî  Kursoò zuò angegebeneî Markierung®  Falló 
+ ..  siå  nichô  existiert¬  erscheinô einå  Fehlermeldung® 
+^Q9  Einå  geloeschtå Markå wirä erneuô angezeigô unä  ver
+     wendet.
+.paŠ4.9. Block move -Kommandos
+
+Miô deî Blocë movå -Kommandoó kanî eiî bestimmteò Textblocë 
+markierô unä verschoben¬ kopierô odeò geloeschô werden.
+
+Liste der Block move -Kommandos:
+
+^KB  Setzô diå  Blockanfangsmarkierung¬  dargestellô  durcè 
+     "(B)"¬ auæ diå Kursorpositioî odeò loeschô diå Markie
+     rung¬ wenî siå schoî dorô steht.
+
+^KK  Setzt die Blockendemarkierung an die Kursorposition.
+
+^KV  Deò markiertå  Textblocë wirä zusammeî miô deî Markie
+     rungeî  aî  diå Kursorpositioî verschobeî (eò  beginnô 
+     danî aî deò Kursorposition).
+
+^KC  Deò  markiertå  Blocë wirä aî diå  Kursorpositioî  ko
+     piert®  Deò Originaltexô bleibô unveraendert® Diå Mar
+     kierungeî bewegeî sicè miô deò Kopie.
+
+^KY  Der markierte Textblock wird geloescht.
+
+^KW  Deò markiertå Blocë wirä auæ eiî andereó Filå kopiert¬ 
+     nacè deí gefragô wird®  Diå Eingabå deò entsprechendeî 
+     Dateibezeichnunç musó miô "RETURN¢ abgeschlosseî  wer
+     den® Dorô evtl® schoî vorhandeneò Texô wirä geloescht® 
+     Daó Ausgangsfilå bleibô unveraendert.
+
+^KH  Diå Blockmarkierungeî  werdeî unterdrueckô (nichô mehò 
+     angezeigt©  bzw®  falló  siå schoî unterdrueckô  sind¬ 
+     wiedeò erzeugt.
+
+^QB  Deò  Kursoò  wirä auæ diå  Blockanfangsmarkierunç  ge
+     setzt.
+
+^QK  Setzt den Kursor auf die Blockendemarkierung
+
+^QV  Setzô deî Kursoò auæ diå Positioî deò Blockanfangsmar
+     kierunç  voî deò Quellå eineó  Blockes¬  deò  kopiert¬ 
+     verschobeî odeò geloeschô wurde®  Gut¬ uí dorô zõ kon
+     trollieren¬ wï deò Texô herkam.
+
+
+
+4.10.Zusatzfiles
+
+Miô  folgendeî  Kommandoó kanî nichô nuò diå geradå voî  TĞ 
+bearbeitete¬  sonderî  aucè jedå anderå  Dateé  beeinflussô 
+werden:
+
+^KJ  Fragô  nacè  eineí File¬  daó geloeschô werdeî  soll.¬ 
+     Wirkô wiå ERASE.
+
+^KR  Fragô nacè eineí zõ lesendeî File¬  welcheó  daraufhiî 
+     vollstaendiç aî diå Kursorpositioî kopierô wird.
+
+^KW  Fragô  nacè eineí  File¬  iî daó eiî markierteò  Blocë Š     geschriebeî werdeî soll.
+
+^R   Aló  Antworô  auæ diå Fragå nacè eineí Zusatzfilå  auó 
+     deí geleseî odeò geschriebeî werdeî soll®  Bewirkô diå 
+     Ausfuehrunç  deó Kommandoó miô deí gleicheî  Filå  wiå 
+     beií vorherigeî Kommando.
+
+
+
+4.11.HELP-Kommandos
+
+^JH  Festlegunç  deó  help-leveló (° bió 3)¬  deò diå Mengå 
+     deò  dargestellteî  Hilfsinformationeî  bestimmt®  Deò 
+     geradå eingesetztå help-leveì wirä angezeigô unä  nacè 
+     eineí neueî gefragt.
+
+^P   Darstellung des Menus fuer besondere Druck-Kommandos
+
+^O   Anzeigen der eingestellten Parameter.
+
+^J^B Erklaerung der Textreformierung (^B)
+
+^J^F Erklaerunç  deò  Zeicheî deò letzteî  Bildschirmspaltå 
+     (Flags)
+
+^J^D Erklaerung der Wirkung der Dot-Kommandos
+
+^J^S Die Statuszeile wird erklaert.
+
+^J^R Die Tabulatorzeile wird erklaert.
+
+^J^M Randeinstellunç  unä Tabulatoreneinstellunç  wirä  er
+     klaert
+
+^J^P Das Setzen der Marken wird erklaert
+
+^J^V Texttransporte werden erklaert.
+
+
+
+5.   DRUCK-FUNKTIONEN
+
+
+5.1. Druck-Kontrollzeichen
+
+Diå  Druck-Kontrollzeicheî sinä einzelnå Zeichen¬  miô  deò 
+CONTROL-Tastå  waehrenä deó Editierenó eingegeben¬  uí ein
+zelnå Funktioneî wiå Unterstreichen¬  Hochschrifô  usw®  zõ 
+steuern®  Diå Zeicheî werdeî iî daó Filå geschrieben¬ indeí 
+maî  davoò  eiî ^Ğ eingibt®  Dieså Zeicheî werdeî  beé  deò 
+Spaltenzaehlunç  nichô  gewerteô unä aucè  nichô  gedruckt® 
+Einå  Zeilå  miô  solcheî Zeileî erscheinô  daheò  auæ  deí 
+Bildschirí zõ lang®  Daó Druck-Kontrollzeicheî musó voò unä 
+hinteò  deí  beeinflussendeî Strinç stehen®  Diå  einzelneî 
+Zeicheî bedeuten:
+
+^S   Unterstreichen® (Blankó werdeî nichô unterstrichen!)
+Š^B   Fettdruck
+
+^D   Doppeldruck¬  schreibô  jedeî Buchstabeî aî diå  selbå 
+     Stelle.
+
+^X   Durchstreicheî  deó  Texteó miô eineò Folgå voî "-¢  -
+     Zeichen.
+
+^V   Tiefschrift®  Schreibô deî Texô etwaó  tiefeò  aló diå 
+     sonstigå Zeile® Daó Masó deò Tiefå kanî miô eineí Dot-
+     Kommandï eingestellô werden.
+
+^T   Hochschrift¬  schreibô  deî   Texô   hoeheò   aló  diå 
+     uebrigå Zeile.
+
+^Y   Farbwechsel (Farbband-Umschaltung)
+
+^C   Unterbrichô deî  Ausdrucë aî dieseò Stellå  (Farbband
+     wechseì usw.)
+
+^A   Umschaltung der Druckweite (Zeichenabstand)
+
+^N   Zurueckschalten der Druckweite
+
+^K   Text fuer dot-Kommandos.
+
+^F   Druckô daó Zeicheî 20È (space)
+
+^G   Druckt das Zeichen 7FH (DEL)
+
+^O   Druckô  eiî  Blank¬  daó keineî Einflusó auæ diå Bild
+     schirmlaengå hat.
+
+^H   daó  folgendå  Zeicheî wirä uebeò  daó  vorherigå  ge
+     druckt.
+
+.paŠ5.2. Dot-Kommandos
+
+Diå  Dot-Kommandoó sinä speziellå Zeilen¬  diå iî daó  Filå 
+geschriebeî  werden¬  uí  z.B®  diå Papierlaengå odeò  einå 
+bestimmtå  Forí  deó Seitenkopfeó  festzulegen®  Allå  Dot-
+Kommandoó  sinä  auæ gebraeuchlichå  Wertå  voreingestellt¬ 
+sodasó  maî  miô TĞ arbeiteî kann¬  ohnå  Dot-Kommandoó  zõ 
+benutzen®   Dot-Kommandoó  werdeî  nichô  miô  ausgedruckt¬ 
+steuerî  abeò daó Druckbild®  Eiî Dot-Kommandï bestehô  auó 
+eineí Punkô iî deò ersteî (!© Spaltå deò Zeile¬ eineí Zwei-
+Buchstaben-Codå  unä  haeufiç nocè eineò  Zahì  odeò  eineí 
+Text®  Diå  Dot-Kommandoó werdeî wiå normaleò Texô eingege
+ben¬  voî  TĞ erkannô unä beé deò Zeilennummerierunç  nichô 
+mitgezaehlt®  Diå Bezeichnungeî deò Dot-Kommandoó  bezieheî 
+sicè auæ einå bestimmtå Forí deò Seitenaufteilunç (Bild):
+
+-------  I---------------------------------------I
+  oberer I                                       I
+  Rand   I---------------------------------------I
+         I    Seitenkopf                         I
+         I---------------------------------------I  ----
+         É                                       É Kopfabst.
+   ----  I---------------------------------------I  ----
+         I    Textanfang                         I
+Papier-  I                                       I
+laenge   I           Filesektor                  I
+         I                                       I
+         I                                       I
+         I    Textende                           I
+   ----  I---------------------------------------I  ----
+ unterer I                                       I Fussabst.
+ Rand    I---------------------------------------I  ----
+         I    Fusstext                           I
+         I---------------------------------------I
+         I                                       I
+-------  I---------------------------------------I
+
+
+Liste der Dot-Kommandos:
+------------------------
+
+ .LHn     Einstelleî  deó Zeilenabstandeó  iî  1/48"®  .LH¸ 
+          ergibô ¶ Zeilå peò inch¬ .LH¶ ergibô ¸ Zeileî peò 
+          inch®  Diå  Voreinstellunç isô ¸ Zeileî peò inch® 
+          Kommandï musó aí Anfanç stehen.
+
+ .PLn     î  isô   diå  Anzahì deò  Zeileî  jå  Papierseitå 
+          einschl®  untereî unä obereî Rand® Vorgabå isô 6¶ 
+          Zeilen/Seite¬ musó aí Anfanç stehen.
+
+ .MTn     Anzahì  deò Zeileî voí obereî Papierranä bió  zuí 
+          Textanfang®  Iî  dieseí Rauí wirä  gegebenenfalló 
+          deò  Seitenkopæ  unä  deò  Kopfabstanä  gedruckt® 
+          Vorgabå isô ³ Zeilen¬ musó aí Anfanç stehen.
+
+ .MBn     Anzahì  deò Zeileî zwischeî Texô unä untereí  Pa
+          pierende®  Iî dieseí Rauí wirä gegebenenfalló diå 
+          Seitennummeò odeò deò Fusstexô gedruckt®  Vorgabå Š          isô ¸ Zeilen¬ musó aí Anfanç stehen.
+
+Diå  maximalå  fueò deî Texô verfuegbarå  Zeilenanzahì  be
+rechneô  sicè auó deò Papierlaengå minuó obereî Ranä  minuó 
+untereî Rand®  Diå obigeî Kommandoó koenneî aucè  innerhalâ 
+eineò Filå eingegebeî werden¬ uí diå Seitenaufteilunç o.ae® 
+waehrenä deó Ausdruckenó zõ veraendern.
+
+Weitere Dot-Kommandos sind:
+
+ .HMn     Anzahì  deò  Leerzeileî zwischeî deí  Seitenkopf® 
+          Vorgabå ² Zeilen.
+
+ .FMn     Anzahì  deò Zeileî zwischeî deí Textendå unä  deí 
+          Fusstexô bzw® deò Seitennummer.
+
+ .PCn     Spalte¬  iî  deò   diå  Zeilennummeò  ausgedruckô 
+          werdeî  soll¬  wenî keiî Fusstexô eingegebeî  unä 
+          deò  Seitennummerdrucë  nichô  abgeschalteô  ist® 
+          Vorgabå 1/² Textbreitå (33® bzw® 30® Spalte).
+
+ .POn     Anzahì deò Spalteî zwischeî deò ersteî Textspaltå 
+          unä deò ersteî Druckerspalte® Deò Texô kanî damiô 
+          beliebiç  voî  deò Randlochunç  beé  Endlospapieò 
+          abgesetzô werden® Vorgabå isô ¸ Spalten.
+
+ .PA      Sofortiger Vorschub auf eine neue Seite.
+
+ .CPn     Seitenwechsel¬  wenî   nocè wenigeò aló î  Zeileî 
+          auæ deò  Papierseitå zuò Verfuegunç stehen.
+
+ .HE...   Deò iî dieseò Zeilå folgendå Texô wirä uebeò jedå 
+          deò  folgendeî Druckseiteî aló Seitenkopæ  ausge
+          druckt¬  bió  erneuô  eiî .HÅ -Kommandï  erfolgt® 
+          Vorgabå isô keiî Texô (Blanks).
+
+ .FO...   Deò  iî  deò  Zeilå folgendå Texô  wirä  auæ  deò 
+          aktuelleî  Seitå unä alleî folgendeî  Seiteî  bió 
+          zuí naechsteî .FÏ aló Fusstexô ausgedruckt®  Vor
+          gabå  isô  Ausdrucë deò Seitennummer¬  sonsô  wiå 
+          .HE®  Wenî eiî Fusstexô angegebeî ist¬  wirä  diå 
+          unterå Seitennummeò nichô gedruckt¬  falló siå ií 
+          Fusstexô  nichô durcè eiî £ befohleî wird.
+
+          Folgendå  Zeicheî koenneî spezielì ií Seitenkopf- 
+          unä Fusstexô  verwendeô werden:
+          
+          #    Ausdrucë  deò   aktuelleî  Seitennummeò   aî 
+               dieseò Stelle®  Fehlô daó Zeichen¬  wirä diå 
+               Seitennummeò nichô gedruckt.
+
+          \    Daó  folgendå   Zeicheî wirä nichô aló  Texô 
+               interpretiert
+
+          ^K   Diå  folgendeî Blankó werdeî bió zuí  ersteî 
+               Nicht- Blankzeicheî ignoriert¬ wenî diå Sei
+               tennummeò  geradå ist®  Kopæ  odeò  Fusstexô 
+               erscheinô   damiô   abwechselnä  linkó   unä Š               rechts.
+
+ .OP      Diå  Vorgabå Ausdrucë deò Seitennummeò aló  Fuss
+          texô wirä unterdrueckt® Eiî eingegebeneò Fusstexô 
+          wuerdå  ebensï diå   Seitennummeò  unterdruecken® 
+          Siå muesstå durcè eiî £ neõ festgelegô werden.
+
+ .PNn     Festlegeî  deò  Seitennummer¬  beé deò  weiterge
+          zaehlô  werdeî soll®  Vorgabå aí Anfanç isô eins® 
+          Einschalteî deó  Seitennummerdruckes¬  falló .OP-
+          Kommandï gegebeî wurdå miô n=Blank.
+
+ .CWn     Einstelleî  deó Zeichenabstandeó iî 1/120"®  Vor
+          gabå  1° Zeicheî peò incè  (.CW12)¬  Vorgabå  deó 
+          alternierendeî Abstandeó miô 1² Z/inc.
+ 
+ .SRn     Einstelleî  Hoch- unä Tiefschriftvorschub¬  bevoò 
+          Texô  gedruckô wirä iî 1/4¸ inch-Schritten®  Vor
+          gabå isô 3/4¸ inch.
+
+ ..text   Ignorieren des folgenden Textes (Kommentarzeile).
+
+ .UJ      Ein-/Ausschalteî  deó   Mikro-Leerstellenausglei
+          ches® 
+          Beé Tabelleî musó .UÊ ofæ sein¬  danacè kanî wie
+          deò .OÊ oî eingeschalteô werden.
+
+Fueò  TPDRUCË  sinä nocè folgendå  Dot-Kommandoó  implemen
+tiert:
+
+ .DFfilenamå  spezifizierô eiî Datenfilå unteò dieseí Nameî 
+          fueò .RV-Kommando
+
+ .RV name,name,name,... 
+          liest Variablenwerte vom Datenfile ein.
+
+ .AV "promt",name
+          fragô  deî  Anwendeò  nacè  eineí  Variablenwert¬ 
+          "promt¢ isô diå Zeichenkette¬  diå diå Fragå ent
+          haelt¬ namå stehô fueò deî Variablenwert.
+
+  &name&  fuegô  aî dieseò Stellå deî Variablenwerô ií Texô 
+          ein.
+        
+ .FI filename
+          Fuegt ein "Document-File" ein
+
+ .DM message
+          zeigô  diå  angegebenå Mitteilunç auæ  deí  Bild
+          schirí an.
+
+
+Fueò diå Einfuegunç voî Dezimalzahleî miô obigeî  Kommandoó 
+koenneî Dezimaltabulatoreî durcè ^OÉ #î gesetzô werden.
+Variablennameî besteheî auó maximaì 3¹ Zeicheî (Buchstaben¬ 
+Zifferî unä daó Zeicheî - )® 
+.paŠ6.   Fehlermeldungen
+
+TP- Fehlermeldungeî  verlangeî voí Benutzeò daó  Quittiereî 
+deó Fehleró miô deò ESCAPE-Taste¬  uí sicherzustellen¬ dasó 
+TĞ  nichô schoî daó naechstå Kommandï bearbeitet¬  daó  deò 
+Benutzeò vielleichô eingegebeî hat¬  ohnå diå Fehlermeldunç 
+zõ sehen® Dieså Fehlermeldunç habeî meisô folgendå Form:
+
+     ***ERROR n:(spezielle Mitteilung)***ESC Druecken#
+
+
