@@ -48,6 +48,8 @@
  * `--wdc 4.2|4.0.05|3.4.05` und `--hd <abbild>` (nur `--machine p8000-16`, P13d): WDC an der
  * 16-Bit-PIO2 bzw. Winchester an Laufwerk 0 (Kopie wie die Disketten, `--rw` = Original);
  * Befehle `wdc [r|u|d|log]`, `cpu wdc` (nur Ansicht).
+ * `--rtc aus|u130x|rtc72421` (nur `--machine p8000-16`, Entwurf 37): Echtzeituhr-Karte am 16-Bit-Teil
+ * (`u130x` folgt mit AP R2 und meldet bis dahin „noch nicht verfuegbar").
  * `--ptape` steckt die Lochstreifen-Karte K6022 (SIF1000, E0H–E7H; alle Maschinen).
  * `--tape <k52>` / `--tape2 <k52>` / `--tape-card` steckt die Kassettenkarte K5020 (A5120/PRG 30H,
  *   K8915 D0H, PC 1715 D0H) und bindet die Kassettendatei an Geraet 1/2; Befehl `tape`.
@@ -235,6 +237,7 @@ int main(int argc, char** argv){
     const char* raf_opt = nullptr; // --raf none|raf128|raf512|raf2m: RAM-Floppy auf 88H/89H
     const char* wdc_opt = nullptr; // --wdc 4.2|4.0.05|3.4.05: WDC an der 16-Bit-PIO2 (P8000, P13d)
     const char* konsole_opt = nullptr; // --konsole kern|original: Terminal an tty1 (P8000, P20c)
+    const char* rtc_opt = nullptr; // --rtc aus|u130x|rtc72421: Uhrenkarte am 16-Bit-Teil (Entwurf 37)
     const char* hd_opt  = nullptr; // --hd <abbild>: Winchester an WDC-Laufwerk 0 (setzt --wdc 4.2)
     std::string ptape_in, ptape_out;   // --ptape-in/-out: Band einlegen / Stanzer an Datei binden
     bool ptape_opt = false;        // --ptape: Lochstreifen-Karte K6022 auf E0H–E7H (Entwurf 23)
@@ -276,6 +279,7 @@ int main(int argc, char** argv){
         else if (!strcmp(argv[i],"--wdc") && i+1<argc) wdc_opt=argv[++i];
         else if (!strcmp(argv[i],"--konsole") && i+1<argc) konsole_opt=argv[++i];
         else if (!strcmp(argv[i],"--hd") && i+1<argc) hd_opt=argv[++i];
+        else if (!strcmp(argv[i],"--rtc") && i+1<argc) rtc_opt=argv[++i];
         else if (!strcmp(argv[i],"--ptape")) ptape_opt=true;
         else if (!strcmp(argv[i],"--tape-card")) tape_opt=true;
         else if (!strcmp(argv[i],"--tape") && i+1<argc) { tape_opt=true; tape1_opt=argv[++i]; }
@@ -335,6 +339,14 @@ int main(int argc, char** argv){
         const std::string k = konsole_opt;
         if (k=="original") p8cfg.terminal = P8000Machine::Config::TerminalArt::Original;
         else if (k!="kern"){ fprintf(stderr,"--konsole: '%s' unbekannt (kern|original)\n",konsole_opt); return 2; }
+    }
+    if (rtc_opt){
+        if (art!=dbgm::Art::P8000_16){ fprintf(stderr,"--rtc gibt es nur am P8000 mit 16-Bit-Karte (--machine p8000-16)\n"); return 2; }
+        const std::string r = rtc_opt;
+        using R = P8000Machine::Config::Rtc;
+        if      (r=="rtc72421") p8cfg.rtc = R::Rtc72421;
+        else if (r=="u130x")    p8cfg.rtc = R::U130X;
+        else if (r!="aus"){ fprintf(stderr,"--rtc: unbekannte Karte '%s' (aus|u130x|rtc72421)\n",rtc_opt); return 2; }
     }
     static std::string hd_kopie;
     struct HdKopieWeg { ~HdKopieWeg(){ if(!hd_kopie.empty()) std::remove(hd_kopie.c_str()); } };

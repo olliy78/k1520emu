@@ -206,6 +206,9 @@ K1520_API K1520Handle k1520_create_pc1715_ex(int variante, int bildschirm, int z
  *                `firmware` (nur 5.0), `zeichensatz` (ezs-dzs | dzs-ezs = Bestueckung ZG1-ZG2),
  *                `teiler` (7 | 8, Zeichentakt), `vorlauf` (ms, die das Terminal vor dem Rechner
  *                eingeschaltet wird; Vorgabe 1500).
+ *                Echtzeituhr-Karte (Entwurf 37, nur mit `karte16=1`): `rtc` (aus | u130x | rtc72421),
+ *                `rtc_jahresversatz` (Jahre, nur Anzeige), `rtc_utc` (0 = Ortszeit | 1 = UTC),
+ *                `rtc_zustand` (Pfad der Batteriedatei).
  *                Schluessel der noch nicht gebauten Teile (`index16`, `mon16`, `dram`, `wdc`,
  *                `platte`) und unbekannte Schluessel/Werte → NULL, Grund in k1520_last_init_error.
  * k1520_machine_type() = 4.  `k1520_create(K1520_MACHINE_P8000)` = Vorgabe-Konfiguration.

@@ -66,6 +66,7 @@
 #include <array>
 #include <atomic>
 #include <deque>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -97,6 +98,14 @@ public:
         /// MMU-Steuerlogik [L1]: Adresse-High = NBR waehlt die Stack-MMU (Plan) bzw. die Data-MMU
         /// (WEGA `nsseg`).  Siehe `P8000Karte16::Config::nbr_gleichheit_stack`.
         bool     nbr_gleichheit_stack = true;
+
+        // ── Echtzeituhr-Karte (Entwurf 37) — nur mit 16-Bit-Karte, sonst Fehler ──
+        enum class Rtc { Aus, U130X, Rtc72421 };
+        Rtc      rtc = Rtc::Aus;
+        int      rtc_jahresversatz = 0;       ///< Jahre, nur Anzeige (Rueckfall −28/−40)
+        bool     rtc_utc = false;             ///< false = Ortszeit des Wirts
+        std::string rtc_zustand;              ///< Batteriedatei, "" = nur im Speicher
+        std::function<int64_t()> rtc_zeitquelle;   ///< Unix-Sekunden UTC (Tests); leer = Systemuhr
 
         // ── WDC (AP P13d) — nur mit 16-Bit-Karte ──
         /// Firmware des WDC bzw. kein WDC.  Vorgabe vorerst AUS (Entwurf §10.4: 4.2), wie `karte16`.

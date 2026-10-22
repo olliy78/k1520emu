@@ -348,6 +348,7 @@ tools/dev.sh tool boot_trace --machine p8000 --quiet --json --keys '<CR><CR>' \
 - **`--machine p8000-16`** (AP P11): dasselbe mit 16-Bit-Karte und Kopplung (`karte16`);
   das Schlussbild nennt zusätzlich den U8001 (Reset/läuft, PC, FCW, Uhr).  Beispiel:
   `--machine p8000-16 --keys '<CR>x<CR>'` ⇒ „U8000-Softwaremonitor Version 3.1 - Press NMI".
+- **`--rtc aus|u130x|rtc72421`** (nur `p8000-16`, Entwurf 37): Echtzeituhr-Karte am 16-Bit-Teil (`u130x` meldet bis AP R2 „noch nicht verfuegbar").
 - **`--wdc 4.2|4.0.05|3.4.05`, `--hd <abbild>`** (nur `p8000-16`, AP P13d): WDC an der 16-Bit-PIO2 bzw.
   Winchester an Laufwerk 0 (`--hd` setzt `--wdc 4.2`; das Abbild wird **beschrieben** — eine Kopie
   übergeben).  Ereignisse: je Statuswechsel des WDC, „WDC Kommando cc LW n …" beim Übernehmen eines

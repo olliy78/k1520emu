@@ -8,6 +8,7 @@
 #include "core/cards/p8000/rom_mon16.h"
 #include "core/logger.h"
 #include "core/serial/sio_format.h"
+#include <stdexcept>
 #include "core/util/zustand.h"
 
 namespace {
@@ -104,6 +105,13 @@ k1520::serial::SerialAnschluss& P8000Karte16::anschluss(int i) { return *anschlu
 P8000Karte16::P8000Karte16(const Config& cfg)
     : cfg_(cfg), cpu_(cpuConfig()), mmu_(mmuConfig(cfg)), dram_(cfg.dram) {
     for (int i = 0; i < TTY_ANZAHL; ++i) anschluesse_[size_t(i)] = std::make_unique<Anschluss>(*this, i);
+    if (cfg.rtc.typ != P8000RtcTyp::Aus) {
+        P8000RtcConfig rc = cfg.rtc;
+        rc.takt_hz = cfg.takt_hz;
+        std::string f;
+        rtc_ = P8000Rtc::anlegen(rc, f);
+        if (!rtc_) throw std::invalid_argument(f.empty() ? "P8000: RTC nicht anlegbar" : f);
+    }
     switch (cfg.mon16) {
         case Config::Mon16::V3_0: rom_ = P8K_MON16_3_0; break;
         case Config::Mon16::V3_1: rom_ = P8K_MON16_3_1; break;
@@ -268,6 +276,7 @@ uint16_t P8000Karte16::nmiIdentifier() const {
 // ─── Zeit ────────────────────────────────────────────────────────────────────
 
 void P8000Karte16::takt(int n) {
+    if (rtc_) rtc_->takte(n);
     bool dirty = ctc0_.clockTick(n);
     dirty |= ctc1_.clockTick(n);
     dirty |= nimmSeriellGeaendert();
@@ -348,7 +357,11 @@ void P8000Karte16::speicherSchreiben(const Z8kBusCycle& c, uint16_t d) {
 
 uint8_t P8000Karte16::ioLesenByte(uint16_t port) {
     if (mmu_.istEigenerPort(port)) return mmu_.ioLesen(port);
-    if (!istPeripherie(port)) return cfg_.leer8;
+    if (!istPeripherie(port)) {
+        uint8_t d;
+        if (rtc_ && rtc_->lesen(port, d)) return d;   // Uhrenkarte (Option), sonst offener Bus
+        return cfg_.leer8;
+    }
     peri_.markIntDirty();
     switch (baustein(port)) {
         case SIO0: return sio0_.ioRead(z80Reg(port));
@@ -369,7 +382,10 @@ void P8000Karte16::ioSchreibenByte(uint16_t port, uint8_t d) {
         if (mmu_.scr() != scrVorher) paritaetNachSCR();
         return;
     }
-    if (!istPeripherie(port)) return;
+    if (!istPeripherie(port)) {
+        if (rtc_) rtc_->schreiben(port, d);
+        return;
+    }
     peri_.markIntDirty();
     const int b = baustein(port);
     switch (b) {
