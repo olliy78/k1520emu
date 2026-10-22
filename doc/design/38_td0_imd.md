@@ -137,6 +137,18 @@ Modell der Agenten: **Sonnet** (`cpp-coder` für Kern, `general-purpose`/Sonnet 
 | **Z1** Abnahme | Merkposten `doc/merkposten/td0_imd.md` + Zeile in `README.md` der Merkposten, Kurzabsatz in `CLAUDE.md`, Eintrag in diesem Entwurf („Stand“), Volllauf `tools/dev.sh test` (Hintergrund), `test-format`, `win`; Ticket #9 kommentieren erst nach Zustimmung des Anwenders. | grüne Lanes; Abnahmeprotokoll am Ende dieses Entwurfs |
 | *(T4)* | *Optional, nicht geplant:* LZHUF-Kodierer für `td`. | — |
 
+## 5a. Clean-Room-Verfahren und Prüfstand (festgelegt 2026-10-22)
+
+* **Formatbeschreibung** `38a_td0_imd_formatbeschreibung.md`: in eigenen Worten aus Beobachtung von HxC (GPL) und
+  greaseweazle (Unlicense) geschrieben, am TD0-Korpus (68 298 Sektoren) gegengeprüft. **Implementierende Agenten lesen nur
+  diese Beschreibung und die gw-Python-Dateien, NIE den HxC-Quelltext.** Im Merkposten wird das vermerkt.
+* **Prüfstand `gw`** (nur lesend: `imd.py`/`td0.py` haben kein Schreiben): optionaler Test, ohne `gw` übersprungen,
+  `gw convert x.td0 y.img` gegen unseren Leser, und `gw convert unser.imd|td0 y.img` gegen unseren Schreiber.
+  HxC (`hxcfe`) nur, wenn der Anwender es gebaut hat.
+* Befunde der Beschreibung, die den Plan ändern: Sektor-ID-Zylinder weichen vom Spurzylinder ab (ID immer aus dem Sektorkopf),
+  doppelte Sektornummern ohne Flag, Pseudosektoren R>=100, 0-Sektor-Spuren, Sektorgrößen bis N=4 (2048 B) im Korpus →
+  `toMedium`/`parseTrack` müssen mehr als 128..1024 B können (AP T1), Methode-2-Musterlänge für c>1 ungeklärt (`2*c`, [Q]).
+
 ## 6. Offen / Entscheidung beim Anwender
 
 * IMD-/Teledisk-Gegenprobe an echter Software (ImageDisk, Teledisk, SAMdisk, `hxcfe`): sobald der Anwender ein
