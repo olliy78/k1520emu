@@ -105,6 +105,11 @@ public:
     virtual int64_t gastZeit() const = 0;
     /// Uhr von aussen stellen: Kalenderzeit im Jahr des Wirts (ohne Jahresversatz); Batteriedatei wird geschrieben.
     virtual void stellen(int64_t wand) = 0;
+    /// Netz-Aus der Maschine: Stand sichern und die Aus-Zeit merken (die Batterie haelt die Uhr).
+    virtual void netzAus() = 0;
+    /// Netz-Ein: Startregel erneut anwenden (Stand + Aus-Dauer, nie hinter die Wirtszeit); ohne Netz-Aus davor
+    /// (Kaltstart der laufenden Maschine) und beim Reset (/RESP) bleibt die Uhr unberuehrt.
+    virtual void netzEin() = 0;
 
     /// Zeit, mit der eine Karte mit dieser Batteriedatei JETZT starten wuerde (Startregel), gastsichtig; ohne Karte.
     static int64_t startzeit(const std::string& zustand, int jahresversatz, bool utc,
@@ -126,18 +131,24 @@ public:
     int64_t versatz() const override { return sek_ - wirtWand(); }
     int64_t gastZeit() const override;
     void stellen(int64_t wand) override;
+    void netzAus() override;
+    void netzEin() override;
 
 protected:
     void zaehle(int n);                         ///< Maschinenzeit weiter: Uhrstand, Speicherintervall
     std::string uhrText() const;                ///< "JJJJ-MM-TT hh:mm:ss" der Uhr (Anzeigejahr mit Jahresversatz)
     int64_t wirtWand() const;                   ///< Wirtszeit als Wandzeit (Ort/UTC), ohne Versatz
     int64_t uhrWand() const { return sek_; }    ///< Uhrstand als Wandzeit (Ort/UTC), ohne Jahresversatz
-    void sichern() const;                       ///< Batteriedatei schreiben (falls `zustand` gesetzt)
+    void sichern(bool erzwingen = false) const; ///< Batteriedatei schreiben (falls `zustand` gesetzt; s. cpp)
+    std::string dateiStand() const;             ///< Inhalt der Batteriedatei (Vergleichswert)
     void setzeUhr(int64_t wand, bool sekunde0); ///< Uhr stellen + sichern (@p sekunde0: Resttakte loeschen)
 
     P8000RtcConfig cfg_;
     int64_t sek_ = 0;                           ///< Uhrstand in ganzen Sekunden (Wandzeit)
     uint64_t rest_ = 0;                         ///< Takte seit dem letzten Sekundenwechsel der Uhr
+    mutable std::string gesehen_;                       ///< Dateiinhalt, den diese Karte zuletzt gelesen/geschrieben hat
+    bool aus_ = false;                                  ///< Netz-Aus gemerkt (gilt bis die Maschine wieder zaehlt)
+    int64_t aus_stand_ = 0, aus_wirt_ = 0;              ///< Uhrstand und Wirtszeit (Unix) beim Netz-Aus
     mutable uint64_t seit_sicher_ = 0;                  ///< Takte seit dem letzten Schreiben der Batteriedatei
     static constexpr int SICHER_SEKUNDEN = 60;  ///< Speicherintervall (Maschinenzeit)
 };

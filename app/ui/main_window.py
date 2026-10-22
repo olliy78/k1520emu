@@ -1692,6 +1692,9 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Kaltstart — die Maschine läuft an.", 4000)
         else:
             self.run_timer.stop()
+            # Die Uhrenkarte hat ihre Batterie: Stand + Aus-Zeit in die Batteriedatei, damit die Anzeige
+            # „Startzeit" und das naechste Einschalten dieselbe Startregel des Kerns anwenden.
+            self._rtc_netz_aus()
             self.screen_widget.set_powered(False)
             # Betriebsanzeige der Tastatur aus, Funktionsanzeigen mit ihr.
             self.keyboard_widget.set_powered(False)
@@ -1882,6 +1885,14 @@ class MainWindow(QMainWindow):
                     and self.profil.modell_hat_rechner(self._model)
                     and self.profil.hardware_wirkt(rtc.SCHLUESSEL_TYP, self._model, self._hardware)
                     and self._hardware.get(rtc.SCHLUESSEL_TYP, rtc.KEINE) != rtc.KEINE)
+
+    def _rtc_netz_aus(self):
+        """Netz-Aus an die Uhrenkarte der Maschine melden (ohne Karte folgenlos)."""
+        try:
+            with kern_sperre():
+                self.emulator.rtc_netz_aus()
+        except Exception:
+            pass
 
     def _rtc_versatz(self) -> int:
         return rtc.versatz_jahre(self._hardware.get(rtc.SCHLUESSEL_VERSATZ))
@@ -2396,6 +2407,11 @@ class MainWindow(QMainWindow):
         surviving = [m for m in self.drives_widget.get_mounts()
                      if 0 <= int(m.get("drive", -1)) < dt.NUM_SLOTS
                      and dt.is_present(types[int(m["drive"])])]
+
+        # Die alte Uhrenkarte schreibt ihren Stand JETZT in die Batteriedatei -- die neue Maschine liest
+        # sie beim Anlegen.  (Zerstoert wird die alte erst danach; der Kern ueberschreibt eine inzwischen
+        # fortgeschriebene Datei ohnehin nicht, R3b.)
+        self._rtc_netz_aus()
 
         # Recreate the machine with the new drive bay / model.
         try:

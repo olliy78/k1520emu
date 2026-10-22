@@ -1035,6 +1035,9 @@ K1520_API int64_t k1520_rtc_zeit(K1520Handle h);
 /** @brief Uhr auf @p unix_wirt stellen (Jahr des Wirts; der Jahresversatz wirkt wie beim Lesen) und die
  *  Batteriedatei schreiben.  0 = ok, -1 ohne Uhrenkarte. */
 K1520_API int      k1520_rtc_stellen(K1520Handle h, int64_t unix_wirt);
+/** @brief Netz-Aus melden (Oberflaeche schaltet die Maschine aus): die Karte sichert Stand + Wirtszeit; beim naechsten
+ *  k1520_power_on laeuft die Uhr um die Aus-Dauer weiter (Startregel).  0 = ok, -1 ohne Uhrenkarte. */
+K1520_API int      k1520_rtc_netz_aus(K1520Handle h);
 /** @brief OHNE Maschine: Zeit, mit der eine Karte mit dieser Batteriedatei JETZT starten wuerde, gastsichtig.
  *  @p zustandsdatei NULL/"" oder nicht vorhanden = Wirtszeit.  @p utc 0 = Ortszeit des Wirts. */
 K1520_API int64_t k1520_rtc_startzeit(const char* zustandsdatei, int jahresversatz, int utc);

@@ -8,7 +8,9 @@
 #include "core/machines/p8000/p8000.h"
 #include "tests/support/temp_path.h"
 #include <cstdio>
+#include <algorithm>
 #include <fstream>
+#include <memory>
 #include <sstream>
 #include <vector>
 
@@ -141,6 +143,95 @@ TEST(P8000RtcMaschine, BatteriedateiBeimZerstoerenUndZwischenstandSchreibtSieFor
     ASSERT_TRUE(m2.restoreStateBytes(zwischen)) << m2.stateError();
     EXPECT_EQ(m2.karte16()->rtc()->gastZeit(), stand);
     EXPECT_EQ(stand_der_datei(), stand);       // die Batteriedatei folgt dem geladenen Stand
+    std::remove(datei.c_str());
+}
+
+// ── Netz-Aus/Ein, Reset, Neubau (AP R3b) ──────────────────────────────────────
+
+namespace {
+P8000Machine::Config r3bConfig(int64_t& jetzt, const std::string& datei) {
+    P8000Machine::Config c;
+    c.karte16 = true;
+    c.rtc = P8000Machine::Config::Rtc::U130X;
+    c.rtc_utc = true;
+    c.rtc_zustand = datei;
+    c.rtc_zeitquelle = [&jetzt] { return jetzt; };
+    return c;
+}
+void laufe(P8000Machine& m, int sek) {
+    int64_t n = 0;
+    while (n < int64_t(sek) * 4'000'000) n += m.run(100'000);
+}
+}  // namespace
+
+TEST(P8000RtcMaschine, NetzAusEinLaesstDieUhrUmDieAusDauerWeiterlaufen) {
+    for (const bool mit_datei : {true, false}) {
+        SCOPED_TRACE(mit_datei ? "mit Batteriedatei" : "nur im Speicher");
+        const std::string datei = mit_datei ? k1520test::tempPath("k1520_test_rtc_netzaus.txt") : "";
+        if (mit_datei) std::remove(datei.c_str());
+        int64_t jetzt = utc(2026, 10, 22, 14, 35, 46);
+        P8000Machine m(r3bConfig(jetzt, datei));
+        laufe(m, 3);
+        const int64_t stand = m.karte16()->rtc()->gastZeit();
+        EXPECT_EQ(stand, utc(2026, 10, 22, 14, 35, 49));
+        m.powerOff();
+        jetzt += 3600;                                    // eine Stunde aus
+        // Anzeige der Oberflaeche (Startregel ohne Maschine) und echtes Einschalten muessen gleich sein.
+        if (mit_datei) EXPECT_EQ(P8000Rtc::startzeit(datei, 0, true, [&] { return jetzt; }), stand + 3600);
+        m.powerOn();
+        EXPECT_EQ(m.karte16()->rtc()->gastZeit(), stand + 3600);
+        if (mit_datei) EXPECT_EQ(P8000Rtc::startzeit(datei, 0, true, [&] { return jetzt; }), stand + 3600);
+
+        // Wirtszeit springt zurueck waehrend aus: die Uhr geht nie zurueck.
+        laufe(m, 2);
+        const int64_t st2 = m.karte16()->rtc()->gastZeit();
+        m.powerOff();
+        jetzt -= 7200;
+        m.powerOn();
+        EXPECT_EQ(m.karte16()->rtc()->gastZeit(), std::max(st2, jetzt));
+        EXPECT_GE(m.karte16()->rtc()->gastZeit(), st2);
+        std::remove(datei.c_str());
+    }
+}
+
+TEST(P8000RtcMaschine, KaltstartOhneNetzAusUndResetLassenDieUhrUnberuehrt) {
+    int64_t jetzt = utc(2026, 10, 22, 14, 35, 46);
+    P8000Machine m(r3bConfig(jetzt, ""));
+    laufe(m, 5);
+    const int64_t stand = m.karte16()->rtc()->gastZeit();
+    jetzt += 1000;                    // Wirtszeit laeuft, die Maschine steht
+    m.reset();                        // Taste /RESP
+    EXPECT_EQ(m.karte16()->rtc()->gastZeit(), stand);
+    m.powerOn();                      // Kaltstart der laufenden Maschine, kein Netz-Aus davor
+    EXPECT_EQ(m.karte16()->rtc()->gastZeit(), stand);
+    laufe(m, 2);
+    // (Wie weit die Karte16 nach dem Kaltstart nachzieht, ist nicht Sache der Uhr - nur: kein Sprung um die Wirtszeit.)
+    EXPECT_GE(m.karte16()->rtc()->gastZeit(), stand + 2);
+    EXPECT_LT(m.karte16()->rtc()->gastZeit(), stand + 100);
+}
+
+TEST(P8000RtcMaschine, AlteKarteUeberschreibtKeineFortgeschriebeneBatteriedatei) {
+    const std::string datei = k1520test::tempPath("k1520_test_rtc_neubau.txt");
+    std::remove(datei.c_str());
+    int64_t jetzt = utc(2026, 10, 22, 14, 35, 46);
+    auto stand_der_datei = [&] {
+        std::ifstream f(datei);
+        std::stringstream ss; ss << f.rdbuf();
+        const std::string t = ss.str();
+        const size_t p = t.find("stand=");
+        return p == std::string::npos ? int64_t(-1) : std::stoll(t.substr(p + 6));
+    };
+    auto alt = std::make_unique<P8000Machine>(r3bConfig(jetzt, datei));
+    laufe(*alt, 4);
+    // Neubau: die neue Maschine liest die Datei, schreibt weiter; erst danach stirbt die alte.
+    jetzt += 10;
+    auto neu = std::make_unique<P8000Machine>(r3bConfig(jetzt, datei));
+    laufe(*neu, 90);                                   // periodisches Speichern der neuen
+    neu->karte16()->rtc()->stellen(utc(2031, 1, 2, 3, 4, 5));
+    alt.reset();                                       // darf die Datei nicht zurueckdrehen
+    EXPECT_EQ(stand_der_datei(), utc(2031, 1, 2, 3, 4, 5));
+    neu.reset();
+    EXPECT_EQ(stand_der_datei(), utc(2031, 1, 2, 3, 4, 5));   // der Besitzer schreibt weiter
     std::remove(datei.c_str());
 }
 

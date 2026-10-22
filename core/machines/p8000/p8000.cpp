@@ -202,6 +202,9 @@ void P8000Machine::powerOn()
         kopplung_->rechne();
     }
     if (wdc_an_) wdc_an_->rechne();
+    // Die Uhrenkarte hat ihre Batterie: sie lief in der Aus-Dauer weiter (Startregel; ohne Netz-Aus davor
+    // bleibt sie unberuehrt).  Die Reset-Taste fasst sie nie an.
+    if (k16_ && k16_->rtc()) k16_->rtc()->netzEin();
     hd_zugriff_lw_ = -1;
     if (hwterm_) {
         // Arbeitsplatz-Reihenfolge: erst das Terminal, dann der Rechner.  Was das Terminal in der
@@ -214,6 +217,11 @@ void P8000Machine::powerOn()
     }
     nachReset();
     LOG_INFO("P8000", "Netz ein (8-Bit-Teil)");
+}
+
+void P8000Machine::powerOff()
+{
+    if (k16_ && k16_->rtc()) k16_->rtc()->netzAus();
 }
 
 void P8000Machine::reset()

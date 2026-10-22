@@ -2027,6 +2027,13 @@ int k1520_rtc_stellen(K1520Handle h, int64_t unix_wirt) {
     return 0;
 }
 
+int k1520_rtc_netz_aus(K1520Handle h) {
+    auto* r = p8000Rtc(h);
+    if (!r) return -1;
+    r->netzAus();
+    return 0;
+}
+
 int64_t k1520_rtc_startzeit(const char* zustandsdatei, int jahresversatz, int utc) {
     return P8000Rtc::startzeit(zustandsdatei ? zustandsdatei : "", jahresversatz, utc != 0);
 }

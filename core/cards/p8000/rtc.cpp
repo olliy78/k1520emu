@@ -118,16 +118,20 @@ bool schreibeBatterie(const std::string& pfad, int64_t stand, int64_t wirt) {
 }
 
 /// Startregel: max(Stand + Abwesenheit, Wirtszeit jetzt); Abwesenheit < 0 zaehlt als 0.
-int64_t startWand(const std::string& pfad, bool utc, const std::function<int64_t()>& zq) {
-    const int64_t jetzt = unixJetzt(zq);
+/// EINE Rechnung fuer Erststart, Oberflaechenanzeige (`startzeit`) und Netz-Ein derselben Maschine.
+int64_t startRegel(const Batterie& b, bool utc, int64_t jetzt) {
     const int64_t host = wandAusUnix(jetzt, utc);
-    const Batterie b = leseBatterie(pfad);
     if (b.fassung == 2) {
         const int64_t weg = jetzt > b.wirt ? jetzt - b.wirt : 0;
         return std::max(b.stand + weg, host);
     }
     if (b.fassung == 1) return std::max(host + b.versatz, host);
     return host;
+}
+
+int64_t startWand(const std::string& pfad, bool utc, const std::function<int64_t()>& zq) {
+    const int64_t jetzt = unixJetzt(zq);
+    return startRegel(leseBatterie(pfad), utc, jetzt);
 }
 
 }  // namespace
@@ -154,9 +158,42 @@ std::unique_ptr<P8000Rtc> P8000Rtc::anlegen(const P8000RtcConfig& cfg, std::stri
 P8000RtcBasis::P8000RtcBasis(const P8000RtcConfig& cfg) : cfg_(cfg) {
     if (cfg_.takt_hz == 0) cfg_.takt_hz = 4'000'000;
     sek_ = startWand(cfg_.zustand, cfg_.utc, cfg_.zeitquelle);
+    gesehen_ = dateiStand();
 }
 
 P8000RtcBasis::~P8000RtcBasis() { sichern(); }
+
+// Inhalt der Batteriedatei als Vergleichswert ("" = fehlt/unlesbar).
+std::string P8000RtcBasis::dateiStand() const {
+    std::ifstream f(cfg_.zustand);
+    std::stringstream ss;
+    ss << f.rdbuf();
+    return f ? ss.str() : std::string();
+}
+
+// Netz-Aus: die Batterie haelt die Uhr, waehrend die Maschinenzeit steht -- Stand und Wirtszeit merken.
+void P8000RtcBasis::netzAus() {
+    sichern(true);
+    aus_ = true;
+    aus_stand_ = sek_;
+    aus_wirt_ = unixJetzt(cfg_.zeitquelle);
+}
+
+// Netz-Ein: die Uhr ist in der Aus-Dauer weitergelaufen (Startregel, dieselbe wie beim Erststart).
+// Ohne vorheriges Netz-Aus (Kaltstart der laufenden Maschine) bleibt die Uhr unberuehrt.
+void P8000RtcBasis::netzEin() {
+    if (!aus_) return;
+    aus_ = false;
+    Batterie b;
+    b.fassung = 2; b.stand = aus_stand_; b.wirt = aus_wirt_;
+    if (!cfg_.zustand.empty()) {
+        const Batterie d = leseBatterie(cfg_.zustand);
+        if (d.fassung == 2) b = d;   // massgeblich ist die Datei (z. B. von aussen gestellt)
+    }
+    sek_ = startRegel(b, cfg_.utc, unixJetzt(cfg_.zeitquelle));
+    rest_ = 0;
+    sichern(true);
+}
 
 int64_t P8000RtcBasis::gastZeit() const { return mitJahresversatz(sek_, cfg_.jahresversatz); }
 
@@ -165,12 +202,13 @@ void P8000RtcBasis::stellen(int64_t wand) { setzeUhr(wand, true); }
 void P8000RtcBasis::setzeUhr(int64_t wand, bool sekunde0) {
     sek_ = wand;
     if (sekunde0) rest_ = 0;
-    sichern();
+    sichern(true);
 }
 
 // Maschinenzeit weiter; je 60 s Maschinenzeit die Batteriedatei fortschreiben.
 void P8000RtcBasis::zaehle(int n) {
     if (n <= 0) return;
+    aus_ = false;   // die Maschine laeuft: ein altes Netz-Aus gilt nicht mehr
     rest_ += uint64_t(n);
     if (rest_ >= cfg_.takt_hz) { sek_ += int64_t(rest_ / cfg_.takt_hz); rest_ %= cfg_.takt_hz; }
     seit_sicher_ += uint64_t(n);
@@ -321,10 +359,18 @@ std::string P8000RtcU130::text() const {
     return b;
 }
 
-void P8000RtcBasis::sichern() const {
+// Schreibt nur, solange die Datei noch das ist, was DIESE Karte zuletzt gelesen/geschrieben hat: hat eine
+// andere Hand sie inzwischen fortgeschrieben (neue Maschine nach dem Neubau, zweite Instanz), wuerde ein
+// spaeterer Schreiber mit altem Stand sie zurueckdrehen (R3b).  @p erzwingen = ausdruecklicher Wille
+// (Stellen, Netz-Aus/-Ein der laufenden Karte).
+void P8000RtcBasis::sichern(bool erzwingen) const {
     if (cfg_.zustand.empty()) return;
     seit_sicher_ = 0;
-    schreibeBatterie(cfg_.zustand, sek_, unixJetzt(cfg_.zeitquelle));
+    if (!erzwingen && dateiStand() != gesehen_) {
+        LOG_WARN("P8000", "RTC: Batteriedatei '%s' von anderer Hand geaendert - nicht ueberschrieben", cfg_.zustand.c_str());
+        return;
+    }
+    if (schreibeBatterie(cfg_.zustand, sek_, unixJetzt(cfg_.zeitquelle))) gesehen_ = dateiStand();
 }
 
 // ─── Save-State ──────────────────────────────────────────────────────────────
@@ -362,7 +408,7 @@ bool P8000Rtc72421::deserialize(const uint8_t*& p, const uint8_t* end) {
     d_ = d & 0x04; e_ = e & 0x0F; f_ = f & 0x0F; hold_ = h; stell_geaendert_ = g;
     phase_ = ph % cfg_.takt_hz;
     for (size_t i = 0; i < sizeof z; ++i) zeit_[i] = z[i] & 0x0F;
-    sichern();   // die Batteriedatei folgt dem geladenen Stand
+    sichern(true);   // die Batteriedatei folgt dem geladenen Stand
     return true;
 }
 
@@ -599,6 +645,6 @@ bool P8000RtcU130::deserialize(const uint8_t*& p, const uint8_t* end) {
     frozen_ = fr; z_ = Z(z); tasten_ = t & 7; total_ = tot; datum_bis_ = db; schritt_bis_ = sb;
     mo_ = uint8_t(klemme(mo, 1, 12)); dz_ = dz % 4; de_ = de % 10; jz_ = jz % 10; je_ = je % 10;
     std_ = sd % 24; mz_ = mz % 6; me_ = me % 10;
-    sichern();
+    sichern(true);
     return true;
 }

@@ -142,6 +142,8 @@ public:
 
     // ─── Lebenslauf ──────────────────────────────────────────────────────────
     void powerOn() override;
+    /// Netz-Aus: nur die batteriegepufferte Uhrenkarte merkt es (Stand sichern, Aus-Zeit); die Maschine laeuft nicht weiter.
+    void powerOff();
     /// Taste /RESP: /RES an alle Bausteine der 8-Bit-Karte, RESI = 0 (§10.2).
     void reset() override;
     int  run(int max_cycles) override;

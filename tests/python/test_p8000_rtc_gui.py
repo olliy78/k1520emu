@@ -171,7 +171,7 @@ def test_konfig_rundreise_und_fehlende_schluessel_sind_die_vorgabe(umgebung, qap
         w2._apply_config(daten)
         assert w2._hardware["rtc"] == "rtc72421" and w2._hardware["rtc_versatz"] == "0"
         assert w2.settings_widget.hardware_combos["rtc"].currentData() == "rtc72421"
-        # ältere Konfiguration ohne die Schluessel: Vorgabe (U130x / -40)
+        # aeltere Konfiguration ohne die Schluessel: Vorgabe (U130x / -40)
         alt = {k: v for k, v in daten["general"].items() if not k.startswith("rtc")}
         w2._apply_config({**daten, "general": alt})
         assert w2._hardware["rtc"] == "u130x" and w2._hardware["rtc_versatz"] == "-40"
@@ -362,5 +362,60 @@ def test_versatzfeld_nennt_die_grenzen_und_sperrt_keinen_wert(umgebung, qapp):
                 _versatz(w, wert)
                 assert w._hardware["rtc_versatz"] == wert and box.isEnabled()
                 assert w.emulator.rtc_zeit() >= 0
+    finally:
+        _zu(w, qapp)
+
+
+# ── AP R3b: Netz-Aus/Ein und Neubau ──────────────────────────────────────────
+
+def test_neubau_die_alte_karte_dreht_die_batteriedatei_nicht_zurueck(umgebung, qapp):
+    """Die neue Maschine liest die Datei beim Anlegen; die alte stirbt erst danach.  Weder der Stand der
+    neuen Maschine noch die Datei duerfen durch den Tod der alten zurueckspringen."""
+    import gc
+    from app import rtc
+    w = _fenster(qapp)
+    try:
+        assert w.emulator.rtc_stellen(ZIEL)
+        alt = w.emulator                                       # haelt die alte Maschine am Leben
+        _versatz(w, "-28")                                     # Neubau
+        assert w.emulator is not alt
+        datei = rtc.zustand_pfad("p8000emu")
+        neu_stand = w.emulator.rtc_zeit()
+        # Datei = Stand der alten beim Neubau (netz_aus), neue Maschine startet damit (Minutengenauigkeit)
+        assert abs(_stand(datei) - ZIEL) <= 60
+        assert abs(neu_stand - rtc.um_jahre(ZIEL, -28)) <= 60
+        # die neue Maschine schreibt die Datei fort (Stellen), danach stirbt die alte
+        assert w.emulator.rtc_stellen(ZIEL + 5000)
+        assert _stand(datei) == ZIEL + 5000
+        del alt
+        gc.collect()
+        assert _stand(datei) == ZIEL + 5000                   # kein Ruecksprung
+        assert w.emulator.rtc_zeit() >= neu_stand
+    finally:
+        _zu(w, qapp)
+    assert _stand(rtc.zustand_pfad("p8000emu")) >= ZIEL + 5000
+
+
+def test_aus_ein_anzeige_vor_dem_einschalten_ist_die_zeit_danach(umgebung, qapp, monkeypatch):
+    """Ausgeschaltet zeigt die Oberflaeche die Startzeit; die Maschine startet mit genau dieser Zeit,
+    auch wenn die Wirtszeit in der Aus-Dauer weitergelaufen ist."""
+    from app import rtc
+    w = _fenster(qapp)
+    try:
+        assert w.emulator.rtc_stellen(ZIEL)
+        w.act_power.setChecked(False)                          # Netz-Aus: Stand + Wirtszeit in die Datei
+        qapp.processEvents()
+        # 2 Stunden "Aus": die Datei traegt die Wirtszeit des Ausschaltens, wir rueckdatieren sie
+        datei = Path(rtc.zustand_pfad("p8000emu"))
+        text = datei.read_text().splitlines()
+        wirt = int(next(z for z in text if z.startswith("wirt="))[5:]) - 7200
+        datei.write_text("\n".join(z if not z.startswith("wirt=") else f"wirt={wirt}" for z in text) + "\n")
+        w._update_rtc()
+        angezeigt = w.settings_widget.rtc_zeit_label.text()
+        assert angezeigt == rtc.anzeige(rtc.um_jahre(ZIEL + 7200, -40))
+        w.act_power.setChecked(True)                           # Netz-Ein
+        qapp.processEvents()
+        w.run_timer.stop()
+        assert rtc.anzeige(w.emulator.rtc_zeit()) == angezeigt
     finally:
         _zu(w, qapp)

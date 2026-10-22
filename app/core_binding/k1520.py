@@ -471,6 +471,8 @@ _lib.k1520_rtc_zeit.argtypes = [K1520Handle]
 _lib.k1520_rtc_zeit.restype = ctypes.c_int64
 _lib.k1520_rtc_stellen.argtypes = [K1520Handle, ctypes.c_int64]
 _lib.k1520_rtc_stellen.restype = ctypes.c_int
+_lib.k1520_rtc_netz_aus.argtypes = [K1520Handle]
+_lib.k1520_rtc_netz_aus.restype = ctypes.c_int
 _lib.k1520_rtc_startzeit.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_int]
 _lib.k1520_rtc_startzeit.restype = ctypes.c_int64
 _lib.k1520_rtc_stellen_datei.argtypes = [ctypes.c_char_p, ctypes.c_int64]
@@ -1896,6 +1898,11 @@ class K1520Emulator:
         """Uhr auf ``unix_wirt`` stellen (Kalenderzeit im Jahr des Wirts, ohne Jahresversatz; der
         Versatz wirkt wie beim Lesen) und die Batteriedatei schreiben.  ``False`` ohne Karte."""
         return _lib.k1520_rtc_stellen(self._handle, int(unix_wirt)) == 0
+
+    def rtc_netz_aus(self) -> bool:
+        """Netz-Aus melden: die Uhrenkarte sichert Stand + Wirtszeit, beim nächsten ``power_on`` läuft
+        die Uhr um die Aus-Dauer weiter.  ``False`` ohne Karte."""
+        return _lib.k1520_rtc_netz_aus(self._handle) == 0
 
     @staticmethod
     def rtc_startzeit(zustandsdatei: str, jahresversatz: int = 0, utc: bool = False) -> int:
