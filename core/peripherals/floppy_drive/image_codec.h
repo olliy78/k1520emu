@@ -13,7 +13,7 @@
  * | Hfe       | `.hfe` | ja (Header/LUT) | nein |
  * | Dmk       | `.dmk` | ja (Header/IDAM-Tabelle) | nein |
  * | Cqm       | `.cqm` | ja (Kopf) | nein (Geometrie aus dem Medium, wie `.img` nur fuer rawCompatible-Medien) |
- * | Td0       | `.td0` | ja (Kopf) | nein (Sektorlisten, Entwurf 38; Lesen AP T1, Schreiben folgt AP T2) |
+ * | Td0       | `.td0` | ja (Kopf) | nein (Sektorlisten, Entwurf 38; Lesen AP T1, Schreiben AP T2, immer unkomprimiert `TD`) |
  * | Imd       | `.imd` | ja (Kopf) | nein (Sektorlisten, Entwurf 38; Lesen/Schreiben AP I1) |
  *
  * @see doc/design/09_floppy_drive.md §4
@@ -36,7 +36,7 @@ enum class ContainerType : uint8_t {
     Hfe,       ///< HxC Floppy Emulator v1 (.hfe) — Bitzellen, self-describing
     Dmk,       ///< David Keil's Disk Image (.dmk) — Spur-Bytes + IDAM-Tabelle
     Cqm,       ///< CopyQM (.cqm) — RLE-gepackte Sektoren; schreibbar nur fuer rawCompatible-Medien einheitlicher Geometrie
-    Td0,       ///< TeleDisk (.td0) — Sektorlisten je Spur (Entwurf 38); Laden AP T1, Speichern folgt in AP T2
+    Td0,       ///< TeleDisk (.td0) — Sektorlisten je Spur (Entwurf 38); Laden AP T1, Speichern AP T2
     Imd        ///< ImageDisk (.imd) — Sektorlisten je Spur (Entwurf 38); Lesen/Schreiben ueber @ref ImdCodec
 };
 

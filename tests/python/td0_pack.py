@@ -259,6 +259,93 @@ def beispiel():
             + spur0 + spur1 + ende())
 
 
+# ─── TD0 lesen (nur 'TD', unabhaengig vom Kern) ──────────────────────────────
+
+class Td0Fehler(ValueError):
+    pass
+
+
+def _entpacke(methode: int, nutz: bytes, soll: int) -> bytes:
+    if methode == 0:
+        out = nutz
+    elif methode == 1:
+        out = bytearray()
+        i = 0
+        while i < len(nutz):
+            z = int.from_bytes(nutz[i:i + 2], "little")
+            out += nutz[i + 2:i + 4] * z
+            i += 4
+        out = bytes(out)
+    elif methode == 2:
+        out = bytearray()
+        i = 0
+        while i < len(nutz):
+            c, z = nutz[i], nutz[i + 1]
+            i += 2
+            if c == 0:
+                out += nutz[i:i + z]
+                i += z
+            else:
+                out += nutz[i:i + 2 * c] * z
+                i += 2 * c
+        out = bytes(out)
+    else:
+        raise Td0Fehler("Methode %d" % methode)
+    if len(out) != soll:
+        raise Td0Fehler("entpackte Laenge %d statt %d" % (len(out), soll))
+    return out
+
+
+def lese(dat: bytes) -> dict:
+    """-> {"kopf": {...}, "kommentar": bytes|None, "stamp": tuple|None, "tracks": [Spur, ...]}.
+
+    Spur: {"cyl", "head", "fm", "sectors": [{"c","h","r","n","flags","data"}]}; ``data`` ist ``None``
+    ohne Datenblock (Flags 0x10/0x20).  Alle CRCs werden geprueft (Kopf, Kommentar, Spur, Sektor).
+    """
+    if dat[:2] != b"TD":
+        raise Td0Fehler("Kennung %r" % dat[:2])
+    if crc16(dat[:10]) != int.from_bytes(dat[10:12], "little"):
+        raise Td0Fehler("Kopf-CRC")
+    kopf = {"volume": dat[2], "pruef": dat[3], "version": dat[4], "rate": dat[5] & 0x7F,
+            "fm": bool(dat[5] & 0x80), "laufwerk": dat[6], "schritt": dat[7] & 0x7F,
+            "kommentar": bool(dat[7] & 0x80), "dos": dat[8], "seiten": dat[9]}
+    i = 12
+    kommentar = stamp = None
+    if kopf["kommentar"]:
+        crc = int.from_bytes(dat[i:i + 2], "little")
+        laenge = int.from_bytes(dat[i + 2:i + 4], "little")
+        if crc16(dat[i + 2:i + 10 + laenge]) != crc:
+            raise Td0Fehler("Kommentar-CRC")
+        stamp = tuple(dat[i + 4:i + 10])
+        kommentar = dat[i + 10:i + 10 + laenge]
+        i += 10 + laenge
+    spuren = []
+    while dat[i] != 0xFF:
+        n, cyl, hb, crc8 = dat[i:i + 4]
+        if crc16(dat[i:i + 3]) & 0xFF != crc8:
+            raise Td0Fehler("Spur-CRC %d/%d" % (cyl, hb))
+        i += 4
+        sek = []
+        for _ in range(n):
+            c, h, r, nn, fl, scrc = dat[i:i + 6]
+            i += 6
+            daten = None
+            if fl & 0x30 == 0:
+                dl = int.from_bytes(dat[i:i + 2], "little")
+                methode = dat[i + 2]
+                nutz = dat[i + 3:i + 2 + dl]
+                i += 2 + dl
+                if fl & 0x40:
+                    daten = b""          # Pseudosektor: Groesse unbekannt, nur der Rohblock zaehlt
+                else:
+                    daten = _entpacke(methode, nutz, 128 << nn)
+                    if crc16(daten) & 0xFF != scrc:
+                        raise Td0Fehler("Sektor-CRC %d/%d R=%d" % (cyl, hb & 1, r))
+            sek.append({"c": c, "h": h, "r": r, "n": nn, "flags": fl, "data": daten})
+        spuren.append({"cyl": cyl, "head": hb & 0x7F, "fm": bool(hb & 0x80), "sectors": sek})
+    return {"kopf": kopf, "kommentar": kommentar, "stamp": stamp, "tracks": spuren, "ende": dat[i:i + 4]}
+
+
 if __name__ == "__main__":
     plain = beispiel()
     gepackt = td_packen(plain)

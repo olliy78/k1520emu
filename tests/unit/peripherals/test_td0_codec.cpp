@@ -1,6 +1,6 @@
 /**
  * @file test_td0_codec.cpp
- * @brief GoogleTests fuer Td0Codec (TeleDisk-Abbild, Lesen, Entwurf 38 AP T1).
+ * @brief GoogleTests fuer Td0Codec (TeleDisk-Abbild, Lesen AP T1, Schreiben AP T2, Entwurf 38).
  *
  * Schwerpunkte:
  *   - synthetische Mini-Dateien je Methode 0/1/2, `TD` und `td` (LZHUF), FM global/je Spur,
@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "core/peripherals/floppy_drive/image_codec.h"
+#include "core/peripherals/floppy_drive/imd_codec.h"
 #include "core/peripherals/floppy_drive/sector_track_io.h"
 #include "core/peripherals/floppy_drive/td0_codec.h"
 #include "core/peripherals/floppy_drive/track_codec.h"
@@ -640,7 +641,7 @@ TEST(Td0Codec, TdAbgeschnittenOderVerfaelschtScheitertSauber) {
 
 // ─── Verdrahtung ─────────────────────────────────────────────────────────────
 
-TEST(Td0Codec, ImageCodecErkenntUndLaedtUndSchreibenIstNochNichtDa) {
+TEST(Td0Codec, ImageCodecErkenntUndLaedt) {
     const std::string pfad = k1520test::tempPath("k1520_test_td0_codec.td0");
     {
         const Bytes d = datei(kopf(), {spur(0, 0, {roh(1, 0, steigend(128))})});
@@ -652,10 +653,452 @@ TEST(Td0Codec, ImageCodecErkenntUndLaedtUndSchreibenIstNochNichtDa) {
     std::string err;
     ASSERT_TRUE(ImageCodec::load(pfad, ContainerType::Td0, nullptr, m, err)) << err;
     EXPECT_EQ(sektoren(m, 0, 0).size(), 1u);
-    EXPECT_FALSE(ImageCodec::save(pfad + ".neu", ContainerType::Td0, nullptr, m, err));
-    EXPECT_FALSE(fs::exists(pfad + ".neu"));
     fs::remove(pfad);
     EXPECT_FALSE(ImageCodec::load("gibt_es_nicht.td0", ContainerType::Td0, nullptr, m, err));
+}
+
+// ─── Schreiben (AP T2) ───────────────────────────────────────────────────────
+
+namespace {
+
+using SectorTrackIo::SectorRecord;
+using SectorTrackIo::TrackRecord;
+
+SectorRecord rs(uint8_t c, uint8_t h, uint8_t r, uint8_t n, uint8_t fill) {
+    SectorRecord s;
+    s.c = c; s.h = h; s.r = r; s.n = n;
+    s.data.assign(s.size(), fill);
+    return s;
+}
+
+/// Sektor mit nicht-periodischem Inhalt (bleibt Methode 0)
+SectorRecord rm(uint8_t c, uint8_t h, uint8_t r, uint8_t n, unsigned seed) {
+    SectorRecord s = rs(c, h, r, n, 0);
+    for (size_t i = 0; i < s.data.size(); ++i) s.data[i] = static_cast<uint8_t>(seed * 31u + i * 7u + (i >> 3));
+    return s;
+}
+
+TrackRecord trk(uint8_t cyl, uint8_t head, Encoding enc, std::vector<SectorRecord> secs) {
+    TrackRecord t;
+    t.cyl = cyl; t.head = head; t.enc = enc;
+    t.sectors = std::move(secs);
+    return t;
+}
+
+DiskMedium medAus(const std::vector<TrackRecord>& t) {
+    DiskMedium m;
+    std::string err;
+    EXPECT_TRUE(SectorTrackIo::toMedium(t, m, err)) << err;
+    return m;
+}
+
+void gleicheMedien(const DiskMedium& a, const DiskMedium& b) {
+    ASSERT_EQ(a.numCylinders(), b.numCylinders());
+    ASSERT_EQ(a.numHeads(), b.numHeads());
+    for (uint8_t c = 0; c < a.numCylinders(); ++c)
+        for (uint8_t h = 0; h < a.numHeads(); ++h) {
+            const TrackImage& x = a.peek(c, h);
+            const TrackImage& y = b.peek(c, h);
+            EXPECT_EQ(x.bytes, y.bytes) << "Spur " << int(c) << "/" << int(h);
+            EXPECT_EQ(x.marks, y.marks) << "Spur " << int(c) << "/" << int(h);
+            EXPECT_EQ(x.encoding, y.encoding) << "Spur " << int(c) << "/" << int(h);
+        }
+}
+
+struct Lauf {
+    Bytes datei;
+    DiskMedium zurueck;
+    Td0Codec::SourceInfo schrieb, las;
+};
+
+Lauf rundlauf(const DiskMedium& m, const Td0Codec::SourceInfo* vorlage = nullptr) {
+    Lauf l;
+    std::string err;
+    EXPECT_TRUE(Td0Codec::encode(m, vorlage, l.datei, &l.schrieb, err)) << err;
+    EXPECT_TRUE(Td0Codec::loadBuffer(l.datei, l.zurueck, &l.las, err)) << err;
+    return l;
+}
+
+Bytes lies(const std::string& p) {
+    std::ifstream f(p, std::ios::binary);
+    return Bytes((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+}
+
+Td0Codec::SourceInfo infoVon(const Bytes& d) {
+    Td0Codec::SourceInfo si;
+    std::string err;
+    DiskMedium m;
+    EXPECT_TRUE(Td0Codec::loadBuffer(d, m, &si, err)) << err;
+    return si;
+}
+
+}  // namespace
+
+TEST(Td0Schreiben, RundlaufMfmInterleaveFlagsUndMischgroessen) {
+    SectorRecord gel = rm(0, 0, 3, 1, 3); gel.deleted = true;
+    SectorRecord dfe = rm(0, 0, 4, 1, 4); dfe.data_error = true;
+    SectorRecord bei = rm(0, 0, 5, 1, 5); bei.deleted = true; bei.data_error = true;
+    SectorRecord nod = rs(0, 0, 6, 1, 0); nod.no_data = true; nod.data.clear();
+    std::vector<SectorRecord> inter;
+    for (uint8_t r : {1, 6, 2, 7, 3, 8, 4, 9, 5}) inter.push_back(rm(1, 1, r, 1, r));
+    const DiskMedium m = medAus({
+        trk(0, 0, Encoding::MFM, {rm(0, 0, 1, 0, 1), rs(0, 0, 2, 0, 0xE5), gel, dfe, bei, nod}),
+        trk(1, 0, Encoding::MFM, {rm(1, 0, 1, 0, 7), rm(1, 0, 2, 2, 8), rm(89, 1, 3, 3, 9)}),   // Mischgroessen, fremde IDs
+        trk(1, 1, Encoding::MFM, inter),
+    });
+    const Lauf l = rundlauf(m);
+    gleicheMedien(m, l.zurueck);
+    EXPECT_EQ(l.datei[0], 'T');
+    EXPECT_EQ(l.datei[1], 'D');
+    EXPECT_TRUE(Td0Codec::isTd0(l.datei.data(), l.datei.size()));
+    EXPECT_EQ(l.las.no_data_sectors, 1u);
+    EXPECT_EQ(l.las.data_error_sectors, 2u);
+    EXPECT_EQ(l.las.deleted_sectors, 2u);
+    EXPECT_EQ(l.las.crc8_mismatch, 0u);
+    EXPECT_TRUE(l.las.warnings.empty()) << l.las.warnings.front();
+    // Sektorfolge (Interleave) und Flags kommen aus dem Medium zurueck
+    const auto s = sektoren(l.zurueck, 1, 1);
+    ASSERT_EQ(s.size(), 9u);
+    const uint8_t soll[] = {1, 6, 2, 7, 3, 8, 4, 9, 5};
+    for (size_t i = 0; i < 9; ++i) EXPECT_EQ(s[i].id, soll[i]);
+    const auto t = sektoren(l.zurueck, 1, 0);
+    ASSERT_EQ(t.size(), 3u);
+    EXPECT_EQ(t[2].cyl, 89);
+    EXPECT_EQ(t[2].head, 1);
+    EXPECT_EQ(t[1].size, 512);
+}
+
+TEST(Td0Schreiben, FmGlobalNurWennAlleSpurenFmSindUndJeSpurBit) {
+    const DiskMedium fm = medAus({trk(0, 0, Encoding::FM, {rm(0, 0, 1, 0, 1)}),
+                                  trk(1, 0, Encoding::FM, {rm(1, 0, 1, 0, 2)})});
+    Lauf l = rundlauf(fm);
+    gleicheMedien(fm, l.zurueck);
+    EXPECT_NE(l.datei[5] & 0x80, 0);
+    EXPECT_TRUE(l.las.fm_global);
+    ASSERT_EQ(l.las.heads.size(), 2u);
+    EXPECT_TRUE(l.las.heads[0].fm);   // Spurbit steht zusaetzlich
+    EXPECT_TRUE(l.las.heads[1].fm);
+
+    const DiskMedium gem = medAus({trk(0, 0, Encoding::FM, {rm(0, 0, 1, 0, 1)}),
+                                   trk(1, 0, Encoding::MFM, {rm(1, 0, 1, 1, 2)})});
+    l = rundlauf(gem);
+    gleicheMedien(gem, l.zurueck);
+    EXPECT_EQ(l.datei[5] & 0x80, 0);
+    EXPECT_FALSE(l.las.fm_global);
+    EXPECT_TRUE(l.las.heads[0].fm);
+    EXPECT_FALSE(l.las.heads[1].fm);
+}
+
+TEST(Td0Schreiben, NeueDateiHatKopfKommentarUndDatum) {
+    const DiskMedium m = medAus({trk(0, 0, Encoding::MFM, {rm(0, 0, 1, 1, 1)}),
+                                 trk(0, 1, Encoding::MFM, {rm(0, 1, 1, 1, 2)}),
+                                 trk(1, 0, Encoding::MFM, {rm(1, 0, 1, 1, 3)}),
+                                 trk(1, 1, Encoding::MFM, {rm(1, 1, 1, 1, 4)})});
+    const Lauf l = rundlauf(m);
+    EXPECT_EQ(l.las.version, 0x15);
+    EXPECT_EQ(l.las.rate_kbps, 250);
+    EXPECT_TRUE(l.las.has_comment);
+    EXPECT_EQ(l.las.comment, "Image file created by k1520emu");
+    EXPECT_EQ(l.las.timestamp.size(), 19u);
+    EXPECT_EQ(l.las.sides, 2);
+    EXPECT_EQ(l.las.drive_type, 1);   // <= 45 Zylinder, 250 kbit/s: 360K
+    EXPECT_EQ(l.las.volume_seq, 0);
+    EXPECT_FALSE(l.las.dos_allocation);
+    EXPECT_EQ(l.las.tracks, 4u);
+    // einseitig
+    const DiskMedium eins = medAus({trk(0, 0, Encoding::MFM, {rm(0, 0, 1, 1, 1)})});
+    EXPECT_EQ(rundlauf(eins).las.sides, 1);
+}
+
+TEST(Td0Schreiben, GleichfoermigeSektorenGehenAlsMethode1UndAnderesAlsMethode0) {
+    // Vorlage ohne Kommentar -> die Dateilaenge ist exakt vorhersagbar
+    const Bytes v = datei(kopf(), {spur(0, 0, {roh(1, 0, steigend(128))})});
+    const Td0Codec::SourceInfo si = infoVon(v);
+    ASSERT_FALSE(si.has_comment);
+    std::string err;
+    Bytes d;
+    const size_t rahmen = 12 + 4 + 6 + 4;   // Kopf, Spurkopf, Sektorkopf, Endemarke
+    const DiskMedium einheitlich = medAus({trk(0, 0, Encoding::MFM, {rs(0, 0, 1, 2, 0xE5)})});
+    ASSERT_TRUE(Td0Codec::encode(einheitlich, &si, d, nullptr, err)) << err;
+    EXPECT_EQ(d.size(), rahmen + 2 + 1 + 4);   // Laenge, Methode 1, Zaehler, Muster
+    EXPECT_EQ(d[12 + 4 + 6 + 2], 1);
+    Bytes dm;
+    DiskMedium paar = medAus({trk(0, 0, Encoding::MFM, {rs(0, 0, 1, 0, 0)})});
+    SectorRecord ab = rs(0, 0, 1, 0, 0);
+    for (size_t i = 0; i < ab.data.size(); ++i) ab.data[i] = (i & 1) ? 0xCD : 0xAB;
+    paar = medAus({trk(0, 0, Encoding::MFM, {ab})});
+    ASSERT_TRUE(Td0Codec::encode(paar, &si, dm, nullptr, err)) << err;
+    EXPECT_EQ(dm.size(), rahmen + 2 + 1 + 4);
+    EXPECT_EQ(dm[12 + 4 + 6 + 2], 1);
+    const DiskMedium roh0 = medAus({trk(0, 0, Encoding::MFM, {rm(0, 0, 1, 0, 5)})});
+    ASSERT_TRUE(Td0Codec::encode(roh0, &si, dm, nullptr, err)) << err;
+    EXPECT_EQ(dm.size(), rahmen + 2 + 1 + 128);
+    EXPECT_EQ(dm[12 + 4 + 6 + 2], 0);
+    // Muster mit fast gleichem Inhalt (eine Abweichung am Ende) bleibt roh
+    SectorRecord fast = rs(0, 0, 1, 0, 0xE5);
+    fast.data.back() = 0xE4;
+    ASSERT_TRUE(Td0Codec::encode(medAus({trk(0, 0, Encoding::MFM, {fast})}), &si, dm, nullptr, err)) << err;
+    EXPECT_EQ(dm[12 + 4 + 6 + 2], 0);
+    // und der Inhalt kommt in allen Faellen zurueck
+    for (const DiskMedium* m : std::initializer_list<const DiskMedium*>{&einheitlich, &paar, &roh0}) {
+        Lauf l = rundlauf(*m);
+        gleicheMedien(*m, l.zurueck);
+    }
+}
+
+TEST(Td0Schreiben, Sektorgroessen128Bis8192) {
+    std::vector<TrackRecord> t;
+    for (uint8_t n = 0; n <= 5; ++n) t.push_back(trk(n, 0, Encoding::MFM, {rm(n, 0, 1, n, n)}));
+    const DiskMedium m = medAus(t);
+    const Lauf l = rundlauf(m);
+    gleicheMedien(m, l.zurueck);
+}
+
+TEST(Td0Schreiben, MitVorlageBleibenKopfKommentarUndDatumByteGleich) {
+    // ungewoehnlicher Kopf: Laufwerk 5, Schritt 1, DOS-Flag, einseitig, Version 1.3, Rate 500
+    const Bytes v = datei(kopf("TD", 2, 5, 0x80 | 1, 1, 1, 0x13),
+                          {kommentar(std::string("Zeile eins\0Zeile zwei\0\0", 23)),
+                           spur(0, 0, {roh(1, 1, steigend(256, 3))})});
+    const Td0Codec::SourceInfo si = infoVon(v);
+    DiskMedium m;
+    std::string err;
+    ASSERT_TRUE(Td0Codec::loadBuffer(v, m, nullptr, err)) << err;
+    Lauf l = rundlauf(m, &si);
+    ASSERT_GT(l.datei.size(), 12u + 10u + 22u);
+    const size_t praefix = 12 + 10 + 23;   // Kopf + Kommentarkopf + Text
+    EXPECT_EQ(Bytes(l.datei.begin(), l.datei.begin() + static_cast<long>(praefix)),
+              Bytes(v.begin(), v.begin() + static_cast<long>(praefix)));
+    // sogar die ganze Datei bis auf die Endemarke (unsere kopiert den letzten Spurkopf, `datei()` schreibt Nullen)
+    EXPECT_EQ(Bytes(l.datei.begin(), l.datei.end() - 4), Bytes(v.begin(), v.end() - 4));
+    {   // Endemarke = FF + Kopie des letzten Spurkopfes (Zylinder, Kopfbyte, CRC8)
+        const size_t spurkopf = l.datei.size() - 4 - (6 + 3 + 256) - 4;
+        EXPECT_EQ(l.datei[l.datei.size() - 4], 0xFF);
+        for (size_t i = 1; i < 4; ++i) EXPECT_EQ(l.datei[l.datei.size() - 4 + i], l.datei[spurkopf + i]) << i;
+    }
+    // dieselbe Datei als Advanced Compression -> kommt als TD zurueck
+    ASSERT_TRUE(laedt(kVektorTd));
+    const Td0Codec::SourceInfo sTd = infoVon(kVektorTd);
+    DiskMedium mTd;
+    ASSERT_TRUE(Td0Codec::loadBuffer(kVektorTd, mTd, nullptr, err)) << err;
+    l = rundlauf(mTd, &sTd);
+    EXPECT_EQ(l.datei[0], 'T');
+    EXPECT_FALSE(l.las.advanced);
+    EXPECT_EQ(l.las.comment, sTd.comment);
+    EXPECT_EQ(l.las.timestamp, sTd.timestamp);
+    EXPECT_EQ(l.las.version, sTd.version);
+    EXPECT_EQ(l.las.drive_type, sTd.drive_type);
+    EXPECT_EQ(l.las.check_seq, sTd.check_seq);
+    EXPECT_EQ(l.las.comment_raw, sTd.comment_raw);
+    gleicheMedien(mTd, l.zurueck);
+    DiskMedium mPlain;
+    ASSERT_TRUE(Td0Codec::loadBuffer(kVektorPlain, mPlain, nullptr, err)) << err;
+    gleicheMedien(mPlain, l.zurueck);
+}
+
+TEST(Td0Schreiben, VorlageOhneKommentarBleibtOhneUndGeaenderteGeometrieVerwirftSie) {
+    const Bytes v = datei(kopf("TD", 1, 3, 0, 0, 2, 0x14), {spur(0, 0, {roh(1, 0, steigend(128))})});
+    const Td0Codec::SourceInfo si = infoVon(v);
+    DiskMedium m;
+    std::string err;
+    ASSERT_TRUE(Td0Codec::loadBuffer(v, m, nullptr, err)) << err;
+    Lauf l = rundlauf(m, &si);
+    EXPECT_FALSE(l.las.has_comment);
+    EXPECT_EQ(l.las.rate_kbps, 300);
+    EXPECT_EQ(l.las.version, 0x14);
+    EXPECT_EQ(l.las.drive_type, 3);
+    EXPECT_TRUE(l.schrieb.warnings.empty());
+    // mehr Zylinder: Vorlage verworfen, frischer Kopf mit Kommentar und Version 1.5
+    const DiskMedium gross = medAus({trk(0, 0, Encoding::MFM, {rm(0, 0, 1, 0, 1)}),
+                                     trk(1, 0, Encoding::MFM, {rm(1, 0, 1, 0, 2)})});
+    l = rundlauf(gross, &si);
+    EXPECT_EQ(l.las.version, 0x15);
+    EXPECT_EQ(l.las.rate_kbps, 250);
+    EXPECT_TRUE(l.las.has_comment);
+    EXPECT_TRUE(hatWarnung(l.schrieb, "Vorlage"));
+}
+
+TEST(Td0Schreiben, PseudosektorenWerdenMitgefuehrtUndNurBeiPassenderSpurZurueckgeschrieben) {
+    // Spur 0: echter Sektor, Pseudosektor (R=105), echter Sektor, Pseudosektor ohne Block; Spur 1 normal
+    S ps = roh(105, 0, steigend(128, 9), 0x40);
+    S pn = ohneDaten(106, 0, 0x40 | 0x20);
+    const Bytes v = datei(kopf(), {spur(0, 0, {roh(1, 0, steigend(128, 1)), ps, roh(2, 0, steigend(128, 2)), pn}),
+                                   spur(1, 0, {roh(1, 0, steigend(128, 3))})});
+    Td0Codec::SourceInfo si;
+    DiskMedium m;
+    std::string err;
+    ASSERT_TRUE(Td0Codec::loadBuffer(v, m, &si, err)) << err;
+    ASSERT_EQ(si.pseudo.size(), 2u);
+    EXPECT_EQ(si.pseudo[0].pos, 1);
+    EXPECT_EQ(si.pseudo[0].real, 2);
+    EXPECT_EQ(si.pseudo[0].header[2], 105);
+    EXPECT_EQ(si.pseudo[1].pos, 2);
+    EXPECT_TRUE(si.pseudo[1].block.empty());
+
+    // mit Vorlage: die Datei kommt bitgleich zurueck (Sektorfolge samt Pseudosektoren)
+    Lauf l = rundlauf(m, &si);
+    EXPECT_EQ(Bytes(l.datei.begin(), l.datei.end() - 4), Bytes(v.begin(), v.end() - 4));
+    EXPECT_EQ(l.las.pseudo_sectors, 2u);
+    EXPECT_TRUE(l.schrieb.warnings.size() == 1u && hatWarnung(l.schrieb, "Pseudosektor"))
+        << "nur der Hinweis 'nicht ins Medium uebernommen' des Lesers";
+    EXPECT_FALSE(hatWarnung(l.schrieb, "nicht zurueckgeschrieben"));
+    ASSERT_EQ(l.las.pseudo.size(), 2u);
+    EXPECT_EQ(l.las.pseudo[0].block, si.pseudo[0].block);
+
+    // ohne Vorlage gehen sie verloren (und es wird nicht geschwiegen) - auch ueber die Vorlage ohne Kopf
+    l = rundlauf(m);
+    EXPECT_EQ(l.las.pseudo_sectors, 0u);
+    l = rundlauf(m, nullptr);
+    Td0Codec::SourceInfo leer;
+    leer.pseudo = si.pseudo;
+    Bytes d;
+    Td0Codec::SourceInfo wr;
+    ASSERT_TRUE(Td0Codec::encode(m, &leer, d, &wr, err)) << err;
+    EXPECT_TRUE(hatWarnung(wr, "nicht zurueckgeschrieben"));
+
+    // Spur hat sich geaendert (anderer Sektorbestand): der Pseudosektor der Spur entfaellt, der andere bleibt nicht stehen
+    const DiskMedium anders = medAus({
+        trk(0, 0, Encoding::MFM, {rm(0, 0, 1, 0, 1)}),     // nur noch ein echter Sektor
+        trk(1, 0, Encoding::MFM, {rm(1, 0, 1, 0, 3)})});
+    ASSERT_TRUE(Td0Codec::encode(anders, &si, d, &wr, err)) << err;
+    EXPECT_EQ(wr.pseudo_sectors, 0u);
+    EXPECT_TRUE(hatWarnung(wr, "2 Pseudosektor(en)"));
+}
+
+TEST(Td0Schreiben, UnterschiedlicheRatenWerdenGemeldetMitVorlageGiltDieRateDerVorlage) {
+    // 8 x 1024 MFM ist eine lange Spur (500 kbit/s geraten), 1 x 128 eine kurze (250)
+    std::vector<SectorRecord> lang;
+    for (uint8_t r = 1; r <= 8; ++r) lang.push_back(rm(0, 0, r, 3, r));
+    const DiskMedium m = medAus({trk(0, 0, Encoding::MFM, lang), trk(1, 0, Encoding::MFM, {rm(1, 0, 1, 0, 1)})});
+    Lauf l = rundlauf(m);
+    EXPECT_TRUE(hatWarnung(l.schrieb, "Datenraten"));
+    EXPECT_EQ(l.las.rate_kbps, 500);   // erste belegte Spur
+    gleicheMedien(m, l.zurueck);
+    // Vorlage mit 300: gilt fuer alle, ohne Warnung
+    const Td0Codec::SourceInfo si = infoVon(datei(kopf("TD", 1), {spur(0, 0, {roh(1, 0, steigend(128))}),
+                                                                   spur(1, 0, {roh(1, 0, steigend(128))})}));
+    l = rundlauf(m, &si);
+    EXPECT_EQ(l.las.rate_kbps, 300);
+    EXPECT_FALSE(hatWarnung(l.schrieb, "Datenraten"));
+}
+
+TEST(Td0Schreiben, LeereSpurenInDerGeometrieWerdenAlsLeereSatzGeschrieben) {
+    const DiskMedium m = medAus({trk(0, 0, Encoding::MFM, {rm(0, 0, 1, 0, 1)}),
+                                 trk(2, 0, Encoding::MFM, {rm(2, 0, 1, 0, 2)})});
+    const Lauf l = rundlauf(m);
+    EXPECT_EQ(l.las.tracks, 3u);
+    EXPECT_EQ(l.las.empty_tracks, 1u);
+    gleicheMedien(m, l.zurueck);
+}
+
+TEST(Td0Schreiben, NichtDarstellbaresWirdMitGrundAbgelehnt) {
+    Bytes d;
+    std::string err;
+    {   // Nachspann mit Nutzdaten hinter der Daten-CRC (UDOS)
+        std::vector<LogicalSector> v;
+        LogicalSector l; l.id = 1; l.size = 128; l.data.assign(128, 0x5A); l.tail = {1, 2, 3, 4};
+        v.push_back(l);
+        DiskMedium m(1, 1, Encoding::MFM);
+        m.setTrack(0, 0, TrackCodec::buildTrack(v, Encoding::MFM));
+        EXPECT_FALSE(Td0Codec::encode(m, nullptr, d, nullptr, err));
+        EXPECT_NE(err.find("Daten-CRC"), std::string::npos) << err;
+    }
+    {   // ID-CRC-Fehler
+        SectorRecord s = rs(0, 0, 1, 0, 1); s.id_error = true;
+        EXPECT_FALSE(Td0Codec::encode(medAus({trk(0, 0, Encoding::MFM, {s})}), nullptr, d, nullptr, err));
+        EXPECT_NE(err.find("ID-CRC"), std::string::npos) << err;
+    }
+    {   // unformatiert
+        DiskMedium m(2, 1, Encoding::MFM);
+        EXPECT_FALSE(Td0Codec::encode(m, nullptr, d, nullptr, err));
+        EXPECT_NE(err.find("unformatiert"), std::string::npos) << err;
+    }
+    {   // 255 Sektoren: 0xFF waere die Endemarke
+        std::vector<SectorRecord> viele;
+        for (unsigned r = 0; r < 255; ++r) viele.push_back(rs(0, 0, static_cast<uint8_t>(r), 0, 1));
+        DiskMedium m;
+        std::string e2;
+        std::vector<TrackRecord> t;
+        if (SectorTrackIo::toMedium({trk(0, 0, Encoding::MFM, viele)}, m, e2)
+            && SectorTrackIo::fromMedium(m, t, e2) && t.front().sectors.size() == 255u) {
+            EXPECT_FALSE(Td0Codec::encode(m, nullptr, d, nullptr, err));
+            EXPECT_NE(err.find("254"), std::string::npos) << err;
+        } else {
+            ADD_FAILURE() << "255 Sektoren sind im Medium nicht darstellbar: " << e2;
+        }
+    }
+}
+
+TEST(Td0Schreiben, SpeichernIstAtomarUndBehaeltDieAlteDateiBeiFehler) {
+    const std::string pfad = k1520test::tempPath("k1520_test_td0_codec_a.td0");
+    fs::remove(pfad);
+    const DiskMedium gut = medAus({trk(0, 0, Encoding::MFM, {rm(0, 0, 1, 0, 0x42)})});
+    std::string err;
+    ASSERT_TRUE(Td0Codec::save(pfad, gut, err)) << err;
+    EXPECT_FALSE(fs::exists(pfad + ".k1520tmp"));
+    EXPECT_TRUE(Td0Codec::isTd0(pfad));
+    const Bytes vorher = lies(pfad);
+
+    SectorRecord kaputt = rs(0, 0, 1, 0, 1); kaputt.id_error = true;
+    EXPECT_FALSE(Td0Codec::save(pfad, medAus({trk(0, 0, Encoding::MFM, {kaputt})}), err));
+    EXPECT_FALSE(fs::exists(pfad + ".k1520tmp"));
+    EXPECT_EQ(lies(pfad), vorher);
+
+    // Ziel nicht ersetzbar (ein Ordner): keine Nachbardatei bleibt liegen
+    const std::string ordner = k1520test::tempPath("k1520_test_td0_codec_dir.td0");
+    fs::remove_all(ordner);
+    fs::create_directories(ordner);
+    EXPECT_FALSE(Td0Codec::save(ordner, gut, err));
+    EXPECT_FALSE(fs::exists(ordner + ".k1520tmp"));
+    fs::remove_all(ordner);
+
+    DiskMedium m;
+    ASSERT_TRUE(Td0Codec::load(pfad, m, nullptr, err)) << err;
+    gleicheMedien(gut, m);
+    fs::remove(pfad);
+}
+
+TEST(Td0Schreiben, ImageCodecSchreibtUndSaveAsUeberVorlage) {
+    const std::string pfad = k1520test::tempPath("k1520_test_td0_codec_ic.td0");
+    const std::string neu = pfad + ".neu.td0";
+    fs::remove(pfad); fs::remove(neu);
+    const DiskMedium m = medAus({trk(0, 0, Encoding::MFM, {rm(0, 0, 1, 1, 1), rs(0, 0, 2, 1, 0xE5)})});
+    std::string err;
+    ASSERT_TRUE(ImageCodec::save(pfad, ContainerType::Td0, nullptr, m, err)) << err;
+    EXPECT_EQ(ImageCodec::detect(pfad), ContainerType::Td0);
+    DiskMedium z;
+    ASSERT_TRUE(ImageCodec::load(pfad, ContainerType::Td0, nullptr, z, err)) << err;
+    gleicheMedien(m, z);
+    // Vorlage aus dem Laden: erneut speichern, Kommentar und Datum bleiben
+    Td0Codec::SourceInfo si;
+    ASSERT_TRUE(Td0Codec::load(pfad, z, &si, err)) << err;
+    ASSERT_TRUE(Td0Codec::save(neu, z, &si, nullptr, err)) << err;
+    EXPECT_EQ(lies(neu), lies(pfad));
+    fs::remove(pfad); fs::remove(neu);
+}
+
+TEST(Td0Kreuz, Td0ZuImdZuTd0LiefertDasselbeMedium) {
+    SectorRecord gel = rm(0, 0, 3, 1, 3); gel.deleted = true;
+    SectorRecord dfe = rm(0, 0, 4, 1, 4); dfe.data_error = true;
+    SectorRecord nod = rs(0, 0, 5, 1, 0); nod.no_data = true; nod.data.clear();
+    const DiskMedium m = medAus({
+        trk(0, 0, Encoding::MFM, {rm(0, 0, 1, 1, 1), rs(0, 0, 2, 1, 0xE5), gel, dfe, nod}),
+        trk(1, 0, Encoding::FM, {rm(1, 0, 2, 0, 5), rm(1, 0, 1, 0, 6)}),
+    });
+    const Lauf t = rundlauf(m);
+    Bytes imd;
+    std::string err;
+    ASSERT_TRUE(ImdCodec::encode(t.zurueck, nullptr, imd, nullptr, err)) << err;
+    DiskMedium ausImd;
+    ASSERT_TRUE(ImdCodec::loadBuffer(imd, ausImd, nullptr, err)) << err;
+    gleicheMedien(m, ausImd);
+    const Lauf zurueck = rundlauf(ausImd);
+    gleicheMedien(m, zurueck.zurueck);
+    // und andersherum: IMD zuerst
+    Bytes imd2;
+    ASSERT_TRUE(ImdCodec::encode(m, nullptr, imd2, nullptr, err)) << err;
+    DiskMedium a;
+    ASSERT_TRUE(ImdCodec::loadBuffer(imd2, a, nullptr, err)) << err;
+    gleicheMedien(m, rundlauf(a).zurueck);
 }
 
 // ─── Echte Abbilder (nur mit K1520_TD0_DIR) ──────────────────────────────────
@@ -732,6 +1175,111 @@ TEST(Td0Echtdaten, AlleDateienLadenMitPruefsummen) {
                 geladen, td, leer, sektorenGesamt);
 }
 
+/// @test Jede ladbare Datei: Medium -> Datei (mit Vorlage) -> Medium ist verlustfrei -- Sektordaten,
+///       Spurbytes + Marken, Kopffelder, Kommentar, Pseudosektoren -- und das Ergebnis ist ein
+///       Fixpunkt (nochmaliges Speichern aendert kein Byte).
+TEST(Td0Echtdaten, SpeichernUndWiederLadenIstVerlustfrei) {
+    const auto liste = td0Dateien();
+    if (liste.empty()) GTEST_SKIP() << "K1520_TD0_DIR nicht gesetzt oder ohne *.td0";
+    size_t geprueft = 0, leere = 0, td = 0, mitPseudo = 0, pseudoGesamt = 0, sektorenGesamt = 0, groesser = 0;
+    for (const auto& p : liste) {
+        SCOPED_TRACE(p.string());
+        const Bytes d = leseDatei(p);
+        if (d.empty()) continue;
+        DiskMedium m1;
+        Td0Codec::SourceInfo si;
+        std::string err;
+        ASSERT_TRUE(Td0Codec::loadBuffer(d, m1, &si, err)) << err;
+        Bytes out;
+        Td0Codec::SourceInfo sw;
+        if (si.sectors == 0) {   // Diskette ganz ohne Sektoren (die 20-Byte-Datei): unformatiert -> Ablehnung
+            EXPECT_FALSE(Td0Codec::encode(m1, &si, out, &sw, err));
+            EXPECT_NE(err.find("unformatiert"), std::string::npos) << err;
+            ++leere;
+            continue;
+        }
+        ASSERT_TRUE(Td0Codec::encode(m1, &si, out, &sw, err)) << err;
+        DiskMedium m2;
+        Td0Codec::SourceInfo si2;
+        ASSERT_TRUE(Td0Codec::loadBuffer(out, m2, &si2, err)) << err;
+        gleicheMedien(m1, m2);
+
+        // Kopffelder
+        ASSERT_EQ(si.raw_header.size(), 12u);
+        ASSERT_EQ(si2.raw_header.size(), 12u);
+        EXPECT_EQ(si2.raw_header[0], 'T');
+        for (size_t i = 2; i < 10; ++i) EXPECT_EQ(si2.raw_header[i], si.raw_header[i]) << "Kopfbyte " << i;
+        EXPECT_EQ(si2.comment_raw, si.comment_raw);
+        EXPECT_EQ(si2.timestamp, si.timestamp);
+        EXPECT_EQ(si2.comment, si.comment);
+        EXPECT_EQ(si2.rate_kbps, si.rate_kbps);
+        EXPECT_EQ(si2.sectors, si.sectors);
+        EXPECT_EQ(si2.no_data_sectors, si.no_data_sectors);
+        EXPECT_EQ(si2.data_error_sectors, si.data_error_sectors);
+        EXPECT_EQ(si2.deleted_sectors, si.deleted_sectors);
+        EXPECT_EQ(si2.duplicate_ids, si.duplicate_ids);
+        EXPECT_EQ(si2.crc8_mismatch, 0u);
+        EXPECT_EQ(si2.tracks, static_cast<size_t>(m1.numCylinders()) * m1.numHeads());
+        // Pseudosektoren
+        EXPECT_EQ(si2.pseudo_sectors, si.pseudo.size());
+        ASSERT_EQ(si2.pseudo.size(), si.pseudo.size());
+        for (size_t i = 0; i < si.pseudo.size(); ++i) {
+            const auto& a = si.pseudo[i];
+            const auto& b = si2.pseudo[i];
+            EXPECT_TRUE(a.cyl == b.cyl && a.head == b.head && a.pos == b.pos && a.real == b.real
+                        && std::equal(a.header, a.header + 6, b.header) && a.block == b.block) << i;
+        }
+        // Fixpunkt: nochmals speichern -> dieselben Bytes
+        Bytes out2;
+        ASSERT_TRUE(Td0Codec::encode(m2, &si2, out2, nullptr, err)) << err;
+        EXPECT_EQ(out2, out);
+
+        sektorenGesamt += si.sectors;
+        pseudoGesamt += si.pseudo.size();
+        mitPseudo += si.pseudo.empty() ? 0 : 1;
+        td += si.advanced ? 1 : 0;
+        groesser += out.size() > d.size() ? 1 : 0;
+        ++geprueft;
+    }
+    std::printf("[ INFO ] Td0Echtdaten Rundlauf: %zu Dateien (davon %zu td), %zu Sektoren, %zu Pseudosektoren in %zu Dateien, "
+                "%zu Ausgaben groesser als die Quelle, %zu sektorlose abgelehnt\n", geprueft, td, sektorenGesamt, pseudoGesamt,
+                mitPseudo, groesser, leere);
+}
+
+/// @test Kreuzprobe mit ImageDisk: TD0 -> Medium -> IMD -> Medium -> TD0 -> Medium bleibt gleich,
+///       soweit IMD die Spur darstellen kann (gemischte Sektorgroessen nicht).
+TEST(Td0Echtdaten, KreuzprobeTd0ImdTd0) {
+    const auto liste = td0Dateien();
+    if (liste.empty()) GTEST_SKIP() << "K1520_TD0_DIR nicht gesetzt oder ohne *.td0";
+    size_t geprueft = 0, abgelehnt = 0;
+    std::map<std::string, size_t> gruende;
+    for (const auto& p : liste) {
+        SCOPED_TRACE(p.string());
+        const Bytes d = leseDatei(p);
+        if (d.empty()) continue;
+        DiskMedium m1;
+        std::string err;
+        ASSERT_TRUE(Td0Codec::loadBuffer(d, m1, nullptr, err)) << err;
+        Bytes imd;
+        if (!ImdCodec::encode(m1, nullptr, imd, nullptr, err)) {
+            ++abgelehnt;
+            ++gruende[err.substr(0, err.find('('))];
+            continue;
+        }
+        DiskMedium m3;
+        ASSERT_TRUE(ImdCodec::loadBuffer(imd, m3, nullptr, err)) << err;
+        gleicheMedien(m1, m3);
+        Bytes td0;
+        ASSERT_TRUE(Td0Codec::encode(m3, nullptr, td0, nullptr, err)) << err;
+        DiskMedium m4;
+        ASSERT_TRUE(Td0Codec::loadBuffer(td0, m4, nullptr, err)) << err;
+        gleicheMedien(m1, m4);
+        ++geprueft;
+    }
+    std::printf("[ INFO ] Td0Echtdaten Kreuzprobe: %zu Dateien TD0->IMD->TD0 gleich, %zu von IMD abgelehnt\n", geprueft, abgelehnt);
+    for (const auto& g : gruende) std::printf("[ INFO ]   %zux %s\n", g.second, g.first.c_str());
+}
+
 /// @test Schreibt je Datei die Inhaltsangabe, wie sie aus dem MEDIUM kommt, fuer den
 ///       Vergleich mit Greaseweazle (tests/python/test_td0_gegenprobe.py, td0_referenz.py).
 ///       Format je Datei `NNN.json`: Pfad, Sektorliste (Spur, ID, Groesse, Kennzeichen, FNV-1a-64
@@ -775,5 +1323,107 @@ TEST(Td0Gegenprobe, SchreibtSektorlisten) {
         char name[32];
         std::snprintf(name, sizeof(name), "%03zu.json", nr++);
         std::ofstream(fs::path(ziel) / name) << o.str();
+    }
+}
+
+namespace {
+
+std::string hexStr(const Bytes& b) {
+    static const char* z = "0123456789abcdef";
+    std::string s;
+    for (uint8_t x : b) { s += z[x >> 4]; s += z[x & 15]; }
+    return s;
+}
+
+/// Inhaltsangabe aus dem MEDIUM (nicht aus dem Schreiber).
+std::string inhaltJson(const DiskMedium& m, size_t pseudo) {
+    std::vector<SectorTrackIo::TrackRecord> t;
+    std::string err;
+    EXPECT_TRUE(SectorTrackIo::fromMedium(m, t, err)) << err;
+    std::ostringstream o;
+    o << "{\"cyls\":" << int(m.numCylinders()) << ",\"heads\":" << int(m.numHeads())
+      << ",\"pseudo\":" << pseudo << ",\"tracks\":[";
+    for (size_t i = 0; i < t.size(); ++i) {
+        o << (i ? "," : "") << "{\"cyl\":" << int(t[i].cyl) << ",\"head\":" << int(t[i].head)
+          << ",\"enc\":\"" << (t[i].enc == Encoding::FM ? "fm" : "mfm") << "\",\"sectors\":[";
+        for (size_t k = 0; k < t[i].sectors.size(); ++k) {
+            const auto& s = t[i].sectors[k];
+            o << (k ? "," : "") << "{\"c\":" << int(s.c) << ",\"h\":" << int(s.h) << ",\"r\":" << int(s.r)
+              << ",\"n\":" << int(s.n) << ",\"deleted\":" << (s.deleted ? 1 : 0)
+              << ",\"data_error\":" << (s.data_error ? 1 : 0) << ",\"no_data\":" << (s.no_data ? 1 : 0)
+              << ",\"data\":\"" << hexStr(s.data) << "\"}";
+        }
+        o << "]}";
+    }
+    o << "]}";
+    return o.str();
+}
+
+void schreibeBeispiel(const fs::path& dir, const std::string& name, const DiskMedium& m,
+                      const Td0Codec::SourceInfo* vorlage = nullptr) {
+    std::string err;
+    Td0Codec::SourceInfo wr;
+    ASSERT_TRUE(Td0Codec::save((dir / (name + ".td0")).string(), m, vorlage, &wr, err)) << err;
+    std::ofstream(dir / (name + ".json")) << inhaltJson(m, wr.pseudo_sectors);
+}
+
+}  // namespace
+
+/// @test Schreibt Beispiele (und, mit K1520_TD0_DIR, jede ladbare Echtdatei erneut gespeichert)
+///       fuer tests/python/test_td0_gegenprobe.py: unabhaengiger Python-Leser (td0_pack.lese) und
+///       Greaseweazle lesen, was der Kern schreibt.
+TEST(Td0Gegenprobe, SchreibtBeispiele) {
+    const char* ziel = std::getenv("K1520_TD0_AUSGABE");
+    if (!ziel || !*ziel) GTEST_SKIP() << "K1520_TD0_AUSGABE nicht gesetzt (nur fuer tests/python/test_td0_gegenprobe.py)";
+    const fs::path dir(ziel);
+    fs::create_directories(dir);
+
+    {   // 2 x 2 x 9 x 512, MFM 250, Interleave 2: der Fall, den auch gw versteht
+        std::vector<TrackRecord> t;
+        for (uint8_t c = 0; c < 2; ++c)
+            for (uint8_t h = 0; h < 2; ++h) {
+                std::vector<SectorRecord> s;
+                for (uint8_t r : {1, 6, 2, 7, 3, 8, 4, 9, 5}) s.push_back(rm(c, h, r, 2, c * 100u + h * 10u + r));
+                t.push_back(trk(c, h, Encoding::MFM, s));
+            }
+        schreibeBeispiel(dir, "mfm_interleave", medAus(t));
+    }
+    {   // FM mit Fremd-IDs, geloescht, Datenfehler, ohne Datenfeld, gleichfoermig
+        SectorRecord gel = rm(1, 0, 3, 1, 3); gel.deleted = true;
+        SectorRecord dfe = rm(1, 0, 4, 1, 4); dfe.data_error = true;
+        SectorRecord nod = rs(1, 0, 5, 1, 0); nod.no_data = true; nod.data.clear();
+        schreibeBeispiel(dir, "fm_alles", medAus({
+            trk(0, 0, Encoding::FM, {rs(0, 0, 1, 0, 0xE5), rm(0, 0, 2, 0, 2)}),
+            trk(1, 0, Encoding::FM, {rm(5, 0, 1, 1, 1), rs(1, 3, 2, 1, 0), gel, dfe, nod})}));
+    }
+    {   // gemischt: FM- und MFM-Spuren, Mischgroessen in einer Spur, leere Spur in der Mitte
+        schreibeBeispiel(dir, "gemischt_leer", medAus({
+            trk(0, 0, Encoding::FM, {rm(0, 0, 1, 0, 9), rm(0, 0, 2, 0, 8)}),
+            trk(2, 0, Encoding::MFM, {rm(2, 0, 1, 3, 7), rm(2, 0, 2, 1, 6), rm(2, 0, 3, 3, 5)})}));
+    }
+    {   // Pseudosektoren bleiben ueber die Vorlage erhalten
+        S ps = roh(105, 0, steigend(128, 9), 0x40);
+        const Bytes v = datei(kopf(), {spur(0, 0, {roh(1, 0, steigend(128, 1)), ps, roh(2, 0, steigend(128, 2))})});
+        DiskMedium m;
+        Td0Codec::SourceInfo si;
+        std::string err;
+        ASSERT_TRUE(Td0Codec::loadBuffer(v, m, &si, err)) << err;
+        schreibeBeispiel(dir, "pseudo", m, &si);
+    }
+
+    const auto liste = td0Dateien();
+    fs::create_directories(dir / "korpus");
+    size_t nr = 0;
+    for (const auto& p : liste) {
+        const Bytes d = leseDatei(p);
+        DiskMedium m;
+        Td0Codec::SourceInfo si;
+        std::string err;
+        if (d.empty() || !Td0Codec::loadBuffer(d, m, &si, err) || si.sectors == 0) continue;   // sektorlos: nicht schreibbar
+        char name[32];
+        std::snprintf(name, sizeof(name), "%03zu", nr++);
+        const fs::path ziel2 = dir / "korpus" / (std::string(name) + ".td0");
+        ASSERT_TRUE(Td0Codec::save(ziel2.string(), m, &si, nullptr, err)) << p << ": " << err;
+        std::ofstream(dir / "korpus" / (std::string(name) + ".json")) << "{\"datei\":\"" << p.string() << "\"}";
     }
 }

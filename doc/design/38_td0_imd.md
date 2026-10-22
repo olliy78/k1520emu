@@ -170,3 +170,23 @@ Modell der Agenten: **Sonnet** (`cpp-coder` für Kern, `general-purpose`/Sonnet 
 * **Pruefstand:** `Td0Echtdaten.*` (`K1520_TD0_DIR`), `tests/python/test_td0_gegenprobe.py` (gw als unabhaengiger Leser:
   Spur, ID, Groesse, Daten-FNV je Sektor), `tests/python/td0_pack.py` (Packer + Baukasten fuer den `td`-Testvektor,
   gegen `greaseweazle.optimised.td0_unpack` geprueft). Baumneuaufbau (>= 32768 Symbole) deckt nur die echte D02V032.TD0 ab.
+
+## 8. Stand AP T2 (TD0 schreiben, 2026-10-22)
+
+* **Fertig:** `Td0Codec::encode/save` (immer `TD`, unkomprimiert; Methode 0, Methode 1 fuer 2-Byte-Muster/Einzelbyte, Methode 2 nie), Kopf-/Kommentar-/Spur-CRC,
+  Sektor-CRC8 ueber die entpackten Daten, FM-Bit im Kopf (nur bei ALLEN belegten Spuren FM) UND je FM-Spur, Datenrate (eine je Datei; Vorlage gewinnt, sonst
+  `guessRate` der ersten belegten Spur, Warnung bei Abweichung), volles Spurraster (leere Spuren als `n = 0`), Endemarke = `FF` + Kopie des letzten Spurkopfes
+  (am Korpus: 100 %), Gegenprobe durch den eigenen Leser, `<datei>.k1520tmp` + `rename`. `ImageCodec::save` fuer `Td0` ruft das ohne Vorlage.
+* **Vorlage** (`SourceInfo` aus dem Laden): bei unveraenderter Geometrie bleiben Kopfbytes 2..9 (Folgenummern, Version, Laufwerkstyp, Schrittweite, DOS-Flag,
+  Seiten), Kommentar samt Datum und die **Pseudosektoren**; `td` wird als `TD` zurueckgeschrieben. Ohne Vorlage: Version 1.5, Kommentar
+  `Image file created by k1520emu` + aktuelles Datum (UTC), Laufwerkstyp aus Rate/Verfahren/Zylinderzahl/Sektoren je Spur geraten (nur informativ).
+* **Pseudosektoren (Flag 0x40)** liegen weiter nicht im Medium, werden aber roh (Kopf + Datenblock + Lage in der Sektorfolge) in `SourceInfo::pseudo` gefuehrt und
+  nur zurueckgeschrieben, wenn die Spur noch dieselbe Zahl echter Sektoren hat. Sonst Warnung in `geschrieben->warnings` ("n Pseudosektor(en) ... nicht
+  zurueckgeschrieben"); beim Speichern ohne Vorlage (z. B. ueber `ImageCodec::save`) gehen sie verloren. Fuer K1 heisst das: `DiskImage` muss die `SourceInfo`
+  beim Laden behalten und bei jedem Speichern als Vorlage uebergeben.
+* **Abgelehnt:** unformatiertes Medium (auch eine Datei ganz ohne Sektoren, wie die 20-Byte-Datei: sie laedt, laesst sich aber nicht zurueckschreiben),
+  Nachspann mit Nutzdaten hinter der Daten-CRC (UDOS), ID-CRC-Fehler, mehr als 254 Sektoren je Spur (0xFF ist die Endemarke). Gemischte Sektorgroessen
+  je Spur sind erlaubt.
+* **Korpus (101 Dateien unter `~/projects`):** 100 Rundlaeufe Datei -> Medium -> Datei -> Medium verlustfrei (Spurbytes, Marken, Kopffelder, Kommentar, 93 Pseudosektoren
+  in 5 Dateien) und Fixpunkt beim zweiten Speichern; Kreuzprobe TD0 -> IMD -> TD0 gleich; mit Greaseweazle gelesen sind alle 100 neu gespeicherten Dateien
+  sektorgleich zum Original, `tests/python/td0_pack.py::lese` (unabhaengiger Leser) prueft alle CRCs.

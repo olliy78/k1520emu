@@ -124,3 +124,118 @@ def test_alle_echten_td0_gleich_greaseweazle(tmp_path):
             abweichungen.append("%s: %s" % (pfad, "; ".join(f[:3])))
     print("\n%d Dateien verglichen, %d Abweichungen" % (len(dateien), len(abweichungen)))
     assert not abweichungen, "\n".join(abweichungen)
+
+
+# ─── der Kern SCHREIBT (AP T2), Python und Greaseweazle lesen ─────────────────
+
+def _schreibe_beispiele(ziel: Path, mit_korpus: bool = False):
+    env = dict(os.environ, K1520_TD0_AUSGABE=str(ziel))
+    if not mit_korpus:
+        env.pop("K1520_TD0_DIR", None)   # nur die eingebauten Beispiele
+    r = subprocess.run([str(TESTBIN), "--gtest_filter=Td0Gegenprobe.SchreibtBeispiele"],
+                       env=env, capture_output=True, text=True, timeout=600)
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+@pytest.fixture(scope="module")
+def beispiele(tmp_path_factory):
+    ziel = tmp_path_factory.mktemp("td0_beispiele")
+    _schreibe_beispiele(ziel)
+    dateien = sorted(ziel.glob("*.td0"))
+    assert len(dateien) >= 4
+    return dateien
+
+
+def _inhalt(td0: Path):
+    return json.loads(td0.with_suffix(".json").read_text())
+
+
+def test_td0_pack_liest_den_vektor_und_weist_kaputtes_ab():
+    a = td0_pack.lese(td0_pack.beispiel())
+    assert a["kommentar"] == b"Testvektor\x00zweite Zeile\x00\x00"
+    assert [(t["cyl"], t["fm"], len(t["sectors"])) for t in a["tracks"]] == [(0, False, 3), (1, True, 1)]
+    assert a["tracks"][0]["sectors"][1]["data"] == b"\xe5" * 128
+    for kaputt in (b"XD" + td0_pack.beispiel()[2:], td0_pack.beispiel()[:40]):
+        with pytest.raises((td0_pack.Td0Fehler, IndexError)):
+            td0_pack.lese(kaputt)
+    bad = bytearray(td0_pack.beispiel())
+    bad[5] ^= 1                                    # Kopf-CRC
+    with pytest.raises(td0_pack.Td0Fehler):
+        td0_pack.lese(bytes(bad))
+
+
+def test_python_liest_was_der_kern_schreibt(beispiele):
+    for td0 in beispiele:
+        soll = _inhalt(td0)
+        abb = td0_pack.lese(td0.read_bytes())
+        k = abb["kopf"]
+        assert k["version"] == 0x15 and k["volume"] == 0
+        assert abb["kommentar"] == b"Image file created by k1520emu\x00" or td0.stem == "pseudo", td0.name
+        # jede Spur der Geometrie steht genau einmal, aufsteigend nach (Zylinder, Kopf)
+        assert [(t["cyl"], t["head"]) for t in abb["tracks"]] == \
+            [(c, h) for c in range(soll["cyls"]) for h in range(soll["heads"])], td0.name
+        belegt = [t for t in abb["tracks"] if t["sectors"]]
+        assert len(belegt) >= len(soll["tracks"]) or td0.stem == "pseudo"
+        echte = {(t["cyl"], t["head"]): t for t in abb["tracks"]}
+        alle_fm = all(t["enc"] == "fm" for t in soll["tracks"])
+        assert k["fm"] == alle_fm, td0.name
+        pseudo = 0
+        for e in soll["tracks"]:
+            t = echte[(e["cyl"], e["head"])]
+            assert t["fm"] == (e["enc"] == "fm"), td0.name        # FM-Bit je Spur
+            recs = [s for s in t["sectors"] if not s["flags"] & 0x40]
+            pseudo += len(t["sectors"]) - len(recs)
+            assert len(recs) == len(e["sectors"]), td0.name
+            for s, x in zip(recs, e["sectors"]):                   # Reihenfolge = Interleave
+                assert (s["c"], s["h"], s["r"], s["n"]) == (x["c"], x["h"], x["r"], x["n"])
+                assert bool(s["flags"] & 0x04) == bool(x["deleted"])
+                assert bool(s["flags"] & 0x02) == bool(x["data_error"])
+                assert bool(s["flags"] & 0x20) == bool(x["no_data"])
+                if x["no_data"]:
+                    assert s["data"] is None
+                else:
+                    assert s["data"] == bytes.fromhex(x["data"])
+        assert pseudo == soll["pseudo"], td0.name
+        assert abb["ende"][0] == 0xFF
+
+
+def test_gw_liest_unsere_beispiele(beispiele):
+    if not GW_DA:
+        pytest.skip("greaseweazle (mit optimised-Erweiterung) nicht installiert")
+    for td0 in beispiele:
+        soll = _inhalt(td0)
+        r = td0_referenz.lese(str(td0))
+        assert "fehler" not in r, (td0.name, r)
+        gw = r["sektoren"]
+        erwartet = [s for t in soll["tracks"] for s in
+                    [(t["cyl"], t["head"], x["c"], x["h"], x["r"], 128 << x["n"], x) for x in t["sectors"]]]
+        # Pseudosektoren fuehrt gw mit (R >= 100): nur die echten vergleichen
+        echte = [g for g in gw if (g[0], g[1], g[2], g[3], g[4]) in
+                 {(e[0], e[1], e[2], e[3], e[4]) for e in erwartet}]
+        assert len(gw) - len(echte) == soll["pseudo"], td0.name
+        assert len(echte) == len(erwartet), td0.name
+        for g, e in zip(echte, erwartet):
+            assert tuple(g[:6]) == tuple(e[:6]), td0.name
+            x = e[6]
+            if not x["no_data"]:
+                assert g[6] == td0_referenz.fnv1a64(bytes.fromhex(x["data"])), (td0.name, e[:5])
+
+
+@pytest.mark.skipif(_ordner() is None, reason="K1520_TD0_DIR nicht gesetzt")
+def test_gespeicherte_echtdateien_gleich_greaseweazle_und_td0_pack(tmp_path):
+    """Jede echte Datei, vom Kern erneut gespeichert: gw liest sie wie das Original, td0_pack prueft alle CRCs."""
+    if not GW_DA:
+        pytest.skip("greaseweazle (mit optimised-Erweiterung) nicht installiert")
+    _schreibe_beispiele(tmp_path, mit_korpus=True)
+    paare = sorted((tmp_path / "korpus").glob("*.td0"))
+    assert len(paare) >= 60
+    abweichungen = []
+    for neu in paare:
+        orig = json.loads(neu.with_suffix(".json").read_text())["datei"]
+        td0_pack.lese(neu.read_bytes())               # alle CRCs, Methoden 0/1 -- unabhaengig vom Kern
+        a = td0_referenz.lese(orig)
+        b = td0_referenz.lese(str(neu))
+        if a != b:
+            abweichungen.append("%s: %s" % (orig, a.get("fehler") or b.get("fehler") or "Sektorlisten verschieden"))
+    print("\n%d Dateien verglichen, %d Abweichungen" % (len(paare), len(abweichungen)))
+    assert not abweichungen, "\n".join(abweichungen)

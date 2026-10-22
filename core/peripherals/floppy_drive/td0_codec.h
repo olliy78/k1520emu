@@ -1,6 +1,6 @@
 /**
  * @file td0_codec.h
- * @brief Td0Codec – TeleDisk-Abbild (`.td0`) ⇄ @ref DiskMedium (AP T1: Lesen).
+ * @brief Td0Codec – TeleDisk-Abbild (`.td0`) ⇄ @ref DiskMedium (AP T1: Lesen, AP T2: Schreiben).
  *
  * TeleDisk (Sydex) fuehrt wie ImageDisk je Spur eine Sektorliste (C/H/R/N, Flags, Daten),
  * nicht den Bitstrom.  Aufbau, CRC-Regeln, Methoden und die Kompression der Kennung `td`
@@ -24,7 +24,28 @@
  * Die 3 Bytes hinter der Endemarke (0xFF) werden nicht ausgewertet.  Bei `td` wird bis zum
  * Ende des Eingabestroms entpackt; das Padding am Stromende ist ohne Folgen.
  *
- * Schreiben (@ref save / @ref encode) folgt in AP T2 und scheitert bis dahin mit Begruendung.
+ * **Schreiben** (@ref save / @ref encode, AP T2): immer **unkomprimiert** (`TD`); eine gelesene
+ * `td`-Datei kommt als `TD` inhaltsgleich zurueck (groesser).  Sektoren werden mit Methode 0
+ * (roh) oder Methode 1 (2-Byte-Muster, auch Einzelbyte) geschrieben, Methode 2 nie.  Kopf-,
+ * Kommentar-, Spur-CRC und Sektor-CRC8 (ueber die entpackten Daten) werden gerechnet; das FM-Bit
+ * steht im Kopf (nur wenn ALLE belegten Spuren FM sind) UND je FM-Spur.  Die Endemarke ist die
+ * Kopie des letzten Spurkopfes mit 0xFF (Befund am Korpus).  Mit einer @p vorlage (aus dem Laden)
+ * bleiben bei **unveraenderter Geometrie** Kopfbytes (Version, Laufwerkstyp, Schrittweite, DOS-Flag,
+ * Seitenzahl, Folgenummern, Datenrate), Kommentar samt Datum und die Pseudosektoren erhalten;
+ * ohne Vorlage entsteht Version 1.5, Kommentar "Image file created by k1520emu" mit dem
+ * aktuellen Datum (UTC), Laufwerkstyp aus Geometrie/Rate geraten.
+ *   - **Pseudosektoren** (Flag 0x40) liegen nicht im Medium; @ref SourceInfo::pseudo fuehrt sie
+ *     (Kopf + Rohblock + Lage) mit.  Sie werden nur zurueckgeschrieben, wenn die Vorlage zur
+ *     Geometrie passt UND die Spur noch dieselbe Zahl echter Sektoren hat; sonst gehen sie mit
+ *     Warnung in @p geschrieben verloren (ebenso beim Speichern ohne Vorlage, z. B. ueber
+ *     ImageCodec::save).
+ *   - TD0 fuehrt EINE Datenrate je Datei: weichen die Raten der Spuren (aus der Laenge geraten)
+ *     voneinander ab, gilt die der ersten belegten Spur, mit Warnung.
+ *   - Abgelehnt mit Begruendung: unformatiertes Medium, Nachspann mit Nutzdaten hinter der
+ *     Daten-CRC (UDOS), ID-CRC-Fehler (TD0 hat dafuer kein Flag), mehr als 254 Sektoren je Spur.
+ *     Gemischte Sektorgroessen in einer Spur sind erlaubt.
+ * Die fertige Datei wird im Speicher aufgebaut, durch den eigenen Leser gegengeprueft und
+ * ueber `<datei>.k1520tmp` + `rename` geschrieben.
  *
  * @see doc/design/38_td0_imd.md, doc/design/38a_td0_imd_formatbeschreibung.md
  * @author Olaf Krieger
@@ -41,7 +62,7 @@
 
 /**
  * @namespace Td0Codec
- * @brief Laden von TeleDisk-Abbildern (Schreiben folgt).
+ * @brief Laden und Schreiben von TeleDisk-Abbildern.
  */
 namespace Td0Codec {
 
@@ -50,6 +71,16 @@ struct TrackHead {
     uint8_t cyl = 0;
     uint8_t head = 0;       ///< Seite (Bit 0 des Kopfbytes)
     bool    fm = false;     ///< Spur-FM-Bit (Bit 7 des Kopfbytes), OHNE das globale FM-Bit
+};
+
+/// @brief Pseudosektor (Flag 0x40): Daten ohne ID-Feld, nicht im Medium; roh mitgefuehrt.
+struct PseudoSector {
+    uint8_t  cyl = 0;              ///< Spur, auf der er stand
+    uint8_t  head = 0;
+    uint16_t pos = 0;              ///< Anzahl echter Sektoren der Spur DAVOR (Lage in der Sektorfolge)
+    uint16_t real = 0;             ///< echte Sektoren der Spur insgesamt (Pruefwert fuer das Zurueckschreiben)
+    uint8_t  header[6] = {0,0,0,0,0,0};   ///< C, H, R, N, Flags, CRC8 wie gelesen
+    std::vector<uint8_t> block;    ///< Datenblock roh (Laenge, Methode, Nutzbytes); leer ohne Block
 };
 
 /**
@@ -74,6 +105,7 @@ struct SourceInfo {
     std::vector<uint8_t> raw_header;     ///< die 12 Kopfbytes wie gelesen (Vorlage fuer das Schreiben)
     std::vector<uint8_t> comment_raw;    ///< Kommentarbytes wie gelesen (ohne Kuerzung)
     std::vector<TrackHead> heads;        ///< je Spursatz (auch leere), eindeutig je Zylinder/Kopf
+    std::vector<PseudoSector> pseudo;    ///< Pseudosektoren (nur fuers Zurueckschreiben)
     size_t tracks          = 0;   ///< Spursaetze (ohne ersetzte Doppelte)
     size_t empty_tracks    = 0;   ///< davon ohne Sektoren
     size_t sectors         = 0;   ///< Sektoren im Medium (ohne Pseudosektoren)
@@ -126,15 +158,23 @@ bool decodeBuffer(const std::vector<uint8_t>& datei,
 ///        warnings); unbekannter Schluessel = "".
 std::string infoField(const SourceInfo& si, const std::string& key);
 
-/// @brief Schreiben folgt in AP T2: scheitert immer mit Begruendung.
+/**
+ * @brief Medium als TeleDisk-Datei (`TD`, unkomprimiert) im Speicher aufbauen (nichts wird geschrieben).
+ * @param vorlage     Metadaten der Quelldatei (aus @ref load); darf nullptr sein
+ * @param out         Ausgabe: die vollstaendige Datei
+ * @param geschrieben Ausgabe (optional): Metadaten der erzeugten Datei, wie der Leser sie sieht,
+ *                    samt Warnungen (verlorene Pseudosektoren, abweichende Raten, verworfene Vorlage)
+ * @return false mit Begruendung in @p err, wenn das Medium nicht darstellbar ist
+ */
 bool encode(const DiskMedium& in, const SourceInfo* vorlage, std::vector<uint8_t>& out,
             SourceInfo* geschrieben, std::string& err);
 
-/// @brief Schreiben folgt in AP T2: scheitert immer mit Begruendung, die Zieldatei bleibt unberuehrt.
+/// @brief Medium als @p path schreiben (erst Nachbardatei, dann umbenennen); siehe @ref encode.
+///        Bei Fehlern bleibt die Zieldatei unberuehrt.
 bool save(const std::string& path, const DiskMedium& in, const SourceInfo* vorlage,
           SourceInfo* geschrieben, std::string& err);
 
-/// @brief Wie oben ohne Vorlage.
+/// @brief Wie oben ohne Vorlage (Standardkopf).
 bool save(const std::string& path, const DiskMedium& in, std::string& err);
 
 }  // namespace Td0Codec

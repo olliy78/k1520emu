@@ -1,6 +1,6 @@
 /**
  * @file td0_codec.cpp
- * @brief Implementierung von Td0Codec (TeleDisk-Abbild, Lesen).
+ * @brief Implementierung von Td0Codec (TeleDisk-Abbild, Lesen und Schreiben).
  *
  * @see core/peripherals/floppy_drive/td0_codec.h
  * @author Olaf Krieger
@@ -14,6 +14,8 @@
 #include <array>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <map>
 #include <set>
@@ -23,6 +25,7 @@ namespace {
 
 using SectorTrackIo::SectorRecord;
 using SectorTrackIo::TrackRecord;
+using Td0Codec::PseudoSector;
 
 constexpr size_t kMaxDatei   = 64u * 1024u * 1024u;
 constexpr size_t kMaxEntpackt = 256u * 1024u * 1024u;
@@ -252,6 +255,17 @@ std::string datumText(const uint8_t s[6]) {
     return buf;
 }
 
+PseudoSector pseudoAus(uint8_t cyl, uint8_t head, size_t pos, const uint8_t* kopf,
+                      const uint8_t* block, size_t blockLen) {
+    PseudoSector p;
+    p.cyl = cyl;
+    p.head = head;
+    p.pos = static_cast<uint16_t>(pos);
+    std::memcpy(p.header, kopf, 6);
+    if (block) p.block.assign(block, block + blockLen);
+    return p;
+}
+
 }  // namespace
 
 // ─── CRC / Erkennung ─────────────────────────────────────────────────────────
@@ -426,10 +440,12 @@ bool Td0Codec::decodeBuffer(const std::vector<uint8_t>& datei, std::vector<Track
         tr.rate_kbps = si.rate_kbps;
 
         std::set<uint8_t> gesehen;
+        std::vector<PseudoSector> pseudoSpur;
         for (unsigned i = 0; i < nsec; ++i) {
             if (!in.braucht(6)) { err = "TeleDisk: " + wo + ": " + stromName + " (Sektorkopf " + std::to_string(i) + ")"; return false; }
             const uint8_t sc = d[in.pos], sh = d[in.pos + 1], sr = d[in.pos + 2], sn = d[in.pos + 3],
                           fl = d[in.pos + 4], scrc = d[in.pos + 5];
+            const size_t kopfPos = in.pos;
             in.pos += 6;
             const bool hatBlock = (fl & 0x30) == 0;
             std::vector<uint8_t> nutz;   // entpackte Daten
@@ -440,9 +456,12 @@ bool Td0Codec::decodeBuffer(const std::vector<uint8_t>& datei, std::vector<Track
                 if (!in.braucht(2 + dlen)) { err = "TeleDisk: " + wo + ": " + stromName + " (Daten von Sektor " + std::to_string(sr) + ")"; return false; }
                 const uint8_t methode = d[in.pos + 2];
                 const uint8_t* np = &d[in.pos + 3];
+                const size_t blockPos = in.pos;
                 in.pos += 2 + dlen;
-                if (fl & 0x40) {   // Pseudosektor: Daten ohne ID-Feld, nicht uebernommen
+                if (fl & 0x40) {   // Pseudosektor: Daten ohne ID-Feld, nicht ins Medium, nur roh gemerkt
                     ++si.pseudo_sectors;
+                    pseudoSpur.push_back(pseudoAus(cyl, static_cast<uint8_t>(head), tr.sectors.size(),
+                                                   &d[kopfPos], &d[blockPos], 2 + dlen));
                     continue;
                 }
                 if (sn > 6) {
@@ -457,7 +476,12 @@ bool Td0Codec::decodeBuffer(const std::vector<uint8_t>& datei, std::vector<Track
                 }
                 if ((crc16(nutz.data(), nutz.size()) & 0xFF) != scrc) ++si.crc8_mismatch;
             } else {
-                if (fl & 0x40) { ++si.pseudo_sectors; continue; }
+                if (fl & 0x40) {
+                    ++si.pseudo_sectors;
+                    pseudoSpur.push_back(pseudoAus(cyl, static_cast<uint8_t>(head), tr.sectors.size(),
+                                                   &d[kopfPos], nullptr, 0));
+                    continue;
+                }
                 if (fl & 0x10) si.warnings.push_back(wo + ": Sektor " + std::to_string(sr)
                                                      + " von der DOS-Allocation uebersprungen (keine Daten)");
                 if (sn > 6) {   // kein Datenfeld und keine darstellbare Groesse: nicht abbildbar
@@ -482,9 +506,13 @@ bool Td0Codec::decodeBuffer(const std::vector<uint8_t>& datei, std::vector<Track
             tr.sectors.push_back(std::move(s));
         }
 
+        for (PseudoSector& p : pseudoSpur) p.real = static_cast<uint16_t>(tr.sectors.size());
         const unsigned key = static_cast<unsigned>(cyl) * 2u + head;
         const auto f = lage.find(key);
         if (f != lage.end()) {
+            si.pseudo.erase(std::remove_if(si.pseudo.begin(), si.pseudo.end(),
+                                           [&](const PseudoSector& p) { return p.cyl == cyl && p.head == head; }),
+                            si.pseudo.end());
             si.warnings.push_back(spurText(cyl, head) + " kommt mehrfach vor, der letzte Satz gilt");
             tracks[f->second] = std::move(tr);
             si.heads[f->second] = {cyl, static_cast<uint8_t>(head), spurFm};
@@ -493,6 +521,7 @@ bool Td0Codec::decodeBuffer(const std::vector<uint8_t>& datei, std::vector<Track
             tracks.push_back(std::move(tr));
             si.heads.push_back({cyl, static_cast<uint8_t>(head), spurFm});
         }
+        for (PseudoSector& p : pseudoSpur) si.pseudo.push_back(std::move(p));
     }
     if (!endeGesehen) { err = "TeleDisk: " + stromName + " (Endemarke fehlt)"; return false; }
 
@@ -555,18 +584,314 @@ std::string Td0Codec::infoField(const SourceInfo& si, const std::string& key) {
 
 // ─── Schreiben (AP T2) ───────────────────────────────────────────────────────
 
-bool Td0Codec::encode(const DiskMedium&, const SourceInfo*, std::vector<uint8_t>&, SourceInfo*,
-                      std::string& err) {
-    err = "TeleDisk (.td0): Schreiben ist noch nicht implementiert";
-    return false;
+namespace {
+
+/// Sektorliste vergleichen (Gegenprobe); ohne Datenfeld zaehlen nur die ID-Felder.
+bool gleich(const SectorRecord& a, const SectorRecord& b) {
+    if (a.c != b.c || a.h != b.h || a.r != b.r || a.n != b.n || a.no_data != b.no_data) return false;
+    if (a.no_data) return true;
+    return a.deleted == b.deleted && a.data_error == b.data_error && a.data == b.data;
+}
+
+bool gleich(const std::vector<TrackRecord>& a, const std::vector<TrackRecord>& b) {
+    if (a.size() != b.size()) return false;
+    for (size_t i = 0; i < a.size(); ++i) {
+        if (a[i].cyl != b[i].cyl || a[i].head != b[i].head || a[i].enc != b[i].enc
+            || a[i].rate_kbps != b[i].rate_kbps || a[i].sectors.size() != b[i].sectors.size())
+            return false;
+        for (size_t k = 0; k < a[i].sectors.size(); ++k)
+            if (!gleich(a[i].sectors[k], b[i].sectors[k])) return false;
+    }
+    return true;
+}
+
+void stempelJetzt(uint8_t st[6]) {
+    const std::time_t t = std::time(nullptr);
+    std::tm tmv{};
+#ifdef _WIN32
+    gmtime_s(&tmv, &t);
+#else
+    gmtime_r(&t, &tmv);
+#endif
+    st[0] = static_cast<uint8_t>(tmv.tm_year);   // Jahr - 1900
+    st[1] = static_cast<uint8_t>(tmv.tm_mon);    // 0-basiert
+    st[2] = static_cast<uint8_t>(tmv.tm_mday);
+    st[3] = static_cast<uint8_t>(tmv.tm_hour);
+    st[4] = static_cast<uint8_t>(tmv.tm_min);
+    st[5] = static_cast<uint8_t>(tmv.tm_sec);
+}
+
+void put16(std::vector<uint8_t>& f, unsigned v) {
+    f.push_back(static_cast<uint8_t>(v & 0xFF));
+    f.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
+}
+
+/// Datenblock eines Sektors: Methode 1, wenn die Daten ein 2-Byte-Muster wiederholen
+/// (auch ein Einzelbyte), sonst Methode 0.  Methode 2 schreiben wir nie.
+void datenBlock(std::vector<uint8_t>& f, const std::vector<uint8_t>& d) {
+    bool muster = d.size() >= 2 && d.size() % 2 == 0;
+    for (size_t i = 2; muster && i < d.size(); ++i) muster = d[i] == d[i - 2];
+    if (muster) {
+        put16(f, 5);   // Methodenbyte + Zaehler (2) + Muster (2)
+        f.push_back(1);
+        put16(f, static_cast<unsigned>(d.size() / 2));
+        f.push_back(d[0]);
+        f.push_back(d[1]);
+    } else {
+        put16(f, static_cast<unsigned>(d.size() + 1));
+        f.push_back(0);
+        f.insert(f.end(), d.begin(), d.end());
+    }
+}
+
+/// Laufwerkstyp (Kopfbyte 6, nur informativ) aus Rate, Verfahren und Geometrie raten.
+uint8_t laufwerkstypRaten(uint16_t rate, bool fm, unsigned zylinder, size_t maxSektoren) {
+    if (rate >= 500) {
+        if (fm) return 5;                       // 8"
+        return maxSektoren >= 18 ? 4 : 2;       // 1,44M | 1,2M
+    }
+    return zylinder <= 45 ? 1 : 3;              // 360K | 720K
+}
+
+}  // namespace
+
+bool Td0Codec::encode(const DiskMedium& in, const SourceInfo* vorlage, std::vector<uint8_t>& out,
+                      SourceInfo* geschrieben, std::string& err) {
+    std::vector<TrackRecord> formatiert;
+    if (!SectorTrackIo::fromMedium(in, formatiert, err)) {
+        err = "TeleDisk: " + err;
+        return false;
+    }
+    std::vector<std::string> warnungen;
+
+    // Vorlage nur bei gueltigem Kopf UND unveraenderter Geometrie
+    const SourceInfo* v = nullptr;
+    if (vorlage && vorlage->raw_header.size() == 12
+        && isTd0(vorlage->raw_header.data(), vorlage->raw_header.size())) {
+        unsigned vc = 0, vh = 0;
+        for (const TrackHead& t : vorlage->heads) {
+            vc = std::max<unsigned>(vc, t.cyl + 1u);
+            vh = std::max<unsigned>(vh, t.head + 1u);
+        }
+        if (vc == in.numCylinders() && vh == in.numHeads()) v = vorlage;
+        else warnungen.push_back("Kopfdaten der Vorlage verworfen: die Geometrie hat sich geaendert");
+    }
+
+    // Pruefung der belegten Spuren
+    size_t maxSektoren = 0;
+    for (const TrackRecord& tr : formatiert) {
+        if (tr.sectors.size() > 254) {   // 0xFF waere die Endemarke
+            err = "TeleDisk: " + spurText(tr.cyl, tr.head) + " hat mehr als 254 Sektoren";
+            return false;
+        }
+        maxSektoren = std::max(maxSektoren, tr.sectors.size());
+        for (const SectorRecord& s : tr.sectors) {
+            if (s.id_error) {
+                err = "TeleDisk kann keinen ID-CRC-Fehler darstellen (" + spurText(tr.cyl, tr.head)
+                      + ", Sektor " + std::to_string(s.r) + "). Bitte .hfe oder .dmk verwenden.";
+                return false;
+            }
+            if (s.n > 6) {
+                err = "TeleDisk: " + spurText(tr.cyl, tr.head) + ": Sektorgroessen-Code "
+                      + std::to_string(s.n) + " nicht darstellbar";
+                return false;
+            }
+        }
+    }
+
+    // Eine Datenrate je Datei
+    uint16_t rate = v ? v->rate_kbps : formatiert.front().rate_kbps;
+    if (rate != 250 && rate != 300 && rate != 500) rate = 250;
+    if (!v) {
+        for (const TrackRecord& tr : formatiert)
+            if (tr.rate_kbps != rate) {
+                warnungen.push_back("Die Spuren haben verschiedene Datenraten, TeleDisk fuehrt nur eine: "
+                                    + std::to_string(rate) + " kbit/s (erste belegte Spur) gilt");
+                break;
+            }
+    }
+    bool alleFm = true;
+    for (const TrackRecord& tr : formatiert) alleFm = alleFm && tr.enc == Encoding::FM;
+    const bool globalFm = alleFm && (!v || v->fm_global);
+    const Encoding standard = formatiert.front().enc;
+
+    std::map<unsigned, size_t> vorhanden;
+    for (size_t i = 0; i < formatiert.size(); ++i)
+        vorhanden[formatiert[i].cyl * 2u + formatiert[i].head] = i;
+    std::map<unsigned, const TrackHead*> vKoepfe;
+    if (v) for (const TrackHead& t : v->heads) vKoepfe[t.cyl * 2u + t.head] = &t;
+
+    // Pseudosektoren der Vorlage je Spur, soweit die Spur noch dazu passt
+    std::map<unsigned, std::vector<const PseudoSector*>> pseudoJe;
+    size_t pseudoVerloren = 0, pseudoGeschrieben = 0;
+    if (v) {
+        for (const PseudoSector& p : v->pseudo) {
+            const unsigned key = p.cyl * 2u + p.head;
+            const auto z = vorhanden.find(key);
+            const size_t echte = z == vorhanden.end() ? 0 : formatiert[z->second].sectors.size();
+            if (p.real == echte && p.pos <= echte && (echte + 1) <= 254) pseudoJe[key].push_back(&p);
+            else ++pseudoVerloren;
+        }
+    } else if (vorlage) {
+        pseudoVerloren = vorlage->pseudo.size();
+    }
+    if (pseudoVerloren)
+        warnungen.push_back(std::to_string(pseudoVerloren) + " Pseudosektor(en) (Flag 0x40) nicht zurueckgeschrieben"
+                            + (v ? " (Spur hat sich geaendert)" : " (keine passende Vorlage)"));
+
+    // Vollstaendige Soll-Liste (auch leere Spuren) samt Spurbit
+    struct Spur { TrackRecord tr; bool fmBit; };
+    std::vector<Spur> soll;
+    for (uint8_t c = 0; c < in.numCylinders(); ++c)
+        for (uint8_t h = 0; h < in.numHeads(); ++h) {
+            const unsigned key = c * 2u + h;
+            const auto th = vKoepfe.find(key);
+            const TrackHead* kopfV = th == vKoepfe.end() ? nullptr : th->second;
+            const auto vi = vorhanden.find(key);
+            Spur sp;
+            bool wollFm;
+            if (vi == vorhanden.end()) {
+                sp.tr.cyl = c; sp.tr.head = h;
+                wollFm = kopfV ? (kopfV->fm || v->fm_global) : standard == Encoding::FM;
+            } else {
+                sp.tr = std::move(formatiert[vi->second]);
+                wollFm = sp.tr.enc == Encoding::FM;
+            }
+            bool bit = wollFm;
+            if (bit && globalFm && kopfV && !kopfV->fm) bit = false;   // wie in der Quelle: nur das globale Bit
+            sp.fmBit = bit;
+            sp.tr.enc = (bit || globalFm) ? Encoding::FM : Encoding::MFM;
+            sp.tr.rate_kbps = rate;
+            soll.push_back(std::move(sp));
+        }
+
+    // Datei aufbauen: Kopf
+    std::vector<uint8_t> f;
+    uint8_t kopf[12] = {'T', 'D', 0, 0, 0x15, 0, 0, 0, 0, 2, 0, 0};
+    bool kommentarDa = true;
+    if (v) {
+        std::memcpy(kopf, v->raw_header.data(), 10);
+        kopf[0] = 'T'; kopf[1] = 'D';          // td wird als TD zurueckgeschrieben
+        kommentarDa = (kopf[7] & 0x80) != 0;
+    } else {
+        kopf[6] = laufwerkstypRaten(rate, alleFm, in.numCylinders(), maxSektoren);
+        kopf[7] = 0x80;
+        kopf[9] = in.numHeads() == 1 ? 1 : 2;
+    }
+    kopf[5] = static_cast<uint8_t>((rate == 250 ? 0 : rate == 300 ? 1 : 2) | (globalFm ? 0x80 : 0));
+    const uint16_t kcrc = crc16(kopf, 10);
+    kopf[10] = static_cast<uint8_t>(kcrc & 0xFF);
+    kopf[11] = static_cast<uint8_t>(kcrc >> 8);
+    f.assign(kopf, kopf + 12);
+
+    // Kommentarblock
+    if (kommentarDa) {
+        std::vector<uint8_t> k;   // ab Byte 2 des Blocks: Laenge, Zeitstempel, Text
+        std::vector<uint8_t> text;
+        uint8_t stamp[6];
+        if (v) {
+            text = v->comment_raw;
+            std::memcpy(stamp, v->stamp, 6);
+        } else {
+            static const char kText[] = "Image file created by k1520emu";
+            text.assign(kText, kText + sizeof(kText));   // inkl. abschliessendem NUL
+            stempelJetzt(stamp);
+        }
+        put16(k, static_cast<unsigned>(text.size()));
+        k.insert(k.end(), stamp, stamp + 6);
+        k.insert(k.end(), text.begin(), text.end());
+        put16(f, crc16(k.data(), k.size()));
+        f.insert(f.end(), k.begin(), k.end());
+    }
+
+    // Spursaetze
+    uint8_t letzteKopie[4] = {0xFF, 0, 0, 0};
+    for (const Spur& sp : soll) {
+        const TrackRecord& tr = sp.tr;
+        const unsigned key = tr.cyl * 2u + tr.head;
+        const auto pj = pseudoJe.find(key);
+        const size_t nPseudo = pj == pseudoJe.end() ? 0 : pj->second.size();
+        const uint8_t hb = static_cast<uint8_t>(tr.head | (sp.fmBit ? 0x80 : 0));
+        uint8_t th[4] = {static_cast<uint8_t>(tr.sectors.size() + nPseudo), tr.cyl, hb, 0};
+        th[3] = static_cast<uint8_t>(crc16(th, 3) & 0xFF);
+        f.insert(f.end(), th, th + 4);
+        std::memcpy(letzteKopie, th, 4);
+
+        size_t nextP = 0;
+        auto pseudosBis = [&](size_t pos) {
+            while (nPseudo && nextP < nPseudo && pj->second[nextP]->pos <= pos) {
+                const PseudoSector& p = *pj->second[nextP++];
+                f.insert(f.end(), p.header, p.header + 6);
+                f.insert(f.end(), p.block.begin(), p.block.end());
+                ++pseudoGeschrieben;
+            }
+        };
+        for (size_t i = 0; i < tr.sectors.size(); ++i) {
+            pseudosBis(i);
+            const SectorRecord& s = tr.sectors[i];
+            uint8_t fl = 0;
+            if (s.no_data) fl = 0x20;
+            else {
+                if (s.data_error) fl |= 0x02;
+                if (s.deleted)    fl |= 0x04;
+            }
+            const uint8_t crc8 = s.no_data ? 0 : static_cast<uint8_t>(crc16(s.data.data(), s.data.size()) & 0xFF);
+            const uint8_t sk[6] = {s.c, s.h, s.r, s.n, fl, crc8};
+            f.insert(f.end(), sk, sk + 6);
+            if (!s.no_data) datenBlock(f, s.data);
+        }
+        pseudosBis(tr.sectors.size());
+    }
+    // Endemarke: Kopie des letzten Spurkopfes mit 0xFF
+    f.push_back(0xFF);
+    f.insert(f.end(), letzteKopie + 1, letzteKopie + 4);
+
+    // Gegenprobe: was wir geschrieben haben, muss der Leser unveraendert zurueckgeben.
+    std::vector<TrackRecord> zurueck, sollListe;
+    for (const Spur& sp : soll) sollListe.push_back(sp.tr);
+    SourceInfo si;
+    std::string e2;
+    if (!decodeBuffer(f, zurueck, &si, e2) || !gleich(sollListe, zurueck)
+        || si.pseudo_sectors != pseudoGeschrieben) {
+        err = "TeleDisk: interner Fehler beim Kodieren (Gegenprobe fehlgeschlagen"
+              + (e2.empty() ? std::string() : ": " + e2) + ")";
+        return false;
+    }
+    for (const std::string& w : warnungen) si.warnings.push_back(w);
+    out = std::move(f);
+    if (geschrieben) *geschrieben = std::move(si);
+    return true;
 }
 
 bool Td0Codec::save(const std::string& path, const DiskMedium& in, const SourceInfo* vorlage,
                     SourceInfo* geschrieben, std::string& err) {
     std::vector<uint8_t> datei;
-    if (!encode(in, vorlage, datei, geschrieben, err)) return false;
-    err = "TeleDisk (.td0): Schreiben ist noch nicht implementiert: " + path;
-    return false;
+    if (!encode(in, vorlage, datei, geschrieben, err)) return false;   // Zieldatei unberuehrt
+
+    // Erst in eine Nachbardatei, dann umbenennen: nie ein halb geschriebenes Abbild.
+    const std::string tmp = path + ".k1520tmp";
+    {
+        std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
+        if (!f) { err = "Kann Datei nicht schreiben: " + tmp; return false; }
+        f.write(reinterpret_cast<const char*>(datei.data()), static_cast<std::streamsize>(datei.size()));
+        f.flush();
+        if (!f) {
+            f.close();
+            std::error_code ec;
+            std::filesystem::remove(tmp, ec);
+            err = "Schreibfehler (unvollstaendig): " + path;
+            return false;
+        }
+    }
+    std::error_code ec;
+    std::filesystem::rename(tmp, path, ec);
+    if (ec) {
+        std::error_code ec2;
+        std::filesystem::remove(tmp, ec2);
+        err = "Kann Datei nicht ersetzen: " + path + " (" + ec.message() + ")";
+        return false;
+    }
+    return true;
 }
 
 bool Td0Codec::save(const std::string& path, const DiskMedium& in, std::string& err) {
