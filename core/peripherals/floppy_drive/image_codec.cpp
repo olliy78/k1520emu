@@ -12,6 +12,7 @@
 #include "core/peripherals/floppy_drive/cqm_codec.h"
 #include "core/peripherals/floppy_drive/dmk_codec.h"
 #include "core/peripherals/floppy_drive/hfe_codec.h"
+#include "core/peripherals/floppy_drive/imd_codec.h"
 #include "core/peripherals/floppy_drive/img_codec.h"
 
 #include <cctype>
@@ -30,16 +31,6 @@ bool endetAuf(const std::string& path, const char* suffix) {
             return false;
     }
     return true;
-}
-
-/// @brief Beginnt die Datei mit @p magic (@p n Bytes)?  Nur die Kennung, keine Kopfpruefung.
-bool beginntMit(const std::string& path, const char* magic, size_t n) {
-    FILE* f = std::fopen(path.c_str(), "rb");
-    if (!f) return false;
-    char buf[8] = {};
-    const size_t got = std::fread(buf, 1, n, f);
-    std::fclose(f);
-    return got == n && std::memcmp(buf, magic, n) == 0;
 }
 
 /// @brief TeleDisk-Kopf: Kennung "TD" (unkomprimiert) / "td" (Advanced Compression) UND
@@ -78,9 +69,9 @@ ContainerType ImageCodec::detect(const std::string& path) {
     if (HfeCodec::isHfe(path)) return ContainerType::Hfe;
     // CQM traegt Kennung + Kopfpruefbyte → ebenfalls Vorrang vor der Endung.
     if (CqmCodec::isCqm(path)) return ContainerType::Cqm;
-    // TD0/IMD: Kennung am Dateianfang (Stub, AP A0; TD0 mit Kopf-CRC).
+    // TD0 (Stub, AP A0; Kopf-CRC) und IMD (Kennung + 0x1A) tragen eine Kennung.
     if (istTd0Kennung(path)) return ContainerType::Td0;
-    if (beginntMit(path, "IMD ", 4)) return ContainerType::Imd;
+    if (ImdCodec::isImd(path)) return ContainerType::Imd;
     // DMK hat keine Magic-Zahl: nur akzeptieren, wenn Endung UND Header passen.
     if (endetAuf(path, ".dmk") && DmkCodec::looksLikeDmk(path)) return ContainerType::Dmk;
     return ContainerType::Img;
@@ -127,8 +118,7 @@ bool ImageCodec::load(const std::string& path, ContainerType type,
             err = "TeleDisk (.td0) ist noch nicht implementiert: " + path;
             return false;
         case ContainerType::Imd:
-            err = "ImageDisk (.imd) ist noch nicht implementiert: " + path;
-            return false;
+            return ImdCodec::load(path, out, nullptr, err);
         case ContainerType::Img:
         default:
             if (!fmt) {
@@ -152,8 +142,7 @@ bool ImageCodec::save(const std::string& path, ContainerType type,
             err = "TeleDisk (.td0) ist noch nicht implementiert: " + path;
             return false;
         case ContainerType::Imd:
-            err = "ImageDisk (.imd) ist noch nicht implementiert: " + path;
-            return false;
+            return ImdCodec::save(path, in, err);
         case ContainerType::Img:
         default:
             if (!fmt) {

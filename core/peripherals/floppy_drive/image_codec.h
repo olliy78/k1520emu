@@ -14,7 +14,7 @@
  * | Dmk       | `.dmk` | ja (Header/IDAM-Tabelle) | nein |
  * | Cqm       | `.cqm` | ja (Kopf) | nein (Geometrie aus dem Medium, wie `.img` nur fuer rawCompatible-Medien) |
  * | Td0       | `.td0` | ja (Kopf) | nein (Sektorlisten, Entwurf 38; AP A0: nur Geruest) |
- * | Imd       | `.imd` | ja (Kopf) | nein (Sektorlisten, Entwurf 38; AP A0: nur Geruest) |
+ * | Imd       | `.imd` | ja (Kopf) | nein (Sektorlisten, Entwurf 38; Lesen/Schreiben AP I1) |
  *
  * @see doc/design/09_floppy_drive.md §4
  * @author Olaf Krieger
@@ -37,7 +37,7 @@ enum class ContainerType : uint8_t {
     Dmk,       ///< David Keil's Disk Image (.dmk) — Spur-Bytes + IDAM-Tabelle
     Cqm,       ///< CopyQM (.cqm) — RLE-gepackte Sektoren; schreibbar nur fuer rawCompatible-Medien einheitlicher Geometrie
     Td0,       ///< TeleDisk (.td0) — Sektorlisten je Spur (Entwurf 38); Laden/Speichern folgt in AP T1/T2
-    Imd        ///< ImageDisk (.imd) — Sektorlisten je Spur (Entwurf 38); Laden/Speichern folgt in AP I1
+    Imd        ///< ImageDisk (.imd) — Sektorlisten je Spur (Entwurf 38); Lesen/Schreiben ueber @ref ImdCodec
 };
 
 /**

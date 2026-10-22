@@ -178,6 +178,8 @@ k1520_add_test(disk_image     SRC peripherals/test_disk_image.cpp     LIBS k1520
 k1520_add_test(cqm_codec      SRC peripherals/test_cqm_codec.cpp      LIBS k1520_floppy2 LABELS "${_lbl}")
 # Zwischenschicht der Sektor-Container .td0/.imd (Entwurf 38, AP A0)
 k1520_add_test(sector_track_io SRC peripherals/test_sector_track_io.cpp LIBS k1520_floppy2 LABELS "${_lbl}")
+# ImageDisk (.imd, Lesen und Schreiben; Entwurf 38 AP I1)
+k1520_add_test(imd_codec      SRC peripherals/test_imd_codec.cpp      LIBS k1520_floppy2 LABELS "${_lbl}")
 # Physische Diskette am Greaseweazle: Spurzustaende + Auftragswarteschlange (§14).
 # Braucht KEINE Hardware — ein Ersatz-Arbeitsfaden bedient die Auftraege aus dem RAM.
 k1520_add_test(track_sync     SRC peripherals/test_track_sync.cpp     LIBS k1520_floppy2 LABELS "${_lbl}")
