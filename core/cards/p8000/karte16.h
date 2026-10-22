@@ -139,6 +139,9 @@ public:
     /// Zieht die Karte bis @p ziel (Takte des U8001) nach; im Reset ohne Schritt.
     void laufeBis(uint64_t ziel);
     uint64_t zeit() const { return zeit_; }
+    /// Setzt die Kartenzeit auf den Stand der Maschine (nach powerOn: die Maschinenzeit laeuft weiter,
+    /// sonst holte laufeBis die gesamte Vorgeschichte nach - und mit ihr die Uhrenkarte).
+    void zeitSetzen(uint64_t t) { zeit_ = t; }
 
     // ─── Bausteine ───────────────────────────────────────────────────────────
     Z8000&            cpu()   { return cpu_; }

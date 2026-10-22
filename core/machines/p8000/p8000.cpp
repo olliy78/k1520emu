@@ -199,6 +199,7 @@ void P8000Machine::powerOn()
     if (wdc_) wdc_->powerOn();   // Netz-Ein des WDC; danach haelt PIO2-B5 (Pull-up) ihn im Reset
     if (k16_) {
         k16_->powerOn();     // PRES−: MRESET− und PIORESET−; RESET (K11) haelt den U8001
+        k16_->zeitSetzen(zeit16(total_cycles_));   // Maschinenzeit laeuft weiter: kein Nachholen der Vorgeschichte (Uhr!)
         kopplung_->rechne();
     }
     if (wdc_an_) wdc_an_->rechne();

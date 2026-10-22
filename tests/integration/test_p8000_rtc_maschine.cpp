@@ -164,6 +164,31 @@ void laufe(P8000Machine& m, int sek) {
 }
 }  // namespace
 
+// ── Uhr == Maschinenzeit der Karte16 (Vorbefund R4) ──────────────────────────
+
+TEST(P8000RtcMaschine, UhrLaeuftSoSchnellWieDieMaschinenzeitBeiderKartentypen) {
+    for (const auto typ : {P8000Machine::Config::Rtc::U130X, P8000Machine::Config::Rtc::Rtc72421}) {
+        int64_t jetzt = utc(2026, 10, 22, 14, 35, 46);
+        P8000Machine::Config c;
+        c.karte16 = true;
+        c.rtc = typ;
+        c.rtc_utc = true;
+        c.rtc_zeitquelle = [&] { return jetzt; };
+        P8000Machine m(c);
+        const int64_t z0 = m.karte16()->rtc()->gastZeit();
+        laufe(m, 30);
+        EXPECT_NEAR(double(m.karte16()->rtc()->gastZeit() - z0), 30.0, 1.0);
+        // Kaltstart mitten im Lauf: die Uhr zaehlt danach weiter nur die neu gelaufene Zeit.
+        m.powerOff();
+        m.powerOn();
+        const int64_t z1 = m.karte16()->rtc()->gastZeit();
+        laufe(m, 10);
+        EXPECT_NEAR(double(m.karte16()->rtc()->gastZeit() - z1), 10.0, 1.0);
+        // Die Kartenzeit selbst folgt der Maschinenzeit (4 MHz: 40 s gelaufen)
+        EXPECT_NEAR(double(m.karte16()->zeit()) / 4e6, 40.0, 1.0);
+    }
+}
+
 TEST(P8000RtcMaschine, NetzAusEinLaesstDieUhrUmDieAusDauerWeiterlaufen) {
     for (const bool mit_datei : {true, false}) {
         SCOPED_TRACE(mit_datei ? "mit Batteriedatei" : "nur im Speicher");
@@ -185,6 +210,8 @@ TEST(P8000RtcMaschine, NetzAusEinLaesstDieUhrUmDieAusDauerWeiterlaufen) {
         // Wirtszeit springt zurueck waehrend aus: die Uhr geht nie zurueck.
         laufe(m, 2);
         const int64_t st2 = m.karte16()->rtc()->gastZeit();
+        // Vorbefund R4: nach powerOn holte die Karte16 die gesamte Vorgeschichte nach (+5 s statt +2 s).
+        EXPECT_NEAR(double(st2 - (stand + 3600)), 2.0, 1.0);
         m.powerOff();
         jetzt -= 7200;
         m.powerOn();
@@ -206,7 +233,7 @@ TEST(P8000RtcMaschine, KaltstartOhneNetzAusUndResetLassenDieUhrUnberuehrt) {
     EXPECT_EQ(m.karte16()->rtc()->gastZeit(), stand);
     laufe(m, 2);
     // (Wie weit die Karte16 nach dem Kaltstart nachzieht, ist nicht Sache der Uhr - nur: kein Sprung um die Wirtszeit.)
-    EXPECT_GE(m.karte16()->rtc()->gastZeit(), stand + 2);
+    EXPECT_NEAR(double(m.karte16()->rtc()->gastZeit() - stand), 2.0, 1.0);
     EXPECT_LT(m.karte16()->rtc()->gastZeit(), stand + 100);
 }
 

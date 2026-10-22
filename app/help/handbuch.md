@@ -1741,10 +1741,18 @@ Abbild, das ein anderer Prozess schon hält, wird nicht angeschlossen (Meldung i
 Die Uhrenkarte steckt am 16-Bit-Teil; *Einstellungen ▸ Allgemein ▸ RTC* hat dafür zwei Felder
 nebeneinander. Ein Wechsel ist ein Kaltstart.
 
-* **Typ.** *Original U130x* ist die Karte des Geräts; der Original-Kern **WEGA 3.2 erkennt nur sie**.
-  *Epson RTC-72421* ist der Nachbau von pofo.de und braucht den Treiber `sa.timer` bzw. den
-  Kerntreiber `timer` ab 1.1 — ein WEGA-Kern ohne ihn sieht die Karte nicht. *keine* lässt den
-  Bus an der Stelle leer. Vorgabe der Auslieferung: *Original U130x*.
+* **Typ.** *Original U130x* ist die Karte des Geräts; *Epson RTC-72421* ist der Nachbau von
+  pofo.de. *keine* lässt den Bus an der Stelle leer. Vorgabe der Auslieferung: *Original U130x*.
+  **Welche Platte die Karte liest:** der Kern der ausgelieferten **WEGA-3.1-Platte** erkennt
+  **beide** Typen und meldet beim Start `RFT U130X RTC found` bzw. `Seiko Epson RTC-72421 found`.
+  Der Kern der **WEGA-3.0-Platte** (Stand 02/88) hat gar keinen Uhrentreiber: er ignoriert jede
+  Karte und läuft mit der Zeit, die das Dateisystem zuletzt kannte — das ist kein Fehler des
+  Emulators. Auf der 3.1-Platte zeigt `date` die Wirtszeit schon **ohne Zeitversatz** richtig
+  (2026 ist kein Problem).
+* **Datum beim Start.** WEGA fragt beim Hochfahren immer „Enter Date … / Enter Time …“; davor steht
+  „Last known date and time:“ — das ist die Zeit, die der Kern von der Karte gelesen hat. Wer
+  nicht antwortet, bekommt nach zwei Minuten genau diese Zeit; wer Datum und Zeit eintippt,
+  überschreibt sie (die Zeit lässt sich nicht mit RETURN überspringen).
 * **Zeitversatz.** Die Uhr zeigt dem Gast die Zeit des Wirts um 0, 28 oder 40 Jahre zurück
   (gerechnet wird nur, was der Gast liest und schreibt). *−28 Jahre* trifft Wochentag **und**
   Schaltjahrmuster, *−40 Jahre* nur das Schaltjahrmuster. Vorgabe: *−40 Jahre*. Das Feld ist nur
@@ -1755,8 +1763,8 @@ nebeneinander. Ein Wechsel ist ein Kaltstart.
   die Jahre 1980–2019 an); *−28 Jahre* trifft im Wirtsjahr 2028 den Jahr-2000-Fehler der
   Stellroutinen von `sa.timer` (beide Karten); die **harte Grenze** ist 2038, weil WEGA die Zeit in
   32 Bit rechnet — ohne Versatz geht es bis 2037, mit −28 bis 2065, mit −40 bis 2077. Der
-  Kerntreiber von pofo.de (`timegm.c`) liefert in Schaltjahren ab März ein Datum einen Tag zu früh;
-  der Original-Kern rechnet richtig. Den Wochentag liest kein Treiber. Die Schaltfläche *Uhr nach
+  Kerntreiber der 3.1-Platte liefert in Schaltjahren ab März ein Datum einen Tag zu früh
+  (gemessen für beide Karten: 15.03.2028 erscheint als 14.03.); der 29.02. stimmt. Den Wochentag liest kein Treiber. Die Schaltfläche *Uhr nach
   Wirtszeit stellen* ist von alledem nicht betroffen (sie schreibt die Karte direkt).
 * **Ohne 16-Bit-Teil** (Ausstattung *nur 8-Bit*) sind beide Felder ausgegraut; die Wahl bleibt
   gemerkt und gilt wieder, sobald die Ausstattung ein 16-Bit-Teil hat. Im Betrieb *nur Terminal*

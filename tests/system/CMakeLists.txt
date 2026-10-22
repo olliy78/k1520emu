@@ -208,6 +208,14 @@ k1520_add_test(p8000_wega_diskette SRC test_p8000_wega_diskette.cpp
                             LIBS k1520_p8000 k1520_fs k1520_logger k1520_testsupport
                             LABELS "system;slow;wega_install" DEFS LOG_LEVEL=2 TIMEOUT 3600 RUN_SERIAL)
 
+# ─── P8000-Uhrenkarten am laufenden WEGA (Entwurf 37 AP R4): `date` nach dem Kaltstart mit U130X/RTC-72421,
+# Treiberbefund der Kerne, Schaltjahr, Zeitverhalten, kein Ruecksprung ueber einen Neustart.  W31 =
+# ausgelieferte Platte; W30 braucht den Zwischenstand p15_7_sync (sonst uebersprungen).
+k1520_add_test(p8000_wega_rtc SRC test_p8000_wega_rtc.cpp
+                            LIBS k1520_p8000 k1520_gzip k1520_logger k1520_testsupport
+                            LABELS "system;slow;wega_install"
+                            DEFS LOG_LEVEL=2 "P8000_WEGA31_DIR=\"${CMAKE_SOURCE_DIR}/disks/p8000_wega31\"" TIMEOUT 14400 RUN_SERIAL)
+
 # ─── Kermit auf WEGA 3.1 (Entwurf 36 AP K1): Kaltstart von der ausgelieferten Platte
 # (disks/p8000_wega31, /usr/bin/kermit + Benutzer `kermit`), Konsole `kermit`, tty0 per Telnet als
 # Kermit-Server hinter getty.  Ohne Startdiskette/Platte uebersprungen; `K1520_WEGA31_PLATTE` uebersteuert.
