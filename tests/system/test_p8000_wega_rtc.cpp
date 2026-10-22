@@ -1,6 +1,6 @@
 /**
  * @file test_p8000_wega_rtc.cpp
- * @brief Abnahme der P8000-Uhrenkarten am laufenden WEGA (Entwurf 37, AP R4): was zeigt `date` nach dem
+ * @brief Abnahme der P8000-Uhrenkarten am laufenden WEGA (Entwurf 38, AP R4): was zeigt `date` nach dem
  *        Kaltstart mit der Karte, welcher Kerntreiber steckt auf welcher Platte, Schaltjahr, Zeitverhalten,
  *        kein Ruecksprung ueber einen Neustart.
  *
@@ -10,7 +10,7 @@
  *   - W31: die ausgelieferte `disks/p8000_wega31/p8000_wega31_platte.avr.img.gz` (Kern mit `u130.o`/`rtc72421`).
  * Kaltstart wie am Geraet (Netz ein -> MON8 -> Koppelsoftware -> MON16 -> NMI -> boot0 -> WEGA), Konsole am
  * Kern-Terminal.  Die Zeitquelle der Karte ist fest eingestellt (Wirtszeit steht, UTC), die Uhr zaehlt in
- * Maschinenzeit.  Befunde: doc/design/37_p8000_rtc.md Abschnitt 11.
+ * Maschinenzeit.  Befunde: doc/design/38_p8000_rtc.md Abschnitt 11.
  */
 
 #include <gtest/gtest.h>
@@ -277,7 +277,7 @@ bool abnahme(const char* titel, const Aufbau& a, Fall& f, std::string* skip = nu
 // ── Treiberbefund (ohne Boot): Kernabbild der Platten ─────────────────────────────────────────────────
 // Der W30-Kern (Generated 02/12/88) enthaelt weder timer.o noch einen Zugriff auf FEF1/FDE1 (Portadressen der Karten);
 // der W31-Kern (Generated 06/29/116) traegt `u130.o`, `rtc72421`, "RFT U130X RTC", "Seiko Epson RTC-72421", "%s found".
-// Belegt per `k1520disktool get <platte> md2/wega` + `strings`, Befund in Entwurf 37 Abschnitt 11; der Kaltstart unten
+// Belegt per `k1520disktool get <platte> md2/wega` + `strings`, Befund in Entwurf 38 Abschnitt 11; der Kaltstart unten
 // zeigt es am laufenden Kern (W31 meldet „... RTC found", W30 nicht).
 
 // ── Kaltstart mit den Karten: was liest der Kern? ─────────────────────────────────────────────────────
@@ -367,7 +367,7 @@ TEST(P8000WegaRtc, W30_KernOhneUhrentreiberIgnoriertDieKarte) {
 }
 
 // Schaltjahr 2028 (Karte und Kern): 29.2. stimmt.  Im Maerz rechnet der Kerntreiber der W31-Platte einen Tag zu frueh
-// (Gastfehler `timegm.c`, Entwurf 37 §7/§11) — beide Karten liefern den richtigen Wert (Karte = Gastzeit).
+// (Gastfehler `timegm.c`, Entwurf 38 §7/§11) — beide Karten liefern den richtigen Wert (Karte = Gastzeit).
 TEST(P8000WegaRtc, W31_U130X_Schaltjahr2028) {
     stumm();
     for (const bool maerz : {false, true}) {

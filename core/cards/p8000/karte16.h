@@ -103,7 +103,7 @@ public:
         uint8_t  nbr_start = 0x00;
         uint8_t  leer8 = 0xFF;
         uint16_t leer16 = 0xFFFF;
-        /// Uhrenkarte (Option, Entwurf 37); `typ = Aus` = nicht bestueckt, E/A bitgleich wie ohne.
+        /// Uhrenkarte (Option, Entwurf 38); `typ = Aus` = nicht bestueckt, E/A bitgleich wie ohne.
         P8000RtcConfig rtc;
     };
 
@@ -157,7 +157,7 @@ public:
     K1520Bus&         peripherieBus() { return peri_; }
     const Config&     config() const { return cfg_; }
     const uint8_t*    rom() const { return rom_; }
-    /// Uhrenkarte (Entwurf 37); nullptr = nicht bestueckt.
+    /// Uhrenkarte (Entwurf 38); nullptr = nicht bestueckt.
     P8000Rtc*         rtc()   { return rtc_.get(); }
 
     /// Externe Treiber an PIO-Pins (Kopplung, WDC) — Muster `P8000Karte8::setzePinTreiber`.

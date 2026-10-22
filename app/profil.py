@@ -103,7 +103,7 @@ class Programmprofil:
     #: Fruehere Modellschluessel → heutige (alte Konfigurationen des P8000: die Kern-Terminal-Modelle
     #: ``p8000``/``p8000-16``/``p8000-8`` gibt es in der Oberflaeche nicht mehr).
     modell_alt: Tuple[Tuple[str, str], ...] = ()
-    #: Gruppe „RTC" (Uhrenkarte, Entwurf 37 R3) unter *Allgemein*: nur am P8000.  Die beiden
+    #: Gruppe „RTC" (Uhrenkarte, Entwurf 38 R3) unter *Allgemein*: nur am P8000.  Die beiden
     #: Felder stehen in :attr:`hardware` (Schluessel ``rtc``/``rtc_versatz``), werden aber als
     #: eigene Gruppe mit Anzeige der Gastzeit und Schaltflaeche gebaut.
     rtc_wahl: bool = False
@@ -687,7 +687,7 @@ P8000 = Programmprofil(
          (("4.2", "WDC 4.2"), ("4.0.05", "WDC 4.0.05 (experimentell)"),
           ("3.4.05", "WDC 3.4.05 (experimentell)")),
          ("p8000-ot",)),
-        # Uhrenkarte (Entwurf 37): als Gruppe „RTC“ gebaut (settings_widget), Vorgabe siehe hardware_vorgaben.
+        # Uhrenkarte (Entwurf 38): als Gruppe „RTC“ gebaut (settings_widget), Vorgabe siehe hardware_vorgaben.
         (_rtc.SCHLUESSEL_TYP, "RTC:", _rtc.TIPP_TYP, _rtc.TYPEN, _MIT16),
         (_rtc.SCHLUESSEL_VERSATZ, "Zeitversatz:", _rtc.TIPP_VERSATZ, _rtc.VERSAETZE, _MIT16),
         ("platte_par", "Parametersatz der Platte:",

@@ -1,4 +1,4 @@
-"""P8000: die Uhrenkarte (RTC) in der Oberflaeche (Entwurf 37, AP R3).
+"""P8000: die Uhrenkarte (RTC) in der Oberflaeche (Entwurf 38, AP R3).
 
 Gruppe *RTC* unter *Einstellungen ▸ Allgemein* (Typ, Zeitversatz, Uhrzeit des Gastsystems, Schaltflaeche),
 Feld „RTC:“ der Statuszeile, Batteriedatei je Instanz, Weitergabe an den Kern ueber das Programmprofil.

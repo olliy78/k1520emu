@@ -100,7 +100,7 @@ def test_vorgaben_des_vollgeraets(qapp, umgebung):
     assert p.standard_modell() == "p8000-ot"
     kern = p.kern_parameter("p8000-ot", {})["p8000"]
     from app import rtc
-    # Uhrenkarte: Auslieferungsvorgabe U130x / -40 Jahre (Entwurf 37 R3)
+    # Uhrenkarte: Auslieferungsvorgabe U130x / -40 Jahre (Entwurf 38 R3)
     assert kern == {"karte16": "1", "wdc": "4.2", "terminal": "original", "index8": "3",
                     "index16": "4", "mon16": "3.1", "dram": "4x256K", "mon8": "3.1",
                     "plattepar": "aus", "rtc": "u130x", "rtc_jahresversatz": -40, "rtc_utc": 1,

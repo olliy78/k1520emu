@@ -1,4 +1,4 @@
-# Echtzeituhr-Karte U130X am P8000 (Entwurf 37, AP R2): `--rtc u130x`, Befehl `rtc`.
+# Echtzeituhr-Karte U130X am P8000 (Entwurf 38, AP R2): `--rtc u130x`, Befehl `rtc`.
 tool:    k1520dbg
 run:     --machine p8000-16 --rtc u130x -x %CLI_DIR%/scripts/p8000_rtc.dbg
 timeout: 120

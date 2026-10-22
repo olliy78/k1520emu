@@ -206,7 +206,7 @@ K1520_API K1520Handle k1520_create_pc1715_ex(int variante, int bildschirm, int z
  *                `firmware` (nur 5.0), `zeichensatz` (ezs-dzs | dzs-ezs = Bestueckung ZG1-ZG2),
  *                `teiler` (7 | 8, Zeichentakt), `vorlauf` (ms, die das Terminal vor dem Rechner
  *                eingeschaltet wird; Vorgabe 1500).
- *                Echtzeituhr-Karte (Entwurf 37, nur mit `karte16=1`): `rtc` (aus | u130x = Originalkarte mit Armbanduhr-Chip,
+ *                Echtzeituhr-Karte (Entwurf 38, nur mit `karte16=1`): `rtc` (aus | u130x = Originalkarte mit Armbanduhr-Chip,
  *                rtc72421 = Nachbau),
  *                `rtc_jahresversatz` (Jahre, nur Anzeige), `rtc_utc` (0 = Ortszeit | 1 = UTC),
  *                `rtc_zustand` (Pfad der Batteriedatei).
@@ -1024,7 +1024,7 @@ K1520_API bool        k1520_state_load(K1520Handle h, const char* path);
 /** @brief Grund des letzten gescheiterten k1520_state_load ("" = keiner). */
 K1520_API const char* k1520_state_error(K1520Handle h);
 
-/* ─── Uhrenkarte des P8000 (Entwurf 37, AP R2b): die Uhr zaehlt in MASCHINENZEIT.
+/* ─── Uhrenkarte des P8000 (Entwurf 38, AP R2b): die Uhr zaehlt in MASCHINENZEIT.
  * Zeiten sind Kalenderzeit als Unix-Sekunden kodiert (die Wanduhr, als waere sie UTC; Ortszeit bzw. UTC
  * wie konfiguriert).  *_zeit/*_startzeit liefern sie GASTSICHTIG (mit Jahresversatz), *_stellen* nehmen sie im
  * Jahr des Wirts (ohne Versatz, wie die Batteriedatei sie speichert).  Die Rechnung lebt im Kern (Startregel

@@ -1,4 +1,4 @@
-"""Uhrenkarte des P8000 in Maschinenzeit (Entwurf 37, AP R2b): C-ABI `k1520_rtc_*` und Python-Bindung.
+"""Uhrenkarte des P8000 in Maschinenzeit (Entwurf 38, AP R2b): C-ABI `k1520_rtc_*` und Python-Bindung.
 
 Die Rechnung (Startregel, Jahresversatz) lebt im Kern; hier wird nur geprueft, dass die Bindung sie
 unveraendert durchreicht -- ohne Maschine (statische Funktionen) und an einer laufenden Maschine.

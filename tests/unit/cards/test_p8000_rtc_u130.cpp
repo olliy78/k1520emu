@@ -1,6 +1,6 @@
 /**
  * @file test_p8000_rtc_u130.cpp
- * @brief Echtzeituhr-Karte U130X (Original, Entwurf 37, AP R2) am 16-Bit-Teil des P8000: Kennung,
+ * @brief Echtzeituhr-Karte U130X (Original, Entwurf 38, AP R2) am 16-Bit-Teil des P8000: Kennung,
  *        Siebensegment-/COM-/Takt-Modell, Zustandsautomat der Armbanduhr, Zeitquelle/Versatz/
  *        Batteriedatei/Save-State, unbestueckt = bitgleich — und der ECHTE Treibercode:
  *        `u130get/u130set/u130start` samt `invalue/rdvalue/outvalue` aus

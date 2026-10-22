@@ -466,7 +466,7 @@ _lib.k1520_term_matrix_scancode.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_
 _lib.k1520_term_matrix_scancode.restype = ctypes.c_uint32
 _lib.k1520_term_leds.argtypes = [K1520Handle, ctypes.c_int]
 _lib.k1520_term_leds.restype = ctypes.c_int
-# Uhrenkarte des P8000 (Entwurf 37, AP R2b)
+# Uhrenkarte des P8000 (Entwurf 38, AP R2b)
 _lib.k1520_rtc_zeit.argtypes = [K1520Handle]
 _lib.k1520_rtc_zeit.restype = ctypes.c_int64
 _lib.k1520_rtc_stellen.argtypes = [K1520Handle, ctypes.c_int64]

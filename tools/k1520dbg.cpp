@@ -48,7 +48,7 @@
  * `--wdc 4.2|4.0.05|3.4.05` und `--hd <abbild>` (nur `--machine p8000-16`, P13d): WDC an der
  * 16-Bit-PIO2 bzw. Winchester an Laufwerk 0 (Kopie wie die Disketten, `--rw` = Original);
  * Befehle `wdc [r|u|d|log]`, `cpu wdc` (nur Ansicht).
- * `--rtc aus|u130x|rtc72421` (nur `--machine p8000-16`, Entwurf 37): Echtzeituhr-Karte am 16-Bit-Teil
+ * `--rtc aus|u130x|rtc72421` (nur `--machine p8000-16`, Entwurf 38): Echtzeituhr-Karte am 16-Bit-Teil
  * (U130X = Originalkarte, rtc72421 = Nachbau); Befehl `rtc` zeigt Typ, Uhrzeit, Versatz, Zustand.
  * `--ptape` steckt die Lochstreifen-Karte K6022 (SIF1000, E0H–E7H; alle Maschinen).
  * `--tape <k52>` / `--tape2 <k52>` / `--tape-card` steckt die Kassettenkarte K5020 (A5120/PRG 30H,
@@ -237,7 +237,7 @@ int main(int argc, char** argv){
     const char* raf_opt = nullptr; // --raf none|raf128|raf512|raf2m: RAM-Floppy auf 88H/89H
     const char* wdc_opt = nullptr; // --wdc 4.2|4.0.05|3.4.05: WDC an der 16-Bit-PIO2 (P8000, P13d)
     const char* konsole_opt = nullptr; // --konsole kern|original: Terminal an tty1 (P8000, P20c)
-    const char* rtc_opt = nullptr; // --rtc aus|u130x|rtc72421: Uhrenkarte am 16-Bit-Teil (Entwurf 37)
+    const char* rtc_opt = nullptr; // --rtc aus|u130x|rtc72421: Uhrenkarte am 16-Bit-Teil (Entwurf 38)
     const char* hd_opt  = nullptr; // --hd <abbild>: Winchester an WDC-Laufwerk 0 (setzt --wdc 4.2)
     std::string ptape_in, ptape_out;   // --ptape-in/-out: Band einlegen / Stanzer an Datei binden
     bool ptape_opt = false;        // --ptape: Lochstreifen-Karte K6022 auf E0H–E7H (Entwurf 23)

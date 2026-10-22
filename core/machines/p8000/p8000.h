@@ -99,7 +99,7 @@ public:
         /// (WEGA `nsseg`).  Siehe `P8000Karte16::Config::nbr_gleichheit_stack`.
         bool     nbr_gleichheit_stack = true;
 
-        // ── Echtzeituhr-Karte (Entwurf 37) — nur mit 16-Bit-Karte, sonst Fehler ──
+        // ── Echtzeituhr-Karte (Entwurf 38) — nur mit 16-Bit-Karte, sonst Fehler ──
         enum class Rtc { Aus, U130X, Rtc72421 };
         Rtc      rtc = Rtc::Aus;
         int      rtc_jahresversatz = 0;       ///< Jahre, nur Anzeige (Rueckfall −28/−40)

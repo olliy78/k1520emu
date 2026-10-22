@@ -344,7 +344,7 @@ int main(int argc, char** argv) {
     bool        machine_p8000 = false;   // P8000, 8-Bit-Seite (AP P7c; gleiche Optionen wie K8915)
     bool        machine_p8000_16 = false;   // --machine p8000-16: mit 16-Bit-Karte (AP P11)
     std::string p8000_wdc, p8000_hd;         // --wdc <fw> / --hd <abbild> (P8000-16, AP P13d)
-    std::string p8000_rtc;                   // --rtc aus|u130x|rtc72421 (P8000-16, Entwurf 37)
+    std::string p8000_rtc;                   // --rtc aus|u130x|rtc72421 (P8000-16, Entwurf 38)
     bool        p8000_original = false;      // --konsole original: tty1 am Originalterminal (AP P20c)
     bool        machine_p8000_terminal = false;   // --machine p8000-terminal: Terminal ohne Rechner (P20d)
     bool        stall_set     = false;   // --stall angegeben? (Vorgabe je Maschine verschieden)

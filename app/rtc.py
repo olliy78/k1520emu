@@ -1,4 +1,4 @@
-"""Uhrenkarte (RTC) des P8000 in der Oberflaeche (Entwurf 37, AP R3).
+"""Uhrenkarte (RTC) des P8000 in der Oberflaeche (Entwurf 38, AP R3).
 
 Hier stehen nur Namen, Texte und die Darstellung der Zeit; GERECHNET wird im Kern
 (Startregel, Jahresversatz, Maschinenzeit -- ``k1520_rtc_*``).  Das Modul importiert

@@ -208,7 +208,7 @@ k1520_add_test(p8000_wega_diskette SRC test_p8000_wega_diskette.cpp
                             LIBS k1520_p8000 k1520_fs k1520_logger k1520_testsupport
                             LABELS "system;slow;wega_install" DEFS LOG_LEVEL=2 TIMEOUT 3600 RUN_SERIAL)
 
-# ─── P8000-Uhrenkarten am laufenden WEGA (Entwurf 37 AP R4): `date` nach dem Kaltstart mit U130X/RTC-72421,
+# ─── P8000-Uhrenkarten am laufenden WEGA (Entwurf 38 AP R4): `date` nach dem Kaltstart mit U130X/RTC-72421,
 # Treiberbefund der Kerne, Schaltjahr, Zeitverhalten, kein Ruecksprung ueber einen Neustart.  W31 =
 # ausgelieferte Platte; W30 braucht den Zwischenstand p15_7_sync (sonst uebersprungen).
 k1520_add_test(p8000_wega_rtc SRC test_p8000_wega_rtc.cpp

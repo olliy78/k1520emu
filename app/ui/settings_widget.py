@@ -324,7 +324,7 @@ class SettingsWidget(QWidget):
                     self.bildschirmSchalterChanged)
                 form.addRow("", self.bildschirm_schalter)
         self._hardware_guard = False
-        # Gruppe „RTC“ (Entwurf 37 R3): Typ und Zeitversatz nebeneinander, darunter die Uhrzeit des
+        # Gruppe „RTC“ (Entwurf 38 R3): Typ und Zeitversatz nebeneinander, darunter die Uhrzeit des
         # Gastsystems und die Schaltflaeche zum Stellen.  Die Felder sind die Hardwarefelder
         # „rtc“/„rtc_versatz“ (Speichern, Vorgabe und Neubau der Maschine laufen wie bei den anderen).
         self.rtc_gruppe = None

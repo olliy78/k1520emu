@@ -2008,7 +2008,7 @@ const char* k1520_state_error(K1520Handle h) {
     return s.c_str();
 }
 
-// ─── Uhrenkarte (P8000, Entwurf 37 AP R2b; andere Maschinen: -1) ─────────────────────────
+// ─── Uhrenkarte (P8000, Entwurf 38 AP R2b; andere Maschinen: -1) ─────────────────────────
 
 static P8000Rtc* p8000Rtc(K1520Handle h) {
     auto* p = h ? dynamic_cast<P8000Machine*>(toMachine(h)) : nullptr;

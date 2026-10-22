@@ -21,7 +21,7 @@
 /// Winchesterabbild an Laufwerk 0 (wird direkt beschrieben — eine Kopie uebergeben).
 /// @p originalTerminal (`--konsole original`, AP P20c): tty1 am Originalterminal Typ 2 statt am
 /// Kern-Terminal; Tasten gehen dann mit Haltezeit ueber die K7673.
-/// @p rtc (`--rtc aus|u130x|rtc72421`, nur mit @p karte16, Entwurf 37): Uhrenkarte am 16-Bit-Teil.
+/// @p rtc (`--rtc aus|u130x|rtc72421`, nur mit @p karte16, Entwurf 38): Uhrenkarte am 16-Bit-Teil.
 int bootTraceP8000(const K8915TraceOpts& o, const prnlst::Listing& prn, bool karte16 = false,
                    const std::string& wdc = "", const std::string& hd = "", bool originalTerminal = false,
                    const std::string& rtc = "");

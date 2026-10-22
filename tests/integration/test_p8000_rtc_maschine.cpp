@@ -1,6 +1,6 @@
 /**
  * @file test_p8000_rtc_maschine.cpp
- * @brief Echtzeituhr-Option in der P8000-Maschine (Entwurf 37, AP R1/R2): nur mit 16-Bit-Karte,
+ * @brief Echtzeituhr-Option in der P8000-Maschine (Entwurf 38, AP R1/R2): nur mit 16-Bit-Karte,
  *        Save-State als eigener Abschnitt (Stand 4 bleibt, alte Staende laden weiter).
  */
 

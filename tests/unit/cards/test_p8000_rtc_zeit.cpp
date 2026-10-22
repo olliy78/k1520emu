@@ -1,6 +1,6 @@
 /**
  * @file test_p8000_rtc_zeit.cpp
- * @brief Zeitmodell der P8000-Uhrenkarten in MASCHINENZEIT (Entwurf 37, AP R2b): die Uhr zaehlt Takte, die
+ * @brief Zeitmodell der P8000-Uhrenkarten in MASCHINENZEIT (Entwurf 38, AP R2b): die Uhr zaehlt Takte, die
  *        Batteriedatei haelt Stand + Wirtszeit, die Startregel max(Stand + Abwesenheit, Wirtszeit) laesst die
  *        Uhr beim Neustart nie zurueckspringen (Schnelllauf-Waechter), von aussen stellen, Jahresversatz,
  *        statische Startzeit, periodisches Speichern, Zwischenstand, Batteriedatei aus R1.

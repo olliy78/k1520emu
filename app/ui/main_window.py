@@ -1876,7 +1876,7 @@ class MainWindow(QMainWindow):
             latch = 0xFF
         platte.zeige(latch, laeuft=an and self.run_timer.isActive(), eingeschaltet=an)
 
-    # ── Uhrenkarte (P8000, Entwurf 37 R3) ────────────────────────────────────
+    # ── Uhrenkarte (P8000, Entwurf 38 R3) ────────────────────────────────────
 
     def _rtc_gesteckt(self) -> bool:
         """Traegt die Maschine eine Uhrenkarte?  Profil mit RTC, Modell mit Rechner UND 16-Bit-Teil

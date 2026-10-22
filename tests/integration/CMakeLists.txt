@@ -345,7 +345,7 @@ k1520_add_test(p8000_stand SRC test_p8000_stand.cpp
                           LIBS k1520_p8000 k1520_logger k1520_testsupport
                           LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 300)
 
-# P8000 Echtzeituhr-Option in der Maschine (Entwurf 37, AP R1): Konfiguration, Save-State-Abschnitt
+# P8000 Echtzeituhr-Option in der Maschine (Entwurf 38, AP R1): Konfiguration, Save-State-Abschnitt
 k1520_add_test(p8000_rtc_maschine SRC test_p8000_rtc_maschine.cpp
                           LIBS k1520_p8000 k1520_logger k1520_testsupport
                           LABELS "${_lbl}" DEFS LOG_LEVEL=2)

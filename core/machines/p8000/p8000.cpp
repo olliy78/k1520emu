@@ -565,7 +565,7 @@ std::vector<uint8_t> P8000Machine::stateBytes() const
         b.clear(); kopplung_->serialize(b); abschnitt(out, ABS_KOPPLUNG, b);
     }
     if (wdc_) { b.clear(); wdc_->serialize(b); abschnitt(out, ABS_WDC, b); }
-    // Uhrenkarte (Entwurf 37): eigener Abschnitt, Stand 4 bleibt — aeltere Leser ueberspringen ihn,
+    // Uhrenkarte (Entwurf 38): eigener Abschnitt, Stand 4 bleibt — aeltere Leser ueberspringen ihn,
     // aeltere Staende laden ohne ihn (der Versatz bleibt dann, wie er ist).
     if (k16_ && k16_->rtc()) { b.clear(); k16_->rtc()->serialize(b); abschnitt(out, ABS_RTC, b); }
 

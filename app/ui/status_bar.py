@@ -410,7 +410,7 @@ class MachineStatus(QWidget):
         # Leitung der P8000-Terminaleinheit zum Rechner (sonst ausgeblendet).
         self.verbindung = SeriellFeld()
         self._lay.addWidget(self.verbindung)
-        # Uhr der P8000-Uhrenkarte (Entwurf 37 R3): nur mit gesteckter Karte und Rechnerbetrieb.
+        # Uhr der P8000-Uhrenkarte (Entwurf 38 R3): nur mit gesteckter Karte und Rechnerbetrieb.
         self.rtc = SeriellFeld()
         self._lay.addWidget(self.rtc)
         self._fest = self._lay.count()

@@ -575,6 +575,17 @@ alles Empfangene als Text an eine `.txt` (`app/mitschrift.py`, Kern `k1520_term_
 (Plan §10.11a). **Vor Arbeiten daran: `doc/merkposten/p8000.md` lesen**; Plan und Stand
 `doc/design/25_p8000.md` (§9/§9a), Quellen/Referenzen `doc/p8000/` (EPROM-Abzüge in `doc/p8000/eproms/`).
 
+## Uhrenkarte (RTC) der P8000 (Ticket #6, Stand 2026-10-22)
+
+Option am 16-Bit-Teil: **U130X** (Original, Armbanduhr-Chip, `FEF1`–`FEFF`) oder **Epson RTC-72421** (Nachbau pofo.de,
+`FDE1`–`FDFF`), Karte `core/cards/p8000/rtc.*`, `P8000Machine::Config::rtc*`, C-ABI `k1520_rtc_*`, `--rtc` in
+`boot_trace`/`k1520dbg` (Befehl `rtc`), Oberfläche *Einstellungen ▸ Allgemein ▸ RTC* (Vorgabe U130x/−40, Statuszeile
+„RTC: …"). Kern-Vorgabe bleibt **aus**.  Drei Festlegungen: **die Uhr zählt in MASCHINENZEIT** und springt beim Start nie
+zurück (`max(Stand + Abwesenheit, Wirtszeit)`, Batteriedatei) — sonst Dateizeiten aus der Zukunft bei schneller Emulation;
+**die Oberfläche speist UTC** (WEGA 3.1 rechnet mit `TZ=MEZ-1MES` selbst um); der 2019-Mangel des echten U130X wird
+**nicht** nachgebildet.  Nur die WEGA-**3.1**-Platte hat einen Uhrentreiber (Lehmanns timer-1.1, Märzfehler in
+`timegm.c` ist Gastcode).  **Vor Arbeiten daran: `doc/merkposten/p8000.md` Nr. 59 lesen**; Entwurf `doc/design/38_p8000_rtc.md`.
+
 ## RAM-Floppy RAF 128/512/2M (alle Maschinen; PC 1715 nur mechanisch, s. Merkposten pc1715)
 
 Steckbare K-1520-RAM-Floppy des ZWG der AdW auf **E/A 88H/89H** (fest), Karte

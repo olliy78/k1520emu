@@ -1,6 +1,6 @@
 /**
  * @file test_p8000_rtc.cpp
- * @brief Echtzeituhr-Karte RTC-72421 am 16-Bit-Teil des P8000 (Entwurf 37, AP R1): Register, BUSY,
+ * @brief Echtzeituhr-Karte RTC-72421 am 16-Bit-Teil des P8000 (Entwurf 38, AP R1): Register, BUSY,
  *        HOLD, Stellen/Lesen, 24/12 h, Schaltjahr, Jahreswechsel, Jahresversatz, Batteriedatei,
  *        Save-State, unbestueckt = bitgleich, und der ECHTE Treibercode `r421init/get/set/start`
  *        (`sa.timer/common/rtc72421.c` des WEGA-Quellbaums, O. Lehmann, BSD) gegen die Karte ueber

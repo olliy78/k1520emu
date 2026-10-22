@@ -5,7 +5,7 @@
  *        Auspraegungen **RTC-72421** (Epson-Nachbau, pofo.de) und **U130X** (Originalkarte 1988,
  *        Armbanduhr-Chip ohne Registerschnittstelle; AP R2, Annahmen [U1]-[U9] weiter unten).
  *
- * Quellen: doc/design/37_p8000_rtc.md; Treiber `sa.timer/common/rtc72421.{h,c}` (BSD, O. Lehmann);
+ * Quellen: doc/design/38_p8000_rtc.md; Treiber `sa.timer/common/rtc72421.{h,c}` (BSD, O. Lehmann);
  * Plan `P8000_Echtzeituhr_v1.2_Plan.pdf` (doc/p8000/uhr/, KiCad Rev 1.7, 2016-07-11).
  *
  * @code
