@@ -162,7 +162,10 @@ configure_if_needed() {
 build_dir() {
     local dir="$1" log; log="$(mktemp)"
     configure_if_needed "$dir"
-    if ! cmake --build "$dir" -j >"$log" 2>&1; then
+    # -j MIT Zahl: ein nacktes `-j` heisst bei make „unbegrenzt" — auf dem 4-Kern-Runner der CI
+    # liefen so Hunderte Compiler gleichzeitig, der Speicher lief voll und der Job wurde im Bau
+    # abgeschossen (Exit 143, 2026-10-22; je nach ccache-Waerme mal ja, mal nein).
+    if ! cmake --build "$dir" -j "${K1520_BAU_JOBS:-$(nproc 2>/dev/null || echo 4)}" >"$log" 2>&1; then
         cat "$log"; rm -f "$log"; c_red "BUILD FEHLGESCHLAGEN: $dir"; exit 1
     fi
     if grep -qE "Building |Linking |Generating " "$log"; then
