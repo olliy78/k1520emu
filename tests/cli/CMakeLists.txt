@@ -205,6 +205,14 @@ add_test(NAME cli_scp_pc1715w
 set_tests_properties(cli_scp_pc1715w PROPERTIES
     TIMEOUT 180 LABELS "cli;fast")
 
+# Waechter „die OS/M-3.0-Systemdiskette des P8000 in disks/ ist der Inhalt von tools/osm_p8000/“ (Entwurf 34).
+# Neu bauen: python3 tools/osm_p8000/build.py --tool build/k1520disktool
+add_test(NAME cli_osm_p8000
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/osm_p8000/build.py"
+            --check --tool "$<TARGET_FILE:k1520disktool>" ${_beigaben_emulator})
+set_tests_properties(cli_osm_p8000 PROPERTIES
+    TIMEOUT 180 LABELS "cli;fast")
+
 # Waechter „die kommentierten Boot-ROM-Listings des PRG 710/710-1 sind die Ausgabe des
 # Generators" (AP-P0d, doc/design/20_prg710.md): tools/gen_prg710_zre_prn.py --check
 # erzeugt beide Listings im Speicher, prueft MD5 der ROM-Abzuege, dass JEDES der 1024 Byte

@@ -1,0 +1,280 @@
+README 'P8000 OS/M - Systemdiskette'
+
+
+	P8000 Betriebssystem OS/M - Systemdiskette
+	  Hinweise zur Installation und Anwendung
+		 Version 3.0 / 15.01.1988
+	------------------------------------------
+
+
+(1)	Inhalt
+
+Die vorliegende OS/M-Systemdiskette enthaelt das Betriebs-
+system OS/M des P8000 mit folgenden Kommandos, Dienstpro-
+grammen und Applikationsprogrammen.
+Die internen Kommandos sind die im OS/M-Betriebssystem
+direkt enthaltenen residenten Kommandos. Sie sind Bestand-
+teil des von der Systemdiskette in den Speicher geladenen
+Betriebssystems. Auf sie kann sofort zugegriffen werden.
+Die externen Kommandos, Dienstprogramme und Applikations-
+programme, sind auf der Diskette als Datei mit dem Dateityp
+".COM" verfuegbar. Sie werden in den Anwenderspeicher durch
+Eingabe ihres Dateinamen geladen.
+
+
+README		-  Datei mit vorliegenden Nutzerhinweisen
+ASM.COM		-  Dienstprogramm ASM; K5801K80-Assembler
+BS1715.COM	-  Bildschirmtreiber fuer Programme, die
+		   fuer den PC1715 / A5120 installiert sind.
+COPYDISK.COM	-  Dienstprogramm COPYDISK; Kopieren von
+		   Disketteninhalten
+DDT.COM		-  Dienstprogramm DDT; Debugger-Programm
+DUMP.COM	-  Dienstprogramm DUMP; hexadezimaler Da-
+		   teiausdruck auf dem Bildschirm
+ED.COM		-  Dienstprogramm ED; Editierprogramm
+ERRORS.COM	-  Dienstprogramm ERRORS; Ausgabe von Dis-
+		   kettenzugriffsfehlern
+FORMAT.COM	-  Dienstprogramm FORMAT; Formatierungs-
+		   programm
+GENHEX.COM	-  Dienstprogramm GENHEX; Transformations-
+		   programm
+LOAD.COM	-  Dienstprogramm LOAD; Transformations-
+		   gramm
+PIP.COM		-  Dienstprogramm PIP; Universelles Ko-
+		   pierprogramm
+POWER.COM	-  Dienstprogramm POWER; Manipulations-
+		   programm fuer Diskettenarbeit
+SETFD.COM	-  Dienstprogramm SETFD; Ausgabe und Aen-
+		   derung der Floppy-Disk-Konfiguration
+SETLP.COM	-  Dienstprogramm SETLP; Anzeige und Aen-
+		   derung der Druckparameter
+SUBMIT.COM	-  Dienstprogramm SUBMIT; Ausfuehren einer
+		   Befehlsfolge
+STAT.COM	-  Dienstprogramm STAT; Anzeige von Sta-
+		   tusinformationen
+SYSGEN.COM	-  Dienstprogramm SYSGEN; Generierung einer
+		   OS/M-Kopie
+XSUB.COM	-  Dienstprogramm XSUB; erweiterte SUBMIT-
+		   Funktion
+
+TP.COM		-  Applikationsprogramm TP; Textprogramm
+TP52.COM	-  TP-Installation fuer Drucker 1152/257
+TPDRUCK.OVR	-  Ueberlagerungsdatei TP
+TPHT.OVR	-  Ueberlagerungsdatei TP
+TPOVLY0.OVR	-  Ueberlagerungsdatei TP
+REDABAS.COM	-  Applikationsprogramm REDABAS; Relationa-
+		   les Datenbankbetriebssystem
+RDBASOVR.COM	-  Ueberlagerungsdatei REDABAS
+RDBASMSG.TXT	-  Ueberlagerungsdatei REDABAS
+
+TP.DOC		-  Dokumentationsdatei "Anwenderbeschrei-
+		   bung TP"
+REDABAS.DOC	-  Dokumentationsdatei "Anwenderbeschrei-
+		   bung REDABAS"
+POWER.DOC	-  Dokumentationsdatei "Anwenderbeschrei-
+		   bung POWER"
+
+BS1715.S	-  Quellprogramm fuer BS1715.COM
+		   im UDOS-Assembler-Format
+BIOS.L		-  Informationen zum OS/M-BIOS, z.B. zum
+		   Aendern der Floppy-Disk-Formate
+	
+
+(2)	Dokumentation
+
+Das P8000 OS/M-Systemhandbuch enthaelt die Beschreibung des
+Betriebssystems OS/M, der Kommandos und der Dienstprogramme.
+Des weiteren werden Literaturhinweise gegeben, die eine wei-
+terfuehrende Beschreibung der im OS/M enthaltenen Kommandos,
+Dienstprogramme und Applikationsprogramme beinhalten.
+Die Dokumentationsdateien TP.DOC, REDABAS.DOC und POWER.DOC
+enthalten Anwenderbeschreibungen (TP-Dateien) zu den Appli-
+katinsprogrammen TP und REDABAS sowie zu dem Dienstprogramm
+POWER.
+
+Folgende Aenderungen ergeben sich zum OS/M-Systemhandbuch:
+
+Bildschirmtreiber BS1715.COM
+----------------------------
+
+FORMAT:
+	BS1715
+
+BESCHREIBUNG:
+
+Das Programm BS1715.COM realisiert die Konvertierung der
+Steuerzeichenfolgen fuer den Bildschirm des PC1715 bzw.
+A5120 in Steuerzeichenfolgen fuer das P8000-Terminal
+(Betriebsart ADM31). Damit sind Programme, die fuer
+den Bildschirm des PC1715 bzw. A5120 installiert sind
+und nicht direkt auf den Bildwiederholspeicher zugreifen,
+ohne Aenderung auf dem P8000 lauffaehig.
+Der Treiber wird durch Eingabe von BS1715 in das BIOS
+geladen und bleibt bis zum Reset/Ausschalten aktiv.
+Alle Steuerzeichen, die nicht PC1715/A5120-spezifisch
+sind, werden unveraendert ausgegeben. Damit bleiben
+alle fuer das P8000-Terminal installierten Programme
+lauffaehig (Ausnahme: Das Zeichen 0CH wird bei aktiviertem
+BS1715 nicht als Fore-Space interpretiert).
+
+Folgende Einschraenkungen ergeben sich:
+
+Video-Attribute werden in 20H konvertiert und sind damit
+nicht wirksam. Die Umschaltung zwischen 1. und 2. Zeichen-
+satz wird nicht unterstuetzt.
+
+
+Erweiterung der Floppy-Disk-Formate
+-----------------------------------
+
+Die Floppy-Disk-Formate wurden wie folgt erweitert:
+
+6 -	5 1/4"-Laufwerk
+	Format: DD-DS 2*9*512*80
+	Operation: Lesen und Schreiben
+
+7 -	5 1/4"-Laufwerk
+	Format: DD-DS 2*5*1024*80
+	(dieses OS/M-Format ist kompatibel zu SCP)
+	Operation: Lesen und Schreiben
+
+8 -	5 1/4"-Laufwerk
+	Nutzerformat 1
+	Standardeinstellung: DD-DS 2*5*1024*80
+	(790K, kompatibel DAC, Humboldt-UNI)
+	Operation: Lesen und Schreiben
+
+9 -	5 1/4"-Laufwerk
+	Nutzerformat 2
+	Standardeinstellung: DD-DS 2*5*1024*80
+	(800K, kompatibel CP/A)
+	Operation: Lesen und Schreiben
+
+Im CP/A-Format kann keine OS/M-Systemdiskette erstellt
+werden.
+Die Formate 8 und 9 koennen z.B. mit DDT.COM geaendert
+werden, siehe BIOS.L.
+
+
+Erstellung eine Systemdiskette im Format 7
+------------------------------------------
+
+Die OS/M-Systemdiskette wird weiterhin im Format 5
+ausgeliefert. Zur Erstellung einer OS/M-Systemdiskette
+im Format 7 sind folgende Schritte noetig:
+ 
+1. OS/M-Systemdiskette in Laufwerk 0 (A:),
+   leere Diskette in Laufwerk 1 (B:) einlegen.
+
+2. SETFD 5700
+
+3. FORMAT B:
+
+4. Systemspuren mit SYSGEN von A: nach B: kopieren.
+
+5. Dateien z.B. mit POWER von A: nach B: kopieren.
+
+6. SETFD 7700 S1
+
+7. RESET-Taste betaetigen, neue OS/M-Systemdiskette in
+   Laufwerk 0 (A:) einlegen und starten.
+
+
+Realisierung einer Verzoegerung fuer das P8000-Terminal
+-------------------------------------------------------
+
+Zur Anpassung der Ausgabegeschwindigkeit des OS/M-
+Terminaltreibers im BIOS an die Geschwindigkeit des
+langsameren P8000-Terminals wird nach Ausgabe des Zeichen
+Linefeed (0AH) eine Zeitverzoegerung von ca.10ms
+wirksam.
+Nach der Ausgabe des Zeichens 00H wird eine Verzoegerung
+von ca. 30ms realisiert.
+Bei der Installation von Programmen fuer das P8000-
+Terminal, sind gegebenenfalls Verzoegerungszeichen (00H)
+in die Steuerzeichenfolgen einzutragen. Fuer die
+Steuerzeichenfolge "Bildschirm loeschen" (1BH 2AH) sind
+zwei Zeichen 00H notwendig.
+(Im Treiber BS1715.COM werden erforderliche Verzoererungen
+intern beruecksichtigt.)
+
+
+Treiber fuer serielle Kanaele ... (Abschnitt 5.2.)
+--------------------------------------------------
+
+Byte 0 (FLAG) der Parametertabelle wurde um zwei
+Bits erweitert:
+
+Bit 4:	nur wirksam fuer Terminalkanal
+	0 - Verzoegerung bei 00H und 0AH wirksam
+	1 - Verzoegerung nicht wirksam
+
+Bit 5:	0 - DTR-Protokoll ausgeschaltet
+	1 - DTR-Protokoll eingeschaltet
+
+Bei ausgeschaltetem DTR-Protokoll ist die V.24-Leitung
+DTR nicht erforderlich. 
+
+
+(3)	Installation
+
+Es ist grundsaetzlich keine Installation erforderlich. Ver-
+aenderungen anderer Standardinstallationen sind jedoch bei
+Bedarf moeglich. So kann mit dem Dienstprogramm "SETFD" die
+Floppy-Disk-Konfiguration geaendert werden und das Dienst-
+programm "SETLP" gestattet eine Aenderung der Druckparame-
+ter.
+
+
+(4)	Nutzerhinweise 
+
+Die Schnittstelle vom OS/M auf dem P8000 zu den unter sei-
+ner Steuerung laufenden Programmen ist voll kompatibel mit
+der Schnittstelle des Betriebssystems CP/M Version 2.2.
+Ausserdem ist die Kompatibilitaet mit dem in der DDR ver-
+fuegbaren Betriebssystem SCPX 1526 fuer die Buerocomputer
+A5120/30 und dem Personalcomputer PC1715 gegeben.
+Bei der Uebernahme von Anwendersoftwarepaketen ist moegli-
+cherweise eine Drucker- bzw. Terminalinstallation notwen-
+dig. Entsprechende Angaben ueber die Steuersequenzen sind
+den Terminal- bzw. Druckerdokumentationen zu entnehmen.
+Treten bei der Uebernahme von Disketten anderer Systeme
+eventuelle Probleme auf, so ist eine auf dem P8000 for-
+matierte Diskette zu verwenden.  
+Das Applikationsprogramm REDABAS ist nicht vollstaendig 
+ausgetestet.
+
+
+(5)	Versionshinweise
+
+Gegenueber der Version 2.0 wurden folgende Aenderungen
+vorgenommen:
+
+- Aenderungen im BIOS (neue Floppy-Disk-Formate,
+  schnelleres Schreiben zum nichtaktuellen Laufwerk,
+  Realisierung von Zeitverzoegerungen bei der Ausgabe
+  zum Terminal).
+
+- Terminal-Treiber BS1715.COM zur Konvertierung von
+  Bildschirmsteuerfolgen fuer PC1715 und A5120 in
+  Steuerfolgen fuer das P8000-Terminal.
+
+- Neue Version von FORMAT.COM (Ermittlung der Parameter
+  zum Formatieren aus der Tabelle "TYPTAB" im BIOS-
+  Floppy-Disk-Treiber).
+
+- Aenderung des Programms SETFD.COM zur Einstellung der
+  neuen Floppy-Disk-Formate.
+
+- Installation von TP52.COM fuer den Drucker Robotron
+  1152 Modell 257. Vor der Benutzung ist die Umbenennung
+  in TP.COM erforderlich.
+
+- Modifikation des Programms XSUB.COM
+
+
+
+(6)	Probleme
+
+---
+

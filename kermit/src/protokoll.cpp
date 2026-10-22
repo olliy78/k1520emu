@@ -503,6 +503,10 @@ Ergebnis Sitzung::sendenGruppe(const std::vector<SendeAuftrag>& auftraege) {
 Ergebnis Sitzung::empfangeTransaktion(const Paket& s, Ziel z) {
     const InitParameter dein = zerlegeInit(s.daten);
     const InitParameter mein = antwortParameter(meineParameter(), dein);
+    // Das Leerlauf-N(0) nach dem B kommt vom ttflui/rpack des C-Kermit 4.2, der GENAU 9 Init-Felder
+    // schickt.  Meldet die Gegenstelle CAPAS (> 9 Felder) — etwa unser eigener Server —, ist sie keine
+    // solche und schickt kein N: dann kostete das Warten nur 2 s je Befehl.
+    nachlaufNoetig_ = dein.felder <= 9;
     chkt_ = 1;
     v_ = verhandle(mein, dein, e_.max_paket);   // EOL/Fuellung schon fuer das Y
     if (!sende('Y', s.seq, initDaten(mein, e_.capas_senden && dein.felder > 9)))
@@ -655,7 +659,7 @@ Ergebnis Sitzung::empfangeTransaktion(const Paket& s, Ziel z) {
             sende('Y', erw, "");
             chkt_ = 1;
             abbruchGruppe_ = false;
-            nachlauf_ = true;
+            nachlauf_ = nachlaufNoetig_;
             return erg;
         default:
             if (senke) senke->verwerfen();

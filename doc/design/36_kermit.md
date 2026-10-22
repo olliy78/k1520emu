@@ -1,7 +1,7 @@
 # 36 — Kermit: Datenaustausch Host-PC ↔ WEGA (P8000)
 
-Stand 2026-10-20 (AP K8), Zweig `kermit` (von `P8000`): **K0–K8 fertig**, offen K9 (Paket/CI) und das
-optionale K2b; offene Einzelpunkte in §7.  Zwei Teile: **(A)** Kermit auf der WEGA-3.1-Platte
+Stand 2026-10-21, Zweig `kermit` (von `P8000`): **K0–K9 fertig** (K9: Paket lokal belegt, Inno/MSVC nur
+in der CI), dazu Kermit-80 als Beigabe auf den Disketten (§6.8); offen nur das optionale K2b; offene Einzelpunkte in §7.  Zwei Teile: **(A)** Kermit auf der WEGA-3.1-Platte
 einrichten (Server hinter `getty`, Client in der Shell), **(B)** ein eigenes Kermit für den PC
 (C++-Bibliothek + Kommandozeile + Python/Qt-Oberfläche), Client **und** Server.
 Merkposten (seit AP K7): `doc/merkposten/kermit.md`.
@@ -190,10 +190,14 @@ anfassen, laufen nacheinander oder im eigenen Worktree.
 | **K6** | **Oberfläche** `app/kermittool/` (beide Modi, Verbindungsdialog, Fortschritt, Drag&Drop, Handbuch, Konfiguration). | `py_kermit_gui` (offscreen), Kürzelwächter | sonnet | fertig — `01786b1` |
 | **K7** | **Gegenprobe am echten C-Kermit 4.2:** beide Richtungen im Emulator (Fall 1 und Fall 2), Messung der 8-Bit-Sauberkeit, Durchsatz, Fristen; Befunde in Vorgaben §5 einarbeiten. | `P8000WegaKermit.*` (Label `wega_install`), `tools/dev.sh test-wega` | opus | fertig — `d52bdd2`, `cda77bb` |
 | **K8** | **Doku:** Handbuch, `doc/merkposten/kermit.md` (+ README-Eintrag), `CLAUDE.md`-Kurzabsatz, `disks/…/README.md`, Entwurf 36 auf Stand. | — | sonnet | fertig (§6.6) |
-| **K9** | *(wenn K1–K8 grün)* **Paket/CI:** Linux-Paket (`build_payload.sh`), Inno-Setup, `windows-ci.yml`, Starter `k1520kermit`. | `py_packaging`, `py_programme` | sonnet | offen |
+| **K9** | *(wenn K1–K8 grün)* **Paket/CI:** Linux-Paket (`build_payload.sh`), Inno-Setup, `windows-ci.yml`, Starter `k1520kermit`. | `py_packaging`, `py_programme` | sonnet | fertig (§6.7) — `0f78cfc` |
+| **K10** | **Bibliothek: Anmeldung des Clients auf Abruf** (§6.10 a): das Login-Skript meldet „Anmeldung verlangt“ und fragt Name/Kennwort über einen Rückruf ab, statt sie vorab zu verlangen; es unterscheidet **abgelehnt** (zweites `login:` / `Login incorrect`) von Frist und Leitungsfehler.  C-ABI additiv + Python-Bindung. | `KermitLogin*` (Unit), `py_kermit_api` (Signaturwächter), Kopplungstest gegen den Server aus K12 | sonnet | **fertig** (2026-10-22, Zweig `kermit`; Stand §6.11) |
+| **K11** | **Oberfläche, Client: Anmeldedialog** (§6.10 b): Popup mit Benutzername, Kennwort, Hinweis „möglicherweise einfach kermit / kermit“ und Haken *Zugangsdaten für diese Verbindung speichern*; erscheint bei verlangter Anmeldung und **erneut bei Ablehnung**; gespeichert wird **im Klartext in der Konfigurationsdatei, im Eintrag der Verbindung**, Neuspeichern überschreibt die alten Werte.  Kehrt die Regel „Kennwörter nie in die Datei“ um (Handbuch, Merkposten, `konfig.ohne_kennwort`, Wächter). | `py_kermit_gui` (Dialog mit Ersatz, Wiederholung, Speichern/Überschreiben, Konfig-Roundtrip) | sonnet | **fertig** (2026-10-22, Zweig `kermit`; Stand §6.13) |
+| **K12** | **Server mit Anmeldezwang** (§6.10 c): Bibliothek (`Sitzung::serve` mit Anmeldephase wie getty der WEGA: `login:` / `Password:` / `Login incorrect` / Wiederholung / nach `finish` zurück zu `login:`) **und** Oberfläche (Haken *Anmeldung erzwingen*, Name/Kennwort mit Vorgabe `kermit`/`kermit`, änderbar, in der Serverkonfiguration im Klartext). | `KermitServerLogin*` (Unit), `py_kermit_gui`, **Kermit-80 meldet sich im Terminalmodus an unserem Server an** (`Kermit80Pc.*`, Gegenstück zu `Kermit80Wega`) | opus (Protokoll) / sonnet (Oberfläche) | **fertig** (2026-10-22, Zweig `kermit`; Stand §6.12) |
+| **K13** | **Doku und Abnahme:** Handbuch (Client-Anmeldung, Server mit Anmeldezwang, Kermit-80 gegen unseren Server mit Anmeldung), Merkposten (Umkehr der Kennwortregel, Reihenfolge der Dialoge), Entwurf 36 auf Stand, Login-Skript in `py_kermit_gui` belegt (war offen, §7 Nr. 7). | `py_help`, `py_kermit_gui`, Abnahme §6.14 | sonnet | **fertig** (2026-10-22; Stand §6.14) — Commit siehe `git log` |
 | K2b | *(optional)* Schiebefenster, `G T`/`G U`, Wiederaufnahme. | — | — | offen (optional) |
 
-Reihenfolge: **K1 ‖ K2** (K2 im Worktree) → K3 → K4 → K5 ‖ K6 → K7 → K8 → K9.
+Reihenfolge: **K1 ‖ K2** (K2 im Worktree) → K3 → K4 → K5 ‖ K6 → K7 → K8 → K9; danach (2026-10-22) **K10 → K11 ‖ K12 → K13**.
 
 ### 6.1 Stand K2 (2026-10-18)
 
@@ -312,7 +316,7 @@ Abweichungen/Festlegungen mit Grund:
    ist ein eigener Fall.
 
 Offen: Windows-Bau/CI-Lauf der DLL (`tools/dev.sh win` siehe Stand unten), K5 (Kommandozeile) und K6 (Oberfläche)
-benutzen die Bibliothek bzw. die Bindung; `k1520kermit` ist noch nicht im Paket (K9).
+benutzen die Bibliothek bzw. die Bindung; `k1520kermit` ist seit K9 im Paket (§6.7).
 
 ### 6.3 Stand K5 (2026-10-18)
 
@@ -492,31 +496,263 @@ Wiederverbinden ohne Anmeldung nach bloßem *Trennen* in der Oberfläche (nur an
 ohne 8-Bit-Präfix.  Dazu: `CLAUDE.md`-Kurzabsatz, §6-Statusspalte, §7.  Merkposten (`doc/merkposten/kermit.md`,
 README-Eintrag) und `disks/p8000_wega31/README.md` waren seit K7 aktuell.
 
+### 6.7 Stand K9 (2026-10-20) — Paket und CI
+
+**Fertig, lokal belegt:** das Linux-Paket schnürt (`packaging/build_payload.sh`, Bau in `build_dist/`) und enthält
+`bin/libk1520kermit.so`, `bin/k1520kermit-cli`, `share/doc/k1520kermit.md`, `app/kermittool/` samt `help/handbuch.md`,
+`kermit_launcher.sh` und `k1520kermit.desktop.in`.  Geschnitten **wie das DiskTool**, nicht wie ein Emulator:
+`launcher.*` wählt am Namen ein Maschinenprofil (`app/profil.py`), Kermit hat keines — also eigene Vorlage
+`kermit_launcher.sh/.cmd`.  `bin/k1520kermit` ist in der Installation der **Starter**, die Kommandozeile heißt dort
+`bin/k1520kermit-cli` (im Quellbaum bleibt `build/k1520kermit` die Kommandozeile; `paths.kermit_cli()` fragt erst den
+`-cli`-Namen).  `app/paths.py::kermit_library()` löste im Installationslayout schon vorher auf (`--paths` zeigt
+`Kermit-Bibliothek` und neu `Kermit (CLI)`); die einzige Änderung dort ist `kermit_cli()`.  Weder Bibliothek noch
+Kommandozeile tragen einen Pfad des Baurechners (kein Formatkatalog), geprüft in `py_packaging`
+(`test_kermit_aus_dem_paket_laeuft_und_ist_sauber`) und im Rauchtest von `release.yml`.
+`install.sh`: Starter, Verweis, `.desktop`, Rauchtest (`k1520k_version`), Schlussmeldung; Deinstallieren über
+`WERKZEUGE`/`KONSOLENWERKZEUGE` (Ausweis unverändert — alles liegt unter `bin app share`).  Die WEGA-3.1-Platte mit dem
+Benutzer `kermit` (`p8000_wega31/`) kommt über die bestehende `p8000_*`-Regel mit (Wächter
+`test_die_wega_platte_mit_kermit_benutzer_liegt_im_paket`: Passwd-Zeile im Abbild, bitgleich zur eingecheckten Platte).
+Wächter: `test_kermit_ist_in_allen_paketwegen` (Skripte, `.iss`, beide Workflows), `test_kermit_cli_name_im_installationslayout`,
+`test_kermit_findet_seine_bibliothek_im_installationslayout`, dazu die erweiterten Listen (Starter, Desktop-Einträge, ASCII-Starter,
+Nutzlast).  Merkposten: `doc/merkposten/paketierung.md`, Entwurf 13 §10c.
+
+**Nur durch die CI prüfbar (Dateien angepasst, Workflows NICHT ausgelöst):** Inno-Setup-Lauf (`k1520emu.iss`: Symbol *K1520 Kermit*,
+`bin\k1520kermit.cmd`, Rauchtest-Feld 47 Zeilen), MSVC-Bau und `dumpbin /exports` (`k1520k_*`, Schwelle 20, 37 Funktionen) und
+`/dependents` für `k1520kermit.dll`, Paket- und Setup-Prüfung in `windows-ci.yml`, beide Rauchtests in `release.yml`
+(Bibliothek lädt, `k1520k_version` = Bauversion, `--help` der Kommandozeile, `--paths` des Einstiegs).  Die Größenschranke der
+Setup-Probe (136 MB) wurde nicht angefasst; Kermit bringt ~1 MB mit.
+
+### 6.8 Stand 2026-10-21 — Kermit-80 als Gegenprobe und Beigabe
+
+**Kermit-80 4.11 (CP/M-Kermit) läuft auf A5120, K8915, PC 1715, PC 1715W, PRG 710/710-1 und am P8000 (8-Bit-Teil, OS/M)** und tauscht Dateien mit der
+Bibliothek aus.  Es ist **nur Client** (Handbuch: „Act as server: No“): `SEND`, `GET`, `REMOTE DIRECTORY`, `FINISH`
+gegen den Server der Bibliothek (`Sitzung::serve`).  Auf den ausgelieferten Disketten liegt es als `KERMIT.COM` —
+eine Beigabe zum Ausprobieren der V.24-Schnittstelle: A5120 (CP/A und SCPX 1.7), K8915 (SCPX 8915), PC 1715
+(SCP 1715 V0006/V0007 und CP/A 1715), PC 1715W (SCP 3.0), PRG 710/710-1 (SCPX) und **P8000 mit OS/M 3.0** (`disks/p8000_osm30/p8000_osm30_system.hfe`, gebaut aus
+`tools/osm_p8000/`, Wächter `cli_osm_p8000`; Überlagerung `kermit_p8000.com`: tty0 = SIO0-A, 24H/25H, Takt CTC1 K0).  Nicht darauf: CP/Z, UDOS.
+
+- **Eine Überlagerung je Rechner.**  Kermit-80 besteht aus dem rechnerunabhängigen Teil (`CPSKER.HEX`) und einer
+  Überlagerung ab 7000H mit dem Anschluss.  `tools/kermit80/bau.py <rechner>` übersetzt sie mit M80 neu (Systemklasse
+  `inout`, Z80-SIO über IN/OUT, Anfangsfolge programmiert Zeitgeber und SIO auf 9600 8N1).  Quellen
+  (`tools/kermit80/quelle/`) und die sechs fertigen `kermit_<rechner>.com` sind
+  eingecheckt (a5120, k8915, pc1715, pc1715w, prg710, p8000); Bau braucht die CP/M-Werkzeugkette (`CPA_TOOLS`), der Selbsttest (`bau.py --selbsttest`) bildet die
+  generische Überlagerung `CPVGEN.HEX` bytegleich nach.
+- **Auf die Disketten** kommt die `.com` über die Bauskripte (`db.kermit80(<rechner>)` in `tools/diskbau.py`,
+  `disketten_beigaben.KERMIT80`); die LIESMICH-Dateien nennen sie.  Neu bauen: `tools/{cpa_a5120,scpx_a5120,scpx_k8915,
+  scpx_prg,scp_pc1715,scp_pc1715w,osm_p8000}/build.py --tool build/k1520disktool`.
+- **Wächter** (`tests/system/test_kermit80.cpp`, `format_integration`): A5120 — Größen und Inhalt (`GET`/`SEND` von 0
+  bis 100 KB), Parität none/even/mark/space/odd mit Prüfsumme 1/2/3; `Kermit80Rechner.*` — K8915, PC 1715, PC 1715W,
+  PRG 710, 710-1 und P8000 mit OS/M (ausgelieferte Diskette, Temp-Kopie, `kermit.com` von der Diskette) schicken die `.com` an den PC-Server, bytegleich; `Kermit80Bau.*` — die eingecheckten `.com` sind das
+  Ergebnis von `bau.py` (übersprungen ohne Werkzeugkette).  `tools/dev.sh test-format -R Kermit80`.
+- **Gegen den echten C-Kermit 4.2 der WEGA** (`Kermit80Wega.ClientGegenC_Kermit42Server`, Label `wega_install`,
+  `tools/dev.sh test-wega -R Kermit80Wega`): zwei gekoppelte Emulatoren — A5120 mit CP/A und Kermit-80 als Client, P8000 mit
+  WEGA 3.1 als Server hinter getty (tty0 Telnet-Server, V.24 des A5120 Telnet-Client, beide in einem Faden in Scheiben
+  gleicher Maschinenzeit).  Wie am Gerät: `connect`, Anmeldung `kermit`/`kermit` im Terminalmodus, **Ctrl-\ `c`** zurück (das
+  Fluchtzeichen dieser Fassung; Kermit-80 meldet es beim `connect`), dann `remote directory`, `get`, `send`, `finish` — alles
+  ohne Fehl.  **Binärdateien gehen über die 7-Bit-Leitung (tty0 löscht Bit 7) mit `set parity space`**: dann nennt Kermit-80 das
+  8-Bit-Präfix, C-Kermit 4.2 schaltet es ein (`get` von `alle256`/`b94`/`b95`, `send` von `sendbin.bin` — alle 256 Bytewerte —,
+  lokal löschen, wieder holen, bytegleich).  Mit `set parity none` (Vorgabe) käme jedes Byte ≥ 80H verstümmelt an.  Die anderen Rechner sind nicht eigens
+  gegen die WEGA geprüft (gleiches Programm, nur die Überlagerung unterscheidet sich).
+- **Handbuch:** `app/kermittool/help/handbuch.md`, Abschnitt *Kermit-80 auf den CP/M-Rechnern* — Start, Leitungen je Rechner,
+  die genauen Befehle für den PC-Server und die WEGA (Anmeldung mit `connect`, Ctrl-\\ `c`, 7-Bit-Text, 8-Bit-Binär mit `set parity space`).
+- **Befund, Bibliothek:** Kermit-80 mit `set parity even|mark|odd` sendet jedes Byte mit Paritätsbit, auch MARK
+  (SOH = 81H).  Der `PaketZerleger` suchte nur 01H und schwieg (Kermit-80 hing bei `Starting …`).  Jetzt erkennt er
+  Parität (81H beim Suchen oder Bit 7 in LEN/SEQ/TYPE), rastet ein und streift danach Bit 7 ab; ohne Parität bleiben
+  rohe 8-Bit-Daten unberührt (`KermitParitaet.*`).  Offener Punkt 9 aus §7 ist damit für den Empfang gelöst.
+- **Nicht belegt:** ein Kermit-Server für CP/M-80 (Kermit-80 hat keinen; eine Websuche nach Alternativen fand keinen),
+  Kermit-80 an CP/Z 2.2.
+
+### 6.9 Stand 2026-10-21 — Empfangsnamen und Nachlauf
+
+- **Empfangsnamen:** `Freigabe::normalisiere` (läuft für jeden Pfad, auch beim Anlegen) wies Steuerzeichen schon ab;
+  die Offen-Liste war hier zu pessimistisch.  Neu: ein Name muss **gültiges UTF-8** sein (streng: keine Kurzformen,
+  keine Ersatzzeichen, bis U+10FFFF), sonst `PfadAbgewiesen` mit „Ungueltige Zeichen im Namen (kein UTF-8)“.
+  Umlaute vom PC bleiben erlaubt.  Grund: Müll aus einem abgebrochenen Senden würde unter Windows in `fs::u8path()`
+  scheitern und unter Linux eine Datei mit unlesbarem Namen anlegen.  Wächter `KermitFreigabe.NamenMussUtf8Sein…`.
+- **Nachlauf:** das Leerlauf-N(0) nach dem B kommt vom C-Kermit 4.2 (9 Init-Felder, kein CAPAS).  Der Empfänger merkt
+  sich am S des Senders, ob es so einer ist (`nachlaufNoetig_ = dein.felder <= 9`); meldet die Gegenstelle CAPAS —
+  unser eigener Server —, entfällt das Warten (vorher 2 s je Befehl nach einem Empfang).  Gegen 9-Felder-Gegenstellen
+  bleibt es unverändert.  Wächter `KermitSitzung.NachlaufEntfaelltGegenDenEigenenServer`/`…BleibtGegenEineGegenstelleOhneCapas`
+  (gemessen in Leitungszeit — die Speicherleitung lässt eine Frist, auf die alle warten, ohne Wartezeit ablaufen).
+
+### 6.10 Neue Arbeitspakete K10–K13 — Anmeldung (Auftrag vom 2026-10-22)
+
+**Anlass.** Heute braucht der Client die Zugangsdaten vorab (Verbindungsdialog, Voreinstellung *WEGA 3.1 (Benutzer
+kermit)*), das Kennwort lebt nur in der Sitzung und steht **nie** in der Konfiguration; ein Server ohne Anmeldung
+gibt es nur als Ordnerfreigabe.  Der Anwender will: (a) die GUI fragt nach, wenn die Gegenstelle eine Anmeldung
+verlangt, (b) kann die Zugangsdaten für die Verbindung merken, (c) der eigene Server kann eine Anmeldung erzwingen
+und verhält sich dann wie die WEGA-Installation.
+
+**a) Bibliothek, Client (K10).**  `loginSkript` bekommt zwei Dinge, die es heute nicht hat: einen **Rückruf**, der bei
+verlangter Anmeldung Name und Kennwort holt (Aufruf aus dem Arbeitsfaden; die Oberfläche zeigt den Dialog im GUI-Faden und
+antwortet), und ein **Ergebnis mit Art** (`Ok`, `Abgelehnt`, `Frist`, `Leitung`, `Abbruch`).  *Abgelehnt* heißt: nach dem
+Kennwort erscheint wieder `login:` bzw. `Login incorrect` — nur dann soll die Oberfläche erneut fragen; bei Frist oder
+Leitungsfehler nicht.  Die Frist der Stille (§6.5) gilt weiter; **das Warten auf die Eingabe des Anwenders zählt nicht als
+Frist** (der Rückruf läuft außerhalb der Fristen, der Abbruch bleibt möglich).  C-ABI additiv (neue Funktion mit
+Rückruf; die vorhandene `k1520k_login` bleibt), Python-Bindung, Signaturwächter `py_kermit_api`.  Offene Entscheidung für den
+Bearbeiter: Rückruf oder zweistufige Schnittstelle (`erkennen` → `antworten`); wegen des GUI-Fadens ist die zweistufige oft
+einfacher.
+
+**b) Oberfläche, Client (K11).**
+- Das Popup erscheint beim Verbinden, wenn die Gegenstelle eine Anmeldung verlangt und für die Verbindung keine
+  Zugangsdaten gespeichert sind, **und wieder nach einer Ablehnung** (Name und Kennwort mit den eben eingegebenen Werten
+  vorbelegt, Hinweis „Anmeldung abgelehnt“).
+- Inhalt: Benutzername, Kennwort (Eingabe verdeckt), Hinweis **„Möglicherweise ist es einfach kermit / kermit.“**, Haken
+  *Zugangsdaten für diese Verbindung speichern* mit dem **Hinweis im Dialog, dass das Kennwort dabei im Klartext in
+  der Konfigurationsdatei gespeichert wird** (am Haken selbst oder direkt darunter, auch als Tooltip), *Anmelden* /
+  *Abbrechen*.
+- Gespeichert wird **nur bei gesetztem Haken**, im **Klartext in der Konfigurationsdatei** (`kermit.yaml`), **im Eintrag
+  dieser Verbindung** (Schlüssel für Name und Kennwort).  Ein erneutes Speichern — auch nach einer Ablehnung mit geänderten
+  Eingaben — **überschreibt die alten Werte**.  Gespeicherte Zugangsdaten werden beim nächsten Verbinden ohne Popup
+  benutzt; schlagen sie fehl, kommt das Popup (siehe oben).
+- Das **kehrt eine bisherige Festlegung um** („Kennwörter stehen nie in der Datei“, `konfig.py::ohne_kennwort`,
+  Verbindungsdialog-Tooltip, Handbuch *So arbeitet K1520 Kermit*, `py_kermit_gui`).  Der Bearbeiter zieht alle Stellen
+  nach.  **Entscheidung des Anwenders (2026-10-22): kein Schutz der Datei** — keine Dateirechte, keine Verschleierung.
+  Begründung: Das Programm dient nicht vertraulichen Daten, die Platte des P8000-Emulators ist mit dem DiskTool ohnehin
+  lesbar, und das Kennwort hat nur eine **funktionale** Aufgabe (getty/login der WEGA), keine Schutzfunktion.  Das
+  Handbuch sagt es offen, der Dialog trägt den Hinweis (siehe oben).  Die Verbindungsliste („zuletzt benutzt“) darf Kennwörter nur dann
+  tragen, wenn der Haken gesetzt war.
+- Die Voreinstellung *WEGA 3.1 (Benutzer kermit)* bleibt, und mit ihr das Laborkennwort (`kermit`/`kermit`): die
+  Popup-Vorbelegung ist `kermit`/`kermit`.  Die Kommandozeile `k1520kermit` ändert sich nicht.
+
+**c) Server mit Anmeldezwang (K12).**
+- **Bibliothek:** `Einstellungen` bekommt `login_pflicht`, `login_name`, `login_kennwort`.  Ist `login_pflicht` gesetzt,
+  verhält sich `Sitzung::serve` **wie getty + `login` der WEGA**: nach dem Verbindungsaufbau `login:`; Name lesen; `Password:`
+  (ohne Echo); stimmt beides, erscheint die Kopfzeile des Servers (wie C-Kermit: *C-Kermit server starting …*) und die
+  Server-Schleife beginnt; sonst `Login incorrect` und wieder `login:`.  **Nach `finish`/`logout` kehrt der Server zu
+  `login:` zurück** (wie die WEGA).  Das eigene Login-Skript (K3) und Kermit-80 im Terminalmodus müssen sich so anmelden
+  können.  Die Anmeldung läuft vor dem Protokoll; Paketbytes davor sind kein Fehler.  Zeichenverhalten wie getty:
+  RETURN oder CR LF beenden eine Eingabe, Bit 7 wird vor dem Vergleich gelöscht (§3, Parität).
+- **Oberfläche:** im Server-Dialog der Haken *Anmeldung erzwingen*, darunter *Benutzername* und *Kennwort* mit
+  **Vorgabe `kermit` / `kermit`**, vom Anwender änderbar; gespeichert in der **Serverkonfiguration** (`kermit.yaml`,
+  Klartext, wie in K11).  Der Server zeigt in der Statuszeile *mit Anmeldung*.
+- **Abnahme:** `KermitServerLogin.*` (Unit: richtig, falsch mit Wiederholung, nach Finish wieder `login:`, Bit 7 am
+  Namen), Kopplungstest Client (K10/K11-Pfad) gegen den Server, und ein System-Fall `Kermit80Pc.*`: Kermit-80 (A5120)
+  meldet sich im Terminalmodus an unserem Server an, geht mit Strg+\ `c` zurück und holt/sendet Dateien — das
+  Gegenstück zu `Kermit80Wega`.
+
+**d) Doku und Abnahme (K13).**  Handbuch: *Verbindung herstellen (Client)* (Popup, Speichern), *Server-Modus* (Anmeldung
+erzwingen), *Kermit-80 auf den CP/M-Rechnern* (gegen unseren Server mit Anmeldung: Ablauf wie bei der WEGA); Merkposten
+`kermit.md`: die Umkehr der Kennwortregel mit Grund, Wächter.  Zusätzlich gehört hierher der bisher offene Punkt aus §7
+Nr. 7: **das Login-Skript wird in `py_kermit_gui` belegt** (mit einer Attrappenleitung, die `login:` / `Password:` spielt).
+
+**Reihenfolge und Risiken.**  K10 zuerst (die Schnittstelle trägt K11).  K11 und K12 sind unabhängig (K12-Bibliothek
+braucht K10 nur für den Kopplungstest).  Offen bleiben: Drag&Drop (offscreen nur über die Mime-Daten belegt, §7 Nr. 7).
+Risiko: Der Rückruf läuft im Arbeitsfaden, der Dialog im GUI-Faden — die Kernsperre (§10.11 in `11_python_app.md`) und das
+Abbrechen während der Eingabe müssen zusammen gedacht werden (`Kern`-Sperre nicht über den Dialog halten).
+
+### 6.11 Stand K10 (2026-10-22) — Anmeldung auf Abruf
+
+**Gewählt: Rückruf (A)**, nicht die zweistufige Schnittstelle.  Grund: `loginSkript` hält seinen Lesezustand (Fenster,
+Ratenmessung) in einer Funktion; eine Zweiteilung bräuchte ein zustandsbehaftetes Objekt über C-ABI-Aufrufe hinweg.
+Der Arbeitsfaden der Oberfläche blockiert ohnehin in der Bibliothek — der Rückruf wartet dort auf den GUI-Faden
+(Signal + Ereignis) wie jede andere Rückfrage.  Die C-ABI-Fläche bleibt klein: `k1520k_login_ask` (+ Rückruftyp
+`K1520KLoginAsk`), `k1520k_login_answer` (nur im Rückruf), `k1520k_login_kind`.  Der Rückruf antwortet **nicht über
+Rückgabewert/Puffer**, sondern ruft `k1520k_login_answer(h, name, kennwort)` (ctypes kann in ein `c_char_p`-Argument nicht
+schreiben; der Signaturwächter kennt nur `void`-Rückrufe); keine Antwort = Abbruch.
+
+- Kern: `LoginOptionen::abfrage` (`std::function<bool(const AnmeldeAnfrage&, name&, kennwort&)>`), `LoginErgebnis::art`
+  (`LoginArt`: `Ok`/`Abgelehnt`/`Frist`/`Leitung`/`Abbruch`) und `::versuche`.  Der Rückruf kommt erst NACH `login:` und
+  der Ruhe; danach wird noch einmal Stille abgewartet (Gestautes gehört nicht zur Antwort).  Nach `Login incorrect`/
+  zweitem `login:` fragt das Skript auf derselben Leitung erneut (`versuch + 1`, `gelesen` enthält die Ablehnung).
+- Die Zeit im Rückruf ist keine Frist (dort wird nicht gelesen); `abbruch`-Flag wirkt nach der Rückkehr, `false` im Rückruf
+  = `Abbruch`.  Ohne Rückruf unverändert (`k1520k_login`, CLI); nur das Ergebnis trägt jetzt die Art.
+- Python: `Kermit.login_ask(frage, frist_ms)` mit `frage(versuch, gelesen) -> (name, kennwort) | None`,
+  `Kermit.login_kind` und `LOGIN_*`.  Wächter: `KermitLoginAbruf.*` (`test_kermit_netz.cpp`), `py_kermit_api`
+  (`test_login_on_demand_*`, `test_login_kind_*`).
+- **Für K11:** im Arbeiter `k.login_ask(frage)` rufen; `frage` läuft im Arbeitsfaden, stellt das Popup im GUI-Faden und
+  wartet dort (ohne Kernsperre/Lock); Abbruch durch `k.abort()` aus dem GUI-Faden UND anschließendes `None` aus `frage`.
+  Nach der Ausnahme `KermitError(E_LOGIN)` `k.login_kind` lesen: nur `LOGIN_ABGELEHNT` (kommt hier nur, wenn `frage`
+  selbst nach einer Ablehnung abbricht oder der Benutzer ohne Kennwort ist) ist eine Ablehnung; `login_ask` fragt bei
+  Ablehnung von selbst erneut.
+
+### 6.12 Stand K12 (2026-10-22) — Server mit Anmeldezwang
+
+**Bibliothek.**  `Einstellungen::login_pflicht`/`login_name`/`login_kennwort` (Vorgabe aus, `kermit`/`kermit`);
+`Sitzung::serve` bekommt eine äußere Schleife: Anmeldung (`anmeldung()`), dann die bisherige Serverschleife, nach
+FINISH/BYE `C-Kermit server done` und wieder `login:` — `serve` endet mit Pflicht nur durch Abbruch/Trennung, ohne
+Pflicht unverändert nach FINISH.  Verhalten wie getty + login der WEGA (Texte aus `doc/p8000/kermit_wega.md` §3):
+`\r\nlogin: ` beim Start und nach jedem Durchlauf; Name im Zeilenmodus (CR, LF, CR LF; Bit 7 zuerst gelöscht;
+Backspace/DEL; Steuerzeichen und NUL überlesen; höchstens 64 Zeichen) mit **Echo**; leere Zeile = nur erneut
+`login:`; `Password:` **ohne Echo**; Treffer → Kopfzeile `k1520kermit` + `C-Kermit server starting …` (vom Login-Skript
+des Clients erkannt); sonst `Login incorrect` und `login:`, nach 3 Fehlversuchen von vorn, ohne Sperre.  Das Echo wird
+je Lesestoß gesammelt und vor dem Blockieren geschrieben.  Der Restpuffer der Sitzung (`puffer_`) wird mitbenutzt,
+sodass Bytes hinter der Kennwortzeile dem Protokoll bleiben.  Angenommen/offen: kein Zeitlimit der Eingabe (getty hat
+eins), keine Telnet-Option-Behandlung außerhalb der Leitung.
+
+**Schnittstellen.**  C-ABI `k1520k_set_server_login(h, pflicht, name, kennwort)` (NULL = unverändert), Python
+`Kermit.set_server_login`; CLI `serve --login-pflicht NAME[:KENNWORT]` (`tools/k1520kermit.md`).  Oberfläche:
+*Server einrichten* hat *Anmeldung erzwingen*, Benutzername, Kennwort (Vorgabe `kermit`/`kermit`, Felder nur mit Haken
+aktiv, Eingabe verdeckt) und den Hinweis auf Klartext; gespeichert im Zweig `server.login` der `kermit.yaml` im
+Klartext (Merkposten 11/12); der Arbeiter setzt es je angenommener Verbindung; Statuszeile `Server: … (mit Anmeldung)`.
+Der Client-Zweig der Konfiguration ist unverändert (K11; umgekehrt in §6.13).
+
+**Abnahme.**  `KermitServerLogin.*` (10 Fälle, Speicherleitung/virtuelle Uhr), `KermitServerLoginKopplung.*`
+(Login-Skript fest und auf Abruf gegen den Server, Telnet und RFC 2217, `holen`/`senden`/FINISH/zweite Anmeldung),
+`KermitCli.ServerMitAnmeldezwang…`, `py_kermit_api`/`py_kermit_gui`, und **`Kermit80Pc.MeldetSichAmServerMitAnmeldezwangAn`**
+(`tests/system/test_kermit80.cpp`, Label `format_integration`): Kermit-80 am A5120 meldet sich im Terminalmodus an, erst mit
+falschem Kennwort (`Login incorrect`), dann richtig, Strg-\ `c`, `remote directory`, `get`, `send`, `finish`, danach zeigt ein
+neues `connect` wieder `login:`.  Gemeinsame Bildhilfen: `tests/system/kermit80_hilfen.h` (auch `Kermit80Wega`).
+
+### 6.13 Stand K11 (2026-10-22) — Anmeldedialog des Clients
+
+**Ablauf.**  `Arbeiter._anmelden` ruft `Kermit.login_ask`.  Beim ersten Versuch gehen vorab bekannte Zugangsdaten
+(Name vorhanden: gespeichert, aus dem Verbindungsdialog oder der Voreinstellung *WEGA 3.1*) ohne Popup raus; sonst
+und **nach jeder Ablehnung** fragt das Popup *Anmeldung* (`ui/anmelde_dialog.py`: Benutzername, Kennwort verdeckt, Hinweis
+„Möglicherweise ist es einfach kermit / kermit.“ — nur Hinweis, keine Vorbelegung —, Haken *Zugangsdaten für diese
+Verbindung speichern* mit Klartext-Hinweis darunter und als Tooltip, *Anmelden*/*Abbrechen*; nach einer Ablehnung
+„Anmeldung abgelehnt“, Felder mit der letzten Eingabe).  Voraussetzung bleibt der Haken *Anmelden* im Verbindungsdialog
+(`login`); der Name darf dort jetzt leer sein.  *Abbrechen* ist still (`E_ABORTED`, „Verbinden abgebrochen“);
+`Abgelehnt` ohne weitere Frage (Benutzer ohne Kennwort) zeigt „Anmeldung abgelehnt“; Frist/Leitung wie bisher.
+
+**Speichern — Wahl.**  Erst NACH gelungener Anmeldung (`Arbeiter.zugang_gemerkt` → `MainWindow._zugang_merken`) und nur
+bei gesetztem Haken; dann sofort in die Datei: `client.login_name`/`client.kennwort` und derselbe Eintrag in `zuletzt`
+(Klartext, **kein Schutz der Datei**, Entscheidung des Anwenders).  Eine abgelehnte Eingabe ändert nichts; erneutes
+Speichern überschreibt.  Der Verbindungsdialog trägt denselben Haken (Schlüssel `kennwort` des Verbindungsdicts nur mit
+Haken belegt; ohne Haken räumt das Neumerken ein altes Kennwort aus `zuletzt`).
+
+**Konfiguration.**  Kennwörter nur an `konfig.KENNWORT_ORTE` (`client.kennwort`, `zuletzt[*].kennwort`,
+`server.login.kennwort`); `ohne_kennwort` räumt alles andere.  Fäden: die Frage wartet ohne Sperre auf ein Event,
+`abbrechen()` antwortet `None`.  Test-Ersatz des Popups: `MainWindow._anmeldefrage`.  Merkposten 12/13.
+
+**Abnahme.**  `py_kermit_gui` (Popup-Inhalt, Verbindungsdialog-Haken, Frage/Wiederholung/Abbruch/gespeicherte Daten/
+Speichern und Überschreiben gegen den Server mit Anmeldezwang aus K12, Benutzer-ohne-Kennwort-Attrappe, Wächter der
+erlaubten Kennwortorte samt Gegentest ohne Haken).  Offen für K13: Handbuch (der Satz „Das Kennwort … schreibt es nie in
+seine Konfigurationsdatei“ unter *Anmeldung* ist überholt).
+
+### 6.14 Stand K13 (2026-10-22) — Handbuch, Merkposten, Abnahme
+
+**Handbuch** (`app/kermittool/help/handbuch.md`): *So arbeitet K1520 Kermit* (Kennwortabsatz neu: Klartext nur mit Haken, kein
+Dateischutz, Speicherregel), *Verbindung herstellen (Client)* (Felder, Fenster *Anmeldung*, Abbrechen, Ablehnung),
+*Server-Modus* (Anmeldung erzwingen), *Kermit-80 …* ▸ *Mit dem PC-Server* ▸ „Mit Anmeldung“, *Fehlersuche*.  Kein neues
+Tastenkürzel.  **Offen benannt:** das Fenster erscheint nur bei gesetztem Haken *Anmelden* (Merkposten Nr. 14; Auto-Erkennung
+ohne Haken wäre eine spätere Entscheidung).  **Merkposten:** Nr. 12 ist „überholt“ markiert, Nr. 13 gilt; neu Nr. 14.
+
+**Login-Skript in `py_kermit_gui`:** belegt durch `test_gespeicherte_daten_brauchen_kein_popup_und_falsche_loesen_es_aus`
+(Name und Kennwort vorab ⇒ keine Frage, gegen den Server mit Anmeldezwang aus K12) und die Popup-Fälle; kein weiterer Test nötig.
+
 ## 7. Offene Aufgaben
 
 Zusammengetragen aus den „Offen"-Listen von §6.1–§6.6, nach Dringlichkeit:
 
-1. **K9 — Paket und CI:** `libk1520kermit`, `k1520kermit` und `app/kermittool` ins Linux-Paket
-   (`build_payload.sh`) und ins Inno-Setup, Starter, `windows-ci.yml` (`dumpbin /exports` auch für
-   `k1520kermit.dll`); Wächter `py_packaging`, `py_programme`.
-2. **Windows:** MinGW-Vorprüfung (`tools/dev.sh win`) und MSVC-Gegenprobe der CI für Bibliothek, CLI und
-   die neuen Tests (Tempo, Austausch, Strg+C nur POSIX geprüft) — bisher nicht gelaufen.
-3. **Empfangsnamen filtern:** Steuer- und 8-Bit-Bytes im Dateinamen eines F-Pakets (beobachtet nach einem
-   abgebrochenen Senden des C-Kermit: `leftover`-Rest in `getpkt()`) werden nicht abgefangen.
+1. ~~**K9 — Paket und CI**~~ erledigt (§6.7); offen bleibt dort nur der erste echte Lauf von `release.yml`/`windows-ci.yml`
+   (Paketjob mit `-f paket=true`) — siehe 2.
+2. **Windows:** MinGW-Vorpruefung gruen (`tools/dev.sh win -R kermit`, 192/192 unter wine, K9).  Offen: MSVC-Gegenprobe der CI für Bibliothek, CLI, die neuen Tests (Tempo, Austausch, Strg+C nur POSIX
+   geprüft) **und das Paket** (Inno-Setup, Kermit-Symbol, Rauchtest) — bisher nicht gelaufen.
+3. ~~**Empfangsnamen filtern**~~ erledigt (§6.9): Steuerzeichen wies `Freigabe::normalisiere` schon immer ab; neu auch Namen, die
+   kein gültiges UTF-8 sind.
 4. **Echte 10×-Messung:** im Test schafft die Maschine frei nur ≈ 5,5×; 10× und 0,1× sind nur mit der
    virtuellen Uhr nachgebildet (`KermitTempo.*`).
 5. **tty3 ohne 8-Bit-Präfix** nicht vermessen (Fall 2 lief mit `&` des PC-Servers).
-6. **Nachlauf 2 s gegen den eigenen Server:** die Wartezeit auf das Leerlauf-N(0) nach einem B kostet gegen
-   einen Server, der keins schickt (die eigene Bibliothek), 2 s je Befehl nach einem Empfang — ggf. am
-   Init-Austausch erkennen und abschalten.
-7. **Oberfläche:** Login-Skript nur über CLI/C++-Tests belegt, nicht in `py_kermit_gui`; Drag&Drop nur über
+6. ~~**Nachlauf 2 s gegen den eigenen Server**~~ erledigt (§6.9): entfällt, wenn die Gegenstelle CAPAS meldet.
+7. **Oberfläche:** ~~Login-Skript nur über CLI/C++-Tests belegt~~ erledigt (K13, §6.14); Drag&Drop nur über
    die Auswertung der Mime-Daten (offscreen keine echten Ereignisse); Wiederverbinden ohne Anmeldung nach
    bloßem *Trennen* nicht eigens geprüft.
-8. **Kennwort:** das Laborkennwort `kermit` steht in der Voreinstellung (`konfig.VOREINSTELLUNGEN`) und auf
-   der ausgelieferten Platte; ob eine Abfrage beim ersten Verbinden oder ein anderes Konto für das Paket
-   besser ist, entscheidet der Anwender.
-9. **Nur aus den Quellen gelesen**, nicht ausgelöst: Speicherfehler bei `G C` ohne Feld, Verhalten bei
-   Parität ≠ none.
+8. ~~**Kennwort**~~ abgeschlossen (K10–K13): entschieden am 2026-10-22: das Laborkennwort bleibt Vorgabe, die Oberfläche fragt bei verlangter
+   Anmeldung nach und kann die Zugangsdaten im Klartext in der Konfiguration merken (→ K10–K13, §6.10).
+   Neu offen: Popup nur bei gesetztem Haken *Anmelden* (Merkposten Nr. 14).
+9. **Nur aus den Quellen gelesen**, nicht ausgelöst: Speicherfehler bei `G C` ohne Feld.  (Parität ≠ none beim
+   Empfang ist seit §6.8 gelöst; gesendet wird weiter ohne Paritätsbit.)
 10. **K2b (optional):** Schiebefenster, `G T`/`G U`, Wiederaufnahme.
 
 ## 8. Risiken

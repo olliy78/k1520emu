@@ -46,7 +46,7 @@ void collectUnknownKeys(const yaml::Node& map, const std::vector<std::string>& k
                         const std::string& where, std::vector<std::string>& issues) {
     for (const auto& e : map.entries)
         if (std::find(known.begin(), known.end(), e.first) == known.end())
-            issues.push_back(where + ": unbekanntes Feld '" + e.first + "' — ignoriert");
+            issues.push_back(where + ": unbekanntes Feld '" + e.first + "' - ignoriert");
 }
 
 /// Pflicht-Skalar als Ganzzahl mit Bereichspruefung.
@@ -118,7 +118,7 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
     else if (n_type->scalar == "udos1715") out.type = FsType::Udos1715;
     else if (n_type->scalar == "wega")     out.type = FsType::Wega;
     else if (n_type->scalar == "tar")      out.type = FsType::Tar;
-    else { why = "'type': '" + n_type->scalar + "' — erlaubt sind cpm | udos | udos1715 | wega | tar";
+    else { why = "'type': '" + n_type->scalar + "' - erlaubt sind cpm | udos | udos1715 | wega | tar";
            return false; }
 
     // ── data_start ──
@@ -205,7 +205,7 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
         if (!intField(node, "block_size", 1024, 16384, v, why)) return false;
         out.block_size = static_cast<uint32_t>(v);
         if (out.block_size & (out.block_size - 1)) {
-            why = "'block_size' muss eine Zweierpotenz sein (1024…16384)";
+            why = "'block_size' muss eine Zweierpotenz sein (1024...16384)";
             return false;
         }
 
@@ -224,7 +224,7 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
         if (const yaml::Node* n = node.find("os")) {
             if (!n->isScalar()) { why = "'os' muss ein Text sein"; return false; }
             if (n->scalar != "cpm2.2" && n->scalar != "p2dos" && n->scalar != "cpm3") {
-                why = "'os': '" + n->scalar + "' — erlaubt sind cpm2.2 | p2dos | cpm3";
+                why = "'os': '" + n->scalar + "' - erlaubt sind cpm2.2 | p2dos | cpm3";
                 return false;
             }
             out.os = n->scalar;
@@ -236,7 +236,7 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
                                  "bitmap_track", "usable_tracks", "system_track0"})
             if (node.has(feld))
                 issues.push_back(where + ": '" + feld + "' gilt nur fuer die UDOS-Familie"
-                                                        " — ignoriert");
+                                                        " - ignoriert");
     } else if (out.type == FsType::Wega || out.type == FsType::Tar) {
         // WEGA beschreibt sich selbst (Superblock): Blockgroesse 512, Inode-Liste und
         // Groesse stehen auf dem Datentraeger.  Eine Diskette = EIN Dateisystem ueber
@@ -246,7 +246,7 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
                                  "boot_track", "directory_track", "bitmap_track",
                                  "usable_tracks", "system_track0"})
             if (node.has(feld))
-                issues.push_back(where + ": '" + feld + "' gilt nicht fuer type: wega — ignoriert");
+                issues.push_back(where + ": '" + feld + "' gilt nicht fuer type: wega - ignoriert");
     } else {
         // ZDOS haengt je Sektor 4 Bytes HINTER die Daten-CRC — ein rohes Sektorabbild
         // verliert damit die gesamte Dateiverkettung.  Das ist keine Einstellung.
@@ -256,7 +256,7 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
         if (out.type == FsType::Udos) {
             if (img_ausdruecklich)
                 issues.push_back(where + ": 'containers: img' ist fuer UDOS/ZDOS unmoeglich "
-                                         "(Sektorkontrollblock hinter der Daten-CRC) — entfernt");
+                                         "(Sektorkontrollblock hinter der Daten-CRC) - entfernt");
             out.allow_img = false;
         }
 
@@ -287,7 +287,7 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
                 { why = "'system_track0' muss true/false sein"; return false; }
             if (out.type != FsType::Udos1715) {
                 issues.push_back(where + ": 'system_track0' gilt nur fuer type: udos1715"
-                                         " — ignoriert");
+                                         " - ignoriert");
             } else {
                 out.system_track0 = b;
             }
@@ -297,13 +297,13 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
         if (out.type == FsType::Udos1715 && out.sides_separate) {
             if (node.has("sides_separate"))
                 issues.push_back(where + ": 'sides_separate: true' gibt es bei UDOS1715 nicht"
-                                         " (die Spur umfasst beide Seiten) — auf false gesetzt");
+                                         " (die Spur umfasst beide Seiten) - auf false gesetzt");
             out.sides_separate = false;
         }
 
         for (const char* feld : {"block_size", "dir_entries", "skew", "os"})
             if (node.has(feld))
-                issues.push_back(where + ": '" + feld + "' gilt nur fuer type: cpm — ignoriert");
+                issues.push_back(where + ": '" + feld + "' gilt nur fuer type: cpm - ignoriert");
     }
 
     return true;
@@ -338,7 +338,7 @@ FsCatalog FsCatalog::load(const std::vector<std::string>& paths,
         yaml::Error err;
         if (!yaml::parseFile(path, root, err)) {
             if (fatal_error)
-                *fatal_error = "Katalog fehlerhaft — " + err.format(path);
+                *fatal_error = "Katalog fehlerhaft - " + err.format(path);
             return FsCatalog{};
         }
         if (!root.isMap()) continue;
@@ -347,7 +347,7 @@ FsCatalog FsCatalog::load(const std::vector<std::string>& paths,
         if (!list) continue;                    // §6.5: Sektion ist optional
         if (!list->isList()) {
             if (fatal_error)
-                *fatal_error = "Katalog fehlerhaft — " + path + ":"
+                *fatal_error = "Katalog fehlerhaft - " + path + ":"
                              + std::to_string(list->line)
                              + ": 'filesystems' ist keine Liste";
             return FsCatalog{};
@@ -363,7 +363,7 @@ FsCatalog FsCatalog::load(const std::vector<std::string>& paths,
             if (!buildProfile(node, formats, p, why, cat.issues_, path)) {
                 const std::string what = p.name.empty() ? std::string("Dateisystem")
                                                         : "Dateisystem '" + p.name + "'";
-                cat.issues_.push_back(where + ": " + what + " uebersprungen — " + why);
+                cat.issues_.push_back(where + ": " + what + " uebersprungen - " + why);
                 continue;
             }
 

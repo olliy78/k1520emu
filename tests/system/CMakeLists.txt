@@ -226,5 +226,27 @@ k1520_add_test(p8000_wega_kermit_austausch SRC test_p8000_wega_kermit_austausch.
                                  "K1520_DISKTOOL=\"$<TARGET_FILE:k1520disktool>\"" TIMEOUT 7200 RUN_SERIAL)
 add_dependencies(k1520_test_p8000_wega_kermit_austausch k1520disktool)
 
+# ─── Kermit-80 4.11 unter CP/A und den uebrigen Systemen gegen die eigene Kermit-Bibliothek (Entwurf 36 §6.8).
+# Kermit-80 ist nur Client; die Bibliothek serviert.  Die Ueberlagerungen je Rechner liegen unter
+# tools/kermit80/ (kermit_<rechner>.com); der Bau-Waechter braucht CPA_TOOLS und wird sonst uebersprungen.
+k1520_add_test(kermit80 SRC test_kermit80.cpp
+                        LIBS k1520_a5120 k1520_k8915 k1520_pc1715 k1520_prg710 k1520_p8000 k1520_fs k1520_serial k1520kermit_core
+                             k1520_logger k1520_testsupport
+                        LABELS "system;slow;format_integration"
+                        DEFS LOG_LEVEL=2 "K1520_KERMIT80_DIR=\"${CMAKE_SOURCE_DIR}/tools/kermit80\""
+                             "K1520_OSM_P8000_DISK=\"${CMAKE_SOURCE_DIR}/disks/p8000_osm30/p8000_osm30_system.hfe\""
+                             K1520_SERTEST_COM="${CMAKE_SOURCE_DIR}/tools/sertest/sertest.com" TIMEOUT 1800)
+
+# ─── Kermit-80 (A5120, CP/A) als Client gegen den C-Kermit 4.2 auf WEGA 3.1 (Entwurf 36 §6.8): zwei gekoppelte
+# Emulatoren.  Nutzt den eingefrorenen Zustand der Kermit-Gegenprobe (wega_kermit_stand.h); ohne Startdiskette/Platte
+# uebersprungen.  Label wie die Gegenprobe (nicht in test/test-format; tools/dev.sh test-wega).
+k1520_add_test(kermit80_wega SRC test_kermit80_wega.cpp
+                            LIBS k1520_a5120 k1520_p8000 k1520_fs k1520_gzip k1520_serial k1520_logger k1520_testsupport
+                            LABELS "system;slow;wega_install"
+                            DEFS LOG_LEVEL=2 "P8000_WEGA31_DIR=\"${CMAKE_SOURCE_DIR}/disks/p8000_wega31\""
+                                 "K1520_KERMIT80_DIR=\"${CMAKE_SOURCE_DIR}/tools/kermit80\""
+                                 "K1520_DISKTOOL=\"$<TARGET_FILE:k1520disktool>\"" TIMEOUT 7200 RUN_SERIAL)
+add_dependencies(k1520_test_kermit80_wega k1520disktool)
+
 # Zeitgrenzen der add_test()-Faelle × K1520_TEST_ZEIT_FAKTOR (tests/cmake/K1520AddTest.cmake)
 k1520_test_zeiten_skalieren()

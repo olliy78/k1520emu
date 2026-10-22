@@ -374,7 +374,7 @@ TEST_P(Z8kRoundTrip, JedesErsteWortMitZufallsfolgeworten) {
                 const std::string cat = std::string(d.insn->mn) + " " + d.insn->src->ops + (ok ? "" : " " + err.substr(0, 20));
                 if (shown.insert(cat).second && shown.size() <= 40)
                     ADD_FAILURE() << (seg ? "seg " : "nonseg ") << hexWords(std::vector<uint16_t>(words, words + d.nwords))
-                                  << "'" << text << "' (" << d.insn->mn << " " << d.insn->src->ops << ") → "
+                                  << "'" << text << "' (" << d.insn->mn << " " << d.insn->src->ops << ") -> "
                                   << (ok ? hexWords(back) : "Fehler: " + err);
                 continue;
             }

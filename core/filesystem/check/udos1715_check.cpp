@@ -135,7 +135,7 @@ FsCheckReport Udos1715FileSystem::check(FsCheckLevel level, bool nachladen) cons
                     "Verzeichnisdatei: Descriptor, Typ und Zeigersektoren");
     if (!brauche(prof_.directory_track)) {
         b.add("udos.verz.ungelesen", FsSeverity::Info, FsLayer::Verwaltung, "",
-              "Die Verzeichnisspur ist noch nicht gelesen — geprueft wurde nichts");
+              "Die Verzeichnisspur ist noch nicht gelesen - geprueft wurde nichts");
         abschluss();
         bericht.sortieren();
         return bericht;
@@ -178,7 +178,7 @@ FsCheckReport Udos1715FileSystem::check(FsCheckLevel level, bool nachladen) cons
                 "Belegungsplan",
                 "Spur " + std::to_string(t) + " Sektor " + std::to_string(i)
                 + " traegt das Dateisystem selbst (Belegungsplan oder Verzeichnis),"
-                  " steht aber als FREI — NDOS vergibt ihn beim naechsten Schreiben",
+                  " steht aber als FREI - NDOS vergibt ihn beim naechsten Schreiben",
                 t, headOf(UdosPointer{i, t}), idOf(UdosPointer{i, t}));
         FsRepair rep{"udos.karte.system.sperren",
                      "Spur " + std::to_string(t) + " Sektor " + std::to_string(i)
@@ -242,7 +242,7 @@ FsCheckReport Udos1715FileSystem::check(FsCheckLevel level, bool nachladen) cons
         if ((hdr.type_byte & 0x80) != 0 && hdr.segments.size() >= kUdosMaxSegments)
             b.addAt("udos.kopf.segmente", FsSeverity::Warnung, FsLayer::Dateien, e.name,
                     "Die Segmentliste des Descriptors hat keinen Abschluss "
-                    "(00 00 00 00) — sie fuellt alle "
+                    "(00 00 00 00) - sie fuellt alle "
                     + std::to_string(kUdosMaxSegments) + " Plaetze",
                     e.header.track, headOf(e.header), idOf(e.header));
         if (hdr.typeName().empty())
@@ -250,13 +250,13 @@ FsCheckReport Udos1715FileSystem::check(FsCheckLevel level, bool nachladen) cons
                     "Das Typbyte des Descriptors hat kein Typbit gesetzt", e.header.track, headOf(e.header), idOf(e.header));
         if (hdr.bytes_in_last > hdr.record_len)
             b.addAt("udos.kopf.letzter", FsSeverity::Warnung, FsLayer::Dateien, e.name,
-                    "„Bytes im letzten Satz" " = " + std::to_string(hdr.bytes_in_last)
+                    "'Bytes im letzten Satz" " = " + std::to_string(hdr.bytes_in_last)
                     + " ist groesser als die Satzlaenge " + std::to_string(hdr.record_len),
                     e.header.track, headOf(e.header), idOf(e.header));
         if ((hdr.type_byte & 0x80) != 0 &&
             (hdr.low_addr == 0xFFFF || hdr.high_addr == 0xFFFF))
             b.addAt("udos.kopf.speicher", FsSeverity::Fehler, FsLayer::Dateien, e.name,
-                    "Programmdatei ohne Speicherangabe (LOW/HIGH = FFFF) — sie laesst"
+                    "Programmdatei ohne Speicherangabe (LOW/HIGH = FFFF) - sie laesst"
                     " sich nicht starten", e.header.track, headOf(e.header), idOf(e.header));
 
         if (hdr.firstbl.end() || hdr.firstbl.track >= tracks_
@@ -264,7 +264,7 @@ FsCheckReport Udos1715FileSystem::check(FsCheckLevel level, bool nachladen) cons
             b.addAt("ndos.firstbl", FsSeverity::Fehler, FsLayer::Dateien, e.name,
                     "FIRSTBL nennt " + (hdr.firstbl.end() ? std::string("FFFF")
                                                           : ort(hdr.firstbl))
-                    + " — dort kann kein Zeigersektor liegen", e.header.track, headOf(e.header), idOf(e.header));
+                    + " - dort kann kein Zeigersektor liegen", e.header.track, headOf(e.header), idOf(e.header));
             continue;
         }
 
@@ -321,7 +321,7 @@ FsCheckReport Udos1715FileSystem::check(FsCheckLevel level, bool nachladen) cons
             // Sektoren; die Satzzahl im Descriptor ist nur ihre Gegenprobe.
             FsRepair rep{"ndos.zeiger.anzahl.anpassen",
                          "Die Satzzahl im Descriptor auf " + std::to_string(daten)
-                         + " setzen — so viele Adressen stehen in den Zeigersektoren",
+                         + " setzen - so viele Adressen stehen in den Zeigersektoren",
                          /*datenverlust*/daten < hdr.record_count, /*empfohlen*/true};
             rep.a = e.header.track; rep.b = e.header.sector_index;
             rep.c = static_cast<int>(daten);
@@ -338,7 +338,7 @@ FsCheckReport Udos1715FileSystem::check(FsCheckLevel level, bool nachladen) cons
             if (a.track >= tracks_ || a.sector_index >= spt) {
                 b.addAt("ndos.zeiger.ausserhalb", FsSeverity::Fehler, FsLayer::Dateien, e.name,
                         "Satz " + std::to_string(i) + " nennt " + ort(a)
-                        + " — das liegt ausserhalb der Diskette", e.header.track, headOf(e.header), idOf(e.header));
+                        + " - das liegt ausserhalb der Diskette", e.header.track, headOf(e.header), idOf(e.header));
                 continue;
             }
             // Die KOPFgrenze darf ein Record ueberschreiten (die Spur ist der ganze
@@ -347,7 +347,7 @@ FsCheckReport Udos1715FileSystem::check(FsCheckLevel level, bool nachladen) cons
                 b.addAt("ndos.satz.spurwechsel", FsSeverity::Fehler, FsLayer::Dateien, e.name,
                         "Satz " + std::to_string(i) + " beginnt bei " + ort(a)
                         + " und braucht " + std::to_string(je_rec)
-                        + " Sektoren — das reicht ueber das Spurende hinaus", a.track, 0);
+                        + " Sektoren - das reicht ueber das Spurende hinaus", a.track, 0);
                 continue;
             }
             if (!brauche(a.track)) continue;
@@ -358,7 +358,7 @@ FsCheckReport Udos1715FileSystem::check(FsCheckLevel level, bool nachladen) cons
                 if (!neu && it->second != e.name)
                     b.addAt("ndos.zeiger.doppelt", FsSeverity::Gefahr, FsLayer::Dateien, e.name,
                             ort(q) + " gehoert sowohl zu '" + it->second + "' als auch zu '"
-                            + e.name + "' — wer als zweiter schreibt, zerstoert die Daten"
+                            + e.name + "' - wer als zweiter schreibt, zerstoert die Daten"
                               " des ersten", q.track, 0);
                 SectorData sec;
                 if (!space_.readSector(q.track, headOf(q), idOf(q), sec) || !sec.ok()) {
@@ -391,7 +391,7 @@ FsCheckReport Udos1715FileSystem::check(FsCheckLevel level, bool nachladen) cons
                     FsLayer::Dateien, wem,
                     std::to_string(sektoren.size()) + " Sektor(en) von '" + wem
                     + "' stehen im Belegungsplan als FREI (der erste bei "
-                    + ort(sektoren.front()) + ") — NDOS vergibt sie beim naechsten"
+                    + ort(sektoren.front()) + ") - NDOS vergibt sie beim naechsten"
                       " Schreiben und zerstoert die Datei",
                     sektoren.front().track, headOf(sektoren.front()),
                                    idOf(sektoren.front()));
@@ -432,7 +432,7 @@ FsCheckReport Udos1715FileSystem::check(FsCheckLevel level, bool nachladen) cons
                     FsLayer::Verwaltung, "Belegungsplan",
                     std::to_string(verloren) + " Sektoren stehen als belegt, gehoeren aber"
                     " zu keiner Datei (ab Spur " + std::to_string(erste_spur)
-                    + ") — verlorener Platz; dort koennten geloeschte Dateien liegen",
+                    + ") - verlorener Platz; dort koennten geloeschte Dateien liegen",
                     erste_spur, 0);
             // E8: der einzige Eingriff, der etwas FREIGIBT.  Gesperrt, solange auch
             // nur eine Zeigersektorkette nicht zu verfolgen war — sonst erklaerte er
@@ -447,13 +447,13 @@ FsCheckReport Udos1715FileSystem::check(FsCheckLevel level, bool nachladen) cons
             }
             FsRepair rep{"udos.karte.neu",
                          "Den Belegungsplan vollstaendig aus den Zeigersektoren neu"
-                         " aufbauen — das gibt die " + std::to_string(verloren)
+                         " aufbauen - das gibt die " + std::to_string(verloren)
                          + " verlorenen Sektoren zurueck",
                          /*datenverlust*/false, /*empfohlen*/blockiert.empty()};
             if (!blockiert.empty()) {
                 rep.gesperrt = true;
                 rep.warum    = "Der Neuaufbau ist erst moeglich, wenn kein Fehler an den"
-                               " Zeigersektoren mehr offen ist — offen ist " + blockiert;
+                               " Zeigersektoren mehr offen ist - offen ist " + blockiert;
             }
             f.repairs.push_back(rep);
         }
@@ -492,7 +492,7 @@ FsCheckReport Udos1715FileSystem::check(FsCheckLevel level, bool nachladen) cons
                     "Medium",
                     std::to_string(frei_kaputt) + " Sektor(en) ausserhalb jeder Datei"
                     " tragen eine falsche Pruefsumme, der erste auf Spur " + std::to_string(erster.track) + " Sektor "
-                    + std::to_string(erster.sector_index) + " — verloren ist dort"
+                    + std::to_string(erster.sector_index) + " - verloren ist dort"
                       " nichts, aber eine geloeschte Datei waere von dort nicht mehr"
                       " zu retten",
                     erster.track, headOf(erster), idOf(erster));
@@ -504,7 +504,7 @@ FsCheckReport Udos1715FileSystem::check(FsCheckLevel level, bool nachladen) cons
         bericht.schrittEntfaellt("udos.schritt.karte_gegen_ketten",
                                  "Plan gegen Zeigersektoren: belegte Sektoren, die als "
                                  "frei gefuehrt sind",
-                                 "das Speicherabbild ist unvollstaendig — der Abgleich "
+                                 "das Speicherabbild ist unvollstaendig - der Abgleich "
                                  "braucht jede Spur");
     bericht.schrittEnde();
     bericht.sortieren();

@@ -505,6 +505,142 @@ TEST(KermitLogin, FalscherNameGibtKlarenText) {
     t.join();
 }
 
+// ─── Anmeldung auf Abruf (K10) ──────────────────────────────────────────────
+
+TEST(KermitLoginAbruf, RichtigeDatenGebenOkUndDerRueckrufKommtErstNachLogin) {
+    SpeicherLeitungPaar paar;   // gerade Paritaet: Bit 7 wird vor dem Vergleich geloescht
+    GettyAttrappe g{paar.ende(1)};
+    g.stilleMs = 0;
+    std::thread t([&] { g.lauf(); });
+    LoginOptionen o = schnell();
+    int aufrufe = 0;
+    std::string gesehen;
+    o.abfrage = [&](const AnmeldeAnfrage& a, std::string& n, std::string& k) {
+        ++aufrufe;
+        gesehen = a.gelesen;
+        EXPECT_EQ(a.versuch, 0);
+        n = "kermit";
+        k = "kermit";
+        return true;
+    };
+    const LoginErgebnis r = loginSkript(paar.ende(0), o);
+    EXPECT_TRUE(r.ok) << r.text;
+    EXPECT_EQ(r.art, LoginArt::Ok);
+    EXPECT_EQ(aufrufe, 1);
+    EXPECT_EQ(r.versuche, 1);
+    EXPECT_NE(gesehen.find("login:"), std::string::npos) << "Rueckruf kam vor dem login:: " << gesehen;
+    paar.ende(0).schliessen();
+    t.join();
+}
+
+TEST(KermitLoginAbruf, FalscheDatenGebenAbgelehntDannErneutOkAufDerselbenLeitung) {
+    for (const bool falscherName : {false, true}) {
+        SpeicherLeitungPaar paar;
+        GettyAttrappe g{paar.ende(1)};
+        g.stilleMs = 0;
+        std::thread t([&] { g.lauf(); });
+        LoginOptionen o = schnell();
+        std::vector<int> versuche;
+        std::string zweitesGelesen;
+        o.abfrage = [&](const AnmeldeAnfrage& a, std::string& n, std::string& k) {
+            versuche.push_back(a.versuch);
+            if (a.versuch == 0) {
+                n = falscherName ? "niemand" : "kermit";
+                k = "falsch";
+            } else {
+                zweitesGelesen = a.gelesen;
+                n = "kermit";
+                k = "kermit";
+            }
+            return true;
+        };
+        const LoginErgebnis r = loginSkript(paar.ende(0), o);
+        EXPECT_TRUE(r.ok) << (falscherName ? "Name: " : "Kennwort: ") << r.text;
+        EXPECT_EQ(r.art, LoginArt::Ok);
+        EXPECT_EQ(versuche, (std::vector<int>{0, 1}));
+        EXPECT_EQ(r.versuche, 2);
+        EXPECT_NE(zweitesGelesen.find("Login incorrect"), std::string::npos) << zweitesGelesen;
+        paar.ende(0).schliessen();
+        t.join();
+        // Zweiter Versuch auf derselben Leitung: das richtige Paar kam an.
+        EXPECT_NE(g.verlauf.find("kermit\rkermit\r"), std::string::npos) << g.verlauf;
+    }
+}
+
+TEST(KermitLoginAbruf, DieAnmeldungOhneRueckrufMeldetDieArtAbgelehnt) {
+    SpeicherLeitungPaar paar;
+    GettyAttrappe g{paar.ende(1)};
+    g.ignorierteReturns = 0;
+    std::thread t([&] { g.lauf(); });
+    LoginOptionen o = schnell();
+    o.kennwort = "falsch";
+    const LoginErgebnis r = loginSkript(paar.ende(0), o);
+    EXPECT_FALSE(r.ok);
+    EXPECT_EQ(r.art, LoginArt::Abgelehnt) << r.text;
+    paar.ende(0).schliessen();
+    t.join();
+}
+
+TEST(KermitLoginAbruf, StummeGegenstelleGibtFristUndRuftNichtAuf) {
+    SpeicherLeitungPaar paar;
+    paar.setzeBeteiligt(1, false);
+    LoginOptionen o = schnell();
+    o.frist_login_ms = 5000;
+    int aufrufe = 0;
+    o.abfrage = [&](const AnmeldeAnfrage&, std::string&, std::string&) { ++aufrufe; return true; };
+    const LoginErgebnis r = loginSkript(paar.ende(0), o);
+    EXPECT_FALSE(r.ok);
+    EXPECT_EQ(r.art, LoginArt::Frist) << r.text;
+    EXPECT_EQ(aufrufe, 0);
+}
+
+TEST(KermitLoginAbruf, LeitungWaehrendDerEingabeGeschlossenGibtLeitung) {
+    SpeicherLeitungPaar paar;
+    GettyAttrappe g{paar.ende(1)};
+    g.ignorierteReturns = 0;
+    std::thread t([&] { g.lauf(); });
+    LoginOptionen o = schnell();
+    o.abfrage = [&](const AnmeldeAnfrage&, std::string& n, std::string& k) {
+        paar.ende(1).schliessen();   // die Gegenstelle legt auf, waehrend der Anwender tippt
+        n = "kermit";
+        k = "kermit";
+        return true;
+    };
+    const LoginErgebnis r = loginSkript(paar.ende(0), o);
+    EXPECT_FALSE(r.ok);
+    EXPECT_EQ(r.art, LoginArt::Leitung) << r.text;
+    paar.ende(0).schliessen();
+    t.join();
+}
+
+TEST(KermitLoginAbruf, AbbruchWaehrendDerEingabe) {
+    // (1) der Anwender bricht ab (Rueckruf gibt false), (2) das Abbruch-Flag wird waehrend der Eingabe gesetzt.
+    for (const bool ueberFlag : {false, true}) {
+        SpeicherLeitungPaar paar;
+        GettyAttrappe g{paar.ende(1)};
+        g.ignorierteReturns = 0;
+        std::thread t([&] { g.lauf(); });
+        std::atomic<bool> stop{false};
+        LoginOptionen o = schnell();
+        o.abbruch = &stop;
+        o.abfrage = [&](const AnmeldeAnfrage&, std::string& n, std::string& k) {
+            if (ueberFlag) {
+                stop = true;
+                n = "kermit";
+                k = "kermit";
+                return true;
+            }
+            return false;
+        };
+        const LoginErgebnis r = loginSkript(paar.ende(0), o);
+        EXPECT_FALSE(r.ok);
+        EXPECT_EQ(r.art, LoginArt::Abbruch) << r.text;
+        EXPECT_EQ(r.versuche, 0) << "nach dem Abbruch darf nichts mehr gesendet worden sein";
+        paar.ende(0).schliessen();
+        t.join();
+    }
+}
+
 TEST(KermitLogin, StummeGegenstelleLaeuftInDieFrist) {
     SpeicherLeitungPaar paar;
     paar.setzeBeteiligt(1, false);
@@ -681,4 +817,90 @@ TEST(KermitNetzHub, KermitGegenEinenEchtenSerialHubKanal) {
     EXPECT_TRUE(gastErgebnis.ok()) << gastErgebnis.text;
     EXPECT_EQ(seite.a.ueberlauf, 0u);
     seite.hub.stop(0);
+}
+
+// ─── Server mit Anmeldezwang (K12): das eigene Login-Skript gegen den eigenen Server ─────────────
+
+namespace {
+
+void serverMitPflichtKopplung(Art art) {
+    Paar p = baue(art, true);
+    ASSERT_TRUE(p.a && p.b) << p.fehler;
+    TempOrdner wurzel, lokal, hol;
+    Freigabe freigabe(wurzel.p);
+    schreibe(wurzel.p / "vorhanden.txt", "auf dem Server");
+    Ergebnis serverErgebnis;
+    std::thread server([&] {
+        Einstellungen e;
+        e.frist_ms = 10000;
+        e.login_pflicht = true;
+        e.login_name = "olli";
+        e.login_kennwort = "geheim";
+        Sitzung s(*p.b, e);
+        serverErgebnis = s.serve(freigabe);
+    });
+
+    // 1. Mit festen Daten.
+    LoginOptionen o = schnell();
+    o.name = "olli";
+    o.kennwort = "geheim";
+    LoginErgebnis lr = loginSkript(*p.a, o);
+    ASSERT_TRUE(lr.ok) << lr.text;
+    {
+        Einstellungen e;
+        e.frist_ms = 10000;
+        Sitzung c(*p.a, e);
+        Ergebnis r = c.holen("vorhanden.txt", hol.s());
+        ASSERT_TRUE(r.ok()) << r.text;
+        EXPECT_EQ(lies(hol.p / "vorhanden.txt"), "auf dem Server");
+        schreibe(lokal.p / "neu.bin", zufall(5000, 7));
+        r = c.senden((lokal.p / "neu.bin").u8string(), "neu.bin");
+        ASSERT_TRUE(r.ok()) << r.text;
+        EXPECT_EQ(lies(wurzel.p / "neu.bin"), zufall(5000, 7));
+        ASSERT_TRUE(c.entferntBeenden().ok());   // FINISH: der Server meldet sich wieder mit login:
+    }
+
+    // 2. Nach FINISH auf Abruf (K10): erst falsches Kennwort -> abgelehnt -> Rueckruf erneut -> richtig.
+    LoginOptionen oa = schnell();
+    std::vector<int> versuche;
+    oa.abfrage = [&](const AnmeldeAnfrage& a, std::string& n, std::string& k) {
+        versuche.push_back(a.versuch);
+        n = "olli";
+        k = a.versuch == 0 ? "falsch" : "geheim";
+        return true;
+    };
+    lr = loginSkript(*p.a, oa);
+    ASSERT_TRUE(lr.ok) << lr.text;
+    EXPECT_EQ(versuche, (std::vector<int>{0, 1}));
+    {
+        Einstellungen e;
+        e.frist_ms = 10000;
+        Sitzung c(*p.a, e);
+        Ergebnis r = c.entferntVerzeichnis("");
+        ASSERT_TRUE(r.ok()) << r.text;
+        EXPECT_NE(r.ausgabe.find("neu.bin"), std::string::npos) << r.ausgabe;
+        ASSERT_TRUE(c.entferntAbmelden().ok());
+    }
+
+    // 3. Ohne Rueckruf und mit falschem Kennwort: Art Abgelehnt.
+    LoginOptionen of = schnell();
+    of.name = "olli";
+    of.kennwort = "nein";
+    lr = loginSkript(*p.a, of);
+    EXPECT_FALSE(lr.ok);
+    EXPECT_EQ(lr.art, LoginArt::Abgelehnt) << lr.text;
+
+    p.a->schliessen();
+    server.join();
+    EXPECT_EQ(serverErgebnis.art, Fehlerart::LeitungGetrennt);
+}
+
+}  // namespace
+
+TEST(KermitServerLoginKopplung, LoginSkriptUndProtokollGegenDenServerMitPflichtTelnet) {
+    serverMitPflichtKopplung(Art::Telnet);
+}
+
+TEST(KermitServerLoginKopplung, LoginSkriptUndProtokollGegenDenServerMitPflichtRfc2217) {
+    serverMitPflichtKopplung(Art::Rfc2217);
 }

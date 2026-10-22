@@ -2,10 +2,10 @@
 # Datenbereich (Verzeichnisplatz 1, erster Zeiger -> 0x0FF0).
 #
 # Drei Aussagen stehen hier auf dem Spiel:
-#   * `--fs` ist der Weg hinein — die Erkennung LEHNT eine Diskette mit
+#   * `--fs` ist der Weg hinein - die Erkennung LEHNT eine Diskette mit
 #     unbrauchbarem Blockzeiger ab, die Pruefung kaeme sonst nie zum Zug.
 #   * Die einzige Reparatur geht mit Datenverlust einher, also fuehrt das
-#     blanke `--repair` sie NICHT aus — und sagt das auch, statt „0 Reparaturen"
+#     blanke `--repair` sie NICHT aus - und sagt das auch, statt '0 Reparaturen"
 #     zu melden, waehrend eine dasteht.
 #   * `--repair=alle` fuehrt sie aus, und danach ist die Diskette ohne Befund
 #     (kein Loch in der Zeigerliste: es wird abgeschnitten, nicht ausgestanzt).

@@ -12,6 +12,7 @@ Flags) auf die Sitzung zugreifen — wie in der C-ABI vorgesehen (``k1520k_abort
 from __future__ import annotations
 
 import queue
+import threading
 import time
 from typing import Callable, List, Optional, Tuple
 
@@ -22,6 +23,24 @@ from app.kermittool.binding import Kermit, KermitError, parse_ls
 
 #: Fortschrittsmeldungen hoechstens so oft (Sekunden) — auf Loopback kaeme sonst jedes Paket.
 FORTSCHRITT_TAKT = 0.05
+
+
+class AnmeldeAnfrage:
+    """Eine Frage nach Zugangsdaten: vom Arbeitsfaden gestellt, im GUI-Faden beantwortet.
+
+    ``antworten((name, kennwort, speichern))`` oder ``antworten(None)`` (= Abbrechen) weckt den
+    wartenden Arbeitsfaden.  Es wird NIE eine Sperre gehalten, solange gewartet wird."""
+
+    def __init__(self, versuch: int, gelesen: str, name: str, kennwort: str, speichern: bool):
+        self.versuch, self.gelesen = versuch, gelesen
+        self.name, self.kennwort, self.speichern = name, kennwort, speichern
+        self.ereignis = threading.Event()
+        self.antwort: Optional[Tuple[str, str, bool]] = None
+
+    def antworten(self, antwort: Optional[Tuple[str, str, bool]]) -> None:
+        if not self.ereignis.is_set():
+            self.antwort = antwort
+            self.ereignis.set()
 
 
 class _Faden(QThread):
@@ -48,6 +67,10 @@ class Arbeiter(QObject):
     auftrag_fertig = Signal(str, bool, int, str, object)
     #: Der Fehlertext/Ergebnistext der Gegenstelle zu einem Auftrag (nur wenn vorhanden).
     gegenstelle_meldet = Signal(str)
+    #: Eine :class:`AnmeldeAnfrage`: das Fenster zeigt das Popup und antwortet (GUI-Faden).
+    anmeldung_verlangt = Signal(object)
+    #: (Name, Kennwort): die Anmeldung gelang und der Anwender wollte die Zugangsdaten speichern.
+    zugang_gemerkt = Signal(str, str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -57,6 +80,8 @@ class Arbeiter(QObject):
         self._wieder = False
         self._stopp = False
         self._abbruch_gewuenscht = False
+        self._offene: List[AnmeldeAnfrage] = []      # wartende Fragen; Sperre nur zum Eintragen/Austragen
+        self._offene_sperre = threading.Lock()
         self._beschaeftigt = 0               # Auftraege in Schlange + laufend — NUR im GUI-Faden gezaehlt
         self._letzter_takt = 0.0
         # Gezaehlt wird im GUI-Faden, wenn das Ergebnis dort ANKOMMT: so stimmt `beschaeftigt` in
@@ -89,6 +114,10 @@ class Arbeiter(QObject):
         """Laufende Operation abbrechen.  ``hart`` = Sitzung und Leitung (``abort``), sonst geordnet (``Z``)."""
         k = self._k
         self._abbruch_gewuenscht = True
+        with self._offene_sperre:                # ein wartendes Popup antwortet „Abbrechen"
+            wartende = list(self._offene)
+        for a in wartende:
+            a.antworten(None)
         if k is None:
             return
         try:
@@ -113,9 +142,12 @@ class Arbeiter(QObject):
 
     # ── Auftraege (Namen der Methoden = was das Fenster anstoesst) ──────────
 
-    def verbinden(self, p: dict, kennwort: Optional[str]) -> None:
+    def verbinden(self, p: dict, kennwort: Optional[str], speichern: bool = False) -> None:
+        """Verbindung herstellen.  ``kennwort``/``p["login_name"]`` sind die vorab bekannten Zugangsdaten
+        (Dialog oder Datei); fehlt der Name, fragt das Popup.  ``speichern``: nach gelungener Anmeldung
+        ``zugang_gemerkt`` senden."""
         self._stopp = False
-        self.auftrag("verbinden", self._j_verbinden, p, kennwort)
+        self.auftrag("verbinden", self._j_verbinden, p, kennwort, speichern)
 
     def verzeichnis(self) -> None:
         self.auftrag("verzeichnis", self._j_dir)
@@ -219,15 +251,68 @@ class Arbeiter(QObject):
         self._k = k
         return k
 
-    def _j_verbinden(self, p: dict, kennwort: Optional[str]) -> str:
+    def _frage_gui(self, a: AnmeldeAnfrage) -> Optional[Tuple[str, str, bool]]:
+        """Im Arbeitsfaden: Popup im GUI-Faden anfordern und warten — OHNE Sperre (Kernsperre, Lock).
+
+        ``abbrechen()`` (GUI-Faden) und ``stoppen()`` beenden das Warten mit ``None``."""
+        with self._offene_sperre:
+            if self._stopp or self._abbruch_gewuenscht:
+                return None
+            self._offene.append(a)
+        try:
+            self.anmeldung_verlangt.emit(a)
+            a.ereignis.wait()
+        finally:
+            with self._offene_sperre:
+                if a in self._offene:
+                    self._offene.remove(a)
+        return a.antwort
+
+    def _anmelden(self, k: Kermit, p: dict, kennwort: Optional[str], speichern: bool) -> None:
+        """Anmeldung auf Abruf (K10).  Beim ersten Versuch gehen vorab bekannte Zugangsdaten (Name vorhanden)
+        ohne Popup raus; sonst — und nach JEDER Ablehnung — fragt das Popup, vorbelegt mit der letzten Eingabe.
+
+        Gespeichert wird (``zugang_gemerkt``) erst NACH gelungener Anmeldung und nur bei gesetztem Haken: eine
+        abgelehnte Eingabe ueberschreibt nie gute gespeicherte Werte.  Die Kennwoerter verlassen diese
+        Methode nur ueber ``zugang_gemerkt`` (das Fenster schreibt sie im Klartext, ohne Dateischutz —
+        Entscheidung des Anwenders) und stehen in keinem Ereignistext."""
+        name = (p.get("login_name") or "").strip()
+        letzter = [name, kennwort or "", bool(speichern)]    # zuletzt abgeschickt: Name, Kennwort, Haken
+
+        def frage(versuch: int, gelesen: str):
+            if versuch == 0 and letzter[0]:
+                antwort = (letzter[0], letzter[1])
+            else:
+                a = AnmeldeAnfrage(versuch, gelesen, letzter[0], letzter[1], letzter[2])
+                ant = self._frage_gui(a)
+                if ant is None:
+                    return None
+                letzter[:] = [ant[0], ant[1], bool(ant[2])]
+                antwort = (ant[0], ant[1])
+            self.ereignis.emit(f"Anmeldung als {antwort[0]} ...")
+            return antwort
+
+        try:
+            k.login_ask(frage, self._einst["login_frist_s"] * 1000)
+        except KermitError as e:
+            if e.code == binding.E_LOGIN:
+                art = k.login_kind
+                if art == binding.LOGIN_ABBRUCH:
+                    raise KermitError(binding.E_ABORTED, "Anmeldung abgebrochen")
+                if art == binding.LOGIN_ABGELEHNT:
+                    raise KermitError(binding.E_LOGIN, "Anmeldung abgelehnt")
+            raise
+        if letzter[2] and letzter[0]:
+            self.zugang_gemerkt.emit(letzter[0], letzter[1])
+
+    def _j_verbinden(self, p: dict, kennwort: Optional[str], speichern: bool = False) -> str:
         self._schliessen()
         try:
             k = self._oeffnen(p)
             self._anwenden(k)
             self._rueckrufe(k)
-            if p.get("login") and p.get("login_name"):
-                self.ereignis.emit(f"Anmeldung als {p['login_name']} ...")
-                k.login(p["login_name"], kennwort or None, self._einst["login_frist_s"] * 1000)
+            if p.get("login"):
+                self._anmelden(k, p, kennwort, speichern)
             peer = k.peer or f"{p.get('host', '')}:{p.get('port', '')}"
             self.zustand.emit("verbunden", f"Verbunden mit {peer}")
             if k.line_notice:
@@ -300,9 +385,14 @@ class Arbeiter(QObject):
                 k = self._oeffnen(p)
                 self._anwenden(k)
                 self._rueckrufe(k)
+                sl = p.get("server_login") or {}
+                if sl.get("pflicht"):
+                    # Wie getty + login der WEGA; serve endet dann nur durch Trennung oder Stopp.
+                    k.set_server_login(True, sl.get("name"), sl.get("kennwort"))
                 self.zustand.emit("verbunden", f"Verbunden mit {k.peer}")
                 self.ereignis.emit(f"Verbunden mit {k.peer} — Freigabe {wurzel}"
-                                   + (" (nur lesen)" if nur_lesen else ""))
+                                   + (" (nur lesen)" if nur_lesen else "")
+                                   + (" (mit Anmeldung)" if sl.get("pflicht") else ""))
                 k.serve(wurzel, nur_lesen)
                 letztes = "Gegenstelle hat den Server beendet"
             except KermitError as e:

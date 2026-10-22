@@ -129,46 +129,46 @@ struct Optionen {
 
 void gebrauch() {
     std::cout <<
-        "k1520disktool — Dateien zwischen Linux und K1520-Disketten austauschen\n\n"
+        "k1520disktool - Dateien zwischen Linux und K1520-Disketten austauschen\n\n"
         "  ls     <abbild> [-l]                     Verzeichnis (nur Namen; -l ausfuehrlich)\n"
-        "  get    <abbild> <muster…> --to <ordner>  Dateien herausholen\n"
-        "         [--fileinfo]                      … bei CP/M je Datei ein .fileinfo\n"
+        "  get    <abbild> <muster...> --to <ordner>  Dateien herausholen\n"
+        "         [--fileinfo]                      ... bei CP/M je Datei ein .fileinfo\n"
         "                                             (bei UDOS entsteht es immer)\n"
-        "  put    <abbild> <datei|ordner…>          Dateien einfuegen\n"
-        "         [--type P1 --props WS --entry 0]  … UDOS-Kopfsektor (Typ/Eigensch./Start)\n"
-        "         [--record-len 1024]               … UDOS-Satzlaenge (Vielfaches von 128)\n"
-        "         [--segment 2600+1591,4000+0200]   … UDOS-Segmente ANFANG+LAENGE (hex)\n"
-        "         [--mem E000:E3FF:0080]            … LOW:HIGH:STACK (hex)\n"
-        "         [--block-len 0] [--extra 0]       … Kopfsektor 17 bzw. 44-47\n"
-        "  rm     <abbild> <muster…>                Dateien loeschen (WEGA: auch leere\n"
+        "  put    <abbild> <datei|ordner...>          Dateien einfuegen\n"
+        "         [--type P1 --props WS --entry 0]  ... UDOS-Kopfsektor (Typ/Eigensch./Start)\n"
+        "         [--record-len 1024]               ... UDOS-Satzlaenge (Vielfaches von 128)\n"
+        "         [--segment 2600+1591,4000+0200]   ... UDOS-Segmente ANFANG+LAENGE (hex)\n"
+        "         [--mem E000:E3FF:0080]            ... LOW:HIGH:STACK (hex)\n"
+        "         [--block-len 0] [--extra 0]       ... Kopfsektor 17 bzw. 44-47\n"
+        "  rm     <abbild> <muster...>                Dateien loeschen (WEGA: auch leere\n"
         "                                             Verzeichnisse)\n"
-        "  mkdir  <abbild> <pfad…>                  Verzeichnis anlegen (nur WEGA)\n"
+        "  mkdir  <abbild> <pfad...>                  Verzeichnis anlegen (nur WEGA)\n"
         "  create <abbild> --fs NAME [--label N]    leere Diskette anlegen\n"
-        "         [--boot abbild.bin]               … mit Bootabbild in den Systemspuren\n"
-        "  attr   <abbild> <datei> [--type …]       Dateiangaben zeigen/aendern\n"
-        "         [--mode 0755 --uid N --gid N --mtime S]  … WEGA: chmod/chown/touch\n"
-        "         [--ro|--no-ro --sys|--no-sys]     … CP/M-Attribute\n"
-        "         [--arc|--no-arc] [--user 3]       … und Nutzerbereich\n"
-        "         [--prg 710|710-1]                 … Bootabbild muss fuer dieses PRG-Geraet sein\n"
+        "         [--boot abbild.bin]               ... mit Bootabbild in den Systemspuren\n"
+        "  attr   <abbild> <datei> [--type ...]       Dateiangaben zeigen/aendern\n"
+        "         [--mode 0755 --uid N --gid N --mtime S]  ... WEGA: chmod/chown/touch\n"
+        "         [--ro|--no-ro --sys|--no-sys]     ... CP/M-Attribute\n"
+        "         [--arc|--no-arc] [--user 3]       ... und Nutzerbereich\n"
+        "         [--prg 710|710-1]                 ... Bootabbild muss fuer dieses PRG-Geraet sein\n"
         "  boot-get <abbild> <datei.bin>            Systemspuren herausschreiben\n"
         "  boot-put <abbild> <datei.bin>            Bootabbild in die Systemspuren\n"
-        "         [--prg 710|710-1]                 … (wie bei create)\n"
+        "         [--prg 710|710-1]                 ... (wie bei create)\n"
         "  boot-scpx <SYL17.SYS> <CCPBD17.SYS> <BIOS.SYS> <aus.bin> [--prg 710|710-1]\n"
         "                                           SCPX-Systemspuren des PRG aus den Modulen\n"
         "                                           bauen (Geraet wird am BIOS erkannt)\n"
         "  save-as <abbild> <ziel>                  Kopie, ggf. anderes Format\n"
         "  info   <abbild>                          Belegung und Erkennung\n"
         "  check  <abbild> [--full]                 Dateisystem pruefen (--full: jede Spur)\n"
-        "  fsck   <abbild> [--full] [--repair[=…]]  pruefen UND reparieren\n"
-        "         [--dry-run]                       … --repair: die empfohlenen ohne\n"
+        "  fsck   <abbild> [--full] [--repair[=...]]  pruefen UND reparieren\n"
+        "         [--dry-run]                       ... --repair: die empfohlenen ohne\n"
         "                                             Datenverlust; =alle auch die mit;\n"
-        "                                             =kennung,… eine Auswahl\n"
+        "                                             =kennung,... eine Auswahl\n"
         "  recover <abbild> [--full] [--to ordner]  geloeschte Dateien suchen und retten\n"
-        "         [--list] [--restore N[=NAME]]     … --full: auch die Bruchstuecke ohne\n"
+        "         [--list] [--restore N[=NAME]]     ... --full: auch die Bruchstuecke ohne\n"
         "                                             Verzeichnisplatz; --restore traegt\n"
         "                                             den Fund auf der Diskette ein\n"
         "  measure <abbild>                         Geometrie messen (auch ohne Dateisystem)\n"
-        "  tar-satz <abbild1> <abbild2>… [--to ordner] [-l]\n"
+        "  tar-satz <abbild1> <abbild2>... [--to ordner] [-l]\n"
         "                                           Disketten mit rohem tar-Strom (ohne Dateisystem):\n"
         "                                           Strome in dieser Reihenfolge verketten, auflisten\n"
         "                                           bzw. mit --to vollstaendig entpacken\n"
@@ -177,15 +177,15 @@ void gebrauch() {
         "                                           die Teile eines Satzes setzt `cat` zusammen\n"
         "  tar-put <abbild> <quelle.tar>            .tar (Vielfaches von 512, passt auf EIN Abbild) wird das\n"
         "                                           Archiv einer LEEREN tar-Diskette (`create x.img --fs\n"
-        "                                           tar720_leer`) — \"als Container\"; die Diskette bleibt danach\n"
+        "                                           tar720_leer`) - \"als Container\"; die Diskette bleibt danach\n"
         "                                           bearbeitbar.  Auf einem Archiv mit Inhalt: Fehler (als Datei\n"
         "                                           kommt eine .tar per `put` hinein).  --dry-run: nur beurteilen.\n"
         "                                           Gewarnt wird vor Nicht-V7-tar (Schreiben geht trotzdem)\n"
-        "  tar-satz-save <abbild1>… [-o basis.ext] [--dry-run]\n"
-        "                  [--put QUELLE[=ZIEL] | --rm NAME | --mkdir NAME | --attr NAME (+ --mode/--uid/--gid/--mtime)]…\n"
+        "  tar-satz-save <abbild1>... [-o basis.ext] [--dry-run]\n"
+        "                  [--put QUELLE[=ZIEL] | --rm NAME | --mkdir NAME | --attr NAME (+ --mode/--uid/--gid/--mtime)]...\n"
         "                                           tar-Satz als Ganzes oeffnen, die Schritte in Reihenfolge\n"
         "                                           anwenden und auf Abbilder GLEICHEN Formats verteilen:\n"
-        "                                           basis1.ext, basis2.ext, … (Nummer vor der Endung; ohne -o\n"
+        "                                           basis1.ext, basis2.ext, ... (Nummer vor der Endung; ohne -o\n"
         "                                           die Namen des Satzes), letztes Abbild mit Nullen gefuellt.\n"
         "                                           Alte hoehere Nummern werden NIE geloescht (Hinweis);\n"
         "                                           ueberschriebene Abbilder einmal als `<name>~` gesichert\n"
@@ -200,22 +200,22 @@ void gebrauch() {
         "  formats                                  bekannte Dateisysteme auflisten\n\n"
         "P8000-Plattenabbild (WEGA, PAR in Zylinder 0): ls/info/check/get/put/rm/mkdir/attr;\n"
         "  Namen mit Partition vorn (md0 = /usr, md2 = /, md3 = /tmp, md4 = /z):\n"
-        "  get platte.img 'md2/etc/*' --to x ·  put platte.img datei --as md2/etc/datei\n\n"
+        "  get platte.img 'md2/etc/*' --to x -  put platte.img datei --as md2/etc/datei\n\n"
         "Gemeinsam: --fs NAME (Erkennung uebersteuern), --volume N (Seite),\n"
         "           --text|--binary, --force, --dry-run, --no-backup\n"
         "  Neben jeder herausgeholten Datei liegt ein <datei>.fileinfo mit dem, was\n"
-        "  eine Linux-Datei nicht traegt (Typ, Satzlaenge, ENTRY, Segmente…).  `put`\n"
+        "  eine Linux-Datei nicht traegt (Typ, Satzlaenge, ENTRY, Segmente...).  `put`\n"
         "  liest es von selbst wieder; ohne es fehlen einer UDOS-Programmdatei genau\n"
         "  die Angaben, die sie lauffaehig machen.  --force schreibt eine .fileinfo\n"
         "  ausnahmsweise als gewoehnliche Datei auf die Diskette.\n"
-        "  --json   maschinenlesbar — bei ls, info, check, fsck und formats\n\n"
+        "  --json   maschinenlesbar - bei ls, info, check, fsck und formats\n\n"
         "Bei beidseitigen UDOS-Disketten sind die Seiten `Side0`/`Side1`:\n"
         "  get  legt sie als Unterverzeichnisse an,\n"
         "  put  verlangt einen Ordner, der genau diese Unterverzeichnisse hat,\n"
         "  Namen duerfen das Praefix tragen:  Side1/HELP.DAT.00\n"
-        "  (UDOS1715/NDOS vom PC 1715 hat das NICHT — dort ist die Diskette EIN\n"
+        "  (UDOS1715/NDOS vom PC 1715 hat das NICHT - dort ist die Diskette EIN\n"
         "   Datentraeger, und sie darf als .img vorliegen.)\n\n"
-        "Exit: 0 ok · 1 Fehler · 2 nicht erkannt · 3 passt nicht · 4 Ordnerstruktur\n";
+        "Exit: 0 ok - 1 Fehler - 2 nicht erkannt - 3 passt nicht - 4 Ordnerstruktur\n";
 }
 
 /// @brief Argumente zerlegen; unbekannte Schalter sind ein Fehler.
@@ -477,11 +477,11 @@ int cmd_ls(const Optionen& o) {
 
     info_aus << "Dateisystem: " << v->detection().filesystem
              << (o.fs.empty() ? " (erkannt)" : " (gewaehlt)");
-    if (!v->detection().unambiguous) info_aus << " — nicht eindeutig";
-    info_aus << " · " << v->volumeCount() << (v->volumeCount() == 1 ? " Seite" : " Seiten");
+    if (!v->detection().unambiguous) info_aus << " - nicht eindeutig";
+    info_aus << " - " << v->volumeCount() << (v->volumeCount() == 1 ? " Seite" : " Seiten");
     for (int i = 0; i < v->volumeCount(); ++i) {
         const std::string l = v->volumeInfo(i).label;
-        if (!l.empty()) info_aus << (i == 0 ? " · " : " / ") << l;
+        if (!l.empty()) info_aus << (i == 0 ? " - " : " / ") << l;
     }
     info_aus << "\n";
     if (!v->detection().remarks.empty())
@@ -524,7 +524,7 @@ int cmd_ls(const Optionen& o) {
     info_aus << liste.size() << " Dateien";
     for (int i = 0; i < v->volumeCount(); ++i) {
         const FsInfo info = v->volumeInfo(i);
-        info_aus << " · " << (seiten ? v->volumeDir(i) + ": " : "")
+        info_aus << " - " << (seiten ? v->volumeDir(i) + ": " : "")
                  << menschlich(info.free_bytes) << " frei";
     }
     info_aus << "\n";
@@ -595,7 +595,7 @@ int cmd_tar_put(const Optionen& o) {
     }
     if (u.wird_satz) {
         std::cerr << "Fehler: Die Datei (" << u.groesse << " Byte) passt nicht auf EIN Abbild ("
-                  << u.kapazitaet << " Byte) — als Satz mit " << u.abbilder
+                  << u.kapazitaet << " Byte) - als Satz mit " << u.abbilder
                   << " Abbildern: `tar-satz-neu --format <name> <basis> --tar-container <quelle.tar>`\n";
         return kFehler;
     }
@@ -610,7 +610,7 @@ int cmd_tar_put(const Optionen& o) {
     }
     // Eine Warnung hindert das Schreiben nicht (kein Blockieren in der Kommandozeile).
     if (!v->lastTarWarnung().empty()) std::cerr << "Warnung: " << v->lastTarWarnung() << "\n";
-    std::cout << "geschrieben: " << o.rest[2] << " → " << o.rest[1] << "\n";
+    std::cout << "geschrieben: " << o.rest[2] << " -> " << o.rest[1] << "\n";
     return kOk;
 }
 
@@ -637,7 +637,7 @@ int satz_bearbeiten(const Optionen& o, DiskVolume& v, const std::string& basis) 
                     std::cerr << "Fehler: " << v.lastError() << "\n";
                     return kFehler;
                 }
-                std::cout << quelle << " → " << v.lastInsertedName() << "\n";
+                std::cout << quelle << " -> " << v.lastInsertedName() << "\n";
             }
         } else if (art == "tar-container") {
             // Eine fertige .tar wird das Archiv (nur bei leerem Archiv; zu gross fuer eine Diskette: Satz).
@@ -646,7 +646,7 @@ int satz_bearbeiten(const Optionen& o, DiskVolume& v, const std::string& basis) 
             if (!u.als_container) { std::cerr << "Fehler: " << u.container_grund << "\n"; return kFehler; }
             if (!v.tarDateiAblegen(arg, TarDateiWeg::AlsContainer)) { std::cerr << "Fehler: " << v.lastError() << "\n"; return kFehler; }
             if (!v.lastTarWarnung().empty()) std::cerr << "Warnung: " << v.lastTarWarnung() << "\n";
-            std::cout << arg << " → Archiv (" << u.abbilder << " Abbild(er))\n";
+            std::cout << arg << " -> Archiv (" << u.abbilder << " Abbild(er))\n";
         } else if (art == "rm") {
             if (!v.erase(FileRef::parse(arg, 0))) { std::cerr << "Fehler: " << v.lastError() << "\n"; return kFehler; }
             std::cout << "geloescht: " << arg << "\n";
@@ -686,7 +686,7 @@ int satz_bearbeiten(const Optionen& o, DiskVolume& v, const std::string& basis) 
 }
 
 int cmd_tar_satz_save(const Optionen& o) {
-    if (o.rest.size() < 2) { std::cerr << "Fehler: tar-satz-save <abbild…> [-o basis] [--put …]\n"; return kFehler; }
+    if (o.rest.size() < 2) { std::cerr << "Fehler: tar-satz-save <abbild...> [-o basis] [--put ...]\n"; return kFehler; }
     const std::vector<std::string> pfade(o.rest.begin() + 1, o.rest.end());
     std::string err;
     auto v = DiskVolume::openTarSatz(pfade, formate(), dateisysteme(), err, o.format);
@@ -705,7 +705,7 @@ int cmd_tar_formate(const Optionen&) {
 
 int cmd_tar_satz_neu(const Optionen& o) {
     if (o.rest.size() != 2 || o.format.empty()) {
-        std::cerr << "Fehler: tar-satz-neu --format <name> <basisname.img|hfe|dmk|cqm> [--put …]\n";
+        std::cerr << "Fehler: tar-satz-neu --format <name> <basisname.img|hfe|dmk|cqm> [--put ...]\n";
         return kFehler;
     }
     std::string err;
@@ -763,7 +763,7 @@ int cmd_info(const Optionen& o) {
         std::cout << "Medium:      " << v->detection().remarks << "\n";
     if (const CqmCodec::SourceInfo* cq = v->cqmInfo()) {
         std::cout << "CopyQM:      " << cq->description;
-        if (!cq->comment.empty()) std::cout << " — Kommentar: " << cq->comment;
+        if (!cq->comment.empty()) std::cout << " - Kommentar: " << cq->comment;
         std::cout << "\n";
     }
 
@@ -861,9 +861,9 @@ int cmd_check(const Optionen& o) {
             const char* marke = !sch.ausgefuehrt ? "[-]" : (sch.treffer ? "[!]" : "[x]");
             std::cout << "  " << marke << " " << sch.titel;
             if (!sch.ausgefuehrt)
-                std::cout << "  — uebersprungen: " << sch.grund;
+                std::cout << "  - uebersprungen: " << sch.grund;
             else if (sch.treffer)
-                std::cout << "  — " << sch.treffer << " Befund(e)";
+                std::cout << "  - " << sch.treffer << " Befund(e)";
             std::cout << "\n";
         }
     }
@@ -878,7 +878,7 @@ int cmd_check(const Optionen& o) {
 
     std::cout << "\n";
     if (!v->hasFileSystem()) {
-        std::cout << "kein Dateisystem erkannt — " << bericht.findings.size()
+        std::cout << "kein Dateisystem erkannt - " << bericht.findings.size()
                   << " gepruefte(r) Kandidat(en) oben\n";
         return kNichtErkannt;
     }
@@ -979,7 +979,7 @@ int cmd_fsck(const Optionen& o) {
                       << ",\"findings\":" << vorher.findings.size()
                       << ",\"repairable\":0,\"selected\":0}\n";
         else
-            std::cout << "\nkein Dateisystem erkannt — " << vorher.findings.size()
+            std::cout << "\nkein Dateisystem erkannt - " << vorher.findings.size()
                       << " gepruefte(r) Kandidat(en) oben; zu reparieren ist hier"
                          " nichts.\n";
         return kNichtErkannt;
@@ -995,9 +995,9 @@ int cmd_fsck(const Optionen& o) {
         else {
             std::cout << "\n" << (vorher.ohneBefund() ? "ohne Befund"
                                                      : vorher.kurzfassung());
-            if (moeglich == 0) std::cout << " — keine Reparatur moeglich\n";
+            if (moeglich == 0) std::cout << " - keine Reparatur moeglich\n";
             else {
-                std::cout << " — " << moeglich << " Reparatur(en) moeglich";
+                std::cout << " - " << moeglich << " Reparatur(en) moeglich";
                 if (auswahl.empty())
                     std::cout << ", alle mit Datenverlust (`--repair=alle` fuehrt"
                                  " sie aus)\n";
@@ -1017,7 +1017,7 @@ int cmd_fsck(const Optionen& o) {
                           ? "\nNichts zu reparieren.\n"
                           : "\nNichts ausgefuehrt: die " + std::to_string(moeglich)
                             + " moegliche(n) Reparatur(en) gehen alle mit Datenverlust"
-                              " einher — `--repair=alle` oder `--repair=<kennung>`"
+                              " einher - `--repair=alle` oder `--repair=<kennung>`"
                               " fuehrt sie aus.\n");
         else std::cout << "{\"image\":" << jsonText(v->path()) << ",\"repaired\":0,\"ok\":"
                        << (vorher.ohneBefund() ? "true" : "false") << "}\n";
@@ -1139,7 +1139,7 @@ int cmd_recover(const Optionen& o) {
         std::cout << "\n\n";
         if (r.leer())
             std::cout << (o.voll ? "nichts zu retten\n"
-                                 : "nichts zu retten — `--full` sieht auch in die"
+                                 : "nichts zu retten - `--full` sieht auch in die"
                                    " freien Bereiche\n");
         else
             std::cout << r.alsText(mit_volume) << "\n" << r.kurzfassung() << "\n";
@@ -1242,7 +1242,7 @@ int cmd_get(const Optionen& o) {
                 std::cerr << "Fehler: " << v->lastError() << "\n";
                 return kFehler;
             }
-            std::cout << e.qualifiedName() << " → " << ziel.string() << "\n";
+            std::cout << e.qualifiedName() << " -> " << ziel.string() << "\n";
             ++n;
         }
     }
@@ -1327,7 +1327,7 @@ int cmd_put(const Optionen& o) {
 
     for (size_t i = 2; i < o.rest.size(); ++i) {
         if (fs::is_directory(o.rest[i], ec)) {
-            std::cerr << "Fehler: " << o.rest[i] << " ist ein Ordner — einen Ordner bitte "
+            std::cerr << "Fehler: " << o.rest[i] << " ist ein Ordner - einen Ordner bitte "
                          "allein angeben\n";
             return kFehler;
         }
@@ -1344,7 +1344,7 @@ int cmd_put(const Optionen& o) {
         // Nicht `name`: bei CP/M setzt das `.fileinfo` den Nutzerbereich wieder ein
         // (`3_SYSTEM.COM` → `3:SYSTEM.COM`), und die Meldung soll sagen, was auf der
         // Diskette steht, nicht was verlangt wurde.
-        std::cout << o.rest[i] << " → " << v->lastInsertedName() << "\n";
+        std::cout << o.rest[i] << " -> " << v->lastInsertedName() << "\n";
     }
     if (o.dry_run) return kOk;
     if (!v->flush()) { std::cerr << "Fehler: " << v->lastError() << "\n"; return kFehler; }
@@ -1440,7 +1440,7 @@ bool pruefePrgWunsch(const Optionen& o, FsType typ, const std::string& bootpfad)
 int cmd_create(const Optionen& o) {
     if (o.rest.size() < 2) { std::cerr << "Fehler: kein Abbild angegeben\n"; return kFehler; }
     if (o.fs.empty()) {
-        std::cerr << "Fehler: --fs NAME fehlt — beim Anlegen gibt es nichts zu erkennen "
+        std::cerr << "Fehler: --fs NAME fehlt - beim Anlegen gibt es nichts zu erkennen "
                      "(`k1520disktool formats` zeigt die bekannten)\n";
         return kFehler;
     }
@@ -1470,7 +1470,7 @@ int cmd_create(const Optionen& o) {
     std::cout << "angelegt: " << o.rest[1] << " (" << o.fs << ", "
               << v->volumeCount() << (v->volumeCount() == 1 ? " Seite" : " Seiten") << ")\n";
     if (!o.boot.empty())
-        std::cout << "Bootabbild: " << o.boot << " → Systemspuren ("
+        std::cout << "Bootabbild: " << o.boot << " -> Systemspuren ("
                   << menschlich(v->bootAreaSize()) << " Platz)\n";
     return kOk;
 }
@@ -1495,7 +1495,7 @@ int cmd_boot_get(const Optionen& o) {
         std::cerr << "Fehler: " << v->lastError() << "\n";
         return kFehler;
     }
-    std::cout << o.rest[1] << " → " << o.rest[2] << " ("
+    std::cout << o.rest[1] << " -> " << o.rest[2] << " ("
               << v->bootAreaSize(o.volume) << " Byte Systemspuren)\n";
     return kOk;
 }
@@ -1515,7 +1515,7 @@ int cmd_boot_put(const Optionen& o) {
         std::cerr << "Fehler: " << v->lastError() << "\n";
         return kFehler;
     }
-    std::cout << o.rest[2] << " → " << o.rest[1] << " (Systemspuren, "
+    std::cout << o.rest[2] << " -> " << o.rest[1] << " (Systemspuren, "
               << menschlich(v->bootAreaSize(o.volume)) << " Platz)\n";
     return kOk;
 }
@@ -1775,7 +1775,7 @@ int cmd_measure(const Optionen& o) {
 
     auto disk = DiskImage::open(o.rest[1], std::nullopt, /*write_protect=*/true);
     if (!disk) {
-        std::cerr << "Fehler: Abbild nicht ladbar (selbstbeschreibend muss es sein — "
+        std::cerr << "Fehler: Abbild nicht ladbar (selbstbeschreibend muss es sein - "
                      ".hfe, .dmk oder .cqm): " << o.rest[1] << "\n";
         return kFehler;
     }
@@ -1830,7 +1830,7 @@ int cmd_save_as(const Optionen& o) {
         std::cerr << "Fehler: " << v->lastError() << "\n";
         return kFehler;
     }
-    std::cout << o.rest[1] << " → " << o.rest[2] << "\n";
+    std::cout << o.rest[1] << " -> " << o.rest[2] << "\n";
     return kOk;
 }
 
@@ -1856,7 +1856,7 @@ int cmd_formats(const Optionen& o) {
     // Steht in keinem Katalog, laesst sich aber ueberall angeben — sonst waere die
     // wichtigste Antwort auf „welche Dateisysteme gibt es?" gerade die unsichtbare.
     std::printf("%-14s %-8s %-18s %s\n", CpaDpbRule::kName, "cpm", "(jede)",
-                "aus der Geometrie nach der CP/A-Regel abgeleitet — Rueckfall beim "
+                "aus der Geometrie nach der CP/A-Regel abgeleitet - Rueckfall beim "
                 "Oeffnen, mit --fs erzwingbar");
     return kOk;
 }
@@ -1983,10 +1983,10 @@ int platte(const std::string& befehl, const Optionen& o) {
     }
     if (befehl == "attr") {
         // chmod/chown/touch an einer Datei der Platte (Name `md<N>/pfad`); ohne Schalter nur Anzeige.
-        if (o.rest.size() != 3) { std::cerr << "Fehler: attr <abbild> md<N>/pfad [--mode … --uid … --gid …]\n"; return kFehler; }
+        if (o.rest.size() != 3) { std::cerr << "Fehler: attr <abbild> md<N>/pfad [--mode ... --uid ... --gid ...]\n"; return kFehler; }
         const auto [v, name] = platteName(*p, o.rest[2]);
         if (v < 0 || name.empty()) {
-            std::cerr << "Fehler: Partition fehlt (md0/…, md2/…): " << o.rest[2] << "\n";
+            std::cerr << "Fehler: Partition fehlt (md0/..., md2/...): " << o.rest[2] << "\n";
             return kFehler;
         }
         if (o.unix_mode > 07777) { std::cerr << "Fehler: --mode muss zwischen 0 und 7777 (oktal) liegen\n"; return kFehler; }
@@ -2007,7 +2007,7 @@ int platte(const std::string& befehl, const Optionen& o) {
         for (size_t i = 2; i < o.rest.size(); ++i) {
             const auto [v, name] = platteName(*p, o.rest[i]);
             if (v < 0) {
-                std::cerr << "Fehler: Partition fehlt (md0/…, md2/…): " << o.rest[i] << "\n";
+                std::cerr << "Fehler: Partition fehlt (md0/..., md2/...): " << o.rest[i] << "\n";
                 return kFehler;
             }
             if (o.dry_run) continue;
@@ -2049,7 +2049,7 @@ int platte(const std::string& befehl, const Optionen& o) {
             return kFehler;
         }
         const PlattenVolume::Fortschritt zeige = [](const std::string& q, const std::string& z) {
-            std::cout << q << " → " << z << "\n";
+            std::cout << q << " -> " << z << "\n";
         };
         auto einfuegen = [&](const std::string& quelle, const std::string& ziel) -> bool {
             if (o.dry_run) return true;

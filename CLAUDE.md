@@ -888,7 +888,8 @@ Drittes Anwenderprogramm **K1520 Kermit**: Dateiaustausch mit dem C-Kermit 4.2 d
 Kermit) über Telnet/RFC 2217, als Client **und** als Server (Ordnerfreigabe).  Eigene Bibliothek `kermit/`
 (`k1520::kermit`, statisch `k1520kermit_core`, C-ABI `k1520k_*` → **`libk1520kermit`**, ohne Z80/Karten), CLI
 `k1520kermit`, Oberfläche `bash run_kermit.sh` (Handbuch `app/kermittool/help/handbuch.md`), WEGA-Seite fertig auf
-`disks/p8000_wega31/` (Benutzer/Kennwort `kermit`).  Entwurf: `doc/design/36_kermit.md` (Offenes §7).
+`disks/p8000_wega31/` (Benutzer/Kennwort `kermit`).  **Im Paket seit K9** (wie das DiskTool: Starter `bin/k1520kermit` =
+Oberfläche, Kommandozeile `bin/k1520kermit-cli`, eigene Vorlage `kermit_launcher.*`; Entwurf 36 §6.7).  Entwurf: `doc/design/36_kermit.md` (Offenes §7).
 
 > **Vor Arbeiten daran: `doc/merkposten/kermit.md` lesen.** Die teuersten Festlegungen (alle am echten C-Kermit gemessen):
 > - **QBIN-Vorgabe `&`, nicht `Y`** — tty0 löscht Bit 7 auf dem Weg PC → WEGA; mit `Y` schaltet C-Kermit 4.2 kein Präfix ein.
@@ -897,6 +898,9 @@ Kermit) über Telnet/RFC 2217, als Client **und** als Server (Ordnerfreigabe).  
 > - **Wiederholungsregeln/Leerlauf-N(0)/Nachlauf** gegen C-Kermit 4.2 nicht „vereinfachen" — jede steht für einen gemessenen Hänger.
 > - **WEGA-Konto `kermit`: Shell `/bin/sh` + `.profile` `exec /usr/bin/kermit`, `.kermrc` OHNE `set file names literal`**
 >   (sonst `G D` = Gebrauchsanweisung bzw. jedes `R` „Can't open file").
+> - **Kermit-80 (CP/M, nur Client) ist Beigabe auf den Disketten** (`KERMIT.COM`: A5120 CP/A+SCPX, K8915, PC 1715 SCP 1715+CP/A 1715, PC 1715W SCP 3.0, PRG 710/-1, P8000/OS/M (`disks/p8000_osm30/`, `tools/osm_p8000/`)):
+>   eine Überlagerung je Rechner, `tools/kermit80/` (`bau.py`, eingecheckte `kermit_*.com`, Wächter `Kermit80*`, Entwurf 36 §6.8);
+>   der Zerleger erkennt Parität selbst.
 
 ## Serielle Schnittstellen nach außen (`core/serial/`, `app/ui/serial_widget.py`)
 

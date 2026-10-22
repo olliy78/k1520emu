@@ -286,6 +286,32 @@ Freigabe::Freigabe(const fs::path& wurzel, bool nurLesen) : nurLesen_(nurLesen) 
     gueltig_ = !ec && fs::is_directory(wurzel_, ec);
 }
 
+namespace {
+/// Streng gueltiges UTF-8 (keine Kurzformen, keine Ersatzzeichen, bis U+10FFFF).
+bool gueltigesUtf8(const std::string& s) {
+    for (std::size_t i = 0; i < s.size();) {
+        const auto c = static_cast<uint8_t>(s[i]);
+        if (c < 0x80) { ++i; continue; }
+        std::size_t n = 0;
+        uint32_t cp = 0;
+        if (c >= 0xC2 && c <= 0xDF) { n = 2; cp = c & 0x1F; }
+        else if (c >= 0xE0 && c <= 0xEF) { n = 3; cp = c & 0x0F; }
+        else if (c >= 0xF0 && c <= 0xF4) { n = 4; cp = c & 0x07; }
+        else return false;
+        if (i + n > s.size()) return false;
+        for (std::size_t k = 1; k < n; ++k) {
+            const auto f = static_cast<uint8_t>(s[i + k]);
+            if ((f & 0xC0) != 0x80) return false;
+            cp = (cp << 6) | (f & 0x3F);
+        }
+        if ((n == 3 && cp < 0x800) || (n == 4 && cp < 0x10000) || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF))
+            return false;
+        i += n;
+    }
+    return true;
+}
+}  // namespace
+
 bool Freigabe::normalisiere(const std::string& entfernt, std::string& relativ, std::string& fehler) const {
     for (char c : entfernt) {
         const auto u = static_cast<uint8_t>(c);
@@ -293,6 +319,13 @@ bool Freigabe::normalisiere(const std::string& entfernt, std::string& relativ, s
             fehler = "Steuerzeichen im Namen";
             return false;
         }
+    }
+    // Namen sind UTF-8 (Umlaute vom PC kommen so an).  Alles andere ist ein beschaedigter Name — etwa
+    // der Rest eines abgebrochenen Sendens im Puffer des C-Kermit — und wuerde unter Windows in
+    // fs::u8path() scheitern bzw. unter Linux eine Datei mit unlesbarem Namen anlegen.
+    if (!gueltigesUtf8(entfernt)) {
+        fehler = "Ungueltige Zeichen im Namen (kein UTF-8)";
+        return false;
     }
     if (entfernt.find('\\') != std::string::npos) {
         fehler = "Rueckstrich im Namen: " + entfernt;

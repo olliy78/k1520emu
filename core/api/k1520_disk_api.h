@@ -27,7 +27,7 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "core/api/k1520_export.h"   ///< `K1520_API` — Ausfuhrkennzeichnung (Windows!)
+#include "core/api/k1520_export.h"   ///< `K1520_API` - Ausfuhrkennzeichnung (Windows!)
 #include "core/api/k1520_sync_api.h"  ///< physische Diskette (Greaseweazle)
 
 /// @brief Opakes Handle einer geoeffneten Diskette.

@@ -186,6 +186,16 @@ kaputt sein kann:
 
 Ein Paket, das daran scheitert, wird kein Release-Asset.
 
+**K1520 Kermit im Rauchtest (AP K9, 2026-10-20).** Beide Jobs prüfen zusätzlich:
+`app/kermittool/main.py --paths` löst `Kermit-Bibliothek` auf (der Einstieg druckt vor
+allen Qt-Importen, läuft also ohne PySide6), `libk1520kermit.so` bzw. `k1520kermit.dll`
+lädt und `k1520k_version()` meldet **genau die Bauversion** (dieselbe Quelle
+`K1520_VERSION_TEXT` wie Kern und DiskTool), `k1520kermit-cli --help` endet mit 0, und
+Bibliothek, Kommandozeile (`bin/k1520kermit-cli[.exe]`), Handbuch (`share/doc/k1520kermit.md`,
+`app/kermittool/help/handbuch.md`) stehen im Paket. Unter Windows kommt `dumpbin /dependents`
+auch für `k1520kermit.dll` (`/MT` muss greifen). Die Workflows sind NICHT gelaufen — nur
+die Dateien angepasst; der erste echte Lauf ist die Probe.
+
 **Drei Wege, es zu starten:**
 
 ```sh
@@ -294,7 +304,8 @@ fällt sonst niemandem auf. Vier nicht zwischenspeicherbare Aufrufe sind normal 
 sind die Verknüpfungsschritte).
 
 Danach prüft der Job mit `dumpbin /exports`, dass **beide** DLLs ihre Funktionen auch
-wirklich ausführen (≥ 30 Symbole je DLL). Ohne `K1520_API` exportiert eine MSVC-DLL
+wirklich ausführen (≥ 30 Symbole je Kern-/DiskTool-DLL; `k1520kermit.dll` hat 37
+`k1520k_*`-Funktionen, Schwelle dort 20). Ohne `K1520_API` exportiert eine MSVC-DLL
 gar nichts, und `ctypes` findet auf der Python-Seite keine einzige Funktion — ein
 Fehler, der sonst erst beim ersten Aufruf auffällt.
 
@@ -487,7 +498,7 @@ Weitere Ausgaben von `tools/version.py`:
 
 ### 7.2 Wer die Version woher bekommt
 
-- **Kern** (`libk1520core`, `libk1520disk`, `k1520dbg`): `core/version.h` wird aus
+- **Kern** (`libk1520core`, `libk1520disk`, `libk1520kermit`, `k1520dbg`): `core/version.h` wird aus
   `core/version.h.in` **erzeugt** (`configure_file` ins Bauverzeichnis, Pfad
   `core/version.h` bleibt für die `#include`s gleich). CMake liest `VERSION` mit
   `CMAKE_CONFIGURE_DEPENDS` (eine geänderte Datei konfiguriert neu) und nimmt den

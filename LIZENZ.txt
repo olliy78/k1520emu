@@ -51,6 +51,9 @@ erzeugten Pakete Material Dritter:
     core/cards/k7024/chargen_*.h, core/cards/*/rom_*.h),
   - digitalisierte Dokumente wie Handbücher, Betriebsdokumentationen,
     Schaltpläne und Datenblätter (z. B. in doc/original_docs/).
+  - Kermit-80 (CP/M-Kermit, Columbia University; Quellen und übersetzte
+    Programme in tools/kermit80/, als KERMIT.COM auf einigen
+    Diskettenabbildern); Urhebervermerk in tools/kermit80/COPYRIGHT.txt.
 
 Diese Beigaben fallen nicht unter die MIT-Lizenz; sie gilt nur für die Arbeit
 der Autoren dieses Projekts. Die Rechte an den Beigaben liegen bei den

@@ -145,7 +145,7 @@ int main(int argc, char** argv) {
         std::ofstream sf(symOut);
         if (!sf) { std::fprintf(stderr, "z8kasm: %s nicht schreibbar\n", symOut.c_str()); return 1; }
         sf << z8k::formatSymbols(r, uint8_t(symSeg), in);
-        std::fprintf(stderr, "z8kasm: %s — %zu Marke(n)\n", symOut.c_str(), r.labels.size());
+        std::fprintf(stderr, "z8kasm: %s - %zu Marke(n)\n", symOut.c_str(), r.labels.size());
     }
     if (out.empty()) {
         out = in;
@@ -157,13 +157,13 @@ int main(int argc, char** argv) {
     uint32_t base = 0;
     std::vector<uint8_t> img = r.flat(&base);
     if (img.size() > (1u << 20)) {
-        std::fprintf(stderr, "z8kasm: Abbild > 1 MB (mehrere Segmente?) — nicht geschrieben\n");
+        std::fprintf(stderr, "z8kasm: Abbild > 1 MB (mehrere Segmente?) - nicht geschrieben\n");
         return 1;
     }
     std::ofstream f(out, std::ios::binary);
     if (!f) { std::fprintf(stderr, "z8kasm: %s nicht schreibbar\n", out.c_str()); return 1; }
     f.write(reinterpret_cast<const char*>(img.data()), std::streamsize(img.size()));
-    std::fprintf(stderr, "z8kasm: %s — %zu Bytes ab %s%04X\n", out.c_str(), img.size(),
+    std::fprintf(stderr, "z8kasm: %s - %zu Bytes ab %s%04X\n", out.c_str(), img.size(),
                  (base >> 16) ? ("<<" + std::to_string(base >> 16) + ">>%").c_str() : "%",
                  unsigned(base & 0xFFFF));
     return 0;

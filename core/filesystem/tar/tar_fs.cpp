@@ -136,7 +136,7 @@ QuellBefund quelleBeurteilen(const std::vector<uint8_t>& d, uint64_t kapazitaet)
     if (d.empty()) { b.fehler = "Die Datei ist leer."; return b; }
     if (d.size() % kBlock) {
         b.fehler = "Die Dateigroesse (" + std::to_string(d.size()) + " Byte) ist kein Vielfaches von "
-                   "512 — ein tar-Strom besteht aus 512-Byte-Bloecken.  Mit `tar` erzeugte "
+                   "512 - ein tar-Strom besteht aus 512-Byte-Bloecken.  Mit `tar` erzeugte "
                    "Archive und Teile von `split -b 737280` sind es immer; wurde die Datei "
                    "anders geteilt, fehlt Auffuellung bis zum Blockrand.";
         return b;
@@ -385,7 +385,7 @@ void TarFileSystem::bewerte() {
     schreibbar_ = false;
     grund_.clear();
     if (!q_->beschreibbar()) {
-        grund_ = "Dieser tar-Strom (Satz aus mehreren Abbildern) ist nur lesbar — Saetze lassen "
+        grund_ = "Dieser tar-Strom (Satz aus mehreren Abbildern) ist nur lesbar - Saetze lassen "
                  "sich noch nicht bearbeiten.";
         return;
     }
@@ -408,7 +408,7 @@ void TarFileSystem::bewerte() {
                      "und nur lesbar (ein Neuaufbau verloere den Rest).";
             return;
         case Ende::Streamende:
-            grund_ = "Das tar-Archiv hat keine Endmarke (zwei Nullbloecke) und ist nur lesbar — es "
+            grund_ = "Das tar-Archiv hat keine Endmarke (zwei Nullbloecke) und ist nur lesbar - es "
                      "setzt sich vermutlich auf einer weiteren Diskette fort (tar-Satz).";
             return;
         case Ende::Nullblock: break;
@@ -653,7 +653,7 @@ bool TarFileSystem::wouldFit(const std::vector<PlannedFile>& files, FitReport& o
         n += b;
         if (name.size() > tar::kNameMax) {
             out.detail = "Der Name '" + name + "' ist laenger als " + std::to_string(tar::kNameMax)
-                         + " Zeichen — das V7-tar des P8000 kennt keine laengeren Namen.";
+                         + " Zeichen - das V7-tar des P8000 kennt keine laengeren Namen.";
             return true;
         }
     }
@@ -707,7 +707,7 @@ FsCheckReport TarFileSystem::check(FsCheckLevel level, bool nachladen) const {
     if (s.ende == Ende::Pruefsumme)
         f.add("tar.pruefsumme", FsSeverity::Fehler, FsLayer::Verwaltung,
               "Byte " + std::to_string(s.ende_off),
-              "Kopfblock ohne gueltige Pruefsumme — der Rest des Stroms ist nicht lesbar");
+              "Kopfblock ohne gueltige Pruefsumme - der Rest des Stroms ist nicht lesbar");
     if (s.ende == Ende::Abgeschnitten && !s.e.empty()) {
         const Eintrag& e = s.e.back();
         f.add("tar.abgeschnitten", FsSeverity::Warnung, FsLayer::Verwaltung, e.name,
@@ -725,13 +725,13 @@ FsCheckReport TarFileSystem::check(FsCheckLevel level, bool nachladen) const {
     }
     if (s.doppelt > 0)
         f.add("tar.doppelt", FsSeverity::Info, FsLayer::Verwaltung, "(Namen)",
-              std::to_string(s.doppelt) + " Name(n) kommen mehrfach vor — gezeigt wird je Name "
+              std::to_string(s.doppelt) + " Name(n) kommen mehrfach vor - gezeigt wird je Name "
               "die letzte Fassung, wie bei tar -x");
     int ge = 0;
     for (const Eintrag& e : s.e) if (e.pfad_geaendert) ++ge;
     if (ge > 0)
         f.add("tar.pfad", FsSeverity::Info, FsLayer::Verwaltung, "(Namen)",
-              std::to_string(ge) + " Name(n) mit fuehrendem '/' oder '..' — beim Auflisten "
+              std::to_string(ge) + " Name(n) mit fuehrendem '/' oder '..' - beim Auflisten "
               "relativ gemacht ('..' wird '__')");
     r.schrittEnde();
     return r;

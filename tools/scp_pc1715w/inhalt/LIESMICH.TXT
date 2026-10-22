@@ -47,3 +47,5 @@ PRUEFPROGRAMM
 -------------
   SERTEST    serielle Schnittstellen des PC 1715W: Drucker X4 (nur Senden)
              und V.24 X5; Pruefstecker- und Gegenstellentest
+  KERMIT     Kermit-80 4.11 (CP/M): Dateiuebertragung ueber V.24 (X5),
+             9600 Bd 8N1 (Beigabe zum Ausprobieren der Schnittstelle)

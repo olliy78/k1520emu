@@ -133,14 +133,14 @@ int bootTraceK8915(const K8915TraceOpts& o, const prnlst::Listing& prn)
     auto emit = [&](const Ev& e) {
         if (!ev_on) return;
         if (ev_lines >= o.events_cap) {
-            if (!ev_capped) { fprintf(ev, "  [ev] Grenze %ld Zeilen erreicht — Protokoll endet (--events-cap)\n", o.events_cap); ev_capped = true; }
+            if (!ev_capped) { fprintf(ev, "  [ev] Grenze %ld Zeilen erreicht - Protokoll endet (--events-cap)\n", o.events_cap); ev_capped = true; }
             return;
         }
         char pcs[24];
         if (e.pc_lo == e.pc_hi) snprintf(pcs, sizeof pcs, "PC=%04X", e.pc_lo);
         else snprintf(pcs, sizeof pcs, "PC=%04X..%04X", e.pc_lo, e.pc_hi);
         fprintf(ev, "  [ev c%-10llu %s] %s", (unsigned long long)e.cyc, pcs, e.text.c_str());
-        if (e.n > 1) fprintf(ev, "  ×%ld", e.n);
+        if (e.n > 1) fprintf(ev, "  x%ld", e.n);
         fprintf(ev, "%s\n", e.tail.c_str());
         ++ev_lines;
     };
@@ -205,8 +205,8 @@ int bootTraceK8915(const K8915TraceOpts& o, const prnlst::Listing& prn)
             const auto& ia = m.lastIntAck();
             const char* dev = e == eventbp::Event::NMI ? "-" : ia.spurious ? "SPURIOUS" : (ia.device ? ia.device : "?");
             char t[160];
-            if (e == eventbp::Event::NMI) snprintf(t, sizeof t, "NMI → ISR 0066 (unterbrochen bei %04X)", ret);
-            else snprintf(t, sizeof t, "INT Vektor=%02X von %s → ISR %04X%s", ia.vector, dev, z.PC, name(z.PC).c_str());
+            if (e == eventbp::Event::NMI) snprintf(t, sizeof t, "NMI -> ISR 0066 (unterbrochen bei %04X)", ret);
+            else snprintf(t, sizeof t, "INT Vektor=%02X von %s -> ISR %04X%s", ia.vector, dev, z.PC, name(z.PC).c_str());
             char key[48]; snprintf(key, sizeof key, "I%02X%04X", e == eventbp::Event::NMI ? 0x100 : ia.vector, z.PC);
             event(key, t, ret);
             if (itr) {
@@ -289,13 +289,13 @@ int bootTraceK8915(const K8915TraceOpts& o, const prnlst::Listing& prn)
             if (f >= 'A' && f <= 'Z') {
                 const std::string tn = bild.substr(23 * 80 + 64, 3);
                 m.keyboard().sendeZeichen(0x0D); fehler_cr = true;
-                if (!o.quiet) fprintf(stderr, "  [c%llu] Selbsttestfehler %s %c → CR getippt\n",
+                if (!o.quiet) fprintf(stderr, "  [c%llu] Selbsttestfehler %s %c -> CR getippt\n",
                                       (unsigned long long)now, tn.c_str(), f);
             }
         }
         if (o.auto_cr && !cr_gesendet && bild.find("* Coldstart *") != std::string::npos) {
             m.keyboard().sendeZeichen(0x0D); cr_gesendet = true;
-            if (!o.quiet) fprintf(stderr, "  [c%llu] Coldstart-Meldung → CR getippt\n", (unsigned long long)now);
+            if (!o.quiet) fprintf(stderr, "  [c%llu] Coldstart-Meldung -> CR getippt\n", (unsigned long long)now);
         }
         const std::string lz = letzteZeile(bild);
         static const std::regex prompt_re("^[A-P]>$");
@@ -312,8 +312,8 @@ int bootTraceK8915(const K8915TraceOpts& o, const prnlst::Listing& prn)
     }
     flush();
     if (ev != stderr) fclose(ev);
-    if (csv) { fclose(csv); fprintf(stderr, "--csv: %ld row(s) → %s\n", csv_rows, o.csv_path.c_str()); }
-    if (itr) { fclose(itr); fprintf(stderr, "--itrace: %ld INT/NMI → %s\n", itr_n, o.itrace_path.c_str()); }
+    if (csv) { fclose(csv); fprintf(stderr, "--csv: %ld row(s) -> %s\n", csv_rows, o.csv_path.c_str()); }
+    if (itr) { fclose(itr); fprintf(stderr, "--itrace: %ld INT/NMI -> %s\n", itr_n, o.itrace_path.c_str()); }
 
     const uint64_t cycles = m.totalCycles();
     if (!o.quiet) {
@@ -323,7 +323,7 @@ int bootTraceK8915(const K8915TraceOpts& o, const prnlst::Listing& prn)
         if (until_hit) fprintf(stderr, " at cycle %llu (PC=0x%04X)\n", (unsigned long long)until_cyc, until_pc);
         fprintf(stderr, "Prompt:      %s\n", prompt ? ("JA (\"" + prompt_zeile + "\")").c_str() : "nein");
         if (stillstand)
-            fprintf(stderr, "Stillstand:  JA — %lld Takte ohne Bildaenderung und ohne Steuerzugriff "
+            fprintf(stderr, "Stillstand:  JA - %lld Takte ohne Bildaenderung und ohne Steuerzugriff "
                             "(PC=%04X)\n", o.stall, m.cpuPC());
         fprintf(stderr, "Speicher:    A8H=%02X map=%s /MEMDI=%s   Anzeigefeld 61H=%02X (%s)\n",
                 dbgm::k8A8(m), dbgm::speicherbild(m).c_str(), dbgm::k8Memdi(m) ? "1" : "0",
@@ -375,7 +375,7 @@ int bootTraceK8915(const K8915TraceOpts& o, const prnlst::Listing& prn)
                 for (auto& kv : v) fprintf(cf, "%s,0x%04X,%u\n", (kv.first & 0x10000) ? "ROM" : "CPU",
                                            kv.first & 0xFFFF, kv.second);
                 fclose(cf);
-                fprintf(stderr, "  CSV written → %s (cpu,pc,hits)\n", o.coverage_path.c_str());
+                fprintf(stderr, "  CSV written -> %s (cpu,pc,hits)\n", o.coverage_path.c_str());
             }
         }
     }

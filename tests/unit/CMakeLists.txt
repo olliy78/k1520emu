@@ -279,6 +279,7 @@ k1520_add_test(kermit_paket   SRC kermit/test_kermit_paket.cpp   LIBS k1520kermi
 k1520_add_test(kermit_dateien SRC kermit/test_kermit_dateien.cpp LIBS k1520kermit_core LABELS "${_lbl}")
 k1520_add_test(kermit_sitzung SRC kermit/test_kermit_sitzung.cpp LIBS k1520kermit_core LABELS "${_lbl}")
 k1520_add_test(kermit_tempo   SRC kermit/test_kermit_tempo.cpp   LIBS k1520kermit_core LABELS "${_lbl}")
+k1520_add_test(kermit_serverlogin SRC kermit/test_kermit_serverlogin.cpp LIBS k1520kermit_core LABELS "${_lbl}")
 
 # Zeitgrenzen der add_test()-Faelle × K1520_TEST_ZEIT_FAKTOR (tests/cmake/K1520AddTest.cmake)
 k1520_test_zeiten_skalieren()

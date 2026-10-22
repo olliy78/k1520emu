@@ -540,8 +540,8 @@ private:
 
     // ─── Hardware-Objekte ────────────────────────────────────────────────────
     K1520Bus&     bus_;
-    Z80PIO        ctrl_pio_{"K5122-CTRL"};   ///< Steuer-PIO: Ports 0x10–0x13
-    Z80PIO        data_pio_{"K5122-DATA"};   ///< Daten-PIO:  Ports 0x14–0x17
+    Z80PIO        ctrl_pio_{"K5122-CTRL"};   ///< Steuer-PIO: Ports 0x10-0x13
+    Z80PIO        data_pio_{"K5122-DATA"};   ///< Daten-PIO:  Ports 0x14-0x17
     FloppyDriveV2 drives_[4];                  ///< bis zu 4 Laufwerke (je mit DriveProfile)
     uint32_t      cpu_hz_ = 2450000;           ///< Taktfrequenz fuer Index-Periode
 

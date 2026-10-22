@@ -126,6 +126,10 @@ TrackSyncSpec specFuer(const DiskMedium& quelle, bool vorauslesen) {
     s.writable   = false;                 // eine echte Diskette wird nicht angefasst
     s.read_ahead = vorauslesen;
     s.request_timeout_ms = 20000;
+    // Ohne Ruhefrist: diese Faelle pruefen die PRIORITAET (Prio 1 schlaegt Prio 3), dazu
+    // muss das Vorauslesen neben dem Boot laufen.  Die Ruhefrist (Issue #14) hat ihre
+    // Faelle in test_track_sync.cpp.
+    s.readahead_quiet_ms = 0;
     return s;
 }
 

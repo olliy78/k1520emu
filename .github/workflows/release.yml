@@ -103,6 +103,13 @@ jobs:
             || { echo "FEHLER: Payload wird nicht als Installation erkannt"; exit 1; }
           ! grep -q 'NICHT GEFUNDEN' "$RUNNER_TEMP/paths.txt" \
             || { echo "FEHLER: ein Pfad loest nicht auf"; exit 1; }
+          # Dieselbe Auskunft ueber den Einstieg von K1520 Kermit (Entwurf 36, AP K9);
+          # sie steht vor allen Qt-Importen, laeuft also auch hier ohne PySide6.
+          K1520_HOME="$root" python3 "$root/app/kermittool/main.py" --paths > "$RUNNER_TEMP/paths_kermit.txt"
+          grep -q '^Kermit-Bibliothek: *[/]' "$RUNNER_TEMP/paths_kermit.txt" \
+            || { echo "FEHLER: Kermit-Bibliothek loest nicht auf"; cat "$RUNNER_TEMP/paths_kermit.txt"; exit 1; }
+          ! grep -q 'NICHT GEFUNDEN' "$RUNNER_TEMP/paths_kermit.txt" \
+            || { echo "FEHLER: ein Pfad loest im Kermit-Einstieg nicht auf"; exit 1; }
 
           echo "── C-ABI ──"
           # Die Bibliothek muss genau die Bauversion des Pakets melden (§7.6):
@@ -132,11 +139,28 @@ jobs:
               print("Maschine", name, "laeuft an")
           PY
 
+          echo "── K1520 Kermit: Bibliothek laedt und meldet die Bauversion ──"
+          python3 - "$root/bin/libk1520kermit.so" "$erwartet" <<'PY'
+          import ctypes, sys
+          lib = ctypes.CDLL(sys.argv[1])
+          lib.k1520k_version.restype = ctypes.c_char_p
+          print("k1520k_version:", lib.k1520k_version().decode())
+          if lib.k1520k_version().decode() != sys.argv[2]:
+              sys.exit("FEHLER: k1520k_version() meldet nicht die Bauversion " + sys.argv[2])
+          PY
+          # Die Kommandozeile hat einen --help-Schalter (anders als k1520dbg) und
+          # liefert 0 — das laedt die statisch gelinkte Protokollschicht.
+          "$root/bin/k1520kermit-cli" --help > "$RUNNER_TEMP/kermit_help.txt" 2>&1 \
+            || { echo "FEHLER: k1520kermit-cli startet nicht"; cat "$RUNNER_TEMP/kermit_help.txt"; exit 1; }
+          head -1 "$RUNNER_TEMP/kermit_help.txt"
+
           echo "── kein Pfad des Baurechners in der Bibliothek ──"
           # Der Debugger steht mit auf der Liste: er linkt den Kern STATISCH und
           # erbt K1520_FORMATS_DEFAULT ueber k1520_floppy2 — traegt also
-          # dieselbe Falle in sich (§10a.3 (2) des Entwurfs).
-          for datei in "$root/bin/libk1520core.so" "$root/bin/k1520dbg"; do
+          # dieselbe Falle in sich (§10a.3 (2) des Entwurfs).  Die Kermit-Teile
+          # tragen keinen Katalog, stehen aber der Vollstaendigkeit halber dabei.
+          for datei in "$root/bin/libk1520core.so" "$root/bin/k1520dbg" \
+                       "$root/bin/libk1520kermit.so" "$root/bin/k1520kermit-cli"; do
             if grep -qa "$GITHUB_WORKSPACE/data/formats.yaml" "$datei"; then
               echo "FEHLER: einkompilierter Pfad des Baurechners in $datei"; exit 1
             fi
@@ -163,6 +187,9 @@ jobs:
 
           echo "── Werkzeuge, Handbuecher und Lizenzen liegen bei ──"
           for datei in bin/k1520dbg bin/k1520disktool-cli \
+                       bin/libk1520kermit.so bin/k1520kermit-cli \
+                       share/doc/k1520kermit.md \
+                       app/kermittool/main.py app/kermittool/help/handbuch.md \
                        share/doc/handbuch_k1520dbg.md \
                        share/tools/z80_disasm2.py \
                        share/doc/lizenzen/isocline-LICENSE.txt \
@@ -320,6 +347,10 @@ jobs:
           $text = $pfade -join "`n"
           if ($text -notmatch '(?m)^Layout:\s*Installation') { throw 'Payload wird nicht als Installation erkannt' }
           if ($text -match 'NICHT GEFUNDEN') { throw 'ein Pfad loest nicht auf' }
+          # Dieselbe Auskunft ueber den Einstieg von K1520 Kermit (Entwurf 36, AP K9).
+          $kpfade = (& python "$root\app\kermittool\main.py" --paths) -join "`n"
+          if ($kpfade -notmatch '(?m)^Kermit-Bibliothek:\s*\S*k1520kermit\.dll') { throw 'Kermit-Bibliothek loest nicht auf' }
+          if ($kpfade -match 'NICHT GEFUNDEN') { throw 'ein Pfad loest im Kermit-Einstieg nicht auf' }
           Remove-Item Env:\K1520_HOME
 
           Write-Host '── C-ABI ──'
@@ -349,12 +380,28 @@ jobs:
           & python $abi "$root\bin\k1520core.dll" $erwartet
           if ($LASTEXITCODE -ne 0) { throw 'k1520core.dll ist nicht ladbar oder meldet eine andere Version' }
 
+          Write-Host '── K1520 Kermit: DLL laedt und meldet die Bauversion ──'
+          $kabi = Join-Path $env:RUNNER_TEMP 'kabi.py'
+          Set-Content -LiteralPath $kabi -Encoding UTF8 -Value @(
+            'import ctypes, sys',
+            'lib = ctypes.CDLL(sys.argv[1])',
+            'lib.k1520k_version.restype = ctypes.c_char_p',
+            "print('k1520k_version:', lib.k1520k_version().decode())",
+            'if lib.k1520k_version().decode() != sys.argv[2]: sys.exit("k1520k_version() meldet nicht die Bauversion " + sys.argv[2])')
+          & python $kabi "$root\bin\k1520kermit.dll" $erwartet
+          if ($LASTEXITCODE -ne 0) { throw 'k1520kermit.dll ist nicht ladbar oder meldet eine andere Version' }
+          $khilfe = & "$root\bin\k1520kermit-cli.exe" --help 2>&1
+          if ($LASTEXITCODE -ne 0) { $khilfe | Write-Host; throw 'k1520kermit-cli.exe startet nicht' }
+          Write-Host "     $($khilfe | Select-Object -First 1)"
+
           Write-Host '── keine fremde C-Laufzeit ──'
-          $abh = (& dumpbin /dependents "$root\bin\k1520core.dll") |
-                 Select-String '^\s{4}\S+\.dll' | ForEach-Object { $_.Line.Trim() }
-          $abh | ForEach-Object { Write-Host "     $_" }
-          if ($abh -match 'msvcp\d+\.dll|vcruntime\d+\.dll|ucrtbase\.dll|api-ms-win-crt-') {
-            throw 'die DLL braucht das VC-Redist — /MT hat nicht gegriffen (§5.1)'
+          foreach ($dll in @('k1520core.dll', 'k1520kermit.dll')) {
+            $abh = (& dumpbin /dependents "$root\bin\$dll") |
+                   Select-String '^\s{4}\S+\.dll' | ForEach-Object { $_.Line.Trim() }
+            $abh | ForEach-Object { Write-Host "     $dll : $_" }
+            if ($abh -match 'msvcp\d+\.dll|vcruntime\d+\.dll|ucrtbase\.dll|api-ms-win-crt-') {
+              throw "$dll braucht das VC-Redist — /MT hat nicht gegriffen (§5.1)"
+            }
           }
 
           Write-Host '── ZIP-Struktur (Trennzeichen, Verzeichnisse) ──'
@@ -407,6 +454,9 @@ jobs:
 
           Write-Host '── Werkzeuge, Handbuecher und Lizenzen liegen bei ──'
           foreach ($datei in @('bin\k1520dbg.exe', 'bin\k1520disktool-cli.exe',
+                               'bin\k1520kermit.dll', 'bin\k1520kermit-cli.exe',
+                               'share\doc\k1520kermit.md',
+                               'app\kermittool\main.py', 'app\kermittool\help\handbuch.md',
                                'share\doc\handbuch_k1520dbg.md',
                                'share\tools\z80_disasm2.py',
                                'share\doc\lizenzen\isocline-LICENSE.txt',

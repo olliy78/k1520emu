@@ -69,7 +69,7 @@ public:
     std::vector<Taktquelle> taktquellen() const override {
         switch (s_) {
             case DfueV24:  return {{"ZRE-CTC K0 (W1:7)"}, {"CTC A34 K2 (W1:7 versetzt)"}};
-            case DfueIfss: return {{"ZRE-CTC K0 (X7–X8)"}, {"CTC A34 K1 (X8–X9)"}};
+            case DfueIfss: return {{"ZRE-CTC K0 (X7-X8)"}, {"CTC A34 K1 (X8-X9)"}};
             default:       return {};
         }
     }

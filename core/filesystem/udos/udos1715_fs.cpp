@@ -176,7 +176,7 @@ bool Udos1715FileSystem::readSector(UdosPointer p, std::vector<uint8_t>& data) c
     if (!inRange(p))
         return fail("Zeiger auf Spur " + std::to_string(p.track) + " Sektor "
                     + std::to_string(p.sector_index) + " liegt ausserhalb der Diskette ("
-                    + std::to_string(tracks_) + " Spuren à "
+                    + std::to_string(tracks_) + " Spuren a "
                     + std::to_string(secs_per_track_) + " Sektoren)");
 
     SectorData sec;
@@ -255,7 +255,7 @@ bool Udos1715FileSystem::readPointerBlock(UdosPointer p, Udos1715PointerBlock& o
 bool Udos1715FileSystem::writePointerBlock(UdosPointer p, const Udos1715PointerBlock& b) {
     if (b.entries.empty() || b.entries.size() > kUdos1715PointersPerBlock)
         return fail("Zeigersektor haette " + std::to_string(b.entries.size())
-                    + " Eintragungen (erlaubt 1…125)");
+                    + " Eintragungen (erlaubt 1...125)");
     std::vector<uint8_t> d(kSector, 0x00);
     for (size_t i = 0; i < b.entries.size(); ++i) {
         d[2 * i]     = b.entries[i].sector_index;
@@ -715,7 +715,7 @@ bool Udos1715FileSystem::write(const std::string& name, const std::vector<uint8_
     for (const UdosDirEntry& d : directory()) {
         if (d.name != name) continue;
         if (!opt.overwrite)
-            return fail("'" + name + "' existiert bereits — Ueberschreiben nicht erlaubt");
+            return fail("'" + name + "' existiert bereits - Ueberschreiben nicht erlaubt");
         if (!erase(name)) return false;
         break;
     }
@@ -1083,14 +1083,14 @@ bool Udos1715FileSystem::karteNeuAufbauen() {
 
     std::vector<UdosPointer> dir_sektoren;
     if (!sectorsOfFile(directoryDescriptor(), dir_sektoren))
-        return fail("Die Zeigersektoren der Verzeichnisdatei sind nicht schluessig — "
+        return fail("Die Zeigersektoren der Verzeichnisdatei sind nicht schluessig - "
                     "der Belegungsplan laesst sich daraus nicht ableiten");
     for (const UdosPointer& p : dir_sektoren) merke(p);
 
     for (const UdosDirEntry& e : directory()) {
         std::vector<UdosPointer> sek;
         if (!sectorsOfFile(e.header, sek))
-            return fail("'" + e.name + "': die Zeigersektoren sind nicht schluessig — "
+            return fail("'" + e.name + "': die Zeigersektoren sind nicht schluessig - "
                         "der Belegungsplan laesst sich nicht ableiten");
         for (const UdosPointer& p : sek) merke(p);
     }

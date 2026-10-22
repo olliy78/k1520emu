@@ -391,6 +391,8 @@ info "K1520-Emulator $VERSION fuer $PLATFORM"
 K1520_CORE_LIB=$(core_lib_name)
 K1520_DISK_LIB=$(disk_lib_name)
 K1520_DISK_CLI=$(disk_cli_name)
+K1520_KERMIT_LIB=$(kermit_lib_name)
+K1520_KERMIT_CLI=$(kermit_cli_name)
 # Der Debugger — das dritte Werkzeug im Paket (§10a des Entwurfs).  Er linkt
 # den Kern STATISCH (k1520_a5120/k1520_floppy, nicht die .so/.dll), ist also
 # ein in sich geschlossenes Programm.
@@ -444,15 +446,19 @@ if [ "$SKIP_BUILD" = no ]; then
     # Die Bauausgabe geht in eine Datei; bei einem Fehlschlag kommt ihr Ende
     # auf den Schirm — sonst steht in der CI nur „fehlgeschlagen" (2026-10-10).
     _baulog="$BUILD_DIR/build_payload.log"
-    cmake --build "$BUILD_DIR" --target k1520core k1520disk k1520disktool k1520dbg \
+    # Dazu das Kermit-Werkzeug (Entwurf 36, AP K9): Bibliothek `k1520kermit` und
+    # Kommandozeile `k1520kermit_cli` (Dateiname k1520kermit[.exe]).
+    cmake --build "$BUILD_DIR" --target k1520core k1520disk k1520disktool k1520dbg k1520kermit k1520kermit_cli \
         -j"$(kerne)" >"$_baulog" 2>&1 \
         || { tail -60 "$_baulog" >&2; die "Bauen der Bibliotheken/Werkzeuge fehlgeschlagen"; }
-    ok "$K1520_CORE_LIB, $K1520_DISK_LIB, $K1520_DISK_CLI, $K1520_DBG"
+    ok "$K1520_CORE_LIB, $K1520_DISK_LIB, $K1520_DISK_CLI, $K1520_DBG, $K1520_KERMIT_LIB, $K1520_KERMIT_CLI"
 fi
 [ -f "$BUILD_DIR/$K1520_CORE_LIB" ]     || die "Kernbibliothek fehlt: $BUILD_DIR/$K1520_CORE_LIB"
 [ -f "$BUILD_DIR/$K1520_DISK_LIB" ] || die "DiskTool-Bibliothek fehlt: $BUILD_DIR/$K1520_DISK_LIB"
 [ -f "$BUILD_DIR/$K1520_DISK_CLI" ] || die "DiskTool-Kommandozeile fehlt: $BUILD_DIR/$K1520_DISK_CLI"
 [ -f "$BUILD_DIR/$K1520_DBG" ]      || die "Debugger fehlt: $BUILD_DIR/$K1520_DBG"
+[ -f "$BUILD_DIR/$K1520_KERMIT_LIB" ] || die "Kermit-Bibliothek fehlt: $BUILD_DIR/$K1520_KERMIT_LIB"
+[ -f "$BUILD_DIR/$K1520_KERMIT_CLI" ] || die "Kermit-Kommandozeile fehlt: $BUILD_DIR/$K1520_KERMIT_CLI"
 
 # ─── 2. Payload zusammenstellen ──────────────────────────────────────────────
 
@@ -480,6 +486,16 @@ if ist_windows; then _cli_ziel="k1520disktool-cli.exe"; else _cli_ziel="$K1520_D
 cp "$BUILD_DIR/$K1520_DISK_CLI" "$STAGE/payload/bin/$_cli_ziel"
 strip "$STAGE/payload/bin/$_cli_ziel" 2>/dev/null || true
 
+# K1520 Kermit (Entwurf 36, AP K9): wie das DiskTool eine eigene Bibliothek und eine
+# Kommandozeile unter -cli — `bin/k1520kermit` ist der Starter der OBERFLAECHE, den
+# der Installer schreibt (unter Windows liegt die DLL `k1520kermit.dll` daneben,
+# der Starter heisst dort k1520kermit.cmd).
+cp "$BUILD_DIR/$K1520_KERMIT_LIB" "$STAGE/payload/bin/$K1520_KERMIT_LIB"
+strip "$STAGE/payload/bin/$K1520_KERMIT_LIB" 2>/dev/null || true
+if ist_windows; then _kcli_ziel="k1520kermit-cli.exe"; else _kcli_ziel="$K1520_KERMIT_CLI-cli"; fi
+cp "$BUILD_DIR/$K1520_KERMIT_CLI" "$STAGE/payload/bin/$_kcli_ziel"
+strip "$STAGE/payload/bin/$_kcli_ziel" 2>/dev/null || true
+
 # Der Debugger.  Er bekommt bewusst KEIN Startmenue-Symbol und keinen
 # Doppelklick-Starter: ein Debugger wird in einen vorhandenen Arbeitsablauf aus
 # Editor, Assembler und Konsole eingebunden, und wie der aussieht, weiss nur der
@@ -493,6 +509,8 @@ strip "$STAGE/payload/bin/$K1520_DBG" 2>/dev/null || true
 # bringt ihr eigenes Handbuch als .md unter app/ mit (F1).
 cp "$REPO/doc/handbuch_k1520dbg.md" "$STAGE/payload/share/doc/handbuch_k1520dbg.md"
 cp "$REPO/tools/k1520disktool.md"   "$STAGE/payload/share/doc/k1520disktool.md" 2>/dev/null || true
+cp "$REPO/tools/k1520kermit.md"     "$STAGE/payload/share/doc/k1520kermit.md" \
+    || die "tools/k1520kermit.md fehlt"
 
 # Statisches Vollisting einer .COM — die Ergaenzung zum interaktiven `u` des
 # Debuggers.  Reines Python, laeuft im mitgelieferten venv.
@@ -506,6 +524,9 @@ cp "$REPO/third_party/isocline/LICENSE" \
 # miniz steckt einkompiliert im Kern und im DiskTool (gepackte Plattenabbilder .img.gz).
 cp "$REPO/third_party/miniz/LICENSE" \
    "$STAGE/payload/share/doc/lizenzen/miniz-LICENSE.txt"
+# Kermit-80 (Columbia University) liegt als KERMIT.COM auf den Beispieldisketten: Urhebervermerk daneben.
+cp "$REPO/tools/kermit80/COPYRIGHT.txt" \
+   "$STAGE/payload/share/doc/lizenzen/kermit80-COPYRIGHT.txt"
 
 # GUI ohne Bytecode-Reste des Entwicklungsrechners (--exclude MUSS vor dem
 # Pfad stehen, sonst wirkt es bei GNU tar nicht)
@@ -515,6 +536,10 @@ cp "$REPO/third_party/miniz/LICENSE" \
 [ -f "$STAGE/payload/app/main.py" ] || die "app/main.py fehlt in der Payload"
 [ -f "$STAGE/payload/app/disktool/main.py" ] \
     || die "app/disktool/main.py fehlt in der Payload"
+[ -f "$STAGE/payload/app/kermittool/main.py" ] \
+    || die "app/kermittool/main.py fehlt in der Payload"
+[ -f "$STAGE/payload/app/kermittool/help/handbuch.md" ] \
+    || die "app/kermittool/help/handbuch.md fehlt in der Payload"
 
 cp "$REPO/data/formats.yaml" "$STAGE/payload/share/k1520emu/formats.yaml"
 # Auslieferungskonfiguration: der Zustand nach der Erstinstallation und das Ziel
@@ -573,9 +598,9 @@ case "$DISKS" in
         done
         # P8000 (2026-10-11, Entscheid des Anwenders): die WEGA-Saetze GANZ — fertig installierte
         # Platten (*.img.gz, bleiben beim Anwender gepackt, der Emulator schliesst sie so an),
-        # Startdisketten und der Installationssatz (*.dmk).
+        # Startdisketten und der Installationssatz (*.dmk), dazu die OS/M-Systemdiskette (*.hfe, p8000_osm30).
         for d in $(find "$REPO/disks" -mindepth 2 -maxdepth 2 -type f -path '*/p8000_*' \
-                        \( -name '*.dmk' -o -name '*.img.gz' \) | sort); do
+                        \( -name '*.dmk' -o -name '*.img.gz' -o -name '*.hfe' \) | sort); do
             lege_diskette_ab "$d"
         done ;;
     *) die "--disks erwartet default|all|none, nicht '$DISKS'" ;;
@@ -600,6 +625,7 @@ cp "$SELF_DIR/slim.py"         "$STAGE/slim.py"
 if ist_windows; then
     cp "$SELF_DIR/launcher.cmd"           "$STAGE/launcher.cmd"
     cp "$SELF_DIR/disktool_launcher.cmd"  "$STAGE/disktool_launcher.cmd"
+    cp "$SELF_DIR/kermit_launcher.cmd"    "$STAGE/kermit_launcher.cmd"
     # Die Werkzeug-Eingabeaufforderung.  Sie traegt die Endung `.in` im
     # Quellbaum, weil sie erst beim Einrichten ausgefuellt wird — im Paket
     # heisst sie wie die uebrigen Vorlagen (der Assistent holt sie ueber
@@ -612,6 +638,8 @@ else
     cp "$SELF_DIR/launcher.sh"              "$STAGE/launcher.sh"
     cp "$SELF_DIR/disktool_launcher.sh"     "$STAGE/disktool_launcher.sh"
     cp "$SELF_DIR/k1520disktool.desktop.in" "$STAGE/k1520disktool.desktop.in"
+    cp "$SELF_DIR/kermit_launcher.sh"       "$STAGE/kermit_launcher.sh"
+    cp "$SELF_DIR/k1520kermit.desktop.in"   "$STAGE/k1520kermit.desktop.in"
     cp "$SELF_DIR/a5120emu.desktop.in"      "$STAGE/a5120emu.desktop.in"
     cp "$SELF_DIR/k8915emu.desktop.in"      "$STAGE/k8915emu.desktop.in"
     cp "$SELF_DIR/prg710emu.desktop.in"     "$STAGE/prg710emu.desktop.in"

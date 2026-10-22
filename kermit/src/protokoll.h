@@ -107,6 +107,12 @@ struct Einstellungen {
     int max_namenslaenge = 0;    ///< 14 fuer WEGA-Ziele; 0 = keine Grenze
     bool i_paket = true;         ///< vor R/G ein I-Paket schicken
     bool ueberschreiben = true;  ///< vorhandene Dateien beim Empfang ersetzen
+    /// Server mit Anmeldezwang (K12): `serve` spricht vor dem Protokoll wie getty + login der WEGA
+    /// (`login:` / `Password:` / `Login incorrect`) und kehrt nach FINISH/BYE zu `login:` zurueck.
+    /// Aus = bisheriges Verhalten (serve endet nach FINISH).
+    bool login_pflicht = false;
+    std::string login_name = "kermit";
+    std::string login_kennwort = "kermit";
 };
 
 struct Rueckrufe {
@@ -233,6 +239,11 @@ private:
     // Server
     Ergebnis serverBefehl(const Paket& p, Freigabe& f, bool& ende);
     Ergebnis serverSende(std::vector<Quelle>& quellen);
+    /// Anmeldephase des Servers (getty + login); Ok = angemeldet.
+    Lesen anmeldung();
+    Lesen leseByte(uint8_t& b);                 ///< ein Byte (erst Restpuffer), blockiert mit Leerlauf-Fristen
+    Lesen leseZeile(std::string& z, bool echo); ///< bis RETURN / CR LF, Bit 7 geloescht
+    void sendeText(const std::string& t);
 
     Leitung& l_;
     Einstellungen e_;
@@ -240,6 +251,8 @@ private:
     PaketZerleger zerleger_;
     std::vector<uint8_t> puffer_;
     std::size_t pufPos_ = 0;
+    std::string echo_;              ///< noch nicht ausgegebenes Echo der Anmeldung
+    bool nachCr_ = false;           ///< letztes Anmeldezeichen war CR (folgendes LF gehoert dazu)
     int chkt_ = 1;                  ///< laufende Blockpruefung
     Vereinbarung v_;                ///< Parameter der laufenden Transaktion
     std::string letztes_;           ///< zuletzt gesendeter Rahmen (fuer Wiederholung)
@@ -259,6 +272,7 @@ private:
     double messSummeBytes_ = 0, messSummeMs_ = 0;   ///< gleitende Summen der Ratenmessung
     Statistik st_;
     bool nachlauf_ = false;         ///< zuletzt ein B quittiert (siehe leereEingang)
+    bool nachlaufNoetig_ = true;    ///< die Gegenstelle sendet wie C-Kermit 4.2 (9 Init-Felder, kein CAPAS)
     std::atomic<bool> abbruch_{false};
     std::atomic<bool> abbruchDatei_{false};
     std::atomic<bool> abbruchGruppe_{false};

@@ -53,7 +53,7 @@ std::string ArchivEintrag::schluessel() const {
 bool kopfSchreiben(const Kopf& k, uint64_t groesse, uint8_t out[kBlock], std::string& err) {
     if (k.name.size() > kNameMax) {
         err = "Der Name '" + k.name + "' ist laenger als " + std::to_string(kNameMax)
-              + " Zeichen — das V7-tar des P8000 kennt keine laengeren Namen.";
+              + " Zeichen - das V7-tar des P8000 kennt keine laengeren Namen.";
         return false;
     }
     if (k.linkname.size() > kNameMax) {
@@ -95,7 +95,7 @@ bool TarArchiv::hinzufuegen(const std::string& name, const std::vector<uint8_t>&
     if (w.empty()) { err = "Leerer Dateiname"; return false; }
     if (w.size() > kNameMax) {
         err = "Der Name '" + w + "' ist laenger als " + std::to_string(kNameMax)
-              + " Zeichen — das V7-tar des P8000 kennt keine laengeren Namen.";
+              + " Zeichen - das V7-tar des P8000 kennt keine laengeren Namen.";
         return false;
     }
     const int alt = finde(w);

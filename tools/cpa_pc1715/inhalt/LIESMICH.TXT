@@ -44,6 +44,8 @@ SYSTEMPROGRAMME
   SERTEST           Serial Test V0.2: prueft Drucker (X4, nur Senden) und V.24
                     (X5) mit Pruefstecker oder gegen einen zweiten Rechner;
                     "SERTEST" ohne Argumente, Ctrl+C beendet
+  KERMIT            Kermit-80 4.11 (CP/M): Dateiuebertragung ueber V.24 (X5),
+                    9600 Bd 8N1 (Beigabe zum Ausprobieren der Schnittstelle)
 
 TEXTVERARBEITUNG
 ----------------

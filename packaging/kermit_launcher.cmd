@@ -1,0 +1,30 @@
+@echo off
+rem K1520 Kermit - Dateiaustausch mit der WEGA (P8000) ueber Telnet/RFC 2217 (Windows).
+rem Die Wurzel setzt der Installer.  Gegenstueck zu kermit_launcher.sh.
+setlocal
+
+set "ROOT=@ROOT@"
+
+if not exist "%ROOT%\venv\Scripts\pythonw.exe" (
+    echo K1520 Kermit: Laufzeitumgebung fehlt in %ROOT%\venv 1>&2
+    echo Neu einrichten:  das Installationsprogramm noch einmal ausfuehren 1>&2
+    exit /b 1
+)
+
+set "K1520_HOME=%ROOT%"
+
+rem Derselbe Datenordner wie beim Emulator-Starter - sonst oeffnete der
+rem Dateidialog woanders, als der Emulator seine Disketten ablegt.
+set "K1520_DATA=@DATEN@"
+if "%K1520_DATA%"=="" set "K1520_DATA="
+
+for /f "usebackq delims=" %%D in (`
+    "%ROOT%\venv\Scripts\python.exe" -c "import sys; sys.path.insert(0, sys.argv[1]); from app import paths; print(paths.user_data_dir())" "%ROOT%" 2^>nul
+`) do set "DATEN=%%D"
+
+if defined DATEN (
+    if not exist "%DATEN%" mkdir "%DATEN%" 2>nul
+    if exist "%DATEN%" cd /d "%DATEN%"
+)
+
+"%ROOT%\venv\Scripts\pythonw.exe" "%ROOT%\app\kermittool\main.py" %*

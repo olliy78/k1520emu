@@ -268,7 +268,9 @@ bool HfeCodec::load(const std::string& path, DiskMedium& out, SourceInfo* info,
                     bestes.cell_factor = static_cast<uint8_t>(bester_f);
                 }
             }
-            if (beste_sektoren > 0) break;    // Sitte steht fest
+            // Beide Sitten durchprobieren (nur einseitig): eine kontinuierliche Altdatei
+            // liefert als halbe Verschraenkte gelesen ebenfalls ein paar gute Sektoren;
+            // der Vergleich der Sektorzahl (oben) entscheidet.
           }
 
           if (bestes_marken > 0) {
@@ -363,7 +365,7 @@ bool HfeCodec::save(const std::string& path, const DiskMedium& in, std::string& 
     std::vector<uint8_t> lut(512, 0xFF);
     uint32_t blk = 2;                                               // Spurdaten ab Block 2
     for (uint8_t c = 0; c < num_cyls; ++c) {
-        const uint32_t track_len = side_lens[c] * num_heads;
+        const uint32_t track_len = side_lens[c] * 2;   // immer beide Seitenschlitze
         wr16(lut, static_cast<size_t>(c) * 4 + 0, static_cast<uint16_t>(blk));
         wr16(lut, static_cast<size_t>(c) * 4 + 2, static_cast<uint16_t>(track_len));
         blk += (track_len + 511) / 512;
@@ -374,10 +376,10 @@ bool HfeCodec::save(const std::string& path, const DiskMedium& in, std::string& 
     f.write(reinterpret_cast<const char*>(hdr.data()), 512);
     f.write(reinterpret_cast<const char*>(lut.data()), 512);
 
-    // 4. Spurdaten seitenverschraenkt (einseitig: kontinuierlich).
+    // 4. Spurdaten seitenverschraenkt (auch einseitig: 2 x 256 B je Block, Seite 1 leer).
     for (uint8_t c = 0; c < num_cyls; ++c) {
         const uint32_t side_len  = side_lens[c];
-        const uint32_t track_len = side_len * num_heads;
+        const uint32_t track_len = side_len * 2;
         std::vector<uint8_t> spur((track_len + 511) / 512 * 512, kHfeGap);
 
         for (uint8_t h = 0; h < num_heads; ++h) {
@@ -396,8 +398,12 @@ bool HfeCodec::save(const std::string& path, const DiskMedium& in, std::string& 
             }
             cells.resize(side_len, kHfeGap);
 
-            const uint32_t slot     = (num_heads == 1) ? 512u : 256u;
-            const size_t   head_off = (num_heads == 1) ? 0u : static_cast<size_t>(h) * 256;
+            // Auch einseitig verschraenkt (Seite 0 = erste 256 B jedes 512-B-Blocks,
+            // Seite 1 bleibt Gap): so legen HxC und Greaseweazle es ab und so liest
+            // es der HxC.  Kontinuierlich geschrieben zeigte der HxC Track Analyser
+            // ein verstuemmeltes Layout (Issue #12).
+            const uint32_t slot     = 256u;
+            const size_t   head_off = static_cast<size_t>(h) * 256;
             uint32_t src = 0;
             for (uint32_t b = 0; src < side_len; ++b) {
                 const size_t   dst_start = static_cast<size_t>(b) * 512 + head_off;

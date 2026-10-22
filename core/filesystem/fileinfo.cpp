@@ -120,7 +120,7 @@ fs::path fileinfoPfad(const fs::path& datei) {
 bool schreibeFileinfo(const fs::path& ziel, const FileAngaben& a) {
     std::ofstream f(ziel, std::ios::binary);
     if (!f) return false;
-    f << "# k1520DiskTool — Angaben zu '" << a.name << "'.\n"
+    f << "# k1520DiskTool - Angaben zu '" << a.name << "'.\n"
          "# Sie stehen NICHT in der Datei selbst.  Beim Einfuegen (`put`) werden sie\n"
          "# wieder uebernommen.\n";
     // Der Satz danach sagt, WAS ohne sie verlorenginge — und das ist bei den beiden
@@ -132,14 +132,14 @@ bool schreibeFileinfo(const fs::path& ziel, const FileAngaben& a) {
              "# teilstueck=ist/soll: die Datei war auf dieser Diskette abgeschnitten.\n";
     else if (a.wega)
         f << "# Ohne sie bekommt die Datei beim Einfuegen die Vorgaben (Modus 0644 bzw.\n"
-             "# 0755, Besitzer 0/0, Zeit jetzt) — Inhalt und Name gehen nicht verloren.\n"
+             "# 0755, Besitzer 0/0, Zeit jetzt) - Inhalt und Name gehen nicht verloren.\n"
              "# Zurueckgespielt werden mode (untere 12 Bit), uid, gid und mtime; art,\n"
              "# nlink, inode, atime, ctime und rdev stehen nur zur Auskunft da.\n";
     else if (a.udos)
-        f << "# Ohne sie kann das Werkzeug nicht wissen, was fuer eine Datei das ist —\n"
+        f << "# Ohne sie kann das Werkzeug nicht wissen, was fuer eine Datei das ist -\n"
              "# aus einem Programm wuerde eine Binaerdatei, die nicht laeuft.\n";
     else
-        f << "# Ohne sie landet die Datei im Nutzerbereich 0 ohne Attribute — das ist\n"
+        f << "# Ohne sie landet die Datei im Nutzerbereich 0 ohne Attribute - das ist\n"
              "# bei CP/M der Normalfall und selten ein Verlust.\n";
     f << "# Loeschen schadet nur dieser einen Datei; die Zeilenform ist dieselbe wie in\n"
          "# udos-dateiangaben.txt bzw. cpm-dateiangaben.txt.\n";

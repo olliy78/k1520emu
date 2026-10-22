@@ -1,0 +1,25 @@
+Kermit-80 (CP/M-80 Kermit), Version 4.11
+========================================
+
+Urhebervermerke, wortgleich aus den Originaldateien (tools/kermit80/holen.sh holt sie):
+
+--- CPKERM.TXT, Zeilen 15-20 ---
+
+                            Copyright (C) 1981,1991
+            Trustees of Columbia University in the City of New York
+
+     Permission is granted to any individual or institution to use, copy,
+    or redistribute this document so long as it is not sold for profit, and
+                  provided this copyright notice is retained.
+
+--- CPSDEF.ASM / CPXTYP.ASM (Kopf; die uebrigen CPX*.ASM und CPSKER.ASM tragen denselben) ---
+
+;       Copyright June 1981,1982,1983,1984,1985
+;       Columbia University
+;
+; Originally written by Bill Catchings of the Columbia University Center for
+; Computing Activities, 612 W. 115th St., New York, NY 10025.
+;
+; Contributions by Frank da Cruz, Daphne Tzoar, Bernie Eiben,
+; Bruce Tanner, Nick Bush, Greg Small, Kimmo Laaksonen, Jeff Damens, and many
+; others.

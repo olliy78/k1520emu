@@ -361,3 +361,180 @@ def _serve_sammeln(server, wurzel, fehler):
         server.serve(str(wurzel))
     except KermitError as e:
         fehler.append(e)
+
+
+# ─── Anmeldung auf Abruf (K10) ───────────────────────────────────────────────
+
+class _GettyAttrappe:
+    """Spielt getty/login nach (Klartext-TCP; die Telnet-Aushandlung des Clients wird ueberlesen):
+    `login:` -> Name -> `Password:` -> Kennwort -> bei richtig der Kermit-Serverbeginn, sonst
+    `Login incorrect` und wieder `login:`."""
+
+    def __init__(self, benutzer="kermit", kennwort="kermit"):
+        import socket
+        self.benutzer, self.kennwort = benutzer, kennwort
+        self.lauscher = socket.socket()
+        self.lauscher.bind(("127.0.0.1", 0))
+        self.lauscher.listen(1)
+        self.port = self.lauscher.getsockname()[1]
+        self.erhalten = []   # (name, kennwort)-Paare
+        self.thread = threading.Thread(target=self._lauf, daemon=True)
+        self.thread.start()
+
+    def _zeile(self, c):
+        z = b""
+        while True:
+            b = c.recv(1)
+            if not b:
+                return None
+            if b == b"\xff":          # IAC + 2 Bytes ueberlesen
+                c.recv(2)
+                continue
+            if b == b"\r":
+                return z.decode("latin-1")
+            if b not in (b"\n", b"\0"):
+                z += b
+
+    def _lauf(self):
+        c, _ = self.lauscher.accept()
+        c.settimeout(20)
+        try:
+            if self._zeile(c) is None:        # erstes RETURN des Clients
+                return
+            while True:
+                c.sendall(b"\r\nWEGA login: ")
+                n = self._zeile(c)
+                if n is None:
+                    return
+                c.sendall(b"\r\nPassword: ")
+                k = self._zeile(c)
+                if k is None:
+                    return
+                self.erhalten.append((n, k))
+                if (n, k) == (self.benutzer, self.kennwort):
+                    break
+                c.sendall(b"\r\nLogin incorrect\r\n")
+            c.sendall(b"\r\nC-Kermit server starting.  Return to your local machine\r\n")
+            while c.recv(100):
+                pass
+        except OSError:
+            pass
+        finally:
+            c.close()
+
+    def schliessen(self):
+        self.lauscher.close()
+
+
+def _anmelde_client(getty):
+    from app.kermittool.binding import Kermit
+    return Kermit.telnet_client("127.0.0.1", getty.port, 5000)
+
+
+def test_login_on_demand_asks_again_after_rejection():
+    from app.kermittool import binding as b
+    getty = _GettyAttrappe()
+    k = _anmelde_client(getty)
+    fragen = []
+
+    def frage(versuch, gelesen):
+        fragen.append((versuch, gelesen))
+        return ("kermit", "falsch") if versuch == 0 else ("kermit", "kermit")
+
+    try:
+        text = k.login_ask(frage, 20000)
+        assert k.login_kind == b.LOGIN_OK
+        assert "server starting" in text
+        assert [f[0] for f in fragen] == [0, 1]
+        assert "login:" in fragen[0][1] and "Login incorrect" in fragen[1][1]
+        assert getty.erhalten == [("kermit", "falsch"), ("kermit", "kermit")]
+    finally:
+        k.close()
+        getty.schliessen()
+
+
+def test_login_on_demand_without_answer_is_an_abort():
+    from app.kermittool import binding as b
+    getty = _GettyAttrappe()
+    k = _anmelde_client(getty)
+    try:
+        with pytest.raises(b.KermitError) as ei:
+            k.login_ask(lambda v, g: None, 20000)      # der Anwender bricht ab
+        assert ei.value.code == b.E_LOGIN
+        assert k.login_kind == b.LOGIN_ABBRUCH
+        assert getty.erhalten == []
+    finally:
+        k.close()
+        getty.schliessen()
+
+
+def test_login_kind_tells_a_rejection_from_a_timeout():
+    from app.kermittool import binding as b
+    getty = _GettyAttrappe()
+    k = _anmelde_client(getty)
+    try:
+        with pytest.raises(b.KermitError):
+            k.login("kermit", "falsch", 3000)            # Anmeldung mit vorab gegebenen Daten
+        assert k.login_kind == b.LOGIN_ABGELEHNT
+    finally:
+        k.close()
+        getty.schliessen()
+
+    # Stumme Gegenstelle: Frist, nicht Ablehnung.
+    import socket
+    stumm = socket.socket()
+    stumm.bind(("127.0.0.1", 0))
+    stumm.listen(1)
+    k = b.Kermit.telnet_client("127.0.0.1", stumm.getsockname()[1], 5000)
+    try:
+        with pytest.raises(b.KermitError):
+            k.login_ask(lambda v, g: ("kermit", "kermit"), 600)
+        assert k.login_kind == b.LOGIN_FRIST
+    finally:
+        k.close()
+        stumm.close()
+
+
+# ─── Server mit Anmeldezwang (K12) ───────────────────────────────────────────
+
+def test_server_login_enforces_the_login_and_returns_to_login_after_finish(tmp_path):
+    from app.kermittool.binding import Kermit, KermitError, E_DISCONNECTED, E_LOGIN
+
+    client, server = _paar("telnet", True)
+    freigabe = tmp_path / "freigabe"
+    freigabe.mkdir()
+    (freigabe / "da.txt").write_bytes(b"da")
+    ziel = tmp_path / "ziel"
+    ziel.mkdir()
+    server.set_server_login(True, "olli", "geheim")
+    fehler = []
+    t = threading.Thread(target=lambda: _serve_sammeln(server, freigabe, fehler))
+    t.start()
+    try:
+        client.login("olli", "geheim", 30000)
+        assert client.get("da.txt", str(ziel)) == ["da.txt"]
+        client.remote_finish()                   # der Server meldet sich wieder mit login:
+        assert t.is_alive(), "mit Anmeldezwang endet serve() nach FINISH nicht"
+        with pytest.raises(KermitError) as ei:   # falsches Kennwort
+            client.login("olli", "falsch", 3000)
+        assert ei.value.code == E_LOGIN
+        client.login("olli", "geheim", 30000)    # derselbe Server, naechste Anmeldung
+        assert client.get("da.txt", str(ziel)) == ["da.txt"]
+    finally:
+        client.close()
+        t.join(30)
+        server.close()
+    assert not t.is_alive()
+    assert len(fehler) == 1 and fehler[0].code == E_DISCONNECTED
+
+
+def test_server_login_defaults_are_off_and_keep_names_when_none(tmp_path):
+    from app.kermittool.binding import Kermit
+
+    client, server = _paar("telnet", True)
+    try:
+        server.set_server_login(False)           # Aufruf ohne Namen/Kennwort ist erlaubt
+        server.set_server_login(True, None, None)
+    finally:
+        client.close()
+        server.close()

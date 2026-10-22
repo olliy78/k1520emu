@@ -94,6 +94,8 @@ public:
     void setzeChkt(int c) { chkt_ = c; }
     void setzeMark(uint8_t m) { mark_ = m; }
     void zuruecksetzen() { z_ = Z::Suche; }
+    /// Die Gegenstelle sendet mit Paritaetsbit (erkannt oder vorgegeben): Bit 7 wird abgestreift.
+    bool paritaetErkannt() const { return par_; }
 
     Ergebnis zufuehren(uint8_t b);
     const Paket& paket() const { return paket_; }
@@ -103,6 +105,7 @@ private:
     Ergebnis fehler() { z_ = Z::Suche; return Ergebnis::Fehlerhaft; }
 
     Z z_ = Z::Suche;
+    bool par_ = false;
     int chkt_ = 1;
     uint8_t mark_ = SOH;
     int len_ = 0, chkl_ = 1, datenLen_ = 0;

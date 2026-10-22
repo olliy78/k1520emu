@@ -71,6 +71,8 @@ PRUEFPROGRAMME (im Emulator entwickelt, am Geraet wie dort verwendbar)
 ------------------------------------------------------------------------
   SERTEST    serielle Schnittstellen (K8025): Pruefstecker- und Gegenstellen-
              test, Baudraten, Flusssteuerung
+  KERMIT     Kermit-80 4.11 (CP/M): Dateiuebertragung ueber die V.24-Schnittstelle,
+             9600 Bd 8N1 (Beigabe zum Ausprobieren der Schnittstelle)
   ROMREAD    liest das Boot-EPROM der ZRE nach ROM.BIN
   EM256ADR   A5120.16: Portbasis der Steuerkarte und Attributspeicher
   EM16ABL    A5120.16: Ablaeufe des 16-Bit-Modus (U8001)

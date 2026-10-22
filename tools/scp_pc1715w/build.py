@@ -27,6 +27,7 @@ def soll():
     d['WM.HLP'] = db.wm_hlp()
     d.update(db.gemeinsam('WM.COM', 'BASIC.COM', 'PASCAL.COM', 'PASCAL.TXT', 'PASCAL.RES'))
     d.update(db.beigaben('SERTEST.COM'))
+    d.update(db.kermit80('pc1715w'))
     return d
 
 

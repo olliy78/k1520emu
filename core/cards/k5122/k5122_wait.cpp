@@ -161,7 +161,7 @@ const TrackImage& K5122::waitStrom()
                 else
                     gruppe.push_back(k);
             }
-            LOG_INFO("K5122", "WAIT: Spur D%d C=%u H=%u — %zu Kennfelder, %zu B (%s)",
+            LOG_INFO("K5122", "WAIT: Spur D%d C=%u H=%u - %zu Kennfelder, %zu B (%s)",
                      selected_drive_, static_cast<unsigned>(zyl),
                      static_cast<unsigned>(current_head_), sektoren, w_strom_.size(),
                      w_strom_.encoding == Encoding::FM ? "FM" : "MFM");

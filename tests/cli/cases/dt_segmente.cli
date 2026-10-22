@@ -1,4 +1,4 @@
-# Eine UDOS-Programmdatei kann MEHRERE Speichersegmente haben — `ZLINK` der
+# Eine UDOS-Programmdatei kann MEHRERE Speichersegmente haben - `ZLINK` der
 # PC-1715-Diskette sechs.  `attr` muss sie alle nennen, nicht bloss das erste:
 # mit nur dem ersten kaeme die Datei aus get/put verstuemmelt zurueck und startete
 # nicht mehr (doc/udos_diskettenformat.md §6.3).

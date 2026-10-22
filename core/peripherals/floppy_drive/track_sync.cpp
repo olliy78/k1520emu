@@ -129,8 +129,14 @@ uint32_t TrackSync::nominalBitcells() const {
 
 // ─── Vordergrund ─────────────────────────────────────────────────────────────
 
+void TrackSync::accessed() {
+    letzter_zugriff_.store(Uhr::now().time_since_epoch().count(),
+                           std::memory_order_relaxed);
+}
+
 bool TrackSync::ensureLoaded(uint8_t cyl, uint8_t head) {
     if (!gueltig(cyl, head)) return false;
+    accessed();
 
     std::unique_lock<std::mutex> sperre(m_);
     if (stop_ || !medium_) return false;
@@ -165,6 +171,7 @@ bool TrackSync::ensureLoaded(uint8_t cyl, uint8_t head) {
 
 void TrackSync::trackChanged(uint8_t cyl, uint8_t head) {
     if (!gueltig(cyl, head)) return;
+    accessed();
 
     std::lock_guard<std::mutex> sperre(m_);
     Eintrag& e = eintraege_[idx(cyl, head)];
@@ -289,6 +296,17 @@ std::string TrackSync::defectText() const {
 
 // ─── Auftragsauswahl ─────────────────────────────────────────────────────────
 
+Uhr::time_point TrackSync::vorauslesenFreiAb() const {
+    const int64_t t = letzter_zugriff_.load(std::memory_order_relaxed);
+    if (t == 0 || spec_.readahead_quiet_ms == 0) return Uhr::time_point{};
+    return Uhr::time_point(Uhr::duration(t)) +
+           std::chrono::milliseconds(spec_.readahead_quiet_ms);
+}
+
+bool TrackSync::vorauslesenZurueckgestellt(Uhr::time_point jetzt) const {
+    return jetzt < vorauslesenFreiAb();
+}
+
 bool TrackSync::waehleAuftrag(SyncJob& out) {
     if (!medium_) return false;
     const auto jetzt = Uhr::now();
@@ -361,7 +379,10 @@ bool TrackSync::waehleAuftrag(SyncJob& out) {
             if (e.dirty_pending || e.verify_pending) return true;
         return false;
     };
-    if (bester == SIZE_MAX && spec_.read_ahead && !rueckstand()) {
+    // Auch in der Ruhefrist nach einem Gastzugriff ruht es (Issue #14): zwischen zwei
+    // Zugriffen des Gastes soll der Kopf nicht zu fremden Spuren fahren.
+    if (bester == SIZE_MAX && spec_.read_ahead && !rueckstand() &&
+        !vorauslesenZurueckgestellt(jetzt)) {
         int bester_weg = 0;
         for (uint8_t c = 0; c < spec_.num_cyls; ++c)
             for (uint8_t h = 0; h < spec_.num_heads; ++h) {
@@ -438,6 +459,10 @@ bool TrackSync::takeJob(SyncJob& out, int timeout_ms) {
                 if (e.dirty_pending && e.job_id == 0)
                     weckzeit = std::min(weckzeit, e.dirty_since + ruhe);
         }
+        // Ruht das Vorauslesen nur wegen der Ruhefrist, muss der Faden an deren Ende
+        // aufwachen (kein Gastzugriff weckt ihn dann noch).
+        if (spec_.read_ahead && vorauslesenZurueckgestellt(Uhr::now()))
+            weckzeit = std::min(weckzeit, vorauslesenFreiAb());
         zaehler_.busy_cyl = zaehler_.busy_head = 255;
         zaehler_.busy_kind = 0;
 
@@ -662,7 +687,7 @@ void TrackSync::verifyAbschliessen(Eintrag& e, uint8_t cyl, uint8_t head,
         // Noch ein Versuch — sofort faellig, der Kopf steht ohnehin dort.
         e.dirty_pending = spec_.writable;
         e.dirty_since   = Uhr::now() - std::chrono::hours(1);
-        letzter_fehler_ = wo + " kam falsch zurueck (" + grund + ") — neuer Versuch";
+        letzter_fehler_ = wo + " kam falsch zurueck (" + grund + ") - neuer Versuch";
         cv_arbeit_.notify_all();
         return;
     }

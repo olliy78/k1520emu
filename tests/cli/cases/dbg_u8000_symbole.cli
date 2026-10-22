@@ -1,4 +1,4 @@
-# S5b: Symboldatei aus z8kasm (--sym) im Debugger — laden, Anzeige in u/bl, Haltepunkt
+# S5b: Symboldatei aus z8kasm (--sym) im Debugger - laden, Anzeige in u/bl, Haltepunkt
 # per Name, Programm per load in den EM-Speicher (durch die Segmentweiche).
 tool:      k1520dbg
 tmpfile bild:

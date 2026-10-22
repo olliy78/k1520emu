@@ -1,7 +1,7 @@
-# K8915 (§8a AP-E4d, Szenario aus tools/how_to_debug_and_trace.md): Coldstart → CR →
+# K8915 (§8a AP-E4d, Szenario aus tools/how_to_debug_and_trace.md): Coldstart -> CR ->
 # Haltepunkt im Marken-ISR E965H des BIOS.  Die BIOS-Zeile annotiert; das ROM-Listing
 # annotiert 0000H nur, solange dort das ROM eingeblendet ist (vor dem Lauf ja, im
-# Betrieb mit A8H=87H nicht — dann steht dort RAM).
+# Betrieb mit A8H=87H nicht - dann steht dort RAM).
 tool:    k1520dbg
 disk:    k8915scpx_boot1.hfe
 timeout: 180

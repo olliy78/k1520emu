@@ -61,6 +61,10 @@ public:
 
     /// @brief Meldung, dass eine Spur im Abbild geaendert wurde (Rueckfuehrung anmelden).
     virtual void trackChanged(uint8_t cyl, uint8_t head) = 0;
+
+    /// @brief Meldung, dass das Gastsystem das Laufwerk anspricht (Seek/Lesen/Schreiben).
+    /// Dient nur dazu, Hintergrundarbeit zurueckzustellen; darf nicht blockieren.
+    virtual void accessed() {}
 };
 
 /**
@@ -162,6 +166,8 @@ public:
     /// @brief Nachlader anmelden/abmelden; @p loader darf nullptr sein (Dateibindung).
     void setLoader(TrackLoader* loader) { loader_ = loader; }
     TrackLoader* loader() const { return loader_; }
+    /// @brief Ein Gastzugriff fand statt (@ref TrackLoader::accessed); ohne Loader ohne Wirkung.
+    void noteAccess() const { if (loader_) loader_->accessed(); }
 
     TrackState state(uint8_t cyl, uint8_t head) const;
 

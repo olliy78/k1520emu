@@ -702,7 +702,7 @@ struct MatchResult {
         if (ratio >= 0.98) return "identischer Build";
         if (ratio >= 0.80) return "gleicher Build, wenige Abweichungen";
         if (ratio >= 0.25) return "gleiches Programm, ANDERER Build";
-        return "schwacher Treffer — passt die Quelle zu diesem Image?";
+        return "schwacher Treffer - passt die Quelle zu diesem Image?";
     }
 };
 

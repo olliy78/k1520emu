@@ -348,9 +348,9 @@ private:
  */
 class SertestK8915 : public SertestBasis<SertestK8915> {
 public:
-    explicit SertestK8915(const std::string& fixture = kDisketteK8915)
+    explicit SertestK8915(const std::string& fixture = kDisketteK8915, const std::string& com = "")
         : disk_(fixture, "sertest_k8915_" + fixture) {
-        fehler_ = aufspielen(disk_.path());
+        fehler_ = aufspielen(disk_.path(), com);
         if (fehler_.empty() && !m_.mountDisk(0, disk_.path(), "cpa800", false))
             fehler_ = "mountDisk: " + m_.lastError();
     }

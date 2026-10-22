@@ -36,6 +36,7 @@ def soll():
                          'RAFCPM.COM', 'RAF512.COM', 'LBREAD.COM', 'LBPUNCH.COM',
                          'KMBGTEST.COM', 'KMBG.REL',
                          'AUPTEST.COM', 'AUPTSIO.COM', 'K3521TST.COM'))   # Kassette K5020 (AP K8; KMBG.REL zum Binden)
+    d.update(db.kermit80('a5120'))
     d['RAFTEST.COM'] = db.raftest()
     d.update(db.aus_fixture(os.path.join('tests', 'fixtures', 'raf'), 'RAFQUICK.COM'))
     return d

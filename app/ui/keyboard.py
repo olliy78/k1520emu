@@ -77,6 +77,14 @@ def qt_event_to_core_key(event) -> Optional[Tuple[int, bool, bool]]:
     mods = event.modifiers()
     shift = bool(mods & Qt.ShiftModifier)
     ctrl = bool(mods & Qt.ControlModifier)
+    # AltGr: Windows meldet es als Strg+Alt (Linux nicht).  Erzeugt die Taste dabei ein
+    # druckbares Zeichen (deutsch AltGr+Q = '@', auch [ ] { } | \ ~), ist das KEIN Strg —
+    # sonst maskiert der Kern es mit & 0x1F zu NUL/ESC.  Ein echtes Strg+Alt+Taste liefert
+    # kein druckbares Zeichen (Text leer oder Steuerzeichen) und bleibt Strg.
+    if ctrl and (mods & Qt.AltModifier):
+        text = event.text()
+        if len(text) == 1 and ord(text) >= 0x20:
+            ctrl = False
 
     # Reine Modifikatoren erzeugen keinen Tastencode.
     if key in (int(Qt.Key_Shift), int(Qt.Key_Control), int(Qt.Key_Alt),

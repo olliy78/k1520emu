@@ -9,4 +9,4 @@ stdin:
   g 200000
   loadstate %state.bin%
   q
-expect_re: state loaded ← .*\n  => 0139:
+expect_re: state loaded <- .*\n  => 0139:

@@ -212,6 +212,7 @@ TrackSyncSpec spec(bool schreibbar = false, bool vorauslesen = false,
     s.writable           = schreibbar;
     s.read_ahead         = vorauslesen;
     s.write_settle_ms    = 60;
+    s.readahead_quiet_ms = 0;       // die Ruhefrist hat ihre eigenen Faelle
     s.request_timeout_ms = 5000;
     s.verify_writes      = verify;
     return s;
@@ -423,13 +424,22 @@ TEST(TrackSync, VorauslesenBeginntBeimZuletztGebrauchtenZylinder) {
     faden.start();
 
     (void)abbild.track(6, 0);            // Kopf steht jetzt bei 6
-    ASSERT_TRUE(warteBis([&] { return faden.verlauf().size() >= 4; }));
+    // Warten, bis die Anforderung UND die drei Folgespuren im Verlauf stehen (die
+    // Anforderung liegt nicht zwingend vorn; unter Last kam der Test sonst zu frueh).
+    auto indexDerAnforderung = [](const auto& verlauf) {
+        size_t n = 0;
+        while (n < verlauf.size() && !(verlauf[n].cyl == 6 && verlauf[n].head == 0)) ++n;
+        return n;
+    };
+    ASSERT_TRUE(warteBis([&] {
+        const auto v = faden.verlauf();
+        return indexDerAnforderung(v) + 3 < v.size();
+    }));
     faden.stop();
 
     // Die drei Spuren nach der Anforderung muessen in ihrer Naehe liegen, nicht bei 0.
     const auto v = faden.verlauf();
-    size_t i = 0;
-    while (i < v.size() && !(v[i].cyl == 6 && v[i].head == 0)) ++i;
+    const size_t i = indexDerAnforderung(v);
     ASSERT_LT(i + 3, v.size());
     for (size_t k = i + 1; k <= i + 3; ++k)
         EXPECT_LE(std::abs(static_cast<int>(v[k].cyl) - 6), 2)
@@ -1105,4 +1115,60 @@ TEST(TrackSync, DieRueckfuehrungFaehrtFahrstuhl) {
     ASSERT_TRUE(sync.takeJob(j, 1000));
     EXPECT_EQ(j.cyl, 0);
     EXPECT_EQ(j.head, 1);
+}
+
+// ─── Ruhefrist des Vorauslesens (Issue #14) ──────────────────────────────────
+
+TEST(TrackSync, DasVorauslesenRuhtInDerRuhefristNachEinemGastzugriff) {
+    // Zwischen zwei Zugriffen des Gastes (FORMAT) soll der Kopf nicht zu fremden Spuren
+    // fahren: jeder Zugriff — auch ein Seek ohne Nachladen — stellt das Vorauslesen zurueck.
+    DiskMedium abbild;
+    TrackSyncSpec s = spec(false, true);
+    s.readahead_quiet_ms = 300;
+    TrackSync sync(s, abbild);
+
+    abbild.noteAccess();                        // Gast spricht das Laufwerk an
+    SyncJob j;
+    EXPECT_FALSE(sync.takeJob(j, 100));         // noch in der Ruhefrist: nichts
+    // Jeder weitere Zugriff schiebt das Ende hinaus.
+    std::this_thread::sleep_for(200ms);
+    abbild.noteAccess();
+    EXPECT_FALSE(sync.takeJob(j, 200));         // 200 ms nach dem zweiten: weiter Ruhe
+    // Nach Ablauf kommt von selbst ein Vorausleseauftrag (der Faden schlaeft bis dahin).
+    ASSERT_TRUE(sync.takeJob(j, 1000));
+    EXPECT_EQ(j.prio, SyncPriority::Readahead);
+}
+
+TEST(TrackSync, EineAnforderungDesGastesWirdInDerRuhefristSofortBedient) {
+    DiskMedium abbild;
+    TrackSyncSpec s = spec(false, true);
+    s.readahead_quiet_ms = 5000;
+    TrackSync sync(s, abbild);
+
+    abbild.noteAccess();
+    std::thread gast([&] { (void)abbild.track(3, 1); });
+    SyncJob j;
+    ASSERT_TRUE(sync.takeJob(j, 1000));         // Demand ueberspringt die Ruhefrist
+    EXPECT_EQ(j.prio, SyncPriority::Demand);
+    EXPECT_EQ(j.cyl, 3);
+    sync.shutdown();
+    gast.join();
+}
+
+TEST(TrackSync, EinLaufenderVorausleseauftragWirdNichtAbgebrochen) {
+    DiskMedium abbild;
+    TrackSyncSpec s = spec(false, true);
+    s.readahead_quiet_ms = 300;
+    TrackSync sync(s, abbild);
+
+    SyncJob j;
+    ASSERT_TRUE(sync.takeJob(j, 500));          // Auftrag laeuft, noch keine Frist
+    EXPECT_EQ(j.prio, SyncPriority::Readahead);
+    abbild.noteAccess();                        // Gastzugriff waehrend des Auftrags
+    TrackImage leer;
+    leer.bitcells = 100000;
+    std::vector<uint8_t> z(12500, 0);
+    EXPECT_TRUE(sync.completeRead(j.id, z.data(), z.size(), 100000));  // wird abgeliefert
+    SyncJob k;
+    EXPECT_FALSE(sync.takeJob(k, 100));         // der naechste aber wartet
 }

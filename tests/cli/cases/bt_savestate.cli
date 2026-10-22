@@ -1,5 +1,5 @@
 # Zustand an einer Bedingung sichern, dann daraus fortsetzen (ROM-Einblendung
-# muss dabei reproduziert werden).  Der Sicherungslauf ist ein setup_run —
+# muss dabei reproduziert werden).  Der Sicherungslauf ist ein setup_run -
 # geprueft wird die Ausgabe des Fortsetzungslaufs.
 tool:      boot_trace
 disk:      cpa_cpa780_k5601_clock.img

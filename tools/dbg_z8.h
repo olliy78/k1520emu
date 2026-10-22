@@ -96,8 +96,8 @@ inline std::string zaehlerText(const Z8& c) {
         const bool en = c.tmr() & (n ? 0x08 : 0x02);
         std::string quelle = "intern (Takt/4)";
         if (n == 1 && !(z.pre & 0x02)) quelle = tin[(c.tmr() >> 4) & 3];
-        o += fmt("T%d: %s  %s  PRE%d=%02X (÷%u)  T%d=%02X (%u)  Stand=%02X  Vorteiler=%u  Endwerte=%llu\n"
-                 "    Takt: %s%s  Periode = 4·%u·%u = %u interne Takte\n",
+        o += fmt("T%d: %s  %s  PRE%d=%02X (/%u)  T%d=%02X (%u)  Stand=%02X  Vorteiler=%u  Endwerte=%llu\n"
+                 "    Takt: %s%s  Periode = 4*%u*%u = %u interne Takte\n",
                  n, en ? "zaehlt" : "steht", (z.pre & 1) ? "Dauer" : "Einzel", n, z.pre, p, n, z.anfang, t,
                  unsigned(z.zaehler & 0xFF), z.vorteiler, (unsigned long long)z.abgelaufen,
                  quelle.c_str(), (n == 1 && z.getriggert) ? " (getriggert)" : "", p, t, 4 * p * t);
@@ -110,7 +110,7 @@ inline std::string uartText(const Z8& c) {
     const Z8Sicht s = c.sicht();
     const bool an = s.p3m & 0x40;
     const unsigned p = (s.t[0].pre >> 2) ? (s.t[0].pre >> 2) : 64, t = s.t[0].anfang ? s.t[0].anfang : 256;
-    std::string o = fmt("UART: %s, Paritaet %s, Bitzeit = 4·%u·%u·16 = %u interne Takte\n",
+    std::string o = fmt("UART: %s, Paritaet %s, Bitzeit = 4*%u*%u*16 = %u interne Takte\n",
                         an ? "ein (P30=SIN, P37=SOUT)" : "aus", (s.p3m & 0x80) ? "ungerade" : "aus", p, t, 64 * p * t);
     o += fmt("  Empfang: Puffer=%02X  %s (Schieber %03X, Teiler %u)\n", s.rxPuffer,
              s.rxLaeuft ? "Zeichen laeuft ein" : "wartet auf Startbit", s.rxSchieber, s.rxTeiler);
@@ -154,18 +154,18 @@ inline std::string irqText(const Z8& c) {
 
 inline std::string portsText(const Z8& c) {
     std::string o;
-    static const char* p0[4] = {"Ausgang", "Eingang", "A8–A11", "A8–A11"};
-    static const char* p0h[4] = {"Ausgang", "Eingang", "A12–A15", "A12–A15"};
-    static const char* p1[4] = {"Ausgang", "Eingang", "AD0–AD7", "hochohmig"};
+    static const char* p0[4] = {"Ausgang", "Eingang", "A8-A11", "A8-A11"};
+    static const char* p0h[4] = {"Ausgang", "Eingang", "A12-A15", "A12-A15"};
+    static const char* p1[4] = {"Ausgang", "Eingang", "AD0-AD7", "hochohmig"};
     const uint8_t m = c.p01m();
-    o += fmt("P0: Pins=%02X aus=%02X treibt=%02X  P00–03 %s, P04–07 %s\n", c.portPegel(0), c.sicht().portAus[0],
+    o += fmt("P0: Pins=%02X aus=%02X treibt=%02X  P00-03 %s, P04-07 %s\n", c.portPegel(0), c.sicht().portAus[0],
              c.portTreibt(0), p0[m & 3], p0h[m >> 6]);
     o += fmt("P1: Pins=%02X aus=%02X treibt=%02X  %s;  Stapel %s, Timing %s\n", c.portPegel(1), c.sicht().portAus[1],
              c.portTreibt(1), p1[(m >> 3) & 3], (m & 4) ? "intern" : "extern", (m & 0x20) ? "erweitert" : "normal");
     o += fmt("P2: Pins=%02X aus=%02X treibt=%02X  P2M=%02X (1=Eingang), %s\n", c.portPegel(2), c.sicht().portAus[2],
              c.portTreibt(2), c.p2m(), (c.p3m() & 1) ? "Gegentakt" : "offener Drain");
     static const char* m34[4] = {"P34 Ausgang", "P34 = /DM", "P34 = /DM", "P33/P34 = Handshake Port 1"};
-    o += fmt("P3: Pins=%02X (Eingaenge P30–P33=%X)  P3M=%02X: %s%s%s%s\n", c.portPegel(3), c.portPegel(3) & 15, c.p3m(),
+    o += fmt("P3: Pins=%02X (Eingaenge P30-P33=%X)  P3M=%02X: %s%s%s%s\n", c.portPegel(3), c.portPegel(3) & 15, c.p3m(),
              m34[(c.p3m() >> 3) & 3], (c.p3m() & 0x04) ? ", Handshake Port 0" : "",
              (c.p3m() & 0x20) ? ", Handshake Port 2" : "", (c.p3m() & 0x40) ? ", UART" : "");
     return o;
@@ -351,9 +351,9 @@ public:
                "  b adr | bl | bd n|all   Haltepunkte\n"
                "  u [adr [n]]             disassemblieren\n"
                "  a adr befehl            assemblieren in den Programmspeicher\n"
-               "  d [adr [n]] | de …      Programm- | Datenspeicher\n"
+               "  d [adr [n]] | de ...      Programm- | Datenspeicher\n"
                "  dr [von [bis]]          Registerdatei (Sicht ohne Wirkung)\n"
-               "  e adr b… | ee adr b…    Programm-/Datenspeicher aendern\n"
+               "  e adr b... | ee adr b...    Programm-/Datenspeicher aendern\n"
                "  er reg wert | set pc|sp|rp|flags|imr|irq|ipr wert\n"
                "  t | uart | irq | ports | bus | sicht   Peripherie\n"
                "  pin p bit 0|1 | port p wert            Eingangspegel setzen\n"
@@ -419,7 +419,7 @@ inline int pruefstand(const std::string& bildArg, const std::string& fassung, co
     Kontext k(cpu, sp);
     cpu.reset();
     cpu.step();
-    std::printf("Z8-Pruefstand (%s): %s, %zu Byte ab %04lX — help fuer Kommandos\n",
+    std::printf("Z8-Pruefstand (%s): %s, %zu Byte ab %04lX - help fuer Kommandos\n",
                 fassung.empty() ? "ub8840" : fassung.c_str(), pfad.c_str(), n, org);
     auto quelle = [&](FILE* in, bool prompt) {
         char zeile[1024];

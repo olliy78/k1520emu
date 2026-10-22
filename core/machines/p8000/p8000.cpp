@@ -123,7 +123,7 @@ P8000Machine::P8000Machine(const Config& cfg)
             throw std::invalid_argument("P8000: Takt 0");
         k16_ = std::make_unique<P8000Karte16>(karte16Config(cfg));
         if (!k16_->dram().fehler().empty())
-            throw std::invalid_argument("P8000: DRAM — " + k16_->dram().fehler());
+            throw std::invalid_argument("P8000: DRAM - " + k16_->dram().fehler());
         P8000Kopplung::Config kc;
         kc.rueckfuehrung = cfg.index16 == Config::Index16::I4 || cfg.bruecken_4xr1_5xr1;
         kopplung_ = std::make_unique<P8000Kopplung>(karte_, *k16_, kc);
@@ -149,7 +149,7 @@ P8000Machine::P8000Machine(const Config& cfg)
         wdc_ = std::make_unique<P8000Wdc>(wc);
         wdc_an_ = std::make_unique<P8000WdcAnschluss>(*k16_, *wdc_);
         if (!cfg.platte.empty() && !hdMount(0, cfg.platte))
-            throw std::invalid_argument("P8000: Platte — " + hd_fehler_);
+            throw std::invalid_argument("P8000: Platte - " + hd_fehler_);
     } else if (!cfg.platte.empty()) {
         throw std::invalid_argument("P8000: Platte ohne WDC (wdc=aus)");
     }
@@ -227,13 +227,13 @@ uint8_t P8000Machine::panelLamps() const
 
 k1520::p8000::Terminal& P8000Machine::terminal()
 {
-    if (!kern_) throw std::logic_error("P8000: Originalterminal an tty1 — kein Kern-Terminal (konsole() benutzen)");
+    if (!kern_) throw std::logic_error("P8000: Originalterminal an tty1 - kein Kern-Terminal (konsole() benutzen)");
     return kern_->terminal();
 }
 
 const k1520::p8000::Terminal& P8000Machine::terminal() const
 {
-    if (!kern_) throw std::logic_error("P8000: Originalterminal an tty1 — kein Kern-Terminal (konsole() benutzen)");
+    if (!kern_) throw std::logic_error("P8000: Originalterminal an tty1 - kein Kern-Terminal (konsole() benutzen)");
     return kern_->terminal();
 }
 
@@ -329,7 +329,7 @@ bool P8000Machine::hdMountMit(int unit, const std::string& path, bool par_ergaen
 {
     hd_fehler_.clear();
     if (!wdc_) { hd_fehler_ = "kein WDC (wdc=aus)"; return false; }
-    if (unit < 0 || unit >= P8000Wdc::LAUFWERKE) { hd_fehler_ = "Laufwerk 0–2"; return false; }
+    if (unit < 0 || unit >= P8000Wdc::LAUFWERKE) { hd_fehler_ = "Laufwerk 0-2"; return false; }
     k1520::winchester::Platte::Config pc;
     pc.par_ergaenzen = par_ergaenzen;
     const auto fw = firmwareVon(cfg_.wdc);

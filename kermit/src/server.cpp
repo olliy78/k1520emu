@@ -16,6 +16,7 @@
  * mit einem NAK beantwortet und verwirrte den Austausch.
  */
 #include "kermit/src/protokoll.h"
+#include "kermit/src/loginskript.h"   // sichtbarMachen
 
 namespace k1520::kermit {
 
@@ -150,12 +151,124 @@ Ergebnis Sitzung::serverBefehl(const Paket& p, Freigabe& f, bool& ende) {
     }
 }
 
+void Sitzung::sendeText(const std::string& t) {
+    l_.schreiben(reinterpret_cast<const uint8_t*>(t.data()), t.size());
+}
+
+Sitzung::Lesen Sitzung::leseByte(uint8_t& b) {
+    for (;;) {
+        if (abbruch_) return Lesen::Abbruch;
+        if (pufPos_ < puffer_.size()) {
+            b = puffer_[pufPos_++];
+            return Lesen::Ok;
+        }
+        puffer_.clear();
+        pufPos_ = 0;
+        // Vor dem Blockieren das Echo hinausgeben (ein Echo je Lesestoss, nicht je Zeichen).
+        if (!echo_.empty()) {
+            sendeText(echo_);
+            echo_.clear();
+        }
+        uint8_t buf[512];
+        const int n = l_.lesen(buf, sizeof buf, e_.frist_ms);
+        if (abbruch_) return Lesen::Abbruch;
+        if (n < 0) return Lesen::Getrennt;
+        if (n > 0) puffer_.assign(buf, buf + n);   // n == 0: Leerlauf, weiter warten
+    }
+}
+
+// Eingabezeile wie ein Terminaltreiber im Zeilenmodus: RETURN (CR) oder LF beendet, ein LF
+// direkt nach CR gehoert zu diesem (CR LF), NUL wird ignoriert, Backspace/DEL loescht.
+// Bit 7 wird vor allem anderen geloescht (die Gegenstelle darf Paritaet senden).
+Sitzung::Lesen Sitzung::leseZeile(std::string& z, bool echo) {
+    z.clear();
+    for (;;) {
+        uint8_t b;
+        const Lesen r = leseByte(b);
+        if (r != Lesen::Ok) return r;
+        b &= 0x7F;
+        const bool nachCr = nachCr_;
+        nachCr_ = false;
+        if (b == 0) continue;
+        if (b == '\n' && nachCr) continue;
+        if (b == '\r' || b == '\n') {
+            nachCr_ = (b == '\r');
+            if (echo) echo_ += "\r\n";
+            return Lesen::Ok;
+        }
+        if (b == 0x08 || b == 0x7F) {
+            if (!z.empty()) {
+                z.pop_back();
+                if (echo) echo_ += "\b \b";
+            }
+            continue;
+        }
+        if (b < 0x20) continue;   // andere Steuerzeichen (z. B. SOH eines frueh gesendeten Pakets)
+        if (z.size() < 64) {
+            z.push_back(static_cast<char>(b));
+            if (echo) echo_.push_back(static_cast<char>(b));
+        }
+    }
+}
+
+// Anmeldung wie getty + login der WEGA.  Name wird zurueckgeechot (der Terminaltreiber tut es),
+// das Kennwort nicht.  Eine leere Eingabe zeigt nur erneut `login:` (kein Fehlversuch) — so
+// antwortet getty auf das RETURN eines Clients, der nicht weiss, ob schon etwas dasteht.  Nach
+// 3 Fehlversuchen beginnt es von vorn (die WEGA startet getty neu); es gibt keine Sperre.
+// Pakete, die ein Client sofort schickt, blockieren nichts: sie sind eine Zeile Muell (Name
+// falsch) und werden wie jede falsche Anmeldung mit `Login incorrect` beantwortet.
+Sitzung::Lesen Sitzung::anmeldung() {
+    int fehl = 0;
+    nachCr_ = false;
+    echo_.clear();
+    sendeText("\r\nlogin: ");
+    for (;;) {
+        std::string name, kennwort;
+        Lesen r = leseZeile(name, true);
+        if (r != Lesen::Ok) return r;
+        if (name.empty()) {
+            echo_ += "login: ";
+            continue;
+        }
+        sendeText(echo_ + "Password:");
+        echo_.clear();
+        r = leseZeile(kennwort, false);
+        if (r != Lesen::Ok) return r;
+        if (name == e_.login_name && kennwort == e_.login_kennwort) {
+            sendeText("\r\nk1520kermit\r\n"
+                      "C-Kermit server starting.  Return to your local machine by typing its escape\r\n"
+                      "sequence for closing the connection, and issue further commands from there.\r\n"
+                      "To shut down the C-Kermit server, issue the FINISH or BYE command and then reconnect.\r\n");
+            zerleger_.zuruecksetzen();
+            if (r_.ereignis) r_.ereignis("Angemeldet: " + name);
+            return Lesen::Ok;
+        }
+        if (r_.ereignis) r_.ereignis("Anmeldung abgelehnt (Name \"" + sichtbarMachen(name) + "\")");
+        std::string t = "\r\nLogin incorrect\r\n";
+        if (++fehl >= 3) {
+            fehl = 0;
+            t += "\r\n";   // getty beginnt von vorn
+        }
+        sendeText(t + "\r\nlogin: ");
+    }
+}
+
 Ergebnis Sitzung::serve(Freigabe& f) {
     abbruch_ = false;
     Ergebnis gesamt;
     if (!f.gueltig()) return fehler(Fehlerart::PfadAbgewiesen, "Freigabe ungueltig", false);
     if (e_.max_namenslaenge > 0) f.setzeMaxNamenslaenge(e_.max_namenslaenge);
     if (r_.ereignis) r_.ereignis("Server bereit");
+    for (;;) {   // aeussere Schleife: eine Anmeldung je Durchlauf (nur mit login_pflicht mehr als einer)
+    if (e_.login_pflicht) {
+        const Lesen a = anmeldung();
+        if (a == Lesen::Abbruch || a == Lesen::Getrennt) {
+            Ergebnis r = a == Lesen::Abbruch ? fehler(Fehlerart::Abgebrochen, "Server angehalten", true)
+                                             : fehler(Fehlerart::LeitungGetrennt, "Leitung getrennt", false);
+            r.dateien = gesamt.dateien;
+            return r;
+        }
+    }
     for (;;) {
         chkt_ = 1;
         abbruchDatei_ = false;
@@ -194,7 +307,13 @@ Ergebnis Sitzung::serve(Freigabe& f) {
             r.dateien = gesamt.dateien;
             return r;
         }
-        if (ende) return gesamt;
+        if (ende) {
+            if (!e_.login_pflicht) return gesamt;
+            // Wie die WEGA: der Server-Prozess endet, getty meldet sich wieder.
+            sendeText("\r\nC-Kermit server done\r\n");
+            break;
+        }
+    }
     }
 }
 

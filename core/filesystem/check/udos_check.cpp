@@ -162,7 +162,7 @@ FsCheckReport UdosFileSystem::check(FsCheckLevel level, bool nachladen) const {
     // ganze Seite unlesbar — deshalb steht sie noch in der Schnellpruefung.
     if (!brauche(prof_.directory_track)) {
         b.add("udos.verz.ungelesen", FsSeverity::Info, FsLayer::Verwaltung, "",
-              "Die Verzeichnisspur ist noch nicht gelesen — geprueft wurde nichts");
+              "Die Verzeichnisspur ist noch nicht gelesen - geprueft wurde nichts");
         abschluss();
         bericht.sortieren();
         return bericht;
@@ -214,7 +214,7 @@ FsCheckReport UdosFileSystem::check(FsCheckLevel level, bool nachladen) const {
                 "Belegungskarte",
                 "Spur " + std::to_string(t) + " Sektor " + std::to_string(i + 1)
                 + " traegt das Dateisystem selbst (Belegungskarte oder Verzeichnis),"
-                  " steht aber als FREI — UDOS vergibt ihn beim naechsten Schreiben",
+                  " steht aber als FREI - UDOS vergibt ihn beim naechsten Schreiben",
                 t, head_, i + 1);
         FsRepair rep{"udos.karte.system.sperren",
                      "Spur " + std::to_string(t) + " Sektor " + std::to_string(i + 1)
@@ -305,7 +305,7 @@ FsCheckReport UdosFileSystem::check(FsCheckLevel level, bool nachladen) const {
         if ((hdr.type_byte & 0x80) != 0 && hdr.segments.size() >= kUdosMaxSegments)
             b.addAt("udos.kopf.segmente", FsSeverity::Warnung, FsLayer::Dateien, e.name,
                     "Die Segmentliste des Kopfsektors hat keinen Abschluss "
-                    "(00 00 00 00) — sie fuellt alle "
+                    "(00 00 00 00) - sie fuellt alle "
                     + std::to_string(kUdosMaxSegments) + " Plaetze",
                     e.header.track, head_, e.header.sectorId());
         if (hdr.typeName().empty())
@@ -314,7 +314,7 @@ FsCheckReport UdosFileSystem::check(FsCheckLevel level, bool nachladen) const {
                     e.header.track, head_, e.header.sectorId());
         if (hdr.bytes_in_last > hdr.record_len)
             b.addAt("udos.kopf.letzter", FsSeverity::Warnung, FsLayer::Dateien, e.name,
-                    "„Bytes im letzten Satz" " = " + std::to_string(hdr.bytes_in_last)
+                    "'Bytes im letzten Satz" " = " + std::to_string(hdr.bytes_in_last)
                     + " ist groesser als die Satzlaenge " + std::to_string(hdr.record_len),
                     e.header.track, head_, e.header.sectorId());
         // §14: Der Lader traegt LOW/HIGH in die Nukleusvariablen und laesst den
@@ -323,7 +323,7 @@ FsCheckReport UdosFileSystem::check(FsCheckLevel level, bool nachladen) const {
         if ((hdr.type_byte & 0x80) != 0) {
             if (hdr.low_addr == 0xFFFF || hdr.high_addr == 0xFFFF)
                 b.addAt("udos.kopf.speicher", FsSeverity::Fehler, FsLayer::Dateien, e.name,
-                        "Programmdatei ohne Speicherangabe (LOW/HIGH = FFFF) — UDOS"
+                        "Programmdatei ohne Speicherangabe (LOW/HIGH = FFFF) - UDOS"
                         " weist sie beim Starten mit MEMORY PROTECT VIOLATION ab",
                         e.header.track, head_, e.header.sectorId());
             else if (hdr.high_addr < hdr.low_addr)
@@ -348,15 +348,15 @@ FsCheckReport UdosFileSystem::check(FsCheckLevel level, bool nachladen) const {
             if (p.track >= tracks_ || p.sector_index >= spt) {
                 b.addAt("udos.kette.ausserhalb", FsSeverity::Fehler, FsLayer::Dateien, e.name,
                         "Satz " + std::to_string(saetze + 1) + " zeigt auf " + ort(p)
-                        + " — das liegt ausserhalb der Diskette ("
-                        + std::to_string(tracks_) + " Spuren à " + std::to_string(spt) + ")",
+                        + " - das liegt ausserhalb der Diskette ("
+                        + std::to_string(tracks_) + " Spuren a " + std::to_string(spt) + ")",
                         e.header.track, head_, e.header.sectorId());
                 abgebrochen = true;
                 break;
             }
             if (!besucht.insert(nr(p)).second) {
                 b.addAt("udos.kette.zyklus", FsSeverity::Fehler, FsLayer::Dateien, e.name,
-                        "Die Satzkette laeuft im Kreis — bei " + ort(p)
+                        "Die Satzkette laeuft im Kreis - bei " + ort(p)
                         + " schliesst sich die Schleife (nach " + std::to_string(saetze)
                         + " Saetzen)", p.track, head_, p.sectorId());
                 abgebrochen = true;
@@ -370,7 +370,7 @@ FsCheckReport UdosFileSystem::check(FsCheckLevel level, bool nachladen) const {
                 b.addAt("udos.kette.spurwechsel", FsSeverity::Fehler, FsLayer::Dateien, e.name,
                         "Satz " + std::to_string(saetze + 1) + " beginnt bei " + ort(p)
                         + " und braucht " + std::to_string(je_satz)
-                        + " Sektoren — das reicht ueber das Spurende hinaus",
+                        + " Sektoren - das reicht ueber das Spurende hinaus",
                         p.track, head_, p.sectorId());
                 abgebrochen = true;
                 break;
@@ -398,7 +398,7 @@ FsCheckReport UdosFileSystem::check(FsCheckLevel level, bool nachladen) const {
                 if (!neu && it->second != e.name)
                     b.addAt("udos.kette.doppelt", FsSeverity::Gefahr, FsLayer::Dateien, e.name,
                             ort(q) + " gehoert sowohl zu '" + it->second + "' als auch zu '"
-                            + e.name + "' — wer als zweiter schreibt, zerstoert die Daten"
+                            + e.name + "' - wer als zweiter schreibt, zerstoert die Daten"
                               " des ersten", q.track, head_, q.sectorId());
             }
 
@@ -457,7 +457,7 @@ FsCheckReport UdosFileSystem::check(FsCheckLevel level, bool nachladen) const {
         if (ohne_nachspann)
             b.addAt("udos.medium.nachspann", FsSeverity::Gefahr, FsLayer::Medium, e.name,
                     std::to_string(ohne_nachspann) + " Sektor(en) dieser Datei haben"
-                    " keinen Sektorkontrollblock hinter der Daten-CRC — dort laesst sich"
+                    " keinen Sektorkontrollblock hinter der Daten-CRC - dort laesst sich"
                     " die Verkettung nicht ablegen",
                     e.header.track, head_, e.header.sectorId());
     }
@@ -482,7 +482,7 @@ FsCheckReport UdosFileSystem::check(FsCheckLevel level, bool nachladen) const {
                     FsLayer::Dateien, wem,
                     std::to_string(sektoren.size()) + " Sektor(en) von '" + wem
                     + "' stehen in der Belegungskarte als FREI (der erste bei "
-                    + ort(sektoren.front()) + ") — UDOS vergibt sie beim naechsten"
+                    + ort(sektoren.front()) + ") - UDOS vergibt sie beim naechsten"
                       " Schreiben und zerstoert die Datei",
                     sektoren.front().track, head_, sektoren.front().sectorId());
             // Nachtragen nimmt nur und gibt nie — der Eingriff kann unter keinen
@@ -524,7 +524,7 @@ FsCheckReport UdosFileSystem::check(FsCheckLevel level, bool nachladen) const {
                     FsLayer::Verwaltung, "Belegungskarte",
                     std::to_string(verloren) + " Sektoren stehen als belegt, gehoeren aber"
                     " zu keiner Datei (ab Spur " + std::to_string(erste_spur)
-                    + ") — verlorener Platz; er laesst sich zurueckgewinnen, und dort"
+                    + ") - verlorener Platz; er laesst sich zurueckgewinnen, und dort"
                       " koennten geloeschte Dateien liegen",
                     erste_spur, head_);
             // Der wertvollste Eingriff ueberhaupt — und der einzige, der etwas
@@ -543,14 +543,14 @@ FsCheckReport UdosFileSystem::check(FsCheckLevel level, bool nachladen) const {
                 break;
             }
             FsRepair rep{"udos.karte.neu",
-                         "Den Belegungsplan vollstaendig aus den Ketten neu aufbauen —"
+                         "Den Belegungsplan vollstaendig aus den Ketten neu aufbauen -"
                          " das gibt die " + std::to_string(verloren)
                          + " verlorenen Sektoren zurueck",
                          /*datenverlust*/false, /*empfohlen*/blockiert.empty()};
             if (!blockiert.empty()) {
                 rep.gesperrt = true;
                 rep.warum    = "Der Neuaufbau ist erst moeglich, wenn kein Kettenfehler"
-                               " mehr offen ist — offen ist " + blockiert;
+                               " mehr offen ist - offen ist " + blockiert;
             }
             f.repairs.push_back(rep);
         }
@@ -584,7 +584,7 @@ FsCheckReport UdosFileSystem::check(FsCheckLevel level, bool nachladen) const {
                             FsLayer::Medium, "Spur " + std::to_string(t),
                             "Spur " + std::to_string(t) + " traegt keine Adressmarken,"
                             " die Belegungskarte fuehrt dort aber "
-                            + std::to_string(belegt) + " Sektor(en) als belegt —"
+                            + std::to_string(belegt) + " Sektor(en) als belegt -"
                               " von dieser Spur ist nichts zu lesen",
                             t, head_);
                 continue;
@@ -620,7 +620,7 @@ FsCheckReport UdosFileSystem::check(FsCheckLevel level, bool nachladen) const {
                     "Medium",
                     std::to_string(frei_kaputt) + " Sektor(en) ausserhalb jeder Datei"
                     " tragen eine falsche Pruefsumme, der erste bei " + ort(erster)
-                    + " — verloren ist dort nichts, aber eine geloeschte Datei waere"
+                    + " - verloren ist dort nichts, aber eine geloeschte Datei waere"
                       " von dort nicht mehr zu retten",
                     erster.track, head_, erster.sectorId());
     }
@@ -630,7 +630,7 @@ FsCheckReport UdosFileSystem::check(FsCheckLevel level, bool nachladen) const {
     if (!bericht.vollstaendig)
         bericht.schrittEntfaellt("udos.schritt.karte_gegen_ketten",
                                  "Karte gegen Ketten: belegte Sektoren, die als frei gefuehrt sind",
-                                 "das Speicherabbild ist unvollstaendig — der Abgleich "
+                                 "das Speicherabbild ist unvollstaendig - der Abgleich "
                                  "braucht jede Spur");
     bericht.schrittEnde();
     bericht.sortieren();

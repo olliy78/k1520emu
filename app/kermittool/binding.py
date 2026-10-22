@@ -28,9 +28,9 @@ Bibliothek sie kennt — :class:`Kermit` haelt sie in ``_cb_refs`` fest.
 from __future__ import annotations
 
 import ctypes
+import threading
 import json
 import sys
-import threading
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
@@ -71,6 +71,10 @@ class KermitError(RuntimeError):
 # Rueckrufe: (Datei, Bytes, Gesamt, user) bzw. (Text, user).
 PROGRESS_CB = ctypes.CFUNCTYPE(None, ctypes.c_char_p, ctypes.c_int64, ctypes.c_int64, ctypes.c_void_p)
 EVENT_CB = ctypes.CFUNCTYPE(None, ctypes.c_char_p, ctypes.c_void_p)
+LOGIN_ASK_CB = ctypes.CFUNCTYPE(None, ctypes.c_int, ctypes.c_char_p, ctypes.c_void_p)
+
+#: Art des Ausgangs einer Anmeldung (``Kermit.login_kind``), gleich ``K1520K_LOGIN_*`` im Header.
+LOGIN_OK, LOGIN_ABGELEHNT, LOGIN_FRIST, LOGIN_LEITUNG, LOGIN_ABBRUCH = 0, 1, 2, 3, 4
 
 _H = ctypes.c_void_p
 _CS = ctypes.c_char_p
@@ -92,6 +96,9 @@ SIGNATUREN: Dict[str, tuple] = {
     "k1520k_peer": (_CS, [_H]),
     "k1520k_line_notice": (_CS, [_H]),
     "k1520k_login": (_I, [_H, _CS, _CS, _I]),
+    "k1520k_login_ask": (_I, [_H, LOGIN_ASK_CB, ctypes.c_void_p, _I]),
+    "k1520k_login_answer": (_I, [_H, _CS, _CS]),
+    "k1520k_login_kind": (_I, [_H]),
     "k1520k_set_pruefsumme": (_I, [_H, _I]),
     "k1520k_set_paketlaenge": (_I, [_H, _I]),
     "k1520k_set_namen": (_I, [_H, _I, _I]),
@@ -101,6 +108,7 @@ SIGNATUREN: Dict[str, tuple] = {
     "k1520k_tempo": (ctypes.c_double, [_H]),
     "k1520k_set_max_namenslaenge": (_I, [_H, _I]),
     "k1520k_set_ueberschreiben": (_I, [_H, _I]),
+    "k1520k_set_server_login": (_I, [_H, _I, _CS, _CS]),
     "k1520k_set_callbacks": (_I, [_H, PROGRESS_CB, EVENT_CB, ctypes.c_void_p]),
     "k1520k_send": (_I, [_H, _CS, _CS]),
     "k1520k_get": (_I, [_H, _CS, _CS]),
@@ -166,11 +174,11 @@ class Kermit:
 
     def __init__(self, handle: int):
         self._h = ctypes.c_void_p(handle)
+        # abort*() kommt aus dem GUI-Faden, close() aus dem Arbeitsfaden: ohne diese Sperre
+        # gibt close() das Handle frei, waehrend abort() es noch benutzt (Segfault in
+        # test_server_lauscht_nach_der_trennung..., sporadisch).  abort* blockieren nicht.
+        self._abbruchsperre = threading.Lock()
         self._cb_refs: list = []
-        # close() loescht das C-Handle; abort*() kommen aus einem ANDEREN Faden (GUI) und pruefen
-        # `_h` nur, um es danach zu benutzen.  Ohne die Sperre gibt es dazwischen ein Use-after-free
-        # (SEGFAULT in k1520k_abort unter Last).  Kurz gehalten: abort* kehrt sofort zurueck.
-        self._sperre = threading.Lock()
 
     # ── Oeffnen ──────────────────────────────────────────────────────────
     @staticmethod
@@ -201,11 +209,11 @@ class Kermit:
 
     # ── Lebenszyklus ─────────────────────────────────────────────────────
     def close(self) -> None:
-        with self._sperre:
+        with self._abbruchsperre:
             if self._h:
                 lib().k1520k_close(self._h)
                 self._h = ctypes.c_void_p(0)
-                self._cb_refs = []
+            self._cb_refs = []
 
     def __enter__(self) -> "Kermit":
         return self
@@ -254,6 +262,31 @@ class Kermit:
         self._pruefe(lib().k1520k_login(self._handle(), _b(name), _b(kennwort), frist_ms))
         return self.result
 
+    def login_ask(self, frage, frist_ms: int = 60000) -> str:
+        """Anmeldung auf Abruf (K10).  ``frage(versuch, gelesen)`` wird IM aufrufenden Faden gerufen, sobald
+        die Gegenstelle ``login:`` zeigt, und liefert ``(name, kennwort)`` oder ``None`` (= Abbruch).
+        Bei ``login_kind == LOGIN_ABGELEHNT`` (Ausnahme ``KermitFehler``) darf man erneut aufrufen --
+        ``login_ask`` selbst fragt nach einer Ablehnung schon von sich aus erneut, solange ``frage`` antwortet.
+        Die Zeit in ``frage`` ist keine Frist; ``abort()`` aus einem anderen Faden wirkt nach deren Rueckkehr."""
+        h = self._handle()
+
+        def _cb(versuch, gelesen, _user):
+            try:
+                antwort = frage(int(versuch), _s(gelesen))
+            except BaseException:   # eine Ausnahme darf nicht durch C laufen: wie Abbruch behandeln
+                antwort = None
+            if antwort:
+                lib().k1520k_login_answer(h, _b(antwort[0]), _b(antwort[1]))
+
+        cb = LOGIN_ASK_CB(_cb)   # bis zur Rueckkehr referenziert halten
+        self._pruefe(lib().k1520k_login_ask(h, cb, None, frist_ms))
+        return self.result
+
+    @property
+    def login_kind(self) -> int:
+        """Art des Ausgangs der letzten Anmeldung (``LOGIN_*``)."""
+        return lib().k1520k_login_kind(self._handle())
+
     # ── Einstellungen ────────────────────────────────────────────────────
     def set_pruefsumme(self, typ: int) -> None:
         self._pruefe(lib().k1520k_set_pruefsumme(self._handle(), typ))
@@ -283,6 +316,12 @@ class Kermit:
 
     def set_ueberschreiben(self, an: bool) -> None:
         self._pruefe(lib().k1520k_set_ueberschreiben(self._handle(), int(an)))
+
+    def set_server_login(self, pflicht: bool, name: Optional[str] = None, kennwort: Optional[str] = None) -> None:
+        """Server mit Anmeldezwang (wie getty + login der WEGA); None = Name/Kennwort unveraendert."""
+        self._pruefe(lib().k1520k_set_server_login(
+            self._handle(), int(pflicht), None if name is None else _b(name),
+            None if kennwort is None else _b(kennwort)))
 
     def set_callbacks(self, fortschritt: Optional[Callable[[str, int, int], None]] = None,
                       ereignis: Optional[Callable[[str], None]] = None) -> None:
@@ -340,17 +379,17 @@ class Kermit:
 
     # ── Abbruch (jeder Faden) ────────────────────────────────────────────
     def abort(self) -> None:
-        with self._sperre:
+        with self._abbruchsperre:
             if self._h:
                 lib().k1520k_abort(self._h)
 
     def abort_file(self) -> None:
-        with self._sperre:
+        with self._abbruchsperre:
             if self._h:
                 lib().k1520k_abort_file(self._h)
 
     def abort_group(self) -> None:
-        with self._sperre:
+        with self._abbruchsperre:
             if self._h:
                 lib().k1520k_abort_group(self._h)
 

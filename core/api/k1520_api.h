@@ -7,7 +7,7 @@ extern "C" {
 #include <stdbool.h>
 
 #include "core/api/k1520_export.h"
-#include "core/api/k1520_sync_api.h"   /* K1520_API — Ausfuhrkennzeichnung (Windows!) */
+#include "core/api/k1520_sync_api.h"   /* K1520_API - Ausfuhrkennzeichnung (Windows!) */
 
 typedef void* K1520Handle;
 

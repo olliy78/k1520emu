@@ -101,7 +101,7 @@ bool cpmVerzeichnisPlausibel(DiskMedium& medium, const DiskFormat& f, const FsPr
     if (p.boot_header == "bcu_syl" || p.boot_header == "bcu_kombi" || p.boot_header == "bcu_kombi80") {
         const BcuStart art = bcuStartArt(raum);
         if (art == BcuStart::Keiner)
-            return nein("Zylinder 1 Sektor 1 traegt keinen SYL-Lader (BCU 880 „SYL auf Spur 1“)");
+            return nein("Zylinder 1 Sektor 1 traegt keinen SYL-Lader (BCU 880 'SYL auf Spur 1')");
         const BcuStart soll = p.boot_header == "bcu_kombi" ? BcuStart::Kombi
                             : p.boot_header == "bcu_kombi80" ? BcuStart::Kombi80 : BcuStart::Syl;
         if (art != soll)
@@ -118,7 +118,7 @@ bool cpmVerzeichnisPlausibel(DiskMedium& medium, const DiskFormat& f, const FsPr
     // ist eine OS/M-Datendiskette Sektor fuer Sektor eine SCP-/CP/A-Diskette, und die
     // Anzeige „OS/M" waere geraten (doc/design/34_osm.md §6).
     if (p.boot_header == "osm" && !CpmFileSystem::osmUrladerVon(raum))
-        return nein("c0h0 Sektor 1 traegt keinen OS/M-Urlader (FD 21 48 0C …, Kennung P8000SYS)");
+        return nein("c0h0 Sektor 1 traegt keinen OS/M-Urlader (FD 21 48 0C ..., Kennung P8000SYS)");
 
     // `dir_boot`: der Bootkopf ist hier der POSITIVE Nachweis.  Ohne ihn waere jede
     // Datendiskette zugleich `cpa800` und `cpa1715` — und damit „nicht eindeutig".
@@ -152,7 +152,7 @@ bool cpmVerzeichnisPlausibel(DiskMedium& medium, const DiskFormat& f, const FsPr
             char hex[8];
             std::snprintf(hex, sizeof hex, "0x%02X", d.user);
             return nein(wo + " traegt Nutzerbereich " + hex
-                        + " — das Verzeichnis ist nicht angelegt");
+                        + " - das Verzeichnis ist nicht angelegt");
         }
         bool ok = !d.name.empty();
         for (char c : d.name)
@@ -352,13 +352,13 @@ std::string k8915Bootabbildproblem(const FsProfile& p, const SectorSpace& raum,
     unsigned n = 0;
     if (!k8915Ladekopf(img.data(), img.size(), n))
         return "Das Bootabbild traegt keinen gueltigen K8915-Ladekopf (Sektor 1, die ersten "
-               "16 Byte mit CRC-CCITT) — es stammt nicht von einer K8915-Systemdiskette. "
+               "16 Byte mit CRC-CCITT) - es stammt nicht von einer K8915-Systemdiskette. "
                "Ein A5120-Bootabbild (CP/A) bootet am K8915 nicht.";
     const uint64_t noetig = static_cast<uint64_t>(n) * spuren.front().sector_size;
     if (img.size() < noetig)
         return "Das Bootabbild ist " + std::to_string(img.size()) + " Byte gross, der Ladekopf "
                "verlangt aber " + std::to_string(n) + " Sektoren (" + std::to_string(noetig)
-               + " Byte) — der Lader bliebe mitten im System stehen.";
+               + " Byte) - der Lader bliebe mitten im System stehen.";
     return {};
 }
 
@@ -397,19 +397,19 @@ std::string osmBootabbildproblem(const FsProfile& p, const SectorSpace& raum,
     if (p.type != FsType::Cpm) return {};
     if (p.boot_header != "osm" && !CpmFileSystem::osmUrladerVon(raum)) return {};
     if (!CpmFileSystem::osmUrlader(img.data(), img.size()))
-        return "Das Bootabbild traegt keinen OS/M-Urlader (Sektor 1: FD 21 48 0C …, Kennung "
-               "P8000SYS bei 0x80) — es stammt nicht von einer OS/M-Systemdiskette.  Ein "
+        return "Das Bootabbild traegt keinen OS/M-Urlader (Sektor 1: FD 21 48 0C ..., Kennung "
+               "P8000SYS bei 0x80) - es stammt nicht von einer OS/M-Systemdiskette.  Ein "
                "UDOS-, SCP- oder CP/A-Bootabbild startet unter OS/M nicht.";
     const uint16_t passend = CpmFileSystem::osmTypenFuer(raum);
     const unsigned typ     = img[CpmFileSystem::kOsmFdconf] & 0x0F;
     if (passend != 0 && !(passend & (1u << typ)))
         return "Der OS/M-Urlader des Bootabbilds ist fuer Laufwerkstyp " + std::to_string(typ)
-             + " eingestellt (FDCONF), diese Diskette hat aber eine andere Geometrie — er "
+             + " eingestellt (FDCONF), diese Diskette hat aber eine andere Geometrie - er "
                "luede das System mit falscher Spurlaenge.  Bootabbild einer Systemdiskette "
                "desselben Formats nehmen (640K = Typ 5, 800K = Typ 7).";
     if (img.size() < kOsmSystemBytes)
         return "Das Bootabbild ist " + std::to_string(img.size()) + " Byte gross, der OS/M-"
-               "Urlader laedt aber " + std::to_string(kOsmSystemBytes) + " Byte (28H Saetze) — "
+               "Urlader laedt aber " + std::to_string(kOsmSystemBytes) + " Byte (28H Saetze) - "
                "er bliebe mitten im System stehen.";
     return {};
 }
@@ -420,7 +420,7 @@ std::string pc1715Bootabbildproblem(const FsProfile& p, const SectorSpace& raum,
     if (p.boot_header != "pc1715" && !pc1715HatKopf(raum)) return {};
 
     if (!CpmFileSystem::bootKopf(img.data(), img.size()))
-        return "Das Bootabbild traegt keinen PC-1715-Bootkopf (Wort F002H/F003H in Byte 0/1) — "
+        return "Das Bootabbild traegt keinen PC-1715-Bootkopf (Wort F002H/F003H in Byte 0/1) - "
                "es stammt nicht von einer 1715-Systemdiskette.  Ein A5120-Bootabbild (SYL-Lader) "
                "startet am PC 1715 nicht.";
     if (p.dir_boot && img.size() < 128)
@@ -529,14 +529,14 @@ std::string bcuBootabbildproblem(const FsProfile& p, const std::vector<uint8_t>&
         std::string warum;
         if (!bcuSylLaderPuffer(img.data() + kBcuSpur, img.size() - kBcuSpur, &warum))
             return "Das Bootabbild traegt auf Zylinder 1 keinen gueltigen SYL-Lader (" + warum
-                 + ") — es stammt nicht von einer BCU-Diskette „SYL auf Spur 1“.  Ein Abbild "
-                   "„ohne SYL“ oder von CP/A startet mit dem Lade-ROM V0.6 nicht.";
+                 + ") - es stammt nicht von einer BCU-Diskette 'SYL auf Spur 1'.  Ein Abbild "
+                   "'ohne SYL' oder von CP/A startet mit dem Lade-ROM V0.6 nicht.";
         const uint8_t* l = img.data() + kBcuSpur;
         const size_t laenge = static_cast<size_t>(l[5]) | (static_cast<size_t>(l[6]) << 8);
         const size_t da = img.size() - 2 * kBcuSpur;
         if (laenge == 0 || laenge > da)
             return "Der SYL-Lader verlangt " + std::to_string(laenge) + " Byte System ab Zylinder 2, "
-                   "das Bootabbild enthaelt dort aber nur " + std::to_string(da) + " — der Lader "
+                   "das Bootabbild enthaelt dort aber nur " + std::to_string(da) + " - der Lader "
                    "bliebe mitten im System stehen.";
         const BcuStart art = bcuArtVon(l, [&](size_t off, size_t n, uint8_t* aus) {
             if (off + n > da) return false;
@@ -548,7 +548,7 @@ std::string bcuBootabbildproblem(const FsProfile& p, const std::vector<uint8_t>&
         if (art != soll) {
             if (art != BcuStart::Syl && soll == BcuStart::Syl)
                 return "Das Bootabbild ist eine Kombidiskette (Verzeichnis ab Zylinder 5, OFF 5 fuer A:); "
-                       "'bcu880_syl' fuehrt kein Dateisystem — Profil bcu880_kombi bzw. bcu880_kombi80 waehlen.";
+                       "'bcu880_syl' fuehrt kein Dateisystem - Profil bcu880_kombi bzw. bcu880_kombi80 waehlen.";
             if (art == BcuStart::Syl)
                 return "Das Bootabbild traegt die Kombi-Aenderungen nicht (Laufwerkskopf A: auf eine Tabelle "
                        "mit OFF 5): ein Verzeichnis ab Zylinder 5 saehe BCU damit nie.  Bauen mit "
@@ -561,7 +561,7 @@ std::string bcuBootabbildproblem(const FsProfile& p, const std::vector<uint8_t>&
     if (p.boot_header == "bcu") {
         const char k[] = "BCU 880";
         if (std::search(img.begin(), img.end(), k, k + 7) == img.end())
-            return "Das Bootabbild traegt keine BCU-880-Kennung (\"BCU 880 VERS …\") — es "
+            return "Das Bootabbild traegt keine BCU-880-Kennung (\"BCU 880 VERS ...\") - es "
                    "stammt nicht von einer BCU-Diskette.  SYSGEN der BCU schreibt Zylinder 0-1.";
     }
     return {};
@@ -613,7 +613,7 @@ bool schreibeBeiblatt(const fs::path& datei,
                       const std::vector<std::pair<std::string, UdosAngabe>>& eintraege) {
     std::ofstream f(datei, std::ios::binary);
     if (!f) return false;
-    f << "# k1520DiskTool — UDOS-Kopfsektorangaben zu den Dateien in diesem Ordner.\n"
+    f << "# k1520DiskTool - UDOS-Kopfsektorangaben zu den Dateien in diesem Ordner.\n"
          "# Sie stehen NICHT in den Dateien selbst; beim Einfuegen (`put <ordner>`)\n"
          "# werden sie wieder uebernommen.  Ohne sie wird aus einer Systemdatei eine\n"
          "# gewoehnliche Binaerdatei und die Diskette bootet nicht.\n"
@@ -623,7 +623,7 @@ bool schreibeBeiblatt(const fs::path& datei,
          "#   block      zweite Laengenangabe    rest   Bytes im letzten Satz\n"
          "#   segment    ANFANG(hex):LAENGE      mem    LOW:HIGH:STACK (hex, wie EXTRACT)\n"
          "#   zusatz     Kopfsektor 44-47 (hex)  erst/geaend  Vermerke (`_` = Leerzeichen)\n"
-         "#   segs       ALLE Segmente ANFANG+LAENGE (hex), mit Komma getrennt — nur bei\n"
+         "#   segs       ALLE Segmente ANFANG+LAENGE (hex), mit Komma getrennt - nur bei\n"
          "#              mehr als einem; sie gehen `segment=` und `zusatz=` vor\n";
     for (const auto& [name, a] : eintraege) {
         f << name
@@ -752,7 +752,7 @@ bool schreibeCpmBeiblatt(const fs::path& datei,
                          const std::vector<std::pair<std::string, CpmAngabe>>& eintraege) {
     std::ofstream f(datei, std::ios::binary);
     if (!f) return false;
-    f << "# k1520DiskTool — CP/M-Angaben zu den Dateien in diesem Ordner.\n"
+    f << "# k1520DiskTool - CP/M-Angaben zu den Dateien in diesem Ordner.\n"
          "# Sie stehen NICHT in den Dateien selbst; beim Einfuegen (`put <ordner>`)\n"
          "# werden sie wieder uebernommen.\n"
          "#\n"
@@ -855,7 +855,7 @@ std::string zielName(const std::string& quelle, FsType typ,
 
 /// @brief Meldung fuer ein Dateisystem ohne Systemspuren — mit dem Grund.
 std::string keineSystemspuren(const FsProfile& p) {
-    return "Das Dateisystem '" + p.name + "' hat keine Systemspuren — es beginnt auf "
+    return "Das Dateisystem '" + p.name + "' hat keine Systemspuren - es beginnt auf "
            "Zylinder 0, dort ist fuer ein Bootabbild kein Platz.";
 }
 
@@ -877,7 +877,7 @@ std::string befund(const GeometryMatch& m, int examined) {
         return "erst " + wieviel + " Spuren angesehen (Stichprobe der Formaterkennung), "
                "die uebrigen sind ungeprueft";
     return "in einer Stichprobe von " + wieviel + " Spuren: " + was
-         + " — die uebrigen Spuren sind noch ungeprueft";
+         + " - die uebrigen Spuren sind noch ungeprueft";
 }
 
 /// @brief Zwei Befundteile mit Semikolon verbinden; leere Teile fallen weg.
@@ -889,8 +889,8 @@ std::string zusammen(const std::string& a, const std::string& b) {
 
 /// @brief Eine Meldung, die sagt, was zu tun ist — nicht bloss, dass es nicht geht.
 constexpr const char* kNurBoot =
-    "Das ist eine reine Startdiskette (BCU 880 „SYL auf Spur 1“): das BIOS sucht sein "
-    "Verzeichnis ab Zylinder 2, dort liegt hier das System — eine Datei, die ab Zylinder 5 "
+    "Das ist eine reine Startdiskette (BCU 880 'SYL auf Spur 1'): das BIOS sucht sein "
+    "Verzeichnis ab Zylinder 2, dort liegt hier das System - eine Datei, die ab Zylinder 5 "
     "stuende, saehe das Geraet nie.  Dateien gehoeren auf eine Arbeitsdiskette (--fs bcu880).";
 constexpr const char* kSchreibschutz =
     "Die Diskette ist schreibgeschuetzt geoeffnet. Zum Aendern den Schreibschutz "
@@ -1132,7 +1132,7 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
                 dv->nur_lesen_erzwungen_  = true;
                 kandidaten.push_back(&*dv->gemessenes_format_);
                 dv->detection_.remarks =
-                    "kein Katalogeintrag passt — als gemessene Geometrie gelesen, "
+                    "kein Katalogeintrag passt - als gemessene Geometrie gelesen, "
                     "deshalb schreibgeschuetzt";
             } else {
                 for (const GeometryMatch& m : treffer) kandidaten.push_back(m.format);
@@ -1338,7 +1338,7 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
                 err = "Das Abbild passt zu keinem Format in data/formats.yaml, und auf "
                       "der gemessenen Geometrie liegt kein lesbares Dateisystem"
                     + (dos.empty() ? (abgelehnt.empty() ? "" : " (" + abgelehnt + ")")
-                                   : " — " + dos)
+                                   : " - " + dos)
                     + ".\nGemessen:\n" + GeometryProbe::describe(gemessen);
                 return roh("kein Format und kein Dateisystem erkannt");
             }
@@ -1349,7 +1349,7 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
             err = "Die Geometrie ist erkannt (" + std::string(kandidaten.front()->name)
                 + "), aber ";
             if (!dos.empty())
-                err += dos + " — dieses Werkzeug liest CP/M und UDOS.";
+                err += dos + " - dieses Werkzeug liest CP/M und UDOS.";
             else
                 err += std::string("kein bekanntes Dateisystem liegt darauf")
                      + (abgelehnt.empty() ? "" : " (" + abgelehnt + ")")
@@ -1427,7 +1427,7 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
                     && p->boot_header != "pc1715" && p->boot_header != "bcu")
                     dv->detection_.remarks = zusammen(
                         dv->detection_.remarks,
-                        "Verzeichnis leer — ebenso gut " + p->name + " (" + p->description
+                        "Verzeichnis leer - ebenso gut " + p->name + " (" + p->description
                       + "); dafuer --fs " + p->name);
         }
     }
@@ -1558,7 +1558,7 @@ bool DiskVolume::linearBytes(std::vector<uint8_t>& out) const {
             raum = eigen.get();
         }
     }
-    if (!raum) return fail("Die Geometrie dieser Diskette ist nicht erkannt — kein Datenstrom lesbar");
+    if (!raum) return fail("Die Geometrie dieser Diskette ist nicht erkannt - kein Datenstrom lesbar");
     out.resize(static_cast<size_t>(raum->size()));
     if (!raum->read(0, out.data(), out.size()))
         return fail("Datenstrom nicht lesbar: " + raum->lastError());
@@ -1699,12 +1699,12 @@ std::string DiskVolume::physischSchreibenGrund() const {
         const TarSatzPlan p = tarSatzPlanen();
         if (p.ok && p.abbilder == 1 && !dirty()) return {};
         if (p.ok && p.abbilder == 1)
-            return "Die Aenderungen an der tar-Diskette sind noch nicht gespeichert — erst speichern, "
+            return "Die Aenderungen an der tar-Diskette sind noch nicht gespeichert - erst speichern, "
                    "dann auf die physische Diskette schreiben.";
     }
     return "Ein tar-Satz ist ein Strom ueber mehrere Disketten und laesst sich nicht direkt auf EINE "
            "physische Diskette schreiben.  Weg: Satz speichern (tarSatzSpeichern), die Einzelabbilder "
-           "(name1, name2, …) oeffnen und jedes Abbild fuer sich auf eine Diskette schreiben.";
+           "(name1, name2, ...) oeffnen und jedes Abbild fuer sich auf eine Diskette schreiben.";
 }
 
 bool DiskVolume::satzNeuMounten() {
@@ -1951,7 +1951,7 @@ bool DiskVolume::tarSatzSpeichern(const std::string& basisname, std::vector<std:
     if (hinweise)
         for (const std::string& a : p.altlasten)
             hinweise->push_back("'" + a + "' gehoert nicht mehr zum Satz (er hat jetzt " + std::to_string(p.abbilder)
-                                + " Abbild(er)) und blieb unveraendert liegen — bei Bedarf selbst loeschen.");
+                                + " Abbild(er)) und blieb unveraendert liegen - bei Bedarf selbst loeschen.");
     return true;
 }
 
@@ -1987,7 +1987,7 @@ bool DiskVolume::satzInsAbbild(const TarSatzPlan& p) {
     if (!volumes_[0].space->write(0, scheibe.data(), scheibe.size())) {
         const std::string grund = volumes_[0].space->lastError();
         disk_->medium().restoreFrom(sicherung);
-        return fail("Abbild nicht beschreibbar: " + grund + " — die Datei wurde nicht veraendert.");
+        return fail("Abbild nicht beschreibbar: " + grund + " - die Datei wurde nicht veraendert.");
     }
     // Das Medium ist sonst IMMER geschuetzt (nur dieser Weg schreibt in die Datei).
     disk_->setWriteProtect(false);
@@ -1996,7 +1996,7 @@ bool DiskVolume::satzInsAbbild(const TarSatzPlan& p) {
     if (!ok) {
         const std::string grund = disk_->lastError();
         disk_->medium().restoreFrom(sicherung);
-        return fail(grund + " — die Datei wurde nicht veraendert.");
+        return fail(grund + " - die Datei wurde nicht veraendert.");
     }
     satz_rev_gespeichert_ = satz_->revision;
     // Der Name der Diskette ist nicht mehr "leer", sobald etwas im Archiv steht (Anzeige im Befund).
@@ -2085,7 +2085,7 @@ TarDateiUrteil DiskVolume::tarDateiBeurteilen(const std::string& tarpfad) const 
         // Der Container darf ueber die Diskette hinausgehen (dann wird es ein Satz).
         const tar::QuellBefund b = tar::quelleBeurteilen(d, std::numeric_limits<uint64_t>::max());
         if (!b.fehler.empty())      u.container_grund = b.fehler;
-        else if (!b.mit_kopf)       u.container_grund = "Die Datei beginnt nicht mit einem tar-Kopf (Folgeteil eines Satzes) — sie ist kein fertiger Container.";
+        else if (!b.mit_kopf)       u.container_grund = "Die Datei beginnt nicht mit einem tar-Kopf (Folgeteil eines Satzes) - sie ist kein fertiger Container.";
         else {
             u.als_container = true;
             u.warnung       = b.warnung;
@@ -2094,7 +2094,7 @@ TarDateiUrteil DiskVolume::tarDateiBeurteilen(const std::string& tarpfad) const 
             u.wird_satz = (!tar_satz_ || satz_einzelname_) && laenge > u.kapazitaet;
         }
     } else {
-        u.container_grund = "Das Archiv ist nicht leer — eine .tar-Datei kommt als Datei hinein.";
+        u.container_grund = "Das Archiv ist nicht leer - eine .tar-Datei kommt als Datei hinein.";
     }
     u.ok = true;
     return u;
@@ -2157,11 +2157,11 @@ bool leseGanz(const std::string& pfad, std::vector<uint8_t>& d, std::string& err
 bool DiskVolume::tarExport(const std::string& ziel, uint64_t* bytes) const {
     if (!disk_) return fail("keine Diskette geoeffnet");
     if (tar_satz_ && !satz_einzel_)
-        return fail("Ein tar-Satz ist schon EIN Strom — fuer den Export die Disketten des Satzes "
+        return fail("Ein tar-Satz ist schon EIN Strom - fuer den Export die Disketten des Satzes "
                     "einzeln oeffnen (jede ergibt ihr Teilstueck, mit `cat` setzt man sie zusammen); "
                     "zum Auspacken genuegt `tar-satz --to`.");
     if (const TarFileSystem* t = tarFs(); t && t->leer())
-        return fail("Die Diskette ist leer (tar720 leer) — es gibt nichts zu exportieren.");
+        return fail("Die Diskette ist leer (tar720 leer) - es gibt nichts zu exportieren.");
     if (profile_ && !istTar())
         return fail("Diese Diskette traegt ein Dateisystem (" + profile_->name + "), keinen tar-Strom.");
     std::vector<uint8_t> strom;
@@ -2205,7 +2205,7 @@ const FsCheckReport& DiskVolume::check(FsCheckLevel level, bool nachladen) {
     check_.schritt("erkennung.schritt",
                    hasFileSystem()
                        ? "Erkennung gegenproben: passt ein anderes Profil besser?"
-                       : "Dateisystem erkennen — warum kam keines in Frage?");
+                       : "Dateisystem erkennen - warum kam keines in Frage?");
     if (!hasFileSystem()) ebene0(check_);
     else                  gegenprobe(check_, level, nachladen);
     check_.schrittEnde();
@@ -2226,7 +2226,7 @@ void DiskVolume::ebene0(FsCheckReport& an) const {
         b.add("erkennung.ohne_kandidat", FsSeverity::Info, FsLayer::Erkennung,
               "(Erkennung)",
               roh_grund_.empty()
-                  ? std::string("Es wurde kein Dateisystem geprueft — schon die "
+                  ? std::string("Es wurde kein Dateisystem geprueft - schon die "
                                 "Geometrie liess keinen Kandidaten zu")
                   : "Kein Kandidat kam zur Probe: " + roh_grund_);
         return;
@@ -2315,7 +2315,7 @@ void DiskVolume::gegenprobe(FsCheckReport& an, FsCheckLevel level, bool nachlade
         text += std::to_string(bester_dateien) + " statt "
               + std::to_string(eigene_dateien) + " sichtbare Dateien";
     }
-    text += ". Moeglicherweise ist '" + detection_.filesystem + "' die falsche Wahl —"
+    text += ". Moeglicherweise ist '" + detection_.filesystem + "' die falsche Wahl -"
             " nachsehen laesst sich das mit `--fs " + bester + "`.";
     // Info, nicht Warnung: die Diskette ist womoeglich voellig in Ordnung, und die
     // Gegenprobe AENDERT DIE WAHL NICHT.  Sie sagt sie nur an — bei sehr aehnlichen
@@ -2392,7 +2392,7 @@ int DiskVolume::applyRepairs(const std::vector<std::pair<int, int>>& auswahl) {
         // neuere Stand schon auf der Scheibe — nur eine erneute Rueckfuehrung stellt
         // sie richtig (14_physische_diskette.md).
         disk_->medium().restoreFrom(sicherung);
-        fail("'" + a.r.kind + "': " + grund + " — die Diskette wurde nicht veraendert.");
+        fail("'" + a.r.kind + "': " + grund + " - die Diskette wurde nicht veraendert.");
         return -1;
     }
 
@@ -2454,7 +2454,7 @@ bool DiskVolume::recoverExtract(int fnr, const std::string& dest_path) {
         t += "Guete:     " + std::string(fsRecoverQualityName(f->quality)) + "\n";
         if (!f->detail.empty()) t += "Vorbehalt: " + f->detail + "\n";
         t += "Fehlende Bereiche sind mit 0xE5 aufgefuellt, damit die Offsets der\n"
-             "uebrigen stimmen — fuer ein Textdokument ist das brauchbar, fuer ein\n"
+             "uebrigen stimmen - fuer ein Textdokument ist das brauchbar, fuer ein\n"
              "Programm nicht.\n";
         const std::vector<uint8_t> bytes(t.begin(), t.end());
         if (!schreibeDatei(dest_path + ".rettung.txt", bytes, err)) return fail(err);
@@ -2513,7 +2513,7 @@ bool DiskVolume::recoverRestore(int fnr, const std::string& name) {
     if (!fs.recoverRestore(kopie, name)) {
         const std::string grund = fs.lastError();
         disk_->medium().restoreFrom(sicherung);
-        return fail(grund + " — die Diskette wurde nicht veraendert.");
+        return fail(grund + " - die Diskette wurde nicht veraendert.");
     }
 
     // Neu suchen UND neu pruefen: der Fund ist jetzt eine Datei.
@@ -2619,7 +2619,7 @@ std::string DiskVolume::zubehoerGrund(const std::string& pfad) {
         // Der Name der gemeinten Nutzdatei steht im Namen selbst — die Endung weg.
         std::string gemeint = name.string();
         gemeint.erase(gemeint.size() - std::char_traits<char>::length(kFileinfoEndung));
-        return "'" + name.string() + "' ist eine Angabendatei, keine Nutzdatei — "
+        return "'" + name.string() + "' ist eine Angabendatei, keine Nutzdatei - "
                "gemeint ist vermutlich '" + gemeint + "'.";
     }
     if (name == kUdosBeiblatt || name == kCpmBeiblatt || name == kWegaBeiblatt)
@@ -2762,7 +2762,7 @@ bool DiskVolume::insert(const std::string& src_path, const FileRef& ref,
                             + kFileinfoEndung + "' traegt "
                             + (ein.wega ? "UNIX-Angaben (fs=wega)" : ein.tar ? "UNIX-Angaben (fs=tar)"
                                                               : "CP/M-Angaben (fs=cpm)")
-                            + ", die Diskette ist eine der UDOS-Familie — die Angaben "
+                            + ", die Diskette ist eine der UDOS-Familie - die Angaben "
                               "passen nicht zusammen.");
             angaben_gefunden       = true;
             mit.udos_type          = ein.u.typ;
@@ -2832,7 +2832,7 @@ bool DiskVolume::insert(const std::string& src_path, const FileRef& ref,
         const std::string kurz = fs::path(src_path).filename().string();
         return fail("Zu '" + kurz + "' gibt es keine Angaben (weder " + kurz
                     + kFileinfoEndung + " noch " + kUdosBeiblatt + "). " + profile_->name
-                    + " braucht Typ, Satzlaenge und — bei einem Programm — Startadresse "
+                    + " braucht Typ, Satzlaenge und - bei einem Programm - Startadresse "
                       "und Speicherangaben; ohne sie entstuende eine Datei, die nicht "
                       "laeuft. Entweder die Datei mit ihrem " + kFileinfoEndung
                     + " herueberholen, oder die Angaben mitgeben: "
@@ -2874,7 +2874,7 @@ bool DiskVolume::insert(const std::string& src_path, const FileRef& ref,
                         + "' traegt " + (ein.wega ? "UNIX-Angaben (fs=wega)"
                                                   : ein.tar ? "UNIX-Angaben (fs=tar)"
                                                             : "UDOS-Angaben (fs=udos)")
-                        + ", die Diskette ist eine CP/M-Diskette — die Angaben passen "
+                        + ", die Diskette ist eine CP/M-Diskette - die Angaben passen "
                           "nicht zusammen.");
         const bool aus_fileinfo = hat_fileinfo;
         if (aus_fileinfo) {
@@ -3057,7 +3057,7 @@ int DiskVolume::schneide(bool nur_gerade_spuren, bool nur_seite_null) {
     // eine unformatierte, mitten im beschriebenen Bereich.
     if (!m.complete()) {
         fail("Es sind noch " + std::to_string(m.unknownCount())
-             + " Spuren ungelesen.  Der Schnitt loest das Abbild vom Laufwerk — was "
+             + " Spuren ungelesen.  Der Schnitt loest das Abbild vom Laufwerk - was "
                "jetzt fehlt, fehlt dann endgueltig.  Erst vollstaendig einlesen.");
         return -1;
     }
@@ -3091,7 +3091,7 @@ int DiskVolume::deleteCylinder(uint8_t cyl) {
     if (cyl >= m.numCylinders()) { fail("diesen Zylinder gibt es nicht"); return -1; }
     if (m.numCylinders() < 2)    { fail("die letzte Spur bleibt"); return -1; }
     if (!m.complete()) {
-        fail("Es sind noch Spuren ungelesen — erst vollstaendig einlesen.");
+        fail("Es sind noch Spuren ungelesen - erst vollstaendig einlesen.");
         return -1;
     }
     m.setLoader(nullptr);                    // Lage aendert sich, s. @ref schneide
@@ -3111,7 +3111,7 @@ int DiskVolume::insertCylinderAt(uint8_t pos, bool mfm) {
     if (pos > alt)   { fail("diese Stelle liegt hinter dem Ende"); return -1; }
     if (alt >= 255)  { fail("mehr Zylinder gehen nicht"); return -1; }
     if (!m.complete()) {
-        fail("Es sind noch Spuren ungelesen — erst vollstaendig einlesen.");
+        fail("Es sind noch Spuren ungelesen - erst vollstaendig einlesen.");
         return -1;
     }
     m.setLoader(nullptr);                    // Lage aendert sich, s. @ref schneide
@@ -3239,7 +3239,7 @@ bool DiskVolume::writeSectorAt(uint8_t cyl, uint8_t head, int index,
     TrackImage spur = disk_->medium().track(cyl, head);
     if (!TrackCodec::writeSectorAt(spur, static_cast<size_t>(index), data, {},
                                    crc_woertlich))
-        return fail("Der Sektor liess sich nicht schreiben — Laenge oder Lage passt "
+        return fail("Der Sektor liess sich nicht schreiben - Laenge oder Lage passt "
                     "nicht (erwartet wird genau die Sektorgroesse).");
 
     disk_->medium().setTrack(cyl, head, std::move(spur));
@@ -3279,7 +3279,7 @@ bool DiskVolume::writeSectorTail(uint8_t cyl, uint8_t head, int index,
     const uint16_t crc = s[static_cast<size_t>(index)].data_crc;
     if (!TrackCodec::writeSectorAt(spur, static_cast<size_t>(index),
                                    s[static_cast<size_t>(index)].data, tail, &crc))
-        return fail("Der Nachspann liess sich nicht schreiben — er wuerde in die "
+        return fail("Der Nachspann liess sich nicht schreiben - er wuerde in die "
                     "naechste Adressmarke laufen.");
     disk_->medium().setTrack(cyl, head, std::move(spur));
     return true;
@@ -3459,12 +3459,12 @@ bool DiskVolume::extractAll(const std::string& dest_dir, const TransferOptions& 
         const fs::path bb = fs::path(dest_dir) / kWegaBeiblatt;
         std::ofstream f(bb, std::ios::binary);
         if (!f) return fail("Beiblatt nicht schreibbar: " + bb.string());
-        f << "# k1520DiskTool — UNIX-Angaben zu allen Eintraegen dieser WEGA-Diskette.\n"
+        f << "# k1520DiskTool - UNIX-Angaben zu allen Eintraegen dieser WEGA-Diskette.\n"
              "# Eine Zeile je Eintrag (auch Verzeichnisse und Geraetedateien, die als Datei\n"
              "# nicht existieren koennen): Pfad, dann schluessel=wert.\n"
-             "#   art    - Datei · d Verzeichnis · c/b Geraet (rdev = major,minor) · p FIFO\n"
+             "#   art    - Datei - d Verzeichnis - c/b Geraet (rdev = major,minor) - p FIFO\n"
              "#   mode   di_mode oktal samt Dateiart (0100755 = -rwxr-xr-x)\n"
-             "#   uid gid nlink inode · mtime/atime/ctime Sekunden seit 1970 (GMT)\n"
+             "#   uid gid nlink inode - mtime/atime/ctime Sekunden seit 1970 (GMT)\n"
              "# Beim Einfuegen (`put <ordner>`) gilt das `.fileinfo` je Datei, nicht dieses Blatt.\n";
         for (const FileEntry& e : volumes_[0].fs->list()) {
             f << e.name << ' ';
@@ -3572,10 +3572,10 @@ bool DiskVolume::sammleQuelldateien(const std::string& src_dir,
             if (!namen.empty()) namen += ", ";
             namen += lose[i];
         }
-        if (lose.size() > 5) namen += ", …";
+        if (lose.size() > 5) namen += ", ...";
         return fail("Neben den SideN-Ordnern liegen weitere Eintraege in " + src_dir
                     + " (" + namen + "). Auf welche Seite sie gehoeren, ist nicht "
-                      "erkennbar — bitte einsortieren.");
+                      "erkennbar - bitte einsortieren.");
     }
 
     for (int v = 0; v < volumeCount(); ++v) {
@@ -3641,7 +3641,7 @@ bool DiskVolume::insertAll(const std::string& src_dir, const TransferOptions& op
     for (const auto& v : je_volume) nutzdateien += v.size();
     if (nutzdateien == 0 && zubehoer_gezaehlt_ > 0)
         return fail("Der Ordner " + src_dir + " enthaelt nur Angabendateien ("
-                    + std::to_string(zubehoer_gezaehlt_) + ") — es gibt nichts einzufuegen.");
+                    + std::to_string(zubehoer_gezaehlt_) + ") - es gibt nichts einzufuegen.");
 
     // Schritt 2: urteilen — VOR der ersten Aenderung.
     std::string bericht;
@@ -3667,7 +3667,7 @@ bool DiskVolume::insertAll(const std::string& src_dir, const TransferOptions& op
             if (!volumes_[0].fs->makeDirectory(wegaZielName(src_dir, e.path().string()))) {
                 const std::string grund = volumes_[0].fs->lastError();
                 zurueck();
-                return fail(grund + " — die Diskette wurde nicht veraendert.");
+                return fail(grund + " - die Diskette wurde nicht veraendert.");
             }
         }
     }
@@ -3712,7 +3712,7 @@ bool DiskVolume::insertAll(const std::string& src_dir, const TransferOptions& op
             if (!insert(quelle, FileRef{static_cast<int>(v), name}, o)) {
                 const std::string grund = last_error_;
                 zurueck();         // Ruecknahme
-                return fail(grund + " — die Diskette wurde nicht veraendert.");
+                return fail(grund + " - die Diskette wurde nicht veraendert.");
             }
         }
     }
@@ -3735,7 +3735,7 @@ bool DiskVolume::insertAll(const std::string& src_dir, const TransferOptions& op
             if (!volumes_[0].fs->setAttributes(wegaZielName(src_dir, e.path().string()), ua)) {
                 const std::string grund = volumes_[0].fs->lastError();
                 zurueck();
-                return fail(grund + " — die Diskette wurde nicht veraendert.");
+                return fail(grund + " - die Diskette wurde nicht veraendert.");
             }
         }
     }
@@ -3759,7 +3759,7 @@ void DiskVolume::setReadOnly(bool ro) {
     }
     if (!ro && nur_lesen_erzwungen_) {
         last_error_ = "Die Geometrie dieser Diskette steht in keinem Katalog und wurde "
-                      "nur gemessen — Schreiben ist gesperrt. Erst einen passenden "
+                      "nur gemessen - Schreiben ist gesperrt. Erst einen passenden "
                       "Eintrag in data/formats.yaml anlegen (die Meldung von `measure` "
                       "taugt als Vorlage).";
         return;
@@ -3775,7 +3775,7 @@ void DiskVolume::setReadOnly(bool ro) {
 bool DiskVolume::exportImage(const std::string& path) const {
     if (!disk_) return fail("keine Diskette geoeffnet");
     if (tar_satz_ && !(satz_einzel_ && !dirty()))
-        return fail("Ein tar-Satz besteht aus Abbildern, deren Stand im Speicher liegt — mit tarSatzSpeichern "
+        return fail("Ein tar-Satz besteht aus Abbildern, deren Stand im Speicher liegt - mit tarSatzSpeichern "
                     "speichern" + std::string(satz_einzel_ ? " (erst die Aenderungen speichern)." : "."));
     std::optional<DiskFormat> of;
     const std::string zielEndung = endung(path);
@@ -3803,7 +3803,7 @@ bool DiskVolume::flush() {
         if (!p.ok) return fail(p.fehler);
         if (p.abbilder > 1)
             return fail("Der Inhalt (" + std::to_string(p.strom) + " Byte) passt nicht auf ein Abbild ("
-                        + std::to_string(p.kapazitaet) + " Byte) — als tar-Satz mit " + std::to_string(p.abbilder)
+                        + std::to_string(p.kapazitaet) + " Byte) - als tar-Satz mit " + std::to_string(p.abbilder)
                         + " nummerierten Abbildern speichern (tarSatzSpeichern, `tar-satz-save`).");
         return tarSatzSpeichern();
     }
@@ -3855,7 +3855,7 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
     }
 
     if (profil->boot_header == "bcu" && profil->detect && boot_image.empty()) {
-        err = "'" + fs_name + "' wird am BCU-System in den Systemspuren erkannt — ohne Bootabbild "
+        err = "'" + fs_name + "' wird am BCU-System in den Systemspuren erkannt - ohne Bootabbild "
               "(--boot, z. B. disks/bootsektoren/boot_bcu12_ohnesyl.bin) legte das Werkzeug eine "
               "Diskette an, die es beim naechsten Oeffnen nicht mehr als BCU-Diskette erkennt.";
         return nullptr;
@@ -4126,7 +4126,7 @@ bool DiskVolume::writeBootImageFile(const std::string& path, int volume) {
 bool DiskVolume::saveAs(const std::string& path) {
     if (!disk_) return fail("keine Diskette geoeffnet");
     if (tar_satz_ && !(satz_einzel_ && !dirty()))
-        return fail("Ein tar-Satz besteht aus Abbildern, deren Stand im Speicher liegt — mit tarSatzSpeichern "
+        return fail("Ein tar-Satz besteht aus Abbildern, deren Stand im Speicher liegt - mit tarSatzSpeichern "
                     "speichern" + std::string(satz_einzel_ ? " (erst die Aenderungen speichern)." : "."));
     std::optional<DiskFormat> of;
     const std::string zielEndung = endung(path);

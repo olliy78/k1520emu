@@ -36,7 +36,7 @@ expect:  nicht auf em:
 expect:  8 Bytes @<<0>>%0100, 8 identisch (100.0 %), 0 Abweichung(en)
 expect:  8 Bytes @em:00210, 8 identisch (100.0 %), 0 Abweichung(en)
 expect:  8 Bytes @<<0>>%0100, 7 identisch (87.5 %), 1 Abweichung(en):
-expect:  U8001: R5 5678→0505
+expect:  U8001: R5 5678->0505
 expect:  EM-DRAM em:00300..em:00300 (1 B)
 expect:  A46 (Paritaets-FF, Merker)=0
 expect:  A53 (Einzelbefehlszaehler)=11 (Vorlast 11)

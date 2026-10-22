@@ -1,6 +1,6 @@
 # Der wichtigste Fall der Dateisystempruefung: eine gesunde Diskette muss
 # SCHWEIGEN.  Ein fsck, das bei heilen Disketten meldet, wird weggeklickt und ist
-# damit wertlos — auch dann, wenn es spaeter einmal recht hat (Entwurf E10).
+# damit wertlos - auch dann, wenn es spaeter einmal recht hat (Entwurf E10).
 tool:   k1520disktool
 disk:   cpa_cpa780_k5601_noclock.img
 run:    check %DISK% --full

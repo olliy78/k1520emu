@@ -62,6 +62,8 @@ TEXTVERARBEITUNG
 PRUEFPROGRAMME (im Emulator entwickelt, am Geraet wie dort verwendbar)
 ------------------------------------------------------------------------
   SERTEST    serielle Schnittstellen (K8025): @SERTEST@
+  KERMIT     Kermit-80 4.11 (CP/M): Dateiuebertragung ueber die V.24-Schnittstelle,
+             9600 Bd 8N1 (Beigabe zum Ausprobieren der Schnittstelle)
   RAFCPM     Treiber RAM-Floppy RAF, Laufwerk M: (Original ZWG)
   RAF512     Treiber RAM-Floppy RAF, Laufwerk P: (2 Karten ab 88H)
   RAFTEST    ZWG-Pruefprogramm RAF; Kartenadresse auf 88H/89H eingestellt

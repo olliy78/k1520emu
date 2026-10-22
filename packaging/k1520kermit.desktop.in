@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=K1520 Kermit
+GenericName=Kermit-Dateiaustausch
+Comment=Dateien mit der WEGA (P8000) oder einem anderen Kermit austauschen (Telnet, RFC 2217)
+Comment[en]=Exchange files with WEGA (P8000) or another Kermit over Telnet or RFC 2217
+Exec="@ROOT@/bin/k1520kermit"
+Icon=a5120emu
+Terminal=false
+Categories=System;Utility;Network;FileTransfer;
+Keywords=K1520;P8000;WEGA;Kermit;robotron;Dateitransfer;Telnet;
+StartupNotify=true
+StartupWMClass=main.py

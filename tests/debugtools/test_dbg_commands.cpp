@@ -12,7 +12,7 @@ bool has(const std::vector<std::string>& v, const std::string& s){
 }
 
 TEST(DbgCommands, PrefixMatchesAllStartingWith){
-    auto m = match("b");                 // b, b2, bd, be, bi, bl, bint, bnmi, breti, bs, bt, bdis…
+    auto m = match("b");                 // b, b2, bd, be, bi, bl, bint, bnmi, breti, bs, bt, bdis...
     EXPECT_TRUE(has(m,"b"));
     EXPECT_TRUE(has(m,"b2"));
     EXPECT_TRUE(has(m,"bl"));
@@ -21,7 +21,7 @@ TEST(DbgCommands, PrefixMatchesAllStartingWith){
 }
 
 TEST(DbgCommands, DistinguishesLongerPrefix){
-    auto m = match("bi");                // bi, bi2 (not bl/bint? bint starts "bi" → included)
+    auto m = match("bi");                // bi, bi2 (not bl/bint? bint starts "bi" -> included)
     EXPECT_TRUE(has(m,"bi"));
     EXPECT_TRUE(has(m,"bi2"));
     EXPECT_TRUE(has(m,"bint"));           // "bint" also starts with "bi"
@@ -31,7 +31,7 @@ TEST(DbgCommands, DistinguishesLongerPrefix){
 TEST(DbgCommands, ExactAndEmptyPrefix){
     auto m = match("snap");
     EXPECT_TRUE(has(m,"snap"));
-    EXPECT_FALSE(has(m,"source"));        // "snap" ≠ prefix of source
+    EXPECT_FALSE(has(m,"source"));        // "snap" != prefix of source
 
     // empty prefix → everything
     EXPECT_EQ(match("").size(), dbgcmd::names().size());

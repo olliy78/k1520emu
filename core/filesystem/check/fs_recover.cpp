@@ -147,7 +147,7 @@ std::string FsRecoverReport::alsText(bool mit_volume) const {
         out += breit(f.name.empty() ? f.vorschlag : f.name, 22);
         out += rechts(std::to_string(f.size), 8) + "  ";
         out += f.origin;
-        if (!f.detail.empty()) out += "  — " + f.detail;
+        if (!f.detail.empty()) out += "  - " + f.detail;
         out += "\n";
     }
     return out;

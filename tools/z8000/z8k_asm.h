@@ -499,7 +499,7 @@ inline bool bindRow(const Insn& in, std::vector<PArg> args, const BindCtx& cx,
                 if (a.reg2 == 0) return valueErr("R0 ist als Index nicht erlaubt");
                 o.reg = uint8_t(a.reg2);
             }
-            if (!cx.seg && a.shortSeg) return valueErr("|…| (kurzer Offset) nur segmentiert");
+            if (!cx.seg && a.shortSeg) return valueErr("|...| (kurzer Offset) nur segmentiert");
             int64_t v;
             if (!evalExpr(a.expr, v)) return false;
             o.shortSeg = a.shortSeg;
@@ -935,7 +935,7 @@ inline std::string formatSymbols(const AsmResult& r, uint8_t nonsegSeg = 0,
     }
     std::sort(v.begin(), v.end());
     std::string out = "# z8kasm-Symbole (U8001) fuer k1520dbg: <<SEG>>%OFFS NAME";
-    if (!source.empty()) out += " — " + source;
+    if (!source.empty()) out += " - " + source;
     out += "\n";
     char buf[32];
     for (auto& e : v) {

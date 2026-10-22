@@ -1,4 +1,4 @@
-# Eine leere tar-Diskette hat nichts zu exportieren — das Werkzeug sagt es, statt
+# Eine leere tar-Diskette hat nichts zu exportieren - das Werkzeug sagt es, statt
 # 720 KiB Nullen als "Archiv" auszugeben.
 tool:   k1520disktool
 tmpfile leer.img:

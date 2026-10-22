@@ -1,4 +1,4 @@
-# dump A N datei → verify datei @A muss 100 % identisch sein (Datei↔RAM-Rundlauf).
+# dump A N datei -> verify datei @A muss 100 % identisch sein (Datei<->RAM-Rundlauf).
 tool:   k1520dbg
 disk:   cpa_cpa780_k5601_clock.img
 run:    %DISK%

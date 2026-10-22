@@ -259,7 +259,7 @@ bool Platte::oeffnen(const std::string& pfad, const Config& cfg)
             if (k.g == geo_) t = k;
         par_ = parSektor(t);
         par_ueberlagert_ = true;
-        LOG_INFO("WDC", "Platte %s: kein PAR-Sektor auf Z0/K0/S1 — ergaenzt (%u/%u/%u)", pfad.c_str(),
+        LOG_INFO("WDC", "Platte %s: kein PAR-Sektor auf Z0/K0/S1 - ergaenzt (%u/%u/%u)", pfad.c_str(),
                  geo_.zylinder, geo_.koepfe, geo_.sektoren);
     }
     unformatiert_.assign(size_t(geo_.zylinder) * geo_.koepfe, 0);
@@ -508,7 +508,7 @@ void Platte::zurueckschreiben(int zyl, int kopf, Spur& s)
     if (!z.formatiert) {
         unformatiert_[spurIndex(zyl, kopf)] = 1;
         if (z.kennfelder > 0)
-            LOG_WARN("WDC", "Platte: Spur %d/%d mit nur %d von %d Kennfeldern — gilt als unformatiert",
+            LOG_WARN("WDC", "Platte: Spur %d/%d mit nur %d von %d Kennfeldern - gilt als unformatiert",
                      zyl, kopf, z.kennfelder, geo_.sektoren);
         return;
     }
@@ -520,7 +520,7 @@ void Platte::zurueckschreiben(int zyl, int kopf, Spur& s)
             LOG_WARN("WDC", "Platte: Sektor %d/%d/%d nicht geschrieben (%s)", zyl, kopf, sc, pfad_.c_str());
     }
     if (static_cast<int>(z.daten.size()) < geo_.sektoren)
-        LOG_WARN("WDC", "Platte: Spur %d/%d: %d Sektoren ohne gueltiges Datenfeld — Abbild behaelt den alten Inhalt",
+        LOG_WARN("WDC", "Platte: Spur %d/%d: %d Sektoren ohne gueltiges Datenfeld - Abbild behaelt den alten Inhalt",
                  zyl, kopf, geo_.sektoren - static_cast<int>(z.daten.size()));
 }
 
@@ -630,7 +630,7 @@ void Platte::ergebnisAbholen()
     }
     // Gescheitert: wieder als ungesichert fuehren — der naechste Versuch schreibt den AKTUELLEN Inhalt
     schreibfehler_ = e->fehler;
-    LOG_WARN("WDC", "Platte: Datei nicht geschrieben (%s) — bleibt ungesichert", e->fehler.c_str());
+    LOG_WARN("WDC", "Platte: Datei nicht geschrieben (%s) - bleibt ungesichert", e->fehler.c_str());
     for (size_t i : in_arbeit_) sektor_neu_[i] = 1;
     in_arbeit_.clear();
     abbild_neu_ = true;

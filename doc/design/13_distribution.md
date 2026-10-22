@@ -904,6 +904,42 @@ Vorgänger: dieselbe Starter-Vorlage (`launcher.sh`/`launcher.cmd` wählen am NA
 - **Menü *Werkzeuge*:** `p8000emu` ist in allen anderen Programmen erreichbar.  Wächter
   `py_programme`/`py_pc1715emu_gui::test_werkzeugmenue_kennt_alle_emulatoren`.
 
+## 10c. K1520 Kermit im Paket (AP K9, 2026-10-20)
+
+Dritte Nicht-Emulator-Sache neben DiskTool und Debugger, **geschnitten wie das DiskTool**
+(`doc/design/36_kermit.md` §6.7): eigene Bibliothek, Kommandozeile unter `-cli`, Oberfläche
+mit eigenem Starter und Startmenü-Eintrag.  Verdrahtet:
+
+- `build_payload.sh` baut die Ziele `k1520kermit` (Bibliothek) und `k1520kermit_cli` (Datei
+  `k1520kermit[.exe]`), legt `bin/libk1520kermit.so|k1520kermit.dll` und
+  `bin/k1520kermit-cli[.exe]` ab (`kermit_lib_name`/`kermit_cli_name` in `lib/common.sh`), dazu
+  `share/doc/k1520kermit.md`; `app/kermittool/` samt `help/handbuch.md` kommt mit der
+  `app/`-Ebene.  Es gibt **keine** Icons und keine Datendatei dazu (Symbol: das gemeinsame
+  `a5120emu`), und `slim.py` braucht nichts Neues (nur QtCore/Gui/Widgets, wie die übrige GUI).
+- **Der NAME `k1520kermit` ist doppelt belegt — das ist gewollt und wie beim DiskTool gelöst:**
+  im Quellbaum ist `build/k1520kermit` die Kommandozeile, in der Installation ist
+  `bin/k1520kermit` der **Starter der Oberfläche** und die Kommandozeile heißt
+  `bin/k1520kermit-cli`.  Deshalb `paths.KERMIT_CLI_NAMEN = ("k1520kermit-cli", "k1520kermit")`
+  (erst der Installationsname; sonst hielte man den Starter für die Kommandozeile).
+- **Eigene Starter-Vorlage** `kermit_launcher.sh/.cmd` (Kopie des DiskTool-Starters: nur die
+  Wurzel setzen, Arbeitsverzeichnis = Benutzerdaten) — NICHT in `launcher.*`: dessen Name→Profil-
+  Schema gilt für Maschinen, ein Nicht-Emulator hat kein Profil (`app/profil.py`).
+  `k1520kermit.desktop.in`, `WERKZEUGE="k1520disktool k1520kermit"` und
+  `KONSOLENWERKZEUGE="… k1520kermit-cli"` in `install.sh`; Windows: Eintrag
+  *K1520 Kermit* bei den Symbolen, `bin\k1520kermit.cmd`, `kermit_launcher.cmd` mit `dontcopy`.
+- **Deinstallieren/Ausweis:** der Ausweis führt nur die Namen der Wurzel (`bin app share …`),
+  alle neuen Dateien liegen darunter — der Riegel bleibt unberührt.  Aufgeräumt werden Verweis,
+  `.desktop` und Symbol über `$STARTER`, der Verweis der Kommandozeile über
+  `$KONSOLENWERKZEUGE` (die Lücke von `k1520disktool-cli` bis 2026-08-18 wiederholt sich nicht).
+- **Rauchtests:** `install.sh` und `.iss` laden `libk1520kermit` und fragen `k1520k_version`;
+  `release.yml` (beide Jobs) wie in `doc/ci_pipeline.md` §4.3; `windows-ci.yml`: `dumpbin
+  /exports` (Muster `k1520k_*`), `/dependents` im Auslieferungsbau, Paket- und Setup-Prüfung.
+- **Die WEGA-3.1-Platte mit dem Benutzer `kermit` liegt im Paket** (`share/disks/p8000_wega31/
+  p8000_wega31_platte.avr.img.gz.gz`, Regel „alle `p8000_*`-Platten" in `build_payload.sh`);
+  Wächter `test_die_wega_platte_mit_kermit_benutzer_liegt_im_paket`.
+- **Nicht lokal belegt:** Inno-Setup-Lauf und MSVC (`windows-ci.yml`, `release.yml`) — nur
+  die CI; lokal `tools/dev.sh win` für die MinGW-Seite.
+
 ---
 
 ## 11. Offene Punkte

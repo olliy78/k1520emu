@@ -1,5 +1,5 @@
 # boot_trace --laderom v06 (AP A7, doc/a5120_alt/bcu.md): Lade-ROM V0.6 startet BCU 880 V1.2
-# von der Diskette „SYL auf Spur 1“ (Satz 2, Bild 64x16 = K7023) auf dem alten Geraet; .img in
+# von der Diskette 'SYL auf Spur 1' (Satz 2, Bild 64x16 = K7023) auf dem alten Geraet; .img in
 # Katalogformat k5601_ss40_26x128 ueber --format.
 tool:    boot_trace
 disk:    bcu12_ss40-26x128_k5600-10_syl-spur1-satz2.img

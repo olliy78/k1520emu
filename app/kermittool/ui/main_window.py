@@ -8,8 +8,9 @@ Alle Aufrufe der Bibliothek laufen im Arbeitsfaden (:mod:`app.kermittool.arbeite
 Fenster beauftragt ihn und bekommt das Ergebnis ueber Signale zurueck
 (``Qt.QueuedConnection``).  Es gibt also keinen blockierenden Aufruf im GUI-Faden.
 
-Das Kennwort einer Anmeldung wird nur in ``self._kennwort`` gehalten (Sitzung) und nie
-geschrieben (:mod:`app.kermittool.konfig`).
+Das Kennwort einer Anmeldung wird in ``self._kennwort`` gehalten (Sitzung) und nur dann
+geschrieben, wenn der Anwender fuer die Verbindung den Haken *Zugangsdaten speichern* gesetzt hat
+(Klartext, siehe :mod:`app.kermittool.konfig`); dann steht es in ``self.verbindung["kennwort"]``.
 """
 
 from __future__ import annotations
@@ -29,7 +30,7 @@ from app.disktool.ui.info_bar import InfoBar
 from app.disktool.ui.log_dock import LogDock
 from app.kermittool import binding, konfig
 from app.kermittool.arbeiter import Arbeiter
-from app.kermittool.ui import actions
+from app.kermittool.ui import actions, anmelde_dialog
 from app.kermittool.ui.einstellungen_dialog import EinstellungenDialog
 from app.kermittool.ui.fern_view import FernView
 from app.kermittool.ui.fortschritt_dialog import FortschrittDialog
@@ -64,6 +65,9 @@ class MainWindow(QMainWindow):
         if "aufbau" not in srv:
             self.server_verb["aufbau"] = "lauschen"
         self.freigabe: str = str(srv.get("ordner", "") or "")
+        # Anmeldezwang des Servers: wird (anders als jedes Client-Kennwort) im Klartext gespeichert.
+        self.server_login: dict = konfig.server_login_aus(srv.get("login"))
+        self._server_mit_anmeldung = False
         self.zuletzt: List[dict] = [konfig.verbindung_aus(v) for v in daten.get("zuletzt", [])
                                     if isinstance(v, dict)][:konfig.ZULETZT_MAX]
         opt = daten.get("optionen") if isinstance(daten.get("optionen"), dict) else {}
@@ -89,6 +93,11 @@ class MainWindow(QMainWindow):
         self.arbeiter.auftrag_beginnt.connect(self._auftrag_beginnt, q)
         self.arbeiter.auftrag_fertig.connect(self._auftrag_fertig, q)
         self.arbeiter.gegenstelle_meldet.connect(lambda t: self.log(f"Gegenstelle: {t}"), q)
+        self.arbeiter.anmeldung_verlangt.connect(self._anmeldung_fragen, q)
+        self.arbeiter.zugang_gemerkt.connect(self._zugang_merken, q)
+        #: Ersatzpunkt fuer Tests: ``fn(AnmeldeAnfrage) -> (name, kennwort, speichern) | None`` statt des
+        #: modalen Popups (ein modales Fenster haengt offscreen).
+        self._anmeldefrage = self._anmeldung_popup
 
         # ── Oberflaeche ─────────────────────────────────────────────────────
         actions.erzeuge_aktionen(self)
@@ -280,7 +289,9 @@ class MainWindow(QMainWindow):
         if self.zustand_art == "getrennt":
             return "Getrennt"
         text = self._zustand_text or self.zustand_art
-        return ("Server: " + text) if self._server_laeuft else text
+        if not self._server_laeuft:
+            return text
+        return "Server: " + text + (" (mit Anmeldung)" if self._server_mit_anmeldung else "")
 
     def _zustand(self, art: str, text: str) -> None:
         self.zustand_art = art
@@ -333,13 +344,18 @@ class MainWindow(QMainWindow):
         if dlg.einstellungsaenderung:
             self.einst.update(dlg.einstellungsaenderung)
             self.arbeiter.einstellungen_setzen(self.einst)
-        self.client_verbinden(dlg.verbindung(), dlg.kennwort())
+        self.client_verbinden(dlg.verbindung(), dlg.kennwort(), dlg.speichern())
         return True
 
-    def client_verbinden(self, p: dict, kennwort: str = "") -> None:
-        """Verbindung herstellen (Aufruf auch ohne Dialog, z. B. aus Tests)."""
+    def client_verbinden(self, p: dict, kennwort: str = "", speichern: bool = False) -> None:
+        """Verbindung herstellen (Aufruf auch ohne Dialog, z. B. aus Tests).
+
+        ``p["kennwort"]`` ist das GESPEICHERTE Kennwort der Verbindung (leer ohne Haken); ``kennwort`` das
+        vorab bekannte dieser Sitzung (Dialog/Voreinstellung).  Fehlt der Name, fragt spaeter das Popup."""
         p = konfig.verbindung_aus(p)
         p["betriebsart"] = "client"
+        kennwort = kennwort or p["kennwort"]
+        speichern = bool(speichern or p["kennwort"])
         self.verbindung = p
         self._kennwort = kennwort or ""
         self._client_p = p
@@ -349,8 +365,33 @@ class MainWindow(QMainWindow):
         self.fern_pfad = []
         self.fern_view.leeren("Verbinde …")
         self.info_bar.verbergen()
-        self.arbeiter.verbinden(p, self._kennwort)
+        self.arbeiter.verbinden(p, self._kennwort, speichern)
         self._aktionen_pruefen()
+
+    def _anmeldung_fragen(self, anfrage) -> None:
+        """GUI-Faden: die Frage des Arbeitsfadens beantworten (Popup oder Ersatz); der Arbeitsfaden wartet."""
+        if anfrage.ereignis.is_set():            # inzwischen abgebrochen
+            return
+        try:
+            antwort = self._anmeldefrage(anfrage)
+        except BaseException:                    # noqa: BLE001 — der Arbeitsfaden darf nie haengen bleiben
+            antwort = None
+        anfrage.antworten(antwort)
+
+    def _anmeldung_popup(self, a) -> Optional[tuple]:
+        gegenstelle = f"{self.verbindung.get('host', '')}:{self.verbindung.get('port', '')}"
+        return anmelde_dialog.fragen(self, a.versuch, a.gelesen, a.name, a.kennwort, a.speichern, gegenstelle)
+
+    def _zugang_merken(self, name: str, kennwort: str) -> None:
+        """Nach GELUNGENER Anmeldung mit gesetztem Haken: Name + Kennwort in den Eintrag dieser Verbindung
+        (``client`` und ``zuletzt``) und SOFORT in die Datei.  Ueberschreibt die alten Werte.
+
+        Klartext, kein Dateischutz (Entscheidung des Anwenders 2026-10-22).  Bei einer Ablehnung wird nichts
+        gespeichert: gute gespeicherte Werte bleiben, bis eine neue Eingabe wirklich funktioniert hat."""
+        self.verbindung = {**self.verbindung, "login": True, "login_name": name, "kennwort": kennwort}
+        self._client_p = self.verbindung
+        self.zuletzt = konfig.zuletzt_merken(self.zuletzt, self.verbindung)
+        self.konfig_sichern()
 
     def _trennen(self) -> None:
         self.arbeiter.trennen()
@@ -427,7 +468,8 @@ class MainWindow(QMainWindow):
 
     def _server_einrichten(self) -> bool:
         dlg = VerbindungDialog(self, "server", self.server_verb, self.zuletzt,
-                               ordner=self.freigabe, nur_lesen=self.act_nur_lesen.isChecked())
+                               ordner=self.freigabe, nur_lesen=self.act_nur_lesen.isChecked(),
+                               server_login=self.server_login)
         if dlg.exec() != VerbindungDialog.Accepted:
             return False
         if dlg.einstellungsaenderung:
@@ -435,6 +477,7 @@ class MainWindow(QMainWindow):
             self.arbeiter.einstellungen_setzen(self.einst)
         self.server_verb = dlg.verbindung()
         self.freigabe = dlg.freigabe()
+        self.server_login = dlg.server_login()
         self.act_nur_lesen.setChecked(dlg.nur_lesen.isChecked())
         self.zuletzt = konfig.zuletzt_merken(self.zuletzt, self.server_verb)
         return True
@@ -462,14 +505,17 @@ class MainWindow(QMainWindow):
             return False
         p = dict(self.server_verb)
         p["betriebsart"] = "server"
+        p["server_login"] = dict(self.server_login)
         if p["aufbau"] == "verbinden" and not p["host"]:
             self.meldung("Server soll verbinden, aber kein Host eingetragen — „Als Server einrichten…“.", "warnung")
             return False
         self._modus = "server"
         self._server_laeuft = True
+        self._server_mit_anmeldung = bool(self.server_login["pflicht"])
         self.links.setCurrentIndex(1)
         self.server_view.leeren()
-        self.server_kopf.setText(f"Freigabe: {self.freigabe}" + ("  (nur lesen)" if self.act_nur_lesen.isChecked() else ""))
+        self.server_kopf.setText(f"Freigabe: {self.freigabe}" + ("  (nur lesen)" if self.act_nur_lesen.isChecked() else "")
+                                  + ("  (mit Anmeldung)" if self._server_mit_anmeldung else ""))
         self.info_bar.verbergen()
         self.arbeiter.wieder_lauschen_setzen(self.act_wieder_lauschen.isChecked())
         self.arbeiter.server(p, self.freigabe, self.act_nur_lesen.isChecked())
@@ -596,12 +642,13 @@ class MainWindow(QMainWindow):
     # ── Konfiguration und Fensterlage ───────────────────────────────────────
 
     def konfig_daten(self) -> dict:
-        """Der zu schreibende Zustand (OHNE Kennwoerter)."""
+        """Der zu schreibende Zustand (``konfig.schreiben`` laesst Kennwoerter nur an ``konfig.KENNWORT_ORTE`` stehen)."""
         return {
             "uebertragung": dict(self.einst),
             "client": dict(self.verbindung),
             "server": {**self.server_verb, "ordner": self.freigabe,
-                       "nur_lesen": self.act_nur_lesen.isChecked()},
+                       "nur_lesen": self.act_nur_lesen.isChecked(),
+                       "login": dict(self.server_login)},      # Klartext, siehe konfig.py
             "optionen": {"wieder_lauschen": self.act_wieder_lauschen.isChecked()},
             "zuletzt": list(self.zuletzt),
             "lokal": {"ordner": str(self.lokal_view.ordner) if self.lokal_view.ordner else ""},

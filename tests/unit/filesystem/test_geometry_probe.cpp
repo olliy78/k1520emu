@@ -128,7 +128,7 @@ TEST(GeometryProbe, LehntUnbekannteGeometrieAbUndBeschreibtSie) {
     EXPECT_TRUE(bestesFormat(m).empty()) << "Mini-Diskette darf zu keinem Format passen";
 
     const std::string text = GeometryProbe::describe(m);
-    EXPECT_NE(text.find("4 Sektoren à 128 B"), std::string::npos) << text;
+    EXPECT_NE(text.find("4 Sektoren a 128 B"), std::string::npos) << text;
     EXPECT_NE(text.find("mfm"), std::string::npos) << text;
     EXPECT_NE(text.find("Zylinder 0-1"), std::string::npos) << text;
 }

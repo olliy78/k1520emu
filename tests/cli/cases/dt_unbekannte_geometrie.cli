@@ -1,5 +1,5 @@
 # Passt ein Abbild zu keinem Katalogeintrag, bricht das Werkzeug ab UND nennt die
-# gemessene Geometrie — die Meldung ist zugleich die Vorlage fuer den fehlenden
+# gemessene Geometrie - die Meldung ist zugleich die Vorlage fuer den fehlenden
 # formats.yaml-Eintrag (doc/design/13_k1520disktool.md §12.3).  Exit 2.
 tool:   k1520disktool
 disk:   cpa_mini.hfe
