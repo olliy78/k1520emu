@@ -20,7 +20,8 @@ def test_sync_generates_source_pages_and_keeps_added_wiki_pages(tmp_path):
     assert "doc/K1520_architecture.md" in architecture
     assert "https://github.com/olliy78/k1520emu/blob/main/doc/design/03_k2526_zre.md" in architecture
     assert "[this](bool lvl)" in architecture
-    assert "Version 0.4.0-beta" in emulator
+    version = (sync_wiki.REPOSITORY_ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    assert f"Version {version}" in emulator
     assert "{{VERSION}}" not in emulator
     assert (destination / "Future-Page.md").read_text(encoding="utf-8") == "# Future page\n"
     assert (destination / "Home.md").is_file()

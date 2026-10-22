@@ -32,7 +32,7 @@ jobs:
         run: |
           git clone "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki-build
           if ! git -C wiki-build rev-parse --verify HEAD >/dev/null 2>&1; then
-            git -C wiki-build checkout -b master
+            git -C wiki-build checkout -B master
           fi
 
       - name: Wiki-Seiten erzeugen
