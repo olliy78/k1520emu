@@ -4,6 +4,10 @@ Hier stehen nur Namen, Texte und die Darstellung der Zeit; GERECHNET wird im Ker
 (Startregel, Jahresversatz, Maschinenzeit -- ``k1520_rtc_*``).  Das Modul importiert
 kein Qt (``app/profil.py`` braucht es vor PySide6).
 
+Zeitzone (R4b): die Karte laeuft IMMER in UTC (``rtc_utc=1``); WEGA liest sie als GMT und
+rechnet mit seiner ``TZ`` selbst in Ortszeit um.  Die Oberflaeche zeigt deshalb den UTC-Wert der
+Karte in der Ortszeit des Wirts (``ortszeit()``), also das, was ``date`` unter WEGA zeigt.
+
 Kodierung der Zeiten (wie die C-ABI): Kalenderzeit als Unix-Sekunden, als waere die
 Wanduhr UTC.  ``rtc_zeit()``/``rtc_startzeit()`` liefern GASTSICHTIG (mit Jahresversatz),
 ``rtc_stellen()``/``rtc_stellen_datei()`` nehmen die Zeit im Jahr des Wirts (unversetzt).
@@ -75,9 +79,29 @@ def versatz_jahre(wert) -> int:
         return 0
 
 
+#: Die Oberflaeche betreibt die Karte immer in UTC (Kernparameter ``rtc_utc``, ``k1520_rtc_startzeit``).
+UTC = True
+
+
 def wirtszeit_kodiert() -> int:
-    """Jetzt, als Ortszeit des Wirts in der Kodierung der C-ABI (kein UTC-Schalter in der Oberflaeche)."""
-    return calendar.timegm(time.localtime())
+    """Jetzt, UTC in der Kodierung der C-ABI (Unix-Sekunden)."""
+    return int(time.time())
+
+
+def ortszeit(t: int, versatz: int = 0) -> int:
+    """Kartenwert *t* (gastsichtig, UTC kodiert) in der Ortszeit des Wirts, wieder so kodiert.
+
+    Der Zonenversatz wird am WIRTSJAHR-Zeitpunkt bestimmt (``t`` minus Jahresversatz), nicht
+    am Gastjahr: 1990 kennt die Zeitzonenrechnung des Wirts (Sommerzeitregeln) womoeglich anders.
+    Bei Fehlern (Wertebereich) bleibt *t* unveraendert.
+    """
+    if t is None or t < 0:
+        return t
+    try:
+        wirt = um_jahre(int(t), -int(versatz))
+        return int(t) + int(time.localtime(wirt).tm_gmtoff or 0)
+    except (OverflowError, OSError, ValueError):
+        return t
 
 
 def anzeige(t: int) -> str:

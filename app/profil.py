@@ -329,6 +329,7 @@ class Programmprofil:
                 # der Konfiguration, wirkt aber erst wieder mit 16-Bit-Teil.
                 kern["rtc"] = hardware["rtc"]
                 kern["rtc_jahresversatz"] = _rtc.versatz_jahre(hardware.get("rtc_versatz"))
+                kern["rtc_utc"] = 1          # R4b: WEGA liest die Karte als GMT und rechnet selbst um
                 kern["rtc_zustand"] = _rtc.zustand_pfad(self.programm)
         kern["mon8"] = hardware.get("mon8", "3.1")
         if mit_wdc:

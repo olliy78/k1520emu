@@ -1910,7 +1910,7 @@ class MainWindow(QMainWindow):
                 with kern_sperre():
                     return int(self.emulator.rtc_zeit())
             return int(K1520Emulator.rtc_startzeit(
-                rtc.zustand_pfad(self.profil.programm), self._rtc_versatz(), False))
+                rtc.zustand_pfad(self.profil.programm), self._rtc_versatz(), rtc.UTC))
         except Exception:
             return -1
 
@@ -1923,8 +1923,9 @@ class MainWindow(QMainWindow):
         if getattr(self, "status_widget", None) is None or getattr(self, "settings_widget", None) is None:
             return
         t = self._rtc_zeit()
-        text = rtc.anzeige(t)
-        tipp = ("Die Zeit, die das Gastsystem von der Uhrenkarte liest (mit Zeitversatz)."
+        text = rtc.anzeige(rtc.ortszeit(t, self._rtc_versatz()))
+        tipp = ("Die Zeit, die das Gastsystem von der Uhrenkarte liest (mit Zeitversatz), in Ortszeit "
+                "umgerechnet, wie WEGA sie mit date zeigt.  Die Karte selbst läuft in UTC."
                 if t >= 0 else "Keine Uhrenkarte gesteckt.")
         if t >= 0 and not (self._emu_started and self.act_power.isChecked()):
             tipp = "Maschine aus: die Zeit, mit der sie jetzt starten würde."
@@ -1934,7 +1935,7 @@ class MainWindow(QMainWindow):
     def _on_rtc_stellen(self):
         """Schaltflaeche „Uhr nach Wirtszeit stellen“.
 
-        Gestellt wird auf die jetzige Ortszeit des Wirts (``rtc_stellen``; der Versatz wirkt wie beim
+        Gestellt wird auf die jetzige Zeit des Wirts in UTC (``rtc_stellen``; der Versatz wirkt wie beim
         Lesen).  Springt die Gastzeit dabei zurueck, vorher fragen: Dateien, die der Gast schon mit
         der spaeteren Zeit gestempelt hat, erscheinen sonst „aus der Zukunft“ (``make``).
         """
@@ -1946,7 +1947,7 @@ class MainWindow(QMainWindow):
         if alt >= 0 and neu < alt - 60:          # unter einer Minute Unterschied ist kein Ruecksprung
             antwort = QMessageBox.question(
                 self, "Uhr stellen",
-                f"Die Uhr des Gastsystems geht von {rtc.anzeige(alt)} auf {rtc.anzeige(neu)} zurück.\n\n"
+                f"Die Uhr des Gastsystems geht von {rtc.anzeige(rtc.ortszeit(alt, self._rtc_versatz()))} auf {rtc.anzeige(rtc.ortszeit(neu, self._rtc_versatz()))} zurück.\n\n"
                 "Dateien, die das Gastsystem schon mit der späteren Zeit angelegt hat, tragen dann "
                 "einen Zeitstempel aus der Zukunft; Werkzeuge wie make halten sie für neuer als alles, "
                 "was jetzt entsteht.\n\nTrotzdem zurückstellen?",

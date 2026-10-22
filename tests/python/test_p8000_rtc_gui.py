@@ -24,10 +24,16 @@ def umgebung(tmp_path, monkeypatch):
     monkeypatch.setenv("K1520_DISKS", str(tmp_path / "disks"))
     monkeypatch.delenv("K1520_INSTANZ", raising=False)
     monkeypatch.delenv("K1520_KONFIG", raising=False)
+    # Zone des Wirts fest (R4b): die Anzeige rechnet UTC -> Ortszeit; die Tests rechnen mit UTC,
+    # einzelne setzen eine andere Zone.
+    monkeypatch.setenv("TZ", "UTC")
+    time.tzset()
     from app import config_io
     ordner = Path(config_io.default_config_dir())
     ordner.mkdir(parents=True, exist_ok=True)
-    return ordner
+    yield ordner
+    monkeypatch.undo()
+    time.tzset()
 
 
 def _fenster(qapp, modell=None):
@@ -185,6 +191,7 @@ def test_kern_parameter_traegt_typ_versatz_und_batteriedatei(umgebung, monkeypat
     hw = p.hardware_standard("p8000-ot")
     k = p.kern_parameter("p8000-ot", hw)["p8000"]
     assert k["rtc"] == "u130x" and k["rtc_jahresversatz"] == -40
+    assert k["rtc_utc"] == 1                                   # R4b: die Karte laeuft immer in UTC
     assert k["rtc_zustand"] == rtc.zustand_pfad("p8000emu")
     assert Path(k["rtc_zustand"]).parent == Path(rtc.paths.config_dir())
     hw["rtc"], hw["rtc_versatz"] = "rtc72421", "-28"
@@ -269,7 +276,7 @@ def test_stellen_ohne_ruecksprung_fragt_nicht(umgebung, qapp):
         assert w.emulator.rtc_stellen(calendar.timegm((2020, 1, 1, 0, 0, 0)))
         w.settings_widget.rtc_stellen_button.click()           # kein Meldungsfenster erlaubt (conftest)
         assert time.gmtime(w.emulator.rtc_zeit()).tm_year == time.localtime().tm_year - 40
-        assert abs(w.emulator.rtc_zeit() - (calendar.timegm(time.localtime()) - 40 * 365.2425 * 86400)) < 3 * 86400
+        assert abs(w.emulator.rtc_zeit() - (int(time.time()) - 40 * 365.2425 * 86400)) < 3 * 86400
     finally:
         _zu(w, qapp)
 
@@ -310,10 +317,10 @@ def test_stellen_bei_ausgeschalteter_maschine_schreibt_die_batteriedatei(umgebun
         _frage(monkeypatch, QMessageBox.Yes)
         w.settings_widget.rtc_stellen_button.click()
         datei = rtc.zustand_pfad("p8000emu")
-        assert abs(_stand(datei) - calendar.timegm(time.localtime())) <= 5
+        assert abs(_stand(datei) - int(time.time())) <= 5
         w._update_rtc()
         assert w.settings_widget.rtc_zeit_label.text() == rtc.anzeige(
-            rtc.um_jahre(calendar.timegm(time.localtime()), -40))
+            rtc.um_jahre(int(time.time()), -40))
     finally:
         _zu(w, qapp)
 
@@ -326,7 +333,7 @@ def test_stellen_faellt_ohne_karte_auf_die_datei_zurueck(umgebung, qapp, monkeyp
         w.act_power.setChecked(False)
         qapp.processEvents()
         w._on_rtc_stellen()
-        assert abs(_stand(rtc.zustand_pfad("p8000emu")) - calendar.timegm(time.localtime())) <= 5
+        assert abs(_stand(rtc.zustand_pfad("p8000emu")) - int(time.time())) <= 5
     finally:
         _zu(w, qapp)
 
@@ -419,3 +426,66 @@ def test_aus_ein_anzeige_vor_dem_einschalten_ist_die_zeit_danach(umgebung, qapp,
         assert rtc.anzeige(w.emulator.rtc_zeit()) == angezeigt
     finally:
         _zu(w, qapp)
+
+
+# ── AP R4b: die Karte laeuft in UTC, die Anzeige rechnet in die Ortszeit des Wirts ─────────────
+
+def _zone(monkeypatch, name):
+    monkeypatch.setenv("TZ", name)
+    time.tzset()
+
+
+def test_ortszeit_rechnet_am_wirtsjahr_und_haelt_das_gastdatum(umgebung, monkeypatch):
+    from app import rtc
+    _zone(monkeypatch, "Europe/Berlin")
+    winter = calendar.timegm((1990, 1, 1, 12, 0, 0))        # Wirt 2030-01-01: MEZ = +1
+    assert rtc.anzeige(rtc.ortszeit(winter, -40)) == "01.01.1990 13:00"
+    sommer = calendar.timegm((1990, 7, 1, 12, 0, 0))        # Wirt 2030-07-01: MESZ = +2
+    assert rtc.anzeige(rtc.ortszeit(sommer, -40)) == "01.07.1990 14:00"
+    assert rtc.ortszeit(-1, -40) == -1
+    # ohne Versatz im Jahr 1986 (vor jeder Zeitzonentabelle des Wirts): kein Fehler, Datum bleibt
+    assert rtc.anzeige(rtc.ortszeit(calendar.timegm((1986, 1, 1, 0, 0, 0)), 0)).startswith("01.01.1986")
+
+
+def test_anzeige_zeigt_den_kartenwert_in_ortszeit(umgebung, qapp, monkeypatch):
+    """Karte UTC 12:00, Wirtszone Berlin: das Feld nennt 13:00 -- wie date unter WEGA mit TZ=MEZ-1MES."""
+    _zone(monkeypatch, "Europe/Berlin")
+    w = _fenster(qapp)
+    try:
+        assert w.emulator.rtc_stellen(ZIEL)
+        w._update_rtc()
+        assert w.settings_widget.rtc_zeit_label.text() == "01.01.1990 13:00"
+        assert w.status_widget.rtc.text.text() == "RTC: 01.01.1990 13:00"
+        w.act_power.setChecked(False)                         # aus: Startzeit, gleiche Umrechnung
+        qapp.processEvents()
+        w._update_rtc()
+        assert w.settings_widget.rtc_zeit_label.text() == "01.01.1990 13:00"
+    finally:
+        _zu(w, qapp)
+
+
+def test_die_karte_laeuft_in_utc_nicht_in_ortszeit(umgebung, qapp, monkeypatch):
+    from app import rtc
+    _zone(monkeypatch, "Pacific/Auckland")                    # weit von UTC weg
+    w = _fenster(qapp)
+    try:
+        karte = w.emulator.rtc_zeit()
+        utc_jetzt = rtc.um_jahre(int(time.time()), -40)
+        assert abs(karte - utc_jetzt) < 3 * 86400 + 3600
+    finally:
+        _zu(w, qapp)
+
+
+def test_alte_batteriedatei_in_ortszeit_springt_nicht_zurueck(umgebung, qapp, monkeypatch):
+    """Datei der R3 (Stand in Ortszeit, hier Berlin +1) und jetzt UTC: Startregel max(Stand + Abwesenheit,
+    Wirtszeit) -> die Uhr geht hoechstens um die Zonendifferenz VOR (bis zum naechsten Stellen), nie zurueck."""
+    from app import rtc
+    from app.core_binding.k1520 import K1520Emulator
+    jetzt = int(time.time())
+    datei = rtc.zustand_pfad("p8000emu")
+    Path(datei).write_text(f"K1520-P8000-RTC 2\nstand={jetzt + 3600}\nwirt={jetzt}\n")
+    start = K1520Emulator.rtc_startzeit(datei, 0, True)
+    assert start >= jetzt + 3600 and start - jetzt < 3600 + 5
+    # Stand der Datei hinter der Wirtszeit (Zone westlich von UTC): die Wirtszeit gewinnt
+    Path(datei).write_text(f"K1520-P8000-RTC 2\nstand={jetzt - 3600}\nwirt={jetzt}\n")
+    assert K1520Emulator.rtc_startzeit(datei, 0, True) >= jetzt - 5

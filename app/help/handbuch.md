@@ -1756,8 +1756,7 @@ nebeneinander. Ein Wechsel ist ein Kaltstart.
 * **Zeitversatz.** Die Uhr zeigt dem Gast die Zeit des Wirts um 0, 28 oder 40 Jahre zurück
   (gerechnet wird nur, was der Gast liest und schreibt). *−28 Jahre* trifft Wochentag **und**
   Schaltjahrmuster, *−40 Jahre* nur das Schaltjahrmuster. Vorgabe: *−40 Jahre*. Das Feld ist nur
-  mit gesteckter Karte aktiv. Es gilt immer die **Ortszeit** des Wirts.
-  Alle drei Werte sind für **beide** Karten wählbar; der Emulator bildet die 2019-Grenze des echten
+  mit gesteckter Karte aktiv.   Alle drei Werte sind für **beide** Karten wählbar; der Emulator bildet die 2019-Grenze des echten
   U130x-Chips bewusst nicht nach, die Karte arbeitet auch ohne Versatz. Was dabei zu beachten ist:
   ohne Versatz lässt sich die U130x unter WEGA nicht mit `sa.timer` stellen (der Treiber nimmt nur
   die Jahre 1980–2019 an); *−28 Jahre* trifft im Wirtsjahr 2028 den Jahr-2000-Fehler der
@@ -1769,8 +1768,14 @@ nebeneinander. Ein Wechsel ist ein Kaltstart.
 * **Ohne 16-Bit-Teil** (Ausstattung *nur 8-Bit*) sind beide Felder ausgegraut; die Wahl bleibt
   gemerkt und gilt wieder, sobald die Ausstattung ein 16-Bit-Teil hat. Im Betrieb *nur Terminal*
   fehlt die Gruppe ganz.
+* **Zeitzone.** Die Karte läuft immer in **UTC**; WEGA liest sie als GMT und rechnet mit seiner
+  eigenen `TZ` (ausgeliefert `MEZ-1MES`) in Ortszeit um. Das Programm zeigt deshalb die Kartenzeit
+  **in der Ortszeit des Wirts**, also das, was `date` unter WEGA zeigt. Setzt man unter WEGA eine
+  andere `TZ`, zeigt `date` entsprechend eine andere Zeit als dieses Feld. Eine Batteriedatei aus
+  der Zeit vor dieser Regel (Ortszeit gespeichert) geht bis zum nächsten *Uhr nach Wirtszeit stellen*
+  um die Zonendifferenz vor; zurück springt sie nie.
 * **Anzeige.** *Uhrzeit des Gastsystems* nennt die Zeit, die der Gast von der Karte liest (mit
-  Versatz); bei laufender Maschine ändert sie sich einmal je Minute. Ist die Maschine aus, steht dort
+  Versatz, in Ortszeit); bei laufender Maschine ändert sie sich einmal je Minute. Ist die Maschine aus, steht dort
   die Zeit, mit der sie jetzt starten würde. Dieselbe Zeit steht als Feld **RTC:** in der Statuszeile.
 * **Warum die Uhr nie zurückspringt.** Die Uhr zählt in **Maschinenzeit**, nicht nach der Wanduhr.
   WEGA liest sie nur beim Start und zählt danach selbst; läuft die Emulation schneller als in
