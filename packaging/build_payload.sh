@@ -635,6 +635,7 @@ if ist_windows; then
 else
     cp "$SELF_DIR/uv_pins.txt"              "$STAGE/uv_pins.txt"
     cp "$SELF_DIR/install.sh"               "$STAGE/install.sh"
+    cp "$SELF_DIR/install_raspberrypi.sh"   "$STAGE/install_raspberrypi.sh"
     cp "$SELF_DIR/launcher.sh"              "$STAGE/launcher.sh"
     cp "$SELF_DIR/disktool_launcher.sh"     "$STAGE/disktool_launcher.sh"
     cp "$SELF_DIR/k1520disktool.desktop.in" "$STAGE/k1520disktool.desktop.in"
@@ -647,7 +648,7 @@ else
     cp "$SELF_DIR/p8000emu.desktop.in"      "$STAGE/p8000emu.desktop.in"
     cp "$SELF_DIR/mc80emu.desktop.in"       "$STAGE/mc80emu.desktop.in"
     cp "$SELF_DIR/lib/common.sh"            "$STAGE/lib/common.sh"
-    chmod +x "$STAGE/install.sh"
+    chmod +x "$STAGE/install.sh" "$STAGE/install_raspberrypi.sh"
 fi
 # LICENSE = der reine englische MIT-Text (GitHubs Lizenzerkennung verlangt ihn
 # unveraendert), LIZENZ.txt = deutsche Uebersetzung + englischer Text + Hinweis
