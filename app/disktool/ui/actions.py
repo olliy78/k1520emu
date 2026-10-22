@@ -25,12 +25,12 @@ from app.disktool.ui.icons import icon
 _SPEC: List[Tuple] = [
     # ── Datei ───────────────────────────────────────────────────────────────
     ("oeffnen", "Abbild &öffnen…", "open", "Ctrl+O",
-     "Ein Diskettenabbild öffnen (.hfe, .dmk, .img, .cqm)", "_oeffnen_dialog", False),
+     "Ein Diskettenabbild öffnen (.hfe, .dmk, .img, .cqm, .td0, .imd)", "_oeffnen_dialog", False),
     ("neu", "&Neue Diskette…", "disk-new", "Ctrl+N",
      "Eine Diskette anlegen — wahlweise bootfähig", "_neu_dialog", False),
     # Bewusst OHNE Tastenkuerzel (die Kuerzeltabelle des Handbuchs ist ein Vertrag).
     ("tar_satz", "tar-&Satz öffnen…", None, None,
-     "Mehrere Abbilder (.cqm/.img/…) in wählbarer Reihenfolge als EINEN tar-Strom öffnen "
+     "Mehrere Abbilder (.cqm/.td0/.imd/.img/…) in wählbarer Reihenfolge als EINEN tar-Strom öffnen "
      "(ein tar-Archiv, das auf mehrere Disketten verteilt ist)", "_tar_satz_dialog", False),
     # Entwurf 37 T4.  Bewusst OHNE Tastenkuerzel (die Kuerzeltabelle des Handbuchs ist ein Vertrag).
     ("tar_neu", "Neue tar-Diskette / tar-Sat&z…", None, None,

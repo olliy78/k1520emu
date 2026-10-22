@@ -6,7 +6,7 @@ Dieses Werkzeug holt Dateien von Disketten der K1520-Rechner (A5120, A5130, PC 1
 auf den heutigen Rechner und schreibt sie zurück. Es liest und schreibt die
 Dateisysteme von **CP/A**, **SCPX**, **UDOS/ZDOS**, **UDOS1715/NDOS** und
 **SCP1700** (CP/M-86 des A7100) in den
-Abbildformaten `.hfe`, `.dmk`, `.img` und `.cqm` (CopyQM; soweit das Medium darstellbar ist).
+Abbildformaten `.hfe`, `.dmk`, `.img`, `.cqm` (CopyQM), `.td0` (TeleDisk) und `.imd` (ImageDisk; soweit das Medium darstellbar ist).
 Dazu kommen die UNIX-Disketten des P8000: **WEGA** (mit Modus, Besitzer und Zeit je
 Datei), **tar-Disketten** ohne Dateisystem und **Plattenabbilder** (`.img.gz`) mit ihren
 Partitionen — alle ohne UDOS-Angaben. Alles
@@ -57,7 +57,7 @@ nicht dort, wo das Programm installiert ist:
 
 | Ordner | Wofür |
 |--------|-------|
-| `K1520emu/Disketten` | die Abbilder (`.hfe`, `.dmk`, `.img`, `.cqm`) |
+| `K1520emu/Disketten` | die Abbilder (`.hfe`, `.dmk`, `.img`, `.cqm`, `.td0`, `.imd`) |
 | `K1520emu/Dateien` | was von den Disketten geholt und auf sie geschrieben wird |
 
 Dort gehen die Dateidialoge auf, und die rechte Hälfte zeigt beim Start den
@@ -106,7 +106,7 @@ Dasselbe geht mit der Maus: Dateien von einer Hälfte in die andere ziehen. Und
 Dinge von außen an — und sonst nichts (überall sonst zeigt der Mauszeiger
 „verboten"; die Statuszeile nennt den Grund):
 
-- **Links (Diskette):** ein **Abbild** (`.hfe`, `.dmk`, `.img`, `.cqm`, Groß-/Kleinschreibung
+- **Links (Diskette):** ein **Abbild** (`.hfe`, `.dmk`, `.img`, `.cqm`, `.td0`, `.imd`, Groß-/Kleinschreibung
   egal) wird **geöffnet**, genau wie *Datei ▸ Öffnen* (mit Rückfrage bei
   ungespeicherten Änderungen). Es darf nur **ein** Abbild auf einmal sein, und
   nicht zusammen mit anderen Dateien. Andere Dateien und Ordner werden wie bisher
@@ -426,6 +426,18 @@ Abbild als `.hfe` im Archiv (wie bei jeder Quelle); das Inhaltsverzeichnis nennt
 als Quelle samt Kommentar, das maschinenlesbare Verzeichnis führt unter `source_container` die
 Angaben und die Prüfsumme der `.cqm`-Datei. Beispiel Konvertieren (Aufnahme → CopyQM, wo es
 passt): `k1520disktool save-as scheibe.hfe scheibe.cqm`.
+
+## TeleDisk- und ImageDisk-Abbilder
+
+Abbilder des Programms TeleDisk (`.td0`) und der ImageDisk (`.imd`) werden wie ein `.cqm`
+gelesen und geschrieben (Öffnen, Dateien holen, Speichern, *Speichern unter…*, *Neue Diskette*,
+Schreibschutz-Schalter). *Diskettenangaben…* zeigt Version, Datum, Datenrate (`.td0`), Spuren,
+Sektoren, den **Kommentar** und **Warnungen** (z. B. beschädigte Sektorprüfsummen). **Fehler-
+und Löschmarken** der Sektoren bleiben erhalten. Nicht darstellbar sind UDOS/ZDOS
+(Sektorkontrollblock hinter der Daten-CRC) und unformatierte Disketten; ein `.imd` kennt
+außerdem nur **eine** Sektorgröße je Spur. Ein `.td0` wird immer unkomprimiert („TD“)
+geschrieben; **Pseudosektoren** der Datei bleiben nur beim Speichern in `.td0` erhalten.
+Auch hier gilt: tar-Disketten bleiben gesperrt.
 
 ## Containerformate im Vergleich
 

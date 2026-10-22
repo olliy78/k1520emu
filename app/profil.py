@@ -131,6 +131,9 @@ class Programmprofil:
     #: Hinweise, die der Laufwerkskasten beim Einlegen eines ``.cqm`` zeigt (Hinweiszeile,
     #: kein Meldungsfenster): was CopyQM an DIESEM Rechner unbrauchbar macht.  Leer = keine.
     cqm_hinweise: Tuple[str, ...] = ()
+    #: Dasselbe fuer ``.td0`` (TeleDisk) und ``.imd`` (ImageDisk).
+    td0_hinweise: Tuple[str, ...] = ()
+    imd_hinweise: Tuple[str, ...] = ()
     #: Diskettenlaufwerke (K5122 o. ae.): ohne sie (MC80) fallen Kasten „Laufwerke“, die
     #: Diskettenmenues und die Laufwerksfelder der Statuszeile weg.
     laufwerke: bool = True
@@ -424,6 +427,12 @@ class Programmprofil:
 #: Hinweise zu CopyQM (.cqm) beim Einlegen; je Profil in `cqm_hinweise` gewaehlt.
 CQM_HINWEIS_UDOS = ("CopyQM-Abbilder sind mit UDOS nicht verwendbar: das Format kann die Sektorkontrollblöcke nicht speichern.")
 CQM_HINWEIS_BOOT = ("CopyQM ist für Bootdisketten ungeeignet: diese enthalten ein gemischtes Format (128-Byte-Systemspuren), das CopyQM nicht darstellen kann.")
+# TeleDisk (.td0) und ImageDisk (.imd): Fehler-/Loeschmarken bleiben erhalten, UDOS geht nicht.
+TD0_HINWEIS_UDOS = ("TeleDisk-Abbilder sind mit UDOS nicht verwendbar: das Format kann die Sektorkontrollblöcke nicht speichern.")
+IMD_HINWEIS_UDOS = ("ImageDisk-Abbilder sind mit UDOS nicht verwendbar: das Format kann die Sektorkontrollblöcke nicht speichern.")
+TD0_HINWEIS_INFO = ("Fehler- und Löschmarken bleiben erhalten. .td0 wird immer unkomprimiert (TD) geschrieben; "
+                    "Pseudosektoren bleiben nur beim Speichern in .td0 erhalten.")
+IMD_HINWEIS_INFO = "Fehler- und Löschmarken bleiben erhalten; Pseudosektoren des .td0 gehen beim Speichern als .imd verloren."
 
 A5120 = Programmprofil(
     maschine="a5120",
@@ -431,6 +440,8 @@ A5120 = Programmprofil(
     titel="A5120 Emulator",
     rechner="A5120",
     cqm_hinweise=(CQM_HINWEIS_UDOS, CQM_HINWEIS_BOOT),
+    td0_hinweise=(TD0_HINWEIS_UDOS, TD0_HINWEIS_INFO),
+    imd_hinweise=(IMD_HINWEIS_UDOS, IMD_HINWEIS_INFO),
     beschreibung="Emulator des Bürocomputers robotron A5120 (K1520-Bus)",
     konfig_datei="a5120emu.yaml",
     vorgabe_datei="default_config_a5120.yaml",
@@ -520,6 +531,8 @@ PRG710 = Programmprofil(
     titel="PRG710 Emulator",
     rechner="PRG 710",
     cqm_hinweise=(CQM_HINWEIS_UDOS,),
+    td0_hinweise=(TD0_HINWEIS_UDOS, TD0_HINWEIS_INFO),
+    imd_hinweise=(IMD_HINWEIS_UDOS, IMD_HINWEIS_INFO),
     beschreibung="Emulator der Programmiergeräte robotron PRG 710 und PRG 710-1 (K1520-Bus)",
     konfig_datei="prg710emu.yaml",
     vorgabe_datei="default_config_prg710.yaml",

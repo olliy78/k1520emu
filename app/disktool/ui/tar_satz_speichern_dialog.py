@@ -95,7 +95,7 @@ class TarSatzSpeichernDialog(QDialog):
     def _waehlen(self) -> None:
         pfad, _ = QFileDialog.getSaveFileName(
             self, "Basisname des Satzes", self.f_basis.text(),
-            "Abbilder (*.hfe *.dmk *.img *.cqm)")
+            "Abbilder (*.hfe *.dmk *.img *.cqm *.td0 *.imd)")
         if pfad:
             self.f_basis.setText(pfad)
 

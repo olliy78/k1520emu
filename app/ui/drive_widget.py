@@ -116,16 +116,21 @@ class DriveWidget(QWidget):
 
     # Dateifilter fuer Oeffnen: alle Container.  .cqm (CopyQM) ist wie .img ein Sektorstrom:
     # schreibbar, aber nur Ziel, wenn das Medium es traegt (doc/merkposten/cqm.md Nr. 4/11).
-    DISK_FILTER = "Disk Images (*.img *.hfe *.dmk *.cqm);;All Files (*)"
+    DISK_FILTER = "Disk Images (*.img *.hfe *.dmk *.cqm *.td0 *.imd);;All Files (*)"
     # Neue Leerdiskette: nur self-describing Container — ein rohes Sektorimage
     # kann "nicht formatiert" nicht ausdruecken (doc/design/09_floppy_drive.md §5).
     BLANK_FILTER = ("Bitstrom-Images (*.hfe *.dmk);;"
                     "Vorformatiertes Sektorimage (*.img);;"
-                    "Vorformatiertes CopyQM-Abbild (*.cqm);;All Files (*)")
+                    "Vorformatiertes CopyQM-Abbild (*.cqm);;"
+                    "Vorformatiertes TeleDisk-Abbild (*.td0);;"
+                    "Vorformatiertes ImageDisk-Abbild (*.imd);;All Files (*)")
     # Speichern unter: .img nur, wenn das Medium sektorweise darstellbar ist.
-    SAVE_FILTER_ALL = "Disk Images (*.hfe *.dmk *.img *.cqm);;All Files (*)"
+    SAVE_FILTER_ALL = "Disk Images (*.hfe *.dmk *.img *.cqm *.td0 *.imd);;All Files (*)"
     # Nur .cqm darstellbar (kein erkanntes Katalogformat, also kein .img).
-    SAVE_FILTER_CQM = "Disk Images (*.hfe *.dmk *.cqm);;All Files (*)"
+    SAVE_FILTER_CQM = "Disk Images (*.hfe *.dmk *.cqm *.td0 *.imd);;All Files (*)"
+    # .cqm/.td0/.imd tragen dieselben Medien (Sektorstrom je Spur, keine Daten hinter der
+    # Daten-CRC); .td0/.imd bilden ausserdem Fehler-/Loeschmarken ab.
+    SEKTORSTROM_ENDUNGEN = (".cqm", ".td0", ".imd")
     SAVE_FILTER_BITSTREAM = "Bitstrom-Images (*.hfe *.dmk);;All Files (*)"
 
     def present_drives(self) -> list:
@@ -458,7 +463,7 @@ class DriveWidget(QWidget):
             # Ohne Endung → .hfe (Leerdiskette).
             if not os.path.splitext(path)[1]:
                 path += ".hfe"
-            if path.lower().endswith((".img", ".cqm")):
+            if path.lower().endswith((".img",) + self.SEKTORSTROM_ENDUNGEN):
                 # Wie .img: ein Sektorstrom kennt "unformatiert" nicht, es entsteht eine
                 # VORFORMATIERTE Diskette; passt deren Geometrie nicht (gemischte
                 # Systemspuren, FM), lehnt der Kern mit Grund ab.
@@ -500,10 +505,13 @@ class DriveWidget(QWidget):
                 return
             if not os.path.splitext(path)[1]:
                 path += ".hfe"
-            if path.lower().endswith(".cqm") and not cqm_ok:
+            endung = os.path.splitext(path)[1].lower()
+            if endung in self.SEKTORSTROM_ENDUNGEN and not cqm_ok:
+                name = {".cqm": "CopyQM-Abbild (.cqm)", ".td0": "TeleDisk-Abbild (.td0)",
+                        ".imd": "ImageDisk-Abbild (.imd)"}[endung]
                 QMessageBox.critical(
                     self, "Nicht möglich",
-                    "Diese Diskette lässt sich nicht als CopyQM-Abbild (.cqm) speichern:\n"
+                    f"Diese Diskette lässt sich nicht als {name} speichern:\n"
                     "unformatierte Spuren oder Nutzdaten hinter der Daten-CRC (z. B. "
                     "UDOS-Sektorkontrollblock) gingen dabei verloren.\n\n"
                     "Bitte .hfe oder .dmk wählen.")
@@ -678,8 +686,10 @@ class DriveWidget(QWidget):
     }
 
     NICHT_SPEICHERBAR = "Abbild nicht speicherbar:"
-    #: Rechnerabhaengige Hinweise zu .cqm (aus dem Programmprofil, vom Hauptfenster gesetzt).
+    #: Rechnerabhaengige Hinweise zu .cqm/.td0/.imd (aus dem Programmprofil, vom Hauptfenster gesetzt).
     cqm_hinweise: tuple = ()
+    td0_hinweise: tuple = ()
+    imd_hinweise: tuple = ()
 
     def _notice_help(self, zeile: str) -> str:
         if zeile.startswith(self.NICHT_SPEICHERBAR):
@@ -698,8 +708,14 @@ class DriveWidget(QWidget):
         except Exception:
             lines = []
         try:
-            if drive in self._mounts and self.emulator.disk_container(drive) == "cqm":
-                lines += list(self.cqm_hinweise)
+            if drive in self._mounts:
+                art = self.emulator.disk_container(drive)
+                if art == "cqm":
+                    lines += list(self.cqm_hinweise)
+                elif art == "td0":
+                    lines += list(self.td0_hinweise)
+                elif art == "imd":
+                    lines += list(self.imd_hinweise)
         except Exception:
             pass
         label = panel._notice_label
@@ -713,35 +729,39 @@ class DriveWidget(QWidget):
                   ("interleave", "Interleave"), ("skew", "Skew"),
                   ("cylinders", "Zylinder"), ("crc", "Prüfwert"))
 
+    #: TeleDisk/ImageDisk: Schluessel der Container-Angaben und ihre Beschriftung.
+    TD0_IMD_FELDER = (("version", "Version"), ("timestamp", "Datum"), ("rate", "Datenrate"),
+                      ("tracks", "Spuren"), ("sectors", "Sektoren"))
+    CONTAINER_NAMEN = {"cqm": "CopyQM-Abbild", "td0": "TeleDisk-Abbild", "imd": "ImageDisk-Abbild"}
+
     def _update_container(self, drive: int):
-        """Abbildkommentar und CopyQM-Kopfdaten als Tooltip am Abbildnamen.  Der
-        Schreibschutz-Haken bleibt frei setzbar (auch bei ``.cqm``)."""
+        """Abbildkommentar und Kopfdaten des Containers (``.cqm``/``.td0``/``.imd``) als
+        Tooltip am Abbildnamen.  Der Schreibschutz-Haken bleibt frei setzbar."""
         panel = self._panels.get(drive)
         if panel is None or not hasattr(panel, "_wp_check"):
             return
         try:
-            cqm = (drive in self._mounts and
-                   self.emulator.disk_container(drive) == "cqm")
+            art = (self.emulator.disk_container(drive) if drive in self._mounts else "")
         except Exception:
-            cqm = False
-        if not cqm:
+            art = ""
+        if art not in self.CONTAINER_NAMEN:
             panel._path_display.setToolTip("")
             return
-        zeilen = []
-        for schluessel, name in self.CQM_FELDER:
+
+        def info(schluessel):
             try:
-                wert = self.emulator.disk_container_info(drive, schluessel)
+                return self.emulator.disk_container_info(drive, schluessel)
             except Exception:
-                wert = ""
-            if wert:
-                zeilen.append(f"{name}: {wert}")
-        try:
-            kommentar = self.emulator.disk_container_info(drive, "comment").strip()
-        except Exception:
-            kommentar = ""
-        text = "CopyQM-Abbild\n" + "\n".join(zeilen)
+                return ""
+        felder = self.CQM_FELDER if art == "cqm" else self.TD0_IMD_FELDER
+        zeilen = [f"{name}: {wert}" for k, name in felder if (wert := info(k))]
+        text = self.CONTAINER_NAMEN[art] + "\n" + "\n".join(zeilen)
+        kommentar = info("comment").strip()
         if kommentar:
             text += "\n\nKommentar:\n" + kommentar
+        warnungen = info("warnings").strip() if art != "cqm" else ""
+        if warnungen:
+            text += "\n\nWarnungen:\n" + warnungen
         panel._path_display.setToolTip(text)
 
     # ── Erkanntes Diskettenformat ────────────────────────────────────────────

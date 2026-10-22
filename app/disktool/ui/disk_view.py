@@ -33,7 +33,7 @@ from app.disktool.ui.schreibsperre import ist_platte
 #: Eigener MIME-Typ fuer das Ziehen von der Diskette in einen Ordner.
 #: Endungen, die das DiskTool als Abbild oeffnet (Gross-/Kleinschreibung egal).
 # `.img.gz`: P8000-Plattenabbilder liegen als `.img.gz` vor (Entwurf 37).
-ABBILD_ENDUNGEN = (".hfe", ".dmk", ".img", ".cqm", ".img.gz")
+ABBILD_ENDUNGEN = (".hfe", ".dmk", ".img", ".cqm", ".td0", ".imd", ".img.gz")
 
 DISK_MIME = "application/x-k1520-diskfiles"
 

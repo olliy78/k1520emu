@@ -62,20 +62,30 @@ _CQM_FELDER = (("description", "Bezeichnung"), ("label", "Etikett"),
                ("cylinders", "Zylinder"), ("crc", "Prüfwert"))
 
 
+_TD0_IMD_FELDER = (("version", "Version"), ("timestamp", "Datum"), ("rate", "Datenrate"),
+                   ("tracks", "Spuren"), ("sectors", "Sektoren"))
+_CONTAINER_NAMEN = {"cqm": "CopyQM (.cqm)", "td0": "TeleDisk (.td0)", "imd": "ImageDisk (.imd)"}
+
+
 def container_zeilen(tool) -> list:
-    """Angaben zum Container der Datei — nur bei ``.cqm`` gibt es welche (Kopf,
-    Prüfwert und der Kommentar des Abbilds)."""
+    """Angaben zum Container der Datei — nur bei ``.cqm``/``.td0``/``.imd`` gibt es
+    welche (Kopf, Prüfwert bzw. Version/Datum/Datenrate, Kommentar, Warnungen)."""
     info = tool.container_info()
-    if info.get("type") != "cqm":
+    art = info.get("type")
+    if art not in _CONTAINER_NAMEN:
         return []
-    zeilen = ["Container:        CopyQM (.cqm)"]
-    for schluessel, name in _CQM_FELDER:
+    zeilen = [f"Container:        {_CONTAINER_NAMEN[art]}"]
+    for schluessel, name in (_CQM_FELDER if art == "cqm" else _TD0_IMD_FELDER):
         if info.get(schluessel):
             zeilen.append(f"{name + ':':<18}{info[schluessel]}")
     kommentar = info.get("comment", "").strip()
     if kommentar:
         zeilen.append("Kommentar:")
         zeilen += [f"  {z}" for z in kommentar.splitlines()]
+    warnungen = info.get("warnings", "").strip() if art != "cqm" else ""
+    if warnungen:
+        zeilen.append("Warnungen:")
+        zeilen += [f"  {z}" for z in warnungen.splitlines()]
     return zeilen
 
 

@@ -28,7 +28,7 @@ Zum Dateiaustausch mit den Disketten gibt es das Schwesterprogramm
    nach dem Boot-ROM stehen.
 2. **Diskette einlegen** — *Datei ▸ Diskette einlegen ▸ Laufwerk A:* oder der
    Knopf *Mount* im Kasten „Laufwerke". Angenommen werden `.hfe`, `.dmk`,
-   `.img` und `.cqm` (CopyQM).
+   `.img`, `.cqm` (CopyQM), `.td0` (TeleDisk) und `.imd` (ImageDisk).
 3. **Kaltstart.** Eine frisch eingelegte Diskette bootet nicht von selbst — der
    Rechner sieht sie erst beim nächsten Start: *Maschine ▸ Rückstellen*
    (Strg+Umschalt+R).
@@ -216,6 +216,18 @@ Speicherabbild weiter) sind:
 ungeeigneten Medium den Grund im Dialog. Wofür welches Format: Bootdisketten und UDOS als
 `.hfe`; Austausch und Archiv einheitlicher Disketten als `.cqm` oder `.img`. Der
 Vergleich aller Formate steht im Handbuch des DiskTool („Containerformate im Vergleich“).
+
+## TeleDisk- und ImageDisk-Abbilder
+
+Ein `.td0` (TeleDisk) oder `.imd` (ImageDisk) wird wie ein `.cqm` eingelegt: les- und
+schreibbar, kein Formatdialog (die Geometrie steht in der Datei). Version, Datum,
+Datenrate, Spuren, Sektoren, der **Kommentar** und etwaige Warnungen stehen als Tooltip am
+Abbildnamen. **Fehler- und Löschmarken** einzelner Sektoren bleiben erhalten; **UDOS** auf
+A5120 und PRG 710 lässt sich in keinem der beiden Formate darstellen (Sektorkontrollblock
+hinter der Datenprüfsumme), unformatierte Disketten ebenfalls nicht. Ein `.td0` wird immer
+unkomprimiert („TD“) geschrieben; **Pseudosektoren** (Zusatzblöcke der Datei) bleiben nur
+beim Speichern in `.td0` erhalten. *Speichern unter…* und *Leere Diskette* bieten beide
+Endungen an und nennen bei einem ungeeigneten Medium den Grund im Dialog.
 
 ## Laufwerke bestücken
 

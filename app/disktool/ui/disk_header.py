@@ -124,12 +124,18 @@ class DiskHeader(QFrame):
         # CopyQM: der Kommentar des Abbilds (Herkunft, Stand …) steht am Dateinamen.
         info = tool.container_info()
         tipp = ""
-        if info.get("type") == "cqm":
-            tipp = "CopyQM-Abbild"
+        art = info.get("type")
+        if art in ("cqm", "td0", "imd"):
+            tipp = {"cqm": "CopyQM-Abbild", "td0": "TeleDisk-Abbild",
+                    "imd": "ImageDisk-Abbild"}[art]
             if info.get("description"):
                 tipp += f"\nBezeichnung: {info['description']}"
+            if art != "cqm" and info.get("timestamp"):
+                tipp += f"\nDatum: {info['timestamp']}"
             if info.get("comment", "").strip():
                 tipp += "\n\nKommentar:\n" + info["comment"].strip()
+            if art != "cqm" and info.get("warnings", "").strip():
+                tipp += "\n\nWarnungen:\n" + info["warnings"].strip()
         self.pfad.setToolTip(tipp)
         erkannt = "erkannt" if tool.unambiguous else "erkannt, nicht eindeutig"
         teile = [f"Format: {tool.format}",

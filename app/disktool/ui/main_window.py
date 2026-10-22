@@ -2189,10 +2189,11 @@ class MainWindow(QMainWindow):
         unverändert.
         """
         ext = str(path).lower().rsplit(".", 1)[-1]
-        if ext in ("img", "cqm") and any(f.name == filesystem and f.type == "udos"
-                                        for f in filesystems()):
-            if ext == "cqm":
-                return ("CopyQM kann die Sektorkontrollblöcke von UDOS nicht speichern: "
+        if ext in ("img", "cqm", "td0", "imd") and any(f.name == filesystem and f.type == "udos"
+                                                      for f in filesystems()):
+            if ext in ("cqm", "td0", "imd"):
+                traeger = {"cqm": "CopyQM", "td0": "TeleDisk", "imd": "ImageDisk"}[ext]
+                return (f"{traeger} kann die Sektorkontrollblöcke von UDOS nicht speichern: "
                         "die Dateiverkettung steht dort hinter der Daten-CRC jedes Sektors "
                         "und ginge verloren.\n\nBitte .hfe oder .dmk wählen.")
             return (f"{filesystem} lässt sich nicht als Sektorabbild (.img) ablegen: die "
@@ -2369,7 +2370,7 @@ class MainWindow(QMainWindow):
     #: Dateifilter „Abbild oeffnen"; .cqm ist auch als Ziel erlaubt (wie .img, soweit darstellbar).
     #: Plattenabbilder (P8000, WEGA) heissen `.img.gz` oder `.img`; ob eine Datei eine Platte
     #: ist, entscheidet ihr Plattenkopf, nicht der Name (`open_image`).
-    OEFFNEN_FILTER = ("Diskettenabbilder und Platten (*.hfe *.dmk *.img *.img.gz *.cqm);;"
+    OEFFNEN_FILTER = ("Diskettenabbilder und Platten (*.hfe *.dmk *.img *.img.gz *.cqm *.td0 *.imd);;"
                       "Alle Dateien (*)")
 
     def _tar_satz_dialog(self) -> None:
@@ -2559,6 +2560,10 @@ class MainWindow(QMainWindow):
         filter_.append("DMK-Abbild (*.dmk)")
         if info.get("img"):
             filter_ += ["Sektorabbild (*.img)", "CopyQM-Abbild (*.cqm)"]
+        if info.get("td0"):
+            filter_.append("TeleDisk-Abbild (*.td0)")
+        if info.get("imd"):
+            filter_.append("ImageDisk-Abbild (*.imd)")
         titel = ("Neue tar-Diskette anlegen" if dlg.art() == EINZEL
                  else "Basisname des neuen tar-Satzes")
         pfad, _ = QFileDialog.getSaveFileName(
@@ -2698,7 +2703,7 @@ class MainWindow(QMainWindow):
         pfad, _ = QFileDialog.getSaveFileName(
             self, "Neue Diskette anlegen", self._disketten_ordner(),
             "HFE-Abbild (*.hfe);;DMK-Abbild (*.dmk);;Sektorabbild (*.img);;"
-            "CopyQM-Abbild (*.cqm)")
+            "CopyQM-Abbild (*.cqm);;TeleDisk-Abbild (*.td0);;ImageDisk-Abbild (*.imd)")
         if not pfad:
             return
         grund = self._container_grund(pfad, fs)
@@ -2755,7 +2760,7 @@ class MainWindow(QMainWindow):
         filter_ = "HFE-Abbild (*.hfe);;DMK-Abbild (*.dmk)"
         if not any(f.name == self.tool.filesystem and f.type == "udos"
                    for f in filesystems()):
-            filter_ += ";;Sektorabbild (*.img);;CopyQM-Abbild (*.cqm)"
+            filter_ += ";;Sektorabbild (*.img);;CopyQM-Abbild (*.cqm);;TeleDisk-Abbild (*.td0);;ImageDisk-Abbild (*.imd)"
         pfad, _ = QFileDialog.getSaveFileName(
             self, "Speichern unter", self._neben_der_diskette(), filter_)
         if pfad:
