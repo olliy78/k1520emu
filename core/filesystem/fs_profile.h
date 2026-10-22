@@ -150,7 +150,8 @@ struct FsProfile {
         if (ext_lower == "dmk") return allow_dmk;
         // CopyQM legt nur Sektor-Nutzdaten ab (wie .img): kein Gap-Anhang, keine
         // Sonderspuren — was ein .img nicht traegt, traegt auch ein .cqm nicht.
-        if (ext_lower == "cqm") return allow_img;
+        // TeleDisk (.td0) und ImageDisk (.imd) sind ebenfalls Sektorlisten: dieselbe Grenze.
+        if (ext_lower == "cqm" || ext_lower == "td0" || ext_lower == "imd") return allow_img;
         return false;
     }
 };

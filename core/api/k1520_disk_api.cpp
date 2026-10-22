@@ -403,6 +403,10 @@ extern "C" const char* k1520d_container_info(K1520Disk h, const char* key) {
         w = v.containerName();
     } else if (const CqmCodec::SourceInfo* c = v.cqmInfo()) {
         w = CqmCodec::infoField(*c, k);
+    } else if (const Td0Codec::SourceInfo* t = v.td0Info()) {
+        w = Td0Codec::infoField(*t, k);
+    } else if (const ImdCodec::SourceInfo* i = v.imdInfo()) {
+        w = ImdCodec::infoField(*i, k);
     }
     return halte(H(h)->s_container, std::move(w));
 }
@@ -460,7 +464,7 @@ extern "C" uint64_t k1520d_tar_format_bytes(int i) {
 
 extern "C" int k1520d_tar_format_container(int i) {
     const TarFormatInfo* f = tarFormat(i);
-    return f ? (f->img ? 1 : 0) | (f->hfe ? 2 : 0) : 0;
+    return f ? (f->img ? 1 : 0) | (f->hfe ? 2 : 0) | (f->img ? 4 | 8 : 0) : 0;
 }
 
 extern "C" K1520Disk k1520d_tar_satz_neu(const char* format, const char* basename) {

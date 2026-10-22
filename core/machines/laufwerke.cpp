@@ -109,11 +109,15 @@ bool Laufwerke::createDisk(int drive, const std::string& path,
         // haengen (UDOS-Sektorkontrollblock), was ein .img nicht speichern koennte.
         if (!path.empty()
             && (ImageCodec::fromExtension(path) == ContainerType::Img
-                || ImageCodec::fromExtension(path) == ContainerType::Cqm)) {
-            last_error_ = "Eine leere Diskette kann nicht als rohes Sektorimage (.img) "
-                          "oder CopyQM-Abbild (.cqm) angelegt werden - bitte .hfe oder "
-                          ".dmk waehlen (oder ein Diskettenformat angeben, um "
-                          "vorformatiert anzulegen).";
+                || ImageCodec::fromExtension(path) == ContainerType::Cqm
+                || ImageCodec::fromExtension(path) == ContainerType::Td0
+                || ImageCodec::fromExtension(path) == ContainerType::Imd)) {
+            // Sektorlisten-Container (.img/.cqm/.td0/.imd) kennen keine unformatierte
+            // Spur; TD0/IMD wuerden die Datei beim Schreiben ablehnen ("unformatiert").
+            last_error_ = "Eine leere Diskette kann nicht als rohes Sektorimage (.img), "
+                          "CopyQM- (.cqm), TeleDisk- (.td0) oder ImageDisk-Abbild (.imd) "
+                          "angelegt werden - bitte .hfe oder .dmk waehlen (oder ein "
+                          "Diskettenformat angeben, um vorformatiert anzulegen).";
             return false;
         }
 
@@ -223,8 +227,10 @@ std::string Laufwerke::diskContainerInfo(int drive, const std::string& key) cons
     const DiskImage* img = afs_.drive(drive).image();
     if (!img) return "";
     if (key == "type") return ImageCodec::name(img->container());
-    const CqmCodec::SourceInfo* c = img->cqmInfo();
-    return c ? CqmCodec::infoField(*c, key) : "";
+    if (const CqmCodec::SourceInfo* c = img->cqmInfo()) return CqmCodec::infoField(*c, key);
+    if (const Td0Codec::SourceInfo* t = img->td0Info()) return Td0Codec::infoField(*t, key);
+    if (const ImdCodec::SourceInfo* i = img->imdInfo()) return ImdCodec::infoField(*i, key);
+    return "";
 }
 
 std::string Laufwerke::diskNotice(int drive) const {

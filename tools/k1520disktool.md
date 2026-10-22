@@ -2,7 +2,7 @@
 
 Holt Dateien von CP/A-, SCPX-, **UDOS**-, **UDOS1715**- und **SCP1700**-Disketten
 (CP/M-86 des A7100) und schreibt sie zurück —
-auf `.img`, `.hfe`, `.dmk` und `.cqm` (CopyQM).  Dieselbe Bibliothek treibt die Oberfläche
+auf `.img`, `.hfe`, `.dmk`, `.cqm` (CopyQM), `.td0` (TeleDisk) und `.imd` (ImageDisk).  Dieselbe Bibliothek treibt die Oberfläche
 (`run_disktool.sh`); Feinentwurf: `doc/design/13_k1520disktool.md`.
 
 Aufruf im Projekt immer über `tools/dev.sh tool k1520disktool …` — nie direkt aus
@@ -956,6 +956,26 @@ verloren (neuer Standardkopf).  Nicht moeglich: UDOS (Gap-Verkettung), CP/A-Disk
 k1520disktool create neu.cqm --fs scpx640
 k1520disktool put neu.cqm PIP.COM
 k1520disktool save-as alt.hfe kopie.cqm      # und zurueck: save-as kopie.cqm neu.hfe
+```
+
+## TeleDisk (`.td0`) und ImageDisk (`.imd`) lesen und schreiben
+
+Beide Container sind Sektorlisten je Spur (Entwurf `doc/design/38_td0_imd.md`) und verhalten sich
+wie `.cqm`/`.img`: lesen immer, `put`/`rm`/`mkdir`/`repair`/`create`/`save-as` nach demselben
+Muster, beim Oeffnen geschuetzt, kein erzwungener Schreibschutz.  Anders als `.img`/`.cqm` tragen sie
+gemischte Geometrie (CP/A-Systemspuren mit 128 B plus Datenspuren), FM- und MFM-Spuren, die
+Sektorreihenfolge (Interleave), geloeschte Marken und Datenfehler.  `info` zeigt eine Zeile
+`TeleDisk: …` bzw. `ImageDisk: …` (Version, Datum, Kommentar, Spuren/Sektoren, Hinweise).
+Kommentar, Datum und (TD0) Pseudosektoren eines geladenen Abbilds bleiben bei `save-as x.td0 y.td0`
+und beim Zurueckschreiben erhalten.  `.td0` wird immer **unkomprimiert** (`TD`) geschrieben, auch wenn
+die Quelle gepackt (`td`) war.  Nicht darstellbar (Befehl bricht mit Begruendung ab, Datei bleibt):
+UDOS (Gap-Verkettung), unformatiertes Medium, ID-CRC-Fehler, bei `.imd` gemischte Sektorgroessen
+in einer Spur.  Eine leere (unformatierte) Diskette laesst sich in diesen Containern nicht anlegen.
+
+```
+k1520disktool info scp07.td0
+k1520disktool create neu.imd --fs scpx640
+k1520disktool save-as scp07.td0 scp07.hfe     # und zurueck: save-as scp07.hfe kopie.td0
 ```
 
 ## tar-Disketten und `tar-satz`

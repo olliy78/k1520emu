@@ -1042,7 +1042,7 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
         }
         if (!dv->profile_->allowsContainer(ext)) {
             err = "Dateisystem '" + fs_name + "' kann nicht als ." + ext + " vorliegen"
-                + (dv->profile_->type == FsType::Udos && ext == "img"
+                + (dv->profile_->type == FsType::Udos && (ext == "img" || ext == "cqm" || ext == "td0" || ext == "imd")
                        ? " (der UDOS-Sektorkontrollblock steht hinter der Daten-CRC)" : "");
             return nullptr;
         }
@@ -1662,7 +1662,8 @@ namespace {
 bool satzContainer(const std::string& pfad, std::string& ext_klein) {
     ext_klein = endung(pfad);
     for (char& c : ext_klein) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return ext_klein == "img" || ext_klein == "hfe" || ext_klein == "dmk" || ext_klein == "cqm";
+    return ext_klein == "img" || ext_klein == "hfe" || ext_klein == "dmk" || ext_klein == "cqm"
+        || ext_klein == "td0" || ext_klein == "imd";
 }
 
 /// Ist die Geometrie einheitlich (ein Spurformat fuer jede Spur)?  Nur dann ist "gleiches Format
@@ -1734,10 +1735,10 @@ std::unique_ptr<DiskVolume> DiskVolume::tarSatzNeu(const std::string& format,
     }
     std::string ext;
     if (!satzContainer(basisname, ext)) {
-        err = "Der Basisname braucht die Endung .img, .hfe, .dmk oder .cqm: " + basisname;
+        err = "Der Basisname braucht die Endung .img, .hfe, .dmk, .cqm, .td0 oder .imd: " + basisname;
         return nullptr;
     }
-    if ((ext == "img" || ext == "cqm") && !fmt->allow_img) {
+    if ((ext == "img" || ext == "cqm" || ext == "td0" || ext == "imd") && !fmt->allow_img) {
         err = "Format '" + format + "' ist nicht als ." + ext + " darstellbar";
         return nullptr;
     }
@@ -1820,8 +1821,8 @@ TarSatzPlan DiskVolume::tarSatzPlanen(const std::string& basisname) const {
     if (p.basisname.empty()) return nein("Kein Basisname angegeben.");
     std::string ext;
     if (!satzContainer(p.basisname, ext))
-        return nein("Der Basisname braucht die Endung .img, .hfe, .dmk oder .cqm: " + p.basisname);
-    if ((ext == "img" || ext == "cqm") && !f->allow_img) return nein("Das Format ist nicht als ." + ext + " darstellbar.");
+        return nein("Der Basisname braucht die Endung .img, .hfe, .dmk, .cqm, .td0 oder .imd: " + p.basisname);
+    if ((ext == "img" || ext == "cqm" || ext == "td0" || ext == "imd") && !f->allow_img) return nein("Das Format ist nicht als ." + ext + " darstellbar.");
     if (ext == "hfe" && !f->allow_hfe) return nein("Das Format ist nicht als .hfe darstellbar.");
 
     // Nutzlaenge: der Strom ohne die Nullen hinter der Endmarke (das fuellt das letzte Abbild).
@@ -3781,8 +3782,8 @@ bool DiskVolume::exportImage(const std::string& path) const {
                     "speichern" + std::string(satz_einzel_ ? " (erst die Aenderungen speichern)." : "."));
     std::optional<DiskFormat> of;
     const std::string zielEndung = endung(path);
-    if (zielEndung == "img" || zielEndung == "cqm") {
-        // Ein CopyQM-Abbild traegt wie ein .img nur Sektordaten.
+    if (zielEndung == "img" || zielEndung == "cqm" || zielEndung == "td0" || zielEndung == "imd") {
+        // CopyQM/TeleDisk/ImageDisk tragen wie ein .img nur Sektordaten.
         if (profile_ && !profile_->allow_img)
             return fail("Dieses Dateisystem kann nicht als ." + zielEndung + " abgelegt werden "
                         "(der UDOS-Sektorkontrollblock steht hinter der Daten-CRC).");
@@ -3851,7 +3852,7 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
     const std::string ext = endung(path);
     if (!profil->allowsContainer(ext)) {
         err = "Dateisystem '" + fs_name + "' kann nicht als ." + ext + " angelegt werden"
-            + (profil->type == FsType::Udos && ext == "img"
+            + (profil->type == FsType::Udos && (ext == "img" || ext == "cqm" || ext == "td0" || ext == "imd")
                    ? " (der UDOS-Sektorkontrollblock steht hinter der Daten-CRC)" : "");
         return nullptr;
     }
@@ -3949,7 +3950,7 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
         v.space = std::make_unique<SectorSpace>(dv->disk_->medium(), *fmt);
         if (profil->type == FsType::Tar) {
             // tar720_leer: ganz Null (DiskImage::create fuellt mit 0xE5 wie eine CP/M-Diskette).
-            // tar braucht keinen UDOS-Gap, also geht auch .img/.cqm; das Medium bleibt gueltig
+            // tar braucht keinen UDOS-Gap, also geht auch .img/.cqm/.td0/.imd; das Medium bleibt gueltig
             // formatiert (Adressmarken, CRCs), nur die Nutzdaten sind Null.
             const std::vector<uint8_t> nullen(static_cast<size_t>(v.space->size()), 0);
             if (!v.space->write(0, nullen.data(), nullen.size())) {
@@ -4132,8 +4133,8 @@ bool DiskVolume::saveAs(const std::string& path) {
                     "speichern" + std::string(satz_einzel_ ? " (erst die Aenderungen speichern)." : "."));
     std::optional<DiskFormat> of;
     const std::string zielEndung = endung(path);
-    if (zielEndung == "img" || zielEndung == "cqm") {
-        // Ein CopyQM-Abbild traegt wie ein .img nur Sektordaten.
+    if (zielEndung == "img" || zielEndung == "cqm" || zielEndung == "td0" || zielEndung == "imd") {
+        // CopyQM/TeleDisk/ImageDisk tragen wie ein .img nur Sektordaten.
         if (profile_ && !profile_->allow_img)
             return fail("Dieses Dateisystem kann nicht als ." + zielEndung + " gespeichert werden "
                         "(der UDOS-Sektorkontrollblock steht hinter der Daten-CRC).");

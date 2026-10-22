@@ -289,3 +289,185 @@ TEST(DiskImageAutoFlush, SchreibgeschuetzteDisketteBleibtUnberuehrt) {
 
     std::filesystem::remove(path);
 }
+
+// ─── TeleDisk (.td0) und ImageDisk (.imd) als gebundene Container (AP K1, #9) ──
+
+namespace {
+
+/// 2 Zylinder x 1 Kopf mit je 2 Sektoren zu 128 B (0xAA / 0xBB), als .hfe-Quelle.
+std::unique_ptr<DiskImage> kleineDiskette() {
+    auto img = DiskImage::createBlank(2, 1, Encoding::MFM);
+    img->writeTrack(0, 0, makeTrack(0, 2, 128, 0xAA));
+    img->writeTrack(1, 0, makeTrack(1, 2, 128, 0xBB));
+    return img;
+}
+
+const char* const kSektorContainer[] = {".td0", ".imd"};
+
+}  // namespace
+
+/// @test saveAs in td0/imd, zurueck nach hfe: Nutzdaten bleiben, Bindung folgt, Info-Zugriff gesetzt
+TEST(DiskImageTd0Imd, ContainerwechselHfeNachTd0NachImdNachHfe) {
+    const auto td0 = tmpPath("k1520_test_di_k1.td0");
+    const auto imd = tmpPath("k1520_test_di_k1.imd");
+    const auto hfe = tmpPath("k1520_test_di_k1.hfe");
+    for (const auto& p : {td0, imd, hfe}) std::filesystem::remove(p);
+
+    auto img = kleineDiskette();
+    ASSERT_TRUE(img->saveAs(td0, std::nullopt)) << img->lastError();
+    EXPECT_EQ(img->container(), ContainerType::Td0);
+    ASSERT_NE(img->td0Info(), nullptr);
+    EXPECT_EQ(img->imdInfo(), nullptr);
+    EXPECT_EQ(img->td0Info()->sectors, 4u);
+
+    ASSERT_TRUE(img->saveAs(imd, std::nullopt)) << img->lastError();
+    EXPECT_EQ(img->container(), ContainerType::Imd);
+    EXPECT_EQ(img->td0Info(), nullptr) << "Vorlage des alten Containers muss weg";
+    ASSERT_NE(img->imdInfo(), nullptr);
+    EXPECT_EQ(img->imdInfo()->sectors, 4u);
+
+    ASSERT_TRUE(img->saveAs(hfe, std::nullopt)) << img->lastError();
+    EXPECT_EQ(img->imdInfo(), nullptr);
+
+    for (const auto& p : {td0, imd, hfe}) {
+        auto back = DiskImage::open(p, std::nullopt, false);
+        ASSERT_NE(back, nullptr) << p;
+        auto s0 = TrackCodec::parseTrack(back->readTrack(0, 0));
+        auto s1 = TrackCodec::parseTrack(back->readTrack(1, 0));
+        ASSERT_EQ(s0.size(), 2u) << p;
+        ASSERT_EQ(s1.size(), 2u) << p;
+        EXPECT_EQ(s0[0].data[0], 0xAA) << p;
+        EXPECT_EQ(s1[1].data[5], 0xBB) << p;
+    }
+    for (const auto& p : {td0, imd, hfe}) std::filesystem::remove(p);
+}
+
+/// @test Autoflush schreibt nach der Ruhezeit in td0/imd zurueck; Kommentar der Quelle ueberlebt
+TEST(DiskImageTd0Imd, AutoflushSchreibtZurueckUndBehaeltDenKopf) {
+    for (const char* ext : kSektorContainer) {
+        SCOPED_TRACE(ext);
+        const auto path = tmpPath((std::string("k1520_test_di_k1_af") + ext).c_str());
+        std::filesystem::remove(path);
+
+        auto img = kleineDiskette();
+        ASSERT_TRUE(img->saveAs(path, std::nullopt)) << img->lastError();
+        const std::string kommentar0 = std::string(ext) == ".td0" ? img->td0Info()->comment
+                                                                   : img->imdInfo()->comment;
+        EXPECT_NE(kommentar0.find("k1520emu"), std::string::npos) << kommentar0;
+
+        img->writeTrack(1, 0, makeTrack(1, 2, 128, 0x77));
+        EXPECT_FALSE(img->autoFlush(1000));
+        EXPECT_FALSE(img->autoFlush(1000 + kAutoFlushDelayCycles / 2));
+        EXPECT_TRUE(img->autoFlush(1000 + kAutoFlushDelayCycles + 1)) << img->lastError();
+        EXPECT_FALSE(img->saveFailed());
+
+        auto back = DiskImage::open(path, std::nullopt, false);
+        ASSERT_NE(back, nullptr);
+        auto secs = TrackCodec::parseTrack(back->readTrack(1, 0));
+        ASSERT_EQ(secs.size(), 2u);
+        EXPECT_EQ(secs[0].data[0], 0x77);
+        const std::string kommentar1 = std::string(ext) == ".td0" ? back->td0Info()->comment
+                                                                   : back->imdInfo()->comment;
+        EXPECT_EQ(kommentar1, kommentar0);
+        std::filesystem::remove(path);
+    }
+}
+
+/// @test Ein selbst geschriebener IMD-Kommentar uebersteht Autoflush UND saveAs auf eine zweite .imd
+TEST(DiskImageTd0Imd, ImdKommentarUebersteheSpeichernUndSaveAs) {
+    const auto a = tmpPath("k1520_test_di_k1_kom_a.imd");
+    const auto b = tmpPath("k1520_test_di_k1_kom_b.imd");
+    for (const auto& p : {a, b}) std::filesystem::remove(p);
+
+    // Quelle mit eigener Kopfzeile + Kommentar schreiben (Vorlage ueber ImdCodec).
+    {
+        auto img = kleineDiskette();
+        ImdCodec::SourceInfo vorlage;
+        const std::string kopf = "IMD 1.18: 01/02/2020 03:04:05\r\nMein Kommentar\r\n";
+        vorlage.raw_header.assign(kopf.begin(), kopf.end());
+        std::string err;
+        ASSERT_TRUE(ImdCodec::save(a, img->medium(), &vorlage, nullptr, err)) << err;
+    }
+    auto img = DiskImage::open(a, std::nullopt, false);
+    ASSERT_NE(img, nullptr);
+    ASSERT_NE(img->imdInfo(), nullptr);
+    EXPECT_EQ(img->imdInfo()->version, "1.18");
+    EXPECT_NE(img->imdInfo()->comment.find("Mein Kommentar"), std::string::npos);
+
+    img->writeTrack(0, 0, makeTrack(0, 2, 128, 0x42));
+    ASSERT_TRUE(img->flush()) << img->lastError();
+    ASSERT_TRUE(img->saveAs(b, std::nullopt)) << img->lastError();
+    for (const auto& p : {a, b}) {
+        auto back = DiskImage::open(p, std::nullopt, false);
+        ASSERT_NE(back, nullptr) << p;
+        EXPECT_EQ(back->imdInfo()->version, "1.18") << p;
+        EXPECT_NE(back->imdInfo()->comment.find("Mein Kommentar"), std::string::npos) << p;
+        EXPECT_EQ(TrackCodec::parseTrack(back->readTrack(0, 0))[0].data[0], 0x42) << p;
+    }
+    for (const auto& p : {a, b}) std::filesystem::remove(p);
+}
+
+/// @test Unformatiertes Medium: saveAs lehnt td0/imd mit Grund ab, Datei entsteht nicht, keine Umbindung
+TEST(DiskImageTd0Imd, LeerdisketteWirdAbgelehnt) {
+    for (const char* ext : kSektorContainer) {
+        SCOPED_TRACE(ext);
+        const auto path = tmpPath((std::string("k1520_test_di_k1_blank") + ext).c_str());
+        std::filesystem::remove(path);
+        auto img = DiskImage::createBlank(2, 1, Encoding::MFM);
+        EXPECT_FALSE(img->saveAs(path, std::nullopt));
+        EXPECT_NE(std::string(img->lastError()).find("unformatiert"), std::string::npos)
+            << img->lastError();
+        EXPECT_FALSE(std::filesystem::exists(path));
+        EXPECT_FALSE(img->hasFile());
+    }
+}
+
+/// @test Nicht darstellbare Aenderung (Nachspann hinter der Daten-CRC) im gebundenen td0/imd:
+///       flush scheitert mit Grund, Datei bleibt, saveFailed() gesetzt
+TEST(DiskImageTd0Imd, NichtDarstellbaresMediumMeldetLastError) {
+    for (const char* ext : kSektorContainer) {
+        SCOPED_TRACE(ext);
+        const auto path = tmpPath((std::string("k1520_test_di_k1_fail") + ext).c_str());
+        std::filesystem::remove(path);
+        auto img = kleineDiskette();
+        ASSERT_TRUE(img->saveAs(path, std::nullopt)) << img->lastError();
+
+        // Spur mit Nutzdaten hinter der Daten-CRC (UDOS-Kontrollblock).
+        std::vector<LogicalSector> secs;
+        for (int i = 1; i <= 2; ++i) {
+            LogicalSector ls;
+            ls.cyl = 1; ls.head = 0; ls.id = static_cast<uint8_t>(i); ls.size = 128;
+            ls.data.assign(128, 0x11);
+            ls.tail.assign(4, 0x99);
+            secs.push_back(std::move(ls));
+        }
+        img->writeTrack(1, 0, TrackCodec::buildTrack(secs, Encoding::MFM));
+        EXPECT_FALSE(img->flush());
+        EXPECT_TRUE(img->saveFailed());
+        EXPECT_NE(std::string(img->lastError()), "");
+        auto back = DiskImage::open(path, std::nullopt, false);
+        ASSERT_NE(back, nullptr);
+        EXPECT_EQ(TrackCodec::parseTrack(back->readTrack(1, 0))[0].data[0], 0xBB)
+            << "Datei darf nicht verstuemmelt sein";
+        std::filesystem::remove(path);
+    }
+}
+
+/// @test create() mit Format legt td0/imd vorformatiert an (Interleave-/Sektorzahl aus dem Format)
+TEST(DiskImageTd0Imd, CreateMitFormatLegtVorformatiertAn) {
+    for (const char* ext : kSektorContainer) {
+        SCOPED_TRACE(ext);
+        const auto path = tmpPath((std::string("k1520_test_di_k1_create") + ext).c_str());
+        std::filesystem::remove(path);
+        std::string err;
+        auto img = DiskImage::create(path, makeSimpleFormat(), false, Encoding::MFM, &err);
+        ASSERT_NE(img, nullptr) << err;
+        EXPECT_TRUE(std::filesystem::exists(path));
+        auto back = DiskImage::open(path, std::nullopt, false);
+        ASSERT_NE(back, nullptr);
+        EXPECT_EQ(back->geometry().num_cyls, 2u);
+        EXPECT_EQ(TrackCodec::parseTrack(back->readTrack(1, 0)).size(), 2u);
+        img.reset(); back.reset();
+        std::filesystem::remove(path);
+    }
+}

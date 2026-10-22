@@ -27,6 +27,8 @@
 #pragma once
 #include "disk_format.h"
 #include "cqm_codec.h"
+#include "imd_codec.h"
+#include "td0_codec.h"
 #include "disk_medium.h"
 #include "image_codec.h"
 #include "track_image.h"
@@ -67,7 +69,8 @@ public:
      *
      * Der Container wird per @ref ImageCodec::detect bestimmt (HFE-Signatur, CQM-Kopf,
      * DMK-Header, sonst `.img`).  @p fmt ist **nur** fuer `.img` noetig — `.hfe`/`.dmk`/
-     * `.cqm` sind self-describing.  Ein `.cqm` ist wie ein `.img` beschreibbar, soweit das
+     * `.cqm`/`.td0`/`.imd` sind self-describing.  `.cqm`, `.td0` und `.imd` sind wie ein
+     * `.img` beschreibbar, soweit das
      * Medium sich als Sektorstrom darstellen laesst (@ref rawCompatible, einheitliche
      * Geometrie); sonst bleibt die Datei unveraendert (@ref saveFailed).
      *
@@ -168,7 +171,15 @@ public:
     /// @brief Kopfdaten eines geladenen CopyQM-Abbilds (nullptr bei anderen Containern).
     ///        Der Kommentartext des Abbilds steht in `cqmInfo()->comment`.
     const CqmCodec::SourceInfo* cqmInfo() const {
-        return cqm_info_.has_value() ? &cqm_info_.value() : nullptr;
+        return kopf_.cqm.has_value() ? &kopf_.cqm.value() : nullptr;
+    }
+    /// @brief Kopfdaten eines geladenen TeleDisk-Abbilds (nullptr bei anderen Containern).
+    const Td0Codec::SourceInfo* td0Info() const {
+        return kopf_.td0.has_value() ? &kopf_.td0.value() : nullptr;
+    }
+    /// @brief Kopfdaten eines geladenen ImageDisk-Abbilds (nullptr bei anderen Containern).
+    const ImdCodec::SourceInfo* imdInfo() const {
+        return kopf_.imd.has_value() ? &kopf_.imd.value() : nullptr;
     }
 
     /**
@@ -213,19 +224,27 @@ public:
 
     const char* lastError() const { return last_error_.c_str(); }
 
-    /// @brief Scheiterte das letzte Zurueckschreiben (z. B. Medium nicht als .cqm/.img
-    ///        darstellbar)?  Die Datei ist dann unveraendert, die Maschine laeuft weiter;
+    /// @brief Scheiterte das letzte Zurueckschreiben (z. B. Medium nicht als
+    ///        .cqm/.td0/.imd/.img darstellbar)?  Die Datei ist dann unveraendert, die Maschine laeuft weiter;
     ///        der Grund steht in @ref lastError.  Wird vom naechsten erfolgreichen
     ///        flush()/saveAs() zurueckgesetzt.
     bool saveFailed() const { return save_failed_; }
 
 private:
-    /// Medium in @p ziel schreiben; bei .cqm mit den Kopfdaten der Quelle als Vorlage,
-    /// die der neuen Datei kommen nach @p info_neu.
+    /// Kopfdaten der Quelle je Container (hoechstens eines gesetzt): bleiben ueber jedes
+    /// Speichern erhalten (Kommentar, Datum, Pseudosektoren, Modi …).
+    struct KopfInfos {
+        std::optional<CqmCodec::SourceInfo> cqm;
+        std::optional<Td0Codec::SourceInfo> td0;
+        std::optional<ImdCodec::SourceInfo> imd;
+    };
+
+    /// Medium in @p ziel schreiben; bei .cqm/.td0/.imd mit den Kopfdaten der Quelle als
+    /// Vorlage, die der neuen Datei kommen nach @p info_neu.
     bool speichere(const std::string& path, ContainerType ziel, const DiskFormat* fmt,
-                   std::optional<CqmCodec::SourceInfo>* info_neu, std::string& err) const;
+                   KopfInfos* info_neu, std::string& err) const;
     bool exportImpl(const std::string& path, std::optional<DiskFormat> fmt,
-                    std::optional<CqmCodec::SourceInfo>* info_neu);
+                    KopfInfos* info_neu);
 
     DiskMedium    medium_;
     /// Physische Bindung (nullptr = Datei/Speicher).  `shared_ptr`, weil die C-ABI dem
@@ -236,7 +255,7 @@ private:
     std::optional<DiskFormat> disk_format_;           ///< nur bei .img
     bool          write_protect_   = false;
     bool          binding_writable_ = true;
-    std::optional<CqmCodec::SourceInfo> cqm_info_;    ///< nur bei geladenem .cqm
+    KopfInfos     kopf_;                              ///< nur bei geladenem .cqm/.td0/.imd
     std::string   last_error_;
     bool          save_failed_     = false;   ///< letztes flush() scheiterte
     uint64_t      failed_revision_ = 0;       ///< … bei dieser Medium-Revision

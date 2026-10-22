@@ -74,7 +74,7 @@ struct TarFormatInfo {
     std::string name;            ///< Katalogname (z. B. `k5601_9x512`)
     std::string description;     ///< Klartext fuer die Auswahl
     uint64_t    bytes = 0;       ///< Nutzbytes EINES Abbilds
-    bool        img = false;     ///< als `.img`/`.cqm` darstellbar
+    bool        img = false;     ///< als `.img`/`.cqm`/`.td0`/`.imd` darstellbar
     bool        hfe = false;     ///< als `.hfe` darstellbar (`.dmk` geht immer)
 };
 
@@ -929,9 +929,11 @@ public:
     bool dirty() const;
 
     /// @brief Kopfdaten (inkl. Kommentartext) eines CopyQM-Abbilds; nullptr bei anderen Containern.
-    /// @brief Container der gebundenen Datei: "img" | "hfe" | "dmk" | "cqm".
+    /// @brief Container der gebundenen Datei: "img" | "hfe" | "dmk" | "cqm" | "td0" | "imd".
     std::string containerName() const;
     const CqmCodec::SourceInfo* cqmInfo() const { return disk_ ? disk_->cqmInfo() : nullptr; }
+    const Td0Codec::SourceInfo* td0Info() const { return disk_ ? disk_->td0Info() : nullptr; }
+    const ImdCodec::SourceInfo* imdInfo() const { return disk_ ? disk_->imdInfo() : nullptr; }
 
     /**
      * @brief Aenderungen in die gebundene Datei schreiben.

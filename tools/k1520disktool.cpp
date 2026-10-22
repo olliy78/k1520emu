@@ -705,7 +705,7 @@ int cmd_tar_formate(const Optionen&) {
 
 int cmd_tar_satz_neu(const Optionen& o) {
     if (o.rest.size() != 2 || o.format.empty()) {
-        std::cerr << "Fehler: tar-satz-neu --format <name> <basisname.img|hfe|dmk|cqm> [--put ...]\n";
+        std::cerr << "Fehler: tar-satz-neu --format <name> <basisname.img|hfe|dmk|cqm|td0|imd> [--put ...]\n";
         return kFehler;
     }
     std::string err;
@@ -765,6 +765,27 @@ int cmd_info(const Optionen& o) {
         std::cout << "CopyQM:      " << cq->description;
         if (!cq->comment.empty()) std::cout << " - Kommentar: " << cq->comment;
         std::cout << "\n";
+    }
+    if (const Td0Codec::SourceInfo* t = v->td0Info()) {
+        std::cout << "TeleDisk:    Version " << Td0Codec::infoField(*t, "version")
+                  << ", " << t->rate_kbps << " kbit/s" << (t->advanced ? ", gepackt (td)" : "")
+                  << ", " << t->tracks << " Spuren, " << t->sectors << " Sektoren";
+        if (!t->timestamp.empty()) std::cout << ", " << t->timestamp;
+        if (!t->comment.empty()) std::cout << " - Kommentar: " << t->comment;
+        std::cout << "\n";
+        if (!t->warnings.empty())
+            std::cout << "             " << t->warnings.size() << " Hinweis(e), erster: "
+                      << t->warnings.front() << "\n";
+    }
+    if (const ImdCodec::SourceInfo* im = v->imdInfo()) {
+        std::cout << "ImageDisk:   Version " << im->version << ", " << im->tracks << " Spuren, "
+                  << im->sectors << " Sektoren";
+        if (!im->timestamp.empty()) std::cout << ", " << im->timestamp;
+        if (!im->comment.empty()) std::cout << " - Kommentar: " << im->comment;
+        std::cout << "\n";
+        if (!im->warnings.empty())
+            std::cout << "             " << im->warnings.size() << " Hinweis(e), erster: "
+                      << im->warnings.front() << "\n";
     }
 
     for (int i = 0; i < v->volumeCount(); ++i) {
@@ -1776,7 +1797,7 @@ int cmd_measure(const Optionen& o) {
     auto disk = DiskImage::open(o.rest[1], std::nullopt, /*write_protect=*/true);
     if (!disk) {
         std::cerr << "Fehler: Abbild nicht ladbar (selbstbeschreibend muss es sein - "
-                     ".hfe, .dmk oder .cqm): " << o.rest[1] << "\n";
+                     ".hfe, .dmk, .cqm, .td0 oder .imd): " << o.rest[1] << "\n";
         return kFehler;
     }
     const std::vector<MeasuredTrack> gemessen = GeometryProbe::measure(disk->medium());

@@ -72,7 +72,23 @@ std::unique_ptr<DiskImage> DiskImage::open(const std::string& path,
             // Die Kopfdaten der Quelle (Kommentar, Etikett, …) bleiben dabei erhalten.
             CqmCodec::SourceInfo info;
             ok = CqmCodec::load(path, img->medium_, &info, err);
-            img->cqm_info_         = info;
+            img->kopf_.cqm         = info;
+            img->binding_writable_ = true;
+            break;
+        }
+        case ContainerType::Td0: {
+            // Wie .cqm: schreibbar; die Quell-SourceInfo wird behalten und bei JEDEM
+            // Speichern als Vorlage uebergeben (Kommentar, Datum, Pseudosektoren).
+            Td0Codec::SourceInfo info;
+            ok = Td0Codec::load(path, img->medium_, &info, err);
+            img->kopf_.td0         = std::move(info);
+            img->binding_writable_ = true;
+            break;
+        }
+        case ContainerType::Imd: {
+            ImdCodec::SourceInfo info;
+            ok = ImdCodec::load(path, img->medium_, &info, err);
+            img->kopf_.imd         = std::move(info);
             img->binding_writable_ = true;
             break;
         }
@@ -135,8 +151,8 @@ std::unique_ptr<DiskImage> DiskImage::create(const std::string& path,
     if (img->container_ == ContainerType::Img) img->disk_format_ = fmt;
 
     std::string err;
-    if (!img->speichere(path, img->container_, img->diskFormat(), &img->cqm_info_, err)) {
-        if (fehler) *fehler = err;     // z. B. Grund, warum das Medium nicht als .cqm/.img darstellbar ist
+    if (!img->speichere(path, img->container_, img->diskFormat(), &img->kopf_, err)) {
+        if (fehler) *fehler = err;     // z. B. Grund, warum das Medium nicht als .cqm/.td0/.imd/.img darstellbar ist
         return nullptr;
     }
 
@@ -175,17 +191,38 @@ bool DiskImage::writeTrack(uint8_t cyl, uint8_t head, const TrackImage& track) {
 // ─── Persistenz ──────────────────────────────────────────────────────────────
 
 bool DiskImage::speichere(const std::string& path, ContainerType ziel, const DiskFormat* fmt,
-                          std::optional<CqmCodec::SourceInfo>* info_neu, std::string& err) const {
-    if (ziel != ContainerType::Cqm)
-        return ImageCodec::save(path, ziel, fmt, medium_, err);
-    // CopyQM: die Kopfdaten der Quelle (falls es eine gab) mitgeben und die der neuen
-    // Datei zurueckmelden — der Kommentar muss ein Umspeichern ueberleben.
-    CqmCodec::SourceInfo neu;
-    if (!CqmCodec::save(path, medium_, cqm_info_.has_value() ? &cqm_info_.value() : nullptr,
-                        &neu, err))
-        return false;
-    if (info_neu) *info_neu = std::move(neu);
-    return true;
+                          KopfInfos* info_neu, std::string& err) const {
+    // CopyQM/TeleDisk/ImageDisk: die Kopfdaten der Quelle (falls es eine gab) mitgeben und
+    // die der neuen Datei zurueckmelden — Kommentar (und bei TD0 die Pseudosektoren)
+    // muessen ein Umspeichern ueberleben.  Die Vorlage gilt nur fuer den GLEICHEN Container.
+    switch (ziel) {
+        case ContainerType::Cqm: {
+            CqmCodec::SourceInfo neu;
+            if (!CqmCodec::save(path, medium_, kopf_.cqm ? &kopf_.cqm.value() : nullptr,
+                                &neu, err))
+                return false;
+            if (info_neu) info_neu->cqm = std::move(neu);
+            return true;
+        }
+        case ContainerType::Td0: {
+            Td0Codec::SourceInfo neu;
+            if (!Td0Codec::save(path, medium_, kopf_.td0 ? &kopf_.td0.value() : nullptr,
+                                &neu, err))
+                return false;
+            if (info_neu) info_neu->td0 = std::move(neu);
+            return true;
+        }
+        case ContainerType::Imd: {
+            ImdCodec::SourceInfo neu;
+            if (!ImdCodec::save(path, medium_, kopf_.imd ? &kopf_.imd.value() : nullptr,
+                                &neu, err))
+                return false;
+            if (info_neu) info_neu->imd = std::move(neu);
+            return true;
+        }
+        default:
+            return ImageCodec::save(path, ziel, fmt, medium_, err);
+    }
 }
 
 bool DiskImage::flush() {
@@ -209,7 +246,7 @@ bool DiskImage::flush() {
     }
 
     std::string err;
-    if (!speichere(path_, container_, diskFormat(), &cqm_info_, err)) {
+    if (!speichere(path_, container_, diskFormat(), &kopf_, err)) {
         last_error_ = err;
         save_failed_ = true;
         failed_revision_ = medium_.revision();
@@ -249,7 +286,7 @@ bool DiskImage::exportTo(const std::string& path, std::optional<DiskFormat> fmt)
 }
 
 bool DiskImage::exportImpl(const std::string& path, std::optional<DiskFormat> fmt,
-                           std::optional<CqmCodec::SourceInfo>* info_neu) {
+                           KopfInfos* info_neu) {
     const ContainerType ziel = ImageCodec::fromExtension(path);
 
     // Eine Abbilddatei ist eine Aussage ueber die GANZE Diskette.  Bei einer physischen
@@ -291,7 +328,7 @@ bool DiskImage::exportImpl(const std::string& path, std::optional<DiskFormat> fm
 }
 
 bool DiskImage::saveAs(const std::string& path, std::optional<DiskFormat> fmt) {
-    std::optional<CqmCodec::SourceInfo> info_neu;
+    KopfInfos info_neu;
     if (!exportImpl(path, fmt, &info_neu)) return false;
 
     // Ab jetzt zeigt die Bindung auf die neue Datei — Autosave folgt dorthin.
@@ -299,7 +336,7 @@ bool DiskImage::saveAs(const std::string& path, std::optional<DiskFormat> fmt) {
     container_        = ImageCodec::fromExtension(path);
     disk_format_      = (container_ == ContainerType::Img) ? fmt : std::nullopt;
     binding_writable_ = true;
-    cqm_info_         = std::move(info_neu);   // nur bei .cqm gesetzt
+    kopf_             = std::move(info_neu);   // nur bei .cqm/.td0/.imd gesetzt
     save_failed_      = false;
     medium_.clearDirty();
     dirty_since_      = 0;

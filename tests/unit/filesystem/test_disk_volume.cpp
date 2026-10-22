@@ -957,6 +957,95 @@ TEST(DiskVolume, CopyQmAnlegenSchreibenUndNeuLaden) {
     fs::remove(pfad);
 }
 
+/// @test TeleDisk/ImageDisk wie CopyQM beschreibbar (AP K1): create → put → flush → neu oeffnen,
+///       Info-Zugriff, kein erzwungener Schreibschutz; Kreuz td0 -> imd -> hfe -> td0 gleiche Dateiliste;
+///       auch die gemischte Geometrie (CP/A: 128-B-Systemspuren) geht, anders als bei .cqm
+TEST(DiskVolume, Td0UndImdAnlegenSchreibenUndKreuzUmspeichern) {
+    for (const char* fs_name : {"scpx640", "cpa780"}) {
+        for (const char* ext : {"td0", "imd"}) {
+            SCOPED_TRACE(std::string(fs_name) + "." + ext);
+            const std::string pfad = k1520test::tempPath((std::string("k1520_test_dv_k1.") + ext).c_str());
+            fs::remove(pfad);
+            TempOrdner q("k1520_test_dv_k1_q");
+            schreibe(q / "HALLO.TXT", std::string(3000, 'x') + "ende");
+            std::string err;
+            {
+                auto dv = DiskVolume::create(pfad, fs_name, "", formate(), dateisysteme(), err);
+                ASSERT_NE(dv, nullptr) << err;
+                EXPECT_EQ(dv->containerName(), ext);
+                EXPECT_FALSE(dv->readOnly());
+                EXPECT_FALSE(dv->readOnlyForced());
+                ASSERT_TRUE(dv->insertAll(q.path(), TransferOptions{})) << dv->lastError();
+                ASSERT_TRUE(dv->flush()) << dv->lastError();
+            }
+            auto dv = oeffne(pfad, "", err);
+            ASSERT_NE(dv, nullptr) << err;
+            EXPECT_EQ(dv->containerName(), ext);
+            EXPECT_TRUE(dv->readOnly());           // Vorgabe beim Oeffnen: geschuetzt ...
+            EXPECT_FALSE(dv->readOnlyForced());    // ... aber frei aufhebbar
+            EXPECT_EQ(dv->cqmInfo(), nullptr);
+            if (std::string(ext) == "td0") { EXPECT_NE(dv->td0Info(), nullptr); EXPECT_EQ(dv->imdInfo(), nullptr); }
+            else                           { EXPECT_NE(dv->imdInfo(), nullptr); EXPECT_EQ(dv->td0Info(), nullptr); }
+            EXPECT_EQ(dv->detection().filesystem, fs_name);
+            bool gefunden = false;
+            for (const auto& e : dv->list()) gefunden |= (e.name.find("HALLO") != std::string::npos);
+            EXPECT_TRUE(gefunden);
+
+            // get: Inhalt zurueckholen
+            TempOrdner aus("k1520_test_dv_k1_aus");
+            TransferOptions t;
+            ASSERT_TRUE(dv->extractAll(aus.path(), t)) << dv->lastError();
+
+            // Nochmal schreiben ueber das wieder geoeffnete Volume (Vorlage muss halten)
+            dv->setReadOnly(false);
+            schreibe(q / "ZWEI.TXT", "zwei");
+            ASSERT_TRUE(dv->insertAll(q.path(), TransferOptions{})) << dv->lastError();
+            ASSERT_TRUE(dv->flush()) << dv->lastError();
+            const size_t n = dv->list().size();
+
+            // Kreuz: -> anderer sektorbasierter Container -> hfe -> zurueck
+            const std::string andere = k1520test::tempPath(std::string(ext) == "td0" ? "k1520_test_dv_k1x.imd"
+                                                                                   : "k1520_test_dv_k1x.td0");
+            const std::string hfe = k1520test::tempPath("k1520_test_dv_k1x.hfe");
+            const std::string zurueck = k1520test::tempPath((std::string("k1520_test_dv_k1z.") + ext).c_str());
+            ASSERT_TRUE(dv->exportImage(andere)) << dv->lastError();
+            auto a = oeffne(andere, "", err);
+            ASSERT_NE(a, nullptr) << err;
+            EXPECT_EQ(a->list().size(), n);
+            ASSERT_TRUE(a->exportImage(hfe)) << a->lastError();
+            auto h = oeffne(hfe, "", err);
+            ASSERT_NE(h, nullptr) << err;
+            EXPECT_EQ(h->list().size(), n);
+            ASSERT_TRUE(h->exportImage(zurueck)) << h->lastError();
+            auto z = oeffne(zurueck, "", err);
+            ASSERT_NE(z, nullptr) << err;
+            EXPECT_EQ(z->list().size(), n);
+            dv.reset(); a.reset(); h.reset(); z.reset();
+            for (const auto& p : {pfad, andere, hfe, zurueck}) fs::remove(p);
+        }
+    }
+}
+
+/// @test UDOS (Gap-Verkettung) laesst sich nie als .td0/.imd anlegen oder speichern (wie .img/.cqm)
+TEST(DiskVolume, Td0UndImdLehnenUdosAb) {
+    for (const char* ext : {"td0", "imd"}) {
+        SCOPED_TRACE(ext);
+        const std::string pfad = k1520test::tempPath((std::string("k1520_test_dv_k1_udos.") + ext).c_str());
+        fs::remove(pfad);
+        std::string err;
+        auto dv = DiskVolume::create(pfad, "udos_ds77", "FRISCH", formate(), dateisysteme(), err);
+        EXPECT_EQ(dv, nullptr);
+        EXPECT_NE(err.find("UDOS"), std::string::npos) << err;
+        EXPECT_FALSE(fs::exists(pfad));
+
+        auto udos = oeffne(fixture("udos_boot_scp.hfe"), "", err);
+        ASSERT_NE(udos, nullptr) << err;
+        EXPECT_FALSE(udos->exportImage(pfad));
+        EXPECT_NE(std::string(udos->lastError()).find("UDOS"), std::string::npos) << udos->lastError();
+        EXPECT_FALSE(fs::exists(pfad));
+    }
+}
+
 TEST(DiskVolume, ExportSchreibtEineKopieOhneUmzubinden) {
     std::string err;
     auto dv = oeffne(fixture("cpa_cpa780_k5601_clock.hfe"), "cpa780", err);

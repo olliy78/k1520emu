@@ -1,0 +1,7 @@
+# UDOS laesst sich weder als .td0 noch als .imd ablegen (Sektorkontrollblock hinter der Daten-CRC).
+tool:   k1520disktool
+disk:   udos_boot_scp.hfe
+tmpfile geht.nicht.td0:
+run:    save-as %DISK% %geht.nicht.td0%
+expect: Daten-CRC
+exit:   1

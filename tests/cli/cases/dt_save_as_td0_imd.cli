@@ -1,0 +1,13 @@
+# `save-as` in TeleDisk (.td0) und ImageDisk (.imd) und zurueck: Dateiliste bleibt, `info`
+# zeigt die Kopfzeile des Containers (AP K1, Entwurf 38).
+tool:   k1520disktool
+disk:   cpa_cpa780_k5601_clock.img
+tmpfile kopie.td0:
+tmpfile kopie.imd:
+setup_run: save-as %DISK% %kopie.td0%
+setup_run: save-as %kopie.td0% %kopie.imd%
+run:    info %kopie.imd%
+expect: ImageDisk:
+expect: cpa780
+expect: k1520emu
+exit:   0

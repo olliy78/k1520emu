@@ -46,7 +46,7 @@ typedef enum {
 
 /**
  * @brief Diskette oeffnen.
- * @param path       `.img`, `.hfe`, `.dmk` oder `.cqm` (CopyQM; schreibbar, soweit das
+ * @param path       `.img`, `.hfe`, `.dmk`, `.cqm` (CopyQM), `.td0` (TeleDisk) oder `.imd` (ImageDisk) (schreibbar, soweit das
  *                   Medium als Sektorstrom darstellbar ist)
  * @param fs_name    Dateisystem erzwingen; NULL oder "" = erkennen
  * @param read_only  **so oeffnen, dass nichts kaputtgehen kann.**  Beim blossen
@@ -269,7 +269,10 @@ K1520_API const char* k1520d_detected_fs(K1520Disk h);
 /**
  * @brief Auskunft ueber den Container der Datei (additiv, ABI-stabil).
  *
- * @p key: "type" (img|hfe|dmk|cqm; bei tar-satz der des ersten Abbilds); nur bei
+ * @p key: "type" (img|hfe|dmk|cqm|td0|imd; bei tar-satz der des ersten Abbilds); nur bei
+ * `.td0`: "version" ("1.5"), "timestamp" ("TT.MM.JJJJ hh:mm:ss"), "comment", "rate" (kbit/s),
+ * "tracks", "sectors", "warnings" ('\n'-getrennt); nur bei `.imd`: dieselben ohne "rate"
+ * (Kopfzeile: "version" "1.17", "timestamp" "TT/MM/JJJJ hh:mm:ss"); nur bei
  * `.cqm`: "description" (Bezeichnung), "label" (Etikett, leer bei "** NONE **"),
  * "comment" (Kommentartext), "interleave", "skew", "cylinders" ("gespeichert/gesamt"),
  * "crc" ("ok" | "falsch" | "nicht geprueft").  Unbekannter Schluessel oder nicht
@@ -301,10 +304,11 @@ K1520_API const char* k1520d_tar_format_name(int i);
 K1520_API const char* k1520d_tar_format_description(int i);
 /// @brief Nutzbytes EINES Abbilds in diesem Format.
 K1520_API uint64_t    k1520d_tar_format_bytes(int i);
-/// @brief Darstellbare Container als Bitmaske: 1 = .img/.cqm, 2 = .hfe (.dmk geht immer).
+/// @brief Darstellbare Container als Bitmaske: 1 = .img/.cqm, 2 = .hfe (.dmk geht immer),
+///        4 = .td0, 8 = .imd (Bits 4/8 additiv, immer zusammen mit Bit 1).
 K1520_API int         k1520d_tar_format_container(int i);
 /// @brief Leeren tar-Satz im Format @p format anlegen (nichts auf der Platte; @p basename mit
-///        Endung .img|.hfe|.dmk|.cqm bestimmt Container und Namen beim Speichern).  NULL = Fehler
+///        Endung .img|.hfe|.dmk|.cqm|.td0|.imd bestimmt Container und Namen beim Speichern).  NULL = Fehler
 ///        (@ref k1520d_last_open_error).
 K1520_API K1520Disk k1520d_tar_satz_neu(const char* format, const char* basename);
 /// @brief Neue LEERE tar-Diskette im Format @p format als Datei @p path anlegen (sofort geschrieben,

@@ -2169,13 +2169,14 @@ class K1520Emulator:
         return p.decode('utf-8', 'replace') if p else ""
 
     def disk_container(self, drive: int) -> str:
-        """Container of the bound file ("img" | "hfe" | "dmk"; "" = none)."""
+        """Container of the bound file ("img" | "hfe" | "dmk" | "cqm" | "td0" | "imd"; "" = none)."""
         c = _lib.k1520_disk_container(self._handle, ctypes.c_int(drive))
         return c.decode('utf-8', 'replace') if c else ""
 
     def disk_container_info(self, drive: int, key: str) -> str:
-        """Metadaten des Containers (nur ``.cqm``): description, label, comment,
-        interleave, skew, cylinders, crc; sonst leer."""
+        """Metadaten des Containers: ``.cqm`` description, label, comment,
+        interleave, skew, cylinders, crc; ``.td0``/``.imd`` version, timestamp, comment,
+        tracks, sectors, warnings (``.td0`` auch rate); sonst leer."""
         c = _lib.k1520_disk_container_info(self._handle, ctypes.c_int(drive),
                                            key.encode())
         return c.decode('utf-8', 'replace') if c else ""

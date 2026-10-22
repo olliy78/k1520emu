@@ -1225,7 +1225,7 @@ class DiskTool:
     def tar_formate() -> list:
         """Die Katalogformate, die sich für eine neue tar-Diskette / einen tar-Satz eignen:
         Liste von Wörterbüchern ``name``, ``beschreibung``, ``bytes`` (Nutzbytes EINES Abbilds),
-        ``img`` (auch ``.cqm``), ``hfe`` (``.dmk`` geht immer)."""
+        ``img`` (auch ``.cqm``), ``hfe`` (``.dmk`` geht immer), ``td0``/``imd`` (TeleDisk/ImageDisk)."""
         aus = []
         for i in range(int(_lib.k1520d_tar_format_count())):
             m = int(_lib.k1520d_tar_format_container(i))
@@ -1235,6 +1235,8 @@ class DiskTool:
                 "bytes": int(_lib.k1520d_tar_format_bytes(i)),
                 "img": bool(m & 1),
                 "hfe": bool(m & 2),
+                "td0": bool(m & 4),
+                "imd": bool(m & 8),
             })
         return aus
 
@@ -1449,14 +1451,21 @@ class DiskTool:
         return _s(_lib.k1520d_detected_fs(self._h))
 
     def container_info(self) -> dict:
-        """Auskunft über den Container der Datei: ``type`` (``img``/``hfe``/``dmk``/``cqm``);
-        bei ``.cqm`` zusätzlich ``description``, ``label``, ``comment``, ``interleave``,
-        ``skew``, ``cylinders`` (``gespeichert/gesamt``) und ``crc`` (``ok``/``falsch``/
-        ``nicht geprueft``).  Bei anderen Containern nur ``type``."""
+        """Auskunft über den Container der Datei: ``type`` (``img``/``hfe``/``dmk``/``cqm``/
+        ``td0``/``imd``); bei ``.cqm`` zusätzlich ``description``, ``label``, ``comment``,
+        ``interleave``, ``skew``, ``cylinders`` (``gespeichert/gesamt``) und ``crc``
+        (``ok``/``falsch``/``nicht geprueft``); bei ``.td0``/``.imd`` ``version``,
+        ``timestamp``, ``comment``, ``tracks``, ``sectors``, ``warnings`` (Zeilen mit
+        ``\\n``), bei ``.td0`` auch ``rate``.  Bei anderen Containern nur ``type``."""
         keys = ["type"]
-        if _s(_lib.k1520d_container_info(self._h, _b("type"))) == "cqm":
+        typ = _s(_lib.k1520d_container_info(self._h, _b("type")))
+        if typ == "cqm":
             keys += ["description", "label", "comment", "interleave", "skew",
                      "cylinders", "crc"]
+        elif typ in ("td0", "imd"):
+            keys += ["version", "timestamp", "comment", "tracks", "sectors", "warnings"]
+            if typ == "td0":
+                keys.append("rate")
         return {k: _s(_lib.k1520d_container_info(self._h, _b(k))) for k in keys}
 
     @property
@@ -2336,6 +2345,16 @@ class DiskTool:
         """Quelle ist ein CopyQM-Abbild (``.cqm``; lesbar und, soweit darstellbar, schreibbar)."""
         return self.container_info().get("type") == "cqm"
 
+    @property
+    def ist_td0(self) -> bool:
+        """Quelle ist ein TeleDisk-Abbild (``.td0``; lesbar und, soweit darstellbar, schreibbar)."""
+        return self.container_info().get("type") == "td0"
+
+    @property
+    def ist_imd(self) -> bool:
+        """Quelle ist ein ImageDisk-Abbild (``.imd``; lesbar und, soweit darstellbar, schreibbar)."""
+        return self.container_info().get("type") == "imd"
+
     def set_read_only(self, ro: bool) -> None:
         _lib.k1520d_set_read_only(self._h, ro)
 
@@ -2426,6 +2445,8 @@ class PlatteTool:
     ist_udos = False
     ist_cpm = False
     ist_cqm = False
+    ist_td0 = False
+    ist_imd = False
     read_only_forced = False
     #: Kennung fuer die Oberflaeche (``ist_platte`` ist die statische Pruefung einer Datei).
     ist_plattenabbild = True

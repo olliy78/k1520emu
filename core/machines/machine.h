@@ -103,7 +103,7 @@ public:
     virtual std::string diskPath(int drive) const = 0;
     virtual std::string diskContainer(int drive) const = 0;
     virtual std::string diskNotice(int drive) const = 0;
-    /// Metadaten des Container (nur .cqm: description|label|comment|interleave|skew|cylinders|crc).
+    /// Metadaten des Container (.cqm: description|label|comment|interleave|skew|cylinders|crc; .td0: version|timestamp|comment|rate|tracks|sectors|warnings; .imd: ohne rate).
     virtual std::string diskContainerInfo(int, const std::string&) const { return ""; }
     virtual std::string detectedFormatName(int drive) const = 0;
     virtual std::string defaultFormatName(int drive) const = 0;
