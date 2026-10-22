@@ -527,6 +527,7 @@ TEST(ImdCodec, SpeichernIstAtomarUndBehaeltDieAlteDateiBeiFehler) {
     EXPECT_FALSE(fs::exists(pfad + ".k1520tmp"));
     std::ifstream g(pfad, std::ios::binary);
     const Bytes nachher((std::istreambuf_iterator<char>(g)), std::istreambuf_iterator<char>());
+    g.close();   // unter Windows laesst sich eine offene Datei nicht loeschen
     EXPECT_EQ(vorher, nachher);
 
     DiskMedium m;
