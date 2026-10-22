@@ -90,7 +90,7 @@ int bootTraceP8000(const K8915TraceOpts& o, const prnlst::Listing& prn, bool kar
     catch (const std::exception& e) { fprintf(stderr, "ERROR: %s\n", e.what()); return 2; }
     P8000Machine& m = *mp;
     if ((!o.raf.empty() && o.raf != "none") || o.ptape)
-        fprintf(stderr, "WARN: --raf/--ptape gibt es am P8000 nicht (kein K1520-Steckplatz) — ignoriert\n");
+        fprintf(stderr, "WARN: --raf/--ptape gibt es am P8000 nicht (kein K1520-Steckplatz) - ignoriert\n");
     auto rd = [&](uint16_t a) { return m.memReadDebug(a); };
     auto prnTail = [&](uint16_t a) -> std::string {
         const std::string* s = prn.find(a);
@@ -133,14 +133,14 @@ int bootTraceP8000(const K8915TraceOpts& o, const prnlst::Listing& prn, bool kar
     auto emit = [&](const Ev& e) {
         if (!ev_on) return;
         if (ev_lines >= o.events_cap) {
-            if (!ev_capped) { fprintf(ev, "  [ev] Grenze %ld Zeilen erreicht — Protokoll endet (--events-cap)\n", o.events_cap); ev_capped = true; }
+            if (!ev_capped) { fprintf(ev, "  [ev] Grenze %ld Zeilen erreicht - Protokoll endet (--events-cap)\n", o.events_cap); ev_capped = true; }
             return;
         }
         char pcs[24];
         if (e.pc_lo == e.pc_hi) snprintf(pcs, sizeof pcs, "PC=%04X", e.pc_lo);
         else snprintf(pcs, sizeof pcs, "PC=%04X..%04X", e.pc_lo, e.pc_hi);
         fprintf(ev, "  [ev c%-10llu %s] %s", (unsigned long long)e.cyc, pcs, e.text.c_str());
-        if (e.n > 1) fprintf(ev, "  ×%ld", e.n);
+        if (e.n > 1) fprintf(ev, "  x%ld", e.n);
         fprintf(ev, "%s\n", e.tail.c_str());
         ++ev_lines;
     };
@@ -198,8 +198,8 @@ int bootTraceP8000(const K8915TraceOpts& o, const prnlst::Listing& prn, bool kar
             const auto& ia = m.bus().lastIntAck();
             const char* dev = e == eventbp::Event::NMI ? "-" : ia.spurious ? "SPURIOUS" : (ia.device ? ia.device : "?");
             char t[160];
-            if (e == eventbp::Event::NMI) snprintf(t, sizeof t, "NMI → ISR 0066 (unterbrochen bei %04X)", ret);
-            else snprintf(t, sizeof t, "INT (IM %d) Vektor=%02X von %s → ISR %04X%s", z.IM, ia.vector, dev,
+            if (e == eventbp::Event::NMI) snprintf(t, sizeof t, "NMI -> ISR 0066 (unterbrochen bei %04X)", ret);
+            else snprintf(t, sizeof t, "INT (IM %d) Vektor=%02X von %s -> ISR %04X%s", z.IM, ia.vector, dev,
                           z.PC, name(z.PC).c_str());
             char key[48]; snprintf(key, sizeof key, "I%02X%04X", e == eventbp::Event::NMI ? 0x100 : ia.vector, z.PC);
             event(key, t, ret);
@@ -338,8 +338,8 @@ int bootTraceP8000(const K8915TraceOpts& o, const prnlst::Listing& prn, bool kar
     }
     flush();
     if (ev != stderr) fclose(ev);
-    if (csv) { fclose(csv); fprintf(stderr, "--csv: %ld row(s) → %s\n", csv_rows, o.csv_path.c_str()); }
-    if (itr) { fclose(itr); fprintf(stderr, "--itrace: %ld INT/NMI → %s\n", itr_n, o.itrace_path.c_str()); }
+    if (csv) { fclose(csv); fprintf(stderr, "--csv: %ld row(s) -> %s\n", csv_rows, o.csv_path.c_str()); }
+    if (itr) { fclose(itr); fprintf(stderr, "--itrace: %ld INT/NMI -> %s\n", itr_n, o.itrace_path.c_str()); }
 
     const uint64_t cycles = m.totalCycles();
     const bool prompt = stillstand && promptZeile(m, bild);
@@ -349,7 +349,7 @@ int bootTraceP8000(const K8915TraceOpts& o, const prnlst::Listing& prn, bool kar
             fprintf(stderr, "--until (%s): %s", o.until.text.c_str(), until_hit ? "MET" : "not met\n");
         if (until_hit) fprintf(stderr, " at cycle %llu (PC=0x%04X)\n", (unsigned long long)until_cyc, until_pc);
         if (stillstand)
-            fprintf(stderr, "Stillstand:  JA — %lld Takte ohne Terminalaenderung und ohne Steuerzugriff (PC=%04X)\n",
+            fprintf(stderr, "Stillstand:  JA - %lld Takte ohne Terminalaenderung und ohne Steuerzugriff (PC=%04X)\n",
                     o.stall, m.cpuPC());
         fprintf(stderr, "Prompt:      %s\n", prompt ? "JA" : "nein");
         if (!o.keys.empty())
@@ -411,7 +411,7 @@ int bootTraceP8000(const K8915TraceOpts& o, const prnlst::Listing& prn, bool kar
                 std::sort(v.begin(), v.end());
                 for (auto& kv : v) fprintf(cf, "CPU,0x%04X,%u\n", kv.first, kv.second);
                 fclose(cf);
-                fprintf(stderr, "  CSV written → %s (cpu,pc,hits)\n", o.coverage_path.c_str());
+                fprintf(stderr, "  CSV written -> %s (cpu,pc,hits)\n", o.coverage_path.c_str());
             }
         }
     }
@@ -443,7 +443,7 @@ int bootTraceP8000(const K8915TraceOpts& o, const prnlst::Listing& prn, bool kar
 
 int bootTraceP8000Terminal(const K8915TraceOpts& o)
 {
-    if (!o.disk.empty()) fprintf(stderr, "WARN: das Terminal hat keine Laufwerke — Diskette ignoriert\n");
+    if (!o.disk.empty()) fprintf(stderr, "WARN: das Terminal hat keine Laufwerke - Diskette ignoriert\n");
     // Die Einheit selbst (ohne Hub): was das Terminal auf XB5 sendet, landet im Bericht statt
     // in einem unverbundenen Wandler.  Gleicher Kern wie `P8000TerminalMachine`.
     k1520::p8000::P8000TerminalEinheit e;
@@ -497,7 +497,7 @@ int bootTraceP8000Terminal(const K8915TraceOpts& o)
         if (!o.keys.empty()) fprintf(stderr, "Tasten:      %zu von %zu getippt\n", getippt, tasten);
         fprintf(stderr, "Cursor:      Zeile %d Spalte %d   BEL %u   LEDs %X   Zeichensatz %d\n", e.hw().cursorZeile(),
                 e.hw().cursorSpalte(), e.hw().klingel(), unsigned(e.tastatur().leds()), e.hw().zeichensatz2() ? 2 : 1);
-        fprintf(stderr, "Leitung XB5 (Terminal → Rechner):%s\n", gesendet.empty() ? " (nichts)" : gesendet.c_str());
+        fprintf(stderr, "Leitung XB5 (Terminal -> Rechner):%s\n", gesendet.empty() ? " (nichts)" : gesendet.c_str());
         const Z8& z = e.hw().z8();
         fprintf(stderr, "Final Z8:    PC=%04X\n", z.pc);
         fprintf(stderr, "Bild:\n");

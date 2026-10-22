@@ -134,7 +134,7 @@ bool entpacken(const uint8_t* d, size_t n, std::vector<uint8_t>& aus, std::strin
         const uint32_t crc = static_cast<uint32_t>(mz_crc32(MZ_CRC32_INIT, aus.data() + anfang, laenge - anfang));
         if (crc != le32(d + pos) || static_cast<uint32_t>(laenge - anfang) != le32(d + pos + 4)) {
             aus.clear();
-            setze(fehler, "gzip-Pruefsumme falsch — Datei beschaedigt");
+            setze(fehler, "gzip-Pruefsumme falsch - Datei beschaedigt");
             return false;
         }
         pos += 8;

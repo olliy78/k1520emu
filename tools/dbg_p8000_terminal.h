@@ -118,7 +118,7 @@ inline bool befehl(k1520::p8000::P8000TerminalEinheit& e, std::string& aus,
             {"CHAR_INSERT", TerminalTaste::CHAR_INSERT}, {"CHAR_DELETE", TerminalTaste::CHAR_DELETE},
         };
         const auto it = t.size() > 1 ? namen.find(t[1]) : namen.end();
-        if (it == namen.end() || !e.taste(it->second)) { out += "  taste MODE|VIDEO|SI_SO|ON_OFF|BREAK|CR|…\n"; return true; }
+        if (it == namen.end() || !e.taste(it->second)) { out += "  taste MODE|VIDEO|SI_SO|ON_OFF|BREAK|CR|...\n"; return true; }
         e.tastenAbwarten();
         sammeln();
         return true;
@@ -182,7 +182,7 @@ inline int pruefstand(const char* script) {
     k.zusatz = [&](const std::vector<std::string>& t, std::string& out) { return befehl(e, aus, t, aktuelleZeile, out); };
     k.zusatzHilfe = hilfe();
     k.maxSchritte = 5'000'000;
-    std::printf("P8000-Terminal Typ 2 (P8T 5.0 + K7673.09) — help fuer Kommandos\n");
+    std::printf("P8000-Terminal Typ 2 (P8T 5.0 + K7673.09) - help fuer Kommandos\n");
     auto quelle = [&](FILE* in, bool prompt) {
         char zeile[1024];
         for (;;) {

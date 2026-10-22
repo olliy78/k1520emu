@@ -220,9 +220,9 @@ void P8000Karte8::nmiTaste()
     // /NMI(U880) = NAND(/NMI-UM, NMIP); /NMI-U8000 = NAND(NOT /NMI-UM, NMIP)
     if (b7eff()) {
         bus_.assertNMI();
-        LOG_INFO("P8000", "NMI-Taste → U880");
+        LOG_INFO("P8000", "NMI-Taste -> U880");
     } else {
-        LOG_INFO("P8000", "NMI-Taste → 16-Bit-Karte (PIO0-B7 = 0)");
+        LOG_INFO("P8000", "NMI-Taste -> 16-Bit-Karte (PIO0-B7 = 0)");
         if (nmi16_cb_) nmi16_cb_();
     }
 }
@@ -306,7 +306,7 @@ void P8000Karte8::ioWrite(uint8_t port, uint8_t data)
         for (auto& a : anschluesse_) a->wirke();   // WR5-RTS wirkt auf /CTS tty0
         if (!wait_gewarnt_ && ((s.channelA().wr[1] | s.channelB().wr[1]) & 0x80)) {
             wait_gewarnt_ = true;
-            LOG_WARN("P8000", "SIO WR1 D7 (Wait-Funktion, /W/RDY an /WAIT) gesetzt — nicht nachgebildet");
+            LOG_WARN("P8000", "SIO WR1 D7 (Wait-Funktion, /W/RDY an /WAIT) gesetzt - nicht nachgebildet");
         }
         return;
     }

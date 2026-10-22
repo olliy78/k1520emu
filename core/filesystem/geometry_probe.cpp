@@ -260,7 +260,7 @@ GeometryMatch match(const std::vector<MeasuredTrack>& tracks, const DiskFormat& 
         for (const auto& t : tracks) {
             if (t.cyl % fmt.step != 0) {
                 if (t.formatted) {
-                    m.reason = "Spur " + tp(t.cyl, t.head) + " ist beschrieben — bei "
+                    m.reason = "Spur " + tp(t.cyl, t.head) + " ist beschrieben - bei "
                                "Doppelschritt muss jeder zweite Zylinder leer sein";
                     return m;
                 }
@@ -318,8 +318,8 @@ GeometryMatch match(const std::vector<MeasuredTrack>& tracks, const DiskFormat& 
         }
         if (t.sector_size != tf->bytes_per_sec) {
             m.reason = "Spur " + tp(t.cyl, t.head) + ": gemessen "
-                     + std::to_string(t.sectors) + "×" + std::to_string(t.sector_size)
-                     + ", Format sagt " + std::to_string(tf->secs_per_track) + "×"
+                     + std::to_string(t.sectors) + "x" + std::to_string(t.sector_size)
+                     + ", Format sagt " + std::to_string(tf->secs_per_track) + "x"
                      + std::to_string(tf->bytes_per_sec);
             return m;
         }
@@ -383,7 +383,7 @@ GeometryMatch match(const std::vector<MeasuredTrack>& tracks, const DiskFormat& 
     // verwarf die Stichprobe das richtige Format und nahm ein zu kleines.
     if (!stichprobe && m.defect_tracks > 2 && m.defect_tracks * 4 > beschrieben) {
         m.reason = std::to_string(m.defect_tracks) + " von " + std::to_string(beschrieben)
-                 + " beschriebenen Spuren weichen ab — das ist kein Schaden, sondern ein "
+                 + " beschriebenen Spuren weichen ab - das ist kein Schaden, sondern ein "
                    "anderes Format";
         return m;
     }
@@ -393,7 +393,7 @@ GeometryMatch match(const std::vector<MeasuredTrack>& tracks, const DiskFormat& 
     // ein „passendes" Format waere schlicht falsch — also ablehnen und es sagen.
     if (m.gap_tracks > 2) {
         m.reason = std::to_string(m.gap_tracks) + " unformatierte Spuren ZWISCHEN "
-                   "beschriebenen — sieht nach Doppelschritt aus (nur jeder zweite "
+                   "beschriebenen - sieht nach Doppelschritt aus (nur jeder zweite "
                    "Zylinder beschrieben)";
         return m;
     }
@@ -406,7 +406,7 @@ GeometryMatch match(const std::vector<MeasuredTrack>& tracks, const DiskFormat& 
     // zweite Seite gilt dann als „Altbestand" (cpa390 auf einer cpa780-Diskette).
     if (m.stray_tracks > 8) {
         m.reason = std::to_string(m.stray_tracks) + " beschriebene Spuren liegen "
-                   "ausserhalb des Formats — das ist zu viel fuer Altbestand";
+                   "ausserhalb des Formats - das ist zu viel fuer Altbestand";
         return m;
     }
 
@@ -482,7 +482,7 @@ std::string describe(const std::vector<MeasuredTrack>& tracks) {
         if (!tracks[i].formatted) {
             os << " : unformatiert";
         } else {
-            os << " : " << int(tracks[i].uniqueSectors()) << " Sektoren à "
+            os << " : " << int(tracks[i].uniqueSectors()) << " Sektoren a "
                << tracks[i].sector_size << " B, IDs " << int(tracks[i].first_id) << "-"
                << int(tracks[i].first_id + tracks[i].uniqueSectors() - 1) << ", "
                << encName(tracks[i].encoding);
@@ -565,7 +565,7 @@ std::optional<DiskFormat> synthesize(const std::vector<MeasuredTrack>& tracks,
     for (int c = 0; c <= letzter; c += step)
         if (zylinderLeer(c))
             return nein("Zylinder " + std::to_string(c) + " ist unformatiert, die "
-                        "Spuren davor und dahinter nicht — ein solcher Datentraeger "
+                        "Spuren davor und dahinter nicht - ein solcher Datentraeger "
                         "laesst sich nicht als zusammenhaengendes Dateisystem lesen");
 
     DiskFormat fmt;

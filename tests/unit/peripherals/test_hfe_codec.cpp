@@ -598,16 +598,9 @@ TEST(HfeCodec, EinseitigeAufnahmeMitSeitenschlitzen) {
     std::string err;
     ASSERT_TRUE(HfeCodec::save(durchgehend, m, err)) << err;
 
-    // Kontinuierlich abgelegt: liest sich (wie bisher) vollstaendig.
-    {
-        const DiskMedium back = loadHfe(durchgehend);
-        const auto zurueck = TrackCodec::parseTrack(back.track(0, 0));
-        ASSERT_EQ(zurueck.size(), 8u);
-        for (const auto& s : zurueck) EXPECT_TRUE(s.data_crc_ok);
-    }
-
-    // 2. Dieselbe Datei in die VERSCHRAENKTE Sitte umbauen: jeder 512-B-Block traegt
-    //    nur noch 256 B Nutzzellen, dahinter Gap — so schreibt es Greaseweazle.
+    // Waechter Issue #12 (HxC Track Analyser zeigte ein verstuemmeltes Layout):
+    // auch EINSEITIG schreibt das Projekt verschraenkt - Spurlaenge = 2 Schlitze,
+    // Seite 0 in den ersten 256 B jedes Blocks, der Seite-1-Schlitz ist Gap (0x88).
     std::vector<uint8_t> roh;
     {
         std::ifstream f(durchgehend, std::ios::binary);
@@ -616,16 +609,26 @@ TEST(HfeCodec, EinseitigeAufnahmeMitSeitenschlitzen) {
     const size_t lut  = (roh[0x12] | (roh[0x13] << 8)) * 512u;
     const size_t start = (roh[lut] | (roh[lut + 1] << 8)) * 512u;
     const size_t laenge = static_cast<size_t>(roh[lut + 2] | (roh[lut + 3] << 8));
-
-    std::vector<uint8_t> neu(roh.begin(), roh.begin() + static_cast<long>(start));
-    for (size_t off = 0; off < laenge; off += 256) {
-        const size_t n = std::min<size_t>(256, laenge - off);
-        neu.insert(neu.end(), roh.begin() + static_cast<long>(start + off),
-                   roh.begin() + static_cast<long>(start + off + n));
-        neu.insert(neu.end(), 256, 0x88);            // Seite-1-Schlitz = Gap
+    ASSERT_EQ(laenge % 512, 0u);
+    EXPECT_EQ(roh[0x0A], 1);                      // number_of_side bleibt 1
+    for (size_t blk = 0; blk < laenge / 512; ++blk)
+        for (size_t i = 256; i < 512; ++i)
+            ASSERT_EQ(roh[start + blk * 512 + i], 0x88)
+                << "Seite-1-Schlitz muss Gap sein (Block " << blk << ")";
+    {
+        const DiskMedium back = loadHfe(durchgehend);
+        const auto zurueck = TrackCodec::parseTrack(back.track(0, 0));
+        ASSERT_EQ(zurueck.size(), 8u);
+        for (const auto& s : zurueck) EXPECT_TRUE(s.data_crc_ok);
     }
-    // Spurlaenge verdoppelt sich dadurch.
-    const size_t neue_laenge = laenge * 2;
+
+    // 2. Altsitte (kontinuierlich, so schrieb dieses Projekt frueher) muss lesbar
+    //    bleiben: aus der Datei ableiten, Spurlaenge halbiert.
+    std::vector<uint8_t> neu(roh.begin(), roh.begin() + static_cast<long>(start));
+    for (size_t off = 0; off < laenge; off += 512)
+        neu.insert(neu.end(), roh.begin() + static_cast<long>(start + off),
+                   roh.begin() + static_cast<long>(start + off + 256));
+    const size_t neue_laenge = laenge / 2;
     neu[lut + 2] = static_cast<uint8_t>(neue_laenge & 0xFF);
     neu[lut + 3] = static_cast<uint8_t>((neue_laenge >> 8) & 0xFF);
 

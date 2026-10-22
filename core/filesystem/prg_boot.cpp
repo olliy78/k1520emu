@@ -92,7 +92,7 @@ std::string problem(const std::vector<uint8_t>& img, System sys, Variante erwart
     const Kennung k = erkenne(img, sys);
     if (!k.ist_prg) {
         if (erwartet == Variante::Unbekannt) return {};
-        return "Das Bootabbild traegt keinen PRG-Lader (Byte 0–4 = 18 03 'SYL') — es stammt "
+        return "Das Bootabbild traegt keinen PRG-Lader (Byte 0-4 = 18 03 'SYL') - es stammt "
                "nicht von einer Systemdiskette des PRG 710/710-1.";
     }
     // Ein PRG-Abbild muss die Teile tragen, ohne die der Kaltstart nicht bis zum
@@ -102,11 +102,11 @@ std::string problem(const std::vector<uint8_t>& img, System sys, Variante erwart
              + " Byte, das BIOS beginnt bei Byte " + std::to_string(kBiosAb) + ").";
     if (sys == System::Udos && img.size() < 3 * 26 * 128)
         return "Das UDOS-Bootabbild endet vor dem Zweitlader (Spur 2, " + std::to_string(img.size())
-             + " Byte) — der Lader findet ihn nicht.";
+             + " Byte) - der Lader findet ihn nicht.";
 
     if (k.variante == Variante::Unbekannt) {
         if (erwartet != Variante::Unbekannt)
-            return "Fuer welches Geraet das Bootabbild gebaut ist, laesst sich nicht erkennen — "
+            return "Fuer welches Geraet das Bootabbild gebaut ist, laesst sich nicht erkennen - "
                    "es passt nicht sicher zum " + std::string(name(erwartet)) + ".";
         return {};
     }
@@ -129,7 +129,7 @@ bool scpxBand(const std::vector<uint8_t>& syl, const std::vector<uint8_t>& ccp,
         return false;
     }
     if (ccp.size() != kCcpLaenge) {
-        err = "CCPBD17.SYS muss " + std::to_string(kCcpLaenge) + " Byte lang sein (C800H–DDFFH), "
+        err = "CCPBD17.SYS muss " + std::to_string(kCcpLaenge) + " Byte lang sein (C800H-DDFFH), "
               "ist aber " + std::to_string(ccp.size()) + " Byte lang.";
         return false;
     }
@@ -137,7 +137,7 @@ bool scpxBand(const std::vector<uint8_t>& syl, const std::vector<uint8_t>& ccp,
     // oder ein anderer `JP` an der Spitze genuegt als Gegenprobe gegen eine falsche Datei.
     if (bios.size() < 3328 || bios.size() > kSpurBytes - kBiosAb || bios[0] != 0xC3) {
         err = "Das BIOS (" + std::to_string(bios.size()) + " Byte) sieht nicht wie ein "
-              "SCPX-BIOS aus (3328–10240 Byte, beginnt mit JP).";
+              "SCPX-BIOS aus (3328-10240 Byte, beginnt mit JP).";
         return false;
     }
     erkannt = scpxVariante(bios, 0);

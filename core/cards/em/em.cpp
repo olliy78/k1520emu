@@ -60,7 +60,7 @@ EM::EM(K1520Bus& bus, const Config& cfg)
 void EM::attachToBus() {
     bus_.registerIO(this, cfg_.modadr, 8);
     bus_.addMemdiDriver(this);
-    LOG_INFO("EM", "%s an MODADR %02XH–%02XH",
+    LOG_INFO("EM", "%s an MODADR %02XH-%02XH",
              cfg_.variante == Variante::EM256 ? "EM256" : "EM064",
              cfg_.modadr, cfg_.modadr + 7);
 }

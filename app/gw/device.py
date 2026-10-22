@@ -279,6 +279,17 @@ class Adapter:
     serial: str
 
 
+#: Anlaufzeit des Motors in Sekunden, bevor die erste Spur gelesen/geschrieben wird.
+#: Die Firmware wartet selbst (``delay_motor``, Vorgabe 750 ms); wir zusaetzlich nur
+#: knapp darunter, weil ein 5,25″-Laufwerk mit schwerem Rad laenger braucht als ein 3,5″.
+_ANLAUF_S = 0.75
+#: Beim Wiederholungsversuch nach „No Index" wird der Motor erst ausgeschaltet und dann
+#: laenger angefahren (die Drehzahl muss stehen, sonst kommt kein Indexpuls).
+_ANLAUF_NACH_FEHLER_S = 1.5
+#: Zusaetzliche Versuche, wenn der Adapter beim Schreiben/Lesen keinen Index sieht.
+_INDEX_WIEDERHOLUNGEN = 2
+
+
 class Device:
     """Ein gewähltes Laufwerk an einem Greaseweazle.
 
@@ -311,6 +322,8 @@ class Device:
         self._letzte_arbeit = 0.0
         self._gewaehlt = False
         self._ticks_per_rev = None
+        #: austauschbar, damit Pruefungen ohne Wartezeit laufen
+        self._schlafen = time.sleep
 
     # ── Auswahl / Motor ─────────────────────────────────────────────────────
 
@@ -337,7 +350,42 @@ class Device:
         self._usb.drive_motor(self._drive.unit_id, an)
         self._motor_an = an
         if an:
-            time.sleep(0.5)      # Anlauf: die erste Umdrehung waere sonst unbrauchbar
+            self._schlafen(_ANLAUF_S)   # Anlauf: die erste Umdrehung waere sonst unbrauchbar
+            # Der Nachlauf zaehlt ab Anlauf, nicht ab dem letzten Auftrag von VOR dem
+            # Abschalten — sonst lief der Motor schon bei der ersten Pause wieder aus.
+            self._letzte_arbeit = time.monotonic()
+
+    def _mit_indexwiederholung(self, vorgang):
+        """``vorgang()`` ausfuehren; sieht der Adapter keinen Index, Motor neu anfahren.
+
+        Ursache (Issue #13): beim Schreiben ohne nebenher laufendes Hintergrundlesen
+        steht der Motor bei Auftragsbeginn oft eben erst im Anlauf (oder der Adapter hat
+        Auswahl/Motor von sich aus abgeschaltet) — der erste Befehl sieht dann keinen
+        Indexpuls, und die Spur wird nicht geschrieben.  Ein Wiederholen mit
+        ausgeschaltetem und erneut, laenger angefahrenem Motor behebt das; ein echter
+        Fehler (kein Laufwerk, keine Diskette) kommt nach den Versuchen unveraendert
+        durch.  Schreiben ist idempotent, die Wiederholung also folgenlos.
+        """
+        for versuch in range(_INDEX_WIEDERHOLUNGEN + 1):
+            try:
+                return vorgang()
+            except Exception as e:                # noqa: BLE001
+                if versuch == _INDEX_WIEDERHOLUNGEN or "no index" not in str(e).lower():
+                    raise
+                self._neu_anfahren()
+
+    def _neu_anfahren(self) -> None:
+        """Motor aus, Pause, wieder an und die Drehzahl abwarten."""
+        try:
+            self._usb.drive_motor(self._drive.unit_id, False)
+        except Exception:                         # noqa: BLE001 — wir fahren ohnehin neu an
+            pass
+        self._motor_an = False
+        self._schlafen(0.2)
+        self._usb.drive_motor(self._drive.unit_id, True)
+        self._motor_an = True
+        self._schlafen(_ANLAUF_NACH_FEHLER_S)
+        self._letzte_arbeit = time.monotonic()
 
     def tick(self) -> None:
         """Nachlauf abarbeiten — regelmäßig aus der Leerlaufschleife rufen."""
@@ -353,6 +401,10 @@ class Device:
 
     @_mit_deutung
     def read_track(self, cyl: int, head: int) -> tuple[bytes, int]:
+        """Eine Spurseite lesen (mit Motor-Neuanlauf bei fehlendem Index)."""
+        return self._mit_indexwiederholung(lambda: self._read_track(cyl, head))
+
+    def _read_track(self, cyl: int, head: int) -> tuple[bytes, int]:
         """Eine Spurseite lesen.
 
         Args:
@@ -413,7 +465,15 @@ class Device:
 
     @_mit_deutung
     def write_track(self, cyl: int, head: int, cells: bytes, bitcells: int) -> None:
-        """Eine Spurseite schreiben — ganze Spur, ab Index bis Index."""
+        """Eine Spurseite schreiben — ganze Spur, ab Index bis Index.
+
+        Der Schreibpfad faehrt den Motor selbst sicher an (Issue #13); er darf nicht
+        davon abhaengen, dass nebenher ein Lesevorgang die Scheibe drehen laesst.
+        """
+        self._mit_indexwiederholung(
+            lambda: self._write_track(cyl, head, cells, bitcells))
+
+    def _write_track(self, cyl: int, head: int, cells: bytes, bitcells: int) -> None:
         from bitarray import bitarray
         MasterTrack = _leise("greaseweazle.track").MasterTrack
 

@@ -1,9 +1,9 @@
-# Bei CP/M entsteht per Vorgabe KEIN .fileinfo: Nutzerbereich 0 und „keine Attribute"
-# sind dort der Normalfall, den auch das echte CP/M erzeugt — es geht nichts verloren
+# Bei CP/M entsteht per Vorgabe KEIN .fileinfo: Nutzerbereich 0 und 'keine Attribute"
+# sind dort der Normalfall, den auch das echte CP/M erzeugt - es geht nichts verloren
 # (doc/bug_disktool_Programmdatei.md §2.4).  Mit --fileinfo entsteht es auf Verlangen.
 #
 # Der Nachweis der Abwesenheit laeuft ueber die Zaehlung des Stapels: haette `get`
-# Angabendateien angelegt, meldete `put <ordner>` „N .fileinfo ausgewertet".
+# Angabendateien angelegt, meldete `put <ordner>` 'N .fileinfo ausgewertet".
 tool:   k1520disktool
 disk:   cpa_cpa780_k5601_noclock.hfe
 capture_file: mit/BRUN.COM.fileinfo

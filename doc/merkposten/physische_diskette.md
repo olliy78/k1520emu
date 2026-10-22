@@ -98,6 +98,20 @@ Was man beim Weiterarbeiten wissen muss:
   (≈ 0,5 s) — dieselbe Regel wie der Autosave, sonst schriebe eine UDOS-Dateioperation
   dieselbe Spur dutzendfach.  Eine gescheiterte Rückführung lässt die Spur `Dirty`
   (eine verlorene Änderung wäre der schlimmere Ausgang); Abmelden wartet darauf.
+- **Vorauslesen ruht in einer Ruhefrist nach jedem Gastzugriff** (Issue #14,
+  `TrackSyncSpec::readahead_quiet_ms`, Vorgabe `kReadaheadRuheMs` = 4000 ms **Wirtszeit**,
+  nicht ueber die C-ABI einstellbar).  Zugriff = `TrackLoader::accessed()`
+  (von `FloppyDriveV2::step/seek/track/mutableTrack` ueber `DiskMedium::noteAccess`),
+  `ensureLoaded`, `trackChanged`.  Ein Gastzugriff (Prio 1) und die Rueckfuehrung
+  (Prio 2) laufen unabhaengig davon; ein schon laufender Vorausleseauftrag wird nicht
+  abgebrochen.  Waechter `TrackSync.DasVorauslesenRuhtInDerRuhefrist*`,
+  `…EineAnforderungDesGastes*`, `…EinLaufenderVorausleseauftrag*`.
+- **Der Schreibpfad faehrt den Motor selbst an** (Issue #13, `app/gw/device.py`):
+  Anlauf `_ANLAUF_S`, Nachlauf zaehlt ab Anlauf, und bei „No Index" wird der Motor
+  ausgeschaltet und mit `_ANLAUF_NACH_FEHLER_S` neu angefahren (`_INDEX_WIEDERHOLUNGEN`
+  Mal, auch Lesen).  Ursache am Geraet NICHT gemessen (vermutet: Motor/Drehzahl beim
+  ersten Befehl nach Pause nicht bereit; vorher half nebenher laufendes Lesen).
+  Waechter `test_gw_motor.py`.
 - **Auch der Schreibvorgang wird nicht ENDLOS wiederholt** (2026-09-14, Entwurf §5.4).
   Nach `write_verify_retries` Versuchen gilt die Spur als **nicht beschreibbar** — wie
   eine Schadstelle, mit demselben Ausweg.  Denn ein Schreibfehler hat zwei ganz

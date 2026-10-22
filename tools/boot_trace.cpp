@@ -105,27 +105,27 @@ struct Milestone {
 
 // ZVE1 (main CPU) milestones — matched against machine.cpuPC().
 static std::vector<Milestone> milestones = {
-    { 0x0008, "LDI loop – zeroing RAM 0000-07FF",          true  },
-    { 0x000E, "XOR A after zeroing – PIO init start",       true  },
+    { 0x0008, "LDI loop - zeroing RAM 0000-07FF",          true  },
+    { 0x000E, "XOR A after zeroing - PIO init start",       true  },
     { 0x001C, "OUT BS-PIO A ctrl (Mode 1)",                 true  },
     { 0x00BC, "ROM-to-RAM copy section (JR Z target)",      true  },
-    { 0x00C4, "LDIR: ROM[BA..3FF] → RAM[BA..3FF]",         true  },
-    { 0x00D4, "OUT BS-PIO B – ROM DISABLE",                 true  },
-    { 0x010F, "IN fcpiobd – start of disk seek loop",       false },
+    { 0x00C4, "LDIR: ROM[BA..3FF] -> RAM[BA..3FF]",         true  },
+    { 0x00D4, "OUT BS-PIO B - ROM DISABLE",                 true  },
+    { 0x010F, "IN fcpiobd - start of disk seek loop",       false },
     { 0x0135, "ZVE1 WAIT_INDEX_LOOP (await 4 index pulses)", false },
-    { 0x0194, "ZVE1 CALL drive-init – releases & starts ZVE2", false },
+    { 0x0194, "ZVE1 CALL drive-init - releases & starts ZVE2", false },
     { 0x0168, "ZVE1 STROBE_INIT wait loop (poll [03F8])",   false },
-    { 0x0174, "ZVE1 CALL 0437h – EXECUTE LOADED BOOT CODE",  true  },
+    { 0x0174, "ZVE1 CALL 0437h - EXECUTE LOADED BOOT CODE",  true  },
     { 0x027E, "ZVE1 alternate boot path (floppy retries done)", true },
 };
 
 // ZVE2 (DMA CPU) milestones — matched against the ZVE2 trace callback PC.
 static std::vector<Milestone> zve2_milestones = {
-    { 0x0000, "ZVE2 reset entry (PC=0000 → JP 01DD)",       true  },
+    { 0x0000, "ZVE2 reset entry (PC=0000 -> JP 01DD)",       true  },
     { 0x01DD, "ZVE2 STROBE_LOOP entry (boot sector load)",  true  },
-    { 0x01FA, "ZVE2 /STR assert → doReadSector",            false },
+    { 0x01FA, "ZVE2 /STR assert -> doReadSector",            false },
     { 0x020B, "ZVE2 IDAM compare loop",                     false },
-    { 0x0224, "ZVE2 IDAM matched → 128-byte INIR transfer", false },
+    { 0x0224, "ZVE2 IDAM matched -> 128-byte INIR transfer", false },
     { 0x0267, "ZVE2 DONE: OUT(11h,03)+[03F8]=3 (completion)", true  },
 };
 
@@ -136,85 +136,85 @@ static const char* romLabel(uint16_t pc) {
         case 0x0000: return "NOP (reset entry)";
         case 0x0001: return "LD BC,0x0800 (zero loop count)";
         case 0x0004: return "LD D,C / LD E,C / LD H,C / LD L,C";
-        case 0x0008: return "LDI – zero RAM[DE++] from ROM[0]";
-        case 0x000A: return "DEC HL – keep HL=0";
-        case 0x000B: return "JP PE,0x0008 – loop while BC≠0";
-        case 0x000E: return "XOR A – A=0 after zero loop";
-        case 0x000F: return "OUT (0x02),A – reset Q240 (/RES-SPA)";
+        case 0x0008: return "LDI - zero RAM[DE++] from ROM[0]";
+        case 0x000A: return "DEC HL - keep HL=0";
+        case 0x000B: return "JP PE,0x0008 - loop while BC!=0";
+        case 0x000E: return "XOR A - A=0 after zero loop";
+        case 0x000F: return "OUT (0x02),A - reset Q240 (/RES-SPA)";
         case 0x0011: return "LD SP,0x07E0";
         case 0x0014: return "IM 2";
-        case 0x0016: return "LD A,0 / LD I,A – I=0";
+        case 0x0016: return "LD A,0 / LD I,A - I=0";
         case 0x001A: return "LD A,0x7F";
-        case 0x001C: return "OUT (0x09),A – BS-PIO A ctrl: Mode 1";
-        case 0x001E: return "OUT (0x0B),A – BS-PIO B ctrl: Mode 1";
+        case 0x001C: return "OUT (0x09),A - BS-PIO A ctrl: Mode 1";
+        case 0x001E: return "OUT (0x0B),A - BS-PIO B ctrl: Mode 1";
         case 0x0020: return "LD A,0xFF";
-        case 0x0022: return "OUT (0x08),A – BS-PIO A data: 0xFF";
-        case 0x0024: return "OUT (0x0A),A – BS-PIO B data: 0xFF (preload latch)";
+        case 0x0022: return "OUT (0x08),A - BS-PIO A data: 0xFF";
+        case 0x0024: return "OUT (0x0A),A - BS-PIO B data: 0xFF (preload latch)";
         case 0x0026: return "LD A,0xB8";
-        case 0x0028: return "OUT (0x09),A – BS-PIO A: interrupt vector 0xB8";
+        case 0x0028: return "OUT (0x09),A - BS-PIO A: interrupt vector 0xB8";
         case 0x002A: return "LD A,0xFF";
-        case 0x002C: return "OUT (0x09),A – BS-PIO A ctrl: Mode 3";
+        case 0x002C: return "OUT (0x09),A - BS-PIO A ctrl: Mode 3";
         case 0x002E: return "LD A,0x7F";
-        case 0x0030: return "OUT (0x09),A – BS-PIO A dir mask: 0x7F";
+        case 0x0030: return "OUT (0x09),A - BS-PIO A dir mask: 0x7F";
         case 0x0032: return "LD IX,0x0800";
         case 0x0036: return "LD (0x0462),IX";
         case 0x003A: return "LD HL,0x044E";
         case 0x003D: return "LD DE,0x0400";
         case 0x0040: return "LD B,0x3E (loop counter=62)";
-        case 0x0042: return "LD C,(IX+0) – read page marker";
+        case 0x0042: return "LD C,(IX+0) - read page marker";
         case 0x0045: return "LD A,0xD7";
-        case 0x0047: return "OUT (0x09),A – BS-PIO A ctrl (int mask)";
+        case 0x0047: return "OUT (0x09),A - BS-PIO A ctrl (int mask)";
         case 0x0049: return "LD A,0x9F";
-        case 0x004B: return "OUT (0x09),A – BS-PIO A: int enable";
+        case 0x004B: return "OUT (0x09),A - BS-PIO A: int enable";
         case 0x004D: return "EI";
-        case 0x004E: return "LD (IX+0),0xFF – write page marker";
+        case 0x004E: return "LD (IX+0),0xFF - write page marker";
         case 0x0052: return "NOP";
         case 0x0053: return "DI";
         case 0x0054: return "LD A,0x47";
-        case 0x0056: return "OUT (0x09),A – BS-PIO A: int disable";
-        case 0x0058: return "ADD IX,DE – IX += 0x400";
-        case 0x005A: return "DJNZ 0x0042 – page loop";
+        case 0x0056: return "OUT (0x09),A - BS-PIO A: int disable";
+        case 0x0058: return "ADD IX,DE - IX += 0x400";
+        case 0x005A: return "DJNZ 0x0042 - page loop";
         case 0x005C: return "LD HL,0x046F";
         case 0x005F: return "LD DE,0x006F";
         case 0x0062: return "LD BC,0x0024";
-        case 0x0065: return "LDDR – copy config from 0x046F downward";
+        case 0x0065: return "LDDR - copy config from 0x046F downward";
         case 0x0067: return "LD HL,0x044E";
-        case 0x006A: return "BIT 0,(HL) – check boot flag";
-        case 0x006C: return "JR Z,0x00BC – jump if normal boot";
+        case 0x006A: return "BIT 0,(HL) - check boot flag";
+        case 0x006C: return "JR Z,0x00BC - jump if normal boot";
         case 0x006E: return "LD HL,0x0800";
         case 0x0071: return "LD (0x004C),HL";
         case 0x0074: return "LD HL,(0x0462)";
         case 0x0077: return "LD L,0x9D";
-        case 0x0079: return "JP (HL) – alternate boot path";
+        case 0x0079: return "JP (HL) - alternate boot path";
         case 0x007B: return "LD A,0x47 (int disable ctrl)";
         case 0x007D: return "OUT (0x09),A";
         case 0x007F: return "LD A,0xFF";
-        case 0x00BC: return "LD HL,0x00BA – ROM copy src";
-        case 0x00BF: return "LD D,H / LD E,L – DE=0x00BA";
+        case 0x00BC: return "LD HL,0x00BA - ROM copy src";
+        case 0x00BF: return "LD D,H / LD E,L - DE=0x00BA";
         case 0x00C1: return "LD BC,0x0346";
-        case 0x00C4: return "LDIR – copy ROM[BA..3FF] to RAM";
+        case 0x00C4: return "LDIR - copy ROM[BA..3FF] to RAM";
         case 0x00C6: return "LD A,0xFF";
-        case 0x00C8: return "OUT (0x0B),A – BS-PIO B ctrl: Mode 3";
-        case 0x00CA: return "OUT (0x13),A – fcpiobc: Mode 3";
+        case 0x00C8: return "OUT (0x0B),A - BS-PIO B ctrl: Mode 3";
+        case 0x00CA: return "OUT (0x13),A - fcpiobc: Mode 3";
         case 0x00CC: return "LD A,0xE2";
-        case 0x00CE: return "OUT (0x0B),A – BS-PIO B dir mask: 0xE2";
-        case 0x00D0: return "IN A,(0x0A) – read BS-PIO B";
-        case 0x00D2: return "AND 0xF6 – clear B0(/LD-ROM) and B3(/WAIT-ZVE2)";
-        case 0x00D4: return "OUT (0x0A),A – ROM DISABLE + ZVE2 stall";
-        case 0x00D6: return "EI – interrupts enabled after ROM disable";
+        case 0x00CE: return "OUT (0x0B),A - BS-PIO B dir mask: 0xE2";
+        case 0x00D0: return "IN A,(0x0A) - read BS-PIO B";
+        case 0x00D2: return "AND 0xF6 - clear B0(/LD-ROM) and B3(/WAIT-ZVE2)";
+        case 0x00D4: return "OUT (0x0A),A - ROM DISABLE + ZVE2 stall";
+        case 0x00D6: return "EI - interrupts enabled after ROM disable";
         case 0x00D7: return "LD A,0xF3";
-        case 0x00D9: return "OUT (0x13),A – fcpiobc: floppy PIO B setup";
+        case 0x00D9: return "OUT (0x13),A - fcpiobc: floppy PIO B setup";
         // ── ZVE1 disk-seek / index-wait / handshake ──────────────────────────
-        case 0x0110: return "IN (0x12) – ctrl PIO B drive status";
+        case 0x0110: return "IN (0x12) - ctrl PIO B drive status";
         case 0x0128: return "WAIT_INDEX_SETUP: [03F7]=4, enable ctrl PIO A int";
         case 0x0135: return "WAIT_INDEX_LOOP: A=[03F7]; JR Z if 0";
         case 0x0153: return "STORE_03FD: [03FD]=0x87 (NZ-path, no step)";
         case 0x015C: return "SEEK_SETUP: cyl/head/sec/size = 0/0/1/0";
-        case 0x0165: return "CALL 0194h – drive init + start ZVE2";
+        case 0x0165: return "CALL 0194h - drive init + start ZVE2";
         case 0x0168: return "STROBE_INIT wait: A=[03F8]; JR Z,0168 (poll)";
-        case 0x016C: return "DEC A; JR Z,014Bh ([03F8]==1 → timeout)";
-        case 0x016F: return "CALL 01B6h – verify boot-sector signature";
-        case 0x0174: return "CALL 0437h – jump into loaded boot code";
+        case 0x016C: return "DEC A; JR Z,014Bh ([03F8]==1 -> timeout)";
+        case 0x016F: return "CALL 01B6h - verify boot-sector signature";
+        case 0x0174: return "CALL 0437h - jump into loaded boot code";
         case 0x0194: return "drive-init: [03F7]=16, OUT(04h) start ZVE2, /STR";
         case 0x01B6: return "verify RAM[0400]='YS', RAM[0402]='L'";
         // ── Index-pulse ISR (vector 0xBA → 0x01C7) ───────────────────────────
@@ -224,10 +224,10 @@ static const char* romLabel(uint16_t pc) {
         case 0x01DD: return "ZVE2 STROBE_LOOP: HL=[03F0] load addr";
         case 0x01E9: return "ZVE2 LOAD_IDAM_REGS: EXX; B'=FE; DE'/HL'=cyl/sec";
         case 0x01F4: return "ZVE2 OUT(10h,BD) /STR high";
-        case 0x01FA: return "ZVE2 OUT(10h,B5) /STR low → doReadSector";
+        case 0x01FA: return "ZVE2 OUT(10h,B5) /STR low -> doReadSector";
         case 0x020B: return "ZVE2 READ_IDAM_NZ: IN(16h); CP B' (0xFE marker)";
-        case 0x0224: return "ZVE2 IDAM matched → data transfer setup";
-        case 0x023C: return "ZVE2 INI/INIR: 128 data bytes → load addr";
+        case 0x0224: return "ZVE2 IDAM matched -> data transfer setup";
+        case 0x023C: return "ZVE2 INI/INIR: 128 data bytes -> load addr";
         case 0x0253: return "ZVE2 loop ctrl: CP L' vs [07F2]=4 (sector count)";
         case 0x025A: return "ZVE2 STROBE_LOOP_BODY: [03FD] path byte";
         case 0x0267: return "ZVE2 DONE: OUT(11h,03); [03F8]=3";
@@ -253,7 +253,7 @@ static int runCoverageDiff(const std::string& pa, const std::string& pb) {
             if (v.empty()) return;
             fprintf(stderr, "     %s:", tag);
             for (size_t i = 0; i < v.size() && i < 24; ++i) fprintf(stderr, " %04X", v[i]);
-            if (v.size() > 24) fprintf(stderr, " … (%zu total)", v.size());
+            if (v.size() > 24) fprintf(stderr, " ... (%zu total)", v.size());
             fprintf(stderr, "\n");
         };
         list("only-A", z.only_a); list("only-B", z.only_b); list("hit-diff", z.changed);
@@ -506,7 +506,7 @@ int main(int argc, char** argv) {
     // trace tool's own stdout/stderr summary (the libs are built LOG_LEVEL=5).
     if (log_path) {
         if (k1520::logging::Logger::instance().setOutputFile(log_path))
-            { if(!quiet) fprintf(stderr, "Emulator log → %s\n", log_path); }
+            { if(!quiet) fprintf(stderr, "Emulator log -> %s\n", log_path); }
         else
             fprintf(stderr, "WARN: could not open log file '%s'\n", log_path);
     }
@@ -535,7 +535,7 @@ int main(int argc, char** argv) {
             if (!maclst::assemble(path, off, prn, mr))
                 fprintf(stderr, "WARN: %s\n", mr.error.c_str());
             else
-                fprintf(stderr, "Quelle:     %s — %d Zeile(n) assembliert (%04X..%04X), "
+                fprintf(stderr, "Quelle:     %s - %d Zeile(n) assembliert (%04X..%04X), "
                                 "%d Anker/%d Nachfuehrung(en), %d unbekannt%s\n",
                         path.c_str(), mr.code, mr.first, mr.last, mr.anchors, mr.resyncs,
                         mr.unknown, "");
@@ -544,8 +544,8 @@ int main(int argc, char** argv) {
         // K8915: mit Objektbytes — annotiert wird nur, solange sie im Speicher stehen.
         int n = prn.load(path, off, /*want_bytes=*/machine_k8915, src_lo, src_hi);
         if (n < 0) fprintf(stderr, "WARN: could not open listing '%s'\n", path.c_str());
-        else if (off) fprintf(stderr, "Listing:    %s — %d line(s), offset %+ld (0x%04X)\n", path.c_str(), n, off, (uint16_t)off);
-        else fprintf(stderr, "Listing:    %s — %d line(s)\n", path.c_str(), n);
+        else if (off) fprintf(stderr, "Listing:    %s - %d line(s), offset %+ld (0x%04X)\n", path.c_str(), n, off, (uint16_t)off);
+        else fprintf(stderr, "Listing:    %s - %d line(s)\n", path.c_str(), n);
     }
     // Fertiger Annotations-Anhang "  ; <quelle>" fuer eine (Laufzeit-)Adresse, oder
     // "" wenn keine .prn-Quelle vorliegt. Direkt als printf-"%s" am Zeilenende.
@@ -555,14 +555,14 @@ int main(int argc, char** argv) {
 
     if (machine_k8915) {
         for (auto& f : nur_a5120)
-            fprintf(stderr, "WARN: %s gibt es am K8915 nicht (A5120: ZVE2/DMA/Savestates/Boot-ROM-Schritte) — ignoriert\n", f.c_str());
+            fprintf(stderr, "WARN: %s gibt es am K8915 nicht (A5120: ZVE2/DMA/Savestates/Boot-ROM-Schritte) - ignoriert\n", f.c_str());
         for (int i = 0; i < watchio_n; ++i)
-            if (watchio_cpu[i] == 2) fprintf(stderr, "WARN: --watchio …:zve2 — der K8915 hat keine ZVE2\n");
-        if (em_variant) fprintf(stderr, "WARN: --em/--cpu u8000 gibt es nur am A5120 (A5120.16) — ignoriert\n");
+            if (watchio_cpu[i] == 2) fprintf(stderr, "WARN: --watchio ...:zve2 - der K8915 hat keine ZVE2\n");
+        if (em_variant) fprintf(stderr, "WARN: --em/--cpu u8000 gibt es nur am A5120 (A5120.16) - ignoriert\n");
         k8o.quiet = quiet; k8o.json = json_summary; k8o.drive = mount_drive; k8o.until = until;
         if (!limit_set) k8o.limit = 250'000'000;
         if (k8o.gen2 && k8o.skip_selftest) {
-            fprintf(stderr, "WARN: --skip-selftest gibt es an der Gen 2 nicht — ignoriert\n");
+            fprintf(stderr, "WARN: --skip-selftest gibt es an der Gen 2 nicht - ignoriert\n");
             k8o.skip_selftest = false;
         }
         if (machine_prg710) {
@@ -571,7 +571,7 @@ int main(int argc, char** argv) {
             if (!limit_set) k8o.limit = k8o.keys.empty() ? 50'000'000 : 250'000'000;
             if (!stall_set) k8o.stall = 5'000'000;
             if (k8o.skip_selftest || !k8o.auto_cr)
-                fprintf(stderr, "WARN: --skip-selftest/--no-cr gibt es am PRG 710 nicht — ignoriert\n");
+                fprintf(stderr, "WARN: --skip-selftest/--no-cr gibt es am PRG 710 nicht - ignoriert\n");
         }
         if (machine_pc1715) {
             // PC 1715 (AP-2): Urlader ab 1,6 s, Systemstart einige Sekunden; 60 Mio. ≈ 24 s.
@@ -608,10 +608,10 @@ int main(int argc, char** argv) {
                 std::filesystem::path tmp = std::filesystem::temp_directory_path() /
                     ("boot_trace_cow_"+std::to_string(k1520::os::processId())+src.extension().string());
                 std::filesystem::copy_file(src, tmp, std::filesystem::copy_options::overwrite_existing, ec);
-                if (ec) fprintf(stderr, "WARN: COW copy of '%s' failed (%s) — mounting original writable\n",
+                if (ec) fprintf(stderr, "WARN: COW copy of '%s' failed (%s) - mounting original writable\n",
                                 disk_path, ec.message().c_str());
                 else { k8o.mount_path = cow_temp = tmp.string();
-                       if (!quiet) fprintf(stderr, "COW: '%s' → %s (writes discarded; --rw to persist)\n",
+                       if (!quiet) fprintf(stderr, "COW: '%s' -> %s (writes discarded; --rw to persist)\n",
                                            disk_path, cow_temp.c_str()); }
             }
         }
@@ -734,7 +734,7 @@ int main(int argc, char** argv) {
     long fold_iters = 0;                  // extra full passes collapsed (beyond the 2 printed)
     auto flushFold = [&]{
         if (!fold_loop.empty() && fold_iters > 0)
-            fprintf(stderr, "    ↻ loop @%04X period=%zu ×%ld more pass(es)\n",
+            fprintf(stderr, "    loop loop @%04X period=%zu x%ld more pass(es)\n",
                     (uint16_t)(fold_loop.front() & 0xFFFF), fold_loop.size(), fold_iters);
         fold_loop.clear(); fold_pos = 0; fold_iters = 0;
     };
@@ -789,7 +789,7 @@ int main(int argc, char** argv) {
         if (cpu == 1 && win_start  >= 0 && (z.PC < win_start  || z.PC > win_end))  return;
         if (cpu == 2 && win2_start >= 0 && (z.PC < win2_start || z.PC > win2_end)) return;
         if (csv_rows >= csv_cap) {
-            if (!csv_capped) { fprintf(stderr, "[csv] cap %ld rows reached — stopped\n", csv_cap); csv_capped = true; }
+            if (!csv_capped) { fprintf(stderr, "[csv] cap %ld rows reached - stopped\n", csv_cap); csv_capped = true; }
             return;
         }
         z80dis::Insn d = z80dis::decode([&](uint16_t x){ return machine.memReadDebug(x); }, z.PC);
@@ -1025,10 +1025,10 @@ int main(int argc, char** argv) {
         std::filesystem::path tmp = std::filesystem::temp_directory_path() /
             ("boot_trace_cow_"+std::to_string(k1520::os::processId())+src.extension().string());
         std::filesystem::copy_file(src, tmp, std::filesystem::copy_options::overwrite_existing, ec);
-        if (ec) fprintf(stderr, "WARN: COW copy of '%s' failed (%s) — mounting original writable\n",
+        if (ec) fprintf(stderr, "WARN: COW copy of '%s' failed (%s) - mounting original writable\n",
                         disk_path, ec.message().c_str());
         else { mount_path = tmp.string(); cow_temp = mount_path;
-               if (!quiet) fprintf(stderr, "COW: '%s' → %s (writes discarded; --rw to persist)\n",
+               if (!quiet) fprintf(stderr, "COW: '%s' -> %s (writes discarded; --rw to persist)\n",
                                    disk_path, mount_path.c_str()); }
     }
     // --format NAME (AP A7): ein .img anderer Geometrie (z. B. k5601_ss40_26x128 fuer BCU 880).
@@ -1053,10 +1053,10 @@ int main(int argc, char** argv) {
     // re-running the boot. The trace then starts from that checkpoint.
     if (load_state_path) {
         if (machine.loadState(load_state_path))
-            fprintf(stderr, "Loaded state ← %s (resuming at PC=0x%04X)\n",
+            fprintf(stderr, "Loaded state <- %s (resuming at PC=0x%04X)\n",
                     load_state_path, machine.cpuPC());
         else
-            fprintf(stderr, "WARN: could not load state '%s' (%s) — booting normally\n",
+            fprintf(stderr, "WARN: could not load state '%s' (%s) - booting normally\n",
                     load_state_path, machine.stateError().empty() ? "missing/invalid"
                                                                    : machine.stateError().c_str());
     }
@@ -1091,7 +1091,7 @@ int main(int argc, char** argv) {
         uint8_t cur_done = machine.memReadDebug(0x03F8);
         if (cur_done != last_done) {
             if (!quiet)
-                fprintf(stderr, "  [cycle %7d] [03F8] done-flag: 0x%02X → 0x%02X  (ZVE1 PC=0x%04X, ZVE2 PC=0x%04X)\n",
+                fprintf(stderr, "  [cycle %7d] [03F8] done-flag: 0x%02X -> 0x%02X  (ZVE1 PC=0x%04X, ZVE2 PC=0x%04X)\n",
                         cycles_done, last_done, cur_done, pc, machine.zve2PC());
             last_done = cur_done;
         }
@@ -1119,14 +1119,14 @@ int main(int argc, char** argv) {
         }
     }
 
-    if (csv_fp) { fclose(csv_fp); fprintf(stderr, "--csv: %ld row(s) → %s\n", csv_rows, csv_path); }
-    if (itrace_fp) { fclose(itrace_fp); fprintf(stderr, "--itrace: %ld INT/NMI → %s\n", itrace_n, itrace_path); }
+    if (csv_fp) { fclose(csv_fp); fprintf(stderr, "--csv: %ld row(s) -> %s\n", csv_rows, csv_path); }
+    if (itrace_fp) { fclose(itrace_fp); fprintf(stderr, "--itrace: %ld INT/NMI -> %s\n", itrace_n, itrace_path); }
 
     // --save-state: persist the machine state at the end of the run (e.g. paired with
     // --until to checkpoint exactly at a condition) for cheap resume via --load-state.
     if (save_state_path) {
         if (machine.saveState(save_state_path))
-            fprintf(stderr, "Saved state → %s (PC=0x%04X, cycle %d)\n",
+            fprintf(stderr, "Saved state -> %s (PC=0x%04X, cycle %d)\n",
                     save_state_path, machine.cpuPC(), cycles_done);
         else
             fprintf(stderr, "WARN: could not write state '%s'\n", save_state_path);
@@ -1157,7 +1157,7 @@ int main(int argc, char** argv) {
     fprintf(stderr, "  ZVE2 reached 0x0267 (DONE): %s\n", zve2_done_seen ? "YES" : "NO");
     if (zve2_instr > 0 && !zve2_done_seen) {
         fprintf(stderr, "  >> DIAGNOSIS: ZVE2 ran but never reached completion. It froze at\n");
-        fprintf(stderr, "     PC=0x%04X — likely BUSRQ released mid-program (see k5122 ioRead 0x16).\n",
+        fprintf(stderr, "     PC=0x%04X - likely BUSRQ released mid-program (see k5122 ioRead 0x16).\n",
                 machine.zve2PC());
     }
 
@@ -1252,7 +1252,7 @@ int main(int argc, char** argv) {
         for (auto& r : ranges) {
             fprintf(stderr, "    0x%04X-0x%04X  (%d byte%s)\n", r.first, r.second,
                     r.second - r.first + 1, (r.second - r.first) ? "s" : "");
-            if (++rshown >= 60) { fprintf(stderr, "    … (%zu ranges total)\n", ranges.size()); break; }
+            if (++rshown >= 60) { fprintf(stderr, "    ... (%zu ranges total)\n", ranges.size()); break; }
         }
         fprintf(stderr, "  ZVE2: %zu distinct instr addresses executed\n", zve2_pc_hist.size());
 
@@ -1271,7 +1271,7 @@ int main(int argc, char** argv) {
                 dump(pc_hist, "ZVE1");
                 dump(zve2_pc_hist, "ZVE2");
                 fclose(cf);
-                fprintf(stderr, "  CSV written → %s (cpu,pc,hits)\n", coverage_path);
+                fprintf(stderr, "  CSV written -> %s (cpu,pc,hits)\n", coverage_path);
             }
         }
     }

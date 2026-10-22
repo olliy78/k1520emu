@@ -154,7 +154,7 @@ uint8_t K1520Bus::ioRead(uint16_t addr) {
     io_addr_ = addr;
     const uint8_t port = static_cast<uint8_t>(addr);
     if (iodi_) {
-        LOG_TRACE("K1520Bus", "ioRead 0x%02X: /IODI aktiv → 0xFF", port);
+        LOG_TRACE("K1520Bus", "ioRead 0x%02X: /IODI aktiv -> 0xFF", port);
         return 0xFF;
     }
     uint8_t val = io_map_[port] ? io_map_[port]->ioRead(port) : 0xFF;
@@ -169,7 +169,7 @@ void K1520Bus::ioWrite(uint16_t addr, uint8_t data) {
     io_addr_ = addr;
     const uint8_t port = static_cast<uint8_t>(addr);
     if (iodi_) {
-        LOG_TRACE("K1520Bus", "ioWrite 0x%02X=0x%02X: /IODI aktiv → ignoriert", port, data);
+        LOG_TRACE("K1520Bus", "ioWrite 0x%02X=0x%02X: /IODI aktiv -> ignoriert", port, data);
         return;
     }
     if (!io_map_[port])
@@ -197,7 +197,7 @@ void K1520Bus::updateInterruptChain() {
     for (auto* dev : int_chain_)
         if (dev->hasInterrupt()) { int_asserted_ = true; break; }
     if (int_asserted_ != was_int)
-        LOG_DEBUG("K1520Bus", "INT: %s → %s", was_int ? "aktiv" : "inaktiv",
+        LOG_DEBUG("K1520Bus", "INT: %s -> %s", was_int ? "aktiv" : "inaktiv",
                   int_asserted_ ? "aktiv" : "inaktiv");
 }
 
@@ -221,7 +221,7 @@ uint8_t K1520Bus::interruptAcknowledge() {
     last_int_ack_.vector   = 0xFF;
     last_int_ack_.spurious = true;
     last_int_ack_.device   = nullptr;
-    LOG_DEBUG("K1520Bus", "INT-Quittung: SPURIOUS (kein Geraet) → 0xFF");
+    LOG_DEBUG("K1520Bus", "INT-Quittung: SPURIOUS (kein Geraet) -> 0xFF");
     return 0xFF;
 }
 

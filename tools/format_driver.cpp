@@ -182,7 +182,7 @@ int main(int argc, char** argv) {
         fprintf(stderr,
             "usage: %s <diskA> <diskB> <script> [createB_format]\n"
             "  createB_format: wenn angegeben, wird diskB NEU angelegt (create) statt\n"
-            "                  geoeffnet — .hfe = leeres Template (Format egal, z.B. '-'),\n"
+            "                  geoeffnet - .hfe = leeres Template (Format egal, z.B. '-'),\n"
             "                  .img = 0xE5-Image in der Geometrie des DiskFormat-Namens.\n",
             argv[0]);
         return 1;
@@ -271,7 +271,7 @@ int main(int argc, char** argv) {
         // FD_PHYSICAL_PRELOAD: erst die GANZE Diskette einlesen (wie „warten, bis der
         // Vorausleser durch ist"), dann das Script fahren.
         if (std::getenv("FD_PHYSICAL_PRELOAD")) {
-            fprintf(stderr, "[preload] lese alle Spuren …\n");
+            fprintf(stderr, "[preload] lese alle Spuren ...\n");
             const bool ok = sync->loadAll();
             fprintf(stderr, "[preload] fertig (%s)\n", ok ? "vollstaendig" : "mit Fehlern");
         }

@@ -1,4 +1,4 @@
-# --json gilt fuer ls, info, check und formats — nicht nur fuer ls (das war bis
+# --json gilt fuer ls, info, check und formats - nicht nur fuer ls (das war bis
 # 2026-08-10 ein Schalter, den `info` stillschweigend ignoriert hat).
 tool:   k1520disktool
 disk:   udos_boot_scp.hfe

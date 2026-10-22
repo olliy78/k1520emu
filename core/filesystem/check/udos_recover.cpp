@@ -96,7 +96,7 @@ constexpr size_t kMaxFunde = 200;
 constexpr const char* kWegZurueck =
     "UDOS fuehrt den Dateinamen nur im Verzeichnis; er ist beim Loeschen"
     " verlorengegangen. Der Fund laesst sich herausholen, benennen und mit `put`"
-    " wieder einspielen — Typ, Eigenschaften und Segmente bringt das Beiblatt"
+    " wieder einspielen - Typ, Eigenschaften und Segmente bringt das Beiblatt"
     " udos-dateiangaben.txt mit.";
 
 std::string ort(UdosPointer p) {
@@ -189,7 +189,7 @@ FsRecoverReport UdosFileSystem::recoverScan(FsRecoverLevel level, bool nachladen
     };
 
     bericht.schritt("udos.suche.lebend",
-                    "Lebende Dateien einlesen — ihre Sektoren sind tabu");
+                    "Lebende Dateien einlesen - ihre Sektoren sind tabu");
     // ── 1. Was LEBT?  Sektoren und Namen ─────────────────────────────────────
     //
     // Ohne das Verzeichnis ist kein Fund zu bewerten: „gehoert dieser Sektor
@@ -245,7 +245,7 @@ FsRecoverReport UdosFileSystem::recoverScan(FsRecoverLevel level, bool nachladen
 
     // ── 2. Namensreste im Verzeichnis (§13, Kasten) ──────────────────────────
     bericht.schritt("udos.suche.namensreste",
-                    "Namensreste im Verzeichnis — der Name ist das einzige, was fehlt");
+                    "Namensreste im Verzeichnis - der Name ist das einzige, was fehlt");
     //
     // `removeDirEntry` schiebt die folgenden Eintraege nach vorn und zieht `FF` nach
     // — der geloeschte Name ist damit ueberschrieben.  Fremde UDOS-Auspraegungen
@@ -324,7 +324,7 @@ FsRecoverReport UdosFileSystem::recoverScan(FsRecoverLevel level, bool nachladen
                 if (q.track >= tracks || q.sector_index >= spt) {
                     abbruch = "die Kette zeigt hinter Satz " + std::to_string(saetze.size())
                             + " auf Spur " + std::to_string(q.track) + " Sektor "
-                            + std::to_string(q.sectorId()) + " — das gibt es nicht";
+                            + std::to_string(q.sectorId()) + " - das gibt es nicht";
                     break;
                 }
                 if (!besucht.insert(nr(q)).second) {
@@ -500,11 +500,11 @@ FsRecoverReport UdosFileSystem::recoverScan(FsRecoverLevel level, bool nachladen
                           static_cast<unsigned>(lauf.back().sectorId()));
             f.vorschlag = wo;
             f.origin    = "Bereich ohne Kopfsektor, " + ort(lauf.front())
-                        + (lauf.size() > 1 ? "…" + std::to_string(lauf.back().sectorId()) : "");
-            f.detail    = "Kein Kopfsektor — Name, Typ und Laenge sind unbekannt;"
+                        + (lauf.size() > 1 ? "..." + std::to_string(lauf.back().sectorId()) : "");
+            f.detail    = "Kein Kopfsektor - Name, Typ und Laenge sind unbekannt;"
                           " gerettet wird der Rohinhalt (" + f.type + ")";
             f.warum_nicht = "Ein Rohbereich hat keinen Kopfsektor, aus dem sich eine Datei"
-                            " bauen liesse — herausholen laesst er sich aber";
+                            " bauen liesse - herausholen laesst er sich aber";
             bericht.hinzu(std::move(f));
             lauf.clear();
             lauf_daten.clear();

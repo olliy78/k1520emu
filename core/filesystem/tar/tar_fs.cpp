@@ -134,7 +134,7 @@ QuellBefund quelleBeurteilen(const std::vector<uint8_t>& d, uint64_t kapazitaet)
     if (d.empty()) { b.fehler = "Die Datei ist leer."; return b; }
     if (d.size() % kBlock) {
         b.fehler = "Die Dateigroesse (" + std::to_string(d.size()) + " Byte) ist kein Vielfaches von "
-                   "512 — ein tar-Strom besteht aus 512-Byte-Bloecken.  Mit `tar` erzeugte "
+                   "512 - ein tar-Strom besteht aus 512-Byte-Bloecken.  Mit `tar` erzeugte "
                    "Archive und Teile von `split -b 737280` sind es immer; wurde die Datei "
                    "anders geteilt, fehlt Auffuellung bis zum Blockrand.";
         return b;
@@ -490,8 +490,8 @@ bool TarFileSystem::firstSector(const std::string& name, FsRecoverOrt& out) cons
 
 namespace {
 constexpr const char* kLeerText =
-    "Auf eine leere tar-Diskette gehoert genau EIN .tar-Archiv (tar-put bzw. „tar-Datei auf "
-    "Diskette schreiben“), keine einzelnen Dateien.";
+    "Auf eine leere tar-Diskette gehoert genau EIN .tar-Archiv (tar-put bzw. 'tar-Datei auf "
+    "Diskette schreiben'), keine einzelnen Dateien.";
 }  // namespace
 
 bool TarFileSystem::write(const std::string&, const std::vector<uint8_t>&, const WriteOptions&) {
@@ -543,7 +543,7 @@ FsCheckReport TarFileSystem::check(FsCheckLevel level, bool nachladen) const {
     if (s.ende == Ende::Pruefsumme)
         f.add("tar.pruefsumme", FsSeverity::Fehler, FsLayer::Verwaltung,
               "Byte " + std::to_string(s.ende_off),
-              "Kopfblock ohne gueltige Pruefsumme — der Rest des Stroms ist nicht lesbar");
+              "Kopfblock ohne gueltige Pruefsumme - der Rest des Stroms ist nicht lesbar");
     if (s.ende == Ende::Abgeschnitten && !s.e.empty()) {
         const Eintrag& e = s.e.back();
         f.add("tar.abgeschnitten", FsSeverity::Warnung, FsLayer::Verwaltung, e.name,
@@ -561,13 +561,13 @@ FsCheckReport TarFileSystem::check(FsCheckLevel level, bool nachladen) const {
     }
     if (s.doppelt > 0)
         f.add("tar.doppelt", FsSeverity::Info, FsLayer::Verwaltung, "(Namen)",
-              std::to_string(s.doppelt) + " Name(n) kommen mehrfach vor — gezeigt wird je Name "
+              std::to_string(s.doppelt) + " Name(n) kommen mehrfach vor - gezeigt wird je Name "
               "die letzte Fassung, wie bei tar -x");
     int ge = 0;
     for (const Eintrag& e : s.e) if (e.pfad_geaendert) ++ge;
     if (ge > 0)
         f.add("tar.pfad", FsSeverity::Info, FsLayer::Verwaltung, "(Namen)",
-              std::to_string(ge) + " Name(n) mit fuehrendem '/' oder '..' — beim Auflisten "
+              std::to_string(ge) + " Name(n) mit fuehrendem '/' oder '..' - beim Auflisten "
               "relativ gemacht ('..' wird '__')");
     r.schrittEnde();
     return r;

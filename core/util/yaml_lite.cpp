@@ -389,7 +389,7 @@ bool parse(const std::string& text, Node& out, Error& err) {
         while (ind < raw.size() && (raw[ind] == ' ' || raw[ind] == '\t')) {
             if (raw[ind] == '\t') {
                 err.line = no;
-                err.message = "Tabulator in der Einrueckung — bitte Leerzeichen verwenden";
+                err.message = "Tabulator in der Einrueckung - bitte Leerzeichen verwenden";
                 return false;
             }
             ++ind;

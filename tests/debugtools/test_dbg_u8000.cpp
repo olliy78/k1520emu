@@ -160,12 +160,12 @@ TEST(DbgU8000Snap, DiffZeigtRegisterKarteUndDramBereiche) {
     b.dram[0x10] = 1; b.dram[0x11] = 2; b.dram[0x80] = 3;
     auto d = dbg16::diffEm(a, b);
     std::string all; for (auto& l : d) all += l + "\n";
-    EXPECT_NE(all.find("R3 0000→BEEF"), std::string::npos) << all;
-    EXPECT_NE(all.find("PC 0000→0104"), std::string::npos) << all;
-    EXPECT_NE(all.find("A33 0→8"), std::string::npos) << all;
-    EXPECT_NE(all.find("A54 0→1"), std::string::npos) << all;
-    EXPECT_NE(all.find("A46/PE 0→1"), std::string::npos) << all;
-    EXPECT_NE(all.find("A22: 2:0→5"), std::string::npos) << all;
+    EXPECT_NE(all.find("R3 0000->BEEF"), std::string::npos) << all;
+    EXPECT_NE(all.find("PC 0000->0104"), std::string::npos) << all;
+    EXPECT_NE(all.find("A33 0->8"), std::string::npos) << all;
+    EXPECT_NE(all.find("A54 0->1"), std::string::npos) << all;
+    EXPECT_NE(all.find("A46/PE 0->1"), std::string::npos) << all;
+    EXPECT_NE(all.find("A22: 2:0->5"), std::string::npos) << all;
     EXPECT_NE(all.find("em:00010..em:00011 (2 B)"), std::string::npos) << all;
     EXPECT_NE(all.find("3 EM-DRAM-Byte(s) in 2 Bereich(en)"), std::string::npos) << all;
 }

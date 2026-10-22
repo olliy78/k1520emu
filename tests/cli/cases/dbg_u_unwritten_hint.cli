@@ -6,4 +6,4 @@ run:    %DISK%
 stdin:
   u 0xC000 40
   q
-expect: ab C000 unbeschriebener Speicher (0xFF) — Ausgabe abgebrochen
+expect: ab C000 unbeschriebener Speicher (0xFF) - Ausgabe abgebrochen

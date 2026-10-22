@@ -301,7 +301,7 @@ bool UdosFileSystem::readSector(UdosPointer p, std::vector<uint8_t>& data,
                                 UdosPointer& back, UdosPointer& fwd) const {
     if (p.end()) return fail("Zeiger zeigt ins Leere (FF FF)");
     if (p.track >= tracks_)
-        return fail("Zeiger auf Spur " + std::to_string(p.track) + " — die Diskette hat nur "
+        return fail("Zeiger auf Spur " + std::to_string(p.track) + " - die Diskette hat nur "
                     + std::to_string(tracks_));
 
     SectorData sec;
@@ -311,7 +311,7 @@ bool UdosFileSystem::readSector(UdosPointer p, std::vector<uint8_t>& data,
                     + std::to_string(p.track) + " ist kuerzer als 128 B");
     if (sec.tail.size() < 4)
         return fail("Sektor " + std::to_string(p.sectorId()) + " auf Spur "
-                    + std::to_string(p.track) + " hat keinen Kontrollblock — das Abbild "
+                    + std::to_string(p.track) + " hat keinen Kontrollblock - das Abbild "
                     "ist kein spurbasiertes Format (.img kann UDOS nicht tragen)");
 
     data.assign(sec.data.begin(), sec.data.begin() + kSector);
@@ -659,7 +659,7 @@ std::string UdosFileSystem::systemspurHinweis() const {
     if (uebrig == 0) return "";
     return " (" + std::to_string(uebrig) + " freie Sektoren liegen auf den Systemspuren"
            " 0-2 und " + std::to_string(prof_.boot_track)
-           + " — dort schreibt das Werkzeug nicht, weil ein Bootabbild sie in einem"
+           + " - dort schreibt das Werkzeug nicht, weil ein Bootabbild sie in einem"
              " Zug ueberschreibt)";
 }
 
@@ -874,7 +874,7 @@ bool UdosFileSystem::write(const std::string& name, const std::vector<uint8_t>& 
     for (const UdosDirEntry& d : directory()) {
         if (d.name != name) continue;
         if (!opt.overwrite)
-            return fail("'" + name + "' existiert bereits — Ueberschreiben nicht erlaubt");
+            return fail("'" + name + "' existiert bereits - Ueberschreiben nicht erlaubt");
         if (!erase(name)) return false;
         break;
     }
@@ -1274,7 +1274,7 @@ bool UdosFileSystem::karteNeuAufbauen() {
     if (!readHeader(directoryHeader(), dir_hdr)) return false;
     std::vector<UdosPointer> dir_kette;
     if (!recordChain(dir_hdr, dir_kette))
-        return fail("Die Satzkette der Verzeichnisdatei bricht ab — der Belegungsplan "
+        return fail("Die Satzkette der Verzeichnisdatei bricht ab - der Belegungsplan "
                     "laesst sich daraus nicht ableiten");
     const uint32_t dir_je_satz = std::max<uint32_t>(1u, dir_hdr.record_len / kSector);
     for (const UdosPointer& satz : dir_kette)
@@ -1284,12 +1284,12 @@ bool UdosFileSystem::karteNeuAufbauen() {
     for (const UdosDirEntry& e : directory()) {
         UdosFileHeader hdr;
         if (!readHeader(e.header, hdr))
-            return fail("'" + e.name + "': der Kopfsektor ist nicht lesbar — der "
+            return fail("'" + e.name + "': der Kopfsektor ist nicht lesbar - der "
                         "Belegungsplan laesst sich nicht ableiten");
         merke(e.header);
         std::vector<UdosPointer> kette;
         if (!recordChain(hdr, kette))
-            return fail("'" + e.name + "': die Satzkette bricht ab — der Belegungsplan "
+            return fail("'" + e.name + "': die Satzkette bricht ab - der Belegungsplan "
                         "laesst sich nicht ableiten");
         const uint32_t je_satz = std::max<uint32_t>(1u, hdr.record_len / kSector);
         for (const UdosPointer& satz : kette)
@@ -1348,7 +1348,7 @@ bool UdosFileSystem::repair(const FsRepair& r) {
         UdosFileHeader hdr;
         if (!readHeader(kopf, hdr)) return false;
         if (r.c <= 0) return fail("Eine Datei ohne einen einzigen Satz laesst sich nicht "
-                                  "kuerzen — der Eintrag gehoert entfernt");
+                                  "kuerzen - der Eintrag gehoert entfernt");
         // Kopfsektor: Satzzahl, letzter Satz, „Bytes im letzten Satz".  Der neue letzte
         // Satz ist ein voller Satz — der angebrochene lag hinter dem Bruch.
         std::vector<uint8_t> d;

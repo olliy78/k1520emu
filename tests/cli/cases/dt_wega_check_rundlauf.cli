@@ -1,7 +1,7 @@
 # Was das Werkzeug auf eine WEGA-Diskette schreibt, muss die eigene Vollpruefung
 # OHNE Befund bestehen: Freiliste, Inode-Zaehler, Linkzaehler und Verzeichnisse
 # so, wie der WEGA-Kern sie selbst hinterliesse (doc/design/27 §4).  Dazwischen
-# loeschen und ueberschreiben — auch der Rueckweg muss sauber sein.
+# loeschen und ueberschreiben - auch der Rueckweg muss sauber sein.
 tool:   k1520disktool
 tmpfile w.img:
 file a:

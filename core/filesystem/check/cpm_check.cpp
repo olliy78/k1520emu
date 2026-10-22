@@ -146,7 +146,7 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
 
     // ── Ist ueberhaupt zu lesen, was zu lesen ist? ───────────────────────────
     bericht.schritt("cpm.schritt.spuren",
-                    "Spuren bereitstellen — was gelesen ist, wird angesehen");
+                    "Spuren bereitstellen - was gelesen ist, wird angesehen");
     //
     // An einer physischen Diskette darf die Pruefung nicht von sich aus Spuren
     // holen (E2).  Fehlt eine, wird sie uebersprungen und der Bericht sagt es —
@@ -161,7 +161,7 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
     if (!spur_da.empty() && !spur_da[0]) {
         // Ohne die erste Spur gibt es kein Verzeichnis und damit gar keine Pruefung.
         b.add("cpm.verz.ungelesen", FsSeverity::Info, FsLayer::Verwaltung, "",
-              "Die Verzeichnisspur ist noch nicht gelesen — geprueft wurde nichts");
+              "Die Verzeichnisspur ist noch nicht gelesen - geprueft wurde nichts");
         bericht.sortieren();
         return bericht;
     }
@@ -220,7 +220,7 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
                             wem.empty() ? ("c" + std::to_string(t.cyl)) : wem,
                             "Sektor " + std::to_string(id) + " auf c" + std::to_string(t.cyl)
                             + "h" + std::to_string(t.head) + " fehlt"
-                            + (wem.empty() ? " (kein Block einer Datei)" : " — " + wem
+                            + (wem.empty() ? " (kein Block einer Datei)" : " - " + wem
                                + " liegt darauf"),
                             t.cyl, t.head, id);
                     continue;
@@ -234,7 +234,7 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
                             + " von Sektor " + std::to_string(id) + " auf c"
                             + std::to_string(t.cyl) + "h" + std::to_string(t.head)
                             + " stimmt nicht"
-                            + (belegt ? " — Satz "
+                            + (belegt ? " - Satz "
                                         + std::to_string((off % prof_.block_size) / kRecordBytes
                                                          + 1)
                                         + " von " + wem + " liegt darauf"
@@ -258,7 +258,7 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
         std::snprintf(hex, sizeof hex, "0x%02X", static_cast<unsigned>(fuell));
         b.add("cpm.dir.fuellbyte", FsSeverity::Warnung, FsLayer::Verwaltung, "Verzeichnis",
               std::string("Der Verzeichnisbereich besteht durchgehend aus ") + hex
-              + " — die Diskette ist formatiert, aber nie eingerichtet worden (fuer CP/M"
+              + " - die Diskette ist formatiert, aber nie eingerichtet worden (fuer CP/M"
                 " ist nur 0xE5 ein freier Platz)");
         bericht.sortieren();
         return bericht;      // alles Weitere waere Rauschen ueber Fuellbytes
@@ -309,7 +309,7 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
             FsFinding& f = b.add("cpm.dir.user", FsSeverity::Fehler, FsLayer::Verwaltung,
                   platz(d.index),
                   std::string("Nutzerbyte ") + hex
-                  + " ist weder ein Nutzerbereich (0…15) noch 0xE5 (frei) noch ein"
+                  + " ist weder ein Nutzerbereich (0...15) noch 0xE5 (frei) noch ein"
                     " bekannter Sondersatz");
             f.repairs.push_back(platz_freigeben(d.index));
             continue;
@@ -332,7 +332,7 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
         if (steuerzeichen || leer)
             b.add("cpm.dir.name", FsSeverity::Fehler, FsLayer::Verwaltung, platz(d.index),
                   leer ? "Der Platz ist belegt, traegt aber keinen Namen"
-                       : "Der Name enthaelt Steuerzeichen — der Platz ist vermutlich Muell")
+                       : "Der Name enthaelt Steuerzeichen - der Platz ist vermutlich Muell")
              .repairs.push_back(platz_freigeben(d.index));
         else if (klein || trenner)
             b.add("cpm.dir.name", FsSeverity::Warnung, FsLayer::Verwaltung, platz(d.index),
@@ -349,7 +349,7 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
 
         if (d.records > 128) {
             FsRepair rep{"cpm.rc.anpassen",
-                         "Die Satzzahl auf 128 setzen — mehr traegt ein Extent nicht",
+                         "Die Satzzahl auf 128 setzen - mehr traegt ein Extent nicht",
                          /*datenverlust*/false, /*empfohlen*/true};
             rep.a = d.index;
             rep.b = 128;
@@ -369,7 +369,7 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
                       platz(d.index),
                       datei(d.user, d.name) + ": Blockzeiger " + std::to_string(blk)
                       + " liegt hinter dem Datenbereich (" + std::to_string(total_blocks_)
-                      + " Bloecke) — meist das falsche Dateisystemprofil")
+                      + " Bloecke) - meist das falsche Dateisystemprofil")
                  .repairs.push_back(zeiger_streichen(d.index));
                 continue;
             }
@@ -377,7 +377,7 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
                 b.add("cpm.block.verzeichnis", FsSeverity::Gefahr, FsLayer::Verwaltung,
                       platz(d.index),
                       datei(d.user, d.name) + " beansprucht Block " + std::to_string(blk)
-                      + ", der zum VERZEICHNIS gehoert — ein Schreibvorgang darauf"
+                      + ", der zum VERZEICHNIS gehoert - ein Schreibvorgang darauf"
                         " zerstoert das Verzeichnis")
                  .repairs.push_back(zeiger_streichen(d.index));
             blockbesitzer[blk].push_back({datei(d.user, d.name) + " Extent "
@@ -421,7 +421,7 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
                   datei(d.user, d.name) + ", Extent " + std::to_string(d.extent) + ": "
                   + std::to_string(angesagt) + " Byte angesagt ("
                   + std::to_string(d.records) + " Saetze), aber nur "
-                  + std::to_string(gedeckt) + " Byte durch Blockzeiger gedeckt — beim"
+                  + std::to_string(gedeckt) + " Byte durch Blockzeiger gedeckt - beim"
                     " Herausholen kaemen " + std::to_string(angesagt - gedeckt)
                   + " Byte Nullen heraus");
             // Ehrlich machen laesst sich das nur ueber die Satzzahl — und nur, wenn
@@ -432,7 +432,7 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
                     std::min<uint32_t>(128u, belegte * saetze_je_block);
                 FsRepair rep{"cpm.rc.anpassen",
                              "Die Satzzahl auf die gedeckten " + std::to_string(moeglich)
-                             + " Saetze setzen — die Datei wird dadurch kuerzer, aber"
+                             + " Saetze setzen - die Datei wird dadurch kuerzer, aber"
                                " sie liefert dann nur noch, was wirklich dasteht",
                              /*datenverlust*/true, /*empfohlen*/true};
                 rep.a = d.index;
@@ -447,7 +447,7 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
                   datei(d.user, d.name) + ", Extent " + std::to_string(d.extent) + ": "
                   + std::to_string(belegte) + " Bloecke belegt, fuer "
                   + std::to_string(angesagt) + " Byte reichen "
-                  + std::to_string(noetig) + " — " + std::to_string(ueberhang)
+                  + std::to_string(noetig) + " - " + std::to_string(ueberhang)
                   + " Byte sind belegt, ueber das Verzeichnis aber nicht erreichbar");
         }
 
@@ -465,7 +465,7 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
               "Block " + std::to_string(blk),
               "Block " + std::to_string(blk) + " wird von " + std::to_string(wer.size())
               + " Eintraegen beansprucht (" + liste
-              + ") — wer als zweiter schreibt, zerstoert die Daten des ersten");
+              + ") - wer als zweiter schreibt, zerstoert die Daten des ersten");
         // Der Block bleibt bei der Datei mit dem KLEINEREN Verzeichnisindex; jede
         // weitere bekommt dort einen Nullzeiger.  Das ist der verlustbehaftete, aber
         // eindeutige Weg; `cpm.kreuz.kopieren` (§8) kommt spaeter.
@@ -499,7 +499,7 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
             b.add("cpm.dir.extentluecke", FsSeverity::Fehler, FsLayer::Verwaltung,
                   datei(schluessel.first, schluessel.second),
                   "Die Datei beginnt erst bei Extent " + std::to_string(ext.front())
-                  + " — ihr Anfang fehlt");
+                  + " - ihr Anfang fehlt");
         for (size_t k = 1; k < ext.size(); ++k)
             if (ext[k] - ext[k - 1] > schritt)
                 b.add("cpm.dir.extentluecke", FsSeverity::Fehler, FsLayer::Verwaltung,
@@ -519,7 +519,7 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
     if (geloescht)
         b.add("cpm.dir.geloescht", FsSeverity::Info, FsLayer::Verwaltung, "Verzeichnis",
               std::to_string(geloescht) + " freie Verzeichnisplaetze tragen noch einen"
-              " lesbaren Eintrag — dort stehen geloeschte Dateien, die sich"
+              " lesbaren Eintrag - dort stehen geloeschte Dateien, die sich"
               " wiederherstellen lassen");
 
     // ── OS/M-Urlader: passt sein Laufwerkstyp zur Diskette? (AP 3, Entwurf 34) ──
@@ -545,7 +545,7 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
             b.addAt("osm.fdconf", FsSeverity::Warnung, FsLayer::Verwaltung, "Urlader",
                     "Der OS/M-Urlader traegt FDCONF " + std::string(hex) + " (Laufwerk A: Typ "
                     + std::to_string(typ) + "), die Geometrie dieser Diskette ist aber Typ "
-                    + soll + " — sie startet am P8000 nicht richtig (System mit falscher "
+                    + soll + " - sie startet am P8000 nicht richtig (System mit falscher "
                     "Spurlaenge geladen bzw. A: mit falschem DPB gelesen)",
                     0, 0, space_.trackAt(0).first_id);
         }
@@ -583,7 +583,7 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
             if (!space_.trackFormatted(t.cyl, t.head)) {
                 b.addAt("cpm.medium.systemspur", FsSeverity::Warnung, FsLayer::Medium,
                         "Systemspur", "Systemspur c" + std::to_string(t.cyl) + "h"
-                        + std::to_string(t.head) + " traegt keine Adressmarken —"
+                        + std::to_string(t.head) + " traegt keine Adressmarken -"
                           " die Diskette ist so nicht bootfaehig",
                         t.cyl, t.head);
                 continue;
@@ -601,7 +601,7 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
                         "Systemspur",
                         std::string(ls.id_crc_ok ? "Daten-CRC" : "ID-CRC")
                         + " von Sektor " + std::to_string(ls.id) + " der Systemspur " + wo
-                        + " stimmt nicht — die Diskette bootet moeglicherweise nicht",
+                        + " stimmt nicht - die Diskette bootet moeglicherweise nicht",
                         t.cyl, t.head, ls.id);
             }
             for (uint8_t k = 0; k < t.sectors; ++k)

@@ -1,6 +1,6 @@
 # Der A7100-Referenzdatentraeger ist WIRKLICH beschaedigt (Bootspur-Sektor 10,
-# doc/design/13_k1520disktool.md §22).  Die Erkennung meldet dazu nur „1 Sektor mit
-# CRC-Fehler" — die Pruefung sagt, WELCHER, und das ist ihr ganzer Zweck.
+# doc/design/13_k1520disktool.md §22).  Die Erkennung meldet dazu nur '1 Sektor mit
+# CRC-Fehler" - die Pruefung sagt, WELCHER, und das ist ihr ganzer Zweck.
 #
 # Und: die SCHNELLpruefung schweigt dazu.  Sie fasst nur die Verwaltungsstrukturen
 # an; Systemspuren kosten einen eigenen Spurdurchlauf (Entwurf E2).

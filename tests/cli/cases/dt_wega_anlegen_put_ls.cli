@@ -1,4 +1,4 @@
-# WEGA (P8000, UNIX System III) — eine 720-K-Diskette anlegen, einen Verzeichnisbaum
+# WEGA (P8000, UNIX System III) - eine 720-K-Diskette anlegen, einen Verzeichnisbaum
 # hineinschreiben und als `ls -l` zurueckbekommen.  Geprueft wird, dass die Erkennung
 # die frisch angelegte Diskette OHNE --fs wiederfindet, dass `--as` fehlende
 # Verzeichnisse anlegt und dass `mkdir` ein leeres Verzeichnis traegt.
