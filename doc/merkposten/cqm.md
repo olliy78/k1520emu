@@ -68,6 +68,7 @@ Voller Befund an 142 Abbildern: `doc/design/35_cqm.md`.
    Saetze, Webseiten-Herkunft als `provenance:`; siehe `disktool.md`, „Archiv mit Herkunft").
    Die `*.crdownload` der Sammlung sind **vollstaendige** CQM-Abbilder (Strom komplett, Pruefwert ok)
    — nur umbenennen; das Skript berichtet es, archiviert sie nicht.
+*(Seit Entwurf 37 sind abgeschlossene tar-Archive und Sätze bearbeitbar — Festlegungen in `doc/merkposten/tar_satz.md`; „danach nur lesbar“ unten gilt nicht mehr.)*
 13. **tar-Export, leere tar-Diskette, `.tar` schreiben (2026-10-17, `tar-export`/`tar-put`,
    `tar720_leer`).**  Rohinhalte einer tar-Diskette als `.tar` heraus (Stücke eines Satzes setzt
    `cat` zusammen) und in neue Disketten zurück.  Festlegungen mit Wächter:

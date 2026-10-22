@@ -603,7 +603,7 @@ Maschinenzeit zurück.  Kasten „Lochstreifen“ nur mit Karte, kein Kürzel, n
 
 `.cqm` ist ein Container wie `.img` (`core/peripherals/floppy_drive/cqm_codec.*`, **lesen UND schreiben**,
 Grenze = `rawCompatible()` + einheitliche MFM-Geometrie, Kopffelder des Originals bleiben; kein erzwungener
-Schreibschutz; die Oberflächen behandeln `.cqm` seit 2026-10-17 als schreibbar, nur tar bleibt gesperrt;
+Schreibschutz; die Oberflächen behandeln `.cqm` seit 2026-10-17 als schreibbar, nur ein nicht abgeschlossenes tar-Stück bleibt gesperrt;
 Ablehnungsgründe stehen ausdrücklich im Kern („CopyQM unterstuetzt keine gemischten Formate…“); die
 Emulatoren zeigen beim Einlegen profilabhängige Hinweise `Programmprofil.cqm_hinweise` (A5120: UDOS+Boot,
 PRG 710: UDOS));
@@ -613,8 +613,12 @@ P8000-Disketten ohne Dateisystem sind
 aus (Kopf+Endmarke → bis dahinter, sonst/Folgeteil ganz; die Teile eines Satzes setzt `cat` zusammen); `create --fs
 tar720_leer` legt eine ganz Null gefüllte 720K-Diskette an (alle vier Container; Erkennung nur bei ALLEN Bytes Null,
 vor der CP/A-Regel), `tar-put` schreibt GENAU EIN `.tar` hinein (≤ 720 KiB, Vielfaches von 512, Warnung bei Nicht-V7),
-danach ist sie `tar720` und nur lesbar.  Aktionen „Diskette als .tar exportieren…“/„tar-Datei auf Diskette schreiben…“.
+danach ist sie `tar720` (seit Entwurf 37 als abgeschlossenes Archiv bearbeitbar).  Aktionen „Diskette als .tar exportieren…“/„tar-Datei auf Diskette schreiben…“.
 **`doc/merkposten/cqm.md` Nr. 13 lesen.**
+**tar-Archive/-Sätze bearbeiten (Entwurf 37, 2026-10-22):** ein *abgeschlossenes* tar-Archiv (Kopf+Endmarke) und jeder Satz
+sind im DiskTool schreibbar (V7-Neuaufbau, Satz = EIN Strom → nummerierte Abbilder `name1.hfe`…, Archiv eines Satzes mit allen Abbildern
++ Dateien + Metadaten); Folgeteile bleiben nur lesbar.  Ebenso P8000-Plattenabbilder (`PlattenVolume`, `k1520d_platte_*`).
+**Vor Arbeiten daran: `doc/merkposten/tar_satz.md` lesen**; Entwurf `doc/design/37_tar_satz_und_platte.md`.
 WEGA/tar tragen UNIX-Angaben statt UDOS-Kopfsektor (`FsType`, `istUnix()`).  Archive der
 pofo.de-Sammlung: `tools/p8000/pofo_archive.py`.
 **Vor Arbeiten daran: `doc/merkposten/cqm.md` lesen** (CRC-Tabellenfehler `& 0x3F`, Offsets);

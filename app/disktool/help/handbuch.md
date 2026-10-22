@@ -950,6 +950,20 @@ archiviert wurde: sie hat keine Abbilddatei, von der sich ein Name ableiten
 liesse. Vorgeschlagen wird der Dateiname der offenen Diskette, sonst ihr
 Datenträgername.
 
+**Ein tar-Satz** (mehrere Disketten, EIN Strom) lässt sich ebenso archivieren. Das Archiv enthält
+dann statt EINES `.hfe` **alle Abbilder des Satzes** im Ordner `abbilder/` (nummeriert wie
+beim Speichern, `name1.hfe`, `name2.hfe`, unverändert), **alle Dateien** mit ihrer Ordnerstruktur
+und `.fileinfo` unter `dateien/` und die Satzangaben (Basisname, Format, Abbildreihenfolge mit
+Prüfsummen) im Abschnitt `tar_satz:` der `diskarchive.yaml` und im Inhaltsverzeichnis.
+Archiviert wird der Stand der **gespeicherten Abbilder**: hat der Satz ungespeicherte
+Änderungen (oder wurde er noch nie gespeichert), fragt das Programm, ob es ihn erst speichern
+soll — „Nein“ bricht das Archivieren ab, es entsteht nichts Halbes. Zurück zum Satz kommt man
+mit `python3 -m app.disktool.archive archiv.zip --satz-entpacken ORDNER`: die Abbilder werden
+gegen ihre Prüfsumme geprüft und in den Ordner gelegt (vorhandene Dateien nur mit `--force`
+ersetzt); dann *Datei ▸ tar-Satz öffnen…*. Auf der Kommandozeile archiviert
+`python3 -m app.disktool.archive satz1.hfe archiv.zip --satz satz2.hfe` (jedes weitere Abbild
+mit `--satz`, in Stromreihenfolge).
+
 Gedacht als Langzeitablage: aus dem Textteil allein lässt sich in zwanzig Jahren
 noch nachvollziehen, was auf der Diskette stand. Archivieren ist eine reine
 Leseoperation und geht auch mit gesetztem Schreibschutz.

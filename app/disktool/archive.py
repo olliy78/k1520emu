@@ -56,6 +56,9 @@ DATEI_ORDNER = "dateien"
 #: Name der Dateien im Archiv, wenn nichts Besseres bekannt ist.
 NAMENLOS = "diskette"
 
+#: Unterordner im Archiv eines tar-SATZES, der dessen Einzelabbilder aufnimmt (Entwurf 37, T5).
+SATZ_ORDNER = "abbilder"
+
 #: Name des maschinenlesbaren Verzeichnisses im Archiv.
 INVENTAR_DATEI = "diskarchive.yaml"
 
@@ -318,8 +321,11 @@ def _herkunft_abschnitt(provenance: dict, beilagen) -> list:
 def inhaltsverzeichnis(tool: "DiskTool", quelle: str = "",
                        bezeichnung: str = "", herkunft: str = "",
                        provenance: dict = None, beilagen=(),
-                       ohne_abbild: bool = False) -> str:
+                       ohne_abbild: bool = False, satz: dict = None) -> str:
     """Das Inhaltsverzeichnis als Text — Kopf, Tabelle, Legende.
+
+    ``satz``: Angaben zu einem tar-Satz (``basis``, ``abbilder`` = Dateinamen in Stromreihenfolge);
+    dann stehen die Abbilder im Archiv unter ``abbilder/`` und der Kopf nennt sie.
 
     Args:
         quelle: Dateiname, unter dem die Diskette geführt wird (Vorgabe: der
@@ -354,6 +360,11 @@ def inhaltsverzeichnis(tool: "DiskTool", quelle: str = "",
     datei = "" if ohne_abbild else Path(quelle or tool.path).name
     if datei:
         z.append(f"Abbild        {datei}")
+    if satz:
+        z.append(f"tar-Satz      {len(satz['abbilder'])} Abbilder, Basisname {satz['basis']} "
+                 f"(im Archiv unter {SATZ_ORDNER}/)")
+        for i, n in enumerate(satz["abbilder"], 1):
+            z.append(f"              {i}. {n}")
     cqm = {} if ohne_abbild else _cqm_angaben(tool)
     if cqm:
         z.append("Container     CopyQM (.cqm)"
@@ -364,7 +375,7 @@ def inhaltsverzeichnis(tool: "DiskTool", quelle: str = "",
                 z.append(f"{name:<13} {cqm[schluessel]}")
     if herkunft:
         z.append(f"Herkunft      {herkunft}")
-    elif not datei and not ohne_abbild:
+    elif not datei and not ohne_abbild and not satz:
         z.append("Herkunft      physisches Laufwerk — kein Abbild als Quelle")
     z.append(f"Format        {tool.format}")
     z.append(f"Dateisystem   {tool.filesystem}"
@@ -416,7 +427,13 @@ def inhaltsverzeichnis(tool: "DiskTool", quelle: str = "",
     z.append(_legende(hat_udos, hat_cpm, hat_wega))
     z.append("")
     z.append("Der Unterordner `" + DATEI_ORDNER + "/` enthaelt dieselben Dateien als")
-    if ohne_abbild:
+    if satz:
+        z.append("gewoehnliche Dateien; die Abbilder des Satzes liegen im Unterordner `"
+                 + SATZ_ORDNER + "/`")
+        z.append("in Stromreihenfolge (nummeriert, gleiches Format) — zusammen sind sie die")
+        z.append("verlustfreie Fassung, aus der sich der Satz wiederherstellen laesst")
+        z.append("(`python3 -m app.disktool.archive --satz-entpacken archiv.zip ORDNER`).")
+    elif ohne_abbild:
         z.append("gewoehnliche Dateien; ein Abbild liegt nicht bei (die Dateien stammen aus")
         z.append("einem Satz mehrerer Disketten — die Abbilder sind die Einzelarchive).")
     else:
@@ -468,6 +485,11 @@ INVENTAR_KOPF = """\
 #   provenance    nur wenn der Aufrufer Herkunftsangaben mitgab (z. B. Webseite, Satz,
 #                 Version, Abrufdatum, sha256 der Quelle, Hinweise): freie Schluessel,
 #                 die das Archiv nicht auswertet.
+#   tar_satz      nur bei einem tar-SATZ (mehrere Disketten = EIN tar-Strom; dann kein
+#                 `image`): basename, format (Katalogname), container (img/hfe/dmk/cqm)
+#                 und images — die Abbilder IN STROMREIHENFOLGE (index ab 1, path unter
+#                 `abbilder/`, size, sha256).  Aus ihnen stellt `--satz-entpacken` den Satz
+#                 wieder her; `dateien/` ist dieselbe Fassung als gewoehnliche Dateien.
 #   files_root    Ordner im Archiv, unter dem die Dateien liegen.
 #   files         eine Zeile je Datei der Diskette:
 #     path        Pfad IM ARCHIV (Eintrag der .zip), Trenner '/', stets relativ.
@@ -536,7 +558,7 @@ def inventar(eintraege, dateien_ordner: Path, *, abbild: Path = None, abbild_nam
              bezeichnung: str = "", quelle: str = "", herkunft: str = "",
              text_mode: bool = False, container=None,
              quelle_pfad: str = "", provenance: dict = None,
-             beilagen: dict = None) -> dict:
+             beilagen: dict = None, satz: dict = None) -> dict:
     """Das maschinenlesbare Verzeichnis als Datenstruktur.
 
     Gerechnet wird über die Dateien, wie sie **im Archiv landen** — nicht über
@@ -602,6 +624,10 @@ def inventar(eintraege, dateien_ordner: Path, *, abbild: Path = None, abbild_nam
     for pfad, inhalt in sorted((beilagen or {}).items()):
         b = inhalt.encode("utf-8") if isinstance(inhalt, str) else bytes(inhalt)
         daten["attachments"].append(_angabe(pfad, len(b), hashlib.sha256(b).hexdigest()))
+    if satz:
+        # Additiv (diskarchive bleibt 1): ein tar-Satz hat KEIN `image`, sondern N Abbilder in
+        # Stromreihenfolge; `images[i].path` liegt im Archiv unter `abbilder/`.
+        daten["tar_satz"] = dict(satz)
     if provenance:
         daten["provenance"] = dict(provenance)
     if container:
@@ -632,7 +658,7 @@ def inventar_yaml(daten: dict) -> str:
 def create_archive(tool: "DiskTool", zip_path, text_mode: bool = False,
                    bezeichnung: str = "", herkunft: str = "",
                    provenance: dict = None, beilagen: dict = None,
-                   ohne_abbild: bool = False) -> Path:
+                   ohne_abbild: bool = False, satz_abbilder=None) -> Path:
     """Abbild, Dateien und beide Inhaltsverzeichnisse in eine `.zip` packen.
 
     Zwei Verzeichnisse, weil zwei Leser: `<name>.txt` fuer den Menschen (mit
@@ -663,14 +689,40 @@ def create_archive(tool: "DiskTool", zip_path, text_mode: bool = False,
         ohne_abbild: kein `.hfe` ins Archiv (und kein `image:`) — fuer ein Archiv
             ueber MEHRERE Disketten (tar-Satz), wo es ein einzelnes Abbild nicht gibt.
 
+        satz_abbilder: die Abbilddateien eines tar-SATZES in Stromreihenfolge
+            (``tool.tar_satz_dateien``).  Sie kommen unveraendert nach ``abbilder/``, die
+            Dateien (mit ``.fileinfo``) nach ``dateien/``, der Satz steht im Inhaltsverzeichnis
+            und unter ``tar_satz:`` in der ``diskarchive.yaml``; ``ohne_abbild`` gilt dann von
+            selbst.  Der Satz muss gespeichert sein (der Aufrufer sorgt dafuer): archiviert wird
+            der Stand der DATEIEN, und der Auszug kommt aus demselben Strom — ein geaenderter,
+            nicht gespeicherter Satz wird abgewiesen statt halb archiviert.
+
     Returns:
         Der geschriebene Archivpfad.
     """
+    satz = None
+    if satz_abbilder:
+        if not tool.tar_satz:
+            raise ValueError("satz_abbilder gibt es nur fuer einen tar-Satz.")
+        if tool.dirty:
+            raise ValueError("Der tar-Satz hat ungespeicherte Aenderungen - erst speichern, "
+                             "dann archivieren (die Abbilder im Archiv waeren sonst ein "
+                             "anderer Stand als die Dateien).")
+        fehlt = [str(p) for p in satz_abbilder if not Path(p).is_file()]
+        if fehlt:
+            raise ValueError("Abbilder des Satzes nicht gefunden: " + ", ".join(fehlt))
+        ohne_abbild = True
+        satz = {"basis": Path(tool.tar_satz_basis or satz_abbilder[0]).name,
+                "abbilder": [Path(p).name for p in satz_abbilder]}
+        if len(set(satz["abbilder"])) != len(satz["abbilder"]):
+            raise ValueError("Die Abbilder des Satzes heissen nicht verschieden - im Archiv "
+                             "wuerden sie sich ueberschreiben.")
     ziel = Path(zip_path)
     if ziel.suffix.lower() != ".zip":
         ziel = ziel.with_suffix(".zip")
 
-    stamm = dateiname(bezeichnung) or Path(tool.path).stem or NAMENLOS
+    stamm = (dateiname(bezeichnung)
+             or (Path(satz["basis"]).stem if satz else "") or Path(tool.path).stem or NAMENLOS)
     # Eine Regel fuer alle Aufrufer (CLI, Dialog, Sammlungsskript): archiv_meta.py.
     from app.disktool.archiv_meta import pruefe_beilagen, pruefe_schluessel
     for k in provenance or ():
@@ -678,7 +730,7 @@ def create_archive(tool: "DiskTool", zip_path, text_mode: bool = False,
     pruefe_beilagen(beilagen, stamm=stamm, unterordner=True)
     text = inhaltsverzeichnis(tool, bezeichnung=bezeichnung, herkunft=herkunft,
                               provenance=provenance, beilagen=tuple(beilagen or ()),
-                              ohne_abbild=ohne_abbild)
+                              ohne_abbild=ohne_abbild, satz=satz)
     eintraege = tool.list()
 
     with tempfile.TemporaryDirectory(prefix="k1520_archiv_") as tmp:
@@ -694,6 +746,14 @@ def create_archive(tool: "DiskTool", zip_path, text_mode: bool = False,
         dateien.mkdir()
         tool.extract_all(dateien, text=text_mode)
 
+        satz_inventar = None
+        if satz:
+            satz_inventar = {
+                "basename": satz["basis"], "format": tool.format,
+                "container": Path(satz["abbilder"][0]).suffix.lstrip(".").lower(),
+                "images": [dict(index=i, **_angabe_datei(Path(p), f"{SATZ_ORDNER}/{Path(p).name}"))
+                           for i, p in enumerate(satz_abbilder, 1)]}
+
         # 3) Das maschinenlesbare Verzeichnis — es rechnet ueber die Dateien,
         #    wie sie gleich in die .zip gehen, also nach dem Auszug.
         daten = inventar(eintraege, dateien,
@@ -705,13 +765,15 @@ def create_archive(tool: "DiskTool", zip_path, text_mode: bool = False,
                          herkunft=herkunft, text_mode=text_mode,
                          container={} if ohne_abbild else _cqm_angaben(tool),
                          quelle_pfad="" if ohne_abbild else tool.path,
-                         provenance=provenance, beilagen=beilagen)
+                         provenance=provenance, beilagen=beilagen, satz=satz_inventar)
 
         # 4) Alles einpacken.
         ziel.parent.mkdir(parents=True, exist_ok=True)
         with zipfile.ZipFile(ziel, "w", zipfile.ZIP_DEFLATED) as z:
             if not ohne_abbild:
                 z.write(abbild, abbild.name)
+            for p in (satz_abbilder or ()):
+                z.write(p, f"{SATZ_ORDNER}/{Path(p).name}")
             for pfad, inhalt in sorted((beilagen or {}).items()):
                 z.writestr(pfad, inhalt)
             z.writestr(f"{stamm}.txt", text)
@@ -726,6 +788,47 @@ def create_archive(tool: "DiskTool", zip_path, text_mode: bool = False,
     return ziel
 
 
+def satz_entpacken(zip_path, ziel_ordner, ueberschreiben: bool = False) -> list:
+    """Die Abbilder eines Satzarchivs in einen Ordner zurueckholen — der Weg zum Satz zurueck.
+
+    Liest ``tar_satz`` aus der ``diskarchive.yaml``, prueft jedes Abbild gegen sein sha256 und
+    legt es unter dem Namen aus dem Archiv ab (Stromreihenfolge = Reihenfolge der Rueckgabe).
+    Danach oeffnet ``DiskTool.open_tar_satz(rueckgabe)`` den Satz wie vorher.  Vorhandene Dateien
+    werden nur mit ``ueberschreiben`` ersetzt; es wird erst geschrieben, wenn ALLES geprueft ist.
+
+    Raises:
+        ValueError: kein Satzarchiv, Namen mit Pfadanteil, Pruefsumme falsch, Ziel vorhanden.
+    """
+    ziel = Path(ziel_ordner)
+    with zipfile.ZipFile(zip_path) as z:
+        try:
+            daten = yaml.safe_load(z.read(INVENTAR_DATEI).decode("utf-8")) or {}
+        except KeyError:
+            raise ValueError(f"{zip_path}: kein {INVENTAR_DATEI} - kein Archiv des DiskTools.")
+        satz = daten.get("tar_satz")
+        if not satz or not satz.get("images"):
+            raise ValueError(f"{zip_path}: enthaelt keinen tar-Satz (kein Abschnitt tar_satz).")
+        inhalt = []
+        for b in sorted(satz["images"], key=lambda i: i["index"]):
+            name = Path(b["path"]).name
+            # Nur der Dateiname zaehlt: ein Archiv darf nichts ausserhalb des Ordners ablegen.
+            if name != b["path"].rsplit("/", 1)[-1] or name in ("", ".", ".."):
+                raise ValueError(f"Unzulaessiger Abbildname im Archiv: {b['path']}")
+            roh = z.read(b["path"])
+            if hashlib.sha256(roh).hexdigest() != b["sha256"]:
+                raise ValueError(f"Pruefsumme von {b['path']} stimmt nicht - Archiv beschaedigt.")
+            inhalt.append((name, roh))
+    vorhanden = [n for n, _ in inhalt if (ziel / n).exists()]
+    if vorhanden and not ueberschreiben:
+        raise ValueError("Schon vorhanden (nicht ueberschrieben): " + ", ".join(vorhanden))
+    ziel.mkdir(parents=True, exist_ok=True)
+    pfade = []
+    for name, roh in inhalt:
+        (ziel / name).write_bytes(roh)
+        pfade.append(ziel / name)
+    return pfade
+
+
 def main(argv=None) -> int:
     import argparse
     from app.disktool import archiv_meta
@@ -735,12 +838,18 @@ def main(argv=None) -> int:
         description="Eine Diskette (Abbild) als .zip archivieren: Abbild als .hfe, alle "
                     "Dateien, lesbares und maschinenlesbares Inhaltsverzeichnis.")
     p.add_argument("abbild")
-    p.add_argument("archiv", metavar="archiv.zip")
+    p.add_argument("archiv", metavar="archiv.zip", nargs="?", default="")
     p.add_argument("beschriftung", nargs="?", default="",
                    help="Beschriftung der Diskette (wie --bezeichnung)")
     p.add_argument("--bezeichnung", metavar="TEXT", default="",
                    help="Beschriftung der Diskette (der Aufkleber); benennt die "
                         "Dateien im Archiv")
+    p.add_argument("--satz", metavar="ABBILD", action="append", default=[],
+                   help="weiteres Abbild eines tar-SATZES (mehrfach, in Stromreihenfolge; das "
+                        "erste ist das Abbild-Argument): archiviert alle Abbilder + Dateien")
+    p.add_argument("--satz-entpacken", metavar="ORDNER",
+                   help="statt zu archivieren: die Abbilder des Satzarchivs (Argument abbild) "
+                        "in ORDNER zurueckholen (ueberschreiben mit --force)")
     p.add_argument("--ohne-abbild", action="store_true",
                    help="kein .hfe ins Archiv (nur Dateien und Verzeichnisse)")
     p.add_argument("--text", action="store_true", help="Zeilenenden umsetzen")
@@ -751,6 +860,17 @@ def main(argv=None) -> int:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     from app.core_binding.k1520disk import DiskTool, K1520DiskError
 
+    if o.satz_entpacken:
+        try:
+            for pf in satz_entpacken(o.abbild, o.satz_entpacken, ueberschreiben=o.force):
+                print(f"zurueckgeholt: {pf}")
+        except (ValueError, OSError, zipfile.BadZipFile) as e:
+            print(f"Fehler: {e}", file=sys.stderr)
+            return 1
+        return 0
+    if not o.archiv:
+        print("Fehler: archiv.zip fehlt.", file=sys.stderr)
+        return 2
     bezeichnung = o.bezeichnung or o.beschriftung
     ziel = Path(o.archiv)
     if ziel.suffix.lower() != ".zip":
@@ -768,14 +888,19 @@ def main(argv=None) -> int:
         return 2
 
     try:
-        with DiskTool.open(o.abbild) as d:           # schreibgeschuetzt - nur lesen
+        # Ein Satz: alle Abbilder in Stromreihenfolge oeffnen; der Satz ist unveraendert
+        # (gerade geoeffnet), also passen die Dateien zum Strom.
+        satz = [o.abbild] + o.satz if o.satz else None
+        with (DiskTool.open_tar_satz(satz) if satz
+              else DiskTool.open(o.abbild)) as d:    # schreibgeschuetzt - nur lesen
             ziel = create_archive(d, ziel, text_mode=o.text, bezeichnung=bezeichnung,
                                   provenance=prov or None, beilagen=beil or None,
-                                  ohne_abbild=o.ohne_abbild)
+                                  ohne_abbild=o.ohne_abbild,
+                                  satz_abbilder=d.tar_satz_dateien or None)
     except archiv_meta.ArchivMetaFehler as e:
         print(f"Fehler: {e}", file=sys.stderr)
         return 2
-    except K1520DiskError as e:
+    except (K1520DiskError, ValueError) as e:
         print(f"Fehler: {e}", file=sys.stderr)
         return 1
     print(f"archiviert: {ziel}")

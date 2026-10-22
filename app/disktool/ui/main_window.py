@@ -2242,17 +2242,56 @@ class MainWindow(QMainWindow):
         # unbrauchbar), bei CP/M nur, wenn der Anwender es verlangt — dort genuegt
         # das Sammelbeiblatt, das ohnehin mit ins Archiv geht.
         self._fileinfo_anwenden()
+        # Ein tar-SATZ (Entwurf 37, T5): alle Abbilder + alle Dateien + Metadaten.  Archiviert
+        # wird der Stand der gespeicherten Abbild-DATEIEN, darum zuerst speichern (s. u.).
+        satz_dateien = None
+        if self.tool.tar_satz:
+            satz_dateien = self._satz_fuer_archiv()
+            if not satz_dateien:
+                return False
         try:
             ziel = create_archive(self.tool, zip_path, text_mode=self.text_mode,
                                   bezeichnung=bezeichnung,
                                   herkunft=self._bezeichnung(),
                                   provenance=provenance or None,
-                                  beilagen=beilagen or None)
+                                  beilagen=beilagen or None,
+                                  satz_abbilder=satz_dateien)
         except (K1520DiskError, OSError, ValueError) as e:
             self._fehler("Archivieren", str(e))
             return False
         self.log(f"Archiviert: {ziel}")
         return True
+
+    def _satz_fuer_archiv(self) -> list:
+        """Die Abbilddateien des Satzes fuers Archiv; ``[]`` = abgebrochen.
+
+        Gewaehlt ist der EINFACHERE Weg (Entwurf 37, T5): ein Satz mit ungespeicherten
+        Aenderungen (oder ein neuer, nie geschriebener) wird erst gespeichert — nach Rueckfrage,
+        weil das Dateien schreibt.  Aus dem Speicherzustand zu archivieren braeuchte einen
+        zweiten Schreibweg im Kern, und die Abbilder im Archiv waeren dann Dateien, die es
+        nirgends sonst gibt.  Gespeichert ist gespeichert: Archiv und Dateien auf der Platte
+        zeigen denselben Stand.
+        """
+        t = self.tool
+        if t.tar_satz_dateien:
+            return t.tar_satz_dateien
+        if not self._frage_satz_vor_archiv():
+            self.log("Archivieren: abgebrochen (Satz nicht gespeichert)")
+            return []
+        if not self._satz_speichern():
+            return []
+        dateien = t.tar_satz_dateien
+        if not dateien:
+            self._fehler("Archivieren", "Der Satz liess sich nicht auf Abbilder speichern.")
+        return dateien
+
+    def _frage_satz_vor_archiv(self) -> bool:
+        return QMessageBox.question(
+            self, "Satz zuerst speichern",
+            "Der tar-Satz hat ungespeicherte Änderungen oder wurde noch nie gespeichert.\n\n"
+            "Das Archiv enthält die Abbilder des Satzes; dafür muss er erst auf Abbilder "
+            "geschrieben werden.  Jetzt speichern und dann archivieren?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes) == QMessageBox.Yes
 
     def save_boot_image(self, path, volume: int = 0) -> bool:
         """Die Systemspuren als `.bin` sichern — der Weg zum eigenen Bootabbild.
@@ -2794,6 +2833,13 @@ class MainWindow(QMainWindow):
         if pfad:
             self.save_as(pfad)
 
+    def _archiv_stamm(self) -> str:
+        """Stamm des Archivnamens: bei einem Satz der Basisname (nicht „satz1“ des ersten Abbilds)."""
+        t = self.tool
+        if t.tar_satz and t.tar_satz_basis:
+            return Path(t.tar_satz_basis).stem
+        return Path(t.path).stem
+
     def _beschriftung_vorschlag(self) -> str:
         """Was in der Frage nach der Beschriftung schon dortsteht.
 
@@ -2805,7 +2851,7 @@ class MainWindow(QMainWindow):
         """
         if self.tool is None:
             return ""
-        stamm = Path(self.tool.path).stem
+        stamm = self._archiv_stamm()
         if stamm:
             return stamm
         for v in self.tool.volumes():
@@ -2818,7 +2864,7 @@ class MainWindow(QMainWindow):
             return
         dlg = ArchivDialog(
             self._beschriftung_vorschlag(), self, self._einstellungen(),
-            stamm_fn=lambda b: dateiname(b) or Path(self.tool.path).stem or NAMENLOS,
+            stamm_fn=lambda b: dateiname(b) or self._archiv_stamm() or NAMENLOS,
             start_ordner=self._neben_der_diskette())
         if dlg.exec() != QDialog.Accepted:
             return

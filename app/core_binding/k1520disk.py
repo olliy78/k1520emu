@@ -1150,6 +1150,11 @@ class DiskTool:
     def __init__(self, handle: int, path: str):
         self._h = handle
         self._path = path
+        # Dateien eines tar-Satzes in Stromreihenfolge (None = nicht bekannt/kein Satz).
+        # Gefuehrt wird sie hier, weil der Kern nur den Basisnamen kennt: beim Oeffnen
+        # duerfen die Abbilder beliebig heissen (`a.img`, `b.img`), und das Archiv eines
+        # Satzes (app/disktool/archive.py) braucht genau diese Dateien.
+        self._satz_pfade = None
 
     # ── Oeffnen / Anlegen ────────────────────────────────────────────────────
 
@@ -1202,7 +1207,9 @@ class DiskTool:
         h = _lib.k1520d_open_tar_satz(_b("\n".join(liste)))
         if not h:
             raise K1520DiskError(_s(_lib.k1520d_last_open_error()))
-        return cls(h, liste[0] if liste else "")
+        t = cls(h, liste[0] if liste else "")
+        t._satz_pfade = liste
+        return t
 
     @classmethod
     def open_tar_satz_format(cls, paths, format: str = "") -> "DiskTool":
@@ -1214,7 +1221,9 @@ class DiskTool:
         h = _lib.k1520d_open_tar_satz_format(_b("\n".join(liste)), _b(format or ""))
         if not h:
             raise K1520DiskError(_s(_lib.k1520d_last_open_error()))
-        return cls(h, liste[0] if liste else "")
+        t = cls(h, liste[0] if liste else "")
+        t._satz_pfade = liste
+        return t
 
     @staticmethod
     def tar_formate() -> list:
@@ -1253,7 +1262,9 @@ class DiskTool:
         h = _lib.k1520d_tar_disk_neu(_b(p), _b(format))
         if not h:
             raise K1520DiskError(_s(_lib.k1520d_last_open_error()))
-        return cls(h, p)
+        t = cls(h, p)
+        t._satz_pfade = [p]
+        return t
 
     @classmethod
     def open_raw(cls, path, filesystem: Optional[str] = None,
@@ -2244,6 +2255,8 @@ class DiskTool:
         """Eine tar-Einzeldiskette in den Satzmodus überführen (``K1520DiskError`` mit dem Grund)."""
         if not _lib.k1520d_tar_zu_satz(self._h, _b(os.fspath(basisname)) if basisname else b""):
             raise K1520DiskError(self._fail())
+        if self._satz_pfade is None and self._path:
+            self._satz_pfade = [self._path]       # die Einzeldiskette ist jetzt Abbild 1
 
     @property
     def tar_satz_basis(self) -> str:
@@ -2282,8 +2295,19 @@ class DiskTool:
             t = _s(roh)
             return t.split("\n") if t else []
 
-        return {"geschrieben": liste(_lib.k1520d_tar_satz_geschrieben(self._h)),
-                "hinweise": liste(_lib.k1520d_tar_satz_hinweise(self._h))}
+        r = {"geschrieben": liste(_lib.k1520d_tar_satz_geschrieben(self._h)),
+             "hinweise": liste(_lib.k1520d_tar_satz_hinweise(self._h))}
+        self._satz_pfade = list(r["geschrieben"])
+        return r
+
+    @property
+    def tar_satz_dateien(self) -> list:
+        """Die Abbilddateien des Satzes in Stromreihenfolge, soweit sie ZUM jetzigen Strom
+        passen: ``[]``, wenn das Volume kein Satz ist, der Satz nie gespeichert/geoeffnet wurde
+        oder seither geaendert (``dirty``) wurde — dann stuende in den Dateien ein anderer Strom."""
+        if not self.tar_satz or self._satz_pfade is None or self.dirty:
+            return []
+        return list(self._satz_pfade)
 
     @property
     def physisch_schreiben_grund(self) -> str:
