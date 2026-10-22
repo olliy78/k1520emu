@@ -48,7 +48,7 @@ tools/dev.sh rebuild             # rm -rf build build_trace, then build from scr
 > (`core/bus|api|util`, CMake, `tests/support`, `dev.sh`, unbekannte Pfade unter `core/`) fährt alles.
 > Der Plan steht vorab in der Ausgabe (`--trocken` = nur Plan). **Im Zweifel `--alles`**; die vollen
 > Spuren fahren weiter von Hand bzw. in der CI. Jeder neue langsame Test braucht ein `fach_*`-Label
-> (Wächter `py_test_auswahl`). `P8000SaFormat.*` liegt seit 2026-10-22 in `wega_install`, nicht mehr in
+> (Wächter `py_testauswahl`). `P8000SaFormat.*` liegt seit 2026-10-22 in `wega_install`, nicht mehr in
 > `test-format`.
 
 > **Läufe über ~60 s gehören in den HINTERGRUND** (`Bash` mit `run_in_background: true`),

@@ -40,7 +40,7 @@ tools/dev.sh test -R K2526           # Namensmuster (ctest-Argumente werden durc
 Pfade über die Tabelle in `tools/test_auswahl.py` auf Fachlabels ab und fährt `test`, die langsamen
 Spuren nur für die berührten Fachgebiete und `win` bei C++/CMake-Änderungen; reine Doku fährt nichts,
 Gemeinsames (`core/bus|api|util`, CMake, `tests/support`, `dev.sh`, unbekannte Pfade unter `core/`)
-fährt alles. **Ein neuer langsamer Test braucht ein `fach_*`-Label** (Wächter `py_test_auswahl`),
+fährt alles. **Ein neuer langsamer Test braucht ein `fach_*`-Label** (Wächter `py_testauswahl`),
 und ein neues Fachgebiet gehört in `FACHER` und in die Tabelle. Im Zweifel `--alles`.
 
 Jeder Lauf hinterlässt nebenbei `build/Testing/junit.xml`; daraus wird eine lesbare

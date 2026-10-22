@@ -13,7 +13,7 @@
 set(_libs k1520_a5120 k1520_floppy k1520_logger k1520_testsupport)
 set(_lbl  "system;slow;format_integration")
 # Fachgebiets-Labels (fach_*): tools/test_auswahl.py waehlt danach, was vor dem Merge laeuft.
-# Jeder Fall der langsamen Labels MUSS mindestens eines tragen (Waechter py_test_auswahl).
+# Jeder Fall der langsamen Labels MUSS mindestens eines tragen (Waechter py_testauswahl).
 
 # Langsamer SCPX-INIT.COM-Formatier-Guard (~35 s, 160 Spuren): INIT formatiert B:,
 # MODF/SYSP erzeugen ein 5x1024-System, PIP kopiert, davon wird gebootet.
