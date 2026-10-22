@@ -23,6 +23,7 @@ from typing import Optional, Tuple
 
 from app import modell as _modell
 from app import p8000_ram as _p8000_ram
+from app import rtc as _rtc
 
 
 @dataclass(frozen=True)
@@ -102,6 +103,12 @@ class Programmprofil:
     #: Fruehere Modellschluessel → heutige (alte Konfigurationen des P8000: die Kern-Terminal-Modelle
     #: ``p8000``/``p8000-16``/``p8000-8`` gibt es in der Oberflaeche nicht mehr).
     modell_alt: Tuple[Tuple[str, str], ...] = ()
+    #: Gruppe „RTC" (Uhrenkarte, Entwurf 37 R3) unter *Allgemein*: nur am P8000.  Die beiden
+    #: Felder stehen in :attr:`hardware` (Schluessel ``rtc``/``rtc_versatz``), werden aber als
+    #: eigene Gruppe mit Anzeige der Gastzeit und Schaltflaeche gebaut.
+    rtc_wahl: bool = False
+    #: Vorgaben einzelner Hardwarefelder, die NICHT der erste Wert sind: ``(Schluessel, Wert)``.
+    hardware_vorgaben: Tuple[Tuple[str, str], ...] = ()
     #: Kaestchen „Lochstreifen" unter *Allgemein* (K6022): am P8000 gibt es die Karte nicht.
     ptape_wahl: bool = True
     #: Kaestchen „Kassette (K5221, AKB K5020)" unter *Allgemein*: wie der Lochstreifen
@@ -215,7 +222,8 @@ class Programmprofil:
         :attr:`modell_vorgaben` die des Modells *modell* (ohne Angabe: des Standardmodells),
         sonst der erste Wert jeder Auswahl."""
         vorgabe = self.modell_vorgabe(modell or self.standard_modell())
-        return {k: str(vorgabe.get(k, werte[0][0]))
+        eigene = dict(self.hardware_vorgaben)
+        return {k: str(vorgabe.get(k, eigene.get(k, werte[0][0])))
                 for k, _b, _t, werte, _m in self.hardware}
 
     def hardware_normalisieren(self, daten, modell=None) -> dict:
@@ -243,6 +251,10 @@ class Programmprofil:
             if k == schluessel:
                 if modelle and self.modell_normalisieren(modell) not in modelle:
                     return False
+                if k == "rtc_versatz":
+                    # Der Versatz wirkt nur mit gesteckter Karte; der gemerkte Wert bleibt.
+                    hw = hardware if hardware is not None else self.hardware_standard(modell)
+                    return hw.get("rtc", "keine") != "keine"
                 if k == "erweiterungsmodul" and self.modell_vorgaben:
                     hw = hardware if hardware is not None else self.hardware_standard(modell)
                     return hw.get("ram") == "k3526"
@@ -312,6 +324,12 @@ class Programmprofil:
             kern["index16"] = index[1]
             kern["mon16"] = hardware.get("mon16", "3.1")
             kern["dram"] = hardware.get("dram", _p8000_ram.STANDARD)
+            if self.rtc_wahl and hardware.get("rtc", "keine") != "keine":
+                # Uhrenkarte nur am 16-Bit-Teil (sonst Fehler im Kern); der gemerkte Wert bleibt in
+                # der Konfiguration, wirkt aber erst wieder mit 16-Bit-Teil.
+                kern["rtc"] = hardware["rtc"]
+                kern["rtc_jahresversatz"] = _rtc.versatz_jahre(hardware.get("rtc_versatz"))
+                kern["rtc_zustand"] = _rtc.zustand_pfad(self.programm)
         kern["mon8"] = hardware.get("mon8", "3.1")
         if mit_wdc:
             kern["wdc"] = hardware.get("wdc", "4.2")
@@ -615,6 +633,8 @@ P8000 = Programmprofil(
     ptape_wahl=False,
     tape_wahl=False,
     raf_wahl=False,                 # die RAF ist eine K1520-Karte; der P8000 hat keinen K1520-Bus
+    rtc_wahl=True,
+    hardware_vorgaben=(("rtc", _rtc.VORGABE_TYP), ("rtc_versatz", _rtc.VORGABE_VERSATZ)),
     modellwahl=True,
     betriebsart_wahl=True,
     # Das Vollgeraet (16-Bit-Teil + Winchester) steht vorn und ist damit die Vorgabe.  Alle sind
@@ -666,6 +686,9 @@ P8000 = Programmprofil(
          (("4.2", "WDC 4.2"), ("4.0.05", "WDC 4.0.05 (experimentell)"),
           ("3.4.05", "WDC 3.4.05 (experimentell)")),
          ("p8000-ot",)),
+        # Uhrenkarte (Entwurf 37): als Gruppe „RTC“ gebaut (settings_widget), Vorgabe siehe hardware_vorgaben.
+        (_rtc.SCHLUESSEL_TYP, "RTC:", _rtc.TIPP_TYP, _rtc.TYPEN, _MIT16),
+        (_rtc.SCHLUESSEL_VERSATZ, "Zeitversatz:", _rtc.TIPP_VERSATZ, _rtc.VERSAETZE, _MIT16),
         ("platte_par", "Parametersatz der Platte:",
          "Was der WDC auf Zylinder 0 / Kopf 0 / Sektor 1 sieht.  aus (Vorgabe): nur das, was in der "
          "Datei steht — eine unformatierte Platte bleibt unformatiert.  ergänzen: fehlt der "

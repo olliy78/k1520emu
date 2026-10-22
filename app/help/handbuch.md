@@ -1585,6 +1585,7 @@ die *Betriebsart*. Was anders ist:
   16-Bit 4, oder beide 1), **MON8** 3.1/3.0, **MON16** 3.1/3.0/3.3, Hauptspeicher der
   16-Bit-Seite (256 KB, 1 MB, 2 MB) und **WDC-Firmware** 4.2/4.0.05/3.4.05. Wo eine Wahl am
   Modell nichts bewirkt, ist das Feld ausgegraut. Jeder Wechsel ist ein Kaltstart.
+  Die **Uhrenkarte** (Gruppe *RTC*) steht im Abschnitt *Die Echtzeituhr*.
 * **Takt** 4 MHz (Vorgabe fünffach: der Hardwaretest mit Speichertest braucht rund 16 s
   Maschinenzeit, bis „Press RETURN" erscheint). **Laufwerke**: zwei K5601 (UDOS-Laufwerk 0
   und 1, hier **A:** und **B:**); der externe Stecker bleibt leer.
@@ -1734,6 +1735,47 @@ Mehrere Instanzen nebeneinander: `--instance NAME` (oder die Umgebungsvariable `
 eigene Konfiguration `p8000emu-NAME.yaml` an und setzt den Namen in den Fenstertitel; `--config DATEI`
 legt die Konfigurationsdatei von Hand fest. Disketten- und Plattenabbilder gehören je einer Instanz: ein
 Abbild, das ein anderer Prozess schon hält, wird nicht angeschlossen (Meldung in der Statuszeile).
+
+### Die Echtzeituhr (RTC)
+
+Die Uhrenkarte steckt am 16-Bit-Teil; *Einstellungen ▸ Allgemein ▸ RTC* hat dafür zwei Felder
+nebeneinander. Ein Wechsel ist ein Kaltstart.
+
+* **Typ.** *Original U130x* ist die Karte des Geräts; der Original-Kern **WEGA 3.2 erkennt nur sie**.
+  *Epson RTC-72421* ist der Nachbau von pofo.de und braucht den Treiber `sa.timer` bzw. den
+  Kerntreiber `timer` ab 1.1 — ein WEGA-Kern ohne ihn sieht die Karte nicht. *keine* lässt den
+  Bus an der Stelle leer. Vorgabe der Auslieferung: *Original U130x*.
+* **Zeitversatz.** Die Uhr zeigt dem Gast die Zeit des Wirts um 0, 28 oder 40 Jahre zurück
+  (gerechnet wird nur, was der Gast liest und schreibt). *−28 Jahre* trifft Wochentag **und**
+  Schaltjahrmuster, *−40 Jahre* nur das Schaltjahrmuster. Vorgabe: *−40 Jahre*. Das Feld ist nur
+  mit gesteckter Karte aktiv. Es gilt immer die **Ortszeit** des Wirts.
+  Alle drei Werte sind für **beide** Karten wählbar; der Emulator bildet die 2019-Grenze des echten
+  U130x-Chips bewusst nicht nach, die Karte arbeitet auch ohne Versatz. Was dabei zu beachten ist:
+  ohne Versatz lässt sich die U130x unter WEGA nicht mit `sa.timer` stellen (der Treiber nimmt nur
+  die Jahre 1980–2019 an); *−28 Jahre* trifft im Wirtsjahr 2028 den Jahr-2000-Fehler der
+  Stellroutinen von `sa.timer` (beide Karten); die **harte Grenze** ist 2038, weil WEGA die Zeit in
+  32 Bit rechnet — ohne Versatz geht es bis 2037, mit −28 bis 2065, mit −40 bis 2077. Der
+  Kerntreiber von pofo.de (`timegm.c`) liefert in Schaltjahren ab März ein Datum einen Tag zu früh;
+  der Original-Kern rechnet richtig. Den Wochentag liest kein Treiber. Die Schaltfläche *Uhr nach
+  Wirtszeit stellen* ist von alledem nicht betroffen (sie schreibt die Karte direkt).
+* **Ohne 16-Bit-Teil** (Ausstattung *nur 8-Bit*) sind beide Felder ausgegraut; die Wahl bleibt
+  gemerkt und gilt wieder, sobald die Ausstattung ein 16-Bit-Teil hat. Im Betrieb *nur Terminal*
+  fehlt die Gruppe ganz.
+* **Anzeige.** *Uhrzeit des Gastsystems* nennt die Zeit, die der Gast von der Karte liest (mit
+  Versatz); bei laufender Maschine ändert sie sich einmal je Minute. Ist die Maschine aus, steht dort
+  die Zeit, mit der sie jetzt starten würde. Dieselbe Zeit steht als Feld **RTC:** in der Statuszeile.
+* **Warum die Uhr nie zurückspringt.** Die Uhr zählt in **Maschinenzeit**, nicht nach der Wanduhr.
+  WEGA liest sie nur beim Start und zählt danach selbst; läuft die Emulation schneller als in
+  Echtzeit (Vorgabe fünffach), eilt die Gastzeit der Wirtszeit voraus. Folgte die Karte der Wanduhr,
+  stünde sie beim nächsten Start vor den Zeitstempeln der Dateien, und `make` hielte Quellen für
+  neuer als ihre Ergebnisse. Der Stand liegt in einer kleinen Batteriedatei im Konfigurationsordner
+  (`rtc_p8000emu.txt`, je Instanz eine eigene) und wird beim Beenden, beim Stellen und etwa einmal je
+  Minute Maschinenzeit geschrieben. Beim Start gilt der spätere von „Stand plus Abwesenheit“ und
+  „Wirtszeit jetzt“.
+* **Uhr nach Wirtszeit stellen** setzt die Uhr auf die jetzige Wirtszeit (mit gewähltem Versatz),
+  auch bei ausgeschalteter Maschine. Würde die Gastzeit dadurch zurückgehen, fragt das Programm
+  vorher: Dateien, die der Gast mit der späteren Zeit angelegt hat, tragen dann Zeitstempel aus der
+  Zukunft. Ein Tastenkürzel gibt es nicht.
 
 ## Bedienung des P8000
 

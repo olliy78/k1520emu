@@ -23,7 +23,7 @@ from typing import Callable, List
 from PySide6.QtWidgets import (
     QWidget, QTabWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QScrollArea,
     QSlider, QDoubleSpinBox, QComboBox, QCheckBox, QPushButton, QLabel, QColorDialog, QFrame,
-    QLineEdit, QToolButton, QFileDialog,
+    QLineEdit, QToolButton, QFileDialog, QGroupBox,
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
@@ -36,6 +36,7 @@ from app import takt
 from app import raf
 from app import k3521
 from app import p8000_ram
+from app import rtc
 from app.ui_icons import icon
 
 
@@ -76,6 +77,8 @@ class SettingsWidget(QWidget):
     k3521Changed = Signal(int, int)
     # Mitschrift des Terminals: Dateiname geaendert (leer = aus).  Nur Profile mit Terminal.
     mitschriftChanged = Signal(str)
+    # Schaltflaeche „Uhr nach Wirtszeit stellen“ der Gruppe RTC (nur P8000).
+    rtcStellenGewuenscht = Signal()
 
     #: (Beschriftung, Faktor).  Die Stufen
     #: stehen in :mod:`app.takt`, damit Auswahlfeld und Statuszeile dasselbe
@@ -311,6 +314,8 @@ class SettingsWidget(QWidget):
             box.currentIndexChanged.connect(
                 lambda _i, s=schluessel: self._on_hardware_combo(s))
             self.hardware_combos[schluessel] = box
+            if self.profil.rtc_wahl and schluessel in (rtc.SCHLUESSEL_TYP, rtc.SCHLUESSEL_VERSATZ):
+                continue                       # steht in der Gruppe „RTC“ (unten)
             form.addRow(beschriftung, box)
             if schluessel == "bildschirm":
                 # Entwurf 33 §3.3: der Schiebeschalter sitzt unter der Kartenwahl.
@@ -319,6 +324,30 @@ class SettingsWidget(QWidget):
                     self.bildschirmSchalterChanged)
                 form.addRow("", self.bildschirm_schalter)
         self._hardware_guard = False
+        # Gruppe „RTC“ (Entwurf 37 R3): Typ und Zeitversatz nebeneinander, darunter die Uhrzeit des
+        # Gastsystems und die Schaltflaeche zum Stellen.  Die Felder sind die Hardwarefelder
+        # „rtc“/„rtc_versatz“ (Speichern, Vorgabe und Neubau der Maschine laufen wie bei den anderen).
+        self.rtc_gruppe = None
+        if self.profil.rtc_wahl:
+            self.rtc_gruppe = QGroupBox("RTC", inner)
+            gv = QVBoxLayout(self.rtc_gruppe)
+            zeile = QHBoxLayout()
+            zeile.addWidget(self.hardware_combos[rtc.SCHLUESSEL_TYP], 1)
+            zeile.addWidget(self.hardware_combos[rtc.SCHLUESSEL_VERSATZ], 1)
+            gv.addLayout(zeile)
+            self.rtc_zeit_label = QLabel("unbekannt", self.rtc_gruppe)
+            self.rtc_zeit_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            fz = QFormLayout()
+            fz.addRow("Uhrzeit des Gastsystems:", self.rtc_zeit_label)
+            gv.addLayout(fz)
+            self.rtc_stellen_button = QPushButton("Uhr nach Wirtszeit stellen", self.rtc_gruppe)
+            self.rtc_stellen_button.setToolTip(
+                "Stellt die Uhr der Karte auf die jetzige Zeit des Wirtsrechners (der gewählte "
+                "Zeitversatz wirkt wie beim Lesen).  Liegt die neue Zeit vor der bisherigen, "
+                "wird vorher gefragt.")
+            self.rtc_stellen_button.clicked.connect(lambda _c=False: self.rtcStellenGewuenscht.emit())
+            gv.addWidget(self.rtc_stellen_button, 0, Qt.AlignLeft)
+            form.addRow(self.rtc_gruppe)
         self._hardware_gesperrt_nach_modell()
 
         self.speed_combo = QComboBox()
@@ -539,6 +568,10 @@ class SettingsWidget(QWidget):
             box = self.hardware_combos["bildschirm"]
             self.bildschirm_schalter.setEnabled(
                 box.isEnabled() and box.currentData() == "beide")
+        if getattr(self, "rtc_gruppe", None) is not None:
+            typ = self.hardware_combos[rtc.SCHLUESSEL_TYP]
+            self.rtc_stellen_button.setEnabled(
+                typ.isEnabled() and typ.currentData() != rtc.KEINE)
         # MC80.2x: die Kassette (MBI) ist eingebaut — das Kaestchen steckt nichts.
         fest = self.profil.modell_normalisieren(modell) in self.profil.tape_fest
         if not hasattr(self, "tape_box"):      # beim ersten Aufruf (Aufbau) noch nicht da
@@ -740,9 +773,20 @@ class SettingsWidget(QWidget):
         if self.profil.betriebsart_wahl:
             self.model_combo.setEnabled(not self._terminal_betrieb())
         hat = self.profil.modell_hat_rechner(self.model_value())
+        if getattr(self, "rtc_gruppe", None) is not None:
+            self.rtc_gruppe.setVisible(hat)          # „nur Terminal“: wie die anderen Rechnerfelder weg
         i = self.tabs.indexOf(self._drives_tab) if hasattr(self, "_drives_tab") else -1
         if i >= 0:
             self.tabs.setTabVisible(i, hat and self.profil.laufwerke)   # MC80: keine Laufwerke
+
+    def set_rtc_anzeige(self, text: str, tipp: str = "") -> None:
+        """Text „Uhrzeit des Gastsystems“ setzen (nur bei Aenderung; ohne Signal)."""
+        if getattr(self, "rtc_gruppe", None) is None:
+            return
+        if self.rtc_zeit_label.text() != text:
+            self.rtc_zeit_label.setText(text)
+        if self.rtc_zeit_label.toolTip() != tipp:
+            self.rtc_zeit_label.setToolTip(tipp)
 
     def set_nenntakt(self, text: str) -> None:
         """Beschriftung der Taktstufen nach dem Nenntakt des Modells (ohne Signal)."""
