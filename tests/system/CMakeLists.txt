@@ -214,7 +214,9 @@ k1520_add_test(p8000_wega_diskette SRC test_p8000_wega_diskette.cpp
 k1520_add_test(p8000_wega_rtc SRC test_p8000_wega_rtc.cpp
                             LIBS k1520_p8000 k1520_gzip k1520_logger k1520_testsupport
                             LABELS "system;slow;wega_install"
-                            DEFS LOG_LEVEL=2 "P8000_WEGA31_DIR=\"${CMAKE_SOURCE_DIR}/disks/p8000_wega31\"" TIMEOUT 14400 RUN_SERIAL)
+                            DEFS LOG_LEVEL=2 "P8000_WEGA31_DIR=\"${CMAKE_SOURCE_DIR}/disks/p8000_wega31\""
+                                 "K1520_DISKTOOL=\"$<TARGET_FILE:k1520disktool>\"" TIMEOUT 14400 RUN_SERIAL)
+add_dependencies(k1520_test_p8000_wega_rtc k1520disktool)
 
 # ─── Kermit auf WEGA 3.1 (Entwurf 36 AP K1): Kaltstart von der ausgelieferten Platte
 # (disks/p8000_wega31, /usr/bin/kermit + Benutzer `kermit`), Konsole `kermit`, tty0 per Telnet als
