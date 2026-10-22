@@ -100,12 +100,31 @@ TEST(SectorTrackIo, ToMediumLehntFalscheDatenlaengeAb) {
     EXPECT_EQ(m.numCylinders(), 0);   // Ausgabe unberuehrt
 }
 
-TEST(SectorTrackIo, ToMediumLehntGrosseGroessencodesUndLeereListeAb) {
+TEST(SectorTrackIo, ToMediumLehntLeereListeUndCodeUeber6Ab) {
     DiskMedium m;
     std::string err;
     EXPECT_FALSE(toMedium({}, m, err));
-    SectorRecord s; s.n = 4; s.data.assign(2048, 0);
+    SectorRecord s; s.n = 7; s.data.assign(16384, 0);
     EXPECT_FALSE(toMedium({spur(0, 0, Encoding::MFM, {s})}, m, err));
+}
+
+TEST(SectorTrackIo, GroessencodesBis6GehenDurchsMedium) {
+    for (uint8_t n = 4; n <= 6; ++n) {
+        SectorRecord s;
+        s.c = 0; s.h = 0; s.r = 1; s.n = n;
+        s.data.resize(128u << n);
+        for (size_t i = 0; i < s.data.size(); ++i) s.data[i] = static_cast<uint8_t>(i * 7 + n);
+        DiskMedium m;
+        std::string err;
+        ASSERT_TRUE(toMedium({spur(0, 0, Encoding::MFM, {s})}, m, err)) << err;
+        std::vector<TrackRecord> back;
+        ASSERT_TRUE(fromMedium(m, back, err)) << err;
+        ASSERT_EQ(back.size(), 1u);
+        ASSERT_EQ(back[0].sectors.size(), 1u);
+        EXPECT_EQ(back[0].sectors[0].n, n);
+        EXPECT_EQ(back[0].sectors[0].data, s.data);
+        EXPECT_FALSE(back[0].sectors[0].data_error);
+    }
 }
 
 TEST(SectorTrackIo, FromMediumLehntUnformatiertAb) {
@@ -191,7 +210,7 @@ TEST(SectorTrackIo, ContainerTypenTd0Imd) {
     DiskMedium m;
     std::string err;
     EXPECT_FALSE(ImageCodec::load("nicht_da.td0", ContainerType::Td0, nullptr, m, err));
-    EXPECT_NE(err.find("nicht implementiert"), std::string::npos);
+    EXPECT_NE(err.find("nicht_da.td0"), std::string::npos);
     EXPECT_FALSE(ImageCodec::save("x.imd", ContainerType::Imd, nullptr, m, err));
 }
 

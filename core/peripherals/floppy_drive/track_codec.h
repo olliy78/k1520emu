@@ -32,7 +32,7 @@ struct LogicalSector {
     uint8_t  cyl  = 0;
     uint8_t  head = 0;
     uint8_t  id   = 1;       ///< 1-basierte Sektor-ID
-    uint16_t size = 128;     ///< Bytes/Sektor (128/256/512/1024)
+    uint16_t size = 128;     ///< Bytes/Sektor (128/256/512/1024; 2048/4096/8192 nur aus .td0/.imd)
     std::vector<uint8_t> data;
     bool     id_crc_ok   = true;   ///< von parseTrack gesetzt
     bool     data_crc_ok = true;   ///< von parseTrack gesetzt

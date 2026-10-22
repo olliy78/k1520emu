@@ -213,6 +213,9 @@ static uint8_t sizeCode(uint16_t size) {
         case 256:  return 1;
         case 512:  return 2;
         case 1024: return 3;
+        case 2048: return 4;    // ab hier nur aus .td0/.imd (Sektor-Container)
+        case 4096: return 5;
+        case 8192: return 6;
         default:
             // Ungueltige Sektorgroesse — Laufzeitfehler
             throw std::invalid_argument("TrackCodec: ungueltige Sektorgroesse");
@@ -435,7 +438,8 @@ std::vector<LogicalSector> parseTrack(const TrackImage& track) {
             id_crc_ok = (crc16Ccitt(crcIn, sizeof(crcIn)) == idCrcGespeichert);
         }
 
-        // Das Groessenfeld der IBM-Adressmarke ist 2 Bit breit (0..3 = 128..1024 B).
+        // Das Groessenfeld der IBM-Adressmarke ist 2 Bit breit (0..3 = 128..1024 B), mit
+        // der Erweiterung 4..6 s. u.
         // Vom MEDIUM gelesene Bytes koennen beliebige Werte tragen — bei einer
         // gestoerten Spur (halb formatiert, Schreibabbruch) steht dort Muell.  Ohne
         // Maske ergaebe das eine unmoegliche Sektorgroesse, an der buildTrack spaeter
@@ -445,7 +449,10 @@ std::vector<LogicalSector> parseTrack(const TrackImage& track) {
         // (parseFormatStream, beginWriteField) — hier wird nur nachgezogen.
         // Fuer die CRC zaehlt weiterhin das ROHE Byte (siehe crcIn oben), sodass
         // ein verfaelschtes Groessenfeld korrekt als CRC-Fehler auffaellt.
-        const uint16_t secSize = static_cast<uint16_t>(128u << (sizeCode & 0x03));
+        // Ausnahme (Entwurf 38): .td0/.imd fuehren Groessencodes 4..6 (2048..8192 B), die
+        // gueltig sind und die Maske sonst verfaelschte.  Alles ab 7 bleibt maskiert.
+        const uint16_t secSize = static_cast<uint16_t>(
+            128u << (sizeCode <= 6 ? sizeCode : (sizeCode & 0x03)));
 
         // Naechste Data-Marke nach dem ID-Feld suchen
         size_t dataPos = SIZE_MAX;

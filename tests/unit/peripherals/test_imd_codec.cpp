@@ -426,7 +426,6 @@ TEST(ImdCodec, UngueltigeFelderWerdenMitGrundAbgewiesen) {
         {40, 6, "Modus"},        // Modus 6
         {42, 2, "Kopf"},         // Kopf 2
         {44, 7, "Sektorgroessen-Code"},
-        {44, 4, "1024"},         // 2048 Byte: nicht darstellbar
         {47, 9, "Sektortyp"},    // erstes Typbyte
     };
     for (const Fall& f : faelle) {

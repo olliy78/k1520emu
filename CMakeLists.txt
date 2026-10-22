@@ -201,6 +201,7 @@ if(BUILD_K1520)
         core/peripherals/floppy_drive/cqm_codec.cpp
         core/peripherals/floppy_drive/sector_track_io.cpp
         core/peripherals/floppy_drive/imd_codec.cpp
+        core/peripherals/floppy_drive/td0_codec.cpp
         core/peripherals/floppy_drive/image_codec.cpp
         core/peripherals/floppy_drive/disk_image.cpp
         core/peripherals/floppy_drive/track_sync.cpp

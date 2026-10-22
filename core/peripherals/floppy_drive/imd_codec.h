@@ -18,8 +18,7 @@
  * > 6, Kopf > 1, Typ > 8 oder eine mitten im Satz abgeschnittene Datei lassen das Laden
  * mit Begruendung scheitern.  Ein Rest von weniger als 5 Bytes hinter dem letzten Satz
  * wird mit Warnung toleriert, ein doppelter Spursatz (gleicher Zylinder/Kopf) ersetzt
- * den frueheren (ebenfalls mit Warnung).  **Sektoren ueber 1024 Byte** (Code 4..6) kennt
- * das Medium noch nicht (@ref TrackCodec) und werden mit Begruendung abgelehnt; die
+ * den frueheren (ebenfalls mit Warnung).  Sektorgroessen gehen bis Code 6 (8192 Byte); die
  * Sektor-ID-Felder von Spuren ohne Sektoren (n = 0) sind bedeutungslos.
  *
  * Schreiben (@ref save, @ref encode): ein Medium, das sich als Sektorliste darstellen

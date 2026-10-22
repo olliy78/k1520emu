@@ -75,7 +75,8 @@ bool fromMedium(const DiskMedium& m, std::vector<TrackRecord>& out, std::string&
             for (const LogicalSector& s : secs) {
                 SectorRecord r;
                 r.c = s.cyl; r.h = s.head; r.r = s.id;
-                r.n = s.size == 128 ? 0 : s.size == 256 ? 1 : s.size == 512 ? 2 : 3;
+                r.n = 0;
+                while (r.n < 6 && (128u << r.n) < s.size) ++r.n;
                 r.id_error = !s.id_crc_ok;
                 if (s.data_pos == SIZE_MAX || s.end_pos == SIZE_MAX) {
                     r.no_data = true;   // kein (vollstaendiges) Datenfeld
@@ -99,9 +100,9 @@ bool toMedium(const std::vector<TrackRecord>& tracks, DiskMedium& out, std::stri
         maxC = std::max<unsigned>(maxC, tr.cyl);
         maxH = std::max<unsigned>(maxH, tr.head);
         for (const SectorRecord& s : tr.sectors) {
-            if (s.n > 3) {
+            if (s.n > 6) {
                 err = spurText(tr.cyl, tr.head) + ": Sektorgroessen-Code " + std::to_string(s.n)
-                      + " nicht darstellbar (nur 128..1024 Byte)";
+                      + " nicht darstellbar (nur 128..8192 Byte)";
                 return false;
             }
             if (!s.no_data && s.data.size() != s.size()) {

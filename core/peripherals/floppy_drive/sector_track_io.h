@@ -24,8 +24,8 @@
  *     Grenze, die auch hier gilt.
  * Deshalb benutzt @ref representable `rawCompatible()` nur als schnellen Positivweg und
  * prueft sonst selbst: erlaubt sind CRC-Fehler, Loeschmarken, fehlende Datenfelder;
- * abgelehnt wird allein ein Nachspann mit Nutzdaten (Groessen > 1024 B kann
- * @ref TrackCodec::parseTrack ohnehin nicht melden; @ref toMedium lehnt solche Codes ab).
+ * abgelehnt wird allein ein Nachspann mit Nutzdaten.  Sektorgroessen gehen bis
+ * Code 6 (8192 B); @ref toMedium lehnt groessere Codes ab.
  *
  * @see doc/design/38_td0_imd.md §4
  * @author Olaf Krieger
@@ -47,14 +47,14 @@ struct SectorRecord {
     uint8_t c = 0;            ///< Zylinder laut ID-Feld
     uint8_t h = 0;            ///< Kopf laut ID-Feld
     uint8_t r = 1;            ///< Sektornummer laut ID-Feld
-    uint8_t n = 0;            ///< Groessen-Code (Bytes = 128 << n); hier nur 0..3 darstellbar
+    uint8_t n = 0;            ///< Groessen-Code (Bytes = 128 << n); 0..6 (128..8192 B)
     bool deleted    = false;  ///< geloeschte Datenmarke (DAM F8)
     bool data_error = false;  ///< Daten-CRC falsch
     bool id_error   = false;  ///< ID-CRC falsch
     bool no_data    = false;  ///< kein Datenfeld (nur ID-Feld)
     std::vector<uint8_t> data;   ///< `128 << n` Bytes; leer bei @ref no_data
 
-    uint16_t size() const { return static_cast<uint16_t>(128u << (n & 3)); }
+    uint16_t size() const { return static_cast<uint16_t>(128u << (n > 6 ? 6 : n)); }
 };
 
 /// @brief Eine Spur: Lage, Verfahren, Datenrate, Sektoren in Spurreihenfolge.
@@ -91,7 +91,7 @@ bool fromMedium(const DiskMedium& m, std::vector<TrackRecord>& out, std::string&
  * Spuren ohne Sektoren und nicht aufgefuehrte Spuren bleiben unformatiert.  Das Ergebnis
  * ist sauber (keine Dirty-Markierung).  Das Standardverfahren des Mediums ist das der
  * ersten Spur.  Abgelehnt wird ohne Aenderung von @p out: Daten, deren Laenge nicht
- * `128 << n` ist, Groessen-Code > 3, Zylinder/Kopf ausserhalb des Byte-Bereichs, Liste leer.
+ * `128 << n` ist, Groessen-Code > 6, Zylinder/Kopf ausserhalb des Byte-Bereichs, Liste leer.
  */
 bool toMedium(const std::vector<TrackRecord>& tracks, DiskMedium& out, std::string& err);
 

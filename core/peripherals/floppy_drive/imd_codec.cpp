@@ -183,11 +183,6 @@ bool ImdCodec::decodeBuffer(const std::vector<uint8_t>& d, std::vector<TrackReco
         }
 
         if (nsec > 0) {
-            if (sc > 3) {
-                err = "ImageDisk: " + wo + ": Sektoren von " + std::to_string(128u << sc)
-                      + " Byte werden noch nicht unterstuetzt (Medium kennt 128..1024 Byte)";
-                return false;
-            }
             const bool cmap = (hb & 0x80) != 0, hmap = (hb & 0x40) != 0;
             const size_t kopfBytes = static_cast<size_t>(nsec) * (1u + (cmap ? 1u : 0u) + (hmap ? 1u : 0u));
             if (d.size() - pos < kopfBytes) {

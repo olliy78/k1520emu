@@ -104,16 +104,16 @@ Datenfehler (t >= 5): die gespeicherten Daten sind das, was gelesen wurde; bei U
 - N im ID-Feld = Groessencode. ID-C/H aus Maps oder physisch. DAM FB bzw. F8 nach Typ; bei Typ 0 gar kein Datenfeld (nicht ein leeres).
 - Typ >= 5: Daten-CRC absichtlich falsch (z. B. invertiert) schreiben.
 
-### 1.9 Handgerechnete Testvektoren (Kopfzeile 36 Byte: `IMD 1.17: 22/10/2026 12:00:00\r\nVektor\r\n\x1a`)
+### 1.9 Handgerechnete Testvektoren (Kopfzeile 40 Byte: `IMD 1.17: 22/10/2026 12:00:00\r\nVektor\r\n\x1a`)
 
 **Vektor A** – MFM 250, Zyl 0 Kopf 0, 2 Sektoren à 128 B, Nummern 1,2; Sektor 1 komprimiert (E5), Sektor 2 normal 00..7F.
 ```
-0024  05 00 00 02 00        Modus 5, Zyl 0, Kopf 0, n=2, s=0
-0029  01 02                 Nummernfolge
-002b  02 E5                 Sektor 1: Typ 2, Fuellbyte E5
-002d  01 00 01 02 ... 7F    Sektor 2: Typ 1 + 128 Byte 00..7F
+0028  05 00 00 02 00        Modus 5, Zyl 0, Kopf 0, n=2, s=0
+002d  01 02                 Nummernfolge
+002f  02 E5                 Sektor 1: Typ 2, Fuellbyte E5
+0031  01 00 01 02 ... 7F    Sektor 2: Typ 1 + 128 Byte 00..7F
 ```
-(Offset 0x24 = Ende der Kopfzeile; Dateilaenge 0xB2.) Erwartet: Spur (0,0) MFM, 2 Sektoren mit ID (0,0,1,0),(0,0,2,0), Daten 128×E5 bzw. 00..7F, beide DAM FB, CRC gut.
+(Offset 0x28 = Ende der Kopfzeile, nach der Nachrechnung 40 Byte: 10 + 19 + 2 + 6 + 2 + 1; Dateilaenge 0xB2.) Erwartet: Spur (0,0) MFM, 2 Sektoren mit ID (0,0,1,0),(0,0,2,0), Daten 128×E5 bzw. 00..7F, beide DAM FB, CRC gut.
 
 **Vektor B** – FM 250, Zylinder 3, Kopf 1 mit beiden Maps, 3 Sektoren.
 ```

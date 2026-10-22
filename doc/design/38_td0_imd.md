@@ -154,3 +154,19 @@ Modell der Agenten: **Sonnet** (`cpp-coder` für Kern, `general-purpose`/Sonnet 
 * IMD-/Teledisk-Gegenprobe an echter Software (ImageDisk, Teledisk, SAMdisk, `hxcfe`): sobald der Anwender ein
   `.imd` oder ein erzeugtes `.td0` dort öffnet, Ergebnis im Merkposten festhalten.
 * Soll beim Speichern einer `td`-Datei wieder `td` entstehen (T4)?  Empfehlung: nein.
+
+## 7. Stand AP T1 (TD0 lesen, 2026-10-22)
+
+* **Fertig:** `td0_codec.{h,cpp}` (Lesen; `encode`/`save` bleiben Stub bis AP T2), Sektorgroessen **bis Code 6 (8192 B)** in
+  `SectorTrackIo`/`TrackCodec` (`parseTrack` maskiert Codes > 6 weiter mit `& 3`; 0..3 bitgleich wie vorher), `ImageCodec::detect/load` fuer
+  `.td0`. Eigener LZHUF-Dekoder (Okumura: N=4096, F=60, Schwelle 2; Positionscode kanonisch aus der Tabelle in 38a 2.7).
+* **Entscheidungen:** Kopf-CRC und Spur-CRC sind harte Fehler, Kommentar-CRC und Sektor-CRC8 nur Warnung/Zaehler. **Pseudosektoren
+  (Flag 0x40, Daten ohne ID-Feld) kommen NICHT ins Medium** (nur `SourceInfo::pseudo_sectors`) — fuer T2 heisst das: sie gehen beim
+  Zurueckschreiben verloren, solange `SourceInfo` sie nicht mitfuehrt (Korpus: 5 Dateien einschliesslich Kopien, M8KROOT.TD0 allein 77). R >= 100 ohne
+  Flag 0x40 ist ein ganz normaler Sektor. Flag 0x10/0x20 = Sektor ohne Datenfeld (`no_data`); 0x02 = Datenfehler, 0x04 = geloescht.
+  Fehlende Endemarke = „Datei abgeschnitten“ (strenger als gw, das mit `IndexError` stirbt). 0-Byte-Datei: Ablehnung mit Grund,
+  20-Byte-Datei (Spur ohne Sektoren) laedt als leere Diskette mit Warnung.
+* **Methode 2, Musterlaenge:** `2*c`; c > 1 kommt im Korpus nicht vor und wird als Warnung gemeldet ([Q] bleibt).
+* **Pruefstand:** `Td0Echtdaten.*` (`K1520_TD0_DIR`), `tests/python/test_td0_gegenprobe.py` (gw als unabhaengiger Leser:
+  Spur, ID, Groesse, Daten-FNV je Sektor), `tests/python/td0_pack.py` (Packer + Baukasten fuer den `td`-Testvektor,
+  gegen `greaseweazle.optimised.td0_unpack` geprueft). Baumneuaufbau (>= 32768 Symbole) deckt nur die echte D02V032.TD0 ab.
