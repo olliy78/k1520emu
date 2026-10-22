@@ -1,0 +1,49 @@
+name: GitHub Wiki synchronisieren
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - README.md
+      - VERSION
+      - doc/K1520_architecture.md
+      - doc/handbuch_k1520dbg.md
+      - app/help/handbuch.md
+      - app/disktool/help/handbuch.md
+      - app/kermittool/help/handbuch.md
+      - tools/sync_wiki.py
+      - wiki/**
+      - .github/workflows/wiki.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wiki abrufen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki-build
+          if ! git -C wiki-build rev-parse --verify HEAD >/dev/null 2>&1; then
+            git -C wiki-build checkout -B master
+          fi
+
+      - name: Wiki-Seiten erzeugen
+        run: python3 tools/sync_wiki.py --destination wiki-build
+
+      - name: Änderungen veröffentlichen
+        run: |
+          git -C wiki-build config user.name "github-actions[bot]"
+          git -C wiki-build config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C wiki-build add -- '*.md'
+          if ! git -C wiki-build diff --cached --quiet; then
+            git -C wiki-build commit -m "Wiki aus Projektquellen synchronisieren"
+            git -C wiki-build push origin HEAD
+          fi
