@@ -28,9 +28,10 @@ def _bytes(n, start=1):
 
 
 @pytest.fixture(scope="module")
-def qt_app():
-    from PySide6.QtWidgets import QApplication
-    yield QApplication.instance() or QApplication([])
+def qt_app(qapp):
+    """Die gemeinsame QApplication aus conftest.py — sie baut die Fenster vor dem Prozessende ab
+    (sonst SegFault beim Interpreterende, zuerst in der CI an py_cqm_disktool_gui gesehen)."""
+    yield qapp
 
 
 @pytest.fixture
@@ -39,6 +40,10 @@ def window(qt_app):
     w = MainWindow()
     yield w
     w._close_tool()
+    # Gleich abbauen statt am Prozessende in beliebiger Reihenfolge (ohne close(): das
+    # schriebe den Fensterzustand in die Benutzerkonfiguration).
+    w.deleteLater()
+    qt_app.processEvents()
 
 
 def _tool():
