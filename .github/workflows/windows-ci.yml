@@ -605,11 +605,11 @@ jobs:
           # COM) — und sie zeigen auf pythonw.exe, nicht auf die .cmd: eine
           # Verknuepfung auf eine Batchdatei oeffnet immer ein Konsolenfenster.
           $menue = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\K1520emu'
-          foreach ($lnk in @('A5120-Emulator.lnk', 'k1520DiskTool.lnk', 'K1520 Kermit.lnk')) {
+          foreach ($lnk in @('A5120 Emulator.lnk', 'k1520DiskTool.lnk', 'K1520 Kermit.lnk')) {
             if (-not (Test-Path -LiteralPath (Join-Path $menue $lnk))) { throw "Verknuepfung fehlt: $lnk" }
           }
           $sh = New-Object -ComObject WScript.Shell
-          $vk = $sh.CreateShortcut((Join-Path $menue 'A5120-Emulator.lnk'))
+          $vk = $sh.CreateShortcut((Join-Path $menue 'A5120 Emulator.lnk'))
           if ($vk.TargetPath -notmatch 'pythonw\.exe$') { throw "Verknuepfung zeigt nicht auf pythonw.exe: $($vk.TargetPath)" }
           # Und sie braucht ein EIGENES Symbol: ohne das steht im Startmenue das
           # Python-Symbol, weil sie eben auf pythonw.exe zeigt.
