@@ -1,6 +1,6 @@
 /**
  * @file test_p8000_rtc_maschine.cpp
- * @brief Echtzeituhr-Option in der P8000-Maschine (Entwurf 37, AP R1): nur mit 16-Bit-Karte,
+ * @brief Echtzeituhr-Option in der P8000-Maschine (Entwurf 37, AP R1/R2): nur mit 16-Bit-Karte,
  *        Save-State als eigener Abschnitt (Stand 4 bleibt, alte Staende laden weiter).
  */
 
@@ -29,11 +29,18 @@ TEST(P8000RtcMaschine, NurMitKarte16) {
     EXPECT_THROW(P8000Machine m(c), std::invalid_argument);
 }
 
-TEST(P8000RtcMaschine, U130XNochNichtVerfuegbar) {
+TEST(P8000RtcMaschine, U130XNurMitKarte16UndKennungAmBus) {
     P8000Machine::Config c;
-    c.karte16 = true;
+    c.karte16 = false;
     c.rtc = P8000Machine::Config::Rtc::U130X;
     EXPECT_THROW(P8000Machine m(c), std::invalid_argument);
+    c.karte16 = true;
+    c.rtc_utc = true;
+    P8000Machine m(c);
+    ASSERT_NE(m.karte16()->rtc(), nullptr);
+    EXPECT_EQ(m.karte16()->rtc()->typ(), P8000RtcTyp::U130X);
+    Z8kBusCycle z; z.st = Z8kStatus::Io; z.system = true; z.word = false; z.read = true; z.addr = 0xFEF1;
+    EXPECT_EQ(uint8_t(m.karte16()->busLesen(z)), 0xBF);   // Kennung des Originals
 }
 
 TEST(P8000RtcMaschine, ZustandRundreiseUndAlterStandOhneUhr) {

@@ -96,6 +96,8 @@ k1520_add_test(p8000_dram16 SRC cards/test_p8000_dram16.cpp LIBS k1520_p8000_dra
 k1520_add_test(p8000_karte16 SRC cards/test_p8000_karte16.cpp LIBS k1520_p8000_karte16 LABELS "${_lbl}")
 # P8000 Echtzeituhr-Karte RTC-72421 + echter Treibercode (Entwurf 37, AP R1)
 k1520_add_test(p8000_rtc SRC cards/test_p8000_rtc.cpp LIBS k1520_p8000_karte16 LABELS "${_lbl}")
+# P8000 Echtzeituhr-Karte U130X (Original) + echter Treibercode u130.c / Kern timer.c (Entwurf 37, AP R2)
+k1520_add_test(p8000_rtc_u130 SRC cards/test_p8000_rtc_u130.cpp LIBS k1520_p8000_karte16 LABELS "${_lbl}")
 # P8000 RAM-Ausbauten (P23b): 16-MB-Karte ueber die MMU, MAXSEG je Ausbau; die langen
 # Hardwaretests (4 × 1 MB, 16 MB) nur in der langsamen Runde.
 k1520_add_test(p8000_ram_konfig SRC cards/test_p8000_ram_konfig.cpp LIBS k1520_p8000_karte16 LABELS "${_lbl}")

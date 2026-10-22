@@ -1,0 +1,7 @@
+# Echtzeituhr-Karte RTC-72421 am P8000 (Entwurf 37): `--rtc rtc72421`, Befehl `rtc`.
+tool:    k1520dbg
+run:     --machine p8000-16 --rtc rtc72421 -x %CLI_DIR%/scripts/p8000_rtc.dbg
+timeout: 120
+exit:    0
+forbid:  unknown command
+expect:  RTC-72421  Uhr

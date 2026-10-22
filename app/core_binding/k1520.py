@@ -1192,7 +1192,8 @@ class K1520Emulator:
             p8000: nur ``machine="p8000"`` — Konfiguration als Wörterbuch (Schlüssel wie im
                 Konfigurationstext von ``k1520_create_p8000``, z. B. ``{"mon8": "3.1"}``,
                 ``{"terminal": "original"}`` = Originalterminal Typ 2 an tty1;
-                Uhrenkarte nur mit ``karte16``: ``{"rtc": "rtc72421", "rtc_jahresversatz": 0,
+                Uhrenkarte nur mit ``karte16``: ``{"rtc": "rtc72421"`` (Nachbau) oder ``"u130x"``
+                (Originalkarte), ``"rtc_jahresversatz": 0,
                 "rtc_utc": 0, "rtc_zustand": "<Batteriedatei>"}``);
                 die Laufwerksnamen aus ``drive_types`` werden als ``lw0``..``lw3`` ergänzt.
                 Bei ``machine="p8000-terminal"`` (Originalterminal ohne Rechner) die Schlüssel

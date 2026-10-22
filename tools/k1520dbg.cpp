@@ -49,7 +49,7 @@
  * 16-Bit-PIO2 bzw. Winchester an Laufwerk 0 (Kopie wie die Disketten, `--rw` = Original);
  * Befehle `wdc [r|u|d|log]`, `cpu wdc` (nur Ansicht).
  * `--rtc aus|u130x|rtc72421` (nur `--machine p8000-16`, Entwurf 37): Echtzeituhr-Karte am 16-Bit-Teil
- * (`u130x` folgt mit AP R2 und meldet bis dahin „noch nicht verfuegbar").
+ * (U130X = Originalkarte, rtc72421 = Nachbau); Befehl `rtc` zeigt Typ, Uhrzeit, Versatz, Zustand.
  * `--ptape` steckt die Lochstreifen-Karte K6022 (SIF1000, E0H–E7H; alle Maschinen).
  * `--tape <k52>` / `--tape2 <k52>` / `--tape-card` steckt die Kassettenkarte K5020 (A5120/PRG 30H,
  *   K8915 D0H, PC 1715 D0H) und bindet die Kassettendatei an Geraet 1/2; Befehl `tape`.
@@ -2787,7 +2787,7 @@ int main(int argc, char** argv){
     // gibt es nur adp/dma/kopp/term; an anderen Maschinen melden sie „nur am P8000“.
     auto p8Kommando = [&](const std::vector<std::string>& t)->bool{
         const std::string& cmd=t[0];
-        static const std::set<std::string> namen={"adp","dma","kopp","mmu","xlat","ml","mp","segt","bsegt","term","wdc"};
+        static const std::set<std::string> namen={"adp","dma","kopp","mmu","xlat","ml","mp","segt","bsegt","term","wdc","rtc"};
         if (!namen.count(cmd)) return false;
         if (!KQ){ fprintf(stderr,"  '%s' gibt es nur am P8000 (--machine p8000|p8000-16)\n",cmd.c_str()); return true; }
         P8000Machine& pm=*m.p8000();
@@ -2804,6 +2804,12 @@ int main(int argc, char** argv){
             fprintf(stderr,"  %zu Zeilen (%llu Ereignisse insgesamt%s):\n",z.size(),(unsigned long long)pr.gesamt(),nurW?", nur Schreiben":"");
             zeilen(z); };
         if (cmd=="adp"){ zeilen(dbgp8::adpZeilen(pm.karte8().speicher())); return true; }
+        if (cmd=="rtc"){
+            if (!need16()) return true;
+            P8000Rtc* r = pm.karte16()->rtc();
+            if (!r) fprintf(stderr,"  keine Uhrenkarte (--machine p8000-16 --rtc u130x|rtc72421)\n");
+            else fprintf(stderr,"  %s\n",r->text().c_str());
+            return true; }
         if (cmd=="wdc"){
             if (!wdcK){ fprintf(stderr,"  kein WDC (--machine p8000-16 --wdc 4.2 bzw. --hd <abbild>)\n"); return true; }
             P8000Wdc& w=*wdcK; Z80& z=w.cpu();
@@ -3131,6 +3137,7 @@ int main(int argc, char** argv){
               "    segt [n|clear] | bsegt [on|off]   SEGT-Protokoll (Zyklus, MMU, TRPL/IF1L) / Halt vor der Behandlung\n"
               "    trap | btrap | status | fcw | psa   Ausnahmen des U8001 (im Kontext u8000)\n"
               "    savestate <f> | loadstate <f>   P8KS (nicht: Medieninhalt) ; snap/rs/bbusrq: nicht vorhanden\n"
+              "    rtc                 Echtzeituhr-Karte (--rtc u130x|rtc72421): Typ, Uhrzeit, Versatz, bei U130X Anzeige/Tasten/Zustand\n"
               "    wdc [r|u|d|log]     WDC (--wdc 4.2 / --hd abbild): Zustand, Register, Disassembler, Speicher, Kommando-Protokoll\n"
               "    Adressen der 16-Bit-Seite: <<seg>>off; `em:ADR` = physischer Hauptspeicher A0-A23 (roh)\n");
         }
