@@ -63,6 +63,11 @@ struct LogicalSector {
     uint16_t id_crc    = 0;         ///< ID-CRC, wie sie auf dem Medium steht
     uint16_t data_crc  = 0;         ///< Daten-CRC, wie sie auf dem Medium steht
     bool     deleted   = false;     ///< DAM war 0xF8 (geloeschter Sektor) statt 0xFB
+    /// @brief Sektor OHNE Datenfeld (nur ID-Feld).  Wird von @ref buildTrack ausgewertet
+    ///        (kein DAM, keine Daten, keine CRC); @ref parseTrack meldet so einen Sektor mit
+    ///        `data_pos == SIZE_MAX`, aber NICHT in diesem Feld (dort steht false) — die
+    ///        Erkennung ist `data_pos == SIZE_MAX`.
+    bool     no_data   = false;
 };
 
 /// @brief Anzahl der Bytes hinter der Daten-CRC, die @ref parseTrack mitnimmt und
@@ -140,6 +145,10 @@ GapParams normGaps(const std::vector<LogicalSector>& sectors, Encoding enc);
 TrackImage buildTrack(const std::vector<LogicalSector>& sectors,
                       Encoding enc,
                       const GapParams& gaps);
+// Zusatz (Entwurf 38): @ref LogicalSector::deleted → DAM F8 statt FB; `id_crc_ok`/`data_crc_ok`
+// == false → absichtlich falsche CRC (FM und MFM); @ref LogicalSector::no_data → kein
+// Datenfeld.  Aufrufer, die diese Felder nicht setzen (Vorgabe true/true/false/false),
+// bekommen bitgleich dieselbe Spur wie zuvor.
 TrackImage buildTrack(const std::vector<LogicalSector>& sectors, Encoding enc);
 
 /**

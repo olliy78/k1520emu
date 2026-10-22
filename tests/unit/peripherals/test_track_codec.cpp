@@ -1122,3 +1122,98 @@ TEST(TrackCodecNormluecken, VorspannWieFormatCom) {
     for (i = 96; i < 146; ++i) ASSERT_EQ(t.bytes[i], 0x4E) << i;
     EXPECT_EQ(t.bytes[146], 0x00) << "Sync vor dem ersten Kennfeld";
 }
+
+// ─── Entwurf 38 AP A0: geloeschte Marke / falsche CRC / Sektor ohne Datenfeld ─────────
+
+namespace {
+std::vector<LogicalSector> a0Sektoren() {
+    std::vector<LogicalSector> v;
+    v.push_back(makeSector(3, 0, 1, 256, 0x11));
+    v.push_back(makeSector(3, 0, 2, 256, 0x22));
+    v.push_back(makeSector(3, 0, 3, 256, 0x33));
+    v.push_back(makeSector(3, 0, 4, 256, 0x44));
+    v[1].deleted = true;
+    v[2].data_crc_ok = false;
+    v[3].id_crc_ok = false;
+    return v;
+}
+}  // namespace
+
+class TrackCodecA0 : public ::testing::TestWithParam<Encoding> {};
+
+TEST_P(TrackCodecA0, GeloeschtUndCrcFehlerLaufenRund) {
+    const Encoding enc = GetParam();
+    const auto soll = a0Sektoren();
+    const auto ist  = TrackCodec::parseTrack(TrackCodec::buildTrack(soll, enc));
+    ASSERT_EQ(ist.size(), 4u);
+    EXPECT_FALSE(ist[0].deleted); EXPECT_TRUE(ist[0].data_crc_ok); EXPECT_TRUE(ist[0].id_crc_ok);
+    EXPECT_TRUE(ist[1].deleted);  EXPECT_TRUE(ist[1].data_crc_ok);   // F8 mit gueltiger CRC
+    EXPECT_FALSE(ist[2].data_crc_ok); EXPECT_TRUE(ist[2].id_crc_ok);
+    EXPECT_FALSE(ist[3].id_crc_ok);   EXPECT_TRUE(ist[3].data_crc_ok);
+    for (size_t i = 0; i < 4; ++i) {
+        EXPECT_EQ(ist[i].data, soll[i].data) << i;
+        EXPECT_EQ(ist[i].id, soll[i].id);
+    }
+}
+
+TEST_P(TrackCodecA0, SektorOhneDatenfeldMitten) {
+    const Encoding enc = GetParam();
+    std::vector<LogicalSector> v;
+    v.push_back(makeSector(0, 0, 1, 128, 0xA1));
+    v.push_back(makeSector(0, 0, 2, 128, 0));
+    v[1].no_data = true;
+    v[1].data.clear();
+    v.push_back(makeSector(0, 0, 3, 128, 0xA3));
+    const auto ist = TrackCodec::parseTrack(TrackCodec::buildTrack(v, enc));
+    ASSERT_EQ(ist.size(), 3u);
+    EXPECT_NE(ist[0].data_pos, SIZE_MAX);
+    EXPECT_EQ(ist[1].data_pos, SIZE_MAX);
+    EXPECT_TRUE(ist[1].data.empty());
+    EXPECT_EQ(ist[2].data, v[2].data);
+    EXPECT_TRUE(ist[2].data_crc_ok);
+}
+
+TEST_P(TrackCodecA0, SektorOhneDatenfeldAmSpurende) {
+    std::vector<LogicalSector> v{makeSector(0, 0, 1, 128, 0x55), makeSector(0, 0, 2, 128, 0)};
+    v[1].no_data = true;
+    const auto ist = TrackCodec::parseTrack(TrackCodec::buildTrack(v, GetParam()));
+    ASSERT_EQ(ist.size(), 2u);
+    EXPECT_EQ(ist[1].data_pos, SIZE_MAX);
+}
+
+TEST_P(TrackCodecA0, InterleaveUndGemischteGroessenBleiben) {
+    std::vector<LogicalSector> v;
+    for (uint8_t id : {1, 5, 2, 6, 3, 7, 4}) v.push_back(makeSector(1, 1, id, 128, id));
+    v.push_back(makeSector(1, 1, 9, 512, 0x99));
+    v.push_back(makeSector(1, 1, 8, 256, 0x88));
+    const auto ist = TrackCodec::parseTrack(TrackCodec::buildTrack(v, GetParam()));
+    ASSERT_EQ(ist.size(), v.size());
+    for (size_t i = 0; i < v.size(); ++i) {
+        EXPECT_EQ(ist[i].id, v[i].id);
+        EXPECT_EQ(ist[i].size, v[i].size);
+        EXPECT_EQ(ist[i].data, v[i].data);
+        EXPECT_TRUE(ist[i].data_crc_ok);
+    }
+}
+
+TEST_P(TrackCodecA0, VorgabeFelderBleibenBitgleich) {
+    // Die neuen Felder in Vorgabestellung duerfen an der Spur nichts aendern.
+    std::vector<LogicalSector> v{makeSector(0, 0, 1, 256, 0xE5), makeSector(0, 0, 2, 256, 0xE5)};
+    auto a = TrackCodec::buildTrack(v, GetParam());
+    v[0].deleted = false; v[0].no_data = false; v[0].id_crc_ok = true; v[0].data_crc_ok = true;
+    auto b = TrackCodec::buildTrack(v, GetParam());
+    EXPECT_EQ(a.bytes, b.bytes);
+    EXPECT_EQ(a.marks, b.marks);
+}
+
+TEST_P(TrackCodecA0, GeloeschteMarkeStehtAlsF8AufDemMedium) {
+    std::vector<LogicalSector> v{makeSector(0, 0, 1, 128, 0x01)};
+    v[0].deleted = true;
+    const auto t = TrackCodec::buildTrack(v, GetParam());
+    const auto ist = TrackCodec::parseTrack(t);
+    ASSERT_EQ(ist.size(), 1u);
+    EXPECT_EQ(t.bytes[ist[0].data_pos], 0xF8);
+}
+
+INSTANTIATE_TEST_SUITE_P(FmMfm, TrackCodecA0,
+                         ::testing::Values(Encoding::FM, Encoding::MFM));

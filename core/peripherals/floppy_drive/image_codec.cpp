@@ -15,6 +15,7 @@
 #include "core/peripherals/floppy_drive/img_codec.h"
 
 #include <cctype>
+#include <cstdio>
 #include <cstring>
 
 namespace {
@@ -31,12 +32,44 @@ bool endetAuf(const std::string& path, const char* suffix) {
     return true;
 }
 
+/// @brief Beginnt die Datei mit @p magic (@p n Bytes)?  Nur die Kennung, keine Kopfpruefung.
+bool beginntMit(const std::string& path, const char* magic, size_t n) {
+    FILE* f = std::fopen(path.c_str(), "rb");
+    if (!f) return false;
+    char buf[8] = {};
+    const size_t got = std::fread(buf, 1, n, f);
+    std::fclose(f);
+    return got == n && std::memcmp(buf, magic, n) == 0;
+}
+
+/// @brief TeleDisk-Kopf: Kennung "TD" (unkomprimiert) / "td" (Advanced Compression) UND
+///        CRC-16 (Poly 0xA097, Start 0, MSB zuerst) ueber Byte 0..9 = Wort in Byte 10..11 (LE).
+///        Die CRC ist noetig, weil ein rohes Sektorimage mit "TD" am Anfang beginnen darf.
+bool istTd0Kennung(const std::string& path) {
+    FILE* f = std::fopen(path.c_str(), "rb");
+    if (!f) return false;
+    unsigned char kopf[12] = {};
+    const size_t got = std::fread(kopf, 1, sizeof(kopf), f);
+    std::fclose(f);
+    if (got != sizeof(kopf)) return false;
+    if (!((kopf[0] == 'T' && kopf[1] == 'D') || (kopf[0] == 't' && kopf[1] == 'd'))) return false;
+    uint16_t crc = 0;
+    for (int i = 0; i < 10; ++i) {
+        crc = static_cast<uint16_t>(crc ^ (kopf[i] << 8));
+        for (int b = 0; b < 8; ++b)
+            crc = static_cast<uint16_t>((crc & 0x8000) ? (crc << 1) ^ 0xA097 : (crc << 1));
+    }
+    return crc == static_cast<uint16_t>(kopf[10] | (kopf[11] << 8));
+}
+
 }  // namespace
 
 ContainerType ImageCodec::fromExtension(const std::string& path) {
     if (endetAuf(path, ".hfe")) return ContainerType::Hfe;
     if (endetAuf(path, ".dmk")) return ContainerType::Dmk;
     if (endetAuf(path, ".cqm")) return ContainerType::Cqm;
+    if (endetAuf(path, ".td0")) return ContainerType::Td0;
+    if (endetAuf(path, ".imd")) return ContainerType::Imd;
     return ContainerType::Img;
 }
 
@@ -45,6 +78,9 @@ ContainerType ImageCodec::detect(const std::string& path) {
     if (HfeCodec::isHfe(path)) return ContainerType::Hfe;
     // CQM traegt Kennung + Kopfpruefbyte → ebenfalls Vorrang vor der Endung.
     if (CqmCodec::isCqm(path)) return ContainerType::Cqm;
+    // TD0/IMD: Kennung am Dateianfang (Stub, AP A0; TD0 mit Kopf-CRC).
+    if (istTd0Kennung(path)) return ContainerType::Td0;
+    if (beginntMit(path, "IMD ", 4)) return ContainerType::Imd;
     // DMK hat keine Magic-Zahl: nur akzeptieren, wenn Endung UND Header passen.
     if (endetAuf(path, ".dmk") && DmkCodec::looksLikeDmk(path)) return ContainerType::Dmk;
     return ContainerType::Img;
@@ -55,8 +91,11 @@ const char* ImageCodec::name(ContainerType t) {
         case ContainerType::Hfe: return "hfe";
         case ContainerType::Dmk: return "dmk";
         case ContainerType::Cqm: return "cqm";
-        default:                 return "img";
+        case ContainerType::Td0: return "td0";
+        case ContainerType::Imd: return "imd";
+        case ContainerType::Img: break;
     }
+    return "img";
 }
 
 const char* ImageCodec::extension(ContainerType t) {
@@ -64,11 +103,14 @@ const char* ImageCodec::extension(ContainerType t) {
         case ContainerType::Hfe: return ".hfe";
         case ContainerType::Dmk: return ".dmk";
         case ContainerType::Cqm: return ".cqm";
-        default:                 return ".img";
+        case ContainerType::Td0: return ".td0";
+        case ContainerType::Imd: return ".imd";
+        case ContainerType::Img: break;
     }
+    return ".img";
 }
 
-bool ImageCodec::selfDescribing(ContainerType t) { return t != ContainerType::Img; }
+bool ImageCodec::selfDescribing(ContainerType t) { return t != ContainerType::Img; }  // Td0/Imd: ja
 bool ImageCodec::needsDiskFormat(ContainerType t) { return t == ContainerType::Img; }
 bool ImageCodec::writable(ContainerType) { return true; }
 
@@ -81,6 +123,13 @@ bool ImageCodec::load(const std::string& path, ContainerType type,
             return DmkCodec::load(path, out, nullptr, err);
         case ContainerType::Cqm:
             return CqmCodec::load(path, out, nullptr, err);
+        case ContainerType::Td0:
+            err = "TeleDisk (.td0) ist noch nicht implementiert: " + path;
+            return false;
+        case ContainerType::Imd:
+            err = "ImageDisk (.imd) ist noch nicht implementiert: " + path;
+            return false;
+        case ContainerType::Img:
         default:
             if (!fmt) {
                 err = "Rohes Sektorimage (.img) braucht ein Diskettenformat: " + path;
@@ -99,6 +148,13 @@ bool ImageCodec::save(const std::string& path, ContainerType type,
             return DmkCodec::save(path, in, err);
         case ContainerType::Cqm:
             return CqmCodec::save(path, in, err);
+        case ContainerType::Td0:
+            err = "TeleDisk (.td0) ist noch nicht implementiert: " + path;
+            return false;
+        case ContainerType::Imd:
+            err = "ImageDisk (.imd) ist noch nicht implementiert: " + path;
+            return false;
+        case ContainerType::Img:
         default:
             if (!fmt) {
                 err = "Rohes Sektorimage (.img) braucht ein Diskettenformat: " + path;

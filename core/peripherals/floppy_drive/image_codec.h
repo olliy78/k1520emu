@@ -13,6 +13,8 @@
  * | Hfe       | `.hfe` | ja (Header/LUT) | nein |
  * | Dmk       | `.dmk` | ja (Header/IDAM-Tabelle) | nein |
  * | Cqm       | `.cqm` | ja (Kopf) | nein (Geometrie aus dem Medium, wie `.img` nur fuer rawCompatible-Medien) |
+ * | Td0       | `.td0` | ja (Kopf) | nein (Sektorlisten, Entwurf 38; AP A0: nur Geruest) |
+ * | Imd       | `.imd` | ja (Kopf) | nein (Sektorlisten, Entwurf 38; AP A0: nur Geruest) |
  *
  * @see doc/design/09_floppy_drive.md §4
  * @author Olaf Krieger
@@ -33,7 +35,9 @@ enum class ContainerType : uint8_t {
     Img = 0,   ///< rohes Sektorimage (.img) — braucht ein DiskFormat
     Hfe,       ///< HxC Floppy Emulator v1 (.hfe) — Bitzellen, self-describing
     Dmk,       ///< David Keil's Disk Image (.dmk) — Spur-Bytes + IDAM-Tabelle
-    Cqm        ///< CopyQM (.cqm) — RLE-gepackte Sektoren; schreibbar nur fuer rawCompatible-Medien einheitlicher Geometrie
+    Cqm,       ///< CopyQM (.cqm) — RLE-gepackte Sektoren; schreibbar nur fuer rawCompatible-Medien einheitlicher Geometrie
+    Td0,       ///< TeleDisk (.td0) — Sektorlisten je Spur (Entwurf 38); Laden/Speichern folgt in AP T1/T2
+    Imd        ///< ImageDisk (.imd) — Sektorlisten je Spur (Entwurf 38); Laden/Speichern folgt in AP I1
 };
 
 /**
@@ -49,14 +53,16 @@ ContainerType fromExtension(const std::string& path);
  * @brief Containertyp einer vorhandenen Datei bestimmen.
  *
  * HFE ueber die Signatur `HXCPICFE`; CQM ueber `CQ` + Kopfpruefbyte (Endung egal);
+ * TD0 ueber `TD`/`td` am Anfang, IMD ueber `IMD ` am Anfang (beide nur Kennung, Endung egal;
+ * die Kopfpruefung folgt mit den Codecs);
  * DMK ueber Endung **plus** Header-Plausibilitaet (DMK hat keine Magic-Zahl); sonst
  * @ref ContainerType::Img.
  */
 ContainerType detect(const std::string& path);
 
-const char* name(ContainerType t);        ///< "img" | "hfe" | "dmk" | "cqm"
-const char* extension(ContainerType t);   ///< ".img" | ".hfe" | ".dmk" | ".cqm"
-bool selfDescribing(ContainerType t);     ///< Hfe/Dmk/Cqm = true
+const char* name(ContainerType t);        ///< "img" | "hfe" | "dmk" | "cqm" | "td0" | "imd"
+const char* extension(ContainerType t);   ///< ".img" | ".hfe" | ".dmk" | ".cqm" | ".td0" | ".imd"
+bool selfDescribing(ContainerType t);     ///< Hfe/Dmk/Cqm/Td0/Imd = true
 bool needsDiskFormat(ContainerType t);    ///< nur Img = true
 bool writable(ContainerType t);           ///< alle Container sind schreibbar (Grenzen: save())
 

@@ -1521,6 +1521,8 @@ std::string DiskVolume::containerName() const {
         case ContainerType::Hfe: return "hfe";
         case ContainerType::Dmk: return "dmk";
         case ContainerType::Cqm: return "cqm";
+        case ContainerType::Td0: return "td0";
+        case ContainerType::Imd: return "imd";
     }
     return {};
 }

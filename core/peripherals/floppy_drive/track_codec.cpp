@@ -277,6 +277,7 @@ TrackImage buildTrack(const std::vector<LogicalSector>& sectors,
             const uint8_t idam_preamble[] = {0xA1, 0xA1, 0xA1, 0xFE,
                                               sec.cyl, sec.head, sec.id, sc};
             uint16_t idCrc = crc16(idam_preamble, sizeof(idam_preamble), 0xFF, 0xFF);
+            if (!sec.id_crc_ok) idCrc ^= 0xFFFF;   // absichtlich falsche ID-CRC (Kopierschutz/Fehlerstelle)
 
             // ID-Feld
             push(sec.cyl);
@@ -288,25 +289,30 @@ TrackImage buildTrack(const std::vector<LogicalSector>& sectors,
 
             fill(gaps.gap_fill, gaps.gap2);
 
+            if (!sec.no_data) {
             // ── MFM DAM ────────────────────────────────────────────────────────
             fill(0x00, gaps.sync_len);      // 12×00 Sync
             push(0xA1);                     // 3× A1-Sync vor dem Data-Mark-Byte (wie IDAM)
             push(0xA1);
             push(0xA1);
-            pushMark(0xFB, MarkType::Data); // Mark-Byte FB traegt die Data-Marke
+            // Mark-Byte FB (normal) bzw. F8 (geloeschte Datenmarke) traegt die Data-Marke
+            const uint8_t dam = sec.deleted ? 0xF8 : 0xFB;
+            pushMark(dam, MarkType::Data);
 
             // Standard-IBM-MFM-Daten-CRC (CRC-16-CCITT) ueber [A1,A1,A1,FB] + Daten,
             // Seed 0xFFFF — exakt wie die echten A5120-Disks (disks/cpadisk_*, z.B.
             // Sektor 0 = 0x233D) und wie der Lader im MFM-Modus ([03FD] bit1=0,
             // Seed 0xE295 = crc16([A1A1A1 FB],0xFFFF) ueber die Datenbytes).
-            std::vector<uint8_t> dataCrcIn = {0xA1, 0xA1, 0xA1, 0xFB};
+            std::vector<uint8_t> dataCrcIn = {0xA1, 0xA1, 0xA1, dam};
             dataCrcIn.insert(dataCrcIn.end(), sec.data.begin(), sec.data.end());
             uint16_t dataCrc = crc16(dataCrcIn.data(), dataCrcIn.size(), 0xFF, 0xFF);
+            if (!sec.data_crc_ok) dataCrc ^= 0xFFFF;   // absichtlich falsche Daten-CRC
 
             // Datenbytes
             for (uint8_t b : sec.data) push(b);
             push(static_cast<uint8_t>(dataCrc >> 8));
             push(static_cast<uint8_t>(dataCrc & 0xFF));
+            }   // !no_data
 
         } else {
             // ── FM IDAM (kein A1-Sync) ────────────────────────────────────────
@@ -316,6 +322,7 @@ TrackImage buildTrack(const std::vector<LogicalSector>& sectors,
             // CRC-CCITT ueber [FE,cyl,head,id,sc]
             const uint8_t idam_fm[] = {0xFE, sec.cyl, sec.head, sec.id, sc};
             uint16_t idCrc = crc16Ccitt(idam_fm, sizeof(idam_fm));
+            if (!sec.id_crc_ok) idCrc ^= 0xFFFF;   // absichtlich falsche ID-CRC
 
             push(sec.cyl);
             push(sec.head);
@@ -326,21 +333,25 @@ TrackImage buildTrack(const std::vector<LogicalSector>& sectors,
 
             fill(gaps.gap_fill, gaps.gap2);
 
+            if (!sec.no_data) {
             // ── FM DAM ────────────────────────────────────────────────────────
             fill(0x00, gaps.sync_len);      // 6×00 Sync
-            pushMark(0xFB, MarkType::Data);
+            const uint8_t dam = sec.deleted ? 0xF8 : 0xFB;
+            pushMark(dam, MarkType::Data);
 
             // CRC-CCITT ueber [FB, <data>]
             std::vector<uint8_t> dataCrcInput;
             dataCrcInput.reserve(1 + sec.data.size());
-            dataCrcInput.push_back(0xFB);
+            dataCrcInput.push_back(dam);
             dataCrcInput.insert(dataCrcInput.end(), sec.data.begin(), sec.data.end());
             uint16_t dataCrc = crc16Ccitt(dataCrcInput.data(), dataCrcInput.size());
+            if (!sec.data_crc_ok) dataCrc ^= 0xFFFF;   // absichtlich falsche Daten-CRC
 
             // Datenbytes
             for (uint8_t b : sec.data) push(b);
             push(static_cast<uint8_t>(dataCrc >> 8));
             push(static_cast<uint8_t>(dataCrc & 0xFF));
+            }   // !no_data
         }
 
         // Nachspann wie auf dem Medium (LogicalSector::tail) — symmetrisch zu
