@@ -115,6 +115,58 @@ _lib.k1520d_tar_warning.argtypes = [_H]
 _lib.k1520d_tar_warning.restype = _CS
 _lib.k1520d_tar_put.argtypes = [_H, _CS]
 _lib.k1520d_tar_put.restype = ctypes.c_bool
+_lib.k1520d_open_tar_satz_format.argtypes = [_CS, _CS]
+_lib.k1520d_open_tar_satz_format.restype = _H
+_lib.k1520d_tar_format_count.argtypes = []
+_lib.k1520d_tar_format_count.restype = ctypes.c_int
+_lib.k1520d_tar_format_name.argtypes = [ctypes.c_int]
+_lib.k1520d_tar_format_name.restype = _CS
+_lib.k1520d_tar_format_description.argtypes = [ctypes.c_int]
+_lib.k1520d_tar_format_description.restype = _CS
+_lib.k1520d_tar_format_bytes.argtypes = [ctypes.c_int]
+_lib.k1520d_tar_format_bytes.restype = ctypes.c_uint64
+_lib.k1520d_tar_format_container.argtypes = [ctypes.c_int]
+_lib.k1520d_tar_format_container.restype = ctypes.c_int
+_lib.k1520d_tar_satz_neu.argtypes = [_CS, _CS]
+_lib.k1520d_tar_satz_neu.restype = _H
+_lib.k1520d_tar_disk_neu.argtypes = [_CS, _CS]
+_lib.k1520d_tar_disk_neu.restype = _H
+_lib.k1520d_tar_satz.argtypes = [_H]
+_lib.k1520d_tar_satz.restype = ctypes.c_bool
+_lib.k1520d_tar_zu_satz.argtypes = [_H, _CS]
+_lib.k1520d_tar_zu_satz.restype = ctypes.c_bool
+_lib.k1520d_tar_satz_basis.argtypes = [_H]
+_lib.k1520d_tar_satz_basis.restype = _CS
+_lib.k1520d_tar_satz_plan.argtypes = [_H, _CS]
+_lib.k1520d_tar_satz_plan.restype = ctypes.c_int
+_lib.k1520d_tar_plan_strom.argtypes = [_H]
+_lib.k1520d_tar_plan_strom.restype = ctypes.c_uint64
+_lib.k1520d_tar_plan_kapazitaet.argtypes = [_H]
+_lib.k1520d_tar_plan_kapazitaet.restype = ctypes.c_uint64
+_lib.k1520d_tar_plan_einzel.argtypes = [_H]
+_lib.k1520d_tar_plan_einzel.restype = ctypes.c_bool
+_lib.k1520d_tar_plan_namen.argtypes = [_H]
+_lib.k1520d_tar_plan_namen.restype = _CS
+_lib.k1520d_tar_plan_ueberschreibt.argtypes = [_H]
+_lib.k1520d_tar_plan_ueberschreibt.restype = _CS
+_lib.k1520d_tar_plan_altlasten.argtypes = [_H]
+_lib.k1520d_tar_plan_altlasten.restype = _CS
+_lib.k1520d_tar_satz_speichern.argtypes = [_H, _CS]
+_lib.k1520d_tar_satz_speichern.restype = ctypes.c_bool
+_lib.k1520d_tar_satz_hinweise.argtypes = [_H]
+_lib.k1520d_tar_satz_hinweise.restype = _CS
+_lib.k1520d_tar_satz_geschrieben.argtypes = [_H]
+_lib.k1520d_tar_satz_geschrieben.restype = _CS
+_lib.k1520d_physisch_schreiben_grund.argtypes = [_H]
+_lib.k1520d_physisch_schreiben_grund.restype = _CS
+_lib.k1520d_tar_datei_pruefen.argtypes = [_H, _CS]
+_lib.k1520d_tar_datei_pruefen.restype = ctypes.c_int
+_lib.k1520d_tar_datei_grund.argtypes = [_H]
+_lib.k1520d_tar_datei_grund.restype = _CS
+_lib.k1520d_tar_datei_abbilder.argtypes = [_H]
+_lib.k1520d_tar_datei_abbilder.restype = ctypes.c_int
+_lib.k1520d_tar_datei_ablegen.argtypes = [_H, _CS, ctypes.c_int, _CS, ctypes.c_bool]
+_lib.k1520d_tar_datei_ablegen.restype = ctypes.c_bool
 _lib.k1520d_set_backup.argtypes = [_H, ctypes.c_bool]
 _lib.k1520d_set_backup.restype = None
 _lib.k1520d_close.argtypes = [_H]
@@ -1151,6 +1203,57 @@ class DiskTool:
         return cls(h, liste[0] if liste else "")
 
     @classmethod
+    def open_tar_satz_format(cls, paths, format: str = "") -> "DiskTool":
+        """Wie :meth:`open_tar_satz`, mit VORGEGEBENEM Katalogformat (``""`` = erkennen).
+
+        Nötig für ``.img``-Sätze: die Dateigröße ist bei kleinen Formaten mehrdeutig.
+        Das Volume ist schreibgeschützt, bis :meth:`set_read_only` ``False`` setzt."""
+        liste = [os.fspath(p) for p in paths]
+        h = _lib.k1520d_open_tar_satz_format(_b("\n".join(liste)), _b(format or ""))
+        if not h:
+            raise K1520DiskError(_s(_lib.k1520d_last_open_error()))
+        return cls(h, liste[0] if liste else "")
+
+    @staticmethod
+    def tar_formate() -> list:
+        """Die Katalogformate, die sich für eine neue tar-Diskette / einen tar-Satz eignen:
+        Liste von Wörterbüchern ``name``, ``beschreibung``, ``bytes`` (Nutzbytes EINES Abbilds),
+        ``img`` (auch ``.cqm``), ``hfe`` (``.dmk`` geht immer)."""
+        aus = []
+        for i in range(int(_lib.k1520d_tar_format_count())):
+            m = int(_lib.k1520d_tar_format_container(i))
+            aus.append({
+                "name": _s(_lib.k1520d_tar_format_name(i)),
+                "beschreibung": _s(_lib.k1520d_tar_format_description(i)),
+                "bytes": int(_lib.k1520d_tar_format_bytes(i)),
+                "img": bool(m & 1),
+                "hfe": bool(m & 2),
+            })
+        return aus
+
+    @classmethod
+    def tar_satz_neu(cls, format: str, basisname) -> "DiskTool":
+        """Leeren tar-Satz im Katalogformat ``format`` anlegen (nichts auf der Platte).
+
+        Die Endung von ``basisname`` (``.img/.hfe/.dmk/.cqm``) bestimmt den Container; gespeichert
+        wird mit :meth:`tar_satz_speichern` als ``name1.ext``, ``name2.ext``, …"""
+        p = os.fspath(basisname)
+        h = _lib.k1520d_tar_satz_neu(_b(format), _b(p))
+        if not h:
+            raise K1520DiskError(_s(_lib.k1520d_last_open_error()))
+        return cls(h, p)
+
+    @classmethod
+    def tar_disk_neu(cls, path, format: str) -> "DiskTool":
+        """Neue LEERE tar-Diskette im Katalogformat ``format`` als Datei ``path`` anlegen
+        (sofort geschrieben, genau dieser Name) und im Satzmodus öffnen."""
+        p = os.fspath(path)
+        h = _lib.k1520d_tar_disk_neu(_b(p), _b(format))
+        if not h:
+            raise K1520DiskError(_s(_lib.k1520d_last_open_error()))
+        return cls(h, p)
+
+    @classmethod
     def open_raw(cls, path, filesystem: Optional[str] = None,
                  read_only: bool = True) -> "DiskTool":
         """Wie :meth:`open`, **öffnet aber auch ohne Erkennung**.
@@ -2120,6 +2223,93 @@ class DiskTool:
         """``.tar`` auf die leere tar-Diskette schreiben und das Abbild zurückschreiben.
         Rückgabe: Warnung (``""`` = keine); ``K1520DiskError`` mit dem Grund bei Ablehnung."""
         if not _lib.k1520d_tar_put(self._h, _b(str(quelle))):
+            raise K1520DiskError(self._fail())
+        return _s(_lib.k1520d_tar_warning(self._h))
+
+    # ── tar-Satz bearbeiten, .tar ablegen (Entwurf 37) ──────────────────────
+
+    @property
+    def tar_satz(self) -> bool:
+        """Satzmodus: ein tar-Strom im Speicher über N gleichformatige Abbilder?"""
+        return bool(_lib.k1520d_tar_satz(self._h))
+
+    def tar_zu_satz(self, basisname=None) -> None:
+        """Eine tar-Einzeldiskette in den Satzmodus überführen (``K1520DiskError`` mit dem Grund)."""
+        if not _lib.k1520d_tar_zu_satz(self._h, _b(os.fspath(basisname)) if basisname else b""):
+            raise K1520DiskError(self._fail())
+
+    @property
+    def tar_satz_basis(self) -> str:
+        """Der beim Speichern vorgesehene Basisname des Satzes (``""`` = keiner)."""
+        return _s(_lib.k1520d_tar_satz_basis(self._h))
+
+    def tar_satz_planen(self, basisname=None) -> dict:
+        """Speichern planen, ohne zu schreiben: ``abbilder``, ``strom``, ``kapazitaet``, ``einzel``,
+        ``namen``, ``ueberschreibt`` (schon vorhanden; Sicherung ``~``), ``altlasten`` (höhere
+        Nummern, die liegenbleiben).  ``K1520DiskError`` bei Fehler."""
+        n = _lib.k1520d_tar_satz_plan(self._h, _b(os.fspath(basisname)) if basisname else b"")
+        if n < 0:
+            raise K1520DiskError(self._fail())
+
+        def liste(roh):
+            t = _s(roh)
+            return t.split("\n") if t else []
+
+        return {
+            "abbilder": int(n),
+            "strom": int(_lib.k1520d_tar_plan_strom(self._h)),
+            "kapazitaet": int(_lib.k1520d_tar_plan_kapazitaet(self._h)),
+            "einzel": bool(_lib.k1520d_tar_plan_einzel(self._h)),
+            "namen": liste(_lib.k1520d_tar_plan_namen(self._h)),
+            "ueberschreibt": liste(_lib.k1520d_tar_plan_ueberschreibt(self._h)),
+            "altlasten": liste(_lib.k1520d_tar_plan_altlasten(self._h)),
+        }
+
+    def tar_satz_speichern(self, basisname=None) -> dict:
+        """Den Strom auf Abbilder gleichen Formats verteilen und schreiben (alles oder nichts).
+        Rückgabe: ``geschrieben`` (Dateien) und ``hinweise`` (z. B. liegengebliebene alte Nummern)."""
+        if not _lib.k1520d_tar_satz_speichern(self._h, _b(os.fspath(basisname)) if basisname else b""):
+            raise K1520DiskError(self._fail())
+
+        def liste(roh):
+            t = _s(roh)
+            return t.split("\n") if t else []
+
+        return {"geschrieben": liste(_lib.k1520d_tar_satz_geschrieben(self._h)),
+                "hinweise": liste(_lib.k1520d_tar_satz_hinweise(self._h))}
+
+    @property
+    def physisch_schreiben_grund(self) -> str:
+        """``""`` = das Volume lässt sich direkt auf eine physische Diskette schreiben; sonst die
+        Begründung (ein tar-Satz hat keine einzelne Diskette) samt Weg."""
+        return _s(_lib.k1520d_physisch_schreiben_grund(self._h))
+
+    def tar_datei_pruefen(self, quelle) -> dict:
+        """Beurteilt eine ``.tar``-Datei, die auf dieses Volume gezogen wird, ohne etwas zu ändern.
+
+        Schlüssel: ``als_datei`` (immer), ``als_container`` (Inhalt WIRD das Archiv; nur bei leerem
+        Archiv), ``ziel_leer``, ``wird_satz`` (Container sprengt die Einzeldiskette),
+        ``abbilder`` (Zahl bei Container), ``container_grund`` (warum nicht), ``warnung`` (kein
+        reines V7-tar).  ``K1520DiskError``, wenn gar nichts geht."""
+        r = _lib.k1520d_tar_datei_pruefen(self._h, _b(str(quelle)))
+        if r < 0:
+            raise K1520DiskError(self._fail())
+        return {
+            "als_datei": bool(r & 1),
+            "als_container": bool(r & 2),
+            "ziel_leer": bool(r & 4),
+            "wird_satz": bool(r & 8),
+            "abbilder": int(_lib.k1520d_tar_datei_abbilder(self._h)) if r & 2 else 0,
+            "container_grund": _s(_lib.k1520d_tar_datei_grund(self._h)),
+            "warnung": _s(_lib.k1520d_tar_warning(self._h)),
+        }
+
+    def tar_datei_ablegen(self, quelle, *, als_container: bool = False, name: str = "",
+                          ersetzen: bool = False) -> str:
+        """``.tar`` ablegen: als Datei (Vorgabe; unter ``name``, sonst ihrem Dateinamen) oder als
+        fertiger Container (nur bei leerem Archiv).  Rückgabe: Warnung (``""`` = keine)."""
+        if not _lib.k1520d_tar_datei_ablegen(self._h, _b(str(quelle)), 1 if als_container else 0,
+                                             _b(name or ""), ersetzen):
             raise K1520DiskError(self._fail())
         return _s(_lib.k1520d_tar_warning(self._h))
 

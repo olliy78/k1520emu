@@ -1561,8 +1561,14 @@ bool DiskVolume::linearBytes(std::vector<uint8_t>& out) const {
 std::unique_ptr<DiskVolume> DiskVolume::openTarSatz(const std::vector<std::string>& pfade,
                                                     const FormatCatalog& formats,
                                                     const FsCatalog& fs_cat,
-                                                    std::string& err) {
+                                                    std::string& err,
+                                                    const std::string& format) {
     if (pfade.empty()) { err = "kein Abbild angegeben"; return nullptr; }
+    const DiskFormat* vorgabe = nullptr;
+    if (!format.empty()) {
+        vorgabe = formats.find(format);
+        if (!vorgabe) { err = "Format '" + format + "' steht nicht im Katalog"; return nullptr; }
+    }
     const FsProfile* prof = nullptr;
     for (const FsProfile& p : fs_cat.profiles())
         if (p.type == FsType::Tar && !p.leer) { prof = &p; break; }
@@ -1572,8 +1578,23 @@ std::unique_ptr<DiskVolume> DiskVolume::openTarSatz(const std::vector<std::strin
     std::vector<uint8_t> strom;
     for (const std::string& pfad : pfade) {
         std::string e;
-        auto v = DiskVolume::open(pfad, "", formats, fs_cat, e, true, /*roh_erlaubt=*/true);
-        if (!v) { err = pfad + ": " + e; return nullptr; }
+        std::unique_ptr<DiskVolume> v;
+        if (vorgabe) {
+            // Geometrie vorgegeben: keine Erkennung (bei .img raet sie nur an der Dateigroesse).
+            v.reset(new DiskVolume);
+            v->path_      = pfad;
+            v->read_only_ = true;
+            v->formate_   = &formats;
+            v->fs_kat_    = &fs_cat;
+            std::optional<DiskFormat> of;
+            if (endung(pfad) == "img") of = *vorgabe;
+            v->disk_ = DiskImage::open(pfad, of, true);
+            if (!v->disk_) { err = pfad + ": Abbild nicht ladbar"; return nullptr; }
+            v->format_ = vorgabe;
+        } else {
+            v = DiskVolume::open(pfad, "", formats, fs_cat, e, true, /*roh_erlaubt=*/true);
+            if (!v) { err = pfad + ": " + e; return nullptr; }
+        }
         std::vector<uint8_t> d;
         if (!v->linearBytes(d)) { err = pfad + ": " + v->lastError(); return nullptr; }
         strom.insert(strom.end(), d.begin(), d.end());
@@ -1801,7 +1822,10 @@ TarSatzPlan DiskVolume::tarSatzPlanen(const std::string& basisname) const {
     const std::string stem = bp.stem().string(), endg = bp.extension().string();
     const fs::path dir = bp.parent_path();
     for (int i = 1; i <= p.abbilder; ++i) {
-        const std::string name = (dir / (stem + std::to_string(i) + endg)).string();
+        // Ein mit tarDisketteNeu angelegtes Einzelabbild behaelt seinen Namen (ohne Nummer).
+        const std::string name = (satz_einzelname_ && p.abbilder == 1)
+                                     ? p.basisname
+                                     : (dir / (stem + std::to_string(i) + endg)).string();
         p.namen.push_back(name);
         std::error_code ec;
         if (fs::exists(name, ec)) p.ueberschreibt.push_back(name);
@@ -1895,6 +1919,138 @@ bool DiskVolume::tarSatzSpeichern(const std::string& basisname, std::vector<std:
         for (const std::string& a : p.altlasten)
             hinweise->push_back("'" + a + "' gehoert nicht mehr zum Satz (er hat jetzt " + std::to_string(p.abbilder)
                                 + " Abbild(er)) und blieb unveraendert liegen — bei Bedarf selbst loeschen.");
+    return true;
+}
+
+// ─── Neu anlegen und .tar ablegen (Entwurf 37, AP T3) ────────────────────────
+
+namespace { bool leseGanz(const std::string& pfad, std::vector<uint8_t>& d, std::string& err); }
+
+std::vector<TarFormatInfo> DiskVolume::tarFormate(const FormatCatalog& formats) {
+    std::vector<TarFormatInfo> aus;
+    for (const DiskFormat& f : formats.formats()) {
+        std::string warum;
+        if (!formatEinheitlich(f, warum)) continue;
+        const uint64_t bytes = f.totalBytes();
+        if (bytes < 2 * 512) continue;                  // Kopf + Endmarke muessen hineinpassen
+        TarFormatInfo i;
+        i.name        = f.name;
+        i.description = f.description;
+        i.bytes       = bytes;
+        i.img         = f.allow_img;
+        i.hfe         = f.allow_hfe;
+        aus.push_back(std::move(i));
+    }
+    return aus;
+}
+
+std::unique_ptr<DiskVolume> DiskVolume::tarDisketteNeu(const std::string& pfad,
+                                                       const std::string& format,
+                                                       const FormatCatalog& formats,
+                                                       const FsCatalog& fs_cat, std::string& err) {
+    // Die Pruefungen (Format einheitlich, Container passt, tar-Profil da) macht tarSatzNeu —
+    // erst wenn die durch sind, wird eine Datei angefasst.
+    {
+        auto probe = tarSatzNeu(format, pfad, formats, fs_cat, err);
+        if (!probe) return nullptr;
+    }
+    const DiskFormat* fmt = formats.find(format);
+    {
+        std::string grund;
+        auto img = DiskImage::create(pfad, *fmt, false, fmt->predominantEncoding(), &grund);
+        if (!img) { err = "Abbild nicht anlegbar: " + pfad + (grund.empty() ? "" : " (" + grund + ")"); return nullptr; }
+        SectorSpace raum(img->medium(), *fmt);
+        const std::vector<uint8_t> nullen(static_cast<size_t>(raum.size()), 0);
+        if (!raum.write(0, nullen.data(), nullen.size())) { err = "Nullfuellung nicht schreibbar: " + raum.lastError(); return nullptr; }
+        if (!img->flush()) { err = img->lastError(); return nullptr; }
+    }
+    auto v = openTarSatz({pfad}, formats, fs_cat, err, format);
+    if (!v) return nullptr;
+    v->read_only_      = false;                 // das eigene frische Werkstueck
+    v->backup_getan_   = true;
+    v->satz_einzelname_ = true;
+    v->satz_basis_     = pfad;                  // NICHT um die Ziffern am Ende gekuerzt
+    v->satz_gesichert_.insert(pfad);            // ganz Null: keine Sicherungskopie noetig
+    v->detection_.remarks = "neue, leere tar-Diskette";
+    return v;
+}
+
+TarDateiUrteil DiskVolume::tarDateiBeurteilen(const std::string& tarpfad) const {
+    TarDateiUrteil u;
+    auto nein = [&](const std::string& why) { u.fehler = why; return u; };
+    if (!disk_ || volumes_.empty()) return nein("keine Diskette geoeffnet");
+    const TarFileSystem* t = tarFs();
+    if (!t) return nein("Eine .tar-Datei laesst sich nur auf eine tar-Diskette oder in einen tar-Satz legen.");
+    if (!t->schreibbar()) return nein(t->nurLesbarGrund());
+    if (read_only_) return nein(kSchreibschutz);
+    std::vector<uint8_t> d;
+    std::string err;
+    if (!leseGanz(tarpfad, d, err)) return nein(err);
+    u.groesse     = d.size();
+    u.kapazitaet  = volumes_[0].space->size();
+    u.als_datei   = true;
+    // "Leer": noch nie beschrieben (ganz Null) ODER alles wieder geloescht.
+    u.ziel_leer   = t->leer() || list().empty();
+    if (u.ziel_leer) {
+        // Der Container darf ueber die Diskette hinausgehen (dann wird es ein Satz).
+        const tar::QuellBefund b = tar::quelleBeurteilen(d, std::numeric_limits<uint64_t>::max());
+        if (!b.fehler.empty())      u.container_grund = b.fehler;
+        else if (!b.mit_kopf)       u.container_grund = "Die Datei beginnt nicht mit einem tar-Kopf (Folgeteil eines Satzes) — sie ist kein fertiger Container.";
+        else {
+            u.als_container = true;
+            u.warnung       = b.warnung;
+            const uint64_t laenge = std::min<uint64_t>(d.size(), tar::exportLaenge(d.data(), d.size()));
+            u.abbilder  = static_cast<int>(std::max<uint64_t>(1, (laenge + u.kapazitaet - 1) / u.kapazitaet));
+            u.wird_satz = !tar_satz_ && laenge > u.kapazitaet;
+        }
+    } else {
+        u.container_grund = "Das Archiv ist nicht leer — eine .tar-Datei kommt als Datei hinein.";
+    }
+    u.ok = true;
+    return u;
+}
+
+bool DiskVolume::tarDateiAblegen(const std::string& tarpfad, TarDateiWeg weg,
+                                 const std::string& name, bool ersetzen) {
+    tar_warnung_.clear();
+    const TarDateiUrteil u = tarDateiBeurteilen(tarpfad);
+    if (!u.ok) return fail(u.fehler);
+
+    if (weg == TarDateiWeg::AlsDatei) {
+        TransferOptions t;
+        t.overwrite = ersetzen;
+        const std::string ziel = name.empty() ? fs::path(tarpfad).filename().string() : name;
+        return insert(tarpfad, FileRef::parse(ziel, 0), t);
+    }
+
+    if (!u.als_container) return fail(u.container_grund);
+    tar_warnung_ = u.warnung;
+
+    // Passt der Container auf die Einzeldiskette und ist sie die frische tar720_leer: der
+    // bestehende Weg (`tar-put`), wie bisher mit Schreibschutz danach.
+    if (!tar_satz_ && tarLeer() && !u.wird_satz) return tarSchreiben(tarpfad);
+
+    std::vector<uint8_t> d;
+    std::string err;
+    if (!leseGanz(tarpfad, d, err)) return fail(err);
+    if (!tar_satz_ && !tarZuSatz()) return false;
+
+    // Den Strom im Speicher ersetzen; Rollback, wenn er sich nicht mounten laesst.
+    const std::vector<uint8_t> alt = satz_->bytes;
+    const uint64_t alt_rev = satz_->revision;
+    satz_->bytes = std::move(d);
+    if (satz_->bytes.size() < satz_->mindest) satz_->bytes.resize(static_cast<size_t>(satz_->mindest), 0);
+    ++satz_->revision;
+    if (!satzNeuMounten()) {
+        const std::string grund = last_error_;
+        satz_->bytes = alt;
+        satz_->revision = alt_rev + 1;
+        satzNeuMounten();
+        return fail(grund);
+    }
+    if (const TarFileSystem* t = tarFs(); t && !t->schreibbar())
+        tar_warnung_ = zusammen(tar_warnung_, "Der Satz ist lesbar, aber nicht bearbeitbar: " + t->nurLesbarGrund());
+    check(FsCheckLevel::Schnell, false);
     return true;
 }
 
@@ -2092,7 +2248,7 @@ void DiskVolume::gegenprobe(FsCheckReport& an, FsCheckLevel level, bool nachlade
     if (disk_ && disk_->medium().dirty()) return;
 
     const int    eigen          = an.zaehlerAb(FsSeverity::Warnung);
-    const size_t eigene_dateien = const_cast<DiskVolume*>(this)->list().size();
+    const size_t eigene_dateien = list().size();
     std::string  bester;
     int          bester_wert    = eigen;
     size_t       bester_dateien = eigene_dateien;

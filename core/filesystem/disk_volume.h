@@ -65,6 +65,45 @@ struct TarSatzPlan {
 };
 
 /**
+ * @struct TarFormatInfo
+ * @brief Ein Katalogformat, das sich fuer eine NEUE leere tar-Diskette / einen tar-Satz eignet
+ *        (Entwurf 37, AP T3): einheitliche Spurgeometrie, damit "gleiches Format fuer alle
+ *        Abbilder" eine einzige Kapazitaet ist.
+ */
+struct TarFormatInfo {
+    std::string name;            ///< Katalogname (z. B. `k5601_9x512`)
+    std::string description;     ///< Klartext fuer die Auswahl
+    uint64_t    bytes = 0;       ///< Nutzbytes EINES Abbilds
+    bool        img = false;     ///< als `.img`/`.cqm` darstellbar
+    bool        hfe = false;     ///< als `.hfe` darstellbar (`.dmk` geht immer)
+};
+
+/// @brief Wie eine `.tar`-Datei in eine tar-Diskette/einen tar-Satz kommt (Entwurf 37, Festlegung 5).
+enum class TarDateiWeg { AlsDatei, AlsContainer };
+
+/**
+ * @struct TarDateiUrteil
+ * @brief Was moeglich ist, wenn eine `.tar`-Datei auf das aktuelle tar-Volume gezogen wird.
+ *
+ * Immer moeglich ist @ref als_datei (die Datei wird ein Eintrag im Archiv).  @ref als_container
+ * ("ist ein fertiger tar-Container": ihr Inhalt IST das Archiv) nur bei LEEREM Archiv.  Ein
+ * Container groesser als eine Diskette wird ein Satz (@ref wird_satz).
+ */
+struct TarDateiUrteil {
+    bool        ok = false;            ///< false: @ref fehler sagt warum (nichts moeglich)
+    std::string fehler;
+    bool        ziel_leer = false;     ///< das Archiv ist leer
+    bool        als_datei = false;     ///< Weg 1 moeglich
+    bool        als_container = false; ///< Weg 2 moeglich
+    std::string container_grund;       ///< warum Weg 2 nicht geht (leer, wenn er geht)
+    std::string warnung;               ///< kein reines V7-tar u. a. (nur bei @ref als_container)
+    uint64_t    groesse = 0;           ///< Dateigroesse
+    uint64_t    kapazitaet = 0;        ///< Nutzbytes EINES Abbilds
+    int         abbilder = 0;          ///< Abbilder, die der Container braucht (nur bei @ref als_container)
+    bool        wird_satz = false;     ///< der Container sprengt die Einzeldiskette -> tar-Satz
+};
+
+/**
  * @struct FileRef
  * @brief Eindeutige Bezeichnung einer Datei ueber die ganze Diskette.
  *
@@ -580,11 +619,17 @@ public:
      * werden Dateien ueber die Diskettengrenze vollstaendig.  Das Ergebnis ist ein
      * schreibgeschuetztes Volume (Medium und Pfad des ersten Abbilds), `list`,
      * `extract`, `extractAll`, `check` gehen wie bei jeder anderen Diskette.
+     *
+     * @p format (optional, Katalogname): die Geometrie VORGEBEN statt zu erkennen.  Noetig bei
+     * `.img`, dessen Format sich nur an der Dateigroesse raten laesst (bei kleinen Formaten
+     * mehrdeutig); bei `.hfe/.dmk/.cqm` steht die Geometrie in der Datei, das Format muss dann
+     * nur dazu passen.
      */
     static std::unique_ptr<DiskVolume> openTarSatz(const std::vector<std::string>& pfade,
                                                    const FormatCatalog& formats,
                                                    const FsCatalog& fs_cat,
-                                                   std::string& err);
+                                                   std::string& err,
+                                                   const std::string& format = {});
 
     // ─── tar-Satz bearbeiten (Entwurf 37, AP T2) ─────────────────────────────
 
@@ -638,6 +683,41 @@ public:
 
     /// @brief Der beim Speichern vorgesehene Basisname des Satzes (leer, wenn keiner).
     const std::string& tarSatzBasis() const { return satz_basis_; }
+
+    // ─── Neu anlegen und .tar ablegen (Entwurf 37, AP T3) ────────────────────
+
+    /// @brief Die Katalogformate, die sich fuer eine neue tar-Diskette / einen tar-Satz eignen
+    ///        (einheitliche Geometrie, mindestens zwei Bloecke), in Katalogreihenfolge.
+    static std::vector<TarFormatInfo> tarFormate(const FormatCatalog& formats);
+
+    /**
+     * @brief Eine neue LEERE tar-Diskette im Katalogformat @p format als Datei @p pfad anlegen.
+     *
+     * Die Datei entsteht sofort (ganz Null, gueltig formatiert) und heisst genau @p pfad (keine
+     * Nummer).  Zurueck kommt das Volume im Satzmodus mit EINEM Abbild: darauf lassen sich
+     * Dateien ablegen und mit @ref tarSatzSpeichern wieder in @p pfad schreiben; waechst der Inhalt
+     * ueber eine Diskette, wird beim Speichern ein nummerierter Satz daraus.  Gegenstueck fuer
+     * 720K bleibt `create(…, "tar720_leer")`.
+     */
+    static std::unique_ptr<DiskVolume> tarDisketteNeu(const std::string& pfad,
+                                                      const std::string& format,
+                                                      const FormatCatalog& formats,
+                                                      const FsCatalog& fs_cat, std::string& err);
+
+    /// @brief Beurteilt eine `.tar`-Datei fuer das Ablegen in dieses Volume, ohne etwas zu aendern.
+    TarDateiUrteil tarDateiBeurteilen(const std::string& tarpfad) const;
+
+    /**
+     * @brief Eine `.tar`-Datei in dieses Volume bringen.
+     *
+     * `AlsDatei`: sie wird ein Eintrag (@p name, sonst ihr Dateiname; @p ersetzen = eine gleichnamige
+     * Datei ueberschreiben).  `AlsContainer`: nur bei leerem Archiv; der Inhalt der Datei WIRD das
+     * Archiv.  Passt er auf die Einzeldiskette, geht er wie `tar-put` direkt hinein (Diskette danach
+     * wie bei tar-put schreibgeschuetzt); sonst wird das Volume ein tar-Satz und der Strom steht im
+     * Speicher bis @ref tarSatzSpeichern.  Warnungen (kein V7-tar) siehe @ref lastTarWarnung.
+     */
+    bool tarDateiAblegen(const std::string& tarpfad, TarDateiWeg weg,
+                         const std::string& name = "", bool ersetzen = false);
 
     /// @brief Laesst sich dieses Volume direkt auf eine PHYSISCHE Diskette schreiben?  Leer = ja;
     ///        sonst die Begruendung (ein tar-Satz hat keine einzelne Diskette; Weg: speichern,
@@ -933,6 +1013,7 @@ private:
     bool fail(const std::string& why) const { last_error_ = why; return false; }
     bool tar_satz_ = false;                 ///< aus @ref openTarSatz: ein verketteter Strom
     std::shared_ptr<TarSatzSpeicher> satz_;   ///< der Strom im Satzmodus (geteilt mit dem TarFileSystem)
+    bool         satz_einzelname_ = false;  ///< ein einzelnes Abbild behaelt den Namen OHNE Nummer (tarDisketteNeu)
     std::string  satz_basis_;               ///< Basisname fuer das Speichern (mit Endung)
     uint64_t     satz_rev_gespeichert_ = 0; ///< Revision des Stroms beim Oeffnen/letzten Speichern
     std::set<std::string> satz_gesichert_;  ///< Pfade, deren `~`-Sicherung in dieser Sitzung schon liegt

@@ -21,7 +21,9 @@
  * k1520disktool tar-export <abbild> <ziel.tar>          # den tar-Strom einer Diskette als .tar
  * k1520disktool tar-put <abbild> <quelle.tar>           # .tar in eine LEERE tar-Diskette
  * k1520disktool tar-satz-save <abbild…> [-o basis] [--put/--rm/--mkdir/--attr …]   # Satz bearbeiten, auf N Abbilder speichern
- * k1520disktool tar-satz-neu --format <name> <basis> [--put/--rm/--mkdir/--attr …] # leeren Satz anlegen
+ * k1520disktool tar-satz-neu --format <name> <basis> [--put/--rm/--mkdir/--attr/--tar-container …] # leeren Satz anlegen
+ * k1520disktool tar-formate                              # Katalogformate fuer neue tar-Disketten/Saetze
+ * k1520disktool create <abbild> --fs tar720_leer --format <name>   # leere tar-Diskette im GEWAEHLTEN Format
  * k1520disktool formats
  * ```
  *
@@ -186,7 +188,13 @@ void gebrauch() {
         "                                           Alte hoehere Nummern werden NIE geloescht (Hinweis);\n"
         "                                           ueberschriebene Abbilder einmal als `<name>~` gesichert\n"
         "  tar-satz-neu --format <katalogformat> <basis.ext> [Schritte wie oben]\n"
-        "                                           leeren Satz anlegen, fuellen, speichern\n"
+        "                                           leeren Satz anlegen, fuellen, speichern;\n"
+        "                                           `--tar-container X.tar` macht eine fertige .tar zum Archiv\n"
+        "                                           (nur bei leerem Archiv; ueber Diskettengroesse: mehrere Abbilder)\n"
+        "  tar-formate                              Katalogformate fuer neue tar-Disketten/Saetze (--format)\n"
+        "  create <abbild> --fs tar720_leer --format <katalogformat>\n"
+        "                                           leere tar-Diskette im GEWAEHLTEN Format (`tar-formate`);\n"
+        "                                           tar-satz/-save: --format gibt die Geometrie eines .img vor\n"
         "  formats                                  bekannte Dateisysteme auflisten\n\n"
         "P8000-Plattenabbild (WEGA, PAR in Zylinder 0): ls/info/check/get/put/rm/mkdir/attr;\n"
         "  Namen mit Partition vorn (md0 = /usr, md2 = /, md3 = /tmp, md4 = /z):\n"
@@ -280,7 +288,7 @@ bool zerlege(int argc, char** argv, int ab, Optionen& o, std::string& err) {
         else if (a == "--no-backup") o.nobackup = true;
         else if (a == "--format")  { if (!wert("--format")) return false; o.format = argv[++i]; }
         else if (a == "-o")        { if (!wert("-o"))       return false; o.ausgabe = argv[++i]; }
-        else if (a == "--put" || a == "--rm" || a == "--mkdir" || a == "--attr") {
+        else if (a == "--put" || a == "--rm" || a == "--mkdir" || a == "--attr" || a == "--tar-container") {
             if (!wert(a.c_str())) return false;
             o.satz_ops.emplace_back(a.substr(2), argv[++i]);
         }
@@ -525,7 +533,7 @@ int cmd_tar_satz(const Optionen& o) {
     if (o.rest.size() < 2) { std::cerr << "Fehler: kein Abbild angegeben\n"; return kFehler; }
     const std::vector<std::string> pfade(o.rest.begin() + 1, o.rest.end());
     std::string err;
-    auto v = DiskVolume::openTarSatz(pfade, formate(), dateisysteme(), err);
+    auto v = DiskVolume::openTarSatz(pfade, formate(), dateisysteme(), err, o.format);
     if (!v) { std::cerr << "Fehler: " << err << "\n"; return kNichtErkannt; }
 
     const std::string bericht = v->checkReport().alsText();
@@ -613,6 +621,14 @@ int satz_bearbeiten(const Optionen& o, DiskVolume& v, const std::string& basis) 
                 }
                 std::cout << quelle << " → " << v.lastInsertedName() << "\n";
             }
+        } else if (art == "tar-container") {
+            // Eine fertige .tar wird das Archiv (nur bei leerem Archiv; zu gross fuer eine Diskette: Satz).
+            const TarDateiUrteil u = v.tarDateiBeurteilen(arg);
+            if (!u.ok) { std::cerr << "Fehler: " << u.fehler << "\n"; return kFehler; }
+            if (!u.als_container) { std::cerr << "Fehler: " << u.container_grund << "\n"; return kFehler; }
+            if (!v.tarDateiAblegen(arg, TarDateiWeg::AlsContainer)) { std::cerr << "Fehler: " << v.lastError() << "\n"; return kFehler; }
+            if (!v.lastTarWarnung().empty()) std::cerr << "Warnung: " << v.lastTarWarnung() << "\n";
+            std::cout << arg << " → Archiv (" << u.abbilder << " Abbild(er))\n";
         } else if (art == "rm") {
             if (!v.erase(FileRef::parse(arg, 0))) { std::cerr << "Fehler: " << v.lastError() << "\n"; return kFehler; }
             std::cout << "geloescht: " << arg << "\n";
@@ -655,10 +671,18 @@ int cmd_tar_satz_save(const Optionen& o) {
     if (o.rest.size() < 2) { std::cerr << "Fehler: tar-satz-save <abbild…> [-o basis] [--put …]\n"; return kFehler; }
     const std::vector<std::string> pfade(o.rest.begin() + 1, o.rest.end());
     std::string err;
-    auto v = DiskVolume::openTarSatz(pfade, formate(), dateisysteme(), err);
+    auto v = DiskVolume::openTarSatz(pfade, formate(), dateisysteme(), err, o.format);
     if (!v) { std::cerr << "Fehler: " << err << "\n"; return kNichtErkannt; }
     // Ohne -o geht der Satz unter seinen eigenen Namen zurueck (Ziffern am Ende des ersten Abbilds entfallen).
     return satz_bearbeiten(o, *v, o.ausgabe);
+}
+
+/// @brief `tar-formate` — die Katalogformate, die sich fuer eine neue tar-Diskette / einen Satz eignen.
+int cmd_tar_formate(const Optionen&) {
+    for (const TarFormatInfo& f : DiskVolume::tarFormate(formate()))
+        std::printf("%-24s %9llu B  %s%s  %s\n", f.name.c_str(), static_cast<unsigned long long>(f.bytes),
+                    f.img ? "img " : "    ", f.hfe ? "hfe" : "   ", f.description.c_str());
+    return kOk;
 }
 
 int cmd_tar_satz_neu(const Optionen& o) {
@@ -1410,6 +1434,18 @@ int cmd_create(const Optionen& o) {
                    return kFehler; }
         if (!pruefePrgWunsch(o, pr->type, o.boot)) return kFehler;
     }
+    if (!o.format.empty()) {
+        // `--format` nur fuer die leere tar-Diskette: GEWAEHLTES Katalogformat statt der 720K des Profils.
+        const FsProfile* pr = dateisysteme().find(o.fs);
+        if (!pr || pr->type != FsType::Tar || !pr->leer) {
+            std::cerr << "Fehler: --format gilt beim Anlegen nur mit --fs tar720_leer (leere tar-Diskette)\n";
+            return kFehler;
+        }
+        auto t = DiskVolume::tarDisketteNeu(o.rest[1], o.format, formate(), dateisysteme(), err);
+        if (!t) { std::cerr << "Fehler: " << err << "\n"; return kFehler; }
+        std::cout << "angelegt: " << o.rest[1] << " (leere tar-Diskette, " << o.format << ")\n";
+        return kOk;
+    }
     auto v = DiskVolume::create(o.rest[1], o.fs, o.label, formate(), dateisysteme(), err, o.boot);
     if (!v) { std::cerr << "Fehler: " << err << "\n"; return kFehler; }
 
@@ -2050,7 +2086,7 @@ int main(int argc, char** argv) {
 
     // P8000-Plattenabbild (PAR in Z0/K0/S1): eigener Weg, mehrere WEGA-Partitionen
     if (o.rest.size() >= 2 && befehl != "create" && befehl != "formats" && befehl != "tar-satz"
-        && befehl != "tar-satz-save" && befehl != "tar-satz-neu" && WegaPlatte::istPlatte(o.rest[1]))
+        && befehl != "tar-satz-save" && befehl != "tar-satz-neu" && befehl != "tar-formate" && WegaPlatte::istPlatte(o.rest[1]))
         return platte(befehl, o);
 
     if (befehl == "ls")      return cmd_ls(o);
@@ -2069,6 +2105,7 @@ int main(int argc, char** argv) {
     if (befehl == "tar-put")  return cmd_tar_put(o);
     if (befehl == "tar-satz-save") return cmd_tar_satz_save(o);
     if (befehl == "tar-satz-neu")  return cmd_tar_satz_neu(o);
+    if (befehl == "tar-formate")   return cmd_tar_formate(o);
     if (befehl == "save-as") return cmd_save_as(o);
     if (befehl == "measure") return cmd_measure(o);
     if (befehl == "check")   return cmd_check(o);

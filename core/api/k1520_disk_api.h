@@ -295,6 +295,65 @@ K1520_API const char* k1520d_tar_warning(K1520Disk h);
 ///        die Diskette `tar720` (nur lesbar); ein zweites Schreiben wird abgelehnt.
 K1520_API bool k1520d_tar_put(K1520Disk h, const char* path);
 
+/* ─── tar-Saetze bearbeiten, Neu-Anlegen, .tar ablegen (Entwurf 37, AP T1-T3; additiv) ───
+ * Regeln: DiskVolume::tarSatz*, tarFormate, tarDisketteNeu, tarDateiBeurteilen/-Ablegen
+ * (core/filesystem/disk_volume.h).  Listen ueber mehrere Namen sind durch '\n' getrennt. */
+
+/// @brief Wie @ref k1520d_open_tar_satz, aber mit VORGEGEBENEM Katalogformat @p format ("" = erkennen).
+///        Noetig fuer `.img`-Saetze (die Dateigroesse ist bei kleinen Formaten mehrdeutig).
+K1520_API K1520Disk k1520d_open_tar_satz_format(const char* paths, const char* format);
+/// @brief Die Katalogformate, die fuer eine neue tar-Diskette / einen Satz taugen (einheitliche
+///        Geometrie): Anzahl; ueber @ref k1520d_tar_format_name usw. nach Index.
+K1520_API int         k1520d_tar_format_count(void);
+K1520_API const char* k1520d_tar_format_name(int i);
+K1520_API const char* k1520d_tar_format_description(int i);
+/// @brief Nutzbytes EINES Abbilds in diesem Format.
+K1520_API uint64_t    k1520d_tar_format_bytes(int i);
+/// @brief Darstellbare Container als Bitmaske: 1 = .img/.cqm, 2 = .hfe (.dmk geht immer).
+K1520_API int         k1520d_tar_format_container(int i);
+/// @brief Leeren tar-Satz im Format @p format anlegen (nichts auf der Platte; @p basename mit
+///        Endung .img|.hfe|.dmk|.cqm bestimmt Container und Namen beim Speichern).  NULL = Fehler
+///        (@ref k1520d_last_open_error).
+K1520_API K1520Disk k1520d_tar_satz_neu(const char* format, const char* basename);
+/// @brief Neue LEERE tar-Diskette im Format @p format als Datei @p path anlegen (sofort geschrieben,
+///        genau dieser Name) und im Satzmodus mit einem Abbild oeffnen.
+K1520_API K1520Disk k1520d_tar_disk_neu(const char* path, const char* format);
+/// @brief Ist das Volume im Satzmodus?
+K1520_API bool k1520d_tar_satz(K1520Disk h);
+/// @brief Eine tar-Einzeldiskette in den Satzmodus ueberfuehren (@p basename "" = aus dem Pfad).
+K1520_API bool k1520d_tar_zu_satz(K1520Disk h, const char* basename);
+/// @brief Der beim Speichern vorgesehene Basisname des Satzes ("" = keiner).
+K1520_API const char* k1520d_tar_satz_basis(K1520Disk h);
+/// @brief Speichern planen (schreibt nichts): Anzahl der Abbilder, -1 = Fehler (k1520d_last_error).
+///        Danach liefern die Getter den Plan; @p basename "" = Basisname des Satzes.
+K1520_API int         k1520d_tar_satz_plan(K1520Disk h, const char* basename);
+K1520_API uint64_t    k1520d_tar_plan_strom(K1520Disk h);       ///< Laenge des Stroms in Byte
+K1520_API uint64_t    k1520d_tar_plan_kapazitaet(K1520Disk h);  ///< Nutzbytes eines Abbilds
+K1520_API bool        k1520d_tar_plan_einzel(K1520Disk h);      ///< passt auf EIN Abbild
+K1520_API const char* k1520d_tar_plan_namen(K1520Disk h);       ///< die Abbilddateien
+K1520_API const char* k1520d_tar_plan_ueberschreibt(K1520Disk h); ///< davon schon vorhanden
+K1520_API const char* k1520d_tar_plan_altlasten(K1520Disk h);   ///< liegenbleibende hoehere Nummern
+/// @brief Den Strom auf Abbilder verteilen und schreiben.  Hinweise (alte Nummern) und die
+///        geschriebenen Dateien danach ueber @ref k1520d_tar_satz_hinweise / @ref k1520d_tar_satz_geschrieben.
+K1520_API bool        k1520d_tar_satz_speichern(K1520Disk h, const char* basename);
+K1520_API const char* k1520d_tar_satz_hinweise(K1520Disk h);
+K1520_API const char* k1520d_tar_satz_geschrieben(K1520Disk h);
+/// @brief Laesst sich das Volume direkt auf eine physische Diskette schreiben?  "" = ja, sonst die Begruendung.
+K1520_API const char* k1520d_physisch_schreiben_grund(K1520Disk h);
+
+/// @brief `.tar`-Datei fuer das Ablegen beurteilen.  -1 = nichts moeglich (@ref k1520d_last_error),
+///        sonst Bitmaske: 1 = als Datei, 2 = als fertiger Container, 4 = Archiv ist leer,
+///        8 = der Container sprengt die Einzeldiskette (wird ein Satz).  Warnung (kein V7-tar):
+///        @ref k1520d_tar_warning; Grund, warum "Container" fehlt: @ref k1520d_tar_datei_grund.
+K1520_API int         k1520d_tar_datei_pruefen(K1520Disk h, const char* path);
+K1520_API const char* k1520d_tar_datei_grund(K1520Disk h);
+/// @brief Abbilder, die der Container braucht (nach @ref k1520d_tar_datei_pruefen mit Bit 2).
+K1520_API int         k1520d_tar_datei_abbilder(K1520Disk h);
+/// @brief `.tar` ablegen: @p weg 0 = als Datei (unter @p name, "" = Dateiname; @p ersetzen = gleichnamige
+///        ueberschreiben), 1 = als fertiger Container (nur bei leerem Archiv).
+K1520_API bool        k1520d_tar_datei_ablegen(K1520Disk h, const char* path, int weg,
+                                               const char* name, bool ersetzen);
+
 /// @brief false = mehrere gleich gute Kandidaten (Alternativen in @ref k1520d_detection_alternatives).
 K1520_API bool        k1520d_detection_unambiguous(K1520Disk h);
 K1520_API const char* k1520d_detection_alternatives(K1520Disk h);

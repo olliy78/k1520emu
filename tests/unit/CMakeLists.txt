@@ -247,6 +247,10 @@ k1520_add_test(tar_write     SRC filesystem/test_tar_write.cpp
 k1520_add_test(tar_satz      SRC filesystem/test_tar_satz.cpp
                              LIBS k1520_fs LABELS "${_lbl}"
                              DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
+# tar neu anlegen mit Format, .tar als Datei vs. Container (Entwurf 37 T3)
+k1520_add_test(tar_neu       SRC filesystem/test_tar_neu.cpp
+                             LIBS k1520_fs LABELS "${_lbl}"
+                             DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
 k1520_add_test(disk_volume   SRC filesystem/test_disk_volume.cpp
                              LIBS k1520_fs LABELS "${_lbl}"
                              DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
