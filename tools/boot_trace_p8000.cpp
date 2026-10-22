@@ -69,7 +69,8 @@ bool promptZeile(const P8000Machine& m, const std::string& bild) {
 }  // namespace
 
 int bootTraceP8000(const K8915TraceOpts& o, const prnlst::Listing& prn, bool karte16,
-                   const std::string& wdc, const std::string& hd, bool originalTerminal)
+                   const std::string& wdc, const std::string& hd, bool originalTerminal,
+                   const std::string& rtc)
 {
     using T = k1520::p8000::Terminal;
     P8000Machine::Config cfg;
@@ -84,6 +85,12 @@ int bootTraceP8000(const K8915TraceOpts& o, const prnlst::Listing& prn, bool kar
         else if (w == "3.4.05") cfg.wdc = W::V3_4_05;
         else { fprintf(stderr, "ERROR: --wdc %s unbekannt (4.2|4.0.05|3.4.05)\n", w.c_str()); return 2; }
         cfg.platte = hd;
+    }
+    if (!rtc.empty() && rtc != "aus") {
+        if (!karte16) { fprintf(stderr, "ERROR: --rtc nur mit --machine p8000-16\n"); return 2; }
+        if      (rtc == "rtc72421") cfg.rtc = P8000Machine::Config::Rtc::Rtc72421;
+        else if (rtc == "u130x")    cfg.rtc = P8000Machine::Config::Rtc::U130X;
+        else { fprintf(stderr, "ERROR: --rtc %s unbekannt (aus|u130x|rtc72421)\n", rtc.c_str()); return 2; }
     }
     std::unique_ptr<P8000Machine> mp;
     try { mp = std::make_unique<P8000Machine>(cfg); }

@@ -410,6 +410,9 @@ class MachineStatus(QWidget):
         # Leitung der P8000-Terminaleinheit zum Rechner (sonst ausgeblendet).
         self.verbindung = SeriellFeld()
         self._lay.addWidget(self.verbindung)
+        # Uhr der P8000-Uhrenkarte (Entwurf 38 R3): nur mit gesteckter Karte und Rechnerbetrieb.
+        self.rtc = SeriellFeld()
+        self._lay.addWidget(self.rtc)
         self._fest = self._lay.count()
 
         # A5120.16-Leuchten (V1/V2) + Modus — feste Stelle zwischen Takt und
@@ -480,6 +483,12 @@ class MachineStatus(QWidget):
             if faktor > 0.0 and gemessen < faktor * 0.9:
                 tipp.append("Der Wirtsrechner kommt nicht mit.")
         self.takt.setToolTip("\n".join(tipp))
+
+    # ── Uhrenkarte ───────────────────────────────────────────────────────────
+
+    def set_rtc(self, text: str, tipp: str = "") -> None:
+        """Das Feld „RTC: TT.MM.JJJJ hh:mm“ setzen; leerer Text (oder kein Rechner) blendet es aus."""
+        self.rtc.zeige(text if self._rechner_sichtbar else "", tipp)
 
     # ── Serielle Schnittstellen ──────────────────────────────────────────────
 
@@ -555,6 +564,8 @@ class MachineStatus(QWidget):
         self._rechner_sichtbar = bool(sichtbar)
         for w in self._laufwerk_widgets:
             w.setVisible(self._rechner_sichtbar)
+        if not self._rechner_sichtbar:
+            self.rtc.setVisible(False)
         if self.frontplatte is not None:
             self.frontplatte.setVisible(self._rechner_sichtbar)
 

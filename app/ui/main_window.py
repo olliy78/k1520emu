@@ -62,6 +62,7 @@ from app import profil as profile
 from app import takt
 from app.emulationstakt import Emulationstakt
 from app import raf
+from app import rtc
 from app import k3521
 
 
@@ -238,6 +239,7 @@ class MainWindow(QMainWindow):
         self.settings_widget.hardwareChanged.connect(self._on_hardware_selected)
         self.settings_widget.bildschirmSchalterChanged.connect(self._on_bildschirm_schalter)
         self.settings_widget.rafChanged.connect(self._on_raf_selected)
+        self.settings_widget.rtcStellenGewuenscht.connect(self._on_rtc_stellen)
         self.settings_widget.rafStandbyChanged.connect(self._on_raf_standby_changed)
         self.settings_widget.ptapeChanged.connect(self._on_ptape_selected)
         self.settings_widget.mitschriftChanged.connect(self._on_mitschrift_selected)
@@ -592,6 +594,7 @@ class MainWindow(QMainWindow):
         if a is not None:
             a.setVisible(not hat)
         self.status_widget.set_rechner_sichtbar(hat)
+        self._update_rtc()
         if not lw:
             self.drives_dock.hide()
         elif not self._rechner_war_da:
@@ -1689,6 +1692,9 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Kaltstart — die Maschine läuft an.", 4000)
         else:
             self.run_timer.stop()
+            # Die Uhrenkarte hat ihre Batterie: Stand + Aus-Zeit in die Batteriedatei, damit die Anzeige
+            # „Startzeit" und das naechste Einschalten dieselbe Startregel des Kerns anwenden.
+            self._rtc_netz_aus()
             self.screen_widget.set_powered(False)
             # Betriebsanzeige der Tastatur aus, Funktionsanzeigen mit ihr.
             self.keyboard_widget.set_powered(False)
@@ -1776,6 +1782,7 @@ class MainWindow(QMainWindow):
         self._update_drive_status()
         self._update_em_status()
         self._update_verbindung()
+        self._update_rtc()
         # Stand von Leser/Stanzer im selben Takt (kein eigener Zeitgeber).
         if self.lochstreifen_dock.isVisible():
             self.lochstreifen_widget.aktualisieren()
@@ -1868,6 +1875,98 @@ class MainWindow(QMainWindow):
         except Exception:
             latch = 0xFF
         platte.zeige(latch, laeuft=an and self.run_timer.isActive(), eingeschaltet=an)
+
+    # ── Uhrenkarte (P8000, Entwurf 38 R3) ────────────────────────────────────
+
+    def _rtc_gesteckt(self) -> bool:
+        """Traegt die Maschine eine Uhrenkarte?  Profil mit RTC, Modell mit Rechner UND 16-Bit-Teil
+        (sonst wirkt die gemerkte Wahl nicht), Typ ungleich ``keine``."""
+        return bool(self.profil.rtc_wahl
+                    and self.profil.modell_hat_rechner(self._model)
+                    and self.profil.hardware_wirkt(rtc.SCHLUESSEL_TYP, self._model, self._hardware)
+                    and self._hardware.get(rtc.SCHLUESSEL_TYP, rtc.KEINE) != rtc.KEINE)
+
+    def _rtc_netz_aus(self):
+        """Netz-Aus an die Uhrenkarte der Maschine melden (ohne Karte folgenlos)."""
+        try:
+            with kern_sperre():
+                self.emulator.rtc_netz_aus()
+        except Exception:
+            pass
+
+    def _rtc_versatz(self) -> int:
+        return rtc.versatz_jahre(self._hardware.get(rtc.SCHLUESSEL_VERSATZ))
+
+    def _rtc_zeit(self) -> int:
+        """Uhrzeit der Karte, gastsichtig (mit Versatz); -1 = keine Karte.
+
+        Eingeschaltet: der Stand der laufenden Karte.  Ausgeschaltet: die Zeit, mit der die Maschine
+        jetzt starten wuerde -- die Startregel rechnet der Kern (``k1520_rtc_startzeit``).
+        """
+        if not self._rtc_gesteckt():
+            return -1
+        try:
+            if self._emu_started and self.act_power.isChecked():
+                with kern_sperre():
+                    return int(self.emulator.rtc_zeit())
+            return int(K1520Emulator.rtc_startzeit(
+                rtc.zustand_pfad(self.profil.programm), self._rtc_versatz(), rtc.UTC))
+        except Exception:
+            return -1
+
+    def _update_rtc(self):
+        """Anzeige „Uhrzeit des Gastsystems“ (Einstellungen) und Feld „RTC:“ (Statuszeile).
+
+        Wird mit dem Sekundentakt gerufen; gesetzt wird nur bei geaendertem Text, die Anzeige
+        wechselt also einmal je Minute Maschinenzeit.
+        """
+        if getattr(self, "status_widget", None) is None or getattr(self, "settings_widget", None) is None:
+            return
+        t = self._rtc_zeit()
+        text = rtc.anzeige(rtc.ortszeit(t, self._rtc_versatz()))
+        tipp = ("Die Zeit, die das Gastsystem von der Uhrenkarte liest (mit Zeitversatz), in Ortszeit "
+                "umgerechnet, wie WEGA sie mit date zeigt.  Die Karte selbst läuft in UTC."
+                if t >= 0 else "Keine Uhrenkarte gesteckt.")
+        if t >= 0 and not (self._emu_started and self.act_power.isChecked()):
+            tipp = "Maschine aus: die Zeit, mit der sie jetzt starten würde."
+        self.settings_widget.set_rtc_anzeige(text, tipp)
+        self.status_widget.set_rtc(f"RTC: {text}" if t >= 0 else "", tipp)
+
+    def _on_rtc_stellen(self):
+        """Schaltflaeche „Uhr nach Wirtszeit stellen“.
+
+        Gestellt wird auf die jetzige Zeit des Wirts in UTC (``rtc_stellen``; der Versatz wirkt wie beim
+        Lesen).  Springt die Gastzeit dabei zurueck, vorher fragen: Dateien, die der Gast schon mit
+        der spaeteren Zeit gestempelt hat, erscheinen sonst „aus der Zukunft“ (``make``).
+        """
+        if not self._rtc_gesteckt():
+            return
+        jetzt = rtc.wirtszeit_kodiert()
+        alt = self._rtc_zeit()
+        neu = rtc.um_jahre(jetzt, self._rtc_versatz())
+        if alt >= 0 and neu < alt - 60:          # unter einer Minute Unterschied ist kein Ruecksprung
+            antwort = QMessageBox.question(
+                self, "Uhr stellen",
+                f"Die Uhr des Gastsystems geht von {rtc.anzeige(rtc.ortszeit(alt, self._rtc_versatz()))} auf {rtc.anzeige(rtc.ortszeit(neu, self._rtc_versatz()))} zurück.\n\n"
+                "Dateien, die das Gastsystem schon mit der späteren Zeit angelegt hat, tragen dann "
+                "einen Zeitstempel aus der Zukunft; Werkzeuge wie make halten sie für neuer als alles, "
+                "was jetzt entsteht.\n\nTrotzdem zurückstellen?",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if antwort != QMessageBox.Yes:
+                return
+        zustand = rtc.zustand_pfad(self.profil.programm)
+        try:
+            # Die Karte der Maschine (auch ausgeschaltet) stellen und die Batteriedatei schreiben
+            # lassen; eine nur in die Datei gestellte Uhr schriebe die Karte beim Beenden zurueck.
+            with kern_sperre():
+                ok = bool(self.emulator.rtc_stellen(jetzt))
+            if not ok:
+                ok = bool(K1520Emulator.rtc_stellen_datei(zustand, jetzt))
+        except Exception:
+            ok = False
+        self.statusBar().showMessage(
+            "Uhr nach Wirtszeit gestellt." if ok else "Die Uhr konnte nicht gestellt werden.", 4000)
+        self._update_rtc()
 
     def _disk_path(self, drive: int) -> str:
         """Pfad der eingelegten Diskette laut Kern (leer = nichts eingelegt)."""
@@ -2309,6 +2408,11 @@ class MainWindow(QMainWindow):
         surviving = [m for m in self.drives_widget.get_mounts()
                      if 0 <= int(m.get("drive", -1)) < dt.NUM_SLOTS
                      and dt.is_present(types[int(m["drive"])])]
+
+        # Die alte Uhrenkarte schreibt ihren Stand JETZT in die Batteriedatei -- die neue Maschine liest
+        # sie beim Anlegen.  (Zerstoert wird die alte erst danach; der Kern ueberschreibt eine inzwischen
+        # fortgeschriebene Datei ohnehin nicht, R3b.)
+        self._rtc_netz_aus()
 
         # Recreate the machine with the new drive bay / model.
         try:

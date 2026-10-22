@@ -59,6 +59,12 @@ general:
   mon16: '3.1'
   dram: 4x256K
   wdc: '4.2'
+  # Uhrenkarte (16-Bit-Teil; Einstellungen ▸ Allgemein ▸ RTC, Kaltstart nötig): rtc = keine |
+  # u130x (Original, vom WEGA-Kern erkannt) | rtc72421 (Nachbau, braucht den Treiber sa.timer);
+  # rtc_versatz = Jahre, um die die Uhr dem Gast zurückgeht: 0 | -28 (gleicher Wochentag) | -40.
+  # Bei „nur 8-Bit“ wirkt die Wahl nicht, sie bleibt aber gemerkt.
+  rtc: u130x
+  rtc_versatz: '-40'
   # Parametersatz der Platte: aus (Vorgabe) | ergaenzen (nur für das WEGA-3.1-Abbild des AVR-Emulators)
   platte_par: aus
 

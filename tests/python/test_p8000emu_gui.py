@@ -99,9 +99,12 @@ def test_vorgaben_des_vollgeraets(qapp, umgebung):
     p = profil.profil("p8000")
     assert p.standard_modell() == "p8000-ot"
     kern = p.kern_parameter("p8000-ot", {})["p8000"]
+    from app import rtc
+    # Uhrenkarte: Auslieferungsvorgabe U130x / -40 Jahre (Entwurf 38 R3)
     assert kern == {"karte16": "1", "wdc": "4.2", "terminal": "original", "index8": "3",
                     "index16": "4", "mon16": "3.1", "dram": "4x256K", "mon8": "3.1",
-                    "plattepar": "aus"}
+                    "plattepar": "aus", "rtc": "u130x", "rtc_jahresversatz": -40, "rtc_utc": 1,
+                    "rtc_zustand": rtc.zustand_pfad("p8000emu")}
     # ohne Winchester: keine wdc-Zeile (der Kern lehnt wdc ohne … nicht ab, aber es soll aus sein)
     k16 = p.kern_parameter("p8000-16-ot", {})["p8000"]
     assert k16["karte16"] == "1" and "wdc" not in k16
@@ -117,7 +120,8 @@ def test_jede_hardwarewahl_baut_eine_maschine(qapp, umgebung):
     from app import profil
     from app.core_binding.k1520 import K1520Emulator
     p = profil.profil("p8000")
-    assert [h[0] for h in p.hardware] == ["index", "mon8", "mon16", "dram", "wdc", "platte_par"]
+    assert [h[0] for h in p.hardware] == ["index", "mon8", "mon16", "dram", "wdc", "rtc", "rtc_versatz",
+                                         "platte_par"]
     for schluessel, _b, _t, werte, modelle in p.hardware:
         for modell in (modelle or ("p8000-ot", "p8000-16-ot", "p8000-8-ot")):
             for wert, _anzeige in werte:
@@ -134,7 +138,8 @@ def test_hardwarewahl_normalisiert_gross_klein_und_fehlendes(qapp, umgebung):
     from app import profil
     p = profil.profil("p8000")
     assert p.hardware_normalisieren({}) == {"index": "34", "mon8": "3.1", "mon16": "3.1",
-                                            "dram": "4x256K", "wdc": "4.2", "platte_par": "aus"}
+                                            "dram": "4x256K", "wdc": "4.2", "rtc": "u130x",
+                                            "rtc_versatz": "-40", "platte_par": "aus"}
     n = p.hardware_normalisieren({"dram": "1m@0+1m@1", "mon8": 3.0, "wdc": "9.9", "index": "11"})
     assert n["dram"] == "2x1M" and n["mon8"] == "3.0" and n["wdc"] == "4.2"
     assert n["index"] == "11"
@@ -182,7 +187,8 @@ def test_rom_fassung_und_modell_in_den_einstellungen(qapp, umgebung):
     w = _fenster(qapp)
     try:
         sw = w.settings_widget
-        assert set(sw.hardware_combos) == {"index", "mon8", "mon16", "dram", "wdc", "platte_par"}
+        assert set(sw.hardware_combos) == {"index", "mon8", "mon16", "dram", "wdc", "platte_par",
+                                           "rtc", "rtc_versatz"}
         # Rechnerausstattung (3) + Betriebsart (2); die Kern-Terminal-Modelle gibt es nicht mehr
         assert sw.model_combo.count() == 3 and not sw.model_combo.isHidden()
         assert [sw.betriebsart_combo.itemData(i) for i in range(2)] == ["computer", "terminal"]

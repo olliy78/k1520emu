@@ -163,6 +163,7 @@ kopp log
 kopp clear
 term
 wdc
+rtc
 bsegt on
 bsegt off
 segt

@@ -466,6 +466,17 @@ _lib.k1520_term_matrix_scancode.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_
 _lib.k1520_term_matrix_scancode.restype = ctypes.c_uint32
 _lib.k1520_term_leds.argtypes = [K1520Handle, ctypes.c_int]
 _lib.k1520_term_leds.restype = ctypes.c_int
+# Uhrenkarte des P8000 (Entwurf 38, AP R2b)
+_lib.k1520_rtc_zeit.argtypes = [K1520Handle]
+_lib.k1520_rtc_zeit.restype = ctypes.c_int64
+_lib.k1520_rtc_stellen.argtypes = [K1520Handle, ctypes.c_int64]
+_lib.k1520_rtc_stellen.restype = ctypes.c_int
+_lib.k1520_rtc_netz_aus.argtypes = [K1520Handle]
+_lib.k1520_rtc_netz_aus.restype = ctypes.c_int
+_lib.k1520_rtc_startzeit.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_int]
+_lib.k1520_rtc_startzeit.restype = ctypes.c_int64
+_lib.k1520_rtc_stellen_datei.argtypes = [ctypes.c_char_p, ctypes.c_int64]
+_lib.k1520_rtc_stellen_datei.restype = ctypes.c_int
 _lib.k1520_state_save.argtypes = [K1520Handle, ctypes.c_char_p]
 _lib.k1520_state_save.restype = ctypes.c_bool
 _lib.k1520_state_load.argtypes = [K1520Handle, ctypes.c_char_p]
@@ -1191,7 +1202,10 @@ class K1520Emulator:
                 Nicht zusammen mit ``em``.
             p8000: nur ``machine="p8000"`` — Konfiguration als Wörterbuch (Schlüssel wie im
                 Konfigurationstext von ``k1520_create_p8000``, z. B. ``{"mon8": "3.1"}``,
-                ``{"terminal": "original"}`` = Originalterminal Typ 2 an tty1);
+                ``{"terminal": "original"}`` = Originalterminal Typ 2 an tty1;
+                Uhrenkarte nur mit ``karte16``: ``{"rtc": "rtc72421"`` (Nachbau) oder ``"u130x"``
+                (Originalkarte), ``"rtc_jahresversatz": 0,
+                "rtc_utc": 0, "rtc_zustand": "<Batteriedatei>"}``);
                 die Laufwerksnamen aus ``drive_types`` werden als ``lw0``..``lw3`` ergänzt.
                 Bei ``machine="p8000-terminal"`` (Originalterminal ohne Rechner) die Schlüssel
                 von ``k1520_create_p8000_terminal``, z. B. ``{"rolle": "client", "port": 5001}``.
@@ -1871,6 +1885,35 @@ class K1520Emulator:
 
     def state_error(self) -> str:
         return (_lib.k1520_state_error(self._handle) or b"").decode("utf-8", "replace")
+
+    # ─── Uhrenkarte des P8000 (k1520_rtc_*) ──────────────────────────────────
+
+    def rtc_zeit(self) -> int:
+        """Uhr der Uhrenkarte, wie der Gast sie sieht (mit Jahresversatz): Kalenderzeit als
+        Unix-Sekunden kodiert (Wanduhr, als wäre sie UTC; Ort/UTC wie konfiguriert).  Die Uhr
+        zählt in Maschinenzeit.  ``-1`` ohne Uhrenkarte."""
+        return int(_lib.k1520_rtc_zeit(self._handle))
+
+    def rtc_stellen(self, unix_wirt: int) -> bool:
+        """Uhr auf ``unix_wirt`` stellen (Kalenderzeit im Jahr des Wirts, ohne Jahresversatz; der
+        Versatz wirkt wie beim Lesen) und die Batteriedatei schreiben.  ``False`` ohne Karte."""
+        return _lib.k1520_rtc_stellen(self._handle, int(unix_wirt)) == 0
+
+    def rtc_netz_aus(self) -> bool:
+        """Netz-Aus melden: die Uhrenkarte sichert Stand + Wirtszeit, beim nächsten ``power_on`` läuft
+        die Uhr um die Aus-Dauer weiter.  ``False`` ohne Karte."""
+        return _lib.k1520_rtc_netz_aus(self._handle) == 0
+
+    @staticmethod
+    def rtc_startzeit(zustandsdatei: str, jahresversatz: int = 0, utc: bool = False) -> int:
+        """Ohne Maschine: Zeit, mit der eine Uhrenkarte mit dieser Batteriedatei JETZT starten würde
+        (Startregel des Kerns), gastsichtig, wie :meth:`rtc_zeit` kodiert.  Fehlende Datei = Wirtszeit."""
+        return int(_lib.k1520_rtc_startzeit((zustandsdatei or "").encode("utf-8"), int(jahresversatz), int(bool(utc))))
+
+    @staticmethod
+    def rtc_stellen_datei(zustandsdatei: str, unix_wirt: int) -> bool:
+        """Ohne Maschine: Batteriedatei auf ``unix_wirt`` (Jahr des Wirts) stellen."""
+        return _lib.k1520_rtc_stellen_datei((zustandsdatei or "").encode("utf-8"), int(unix_wirt)) == 0
 
     # ─── Winchesterplatten am WDC des P8000 (k1520_hd_*) ─────────────────────
 
