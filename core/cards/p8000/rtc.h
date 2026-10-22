@@ -19,13 +19,33 @@
  *     E (MASK b0, ITRPT/STND b1, t0 b2, t1 b3 — unbenutzt)  F (RESET b0, STOP b1, 24/12 b2, TEST b3)
  * @endcode
  *
- * **Zeitmodell („Batterie"):** Uhr = Wirtszeit + `versatz_` (Sekunden).  Stellt der Gast die Uhr
- * (STOP/RESET setzen, Ziffern schreiben, beide wieder loeschen), wird aus der gestellten Zeit
- * `versatz_ = gestellt − Wirtszeit` und — bei gesetztem `zustand` — in die Batteriedatei
- * geschrieben.  Ohne gestellte Uhr laeuft sie mit der Wirtszeit.  Die Zeitquelle ist
- * injizierbar (Tests); Vorgabe `std::time`.  Anzeige in der Ortszeit des Wirts (`utc = false`)
- * oder UTC.  `jahresversatz` verschiebt NUR die angezeigte Jahreszahl (Rueckfall, falls WEGA 2026
- * nicht mag; ein 29.2. in einem Nicht-Schaltjahr wird 28.2.).
+ * **Zeitmodell (AP R2b, „Batterie" in Maschinenzeit):** Die Uhr zaehlt in **Maschinenzeit** der Karte16
+ * (Takte / `takt_hz`), wie die Kernuhr des Gasts — bei 5facher Emulation also 5 Uhrsekunden je Wirtssekunde;
+ * angehaltene Maschine = Uhr steht.  Grund: WEGA liest die RTC nur beim Booten und zaehlt danach ueber die CTC;
+ * folgte die RTC der Wirtszeit, sprang die Uhr beim naechsten Boot hinter die (vorauseilenden) Dateizeiten zurueck
+ * (`make` haelt Quellen fuer neuer).  Die Uhr darf beim Neustart nie zurueckspringen.
+ *  - Erststart ohne Batteriedatei: Startwert = Wirtszeit (Zeitquelle, injizierbar; Vorgabe `std::time`;
+ *    Ortszeit des Wirts bzw. UTC je `utc`).
+ *  - Batteriedatei (`zustand`, Text, Kopf `K1520-P8000-RTC 2`): `stand=` (Uhrstand als Wandzeit, **ohne**
+ *    Jahresversatz) und `wirt=` (Unix-Sekunden UTC beim Speichern).  Geschrieben: beim Zerstoeren der Karte, beim
+ *    Stellen (Gast, von aussen, Laden eines Zwischenstands) und je 60 s Maschinenzeit (kleine Datei, nie je Befehl).
+ *    Das alte Format 1 (`versatz=`) wird gelesen und wie „Wirtszeit + Versatz" als Stand genommen.
+ *  - **Startregel:** Startwert = max(gespeicherter Stand + (Wirtszeit jetzt − Wirtszeit beim Speichern),
+ *    Wirtszeit jetzt).  Eine vorausgelaufene Uhr holt auf, sobald die Wirtszeit sie ueberholt; negative Abwesenheit
+ *    (Wirtsuhr zurueckgestellt) zaehlt als 0.  Folge: auch eine vom Gast ZURUECKgestellte Uhr gilt nur bis zum
+ *    naechsten Start, sofern sie hinter der Wirtszeit liegt.  Beim Wechsel Ortszeit/UTC oder einer Sommerzeitgrenze in
+ *    der Abwesenheit rechnet die Regel in der Wandzeit des gespeicherten Modus (Abweichung hoechstens die Zonendifferenz,
+ *    die Uhr springt auch dann nicht zurueck).
+ *  - Der Gast stellt die Uhr (STOP/RESET setzen, Ziffern schreiben, beide wieder loeschen): der neue Stand gilt, auch
+ *    rueckwaerts, und wird sofort gespeichert.  `jahresversatz` verschiebt NUR, was der Gast liest/schreibt; gespeichert
+ *    und gerechnet wird unversetzt (ein 29.2. in einem Nicht-Schaltjahr wird 28.2.).
+ *  - Von aussen: `gastZeit()`/`stellen()` und die statischen `startzeit()`/`stellenDatei()` (C-ABI `k1520_rtc_*`).
+ *    Kodierung: Kalenderzeit als Unix-Sekunden (die Wanduhr, als waere sie UTC).  `gastZeit()`/`startzeit()` liefern sie
+ *    **gastsichtig** (mit Jahresversatz), `stellen()`/`stellenDatei()` nehmen sie **im Jahr des Wirts** (unversetzt,
+ *    wie gespeichert); die Karte wendet den Versatz beim Lesen an.
+ *  - Save-State: Uhrstand (Sekunden + Resttakte) im Kartenabschnitt.  Laden stellt den Stand wieder her, wie er war
+ *    (konsistent zur geladenen Kernzeit), und die Batteriedatei wird danach damit fortgeschrieben.  Staende aus R1/R2
+ *    (Versatz) laden als „Wirtszeit + Versatz".
  *
  * Benannte Annahmen (ein Datenblatt des RTC-72421 liegt nicht vor; belegt ist nur, was Treiber
  * und Plan zeigen):
@@ -46,8 +66,7 @@
  *  [R6] 30s-ADJ (D b3): rundet auf die volle Minute (>= 30 s auf, sonst ab), Bit selbstloeschend.
  *  [R7] Gerade Adressen und Adressen ausserhalb 0xFDE1–0xFDFF antworten nicht (offener Bus).
  *
- * Save-State: eigener Abschnitt der Maschine (Version 1): `versatz_` und Registerzustand.
- * Die Wirtszeit laeuft nie zurueck, ein geladener Versatz bleibt daher richtig.
+ * Save-State: eigener Abschnitt der Maschine (Version 2; Version 1 mit `versatz_` bleibt ladbar).
  */
 
 #pragma once
@@ -77,32 +96,50 @@ public:
     /// E/A-Lesen; @c false = die Karte antwortet nicht (offener Bus, der Aufrufer liefert `leer8`).
     virtual bool lesen(uint16_t port, uint8_t& d) = 0;
     virtual bool schreiben(uint16_t port, uint8_t d) = 0;
-    /// Maschinenzeit der Karte um @p n Takte weiter.
+    /// Maschinenzeit der Karte um @p n Takte weiter (die Uhr zaehlt mit).
     virtual void takte(int n) = 0;
     virtual P8000RtcTyp typ() const = 0;
-    /// Versatz „Uhr − Wirtszeit" in Sekunden (Tests, Anzeige).
+    /// Abstand „Uhr − Wirtszeit jetzt" in Sekunden (Tests, Anzeige) — wandert mit der Emulationsgeschwindigkeit.
     virtual int64_t versatz() const = 0;
+    /// Uhr wie der Gast sie sieht (mit Jahresversatz), Kalenderzeit als Unix-Sekunden kodiert.
+    virtual int64_t gastZeit() const = 0;
+    /// Uhr von aussen stellen: Kalenderzeit im Jahr des Wirts (ohne Jahresversatz); Batteriedatei wird geschrieben.
+    virtual void stellen(int64_t wand) = 0;
+
+    /// Zeit, mit der eine Karte mit dieser Batteriedatei JETZT starten wuerde (Startregel), gastsichtig; ohne Karte.
+    static int64_t startzeit(const std::string& zustand, int jahresversatz, bool utc,
+                             const std::function<int64_t()>& zeitquelle = {});
+    /// Batteriedatei auf @p wand (Kalenderzeit im Jahr des Wirts) stellen; false = nicht schreibbar.
+    static bool stellenDatei(const std::string& zustand, int64_t wand,
+                             const std::function<int64_t()>& zeitquelle = {});
     /// Zustand der Karte als Text (Debugger `rtc`): Typ, Uhrzeit, Versatz, Typ-Besonderheiten.
     virtual std::string text() const = 0;
     virtual void serialize(std::vector<uint8_t>& out) const = 0;
     virtual bool deserialize(const uint8_t*& p, const uint8_t* end) = 0;
 };
 
-/// Gemeinsame Zeitbasis beider Auspraegungen: Zeitquelle, Batterie (`versatz_`), Batteriedatei.
+/// Gemeinsame Zeitbasis beider Auspraegungen: Zeitquelle, Uhrstand in Maschinenzeit, Batteriedatei.
 class P8000RtcBasis : public P8000Rtc {
 public:
     explicit P8000RtcBasis(const P8000RtcConfig& cfg);
-    int64_t versatz() const override { return versatz_; }
+    ~P8000RtcBasis() override;
+    int64_t versatz() const override { return sek_ - wirtWand(); }
+    int64_t gastZeit() const override;
+    void stellen(int64_t wand) override;
 
 protected:
+    void zaehle(int n);                         ///< Maschinenzeit weiter: Uhrstand, Speicherintervall
     std::string uhrText() const;                ///< "JJJJ-MM-TT hh:mm:ss" der Uhr (Anzeigejahr mit Jahresversatz)
     int64_t wirtWand() const;                   ///< Wirtszeit als Wandzeit (Ort/UTC), ohne Versatz
-    int64_t uhrWand() const { return wirtWand() + versatz_; }
+    int64_t uhrWand() const { return sek_; }    ///< Uhrstand als Wandzeit (Ort/UTC), ohne Jahresversatz
     void sichern() const;                       ///< Batteriedatei schreiben (falls `zustand` gesetzt)
-    void laden();                               ///< Batteriedatei lesen (im Konstruktor)
+    void setzeUhr(int64_t wand, bool sekunde0); ///< Uhr stellen + sichern (@p sekunde0: Resttakte loeschen)
 
     P8000RtcConfig cfg_;
-    int64_t versatz_ = 0;
+    int64_t sek_ = 0;                           ///< Uhrstand in ganzen Sekunden (Wandzeit)
+    uint64_t rest_ = 0;                         ///< Takte seit dem letzten Sekundenwechsel der Uhr
+    mutable uint64_t seit_sicher_ = 0;                  ///< Takte seit dem letzten Schreiben der Batteriedatei
+    static constexpr int SICHER_SEKUNDEN = 60;  ///< Speicherintervall (Maschinenzeit)
 };
 
 /// Epson RTC-72421 (Nachbau 2009–2016).
@@ -124,7 +161,7 @@ private:
     bool angehalten() const { return (f_ & 0x03) != 0; }
     void ladeNibbel(int64_t wand, uint8_t* n13) const;   ///< Nibbelregister aus einer Wandzeit (24/12 h)
     bool wandAusNibbeln(int64_t& wand) const;   ///< false = Nibbel unbrauchbar
-    void festschreiben();                       ///< gestellte Zeit → versatz_, Datei
+    void festschreiben();                       ///< gestellte Zeit → Uhrstand, Datei
     void minuteRunden();
 
     uint8_t d_ = 0, e_ = 0, f_ = 0x04;          ///< Register D (HOLD/IRQ), E, F
@@ -157,7 +194,7 @@ private:
  *  [U2] COM wechselt alle 1 ms Maschinenzeit (der echte Chip taktet mit rund 32 Hz; beobachtbar ist nur,
  *       dass der Wert zwischen zwei Lesungen kippen kann).  Sekundentakt (Bit7 FEFF): erste Haelfte jeder
  *       Maschinensekunde 1.  Beides in Maschinenzeit der Karte, nicht in Wirtszeit.
- *  [U3] Zeitwerte aus Wirtszeit + `versatz_` wie beim RTC-72421; Jahr zweistellig 00-99 (die Karte
+ *  [U3] Zeitwerte aus dem Uhrstand (Maschinenzeit) wie beim RTC-72421; Jahr zweistellig 00-99 (die Karte
  *       bildet nicht die Grenze 2019 des Chips nach), `jahresversatz` nur in der Anzeige.
  *  [U4] Anzeige: Stunde Zehner wird bei 0 leer gezeigt (sonst nicht lesbar, der Treiber kennt keinen
  *       Code dafuer); alle anderen Stellen zeigen die Null.
@@ -183,7 +220,7 @@ private:
  *       und bei der folgenden Zehnerlesung (binnen 400 Takten = 100 us) herausgegeben.  Die echte Anzeige wechselt
  *       beide Stellen im selben Augenblick; die Treiber lesen nacheinander und wuerden sonst beim Umlauf einen
  *       zerrissenen Wert sehen (59 -> 9, Monat 12 -> 2, Stunde 9 -> 19).
- * Save-State: Abschnitt-Kennung 0x81 (der RTC-72421 nutzt 1, die Typen laden sich nicht gegenseitig).
+ * Save-State: Abschnitt-Kennung 0x82 (0x81 = R2-Fassung mit Versatz, ladbar; der RTC-72421 nutzt 1/2, die Typen laden sich nicht gegenseitig).
  */
 class P8000RtcU130 final : public P8000RtcBasis {
 public:

@@ -2008,6 +2008,33 @@ const char* k1520_state_error(K1520Handle h) {
     return s.c_str();
 }
 
+// ─── Uhrenkarte (P8000, Entwurf 37 AP R2b; andere Maschinen: -1) ─────────────────────────
+
+static P8000Rtc* p8000Rtc(K1520Handle h) {
+    auto* p = h ? dynamic_cast<P8000Machine*>(toMachine(h)) : nullptr;
+    return (p && p->karte16()) ? p->karte16()->rtc() : nullptr;
+}
+
+int64_t k1520_rtc_zeit(K1520Handle h) {
+    auto* r = p8000Rtc(h);
+    return r ? r->gastZeit() : -1;
+}
+
+int k1520_rtc_stellen(K1520Handle h, int64_t unix_wirt) {
+    auto* r = p8000Rtc(h);
+    if (!r) return -1;
+    r->stellen(unix_wirt);
+    return 0;
+}
+
+int64_t k1520_rtc_startzeit(const char* zustandsdatei, int jahresversatz, int utc) {
+    return P8000Rtc::startzeit(zustandsdatei ? zustandsdatei : "", jahresversatz, utc != 0);
+}
+
+int k1520_rtc_stellen_datei(const char* zustandsdatei, int64_t unix_wirt) {
+    return P8000Rtc::stellenDatei(zustandsdatei ? zustandsdatei : "", unix_wirt) ? 0 : -1;
+}
+
 // ─── Winchester (P8000-WDC, Entwurf 25 §10.9; andere Maschinen: false / "") ──────────────
 
 static P8000Machine* p8000Hd(K1520Handle h) {

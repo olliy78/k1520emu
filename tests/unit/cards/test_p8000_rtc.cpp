@@ -11,6 +11,7 @@
 #include "core/cards/p8000/karte16.h"
 #include "core/cards/p8000/rtc.h"
 #include "tests/support/temp_path.h"
+#include <algorithm>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -49,6 +50,11 @@ struct P8000Rtc72421 : ::testing::Test {
         c.rtc.zustand = datei;
         c.rtc.zeitquelle = [this] { return jetzt; };
         return c;
+    }
+    /// @p sek Sekunden vergehen: Maschinenzeit der Karte UND (zur Gegenprobe) die Wirtszeit.
+    void vergeht(int64_t sek) {
+        jetzt += sek;
+        for (int64_t t = sek * 4'000'000; t > 0;) { const int n = int(std::min<int64_t>(t, 1 << 30)); k->rtc()->takte(n); t -= n; }
     }
     void bestuecken(int versatzJahre = 0) { k = std::make_unique<P8000Karte16>(konfig(versatzJahre)); }
 
@@ -93,7 +99,7 @@ TEST_F(P8000Rtc72421, LiestDieWirtszeit2026) {
 }
 
 TEST_F(P8000Rtc72421, UhrLaeuftMitDerWirtszeit) {
-    jetzt += 25;
+    vergeht(25);
     EXPECT_EQ(lesenZeit(), 261022143611LL);
 }
 
@@ -123,7 +129,7 @@ TEST_F(P8000Rtc72421, HoldHaeltDieZeitFest) {
     k->rtc()->takte(1000);
     out(REG_D, 0x01);
     EXPECT_EQ(in(REG_D) & 0x01, 0x01);
-    jetzt += 7;
+    vergeht(7);
     EXPECT_EQ(lesenZeit(), 261022143546LL);
     out(REG_D, 0x00);
     EXPECT_EQ(lesenZeit(), 261022143553LL);
@@ -132,7 +138,7 @@ TEST_F(P8000Rtc72421, HoldHaeltDieZeitFest) {
 TEST_F(P8000Rtc72421, StellenUndLesen) {
     stelle(27, 3, 14, 8, 15, 30);
     EXPECT_EQ(lesenZeit(), 270314081530LL);
-    jetzt += 90;
+    vergeht(90);
     EXPECT_EQ(lesenZeit(), 270314081700LL);
     EXPECT_EQ(k->rtc()->versatz(), utc(2027, 3, 14, 8, 15, 30) - (utc(2026, 10, 22, 14, 35, 46)));
 }
@@ -140,7 +146,7 @@ TEST_F(P8000Rtc72421, StellenUndLesen) {
 TEST_F(P8000Rtc72421, WaehrendStopStehtDieZeit) {
     out(REG_F, 0x07);   // RESET|STOP|24 h
     const int64_t vorher = lesenZeit();
-    jetzt += 100;
+    vergeht(100);
     EXPECT_EQ(lesenZeit(), vorher);
     out(REG_F, 0x04);   // ohne Stellen weiterlaufen: Versatz unveraendert
     EXPECT_EQ(k->rtc()->versatz(), 0);
@@ -156,6 +162,7 @@ TEST_F(P8000Rtc72421, ZwoelfStundenBetrieb) {
     EXPECT_EQ(nib(H1), 2);
     EXPECT_EQ(nib(H10), 4);   // 14 Uhr = 2 PM, Bit 2 = PM
     jetzt = utc(2026, 10, 22, 0, 5, 0);
+    k->rtc()->stellen(jetzt);
     EXPECT_EQ(nib(H1), 2); EXPECT_EQ(nib(H10), 1);   // 0 Uhr = 12 AM
     // in 12 h stellen: 7 PM = 19 Uhr
     out(REG_F, 0x03);
@@ -169,16 +176,16 @@ TEST_F(P8000Rtc72421, ZwoelfStundenBetrieb) {
 TEST_F(P8000Rtc72421, Schaltjahr2028) {
     stelle(28, 2, 29, 23, 59, 59);
     EXPECT_EQ(lesenZeit(), 280229235959LL);
-    jetzt += 1;
+    vergeht(1);
     EXPECT_EQ(lesenZeit(), 280301000000LL);
-    jetzt += 365LL * 86400;   // 1.3.2029 ... 2029 ist kein Schaltjahr
+    vergeht(365LL * 86400);   // 1.3.2029 ... 2029 ist kein Schaltjahr
     EXPECT_EQ(lesenZeit(), 290301000000LL);
 }
 
 TEST_F(P8000Rtc72421, Jahreswechsel2026Auf2027) {
     stelle(26, 12, 31, 23, 59, 59);
     EXPECT_EQ(lesenZeit(), 261231235959LL);
-    jetzt += 1;
+    vergeht(1);
     EXPECT_EQ(lesenZeit(), 270101000000LL);
 }
 
@@ -192,7 +199,7 @@ TEST_F(P8000Rtc72421, Jahresversatz) {
     EXPECT_EQ(nib(Y10) * 10 + nib(Y1), 98);   // 2026 − 28 = 1998
     stelle(98, 12, 31, 23, 59, 59);          // gestellt wie angezeigt → wirkliches 2026
     EXPECT_EQ(lesenZeit(), 981231235959LL);
-    jetzt += 1;
+    vergeht(1);
     EXPECT_EQ(lesenZeit(), 990101000000LL);
     // wirkliche Zeit liegt im Jahr 2027 (+1 s ueber 31.12.2026)
     EXPECT_EQ(k->rtc()->versatz(), utc(2026, 12, 31, 23, 59, 59) - utc(2026, 10, 22, 14, 35, 46));
@@ -219,7 +226,7 @@ TEST_F(P8000Rtc72421, Dreissigsekundenabgleich) {
     out(REG_D, 0x08);   // 14:35:46 → 14:36:00
     EXPECT_EQ(lesenZeit(), 261022143600LL);
     EXPECT_EQ(in(REG_D) & 0x08, 0);
-    jetzt += 20;
+    vergeht(20);
     out(REG_D, 0x08);   // 14:36:20 → 14:36:00 (ab)
     EXPECT_EQ(lesenZeit(), 261022143600LL);
 }
@@ -356,7 +363,7 @@ TEST_F(P8000Rtc72421, EchterTreiberRundreise) {
         d.start();
         EXPECT_EQ(d.get(), long(t)) << t;
     }
-    jetzt += 3;
+    vergeht(3);
     EXPECT_EQ(d.get(), long(utc(2001, 1, 1, 0, 0, 0)) + 3);
 }
 

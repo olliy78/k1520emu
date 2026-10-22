@@ -466,6 +466,15 @@ _lib.k1520_term_matrix_scancode.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_
 _lib.k1520_term_matrix_scancode.restype = ctypes.c_uint32
 _lib.k1520_term_leds.argtypes = [K1520Handle, ctypes.c_int]
 _lib.k1520_term_leds.restype = ctypes.c_int
+# Uhrenkarte des P8000 (Entwurf 37, AP R2b)
+_lib.k1520_rtc_zeit.argtypes = [K1520Handle]
+_lib.k1520_rtc_zeit.restype = ctypes.c_int64
+_lib.k1520_rtc_stellen.argtypes = [K1520Handle, ctypes.c_int64]
+_lib.k1520_rtc_stellen.restype = ctypes.c_int
+_lib.k1520_rtc_startzeit.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_int]
+_lib.k1520_rtc_startzeit.restype = ctypes.c_int64
+_lib.k1520_rtc_stellen_datei.argtypes = [ctypes.c_char_p, ctypes.c_int64]
+_lib.k1520_rtc_stellen_datei.restype = ctypes.c_int
 _lib.k1520_state_save.argtypes = [K1520Handle, ctypes.c_char_p]
 _lib.k1520_state_save.restype = ctypes.c_bool
 _lib.k1520_state_load.argtypes = [K1520Handle, ctypes.c_char_p]
@@ -1874,6 +1883,30 @@ class K1520Emulator:
 
     def state_error(self) -> str:
         return (_lib.k1520_state_error(self._handle) or b"").decode("utf-8", "replace")
+
+    # ─── Uhrenkarte des P8000 (k1520_rtc_*) ──────────────────────────────────
+
+    def rtc_zeit(self) -> int:
+        """Uhr der Uhrenkarte, wie der Gast sie sieht (mit Jahresversatz): Kalenderzeit als
+        Unix-Sekunden kodiert (Wanduhr, als wäre sie UTC; Ort/UTC wie konfiguriert).  Die Uhr
+        zählt in Maschinenzeit.  ``-1`` ohne Uhrenkarte."""
+        return int(_lib.k1520_rtc_zeit(self._handle))
+
+    def rtc_stellen(self, unix_wirt: int) -> bool:
+        """Uhr auf ``unix_wirt`` stellen (Kalenderzeit im Jahr des Wirts, ohne Jahresversatz; der
+        Versatz wirkt wie beim Lesen) und die Batteriedatei schreiben.  ``False`` ohne Karte."""
+        return _lib.k1520_rtc_stellen(self._handle, int(unix_wirt)) == 0
+
+    @staticmethod
+    def rtc_startzeit(zustandsdatei: str, jahresversatz: int = 0, utc: bool = False) -> int:
+        """Ohne Maschine: Zeit, mit der eine Uhrenkarte mit dieser Batteriedatei JETZT starten würde
+        (Startregel des Kerns), gastsichtig, wie :meth:`rtc_zeit` kodiert.  Fehlende Datei = Wirtszeit."""
+        return int(_lib.k1520_rtc_startzeit((zustandsdatei or "").encode("utf-8"), int(jahresversatz), int(bool(utc))))
+
+    @staticmethod
+    def rtc_stellen_datei(zustandsdatei: str, unix_wirt: int) -> bool:
+        """Ohne Maschine: Batteriedatei auf ``unix_wirt`` (Jahr des Wirts) stellen."""
+        return _lib.k1520_rtc_stellen_datei((zustandsdatei or "").encode("utf-8"), int(unix_wirt)) == 0
 
     # ─── Winchesterplatten am WDC des P8000 (k1520_hd_*) ─────────────────────
 

@@ -13,6 +13,7 @@
 #include "core/cards/p8000/karte16.h"
 #include "core/cards/p8000/rtc.h"
 #include "tests/support/temp_path.h"
+#include <algorithm>
 #include <cstdio>
 #include <filesystem>
 #include <functional>
@@ -290,6 +291,13 @@ struct P8000RtcU130 : ::testing::Test {
         return c;
     }
     void takte(int n) { k->rtc()->takte(n); ticks += n; }
+    /// @p sek Sekunden vergehen: Maschinenzeit der Karte UND (zur Gegenprobe) die Wirtszeit.
+    void vergeht(int64_t sek) {
+        jetzt += sek;
+        for (int64_t t = sek * 4'000'000; t > 0;) { const int n = int(std::min<int64_t>(t, 1 << 30)); k->rtc()->takte(n); t -= n; }
+    }
+    /// Uhr (und Wirtszeit) auf @p t setzen, ohne Resttakte: wie eine frisch bestueckte Karte zu dieser Wirtszeit.
+    void starte(int64_t t) { jetzt = t; k->rtc()->stellen(t); }
     // Jeder E/A-Zugriff kostet etwas Maschinenzeit (ein E/A-Befehl des U8001).
     void out(unsigned port, int d) {
         k->busSchreiben(io(uint16_t(port), false), uint16_t(d << 8 | (d & 0xFF)));
@@ -406,7 +414,7 @@ TEST_F(P8000RtcU130, DoppelleseZweigBeiPhasenwechsel) {
 
 TEST_F(P8000RtcU130, LeereStundenzehnerUndTaktImStellmodus) {
     // Stundenzehner 0 ist leer: mit flag = 1 liefert der Treiber 0 nur bei gesetztem Sekundentakt, sonst 0xff.
-    jetzt = utc(2026, 10, 22, 7, 5, 9);
+    starte(utc(2026, 10, 22, 7, 5, 9));
     EXPECT_EQ(d.invalue(U130HHx1, 1), 7);
     int hohe = 0, tiefe = 0;
     for (int i = 0; i < 100; ++i) {
@@ -426,7 +434,7 @@ TEST_F(P8000RtcU130, KernGettimeLiestWirtszeit2026) {
     EXPECT_EQ(karte()->zustand(), Karte::Z::Zeit);
     EXPECT_EQ(d.u130get(), long(jetzt));
     EXPECT_EQ(karte()->zustand(), Karte::Z::Zeit);
-    jetzt += 25;
+    vergeht(25);
     EXPECT_EQ(kern.gettime(), long(jetzt));
 }
 
@@ -436,7 +444,7 @@ TEST_F(P8000RtcU130, GettimeWartetBeiSekunde59AufDenUebertrag) {
     for (int versatz : {0, 17, 53, 101, 131, 159}) {
         bestuecken();
         gekoppelt = true;
-        jetzt = utc(2026, 10, 22, 14, 35, 59);
+        starte(utc(2026, 10, 22, 14, 35, 59));
         takte(versatz);
         const long t = kern.gettime();
         EXPECT_GT(ticks, 3'000'000) << versatz;   // es hat wirklich auf die Sekunde gewartet
@@ -448,7 +456,7 @@ TEST_F(P8000RtcU130, GettimeWartetBeiSekunde59AufDenUebertrag) {
 TEST_F(P8000RtcU130, StellenpaarWirdNichtZerrissen) {
     // Direkt: Einer lesen, Sekundengrenze ueberschreiten, Zehner lesen -> der Zehner gehoert noch zum Einer.
     gekoppelt = true;
-    jetzt = utc(2026, 10, 22, 14, 35, 59);
+    starte(utc(2026, 10, 22, 14, 35, 59));
     takte(4'000'000 - 60);
     d.inb = [&](unsigned a) { return in(a); };
     const int einer = in(0xFEF5);    // 9 (Sekunde 59), danach liegt die Grenze zwischen den Lesungen
@@ -468,7 +476,7 @@ TEST_F(P8000RtcU130, GettimeNachAbgelaufenemDatumsFenster) {
     ASSERT_EQ(karte()->zustand(), Karte::Z::Datum);
     takte(8'100'000);
     ASSERT_EQ(karte()->zustand(), Karte::Z::Zeit);
-    EXPECT_EQ(kern.gettime(), long(jetzt));
+    EXPECT_EQ(kern.gettime(), long(jetzt) + 2);   // die Uhr zaehlt in Maschinenzeit: 8,1M Takte = 2 s
 }
 
 // ── Treiber u130set / u130start ───────────────────────────────────────────────
@@ -501,25 +509,25 @@ TEST_F(P8000RtcU130, StelltAlleStellen) {
 TEST_F(P8000RtcU130, UhrLaeuftNachStartMitDerWirtszeit) {
     d.u130set(long(utc(2026, 12, 31, 23, 59, 0)));
     d.u130start();
-    jetzt += 60;                                // eine Minute Wirtszeit
+    vergeht(60);                                // eine Minute Wirtszeit
     EXPECT_EQ(kern.gettime(), long(utc(2027, 1, 1, 0, 0, 0)));   // Jahreswechsel 2026 -> 2027
-    jetzt += 58;   // (bei :59 wartet der Treiber auf die naechste Sekunde — bei stehender Wirtszeit ewig)
+    vergeht(58);   // (bei :59 wartet der Treiber auf die naechste Sekunde — bei stehender Wirtszeit ewig)
     EXPECT_EQ(kern.gettime(), long(utc(2027, 1, 1, 0, 0, 58)));
 }
 
 TEST_F(P8000RtcU130, Schaltjahr2028) {
     d.u130set(long(utc(2028, 2, 28, 23, 59, 0)));
     d.u130start();
-    jetzt += 60;
+    vergeht(60);
     EXPECT_EQ(kern.gettime(), long(utc(2028, 2, 29, 0, 0, 0)));
-    jetzt += 86400;
+    vergeht(86400);
     // Der Kern rechnet 1-basiert (d3 > 2): der 1.3.2028 stimmt.
     EXPECT_EQ(kern.gettime(), long(utc(2028, 3, 1, 0, 0, 0)));
     // Befund: `timegm.c` des Standalone-Treibers (u130get/r421get) bekommt den schon dekrementierten
     // Monat und prueft `tm_mon > 2` — im Maerz eines Schaltjahrs fehlt dort der 29.2.: ein Tag zu frueh.
     // Die Karte liefert die richtigen Ziffern (der Kern zeigt es); das ist ein Fehler des Treibers.
     EXPECT_EQ(d.u130get(), long(utc(2028, 3, 1, 0, 0, 0)) - 86400);
-    jetzt += 365LL * 86400;                       // 2029 kein Schaltjahr: 1.3.2029 (Jahr 29 -> 29%4 != 0)
+    vergeht(365LL * 86400);                       // 2029 kein Schaltjahr: 1.3.2029 (Jahr 29 -> 29%4 != 0)
     EXPECT_EQ(kern.gettime(), long(utc(2029, 3, 1, 0, 0, 0)));
 }
 
@@ -541,7 +549,7 @@ TEST_F(P8000RtcU130, SekundenSchnellkorrekturRundet) {
     EXPECT_EQ(kern.gettime(), long(utc(2026, 10, 22, 14, 36, 0)));
     EXPECT_EQ(k->rtc()->versatz(), 14);
     // 14:36:12 (Wirtszeit +26 s) -> < 30 s: Sekunden 0, Minute bleibt
-    jetzt += 26;
+    vergeht(26);
     taste(0x01);
     taste(0x02);
     durch();
@@ -563,7 +571,7 @@ TEST_F(P8000RtcU130, Jahresversatzminus28) {
     d.u130set(long(utc(1998, 12, 31, 23, 59, 0)));     // gestellt wie angezeigt -> wirkliches 2026
     d.u130start();
     EXPECT_EQ(k->rtc()->versatz(), utc(2026, 12, 31, 23, 59, 0) - jetzt);
-    jetzt += 60;
+    vergeht(60);
     EXPECT_EQ(kern.gettime(), long(utc(1999, 1, 1, 0, 0, 0)));
 }
 

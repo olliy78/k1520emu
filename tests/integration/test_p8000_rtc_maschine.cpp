@@ -6,6 +6,10 @@
 
 #include <gtest/gtest.h>
 #include "core/machines/p8000/p8000.h"
+#include "tests/support/temp_path.h"
+#include <cstdio>
+#include <fstream>
+#include <sstream>
 #include <vector>
 
 namespace {
@@ -78,6 +82,66 @@ TEST(P8000RtcMaschine, ZustandRundreiseUndAlterStandOhneUhr) {
     EXPECT_EQ(z.karte16()->rtc()->versatz(), vs);
     // Stand MIT Uhr in eine Maschine OHNE Uhr: der Abschnitt wird uebersprungen
     ASSERT_TRUE(ohne.restoreStateBytes(b)) << ohne.stateError();
+}
+
+// ── Maschinenzeit (AP R2b) ────────────────────────────────────────────────────
+
+TEST(P8000RtcMaschine, UhrZaehltInMaschinenzeitUndStehtBeiPause) {
+    int64_t jetzt = utc(2026, 10, 22, 14, 35, 46);
+    P8000Machine::Config c;
+    c.karte16 = true;
+    c.rtc = P8000Machine::Config::Rtc::Rtc72421;
+    c.rtc_utc = true;
+    c.rtc_zeitquelle = [&] { return jetzt; };
+    P8000Machine m(c);
+    ASSERT_NE(m.karte16()->rtc(), nullptr);
+    const int64_t z0 = m.karte16()->rtc()->gastZeit();
+    EXPECT_EQ(z0, jetzt);
+    int64_t n = 0;
+    while (n < 3 * 4'000'000) n += m.run(100'000);   // ~3 s Maschinenzeit
+    const int64_t z1 = m.karte16()->rtc()->gastZeit();
+    EXPECT_EQ(z1 - z0, 3) << "gelaufene Takte " << n;
+    jetzt += 100000;                                  // Wirtszeit laeuft, Maschine steht
+    EXPECT_EQ(m.karte16()->rtc()->gastZeit(), z1);
+}
+
+TEST(P8000RtcMaschine, BatteriedateiBeimZerstoerenUndZwischenstandSchreibtSieFort) {
+    const std::string datei = k1520test::tempPath("k1520_test_rtc_maschine.txt");
+    std::remove(datei.c_str());
+    int64_t jetzt = utc(2026, 10, 22, 14, 35, 46);
+    P8000Machine::Config c;
+    c.karte16 = true;
+    c.rtc = P8000Machine::Config::Rtc::U130X;
+    c.rtc_utc = true;
+    c.rtc_zustand = datei;
+    c.rtc_zeitquelle = [&] { return jetzt; };
+    std::vector<uint8_t> zwischen;
+    int64_t stand = 0, ende = 0;
+    {
+        P8000Machine m(c);
+        int64_t n = 0;
+        while (n < 2 * 4'000'000) n += m.run(100'000);
+        stand = m.karte16()->rtc()->gastZeit();
+        zwischen = m.stateBytes();
+        n = 0;
+        while (n < 4'000'000) n += m.run(100'000);   // danach weiter - der Zwischenstand bleibt zurueck
+        ende = m.karte16()->rtc()->gastZeit();
+    }
+    auto stand_der_datei = [&] {
+        std::ifstream f(datei);
+        std::stringstream ss; ss << f.rdbuf();
+        const std::string t = ss.str();
+        const size_t p = t.find("stand=");
+        return p == std::string::npos ? int64_t(-1) : std::stoll(t.substr(p + 6));
+    };
+    EXPECT_EQ(stand_der_datei(), ende);   // beim Zerstoeren geschrieben
+    // Neustart (Wirtszeit stand): nie zurueck; Zwischenstand laden stellt den Stand wieder her wie er war
+    P8000Machine m2(c);
+    EXPECT_EQ(m2.karte16()->rtc()->gastZeit(), ende);
+    ASSERT_TRUE(m2.restoreStateBytes(zwischen)) << m2.stateError();
+    EXPECT_EQ(m2.karte16()->rtc()->gastZeit(), stand);
+    EXPECT_EQ(stand_der_datei(), stand);       // die Batteriedatei folgt dem geladenen Stand
+    std::remove(datei.c_str());
 }
 
 }  // namespace

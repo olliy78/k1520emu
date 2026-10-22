@@ -289,8 +289,9 @@ void P8000Karte16::takt(int n) {
 }
 
 int P8000Karte16::schritt() {
-    if (mreset_) {   // CPU, CTC, SIO stehen; die Zeit laeuft
+    if (mreset_) {   // CPU, CTC, SIO stehen; die Zeit laeuft (und die batteriegepufferte Uhr mit)
         ++zeit_;
+        if (rtc_) rtc_->takte(1);
         return 1;
     }
     if (schrittHaken && schrittHaken(cpu_)) return 0;   // Debugger-Halt VOR dem Befehl
@@ -304,7 +305,12 @@ int P8000Karte16::schritt() {
 
 void P8000Karte16::laufeBis(uint64_t ziel) {
     while (zeit_ < ziel) {
-        if (mreset_) { zeit_ = ziel; break; }
+        if (mreset_) {
+            // Die Uhrenkarte hat ihre Batterie: sie zaehlt auch, solange der U8001 im Reset steht.
+            for (uint64_t r = ziel - zeit_; rtc_ && r > 0;) { const int n = int(r > (1u << 30) ? (1u << 30) : r); rtc_->takte(n); r -= uint64_t(n); }
+            zeit_ = ziel;
+            break;
+        }
         if (schritt() == 0) break;   // Debugger-Halt: die Zeit bleibt als Guthaben stehen
     }
 }

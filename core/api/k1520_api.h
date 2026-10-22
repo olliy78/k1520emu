@@ -1024,6 +1024,23 @@ K1520_API bool        k1520_state_load(K1520Handle h, const char* path);
 /** @brief Grund des letzten gescheiterten k1520_state_load ("" = keiner). */
 K1520_API const char* k1520_state_error(K1520Handle h);
 
+/* ─── Uhrenkarte des P8000 (Entwurf 37, AP R2b): die Uhr zaehlt in MASCHINENZEIT.
+ * Zeiten sind Kalenderzeit als Unix-Sekunden kodiert (die Wanduhr, als waere sie UTC; Ortszeit bzw. UTC
+ * wie konfiguriert).  *_zeit/*_startzeit liefern sie GASTSICHTIG (mit Jahresversatz), *_stellen* nehmen sie im
+ * Jahr des Wirts (ohne Versatz, wie die Batteriedatei sie speichert).  Die Rechnung lebt im Kern (Startregel
+ * max(Stand + Abwesenheit, Wirtszeit)); die Oberflaeche rechnet nicht nach. */
+
+/** @brief Uhr wie der Gast sie sieht; -1 ohne Uhrenkarte oder an anderen Maschinen. */
+K1520_API int64_t k1520_rtc_zeit(K1520Handle h);
+/** @brief Uhr auf @p unix_wirt stellen (Jahr des Wirts; der Jahresversatz wirkt wie beim Lesen) und die
+ *  Batteriedatei schreiben.  0 = ok, -1 ohne Uhrenkarte. */
+K1520_API int      k1520_rtc_stellen(K1520Handle h, int64_t unix_wirt);
+/** @brief OHNE Maschine: Zeit, mit der eine Karte mit dieser Batteriedatei JETZT starten wuerde, gastsichtig.
+ *  @p zustandsdatei NULL/"" oder nicht vorhanden = Wirtszeit.  @p utc 0 = Ortszeit des Wirts. */
+K1520_API int64_t k1520_rtc_startzeit(const char* zustandsdatei, int jahresversatz, int utc);
+/** @brief OHNE Maschine: Batteriedatei auf @p unix_wirt (Jahr des Wirts) stellen.  0 = ok, -1 Fehler. */
+K1520_API int      k1520_rtc_stellen_datei(const char* zustandsdatei, int64_t unix_wirt);
+
 /* ─── Winchesterplatten am WDC (P8000, Entwurf 25 §10.9; andere Maschinen bzw. ohne WDC:
  * false / "") — Laufwerk 0–2, Abbild roh/LBA (Sektor Z/K/S bei ((Z·K+K)·S+S−1)·512). */
 

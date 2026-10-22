@@ -7,6 +7,7 @@
 #include "core/logger.h"
 #include "core/util/zustand.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <ctime>
 #include <fstream>
@@ -14,7 +15,7 @@
 
 namespace {
 
-constexpr uint8_t SAVE_VERSION = 1;
+constexpr uint8_t SAVE_VERSION = 2;   // 1 = R1/R2 (Versatz), ladbar
 constexpr uint8_t KENNUNG = 0x30;   ///< obere vier Bit beim Lesen (Pull-ups, Treiber `STR_R421`)
 
 int64_t floorDiv(int64_t a, int64_t b) { int64_t q = a / b; return (a % b != 0 && ((a < 0) != (b < 0))) ? q - 1 : q; }
@@ -50,7 +51,96 @@ void zivilAusTagen(int64_t z, int& j, int& mo, int& t) {
 
 int klemme(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
+int64_t unixJetzt(const std::function<int64_t()>& zq) { return zq ? zq() : int64_t(std::time(nullptr)); }
+
+/// Wirtszeit (Unix UTC) als Wandzeit: UTC oder Ortszeit des Wirts.
+int64_t wandAusUnix(int64_t t, bool utc) {
+    if (utc) return t;
+    // Ortszeit ohne tm_gmtoff (Windows kennt es nicht): die Wanduhr als „Sekunden seit 1970" lesen.
+    const std::time_t tt = std::time_t(t);
+    std::tm lt{};
+#ifdef _WIN32
+    if (localtime_s(&lt, &tt) != 0) return t;
+#else
+    if (!localtime_r(&tt, &lt)) return t;
+#endif
+    return tageSeit1970(lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday) * 86400 + lt.tm_hour * 3600 +
+           lt.tm_min * 60 + lt.tm_sec;
+}
+
+/// Wandzeit mit Jahresversatz (nur Anzeige/Gast); ein 29.2. im Nicht-Schaltjahr wird 28.2.
+int64_t mitJahresversatz(int64_t wand, int versatz) {
+    if (versatz == 0) return wand;
+    const int64_t tage = floorDiv(wand, 86400);
+    const int64_t sod = wand - tage * 86400;
+    int j, mo, t;
+    zivilAusTagen(tage, j, mo, t);
+    j += versatz;
+    if (mo == 2 && t == 29 && !schaltjahr(j)) t = 28;
+    return tageSeit1970(j, mo, t) * 86400 + sod;
+}
+
+// ─── Batteriedatei ───────────────────────────────────────────────────────────
+
+struct Batterie {
+    int fassung = 0;       ///< 0 = keine/unbrauchbar, 1 = R1 (versatz=), 2 = Stand + Wirtszeit
+    int64_t stand = 0, wirt = 0, versatz = 0;
+};
+
+Batterie leseBatterie(const std::string& pfad) {
+    Batterie b;
+    if (pfad.empty()) return b;
+    std::ifstream f(pfad);
+    if (!f) return b;   // noch keine Batteriedatei
+    std::string kopf, zeile;
+    std::getline(f, kopf);
+    const int fassung = kopf == "K1520-P8000-RTC 2" ? 2 : kopf == "K1520-P8000-RTC 1" ? 1 : 0;
+    if (!fassung) { LOG_WARN("P8000", "RTC: Batteriedatei '%s' unbekannt", pfad.c_str()); return b; }
+    bool stand = false, wirt = false;
+    auto zahl = [](const std::string& z, size_t n, int64_t& v) {
+        try { v = std::stoll(z.substr(n)); return true; } catch (...) { return false; }
+    };
+    while (std::getline(f, zeile)) {
+        if (zeile.compare(0, 6, "stand=") == 0) stand = zahl(zeile, 6, b.stand);
+        else if (zeile.compare(0, 5, "wirt=") == 0) wirt = zahl(zeile, 5, b.wirt);
+        else if (zeile.compare(0, 8, "versatz=") == 0) zahl(zeile, 8, b.versatz);
+    }
+    if (fassung == 2 && stand && wirt) b.fassung = 2;
+    else if (fassung == 1) { b.fassung = 1; }
+    return b;
+}
+
+bool schreibeBatterie(const std::string& pfad, int64_t stand, int64_t wirt) {
+    std::ofstream f(pfad, std::ios::trunc);
+    if (!f) { LOG_WARN("P8000", "RTC: Batteriedatei '%s' nicht schreibbar", pfad.c_str()); return false; }
+    f << "K1520-P8000-RTC 2\nstand=" << stand << "\nwirt=" << wirt << "\n";
+    return bool(f);
+}
+
+/// Startregel: max(Stand + Abwesenheit, Wirtszeit jetzt); Abwesenheit < 0 zaehlt als 0.
+int64_t startWand(const std::string& pfad, bool utc, const std::function<int64_t()>& zq) {
+    const int64_t jetzt = unixJetzt(zq);
+    const int64_t host = wandAusUnix(jetzt, utc);
+    const Batterie b = leseBatterie(pfad);
+    if (b.fassung == 2) {
+        const int64_t weg = jetzt > b.wirt ? jetzt - b.wirt : 0;
+        return std::max(b.stand + weg, host);
+    }
+    if (b.fassung == 1) return std::max(host + b.versatz, host);
+    return host;
+}
+
 }  // namespace
+
+int64_t P8000Rtc::startzeit(const std::string& zustand, int jahresversatz, bool utc,
+                            const std::function<int64_t()>& zeitquelle) {
+    return mitJahresversatz(startWand(zustand, utc, zeitquelle), jahresversatz);
+}
+
+bool P8000Rtc::stellenDatei(const std::string& zustand, int64_t wand, const std::function<int64_t()>& zeitquelle) {
+    if (zustand.empty()) return false;
+    return schreibeBatterie(zustand, wand, unixJetzt(zeitquelle));
+}
 
 std::unique_ptr<P8000Rtc> P8000Rtc::anlegen(const P8000RtcConfig& cfg, std::string& fehler) {
     fehler.clear();
@@ -63,27 +153,35 @@ std::unique_ptr<P8000Rtc> P8000Rtc::anlegen(const P8000RtcConfig& cfg, std::stri
 
 P8000RtcBasis::P8000RtcBasis(const P8000RtcConfig& cfg) : cfg_(cfg) {
     if (cfg_.takt_hz == 0) cfg_.takt_hz = 4'000'000;
-    laden();
+    sek_ = startWand(cfg_.zustand, cfg_.utc, cfg_.zeitquelle);
+}
+
+P8000RtcBasis::~P8000RtcBasis() { sichern(); }
+
+int64_t P8000RtcBasis::gastZeit() const { return mitJahresversatz(sek_, cfg_.jahresversatz); }
+
+void P8000RtcBasis::stellen(int64_t wand) { setzeUhr(wand, true); }
+
+void P8000RtcBasis::setzeUhr(int64_t wand, bool sekunde0) {
+    sek_ = wand;
+    if (sekunde0) rest_ = 0;
+    sichern();
+}
+
+// Maschinenzeit weiter; je 60 s Maschinenzeit die Batteriedatei fortschreiben.
+void P8000RtcBasis::zaehle(int n) {
+    if (n <= 0) return;
+    rest_ += uint64_t(n);
+    if (rest_ >= cfg_.takt_hz) { sek_ += int64_t(rest_ / cfg_.takt_hz); rest_ %= cfg_.takt_hz; }
+    seit_sicher_ += uint64_t(n);
+    if (seit_sicher_ >= uint64_t(SICHER_SEKUNDEN) * cfg_.takt_hz) sichern();
 }
 
 P8000Rtc72421::P8000Rtc72421(const P8000RtcConfig& cfg) : P8000RtcBasis(cfg) {
     busy_takte_ = uint64_t(cfg_.takt_hz) * BUSY_US / 1'000'000;
 }
 
-int64_t P8000RtcBasis::wirtWand() const {
-    const int64_t t = cfg_.zeitquelle ? cfg_.zeitquelle() : int64_t(std::time(nullptr));
-    if (cfg_.utc) return t;
-    // Ortszeit ohne tm_gmtoff (Windows kennt es nicht): die Wanduhr als „Sekunden seit 1970" lesen.
-    const std::time_t tt = std::time_t(t);
-    std::tm lt{};
-#ifdef _WIN32
-    if (localtime_s(&lt, &tt) != 0) return t;
-#else
-    if (!localtime_r(&tt, &lt)) return t;
-#endif
-    return tageSeit1970(lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday) * 86400 + lt.tm_hour * 3600 +
-           lt.tm_min * 60 + lt.tm_sec;
-}
+int64_t P8000RtcBasis::wirtWand() const { return wandAusUnix(unixJetzt(cfg_.zeitquelle), cfg_.utc); }
 
 // Stellregister aus einer Wandzeit; Jahresversatz nur hier (Anzeige).  [R1]
 void P8000Rtc72421::ladeNibbel(int64_t wand, uint8_t* n) const {
@@ -133,15 +231,13 @@ bool P8000Rtc72421::wandAusNibbeln(int64_t& wand) const {
 void P8000Rtc72421::festschreiben() {
     int64_t wand;
     if (!wandAusNibbeln(wand)) return;
-    versatz_ = wand - wirtWand();
-    sichern();
-    LOG_INFO("P8000", "RTC-72421 gestellt, Versatz zur Wirtszeit %lld s", static_cast<long long>(versatz_));
+    setzeUhr(wand, true);
+    LOG_INFO("P8000", "RTC-72421 gestellt, Uhr %s", uhrText().c_str());
 }
 
 void P8000Rtc72421::minuteRunden() {
     const int s = int(uhrWand() - floorDiv(uhrWand(), 60) * 60);
-    versatz_ += s >= 30 ? 60 - s : -s;
-    sichern();
+    setzeUhr(sek_ + (s >= 30 ? 60 - s : -s), true);
 }
 
 bool P8000Rtc72421::lesen(uint16_t port, uint8_t& d) {
@@ -188,7 +284,7 @@ bool P8000Rtc72421::schreiben(uint16_t port, uint8_t d) {
 }
 
 void P8000Rtc72421::takte(int n) {
-    if (n > 0) phase_ = (phase_ + uint64_t(n)) % cfg_.takt_hz;
+    if (n > 0) { phase_ = (phase_ + uint64_t(n)) % cfg_.takt_hz; zaehle(n); }
 }
 
 // ─── Batteriedatei ───────────────────────────────────────────────────────────
@@ -206,8 +302,8 @@ std::string P8000RtcBasis::uhrText() const {
 
 std::string P8000Rtc72421::text() const {
     char b[160];
-    snprintf(b, sizeof b, "RTC-72421  Uhr %s %s  Versatz %lld s  D=%X E=%X F=%X%s", uhrText().c_str(),
-             cfg_.utc ? "UTC" : "Ort", static_cast<long long>(versatz_), d_ | (hold_ ? 1 : 0), e_, f_,
+    snprintf(b, sizeof b, "RTC-72421  Uhr %s %s  Abstand zur Wirtszeit %lld s  D=%X E=%X F=%X%s", uhrText().c_str(),
+             cfg_.utc ? "UTC" : "Ort", static_cast<long long>(versatz()), d_ | (hold_ ? 1 : 0), e_, f_,
              angehalten() ? "  (STOP/RESET)" : "");
     return b;
 }
@@ -219,30 +315,16 @@ std::string P8000RtcU130::text() const {
     for (int i = 0; i < 6; ++i) z[5 - i] = pos[i] < 0 ? ' ' : char('0' + pos[i]);
     z[6] = 0;
     char b[200];
-    snprintf(b, sizeof b, "U130X  Uhr %s %s  Versatz %lld s  Anzeige [%s] %s  Tasten=%X  Zustand %s", uhrText().c_str(),
-             cfg_.utc ? "UTC" : "Ort", static_cast<long long>(versatz_), z, datumAnzeige() ? "Datum (MMTTJJ)" : "Zeit (hhmmss)",
+    snprintf(b, sizeof b, "U130X  Uhr %s %s  Abstand zur Wirtszeit %lld s  Anzeige [%s] %s  Tasten=%X  Zustand %s", uhrText().c_str(),
+             cfg_.utc ? "UTC" : "Ort", static_cast<long long>(versatz()), z, datumAnzeige() ? "Datum (MMTTJJ)" : "Zeit (hhmmss)",
              tasten_, zustandName(z_));
     return b;
 }
 
 void P8000RtcBasis::sichern() const {
     if (cfg_.zustand.empty()) return;
-    std::ofstream f(cfg_.zustand, std::ios::trunc);
-    if (!f) { LOG_WARN("P8000", "RTC: Batteriedatei '%s' nicht schreibbar", cfg_.zustand.c_str()); return; }
-    f << "K1520-P8000-RTC 1\nversatz=" << versatz_ << "\n";
-}
-
-void P8000RtcBasis::laden() {
-    if (cfg_.zustand.empty()) return;
-    std::ifstream f(cfg_.zustand);
-    if (!f) return;   // noch keine Batteriedatei: Uhr = Wirtszeit
-    std::string kopf, zeile;
-    std::getline(f, kopf);
-    if (kopf != "K1520-P8000-RTC 1") { LOG_WARN("P8000", "RTC: Batteriedatei '%s' unbekannt", cfg_.zustand.c_str()); return; }
-    while (std::getline(f, zeile))
-        if (zeile.compare(0, 8, "versatz=") == 0) {
-            try { versatz_ = std::stoll(zeile.substr(8)); } catch (...) { versatz_ = 0; }
-        }
+    seit_sicher_ = 0;
+    schreibeBatterie(cfg_.zustand, sek_, unixJetzt(cfg_.zeitquelle));
 }
 
 // ─── Save-State ──────────────────────────────────────────────────────────────
@@ -250,28 +332,34 @@ void P8000RtcBasis::laden() {
 void P8000Rtc72421::serialize(std::vector<uint8_t>& out) const {
     out.push_back(SAVE_VERSION);
     auto a = k1520::ZAr::schreiber(out);
-    int64_t vs = versatz_;
+    int64_t sk = sek_;
+    uint64_t rs = rest_;
     uint8_t d = d_, e = e_, f = f_;
     bool h = hold_, g = stell_geaendert_;
     uint64_t ph = phase_;
-    a.num(vs); a.num(d); a.num(e); a.num(f); a.flag(h); a.flag(g); a.num(ph);
+    a.num(sk); a.num(rs); a.num(d); a.num(e); a.num(f); a.flag(h); a.flag(g); a.num(ph);
     a.raw(const_cast<uint8_t*>(zeit_), sizeof zeit_);
 }
 
 bool P8000Rtc72421::deserialize(const uint8_t*& p, const uint8_t* end) {
-    if (end - p < 1 || *p != SAVE_VERSION) return false;
+    if (end - p < 1 || (*p != SAVE_VERSION && *p != 1)) return false;
+    const bool alt = *p == 1;   // R1/R2: Versatz zur Wirtszeit statt Uhrstand
     ++p;
     auto a = k1520::ZAr::leser(p, end);
     int64_t vs = 0;
+    uint64_t rs = 0;
     uint8_t d = 0, e = 0, f = 0;
     bool h = false, g = false;
     uint64_t ph = 0;
     uint8_t z[sizeof zeit_] = {};
-    a.num(vs); a.num(d); a.num(e); a.num(f); a.flag(h); a.flag(g); a.num(ph);
+    a.num(vs);
+    if (!alt) a.num(rs);
+    a.num(d); a.num(e); a.num(f); a.flag(h); a.flag(g); a.num(ph);
     a.raw(z, sizeof z);
     if (!a.ok) return false;
     p = a.p;
-    versatz_ = vs; d_ = d & 0x04; e_ = e & 0x0F; f_ = f & 0x0F; hold_ = h; stell_geaendert_ = g;
+    if (alt) { sek_ = wirtWand() + vs; rest_ = 0; } else { sek_ = vs; rest_ = rs % cfg_.takt_hz; }
+    d_ = d & 0x04; e_ = e & 0x0F; f_ = f & 0x0F; hold_ = h; stell_geaendert_ = g;
     phase_ = ph % cfg_.takt_hz;
     for (size_t i = 0; i < sizeof z; ++i) zeit_[i] = z[i] & 0x0F;
     sichern();   // die Batteriedatei folgt dem geladenen Stand
@@ -282,7 +370,7 @@ bool P8000Rtc72421::deserialize(const uint8_t*& p, const uint8_t* end) {
 // Modell und Annahmen [U1]-[U9]: siehe rtc.h.
 
 namespace {
-constexpr uint8_t U130_SAVE = 0x81;
+constexpr uint8_t U130_SAVE = 0x82;   // 0x81 = R2 (Versatz), ladbar
 // Segmentcodes der fuenf abgetasteten Segmente je Ziffer (Bit0-4, aktiv = 1), wie `invalue()` der Treiber.
 constexpr uint8_t SEG7[10] = {0x0F, 0x02, 0x17, 0x13, 0x1A, 0x19, 0x1D, 0x03, 0x1F, 0x1B};
 }  // namespace
@@ -412,9 +500,8 @@ void P8000RtcU130::vt(bool htGehalten) {
             return;
         }
         case Z::Halt:   // Start der Zeit
-            versatz_ = frozen_ - wirtWand();
-            sichern();
-            LOG_INFO("P8000", "U130X gestellt, Versatz zur Wirtszeit %lld s", static_cast<long long>(versatz_));
+            setzeUhr(frozen_, true);
+            LOG_INFO("P8000", "U130X gestellt, Uhr %s", uhrText().c_str());
             z_ = Z::Zeit;
             return;
         default: return;
@@ -452,9 +539,8 @@ void P8000RtcU130::datumUebernehmen() {
     j -= cfg_.jahresversatz;
     const int mo = klemme(mo_, 1, 12);
     const int t = klemme(dz_ * 10 + de_, 1, monatsTage(j, mo));
-    versatz_ += tageSeit1970(j, mo, t) * 86400 + sod - wand;
-    sichern();
-    LOG_INFO("P8000", "U130X Datum gestellt, Versatz zur Wirtszeit %lld s", static_cast<long long>(versatz_));
+    setzeUhr(sek_ + tageSeit1970(j, mo, t) * 86400 + sod - wand, false);
+    LOG_INFO("P8000", "U130X Datum gestellt, Uhr %s", uhrText().c_str());
 }
 
 void P8000RtcU130::schritt() {
@@ -474,6 +560,7 @@ void P8000RtcU130::schritt() {
 void P8000RtcU130::takte(int n) {
     if (n <= 0) return;
     total_ += uint64_t(n);
+    zaehle(n);
     if (z_ == Z::Datum && total_ >= datum_bis_) z_ = Z::Zeit;
     if ((korrDatum() || korrZeit()) && total_ >= schritt_bis_) {
         uint64_t k = (total_ - schritt_bis_) / schritt_takte_ + 1;
@@ -486,25 +573,30 @@ void P8000RtcU130::takte(int n) {
 void P8000RtcU130::serialize(std::vector<uint8_t>& out) const {
     out.push_back(U130_SAVE);
     auto a = k1520::ZAr::schreiber(out);
-    int64_t vs = versatz_, fr = frozen_;
+    int64_t vs = sek_, fr = frozen_;
+    uint64_t rs = rest_;
     uint8_t z = uint8_t(z_), t = tasten_, mo = mo_, dz = dz_, de = de_, jz = jz_, je = je_, sd = std_, mz = mz_, me = me_;
     uint64_t tot = total_, db = datum_bis_, sb = schritt_bis_;
-    a.num(vs); a.num(fr); a.num(z); a.num(t); a.num(tot); a.num(db); a.num(sb);
+    a.num(vs); a.num(rs); a.num(fr); a.num(z); a.num(t); a.num(tot); a.num(db); a.num(sb);
     a.num(mo); a.num(dz); a.num(de); a.num(jz); a.num(je); a.num(sd); a.num(mz); a.num(me);
 }
 
 bool P8000RtcU130::deserialize(const uint8_t*& p, const uint8_t* end) {
-    if (end - p < 1 || *p != U130_SAVE) return false;
+    if (end - p < 1 || (*p != U130_SAVE && *p != 0x81)) return false;
+    const bool alt = *p == 0x81;   // R2: Versatz zur Wirtszeit statt Uhrstand
     ++p;
     auto a = k1520::ZAr::leser(p, end);
     int64_t vs = 0, fr = 0;
     uint8_t z = 0, t = 0, mo = 1, dz = 0, de = 0, jz = 0, je = 0, sd = 0, mz = 0, me = 0;
-    uint64_t tot = 0, db = 0, sb = 0;
-    a.num(vs); a.num(fr); a.num(z); a.num(t); a.num(tot); a.num(db); a.num(sb);
+    uint64_t tot = 0, db = 0, sb = 0, rs = 0;
+    a.num(vs);
+    if (!alt) a.num(rs);
+    a.num(fr); a.num(z); a.num(t); a.num(tot); a.num(db); a.num(sb);
     a.num(mo); a.num(dz); a.num(de); a.num(jz); a.num(je); a.num(sd); a.num(mz); a.num(me);
     if (!a.ok || z >= uint8_t(Z::ANZAHL)) return false;
     p = a.p;
-    versatz_ = vs; frozen_ = fr; z_ = Z(z); tasten_ = t & 7; total_ = tot; datum_bis_ = db; schritt_bis_ = sb;
+    if (alt) { sek_ = wirtWand() + vs; rest_ = 0; } else { sek_ = vs; rest_ = rs % cfg_.takt_hz; }
+    frozen_ = fr; z_ = Z(z); tasten_ = t & 7; total_ = tot; datum_bis_ = db; schritt_bis_ = sb;
     mo_ = uint8_t(klemme(mo, 1, 12)); dz_ = dz % 4; de_ = de % 10; jz_ = jz % 10; je_ = je % 10;
     std_ = sd % 24; mz_ = mz % 6; me_ = me % 10;
     sichern();
