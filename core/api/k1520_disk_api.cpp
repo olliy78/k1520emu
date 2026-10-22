@@ -19,6 +19,7 @@
 
 #include "core/filesystem/disk_volume.h"
 #include "core/filesystem/geometry_probe.h"
+#include "core/filesystem/wega/platten_volume.h"
 
 #include <algorithm>
 #include <memory>
@@ -66,6 +67,9 @@ struct Handle {
     std::string s_error, s_name, s_type, s_attrs, s_date, s_dir, s_label, s_created,
                 s_segments, s_blocks, s_ziel;
     std::string s_fmt, s_fs, s_alt, s_remarks, s_fit, s_check, s_container, s_tarwarn;
+    std::string s_satzbasis, s_pnamen, s_pueber, s_palt, s_hinweise, s_geschr, s_tgrund, s_physgrund;
+    TarSatzPlan satzplan;                         ///< Stand des letzten k1520d_tar_satz_plan
+    TarDateiUrteil tarurteil;                     ///< Stand des letzten k1520d_tar_datei_pruefen
     std::string s_bid, s_bobj, s_btext, s_bsum;   ///< Puffer der Pruefung
     std::string s_sid, s_stitel, s_swarum;        ///< Puffer der Checkliste (§5a)
     std::string s_rid, s_rtext, s_rwhy;           ///< Puffer der Reparatur
@@ -140,6 +144,10 @@ extern "C" K1520Disk k1520d_open_raw(const char* path, const char* fs_name,
 }
 
 extern "C" K1520Disk k1520d_open_tar_satz(const char* paths) {
+    return k1520d_open_tar_satz_format(paths, "");
+}
+
+extern "C" K1520Disk k1520d_open_tar_satz_format(const char* paths, const char* format) {
     g_open_error.clear();
     std::vector<std::string> liste;
     std::string rest = paths ? paths : "";
@@ -154,7 +162,8 @@ extern "C" K1520Disk k1520d_open_tar_satz(const char* paths) {
 
     auto h = std::make_unique<Handle>();
     std::string err;
-    h->vol = DiskVolume::openTarSatz(liste, kataloge().formate, kataloge().dateisysteme, err);
+    h->vol = DiskVolume::openTarSatz(liste, kataloge().formate, kataloge().dateisysteme, err,
+                                     format ? format : "");
     if (!h->vol) { g_open_error = err; return nullptr; }
     return h.release();
 }
@@ -398,33 +407,162 @@ extern "C" const char* k1520d_container_info(K1520Disk h, const char* key) {
     return halte(H(h)->s_container, std::move(w));
 }
 
-// ─── tar-Disketten: Export, leere Diskette, Schreiben ────────────────────────
-
-extern "C" bool k1520d_tar_leer(K1520Disk h) {
-    return h && H(h)->vol->tarLeer();
-}
+// ─── tar-Disketten: Export ────────────────────────
 
 extern "C" bool k1520d_tar_export(K1520Disk h, const char* path) {
     return h && path && H(h)->vol->tarExport(path);
 }
 
-extern "C" int k1520d_tar_put_pruefen(K1520Disk h, const char* path) {
-    if (!h || !path) return -1;
-    std::string w;
-    if (!H(h)->vol->tarPruefen(path, &w)) return -1;
-    halte(H(h)->s_tarwarn, std::move(w));
-    return H(h)->s_tarwarn.empty() ? 0 : 1;
-}
-
 extern "C" const char* k1520d_tar_warning(K1520Disk h) {
-    if (!h) return "";
-    return halte(H(h)->s_tarwarn, H(h)->vol->lastTarWarnung());
+    // Der Puffer wird von tar_datei_pruefen (Urteil) UND tar_datei_ablegen (Ablegen) gefuellt.
+    return h ? H(h)->s_tarwarn.c_str() : "";
 }
 
-extern "C" bool k1520d_tar_put(K1520Disk h, const char* path) {
+// ─── tar-Saetze bearbeiten, Neu-Anlegen, .tar ablegen (Entwurf 37, T1-T3) ───
+
+namespace {
+
+/// Die Formatliste fuer neue tar-Disketten: einmal aus dem (unveraenderlichen) Katalog gebildet.
+const std::vector<TarFormatInfo>& tarFormateListe() {
+    static const std::vector<TarFormatInfo> l = DiskVolume::tarFormate(kataloge().formate);
+    return l;
+}
+
+const TarFormatInfo* tarFormat(int i) {
+    const auto& l = tarFormateListe();
+    return (i < 0 || i >= static_cast<int>(l.size())) ? nullptr : &l[static_cast<size_t>(i)];
+}
+
+std::string zeilen(const std::vector<std::string>& v) {
+    std::string s;
+    for (const std::string& e : v) { if (!s.empty()) s += '\n'; s += e; }
+    return s;
+}
+
+}  // namespace
+
+extern "C" int k1520d_tar_format_count(void) { return static_cast<int>(tarFormateListe().size()); }
+
+extern "C" const char* k1520d_tar_format_name(int i) {
+    const TarFormatInfo* f = tarFormat(i);
+    return f ? halte(g_scratch, f->name) : "";
+}
+
+extern "C" const char* k1520d_tar_format_description(int i) {
+    const TarFormatInfo* f = tarFormat(i);
+    return f ? halte(g_scratch, f->description) : "";
+}
+
+extern "C" uint64_t k1520d_tar_format_bytes(int i) {
+    const TarFormatInfo* f = tarFormat(i);
+    return f ? f->bytes : 0;
+}
+
+extern "C" int k1520d_tar_format_container(int i) {
+    const TarFormatInfo* f = tarFormat(i);
+    return f ? (f->img ? 1 : 0) | (f->hfe ? 2 : 0) : 0;
+}
+
+extern "C" K1520Disk k1520d_tar_satz_neu(const char* format, const char* basename) {
+    g_open_error.clear();
+    if (!format || !*format || !basename || !*basename) { g_open_error = "Format und Basisname angeben"; return nullptr; }
+    auto h = std::make_unique<Handle>();
+    std::string err;
+    h->vol = DiskVolume::tarSatzNeu(format, basename, kataloge().formate, kataloge().dateisysteme, err);
+    if (!h->vol) { g_open_error = err; return nullptr; }
+    return h.release();
+}
+
+extern "C" K1520Disk k1520d_tar_disk_neu(const char* path, const char* format) {
+    g_open_error.clear();
+    if (!format || !*format || !path || !*path) { g_open_error = "Pfad und Format angeben"; return nullptr; }
+    auto h = std::make_unique<Handle>();
+    std::string err;
+    h->vol = DiskVolume::tarDisketteNeu(path, format, kataloge().formate, kataloge().dateisysteme, err);
+    if (!h->vol) { g_open_error = err; return nullptr; }
+    return h.release();
+}
+
+extern "C" bool k1520d_tar_satz_einzel(K1520Disk h) {
+    return h && H(h)->vol->tarSatzEinzel();
+}
+
+extern "C" bool k1520d_tar_satz(K1520Disk h) {
+    return h && H(h)->vol->tarSatz();
+}
+
+extern "C" bool k1520d_tar_zu_satz(K1520Disk h, const char* basename) {
+    return h && H(h)->vol->tarZuSatz(basename ? basename : "");
+}
+
+extern "C" const char* k1520d_tar_satz_basis(K1520Disk h) {
+    if (!h) return "";
+    return halte(H(h)->s_satzbasis, H(h)->vol->tarSatzBasis());
+}
+
+extern "C" int k1520d_tar_satz_plan(K1520Disk h, const char* basename) {
+    if (!h) return -1;
+    Handle* p = H(h);
+    p->satzplan = p->vol->tarSatzPlanen(basename ? basename : "");
+    if (!p->satzplan.ok) { p->vol->noteError(p->satzplan.fehler); return -1; }
+    return p->satzplan.abbilder;
+}
+
+extern "C" uint64_t k1520d_tar_plan_strom(K1520Disk h) { return h ? H(h)->satzplan.strom : 0; }
+extern "C" uint64_t k1520d_tar_plan_kapazitaet(K1520Disk h) { return h ? H(h)->satzplan.kapazitaet : 0; }
+extern "C" bool k1520d_tar_plan_einzel(K1520Disk h) { return h && H(h)->satzplan.einzel; }
+
+extern "C" const char* k1520d_tar_plan_namen(K1520Disk h) {
+    return h ? halte(H(h)->s_pnamen, zeilen(H(h)->satzplan.namen)) : "";
+}
+
+extern "C" const char* k1520d_tar_plan_ueberschreibt(K1520Disk h) {
+    return h ? halte(H(h)->s_pueber, zeilen(H(h)->satzplan.ueberschreibt)) : "";
+}
+
+extern "C" const char* k1520d_tar_plan_altlasten(K1520Disk h) {
+    return h ? halte(H(h)->s_palt, zeilen(H(h)->satzplan.altlasten)) : "";
+}
+
+extern "C" bool k1520d_tar_satz_speichern(K1520Disk h, const char* basename) {
+    if (!h) return false;
+    Handle* p = H(h);
+    std::vector<std::string> hinweise, geschrieben;
+    const bool ok = p->vol->tarSatzSpeichern(basename ? basename : "", &hinweise, &geschrieben);
+    halte(p->s_hinweise, zeilen(hinweise));
+    halte(p->s_geschr, zeilen(geschrieben));
+    return ok;
+}
+
+extern "C" const char* k1520d_tar_satz_hinweise(K1520Disk h) { return h ? H(h)->s_hinweise.c_str() : ""; }
+extern "C" const char* k1520d_tar_satz_geschrieben(K1520Disk h) { return h ? H(h)->s_geschr.c_str() : ""; }
+
+extern "C" const char* k1520d_physisch_schreiben_grund(K1520Disk h) {
+    if (!h) return "";
+    return halte(H(h)->s_physgrund, H(h)->vol->physischSchreibenGrund());
+}
+
+extern "C" int k1520d_tar_datei_pruefen(K1520Disk h, const char* path) {
+    if (!h || !path) return -1;
+    Handle* p = H(h);
+    p->tarurteil = p->vol->tarDateiBeurteilen(path);
+    const TarDateiUrteil& u = p->tarurteil;
+    halte(p->s_tarwarn, u.warnung);
+    halte(p->s_tgrund, u.container_grund);
+    if (!u.ok) { p->vol->noteError(u.fehler); return -1; }
+    return (u.als_datei ? 1 : 0) | (u.als_container ? 2 : 0) | (u.ziel_leer ? 4 : 0) | (u.wird_satz ? 8 : 0);
+}
+
+extern "C" const char* k1520d_tar_datei_grund(K1520Disk h) { return h ? H(h)->s_tgrund.c_str() : ""; }
+extern "C" int k1520d_tar_datei_abbilder(K1520Disk h) { return h ? H(h)->tarurteil.abbilder : 0; }
+
+extern "C" bool k1520d_tar_datei_ablegen(K1520Disk h, const char* path, int weg,
+                                         const char* name, bool ersetzen) {
     if (!h || !path) return false;
-    const bool ok = H(h)->vol->tarSchreiben(path);
-    halte(H(h)->s_tarwarn, H(h)->vol->lastTarWarnung());
+    Handle* p = H(h);
+    const bool ok = p->vol->tarDateiAblegen(path, weg == 1 ? TarDateiWeg::AlsContainer : TarDateiWeg::AlsDatei,
+                                            name ? name : "", ersetzen);
+    halte(p->s_tarwarn, p->vol->lastTarWarnung());
     return ok;
 }
 
@@ -931,6 +1069,11 @@ extern "C" bool k1520d_erase(K1520Disk h, const char* name) {
     return H(h)->vol->erase(FileRef::parse(name));
 }
 
+extern "C" bool k1520d_mkdir(K1520Disk h, const char* name) {
+    if (!h || !name) return false;
+    return H(h)->vol->makeDirectory(FileRef::parse(name));
+}
+
 extern "C" bool k1520d_file_first_sector(K1520Disk h, const char* name,
                                         int* cyl, int* head, int* sector) {
     if (!h || !name || !cyl || !head || !sector) return false;
@@ -1333,4 +1476,215 @@ extern "C" bool k1520d_recover_extract(K1520Disk h, int i, const char* pfad) {
 extern "C" bool k1520d_recover_restore(K1520Disk h, int i, const char* name) {
     if (!h) return false;
     return H(h)->vol->recoverRestore(i, name ? name : "");
+}
+
+// ─── P8000-Platte (PlattenVolume) ────────────────────────────────────────────
+
+namespace {
+
+struct PlattenHandle {
+    std::unique_ptr<PlattenVolume> vol;
+    std::vector<FileEntry>         eintraege;   ///< Stand des letzten k1520d_platte_list
+    std::vector<uint8_t>           gelesen;     ///< Inhalt des letzten k1520d_platte_read_size
+    bool                           gelesen_da = false;
+    std::string s_error, s_path, s_dir, s_role, s_label, s_name, s_type, s_attrs, s_date;
+};
+
+PlattenHandle* P(K1520Platte h) { return static_cast<PlattenHandle*>(h); }
+
+const FileEntry* peintrag(K1520Platte h, int i) {
+    if (!h) return nullptr;
+    PlattenHandle* p = P(h);
+    if (i < 0 || i >= static_cast<int>(p->eintraege.size())) return nullptr;
+    return &p->eintraege[static_cast<size_t>(i)];
+}
+
+bool pvolume_ok(K1520Platte h, int v) {
+    return h && v >= 0 && v < P(h)->vol->platte().volumeCount();
+}
+
+}  // namespace
+
+extern "C" bool k1520d_platte_ist(const char* path) {
+    return path && *path && WegaPlatte::istPlatte(path);
+}
+
+extern "C" K1520Platte k1520d_platte_open(const char* path, bool read_only) {
+    g_open_error.clear();
+    if (!path || !*path) { g_open_error = "kein Pfad angegeben"; return nullptr; }
+    auto h = std::make_unique<PlattenHandle>();
+    std::string err;
+    h->vol = PlattenVolume::open(path, err, read_only);
+    if (!h->vol) { g_open_error = err; return nullptr; }
+    return h.release();
+}
+
+extern "C" void k1520d_platte_close(K1520Platte h) { delete P(h); }
+
+extern "C" const char* k1520d_platte_last_error(K1520Platte h) {
+    if (!h) return g_open_error.c_str();
+    return halte(P(h)->s_error, P(h)->vol->lastError());
+}
+
+extern "C" const char* k1520d_platte_path(K1520Platte h) {
+    return h ? halte(P(h)->s_path, P(h)->vol->path()) : "";
+}
+
+extern "C" bool k1520d_platte_read_only(K1520Platte h) { return h && P(h)->vol->readOnly(); }
+extern "C" void k1520d_platte_set_read_only(K1520Platte h, bool ro) {
+    if (h) P(h)->vol->setReadOnly(ro);
+}
+extern "C" void k1520d_platte_set_backup(K1520Platte h, bool on) {
+    if (h) P(h)->vol->setBackup(on);
+}
+extern "C" bool k1520d_platte_dirty(K1520Platte h) { return h && P(h)->vol->dirty(); }
+extern "C" bool k1520d_platte_flush(K1520Platte h) { return h && P(h)->vol->flush(); }
+
+extern "C" int k1520d_platte_volume_count(K1520Platte h) {
+    return h ? P(h)->vol->platte().volumeCount() : 0;
+}
+
+extern "C" const char* k1520d_platte_volume_dir(K1520Platte h, int v) {
+    return pvolume_ok(h, v) ? halte(P(h)->s_dir, P(h)->vol->platte().volumeDir(v)) : "";
+}
+
+extern "C" const char* k1520d_platte_volume_role(K1520Platte h, int v) {
+    return pvolume_ok(h, v) ? halte(P(h)->s_role, P(h)->vol->platte().partition(v).rolle) : "";
+}
+
+extern "C" const char* k1520d_platte_volume_label(K1520Platte h, int v) {
+    return pvolume_ok(h, v) ? halte(P(h)->s_label, P(h)->vol->info(v).label) : "";
+}
+
+extern "C" uint64_t k1520d_platte_volume_total(K1520Platte h, int v) {
+    return pvolume_ok(h, v) ? P(h)->vol->info(v).total_bytes : 0;
+}
+extern "C" uint64_t k1520d_platte_volume_free(K1520Platte h, int v) {
+    return pvolume_ok(h, v) ? P(h)->vol->info(v).free_bytes : 0;
+}
+extern "C" uint64_t k1520d_platte_volume_used(K1520Platte h, int v) {
+    return pvolume_ok(h, v) ? P(h)->vol->info(v).used_bytes : 0;
+}
+
+extern "C" int k1520d_platte_list(K1520Platte h) {
+    if (!h) return 0;
+    P(h)->eintraege = P(h)->vol->list();
+    return static_cast<int>(P(h)->eintraege.size());
+}
+
+extern "C" int k1520d_platte_entry_volume(K1520Platte h, int i) {
+    const FileEntry* e = peintrag(h, i);
+    return e ? e->volume : 0;
+}
+extern "C" const char* k1520d_platte_entry_name(K1520Platte h, int i) {
+    const FileEntry* e = peintrag(h, i);
+    return e ? halte(P(h)->s_name, e->name) : "";
+}
+extern "C" uint64_t k1520d_platte_entry_size(K1520Platte h, int i) {
+    const FileEntry* e = peintrag(h, i);
+    return e ? e->size : 0;
+}
+extern "C" const char* k1520d_platte_entry_type(K1520Platte h, int i) {
+    const FileEntry* e = peintrag(h, i);
+    return e ? halte(P(h)->s_type, e->type) : "";
+}
+extern "C" const char* k1520d_platte_entry_attrs(K1520Platte h, int i) {
+    const FileEntry* e = peintrag(h, i);
+    return e ? halte(P(h)->s_attrs, e->attributes) : "";
+}
+extern "C" const char* k1520d_platte_entry_date(K1520Platte h, int i) {
+    const FileEntry* e = peintrag(h, i);
+    return e ? halte(P(h)->s_date, e->date) : "";
+}
+extern "C" bool k1520d_platte_entry_damaged(K1520Platte h, int i) {
+    const FileEntry* e = peintrag(h, i);
+    return e && e->damaged;
+}
+
+#define K1520D_PLATTE_UNIX(name, typ, feld) \
+    extern "C" typ name(K1520Platte h, int i) { \
+        const FileEntry* e = peintrag(h, i); \
+        return e ? static_cast<typ>(e->feld) : static_cast<typ>(0); \
+    }
+K1520D_PLATTE_UNIX(k1520d_platte_entry_unix_mode,  uint16_t, unix_mode)
+K1520D_PLATTE_UNIX(k1520d_platte_entry_unix_uid,   int,      unix_uid)
+K1520D_PLATTE_UNIX(k1520d_platte_entry_unix_gid,   int,      unix_gid)
+K1520D_PLATTE_UNIX(k1520d_platte_entry_unix_nlink, int,      unix_nlink)
+K1520D_PLATTE_UNIX(k1520d_platte_entry_unix_inode, uint32_t, unix_inode)
+K1520D_PLATTE_UNIX(k1520d_platte_entry_unix_mtime, uint32_t, unix_mtime)
+K1520D_PLATTE_UNIX(k1520d_platte_entry_unix_atime, uint32_t, unix_atime)
+K1520D_PLATTE_UNIX(k1520d_platte_entry_unix_ctime, uint32_t, unix_ctime)
+K1520D_PLATTE_UNIX(k1520d_platte_entry_unix_rdev,  uint16_t, unix_rdev)
+#undef K1520D_PLATTE_UNIX
+
+extern "C" int64_t k1520d_platte_read_size(K1520Platte h, const char* path) {
+    if (!h || !path) return -1;
+    PlattenHandle* p = P(h);
+    p->gelesen.clear();
+    p->gelesen_da = false;
+    if (!p->vol->read(path, p->gelesen)) return -1;
+    p->gelesen_da = true;
+    return static_cast<int64_t>(p->gelesen.size());
+}
+
+extern "C" int64_t k1520d_platte_read_data(K1520Platte h, uint8_t* buf, uint64_t cap) {
+    if (!h || !P(h)->gelesen_da) return -1;
+    const auto& d = P(h)->gelesen;
+    const size_t n = static_cast<size_t>(std::min<uint64_t>(cap, d.size()));
+    if (buf && n) std::copy(d.begin(), d.begin() + static_cast<std::ptrdiff_t>(n), buf);
+    return static_cast<int64_t>(n);
+}
+
+extern "C" bool k1520d_platte_write(K1520Platte h, const char* path,
+                                    const uint8_t* buf, uint64_t len, bool overwrite,
+                                    int mode, int uid, int gid, uint32_t mtime) {
+    if (!h || !path || (len && !buf)) return false;
+    WriteOptions w;
+    w.overwrite = overwrite;
+    if (mode >= 0) {
+        w.wega_mode = static_cast<uint16_t>(mode & 07777);
+        w.wega_mode_gesetzt = true;
+    }
+    if (uid >= 0 || gid >= 0) {
+        w.wega_uid = static_cast<uint16_t>(uid < 0 ? 0 : uid);
+        w.wega_gid = static_cast<uint16_t>(gid < 0 ? 0 : gid);
+        w.wega_owner_gesetzt = true;
+    }
+    w.wega_mtime = mtime;
+    const std::vector<uint8_t> d(buf, buf + len);
+    return P(h)->vol->write(path, d, w);
+}
+
+extern "C" bool k1520d_platte_erase(K1520Platte h, const char* path) {
+    return h && path && P(h)->vol->erase(path);
+}
+
+extern "C" bool k1520d_platte_mkdir(K1520Platte h, const char* path) {
+    return h && path && P(h)->vol->makeDirectory(path);
+}
+
+extern "C" bool k1520d_platte_set_unix_attrs(K1520Platte h, const char* path,
+                                             bool set_mode,  uint16_t mode,
+                                             bool set_uid,   int uid,
+                                             bool set_gid,   int gid,
+                                             bool set_mtime, uint32_t mtime) {
+    if (!h || !path) return false;
+    UnixAttrs a;
+    a.set_mode  = set_mode;  a.mode  = mode;
+    a.set_uid   = set_uid;   a.uid   = uid;
+    a.set_gid   = set_gid;   a.gid   = gid;
+    a.set_mtime = set_mtime; a.mtime = mtime;
+    return P(h)->vol->setAttributes(path, a);
+}
+
+extern "C" bool k1520d_platte_extract(K1520Platte h, const char* path, const char* dest_dir,
+                                      bool overwrite) {
+    if (!h || !dest_dir) return false;
+    return P(h)->vol->extract(path ? path : "", dest_dir, overwrite);
+}
+
+extern "C" bool k1520d_platte_insert(K1520Platte h, const char* src, const char* dest,
+                                     bool overwrite) {
+    if (!h || !src || !dest) return false;
+    return P(h)->vol->insert(src, dest, overwrite);
 }

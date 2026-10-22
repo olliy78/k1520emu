@@ -105,16 +105,64 @@ _lib.k1520d_set_read_only.argtypes = [_H, ctypes.c_bool]
 _lib.k1520d_set_read_only.restype = None
 _lib.k1520d_read_only_forced.argtypes = [_H]
 _lib.k1520d_read_only_forced.restype = ctypes.c_bool
-_lib.k1520d_tar_leer.argtypes = [_H]
-_lib.k1520d_tar_leer.restype = ctypes.c_bool
 _lib.k1520d_tar_export.argtypes = [_H, _CS]
 _lib.k1520d_tar_export.restype = ctypes.c_bool
-_lib.k1520d_tar_put_pruefen.argtypes = [_H, _CS]
-_lib.k1520d_tar_put_pruefen.restype = ctypes.c_int
 _lib.k1520d_tar_warning.argtypes = [_H]
 _lib.k1520d_tar_warning.restype = _CS
-_lib.k1520d_tar_put.argtypes = [_H, _CS]
-_lib.k1520d_tar_put.restype = ctypes.c_bool
+_lib.k1520d_open_tar_satz_format.argtypes = [_CS, _CS]
+_lib.k1520d_open_tar_satz_format.restype = _H
+_lib.k1520d_tar_format_count.argtypes = []
+_lib.k1520d_tar_format_count.restype = ctypes.c_int
+_lib.k1520d_tar_format_name.argtypes = [ctypes.c_int]
+_lib.k1520d_tar_format_name.restype = _CS
+_lib.k1520d_tar_format_description.argtypes = [ctypes.c_int]
+_lib.k1520d_tar_format_description.restype = _CS
+_lib.k1520d_tar_format_bytes.argtypes = [ctypes.c_int]
+_lib.k1520d_tar_format_bytes.restype = ctypes.c_uint64
+_lib.k1520d_tar_format_container.argtypes = [ctypes.c_int]
+_lib.k1520d_tar_format_container.restype = ctypes.c_int
+_lib.k1520d_tar_satz_neu.argtypes = [_CS, _CS]
+_lib.k1520d_tar_satz_neu.restype = _H
+_lib.k1520d_tar_disk_neu.argtypes = [_CS, _CS]
+_lib.k1520d_tar_disk_neu.restype = _H
+_lib.k1520d_tar_satz.argtypes = [_H]
+_lib.k1520d_tar_satz.restype = ctypes.c_bool
+_lib.k1520d_tar_satz_einzel.argtypes = [_H]
+_lib.k1520d_tar_satz_einzel.restype = ctypes.c_bool
+_lib.k1520d_tar_zu_satz.argtypes = [_H, _CS]
+_lib.k1520d_tar_zu_satz.restype = ctypes.c_bool
+_lib.k1520d_tar_satz_basis.argtypes = [_H]
+_lib.k1520d_tar_satz_basis.restype = _CS
+_lib.k1520d_tar_satz_plan.argtypes = [_H, _CS]
+_lib.k1520d_tar_satz_plan.restype = ctypes.c_int
+_lib.k1520d_tar_plan_strom.argtypes = [_H]
+_lib.k1520d_tar_plan_strom.restype = ctypes.c_uint64
+_lib.k1520d_tar_plan_kapazitaet.argtypes = [_H]
+_lib.k1520d_tar_plan_kapazitaet.restype = ctypes.c_uint64
+_lib.k1520d_tar_plan_einzel.argtypes = [_H]
+_lib.k1520d_tar_plan_einzel.restype = ctypes.c_bool
+_lib.k1520d_tar_plan_namen.argtypes = [_H]
+_lib.k1520d_tar_plan_namen.restype = _CS
+_lib.k1520d_tar_plan_ueberschreibt.argtypes = [_H]
+_lib.k1520d_tar_plan_ueberschreibt.restype = _CS
+_lib.k1520d_tar_plan_altlasten.argtypes = [_H]
+_lib.k1520d_tar_plan_altlasten.restype = _CS
+_lib.k1520d_tar_satz_speichern.argtypes = [_H, _CS]
+_lib.k1520d_tar_satz_speichern.restype = ctypes.c_bool
+_lib.k1520d_tar_satz_hinweise.argtypes = [_H]
+_lib.k1520d_tar_satz_hinweise.restype = _CS
+_lib.k1520d_tar_satz_geschrieben.argtypes = [_H]
+_lib.k1520d_tar_satz_geschrieben.restype = _CS
+_lib.k1520d_physisch_schreiben_grund.argtypes = [_H]
+_lib.k1520d_physisch_schreiben_grund.restype = _CS
+_lib.k1520d_tar_datei_pruefen.argtypes = [_H, _CS]
+_lib.k1520d_tar_datei_pruefen.restype = ctypes.c_int
+_lib.k1520d_tar_datei_grund.argtypes = [_H]
+_lib.k1520d_tar_datei_grund.restype = _CS
+_lib.k1520d_tar_datei_abbilder.argtypes = [_H]
+_lib.k1520d_tar_datei_abbilder.restype = ctypes.c_int
+_lib.k1520d_tar_datei_ablegen.argtypes = [_H, _CS, ctypes.c_int, _CS, ctypes.c_bool]
+_lib.k1520d_tar_datei_ablegen.restype = ctypes.c_bool
 _lib.k1520d_set_backup.argtypes = [_H, ctypes.c_bool]
 _lib.k1520d_set_backup.restype = None
 _lib.k1520d_close.argtypes = [_H]
@@ -382,6 +430,8 @@ _lib.k1520d_insert.argtypes = [_H, _CS, _CS, ctypes.c_int, ctypes.c_bool]
 _lib.k1520d_insert.restype = ctypes.c_bool
 _lib.k1520d_erase.argtypes = [_H, _CS]
 _lib.k1520d_erase.restype = ctypes.c_bool
+_lib.k1520d_mkdir.argtypes = [_H, _CS]
+_lib.k1520d_mkdir.restype = ctypes.c_bool
 _lib.k1520d_insert_forced.argtypes = [_H, _CS, _CS, ctypes.c_int, ctypes.c_bool]
 _lib.k1520d_insert_forced.restype = ctypes.c_bool
 _lib.k1520d_insert_with_info.argtypes = [_H, _CS, _CS, ctypes.c_int, ctypes.c_bool, _CS]
@@ -544,6 +594,98 @@ _lib.k1520d_recover_extract.argtypes = [_H, ctypes.c_int, _CS]
 _lib.k1520d_recover_extract.restype = ctypes.c_bool
 _lib.k1520d_recover_restore.argtypes = [_H, ctypes.c_int, _CS]
 _lib.k1520d_recover_restore.restype = ctypes.c_bool
+
+# ── P8000-Platte (Entwurf 37) ────────────────────────────────────────────────
+_I64 = ctypes.c_int64
+_U8P = ctypes.POINTER(ctypes.c_uint8)
+_lib.k1520d_platte_ist.argtypes = [_CS]
+_lib.k1520d_platte_ist.restype = ctypes.c_bool
+_lib.k1520d_platte_open.argtypes = [_CS, ctypes.c_bool]
+_lib.k1520d_platte_open.restype = _H
+_lib.k1520d_platte_close.argtypes = [_H]
+_lib.k1520d_platte_close.restype = None
+_lib.k1520d_platte_last_error.argtypes = [_H]
+_lib.k1520d_platte_last_error.restype = _CS
+_lib.k1520d_platte_path.argtypes = [_H]
+_lib.k1520d_platte_path.restype = _CS
+_lib.k1520d_platte_read_only.argtypes = [_H]
+_lib.k1520d_platte_read_only.restype = ctypes.c_bool
+_lib.k1520d_platte_set_read_only.argtypes = [_H, ctypes.c_bool]
+_lib.k1520d_platte_set_read_only.restype = None
+_lib.k1520d_platte_set_backup.argtypes = [_H, ctypes.c_bool]
+_lib.k1520d_platte_set_backup.restype = None
+_lib.k1520d_platte_dirty.argtypes = [_H]
+_lib.k1520d_platte_dirty.restype = ctypes.c_bool
+_lib.k1520d_platte_flush.argtypes = [_H]
+_lib.k1520d_platte_flush.restype = ctypes.c_bool
+_lib.k1520d_platte_volume_count.argtypes = [_H]
+_lib.k1520d_platte_volume_count.restype = ctypes.c_int
+_lib.k1520d_platte_volume_dir.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_platte_volume_dir.restype = _CS
+_lib.k1520d_platte_volume_role.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_platte_volume_role.restype = _CS
+_lib.k1520d_platte_volume_label.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_platte_volume_label.restype = _CS
+_lib.k1520d_platte_volume_total.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_platte_volume_total.restype = _U64
+_lib.k1520d_platte_volume_free.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_platte_volume_free.restype = _U64
+_lib.k1520d_platte_volume_used.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_platte_volume_used.restype = _U64
+_lib.k1520d_platte_list.argtypes = [_H]
+_lib.k1520d_platte_list.restype = ctypes.c_int
+_lib.k1520d_platte_entry_volume.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_platte_entry_volume.restype = ctypes.c_int
+_lib.k1520d_platte_entry_name.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_platte_entry_name.restype = _CS
+_lib.k1520d_platte_entry_type.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_platte_entry_type.restype = _CS
+_lib.k1520d_platte_entry_attrs.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_platte_entry_attrs.restype = _CS
+_lib.k1520d_platte_entry_date.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_platte_entry_date.restype = _CS
+_lib.k1520d_platte_entry_size.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_platte_entry_size.restype = _U64
+_lib.k1520d_platte_entry_damaged.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_platte_entry_damaged.restype = ctypes.c_bool
+_lib.k1520d_platte_entry_unix_mode.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_platte_entry_unix_mode.restype = ctypes.c_uint16
+_lib.k1520d_platte_entry_unix_uid.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_platte_entry_unix_uid.restype = ctypes.c_int
+_lib.k1520d_platte_entry_unix_gid.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_platte_entry_unix_gid.restype = ctypes.c_int
+_lib.k1520d_platte_entry_unix_nlink.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_platte_entry_unix_nlink.restype = ctypes.c_int
+_lib.k1520d_platte_entry_unix_inode.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_platte_entry_unix_inode.restype = ctypes.c_uint32
+_lib.k1520d_platte_entry_unix_mtime.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_platte_entry_unix_mtime.restype = ctypes.c_uint32
+_lib.k1520d_platte_entry_unix_atime.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_platte_entry_unix_atime.restype = ctypes.c_uint32
+_lib.k1520d_platte_entry_unix_ctime.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_platte_entry_unix_ctime.restype = ctypes.c_uint32
+_lib.k1520d_platte_entry_unix_rdev.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_platte_entry_unix_rdev.restype = ctypes.c_uint16
+_lib.k1520d_platte_read_size.argtypes = [_H, _CS]
+_lib.k1520d_platte_read_size.restype = _I64
+_lib.k1520d_platte_read_data.argtypes = [_H, _U8P, _U64]
+_lib.k1520d_platte_read_data.restype = _I64
+_lib.k1520d_platte_write.argtypes = [_H, _CS, _U8P, _U64, ctypes.c_bool,
+                                     ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                                     ctypes.c_uint32]
+_lib.k1520d_platte_write.restype = ctypes.c_bool
+_lib.k1520d_platte_erase.argtypes = [_H, _CS]
+_lib.k1520d_platte_erase.restype = ctypes.c_bool
+_lib.k1520d_platte_mkdir.argtypes = [_H, _CS]
+_lib.k1520d_platte_mkdir.restype = ctypes.c_bool
+_lib.k1520d_platte_set_unix_attrs.argtypes = [
+    _H, _CS, ctypes.c_bool, ctypes.c_uint16, ctypes.c_bool, ctypes.c_int,
+    ctypes.c_bool, ctypes.c_int, ctypes.c_bool, ctypes.c_uint32]
+_lib.k1520d_platte_set_unix_attrs.restype = ctypes.c_bool
+_lib.k1520d_platte_extract.argtypes = [_H, _CS, _CS, ctypes.c_bool]
+_lib.k1520d_platte_extract.restype = ctypes.c_bool
+_lib.k1520d_platte_insert.argtypes = [_H, _CS, _CS, ctypes.c_bool]
+_lib.k1520d_platte_insert.restype = ctypes.c_bool
 
 
 def _s(raw) -> str:
@@ -1004,6 +1146,11 @@ class DiskTool:
     def __init__(self, handle: int, path: str):
         self._h = handle
         self._path = path
+        # Dateien eines tar-Satzes in Stromreihenfolge (None = nicht bekannt/kein Satz).
+        # Gefuehrt wird sie hier, weil der Kern nur den Basisnamen kennt: beim Oeffnen
+        # duerfen die Abbilder beliebig heissen (`a.img`, `b.img`), und das Archiv eines
+        # Satzes (app/disktool/archive.py) braucht genau diese Dateien.
+        self._satz_pfade = None
 
     # ── Oeffnen / Anlegen ────────────────────────────────────────────────────
 
@@ -1056,7 +1203,64 @@ class DiskTool:
         h = _lib.k1520d_open_tar_satz(_b("\n".join(liste)))
         if not h:
             raise K1520DiskError(_s(_lib.k1520d_last_open_error()))
-        return cls(h, liste[0] if liste else "")
+        t = cls(h, liste[0] if liste else "")
+        t._satz_pfade = liste
+        return t
+
+    @classmethod
+    def open_tar_satz_format(cls, paths, format: str = "") -> "DiskTool":
+        """Wie :meth:`open_tar_satz`, mit VORGEGEBENEM Katalogformat (``""`` = erkennen).
+
+        Nötig für ``.img``-Sätze: die Dateigröße ist bei kleinen Formaten mehrdeutig.
+        Das Volume ist schreibgeschützt, bis :meth:`set_read_only` ``False`` setzt."""
+        liste = [os.fspath(p) for p in paths]
+        h = _lib.k1520d_open_tar_satz_format(_b("\n".join(liste)), _b(format or ""))
+        if not h:
+            raise K1520DiskError(_s(_lib.k1520d_last_open_error()))
+        t = cls(h, liste[0] if liste else "")
+        t._satz_pfade = liste
+        return t
+
+    @staticmethod
+    def tar_formate() -> list:
+        """Die Katalogformate, die sich für eine neue tar-Diskette / einen tar-Satz eignen:
+        Liste von Wörterbüchern ``name``, ``beschreibung``, ``bytes`` (Nutzbytes EINES Abbilds),
+        ``img`` (auch ``.cqm``), ``hfe`` (``.dmk`` geht immer)."""
+        aus = []
+        for i in range(int(_lib.k1520d_tar_format_count())):
+            m = int(_lib.k1520d_tar_format_container(i))
+            aus.append({
+                "name": _s(_lib.k1520d_tar_format_name(i)),
+                "beschreibung": _s(_lib.k1520d_tar_format_description(i)),
+                "bytes": int(_lib.k1520d_tar_format_bytes(i)),
+                "img": bool(m & 1),
+                "hfe": bool(m & 2),
+            })
+        return aus
+
+    @classmethod
+    def tar_satz_neu(cls, format: str, basisname) -> "DiskTool":
+        """Leeren tar-Satz im Katalogformat ``format`` anlegen (nichts auf der Platte).
+
+        Die Endung von ``basisname`` (``.img/.hfe/.dmk/.cqm``) bestimmt den Container; gespeichert
+        wird mit :meth:`tar_satz_speichern` als ``name1.ext``, ``name2.ext``, …"""
+        p = os.fspath(basisname)
+        h = _lib.k1520d_tar_satz_neu(_b(format), _b(p))
+        if not h:
+            raise K1520DiskError(_s(_lib.k1520d_last_open_error()))
+        return cls(h, p)
+
+    @classmethod
+    def tar_disk_neu(cls, path, format: str) -> "DiskTool":
+        """Neue LEERE tar-Diskette im Katalogformat ``format`` als Datei ``path`` anlegen
+        (sofort geschrieben, genau dieser Name) und im Satzmodus öffnen."""
+        p = os.fspath(path)
+        h = _lib.k1520d_tar_disk_neu(_b(p), _b(format))
+        if not h:
+            raise K1520DiskError(_s(_lib.k1520d_last_open_error()))
+        t = cls(h, p)
+        t._satz_pfade = [p]
+        return t
 
     @classmethod
     def open_raw(cls, path, filesystem: Optional[str] = None,
@@ -1674,6 +1878,11 @@ class DiskTool:
         if not _lib.k1520d_erase(self._h, _b(name)):
             raise K1520DiskError(self._fail())
 
+    def mkdir(self, name: str) -> None:
+        """Verzeichnis anlegen (UNIX-Sicht: WEGA, tar); Zwischenverzeichnisse entstehen mit."""
+        if not _lib.k1520d_mkdir(self._h, _b(name)):
+            raise K1520DiskError(self._fail())
+
     def first_sector(self, name: str):
         """Der erste Sektor der Datei als ``(cyl, head, sector)`` — sonst ``None``.
 
@@ -1986,6 +2195,7 @@ class DiskTool:
         if not _lib.k1520d_save_as(self._h, _b(os.fspath(path))):
             raise K1520DiskError(self._fail())
         self._path = os.fspath(path)
+        self._satz_pfade = None       # eine tar-Diskette heisst jetzt so (einziges Abbild)
 
     def export_image(self, path) -> None:
         """Kopie in einen anderen Container schreiben, **ohne** umzubinden.
@@ -2006,28 +2216,118 @@ class DiskTool:
         """Schreibschutz unaufhebbar (``.cqm``, tar-Diskette, nur gemessene Geometrie)?"""
         return bool(_lib.k1520d_read_only_forced(self._h))
 
-    @property
-    def tar_leer(self) -> bool:
-        """Die LEERE tar-Diskette (``tar720_leer``): ganz Null, nimmt genau ein ``.tar`` auf."""
-        return bool(_lib.k1520d_tar_leer(self._h))
-
     def tar_export(self, ziel) -> None:
         """Den tar-Strom der Diskette als ``.tar`` schreiben (``K1520DiskError`` mit dem Grund)."""
         if not _lib.k1520d_tar_export(self._h, _b(str(ziel))):
             raise K1520DiskError(self._fail())
 
-    def tar_put_pruefen(self, quelle) -> str:
-        """``.tar`` für :meth:`tar_put` beurteilen.  Rückgabe: Warnung (``""`` = keine);
-        ``K1520DiskError`` mit dem Grund, wenn abgelehnt."""
-        r = _lib.k1520d_tar_put_pruefen(self._h, _b(str(quelle)))
+    # ── tar-Satz bearbeiten, .tar ablegen (Entwurf 37) ──────────────────────
+
+    @property
+    def tar_satz(self) -> bool:
+        """Satzmodus: ein tar-Strom im Speicher über N ≥ 1 gleichformatige Abbilder?  Jede
+        schreibbare tar-Diskette aus einer Datei ist ein Satz (mit einem Abbild)."""
+        return bool(_lib.k1520d_tar_satz(self._h))
+
+    @property
+    def tar_satz_einzel(self) -> bool:
+        """Satzmodus UND die Datei ist das einzige Abbild: Speichern geht in dieselbe Datei,
+        solange der Inhalt auf ein Abbild passt."""
+        return bool(_lib.k1520d_tar_satz_einzel(self._h))
+
+    def tar_zu_satz(self, basisname=None) -> None:
+        """Eine tar-Einzeldiskette in den Satzmodus überführen (``K1520DiskError`` mit dem Grund)."""
+        if not _lib.k1520d_tar_zu_satz(self._h, _b(os.fspath(basisname)) if basisname else b""):
+            raise K1520DiskError(self._fail())
+        if self._satz_pfade is None and self._path:
+            self._satz_pfade = [self._path]       # die Einzeldiskette ist jetzt Abbild 1
+
+    @property
+    def tar_satz_basis(self) -> str:
+        """Der beim Speichern vorgesehene Basisname des Satzes (``""`` = keiner)."""
+        return _s(_lib.k1520d_tar_satz_basis(self._h))
+
+    def tar_satz_planen(self, basisname=None) -> dict:
+        """Speichern planen, ohne zu schreiben: ``abbilder``, ``strom``, ``kapazitaet``, ``einzel``,
+        ``namen``, ``ueberschreibt`` (schon vorhanden; Sicherung ``~``), ``altlasten`` (höhere
+        Nummern, die liegenbleiben).  ``K1520DiskError`` bei Fehler."""
+        n = _lib.k1520d_tar_satz_plan(self._h, _b(os.fspath(basisname)) if basisname else b"")
+        if n < 0:
+            raise K1520DiskError(self._fail())
+
+        def liste(roh):
+            t = _s(roh)
+            return t.split("\n") if t else []
+
+        return {
+            "abbilder": int(n),
+            "strom": int(_lib.k1520d_tar_plan_strom(self._h)),
+            "kapazitaet": int(_lib.k1520d_tar_plan_kapazitaet(self._h)),
+            "einzel": bool(_lib.k1520d_tar_plan_einzel(self._h)),
+            "namen": liste(_lib.k1520d_tar_plan_namen(self._h)),
+            "ueberschreibt": liste(_lib.k1520d_tar_plan_ueberschreibt(self._h)),
+            "altlasten": liste(_lib.k1520d_tar_plan_altlasten(self._h)),
+        }
+
+    def tar_satz_speichern(self, basisname=None) -> dict:
+        """Den Strom auf Abbilder gleichen Formats verteilen und schreiben (alles oder nichts).
+        Rückgabe: ``geschrieben`` (Dateien) und ``hinweise`` (z. B. liegengebliebene alte Nummern)."""
+        if not _lib.k1520d_tar_satz_speichern(self._h, _b(os.fspath(basisname)) if basisname else b""):
+            raise K1520DiskError(self._fail())
+
+        def liste(roh):
+            t = _s(roh)
+            return t.split("\n") if t else []
+
+        r = {"geschrieben": liste(_lib.k1520d_tar_satz_geschrieben(self._h)),
+             "hinweise": liste(_lib.k1520d_tar_satz_hinweise(self._h))}
+        self._satz_pfade = list(r["geschrieben"])
+        return r
+
+    @property
+    def tar_satz_dateien(self) -> list:
+        """Die Abbilddateien des Satzes in Stromreihenfolge, soweit sie ZUM jetzigen Strom
+        passen: ``[]``, wenn das Volume kein Satz ist, der Satz nie gespeichert/geoeffnet wurde
+        oder seither geaendert (``dirty``) wurde — dann stuende in den Dateien ein anderer Strom."""
+        if not self.tar_satz or self.dirty:
+            return []
+        if self._satz_pfade is None:
+            # Eine geoeffnete tar-Diskette: ihr einziges Abbild ist die Datei selbst.
+            return [self._path] if self.tar_satz_einzel and self._path else []
+        return list(self._satz_pfade)
+
+    @property
+    def physisch_schreiben_grund(self) -> str:
+        """``""`` = das Volume lässt sich direkt auf eine physische Diskette schreiben; sonst die
+        Begründung (ein tar-Satz hat keine einzelne Diskette) samt Weg."""
+        return _s(_lib.k1520d_physisch_schreiben_grund(self._h))
+
+    def tar_datei_pruefen(self, quelle) -> dict:
+        """Beurteilt eine ``.tar``-Datei, die auf dieses Volume gezogen wird, ohne etwas zu ändern.
+
+        Schlüssel: ``als_datei`` (immer), ``als_container`` (Inhalt WIRD das Archiv; nur bei leerem
+        Archiv), ``ziel_leer``, ``wird_satz`` (Container sprengt die Einzeldiskette),
+        ``abbilder`` (Zahl bei Container), ``container_grund`` (warum nicht), ``warnung`` (kein
+        reines V7-tar).  ``K1520DiskError``, wenn gar nichts geht."""
+        r = _lib.k1520d_tar_datei_pruefen(self._h, _b(str(quelle)))
         if r < 0:
             raise K1520DiskError(self._fail())
-        return _s(_lib.k1520d_tar_warning(self._h)) if r else ""
+        return {
+            "als_datei": bool(r & 1),
+            "als_container": bool(r & 2),
+            "ziel_leer": bool(r & 4),
+            "wird_satz": bool(r & 8),
+            "abbilder": int(_lib.k1520d_tar_datei_abbilder(self._h)) if r & 2 else 0,
+            "container_grund": _s(_lib.k1520d_tar_datei_grund(self._h)),
+            "warnung": _s(_lib.k1520d_tar_warning(self._h)),
+        }
 
-    def tar_put(self, quelle) -> str:
-        """``.tar`` auf die leere tar-Diskette schreiben und das Abbild zurückschreiben.
-        Rückgabe: Warnung (``""`` = keine); ``K1520DiskError`` mit dem Grund bei Ablehnung."""
-        if not _lib.k1520d_tar_put(self._h, _b(str(quelle))):
+    def tar_datei_ablegen(self, quelle, *, als_container: bool = False, name: str = "",
+                          ersetzen: bool = False) -> str:
+        """``.tar`` ablegen: als Datei (Vorgabe; unter ``name``, sonst ihrem Dateinamen) oder als
+        fertiger Container (nur bei leerem Archiv).  Rückgabe: Warnung (``""`` = keine)."""
+        if not _lib.k1520d_tar_datei_ablegen(self._h, _b(str(quelle)), 1 if als_container else 0,
+                                             _b(name or ""), ersetzen):
             raise K1520DiskError(self._fail())
         return _s(_lib.k1520d_tar_warning(self._h))
 
@@ -2038,3 +2338,253 @@ class DiskTool:
 
     def set_read_only(self, ro: bool) -> None:
         _lib.k1520d_set_read_only(self._h, ro)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# P8000-Platte (md0 ... md4)
+# ════════════════════════════════════════════════════════════════════════════
+
+
+def ist_platte(path) -> bool:
+    """Trägt die Datei einen PAR-Sektor, ist sie also ein P8000-Plattenabbild?"""
+    return bool(_lib.k1520d_platte_ist(_b(os.fspath(path))))
+
+
+class PlatteTool:
+    """Ein geöffnetes P8000-Plattenabbild (WEGA) — dieselbe Oberfläche wie :class:`DiskTool`,
+    soweit die GUI sie braucht (Duck-Typing, ``ist_unix`` ist immer wahr).
+
+    Die Partitionen erscheinen als oberste Ordner; Namen sind volle Pfade
+    (``md2/etc/passwd``).  Schreibschutz ist die Vorgabe.  ``close()`` schreibt
+    **nicht** von selbst — vorher :meth:`flush`.
+    """
+
+    ist_unix = True
+
+    def __init__(self, handle: int, path: str):
+        self._h = handle
+        self._path = path
+
+    @classmethod
+    def open(cls, path, read_only: bool = True) -> "PlatteTool":
+        """Platte öffnen (``.img`` oder ``.img.gz``).
+
+        Raises:
+            K1520DiskError: keine Platte oder keine Partition mit WEGA-Dateisystem.
+        """
+        p = os.fspath(path)
+        h = _lib.k1520d_platte_open(_b(p), read_only)
+        if not h:
+            raise K1520DiskError(_s(_lib.k1520d_last_open_error()))
+        return cls(h, p)
+
+    @staticmethod
+    def ist_platte(path) -> bool:
+        return ist_platte(path)
+
+    def __enter__(self) -> "PlatteTool":
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self.close()
+
+    def close(self) -> None:
+        if getattr(self, "_h", None):
+            _lib.k1520d_platte_close(self._h)
+            self._h = None
+
+    def __del__(self):
+        self.close()
+
+    def _fail(self) -> str:
+        return _s(_lib.k1520d_platte_last_error(self._h)) or "unbekannter Fehler"
+
+    # ── Auskunft (Duck-Typing zu DiskTool) ───────────────────────────────────
+
+    @property
+    def path(self) -> str:
+        return self._path
+
+    @property
+    def filesystem(self) -> str:
+        return "wega"
+
+    @property
+    def filesystem_type(self) -> str:
+        return "wega"
+
+    @property
+    def format(self) -> str:
+        return "wega"
+
+    @property
+    def has_filesystem(self) -> bool:
+        return True
+
+    ist_wega = True
+    ist_tar = False
+    ist_udos = False
+    ist_cpm = False
+    ist_cqm = False
+    read_only_forced = False
+    #: Kennung fuer die Oberflaeche (``ist_platte`` ist die statische Pruefung einer Datei).
+    ist_plattenabbild = True
+
+    # Was die gemeinsamen Teile der Oberflaeche (Kopf, Meldungsstreifen, Sperrlogik)
+    # an einem ``DiskTool`` abfragen und eine Platte nicht kennt: neutrale Werte statt
+    # Sonderfaelle an jeder Stelle.  Eine Platte hat weder Spuren noch eine
+    # mehrdeutige Erkennung noch einen Medienkommentar.
+    unambiguous = True
+    alternatives: List[str] = []
+    remarks = ""
+    tar_satz = False
+    tar_satz_einzel = False
+    tar_satz_basis = ""
+    physisch_schreiben_grund = ""
+    medium_cylinders = 0
+    medium_heads = 0
+    examined_tracks = 0
+
+    def container_info(self) -> dict:
+        return {}
+
+    def unix_blocks(self, name: str) -> str:
+        """Blockliste einer Datei — fuer Platten nicht ausgegeben (leer)."""
+        return ""
+
+    @property
+    def volume_count(self) -> int:
+        return int(_lib.k1520d_platte_volume_count(self._h))
+
+    def volume_dir(self, v: int) -> str:
+        return _s(_lib.k1520d_platte_volume_dir(self._h, v))
+
+    def volumes(self) -> List[VolumeInfo]:
+        """Die Partitionen: ``dir`` = ``md2``, ``label`` = Datenträgername."""
+        return [
+            VolumeInfo(index=v, dir=self.volume_dir(v),
+                       label=_s(_lib.k1520d_platte_volume_label(self._h, v)),
+                       total=int(_lib.k1520d_platte_volume_total(self._h, v)),
+                       used=int(_lib.k1520d_platte_volume_used(self._h, v)),
+                       free=int(_lib.k1520d_platte_volume_free(self._h, v)))
+            for v in range(self.volume_count)
+        ]
+
+    def volume_role(self, v: int) -> str:
+        """Rolle laut Standardtabelle: ``/usr``, ``/``, ``/tmp`` …"""
+        return _s(_lib.k1520d_platte_volume_role(self._h, v))
+
+    # ── Verzeichnis ──────────────────────────────────────────────────────────
+
+    def list(self) -> List[Entry]:
+        """Wurzel, Partitionen und alle Einträge — immer frisch gelesen.
+
+        ``name`` ist der volle Pfad (``md2/etc/passwd``); die Partitionsordner
+        selbst sind Einträge vom Typ ``d``.  ``side_dir`` bleibt leer, damit
+        ``ref`` gleich ``name`` ist.
+        """
+        return [self._entry(i) for i in range(_lib.k1520d_platte_list(self._h))]
+
+    def _entry(self, i: int) -> Entry:
+        h = self._h
+        return Entry(
+            volume=int(_lib.k1520d_platte_entry_volume(h, i)),
+            name=_s(_lib.k1520d_platte_entry_name(h, i)),
+            size=int(_lib.k1520d_platte_entry_size(h, i)),
+            type=_s(_lib.k1520d_platte_entry_type(h, i)),
+            attrs=_s(_lib.k1520d_platte_entry_attrs(h, i)),
+            date=_s(_lib.k1520d_platte_entry_date(h, i)),
+            damaged=bool(_lib.k1520d_platte_entry_damaged(h, i)),
+            unix_mode=int(_lib.k1520d_platte_entry_unix_mode(h, i)),
+            unix_uid=int(_lib.k1520d_platte_entry_unix_uid(h, i)),
+            unix_gid=int(_lib.k1520d_platte_entry_unix_gid(h, i)),
+            unix_nlink=int(_lib.k1520d_platte_entry_unix_nlink(h, i)),
+            unix_inode=int(_lib.k1520d_platte_entry_unix_inode(h, i)),
+            unix_mtime=int(_lib.k1520d_platte_entry_unix_mtime(h, i)),
+            unix_atime=int(_lib.k1520d_platte_entry_unix_atime(h, i)),
+            unix_ctime=int(_lib.k1520d_platte_entry_unix_ctime(h, i)),
+            unix_rdev=int(_lib.k1520d_platte_entry_unix_rdev(h, i)),
+        )
+
+    # ── Lesen / Schreiben ────────────────────────────────────────────────────
+
+    def read(self, name: str) -> bytes:
+        """Inhalt einer Datei (``name`` mit Partition: ``md2/etc/passwd``)."""
+        n = int(_lib.k1520d_platte_read_size(self._h, _b(name)))
+        if n < 0:
+            raise K1520DiskError(self._fail())
+        buf = (ctypes.c_uint8 * max(n, 1))()
+        if _lib.k1520d_platte_read_data(self._h, buf, n) != n:
+            raise K1520DiskError(self._fail())
+        return bytes(buf[:n])
+
+    def write(self, name: str, data: bytes, *, overwrite: bool = False,
+              mode: Optional[int] = None, uid: Optional[int] = None,
+              gid: Optional[int] = None, mtime: int = 0) -> None:
+        """Datei anlegen oder (``overwrite``) ersetzen.  Nicht angegebene Angaben
+        nimmt das Dateisystem selbst (Vorgabe: 0644, Besitzer 0, Zeit jetzt)."""
+        data = bytes(data)
+        buf = (ctypes.c_uint8 * max(len(data), 1)).from_buffer_copy(data or b"\0")
+        if not _lib.k1520d_platte_write(
+                self._h, _b(name), buf, len(data), overwrite,
+                -1 if mode is None else int(mode),
+                -1 if uid is None else int(uid),
+                -1 if gid is None else int(gid), int(mtime)):
+            raise K1520DiskError(self._fail())
+
+    def erase(self, name: str) -> None:
+        if not _lib.k1520d_platte_erase(self._h, _b(name)):
+            raise K1520DiskError(self._fail())
+
+    def mkdir(self, name: str) -> None:
+        if not _lib.k1520d_platte_mkdir(self._h, _b(name)):
+            raise K1520DiskError(self._fail())
+
+    def set_unix_attrs(self, name: str, *, mode: Optional[int] = None,
+                       uid: Optional[int] = None, gid: Optional[int] = None,
+                       mtime: Optional[int] = None) -> None:
+        """``chmod``/``chown``/``touch`` — wie :meth:`DiskTool.set_unix_attrs`."""
+        if not _lib.k1520d_platte_set_unix_attrs(
+                self._h, _b(name),
+                mode is not None, int(mode or 0) & 0xFFFF,
+                uid is not None, int(uid or 0),
+                gid is not None, int(gid or 0),
+                mtime is not None, int(mtime or 0)):
+            raise K1520DiskError(self._fail())
+
+    # ── Uebertragung ──────────────────────────────────────────────────────────
+
+    def extract(self, name: str, dest_dir, overwrite: bool = False) -> None:
+        """Datei oder Ordner (rekursiv) samt ``.fileinfo`` nach ``dest_dir`` holen;
+        ``name`` leer = die ganze Platte.  Unter ``dest_dir`` entsteht ``md2/…``."""
+        if not _lib.k1520d_platte_extract(self._h, _b(name or ""),
+                                          _b(os.fspath(dest_dir)), overwrite):
+            raise K1520DiskError(self._fail())
+
+    def insert(self, src, name: str, overwrite: bool = False) -> None:
+        """Linux-Datei oder -Ordner (rekursiv) einfügen; ``name`` = voller Zielpfad
+        (bei einem Ordner der Zielordner, ``md2`` = Wurzel der Partition)."""
+        if not _lib.k1520d_platte_insert(self._h, _b(os.fspath(src)), _b(name), overwrite):
+            raise K1520DiskError(self._fail())
+
+    # ── Dateibindung ─────────────────────────────────────────────────────────
+
+    @property
+    def dirty(self) -> bool:
+        return bool(_lib.k1520d_platte_dirty(self._h))
+
+    def set_backup(self, on: bool) -> None:
+        """Sicherungskopie ``…~`` beim ersten Zurückschreiben (Vorgabe: an)."""
+        _lib.k1520d_platte_set_backup(self._h, on)
+
+    def flush(self) -> None:
+        if not _lib.k1520d_platte_flush(self._h):
+            raise K1520DiskError(self._fail())
+
+    @property
+    def read_only(self) -> bool:
+        """Schreibgeschützt?  Vorgabe beim Öffnen: ja."""
+        return bool(_lib.k1520d_platte_read_only(self._h))
+
+    def set_read_only(self, ro: bool) -> None:
+        _lib.k1520d_platte_set_read_only(self._h, ro)

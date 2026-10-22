@@ -19,7 +19,9 @@ from PySide6.QtWidgets import (
 )
 
 from app.core_binding.k1520disk import filesystems
-from app.disktool.ui.schreibsperre import dateisystem_anzeige
+from app.disktool.ui.schreibsperre import (
+    PLATTE_FORMAT_FEST, dateisystem_anzeige, ist_platte,
+)
 from app.disktool.ui.icons import icon
 
 
@@ -93,6 +95,13 @@ class DiskHeader(QFrame):
         self.pfad.setToolTip("")
         self.angaben.setText("Öffnen Sie ein Abbild oder legen Sie eine neue "
                              "Diskette an.")
+        self._fs_frei(True)
+
+    def _fs_frei(self, frei: bool) -> None:
+        """Das Auswahlfeld sperren (Platte: das Format steht fest) oder freigeben."""
+        self.fs_wahl.setEnabled(frei)
+        self.fs_wahl.setToolTip("Die Erkennung übersteuern und neu öffnen" if frei
+                                else "Gesperrt: " + PLATTE_FORMAT_FEST)
 
     def setze(self, tool, name: str = "") -> None:
         """Kopf aus einer geöffneten Diskette füllen.
@@ -102,6 +111,16 @@ class DiskHeader(QFrame):
         muss.
         """
         self.pfad.setText(name or tool.path)
+        if ist_platte(tool):
+            # Eine Platte hat Partitionen statt Seiten und kein waehlbares Format.
+            self.pfad.setToolTip("")
+            self._fs_frei(False)
+            self.angaben.setText("   ·   ".join([
+                "Format: P8000-Plattenabbild",
+                f"Dateisystem: {dateisystem_anzeige(tool)}",
+                "Partitionen: " + ", ".join(v.dir for v in tool.volumes())]))
+            return
+        self._fs_frei(True)
         # CopyQM: der Kommentar des Abbilds (Herkunft, Stand …) steht am Dateinamen.
         info = tool.container_info()
         tipp = ""

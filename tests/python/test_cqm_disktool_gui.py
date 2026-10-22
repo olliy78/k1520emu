@@ -36,10 +36,13 @@ def _kopf(name: str, daten: bytes) -> bytes:
 
 
 def _tar_roh() -> bytes:
+    # OHNE Endmarke: ein abgeschlossenes Archiv (Kopf + Endmarke) ist seit Entwurf 37 T1 im
+    # Kern schreibbar; die Oberflaeche kennt das erst mit T4 und prueft hier noch die Sperre,
+    # die weiterhin fuer unabgeschlossene Archive (Folgeteil einer Diskettenfolge) gilt.
     s = b""
     for name, daten in (("a.txt", b"Hallo\n"), ("dir/b.bin", bytes(range(200)))):
         s += _kopf(name, daten) + daten + bytes(-len(daten) % 512)
-    return (s + bytes(1024)).ljust(DISK, b"\xe5")
+    return s.ljust(DISK, b"\xe5")
 
 
 @pytest.fixture(scope="module")
@@ -304,7 +307,10 @@ def test_tar_satz_opens_split_stream_as_one(window, tmp_path):
     assert "gross.bin" in namen
     e = next(x for x in window.tool.list() if x.name == "gross.bin")
     assert e.size == len(gross) and not e.damaged
-    assert window.tool.read_only_forced
+    # Entwurf 37 T2: ein VOLLSTAENDIGER Satz ist bearbeitbar (kein erzwungener Schutz mehr), bleibt
+    # aber wie jedes fremde Abbild beim Oeffnen schreibgeschuetzt; die GUI-Bedienung folgt in T4.
+    assert window.tool.read_only
+    assert not window.tool.read_only_forced
     assert "tar-Satz aus 2 Abbildern" in window.kopf.pfad.text()
 
 

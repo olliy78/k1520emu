@@ -1,0 +1,12 @@
+# Eine tar-Diskette (Satz mit einem Abbild; leere tar720, 720 KiB) bekommt mehr Inhalt, als sie fasst: tar-satz-save macht
+# daraus beim Speichern einen Satz aus zwei Abbildern; die Einzeldatei bleibt unberuehrt.
+tool:   k1520disktool
+tmpfile e.img:
+tmpfile z.img:
+setup_run: create %e.img% --fs tar720_leer
+run:    tar-satz-save %e.img% -o %z.img% --put %CLI_DIR%/../fixtures/disks/cpa_cpa780_combo5zoll_noclock.img=gross.img
+expect: Satz: 2 Abbild
+expect: z1.img
+expect: z2.img
+expect: gespeichert: 2 Abbild
+exit:   0

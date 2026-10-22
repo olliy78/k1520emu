@@ -1,0 +1,9 @@
+# Bearbeiten im Satz: Datei einfuegen, Modus/Besitzer setzen, Rundlauf zeigt ls -l.
+tool:   k1520disktool
+tmpfile s.hfe:
+tmpfile s1.hfe:
+setup_run: tar-satz-neu --format k5601_ss40_16x256 %s.hfe% --put %CLI_DIR%/../fixtures/p8000/tar_v7_klein.tar=klein.tar --attr klein.tar --mode 0600 --uid 7
+run:    tar-satz -l %s1.hfe%
+expect: rw-------
+expect: klein.tar
+exit:   0

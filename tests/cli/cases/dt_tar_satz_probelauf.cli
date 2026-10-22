@@ -1,0 +1,8 @@
+# --dry-run: Plan zeigen (Anzahl, Namen), nichts schreiben.
+tool:   k1520disktool
+tmpfile s.hfe:
+run:    tar-satz-neu --format k5601_ss40_16x256 %s.hfe% --put %CLI_DIR%/../fixtures/disks/cpa_cpa780_combo5zoll_noclock.img=gross.img --dry-run
+expect: Satz: 5 Abbild
+expect: s3.hfe
+forbid: gespeichert
+exit:   0

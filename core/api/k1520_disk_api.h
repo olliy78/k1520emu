@@ -33,6 +33,9 @@ extern "C" {
 /// @brief Opakes Handle einer geoeffneten Diskette.
 typedef void* K1520Disk;
 
+/// @brief Opakes Handle eines geoeffneten P8000-Plattenabbilds (@ref k1520d_platte_open).
+typedef void* K1520Platte;
+
 /// @brief Uebertragungsmodus fuer @ref k1520d_extract / @ref k1520d_insert.
 typedef enum {
     K1520D_BINARY = 0,   ///< Bytes unveraendert
@@ -274,23 +277,79 @@ K1520_API const char* k1520d_detected_fs(K1520Disk h);
  */
 K1520_API const char* k1520d_container_info(K1520Disk h, const char* key);
 
-/* ─── tar-Disketten: Export, leere Diskette, Schreiben (additiv) ──────────────
- * Regeln: DiskVolume::tarExport / tarPruefen / tarSchreiben (core/filesystem/disk_volume.h). */
+/* ─── tar-Disketten: Export (additiv) ─────────────────────────────────────────
+ * Regeln: DiskVolume::tarExport (core/filesystem/disk_volume.h).  Eine `.tar` kommt ueber
+ * @ref k1520d_tar_datei_ablegen in eine tar-Diskette (als Datei oder als Container). */
 
-/// @brief Ist das die LEERE tar-Diskette (`tar720_leer`, ganz Null, beschreibbar mit einem .tar)?
-K1520_API bool k1520d_tar_leer(K1520Disk h);
 /// @brief Den tar-Strom als `.tar` nach @p path schreiben (Bloecke 1:1, bis hinter die Endmarke
 ///        bzw. der ganze Strom).  Nur an tar-Disketten und roh geoeffneten; aendert nichts.
 K1520_API bool k1520d_tar_export(K1520Disk h, const char* path);
-/// @brief `.tar`-Datei fuer @ref k1520d_tar_put beurteilen, ohne etwas zu schreiben.
-/// @return -1 abgelehnt (@ref k1520d_last_error); 0 in Ordnung; 1 in Ordnung, aber mit
-///         Warnung (kein reines V7-tar), Text in @ref k1520d_tar_warning.
-K1520_API int k1520d_tar_put_pruefen(K1520Disk h, const char* path);
-/// @brief Warnung der letzten Pruefung bzw. des letzten @ref k1520d_tar_put; "" = keine.
+/// @brief Warnung (kein reines V7-tar) des letzten @ref k1520d_tar_datei_ablegen; "" = keine.
 K1520_API const char* k1520d_tar_warning(K1520Disk h);
-/// @brief `.tar` auf die leere tar-Diskette schreiben und das Abbild zurueckschreiben.  Danach ist
-///        die Diskette `tar720` (nur lesbar); ein zweites Schreiben wird abgelehnt.
-K1520_API bool k1520d_tar_put(K1520Disk h, const char* path);
+
+/* ─── tar-Saetze bearbeiten, Neu-Anlegen, .tar ablegen (Entwurf 37, AP T1-T3; additiv) ───
+ * Regeln: DiskVolume::tarSatz*, tarFormate, tarDisketteNeu, tarDateiBeurteilen/-Ablegen
+ * (core/filesystem/disk_volume.h).  Listen ueber mehrere Namen sind durch '\n' getrennt. */
+
+/// @brief Wie @ref k1520d_open_tar_satz, aber mit VORGEGEBENEM Katalogformat @p format ("" = erkennen).
+///        Noetig fuer `.img`-Saetze (die Dateigroesse ist bei kleinen Formaten mehrdeutig).
+K1520_API K1520Disk k1520d_open_tar_satz_format(const char* paths, const char* format);
+/// @brief Die Katalogformate, die fuer eine neue tar-Diskette / einen Satz taugen (einheitliche
+///        Geometrie): Anzahl; ueber @ref k1520d_tar_format_name usw. nach Index.
+K1520_API int         k1520d_tar_format_count(void);
+K1520_API const char* k1520d_tar_format_name(int i);
+K1520_API const char* k1520d_tar_format_description(int i);
+/// @brief Nutzbytes EINES Abbilds in diesem Format.
+K1520_API uint64_t    k1520d_tar_format_bytes(int i);
+/// @brief Darstellbare Container als Bitmaske: 1 = .img/.cqm, 2 = .hfe (.dmk geht immer).
+K1520_API int         k1520d_tar_format_container(int i);
+/// @brief Leeren tar-Satz im Format @p format anlegen (nichts auf der Platte; @p basename mit
+///        Endung .img|.hfe|.dmk|.cqm bestimmt Container und Namen beim Speichern).  NULL = Fehler
+///        (@ref k1520d_last_open_error).
+K1520_API K1520Disk k1520d_tar_satz_neu(const char* format, const char* basename);
+/// @brief Neue LEERE tar-Diskette im Format @p format als Datei @p path anlegen (sofort geschrieben,
+///        genau dieser Name) und im Satzmodus mit einem Abbild oeffnen.
+K1520_API K1520Disk k1520d_tar_disk_neu(const char* path, const char* format);
+/// @brief Ist das Volume im Satzmodus?  Jede schreibbare tar-Diskette aus einer Datei ist es
+///        (ein Satz mit EINEM Abbild, Entwurf 37 "Vereinheitlichung").
+K1520_API bool k1520d_tar_satz(K1520Disk h);
+/// @brief Satzmodus UND die Datei ist das einzige Abbild des Stroms (Speichern geht in dieselbe Datei,
+///        solange der Inhalt auf ein Abbild passt)?
+K1520_API bool k1520d_tar_satz_einzel(K1520Disk h);
+/// @brief Eine tar-Diskette in den Satzmodus ueberfuehren (@p basename "" = aus dem Pfad); bei einer aus
+///        einer Datei geoeffneten schreibbaren tar-Diskette schon geschehen (dann true ohne Wirkung).
+K1520_API bool k1520d_tar_zu_satz(K1520Disk h, const char* basename);
+/// @brief Der beim Speichern vorgesehene Basisname des Satzes ("" = keiner).
+K1520_API const char* k1520d_tar_satz_basis(K1520Disk h);
+/// @brief Speichern planen (schreibt nichts): Anzahl der Abbilder, -1 = Fehler (k1520d_last_error).
+///        Danach liefern die Getter den Plan; @p basename "" = Basisname des Satzes.
+K1520_API int         k1520d_tar_satz_plan(K1520Disk h, const char* basename);
+K1520_API uint64_t    k1520d_tar_plan_strom(K1520Disk h);       ///< Laenge des Stroms in Byte
+K1520_API uint64_t    k1520d_tar_plan_kapazitaet(K1520Disk h);  ///< Nutzbytes eines Abbilds
+K1520_API bool        k1520d_tar_plan_einzel(K1520Disk h);      ///< passt auf EIN Abbild
+K1520_API const char* k1520d_tar_plan_namen(K1520Disk h);       ///< die Abbilddateien
+K1520_API const char* k1520d_tar_plan_ueberschreibt(K1520Disk h); ///< davon schon vorhanden
+K1520_API const char* k1520d_tar_plan_altlasten(K1520Disk h);   ///< liegenbleibende hoehere Nummern
+/// @brief Den Strom auf Abbilder verteilen und schreiben.  Hinweise (alte Nummern) und die
+///        geschriebenen Dateien danach ueber @ref k1520d_tar_satz_hinweise / @ref k1520d_tar_satz_geschrieben.
+K1520_API bool        k1520d_tar_satz_speichern(K1520Disk h, const char* basename);
+K1520_API const char* k1520d_tar_satz_hinweise(K1520Disk h);
+K1520_API const char* k1520d_tar_satz_geschrieben(K1520Disk h);
+/// @brief Laesst sich das Volume direkt auf eine physische Diskette schreiben?  "" = ja, sonst die Begruendung.
+K1520_API const char* k1520d_physisch_schreiben_grund(K1520Disk h);
+
+/// @brief `.tar`-Datei fuer das Ablegen beurteilen.  -1 = nichts moeglich (@ref k1520d_last_error),
+///        sonst Bitmaske: 1 = als Datei, 2 = als fertiger Container, 4 = Archiv ist leer,
+///        8 = der Container sprengt die Einzeldiskette (wird ein Satz).  Warnung (kein V7-tar):
+///        @ref k1520d_tar_warning; Grund, warum "Container" fehlt: @ref k1520d_tar_datei_grund.
+K1520_API int         k1520d_tar_datei_pruefen(K1520Disk h, const char* path);
+K1520_API const char* k1520d_tar_datei_grund(K1520Disk h);
+/// @brief Abbilder, die der Container braucht (nach @ref k1520d_tar_datei_pruefen mit Bit 2).
+K1520_API int         k1520d_tar_datei_abbilder(K1520Disk h);
+/// @brief `.tar` ablegen: @p weg 0 = als Datei (unter @p name, "" = Dateiname; @p ersetzen = gleichnamige
+///        ueberschreiben), 1 = als fertiger Container (nur bei leerem Archiv).
+K1520_API bool        k1520d_tar_datei_ablegen(K1520Disk h, const char* path, int weg,
+                                               const char* name, bool ersetzen);
 
 /// @brief false = mehrere gleich gute Kandidaten (Alternativen in @ref k1520d_detection_alternatives).
 K1520_API bool        k1520d_detection_unambiguous(K1520Disk h);
@@ -661,6 +720,9 @@ K1520_API bool k1520d_insert_with_info(K1520Disk h, const char* src, const char*
 
 K1520_API bool k1520d_erase  (K1520Disk h, const char* name);
 
+/// Verzeichnis anlegen (UNIX-Sicht: WEGA, tar; Zwischenverzeichnisse entstehen mit).
+K1520_API bool k1520d_mkdir  (K1520Disk h, const char* name);
+
 /// @name Warum das letzte Einfuegen abgelehnt wurde (@ref k1520d_last_insert_problem)
 /// @{
 #define K1520D_INSERT_OK              0  ///< gewoehnlicher Ablauf (auch: normaler Fehler)
@@ -930,6 +992,103 @@ K1520_API bool k1520d_recover_extract(K1520Disk h, int i, const char* pfad);
 /// @brief Den Fund auf der Diskette wieder eintragen.  @p name leer = der
 ///        ueberlieferte.  Danach wird neu gesucht UND neu geprueft.
 K1520_API bool k1520d_recover_restore(K1520Disk h, int i, const char* name);
+
+/* ─── P8000-Platte (WEGA, md0 ... md4) ────────────────────────────────────────
+ * Eigener Handle neben der Diskette: eine Platte hat Partitionen statt Seiten und
+ * kein Diskettenformat.  Die Partitionen erscheinen als oberste Ordner einer
+ * virtuellen Wurzel, Pfade lauten `md2/etc/passwd` (Entwurf 37, Festlegungen 10-13).
+ * Die Fehlertexte des Oeffnens liefert @ref k1520d_last_open_error.
+ *
+ * Schreibschutz ist die Vorgabe; vor dem ersten Zurueckschreiben entsteht `<abbild>~`.
+ * Wie bei der Diskette gilt: @ref k1520d_platte_close schreibt NICHT selbsttaetig.
+ */
+
+/// @brief Traegt die Datei einen PAR-Sektor (ist es ein Plattenabbild)?  Liest nur 512 Byte.
+K1520_API bool k1520d_platte_ist(const char* path);
+
+/// @brief Platte oeffnen (`.img` oder `.img.gz`); NULL + @ref k1520d_last_open_error.
+K1520_API K1520Platte k1520d_platte_open(const char* path, bool read_only);
+K1520_API void        k1520d_platte_close(K1520Platte h);
+K1520_API const char* k1520d_platte_last_error(K1520Platte h);
+
+/// @brief Pfad der geoeffneten Datei.
+K1520_API const char* k1520d_platte_path(K1520Platte h);
+K1520_API bool k1520d_platte_read_only(K1520Platte h);
+K1520_API void k1520d_platte_set_read_only(K1520Platte h, bool ro);
+K1520_API void k1520d_platte_set_backup(K1520Platte h, bool on);
+K1520_API bool k1520d_platte_dirty(K1520Platte h);
+/// @brief Geaenderte Platte zurueckschreiben (in der Art der Quelle, `.gz` bleibt `.gz`).
+K1520_API bool k1520d_platte_flush(K1520Platte h);
+
+/// @brief Zahl der eingehaengten Partitionen mit WEGA-Dateisystem.
+K1520_API int         k1520d_platte_volume_count(K1520Platte h);
+/// @brief "md2" — Ordnername der Partition @p v (0 ... Anzahl-1, NICHT die md-Nummer).
+K1520_API const char* k1520d_platte_volume_dir(K1520Platte h, int v);
+/// @brief Rolle laut Standardtabelle: "/usr", "/", "/tmp" ...
+K1520_API const char* k1520d_platte_volume_role(K1520Platte h, int v);
+K1520_API const char* k1520d_platte_volume_label(K1520Platte h, int v);
+K1520_API uint64_t    k1520d_platte_volume_total(K1520Platte h, int v);
+K1520_API uint64_t    k1520d_platte_volume_free(K1520Platte h, int v);
+K1520_API uint64_t    k1520d_platte_volume_used(K1520Platte h, int v);
+
+/// @brief Verzeichnis lesen (immer frisch); die Eintraege tragen den vollen Pfad
+///        (`md2/etc/passwd`), die Partitionsordner selbst sind Eintraege vom Typ "d".
+K1520_API int         k1520d_platte_list(K1520Platte h);
+K1520_API int         k1520d_platte_entry_volume(K1520Platte h, int i);
+K1520_API const char* k1520d_platte_entry_name(K1520Platte h, int i);
+K1520_API uint64_t    k1520d_platte_entry_size(K1520Platte h, int i);
+/// @brief Dateiart: "-" Datei, "d" Ordner, "c"/"b" Geraet, "p" FIFO.
+K1520_API const char* k1520d_platte_entry_type(K1520Platte h, int i);
+/// @brief `ls -l`-Modusstring.
+K1520_API const char* k1520d_platte_entry_attrs(K1520Platte h, int i);
+K1520_API const char* k1520d_platte_entry_date(K1520Platte h, int i);
+K1520_API uint16_t    k1520d_platte_entry_unix_mode(K1520Platte h, int i);
+K1520_API int         k1520d_platte_entry_unix_uid(K1520Platte h, int i);
+K1520_API int         k1520d_platte_entry_unix_gid(K1520Platte h, int i);
+K1520_API int         k1520d_platte_entry_unix_nlink(K1520Platte h, int i);
+K1520_API uint32_t    k1520d_platte_entry_unix_inode(K1520Platte h, int i);
+K1520_API uint32_t    k1520d_platte_entry_unix_mtime(K1520Platte h, int i);
+K1520_API uint32_t    k1520d_platte_entry_unix_atime(K1520Platte h, int i);
+K1520_API uint32_t    k1520d_platte_entry_unix_ctime(K1520Platte h, int i);
+K1520_API uint16_t    k1520d_platte_entry_unix_rdev(K1520Platte h, int i);
+K1520_API bool        k1520d_platte_entry_damaged(K1520Platte h, int i);
+
+/**
+ * @brief Eine Datei lesen — Teil 1: laden und die Groesse liefern (-1 = Fehler).
+ *
+ * Der Inhalt bleibt im Handle, bis das naechste @c read_size ihn ersetzt (oder die
+ * Platte geschlossen wird); @ref k1520d_platte_read_data holt ihn ab, auch mehrfach.
+ */
+K1520_API int64_t k1520d_platte_read_size(K1520Platte h, const char* path);
+/// @brief Teil 2: den geladenen Inhalt nach @p buf kopieren (hoechstens @p cap Byte);
+///        liefert die kopierten Bytes, -1 ohne vorheriges @c read_size.
+K1520_API int64_t k1520d_platte_read_data(K1520Platte h, uint8_t* buf, uint64_t cap);
+
+/**
+ * @brief Eine Datei schreiben (anlegen oder, mit @p overwrite, ersetzen).
+ *
+ * @param mode  Modus (untere 12 Bit); negativ = Vorgabe des Dateisystems.
+ * @param uid/gid  Besitzer; beide negativ = Vorgabe.  Eine Angabe setzt beide.
+ * @param mtime Sekunden seit 1970; 0 = jetzt.
+ */
+K1520_API bool k1520d_platte_write(K1520Platte h, const char* path,
+                                   const uint8_t* buf, uint64_t len, bool overwrite,
+                                   int mode, int uid, int gid, uint32_t mtime);
+K1520_API bool k1520d_platte_erase(K1520Platte h, const char* path);
+K1520_API bool k1520d_platte_mkdir(K1520Platte h, const char* path);
+/// @brief `chmod`/`chown`/`touch` — wie @ref k1520d_set_unix_attrs.
+K1520_API bool k1520d_platte_set_unix_attrs(K1520Platte h, const char* path,
+                                            bool set_mode,  uint16_t mode,
+                                            bool set_uid,   int uid,
+                                            bool set_gid,   int gid,
+                                            bool set_mtime, uint32_t mtime);
+
+/// @brief Datei oder Ordner (rekursiv) samt `.fileinfo` herausholen; @p path leer = alles.
+K1520_API bool k1520d_platte_extract(K1520Platte h, const char* path, const char* dest_dir,
+                                     bool overwrite);
+/// @brief Linux-Datei oder -Ordner (rekursiv) einfuegen; @p dest = voller Zielpfad.
+K1520_API bool k1520d_platte_insert(K1520Platte h, const char* src, const char* dest,
+                                    bool overwrite);
 
 #ifdef __cplusplus
 }

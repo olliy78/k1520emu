@@ -19,7 +19,11 @@
  * k1520disktool check  <abbild>
  * k1520disktool tar-satz <abbild…> [--to ordner] [-l]  # Mehrdisketten-tar-Strom
  * k1520disktool tar-export <abbild> <ziel.tar>          # den tar-Strom einer Diskette als .tar
- * k1520disktool tar-put <abbild> <quelle.tar>           # .tar in eine LEERE tar-Diskette
+ * k1520disktool tar-put <abbild> <quelle.tar>           # .tar wird das Archiv einer LEEREN tar-Diskette (Container)
+ * k1520disktool tar-satz-save <abbild…> [-o basis] [--put/--rm/--mkdir/--attr …]   # Satz bearbeiten, auf N Abbilder speichern
+ * k1520disktool tar-satz-neu --format <name> <basis> [--put/--rm/--mkdir/--attr/--tar-container …] # leeren Satz anlegen
+ * k1520disktool tar-formate                              # Katalogformate fuer neue tar-Disketten/Saetze
+ * k1520disktool create <abbild> --fs tar720_leer --format <name>   # leere tar-Diskette im GEWAEHLTEN Format
  * k1520disktool formats
  * ```
  *
@@ -36,7 +40,7 @@
 #include "core/filesystem/disk_volume.h"
 #include "core/filesystem/prg_boot.h"
 #include "core/filesystem/geometry_probe.h"
-#include "core/filesystem/wega/wega_platte.h"
+#include "core/filesystem/wega/platten_volume.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -115,6 +119,11 @@ struct Optionen {
     /// @brief Wert von `--repair=…`: "" = die sicheren, "alle" = auch die
     ///        verlustbehafteten, sonst eine Liste von Kennungen.
     std::string repair_wahl;
+    std::string format;             ///< --format (tar-satz-neu: Katalogformat des Satzes)
+    std::string ausgabe;            ///< -o (tar-satz-save: Basisname des gespeicherten Satzes)
+    /// @brief Bearbeitungsschritte des Satzmodus in Kommandozeilenfolge: (Art, Argument) mit
+    ///        Art `put` | `rm` | `mkdir` | `attr`.
+    std::vector<std::pair<std::string, std::string>> satz_ops;
     std::vector<std::string> rest;  ///< uebrige Argumente (Abbild, Muster, Dateien)
 };
 
@@ -166,10 +175,28 @@ void gebrauch() {
         "  tar-export <abbild> <ziel.tar>           den tar-Strom einer Diskette (Bloecke 1:1, bis hinter\n"
         "                                           die Endmarke; Folgeteile ganz) als .tar herausschreiben;\n"
         "                                           die Teile eines Satzes setzt `cat` zusammen\n"
-        "  tar-put <abbild> <quelle.tar>            .tar (<= 720 KiB, Vielfaches von 512) in eine LEERE\n"
-        "                                           tar-Diskette schreiben (`create x.img --fs tar720_leer`),\n"
-        "                                           einmal; danach ist sie tar720 und nur lesbar.\n"
+        "  tar-put <abbild> <quelle.tar>            .tar (Vielfaches von 512, passt auf EIN Abbild) wird das\n"
+        "                                           Archiv einer LEEREN tar-Diskette (`create x.img --fs\n"
+        "                                           tar720_leer`) - \"als Container\"; die Diskette bleibt danach\n"
+        "                                           bearbeitbar.  Auf einem Archiv mit Inhalt: Fehler (als Datei\n"
+        "                                           kommt eine .tar per `put` hinein).  --dry-run: nur beurteilen.\n"
         "                                           Gewarnt wird vor Nicht-V7-tar (Schreiben geht trotzdem)\n"
+        "  tar-satz-save <abbild1>... [-o basis.ext] [--dry-run]\n"
+        "                  [--put QUELLE[=ZIEL] | --rm NAME | --mkdir NAME | --attr NAME (+ --mode/--uid/--gid/--mtime)]...\n"
+        "                                           tar-Satz als Ganzes oeffnen, die Schritte in Reihenfolge\n"
+        "                                           anwenden und auf Abbilder GLEICHEN Formats verteilen:\n"
+        "                                           basis1.ext, basis2.ext, ... (Nummer vor der Endung; ohne -o\n"
+        "                                           die Namen des Satzes), letztes Abbild mit Nullen gefuellt.\n"
+        "                                           Alte hoehere Nummern werden NIE geloescht (Hinweis);\n"
+        "                                           ueberschriebene Abbilder einmal als `<name>~` gesichert\n"
+        "  tar-satz-neu --format <katalogformat> <basis.ext> [Schritte wie oben]\n"
+        "                                           leeren Satz anlegen, fuellen, speichern;\n"
+        "                                           `--tar-container X.tar` macht eine fertige .tar zum Archiv\n"
+        "                                           (nur bei leerem Archiv; ueber Diskettengroesse: mehrere Abbilder)\n"
+        "  tar-formate                              Katalogformate fuer neue tar-Disketten/Saetze (--format)\n"
+        "  create <abbild> --fs tar720_leer --format <katalogformat>\n"
+        "                                           leere tar-Diskette im GEWAEHLTEN Format (`tar-formate`);\n"
+        "                                           tar-satz/-save: --format gibt die Geometrie eines .img vor\n"
         "  formats                                  bekannte Dateisysteme auflisten\n\n"
         "P8000-Plattenabbild (WEGA, PAR in Zylinder 0): ls/info/check/get/put/rm/mkdir/attr;\n"
         "  Namen mit Partition vorn (md0 = /usr, md2 = /, md3 = /tmp, md4 = /z):\n"
@@ -261,6 +288,12 @@ bool zerlege(int argc, char** argv, int ab, Optionen& o, std::string& err) {
             if (a.size() > 9) o.repair_wahl = a.substr(9);
         }
         else if (a == "--no-backup") o.nobackup = true;
+        else if (a == "--format")  { if (!wert("--format")) return false; o.format = argv[++i]; }
+        else if (a == "-o")        { if (!wert("-o"))       return false; o.ausgabe = argv[++i]; }
+        else if (a == "--put" || a == "--rm" || a == "--mkdir" || a == "--attr" || a == "--tar-container") {
+            if (!wert(a.c_str())) return false;
+            o.satz_ops.emplace_back(a.substr(2), argv[++i]);
+        }
         else if (!a.empty() && a[0] == '-') { err = "unbekannter Schalter: " + a; return false; }
         else o.rest.push_back(a);
     }
@@ -502,7 +535,7 @@ int cmd_tar_satz(const Optionen& o) {
     if (o.rest.size() < 2) { std::cerr << "Fehler: kein Abbild angegeben\n"; return kFehler; }
     const std::vector<std::string> pfade(o.rest.begin() + 1, o.rest.end());
     std::string err;
-    auto v = DiskVolume::openTarSatz(pfade, formate(), dateisysteme(), err);
+    auto v = DiskVolume::openTarSatz(pfade, formate(), dateisysteme(), err, o.format);
     if (!v) { std::cerr << "Fehler: " << err << "\n"; return kNichtErkannt; }
 
     const std::string bericht = v->checkReport().alsText();
@@ -542,6 +575,9 @@ int cmd_tar_export(const Optionen& o) {
     return kOk;
 }
 
+/// @brief `tar-put` — eine fertige `.tar` wird das Archiv einer LEEREN tar-Diskette (Container).
+///        Duenne Huelle ueber `tarDateiAblegen(AlsContainer)` + Speichern; auf einem Archiv mit
+///        Inhalt kommt eine `.tar` nur als Datei hinein (`put`).
 int cmd_tar_put(const Optionen& o) {
     if (o.rest.size() != 3) {
         std::cerr << "Fehler: tar-put <abbild> <quelle.tar>\n";
@@ -550,19 +586,132 @@ int cmd_tar_put(const Optionen& o) {
     int rc = kOk;
     auto v = oeffne(o, o.rest[1], rc, /*schreibend=*/true, /*roh_erlaubt=*/true);
     if (!v) return rc;
+    const TarDateiUrteil u = v->tarDateiBeurteilen(o.rest[2]);
+    if (!u.ok) { std::cerr << "Fehler: " << u.fehler << "\n"; return kFehler; }
+    if (!u.als_container) {
+        std::cerr << "Fehler: " << u.container_grund
+                  << (u.ziel_leer ? "" : "  Als Datei: `put <abbild> <quelle.tar>`.") << "\n";
+        return kFehler;
+    }
+    if (u.wird_satz) {
+        std::cerr << "Fehler: Die Datei (" << u.groesse << " Byte) passt nicht auf EIN Abbild ("
+                  << u.kapazitaet << " Byte) - als Satz mit " << u.abbilder
+                  << " Abbildern: `tar-satz-neu --format <name> <basis> --tar-container <quelle.tar>`\n";
+        return kFehler;
+    }
     if (o.dry_run) {
-        std::string w;
-        if (!v->tarPruefen(o.rest[2], &w)) { std::cerr << "Fehler: " << v->lastError() << "\n"; return kFehler; }
-        if (!w.empty()) std::cerr << "Warnung: " << w << "\n";
+        if (!u.warnung.empty()) std::cerr << "Warnung: " << u.warnung << "\n";
         std::cout << "tar-put (Probelauf): " << o.rest[2] << " passt\n";
         return kOk;
     }
-    if (!v->tarSchreiben(o.rest[2])) { std::cerr << "Fehler: " << v->lastError() << "\n"; return kFehler; }
+    if (!v->tarDateiAblegen(o.rest[2], TarDateiWeg::AlsContainer) || !v->flush()) {
+        std::cerr << "Fehler: " << v->lastError() << "\n";
+        return kFehler;
+    }
     // Eine Warnung hindert das Schreiben nicht (kein Blockieren in der Kommandozeile).
     if (!v->lastTarWarnung().empty()) std::cerr << "Warnung: " << v->lastTarWarnung() << "\n";
-    std::cout << "geschrieben: " << o.rest[2] << " -> " << o.rest[1]
-              << " (die Diskette ist jetzt tar720, nur lesbar)\n";
+    std::cout << "geschrieben: " << o.rest[2] << " -> " << o.rest[1] << "\n";
     return kOk;
+}
+
+/// @brief Gemeinsamer Teil von `tar-satz-save` und `tar-satz-neu`: Schritte anwenden, Plan zeigen,
+///        speichern.  @p basis ist der Basisname fuer das Speichern (leer = der des Satzes).
+int satz_bearbeiten(const Optionen& o, DiskVolume& v, const std::string& basis) {
+    v.setReadOnly(false);
+    if (v.readOnly()) { std::cerr << "Fehler: " << v.lastError() << "\n"; return kFehler; }
+    for (const auto& [art, arg] : o.satz_ops) {
+        std::error_code ec;
+        if (art == "put") {
+            std::string quelle = arg, ziel;
+            const size_t gl = arg.find('=');
+            if (gl != std::string::npos) { quelle = arg.substr(0, gl); ziel = arg.substr(gl + 1); }
+            TransferOptions t;
+            t.overwrite = true;               // im Satz ersetzt eine neue Fassung die alte (wie `tar r`)
+            t.text = o.text;
+            if (fs::is_directory(quelle, ec)) {
+                if (!v.insertAll(quelle, t)) { std::cerr << "Fehler: " << v.lastError() << "\n"; return kFehler; }
+                std::cout << "eingefuegt aus " << quelle << "\n";
+            } else {
+                if (ziel.empty()) ziel = fs::path(quelle).filename().string();
+                if (!v.insert(quelle, FileRef::parse(ziel, 0), t)) {
+                    std::cerr << "Fehler: " << v.lastError() << "\n";
+                    return kFehler;
+                }
+                std::cout << quelle << " -> " << v.lastInsertedName() << "\n";
+            }
+        } else if (art == "tar-container") {
+            // Eine fertige .tar wird das Archiv (nur bei leerem Archiv; zu gross fuer eine Diskette: Satz).
+            const TarDateiUrteil u = v.tarDateiBeurteilen(arg);
+            if (!u.ok) { std::cerr << "Fehler: " << u.fehler << "\n"; return kFehler; }
+            if (!u.als_container) { std::cerr << "Fehler: " << u.container_grund << "\n"; return kFehler; }
+            if (!v.tarDateiAblegen(arg, TarDateiWeg::AlsContainer)) { std::cerr << "Fehler: " << v.lastError() << "\n"; return kFehler; }
+            if (!v.lastTarWarnung().empty()) std::cerr << "Warnung: " << v.lastTarWarnung() << "\n";
+            std::cout << arg << " -> Archiv (" << u.abbilder << " Abbild(er))\n";
+        } else if (art == "rm") {
+            if (!v.erase(FileRef::parse(arg, 0))) { std::cerr << "Fehler: " << v.lastError() << "\n"; return kFehler; }
+            std::cout << "geloescht: " << arg << "\n";
+        } else if (art == "mkdir") {
+            if (!v.makeDirectory(FileRef::parse(arg, 0))) { std::cerr << "Fehler: " << v.lastError() << "\n"; return kFehler; }
+            std::cout << "angelegt: " << arg << "\n";
+        } else if (art == "attr") {
+            if (!(o.unix_mode_gesetzt || o.unix_uid_gesetzt || o.unix_gid_gesetzt || o.unix_mtime_gesetzt)) {
+                std::cerr << "Fehler: --attr braucht --mode, --uid, --gid und/oder --mtime\n";
+                return kFehler;
+            }
+            UnixAttrs u;
+            u.set_mode  = o.unix_mode_gesetzt;  u.mode  = static_cast<uint16_t>(o.unix_mode);
+            u.set_uid   = o.unix_uid_gesetzt;   u.uid   = o.unix_uid;
+            u.set_gid   = o.unix_gid_gesetzt;   u.gid   = o.unix_gid;
+            u.set_mtime = o.unix_mtime_gesetzt; u.mtime = static_cast<uint32_t>(o.unix_mtime);
+            if (!v.setAttributes(FileRef::parse(arg, 0), u)) { std::cerr << "Fehler: " << v.lastError() << "\n"; return kFehler; }
+            std::cout << "geaendert: " << arg << "\n";
+        }
+    }
+    const TarSatzPlan plan = v.tarSatzPlanen(basis);
+    if (!plan.ok) { std::cerr << "Fehler: " << plan.fehler << "\n"; return kFehler; }
+    std::cout << "Satz: " << plan.abbilder << " Abbild(er), " << plan.strom << " Byte Strom, "
+              << plan.kapazitaet << " Byte je Abbild\n";
+    for (const std::string& n : plan.namen) std::cout << "  " << n << "\n";
+    if (o.dry_run) {
+        for (const std::string& n : plan.ueberschreibt) std::cout << "  (wuerde ueberschreiben: " << n << ")\n";
+        for (const std::string& a : plan.altlasten)
+            std::cerr << "Hinweis: '" << a << "' gehoert nicht mehr zum Satz und bliebe unveraendert liegen\n";
+        return kOk;
+    }
+    std::vector<std::string> hinweise;
+    if (!v.tarSatzSpeichern(basis, &hinweise)) { std::cerr << "Fehler: " << v.lastError() << "\n"; return kFehler; }
+    for (const std::string& h : hinweise) std::cerr << "Hinweis: " << h << "\n";
+    std::cout << "gespeichert: " << plan.abbilder << " Abbild(er)\n";
+    return kOk;
+}
+
+int cmd_tar_satz_save(const Optionen& o) {
+    if (o.rest.size() < 2) { std::cerr << "Fehler: tar-satz-save <abbild...> [-o basis] [--put ...]\n"; return kFehler; }
+    const std::vector<std::string> pfade(o.rest.begin() + 1, o.rest.end());
+    std::string err;
+    auto v = DiskVolume::openTarSatz(pfade, formate(), dateisysteme(), err, o.format);
+    if (!v) { std::cerr << "Fehler: " << err << "\n"; return kNichtErkannt; }
+    // Ohne -o geht der Satz unter seinen eigenen Namen zurueck (Ziffern am Ende des ersten Abbilds entfallen).
+    return satz_bearbeiten(o, *v, o.ausgabe);
+}
+
+/// @brief `tar-formate` — die Katalogformate, die sich fuer eine neue tar-Diskette / einen Satz eignen.
+int cmd_tar_formate(const Optionen&) {
+    for (const TarFormatInfo& f : DiskVolume::tarFormate(formate()))
+        std::printf("%-24s %9llu B  %s%s  %s\n", f.name.c_str(), static_cast<unsigned long long>(f.bytes),
+                    f.img ? "img " : "    ", f.hfe ? "hfe" : "   ", f.description.c_str());
+    return kOk;
+}
+
+int cmd_tar_satz_neu(const Optionen& o) {
+    if (o.rest.size() != 2 || o.format.empty()) {
+        std::cerr << "Fehler: tar-satz-neu --format <name> <basisname.img|hfe|dmk|cqm> [--put ...]\n";
+        return kFehler;
+    }
+    std::string err;
+    auto v = DiskVolume::tarSatzNeu(o.format, o.rest[1], formate(), dateisysteme(), err);
+    if (!v) { std::cerr << "Fehler: " << err << "\n"; return kFehler; }
+    return satz_bearbeiten(o, *v, o.rest[1]);
 }
 
 int cmd_info(const Optionen& o) {
@@ -1303,6 +1452,18 @@ int cmd_create(const Optionen& o) {
                    return kFehler; }
         if (!pruefePrgWunsch(o, pr->type, o.boot)) return kFehler;
     }
+    if (!o.format.empty()) {
+        // `--format` nur fuer die leere tar-Diskette: GEWAEHLTES Katalogformat statt der 720K des Profils.
+        const FsProfile* pr = dateisysteme().find(o.fs);
+        if (!pr || pr->type != FsType::Tar || !pr->leer) {
+            std::cerr << "Fehler: --format gilt beim Anlegen nur mit --fs tar720_leer (leere tar-Diskette)\n";
+            return kFehler;
+        }
+        auto t = DiskVolume::tarDisketteNeu(o.rest[1], o.format, formate(), dateisysteme(), err);
+        if (!t) { std::cerr << "Fehler: " << err << "\n"; return kFehler; }
+        std::cout << "angelegt: " << o.rest[1] << " (leere tar-Diskette, " << o.format << ")\n";
+        return kOk;
+    }
     auto v = DiskVolume::create(o.rest[1], o.fs, o.label, formate(), dateisysteme(), err, o.boot);
     if (!v) { std::cerr << "Fehler: " << err << "\n"; return kFehler; }
 
@@ -1725,9 +1886,10 @@ int platte(const std::string& befehl, const Optionen& o) {
                             || (befehl == "attr" && attr_aendert);
     std::string err;
     // Schreibschutz ist die Vorgabe; nur die schreibenden Befehle heben ihn auf.
-    auto p = WegaPlatte::open(o.rest[1], err, /*read_only=*/!schreibend || o.dry_run);
-    if (!p) { std::cerr << "Fehler: " << err << "\n"; return kNichtErkannt; }
-    if (o.nobackup) p->setBackup(false);
+    auto pv = PlattenVolume::open(o.rest[1], err, /*read_only=*/!schreibend || o.dry_run);
+    if (!pv) { std::cerr << "Fehler: " << err << "\n"; return kNichtErkannt; }
+    if (o.nobackup) pv->setBackup(false);
+    WegaPlatte* p = &pv->platte();
 
     auto kopf = [&](std::ostream& aus) {
         aus << "Plattenabbild: " << p->laufwerk() << " (" << p->zylinder() << " Zyl. x "
@@ -1770,17 +1932,7 @@ int platte(const std::string& befehl, const Optionen& o) {
     }
     if (befehl == "check" || befehl == "fsck") {
         const FsCheckLevel stufe = o.voll ? FsCheckLevel::Voll : FsCheckLevel::Schnell;
-        FsCheckReport gesamt;
-        gesamt.level = stufe;
-        for (int v = 0; v < p->volumeCount(); ++v) {
-            FsCheckReport r = p->fs(v).check(stufe, true);
-            for (FsFinding& f : r.findings) {
-                f.volume = v;
-                f.object = p->volumeDir(v) + ":" + f.object;
-            }
-            gesamt.uebernimm(r);
-        }
-        gesamt.sortieren();
+        const FsCheckReport gesamt = pv->check(stufe);
         if (o.json) {
             std::cout << "{\"findings\":[";
             for (size_t i = 0; i < gesamt.findings.size(); ++i) {
@@ -1812,24 +1964,18 @@ int platte(const std::string& befehl, const Optionen& o) {
                 for (const std::string& m : muster) if (passt(m, name)) treffer = true;
                 if (!treffer) continue;
                 const fs::path ziel = fs::path(o.ziel) / name;
+                // Ordner und Dateien samt `.fileinfo`; Geraete/FIFOs haben keinen Inhalt.
+                if (e.type != "d" && e.type != "-") continue;
                 std::error_code ec;
-                if (e.type == "d") { fs::create_directories(ziel, ec); continue; }
-                if (e.type != "-") continue;            // Geraetedateien haben keinen Inhalt
-                std::vector<uint8_t> d;
-                if (!p->fs(v).read(e.name, d)) {
-                    std::cerr << "Fehler: " << p->fs(v).lastError() << "\n";
-                    return kFehler;
-                }
-                if (o.dry_run) { ++n; continue; }
-                if (!o.force && fs::exists(ziel, ec)) {
+                if (e.type == "-" && !o.force && !o.dry_run && fs::exists(ziel, ec)) {
                     std::cerr << "Fehler: Zieldatei existiert bereits: " << ziel.string() << "\n";
                     return kFehler;
                 }
-                fs::create_directories(ziel.parent_path(), ec);
-                std::ofstream f(ziel, std::ios::binary);
-                f.write(reinterpret_cast<const char*>(d.data()),
-                        static_cast<std::streamsize>(d.size()));
-                ++n;
+                if (!pv->extractEintrag(name, o.ziel, o.force, o.dry_run)) {
+                    std::cerr << "Fehler: " << pv->lastError() << "\n";
+                    return kFehler;
+                }
+                if (e.type == "-") ++n;
             }
         if (n == 0) { std::cerr << "Fehler: kein Eintrag passt auf das Muster\n"; return kFehler; }
         std::cout << n << " Dateien nach " << o.ziel << "\n";
@@ -1837,10 +1983,10 @@ int platte(const std::string& befehl, const Optionen& o) {
     }
     if (befehl == "attr") {
         // chmod/chown/touch an einer Datei der Platte (Name `md<N>/pfad`); ohne Schalter nur Anzeige.
-        if (o.rest.size() != 3) { std::cerr << "Fehler: attr <abbild> md<N>/pfad [--mode … --uid … --gid …]\n"; return kFehler; }
+        if (o.rest.size() != 3) { std::cerr << "Fehler: attr <abbild> md<N>/pfad [--mode ... --uid ... --gid ...]\n"; return kFehler; }
         const auto [v, name] = platteName(*p, o.rest[2]);
         if (v < 0 || name.empty()) {
-            std::cerr << "Fehler: Partition fehlt (md0/…, md2/…): " << o.rest[2] << "\n";
+            std::cerr << "Fehler: Partition fehlt (md0/..., md2/...): " << o.rest[2] << "\n";
             return kFehler;
         }
         if (o.unix_mode > 07777) { std::cerr << "Fehler: --mode muss zwischen 0 und 7777 (oktal) liegen\n"; return kFehler; }
@@ -1850,7 +1996,7 @@ int platte(const std::string& befehl, const Optionen& o) {
             u.set_uid   = o.unix_uid_gesetzt;   u.uid   = o.unix_uid;
             u.set_gid   = o.unix_gid_gesetzt;   u.gid   = o.unix_gid;
             u.set_mtime = o.unix_mtime_gesetzt; u.mtime = static_cast<uint32_t>(o.unix_mtime);
-            if (!p->fs(v).setAttributes(name, u)) { std::cerr << "Fehler: " << p->fs(v).lastError() << "\n"; return kFehler; }
+            if (!pv->setAttributes(o.rest[2], u)) { std::cerr << "Fehler: " << pv->lastError() << "\n"; return kFehler; }
         }
         for (const FileEntry& e : p->fs(v).list())
             if (e.name == name)
@@ -1865,8 +2011,8 @@ int platte(const std::string& befehl, const Optionen& o) {
                 return kFehler;
             }
             if (o.dry_run) continue;
-            if (!p->fs(v).makeDirectory(name)) {
-                std::cerr << "Fehler: " << p->fs(v).lastError() << "\n";
+            if (!pv->makeDirectory(o.rest[i])) {
+                std::cerr << "Fehler: " << pv->lastError() << "\n";
                 return kFehler;
             }
             std::cout << "angelegt: " << o.rest[i] << "\n";
@@ -1887,8 +2033,8 @@ int platte(const std::string& befehl, const Optionen& o) {
                 std::cout << "wuerde loeschen: " << p->volumeDir(v) << "/" << name << "\n";
                 continue;
             }
-            if (!p->fs(v).erase(name)) {
-                std::cerr << "Fehler: " << p->fs(v).lastError() << "\n";
+            if (!pv->erase(p->volumeDir(v) + "/" + name)) {
+                std::cerr << "Fehler: " << pv->lastError() << "\n";
                 return kFehler;
             }
             std::cout << "geloescht: " << p->volumeDir(v) << "/" << name << "\n";
@@ -1902,46 +2048,28 @@ int platte(const std::string& befehl, const Optionen& o) {
                          "(md0 = /usr, md2 = /)\n";
             return kFehler;
         }
-        auto schreibe = [&, v = v](const fs::path& quelle, const std::string& ziel) -> bool {
-            std::ifstream f(quelle, std::ios::binary);
-            std::vector<uint8_t> d((std::istreambuf_iterator<char>(f)),
-                                   std::istreambuf_iterator<char>());
-            WriteOptions w;
-            w.overwrite = o.force;
-            std::error_code ec;
-            const bool x = (fs::status(quelle, ec).permissions() & fs::perms::owner_exec)
-                           != fs::perms::none;
-            w.wega_mode = x ? 0755 : 0644;
-            w.wega_mode_gesetzt = true;
+        const PlattenVolume::Fortschritt zeige = [](const std::string& q, const std::string& z) {
+            std::cout << q << " -> " << z << "\n";
+        };
+        auto einfuegen = [&](const std::string& quelle, const std::string& ziel) -> bool {
             if (o.dry_run) return true;
-            if (!p->fs(v).write(ziel, d, w)) {
-                std::cerr << "Fehler: " << p->fs(v).lastError() << "\n";
+            if (!pv->insert(quelle, ziel, o.force, zeige)) {
+                std::cerr << "Fehler: " << pv->lastError() << "\n";
                 return false;
             }
-            std::cout << quelle.string() << " -> " << p->volumeDir(v) << "/" << ziel << "\n";
             return true;
         };
+        const std::string md = p->volumeDir(v);
         std::error_code ec;
         if (o.rest.size() == 3 && fs::is_directory(o.rest[2], ec)) {
-            for (const auto& e : fs::recursive_directory_iterator(o.rest[2], ec)) {
-                const std::string rel = e.path().lexically_relative(o.rest[2]).generic_string();
-                const std::string ziel = basis.empty() ? rel : basis + "/" + rel;
-                if (e.is_directory()) {
-                    if (!o.dry_run && !p->fs(v).makeDirectory(ziel)) {
-                        std::cerr << "Fehler: " << p->fs(v).lastError() << "\n";
-                        return kFehler;
-                    }
-                    continue;
-                }
-                if (!schreibe(e.path(), ziel)) return kFehler;
-            }
+            if (!einfuegen(o.rest[2], md + (basis.empty() ? "" : "/" + basis))) return kFehler;
         } else if (o.rest.size() == 3) {
             if (basis.empty()) { std::cerr << "Fehler: --as md<N>/pfad/name\n"; return kFehler; }
-            if (!schreibe(o.rest[2], basis)) return kFehler;
+            if (!einfuegen(o.rest[2], md + "/" + basis)) return kFehler;
         } else {
             for (size_t i = 2; i < o.rest.size(); ++i)
-                if (!schreibe(o.rest[i], (basis.empty() ? "" : basis + "/")
-                                         + fs::path(o.rest[i]).filename().string()))
+                if (!einfuegen(o.rest[i], md + "/" + (basis.empty() ? "" : basis + "/")
+                                          + fs::path(o.rest[i]).filename().string()))
                     return kFehler;
         }
     } else {
@@ -1950,7 +2078,7 @@ int platte(const std::string& befehl, const Optionen& o) {
         return kFehler;
     }
     if (o.dry_run) return kOk;
-    if (!p->flush()) { std::cerr << "Fehler: " << p->lastError() << "\n"; return kFehler; }
+    if (!pv->flush()) { std::cerr << "Fehler: " << pv->lastError() << "\n"; return kFehler; }
     return kOk;
 }
 
@@ -1976,7 +2104,7 @@ int main(int argc, char** argv) {
 
     // P8000-Plattenabbild (PAR in Z0/K0/S1): eigener Weg, mehrere WEGA-Partitionen
     if (o.rest.size() >= 2 && befehl != "create" && befehl != "formats" && befehl != "tar-satz"
-        && WegaPlatte::istPlatte(o.rest[1]))
+        && befehl != "tar-satz-save" && befehl != "tar-satz-neu" && befehl != "tar-formate" && WegaPlatte::istPlatte(o.rest[1]))
         return platte(befehl, o);
 
     if (befehl == "ls")      return cmd_ls(o);
@@ -1993,6 +2121,9 @@ int main(int argc, char** argv) {
     if (befehl == "tar-satz") return cmd_tar_satz(o);
     if (befehl == "tar-export") return cmd_tar_export(o);
     if (befehl == "tar-put")  return cmd_tar_put(o);
+    if (befehl == "tar-satz-save") return cmd_tar_satz_save(o);
+    if (befehl == "tar-satz-neu")  return cmd_tar_satz_neu(o);
+    if (befehl == "tar-formate")   return cmd_tar_formate(o);
     if (befehl == "save-as") return cmd_save_as(o);
     if (befehl == "measure") return cmd_measure(o);
     if (befehl == "check")   return cmd_check(o);

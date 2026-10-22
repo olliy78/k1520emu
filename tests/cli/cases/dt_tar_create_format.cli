@@ -1,0 +1,11 @@
+# create --fs tar720_leer --format: leere tar-Diskette im GEWAEHLTEN Format (hier 160 KiB statt 720K),
+# Datei sofort mit genau diesem Namen; danach als Satz mit vorgegebenem Format geoeffnet und befuellt.
+tool:   k1520disktool
+tmpfile k.img:
+tmpfile k1.img:
+setup_run: create %k.img% --fs tar720_leer --format k5601_ss40_16x256
+run:    tar-satz-save %k.img% --format k5601_ss40_16x256 -o %k.img% --put %CLI_DIR%/../fixtures/p8000/tar_v7_klein.tar=klein.tar
+expect: Satz: 1 Abbild
+expect: gespeichert: 1 Abbild
+forbid: Fehler
+exit:   0

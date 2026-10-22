@@ -8,8 +8,10 @@ Dateisysteme von **CP/A**, **SCPX**, **UDOS/ZDOS**, **UDOS1715/NDOS** und
 **SCP1700** (CP/M-86 des A7100) in den
 Abbildformaten `.hfe`, `.dmk`, `.img` und `.cqm` (CopyQM; soweit das Medium darstellbar ist).
 Dazu kommen die UNIX-Disketten des P8000: **WEGA** (mit Modus, Besitzer und Zeit je
-Datei) und **tar-Disketten** ohne Dateisystem, beide ohne UDOS-Angaben. Alles
+Datei), **tar-Disketten** ohne Dateisystem und **Plattenabbilder** (`.img.gz`) mit ihren
+Partitionen — alle ohne UDOS-Angaben. Alles
 Wesentliche zu den neueren Funktionen steht in den Abschnitten *tar-Disketten*,
+*P8000-Platten (WEGA)*,
 *CopyQM-Abbilder*, *Containerformate im Vergleich*, *Was eine Datei außer ihren Bytes hat* und *Archivieren*
 (einschließlich *Archive auf der Kommandozeile*).
 
@@ -117,9 +119,10 @@ Dinge von außen an — und sonst nichts (überall sonst zeigt der Mauszeiger
   Datei auf die Diskette bringen, wählt man sie in der Ordneransicht (rechts)
   aus und benutzt `|←` bzw. dem entsprechenden Menüpunkt (Strg+←).
 
-- **Leere tar-Diskette:** Auf eine `tar720_leer`-Diskette (Schreibschutz aufgehoben) wird eine
-  abgelegte oder in der Ordneransicht gewählte **`.tar`-Datei** als Archiv geschrieben — genau EINE;
-  mehrere Dateien, Ordner und Abbild-Endungen weist die Statuszeile ab. Näheres bei den tar-Disketten.
+- **Leere tar-Diskette:** Sie nimmt Dateien und Ordner an wie jedes Archiv (Schreibschutz
+  aufgehoben). Eine einzelne abgelegte oder in der Ordneransicht gewählte **`.tar`-Datei** kann
+  auf einem LEEREN Archiv als Archiv selbst gelten (Rückfrage *Als Datei* / *Fertiger
+  Container*); Näheres bei den tar-Disketten.
 
 **Binär oder Text?** Im Menü *Übertragung*. Bei *Text* werden die Zeilenenden
 umgesetzt (CR LF ↔ LF) — richtig für Quelltexte und Dokumente, **falsch für
@@ -207,8 +210,9 @@ Beim Herausholen wird daraus `GW_ZSID.DOC`.
 ## tar-Disketten — ein Archiv statt eines Dateisystems
 
 Viele P8000-Lieferdisketten tragen **kein Dateisystem**: jemand hat mit `tar` direkt auf
-die rohe Diskette geschrieben. Das Werkzeug erkennt das als `tar720` (nur lesbar, immer
-als letzter Versuch hinter allen echten Dateisystemen) und zeigt Modus, Besitzer und
+die rohe Diskette geschrieben. Das Werkzeug erkennt das als `tar720` (immer als letzter
+Versuch hinter allen echten Dateisystemen; bearbeitbar ist ein *abgeschlossenes* Archiv, siehe
+unten) und zeigt Modus, Besitzer und
 Zeit wie bei WEGA. Mehrere Disketten eines Satzes sind **ein** Strom: die letzte Datei
 einer Diskette ist dann abgeschnitten (`tar.abgeschnitten`, in der Liste `[DEFEKT]`,
 das `.fileinfo` trägt `teilstueck=ist/soll`), und Diskette 2…n beginnt mitten in einer
@@ -219,10 +223,50 @@ Vollständig werden die Dateien mit `k1520disktool tar-satz abbild1 abbild2 … 
 Im Fenster heißt der Weg **Datei ▸ tar-Satz öffnen…** (ohne Tastenkürzel): man wählt
 alle Abbilder des Satzes (`.cqm` oder `.img`), ordnet sie in der Liste mit *Auf* und *Ab*
 — der Vorschlag sortiert nach den Zahlen in den Dateinamen, `ariane2` vor `ariane10` — und
-bekommt EINE Diskette mit den vollständigen Dateien. Ein tar-Satz ist wie jede tar-Diskette
-nur lesbar. Das Dateisystem heißt in der Anzeige „tar-Archiv (UNIX)“; die Befunde
+bekommt EINE Diskette mit den vollständigen Dateien. Wie jedes Abbild ist er beim Öffnen
+schreibgeschützt (Schreibschutz aufheben, dann lässt er sich bearbeiten, siehe den nächsten
+Abschnitt). Öffnet man dagegen ein einzelnes Teilstück (die letzte Datei abgeschnitten, der
+Anfang mitten in einer Datei, keine Endmarke), zeigt der Meldungsstreifen den Weg mit einem
+Knopf **tar-Satz öffnen…**; ein solches Stück bleibt allein nur lesbar. Das Dateisystem heißt in
+der Anzeige „tar-Archiv (UNIX)“, bei einem Satz aus mehreren Abbildern „tar-Satz (UNIX)“; die Befunde
 `tar.fortsetzung` (die Diskette beginnt mitten in einer Datei) und `tar.abgeschnitten`
 (die letzte Datei setzt sich auf der nächsten Diskette fort) stehen im Protokoll.
+
+### tar-Sätze und -Archive im Fenster bearbeiten
+
+Ein **abgeschlossenes** tar-Archiv (Kopf bei Sektor 0 und Endmarke) und jeder **tar-Satz** lassen
+sich im Fenster wie eine große Diskette bearbeiten, sobald der Schreibschutz aufgehoben ist
+(Strg+R). Der Satz liegt dabei als EIN Strom im Speicher; geschrieben wird erst beim Speichern.
+
+- **Dateien und Ordner hinein:** ziehen auf die Diskettenansicht, *Auf die Diskette schreiben*
+  (`|←`, Strg+←) oder *Alles einfügen*. Auch ganze Ordner gehen (samt leerer Unterordner). Eine
+  daneben liegende `<datei>.fileinfo` (Modus, uid, gid, mtime) wird übernommen, sonst gelten 0644
+  bzw. 0755, uid/gid 0 und die Zeit „jetzt“. *Herunterladen* schreibt diese `.fileinfo`.
+- **Löschen, Ordner, Eigenschaften:** *Löschen*, **Bearbeiten ▸ Ordner im tar-Archiv anlegen…**
+  und *Eigenschaften* (Modus, uid, gid, mtime) wie bei einer WEGA-Diskette.
+- **Eine einzelne `.tar`-Datei ablegen** (ziehen, `|←`, Strg+←): ist das Archiv **leer** — ein
+  neuer Satz, eine neue oder die leere Diskette `tar720_leer`, auch ein leer geräumtes Archiv —, fragt
+  ein Fenster: *Als Datei im Container ablegen* (sie wird ein Eintrag) oder *Ist ein fertiger
+  tar-Container* (ihr Inhalt wird das Archiv; über eine Diskette hinaus entsteht ein Satz aus mehreren
+  Abbildern). Auf einem Archiv mit Inhalt, bei mehreren abgelegten Dateien oder einem Ordner wird eine
+  `.tar` immer eine Datei. Eine Datei ohne tar-Kopf am Anfang (Folgeteil) ist kein Container. Die
+  Diskette bleibt danach ganz normal bearbeitbar.
+- **Eine tar-Diskette ist ein Satz mit einem Abbild:** der Inhalt darf über eine Diskette hinaus
+  wachsen (das Protokoll sagt es), es gibt keine Rückfrage beim Einfügen. Gespeichert wird beim
+  Speichern.
+- **Speichern (Strg+S):** passt der Inhalt noch auf EIN Abbild, geht er ohne Rückfrage in
+  **dasselbe Abbild** zurück (Container und Format bleiben; vor dem ersten Schreiben entsteht eine
+  Sicherung `<name>~`). Sonst — und bei **Speichern unter…** — zeigt ein Fenster, was geschieht:
+  die Zahl der Abbilder, ihre Namen, welche Dateien schon da sind und überschrieben werden und welche
+  **höheren Nummern liegen bleiben** (gelöscht wird nie etwas). Die Nummer steht am Ende des Namens
+  vor der Endung (`name1.hfe`, `name2.hfe`; abschließende Ziffern des alten Namens entfallen); die
+  Endung bestimmt den Container.
+- **Datei ▸ Neue tar-Diskette / tar-Satz…** legt etwas Neues an: Format (alle einheitlichen
+  Katalogformate, nicht nur 720K) und Art — *Einzelne Diskette* (die Datei entsteht sofort, wächst bei
+  Bedarf zum Satz) oder *Satz* (nichts entsteht bis zum Speichern; `name1`, `name2` …).
+- **Greaseweazle:** ein Satz lässt sich nicht direkt auf EINE echte Diskette schreiben; *Physische
+  Diskette überschreiben…* ist gesperrt, der Tooltip nennt den Weg: Satz speichern, die
+  Einzelabbilder öffnen, jedes für sich schreiben.
 
 ### tar-Archive herausholen, bearbeiten und zurückschreiben
 
@@ -250,26 +294,27 @@ Disketten:
 
 3. **Datei ▸ Neue Diskette…** mit dem Dateisystem `tar720_leer` (Kommandozeile
    `create x.cqm --fs tar720_leer`) legt eine **leere tar-Diskette** an: 720 KiB (80 × 2 × 9 × 512), ganz Null, in jedem
-   Container (`.img`, `.hfe`, `.dmk`, `.cqm`). Sie wird beim Öffnen als „tar-Diskette, leer“ erkannt
+   Container (`.img`, `.hfe`, `.dmk`, `.cqm`). Sie wird beim Öffnen als leeres tar-Archiv erkannt
    (nur wenn **alle** Bytes Null sind; eine mit Nullen gefüllte CP/A-Diskette erscheint ebenfalls so —
-   *Diskette ▸ Dateisystem übersteuern* ▸ `cpa_auto` stellt es richtig).
-4. **Diskette ▸ tar-Datei auf Diskette schreiben…** (Kommandozeile `tar-put`) schreibt die Datei ab Sektor 0 und
-   macht die Diskette zu einer gewöhnlichen, **nur lesbaren** tar-Diskette (`tar720`). Es geht
-   **genau einmal**; ein zweites Schreiben wird abgelehnt. Dieselbe Datei lässt sich auch über
-   **`|←` / Strg+←** (Datei in der Ordneransicht gewählt) oder durch **Ziehen und Ablegen** auf die
-   Diskettenansicht schreiben — es muss genau EINE Datei sein (kein Ordner, keine Diskettenabbild-
-   Endung; sonst Hinweis in der Statuszeile), sie geht denselben Prüfweg samt Rückfrage. Alle
-   anderen Datei-Wege (Löschen, *Alles einfügen*, `put`) und jeder Weg auf eine belegte tar-Diskette
-   bleiben gesperrt. Vorher geprüft wird: höchstens 720 KiB
-   (sonst mit `split -b 737280` teilen) und ein Vielfaches von 512 Byte. Beginnt die Datei mit
-   einem tar-Kopf, der **nicht V7** ist (`ustar`-Magic, also GNU- oder POSIX-Format; pax-Kopf;
-   GNU-Langname; Name mit 100 Zeichen; binäres Größenfeld), erscheint die Rückfrage **„Trotzdem
-   schreiben?“** (in der Kommandozeile eine Warnung auf stderr, geschrieben wird trotzdem): die
-   P8000-/WEGA-Werkzeuge verstehen nur V7. `tar --format=v7` erzeugt ein solches Archiv (Namen
-   bis 99 Zeichen). Eine Datei ohne Kopf am Anfang (Folgeteil) wird kommentarlos übernommen.
+   *Diskette ▸ Dateisystem übersteuern* ▸ `cpa_auto` stellt es richtig). Wie jede tar-Diskette ist
+   sie ein Satz mit einem Abbild und nimmt Dateien, Ordner und `.tar`-Dateien an.
+4. **Das fertige Archiv zurück:** das bearbeitete `w11data.tar` legt man (ziehen, `|←`) auf einen
+   **leeren neuen Satz** (*Datei ▸ Neue tar-Diskette / tar-Satz…* ▸ Satz) und wählt *Ist ein fertiger
+   tar-Container*; beim Speichern wird es auf nummerierte Abbilder GLEICHEN Formats verteilt
+   (`split` ist nicht mehr nötig). Auf der Kommandozeile: `tar-satz-neu --format k5601_9x512 neu.hfe
+   --tar-container w11data.tar` (Abbilder `neu1.hfe`, `neu2.hfe`, …) bzw. für ein Archiv, das auf EIN
+   Abbild passt, `tar-put diskette00.cqm archiv.tar` (die Datei wird das Archiv der **leeren**
+   Diskette; mit `--dry-run` nur beurteilen). Auf einer Diskette mit Inhalt kommt eine `.tar` nur als
+   Datei hinein (`put`). Die Diskette ist danach **nicht schreibgeschützt**. Beurteilt wird vorher: ein
+   Vielfaches von 512 Byte und ein tar-Kopf am Anfang. Ist der erste Kopf **nicht V7** (`ustar`-Magic,
+   also GNU- oder POSIX-Format; pax-Kopf; GNU-Langname; Name mit 100 Zeichen; binäres Größenfeld),
+   steht ein **Hinweis** im Rückfragefenster (in der Kommandozeile eine Warnung auf stderr, abgelegt
+   wird trotzdem): die P8000-/WEGA-Werkzeuge verstehen nur V7. `tar --format=v7` erzeugt ein solches
+   Archiv (Namen bis 99 Zeichen).
 
        k1520disktool create diskette00.cqm --fs tar720_leer
-       k1520disktool tar-put diskette00.cqm neu_00              # … für jedes Teil eine neue Diskette
+       k1520disktool tar-put diskette00.cqm archiv.tar          # passt auf eine Diskette
+       k1520disktool tar-satz-neu --format k5601_9x512 neu.hfe --tar-container gross.tar   # neu1.hfe, neu2.hfe …
 
 #### Passende tar-Dateien unter Linux erzeugen und entpacken
 
@@ -291,8 +336,10 @@ Disketten:
   die Teile ergeben, hintereinandergelegt, wieder genau das V7-Archiv.
 - Die Teile 2 bis n beginnen mitten in einer Datei und sind einzeln für `tar tf` nicht lesbar
   („This does not look like a tar archive“). Das ist richtig so; erst zusammen ergeben sie das Archiv.
-- Jedes Teil auf eine eigene leere Diskette schreiben (`tar-put`, siehe oben). Das DiskTool prüft
-  nur, ob ein Kopf am Anfang V7 ist; ein Folgeteil nimmt es ohne Meldung an.
+- Das ganze Archiv auf nummerierte Disketten verteilen lässt man das DiskTool (`tar-satz-neu
+  --tar-container`, siehe oben); es teilt an den Diskettengrenzen wie `split`. Einzelne Teile als
+  Container auf eine leere Diskette zu legen geht nicht mehr — ein Folgeteil hat keinen Kopf am
+  Anfang. Das DiskTool beurteilt nur, ob ein Kopf am Anfang V7 ist.
 
 **Mehrere `.tar`-Teile zu einem Archiv zusammensetzen und in ein Verzeichnis entpacken:**
 
@@ -312,11 +359,42 @@ Disketten:
   `tar --delete -f wega.tar pfad` entfernt. Danach wieder mit `split` teilen. Beim Anhängen
   `--format=v7` mitgeben, sonst mischt `tar` GNU-Köpfe hinein.
 
-**Rundlauf.** `tar-export` einer mit `tar-put` beschriebenen Diskette liefert: bei einer Datei
-mit Kopf und Endmarke genau die Datei; bei einer Datei mit Kopf **ohne** Endmarke die Datei plus
-zwei Nullblöcke (die Auffüllung der Diskette hat dann eine); bei einem Folgeteil die Datei,
-mit Nullen auf 720 KiB aufgefüllt — ein volles Teil kommt bitgleich zurück. Nach dem `cat` der
-exportierten Teile bleibt daher höchstens Nullauffüllung am Ende des Archivs übrig, die `tar` ignoriert.
+**Rundlauf.** `tar-export` einer mit `tar-put` (bzw. als Container abgelegten) beschriebenen Diskette
+liefert: bei einer Datei mit Kopf und Endmarke genau die Datei; bei einer Datei mit Kopf **ohne** Endmarke
+die Datei plus zwei Nullblöcke (die Auffüllung der Diskette hat dann eine). Die Teile eines Satzes
+exportiert man einzeln (ein Folgeteil immer ganz, bis zum Abbildende). Nach dem `cat` der exportierten
+Teile bleibt daher höchstens Nullauffüllung am Ende des Archivs übrig, die `tar` ignoriert.
+
+## P8000-Platten (WEGA)
+
+Ein **Plattenabbild** des P8000 (`.img` oder gepackt `.img.gz`, etwa `…k5504.img.gz`) öffnet
+man wie eine Diskette: *Datei ▸ Abbild öffnen…* oder die Datei auf die linke Hälfte ziehen. Ob
+es eine Platte ist, entscheidet ihr Plattenkopf, nicht der Name — und es erscheint **kein
+Formatdialog**: Format und Dateisystem (WEGA) stehen fest.
+
+* **Ansicht.** Die Partitionen `md0`, `md2`, `md3`, `md4` stehen als oberste Ordner (mit
+  Verwendung, Datenträgername und freiem Platz), darunter der Verzeichnisbaum. Je Zeile: Art,
+  Größe, Rechte (wie `ls -l`), uid, gid und Änderungszeit.
+* **Eigenschaften** (Doppelklick, `Alt+Return`) zeigen und ändern Modus, Besitzer und Zeit wie
+  bei einer WEGA-Diskette.
+* **Holen** legt Datei oder Ordner mit ihrem Pfad in den Ordner (`md2/etc/passwd`) und schreibt
+  neben jede Datei ein `.fileinfo` (Modus, uid/gid, Zeit). **Alles extrahieren** holt alle
+  Partitionen.
+* **Hinzufügen** (*Auf die Platte schreiben*, `Strg+←`, oder Ziehen) legt in den angeklickten
+  Ordner der Platte — beim Ziehen in den Ordner unter dem Mauszeiger. Ein `.fileinfo` neben der
+  Datei liefert Modus, Besitzer und Zeit; sonst gelten 0644/0755, uid/gid 0 und „jetzt“. Ist
+  kein Zielordner bestimmt, wird **nichts geraten**. *Löschen* entfernt Dateien und Ordner (keine
+  Partition); *Ordner auf der Platte anlegen…* (Menü *Bearbeiten*, auch im Kontextmenü) legt
+  einen Ordner im angeklickten Ordner an.
+* **Schreibschutz.** Wie bei jedem Datenträger ist er beim Öffnen gesetzt; *Diskette ▸
+  Schreibschutz* (`Strg+R`) hebt ihn auf. Geschrieben wird erst beim Speichern (`Strg+S`), und
+  zwar in der Art der Quelle (`.img.gz` bleibt gepackt). Vor dem ersten Zurückschreiben entsteht
+  einmalig eine Sicherung `<abbild>~`.
+* **Gesperrt** sind Aktionen, die an einer Platte keinen Sinn haben — mit Begründung im
+  Tooltip: Diskeditor, Bootabbild, Dateisystemwahl und Spurschnitte (die Platte hat keine
+  Spuren, Seiten oder Systemspuren), Greaseweazle, Diskettenangaben, Dateisystemprüfung,
+  Wiederherstellen, Archivieren, *Speichern unter* (für eine Arbeitskopie die Datei im
+  Dateimanager kopieren) und *Alles einfügen* (dafür Ziehen oder *Auf die Platte schreiben*).
 
 ## CopyQM-Abbilder
 
@@ -417,6 +495,8 @@ zeigt die Angaben, die ein Linux-Dateisystem nicht tragen kann:
   Das Feld **Segmente** trägt sie alle, durch Leerzeichen getrennt
   (`4000+06A7 62A7+0002 …`): ein Programm kann mehrere Speicherbereiche belegen.
 * **CP/M** — Nutzerbereich (0–15) und die Attribute R/O, SYS, ARC.
+* **tar** — wie bei WEGA Modus, uid, gid und mtime (aus dem tar-Kopf); in der `.fileinfo` steht
+  `fs=tar`.
 * **WEGA** (UNIX des P8000) — die Inode: Dateiart, Modus (als Kästchen für
   Besitzer/Gruppe/Andere, die Sonderbits setuid/setgid/sticky und als Oktalzahl wie bei
   `chmod`), Besitzer (uid), Gruppe (gid), Änderungszeit (mtime, GMT), dazu als reine
@@ -878,6 +958,20 @@ Dateien im Archiv, und sie steht im Kopf des Inhaltsverzeichnisses. Bei einer
 archiviert wurde: sie hat keine Abbilddatei, von der sich ein Name ableiten
 liesse. Vorgeschlagen wird der Dateiname der offenen Diskette, sonst ihr
 Datenträgername.
+
+**Ein tar-Satz** (mehrere Disketten, EIN Strom) lässt sich ebenso archivieren. Das Archiv enthält
+dann statt EINES `.hfe` **alle Abbilder des Satzes** im Ordner `abbilder/` (nummeriert wie
+beim Speichern, `name1.hfe`, `name2.hfe`, unverändert), **alle Dateien** mit ihrer Ordnerstruktur
+und `.fileinfo` unter `dateien/` und die Satzangaben (Basisname, Format, Abbildreihenfolge mit
+Prüfsummen) im Abschnitt `tar_satz:` der `diskarchive.yaml` und im Inhaltsverzeichnis.
+Archiviert wird der Stand der **gespeicherten Abbilder**: hat der Satz ungespeicherte
+Änderungen (oder wurde er noch nie gespeichert), fragt das Programm, ob es ihn erst speichern
+soll — „Nein“ bricht das Archivieren ab, es entsteht nichts Halbes. Zurück zum Satz kommt man
+mit `python3 -m app.disktool.archive archiv.zip --satz-entpacken ORDNER`: die Abbilder werden
+gegen ihre Prüfsumme geprüft und in den Ordner gelegt (vorhandene Dateien nur mit `--force`
+ersetzt); dann *Datei ▸ tar-Satz öffnen…*. Auf der Kommandozeile archiviert
+`python3 -m app.disktool.archive satz1.hfe archiv.zip --satz satz2.hfe` (jedes weitere Abbild
+mit `--satz`, in Stromreihenfolge).
 
 Gedacht als Langzeitablage: aus dem Textteil allein lässt sich in zwanzig Jahren
 noch nachvollziehen, was auf der Diskette stand. Archivieren ist eine reine

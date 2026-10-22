@@ -332,6 +332,29 @@ def test_abort_ends_a_blocking_serve(tmp_path):
     server.close()
 
 
+def test_abort_racing_close_does_not_touch_a_freed_handle(tmp_path):
+    """Waechter fuer den SEGFAULT in k1520k_abort: die GUI bricht ab, waehrend der Arbeitsfaden die
+    Sitzung schliesst (Use-after-free zwischen `if self._h` und dem Aufruf).  Ohne die Sperre in
+    Kermit.close()/abort*() stuerzt der Prozess nach wenigen Runden ab."""
+    for _ in range(40):
+        client, server = _paar("telnet", True)
+        stopp = threading.Event()
+
+        def hammer(k=server):
+            while not stopp.is_set():
+                k.abort()
+                k.abort_file()
+                k.abort_group()
+
+        t = threading.Thread(target=hammer)
+        t.start()
+        client.close()
+        server.close()
+        stopp.set()
+        t.join(10)
+        assert not t.is_alive()
+
+
 def _serve_sammeln(server, wurzel, fehler):
     from app.kermittool.binding import KermitError
     try:

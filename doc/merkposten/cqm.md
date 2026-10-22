@@ -68,6 +68,7 @@ Voller Befund an 142 Abbildern: `doc/design/35_cqm.md`.
    Saetze, Webseiten-Herkunft als `provenance:`; siehe `disktool.md`, „Archiv mit Herkunft").
    Die `*.crdownload` der Sammlung sind **vollstaendige** CQM-Abbilder (Strom komplett, Pruefwert ok)
    — nur umbenennen; das Skript berichtet es, archiviert sie nicht.
+*(Seit Entwurf 37 sind abgeschlossene tar-Archive und Sätze bearbeitbar — Festlegungen in `doc/merkposten/tar_satz.md`; „danach nur lesbar“ unten gilt nicht mehr.  **Seit der Vereinheitlichung 2026-10-22 (tar_satz.md Nr. 16) ist auch die Verriegelung (3) „genau EIN `.tar`“ samt `tarSchreiben/tarPruefen/tarLeer`, `k1520d_tar_put*` und der GUI-Aktion „tar-Datei auf Diskette schreiben…“ entfallen; (1) Export, (2) Erkennung, (4) V7-Urteil gelten weiter, (5) Rundlauf nur für Container mit Kopf; Folgeteile lassen sich nicht mehr einzeln auf leere Disketten schreiben.**)*
 13. **tar-Export, leere tar-Diskette, `.tar` schreiben (2026-10-17, `tar-export`/`tar-put`,
    `tar720_leer`).**  Rohinhalte einer tar-Diskette als `.tar` heraus (Stücke eines Satzes setzt
    `cat` zusammen) und in neue Disketten zurück.  Festlegungen mit Wächter:
@@ -88,8 +89,11 @@ Voller Befund an 142 Abbildern: `doc/design/35_cqm.md`.
    Folgeteil ohne einen Kopf — nur in dieser Sitzung, beim Wiederöffnen ist es „kein Dateisystem“,
    Export geht trotzdem) das leere, `readOnlyForced`, `detection_.filesystem = tar720`, Abbild
    sofort zurückgeschrieben (flush), Medium bei Fehler zurückgerollt, keine `~`-Sicherung (nur Nullen
-   überschrieben).  Datei-Wege (`insert`/`erase`/…) melden auf der leeren Diskette „genau EIN
-   .tar“.  Wächter `TarLeer.SchreibenRundlaufUndVerriegelung`, `NurInEineLeereDiskette`.
+   überschrieben).  **Seit Entwurf 37 T1 (2026-10-22) überholt:** Datei-Wege (`insert`/`erase`/`mkdir`/`setAttributes`) sind auf der leeren
+   Diskette und an einem ABGESCHLOSSENEN Archiv (Kopf bei Sektor 0 + Endmarke) erlaubt (`TarArchiv`, `tar_archiv.*`: Strom
+   wird jedes Mal neu gebaut, V7, kein Patchen; `readOnlyForced` nur noch für Folgeteil/abgeschnitten/ohne Endmarke,
+   Grund in `TarFileSystem::nurLesbarGrund`); `tar-put` bleibt Einmalwurf und lässt die Diskette schreibgeschützt,
+   aufhebbar.  Wächter `TarWrite.*`.  Wächter `TarLeer.SchreibenRundlaufUndVerriegelung`, `NurInEineLeereDiskette`.
    **(4) V7-Urteil** `tar::quelleBeurteilen`: ALLE vom Anfang her ablaufbaren Köpfe;
    Warnung (nie Sperre) bei `ustar`-Magic, Typ x/g, L/K, 3/4/6/7, Name ohne NUL (100 Zeichen), binärem
    Größenfeld; Folgeteil → keine Warnung; Ablehnung: leer, nicht 512-Vielfaches, > 720 KiB

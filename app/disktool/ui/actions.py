@@ -32,8 +32,14 @@ _SPEC: List[Tuple] = [
     ("tar_satz", "tar-&Satz öffnen…", None, None,
      "Mehrere Abbilder (.cqm/.img/…) in wählbarer Reihenfolge als EINEN tar-Strom öffnen "
      "(ein tar-Archiv, das auf mehrere Disketten verteilt ist)", "_tar_satz_dialog", False),
+    # Entwurf 37 T4.  Bewusst OHNE Tastenkuerzel (die Kuerzeltabelle des Handbuchs ist ein Vertrag).
+    ("tar_neu", "Neue tar-Diskette / tar-Sat&z…", None, None,
+     "Eine leere tar-Diskette oder einen leeren tar-Satz in einem wählbaren Format anlegen — "
+     "Dateien und Ordner hineinziehen, dann speichern (wächst der Inhalt über eine Diskette, "
+     "entstehen nummerierte Abbilder)", "_tar_neu_dialog", False),
     ("speichern", "&Speichern", "save", "Ctrl+S",
-     "Die Änderungen in die Abbilddatei schreiben", "save", False),
+     "Die Änderungen in die Abbilddatei schreiben (bei einem tar-Satz: erst die Rückfrage mit "
+     "Namen und Umfang)", "save", False),
     ("speichern_unter", "Speichern &unter…", "save-as", "Ctrl+Shift+S",
      "Unter neuem Namen oder in einem anderen Container speichern und dort "
      "weiterarbeiten", "_speichern_unter_dialog", False),
@@ -55,6 +61,15 @@ _SPEC: List[Tuple] = [
      "_einfuegen_auswahl", False),
     ("loeschen", "&Löschen", "delete", "Del",
      "Die ausgewählten Dateien von der Diskette löschen", "_loeschen_auswahl", False),
+    # Nur an einer P8000-Platte sichtbar (Entwurf 37).  Bewusst OHNE Tastenkuerzel (die
+    # Kuerzeltabelle des Handbuchs ist ein Vertrag).
+    ("platte_ordner", "Ordner auf der &Platte anlegen…", None, None,
+     "Auf der Platte im angeklickten Ordner (oder der Partition) einen neuen Ordner "
+     "anlegen", "_platte_ordner_anlegen", False),
+    # Nur an einem tar-Archiv sichtbar (Entwurf 37 T4); OHNE Tastenkuerzel.
+    ("tar_ordner", "Ordner im &tar-Archiv anlegen…", None, None,
+     "Im tar-Archiv einen neuen Ordner anlegen (Zwischenordner entstehen mit)",
+     "_tar_ordner_anlegen", False),
     # Der Weg von der Datei zu ihren Bytes: er gehoert neben „Eigenschaften",
     # weil beides dieselbe Frage beantwortet — was steht da eigentlich?
     ("datei_im_editor", "Im Disk&editor öffnen", "disk-editor", None,
@@ -72,14 +87,12 @@ _SPEC: List[Tuple] = [
      "Den ganzen Disketteninhalt in einen Ordner holen", "_alles_extrahieren", False),
     ("alles_rein", "Alles ei&nfügen…", "in-all", None,
      "Einen ganzen Ordner auf die Diskette schreiben", "_alles_einfuegen", False),
-    # tar-Disketten: das Archiv als Ganzes herausholen bzw. hineinschreiben.  Bewusst OHNE
-    # Tastenkuerzel (die Kuerzeltabelle des Handbuchs ist ein Vertrag).
+    # tar-Disketten: das Archiv als Ganzes herausholen.  Hineinlegen geht ueber den normalen
+    # Einfuegen-Weg (Entwurf 37, Vereinheitlichung).  Bewusst OHNE Tastenkuerzel (die
+    # Kuerzeltabelle des Handbuchs ist ein Vertrag).
     ("tar_export", "Diskette als .tar e&xportieren…", None, None,
      "Den tar-Strom dieser Diskette (Blöcke 1:1) als .tar-Datei herausschreiben — die Teile "
      "eines Satzes setzt man mit „cat“ zusammen", "_tar_export_dialog", False),
-    ("tar_schreiben", "tar-Datei auf Diskette sch&reiben…", None, None,
-     "Eine .tar-Datei (höchstens 720 KiB) auf die LEERE tar-Diskette schreiben — "
-     "einmalig; danach ist die Diskette nur lesbar", "_tar_schreiben_dialog", False),
     # Die echte Diskette: laden und ueberschreiben stehen NEBENEINANDER — es sind
     # die beiden Richtungen desselben Wegs, und der Bediener sucht sie zusammen.
     ("physisch", "&Physische Diskette laden…", "disk-physical", "Ctrl+Shift+O",
@@ -183,6 +196,8 @@ _SPEC: List[Tuple] = [
 KURZ = {'oeffnen': 'Öffnen',
     'neu': 'Neu',
     'tar_satz': 'tar-Satz',
+    'tar_neu': 'tar neu',
+    'tar_ordner': 'tar-Ordner',
     'physisch': 'Diskette laden',
     'physisch_schreiben': 'Diskette schreiben',
     'neu_beschreiben': 'Neu schreiben',
@@ -195,13 +210,13 @@ KURZ = {'oeffnen': 'Öffnen',
     'holen': 'Holen',
     'schreiben': 'Schreiben',
     'loeschen': 'Löschen',
+    'platte_ordner': 'Neuer Plattenordner',
     'datei_im_editor': 'Sektor',
     'eigenschaften': 'Angaben',
     'schreibschutz': 'R/O',
     'alles_raus': 'Alles holen',
     'alles_rein': 'Alles einfügen',
     'tar_export': 'tar-Export',
-    'tar_schreiben': 'tar schreiben',
     'gerade_spuren': 'Ungerade weg',
     'seite1_weg': 'Seite 1 weg',
     'bootabbild': 'Bootabbild',

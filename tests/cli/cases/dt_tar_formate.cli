@@ -1,0 +1,7 @@
+# tar-formate: die Katalogformate, die sich fuer eine neue tar-Diskette bzw. einen Satz eignen.
+tool:   k1520disktool
+run:    tar-formate
+expect: k5601_9x512
+expect: k5601_ss40_16x256
+expect: 163840
+exit:   0

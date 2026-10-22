@@ -40,8 +40,68 @@
 
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
+
+class TarFileSystem;
+struct TarSatzSpeicher;
+
+/**
+ * @struct TarSatzPlan
+ * @brief Was @ref DiskVolume::tarSatzSpeichern tun wird (Entwurf 37, AP T2) — fuer die Rueckfrage.
+ */
+struct TarSatzPlan {
+    bool                     ok = false;       ///< false: @ref fehler sagt warum
+    std::string              fehler;
+    int                      abbilder = 0;     ///< Anzahl der Abbilder (mindestens 1)
+    uint64_t                 strom = 0;        ///< Laenge des tar-Stroms in Byte
+    uint64_t                 kapazitaet = 0;   ///< Nutzbytes EINES Abbilds
+    std::string              basisname;        ///< der Basisname, der geplant wurde (mit Endung)
+    std::vector<std::string> namen;            ///< die Abbilddateien: name1.ext, name2.ext, …
+    std::vector<std::string> ueberschreibt;    ///< davon schon vorhanden (werden ersetzt, Sicherung `~`)
+    std::vector<std::string> altlasten;        ///< vorhandene hoehere Nummern, die NICHT mehr zum Satz gehoeren
+    bool                     einzel = false;   ///< der Inhalt passt auf EINE Diskette
+};
+
+/**
+ * @struct TarFormatInfo
+ * @brief Ein Katalogformat, das sich fuer eine NEUE leere tar-Diskette / einen tar-Satz eignet
+ *        (Entwurf 37, AP T3): einheitliche Spurgeometrie, damit "gleiches Format fuer alle
+ *        Abbilder" eine einzige Kapazitaet ist.
+ */
+struct TarFormatInfo {
+    std::string name;            ///< Katalogname (z. B. `k5601_9x512`)
+    std::string description;     ///< Klartext fuer die Auswahl
+    uint64_t    bytes = 0;       ///< Nutzbytes EINES Abbilds
+    bool        img = false;     ///< als `.img`/`.cqm` darstellbar
+    bool        hfe = false;     ///< als `.hfe` darstellbar (`.dmk` geht immer)
+};
+
+/// @brief Wie eine `.tar`-Datei in eine tar-Diskette/einen tar-Satz kommt (Entwurf 37, Festlegung 5).
+enum class TarDateiWeg { AlsDatei, AlsContainer };
+
+/**
+ * @struct TarDateiUrteil
+ * @brief Was moeglich ist, wenn eine `.tar`-Datei auf das aktuelle tar-Volume gezogen wird.
+ *
+ * Immer moeglich ist @ref als_datei (die Datei wird ein Eintrag im Archiv).  @ref als_container
+ * ("ist ein fertiger tar-Container": ihr Inhalt IST das Archiv) nur bei LEEREM Archiv.  Ein
+ * Container groesser als eine Diskette wird ein Satz (@ref wird_satz).
+ */
+struct TarDateiUrteil {
+    bool        ok = false;            ///< false: @ref fehler sagt warum (nichts moeglich)
+    std::string fehler;
+    bool        ziel_leer = false;     ///< das Archiv ist leer
+    bool        als_datei = false;     ///< Weg 1 moeglich
+    bool        als_container = false; ///< Weg 2 moeglich
+    std::string container_grund;       ///< warum Weg 2 nicht geht (leer, wenn er geht)
+    std::string warnung;               ///< kein reines V7-tar u. a. (nur bei @ref als_container)
+    uint64_t    groesse = 0;           ///< Dateigroesse
+    uint64_t    kapazitaet = 0;        ///< Nutzbytes EINES Abbilds
+    int         abbilder = 0;          ///< Abbilder, die der Container braucht (nur bei @ref als_container)
+    bool        wird_satz = false;     ///< der Container sprengt die Einzeldiskette -> tar-Satz
+};
 
 /**
  * @struct FileRef
@@ -505,11 +565,13 @@ public:
     bool istUnix() const {
         return profile_ && (profile_->type == FsType::Wega || profile_->type == FsType::Tar);
     }
-    /// @brief Archiv aus einem tar-Strom (nur lesbar, kein Dateisystem)?
+    /// @brief Archiv aus einem tar-Strom (kein Dateisystem)?  Schreibbar ist nur ein abgeschlossenes
+    ///        Archiv (Kopf + Endmarke, oder leer) — sonst @ref readOnlyForced.  Ein schreibbares
+    ///        tar-Archiv aus einer Datei arbeitet IMMER im Satzmodus (@ref tarSatz; Entwurf 37,
+    ///        Vereinheitlichung): eine tar-Diskette ist ein Satz mit N >= 1 Abbildern.
     bool istTar() const { return profile_ && profile_->type == FsType::Tar; }
-    /// @brief Die LEERE tar-Diskette (`tar720_leer`): ganz aus Nullen, beschreibbar mit genau
-    ///        einem `.tar` (@ref tarSchreiben).  Nach dem Schreiben false, @ref istTar bleibt true.
-    bool tarLeer() const;
+    /// @brief Das tar-Dateisystem dieser Diskette; nullptr, wenn es keine tar-Diskette ist.
+    const TarFileSystem* tarFs() const;
 
     /**
      * @brief Den tar-Strom der Diskette als `.tar` herausschreiben (`tar-export`).
@@ -518,34 +580,15 @@ public:
      * @ref tar::exportLaenge (Kopf + Endmarke: bis hinter die Endmarke; sonst der ganze
      * Strom, ein Folgeteil immer ganz).  Geht an einer tar-Diskette und an einer roh
      * geoeffneten (kein Dateisystem erkannt, z. B. ein Folgeteil ohne einen Kopfblock);
-     * nicht an einer mit Dateisystem, nicht an der leeren und nicht an einem tar-Satz
-     * (der ist schon EIN Strom — die Teile einzeln exportieren).  Aendert nichts.
+     * nicht an einer mit Dateisystem, nicht an einem leeren Archiv und nicht an einem echten
+     * tar-Satz aus mehreren Abbildern (@ref tarSatzEinzel false; der ist schon EIN Strom — die
+     * Teile einzeln exportieren).  Eine tar-Diskette (Satz mit EINEM Abbild) exportiert ihren
+     * Strom einschliesslich ungespeicherter Aenderungen.  Aendert nichts.
      * @param bytes  (optional) Zahl der geschriebenen Bytes.
      */
     bool tarExport(const std::string& ziel, uint64_t* bytes = nullptr) const;
 
-    /**
-     * @brief Beurteilt eine `.tar`-Datei fuer @ref tarSchreiben, ohne etwas zu aendern.
-     *
-     * @return false = abgelehnt (Grund in @ref lastError).  true = darf geschrieben werden;
-     *         @p warnung ist dann nicht leer, wenn die Datei kein reines V7-tar ist (der
-     *         Aufrufer fragt zurueck bzw. gibt sie aus; geschrieben wird trotzdem).
-     */
-    bool tarPruefen(const std::string& quelle, std::string* warnung = nullptr) const;
-
-    /**
-     * @brief Eine `.tar`-Datei auf die LEERE tar-Diskette schreiben (`tar-put`).
-     *
-     * Verriegelt: nur an @ref tarLeer; danach ist die Diskette `tar720` (nur lesbar), ein
-     * zweites Schreiben wird abgelehnt.  Geprueft wird VOR dem Schreiben (@ref tarPruefen),
-     * geschrieben ab Sektor 0 in Lesereihenfolge, der Rest bleibt Null; bei einem Fehler
-     * wird das Medium zurueckgerollt.  Das Abbild wird sofort zurueckgeschrieben (flush),
-     * solange es noch beschreibbar ist.  Warnungen siehe @ref lastTarWarnung.
-     * Rundlauf: der Export des Ergebnisses ist die Datei selbst, wenn sie mit Kopf und
-     * Endmarke endet, sonst die Datei plus Nullen bis zum Diskettenende (doc/design/35_cqm.md).
-     */
-    bool tarSchreiben(const std::string& quelle);
-    /// @brief Warnung (kein V7-tar) des letzten @ref tarSchreiben / @ref tarPruefen; sonst leer.
+    /// @brief Warnung (kein V7-tar) des letzten @ref tarDateiAblegen; sonst leer.
     const std::string& lastTarWarnung() const { return tar_warnung_; }
 
     /**
@@ -555,11 +598,123 @@ public:
      * werden Dateien ueber die Diskettengrenze vollstaendig.  Das Ergebnis ist ein
      * schreibgeschuetztes Volume (Medium und Pfad des ersten Abbilds), `list`,
      * `extract`, `extractAll`, `check` gehen wie bei jeder anderen Diskette.
+     *
+     * @p format (optional, Katalogname): die Geometrie VORGEBEN statt zu erkennen.  Noetig bei
+     * `.img`, dessen Format sich nur an der Dateigroesse raten laesst (bei kleinen Formaten
+     * mehrdeutig); bei `.hfe/.dmk/.cqm` steht die Geometrie in der Datei, das Format muss dann
+     * nur dazu passen.
      */
     static std::unique_ptr<DiskVolume> openTarSatz(const std::vector<std::string>& pfade,
                                                    const FormatCatalog& formats,
                                                    const FsCatalog& fs_cat,
-                                                   std::string& err);
+                                                   std::string& err,
+                                                   const std::string& format = {});
+
+    // ─── tar-Satz bearbeiten (Entwurf 37, AP T2) ─────────────────────────────
+
+    /// @brief Ist das Volume im Satzmodus (ein tar-Strom im Speicher ueber N >= 1 gleichformatige
+    ///        Abbilder)?  Jedes schreibbare tar-Archiv aus einer Datei ist es (Vereinheitlichung).
+    bool tarSatz() const { return tar_satz_; }
+
+    /// @brief Satzmodus UND die Datei @ref path ist das (einzige) Abbild des Stroms: der Strom wird
+    ///        beim Speichern in dasselbe Abbild zurueckgeschrieben (Container und Format bleiben),
+    ///        solange er auf EIN Abbild passt.  false bei einem aus mehreren Abbildern geoeffneten
+    ///        oder nach dem Speichern auf mehrere Abbilder verteilten Satz.
+    bool tarSatzEinzel() const { return tar_satz_ && satz_einzel_; }
+
+    /**
+     * @brief Einen LEEREN tar-Satz mit dem Katalogformat @p format anlegen (nichts auf der Platte).
+     *
+     * Das Format muss einheitlich sein (eine Sektorgroesse/-zahl/Kodierung ueber alle Spuren).
+     * @p basisname (mit Endung `.img|.hfe|.dmk|.cqm`) bestimmt die Container-Art und den Namen beim
+     * Speichern (`name1.ext`, …).  Das Volume ist beschreibbar, @ref dirty ist erst nach einer
+     * Aenderung wahr.
+     */
+    static std::unique_ptr<DiskVolume> tarSatzNeu(const std::string& format,
+                                                  const std::string& basisname,
+                                                  const FormatCatalog& formats,
+                                                  const FsCatalog& fs_cat, std::string& err);
+
+    /**
+     * @brief Eine tar-Einzeldiskette (abgeschlossenes Archiv) in den Satzmodus ueberfuehren.
+     *
+     * Danach wirken Aenderungen ohne Diskettengrenze auf den Strom im Speicher; die Datei der
+     * Diskette bleibt unberuehrt, bis @ref tarSatzSpeichern / @ref flush sie (oder einen Satz)
+     * schreibt.  Eine aus einer Datei geoeffnete schreibbare tar-Diskette ist schon im Satzmodus
+     * (dann ein No-Op); gebraucht wird der Aufruf nur noch fuer Volumes, die der Aufrufer
+     * ausserhalb der Erkennung zusammenbaut.
+     */
+    bool tarZuSatz(const std::string& basisname = "");
+
+    /// @brief Der Basisname zu einem Abbildpfad: abschliessende Ziffern vor der Endung entfallen
+    ///        (`/x/ariane1.cqm` → `/x/ariane.cqm`; ohne Ziffern unveraendert).
+    static std::string tarSatzBasisname(const std::string& abbildpfad);
+
+    /**
+     * @brief Planung des Speicherns (ohne etwas zu schreiben): Anzahl, Namen, was ueberschrieben
+     *        wird und welche hoeheren Nummern liegenbleiben.  @p basisname leer = der des Satzes.
+     */
+    TarSatzPlan tarSatzPlanen(const std::string& basisname = "") const;
+
+    /**
+     * @brief Den Strom auf Abbilder GLEICHEN Formats verteilen und schreiben.
+     *
+     * Nummer ans Ende des Basisnamens VOR der Endung, letztes Abbild mit Nullen aufgefuellt.
+     * Alles-oder-nichts (erst temporaer, dann umbenennen); vorhandene Dateien gleichen Namens
+     * werden einmal je Sitzung als `<name>~` gesichert.  Alte, nicht mehr gebrauchte Nummern
+     * werden NIE geloescht: @p hinweise bekommt je eine Zeile (und @ref tarSatzPlanen listet sie).
+     * Auch bei Schreibschutz erlaubt (es wird nicht in das Volume geschrieben).
+     * Bei @ref tarSatzEinzel und EINEM Abbild unter dem Namen der Datei wird in dieselbe Datei
+     * zurueckgeschrieben (Container/Format bleiben, `<name>~` einmal je Sitzung); passt der Strom
+     * nicht mehr, entstehen nummerierte Abbilder (Ziffern am Ende des Namens entfallen) und das
+     * Volume ist danach ein echter Satz.
+     */
+    bool tarSatzSpeichern(const std::string& basisname = "",
+                          std::vector<std::string>* hinweise = nullptr,
+                          std::vector<std::string>* geschrieben = nullptr);
+
+    /// @brief Der beim Speichern vorgesehene Basisname des Satzes (leer, wenn keiner).
+    const std::string& tarSatzBasis() const { return satz_basis_; }
+
+    // ─── Neu anlegen und .tar ablegen (Entwurf 37, AP T3) ────────────────────
+
+    /// @brief Die Katalogformate, die sich fuer eine neue tar-Diskette / einen tar-Satz eignen
+    ///        (einheitliche Geometrie, mindestens zwei Bloecke), in Katalogreihenfolge.
+    static std::vector<TarFormatInfo> tarFormate(const FormatCatalog& formats);
+
+    /**
+     * @brief Eine neue LEERE tar-Diskette im Katalogformat @p format als Datei @p pfad anlegen.
+     *
+     * Die Datei entsteht sofort (ganz Null, gueltig formatiert) und heisst genau @p pfad (keine
+     * Nummer).  Zurueck kommt das Volume im Satzmodus mit EINEM Abbild: darauf lassen sich
+     * Dateien ablegen und mit @ref tarSatzSpeichern wieder in @p pfad schreiben; waechst der Inhalt
+     * ueber eine Diskette, wird beim Speichern ein nummerierter Satz daraus.  Gegenstueck fuer
+     * 720K bleibt `create(…, "tar720_leer")`.
+     */
+    static std::unique_ptr<DiskVolume> tarDisketteNeu(const std::string& pfad,
+                                                      const std::string& format,
+                                                      const FormatCatalog& formats,
+                                                      const FsCatalog& fs_cat, std::string& err);
+
+    /// @brief Beurteilt eine `.tar`-Datei fuer das Ablegen in dieses Volume, ohne etwas zu aendern.
+    TarDateiUrteil tarDateiBeurteilen(const std::string& tarpfad) const;
+
+    /**
+     * @brief Eine `.tar`-Datei in dieses Volume bringen.
+     *
+     * `AlsDatei`: sie wird ein Eintrag (@p name, sonst ihr Dateiname; @p ersetzen = eine gleichnamige
+     * Datei ueberschreiben).  `AlsContainer`: nur bei leerem Archiv; der Inhalt der Datei WIRD das
+     * Archiv; der Strom steht im Speicher bis @ref tarSatzSpeichern bzw. @ref flush (passt er auf EIN
+     * Abbild, geht er dabei in dasselbe Abbild zurueck, sonst entsteht ein nummerierter Satz).
+     * Warnungen (kein V7-tar) siehe @ref lastTarWarnung.
+     */
+    bool tarDateiAblegen(const std::string& tarpfad, TarDateiWeg weg,
+                         const std::string& name = "", bool ersetzen = false);
+
+    /// @brief Laesst sich dieses Volume direkt auf eine PHYSISCHE Diskette schreiben?  Leer = ja;
+    ///        sonst die Begruendung (ein tar-Satz hat keine einzelne Diskette; Weg: speichern,
+    ///        Einzelabbilder oeffnen, je Abbild schreiben).
+    std::string physischSchreibenGrund() const;
 
     /// @brief Die ganze lineare Sektorfolge (Zylinder, Kopf, Sektor) — auch einer roh
     ///        geoeffneten Diskette, sofern ihre Geometrie bekannt ist.
@@ -849,6 +1004,18 @@ private:
 
     bool fail(const std::string& why) const { last_error_ = why; return false; }
     bool tar_satz_ = false;                 ///< aus @ref openTarSatz: ein verketteter Strom
+    std::shared_ptr<TarSatzSpeicher> satz_;   ///< der Strom im Satzmodus (geteilt mit dem TarFileSystem)
+    bool         satz_einzelname_ = false;  ///< ein einzelnes Abbild behaelt den Namen OHNE Nummer (tar-Diskette)
+    bool         satz_einzel_ = false;      ///< disk_ IST die Datei des einzigen Abbilds (Rueckschreiben in dasselbe Abbild)
+    /// @brief Eine geoeffnete/angelegte schreibbare tar-Diskette in den Einzel-Satzmodus bringen.
+    bool einzelSatzMachen();
+    /// @brief Strom (ein Abbild) in die gebundene Datei @ref path_ zurueckschreiben (Container bleibt).
+    bool satzInsAbbild(const TarSatzPlan& p);
+    std::string  satz_basis_;               ///< Basisname fuer das Speichern (mit Endung)
+    uint64_t     satz_rev_gespeichert_ = 0; ///< Revision des Stroms beim Oeffnen/letzten Speichern
+    std::set<std::string> satz_gesichert_;  ///< Pfade, deren `~`-Sicherung in dieser Sitzung schon liegt
+    /// @brief TarFileSystem frisch ueber dem Satzstrom aufsetzen (nach Rollback, Anlegen).
+    bool satzNeuMounten();
     mutable std::string tar_warnung_;
     /// @brief Meldung fuer eine abgewiesene Schreibanforderung (tar eigener Text).
     std::string schreibschutzText() const;

@@ -1,0 +1,9 @@
+# --tar-container: eine fertige .tar wird das Archiv eines neuen Satzes (nicht eine Datei darin).
+tool:   k1520disktool
+tmpfile c.img:
+tmpfile c1.img:
+run:    tar-satz-neu --format k5601_ss40_16x256 %c.img% --tar-container %CLI_DIR%/../fixtures/p8000/tar_v7_klein.tar
+expect: Archiv (1 Abbild
+expect: gespeichert: 1 Abbild
+forbid: Fehler
+exit:   0

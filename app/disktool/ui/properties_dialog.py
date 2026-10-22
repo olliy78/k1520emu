@@ -152,10 +152,13 @@ class PropertiesDialog(QDialog):
         self.hinweis.setStyleSheet("color: #a06000;")
         if tool.read_only:
             grund = sperrgrund(tool)
+            traeger = "Die Platte" if getattr(tool, "ist_plattenabbild", False) else "Die Diskette"
             self.hinweis.setText(
-                "Die Diskette ist schreibgeschützt geöffnet — die Felder lassen sich "
+                f"{traeger} ist schreibgeschützt geöffnet — die Felder lassen sich "
                 "ansehen, aber nicht ändern."
                 + (f"  {grund}" if grund else
+                   "  Zum Ändern den Schreibschutz aufheben (Strg+R)."
+                   if getattr(tool, "ist_plattenabbild", False) else
                    "  Zum Ändern den Haken „Nur lesen“ entfernen."))
         lay.addWidget(self.hinweis)
 

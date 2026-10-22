@@ -80,10 +80,10 @@ struct FsProfile {
     ///        K8915 darauf geschrieben hat, findet es die CP/A-Regel ohnehin selbst.
     bool detect = true;
 
-    /// @brief Nur `type: tar`: die **leere** tar-Diskette (`tar720_leer`) — beschreibbar mit
-    ///        genau EINEM `.tar` (@ref DiskVolume::tarSchreiben), danach ein gewoehnliches
-    ///        `tar720`.  Erkannt wird sie nur an einer Diskette, die ganz aus Nullen besteht
-    ///        (siehe disk_volume.cpp, Erkennung).
+    /// @brief Nur `type: tar`: die **leere** tar-Diskette (`tar720_leer`) — ein leeres Archiv, das
+    ///        wie jede tar-Diskette bearbeitet wird (ein Satz mit einem Abbild; eine `.tar` darauf
+    ///        kann als Container gelten, @ref DiskVolume::tarDateiAblegen).  Erkannt wird sie nur an
+    ///        einer Diskette, die ganz aus Nullen besteht (siehe disk_volume.cpp, Erkennung).
     bool leer = false;
 
     /// @brief Bauart des **Ladekopfs** in Sektor 1 der Systemspuren, den ein Bootabbild

@@ -1,0 +1,16 @@
+# -o legt den Satz unter einem NEUEN Basisnamen und in einem anderen Container ab (hfe -> img).
+tool:   k1520disktool
+tmpfile s.hfe:
+tmpfile s1.hfe:
+tmpfile s2.hfe:
+tmpfile s3.hfe:
+tmpfile s4.hfe:
+tmpfile s5.hfe:
+tmpfile neu.img:
+setup_run: tar-satz-neu --format k5601_ss40_16x256 %s.hfe% --put %CLI_DIR%/../fixtures/disks/cpa_cpa780_combo5zoll_noclock.img=gross.img
+run:    tar-satz-save %s1.hfe% %s2.hfe% %s3.hfe% %s4.hfe% %s5.hfe% -o %neu.img%
+expect: neu1.img
+expect: neu5.img
+expect: gespeichert: 5 Abbild
+forbid: Hinweis
+exit:   0

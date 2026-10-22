@@ -159,6 +159,21 @@ std::vector<uint8_t> beispiel() {
     return s;
 }
 
+/// Dasselbe Archiv OHNE Endmarke: nicht abgeschlossen, bleibt lesbar, aber nicht schreibbar
+/// (ein abgeschlossenes Archiv ist seit Entwurf 37 T1 schreibbar, siehe test_tar_write.cpp).
+std::vector<uint8_t> beispielOffen() {
+    auto s = beispiel();
+    s.resize(s.size() - 1024);
+    return s;
+}
+
+/// Ist das Archiv der Diskette LEER (ganz Null, nie beschrieben)?  Ersatz fuer das entfallene
+/// `DiskVolume::tarLeer()` (Entwurf 37, Vereinheitlichung: eine leere tar-Diskette ist ein leeres Archiv).
+bool tarLeer(const DiskVolume& v) {
+    const TarFileSystem* t = v.tarFs();
+    return t && t->leer();
+}
+
 }  // namespace
 
 // ─── Erkennung und Lesen ─────────────────────────────────────────────────────
@@ -360,7 +375,7 @@ TEST(TarFs, Pruefsummenfehler) {
 }
 
 /// @test Daten ohne tar-Kopf werden NICHT als tar-Archiv erkannt.  Eine ganz mit Nullen gefuellte
-///       Diskette ist die LEERE tar-Diskette (kein Archiv, `tarLeer()`).
+///       Diskette ist die LEERE tar-Diskette (ein leeres Archiv, `tarFs()->leer()`).
 TEST(TarFs, NichtTarDatenWerdenNichtErkannt) {
     std::vector<uint8_t> text(kDisk);
     for (size_t i = 0; i < text.size(); ++i) text[i] = static_cast<uint8_t>('a' + (i * 7) % 26);
@@ -368,8 +383,8 @@ TEST(TarFs, NichtTarDatenWerdenNichtErkannt) {
         const std::string p = imgMit("k1520_test_tar_g.img", d);
         auto v = oeffne(p);
         ASSERT_TRUE(v);
-        EXPECT_FALSE(v->hasFileSystem() && v->istTar() && !v->tarLeer());
-        EXPECT_EQ(v->tarLeer(), d[0] == 0 && d[1] == 0);
+        EXPECT_FALSE(v->hasFileSystem() && v->istTar() && !tarLeer(*v));
+        EXPECT_EQ(tarLeer(*v), d[0] == 0 && d[1] == 0);
         fs::remove(p);
     }
 }
@@ -409,9 +424,10 @@ TEST(TarFs, EchteDateisystemeGehenVor) {
     fs::remove(c);
 }
 
-/// @test Nur lesbar: put/rm/mkdir scheitern mit klarer Meldung, setReadOnly(false) wirkt nicht.
+/// @test Nur lesbar (Archiv ohne Endmarke): put/rm/mkdir scheitern mit klarer Meldung,
+///       setReadOnly(false) wirkt nicht.  Das abgeschlossene Archiv ist schreibbar: TarWrite.*
 TEST(TarFs, NurLesbar) {
-    const std::string p = imgMit("k1520_test_tar_j.img", aufDisk(beispiel()));
+    const std::string p = imgMit("k1520_test_tar_j.img", aufDisk(beispielOffen()));
     auto v = oeffne(p, /*schreibend=*/true);
     ASSERT_TRUE(v);
     EXPECT_TRUE(v->readOnly());
@@ -522,12 +538,12 @@ std::vector<uint8_t> baueCqm(const std::vector<uint8_t>& raw, const std::string&
 ///       nur lesbar); eine leere .cqm laesst sich schreibbar oeffnen.
 TEST(CqmDiskVolume, SchreibschutzKommtVomTarProfilNichtVomContainer) {
     const std::string p = k1520test::tempPath("k1520_test_cqmvol.cqm");
-    schreibeDatei(p, baueCqm(aufDisk(beispiel()), "Kommentar"));
+    schreibeDatei(p, baueCqm(aufDisk(beispielOffen()), "Kommentar"));
     auto v = oeffne(p, /*schreibend=*/true);
     ASSERT_TRUE(v);
     ASSERT_TRUE(v->hasFileSystem());
     EXPECT_EQ(v->detection().filesystem, "tar720");
-    EXPECT_TRUE(v->readOnlyForced());          // tar: unaufhebbar
+    EXPECT_TRUE(v->readOnlyForced());          // tar ohne Endmarke: unaufhebbar
     EXPECT_EQ(v->containerName(), "cqm");
     v->setReadOnly(false);
     EXPECT_TRUE(v->readOnly());
@@ -929,8 +945,9 @@ TEST(TarLeer, AnlegenInAllenContainernUndWiederErkennen) {
         SCOPED_TRACE(ext);
         auto v = neueLeere(std::string("k1520_test_tarl_a.") + ext);
         ASSERT_TRUE(v);
-        EXPECT_TRUE(v->tarLeer());
+        EXPECT_TRUE(tarLeer(*v));
         EXPECT_TRUE(v->istTar());
+        EXPECT_TRUE(v->tarSatzEinzel());                // eine tar-Diskette ist ein Satz mit EINEM Abbild
         EXPECT_FALSE(v->readOnly());
         EXPECT_FALSE(v->readOnlyForced());
         EXPECT_EQ(v->detection().filesystem, "tar720_leer");
@@ -940,17 +957,28 @@ TEST(TarLeer, AnlegenInAllenContainernUndWiederErkennen) {
         std::string err;
         auto w = DiskVolume::open(p, "", formate(), dateisysteme(), err, true, true);
         ASSERT_TRUE(w) << err;
-        EXPECT_TRUE(w->tarLeer());
+        EXPECT_TRUE(tarLeer(*w));
         EXPECT_EQ(w->detection().filesystem, "tar720_leer");
         EXPECT_TRUE(w->readOnly());                   // Vorgabe beim Oeffnen
         EXPECT_FALSE(w->readOnlyForced());            // aber aufhebbar
         w->setReadOnly(false);
         EXPECT_FALSE(w->readOnly());
-        // Einzeldateien gehoeren nicht auf die leere tar-Diskette
+        // Einzeldateien gehoeren auf die leere tar-Diskette (sie wird damit zum Archiv) ...
         const std::string q = k1520test::tempPath("k1520_test_tarl_a.txt");
         schreibeDatei(q, {'a'});
-        EXPECT_FALSE(w->insert(q, FileRef{0, "neu.txt"}, TransferOptions{}));
-        EXPECT_NE(w->lastError().find("EIN .tar"), std::string::npos) << w->lastError();
+        EXPECT_TRUE(w->insert(q, FileRef{0, "neu.txt"}, TransferOptions{})) << w->lastError();
+        EXPECT_FALSE(tarLeer(*w));
+        EXPECT_TRUE(finde(w->list(), "neu.txt"));
+        // ... und gehen mit flush() in dasselbe Abbild zurueck (Container bleibt).
+        ASSERT_TRUE(w->flush()) << w->lastError();
+        EXPECT_FALSE(w->dirty());
+        EXPECT_EQ(w->containerName(), ext);
+        w.reset();
+        auto x = DiskVolume::open(p, "", formate(), dateisysteme(), err, true, true);
+        ASSERT_TRUE(x) << err;
+        EXPECT_TRUE(finde(x->list(), "neu.txt"));
+        EXPECT_EQ(x->detection().filesystem, "tar720");
+        x.reset();
         fs::remove(q);
         fs::remove(p);
     }
@@ -961,7 +989,7 @@ TEST(TarLeer, ErkennungNurBeiGanzNull) {
     const std::string p = imgMit("k1520_test_tarl_b.img", std::vector<uint8_t>(kDisk, 0));
     auto v = oeffne(p);
     ASSERT_TRUE(v);
-    EXPECT_TRUE(v->tarLeer());
+    EXPECT_TRUE(tarLeer(*v));
     fs::remove(p);
 
     std::vector<uint8_t> d(kDisk, 0);
@@ -969,7 +997,7 @@ TEST(TarLeer, ErkennungNurBeiGanzNull) {
     const std::string q = imgMit("k1520_test_tarl_c.img", d);
     auto w = oeffne(q);
     ASSERT_TRUE(w);
-    EXPECT_FALSE(w->tarLeer());
+    EXPECT_FALSE(tarLeer(*w));
     fs::remove(q);
 
     // Mit --fs bleibt die Null-Diskette als CP/A lesbar (Uebersteuerung gewinnt)
@@ -977,7 +1005,7 @@ TEST(TarLeer, ErkennungNurBeiGanzNull) {
     std::string err;
     auto c = DiskVolume::open(r, "cpa_auto", formate(), dateisysteme(), err, true, true);
     ASSERT_TRUE(c) << err;
-    EXPECT_FALSE(c->tarLeer());
+    EXPECT_FALSE(tarLeer(*c));
     fs::remove(r);
 
     // eine formatierte CP/A-Diskette (0xE5) wird nie leer-tar
@@ -989,12 +1017,14 @@ TEST(TarLeer, ErkennungNurBeiGanzNull) {
     cpm.reset();
     auto cpm2 = oeffne(cp);
     ASSERT_TRUE(cpm2);
-    EXPECT_FALSE(cpm2->tarLeer());
+    EXPECT_FALSE(tarLeer(*cpm2));
     fs::remove(cp);
 }
 
-/// @test Rundlauf in allen Containern: put -> Wiederoeffnen -> Export == Datei; zweites put abgelehnt.
-TEST(TarLeer, SchreibenRundlaufUndVerriegelung) {
+/// @test Rundlauf in allen Containern: .tar als Container ablegen + speichern -> Wiederoeffnen ->
+///       Export == Datei.  Die Diskette ist danach NICHT schreibgeschuetzt und ein Archiv mit
+///       Inhalt; eine weitere .tar kommt nur noch als Datei hinein (Container nur auf leerem Archiv).
+TEST(TarLeer, ContainerRundlaufUndNurAufLeeremArchiv) {
     const auto x = v7MitEnde();
     const std::string src = k1520test::tempPath("k1520_test_tarl_f.tar");
     schreibeDatei(src, x);
@@ -1002,54 +1032,68 @@ TEST(TarLeer, SchreibenRundlaufUndVerriegelung) {
         SCOPED_TRACE(ext);
         auto v = neueLeere(std::string("k1520_test_tarl_f.") + ext);
         ASSERT_TRUE(v);
-        ASSERT_TRUE(v->tarSchreiben(src)) << v->lastError();
+        TarDateiUrteil u = v->tarDateiBeurteilen(src);
+        ASSERT_TRUE(u.ok) << u.fehler;
+        EXPECT_TRUE(u.ziel_leer);
+        EXPECT_TRUE(u.als_container) << u.container_grund;
+        ASSERT_TRUE(v->tarDateiAblegen(src, TarDateiWeg::AlsContainer)) << v->lastError();
+        ASSERT_TRUE(v->flush()) << v->lastError();
         EXPECT_TRUE(v->lastTarWarnung().empty());
-        // sofort danach: tar720, nur lesbar, Archiv sichtbar
-        EXPECT_FALSE(v->tarLeer());
-        EXPECT_TRUE(v->readOnly());
-        EXPECT_TRUE(v->readOnlyForced());
+        // sofort danach: tar720, Archiv sichtbar, NICHT schreibgeschuetzt, nicht dirty
+        EXPECT_FALSE(tarLeer(*v));
+        EXPECT_FALSE(v->readOnly());
+        EXPECT_FALSE(v->readOnlyForced());
+        EXPECT_FALSE(v->dirty());
         EXPECT_EQ(v->detection().filesystem, "tar720");
         ASSERT_TRUE(finde(v->list(), "dir/b.bin"));
-        EXPECT_FALSE(v->tarSchreiben(src));
-        EXPECT_NE(v->lastError().find("tar-Archiv"), std::string::npos) << v->lastError();
+        // eine zweite .tar: nur noch als Datei
+        u = v->tarDateiBeurteilen(src);
+        ASSERT_TRUE(u.ok) << u.fehler;
+        EXPECT_FALSE(u.ziel_leer);
+        EXPECT_TRUE(u.als_datei);
+        EXPECT_FALSE(u.als_container);
+        EXPECT_FALSE(v->tarDateiAblegen(src, TarDateiWeg::AlsContainer));
+        EXPECT_NE(v->lastError().find("nicht leer"), std::string::npos) << v->lastError();
         const std::string p = v->path();
         v.reset();
 
-        // Wiederoeffnen: dasselbe, Export == Datei, und wieder kein zweites Schreiben
+        // Wiederoeffnen: dasselbe, Export == Datei, und wieder nur als Datei
         std::string err;
         auto w = DiskVolume::open(p, "", formate(), dateisysteme(), err, false, true);
         ASSERT_TRUE(w) << err;
         EXPECT_TRUE(w->istTar());
-        EXPECT_FALSE(w->tarLeer());
-        EXPECT_TRUE(w->readOnlyForced());
+        EXPECT_FALSE(tarLeer(*w));
+        EXPECT_FALSE(w->readOnlyForced());         // Kopf + Endmarke: schreibbar
         EXPECT_EQ(w->detection().filesystem, "tar720");
         std::vector<uint8_t> aus;
         ASSERT_EQ(exportiere(*w, "k1520_test_tarl_f_aus.tar", aus), "");
         EXPECT_EQ(aus, x);                         // Kopf + Endmarke: exakt die Datei
-        EXPECT_FALSE(w->tarSchreiben(src));
+        EXPECT_FALSE(w->tarDateiAblegen(src, TarDateiWeg::AlsContainer));
+        w.reset();
         fs::remove(p);
     }
     fs::remove(src);
 }
 
-/// @test Rundlauf-Regel fuer Folgeteil / Teil ohne Endmarke: Nullauffuellung; voller Teil bitgleich.
+/// @test Rundlauf-Regel fuer Teil ohne Endmarke (Nullauffuellung); Folgeteile (kein Kopf am Anfang)
+///       sind KEIN Container — sie lassen sich nur als Datei ablegen (der Strom eines Satzes beginnt
+///       mit einem Kopf; die Teile eines Satzes entstehen beim Speichern eines Container-Satzes).
 TEST(TarLeer, RundlaufRegelnFuerFolgeteileUndTeileOhneEndmarke) {
-    struct Fall { const char* name; std::vector<uint8_t> quelle; std::vector<uint8_t> soll; };
+    struct Fall { const char* name; std::vector<uint8_t> quelle; bool container; std::vector<uint8_t> soll; };
     std::vector<Fall> faelle;
 
     std::vector<uint8_t> folge(10 * 512);
     for (size_t i = 0; i < folge.size(); ++i) folge[i] = static_cast<uint8_t>(1 + i % 200);
-    auto folgeSoll = folge; folgeSoll.resize(kDisk, 0);
-    faelle.push_back({"folge", folge, folgeSoll});        // Folgeteil: + Nullen bis 720 KiB
+    faelle.push_back({"folge", folge, false, {}});        // Folgeteil: kein Container
 
     std::vector<uint8_t> voll(kDisk);
     for (size_t i = 0; i < voll.size(); ++i) voll[i] = static_cast<uint8_t>(1 + (i * 3) % 250);
-    faelle.push_back({"voll", voll, voll});               // voller Teil: bitgleich
+    faelle.push_back({"voll", voll, false, {}});          // voller Teil ohne Kopf: kein Container
 
     std::vector<uint8_t> ohne;
     haenge(ohne, {"a.txt", "Hallo"});                     // Kopf, aber keine Endmarke
     auto ohneSoll = ohne; ohneSoll.resize(ohne.size() + 1024, 0);
-    faelle.push_back({"ohne", ohne, ohneSoll});           // + die zwei Nullbloecke der Auffuellung
+    faelle.push_back({"ohne", ohne, true, ohneSoll});     // + die zwei Nullbloecke der Auffuellung
 
     for (const Fall& f : faelle) {
         SCOPED_TRACE(f.name);
@@ -1057,19 +1101,28 @@ TEST(TarLeer, RundlaufRegelnFuerFolgeteileUndTeileOhneEndmarke) {
         schreibeDatei(src, f.quelle);
         auto v = neueLeere(std::string("k1520_test_tarl_g_") + f.name + ".img");
         ASSERT_TRUE(v);
-        ASSERT_TRUE(v->tarSchreiben(src)) << v->lastError();
-        std::vector<uint8_t> aus;
-        ASSERT_EQ(exportiere(*v, std::string("k1520_test_tarl_g_") + f.name + "_aus.tar", aus), "");
-        EXPECT_EQ(aus, f.soll);
-        // ohne Kopf: im selben Lauf als Fortsetzung sichtbar
-        if (std::string(f.name) != "ohne") EXPECT_TRUE(finde(v->list(), tar::kFortsetzungName));
         const std::string p = v->path();
+        if (!f.container) {
+            const TarDateiUrteil u = v->tarDateiBeurteilen(src);
+            ASSERT_TRUE(u.ok) << u.fehler;
+            EXPECT_TRUE(u.als_datei);
+            EXPECT_FALSE(u.als_container);
+            EXPECT_FALSE(u.container_grund.empty());
+            EXPECT_FALSE(v->tarDateiAblegen(src, TarDateiWeg::AlsContainer));
+            EXPECT_TRUE(tarLeer(*v)) << "eine Ablehnung aendert nichts";
+        } else {
+            ASSERT_TRUE(v->tarDateiAblegen(src, TarDateiWeg::AlsContainer)) << v->lastError();
+            ASSERT_TRUE(v->flush()) << v->lastError();
+            std::vector<uint8_t> aus;
+            ASSERT_EQ(exportiere(*v, std::string("k1520_test_tarl_g_") + f.name + "_aus.tar", aus), "");
+            EXPECT_EQ(aus, f.soll);
+        }
         v.reset();
         fs::remove(p); fs::remove(src);
     }
 }
 
-/// @test Warnung (ustar) laesst sich pruefen UND geschrieben wird trotzdem; Ablehnungen aendern nichts.
+/// @test Warnung (ustar) laesst sich beurteilen UND abgelegt wird trotzdem; Ablehnungen aendern nichts.
 TEST(TarLeer, WarnungSchreibtTrotzdemAblehnungLaesstDieDisketteUnveraendert) {
     std::vector<uint8_t> u;
     Datei d; d.name = "u.txt"; d.inhalt = "x"; d.ustar = true;
@@ -1082,32 +1135,33 @@ TEST(TarLeer, WarnungSchreibtTrotzdemAblehnungLaesstDieDisketteUnveraendert) {
     const std::string p = v->path();
     const auto vorher = leseDatei(p);
 
-    // abgelehnt: zu gross / krumm -> Datei und Zustand unveraendert
+    // abgelehnt: kein Kopf (Folgeteil) / krumm / fehlt -> Datei und Zustand unveraendert
     const std::string gross = k1520test::tempPath("k1520_test_tarl_h_gross.tar");
     schreibeDatei(gross, std::vector<uint8_t>(kDisk + 512, 1));
-    EXPECT_FALSE(v->tarSchreiben(gross));
-    EXPECT_NE(v->lastError().find("split"), std::string::npos);
+    EXPECT_FALSE(v->tarDateiAblegen(gross, TarDateiWeg::AlsContainer));
     const std::string krumm = k1520test::tempPath("k1520_test_tarl_h_krumm.tar");
     schreibeDatei(krumm, std::vector<uint8_t>(700, 1));
-    EXPECT_FALSE(v->tarSchreiben(krumm));
-    EXPECT_FALSE(v->tarSchreiben("/nicht/da.tar"));
-    EXPECT_TRUE(v->tarLeer());
+    EXPECT_FALSE(v->tarDateiAblegen(krumm, TarDateiWeg::AlsContainer));
+    EXPECT_NE(v->lastError().find("512"), std::string::npos) << v->lastError();
+    EXPECT_FALSE(v->tarDateiAblegen("/nicht/da.tar", TarDateiWeg::AlsContainer));
+    EXPECT_TRUE(tarLeer(*v));
+    EXPECT_FALSE(v->dirty());
     EXPECT_EQ(leseDatei(p), vorher);
 
-    std::string w;
-    ASSERT_TRUE(v->tarPruefen(src, &w));
-    EXPECT_FALSE(w.empty());
-    EXPECT_TRUE(v->tarLeer());                         // Pruefen schreibt nie
-    ASSERT_TRUE(v->tarSchreiben(src)) << v->lastError();
+    const TarDateiUrteil ur = v->tarDateiBeurteilen(src);
+    ASSERT_TRUE(ur.ok) << ur.fehler;
+    EXPECT_FALSE(ur.warnung.empty());
+    EXPECT_TRUE(tarLeer(*v));                          // Beurteilen schreibt nie
+    ASSERT_TRUE(v->tarDateiAblegen(src, TarDateiWeg::AlsContainer)) << v->lastError();
     EXPECT_FALSE(v->lastTarWarnung().empty());
-    EXPECT_FALSE(v->tarLeer());
+    EXPECT_FALSE(tarLeer(*v));
     v.reset();
     fs::remove(p); fs::remove(src); fs::remove(gross); fs::remove(krumm);
 }
 
-/// @test Verriegelung: nur LEERE tar-Disketten; tar720, CP/A-Diskette, nicht-leere Roh-Diskette und
-///       schreibgeschuetzt geoeffnete leere Diskette lehnen mit eigenem Grund ab.
-TEST(TarLeer, NurInEineLeereDiskette) {
+/// @test Container nur in ein LEERES tar-Archiv: tar720 mit Inhalt, CP/A-Diskette (Dateisystem),
+///       Roh-Diskette und schreibgeschuetzt geoeffnete leere Diskette lehnen mit eigenem Grund ab.
+TEST(TarLeer, NurInEinLeeresTarArchiv) {
     const std::string src = k1520test::tempPath("k1520_test_tarl_i.tar");
     schreibeDatei(src, v7MitEnde());
     std::string err;
@@ -1115,23 +1169,24 @@ TEST(TarLeer, NurInEineLeereDiskette) {
     const std::string t = imgMit("k1520_test_tarl_i1.img", aufDisk(v7MitEnde()));
     auto tv = oeffne(t, true);
     ASSERT_TRUE(tv);
-    EXPECT_FALSE(tv->tarSchreiben(src));
-    EXPECT_NE(tv->lastError().find("tar720"), std::string::npos) << tv->lastError();
+    EXPECT_FALSE(tv->tarDateiAblegen(src, TarDateiWeg::AlsContainer));
+    EXPECT_NE(tv->lastError().find("nicht leer"), std::string::npos) << tv->lastError();
+    EXPECT_TRUE(tv->tarDateiBeurteilen(src).als_datei);      // als Datei geht es immer
 
     const std::string c = k1520test::tempPath("k1520_test_tarl_i2.img");
     fs::remove(c);
     auto cv = DiskVolume::create(c, "cpa800", "", formate(), dateisysteme(), err);
     ASSERT_TRUE(cv) << err;
-    EXPECT_FALSE(cv->tarSchreiben(src));
-    EXPECT_NE(cv->lastError().find("Dateisystem"), std::string::npos) << cv->lastError();
+    EXPECT_FALSE(cv->tarDateiAblegen(src, TarDateiWeg::AlsContainer));
+    EXPECT_NE(cv->lastError().find("tar-Diskette"), std::string::npos) << cv->lastError();
 
     std::vector<uint8_t> d(kDisk);
     for (size_t i = 0; i < d.size(); ++i) d[i] = static_cast<uint8_t>(1 + i % 99);
     const std::string r = imgMit("k1520_test_tarl_i3.img", d);
     auto rv = oeffne(r, true);
     ASSERT_TRUE(rv);
-    EXPECT_FALSE(rv->tarSchreiben(src));
-    EXPECT_NE(rv->lastError().find("nicht leer"), std::string::npos) << rv->lastError();
+    EXPECT_FALSE(rv->tarDateiAblegen(src, TarDateiWeg::AlsContainer));
+    EXPECT_NE(rv->lastError().find("tar-Diskette"), std::string::npos) << rv->lastError();
 
     auto lv = neueLeere("k1520_test_tarl_i4.img");
     ASSERT_TRUE(lv);
@@ -1139,14 +1194,16 @@ TEST(TarLeer, NurInEineLeereDiskette) {
     lv.reset();
     auto ro = DiskVolume::open(lp, "", formate(), dateisysteme(), err, /*read_only=*/true, true);
     ASSERT_TRUE(ro) << err;
-    EXPECT_FALSE(ro->tarSchreiben(src));
+    EXPECT_FALSE(ro->tarDateiAblegen(src, TarDateiWeg::AlsContainer));
     EXPECT_NE(ro->lastError().find("Schreibschutz"), std::string::npos) << ro->lastError();
 
     for (const std::string& p : {t, c, r, lp, src}) fs::remove(p);
 }
 
-/// @test Echtdaten: alle Teile von w11data exportieren, zusammensetzen == w11data.tar; Teile in neue
-///       leere Disketten zurueckschreiben und bitgleich wieder herausholen.
+/// @test Echtdaten: alle Teile von w11data exportieren, zusammensetzen == w11data.tar; das GANZE
+///       Archiv als Container in einen neuen Satz legen und speichern: die Exporte der gespeicherten
+///       Abbilder setzen sich wieder zu w11data.tar zusammen (Folgeteile lassen sich nicht einzeln als
+///       Container ablegen; frueher wurden die Teile einzeln auf leere Disketten geschrieben).
 TEST(TarEchtdaten, ExportCatUndRueckschreiben) {
     const std::string dir = cqmOrdner();
     if (dir.empty()) GTEST_SKIP() << "K1520_CQM_DIR nicht gesetzt";
@@ -1163,18 +1220,39 @@ TEST(TarEchtdaten, ExportCatUndRueckschreiben) {
         ASSERT_EQ(exportiere(*v, "k1520_test_tare_t.tar", teil), "");
         gesamt.insert(gesamt.end(), teil.begin(), teil.end());
 
-        // zurueckschreiben (img und cqm im Wechsel) und bitgleich wieder holen
-        const std::string tsrc = k1520test::tempPath("k1520_test_tare_src.tar");
-        schreibeDatei(tsrc, teil);
-        auto neu = neueLeere(std::string("k1520_test_tare_n.") + (i % 2 ? "img" : "cqm"));
-        ASSERT_TRUE(neu);
-        ASSERT_TRUE(neu->tarSchreiben(tsrc)) << neu->lastError();
-        std::vector<uint8_t> zurueck;
-        ASSERT_EQ(exportiere(*neu, "k1520_test_tare_z.tar", zurueck), "");
-        EXPECT_EQ(zurueck, teil);
-        const std::string np = neu->path();
-        neu.reset();
-        fs::remove(np); fs::remove(tsrc);
     }
     EXPECT_EQ(gesamt, leseDatei(ref.string()));
+
+    // Rueckweg: Satz mit dem ganzen Archiv als Container, auf Abbilder verteilt.
+    {
+        const std::string basis = k1520test::tempPath("k1520_test_tare_n.cqm");
+        std::string err;
+        auto satz = DiskVolume::tarSatzNeu("k5601_9x512", basis, formate(), dateisysteme(), err);
+        ASSERT_TRUE(satz) << err;
+        ASSERT_TRUE(satz->tarDateiAblegen(ref.string(), TarDateiWeg::AlsContainer)) << satz->lastError();
+        std::vector<std::string> geschrieben;
+        ASSERT_TRUE(satz->tarSatzSpeichern("", nullptr, &geschrieben)) << satz->lastError();
+        // Die Originalteile sind teils kleiner als 720K, die neuen Abbilder haben alle 720K: die Anzahl
+        // und die Grenzen stimmen nicht mehr, aber die Exporte der neuen Abbilder setzen sich zum
+        // selben Archiv zusammen.
+        ASSERT_GE(geschrieben.size(), 2u);
+        std::vector<uint8_t> neu_gesamt;
+        for (size_t i = 0; i < geschrieben.size(); ++i) {
+            SCOPED_TRACE(geschrieben[i]);
+            auto neu = DiskVolume::open(geschrieben[i], "", formate(), dateisysteme(), err, true, true);
+            ASSERT_TRUE(neu) << err;
+            std::vector<uint8_t> zurueck;
+            ASSERT_EQ(exportiere(*neu, "k1520_test_tare_z.tar", zurueck), "");
+            neu_gesamt.insert(neu_gesamt.end(), zurueck.begin(), zurueck.end());
+            neu.reset();
+            fs::remove(geschrieben[i]); fs::remove(geschrieben[i] + "~");
+        }
+        // Ein Container zaehlt nur das Archiv bis hinter die Endmarke (`exportLaenge`); was die
+        // Originaldisketten dahinter noch tragen, gehoert nicht dazu.  Das letzte Teilstueck ist ein
+        // Folgeteil, sein Export geht bis zum Abbildende (Nullen dahinter).
+        const uint64_t n = tar::exportLaenge(gesamt.data(), gesamt.size());
+        ASSERT_GE(neu_gesamt.size(), n);
+        EXPECT_TRUE(std::equal(gesamt.begin(), gesamt.begin() + static_cast<std::ptrdiff_t>(n), neu_gesamt.begin()));
+        EXPECT_TRUE(tar::alleNull(neu_gesamt.data() + n, neu_gesamt.size() - n));
+    }
 }

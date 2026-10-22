@@ -9,10 +9,12 @@
  */
 
 #include "core/filesystem/tar/tar_fs.h"
+#include "core/filesystem/tar/tar_archiv.h"
 
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <map>
 
 namespace tar {
@@ -202,19 +204,24 @@ bool TarSpeicherQuelle::read(uint64_t off, uint8_t* dst, size_t n) const {
     return true;
 }
 
+bool TarSatzQuelle::read(uint64_t off, uint8_t* dst, size_t n) const {
+    if (off + n > s_->bytes.size()) return false;
+    std::memcpy(dst, s_->bytes.data() + off, n);
+    return true;
+}
+
+bool TarSatzQuelle::schreibe(uint64_t off, const uint8_t* src, size_t n) {
+    if (off + n > s_->bytes.size()) s_->bytes.resize(static_cast<size_t>(off + n), 0);
+    std::memcpy(s_->bytes.data() + off, src, n);
+    ++s_->revision;
+    return true;
+}
+
 namespace {
 
-/// Pfad bereinigen: kein fuehrendes '/', keine "." und leeren Teile, ".." wird "__".
+/// Pfad bereinigen (gemeinsame Regel mit dem Archivmodell, siehe tar_archiv.h).
 std::string bereinige(const std::string& roh, bool& geaendert) {
-    geaendert = !roh.empty() && roh[0] == '/';
-    std::string out, t;
-    for (char c : roh + "/") {
-        if (c != '/') { t += c; continue; }
-        if (t == "..") { t = "__"; geaendert = true; }
-        if (!t.empty() && t != ".") out += (out.empty() ? "" : "/") + t;
-        t.clear();
-    }
-    return out;
+    return tar::bereinigePfad(roh, geaendert);
 }
 
 std::string datumText(uint32_t t) {
@@ -339,7 +346,9 @@ TarFileSystem::Scan TarFileSystem::scanAlles(const TarQuelle& q) {
 std::unique_ptr<TarFileSystem> TarFileSystem::mount(std::unique_ptr<TarQuelle> q, std::string& why) {
     if (!q) { why = "kein Datenstrom"; return nullptr; }
     if (!looksLikeTar(*q, &why)) return nullptr;
-    return std::unique_ptr<TarFileSystem>(new TarFileSystem(std::move(q)));
+    std::unique_ptr<TarFileSystem> t(new TarFileSystem(std::move(q)));
+    t->bewerte();
+    return t;
 }
 
 bool TarFileSystem::istLeer(const TarQuelle& q, std::string* why) {
@@ -359,6 +368,7 @@ std::unique_ptr<TarFileSystem> TarFileSystem::mountLeer(std::unique_ptr<TarQuell
     if (!istLeer(*q, &why)) return nullptr;
     std::unique_ptr<TarFileSystem> t(new TarFileSystem(std::move(q)));
     t->leer_ = true;
+    t->bewerte();
     return t;
 }
 
@@ -366,8 +376,51 @@ std::unique_ptr<TarFileSystem> TarFileSystem::mountRoh(std::unique_ptr<TarQuelle
     if (!q) { why = "kein Datenstrom"; return nullptr; }
     std::unique_ptr<TarFileSystem> t(new TarFileSystem(std::move(q)));
     t->roh_ = true;
+    t->bewerte();
     (void)why;
     return t;
+}
+
+void TarFileSystem::bewerte() {
+    schreibbar_ = false;
+    grund_.clear();
+    if (!q_->beschreibbar()) {
+        grund_ = "Dieser tar-Strom (Satz aus mehreren Abbildern) ist nur lesbar - Saetze lassen "
+                 "sich noch nicht bearbeiten.";
+        return;
+    }
+    if (leer_) { schreibbar_ = true; return; }
+    const Scan s = roh_ ? Scan{} : scanAlles(*q_);
+    if (!s.ok || s.anfang > 0) {
+        grund_ = "Diese Diskette beginnt mitten in einer Datei (Folgeteil eines tar-Satzes) und ist "
+                 "nur lesbar.  Zum Bearbeiten alle Disketten des Satzes zusammen als tar-Satz oeffnen.";
+        return;
+    }
+    switch (s.ende) {
+        case Ende::Abgeschnitten:
+            grund_ = "Das tar-Archiv ist nicht abgeschlossen (die letzte Datei ist abgeschnitten, der "
+                     "Strom setzt sich auf der naechsten Diskette fort) und ist nur lesbar.  Zum "
+                     "Bearbeiten alle Disketten des Satzes als tar-Satz oeffnen.";
+            return;
+        case Ende::Pruefsumme:
+            grund_ = "Hinter dem letzten Eintrag folgt weder eine Endmarke noch ein gueltiger tar-Kopf "
+                     "(Pruefsumme stimmt nicht): das tar-Archiv ist nicht abgeschlossen oder beschaedigt "
+                     "und nur lesbar (ein Neuaufbau verloere den Rest).";
+            return;
+        case Ende::Streamende:
+            grund_ = "Das tar-Archiv hat keine Endmarke (zwei Nullbloecke) und ist nur lesbar - es "
+                     "setzt sich vermutlich auf einer weiteren Diskette fort (tar-Satz).";
+            return;
+        case Ende::Nullblock: break;
+    }
+    uint8_t b[kBlock];
+    if (s.ende_off + 2 * kBlock > q_->size() || !q_->read(s.ende_off + kBlock, b, kBlock)
+        || !tar::nullblock(b)) {
+        grund_ = "Das tar-Archiv endet mit einem einzelnen Nullblock statt der Endmarke (zwei "
+                 "Nullbloecke) und ist nur lesbar.";
+        return;
+    }
+    schreibbar_ = true;
 }
 
 TarFileSystem::Scan TarFileSystem::scan() const {
@@ -488,24 +541,135 @@ bool TarFileSystem::firstSector(const std::string& name, FsRecoverOrt& out) cons
     return e && q_->ort(e->kopf_off, out);
 }
 
-namespace {
-constexpr const char* kLeerText =
-    "Auf eine leere tar-Diskette gehoert genau EIN .tar-Archiv (tar-put bzw. 'tar-Datei auf "
-    "Diskette schreiben'), keine einzelnen Dateien.";
-}  // namespace
-
-bool TarFileSystem::write(const std::string&, const std::vector<uint8_t>&, const WriteOptions&) {
-    return fail(leer_ ? kLeerText : "tar-Disketten sind nur lesbar");
-}
-bool TarFileSystem::erase(const std::string&) {
-    return fail(leer_ ? kLeerText : "tar-Disketten sind nur lesbar");
-}
-bool TarFileSystem::wouldFit(const std::vector<PlannedFile>&, FitReport& out) const {
-    out = FitReport{};
-    out.detail = leer_ ? kLeerText : "tar-Disketten sind nur lesbar";
+bool TarFileSystem::ladeArchiv(tar::TarArchiv& a) const {
+    const Scan s = scan();
+    a.eintraege().clear();
+    for (const Eintrag& e : s.e) {
+        tar::ArchivEintrag n;
+        n.k = e.k;
+        if (n.k.typ == '7') n.k.typ = '0';          // "zusammenhaengend" ist fuer uns eine Datei
+        if (n.k.typ == '0') {
+            n.daten.resize(static_cast<size_t>(e.ist));
+            if (e.ist && !q_->read(e.daten_off, n.daten.data(), n.daten.size()))
+                return fail(e.name + ": Datenstrom nicht lesbar");
+        }
+        a.eintraege().push_back(std::move(n));
+    }
     return true;
 }
-bool TarFileSystem::mkfs() { return fail(leer_ ? kLeerText : "tar-Disketten sind nur lesbar"); }
+
+bool TarFileSystem::speichere(const tar::TarArchiv& a) {
+    const Scan alt = scan();
+    std::vector<uint8_t> strom;
+    std::string err;
+    if (!a.strom(strom, err)) return fail(err);
+    if (!q_->wachsend() && strom.size() > q_->size())
+        return fail("Das Archiv wuerde " + std::to_string(strom.size()) + " Byte belegen (Koepfe, Daten, "
+                    "Endmarke), der Datentraeger fasst nur " + std::to_string(q_->size())
+                    + " Byte.  Ein tar-Satz ueber mehrere Disketten ist hier noch nicht moeglich.");
+    // Der Rest des alten Archivs (samt alter Endmarke) wird Null; ein leeres Archiv ist wieder
+    // die ganz-Null-Diskette und wird so auch beim Oeffnen als leer erkannt.
+    uint64_t alt_ende = leer_ ? 0 : std::min<uint64_t>(q_->size(), alt.ende_off + 2 * kBlock);
+    if (a.eintraege().empty()) alt_ende = q_->size();
+    // Ein wachsender Strom (tar-Satz) hat danach genau die Laenge des Archivs, mindestens
+    // aber die einer Diskette; die Nullen dahinter fuellt erst das Speichern auf Abbilder.
+    const uint64_t soll = std::max<uint64_t>(strom.size(), q_->mindestGroesse());
+    strom.resize(static_cast<size_t>(std::max<uint64_t>(strom.size(), alt_ende)), 0);
+    if (!q_->schreibe(0, strom.data(), strom.size()))
+        return fail("Schreiben in den tar-Strom fehlgeschlagen");
+    if (q_->wachsend() && !q_->groesseSetzen(soll))
+        return fail("tar-Strom laesst sich nicht auf die neue Laenge setzen");
+    leer_ = a.eintraege().empty();
+    return true;
+}
+
+bool TarFileSystem::write(const std::string& name, const std::vector<uint8_t>& data, const WriteOptions& opt) {
+    if (!schreibbar_) return fail(grund_);
+    tar::TarArchiv a;
+    if (!ladeArchiv(a)) return false;
+    tar::NeuAngaben n;
+    n.mode  = opt.wega_mode_gesetzt ? (opt.wega_mode & 07777u) : 0644u;
+    n.uid   = static_cast<uint32_t>(opt.wega_uid);
+    n.gid   = static_cast<uint32_t>(opt.wega_gid);
+    n.mtime = opt.wega_mtime;
+    std::string err;
+    if (!a.hinzufuegen(name, data, n, opt.overwrite, err)) return fail(err);
+    return speichere(a);
+}
+
+bool TarFileSystem::erase(const std::string& name) {
+    if (!schreibbar_) return fail(grund_);
+    tar::TarArchiv a;
+    if (!ladeArchiv(a)) return false;
+    std::string err;
+    if (!a.loeschen(name, err)) return fail(err);
+    return speichere(a);
+}
+
+bool TarFileSystem::makeDirectory(const std::string& name) {
+    if (!schreibbar_) return fail(grund_);
+    tar::TarArchiv a;
+    if (!ladeArchiv(a)) return false;
+    tar::NeuAngaben n;
+    n.mode = 0755;
+    std::string err;
+    if (!a.verzeichnis(name, n, err)) return fail(err);
+    return speichere(a);
+}
+
+bool TarFileSystem::setAttributes(const std::string& name, const UnixAttrs& u) {
+    if (!schreibbar_) return fail(grund_);
+    if ((u.set_uid && (u.uid < 0 || u.uid > 65535)) || (u.set_gid && (u.gid < 0 || u.gid > 65535)))
+        return fail("uid/gid muessen zwischen 0 und 65535 liegen");
+    tar::TarArchiv a;
+    if (!ladeArchiv(a)) return false;
+    const uint32_t mode = u.mode, uid = static_cast<uint32_t>(u.uid), gid = static_cast<uint32_t>(u.gid),
+                   mtime = u.mtime;
+    std::string err;
+    if (!a.attribute(name, u.set_mode ? &mode : nullptr, u.set_uid ? &uid : nullptr,
+                     u.set_gid ? &gid : nullptr, u.set_mtime ? &mtime : nullptr, err))
+        return fail(err);
+    return speichere(a);
+}
+
+bool TarFileSystem::wouldFit(const std::vector<PlannedFile>& files, FitReport& out) const {
+    out = FitReport{};
+    if (!schreibbar_) { out.detail = grund_; return true; }
+    tar::TarArchiv a;
+    if (!ladeArchiv(a)) return false;
+    // Der Bedarf des neuen Stroms: bestehende Eintraege, die ersetzt werden, fallen weg;
+    // jede geplante Datei bringt Kopf + aufgefuellte Daten mit.
+    uint64_t n = a.stromLaenge();
+    std::map<std::string, uint64_t> geplant;
+    for (const PlannedFile& f : files) {
+        bool g = false;
+        geplant[tar::bereinigePfad(f.name, g)] = kBlock + (f.size + kBlock - 1) / kBlock * kBlock;
+    }
+    for (const tar::ArchivEintrag& e : a.eintraege()) {
+        const auto it = geplant.find(e.schluessel());
+        if (it != geplant.end() && e.k.typ == '0') n -= e.belegt();
+    }
+    for (const auto& [name, b] : geplant) {
+        n += b;
+        if (name.size() > tar::kNameMax) {
+            out.detail = "Der Name '" + name + "' ist laenger als " + std::to_string(tar::kNameMax)
+                         + " Zeichen - das V7-tar des P8000 kennt keine laengeren Namen.";
+            return true;
+        }
+    }
+    out.needed    = n;
+    out.available = q_->wachsend() ? std::max(n, q_->size()) : q_->size();
+    out.fits      = q_->wachsend() || n <= q_->size();
+    if (!out.fits)
+        out.detail = "Das Archiv wuerde " + std::to_string(n) + " Byte belegen, der Datentraeger fasst "
+                     + std::to_string(q_->size()) + " Byte.  Ein tar-Satz ueber mehrere Disketten ist "
+                     "hier noch nicht moeglich.";
+    return true;
+}
+bool TarFileSystem::mkfs() {
+    return fail(schreibbar_ ? "Eine tar-Diskette hat kein Dateisystem, das sich anlegen liesse"
+                            : grund_);
+}
 
 FsInfo TarFileSystem::info() const {
     FsInfo i;

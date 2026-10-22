@@ -238,8 +238,22 @@ k1520_add_test(wega_fs       SRC filesystem/test_wega_fs.cpp
                              DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
 k1520_add_test(wega_platte   SRC filesystem/test_wega_platte.cpp
                              LIBS k1520_fs LABELS "${_lbl}")
+k1520_add_test(platten_volume SRC filesystem/test_platten_volume.cpp
+                             LIBS k1520_fs LABELS "${_lbl}")
 # Tar-Disketten (rohe tar-Stroeme ohne Dateisystem, nur lesbar) — Echtdaten mit K1520_CQM_DIR
 k1520_add_test(tar_fs        SRC filesystem/test_tar_fs.cpp
+                             LIBS k1520_fs LABELS "${_lbl}"
+                             DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
+# tar-Disketten schreiben (Entwurf 37 T1): TarArchiv + schreibbares TarFileSystem, Gegenprobe System-tar
+k1520_add_test(tar_write     SRC filesystem/test_tar_write.cpp
+                             LIBS k1520_fs LABELS "${_lbl}"
+                             DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
+# tar-Satz bearbeiten (Entwurf 37 T2): Verteilen auf N Abbilder, Nummern, Ueberlauf, System-tar-Gegenprobe
+k1520_add_test(tar_satz      SRC filesystem/test_tar_satz.cpp
+                             LIBS k1520_fs LABELS "${_lbl}"
+                             DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
+# tar neu anlegen mit Format, .tar als Datei vs. Container (Entwurf 37 T3)
+k1520_add_test(tar_neu       SRC filesystem/test_tar_neu.cpp
                              LIBS k1520_fs LABELS "${_lbl}"
                              DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
 k1520_add_test(disk_volume   SRC filesystem/test_disk_volume.cpp

@@ -1,0 +1,11 @@
+# tar-satz-neu: leerer Satz im Format k5601_ss40_16x256 (160 KiB je Abbild), eine 813-KiB-Datei
+# und ein Ordner hinein; gespeichert wird auf FUENF Abbilder s1..s5 (Nummer vor der Endung).
+tool:   k1520disktool
+tmpfile s.hfe:
+run:    tar-satz-neu --format k5601_ss40_16x256 %s.hfe% --mkdir ordner --put %CLI_DIR%/../fixtures/disks/cpa_cpa780_combo5zoll_noclock.img=ordner/gross.img
+expect: Satz: 5 Abbild
+expect: s1.hfe
+expect: s5.hfe
+expect: gespeichert: 5 Abbild
+forbid: Fehler
+exit:   0
