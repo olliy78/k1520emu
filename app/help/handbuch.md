@@ -2230,40 +2230,41 @@ entpackt; `tar` liest sie als einen Strom:
 
 #### 6  Der Weg zurück
 
-**a) Ein V7-Archiv für WEGA erzeugen und in Diskettenstücke teilen.** Ändern Sie etwas im Ordner (hier eine neue
-Datei), dann **ein** Archiv, geteilt in Stücke zu je 737 280 Byte (eine Diskette):
+**a) Ein V7-Archiv für WEGA erzeugen.** Ändern Sie etwas im Ordner (hier eine neue Datei), dann **ein** Archiv
+(das DiskTool teilt es in b) selbst an den Diskettengrenzen, 737 280 Byte je Diskette):
 
     $ echo "Neu von Linux" > lokal/man2/NEU.TXT
     $ cd lokal
     $ find . -type f | sed 's|^\./||' | sort | tar --format=v7 -cf ../alles.tar -T -
     $ cd ..
-    $ split -b 737280 -d -a 2 --additional-suffix=.tar alles.tar teil
-    $ ls -l teil*.tar
-    -rw-rw-r-- 1 olliy olliy 737280 ... teil00.tar
-    -rw-rw-r-- 1 olliy olliy 737280 ... teil01.tar
+    $ ls -l alles.tar
+    -rw-rw-r-- 1 olliy olliy 1474560 ... alles.tar
 
 * `--format=v7` ist Pflicht: GNU- und ustar-Köpfe versteht WEGA nicht. Pfadnamen sind auf 99 Zeichen begrenzt.
 * Nur **Dateien** ins Archiv (`find -type f`): die Verzeichniseinträge, die GNU-`tar` sonst mitschreibt,
   quittiert WEGA-`tar` beim Auspacken mit „cannot create".
-* Mit `split` teilen, **nicht** mit `tar -M -L`: `--format=v7` und `-M` vertragen sich nicht („GNU features wanted
+* Nicht mit `tar -M -L` in Stücke zerlegen: `--format=v7` und `-M` vertragen sich nicht („GNU features wanted
   on incompatible archive format"), und mit einem GNU-Format schreibt `-M` Fortsetzungsköpfe, die WEGA nicht kennt.
-  `split` schneidet den einen V7-Strom nur an der Diskettengrenze, genau wie WEGA-`tar` es selbst täte.
+  Das DiskTool (oder `split`) schneidet den einen V7-Strom nur an der Diskettengrenze, genau wie WEGA-`tar` es selbst täte.
 * Hier gab es zwei Stücke (1 474 560 Byte, durch den Blockungsfaktor von GNU-`tar` auf 10 KiB aufgefüllt); wie
   viele es sind, hängt von der Archivgröße ab.
 
-**b) Auf Disketten schreiben.** Je Stück eine neue, **ganz leere** `tar`-Diskette anlegen und das Stück einmal
-hineinschreiben:
+**b) Auf Disketten schreiben.** Das ganze Archiv kommt als *fertiger Container* in einen neuen tar-Satz; beim
+Speichern verteilt ihn das DiskTool an den Diskettengrenzen auf nummerierte, ganz gleiche Abbilder (so, wie `split`
+es täte). Das Zerschneiden mit `split` ist dafür nicht mehr nötig:
 
-    $ k1520disktool create teil00.hfe --fs tar720_leer
-    $ k1520disktool tar-put teil00.hfe teil00.tar
-    geschrieben: teil00.tar → teil00.hfe (die Diskette ist jetzt tar720, nur lesbar)
-    $ k1520disktool create teil01.hfe --fs tar720_leer
-    $ k1520disktool tar-put teil01.hfe teil01.tar
+    $ k1520disktool tar-satz-neu --format k5601_9x512 teil.hfe --tar-container alles.tar
+    Warnung: …  (nur wenn der erste Kopf nicht V7 ist; abgelegt wird trotzdem)
+    alles.tar → Archiv (2 Abbild(er))
+    Satz: 2 Abbild(er), 1474560 Byte Strom, 737280 Byte je Abbild
+      teil1.hfe
+      teil2.hfe
+    gespeichert: 2 Abbild(er)
 
-`tar-put` prüft vorher: höchstens 737 280 Byte, ein Vielfaches von 512, und warnt (stderr), wenn der erste Kopf
-nicht V7 ist. Es geht **genau einmal** je Diskette; danach ist sie im DiskTool „nur lesbar" — für WEGA eine
-gewöhnliche `tar`-Diskette. In der GUI: `Datei ▸ Neue Diskette…` mit dem Dateisystem `tar720_leer`, dann
-`Diskette ▸ tar-Datei auf Diskette schreiben…` (oder die `.tar` auf die Diskettenansicht ziehen).
+Passt das Archiv auf EINE Diskette, genügt `create teil.hfe --fs tar720_leer` und `tar-put teil.hfe alles.tar`
+(die Datei wird das Archiv der leeren Diskette; die Diskette bleibt danach bearbeitbar). In der GUI:
+`Datei ▸ Neue tar-Diskette / tar-Satz…` (Art *Satz*, Format 720K), die `.tar` auf die Diskettenansicht ziehen und
+*Ist ein fertiger tar-Container* wählen, dann speichern.
 
 **c) Datei auf der WEGA-Dateisystemdiskette austauschen.** Das DiskTool schreibt in die WEGA-Diskette, als
 wäre es das Betriebssystem:
@@ -2296,15 +2297,15 @@ die Gegenprobe, dass das DiskTool ein Dateisystem geschrieben hat, das WEGA ohne
     Datei vom Linux-Rechner
     #5 /etc/umount /dev/fd1
 
-(`mkdir /dsk` nur, wenn es das Verzeichnis noch nicht gibt.) Dann die Diskette auswerfen, `teil00` in B: einlegen
+(`mkdir /dsk` nur, wenn es das Verzeichnis noch nicht gibt.) Dann die Diskette auswerfen, `teil1.hfe` in B: einlegen
 und das Mehrdisketten-Archiv in ein temporäres Verzeichnis auf der großen Platte `/z` entpacken (`/tmp` ist nur
-2 MB groß). Am Ende der ersten Diskette fragt `tar` nach der nächsten — `teil01` einlegen, RETURN:
+2 MB groß). Am Ende der ersten Diskette fragt `tar` nach der nächsten — `teil2.hfe` einlegen, RETURN:
 
     #6 mkdir /z/tmp
     #7 cd /z/tmp; tar xvf /dev/rfd1
     x man1/...
     ...
-    insert next disk :                       ← teil01 einlegen, RETURN
+    insert next disk :                       ← teil2.hfe einlegen, RETURN
     ...
     x manM/xq.M, 4619 bytes, 10 archiv blocks
     #8 find /z/tmp -type f -print | wc -l

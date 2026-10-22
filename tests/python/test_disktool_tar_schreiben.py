@@ -1,5 +1,11 @@
-"""tar-Export, leere tar-Diskette (``tar720_leer``) und ``.tar`` auf Diskette schreiben:
+"""tar-Export, leere tar-Diskette (``tar720_leer``) und ``.tar`` ablegen:
 C-ABI (``DiskTool.tar_*``) und Oberflaeche (PySide6, headless).
+
+Seit der Vereinheitlichung (Entwurf 37) ist eine tar-Diskette immer ein Satz mit N >= 1 Abbildern:
+es gibt keinen Sonderweg „genau EIN .tar auf die leere Diskette“ mehr (frueher ``tar_put`` /
+„tar-Datei auf Diskette schreiben…“).  Eine ``.tar`` kommt ueber den normalen Ablegen-Weg
+(``tar_datei_ablegen`` bzw. Einfuegen/Ziehen) hinein: auf einem LEEREN Archiv als Datei oder als
+Container, auf einem Archiv mit Inhalt immer als Datei; die Diskette bleibt danach bearbeitbar.
 
 Die Regeln selbst (Endmarke, Folgeteil, V7-Urteil, Rundlauf) pruefen die C++-Tests
 ``TarExport.*``/``TarPruefen.*``/``TarLeer.*``; hier geht es um die Verdrahtung.
@@ -60,29 +66,32 @@ def test_empty_tar_disk_roundtrip_through_the_abi(tmp_path, leere):
     quelle = tmp_path / "x.tar"
     quelle.write_bytes(_tar())
     with DiskTool.open(leere, read_only=False) as d:
-        assert d.tar_leer and d.ist_tar and not d.read_only_forced
+        # eine tar-Diskette ist ein Satz mit EINEM Abbild
+        assert d.ist_tar and d.tar_satz and d.tar_satz_einzel and not d.read_only_forced
         assert d.filesystem == "tar720_leer"
         with pytest.raises(K1520DiskError, match="leer"):
             d.tar_export(tmp_path / "nichts.tar")
-        assert d.tar_put_pruefen(quelle) == ""
-        assert d.tar_put(quelle) == ""
-        # abgeschlossenes Archiv (Kopf + Endmarke): schreibbar (T1), tar-put schuetzt es aber einmalig
-        assert not d.tar_leer and d.read_only and not d.read_only_forced
+        u = d.tar_datei_pruefen(quelle)
+        assert u["ziel_leer"] and u["als_datei"] and u["als_container"] and not u["wird_satz"]
+        assert d.tar_datei_ablegen(quelle, als_container=True) == ""
+        d.flush()                                    # geht in dasselbe Abbild (.cqm bleibt .cqm)
+        # nicht schreibgeschuetzt, ganz normal bearbeitbar; ein zweiter Container: nein
+        assert not d.read_only and not d.read_only_forced and not d.dirty
         assert d.filesystem == "tar720"
         assert [e.name for e in d.list()] == ["a.txt", "dir/b.bin"]
-        with pytest.raises(K1520DiskError, match="tar-Archiv"):
-            d.tar_put(quelle)
+        with pytest.raises(K1520DiskError, match="nicht leer"):
+            d.tar_datei_ablegen(quelle, als_container=True)
         aus = tmp_path / "aus.tar"
         d.tar_export(aus)
         assert aus.read_bytes() == quelle.read_bytes()
     with DiskTool.open(leere) as d:                  # Wiederoeffnen
-        assert d.filesystem == "tar720" and not d.tar_leer
+        assert d.filesystem == "tar720" and d.container_info()["type"] == "cqm"
         aus2 = tmp_path / "aus2.tar"
         d.tar_export(aus2)
         assert aus2.read_bytes() == quelle.read_bytes()
 
 
-def test_put_check_reports_warning_and_rejections(tmp_path, leere):
+def test_container_check_reports_warning_and_rejections(tmp_path, leere):
     from app.core_binding.k1520disk import DiskTool, K1520DiskError
     gnu = tmp_path / "gnu.tar"
     gnu.write_bytes(_tar(ustar=True))
@@ -91,24 +100,27 @@ def test_put_check_reports_warning_and_rejections(tmp_path, leere):
     krumm = tmp_path / "krumm.tar"
     krumm.write_bytes(b"x" * 700)
     with DiskTool.open(leere, read_only=False) as d:
-        assert "V7" in d.tar_put_pruefen(gnu)
-        with pytest.raises(K1520DiskError, match="split -b 737280"):
-            d.tar_put_pruefen(gross)
-        with pytest.raises(K1520DiskError, match="512"):
-            d.tar_put_pruefen(krumm)
-        assert d.tar_leer                              # Pruefen schreibt nie
+        u = d.tar_datei_pruefen(gnu)
+        assert u["als_container"] and "V7" in u["warnung"]
+        # ohne Kopf / nicht durch 512 teilbar: kein Container (als Datei geht es immer)
+        for datei, grund in ((gross, "Kopf"), (krumm, "512")):
+            u = d.tar_datei_pruefen(datei)
+            assert u["als_datei"] and not u["als_container"] and grund in u["container_grund"]
+            with pytest.raises(K1520DiskError, match=grund):
+                d.tar_datei_ablegen(datei, als_container=True)
+        assert not d.dirty and d.list() == []            # Pruefen und Ablehnen schreiben nie
 
 
-def test_put_needs_the_lock_released(tmp_path, leere):
+def test_container_needs_the_lock_released(tmp_path, leere):
     from app.core_binding.k1520disk import DiskTool, K1520DiskError
     quelle = tmp_path / "x.tar"
     quelle.write_bytes(_tar())
     with DiskTool.open(leere) as d:                    # Vorgabe: schreibgeschuetzt
-        assert d.tar_leer and d.read_only and not d.read_only_forced
+        assert d.tar_satz_einzel and d.read_only and not d.read_only_forced
         with pytest.raises(K1520DiskError, match="Schreibschutz"):
-            d.tar_put(quelle)
+            d.tar_datei_ablegen(quelle, als_container=True)
         d.set_read_only(False)
-        d.tar_put(quelle)
+        d.tar_datei_ablegen(quelle, als_container=True)
 
 
 # ─── Oberflaeche ─────────────────────────────────────────────────────────────
@@ -130,80 +142,78 @@ def window(qt_app):
     w._close_tool()
 
 
+def _wahl(window, monkeypatch, antwort, gesehen=None):
+    """Das Popup „Als Datei / Container“ ersetzen (ein echtes modales Fenster scheitert in der Testebene)."""
+    def w(name, urteil):
+        if gesehen is not None:
+            gesehen.append((name, urteil))
+        return antwort
+    monkeypatch.setattr(window, "_tar_datei_wahl", w)
+
+
 def test_actions_exist_without_shortcut(window):
-    for name in ("act_tar_export", "act_tar_schreiben"):
-        a = getattr(window, name)
-        assert a.shortcut().isEmpty()
+    assert window.act_tar_export.shortcut().isEmpty()
     assert ".tar" in window.act_tar_export.text()
-    assert ".tar" in window.act_tar_schreiben.text() or "tar-Datei" in window.act_tar_schreiben.text()
+    # der Sonderweg „tar-Datei auf Diskette schreiben“ ist entfallen (Einfuegen/Ziehen genuegt)
+    assert not hasattr(window, "act_tar_schreiben")
 
 
 def test_empty_tar_disk_in_the_window(window, leere):
     assert window.open_image(str(leere))
     t = window.tool
-    assert t.tar_leer
-    assert "tar-Diskette, leer" in window.kopf.angaben.text()
-    # geschuetzt geoeffnet: auch das Schreiben des .tar ist zu, der Tooltip nennt den Grund
-    assert not window.act_tar_schreiben.isEnabled()
-    assert "Schreibschutz" in window.act_tar_schreiben.toolTip()
+    assert t.tar_satz_einzel and t.list() == []
+    assert "tar-Archiv (UNIX)" in window.kopf.angaben.text()
     window.set_read_only(False)
-    assert window.act_tar_schreiben.isEnabled()
-    # die Datei-Wege bleiben zu, der Export auch (nichts zu exportieren)
-    for a in (window.act_loeschen, window.act_alles_rein, window.act_tar_export):
-        assert not a.isEnabled()
-    assert "genau ein .tar" in window.act_loeschen.toolTip()
+    # auch die leere tar-Diskette nimmt Dateien, Ordner und Einfuegen an wie jedes Archiv
+    assert window.act_alles_rein.isEnabled() and window.act_tar_ordner.isEnabled()
+    assert window.act_tar_ordner.isVisible()
 
 
-def test_write_a_v7_tar_then_locked_and_exportable(window, leere, tmp_path, monkeypatch):
+def test_container_through_the_normal_way_stays_editable_and_exportable(window, leere, tmp_path,
+                                                                        monkeypatch):
     from PySide6.QtWidgets import QMessageBox
     quelle = tmp_path / "x.tar"
     quelle.write_bytes(_tar())
     assert window.open_image(str(leere))
     window.set_read_only(False)
-    # V7: keine Rueckfrage (die Sperre der Tests wuerde sie sonst als Fehlschlag melden)
-    assert window.tar_schreiben(quelle)
+    gesehen = []
+    _wahl(window, monkeypatch, "container", gesehen)
+    assert window.insert_paths([str(quelle)])
+    assert gesehen and gesehen[0][0] == "x.tar" and gesehen[0][1]["als_container"]
     t = window.tool
-    # abgeschlossenes Archiv: im Kern schreibbar (Entwurf 37 T1); tar-put schuetzt es einmalig
-    assert t.ist_tar and not t.tar_leer and t.read_only and not t.read_only_forced
+    assert t.dirty and [e.name for e in t.list()] == ["a.txt", "dir/b.bin"]
+    assert window.save()                                # ohne Rueckfrage: ins selbe Abbild
+    assert not t.dirty and not t.read_only and not t.read_only_forced
     assert "tar-Archiv (UNIX)" in window.kopf.angaben.text()
-    assert not window.act_tar_schreiben.isEnabled()
     assert window.act_tar_export.isEnabled()
-    assert [e.name for e in t.list()] == ["a.txt", "dir/b.bin"]
-    # zweites Schreiben: abgelehnt mit Meldung
-    meldungen = []
-    monkeypatch.setattr(QMessageBox, "critical",
-                        staticmethod(lambda *a, **k: meldungen.append(a[2])))
-    assert not window.tar_schreiben(quelle)
-    assert meldungen and "tar-Archiv" in meldungen[0]
-    # Export
+    # eine zweite .tar: nicht mehr leer -> OHNE Popup als Datei
+    _wahl(window, monkeypatch, None)
+    monkeypatch.setattr(window, "_tar_datei_wahl",
+                        lambda *a: (_ for _ in ()).throw(AssertionError("Popup auf nicht leerem Archiv")))
+    assert window.insert_paths([str(quelle)])
+    assert sorted(e.name for e in t.list()) == ["a.txt", "dir/b.bin", "x.tar"]
+    # Export der Mischung: Strom einschliesslich der abgelegten Datei
     ziel = tmp_path / "aus.tar"
     assert window.tar_export(ziel)
-    assert ziel.read_bytes() == quelle.read_bytes()
+    assert ziel.stat().st_size >= quelle.stat().st_size
 
 
-def test_non_v7_asks_and_no_leaves_the_disk_untouched(window, leere, tmp_path, monkeypatch):
-    from PySide6.QtWidgets import QMessageBox
+def test_non_v7_shows_the_hint_in_the_popup_and_cancel_leaves_the_disk_untouched(
+        window, leere, tmp_path, monkeypatch):
     quelle = tmp_path / "gnu.tar"
     quelle.write_bytes(_tar(ustar=True))
     assert window.open_image(str(leere))
     window.set_read_only(False)
-    fragen = []
+    gesehen = []
+    _wahl(window, monkeypatch, None, gesehen)           # Abbrechen
+    assert not window.insert_paths([str(quelle)])
+    assert gesehen and "V7" in gesehen[0][1]["warnung"]
+    assert window.tool.list() == [] and not window.tool.dirty    # nichts geschrieben
 
-    def antwort(wert):
-        def q(*a, **k):
-            fragen.append(a[2])
-            return wert
-        return staticmethod(q)
-
-    monkeypatch.setattr(QMessageBox, "question", antwort(QMessageBox.No))
-    assert not window.tar_schreiben(quelle)
-    assert fragen and "Trotzdem schreiben?" in fragen[0] and "V7" in fragen[0]
-    assert window.tool.tar_leer                         # nichts geschrieben
-
-    monkeypatch.setattr(QMessageBox, "question", antwort(QMessageBox.Yes))
-    assert window.tar_schreiben(quelle)
-    assert not window.tool.tar_leer and window.tool.ist_tar
-    assert len(fragen) == 2
+    _wahl(window, monkeypatch, "container", gesehen)
+    assert window.insert_paths([str(quelle)])
+    assert [e.name for e in window.tool.list()] == ["a.txt", "dir/b.bin"]
+    assert len(gesehen) == 2
 
 
 def test_export_is_offered_on_a_raw_opened_follow_up_part(window, tmp_path):
@@ -213,7 +223,6 @@ def test_export_is_offered_on_a_raw_opened_follow_up_part(window, tmp_path):
     assert window.open_image(str(p))
     assert not window.tool.has_filesystem
     assert window.act_tar_export.isEnabled()
-    assert not window.act_tar_schreiben.isEnabled()
     ziel = tmp_path / "teil.tar"
     assert window.tar_export(ziel)
     assert ziel.read_bytes() == d
@@ -244,41 +253,31 @@ def _drop_dateien(ziel, pfade):
     return ev.isAccepted()
 
 
-def test_drop_one_tar_writes_it_and_locks(window, leere, tmp_path):
+def test_drop_one_tar_on_the_empty_disk_asks_and_stays_editable(window, leere, tmp_path, monkeypatch):
     quelle = tmp_path / "x.tar"
     quelle.write_bytes(_tar())
     assert window.open_image(str(leere))
     window.set_read_only(False)
+    gesehen = []
+    _wahl(window, monkeypatch, "container", gesehen)
     assert _drop_dateien(window.disk_view.tree.viewport(), [quelle])
-    assert window.tool.ist_tar and not window.tool.tar_leer
+    assert gesehen
+    assert window.tool.ist_tar and not window.tool.read_only
     assert [e.name for e in window.tool.list()] == ["a.txt", "dir/b.bin"]
 
 
-def test_drop_of_non_v7_asks_and_no_keeps_the_disk_empty(window, leere, tmp_path, monkeypatch):
-    from PySide6.QtWidgets import QMessageBox
-    quelle = tmp_path / "gnu.tar"
-    quelle.write_bytes(_tar(ustar=True))
-    assert window.open_image(str(leere))
-    window.set_read_only(False)
-    fragen = []
-    monkeypatch.setattr(QMessageBox, "question",
-                        staticmethod(lambda *a, **k: fragen.append(a[2]) or QMessageBox.No))
-    window.insert_paths([str(quelle)])
-    assert fragen and "Trotzdem schreiben?" in fragen[0]
-    assert window.tool.tar_leer
-
-
-def test_toolbar_way_uses_the_selected_folder_file(window, leere, tmp_path):
+def test_toolbar_way_uses_the_selected_folder_file(window, leere, tmp_path, monkeypatch):
     quelle = tmp_path / "x.tar"
     quelle.write_bytes(_tar())
     assert window.open_image(str(leere))
     window.set_read_only(False)
+    _wahl(window, monkeypatch, "datei")
     window.insert_paths([str(quelle)], 0)          # der Weg von |← / Strg+←
-    assert window.tool.ist_tar and not window.tool.tar_leer
+    assert [e.name for e in window.tool.list()] == ["x.tar"]
 
 
-def test_multiple_folders_images_and_locked_are_refused_with_a_message(window, leere, tmp_path,
-                                                                     monkeypatch):
+def test_multiple_tars_folders_and_images_are_plain_files_and_the_lock_refuses(
+        window, leere, tmp_path, monkeypatch):
     from PySide6.QtWidgets import QMessageBox
     t1 = tmp_path / "a.tar"
     t2 = tmp_path / "b.tar"
@@ -286,21 +285,21 @@ def test_multiple_folders_images_and_locked_are_refused_with_a_message(window, l
     t2.write_bytes(_tar())
     ordner = tmp_path / "o"
     ordner.mkdir()
+    (ordner / "i.txt").write_bytes(b"i")
     abbild = tmp_path / "z.img"
     abbild.write_bytes(b"x")
     assert window.open_image(str(leere))
     window.set_read_only(False)
-    for pfade, wort in (([t1, t2], "EINE"), ([ordner], "Ordner"), ([abbild], "Abbild")):
-        assert not window.insert_paths([str(p) for p in pfade])
-        assert wort in window.statusBar().currentMessage(), (wort, window.statusBar().currentMessage())
-        assert window.tool.tar_leer
+    # Popup nur bei GENAU EINER .tar auf leerem Archiv: hier nie
+    monkeypatch.setattr(window, "_tar_datei_wahl",
+                        lambda *a: (_ for _ in ()).throw(AssertionError("unerwartetes Popup")))
+    assert window.insert_paths([str(t1), str(t2), str(ordner), str(abbild)])
+    namen = sorted(e.name for e in window.tool.list())
+    assert {"a.tar", "b.tar", "z.img", "o/i.txt"} <= set(namen), namen
+    # geschuetzt: abgelehnt, mit Meldung des Kerns
     window.set_read_only(True)
+    meldungen = []
+    monkeypatch.setattr(QMessageBox, "critical",
+                        staticmethod(lambda *a, **k: meldungen.append(a[2])))
     assert not window.insert_paths([str(t1)])
-    assert "Schreibschutz" in window.statusBar().currentMessage()
-    # belegte tar720: weiter gesperrt
-    window.set_read_only(False)
-    assert window.insert_paths([str(t1)])
-    assert not window.act_schreiben.isEnabled()
-    monkeypatch.setattr(QMessageBox, "critical", staticmethod(lambda *a, **k: None))
-    assert not window.insert_paths([str(t2)])       # ein zweites .tar wird abgelehnt
-    assert not window.tool.tar_leer
+    assert meldungen and "Schreibschutz" in meldungen[0]

@@ -97,15 +97,37 @@ def test_old_numbers_are_kept_and_reported(tmp_path):
         assert len(r["hinweise"]) == 1 and (tmp_path / "s2.img").exists()
 
 
-def test_single_disk_becomes_set_on_demand(tmp_path):
+def test_single_disk_is_a_set_with_one_image_and_grows_to_numbered_images(tmp_path):
+    """Vereinheitlichung: eine geoeffnete tar-Diskette ist schon ein Satz mit EINEM Abbild; waechst der
+    Inhalt darueber, wird beim Speichern nummeriert (frueher: erst `tar_zu_satz`)."""
+    from app.core_binding.k1520disk import K1520DiskError
     einzel = tmp_path / "e.img"
     _tool().create(einzel, "tar720_leer", "").close()
     with _tool().open(einzel, read_only=False) as t:
-        assert not t.tar_satz
-        t.tar_zu_satz(tmp_path / "ueb.img")
-        assert t.tar_satz and t.tar_satz_basis == str(tmp_path / "ueb.img")
+        assert t.tar_satz and t.tar_satz_einzel
+        assert t.tar_satz_dateien == [str(einzel)]              # das einzige Abbild ist die Datei
         t.insert(str(_quelle(tmp_path, "gross", _bytes(800000, 9))), "gross")
-        assert t.tar_satz_planen()["abbilder"] == 2
+        plan = t.tar_satz_planen()
+        assert plan["abbilder"] == 2
+        assert plan["namen"] == [str(tmp_path / "e1.img"), str(tmp_path / "e2.img")]
+        with pytest.raises(K1520DiskError, match="nummerierten Abbildern"):
+            t.flush()                                           # EIN Abbild reicht nicht
+        t.tar_zu_satz(tmp_path / "ueb.img")                     # bleibt als No-Op erhalten
+        r = t.tar_satz_speichern(tmp_path / "ueb.img")
+        assert r["geschrieben"] == [str(tmp_path / "ueb1.img"), str(tmp_path / "ueb2.img")]
+        assert not t.tar_satz_einzel and t.tar_satz
+
+
+def test_single_disk_saves_into_its_own_image(tmp_path):
+    einzel = tmp_path / "e.hfe"
+    _tool().create(einzel, "tar720_leer", "").close()
+    with _tool().open(einzel, read_only=False) as t:
+        t.insert(str(_quelle(tmp_path, "klein", _bytes(1000, 2))), "klein")
+        assert t.dirty
+        t.flush()
+        assert not t.dirty and t.container_info()["type"] == "hfe"
+    with _tool().open(einzel) as t:
+        assert [e.name for e in t.list()] == ["klein"]
 
 
 def test_new_set_rejects_unfit_formats_and_names(tmp_path):

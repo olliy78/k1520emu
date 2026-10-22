@@ -940,18 +940,20 @@ filesystems:
   # Abbilder sind 720K — fuer andere Geometrien gibt es kein Beispiel.
 
   - name:        tar720
-    description: "tar-Strom ohne Dateisystem (P8000-Lieferdiskette) — 720K, nur lesbar"
+    description: "tar-Strom ohne Dateisystem (P8000-Lieferdiskette) — 720K"
     format:      k5601_9x512
     type:        tar
     detect_rank: 900
 
-  # Die LEERE tar-Diskette: ganz aus Nullen, nimmt genau EIN `.tar` auf (`tar-put`, in der
-  # Oberflaeche „tar-Datei auf Diskette schreiben"); danach ist sie ein gewoehnliches
-  # `tar720`, nur lesbar.  Erkannt wird sie nur, wenn ALLE 720 KiB Null sind — und dann VOR
-  # der CP/A-Regel (eine Null-Diskette liest die sonst als „CP/A, Verzeichnis nicht angelegt").
-  # Wer sie als CP/A will: `--fs cpa_auto` bzw. Dateisystem-Menue (cpa780 waere 5x1024, passt nicht auf 9x512).  Anlegen: `create --fs tar720_leer`.
+  # Die LEERE tar-Diskette: ein leeres tar-Archiv, ganz aus Nullen.  Seit Entwurf 37
+  # (Vereinheitlichung) gibt es keinen Sonderweg „genau EIN .tar" mehr: sie wird wie jede
+  # tar-Diskette bearbeitet (Satz mit einem Abbild); das Profil bleibt, damit eine leere
+  # Diskette beim Öffnen erkennbar ist.  Erkannt wird sie nur, wenn ALLE 720 KiB Null sind —
+  # und dann VOR der CP/A-Regel (eine Null-Diskette liest die sonst als „CP/A, Verzeichnis
+  # nicht angelegt").  Wer sie als CP/A will: `--fs cpa_auto` bzw. Dateisystem-Menue (cpa780 waere
+  # 5x1024, passt nicht auf 9x512).  Anlegen: `create --fs tar720_leer`.
   - name:        tar720_leer
-    description: "tar-Diskette, leer (720K) — nimmt genau ein .tar auf"
+    description: "tar-Diskette, leer (720K) — leeres tar-Archiv"
     format:      k5601_9x512
     type:        tar
     leer:        true

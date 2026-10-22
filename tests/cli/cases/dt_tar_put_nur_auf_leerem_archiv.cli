@@ -1,0 +1,12 @@
+# tar-put legt eine .tar als CONTAINER auf ein LEERES Archiv.  Hat das Archiv Inhalt, wird sie
+# abgelehnt (als Datei kommt eine .tar per `put` hinein); die Diskette bleibt danach bearbeitbar
+# (frueher: Einmalwurf, danach nur lesbar).
+tool:   k1520disktool
+tmpfile neu.img:
+setup_run: create %neu.img% --fs tar720_leer
+setup_run: tar-put %neu.img% %CLI_DIR%/../fixtures/p8000/tar_v7_klein.tar
+run:    tar-put %neu.img% %CLI_DIR%/../fixtures/p8000/tar_v7_klein.tar
+expect: nicht leer
+expect: put
+forbid: nur lesbar
+exit:   1

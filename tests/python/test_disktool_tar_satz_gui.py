@@ -87,7 +87,7 @@ def _antworte_nie(window, monkeypatch):
     """Ein Test, der KEINE Frage erwartet: jede Rueckfrage der Oberflaeche scheitert."""
     def nein(*a, **k):
         raise AssertionError("unerwartete Rueckfrage")
-    for name in ("_tar_datei_wahl", "_satz_speichern_fragen", "_frage_zu_satz"):
+    for name in ("_tar_datei_wahl", "_satz_speichern_fragen"):
         monkeypatch.setattr(window, name, nein)
 
 
@@ -227,7 +227,7 @@ def test_leftover_numbers_are_reported_after_saving(window, satz_zwei, monkeypat
     window.erase_refs(["gross.bin"])
     monkeypatch.setattr(window, "_satz_speichern_fragen", lambda unter=False: "")
     assert window.save()
-    protokoll = window.log_dock.toPlainText() if hasattr(window.log_dock, "toPlainText") \
+    protokoll = window.log_dock.text.toPlainText() if hasattr(window.log_dock, "toPlainText") \
         else window.protokoll.toPlainText()
     assert "satz2.hfe" in protokoll and "Gespeichert" in protokoll
 
@@ -363,40 +363,95 @@ def test_the_popup_text_names_both_ways_and_the_warning(window, paket, monkeypat
 
 # ─── Einzeldiskette waechst zum Satz ─────────────────────────────────────────
 
-def test_single_disk_overflow_offers_a_set(window, tmp_path, monkeypatch):
+def test_single_disk_overflow_is_announced_and_saved_as_numbered_images(window, tmp_path, monkeypatch):
+    """Eine tar-Diskette ist ein Satz mit EINEM Abbild: kein Ablehnen, keine Rueckfrage beim Einfuegen;
+    der Inhalt waechst im Speicher, das Protokoll sagt es, der Plan-Dialog zeigt die Abbilder."""
     einzel = tmp_path / "e.img"
     _tool().create(einzel, "tar720_leer", "").close()
+    vorher = einzel.read_bytes()
     p = tmp_path / "q"
     p.mkdir()
     (p / "gross.bin").write_bytes(_bytes(800000, 5))
     assert window.open_image(str(einzel))
-    assert window.tool.tar_leer
-    # die leere Einzeldiskette nimmt Dateien weiter nur als EIN .tar (Altverhalten); mit einer
-    # gefuellten tar-Diskette geht es ueber den Satz
-    (p / "klein.bin").write_bytes(_bytes(1000, 2))
-    paket = tmp_path / "klein.tar"
+    assert window.tool.tar_satz_einzel
+    window.set_read_only(False)
+    _antworte_nie_ausser_speichern(window, monkeypatch)
+    assert window.insert_paths([str(p / "gross.bin")])
+    assert window.tool.tar_satz_planen()["abbilder"] == 2
+    assert "2 nummerierte Abbilder" in window.log_dock.text.toPlainText()
+    # Abbrechen im Plan-Dialog: nichts geschrieben
+    monkeypatch.setattr(window, "_satz_speichern_fragen", lambda unter=False: None)
+    assert not window.save()
+    assert einzel.read_bytes() == vorher and not (tmp_path / "e1.img").exists()
+    # Zustimmen: nummeriert, die Einzeldatei bleibt unberuehrt
+    monkeypatch.setattr(window, "_satz_speichern_fragen", lambda unter=False: "")
+    assert window.save()
+    assert (tmp_path / "e1.img").exists() and (tmp_path / "e2.img").exists()
+    assert einzel.read_bytes() == vorher
+    assert not window.tool.tar_satz_einzel
+
+
+def _antworte_nie_ausser_speichern(window, monkeypatch):
+    def nein(*a, **k):
+        raise AssertionError("unerwartete Rueckfrage")
+    monkeypatch.setattr(window, "_tar_datei_wahl", nein)
+
+
+def test_save_of_an_opened_tar_disk_goes_into_its_image_without_a_question(window, tmp_path,
+                                                                           monkeypatch):
+    einzel = tmp_path / "e.hfe"
+    _tool().create(einzel, "tar720_leer", "").close()
+    q = _quellen(tmp_path)
+    assert window.open_image(str(einzel))
+    window.set_read_only(False)
+    _antworte_nie(window, monkeypatch)                   # Strg+S: KEIN Plan-Dialog bei einem Abbild
+    assert window.insert_paths([str(q / "a.bin")])
+    assert window.tool.dirty
+    assert window.save()
+    assert not window.tool.dirty
+    assert not (tmp_path / "e1.hfe").exists()
+    with _tool().open(einzel) as t:
+        assert [e.name for e in t.list()] == ["a.bin"] and t.container_info()["type"] == "hfe"
+
+
+def test_tar_on_an_empty_single_disk_offers_both_ways(window, paket, tmp_path, monkeypatch):
+    """Popup gilt fuer JEDE .tar auf einem LEEREN Archiv — auch auf der leeren Einzeldiskette."""
+    for antwort, erwartet in (("datei", ["paket.tar"]), ("container", ["x.bin"])):
+        einzel = tmp_path / f"{antwort}.img"
+        _tool().create(einzel, "tar720_leer", "").close()
+        assert window.open_image(str(einzel))
+        window.set_read_only(False)
+        fragen = []
+        monkeypatch.setattr(window, "_tar_datei_wahl",
+                            lambda name, urteil, f=fragen, a=antwort: f.append((name, urteil)) or a)
+        assert window.insert_paths([str(paket)])
+        assert fragen and fragen[0][1]["als_datei"] and fragen[0][1]["als_container"]
+        assert [e.name for e in window.tool.list()] == erwartet
+        assert window.save()
+
+
+def test_container_beyond_one_disk_becomes_a_set_in_the_window(window, tmp_path, monkeypatch):
     if not shutil.which("tar"):
         pytest.skip("kein tar im System")
-    subprocess.run(["tar", "--format=v7", "-cf", str(paket), "-C", str(p), "klein.bin"], check=True)
+    q = tmp_path / "q"
+    q.mkdir()
+    for i in range(3):
+        (q / f"d{i}").write_bytes(_bytes(300000, 20 + i))
+    gross = tmp_path / "gross.tar"
+    subprocess.run(["tar", "--format=v7", "-cf", str(gross), "-C", str(q), "d0", "d1", "d2"], check=True)
+    einzel = tmp_path / "e.img"
+    _tool().create(einzel, "tar720_leer", "").close()
+    assert window.open_image(str(einzel))
     window.set_read_only(False)
-    assert window.tar_schreiben(str(paket))
-    window.set_read_only(False)
-    assert window.tool.ist_tar and not window.tool.tar_satz and not window.tool.tar_leer
-    fragen = []
-    monkeypatch.setattr(window, "_frage_zu_satz", lambda grund: fragen.append(grund) or True)
-    assert window.insert_paths([str(p / "gross.bin")])
-    assert fragen and window.tool.tar_satz
+    gesehen = []
+    monkeypatch.setattr(window, "_tar_datei_wahl",
+                        lambda name, urteil: gesehen.append(urteil) or "container")
+    assert window.insert_paths([str(gross)])
+    assert gesehen[0]["wird_satz"] and gesehen[0]["abbilder"] == 2
     assert window.tool.tar_satz_planen()["abbilder"] == 2
-    # nein: der Fehler des Kerns wird gemeldet, nichts geaendert
-    from PySide6.QtWidgets import QMessageBox
-    window.open_image(str(einzel))
-    window.set_read_only(False)
-    meldungen = []
-    monkeypatch.setattr(QMessageBox, "critical",
-                        staticmethod(lambda *a, **k: meldungen.append(a[2])))
-    monkeypatch.setattr(window, "_frage_zu_satz", lambda grund: False)
-    assert not window.insert_paths([str(p / "gross.bin")])
-    assert meldungen and not window.tool.tar_satz
+    monkeypatch.setattr(window, "_satz_speichern_fragen", lambda unter=False: "")
+    assert window.save()
+    assert (tmp_path / "e1.img").exists() and (tmp_path / "e2.img").exists()
 
 
 # ─── Hinweis auf eine Folgediskette ──────────────────────────────────────────
@@ -517,13 +572,13 @@ def test_download_writes_fileinfo_for_tar_and_insert_reads_it(window, satz_zwei,
 
 # ─── Sperren im Fenster ──────────────────────────────────────────────────────
 
-def test_empty_single_disk_keeps_the_one_tar_rule(window, tmp_path):
+def test_empty_single_disk_takes_files_and_folders_like_any_archive(window, tmp_path):
     einzel = tmp_path / "e.img"
     _tool().create(einzel, "tar720_leer", "").close()
     assert window.open_image(str(einzel))
     window.set_read_only(False)
-    assert not window.act_loeschen.isEnabled() and not window.act_alles_rein.isEnabled()
-    assert not window.act_tar_ordner.isVisible()
+    assert window.act_alles_rein.isEnabled()
+    assert window.act_tar_ordner.isVisible() and window.act_tar_ordner.isEnabled()
 
 
 def test_mkdir_in_a_read_only_archive_is_refused_with_a_message(window, satz_zwei, monkeypatch):

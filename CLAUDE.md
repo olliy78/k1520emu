@@ -612,10 +612,13 @@ P8000-Disketten ohne Dateisystem sind
 **tar herausholen und zurückschreiben (2026-10-17):** `tar-export` gibt den Strom einer tar-Diskette als `.tar`
 aus (Kopf+Endmarke → bis dahinter, sonst/Folgeteil ganz; die Teile eines Satzes setzt `cat` zusammen); `create --fs
 tar720_leer` legt eine ganz Null gefüllte 720K-Diskette an (alle vier Container; Erkennung nur bei ALLEN Bytes Null,
-vor der CP/A-Regel), `tar-put` schreibt GENAU EIN `.tar` hinein (≤ 720 KiB, Vielfaches von 512, Warnung bei Nicht-V7),
-danach ist sie `tar720` (seit Entwurf 37 als abgeschlossenes Archiv bearbeitbar).  Aktionen „Diskette als .tar exportieren…“/„tar-Datei auf Diskette schreiben…“.
+vor der CP/A-Regel).  **Seit der Vereinheitlichung (2026-10-22, Entwurf 37 §6) gibt es keinen Sonderweg „genau EIN `.tar`“ mehr:**
+eine tar-Diskette ist IMMER ein Satz mit N ≥ 1 Abbildern (auch die leere); `tar-put` ist nur noch eine CLI-Hülle (`.tar` als Container auf ein
+LEERES Archiv + Speichern, danach nicht schreibgeschützt), in der GUI gilt das Popup „Als Datei / Fertiger Container“ für jede `.tar` auf leerem
+Archiv; die Aktion „tar-Datei auf Diskette schreiben…“ ist entfallen.  Aktion „Diskette als .tar exportieren…“.
 **`doc/merkposten/cqm.md` Nr. 13 lesen.**
 **tar-Archive/-Sätze bearbeiten (Entwurf 37, 2026-10-22):** ein *abgeschlossenes* tar-Archiv (Kopf+Endmarke) und jeder Satz
+(eine tar-Diskette = Satz mit einem Abbild, Strg+S schreibt ins eigene Abbild zurück, solange es passt)
 sind im DiskTool schreibbar (V7-Neuaufbau, Satz = EIN Strom → nummerierte Abbilder `name1.hfe`…, Archiv eines Satzes mit allen Abbildern
 + Dateien + Metadaten); Folgeteile bleiben nur lesbar.  Ebenso P8000-Plattenabbilder (`PlattenVolume`, `k1520d_platte_*`).
 **Vor Arbeiten daran: `doc/merkposten/tar_satz.md` lesen**; Entwurf `doc/design/37_tar_satz_und_platte.md`.

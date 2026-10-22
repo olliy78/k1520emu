@@ -1,0 +1,15 @@
+# Nach tar-put ist die Diskette NICHT schreibgeschuetzt: eine weitere Datei (auch eine .tar als Datei)
+# kommt per `put` hinein und steht im Archiv neben den Dateien des Containers.
+tool:   k1520disktool
+tmpfile neu.img:
+file dazu.txt:
+  noch eine Datei
+setup_run: create %neu.img% --fs tar720_leer
+setup_run: tar-put %neu.img% %CLI_DIR%/../fixtures/p8000/tar_v7_klein.tar
+setup_run: put %neu.img% %dazu.txt%
+run:    ls %neu.img%
+expect: a.txt
+expect: b.txt
+expect: dazu.txt
+forbid: nur lesbar
+exit:   0

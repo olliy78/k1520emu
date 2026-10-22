@@ -25,6 +25,7 @@
 #include "core/filesystem/fileinfo.h"
 #include "core/filesystem/fs_catalog.h"
 #include "core/filesystem/tar/tar_archiv.h"
+#include "core/filesystem/tar/tar_fs.h"
 #include "tests/support/temp_path.h"
 
 namespace fs = std::filesystem;
@@ -64,6 +65,12 @@ void schreibeDatei(const std::string& p, const std::vector<uint8_t>& d) {
 }
 
 std::vector<uint8_t> bytes(const std::string& s) { return std::vector<uint8_t>(s.begin(), s.end()); }
+
+/// Ist das Archiv der Diskette LEER (ganz Null)?  (Ersatz fuer das entfallene `DiskVolume::tarLeer()`.)
+bool tarLeer(const DiskVolume& v) {
+    const TarFileSystem* t = v.tarFs();
+    return t && t->leer();
+}
 
 /// Die LEERE tar-Diskette als frische Datei, schreibbar geoeffnet.
 std::unique_ptr<DiskVolume> neueLeere(const std::string& name) {
@@ -216,14 +223,14 @@ TEST(TarWrite, LeereDisketteRundlaufMitSystemTar) {
     {
         auto v = neueLeere("k1520_test_tarw_a.img");
         ASSERT_TRUE(v);
-        ASSERT_TRUE(v->tarLeer());
+        ASSERT_TRUE(tarLeer(*v));
         EXPECT_FALSE(v->readOnlyForced());
         const std::string q1 = quelle("k1520_test_tarw_q1.txt", "Hallo\n");
         const std::string q2 = quelle("k1520_test_tarw_q2.bin", std::string(1300, 'z'));
         ASSERT_TRUE(v->makeDirectory(FileRef{0, "dir"})) << v->lastError();
         ASSERT_TRUE(v->insert(q1, FileRef{0, "a.txt"}, TransferOptions{})) << v->lastError();
         ASSERT_TRUE(v->insert(q2, FileRef{0, "dir/b.bin"}, TransferOptions{})) << v->lastError();
-        EXPECT_FALSE(v->tarLeer());
+        EXPECT_FALSE(tarLeer(*v));
         EXPECT_EQ(v->detection().filesystem, "tar720_leer");     // Profil bleibt bis zum Wiederoeffnen
         ASSERT_TRUE(v->flush()) << v->lastError();
         fs::remove(q1); fs::remove(q2);
@@ -338,14 +345,14 @@ TEST(TarWrite, AllesLoeschenGibtDieLeereDiskette) {
         ASSERT_TRUE(v);
         ASSERT_TRUE(v->insert(quelle("k1520_test_tarw_qc.txt", "x"), FileRef{0, "x"}, TransferOptions{}));
         ASSERT_TRUE(v->erase(FileRef{0, "x"})) << v->lastError();
-        EXPECT_TRUE(v->tarLeer());
+        EXPECT_TRUE(tarLeer(*v));
         ASSERT_TRUE(v->flush());
     }
     const auto roh = leseDatei(pfad);
     EXPECT_TRUE(tar::alleNull(roh.data(), roh.size()));
     auto w = oeffne(pfad, false);
     ASSERT_TRUE(w);
-    EXPECT_TRUE(w->tarLeer());
+    EXPECT_TRUE(tarLeer(*w));
     w.reset();
     fs::remove(pfad);
 }
@@ -429,35 +436,48 @@ TEST(TarWrite, UnabgeschlosseneArchiveBleibenLesbar) {
     }
 }
 
-/// @test Passt der neue Strom nicht mehr auf EINE Diskette: klarer Fehler, Diskette unveraendert.
-TEST(TarWrite, ZuGrossFuerEineDiskette) {
+/// @test Passt der neue Strom nicht mehr auf EIN Abbild: die Aenderung bleibt im Speicher (die tar-Diskette
+///       ist ein Satz, der wachsen darf), `flush()` nennt klar den Weg und schreibt nichts, die Datei bleibt
+///       unveraendert; schrumpft der Inhalt wieder, geht er ins selbe Abbild zurueck.
+///       (Vorher: der Einfuegeschritt selbst wurde mit „fasst nur ...“ abgelehnt.)
+TEST(TarWrite, ZuGrossFuerEinAbbildBleibtImSpeicherUndFlushNenntDenWeg) {
     const std::string pfad = k1520test::tempPath("k1520_test_tarw_f.img");
     auto v = neueLeere("k1520_test_tarw_f.img");
     ASSERT_TRUE(v);
     ASSERT_TRUE(v->insert(quelle("k1520_test_tarw_qf1.bin", std::string(500000, 'a')), FileRef{0, "a"},
                           TransferOptions{}));
+    ASSERT_TRUE(v->flush()) << v->lastError();
+    const auto vorher = leseDatei(pfad);
     const std::string q2 = quelle("k1520_test_tarw_qf2.bin", std::string(400000, 'b'));
-    EXPECT_FALSE(v->insert(q2, FileRef{0, "b"}, TransferOptions{}));
-    EXPECT_NE(v->lastError().find("fasst nur"), std::string::npos) << v->lastError();
-    EXPECT_NE(v->lastError().find("Satz"), std::string::npos) << v->lastError();
-    ASSERT_EQ(v->list().size(), 1u);
-    EXPECT_EQ(lies(*v, "a"), std::string(500000, 'a'));
-    // die Platzpruefung des Stapelwegs sagt dasselbe, ohne zu schreiben
+    ASSERT_TRUE(v->insert(q2, FileRef{0, "b"}, TransferOptions{})) << v->lastError();
+    EXPECT_TRUE(v->dirty());
+    EXPECT_EQ(v->list().size(), 2u);
+    EXPECT_EQ(lies(*v, "b"), std::string(400000, 'b'));
+    const TarSatzPlan plan = v->tarSatzPlanen();
+    ASSERT_TRUE(plan.ok) << plan.fehler;
+    EXPECT_EQ(plan.abbilder, 2);
+    EXPECT_FALSE(v->flush());
+    EXPECT_NE(v->lastError().find("nummerierten Abbildern"), std::string::npos) << v->lastError();
+    EXPECT_EQ(leseDatei(pfad), vorher) << "ein abgelehntes Speichern aendert die Datei nicht";
+    // die Platzpruefung des Stapelwegs lehnt nichts mehr ab: auch der Ordner geht in den Speicher
     const std::string ordner = k1520test::tempPath("k1520_test_tarw_fo");
     fs::remove_all(ordner);
     fs::create_directories(ordner);
-    fs::copy_file(q2, ordner + "/b");
+    fs::copy_file(q2, ordner + "/c");
     std::string bericht;
-    EXPECT_FALSE(v->checkFit(ordner, bericht));
-    EXPECT_NE(bericht.find("fasst"), std::string::npos) << bericht;
-    EXPECT_FALSE(v->insertAll(ordner, TransferOptions{}));
-    EXPECT_EQ(v->list().size(), 1u);
+    EXPECT_TRUE(v->checkFit(ordner, bericht)) << bericht;
     fs::remove_all(ordner);
-    // Ersetzen derselben Datei durch eine kleinere passt
+    // Wieder auf EIN Abbild geschrumpft: es geht in dasselbe Abbild zurueck.
+    ASSERT_TRUE(v->erase(FileRef{0, "b"})) << v->lastError();
     TransferOptions o;
     o.overwrite = true;
     ASSERT_TRUE(v->insert(q2, FileRef{0, "a"}, o)) << v->lastError();
+    ASSERT_TRUE(v->flush()) << v->lastError();
     v.reset();
+    auto w = oeffne(pfad, false);
+    ASSERT_TRUE(w);
+    EXPECT_EQ(lies(*w, "a"), std::string(400000, 'b'));
+    w.reset();
     fs::remove(pfad);
 }
 
@@ -611,9 +631,10 @@ TEST(TarWrite, SystemTarArchivBearbeitenUndGegenprobe) {
 #endif
 }
 
-/// @test tar-put auf die leere Diskette geht weiter (und ist danach per put bearbeitbar, wenn der
-///       Schreibschutz aufgehoben wird); ein zweites .tar wird weiter abgelehnt.
-TEST(TarWrite, TarPutBleibtEinmalwurfUndDanachBearbeitbar) {
+/// @test Eine fertige .tar als Container auf die leere Diskette (frueher `tar-put`): danach ist die
+///       Diskette NICHT schreibgeschuetzt und ganz normal bearbeitbar; eine zweite .tar kommt nur noch
+///       als Datei hinein (Container nur auf leerem Archiv).
+TEST(TarWrite, ContainerAufLeereDisketteDanachBearbeitbar) {
     tar::TarArchiv a;
     std::string err;
     ASSERT_TRUE(a.hinzufuegen("x.txt", bytes("x"), {}, false, err));
@@ -623,16 +644,22 @@ TEST(TarWrite, TarPutBleibtEinmalwurfUndDanachBearbeitbar) {
     schreibeDatei(src, s);
     auto v = neueLeere("k1520_test_tarw_j.img");
     ASSERT_TRUE(v);
-    ASSERT_TRUE(v->tarSchreiben(src)) << v->lastError();
-    EXPECT_TRUE(v->readOnly());                  // tar-put schuetzt einmalig
-    EXPECT_FALSE(v->readOnlyForced());           // aber aufhebbar: abgeschlossenes Archiv
-    EXPECT_FALSE(v->tarSchreiben(src));
-    v->setReadOnly(false);
-    ASSERT_FALSE(v->readOnly());
+    ASSERT_TRUE(v->tarDateiAblegen(src, TarDateiWeg::AlsContainer)) << v->lastError();
+    ASSERT_TRUE(v->flush()) << v->lastError();
+    EXPECT_FALSE(v->readOnly());                 // kein Einmalwurf mehr: nicht schreibgeschuetzt
+    EXPECT_FALSE(v->readOnlyForced());
+    EXPECT_FALSE(v->tarDateiBeurteilen(src).als_container);   // zweiter Container: nein ...
+    EXPECT_FALSE(v->tarDateiAblegen(src, TarDateiWeg::AlsContainer));
+    EXPECT_TRUE(v->tarDateiBeurteilen(src).als_datei);        // ... als Datei ja
     ASSERT_TRUE(v->insert(quelle("k1520_test_tarw_qj.txt", "y"), FileRef{0, "y.txt"}, TransferOptions{}))
         << v->lastError();
     EXPECT_EQ(v->list().size(), 2u);
+    ASSERT_TRUE(v->flush()) << v->lastError();
     const std::string p = v->path();
     v.reset();
+    auto w = oeffne(p, false);
+    ASSERT_TRUE(w);
+    EXPECT_EQ(w->list().size(), 2u);
+    w.reset();
     fs::remove(p); fs::remove(src);
 }

@@ -895,6 +895,9 @@ constexpr const char* kNurBoot =
 constexpr const char* kSchreibschutz =
     "Die Diskette ist schreibgeschuetzt geoeffnet. Zum Aendern den Schreibschutz "
     "aufheben (in der Oberflaeche den Haken \"Nur lesen\" entfernen).";
+constexpr const char* kSatzKeinSektorEingriff =
+    "Eine tar-Diskette bzw. ein tar-Satz lebt als Strom im Speicher; Sektoren lassen sich nicht einzeln "
+    "aendern (die Aenderung ginge beim Speichern verloren).  Dateien und Ordner bearbeiten.";
 }  // namespace
 
 // ─── FileRef ─────────────────────────────────────────────────────────────────
@@ -1492,6 +1495,16 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
         dv->volumes_.push_back(std::move(v));
     }
 
+    // Eine schreibbare tar-Diskette AUS EINER DATEI ist fachlich ein Satz mit einem Abbild
+    // (Entwurf 37, Vereinheitlichung): der Strom lebt im Speicher und geht beim Speichern
+    // zurueck.  Folgeteil und abgeschnittenes Archiv bleiben, wie sie sind (lesbar, gesperrt);
+    // eine physische Diskette hat keine Datei, in die ein Satz zurueckgeschrieben werden koennte.
+    if (!vorhanden && dv->profile_->type == FsType::Tar && dv->tarFs() && dv->tarFs()->schreibbar()
+        && !dv->einzelSatzMachen()) {
+        err = dv->lastError();
+        return roh(err);
+    }
+
     // Automatik (E2): die Schnellpruefung sieht nur die Verwaltungsstrukturen an,
     // die das Mounten gerade gelesen hat — sie kostet auch an einem echten Laufwerk
     // keinen zusaetzlichen Spurzugriff.  Deshalb darf sie hier stehen, ohne das
@@ -1527,12 +1540,6 @@ bool DiskVolume::readOnlyForced() const {
 const TarFileSystem* DiskVolume::tarFs() const {
     if (!profile_ || profile_->type != FsType::Tar || volumes_.empty()) return nullptr;
     return dynamic_cast<const TarFileSystem*>(volumes_[0].fs.get());
-}
-
-bool DiskVolume::tarLeer() const {
-    if (tar_satz_ || !profile_ || profile_->type != FsType::Tar || !profile_->leer || volumes_.empty()) return false;
-    const auto* t = dynamic_cast<const TarFileSystem*>(volumes_[0].fs.get());
-    return t && t->leer();
 }
 
 const DiskFormat* DiskVolume::rohFormat() const {
@@ -1628,6 +1635,9 @@ std::unique_ptr<DiskVolume> DiskVolume::openTarSatz(const std::vector<std::strin
     erste->profile_ = prof;
     erste->format_  = f;
     erste->tar_satz_ = true;
+    erste->satz_einzel_ = false;        // ein aus Abbildern geoeffneter Satz hat kein "eigenes" Abbild
+    erste->satz_einzelname_ = false;
+    erste->satz_gesichert_.clear();
     erste->satz_ = satz;
     erste->satz_rev_gespeichert_ = satz->revision;
     erste->satz_basis_ = tarSatzBasisname(pfade.front());
@@ -1684,6 +1694,14 @@ std::string DiskVolume::tarSatzBasisname(const std::string& abbildpfad) {
 
 std::string DiskVolume::physischSchreibenGrund() const {
     if (!tar_satz_) return {};
+    if (satz_einzel_) {
+        // Eine tar-Diskette (ein Abbild): das Medium stimmt mit dem Strom ueberein, sobald gespeichert ist.
+        const TarSatzPlan p = tarSatzPlanen();
+        if (p.ok && p.abbilder == 1 && !dirty()) return {};
+        if (p.ok && p.abbilder == 1)
+            return "Die Aenderungen an der tar-Diskette sind noch nicht gespeichert — erst speichern, "
+                   "dann auf die physische Diskette schreiben.";
+    }
     return "Ein tar-Satz ist ein Strom ueber mehrere Disketten und laesst sich nicht direkt auf EINE "
            "physische Diskette schreiben.  Weg: Satz speichern (tarSatzSpeichern), die Einzelabbilder "
            "(name1, name2, …) oeffnen und jedes Abbild fuer sich auf eine Diskette schreiben.";
@@ -1818,11 +1836,15 @@ TarSatzPlan DiskVolume::tarSatzPlanen(const std::string& basisname) const {
     p.abbilder = static_cast<int>(std::max<uint64_t>(1, (laenge + p.kapazitaet - 1) / p.kapazitaet));
     p.einzel   = p.abbilder == 1;
 
+    // Eine tar-Diskette behaelt ihren Namen (ohne Nummer), solange der Inhalt auf EIN Abbild passt.
+    // Waechst er darueber, wird nummeriert; abschliessende Ziffern des Namens entfallen dabei
+    // (`ariane1.cqm` -> `ariane1.cqm`, `ariane2.cqm`, nicht `ariane11.cqm`).
+    if (satz_einzelname_ && p.abbilder > 1 && basisname.empty())
+        p.basisname = tarSatzBasisname(p.basisname);
     const fs::path bp(p.basisname);
     const std::string stem = bp.stem().string(), endg = bp.extension().string();
     const fs::path dir = bp.parent_path();
     for (int i = 1; i <= p.abbilder; ++i) {
-        // Ein mit tarDisketteNeu angelegtes Einzelabbild behaelt seinen Namen (ohne Nummer).
         const std::string name = (satz_einzelname_ && p.abbilder == 1)
                                      ? p.basisname
                                      : (dir / (stem + std::to_string(i) + endg)).string();
@@ -1857,6 +1879,12 @@ bool DiskVolume::tarSatzSpeichern(const std::string& basisname, std::vector<std:
     if (geschrieben) geschrieben->clear();
     const TarSatzPlan p = tarSatzPlanen(basisname);
     if (!p.ok) return fail(p.fehler);
+    // Eine tar-Diskette geht in IHR Abbild zurueck (Container, Format, Kopffelder bleiben).
+    if (satz_einzel_ && p.abbilder == 1 && p.namen.front() == path_) {
+        if (!satzInsAbbild(p)) return false;
+        if (geschrieben) geschrieben->push_back(path_);
+        return true;
+    }
     const DiskFormat* f = rohFormat();
     const fs::path bp(p.basisname);
     const std::string endg = bp.extension().string();
@@ -1915,10 +1943,71 @@ bool DiskVolume::tarSatzSpeichern(const std::string& basisname, std::vector<std:
     satz_rev_gespeichert_ = satz_->revision;
     satz_basis_ = p.basisname;
     path_ = p.namen.front();
+    // Die Datei des Satzes ist jetzt eine neu geschriebene, nicht mehr disk_: kein Rueckschreiben
+    // "in dasselbe Abbild" mehr.  Hat sich der Inhalt ueber mehrere Abbilder verteilt, ist es ein
+    // echter Satz (Nummern bleiben), sonst behaelt die Diskette ihren Namen ohne Nummer.
+    satz_einzel_ = false;
+    if (p.abbilder > 1) satz_einzelname_ = false;
     if (hinweise)
         for (const std::string& a : p.altlasten)
             hinweise->push_back("'" + a + "' gehoert nicht mehr zum Satz (er hat jetzt " + std::to_string(p.abbilder)
                                 + " Abbild(er)) und blieb unveraendert liegen — bei Bedarf selbst loeschen.");
+    return true;
+}
+
+bool DiskVolume::einzelSatzMachen() {
+    // Ob der Strom ueberhaupt Inhalt hat, steht VOR der Umstellung fest: ein ganz leeres Archiv
+    // (nur Nullen) braucht beim ersten Schreiben keine Sicherungskopie seiner selbst.
+    const TarFileSystem* t0 = tarFs();
+    const bool war_leer = t0 && t0->leer();
+    if (!tarZuSatz(path_)) return false;
+    satz_einzel_     = true;
+    satz_einzelname_ = true;
+    satz_basis_      = path_;               // NICHT um Ziffern gekuerzt (nur beim Nummerieren)
+    satz_gesichert_.clear();
+    if (war_leer) satz_gesichert_.insert(path_);
+    return true;
+}
+
+bool DiskVolume::satzInsAbbild(const TarSatzPlan& p) {
+    const DiskFormat* f = rohFormat();
+    if (!f || volumes_.empty() || !disk_) return fail("Die Geometrie des Abbilds ist unbekannt.");
+    std::error_code ec;
+    if (fs::exists(path_, ec) && !satz_gesichert_.count(path_)) {
+        fs::copy_file(path_, path_ + "~", fs::copy_options::overwrite_existing, ec);
+        if (ec) return fail("Sicherungskopie " + path_ + "~ nicht anlegbar: " + ec.message());
+        satz_gesichert_.insert(path_);
+    }
+    // Was hinter der Archivlaenge liegt, ist Null (Auffuellung wie bei jedem letzten Abbild).
+    std::vector<uint8_t> scheibe(static_cast<size_t>(p.kapazitaet), 0);
+    const uint64_t n = std::min<uint64_t>(std::min<uint64_t>(p.strom, p.kapazitaet), satz_->bytes.size());
+    std::copy_n(satz_->bytes.begin(), n, scheibe.begin());
+
+    const DiskMedium sicherung = disk_->medium();
+    if (!volumes_[0].space->write(0, scheibe.data(), scheibe.size())) {
+        const std::string grund = volumes_[0].space->lastError();
+        disk_->medium().restoreFrom(sicherung);
+        return fail("Abbild nicht beschreibbar: " + grund + " — die Datei wurde nicht veraendert.");
+    }
+    // Das Medium ist sonst IMMER geschuetzt (nur dieser Weg schreibt in die Datei).
+    disk_->setWriteProtect(false);
+    const bool ok = disk_->flush();
+    disk_->setWriteProtect(true);
+    if (!ok) {
+        const std::string grund = disk_->lastError();
+        disk_->medium().restoreFrom(sicherung);
+        return fail(grund + " — die Datei wurde nicht veraendert.");
+    }
+    satz_rev_gespeichert_ = satz_->revision;
+    // Der Name der Diskette ist nicht mehr "leer", sobald etwas im Archiv steht (Anzeige im Befund).
+    if (profile_ && profile_->leer) {
+        const TarFileSystem* t = tarFs();
+        std::string neu = profile_->name;
+        if (t && !t->leer() && neu.size() > 5 && neu.compare(neu.size() - 5, 5, "_leer") == 0) {
+            neu.resize(neu.size() - 5);
+            detection_.filesystem = neu;
+        }
+    }
     return true;
 }
 
@@ -1968,6 +2057,7 @@ std::unique_ptr<DiskVolume> DiskVolume::tarDisketteNeu(const std::string& pfad,
     if (!v) return nullptr;
     v->read_only_      = false;                 // das eigene frische Werkstueck
     v->backup_getan_   = true;
+    v->satz_einzel_    = true;                  // disk_ IST die Datei: Rueckschreiben in dasselbe Abbild
     v->satz_einzelname_ = true;
     v->satz_basis_     = pfad;                  // NICHT um die Ziffern am Ende gekuerzt
     v->satz_gesichert_.insert(pfad);            // ganz Null: keine Sicherungskopie noetig
@@ -1978,7 +2068,7 @@ std::unique_ptr<DiskVolume> DiskVolume::tarDisketteNeu(const std::string& pfad,
 TarDateiUrteil DiskVolume::tarDateiBeurteilen(const std::string& tarpfad) const {
     TarDateiUrteil u;
     auto nein = [&](const std::string& why) { u.fehler = why; return u; };
-    if (!disk_ || volumes_.empty()) return nein("keine Diskette geoeffnet");
+    if (!disk_) return nein("keine Diskette geoeffnet");
     const TarFileSystem* t = tarFs();
     if (!t) return nein("Eine .tar-Datei laesst sich nur auf eine tar-Diskette oder in einen tar-Satz legen.");
     if (!t->schreibbar()) return nein(t->nurLesbarGrund());
@@ -2001,7 +2091,7 @@ TarDateiUrteil DiskVolume::tarDateiBeurteilen(const std::string& tarpfad) const 
             u.warnung       = b.warnung;
             const uint64_t laenge = std::min<uint64_t>(d.size(), tar::exportLaenge(d.data(), d.size()));
             u.abbilder  = static_cast<int>(std::max<uint64_t>(1, (laenge + u.kapazitaet - 1) / u.kapazitaet));
-            u.wird_satz = !tar_satz_ && laenge > u.kapazitaet;
+            u.wird_satz = (!tar_satz_ || satz_einzelname_) && laenge > u.kapazitaet;
         }
     } else {
         u.container_grund = "Das Archiv ist nicht leer — eine .tar-Datei kommt als Datei hinein.";
@@ -2025,10 +2115,6 @@ bool DiskVolume::tarDateiAblegen(const std::string& tarpfad, TarDateiWeg weg,
 
     if (!u.als_container) return fail(u.container_grund);
     tar_warnung_ = u.warnung;
-
-    // Passt der Container auf die Einzeldiskette und ist sie die frische tar720_leer: der
-    // bestehende Weg (`tar-put`), wie bisher mit Schreibschutz danach.
-    if (!tar_satz_ && tarLeer() && !u.wird_satz) return tarSchreiben(tarpfad);
 
     std::vector<uint8_t> d;
     std::string err;
@@ -2070,11 +2156,11 @@ bool leseGanz(const std::string& pfad, std::vector<uint8_t>& d, std::string& err
 
 bool DiskVolume::tarExport(const std::string& ziel, uint64_t* bytes) const {
     if (!disk_) return fail("keine Diskette geoeffnet");
-    if (tar_satz_)
+    if (tar_satz_ && !satz_einzel_)
         return fail("Ein tar-Satz ist schon EIN Strom — fuer den Export die Disketten des Satzes "
                     "einzeln oeffnen (jede ergibt ihr Teilstueck, mit `cat` setzt man sie zusammen); "
                     "zum Auspacken genuegt `tar-satz --to`.");
-    if (tarLeer())
+    if (const TarFileSystem* t = tarFs(); t && t->leer())
         return fail("Die Diskette ist leer (tar720 leer) — es gibt nichts zu exportieren.");
     if (profile_ && !istTar())
         return fail("Diese Diskette traegt ein Dateisystem (" + profile_->name + "), keinen tar-Strom.");
@@ -2088,74 +2174,6 @@ bool DiskVolume::tarExport(const std::string& ziel, uint64_t* bytes) const {
     f.close();
     if (!f) return fail("Schreibfehler: " + ziel);
     if (bytes) *bytes = n;
-    return true;
-}
-
-bool DiskVolume::tarPruefen(const std::string& quelle, std::string* warnung) const {
-    tar_warnung_.clear();
-    if (warnung) warnung->clear();
-    if (!disk_) return fail("keine Diskette geoeffnet");
-    if (!tarLeer()) {
-        if (tar_satz_) return fail("Auf einen tar-Satz laesst sich nicht schreiben.");
-        if (istTar())
-            return fail("Diese Diskette traegt schon ein tar-Archiv (tar720) — ein fertiges .tar "
-                        "wird nur auf eine LEERE tar-Diskette geschrieben (`create --fs tar720_leer`), "
-                        "und nur einmal.  Dateien in ein vorhandenes Archiv kommen per put/rm.");
-        if (profile_)
-            return fail("Diese Diskette traegt ein Dateisystem (" + profile_->name + "); ein tar-Archiv "
-                        "gehoert nur auf eine leere tar-Diskette (`create --fs tar720_leer`).");
-        return fail("Die Diskette ist nicht leer: ein tar-Archiv wird nur auf eine Diskette "
-                    "geschrieben, die ganz aus Nullen besteht (`create --fs tar720_leer`).");
-    }
-    if (read_only_) return fail(kSchreibschutz);
-    std::vector<uint8_t> d;
-    std::string err;
-    if (!leseGanz(quelle, d, err)) return fail(err);
-    const tar::QuellBefund b = tar::quelleBeurteilen(d, volumes_[0].space->size());
-    if (!b.fehler.empty()) return fail(b.fehler);
-    tar_warnung_ = b.warnung;
-    if (warnung) *warnung = b.warnung;
-    return true;
-}
-
-bool DiskVolume::tarSchreiben(const std::string& quelle) {
-    if (!tarPruefen(quelle)) return false;
-    std::vector<uint8_t> d;
-    std::string err;
-    if (!leseGanz(quelle, d, err)) return fail(err);
-
-    SectorSpace& raum = *volumes_[0].space;
-    const DiskMedium sicherung = disk_->medium();
-    // Ab Sektor 0 in Lesereihenfolge (SectorSpace ist dieselbe Folge wie beim Lesen); der Rest
-    // war Null (tarLeer) und bleibt es.
-    if (!raum.write(0, d.data(), d.size())) {
-        const std::string grund = raum.lastError();
-        disk_->medium().restoreFrom(sicherung);
-        return fail("Schreiben fehlgeschlagen: " + grund + " — die Diskette wurde nicht veraendert.");
-    }
-    // Zurueckschreiben, SOLANGE die Diskette noch beschreibbar ist: danach ist sie tar720.
-    // Eine Sicherungskopie (`<abbild>~`) lohnt nicht: die Diskette war ganz Null, es geht
-    // keine Information verloren.
-    backup_getan_ = true;
-    if (!flush()) {
-        const std::string grund = last_error_;
-        disk_->medium().restoreFrom(sicherung);
-        return fail(grund + " — die Diskette wurde nicht veraendert.");
-    }
-
-    std::string warum;
-    auto t = TarFileSystem::mount(std::make_unique<TarSpaceQuelle>(raum), warum);
-    if (!t) t = TarFileSystem::mountRoh(std::make_unique<TarSpaceQuelle>(raum), warum);   // Folgeteil
-    volumes_[0].fs = std::move(t);
-    // Die Diskette heisst jetzt tar720 (die Profile tragen die Namen `<x>_leer` / `<x>`).
-    // Ein abgeschlossenes Archiv waere schreibbar (T1); tar-put bleibt trotzdem ein Einmalwurf:
-    // sie bleibt hier schreibgeschuetzt, bis der Anwender den Schutz ausdruecklich aufhebt.
-    std::string neu = profile_->name;
-    if (neu.size() > 5 && neu.compare(neu.size() - 5, 5, "_leer") == 0) neu.resize(neu.size() - 5);
-    detection_.filesystem = neu;
-    read_only_ = true;
-    disk_->setWriteProtect(true);
-    check(FsCheckLevel::Schnell, false);
     return true;
 }
 
@@ -3210,6 +3228,9 @@ bool DiskVolume::writeSectorAt(uint8_t cyl, uint8_t head, int index,
                                const std::vector<uint8_t>& data,
                                const uint16_t* crc_woertlich) {
     if (read_only_) return fail(schreibschutzText());
+    // Ein tar-Satz lebt als Strom im Speicher (Entwurf 37): ein Sektoreingriff am Medium wuerde beim
+    // Speichern vom Strom ueberschrieben, ohne dass jemand es merkt.
+    if (tar_satz_) return fail(kSatzKeinSektorEingriff);
     if (!disk_)     return fail("keine Diskette geoeffnet");
     if (index < 0)  return fail("Diesen Sektor gibt es auf der Spur nicht (mehr)");
 
@@ -3239,6 +3260,9 @@ bool DiskVolume::readSectorTail(uint8_t cyl, uint8_t head, int index,
 bool DiskVolume::writeSectorTail(uint8_t cyl, uint8_t head, int index,
                                  const std::vector<uint8_t>& tail) {
     if (read_only_) return fail(schreibschutzText());
+    // Ein tar-Satz lebt als Strom im Speicher (Entwurf 37): ein Sektoreingriff am Medium wuerde beim
+    // Speichern vom Strom ueberschrieben, ohne dass jemand es merkt.
+    if (tar_satz_) return fail(kSatzKeinSektorEingriff);
     if (!disk_)     return fail("keine Diskette geoeffnet");
     if (index < 0)  return fail("Diesen Sektor gibt es auf der Spur nicht (mehr)");
     if (tail.size() > kSectorTailBytes)
@@ -3264,6 +3288,9 @@ bool DiskVolume::writeSectorTail(uint8_t cyl, uint8_t head, int index,
 bool DiskVolume::eraseSectorAt(uint8_t cyl, uint8_t head, int index,
                                uint16_t tail_bytes) {
     if (read_only_) return fail(schreibschutzText());
+    // Ein tar-Satz lebt als Strom im Speicher (Entwurf 37): ein Sektoreingriff am Medium wuerde beim
+    // Speichern vom Strom ueberschrieben, ohne dass jemand es merkt.
+    if (tar_satz_) return fail(kSatzKeinSektorEingriff);
     if (!disk_)     return fail("keine Diskette geoeffnet");
     if (index < 0)  return fail("Diesen Sektor gibt es auf der Spur nicht (mehr)");
 
@@ -3277,6 +3304,9 @@ bool DiskVolume::eraseSectorAt(uint8_t cyl, uint8_t head, int index,
 bool DiskVolume::createSector(uint8_t cyl, uint8_t head, const TrackCodec::NewSectorSpec& spec,
                               bool mfm) {
     if (read_only_) return fail(schreibschutzText());
+    // Ein tar-Satz lebt als Strom im Speicher (Entwurf 37): ein Sektoreingriff am Medium wuerde beim
+    // Speichern vom Strom ueberschrieben, ohne dass jemand es merkt.
+    if (tar_satz_) return fail(kSatzKeinSektorEingriff);
     if (!disk_)     return fail("keine Diskette geoeffnet");
 
     TrackImage spur = disk_->medium().track(cyl, head);
@@ -3744,7 +3774,9 @@ void DiskVolume::setReadOnly(bool ro) {
 
 bool DiskVolume::exportImage(const std::string& path) const {
     if (!disk_) return fail("keine Diskette geoeffnet");
-    if (tar_satz_) return fail("Ein tar-Satz besteht aus mehreren Abbildern — mit tarSatzSpeichern speichern.");
+    if (tar_satz_ && !(satz_einzel_ && !dirty()))
+        return fail("Ein tar-Satz besteht aus Abbildern, deren Stand im Speicher liegt — mit tarSatzSpeichern "
+                    "speichern" + std::string(satz_einzel_ ? " (erst die Aenderungen speichern)." : "."));
     std::optional<DiskFormat> of;
     const std::string zielEndung = endung(path);
     if (zielEndung == "img" || zielEndung == "cqm") {
@@ -3760,9 +3792,21 @@ bool DiskVolume::exportImage(const std::string& path) const {
 
 bool DiskVolume::flush() {
     if (!disk_) return fail("keine Diskette geoeffnet");
-    // Im Satzmodus gibt es keine Datei, in die sich ein Aenderungsstand zurueckschreiben liesse:
-    // gespeichert wird ausdruecklich mit tarSatzSpeichern (auf N Abbilder).
-    if (tar_satz_) return true;
+    // Ein echter Satz (mehrere Abbilder) hat keine EINE Datei, in die sich ein Aenderungsstand
+    // zurueckschreiben liesse: gespeichert wird ausdruecklich mit tarSatzSpeichern.  Eine tar-Diskette
+    // (Satz mit einem Abbild, Name ohne Nummer) schreibt sich in IHR Abbild zurueck — solange
+    // der Inhalt auf eines passt; sonst bleibt alles im Speicher und der Fehler sagt, was zu tun ist.
+    if (tar_satz_) {
+        if (!satz_einzelname_ || !dirty()) return true;
+        if (read_only_) return fail(schreibschutzText());
+        const TarSatzPlan p = tarSatzPlanen();
+        if (!p.ok) return fail(p.fehler);
+        if (p.abbilder > 1)
+            return fail("Der Inhalt (" + std::to_string(p.strom) + " Byte) passt nicht auf ein Abbild ("
+                        + std::to_string(p.kapazitaet) + " Byte) — als tar-Satz mit " + std::to_string(p.abbilder)
+                        + " nummerierten Abbildern speichern (tarSatzSpeichern, `tar-satz-save`).");
+        return tarSatzSpeichern();
+    }
     if (read_only_) {
         if (!dirty()) return true;          // nichts zu tun — kein Grund zu klagen
         return fail(schreibschutzText());
@@ -3941,6 +3985,8 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
     // Eine frisch angelegte Diskette braucht keine Sicherungskopie ihrer selbst.
     dv->backup_getan_ = true;
     if (!dv->flush()) { err = dv->lastError(); return nullptr; }
+    // Eine neue tar-Diskette ist (wie eine geoeffnete) ein Satz mit einem Abbild.
+    if (profil->type == FsType::Tar && !dv->einzelSatzMachen()) { err = dv->lastError(); return nullptr; }
     return dv;
 }
 
@@ -4079,7 +4125,9 @@ bool DiskVolume::writeBootImageFile(const std::string& path, int volume) {
 
 bool DiskVolume::saveAs(const std::string& path) {
     if (!disk_) return fail("keine Diskette geoeffnet");
-    if (tar_satz_) return fail("Ein tar-Satz besteht aus mehreren Abbildern — mit tarSatzSpeichern speichern.");
+    if (tar_satz_ && !(satz_einzel_ && !dirty()))
+        return fail("Ein tar-Satz besteht aus Abbildern, deren Stand im Speicher liegt — mit tarSatzSpeichern "
+                    "speichern" + std::string(satz_einzel_ ? " (erst die Aenderungen speichern)." : "."));
     std::optional<DiskFormat> of;
     const std::string zielEndung = endung(path);
     if (zielEndung == "img" || zielEndung == "cqm") {
@@ -4091,5 +4139,6 @@ bool DiskVolume::saveAs(const std::string& path) {
     }
     if (!disk_->saveAs(path, of)) return fail(disk_->lastError());
     path_ = path;
+    if (tar_satz_) { satz_basis_ = path; satz_gesichert_.insert(path); }   // die Diskette heisst jetzt so
     return true;
 }

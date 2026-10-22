@@ -1,4 +1,4 @@
-# Eine Datei, die kein Vielfaches von 512 Byte ist, wird vor dem Schreiben abgelehnt;
+# Eine Datei, die kein Vielfaches von 512 Byte ist, ist kein Container und wird abgelehnt;
 # die Diskette bleibt leer.
 tool:   k1520disktool
 tmpfile neu.img:

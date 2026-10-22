@@ -352,7 +352,8 @@ TEST(P8000WegaDiskette, FormatMountTarUndDiskTool) {
         ASSERT_TRUE(v->insert(quelle, FileRef::parse("neu.txt"), TransferOptions{})) << v->lastError();
         ASSERT_TRUE(v->flush()) << v->lastError();
     }
-    // Linux: eine Datei hinzufuegen, EIN V7-Strom (nur Dateien), in Stuecke zu 737280 Byte, je auf eine leere tar-Diskette.
+    // Linux: eine Datei hinzufuegen, EIN V7-Strom (nur Dateien); er wird als Container in einen tar-Satz
+    // gelegt und beim Speichern auf Abbilder zu 737280 Byte verteilt (jede ist eine tar-Diskette).
     { std::ofstream(lokal + "/man2/NEU.TXT") << "Neu vom Linux-Rechner\n"; }
     std::vector<std::pair<std::string, std::string>> dateien;
     for (const auto& e : stdfs::recursive_directory_iterator(lokal)) {
@@ -362,18 +363,16 @@ TEST(P8000WegaDiskette, FormatMountTarUndDiskTool) {
     std::sort(dateien.begin(), dateien.end());
     ASSERT_EQ(dateien.size(), 452u);
     const std::string strom = v7Archiv(dateien);
+    const std::string gesamt = dir + "/gesamt.tar";
+    { std::ofstream(gesamt, std::ios::binary) << strom; }
     std::vector<std::string> teile;
-    for (size_t ab = 0, i = 0; ab < strom.size(); ab += 737'280, ++i) {
-        const std::string tarf = dir + "/teil" + std::to_string(i) + ".tar";
-        { std::ofstream(tarf, std::ios::binary) << strom.substr(ab, 737'280); }
-        const std::string hfe = dir + "/teil" + std::to_string(i) + ".hfe";
+    {
         std::string err;
-        auto v = DiskVolume::create(hfe, "tar720_leer", "", formate(), dateisysteme(), err);
-        ASSERT_TRUE(v) << err;
-        ASSERT_TRUE(v->tarSchreiben(tarf)) << v->lastError();
-        ASSERT_TRUE(v->flush()) << v->lastError();
-        EXPECT_TRUE(v->lastTarWarnung().empty()) << v->lastTarWarnung();   // V7: keine Rueckfrage
-        teile.push_back(hfe);
+        auto satz = DiskVolume::tarSatzNeu("k5601_9x512", dir + "/teil.hfe", formate(), dateisysteme(), err);
+        ASSERT_TRUE(satz) << err;
+        ASSERT_TRUE(satz->tarDateiAblegen(gesamt, TarDateiWeg::AlsContainer)) << satz->lastError();
+        EXPECT_TRUE(satz->lastTarWarnung().empty()) << satz->lastTarWarnung();   // V7: keine Rueckfrage
+        ASSERT_TRUE(satz->tarSatzSpeichern("", nullptr, &teile)) << satz->lastError();
     }
     ASSERT_EQ(teile.size(), 2u) << strom.size();
 

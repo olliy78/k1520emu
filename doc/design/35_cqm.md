@@ -133,6 +133,8 @@ verkettet die linearen Ströme; CLI `k1520disktool tar-satz`.  Befunde `tar.abge
 
 ### 4b. tar exportieren, leere tar-Diskette, `.tar` zurückschreiben (2026-10-17)
 
+> **Teilweise überholt (2026-10-22, Entwurf 37 §6):** die Verriegelung „genau EIN `.tar` auf die leere Diskette“ (`tar-put` als Einmalwurf, Folgeteile roh auf leere Disketten) ist entfallen; eine tar-Diskette ist ein Satz mit N ≥ 1 Abbildern, eine `.tar` kommt als Datei oder Container hinein.
+
 Anlass: ein Archiv über mehrere Disketten zeigt jede Einzeldiskette abgeschnitten.  Der Anwender
 holt die Rohinhalte als `.tar` (`tar-export`), setzt sie mit `cat` zusammen, bearbeitet, teilt mit
 `split -b 737280` und schreibt die Teile in neue Disketten (`create --fs tar720_leer`, `tar-put`).

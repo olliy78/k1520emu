@@ -105,16 +105,10 @@ _lib.k1520d_set_read_only.argtypes = [_H, ctypes.c_bool]
 _lib.k1520d_set_read_only.restype = None
 _lib.k1520d_read_only_forced.argtypes = [_H]
 _lib.k1520d_read_only_forced.restype = ctypes.c_bool
-_lib.k1520d_tar_leer.argtypes = [_H]
-_lib.k1520d_tar_leer.restype = ctypes.c_bool
 _lib.k1520d_tar_export.argtypes = [_H, _CS]
 _lib.k1520d_tar_export.restype = ctypes.c_bool
-_lib.k1520d_tar_put_pruefen.argtypes = [_H, _CS]
-_lib.k1520d_tar_put_pruefen.restype = ctypes.c_int
 _lib.k1520d_tar_warning.argtypes = [_H]
 _lib.k1520d_tar_warning.restype = _CS
-_lib.k1520d_tar_put.argtypes = [_H, _CS]
-_lib.k1520d_tar_put.restype = ctypes.c_bool
 _lib.k1520d_open_tar_satz_format.argtypes = [_CS, _CS]
 _lib.k1520d_open_tar_satz_format.restype = _H
 _lib.k1520d_tar_format_count.argtypes = []
@@ -133,6 +127,8 @@ _lib.k1520d_tar_disk_neu.argtypes = [_CS, _CS]
 _lib.k1520d_tar_disk_neu.restype = _H
 _lib.k1520d_tar_satz.argtypes = [_H]
 _lib.k1520d_tar_satz.restype = ctypes.c_bool
+_lib.k1520d_tar_satz_einzel.argtypes = [_H]
+_lib.k1520d_tar_satz_einzel.restype = ctypes.c_bool
 _lib.k1520d_tar_zu_satz.argtypes = [_H, _CS]
 _lib.k1520d_tar_zu_satz.restype = ctypes.c_bool
 _lib.k1520d_tar_satz_basis.argtypes = [_H]
@@ -2199,6 +2195,7 @@ class DiskTool:
         if not _lib.k1520d_save_as(self._h, _b(os.fspath(path))):
             raise K1520DiskError(self._fail())
         self._path = os.fspath(path)
+        self._satz_pfade = None       # eine tar-Diskette heisst jetzt so (einziges Abbild)
 
     def export_image(self, path) -> None:
         """Kopie in einen anderen Container schreiben, **ohne** umzubinden.
@@ -2219,37 +2216,24 @@ class DiskTool:
         """Schreibschutz unaufhebbar (``.cqm``, tar-Diskette, nur gemessene Geometrie)?"""
         return bool(_lib.k1520d_read_only_forced(self._h))
 
-    @property
-    def tar_leer(self) -> bool:
-        """Die LEERE tar-Diskette (``tar720_leer``): ganz Null, nimmt genau ein ``.tar`` auf."""
-        return bool(_lib.k1520d_tar_leer(self._h))
-
     def tar_export(self, ziel) -> None:
         """Den tar-Strom der Diskette als ``.tar`` schreiben (``K1520DiskError`` mit dem Grund)."""
         if not _lib.k1520d_tar_export(self._h, _b(str(ziel))):
             raise K1520DiskError(self._fail())
 
-    def tar_put_pruefen(self, quelle) -> str:
-        """``.tar`` für :meth:`tar_put` beurteilen.  Rückgabe: Warnung (``""`` = keine);
-        ``K1520DiskError`` mit dem Grund, wenn abgelehnt."""
-        r = _lib.k1520d_tar_put_pruefen(self._h, _b(str(quelle)))
-        if r < 0:
-            raise K1520DiskError(self._fail())
-        return _s(_lib.k1520d_tar_warning(self._h)) if r else ""
-
-    def tar_put(self, quelle) -> str:
-        """``.tar`` auf die leere tar-Diskette schreiben und das Abbild zurückschreiben.
-        Rückgabe: Warnung (``""`` = keine); ``K1520DiskError`` mit dem Grund bei Ablehnung."""
-        if not _lib.k1520d_tar_put(self._h, _b(str(quelle))):
-            raise K1520DiskError(self._fail())
-        return _s(_lib.k1520d_tar_warning(self._h))
-
     # ── tar-Satz bearbeiten, .tar ablegen (Entwurf 37) ──────────────────────
 
     @property
     def tar_satz(self) -> bool:
-        """Satzmodus: ein tar-Strom im Speicher über N gleichformatige Abbilder?"""
+        """Satzmodus: ein tar-Strom im Speicher über N ≥ 1 gleichformatige Abbilder?  Jede
+        schreibbare tar-Diskette aus einer Datei ist ein Satz (mit einem Abbild)."""
         return bool(_lib.k1520d_tar_satz(self._h))
+
+    @property
+    def tar_satz_einzel(self) -> bool:
+        """Satzmodus UND die Datei ist das einzige Abbild: Speichern geht in dieselbe Datei,
+        solange der Inhalt auf ein Abbild passt."""
+        return bool(_lib.k1520d_tar_satz_einzel(self._h))
 
     def tar_zu_satz(self, basisname=None) -> None:
         """Eine tar-Einzeldiskette in den Satzmodus überführen (``K1520DiskError`` mit dem Grund)."""
@@ -2305,8 +2289,11 @@ class DiskTool:
         """Die Abbilddateien des Satzes in Stromreihenfolge, soweit sie ZUM jetzigen Strom
         passen: ``[]``, wenn das Volume kein Satz ist, der Satz nie gespeichert/geoeffnet wurde
         oder seither geaendert (``dirty``) wurde — dann stuende in den Dateien ein anderer Strom."""
-        if not self.tar_satz or self._satz_pfade is None or self.dirty:
+        if not self.tar_satz or self.dirty:
             return []
+        if self._satz_pfade is None:
+            # Eine geoeffnete tar-Diskette: ihr einziges Abbild ist die Datei selbst.
+            return [self._path] if self.tar_satz_einzel and self._path else []
         return list(self._satz_pfade)
 
     @property
@@ -2450,8 +2437,8 @@ class PlatteTool:
     unambiguous = True
     alternatives: List[str] = []
     remarks = ""
-    tar_leer = False
     tar_satz = False
+    tar_satz_einzel = False
     tar_satz_basis = ""
     physisch_schreiben_grund = ""
     medium_cylinders = 0

@@ -76,7 +76,6 @@ PLATTE_GESPERRT = {
     "gerade_spuren": "Eine Platte hat keine Spuren.",
     "seite1_weg": "Eine Platte hat keine Diskettenseiten.",
     "tar_export": "Das ist keine tar-Diskette.",
-    "tar_schreiben": "Das ist keine tar-Diskette.",
     "neu_beschreiben": "Das ist keine physische Diskette.",
 }
 
@@ -90,7 +89,7 @@ def dateisystem_anzeige(tool) -> str:
     if ist_platte(tool):
         return "WEGA (P8000-Platte)"
     if tool.ist_tar:
-        if tool.tar_satz:
+        if tool.tar_satz and not tool.tar_satz_einzel:
             return "tar-Satz (UNIX)"
-        return "tar-Diskette, leer" if tool.tar_leer else "tar-Archiv (UNIX)"
+        return "tar-Archiv (UNIX)"
     return tool.filesystem

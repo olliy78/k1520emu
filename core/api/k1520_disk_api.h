@@ -277,23 +277,15 @@ K1520_API const char* k1520d_detected_fs(K1520Disk h);
  */
 K1520_API const char* k1520d_container_info(K1520Disk h, const char* key);
 
-/* ─── tar-Disketten: Export, leere Diskette, Schreiben (additiv) ──────────────
- * Regeln: DiskVolume::tarExport / tarPruefen / tarSchreiben (core/filesystem/disk_volume.h). */
+/* ─── tar-Disketten: Export (additiv) ─────────────────────────────────────────
+ * Regeln: DiskVolume::tarExport (core/filesystem/disk_volume.h).  Eine `.tar` kommt ueber
+ * @ref k1520d_tar_datei_ablegen in eine tar-Diskette (als Datei oder als Container). */
 
-/// @brief Ist das die LEERE tar-Diskette (`tar720_leer`, ganz Null, beschreibbar mit einem .tar)?
-K1520_API bool k1520d_tar_leer(K1520Disk h);
 /// @brief Den tar-Strom als `.tar` nach @p path schreiben (Bloecke 1:1, bis hinter die Endmarke
 ///        bzw. der ganze Strom).  Nur an tar-Disketten und roh geoeffneten; aendert nichts.
 K1520_API bool k1520d_tar_export(K1520Disk h, const char* path);
-/// @brief `.tar`-Datei fuer @ref k1520d_tar_put beurteilen, ohne etwas zu schreiben.
-/// @return -1 abgelehnt (@ref k1520d_last_error); 0 in Ordnung; 1 in Ordnung, aber mit
-///         Warnung (kein reines V7-tar), Text in @ref k1520d_tar_warning.
-K1520_API int k1520d_tar_put_pruefen(K1520Disk h, const char* path);
-/// @brief Warnung der letzten Pruefung bzw. des letzten @ref k1520d_tar_put; "" = keine.
+/// @brief Warnung (kein reines V7-tar) des letzten @ref k1520d_tar_datei_ablegen; "" = keine.
 K1520_API const char* k1520d_tar_warning(K1520Disk h);
-/// @brief `.tar` auf die leere tar-Diskette schreiben und das Abbild zurueckschreiben.  Danach ist
-///        die Diskette `tar720` (nur lesbar); ein zweites Schreiben wird abgelehnt.
-K1520_API bool k1520d_tar_put(K1520Disk h, const char* path);
 
 /* ─── tar-Saetze bearbeiten, Neu-Anlegen, .tar ablegen (Entwurf 37, AP T1-T3; additiv) ───
  * Regeln: DiskVolume::tarSatz*, tarFormate, tarDisketteNeu, tarDateiBeurteilen/-Ablegen
@@ -318,9 +310,14 @@ K1520_API K1520Disk k1520d_tar_satz_neu(const char* format, const char* basename
 /// @brief Neue LEERE tar-Diskette im Format @p format als Datei @p path anlegen (sofort geschrieben,
 ///        genau dieser Name) und im Satzmodus mit einem Abbild oeffnen.
 K1520_API K1520Disk k1520d_tar_disk_neu(const char* path, const char* format);
-/// @brief Ist das Volume im Satzmodus?
+/// @brief Ist das Volume im Satzmodus?  Jede schreibbare tar-Diskette aus einer Datei ist es
+///        (ein Satz mit EINEM Abbild, Entwurf 37 "Vereinheitlichung").
 K1520_API bool k1520d_tar_satz(K1520Disk h);
-/// @brief Eine tar-Einzeldiskette in den Satzmodus ueberfuehren (@p basename "" = aus dem Pfad).
+/// @brief Satzmodus UND die Datei ist das einzige Abbild des Stroms (Speichern geht in dieselbe Datei,
+///        solange der Inhalt auf ein Abbild passt)?
+K1520_API bool k1520d_tar_satz_einzel(K1520Disk h);
+/// @brief Eine tar-Diskette in den Satzmodus ueberfuehren (@p basename "" = aus dem Pfad); bei einer aus
+///        einer Datei geoeffneten schreibbaren tar-Diskette schon geschehen (dann true ohne Wirkung).
 K1520_API bool k1520d_tar_zu_satz(K1520Disk h, const char* basename);
 /// @brief Der beim Speichern vorgesehene Basisname des Satzes ("" = keiner).
 K1520_API const char* k1520d_tar_satz_basis(K1520Disk h);

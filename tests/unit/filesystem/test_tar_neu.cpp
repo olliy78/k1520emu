@@ -334,7 +334,7 @@ TEST(TarNeu, ContainerUeberDisketteGroesseWirdEinSatz) {
     EXPECT_EQ(inhalt(*w, "d2"), muster(300000, 22));
 }
 
-TEST(TarNeu, ContainerPasstAufEinzelDisketteGehtWieTarPut) {
+TEST(TarNeu, ContainerPasstAufEinzelDisketteGehtInDasselbeAbbild) {
     if (!hatTar()) GTEST_SKIP() << "kein tar im System";
     Ordner o("tarneu_put");
     quelle(o, "k", muster(5000, 30));
@@ -348,7 +348,9 @@ TEST(TarNeu, ContainerPasstAufEinzelDisketteGehtWieTarPut) {
         ASSERT_TRUE(u.als_container) << u.container_grund;
         EXPECT_FALSE(u.wird_satz);
         ASSERT_TRUE(v->tarDateiAblegen(o / "k.tar", TarDateiWeg::AlsContainer)) << v->lastError();
-        EXPECT_FALSE(v->tarSatz());
+        EXPECT_TRUE(v->tarSatzEinzel());            // eine tar-Diskette ist ein Satz mit einem Abbild
+        ASSERT_TRUE(v->flush()) << v->lastError();  // und geht in dasselbe Abbild zurueck
+        EXPECT_FALSE(v->readOnly());
     }
     std::string e2;
     auto w = DiskVolume::open(einzel, "", formate(), dateisysteme(), e2, true);
@@ -397,4 +399,144 @@ TEST(TarNeu, SchreibschutzUndKeinTarVolumeSindKlareAbsagen) {
     EXPECT_FALSE(w->tarDateiAblegen(o / "k.tar", TarDateiWeg::AlsDatei));
     // Ein Satz laesst sich nicht direkt auf eine physische Diskette schreiben.
     EXPECT_FALSE(w->physischSchreibenGrund().empty());
+}
+
+// ── Vereinheitlichung: eine tar-Diskette ist immer ein Satz mit N >= 1 Abbildern ────────────
+
+/// @test Auf einer LEEREN Einzeldiskette bieten sich BEIDE Wege an; jeder fuehrt zum erwarteten Archiv.
+TEST(TarNeu, LeereEinzelDisketteBietetBeideWegeUndJederFuehrtZumArchiv) {
+    if (!hatTar()) GTEST_SKIP() << "kein tar im System";
+    Ordner o("tarneu_einzel_beide");
+    quelle(o, "x.bin", muster(3000, 60));
+    ASSERT_TRUE(systemTar(o, o / "paket.tar", {"x.bin"}));
+    std::string err;
+    for (const bool als_container : {false, true}) {
+        SCOPED_TRACE(als_container ? "Container" : "Datei");
+        const std::string pfad = o / (als_container ? "c.hfe" : "d.hfe");
+        {
+            auto v = DiskVolume::create(pfad, "tar720_leer", "", formate(), dateisysteme(), err);
+            ASSERT_TRUE(v) << err;
+            const TarDateiUrteil u = v->tarDateiBeurteilen(o / "paket.tar");
+            ASSERT_TRUE(u.ok) << u.fehler;
+            EXPECT_TRUE(u.ziel_leer);
+            EXPECT_TRUE(u.als_datei);
+            EXPECT_TRUE(u.als_container) << u.container_grund;
+            EXPECT_FALSE(u.wird_satz);
+            ASSERT_TRUE(v->tarDateiAblegen(o / "paket.tar",
+                        als_container ? TarDateiWeg::AlsContainer : TarDateiWeg::AlsDatei)) << v->lastError();
+            ASSERT_TRUE(v->flush()) << v->lastError();
+        }
+        auto w = DiskVolume::open(pfad, "", formate(), dateisysteme(), err, true, true);
+        ASSERT_TRUE(w) << err;
+        EXPECT_EQ(namen(*w), als_container ? std::vector<std::string>{"x.bin"}
+                                           : std::vector<std::string>{"paket.tar"});
+        EXPECT_EQ(w->containerName(), "hfe");
+    }
+}
+
+/// @test Eine geoeffnete tar-Diskette ist ein Satz mit EINEM Abbild: Aenderungen gehen beim Speichern in
+///       DASSELBE Abbild (Container bleibt), `<name>~` genau einmal je Sitzung; dirty folgt dem Strom.
+TEST(TarNeu, GeoeffneteTarDisketteSchreibtInsSelbeAbbildZurueck) {
+    Ordner o("tarneu_inplace");
+    std::string err;
+    const std::string pfad = o / "ariane1.cqm";
+    {
+        auto v = DiskVolume::create(pfad, "tar720_leer", "", formate(), dateisysteme(), err);
+        ASSERT_TRUE(v) << err;
+        ASSERT_TRUE(einfuegen(*v, quelle(o, "a", muster(2000, 61)), "a")) << v->lastError();
+        ASSERT_TRUE(v->flush()) << v->lastError();
+    }
+    auto v = DiskVolume::open(pfad, "", formate(), dateisysteme(), err, false, true);
+    ASSERT_TRUE(v) << err;
+    EXPECT_TRUE(v->tarSatz());
+    EXPECT_TRUE(v->tarSatzEinzel());
+    EXPECT_FALSE(v->readOnly());
+    EXPECT_FALSE(v->dirty());
+    ASSERT_TRUE(einfuegen(*v, quelle(o, "b", muster(3000, 62)), "b")) << v->lastError();
+    EXPECT_TRUE(v->dirty());
+    const TarSatzPlan plan = v->tarSatzPlanen();
+    ASSERT_TRUE(plan.ok) << plan.fehler;
+    ASSERT_EQ(plan.namen.size(), 1u);
+    EXPECT_EQ(plan.namen[0], pfad) << "ohne Nummer, solange der Inhalt auf EIN Abbild passt";
+    ASSERT_TRUE(v->flush()) << v->lastError();
+    EXPECT_FALSE(v->dirty());
+    EXPECT_TRUE(fs::exists(pfad + "~")) << "die erste Aenderung sichert das Fremdabbild";
+    const auto sicherung = leseDatei(pfad + "~");
+    ASSERT_TRUE(einfuegen(*v, quelle(o, "c", muster(100, 63)), "c")) << v->lastError();
+    ASSERT_TRUE(v->flush()) << v->lastError();
+    EXPECT_EQ(leseDatei(pfad + "~"), sicherung) << "die Sicherung entsteht nur einmal je Sitzung";
+    v.reset();
+    auto w = DiskVolume::open(pfad, "", formate(), dateisysteme(), err, true, true);
+    ASSERT_TRUE(w) << err;
+    EXPECT_EQ(w->containerName(), "cqm");
+    EXPECT_EQ(namen(*w), (std::vector<std::string>{"a", "b", "c"}));
+    EXPECT_EQ(inhalt(*w, "b"), muster(3000, 62));
+}
+
+/// @test Wuchs der Inhalt ueber ein Abbild, wird beim Speichern nummeriert (Ziffern am Namensende
+///       entfallen); danach ist es ein echter Satz.  Folgeteile bleiben unveraendert nur lesbar.
+TEST(TarNeu, GeoeffneteTarDisketteWaechstZumSatz) {
+    Ordner o("tarneu_waechst_offen");
+    std::string err;
+    const std::string pfad = o / "ariane1.img";
+    {
+        auto v = DiskVolume::create(pfad, "tar720_leer", "", formate(), dateisysteme(), err);
+        ASSERT_TRUE(v) << err;
+        ASSERT_TRUE(v->flush());
+    }
+    auto v = DiskVolume::open(pfad, "", formate(), dateisysteme(), err, false, true);
+    ASSERT_TRUE(v) << err;
+    ASSERT_TRUE(einfuegen(*v, quelle(o, "gross", muster(900000, 64)), "gross")) << v->lastError();
+    const TarSatzPlan plan = v->tarSatzPlanen();
+    ASSERT_TRUE(plan.ok) << plan.fehler;
+    EXPECT_EQ(plan.abbilder, 2);
+    EXPECT_EQ(plan.namen, (std::vector<std::string>{o / "ariane1.img", o / "ariane2.img"}));
+    EXPECT_FALSE(v->flush());
+    ASSERT_TRUE(v->tarSatzSpeichern()) << v->lastError();
+    EXPECT_FALSE(v->tarSatzEinzel());
+    auto w = oeffneSatz({o / "ariane1.img", o / "ariane2.img"});
+    ASSERT_TRUE(w);
+    EXPECT_EQ(inhalt(*w, "gross"), muster(900000, 64));
+
+    // Ein Folgeteil (Teil 2 allein) ist KEIN Satz mit einem Abbild: lesbar, nicht bearbeitbar.
+    auto teil2 = DiskVolume::open(o / "ariane2.img", "", formate(), dateisysteme(), err, false, true);
+    ASSERT_TRUE(teil2) << err;
+    EXPECT_FALSE(teil2->tarSatz());
+    EXPECT_TRUE(!teil2->hasFileSystem() || teil2->readOnlyForced());
+}
+
+/// @test Eine tar-Diskette lebt als Strom im Speicher: Sektoreingriffe am Medium werden abgelehnt (sie
+///       gingen beim Speichern verloren); Export des Abbilds / Speichern unter gehen nur im gespeicherten
+///       Zustand und binden die Diskette an den neuen Namen.
+TEST(TarNeu, TarDisketteSektorenSperreUndSpeichernUnter) {
+    Ordner o("tarneu_sektor");
+    std::string err;
+    const std::string pfad = o / "s.img";
+    {
+        auto v = DiskVolume::create(pfad, "tar720_leer", "", formate(), dateisysteme(), err);
+        ASSERT_TRUE(v) << err;
+        ASSERT_TRUE(einfuegen(*v, quelle(o, "a", muster(2000, 70)), "a")) << v->lastError();
+        ASSERT_TRUE(v->flush()) << v->lastError();
+    }
+    auto v = DiskVolume::open(pfad, "", formate(), dateisysteme(), err, false, true);
+    ASSERT_TRUE(v) << err;
+    EXPECT_FALSE(v->writeSectorAt(0, 0, 0, std::vector<uint8_t>(512, 1), nullptr));
+    EXPECT_NE(v->lastError().find("Strom im Speicher"), std::string::npos) << v->lastError();
+
+    ASSERT_TRUE(einfuegen(*v, quelle(o, "b", muster(100, 71)), "b")) << v->lastError();
+    EXPECT_FALSE(v->saveAs(o / "u.hfe")) << "mit ungespeicherten Aenderungen: erst speichern";
+    EXPECT_FALSE(v->exportImage(o / "u.hfe"));
+    ASSERT_TRUE(v->flush()) << v->lastError();
+    ASSERT_TRUE(v->exportImage(o / "x.hfe")) << v->lastError();      // gespeichert: geht, ohne umzubinden
+    EXPECT_EQ(v->path(), pfad);
+    ASSERT_TRUE(v->saveAs(o / "u.hfe")) << v->lastError();           // und bindet an den neuen Namen
+    EXPECT_EQ(v->path(), o / "u.hfe");
+    ASSERT_TRUE(einfuegen(*v, quelle(o, "c", muster(100, 72)), "c")) << v->lastError();
+    ASSERT_TRUE(v->flush()) << v->lastError();                        // schreibt in u.hfe, nicht in s.img
+    auto w = DiskVolume::open(o / "u.hfe", "", formate(), dateisysteme(), err, true, true);
+    ASSERT_TRUE(w) << err;
+    EXPECT_EQ(namen(*w), (std::vector<std::string>{"a", "b", "c"}));
+    auto alt = DiskVolume::open(pfad, "", formate(), dateisysteme(), err, true, true);
+    ASSERT_TRUE(alt) << err;
+    EXPECT_EQ(namen(*alt), (std::vector<std::string>{"a", "b"}));
 }

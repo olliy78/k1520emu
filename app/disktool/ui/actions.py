@@ -87,14 +87,12 @@ _SPEC: List[Tuple] = [
      "Den ganzen Disketteninhalt in einen Ordner holen", "_alles_extrahieren", False),
     ("alles_rein", "Alles ei&nfügen…", "in-all", None,
      "Einen ganzen Ordner auf die Diskette schreiben", "_alles_einfuegen", False),
-    # tar-Disketten: das Archiv als Ganzes herausholen bzw. hineinschreiben.  Bewusst OHNE
-    # Tastenkuerzel (die Kuerzeltabelle des Handbuchs ist ein Vertrag).
+    # tar-Disketten: das Archiv als Ganzes herausholen.  Hineinlegen geht ueber den normalen
+    # Einfuegen-Weg (Entwurf 37, Vereinheitlichung).  Bewusst OHNE Tastenkuerzel (die
+    # Kuerzeltabelle des Handbuchs ist ein Vertrag).
     ("tar_export", "Diskette als .tar e&xportieren…", None, None,
      "Den tar-Strom dieser Diskette (Blöcke 1:1) als .tar-Datei herausschreiben — die Teile "
      "eines Satzes setzt man mit „cat“ zusammen", "_tar_export_dialog", False),
-    ("tar_schreiben", "tar-Datei auf Diskette sch&reiben…", None, None,
-     "Eine .tar-Datei (höchstens 720 KiB) auf die LEERE tar-Diskette schreiben — "
-     "einmalig; danach ist die Diskette nur lesbar", "_tar_schreiben_dialog", False),
     # Die echte Diskette: laden und ueberschreiben stehen NEBENEINANDER — es sind
     # die beiden Richtungen desselben Wegs, und der Bediener sucht sie zusammen.
     ("physisch", "&Physische Diskette laden…", "disk-physical", "Ctrl+Shift+O",
@@ -219,7 +217,6 @@ KURZ = {'oeffnen': 'Öffnen',
     'alles_raus': 'Alles holen',
     'alles_rein': 'Alles einfügen',
     'tar_export': 'tar-Export',
-    'tar_schreiben': 'tar schreiben',
     'gerade_spuren': 'Ungerade weg',
     'seite1_weg': 'Seite 1 weg',
     'bootabbild': 'Bootabbild',

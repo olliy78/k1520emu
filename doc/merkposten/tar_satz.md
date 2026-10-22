@@ -21,14 +21,15 @@ Tickets #10 (tar-Satz) und #11 (Platte), Zweig `tar_satz_platte`.  Kern: `core/f
    ein Umbau würde die Fortsetzung zerstören.  Wächter `TarWrite.UnabgeschlosseneArchiveBleibenLesbar`,
    `TarSatz.OffenerSatzIstGeschuetztUndNurMitFolgeteilenBearbeitbar`,
    `test_a_follow_up_part_stays_readonly_with_the_reason`.
-3. **Der Satz ist EIN Strom im Speicher**, geschrieben wird nur beim Speichern; `flush()` ist im
-   Satzmodus leer, `dirty()` folgt der Strom-Revision.  Verteilt wird auf Abbilder GLEICHEN Formats
+3. **Der Satz ist EIN Strom im Speicher**, geschrieben wird nur beim Speichern; `flush()` ist bei einem
+   echten Satz (mehrere Abbilder) leer, bei einer tar-Diskette (Nr. 16) schreibt es ins eigene Abbild;
+   `dirty()` folgt der Strom-Revision.  Verteilt wird auf Abbilder GLEICHEN Formats
    (nur einheitliche Katalogformate), das letzte mit Nullen aufgefüllt.  Wächter
    `TarSatz.VerteiltAufNAbbilderMitNummerVorDerEndung`, `LetztesAbbildMitNullenAufgefuellt`,
    `GemischtesFormatIstKeinSatzformat`, `GegenprobeSystemTarUeberDieAbbildDatenbereiche`.
 4. **Nummer VOR der Endung** (`name1.hfe`, `name2.hfe`; die Endung bestimmt den Container
-   img/hfe/dmk/cqm).  Ein mit `tarDisketteNeu` angelegtes EINZELabbild behält seinen Namen ohne
-   Nummer, solange es auf ein Abbild passt.  Wächter `TarSatz.BasisnameOhneZiffernUndMitZiffern`,
+   img/hfe/dmk/cqm).  Eine tar-Diskette (Nr. 16) behält ihren Namen ohne Nummer, solange der Inhalt auf ein
+   Abbild passt; beim Nummerieren entfallen abschließende Ziffern des Namens.  Wächter `TarSatz.BasisnameOhneZiffernUndMitZiffern`,
    `TarNeu.WaechstDerInhaltUeberEineDisketteWirdBeimSpeichernEinSatz`.
 5. **Nie stillschweigend löschen**: werden es weniger Abbilder, bleiben die höheren Nummern liegen
    und kommen als Hinweis (Plan-Dialog nennt sie vorab).  Geschrieben wird alles-oder-nichts
@@ -45,10 +46,13 @@ Tickets #10 (tar-Satz) und #11 (Platte), Zweig `tar_satz_platte`.  Kern: `core/f
    wird ein Satz.  Wächter `TarNeu.TarAufLeereDisketteBietetBeideWegeAufNichtLeereNurDatei`,
    `ContainerWirdDasArchivEinesSatzes`, `ContainerUeberDisketteGroesseWirdEinSatz`,
    `test_tar_on_an_empty_archive_*`, `test_tar_on_a_nonempty_archive_is_always_a_file_without_a_popup`.
-8. **Altregel `tar720_leer` bleibt**: die LEERE Einzeldiskette nimmt genau EINE `.tar` als Archiv
-   (`tar-put`/„tar-Datei auf Diskette schreiben…“, ohne Popup), danach ist sie ein normales
-   abgeschlossenes Archiv.  Wächter `test_empty_single_disk_keeps_the_one_tar_rule`,
-   `py_disktool_tar_schreiben`, `TarWrite.TarPutBleibtEinmalwurfUndDanachBearbeitbar`.
+8. **Die Altregel „`tar720_leer` nimmt genau EINE `.tar`“ ist ENTFALLEN** (2026-10-22, Vereinheitlichung, Nr. 16):
+   `tarLeer/tarPruefen/tarSchreiben`, `k1520d_tar_put*`, `DiskTool.tar_leer/tar_put*`, `act_tar_schreiben`
+   gibt es nicht mehr.  Die leere Diskette ist ein leeres Archiv: eine einzelne `.tar` darauf fragt wie in Nr. 7
+   (Datei/Container), danach ist sie NICHT schreibgeschützt.  `tar-put` bleibt als CLI-Hülle (Container auf LEERES
+   Archiv + Speichern).  Wächter `TarLeer.ContainerRundlaufUndNurAufLeeremArchiv`, `TarLeer.NurInEinLeeresTarArchiv`,
+   `TarWrite.ContainerAufLeereDisketteDanachBearbeitbar`, `dt_tar_put_nur_auf_leerem_archiv.cli`,
+   `test_tar_on_an_empty_single_disk_offers_both_ways`.
 9. **`.img`-Geometrie wird beim Öffnen eines Satzes GERATEN** (die Dateigröße ist bei kleinen
    Formaten mehrdeutig); wer es weiß, übergibt das Format: `openTarSatz(…, format)` /
    `DiskTool.open_tar_satz_format`.  Neu angelegt wird immer mit gewähltem Format
@@ -71,6 +75,18 @@ Tickets #10 (tar-Satz) und #11 (Platte), Zweig `tar_satz_platte`.  Kern: `core/f
     nichts ausserhalb des Ordners), schreibt erst nach der Prüfung ALLER Abbilder, überschreibt nur mit
     `--force`.  `ohne_abbild=True` ohne `satz_abbilder` bleibt das Sammlungsarchiv (nur Dateien).
     Wächter `py_disktool_archiv_tar_satz`.
+16. **Vereinheitlichung (2026-10-22): eine tar-Diskette IST ein Satz mit N >= 1 Abbildern.**  Jede aus einer Datei
+    geöffnete oder angelegte *schreibbare* tar-Diskette (auch `tar720_leer`) arbeitet im Satzmodus
+    (`DiskVolume::einzelSatzMachen`, `tarSatzEinzel()`): Strom im Speicher, `flush()`/Strg+S schreibt ihn in
+    DASSELBE Abbild zurück (`satzInsAbbild`: Container/Format/CQM-Kopffelder bleiben, `<abbild>~` einmal je Sitzung,
+    nicht bei ganz leerem Archiv), solange er auf EIN Abbild passt; sonst meldet `flush()` den Weg und
+    `tarSatzSpeichern()` nummeriert (danach echter Satz, `tarSatzEinzel()` false).  Folgeteil/abgeschnitten/ohne
+    Endmarke werden NICHT umgestellt (lesbar + Hinweis).  Es gibt keine Platzgrenze beim Einfügen mehr.
+    Das Profil `tar720_leer` bleibt (Erkennung ganz Null, sonst „CP/A Füllbyte 0x00“).  `tar-export` einer tar-Diskette
+    liefert den Strom einschließlich ungespeicherter Änderungen; einzelne Folgeteile lassen sich nicht mehr roh auf
+    leere Disketten schreiben — Weg ist der Container-Satz.  Greaseweazle: erlaubt, wenn gespeichert und EIN Abbild.
+    Wächter `TarNeu.GeoeffneteTarDisketteSchreibtInsSelbeAbbildZurueck`, `…WaechstZumSatz`, `TarSatz.Einzeldiskette…`,
+    `TarWrite.ZuGrossFuerEinAbbild…`, `py_disktool_tar_satz_gui` (`…_without_a_question`, `…_overflow_…`).
 
 **Platte (#11)**
 

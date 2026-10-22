@@ -17,6 +17,8 @@ Vorlagen: `doc/design/35_cqm.md` §4a (tar lesen/exportieren), `doc/design/27_we
 
 ## 1. Festlegungen (Entscheidungen, nicht neu aufrollen)
 
+> **Überholt in einem Punkt (2026-10-22, §6 „Vereinheitlichung“):** es gibt keine „Einzeldiskette“ neben dem Satz mehr; Nr. 3 (Einzeldiskette→Satz mit Rückfrage), Nr. 5 und die Altregel „`tar720_leer` nimmt genau EINE `.tar`“ gelten in der Fassung von §6.
+
 ### tar (#10)
 1. **Ein editierbares Archivmodell im Speicher** (`TarArchiv`: Liste Kopf+Daten).  Jede Änderung
    (Hinzufügen, Löschen, Ersetzen, Attribute) baut den Strom neu: V7-Köpfe, Daten auf 512 aufgefüllt,
@@ -107,3 +109,57 @@ der `.fileinfo`-Umbau in P1 nützt dem tar-Weg T1).
 ## 5. Gesamtstand
 
 Alle Arbeitspakete umgesetzt (Platte P1-P3, tar T1-T5). Offen: Abnahme je AP durch den Anwender, Volllauf `tools/dev.sh test` auf dem Zweigstand, Ticket-Kommentare #10/#11. Bekannte Grenzen: `openTarSatz` raet die Geometrie eines `.img` (Format ueber `open_tar_satz_format` vorgeben); Export aus einem geoeffneten Satz als `.tar` bleibt bewusst offen (`cqm.md` Nr. 13 (6)); das Archiv eines Satzes setzt gespeicherte Abbilder voraus.
+
+## 6. Vereinheitlichung: eine tar-Diskette ist immer ein Satz (Anwenderentscheidung 2026-10-22)
+
+**Entscheidung (nicht neu aufrollen):** Es gibt keinen Sonderweg „Einzeldiskette“. Eine tar-Diskette ist
+fachlich IMMER ein Satz mit N >= 1 Abbildern desselben Formats. Entfallen sind: die Unterscheidung
+Einzeldiskette (Strom direkt aus den Sektoren, nicht wachsend) vs. Satz (wachsender Speicherstrom), die Altregel
+„`tar720_leer` nimmt genau EINE `.tar`“, `DiskVolume::tarLeer/tarPruefen/tarSchreiben`, die C-ABI
+`k1520d_tar_leer/_put/_put_pruefen`, `DiskTool.tar_leer/tar_put/tar_put_pruefen`, die GUI-Aktion
+`act_tar_schreiben` („tar-Datei auf Diskette schreiben…“) samt `_tar_leer_einfuegen`, die Rückfrage
+`_frage_zu_satz` und die harte Platzgrenze beim Einfügen („fasst nur …“).
+
+Umsetzung:
+- **Öffnen/Anlegen:** `DiskVolume::oeffnenMit` (Datei, nicht physisch) und `create(…, tar720_leer)` rufen
+  `einzelSatzMachen()`: der Strom lebt im Speicher (`tarZuSatz`), `satz_einzel_` (die Datei ist das einzige Abbild;
+  `tarSatzEinzel()`), `satz_einzelname_` (Name ohne Nummer solange der Inhalt auf EIN Abbild passt). Der Schreibschutz
+  folgt wie bei allen Datenträgern dem Aufrufer (Vorgabe beim Öffnen: an). Folgeteil, abgeschnittenes und
+  Archiv ohne Endmarke werden NICHT umgestellt (lesbar + Hinweis, unaufhebbar gesperrt — T1-Regel).
+- **Speichern:** `flush()` einer tar-Diskette = `tarSatzSpeichern()` bei EINEM Abbild: Rückschreiben in DASSELBE Abbild
+  (`satzInsAbbild`; Container, Format und CopyQM-Kopffelder bleiben, `<abbild>~` einmal je Sitzung, nicht bei einem
+  ganz leeren Archiv). Passt der Strom nicht mehr, scheitert `flush()` mit dem Weg („… nummerierten Abbildern speichern“),
+  `tarSatzSpeichern()` nummeriert (Ziffern am Ende des Namens entfallen: `ariane1.cqm` → `ariane1/2.cqm`) und das Volume
+  ist danach ein echter Satz (`tarSatzEinzel()` false). Ein echter Satz (aus mehreren Abbildern geöffnet): `flush()` bleibt leer.
+- **`.tar` ablegen** (`tarDateiBeurteilen/-Ablegen`): Popup „Als Datei im Container / Ist ein fertiger tar-Container“ für
+  JEDE `.tar` auf einem LEEREN Archiv (auch `tar720_leer`, neu angelegte Diskette, leer geräumtes Archiv); auf Archiv mit
+  Inhalt immer als Datei; Container über Diskettengröße → Satz (`wird_satz`); Folgeteil/kein Kopf/kein 512-Vielfaches ist
+  kein Container. Danach NICHT schreibgeschützt.
+- **Export** (`tar-export`): an einer tar-Diskette der Strom einschließlich nicht gespeicherter Änderungen; leeres Archiv →
+  „leer“; echter Satz aus mehreren Abbildern weiter abgelehnt (Teile einzeln exportieren).
+- **GUI:** Strg+S speichert eine tar-Diskette ohne Rückfrage ins eigene Abbild (`_einzel_direkt`), der Plan-Dialog erscheint
+  nur bei mehreren Abbildern/„Speichern unter…“; Wachstum über ein Abbild steht im Protokoll. Der Kopf zeigt „tar-Archiv (UNIX)“
+  (auch leer); „tar-Satz (UNIX)“ nur bei einem echten Satz. Greaseweazle: erlaubt, solange gespeichert und ein Abbild
+  (`physischSchreibenGrund`). Der Diskeditor arbeitet am Medium und ist an einer tar-Diskette wie an jedem Satz nicht
+  mit dem Strom verbunden — Änderungen dort wären nach dem Speichern weg (ungelöst, Annahme: tar-Disketten werden
+  über Dateien, nicht über Sektoren bearbeitet).
+- **Profil `tar720_leer` bleibt** (Entscheidung: das Einfachere): ohne es wäre eine leere (ganz Null) Diskette beim
+  Öffnen nicht von „CP/A, Füllbyte 0x00“ zu unterscheiden (Erkennung, `create`, `info`, `.cqm`/`.hfe`/`.dmk` alle
+  gleich); entfallen wäre nur ein Katalogeintrag, aber die Erkennung bräuchte dann einen Sonderfall im Code. Seine
+  Beschreibung sagt nur noch „leeres tar-Archiv“.
+- **CLI:** `tar-put` und `tar-export` bleiben als dünne Hüllen/Auskunft mit der neuen Semantik (`tar-put` = Container
+  auf LEERES Archiv + Speichern; auf Archiv mit Inhalt Fehler mit Verweis auf `put`; zu groß → Hinweis auf
+  `tar-satz-neu --tar-container`). `tools/k1520disktool.md` nachgezogen.
+- **Folge:** einzelne Teile eines Mehrdisketten-Archivs lassen sich nicht mehr roh auf leere Disketten schreiben (ein
+  Folgeteil hat keinen Kopf). Der Weg ist der Container-Satz (`tar-satz-neu --tar-container`); die WEGA-Systemprobe
+  (`P8000WegaDiskette`) schreibt das ganze Archiv in einen Satz statt der geteilten Stücke.
+
+Wächter (neu/umgeschrieben): `TarLeer.*` (`ContainerRundlaufUndNurAufLeeremArchiv`, `NurInEinLeeresTarArchiv`, …),
+`TarNeu.LeereEinzelDisketteBietetBeideWegeUndJederFuehrtZumArchiv`, `GeoeffneteTarDisketteSchreibtInsSelbeAbbildZurueck`,
+`GeoeffneteTarDisketteWaechstZumSatz`, `ContainerUeberDisketteGroesseWirdEinSatz`, `TarWrite.ZuGrossFuerEinAbbild…`,
+`py_disktool_tar_schreiben`, `py_disktool_tar_satz_gui` (`…_offers_both_ways`, `…_goes_into_its_image_without_a_question`),
+`dt_tar_put_*.cli`.
+
+## 7. Verlauf (Fortsetzung)
+
+- 2026-10-22: Vereinheitlichung umgesetzt (§6).

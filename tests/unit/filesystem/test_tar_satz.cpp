@@ -250,13 +250,10 @@ TEST(TarSatz, EinzeldisketteMitUeberlaufWirdBeimSpeichernZumSatz) {
     std::string e2;
     auto v = DiskVolume::open(einzel, "", formate(), dateisysteme(), e2, false, true);
     ASSERT_TRUE(v) << e2;
-    // Die Einzeldiskette hat eine harte Grenze ...
-    EXPECT_FALSE(einfuegen(*v, quelle(o, "gross", muster(800000, 9)), "gross"));
-    EXPECT_NE(v->lastError().find("fasst"), std::string::npos) << v->lastError();
-    // ... der Satzmodus nicht.
-    EXPECT_FALSE(v->tarSatz());
-    ASSERT_TRUE(v->tarZuSatz(o / "ueb.img")) << v->lastError();
+    // Eine tar-Diskette ist ein Satz mit EINEM Abbild: es gibt keine harte Grenze der Einzeldiskette mehr,
+    // der Inhalt darf ueber ein Abbild wachsen (vorher: Ablehnung "fasst nur ...").
     EXPECT_TRUE(v->tarSatz());
+    EXPECT_TRUE(v->tarSatzEinzel());
     EXPECT_EQ(v->tarSatzPlanen().abbilder, 1);
     const auto gross = muster(800000, 9);
     ASSERT_TRUE(einfuegen(*v, quelle(o, "gross", gross), "gross")) << v->lastError();
@@ -264,7 +261,13 @@ TEST(TarSatz, EinzeldisketteMitUeberlaufWirdBeimSpeichernZumSatz) {
     ASSERT_TRUE(plan.ok) << plan.fehler;
     EXPECT_EQ(plan.abbilder, 2);
     EXPECT_FALSE(plan.einzel);
-    ASSERT_TRUE(v->tarSatzSpeichern()) << v->lastError();
+    EXPECT_EQ(plan.namen[0], o / "e1.img") << "nummeriert; die Ziffern am Ende des Namens entfielen";
+    // Speichern der Einzeldiskette (flush) geht nicht in ein Abbild: Meldung mit dem Weg, nichts geschrieben.
+    EXPECT_FALSE(v->flush());
+    EXPECT_NE(v->lastError().find("nummerierten Abbildern"), std::string::npos) << v->lastError();
+    EXPECT_EQ(leseDatei(einzel), vorher);
+    ASSERT_TRUE(v->tarSatzSpeichern(o / "ueb.img")) << v->lastError();
+    EXPECT_FALSE(v->tarSatzEinzel()) << "nach dem Verteilen ist es ein echter Satz";
     EXPECT_TRUE(fs::exists(o / "ueb1.img"));
     EXPECT_TRUE(fs::exists(o / "ueb2.img"));
     EXPECT_EQ(leseDatei(einzel), vorher) << "die Datei der Einzeldiskette darf nicht angefasst werden";
@@ -374,6 +377,11 @@ TEST(TarSatz, PhysischSchreibenIstFuerSaetzeGesperrtMitBegruendung) {
     const std::string p = o / "e.img";
     auto e = DiskVolume::create(p, "tar720_leer", "", formate(), dateisysteme(), err);
     ASSERT_TRUE(e) << err;
+    EXPECT_TRUE(e->physischSchreibenGrund().empty());
+    // Mit ungespeicherten Aenderungen stimmt das Medium nicht mit dem Strom ueberein: erst speichern.
+    ASSERT_TRUE(einfuegen(*e, quelle(o, "k", muster(100, 3)), "k")) << e->lastError();
+    EXPECT_NE(e->physischSchreibenGrund().find("speichern"), std::string::npos);
+    ASSERT_TRUE(e->flush()) << e->lastError();
     EXPECT_TRUE(e->physischSchreibenGrund().empty());
     // Ein Satz ist kein einzelnes Abbild: saveAs/exportImage verweigern sich.
     EXPECT_FALSE(v->saveAs(o / "z.hfe"));

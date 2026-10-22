@@ -962,11 +962,14 @@ k1520disktool save-as alt.hfe kopie.cqm      # und zurueck: save-as kopie.cqm ne
 
 84 der 142 P8000-Abbilder (`doc/design/35_cqm.md` §4a) tragen einen rohen `tar`-Strom ab
 Sektor 0 statt eines Dateisystems. Profil `tar720` (auch in einer `.cqm`). **Schreibbar ist ein abgeschlossenes Archiv** (Kopf bei
-Sektor 0 UND Endmarke) und die leere tar-Diskette: `put`/`rm`/`mkdir`/`attr` bauen den Strom aus dem
+Sektor 0 UND Endmarke) und die leere tar-Diskette — eine tar-Diskette ist ein **Satz mit einem Abbild**
+(Entwurf 37, Vereinheitlichung): `put`/`rm`/`mkdir`/`attr` bauen den Strom aus dem
 Archivmodell (`TarArchiv`) jedes Mal NEU (V7-Köpfe, Namen ≤ 100, Verzeichnisse als Typ `5`, `.fileinfo`
 `fs=tar` wird gelesen, sonst 0644/0755, uid/gid 0, Zeit jetzt). Folgeteil, abgeschnittenes Archiv und
-Archiv ohne Endmarke bleiben nur lesbar (die Meldung nennt den Weg); passt der neue Strom nicht auf
-EINE Diskette, scheitert die Änderung (der Satzmodus folgt, Entwurf 37 T2). `create` eines belegten
+Archiv ohne Endmarke bleiben nur lesbar (die Meldung nennt den Weg). Die Änderung liegt im Speicher und
+geht mit dem Speichern (jedes Kommando, das schreibt, ruft `flush`) in **dasselbe Abbild** zurück
+(Container und Format bleiben, `<abbild>~` einmal je Sitzung); passt der neue Strom nicht mehr auf
+EINE Diskette, meldet das Speichern den Weg (`tar-satz-save … -o`, nummerierte Abbilder) und schreibt nichts. `create` eines belegten
 `tar720` bleibt unmöglich, Erkennung zuletzt, nach CP/A-Regel und allen echten
 Dateisystemen. `ls -l`, `get`, `info`, `check` wie bei WEGA (UNIX-Spalten, `.fileinfo`
 mit `fs=tar`). Befunde: `tar.abgeschnitten` (Warnung; Teilstück bleibt lesbar),
@@ -985,7 +988,7 @@ bestimmt der Aufrufer (Satznamen). Exit 1 nur bei einem Befund `Fehler`.
 ```
 k1520disktool tar-satz-neu --format k5601_ss40_16x256 satz.hfe --put datei=ziel/name --mkdir ordner
 k1520disktool tar-satz-save satz1.hfe satz2.hfe satz3.hfe --rm alt.bin --put neu.bin       # zurueck unter den eigenen Namen
-k1520disktool tar-satz-save e.img -o gross.hfe --put riesig.bin    # Einzeldiskette laeuft ueber -> Satz gross1.hfe, gross2.hfe, …
+k1520disktool tar-satz-save e.img -o gross.hfe --put riesig.bin    # tar-Diskette laeuft ueber -> Satz gross1.hfe, gross2.hfe, …
 k1520disktool tar-satz-save satz1.hfe satz2.hfe -o neu.cqm --dry-run   # nur den Plan zeigen
 ```
 Der Satz wird als Ganzes geoeffnet (ein Strom im Speicher); die Schritte `--put QUELLE[=ZIEL]` (Ordner =
@@ -1007,22 +1010,28 @@ Saetze `.hfe/.dmk/.cqm` bevorzugen.
 ```
 k1520disktool tar-export <abbild> <ziel.tar>   # Rohinhalt der Diskette als .tar
 k1520disktool create x.cqm --fs tar720_leer    # leere 720K-tar-Diskette (img|hfe|dmk|cqm)
-k1520disktool tar-put x.cqm quelle.tar         # .tar hinein (einmal), --dry-run nur pruefen
+k1520disktool tar-put x.cqm quelle.tar         # .tar wird das Archiv der LEEREN Diskette (Container), --dry-run nur beurteilen
 ```
 `tar-export`: die 512-Byte-Bloecke des Stroms 1:1. Beginnt die Diskette mit einem gueltigen
 tar-Kopf, wird die Struktur abgelaufen und der Export endet hinter der Endmarke (zwei
 Nullbloecke an einer Kopfposition); sonst — auch bei einem Folgeteil, dessen Dateidaten
 Nullbloecke enthalten koennen — der ganze Strom. Geht an tar-Disketten und an roh geoeffneten
-(kein Dateisystem erkannt), nicht an Disketten mit Dateisystem, nicht an der leeren, nicht
-an einem `tar-satz`.
+(kein Dateisystem erkannt), nicht an Disketten mit Dateisystem, nicht an einem leeren Archiv, nicht
+an einem `tar-satz` aus mehreren Abbildern (eine tar-Diskette exportiert ihren Strom einschliesslich
+nicht gespeicherter Aenderungen).
 
 `tar720_leer` ist ganz Null und wird nur dann so erkannt (VOR der CP/A-Regel, die eine
-Null-Diskette sonst als „CP/A, Fuellbyte 0x00“ liest; `--fs cpa_auto` uebersteuert). `tar-put`
-prueft vor dem Schreiben: Diskette leer und beschreibbar, Datei <= 737280 Byte und Vielfaches
-von 512 (sonst Ablehnung, bei Ueberlaenge mit Hinweis auf `split -b 737280`); ein erster Kopf
-ohne V7 (ustar-Magic, pax, GNU-Langname, 100-Zeichen-Name, binaere Groesse) ergibt eine
-**Warnung auf stderr**, geschrieben wird trotzdem. Danach ist die Diskette `tar720`
-(zunächst schreibgeschützt; bei abgeschlossenem Archiv aufhebbar), ein zweites `tar-put` scheitert. Rundlauf: siehe Handbuch („tar-Archive
+Null-Diskette sonst als „CP/A, Fuellbyte 0x00“ liest; `--fs cpa_auto` uebersteuert); das Profil bleibt,
+weil sonst eine leere tar-Diskette beim Oeffnen nicht von einer CP/A-Diskette zu unterscheiden waere
+(Erkennung ganz Null, `create`, `info`).  **Es gibt keinen Sonderweg „genau EIN .tar“ mehr:** `tar-put`
+ist eine duenne Huelle ueber `DiskVolume::tarDateiBeurteilen` + `tarDateiAblegen(AlsContainer)` + Speichern.
+Es legt die `.tar` als **Container** auf ein LEERES Archiv (ihr Inhalt wird das Archiv); auf einem Archiv
+mit Inhalt, bei einer Datei ohne tar-Kopf am Anfang (Folgeteil) und bei einer Datei, die kein Vielfaches von
+512 Byte ist, scheitert es mit Grund (als Datei kommt eine `.tar` per `put` hinein); passt der Container
+nicht auf EIN Abbild, nennt es `tar-satz-neu … --tar-container`.  Ein erster Kopf ohne V7 (ustar-Magic, pax,
+GNU-Langname, 100-Zeichen-Name, binaere Groesse) ergibt eine **Warnung auf stderr**, abgelegt wird trotzdem.
+Die Diskette ist danach **nicht** schreibgeschuetzt und bearbeitbar (`put`, `rm` …), ein zweites
+`tar-put` scheitert mit „nicht leer“. Rundlauf: siehe Handbuch („tar-Archive
 herausholen, bearbeiten und zurueckschreiben“).
 
 Passende Archive unter Linux: `tar --format=v7 -b 20 -cf wega.tar -C ordner .`, danach

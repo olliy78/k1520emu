@@ -81,7 +81,7 @@ struct QuellBefund {
 };
 
 /**
- * @brief Beurteilt eine `.tar`-Datei fuer @ref DiskVolume::tarSchreiben.
+ * @brief Beurteilt eine `.tar`-Datei fuer @ref DiskVolume::tarDateiAblegen.
  *
  * Abgelehnt wird: leer, kein Vielfaches von 512, groesser als @p kapazitaet (mit dem
  * Hinweis auf `split -b`).  Gewarnt wird vor allem, was kein V7-tar ist — der P8000-/WEGA-

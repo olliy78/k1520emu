@@ -306,7 +306,6 @@ class MainWindow(QMainWindow):
         m.addAction(self.act_alles_rein)
         m.addSeparator()
         m.addAction(self.act_tar_export)
-        m.addAction(self.act_tar_schreiben)
         m.addSeparator()
         # Eigenes Untermenue: das sind Eingriffe ins ABBILD, nicht in die Diskette —
         # der Unterschied gehoert sichtbar gemacht.
@@ -650,17 +649,15 @@ class MainWindow(QMainWindow):
         # sich „frei, aber beschrieben" bestimmen liesse.
         self.act_wiederherstellen.setEnabled(mit_fs)
         self.act_speichern.setEnabled(schreibbar)
-        # Die leere tar-Diskette ist beschreibbar, aber nur mit EINEM .tar (tar_schreiben):
-        # die Datei-Wege (Einfuegen, Loeschen, Alles einfuegen) bleiben dort zu.
-        # (Seit Entwurf 37 gilt das nur noch fuer die LEERE Einzeldiskette; ein abgeschlossenes
-        # Archiv und jeder Satz nehmen Dateien, Ordner und Loeschen an.)
-        datei_schreibbar = schreibbar and not (self.tool.ist_tar and self.tool.tar_leer)
+        # Eine tar-Diskette ist ein Satz mit N >= 1 Abbildern (Entwurf 37, Vereinheitlichung): auch
+        # die leere nimmt Dateien, Ordner und Loeschen an; eine .tar kommt ueber denselben Weg
+        # (Einfuegen/Ziehen) hinein — auf leerem Archiv mit der Rueckfrage Datei/Container.
+        datei_schreibbar = schreibbar
         self.act_alles_rein.setEnabled(datei_schreibbar and mit_fs)
-        # tar-Export: tar-Disketten (nicht die leere) und roh geoeffnete Disketten, an denen
-        # kein Dateisystem erkannt wurde (z. B. ein Folgeteil ohne einen einzigen Kopfblock).
-        self.act_tar_export.setEnabled(
-            offen and ((self.tool.ist_tar and not self.tool.tar_leer) or not mit_fs))
-        self.act_tar_schreiben.setEnabled(schreibbar and self.tool.tar_leer)
+        # tar-Export: tar-Disketten und roh geoeffnete Disketten, an denen kein Dateisystem
+        # erkannt wurde (z. B. ein Folgeteil ohne einen einzigen Kopfblock).  Ein leeres Archiv
+        # meldet der Kern („nichts zu exportieren“).
+        self.act_tar_export.setEnabled(offen and (self.tool.ist_tar or not mit_fs))
 
         self.act_holen.setEnabled(offen and disk_auswahl)
         self.act_eigenschaften.setEnabled(offen and len(
@@ -669,9 +666,7 @@ class MainWindow(QMainWindow):
         self.act_datei_im_editor.setEnabled(
             mit_fs and len(self.disk_view.selected_refs()) == 1)
         self.act_loeschen.setEnabled(datei_schreibbar and disk_auswahl)
-        # Auf der leeren tar-Diskette fuehrt derselbe Weg (|←) das EINE .tar zum Schreiben.
-        self.act_schreiben.setEnabled(
-            (datei_schreibbar or (schreibbar and self.tool.tar_leer)) and ordner_auswahl)
+        self.act_schreiben.setEnabled(datei_schreibbar and ordner_auswahl)
 
         # Die beiden Ordner-Aktionen haengen NICHT an der Diskette: sie arbeiten im
         # Wirtsystem und gelten auch dann, wenn gar keine Diskette offen ist.
@@ -718,22 +713,9 @@ class MainWindow(QMainWindow):
             self.act_schreibschutz.setEnabled(False)
         tipps = self.__dict__.setdefault("_tipps_ohne_sperre", {})
         for a in (self.act_speichern, self.act_schreiben, self.act_loeschen,
-                  self.act_alles_rein, self.act_neu_beschreiben, self.act_schreibschutz,
-                  self.act_tar_schreiben):
+                  self.act_alles_rein, self.act_neu_beschreiben, self.act_schreibschutz):
             tipps.setdefault(a, a.toolTip())
             a.setToolTip(f"{tipps[a]}\n\nGesperrt: {grund}" if grund else tipps[a])
-        # Die leere tar-Diskette: die Datei-Wege sind zu, weil dort genau EIN .tar hingehoert.
-        if offen and self.tool.tar_leer:
-            for a in (self.act_loeschen, self.act_alles_rein):
-                a.setToolTip(f"{tipps[a]}\n\nGesperrt: auf die leere tar-Diskette gehört "
-                             "genau ein .tar — „tar-Datei auf Diskette schreiben…“.")
-            self.act_schreiben.setToolTip(
-                f"{tipps[self.act_schreiben]}\n\nAuf der leeren tar-Diskette: genau EINE "
-                "ausgewählte .tar-Datei wird als Archiv geschrieben (wie „tar-Datei auf "
-                "Diskette schreiben…“); Ordner und mehrere Dateien nicht.")
-        if offen and self.tool.tar_leer and self.tool.read_only:
-            self.act_tar_schreiben.setToolTip(
-                f"{tipps[self.act_tar_schreiben]}\n\nGesperrt: erst den Schreibschutz aufheben.")
 
         # Greaseweazle: ein tar-Satz hat keine einzelne Diskette — der Kern nennt den Grund
         # samt Weg; er steht im Tooltip, damit niemand einen Schalter sucht.
@@ -747,7 +729,7 @@ class MainWindow(QMainWindow):
             self.act_physisch_schreiben.setToolTip(tipps[self.act_physisch_schreiben])
 
         # „Ordner im tar-Archiv anlegen": nur an einem schreibbaren tar-Archiv sichtbar.
-        tar_offen = offen and self.tool.ist_tar and not self.tool.tar_leer
+        tar_offen = offen and self.tool.ist_tar
         self.act_tar_ordner.setVisible(bool(tar_offen))
         self.act_tar_ordner.setEnabled(bool(tar_offen and schreibbar))
         tipps.setdefault(self.act_tar_ordner, self.act_tar_ordner.toolTip())
@@ -1038,7 +1020,7 @@ class MainWindow(QMainWindow):
             if satz and self.tool is not None:
                 return (f"tar-Satz aus {len(satz)} Abbildern: "
                         + ", ".join(Path(s).name for s in satz))
-            if self.tool is not None and self.tool.tar_satz:
+            if self.tool is not None and self.tool.tar_satz and not self.tool.tar_satz_einzel:
                 return f"tar-Satz (Basisname {self.tool.tar_satz_basis or 'noch keiner'})"
             return ""
         art = "schreibend" if self.tool is not None and not self.tool.read_only \
@@ -2045,8 +2027,6 @@ class MainWindow(QMainWindow):
             return False
         if ist_platte(self.tool):
             return self._platte_einfuegen(paths, self._platte_zielordner())
-        if self.tool.tar_leer:
-            return self._tar_leer_einfuegen(paths)
 
         pfade, uebersprungen = self._zubehoer_aussortieren(paths)
         if pfade is None:
@@ -2412,9 +2392,10 @@ class MainWindow(QMainWindow):
     # Ein tar-Satz lebt als EIN Strom im Speicher (Kern: `tar_satz`); Dateien, Ordner und
     # Eigenschaften aendern ihn sofort, geschrieben wird erst beim Speichern — verteilt auf
     # Abbilder gleichen Formats.  Jede Frage an den Anwender steht in einer eigenen, kleinen
-    # Methode (`_tar_datei_wahl`, `_satz_speichern_fragen`, `_frage_zu_satz`,
-    # `_tar_neu_wahl`), damit ein Test sie ersetzen kann: ein unerwartetes modales Fenster
-    # wuerde sonst die Testebene anhalten.
+    # Methode (`_tar_datei_wahl`, `_satz_speichern_fragen`, `_tar_neu_wahl`), damit ein Test sie
+    # ersetzen kann: ein unerwartetes modales Fenster wuerde sonst die Testebene anhalten.
+    # Eine tar-DISKETTE ist ein Satz mit EINEM Abbild (Vereinheitlichung): Strg+S schreibt sie ohne
+    # Rueckfrage in ihr Abbild zurueck, solange der Inhalt darauf passt (`_einzel_direkt`).
 
     @staticmethod
     def _ist_tar_datei(pfad) -> bool:
@@ -2458,33 +2439,29 @@ class MainWindow(QMainWindow):
         return True
 
     def _tar_mit_satzfrage(self, aktion):
-        """``aktion()`` ausfuehren; passt der Inhalt nicht auf die Einzeldiskette, anbieten,
-        sie als Satz (nummerierte Abbilder) weiterzufuehren, und es noch einmal versuchen.
+        """``aktion()`` ausfuehren und den Anwender auf einen Satz hinweisen, wenn der Inhalt dadurch
+        ueber EIN Abbild hinauswaechst.
 
-        Der Kern lehnt eine Einzeldiskette ab, deren Archiv ueber die Kapazitaet waechst
-        (Meldung „… Ein tar-Satz ueber mehrere Disketten ist hier noch nicht moeglich"); ein Satz hat keine solche Grenze.
+        Eine tar-Diskette ist ein Satz mit N >= 1 Abbildern (Entwurf 37, Vereinheitlichung): es gibt
+        keine Grenze der Einzeldiskette und darum auch keine Rueckfrage mehr; der Strom waechst im
+        Speicher, und beim Speichern zeigt der Plan-Dialog die nummerierten Abbilder.
         """
-        try:
-            return aktion()
-        except K1520DiskError as e:
-            t = self.tool
-            if not (t.ist_tar and not t.tar_satz and "ueber mehrere Disketten" in str(e)):
-                raise
-            if not self._frage_zu_satz(str(e)):
-                raise
-            t.tar_zu_satz()
-            self.log("Die Einzeldiskette wird als tar-Satz weitergeführt; gespeichert wird "
-                     f"als {t.tar_satz_basis or 'Basisname'} mit Nummer")
-            return aktion()
+        ergebnis = aktion()
+        self._satz_wachstum_melden()
+        return ergebnis
 
-    def _frage_zu_satz(self, grund: str) -> bool:
-        antwort = QMessageBox.question(
-            self, "Passt nicht auf eine Diskette",
-            "Der Inhalt passt nicht mehr auf EINE Diskette.\n\nAls tar-Satz mit nummerierten "
-            "Abbildern (name1, name2 …) weiterführen?  Die Datei dieser Diskette bleibt, bis "
-            "gespeichert wird, unberührt.",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
-        return antwort == QMessageBox.Yes
+    def _satz_wachstum_melden(self) -> None:
+        t = self.tool
+        if t is None or not t.tar_satz_einzel:
+            return
+        try:
+            plan = t.tar_satz_planen()
+        except K1520DiskError:
+            return
+        if plan["abbilder"] > 1:
+            self.log(f"Der Inhalt passt nicht mehr auf EIN Abbild: beim Speichern entstehen "
+                     f"{plan['abbilder']} nummerierte Abbilder ({', '.join(Path(n).name for n in plan['namen'])})",
+                     stufe="warnung")
 
     def _tar_datei_wahl(self, name: str, urteil: dict) -> Optional[str]:
         """Popup beim Ablegen einer ``.tar`` auf ein LEERES tar-Archiv (Entwurf 37, Nr. 5):
@@ -2633,6 +2610,18 @@ class MainWindow(QMainWindow):
             return None
         return dlg.basis()
 
+    def _einzel_direkt(self) -> bool:
+        """Geht Strg+S ohne Rueckfrage in dasselbe Abbild zurueck?  (tar-Diskette, ein Abbild, der
+        Name steht fest; ein Plan mit mehreren Abbildern oder ein neuer Name braucht den Dialog.)"""
+        t = self.tool
+        if not (t.tar_satz_einzel and t.tar_satz_basis):
+            return False
+        try:
+            plan = t.tar_satz_planen()
+        except K1520DiskError:
+            return False
+        return plan["abbilder"] == 1 and plan["namen"] == [t.path]
+
     def _satz_speichern(self, unter: bool = False) -> bool:
         """Den tar-Satz auf Abbilder schreiben (Strg+S bzw. Speichern unter…).
 
@@ -2645,10 +2634,15 @@ class MainWindow(QMainWindow):
         if not unter and not self.tool.dirty and self.tool.tar_satz_basis:
             self.log("tar-Satz: nichts zu speichern (keine Änderung)")
             return True
-        basis = self._satz_speichern_fragen(unter or not self.tool.tar_satz_basis)
-        if basis is None:
-            self.log("tar-Satz speichern: abgebrochen")
-            return False
+        basis = ""
+        # Eine tar-Diskette (Satz mit EINEM Abbild) geht ohne Rueckfrage in IHR Abbild zurueck, solange
+        # der Inhalt auf eines passt; nur Speichern unter… und das Verteilen auf mehrere Abbilder
+        # zeigen den Plan.
+        if unter or not self._einzel_direkt():
+            basis = self._satz_speichern_fragen(unter or not self.tool.tar_satz_basis)
+            if basis is None:
+                self.log("tar-Satz speichern: abgebrochen")
+                return False
         try:
             r = self.tool.tar_satz_speichern(basis or None)
         except K1520DiskError as e:
@@ -2690,72 +2684,6 @@ class MainWindow(QMainWindow):
             str(Path(self._neben_der_diskette()) / (stamm + ".tar")), "tar-Archiv (*.tar)")
         if pfad:
             self.tar_export(pfad)
-
-    def tar_schreiben(self, quelle) -> bool:
-        """Eine ``.tar``-Datei auf die LEERE tar-Diskette schreiben.
-
-        Abgelehnt (Größe, kein Vielfaches von 512, Diskette nicht leer) wird mit
-        Meldung.  Ist das Archiv kein reines V7-tar, kommt die Rückfrage „Trotzdem
-        schreiben?“ — bei Nein bleibt die Diskette unverändert.
-        """
-        if self.tool is None:
-            return False
-        try:
-            warnung = self.tool.tar_put_pruefen(quelle)
-        except K1520DiskError as e:
-            self._fehler("tar-Datei schreiben", str(e))
-            return False
-        if warnung:
-            antwort = QMessageBox.question(
-                self, "tar-Datei schreiben",
-                f"{warnung}\n\nTrotzdem schreiben?",
-                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-            if antwort != QMessageBox.Yes:
-                self.log("tar-Datei schreiben: abgebrochen (kein reines V7-tar)")
-                return False
-        try:
-            self.tool.tar_put(quelle)
-        except K1520DiskError as e:
-            self._fehler("tar-Datei schreiben", str(e))
-            return False
-        self._reload()
-        self.log(f"tar-Datei geschrieben: {quelle} — die Diskette ist jetzt tar720 und nur lesbar",
-                 stufe="warnung" if warnung else "")
-        return True
-
-    def _tar_leer_einfuegen(self, paths) -> bool:
-        """Einfügen-Wege (``|←``, Strg+←, Ziehen und Ablegen) auf der LEEREN tar-Diskette.
-
-        Dort gehört genau EIN ``.tar`` hin: die eine Datei geht denselben Prüf- und
-        Schreibweg wie „tar-Datei auf Diskette schreiben…“ (samt V7-Rückfrage).  Mehrere
-        Dateien, Ordner und Dateien mit Abbild-Endung werden mit Hinweis abgelehnt.
-        """
-        if len(paths) != 1:
-            self.log("Leere tar-Diskette: es lässt sich nur EINE .tar-Datei auf einmal schreiben "
-                     f"({len(paths)} gewählt)", stufe="warnung")
-            return False
-        p = Path(paths[0])
-        if p.is_dir():
-            self.log(f"Leere tar-Diskette: „{p.name}“ ist ein Ordner — erwartet wird genau eine "
-                     ".tar-Datei", stufe="warnung")
-            return False
-        if p.suffix.lower() in (".hfe", ".dmk", ".img", ".cqm"):
-            self.log(f"Leere tar-Diskette: „{p.name}“ ist ein Diskettenabbild, kein tar-Archiv "
-                     "(Abbilder öffnet Datei ▸ Abbild öffnen…)", stufe="warnung")
-            return False
-        if self.tool.read_only:
-            self.log("Leere tar-Diskette: erst den Schreibschutz aufheben", stufe="warnung")
-            return False
-        return self.tar_schreiben(str(p))
-
-    def _tar_schreiben_dialog(self) -> None:
-        if self.tool is None or not self.tool.tar_leer:
-            return
-        pfad, _ = QFileDialog.getOpenFileName(
-            self, "tar-Datei auf Diskette schreiben", self._neben_der_diskette(),
-            "tar-Archiv (*.tar);;Alle Dateien (*)")
-        if pfad:
-            self.tar_schreiben(pfad)
 
     def _neu_dialog(self) -> None:
         if not self._darf_verwerfen():

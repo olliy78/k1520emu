@@ -19,7 +19,7 @@
  * k1520disktool check  <abbild>
  * k1520disktool tar-satz <abbild…> [--to ordner] [-l]  # Mehrdisketten-tar-Strom
  * k1520disktool tar-export <abbild> <ziel.tar>          # den tar-Strom einer Diskette als .tar
- * k1520disktool tar-put <abbild> <quelle.tar>           # .tar in eine LEERE tar-Diskette
+ * k1520disktool tar-put <abbild> <quelle.tar>           # .tar wird das Archiv einer LEEREN tar-Diskette (Container)
  * k1520disktool tar-satz-save <abbild…> [-o basis] [--put/--rm/--mkdir/--attr …]   # Satz bearbeiten, auf N Abbilder speichern
  * k1520disktool tar-satz-neu --format <name> <basis> [--put/--rm/--mkdir/--attr/--tar-container …] # leeren Satz anlegen
  * k1520disktool tar-formate                              # Katalogformate fuer neue tar-Disketten/Saetze
@@ -175,9 +175,11 @@ void gebrauch() {
         "  tar-export <abbild> <ziel.tar>           den tar-Strom einer Diskette (Bloecke 1:1, bis hinter\n"
         "                                           die Endmarke; Folgeteile ganz) als .tar herausschreiben;\n"
         "                                           die Teile eines Satzes setzt `cat` zusammen\n"
-        "  tar-put <abbild> <quelle.tar>            .tar (<= 720 KiB, Vielfaches von 512) in eine LEERE\n"
-        "                                           tar-Diskette schreiben (`create x.img --fs tar720_leer`),\n"
-        "                                           einmal; danach ist sie tar720 und nur lesbar.\n"
+        "  tar-put <abbild> <quelle.tar>            .tar (Vielfaches von 512, passt auf EIN Abbild) wird das\n"
+        "                                           Archiv einer LEEREN tar-Diskette (`create x.img --fs\n"
+        "                                           tar720_leer`) — \"als Container\"; die Diskette bleibt danach\n"
+        "                                           bearbeitbar.  Auf einem Archiv mit Inhalt: Fehler (als Datei\n"
+        "                                           kommt eine .tar per `put` hinein).  --dry-run: nur beurteilen.\n"
         "                                           Gewarnt wird vor Nicht-V7-tar (Schreiben geht trotzdem)\n"
         "  tar-satz-save <abbild1>… [-o basis.ext] [--dry-run]\n"
         "                  [--put QUELLE[=ZIEL] | --rm NAME | --mkdir NAME | --attr NAME (+ --mode/--uid/--gid/--mtime)]…\n"
@@ -573,6 +575,9 @@ int cmd_tar_export(const Optionen& o) {
     return kOk;
 }
 
+/// @brief `tar-put` — eine fertige `.tar` wird das Archiv einer LEEREN tar-Diskette (Container).
+///        Duenne Huelle ueber `tarDateiAblegen(AlsContainer)` + Speichern; auf einem Archiv mit
+///        Inhalt kommt eine `.tar` nur als Datei hinein (`put`).
 int cmd_tar_put(const Optionen& o) {
     if (o.rest.size() != 3) {
         std::cerr << "Fehler: tar-put <abbild> <quelle.tar>\n";
@@ -581,18 +586,31 @@ int cmd_tar_put(const Optionen& o) {
     int rc = kOk;
     auto v = oeffne(o, o.rest[1], rc, /*schreibend=*/true, /*roh_erlaubt=*/true);
     if (!v) return rc;
+    const TarDateiUrteil u = v->tarDateiBeurteilen(o.rest[2]);
+    if (!u.ok) { std::cerr << "Fehler: " << u.fehler << "\n"; return kFehler; }
+    if (!u.als_container) {
+        std::cerr << "Fehler: " << u.container_grund
+                  << (u.ziel_leer ? "" : "  Als Datei: `put <abbild> <quelle.tar>`.") << "\n";
+        return kFehler;
+    }
+    if (u.wird_satz) {
+        std::cerr << "Fehler: Die Datei (" << u.groesse << " Byte) passt nicht auf EIN Abbild ("
+                  << u.kapazitaet << " Byte) — als Satz mit " << u.abbilder
+                  << " Abbildern: `tar-satz-neu --format <name> <basis> --tar-container <quelle.tar>`\n";
+        return kFehler;
+    }
     if (o.dry_run) {
-        std::string w;
-        if (!v->tarPruefen(o.rest[2], &w)) { std::cerr << "Fehler: " << v->lastError() << "\n"; return kFehler; }
-        if (!w.empty()) std::cerr << "Warnung: " << w << "\n";
+        if (!u.warnung.empty()) std::cerr << "Warnung: " << u.warnung << "\n";
         std::cout << "tar-put (Probelauf): " << o.rest[2] << " passt\n";
         return kOk;
     }
-    if (!v->tarSchreiben(o.rest[2])) { std::cerr << "Fehler: " << v->lastError() << "\n"; return kFehler; }
+    if (!v->tarDateiAblegen(o.rest[2], TarDateiWeg::AlsContainer) || !v->flush()) {
+        std::cerr << "Fehler: " << v->lastError() << "\n";
+        return kFehler;
+    }
     // Eine Warnung hindert das Schreiben nicht (kein Blockieren in der Kommandozeile).
     if (!v->lastTarWarnung().empty()) std::cerr << "Warnung: " << v->lastTarWarnung() << "\n";
-    std::cout << "geschrieben: " << o.rest[2] << " → " << o.rest[1]
-              << " (die Diskette ist jetzt tar720, nur lesbar)\n";
+    std::cout << "geschrieben: " << o.rest[2] << " → " << o.rest[1] << "\n";
     return kOk;
 }
 

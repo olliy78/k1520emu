@@ -407,34 +407,15 @@ extern "C" const char* k1520d_container_info(K1520Disk h, const char* key) {
     return halte(H(h)->s_container, std::move(w));
 }
 
-// ─── tar-Disketten: Export, leere Diskette, Schreiben ────────────────────────
-
-extern "C" bool k1520d_tar_leer(K1520Disk h) {
-    return h && H(h)->vol->tarLeer();
-}
+// ─── tar-Disketten: Export ────────────────────────
 
 extern "C" bool k1520d_tar_export(K1520Disk h, const char* path) {
     return h && path && H(h)->vol->tarExport(path);
 }
 
-extern "C" int k1520d_tar_put_pruefen(K1520Disk h, const char* path) {
-    if (!h || !path) return -1;
-    std::string w;
-    if (!H(h)->vol->tarPruefen(path, &w)) return -1;
-    halte(H(h)->s_tarwarn, std::move(w));
-    return H(h)->s_tarwarn.empty() ? 0 : 1;
-}
-
 extern "C" const char* k1520d_tar_warning(K1520Disk h) {
-    if (!h) return "";
-    return halte(H(h)->s_tarwarn, H(h)->vol->lastTarWarnung());
-}
-
-extern "C" bool k1520d_tar_put(K1520Disk h, const char* path) {
-    if (!h || !path) return false;
-    const bool ok = H(h)->vol->tarSchreiben(path);
-    halte(H(h)->s_tarwarn, H(h)->vol->lastTarWarnung());
-    return ok;
+    // Der Puffer wird von tar_datei_pruefen (Urteil) UND tar_datei_ablegen (Ablegen) gefuellt.
+    return h ? H(h)->s_tarwarn.c_str() : "";
 }
 
 // ─── tar-Saetze bearbeiten, Neu-Anlegen, .tar ablegen (Entwurf 37, T1-T3) ───
@@ -500,6 +481,10 @@ extern "C" K1520Disk k1520d_tar_disk_neu(const char* path, const char* format) {
     h->vol = DiskVolume::tarDisketteNeu(path, format, kataloge().formate, kataloge().dateisysteme, err);
     if (!h->vol) { g_open_error = err; return nullptr; }
     return h.release();
+}
+
+extern "C" bool k1520d_tar_satz_einzel(K1520Disk h) {
+    return h && H(h)->vol->tarSatzEinzel();
 }
 
 extern "C" bool k1520d_tar_satz(K1520Disk h) {

@@ -1076,9 +1076,9 @@ Was beim Weiterarbeiten zu wissen ist:
 - **tar-Export / leere tar-Diskette / `.tar` schreiben (2026-10-17):** `tar-export`, `tar-put`, Profil
   `tar720_leer`, C-ABI `k1520d_tar_*`/`k1520d_fs_leer`, Aktionen „Diskette als .tar exportieren…“ und
   „tar-Datei auf Diskette schreiben…“ (ohne Kürzel).  Alle Festlegungen mit Wächtern in
-  `doc/merkposten/cqm.md` Nr. 13.  Oberfläche: die Datei-Wege (Einfügen, Löschen, Alles einfügen) sind auf der
-  leeren tar-Diskette zu (`datei_schreibbar = schreibbar and not ist_tar`), der Neu-Dialog bietet nur
-  `tar720_leer` (nicht `tar720`).  Wächter `py_disktool_tar_schreiben`, `dt_tar_*.cli`.
+  `doc/merkposten/cqm.md` Nr. 13.  **Überholt 2026-10-22 (`tar_satz.md` Nr. 16):** `tar-put`-Einmalwurf, die Aktion
+  „tar-Datei auf Diskette schreiben…“ und die Sperre der Datei-Wege auf der leeren Diskette sind entfallen; eine tar-Diskette
+  ist ein Satz mit einem Abbild.  Der Neu-Dialog bietet nur `tar720_leer` (nicht `tar720`).  Wächter `py_disktool_tar_schreiben`, `dt_tar_*.cli`.
 
 - **OS/M-Disketten (P8000, 8-Bit-Teil; Entwurf `doc/design/34_osm.md`, AP 1–3 umgesetzt 2026-10-17).**
   OS/M ist CP/M 2.2 auf den **SCP-Formaten des PC 1715** — kein eigenes Dateisystem, kein
