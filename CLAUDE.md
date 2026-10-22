@@ -627,6 +627,10 @@ pofo.de-Sammlung: `tools/p8000/pofo_archive.py`.
 **Vor Arbeiten daran: `doc/merkposten/cqm.md` lesen** (CRC-Tabellenfehler `& 0x3F`, Offsets);
 Entwurf `doc/design/35_cqm.md`.
 
+**TeleDisk (`.td0`) und ImageDisk (`.imd`) (Stand 2026-10-22, Entwurf 38, #9):** zwei weitere Container wie `.cqm` (lesen und schreiben,
+Kern `core/peripherals/floppy_drive/{td0,imd}_codec.*` über `sector_track_io`; `.td0` wird immer unkomprimiert geschrieben; keine leere
+Diskette in diesen Formaten; Clean-Room nach `doc/design/38a_…`, **HxC-Quelltext (GPL) nie lesen**).  **Vor Arbeiten daran: `doc/merkposten/td0_imd.md` lesen.**
+
 **OS/M (P8000, 8-Bit) = CP/M 2.2 auf den SCP-Formaten** (Entwurf `doc/design/34_osm.md`): Profile `osm640`/`osm800`
 (`boot_header: osm`) werden NUR mit OS/M-Urlader in c0h0 Sektor 1 erkannt (Code `FD 21 48 0C …` UND `P8000SYS`);
 Datendisketten bleiben `scpx640`/`cpa_auto`/`cpa800`.  **Deckungsgleiche Profile sind keine Mehrdeutigkeit** (das mit
