@@ -38,7 +38,7 @@ jobs:
       - name: Wiki-Seiten erzeugen
         run: python3 tools/sync_wiki.py --destination wiki-build
 
-      - name: Änderungen veröffentlichen
+      - name: Aenderungen veroeffentlichen
         run: |
           git -C wiki-build config user.name "github-actions[bot]"
           git -C wiki-build config user.email "41898282+github-actions[bot]@users.noreply.github.com"
