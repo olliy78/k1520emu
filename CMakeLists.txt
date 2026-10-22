@@ -446,7 +446,7 @@ if(BUILD_K1520)
     target_include_directories(k1520_p8000_dram16 PUBLIC ${CMAKE_SOURCE_DIR})
 
     # P8000, 16-Bit-Rechnerkarte: U8001, On-Board-Speicher, CTC/SIO/PIO, E/A, NMI/Reset (AP P10b)
-    add_library(k1520_p8000_karte16 STATIC core/cards/p8000/karte16.cpp)
+    add_library(k1520_p8000_karte16 STATIC core/cards/p8000/karte16.cpp core/cards/p8000/rtc.cpp)
     target_link_libraries(k1520_p8000_karte16 PUBLIC k1520_p8000_mmu_logik16 k1520_p8000_dram16 k1520_z8000 k1520_ctc k1520_sio k1520_pio k1520_bus k1520_logger k1520_serial)
     target_include_directories(k1520_p8000_karte16 PUBLIC ${CMAKE_SOURCE_DIR})
 

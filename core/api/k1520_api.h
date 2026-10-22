@@ -206,6 +206,10 @@ K1520_API K1520Handle k1520_create_pc1715_ex(int variante, int bildschirm, int z
  *                `firmware` (nur 5.0), `zeichensatz` (ezs-dzs | dzs-ezs = Bestueckung ZG1-ZG2),
  *                `teiler` (7 | 8, Zeichentakt), `vorlauf` (ms, die das Terminal vor dem Rechner
  *                eingeschaltet wird; Vorgabe 1500).
+ *                Echtzeituhr-Karte (Entwurf 38, nur mit `karte16=1`): `rtc` (aus | u130x = Originalkarte mit Armbanduhr-Chip,
+ *                rtc72421 = Nachbau),
+ *                `rtc_jahresversatz` (Jahre, nur Anzeige), `rtc_utc` (0 = Ortszeit | 1 = UTC),
+ *                `rtc_zustand` (Pfad der Batteriedatei).
  *                Schluessel der noch nicht gebauten Teile (`index16`, `mon16`, `dram`, `wdc`,
  *                `platte`) und unbekannte Schluessel/Werte → NULL, Grund in k1520_last_init_error.
  * k1520_machine_type() = 4.  `k1520_create(K1520_MACHINE_P8000)` = Vorgabe-Konfiguration.
@@ -1020,6 +1024,26 @@ K1520_API bool        k1520_state_save(K1520Handle h, const char* path);
 K1520_API bool        k1520_state_load(K1520Handle h, const char* path);
 /** @brief Grund des letzten gescheiterten k1520_state_load ("" = keiner). */
 K1520_API const char* k1520_state_error(K1520Handle h);
+
+/* ─── Uhrenkarte des P8000 (Entwurf 38, AP R2b): die Uhr zaehlt in MASCHINENZEIT.
+ * Zeiten sind Kalenderzeit als Unix-Sekunden kodiert (die Wanduhr, als waere sie UTC; Ortszeit bzw. UTC
+ * wie konfiguriert).  *_zeit/*_startzeit liefern sie GASTSICHTIG (mit Jahresversatz), *_stellen* nehmen sie im
+ * Jahr des Wirts (ohne Versatz, wie die Batteriedatei sie speichert).  Die Rechnung lebt im Kern (Startregel
+ * max(Stand + Abwesenheit, Wirtszeit)); die Oberflaeche rechnet nicht nach. */
+
+/** @brief Uhr wie der Gast sie sieht; -1 ohne Uhrenkarte oder an anderen Maschinen. */
+K1520_API int64_t k1520_rtc_zeit(K1520Handle h);
+/** @brief Uhr auf @p unix_wirt stellen (Jahr des Wirts; der Jahresversatz wirkt wie beim Lesen) und die
+ *  Batteriedatei schreiben.  0 = ok, -1 ohne Uhrenkarte. */
+K1520_API int      k1520_rtc_stellen(K1520Handle h, int64_t unix_wirt);
+/** @brief Netz-Aus melden (Oberflaeche schaltet die Maschine aus): die Karte sichert Stand + Wirtszeit; beim naechsten
+ *  k1520_power_on laeuft die Uhr um die Aus-Dauer weiter (Startregel).  0 = ok, -1 ohne Uhrenkarte. */
+K1520_API int      k1520_rtc_netz_aus(K1520Handle h);
+/** @brief OHNE Maschine: Zeit, mit der eine Karte mit dieser Batteriedatei JETZT starten wuerde, gastsichtig.
+ *  @p zustandsdatei NULL/"" oder nicht vorhanden = Wirtszeit.  @p utc 0 = Ortszeit des Wirts. */
+K1520_API int64_t k1520_rtc_startzeit(const char* zustandsdatei, int jahresversatz, int utc);
+/** @brief OHNE Maschine: Batteriedatei auf @p unix_wirt (Jahr des Wirts) stellen.  0 = ok, -1 Fehler. */
+K1520_API int      k1520_rtc_stellen_datei(const char* zustandsdatei, int64_t unix_wirt);
 
 /* ─── Winchesterplatten am WDC (P8000, Entwurf 25 §10.9; andere Maschinen bzw. ohne WDC:
  * false / "") — Laufwerk 0–2, Abbild roh/LBA (Sektor Z/K/S bei ((Z·K+K)·S+S−1)·512). */

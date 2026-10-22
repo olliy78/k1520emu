@@ -251,6 +251,20 @@ static bool p8000Konfig(const char* text, P8000Machine::Config& cfg, std::string
             else if (val == "3.1") cfg.mon16 = Cfg::Mon16::V3_1;
             else if (val == "3.3") cfg.mon16 = Cfg::Mon16::V3_3;
             else { fehler = "P8000: mon16 = " + val + " unbekannt (3.0 | 3.1 | 3.3)"; return false; }
+        } else if (key == "rtc") {
+            if (val == "aus") cfg.rtc = Cfg::Rtc::Aus;
+            else if (val == "u130x") cfg.rtc = Cfg::Rtc::U130X;
+            else if (val == "rtc72421") cfg.rtc = Cfg::Rtc::Rtc72421;
+            else { fehler = "P8000: rtc = " + val + " unbekannt (aus | u130x | rtc72421)"; return false; }
+        } else if (key == "rtc_jahresversatz") {
+            try { size_t n = 0; cfg.rtc_jahresversatz = std::stoi(val, &n); if (n != val.size()) throw 0; }
+            catch (...) { fehler = "P8000: rtc_jahresversatz = " + val + " ungueltig (ganze Jahre)"; return false; }
+        } else if (key == "rtc_utc") {
+            if (val == "0") cfg.rtc_utc = false;
+            else if (val == "1") cfg.rtc_utc = true;
+            else { fehler = "P8000: rtc_utc = " + val + " unbekannt (0 | 1)"; return false; }
+        } else if (key == "rtc_zustand") {
+            cfg.rtc_zustand = val;     // Pfad der Batteriedatei
         } else if (key == "dram") {
             // Langform "1M@0+256K@4" (Moduladressen), Kurzform "4x256K" | "4x1M" | "16M" (RAM-Karte
             // 16 MB) — Regeln und Pruefung (Ueberlappung, Anzahl, Moduladresse): P8000Dram16::parse.
@@ -1992,6 +2006,40 @@ const char* k1520_state_error(K1520Handle h) {
     else if (auto* t = h ? dynamic_cast<P8000TerminalMachine*>(toMachine(h)) : nullptr) s = t->stateError();
     else s = "kein Save-State an dieser Maschine";
     return s.c_str();
+}
+
+// ─── Uhrenkarte (P8000, Entwurf 38 AP R2b; andere Maschinen: -1) ─────────────────────────
+
+static P8000Rtc* p8000Rtc(K1520Handle h) {
+    auto* p = h ? dynamic_cast<P8000Machine*>(toMachine(h)) : nullptr;
+    return (p && p->karte16()) ? p->karte16()->rtc() : nullptr;
+}
+
+int64_t k1520_rtc_zeit(K1520Handle h) {
+    auto* r = p8000Rtc(h);
+    return r ? r->gastZeit() : -1;
+}
+
+int k1520_rtc_stellen(K1520Handle h, int64_t unix_wirt) {
+    auto* r = p8000Rtc(h);
+    if (!r) return -1;
+    r->stellen(unix_wirt);
+    return 0;
+}
+
+int k1520_rtc_netz_aus(K1520Handle h) {
+    auto* r = p8000Rtc(h);
+    if (!r) return -1;
+    r->netzAus();
+    return 0;
+}
+
+int64_t k1520_rtc_startzeit(const char* zustandsdatei, int jahresversatz, int utc) {
+    return P8000Rtc::startzeit(zustandsdatei ? zustandsdatei : "", jahresversatz, utc != 0);
+}
+
+int k1520_rtc_stellen_datei(const char* zustandsdatei, int64_t unix_wirt) {
+    return P8000Rtc::stellenDatei(zustandsdatei ? zustandsdatei : "", unix_wirt) ? 0 : -1;
 }
 
 // ─── Winchester (P8000-WDC, Entwurf 25 §10.9; andere Maschinen: false / "") ──────────────

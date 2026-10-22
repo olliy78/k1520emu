@@ -131,6 +131,7 @@ gibt es keinen FBO. Bildinhalte prüft die C++-Seite über das VRAM.
 | `fast` | läuft in der Standardrunde mit |
 | `slow` | nur auf Anforderung |
 | `format_integration` | die **Tiefe** der Formatierung: je Laufwerkstyp ein Format über die ganze Diskette (`dev.sh test-format`) |
+| `fach_*` | Fachgebiet (zusätzlich auf jedem Fall der langsamen Spuren); Grundlage von `dev.sh test-merge` |
 | `format_matrix` | die **Breite**: jeder einzelne FORMAT.COM-Menüeintrag, Umfang Smoke (`dev.sh test-matrix`) |
 
 `format_integration` und `format_matrix` sind zusammen mit `slow` deckungsgleich;

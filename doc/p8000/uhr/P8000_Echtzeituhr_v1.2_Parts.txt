@@ -1,0 +1,12 @@
+Bauteil		Bezeichnung						Reichelt-Art.Nr.		Anzahl		 Preis
+C1		Vielschicht-Keramikkondensator 100N, 20%		Z5U-2,5 100N			3		 0,04
+R1		Metallschichtwiderstand 18,7 K-Ohm			METALL 18,7K			2		 0,082
+VD1		Planar Epitaxial Schaltdiode, DO35, 100V, 0,15A		1N 4148				2		 0,04
+BT1		Knopfzellenhalter für Ø 20 mm				KZH 20-1			1		 0,64
+D1		74LS133							LS 133				1		 0,33
+D2		74LS02							LS 02				1		 0,34
+D3		Real Time Clock 10 ppm Dil-18 RTC 72421A		RTC 72421			1		 6,55
+D4		74LS245							LS 245				1		 0,67
+RR1		Widerstands-Netzwerk, 7Wid./8Pins, 4,7 K-Ohm		SIL 8-7 4,7K			1		 0,09
+X1		Messerleiste 96-pol, gewinkelt, A-B-C, THR		ML-C 96W-THR			1		 1,90
+													Summe		10,84

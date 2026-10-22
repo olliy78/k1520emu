@@ -32,6 +32,7 @@ tools/dev.sh test -R K2526       #   one card's tests by name regex
 tools/dev.sh build [trace]       # just build build/ (+ build_trace/ with 'trace')
 tools/dev.sh trace <boot_trace-args>   # build build_trace/, then run boot_trace
 tools/dev.sh tool <name> [args]  # build build/, then run build/<name> (floppy_diag, k1520dbg, kbd_test…)
+tools/dev.sh test-merge [basis]  # VOR DEM MERGE: waehlt nach Aenderungsbereich (--alles, --trocken)
 tools/dev.sh test-python         # only the pytest layer (C-ABI + GUI, label "python")
 tools/dev.sh test-level unit     # one test level: unit|debugtools|integration|cli|system|python
 tools/dev.sh test-oracle         # Z8000-Kern gegen MAME (build_oracle/, lädt MAME beim Konfigurieren)
@@ -39,6 +40,16 @@ tools/dev.sh win [ctest-args]    # Cross-Bau nach WINDOWS (MinGW-w64) + Tests un
 tools/dev.sh check               # build both dirs + report freshness
 tools/dev.sh rebuild             # rm -rf build build_trace, then build from scratch
 ```
+
+> **Vor dem Merge: `tools/dev.sh test-merge`** (2026-10-22). Es liest den `git diff` gegen `main`
+> (auf `main`: `origin/main`), bildet Pfade über `tools/test_auswahl.py` auf Fachlabels `fach_*` ab und
+> fährt `test`, die langsamen Spuren (`format_integration`/`format_matrix`/`wega_install`) nur für die
+> berührten Fachgebiete und `win` bei C++/CMake-Änderungen; reine Doku fährt nichts, Gemeinsames
+> (`core/bus|api|util`, CMake, `tests/support`, `dev.sh`, unbekannte Pfade unter `core/`) fährt alles.
+> Der Plan steht vorab in der Ausgabe (`--trocken` = nur Plan). **Im Zweifel `--alles`**; die vollen
+> Spuren fahren weiter von Hand bzw. in der CI. Jeder neue langsame Test braucht ein `fach_*`-Label
+> (Wächter `py_testauswahl`). `P8000SaFormat.*` liegt seit 2026-10-22 in `wega_install`, nicht mehr in
+> `test-format`.
 
 > **Läufe über ~60 s gehören in den HINTERGRUND** (`Bash` mit `run_in_background: true`),
 > nicht in den Vordergrund. Betrifft `test-format` (~60 s), `test-matrix` (~160 s),
@@ -574,6 +585,17 @@ alles Empfangene als Text an eine `.txt` (`app/mitschrift.py`, Kern `k1520_term_
 **Grundsatz:** Chips werden vollständig + systematisch getestet, Debugger unterstützen sie vollständig
 (Plan §10.11a). **Vor Arbeiten daran: `doc/merkposten/p8000.md` lesen**; Plan und Stand
 `doc/design/25_p8000.md` (§9/§9a), Quellen/Referenzen `doc/p8000/` (EPROM-Abzüge in `doc/p8000/eproms/`).
+
+## Uhrenkarte (RTC) der P8000 (Ticket #6, Stand 2026-10-22)
+
+Option am 16-Bit-Teil: **U130X** (Original, Armbanduhr-Chip, `FEF1`–`FEFF`) oder **Epson RTC-72421** (Nachbau pofo.de,
+`FDE1`–`FDFF`), Karte `core/cards/p8000/rtc.*`, `P8000Machine::Config::rtc*`, C-ABI `k1520_rtc_*`, `--rtc` in
+`boot_trace`/`k1520dbg` (Befehl `rtc`), Oberfläche *Einstellungen ▸ Allgemein ▸ RTC* (Vorgabe U130x/−40, Statuszeile
+„RTC: …"). Kern-Vorgabe bleibt **aus**.  Drei Festlegungen: **die Uhr zählt in MASCHINENZEIT** und springt beim Start nie
+zurück (`max(Stand + Abwesenheit, Wirtszeit)`, Batteriedatei) — sonst Dateizeiten aus der Zukunft bei schneller Emulation;
+**die Oberfläche speist UTC** (WEGA 3.1 rechnet mit `TZ=MEZ-1MES` selbst um); der 2019-Mangel des echten U130X wird
+**nicht** nachgebildet.  Nur die WEGA-**3.1**-Platte hat einen Uhrentreiber (Lehmanns timer-1.1, Märzfehler in
+`timegm.c` ist Gastcode).  **Vor Arbeiten daran: `doc/merkposten/p8000.md` Nr. 59 lesen**; Entwurf `doc/design/38_p8000_rtc.md`.
 
 ## RAM-Floppy RAF 128/512/2M (alle Maschinen; PC 1715 nur mechanisch, s. Merkposten pc1715)
 

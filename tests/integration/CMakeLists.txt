@@ -76,7 +76,7 @@ k1520_add_test(serielle_kopplung SRC test_serielle_kopplung.cpp
                                  LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 120)
 k1520_add_test(serielle_kopplung_voll SRC test_serielle_kopplung.cpp
                                  LIBS k1520_a5120 k1520_logger
-                                 LABELS "integration;slow;format_integration"
+                                 LABELS "integration;slow;format_integration;fach_serial"
                                  DEFS LOG_LEVEL=2 KOPPLUNG_VOLL=1 TIMEOUT 600)
 
 # A5120.16, Abnahme S1: Original-BIOS (em256 equ 1) erkennt das EM256, RAM-Floppy M:
@@ -344,6 +344,11 @@ k1520_add_test(p8000_boot SRC test_p8000_boot.cpp
 k1520_add_test(p8000_stand SRC test_p8000_stand.cpp
                           LIBS k1520_p8000 k1520_logger k1520_testsupport
                           LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 300)
+
+# P8000 Echtzeituhr-Option in der Maschine (Entwurf 38, AP R1): Konfiguration, Save-State-Abschnitt
+k1520_add_test(p8000_rtc_maschine SRC test_p8000_rtc_maschine.cpp
+                          LIBS k1520_p8000 k1520_logger k1520_testsupport
+                          LABELS "${_lbl}" DEFS LOG_LEVEL=2)
 
 # P8000 Meilenstein M2 (doc/design/25_p8000.md §10.11 AP P11): Kopplung 8 ↔ 16 in der Maschine,
 # U8000-Monitor ueber tty1, Hardwaretest U8001, `O U` + `boot` von der WEGA-Startdiskette.

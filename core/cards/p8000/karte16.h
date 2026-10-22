@@ -70,6 +70,7 @@
 #include "core/bus/k1520_bus.h"
 #include "core/cards/p8000/dram16.h"
 #include "core/cards/p8000/mmu_logik16.h"
+#include "core/cards/p8000/rtc.h"
 #include "core/primitives/z8000.h"
 #include "core/primitives/z80_ctc.h"
 #include "core/primitives/z80_pio.h"
@@ -102,6 +103,8 @@ public:
         uint8_t  nbr_start = 0x00;
         uint8_t  leer8 = 0xFF;
         uint16_t leer16 = 0xFFFF;
+        /// Uhrenkarte (Option, Entwurf 38); `typ = Aus` = nicht bestueckt, E/A bitgleich wie ohne.
+        P8000RtcConfig rtc;
     };
 
     static constexpr int TTY_ANZAHL = 4;   ///< tty4–tty7
@@ -136,6 +139,9 @@ public:
     /// Zieht die Karte bis @p ziel (Takte des U8001) nach; im Reset ohne Schritt.
     void laufeBis(uint64_t ziel);
     uint64_t zeit() const { return zeit_; }
+    /// Setzt die Kartenzeit auf den Stand der Maschine (nach powerOn: die Maschinenzeit laeuft weiter,
+    /// sonst holte laufeBis die gesamte Vorgeschichte nach - und mit ihr die Uhrenkarte).
+    void zeitSetzen(uint64_t t) { zeit_ = t; }
 
     // ─── Bausteine ───────────────────────────────────────────────────────────
     Z8000&            cpu()   { return cpu_; }
@@ -151,6 +157,8 @@ public:
     K1520Bus&         peripherieBus() { return peri_; }
     const Config&     config() const { return cfg_; }
     const uint8_t*    rom() const { return rom_; }
+    /// Uhrenkarte (Entwurf 38); nullptr = nicht bestueckt.
+    P8000Rtc*         rtc()   { return rtc_.get(); }
 
     /// Externe Treiber an PIO-Pins (Kopplung, WDC) — Muster `P8000Karte8::setzePinTreiber`.
     /// @p pio 0..2, @p port 0 = A, 1 = B.  Vorgabe [K1].
@@ -204,6 +212,7 @@ private:
     Z8000 cpu_;
     P8000MmuLogik16 mmu_;
     P8000Dram16 dram_;
+    std::unique_ptr<P8000Rtc> rtc_;
     std::array<uint8_t, 2048> sram_{};
     Z80CTC  ctc0_{"P8K16-CTC0"}, ctc1_{"P8K16-CTC1"};
     Z80SIO  sio0_{"P8K16-SIO0"}, sio1_{"P8K16-SIO1"};

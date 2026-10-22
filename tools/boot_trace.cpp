@@ -344,6 +344,7 @@ int main(int argc, char** argv) {
     bool        machine_p8000 = false;   // P8000, 8-Bit-Seite (AP P7c; gleiche Optionen wie K8915)
     bool        machine_p8000_16 = false;   // --machine p8000-16: mit 16-Bit-Karte (AP P11)
     std::string p8000_wdc, p8000_hd;         // --wdc <fw> / --hd <abbild> (P8000-16, AP P13d)
+    std::string p8000_rtc;                   // --rtc aus|u130x|rtc72421 (P8000-16, Entwurf 38)
     bool        p8000_original = false;      // --konsole original: tty1 am Originalterminal (AP P20c)
     bool        machine_p8000_terminal = false;   // --machine p8000-terminal: Terminal ohne Rechner (P20d)
     bool        stall_set     = false;   // --stall angegeben? (Vorgabe je Maschine verschieden)
@@ -388,6 +389,7 @@ int main(int argc, char** argv) {
         else if (!strcmp(argv[i], "--raf") && i+1 < argc) { raf_opt = argv[++i]; k8o.raf = raf_opt; }
         else if (!strcmp(argv[i], "--wdc") && i+1 < argc) p8000_wdc = argv[++i];
         else if (!strcmp(argv[i], "--hd") && i+1 < argc) p8000_hd = argv[++i];
+        else if (!strcmp(argv[i], "--rtc") && i+1 < argc) p8000_rtc = argv[++i];
         else if (!strcmp(argv[i], "--konsole") && i+1 < argc) {
             const std::string k = argv[++i];
             if (k == "original") p8000_original = true;
@@ -620,7 +622,7 @@ int main(int argc, char** argv) {
             return bootTraceP8000Terminal(k8o);
         }
         if (p8000_original && !machine_p8000) { fprintf(stderr, "ERROR: --konsole nur mit --machine p8000[-16]\n"); return 2; }
-        const int rc = machine_p8000 ? bootTraceP8000(k8o, prn, machine_p8000_16, p8000_wdc, p8000_hd, p8000_original)
+        const int rc = machine_p8000 ? bootTraceP8000(k8o, prn, machine_p8000_16, p8000_wdc, p8000_hd, p8000_original, p8000_rtc)
                      : machine_mc80 >= 3 ? bootTraceMc80_2x(k8o, prn, machine_mc80 == 4)
                      : machine_mc80 ? bootTraceMc80(k8o, prn, machine_mc80 == 2)
                      : machine_pc1715 ? bootTracePc1715(k8o, prn, machine_pc1715w)

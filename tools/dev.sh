@@ -26,11 +26,18 @@
 #                                     fassung); -v bzw. --voll oder
 #                                     K1520_TEST_VOLL=1 druckt alles.
 #   tools/dev.sh test-all [ctest-args] wie test, ABER inkl. beider Format-Label
-#   tools/dev.sh test-format [args]   NUR die langsamen format_integration-Boot-Disk-Tests
+#   tools/dev.sh test-format [args]   NUR die langsamen format_integration-Tests (Disketten, Kopplung, Kermit-80)
 #   tools/dev.sh test-matrix [args]   NUR die 88 Format-Matrix-Tests (jedes FORMAT.COM-Menue
 #                                     jedes Laufwerkstyps, Leerdiskette, Smoke Spur 0-2)
-#   tools/dev.sh test-wega [args]     NUR P8000-WEGA-Installation (Label wega_install, lang,
+#   tools/dev.sh test-wega [args]     NUR P8000 (Label wega_install: WEGA, Platte sa.format, lang,
 #                                     braucht die WEGA-Disketten ausserhalb des Repos)
+#   tools/dev.sh test-merge [basis] [--alles] [--trocken]
+#                                     VOR DEM MERGE: waehlt nach Aenderungsbereich (git diff gegen
+#                                     basis, Vorgabe main; auf main origin/main), was laeuft — test,
+#                                     die langsamen Spuren nur fuer die beruehrten Fachgebiete
+#                                     (Labels fach_*), win bei C++/CMake.  Tabelle: tools/test_auswahl.py.
+#                                     --alles erzwingt alles, --trocken druckt nur den Plan,
+#                                     --dateien <pfad>... ersetzt den git diff (Planprobe).
 #   tools/dev.sh test-python [args]   NUR die Python-Ebene (C-ABI + GUI, Label python)
 #   tools/dev.sh test-oracle [args]   U8001/U8002-Primitive gegen MAMEs z8000 (Differenz-
 #                                     pruefung, Label mame_oracle, eigenes build_oracle/,
@@ -155,7 +162,10 @@ configure_if_needed() {
 build_dir() {
     local dir="$1" log; log="$(mktemp)"
     configure_if_needed "$dir"
-    if ! cmake --build "$dir" -j >"$log" 2>&1; then
+    # -j MIT Zahl: ein nacktes `-j` heisst bei make „unbegrenzt" — auf dem 4-Kern-Runner der CI
+    # liefen so Hunderte Compiler gleichzeitig, der Speicher lief voll und der Job wurde im Bau
+    # abgeschossen (Exit 143, 2026-10-22; je nach ccache-Waerme mal ja, mal nein).
+    if ! cmake --build "$dir" -j "${K1520_BAU_JOBS:-$(nproc 2>/dev/null || echo 4)}" >"$log" 2>&1; then
         cat "$log"; rm -f "$log"; c_red "BUILD FEHLGESCHLAGEN: $dir"; exit 1
     fi
     if grep -qE "Building |Linking |Generating " "$log"; then
@@ -280,6 +290,49 @@ case "$cmd" in
         build_dir build_oracle
         c_ylw ">> ctest (build_oracle/) NUR mame_oracle — U8001 gegen MAME z8000"
         run_ctest build_oracle -L mame_oracle "$@" ;;
+    test-merge)
+        # Auswahl vor dem Merge (Tabelle und Begruendungen: tools/test_auswahl.py).
+        # Plan erst ausdrucken, dann nacheinander test -> langsame Spuren (EIN ctest-Aufruf,
+        # Spurlabel UND Fachlabel, mehrere -L verknuepft ctest mit UND) -> win.
+        # Alle Laeufe werden gefahren, auch wenn einer rot ist; Rueckgabe rot, wenn einer rot war.
+        VPY=python3; command -v python3 >/dev/null 2>&1 || VPY=python
+        basis=""; alles=0; trocken=0; dateien=0; _dl=()
+        for _a in "$@"; do
+            if [ "$dateien" = 1 ]; then _dl+=("$_a"); continue; fi
+            case "$_a" in
+                --dateien) dateien=1 ;;   # Rest = Dateiliste statt git diff (Planprobe mit --trocken)
+                --alles)   alles=1 ;;
+                --trocken) trocken=1 ;;
+                -*)        c_red "unbekannte Option: $_a"; exit 2 ;;
+                *)         basis="$_a" ;;
+            esac
+        done
+        _pa=()
+        [ "$alles" = 1 ] && _pa+=(--alles)
+        [ -n "$basis" ] && _pa+=(--basis "$basis")
+        [ "$dateien" = 1 ] && _pa+=(--dateien ${_dl[@]+"${_dl[@]}"})
+        _plan="$("$VPY" tools/test_auswahl.py --shell ${_pa[@]+"${_pa[@]}"})" || exit 1
+        eval "$_plan"
+        [ "$trocken" = 1 ] && exit 0
+        rot=0
+        if [ "$PLAN_TEST" = 1 ]; then
+            "$0" test || rot=1
+            if [ -n "$PLAN_FACH" ]; then
+                if [ "$PLAN_FACH" = '*' ]; then
+                    _lbl='format_integration|format_matrix|wega_install'
+                    c_ylw ">> langsame Spuren: alle"
+                    build_dir build
+                    run_ctest build -L "$_lbl" || rot=1
+                else
+                    c_ylw ">> langsame Spuren: $PLAN_FACH"
+                    build_dir build
+                    run_ctest build -L 'format_integration|format_matrix|wega_install' -L "$PLAN_FACH" || rot=1
+                fi
+            fi
+            if [ "$PLAN_WIN" = 1 ]; then "$0" win || rot=1; fi
+        fi
+        [ "$rot" = 0 ] && c_grn ">> test-merge: alles gruen" || c_red ">> test-merge: ROT"
+        exit $rot ;;
     test-python)
         # pytest-Ebene: C-ABI (ctypes gegen libk1520core.so) + PySide6-GUI.
         # Braucht die gebaute Bibliothek — deshalb erst bauen.
@@ -399,7 +452,7 @@ case "$cmd" in
             esac
         fi ;;
     ''|-h|--help|help)
-        sed -n '2,46p' "${BASH_SOURCE[0]}" | sed 's/^#\{0,1\} \{0,1\}//' ;;
+        sed -n '2,53p' "${BASH_SOURCE[0]}" | sed 's/^#\{0,1\} \{0,1\}//' ;;
     *)
         c_red "unbekanntes Kommando: $cmd"; echo "siehe: tools/dev.sh --help"; exit 2 ;;
 esac

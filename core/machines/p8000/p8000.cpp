@@ -45,6 +45,15 @@ P8000Karte16::Config P8000Machine::karte16Config(const Config& c)
     k.sram_fuellwert = c.ram_fuellwert;
     k.nbr_start = c.latch_start;
     k.nbr_gleichheit_stack = c.nbr_gleichheit_stack;
+    switch (c.rtc) {
+        case Config::Rtc::U130X:    k.rtc.typ = P8000RtcTyp::U130X; break;
+        case Config::Rtc::Rtc72421: k.rtc.typ = P8000RtcTyp::Rtc72421; break;
+        default:                    k.rtc.typ = P8000RtcTyp::Aus; break;
+    }
+    k.rtc.jahresversatz = c.rtc_jahresversatz;
+    k.rtc.utc = c.rtc_utc;
+    k.rtc.zustand = c.rtc_zustand;
+    k.rtc.zeitquelle = c.rtc_zeitquelle;
     return k;
 }
 
@@ -113,6 +122,8 @@ P8000Machine::P8000Machine(const Config& cfg)
         konsole_ = std::move(t);
     }
     karte_.cpu().abortBeforeExecute = [this] { return stop_.load(std::memory_order_relaxed); };
+    if (cfg.rtc != Config::Rtc::Aus && !cfg.karte16)
+        throw std::invalid_argument("P8000: RTC nur mit 16-Bit-Karte (karte16=1)");
     if (cfg.karte16) {
         // Handbuch S. 3-33/3-87: nur die Paare 8-Bit Index 1 / 16-Bit Index 1 bzw. 3 / 4.
         const bool paar1 = cfg.index8 == Config::Index8::I1 && cfg.index16 == Config::Index16::I1;
@@ -188,9 +199,13 @@ void P8000Machine::powerOn()
     if (wdc_) wdc_->powerOn();   // Netz-Ein des WDC; danach haelt PIO2-B5 (Pull-up) ihn im Reset
     if (k16_) {
         k16_->powerOn();     // PRES−: MRESET− und PIORESET−; RESET (K11) haelt den U8001
+        k16_->zeitSetzen(zeit16(total_cycles_));   // Maschinenzeit laeuft weiter: kein Nachholen der Vorgeschichte (Uhr!)
         kopplung_->rechne();
     }
     if (wdc_an_) wdc_an_->rechne();
+    // Die Uhrenkarte hat ihre Batterie: sie lief in der Aus-Dauer weiter (Startregel; ohne Netz-Aus davor
+    // bleibt sie unberuehrt).  Die Reset-Taste fasst sie nie an.
+    if (k16_ && k16_->rtc()) k16_->rtc()->netzEin();
     hd_zugriff_lw_ = -1;
     if (hwterm_) {
         // Arbeitsplatz-Reihenfolge: erst das Terminal, dann der Rechner.  Was das Terminal in der
@@ -203,6 +218,11 @@ void P8000Machine::powerOn()
     }
     nachReset();
     LOG_INFO("P8000", "Netz ein (8-Bit-Teil)");
+}
+
+void P8000Machine::powerOff()
+{
+    if (k16_ && k16_->rtc()) k16_->rtc()->netzAus();
 }
 
 void P8000Machine::reset()
@@ -475,7 +495,7 @@ int P8000Machine::run(int max_cycles)
 namespace {
 constexpr char     MAGIC[4] = {'P', '8', 'K', 'S'};
 constexpr uint8_t  ABS_CONFIG = 1, ABS_FLOPPY = 2, ABS_KARTE = 3, ABS_TERMINAL = 4, ABS_MASCHINE = 5,
-                   ABS_KARTE16 = 6, ABS_KOPPLUNG = 7, ABS_WDC = 8, ABS_ANZAHL = 9;
+                   ABS_KARTE16 = 6, ABS_KOPPLUNG = 7, ABS_WDC = 8, ABS_RTC = 9, ABS_ANZAHL = 10;
 
 void abschnitt(std::vector<uint8_t>& out, uint8_t id, const std::vector<uint8_t>& inhalt)
 {
@@ -545,6 +565,9 @@ std::vector<uint8_t> P8000Machine::stateBytes() const
         b.clear(); kopplung_->serialize(b); abschnitt(out, ABS_KOPPLUNG, b);
     }
     if (wdc_) { b.clear(); wdc_->serialize(b); abschnitt(out, ABS_WDC, b); }
+    // Uhrenkarte (Entwurf 38): eigener Abschnitt, Stand 4 bleibt — aeltere Leser ueberspringen ihn,
+    // aeltere Staende laden ohne ihn (der Versatz bleibt dann, wie er ist).
+    if (k16_ && k16_->rtc()) { b.clear(); k16_->rtc()->serialize(b); abschnitt(out, ABS_RTC, b); }
 
     b.clear();
     {
@@ -627,6 +650,8 @@ bool P8000Machine::wendeAbschnitteAn(const std::vector<uint8_t>& b)
     // WDC samt Plattenmechanik; die Abbilder selbst mountet der Aufrufer vorher (wie Disketten).
     if (wdc_ && !lade(ABS_WDC, "WDC (Platten wie beim Speichern angeschlossen?)",
                       [&](const uint8_t*& p, const uint8_t* e) { return wdc_->deserialize(p, e); })) return false;
+    if (k16_ && k16_->rtc() &&
+        !lade(ABS_RTC, "Uhrenkarte", [&](const uint8_t*& p, const uint8_t* e) { return k16_->rtc()->deserialize(p, e); })) return false;
     if (!lade(ABS_TERMINAL, "Terminal", [&](const uint8_t*& p, const uint8_t* e) {
             return konsole_->deserialize(p, e); })) return false;
     if (!lade(ABS_MASCHINE, "Maschine", [&](const uint8_t*& p, const uint8_t* e) {
