@@ -723,6 +723,9 @@ K1520_API bool k1520d_insert_with_info(K1520Disk h, const char* src, const char*
 
 K1520_API bool k1520d_erase  (K1520Disk h, const char* name);
 
+/// Verzeichnis anlegen (UNIX-Sicht: WEGA, tar; Zwischenverzeichnisse entstehen mit).
+K1520_API bool k1520d_mkdir  (K1520Disk h, const char* name);
+
 /// @name Warum das letzte Einfuegen abgelehnt wurde (@ref k1520d_last_insert_problem)
 /// @{
 #define K1520D_INSERT_OK              0  ///< gewoehnlicher Ablauf (auch: normaler Fehler)

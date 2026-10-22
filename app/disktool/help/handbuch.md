@@ -209,8 +209,9 @@ Beim Herausholen wird daraus `GW_ZSID.DOC`.
 ## tar-Disketten — ein Archiv statt eines Dateisystems
 
 Viele P8000-Lieferdisketten tragen **kein Dateisystem**: jemand hat mit `tar` direkt auf
-die rohe Diskette geschrieben. Das Werkzeug erkennt das als `tar720` (nur lesbar, immer
-als letzter Versuch hinter allen echten Dateisystemen) und zeigt Modus, Besitzer und
+die rohe Diskette geschrieben. Das Werkzeug erkennt das als `tar720` (immer als letzter
+Versuch hinter allen echten Dateisystemen; bearbeitbar ist ein *abgeschlossenes* Archiv, siehe
+unten) und zeigt Modus, Besitzer und
 Zeit wie bei WEGA. Mehrere Disketten eines Satzes sind **ein** Strom: die letzte Datei
 einer Diskette ist dann abgeschnitten (`tar.abgeschnitten`, in der Liste `[DEFEKT]`,
 das `.fileinfo` trägt `teilstueck=ist/soll`), und Diskette 2…n beginnt mitten in einer
@@ -221,10 +222,44 @@ Vollständig werden die Dateien mit `k1520disktool tar-satz abbild1 abbild2 … 
 Im Fenster heißt der Weg **Datei ▸ tar-Satz öffnen…** (ohne Tastenkürzel): man wählt
 alle Abbilder des Satzes (`.cqm` oder `.img`), ordnet sie in der Liste mit *Auf* und *Ab*
 — der Vorschlag sortiert nach den Zahlen in den Dateinamen, `ariane2` vor `ariane10` — und
-bekommt EINE Diskette mit den vollständigen Dateien. Ein tar-Satz ist wie jede tar-Diskette
-nur lesbar. Das Dateisystem heißt in der Anzeige „tar-Archiv (UNIX)“; die Befunde
+bekommt EINE Diskette mit den vollständigen Dateien. Wie jedes Abbild ist er beim Öffnen
+schreibgeschützt (Schreibschutz aufheben, dann lässt er sich bearbeiten, siehe den nächsten
+Abschnitt). Öffnet man dagegen ein einzelnes Teilstück (die letzte Datei abgeschnitten, der
+Anfang mitten in einer Datei, keine Endmarke), zeigt der Meldungsstreifen den Weg mit einem
+Knopf **tar-Satz öffnen…**; ein solches Stück bleibt allein nur lesbar. Das Dateisystem heißt in
+der Anzeige „tar-Archiv (UNIX)“, bei einem Satz „tar-Satz (UNIX)“; die Befunde
 `tar.fortsetzung` (die Diskette beginnt mitten in einer Datei) und `tar.abgeschnitten`
 (die letzte Datei setzt sich auf der nächsten Diskette fort) stehen im Protokoll.
+
+### tar-Sätze und -Archive im Fenster bearbeiten
+
+Ein **abgeschlossenes** tar-Archiv (Kopf bei Sektor 0 und Endmarke) und jeder **tar-Satz** lassen
+sich im Fenster wie eine große Diskette bearbeiten, sobald der Schreibschutz aufgehoben ist
+(Strg+R). Der Satz liegt dabei als EIN Strom im Speicher; geschrieben wird erst beim Speichern.
+
+- **Dateien und Ordner hinein:** ziehen auf die Diskettenansicht, *Auf die Diskette schreiben*
+  (`|←`, Strg+←) oder *Alles einfügen*. Auch ganze Ordner gehen (samt leerer Unterordner). Eine
+  daneben liegende `<datei>.fileinfo` (Modus, uid, gid, mtime) wird übernommen, sonst gelten 0644
+  bzw. 0755, uid/gid 0 und die Zeit „jetzt“. *Herunterladen* schreibt diese `.fileinfo`.
+- **Löschen, Ordner, Eigenschaften:** *Löschen*, **Bearbeiten ▸ Ordner im tar-Archiv anlegen…**
+  und *Eigenschaften* (Modus, uid, gid, mtime) wie bei einer WEGA-Diskette.
+- **Eine `.tar`-Datei ablegen:** ist das Archiv noch **leer** (ein neuer Satz), fragt ein Fenster:
+  *Als Datei im Container ablegen* (sie wird ein Eintrag) oder *Ist ein fertiger tar-Container*
+  (ihr Inhalt wird das Archiv; über 720 KiB entsteht ein Satz aus mehreren Abbildern). Auf einem
+  Archiv mit Inhalt wird sie immer eine Datei. (Die leere Einzeldiskette `tar720_leer` nimmt
+  weiterhin genau eine `.tar` als Archiv, siehe unten.)
+- **Speichern (Strg+S) und Speichern unter…:** vor dem Schreiben zeigt ein Fenster, was geschieht:
+  die Zahl der Abbilder, ihre Namen, welche Dateien schon da sind und überschrieben werden (beim
+  ersten Mal entsteht eine Sicherung `<name>~`) und welche **höheren Nummern liegen bleiben**
+  (gelöscht wird nie etwas). Die Nummer steht am Ende des Namens vor der Endung (`name1.hfe`,
+  `name2.hfe`); die Endung bestimmt den Container. Wächst der Inhalt einer Einzeldiskette über
+  720 KiB, bietet das Werkzeug an, sie als Satz weiterzuführen.
+- **Datei ▸ Neue tar-Diskette / tar-Satz…** legt etwas Neues an: Format (alle einheitlichen
+  Katalogformate, nicht nur 720K) und Art — *Einzelne Diskette* (die Datei entsteht sofort, wächst bei
+  Bedarf zum Satz) oder *Satz* (nichts entsteht bis zum Speichern; `name1`, `name2` …).
+- **Greaseweazle:** ein Satz lässt sich nicht direkt auf EINE echte Diskette schreiben; *Physische
+  Diskette überschreiben…* ist gesperrt, der Tooltip nennt den Weg: Satz speichern, die
+  Einzelabbilder öffnen, jedes für sich schreiben.
 
 ### tar-Archive herausholen, bearbeiten und zurückschreiben
 
@@ -260,9 +295,10 @@ Disketten:
    **genau einmal**; ein zweites Schreiben wird abgelehnt. Dieselbe Datei lässt sich auch über
    **`|←` / Strg+←** (Datei in der Ordneransicht gewählt) oder durch **Ziehen und Ablegen** auf die
    Diskettenansicht schreiben — es muss genau EINE Datei sein (kein Ordner, keine Diskettenabbild-
-   Endung; sonst Hinweis in der Statuszeile), sie geht denselben Prüfweg samt Rückfrage. Alle
-   anderen Datei-Wege (Löschen, *Alles einfügen*, `put`) und jeder Weg auf eine belegte tar-Diskette
-   bleiben gesperrt. Vorher geprüft wird: höchstens 720 KiB
+   Endung; sonst Hinweis in der Statuszeile), sie geht denselben Prüfweg samt Rückfrage. Auf
+   der leeren Diskette bleiben alle anderen Datei-Wege (Löschen, *Alles einfügen*, `put`) gesperrt;
+   die danach belegte Diskette ist schreibgeschützt (nach dem Aufheben nimmt sie Dateien — auch
+   eine weitere `.tar` als Datei — wie im vorigen Abschnitt an). Vorher geprüft wird: höchstens 720 KiB
    (sonst mit `split -b 737280` teilen) und ein Vielfaches von 512 Byte. Beginnt die Datei mit
    einem tar-Kopf, der **nicht V7** ist (`ustar`-Magic, also GNU- oder POSIX-Format; pax-Kopf;
    GNU-Langname; Name mit 100 Zeichen; binäres Größenfeld), erscheint die Rückfrage **„Trotzdem
@@ -450,6 +486,8 @@ zeigt die Angaben, die ein Linux-Dateisystem nicht tragen kann:
   Das Feld **Segmente** trägt sie alle, durch Leerzeichen getrennt
   (`4000+06A7 62A7+0002 …`): ein Programm kann mehrere Speicherbereiche belegen.
 * **CP/M** — Nutzerbereich (0–15) und die Attribute R/O, SYS, ARC.
+* **tar** — wie bei WEGA Modus, uid, gid und mtime (aus dem tar-Kopf); in der `.fileinfo` steht
+  `fs=tar`.
 * **WEGA** (UNIX des P8000) — die Inode: Dateiart, Modus (als Kästchen für
   Besitzer/Gruppe/Andere, die Sonderbits setuid/setgid/sticky und als Oktalzahl wie bei
   `chmod`), Besitzer (uid), Gruppe (gid), Änderungszeit (mtime, GMT), dazu als reine

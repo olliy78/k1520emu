@@ -32,8 +32,14 @@ _SPEC: List[Tuple] = [
     ("tar_satz", "tar-&Satz öffnen…", None, None,
      "Mehrere Abbilder (.cqm/.img/…) in wählbarer Reihenfolge als EINEN tar-Strom öffnen "
      "(ein tar-Archiv, das auf mehrere Disketten verteilt ist)", "_tar_satz_dialog", False),
+    # Entwurf 37 T4.  Bewusst OHNE Tastenkuerzel (die Kuerzeltabelle des Handbuchs ist ein Vertrag).
+    ("tar_neu", "Neue tar-Diskette / tar-Sat&z…", None, None,
+     "Eine leere tar-Diskette oder einen leeren tar-Satz in einem wählbaren Format anlegen — "
+     "Dateien und Ordner hineinziehen, dann speichern (wächst der Inhalt über eine Diskette, "
+     "entstehen nummerierte Abbilder)", "_tar_neu_dialog", False),
     ("speichern", "&Speichern", "save", "Ctrl+S",
-     "Die Änderungen in die Abbilddatei schreiben", "save", False),
+     "Die Änderungen in die Abbilddatei schreiben (bei einem tar-Satz: erst die Rückfrage mit "
+     "Namen und Umfang)", "save", False),
     ("speichern_unter", "Speichern &unter…", "save-as", "Ctrl+Shift+S",
      "Unter neuem Namen oder in einem anderen Container speichern und dort "
      "weiterarbeiten", "_speichern_unter_dialog", False),
@@ -60,6 +66,10 @@ _SPEC: List[Tuple] = [
     ("platte_ordner", "Ordner auf der &Platte anlegen…", None, None,
      "Auf der Platte im angeklickten Ordner (oder der Partition) einen neuen Ordner "
      "anlegen", "_platte_ordner_anlegen", False),
+    # Nur an einem tar-Archiv sichtbar (Entwurf 37 T4); OHNE Tastenkuerzel.
+    ("tar_ordner", "Ordner im &tar-Archiv anlegen…", None, None,
+     "Im tar-Archiv einen neuen Ordner anlegen (Zwischenordner entstehen mit)",
+     "_tar_ordner_anlegen", False),
     # Der Weg von der Datei zu ihren Bytes: er gehoert neben „Eigenschaften",
     # weil beides dieselbe Frage beantwortet — was steht da eigentlich?
     ("datei_im_editor", "Im Disk&editor öffnen", "disk-editor", None,
@@ -188,6 +198,8 @@ _SPEC: List[Tuple] = [
 KURZ = {'oeffnen': 'Öffnen',
     'neu': 'Neu',
     'tar_satz': 'tar-Satz',
+    'tar_neu': 'tar neu',
+    'tar_ordner': 'tar-Ordner',
     'physisch': 'Diskette laden',
     'physisch_schreiben': 'Diskette schreiben',
     'neu_beschreiben': 'Neu schreiben',

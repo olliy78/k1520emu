@@ -1,9 +1,10 @@
 """Warum sich an dieser Diskette nichts schreiben lässt — an EINER Stelle.
 
-Eine tar-Diskette (ein Archivstrom, kein Dateisystem) ist nicht nur „schreibgeschützt
-geöffnet", sondern **nicht beschreibbar**.  Der Haken „Schreibschutz" lässt sich dort
-nicht abwählen; die Oberfläche soll deshalb nicht raten „Schreibschutz aufheben",
-sondern den wahren Grund nennen.  (Ein CopyQM-Abbild, ``.cqm``, gehört seit dem
+Ein tar-Stück, das KEIN abgeschlossenes Archiv ist (Folgeteil einer Diskettenfolge,
+abgeschnitten, ohne Endmarke), ist nicht nur „schreibgeschützt geöffnet", sondern
+**nicht beschreibbar**.  Der Haken „Schreibschutz" lässt sich dort nicht abwählen; die
+Oberfläche soll deshalb nicht raten „Schreibschutz aufheben", sondern den wahren Grund
+und den Weg nennen (Entwurf 37, Festlegung 2: nur als Satz öffnen).  (Ein CopyQM-Abbild, ``.cqm``, gehört seit dem
 Schreiben im Kern NICHT mehr hierher — es ist wie ein ``.img`` beschreibbar.)
 """
 
@@ -17,8 +18,9 @@ def sperrgrund(tool) -> str:
         return ""
     teile = []
     if tool.ist_tar:
-        teile.append("tar-Disketten sind nur lesbar: sie tragen einen Archivstrom und "
-                     "kein Dateisystem.")
+        teile.append("Dieser Archivstrom ist kein abgeschlossenes tar-Archiv (Folgeteil einer "
+                     "Diskettenfolge oder ohne Endmarke) und nur lesbar.  Zum Bearbeiten "
+                     "alle Abbilder zusammen über „Datei ▸ tar-Satz öffnen…“ laden.")
     if teile:
         return " ".join(teile)
     return "Der Schreibschutz dieser Diskette lässt sich nicht aufheben."
@@ -29,8 +31,18 @@ def schutz_text(tool) -> str:
     if tool is None or not tool.read_only_forced:
         return ""
     if tool.ist_tar:
-        return "R/O  nur lesbar (tar-Archiv)"
+        return "R/O  nur lesbar (tar-Archiv, Teilstück)"
     return "R/O  nicht beschreibbar"
+
+
+def physisch_grund(tool) -> str:
+    """Warum sich dieses Volume nicht direkt auf eine physische Diskette schreiben lässt
+    ("" = es geht).  Der Kern urteilt (``physisch_schreiben_grund``): ein tar-Satz ist ein
+    Strom über mehrere Disketten; der Grund nennt auch den Weg (Satz speichern, dann je
+    Abbild schreiben).  Ein Plattenabbild hat keine solche Auskunft."""
+    if tool is None:
+        return ""
+    return str(getattr(tool, "physisch_schreiben_grund", "") or "")
 
 
 def ist_platte(tool) -> bool:
@@ -78,5 +90,7 @@ def dateisystem_anzeige(tool) -> str:
     if ist_platte(tool):
         return "WEGA (P8000-Platte)"
     if tool.ist_tar:
+        if tool.tar_satz:
+            return "tar-Satz (UNIX)"
         return "tar-Diskette, leer" if tool.tar_leer else "tar-Archiv (UNIX)"
     return tool.filesystem

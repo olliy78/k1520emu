@@ -434,6 +434,8 @@ _lib.k1520d_insert.argtypes = [_H, _CS, _CS, ctypes.c_int, ctypes.c_bool]
 _lib.k1520d_insert.restype = ctypes.c_bool
 _lib.k1520d_erase.argtypes = [_H, _CS]
 _lib.k1520d_erase.restype = ctypes.c_bool
+_lib.k1520d_mkdir.argtypes = [_H, _CS]
+_lib.k1520d_mkdir.restype = ctypes.c_bool
 _lib.k1520d_insert_forced.argtypes = [_H, _CS, _CS, ctypes.c_int, ctypes.c_bool]
 _lib.k1520d_insert_forced.restype = ctypes.c_bool
 _lib.k1520d_insert_with_info.argtypes = [_H, _CS, _CS, ctypes.c_int, ctypes.c_bool, _CS]
@@ -1869,6 +1871,11 @@ class DiskTool:
         if not _lib.k1520d_erase(self._h, _b(name)):
             raise K1520DiskError(self._fail())
 
+    def mkdir(self, name: str) -> None:
+        """Verzeichnis anlegen (UNIX-Sicht: WEGA, tar); Zwischenverzeichnisse entstehen mit."""
+        if not _lib.k1520d_mkdir(self._h, _b(name)):
+            raise K1520DiskError(self._fail())
+
     def first_sector(self, name: str):
         """Der erste Sektor der Datei als ``(cyl, head, sector)`` — sonst ``None``.
 
@@ -2420,6 +2427,9 @@ class PlatteTool:
     alternatives: List[str] = []
     remarks = ""
     tar_leer = False
+    tar_satz = False
+    tar_satz_basis = ""
+    physisch_schreiben_grund = ""
     medium_cylinders = 0
     medium_heads = 0
     examined_tracks = 0

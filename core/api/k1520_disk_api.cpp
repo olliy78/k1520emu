@@ -1084,6 +1084,11 @@ extern "C" bool k1520d_erase(K1520Disk h, const char* name) {
     return H(h)->vol->erase(FileRef::parse(name));
 }
 
+extern "C" bool k1520d_mkdir(K1520Disk h, const char* name) {
+    if (!h || !name) return false;
+    return H(h)->vol->makeDirectory(FileRef::parse(name));
+}
+
 extern "C" bool k1520d_file_first_sector(K1520Disk h, const char* name,
                                         int* cyl, int* head, int* sector) {
     if (!h || !name || !cyl || !head || !sector) return false;
