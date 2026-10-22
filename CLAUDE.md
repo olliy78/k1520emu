@@ -32,6 +32,7 @@ tools/dev.sh test -R K2526       #   one card's tests by name regex
 tools/dev.sh build [trace]       # just build build/ (+ build_trace/ with 'trace')
 tools/dev.sh trace <boot_trace-args>   # build build_trace/, then run boot_trace
 tools/dev.sh tool <name> [args]  # build build/, then run build/<name> (floppy_diag, k1520dbg, kbd_test…)
+tools/dev.sh test-merge [basis]  # VOR DEM MERGE: waehlt nach Aenderungsbereich (--alles, --trocken)
 tools/dev.sh test-python         # only the pytest layer (C-ABI + GUI, label "python")
 tools/dev.sh test-level unit     # one test level: unit|debugtools|integration|cli|system|python
 tools/dev.sh test-oracle         # Z8000-Kern gegen MAME (build_oracle/, lädt MAME beim Konfigurieren)
@@ -39,6 +40,16 @@ tools/dev.sh win [ctest-args]    # Cross-Bau nach WINDOWS (MinGW-w64) + Tests un
 tools/dev.sh check               # build both dirs + report freshness
 tools/dev.sh rebuild             # rm -rf build build_trace, then build from scratch
 ```
+
+> **Vor dem Merge: `tools/dev.sh test-merge`** (2026-10-22). Es liest den `git diff` gegen `main`
+> (auf `main`: `origin/main`), bildet Pfade über `tools/test_auswahl.py` auf Fachlabels `fach_*` ab und
+> fährt `test`, die langsamen Spuren (`format_integration`/`format_matrix`/`wega_install`) nur für die
+> berührten Fachgebiete und `win` bei C++/CMake-Änderungen; reine Doku fährt nichts, Gemeinsames
+> (`core/bus|api|util`, CMake, `tests/support`, `dev.sh`, unbekannte Pfade unter `core/`) fährt alles.
+> Der Plan steht vorab in der Ausgabe (`--trocken` = nur Plan). **Im Zweifel `--alles`**; die vollen
+> Spuren fahren weiter von Hand bzw. in der CI. Jeder neue langsame Test braucht ein `fach_*`-Label
+> (Wächter `py_test_auswahl`). `P8000SaFormat.*` liegt seit 2026-10-22 in `wega_install`, nicht mehr in
+> `test-format`.
 
 > **Läufe über ~60 s gehören in den HINTERGRUND** (`Bash` mit `run_in_background: true`),
 > nicht in den Vordergrund. Betrifft `test-format` (~60 s), `test-matrix` (~160 s),

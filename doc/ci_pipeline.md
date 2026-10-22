@@ -157,6 +157,13 @@ Merge nach `main` und vor einem Release** sinnvoll:
 | `format_matrix` | die **Breite**: 88 FORMAT.COM-Menüeinträge, Smoke Spur 0–2 | `tools/dev.sh test-matrix -j4` |
 | `beide` (Vorgabe) | nacheinander beides | |
 
+**Vor dem Merge lokal: `tools/dev.sh test-merge`** (2026-10-22). Statt immer alle Spuren zu fahren,
+wählt es nach Änderungsbereich (`git diff` gegen `main`, auf `main` gegen `origin/main`) über die
+Fachlabels `fach_*` (Tabelle `tools/test_auswahl.py`, Beschreibung `tests/README.md`): `test` immer
+außer bei reiner Doku, die langsamen Spuren nur für berührte Fachgebiete (Gemeinsames → alle),
+`win` bei C++/CMake-Änderungen. Der Plan wird vorab gedruckt (`--trocken` = nur Plan, `--alles`
+erzwingt alles). Die CI-Workflows bleiben unverändert und fahren weiter die vollen Spuren.
+
 Anstoßen:
 
 ```sh

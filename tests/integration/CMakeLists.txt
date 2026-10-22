@@ -76,7 +76,7 @@ k1520_add_test(serielle_kopplung SRC test_serielle_kopplung.cpp
                                  LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 120)
 k1520_add_test(serielle_kopplung_voll SRC test_serielle_kopplung.cpp
                                  LIBS k1520_a5120 k1520_logger
-                                 LABELS "integration;slow;format_integration"
+                                 LABELS "integration;slow;format_integration;fach_serial"
                                  DEFS LOG_LEVEL=2 KOPPLUNG_VOLL=1 TIMEOUT 600)
 
 # A5120.16, Abnahme S1: Original-BIOS (em256 equ 1) erkennt das EM256, RAM-Floppy M:

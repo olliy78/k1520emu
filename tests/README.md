@@ -26,10 +26,22 @@ tools/dev.sh test                    # Regression: alles außer den langsamen (~
 tools/dev.sh test-format             # NUR die Boot-Disk-Kette (Label format_integration)
 tools/dev.sh test-matrix             # NUR die 88 Format-Matrix-Tests (jedes FORMAT.COM-Menü)
 tools/dev.sh test-all                # beides
+tools/dev.sh test-merge              # VOR DEM MERGE: nach Aenderungsbereich gewaehlt (s. u.)
 tools/dev.sh test-python             # nur die pytest-Ebene
 tools/dev.sh test-level unit         # eine Ebene: unit|debugtools|integration|cli|system|python
 tools/dev.sh test -R K2526           # Namensmuster (ctest-Argumente werden durchgereicht)
 ```
+
+**Fachgebiets-Labels und `test-merge`.** Jeder Fall der langsamen Spuren (`format_integration`,
+`format_matrix`, `wega_install`) trägt zusätzlich mindestens ein `fach_*`-Label (`fach_floppy`,
+`fach_serial`, `fach_kermit`, `fach_p8000`, `fach_wega`, `fach_rtc`, `fach_a5120`, `fach_k8915`,
+`fach_pc1715`, `fach_prg710`), gesetzt in `LABELS` der `k1520_add_test()`-Zeile bzw. des `add_test`.
+`tools/dev.sh test-merge [basis] [--alles] [--trocken]` liest den `git diff` gegen die Basis, bildet
+Pfade über die Tabelle in `tools/test_auswahl.py` auf Fachlabels ab und fährt `test`, die langsamen
+Spuren nur für die berührten Fachgebiete und `win` bei C++/CMake-Änderungen; reine Doku fährt nichts,
+Gemeinsames (`core/bus|api|util`, CMake, `tests/support`, `dev.sh`, unbekannte Pfade unter `core/`)
+fährt alles. **Ein neuer langsamer Test braucht ein `fach_*`-Label** (Wächter `py_test_auswahl`),
+und ein neues Fachgebiet gehört in `FACHER` und in die Tabelle. Im Zweifel `--alles`.
 
 Jeder Lauf hinterlässt nebenbei `build/Testing/junit.xml`; daraus wird eine lesbare
 Seite (Ebenen, Laufzeiten, Fehlschläge mit voller Ausgabe):

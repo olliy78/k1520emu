@@ -12,16 +12,18 @@
 
 set(_libs k1520_a5120 k1520_floppy k1520_logger k1520_testsupport)
 set(_lbl  "system;slow;format_integration")
+# Fachgebiets-Labels (fach_*): tools/test_auswahl.py waehlt danach, was vor dem Merge laeuft.
+# Jeder Fall der langsamen Labels MUSS mindestens eines tragen (Waechter py_test_auswahl).
 
 # Langsamer SCPX-INIT.COM-Formatier-Guard (~35 s, 160 Spuren): INIT formatiert B:,
 # MODF/SYSP erzeugen ein 5x1024-System, PIP kopiert, davon wird gebootet.
 k1520_add_test(scpx_init SRC test_scpx_init.cpp LIBS ${_libs}
-                         LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 120)
+                         LABELS "${_lbl};fach_floppy;fach_a5120" DEFS LOG_LEVEL=2 TIMEOUT 120)
 
 # SCPX + Robotron-Kassettenbibliothek KMBG.REL (doc/design/29_kassette.md AP K8): KMBGTEST.COM
 # schreibt mit gesteckter K5020 einen Block, setzt zurueck, liest ihn wieder.
 k1520_add_test(scpx_kmbg SRC test_scpx_kmbg.cpp LIBS ${_libs} k1520_fs
-                         LABELS "${_lbl}" DEFS LOG_LEVEL=2
+                         LABELS "${_lbl};fach_floppy;fach_a5120" DEFS LOG_LEVEL=2
                          K1520_KMBGTEST_COM="${CMAKE_SOURCE_DIR}/tools/kassette/kmbgtest/kmbgtest.com"
                          TIMEOUT 300)
 
@@ -30,24 +32,24 @@ k1520_add_test(scpx_kmbg SRC test_scpx_kmbg.cpp LIBS ${_libs} k1520_fs
 # Vergleicht dabei das formatierte Band mit dem Beispielband disks/a5120_bcu/bcu_kassette_formatiert.k52
 # (K1520_BEISPIELBAND=<pfad> schreibt es neu, tools/bcu_a5120/build.py).
 k1520_add_test(bcu_kassette SRC test_bcu_kassette.cpp LIBS ${_libs} k1520_fs
-                            LABELS "${_lbl}" DEFS LOG_LEVEL=2
+                            LABELS "${_lbl};fach_floppy;fach_a5120" DEFS LOG_LEVEL=2
                             "A5120_LIEFERDISKETTEN=\"${CMAKE_SOURCE_DIR}/disks\"" TIMEOUT 600)
 
 # UDOS-4.3-Schreibpfad (origin/main 69b7445): 8212-Laufwerksauswahl und
 # Sektorkontrollblock — langsam, daher dasselbe Label.
 k1520_add_test(udos_format SRC test_udos_format.cpp LIBS ${_libs}
-                           LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 600)
+                           LABELS "${_lbl};fach_floppy;fach_a5120" DEFS LOG_LEVEL=2 TIMEOUT 600)
 
 # k1520DiskTool <-> echtes UDOS: geschrieben wird mit UdosFileSystem, gelesen vom
 # laufenden Betriebssystem (CAT / PRINT / STATUS).  Doc: doc/design/13_k1520disktool.md §15
 k1520_add_test(disktool_udos_roundtrip SRC test_disktool_udos_roundtrip.cpp
                                        LIBS ${_libs} k1520_fs
-                                       LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 600)
+                                       LABELS "${_lbl};fach_floppy;fach_a5120" DEFS LOG_LEVEL=2 TIMEOUT 600)
 
 # HARDY-Hardware-Testprogramm: der „Rechner"-Test laeuft clean durch (Waechter
 # fuer den /MEMDI- + BS-PIO-Bus-Strobe-Fix).
 k1520_add_test(hardy     SRC test_hardy.cpp     LIBS ${_libs}
-                         LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 180)
+                         LABELS "${_lbl};fach_floppy;fach_a5120" DEFS LOG_LEVEL=2 TIMEOUT 180)
 
 # ─── Boot-Disk-Erstellung: leere Diskette → formatieren → bootfaehig → boot ──
 # Voller Anwender-Workflow (Tastatur-getrieben ueber format_driver): eine leere,
@@ -67,7 +69,7 @@ macro(add_bootdisk_test name preset)
         "FORMAT_DRIVER=$<TARGET_FILE:format_driver> python3 ${_mkboot} --preset ${preset} --quiet")
     set_tests_properties(${name} PROPERTIES
         TIMEOUT 600 PASS_REGULAR_EXPRESSION "BOOTDISK OK"
-        LABELS "system;slow;format_integration")
+        LABELS "system;slow;format_integration;fach_floppy;fach_a5120")
 endmacro()
 
 add_bootdisk_test(bootdisk_cpa780        cpa780)         # 5¼″-MFM   cpa780
@@ -116,7 +118,7 @@ else()
         set_tests_properties(format_matrix_${_boot}_${_drv}_${_geotag}_${_key}
             PROPERTIES TIMEOUT 300
             FAIL_REGULAR_EXPRESSION "SPUR DEFEKT|FEHLER"
-            LABELS "system;slow;format_matrix")
+            LABELS "system;slow;format_matrix;fach_floppy;fach_a5120")
     endforeach()
     list(LENGTH _fmt_rows _fmt_n)
     message(STATUS "Format-Matrix: ${_fmt_n} Tests registriert (LABEL format_matrix)")
@@ -129,10 +131,10 @@ endif()
 # FORMAT-Menues auf Zylinder 00–02 die BREITE (format_matrix, wie die A5120-Matrix).
 k1520_add_test(k8915_format SRC test_k8915_format.cpp
                             LIBS k1520_k8915 k1520_fs k1520_logger k1520_testsupport
-                            LABELS "system;slow;format_integration" DEFS LOG_LEVEL=2 TIMEOUT 600)
+                            LABELS "system;slow;format_integration;fach_floppy;fach_k8915" DEFS LOG_LEVEL=2 TIMEOUT 600)
 k1520_add_test(k8915_format_verfahren SRC test_k8915_format_verfahren.cpp
                             LIBS k1520_k8915 k1520_logger k1520_testsupport
-                            LABELS "system;slow;format_matrix" DEFS LOG_LEVEL=2 TIMEOUT 300)
+                            LABELS "system;slow;format_matrix;fach_floppy;fach_k8915" DEFS LOG_LEVEL=2 TIMEOUT 300)
 
 # ─── SERTEST.COM (Entwurf 19 §14.8, AP-ST2): Serial Test unter CP/A und SCPX 8915 ──
 # Erkennung + Schnittstellenliste, Kurzhilfe, Ergebniszeilen, Ctrl+C → bedienbar.
@@ -155,7 +157,7 @@ k1520_add_test(sertest_kopplung SRC test_sertest_kopplung.cpp
                        K1520_SERTEST_V02="${CMAKE_SOURCE_DIR}/tests/fixtures/cpm/SERTEST_V02.COM")
 k1520_add_test(sertest_kopplung_lang SRC test_sertest_kopplung.cpp
                        LIBS k1520_a5120 k1520_k8915 k1520_pc1715 k1520_prg710 k1520_fs k1520_logger k1520_testsupport
-                       LABELS "system;slow;format_integration" DEFS LOG_LEVEL=2 SERTEST_KOPPLUNG_LANG=1
+                       LABELS "system;slow;format_integration;fach_serial" DEFS LOG_LEVEL=2 SERTEST_KOPPLUNG_LANG=1
                        K1520_SERTEST_COM="${CMAKE_SOURCE_DIR}/tools/sertest/sertest.com"
                        K1520_SERTEST_V01="${CMAKE_SOURCE_DIR}/tests/fixtures/cpm/SERTEST_V01.COM"
                        K1520_SERTEST_V02="${CMAKE_SOURCE_DIR}/tests/fixtures/cpm/SERTEST_V02.COM" TIMEOUT 300)
@@ -166,26 +168,28 @@ k1520_add_test(sertest_kopplung_lang SRC test_sertest_kopplung.cpp
 # tests/integration/test_prg710_format.cpp.
 k1520_add_test(prg710_format_boot SRC test_prg710_format_boot.cpp
                             LIBS k1520_prg710 k1520_fs k1520_logger k1520_testsupport
-                            LABELS "system;slow;format_integration" DEFS LOG_LEVEL=2 TIMEOUT 300)
+                            LABELS "system;slow;format_integration;fach_floppy;fach_prg710" DEFS LOG_LEVEL=2 TIMEOUT 300)
 
 # ─── PC 1715 (doc/design/21_pc1715.md AP-4f): Werkstest PCTEST.COM unter SCP 1715 mit
 # Pruefsteckern (Loop am Hub), wie HARDY — Testzeit 1 min Maschinenzeit.
 k1520_add_test(pc1715_pctest_scp SRC test_pc1715_pctest_scp.cpp
                             LIBS k1520_pc1715 k1520_fs k1520_logger k1520_testsupport
-                            LABELS "system;slow;format_integration" DEFS LOG_LEVEL=2 TIMEOUT 600)
+                            LABELS "system;slow;format_integration;fach_floppy;fach_pc1715" DEFS LOG_LEVEL=2 TIMEOUT 600)
 
 # ─── PC 1715 (doc/design/21_pc1715.md AP-5b): FORMAT unter SCP 1715 / CP/A 1715 ──
 k1520_add_test(pc1715_format SRC test_pc1715_format.cpp
                             LIBS k1520_pc1715 k1520_fs k1520_logger k1520_testsupport
-                            LABELS "system;slow;format_integration" DEFS LOG_LEVEL=2 TIMEOUT 600)
+                            LABELS "system;slow;format_integration;fach_floppy;fach_pc1715" DEFS LOG_LEVEL=2 TIMEOUT 600)
 
 # ─── P8000 M3-Anfang (doc/design/25_p8000.md §10.11 AP P13d): WDC 4.2 an der 16-Bit-PIO2,
 # sa.format + sa.verify von der WEGA-Startdiskette formatieren und pruefen eine TempPlatte
-# (K5504.50, 5120 Spuren) — Minuten, daher format_integration.
+# (K5504.50, 5120 Spuren) — Minuten.  Seit 2026-10-22 in der Spur `wega_install` (P8000-Platte, nicht
+# Diskette; FormatiertUndPrueftEineTempPlatte allein 462 s und bestimmte die Dauer von test-format).
+# Braucht nur die eingecheckte Startdiskette (tests/fixtures/p8000), keine Disketten ausserhalb des Repos.
 set(_p8000_dir "P8000_FIXTURE_DIR=\"${CMAKE_SOURCE_DIR}/tests/fixtures/p8000\"")
 k1520_add_test(p8000_sa_format SRC test_p8000_sa_format.cpp
                             LIBS k1520_p8000 k1520_fs k1520_logger k1520_testsupport
-                            LABELS "system;slow;format_integration" DEFS LOG_LEVEL=2 ${_p8000_dir} TIMEOUT 3600)
+                            LABELS "system;slow;wega_install;fach_p8000;fach_wega" DEFS LOG_LEVEL=2 ${_p8000_dir} TIMEOUT 3600)
 
 # ─── P8000 M3 (doc/design/25_p8000.md AP P15): WEGA 3.0 auf die Platte installieren und von ihr
 # starten.  Braucht die WEGA-Disketten ausserhalb des Repos (sonst uebersprungen) und rechnet
@@ -193,27 +197,27 @@ k1520_add_test(p8000_sa_format SRC test_p8000_sa_format.cpp
 # Zwischenstaende in ~/.cache/k1520emu/p8000_wega (tests/support/p8000_wega.h).
 k1520_add_test(p8000_wega_install SRC test_p8000_wega_install.cpp
                             LIBS k1520_p8000 k1520_fs k1520_logger k1520_testsupport
-                            LABELS "system;slow;wega_install" DEFS LOG_LEVEL=2 ${_p8000_dir} TIMEOUT 14400 RUN_SERIAL)
+                            LABELS "system;slow;wega_install;fach_p8000;fach_wega" DEFS LOG_LEVEL=2 ${_p8000_dir} TIMEOUT 14400 RUN_SERIAL)
 
 # ─── P8000 Mehrplatz-Abnahme (doc/design/25_p8000.md §11 AP P22): Kaltstart von der Platte aus
 # p15_7_sync mit der Konsole am Originalterminal und zwei Arbeitsplaetzen („P8000 Terminal") ueber
 # Loopback-Telnet.  Ohne Zwischenstand uebersprungen; Label wie die Installation.
 k1520_add_test(p8000_wega_mehrplatz SRC test_p8000_wega_mehrplatz.cpp
                             LIBS k1520_p8000 k1520_logger k1520_testsupport
-                            LABELS "system;slow;wega_install" DEFS LOG_LEVEL=2 TIMEOUT 7200 RUN_SERIAL)
+                            LABELS "system;slow;wega_install;fach_p8000;fach_wega" DEFS LOG_LEVEL=2 TIMEOUT 7200 RUN_SERIAL)
 
 # ─── P8000/WEGA: Disketten formatieren (format/mkfs), mounten, mit tar beschreiben und im DiskTool
 # lesen.  Startet aus dem eingefrorenen Zustand p15_6_login (kein Boot); ohne ihn uebersprungen.
 k1520_add_test(p8000_wega_diskette SRC test_p8000_wega_diskette.cpp
                             LIBS k1520_p8000 k1520_fs k1520_logger k1520_testsupport
-                            LABELS "system;slow;wega_install" DEFS LOG_LEVEL=2 TIMEOUT 3600 RUN_SERIAL)
+                            LABELS "system;slow;wega_install;fach_p8000;fach_wega" DEFS LOG_LEVEL=2 TIMEOUT 3600 RUN_SERIAL)
 
 # ─── P8000-Uhrenkarten am laufenden WEGA (Entwurf 38 AP R4): `date` nach dem Kaltstart mit U130X/RTC-72421,
 # Treiberbefund der Kerne, Schaltjahr, Zeitverhalten, kein Ruecksprung ueber einen Neustart.  W31 =
 # ausgelieferte Platte; W30 braucht den Zwischenstand p15_7_sync (sonst uebersprungen).
 k1520_add_test(p8000_wega_rtc SRC test_p8000_wega_rtc.cpp
                             LIBS k1520_p8000 k1520_gzip k1520_logger k1520_testsupport
-                            LABELS "system;slow;wega_install"
+                            LABELS "system;slow;wega_install;fach_p8000;fach_wega;fach_rtc"
                             DEFS LOG_LEVEL=2 "P8000_WEGA31_DIR=\"${CMAKE_SOURCE_DIR}/disks/p8000_wega31\""
                                  "K1520_DISKTOOL=\"$<TARGET_FILE:k1520disktool>\"" TIMEOUT 14400 RUN_SERIAL)
 add_dependencies(k1520_test_p8000_wega_rtc k1520disktool)
@@ -223,7 +227,7 @@ add_dependencies(k1520_test_p8000_wega_rtc k1520disktool)
 # Kermit-Server hinter getty.  Ohne Startdiskette/Platte uebersprungen; `K1520_WEGA31_PLATTE` uebersteuert.
 k1520_add_test(p8000_wega_kermit SRC test_p8000_wega_kermit.cpp
                             LIBS k1520_p8000 k1520_gzip k1520_serial k1520_logger k1520_testsupport
-                            LABELS "system;slow;wega_install"
+                            LABELS "system;slow;wega_install;fach_p8000;fach_wega;fach_kermit"
                             DEFS LOG_LEVEL=2 "P8000_WEGA31_DIR=\"${CMAKE_SOURCE_DIR}/disks/p8000_wega31\"" TIMEOUT 7200 RUN_SERIAL)
 
 # ─── Kermit-Gegenprobe (Entwurf 36 AP K7): die Bibliothek kermit/ gegen den echten C-Kermit 4.2 unter
@@ -231,7 +235,7 @@ k1520_add_test(p8000_wega_kermit SRC test_p8000_wega_kermit.cpp
 # Lauf: Plattenkopie + Testdateien per DiskTool + Kaltstart); ohne Startdiskette/Platte uebersprungen.
 k1520_add_test(p8000_wega_kermit_austausch SRC test_p8000_wega_kermit_austausch.cpp
                             LIBS k1520_p8000 k1520_gzip k1520_serial k1520kermit_core k1520_logger k1520_testsupport
-                            LABELS "system;slow;wega_install"
+                            LABELS "system;slow;wega_install;fach_p8000;fach_wega;fach_kermit"
                             DEFS LOG_LEVEL=2 "P8000_WEGA31_DIR=\"${CMAKE_SOURCE_DIR}/disks/p8000_wega31\""
                                  "K1520_DISKTOOL=\"$<TARGET_FILE:k1520disktool>\"" TIMEOUT 7200 RUN_SERIAL)
 add_dependencies(k1520_test_p8000_wega_kermit_austausch k1520disktool)
@@ -242,7 +246,7 @@ add_dependencies(k1520_test_p8000_wega_kermit_austausch k1520disktool)
 k1520_add_test(kermit80 SRC test_kermit80.cpp
                         LIBS k1520_a5120 k1520_k8915 k1520_pc1715 k1520_prg710 k1520_p8000 k1520_fs k1520_serial k1520kermit_core
                              k1520_logger k1520_testsupport
-                        LABELS "system;slow;format_integration"
+                        LABELS "system;slow;format_integration;fach_kermit"
                         DEFS LOG_LEVEL=2 "K1520_KERMIT80_DIR=\"${CMAKE_SOURCE_DIR}/tools/kermit80\""
                              "K1520_OSM_P8000_DISK=\"${CMAKE_SOURCE_DIR}/disks/p8000_osm30/p8000_osm30_system.hfe\""
                              K1520_SERTEST_COM="${CMAKE_SOURCE_DIR}/tools/sertest/sertest.com" TIMEOUT 1800)
@@ -252,7 +256,7 @@ k1520_add_test(kermit80 SRC test_kermit80.cpp
 # uebersprungen.  Label wie die Gegenprobe (nicht in test/test-format; tools/dev.sh test-wega).
 k1520_add_test(kermit80_wega SRC test_kermit80_wega.cpp
                             LIBS k1520_a5120 k1520_p8000 k1520_fs k1520_gzip k1520_serial k1520_logger k1520_testsupport
-                            LABELS "system;slow;wega_install"
+                            LABELS "system;slow;wega_install;fach_p8000;fach_wega;fach_kermit"
                             DEFS LOG_LEVEL=2 "P8000_WEGA31_DIR=\"${CMAKE_SOURCE_DIR}/disks/p8000_wega31\""
                                  "K1520_KERMIT80_DIR=\"${CMAKE_SOURCE_DIR}/tools/kermit80\""
                                  "K1520_DISKTOOL=\"$<TARGET_FILE:k1520disktool>\"" TIMEOUT 7200 RUN_SERIAL)
