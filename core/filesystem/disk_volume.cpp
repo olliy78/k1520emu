@@ -1683,13 +1683,22 @@ bool formatEinheitlich(const DiskFormat& f, std::string& warum) {
 
 }  // namespace
 
+// Verzeichnisteil eines Pfades TEXTUELL (samt abschliessendem Trenner, leer ohne Verzeichnis).
+// Der vom Anwender uebergebene Pfad behaelt so seine Schreibweise: fs::path::operator/ setzt unter
+// Windows den nativen Trenner '\\' ein und machte aus "/x/a1.img" ein "/x\\a.img".
+static std::string verzeichnisTeil(const std::string& pfad) {
+    const char* trenner = fs::path::preferred_separator == '\\' ? "/\\" : "/";
+    const size_t pos = pfad.find_last_of(trenner);
+    return pos == std::string::npos ? std::string() : pfad.substr(0, pos + 1);
+}
+
 std::string DiskVolume::tarSatzBasisname(const std::string& abbildpfad) {
     const fs::path p(abbildpfad);
     std::string stem = p.stem().string();
     size_t n = stem.size();
     while (n > 0 && std::isdigit(static_cast<unsigned char>(stem[n - 1]))) --n;
     if (n == 0 || n == stem.size()) return abbildpfad;      // keine Ziffern (oder nur Ziffern: Name behalten)
-    return (p.parent_path() / (stem.substr(0, n) + p.extension().string())).string();
+    return verzeichnisTeil(abbildpfad) + stem.substr(0, n) + p.extension().string();
 }
 
 std::string DiskVolume::physischSchreibenGrund() const {
@@ -1843,11 +1852,12 @@ TarSatzPlan DiskVolume::tarSatzPlanen(const std::string& basisname) const {
         p.basisname = tarSatzBasisname(p.basisname);
     const fs::path bp(p.basisname);
     const std::string stem = bp.stem().string(), endg = bp.extension().string();
-    const fs::path dir = bp.parent_path();
+    const std::string dirText = verzeichnisTeil(p.basisname);
+    const fs::path dir = dirText;
     for (int i = 1; i <= p.abbilder; ++i) {
         const std::string name = (satz_einzelname_ && p.abbilder == 1)
                                      ? p.basisname
-                                     : (dir / (stem + std::to_string(i) + endg)).string();
+                                     : dirText + stem + std::to_string(i) + endg;
         p.namen.push_back(name);
         std::error_code ec;
         if (fs::exists(name, ec)) p.ueberschreibt.push_back(name);
@@ -1865,7 +1875,7 @@ TarSatzPlan DiskVolume::tarSatzPlanen(const std::string& basisname) const {
             || !std::all_of(mitte.begin(), mitte.end(), [](char c) { return std::isdigit(static_cast<unsigned char>(c)); }))
             continue;
         const unsigned long num = std::stoul(mitte);
-        if (num > static_cast<unsigned long>(p.abbilder)) alt.emplace_back(num, e.path().string());
+        if (num > static_cast<unsigned long>(p.abbilder)) alt.emplace_back(num, dirText + fn);
     }
     std::sort(alt.begin(), alt.end());
     for (const auto& a : alt) p.altlasten.push_back(a.second);
@@ -1896,7 +1906,7 @@ bool DiskVolume::tarSatzSpeichern(const std::string& basisname, std::vector<std:
     auto aufraeumen = [&]() { std::error_code ec; for (const auto& t : tmp) fs::remove(t, ec); };
     for (int i = 0; i < p.abbilder; ++i) {
         const fs::path ziel(p.namen[static_cast<size_t>(i)]);
-        const std::string hilfsname = (ziel.parent_path() / ("~satz" + std::to_string(i + 1) + "_" + ziel.filename().string())).string();
+        const std::string hilfsname = verzeichnisTeil(p.namen[static_cast<size_t>(i)]) + "~satz" + std::to_string(i + 1) + "_" + ziel.filename().string();
         tmp.push_back(hilfsname);
         std::string grund;
         {
