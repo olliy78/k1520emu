@@ -38,6 +38,13 @@ def _fenster(qapp):
     from app.ui.main_window import MainWindow
     w = MainWindow(None, profil=profil.profil("p8000"))
     w.run_timer.stop()                        # die Zeit schaltet der Test
+    # Die Waechter sind an MON 3.1 geschrieben (Bedienfolge „Press RETURN“ → x → „Press NMI“, Merkposten
+    # 26b/54).  Die Voreinstellung P8000 setzt seit Ticket #15 MON 3.0 (Compact: 3.1), dessen Hochlauf
+    # (beobachtet: MON16 laeuft ohne „Press NMI“-Halt bis MAXSEG durch; Ursache nicht untersucht) diese Folge nicht trifft — deshalb hier 3.1,
+    # alles andere (Index, 4x256K, WDC 4.2, plattepar=aus, Originalterminal) bleibt die Auslieferung.
+    w._on_hardware_selected("mon8", "3.1")
+    w._on_hardware_selected("mon16", "3.1")
+    w.run_timer.stop()
     w.show()
     qapp.processEvents()
     return w

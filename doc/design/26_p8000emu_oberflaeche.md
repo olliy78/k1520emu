@@ -209,3 +209,39 @@ Fokusverlust), Verbindungsdialog, Statuszeile, Portvorschläge, Instanzname/`--c
 Das Vollgerät legt **keine** Standardplatte mehr an (`_platte_vorbereiten` ist weg): eine leere E5-Platte schickte MON16 in den
 AUTOBOOT.  Ohne Platte endet der Hochlauf am MON8-Prompt (`Press RETURN`, `>`).  Eine Platte entsteht nur über *Neue Platte…*
 im Plattenkasten, der das im Hinweis sagt; ein `platte`-Abschnitt in der Konfiguration (auch `path: ""`) wirkt wie zuvor.
+
+### 8.7 Voreinstellungen P8000 / P8000 Compact und mehrere Winchester (Ticket #15, 2026-10-23)
+
+**Modellliste:** `general.model` kennt vier Schlüssel (`p8000-ot`, `p8000-16-ot`, `p8000-8-ot`, `p8000-term`).  Ein eigenes
+Compact-Modell gibt es nicht; der kurz im Umlauf gewesene Schlüssel `p8000-c-ot` wird über `modell_alt` auf `p8000-ot` abgebildet und
+beim Laden (ohne `general.bauart`) als Bauart `compact` gelesen.
+
+**Bauart = Vorgabe-Satz**, wie A5120/A5130/K8924 beim A5120 (`app/modell.py::VORGABEN`): `Programmprofil.bauarten` (Schlüssel,
+Anzeigename, Fenstertitel, Vorgaben), im P8000-Profil `P8000_BAUARTEN`.  Das Auswahlfeld *Allgemein ▸ Modell* ist **orthogonal** zu
+*Rechnerausstattung* und *Betriebsart*; `general.bauart` (`p8000` | `compact`) wird gespeichert.  Die Wahl (`MainWindow._on_bauart_selected`,
+Signal `activated`, also auch beim erneuten Wählen) **übernimmt ohne Rückfrage** `mon8`, `mon16`, `dram`, `rtc`, `rtc_versatz`, die
+Diskettenlaufwerke und die Winchester-Zahl und baut die Maschine kalt neu; danach ist jede Option einzeln änderbar.  Index, WDC-Firmware
+und Plattenparameter gehören nicht dazu.  `hardware_standard(modell, bauart)` / `hardware_normalisieren(daten, modell, bauart)` legen die
+Bauart zwischen Modellvorgabe und Profilvorgabe; der Fenstertitel folgt ihr (`modell_titel(modell, bauart)`; die Terminaleinheit bleibt
+„P8000 Terminal“).
+
+| | P8000 (Programmvorgabe) | P8000 Compact |
+|---|---|---|
+| MON8 / MON16 | 3.0 / 3.0 | 3.1 / 3.1 |
+| Hauptspeicher | 4 × 256 KB | 4 × 1 MB |
+| RTC | U130X (−40 Jahre) | U130X (−40 Jahre) |
+| Disketten K5601 | 2 | 3 |
+| Winchester K5504.50 | 1 | 1 |
+
+Die Programmvorgabe `data/default_config_p8000.yaml` hat dadurch MON 3.0 (vorher 3.1); die Wächter, die den Hochlauf-Text prüfen, sind
+nachgezogen.  Die Epson RTC-72421 bleibt wählbar, ist aber nie Vorgabe.
+
+**Winchester-Laufwerke:** *Einstellungen ▸ Laufwerke ▸ Winchester-Laufwerke* (1–3, Vorgabe 1; nur mit WDC wirksam, sonst gesperrt;
+`general.winchester`).  `PlattenGruppe` (`app/ui/platten_widget.py`) hält drei `PlattenWidget`-Kästen (`unit` 0–2), sichtbar sind so
+viele wie gewählt; `main.platten_widget` bleibt das Laufwerk 0.  Konfiguration: `platte:` (Laufwerk 0, unverändert), `platte1:`, `platte2:`
+mit je `{path: …}`; fehlt `general.winchester`, zählt der höchste vorhandene Abschnitt (alter Stand = 1).  Die Zahl braucht **keinen
+Maschinenneubau**: der Kern führt immer drei Laufwerke und nimmt `hd_mount(unit, …)` jederzeit an (der WDC liest den Anschluss beim
+Hochlauf — Rückstellen genügt); die Platten gehen deshalb weiter per `hd_mount` an die neue Maschine, nicht über `platte0..2` im
+Konfigurationstext.  Weniger Laufwerke trennt die überzähligen ab (der Kern schreibt vorher zurück) und vergisst ihre Datei.  Die
+Platten-Lampe der Frontplatte ist im Kern das ODER aller Laufwerke (`panelLamps`), Plattensperre `<abbild>.lock` gilt je Datei.
+Wächter: `test_p8000emu_gui.py::test_voreinstellung_*`, `test_winchester_*`.

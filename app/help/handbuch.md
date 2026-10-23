@@ -1593,11 +1593,17 @@ die *Betriebsart*. Was anders ist:
   **nur Terminal** (s. u.). Ein Wechsel startet die Maschine kalt. Alte Konfigurationen mit dem
   früheren schlanken Kern-Terminal werden beim Laden auf die Ausstattung mit Originalterminal
   abgebildet.
-* **P8000 Compact** — als Rechnerausstattung *P8000 Compact (Vollgerät mit Terminal)* wählbar. Die Compact (1989) ist die P8000
-  im Tischgehäuse mit unveränderten Platinen; Winchester und Uhr gehören zur Grundausstattung. Nachgebildet ist nur die Variante mit
-  16-Bit-Teil und Originalterminal (Uhr U130x vorbelegt, Platte wie beim Vollgerät); eine 8-Bit-Compact und der WDOS-Adapter fehlen.
+* **Voreinstellung P8000 / P8000 Compact** — *Einstellungen ▸ Allgemein ▸ Modell*. Beide sind **Vorgabe-Sätze**, keine
+  eigenen Maschinen (wie A5120/A5130/K8924 beim A5120): die Wahl übernimmt ihre Werte ohne Rückfrage und baut die Maschine
+  neu auf; danach ist jede Option einzeln änderbar, auch das erneute Wählen derselben Voreinstellung setzt sie wieder.
+  **P8000** (Vorgabe): MON8 3.0, MON16 3.0, Hauptspeicher 4 × 256 KB, RTC U130X, 2 Diskettenlaufwerke K5601, 1 Winchester
+  K5504.50. **P8000 Compact** (1989, die P8000 im Tischgehäuse mit unveränderten Platinen): MON8 3.1, MON16 3.1, 4 × 1 MB, RTC U130X,
+  3 Diskettenlaufwerke K5601, 1 Winchester K5504.50. Platinenindex, WDC-Firmware und Plattenparameter gehören nicht dazu und
+  bleiben. Die Voreinstellung ist unabhängig von *Rechnerausstattung* und *Betriebsart*; der Fenstertitel folgt ihr
+  (*P8000 Emulator* / *P8000 Compact Emulator*). Die Epson RTC-72421 (Community-Nachbau) bleibt unter *RTC* wählbar, ist aber
+  nie Vorgabe. Nachgebildet ist nur die Variante mit 16-Bit-Teil und Originalterminal; eine 8-Bit-Compact und der WDOS-Adapter fehlen.
 * **ROM-Fassungen und Bestückung** — ebenfalls unter *Allgemein*: Platinenindex (8-Bit 3 /
-  16-Bit 4, oder beide 1), **MON8** 3.1/3.0, **MON16** 3.1/3.0/3.3, Hauptspeicher der
+  16-Bit 4, oder beide 1), **MON8** 3.0/3.1, **MON16** 3.0/3.1/3.3, Hauptspeicher der
   16-Bit-Seite (256 KB, 1 MB, 2 MB) und **WDC-Firmware** 4.2/4.0.05/3.4.05. Wo eine Wahl am
   Modell nichts bewirkt, ist das Feld ausgegraut. Jeder Wechsel ist ein Kaltstart.
   Die **Uhrenkarte** (Gruppe *RTC*) steht im Abschnitt *Die Echtzeituhr*.
@@ -1624,7 +1630,15 @@ die *Betriebsart*. Was anders ist:
   schaltet die Mitschrift aus; ist die Datei nicht beschreibbar, meldet es die Statuszeile und die
   Mitschrift stoppt, der Emulator läuft weiter. Das Feld gilt für beide Betriebsarten (Computer mit
   Terminal und nur Terminal) und wird in der Konfiguration gemerkt.
-* **Winchesterplatte** — im Kasten *Laufwerke* unter den Disketten. **Anschließen…** hängt ein
+* **Mehrere Winchester** — *Einstellungen ▸ Laufwerke ▸ Winchester-Laufwerke*: 1 bis 3 (Vorgabe 1). Jedes Laufwerk bekommt im
+  Kasten *Laufwerke* einen eigenen Plattenkasten (*Laufwerk 0*, *1*, *2*) mit **Anschließen…**, **Neue Platte…**, **Abtrennen**
+  und eigener Lampe; die Platte jedes Laufwerks wird gemerkt. Die Zahl wirkt ohne Neustart der Maschine, der WDC erkennt neu
+  angeschlossene Platten aber erst beim Hochlauf (*Rückstellen* oder *Rechner ein*). Wer die Zahl verringert, trennt die
+  weggenommenen Laufwerke ab (vorher wird zurückgeschrieben). Ohne Winchesterkontroller (*ohne Winchester*, *nur 8-Bit-Teil*)
+  ist die Wahl gesperrt. Das Lämpchen *Platte* der Frontplatte leuchtet bei Zugriff auf irgendeines der Laufwerke; zwei
+  Instanzen können dieselbe Plattendatei nicht gleichzeitig belegen (Sperre je Datei). Ob der Gast (MON16, WEGA) an
+  Laufwerk 1 und 2 lesen kann, ist noch nicht geprüft.
+* **Winchesterplatte** — im Kasten *Laufwerke* unter den Disketten (je Laufwerk einer). **Anschließen…** hängt ein
   vorhandenes Abbild an den WDC, **Neue Platte…** legt eines an (Typ K5504.50 u. a.; Wahl
   **Inhalt**: Vorgabe *Unformatiert, wie ein neues Laufwerk* — ohne Parametersatz, formatieren mit
   `sa.format` im Gast; oder *Formatiert mit Parametersatz (K5504.50, leer)*, nur für Sonderfälle),
@@ -1834,10 +1848,10 @@ gilt beim U880-Monitor gleich, beim U8000-Monitor nur Großbuchstaben (Handbuch 
 
 Wo die einzelnen Teile im Emulator eingestellt werden:
 
-* *Einstellungen ▸ Allgemein*: **Rechnerausstattung** (*Vollgerät*, *ohne Winchester*, *nur
+* *Einstellungen ▸ Allgemein*: **Modell** (Voreinstellung *P8000* oder *P8000 Compact*), **Rechnerausstattung** (*Vollgerät*, *ohne Winchester*, *nur
   8-Bit-Teil*), **Betriebsart** (*Computer mit Terminal* oder *nur Terminal*), **Hauptspeicher
   (16-Bit)**, ROM-Fassungen.
-* *Ansicht ▸ Laufwerke*: Disketten A: und B: sowie der **Plattenkasten** (*Anschließen…*, *Neue
+* *Ansicht ▸ Laufwerke*: Disketten A: und B: (Compact: auch C:) sowie die **Plattenkästen** (1–3, *Einstellungen ▸ Laufwerke ▸ Winchester-Laufwerke*) (*Anschließen…*, *Neue
   Platte…*, *Abtrennen*).
 * *Datei ▸ Diskette einlegen* (oder *Mount* im Laufwerkskasten): Diskette einlegen.
 * *Maschine ▸ Rückstellen*, *Maschine ▸ NMI-Taster*, *Maschine ▸ Verbindung zum Rechner…* (nur

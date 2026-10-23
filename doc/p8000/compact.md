@@ -34,13 +34,24 @@ Weitere Compact-spezifische EPROM-Hinweise fanden sich auf ycdtotv.de/pofo.de ni
 `datem.c`/`KTIME`).
 
 ## 4. Umsetzung
-Modell `p8000-c-ot` „P8000 Compact (Vollgerät mit Terminal)“ in `app/profil.py`: Kernparameter wie `p8000-ot` (16-Bit-Teil, WDC 4.2,
-Originalterminal), gleiche Hardwarewahl-Felder. Der Kern bleibt unverändert. Die Uhr (U130X, −40 Jahre) ist schon die Programmvorgabe
-aller Modelle mit 16-Bit-Teil (`hardware_vorgaben`), gilt also auch hier; sie bleibt abwählbar **[abgeleitet: kein Modellzwang nötig]**.
+**Voreinstellung, kein Modell (Anwenderentscheid 2026-10-23).** P8000 und P8000 Compact sind im `p8000emu` Vorgabe-Sätze einer Bauart
+(`Programmprofil.bauarten`, *Einstellungen ▸ Allgemein ▸ Modell*), wie A5120/A5130/K8924 beim A5120; Entwurf 26 §8.7. Der Kern bleibt
+unverändert (gleiche Schaltung, Kernparameter wie das Vollgerät).
 
-## 5. Offen [Anwender]
-1. Uhrentyp der Compact (U130X vermutet; die Neuentwicklung könnte auch ein anderer Chip sein).
-2. MON16-Version und Platinenindex der 16-Bit-Platine der Compact (Vorgabe hier: 3.1, 8-Bit 3 / 16-Bit 4).
-3. Dritte Floppy (auf einem Foto zu sehen): Laufwerksbelegung und Treiber unklar; der Emulator bietet weiter die Laufwerke der P8000.
-4. Anzahl und Belegung der bis zu 7 Terminal-Anschlüsse (der Emulator hat die tty-Schnittstellen der P8000).
-5. Zweite Platte: 2 × K 5504.50 sind belegt. **Kern (2026-10-23):** der WDC kennt bis zu DREI Laufwerke, `Config::platte/platte1/platte2` (Konfigurationstext `platte0..2`, CLI `--hd0..2`, Merkposten 61); bisher nur gemountet und in Kern- und CLI-Tests geprüft, ein Gast-Lesebefehl an LW 1/2 (MON16/WEGA) ist nicht getestet. Die Oberfläche bietet noch nur eine Platte (Folgeauftrag).
+| | P8000 | P8000 Compact |
+|---|---|---|
+| MON8 / MON16 | 3.0 / 3.0 | 3.1 / 3.1 |
+| Hauptspeicher | 4 × 256 KB | 4 × 1 MB |
+| RTC | U130X | U130X |
+| Disketten K5601 | 2 | 3 |
+| Winchester K5504.50 | 1 | 1 |
+
+Die Wahl übernimmt die Werte ohne Rückfrage (Kaltstart), danach ist jede Option einzeln änderbar. Hinzu kommt *Einstellungen ▸ Laufwerke ▸
+Winchester-Laufwerke* (1–3) mit je einem Plattenkasten (Kern: bis drei Laufwerke, Merkposten 61).
+
+## 5. Offen / beantwortet
+1. ~~Uhrentyp der Compact~~ **beantwortet (Anwender): U130X.** Die Epson RTC-72421 ist ein Community-Nachbau, bleibt als Option wählbar, ist nie Vorgabe.
+2. ~~MON16-Version und Platinenindex~~ **beantwortet (Anwender): MON8/MON16 3.1** (die klassische P8000 bekommt 3.0); Platinenindex bleibt 8-Bit 3 / 16-Bit 4.
+3. ~~Dritte Floppy~~ **beantwortet (Anwender): 3 Disketten-Laufwerke K5601** in der Voreinstellung (Treiber/Belegung im Gast weiter ungeprüft **[offen]**).
+4. **[offen]** Anzahl und Belegung der bis zu 7 Terminal-Anschlüsse (der Emulator hat die tty-Schnittstellen der P8000).
+5. Zweite Platte: 2 × K 5504.50 sind belegt. Kern: bis DREI Laufwerke (`Config::platte/platte1/platte2`, Merkposten 61), Oberfläche: bis drei Plattenkästen (2026-10-23). **[offen]** Ein Gast-Lesebefehl an LW 1/2 (MON16/WEGA) ist nicht getestet.

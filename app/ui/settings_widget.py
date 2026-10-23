@@ -51,6 +51,10 @@ class SettingsWidget(QWidget):
     # Emitted when a drive-type dropdown changes; carries the list of 4 core
     # DriveProfile names (one per K5122 slot, "none" = empty slot).
     driveTypesChanged = Signal(list)
+    #: Voreinstellung P8000 / P8000 Compact gewaehlt (Schluessel; auch beim erneuten Waehlen).
+    bauartChanged = Signal(str)
+    #: Zahl der Winchester-Laufwerke (1–3).
+    winchesterChanged = Signal(int)
     # Emitted when the model dropdown changes; carries the model key
     # (app.modell.A5120 / app.modell.A5120_16).
     modelChanged = Signal(str)
@@ -292,6 +296,22 @@ class SettingsWidget(QWidget):
             "(Maschine ▸ Verbindung zum Rechner…) mit dem Rechner eines anderen P8000-Emulators "
             "verbunden.  Ein Wechsel schaltet die Maschine aus und neu ein.")
         self.betriebsart_combo.currentIndexChanged.connect(self._on_model_combo)
+        # Voreinstellung (P8000 | P8000 Compact): ein Vorgabe-Satz wie die Modellwahl des A5120.
+        # `activated` kommt nur bei Bedienung, auch beim erneuten Waehlen desselben Eintrags.
+        self.bauart_combo = QComboBox(inner)
+        for schluessel, beschriftung, _titel, _vorgaben in self.profil.bauarten:
+            self.bauart_combo.addItem(beschriftung, schluessel)
+        self.bauart_combo.setToolTip(
+            "Voreinstellung: übernimmt die Bestückung des Geräts — MON8/MON16-Fassung, Hauptspeicher, "
+            "RTC, Zahl der Diskettenlaufwerke (Einstellungen ▸ Laufwerke) und der Winchester.  "
+            "P8000: MON 3.0, 4 × 256 KB, 2 Disketten.  P8000 Compact: MON 3.1, 4 × 1 MB, 3 Disketten.  "
+            "Danach ist jede Option einzeln änderbar.  Die Wahl baut die Maschine neu auf (Kaltstart).")
+        self.bauart_combo.activated.connect(
+            lambda _i: self.bauartChanged.emit(self.bauart_combo.currentData()))
+        if self.profil.bauarten and self.profil.modellwahl:
+            form.addRow("Modell:", self.bauart_combo)
+        else:
+            self.bauart_combo.setVisible(False)
         # Nur im Programm mit Modellwahl; model_value() liefert sonst die Vorgabe.
         if self.profil.modellwahl:
             form.addRow("Rechnerausstattung:" if self.profil.betriebsart_wahl else "Modell:",
@@ -727,6 +747,30 @@ class SettingsWidget(QWidget):
             return
         self.modelChanged.emit(self.model_value())
 
+    def bauart_value(self) -> str:
+        """Die gewählte Bauart (``""`` ohne Bauarten)."""
+        return self.profil.bauart_normalisieren(self.bauart_combo.currentData())
+
+    def set_bauart_value(self, schluessel: str) -> None:
+        """Die Bauart setzen (ohne Signal)."""
+        i = self.bauart_combo.findData(self.profil.bauart_normalisieren(schluessel))
+        if i >= 0:
+            self.bauart_combo.setCurrentIndex(i)
+
+    def winchester_value(self) -> int:
+        return int(self.winchester_combo.currentData() or 1) if self.winchester_combo else 1
+
+    def set_winchester_value(self, n: int) -> None:
+        """Zahl der Winchester setzen (ohne Signal)."""
+        if self.winchester_combo is None:
+            return
+        self._winchester_guard = True
+        try:
+            i = self.winchester_combo.findData(max(1, min(3, int(n))))
+            self.winchester_combo.setCurrentIndex(i if i >= 0 else 0)
+        finally:
+            self._winchester_guard = False
+
     def _terminal_betrieb(self) -> bool:
         return (self.profil.betriebsart_wahl
                 and self.betriebsart_combo.currentData() == "terminal")
@@ -773,6 +817,10 @@ class SettingsWidget(QWidget):
         if self.profil.betriebsart_wahl:
             self.model_combo.setEnabled(not self._terminal_betrieb())
         hat = self.profil.modell_hat_rechner(self.model_value())
+        if getattr(self, "winchester_combo", None) is not None:
+            self.winchester_combo.setEnabled(self.profil.modell_hat_wdc(self.model_value()))
+        if getattr(self, "bauart_combo", None) is not None:
+            self.bauart_combo.setEnabled(hat)        # „nur Terminal“: die Bauart gehoert zum Rechner
         if getattr(self, "rtc_gruppe", None) is not None:
             self.rtc_gruppe.setVisible(hat)          # „nur Terminal“: wie die anderen Rechnerfelder weg
         i = self.tabs.indexOf(self._drives_tab) if hasattr(self, "_drives_tab") else -1
@@ -840,9 +888,29 @@ class SettingsWidget(QWidget):
             self._drive_combos.append(combo)
             form.addRow(f"Laufwerk {slot}:", combo)
 
+        # Winchester-Laufwerke (P8000, Ticket #15): 1–3 Kaesten im Laufwerksreiter; wirkt ohne Neubau.
+        self.winchester_combo = None
+        self._winchester_guard = False
+        if self.profil.platte:
+            self.winchester_combo = QComboBox()
+            for n in (1, 2, 3):
+                self.winchester_combo.addItem(str(n), n)
+            self.winchester_combo.setToolTip(
+                "Zahl der Winchester-Laufwerke am WDC (1–3, Vorgabe 1).  Jedes bekommt im Reiter "
+                "Laufwerke einen Kasten für sein Plattenabbild.  Der WDC erkennt die Platten beim "
+                "Hochlauf (nach Rückstellen oder Rechner ein).  Ein weggenommenes Laufwerk wird "
+                "abgetrennt.  Ohne Winchesterkontroller (Ausstattung ohne Winchester / nur 8-Bit) "
+                "gesperrt.")
+            self.winchester_combo.currentIndexChanged.connect(self._on_winchester_combo)
+            form.addRow("Winchester-Laufwerke:", self.winchester_combo)
+
         # Start from the standard configuration until a config restore sets it.
         self.set_drive_types(self.profil.standard_laufwerke())
         return inner
+
+    def _on_winchester_combo(self, _i: int):
+        if not self._winchester_guard:
+            self.winchesterChanged.emit(self.winchester_value())
 
     def _on_drive_combo(self, _idx: int):
         if self._drive_guard:

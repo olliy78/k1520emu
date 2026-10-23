@@ -83,6 +83,13 @@ class Programmprofil:
     #: Werte; danach ist jede Option einzeln aenderbar.  Leer = Modelle sind Maschinen (alle anderen
     #: Programme).  Optionen mit Auswahlfeld stehen zusaetzlich in :attr:`hardware`.
     modell_vorgaben: Tuple[Tuple[str, Tuple[Tuple[str, object], ...]], ...] = ()
+    #: Bauarten als VORGABEN (P8000 / P8000 Compact, Ticket #15): ``(Schluessel, Anzeigename,
+    #: Fenstertitel, ((Option, Wert), …))``.  Wie :attr:`modell_vorgaben` beim A5120: die Wahl
+    #: UEBERNIMMT die Werte, danach ist jede Option einzeln aenderbar.  Optionen: die Hardwarefelder
+    #: (``mon8``, ``mon16``, ``dram``, ``rtc``, ``rtc_versatz``), ``laufwerke`` (K5122-Steckplaetze)
+    #: und ``winchester`` (Anzahl der Plattenlaufwerke).  Orthogonal zur Rechnerausstattung
+    #: (:attr:`modelle`) und zur Betriebsart.  Leer = keine Bauarten.  Die erste ist die Vorgabe.
+    bauarten: Tuple[Tuple[str, str, str, Tuple[Tuple[str, object], ...]], ...] = ()
     #: Terminal-Maschine (P8000): statt der Bildroehre ein Textbildschirm je Kern-Terminal
     #: (`app/ui/p8000_terminal.py`), Funktionstastenleiste statt Bildschirmtastatur.
     terminal: bool = False
@@ -220,21 +227,53 @@ class Programmprofil:
                 return hz, text
         return self.nenntakt_hz, self.nenntakt_text
 
-    def hardware_standard(self, modell=None) -> dict:
+    # ── Bauarten (P8000 / P8000 Compact) ─────────────────────────────────────
+
+    def standard_bauart(self) -> str:
+        """Schluessel der Bauart ab Werk (die erste; ``""`` ohne :attr:`bauarten`)."""
+        return self.bauarten[0][0] if self.bauarten else ""
+
+    def bauart_normalisieren(self, bauart) -> str:
+        """Eine bekannte Bauart — Unbekanntes/Fehlendes wird die Vorgabe."""
+        b = str(bauart).strip().lower() if bauart else ""
+        return b if any(x[0] == b for x in self.bauarten) else self.standard_bauart()
+
+    def bauart_vorgabe(self, bauart) -> dict:
+        """Vorgaben der Bauart (``laufwerke`` als Liste); leer ohne :attr:`bauarten`."""
+        b = self.bauart_normalisieren(bauart)
+        for k, _l, _t, paare in self.bauarten:
+            if k == b:
+                aus = dict(paare)
+                if "laufwerke" in aus:
+                    aus["laufwerke"] = list(aus["laufwerke"])
+                return aus
+        return {}
+
+    def bauart_titel(self, bauart) -> str:
+        b = self.bauart_normalisieren(bauart)
+        for k, _l, titel, _p in self.bauarten:
+            if k == b:
+                return titel
+        return self.titel
+
+    def hardware_standard(self, modell=None, bauart=None) -> dict:
         """Vorgabe jeder Hardwarevariante (``{}`` ohne :attr:`hardware`).  Mit
         :attr:`modell_vorgaben` die des Modells *modell* (ohne Angabe: des Standardmodells),
-        sonst der erste Wert jeder Auswahl."""
+        mit :attr:`bauarten` die der Bauart *bauart* (ohne Angabe: der ersten), sonst der erste
+        Wert jeder Auswahl."""
         vorgabe = self.modell_vorgabe(modell or self.standard_modell())
+        bau = self.bauart_vorgabe(bauart)
         eigene = dict(self.hardware_vorgaben)
-        return {k: str(vorgabe.get(k, eigene.get(k, werte[0][0])))
+        return {k: str(vorgabe.get(k, bau.get(k, eigene.get(k, werte[0][0]))))
                 for k, _b, _t, werte, _m in self.hardware}
 
-    def hardware_normalisieren(self, daten, modell=None) -> dict:
+    def hardware_normalisieren(self, daten, modell=None, bauart=None) -> dict:
         """Hardwarewahl aus einem Konfigurationsabschnitt: fehlende oder unbekannte
         Werte werden zur Vorgabe (ältere Konfigurationen) — mit :attr:`modell_vorgaben`
-        zur Vorgabe des Modells *modell*.  Jede Option wird einzeln geprüft."""
+        zur Vorgabe des Modells *modell*, mit :attr:`bauarten` zu der der Bauart *bauart*.
+        Jede Option wird einzeln geprüft."""
         daten = daten if isinstance(daten, dict) else {}
-        aus = self.hardware_standard(modell)
+        aus = self.hardware_standard(modell, bauart)
         for k, _b, _t, werte, _m in self.hardware:
             v = str(daten.get(k, "")).strip().lower()
             for w, _a in werte:        # Gross-/Kleinschreibung egal ("1M@0"), Wert wie im Profil
@@ -242,7 +281,7 @@ class Programmprofil:
                     aus[k] = w
                     break
             if k == "dram":            # P8000: Umzug alter Werte, eigene Bestueckung bleibt
-                aus[k] = _p8000_ram.normalisieren(daten.get(k))
+                aus[k] = _p8000_ram.normalisieren(daten.get(k, aus[k]))
         return aus
 
     def hardware_wirkt(self, schluessel: str, modell, hardware=None) -> bool:
@@ -401,12 +440,15 @@ class Programmprofil:
         z = self.ausstattungen()
         return k if any(m[0] == k for m in z) else (z[0][0] if z else self.standard_modell())
 
-    def modell_titel(self, modell) -> str:
-        """Fenstertitel des Modells: die eigenständige Terminaleinheit heißt „P8000 Terminal“."""
+    def modell_titel(self, modell, bauart=None) -> str:
+        """Fenstertitel des Modells: die eigenständige Terminaleinheit heißt „P8000 Terminal“,
+        sonst folgt er der Bauart (P8000 | P8000 Compact)."""
         if self.modell_vorgaben:
             return _modell.titel(self.modell_normalisieren(modell))
         if self.modell_art(modell) == "einheit":
             return "P8000 Terminal"
+        if self.bauarten:
+            return self.bauart_titel(bauart)
         return "P8000 Emulator" if self.modell_arten else self.titel
 
     def modell_tastatur(self, modell) -> str:
@@ -624,10 +666,26 @@ PC1715 = Programmprofil(
 #: Modelle des P8000 mit einem Rechner / mit der 16-Bit-Karte (Wirkungsbereich der Hardwarewahl).
 #: Die Kern-Terminal-Modelle (``p8000``, ``p8000-16``, ``p8000-8``) gibt es in der Oberflaeche nicht
 #: mehr (P23a); im Kern bleiben sie als Testgegenstelle.
-_RECHNER = ("p8000-ot", "p8000-16-ot", "p8000-8-ot", "p8000-c-ot")
-_MIT16 = ("p8000-ot", "p8000-16-ot", "p8000-c-ot")
+_RECHNER = ("p8000-ot", "p8000-16-ot", "p8000-8-ot")
+_MIT16 = ("p8000-ot", "p8000-16-ot")
 #: Modelle mit Winchesterkontroller.
-_MIT_WDC = ("p8000-ot", "p8000-c-ot")
+_MIT_WDC = ("p8000-ot",)
+
+#: Bauarten (Voreinstellungen, Ticket #15; doc/p8000/compact.md): P8000 und P8000 Compact sind KEINE
+#: Maschinen, sondern Vorgabe-Saetze fuer Einzeloptionen — wie A5120/A5130/K8924 beim A5120.  Die Wahl
+#: uebernimmt sie ohne Rueckfrage; danach ist jede Option einzeln aenderbar.  Die RTC ist bei beiden
+#: die U130X (Anwenderangabe); die Epson RTC-72421 bleibt waehlbar, ist aber nie Vorgabe.
+_K5601 = "K5601"
+P8000_BAUARTEN = (
+    ("p8000", "P8000", "P8000 Emulator",
+     (("mon8", "3.0"), ("mon16", "3.0"), ("dram", "4x256K"), ("rtc", _rtc.VORGABE_TYP),
+      ("rtc_versatz", _rtc.VORGABE_VERSATZ),
+      ("laufwerke", (_K5601, _K5601, "none", "none")), ("winchester", 1))),
+    ("compact", "P8000 Compact", "P8000 Compact Emulator",
+     (("mon8", "3.1"), ("mon16", "3.1"), ("dram", "4x1M"), ("rtc", _rtc.VORGABE_TYP),
+      ("rtc_versatz", _rtc.VORGABE_VERSATZ),
+      ("laufwerke", (_K5601, _K5601, _K5601, "none")), ("winchester", 1))),
+)
 
 P8000 = Programmprofil(
     maschine="p8000",
@@ -659,21 +717,20 @@ P8000 = Programmprofil(
     modelle=(("p8000-ot", "p8000", None, "Vollgerät (16-Bit-Teil und Winchester)", "k7673"),
              ("p8000-16-ot", "p8000", None, "ohne Winchester (16-Bit-Teil, nur UDOS)", "k7673"),
              ("p8000-8-ot", "p8000", None, "nur 8-Bit-Teil (UDOS, erste Baustufe)", "k7673"),
-             # P8000 Compact (1989): dieselben Platinen im Tischgehaeuse, Winchester + Uhr im Geraet
-             # (doc/p8000/compact.md).  Nur die Zwei-Prozessor-Variante mit Terminal.
-             ("p8000-c-ot", "p8000", None, "P8000 Compact (Vollgerät mit Terminal)", "k7673"),
              # Nur das Terminal: ein Arbeitsplatz, der sich ueber seine serielle Leitung mit dem
              # Rechner eines anderen Programms verbindet (Mehrplatzbetrieb).
              ("p8000-term", "p8000-terminal", None,
               "nur Terminal (Arbeitsplatz, ohne Rechner)", "k7673")),
     modell_kern=(("p8000-ot", (("karte16", "1"), ("wdc", "4.2"), ("terminal", "original"))),
                  ("p8000-16-ot", (("karte16", "1"), ("terminal", "original"))),
-                 ("p8000-8-ot", (("karte16", "0"), ("terminal", "original"))),
-                 ("p8000-c-ot", (("karte16", "1"), ("wdc", "4.2"), ("terminal", "original")))),
+                 ("p8000-8-ot", (("karte16", "0"), ("terminal", "original")))),
     modell_arten=(("p8000-ot", "original"), ("p8000-16-ot", "original"),
-                  ("p8000-8-ot", "original"), ("p8000-c-ot", "original"),
+                  ("p8000-8-ot", "original"),
                   ("p8000-term", "einheit")),
-    modell_alt=(("p8000", "p8000-ot"), ("p8000-16", "p8000-16-ot"), ("p8000-8", "p8000-8-ot")),
+    # `p8000-c-ot` (nur kurz im Umlauf, 2026-10-23) ist heute die Bauart `compact` mit Vollgeraet.
+    modell_alt=(("p8000", "p8000-ot"), ("p8000-16", "p8000-16-ot"), ("p8000-8", "p8000-8-ot"),
+                ("p8000-c-ot", "p8000-ot")),
+    bauarten=P8000_BAUARTEN,
     modell_tipp=("Rechnerausstattung: Vollgerät = 8-Bit-Karte, 16-Bit-Karte mit U8001 und "
                  "Winchesterkontroller (WEGA); ohne Winchester = nur UDOS und Monitor; nur 8-Bit-Teil "
                  "= wie die erste Baustufe des Geräts (die Koppelsoftware meldet „Hardware Error in "

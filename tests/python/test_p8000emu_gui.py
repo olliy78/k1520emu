@@ -94,7 +94,7 @@ def test_profil_und_titel(qapp, umgebung):
 
 
 def test_vorgaben_des_vollgeraets(qapp, umgebung):
-    """karte16 an, Index 3/4, MON 3.1, 1 MB, WDC 4.2, Platte = Datei (Vorgabe des Auftrags)."""
+    """karte16 an, Index 3/4, MON 3.0 (Voreinstellung P8000), 1 MB, WDC 4.2, Platte = Datei."""
     from app import profil
     p = profil.profil("p8000")
     assert p.standard_modell() == "p8000-ot"
@@ -102,40 +102,55 @@ def test_vorgaben_des_vollgeraets(qapp, umgebung):
     from app import rtc
     # Uhrenkarte: Auslieferungsvorgabe U130x / -40 Jahre (Entwurf 38 R3)
     assert kern == {"karte16": "1", "wdc": "4.2", "terminal": "original", "index8": "3",
-                    "index16": "4", "mon16": "3.1", "dram": "4x256K", "mon8": "3.1",
+                    "index16": "4", "mon16": "3.0", "dram": "4x256K", "mon8": "3.0",
                     "plattepar": "aus", "rtc": "u130x", "rtc_jahresversatz": -40, "rtc_utc": 1,
                     "rtc_zustand": rtc.zustand_pfad("p8000emu")}
     # ohne Winchester: keine wdc-Zeile (der Kern lehnt wdc ohne … nicht ab, aber es soll aus sein)
     k16 = p.kern_parameter("p8000-16-ot", {})["p8000"]
     assert k16["karte16"] == "1" and "wdc" not in k16
     k8 = p.kern_parameter("p8000-8-ot", {})["p8000"]
-    assert k8 == {"karte16": "0", "terminal": "original", "index8": "3", "mon8": "3.1"}
+    assert k8 == {"karte16": "0", "terminal": "original", "index8": "3", "mon8": "3.0"}
     assert p.modell_hat_wdc("p8000-ot") and not p.modell_hat_wdc("p8000-16-ot")
     # unbekanntes Modell → Vorgabe
     assert p.modell_normalisieren("quatsch") == "p8000-ot"
 
 
-def test_compact_ist_das_vollgeraet_mit_terminal(qapp, umgebung):
-    """P8000 Compact (Ticket #15): 16-Bit-Teil, WDC 4.2, Originalterminal, Uhr; Hardwarefelder wie beim Vollgeraet."""
-    from app import profil
+def test_compact_ist_eine_voreinstellung_und_kein_modell(qapp, umgebung):
+    """P8000 und P8000 Compact (Ticket #15) sind Vorgabe-Saetze einer Bauart, wie A5120/A5130/K8924."""
+    from app import profil, rtc
     p = profil.profil("p8000")
-    assert p.modell_normalisieren("p8000-c-ot") == "p8000-c-ot"
-    assert p.kern_parameter("p8000-c-ot", {}) == p.kern_parameter("p8000-ot", {})
-    kern = p.kern_parameter("p8000-c-ot", {})["p8000"]
-    assert kern["karte16"] == "1" and kern["wdc"] == "4.2" and kern["terminal"] == "original"
-    assert kern["rtc"] == "u130x"
-    assert p.modell_hat_wdc("p8000-c-ot") and p.modell_hat_rechner("p8000-c-ot")
-    for feld in ("index", "mon8", "mon16", "dram", "wdc", "rtc", "rtc_versatz", "platte_par"):
-        assert p.hardware_wirkt(feld, "p8000-c-ot") == p.hardware_wirkt(feld, "p8000-ot"), feld
-    # die alten Schluessel bleiben, wie sie waren
-    assert p.modell_normalisieren("p8000") == "p8000-ot" and p.standard_modell() == "p8000-ot"
+    assert [b[0] for b in p.bauarten] == ["p8000", "compact"] and p.standard_bauart() == "p8000"
+    # kein eigenes Modell: der kurz im Umlauf gewesene Schluessel wird zum Vollgeraet
+    assert p.modell_normalisieren("p8000-c-ot") == "p8000-ot"
+    assert p.bauart_normalisieren("quatsch") == "p8000" and p.bauart_normalisieren(None) == "p8000"
+    assert p.bauart_vorgabe("p8000") == {
+        "mon8": "3.0", "mon16": "3.0", "dram": "4x256K", "rtc": rtc.VORGABE_TYP,
+        "rtc_versatz": rtc.VORGABE_VERSATZ, "laufwerke": ["K5601", "K5601", "none", "none"],
+        "winchester": 1}
+    c = p.bauart_vorgabe("compact")
+    assert (c["mon8"], c["mon16"], c["dram"], c["rtc"], c["winchester"]) == ("3.1", "3.1", "4x1M", "u130x", 1)
+    assert c["laufwerke"] == ["K5601", "K5601", "K5601", "none"]
+    # Hardwarevorgaben je Bauart; die Bauart aendert nichts an Ausstattung/WDC
+    hw = p.hardware_standard("p8000-ot", "compact")
+    assert (hw["mon8"], hw["mon16"], hw["dram"], hw["rtc"]) == ("3.1", "3.1", "4x1M", "u130x")
+    assert p.hardware_standard()["mon8"] == "3.0"
+    kern = p.kern_parameter("p8000-ot", hw)["p8000"]
+    assert kern["karte16"] == "1" and kern["wdc"] == "4.2" and kern["dram"] == "4x1M" and kern["mon16"] == "3.1"
+    assert p.modell_titel("p8000-ot", "compact") == "P8000 Compact Emulator"
+    assert p.modell_titel("p8000-ot", "p8000") == "P8000 Emulator"
+    assert p.modell_titel("p8000-term", "compact") == "P8000 Terminal"
+    # die RTC ist nie die Epson-Nachbaukarte als Vorgabe, bleibt aber waehlbar
+    assert all(dict(b[3])["rtc"] == "u130x" for b in p.bauarten)
+    assert "rtc72421" in [w for w, _a in next(h for h in p.hardware if h[0] == "rtc")[3]]
 
 
 def test_compact_erzeugt_eine_kernmaschine(qapp, umgebung):
     from app import profil
     from app.core_binding.k1520 import K1520Emulator
     p = profil.profil("p8000")
-    emu = K1520Emulator(["K5601", "K5601", "none", "none"], machine="p8000", **p.kern_parameter("p8000-c-ot", {}))
+    hw = p.hardware_standard("p8000-ot", "compact")
+    emu = K1520Emulator(["K5601", "K5601", "K5601", "none"], machine="p8000",
+                        **p.kern_parameter("p8000-ot", hw))
     emu.power_on()
     assert emu.run(200_000) > 0 and emu.term_count() == 1
 
@@ -148,7 +163,7 @@ def test_jede_hardwarewahl_baut_eine_maschine(qapp, umgebung):
     assert [h[0] for h in p.hardware] == ["index", "mon8", "mon16", "dram", "wdc", "rtc", "rtc_versatz",
                                          "platte_par"]
     for schluessel, _b, _t, werte, modelle in p.hardware:
-        for modell in (modelle or ("p8000-ot", "p8000-16-ot", "p8000-8-ot", "p8000-c-ot")):
+        for modell in (modelle or ("p8000-ot", "p8000-16-ot", "p8000-8-ot")):
             for wert, _anzeige in werte:
                 hw = {**p.hardware_standard(), schluessel: wert}
                 emu = K1520Emulator(["K5601", "K5601", "none", "none"], machine="p8000",
@@ -162,11 +177,11 @@ def test_jede_hardwarewahl_baut_eine_maschine(qapp, umgebung):
 def test_hardwarewahl_normalisiert_gross_klein_und_fehlendes(qapp, umgebung):
     from app import profil
     p = profil.profil("p8000")
-    assert p.hardware_normalisieren({}) == {"index": "34", "mon8": "3.1", "mon16": "3.1",
+    assert p.hardware_normalisieren({}) == {"index": "34", "mon8": "3.0", "mon16": "3.0",
                                             "dram": "4x256K", "wdc": "4.2", "rtc": "u130x",
                                             "rtc_versatz": "-40", "platte_par": "aus"}
-    n = p.hardware_normalisieren({"dram": "1m@0+1m@1", "mon8": 3.0, "wdc": "9.9", "index": "11"})
-    assert n["dram"] == "2x1M" and n["mon8"] == "3.0" and n["wdc"] == "4.2"
+    n = p.hardware_normalisieren({"dram": "1m@0+1m@1", "mon8": 3.1, "wdc": "9.9", "index": "11"})
+    assert n["dram"] == "2x1M" and n["mon8"] == "3.1" and n["wdc"] == "4.2"
     assert n["index"] == "11"
 
 
@@ -214,20 +229,20 @@ def test_rom_fassung_und_modell_in_den_einstellungen(qapp, umgebung):
         sw = w.settings_widget
         assert set(sw.hardware_combos) == {"index", "mon8", "mon16", "dram", "wdc", "platte_par",
                                            "rtc", "rtc_versatz"}
-        # Rechnerausstattung (4) + Betriebsart (2); die Kern-Terminal-Modelle gibt es nicht mehr
-        assert sw.model_combo.count() == 4 and not sw.model_combo.isHidden()
+        # Rechnerausstattung (3) + Betriebsart (2); die Kern-Terminal-Modelle gibt es nicht mehr
+        assert sw.model_combo.count() == 3 and not sw.model_combo.isHidden()
         assert [sw.betriebsart_combo.itemData(i) for i in range(2)] == ["computer", "terminal"]
         assert not sw.ptape_box.isVisibleTo(sw)           # am P8000 keine Lochstreifenkarte
         for k in ("mon16", "dram", "wdc", "mon8", "index"):
             assert sw.hardware_combos[k].isEnabled()
 
-        # MON8 3.0: Banner der Maschine aendert sich, Konfiguration merkt es
-        w._on_hardware_selected("mon8", "3.0")
-        assert w._hardware["mon8"] == "3.0"
-        assert _bis(w, HARDWARETEST + " - Version 3.0", 20_000_000)
+        # MON8 3.1 (Voreinstellung P8000: 3.0): Banner der Maschine aendert sich, Konfiguration merkt es
+        w._on_hardware_selected("mon8", "3.1")
+        assert w._hardware["mon8"] == "3.1"
+        assert _bis(w, HARDWARETEST + " - Version 3.1", 20_000_000)
         w._autosave_now()
         cfg = config_io.load_config(str(umgebung / "p8000emu.yaml"))
-        assert cfg["general"]["mon8"] == "3.0" and cfg["general"]["model"] == "p8000-ot"
+        assert cfg["general"]["mon8"] == "3.1" and cfg["general"]["model"] == "p8000-ot"
 
         # nur 8-Bit-Teil: 16-Bit-Felder und WDC ausgegraut, Platte gesperrt
         w._on_model_selected("p8000-8-ot")
@@ -262,7 +277,7 @@ def test_boot_zeigt_das_banner_im_originalterminal(qapp, umgebung):
         assert _bis(w, "Press RETURN")
         t = w.screen_widget
         t.aktualisieren()
-        assert HARDWARETEST in t.text() and "U880-Softwaremonitor Version 3.1" in t.text()
+        assert HARDWARETEST in t.text() and "U880-Softwaremonitor Version 3.0" in t.text()
         stufen = {t.pixel(x, y) for x in range(0, 640, 2) for y in range(0, 312, 3)}
         assert stufen >= {0, 2} or stufen >= {0, 1}, stufen
         assert t._fb_bytes is not None and len(t._fb_bytes) == 640 * 312
@@ -413,7 +428,7 @@ def test_laufwerkskasten_zwei_disketten_und_der_plattenkasten_darunter(qapp, umg
         kasten = w.drives_dock.widget().widget()
         lay = kasten.layout()
         assert lay.itemAt(0).widget() is w.drives_widget
-        assert lay.itemAt(1).widget() is w.platten_widget
+        assert lay.itemAt(1).widget() is w.platten_gruppe and w.platten_gruppe.kaesten[0] is w.platten_widget
         assert [f.drive for f in w.status_widget.felder()] == [0, 1]
     finally:
         _zu(w, qapp)
@@ -772,5 +787,202 @@ def test_programm_ergaenzt_den_parametersatz_nicht_von_selbst(qapp, umgebung, tm
         assert Path(pfad).read_bytes()[:512] == b"\xe5" * 512      # unveraendert, kein PAR zurueckgeschrieben
         w.emulator.hd_flush()
         assert Path(pfad).read_bytes()[256:262] != b"PARMTR"
+    finally:
+        _zu(w, qapp)
+
+
+# ─── Voreinstellungen P8000 / P8000 Compact und mehrere Winchester (Ticket #15) ──────────────
+
+def _lw_belegung(w):
+    return list(w._drive_types)
+
+
+def test_voreinstellung_p8000_setzt_ihre_werte(qapp, umgebung):
+    """Die Programmvorgabe ist die klassische P8000: MON 3.0, 4 × 256 KB, RTC U130X, 2 Disketten, 1 Winchester."""
+    w = _fenster(qapp)
+    try:
+        sw = w.settings_widget
+        assert w._bauart == "p8000" and sw.bauart_value() == "p8000"
+        assert not sw.bauart_combo.isHidden()
+        assert [sw.bauart_combo.itemData(i) for i in range(2)] == ["p8000", "compact"]
+        assert (w._hardware["mon8"], w._hardware["mon16"], w._hardware["dram"], w._hardware["rtc"]) == \
+            ("3.0", "3.0", "4x256K", "u130x")
+        assert _lw_belegung(w) == ["K5601", "K5601", "none", "none"]
+        assert w.drives_widget.present_drives() == [0, 1]
+        assert w._winchester == 1 and sw.winchester_value() == 1
+        assert w.windowTitle() == "P8000 Emulator"
+        assert w.emulator.hd_path(0) == ""
+    finally:
+        _zu(w, qapp)
+
+
+def test_voreinstellung_compact_wechsel_und_einzelaenderung(qapp, umgebung):
+    w = _fenster(qapp)
+    try:
+        sw = w.settings_widget
+        sw.bauart_combo.setCurrentIndex(1)
+        w._on_bauart_selected(sw.bauart_combo.currentData())
+        w.run_timer.stop()
+        assert w._bauart == "compact" and w.windowTitle() == "P8000 Compact Emulator"
+        assert (w._hardware["mon8"], w._hardware["mon16"], w._hardware["dram"], w._hardware["rtc"]) == \
+            ("3.1", "3.1", "4x1M", "u130x")
+        # die Felder zeigen es, die Maschine hat es
+        assert sw.hardware_value()["dram"] == "4x1M" and sw.hardware_value()["mon8"] == "3.1"
+        assert _lw_belegung(w) == ["K5601", "K5601", "K5601", "none"]
+        assert w.drives_widget.present_drives() == [0, 1, 2]
+        assert sw.drive_types() == _lw_belegung(w)
+        assert w._winchester == 1
+        # danach ist jede Option einzeln aenderbar; das Modell (Ausstattung) bleibt davon unberuehrt
+        w._on_hardware_selected("mon8", "3.0")
+        assert w._hardware["mon8"] == "3.0" and w._bauart == "compact"
+        w._on_model_selected("p8000-16-ot")
+        w.run_timer.stop()
+        assert w._bauart == "compact" and w.windowTitle() == "P8000 Compact Emulator"
+        w._on_model_selected("p8000-ot")
+        # erneutes Waehlen derselben Bauart uebernimmt die Vorgaben wieder (wie beim A5120)
+        w._on_bauart_selected("compact")
+        w.run_timer.stop()
+        assert w._hardware["mon8"] == "3.1"
+        # zurueck auf die P8000
+        sw.bauart_combo.setCurrentIndex(0)
+        w._on_bauart_selected("p8000")
+        w.run_timer.stop()
+        assert (w._hardware["mon8"], w._hardware["dram"]) == ("3.0", "4x256K")
+        assert _lw_belegung(w) == ["K5601", "K5601", "none", "none"]
+        assert w.windowTitle() == "P8000 Emulator"
+        # WDC-Firmware und Platinenindex gehoeren nicht zur Voreinstellung
+        w._on_hardware_selected("index", "11")
+        w._on_bauart_selected("compact")
+        w.run_timer.stop()
+        assert w._hardware["index"] == "11"
+    finally:
+        _zu(w, qapp)
+
+
+def test_voreinstellung_ueberlebt_die_konfiguration_und_der_alte_compact_schluessel_wird_umgesetzt(
+        qapp, umgebung):
+    import yaml
+    from app import config_io
+    w = _fenster(qapp)
+    try:
+        w._on_bauart_selected("compact")
+        w.run_timer.stop()
+        w._autosave_now()
+        g = config_io.load_config(str(umgebung / "p8000emu.yaml"))["general"]
+        assert g["bauart"] == "compact" and g["winchester"] == 1 and g["dram"] == "4x1M"
+    finally:
+        _zu(w, qapp)
+    w = _fenster(qapp)
+    try:
+        assert w._bauart == "compact" and w.settings_widget.bauart_value() == "compact"
+        assert w.windowTitle() == "P8000 Compact Emulator" and w.drives_widget.present_drives() == [0, 1, 2]
+    finally:
+        _zu(w, qapp)
+    # Konfiguration vom 2026-10-23: `model: p8000-c-ot` ohne Bauart
+    (umgebung / "p8000emu.yaml").write_text(
+        yaml.safe_dump({"version": 1, "general": {"model": "p8000-c-ot"}}), encoding="utf-8")
+    w = _fenster(qapp)
+    try:
+        assert w._model == "p8000-ot" and w._bauart == "compact"
+        assert w._hardware["dram"] == "4x1M"
+    finally:
+        _zu(w, qapp)
+
+
+def test_winchester_auswahl_erzeugt_kaesten_und_erreicht_den_kern(qapp, umgebung, tmp_path):
+    w = _fenster(qapp)
+    try:
+        sw, g = w.settings_widget, w.platten_gruppe
+        assert [sw.winchester_combo.itemData(i) for i in range(sw.winchester_combo.count())] == [1, 2, 3]
+        assert sw.winchester_value() == 1 and g.anzahl() == 1
+        assert [k.isVisibleTo(g) for k in g.kaesten] == [True, False, False]
+        assert w.platten_widget is g.kaesten[0] and g.kaesten[0].unit == 0
+        sw.winchester_combo.setCurrentIndex(2)             # Bedienung -> Signal
+        assert w._winchester == 3 and g.anzahl() == 3
+        assert [k.isVisibleTo(g) for k in g.kaesten] == [True, True, True]
+        assert [k.unit for k in g.kaesten] == [0, 1, 2]
+        assert "Laufwerk 1" in g.kaesten[1].titel.text() and "Laufwerk 2" in g.kaesten[2].titel.text()
+        # Mounten in Laufwerk 1 und 2 erreicht den Kern
+        p1, p2 = str(tmp_path / "eins.img"), str(tmp_path / "zwei.img")
+        assert g.kaesten[1].neu_anlegen(p1) and g.kaesten[2].neu_anlegen(p2, "D5126")
+        assert w.emulator.hd_path(1) == p1 and w.emulator.hd_path(2) == p2 and w.emulator.hd_path(0) == ""
+        assert os.path.getsize(p1) == PLATTE_BYTES
+        # (Die Platten-Lampe der Frontplatte bildet im Kern alle drei Laufwerke ab: ODER ueber hdLed.)
+        # weniger Laufwerke: das weggenommene wird abgetrennt, die uebrigen bleiben
+        sw.winchester_combo.setCurrentIndex(1)
+        assert g.anzahl() == 2 and not g.kaesten[2].isVisibleTo(g)
+        assert w.emulator.hd_path(2) == "" and w.emulator.hd_path(1) == p1
+        assert g.kaesten[2].pfad() == ""
+    finally:
+        _zu(w, qapp)
+
+
+def test_winchester_konfiguration_rundreise_und_alter_platte_abschnitt(qapp, umgebung, tmp_path):
+    import yaml
+    from app import config_io
+    p0, p1 = str(tmp_path / "null.img"), str(tmp_path / "eins.img")
+    w = _fenster(qapp)
+    try:
+        w.settings_widget.winchester_combo.setCurrentIndex(1)           # 2
+        assert w.platten_gruppe.kaesten[0].neu_anlegen(p0) and w.platten_gruppe.kaesten[1].neu_anlegen(p1)
+        w._autosave_now()
+        cfg = config_io.load_config(str(umgebung / "p8000emu.yaml"))
+        assert cfg["general"]["winchester"] == 2
+        assert cfg["platte"] == {"path": p0} and cfg["platte1"] == {"path": p1} and "platte2" not in cfg
+    finally:
+        _zu(w, qapp)
+    w = _fenster(qapp)                                                 # neu starten: beides wieder da
+    try:
+        assert w._winchester == 2 and w.settings_widget.winchester_value() == 2
+        assert w.emulator.hd_path(0) == p0 and w.emulator.hd_path(1) == p1 and w.emulator.hd_path(2) == ""
+    finally:
+        _zu(w, qapp)
+    # alter Stand: nur `platte:` (= Laufwerk 0), kein general.winchester -> ein Laufwerk
+    (umgebung / "p8000emu.yaml").write_text(
+        yaml.safe_dump({"version": 1, "general": {"model": "p8000-ot"}, "platte": {"path": p0}}),
+        encoding="utf-8")
+    w = _fenster(qapp)
+    try:
+        assert w._winchester == 1 and w.emulator.hd_path(0) == p0 and w.emulator.hd_path(1) == ""
+        assert not w.platten_gruppe.kaesten[1].isVisibleTo(w.platten_gruppe)
+    finally:
+        _zu(w, qapp)
+    # `platte1:` ohne Zaehler (haendisch editiert) holt das Laufwerk herein
+    (umgebung / "p8000emu.yaml").write_text(
+        yaml.safe_dump({"version": 1, "platte": {"path": p0}, "platte1": {"path": p1}}), encoding="utf-8")
+    w = _fenster(qapp)
+    try:
+        assert w._winchester == 2 and w.emulator.hd_path(1) == p1
+    finally:
+        _zu(w, qapp)
+
+
+def test_winchester_wahl_ist_ohne_wdc_gesperrt_und_wird_gemerkt(qapp, umgebung):
+    w = _fenster(qapp)
+    try:
+        sw = w.settings_widget
+        sw.winchester_combo.setCurrentIndex(2)
+        assert sw.winchester_combo.isEnabled()
+        w._on_model_selected("p8000-16-ot")
+        w.run_timer.stop()
+        assert not sw.winchester_combo.isEnabled() and w._winchester == 3
+        assert not w.platten_gruppe.kaesten[1].knopf_neu.isEnabled()      # Kasten gesperrt wie Laufwerk 0
+        w._on_model_selected("p8000-ot")
+        w.run_timer.stop()
+        assert sw.winchester_combo.isEnabled() and sw.winchester_value() == 3
+        assert w.platten_gruppe.kaesten[1].knopf_neu.isEnabled()
+    finally:
+        _zu(w, qapp)
+
+
+def test_voreinstellung_setzt_die_winchesterzahl_zurueck_und_trennt_ab(qapp, umgebung, tmp_path):
+    w = _fenster(qapp)
+    try:
+        w.settings_widget.winchester_combo.setCurrentIndex(2)
+        assert w.platten_gruppe.kaesten[2].neu_anlegen(str(tmp_path / "zwei.img"))
+        w._on_bauart_selected("compact")             # beide Voreinstellungen: 1 Winchester
+        w.run_timer.stop()
+        assert w._winchester == 1 and w.platten_gruppe.anzahl() == 1
+        assert w.emulator.hd_path(2) == ""
     finally:
         _zu(w, qapp)
