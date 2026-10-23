@@ -202,6 +202,16 @@ K1520_API K1520Disk k1520d_create(const char* path, const char* fs_name, const c
 K1520_API K1520Disk k1520d_create_bootable(const char* path, const char* fs_name,
                                            const char* label, const char* boot_image);
 
+/**
+ * @brief Wie @ref k1520d_create_bootable, mit **Inode-Zahl** (nur WEGA/MUTOS, sonst ignoriert).
+ * @param unix_inodes  Mindestzahl Inodes; 0 = Vorgabe (@ref k1520d_fs_unix_inodes)
+ */
+K1520_API K1520Disk k1520d_create_ex(const char* path, const char* fs_name, const char* label,
+                                     const char* boot_image, uint32_t unix_inodes);
+
+/// @brief Vorgabe der Inode-Zahl beim Anlegen (Bloecke/25 Inode-Bloecke); 0 = kein UNIX-Dateisystem.
+K1520_API uint32_t k1520d_fs_unix_inodes(const char* fs_name);
+
 /* ─── Bootabbild (Systemspuren) ───────────────────────────────────────────── */
 
 /// @brief Ist das Profil die LEERE tar-Diskette (`tar720_leer`; nur Anlegen/Schreiben eines .tar)?
@@ -256,7 +266,7 @@ K1520_API const char* k1520d_fs_name(int i);
 K1520_API const char* k1520d_fs_description(const char* name);
 /// @brief Geometrie, auf der dieses Dateisystem liegt.
 K1520_API const char* k1520d_fs_format(const char* name);
-/// @brief "cpm" | "udos" | "udos1715" | "wega"
+/// @brief "cpm" | "udos" | "udos1715" | "wega_mutos"
 K1520_API const char* k1520d_fs_type(const char* name);
 /// @brief Geladene Katalogdateien (mehrzeilig) + Beanstandungen.
 K1520_API const char* k1520d_catalog_report(void);
@@ -504,7 +514,7 @@ K1520_API bool k1520d_set_cpm_attrs(K1520Disk h, const char* name,
                                     bool set_user,      int  user);
 
 /* ─── WEGA-(UNIX-)Dateiangaben ─────────────────────────────────────────────────
- * Nur bei einer Diskette mit Dateisystemart "wega" (@ref k1520d_fs_type); sonst
+ * Nur bei einer Diskette mit Dateisystemart "wega_mutos" (@ref k1520d_fs_type); sonst
  * liefern die Getter 0 bzw. "" und @ref k1520d_set_unix_attrs scheitert.
  */
 /// @brief di_mode samt Dateiart (z. B. 0100755); 0 = kein UNIX-Eintrag.

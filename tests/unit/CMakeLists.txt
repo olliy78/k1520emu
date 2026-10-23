@@ -242,6 +242,9 @@ k1520_add_test(scp1700_fs    SRC filesystem/test_scp1700_fs.cpp
 k1520_add_test(wega_fs       SRC filesystem/test_wega_fs.cpp
                              LIBS k1520_fs LABELS "${_lbl}"
                              DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
+k1520_add_test(mutos_fs      SRC filesystem/test_mutos_fs.cpp
+                             LIBS k1520_fs k1520_testsupport LABELS "${_lbl}"
+                             DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
 k1520_add_test(wega_platte   SRC filesystem/test_wega_platte.cpp
                              LIBS k1520_fs LABELS "${_lbl}")
 k1520_add_test(platten_volume SRC filesystem/test_platten_volume.cpp

@@ -38,10 +38,10 @@ enum class FsType : uint8_t {
     /// und eine „Spur" umfasst BEIDE Seiten eines Zylinders (32 Sektoren).
     /// @see doc/udos1715_diskettenformat.md
     Udos1715,
-    /// @brief WEGA (UNIX System III des P8000): 512-B-Bloecke, Superblock in Block 1,
+    /// @brief WEGA/MUTOS (UNIX System III des P8000 bzw. MUTOS 8000 der A5120.16): 512-B-Bloecke, Superblock in Block 1,
     ///        Inodes ab Block 2, Verzeichnisbaum.  Kein Magic — die Erkennung ist eine
     ///        Plausibilitaetspruefung.  @see doc/design/27_wega_dateisystem.md
-    Wega,
+    WegaMutos,
     /// @brief Tar-Strom direkt auf der Diskette (kein Dateisystem), nur lesbar.
     ///        @see core/filesystem/tar/tar_fs.h
     Tar
@@ -67,6 +67,11 @@ struct FsProfile {
     ///        gar nicht ausdrueckbar (doc/design/13_k1520disktool.md §6.2).
     uint8_t data_cyl  = 0;
     uint8_t data_head = 0;
+
+    /// @brief Nur `type: wega_mutos`: Familie des System-III-Dateisystems.  false = WEGA/MUTOS 8000
+    ///        (Z8000, big endian, 512-B-Bloecke), true = MUTOS 1700 (A7100/8086, little endian
+    ///        mit PDP-Langworten, 1024-B-Bloecke) — YAML `unix_layout: mutos1700`.
+    bool mutos1700_layout = false;
 
     bool allow_img = true;     ///< als rohes Sektorabbild darstellbar (UDOS: nie)
     bool allow_hfe = true;

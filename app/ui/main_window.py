@@ -1380,7 +1380,7 @@ class MainWindow(QMainWindow):
         try:
             self.screen_widget.params.update_from_dict(data.get("crt", {}))
             self.settings_widget.refresh_all()
-            self.screen_widget.update()
+            self.screen_widget.parameter_geaendert()
 
             general = data.get("general") or {}
             # „unbegrenzt" gibt es in der Oberflaeche nicht mehr — takt.stufe.

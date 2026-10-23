@@ -65,6 +65,7 @@ struct Optionen {
     std::string fs;          ///< --fs
     std::string ziel;        ///< --to
     std::string als;         ///< --as
+    int         inodes = 0;  ///< --inodes (WEGA/MUTOS: Mindestzahl Inodes beim Anlegen)
     std::string label;       ///< --label
     std::string boot;        ///< --boot (Bootabbild fuer die Systemspuren)
     std::string prg;         ///< --prg 710|710-1 (Geraet, fuer das das Bootabbild gebaut sein muss)
@@ -145,6 +146,7 @@ void gebrauch() {
         "  mkdir  <abbild> <pfad...>                  Verzeichnis anlegen (nur WEGA)\n"
         "  create <abbild> --fs NAME [--label N]    leere Diskette anlegen\n"
         "         [--boot abbild.bin]               ... mit Bootabbild in den Systemspuren\n"
+        "         [--inodes N]                      ... WEGA/MUTOS: mindestens N Inodes (Vorgabe: Bloecke/25)\n"
         "  attr   <abbild> <datei> [--type ...]       Dateiangaben zeigen/aendern\n"
         "         [--mode 0755 --uid N --gid N --mtime S]  ... WEGA: chmod/chown/touch\n"
         "         [--ro|--no-ro --sys|--no-sys]     ... CP/M-Attribute\n"
@@ -232,6 +234,7 @@ bool zerlege(int argc, char** argv, int ab, Optionen& o, std::string& err) {
         else if (a == "--restore") { if (!wert("--restore")) return false;
                                      o.restore_wahl = argv[++i]; }
         else if (a == "--as")      { if (!wert("--as"))     return false; o.als    = argv[++i]; }
+        else if (a == "--inodes")  { if (!wert("--inodes")) return false; o.inodes = std::atoi(argv[++i]); }
         else if (a == "--label")   { if (!wert("--label"))  return false; o.label  = argv[++i]; }
         else if (a == "--boot")    { if (!wert("--boot"))   return false; o.boot   = argv[++i]; }
         else if (a == "--prg")     { if (!wert("--prg"))    return false; o.prg    = argv[++i]; }
@@ -1485,7 +1488,8 @@ int cmd_create(const Optionen& o) {
         std::cout << "angelegt: " << o.rest[1] << " (leere tar-Diskette, " << o.format << ")\n";
         return kOk;
     }
-    auto v = DiskVolume::create(o.rest[1], o.fs, o.label, formate(), dateisysteme(), err, o.boot);
+    auto v = DiskVolume::create(o.rest[1], o.fs, o.label, formate(), dateisysteme(), err, o.boot,
+                                 static_cast<uint32_t>(std::max(0, o.inodes)));
     if (!v) { std::cerr << "Fehler: " << err << "\n"; return kFehler; }
 
     std::cout << "angelegt: " << o.rest[1] << " (" << o.fs << ", "

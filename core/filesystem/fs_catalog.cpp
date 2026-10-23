@@ -23,7 +23,7 @@ const char* fsTypeName(FsType t) {
         case FsType::Cpm:      return "cpm";
         case FsType::Udos:     return "udos";
         case FsType::Udos1715: return "udos1715";
-        case FsType::Wega:     return "wega";
+        case FsType::WegaMutos:     return "wega_mutos";
         case FsType::Tar:      return "tar";
     }
     return "?";
@@ -83,7 +83,7 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
                         "containers", "detect_rank", "detect", "leer", "boot_header", "dir_boot", "nur_boot",
                         "block_size", "dir_entries", "skew", "max_blocks", "os",
                         "sides_separate", "boot_track", "directory_track",
-                        "bitmap_track", "usable_tracks"},
+                        "bitmap_track", "usable_tracks", "unix_layout"},
                        where, issues);
 
     // ── name (Pflicht) ──
@@ -112,14 +112,27 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
     // ── type (Pflicht) ──
     const yaml::Node* n_type = node.find("type");
     if (!n_type || !n_type->isScalar())
-        { why = "Pflichtfeld 'type' fehlt (cpm | udos | udos1715 | wega | tar)"; return false; }
+        { why = "Pflichtfeld 'type' fehlt (cpm | udos | udos1715 | wega_mutos | tar)"; return false; }
     if      (n_type->scalar == "cpm")      out.type = FsType::Cpm;
     else if (n_type->scalar == "udos")     out.type = FsType::Udos;
     else if (n_type->scalar == "udos1715") out.type = FsType::Udos1715;
-    else if (n_type->scalar == "wega")     out.type = FsType::Wega;
+    else if (n_type->scalar == "wega_mutos" || n_type->scalar == "wega")   // "wega": aeltere formats.yaml
+                                           out.type = FsType::WegaMutos;
     else if (n_type->scalar == "tar")      out.type = FsType::Tar;
-    else { why = "'type': '" + n_type->scalar + "' - erlaubt sind cpm | udos | udos1715 | wega | tar";
+    else { why = "'type': '" + n_type->scalar + "' - erlaubt sind cpm | udos | udos1715 | wega_mutos | tar";
            return false; }
+
+    // ── unix_layout (nur wega_mutos) ──
+    if (const yaml::Node* n = node.find("unix_layout")) {
+        if (out.type != FsType::WegaMutos) {
+            issues.push_back(where + ": 'unix_layout' gilt nur fuer type: wega_mutos - ignoriert");
+        } else if (n->scalar == "mutos1700") {
+            out.mutos1700_layout = true;
+        } else if (n->scalar != "wega") {
+            why = "'unix_layout': '" + n->scalar + "' - erlaubt sind wega | mutos1700";
+            return false;
+        }
+    }
 
     // ── data_start ──
     if (const yaml::Node* n = node.find("data_start")) {
@@ -237,7 +250,7 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
             if (node.has(feld))
                 issues.push_back(where + ": '" + feld + "' gilt nur fuer die UDOS-Familie"
                                                         " - ignoriert");
-    } else if (out.type == FsType::Wega || out.type == FsType::Tar) {
+    } else if (out.type == FsType::WegaMutos || out.type == FsType::Tar) {
         // WEGA beschreibt sich selbst (Superblock): Blockgroesse 512, Inode-Liste und
         // Groesse stehen auf dem Datentraeger.  Eine Diskette = EIN Dateisystem ueber
         // beide Seiten, ab Block 0 (doc/design/27_wega_dateisystem.md §2).
@@ -246,7 +259,7 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
                                  "boot_track", "directory_track", "bitmap_track",
                                  "usable_tracks", "system_track0"})
             if (node.has(feld))
-                issues.push_back(where + ": '" + feld + "' gilt nicht fuer type: wega - ignoriert");
+                issues.push_back(where + ": '" + feld + "' gilt nicht fuer type: wega_mutos - ignoriert");
     } else {
         // ZDOS haengt je Sektor 4 Bytes HINTER die Daten-CRC — ein rohes Sektorabbild
         // verliert damit die gesamte Dateiverkettung.  Das ist keine Einstellung.

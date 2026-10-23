@@ -48,6 +48,7 @@ from PySide6.QtWidgets import (
 
 from app import paths
 from app.disktool.ui.archiv_dialog import ArchivDialog
+from app.disktool.ui.neu_dialog import NeuDialog
 from app.disktool.archive import NAMENLOS, create_archive, dateiname
 
 from app.core_binding.k1520disk import (
@@ -1775,7 +1776,7 @@ class MainWindow(QMainWindow):
             QApplication.restoreOverrideCursor()
 
     def create_disk(self, path, filesystem: str, label: str = "",
-                    boot_image=None) -> bool:
+                    boot_image=None, inodes: int = 0) -> bool:
         """Neue Diskette anlegen — mit ``boot_image`` als **Bootdiskette**.
 
         Das Bootabbild geht in die Systemspuren vor dem Dateisystem; passt es nicht,
@@ -1783,7 +1784,7 @@ class MainWindow(QMainWindow):
         """
         self._close_tool()
         try:
-            self.tool = DiskTool.create(path, filesystem, label, boot_image)
+            self.tool = DiskTool.create(path, filesystem, label, boot_image, inodes)
         except K1520DiskError as e:
             self.tool = None
             self._aktionen_pruefen()
@@ -2695,11 +2696,11 @@ class MainWindow(QMainWindow):
             return
         # tar720 (mit Inhalt) laesst sich nicht anlegen — angeboten wird die LEERE tar-Diskette.
         eintraege = neu_eintraege()
-        gewaehlt, ok = QInputDialog.getItem(
-            self, "Neue Diskette", "Dateisystem:", [t for _, t in eintraege], 0, False)
-        if not ok:
+        dlg = NeuDialog(eintraege, self)
+        if dlg.exec() != QDialog.Accepted:
             return
-        fs = next(n for n, t in eintraege if t == gewaehlt)
+        fs = dlg.dateisystem()
+        inodes = dlg.inodes()           # 0 = Vorgabe (nur WEGA/MUTOS)
         pfad, _ = QFileDialog.getSaveFileName(
             self, "Neue Diskette anlegen", self._disketten_ordner(),
             "HFE-Abbild (*.hfe);;DMK-Abbild (*.dmk);;Sektorabbild (*.img);;"
@@ -2719,7 +2720,7 @@ class MainWindow(QMainWindow):
             return
 
         label, _ = QInputDialog.getText(self, "Neue Diskette", "Datenträgername:")
-        self.create_disk(pfad, fs, label or "", boot or None)
+        self.create_disk(pfad, fs, label or "", boot or None, inodes)
 
     def _bootabbild_waehlen(self, filesystem: str):
         """Bootabbild für eine neue Diskette erfragen.
