@@ -305,6 +305,24 @@ class Dateisystem:
             bl += ind(ad[11], 2)
         return b"".join(self.dev.block(b) for b in bl)[:size]
 
+    def belegt(self, n):
+        """Alle Bloecke der Inode n: Daten UND Indirektbloecke (fuer die Grenze s_fsize)."""
+        ad = self.inode(n)[5]
+        res = [a for a in ad if a]
+
+        def ind(b, lvl):
+            for i in range(128):
+                a = struct.unpack(">I", self.dev.block(b)[4 * i:4 * i + 4])[0]
+                if a:
+                    res.append(a)
+                    if lvl > 1:
+                        ind(a, lvl - 1)
+        if ad[10]:
+            ind(ad[10], 1)
+        if ad[11]:
+            ind(ad[11], 2)
+        return res
+
     def eintraege(self, n):
         """Verzeichnis n: [(ino, name)] ohne '.', '..' und leere Slots."""
         dat = self.inhalt(n)

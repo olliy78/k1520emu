@@ -715,7 +715,8 @@ std::unique_ptr<WegaFileSystem> WegaFileSystem::format(std::unique_ptr<WegaBlock
     if (zeit) fs->setClock([zeit] { return zeit; });
     if (bloecke == 0) bloecke = fs->dev_->blocks();
     if (bloecke > fs->dev_->blocks() || bloecke < 16) {
-        err = "Dateisystemgroesse " + std::to_string(bloecke) + " passt nicht zum Datentraeger";
+        err = "Dateisystemgroesse " + std::to_string(bloecke) + " Bloecke passt nicht zum Datentraeger ("
+              "16 bis " + std::to_string(fs->dev_->blocks()) + " Bloecke)";
         return nullptr;
     }
     if (n <= 0 || n >= 1000) n = 1000;
@@ -731,6 +732,13 @@ std::unique_ptr<WegaFileSystem> WegaFileSystem::format(std::unique_ptr<WegaBlock
                          : bloecke / 25;
     if (ib == 0) ib = 1;
     if (ib > 65500 / fs->V().inopb()) ib = 65500 / fs->V().inopb();
+    // Mit --blocks muss hinter der Inode-Liste noch Platz fuer Daten bleiben (sonst gaebe es nur
+    // eine leere Freiliste); die Groesse selbst ist oben gegen den Blockraum geprueft.
+    if (ib + 2 >= bloecke) {
+        err = "Dateisystemgroesse " + std::to_string(bloecke) + " Bloecke ist zu klein: die Inode-Liste belegt "
+              "bereits " + std::to_string(ib + 2) + " Bloecke";
+        return nullptr;
+    }
     sb.isize = static_cast<uint16_t>(ib + 2);
     sb.m = static_cast<int16_t>(m);
     sb.n = static_cast<int16_t>(n);

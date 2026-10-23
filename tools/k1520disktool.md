@@ -18,6 +18,9 @@ k1520disktool put    <abbild> <datei|ordner…>          Dateien einfügen
 k1520disktool rm     <abbild> <muster…>                Dateien löschen
 k1520disktool create <abbild> --fs NAME [--label N]    leere Diskette anlegen
        [--boot abbild.bin] [--prg 710|710-1]           … bootfähig (Systemspuren)
+       [--inodes N] [--blocks N]                       … WEGA/MUTOS: Mindestzahl Inodes / Dateisystem
+                                                         nur N Blöcke groß (s_fsize; Rest bleibt frei,
+                                                         z. B. für den Swap-Bereich des Kernels)
 k1520disktool attr   <abbild> <datei> [schalter…]      Dateiangaben zeigen/ändern
 k1520disktool boot-get <abbild> <datei.bin>            Systemspuren herausschreiben
 k1520disktool boot-put <abbild> <datei.bin>            Bootabbild einspielen

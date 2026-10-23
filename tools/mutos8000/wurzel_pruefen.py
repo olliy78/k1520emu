@@ -13,13 +13,15 @@ import m8k  # noqa: E402
 def pruefen(abbild, quelle, ausgabe=print):
     fs = m8k.Dateisystem(abbild)
     ausgabe("s_isize %d s_fsize %d" % (fs.isize, fs.fsize))
-    stat = {"bad": 0, "seen": 0}
+    stat = {"bad": 0, "seen": 0, "hoechster": 0}
 
     def walk(n, pfad):
         for ino, nm in fs.eintraege(n):
             p = pfad + "/" + nm
             mode = fs.inode(ino)[0]
             stat["seen"] += 1
+            if mode & 0xF000 in (0x4000, 0x8000):
+                stat["hoechster"] = max([stat["hoechster"]] + fs.belegt(ino))
             if mode & 0xF000 == 0x4000:
                 walk(ino, p)
             elif mode & 0xF000 == 0x8000:
@@ -33,7 +35,12 @@ def pruefen(abbild, quelle, ausgabe=print):
 
     ausgabe("root mode %o" % fs.inode(2)[0])
     walk(2, "")
-    ausgabe("Eintraege %d Abweichungen %d" % (stat["seen"], stat["bad"]))
+    ausgabe("Eintraege %d Abweichungen %d, hoechster belegter Block %d" % (
+        stat["seen"], stat["bad"], stat["hoechster"]))
+    # Hinter s_fsize liegt der Auslagerungsbereich des Kernels (Entwurf 39 4.8): kein Block darf dorthin zeigen.
+    if stat["hoechster"] >= fs.fsize:
+        ausgabe("FEHLER: Block %d liegt hinter s_fsize %d" % (stat["hoechster"], fs.fsize))
+        stat["bad"] += 1
     return stat["bad"]
 
 

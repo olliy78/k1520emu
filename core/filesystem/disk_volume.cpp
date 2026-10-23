@@ -4028,7 +4028,8 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
                                                const FsCatalog& fs_cat,
                                                std::string& err,
                                                const std::string& boot_image,
-                                               uint32_t unix_inodes) {
+                                               uint32_t unix_inodes,
+                                               uint32_t unix_bloecke) {
     const FsProfile* profil = fs_cat.find(fs_name);
     if (!profil) { err = "Dateisystem '" + fs_name + "' steht nicht im Katalog"; return nullptr; }
     const DiskFormat* fmt = formats.find(profil->format);
@@ -4164,7 +4165,7 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
             // MUTOS (Blockraum ab Zylinder 1) traegt 3/500, wie CMD/CC1/CC2.
             const bool mutos = profil->mutos1700_layout || profil->data_cyl != 0;
             auto w = WegaFileSystem::format(unixGeraet(*v.space, *profil), label, err,
-                0, mutos ? 3 : 1, mutos ? 500 : 72, 0, unix_inodes);
+                unix_bloecke, mutos ? 3 : 1, mutos ? 500 : 72, 0, unix_inodes);
             if (!w) return nullptr;
             v.fs = std::move(w);
         } else {

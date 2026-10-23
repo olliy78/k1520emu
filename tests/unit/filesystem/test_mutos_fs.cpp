@@ -259,6 +259,66 @@ TEST(MutosFs, InodeZahl_VorgabeUndAbweichung) {
     std::filesystem::remove_all(dir);
 }
 
+// ─── Dateisystemgroesse beim Anlegen (--blocks, s_fsize) ─────────────────────────────────
+//
+// Auf M8KROOT endet das Dateisystem bei s_fsize 250; dahinter liegt der Auslagerungsbereich (swap)
+// des Kernels auf demselben Geraet.  Ein bis Block 494 reichendes Dateisystem wurde dort vom
+// Prozessabbild ueberschrieben (Entwurf 39 §4.8).
+
+TEST(MutosFs, Blocks_BegrenztDasDateisystemAufDieAngegebeneGroesse) {
+    const auto dir = std::filesystem::temp_directory_path() / "mutos_blocks_test";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir / "src");
+    std::string err;
+    // ganze Diskette: 494 Bloecke, 104 Inodes = 13 Inode-Bloecke -> s_isize 15
+    {
+        auto dv = DiskVolume::create((dir / "voll.dmk").string(), "mutos8k_fm", "t", formate(),
+                                     dateisysteme(), err, "", 104, 0);
+        ASSERT_TRUE(dv) << err;
+        EXPECT_EQ(dv->volumeInfo(0).total_bytes, (494u - 15u) * 512u);
+    }
+    auto dv = DiskVolume::create((dir / "klein.dmk").string(), "mutos8k_fm", "t", formate(),
+                                 dateisysteme(), err, "", 104, 250);
+    ASSERT_TRUE(dv) << err;
+    EXPECT_EQ(dv->volumeInfo(0).total_bytes, (250u - 15u) * 512u);          // 235 Datenbloecke
+
+    // 100000 B passen (196 Bloecke samt Indirektbloecken), weitere 30000 B nicht mehr:
+    // waeren Bloecke ab 250 frei, ginge das (494 - 15 Bloecke Platz).
+    const std::vector<uint8_t> inhalt(100000, 0xA5), mehr(30000, 0x5A);
+    auto schreibe = [&](const char* name, const std::vector<uint8_t>& d) {
+        std::ofstream(dir / "src" / name, std::ios::binary)
+            .write(reinterpret_cast<const char*>(d.data()), static_cast<std::streamsize>(d.size()));
+    };
+    schreibe("a", inhalt);
+    ASSERT_TRUE(dv->insertAll((dir / "src").string(), TransferOptions{})) << dv->lastError();
+    ASSERT_TRUE(dv->flush()) << dv->lastError();
+    const FsCheckReport& r = dv->check(FsCheckLevel::Voll, true);
+    EXPECT_EQ(r.alsText().find("Fehler"), std::string::npos) << r.alsText();
+    EXPECT_EQ(r.alsText().find("Warnung"), std::string::npos) << r.alsText();
+    EXPECT_LT(dv->volumeInfo(0).free_bytes, 40000u);                       // Rest < 79 Bloecke
+
+    std::filesystem::remove(dir / "src" / "a");
+    schreibe("b", mehr);
+    EXPECT_FALSE(dv->insertAll((dir / "src").string(), TransferOptions{}));
+    std::filesystem::remove_all(dir);
+}
+
+TEST(MutosFs, Blocks_ZuGrossOderZuKleinIstEinFehler) {
+    const auto dir = std::filesystem::temp_directory_path() / "mutos_blocks_fehler";
+    std::filesystem::create_directories(dir);
+    std::string err;
+    // mehr als der Blockraum (494)
+    EXPECT_FALSE(DiskVolume::create((dir / "a.dmk").string(), "mutos8k_fm", "t", formate(),
+                                    dateisysteme(), err, "", 104, 495));
+    EXPECT_NE(err.find("495"), std::string::npos) << err;
+    // nicht groesser als der Inode-Bereich (104 Inodes = s_isize 15; 20 Bloecke waeren 5 Daten, 15 zu klein)
+    err.clear();
+    EXPECT_FALSE(DiskVolume::create((dir / "b.dmk").string(), "mutos8k_fm", "t", formate(),
+                                    dateisysteme(), err, "", 400, 20));
+    EXPECT_FALSE(err.empty());
+    std::filesystem::remove_all(dir);
+}
+
 // ─── M8K-Satz (MUTOS 8000, 8″ FM 26×128 und 5¼″ 8×512) ───────────────────────────────────
 //
 // Fixtures aus `~/projects/robotron/A5120/discs/MUTOS8000/M8K*.TD0` (TeleDisk 2011):

@@ -364,6 +364,9 @@ public:
      *                    Passt sie nicht, wird **gar nichts angelegt** — die Pruefung
      *                    laeuft vor dem Formatieren.
      * @param unix_inodes nur WEGA/MUTOS: Mindestzahl Inodes (0 = bloecke/25, wie `mkfs`)
+     * @param unix_bloecke nur WEGA/MUTOS: s_fsize in Bloecken (0 = ganzer Blockraum).  Dahinter
+     *                    bleibt der Datentraeger frei fuer den Auslagerungsbereich (swap) des
+     *                    Kernels; N muss <= Blockraum und > Inode-Bereich sein.
      */
     static std::unique_ptr<DiskVolume> create(const std::string& path,
                                               const std::string& fs_name,
@@ -372,7 +375,8 @@ public:
                                               const FsCatalog& fs_cat,
                                               std::string& err,
                                               const std::string& boot_image = {},
-                                              uint32_t unix_inodes = 0);
+                                              uint32_t unix_inodes = 0,
+                                              uint32_t unix_bloecke = 0);
 
     // ─── Bootabbild (Systemspuren) ───────────────────────────────────────────
     //

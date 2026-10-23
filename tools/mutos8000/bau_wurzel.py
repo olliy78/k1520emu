@@ -4,7 +4,7 @@
 Fahrplan (alles in einem Temp-Verzeichnis, an Kopien der eingecheckten Abbilder):
   1. DISK-ROOT mit `k1520disktool get` in einen Ordner auszug holen,
   2. Quellbaum bauen (wurzel_quellbaum.py: M8KROOT zurueckgeschoben + DISK-ROOT-Programme),
-  3. `create --fs mutos8k_fm --inodes 104`,
+  3. `create --fs mutos8k_fm --inodes 104 --blocks 250`,
   4. Zylinder 0 von M8KCMD mit `boot-get` holen und mit `boot-put` einspielen,
   5. `put` des Quellbaums (Modi, Eigentuemer, Zeiten, Geraete aus .fileinfo/wega-dateiangaben.txt),
   6. `check --full`,
@@ -28,6 +28,11 @@ import wurzel_quellbaum  # noqa: E402
 
 EINGECHECKT = m8k.disk("m8k_root_rekonstruiert.hfe")
 INODES = "104"      # s_isize 15 wie M8KROOT
+# s_fsize 250 wie M8KROOT.  Dahinter liegt auf demselben Geraet (rk2, /dev/swap = 4,2) der
+# AUSLAGERUNGSBEREICH des Kernels.  Mit s_fsize 494 (ganze Diskette) legte das Dateisystem Daten
+# (u. a. /bin/sh) in den Swap-Bereich; nach Benutzung stand dort ein Prozessabbild, fsck sah nichts
+# (Entwurf 39 4.8).
+BLOECKE = "250"
 
 
 def disktool(*args, ok=(0,)):
@@ -93,7 +98,7 @@ def main(argv=None):
         bau = os.path.join(tmp, "bau.hfe")
         if os.path.exists(bau):
             os.remove(bau)
-        disktool("create", bau, "--fs", "mutos8k_fm", "--inodes", INODES)
+        disktool("create", bau, "--fs", "mutos8k_fm", "--inodes", INODES, "--blocks", BLOECKE)
         boot = os.path.join(tmp, "cmdboot.bin")
         disktool("boot-get", kopie["m8k_cmd.td0"], boot)
         disktool("boot-put", bau, boot)
