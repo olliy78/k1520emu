@@ -873,7 +873,7 @@ Sitzungsschalter: `--drive a|b|0…3`, `--cyls`, `--heads`, `--rate`, `--rpm`,
   `--herkunft schluessel=wert` (mehrfach, überschreibt die Datei; Schlüssel nur `a-z0-9_`;
   `hinweise=` hängt eine Zeile an), `--beilage datei.txt[=name]` (mehrfach; Beiblatt an der
   Wurzel der `.zip`, nie unter `dateien/`; Text bis 4 MiB, Latin-1/UTF-8 wird erkannt, sonst
-  `--beilage-kodierung`). Ungültige Angaben (Pfadanteile, `..`, Namenskollision, Binärdatei,
+  `--beilage-kodierung`; `--beilage-binaer datei[=name]` legt eine Binärdatei unverändert ab, gleiche Namens- und Größenregeln, bis 4 MiB). Ungültige Angaben (Pfadanteile, `..`, Namenskollision, Binärdatei,
   zu groß, schlechter Schlüssel) enden mit Exit 2, bevor das Laufwerk angefasst wird.
 * **`save-as` und `archive` ersetzen keine vorhandene Datei** — dafür `--force`.
   Der Aufruf bricht ab und erfindet keinen Ausweichnamen; geprüft wird, **bevor**

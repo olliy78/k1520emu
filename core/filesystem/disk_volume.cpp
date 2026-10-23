@@ -3799,9 +3799,14 @@ bool DiskVolume::insertAll(const std::string& src_dir, const TransferOptions& op
     // WEGA: auch die LEEREN Unterordner gehoeren zum Baum.
     if (istUnix()) {
         std::error_code ec;
-        for (const auto& e : fs::recursive_directory_iterator(src_dir, ec)) {
-            if (!e.is_directory()) continue;
-            if (!volumes_[0].fs->makeDirectory(wegaZielName(src_dir, e.path().string()))) {
+        // Sortiert: die Reihenfolge des Dateisystems bestimmt sonst, welches Verzeichnis welchen
+        // Block bekommt (Abbild nicht reproduzierbar); Eltern stehen vor ihren Kindern ("a" < "a/b").
+        std::vector<std::string> ordner;
+        for (const auto& e : fs::recursive_directory_iterator(src_dir, ec))
+            if (e.is_directory()) ordner.push_back(e.path().string());
+        std::sort(ordner.begin(), ordner.end());
+        for (const std::string& o : ordner) {
+            if (!volumes_[0].fs->makeDirectory(wegaZielName(src_dir, o))) {
                 const std::string grund = volumes_[0].fs->lastError();
                 zurueck();
                 return fail(grund + " - die Diskette wurde nicht veraendert.");

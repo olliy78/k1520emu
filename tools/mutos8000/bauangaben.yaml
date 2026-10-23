@@ -1,0 +1,11 @@
+# Bauangaben der rekonstruierten MUTOS-8000-Wurzeldiskette (Entwurf 39, 4.8).
+# Vorlage fuer tools/mutos8000/archiv_erzeugen.py; bau_aus_archiv.py liest sie aus dem Archiv.
+# Nur "schluessel: wert", ein Wert je Zeile.
+fs: mutos8k_fm
+inodes: 104
+# Dateisystemgroesse (s_fsize) in Bloecken.  Dahinter liegt auf demselben Geraet (rk2, /dev/swap = 4,2)
+# der AUSLAGERUNGSBEREICH des Kernels: Bloecke ab 250 duerfen nie vom Dateisystem belegt werden
+# (Entwurf 39, 4.8).  Nicht auf die ganze Diskette (494) vergroessern.
+bloecke: 250
+# Ladecode Zylinder 0 (Etiketten ERMAP / VOL1MUTOS), Rohbytes aus `boot-get`; wird mit `boot-put` eingespielt.
+zylinder0: zylinder0.bin

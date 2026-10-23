@@ -82,6 +82,27 @@ def test_cli_gueltig(fixture_disks, tmp_path):
         assert "HERKUNFT / BESCHREIBUNG" in z.read("T1.txt").decode("utf-8")
 
 
+def test_cli_beilage_binaer_kommt_unveraendert_ins_archiv(fixture_disks, tmp_path, capsys):
+    roh = bytes(range(256)) * 3 + b"\x00\xe5"
+    b = tmp_path / "z.bin"
+    b.write_bytes(roh)
+    ziel = tmp_path / "a.zip"
+    basis = [fixture_disks / DISK, ziel, "--bezeichnung", "T1"]
+    assert _cli(basis + ["--beilage", b]) == 2                          # Text-Schalter: weiter abgelehnt
+    assert _cli(basis + ["--beilage-binaer", f"{b}=lader.bin"]) == 0
+    namen, inv = _inventar(ziel)
+    with zipfile.ZipFile(ziel) as z:
+        assert z.read("lader.bin") == roh
+    eintrag = [a for a in inv["attachments"] if a["path"] == "lader.bin"][0]
+    import hashlib
+    assert eintrag["sha256"] == hashlib.sha256(roh).hexdigest()
+    # gleiche Namensregeln: nichts unter dateien/, kein Doppel mit einer Textbeilage
+    assert _cli(basis + ["--force", "--beilage-binaer", f"{b}=dateien/x"]) == 2
+    t = tmp_path / "t.txt"
+    t.write_text("x", encoding="utf-8")
+    assert _cli(basis + ["--force", "--beilage", f"{t}=lader.bin", "--beilage-binaer", f"{b}=lader.bin"]) == 2
+
+
 def test_cli_ohne_angaben_bleibt_bitgleich(fixture_disks, tmp_path):
     a, b = tmp_path / "a.zip", tmp_path / "b.zip"
     assert _cli([fixture_disks / DISK, a, "X"]) == 0
