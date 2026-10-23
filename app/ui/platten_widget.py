@@ -43,11 +43,14 @@ TYPEN = (
     ("D5126", "D5126 (NEC, 615 Zyl., 4 Köpfe)", 615, 4, 18),
     ("D5146", "D5146 (NEC, 615 Zyl., 8 Köpfe)", 615, 8, 18),
     ("VS", "VS (Robotron, 820 Zyl., 6 Köpfe)", 820, 6, 18),
+    # Geometrie der ausgelieferten WEGA-3.1-Platte; eine zweite Platte daneben muss denselben Typ haben
+    # (WDC 4.2 verlangt fuer LW 1/2 den PAR von LW 0, Merkposten p8000 Nr. 64).
+    ("WEGA31-AVR", "WEGA31-AVR (wie die WEGA-3.1-Platte, 1380 Zyl., 10 Köpfe)", 1380, 10, 18),
 )
 #: Dateinamenkuerzel je Typ (Kern: `winchester::typen()`, geprueft durch `k1520_hd_typ_kuerzel`):
 #: Plattenabbilder heissen ``<name>.<kuerzel>.img`` (P24) — die Endung bleibt ``.img``, damit
 #: DiskTool und Dateimanager sie weiter erkennen; gepackt ``<name>.<kuerzel>.img.gz``.
-KUERZEL = {"K5504.50": "k5504", "D5126": "d5126", "D5146": "d5146", "VS": "vs"}
+KUERZEL = {"K5504.50": "k5504", "D5126": "d5126", "D5146": "d5146", "VS": "vs", "WEGA31-AVR": "avr"}
 #: WDC-Fassungen, die noch nicht belegt sind (3.x-Spurformat, wdc_firmware.md §12 Nr. 11).
 EXPERIMENTELL = ("4.0.05", "3.4.05")
 STANDARD_TYP = "K5504.50:unformatiert"   # Vorgabe: Laufwerk wie neu, ohne Parametersatz

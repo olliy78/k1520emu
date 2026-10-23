@@ -54,4 +54,7 @@ Winchester-Laufwerke* (1–3) mit je einem Plattenkasten (Kern: bis drei Laufwer
 2. ~~MON16-Version und Platinenindex~~ **beantwortet (Anwender): MON8/MON16 3.1** (die klassische P8000 bekommt 3.0); Platinenindex bleibt 8-Bit 3 / 16-Bit 4.
 3. ~~Dritte Floppy~~ **beantwortet (Anwender): 3 Disketten-Laufwerke K5601** in der Voreinstellung (Treiber/Belegung im Gast weiter ungeprüft **[offen]**).
 4. **[offen]** Anzahl und Belegung der bis zu 7 Terminal-Anschlüsse (der Emulator hat die tty-Schnittstellen der P8000).
-5. Zweite Platte: 2 × K 5504.50 sind belegt. Kern: bis DREI Laufwerke (`Config::platte/platte1/platte2`, Merkposten 61), Oberfläche: bis drei Plattenkästen (2026-10-23). **[offen]** Ein Gast-Lesebefehl an LW 1/2 (MON16/WEGA) ist nicht getestet.
+5. Zweite Platte: 2 × K 5504.50 sind belegt. Kern: bis DREI Laufwerke (`Config::platte/platte1/platte2`, Merkposten 61), Oberfläche: bis drei Plattenkästen (2026-10-23).
+   **Unter WEGA 3.1 nachgewiesen (Merkposten 64):** LW 1 geht mit `sa.format` (LW 1), `sysgen` (zweite Platte), `mknod`/`mkfs`/`mount` und Einträgen in
+   `/etc/mfs`, `/etc/rc_csh`, `/etc/checklist`; Bedingung: **gleicher Plattentyp** wie LW 0 (WDC 4.2). LW 2 kann WEGA nicht ansprechen. Ob die Compact-Auslieferung
+   einen schon generierten Kern für zwei Platten hatte (`/etc/insfdhd2` auf ycdtotv.de deutet auf ein Einrichteskript), ist **[offen]**.
