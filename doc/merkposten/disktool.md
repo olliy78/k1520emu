@@ -1139,7 +1139,7 @@ Vier Anwender-Disketten (ROOT, CMD, CC1, CC2; `.TD0` und `.dmk`) plus die UDOS-L
 
 ## MUTOS 1700 (A7100) — dieselbe Klasse, zweite Familie (2026-10-23)
 
-Ordner `robotron/MUTOS/mutos1700/`: 13 TeleDisk-Abbilder.  **Neun sind `tar720`** (DOC1/2, MAN1/2, ROOT2, SYS1, USER1/2 —
+Ordner `robotron/MUTOS/mutos1700/`: 12 TeleDisk-Abbilder.  **Acht sind `tar720`** (DOC1/2, MAN1/2, ROOT2, SYS1, USER1/2 —
 liefen schon), drei tragen ein UNIX-Dateisystem, eines (`ROOT1_G`) ist ein beschädigter Abzug.  `.zip` sind Pakete derselben
 `.TD0`; `ROOT1_D_TD0.scp` (31 MB) ist ein SuperCard-Pro-Fluss, kein Container des Werkzeugs.
 1. **Familie „mutos1700"** (`wega::kXenixV`): Xenix-Sitte auf dem 8086 — **little endian, Langworte PDP-11-artig** (hoeherwertiges
