@@ -20,6 +20,7 @@
 
 #include "core/peripherals/floppy_drive/bit_codec.h"
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cstring>
 
@@ -63,6 +64,14 @@ static inline bool getBit(const std::vector<uint8_t>& stream, uint32_t pos) {
 /// Liest ein 16-Bit-Zellwort MSB-first aus @p stream ab Bitposition @p pos.
 static uint16_t get16(const std::vector<uint8_t>& stream, uint32_t pos,
                       uint32_t total_bits) {
+    if (pos + 16 <= total_bits) {
+        // Schnellweg (jedes Byte jeder Spur): drei Bytes zusammensetzen statt 16 Einzelbits.
+        // pos + 16 <= total_bits ⇒ Byte (pos+15)/8 liegt noch im Strom.
+        const size_t   i  = pos / 8;
+        const uint32_t v  = (uint32_t(stream[i]) << 16) | (uint32_t(stream[i + 1]) << 8)
+                          | (i + 2 < stream.size() ? stream[i + 2] : 0u);
+        return static_cast<uint16_t>(v >> (8 - pos % 8));
+    }
     uint16_t w = 0;
     for (int i = 0; i < 16; ++i) {
         w = static_cast<uint16_t>(w << 1);
@@ -96,13 +105,15 @@ static uint16_t mfm_cell_word(uint8_t data_byte, bool& prev_d_bit) {
 /// Decodiert die 8 Daten-Bits aus einem 16-Bit-MFM-Zellwort.
 /// Die Daten-Bits liegen an den ungeraden Positionen (Bits 14,12,10,8,6,4,2,0).
 static uint8_t mfm_decode_word(uint16_t w) {
-    uint8_t b = 0;
-    for (int i = 7; i >= 0; --i) {
-        b = static_cast<uint8_t>(b << 1);
-        if ((w >> (i * 2)) & 1u)
-            b |= 1u;
-    }
-    return b;
+    // Tabelle: aus einem Zellbyte die vier Daten-Bits an den Positionen 6,4,2,0.
+    static const auto tab = [] {
+        std::array<uint8_t, 256> t{};
+        for (unsigned v = 0; v < 256; ++v)
+            t[v] = static_cast<uint8_t>(((v >> 6 & 1u) << 3) | ((v >> 4 & 1u) << 2)
+                                      | ((v >> 2 & 1u) << 1) |  (v & 1u));
+        return t;
+    }();
+    return static_cast<uint8_t>((tab[w >> 8] << 4) | tab[w & 0xFFu]);
 }
 
 // ─── FM-Zellencodierung ───────────────────────────────────────────────────────
@@ -179,34 +190,46 @@ static MarkType fmMarkFromClock(uint8_t data, uint8_t clock) {
 
 // ─── Sync-Karte (fuer den re-synchronisierenden Decoder) ──────────────────────
 
+/// Ein Sync-Treffer: Bitposition und verfahrensabhaengige Kennung (> 0).
+struct SyncHit {
+    uint32_t pos;
+    uint8_t  kind;
+};
+
 /// Klassifiziert JEDE Bitposition der Spur per 16-Bit-Schieberegister: @p classify
 /// bekommt das Zellwort ab der Position und liefert 0 (kein Sync) oder eine
-/// verfahrensabhaengige Sync-Kennung.  Positionen ab `bitcell_count-15` bleiben 0.
+/// verfahrensabhaengige Sync-Kennung.  Positionen ab `bitcell_count-15` werden nicht
+/// betrachtet.  Geliefert werden nur die Treffer, aufsteigend — Sync-Muster sind selten,
+/// eine Karte mit einem Byte je Bitzelle (100 KB je Spur) waere fast nur Nullen.
 template <typename Fn>
-static std::vector<uint8_t> buildSyncMap(const std::vector<uint8_t>& stream,
-                                         uint32_t bitcell_count, Fn classify) {
-    std::vector<uint8_t> map(bitcell_count, 0);
-    if (bitcell_count < 16) return map;
+static std::vector<SyncHit> findSyncs(const std::vector<uint8_t>& stream,
+                                      uint32_t bitcell_count, Fn classify) {
+    std::vector<SyncHit> hits;
+    if (bitcell_count < 16) return hits;
 
-    uint32_t w = 0;
-    for (uint32_t i = 0; i < 16; ++i)
-        w = (w << 1) | (getBit(stream, i) ? 1u : 0u);
-
-    for (uint32_t p = 0;; ++p) {
-        map[p] = classify(static_cast<uint16_t>(w));
-        if (p + 16 >= bitcell_count) break;
-        w = ((w << 1) | (getBit(stream, p + 16) ? 1u : 0u)) & 0xFFFFu;
+    // Je Byte alle acht Bitversaetze aus einem 24-Bit-Fenster — ohne Einzelbitzugriff.
+    // Fenster ab Position p = 8*b + k ist Bit 23-k … 8-k des Fensters aus den Bytes b..b+2.
+    const uint32_t letzte = bitcell_count - 16;   // letzte Position, an der ein Zellwort passt
+    const size_t   n      = stream.size();
+    for (uint32_t b = 0; b * 8 <= letzte; ++b) {
+        const uint32_t v = (uint32_t(stream[b]) << 16)
+                         | (b + 1 < n ? uint32_t(stream[b + 1]) << 8 : 0u)
+                         | (b + 2 < n ? uint32_t(stream[b + 2])      : 0u);
+        for (uint32_t k = 0; k < 8; ++k) {
+            const uint32_t p = b * 8 + k;
+            if (p > letzte) return hits;
+            if (const uint8_t kind = classify(static_cast<uint16_t>((v >> (8 - k)) & 0xFFFFu)))
+                hits.push_back({p, kind});
+        }
     }
-    return map;
+    return hits;
 }
 
-/// Sammelt alle Positionen, an denen @p is_strong gilt, aufsteigend.
-template <typename Fn>
-static std::vector<uint32_t> collectStrong(uint32_t bitcell_count, Fn is_strong) {
-    std::vector<uint32_t> v;
-    for (uint32_t p = 0; p + 16 <= bitcell_count; ++p)
-        if (is_strong(p)) v.push_back(p);
-    return v;
+/// Kennung des Sync-Treffers an Position @p p; 0, wenn dort keiner liegt.
+static uint8_t syncKindAt(const std::vector<SyncHit>& hits, uint32_t p) {
+    auto it = std::lower_bound(hits.begin(), hits.end(), p,
+                               [](const SyncHit& h, uint32_t v) { return h.pos < v; });
+    return (it != hits.end() && it->pos == p) ? it->kind : uint8_t{0};
 }
 
 /// Gap-Fuellbyte fuer MFM (encodiertes 0x4E ergibt 0x9254 als Zellwort; als
@@ -245,7 +268,7 @@ TrackImage decode(const std::vector<uint8_t>& cells, uint32_t bitcell_count,
 
         // Schritt 2a: Sync-Karte ueber die GANZE Spur (0x4489 = A1-Sync fuer IDAM/DAM,
         // 0x5224 = C2-Sync fuer IAM), bitweise per Schieberegister.
-        auto sync_map = buildSyncMap(stream, bitcell_count, [](uint16_t w) -> uint8_t {
+        const std::vector<SyncHit> syncs = findSyncs(stream, bitcell_count, [](uint16_t w) -> uint8_t {
             if (w == 0x4489u) return 1;   // A1
             if (w == 0x5224u) return 2;   // C2
             return 0;
@@ -256,12 +279,15 @@ TrackImage decode(const std::vector<uint8_t>& cells, uint32_t bitcell_count,
         // zwar phasenrichtig ein Codeverstoss, als reines Bitmuster aber auch verschoben
         // in gueltigem MFM moeglich — die Doppelung schliesst Zufallstreffer praktisch aus.
         auto strong = [&](uint32_t p) -> bool {
-            if (!sync_map[p]) return false;
-            if (p + 32 <= bitcell_count && sync_map[p + 16] == sync_map[p]) return true;
-            if (p >= 16 && sync_map[p - 16] == sync_map[p]) return true;
+            const uint8_t k = syncKindAt(syncs, p);
+            if (!k) return false;
+            if (p + 32 <= bitcell_count && syncKindAt(syncs, p + 16) == k) return true;
+            if (p >= 16 && syncKindAt(syncs, p - 16) == k) return true;
             return false;
         };
-        std::vector<uint32_t> strongs = collectStrong(bitcell_count, strong);
+        std::vector<uint32_t> strongs;
+        for (const SyncHit& h : syncs)
+            if (strong(h.pos)) strongs.push_back(h.pos);
 
         // EINZELNE Sync-Marken (nur ein 0x4489, weil der schreibende Controller die
         // uebrigen A1 der Gruppe regulaer kodiert hat — s. u.) sind als Einrastpunkt zu
@@ -272,7 +298,7 @@ TrackImage decode(const std::vector<uint8_t>& cells, uint32_t bitcell_count,
         // deshalb gesammelt, aber erst im ZWEITEN Durchlauf benutzt — und nur dort, wo
         // ein Sektorkopf ohne Datenfeld dasteht (s. unten).
         auto einzelsync = [&](uint32_t p) -> bool {
-            if (!sync_map[p] || strong(p)) return false;
+            if (strong(p)) return false;   // (p ist ein Treffer)
             // Die Gruppe ab p: bis zu drei weitere 0xA1, dann MUSS eine Marke kommen.
             for (uint32_t q = p + 16, i = 0; i < 4 && q + 16 <= bitcell_count; ++i, q += 16) {
                 const uint8_t b = mfm_decode_word(get16(stream, q, bitcell_count));
@@ -281,15 +307,16 @@ TrackImage decode(const std::vector<uint8_t>& cells, uint32_t bitcell_count,
             }
             return false;
         };
-        const std::vector<uint32_t> einzelne = collectStrong(bitcell_count, einzelsync);
+        std::vector<uint32_t> einzelne;
+        for (const SyncHit& h : syncs)
+            if (einzelsync(h.pos)) einzelne.push_back(h.pos);
 
         // Startpunkt: erste starke Sync-Gruppe; ersatzweise das erste Sync ueberhaupt.
         uint32_t lock_pos = bitcell_count;
         if (!strongs.empty()) {
             lock_pos = strongs.front();
         } else {
-            for (uint32_t b = 0; b + 16 <= bitcell_count; ++b)
-                if (sync_map[b]) { lock_pos = b; break; }
+            if (!syncs.empty()) lock_pos = syncs.front().pos;
         }
         if (lock_pos == bitcell_count) {
             // Kein Sync gefunden — Rohdaten ohne Marken ausgeben
@@ -425,7 +452,7 @@ TrackImage decode(const std::vector<uint8_t>& cells, uint32_t bitcell_count,
         // ── FM-Decode ─────────────────────────────────────────────────────────
 
         // Schritt 3a: Sync-Karte ueber die ganze Spur (FM-Marken-Zellworte mit Sondertakt).
-        auto sync_map = buildSyncMap(stream, bitcell_count, [](uint16_t w) -> uint8_t {
+        const std::vector<SyncHit> syncs = findSyncs(stream, bitcell_count, [](uint16_t w) -> uint8_t {
             return isFmSyncWord(w) ? 1u : 0u;
         });
 
@@ -433,16 +460,17 @@ TrackImage decode(const std::vector<uint8_t>& cells, uint32_t bitcell_count,
         // einen phasenverschobenen Re-Sync das normgerechte 00-Sync-Feld davor
         // (FM-Zellwort von 0x00 mit vollem Takt = 0xAAAA).
         auto strong = [&](uint32_t p) -> bool {
-            return sync_map[p] && p >= 16 && get16(stream, p - 16, bitcell_count) == 0xAAAAu;
+            return p >= 16 && get16(stream, p - 16, bitcell_count) == 0xAAAAu;   // (p ist ein Treffer)
         };
-        const std::vector<uint32_t> strongs = collectStrong(bitcell_count, strong);
+        std::vector<uint32_t> strongs;
+        for (const SyncHit& h : syncs)
+            if (strong(h.pos)) strongs.push_back(h.pos);
 
         uint32_t lock_pos = bitcell_count;
         if (!strongs.empty()) {
             lock_pos = strongs.front();
         } else {
-            for (uint32_t b = 0; b + 16 <= bitcell_count; ++b)
-                if (sync_map[b]) { lock_pos = b; break; }
+            if (!syncs.empty()) lock_pos = syncs.front().pos;
         }
         if (lock_pos == bitcell_count)
             return result;
@@ -622,6 +650,8 @@ std::vector<uint8_t> downsampleCells(const std::vector<uint8_t>& cells,
     uint32_t last_cell  = 0;   // Zellindex der letzten geschriebenen Flanke
 
     for (uint32_t p = 0; p < bitcell_count; ++p) {
+        // Leere Bytes im Ganzen uebergehen (rund die Haelfte der Zellen sind Nullen).
+        if (p % 8 == 0 && p / 8 < cells.size() && cells[p / 8] == 0) { p += 7; continue; }
         if (!sample(p)) continue;
 
         uint32_t cell;

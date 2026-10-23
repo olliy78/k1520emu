@@ -17,6 +17,7 @@
 
 #include "core/peripherals/floppy_drive/track_codec.h"
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <climits>
 #include <stdexcept>
@@ -58,16 +59,22 @@ uint16_t crc16(const uint8_t* data, size_t n, uint8_t b, uint8_t c) {
  * Standard-CRC-16-CCITT, Polynom 0x1021, MSB-first.  Fuer IBM-3740-FM-Tracks.
  */
 uint16_t crc16Ccitt(const uint8_t* data, size_t n, uint16_t seed) {
-    uint16_t crc = seed;
-    for (size_t i = 0; i < n; ++i) {
-        crc ^= static_cast<uint16_t>(data[i]) << 8;
-        for (int bit = 0; bit < 8; ++bit) {
-            if (crc & 0x8000)
-                crc = static_cast<uint16_t>((crc << 1) ^ 0x1021);
-            else
-                crc = static_cast<uint16_t>(crc << 1);
+    // Tabellenfassung desselben Polynoms 0x1021 (MSB-first): ein Tabellenzugriff je Byte
+    // statt acht Schiebeschritte.  Wird je Feld jeder Spur gerechnet (Lesen UND Pruefen).
+    static const auto tab = [] {
+        std::array<uint16_t, 256> t{};
+        for (unsigned i = 0; i < 256; ++i) {
+            uint16_t c = static_cast<uint16_t>(i << 8);
+            for (int bit = 0; bit < 8; ++bit)
+                c = (c & 0x8000) ? static_cast<uint16_t>((c << 1) ^ 0x1021)
+                                 : static_cast<uint16_t>(c << 1);
+            t[i] = c;
         }
-    }
+        return t;
+    }();
+    uint16_t crc = seed;
+    for (size_t i = 0; i < n; ++i)
+        crc = static_cast<uint16_t>((crc << 8) ^ tab[(crc >> 8) ^ data[i]]);
     return crc;
 }
 
