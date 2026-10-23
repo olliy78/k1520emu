@@ -48,6 +48,10 @@
  * `--wdc 4.2|4.0.05|3.4.05` und `--hd <abbild>` (= `--hd0`; `--hd1`/`--hd2` fuer Laufwerk 1/2, nur `--machine p8000-16`, P13d): WDC an der
  * 16-Bit-PIO2 bzw. Winchester an Laufwerk 0 (Kopie wie die Disketten, `--rw` = Original);
  * Befehle `wdc [r|u|d|log]`, `cpu wdc` (nur Ansicht).
+ * `--plattepar aus|ergaenzen` (P8000): Parametersatz einer Platte ohne PAR ergaenzen (Kern-Vorgabe) oder nicht (Vorgabe des p8000emu).
+ * Befehl `nmi` (P8000): NMI-Taster.
+ * `--mon8 3.0|3.1` und `--mon16 3.0|3.1|3.3` (nur `--machine p8000[-16]`, Merkposten p8000 Nr. 63): ROM-Fassung der
+ * Monitore (Vorgabe 3.1; die Programmvorgabe des p8000emu ist 3.0/3.0).
  * `--rtc aus|u130x|rtc72421` (nur `--machine p8000-16`, Entwurf 38): Echtzeituhr-Karte am 16-Bit-Teil
  * (U130X = Originalkarte, rtc72421 = Nachbau); Befehl `rtc` zeigt Typ, Uhrzeit, Versatz, Zustand.
  * `--ptape` steckt die Lochstreifen-Karte K6022 (SIF1000, E0H–E7H; alle Maschinen).
@@ -235,6 +239,8 @@ int main(int argc, char** argv){
     const char* aup_alpha_opt = nullptr;   // --aup-alpha led|ohne|mit
     bool aup_sonder_opt = false;           // --aup-sonder: Sonderschnittstelle (N10d)
     const char* raf_opt = nullptr; // --raf none|raf128|raf512|raf2m: RAM-Floppy auf 88H/89H
+    const char* mon8_opt = nullptr; const char* mon16_opt = nullptr; // --mon8/--mon16: ROM-Fassung der Monitore (P8000)
+    const char* plattepar_opt = nullptr; // --plattepar aus|ergaenzen: Parametersatz einer Platte ohne PAR ergaenzen (Kern-Vorgabe) oder nicht (p8000emu-Vorgabe)
     const char* wdc_opt = nullptr; // --wdc 4.2|4.0.05|3.4.05: WDC an der 16-Bit-PIO2 (P8000, P13d)
     const char* konsole_opt = nullptr; // --konsole kern|original: Terminal an tty1 (P8000, P20c)
     const char* rtc_opt = nullptr; // --rtc aus|u130x|rtc72421: Uhrenkarte am 16-Bit-Teil (Entwurf 38)
@@ -277,6 +283,9 @@ int main(int argc, char** argv){
         else if (!strcmp(argv[i],"--aup-alpha") && i+1<argc) { aup_opt=true; aup_alpha_opt=argv[++i]; }
         else if (!strcmp(argv[i],"--raf") && i+1<argc) raf_opt=argv[++i];
         else if (!strcmp(argv[i],"--wdc") && i+1<argc) wdc_opt=argv[++i];
+        else if (!strcmp(argv[i],"--plattepar") && i+1<argc) plattepar_opt=argv[++i];
+        else if (!strcmp(argv[i],"--mon8") && i+1<argc) mon8_opt=argv[++i];
+        else if (!strcmp(argv[i],"--mon16") && i+1<argc) mon16_opt=argv[++i];
         else if (!strcmp(argv[i],"--konsole") && i+1<argc) konsole_opt=argv[++i];
         else if ((!strcmp(argv[i],"--hd") || !strcmp(argv[i],"--hd0")) && i+1<argc) hd_opt[0]=argv[++i];
         else if (!strcmp(argv[i],"--hd1") && i+1<argc) hd_opt[1]=argv[++i];
@@ -341,6 +350,30 @@ int main(int argc, char** argv){
         const std::string k = konsole_opt;
         if (k=="original") p8cfg.terminal = P8000Machine::Config::TerminalArt::Original;
         else if (k!="kern"){ fprintf(stderr,"--konsole: '%s' unbekannt (kern|original)\n",konsole_opt); return 2; }
+    }
+    if (plattepar_opt){
+        const std::string v = plattepar_opt;
+        if      (v=="aus")       p8cfg.platte_par_ergaenzen = false;
+        else if (v=="ergaenzen") p8cfg.platte_par_ergaenzen = true;
+        else { fprintf(stderr,"--plattepar: '%s' unbekannt (aus|ergaenzen)\n",plattepar_opt); return 2; }
+    }
+    if (mon8_opt || mon16_opt){
+        if (art!=dbgm::Art::P8000 && art!=dbgm::Art::P8000_16){ fprintf(stderr,"--mon8/--mon16 gibt es nur am P8000\n"); return 2; }
+        if (mon8_opt){
+            const std::string v = mon8_opt;
+            if      (v=="3.0") p8cfg.mon8 = P8000Machine::Config::Mon8::V3_0;
+            else if (v=="3.1") p8cfg.mon8 = P8000Machine::Config::Mon8::V3_1;
+            else { fprintf(stderr,"--mon8: '%s' unbekannt (3.0|3.1)\n",mon8_opt); return 2; }
+        }
+        if (mon16_opt){
+            if (art!=dbgm::Art::P8000_16){ fprintf(stderr,"--mon16 gibt es nur mit 16-Bit-Karte (--machine p8000-16)\n"); return 2; }
+            const std::string v = mon16_opt;
+            using M = P8000Machine::Config::Mon16;
+            if      (v=="3.0") p8cfg.mon16 = M::V3_0;
+            else if (v=="3.1") p8cfg.mon16 = M::V3_1;
+            else if (v=="3.3") p8cfg.mon16 = M::V3_3;
+            else { fprintf(stderr,"--mon16: '%s' unbekannt (3.0|3.1|3.3)\n",mon16_opt); return 2; }
+        }
     }
     if (rtc_opt){
         if (art!=dbgm::Art::P8000_16){ fprintf(stderr,"--rtc gibt es nur am P8000 mit 16-Bit-Karte (--machine p8000-16)\n"); return 2; }
@@ -2793,7 +2826,7 @@ int main(int argc, char** argv){
     // gibt es nur adp/dma/kopp/term; an anderen Maschinen melden sie „nur am P8000“.
     auto p8Kommando = [&](const std::vector<std::string>& t)->bool{
         const std::string& cmd=t[0];
-        static const std::set<std::string> namen={"adp","dma","kopp","mmu","xlat","ml","mp","segt","bsegt","term","wdc","rtc"};
+        static const std::set<std::string> namen={"adp","dma","kopp","mmu","xlat","ml","mp","segt","bsegt","term","wdc","rtc","nmi"};
         if (!namen.count(cmd)) return false;
         if (!KQ){ fprintf(stderr,"  '%s' gibt es nur am P8000 (--machine p8000|p8000-16)\n",cmd.c_str()); return true; }
         P8000Machine& pm=*m.p8000();
@@ -2810,6 +2843,10 @@ int main(int argc, char** argv){
             fprintf(stderr,"  %zu Zeilen (%llu Ereignisse insgesamt%s):\n",z.size(),(unsigned long long)pr.gesamt(),nurW?", nur Schreiben":"");
             zeilen(z); };
         if (cmd=="adp"){ zeilen(dbgp8::adpZeilen(pm.karte8().speicher())); return true; }
+        if (cmd=="nmi"){          // NMI-Taster der Frontplatte (wie das Fenster: eine Flanke bei der naechsten Gelegenheit)
+            pm.nmi();
+            fprintf(stderr,"  NMI-Taster gedrueckt\n");
+            return true; }
         if (cmd=="rtc"){
             if (!need16()) return true;
             P8000Rtc* r = pm.karte16()->rtc();
@@ -3143,6 +3180,7 @@ int main(int argc, char** argv){
               "    segt [n|clear] | bsegt [on|off]   SEGT-Protokoll (Zyklus, MMU, TRPL/IF1L) / Halt vor der Behandlung\n"
               "    trap | btrap | status | fcw | psa   Ausnahmen des U8001 (im Kontext u8000)\n"
               "    savestate <f> | loadstate <f>   P8KS (nicht: Medieninhalt) ; snap/rs/bbusrq: nicht vorhanden\n"
+              "    nmi                 NMI-Taster der Frontplatte (eine Flanke; beim naechsten Lauf wirksam)\n"
               "    rtc                 Echtzeituhr-Karte (--rtc u130x|rtc72421): Typ, Uhrzeit, Versatz, bei U130X Anzeige/Tasten/Zustand\n"
               "    wdc [r|u|d|log]     WDC (--wdc 4.2 / --hd abbild): Zustand, Register, Disassembler, Speicher, Kommando-Protokoll\n"
               "    Adressen der 16-Bit-Seite: <<seg>>off; `em:ADR` = physischer Hauptspeicher A0-A23 (roh)\n");

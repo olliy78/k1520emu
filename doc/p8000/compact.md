@@ -40,7 +40,7 @@ unverändert (gleiche Schaltung, Kernparameter wie das Vollgerät).
 
 | | P8000 | P8000 Compact |
 |---|---|---|
-| MON8 / MON16 | 3.0 / 3.0 | 3.1 / 3.1 |
+| MON8 / MON16 | 3.0 / 3.0 (Unterschiede zu 3.1: Merkposten 63) | 3.1 / 3.1 |
 | Hauptspeicher | 4 × 256 KB | 4 × 1 MB |
 | RTC | U130X | U130X |
 | Disketten K5601 | 2 | 3 |
