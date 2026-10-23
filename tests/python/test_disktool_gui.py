@@ -32,6 +32,7 @@ def qt_app(qapp):
 
 @pytest.fixture
 def window(qt_app):
+    from PySide6.QtCore import QCoreApplication, QEvent
     from app.disktool.ui.main_window import MainWindow
     w = MainWindow()
     yield w
@@ -39,7 +40,12 @@ def window(qt_app):
     # Gleich abbauen statt am Prozessende in beliebiger Reihenfolge (ohne close(): das
     # schriebe den Fensterzustand in die Benutzerkonfiguration).
     w.deleteLater()
+    # processEvents() liefert eine verzoegerte Loeschung OHNE laufende Ereignisschleife nicht
+    # aus: die Fenster blieben liegen (mit ihren ~13 Top-Level-Kindern und dem app-weiten
+    # Ablage-Filter in Python), und jeder Test baute auf einem langsameren Qt auf — Aufbau
+    # je Fall 0,02 s am Anfang, 0,7 s zum Schluss (114 s statt ~40 s fuers Modul).
     qt_app.processEvents()
+    QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
 
 
 def gruppen(view) -> list:

@@ -43,7 +43,11 @@ def window(qt_app):
     # Gleich abbauen statt am Prozessende in beliebiger Reihenfolge (ohne close(): das
     # schriebe den Fensterzustand in die Benutzerkonfiguration).
     w.deleteLater()
+    # processEvents() liefert eine verzoegerte Loeschung ohne laufende Ereignisschleife nicht
+    # aus: die Fenster blieben liegen und machten jeden folgenden Test langsamer.
+    from PySide6.QtCore import QCoreApplication, QEvent
     qt_app.processEvents()
+    QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
 
 
 def _tool():
