@@ -138,7 +138,8 @@ class SettingsWidget(QWidget):
 
     def _apply(self):
         """Push params to the screen, force a repaint, and notify listeners."""
-        self.screen.update()
+        self.screen.parameter_geaendert()
+        self._crt_freigeben()
         self.crtChanged.emit()
 
     def _add_float(self, form: QFormLayout, label: str, minv: float, maxv: float,
@@ -871,6 +872,28 @@ class SettingsWidget(QWidget):
         inner = QWidget()
         form = QFormLayout(inner)
 
+        # Gesamtschalter + Bildrate der Anzeige
+        self._add_stufe(form, "Röhren-Nachbildung (aus = schlichte Textkonsole, spart Rechenleistung)",
+                        "crt_on")
+        rate = QComboBox()
+        for hz in (15, 30, 60):
+            rate.addItem(f"{hz} Bilder/s", float(hz))
+
+        def rate_refresh():
+            rate.blockSignals(True)
+            i = rate.findData(float(self.screen.params.bildrate))
+            rate.setCurrentIndex(i if i >= 0 else 1)
+            rate.blockSignals(False)
+
+        def rate_changed(_i):
+            self.screen.params.bildrate = float(rate.currentData())
+            self._apply()
+
+        rate.currentIndexChanged.connect(rate_changed)
+        rate_refresh()
+        self._refreshers.append(rate_refresh)
+        form.addRow("Bildrate der Anzeige", rate)
+
         # Filterstufen (einzeln abschaltbar)
         for text, attr in (("Vignette", "vignette_on"),):
             self._add_stufe(form, text, attr)
@@ -923,16 +946,37 @@ class SettingsWidget(QWidget):
         reset_btn.clicked.connect(self._reset_crt)
         form.addRow(reset_btn)
 
+        # Regler, die nur der CRT-Shader auswertet (die schlichte Qt-Flaeche kennt sie nicht).
+        self._nur_crt = []
+        nur_crt = {"Kontrast", "Krümmung X", "Krümmung Y", "Ecken-Rundung"}
+        for i in range(form.rowCount()):
+            lab = form.itemAt(i, QFormLayout.LabelRole)
+            feld = form.itemAt(i, QFormLayout.FieldRole)
+            span = form.itemAt(i, QFormLayout.SpanningRole)
+            if lab is not None and lab.widget() is not None and lab.widget().text() in nur_crt:
+                self._nur_crt += [lab.widget(), feld.widget()]
+            elif span is not None and isinstance(span.widget(), QCheckBox) \
+                    and span.widget().text() == "Vignette":
+                self._nur_crt.append(span.widget())
+        self._crt_freigeben()
+
         # Wrap in a scroll area so the panel stays usable when narrow.
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setWidget(inner)
         return scroll
 
+    def _crt_freigeben(self):
+        """Regler, die ohne Roehren-Nachbildung nichts bewirken, ausgrauen."""
+        an = bool(self.screen.params.crt_on)
+        for w in getattr(self, "_nur_crt", ()):
+            w.setEnabled(an)
+
     def refresh_all(self):
         """Re-read every control from the live params (e.g. after a config load)."""
         for refresh in self._refreshers:
             refresh()
+        self._crt_freigeben()
 
     def _reset_crt(self):
         from dataclasses import fields

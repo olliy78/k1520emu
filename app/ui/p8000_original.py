@@ -181,7 +181,7 @@ class OriginalTerminalWidget(ScreenWidget):
             self._texture_stale = True
         self._fb_bytes = daten.translate(_STUFEN)
         self._pending_upload = True
-        self.update()
+        self._bild_neu()
 
     def pixel(self, x: int, y: int) -> int:
         """Stufe (0 dunkel, 1 normal, 2 hell) des Punktes (x, y) im letzten geholten Bild — für Tests."""

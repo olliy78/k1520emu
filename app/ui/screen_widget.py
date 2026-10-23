@@ -32,8 +32,9 @@ next frame picks them up) to dial the look toward the real screen.
 from dataclasses import dataclass, field
 from typing import Optional, Tuple
 
-from PySide6.QtWidgets import QMenu, QWidget
-from PySide6.QtGui import QGuiApplication, QImage, QKeyEvent
+from PySide6.QtWidgets import QMenu, QVBoxLayout, QWidget
+from PySide6.QtGui import QColor, QGuiApplication, QImage, QKeyEvent, QPainter, qRgb
+from PySide6.QtCore import QRect, QRectF
 from PySide6.QtCore import QEvent, Qt, QTimer, QSize, QElapsedTimer, Signal
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from PySide6.QtOpenGL import (
@@ -131,7 +132,15 @@ class CRTParams:
     # erhalten.  (Kontrast, Kruemmung und Ecken-Rundung haben dafuer ihren Regler.)
     vignette_on: bool = True
 
-    STUFEN = ("vignette_on",)
+    # Gesamtschalter: aus = schlichte Textkonsole (zwei Farben, ein Texturzugriff,
+    # keine Mipmaps/Kruemmung/Vignette) — spart GPU, CPU und Speicher auf schwachen Rechnern.
+    crt_on: bool = True
+
+    # Bildrate der ANZEIGE in Hz, unabhaengig vom Tempo des Gastes (10x Tempo
+    # braucht kein 500-Hz-Bild).
+    bildrate: float = 30.0
+
+    STUFEN = ("vignette_on", "crt_on")
 
     # ── (de)serialisation for config files ───────────────────────────────────
 
@@ -152,6 +161,7 @@ class CRTParams:
             "scale_y": self.scale_y,
             "offset_x": self.offset_x,
             "offset_y": self.offset_y,
+            "bildrate": self.bildrate,
             **{k: bool(getattr(self, k)) for k in self.STUFEN},
         }
 
@@ -168,7 +178,7 @@ class CRTParams:
         for key in ("brightness", "contrast",
                     "mask_strength", "mask_pitch", "corner_radius",
                     "vignette_strength", "flicker_strength", "scale_x",
-                    "scale_y", "offset_x", "offset_y"):
+                    "scale_y", "offset_x", "offset_y", "bildrate"):
             if key in d and d[key] is not None:
                 setattr(self, key, float(d[key]))
         for key in self.STUFEN:
@@ -333,6 +343,18 @@ void main() {
 }
 """
 
+# Schlichter Weg (CRT aus): Textur in die beiden Phosphorfarben abbilden, sonst nichts.
+_FRAG_SHADER_EINFACH = """
+#version 120
+uniform sampler2D uScreen;
+uniform vec3  uPhosphorOn;
+uniform vec3  uPhosphorOff;
+varying vec2 vUv;
+void main() {
+    gl_FragColor = vec4(mix(uPhosphorOff, uPhosphorOn, texture2D(uScreen, vUv).r), 1.0);
+}
+"""
+
 
 def _set_anisotropy(tex, level: float = 16.0):
     """Anisotrope Filterung einschalten, wo die GL sie hergibt.
@@ -349,8 +371,13 @@ def _set_anisotropy(tex, level: float = 16.0):
         pass
 
 
-class ScreenWidget(QOpenGLWidget):
-    """GPU CRT display widget for the K1520 framebuffer."""
+class ScreenWidget(QWidget):
+    """Bildschirm-Widget fuer den K1520-Framebuffer.
+
+    Zeichenflaeche wechselbar zur Laufzeit (``params.crt_on``): OpenGL mit CRT-Shader
+    (:class:`_GlFlaeche`) oder schlichte CPU-Zeichnung (:class:`_QtFlaeche`), die auf
+    Rechnern ohne brauchbare GPU deutlich billiger ist und keinen GL-Kontext haelt.
+    """
 
     # Kept for backward compatibility with callers/tests referencing them.
     COLS = 80
@@ -388,22 +415,18 @@ class ScreenWidget(QOpenGLWidget):
         self._texture_stale = False
         self._pending_upload = False
 
-        # GL objects (created in initializeGL, recreated on context loss).
-        self._program: Optional[QOpenGLShaderProgram] = None
-        self._vbo: Optional[QOpenGLBuffer] = None
-        self._vao: Optional[QOpenGLVertexArrayObject] = None
-        self._texture: Optional[QOpenGLTexture] = None
-        self._loc_pos = -1
-        self._loc_uv = -1
-
-        # Wall-clock for time-based effects (flicker).
-        self._clock = QElapsedTimer()
-        self._clock.start()
+        # Die Zeichenflaeche (GL oder Qt) fuellt das Widget; sie wird in
+        # parameter_geaendert() gewechselt, sobald params.crt_on es verlangt.
+        self._layout = QVBoxLayout(self)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._flaeche = None
+        self._flaeche_art = None
+        self._flaeche_waehlen()
 
         # Poll the core for framebuffer changes at 50 Hz (like the hardware).
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._on_update)
-        self.timer.setInterval(20)  # 20 ms = 50 Hz
+        self.timer.setInterval(self._bildintervall_ms())
 
         # Scalable: allow any size >= a sensible minimum, keep a 4:3 hint.
         self.setMinimumSize(320, 240)
@@ -423,6 +446,40 @@ class ScreenWidget(QOpenGLWidget):
         """Connect to the emulator core binding."""
         self.emulator = emulator
 
+    def _bildintervall_ms(self) -> int:
+        return max(1, int(round(1000.0 / max(1.0, float(self.params.bildrate)))))
+
+    def parameter_geaendert(self):
+        """Nach einer Aenderung von :attr:`params`: Bildrate uebernehmen, Zeichenflaeche
+        passend zu ``crt_on`` waehlen, neu zeichnen."""
+        ms = self._bildintervall_ms()
+        if self.timer.interval() != ms:
+            self.timer.setInterval(ms)
+        self._flaeche_waehlen()
+        self._bild_neu()
+
+    def _flaeche_waehlen(self):
+        """Die Zeichenflaeche zu ``params.crt_on`` haben; die alte wird freigegeben (samt GL-Kontext)."""
+        art = "gl" if self.params.crt_on else "qt"
+        if art == self._flaeche_art:
+            return
+        alt, self._flaeche = self._flaeche, (_GlFlaeche(self) if art == "gl" else _QtFlaeche(self))
+        self._flaeche_art = art
+        self._layout.addWidget(self._flaeche)
+        # Die neue Flaeche kennt das Bild noch nicht.
+        self._texture_stale = True
+        self._pending_upload = self._fb_bytes is not None
+        if alt is not None:
+            self._layout.removeWidget(alt)
+            alt.hide()
+            alt.setParent(None)        # der GL-Kontext raeumt sich ueber aboutToBeDestroyed ab
+            alt.deleteLater()
+
+    def _bild_neu(self):
+        """Neu zeichnen lassen (die Flaeche zeichnet, nicht dieses Widget)."""
+        if self._flaeche is not None:
+            self._flaeche.update()
+
     def start_display(self):
         """Start polling the framebuffer and repainting."""
         self.timer.start()
@@ -438,7 +495,7 @@ class ScreenWidget(QOpenGLWidget):
             self.start_display()
         else:
             self.stop_display()
-        self.update()   # sofort neu zeichnen (schwarz bzw. aktuelles Bild)
+        self._bild_neu()   # sofort neu zeichnen (schwarz bzw. aktuelles Bild)
 
     def sizeHint(self) -> QSize:
         return QSize(640, 480)  # 4:3
@@ -644,10 +701,37 @@ class ScreenWidget(QOpenGLWidget):
             self._fb_w, self._fb_h = groesse
             self._texture_stale = True
         # Copy the framebuffer out of the core and stage it for upload.
-        self._fb_bytes = bytes(self.emulator.get_framebuffer())
+        self._fb_bytes = self.emulator.framebuffer_bytes()
         self.emulator.clear_framebuffer_dirty_flag()
         self._pending_upload = True
-        self.update()  # schedule a repaint (paintGL runs with GL current)
+        self._bild_neu()  # Neuzeichnen anstossen (die Flaeche holt sich das Bild)
+
+
+class _GlFlaeche(QOpenGLWidget):
+    """Die OpenGL-Zeichenflaeche (CRT-Shader) im :class:`ScreenWidget`.
+
+    Haelt nur GL-Objekte; Bildbytes, Groesse, ``params`` und der Ein/Aus-Zustand
+    liegen beim Besitzer ``_b`` (dem ScreenWidget).  Nimmt weder Fokus noch Maus
+    (beides gehoert dem Besitzer).
+    """
+
+    def __init__(self, besitzer):
+        super().__init__(besitzer)
+        self._b = besitzer
+        self.setFocusPolicy(Qt.NoFocus)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+        # GL objects (created in initializeGL, recreated on context loss).
+        self._program: Optional[QOpenGLShaderProgram] = None
+        self._program_einfach: Optional[QOpenGLShaderProgram] = None
+        self._filter_einfach: Optional[bool] = None    # Filterzustand der Textur
+        self._vbo: Optional[QOpenGLBuffer] = None
+        self._vao: Optional[QOpenGLVertexArrayObject] = None
+        self._texture: Optional[QOpenGLTexture] = None
+        self._loc_pos = -1
+        self._loc_uv = -1
+        # Wall-clock for time-based effects (flicker).
+        self._clock = QElapsedTimer()
+        self._clock.start()
 
     # ── OpenGL lifecycle ─────────────────────────────────────────────────────
 
@@ -668,8 +752,8 @@ class ScreenWidget(QOpenGLWidget):
         self._build_texture()
 
         # After a context rebuild, re-upload the last framebuffer we had.
-        if self._fb_bytes is not None:
-            self._pending_upload = True
+        if self._b._fb_bytes is not None:
+            self._b._pending_upload = True
 
     def _cleanup_gl(self):
         """Release all GL objects while the outgoing context is still current.
@@ -690,6 +774,10 @@ class ScreenWidget(QOpenGLWidget):
             if self._program is not None:
                 self._program.removeAllShaders()
                 self._program = None
+            if self._program_einfach is not None:
+                self._program_einfach.removeAllShaders()
+                self._program_einfach = None
+            self._filter_einfach = None
             self._loc_pos = -1
             self._loc_uv = -1
         finally:
@@ -709,6 +797,22 @@ class ScreenWidget(QOpenGLWidget):
         self._program = prog
         self._loc_pos = prog.attributeLocation("aPos")
         self._loc_uv = prog.attributeLocation("aUv")
+
+    def _einfaches_programm(self) -> QOpenGLShaderProgram:
+        """Das Programm fuer „CRT aus“ — erst beim ersten Bedarf gebaut und gebunden."""
+        if self._program_einfach is None:
+            prog = QOpenGLShaderProgram()
+            if not prog.addShaderFromSourceCode(QOpenGLShader.Vertex, _VERT_SHADER):
+                raise RuntimeError("Einfach-Vertex-Shader:\n" + prog.log())
+            if not prog.addShaderFromSourceCode(QOpenGLShader.Fragment, _FRAG_SHADER_EINFACH):
+                raise RuntimeError("Einfach-Fragment-Shader:\n" + prog.log())
+            # Gleiche Attributplaetze wie das CRT-Programm, damit das VAO passt.
+            prog.bindAttributeLocation("aPos", self._loc_pos)
+            prog.bindAttributeLocation("aUv", self._loc_uv)
+            if not prog.link():
+                raise RuntimeError("Einfach-Shader link:\n" + prog.log())
+            self._program_einfach = prog
+        return self._program_einfach
 
     def _build_geometry(self):
         # Fullscreen quad as a triangle strip: (pos.xy, uv.xy).
@@ -745,7 +849,7 @@ class ScreenWidget(QOpenGLWidget):
     def _build_texture(self):
         tex = QOpenGLTexture(QOpenGLTexture.Target2D)
         tex.setFormat(QOpenGLTexture.R8_UNorm)
-        tex.setSize(self._fb_w, self._fb_h)
+        tex.setSize(self._b._fb_w, self._b._fb_h)
         # Full mip chain so minification (small/scaled-down window) samples an
         # averaged level instead of dropping thin glyph strokes.  Trilinear
         # (LinearMipMapLinear) min filter, plain Linear when magnifying.
@@ -759,20 +863,21 @@ class ScreenWidget(QOpenGLWidget):
 
     def _upload_texture(self):
         """Upload the staged framebuffer bytes into the GL texture."""
-        if self._fb_bytes is None or self._texture is None:
+        if self._b._fb_bytes is None or self._texture is None:
             return
         try:
             # Fast path: sub-image the raw single-channel bytes in place, then
             # rebuild the mip chain so the downscaled view stays anti-aliased.
             self._texture.setData(
-                QOpenGLTexture.Red, QOpenGLTexture.UInt8, self._fb_bytes
+                QOpenGLTexture.Red, QOpenGLTexture.UInt8, self._b._fb_bytes
             )
-            self._texture.generateMipMaps()
+            if self._b.params.crt_on:
+                self._texture.generateMipMaps()
         except (TypeError, RuntimeError):
             # Fallback: rebuild the texture from a grayscale QImage.  QImage is
             # top-row-first while QOpenGLTexture uploads bottom-first, so mirror.
             # The QImage ctor generates a full mip chain by default.
-            img = QImage(self._fb_bytes, self._fb_w, self._fb_h, self._fb_w,
+            img = QImage(self._b._fb_bytes, self._b._fb_w, self._b._fb_h, self._b._fb_w,
                          QImage.Format_Grayscale8).mirrored(False, True)
             if self._texture is not None:
                 self._texture.destroy()
@@ -795,20 +900,21 @@ class ScreenWidget(QOpenGLWidget):
         f.glClear(GL_COLOR_BUFFER_BIT)
 
         # Powered off → dark tube (leave the cleared black frame).
-        if not self._powered:
+        if not self._b._powered:
             return
 
         if self._program is None or self._texture is None:
             return
 
-        if self._texture_stale:
+        if self._b._texture_stale:
             self._texture.destroy()
             self._build_texture()
-            self._texture_stale = False
-            self._pending_upload = self._fb_bytes is not None
-        if self._pending_upload:
+            self._filter_einfach = None
+            self._b._texture_stale = False
+            self._b._pending_upload = self._b._fb_bytes is not None
+        if self._b._pending_upload:
             self._upload_texture()
-            self._pending_upload = False
+            self._b._pending_upload = False
 
         # Compute the largest 4:3 rectangle that fits the widget (device px).
         dpr = self.devicePixelRatioF()
@@ -824,12 +930,28 @@ class ScreenWidget(QOpenGLWidget):
         vy = (vh_full - vh) // 2
         f.glViewport(vx, vy, vw, vh)
 
-        self._program.bind()
-        self._set_uniforms(f)
+        einfach = not self._b.params.crt_on
+        prog = self._einfaches_programm() if einfach else self._program
+        # Filter nur bei Moduswechsel umstellen; ohne Mipmaps genuegt Linear.  Beim
+        # Zurueckschalten auf CRT fehlt die Mipkette bis zum naechsten Bild.
+        if self._filter_einfach != einfach:
+            self._texture.setMinificationFilter(
+                QOpenGLTexture.Linear if einfach else QOpenGLTexture.LinearMipMapLinear)
+            self._filter_einfach = einfach
+            if not einfach:
+                self._texture.generateMipMaps()
+        prog.bind()
+        if einfach:
+            f.glUniform3f(prog.uniformLocation("uPhosphorOn"),
+                          *[float(c) for c in self._b.params.phosphor_on])
+            f.glUniform3f(prog.uniformLocation("uPhosphorOff"),
+                          *[float(c) for c in self._b.params.phosphor_off])
+        else:
+            self._set_uniforms(f)
 
         f.glActiveTexture(GL_TEXTURE0)
         self._texture.bind()
-        f.glUniform1i(self._program.uniformLocation("uScreen"), 0)
+        f.glUniform1i(prog.uniformLocation("uScreen"), 0)
 
         if self._vao is not None:
             self._vao.bind()
@@ -838,7 +960,7 @@ class ScreenWidget(QOpenGLWidget):
             self._vao.release()
 
         self._texture.release()
-        self._program.release()
+        prog.release()
 
     def _set_uniforms(self, f):
         """Set all shader uniforms via the typed glUniform* calls.
@@ -849,12 +971,12 @@ class ScreenWidget(QOpenGLWidget):
         glUniform2f / glUniform3f functions avoids that overload trap.
         """
         prog = self._program
-        p = self.params
+        p = self._b.params
 
         def u(name):
             return prog.uniformLocation(name)
 
-        f.glUniform2f(u("uResolution"), float(self._fb_w), float(self._fb_h))
+        f.glUniform2f(u("uResolution"), float(self._b._fb_w), float(self._b._fb_h))
         f.glUniform3f(u("uPhosphorOn"), *[float(c) for c in p.phosphor_on])
         f.glUniform3f(u("uPhosphorOff"), *[float(c) for c in p.phosphor_off])
         f.glUniform1f(u("uBrightness"), float(p.brightness))
@@ -868,3 +990,72 @@ class ScreenWidget(QOpenGLWidget):
         f.glUniform1f(u("uTime"), float(self._clock.elapsed() / 1000.0))
         f.glUniform2f(u("uScale"), float(p.scale_x), float(p.scale_y))
         f.glUniform2f(u("uOffset"), float(p.offset_x), float(p.offset_y))
+
+
+class _QtFlaeche(QWidget):
+    """Schlichte Zeichenflaeche ohne OpenGL (CRT aus): ein indiziertes ``QImage`` mit 256
+    Abstufungen zwischen den beiden Phosphorfarben, vom Qt-Rasterisierer auf das 4:3-Rechteck
+    skaliert.  Keine Kruemmung/Vignette/Helligkeit — wie der schlichte GL-Shader.
+
+    Gezeichnet wird nur bei neuem Bild oder Groessenaenderung; kein GL-Kontext, kein
+    Fenster-grosser Framebuffer.
+    """
+
+    def __init__(self, besitzer):
+        super().__init__(besitzer)
+        self._b = besitzer
+        self.setFocusPolicy(Qt.NoFocus)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.setAttribute(Qt.WA_OpaquePaintEvent)       # wir fuellen alles selbst
+        self._bild: Optional[QImage] = None
+        self._farben = None
+
+    @staticmethod
+    def _tabelle(on, off, helligkeit):
+        """256 Abstufungen zwischen den Phosphorfarben; beide Farben mal *helligkeit*."""
+        def kan(c):
+            return min(255, max(0, int(round(c * helligkeit * 255))))
+        return [qRgb(*(kan(o + (n - o) * i / 255.0) for n, o in zip(on, off)))
+                for i in range(256)]
+
+    def paintEvent(self, event):
+        b = self._b
+        p = QPainter(self)
+        p.fillRect(self.rect(), Qt.black)
+        if not b._powered or b._fb_bytes is None:
+            return
+        w, h = b._fb_w, b._fb_h
+        if len(b._fb_bytes) < w * h:                    # Groesse noch im Wechsel
+            return
+        if b._pending_upload or self._bild is None or self._bild.width() != w \
+                or self._bild.height() != h:
+            # Kein Kopieren: das QImage zeigt auf die Bytes des Besitzers (bleiben dort gehalten).
+            self._bild = QImage(b._fb_bytes, w, h, w, QImage.Format_Indexed8)
+            self._farben = None
+            b._pending_upload = False
+            b._texture_stale = False
+        prm = b.params
+        # Helligkeitsregler: 2,0 = Farben unveraendert, 0 = dunkel, 4 = doppelt so hell.
+        faktor = max(0.0, float(prm.brightness)) / 2.0
+        farben = (tuple(prm.phosphor_on), tuple(prm.phosphor_off), faktor)
+        if farben != self._farben:
+            self._bild.setColorTable(self._tabelle(*farben))
+            self._farben = farben
+        # 4:3-Roehrenflaeche, mittig im Widget.
+        bw, bh = self.width(), self.height()
+        if bw / max(1, bh) > DISPLAY_ASPECT:
+            vh, vw = bh, int(round(bh * DISPLAY_ASPECT))
+        else:
+            vw, vh = bw, int(round(bw / DISPLAY_ASPECT))
+        vx, vy = (bw - vw) // 2, (bh - vh) // 2
+        # Ausserhalb des Rasters, aber auf der Roehre: der „unbeleuchtete“ Ton.
+        p.fillRect(QRect(vx, vy, vw, vh), QColor(self._bild.color(0)))
+        # Raster wie beim CRT-Shader: Groesse relativ zur Roehre, Verschiebung in Roehrenbreiten
+        # je Achse (Bildzeile 0 oben, positive Y-Verschiebung = nach unten).
+        rw, rh = vw * prm.scale_x, vh * prm.scale_y
+        cx = vx + vw / 2.0 + prm.offset_x * vw
+        cy = vy + vh / 2.0 + prm.offset_y * vh
+        ziel = QRectF(cx - rw / 2.0, cy - rh / 2.0, rw, rh)
+        p.setClipRect(QRect(vx, vy, vw, vh))
+        p.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        p.drawImage(ziel, self._bild)
