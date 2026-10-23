@@ -902,6 +902,8 @@ def test_winchester_auswahl_erzeugt_kaesten_und_erreicht_den_kern(qapp, umgebung
     try:
         sw, g = w.settings_widget, w.platten_gruppe
         assert [sw.winchester_combo.itemData(i) for i in range(sw.winchester_combo.count())] == [1, 2, 3]
+        assert [sw.winchester_combo.itemText(i) for i in range(3)] == [
+            "1", "2", "3 (wird aktuell nicht von WEGA unterstützt)"]
         assert sw.winchester_value() == 1 and g.anzahl() == 1
         assert [k.isVisibleTo(g) for k in g.kaesten] == [True, False, False]
         assert w.platten_widget is g.kaesten[0] and g.kaesten[0].unit == 0

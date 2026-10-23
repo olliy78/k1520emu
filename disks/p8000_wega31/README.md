@@ -8,7 +8,8 @@ die Tests benutzen diese Dateien nicht, und der Emulator schreibt zurück.
 
 | Datei | Inhalt |
 |-------|--------|
-| `p8000_wega31_platte.avr.img.gz` | **Fertig installierte Platte**, Geometrie 1380/10/18 (127 MB → 5,9 MB gepackt), Typkürzel `avr` = `WEGA31-AVR`; **seit 2026-10-18 mit Kermit** (s. u.) |
+| `p8000_wega31_platte.avr.img.gz` | **Fertig installierte Platte**, Geometrie 1380/10/18 (127 MB → rund 6 MB gepackt), Typkürzel `avr` = `WEGA31-AVR`; **seit 2026-10-18 mit Kermit** (s. u.), **seit 2026-10-23 für zwei Platten vorbereitet** (s. u.) |
+| `p8000_wega31_usr2.avr.img.gz` | **Zweite Platte** für Laufwerk 1, gleicher Typ `WEGA31-AVR` (WDC 4.2 verlangt für alle Laufwerke denselben Parametersatz): formatiert (`sa.format`), `mkfs` 248 220 Blöcke, `labelit` als `/usr2`, leer bis auf `lost+found` (127 MB → 0,6 MB gepackt) |
 | `p8000_wega31_udos_boot.dmk` | UDOS-Startdiskette.  Dieselbe Datei wie `../wega30/p8000_wega30_udos_boot.dmk`: sie bringt nur UDOS und die Koppelsoftware für den 8-Bit-Teil, WEGA selbst kommt von der Platte |
 
 ## Herkunft
@@ -56,3 +57,35 @@ Auf der Platte stehen C-Kermit 4.2(030) und ein Anmeldekonto, das einen **Kermit
   ohne Befund.  Ablauf, Bildschirmtexte, Fallen: `doc/p8000/kermit_wega.md`, `doc/merkposten/kermit.md`; Tests
   `P8000WegaKermit.ServerHinterGetty` und die Gegenprobe der PC-Bibliothek `P8000WegaKermit.*` in
   `tests/system/test_p8000_wega_kermit_austausch.cpp` (`tools/dev.sh test-wega`).
+
+## Zweite Platte (seit 2026-10-23, Ticket #15, Merkposten p8000 Nr. 65)
+
+Die Platte ist für zwei Laufwerke vorbereitet; **nur gegenüber der Fassung davor geändert:**
+
+- Kern mit `md10` (sysgen „add an second harddisk", `md10` = 248 220 Blöcke) als `/wega`, der bisherige als `/wega.old`;
+  dazu die Ergebnisse von `sysgen` unter `/usr/sys/conf` (`wega`, `boot`).
+- Gerätedateien `/dev/md10` (`brw-r----- bin system 0,10`) und `/dev/rmd10`, Verzeichnis `/usr2`.
+- `/etc/rc_csh` fragt nach der `/dev/rz`-Prüfung **einmal** nach, ob Laufwerk 1 antwortet (`dd` auf `/dev/rmd10`), meldet das
+  und legt dann die Marke `/etc/md10.da` an bzw. nicht; `/etc/mfs` (= `/etc/umfs`) hängt `md10` nur bei vorhandener Marke
+  ein (nach `/dev/usr`) bzw. aus (vor `/dev/usr`).  `/etc/checklist` bleibt unverändert: `fsck` ohne Argumente ist
+  interaktiv und liefe ohne Platte in einen Lesefehler.
+- Sonst nichts (gleiche Benutzer, Kermit-Konto usw.).
+
+Die Platte läuft auch ohne Laufwerk 1.  Der Kern meldet jeden Zugriff auf `md10` ohne Platte (`err on dev 0/10 … md: fatal
+error`); das ist nicht abschaltbar, deshalb rahmen die Meldungen von `rc_csh` die drei Kernzeilen ein:
+
+    Checking second hard disk (md10) ...
+    err on dev 0/10
+    bn=0 er=FF18,3
+    md: fatal error
+    Second hard disk not present - /usr2 not mounted.
+
+Mit der zweiten Platte an Laufwerk 1 steht dort `Second hard disk found - checking /usr2`, danach die `fsck`-Ausgabe
+(≈ 290 s Maschinenzeit).  Anschließen: *Einstellungen ▸ Laufwerke ▸ Winchester-Laufwerke* = 2, im Plattenkasten *Laufwerk 1*
+**Anschließen…**, *Rückstellen*; Handbuch „Zweite Festplatte unter WEGA einrichten".  Die Voreinstellungen P8000 und
+P8000 Compact stellen 1 Laufwerk ein.
+
+**Erzeugt** am Emulator mit `tools/p8000/zweite_platte_bereitstellen.sh` (Systemtest
+`P8000WegaZweitePlatte.Bereitstellen`) aus der Platte des Git-Stands `c8a7a744`; Wächter der fertigen Abbilder:
+`OhneZweitePlatteLaeuftUnauffaellig`, `MitAusgelieferterZweiterPlatteEingebunden`.  Beide Abbilder sind mit `gzip -9 -n`
+gepackt.

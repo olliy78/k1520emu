@@ -59,3 +59,6 @@ Winchester-Laufwerke* (1–3) mit je einem Plattenkasten (Kern: bis drei Laufwer
    **Unter WEGA 3.1 nachgewiesen (Merkposten 64):** LW 1 geht mit `sa.format` (LW 1), `sysgen` (zweite Platte), `mknod`/`mkfs`/`mount` und Einträgen in
    `/etc/mfs`, `/etc/rc_csh`, `/etc/checklist`; Bedingung: **gleicher Plattentyp** wie LW 0 (WDC 4.2). LW 2 kann WEGA nicht ansprechen. Ob die Compact-Auslieferung
    einen schon generierten Kern für zwei Platten hatte (`/etc/insfdhd2` auf ycdtotv.de deutet auf ein Einrichteskript), ist **[offen]**.
+   **Ausgeliefert (Merkposten 65):** die WEGA-3.1-Platte in `disks/p8000_wega31/` ist für zwei Platten vorbereitet (Kern mit `md10`, `/usr2`, bedingte
+   Einbindung in `rc_csh`/`mfs`) und kommt mit der fertigen zweiten Platte `p8000_wega31_usr2.avr.img.gz`. Die Voreinstellung (auch Compact) stellt weiter
+   **1** Winchester ein; die zweite wird über *Winchester-Laufwerke = 2* und *Anschließen…* an Laufwerk 1 zugeschaltet.

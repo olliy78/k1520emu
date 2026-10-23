@@ -894,7 +894,9 @@ class SettingsWidget(QWidget):
         if self.profil.platte:
             self.winchester_combo = QComboBox()
             for n in (1, 2, 3):
-                self.winchester_combo.addItem(str(n), n)
+                # Der gespeicherte Wert bleibt die Zahl; nur die Anzeige trägt den Zusatz (unter WEGA ist LW 2 nicht nutzbar).
+                self.winchester_combo.addItem(
+                    str(n) if n < 3 else "3 (wird aktuell nicht von WEGA unterstützt)", n)
             self.winchester_combo.setToolTip(
                 "Zahl der Winchester-Laufwerke am WDC (1–3, Vorgabe 1).  Jedes bekommt im Reiter "
                 "Laufwerke einen Kasten für sein Plattenabbild.  Der WDC erkennt die Platten beim "

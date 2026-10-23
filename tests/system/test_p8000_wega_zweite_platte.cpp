@@ -1,10 +1,17 @@
 /**
  * @file test_p8000_wega_zweite_platte.cpp
- * @brief Zweite Festplatte (WDC-Laufwerk 1) unter WEGA 3.1 einrichten, formatieren, mounten und dauerhaft
- *        einbinden (Ticket #15, Merkposten p8000 Nr. 64; Handbuch „Zweite Festplatte unter WEGA einrichten").
+ * @brief Zweite Festplatte (WDC-Laufwerk 1) unter WEGA 3.1 (Ticket #15, Merkposten p8000 Nr. 64/65; Handbuch
+ *        „Zweite Festplatte unter WEGA einrichten").
  *
- * Verfahren nach dem WEGA-Systemhandbuch, Abschnitt 4.4 („Einbinden eines zweiten Hard-Disk-Laufwerks") und 5.5
- * (sysgen), am Emulator nachgewiesen:
+ * DREI Tests:
+ *   - `OhneZweitePlatte` und `MitZweiterPlatte` (Waechter, laufen immer): die AUSGELIEFERTE Platte
+ *     (`p8000_wega31_platte.avr.img.gz`) ist fuer zwei Platten vorbereitet (Kern mit md10, /dev/md10, /usr2, bedingte
+ *     Einbindung in `/etc/rc_csh` + `/etc/mfs`); die AUSGELIEFERTE zweite Platte (`p8000_wega31_usr2.avr.img.gz`,
+ *     sa.format + mkfs + labelit /usr2) kommt an LW 1.  Ohne LW 1 laeuft das System ohne fsck-/mount-Fehler und zeigt
+ *     die drei Meldungszeilen; mit LW 1 wird /usr2 geprueft, eingehaengt, beschrieben und ist nach einem Neustart da.
+ *   - `Bereitstellen` (nur mit `K1520_ZP_AUSGANG` + `K1520_ZP_AUS`, sonst uebersprungen): erzeugt beide Auslieferungs-
+ *     abbilder.  Aufruf: `tools/p8000/zweite_platte_bereitstellen.sh`.  Der Ablauf ist der lange Weg des Handbuchs
+ *     am Emulator, ausgehend von der UNVERAENDERTEN Platte (Stand vor Merkposten 65):
  *   1. Neue Platte vom Typ der Platte 0 (hier WEGA31-AVR, 1380/10/18; unformatiert) an Laufwerk 1, Kaltstart.  Der Hardwaretest bemaengelt den fehlenden
  *      Parametersatz von LW 1 und bleibt am Monitor stehen (`*`, kein AUTOBOOT).
  *   2. `O U` -> `boot` -> `md(0,16000)sa.format`: Laufwerk 1, vorgeschlagener PAR (= LW 0) `y`, ganze Platte formatieren, PAR&BTT
@@ -12,17 +19,15 @@
  *   3. Der ausgelieferte Kern kennt LW 1 nur mit Groesse 0 (`md_sizes[10..19]` in `wpar.c` aus
  *      `/usr/sys/h/mdsize.h`): `cd /usr/sys/conf; sysgen` mit „add second harddisk" -> neuer Kern, `cp` nach /wega.
  *   4. Kaltstart mit dem neuen Kern: `mknod`/`chmog` fuer md10/rmd10, `mkdir /usr2`, `mkfs`, `labelit`, `mount`,
- *      `mlf`; Eintraege in `/etc/mfs` (= `/etc/umfs`, harter Link), `/etc/rc_csh` (fsck) und `/etc/checklist`.
- *      Daten schreiben, `sync`.
- *   5. Kaltstart: `rc_csh` prueft /dev/rmd10, `mfs` mountet /usr2, die Daten sind da.
+ *      `mlf`; bedingte Eintraege in `/etc/mfs` (= `/etc/umfs`, harter Link) und `/etc/rc_csh` (siehe `ed`-Skripte unten).
+ *      KEIN Eintrag in `/etc/checklist` (`fsck` ohne Argumente ist interaktiv und liefe ohne Platte in einen Fehler).
  * Ein /etc/fstab gibt es in WEGA nicht; eingebunden wird ueber die Shell-Prozedur /etc/mfs, die /etc/rc_csh beim
  * Uebergang in den Mehrbenutzerbetrieb aufruft.
  *
  * VERKUERZUNG (wie test_p8000_wega_rtc.cpp): Schritt 1–2 und 3 liegen als eingefrorene Zustaende im Ablageordner
  * (`~/.cache/k1520emu/p8000_wega`, Namen `zp31_*`), gebaut beim ersten Lauf (Formatieren der ganzen Platte und der
- * Kernbau kosten zusammen ~ 30 Maschinenminuten).  Der Stempel haengt an Groesse/Zeit der ausgelieferten Platte und
- * an kStufenStand; `K1520_ZP_NEU=1` baut alles neu.  Schritt 4 und 5 (Einrichten und Dauerhaftigkeit) laufen bei
- * JEDEM Lauf.
+ * Kernbau kosten zusammen ~ 30 Maschinenminuten).  Der Stempel haengt an Groesse/Zeit der Ausgangsplatte und
+ * an kStufenStand; `K1520_ZP_NEU=1` baut alles neu.
  *
  * Platten als `.img.gz` (die Platte packt selbst, Merkposten 56) — die Zustaende bleiben klein.  Konsole =
  * Kern-Terminal (schnelles Tippen); getippt wird wie am Geraet.
@@ -59,7 +64,14 @@ void stumm() { k1520::logging::Logger::instance().setBaseLevel(k1520::logging::L
 
 constexpr int kStufenStand = 2;   // anheben, wenn sich der Ablauf bis zu einem Zustand aendert
 const std::string kPlatte0Quelle = P8000_WEGA31_DIR "/p8000_wega31_platte.avr.img.gz";
+const std::string kPlatte1Quelle = P8000_WEGA31_DIR "/p8000_wega31_usr2.avr.img.gz";
 const std::string kStartQuelle = P8000_WEGA31_DIR "/p8000_wega31_udos_boot.dmk";
+
+/// Ausgangsplatte des Bereitstellens (die UNVERAENDERTE WEGA-3.1-Platte); sonst die ausgelieferte.
+std::string ausgang() {
+    const char* e = std::getenv("K1520_ZP_AUSGANG");
+    return (e && *e) ? std::string(e) : kPlatte0Quelle;
+}
 
 /// Groessen wie im ausgelieferten /usr/sys/h/mdsize.h (sysgen fragt ALLE Bereiche von LW 0 neu ab).
 constexpr const char* kUsr = "13000";
@@ -96,8 +108,8 @@ bool dateiInhalt(const std::string& pf, std::string& s) {
 
 std::string stempel() {
     std::error_code ec;
-    return std::to_string(kStufenStand) + " " + std::to_string(std::filesystem::file_size(kPlatte0Quelle, ec)) + " " +
-           std::to_string(std::filesystem::last_write_time(kPlatte0Quelle, ec).time_since_epoch().count());
+    return std::to_string(kStufenStand) + " " + std::to_string(std::filesystem::file_size(ausgang(), ec)) + " " +
+           std::to_string(std::filesystem::last_write_time(ausgang(), ec).time_since_epoch().count());
 }
 
 /// Die Anlage: P8000 mit WDC 4.2, LW 0 = WEGA 3.1, LW 1 = zweite Platte, Startdiskette in Floppy 0.
@@ -227,8 +239,9 @@ struct Anlage {
         };
         for (;;) {
             int i = -1;
-            for (long long t = 0; t < 40'000'000'000LL && i < 0; t += 100'000'000) {
-                i = warteAufFrage(m(), {"login:", "#1", "Enter Date (MM/DD/YY or <cr>):", "Enter Time (HH:MM):"}, 100'000'000);
+            // 10-Mio.-Schritte: die Meldungen von rc_csh (dd-Fehlerblock, fsck) rollen sonst zwischen zwei Blicken aus dem Bild.
+            for (long long t = 0; t < 40'000'000'000LL && i < 0; t += 10'000'000) {
+                i = warteAufFrage(m(), {"login:", "#1", "Enter Date (MM/DD/YY or <cr>):", "Enter Time (HH:MM):"}, 10'000'000);
                 sammle();
                 if (t % 2'000'000'000LL == 0) fortschritt(m());
             }
@@ -252,7 +265,7 @@ struct Anlage {
 void stufeFormatiert(Anlage& a) {
     if (a.laden("zp31_formatiert")) return;
     std::fprintf(stderr, "  [Zustand 'zp31_formatiert' wird gebaut: sa.format der ganzen Platte]\n");
-    ASSERT_TRUE(kopiere(kPlatte0Quelle, a.platte0));
+    ASSERT_TRUE(kopiere(ausgang(), a.platte0));
     ASSERT_TRUE(kopiere(kStartQuelle, a.start));
     ASSERT_TRUE(a.bauen(false));
     P8000Machine& m = a.m();
@@ -342,87 +355,165 @@ void stufeKern(Anlage& a) {
     ASSERT_TRUE(a.sichern("zp31_kern"));
 }
 
-}  // namespace
+// ── Auslieferungsabbilder erzeugen ──────────────────────────────────────────────────────────────────────────────
 
-TEST(P8000WegaZweitePlatte, EinrichtenMountenUndNachNeustartEingebunden) {
+/// Meldungen der bedingten Einbindung (Wortlaut ist Vertrag mit Handbuch und Waechtern).
+constexpr const char* kMeldPruefen = "Checking second hard disk (md10) ...";
+constexpr const char* kMeldGefunden = "Second hard disk found - checking /usr2";
+constexpr const char* kMeldFehlt = "Second hard disk not present - /usr2 not mounted.";
+
+/// Erzeugt `p8000_wega31_platte.avr.img.gz` (fuer zwei Platten vorbereitet) und `p8000_wega31_usr2.avr.img.gz` in
+/// $K1520_ZP_AUS aus der unveraenderten Platte $K1520_ZP_AUSGANG.  Sonst darf sich am Abbild nichts aendern.
+TEST(P8000WegaZweitePlatte, Bereitstellen) {
     stumm();
-    if (!dateiDa(kStartQuelle) || !dateiDa(kPlatte0Quelle)) GTEST_SKIP() << "WEGA-3.1-Platte/Startdiskette fehlt";
-    const auto t0 = std::chrono::steady_clock::now();
+    const char* aus = std::getenv("K1520_ZP_AUS");
+    if (!aus || !*aus || !std::getenv("K1520_ZP_AUSGANG")) GTEST_SKIP() << "nur mit K1520_ZP_AUSGANG + K1520_ZP_AUS (tools/p8000/zweite_platte_bereitstellen.sh)";
+    ASSERT_TRUE(dateiDa(ausgang())) << ausgang();
     Anlage a;
     ASSERT_NO_FATAL_FAILURE(stufeKern(a));
-    P8000Machine& m0 = a.m();
-    ASSERT_TRUE(m0.platte(1)) << "LW 1 nicht angeschlossen";
-
-    // ── Schritt 4: Kaltstart mit dem neuen Kern (AUTOBOOT: beide Platten mit PAR) ──
     ASSERT_TRUE(a.bisMaxseg());
     P8000Machine& m = a.m();
     ASSERT_TRUE(langBisText(m, "WEGA Kernel -- Release 3.2", 2'000'000'000LL)) << bild(m);
     ASSERT_TRUE(a.anmelden());
-    std::fprintf(stderr, "  [neuer Kern angemeldet: %.0f s Rechenzeit]\n",
-                 std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count());
     ASSERT_TRUE(a.kommando("/etc/mknod /dev/md10 b 0 10"));
     ASSERT_TRUE(a.kommando("/etc/mknod /dev/rmd10 c 0 10"));
     ASSERT_TRUE(a.kommando("/etc/chmog 640 bin 0 /dev/md10 /dev/rmd10"));
     ASSERT_TRUE(a.kommando("mkdir /usr2"));
     ASSERT_TRUE(a.kommando(std::string("/etc/mkfs /dev/rmd10 ") + kMd10, 80'000'000'000LL));
-    std::fprintf(stderr, "--- mkfs\n%s", bild(m).c_str());
     ASSERT_TRUE(a.kommando("/etc/labelit /dev/rmd10 /usr2 1"));
     ASSERT_TRUE(a.kommando("/etc/mount /dev/md10 /usr2"));
     ASSERT_TRUE(a.kommando("/etc/mlf /usr2"));
     ASSERT_TRUE(a.kommando("/etc/chmog 644 bin 0 /usr2/lost+found"));
-    // Dauerhaft einbinden: mfs (= umfs), fsck in rc_csh, checklist
-    ASSERT_TRUE(a.ed("/etc/mfs", {"/etc\\/mount \\/dev\\/usr/a", "\t\t\t/etc/mount /dev/md10 /usr2", ".",
-                                  "/etc\\/umount \\/dev\\/usr/a", "\t\t\t/etc/umount /dev/md10", ".", "w"}));
-    ASSERT_TRUE(a.ed("/etc/rc_csh", {"/dev\\/rz/a", "\t/etc/fsck -y -t /tmp/scratch /dev/rmd10", ".", "w"}));
-    ASSERT_TRUE(a.kommando("echo /dev/rmd10 >> /etc/checklist"));
-    ASSERT_TRUE(a.kommando("cat /etc/mfs"));
-    std::fprintf(stderr, "--- /etc/mfs\n%s", bild(m).c_str());
-    EXPECT_NE(bild(m).find("/etc/mount /dev/md10 /usr2"), std::string::npos) << bild(m);
-    EXPECT_NE(bild(m).find("/etc/umount /dev/md10"), std::string::npos) << bild(m);
-    ASSERT_TRUE(a.kommando("cat /etc/umfs /etc/checklist; grep md10 /etc/rc_csh"));
-    std::fprintf(stderr, "--- umfs/checklist/rc_csh\n%s", bild(m).c_str());
-    EXPECT_NE(bild(m).find("/etc/fsck -y -t /tmp/scratch /dev/rmd10"), std::string::npos) << bild(m);
-    // Daten auf die zweite Platte
+    // Bedingte Einbindung: Laufwerk 1 darf fehlen.  Jeder Zugriff auf md10 ohne Platte erzeugt einen Kernblock
+    // („err on dev 0/10 ... md: fatal error"), den nichts unterdrueckt — deshalb wird EINMAL beim Start gefragt
+    // (dd), das Ergebnis steht in /etc/md10.da, und mfs/umfs fassen md10 nur bei vorhandener Datei an.
+    // Reihenfolge in mfs: eingehaengt wird md10 nach /dev/usr, ausgehaengt VOR /dev/usr (nach /dev/tmp) — zuletzt
+    // hinein, zuerst hinaus.
+    ASSERT_TRUE(a.ed("/etc/mfs", {"/etc\\/mount \\/dev\\/usr/a", "\t\t\ttest -f /etc/md10.da && /etc/mount /dev/md10 /usr2", ".",
+                                  "/etc\\/umount \\/dev\\/tmp/a", "\t\t\ttest -f /etc/md10.da && /etc/umount /dev/md10", ".", "w"}));
+    ASSERT_TRUE(a.ed("/etc/rc_csh", {"/dev\\/rz/a",
+                                     std::string("\techo \"") + kMeldPruefen + "\"",
+                                     "\trm -f /etc/md10.da",
+                                     "\tdd if=/dev/rmd10 of=/dev/null count=1 >& /dev/null",
+                                     "\tif ( $status == 0 ) then",
+                                     std::string("\t\techo \"") + kMeldGefunden + "\"",
+                                     "\t\ttouch /etc/md10.da",
+                                     "\t\t/etc/fsck -y -t /tmp/scratch /dev/rmd10",
+                                     "\telse",
+                                     std::string("\t\techo \"") + kMeldFehlt + "\"",
+                                     "\tendif", ".", "w"}));
+    ASSERT_TRUE(a.kommando("cat /etc/mfs; sed -n 6,30p /etc/rc_csh"));
+    std::fprintf(stderr, "--- mfs/rc_csh\n%s", bild(m).c_str());
+    ASSERT_TRUE(a.kommando("/etc/umount /dev/md10"));
+    ASSERT_TRUE(a.kommando("sync"));
+    ASSERT_TRUE(a.kommando("sync"));
+    laufe(m, 40'000'000);
+    m.hdFlush();
+    m.flushDisks();
+    std::error_code ec;
+    std::filesystem::create_directories(aus, ec);
+    ASSERT_TRUE(kopiere(a.platte0, std::string(aus) + "/p8000_wega31_platte.avr.img.gz"));
+    ASSERT_TRUE(kopiere(a.platte1, std::string(aus) + "/p8000_wega31_usr2.avr.img.gz"));
+    std::fprintf(stderr, "  [Auslieferungsabbilder in %s]\n", aus);
+}
+
+// ── Waechter der ausgelieferten Abbilder ────────────────────────────────────────────────────────────────────────
+
+/// Frische Anlage mit den AUSGELIEFERTEN Abbildern (Kopien — der Emulator schreibt zurueck).
+void auslieferung(Anlage& a) {
+    ASSERT_TRUE(kopiere(kPlatte0Quelle, a.platte0));
+    ASSERT_TRUE(kopiere(kPlatte1Quelle, a.platte1));
+    ASSERT_TRUE(kopiere(kStartQuelle, a.start));
+}
+
+/// Kaltstart bis zur Anmeldung; @p gesehen sammelt die Konsolenzeilen des Starts.
+::testing::AssertionResult kaltstartBisAnmeldung(Anlage& a, std::string* gesehen) {
+    if (auto r = a.bisMaxseg(); !r) return r;
+    if (!langBisText(a.m(), "WEGA Kernel -- Release 3.2", 2'000'000'000LL)) return ::testing::AssertionFailure() << bild(a.m());
+    return a.anmelden(gesehen);
+}
+
+/// Was beim Start NICHT vorkommen darf: fsck-/mount-Fehler (der md-Kernblock selbst ist ohne LW 1 erwartet).
+void keineEinbindungsFehler(const std::string& g) {
+    for (const char* schlecht : {"CAN NOT READ", "mount: read error", "Program terminated"})
+        EXPECT_EQ(g.find(schlecht), std::string::npos) << "'" << schlecht << "' beim Start:\n" << g;
+}
+
+}  // namespace
+
+TEST(P8000WegaZweitePlatte, OhneZweitePlatteLaeuftUnauffaellig) {
+    stumm();
+    if (!dateiDa(kStartQuelle) || !dateiDa(kPlatte0Quelle)) GTEST_SKIP() << "WEGA-3.1-Platte/Startdiskette fehlt";
+    Anlage a;
+    ASSERT_NO_FATAL_FAILURE(auslieferung(a));
+    ASSERT_TRUE(a.bauen(false));
+    std::string g;
+    ASSERT_TRUE(kaltstartBisAnmeldung(a, &g));
+    std::fprintf(stderr, "--- Start ohne LW 1 (gesammelte Zeilen)\n%s", g.c_str());
+    const size_t p = g.find(kMeldPruefen), q = g.find(kMeldFehlt);
+    EXPECT_NE(p, std::string::npos) << g;
+    EXPECT_NE(q, std::string::npos) << g;
+    EXPECT_LT(p, q) << "Meldungen in falscher Reihenfolge\n" << g;
+    EXPECT_EQ(g.find(kMeldGefunden), std::string::npos) << g;
+    // Der Kernblock steht zwischen den beiden Zeilen (er laesst sich nicht unterdruecken, daher ist er eingerahmt).
+    EXPECT_NE(g.find("md: fatal error"), std::string::npos) << g;
+    keineEinbindungsFehler(g);
+    // bedienbar: /usr2 ist nur ein leeres Verzeichnis auf der Wurzel, nichts haengt dort.
+    ASSERT_TRUE(a.kommando("/etc/mount; ls -l /dev/md10 /dev/rmd10; ls -a /usr2; test -f /etc/md10.da || echo md10-da-fehlt"));
+    const std::string b = bild(a.m());
+    std::fprintf(stderr, "--- nach dem Start ohne LW 1\n%s", b.c_str());
+    EXPECT_EQ(b.find("/usr2 on"), std::string::npos) << b;
+    EXPECT_NE(b.find("/usr on /dev/usr"), std::string::npos) << b;
+    EXPECT_NE(b.find("md10-da-fehlt"), std::string::npos) << b;
+    ASSERT_TRUE(a.kommando("echo bedienbar > /tmp/probe; cat /tmp/probe"));
+    EXPECT_NE(bild(a.m()).find("\nbedienbar\n"), std::string::npos) << bild(a.m());
+    ASSERT_TRUE(a.kommando("sync"));
+}
+
+TEST(P8000WegaZweitePlatte, MitAusgelieferterZweiterPlatteEingebunden) {
+    stumm();
+    if (!dateiDa(kStartQuelle) || !dateiDa(kPlatte0Quelle) || !dateiDa(kPlatte1Quelle)) GTEST_SKIP() << "WEGA-3.1-Platte/zweite Platte/Startdiskette fehlt";
+    Anlage a;
+    ASSERT_NO_FATAL_FAILURE(auslieferung(a));
+    ASSERT_TRUE(a.bauen(true));
+    ASSERT_TRUE(a.m().platte(1)) << "LW 1 nicht angeschlossen";
+    std::string g;
+    ASSERT_TRUE(kaltstartBisAnmeldung(a, &g));
+    std::fprintf(stderr, "--- Start mit LW 1 (gesammelte Zeilen)\n%s", g.c_str());
+    EXPECT_NE(g.find(kMeldPruefen), std::string::npos) << g;
+    EXPECT_NE(g.find(kMeldGefunden), std::string::npos) << g;
+    EXPECT_EQ(g.find(kMeldFehlt), std::string::npos) << g;
+    EXPECT_EQ(g.find("md: fatal error"), std::string::npos) << "Kernblock trotz vorhandener Platte\n" << g;
+    EXPECT_NE(g.find("File System: /usr2 Volume: 1"), std::string::npos) << "fsck ohne labelit-Namen\n" << g;
+    keineEinbindungsFehler(g);
+    P8000Machine& m = a.m();
+    ASSERT_TRUE(a.kommando("/etc/mount; ls -a /usr2"));
+    EXPECT_NE(bild(m).find("/usr2 on /dev/md10"), std::string::npos) << bild(m);
+    EXPECT_NE(bild(m).find("lost+found"), std::string::npos) << bild(m);
     ASSERT_TRUE(a.kommando("cp /etc/passwd /usr2/passwd.kopie"));
     ASSERT_TRUE(a.kommando("echo zweite Platte LW1 > /usr2/notiz"));
     ASSERT_TRUE(a.kommando("sum /etc/passwd /usr2/passwd.kopie"));
     const std::string sum_vorher = bild(m);
-    ASSERT_TRUE(a.kommando("df; /etc/mount"));
-    std::fprintf(stderr, "--- df/mount\n%s", bild(m).c_str());
-    EXPECT_NE(bild(m).find("/usr2 on /dev/md10"), std::string::npos) << bild(m);
     ASSERT_TRUE(a.kommando("sync"));
     ASSERT_TRUE(a.kommando("sync"));
     laufe(m, 40'000'000);
 
-    // ── Schritt 5: Kaltstart, automatische Einbindung pruefen ──
-    ASSERT_TRUE(a.bisMaxseg());
-    ASSERT_TRUE(langBisText(m, "WEGA Kernel -- Release 3.2", 2'000'000'000LL)) << bild(m);
-    std::string gesehen;
-    ASSERT_TRUE(a.anmelden(&gesehen));
-    std::fprintf(stderr, "--- Mehrbenutzerstart (gesammelte Zeilen)\n%s", gesehen.c_str());
-    EXPECT_NE(gesehen.find("/dev/rmd10"), std::string::npos) << "fsck prueft /dev/rmd10 nicht\n" << gesehen;
-    EXPECT_NE(gesehen.find("File System: /usr2 Volume: 1"), std::string::npos) << "fsck ohne labelit-Namen\n" << gesehen;
-    // Die Ausgabe von mfs rollt mit datem aus dem Bild; der Nachweis ist /etc/mount nach der Anmeldung (Zeitpunkt
-    // des Einhaengens = Mehrbenutzerstart, nicht dieses Kommando).
-    ASSERT_TRUE(a.kommando("/etc/mount; cat /usr2/notiz; ls /usr2"));
-    std::fprintf(stderr, "--- nach dem Neustart\n%s", bild(m).c_str());
+    // Neustart: die Datei muss da sein.
+    std::string g2;
+    ASSERT_TRUE(kaltstartBisAnmeldung(a, &g2));
+    EXPECT_NE(g2.find(kMeldGefunden), std::string::npos) << g2;
+    keineEinbindungsFehler(g2);
+    ASSERT_TRUE(a.kommando("/etc/mount; cat /usr2/notiz"));
     EXPECT_NE(bild(m).find("/usr2 on /dev/md10"), std::string::npos) << bild(m);
     EXPECT_NE(bild(m).find("zweite Platte LW1"), std::string::npos) << bild(m);
-    EXPECT_NE(bild(m).find("passwd.kopie"), std::string::npos) << bild(m);
     ASSERT_TRUE(a.kommando("sum /usr2/passwd.kopie"));
-    {
-        // gleiche Pruefsumme wie vor dem Neustart (Zeile "NNNNN N /usr2/passwd.kopie")
-        const std::string nach = bild(m);
-        auto summe = [](const std::string& b) {
-            const size_t p = b.rfind(" /usr2/passwd.kopie\n");
-            if (p == std::string::npos) return std::string();
-            const size_t a0 = b.rfind('\n', p);
-            return b.substr(a0 + 1, p - a0 - 1);
-        };
-        EXPECT_FALSE(summe(sum_vorher).empty()) << sum_vorher;
-        EXPECT_EQ(summe(sum_vorher), summe(nach)) << sum_vorher << "\n---\n" << nach;
-    }
+    auto summe = [](const std::string& b) {
+        const size_t p = b.rfind(" /usr2/passwd.kopie\n");
+        if (p == std::string::npos) return std::string();
+        const size_t a0 = b.rfind('\n', p);
+        return b.substr(a0 + 1, p - a0 - 1);
+    };
+    EXPECT_FALSE(summe(sum_vorher).empty()) << sum_vorher;
+    EXPECT_EQ(summe(sum_vorher), summe(bild(m))) << sum_vorher << "\n---\n" << bild(m);
     ASSERT_TRUE(a.kommando("sync"));
-    std::fprintf(stderr, "  [fertig: %.0f s Rechenzeit]\n",
-                 std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count());
 }
