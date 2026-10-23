@@ -45,7 +45,7 @@
  * `--tastatur k7636|k7637` (A5120, AP A7): Tastatur abweichend von der Ausfuehrung.
  * `--format NAME`: Katalogformat, mit dem ein `.img` zuerst gemountet wird (bei .hfe/.dmk
  * Platzhalter), z. B. `k5601_ss40_26x128` fuer die BCU-Abbilder.
- * `--wdc 4.2|4.0.05|3.4.05` und `--hd <abbild>` (nur `--machine p8000-16`, P13d): WDC an der
+ * `--wdc 4.2|4.0.05|3.4.05` und `--hd <abbild>` (= `--hd0`; `--hd1`/`--hd2` fuer Laufwerk 1/2, nur `--machine p8000-16`, P13d): WDC an der
  * 16-Bit-PIO2 bzw. Winchester an Laufwerk 0 (Kopie wie die Disketten, `--rw` = Original);
  * Befehle `wdc [r|u|d|log]`, `cpu wdc` (nur Ansicht).
  * `--rtc aus|u130x|rtc72421` (nur `--machine p8000-16`, Entwurf 38): Echtzeituhr-Karte am 16-Bit-Teil
@@ -238,7 +238,7 @@ int main(int argc, char** argv){
     const char* wdc_opt = nullptr; // --wdc 4.2|4.0.05|3.4.05: WDC an der 16-Bit-PIO2 (P8000, P13d)
     const char* konsole_opt = nullptr; // --konsole kern|original: Terminal an tty1 (P8000, P20c)
     const char* rtc_opt = nullptr; // --rtc aus|u130x|rtc72421: Uhrenkarte am 16-Bit-Teil (Entwurf 38)
-    const char* hd_opt  = nullptr; // --hd <abbild>: Winchester an WDC-Laufwerk 0 (setzt --wdc 4.2)
+    const char* hd_opt[3] = {nullptr,nullptr,nullptr}; // --hd/--hd0 <abbild>, --hd1, --hd2: Winchester an WDC-Laufwerk 0..2 (setzt --wdc 4.2)
     std::string ptape_in, ptape_out;   // --ptape-in/-out: Band einlegen / Stanzer an Datei binden
     bool ptape_opt = false;        // --ptape: Lochstreifen-Karte K6022 auf E0H–E7H (Entwurf 23)
     bool tape_opt = false;         // --tape/--tape2/--tape-card: Kassettenkarte K5020 (Entwurf 29)
@@ -278,7 +278,9 @@ int main(int argc, char** argv){
         else if (!strcmp(argv[i],"--raf") && i+1<argc) raf_opt=argv[++i];
         else if (!strcmp(argv[i],"--wdc") && i+1<argc) wdc_opt=argv[++i];
         else if (!strcmp(argv[i],"--konsole") && i+1<argc) konsole_opt=argv[++i];
-        else if (!strcmp(argv[i],"--hd") && i+1<argc) hd_opt=argv[++i];
+        else if ((!strcmp(argv[i],"--hd") || !strcmp(argv[i],"--hd0")) && i+1<argc) hd_opt[0]=argv[++i];
+        else if (!strcmp(argv[i],"--hd1") && i+1<argc) hd_opt[1]=argv[++i];
+        else if (!strcmp(argv[i],"--hd2") && i+1<argc) hd_opt[2]=argv[++i];
         else if (!strcmp(argv[i],"--rtc") && i+1<argc) rtc_opt=argv[++i];
         else if (!strcmp(argv[i],"--ptape")) ptape_opt=true;
         else if (!strcmp(argv[i],"--tape-card")) tape_opt=true;
@@ -348,10 +350,11 @@ int main(int argc, char** argv){
         else if (r=="u130x")    p8cfg.rtc = R::U130X;
         else if (r!="aus"){ fprintf(stderr,"--rtc: unbekannte Karte '%s' (aus|u130x|rtc72421)\n",rtc_opt); return 2; }
     }
-    static std::string hd_kopie;
-    struct HdKopieWeg { ~HdKopieWeg(){ if(!hd_kopie.empty()) std::remove(hd_kopie.c_str()); } };
+    static std::string hd_kopie[3];
+    struct HdKopieWeg { ~HdKopieWeg(){ for(auto& k:hd_kopie) if(!k.empty()) std::remove(k.c_str()); } };
     static HdKopieWeg hd_kopie_weg;
-    if (wdc_opt || hd_opt){
+    const bool hd_gegeben = hd_opt[0]||hd_opt[1]||hd_opt[2];
+    if (wdc_opt || hd_gegeben){
         if (art!=dbgm::Art::P8000_16){ fprintf(stderr,"--wdc/--hd gibt es nur am P8000 mit 16-Bit-Karte (--machine p8000-16)\n"); return 2; }
         const std::string w = wdc_opt? wdc_opt : "4.2";
         using W = P8000Machine::Config::Wdc;
@@ -359,18 +362,21 @@ int main(int argc, char** argv){
         else if (w=="4.0.05") p8cfg.wdc = W::V4_0_05;
         else if (w=="3.4.05") p8cfg.wdc = W::V3_4_05;
         else if (w!="aus"){ fprintf(stderr,"--wdc: unbekannte Firmware '%s' (4.2|4.0.05|3.4.05|aus)\n",wdc_opt); return 2; }
-        if (hd_opt){
-            if (p8cfg.wdc==W::Aus){ fprintf(stderr,"--hd braucht einen WDC\n"); return 2; }
-            std::string pfad = hd_opt;
+        if (hd_gegeben && p8cfg.wdc==W::Aus){ fprintf(stderr,"--hd braucht einen WDC\n"); return 2; }
+        std::string* ziel[3] = {&p8cfg.platte,&p8cfg.platte1,&p8cfg.platte2};
+        for (int u=0;u<3;++u){
+            if (!hd_opt[u]) continue;
+            std::string pfad = hd_opt[u];
             if (mount_mode!=MOUNT_RW){
-                hd_kopie = (std::filesystem::temp_directory_path() / ("k1520dbg_hd_" + std::to_string(k1520::os::processId()) + ".img")).string();
+                // LW 0 behaelt den bisherigen Kopienamen, LW 1/2 tragen die Nummer
+                hd_kopie[u] = (std::filesystem::temp_directory_path() / ("k1520dbg_hd_" + std::to_string(k1520::os::processId()) + (u?"_"+std::to_string(u):std::string()) + ".img")).string();
                 std::error_code ec;
-                std::filesystem::copy_file(pfad, hd_kopie, std::filesystem::copy_options::overwrite_existing, ec);
-                if (ec){ fprintf(stderr,"--hd: Kopie von %s scheitert: %s\n",hd_opt,ec.message().c_str()); hd_kopie.clear(); return 2; }
-                pfad = hd_kopie;
-                fprintf(stderr,"Platte (Kopie, --rw schreibt ins Original): %s\n",hd_opt);
+                std::filesystem::copy_file(pfad, hd_kopie[u], std::filesystem::copy_options::overwrite_existing, ec);
+                if (ec){ fprintf(stderr,"--hd%d: Kopie von %s scheitert: %s\n",u,hd_opt[u],ec.message().c_str()); hd_kopie[u].clear(); return 2; }
+                pfad = hd_kopie[u];
+                fprintf(stderr,"Platte %d (Kopie, --rw schreibt ins Original): %s\n",u,hd_opt[u]);
             }
-            p8cfg.platte = pfad;
+            *ziel[u] = pfad;
         }
     }
     std::unique_ptr<dbgm::DbgMachine> m_halter;

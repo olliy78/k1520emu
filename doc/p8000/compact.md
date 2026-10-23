@@ -43,4 +43,4 @@ aller Modelle mit 16-Bit-Teil (`hardware_vorgaben`), gilt also auch hier; sie bl
 2. MON16-Version und Platinenindex der 16-Bit-Platine der Compact (Vorgabe hier: 3.1, 8-Bit 3 / 16-Bit 4).
 3. Dritte Floppy (auf einem Foto zu sehen): Laufwerksbelegung und Treiber unklar; der Emulator bietet weiter die Laufwerke der P8000.
 4. Anzahl und Belegung der bis zu 7 Terminal-Anschlüsse (der Emulator hat die tty-Schnittstellen der P8000).
-5. Zweite Platte: 2 × K 5504.50 sind belegt, im Emulator gibt es eine Platte.
+5. Zweite Platte: 2 × K 5504.50 sind belegt. **Kern (2026-10-23):** der WDC kennt bis zu DREI Laufwerke, `Config::platte/platte1/platte2` (Konfigurationstext `platte0..2`, CLI `--hd0..2`, Merkposten 61); bisher nur gemountet und in Kern- und CLI-Tests geprüft, ein Gast-Lesebefehl an LW 1/2 (MON16/WEGA) ist nicht getestet. Die Oberfläche bietet noch nur eine Platte (Folgeauftrag).

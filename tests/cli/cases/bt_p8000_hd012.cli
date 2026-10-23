@@ -1,0 +1,9 @@
+# boot_trace: --hd1/--hd2; das Schlussbild nennt alle gemounteten Platten (Exit 1 = Zyklusgrenze erreicht).
+nullfile hd1.img: 47185920
+nullfile hd2.img: 47185920
+tool:    boot_trace
+run:     --machine p8000-16 --hd1 %hd1.img% --hd2 %hd2.img% -c 2000000
+timeout: 240
+exit:    1
+expect:  LW1=
+expect:  LW2=

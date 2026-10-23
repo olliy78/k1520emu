@@ -1,0 +1,15 @@
+# Drei Winchester am WDC (Ticket #15): --hd0 (= --hd), --hd1, --hd2; die Befehlsansicht `wdc` zeigt alle drei.
+nullfile hd0.img: 47185920
+nullfile hd1.img: 47185920
+nullfile hd2.img: 47185920
+tool:    k1520dbg
+run:     --machine p8000-16 --hd0 %hd0.img% --hd1 %hd1.img% --hd2 %hd2.img% -x %CLI_DIR%/scripts/p8000_wdc.dbg
+timeout: 120
+exit:    0
+forbid:  LW 0: -
+forbid:  LW 1: -
+forbid:  LW 2: -
+expect:  LW 0:
+expect:  LW 1:
+expect:  LW 2:
+expect:  Platte 2 (Kopie

@@ -18,6 +18,8 @@ Dateiformat (Zeilenweise, `#` ist Kommentar):
     disk:       <fixture>                   Fixture nach /tmp kopieren → %DISK%
     disk_path:  <pfad>                      literaler Pfad → %DISK% (keine Kopie)
     tmpfile <n>:                            freier Temp-Pfad → %n%
+    nullfile <n>: <bytes>                   Temp-Datei der Groesse <bytes>, ganz Null → %n%
+                                            (Winchester-Abbilder: 47185920 = K5504.50)
     timeout:    <sekunden>                  Vorgabe 120
 
     file <n>:                               Block → Temp-Datei, Pfad als %n%
@@ -85,7 +87,7 @@ class CaseError(Exception):
 def parse_case(path):
     """`.cli`-Datei → dict.  Blockdirektiven sammeln eingerueckte Folgezeilen."""
     case = {"expect": [], "expect_re": [], "forbid": [], "forbid_re": [],
-            "setup_run": [], "capture_file": [], "poke": [], "files": {}, "tmpfiles": [], "stdin": None,
+            "setup_run": [], "capture_file": [], "poke": [], "files": {}, "tmpfiles": [], "nullfiles": {}, "stdin": None,
             "tool": None, "disk": None, "disk_path": None, "run": None,
             "exit": None, "timeout": 120, "doc": []}
     block_key = None
@@ -128,6 +130,8 @@ def parse_case(path):
             block_key, block_lines = "stdin", []
         elif key.startswith("file ") and not value:
             block_key, block_lines = key[5:].strip(), []
+        elif key.startswith("nullfile "):
+            case["nullfiles"][key[9:].strip()] = int(value, 0)
         elif key.startswith("tmpfile"):
             case["tmpfiles"].append(key[7:].strip())
         elif key in ("expect", "expect_re", "forbid", "forbid_re", "setup_run",
@@ -185,6 +189,11 @@ def main():
             path = os.path.join(tmpdir, name)
             with open(path, "w", encoding="utf-8", newline="") as f:   # kein CRLF unter Windows
                 f.write(content)
+            subst[name] = path
+        for name, groesse in case["nullfiles"].items():
+            path = os.path.join(tmpdir, name)
+            with open(path, "wb") as f:
+                f.truncate(groesse)
             subst[name] = path
         for name in case["tmpfiles"]:
             subst[name] = os.path.join(tmpdir, name)
