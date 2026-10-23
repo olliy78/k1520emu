@@ -2037,8 +2037,8 @@ class MainWindow(QMainWindow):
     def _on_bauart_selected(self, bauart: str):
         """Voreinstellung P8000 / P8000 Compact gewaehlt (Ticket #15): wie die Modellwahl des A5120
         UEBERNIMMT sie ihre Werte ohne Rueckfrage — MON-Fassungen, Hauptspeicher, RTC, Disketten-
-        laufwerke und Zahl der Winchester —, auch beim erneuten Waehlen derselben Bauart.  Danach
-        ist jede Option einzeln aenderbar.  Platinenindex, WDC-Firmware und Plattenparameter gehoeren
+        laufwerke, Platinenindex und Zahl der Winchester —, auch beim erneuten Waehlen derselben Bauart.  Danach
+        ist jede Option einzeln aenderbar.  WDC-Firmware und Plattenparameter gehoeren
         nicht dazu und bleiben.  Die Maschine wird neu aufgebaut (Kaltstart)."""
         neu = self.profil.bauart_normalisieren(bauart)
         if neu != self._bauart and not self._eprom_rueckfrage("Wechsel der Voreinstellung"):

@@ -57,11 +57,11 @@ general:
   # der gespeicherten p8000emu.yaml (hier bewusst nicht, s. o.).
   winchester: 1
   # Hardwarevarianten (Kaltstart nötig; ein fehlender Schlüssel = Vorgabe):
-  # Platinenindex 34 (8-Bit 3 / 16-Bit 4) | 11; MON8 3.0 | 3.1; MON16 3.0 | 3.1 | 3.3;
+  # Platinenindex 11 (8-Bit 1 / 16-Bit 1, Voreinstellung P8000) | 34 (8-Bit 3 / 16-Bit 4, Compact); MON8 3.0 | 3.1; MON16 3.0 | 3.1 | 3.3;
   # Hauptspeicher 4x256K (Standard, 1 MB) | 2x256K | 4x1M | 16M | 8M (RAM-Karte 16 MB) oder eine
   # eigene Bestückung wie 1M@0+256K@4 (doc/p8000/ram_konfiguration.md); WDC-Firmware 4.2 | 4.0.05 | 3.4.05
   # (die beiden älteren experimentell: ihr EPROM legt das Laufwerk fest, K5504.50).
-  index: '34'
+  index: '11'
   mon8: '3.0'
   mon16: '3.0'
   dram: 4x256K

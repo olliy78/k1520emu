@@ -1596,14 +1596,15 @@ die *Betriebsart*. Was anders ist:
 * **Voreinstellung P8000 / P8000 Compact** — *Einstellungen ▸ Allgemein ▸ Modell*. Beide sind **Vorgabe-Sätze**, keine
   eigenen Maschinen (wie A5120/A5130/K8924 beim A5120): die Wahl übernimmt ihre Werte ohne Rückfrage und baut die Maschine
   neu auf; danach ist jede Option einzeln änderbar, auch das erneute Wählen derselben Voreinstellung setzt sie wieder.
-  **P8000** (Vorgabe): MON8 3.0, MON16 3.0, Hauptspeicher 4 × 256 KB, RTC U130X, 2 Diskettenlaufwerke K5601, 1 Winchester
-  K5504.50. **P8000 Compact** (1989, die P8000 im Tischgehäuse mit unveränderten Platinen): MON8 3.1, MON16 3.1, 4 × 1 MB, RTC U130X,
-  3 Diskettenlaufwerke K5601, 1 Winchester K5504.50. Platinenindex, WDC-Firmware und Plattenparameter gehören nicht dazu und
-  bleiben. Die Voreinstellung ist unabhängig von *Rechnerausstattung* und *Betriebsart*; der Fenstertitel folgt ihr
+  **P8000** (Vorgabe): Platinenindex 1/1 (8-Bit 1 / 16-Bit 1), MON8 3.0, MON16 3.0, Hauptspeicher 4 × 256 KB, RTC U130X, 2 Diskettenlaufwerke K5601, 1 Winchester
+  K5504.50. **P8000 Compact** (1989, die P8000 im Tischgehäuse mit unveränderten Platinen): Platinenindex 3/4 (8-Bit 3 / 16-Bit 4), MON8 3.1, MON16 3.1, 4 × 1 MB, RTC U130X,
+  3 Diskettenlaufwerke K5601, 1 Winchester K5504.50. WDC-Firmware und Plattenparameter gehören nicht dazu und
+  bleiben. Der Platinenindex gehört zur Voreinstellung (MON8 3.0 meldet am Index 3/4 nach der RESET-Taste „Hardware Error in
+  Connection“), ist danach aber einzeln änderbar. Die Voreinstellung ist unabhängig von *Rechnerausstattung* und *Betriebsart*; der Fenstertitel folgt ihr
   (*P8000 Emulator* / *P8000 Compact Emulator*). Die Epson RTC-72421 (Community-Nachbau) bleibt unter *RTC* wählbar, ist aber
   nie Vorgabe. Nachgebildet ist nur die Variante mit 16-Bit-Teil und Originalterminal; eine 8-Bit-Compact und der WDOS-Adapter fehlen.
-* **ROM-Fassungen und Bestückung** — ebenfalls unter *Allgemein*: Platinenindex (8-Bit 3 /
-  16-Bit 4, oder beide 1), **MON8** 3.0/3.1, **MON16** 3.0/3.1/3.3, Hauptspeicher der
+* **ROM-Fassungen und Bestückung** — ebenfalls unter *Allgemein*: Platinenindex (beide 1 oder 8-Bit 3 /
+  16-Bit 4; die Voreinstellung setzt ihn), **MON8** 3.0/3.1, **MON16** 3.0/3.1/3.3, Hauptspeicher der
   16-Bit-Seite (256 KB, 1 MB, 2 MB) und **WDC-Firmware** 4.2/4.0.05/3.4.05. Wo eine Wahl am
   Modell nichts bewirkt, ist das Feld ausgegraut. Jeder Wechsel ist ein Kaltstart.
   Die **Uhrenkarte** (Gruppe *RTC*) steht im Abschnitt *Die Echtzeituhr*.

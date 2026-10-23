@@ -360,7 +360,7 @@ class Programmprofil:
         mit16 = kern.get("karte16") == "1"
         mit_wdc = kern.get("wdc", "aus") != "aus"
         # Platinenindex: ein Schalter fuer beide Karten (nur 1/1 oder 3/4 sind zulaessig).
-        index = hardware.get("index", "34")
+        index = hardware.get("index", "11")
         kern["index8"] = index[0]
         if mit16:
             kern["index16"] = index[1]
@@ -678,11 +678,11 @@ _MIT_WDC = ("p8000-ot",)
 _K5601 = "K5601"
 P8000_BAUARTEN = (
     ("p8000", "P8000", "P8000 Emulator",
-     (("mon8", "3.0"), ("mon16", "3.0"), ("dram", "4x256K"), ("rtc", _rtc.VORGABE_TYP),
+     (("index", "11"), ("mon8", "3.0"), ("mon16", "3.0"), ("dram", "4x256K"), ("rtc", _rtc.VORGABE_TYP),
       ("rtc_versatz", _rtc.VORGABE_VERSATZ),
       ("laufwerke", (_K5601, _K5601, "none", "none")), ("winchester", 1))),
     ("compact", "P8000 Compact", "P8000 Compact Emulator",
-     (("mon8", "3.1"), ("mon16", "3.1"), ("dram", "4x1M"), ("rtc", _rtc.VORGABE_TYP),
+     (("index", "34"), ("mon8", "3.1"), ("mon16", "3.1"), ("dram", "4x1M"), ("rtc", _rtc.VORGABE_TYP),
       ("rtc_versatz", _rtc.VORGABE_VERSATZ),
       ("laufwerke", (_K5601, _K5601, _K5601, "none")), ("winchester", 1))),
 )
@@ -742,9 +742,10 @@ P8000 = Programmprofil(
     # Wo eine Wahl am Modell nichts bewirkt (16-Bit-Karte, WDC), steht das Feld ausgegraut.
     hardware=(
         ("index", "Platinenindex:",
-         "Ausgabestand der Karten: 8-Bit-Karte Index 3 mit 16-Bit-Karte Index 4 (Vorgabe) oder "
-         "beide Index 1.  Wirkt auf Rücksetzweg, Kopplung und Laufwerksstecker.",
-         (("34", "8-Bit 3 / 16-Bit 4 (Vorgabe)"), ("11", "8-Bit 1 / 16-Bit 1")),
+         "Ausgabestand der Karten: beide Index 1 (Voreinstellung P8000, passend zu MON 3.0) oder "
+         "8-Bit-Karte Index 3 mit 16-Bit-Karte Index 4 (Voreinstellung P8000 Compact).  Wirkt auf "
+         "Rücksetzweg, Kopplung und Laufwerksstecker.",
+         (("11", "8-Bit 1 / 16-Bit 1"), ("34", "8-Bit 3 / 16-Bit 4")),
          _RECHNER),
         ("mon8", "MON8 (U880-Monitor):",
          "ROM-Fassung des Monitors der 8-Bit-Karte.",

@@ -219,14 +219,15 @@ beim Laden (ohne `general.bauart`) als Bauart `compact` gelesen.
 **Bauart = Vorgabe-Satz**, wie A5120/A5130/K8924 beim A5120 (`app/modell.py::VORGABEN`): `Programmprofil.bauarten` (Schlüssel,
 Anzeigename, Fenstertitel, Vorgaben), im P8000-Profil `P8000_BAUARTEN`.  Das Auswahlfeld *Allgemein ▸ Modell* ist **orthogonal** zu
 *Rechnerausstattung* und *Betriebsart*; `general.bauart` (`p8000` | `compact`) wird gespeichert.  Die Wahl (`MainWindow._on_bauart_selected`,
-Signal `activated`, also auch beim erneuten Wählen) **übernimmt ohne Rückfrage** `mon8`, `mon16`, `dram`, `rtc`, `rtc_versatz`, die
-Diskettenlaufwerke und die Winchester-Zahl und baut die Maschine kalt neu; danach ist jede Option einzeln änderbar.  Index, WDC-Firmware
+Signal `activated`, also auch beim erneuten Wählen) **übernimmt ohne Rückfrage** `index` (P8000 = `11`, Compact = `34`; Anwenderentscheid, Merkposten 63), `mon8`, `mon16`, `dram`, `rtc`, `rtc_versatz`, die
+Diskettenlaufwerke und die Winchester-Zahl und baut die Maschine kalt neu; danach ist jede Option einzeln änderbar.  WDC-Firmware
 und Plattenparameter gehören nicht dazu.  `hardware_standard(modell, bauart)` / `hardware_normalisieren(daten, modell, bauart)` legen die
 Bauart zwischen Modellvorgabe und Profilvorgabe; der Fenstertitel folgt ihr (`modell_titel(modell, bauart)`; die Terminaleinheit bleibt
 „P8000 Terminal“).
 
 | | P8000 (Programmvorgabe) | P8000 Compact |
 |---|---|---|
+| Platinenindex | 11 (8-Bit 1 / 16-Bit 1) | 34 (8-Bit 3 / 16-Bit 4) |
 | MON8 / MON16 | 3.0 / 3.0 | 3.1 / 3.1 |
 | Hauptspeicher | 4 × 256 KB | 4 × 1 MB |
 | RTC | U130X (−40 Jahre) | U130X (−40 Jahre) |

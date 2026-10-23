@@ -94,22 +94,22 @@ def test_profil_und_titel(qapp, umgebung):
 
 
 def test_vorgaben_des_vollgeraets(qapp, umgebung):
-    """karte16 an, Index 3/4, MON 3.0 (Voreinstellung P8000), 1 MB, WDC 4.2, Platte = Datei."""
+    """karte16 an, Index 1/1, MON 3.0 (Voreinstellung P8000), 1 MB, WDC 4.2, Platte = Datei."""
     from app import profil
     p = profil.profil("p8000")
     assert p.standard_modell() == "p8000-ot"
     kern = p.kern_parameter("p8000-ot", {})["p8000"]
     from app import rtc
     # Uhrenkarte: Auslieferungsvorgabe U130x / -40 Jahre (Entwurf 38 R3)
-    assert kern == {"karte16": "1", "wdc": "4.2", "terminal": "original", "index8": "3",
-                    "index16": "4", "mon16": "3.0", "dram": "4x256K", "mon8": "3.0",
+    assert kern == {"karte16": "1", "wdc": "4.2", "terminal": "original", "index8": "1",
+                    "index16": "1", "mon16": "3.0", "dram": "4x256K", "mon8": "3.0",
                     "plattepar": "aus", "rtc": "u130x", "rtc_jahresversatz": -40, "rtc_utc": 1,
                     "rtc_zustand": rtc.zustand_pfad("p8000emu")}
     # ohne Winchester: keine wdc-Zeile (der Kern lehnt wdc ohne … nicht ab, aber es soll aus sein)
     k16 = p.kern_parameter("p8000-16-ot", {})["p8000"]
     assert k16["karte16"] == "1" and "wdc" not in k16
     k8 = p.kern_parameter("p8000-8-ot", {})["p8000"]
-    assert k8 == {"karte16": "0", "terminal": "original", "index8": "3", "mon8": "3.0"}
+    assert k8 == {"karte16": "0", "terminal": "original", "index8": "1", "mon8": "3.0"}
     assert p.modell_hat_wdc("p8000-ot") and not p.modell_hat_wdc("p8000-16-ot")
     # unbekanntes Modell → Vorgabe
     assert p.modell_normalisieren("quatsch") == "p8000-ot"
@@ -124,15 +124,16 @@ def test_compact_ist_eine_voreinstellung_und_kein_modell(qapp, umgebung):
     assert p.modell_normalisieren("p8000-c-ot") == "p8000-ot"
     assert p.bauart_normalisieren("quatsch") == "p8000" and p.bauart_normalisieren(None) == "p8000"
     assert p.bauart_vorgabe("p8000") == {
-        "mon8": "3.0", "mon16": "3.0", "dram": "4x256K", "rtc": rtc.VORGABE_TYP,
+        "index": "11", "mon8": "3.0", "mon16": "3.0", "dram": "4x256K", "rtc": rtc.VORGABE_TYP,
         "rtc_versatz": rtc.VORGABE_VERSATZ, "laufwerke": ["K5601", "K5601", "none", "none"],
         "winchester": 1}
     c = p.bauart_vorgabe("compact")
     assert (c["mon8"], c["mon16"], c["dram"], c["rtc"], c["winchester"]) == ("3.1", "3.1", "4x1M", "u130x", 1)
-    assert c["laufwerke"] == ["K5601", "K5601", "K5601", "none"]
+    assert c["laufwerke"] == ["K5601", "K5601", "K5601", "none"] and c["index"] == "34"
     # Hardwarevorgaben je Bauart; die Bauart aendert nichts an Ausstattung/WDC
     hw = p.hardware_standard("p8000-ot", "compact")
     assert (hw["mon8"], hw["mon16"], hw["dram"], hw["rtc"]) == ("3.1", "3.1", "4x1M", "u130x")
+    assert hw["index"] == "34" and p.hardware_standard()["index"] == "11"
     assert p.hardware_standard()["mon8"] == "3.0"
     kern = p.kern_parameter("p8000-ot", hw)["p8000"]
     assert kern["karte16"] == "1" and kern["wdc"] == "4.2" and kern["dram"] == "4x1M" and kern["mon16"] == "3.1"
@@ -177,7 +178,7 @@ def test_jede_hardwarewahl_baut_eine_maschine(qapp, umgebung):
 def test_hardwarewahl_normalisiert_gross_klein_und_fehlendes(qapp, umgebung):
     from app import profil
     p = profil.profil("p8000")
-    assert p.hardware_normalisieren({}) == {"index": "34", "mon8": "3.0", "mon16": "3.0",
+    assert p.hardware_normalisieren({}) == {"index": "11", "mon8": "3.0", "mon16": "3.0",
                                             "dram": "4x256K", "wdc": "4.2", "rtc": "u130x",
                                             "rtc_versatz": "-40", "platte_par": "aus"}
     n = p.hardware_normalisieren({"dram": "1m@0+1m@1", "mon8": 3.1, "wdc": "9.9", "index": "11"})
@@ -850,11 +851,18 @@ def test_voreinstellung_compact_wechsel_und_einzelaenderung(qapp, umgebung):
         assert (w._hardware["mon8"], w._hardware["dram"]) == ("3.0", "4x256K")
         assert _lw_belegung(w) == ["K5601", "K5601", "none", "none"]
         assert w.windowTitle() == "P8000 Emulator"
-        # WDC-Firmware und Platinenindex gehoeren nicht zur Voreinstellung
-        w._on_hardware_selected("index", "11")
+        # Platinenindex gehoert zur Voreinstellung (P8000 = 11, Compact = 34), danach einzeln aenderbar;
+        # die WDC-Firmware gehoert nicht dazu
+        assert w._hardware["index"] == "11"
         w._on_bauart_selected("compact")
         w.run_timer.stop()
-        assert w._hardware["index"] == "11"
+        assert w._hardware["index"] == "34" and sw.hardware_value()["index"] == "34"
+        w._on_hardware_selected("index", "11")
+        assert w._hardware["index"] == "11" and w._bauart == "compact"
+        w._on_hardware_selected("wdc", "4.0.05")
+        w._on_bauart_selected("p8000")
+        w.run_timer.stop()
+        assert w._hardware["index"] == "11" and w._hardware["wdc"] == "4.0.05"
     finally:
         _zu(w, qapp)
 

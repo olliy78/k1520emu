@@ -68,7 +68,7 @@ def _zu(w, qapp):
 
 
 def _zurueck_zum_u880_monitor(w):
-    """RESET-Taste (Platte bleibt) — ausser bei MON 3.0 am Platinenindex 4: dort bleiben die PIOs der
+    """RESET-Taste (Platte bleibt) — ausser bei MON 3.0 am Platinenindex 4 (Voreinstellung Compact): dort bleiben die PIOs der
     Kopplung bei der RESET-Taste stehen, und MON8 3.0 meldet danach „Hardware Error in Connection“ (Merkposten
     p8000 Nr. 63, Waechter ``test_mon30_nach_der_reset_taste_...``).  Dann bleibt nur der Kaltstart (Netzschalter)."""
     if w._fassung == "3.0" and w._hardware.get("index") == "34":
@@ -203,7 +203,7 @@ def test_platte_mit_parametersatz_ohne_urlader_bootet_statt_stern(qapp, fassung,
 
 @pytest.mark.parametrize("index,erwartet", [("34", False), ("11", True)])
 def test_mon30_nach_der_reset_taste_haengt_vom_platinenindex_ab(index, erwartet):
-    """MON 3.0 (Programmvorgabe P8000) nach der RESET-Taste: Am Platinenindex 4 (Vorgabe) behalten die PIOs
+    """MON 3.0 (Programmvorgabe P8000, dort Index 1) nach der RESET-Taste: Am Platinenindex 4 (Compact) behalten die PIOs
     der Kopplung ihren Stand (``PIORESET−`` nur bei PRES−/TRESET−, Entwurf 25) — MON8 3.0 meldet dann beim
     ``x`` „Hardware Error in Connection“, MON8 3.1 kommt zurecht.  Am Index 1 (PIOs an MRESET−) laeuft 3.0 durch.
     Gemessen am Kern, nicht am Geraet: ein Geraetebefund steht aus (Merkposten p8000 Nr. 63).  Faellt dieser

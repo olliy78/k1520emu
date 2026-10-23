@@ -40,6 +40,7 @@ unverändert (gleiche Schaltung, Kernparameter wie das Vollgerät).
 
 | | P8000 | P8000 Compact |
 |---|---|---|
+| Platinenindex | 11 (8-Bit 1 / 16-Bit 1) | 34 (8-Bit 3 / 16-Bit 4) |
 | MON8 / MON16 | 3.0 / 3.0 (Unterschiede zu 3.1: Merkposten 63) | 3.1 / 3.1 |
 | Hauptspeicher | 4 × 256 KB | 4 × 1 MB |
 | RTC | U130X | U130X |
@@ -51,7 +52,7 @@ Winchester-Laufwerke* (1–3) mit je einem Plattenkasten (Kern: bis drei Laufwer
 
 ## 5. Offen / beantwortet
 1. ~~Uhrentyp der Compact~~ **beantwortet (Anwender): U130X.** Die Epson RTC-72421 ist ein Community-Nachbau, bleibt als Option wählbar, ist nie Vorgabe.
-2. ~~MON16-Version und Platinenindex~~ **beantwortet (Anwender): MON8/MON16 3.1** (die klassische P8000 bekommt 3.0); Platinenindex bleibt 8-Bit 3 / 16-Bit 4.
+2. ~~MON16-Version und Platinenindex~~ **beantwortet (Anwender): MON8/MON16 3.1** (die klassische P8000 bekommt 3.0); Platinenindex: **P8000 = 11, Compact = 34** (Anwenderentscheid, Merkposten 63; Teil der Voreinstellung, danach einzeln änderbar).
 3. ~~Dritte Floppy~~ **beantwortet (Anwender): 3 Disketten-Laufwerke K5601** in der Voreinstellung (Treiber/Belegung im Gast weiter ungeprüft **[offen]**).
 4. **[offen]** Anzahl und Belegung der bis zu 7 Terminal-Anschlüsse (der Emulator hat die tty-Schnittstellen der P8000).
 5. Zweite Platte: 2 × K 5504.50 sind belegt. Kern: bis DREI Laufwerke (`Config::platte/platte1/platte2`, Merkposten 61), Oberfläche: bis drei Plattenkästen (2026-10-23).
