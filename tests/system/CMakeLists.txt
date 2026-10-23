@@ -222,6 +222,14 @@ k1520_add_test(p8000_wega_rtc SRC test_p8000_wega_rtc.cpp
                                  "K1520_DISKTOOL=\"$<TARGET_FILE:k1520disktool>\"" TIMEOUT 14400 RUN_SERIAL)
 add_dependencies(k1520_test_p8000_wega_rtc k1520disktool)
 
+# ─── Zweite Festplatte (WDC-LW 1) unter WEGA 3.1 (Ticket #15, Merkposten p8000 Nr. 64): sa.format LW 1, sysgen,
+# mknod/mkfs/mount, Eintraege in /etc/mfs, rc_csh, checklist; nach dem Kaltstart automatisch eingebunden.  Startet
+# aus eingefrorenen Zustaenden (beim ersten Lauf gebaut); ohne Platte/Startdiskette uebersprungen.
+k1520_add_test(p8000_wega_zweite_platte SRC test_p8000_wega_zweite_platte.cpp
+                            LIBS k1520_p8000 k1520_logger k1520_testsupport
+                            LABELS "system;slow;wega_install;fach_p8000;fach_wega"
+                            DEFS LOG_LEVEL=2 "P8000_WEGA31_DIR=\"${CMAKE_SOURCE_DIR}/disks/p8000_wega31\"" TIMEOUT 14400 RUN_SERIAL)
+
 # ─── Kermit auf WEGA 3.1 (Entwurf 36 AP K1): Kaltstart von der ausgelieferten Platte
 # (disks/p8000_wega31, /usr/bin/kermit + Benutzer `kermit`), Konsole `kermit`, tty0 per Telnet als
 # Kermit-Server hinter getty.  Ohne Startdiskette/Platte uebersprungen; `K1520_WEGA31_PLATTE` uebersteuert.

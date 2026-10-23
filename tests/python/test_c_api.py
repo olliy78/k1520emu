@@ -240,6 +240,20 @@ def test_p8000_can_be_created_configured_and_refused():
         assert _lib.k1520_hd_create(handle, 0, pfad.encode(), b"D5126"), _lib.k1520_hd_error(handle)
         assert os.path.getsize(pfad) == 615 * 4 * 18 * 512
         assert _lib.k1520_hd_path(handle, 0) == pfad.encode()
+        # Ticket #15: platte0/platte1/platte2 (`platte` = Alias fuer platte0), plattentyp0..2
+        zwei = os.path.join(d, "zwei.img")
+        assert _lib.k1520_hd_create(handle, 1, zwei.encode(), b"D5126"), _lib.k1520_hd_error(handle)
+        for text, erwartet in ((f"karte16=1,wdc=4.2,platte={pfad}", (pfad, "", "")),
+                               (f"karte16=1,wdc=4.2,platte0={pfad},platte1={zwei},platte2={pfad}", (pfad, zwei, pfad)),
+                               (f"karte16=1,wdc=4.2,platte1={zwei},plattentyp1=D5126", ("", zwei, ""))):
+            h3 = _lib.k1520_create_p8000(text.encode())
+            assert h3, (text, _lib.k1520_last_init_error())
+            for u in range(3):
+                assert _lib.k1520_hd_path(h3, u) == erwartet[u].encode(), (text, u)
+            _lib.k1520_destroy(K1520Handle(h3))
+        for schlecht in (b"karte16=1,wdc=4.2,platte2=/gibt/es/nicht.img", b"platte1=/tmp/x.img",
+                         b"karte16=1,wdc=4.2,plattentyp2=XY"):
+            assert not _lib.k1520_create_p8000(schlecht), schlecht
         assert not _lib.k1520_hd_mount(handle, 1, pfad.encode(), True)   # kein Schreibschutz
         assert _lib.k1520_hd_error(handle)
         assert not _lib.k1520_hd_create(handle, 0, pfad.encode(), b"quatsch")

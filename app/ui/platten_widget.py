@@ -43,11 +43,14 @@ TYPEN = (
     ("D5126", "D5126 (NEC, 615 Zyl., 4 Köpfe)", 615, 4, 18),
     ("D5146", "D5146 (NEC, 615 Zyl., 8 Köpfe)", 615, 8, 18),
     ("VS", "VS (Robotron, 820 Zyl., 6 Köpfe)", 820, 6, 18),
+    # Geometrie der ausgelieferten WEGA-3.1-Platte; eine zweite Platte daneben muss denselben Typ haben
+    # (WDC 4.2 verlangt fuer LW 1/2 den PAR von LW 0, Merkposten p8000 Nr. 64).
+    ("WEGA31-AVR", "WEGA31-AVR (wie die WEGA-3.1-Platte, 1380 Zyl., 10 Köpfe)", 1380, 10, 18),
 )
 #: Dateinamenkuerzel je Typ (Kern: `winchester::typen()`, geprueft durch `k1520_hd_typ_kuerzel`):
 #: Plattenabbilder heissen ``<name>.<kuerzel>.img`` (P24) — die Endung bleibt ``.img``, damit
 #: DiskTool und Dateimanager sie weiter erkennen; gepackt ``<name>.<kuerzel>.img.gz``.
-KUERZEL = {"K5504.50": "k5504", "D5126": "d5126", "D5146": "d5146", "VS": "vs"}
+KUERZEL = {"K5504.50": "k5504", "D5126": "d5126", "D5146": "d5146", "VS": "vs", "WEGA31-AVR": "avr"}
 #: WDC-Fassungen, die noch nicht belegt sind (3.x-Spurformat, wdc_firmware.md §12 Nr. 11).
 EXPERIMENTELL = ("4.0.05", "3.4.05")
 STANDARD_TYP = "K5504.50:unformatiert"   # Vorgabe: Laufwerk wie neu, ohne Parametersatz
@@ -64,7 +67,8 @@ def typ_mit_inhalt(typ: str, inhalt: str) -> str:
 GZ = ".gz"
 GZIP_KENNUNG = b"\x1f\x8b"
 
-UNIT = 0          # nur Laufwerk 0 — die Maschine fuehrt drei, der Kasten bedient das erste
+#: Der WDC fuehrt drei Laufwerke (Ticket #15); die Oberflaeche zeigt 1 bis 3 Kaesten.
+MAX_LAUFWERKE = 3
 
 
 def rom_typ(firmware: str) -> str:
@@ -272,16 +276,18 @@ class PlattenDialog(QDialog):
 
 
 class PlattenWidget(QWidget):
-    """Anschließen, Neu anlegen und Abtrennen der Winchesterplatte (Laufwerk 0)."""
+    """Anschließen, Neu anlegen und Abtrennen der Winchesterplatte eines Laufwerks (0–2)."""
 
     #: Die Belegung hat sich geaendert (fuer die Konfiguration).
     geaendert = Signal()
     #: Hinweis fuer die Statuszeile des Fensters.
     meldung = Signal(str)
 
-    def __init__(self, emulator=None, parent=None):
+    def __init__(self, emulator=None, parent=None, unit: int = 0):
         super().__init__(parent)
         self.emulator = emulator
+        #: Laufwerk am WDC (0–2); der Kern fuehrt die Platte unter dieser Nummer.
+        self.unit = int(unit)
         self._pfad = ""
         self._verfuegbar = True
         #: WDC-Firmware der Maschine ("4.2" | "4.0.05" | "3.4.05"); bis 4.0 legt das EPROM den Typ fest.
@@ -294,7 +300,7 @@ class PlattenWidget(QWidget):
         lay.setContentsMargins(6, 6, 6, 6)
         kopf = QHBoxLayout()
         self.lampe = status_bar.DriveLamp()
-        self.titel = QLabel("<b>Winchester</b> — Laufwerk 0")
+        self.titel = QLabel(f"<b>Winchester</b> — Laufwerk {self.unit}")
         kopf.addWidget(self.lampe)
         kopf.addWidget(self.titel, 1)
         lay.addLayout(kopf)
@@ -370,7 +376,7 @@ class PlattenWidget(QWidget):
         if not self._sperren(self._pfad):
             self._pfad = ""
             return
-        if not self.emulator.hd_mount(UNIT, self._pfad):
+        if not self.emulator.hd_mount(self.unit, self._pfad):
             self.meldung.emit(f"Platte {self._pfad} nicht anschließbar: {self.emulator.hd_error()}")
             instanz.sperre_loesen(self._pfad)
             self._pfad = ""
@@ -394,7 +400,7 @@ class PlattenWidget(QWidget):
         if not self._sperren(pfad):
             self._anzeigen()
             return False
-        if not self.emulator.hd_mount(UNIT, pfad):
+        if not self.emulator.hd_mount(self.unit, pfad):
             instanz.sperre_loesen(pfad)
             self.meldung.emit(f"Platte nicht angeschlossen: {self.emulator.hd_error()}")
             self._anzeigen()
@@ -431,7 +437,7 @@ class PlattenWidget(QWidget):
         if not self._sperren(pfad):
             self._anzeigen()
             return False
-        if not self.emulator.hd_create(UNIT, pfad, typ):
+        if not self.emulator.hd_create(self.unit, pfad, typ):
             instanz.sperre_loesen(pfad)
             self.meldung.emit(f"Platte nicht angelegt: {self.emulator.hd_error()}")
             self._anzeigen()
@@ -451,7 +457,7 @@ class PlattenWidget(QWidget):
 
     def _loesen(self):
         if self._pfad and self.emulator is not None:
-            self.emulator.hd_unmount(UNIT)
+            self.emulator.hd_unmount(self.unit)
         if self._pfad:
             instanz.sperre_loesen(self._pfad)
         self._pfad = ""
@@ -537,7 +543,7 @@ class PlattenWidget(QWidget):
         if self._pfad:
             zustand = status_bar.BELEGT
             try:
-                if self.emulator is not None and self.emulator.hd_led(UNIT):
+                if self.emulator is not None and self.emulator.hd_led(self.unit):
                     zustand = status_bar.ZUGRIFF
             except Exception:
                 pass
@@ -576,3 +582,109 @@ class PlattenWidget(QWidget):
                                  f"legt das Laufwerk fest ({rom_typ(self.firmware)}, Endung "
                                  f".{KUERZEL.get(rom_typ(self.firmware), '')}.img).")
         self._lampe()
+
+
+class PlattenGruppe(QWidget):
+    """Die Kästen aller Winchester-Laufwerke (1 bis :data:`MAX_LAUFWERKE`) untereinander.
+
+    Die Gruppe bietet dieselbe Bedienung wie ein einzelner :class:`PlattenWidget` für alles, was
+    die ganze Maschine betrifft (Firmware, Neuaufbau, Sichern, Konfiguration).  Die Zahl der
+    Kästen ist die Zahl der angeschlossenen Laufwerke; sie wirkt ohne Neubau der Maschine, denn
+    der Kern führt immer drei Laufwerke und der WDC liest den Anschluss beim Hochlauf
+    (*Rückstellen* oder *Rechner ein* genügt).  Ein weggenommenes Laufwerk wird abgetrennt
+    (die Platte wird vorher zurückgeschrieben) und vergisst seine Datei.
+    """
+
+    geaendert = Signal()
+    meldung = Signal(str)
+
+    def __init__(self, emulator=None, parent=None):
+        super().__init__(parent)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        self.kaesten = [PlattenWidget(emulator, self, unit=u) for u in range(MAX_LAUFWERKE)]
+        for k in self.kaesten:
+            k.meldung.connect(self.meldung)
+            k.geaendert.connect(self.geaendert)
+            lay.addWidget(k)
+        self._anzahl = 1
+        self._sichtbar()
+
+    def _sichtbar(self):
+        for u, k in enumerate(self.kaesten):
+            k.setVisible(u < self._anzahl)
+
+    def anzahl(self) -> int:
+        return self._anzahl
+
+    def set_anzahl(self, n) -> None:
+        """Zahl der Laufwerke setzen (1–3, sonst begrenzt).  Weggenommene werden abgetrennt."""
+        try:
+            n = int(n)
+        except (TypeError, ValueError):
+            n = 1
+        n = max(1, min(MAX_LAUFWERKE, n))
+        for u in range(n, MAX_LAUFWERKE):
+            if self.kaesten[u].pfad():
+                self.kaesten[u].abtrennen()
+        self._anzahl = n
+        self._sichtbar()
+
+    def aktive(self):
+        return self.kaesten[:self._anzahl]
+
+    # -- Bedienung wie ein einzelner Kasten -------------------------------------------------
+
+    def set_verfuegbar(self, an: bool):
+        for k in self.kaesten:
+            k.set_verfuegbar(an)
+
+    def set_firmware(self, firmware: str):
+        for k in self.kaesten:
+            k.set_firmware(firmware)
+
+    def passt_nicht_zu(self, firmware: str) -> str:
+        for k in self.aktive():
+            grund = k.passt_nicht_zu(firmware)
+            if grund:
+                return grund
+        return ""
+
+    def set_emulator(self, emulator):
+        for k in self.kaesten:
+            k.set_emulator(emulator)
+
+    def sichern(self):
+        for k in self.kaesten:
+            k.sichern()
+
+    def freigeben(self):
+        for k in self.kaesten:
+            k.freigeben()
+
+    # -- Konfiguration: `platte` (Laufwerk 0, wie bisher), `platte1`, `platte2` -------------
+
+    @staticmethod
+    def schluessel(unit: int) -> str:
+        return "platte" if unit == 0 else f"platte{unit}"
+
+    def zustand_lesen(self) -> dict:
+        """``{"platte": {...}, "platte1": {...}, …}`` — nur die angeschlossenen Laufwerke."""
+        return {self.schluessel(k.unit): k.zustand_lesen() for k in self.aktive()}
+
+    def zustand_anwenden(self, daten: dict) -> None:
+        """Wie :meth:`zustand_lesen`.  Ein fehlender Schlüssel heißt „nicht anfassen“."""
+        for k in self.aktive():
+            s = self.schluessel(k.unit)
+            if s in daten:
+                k.zustand_anwenden(daten[s])
+
+    @staticmethod
+    def anzahl_aus_konfig(daten: dict) -> int:
+        """Aus einer Konfiguration ohne ``general.winchester`` (älterer Stand): die höchste
+        Laufwerksnummer mit eigenem Abschnitt + 1, mindestens 1."""
+        n = 1
+        for u in range(1, MAX_LAUFWERKE):
+            if PlattenGruppe.schluessel(u) in (daten or {}):
+                n = u + 1
+        return n

@@ -350,9 +350,9 @@ tools/dev.sh tool boot_trace --machine p8000 --quiet --json --keys '<CR><CR>' \
   `--machine p8000-16 --keys '<CR>x<CR>'` ⇒ „U8000-Softwaremonitor Version 3.1 - Press NMI".
 - **`--rtc aus|u130x|rtc72421`** (nur `p8000-16`, Entwurf 38): Echtzeituhr-Karte am 16-Bit-Teil (`u130x` = Originalkarte mit Armbanduhr-Chip, `rtc72421` = Nachbau).
 - **`--wdc 4.2|4.0.05|3.4.05`, `--hd <abbild>`** (nur `p8000-16`, AP P13d): WDC an der 16-Bit-PIO2 bzw.
-  Winchester an Laufwerk 0 (`--hd` setzt `--wdc 4.2`; das Abbild wird **beschrieben** — eine Kopie
+  Winchester an Laufwerk 0 (`--hd` = `--hd0`, dazu `--hd1`/`--hd2` für Laufwerk 1/2; `--hd*` setzt `--wdc 4.2`; das Abbild wird **beschrieben** — eine Kopie
   übergeben).  Ereignisse: je Statuswechsel des WDC, „WDC Kommando cc LW n …" beim Übernehmen eines
-  Kommandoblocks, „WDC Fehler nn" bei Status 7; das Schlussbild nennt Zustand, Kommando- und Fehlerzahl.
+  Kommandoblocks, „WDC Fehler nn" bei Status 7; das Schlussbild nennt Zustand, Kommando- und Fehlerzahl und die gemounteten Platten (`LW0=… LW1=…`; nur LW 0 = der Pfad allein).
 - Noch nicht: `--p8000 <konfig>`, Ereignisse des 16-Bit-Teils.  Für alles Interaktive
   (aktive CPU, MMU-Sicht, DMA-/Kopplungsprotokoll) gibt es seit P12 `k1520dbg --machine p8000|p8000-16`
   (`tools/k1520dbg.md` §11d) — `boot_trace` lokalisiert, `k1520dbg` seziert.

@@ -187,3 +187,6 @@ Priorität C (nachrangig):
 8. Seriennummern, Leiterplattenindex 16-Bit (Index 1 vs. 4) und ob GLE-Terminal vorhanden — wirkt auf Schaltplanauswahl.
 9. Uhr-/RTC-Karte (`rtc.php`, Timer-Software 1.1), Kassettenlaufwerk (`Tapeinterface`) und Drucker-Schnittstelle — nur falls im Zielumfang.
 10. P8000 compact/EMR (80286-Teil) und WDOS — nicht im Zielumfang vermerkt; ggf. verwerfen.
+
+## P8000 Compact
+Siehe `compact.md` (Ticket #15): Quellen robotrontechnik.de, pofo.de-Prospekt, ycdtotv.de; EPROM-Abzüge bitgleich mit den vorhandenen.

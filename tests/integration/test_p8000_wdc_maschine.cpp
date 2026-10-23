@@ -274,3 +274,56 @@ TEST(P8000WdcMaschine, P24UnformatiertePlatteBleibtBeimAnschliessenOhnePar) {
     EXPECT_EQ(s[0], 0xE5);
     EXPECT_EQ(s[256], 0xE5);
 }
+
+// Ticket #15: der WDC kennt drei Laufwerke; die Konfiguration mountet alle drei (platte/platte1/platte2).
+TEST(P8000WdcMaschine, DreiPlattenPerKonfigurationLaufwerk0Bis2) {
+    stumm();
+    k1520test::TempPlatte p0("K5504.50", "drei_0.img"), p1("D5126", "drei_1.img"), p2("K5504.50", "drei_2.img");
+    P8000Machine::Config c = mitWdc(p0.path());
+    c.platte1 = p1.path();
+    c.platte2 = p2.path();
+    c.platte_typ1 = "D5126";                       // eigener Typ je Laufwerk
+    P8000Machine m(c);
+    EXPECT_EQ(m.hdPath(0), p0.path());
+    EXPECT_EQ(m.hdPath(1), p1.path());
+    EXPECT_EQ(m.hdPath(2), p2.path());
+    for (int u = 0; u < 3; ++u) {
+        ASSERT_NE(m.platte(u), nullptr) << u;
+        EXPECT_EQ(m.wdc()->platte(u), m.platte(u)) << u;
+    }
+    EXPECT_EQ(m.platte(1)->geometrie().zylinder, 615);      // D5126
+    EXPECT_NE(m.platte(0)->geometrie().zylinder, 615);      // K5504.50
+
+    // nur Laufwerk 1 (ohne 0) ist zulaessig; ein widersprechender Typ an LW 1 wird abgewiesen
+    P8000Machine::Config e = mitWdc("");
+    e.platte1 = p1.path();
+    P8000Machine n(e);
+    EXPECT_EQ(n.hdPath(0), "");
+    EXPECT_EQ(n.hdPath(1), p1.path());
+    P8000Machine::Config f = mitWdc("");
+    f.platte1 = p0.path();
+    f.platte_typ1 = "D5126";                       // Datei ist K5504.50 gross
+    EXPECT_THROW(P8000Machine{f}, std::invalid_argument);
+    // Platte an LW 2 ohne WDC
+    P8000Machine::Config g;
+    g.karte16 = true;
+    g.platte2 = p2.path();
+    EXPECT_THROW(P8000Machine{g}, std::invalid_argument);
+}
+
+// Save-State: der WDC-Abschnitt traegt je Laufwerk ein Anwesenheitsbyte (wdc.cpp deserialize) — der
+// Stand passt nur auf eine Maschine mit GENAU denselben belegten Laufwerken.
+TEST(P8000WdcMaschine, SaveStateVerlangtDieselbenBelegtenLaufwerke) {
+    stumm();
+    k1520test::TempPlatte a0("K5504.50", "ss_0.img"), a1("D5126", "ss_1.img"), b0("K5504.50", "ss_b0.img");
+    P8000Machine::Config c = mitWdc(a0.path());
+    c.platte1 = a1.path();
+    P8000Machine m(c);
+    laufe(m, 200'000);
+    const auto stand = m.stateBytes();
+    P8000Machine gleich(c);
+    EXPECT_TRUE(gleich.restoreStateBytes(stand)) << gleich.stateError();
+    P8000Machine nur0(mitWdc(b0.path()));
+    EXPECT_FALSE(nur0.restoreStateBytes(stand));
+    EXPECT_NE(nur0.stateError().find("WDC"), std::string::npos) << nur0.stateError();
+}

@@ -116,6 +116,15 @@ public:
         /// `winchester::typen()`, z. B. "K5504.50"), sonst aus PAR-Sektor bzw. Dateigroesse.
         std::string platte;
         std::string platte_typ;
+        /// Laufwerk 1 und 2 (Ticket #15; der WDC kennt bis zu drei).  `platte`/`platte_typ` bleiben
+        /// Laufwerk 0.  Ein leerer `platte_typ1/2` erbt `platte_typ` (gleiche Regel wie bisher).
+        std::string platte1, platte2;
+        std::string platte_typ1, platte_typ2;
+        const std::string& plattePfad(int u) const { return u == 1 ? platte1 : u == 2 ? platte2 : platte; }
+        const std::string& plattenTyp(int u) const {
+            const std::string& t = u == 1 ? platte_typ1 : u == 2 ? platte_typ2 : platte_typ;
+            return t.empty() ? platte_typ : t;
+        }
         /// [P5] der Platte: fehlt Z0/K0/S1 ein gueltiger PAR-Sektor, liefert die Spursynthese einen
         /// erzeugten (WEGA-3.1-AVR-Abbild).  AUS = die Firmware sieht den Sektor, wie er ist.
         bool        platte_par_ergaenzen = true;
