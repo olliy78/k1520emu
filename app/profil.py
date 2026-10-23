@@ -624,8 +624,10 @@ PC1715 = Programmprofil(
 #: Modelle des P8000 mit einem Rechner / mit der 16-Bit-Karte (Wirkungsbereich der Hardwarewahl).
 #: Die Kern-Terminal-Modelle (``p8000``, ``p8000-16``, ``p8000-8``) gibt es in der Oberflaeche nicht
 #: mehr (P23a); im Kern bleiben sie als Testgegenstelle.
-_RECHNER = ("p8000-ot", "p8000-16-ot", "p8000-8-ot")
-_MIT16 = ("p8000-ot", "p8000-16-ot")
+_RECHNER = ("p8000-ot", "p8000-16-ot", "p8000-8-ot", "p8000-c-ot")
+_MIT16 = ("p8000-ot", "p8000-16-ot", "p8000-c-ot")
+#: Modelle mit Winchesterkontroller.
+_MIT_WDC = ("p8000-ot", "p8000-c-ot")
 
 P8000 = Programmprofil(
     maschine="p8000",
@@ -657,15 +659,20 @@ P8000 = Programmprofil(
     modelle=(("p8000-ot", "p8000", None, "Vollgerät (16-Bit-Teil und Winchester)", "k7673"),
              ("p8000-16-ot", "p8000", None, "ohne Winchester (16-Bit-Teil, nur UDOS)", "k7673"),
              ("p8000-8-ot", "p8000", None, "nur 8-Bit-Teil (UDOS, erste Baustufe)", "k7673"),
+             # P8000 Compact (1989): dieselben Platinen im Tischgehaeuse, Winchester + Uhr im Geraet
+             # (doc/p8000/compact.md).  Nur die Zwei-Prozessor-Variante mit Terminal.
+             ("p8000-c-ot", "p8000", None, "P8000 Compact (Vollgerät mit Terminal)", "k7673"),
              # Nur das Terminal: ein Arbeitsplatz, der sich ueber seine serielle Leitung mit dem
              # Rechner eines anderen Programms verbindet (Mehrplatzbetrieb).
              ("p8000-term", "p8000-terminal", None,
               "nur Terminal (Arbeitsplatz, ohne Rechner)", "k7673")),
     modell_kern=(("p8000-ot", (("karte16", "1"), ("wdc", "4.2"), ("terminal", "original"))),
                  ("p8000-16-ot", (("karte16", "1"), ("terminal", "original"))),
-                 ("p8000-8-ot", (("karte16", "0"), ("terminal", "original")))),
+                 ("p8000-8-ot", (("karte16", "0"), ("terminal", "original"))),
+                 ("p8000-c-ot", (("karte16", "1"), ("wdc", "4.2"), ("terminal", "original")))),
     modell_arten=(("p8000-ot", "original"), ("p8000-16-ot", "original"),
-                  ("p8000-8-ot", "original"), ("p8000-term", "einheit")),
+                  ("p8000-8-ot", "original"), ("p8000-c-ot", "original"),
+                  ("p8000-term", "einheit")),
     modell_alt=(("p8000", "p8000-ot"), ("p8000-16", "p8000-16-ot"), ("p8000-8", "p8000-8-ot")),
     modell_tipp=("Rechnerausstattung: Vollgerät = 8-Bit-Karte, 16-Bit-Karte mit U8001 und "
                  "Winchesterkontroller (WEGA); ohne Winchester = nur UDOS und Monitor; nur 8-Bit-Teil "
@@ -699,7 +706,7 @@ P8000 = Programmprofil(
          "(doc/p8000/wdc_firmware.md §12 Nr. 11).",
          (("4.2", "WDC 4.2"), ("4.0.05", "WDC 4.0.05 (experimentell)"),
           ("3.4.05", "WDC 3.4.05 (experimentell)")),
-         ("p8000-ot",)),
+         _MIT_WDC),
         # Uhrenkarte (Entwurf 38): als Gruppe „RTC“ gebaut (settings_widget), Vorgabe siehe hardware_vorgaben.
         (_rtc.SCHLUESSEL_TYP, "RTC:", _rtc.TIPP_TYP, _rtc.TYPEN, _MIT16),
         (_rtc.SCHLUESSEL_VERSATZ, "Zeitversatz:", _rtc.TIPP_VERSATZ, _rtc.VERSAETZE, _MIT16),
@@ -709,7 +716,7 @@ P8000 = Programmprofil(
          "Parametersatz, liefert die Platte einen erzeugten (nur für das WEGA-3.1-Abbild des "
          "AVR-Emulators, 1380/10/18).",
          (("aus", "aus (Vorgabe)"), ("ergaenzen", "ergänzen (WEGA-3.1-AVR-Abbild)")),
-         ("p8000-ot",)),
+         _MIT_WDC),
     ),
     schnittstellen_ports=(("tty0", 5000), ("tty2", 5002), ("tty3", 5003), ("tty4", 5004),
                           ("tty5", 5005), ("tty6", 5006), ("tty7", 5007),

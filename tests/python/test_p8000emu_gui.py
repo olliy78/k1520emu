@@ -115,6 +115,31 @@ def test_vorgaben_des_vollgeraets(qapp, umgebung):
     assert p.modell_normalisieren("quatsch") == "p8000-ot"
 
 
+def test_compact_ist_das_vollgeraet_mit_terminal(qapp, umgebung):
+    """P8000 Compact (Ticket #15): 16-Bit-Teil, WDC 4.2, Originalterminal, Uhr; Hardwarefelder wie beim Vollgeraet."""
+    from app import profil
+    p = profil.profil("p8000")
+    assert p.modell_normalisieren("p8000-c-ot") == "p8000-c-ot"
+    assert p.kern_parameter("p8000-c-ot", {}) == p.kern_parameter("p8000-ot", {})
+    kern = p.kern_parameter("p8000-c-ot", {})["p8000"]
+    assert kern["karte16"] == "1" and kern["wdc"] == "4.2" and kern["terminal"] == "original"
+    assert kern["rtc"] == "u130x"
+    assert p.modell_hat_wdc("p8000-c-ot") and p.modell_hat_rechner("p8000-c-ot")
+    for feld in ("index", "mon8", "mon16", "dram", "wdc", "rtc", "rtc_versatz", "platte_par"):
+        assert p.hardware_wirkt(feld, "p8000-c-ot") == p.hardware_wirkt(feld, "p8000-ot"), feld
+    # die alten Schluessel bleiben, wie sie waren
+    assert p.modell_normalisieren("p8000") == "p8000-ot" and p.standard_modell() == "p8000-ot"
+
+
+def test_compact_erzeugt_eine_kernmaschine(qapp, umgebung):
+    from app import profil
+    from app.core_binding.k1520 import K1520Emulator
+    p = profil.profil("p8000")
+    emu = K1520Emulator(["K5601", "K5601", "none", "none"], machine="p8000", **p.kern_parameter("p8000-c-ot", {}))
+    emu.power_on()
+    assert emu.run(200_000) > 0 and emu.term_count() == 1
+
+
 def test_jede_hardwarewahl_baut_eine_maschine(qapp, umgebung):
     """Jeder angebotene Wert (je Modell, an dem er wirkt) ergibt eine startende Maschine."""
     from app import profil
@@ -123,7 +148,7 @@ def test_jede_hardwarewahl_baut_eine_maschine(qapp, umgebung):
     assert [h[0] for h in p.hardware] == ["index", "mon8", "mon16", "dram", "wdc", "rtc", "rtc_versatz",
                                          "platte_par"]
     for schluessel, _b, _t, werte, modelle in p.hardware:
-        for modell in (modelle or ("p8000-ot", "p8000-16-ot", "p8000-8-ot")):
+        for modell in (modelle or ("p8000-ot", "p8000-16-ot", "p8000-8-ot", "p8000-c-ot")):
             for wert, _anzeige in werte:
                 hw = {**p.hardware_standard(), schluessel: wert}
                 emu = K1520Emulator(["K5601", "K5601", "none", "none"], machine="p8000",
@@ -189,8 +214,8 @@ def test_rom_fassung_und_modell_in_den_einstellungen(qapp, umgebung):
         sw = w.settings_widget
         assert set(sw.hardware_combos) == {"index", "mon8", "mon16", "dram", "wdc", "platte_par",
                                            "rtc", "rtc_versatz"}
-        # Rechnerausstattung (3) + Betriebsart (2); die Kern-Terminal-Modelle gibt es nicht mehr
-        assert sw.model_combo.count() == 3 and not sw.model_combo.isHidden()
+        # Rechnerausstattung (4) + Betriebsart (2); die Kern-Terminal-Modelle gibt es nicht mehr
+        assert sw.model_combo.count() == 4 and not sw.model_combo.isHidden()
         assert [sw.betriebsart_combo.itemData(i) for i in range(2)] == ["computer", "terminal"]
         assert not sw.ptape_box.isVisibleTo(sw)           # am P8000 keine Lochstreifenkarte
         for k in ("mon16", "dram", "wdc", "mon8", "index"):

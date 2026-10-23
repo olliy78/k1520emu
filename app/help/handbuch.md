@@ -1593,6 +1593,9 @@ die *Betriebsart*. Was anders ist:
   **nur Terminal** (s. u.). Ein Wechsel startet die Maschine kalt. Alte Konfigurationen mit dem
   früheren schlanken Kern-Terminal werden beim Laden auf die Ausstattung mit Originalterminal
   abgebildet.
+* **P8000 Compact** — als Rechnerausstattung *P8000 Compact (Vollgerät mit Terminal)* wählbar. Die Compact (1989) ist die P8000
+  im Tischgehäuse mit unveränderten Platinen; Winchester und Uhr gehören zur Grundausstattung. Nachgebildet ist nur die Variante mit
+  16-Bit-Teil und Originalterminal (Uhr U130x vorbelegt, Platte wie beim Vollgerät); eine 8-Bit-Compact und der WDOS-Adapter fehlen.
 * **ROM-Fassungen und Bestückung** — ebenfalls unter *Allgemein*: Platinenindex (8-Bit 3 /
   16-Bit 4, oder beide 1), **MON8** 3.1/3.0, **MON16** 3.1/3.0/3.3, Hauptspeicher der
   16-Bit-Seite (256 KB, 1 MB, 2 MB) und **WDC-Firmware** 4.2/4.0.05/3.4.05. Wo eine Wahl am
