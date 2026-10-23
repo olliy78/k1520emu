@@ -120,6 +120,12 @@ std::string aufspielen(const std::string& pfad, const std::string& com, const st
     return {};
 }
 
+/// Die "grosse" Datei der Uebertragungstests.  40 KB genuegen fuer das, was sie pruefen: mehrere
+/// CP/M-Extents (je 16 KB) und mehrfaches Umlaufen der Paketnummer (mod 64, ~94 B je Paket, also
+/// alle ~6 KB — hier rund siebenmal).  Mit 100 KB dauerte jeder der beiden Faelle 17 s Wirtszeit
+/// (Maschine bei ~340 B/s), ohne dass etwas Zusaetzliches geprueft wuerde.
+constexpr size_t kGrosseDatei = 40960;
+
 std::string rtrim(std::string s) {
     while (!s.empty() && (s.back() == ' ' || s.back() == '\0')) s.pop_back();
     return s;
@@ -362,11 +368,11 @@ TEST(Kermit80A5120, GetGroessenUndInhalt) {
     stumm();
     KERMIT80_COM_ODER_SKIP("a5120");
     Lauf l(com);
-    const std::string zuf = zufall(102400, 80);
+    const std::string zuf = zufall(kGrosseDatei, 80);
     std::string alle(4096, '\0');
     for (size_t i = 0; i < alle.size(); ++i) alle[i] = char(i & 0xFF);
     const std::map<std::string, std::string> pc = {{"g0", ""}, {"g1", std::string(1, char(0xE5))}, {"g128", zufall(128, 128)},
-                                                   {"g129", zufall(129, 129)}, {"alle256", alle}, {"g100k", zuf}};
+                                                   {"g129", zufall(129, 129)}, {"alle256", alle}, {"g40k", zuf}};
     for (const auto& [n, s] : pc) schreibe(l.srv.frei.p / n, s);
     ASSERT_TRUE(l.bereit({"set file-mode binary"}));
     for (const auto& [n, s] : pc) ASSERT_TRUE(l.messen("get " + n, s.size())) << l.a.bild();
@@ -408,12 +414,12 @@ TEST(Kermit80A5120, SendGroessenUndInhalt) {
         {"S128.BIN", zufall(128, 1128)},
         {"S256.BIN", zufall(256, 1256)},
         {"ALLE256.BIN", alle},
-        {"S100K.BIN", zufall(102400, 1100)},
+        {"S40K.BIN", zufall(kGrosseDatei, 1100)},
         {"TEXT.TXT", recordAuffuellen(text, 0x1A)},
     };
     Lauf l(com, cpm);
     ASSERT_TRUE(l.bereit({"set file-mode binary"}));
-    for (const char* n : {"s1.bin", "s128.bin", "s256.bin", "alle256.bin", "s100k.bin"}) {
+    for (const char* n : {"s1.bin", "s128.bin", "s256.bin", "alle256.bin", "s40k.bin"}) {
         std::string up = n;
         for (auto& c : up) c = char(std::toupper(static_cast<unsigned char>(c)));
         ASSERT_TRUE(l.messen(std::string("send ") + n, cpm.at(up).size())) << l.a.bild();
