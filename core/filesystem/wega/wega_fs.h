@@ -216,14 +216,17 @@ public:
      * Inode-Liste = bloecke/25 Bloecke (+2), Freiliste in der Verschraenkung
      * @p m / @p n (die 720-K-Disketten tragen 1/72), Inode 1 = leere Bad-Block-Datei,
      * Inode 2 = Wurzel (`040777`, uid/gid 0) — genau so steht es auf den
-     * Lieferdisketten.
+     * Lieferdisketten.  @p inodes > 0 verlangt mindestens so viele Inodes (aufgerundet auf
+     * ganze Inode-Bloecke) statt bloecke/25 — eine bis zum Rand gefuellte Originaldiskette
+     * hat oft eine KLEINERE Inode-Liste als diese Vorgabe.
      */
     static std::unique_ptr<WegaFileSystem> format(std::unique_ptr<WegaBlockDev> dev,
                                                   const std::string& label,
                                                   std::string& err,
                                                   uint32_t bloecke = 0,
                                                   int m = 1, int n = 72,
-                                                  uint32_t zeit = 0);
+                                                  uint32_t zeit = 0,
+                                                  uint32_t inodes = 0);
 
     /**
      * @brief Traegt das Geraet ein WEGA-Dateisystem?  Ohne Magic — die Probe ist
@@ -243,6 +246,8 @@ public:
     std::string blockList(const std::string& name) const override;
     using FileSystem::setAttributes;   // die Ueberladungen fuer UDOS/CP/M bleiben sichtbar
     bool makeDirectory(const std::string& name) override;
+    bool makeNode(const std::string& name, uint16_t mode, uint16_t rdev) override;
+    bool makeLink(const std::string& vorhanden, const std::string& neu) override;
     bool wouldFit(const std::vector<PlannedFile>& files, FitReport& out) const override;
     bool mkfs() override;
     FsInfo info() const override;
@@ -269,6 +274,9 @@ private:
 
     class Tx;                    // Arbeitskopie einer schreibenden Operation
     friend class Tx;
+    /// Name in ein Verzeichnis eintragen (Elter-mtime/ctime = jetzt, nlink += Delta).
+    bool eintragen(Tx& tx, uint32_t dir, const std::string& blatt, uint32_t ino,
+                   uint32_t jetzt_, int nlinkDelta);
 
     std::unique_ptr<WegaBlockDev> dev_;
     const wega::Variante* v_;

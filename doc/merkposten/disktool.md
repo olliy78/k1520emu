@@ -1158,3 +1158,20 @@ liefen schon), drei tragen ein UNIX-Dateisystem, eines (`ROOT1_G`) ist ein besch
    abgewiesen (das ist richtig — 25 % der Blöcke hätten ihre ersten 256 Byte verloren); **`ROOT1GN` ist die brauchbare Fassung**.
 4. Wächter `MutosFs.Mutos1700_*` (Fixtures `mutos1700_720_uucp.td0`, `mutos1700_a7100_root1gn.td0`).  Offen: auf den A7100-
    Disketten steht keine Bootprüfung (`boot-get`/`boot-put` für den Ladebereich c0h0 gibt es nicht).
+
+## UNIX-Metadaten vollständig zurückspielen (WEGA/MUTOS, 2026-10-23)
+1. **`put <ordner>` stellt jetzt alles her, was die Diskette trägt** (Entwurf 27 §8): Modus/uid/gid/mtime/**atime/ctime**
+   (`UnixAttrs::set_atime/set_ctime` — nur hier gibt es ein vorgegebenes ctime), Verzeichnisse und die **Wurzel**
+   (Beiblatt-Zeile `.`, `setAttributes("")`), **Geräte/FIFOs** (`makeNode`, Quelle ist NUR `wega-dateiangaben.txt`),
+   **harte Links** (`makeLink`; Dateien über `.fileinfo`: gleiche `inode=`, `nlink>1`, gleiche Größe/mtime/Modus UND
+   gleicher Inhalt — nie nur die Nummer; Geräte über das Beiblatt).  Angaben werden erst NACH allen Links gesetzt
+   (jeder Link verschiebt die ctime der Inode).
+2. **Platzprüfung**: ein Link ist `PlannedFile::link` (nur Eintrag, keine Inode); die Verzeichnis-Reserve wird je
+   Elternverzeichnis gerechnet (n·16 B), nicht „1 Block je Datei" — 190 Geräte in `/dev` brauchen keine 190 Blöcke.
+3. **Inode-Zahl** (`s_isize`) ist je Diskette verschieden (MUTOS 1700: ROOT1_D 19 = 272 Inodes, UUCP 30 = 448; MUTOS 8000:
+   ROOT 12, CMD/CC 14).  Vorgabe beim Anlegen `fsize/25` Blöcke (wie `mkfs`, passt zu UUCP/CMD/CC); `create --inodes N`
+   verlangt mindestens N.  ROOT1_D lässt sich nur mit `--inodes 272` auf eine neue Diskette zurückspielen.
+   Auch in der Oberfläche (`app/disktool/ui/neu_dialog.py`: Haken „Abweichende Anzahl von Inodes", Feld zeigt zunächst die
+   Vorgabe und ist gesperrt; C-ABI `k1520d_create_ex`, `k1520d_fs_unix_inodes`; Wächter `py_disktool_neu_inodes_gui`).
+4. Wächter `MutosFs.Mutos8000_VollstaendigeWiederherstellung`, `…Mutos1700_A7100_VollstaendigeWiederherstellungMitLinksUndGeraeten`;
+   von Hand zusätzlich ROOT1_D (mit `--inodes 272`), UUCP, CMD, CC1 über das Archiv (`python -m app.disktool.archive`).

@@ -185,6 +185,9 @@ struct WriteOptions {
     int      wega_gid  = 0;
     /// @brief Aenderungszeit (Sekunden seit 1970); 0 = jetzt.
     uint32_t wega_mtime = 0;
+    /// @brief Zugriffs- und Inode-Zeit aus einer `.fileinfo`; 0 = wie @ref wega_mtime bzw. jetzt.
+    uint32_t wega_atime = 0;
+    uint32_t wega_ctime = 0;
     /// @brief uid/gid gelten auch dann, wenn beide 0 sind und kein Modus gesetzt ist
     ///        (z. B. aus einer `.fileinfo`).  Sonst wirken sie nur zusammen mit
     ///        @ref wega_mode_gesetzt oder bei einem Wert ungleich 0.
@@ -250,6 +253,10 @@ struct UnixAttrs {
     bool     set_uid   = false;  int      uid   = 0;   ///< 0…65535
     bool     set_gid   = false;  int      gid   = 0;   ///< 0…65535
     bool     set_mtime = false;  uint32_t mtime = 0;   ///< Sekunden seit 1970 (`touch`)
+    /// Zugriffs- und Inode-Zeit: nur zum WIEDERHERSTELLEN einer Diskette aus ihren Angaben
+    /// (`.fileinfo`); der Kern setzt ctime sonst bei jeder Aenderung auf „jetzt".
+    bool     set_atime = false;  uint32_t atime = 0;
+    bool     set_ctime = false;  uint32_t ctime = 0;
 };
 
 /**
@@ -261,6 +268,7 @@ struct PlannedFile {
     uint64_t    size   = 0;
     int         volume = 0;
     bool        replaces_existing = false;   ///< von @ref FileSystem::wouldFit gesetzt
+    bool        link = false;   ///< harter Link auf eine andere geplante Datei: nur ein Verzeichniseintrag
 };
 
 /**
@@ -354,6 +362,24 @@ public:
     virtual bool makeDirectory(const std::string& name) {
         (void)name;
         return fail("Dieses Dateisystem kennt keine Unterverzeichnisse");
+    }
+
+    /**
+     * @brief Geraetedatei (c/b) oder FIFO anlegen (nur WEGA/MUTOS).
+     *
+     * @param mode  `di_mode` samt Dateiart (`020664` = Zeichengeraet 0664)
+     * @param rdev  major<<8 | minor (bei FIFO ignoriert)
+     * Fehlende Zwischenverzeichnisse entstehen mit; ein vorhandener Name ist ein Fehler.
+     */
+    virtual bool makeNode(const std::string& name, uint16_t mode, uint16_t rdev) {
+        (void)name; (void)mode; (void)rdev;
+        return fail("Dieses Dateisystem kennt keine Geraetedateien");
+    }
+
+    /// @brief Harten Link @p neu auf die vorhandene Datei @p vorhanden anlegen (nur WEGA/MUTOS).
+    virtual bool makeLink(const std::string& vorhanden, const std::string& neu) {
+        (void)vorhanden; (void)neu;
+        return fail("Dieses Dateisystem kennt keine harten Links");
     }
 
     /**

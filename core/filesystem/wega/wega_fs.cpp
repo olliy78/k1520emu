@@ -654,7 +654,8 @@ std::unique_ptr<WegaFileSystem> WegaFileSystem::mount(std::unique_ptr<WegaBlockD
 std::unique_ptr<WegaFileSystem> WegaFileSystem::format(std::unique_ptr<WegaBlockDev> dev,
                                                        const std::string& label,
                                                        std::string& err, uint32_t bloecke,
-                                                       int m, int n, uint32_t zeit) {
+                                                       int m, int n, uint32_t zeit,
+                                                       uint32_t inodes) {
     if (!dev) { err = "kein Blockgeraet"; return nullptr; }
     std::unique_ptr<WegaFileSystem> fs(new WegaFileSystem(std::move(dev)));
     if (zeit) fs->setClock([zeit] { return zeit; });
@@ -670,8 +671,10 @@ std::unique_ptr<WegaFileSystem> WegaFileSystem::format(std::unique_ptr<WegaBlock
     Superblock sb;
     sb.v = &fs->V();
     sb.fsize = bloecke;
-    // Inode-Liste: ein Inode je ~3 Bloecke zu 512 B, unabhaengig von der Blockgroesse
-    uint32_t ib = bloecke * kBlock / fs->V().block / 25;
+    // Inode-Liste fsize/25 Bloecke — in Bloecken der jeweiligen Familie: UUCP (MUTOS 1700, 720 Bloecke
+    // zu 1 KB) traegt s_isize 30, CMD (MUTOS 8000, 320 Bloecke zu 512 B) 14.
+    uint32_t ib = inodes ? (inodes + static_cast<uint32_t>(fs->V().inopb()) - 1) / fs->V().inopb()
+                         : bloecke / 25;
     if (ib == 0) ib = 1;
     if (ib > 65500 / fs->V().inopb()) ib = 65500 / fs->V().inopb();
     sb.isize = static_cast<uint16_t>(ib + 2);
@@ -824,6 +827,90 @@ bool nameGueltig(const std::string& n, std::string& why) {
 }
 } // namespace
 
+// Neuen Namen @p blatt (Inode @p ino) in das Verzeichnis @p dir eintragen.
+bool WegaFileSystem::eintragen(Tx& tx, uint32_t dir, const std::string& blatt, uint32_t ino,
+                               uint32_t jetzt_, int nlinkDelta) {
+    const Leser l = tx.leser();
+    Dinode e;
+    if (!tx.inode(dir, e)) return fail("Elternverzeichnis nicht lesbar");
+    std::vector<uint8_t> roh;
+    std::string err;
+    if (!dateiLesen(V(), l, e, tx.sb.fsize, roh, err)) return fail(err);
+    size_t platz = roh.size();
+    for (size_t k = 0; k + kDirEintrag <= roh.size(); k += kDirEintrag)
+        if (rd16(V(), roh.data() + k) == 0) { platz = k; break; }
+    if (platz == roh.size()) roh.resize(roh.size() + kDirEintrag, 0);
+    std::memset(roh.data() + platz, 0, kDirEintrag);
+    wr16(V(), roh.data() + platz, static_cast<uint16_t>(ino));
+    std::memcpy(roh.data() + platz + 2, blatt.data(), blatt.size());
+    if (!tx.kuerzen(e) || !tx.fuellen(e, roh)) return false;
+    e.nlink = static_cast<int16_t>(e.nlink + nlinkDelta);
+    e.mtime = e.ctime = jetzt_;
+    return tx.setzeInode(dir, e);
+}
+
+bool WegaFileSystem::makeNode(const std::string& name, uint16_t mode, uint16_t rdev) {
+    const uint16_t art = mode & IFMT;
+    if (art != IFCHR && art != IFBLK && art != IFIFO && art != IFMPC && art != IFMPB)
+        return fail("Modus 0" + oktal(mode) + " ist keine Geraetedatei und kein FIFO");
+    const std::vector<std::string> t = teile(name);
+    if (t.empty()) return fail("kein Dateiname");
+    std::string why;
+    for (const std::string& teil : t) if (!nameGueltig(teil, why)) return fail(why);
+    if (t.size() > 1) {
+        std::string elterpfad;
+        for (size_t i = 0; i + 1 < t.size(); ++i) elterpfad += (i ? "/" : "") + t[i];
+        if (lookup(elterpfad) == 0 && !makeDirectory(elterpfad)) return false;
+    }
+    Tx tx(*this);
+    if (!tx.start()) return false;
+    uint32_t elter = 0;
+    std::string blatt;
+    if (suche(tx.leser(), tx.sb, name, &elter, &blatt))
+        return fail("'" + name + "' gibt es schon");
+    if (!elter) return fail("Verzeichnis zu '" + name + "' nicht gefunden");
+    uint32_t ino = 0;
+    if (!tx.allocInode(ino)) return false;
+    const uint32_t jetzt_ = jetzt();
+    Dinode d;
+    d.mode = static_cast<uint16_t>(art | (mode & 07777));
+    d.nlink = 1;
+    d.atime = d.mtime = d.ctime = jetzt_;
+    if (art != IFIFO) d.addr[0] = rdev;      // Geraetenummer statt Blockadresse
+    if (!tx.setzeInode(ino, d)) return false;
+    if (!eintragen(tx, elter, blatt, ino, jetzt_, 0)) return false;
+    return tx.commit();
+}
+
+bool WegaFileSystem::makeLink(const std::string& vorhanden, const std::string& neu) {
+    const std::vector<std::string> t = teile(neu);
+    if (t.empty()) return fail("kein Dateiname");
+    std::string why;
+    for (const std::string& teil : t) if (!nameGueltig(teil, why)) return fail(why);
+    if (t.size() > 1) {
+        std::string elterpfad;
+        for (size_t i = 0; i + 1 < t.size(); ++i) elterpfad += (i ? "/" : "") + t[i];
+        if (lookup(elterpfad) == 0 && !makeDirectory(elterpfad)) return false;
+    }
+    Tx tx(*this);
+    if (!tx.start()) return false;
+    const uint32_t ino = suche(tx.leser(), tx.sb, vorhanden, nullptr, nullptr);
+    if (!ino || ino == 1) return fail("Datei nicht gefunden: " + vorhanden);
+    Dinode d;
+    if (!tx.inode(ino, d)) return fail("Inode nicht lesbar");
+    if ((d.mode & IFMT) == IFDIR) return fail("auf ein Verzeichnis gibt es keinen harten Link");
+    uint32_t elter = 0;
+    std::string blatt;
+    if (suche(tx.leser(), tx.sb, neu, &elter, &blatt)) return fail("'" + neu + "' gibt es schon");
+    if (!elter) return fail("Verzeichnis zu '" + neu + "' nicht gefunden");
+    const uint32_t jetzt_ = jetzt();
+    ++d.nlink;
+    d.ctime = jetzt_;
+    if (!tx.setzeInode(ino, d)) return false;
+    if (!eintragen(tx, elter, blatt, ino, jetzt_, 0)) return false;
+    return tx.commit();
+}
+
 bool WegaFileSystem::makeDirectory(const std::string& name) {
     Tx tx(*this);
     if (!tx.start()) return false;
@@ -926,7 +1013,9 @@ bool WegaFileSystem::write(const std::string& name, const std::vector<uint8_t>& 
         d.gid   = static_cast<int16_t>(opt.wega_gid);
     }
     if (!tx.fuellen(d, data)) return false;
-    d.atime = mzeit; d.mtime = mzeit; d.ctime = jetzt_;
+    d.atime = opt.wega_atime ? opt.wega_atime : mzeit;
+    d.mtime = mzeit;
+    d.ctime = opt.wega_ctime ? opt.wega_ctime : jetzt_;
     if (!tx.setzeInode(ino, d)) return false;
 
     if (!vorhanden) {
@@ -959,7 +1048,8 @@ bool WegaFileSystem::setAttributes(const std::string& name, const UnixAttrs& a) 
         return fail("uid " + std::to_string(a.uid) + " liegt ausserhalb von 0...65535");
     if (a.set_gid && (a.gid < 0 || a.gid > 65535))
         return fail("gid " + std::to_string(a.gid) + " liegt ausserhalb von 0...65535");
-    if (!a.set_mode && !a.set_uid && !a.set_gid && !a.set_mtime) return true;
+    if (!a.set_mode && !a.set_uid && !a.set_gid && !a.set_mtime && !a.set_atime && !a.set_ctime)
+        return true;
 
     Tx tx(*this);
     if (!tx.start()) return false;
@@ -974,9 +1064,11 @@ bool WegaFileSystem::setAttributes(const std::string& name, const UnixAttrs& a) 
     if (a.set_uid)  d.uid = static_cast<int16_t>(a.uid);
     if (a.set_gid)  d.gid = static_cast<int16_t>(a.gid);
     // `touch -m`: nur die Aenderungszeit.  Die Inode-Zeit (ctime) setzt wie im Kern
-    // jede Aenderung am Inode auf „jetzt" — sie laesst sich nicht vorgeben.
+    // jede Aenderung am Inode auf „jetzt" — nur das Wiederherstellen aus einer
+    // `.fileinfo` gibt sie vor (set_ctime).
     if (a.set_mtime) d.mtime = a.mtime;
-    d.ctime = jetzt();
+    if (a.set_atime) d.atime = a.atime;
+    d.ctime = a.set_ctime ? a.ctime : jetzt();
     if (!tx.setzeInode(ino, d)) return false;
     return tx.commit();
 }
@@ -1080,7 +1172,13 @@ bool WegaFileSystem::wouldFit(const std::vector<PlannedFile>& files, FitReport& 
     uint64_t bedarf = 0, gutschrift = 0;
     int inodes = 0;
     std::set<std::string> neue_dirs;
+    std::map<std::string, uint64_t> neue_eintraege;   // Elternpfad -> neue Verzeichniseintraege
     for (const PlannedFile& f : files) {
+        if (f.link) {       // harter Link: keine Inode, keine Daten — nur ein Eintrag im Elternverzeichnis
+            const size_t schr = f.name.rfind('/');
+            ++neue_eintraege[schr == std::string::npos ? std::string() : f.name.substr(0, schr)];
+            continue;
+        }
         bedarf += blockBedarf(V(), f.size);
         const uint32_t ino = suche(l, sb, f.name, nullptr, nullptr);
         if (ino) {
@@ -1099,9 +1197,14 @@ bool WegaFileSystem::wouldFit(const std::vector<PlannedFile>& files, FitReport& 
                     bedarf += 1;
                 }
             }
-            bedarf += 1;          // Reserve: das Elternverzeichnis kann einen Block wachsen
+            // Reserve: das Elternverzeichnis waechst um einen Eintrag (16 B) — unten je Verzeichnis
+            // gerechnet, nicht je Datei (190 Geraetedateien in /dev brauchen keine 190 Bloecke).
+            const size_t schr = f.name.rfind('/');
+            ++neue_eintraege[schr == std::string::npos ? std::string() : f.name.substr(0, schr)];
         }
     }
+    for (const auto& [elter, n] : neue_eintraege)
+        bedarf += (n * kDirEintrag + V().block - 1) / V().block + 1;   // +1: Verzeichnis neu schreiben
     // s_tfree zaehlt die Endmarke der Freiliste mit (s. check) — vorsichtig einen
     // weniger rechnen, sonst „passt" eine Datei, deren letzter Block fehlt.
     const uint64_t frei = sb.tfree ? sb.tfree - 1u : 0u;

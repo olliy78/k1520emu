@@ -202,6 +202,16 @@ K1520_API K1520Disk k1520d_create(const char* path, const char* fs_name, const c
 K1520_API K1520Disk k1520d_create_bootable(const char* path, const char* fs_name,
                                            const char* label, const char* boot_image);
 
+/**
+ * @brief Wie @ref k1520d_create_bootable, mit **Inode-Zahl** (nur WEGA/MUTOS, sonst ignoriert).
+ * @param unix_inodes  Mindestzahl Inodes; 0 = Vorgabe (@ref k1520d_fs_unix_inodes)
+ */
+K1520_API K1520Disk k1520d_create_ex(const char* path, const char* fs_name, const char* label,
+                                     const char* boot_image, uint32_t unix_inodes);
+
+/// @brief Vorgabe der Inode-Zahl beim Anlegen (Bloecke/25 Inode-Bloecke); 0 = kein UNIX-Dateisystem.
+K1520_API uint32_t k1520d_fs_unix_inodes(const char* fs_name);
+
 /* ─── Bootabbild (Systemspuren) ───────────────────────────────────────────── */
 
 /// @brief Ist das Profil die LEERE tar-Diskette (`tar720_leer`; nur Anlegen/Schreiben eines .tar)?
