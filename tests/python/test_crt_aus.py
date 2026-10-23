@@ -4,7 +4,7 @@ from app.ui.screen_widget import CRTParams
 
 def test_crt_aus_und_bildrate_gehen_durch_die_konfiguration():
     p = CRTParams()
-    assert p.crt_on is True and p.bildrate == 30.0      # Vorgabe: Röhre an, 30 Bilder/s
+    assert p.crt_on is True and p.bildrate == 30.0      # Vorgabe: Roehre an, 30 Bilder/s
     p.crt_on, p.bildrate = False, 60.0
     q = CRTParams()
     q.update_from_dict(p.to_dict())
