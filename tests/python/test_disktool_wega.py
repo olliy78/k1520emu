@@ -73,7 +73,7 @@ def _eintrag(tool, name):
 def test_filesystem_family_is_asked_not_guessed(wega_disk):
     from app.core_binding.k1520disk import DiskTool
     with DiskTool.open(wega_disk) as d:
-        assert d.filesystem_type == "wega"
+        assert d.filesystem_type == "wega_mutos"
         assert d.ist_wega and not d.ist_udos and not d.ist_cpm
         e = _eintrag(d, "bin/hallo")
         # Genau das, woran das alte Werkzeug scheiterte: ein gefuelltes Typfeld.
@@ -241,7 +241,7 @@ def test_archive_inventory_carries_unix_keys_additively(window, wega_disk, tmp_p
         assert {n for n in namen if not n.endswith("/")} == erklaert
 
         fi = z.read("dateien/bin/hallo.fileinfo").decode("utf-8")
-    assert "fs=wega" in fi and "mode=0104711" in fi and "uid=5" in fi
+    assert "fs=wega_mutos" in fi and "mode=0104711" in fi and "uid=5" in fi
     assert "typ=" not in fi and "satz=" not in fi
 
 
@@ -275,7 +275,7 @@ def test_extract_all_writes_unix_fileinfo_and_directory_folders(wega_disk, tmp_p
     with DiskTool.open(wega_disk) as d:
         d.extract_all(ziel)
     assert (ziel / "usr" / "leer").is_dir()
-    assert (ziel / "usr.fileinfo").read_text().count("fs=wega") == 1
+    assert (ziel / "usr.fileinfo").read_text().count("fs=wega_mutos") == 1
     assert (ziel / "bin" / "hallo").read_bytes() == b"echo hallo\n"
     assert "mode=0104711" in (ziel / "bin" / "hallo.fileinfo").read_text()
     bb = (ziel / "wega-dateiangaben.txt").read_text()

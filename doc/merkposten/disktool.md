@@ -1116,3 +1116,45 @@ Was beim Weiterarbeiten zu wissen ist:
   Echtdaten: `OsmEchtdaten.ErkennungUeberDieGanzeSammlung` (`K1520_CQM_DIR`) — genau die 8
   Systemdisketten wechseln (3 × osm640, 5 × osm800), alle übrigen behalten ihr Profil.  Offen: `osm720`
   (Format 6, AP 4/5), Oberfläche/Archiv (AP 6).
+
+## MUTOS 8000 (A5120.16) — Dateisystem wie WEGA, Blockraum ab Zylinder 1 (2026-10-23)
+
+Vier Anwender-Disketten (ROOT, CMD, CC1, CC2; `.TD0` und `.dmk`) plus die UDOS-Ladediskette
+(`Mutos8000_Bootdisk.dmk`, ganz normales `udos_ss77`, 19 Dateien, MUTOS selbst liegt in ihren Systemspuren).
+1. **Dasselbe Dateisystem wie WEGA** (System III, Z8000 big endian, 64-B-Inodes, 3-Byte-Adressen, NICFREE 50) —
+   `FsType::WegaMutos` (Typname `wega_mutos` in `formats.yaml`, C-ABI, `.fileinfo` `fs=`; `wega` wird beim Lesen weiter akzeptiert), KEIN eigener Typ.  Unterschied nur die Lage: Zylinder 0 ist ein 26×128-Bereich (auf allen
+   vier Disketten mit 0x53 gefüllt, ohne Dateisystem), **Block 0 = Zylinder 1 Sektor 1**, einseitig 8×512.
+   Block 0 trägt Z8000-Code (Urlader), Block 1 den Superblock.  Dafür bekam `WegaSpaceDev` einen Startoffset
+   aus `data_start` des Profils (`data_cyl/data_head`), und zwar in Erkennung, `mount` und `format`.
+2. **Zwei Katalogformate/-profile** (`mutos_ss77`/`mutos77`: Zyl. 1–76, `mutos_ss80`/`mutos80`: Zyl. 1–79).
+   CMD trägt hinter Zylinder 76 noch Altbestand (9×512, 1×2048) — das Format ignoriert ihn (`stray_tracks`).
+   Das Dateisystem ist kleiner als die Diskette (`s_fsize` 312/320/352 Blöcke), das ist so gewollt.
+3. **Verschränkung der Freiliste**: CMD/CC1/CC2 haben `s_m/s_n = 3/500`, ROOT 1/96.  `create --fs mutos77` nimmt 3/500.
+   `s_isize` zählt wie bei WEGA Block 0 und 1 mit (14 → 96 Inodes); ROOT hat 12 (nicht fsize/25+2).
+4. **fsck**: CMD/CC1/CC2 ohne Befund; ROOT meldet 2 Warnungen, die im ORIGINAL stehen
+   (`s_tinode` veraltet, Inode 26 ohne Namen) — keine Falschmeldung, nicht „reparieren".
+5. Wächter `MutosFs.*` (Fixtures `tests/fixtures/disks/mutos8000_ss80_root.td0`, `…ss77_cc2.td0`).
+   Offen: die A5120.16 bootet MUTOS noch nicht im Emulator (Entwurf 17 §9: Kern liegt in den Systemspuren der
+   UDOS-Ladediskette, `BOOT MUTOS`); das DiskTool kann den Bootbereich schon herausholen (`boot-get`).
+
+## MUTOS 1700 (A7100) — dieselbe Klasse, zweite Familie (2026-10-23)
+
+Ordner `robotron/MUTOS/mutos1700/`: 13 TeleDisk-Abbilder.  **Neun sind `tar720`** (DOC1/2, MAN1/2, ROOT2, SYS1, USER1/2 —
+liefen schon), drei tragen ein UNIX-Dateisystem, eines (`ROOT1_G`) ist ein beschädigter Abzug.  `.zip` sind Pakete derselben
+`.TD0`; `ROOT1_D_TD0.scp` (31 MB) ist ein SuperCard-Pro-Fluss, kein Container des Werkzeugs.
+1. **Familie „mutos1700"** (`wega::kXenixV`): Xenix-Sitte auf dem 8086 — **little endian, Langworte PDP-11-artig** (hoeherwertiges
+   Wort zuerst, jedes Wort LE), **Block 1024 B**, NICFREE 100 (`fblk`: i16 + 100 × long), Superblock ab `s_ninode` um 200 Byte
+   weiter (`s_ninode`@408, `s_inode`@410, `s_time`@614, `s_tfree`@618, `s_m/s_n`@624/626), Inode 64 B (16 je Block),
+   Adressen 3 Byte = `[hoch][niedrig LE16]` (`l3tol` der PDP), indirekter Block = 256 × PDP-long.  Verzeichniseintrag
+   unverändert (16 B, `d_ino` LE).  `s_m/s_n = 3/500` wie bei MUTOS 8000 (dasselbe `mkfs`).
+   Umsetzung: `wega::Variante` (Block, NICFREE, Bytefolge) hängt am Blockgerät (`WegaBlockDev::variante()`), `Superblock`/`Dinode`
+   lesen/schreiben über sie; Profilschlüssel `unix_layout: mutos1700` (Standard `wega`).  **Nichts im Code darf `kBlock`
+   voraussetzen** außer `WegaSpeicherDev` (Platten sind immer WEGA/512).
+2. **Zwei Lagen**: `mutos1700_720` (9×512 DS ab Zylinder 0 — ROOT1_D, UUCP) und `mutos1700_a7100` (Format `scp1700_640`,
+   FM-Ladespur c0h0 16×128, **Blockraum ab c0h1**, `data_start {0,1}` — ROOT1GN; 636 Blöcke = 159 Spuren × 4 exakt).
+   Alle drei `fsck --full` ohne Befund, Schreiben/Anlegen (`create --fs mutos1700_720`) mit unabhängigem Python-Leser gegengeprüft.
+3. **`ROOT1_G.TD0` ist BESCHÄDIGT, nicht ein anderes Format**: auf jeder Spur außer c0h0 fehlt Sektor-ID 1 (15 statt 16
+   Sektoren, IDs 2–16); alle 2401 vorhandenen Sektoren sind bytegleich zu `ROOT1GN`.  Der Abzug wird als „passt zu keinem Format"
+   abgewiesen (das ist richtig — 25 % der Blöcke hätten ihre ersten 256 Byte verloren); **`ROOT1GN` ist die brauchbare Fassung**.
+4. Wächter `MutosFs.Mutos1700_*` (Fixtures `mutos1700_720_uucp.td0`, `mutos1700_a7100_root1gn.td0`).  Offen: auf den A7100-
+   Disketten steht keine Bootprüfung (`boot-get`/`boot-put` für den Ladebereich c0h0 gibt es nicht).

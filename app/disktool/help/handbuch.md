@@ -544,7 +544,7 @@ gehört und wo es anfängt. Fehlen sie beim Zurückschreiben, wird deshalb **gef
 statt geraten** — ein Fenster erhebt Typ, Satzlänge und, bei einem Programm,
 Einsprung und Speicherangaben. Bei mehreren Dateien genügt „Für alle übernehmen".
 
-**Bei WEGA entsteht es immer** (`fs=wega`): `mode` (oktal, samt Dateiart), `uid`, `gid`,
+**Bei WEGA entsteht es immer** (`fs=wega_mutos`): `mode` (oktal, samt Dateiart), `uid`, `gid`,
 `mtime`, dazu zur Auskunft `art`, `nlink`, `inode`, `atime`, `ctime` und bei Geräten
 `rdev`. Beim Zurückschreiben gelten Modus (untere 12 Bit), uid, gid und mtime; Links und
 Inode-Nummer vergibt das Dateisystem neu. Auch jedes **Verzeichnis** bekommt eines

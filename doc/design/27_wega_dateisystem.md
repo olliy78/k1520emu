@@ -62,7 +62,7 @@ Ankerblock.  `s_tfree` zählt die freien Blöcke (ohne die Endmarke 0).
 
 ## 2. Einbindung
 
-- `FsType::Wega`, Katalogprofil **`wega720`** (`k5601_9x512`, `detect_rank: -10`).
+- `FsType::WegaMutos` (Typname `wega_mutos`), Katalogprofil **`wega720`** (`k5601_9x512`, `detect_rank: -10`).
   Mehr Profile nicht: das Dateisystem beschreibt sich selbst.
 - `WegaFileSystem` arbeitet auf einem **Blockgerät** (`WegaBlockDev`): `WegaSpaceDev` über
   dem `SectorSpace` (Diskette), `WegaSpeicherDev` über einem Byte-Puffer (Platte).

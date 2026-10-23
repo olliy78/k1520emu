@@ -808,6 +808,11 @@ std::map<std::string, CpmAngabe> leseCpmBeiblatt(const fs::path& datei) {
 // Das ist gewollt: die einzelne Datei soll fuer sich genommen vollstaendig sein,
 // gleich aus welchem Ordner sie stammt und wohin sie spaeter kopiert wird.
 
+/// @brief Familie des System-III-Dateisystems, die ein Profil beschreibt.
+const wega::Variante& unixVariante(const FsProfile& p) {
+    return p.mutos1700_layout ? wega::kXenixV : wega::kWegaV;
+}
+
 // ─── WEGA: die Angaben einer UNIX-Inode ──────────────────────────────────────
 //
 // WEGA fuehrt weder UDOS-Kopfsektorangaben noch CP/M-Attribute, sondern eine Inode:
@@ -1197,9 +1202,9 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
                 } else if (p->type == FsType::Udos1715) {
                     SectorSpace probe(dv->disk_->medium(), *f);
                     ja = Udos1715FileSystem::looksLikeUdos1715(probe, *p, &warum);
-                } else if (p->type == FsType::Wega) {
+                } else if (p->type == FsType::WegaMutos) {
                     SectorSpace probe(dv->disk_->medium(), *f);
-                    const WegaSpaceDev geraet(probe);
+                    const WegaSpaceDev geraet(probe, p->data_cyl, p->data_head, unixVariante(*p));
                     ja = WegaFileSystem::looksLikeWega(geraet, &warum);
                 } else {
                     int belegt = 0;
@@ -1465,8 +1470,10 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
             auto u = Udos1715FileSystem::mount(*v.space, *dv->profile_, warum);
             if (!u) { err = warum; return roh(warum); }
             v.fs = std::move(u);
-        } else if (dv->profile_->type == FsType::Wega) {
-            auto w = WegaFileSystem::mount(std::make_unique<WegaSpaceDev>(*v.space), warum);
+        } else if (dv->profile_->type == FsType::WegaMutos) {
+            auto w = WegaFileSystem::mount(std::make_unique<WegaSpaceDev>(
+                *v.space, dv->profile_->data_cyl, dv->profile_->data_head,
+                unixVariante(*dv->profile_)), warum);
             if (!w) { err = warum; return roh(warum); }
             v.fs = std::move(w);
         } else if (dv->profile_->type == FsType::Tar && dv->profile_->leer) {
@@ -3978,9 +3985,13 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
             auto u = Udos1715FileSystem::format(*v.space, *profil, label, err);
             if (!u) return nullptr;
             v.fs = std::move(u);
-        } else if (profil->type == FsType::Wega) {
-            // wie `sa.mkfs 1440` — Verschraenkung 1/72 wie auf den Lieferdisketten
-            auto w = WegaFileSystem::format(std::make_unique<WegaSpaceDev>(*v.space), label, err);
+        } else if (profil->type == FsType::WegaMutos) {
+            // wie `sa.mkfs 1440` — Verschraenkung 1/72 wie auf den Lieferdisketten.
+            // MUTOS (Blockraum ab Zylinder 1) traegt 3/500, wie CMD/CC1/CC2.
+            const bool mutos = profil->mutos1700_layout || profil->data_cyl != 0;
+            auto w = WegaFileSystem::format(std::make_unique<WegaSpaceDev>(
+                *v.space, profil->data_cyl, profil->data_head, unixVariante(*profil)), label, err,
+                0, mutos ? 3 : 1, mutos ? 500 : 72);
             if (!w) return nullptr;
             v.fs = std::move(w);
         } else {

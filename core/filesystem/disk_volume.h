@@ -560,10 +560,10 @@ public:
     /// @brief Verzeichnis anlegen (nur WEGA; Zwischenverzeichnisse entstehen mit).
     bool makeDirectory(const FileRef& ref);
     /// @brief Liegt ein WEGA-Dateisystem (Verzeichnisbaum, UNIX) vor?
-    bool istWega() const { return profile_ && profile_->type == FsType::Wega; }
+    bool istWega() const { return profile_ && profile_->type == FsType::WegaMutos; }
     /// @brief UNIX-Sicht (Modus/uid/gid, Pfade, `ls -l`): WEGA oder tar-Diskette.
     bool istUnix() const {
-        return profile_ && (profile_->type == FsType::Wega || profile_->type == FsType::Tar);
+        return profile_ && (profile_->type == FsType::WegaMutos || profile_->type == FsType::Tar);
     }
     /// @brief Archiv aus einem tar-Strom (kein Dateisystem)?  Schreibbar ist nur ein abgeschlossenes
     ///        Archiv (Kopf + Endmarke, oder leer) — sonst @ref readOnlyForced.  Ein schreibbares

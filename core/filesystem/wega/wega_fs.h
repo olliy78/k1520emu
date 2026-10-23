@@ -36,6 +36,7 @@
  */
 
 #pragma once
+#include <algorithm>
 #include "core/filesystem/file_system.h"
 #include "core/filesystem/sector_space.h"
 
@@ -50,14 +51,15 @@
 
 namespace wega {
 
-constexpr uint32_t kBlock     = 512;    ///< BSIZE
+constexpr uint32_t kBlock     = 512;    ///< BSIZE der WEGA-Disketten (Vorgabe)
+constexpr uint32_t kMaxBlock  = 1024;   ///< groesster Block ueber alle Varianten
+constexpr int      kMaxNicFree = 100;   
 constexpr int      kNicFree   = 50;     ///< NICFREE — Freibloecke im Superblock
 constexpr int      kNicInod   = 100;    ///< NICINOD — freie Inodes im Superblock
 constexpr int      kInodesProBlock = 8; ///< INOPB
 constexpr int      kInodeGroesse   = 64;
 constexpr int      kNAddr     = 13;     ///< 10 direkt, einfach, doppelt, dreifach
 constexpr int      kNDirekt   = 10;
-constexpr int      kNIndir    = 128;    ///< Blockadressen je indirektem Block
 constexpr int      kDirSiz    = 14;     ///< DIRSIZ
 constexpr int      kDirEintrag = 16;
 constexpr uint16_t kRootIno   = 2;
@@ -71,6 +73,26 @@ constexpr uint16_t IFREG = 0100000;
 constexpr uint16_t IFIFO = 0010000;
 constexpr uint16_t IFMPC = 0030000;   ///< System III: gemultiplexte Zeichendatei
 constexpr uint16_t IFMPB = 0070000;   ///< System III: gemultiplexte Blockdatei
+
+/**
+ * @struct Variante
+ * @brief Die Familie des System-III-Dateisystems: gleiche Strukturen, andere Bytefolge und
+ *        Blockgroesse.
+ *
+ *  - **WEGA** (P8000/Z8000, MUTOS 8000): big endian, 512-B-Bloecke, NICFREE 50.
+ *  - **MUTOS 1700** (A7100/8086, Xenix-Sitte): little endian, Langworte PDP-11-artig (hoeherwertiges
+ *    Wort zuerst), 1024-B-Bloecke, NICFREE 100; Superblock ab `s_ninode` um 200 Byte verschoben.
+ */
+struct Variante {
+    const char* name;
+    uint32_t    block;     ///< BSIZE
+    int         nicFree;   ///< NICFREE
+    bool        be;        ///< big endian?
+    int  inopb()   const { return static_cast<int>(block / 64); }
+    int  nIndir()  const { return static_cast<int>(block / 4); }   ///< Adressen je indirektem Block
+};
+inline const Variante kWegaV  {"wega",  512,  50, true};
+inline const Variante kXenixV {"mutos1700", 1024, 100, false};
 
 /// @brief Traegt eine Inode dieser Art Blockadressen (statt einer Geraetenummer)?
 inline bool hatBloecke(uint16_t mode) {
@@ -90,7 +112,7 @@ struct Superblock {
     uint16_t isize = 0;
     uint32_t fsize = 0;
     int16_t  nfree = 0;
-    std::array<uint32_t, kNicFree> free{};
+    std::array<uint32_t, kMaxNicFree> free{};
     int16_t  ninode = 0;
     std::array<uint16_t, kNicInod> inode{};
     uint8_t  flock = 0, ilock = 0, fmod = 0, ronly = 0;
@@ -102,12 +124,13 @@ struct Superblock {
     uint8_t  mach = 0;
 
     /// @brief Rohe Felder, die beim Zurueckschreiben unveraendert bleiben (ab 441).
-    std::array<uint8_t, kBlock> roh{};
+    std::array<uint8_t, kMaxBlock> roh{};
+    const Variante* v = &kWegaV;
 
-    static Superblock aus(const uint8_t* b);
+    static Superblock aus(const uint8_t* b, const Variante& v = kWegaV);
     void in(uint8_t* b) const;
     /// @brief Zahl der Inodes = (isize − 2) · 8.
-    uint32_t inodes() const { return isize >= 2 ? (isize - 2u) * kInodesProBlock : 0; }
+    uint32_t inodes() const { return isize >= 2 ? (isize - 2u) * static_cast<uint32_t>(v->inopb()) : 0; }
 };
 
 /**
@@ -124,8 +147,8 @@ struct Dinode {
     uint8_t  pad40 = 0;          ///< 40. Adressbyte (unbenutzt, wird erhalten)
     uint32_t atime = 0, mtime = 0, ctime = 0;
 
-    static Dinode aus(const uint8_t* p);
-    void in(uint8_t* p) const;
+    static Dinode aus(const uint8_t* p, const Variante& v = kWegaV);
+    void in(uint8_t* p, const Variante& v = kWegaV) const;
 };
 
 } // namespace wega
@@ -139,6 +162,8 @@ public:
     virtual ~WegaBlockDev() = default;
     /// @brief Bloecke im Bereich (obere Grenze fuer s_fsize).
     virtual uint32_t blocks() const = 0;
+    /// @brief Familie des Dateisystems auf diesem Geraet (Blockgroesse, Bytefolge).
+    virtual const wega::Variante& variante() const { return wega::kWegaV; }
     virtual bool readBlock(uint32_t bn, uint8_t* dst) const = 0;
     virtual bool writeBlock(uint32_t bn, const uint8_t* src) = 0;
     /// @brief Ort eines Blocks fuer den Diskeditor (nur bei Disketten).
@@ -147,25 +172,33 @@ public:
 
 /**
  * @class WegaSpaceDev
- * @brief Blockgeraet ueber einem @ref SectorSpace: Block n = Bytes n·512 der
- *        linearen Sektorfolge (Zylinder aussen, Kopf, Sektor) — so, wie der
- *        WEGA-Diskettentreiber und das `.img` die Diskette sehen.
+ * @brief Blockgeraet ueber einem @ref SectorSpace: Block n = Bytes n·Blockgroesse ab der
+ *        Startspur der linearen Sektorfolge (Zylinder, Kopf, Sektor) — so, wie der
+ *        Diskettentreiber und das `.img` die Diskette sehen.
  */
 class WegaSpaceDev : public WegaBlockDev {
 public:
-    explicit WegaSpaceDev(SectorSpace& s) : s_(s) {}
+    /// @param cyl,head Spur, ab der Block 0 beginnt.  MUTOS-Disketten tragen auf
+    ///        Zylinder 0 einen eigenen 26×128-Bereich, der nicht zum Blockraum gehoert.
+    /// @param v        Familie des Dateisystems (Blockgroesse, Bytefolge)
+    explicit WegaSpaceDev(SectorSpace& s, uint8_t cyl = 0, uint8_t head = 0,
+                          const wega::Variante& v = wega::kWegaV)
+        : s_(s), v_(v), start_(std::max<int64_t>(0, s.offsetOf(cyl, head))) {}
     uint32_t blocks() const override {
-        return static_cast<uint32_t>(s_.size() / wega::kBlock);
+        return static_cast<uint32_t>((s_.size() - start_) / v_.block);
     }
+    const wega::Variante& variante() const override { return v_; }
     bool readBlock(uint32_t bn, uint8_t* dst) const override {
-        return s_.read(static_cast<uint64_t>(bn) * wega::kBlock, dst, wega::kBlock);
+        return s_.read(start_ + static_cast<uint64_t>(bn) * v_.block, dst, v_.block);
     }
     bool writeBlock(uint32_t bn, const uint8_t* src) override {
-        return s_.write(static_cast<uint64_t>(bn) * wega::kBlock, src, wega::kBlock);
+        return s_.write(start_ + static_cast<uint64_t>(bn) * v_.block, src, v_.block);
     }
     bool ort(uint32_t bn, FsRecoverOrt& out) const override;
 private:
     SectorSpace& s_;
+    const wega::Variante& v_;
+    uint64_t     start_;   ///< Byte-Offset von Block 0 im linearen Raum
 };
 
 /**
@@ -230,12 +263,15 @@ public:
     static std::string modeText(uint16_t mode);
 
 private:
-    explicit WegaFileSystem(std::unique_ptr<WegaBlockDev> dev) : dev_(std::move(dev)) {}
+    explicit WegaFileSystem(std::unique_ptr<WegaBlockDev> dev)
+        : dev_(std::move(dev)), v_(&dev_->variante()) {}
+    const wega::Variante& V() const { return *v_; }
 
     class Tx;                    // Arbeitskopie einer schreibenden Operation
     friend class Tx;
 
     std::unique_ptr<WegaBlockDev> dev_;
+    const wega::Variante* v_;
     std::function<uint32_t()> uhr_;
     uint32_t jetzt() const;
 
@@ -245,10 +281,10 @@ private:
     static bool inodeLesen(const Leser& l, const wega::Superblock& sb, uint32_t ino,
                            wega::Dinode& out);
     /// @brief Alle Datenbloecke (0 = Loch) in Dateireihenfolge, bis @p groesse.
-    static bool dateiBloecke(const Leser& l, const wega::Dinode& di, uint32_t fsize,
+    static bool dateiBloecke(const wega::Variante& vv, const Leser& l, const wega::Dinode& di, uint32_t fsize,
                              std::vector<uint32_t>& daten, std::vector<uint32_t>* indirekt,
                              std::string& err);
-    static bool dateiLesen(const Leser& l, const wega::Dinode& di, uint32_t fsize,
+    static bool dateiLesen(const wega::Variante& vv, const Leser& l, const wega::Dinode& di, uint32_t fsize,
                            std::vector<uint8_t>& out, std::string& err);
     struct DirEintrag { uint16_t ino; std::string name; uint32_t slot; };
     static bool verzeichnisLesen(const Leser& l, const wega::Superblock& sb, uint32_t ino,

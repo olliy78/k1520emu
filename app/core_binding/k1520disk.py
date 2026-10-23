@@ -1484,7 +1484,7 @@ class DiskTool:
     @property
     def ist_wega(self) -> bool:
         """UNIX-Dateisystem (WEGA): Modus/uid/gid statt UDOS- oder CP/M-Angaben."""
-        return self.filesystem_type == "wega"
+        return self.filesystem_type == "wega_mutos"
 
     @property
     def ist_tar(self) -> bool:
@@ -2430,7 +2430,7 @@ class PlatteTool:
 
     @property
     def filesystem_type(self) -> str:
-        return "wega"
+        return "wega_mutos"
 
     @property
     def format(self) -> str:

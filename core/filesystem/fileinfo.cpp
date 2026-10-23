@@ -143,7 +143,7 @@ bool schreibeFileinfo(const fs::path& ziel, const FileAngaben& a) {
              "# bei CP/M der Normalfall und selten ein Verlust.\n";
     f << "# Loeschen schadet nur dieser einen Datei; die Zeilenform ist dieselbe wie in\n"
          "# udos-dateiangaben.txt bzw. cpm-dateiangaben.txt.\n";
-    f << "fs=" << (a.tar ? "tar" : a.wega ? "wega" : a.udos ? "udos" : "cpm") << '\n';
+    f << "fs=" << (a.tar ? "tar" : a.wega ? "wega_mutos" : a.udos ? "udos" : "cpm") << '\n';
     f << "name=" << a.name << '\n';
     if (a.wega || a.tar) {
         schreibeUnixFelder(f, a.x, '\n');
@@ -188,7 +188,7 @@ bool leseFileinfo(const fs::path& datei, FileAngaben& out) {
         if (g == std::string::npos) continue;
         const std::string k = zeile.substr(0, g), v = zeile.substr(g + 1);
         etwas = true;
-        if      (k == "fs")   { a.wega = (v == "wega");
+        if      (k == "fs")   { a.wega = (v == "wega_mutos" || v == "wega");   // "wega": aeltere .fileinfo
                                 a.tar  = (v == "tar");
                                 a.udos = (v != "cpm" && !a.wega && !a.tar); }
         else if (k == "name")   a.name = v;
