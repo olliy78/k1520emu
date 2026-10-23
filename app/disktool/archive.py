@@ -178,7 +178,7 @@ def _legende_wega() -> str:
         "",
         "WAS DER ORDNER `dateien/` ZURUECKGIBT",
         "",
-        "  Jede Datei hat ein `<datei>.fileinfo` (fs=wega) mit Modus, uid, gid und",
+        "  Jede Datei hat ein `<datei>.fileinfo` (fs=wega_mutos) mit Modus, uid, gid und",
         "  mtime; ebenso jedes Verzeichnis (`<ordner>.fileinfo` neben dem Ordner).",
         "  Beim Einfuegen (`put <ordner>`) werden diese vier Angaben wiederhergestellt;",
         "  Links, Inode-Nummer, atime und ctime vergibt das Dateisystem neu.",

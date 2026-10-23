@@ -2048,6 +2048,15 @@ class K1520Emulator:
             size = width * height if (width and height) else 1920
             return bytearray(ctypes.string_at(fb_ptr, size))
     
+    def framebuffer_bytes(self) -> bytes:
+        """Wie :meth:`get_framebuffer`, aber als ``bytes`` mit EINER Kopie (Anzeigeweg)."""
+        with kern_sperre():
+            width = _lib.k1520_fb_width(self._handle)
+            height = _lib.k1520_fb_height(self._handle)
+            fb_ptr = _lib.k1520_framebuffer(self._handle)
+            size = width * height if (width and height) else 1920
+            return ctypes.string_at(fb_ptr, size) if fb_ptr else bytes(size)
+
     def is_framebuffer_dirty(self) -> bool:
         """Check if framebuffer was updated since last clear."""
         return _lib.k1520_fb_dirty(self._handle)

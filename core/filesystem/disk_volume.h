@@ -363,6 +363,7 @@ public:
      *                    Systemspuren; "" = nicht bootfaehig (§ Bootabbild unten).
      *                    Passt sie nicht, wird **gar nichts angelegt** — die Pruefung
      *                    laeuft vor dem Formatieren.
+     * @param unix_inodes nur WEGA/MUTOS: Mindestzahl Inodes (0 = bloecke/25, wie `mkfs`)
      */
     static std::unique_ptr<DiskVolume> create(const std::string& path,
                                               const std::string& fs_name,
@@ -370,7 +371,8 @@ public:
                                               const FormatCatalog& formats,
                                               const FsCatalog& fs_cat,
                                               std::string& err,
-                                              const std::string& boot_image = {});
+                                              const std::string& boot_image = {},
+                                              uint32_t unix_inodes = 0);
 
     // ─── Bootabbild (Systemspuren) ───────────────────────────────────────────
     //
@@ -400,6 +402,14 @@ public:
      * @return 0 = dieses Dateisystem hat keine Systemspuren.
      */
     static uint64_t bootAreaCapacity(const FsProfile& prof, const DiskFormat& fmt);
+
+    /**
+     * @brief Vorgabe der Inode-Zahl beim Anlegen eines WEGA/MUTOS-Dateisystems (0 = anderer Typ).
+     *
+     * Wie `mkfs`: Inode-Liste = Bloecke/25 Bloecke (Bloecke der Familie: 512 B bei WEGA/MUTOS 8000,
+     * 1024 B bei MUTOS 1700, gezaehlt ab der Startspur des Profils), mal Inodes je Block.
+     */
+    static uint32_t unixStandardInodes(const FsProfile& prof, const DiskFormat& fmt);
 
     /// @brief Fassungsvermoegen der Systemspuren dieser Diskette (0 = keine).
     uint64_t bootAreaSize(int volume = 0) const;
@@ -560,10 +570,10 @@ public:
     /// @brief Verzeichnis anlegen (nur WEGA; Zwischenverzeichnisse entstehen mit).
     bool makeDirectory(const FileRef& ref);
     /// @brief Liegt ein WEGA-Dateisystem (Verzeichnisbaum, UNIX) vor?
-    bool istWega() const { return profile_ && profile_->type == FsType::Wega; }
+    bool istWega() const { return profile_ && profile_->type == FsType::WegaMutos; }
     /// @brief UNIX-Sicht (Modus/uid/gid, Pfade, `ls -l`): WEGA oder tar-Diskette.
     bool istUnix() const {
-        return profile_ && (profile_->type == FsType::Wega || profile_->type == FsType::Tar);
+        return profile_ && (profile_->type == FsType::WegaMutos || profile_->type == FsType::Tar);
     }
     /// @brief Archiv aus einem tar-Strom (kein Dateisystem)?  Schreibbar ist nur ein abgeschlossenes
     ///        Archiv (Kopf + Endmarke, oder leer) — sonst @ref readOnlyForced.  Ein schreibbares

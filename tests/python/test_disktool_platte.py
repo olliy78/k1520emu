@@ -72,7 +72,7 @@ def test_oeffnen_einer_diskette_scheitert_mit_grund():
 def test_platte_ist_schreibgeschuetzt_und_zeigt_partitionen(platte):
     assert platte.read_only
     assert platte.ist_unix and platte.ist_wega and platte.has_filesystem
-    assert platte.filesystem_type == "wega"
+    assert platte.filesystem_type == "wega_mutos"
     dirs = [v.dir for v in platte.volumes()]
     assert dirs[:2] == ["md0", "md2"] and "md3" in dirs
     assert platte.volume_role(dirs.index("md3")) == "/tmp"

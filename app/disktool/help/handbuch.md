@@ -544,7 +544,7 @@ gehört und wo es anfängt. Fehlen sie beim Zurückschreiben, wird deshalb **gef
 statt geraten** — ein Fenster erhebt Typ, Satzlänge und, bei einem Programm,
 Einsprung und Speicherangaben. Bei mehreren Dateien genügt „Für alle übernehmen".
 
-**Bei WEGA entsteht es immer** (`fs=wega`): `mode` (oktal, samt Dateiart), `uid`, `gid`,
+**Bei WEGA entsteht es immer** (`fs=wega_mutos`): `mode` (oktal, samt Dateiart), `uid`, `gid`,
 `mtime`, dazu zur Auskunft `art`, `nlink`, `inode`, `atime`, `ctime` und bei Geräten
 `rdev`. Beim Zurückschreiben gelten Modus (untere 12 Bit), uid, gid und mtime; Links und
 Inode-Nummer vergibt das Dateisystem neu. Auch jedes **Verzeichnis** bekommt eines
@@ -563,6 +563,15 @@ führt und jede Datei für sich vollständig haben will, schaltet es ein.
 
 *Datei ▸ Neue Diskette* (Strg+N) legt eine formatierte, leere Diskette an. Gefragt
 werden Dateisystem, Datei und Datenträgername.
+
+Bei den **UNIX-Dateisystemen** (WEGA, MUTOS 8000, MUTOS 1700) steht im Auswahlfenster
+unter dem Dateisystem der Haken **Abweichende Anzahl von Inodes**. Das Zahlenfeld zeigt zunächst
+die Vorgabe (Blöcke ÷ 25 Blöcke für die Inode-Liste, wie `mkfs`) und ist gesperrt; mit dem Haken
+lässt sich eine andere Zahl eintragen (zum Beispiel 272 für die Diskette `ROOT1_D`). Jede Datei,
+jedes Verzeichnis und jedes Gerät braucht eine Inode — die Zahl begrenzt also, wie viele Dateien auf
+die Diskette passen; die Inode-Liste selbst belegt Blöcke, die für Daten fehlen. Kleiner gewählt
+bleibt mehr Platz für Daten, größer lassen sich mehr (kleine) Dateien ablegen. Auf der
+Kommandozeile heißt es `create --inodes N`.
 
 Wo es Systemspuren gibt, wird zusätzlich gefragt, ob die Diskette **bootfähig**
 sein soll. Dann braucht es ein Bootabbild (`.bin`) — das holt man sich mit

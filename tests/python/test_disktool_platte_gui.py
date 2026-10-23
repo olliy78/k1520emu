@@ -208,7 +208,7 @@ def test_ordner_anlegen_einfuegen_loeschen_speichern(offen, platte_pfad, tmp_pat
     quelle.mkdir()
     (quelle / "daten").write_bytes(b"hallo platte\n")
     (quelle / "daten.fileinfo").write_text(
-        "fs=wega\nmode=0640\nuid=7\ngid=3\nmtime=%d\n" % STAND)
+        "fs=wega_mutos\nmode=0640\nuid=7\ngid=3\nmtime=%d\n" % STAND)
     _waehle(offen, "md3/neu")
     assert offen.act_platte_ordner.isEnabled()
     assert offen.insert_paths([str(quelle / "daten"), str(quelle / "daten.fileinfo")])

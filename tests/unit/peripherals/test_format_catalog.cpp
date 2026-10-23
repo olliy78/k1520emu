@@ -92,6 +92,8 @@ TEST(FormatCatalog, Formatnamen_SindEinStabilerVertrag) {
         // UDOS-Geometrien, an disks/udos_boot_*.hfe gemessen (k1520DiskTool,
         // doc/design/13_k1520disktool.md §6).
         "udos_ds77", "udos_ss77",
+        // MUTOS 8000 (A5120.16): Zylinder 0 26x128, dahinter 8x512
+        "mutos_ss77", "mutos_ss80",
         "k5601_16x256", "k5601_16x256_77", "k5601_26x128",
         "k5601_9x512", "k5601_10x512",
         "k5601_ss80_26x128", "k5601_ss80_9x512",

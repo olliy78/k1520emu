@@ -523,7 +523,7 @@ def test_a_set_cannot_be_written_to_a_physical_disk(window, satz_zwei, monkeypat
 
 def test_python_fileinfo_writer_knows_tar_and_wega(tmp_path):
     from app.disktool.fileinfo import schreibe_fileinfo, unix_vorgaben
-    for fs in ("tar", "wega"):
+    for fs in ("tar", "wega_mutos"):
         p = schreibe_fileinfo(tmp_path / f"{fs}.fileinfo",
                               {"fs": fs, "mtime": 1234, "uid": 0, "gid": 3, "mode": "0100640",
                                "art": "-"}, "dir/datei")

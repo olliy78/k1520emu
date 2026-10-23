@@ -93,6 +93,10 @@ _lib.k1520d_create.argtypes = [_CS, _CS, _CS]
 _lib.k1520d_create.restype = _H
 _lib.k1520d_create_bootable.argtypes = [_CS, _CS, _CS, _CS]
 _lib.k1520d_create_bootable.restype = _H
+_lib.k1520d_create_ex.argtypes = [_CS, _CS, _CS, _CS, ctypes.c_uint32]
+_lib.k1520d_create_ex.restype = _H
+_lib.k1520d_fs_unix_inodes.argtypes = [_CS]
+_lib.k1520d_fs_unix_inodes.restype = ctypes.c_uint32
 _lib.k1520d_flush.argtypes = [_H]
 _lib.k1520d_flush.restype = ctypes.c_bool
 _lib.k1520d_save_as.argtypes = [_H, _CS]
@@ -737,6 +741,11 @@ def filesystems() -> List[FileSystemInfo]:
             leer=bool(_lib.k1520d_fs_leer(_b(name))),
         ))
     return out
+
+
+def unix_standard_inodes(filesystem: str) -> int:
+    """Vorgabe der Inode-Zahl beim Anlegen (Blöcke/25 Inode-Blöcke); 0 = kein UNIX-Dateisystem."""
+    return int(_lib.k1520d_fs_unix_inodes(_b(filesystem)))
 
 
 def boot_capacity(filesystem: str) -> int:
@@ -1403,12 +1412,15 @@ class DiskTool:
 
     @classmethod
     def create(cls, path, filesystem: str, label: str = "",
-               boot_image=None) -> "DiskTool":
+               boot_image=None, inodes: int = 0) -> "DiskTool":
         """Neue, leere Diskette anlegen (formatieren + Dateisystem initialisieren).
 
         Mit ``boot_image`` (Pfad einer ``.bin``-Datei) wandert dieses Byteband in die
         **Systemspuren** vor dem Dateisystem — erst das macht eine Diskette bootfähig.
         Passt es nicht hinein, wird **gar nichts** angelegt.
+
+        ``inodes`` (nur WEGA/MUTOS): Mindestzahl Inodes statt der Vorgabe
+        (:func:`unix_standard_inodes`); 0 = Vorgabe.
 
         Raises:
             K1520DiskError: Dateisystem unbekannt, Container unpassend, oder das
@@ -1417,7 +1429,7 @@ class DiskTool:
         """
         p = os.fspath(path)
         boot = os.fspath(boot_image) if boot_image else ""
-        h = _lib.k1520d_create_bootable(_b(p), _b(filesystem), _b(label), _b(boot))
+        h = _lib.k1520d_create_ex(_b(p), _b(filesystem), _b(label), _b(boot), int(inodes))
         if not h:
             raise K1520DiskError(_s(_lib.k1520d_last_open_error()))
         return cls(h, p)
@@ -1484,7 +1496,7 @@ class DiskTool:
     @property
     def ist_wega(self) -> bool:
         """UNIX-Dateisystem (WEGA): Modus/uid/gid statt UDOS- oder CP/M-Angaben."""
-        return self.filesystem_type == "wega"
+        return self.filesystem_type == "wega_mutos"
 
     @property
     def ist_tar(self) -> bool:
@@ -2430,7 +2442,7 @@ class PlatteTool:
 
     @property
     def filesystem_type(self) -> str:
-        return "wega"
+        return "wega_mutos"
 
     @property
     def format(self) -> str:

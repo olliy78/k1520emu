@@ -175,6 +175,24 @@ formats:
     tracks:
       - { cyls: 0-76, heads: 0, sectors: 26, size: 128 }
 
+  # MUTOS 8000 (A5120.16): Zylinder 0 traegt einen eigenen 26x128-Bereich (UDOS-Ladespur),
+  # das UNIX-Dateisystem beginnt auf Zylinder 1 mit 8x512.  Gemessen an DISK_ROOT/CMD/CC1/CC2.
+  - name:        mutos_ss77
+    description: "MUTOS 8000 — Zylinder 0 26×128, Zylinder 1-76 einseitig 8×512"
+    drives:      [K5601, K5600.20, MF6400]
+    encoding:    mfm
+    tracks:
+      - { cyls: 0,    heads: 0, sectors: 26, size: 128 }
+      - { cyls: 1-76, heads: 0, sectors: 8,  size: 512 }
+
+  - name:        mutos_ss80
+    description: "MUTOS 8000 — Zylinder 0 26×128, Zylinder 1-79 einseitig 8×512"
+    drives:      [K5601, K5600.20]
+    encoding:    mfm
+    tracks:
+      - { cyls: 0,    heads: 0, sectors: 26, size: 128 }
+      - { cyls: 1-79, heads: 0, sectors: 8,  size: 512 }
+
   # ══ 8″-Laufwerke ═══════════════════════════════════════════════════════════
 
   # Beide 8″-Laufwerke sind einseitig mit 77 Spuren.  Das MF3200 beherrscht NUR FM
@@ -928,7 +946,43 @@ filesystems:
   - name:        wega720
     description: "WEGA (UNIX System III, P8000) — 80 Spuren doppelseitig, 9×512 (720K)"
     format:      k5601_9x512
-    type:        wega
+    type:        wega_mutos
+    detect_rank: -10
+
+  # MUTOS 1700 (A7100, 8086): ebenfalls System III, aber little endian mit PDP-Langworten und
+  # 1024-B-Bloecken (Xenix-Sitte, `unix_layout: mutos1700`).  Zwei Lagen:
+  #  - 720K-Diskette 9x512 ab Zylinder 0 (ROOT1_D, UUCP; Superblock in Block 1 = Byte 1024),
+  #  - A7100-Diskette (Format `scp1700_640`: Zyl. 0 Kopf 0 = FM-Ladespur 16x128), Blockraum ab
+  #    Zylinder 0 KOPF 1 (ROOT1GN).
+  - name:        mutos1700_720
+    description: "MUTOS 1700 (UNIX, A7100) — 80 Spuren doppelseitig 9×512, Dateisystem ab Zylinder 0"
+    format:      k5601_9x512
+    type:        wega_mutos
+    unix_layout: mutos1700
+    detect_rank: -10
+
+  - name:        mutos1700_a7100
+    description: "MUTOS 1700 (UNIX, A7100) — FM-Ladespur, Blockraum ab Zylinder 0 Kopf 1 (16×256)"
+    format:      scp1700_640
+    type:        wega_mutos
+    unix_layout: mutos1700
+    data_start:  { cyl: 0, head: 1 }
+    detect_rank: -10
+
+  # MUTOS 8000: dasselbe System-III-Dateisystem wie WEGA (Z8000, big endian), aber der Blockraum
+  # beginnt auf Zylinder 1 (`data_start`); Zylinder 0 ist die 128-B-Ladespur.
+  - name:        mutos77
+    description: "MUTOS 8000 (UNIX, A5120.16) — einseitig, Blockraum ab Zylinder 1 (bis Zyl. 76)"
+    format:      mutos_ss77
+    type:        wega_mutos
+    data_start:  { cyl: 1, head: 0 }
+    detect_rank: -10
+
+  - name:        mutos80
+    description: "MUTOS 8000 (UNIX, A5120.16) — einseitig, Blockraum ab Zylinder 1 (bis Zyl. 79)"
+    format:      mutos_ss80
+    type:        wega_mutos
+    data_start:  { cyl: 1, head: 0 }
     detect_rank: -10
 
   # ══ tar-Disketten (P8000-Lieferungen) ══════════════════════════════════════

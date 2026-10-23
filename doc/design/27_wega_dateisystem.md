@@ -62,7 +62,7 @@ Ankerblock.  `s_tfree` zählt die freien Blöcke (ohne die Endmarke 0).
 
 ## 2. Einbindung
 
-- `FsType::Wega`, Katalogprofil **`wega720`** (`k5601_9x512`, `detect_rank: -10`).
+- `FsType::WegaMutos` (Typname `wega_mutos`), Katalogprofil **`wega720`** (`k5601_9x512`, `detect_rank: -10`).
   Mehr Profile nicht: das Dateisystem beschreibt sich selbst.
 - `WegaFileSystem` arbeitet auf einem **Blockgerät** (`WegaBlockDev`): `WegaSpaceDev` über
   dem `SectorSpace` (Diskette), `WegaSpeicherDev` über einem Byte-Puffer (Platte).
@@ -143,9 +143,9 @@ Eine WEGA-Datei trägt eine Inode, keinen UDOS-Kopfsektor:
 | uid / gid | ja | ja (0…65535) | `uid=`/`gid=` | ja |
 | mtime | ja | ja (`touch`) | `mtime=` | ja |
 | Dateiart `-`/`d`/`c`/`b`/`p` | ja | nein | `art=` | nein (Struktur) |
-| Inode, Links, Größe | ja | nein | `inode=`/`nlink=` | nein |
-| atime, ctime | ja | nein (`ctime` = jetzt) | `atime=`/`ctime=` | nein |
-| Gerät major,minor | ja | nein | `rdev=` | nein |
+| Inode, Links, Größe | ja | nein | `inode=`/`nlink=` | Links **ja** (gleiche `inode=` + `nlink>1` + gleicher Inhalt ⇒ harter Link), Inode-Nummer neu |
+| atime, ctime | ja | nein (`ctime` = jetzt) | `atime=`/`ctime=` | **ja** (nur beim Wiederherstellen aus der `.fileinfo`) |
+| Gerät major,minor | ja | nein (Struktur) | `rdev=` | **ja**, aus `wega-dateiangaben.txt` (Geräte/FIFOs existieren nur dort) |
 | Blockliste | ja (Einzelansicht) | nein | — | — |
 
 Schreibseite: `FileSystem::setAttributes(name, UnixAttrs)` → `WegaFileSystem` (eine `Tx`,
@@ -165,3 +165,14 @@ Zurückschreiben werden sie zu Kopien.
 - Reparaturen (Freiliste neu aufbauen wie `fsck -s`).
 - Oberfläche: Dateiliste und Eigenschaften kommen über das Muster mit; Baumansicht,
   Plattenabbild (Stufe B) nur in der Kommandozeile.
+
+## 8. Vollständige Wiederherstellung (2026-10-23, MUTOS)
+
+`put <ordner>` stellt eine ausgepackte Diskette (Archiv, `get`/`extractAll`) vollständig her: Modus, uid, gid,
+mtime/atime/ctime jeder Datei und jedes Verzeichnisses (`.fileinfo`), die **Wurzel** (Zeile `.` im Beiblatt),
+**Geräte und FIFOs** (nur im Beiblatt `wega-dateiangaben.txt`, `FileSystem::makeNode`) und **harte Links**
+(`FileSystem::makeLink`, Dateien wie Geräte; die Platzprüfung rechnet sie als bloßen Eintrag).  Geprüft als
+Rundlauf auspacken → `create` → `put` → wieder auspacken, Beiblatt zeilengleich ohne Inode-Nummern
+(`MutosFs.*Wiederherstellung*`).  Nicht herstellbar: Inode-Nummern, Blocklage, Lochdateien (werden dicht
+geschrieben), Block 0/Ladebereich.  Eine bis zum Rand gefüllte Originaldiskette braucht die **gleiche
+Inode-Zahl**: `create --inodes N` (CLI).

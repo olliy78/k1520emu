@@ -23,15 +23,29 @@ using namespace wega;
 
 namespace {
 
-uint16_t be16(const uint8_t* p) { return static_cast<uint16_t>(p[0] << 8 | p[1]); }
-uint32_t be32(const uint8_t* p) {
-    return static_cast<uint32_t>(p[0]) << 24 | static_cast<uint32_t>(p[1]) << 16
-         | static_cast<uint32_t>(p[2]) << 8 | p[3];
+// Die Bytefolge haengt von der Rechnerfamilie ab: WEGA (Z8000) big endian, MUTOS 1700
+// (8086, Xenix-Sitte) little endian mit PDP-11-Langworten (hoeherwertiges Wort zuerst).
+uint16_t rd16(const Variante& v, const uint8_t* p) {
+    return v.be ? static_cast<uint16_t>(p[0] << 8 | p[1]) : static_cast<uint16_t>(p[1] << 8 | p[0]);
 }
-void put16(uint8_t* p, uint16_t v) { p[0] = static_cast<uint8_t>(v >> 8); p[1] = static_cast<uint8_t>(v); }
-void put32(uint8_t* p, uint32_t v) {
-    p[0] = static_cast<uint8_t>(v >> 24); p[1] = static_cast<uint8_t>(v >> 16);
-    p[2] = static_cast<uint8_t>(v >> 8);  p[3] = static_cast<uint8_t>(v);
+uint32_t rd32(const Variante& v, const uint8_t* p) {
+    if (v.be)
+        return static_cast<uint32_t>(p[0]) << 24 | static_cast<uint32_t>(p[1]) << 16
+             | static_cast<uint32_t>(p[2]) << 8 | p[3];
+    return static_cast<uint32_t>(rd16(v, p)) << 16 | rd16(v, p + 2);
+}
+void wr16(const Variante& v, uint8_t* p, uint16_t x) {
+    if (v.be) { p[0] = static_cast<uint8_t>(x >> 8); p[1] = static_cast<uint8_t>(x); }
+    else      { p[0] = static_cast<uint8_t>(x);      p[1] = static_cast<uint8_t>(x >> 8); }
+}
+void wr32(const Variante& v, uint8_t* p, uint32_t x) {
+    if (v.be) {
+        p[0] = static_cast<uint8_t>(x >> 24); p[1] = static_cast<uint8_t>(x >> 16);
+        p[2] = static_cast<uint8_t>(x >> 8);  p[3] = static_cast<uint8_t>(x);
+    } else {
+        wr16(v, p, static_cast<uint16_t>(x >> 16));
+        wr16(v, p + 2, static_cast<uint16_t>(x));
+    }
 }
 
 std::string festText(const uint8_t* p, size_t n) {
@@ -108,113 +122,121 @@ bool bekannteArt(uint16_t mode) {
 }
 
 /// @brief Bedarf an Bloecken (Daten + indirekte) fuer @p groesse Byte.
-uint64_t blockBedarf(uint64_t groesse) {
-    uint64_t d = (groesse + kBlock - 1) / kBlock;
+uint64_t blockBedarf(const Variante& v, uint64_t groesse) {
+    const uint64_t ni = static_cast<uint64_t>(v.nIndir());
+    uint64_t d = (groesse + v.block - 1) / v.block;
     uint64_t n = d;
     if (d <= kNDirekt) return n;
     d -= kNDirekt;
     n += 1;                                        // einfach indirekt
-    if (d <= kNIndir) return n;
-    d -= kNIndir;
-    const uint64_t k2 = static_cast<uint64_t>(kNIndir) * kNIndir;
+    if (d <= ni) return n;
+    d -= ni;
+    const uint64_t k2 = ni * ni;
     const uint64_t in2 = std::min<uint64_t>(d, k2);
-    n += 1 + (in2 + kNIndir - 1) / kNIndir;        // doppelt indirekt
+    n += 1 + (in2 + ni - 1) / ni;                  // doppelt indirekt
     if (d <= k2) return n;
     d -= k2;
-    n += 1 + (d + k2 - 1) / k2 + (d + kNIndir - 1) / kNIndir;   // dreifach
+    n += 1 + (d + k2 - 1) / k2 + (d + ni - 1) / ni;   // dreifach
     return n;
 }
 
-constexpr uint64_t kMaxDatei =
-    static_cast<uint64_t>(kNDirekt + kNIndir + kNIndir * kNIndir) * kBlock
-    + static_cast<uint64_t>(kNIndir) * kNIndir * kNIndir * kBlock;
+uint64_t maxDatei(const Variante& v) {
+    const uint64_t ni = static_cast<uint64_t>(v.nIndir());
+    return (kNDirekt + ni + ni * ni + ni * ni * ni) * v.block;
+}
 
 } // namespace
 
 // ═══ Superblock / Inode ═════════════════════════════════════════════════════
 
-Superblock Superblock::aus(const uint8_t* b) {
+Superblock Superblock::aus(const uint8_t* b, const Variante& v) {
     Superblock s;
-    std::memcpy(s.roh.data(), b, kBlock);
-    s.isize = be16(b + 0);
-    s.fsize = be32(b + 2);
-    s.nfree = static_cast<int16_t>(be16(b + 6));
-    for (int i = 0; i < kNicFree; ++i) s.free[static_cast<size_t>(i)] = be32(b + 8 + 4 * i);
-    s.ninode = static_cast<int16_t>(be16(b + 208));
-    for (int i = 0; i < kNicInod; ++i) s.inode[static_cast<size_t>(i)] = be16(b + 210 + 2 * i);
-    s.flock = b[410]; s.ilock = b[411]; s.fmod = b[412]; s.ronly = b[413];
-    s.time   = be32(b + 414);
-    s.tfree  = be32(b + 418);
-    s.tinode = be16(b + 422);
-    s.m = static_cast<int16_t>(be16(b + 424));
-    s.n = static_cast<int16_t>(be16(b + 426));
-    s.fname = festText(b + 428, 6);
-    s.fpack = festText(b + 434, 6);
-    s.mach  = b[440];
+    s.v = &v;
+    std::memcpy(s.roh.data(), b, v.block);
+    const int o = v.nicFree == 50 ? 0 : 200;   // ab s_ninode verschiebt sich alles um 2 * 100 Byte
+    s.isize = rd16(v, b + 0);
+    s.fsize = rd32(v, b + 2);
+    s.nfree = static_cast<int16_t>(rd16(v, b + 6));
+    for (int i = 0; i < v.nicFree; ++i) s.free[static_cast<size_t>(i)] = rd32(v, b + 8 + 4 * i);
+    s.ninode = static_cast<int16_t>(rd16(v, b + 208 + o));
+    for (int i = 0; i < kNicInod; ++i) s.inode[static_cast<size_t>(i)] = rd16(v, b + 210 + o + 2 * i);
+    s.flock = b[410 + o]; s.ilock = b[411 + o]; s.fmod = b[412 + o]; s.ronly = b[413 + o];
+    s.time   = rd32(v, b + 414 + o);
+    s.tfree  = rd32(v, b + 418 + o);
+    s.tinode = rd16(v, b + 422 + o);
+    s.m = static_cast<int16_t>(rd16(v, b + 424 + o));
+    s.n = static_cast<int16_t>(rd16(v, b + 426 + o));
+    s.fname = festText(b + 428 + o, 6);
+    s.fpack = festText(b + 434 + o, 6);
+    s.mach  = b[440 + o];
     return s;
 }
 
 void Superblock::in(uint8_t* b) const {
-    std::memcpy(b, roh.data(), kBlock);
-    put16(b + 0, isize);
-    put32(b + 2, fsize);
-    put16(b + 6, static_cast<uint16_t>(nfree));
-    for (int i = 0; i < kNicFree; ++i) put32(b + 8 + 4 * i, free[static_cast<size_t>(i)]);
-    put16(b + 208, static_cast<uint16_t>(ninode));
-    for (int i = 0; i < kNicInod; ++i) put16(b + 210 + 2 * i, inode[static_cast<size_t>(i)]);
-    b[410] = flock; b[411] = ilock; b[412] = fmod; b[413] = ronly;
-    put32(b + 414, time);
-    put32(b + 418, tfree);
-    put16(b + 422, tinode);
-    put16(b + 424, static_cast<uint16_t>(m));
-    put16(b + 426, static_cast<uint16_t>(n));
-    std::memset(b + 428, 0, 12);
-    std::memcpy(b + 428, fname.data(), std::min<size_t>(fname.size(), 6));
-    std::memcpy(b + 434, fpack.data(), std::min<size_t>(fpack.size(), 6));
-    b[440] = mach;
+    const Variante& v = *this->v;
+    const int o = v.nicFree == 50 ? 0 : 200;
+    std::memcpy(b, roh.data(), v.block);
+    wr16(v, b + 0, isize);
+    wr32(v, b + 2, fsize);
+    wr16(v, b + 6, static_cast<uint16_t>(nfree));
+    for (int i = 0; i < v.nicFree; ++i) wr32(v, b + 8 + 4 * i, free[static_cast<size_t>(i)]);
+    wr16(v, b + 208 + o, static_cast<uint16_t>(ninode));
+    for (int i = 0; i < kNicInod; ++i) wr16(v, b + 210 + o + 2 * i, inode[static_cast<size_t>(i)]);
+    b[410 + o] = flock; b[411 + o] = ilock; b[412 + o] = fmod; b[413 + o] = ronly;
+    wr32(v, b + 414 + o, time);
+    wr32(v, b + 418 + o, tfree);
+    wr16(v, b + 422 + o, tinode);
+    wr16(v, b + 424 + o, static_cast<uint16_t>(m));
+    wr16(v, b + 426 + o, static_cast<uint16_t>(n));
+    std::memset(b + 428 + o, 0, 12);
+    std::memcpy(b + 428 + o, fname.data(), std::min<size_t>(fname.size(), 6));
+    std::memcpy(b + 434 + o, fpack.data(), std::min<size_t>(fpack.size(), 6));
+    b[440 + o] = mach;
 }
 
-Dinode Dinode::aus(const uint8_t* p) {
+// Adresse zu 3 Byte: big endian (WEGA) bzw. PDP-11-`l3tol` (hohes Byte zuerst, dann das niedrige Wort LE).
+static uint32_t adr3(const Variante& v, const uint8_t* a) {
+    return v.be ? static_cast<uint32_t>(a[0]) << 16 | static_cast<uint32_t>(a[1]) << 8 | a[2]
+                : static_cast<uint32_t>(a[0]) << 16 | static_cast<uint32_t>(a[2]) << 8 | a[1];
+}
+static void adr3(const Variante& v, uint8_t* a, uint32_t x) {
+    a[0] = static_cast<uint8_t>(x >> 16);
+    a[v.be ? 1 : 2] = static_cast<uint8_t>(x >> 8);
+    a[v.be ? 2 : 1] = static_cast<uint8_t>(x);
+}
+
+Dinode Dinode::aus(const uint8_t* p, const Variante& v) {
     Dinode d;
-    d.mode  = be16(p + 0);
-    d.nlink = static_cast<int16_t>(be16(p + 2));
-    d.uid   = static_cast<int16_t>(be16(p + 4));
-    d.gid   = static_cast<int16_t>(be16(p + 6));
-    d.size  = be32(p + 8);
-    for (int k = 0; k < kNAddr; ++k) {
-        const uint8_t* a = p + 12 + 3 * k;
-        d.addr[static_cast<size_t>(k)] =
-            static_cast<uint32_t>(a[0]) << 16 | static_cast<uint32_t>(a[1]) << 8 | a[2];
-    }
+    d.mode  = rd16(v, p + 0);
+    d.nlink = static_cast<int16_t>(rd16(v, p + 2));
+    d.uid   = static_cast<int16_t>(rd16(v, p + 4));
+    d.gid   = static_cast<int16_t>(rd16(v, p + 6));
+    d.size  = rd32(v, p + 8);
+    for (int k = 0; k < kNAddr; ++k) d.addr[static_cast<size_t>(k)] = adr3(v, p + 12 + 3 * k);
     d.pad40 = p[51];
-    d.atime = be32(p + 52);
-    d.mtime = be32(p + 56);
-    d.ctime = be32(p + 60);
+    d.atime = rd32(v, p + 52);
+    d.mtime = rd32(v, p + 56);
+    d.ctime = rd32(v, p + 60);
     return d;
 }
 
-void Dinode::in(uint8_t* p) const {
-    put16(p + 0, mode);
-    put16(p + 2, static_cast<uint16_t>(nlink));
-    put16(p + 4, static_cast<uint16_t>(uid));
-    put16(p + 6, static_cast<uint16_t>(gid));
-    put32(p + 8, size);
-    for (int k = 0; k < kNAddr; ++k) {
-        const uint32_t v = addr[static_cast<size_t>(k)];
-        p[12 + 3 * k] = static_cast<uint8_t>(v >> 16);
-        p[13 + 3 * k] = static_cast<uint8_t>(v >> 8);
-        p[14 + 3 * k] = static_cast<uint8_t>(v);
-    }
+void Dinode::in(uint8_t* p, const Variante& v) const {
+    wr16(v, p + 0, mode);
+    wr16(v, p + 2, static_cast<uint16_t>(nlink));
+    wr16(v, p + 4, static_cast<uint16_t>(uid));
+    wr16(v, p + 6, static_cast<uint16_t>(gid));
+    wr32(v, p + 8, size);
+    for (int k = 0; k < kNAddr; ++k) adr3(v, p + 12 + 3 * k, addr[static_cast<size_t>(k)]);
     p[51] = pad40;
-    put32(p + 52, atime);
-    put32(p + 56, mtime);
-    put32(p + 60, ctime);
+    wr32(v, p + 52, atime);
+    wr32(v, p + 56, mtime);
+    wr32(v, p + 60, ctime);
 }
 
 // ═══ Blockgeraete ═══════════════════════════════════════════════════════════
 
 bool WegaSpaceDev::ort(uint32_t bn, FsRecoverOrt& out) const {
-    const uint64_t off = static_cast<uint64_t>(bn) * kBlock;
+    const uint64_t off = start_ + static_cast<uint64_t>(bn) * v_.block;
     for (size_t i = 0; i < s_.trackCount(); ++i) {
         const SectorSpace::TrackRef t = s_.trackAt(i);
         if (off >= t.start && off < t.start + t.bytes && t.sector_size) {
@@ -255,11 +277,12 @@ bool WegaSpeicherDev::writeBlock(uint32_t bn, const uint8_t* src) {
 class WegaFileSystem::Tx {
 public:
     explicit Tx(WegaFileSystem& fs) : fs_(fs) {}
+    const Variante& V() const { return fs_.V(); }
 
     bool start() {
-        uint8_t b[kBlock];
+        uint8_t b[kMaxBlock];
         if (!fs_.dev_->readBlock(1, b)) return fs_.fail("Superblock nicht lesbar");
-        sb = Superblock::aus(b);
+        sb = Superblock::aus(b, V());
         return true;
     }
     Leser leser() {
@@ -267,17 +290,17 @@ public:
     }
     bool lies(uint32_t bn, uint8_t* d) const {
         auto it = kopie_.find(bn);
-        if (it != kopie_.end()) { std::memcpy(d, it->second.data(), kBlock); return true; }
+        if (it != kopie_.end()) { std::memcpy(d, it->second.data(), V().block); return true; }
         return fs_.dev_->readBlock(bn, d);
     }
     void schreib(uint32_t bn, const uint8_t* d) {
-        std::array<uint8_t, kBlock>& z = kopie_[bn];
-        std::memcpy(z.data(), d, kBlock);
+        std::array<uint8_t, kMaxBlock>& z = kopie_[bn];
+        std::memcpy(z.data(), d, V().block);
     }
     bool commit() {
         sb.time = fs_.jetzt();
         sb.fmod = 0;
-        uint8_t b[kBlock];
+        uint8_t b[kMaxBlock];
         if (!fs_.dev_->readBlock(1, b)) return fs_.fail("Superblock nicht lesbar");
         sb.in(b);
         schreib(1, b);
@@ -294,10 +317,10 @@ public:
     }
     bool setzeInode(uint32_t ino, const Dinode& d) {
         if (ino < 1 || ino > sb.inodes()) return fs_.fail("Inode ausserhalb");
-        const uint32_t bn = 2 + (ino - 1) / kInodesProBlock;
-        uint8_t b[kBlock];
+        const uint32_t bn = 2 + (ino - 1) / V().inopb();
+        uint8_t b[kMaxBlock];
         if (!lies(bn, b)) return fs_.fail("Inode-Block nicht lesbar");
-        d.in(b + ((ino - 1) % kInodesProBlock) * kInodeGroesse);
+        d.in(b + ((ino - 1) % V().inopb()) * kInodeGroesse, V());
         schreib(bn, b);
         return true;
     }
@@ -305,22 +328,22 @@ public:
     /// @brief `alloc()` des Kerns.
     bool allocBlock(uint32_t& bno) {
         for (;;) {
-            if (sb.nfree <= 0 || sb.nfree > kNicFree)
+            if (sb.nfree <= 0 || sb.nfree > V().nicFree)
                 return fs_.fail("Kein Platz mehr auf dem Datentraeger");
             bno = sb.free[static_cast<size_t>(--sb.nfree)];
             if (bno == 0) return fs_.fail("Kein Platz mehr auf dem Datentraeger");
             if (bno >= sb.isize && bno < sb.fsize) break;   // sonst: badblock, weiter
         }
         if (sb.nfree <= 0) {
-            uint8_t b[kBlock];
+            uint8_t b[kMaxBlock];
             if (!lies(bno, b)) return fs_.fail("Freilistenblock nicht lesbar");
-            const int16_t n = static_cast<int16_t>(be16(b));
-            if (n <= 0 || n > kNicFree) return fs_.fail("Freiliste beschaedigt (Block "
+            const int16_t n = static_cast<int16_t>(rd16(V(), b));
+            if (n <= 0 || n > V().nicFree) return fs_.fail("Freiliste beschaedigt (Block "
                                                        + std::to_string(bno) + ")");
             sb.nfree = n;
-            for (int i = 0; i < kNicFree; ++i) sb.free[static_cast<size_t>(i)] = be32(b + 2 + 4 * i);
+            for (int i = 0; i < V().nicFree; ++i) sb.free[static_cast<size_t>(i)] = rd32(V(), b + 2 + 4 * i);
         }
-        uint8_t null[kBlock] = {};
+        uint8_t null[kMaxBlock] = {};
         schreib(bno, null);
         if (sb.tfree) --sb.tfree;
         return true;
@@ -330,10 +353,10 @@ public:
     void freeBlock(uint32_t bno) {
         if (bno < sb.isize || bno >= sb.fsize) return;
         if (sb.nfree <= 0) { sb.nfree = 1; sb.free[0] = 0; }
-        if (sb.nfree >= kNicFree) {
-            uint8_t b[kBlock] = {};
-            put16(b, static_cast<uint16_t>(sb.nfree));
-            for (int i = 0; i < kNicFree; ++i) put32(b + 2 + 4 * i, sb.free[static_cast<size_t>(i)]);
+        if (sb.nfree >= V().nicFree) {
+            uint8_t b[kMaxBlock] = {};
+            wr16(V(), b, static_cast<uint16_t>(sb.nfree));
+            for (int i = 0; i < V().nicFree; ++i) wr32(V(), b + 2 + 4 * i, sb.free[static_cast<size_t>(i)]);
             schreib(bno, b);
             sb.nfree = 0;
         }
@@ -377,7 +400,7 @@ public:
         if (!hatBloecke(d.mode)) return true;
         std::vector<uint32_t> daten, indirekt;
         std::string err;
-        if (!WegaFileSystem::dateiBloecke(leser(), d, sb.fsize, daten, &indirekt, err))
+        if (!WegaFileSystem::dateiBloecke(V(), leser(), d, sb.fsize, daten, &indirekt, err))
             return fs_.fail(err);
         // Rueckwaerts freigeben: der Kern gibt vom Ende her frei, und die Freiliste
         // liefert danach dieselben Bloecke in Vorwaertsreihenfolge wieder aus.
@@ -390,14 +413,14 @@ public:
 
     /// @brief Inhalt einer (gekuerzten) Inode schreiben: Datenbloecke + Indirektion.
     bool fuellen(Dinode& d, const std::vector<uint8_t>& inhalt) {
-        if (inhalt.size() > kMaxDatei) return fs_.fail("Datei zu gross fuer WEGA");
-        const size_t n = (inhalt.size() + kBlock - 1) / kBlock;
+        if (inhalt.size() > maxDatei(V())) return fs_.fail("Datei zu gross fuer WEGA");
+        const size_t n = (inhalt.size() + V().block - 1) / V().block;
         std::vector<uint32_t> bl(n);
         for (size_t i = 0; i < n; ++i) {
             if (!allocBlock(bl[i])) return false;
-            uint8_t b[kBlock] = {};
-            const size_t von = i * kBlock;
-            std::memcpy(b, inhalt.data() + von, std::min<size_t>(kBlock, inhalt.size() - von));
+            uint8_t b[kMaxBlock] = {};
+            const size_t von = i * V().block;
+            std::memcpy(b, inhalt.data() + von, std::min<size_t>(V().block, inhalt.size() - von));
             schreib(bl[i], b);
         }
         size_t k = 0;
@@ -418,19 +441,19 @@ private:
     /// @brief Indirekten Block der Stufe @p stufe bauen, Datenbloecke ab @p k verbrauchen.
     bool baue(int stufe, const std::vector<uint32_t>& bl, size_t& k, uint32_t& out) {
         if (!allocBlock(out)) return false;
-        uint8_t b[kBlock] = {};
-        for (int i = 0; i < kNIndir && k < bl.size(); ++i) {
+        uint8_t b[kMaxBlock] = {};
+        for (int i = 0; i < V().nIndir() && k < bl.size(); ++i) {
             uint32_t eintrag = 0;
             if (stufe == 1) eintrag = bl[k++];
             else if (!baue(stufe - 1, bl, k, eintrag)) return false;
-            put32(b + 4 * i, eintrag);
+            wr32(V(), b + 4 * i, eintrag);
         }
         schreib(out, b);
         return true;
     }
 
     WegaFileSystem& fs_;
-    std::map<uint32_t, std::array<uint8_t, kBlock>> kopie_;
+    std::map<uint32_t, std::array<uint8_t, kMaxBlock>> kopie_;
 };
 
 // ═══ Lesen ══════════════════════════════════════════════════════════════════
@@ -446,17 +469,18 @@ WegaFileSystem::Leser WegaFileSystem::geraeteLeser() const {
 }
 
 wega::Superblock WegaFileSystem::superblock() const {
-    uint8_t b[kBlock] = {};
+    uint8_t b[kMaxBlock] = {};
     dev_->readBlock(1, b);
-    return Superblock::aus(b);
+    return Superblock::aus(b, V());
 }
 
 bool WegaFileSystem::inodeLesen(const Leser& l, const Superblock& sb, uint32_t ino,
                                 Dinode& out) {
+    const Variante& vv = *sb.v;
     if (ino < 1 || ino > sb.inodes()) return false;
-    uint8_t b[kBlock];
-    if (!l(2 + (ino - 1) / kInodesProBlock, b)) return false;
-    out = Dinode::aus(b + ((ino - 1) % kInodesProBlock) * kInodeGroesse);
+    uint8_t b[kMaxBlock];
+    if (!l(2 + (ino - 1) / vv.inopb(), b)) return false;
+    out = Dinode::aus(b + ((ino - 1) % vv.inopb()) * kInodeGroesse, vv);
     return true;
 }
 
@@ -464,7 +488,7 @@ bool WegaFileSystem::readInode(uint32_t ino, Dinode& out) const {
     return inodeLesen(geraeteLeser(), superblock(), ino, out);
 }
 
-bool WegaFileSystem::dateiBloecke(const Leser& l, const Dinode& di, uint32_t fsize,
+bool WegaFileSystem::dateiBloecke(const Variante& vv, const Leser& l, const Dinode& di, uint32_t fsize,
                                   std::vector<uint32_t>& daten,
                                   std::vector<uint32_t>* indirekt, std::string& err) {
     daten.clear();
@@ -472,28 +496,28 @@ bool WegaFileSystem::dateiBloecke(const Leser& l, const Dinode& di, uint32_t fsi
     if (!hatBloecke(di.mode)) return true;
     // Gezaehlt wird bis zur Dateigroesse — dahinter stehende Adressen sind Reste.
     // Fuer die Freigabe (`indirekt != nullptr`) wird dagegen ALLES eingesammelt.
-    const uint64_t noetig = (static_cast<uint64_t>(di.size) + kBlock - 1) / kBlock;
+    const uint64_t noetig = (static_cast<uint64_t>(di.size) + vv.block - 1) / vv.block;
     const bool alles = indirekt != nullptr;
     for (int i = 0; i < kNDirekt; ++i) {
         if (!alles && daten.size() >= noetig) return true;
         daten.push_back(di.addr[static_cast<size_t>(i)]);
     }
     std::function<bool(uint32_t, int)> ab = [&](uint32_t bn, int stufe) -> bool {
-        const uint64_t pro = stufe == 1 ? 1u : stufe == 2 ? kNIndir : kNIndir * kNIndir;
+        const uint64_t pro = stufe == 1 ? 1u : stufe == 2 ? vv.nIndir() : vv.nIndir() * vv.nIndir();
         if (bn == 0) {
             // Loch: so viele Nullbloecke, wie dieser Ast haette tragen koennen.
             if (alles) return true;
-            for (uint64_t i = 0; i < kNIndir * pro && daten.size() < noetig; ++i)
+            for (uint64_t i = 0; i < vv.nIndir() * pro && daten.size() < noetig; ++i)
                 daten.push_back(0);
             return true;
         }
         if (bn >= fsize) { err = "Indirekter Block " + std::to_string(bn) + " ausserhalb"; return false; }
         if (indirekt) indirekt->push_back(bn);
-        uint8_t b[kBlock];
+        uint8_t b[kMaxBlock];
         if (!l(bn, b)) { err = "Block " + std::to_string(bn) + " nicht lesbar"; return false; }
-        for (int i = 0; i < kNIndir; ++i) {
+        for (int i = 0; i < vv.nIndir(); ++i) {
             if (!alles && daten.size() >= noetig) return true;
-            const uint32_t a = be32(b + 4 * i);
+            const uint32_t a = rd32(vv, b + 4 * i);
             if (stufe == 1) daten.push_back(a);
             else if (!ab(a, stufe - 1)) return false;
         }
@@ -506,33 +530,34 @@ bool WegaFileSystem::dateiBloecke(const Leser& l, const Dinode& di, uint32_t fsi
     return true;
 }
 
-bool WegaFileSystem::dateiLesen(const Leser& l, const Dinode& di, uint32_t fsize,
+bool WegaFileSystem::dateiLesen(const Variante& vv, const Leser& l, const Dinode& di, uint32_t fsize,
                                 std::vector<uint8_t>& out, std::string& err) {
     std::vector<uint32_t> bl;
-    if (!dateiBloecke(l, di, fsize, bl, nullptr, err)) return false;
+    if (!dateiBloecke(vv, l, di, fsize, bl, nullptr, err)) return false;
     out.assign(static_cast<size_t>(di.size), 0);
-    uint8_t b[kBlock];
+    uint8_t b[kMaxBlock];
     for (size_t i = 0; i < bl.size(); ++i) {
-        const size_t von = i * kBlock;
+        const size_t von = i * vv.block;
         if (von >= out.size()) break;
         if (bl[i] == 0) continue;                       // Loch = Nullen
         if (bl[i] >= fsize) { err = "Block " + std::to_string(bl[i]) + " ausserhalb"; return false; }
         if (!l(bl[i], b)) { err = "Block " + std::to_string(bl[i]) + " nicht lesbar"; return false; }
-        std::memcpy(out.data() + von, b, std::min<size_t>(kBlock, out.size() - von));
+        std::memcpy(out.data() + von, b, std::min<size_t>(vv.block, out.size() - von));
     }
     return true;
 }
 
 bool WegaFileSystem::verzeichnisLesen(const Leser& l, const Superblock& sb, uint32_t ino,
                                       std::vector<DirEintrag>& out, std::string& err) {
+    const Variante& vv = *sb.v;
     out.clear();
     Dinode d;
     if (!inodeLesen(l, sb, ino, d)) { err = "Inode " + std::to_string(ino) + " nicht lesbar"; return false; }
     if ((d.mode & IFMT) != IFDIR) { err = "kein Verzeichnis"; return false; }
     std::vector<uint8_t> roh;
-    if (!dateiLesen(l, d, sb.fsize, roh, err)) return false;
+    if (!dateiLesen(vv, l, d, sb.fsize, roh, err)) return false;
     for (size_t k = 0; k + kDirEintrag <= roh.size(); k += kDirEintrag) {
-        const uint16_t n = be16(roh.data() + k);
+        const uint16_t n = rd16(vv, roh.data() + k);
         out.push_back({n, festText(roh.data() + k + 2, kDirSiz), static_cast<uint32_t>(k / kDirEintrag)});
     }
     return true;
@@ -582,17 +607,18 @@ std::string WegaFileSystem::modeText(uint16_t mode) {
 // ═══ Erkennung und Einhaengen ═══════════════════════════════════════════════
 
 bool WegaFileSystem::looksLikeWega(const WegaBlockDev& dev, std::string* why) {
+    const Variante& vv = dev.variante();
     auto nein = [&](const std::string& w) { if (why) *why = w; return false; };
-    uint8_t b[kBlock];
+    uint8_t b[kMaxBlock];
     if (dev.blocks() < 8 || !dev.readBlock(1, b)) return nein("Block 1 nicht lesbar");
-    const Superblock sb = Superblock::aus(b);
+    const Superblock sb = Superblock::aus(b, vv);
     if (sb.isize < 3 || sb.fsize <= sb.isize)
         return nein("Superblock: s_isize " + std::to_string(sb.isize) + " / s_fsize "
                     + std::to_string(sb.fsize) + " unplausibel");
     if (sb.fsize > dev.blocks())
         return nein("Superblock: s_fsize " + std::to_string(sb.fsize) + " > "
                     + std::to_string(dev.blocks()) + " Bloecke des Datentraegers");
-    if (sb.nfree < 0 || sb.nfree > kNicFree || sb.ninode < 0 || sb.ninode > kNicInod)
+    if (sb.nfree < 0 || sb.nfree > vv.nicFree || sb.ninode < 0 || sb.ninode > kNicInod)
         return nein("Superblock: s_nfree/s_ninode ausserhalb 0...50/0...100");
     if (sb.tfree > sb.fsize - sb.isize || sb.tinode > sb.inodes())
         return nein("Superblock: Zaehler s_tfree/s_tinode zu gross");
@@ -612,8 +638,8 @@ bool WegaFileSystem::looksLikeWega(const WegaBlockDev& dev, std::string* why) {
     if (root.addr[0] < sb.isize || root.addr[0] >= sb.fsize)
         return nein("Wurzelverzeichnis: erster Block ausserhalb");
     if (!l(root.addr[0], b)) return nein("Wurzelverzeichnis nicht lesbar");
-    if (be16(b) != kRootIno || festText(b + 2, kDirSiz) != "."
-        || be16(b + 16) != kRootIno || festText(b + 18, kDirSiz) != "..")
+    if (rd16(vv, b) != kRootIno || festText(b + 2, kDirSiz) != "."
+        || rd16(vv, b + 16) != kRootIno || festText(b + 18, kDirSiz) != "..")
         return nein("Wurzelverzeichnis beginnt nicht mit '.' und '..' auf Inode 2");
     return true;
 }
@@ -628,7 +654,8 @@ std::unique_ptr<WegaFileSystem> WegaFileSystem::mount(std::unique_ptr<WegaBlockD
 std::unique_ptr<WegaFileSystem> WegaFileSystem::format(std::unique_ptr<WegaBlockDev> dev,
                                                        const std::string& label,
                                                        std::string& err, uint32_t bloecke,
-                                                       int m, int n, uint32_t zeit) {
+                                                       int m, int n, uint32_t zeit,
+                                                       uint32_t inodes) {
     if (!dev) { err = "kein Blockgeraet"; return nullptr; }
     std::unique_ptr<WegaFileSystem> fs(new WegaFileSystem(std::move(dev)));
     if (zeit) fs->setClock([zeit] { return zeit; });
@@ -642,17 +669,21 @@ std::unique_ptr<WegaFileSystem> WegaFileSystem::format(std::unique_ptr<WegaBlock
     const uint32_t t = fs->jetzt();
 
     Superblock sb;
+    sb.v = &fs->V();
     sb.fsize = bloecke;
-    uint32_t ib = bloecke / 25;
+    // Inode-Liste fsize/25 Bloecke — in Bloecken der jeweiligen Familie: UUCP (MUTOS 1700, 720 Bloecke
+    // zu 1 KB) traegt s_isize 30, CMD (MUTOS 8000, 320 Bloecke zu 512 B) 14.
+    uint32_t ib = inodes ? (inodes + static_cast<uint32_t>(fs->V().inopb()) - 1) / fs->V().inopb()
+                         : bloecke / 25;
     if (ib == 0) ib = 1;
-    if (ib > 65500 / kInodesProBlock) ib = 65500 / kInodesProBlock;
+    if (ib > 65500 / fs->V().inopb()) ib = 65500 / fs->V().inopb();
     sb.isize = static_cast<uint16_t>(ib + 2);
     sb.m = static_cast<int16_t>(m);
     sb.n = static_cast<int16_t>(n);
     sb.fname = label.substr(0, 6);
     sb.roh.fill(0);
 
-    uint8_t null[kBlock] = {};
+    uint8_t null[kMaxBlock] = {};
     for (uint32_t b = 2; b < sb.isize; ++b)
         if (!fs->dev_->writeBlock(b, null)) { err = "Inode-Liste nicht schreibbar"; return nullptr; }
     sb.tinode = static_cast<uint16_t>(sb.inodes());
@@ -698,15 +729,15 @@ std::unique_ptr<WegaFileSystem> WegaFileSystem::format(std::unique_ptr<WegaBlock
     root.mode = IFDIR | 0777; root.nlink = 2;
     root.atime = root.mtime = root.ctime = t;
     std::vector<uint8_t> inhalt(2 * kDirEintrag, 0);
-    put16(inhalt.data(), kRootIno); inhalt[2] = '.';
-    put16(inhalt.data() + 16, kRootIno); inhalt[18] = '.'; inhalt[19] = '.';
+    wr16(fs->V(), inhalt.data(), kRootIno); inhalt[2] = '.';
+    wr16(fs->V(), inhalt.data() + 16, kRootIno); inhalt[18] = '.'; inhalt[19] = '.';
     if (!tx.fuellen(root, inhalt)) { err = fs->lastError(); return nullptr; }
     tx.setzeInode(kRootIno, root);
     --tx.sb.tinode;
     tx.sb.mach = 0;
 
     // Superblock erstmals schreiben, dann wie gewohnt festschreiben
-    uint8_t sbb[kBlock] = {};
+    uint8_t sbb[kMaxBlock] = {};
     tx.sb.in(sbb);
     if (!fs->dev_->writeBlock(1, sbb)) { err = "Superblock nicht schreibbar"; return nullptr; }
     if (!tx.commit()) { err = fs->lastError(); return nullptr; }
@@ -780,7 +811,7 @@ bool WegaFileSystem::read(const std::string& name, std::vector<uint8_t>& out) {
     if (!hatBloecke(d.mode))
         return fail(name + " ist eine Geraetedatei und hat keinen Inhalt");
     std::string err;
-    if (!dateiLesen(l, d, sb.fsize, out, err)) return fail(name + ": " + err);
+    if (!dateiLesen(V(), l, d, sb.fsize, out, err)) return fail(name + ": " + err);
     return true;
 }
 
@@ -795,6 +826,90 @@ bool nameGueltig(const std::string& n, std::string& why) {
     return true;
 }
 } // namespace
+
+// Neuen Namen @p blatt (Inode @p ino) in das Verzeichnis @p dir eintragen.
+bool WegaFileSystem::eintragen(Tx& tx, uint32_t dir, const std::string& blatt, uint32_t ino,
+                               uint32_t jetzt_, int nlinkDelta) {
+    const Leser l = tx.leser();
+    Dinode e;
+    if (!tx.inode(dir, e)) return fail("Elternverzeichnis nicht lesbar");
+    std::vector<uint8_t> roh;
+    std::string err;
+    if (!dateiLesen(V(), l, e, tx.sb.fsize, roh, err)) return fail(err);
+    size_t platz = roh.size();
+    for (size_t k = 0; k + kDirEintrag <= roh.size(); k += kDirEintrag)
+        if (rd16(V(), roh.data() + k) == 0) { platz = k; break; }
+    if (platz == roh.size()) roh.resize(roh.size() + kDirEintrag, 0);
+    std::memset(roh.data() + platz, 0, kDirEintrag);
+    wr16(V(), roh.data() + platz, static_cast<uint16_t>(ino));
+    std::memcpy(roh.data() + platz + 2, blatt.data(), blatt.size());
+    if (!tx.kuerzen(e) || !tx.fuellen(e, roh)) return false;
+    e.nlink = static_cast<int16_t>(e.nlink + nlinkDelta);
+    e.mtime = e.ctime = jetzt_;
+    return tx.setzeInode(dir, e);
+}
+
+bool WegaFileSystem::makeNode(const std::string& name, uint16_t mode, uint16_t rdev) {
+    const uint16_t art = mode & IFMT;
+    if (art != IFCHR && art != IFBLK && art != IFIFO && art != IFMPC && art != IFMPB)
+        return fail("Modus 0" + oktal(mode) + " ist keine Geraetedatei und kein FIFO");
+    const std::vector<std::string> t = teile(name);
+    if (t.empty()) return fail("kein Dateiname");
+    std::string why;
+    for (const std::string& teil : t) if (!nameGueltig(teil, why)) return fail(why);
+    if (t.size() > 1) {
+        std::string elterpfad;
+        for (size_t i = 0; i + 1 < t.size(); ++i) elterpfad += (i ? "/" : "") + t[i];
+        if (lookup(elterpfad) == 0 && !makeDirectory(elterpfad)) return false;
+    }
+    Tx tx(*this);
+    if (!tx.start()) return false;
+    uint32_t elter = 0;
+    std::string blatt;
+    if (suche(tx.leser(), tx.sb, name, &elter, &blatt))
+        return fail("'" + name + "' gibt es schon");
+    if (!elter) return fail("Verzeichnis zu '" + name + "' nicht gefunden");
+    uint32_t ino = 0;
+    if (!tx.allocInode(ino)) return false;
+    const uint32_t jetzt_ = jetzt();
+    Dinode d;
+    d.mode = static_cast<uint16_t>(art | (mode & 07777));
+    d.nlink = 1;
+    d.atime = d.mtime = d.ctime = jetzt_;
+    if (art != IFIFO) d.addr[0] = rdev;      // Geraetenummer statt Blockadresse
+    if (!tx.setzeInode(ino, d)) return false;
+    if (!eintragen(tx, elter, blatt, ino, jetzt_, 0)) return false;
+    return tx.commit();
+}
+
+bool WegaFileSystem::makeLink(const std::string& vorhanden, const std::string& neu) {
+    const std::vector<std::string> t = teile(neu);
+    if (t.empty()) return fail("kein Dateiname");
+    std::string why;
+    for (const std::string& teil : t) if (!nameGueltig(teil, why)) return fail(why);
+    if (t.size() > 1) {
+        std::string elterpfad;
+        for (size_t i = 0; i + 1 < t.size(); ++i) elterpfad += (i ? "/" : "") + t[i];
+        if (lookup(elterpfad) == 0 && !makeDirectory(elterpfad)) return false;
+    }
+    Tx tx(*this);
+    if (!tx.start()) return false;
+    const uint32_t ino = suche(tx.leser(), tx.sb, vorhanden, nullptr, nullptr);
+    if (!ino || ino == 1) return fail("Datei nicht gefunden: " + vorhanden);
+    Dinode d;
+    if (!tx.inode(ino, d)) return fail("Inode nicht lesbar");
+    if ((d.mode & IFMT) == IFDIR) return fail("auf ein Verzeichnis gibt es keinen harten Link");
+    uint32_t elter = 0;
+    std::string blatt;
+    if (suche(tx.leser(), tx.sb, neu, &elter, &blatt)) return fail("'" + neu + "' gibt es schon");
+    if (!elter) return fail("Verzeichnis zu '" + neu + "' nicht gefunden");
+    const uint32_t jetzt_ = jetzt();
+    ++d.nlink;
+    d.ctime = jetzt_;
+    if (!tx.setzeInode(ino, d)) return false;
+    if (!eintragen(tx, elter, blatt, ino, jetzt_, 0)) return false;
+    return tx.commit();
+}
 
 bool WegaFileSystem::makeDirectory(const std::string& name) {
     Tx tx(*this);
@@ -826,20 +941,20 @@ bool WegaFileSystem::makeDirectory(const std::string& name) {
         neu.mode = IFDIR | 0755; neu.nlink = 2;
         neu.atime = neu.mtime = neu.ctime = jetzt_;
         std::vector<uint8_t> inhalt(2 * kDirEintrag, 0);
-        put16(inhalt.data(), static_cast<uint16_t>(ino)); inhalt[2] = '.';
-        put16(inhalt.data() + 16, static_cast<uint16_t>(dir)); inhalt[18] = '.'; inhalt[19] = '.';
+        wr16(V(), inhalt.data(), static_cast<uint16_t>(ino)); inhalt[2] = '.';
+        wr16(V(), inhalt.data() + 16, static_cast<uint16_t>(dir)); inhalt[18] = '.'; inhalt[19] = '.';
         if (!tx.fuellen(neu, inhalt) || !tx.setzeInode(ino, neu)) return false;
 
         Dinode elter;
         if (!tx.inode(dir, elter)) return fail("Elternverzeichnis nicht lesbar");
         std::vector<uint8_t> roh;
-        if (!dateiLesen(l, elter, tx.sb.fsize, roh, err)) return fail(err);
+        if (!dateiLesen(V(), l, elter, tx.sb.fsize, roh, err)) return fail(err);
         size_t platz = roh.size();
         for (size_t k = 0; k + kDirEintrag <= roh.size(); k += kDirEintrag)
-            if (be16(roh.data() + k) == 0) { platz = k; break; }
+            if (rd16(V(), roh.data() + k) == 0) { platz = k; break; }
         if (platz == roh.size()) roh.resize(roh.size() + kDirEintrag, 0);
         std::memset(roh.data() + platz, 0, kDirEintrag);
-        put16(roh.data() + platz, static_cast<uint16_t>(ino));
+        wr16(V(), roh.data() + platz, static_cast<uint16_t>(ino));
         std::memcpy(roh.data() + platz + 2, teil.data(), teil.size());
         if (!tx.kuerzen(elter) || !tx.fuellen(elter, roh)) return false;
         ++elter.nlink;
@@ -856,7 +971,7 @@ bool WegaFileSystem::write(const std::string& name, const std::vector<uint8_t>& 
     if (t.empty()) return fail("kein Dateiname");
     std::string why;
     for (const std::string& teil : t) if (!nameGueltig(teil, why)) return fail(why);
-    if (data.size() > kMaxDatei) return fail("Datei zu gross fuer WEGA");
+    if (data.size() > maxDatei(V())) return fail("Datei zu gross fuer WEGA");
 
     // Fehlende Verzeichnisse vorab anlegen (eigene Transaktion — ein Fehlschlag
     // danach laesst hoechstens leere Verzeichnisse zurueck, keine halbe Datei).
@@ -898,7 +1013,9 @@ bool WegaFileSystem::write(const std::string& name, const std::vector<uint8_t>& 
         d.gid   = static_cast<int16_t>(opt.wega_gid);
     }
     if (!tx.fuellen(d, data)) return false;
-    d.atime = mzeit; d.mtime = mzeit; d.ctime = jetzt_;
+    d.atime = opt.wega_atime ? opt.wega_atime : mzeit;
+    d.mtime = mzeit;
+    d.ctime = opt.wega_ctime ? opt.wega_ctime : jetzt_;
     if (!tx.setzeInode(ino, d)) return false;
 
     if (!vorhanden) {
@@ -906,13 +1023,13 @@ bool WegaFileSystem::write(const std::string& name, const std::vector<uint8_t>& 
         if (!tx.inode(elter, e)) return fail("Elternverzeichnis nicht lesbar");
         std::vector<uint8_t> roh;
         std::string err;
-        if (!dateiLesen(l, e, tx.sb.fsize, roh, err)) return fail(err);
+        if (!dateiLesen(V(), l, e, tx.sb.fsize, roh, err)) return fail(err);
         size_t platz = roh.size();
         for (size_t k = 0; k + kDirEintrag <= roh.size(); k += kDirEintrag)
-            if (be16(roh.data() + k) == 0) { platz = k; break; }
+            if (rd16(V(), roh.data() + k) == 0) { platz = k; break; }
         if (platz == roh.size()) roh.resize(roh.size() + kDirEintrag, 0);
         std::memset(roh.data() + platz, 0, kDirEintrag);
-        put16(roh.data() + platz, static_cast<uint16_t>(ino));
+        wr16(V(), roh.data() + platz, static_cast<uint16_t>(ino));
         std::memcpy(roh.data() + platz + 2, blatt.data(), blatt.size());
         if (!tx.kuerzen(e) || !tx.fuellen(e, roh)) return false;
         e.mtime = e.ctime = jetzt_;
@@ -931,7 +1048,8 @@ bool WegaFileSystem::setAttributes(const std::string& name, const UnixAttrs& a) 
         return fail("uid " + std::to_string(a.uid) + " liegt ausserhalb von 0...65535");
     if (a.set_gid && (a.gid < 0 || a.gid > 65535))
         return fail("gid " + std::to_string(a.gid) + " liegt ausserhalb von 0...65535");
-    if (!a.set_mode && !a.set_uid && !a.set_gid && !a.set_mtime) return true;
+    if (!a.set_mode && !a.set_uid && !a.set_gid && !a.set_mtime && !a.set_atime && !a.set_ctime)
+        return true;
 
     Tx tx(*this);
     if (!tx.start()) return false;
@@ -946,9 +1064,11 @@ bool WegaFileSystem::setAttributes(const std::string& name, const UnixAttrs& a) 
     if (a.set_uid)  d.uid = static_cast<int16_t>(a.uid);
     if (a.set_gid)  d.gid = static_cast<int16_t>(a.gid);
     // `touch -m`: nur die Aenderungszeit.  Die Inode-Zeit (ctime) setzt wie im Kern
-    // jede Aenderung am Inode auf „jetzt" — sie laesst sich nicht vorgeben.
+    // jede Aenderung am Inode auf „jetzt" — nur das Wiederherstellen aus einer
+    // `.fileinfo` gibt sie vor (set_ctime).
     if (a.set_mtime) d.mtime = a.mtime;
-    d.ctime = jetzt();
+    if (a.set_atime) d.atime = a.atime;
+    d.ctime = a.set_ctime ? a.ctime : jetzt();
     if (!tx.setzeInode(ino, d)) return false;
     return tx.commit();
 }
@@ -962,7 +1082,7 @@ std::string WegaFileSystem::blockList(const std::string& name) const {
     if (!hatBloecke(d.mode)) return {};
     std::vector<uint32_t> daten, indirekt;
     std::string err;
-    if (!dateiBloecke(l, d, sb.fsize, daten, &indirekt, err)) return {};
+    if (!dateiBloecke(V(), l, d, sb.fsize, daten, &indirekt, err)) return {};
     // Aufeinanderfolgende Bloecke zu Bereichen („120-125"); Loecher (0) bleiben Loecher.
     auto bereiche = [](const std::vector<uint32_t>& v) {
         std::string s;
@@ -1007,25 +1127,25 @@ bool WegaFileSystem::erase(const std::string& name) {
     Dinode e;
     if (!tx.inode(elter, e)) return fail("Elternverzeichnis nicht lesbar");
     std::vector<uint8_t> roh;
-    if (!dateiLesen(l, e, tx.sb.fsize, roh, err)) return fail(err);
+    if (!dateiLesen(V(), l, e, tx.sb.fsize, roh, err)) return fail(err);
     bool weg = false;
     for (size_t k = 0; k + kDirEintrag <= roh.size(); k += kDirEintrag)
-        if (be16(roh.data() + k) == ino && festText(roh.data() + k + 2, kDirSiz) == blatt) {
-            put16(roh.data() + k, 0);
+        if (rd16(V(), roh.data() + k) == ino && festText(roh.data() + k + 2, kDirSiz) == blatt) {
+            wr16(V(), roh.data() + k, 0);
             weg = true;
             break;
         }
     if (!weg) return fail("Verzeichniseintrag nicht gefunden: " + name);
     // Nur den betroffenen Block zurueckschreiben — Groesse und Bloecke bleiben.
     std::vector<uint32_t> bl;
-    if (!dateiBloecke(l, e, tx.sb.fsize, bl, nullptr, err)) return fail(err);
+    if (!dateiBloecke(V(), l, e, tx.sb.fsize, bl, nullptr, err)) return fail(err);
     for (size_t i = 0; i < bl.size(); ++i) {
         if (!bl[i]) continue;
-        uint8_t b[kBlock] = {};
-        const size_t von = i * kBlock;
-        std::memcpy(b, roh.data() + von, std::min<size_t>(kBlock, roh.size() - von));
-        uint8_t alt[kBlock];
-        if (tx.lies(bl[i], alt) && std::memcmp(alt, b, kBlock) != 0) tx.schreib(bl[i], b);
+        uint8_t b[kMaxBlock] = {};
+        const size_t von = i * V().block;
+        std::memcpy(b, roh.data() + von, std::min<size_t>(V().block, roh.size() - von));
+        uint8_t alt[kMaxBlock];
+        if (tx.lies(bl[i], alt) && std::memcmp(alt, b, V().block) != 0) tx.schreib(bl[i], b);
     }
     const uint32_t jetzt_ = jetzt();
     if (ist_dir && e.nlink > 0) --e.nlink;
@@ -1052,13 +1172,19 @@ bool WegaFileSystem::wouldFit(const std::vector<PlannedFile>& files, FitReport& 
     uint64_t bedarf = 0, gutschrift = 0;
     int inodes = 0;
     std::set<std::string> neue_dirs;
+    std::map<std::string, uint64_t> neue_eintraege;   // Elternpfad -> neue Verzeichniseintraege
     for (const PlannedFile& f : files) {
-        bedarf += blockBedarf(f.size);
+        if (f.link) {       // harter Link: keine Inode, keine Daten — nur ein Eintrag im Elternverzeichnis
+            const size_t schr = f.name.rfind('/');
+            ++neue_eintraege[schr == std::string::npos ? std::string() : f.name.substr(0, schr)];
+            continue;
+        }
+        bedarf += blockBedarf(V(), f.size);
         const uint32_t ino = suche(l, sb, f.name, nullptr, nullptr);
         if (ino) {
             Dinode d;
             if (inodeLesen(l, sb, ino, d) && hatBloecke(d.mode))
-                gutschrift += blockBedarf(d.size);
+                gutschrift += blockBedarf(V(), d.size);
         } else {
             ++inodes;
             // Zwischenverzeichnisse, die es noch nicht gibt: je eine Inode + ein Block
@@ -1071,20 +1197,25 @@ bool WegaFileSystem::wouldFit(const std::vector<PlannedFile>& files, FitReport& 
                     bedarf += 1;
                 }
             }
-            bedarf += 1;          // Reserve: das Elternverzeichnis kann einen Block wachsen
+            // Reserve: das Elternverzeichnis waechst um einen Eintrag (16 B) — unten je Verzeichnis
+            // gerechnet, nicht je Datei (190 Geraetedateien in /dev brauchen keine 190 Bloecke).
+            const size_t schr = f.name.rfind('/');
+            ++neue_eintraege[schr == std::string::npos ? std::string() : f.name.substr(0, schr)];
         }
     }
+    for (const auto& [elter, n] : neue_eintraege)
+        bedarf += (n * kDirEintrag + V().block - 1) / V().block + 1;   // +1: Verzeichnis neu schreiben
     // s_tfree zaehlt die Endmarke der Freiliste mit (s. check) — vorsichtig einen
     // weniger rechnen, sonst „passt" eine Datei, deren letzter Block fehlt.
     const uint64_t frei = sb.tfree ? sb.tfree - 1u : 0u;
-    out.needed    = bedarf * kBlock;
-    out.available = (frei + gutschrift) * kBlock;
+    out.needed    = bedarf * V().block;
+    out.available = (frei + gutschrift) * V().block;
     out.dir_needed = inodes;
     out.dir_free   = sb.tinode;
     out.fits = bedarf <= frei + gutschrift && inodes <= static_cast<int>(sb.tinode);
     if (!out.fits) {
         out.detail = bedarf > frei + gutschrift
-            ? "Es fehlen " + std::to_string((bedarf - frei - gutschrift) * kBlock / 1024)
+            ? "Es fehlen " + std::to_string((bedarf - frei - gutschrift) * V().block / 1024)
               + " KB (" + std::to_string(bedarf) + " Bloecke noetig, "
               + std::to_string(frei + gutschrift) + " frei)"
             : "Es fehlen Inodes (" + std::to_string(inodes) + " noetig, "
@@ -1108,8 +1239,8 @@ FsInfo WegaFileSystem::info() const {
     const Superblock sb = superblock();
     i.label = sb.fname;
     if (!sb.fpack.empty() && sb.fpack != sb.fname) i.label += i.label.empty() ? sb.fpack : " " + sb.fpack;
-    i.total_bytes = static_cast<uint64_t>(sb.fsize - std::min<uint32_t>(sb.fsize, sb.isize)) * kBlock;
-    i.free_bytes  = static_cast<uint64_t>(sb.tfree) * kBlock;
+    i.total_bytes = static_cast<uint64_t>(sb.fsize - std::min<uint32_t>(sb.fsize, sb.isize)) * V().block;
+    i.free_bytes  = static_cast<uint64_t>(sb.tfree) * V().block;
     i.used_bytes  = i.total_bytes > i.free_bytes ? i.total_bytes - i.free_bytes : 0;
     int n = 0;
     for (const FileEntry& e : list()) if (e.type != "d") ++n;
@@ -1131,13 +1262,13 @@ FsCheckReport WegaFileSystem::check(FsCheckLevel level, bool nachladen) const {
     };
 
     r.schritt("wega.schritt.superblock", "Superblock (Block 1)");
-    uint8_t b[kBlock];
+    uint8_t b[kMaxBlock];
     if (!dev_->readBlock(1, b)) {
         f.add("wega.super.lesen", FsSeverity::Fehler, FsLayer::Verwaltung, "Block 1",
               "Der Superblock ist nicht lesbar");
         return r;
     }
-    const Superblock sb = Superblock::aus(b);
+    const Superblock sb = Superblock::aus(b, V());
     const uint32_t n_ino = sb.inodes();
     if (sb.isize < 3 || sb.fsize <= sb.isize || sb.fsize > dev_->blocks()) {
         f.add("wega.super.groesse", FsSeverity::Fehler, FsLayer::Verwaltung, "Superblock",
@@ -1145,7 +1276,7 @@ FsCheckReport WegaFileSystem::check(FsCheckLevel level, bool nachladen) const {
               + " passen nicht zum Datentraeger (" + std::to_string(dev_->blocks()) + " Bloecke)");
         return r;
     }
-    if (sb.nfree < 0 || sb.nfree > kNicFree)
+    if (sb.nfree < 0 || sb.nfree > V().nicFree)
         f.add("wega.super.nfree", FsSeverity::Fehler, FsLayer::Verwaltung, "Superblock",
               "s_nfree = " + std::to_string(sb.nfree) + " (erlaubt 0...50) - der Kern meldet "
               "'Bad free count' und vergibt nichts mehr");
@@ -1167,7 +1298,7 @@ FsCheckReport WegaFileSystem::check(FsCheckLevel level, bool nachladen) const {
         if (!inodeLesen(l, sb, i, inode[i])) {
             auto& x = f.add("wega.inode.lesen", FsSeverity::Fehler, FsLayer::Verwaltung,
                             "Inode " + std::to_string(i), "Inode-Block nicht lesbar");
-            ortVon(x, 2 + (i - 1) / kInodesProBlock);
+            ortVon(x, 2 + (i - 1) / V().inopb());
             continue;
         }
         const Dinode& d = inode[i];
@@ -1208,11 +1339,11 @@ FsCheckReport WegaFileSystem::check(FsCheckLevel level, bool nachladen) const {
     bool frei_vollstaendig = true;
     {
         int16_t n = sb.nfree;
-        std::array<uint32_t, kNicFree> liste = sb.free;
+        std::array<uint32_t, kMaxNicFree> liste = sb.free;
         std::set<uint32_t> anker;
         uint32_t woher = 1;
         for (;;) {
-            if (n < 0 || n > kNicFree) {
+            if (n < 0 || n > V().nicFree) {
                 auto& x = f.add("wega.frei.kette", FsSeverity::Fehler, FsLayer::Dateien,
                                 "Block " + std::to_string(woher),
                                 "Freilistenblock mit df_nfree = " + std::to_string(n));
@@ -1245,7 +1376,7 @@ FsCheckReport WegaFileSystem::check(FsCheckLevel level, bool nachladen) const {
                 frei_vollstaendig = false;
                 break;
             }
-            uint8_t fb[kBlock];
+            uint8_t fb[kMaxBlock];
             if (!l(naechster, fb)) {
                 f.add("wega.frei.kette", FsSeverity::Fehler, FsLayer::Dateien,
                       "Block " + std::to_string(naechster), "Freilistenblock nicht lesbar");
@@ -1253,8 +1384,8 @@ FsCheckReport WegaFileSystem::check(FsCheckLevel level, bool nachladen) const {
                 break;
             }
             woher = naechster;
-            n = static_cast<int16_t>(be16(fb));
-            for (int i = 0; i < kNicFree; ++i) liste[static_cast<size_t>(i)] = be32(fb + 2 + 4 * i);
+            n = static_cast<int16_t>(rd16(V(), fb));
+            for (int i = 0; i < V().nicFree; ++i) liste[static_cast<size_t>(i)] = rd32(V(), fb + 2 + 4 * i);
         }
     }
     // s_tfree = Laenge + 1 ist der Normalfall: sa.mkfs zaehlt die Endmarke 0 mit
@@ -1325,7 +1456,7 @@ FsCheckReport WegaFileSystem::check(FsCheckLevel level, bool nachladen) const {
         std::vector<uint32_t> daten, ind;
         std::string err;
         const std::string wer = pfad_von.count(i) ? pfad_von[i] : "Inode " + std::to_string(i);
-        if (!dateiBloecke(l, d, sb.fsize, daten, &ind, err)) {
+        if (!dateiBloecke(V(), l, d, sb.fsize, daten, &ind, err)) {
             f.add("wega.block.ausserhalb", FsSeverity::Fehler, FsLayer::Dateien, wer, err);
             continue;
         }

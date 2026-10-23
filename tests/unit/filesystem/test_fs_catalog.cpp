@@ -91,6 +91,8 @@ TEST(FsCatalog, ProfilnamenSindEinStabilerVertrag) {
         // WEGA (P8000, UNIX System III): andere Familie, beschreibt sich selbst
         // (doc/design/27_wega_dateisystem.md) — ein Eintrag fuer die 720-K-Diskette.
         "wega720",
+        // MUTOS 8000 (A5120.16): dasselbe Dateisystem, Blockraum ab Zylinder 1.
+        "mutos77", "mutos80", "mutos1700_720", "mutos1700_a7100",
         // tar-Disketten (P8000-Lieferungen ohne Dateisystem, nur lesbar): letzter
         // Erkennungsversuch hinter allen echten Dateisystemen (disk_volume.cpp).
         "tar720",

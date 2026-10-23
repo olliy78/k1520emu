@@ -808,6 +808,11 @@ std::map<std::string, CpmAngabe> leseCpmBeiblatt(const fs::path& datei) {
 // Das ist gewollt: die einzelne Datei soll fuer sich genommen vollstaendig sein,
 // gleich aus welchem Ordner sie stammt und wohin sie spaeter kopiert wird.
 
+/// @brief Familie des System-III-Dateisystems, die ein Profil beschreibt.
+const wega::Variante& unixVariante(const FsProfile& p) {
+    return p.mutos1700_layout ? wega::kXenixV : wega::kWegaV;
+}
+
 // ─── WEGA: die Angaben einer UNIX-Inode ──────────────────────────────────────
 //
 // WEGA fuehrt weder UDOS-Kopfsektorangaben noch CP/M-Attribute, sondern eine Inode:
@@ -836,6 +841,90 @@ bool istBeiblatt(const fs::path& name) {
 /// @brief WEGA: Pfad im Quellordner = Pfad auf dem Datentraeger ("bin/ls").
 std::string wegaZielName(const std::string& src_dir, const std::string& quelle) {
     return fs::path(quelle).lexically_relative(src_dir).generic_string();
+}
+
+/// @brief Die UNIX-Angaben einer `.fileinfo`/des Beiblatts als Bausatz fuer setAttributes —
+///        alles, was die Diskette herstellen kann (auch atime/ctime).
+UnixAttrs unixAttrsAus(const UnixAngabe& x) {
+    UnixAttrs ua;
+    if (x.mode_da)  { ua.set_mode = true; ua.mode = x.mode & 07777; }
+    if (x.owner_da) { ua.set_uid = ua.set_gid = true; ua.uid = x.uid; ua.gid = x.gid; }
+    if (x.mtime)    { ua.set_mtime = true; ua.mtime = x.mtime; }
+    if (x.atime)    { ua.set_atime = true; ua.atime = x.atime; }
+    if (x.ctime)    { ua.set_ctime = true; ua.ctime = x.ctime; }
+    return ua;
+}
+
+/// @brief Eine Zeile des WEGA-Beiblatts: Pfad + UNIX-Angaben.
+struct WegaBeiblattEintrag {
+    std::string name;
+    UnixAngabe  x;
+    uint16_t    rdev = 0;        ///< major<<8 | minor
+};
+
+/// @brief `wega-dateiangaben.txt` lesen.  Fehlt es, ist die Liste leer.  Der Pfad endet vor dem
+///        ersten ` art=` (Namen duerfen Leerzeichen tragen), danach folgen `schluessel=wert`.
+std::vector<WegaBeiblattEintrag> leseWegaBeiblatt(const fs::path& datei) {
+    std::vector<WegaBeiblattEintrag> out;
+    std::ifstream f(datei);
+    std::string zeile;
+    while (std::getline(f, zeile)) {
+        if (!zeile.empty() && zeile.back() == '\r') zeile.pop_back();
+        if (zeile.empty() || zeile[0] == '#') continue;
+        const size_t g = zeile.find(" art=");
+        if (g == std::string::npos) continue;
+        WegaBeiblattEintrag e;
+        e.name = zeile.substr(0, g);
+        std::istringstream felder(zeile.substr(g + 1));
+        std::string tok;
+        while (felder >> tok) {
+            const size_t eq = tok.find('=');
+            if (eq == std::string::npos) continue;
+            leseUnixFeld(e.x, tok.substr(0, eq), tok.substr(eq + 1));
+        }
+        const size_t k = e.x.rdev.find(',');
+        if (k != std::string::npos)
+            e.rdev = static_cast<uint16_t>((std::atoi(e.x.rdev.c_str()) << 8)
+                                           | (std::atoi(e.x.rdev.c_str() + k + 1) & 0xFF));
+        out.push_back(std::move(e));
+    }
+    return out;
+}
+
+/// @brief Geraetedateien/FIFOs des Beiblatts — das, was als Datei nicht existieren kann.
+std::vector<WegaBeiblattEintrag> beiblattKnoten(const fs::path& src_dir) {
+    std::vector<WegaBeiblattEintrag> out;
+    for (WegaBeiblattEintrag& e : leseWegaBeiblatt(src_dir / kWegaBeiblatt))
+        if (e.x.art == "c" || e.x.art == "b" || e.x.art == "p") out.push_back(std::move(e));
+    return out;
+}
+
+/// @brief Harte Links der Quelle: Quelle -> Pfad der ERSTEN Quelle desselben Inodes.
+///
+/// Eine Datei mit `nlink > 1` steht nach dem Auspacken mehrfach im Ordner (jede mit ihrem
+/// `.fileinfo`, gleicher `inode=`).  Als Link zusammengefasst werden sie nur, wenn auch
+/// Groesse, Aenderungszeit und INHALT gleich sind — eine zufaellig gleiche Inode-Nummer
+/// aus einem anderen Ordner darf nie zwei verschiedene Dateien verschmelzen.
+std::map<std::string, std::string> linkPlan(const std::vector<std::string>& quellen) {
+    std::map<std::string, std::string> out;
+    std::map<uint32_t, std::string> erste;
+    auto lies = [](const std::string& p) {
+        std::ifstream f(p, std::ios::binary);
+        return std::string((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    };
+    for (const std::string& q : quellen) {
+        FileAngaben ein;
+        if (!leseFileinfo(fileinfoPfad(q), ein) || !ein.wega || ein.x.nlink < 2 || !ein.x.inode)
+            continue;
+        const auto it = erste.find(ein.x.inode);
+        if (it == erste.end()) { erste[ein.x.inode] = q; continue; }
+        FileAngaben e0;
+        leseFileinfo(fileinfoPfad(it->second), e0);
+        if (e0.x.mtime == ein.x.mtime && e0.x.mode == ein.x.mode
+            && fs::file_size(it->second) == fs::file_size(q) && lies(it->second) == lies(q))
+            out[q] = it->second;
+    }
+    return out;
 }
 
 std::string zielName(const std::string& quelle, FsType typ,
@@ -1197,9 +1286,9 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
                 } else if (p->type == FsType::Udos1715) {
                     SectorSpace probe(dv->disk_->medium(), *f);
                     ja = Udos1715FileSystem::looksLikeUdos1715(probe, *p, &warum);
-                } else if (p->type == FsType::Wega) {
+                } else if (p->type == FsType::WegaMutos) {
                     SectorSpace probe(dv->disk_->medium(), *f);
-                    const WegaSpaceDev geraet(probe);
+                    const WegaSpaceDev geraet(probe, p->data_cyl, p->data_head, unixVariante(*p));
                     ja = WegaFileSystem::looksLikeWega(geraet, &warum);
                 } else {
                     int belegt = 0;
@@ -1465,8 +1554,10 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
             auto u = Udos1715FileSystem::mount(*v.space, *dv->profile_, warum);
             if (!u) { err = warum; return roh(warum); }
             v.fs = std::move(u);
-        } else if (dv->profile_->type == FsType::Wega) {
-            auto w = WegaFileSystem::mount(std::make_unique<WegaSpaceDev>(*v.space), warum);
+        } else if (dv->profile_->type == FsType::WegaMutos) {
+            auto w = WegaFileSystem::mount(std::make_unique<WegaSpaceDev>(
+                *v.space, dv->profile_->data_cyl, dv->profile_->data_head,
+                unixVariante(*dv->profile_)), warum);
             if (!w) { err = warum; return roh(warum); }
             v.fs = std::move(w);
         } else if (dv->profile_->type == FsType::Tar && dv->profile_->leer) {
@@ -2951,6 +3042,8 @@ bool DiskVolume::insert(const std::string& src_path, const FileRef& ref,
                 wo.wega_owner_gesetzt = true;
             }
             wo.wega_mtime = ein.x.mtime;       // 0 = jetzt
+            wo.wega_atime = ein.x.atime;
+            wo.wega_ctime = ein.x.ctime;
         }
     }
     // Ohne Angaben: Zugriffsrechte aus der Linux-Datei — ausfuehrbar bleibt ausfuehrbar.
@@ -3478,7 +3571,20 @@ bool DiskVolume::extractAll(const std::string& dest_dir, const TransferOptions& 
              "#   art    - Datei - d Verzeichnis - c/b Geraet (rdev = major,minor) - p FIFO\n"
              "#   mode   di_mode oktal samt Dateiart (0100755 = -rwxr-xr-x)\n"
              "#   uid gid nlink inode - mtime/atime/ctime Sekunden seit 1970 (GMT)\n"
-             "# Beim Einfuegen (`put <ordner>`) gilt das `.fileinfo` je Datei, nicht dieses Blatt.\n";
+             "# Beim Einfuegen (`put <ordner>`) gilt das `.fileinfo` je Datei und Verzeichnis; dieses Blatt\n"
+             "# liefert die Geraetedateien/FIFOs (sie sind keine Dateien) und die Wurzel (\".\").\n";
+        // Die Wurzel (Inode 2) hat keinen Namen und steht nicht in list(): als "." eintragen.
+        if (auto* w = dynamic_cast<WegaFileSystem*>(volumes_[0].fs.get())) {
+            wega::Dinode r;
+            if (w->readInode(2, r)) {
+                UnixAngabe x;
+                x.art = "d"; x.mode = r.mode; x.mode_da = true; x.uid = r.uid; x.gid = r.gid;
+                x.owner_da = true; x.nlink = r.nlink; x.inode = 2;
+                x.mtime = r.mtime; x.atime = r.atime; x.ctime = r.ctime;
+                f << ". ";
+                schreibeUnixFelder(f, x, ' ');
+            }
+        }
         for (const FileEntry& e : volumes_[0].fs->list()) {
             f << e.name << ' ';
             schreibeUnixFelder(f, unixAus(e), ' ');
@@ -3616,14 +3722,27 @@ bool DiskVolume::checkFit(const std::string& src_dir, std::string& bericht) cons
     bool passt = true;
     for (size_t v = 0; v < volumes_.size(); ++v) {
         std::vector<PlannedFile> plan;
+        const std::map<std::string, std::string> links =
+            (istUnix() && v == 0) ? linkPlan(je_volume[v]) : std::map<std::string, std::string>{};
         for (const std::string& p : je_volume[v]) {
             std::error_code ec;
             PlannedFile f;
+            if (links.count(p)) { f.size = 0; f.volume = static_cast<int>(v); f.link = true;   // nur ein Eintrag
+                                  f.name = wegaZielName(src_dir, p); plan.push_back(f); continue; }
             f.name   = istUnix() ? wegaZielName(src_dir, p)
                               : zielName(p, profile_->type, cpm_beiblatt);
             f.size   = fs::file_size(p, ec);
             f.volume = static_cast<int>(v);
             plan.push_back(f);
+        }
+        if (istUnix() && v == 0) {     // Geraetedateien/FIFOs: je eine Inode
+            std::set<uint32_t> erste;
+            for (const WegaBeiblattEintrag& k : beiblattKnoten(src_dir)) {
+                PlannedFile f;
+                f.name = k.name; f.size = 0; f.volume = 0;
+                f.link = k.x.nlink > 1 && k.x.inode && !erste.insert(k.x.inode).second;
+                plan.push_back(f);
+            }
         }
         FitReport r;
         if (!volumes_[v].fs->wouldFit(plan, r)) { bericht = volumes_[v].fs->lastError();
@@ -3689,10 +3808,24 @@ bool DiskVolume::insertAll(const std::string& src_dir, const TransferOptions& op
     const std::map<std::string, CpmAngabe> cpm_beiblatt =
         leseCpmBeiblatt(fs::path(src_dir) / kCpmBeiblatt);
 
+    // WEGA/MUTOS: harte Links als Links wiederherstellen (sonst belegt jede Kopie Platz).
+    const std::map<std::string, std::string> links =
+        istUnix() ? linkPlan(je_volume[0]) : std::map<std::string, std::string>{};
+    std::vector<std::string> unix_nachziehen;     // Quellen, deren Angaben zuletzt gesetzt werden
     for (size_t v = 0; v < volumes_.size(); ++v) {
         for (const std::string& quelle : je_volume[v]) {
             const std::string name = istUnix() ? wegaZielName(src_dir, quelle)
                                                : zielName(quelle, profile_->type, cpm_beiblatt);
+            if (const auto lk = links.find(quelle); lk != links.end()) {
+                if (!volumes_[0].fs->makeLink(wegaZielName(src_dir, lk->second), name)) {
+                    const std::string grund = volumes_[0].fs->lastError();
+                    zurueck();
+                    return fail(grund + " - die Diskette wurde nicht veraendert.");
+                }
+                unix_nachziehen.push_back(quelle);
+                unix_nachziehen.push_back(lk->second);   // sein ctime hat der Link verschoben
+                continue;
+            }
             TransferOptions o = opt;
             o.overwrite = true;          // im Stapel ersetzt der Ordner den Bestand
             // Gefiltert ist hier schon; die Einzelsperre wuerde nur noch einmal
@@ -3730,6 +3863,45 @@ bool DiskVolume::insertAll(const std::string& src_dir, const TransferOptions& op
         }
     }
 
+    if (istUnix()) {
+        // Geraetedateien und FIFOs gibt es nur im Beiblatt: als Datei koennen sie nicht ausgepackt werden.
+        // Dieselbe Inode unter mehreren Namen (`nlink > 1`, gleiche `inode=`): der erste wird angelegt,
+        // die uebrigen werden harte Links darauf.
+        const std::vector<WegaBeiblattEintrag> knoten = beiblattKnoten(src_dir);
+        std::map<uint32_t, std::string> knoten_erste;
+        for (const WegaBeiblattEintrag& k : knoten) {
+            const auto da = (k.x.nlink > 1 && k.x.inode) ? knoten_erste.find(k.x.inode) : knoten_erste.end();
+            const bool ok = da != knoten_erste.end()
+                          ? volumes_[0].fs->makeLink(da->second, k.name)
+                          : volumes_[0].fs->makeNode(k.name, k.x.mode, k.rdev);
+            if (!ok) {
+                const std::string grund = volumes_[0].fs->lastError();
+                zurueck();
+                return fail(grund + " - die Diskette wurde nicht veraendert.");
+            }
+            if (da == knoten_erste.end() && k.x.nlink > 1 && k.x.inode) knoten_erste[k.x.inode] = k.name;
+        }
+        // Angaben erst jetzt: jeder Link verschiebt die ctime der gemeinsamen Inode.
+        for (const WegaBeiblattEintrag& k : knoten)
+            if (!volumes_[0].fs->setAttributes(k.name, unixAttrsAus(k.x))) {
+                const std::string grund = volumes_[0].fs->lastError();
+                zurueck();
+                return fail(grund + " - die Diskette wurde nicht veraendert.");
+            }
+        std::sort(unix_nachziehen.begin(), unix_nachziehen.end());
+        unix_nachziehen.erase(std::unique(unix_nachziehen.begin(), unix_nachziehen.end()),
+                              unix_nachziehen.end());
+        for (const std::string& q : unix_nachziehen) {
+            FileAngaben ein;
+            if (!leseFileinfo(fileinfoPfad(q), ein)) continue;
+            if (!volumes_[0].fs->setAttributes(wegaZielName(src_dir, q), unixAttrsAus(ein.x))) {
+                const std::string grund = volumes_[0].fs->lastError();
+                zurueck();
+                return fail(grund + " - die Diskette wurde nicht veraendert.");
+            }
+        }
+    }
+
     // WEGA: Rechte, Besitzer und Zeit der Verzeichnisse (`<ordner>.fileinfo`).  Erst
     // jetzt: jede Datei darin aendert die mtime des Verzeichnisses, und ein
     // Verzeichnis mit Modus 0555 liesse sich vorher gar nicht fuellen (der Kern
@@ -3740,17 +3912,20 @@ bool DiskVolume::insertAll(const std::string& src_dir, const TransferOptions& op
             if (!e.is_directory()) continue;
             FileAngaben ein;
             if (!leseFileinfo(fileinfoPfad(e.path()), ein) || !(ein.wega || ein.tar)) continue;
-            UnixAttrs ua;
-            if (ein.x.mode_da)  { ua.set_mode = true; ua.mode = ein.x.mode & 07777; }
-            if (ein.x.owner_da) { ua.set_uid = ua.set_gid = true;
-                                  ua.uid = ein.x.uid; ua.gid = ein.x.gid; }
-            if (ein.x.mtime)    { ua.set_mtime = true; ua.mtime = ein.x.mtime; }
-            if (!volumes_[0].fs->setAttributes(wegaZielName(src_dir, e.path().string()), ua)) {
+            if (!volumes_[0].fs->setAttributes(wegaZielName(src_dir, e.path().string()),
+                                               unixAttrsAus(ein.x))) {
                 const std::string grund = volumes_[0].fs->lastError();
                 zurueck();
                 return fail(grund + " - die Diskette wurde nicht veraendert.");
             }
         }
+        // Die Wurzel hat kein `.fileinfo` (kein Name): ihre Angaben stehen im Beiblatt unter ".".
+        for (const WegaBeiblattEintrag& b : leseWegaBeiblatt(fs::path(src_dir) / kWegaBeiblatt))
+            if (b.name == "." && !volumes_[0].fs->setAttributes("", unixAttrsAus(b.x))) {
+                const std::string grund = volumes_[0].fs->lastError();
+                zurueck();
+                return fail(grund + " - die Diskette wurde nicht veraendert.");
+            }
     }
     return true;
 }
@@ -3847,7 +4022,8 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
                                                const FormatCatalog& formats,
                                                const FsCatalog& fs_cat,
                                                std::string& err,
-                                               const std::string& boot_image) {
+                                               const std::string& boot_image,
+                                               uint32_t unix_inodes) {
     const FsProfile* profil = fs_cat.find(fs_name);
     if (!profil) { err = "Dateisystem '" + fs_name + "' steht nicht im Katalog"; return nullptr; }
     const DiskFormat* fmt = formats.find(profil->format);
@@ -3978,9 +4154,13 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
             auto u = Udos1715FileSystem::format(*v.space, *profil, label, err);
             if (!u) return nullptr;
             v.fs = std::move(u);
-        } else if (profil->type == FsType::Wega) {
-            // wie `sa.mkfs 1440` — Verschraenkung 1/72 wie auf den Lieferdisketten
-            auto w = WegaFileSystem::format(std::make_unique<WegaSpaceDev>(*v.space), label, err);
+        } else if (profil->type == FsType::WegaMutos) {
+            // wie `sa.mkfs 1440` — Verschraenkung 1/72 wie auf den Lieferdisketten.
+            // MUTOS (Blockraum ab Zylinder 1) traegt 3/500, wie CMD/CC1/CC2.
+            const bool mutos = profil->mutos1700_layout || profil->data_cyl != 0;
+            auto w = WegaFileSystem::format(std::make_unique<WegaSpaceDev>(
+                *v.space, profil->data_cyl, profil->data_head, unixVariante(*profil)), label, err,
+                0, mutos ? 3 : 1, mutos ? 500 : 72, 0, unix_inodes);
             if (!w) return nullptr;
             v.fs = std::move(w);
         } else {
@@ -4004,6 +4184,17 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
 }
 
 // ─── Bootabbild (Systemspuren) ───────────────────────────────────────────────
+
+uint32_t DiskVolume::unixStandardInodes(const FsProfile& prof, const DiskFormat& fmt) {
+    if (prof.type != FsType::WegaMutos) return 0;
+    DiskMedium leer(fmt.numCylinders(), fmt.numHeads(), fmt.predominantEncoding());
+    const SectorSpace raum(leer, fmt, SectorSpace::kAllHeads);
+    const wega::Variante& v = unixVariante(prof);
+    const uint64_t bytes = raum.size() - systemspurBytes(raum, prof);
+    const uint64_t bloecke = bytes / v.block;
+    const uint64_t ib = std::max<uint64_t>(1, bloecke / 25);
+    return static_cast<uint32_t>(ib * static_cast<uint64_t>(v.inopb()));
+}
 
 uint64_t DiskVolume::bootAreaCapacity(const FsProfile& prof, const DiskFormat& fmt) {
     // Der lineare Aufbau haengt allein am Format — ein leeres Medium in dessen

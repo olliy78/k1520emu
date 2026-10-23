@@ -386,8 +386,9 @@ class _Programm:
 
 def _uniformen(screen):
     f = _Uniformen()
-    screen._program = _Programm()
-    screen._set_uniforms(f)
+    gl = screen._flaeche
+    gl._program = _Programm()
+    gl._set_uniforms(f)
     return f.werte
 
 
