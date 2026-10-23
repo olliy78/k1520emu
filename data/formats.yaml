@@ -985,6 +985,19 @@ filesystems:
     data_start:  { cyl: 1, head: 0 }
     detect_rank: -10
 
+  # MUTOS 8000, 8″-FM-Zuschnitt (M8KCMD, M8KUSR): 77 Spuren 26×128, der Blockraum beginnt auf
+  # Zylinder 1.  Der Treiber legt je 512-B-Block 4 logische Sektoren mit Verschraenkung 2 und
+  # 6 Sektoren Spurversatz ab (`unix_layout: mutos8k`, Mutos8kDev) - das ist NICHT die lineare
+  # Sektorfolge der anderen Profile.  Eigener Eintrag, weil nur diese Abbildung die Blocknummern
+  # des Dateisystems trifft (doc/design/39_mutos8000.md §4).
+  - name:        mutos8k_fm
+    description: "MUTOS 8000 (UNIX, A5120.16) — 8″ FM 26×128, Blockraum ab Zylinder 1 (verschraenkt)"
+    format:      mf3200_26x128
+    type:        wega_mutos
+    unix_layout: mutos8k
+    data_start:  { cyl: 1, head: 0 }
+    detect_rank: -10
+
   # ══ tar-Disketten (P8000-Lieferungen) ══════════════════════════════════════
   # Eigener Grund fuer einen Eintrag: 84 der 142 P8000-Disketten tragen KEIN
   # Dateisystem, sondern einen `tar`-Strom direkt ab Sektor 0 (Mehrdisketten-Saetze

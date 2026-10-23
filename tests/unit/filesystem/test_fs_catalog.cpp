@@ -92,7 +92,7 @@ TEST(FsCatalog, ProfilnamenSindEinStabilerVertrag) {
         // (doc/design/27_wega_dateisystem.md) — ein Eintrag fuer die 720-K-Diskette.
         "wega720",
         // MUTOS 8000 (A5120.16): dasselbe Dateisystem, Blockraum ab Zylinder 1.
-        "mutos77", "mutos80", "mutos1700_720", "mutos1700_a7100",
+        "mutos77", "mutos80", "mutos1700_720", "mutos1700_a7100", "mutos8k_fm",
         // tar-Disketten (P8000-Lieferungen ohne Dateisystem, nur lesbar): letzter
         // Erkennungsversuch hinter allen echten Dateisystemen (disk_volume.cpp).
         "tar720",

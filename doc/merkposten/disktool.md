@@ -1175,3 +1175,16 @@ liefen schon), drei tragen ein UNIX-Dateisystem, eines (`ROOT1_G`) ist ein besch
    Vorgabe und ist gesperrt; C-ABI `k1520d_create_ex`, `k1520d_fs_unix_inodes`; Wächter `py_disktool_neu_inodes_gui`).
 4. Wächter `MutosFs.Mutos8000_VollstaendigeWiederherstellung`, `…Mutos1700_A7100_VollstaendigeWiederherstellungMitLinksUndGeraeten`;
    von Hand zusätzlich ROOT1_D (mit `--inodes 272`), UUCP, CMD, CC1 über das Archiv (`python -m app.disktool.archive`).
+
+## MUTOS 8000 M8K-Satz (8″ FM 26×128, 2026-10-23, #22)
+
+Ausführliche Formatbeschreibung, Belege und Tabellen: **`doc/design/39_mutos8000.md` §4.6**.  Das Wichtigste:
+1. **CMD/USR** (`mutos8k_fm`, `unix_layout: mutos8k`, `Mutos8kDev`): 512-B-Block = 4 logische Sektoren zu 128 B, 26 je Spur über alle Spuren ab Zyl. 1,
+   Verschränkung 2 (13 ungerade, dann 13 gerade IDs) und **6 Sektoren Spurversatz je Zylinder**: `ID = ((platz + 6·(Zyl−1)) mod 26) + 1`.  Nicht die lineare Folge —
+   Block 6 überschreitet die Spurgrenze.  Beleg: Wurzel/Baum/Freiliste, 23 `a.out` mit Größe = 16+Text+Daten+Symbole.  Nichts im Code darf hier
+   `WegaSpaceDev`/lineare Offsets voraussetzen.
+2. **Quelldefekte gehören der Quelle** (TD0 = SCP-Fluss): CMD `bin/pr`, USR `bin/ed`/`lib/c0`/`lib/c1` (fehlende bzw. CRC-Sektoren), BIN `wc`/`size` nur E5-Füllung,
+   `passwd` gekürzt (fsck sieht letzteres nicht).  Die Wächter pinnen genau diese Dateien; nicht „reparieren".
+3. **BIN** ist gewöhnliches `mutos77` (Zusatzsektor ID 126 auf Zyl. 0 = TD0-Pseudosektor, bleibt beim Zurückschreiben erhalten).
+4. **ROOT wird NICHT erkannt (richtig so)**: 1-Bit-Verschiebung ab Offset 1 und Fremdtabelle in Offset 80–127 jedes 128-B-Sektors; Wurzel-Modus `83FE` statt `41FF`
+   ist der Grund für ENOTDIR im Emulator-Boot.  Wächter `MutosFs.M8k_*` (Fixtures `mutos8000_m8k_*.td0`).

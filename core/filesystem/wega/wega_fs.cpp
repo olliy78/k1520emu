@@ -249,6 +249,60 @@ bool WegaSpaceDev::ort(uint32_t bn, FsRecoverOrt& out) const {
     return false;
 }
 
+// ─── Mutos8kDev ──────────────────────────────────────────────────────────────
+
+Mutos8kDev::Mutos8kDev(SectorSpace& s, uint8_t cyl0, uint8_t head)
+    : s_(s), cyl0_(cyl0), head_(head) {
+    // nur Spuren im 26×128-Zuschnitt zaehlen; die erste fremde Spur beendet den Blockraum
+    for (unsigned c = cyl0; c < 256; ++c) {
+        const uint8_t cc = static_cast<uint8_t>(c);
+        if (s.sectorsPerTrack(cc, head) != kSektoren || s.sectorSize(cc, head) != kSektorBytes) break;
+        ++spuren_;
+    }
+}
+
+bool Mutos8kDev::sektorOrt(uint32_t l, uint8_t& cyl, uint8_t& id) const {
+    const uint32_t rel = l / kSektoren;
+    if (rel >= spuren_) return false;
+    const uint32_t pos = l % kSektoren;
+    // Verschraenkung 2: 13 ungerade Plaetze, dann 13 gerade
+    const uint32_t platz = pos < 13 ? 2 * pos : 2 * (pos - 13) + 1;
+    cyl = static_cast<uint8_t>(cyl0_ + rel);
+    id  = static_cast<uint8_t>((platz + static_cast<uint32_t>(kSpurversatz) * rel) % kSektoren
+                               + s_.firstSectorId(cyl, head_));
+    return true;
+}
+
+bool Mutos8kDev::readBlock(uint32_t bn, uint8_t* dst) const {
+    if (bn >= blocks()) return false;
+    SectorData sec;
+    for (uint32_t k = 0; k < 4; ++k) {
+        uint8_t cyl = 0, id = 0;
+        if (!sektorOrt(bn * 4 + k, cyl, id) || !s_.readSector(cyl, head_, id, sec)
+            || sec.data.size() < kSektorBytes) return false;
+        std::memcpy(dst + k * kSektorBytes, sec.data.data(), kSektorBytes);
+    }
+    return true;
+}
+
+bool Mutos8kDev::writeBlock(uint32_t bn, const uint8_t* src) {
+    if (bn >= blocks()) return false;
+    for (uint32_t k = 0; k < 4; ++k) {
+        uint8_t cyl = 0, id = 0;
+        if (!sektorOrt(bn * 4 + k, cyl, id)) return false;
+        const std::vector<uint8_t> d(src + k * kSektorBytes, src + (k + 1) * kSektorBytes);
+        if (!s_.writeSector(cyl, head_, id, d)) return false;
+    }
+    return true;
+}
+
+bool Mutos8kDev::ort(uint32_t bn, FsRecoverOrt& out) const {
+    uint8_t cyl = 0, id = 0;
+    if (bn >= blocks() || !sektorOrt(bn * 4, cyl, id)) return false;
+    out.cyl = cyl; out.head = head_; out.sector = id;
+    return true;
+}
+
 bool WegaSpeicherDev::readBlock(uint32_t bn, uint8_t* dst) const {
     if (bn >= n_) return false;
     const int64_t o = off_(bn);

@@ -72,6 +72,10 @@ struct FsProfile {
     ///        (Z8000, big endian, 512-B-Bloecke), true = MUTOS 1700 (A7100/8086, little endian
     ///        mit PDP-Langworten, 1024-B-Bloecke) — YAML `unix_layout: mutos1700`.
     bool mutos1700_layout = false;
+    /// @brief Nur `type: wega_mutos`: MUTOS 8000 im **26×128-Zuschnitt** (8″ FM, M8KCMD/M8KUSR) -
+    ///        Bloecke zu 4 Sektoren mit Verschraenkung 2 und 6 Sektoren Spurversatz
+    ///        (@ref Mutos8kDev) - YAML `unix_layout: mutos8k`.
+    bool mutos8k_layout = false;
 
     bool allow_img = true;     ///< als rohes Sektorabbild darstellbar (UDOS: nie)
     bool allow_hfe = true;

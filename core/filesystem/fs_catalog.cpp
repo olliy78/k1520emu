@@ -128,8 +128,10 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
             issues.push_back(where + ": 'unix_layout' gilt nur fuer type: wega_mutos - ignoriert");
         } else if (n->scalar == "mutos1700") {
             out.mutos1700_layout = true;
+        } else if (n->scalar == "mutos8k") {
+            out.mutos8k_layout = true;
         } else if (n->scalar != "wega") {
-            why = "'unix_layout': '" + n->scalar + "' - erlaubt sind wega | mutos1700";
+            why = "'unix_layout': '" + n->scalar + "' - erlaubt sind wega | mutos1700 | mutos8k";
             return false;
         }
     }

@@ -202,6 +202,41 @@ private:
 };
 
 /**
+ * @class Mutos8kDev
+ * @brief Blockgeraet der MUTOS-8000-Disketten im **26×128-Format** (8″ FM: M8KCMD, M8KUSR).
+ *
+ * Der MUTOS-Plattentreiber (`mutos_io`) rechnet 512-B-Bloecke auf 128-B-Sektoren um — und
+ * legt sie NICHT hintereinander auf die Spur:
+ *   - Ein Block sind 4 aufeinanderfolgende **logische** Sektoren; ab Zylinder @c cyl0 laufen die
+ *     logischen Sektoren ueber alle Spuren durch (26 je Spur), ein Block darf also eine
+ *     Spurgrenze ueberschreiten (6,5 Bloecke je Spur; 76 Spuren = 494 Bloecke = `s_fsize`).
+ *   - Innerhalb der Spur gilt Verschraenkung 2 (erst die 13 ungeraden, dann die 13 geraden IDs):
+ *     logisch 0..12 -> ID 1,3,..,25; logisch 13..25 -> ID 2,4,..,26.
+ *   - Jede folgende Spur ist um **6 Sektoren** gegen die vorige versetzt (Spurversatz,
+ *     die „Schrittweite 6" des Treibers): ID = (Platz + 6·(Zylinder − cyl0)) mod 26 + 1.
+ * Belegt durch Konsistenz an CMD/USR (Wurzel, Verzeichnisbaum, 94 % der Inodes lesbar,
+ * Freiliste; Entwurf 39 §4).  Rechnet kein Sektor-ID 126 o. ae. — die Zusatzsektoren der
+ * M8KROOT-Spuren gehoeren nicht dazu.
+ */
+class Mutos8kDev : public WegaBlockDev {
+public:
+    static constexpr int kSektoren = 26;      ///< logische Sektoren je Spur
+    static constexpr int kSektorBytes = 128;
+    static constexpr int kSpurversatz = 6;    ///< Versatz der Sektor-IDs von Spur zu Spur
+    explicit Mutos8kDev(SectorSpace& s, uint8_t cyl0 = 1, uint8_t head = 0);
+    uint32_t blocks() const override { return spuren_ * kSektoren / 4; }
+    bool readBlock(uint32_t bn, uint8_t* dst) const override;
+    bool writeBlock(uint32_t bn, const uint8_t* src) override;
+    bool ort(uint32_t bn, FsRecoverOrt& out) const override;
+    /// @brief Spur und ID des @p l-ten logischen Sektors (ab cyl0); false = hinter dem Ende.
+    bool sektorOrt(uint32_t l, uint8_t& cyl, uint8_t& id) const;
+private:
+    SectorSpace& s_;
+    uint8_t  cyl0_, head_;
+    uint32_t spuren_ = 0;   ///< aufeinanderfolgende 26×128-Spuren ab cyl0
+};
+
+/**
  * @class WegaFileSystem
  * @brief Ein WEGA-Dateisystem auf einem Blockgeraet.
  */
