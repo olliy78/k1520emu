@@ -9,12 +9,14 @@ Nur Python-Standardbibliothek, lauffähig mit `python3 -I`; das DiskTool wird nu
 | `m8kroot_lesen.py` | Befund der beschädigten `M8KROOT` (Superblock, Inodes, Baum, lesbare Bytes; `--inodes`, `--vergleich ORDNER`) |
 | `wurzel_quellbaum.py` | Quellbaum (Dateien, `.fileinfo`, `wega-dateiangaben.txt`) aus `M8KROOT` + Auszug von DISK-ROOT; Handangaben (Namen, `.profile`, Geräte) stehen als Daten im Skript |
 | `wurzel_pruefen.py` | unabhängiger Leser: Baum einer Wurzel (`.td0`/`.imd`) byteweise gegen einen Quellbaum |
-| `bau_alle.py` | **alle fünf fertigen Disketten** aus den beiden Archiven nach `disks/a5120_16_MUTOS/` (s. u.) |
+| `bau_alle.py` | **alle elf fertigen Disketten** (3 Ladedisketten, 2 Wurzeln, 6 Datendisketten) aus den Archiven nach `disks/a5120_16_MUTOS/` (s. u.) |
 | `bau_wurzel.py` | ganzer Nachbau: DISK-ROOT holen, Quellbaum, `create --fs mutos8k_fm --inodes 104 --blocks 250` (Swap-Bereich ab Block 250, §4.8), Zylinder 0 per `boot-get` von M8KCMD + `boot-put`, `put`, `check --full`, Prüfung |
 | `bau_aus_archiv.py` | baut die Wurzeldiskette aus einem **Archiv** (`.zip` oder ausgepackter Ordner): `bauangaben.yaml`, `zylinder0.bin`, `dateien/`; `check --full` und unabhängige Prüfung (Fehler bei Block >= `s_fsize`) |
 | `archiv_erzeugen.py` | erzeugt die eingecheckten Quell-Archive aus den Disketten (`archive --ohne-abbild`): `--art wurzel` (Vorgabe) → `…_m8k_root.zip`, `--art ladediskette` → `…_boot_udos.zip` aus der Original-Ladediskette `…_boot_udos.dmk` |
 | `bauangaben.yaml` | Vorlage der Bauangaben (fs, `fs_mfm`, Inodes, Blöcke = Swap-Grenze, Ladecode-Datei) |
 | `bau_ladediskette.py` | baut die **UDOS-Ladediskette** aus dem Archiv `a5120_mutos8000_boot_udos.zip` (oder einem ausgepackten Ordner) je Laufwerksvariante; s. u. |
+| `best_of.py` | stellt die **Best-of-Datendisketten** `cmd`/`usr`/`bin` aus den Originalabbildern beider Sätze zusammen (Tabelle `AUSWAHL` mit Herkunft und Grund je Datei, Gesundheitsprüfung) und liefert den FM-Zwischenstand für `archiv_erzeugen.py --art cmd\|usr\|bin` |
+| `bauangaben_{cmd,usr,bin}.yaml` | Vorlagen der Bauangaben der Datendisketten (Inodes, `bloecke: 494`) |
 | `bauangaben_ladediskette.yaml` | Vorlage der Bauangaben der Ladediskette (Profile, Muster der Laufwerkstyp-Konstante, Varianten); `archiv_erzeugen.py --art ladediskette` legt sie ins Archiv |
 
 ```sh
@@ -34,7 +36,8 @@ Einzelheiten: Entwurf 39 §4.7.6 und §4.8.
 Quellen (Originale, Archive) liegen in `disks/a5120_mutos8000/`, die **fertigen Disketten in `disks/a5120_16_MUTOS/`**:
 
 ```sh
-python3 -I tools/mutos8000/bau_alle.py --ueberschreiben            # baut alle fünf neu nach disks/a5120_16_MUTOS/
+python3 -I tools/mutos8000/bau_alle.py --ueberschreiben            # baut alle elf neu nach disks/a5120_16_MUTOS/
+python3 -I tools/mutos8000/bau_alle.py --nur-daten --ueberschreiben  # nur die sechs Datendisketten
 python3 -I tools/mutos8000/bau_alle.py --ziel-ordner aus/ --wurzel-quelle meine_wurzel --lade-quelle meine_lade
 ```
 
@@ -47,6 +50,18 @@ python3 -I tools/mutos8000/bau_alle.py --ziel-ordner aus/ --wurzel-quelle meine_
 Jede Zeile hat einen Boot-Wächter bis `single user login: root` und `ls -l /` (`cli_mutos8000_boot_ladediskette_{mf3200,k5601,mf3200_k5601}`).
 Die Ladedisketten werden bitgleich, die Wurzeln bis auf die Anlagezeit (`s_time`).  Wächter `test_bau_alle_kennt_genau_die_fertigen_disketten`:
 Ordner und Skript nennen dieselben Disketten.
+
+**Datendisketten** (Entwurf 39 §10): je Rolle FM (`…_<rolle>.hfe`, MF3200) und MFM (`…_<rolle>_mfm.hfe`, K5601), gebaut aus
+`disks/a5120_mutos8000/a5120_mutos8000_best_<rolle>.zip` mit `bau_aus_archiv.py [--laufwerke k5601]`:
+
+| Rolle | Mountpunkt | Inhalt |
+|---|---|---|
+| `cmd` | `/mnt` | `bin/` (30 Befehle: ar cat chmod chown cmp convert cp dd df echo ed hex kill ln ls mkdir mv nm od passwd pr ps pstat pwd rm rmdir size strip wc who) und `etc/` (clri dcheck icheck mkfs mknod ncheck) |
+| `usr` | `/usr` | C-Übersetzer: `bin/` as cc ld, `include/` (+ `sys/stat.h`, `types.h`), `lib/` c0 c1 c2 cpp crt0.o libc.a mcrt0.o |
+| `bin` | `/tmp` | Zusatzbefehle im Wurzelverzeichnis: adb mt tar (`/tmp` steht im PATH der Wurzel) |
+
+Wer eine Datei ändern will: `unzip …best_cmd.zip -d meine_cmd`, Datei unter `dateien/` tauschen, `bau_aus_archiv.py meine_cmd neu.hfe --laufwerke k5601`.
+Das Archiv entsteht aus den Originalen mit `archiv_erzeugen.py --art cmd|usr|bin --force`; die Herkunft jeder Datei steht als `entscheidungen.txt` darin.
 
 Nachbau gegen `…_root.hfe`: Dateibaum, Inhalte und `ls -l` (Modus, uid/gid, Größe, Zeit) sind gleich; Prüfer: 43 Einträge, 0 Abweichungen.
 Wächter: `tests/python/test_mutos8000_werkzeuge.py` (Befund-Leser, Archiv → Bau → Vergleich, getauschte Datei).
