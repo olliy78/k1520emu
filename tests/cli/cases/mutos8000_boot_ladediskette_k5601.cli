@@ -1,0 +1,34 @@
+# MUTOS 8000: aus dem Archiv gebaute UDOS-Ladediskette (tools/mutos8000/bau_ladediskette.py, --laufwerke k5601)
+# bootet MUTOS bis zur Shell.  Laufwerke K5601,K5601,K5601; Wurzel in C: je nach Laufwerkstyp
+# (m8k_root_rekonstruiert_mfm.hfe).  Die Laufwerkstyp-Konstante steht in den Systemspuren der Ladediskette (Entwurf 39 9.13);
+# passen Aufzeichnung (FM/MFM) oder Konstante nicht zur Laufwerksbestueckung, erscheint kein "single user login".
+# Beide Disketten werden von k1520dbg als Kopie (COW) gemountet - die eingecheckten Abbilder bleiben heil.
+tool:      k1520dbg
+disk_path: %CLI_DIR%/../../disks/a5120_mutos8000/a5120_mutos8000_boot_udos_k5601.hfe
+timeout:   300
+run:       --em em256 --laufwerke K5601,K5601,K5601 %DISK%
+stdin:
+  g 80000000
+  keys BOOT\sMUTOS\r
+  g 100000000
+  eject A
+  mount C %CLI_DIR%/../../disks/a5120_mutos8000/a5120_mutos8000_m8k_root_rekonstruiert_mfm.hfe udos_ss77
+  keys r
+  g 100000000
+  keys root\r
+  g 100000000
+  keys ls\s-l\s/\r
+  g 100000000
+  screen
+  q
+exit:      0
+expect:    mem = 196608
+expect_re: single user login: root\s+\|
+expect:    MUTOS 8000 V.1.0
+expect_re: \|# ls -l /\s+\|
+expect_re: -rw-rw-r-- 1 root\s+108 Jan  9  1986 \.profile
+expect_re: drwxrwxrwx 2 root\s+336 Jan  9  1986 dev
+expect_re: drwxrwxrwx 2 root\s+192 Jan  9  1986 etc
+forbid:    panic
+forbid:    err on dev
+forbid:    INITIALIZATION ERROR

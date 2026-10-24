@@ -1137,6 +1137,12 @@ Vier Anwender-Disketten (ROOT, CMD, CC1, CC2; `.TD0` und `.dmk`) plus die UDOS-L
    Offen: die A5120.16 bootet MUTOS noch nicht im Emulator (Entwurf 17 §9: Kern liegt in den Systemspuren der
    UDOS-Ladediskette, `BOOT MUTOS`); das DiskTool kann den Bootbereich schon herausholen (`boot-get`).
 
+6. **Profile `mutos8k_mfm` und `udos_ss77_fm` (2026-10-24, #22):** `mutos8k_mfm` = dieselbe 8k-Wurzel in MFM (Format `udos_ss77`, Rang −10 → gewinnt vor dem UDOS-Profil
+   derselben Spurlage, eine UDOS-Diskette bleibt UDOS); `udos_ss77_fm` = UDOS auf 77 × 26 × 128 **FM** (Format `mf3200_26x128`, 8″ MF3200), nötig, weil `create` das Verfahren aus dem
+   Format nimmt. Wächter `MutosFs.M8k_MfmUndFmErkennungUndUdosBleibtUdos`, `FsCatalog` (Namensliste). Die Ladedisketten baut `tools/mutos8000/bau_ladediskette.py` aus dem Archiv
+   `…_boot_udos.zip`. **Fallstrick: `get` schreibt einen leeren Datumsvermerk als `erst=-`/`geaend=-`, `put` liest `-` als „heute“** — das Erzeugerskript schreibt `______` aus, sonst wäre
+   der Bau tagesabhängig. Wächter `test_mutos8000_werkzeuge.py`, `cli_mutos8000_boot_ladediskette_*`.
+
 ## MUTOS 1700 (A7100) — dieselbe Klasse, zweite Familie (2026-10-23)
 
 Ordner `robotron/MUTOS/mutos1700/`: 12 TeleDisk-Abbilder.  **Acht sind `tar720`** (DOC1/2, MAN1/2, ROOT2, SYS1, USER1/2 —
