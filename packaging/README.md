@@ -40,6 +40,28 @@ verhandelbar:
   Baurechner: für Veröffentlichungen auf einer alten Baseline bauen
   (manylinux_2_28 o. ä.), nicht auf der Entwicklungsmaschine.
 
+## Raspberry Pi OS (ARM64)
+
+Workflow `release.yml`, Job `raspberrypi-arm64` (nativer Runner `ubuntu-22.04-arm`, glibc 2.35 ≤ Bookworm 2.36;
+Auslöser wie beim Linux-Job: von Hand oder Tag `v*`).  Er prüft die Architektur (`uname -m`, `readelf`: alle
+ELF-Dateien in `bin/` müssen AArch64 sein, sonst Abbruch), lädt `k1520emu-raspberrypi-arm64` als Artefakt hoch
+(darin `k1520emu-<version>-linux-aarch64.tar.gz`) und hängt es bei einem Tag ans Release.
+
+```sh
+tar xzf k1520emu-<version>-linux-aarch64.tar.gz
+cd k1520emu-<version>-linux-aarch64
+./install_raspberrypi.sh            # Systempakete per apt, dann install.sh
+./install_raspberrypi.sh --check-deps   # nur prüfen, kein sudo nötig
+```
+
+Automatisch (nur wenn fehlend) installierte apt-Pakete: libgtk-3-0, libasound2, libnss3, libxss1, libgbm1,
+libx11-xcb1, libxkbcommon0, libdrm2, libxdamage1, libxcomposite1, libxrandr2, libatk1.0-0, libatk-bridge2.0-0,
+libpango-1.0-0, libcairo2, dazu für Qt libxcb-cursor0, libegl1, libgl1.  Wo ein Paket die `t64`-Endung trägt
+(Debian 13/Ubuntu 24.04), wird die vorhandene bzw. verfügbare Fassung gewählt.  apt braucht **sudo/root**
+(nur dafür; K1520emu selbst installiert benutzerlokal) und Netz; ebenso lädt `install.sh` Python/Qt nach —
+**ein reiner Offline-Betrieb ist nicht vorgesehen**.  Mit `--no-apt` bleibt das System unangetastet.
+Test auf echter Hardware: durch die Maintainer.
+
 ## Probeinstallation
 
 ```sh
@@ -109,6 +131,7 @@ Datei im Zielordner überlebt.
 |-------|-------|
 | `build_payload.sh` | baut den Release-Kern und schnürt das Archiv |
 | `install.sh` | Bootstrap-Installer Linux/macOS (liegt im Paket, läuft beim Anwender) |
+| `install_raspberrypi.sh` | Installer Raspberry Pi OS (ARM64): installiert fehlende Systempakete per apt (`dpkg -s`-Prüfung, sudo), ruft dann `install.sh` |
 | `k1520emu.iss` | Windows-Installationsprogramm (Inno Setup ≥ 6.5). Es **installiert selbst** — laden, auspacken, Laufzeitumgebung, Schlankmachen, Starter, Rauchtest, Deinstallieren; kein PowerShell beteiligt (Guards in `tests/python/test_packaging.py`) |
 | `python_pins.txt` | gepinnter Python für das Windows-Setup: Fassung, Größe, SHA256 (`build_payload.sh --refresh-python`) |
 | `launcher.cmd`, `disktool_launcher.cmd`, `kermit_launcher.cmd` | Windows-Starter; die Startmenü-Verknüpfung zeigt dagegen direkt auf `pythonw.exe`, sonst öffnet sich ein Konsolenfenster |

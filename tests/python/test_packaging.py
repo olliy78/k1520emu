@@ -29,7 +29,7 @@ import pytest
 from conftest import PROJECT_ROOT, ausgelieferte_diskette, requires_core
 
 PACKAGING = PROJECT_ROOT / "packaging"
-SCRIPTS = ["install.sh", "build_payload.sh", "launcher.sh",
+SCRIPTS = ["install.sh", "install_raspberrypi.sh", "build_payload.sh", "launcher.sh",
            "disktool_launcher.sh", "kermit_launcher.sh", "lib/common.sh"]
 # Frisch geschlankt sind es ~146 MB OHNE Disketten (§8 des Entwurfs).  Mit der Vorgabeauswahl
 # kamen die P8000-WEGA-Saetze dazu (~13 MB, seit 2026-10-11) und K1520 Kermit (~2,4 MB,
