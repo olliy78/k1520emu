@@ -2,6 +2,8 @@
 # Vorlage fuer tools/mutos8000/archiv_erzeugen.py; bau_aus_archiv.py liest sie aus dem Archiv.
 # Nur "schluessel: wert", ein Wert je Zeile.
 fs: mutos8k_fm
+# Dieselbe Wurzel in MFM (bau_aus_archiv.py --laufwerke k5601)
+fs_mfm: mutos8k_mfm
 inodes: 104
 # Dateisystemgroesse (s_fsize) in Bloecken.  Dahinter liegt auf demselben Geraet (rk2, /dev/swap = 4,2)
 # der AUSLAGERUNGSBEREICH des Kernels: Bloecke ab 250 duerfen nie vom Dateisystem belegt werden

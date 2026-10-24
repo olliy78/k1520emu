@@ -7,6 +7,9 @@ Wurzel).  Wer eine Datei unter dateien/ austauscht, bekommt mit diesem Skript ei
 
 Ablauf: auspacken (Temp), create --fs/--inodes/--blocks, boot-put, put dateien/, check --full,
 unabhaengige Pruefung (wurzel_pruefen.py; Fehler bei Block >= s_fsize).
+`--laufwerke mf3200` (Vorgabe) baut FM-Spuren (Profil `fs`), `--laufwerke k5601` dieselbe Wurzel in MFM
+(Profil `fs_mfm`, Entwurf 39 §9.13): Blockabbildung und Verschraenkung haengen nur an den Sektornummern.
+Die UDOS-Ladedisketten baut bau_ladediskette.py.
 Das DiskTool wird nur ueber tools/dev.sh gerufen.  Die eingecheckte Diskette ist nur mit
 --ueberschreiben als Ziel erlaubt; ein vorhandenes Ziel ebenso.
 """
@@ -24,6 +27,8 @@ import wurzel_pruefen  # noqa: E402
 
 EINGECHECKT = m8k.disk("m8k_root_rekonstruiert.hfe")
 PFLICHT = ("fs", "inodes", "bloecke", "zylinder0")
+# --laufwerke -> Schluessel der Bauangaben, der das Profil nennt (Spuraufzeichnung steckt im Profil)
+LAUFWERKE = {"mf3200": "fs", "k5601": "fs_mfm"}
 
 
 def disktool(*args):
@@ -39,7 +44,7 @@ def disktool(*args):
     return r.stdout
 
 
-def bauangaben_lesen(pfad):
+def bauangaben_lesen(pfad, pflicht=PFLICHT, zahlen=("inodes", "bloecke")):
     """Flaches `schluessel: wert` mit #-Kommentaren; fehlt etwas, bricht der Bau ab."""
     if not os.path.isfile(pfad):
         raise SystemExit("bauangaben.yaml fehlt (Archiv ohne Bauangaben?)")
@@ -52,10 +57,10 @@ def bauangaben_lesen(pfad):
         if not sep:
             raise SystemExit("bauangaben.yaml: Zeile ohne ':' -> %r" % z)
         a[k.strip()] = v.strip().strip("\"'")
-    fehlt = [k for k in PFLICHT if not a.get(k)]
+    fehlt = [k for k in pflicht if not a.get(k)]
     if fehlt:
         raise SystemExit("bauangaben.yaml: fehlt " + ", ".join(fehlt))
-    for k in ("inodes", "bloecke"):
+    for k in zahlen:
         if not a[k].isdigit():
             raise SystemExit("bauangaben.yaml: %s muss eine Zahl sein" % k)
     return a
@@ -75,7 +80,9 @@ def auspacken(quelle, tmp):
     return ziel
 
 
-def bauen(quelle, ziel, ueberschreiben=False, ausgabe=print):
+def bauen(quelle, ziel, ueberschreiben=False, ausgabe=print, laufwerke="mf3200"):
+    if laufwerke not in LAUFWERKE:
+        raise SystemExit("--laufwerke: %s" % " | ".join(LAUFWERKE))
     ziel = os.path.abspath(ziel)
     if os.path.realpath(ziel) == os.path.realpath(EINGECHECKT) and not ueberschreiben:
         raise SystemExit("Ziel ist die eingecheckte Diskette; nur mit --ueberschreiben")
@@ -92,8 +99,11 @@ def bauen(quelle, ziel, ueberschreiben=False, ausgabe=print):
         if not os.path.isdir(dateien):
             raise SystemExit("Ordner dateien/ fehlt")
         bau = os.path.join(tmp, "bau.hfe")
-        ausgabe("anlegen: %s, %s Inodes, %s Bloecke" % (a["fs"], a["inodes"], a["bloecke"]))
-        disktool("create", bau, "--fs", a["fs"], "--inodes", a["inodes"], "--blocks", a["bloecke"])
+        fs = a.get(LAUFWERKE[laufwerke])
+        if not fs:
+            raise SystemExit("bauangaben.yaml: %s fehlt (--laufwerke %s)" % (LAUFWERKE[laufwerke], laufwerke))
+        ausgabe("anlegen: %s, %s Inodes, %s Bloecke" % (fs, a["inodes"], a["bloecke"]))
+        disktool("create", bau, "--fs", fs, "--inodes", a["inodes"], "--blocks", a["bloecke"])
         disktool("boot-put", bau, boot)
         disktool("put", bau, dateien)
         ausgabe(disktool("check", bau, "--full").strip().splitlines()[-1])
@@ -115,8 +125,10 @@ def main(argv=None):
     ap.add_argument("ziel", help="Zieldiskette (.hfe)")
     ap.add_argument("--ueberschreiben", action="store_true",
                     help="vorhandenes Ziel (auch die eingecheckte Diskette) ersetzen")
+    ap.add_argument("--laufwerke", choices=sorted(LAUFWERKE), default="mf3200",
+                    help="mf3200: FM (8 Zoll, Vorgabe) | k5601: MFM (5,25 Zoll)")
     a = ap.parse_args(argv)
-    bauen(a.quelle, a.ziel, a.ueberschreiben)
+    bauen(a.quelle, a.ziel, a.ueberschreiben, laufwerke=a.laufwerke)
     return 0
 
 
