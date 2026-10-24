@@ -40,7 +40,7 @@ def test_m8kroot_befund_stimmt_mit_dem_entwurf_ueberein():
 
 def test_skripte_zeigen_ihre_hilfe():
     for s in ("m8kroot_lesen.py", "wurzel_quellbaum.py", "wurzel_pruefen.py", "bau_wurzel.py",
-              "bau_aus_archiv.py", "archiv_erzeugen.py", "bau_ladediskette.py"):
+              "bau_aus_archiv.py", "archiv_erzeugen.py", "bau_ladediskette.py", "best_of.py", "bau_alle.py"):
         assert "usage" in lauf(s, "--help")
 
 
@@ -288,6 +288,117 @@ def test_bau_alle_kennt_genau_die_fertigen_disketten():
     """disks/a5120_16_MUTOS/ und tools/mutos8000/bau_alle.py muessen dieselben Disketten nennen."""
     sys.path.insert(0, str(TOOLS))
     import bau_alle
-    im_skript = {n for _, n in bau_alle.LADEDISKETTEN + bau_alle.WURZELN}
+    im_skript = {n for _, n in bau_alle.LADEDISKETTEN + bau_alle.WURZELN} | set(bau_alle.datendisketten())
     im_ordner = {p.name for p in FERTIG.glob("*.hfe")}
     assert im_skript == im_ordner
+
+
+# ─── Best-of-Datendisketten (Entwurf 39, Abschnitt 10) ───────────────────────
+
+ROLLEN = {"cmd": 56, "usr": 48, "bin": 16}      # Rolle -> Inodes laut Bauangaben
+
+
+def _archiv(rolle):
+    return DISKS / ("a5120_mutos8000_best_%s.zip" % rolle)
+
+
+def _dateien(rolle):
+    """Pfade (relativ zu dateien/) der Nutzdateien eines Archivs."""
+    with zipfile.ZipFile(_archiv(rolle)) as z:
+        return sorted(n[len("dateien/"):] for n in z.namelist()
+                      if n.startswith("dateien/") and not n.endswith((".fileinfo", "/", "wega-dateiangaben.txt")))
+
+
+@pytest.mark.parametrize("rolle", sorted(ROLLEN))
+def test_datendisketten_archiv_ist_vollstaendig_und_ohne_abbild(rolle):
+    with zipfile.ZipFile(_archiv(rolle)) as z:
+        namen = z.namelist()
+        assert not any(n.endswith(".hfe") for n in namen)
+        angaben = z.read("bauangaben.yaml").decode("utf-8")
+        assert len(z.read("zylinder0.bin")) == 26 * 128
+        entsch = z.read("entscheidungen.txt").decode("utf-8")
+        for n in _dateien(rolle):
+            assert "dateien/%s.fileinfo" % n in namen
+            assert n in entsch                     # jede Datei hat ihre dokumentierte Herkunft
+    assert "fs: mutos8k_fm" in angaben and "fs_mfm: mutos8k_mfm" in angaben
+    assert "inodes: %d" % ROLLEN[rolle] in angaben and "bloecke: 494" in angaben
+
+
+def test_datendisketten_auswahl_deckt_die_m8k_originale_ab_und_meidet_beschaedigtes():
+    """cmd/usr/bin zusammen enthalten jede Datei der M8K-Disketten (Ausnahmen mit Grund), und keine Textdatei traegt NUL-Bytes."""
+    sys.path.insert(0, str(TOOLS))
+    import m8k
+    cmd, usr, bin_ = (set(_dateien(r)) for r in ("cmd", "usr", "bin"))
+
+    def namen(abbild):
+        fs = m8k.Dateisystem(str(DISKS / abbild))
+        res = set()
+
+        def lauf(ino, pfad):
+            for i, n in fs.eintraege(ino):
+                p = pfad + n
+                if fs.inode(i)[0] & 0xF000 == 0x4000:
+                    lauf(i, p + "/")
+                else:
+                    res.add(p)
+        lauf(2, "")
+        return res
+    fehlt_cmd = namen("a5120_mutos8000_m8k_cmd.td0") - cmd - {"bin/" + n for n in bin_}
+    assert fehlt_cmd == set()                        # adb steht auf bin (Platz), mt/tar kommen von dort
+    fehlt_usr = namen("a5120_mutos8000_m8k_usr.td0") - usr
+    assert fehlt_usr == {"bin/ed", "include/grp.h"}  # ed liegt auf cmd; grp.h ist in keinem Satz heil
+    with zipfile.ZipFile(_archiv("usr")) as z:
+        for n in _dateien("usr"):
+            if n.endswith(".h"):
+                assert b"\0" not in z.read("dateien/" + n), n
+    assert "bin/adb" not in cmd and "adb" in bin_ and "tar" in bin_ and "mt" in bin_
+
+
+def test_datendisketten_pwd_ist_die_aeltere_fassung():
+    """Die 1987er pwd (DISK-ROOT) haengt auf dem Kernel der Ladediskette; die 1986er (M8KCMD) laeuft (Entwurf 39, Abschnitt 10)."""
+    with zipfile.ZipFile(_archiv("cmd")) as z:
+        pwd = z.read("dateien/bin/pwd")
+    assert len(pwd) == 3460
+    sys.path.insert(0, str(TOOLS))
+    import m8k
+    fs = m8k.Dateisystem(str(DISKS / "a5120_mutos8000_m8k_cmd.td0"))
+    bin_ino = dict((n, i) for i, n in fs.eintraege(2))["bin"]
+    assert pwd == fs.inhalt(dict((n, i) for i, n in fs.eintraege(bin_ino))["pwd"])
+
+
+@braucht_disktool
+@pytest.mark.parametrize("rolle", sorted(ROLLEN))
+@pytest.mark.parametrize("laufwerke,suffix,profil", [("mf3200", "", "mutos8k_fm"), ("k5601", "_mfm", "mutos8k_mfm")])
+def test_datendiskette_aus_dem_archiv_ist_die_eingecheckte(tmp_path, monkeypatch, rolle, laufwerke, suffix, profil):
+    monkeypatch.setenv("K1520_DISKTOOL", str(DISKTOOL))
+    sys.path.insert(0, str(TOOLS))
+    import bau_aus_archiv
+    neu = tmp_path / "neu.hfe"
+    bau_aus_archiv.bauen(str(_archiv(rolle)), str(neu), ausgabe=lambda *_: None, laufwerke=laufwerke)
+    ein = FERTIG / ("a5120_mutos8000_%s%s.hfe" % (rolle, suffix))
+    fs_neu, fs_ein = _lesen(DISKTOOL, neu, tmp_path, "neu"), _lesen(DISKTOOL, ein, tmp_path, "ein")
+    assert (fs_neu.isize, fs_neu.fsize) == (fs_ein.isize, fs_ein.fsize) and fs_neu.fsize == 494
+    assert _ohne_anlagezeit(fs_neu) == _ohne_anlagezeit(fs_ein)
+    info = subprocess.run([str(DISKTOOL), "info", str(neu)], capture_output=True, text=True).stdout
+    assert "Dateisystem: " + profil in info
+    pruef = subprocess.run([str(DISKTOOL), "check", str(ein), "--full"], capture_output=True, text=True)
+    assert pruef.returncode == 0 and "ohne Befund" in pruef.stdout
+
+
+@braucht_disktool
+def test_datendiskette_getauschte_datei_kommt_an(tmp_path, monkeypatch):
+    monkeypatch.setenv("K1520_DISKTOOL", str(DISKTOOL))
+    sys.path.insert(0, str(TOOLS))
+    import bau_aus_archiv
+    ordner = tmp_path / "ausgepackt"
+    with zipfile.ZipFile(_archiv("cmd")) as z:
+        z.extractall(ordner)
+    echo = ordner / "dateien" / "bin" / "echo"
+    alt = echo.read_bytes()
+    echo.write_bytes(alt[:-4] + b"\xde\xad\xbe\xef")
+    ziel = tmp_path / "geaendert.hfe"
+    bau_aus_archiv.bauen(str(ordner), str(ziel), ausgabe=lambda *_: None, laufwerke="k5601")
+    fs = _lesen(DISKTOOL, ziel, tmp_path, "geaendert")
+    assert _datei(fs, "bin/echo") == alt[:-4] + b"\xde\xad\xbe\xef"
+    assert _datei(fs, "bin/ls") == (ordner / "dateien" / "bin" / "ls").read_bytes()
+    assert fs.fsize == 494

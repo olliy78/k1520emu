@@ -1,0 +1,64 @@
+# MUTOS 8000: Datendisketten einbinden (Entwurf 39 Abschnitt 10, Ticket #22).  Drei K5601; Ladediskette in A:, Wurzel in C:.
+# Nach der Anmeldung kommen die Best-of-Disketten (tools/mutos8000/best_of.py, bau_aus_archiv.py --laufwerke k5601)
+# in A: (usr -> /usr) und B: (cmd -> /mnt); mount, ein Programm von /mnt, der C-Uebersetzer von /usr (cc -> c0/c1/c2/as/ld,
+# ein Programm erzeugen und starten), umount.  Der Lader (mutos_io) liest nur 26x128 (Verschraenkung 2, Spurversatz 6);
+# die 8x512-Disketten des DISK-Satzes meldet er mit "err on dev 4/1 bn=1 er=0,304".  "er=0,302" heisst "Laufwerk nicht bereit"
+# (UDOS-Nukleus C2): leeres Laufwerk, etwa weil der Mount abgelehnt wurde (`mutos8k_fm` ist kein Mount-Format, nur `udos_ss77`
+# nimmt 26x128 in FM wie MFM), oder ein Laufwerk ohne Typ in [0FCAH] (rk3, siehe mutos8000_datendisketten_mf3200_d.cli).
+tool:      k1520dbg
+disk_path: %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_boot_udos_k5601.hfe
+timeout:   600
+run:       --em em256 --laufwerke K5601,K5601,K5601 %DISK%
+stdin:
+  g 80000000
+  keys BOOT\sMUTOS\r
+  g 100000000
+  eject A
+  mount C %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_root_mfm.hfe udos_ss77
+  keys r
+  g 100000000
+  keys root\r
+  g 100000000
+  mount A %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_usr_mfm.hfe udos_ss77
+  mount B %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_cmd_mfm.hfe udos_ss77
+  keys /etc/mount\s/dev/rk0\s/usr\r
+  g 50000000
+  keys /etc/mount\s/dev/rk1\s/mnt\r
+  g 50000000
+  keys ls\s-l\s/mnt/etc\r
+  g 50000000
+  screen
+  keys echo\s'main(){write(1,"hi\x5Cn",3);}'\s>\s/tmp/h.c\r
+  g 20000000
+  keys cc\s-o\s/tmp/h\s/tmp/h.c\r
+  g 600000000
+  keys /tmp/h\r
+  g 50000000
+  keys wc\s/tmp/h.c\r
+  g 50000000
+  keys pwd\r
+  g 50000000
+  keys echo\spwd-ok\r
+  g 30000000
+  screen
+  keys /etc/umount\s/dev/rk0\r
+  g 50000000
+  keys ls\s/usr\r
+  g 50000000
+  keys echo\sumount-ok\r
+  g 30000000
+  screen
+  q
+exit:      0
+expect:    mem = 196608
+expect_re: single user login: root\s+\|
+expect_re: \|# ls -l /mnt/etc\s+\|
+expect_re: -rwxr\S+\s+1 root\s+8406 Mar 17\s+1987 mkfs
+expect_re: \|# /tmp/h\s+\|\s+\|hi\s+\|
+expect_re: \|\s*1\s+1\s+27 /tmp/h\.c\s+\|
+expect:    umount-ok
+expect_re: \|# echo pwd-ok\s+\|\s+\|pwd-ok
+forbid:    panic
+forbid:    err on dev
+forbid:    not found
+forbid:    INITIALIZATION ERROR
