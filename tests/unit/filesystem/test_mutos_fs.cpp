@@ -468,6 +468,50 @@ TEST(MutosFs, M8k_NeueDisketteRundlaufUndFsize494) {
     std::filesystem::remove_all(dir);
 }
 
+/// @test Die 8k-Wurzel in MFM (K5601) ist dieselbe Diskette in anderer Aufzeichnung: eigenes Profil
+///       `mutos8k_mfm` (Format udos_ss77, Rang -10 - gewinnt vor dem UDOS-Profil derselben Spurlage);
+///       dieselbe Wurzel in FM bleibt `mutos8k_fm`, eine UDOS-Diskette auf demselben Format `udos_ss77`
+///       bleibt UDOS (Entwurf 39 9.13).
+TEST(MutosFs, M8k_MfmUndFmErkennungUndUdosBleibtUdos) {
+    const auto dir = std::filesystem::temp_directory_path() / "mutos_m8k_mfm";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir / "q" / "etc");
+    std::vector<uint8_t> inhalt(5000);
+    for (size_t i = 0; i < inhalt.size(); ++i) inhalt[i] = static_cast<uint8_t>(i % 251);
+    { FILE* f = fopen((dir / "q" / "etc" / "d.bin").string().c_str(), "wb"); ASSERT_TRUE(f);
+      fwrite(inhalt.data(), 1, inhalt.size(), f); fclose(f); }
+    std::string err;
+    struct Fall { const char* profil; const char* format; };
+    for (const Fall& fall : {Fall{"mutos8k_mfm", "udos_ss77"}, Fall{"mutos8k_fm", "mf3200_26x128"}}) {
+        const std::string neu = (dir / (std::string(fall.profil) + ".hfe")).string();
+        {
+            auto dv = DiskVolume::create(neu, fall.profil, "m8k", formate(), dateisysteme(), err);
+            ASSERT_TRUE(dv) << err;
+            ASSERT_TRUE(dv->insertAll((dir / "q").string(), TransferOptions{})) << dv->lastError();
+            ASSERT_TRUE(dv->flush()) << dv->lastError();
+        }
+        auto dv = DiskVolume::open(neu, "", formate(), dateisysteme(), err);
+        ASSERT_TRUE(dv) << err;
+        EXPECT_EQ(dv->detection().filesystem, fall.profil);
+        EXPECT_EQ(dv->detection().format, fall.format);
+        const auto ziel = dir / (std::string(fall.profil) + ".aus");
+        ASSERT_TRUE(dv->extract(FileRef{0, "etc/d.bin"}, ziel.string(), TransferOptions{})) << dv->lastError();
+        const std::string b = k1520test::readFileBytes(ziel.string());
+        EXPECT_EQ(std::vector<uint8_t>(b.begin(), b.end()), inhalt) << fall.profil;
+    }
+    // UDOS auf demselben MFM-Format und auf FM (Ladediskette): bleibt UDOS, wird nie als MUTOS-Wurzel gelesen
+    for (const Fall& fall : {Fall{"udos_ss77", "udos_ss77"}, Fall{"udos_ss77_fm", "mf3200_26x128"}}) {
+        const std::string neu = (dir / (std::string(fall.profil) + ".hfe")).string();
+        { auto dv = DiskVolume::create(neu, fall.profil, "", formate(), dateisysteme(), err);
+          ASSERT_TRUE(dv) << err; ASSERT_TRUE(dv->flush()) << dv->lastError(); }
+        auto dv = DiskVolume::open(neu, "", formate(), dateisysteme(), err);
+        ASSERT_TRUE(dv) << err;
+        EXPECT_EQ(dv->detection().filesystem, fall.profil);
+        EXPECT_EQ(dv->detection().format, fall.format);
+    }
+    std::filesystem::remove_all(dir);
+}
+
 TEST(MutosFs, M8k_BinIstGewoehnlichesMutos77UndSauber) {
     k1520test::TempDisk t("mutos8000_m8k_bin.td0", "m8k_bin.td0");
     std::string err;

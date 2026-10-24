@@ -900,6 +900,14 @@ filesystems:
     format:      udos_ss77
     type:        udos
 
+  # UDOS auf dem 8″-MF3200: dieselbe Spurlage (77 x 26 x 128), aber FM (Entwurf 39 §9.8).  Eigener Eintrag,
+  # weil `create` das Aufzeichnungsverfahren aus dem Format nimmt; ohne ihn gaebe es UDOS nur in MFM
+  # (die FM-Ladediskette fuer MUTOS 8000 wurde sonst ueber das Profil mutos8k_fm angelegt).
+  - name:        udos_ss77_fm
+    description: "UDOS 4.x einseitig — 77 Spuren 26×128 FM (8″ MF3200)"
+    format:      mf3200_26x128
+    type:        udos
+
   - name:        udos_ss40
     description: "UDOS 4.x einseitig — 40 Spuren 26×128 (K5600.10)"
     format:      k5601_ss40_26x128
@@ -993,6 +1001,16 @@ filesystems:
   - name:        mutos8k_fm
     description: "MUTOS 8000 (UNIX, A5120.16) — 8″ FM 26×128, Blockraum ab Zylinder 1 (verschraenkt)"
     format:      mf3200_26x128
+    type:        wega_mutos
+    unix_layout: mutos8k
+    data_start:  { cyl: 1, head: 0 }
+    detect_rank: -10
+
+  # Dieselbe Wurzel fuer MFM-Laufwerke (K5601): Blockabbildung und Verschraenkung haengen nur an den
+  # Sektornummern, nicht am Aufzeichnungsverfahren - 77 x 26 x 128 MFM statt FM (Entwurf 39 §9.13).
+  - name:        mutos8k_mfm
+    description: "MUTOS 8000 (UNIX, A5120.16) — 5¼″ MFM 26×128, Blockraum ab Zylinder 1 (verschraenkt)"
+    format:      udos_ss77
     type:        wega_mutos
     unix_layout: mutos8k
     data_start:  { cyl: 1, head: 0 }

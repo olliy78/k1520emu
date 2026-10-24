@@ -1,0 +1,19 @@
+# Bauangaben der UDOS-Ladedisketten fuer MUTOS 8000 (Entwurf 39 §9.13; bau_ladediskette.py).
+# Vorlage fuer tools/mutos8000/archiv_erzeugen.py --art ladediskette; der Bau liest sie aus dem Archiv.
+# Nur "schluessel: wert", ein Wert je Zeile.
+art: ladediskette
+# Profile je Aufzeichnungsverfahren: FM (8 Zoll, MF3200) und MFM (5,25 Zoll, K5601)
+fs_fm: udos_ss77_fm
+fs_mfm: udos_ss77
+# Systemspuren (Spur 0-2 mit dem SYL-Ladekopf plus Bootspur), Rohbytes aus `boot-get`
+systemspuren: systemspuren.bin
+# Laufwerkstyp-Konstante: `LD A,2AH / AND D / LD (0FCAH),A` (Zylinder 2, Sektor-ID 1, Offset 120/121).
+# 2 Bit je Laufwerk (A: unten): 1 = 40 Spuren MFM, 2 = 77 Spuren FM, 3 = 77 Spuren MFM.
+# Das Muster muss GENAU EINMAL in den Systemspuren stehen, das zweite Byte ist der Erwartungswert
+# der Vorlage (sonst bricht der Bau ab, bevor etwas gepatcht wird).  `??` = beliebig (die Konstante).
+typ_muster: 3E??A232CA0F
+typ_erwartet: 2A
+# Varianten: <Aufzeichnung> <Konstante>
+variante_mf3200: fm 2A
+variante_k5601: mfm 3F
+variante_mf3200_k5601: fm 3E
