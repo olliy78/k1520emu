@@ -166,8 +166,8 @@ def test_wurzel_fuer_mfm_laufwerke_hat_dieselbe_blockabbildung(tmp_path, monkeyp
 # Variante -> (Katalogformat der Aufzeichnung, Laufwerkstyp-Konstante, eingecheckte Diskette)
 VARIANTEN = {
     "mf3200": ("mf3200_26x128", 0x2A, "a5120_mutos8000_boot_udos_mf3200.hfe"),
-    "k5601": ("udos_ss77", 0x3F, "a5120_mutos8000_boot_udos_k5601.hfe"),
-    "mf3200_k5601": ("mf3200_26x128", 0x3E, "a5120_mutos8000_boot_udos_mf3200_k5601.hfe"),
+    "k5601": ("udos_ss77", 0xFF, "a5120_mutos8000_boot_udos_k5601.hfe"),
+    "mf3200_k5601": ("mf3200_26x128", 0xFE, "a5120_mutos8000_boot_udos_mf3200_k5601.hfe"),
 }
 MUSTER = bytes.fromhex("3E2AA232CA0F")      # LD A,2AH / AND D / LD (0FCAH),A
 
@@ -202,7 +202,7 @@ def test_ladedisketten_archiv_ist_vollstaendig():
     stelle = 52 * 132 + 120
     assert sysspur[stelle:stelle + 2] == b"\x3e\x2a" and sysspur.find(MUSTER) == stelle
     for zeile in ("art: ladediskette", "fs_fm: udos_ss77_fm", "fs_mfm: udos_ss77", "typ_erwartet: 2A",
-                  "variante_mf3200: fm 2A", "variante_k5601: mfm 3F", "variante_mf3200_k5601: fm 3E"):
+                  "variante_mf3200: fm 2A", "variante_k5601: mfm FF", "variante_mf3200_k5601: fm FE"):
         assert zeile in angaben
 
 

@@ -8,8 +8,8 @@ einer anderen Diskette kopiert.  Wer eine Datei unter dateien/ tauscht, bekommt 
 --laufwerke waehlt die Variante (Aufzeichnung + Laufwerkstyp-Konstante, die `mutos_io`, FORM.*, COPY.* aus
 [0FCAH] lesen; 2 Bit je Laufwerk):
   mf3200         FM,  2AH  alle drei Laufwerke 8 Zoll (Auslieferung)
-  k5601          MFM, 3FH  alle drei Laufwerke 5,25 Zoll
-  mf3200_k5601   FM,  3EH  A: MF3200 (FM), B:/C: K5601 (MFM)  - die Diskette liegt in A:
+  k5601          MFM, FFH  alle vier Laufwerke 5,25 Zoll
+  mf3200_k5601   FM,  FEH  A: MF3200 (FM), B:-D: K5601 (MFM)  - die Diskette liegt in A:
 
 Ablauf: create im Profil der Aufzeichnung, boot-put (Systemspuren mit gepatchter Konstante; das Muster muss genau
 einmal vorkommen und den erwarteten Wert tragen, sonst Abbruch VOR dem Patch), put dateien/, check --full ohne
@@ -145,7 +145,7 @@ def main(argv=None):
     ap.add_argument("quelle", help="Archiv (.zip) oder ausgepackter Ordner")
     ap.add_argument("ziel", help="Zieldiskette (.hfe)")
     ap.add_argument("--laufwerke", required=True, choices=VARIANTEN,
-                    help="Variante: mf3200 (FM, 2AH) | k5601 (MFM, 3FH) | mf3200_k5601 (FM, 3EH)")
+                    help="Variante: mf3200 (FM, 2AH) | k5601 (MFM, FFH) | mf3200_k5601 (FM, FEH)")
     ap.add_argument("--ueberschreiben", action="store_true", help="vorhandenes Ziel ersetzen")
     a = ap.parse_args(argv)
     bauen(a.quelle, a.ziel, a.laufwerke, a.ueberschreiben)

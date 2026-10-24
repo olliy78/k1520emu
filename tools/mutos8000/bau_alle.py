@@ -6,8 +6,8 @@ Quellen (disks/a5120_mutos8000/):  a5120_mutos8000_boot_udos.zip (Ladediskette),
 Ziel (Vorgabe disks/a5120_16_MUTOS/), je Laufwerksbestueckung ein Paar Lade- + Wurzeldiskette:
 
   nur MF3200            boot_udos_mf3200.hfe        (FM, 2AH) + root.hfe     (FM)
-  nur K5601             boot_udos_k5601.hfe         (MFM, 3FH) + root_mfm.hfe (MFM)
-  A: MF3200, B:/C: K5601 boot_udos_mf3200_k5601.hfe (FM, 3EH) + root_mfm.hfe (MFM)
+  nur K5601             boot_udos_k5601.hfe         (MFM, FFH) + root_mfm.hfe (MFM)
+  A: MF3200, B:-D: K5601 boot_udos_mf3200_k5601.hfe (FM, FEH) + root_mfm.hfe (MFM)
 
 Dazu die Best-of-Datendisketten cmd (/mnt), usr (/usr), bin (/tmp) aus den Archiven best_<rolle>.zip, je FM
 (<rolle>.hfe) und MFM (<rolle>_mfm.hfe); Entwurf 39 Abschnitt 10.

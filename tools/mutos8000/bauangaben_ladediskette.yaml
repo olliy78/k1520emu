@@ -15,5 +15,5 @@ typ_muster: 3E??A232CA0F
 typ_erwartet: 2A
 # Varianten: <Aufzeichnung> <Konstante>
 variante_mf3200: fm 2A
-variante_k5601: mfm 3F
-variante_mf3200_k5601: fm 3E
+variante_k5601: mfm FF
+variante_mf3200_k5601: fm FE

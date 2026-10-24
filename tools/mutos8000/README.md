@@ -44,8 +44,8 @@ python3 -I tools/mutos8000/bau_alle.py --ziel-ordner aus/ --wurzel-quelle meine_
 | Laufwerke A: / B: / C: | Ladediskette (A:) | Wurzel (C:) |
 |---|---|---|
 | 3 × MF3200 (8″ FM) | `…_boot_udos_mf3200.hfe` (FM, `2AH`) | `…_root.hfe` (FM) |
-| **3 × K5601** (5¼″ MFM) | `…_boot_udos_k5601.hfe` (MFM, `3FH`) | `…_root_mfm.hfe` (MFM) |
-| MF3200 + 2 × K5601 | `…_boot_udos_mf3200_k5601.hfe` (FM, `3EH`) | `…_root_mfm.hfe` (MFM) |
+| **3–4 × K5601** (5¼″ MFM) | `…_boot_udos_k5601.hfe` (MFM, `FFH`) | `…_root_mfm.hfe` (MFM) |
+| MF3200 + 2–3 × K5601 | `…_boot_udos_mf3200_k5601.hfe` (FM, `FEH`) | `…_root_mfm.hfe` (MFM) |
 
 Jede Zeile hat einen Boot-Wächter bis `single user login: root` und `ls -l /` (`cli_mutos8000_boot_ladediskette_{mf3200,k5601,mf3200_k5601}`).
 Die Ladedisketten werden bitgleich, die Wurzeln bis auf die Anlagezeit (`s_time`).  Wächter `test_bau_alle_kennt_genau_die_fertigen_disketten`:
@@ -109,8 +109,8 @@ Offset 120 (`3EH`) / 121 (Wert). 2 Bit je Laufwerk: 2 = 77 Spuren FM, 3 = 77 Spu
 | `--laufwerke` | Aufzeichnung | Profil | Konstante | Laufwerke A: / B: / C: |
 |---|---|---|---|---|
 | `mf3200` | FM | `udos_ss77_fm` | `2AH` | alle 8″ MF3200 (Auslieferung) |
-| `k5601` | MFM | `udos_ss77` | `3FH` | alle 5¼″ K5601 |
-| `mf3200_k5601` | FM | `udos_ss77_fm` | `3EH` | A: MF3200 (Diskette liegt in A:), B:/C: K5601 (Wurzel dort MFM) |
+| `k5601` | MFM | `udos_ss77` | `FFH` | A:–D: 5¼″ K5601 (D: fehlt ein Laufwerk, antwortet es nicht: Maske D, 0 = nicht vorhanden) |
+| `mf3200_k5601` | FM | `udos_ss77_fm` | `FEH` | A: MF3200 (Diskette liegt in A:), B:–D: K5601 (Wurzel dort MFM) |
 
 ```sh
 python3 -I tools/mutos8000/bau_ladediskette.py disks/a5120_mutos8000/a5120_mutos8000_boot_udos.zip meine_lade.hfe --laufwerke k5601
