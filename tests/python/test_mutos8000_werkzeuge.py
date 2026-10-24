@@ -402,3 +402,36 @@ def test_datendiskette_getauschte_datei_kommt_an(tmp_path, monkeypatch):
     assert _datei(fs, "bin/echo") == alt[:-4] + b"\xde\xad\xbe\xef"
     assert _datei(fs, "bin/ls") == (ordner / "dateien" / "bin" / "ls").read_bytes()
     assert fs.fsize == 494
+
+
+# --- Entwurf 39 Abschnitt 11: Patchliste mutos_patch.py (gemessen im Debugger, hier nur die Bytes) ----------------
+
+def _lade_datei(name):
+    with zipfile.ZipFile(LADE_ARCHIV) as z:
+        return z.read("dateien/" + name)
+
+
+def test_patchliste_passt_auf_die_dateien_der_ladediskette_und_ist_nicht_doppelt_anwendbar(tmp_path):
+    ein = {}
+    for name in ("mutos_io", "ZDOS", "mutos_1216"):
+        ein[name] = tmp_path / name
+        ein[name].write_bytes(_lade_datei(name))
+    aus = tmp_path / "io8"
+    lauf("mutos_patch.py", "io-8x512", str(ein["mutos_io"]), "-o", str(aus))
+    neu, alt = aus.read_bytes(), ein["mutos_io"].read_bytes()
+    assert len(neu) == len(alt)
+    # Block -> Sektor: pos = bn & 7 (996DH), Zylinder-1 = bn >> 3 (996CH); Sektorlaenge-Wort [0003H] = 4
+    assert neu[0x750:0x756] == bytes.fromhex("7D E6 07 32 6D 99") and neu[0x19A:0x19F] == bytes.fromhex("3E 04 00 00 00")
+    assert neu[0x728:0x72A] == bytes([0, 2]) and neu[0x7B4:0x7B6] == bytes([0, 2])
+    assert sum(a != b for a, b in zip(alt, neu)) <= 80          # nur die Patchstellen
+    r = subprocess.run([sys.executable, "-I", str(TOOLS / "mutos_patch.py"), "io-8x512", str(aus), "-o", str(tmp_path / "x")],
+                       capture_output=True, text=True)
+    assert r.returncode != 0 and "Altbytes" in (r.stdout + r.stderr)      # zweimal: Altbytes passen nicht
+    lauf("mutos_patch.py", "zdos-einheit0", str(ein["ZDOS"]), "-o", str(tmp_path / "z"))
+    z = (tmp_path / "z").read_bytes()
+    assert z[0x27D:0x27F] == bytes.fromhex("37 00") and z[0xC9B] == 0
+    lauf("mutos_patch.py", "kern", "--root", "0", "--swap", "1", "--swplo", "0", "--nswap", "608", str(ein["mutos_1216"]),
+         "-o", str(tmp_path / "k"))
+    k = (tmp_path / "k").read_bytes()
+    assert k[0x887C:0x8882] == bytes.fromhex("04 00 04 01 04 02")
+    assert k[0x8884:0x888A] == bytes.fromhex("00 00 00 00 02 60")
