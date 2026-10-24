@@ -40,15 +40,15 @@ python3 -I tools/mutos8000/bau_alle.py --ziel-ordner aus/ --wurzel-quelle meine_
 
 | Laufwerke A: / B: / C: | Ladediskette (A:) | Wurzel (C:) |
 |---|---|---|
-| 3 × MF3200 (8″ FM) | `…_boot_udos_mf3200.hfe` (FM, `2AH`) | `…_m8k_root_rekonstruiert.hfe` (FM) |
-| **3 × K5601** (5¼″ MFM) | `…_boot_udos_k5601.hfe` (MFM, `3FH`) | `…_m8k_root_rekonstruiert_mfm.hfe` (MFM) |
-| MF3200 + 2 × K5601 | `…_boot_udos_mf3200_k5601.hfe` (FM, `3EH`) | `…_m8k_root_rekonstruiert_mfm.hfe` (MFM) |
+| 3 × MF3200 (8″ FM) | `…_boot_udos_mf3200.hfe` (FM, `2AH`) | `…_root.hfe` (FM) |
+| **3 × K5601** (5¼″ MFM) | `…_boot_udos_k5601.hfe` (MFM, `3FH`) | `…_root_mfm.hfe` (MFM) |
+| MF3200 + 2 × K5601 | `…_boot_udos_mf3200_k5601.hfe` (FM, `3EH`) | `…_root_mfm.hfe` (MFM) |
 
 Jede Zeile hat einen Boot-Wächter bis `single user login: root` und `ls -l /` (`cli_mutos8000_boot_ladediskette_{mf3200,k5601,mf3200_k5601}`).
 Die Ladedisketten werden bitgleich, die Wurzeln bis auf die Anlagezeit (`s_time`).  Wächter `test_bau_alle_kennt_genau_die_fertigen_disketten`:
 Ordner und Skript nennen dieselben Disketten.
 
-Nachbau gegen `…_m8k_root_rekonstruiert.hfe`: Dateibaum, Inhalte und `ls -l` (Modus, uid/gid, Größe, Zeit) sind gleich; Prüfer: 43 Einträge, 0 Abweichungen.
+Nachbau gegen `…_root.hfe`: Dateibaum, Inhalte und `ls -l` (Modus, uid/gid, Größe, Zeit) sind gleich; Prüfer: 43 Einträge, 0 Abweichungen.
 Wächter: `tests/python/test_mutos8000_werkzeuge.py` (Befund-Leser, Archiv → Bau → Vergleich, getauschte Datei).
 
 ## Ablauf: Datei ändern → neue Wurzel (Ticket #22)
@@ -73,7 +73,7 @@ Das Archiv entsteht aus der eingecheckten Diskette mit `python3 -I tools/mutos80
 `python3 -I tools/mutos8000/bau_aus_archiv.py --laufwerke k5601 <archiv> <ziel.hfe>` baut dieselbe Wurzel in **MFM** statt FM
 (Profil `mutos8k_mfm` aus `fs_mfm` der Bauangaben; Vorgabe `--laufwerke mf3200` = FM, `mutos8k_fm`). Blockabbildung (Verschränkung 2,
 Spurversatz 6) und Inhalt sind gleich, nur das Aufzeichnungsverfahren der 77 × 26 × 128 Sektoren ist ein anderes (Entwurf 39 §4.6.3).
-Eingecheckt in `disks/a5120_16_MUTOS/`: `…_m8k_root_rekonstruiert_mfm.hfe`. Die Anlagezeit (`s_time`) ist das Einzige, was zwei Bauten unterscheidet.
+Eingecheckt in `disks/a5120_16_MUTOS/`: `…_root_mfm.hfe`. Die Anlagezeit (`s_time`) ist das Einzige, was zwei Bauten unterscheidet.
 
 ## Ladedisketten aus dem Archiv bauen (Ticket #22)
 

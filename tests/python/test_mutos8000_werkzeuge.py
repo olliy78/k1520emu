@@ -17,7 +17,7 @@ DISKS = PROJECT_ROOT / "disks" / "a5120_mutos8000"      # Quellen und Archive
 FERTIG = PROJECT_ROOT / "disks" / "a5120_16_MUTOS"     # gebaute Disketten
 ARCHIV = DISKS / "a5120_mutos8000_m8k_root.zip"
 LADE_ARCHIV = DISKS / "a5120_mutos8000_boot_udos.zip"
-WURZEL = FERTIG / "a5120_mutos8000_m8k_root_rekonstruiert.hfe"
+WURZEL = FERTIG / "a5120_mutos8000_root.hfe"
 DISKTOOL = PROJECT_ROOT / "build" / "k1520disktool"
 
 braucht_disktool = pytest.mark.skipif(not DISKTOOL.exists(), reason="k1520disktool nicht gebaut")
@@ -156,7 +156,7 @@ def test_wurzel_fuer_mfm_laufwerke_hat_dieselbe_blockabbildung(tmp_path, monkeyp
         _ohne_anlagezeit(_lesen(DISKTOOL, WURZEL, tmp_path, "fm"))
     # ... und die eingecheckte MFM-Wurzel traegt denselben Baum
     assert _ohne_anlagezeit(_lesen(DISKTOOL, mfm, tmp_path, "mfm2")) == \
-        _ohne_anlagezeit(_lesen(DISKTOOL, FERTIG / "a5120_mutos8000_m8k_root_rekonstruiert_mfm.hfe", tmp_path, "ein"))
+        _ohne_anlagezeit(_lesen(DISKTOOL, FERTIG / "a5120_mutos8000_root_mfm.hfe", tmp_path, "ein"))
     with pytest.raises(SystemExit, match="laufwerke"):
         bau_aus_archiv.bauen(str(ARCHIV), str(tmp_path / "x.hfe"), ausgabe=lambda *_: None, laufwerke="mf6400")
 

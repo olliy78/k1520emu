@@ -1,6 +1,6 @@
 # MUTOS 8000: aus dem Archiv gebaute UDOS-Ladediskette (tools/mutos8000/bau_ladediskette.py, --laufwerke k5601)
 # bootet MUTOS bis zur Shell.  Laufwerke K5601,K5601,K5601; Wurzel in C: je nach Laufwerkstyp
-# (m8k_root_rekonstruiert_mfm.hfe).  Die Laufwerkstyp-Konstante steht in den Systemspuren der Ladediskette (Entwurf 39 9.13);
+# (root_mfm.hfe).  Die Laufwerkstyp-Konstante steht in den Systemspuren der Ladediskette (Entwurf 39 9.13);
 # passen Aufzeichnung (FM/MFM) oder Konstante nicht zur Laufwerksbestueckung, erscheint kein "single user login".
 # Beide Disketten werden von k1520dbg als Kopie (COW) gemountet - die eingecheckten Abbilder bleiben heil.
 tool:      k1520dbg
@@ -12,7 +12,7 @@ stdin:
   keys BOOT\sMUTOS\r
   g 100000000
   eject A
-  mount C %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_m8k_root_rekonstruiert_mfm.hfe udos_ss77
+  mount C %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_root_mfm.hfe udos_ss77
   keys r
   g 100000000
   keys root\r

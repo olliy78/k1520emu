@@ -5,9 +5,9 @@ Quellen (disks/a5120_mutos8000/):  a5120_mutos8000_boot_udos.zip (Ladediskette),
                                    a5120_mutos8000_m8k_root.zip  (Wurzel).
 Ziel (Vorgabe disks/a5120_16_MUTOS/), je Laufwerksbestueckung ein Paar Lade- + Wurzeldiskette:
 
-  nur MF3200            boot_udos_mf3200.hfe        (FM, 2AH) + m8k_root_rekonstruiert.hfe     (FM)
-  nur K5601             boot_udos_k5601.hfe         (MFM, 3FH) + m8k_root_rekonstruiert_mfm.hfe (MFM)
-  A: MF3200, B:/C: K5601 boot_udos_mf3200_k5601.hfe (FM, 3EH) + m8k_root_rekonstruiert_mfm.hfe (MFM)
+  nur MF3200            boot_udos_mf3200.hfe        (FM, 2AH) + root.hfe     (FM)
+  nur K5601             boot_udos_k5601.hfe         (MFM, 3FH) + root_mfm.hfe (MFM)
+  A: MF3200, B:/C: K5601 boot_udos_mf3200_k5601.hfe (FM, 3EH) + root_mfm.hfe (MFM)
 
 Vorhandene Disketten werden nur mit --ueberschreiben ersetzt.  Wer eine Datei aendern will, packt das
 Archiv aus, tauscht sie unter dateien/ und gibt den Ordner mit --wurzel-quelle/--lade-quelle an.
@@ -25,8 +25,8 @@ import m8k  # noqa: E402
 LADEDISKETTEN = (("mf3200", "a5120_mutos8000_boot_udos_mf3200.hfe"),
                  ("k5601", "a5120_mutos8000_boot_udos_k5601.hfe"),
                  ("mf3200_k5601", "a5120_mutos8000_boot_udos_mf3200_k5601.hfe"))
-WURZELN = (("mf3200", "a5120_mutos8000_m8k_root_rekonstruiert.hfe"),
-           ("k5601", "a5120_mutos8000_m8k_root_rekonstruiert_mfm.hfe"))
+WURZELN = (("mf3200", "a5120_mutos8000_root.hfe"),
+           ("k5601", "a5120_mutos8000_root_mfm.hfe"))
 
 
 def main(argv=None):

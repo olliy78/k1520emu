@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import m8k  # noqa: E402
 import wurzel_pruefen  # noqa: E402
 
-EINGECHECKT = m8k.fertig("m8k_root_rekonstruiert.hfe")
+EINGECHECKT = m8k.fertig("root.hfe")
 PFLICHT = ("fs", "inodes", "bloecke", "zylinder0")
 # --laufwerke -> Schluessel der Bauangaben, der das Profil nennt (Spuraufzeichnung steckt im Profil)
 LAUFWERKE = {"mf3200": "fs", "k5601": "fs_mfm"}
