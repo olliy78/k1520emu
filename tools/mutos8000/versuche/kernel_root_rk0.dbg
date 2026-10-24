@@ -1,0 +1,21 @@
+# Entwurf 39 Abschnitt 11.5: rootdev/swapdev/pipedev des Kernels von 4,2 auf 4,0 (Minor-Bytes 887D/887F/8881),
+# Wurzel in A: (rk0) mit der Standardzuordnung.  EM-Speicher ist ab em:0 der Kernel (flach).
+#   tools/dev.sh tool k1520dbg --em em256 --laufwerke K5601,K5601,K5601 \
+#       disks/a5120_16_MUTOS/a5120_mutos8000_boot_udos_k5601.hfe -x tools/mutos8000/versuche/kernel_root_rk0.dbg
+g 80000000
+keys BOOT\sMUTOS\r
+g 100000000
+e em:887D 00
+e em:887F 00
+e em:8881 00
+d em:887C 8
+eject A
+mount A disks/a5120_16_MUTOS/a5120_mutos8000_root_mfm.hfe udos_ss77
+keys r
+g 100000000
+keys root\r
+g 100000000
+keys ls\s-l\s/\r
+g 100000000
+screen
+q
