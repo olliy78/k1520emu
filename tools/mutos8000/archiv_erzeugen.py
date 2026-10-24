@@ -24,7 +24,7 @@ import zipfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import m8k  # noqa: E402
 
-QUELLE = m8k.disk("m8k_root_rekonstruiert.hfe")
+QUELLE = m8k.fertig("m8k_root_rekonstruiert.hfe")
 ZIEL = m8k.disk("m8k_root.zip")
 ANGABEN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bauangaben.yaml")
 LADE_QUELLE = m8k.disk("boot_udos.dmk")

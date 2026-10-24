@@ -13,10 +13,11 @@ import pytest
 from conftest import PROJECT_ROOT
 
 TOOLS = PROJECT_ROOT / "tools" / "mutos8000"
-DISKS = PROJECT_ROOT / "disks" / "a5120_mutos8000"
+DISKS = PROJECT_ROOT / "disks" / "a5120_mutos8000"      # Quellen und Archive
+FERTIG = PROJECT_ROOT / "disks" / "a5120_16_MUTOS"     # gebaute Disketten
 ARCHIV = DISKS / "a5120_mutos8000_m8k_root.zip"
 LADE_ARCHIV = DISKS / "a5120_mutos8000_boot_udos.zip"
-WURZEL = DISKS / "a5120_mutos8000_m8k_root_rekonstruiert.hfe"
+WURZEL = FERTIG / "a5120_mutos8000_m8k_root_rekonstruiert.hfe"
 DISKTOOL = PROJECT_ROOT / "build" / "k1520disktool"
 
 braucht_disktool = pytest.mark.skipif(not DISKTOOL.exists(), reason="k1520disktool nicht gebaut")
@@ -155,7 +156,7 @@ def test_wurzel_fuer_mfm_laufwerke_hat_dieselbe_blockabbildung(tmp_path, monkeyp
         _ohne_anlagezeit(_lesen(DISKTOOL, WURZEL, tmp_path, "fm"))
     # ... und die eingecheckte MFM-Wurzel traegt denselben Baum
     assert _ohne_anlagezeit(_lesen(DISKTOOL, mfm, tmp_path, "mfm2")) == \
-        _ohne_anlagezeit(_lesen(DISKTOOL, DISKS / "a5120_mutos8000_m8k_root_rekonstruiert_mfm.hfe", tmp_path, "ein"))
+        _ohne_anlagezeit(_lesen(DISKTOOL, FERTIG / "a5120_mutos8000_m8k_root_rekonstruiert_mfm.hfe", tmp_path, "ein"))
     with pytest.raises(SystemExit, match="laufwerke"):
         bau_aus_archiv.bauen(str(ARCHIV), str(tmp_path / "x.hfe"), ausgabe=lambda *_: None, laufwerke="mf6400")
 
@@ -234,7 +235,7 @@ def test_ladediskette_aus_dem_archiv_ist_bitgleich_der_eingecheckten(tmp_path, m
     neu = tmp_path / "neu.hfe"
     bau_ladediskette.bauen(str(LADE_ARCHIV), str(neu), variante, ausgabe=lambda *_: None)
     # kein Zeitstempel im Bau (UDOS-Daten stehen im Archiv): die Datei ist Byte fuer Byte die eingecheckte
-    assert neu.read_bytes() == (DISKS / eingecheckt).read_bytes()
+    assert neu.read_bytes() == (FERTIG / eingecheckt).read_bytes()
     info = subprocess.run([str(DISKTOOL), "info", str(neu)], capture_output=True, text=True).stdout
     assert "Format:      " + format_ in info                          # FM bzw. MFM, wie die Variante verlangt
     bin_ = tmp_path / "sys.bin"
@@ -271,7 +272,7 @@ def test_ladediskette_getauschte_datei_kommt_an_und_schutzregeln(tmp_path, monke
     with pytest.raises(SystemExit, match="ueberschreiben"):
         bau_ladediskette.bauen(str(ordner), str(ziel), "k5601", ausgabe=lambda *_: None)
     with pytest.raises(SystemExit, match="ueberschreiben"):
-        bau_ladediskette.bauen(str(ordner), str(DISKS / VARIANTEN["k5601"][2]), "k5601", ausgabe=lambda *_: None)
+        bau_ladediskette.bauen(str(ordner), str(FERTIG / VARIANTEN["k5601"][2]), "k5601", ausgabe=lambda *_: None)
     with pytest.raises(SystemExit, match="hfe"):
         bau_ladediskette.bauen(str(ordner), str(tmp_path / "x.dmk"), "k5601", ausgabe=lambda *_: None)
     # Abweichender Erwartungswert in den Bauangaben: der Bau bricht ab, bevor irgendetwas geschrieben wird
@@ -281,3 +282,12 @@ def test_ladediskette_getauschte_datei_kommt_an_und_schutzregeln(tmp_path, monke
     with pytest.raises(SystemExit, match="erwartet 3F"):
         bau_ladediskette.bauen(str(ordner), str(nie), "k5601", ausgabe=lambda *_: None)
     assert not nie.exists()
+
+
+def test_bau_alle_kennt_genau_die_fertigen_disketten():
+    """disks/a5120_16_MUTOS/ und tools/mutos8000/bau_alle.py muessen dieselben Disketten nennen."""
+    sys.path.insert(0, str(TOOLS))
+    import bau_alle
+    im_skript = {n for _, n in bau_alle.LADEDISKETTEN + bau_alle.WURZELN}
+    im_ordner = {p.name for p in FERTIG.glob("*.hfe")}
+    assert im_skript == im_ordner

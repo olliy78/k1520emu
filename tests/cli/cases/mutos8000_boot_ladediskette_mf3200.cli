@@ -4,7 +4,7 @@
 # passen Aufzeichnung (FM/MFM) oder Konstante nicht zur Laufwerksbestueckung, erscheint kein "single user login".
 # Beide Disketten werden von k1520dbg als Kopie (COW) gemountet - die eingecheckten Abbilder bleiben heil.
 tool:      k1520dbg
-disk_path: %CLI_DIR%/../../disks/a5120_mutos8000/a5120_mutos8000_boot_udos_mf3200.hfe
+disk_path: %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_boot_udos_mf3200.hfe
 timeout:   300
 run:       --em em256 --laufwerke MF3200,MF3200,MF3200 %DISK%
 stdin:
@@ -12,7 +12,7 @@ stdin:
   keys BOOT\sMUTOS\r
   g 100000000
   eject A
-  mount C %CLI_DIR%/../../disks/a5120_mutos8000/a5120_mutos8000_m8k_root_rekonstruiert.hfe udos_ss77
+  mount C %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_m8k_root_rekonstruiert.hfe udos_ss77
   keys r
   g 100000000
   keys root\r

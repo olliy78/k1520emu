@@ -9,6 +9,7 @@ Nur Python-Standardbibliothek, lauffähig mit `python3 -I`; das DiskTool wird nu
 | `m8kroot_lesen.py` | Befund der beschädigten `M8KROOT` (Superblock, Inodes, Baum, lesbare Bytes; `--inodes`, `--vergleich ORDNER`) |
 | `wurzel_quellbaum.py` | Quellbaum (Dateien, `.fileinfo`, `wega-dateiangaben.txt`) aus `M8KROOT` + Auszug von DISK-ROOT; Handangaben (Namen, `.profile`, Geräte) stehen als Daten im Skript |
 | `wurzel_pruefen.py` | unabhängiger Leser: Baum einer Wurzel (`.td0`/`.imd`) byteweise gegen einen Quellbaum |
+| `bau_alle.py` | **alle fünf fertigen Disketten** aus den beiden Archiven nach `disks/a5120_16_MUTOS/` (s. u.) |
 | `bau_wurzel.py` | ganzer Nachbau: DISK-ROOT holen, Quellbaum, `create --fs mutos8k_fm --inodes 104 --blocks 250` (Swap-Bereich ab Block 250, §4.8), Zylinder 0 per `boot-get` von M8KCMD + `boot-put`, `put`, `check --full`, Prüfung |
 | `bau_aus_archiv.py` | baut die Wurzeldiskette aus einem **Archiv** (`.zip` oder ausgepackter Ordner): `bauangaben.yaml`, `zylinder0.bin`, `dateien/`; `check --full` und unabhängige Prüfung (Fehler bei Block >= `s_fsize`) |
 | `archiv_erzeugen.py` | erzeugt die eingecheckten Quell-Archive aus den Disketten (`archive --ohne-abbild`): `--art wurzel` (Vorgabe) → `…_m8k_root.zip`, `--art ladediskette` → `…_boot_udos.zip` aus der Original-Ladediskette `…_boot_udos.dmk` |
@@ -27,6 +28,25 @@ Die Programme aus DISK-ROOT werden nicht eingecheckt; sie entstehen beim Bau aus
 **Gemessen** (aus `M8KROOT`, rückgeschoben): Baum, Modi, uid/gid, Gerätenummern, voll lesbare Dateien, Zeiten der Inodes am Sektoranfang.
 **Abgeleitet**: Namen, die letzten 28 Byte von `.profile`, Bit 0200 der Modi, Zeiten der Inodes am Sektorende (Zeit des Nachbarn), `etc/mount`/`umount` (Ersatz aus DISK-ROOT).
 Einzelheiten: Entwurf 39 §4.7.6 und §4.8.
+
+## Alle fertigen Disketten bauen
+
+Quellen (Originale, Archive) liegen in `disks/a5120_mutos8000/`, die **fertigen Disketten in `disks/a5120_16_MUTOS/`**:
+
+```sh
+python3 -I tools/mutos8000/bau_alle.py --ueberschreiben            # baut alle fünf neu nach disks/a5120_16_MUTOS/
+python3 -I tools/mutos8000/bau_alle.py --ziel-ordner aus/ --wurzel-quelle meine_wurzel --lade-quelle meine_lade
+```
+
+| Laufwerke A: / B: / C: | Ladediskette (A:) | Wurzel (C:) |
+|---|---|---|
+| 3 × MF3200 (8″ FM) | `…_boot_udos_mf3200.hfe` (FM, `2AH`) | `…_m8k_root_rekonstruiert.hfe` (FM) |
+| **3 × K5601** (5¼″ MFM) | `…_boot_udos_k5601.hfe` (MFM, `3FH`) | `…_m8k_root_rekonstruiert_mfm.hfe` (MFM) |
+| MF3200 + 2 × K5601 | `…_boot_udos_mf3200_k5601.hfe` (FM, `3EH`) | `…_m8k_root_rekonstruiert_mfm.hfe` (MFM) |
+
+Jede Zeile hat einen Boot-Wächter bis `single user login: root` und `ls -l /` (`cli_mutos8000_boot_ladediskette_{mf3200,k5601,mf3200_k5601}`).
+Die Ladedisketten werden bitgleich, die Wurzeln bis auf die Anlagezeit (`s_time`).  Wächter `test_bau_alle_kennt_genau_die_fertigen_disketten`:
+Ordner und Skript nennen dieselben Disketten.
 
 Nachbau gegen `…_m8k_root_rekonstruiert.hfe`: Dateibaum, Inhalte und `ls -l` (Modus, uid/gid, Größe, Zeit) sind gleich; Prüfer: 43 Einträge, 0 Abweichungen.
 Wächter: `tests/python/test_mutos8000_werkzeuge.py` (Befund-Leser, Archiv → Bau → Vergleich, getauschte Datei).
@@ -53,7 +73,7 @@ Das Archiv entsteht aus der eingecheckten Diskette mit `python3 -I tools/mutos80
 `python3 -I tools/mutos8000/bau_aus_archiv.py --laufwerke k5601 <archiv> <ziel.hfe>` baut dieselbe Wurzel in **MFM** statt FM
 (Profil `mutos8k_mfm` aus `fs_mfm` der Bauangaben; Vorgabe `--laufwerke mf3200` = FM, `mutos8k_fm`). Blockabbildung (Verschränkung 2,
 Spurversatz 6) und Inhalt sind gleich, nur das Aufzeichnungsverfahren der 77 × 26 × 128 Sektoren ist ein anderes (Entwurf 39 §4.6.3).
-Eingecheckt: `…_m8k_root_rekonstruiert_mfm.hfe`. Die Anlagezeit (`s_time`) ist das Einzige, was zwei Bauten unterscheidet.
+Eingecheckt in `disks/a5120_16_MUTOS/`: `…_m8k_root_rekonstruiert_mfm.hfe`. Die Anlagezeit (`s_time`) ist das Einzige, was zwei Bauten unterscheidet.
 
 ## Ladedisketten aus dem Archiv bauen (Ticket #22)
 
@@ -91,4 +111,4 @@ Disketten an anderen Sektoren als auf dem Original (der Urlader findet sie über
 stehen im `.fileinfo` daneben), `bau_ladediskette.py meine_lade neu.hfe --laufwerke …`. Danach im Emulator in A: einlegen, Laufwerke passend
 (`k1520dbg --em em256 --laufwerke K5601,K5601,K5601 neu.hfe`), `BOOT MUTOS`, Wurzel erst NACH der Aufforderung in C: einlegen (`eject A`, `mount C … udos_ss77`, `r`).
 Das Archiv entsteht aus der Original-Ladediskette mit `python3 -I tools/mutos8000/archiv_erzeugen.py --art ladediskette --force`.
-Eingecheckt sind die drei Varianten `…_boot_udos_mf3200.hfe`, `…_boot_udos_k5601.hfe`, `…_boot_udos_mf3200_k5601.hfe`.
+Eingecheckt in `disks/a5120_16_MUTOS/` sind die drei Varianten `…_boot_udos_mf3200.hfe`, `…_boot_udos_k5601.hfe`, `…_boot_udos_mf3200_k5601.hfe`.

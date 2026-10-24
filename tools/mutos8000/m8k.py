@@ -18,8 +18,16 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 DISKS = os.path.join(REPO, "disks", "a5120_mutos8000")
 
 
+FERTIG = os.path.join(REPO, "disks", "a5120_16_MUTOS")
+
+
+def fertig(name):
+    """Pfad einer gebauten (fertigen) MUTOS-8000-Diskette in disks/a5120_16_MUTOS/."""
+    return os.path.join(FERTIG, "a5120_mutos8000_" + name)
+
+
 def disk(name):
-    """Pfad einer eingecheckten MUTOS-8000-Diskette."""
+    """Pfad einer eingecheckten Quelle (Original oder Archiv) in disks/a5120_mutos8000/."""
     return os.path.join(DISKS, "a5120_mutos8000_" + name)
 
 

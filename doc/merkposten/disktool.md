@@ -1194,7 +1194,7 @@ Ausführliche Formatbeschreibung, Belege und Tabellen: **`doc/design/39_mutos800
 3. **BIN** ist gewöhnliches `mutos77` (Zusatzsektor ID 126 auf Zyl. 0 = TD0-Pseudosektor, bleibt beim Zurückschreiben erhalten).
 4. **ROOT wird NICHT erkannt (richtig so)**: 1-Bit-Verschiebung ab Offset 1 und Fremdtabelle in Offset 80–127 jedes 128-B-Sektors; Wurzel-Modus `83FE` statt `41FF`
    ist der Grund für ENOTDIR im Emulator-Boot.  Wächter `MutosFs.M8k_*` (Fixtures `mutos8000_m8k_*.td0`).
-5. **Rekonstruierte Wurzel** `disks/a5120_mutos8000/a5120_mutos8000_m8k_root_rekonstruiert.hfe` (Entwurf 39 §4.7.6/§4.8): mit `create --fs mutos8k_fm --inodes 104 --blocks 250`, `boot-put` (Zylinder 0 von M8KCMD)
+5. **Rekonstruierte Wurzel** `disks/a5120_16_MUTOS/a5120_mutos8000_m8k_root_rekonstruiert.hfe` (Entwurf 39 §4.7.6/§4.8): mit `create --fs mutos8k_fm --inodes 104 --blocks 250`, `boot-put` (Zylinder 0 von M8KCMD)
    und `put <quellordner>` (`.fileinfo` je Datei/Verzeichnis + `wega-dateiangaben.txt` für die 19 Knoten) gebaut — kein Code nötig; **bootet im Emulator bis zur Shell**
    (Wächter `cli_mutos8000_boot_rekonstruierte_wurzel`).  **`--blocks 250` ist Pflicht** (`create --blocks N` = `s_fsize` N, nur WEGA/MUTOS, C-ABI `k1520d_create_ex2`;
    `MutosFs.Blocks_*`): hinter Block 250 liegt der Swap-Bereich des Kernels auf rk2 — mit `s_fsize` 494 wurden `/bin/sh`-Blöcke vom Auslagern überschrieben, `fsck` sah nichts, `date` hing.
