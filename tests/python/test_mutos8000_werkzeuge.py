@@ -168,6 +168,17 @@ VARIANTEN = {
     "mf3200": ("mf3200_26x128", 0x2A, "a5120_mutos8000_boot_udos_mf3200.hfe"),
     "k5601": ("udos_ss77", 0xFF, "a5120_mutos8000_boot_udos_k5601.hfe"),
     "mf3200_k5601": ("mf3200_26x128", 0xFE, "a5120_mutos8000_boot_udos_mf3200_k5601.hfe"),
+    # Varianten mit Patches (Ticket #22): Aufzeichnung und Konstante wie die Grundvariante
+    "k5601_nur_a": ("udos_ss77", 0xFF, "a5120_mutos8000_boot_udos_k5601_nur_a.hfe"),
+    "mf3200_k5601_nur_a": ("mf3200_26x128", 0xFE, "a5120_mutos8000_boot_udos_mf3200_k5601_nur_a.hfe"),
+    "k5601_8x512": ("udos_ss77", 0xFF, "a5120_mutos8000_boot_udos_k5601_8x512.hfe"),
+}
+# Variante -> {Datei: (Patchart, Optionen)}; die UEBRIGEN Dateien muessen die Archivdateien sein.
+ERWARTETE_PATCHES = {
+    "mf3200": {}, "k5601": {}, "mf3200_k5601": {},
+    "k5601_nur_a": {"ZDOS": "zdos"},
+    "mf3200_k5601_nur_a": {"ZDOS": "zdos"},
+    "k5601_8x512": {"ZDOS": "zdos", "mutos_io": "io", "mutos_1216": "kern"},
 }
 MUSTER = bytes.fromhex("3E2AA232CA0F")      # LD A,2AH / AND D / LD (0FCAH),A
 
@@ -435,3 +446,97 @@ def test_patchliste_passt_auf_die_dateien_der_ladediskette_und_ist_nicht_doppelt
     k = (tmp_path / "k").read_bytes()
     assert k[0x887C:0x8882] == bytes.fromhex("04 00 04 01 04 02")
     assert k[0x8884:0x888A] == bytes.fromhex("00 00 00 00 02 60")
+
+
+# --- Ladedisketten-Varianten mit Patches (Ticket #22; Entwurf 39 11.2/11.5/11.6) ----------------------------------
+
+def _erwartet(name, variante):
+    """Archivdatei `name` mit den Patches der Variante, ausgerechnet UNABHAENGIG vom Bau (Offsets aus dem Entwurf)."""
+    d = bytearray(_lade_datei(name))
+    art = ERWARTETE_PATCHES[variante].get(name)
+    if art == "zdos":
+        assert d[0x27D:0x27F] == bytes.fromhex("C6 20") and d[0xC9B] == 1
+        d[0x27D:0x27F] = bytes.fromhex("37 00")
+        d[0xC9B] = 0
+    elif art == "io":
+        # Offsets laut Entwurf 39 11.2 (Tabelle), unabhaengig von mutos_patch.io_off
+        stellen = [(0x19A, "3A 03 00 F6 01", "3E 04 00 00 00"), (0x728, "80 00", "00 02"), (0x7B4, "80 00", "00 02"),
+                   (0x750, "29 29 06 08 11 00 0D AF ED 52", "7D E6 07 32 6D 99 CB 3C CB 1D"),
+                   (0x820, "1A", "08"), (0x824, "1A", "08"), (0x83F, "3A 6B 99 57 3A 6D", "3A 6D 99 C3 55 99")]
+        for off, alt, neu in stellen:
+            alt, neu = bytes.fromhex(alt), bytes.fromhex(neu)
+            assert d[off:off + len(alt)] == alt
+            d[off:off + len(neu)] = neu
+        rest = bytes.fromhex("CB 3C CB 1D CB 3C CB 1D 7D 32 6C 99 AF 32 6B 99") + bytes(23)      # Rest des 49-B-Blocks
+        d[0x750 + 10:0x750 + 49] = rest[:39]
+    elif art == "kern":
+        assert d[0x8884:0x888A] == bytes.fromhex("00 00 00 FA 00 F4")
+        d[0x8884:0x888A] = bytes.fromhex("00 00 01 60 01 00")                   # swplo 352, nswap 256
+    return bytes(d)
+
+
+def test_bauangaben_der_varianten_nennen_genau_die_erwarteten_patches(tmp_path):
+    with zipfile.ZipFile(LADE_ARCHIV) as z:
+        angaben = z.read("bauangaben.yaml").decode("utf-8")
+    sys.path.insert(0, str(TOOLS))
+    import bau_ladediskette as bl
+    import bau_aus_archiv as basis
+    p = tmp_path / "bauangaben.yaml"
+    p.write_text(angaben, encoding="utf-8")
+    a = basis.bauangaben_lesen(str(p), bl.PFLICHT, ())
+    for v, soll in ERWARTETE_PATCHES.items():
+        assert {d for d, _, _ in bl.patches_lesen(a, v)} == set(soll), v
+        assert ("variante_" + v) in a
+    # die bisherigen drei Varianten tragen KEINE Patchzeile
+    assert not [k for k in a if k.startswith("patch_") and k.split("_")[1] in ("mf3200", "k5601")
+                and not k.startswith(("patch_k5601_nur", "patch_k5601_8x", "patch_mf3200_k5601_nur"))]
+    assert a["wurzel_fsize_k5601_8x512"] == "352"
+
+
+def test_wurzelgroesse_der_8x512_variante_stimmt_mit_disk_root_ueberein():
+    """s_fsize von DISK-ROOT (Block 1 = Zyl. 1, Sektor-ID 2; linear 8 x 512) = wurzel_fsize der Bauangaben."""
+    import struct
+    sys.path.insert(0, str(TOOLS))
+    import m8k
+    spuren = m8k.td0_laden(str(DISKS / "a5120_mutos8000_root.td0"))
+    sb = [x for c, _h, s in spuren if c == 1 for x in s if x["r"] == 2][0]["data"]
+    isize, fsize = struct.unpack(">HI", sb[:6])
+    assert fsize == 352
+    with zipfile.ZipFile(LADE_ARCHIV) as z:
+        assert "wurzel_fsize_k5601_8x512: 352" in z.read("bauangaben.yaml").decode("utf-8")
+    assert open(str(DISKS / "a5120_mutos8000_root.td0"), "rb").read()[5] & 0x80 == 0     # nicht FM: MFM, nur K5601
+
+
+def test_swap_ueberschneidet_nie_das_dateisystem(tmp_path):
+    """Der Bau bricht ab, wenn swplo < s_fsize der Wurzel (Auslagern ueberschriebe Dateien)."""
+    sys.path.insert(0, str(TOOLS))
+    import bau_ladediskette as bl
+    arch = tmp_path / "dateien"
+    arch.mkdir()
+    (arch / "mutos_1216").write_bytes(_lade_datei("mutos_1216"))
+    a = {"wurzel_fsize_x": "352"}
+    with pytest.raises(SystemExit, match="s_fsize.*swplo"):
+        bl.patches_anwenden(str(arch), str(tmp_path / "g"), [("mutos_1216", "kern", {"swplo": 250, "nswap": 244})],
+                            a, "x", lambda *_: None)
+    with pytest.raises(SystemExit, match="wurzel_fsize_y"):
+        bl.patches_anwenden(str(arch), str(tmp_path / "g2"), [("mutos_1216", "kern", {"swplo": 352})],
+                            a, "y", lambda *_: None)
+    with pytest.raises(SystemExit, match="Option"):
+        bl.patches_lesen({"patch_v_1": "ZDOS kern swplo=abc"}, "v")
+    with pytest.raises(SystemExit, match="erwartet"):
+        bl.patches_lesen({"patch_v_1": "ZDOS unbekannt"}, "v")
+
+
+@braucht_disktool
+@pytest.mark.parametrize("variante", sorted(ERWARTETE_PATCHES))
+def test_eingecheckte_ladediskette_traegt_genau_die_erwarteten_patches(tmp_path, monkeypatch, variante):
+    """Dateien der EINGECHECKTEN Diskette: gepatchte = Archivdatei + erwartete Bytes (Altwert/Neuwert), alle anderen gleich."""
+    fertig = FERTIG / VARIANTEN[variante][2]
+    holen = tmp_path / "geholt"
+    subprocess.run([str(DISKTOOL), "get", str(fertig), "--to", str(holen)], check=True, capture_output=True)
+    with zipfile.ZipFile(LADE_ARCHIV) as z:
+        namen = [n[len("dateien/"):] for n in z.namelist()
+                 if n.startswith("dateien/") and not n.endswith((".fileinfo", "udos-dateiangaben.txt"))]
+    assert len(namen) == 18
+    for n in namen:
+        assert (holen / n).read_bytes() == _erwartet(n, variante), (variante, n)

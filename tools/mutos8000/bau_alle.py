@@ -9,6 +9,10 @@ Ziel (Vorgabe disks/a5120_16_MUTOS/), je Laufwerksbestueckung ein Paar Lade- + W
   nur K5601             boot_udos_k5601.hfe         (MFM, FFH) + root_mfm.hfe (MFM)
   A: MF3200, B:-D: K5601 boot_udos_mf3200_k5601.hfe (FM, FEH) + root_mfm.hfe (MFM)
 
+Dazu drei Ladedisketten mit Patches (Entwurf 39, 11.2/11.6): boot_udos_k5601_nur_a.hfe und
+boot_udos_mf3200_k5601_nur_a.hfe (UDOS meldet nur A: an; MUTOS-Disketten schon beim Einschalten in B:-D:),
+boot_udos_k5601_8x512.hfe (zusaetzlich 8 x 512 B und Swap ab Block 352 fuer den DISK-Satz, nur K5601).
+
 Dazu die Best-of-Datendisketten cmd (/mnt), usr (/usr), bin (/tmp) aus den Archiven best_<rolle>.zip, je FM
 (<rolle>.hfe) und MFM (<rolle>_mfm.hfe); Entwurf 39 Abschnitt 10.
 
@@ -27,7 +31,11 @@ import m8k  # noqa: E402
 # (Variante, Dateiname im Zielordner)
 LADEDISKETTEN = (("mf3200", "a5120_mutos8000_boot_udos_mf3200.hfe"),
                  ("k5601", "a5120_mutos8000_boot_udos_k5601.hfe"),
-                 ("mf3200_k5601", "a5120_mutos8000_boot_udos_mf3200_k5601.hfe"))
+                 ("mf3200_k5601", "a5120_mutos8000_boot_udos_mf3200_k5601.hfe"),
+                 # mit Patches (bauangaben_ladediskette.yaml): UDOS meldet nur A: an / DISK-Satz 8 x 512
+                 ("k5601_nur_a", "a5120_mutos8000_boot_udos_k5601_nur_a.hfe"),
+                 ("mf3200_k5601_nur_a", "a5120_mutos8000_boot_udos_mf3200_k5601_nur_a.hfe"),
+                 ("k5601_8x512", "a5120_mutos8000_boot_udos_k5601_8x512.hfe"))
 WURZELN = (("mf3200", "a5120_mutos8000_root.hfe"),
            ("k5601", "a5120_mutos8000_root_mfm.hfe"))
 

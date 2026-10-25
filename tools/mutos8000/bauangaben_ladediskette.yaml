@@ -17,3 +17,17 @@ typ_erwartet: 2A
 variante_mf3200: fm 2A
 variante_k5601: mfm FF
 variante_mf3200_k5601: fm FE
+# Varianten mit Patches (Entwurf 39, 11.2/11.5/11.6; Patchfunktionen in mutos_patch.py, angewandt BEIM BAU auf eine Kopie von dateien/).
+# Zeile: patch_<variante>_<n>: <Datei> <Art> [opt=zahl ...], n = Reihenfolge.  Arten: io-8x512 | zdos-einheit0 | kern.
+# nur_a: UDOS meldet beim Start nur A: an, MUTOS-Disketten duerfen schon in B:-D: liegen
+variante_k5601_nur_a: mfm FF
+patch_k5601_nur_a_1: ZDOS zdos-einheit0
+variante_mf3200_k5601_nur_a: fm FE
+patch_mf3200_k5601_nur_a_1: ZDOS zdos-einheit0
+# 8x512: DISK-Satz (root/cc1/cc2/cmd.td0, MFM 250 kbit/s, nur K5601).  Swap ab Block 352 = s_fsize von DISK-ROOT,
+# 352 + 256 = 608 = Blockgrenze 8 x 512; der Bau bricht ab, wenn s_fsize > swplo.
+variante_k5601_8x512: mfm FF
+patch_k5601_8x512_1: mutos_io io-8x512
+patch_k5601_8x512_2: ZDOS zdos-einheit0
+patch_k5601_8x512_3: mutos_1216 kern swplo=352 nswap=256
+wurzel_fsize_k5601_8x512: 352

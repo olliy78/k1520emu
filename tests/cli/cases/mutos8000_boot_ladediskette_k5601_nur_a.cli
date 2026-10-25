@@ -1,0 +1,37 @@
+# MUTOS 8000: Ladediskette "k5601_nur_a" (ZDOS gepatcht: UDOS meldet beim Start nur A: an, Entwurf 39 11.6).
+# Wurzel (C:) und eine Datendiskette (B:, cmd) liegen SCHON BEIM START in den Laufwerken: bei den Ladedisketten ohne
+# Patch endet das in "I/O ERROR C2 ON UNIT 00" (26 x 128) bzw. "DISK INITIALIZATION ERROR C6" (8 x 512), kein Menue.
+# Die Ladediskette bleibt in A: (das "remove boot-disk" ist nur Text).  Alle Disketten werden als Kopie (COW) gemountet.
+tool:      k1520dbg
+disk_path: %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_boot_udos_k5601_nur_a.hfe
+timeout:   300
+run:       --em em256 --laufwerke K5601,K5601,K5601 %DISK% -b %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_cmd_mfm.hfe -c %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_root_mfm.hfe
+stdin:
+  g 80000000
+  keys BOOT\sMUTOS\r
+  g 100000000
+  keys r
+  g 100000000
+  keys root\r
+  g 100000000
+  keys ls\s-l\s/\r
+  g 100000000
+  keys /etc/mount\s/dev/rk1\s/mnt\r
+  g 50000000
+  keys ls\s/mnt\r
+  g 100000000
+  screen
+  q
+exit:      0
+expect:    mem = 196608
+expect_re: single user login: root\s+\|
+expect:    MUTOS 8000 V.1.0
+expect_re: \|# ls -l /\s+\|
+expect_re: -rw-rw-r-- 1 root\s+108 Jan  9  1986 \.profile
+expect_re: drwxrwxrwx 2 root\s+336 Jan  9  1986 dev
+expect_re: \|# ls /mnt\s+\|\s+\|bin
+forbid:    panic
+forbid:    err on dev
+forbid:    not found
+forbid:    INITIALIZATION ERROR
+forbid:    I/O ERROR
