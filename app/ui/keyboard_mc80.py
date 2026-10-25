@@ -42,12 +42,12 @@ KEY_RETURN = int(Qt.Key_Return)       # ENTER → 11H
 KEY_ESCAPE = int(Qt.Key_Escape)       # OFF   → 13H
 KEY_TAB = int(Qt.Key_Tab)             # 09H
 KEY_F1 = int(Qt.Key_F1)               # Sondertaste n = Key_F1 + n
-# Tasten ohne Qt-Gegenstück (= Mc80Tastatur::TASTE_*)
+# Tasten ohne Qt-Gegenstueck (= Mc80Tastatur::TASTE_*)
 CODE_CRLF = 0x02000001
 CODE_ZB_CL = 0x02000002
 CODE_ZB_00 = 0x02000003
 CODE_ZB_LEER = 0x02000004
-CODE_ZB_ZEICHEN = 0x02000100          # + ASCII: Zeichen im Ziffernblock (Präfix 1DH)
+CODE_ZB_ZEICHEN = 0x02000100          # + ASCII: Zeichen im Ziffernblock (Praefix 1DH)
 
 LED_BEREIT = 0x01                     # Bit 0 der Anzeigemaske [?]
 

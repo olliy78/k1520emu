@@ -96,7 +96,7 @@ public:
     bool     leer() const { return queue_.empty(); }
     size_t   wartend() const { return queue_.size(); }
     uint32_t summerZaehler() const { return summer_; }
-    bool     anzeige() const { return bereit_; }   ///< Bereit-LED (grün)
+    bool     anzeige() const { return bereit_; }   ///< Bereit-LED (gruen)
     bool     bereit() const { return bereit_; }
     bool     dauerton() const { return dauerton_; }
     bool     umschaltungGesperrt() const { return umschaltung_gesperrt_; }

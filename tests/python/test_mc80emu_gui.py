@@ -256,7 +256,7 @@ def test_tastenbild_der_bildschirmtastatur():
     assert nach_text["←"].code == int(Qt.Key_Left) and nach_text["→"].code == int(Qt.Key_Right)
     assert nach_text["CL"].code == int(Qt.Key_Delete)
     assert nach_text["CRLF"].code == k.CODE_CRLF
-    # Ziffernblock: eigene Codes (Präfix 1DH), nur ÷ bleibt ohne Code [?].
+    # Ziffernblock: eigene Codes (Praefix 1DH), nur ÷ bleibt ohne Code [?].
     zb = {t.low: t for t in tasten if t.x >= 19.4}
     assert zb["CL"].code == k.CODE_ZB_CL and zb["00"].code == k.CODE_ZB_00
     assert zb["7"].code == k.CODE_ZB_ZEICHEN + ord("7")
