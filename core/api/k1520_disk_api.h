@@ -209,6 +209,16 @@ K1520_API K1520Disk k1520d_create_bootable(const char* path, const char* fs_name
 K1520_API K1520Disk k1520d_create_ex(const char* path, const char* fs_name, const char* label,
                                      const char* boot_image, uint32_t unix_inodes);
 
+/**
+ * @brief Wie @ref k1520d_create_ex, zusaetzlich mit **Dateisystemgroesse** (nur WEGA/MUTOS, sonst ignoriert).
+ * @param unix_bloecke s_fsize in Bloecken; 0 = ganzer Blockraum.  Der Rest des Datentraegers bleibt
+ *                     unberuehrt (MUTOS 8000: Auslagerungsbereich des Kernels ab Block 250).
+ *                     Zu gross oder nicht groesser als der Inode-Bereich: Fehler (@ref k1520d_last_open_error).
+ */
+K1520_API K1520Disk k1520d_create_ex2(const char* path, const char* fs_name, const char* label,
+                                      const char* boot_image, uint32_t unix_inodes,
+                                      uint32_t unix_bloecke);
+
 /// @brief Vorgabe der Inode-Zahl beim Anlegen (Bloecke/25 Inode-Bloecke); 0 = kein UNIX-Dateisystem.
 K1520_API uint32_t k1520d_fs_unix_inodes(const char* fs_name);
 

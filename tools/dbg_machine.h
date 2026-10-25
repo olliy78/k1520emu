@@ -372,6 +372,7 @@ public:
     bool mountDisk(int d, const std::string& p, const std::string& f, bool wp) {
         return base().mountDisk(d, p, f, wp);
     }
+    bool unmountDisk(int d) { return base().unmountDisk(d); }
     std::string lastError() { return base().lastError(); }
     std::string diskNotice(int d) { return base().diskNotice(d); }
 

@@ -4132,6 +4132,24 @@ int main(int argc, char** argv){
                     ia.vector, (unsigned long long)ia.count);
             if (warned) fprintf(stderr,"  ==> %d scharfe Quelle(n) ohne gueltigen Tabelleneintrag\n",warned);
             fprintf(stderr,"  (ivt all = auch gesperrte Quellen; ivt 2 = I-Register der ZVE2; ~ = SIO-Basisvektor)\n"); }
+        else if (cmd=="mount" || cmd=="eject"){   // Diskettenwechsel zur Laufzeit (MUTOS-Lader verlangt ihn)
+            int drv = -1;
+            if (t.size()>=2 && !t[1].empty()){
+                char a = (char)toupper((unsigned char)t[1][0]);
+                if (a>='A'&&a<='D') drv = a-'A'; else if (a>='0'&&a<='3') drv = a-'0';
+            }
+            if (drv<0 || (cmd=="mount" && t.size()<3)){
+                fprintf(stderr,"  Aufruf: mount <A-D|0-3> <abbild> [format]   |   eject <A-D|0-3>\n");
+            } else if (cmd=="eject"){
+                fprintf(stderr,"  %s: %s\n",std::string(1,(char)('A'+drv)).c_str(),
+                        m.unmountDisk(drv)?"ausgeworfen":m.lastError().c_str());
+            } else {
+                bool wp=false; std::string mp=prepareDisk(t[2].c_str(),wp);
+                bool ok = t.size()>=4 ? m.mountDisk(drv,mp,t[3],wp)
+                                      : (m.mountDisk(drv,mp,fmt1,wp) || m.mountDisk(drv,mp,fmt2,wp));
+                fprintf(stderr,"  %c: %s%s\n",(char)('A'+drv),ok?"gemountet":"FEHLER: ",ok?"":m.lastError().c_str());
+            }
+        }
         else if (cmd=="disk"){   // §13 disk verify [B]: Sektor-/CRC-Health aller Spuren
             if (t.size()>=2 && t[1]=="verify"){
                 // Laufwerk als Buchstabe (A..D) oder Zahl (0..3); ohne Angabe A:.

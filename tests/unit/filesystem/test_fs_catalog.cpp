@@ -77,6 +77,9 @@ TEST(FsCatalog, ProfilnamenSindEinStabilerVertrag) {
         "cpa780", "cpa800",
         "scpx640", "scpx798",
         "udos_ds77", "udos_ss77", "udos_ss40",
+        // UDOS auf dem 8-Zoll-MF3200 (FM): `create` nimmt das Verfahren aus dem Format
+        // (MUTOS-Ladediskette, Entwurf 39 9.13).
+        "udos_ss77_fm",
         "udos1715", "udos1715_ss80", "udos1715_ss40",
         // CP/M-86 des A7100: eigener Eintrag, weil die CP/A-Regel hier NICHT gilt
         // (sie bildet das CP/A-BIOS nach, nicht das SCP1700).
@@ -92,7 +95,9 @@ TEST(FsCatalog, ProfilnamenSindEinStabilerVertrag) {
         // (doc/design/27_wega_dateisystem.md) — ein Eintrag fuer die 720-K-Diskette.
         "wega720",
         // MUTOS 8000 (A5120.16): dasselbe Dateisystem, Blockraum ab Zylinder 1.
-        "mutos77", "mutos80", "mutos1700_720", "mutos1700_a7100",
+        "mutos77", "mutos80", "mutos1700_720", "mutos1700_a7100", "mutos8k_fm",
+        // … dieselbe 8k-Wurzel in MFM (K5601); Rang -10, damit sie vor udos_ss77 gewinnt.
+        "mutos8k_mfm",
         // tar-Disketten (P8000-Lieferungen ohne Dateisystem, nur lesbar): letzter
         // Erkennungsversuch hinter allen echten Dateisystemen (disk_volume.cpp).
         "tar720",

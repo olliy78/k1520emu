@@ -144,7 +144,14 @@ struct DriveProfile {
     int bytePeriodCycles(Encoding enc, uint32_t cpu_hz) const {
         // Datenrate → Bytes/s (K5601-Datenblatt): MFM 250 kbit/s = 31250 B/s,
         // FM 125 kbit/s = 15625 B/s.
-        const uint32_t bytes_per_sec = (enc == Encoding::FM) ? 15625u : 31250u;
+        uint32_t bytes_per_sec = (enc == Encoding::FM) ? 15625u : 31250u;
+        // 8-Zoll-Laufwerk: FM laeuft mit 250 kbit/s (5,25-Zoll: 125).  Mit der halben Rate
+        // waere ein UDOS-Ganzspurlesen (26x128, ZVE1-Software-CRC je Sektor ca. 20000 Takte)
+        // langsamer als ZVE1 rechnet: ZVE1 findet den Zeiger [0004H] der ZVE2 noch alt, verwirft
+        // die Uebertragung, und nach 16 Sektoren meldet der Nukleus "C6" (FORM.B/FORM.M der
+        // MUTOS-Ladediskette).  NUR FM: MFM am 8-Zoll-Laufwerk zu verdoppeln liess das Boot-ROM
+        // haengen (Doku 39_mutos8000.md, 9.3/9.11).
+        if (medium_inch == 8 && enc == Encoding::FM) bytes_per_sec *= 2;
         return static_cast<int>(cpu_hz / bytes_per_sec);
     }
 

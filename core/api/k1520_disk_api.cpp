@@ -281,6 +281,12 @@ extern "C" uint32_t k1520d_fs_unix_inodes(const char* fs_name) {
 
 extern "C" K1520Disk k1520d_create_ex(const char* path, const char* fs_name, const char* label,
                                       const char* boot_image, uint32_t unix_inodes) {
+    return k1520d_create_ex2(path, fs_name, label, boot_image, unix_inodes, 0);
+}
+
+extern "C" K1520Disk k1520d_create_ex2(const char* path, const char* fs_name, const char* label,
+                                       const char* boot_image, uint32_t unix_inodes,
+                                       uint32_t unix_bloecke) {
     g_open_error.clear();
     if (!path || !*path)       { g_open_error = "kein Pfad angegeben"; return nullptr; }
     if (!fs_name || !*fs_name) { g_open_error = "kein Dateisystem angegeben - beim "
@@ -290,7 +296,7 @@ extern "C" K1520Disk k1520d_create_ex(const char* path, const char* fs_name, con
     std::string err;
     h->vol = DiskVolume::create(path, fs_name, label ? label : "",
                                 kataloge().formate, kataloge().dateisysteme, err,
-                                boot_image ? boot_image : "", unix_inodes);
+                                boot_image ? boot_image : "", unix_inodes, unix_bloecke);
     if (!h->vol) { g_open_error = err; return nullptr; }
     return h.release();
 }

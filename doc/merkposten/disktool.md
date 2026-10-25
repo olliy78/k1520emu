@@ -1137,6 +1137,12 @@ Vier Anwender-Disketten (ROOT, CMD, CC1, CC2; `.TD0` und `.dmk`) plus die UDOS-L
    Offen: die A5120.16 bootet MUTOS noch nicht im Emulator (Entwurf 17 §9: Kern liegt in den Systemspuren der
    UDOS-Ladediskette, `BOOT MUTOS`); das DiskTool kann den Bootbereich schon herausholen (`boot-get`).
 
+6. **Profile `mutos8k_mfm` und `udos_ss77_fm` (2026-10-24, #22):** `mutos8k_mfm` = dieselbe 8k-Wurzel in MFM (Format `udos_ss77`, Rang −10 → gewinnt vor dem UDOS-Profil
+   derselben Spurlage, eine UDOS-Diskette bleibt UDOS); `udos_ss77_fm` = UDOS auf 77 × 26 × 128 **FM** (Format `mf3200_26x128`, 8″ MF3200), nötig, weil `create` das Verfahren aus dem
+   Format nimmt. Wächter `MutosFs.M8k_MfmUndFmErkennungUndUdosBleibtUdos`, `FsCatalog` (Namensliste). Die Ladedisketten baut `tools/mutos8000/bau_ladediskette.py` aus dem Archiv
+   `…_boot_udos.zip`. **Fallstrick: `get` schreibt einen leeren Datumsvermerk als `erst=-`/`geaend=-`, `put` liest `-` als „heute“** — das Erzeugerskript schreibt `______` aus, sonst wäre
+   der Bau tagesabhängig. Wächter `test_mutos8000_werkzeuge.py`, `cli_mutos8000_boot_ladediskette_*`.
+
 ## MUTOS 1700 (A7100) — dieselbe Klasse, zweite Familie (2026-10-23)
 
 Ordner `robotron/MUTOS/mutos1700/`: 12 TeleDisk-Abbilder.  **Acht sind `tar720`** (DOC1/2, MAN1/2, ROOT2, SYS1, USER1/2 —
@@ -1175,3 +1181,22 @@ liefen schon), drei tragen ein UNIX-Dateisystem, eines (`ROOT1_G`) ist ein besch
    Vorgabe und ist gesperrt; C-ABI `k1520d_create_ex`, `k1520d_fs_unix_inodes`; Wächter `py_disktool_neu_inodes_gui`).
 4. Wächter `MutosFs.Mutos8000_VollstaendigeWiederherstellung`, `…Mutos1700_A7100_VollstaendigeWiederherstellungMitLinksUndGeraeten`;
    von Hand zusätzlich ROOT1_D (mit `--inodes 272`), UUCP, CMD, CC1 über das Archiv (`python -m app.disktool.archive`).
+
+## MUTOS 8000 M8K-Satz (8″ FM 26×128, 2026-10-23, #22)
+
+Ausführliche Formatbeschreibung, Belege und Tabellen: **`doc/design/39_mutos8000.md` §4.6**.  Das Wichtigste:
+1. **CMD/USR** (`mutos8k_fm`, `unix_layout: mutos8k`, `Mutos8kDev`): 512-B-Block = 4 logische Sektoren zu 128 B, 26 je Spur über alle Spuren ab Zyl. 1,
+   Verschränkung 2 (13 ungerade, dann 13 gerade IDs) und **6 Sektoren Spurversatz je Zylinder**: `ID = ((platz + 6·(Zyl−1)) mod 26) + 1`.  Nicht die lineare Folge —
+   Block 6 überschreitet die Spurgrenze.  Beleg: Wurzel/Baum/Freiliste, 23 `a.out` mit Größe = 16+Text+Daten+Symbole.  Nichts im Code darf hier
+   `WegaSpaceDev`/lineare Offsets voraussetzen.
+2. **Quelldefekte gehören der Quelle** (TD0 = SCP-Fluss): CMD `bin/pr`, USR `bin/ed`/`lib/c0`/`lib/c1` (fehlende bzw. CRC-Sektoren), BIN `wc`/`size` nur E5-Füllung,
+   `passwd` gekürzt (fsck sieht letzteres nicht).  Die Wächter pinnen genau diese Dateien; nicht „reparieren".
+3. **BIN** ist gewöhnliches `mutos77` (Zusatzsektor ID 126 auf Zyl. 0 = TD0-Pseudosektor, bleibt beim Zurückschreiben erhalten).
+4. **ROOT wird NICHT erkannt (richtig so)**: 1-Bit-Verschiebung ab Offset 1 und Fremdtabelle in Offset 80–127 jedes 128-B-Sektors; Wurzel-Modus `83FE` statt `41FF`
+   ist der Grund für ENOTDIR im Emulator-Boot.  Wächter `MutosFs.M8k_*` (Fixtures `mutos8000_m8k_*.td0`).
+5. **Rekonstruierte Wurzel** `disks/a5120_16_MUTOS/a5120_mutos8000_root_fm.hfe` (Entwurf 39 §4.7.6/§4.8): mit `create --fs mutos8k_fm --inodes 104 --blocks 250`, `boot-put` (Zylinder 0 von M8KCMD)
+   und `put <quellordner>` (`.fileinfo` je Datei/Verzeichnis + `wega-dateiangaben.txt` für die 19 Knoten) gebaut — kein Code nötig; **bootet im Emulator bis zur Shell**
+   (Wächter `cli_mutos8000_boot_rekonstruierte_wurzel`).  **`--blocks 250` ist Pflicht** (`create --blocks N` = `s_fsize` N, nur WEGA/MUTOS, C-ABI `k1520d_create_ex2`;
+   `MutosFs.Blocks_*`): hinter Block 250 liegt der Swap-Bereich des Kernels auf rk2 — mit `s_fsize` 494 wurden `/bin/sh`-Blöcke vom Auslagern überschrieben, `fsck` sah nichts, `date` hing.
+   Die GUI („Neue Diskette“) bietet `--blocks` nicht an (Vorgabe/Obergrenze, der Blockraum, ist nicht in der C-ABI; Anwendungsfall nur dieser Nachbau).  Container `.hfe`, weil der Emulator `.td0` nicht zurückschreibt; `create … .dmk` im Profil `mutos8k_fm` hat 62 Sektoren mit CRC-Fehler
+   (nicht verfolgt).  Die Datei ist eine Rekonstruktion: Programme aus DISK-ROOT, `mount`/`umount` Ersatz, sechs Gerätenamen + `login`/`motd`/`mount`/`mtab` abgeleitet.

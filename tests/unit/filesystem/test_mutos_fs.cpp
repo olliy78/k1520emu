@@ -258,3 +258,282 @@ TEST(MutosFs, InodeZahl_VorgabeUndAbweichung) {
     EXPECT_EQ(DiskVolume::unixStandardInodes(*c, *formate().find(c->format)), 0u);
     std::filesystem::remove_all(dir);
 }
+
+// ─── Dateisystemgroesse beim Anlegen (--blocks, s_fsize) ─────────────────────────────────
+//
+// Auf M8KROOT endet das Dateisystem bei s_fsize 250; dahinter liegt der Auslagerungsbereich (swap)
+// des Kernels auf demselben Geraet.  Ein bis Block 494 reichendes Dateisystem wurde dort vom
+// Prozessabbild ueberschrieben (Entwurf 39 §4.8).
+
+TEST(MutosFs, Blocks_BegrenztDasDateisystemAufDieAngegebeneGroesse) {
+    const auto dir = std::filesystem::temp_directory_path() / "mutos_blocks_test";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir / "src");
+    std::string err;
+    // ganze Diskette: 494 Bloecke, 104 Inodes = 13 Inode-Bloecke -> s_isize 15
+    {
+        auto dv = DiskVolume::create((dir / "voll.dmk").string(), "mutos8k_fm", "t", formate(),
+                                     dateisysteme(), err, "", 104, 0);
+        ASSERT_TRUE(dv) << err;
+        EXPECT_EQ(dv->volumeInfo(0).total_bytes, (494u - 15u) * 512u);
+    }
+    auto dv = DiskVolume::create((dir / "klein.dmk").string(), "mutos8k_fm", "t", formate(),
+                                 dateisysteme(), err, "", 104, 250);
+    ASSERT_TRUE(dv) << err;
+    EXPECT_EQ(dv->volumeInfo(0).total_bytes, (250u - 15u) * 512u);          // 235 Datenbloecke
+
+    // 100000 B passen (196 Bloecke samt Indirektbloecken), weitere 30000 B nicht mehr:
+    // waeren Bloecke ab 250 frei, ginge das (494 - 15 Bloecke Platz).
+    const std::vector<uint8_t> inhalt(100000, 0xA5), mehr(30000, 0x5A);
+    auto schreibe = [&](const char* name, const std::vector<uint8_t>& d) {
+        std::ofstream(dir / "src" / name, std::ios::binary)
+            .write(reinterpret_cast<const char*>(d.data()), static_cast<std::streamsize>(d.size()));
+    };
+    schreibe("a", inhalt);
+    ASSERT_TRUE(dv->insertAll((dir / "src").string(), TransferOptions{})) << dv->lastError();
+    ASSERT_TRUE(dv->flush()) << dv->lastError();
+    const FsCheckReport& r = dv->check(FsCheckLevel::Voll, true);
+    EXPECT_EQ(r.alsText().find("Fehler"), std::string::npos) << r.alsText();
+    EXPECT_EQ(r.alsText().find("Warnung"), std::string::npos) << r.alsText();
+    EXPECT_LT(dv->volumeInfo(0).free_bytes, 40000u);                       // Rest < 79 Bloecke
+
+    std::filesystem::remove(dir / "src" / "a");
+    schreibe("b", mehr);
+    EXPECT_FALSE(dv->insertAll((dir / "src").string(), TransferOptions{}));
+    std::filesystem::remove_all(dir);
+}
+
+TEST(MutosFs, Blocks_ZuGrossOderZuKleinIstEinFehler) {
+    const auto dir = std::filesystem::temp_directory_path() / "mutos_blocks_fehler";
+    std::filesystem::create_directories(dir);
+    std::string err;
+    // mehr als der Blockraum (494)
+    EXPECT_FALSE(DiskVolume::create((dir / "a.dmk").string(), "mutos8k_fm", "t", formate(),
+                                    dateisysteme(), err, "", 104, 495));
+    EXPECT_NE(err.find("495"), std::string::npos) << err;
+    // nicht groesser als der Inode-Bereich (104 Inodes = s_isize 15; 20 Bloecke waeren 5 Daten, 15 zu klein)
+    err.clear();
+    EXPECT_FALSE(DiskVolume::create((dir / "b.dmk").string(), "mutos8k_fm", "t", formate(),
+                                    dateisysteme(), err, "", 400, 20));
+    EXPECT_FALSE(err.empty());
+    std::filesystem::remove_all(dir);
+}
+
+// ─── M8K-Satz (MUTOS 8000, 8″ FM 26×128 und 5¼″ 8×512) ───────────────────────────────────
+//
+// Fixtures aus `~/projects/robotron/A5120/discs/MUTOS8000/M8K*.TD0` (TeleDisk 2011):
+//  - CMD, USR : 77 Spuren 26×128 FM.  Der Treiber legt 512-B-Bloecke auf je 4 logische Sektoren
+//    mit Verschraenkung 2 und 6 Sektoren Spurversatz (`Mutos8kDev`, Entwurf 39 §4).
+//  - BIN      : 8×512 ab Zylinder 1 (gewoehnliches `mutos77`), Zylinder 0 mit Zusatzsektor ID 126.
+//  - ROOT     : NICHT lesbar (Nachweis in `doc/merkposten/disktool.md`, MUTOS 8000 M8K-Satz).
+// Quelldefekte (fehlende/CRC-Sektoren auf CMD/USR) sind Befund der Quelle, nicht des Werkzeugs.
+
+namespace {
+
+/// Wahr, wenn die Datei ein Z8000-a.out (Magic E807) ist und ihre Groesse zum Kopf passt:
+/// 16 + Text + Daten + Symbole.  Die Kopffelder sind unabhaengig vom Dateisystem —
+/// eine falsche Blockabbildung bricht diese Gleichung sofort.
+bool aoutPasst(const std::vector<uint8_t>& d) {
+    if (d.size() < 16 || d[0] != 0xE8 || d[1] != 0x07) return false;
+    auto w = [&](size_t i) { return static_cast<size_t>(d[i] << 8 | d[i + 1]); };
+    return 16 + w(2) + w(4) + w(8) == d.size();
+}
+
+/// Alle Dateien unter bin/ einzeln herausholen; liefert die Namen, die NICHT lesbar waren.
+std::vector<std::string> binPruefen(DiskVolume& dv, int& geprueft, const std::string& tag,
+                                   const std::string& praefix = "bin/") {
+    std::vector<std::string> schlecht;
+    const auto tmp = std::filesystem::temp_directory_path() / ("mutos_m8k_aout_" + tag);
+    std::filesystem::remove_all(tmp);
+    std::filesystem::create_directories(tmp);
+    geprueft = 0;
+    for (const FileEntry& e : dv.list()) {
+        if (e.name.rfind(praefix, 0) != 0 || e.type == "d") continue;
+        const auto ziel = tmp / "datei";
+        std::filesystem::remove(ziel);
+        if (!dv.extract(FileRef{0, e.name}, ziel.string(), TransferOptions{})) { schlecht.push_back(e.name); continue; }
+        const std::string b = k1520test::readFileBytes(ziel.string());
+        if (!aoutPasst(std::vector<uint8_t>(b.begin(), b.end()))) { schlecht.push_back(e.name); continue; }
+        ++geprueft;
+    }
+    std::filesystem::remove_all(tmp);
+    return schlecht;
+}
+
+}  // namespace
+
+TEST(MutosFs, M8k_CmdUndUsrWerdenAlsMutos8kErkannt) {
+    for (const char* fx : {"mutos8000_m8k_cmd.td0", "mutos8000_m8k_usr.td0"}) {
+        k1520test::TempDisk t(fx, std::string("m8k_erk_") + fx);
+        std::string err;
+        auto dv = DiskVolume::open(t.path(), "", formate(), dateisysteme(), err, false);
+        ASSERT_TRUE(dv) << fx << ": " << err;
+        EXPECT_EQ(dv->detection().filesystem, "mutos8k_fm") << fx;
+        EXPECT_TRUE(dv->istWega());
+        const auto l = liste(*dv);
+        ASSERT_TRUE(l.count("bin")) << fx;
+        EXPECT_EQ(l.at("bin").type, "d");
+    }
+}
+
+TEST(MutosFs, M8k_CmdLiestBaumUndProgrammeBisAufDieQuelldefekte) {
+    k1520test::TempDisk t("mutos8000_m8k_cmd.td0", "m8k_cmd_lesen.td0");
+    std::string err;
+    auto dv = DiskVolume::open(t.path(), "", formate(), dateisysteme(), err, false);
+    ASSERT_TRUE(dv) << err;
+    const auto l = liste(*dv);
+    EXPECT_TRUE(l.count("etc/mkfs"));
+    EXPECT_TRUE(l.count("bin/ls"));
+    int ok = 0;
+    const auto schlecht = binPruefen(*dv, ok, "cmd");
+    // 24 Programme unter bin/; bin/pr liegt auf einem CRC-/Fehlsektor der Quelle (Block 127/142)
+    EXPECT_EQ(schlecht, std::vector<std::string>{"bin/pr"});
+    EXPECT_GE(ok, 20);
+    // fsck findet genau diese Datei und sonst nichts Schlimmeres
+    const FsCheckReport& r = dv->check(FsCheckLevel::Voll, true);
+    for (const FsFinding& f : r.findings)
+        if (f.severity == FsSeverity::Fehler && !f.object.empty()) EXPECT_EQ(f.object, "bin/pr") << f.text;
+}
+
+TEST(MutosFs, M8k_UsrLiestAsCcUndDieHeader) {
+    k1520test::TempDisk t("mutos8000_m8k_usr.td0", "m8k_usr_lesen.td0");
+    std::string err;
+    auto dv = DiskVolume::open(t.path(), "", formate(), dateisysteme(), err, false);
+    ASSERT_TRUE(dv) << err;
+    const auto l = liste(*dv);
+    EXPECT_TRUE(l.count("lib/libc.a"));
+    EXPECT_EQ(l.at("lib/libc.a").size, 65250u);
+    EXPECT_EQ(l.at("include/stdio.h").size, 937u);
+    int ok = 0;
+    const auto schlecht = binPruefen(*dv, ok, "usr");
+    EXPECT_EQ(schlecht, std::vector<std::string>{"bin/ed"});   // Quelldefekt (Indirektblock)
+    EXPECT_GE(ok, 3);                                           // as, cc, ld
+}
+
+TEST(MutosFs, M8k_SchreibenRundlaufUndUnabhaengigerBefund) {
+    k1520test::TempDisk t("mutos8000_m8k_usr.td0", "m8k_usr_schreiben.td0");
+    std::string err;
+    auto dv = DiskVolume::open(t.path(), "", formate(), dateisysteme(), err, false);
+    ASSERT_TRUE(dv) << err;
+    // 1500 Byte = 3 Bloecke (USR hat 5 frei), im Wurzelverzeichnis
+    std::vector<uint8_t> muster(1500);
+    for (size_t i = 0; i < muster.size(); ++i) muster[i] = static_cast<uint8_t>(i * 7 + 3);
+    const auto quelle = std::filesystem::path(t.path()).parent_path() / "m8k_quelle";
+    std::filesystem::remove_all(quelle);
+    std::filesystem::create_directories(quelle);
+    { FILE* f = fopen((quelle / "m.bin").string().c_str(), "wb"); ASSERT_TRUE(f);
+      fwrite(muster.data(), 1, muster.size(), f); fclose(f); }
+    ASSERT_TRUE(dv->insertAll(quelle.string(), TransferOptions{})) << dv->lastError();
+    ASSERT_TRUE(dv->flush()) << dv->lastError();
+    dv.reset();
+
+    dv = DiskVolume::open(t.path(), "", formate(), dateisysteme(), err);
+    ASSERT_TRUE(dv) << err;
+    EXPECT_EQ(dv->detection().filesystem, "mutos8k_fm");
+    ASSERT_TRUE(liste(*dv).count("m.bin"));
+    const auto ziel = quelle / "aus.bin";
+    ASSERT_TRUE(dv->extract(FileRef{0, "m.bin"}, ziel.string(), TransferOptions{})) << dv->lastError();
+    const std::string b = k1520test::readFileBytes(ziel.string());
+    EXPECT_EQ(std::vector<uint8_t>(b.begin(), b.end()), muster);
+    // die Quelldefekte (bin/ed) bleiben die einzigen Fehler, nichts Neues
+    for (const FsFinding& f : dv->check(FsCheckLevel::Voll, true).findings)
+        if (f.severity == FsSeverity::Fehler && !f.object.empty()) EXPECT_EQ(f.object, "bin/ed") << f.text;
+    std::filesystem::remove_all(quelle);
+}
+
+TEST(MutosFs, M8k_NeueDisketteRundlaufUndFsize494) {
+    const auto dir = std::filesystem::temp_directory_path() / "mutos_m8k_neu";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir / "q" / "usr");
+    std::vector<uint8_t> gross(120000);              // direkt + einfach indirekt
+    for (size_t i = 0; i < gross.size(); ++i) gross[i] = static_cast<uint8_t>(i % 253);
+    { FILE* f = fopen((dir / "q" / "usr" / "g.bin").string().c_str(), "wb"); ASSERT_TRUE(f);
+      fwrite(gross.data(), 1, gross.size(), f); fclose(f); }
+    std::string err;
+    const std::string neu = (dir / "neu.dmk").string();
+    {
+        auto dv = DiskVolume::create(neu, "mutos8k_fm", "m8k", formate(), dateisysteme(), err);
+        ASSERT_TRUE(dv) << err;
+        ASSERT_TRUE(dv->insertAll((dir / "q").string(), TransferOptions{})) << dv->lastError();
+        ASSERT_TRUE(dv->flush()) << dv->lastError();
+        EXPECT_EQ(dv->check(FsCheckLevel::Voll, true).alsText().find("Warnung"), std::string::npos);
+    }
+    auto dv = DiskVolume::open(neu, "", formate(), dateisysteme(), err);
+    ASSERT_TRUE(dv) << err;
+    EXPECT_EQ(dv->detection().filesystem, "mutos8k_fm");
+    const auto ziel = dir / "aus.bin";
+    ASSERT_TRUE(dv->extract(FileRef{0, "usr/g.bin"}, ziel.string(), TransferOptions{})) << dv->lastError();
+    const std::string b = k1520test::readFileBytes(ziel.string());
+    EXPECT_EQ(std::vector<uint8_t>(b.begin(), b.end()), gross);
+    std::filesystem::remove_all(dir);
+}
+
+/// @test Die 8k-Wurzel in MFM (K5601) ist dieselbe Diskette in anderer Aufzeichnung: eigenes Profil
+///       `mutos8k_mfm` (Format udos_ss77, Rang -10 - gewinnt vor dem UDOS-Profil derselben Spurlage);
+///       dieselbe Wurzel in FM bleibt `mutos8k_fm`, eine UDOS-Diskette auf demselben Format `udos_ss77`
+///       bleibt UDOS (Entwurf 39 9.13).
+TEST(MutosFs, M8k_MfmUndFmErkennungUndUdosBleibtUdos) {
+    const auto dir = std::filesystem::temp_directory_path() / "mutos_m8k_mfm";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir / "q" / "etc");
+    std::vector<uint8_t> inhalt(5000);
+    for (size_t i = 0; i < inhalt.size(); ++i) inhalt[i] = static_cast<uint8_t>(i % 251);
+    { FILE* f = fopen((dir / "q" / "etc" / "d.bin").string().c_str(), "wb"); ASSERT_TRUE(f);
+      fwrite(inhalt.data(), 1, inhalt.size(), f); fclose(f); }
+    std::string err;
+    struct Fall { const char* profil; const char* format; };
+    for (const Fall& fall : {Fall{"mutos8k_mfm", "udos_ss77"}, Fall{"mutos8k_fm", "mf3200_26x128"}}) {
+        const std::string neu = (dir / (std::string(fall.profil) + ".hfe")).string();
+        {
+            auto dv = DiskVolume::create(neu, fall.profil, "m8k", formate(), dateisysteme(), err);
+            ASSERT_TRUE(dv) << err;
+            ASSERT_TRUE(dv->insertAll((dir / "q").string(), TransferOptions{})) << dv->lastError();
+            ASSERT_TRUE(dv->flush()) << dv->lastError();
+        }
+        auto dv = DiskVolume::open(neu, "", formate(), dateisysteme(), err);
+        ASSERT_TRUE(dv) << err;
+        EXPECT_EQ(dv->detection().filesystem, fall.profil);
+        EXPECT_EQ(dv->detection().format, fall.format);
+        const auto ziel = dir / (std::string(fall.profil) + ".aus");
+        ASSERT_TRUE(dv->extract(FileRef{0, "etc/d.bin"}, ziel.string(), TransferOptions{})) << dv->lastError();
+        const std::string b = k1520test::readFileBytes(ziel.string());
+        EXPECT_EQ(std::vector<uint8_t>(b.begin(), b.end()), inhalt) << fall.profil;
+    }
+    // UDOS auf demselben MFM-Format und auf FM (Ladediskette): bleibt UDOS, wird nie als MUTOS-Wurzel gelesen
+    for (const Fall& fall : {Fall{"udos_ss77", "udos_ss77"}, Fall{"udos_ss77_fm", "mf3200_26x128"}}) {
+        const std::string neu = (dir / (std::string(fall.profil) + ".hfe")).string();
+        { auto dv = DiskVolume::create(neu, fall.profil, "", formate(), dateisysteme(), err);
+          ASSERT_TRUE(dv) << err; ASSERT_TRUE(dv->flush()) << dv->lastError(); }
+        auto dv = DiskVolume::open(neu, "", formate(), dateisysteme(), err);
+        ASSERT_TRUE(dv) << err;
+        EXPECT_EQ(dv->detection().filesystem, fall.profil);
+        EXPECT_EQ(dv->detection().format, fall.format);
+    }
+    std::filesystem::remove_all(dir);
+}
+
+TEST(MutosFs, M8k_BinIstGewoehnlichesMutos77UndSauber) {
+    k1520test::TempDisk t("mutos8000_m8k_bin.td0", "m8k_bin.td0");
+    std::string err;
+    auto dv = DiskVolume::open(t.path(), "", formate(), dateisysteme(), err, false);
+    ASSERT_TRUE(dv) << err;
+    EXPECT_EQ(dv->detection().filesystem, "mutos77");
+    // Zylinder 77 (unformatiert) und der CRC-Sektor auf Zylinder 51 liegen HINTER s_fsize = 364
+    EXPECT_EQ(dv->check(FsCheckLevel::Voll, true).alsText().find("Fehler"), std::string::npos);
+    int ok = 0;
+    auto schlecht = binPruefen(*dv, ok, "bin", "");
+    std::sort(schlecht.begin(), schlecht.end());
+    // Quelldefekte, von fsck nicht zu sehen: die zuletzt geschriebenen Bloecke (ab Block 315 = Zyl. 40) sind
+    // unbeschriebene E5-Fuellung - wc und size bestehen nur daraus, passwd ist hinten abgeschnitten.
+    EXPECT_EQ(schlecht, (std::vector<std::string>{"passwd", "size", "wc"}));
+    EXPECT_EQ(ok, 18);
+}
+
+TEST(MutosFs, M8k_RootDisketteWirdNichtFalschErkannt) {
+    // ROOT: jeder Sektor traegt in den letzten 48 Byte dieselbe Fremdtabelle und die Wurzel-Inode hat
+    // Modus 0x83FE statt 0x41FF.  Kein Dateisystem - und das ist die richtige Antwort.
+    k1520test::TempDisk t("mutos8000_m8k_root.td0", "m8k_root.td0");
+    std::string err;
+    auto dv = DiskVolume::open(t.path(), "", formate(), dateisysteme(), err, false);
+    EXPECT_FALSE(dv && dv->hasFileSystem());
+}

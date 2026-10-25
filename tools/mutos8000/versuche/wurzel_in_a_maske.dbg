@@ -1,0 +1,20 @@
+# Entwurf 39 Abschnitt 11.4: Wurzel in Laufwerk A: OHNE jeden Patch - ueber die Zuordnungsmaske von mutos_io.
+#   tools/dev.sh tool k1520dbg --em em256 --laufwerke K5601,K5601,K5601 \
+#       disks/a5120_16_MUTOS/a5120_mutos8000_boot_udos_k5601.hfe -x tools/mutos8000/versuche/wurzel_in_a_maske.dbg
+g 80000000
+keys BOOT\sMUTOS\r
+g 100000000
+# Maske "floppy - drive 0 1 2 3" / "mutos - rk": je Spalte die rk-Nummer tippen: Laufwerk 0 -> rk2, 1 -> rk1, 2 -> rk0, 3 -> rk3
+eject A
+mount A disks/a5120_16_MUTOS/a5120_mutos8000_root_mfm.hfe udos_ss77
+keys 2103
+g 20000000
+keys r
+g 100000000
+keys root\r
+g 100000000
+keys ls\s-l\s/\r
+g 100000000
+screen
+d 0xA126 16
+q

@@ -1,0 +1,43 @@
+# MUTOS 8000: das VIERTE Laufwerk (D:, rk3) ohne Eingriff (Entwurf 39 Abschnitt 9.13 und 10, 2026-10-24).
+# Vier K5601.  Die Ladediskette k5601 traegt die Laufwerkstyp-Konstante FFH (A:-D: Typ 3 = 77 Spuren MFM); bei 2AH/3FH
+# hatte D: Typ 0 und /etc/mount /dev/rk3 meldete "err on dev 4/3 er=0,302".  Wurzel in C:, die Datendiskette cmd
+# (MFM) erst nach der Anmeldung in D: - ohne `e 0x0FCA ...`.  Die Befehle liegen auf der Datendiskette (/mnt/bin):
+# nach dem umount sind sie weg, darum wird gleich wieder eingebunden (beweist, dass umount gelungen ist).
+tool:      k1520dbg
+disk_path: %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_boot_udos_k5601.hfe
+timeout:   600
+run:       --em em256 --laufwerke K5601,K5601,K5601,K5601 %DISK%
+stdin:
+  g 80000000
+  keys BOOT\sMUTOS\r
+  g 100000000
+  eject A
+  mount C %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_root_mfm.hfe udos_ss77
+  keys r
+  g 100000000
+  keys root\r
+  g 100000000
+  screen
+  mount D %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_cmd_mfm.hfe udos_ss77
+  keys /etc/mount\s/dev/rk3\s/mnt\r
+  g 50000000
+  keys ls\s/mnt/bin\r
+  g 150000000
+  screen
+  keys /etc/umount\s/dev/rk3\r
+  g 50000000
+  keys /etc/mount\s/dev/rk3\s/mnt\r
+  g 50000000
+  keys ls\s/mnt\r
+  g 100000000
+  screen
+  q
+exit:      0
+expect:    mem = 196608
+expect_re: single user login: root\s+\|
+expect_re: \|# ls /mnt/bin\s+\|
+expect_re: \|# ls /mnt\s+\|\s+\|bin
+forbid:    panic
+forbid:    err on dev
+forbid:    not found
+forbid:    INITIALIZATION ERROR

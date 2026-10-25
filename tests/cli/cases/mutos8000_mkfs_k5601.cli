@@ -1,0 +1,50 @@
+# MUTOS 8000: neues Dateisystem UNTER MUTOS anlegen (Entwurf 39 Abschnitt A5, 2026-10-24).
+# Drei K5601.  Formatieren (Spuren, Sektoren) kann MUTOS nicht - das macht FORM.M unter UDOS -, wohl aber das
+# Dateisystem: /mnt/etc/mkfs von der Datendiskette cmd (in A:, nach der Anmeldung) auf die Diskette in B:.
+# Als Ziel dient eine Kopie (COW) der Datendiskette bin: sie ist bereits 26 x 128 MFM formatiert, mkfs ueberschreibt
+# ihr Dateisystem.  Danach einhaengen, Datei und Verzeichnis anlegen, aushaengen, wieder einhaengen, lesen.
+tool:      k1520dbg
+disk_path: %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_boot_udos_k5601.hfe
+timeout:   600
+run:       --em em256 --laufwerke K5601,K5601,K5601 %DISK%
+stdin:
+  g 80000000
+  keys BOOT\sMUTOS\r
+  g 100000000
+  eject A
+  mount C %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_root_mfm.hfe udos_ss77
+  keys r
+  g 100000000
+  keys root\r
+  g 100000000
+  mount A %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_cmd_mfm.hfe udos_ss77
+  keys /etc/mount\s/dev/rk0\s/mnt\r
+  g 50000000
+  mount B %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_bin_mfm.hfe udos_ss77
+  keys /mnt/etc/mkfs\s/dev/rk1\s494\r
+  g 300000000
+  keys /etc/mount\s/dev/rk1\s/usr\r
+  g 50000000
+  keys echo\shallo\s>/usr/x\r
+  g 50000000
+  keys mkdir\s/usr/d\r
+  g 80000000
+  keys ls\s/usr\r
+  g 100000000
+  keys /etc/umount\s/dev/rk1\r
+  g 50000000
+  keys /etc/mount\s/dev/rk1\s/usr\r
+  g 50000000
+  keys cat\s/usr/x\r
+  g 80000000
+  screen
+  q
+exit:      0
+expect:    isize = 152
+expect:    m/n = 3 500
+expect_re: \|# ls /usr\s+\|\s+\|d\s+\|\s+\|x\s+\|
+expect_re: \|# cat /usr/x\s+\|\s+\|hallo\s+\|
+forbid:    panic
+forbid:    err on dev
+forbid:    not found
+forbid:    adb

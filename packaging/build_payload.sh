@@ -63,6 +63,19 @@ a5120_bcu12_k5600-10_arbeit-sys1.hfe
 bcu_kassette_formatiert.k52
 bandtest_boot.k52"
 
+# MUTOS 8000 (A5120.16, 2026-10-25): NUR der K5601-Satz — Ladediskette mit "nur_a" (Wurzel und
+# Datendisketten duerfen schon beim Einschalten in B:/C: liegen) und die dazu passenden MFM-Disketten.
+# Die Fassungen fuer MF3200 (FM), die anderen Ladedisketten (mf3200, 8x512, ...) und die Quellen in
+# disks/a5120_mutos8000/ (.td0, .zip) liegen nur im Repository: gleiche Inhalte in anderer Aufzeichnung
+# waeren im Paket reine Redundanz.  Gilt auch fuer --disks all.
+MUTOS_PAKET="a5120_mutos8000_boot_udos_k5601_nur_a.hfe
+a5120_mutos8000_root_mfm.hfe
+a5120_mutos8000_cmd_mfm.hfe
+a5120_mutos8000_usr_mfm.hfe
+a5120_mutos8000_bin_mfm.hfe
+a5120_mutos8000_cc1_mfm.hfe
+a5120_mutos8000_cc2_mfm.hfe"
+
 usage() {
     cat <<EOF
 K1520-Emulator — Paket schnueren
@@ -585,6 +598,11 @@ case "$DISKS" in
         for d in $(find "$REPO/disks" -mindepth 2 -maxdepth 2 -type f \
                         \( -name '*.hfe' -o -name '*.img' -o -name '*.dmk' -o -name '*.img.gz' -o -name '*.k52' \) \
                         | sort); do
+            case "$d" in
+                */a5120_mutos8000/*) continue ;;                       # Quellen/Originale des MUTOS-Satzes
+                */a5120_16_MUTOS/*) case " $(echo $MUTOS_PAKET) " in
+                                        *" $(basename "$d") "*) ;; *) continue ;; esac ;;
+            esac
             lege_diskette_ab "$d"
         done ;;
     default)
@@ -595,6 +613,10 @@ case "$DISKS" in
             else
                 warn "Beispieldiskette fehlt, wird ausgelassen: $d"
             fi
+        done
+        for d in $MUTOS_PAKET; do
+            pfad=$(find "$REPO/disks/a5120_16_MUTOS" -maxdepth 1 -type f -name "$d" | head -1)
+            if [ -n "$pfad" ]; then lege_diskette_ab "$pfad"; else warn "MUTOS-Diskette fehlt, wird ausgelassen: $d"; fi
         done
         # P8000 (2026-10-11, Entscheid des Anwenders): die WEGA-Saetze GANZ — fertig installierte
         # Platten (*.img.gz, bleiben beim Anwender gepackt, der Emulator schliesst sie so an),

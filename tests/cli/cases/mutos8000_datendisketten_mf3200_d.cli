@@ -1,0 +1,47 @@
+# MUTOS 8000: Datendisketten in FM (8 Zoll) und das VIERTE Laufwerk (Entwurf 39 Abschnitt 10, Ticket #22).
+# Vier MF3200.  Die Ladediskette traegt die Laufwerkstyp-Konstante 2AH (Laufwerke A: bis C:, Typ 2 = 77 Spuren FM); Laufwerk D:
+# (rk3) hat dort Typ 0 = "nicht vorhanden" und liefert "err on dev 4/3 er=0,302" (UDOS-Nukleus C2).  Der Handgriff:
+# `e 0x0FCA 0xAA` (im Debugger; auf der Diskette das Byte an Zylinder 2, Sektor-ID 1, Offset 121 von 2AH auf AAH), danach laesst
+# sich /dev/rk3 mounten.  cmd -> D: (rk3) -> /mnt, bin -> B: (rk1) -> /tmp.
+tool:      k1520dbg
+disk_path: %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_boot_udos_mf3200.hfe
+timeout:   600
+run:       --em em256 --laufwerke MF3200,MF3200,MF3200,MF3200 %DISK%
+stdin:
+  g 80000000
+  keys BOOT\sMUTOS\r
+  g 100000000
+  eject A
+  mount C %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_root_fm.hfe udos_ss77
+  keys r
+  g 100000000
+  keys root\r
+  g 100000000
+  mount D %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_cmd_fm.hfe udos_ss77
+  mount B %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_bin_fm.hfe udos_ss77
+  keys /etc/mount\s/dev/rk3\s/mnt\r
+  g 50000000
+  screen
+  e 0x0FCA 0xAA
+  keys /etc/mount\s/dev/rk3\s/mnt\r
+  g 50000000
+  keys /etc/mount\s/dev/rk1\s/tmp\r
+  g 50000000
+  keys ls\s-l\s/tmp\r
+  g 50000000
+  keys /mnt/bin/wc\s/.profile\r
+  g 50000000
+  keys /tmp/tar\r
+  g 50000000
+  screen
+  q
+exit:      0
+expect:    mem = 196608
+expect_re: single user login: root\s+\|
+expect_re: err on dev 4/3
+expect_re: mount: I/O error
+expect_re: \|\s*4\s+9\s+108 /\.profile\s+\|
+expect_re: -rwxr\S+\s+1 root\s+17000 Mar 17\s+1987 tar
+expect_re: -rwxr\S+\s+1 root\s+27770 Mar 17\s+1987 adb
+forbid:    panic
+forbid:    INITIALIZATION ERROR

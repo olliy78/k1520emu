@@ -567,6 +567,13 @@ private:
                                                ///< Der Drive-Cache bleibt immer IBM-Format,
                                                ///< damit commitWrite()/parseTrack() funktioniert.
     size_t            head_pos_     = 0;        ///< Lesekopf-Position (Byte) in der Spur
+    /// Letzter MK/MK1-Resync: Position DAVOR und Zahl der IN 16H seither (kResyncKeine = keiner
+    /// gemerkt).  Nur fuer beginWriteField(), das einen Resync unmittelbar vor dem Schreiben
+    /// zuruecknimmt.
+    static constexpr unsigned kResyncKeine  = 0xFFFFu;
+    static constexpr unsigned kResyncUndoIns = 4;
+    size_t            resync_prev_pos_ = 0;
+    unsigned          resync_ins_      = kResyncKeine;
     bool              locked_       = false;    ///< Datenseparator auf eine Marke synchronisiert
     bool              transferring_ = false;    ///< Lesetransfer laeuft
     /// @brief Traegt der aktive Lese-Strom ueberhaupt Adressmarken?

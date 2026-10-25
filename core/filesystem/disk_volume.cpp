@@ -808,6 +808,13 @@ std::map<std::string, CpmAngabe> leseCpmBeiblatt(const fs::path& datei) {
 // Das ist gewollt: die einzelne Datei soll fuer sich genommen vollstaendig sein,
 // gleich aus welchem Ordner sie stammt und wohin sie spaeter kopiert wird.
 
+/// @brief Blockgeraet eines UNIX-Profils ueber dem Sektorraum der Diskette.
+std::unique_ptr<WegaBlockDev> unixGeraet(SectorSpace& raum, const FsProfile& p) {
+    if (p.mutos8k_layout) return std::make_unique<Mutos8kDev>(raum, p.data_cyl, p.data_head);
+    return std::make_unique<WegaSpaceDev>(raum, p.data_cyl, p.data_head,
+                                          p.mutos1700_layout ? wega::kXenixV : wega::kWegaV);
+}
+
 /// @brief Familie des System-III-Dateisystems, die ein Profil beschreibt.
 const wega::Variante& unixVariante(const FsProfile& p) {
     return p.mutos1700_layout ? wega::kXenixV : wega::kWegaV;
@@ -1288,8 +1295,8 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
                     ja = Udos1715FileSystem::looksLikeUdos1715(probe, *p, &warum);
                 } else if (p->type == FsType::WegaMutos) {
                     SectorSpace probe(dv->disk_->medium(), *f);
-                    const WegaSpaceDev geraet(probe, p->data_cyl, p->data_head, unixVariante(*p));
-                    ja = WegaFileSystem::looksLikeWega(geraet, &warum);
+                    const auto geraet = unixGeraet(probe, *p);
+                    ja = WegaFileSystem::looksLikeWega(*geraet, &warum);
                 } else {
                     int belegt = 0;
                     ja = cpmVerzeichnisPlausibel(dv->disk_->medium(), *f, *p, &warum,
@@ -1555,9 +1562,7 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
             if (!u) { err = warum; return roh(warum); }
             v.fs = std::move(u);
         } else if (dv->profile_->type == FsType::WegaMutos) {
-            auto w = WegaFileSystem::mount(std::make_unique<WegaSpaceDev>(
-                *v.space, dv->profile_->data_cyl, dv->profile_->data_head,
-                unixVariante(*dv->profile_)), warum);
+            auto w = WegaFileSystem::mount(unixGeraet(*v.space, *dv->profile_), warum);
             if (!w) { err = warum; return roh(warum); }
             v.fs = std::move(w);
         } else if (dv->profile_->type == FsType::Tar && dv->profile_->leer) {
@@ -3794,9 +3799,14 @@ bool DiskVolume::insertAll(const std::string& src_dir, const TransferOptions& op
     // WEGA: auch die LEEREN Unterordner gehoeren zum Baum.
     if (istUnix()) {
         std::error_code ec;
-        for (const auto& e : fs::recursive_directory_iterator(src_dir, ec)) {
-            if (!e.is_directory()) continue;
-            if (!volumes_[0].fs->makeDirectory(wegaZielName(src_dir, e.path().string()))) {
+        // Sortiert: die Reihenfolge des Dateisystems bestimmt sonst, welches Verzeichnis welchen
+        // Block bekommt (Abbild nicht reproduzierbar); Eltern stehen vor ihren Kindern ("a" < "a/b").
+        std::vector<std::string> ordner;
+        for (const auto& e : fs::recursive_directory_iterator(src_dir, ec))
+            if (e.is_directory()) ordner.push_back(e.path().string());
+        std::sort(ordner.begin(), ordner.end());
+        for (const std::string& o : ordner) {
+            if (!volumes_[0].fs->makeDirectory(wegaZielName(src_dir, o))) {
                 const std::string grund = volumes_[0].fs->lastError();
                 zurueck();
                 return fail(grund + " - die Diskette wurde nicht veraendert.");
@@ -4023,7 +4033,8 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
                                                const FsCatalog& fs_cat,
                                                std::string& err,
                                                const std::string& boot_image,
-                                               uint32_t unix_inodes) {
+                                               uint32_t unix_inodes,
+                                               uint32_t unix_bloecke) {
     const FsProfile* profil = fs_cat.find(fs_name);
     if (!profil) { err = "Dateisystem '" + fs_name + "' steht nicht im Katalog"; return nullptr; }
     const DiskFormat* fmt = formats.find(profil->format);
@@ -4158,9 +4169,8 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
             // wie `sa.mkfs 1440` — Verschraenkung 1/72 wie auf den Lieferdisketten.
             // MUTOS (Blockraum ab Zylinder 1) traegt 3/500, wie CMD/CC1/CC2.
             const bool mutos = profil->mutos1700_layout || profil->data_cyl != 0;
-            auto w = WegaFileSystem::format(std::make_unique<WegaSpaceDev>(
-                *v.space, profil->data_cyl, profil->data_head, unixVariante(*profil)), label, err,
-                0, mutos ? 3 : 1, mutos ? 500 : 72, 0, unix_inodes);
+            auto w = WegaFileSystem::format(unixGeraet(*v.space, *profil), label, err,
+                unix_bloecke, mutos ? 3 : 1, mutos ? 500 : 72, 0, unix_inodes);
             if (!w) return nullptr;
             v.fs = std::move(w);
         } else {

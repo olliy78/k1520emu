@@ -818,6 +818,138 @@ So geht es:
   V2.1-System läuft nur als **Eigenbau** (V1.2-Lader mit V2.1-System und
   V1.2-Plattentreiber, `tools/bcu_v21_eigenbau.py`) — **kein Original**.
 
+## MUTOS 8000 (A5120.16)
+
+MUTOS 8000 ist ein UNIX für den 16-Bit-Teil des A5120.16 (U8001). Dieser Abschnitt ist eine
+**Kurzanleitung** für den Rechner mit **drei K5601** (A:, B:, C:; die Standardbestückung).
+Vorbereitung: *Einstellungen ▸ Allgemein ▸ Erweiterungsmodul* auf **EM256**, Laufwerke wie ausgeliefert
+(*Einstellungen ▸ Laufwerke*). Bis jetzt nur im Emulator erprobt, nicht an echter Hardware; die
+Schritte unten sind mit dem Kommandozeilen-Debugger durchgespielt, in dieser Oberfläche nicht
+Schritt für Schritt abgenommen. MUTOS startet im **Einbenutzerbetrieb** (`single user login`);
+einen Mehrbenutzerbetrieb gibt es noch nicht.
+
+**Die Disketten** liegen im Ordner `a5120_16_MUTOS/` der Beispieldisketten (K5601, MFM):
+
+| Datei | Rolle | Einhängepunkt |
+|-------|-------|---------------|
+| `a5120_mutos8000_boot_udos_k5601_nur_a.hfe` | Ladediskette (UDOS + Lader + Kernel) | – |
+| `a5120_mutos8000_root_mfm.hfe` | Wurzel (`/bin`, `/etc`, `/dev`) | `/` |
+| `a5120_mutos8000_cmd_mfm.hfe` | Befehle (`ls`, `cp`, `ed`, `mkfs` …) | `/mnt` |
+| `a5120_mutos8000_usr_mfm.hfe` | C-Übersetzer (`cc`, `as`, `ld`) | `/usr` |
+| `a5120_mutos8000_bin_mfm.hfe` | `adb`, `mt`, `tar` | `/tmp` |
+| `a5120_mutos8000_cc1_mfm.hfe`, `a5120_mutos8000_cc2_mfm.hfe` | Inhalt der Original-Compilerdisketten (cc1: `as`, `cc`, `ld`, `ed`, Header, `c0`, `c1`; cc2: `c2`, `cpp`, `libc.a`, `nm`) | `/usr` (nur eine zugleich) |
+
+Im **GitHub-Repository** (`disks/a5120_16_MUTOS/`) liegen außerdem die Fassungen für **MF3200**
+(8″, FM; Dateien mit `_fm` im Namen), gemischte Bestückungen und weitere Ladedisketten. Eine Diskette
+passt nur zur Aufzeichnung ihres Laufwerks: K5601 nimmt nur MFM, MF3200 nur FM.
+
+**Arbeitskopien verwenden.** MUTOS schreibt in die Wurzel und in eingehängte Disketten; der
+Emulator schreibt die Datei zurück. Die Originale deshalb zuerst kopieren und nur mit den Kopien
+arbeiten.
+
+### Starten (Einbenutzerbetrieb)
+
+1. **Ladediskette `…_boot_udos_k5601_nur_a.hfe` in A:** einlegen. Diese Ladediskette meldet UDOS beim Start nur
+   Laufwerk A: an; deshalb dürfen die **Wurzel in C:** und z. B. die **`cmd`-Diskette in B:** schon beim
+   Einschalten eingelegt sein (die übrigen Ladedisketten brauchen B:–C: leer, sonst
+   `DISK INITIALIZATION ERROR` bzw. `I/O ERROR`).
+2. Rechner einschalten. UDOS zeigt das Menü `LOADER  M U T O S 8000`. Eingabe: `BOOT MUTOS`, RETURN.
+3. Nach einigen Sekunden verlangt der Lader: `remove mutos8000 boot - disk` / `insert mutos8000 root - disk on rk2`.
+   Liegt die Wurzel schon in C:, genügt `r` und RETURN (die Ladediskette wird nicht mehr gebraucht; sie darf in A:
+   bleiben). Sonst jetzt die Wurzel in C: einlegen, dann `r`.
+4. Es folgt `mem = 196608` und `single user login:` — Eingabe `root` (kein Kennwort). Prompt `#`.
+
+### Weitere Disketten einhängen
+
+Laufwerk = Gerät: **A: = `/dev/rk0`, B: = `rk1`, C: = `rk2` (Wurzel)**. A: ist jetzt frei (Ladediskette auswerfen).
+Was noch nicht liegt, einlegen, dann als `root`:
+
+    # /etc/mount /dev/rk0 /usr          (usr-Diskette in A:)
+    # /etc/mount /dev/rk1 /mnt          (cmd-Diskette in B:)
+    # ls /mnt/bin
+    # cc -o /tmp/x /tmp/x.c             (C-Programm übersetzen)
+
+Die Befehle der Disketten stehen ohne Pfad zur Verfügung (`PATH` in `/.profile`). Zum Wechseln:
+**`/etc/umount /dev/rk0`**, erst danach die Diskette tauschen und neu einhängen (z. B. die `bin`-Diskette
+nach `/tmp`). Vor dem Abschalten alles aushängen und `sync` eingeben.
+
+> **Warnung: C: (`rk2`) ist auch der Swap-Bereich.** Die Wurzel belegt nur die ersten 250 Blöcke der
+> Diskette; **ab Block 250 (etwa ab Spur 38 von 77) lagert MUTOS im laufenden Betrieb Prozesse aus und
+> schreibt dort Daten** — ohne Meldung und ohne dass ein Dateisystem darauf wüsste. In C: darf deshalb
+> **nie eine andere Diskette liegen**, solange MUTOS läuft: sie würde vermutlich zerstört. Aus demselben
+> Grund nie ein Dateisystem mit mehr als 250 Blöcken auf der Wurzel anlegen (kein `mkfs … 494` dort).
+
+### Mehrbenutzerbetrieb und zweites Terminal
+
+MUTOS kennt kein `init 2`. Sein `init` wartet im Einbenutzerbetrieb auf das **Ende der Shell** und
+startet danach auf jedem in `/etc/ttys` freigegebenen Gerät ein `getty`. Die Wurzel gibt die Konsole
+und **`tty1`** schon frei; `tty1` ist die Schnittstelle **DFÜ/V.24** des Rechners.
+
+1. Wie oben starten, anmelden, die Disketten einhängen (`/etc/mount …`). Die Einhängungen bleiben später erhalten.
+2. **Zweites Terminal anschließen** (Möglichkeiten unten).
+3. Die Einbenutzer-Shell mit **Strg+Z** beenden (das EOF-Zeichen dieses Systems; `Strg+D` und `exit` tun hier nichts).
+   Auf der Konsole und am zweiten Terminal erscheint `login:`; beide Plätze arbeiten gleichzeitig,
+   `who` zeigt `console` und `tty1`, `ps` (ohne Argumente) die Prozesse.
+
+Beim nächsten Start beginnt wieder der Einbenutzerbetrieb; `/etc/rc` gibt es nicht, eingehängt wird jedes Mal von Hand.
+**Strg+C** bricht ein laufendes Programm ab (die Taste *Entf* tut das nicht).
+
+**Zweites Terminal — mit dem P8000-Terminal (ohne Telnet-Programm, auch unter Windows).**
+Das Programm `p8000emu` in der Betriebsart *Nur Terminal* (`p8000emu --mode terminal`) ist ein Arbeitsplatz mit dem
+Originalterminal und der Flachtastatur K7673; es spricht selbst Telnet.
+
+1. Im A5120-Emulator: *Einstellungen ▸ Schnittstellen*, Block **DFÜ/V.24**: Betriebsart *Telnet*, Rolle *Server*,
+   einen Port wählen (z. B. 5000), starten.
+2. Im Terminal: *Maschine ▸ Verbindung zum Rechner…*, Rechner `127.0.0.1` (oder die Adresse des PCs, auf dem der
+   Emulator läuft), denselben Port, *Verbinden*. Die Statuszeile zeigt „verbunden". Reihenfolge egal; der Server muss vor dem *Verbinden* laufen.
+3. Nach Strg+Z auf der A5120-Konsole meldet sich `login:` am Terminal. Anmelden als `root` (kein Kennwort).
+
+Die Strg-Tasten gehen an das Gastsystem: **Strg+Z** (EOF), **Strg+C** (Abbruch) wurden am Terminal geprüft; Strg+S/Strg+Q sind
+nicht erprobt. Strg wird am Terminal wie an der K7673 gedrückt (Wirtstaste oder in der Bildschirmtastatur einrasten lassen).
+Gleichwertig geht jedes andere Terminalprogramm, das Telnet (oder RFC 2217) spricht, z. B. PuTTY (Verbindungsart *Telnet*); der Gast meldet keine Baudrate, das ist unschädlich.
+
+### Disketten formatieren und verwenden
+
+Zwei getrennte Schritte: **formatieren** (Spuren schreiben) und **Dateisystem anlegen** (`mkfs`). Für eine
+Datendiskette gilt: 494 Blöcke, K5601 = MFM.
+
+**Im Gastsystem:**
+
+1. Eine *Leere Diskette* (`.hfe`) anlegen (Laufwerkskasten, Knopf *Leere Diskette*) und in B: einlegen —
+   **vor MUTOS**, mit der Ladediskette in A: am Lader-Menü (also nach dem Einschalten, bevor `BOOT MUTOS` kommt).
+2. `FORM.M` eingeben. Fragen: `drive ?` → `1` (B:), `sectorlength` → `0` (= 128 Byte), `ready ?` → `Y`; jeweils RETURN.
+3. Rechner zurückstellen und wie oben starten (ein direkter `BOOT MUTOS` nach `FORM.M` scheitert mit
+   `I/O ERROR C2`). Die Wurzel kommt in C:.
+4. Nach der Anmeldung die `cmd`-Diskette in A: legen und nach `/mnt` einhängen (dort liegt `mkfs`); die formatierte
+   Diskette bleibt in B:. Dann `/mnt/etc/mkfs /dev/rk1 494` ausführen (Ausgabe `isize = 152`). Dann `/etc/mount /dev/rk1 /usr` usw.
+
+Unter MUTOS selbst kann man nicht formatieren, nur `mkfs`.
+
+**Mit dem DiskTool** (Menü *Werkzeuge*): *Datei ▸ Neue Diskette* mit dem Dateisystem **`mutos8k_mfm`** (K5601; `mutos8k_fm`
+für MF3200) legt eine fertig formatierte Datendiskette samt Dateisystem an; Dateien holt und schreibt man wie bei jeder
+anderen Diskette (*Datei ▸ Abbild öffnen*). Auf der Kommandozeile:
+
+    k1520disktool create neu.hfe --fs mutos8k_mfm --blocks 494
+    k1520disktool put neu.hfe datei.txt
+    k1520disktool ls -l neu.hfe
+
+Dieselbe Diskette nie gleichzeitig im DiskTool und im Emulator offen halten. Eine so angelegte Diskette
+hängt MUTOS ohne `mkfs` direkt ein.
+
+### Sicherungskopien
+
+* **Die Datei kopieren** — das ist die ganze Diskette. Erst die Diskette **auswerfen** (oder den Rechner
+  ausschalten), da der Emulator erst dabei die letzten Änderungen zurückschreibt, dann die `.hfe`
+  im Dateimanager kopieren. Vorher in MUTOS `/etc/umount` und `sync`.
+* Alternativ *Speichern unter…* beim eingelegten Laufwerk: sichert die Diskette unter neuem Namen
+  (und arbeitet ab dann an der Kopie weiter).
+* Eine **unersetzliche Diskette** mit dem Haken *Write-Protect* im Laufwerkskasten schützen.
+* Die Wurzel vor dem ersten Start sichern: sie wird bei jedem Lauf verändert.
+* Einzelne Dateien sichert das DiskTool mit *Datei holen* bzw. `k1520disktool get neu.hfe --to ordner`.
+
+Genaueres und die Hintergründe (Laufwerkstypen, andere Bestückungen, Geometrie 8 × 512, Swap verlegen):
+`doc/design/39_mutos8000.md`.
+
 ## RAM-Floppy RAF
 
 *Einstellungen ▸ Allgemein ▸ RAM-Disk* steckt eine RAM-Floppy des ZWG der AdW

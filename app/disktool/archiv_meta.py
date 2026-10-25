@@ -238,6 +238,33 @@ def beilagen_aus_angaben(angaben: Iterable[str], kodierung: str = "auto",
     return aus
 
 
+def beilagen_binaer_aus_angaben(angaben: Iterable[str], *, stamm: str = "",
+                                schon: Iterable[str] = ()) -> Dict[str, bytes]:
+    """``--beilage-binaer datei[=name]`` (mehrfach) -> ``{Name im Archiv: Bytes}``.
+
+    Unveraendert, ohne Dekodierung: fuer Beigaben, die kein Text sind (z. B. ein Ladecode,
+    den ein Bauskript wieder einspielt).  Gleiche Namens- und Groessenregeln wie bei Text.
+    """
+    aus: Dict[str, bytes] = {}
+    belegt = {k.lower() for k in schon}
+    for a in angaben or ():
+        pfad, name = a, ""
+        if not Path(a).is_file() and "=" in a:
+            pfad, _, name = a.rpartition("=")
+        p = Path(pfad)
+        if not p.is_file():
+            raise ArchivMetaFehler(f"Beilage '{p}' gibt es nicht")
+        if p.stat().st_size > MAX_BEILAGE:
+            raise ArchivMetaFehler(f"Beilage '{p.name}' ist {p.stat().st_size} Byte gross "
+                                   f"(Grenze {MAX_BEILAGE // (1024 * 1024)} MiB)")
+        n = pruefe_beilagenname(name or p.name, stamm=stamm)
+        if n.lower() in belegt:
+            raise ArchivMetaFehler(f"Beilage '{n}' kommt doppelt vor")
+        belegt.add(n.lower())
+        aus[n] = p.read_bytes()
+    return aus
+
+
 # ─── Kommandozeile ───────────────────────────────────────────────────────────
 
 def add_argumente(gruppe) -> None:
@@ -256,11 +283,15 @@ def add_argumente(gruppe) -> None:
              "4 MiB; wird nach UTF-8 uebernommen; NAME = Name im Archiv). Sie liegt "
              "NICHT unter dateien/ und kommt nie auf die Diskette")
     gruppe.add_argument(
+        "--beilage-binaer", metavar="DATEI[=NAME]", action="append", default=[],
+        help="wie --beilage, aber BINAER: die Bytes kommen unveraendert ins Archiv "
+             "(hoechstens 4 MiB), ohne Textpruefung")
+    gruppe.add_argument(
         "--beilage-kodierung", metavar="KODIERUNG", default="auto",
         help="Kodierung der Beilagen (Vorgabe auto: UTF-8, sonst Latin-1)")
 
 
-def aus_optionen(o, *, stamm: str = "") -> Tuple[dict, Dict[str, str]]:
+def aus_optionen(o, *, stamm: str = "") -> Tuple[dict, dict]:
     """``(provenance, beilagen)`` aus den Schaltern; leer = ``({}, {})``.
 
     Wirft :class:`ArchivMetaFehler` — der Aufrufer meldet es und beendet mit 2.
@@ -269,4 +300,6 @@ def aus_optionen(o, *, stamm: str = "") -> Tuple[dict, Dict[str, str]]:
     prov = bereinige_provenance(herkunft_aus_paaren(getattr(o, "herkunft", ()), basis))
     beil = beilagen_aus_angaben(getattr(o, "beilage", ()),
                                 getattr(o, "beilage_kodierung", "auto"), stamm=stamm)
+    beil.update(beilagen_binaer_aus_angaben(getattr(o, "beilage_binaer", ()),
+                                            stamm=stamm, schon=beil))
     return prov, beil

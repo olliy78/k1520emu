@@ -99,6 +99,7 @@ uint8_t K5122::ioRead(uint8_t port) {
                         result = 0x00;
                     }
                     head_pos_ = (head_pos_ + 1) % cur_track_->size();
+                    if (resync_ins_ < kResyncKeine) ++resync_ins_;
                 }
                 // Byte abgeholt → einen Byte-Slot konsumieren (Spacing: die im
                 // ZVE2-Fenster aufgelaufene Phase bleibt erhalten, s. consumeByteSlot()).
@@ -1081,6 +1082,8 @@ void K5122::resyncToNextMark() {
         }
     }
     if (t != SIZE_MAX) {
+        resync_prev_pos_ = head_pos_;
+        resync_ins_      = 0;
         head_pos_ = t;
         locked_   = true;
         LOG_TRACE("K5122", "resync -> pos=%zu (0x%02X)", t, cur_track_->bytes[t]);
@@ -1325,6 +1328,20 @@ void K5122::commitFormatTrack() {
 void K5122::beginWriteField() {
     we_writing_ = true;
     write_buf_.clear();
+
+    // FM: den MK1-Resync VOR dem Schreiben zuruecknehmen.  Der UDOS-Treiber pulst MK1
+    // (Steuerwort 91H) unmittelbar vor dem Schreiben, ohne dass noch eine Marke gesucht
+    // wird; unser Resync setzte den Kopf dabei auf die DAM vor, und das Datenfeld (145 B
+    // samt Sync) endete dann EIN Byte vor der naechsten ID.  ZVE2 braucht danach einige
+    // Bytes, um den Lesepfad einzurichten (L0A1A), und verpasste jede Folge-ID -> je Sektor
+    // eine volle Umdrehung, nach 10 Sektoren war der Suchzaehler [0FCDH] leer, ERROR C4
+    // (FORM.B am 8-Zoll-FM-Ziel, doc/design/39_mutos8000.md 9.11).  Auf echter HW beginnt
+    // das Schreiben ca. 12 Bytes hinter der ID, also dort, wo der Kopf VOR dem Resync stand.
+    if (resync_ins_ <= kResyncUndoIns && cur_track_ && !cur_track_->empty()
+        && effReadEnc() == Encoding::FM) {
+        head_pos_ = (resync_prev_pos_ + resync_ins_ + 1) % cur_track_->size();
+    }
+    resync_ins_ = kResyncKeine;
     wr_id_ = 0; wr_size_ = cur_sector_size_; wr_cyl_ = 0; wr_head_ = current_head_;
 
     if (cur_track_ && !cur_track_->empty()) {
