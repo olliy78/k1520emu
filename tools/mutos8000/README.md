@@ -9,7 +9,7 @@ Nur Python-Standardbibliothek, lauffähig mit `python3 -I`; das DiskTool wird nu
 | `m8kroot_lesen.py` | Befund der beschädigten `M8KROOT` (Superblock, Inodes, Baum, lesbare Bytes; `--inodes`, `--vergleich ORDNER`) |
 | `wurzel_quellbaum.py` | Quellbaum (Dateien, `.fileinfo`, `wega-dateiangaben.txt`) aus `M8KROOT` + Auszug von DISK-ROOT; Handangaben (Namen, `.profile`, Geräte) stehen als Daten im Skript |
 | `wurzel_pruefen.py` | unabhängiger Leser: Baum einer Wurzel (`.td0`/`.imd`) byteweise gegen einen Quellbaum |
-| `bau_alle.py` | **alle vierzehn fertigen Disketten** (6 Ladedisketten, 2 Wurzeln, 6 Datendisketten) aus den Archiven nach `disks/a5120_16_MUTOS/` (s. u.) |
+| `bau_alle.py` | **alle achtzehn fertigen Disketten** (6 Ladedisketten, 2 Wurzeln, 10 Datendisketten) aus den Archiven nach `disks/a5120_16_MUTOS/` (s. u.) |
 | `bau_wurzel.py` | ganzer Nachbau: DISK-ROOT holen, Quellbaum, `create --fs mutos8k_fm --inodes 104 --blocks 250` (Swap-Bereich ab Block 250, §4.8), Zylinder 0 per `boot-get` von M8KCMD + `boot-put`, `put`, `check --full`, Prüfung |
 | `bau_aus_archiv.py` | baut die Wurzeldiskette aus einem **Archiv** (`.zip` oder ausgepackter Ordner): `bauangaben.yaml`, `zylinder0.bin`, `dateien/`; `check --full` und unabhängige Prüfung (Fehler bei Block >= `s_fsize`) |
 | `archiv_erzeugen.py` | erzeugt die eingecheckten Quell-Archive aus den Disketten (`archive --ohne-abbild`): `--art wurzel` (Vorgabe) → `…_m8k_root.zip`, `--art ladediskette` → `…_boot_udos.zip` aus der Original-Ladediskette `…_boot_udos.dmk` |
@@ -38,14 +38,14 @@ Einzelheiten: Entwurf 39 §4.7.6 und §4.8.
 Quellen (Originale, Archive) liegen in `disks/a5120_mutos8000/`, die **fertigen Disketten in `disks/a5120_16_MUTOS/`**:
 
 ```sh
-python3 -I tools/mutos8000/bau_alle.py --ueberschreiben            # baut alle vierzehn neu nach disks/a5120_16_MUTOS/
-python3 -I tools/mutos8000/bau_alle.py --nur-daten --ueberschreiben  # nur die sechs Datendisketten
+python3 -I tools/mutos8000/bau_alle.py --ueberschreiben            # baut alle achtzehn neu nach disks/a5120_16_MUTOS/
+python3 -I tools/mutos8000/bau_alle.py --nur-daten --ueberschreiben  # nur die zehn Datendisketten
 python3 -I tools/mutos8000/bau_alle.py --ziel-ordner aus/ --wurzel-quelle meine_wurzel --lade-quelle meine_lade
 ```
 
 | Laufwerke A: / B: / C: | Ladediskette (A:) | Wurzel (C:) |
 |---|---|---|
-| 3 × MF3200 (8″ FM) | `…_boot_udos_mf3200.hfe` (FM, `2AH`) | `…_root.hfe` (FM) |
+| 3 × MF3200 (8″ FM) | `…_boot_udos_mf3200.hfe` (FM, `2AH`) | `…_root_fm.hfe` (FM) |
 | **3–4 × K5601** (5¼″ MFM) | `…_boot_udos_k5601.hfe` (MFM, `FFH`) | `…_root_mfm.hfe` (MFM) |
 | MF3200 + 2–3 × K5601 | `…_boot_udos_mf3200_k5601.hfe` (FM, `FEH`) | `…_root_mfm.hfe` (MFM) |
 
@@ -53,7 +53,7 @@ Jede Zeile hat einen Boot-Wächter bis `single user login: root` und `ls -l /` (
 Die Ladedisketten werden bitgleich, die Wurzeln bis auf die Anlagezeit (`s_time`).  Wächter `test_bau_alle_kennt_genau_die_fertigen_disketten`:
 Ordner und Skript nennen dieselben Disketten.
 
-**Datendisketten** (Entwurf 39 §10): je Rolle FM (`…_<rolle>.hfe`, MF3200) und MFM (`…_<rolle>_mfm.hfe`, K5601), gebaut aus
+**Datendisketten** (Entwurf 39 §10): je Rolle FM (`…_<rolle>_fm.hfe`, MF3200) und MFM (`…_<rolle>_mfm.hfe`, K5601), gebaut aus
 `disks/a5120_mutos8000/a5120_mutos8000_best_<rolle>.zip` mit `bau_aus_archiv.py [--laufwerke k5601]`:
 
 | Rolle | Mountpunkt | Inhalt |
@@ -65,7 +65,7 @@ Ordner und Skript nennen dieselben Disketten.
 Wer eine Datei ändern will: `unzip …best_cmd.zip -d meine_cmd`, Datei unter `dateien/` tauschen, `bau_aus_archiv.py meine_cmd neu.hfe --laufwerke k5601`.
 Das Archiv entsteht aus den Originalen mit `archiv_erzeugen.py --art cmd|usr|bin --force`; die Herkunft jeder Datei steht als `entscheidungen.txt` darin.
 
-Nachbau gegen `…_root.hfe`: Dateibaum, Inhalte und `ls -l` (Modus, uid/gid, Größe, Zeit) sind gleich; Prüfer: 43 Einträge, 0 Abweichungen.
+Nachbau gegen `…_root_fm.hfe`: Dateibaum, Inhalte und `ls -l` (Modus, uid/gid, Größe, Zeit) sind gleich; Prüfer: 43 Einträge, 0 Abweichungen.
 Wächter: `tests/python/test_mutos8000_werkzeuge.py` (Befund-Leser, Archiv → Bau → Vergleich, getauschte Datei).
 
 ## Ablauf: Datei ändern → neue Wurzel (Ticket #22)

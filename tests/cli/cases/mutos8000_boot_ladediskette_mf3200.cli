@@ -12,7 +12,7 @@ stdin:
   keys BOOT\sMUTOS\r
   g 100000000
   eject A
-  mount C %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_root.hfe udos_ss77
+  mount C %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_root_fm.hfe udos_ss77
   keys r
   g 100000000
   keys root\r

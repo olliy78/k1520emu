@@ -2214,3 +2214,16 @@ def test_release_workflow_prueft_tag_und_unterscheidet_vorabversion():
     # Der Rauchtest sucht die Disketten gegliedert und prueft die Bibliotheksversion.
     assert 'share/disks"/*/*.gz' in wf
     assert len(re.findall(r"tools/version\.py --bau", wf)) == 2
+
+
+def test_mutos8000_nur_der_k5601_satz_im_paket():
+    """MUTOS 8000 (A5120.16): Das Paket (default UND all) enthaelt nur die K5601-Ladediskette `_nur_a` und die
+    MFM-Disketten root/bin/cmd/usr/cc1/cc2 - keine FM-Fassungen, keine anderen Ladedisketten, keine Quellen."""
+    text = (PACKAGING / "build_payload.sh").read_text(encoding="utf-8")
+    block = text[text.index('MUTOS_PAKET="'):]
+    block = set(block[len('MUTOS_PAKET="'):].split('"', 1)[0].split())
+    assert block == {"a5120_mutos8000_boot_udos_k5601_nur_a.hfe"} | {
+        "a5120_mutos8000_%s_mfm.hfe" % r for r in ("root", "bin", "cmd", "usr", "cc1", "cc2")}
+    for name in block:
+        assert ausgelieferte_diskette(name).is_file(), name
+    assert "*/a5120_mutos8000/*) continue" in text          # --disks all laesst die Quellen aus

@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import best_of  # noqa: E402
 import m8k  # noqa: E402
 
-QUELLE = m8k.fertig("root.hfe")
+QUELLE = m8k.fertig("root_fm.hfe")
 ZIEL = m8k.disk("m8k_root.zip")
 ANGABEN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bauangaben.yaml")
 LADE_QUELLE = m8k.disk("boot_udos.dmk")

@@ -12,13 +12,13 @@ stdin:
   keys BOOT\sMUTOS\r
   g 100000000
   eject A
-  mount C %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_root.hfe udos_ss77
+  mount C %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_root_fm.hfe udos_ss77
   keys r
   g 100000000
   keys root\r
   g 100000000
-  mount D %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_cmd.hfe udos_ss77
-  mount B %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_bin.hfe udos_ss77
+  mount D %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_cmd_fm.hfe udos_ss77
+  mount B %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_bin_fm.hfe udos_ss77
   keys /etc/mount\s/dev/rk3\s/mnt\r
   g 50000000
   screen

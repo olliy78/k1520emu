@@ -12,6 +12,8 @@ Rollen (Mountpunkte der Wurzel, PATH der .profile = :/mnt/bin:/usr/bin:/bin:/etc
   cmd  -> /mnt   bin/ + etc/ der Befehle (Gegenstueck M8KCMD)
   usr  -> /usr   bin/ include/ lib/ des C-Uebersetzers (Gegenstueck M8KUSR)
   bin  -> /tmp   Zusatzbefehle im Wurzelverzeichnis (Gegenstueck M8KBIN; /tmp steht im PATH)
+  cc1, cc2 -> /usr  Inhalt von DISK-CC1 bzw. DISK-CC2 (1987) unveraendert auf 26x128; beide tragen lib/ und bin/, es kann nur
+                    eine zugleich auf /usr liegen - die vollstaendige Kette steht auf usr
 
 Je Datei gilt: die gesunde Fassung des DISK-Satzes (neuer), sonst die gesunde des M8K-Satzes; eine neuere Fassung, die
 auf dem Kernel der Ladediskette (1986) nachweislich nicht laeuft (pwd), wird durch die aeltere ersetzt.  "Gesund" heisst: die
@@ -107,6 +109,28 @@ AUSWAHL = {
         ("lib/libc.a", "cc2", "lib/libc.a", D + " (71914 B, 140 Glieder); M8KUSR-Fassung ab Offset 29810 Programmdaten"),
         ("lib/mcrt0.o", "cc2", "lib/mcrt0.o", D + " (gleich)"),
     ],
+    # cc1/cc2: der Inhalt von DISK-CC1 bzw. DISK-CC2 (1987) unveraendert, nur auf 26x128 umgesetzt.  Weggelassen wie bei
+    # usr: bin/c_beispiel.c (ab Byte 1155 Programmdaten) und die 64-Byte-"Datei" include/sys (Verzeichnis mit falschen Typbits).
+    "cc1": [
+        ("bin/as", "cc1", "bin/as", D),
+        ("bin/cc", "cc1", "bin/cc", D),
+        ("bin/ed", "cc1", "bin/ed", D + " (gleich DISK-CMD)"),
+        ("bin/ld", "cc1", "bin/ld", D),
+    ] + [("include/" + h, "cc1", "include/" + h, D) for h in
+         ("a.out.h", "ar.h", "ctype.h", "execargs.h", "math.h", "pwd.h", "signal.h", "stdio.h", "symbol.h", "time.h")] + [
+        ("include/sgtty.h", "cc1", "include/sgtty.h",
+         "GEKUERZT auf die lesbaren ersten 512 B; der Rest (1729 B) ist in beiden Saetzen Programmdaten statt Text"),
+        ("lib/c0", "cc1", "lib/c0", D),
+        ("lib/c1", "cc1", "lib/c1", D),
+    ],
+    "cc2": [
+        ("bin/nm", "cc2", "bin/nm", D),
+        ("lib/c2", "cc2", "lib/c2", D),
+        ("lib/cpp", "cc2", "lib/cpp", D),
+        ("lib/crt0.o", "cc2", "lib/crt0.o", D),
+        ("lib/libc.a", "cc2", "lib/libc.a", D + " (140 Glieder)"),
+        ("lib/mcrt0.o", "cc2", "lib/mcrt0.o", D),
+    ],
     "bin": [
         ("adb", "dcmd", "bin/adb", D + "; M8KCMD 27846 B ist die aeltere Fassung, M8KBIN ab 7680 B beschaedigt; "
                                   "wegen der Platzgrenze von cmd (2 Bloecke zu viel) hier statt auf cmd"),
@@ -120,10 +144,12 @@ VERZEICHNISSE = {
     "usr": {"": "1986-01-09 22:37", "bin": "1986-01-09 22:14", "include": "1986-01-09 22:25",
             "include/sys": "1986-01-09 22:34", "lib": "1986-01-09 22:31"},
     "bin": {"": "1986-01-30 10:18"},
+    "cc1": {"": "1987-03-17 21:56", "bin": "1987-03-17 21:56", "include": "1987-03-17 21:56", "lib": "1987-03-17 21:56"},
+    "cc2": {"": "1987-03-17 22:28", "bin": "1987-03-17 22:28", "lib": "1987-03-17 22:28"},
 }
-INODES = {"cmd": 56, "usr": 48, "bin": 16}      # wie M8KCMD/M8KUSR; die Zusatzdiskette braucht 3 Dateien
+INODES = {"cmd": 56, "usr": 48, "bin": 16, "cc1": 48, "cc2": 16}      # wie M8KCMD/M8KUSR; die Zusatzdiskette braucht 3 Dateien
 BLOECKE = 494                                    # ganze 8-Zoll-Diskette (76 Spuren x 26 / 4); kein Auslagerungsbereich
-ROLLEN = ("cmd", "usr", "bin")
+ROLLEN = ("cmd", "usr", "bin", "cc1", "cc2")
 # Dateien, von denen nur der lesbare Anfang existiert: Ziel -> Laenge
 KUERZEN = {"include/sgtty.h": 512}
 # Bewusst WEGGELASSEN (in keinem Satz heil): bin/c_beispiel.c (DISK-CC1, ab Byte 1155 Programmdaten),
@@ -221,7 +247,7 @@ def zwischenstand(rolle, ziel_hfe, ausgabe=print):
         text = zusammenstellen(rolle, stand, ausgabe)
         z0 = os.path.join(tmp, "zylinder0.bin")
         # Zylinder 0 mit den Etiketten ERMAP/VOL1MUTOS: gleich dem der Wurzel (gleich M8KCMD)
-        disktool("boot-get", m8k.fertig("root.hfe"), z0)
+        disktool("boot-get", m8k.fertig("root_fm.hfe"), z0)
         disktool("create", ziel_hfe, "--fs", "mutos8k_fm", "--inodes", INODES[rolle], "--blocks", BLOECKE)
         disktool("boot-put", ziel_hfe, z0)
         disktool("put", ziel_hfe, stand)

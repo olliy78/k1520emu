@@ -26,7 +26,7 @@ import m8k  # noqa: E402
 import wurzel_pruefen  # noqa: E402
 import wurzel_quellbaum  # noqa: E402
 
-EINGECHECKT = m8k.fertig("root.hfe")
+EINGECHECKT = m8k.fertig("root_fm.hfe")
 INODES = "104"      # s_isize 15 wie M8KROOT
 # s_fsize 250 wie M8KROOT.  Dahinter liegt auf demselben Geraet (rk2, /dev/swap = 4,2) der
 # AUSLAGERUNGSBEREICH des Kernels.  Mit s_fsize 494 (ganze Diskette) legte das Dateisystem Daten

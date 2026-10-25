@@ -17,7 +17,7 @@ DISKS = PROJECT_ROOT / "disks" / "a5120_mutos8000"      # Quellen und Archive
 FERTIG = PROJECT_ROOT / "disks" / "a5120_16_MUTOS"     # gebaute Disketten
 ARCHIV = DISKS / "a5120_mutos8000_m8k_root.zip"
 LADE_ARCHIV = DISKS / "a5120_mutos8000_boot_udos.zip"
-WURZEL = FERTIG / "a5120_mutos8000_root.hfe"
+WURZEL = FERTIG / "a5120_mutos8000_root_fm.hfe"
 DISKTOOL = PROJECT_ROOT / "build" / "k1520disktool"
 
 braucht_disktool = pytest.mark.skipif(not DISKTOOL.exists(), reason="k1520disktool nicht gebaut")
@@ -306,7 +306,7 @@ def test_bau_alle_kennt_genau_die_fertigen_disketten():
 
 # ─── Best-of-Datendisketten (Entwurf 39, Abschnitt 10) ───────────────────────
 
-ROLLEN = {"cmd": 56, "usr": 48, "bin": 16}      # Rolle -> Inodes laut Bauangaben
+ROLLEN = {"cmd": 56, "usr": 48, "bin": 16, "cc1": 48, "cc2": 16}      # Rolle -> Inodes laut Bauangaben
 
 
 def _archiv(rolle):
@@ -379,7 +379,7 @@ def test_datendisketten_pwd_ist_die_aeltere_fassung():
 
 @braucht_disktool
 @pytest.mark.parametrize("rolle", sorted(ROLLEN))
-@pytest.mark.parametrize("laufwerke,suffix,profil", [("mf3200", "", "mutos8k_fm"), ("k5601", "_mfm", "mutos8k_mfm")])
+@pytest.mark.parametrize("laufwerke,suffix,profil", [("mf3200", "_fm", "mutos8k_fm"), ("k5601", "_mfm", "mutos8k_mfm")])
 def test_datendiskette_aus_dem_archiv_ist_die_eingecheckte(tmp_path, monkeypatch, rolle, laufwerke, suffix, profil):
     monkeypatch.setenv("K1520_DISKTOOL", str(DISKTOOL))
     sys.path.insert(0, str(TOOLS))

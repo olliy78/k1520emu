@@ -837,9 +837,10 @@ einen Mehrbenutzerbetrieb gibt es noch nicht.
 | `a5120_mutos8000_cmd_mfm.hfe` | Befehle (`ls`, `cp`, `ed`, `mkfs` …) | `/mnt` |
 | `a5120_mutos8000_usr_mfm.hfe` | C-Übersetzer (`cc`, `as`, `ld`) | `/usr` |
 | `a5120_mutos8000_bin_mfm.hfe` | `adb`, `mt`, `tar` | `/tmp` |
+| `a5120_mutos8000_cc1_mfm.hfe`, `a5120_mutos8000_cc2_mfm.hfe` | Inhalt der Original-Compilerdisketten (cc1: `as`, `cc`, `ld`, `ed`, Header, `c0`, `c1`; cc2: `c2`, `cpp`, `libc.a`, `nm`) | `/usr` (nur eine zugleich) |
 
 Im **GitHub-Repository** (`disks/a5120_16_MUTOS/`) liegen außerdem die Fassungen für **MF3200**
-(8″, FM; Dateien ohne `_mfm`), gemischte Bestückungen und weitere Ladedisketten. Eine Diskette
+(8″, FM; Dateien mit `_fm` im Namen), gemischte Bestückungen und weitere Ladedisketten. Eine Diskette
 passt nur zur Aufzeichnung ihres Laufwerks: K5601 nimmt nur MFM, MF3200 nur FM.
 
 **Arbeitskopien verwenden.** MUTOS schreibt in die Wurzel und in eingehängte Disketten; der
@@ -877,6 +878,35 @@ nach `/tmp`). Vor dem Abschalten alles aushängen und `sync` eingeben.
 > schreibt dort Daten** — ohne Meldung und ohne dass ein Dateisystem darauf wüsste. In C: darf deshalb
 > **nie eine andere Diskette liegen**, solange MUTOS läuft: sie würde vermutlich zerstört. Aus demselben
 > Grund nie ein Dateisystem mit mehr als 250 Blöcken auf der Wurzel anlegen (kein `mkfs … 494` dort).
+
+### Mehrbenutzerbetrieb und zweites Terminal
+
+MUTOS kennt kein `init 2`. Sein `init` wartet im Einbenutzerbetrieb auf das **Ende der Shell** und
+startet danach auf jedem in `/etc/ttys` freigegebenen Gerät ein `getty`. Die Wurzel gibt die Konsole
+und **`tty1`** schon frei; `tty1` ist die Schnittstelle **DFÜ/V.24** des Rechners.
+
+1. Wie oben starten, anmelden, die Disketten einhängen (`/etc/mount …`). Die Einhängungen bleiben später erhalten.
+2. **Zweites Terminal anschließen** (Möglichkeiten unten).
+3. Die Einbenutzer-Shell mit **Strg+Z** beenden (das EOF-Zeichen dieses Systems; `Strg+D` und `exit` tun hier nichts).
+   Auf der Konsole und am zweiten Terminal erscheint `login:`; beide Plätze arbeiten gleichzeitig,
+   `who` zeigt `console` und `tty1`, `ps` (ohne Argumente) die Prozesse.
+
+Beim nächsten Start beginnt wieder der Einbenutzerbetrieb; `/etc/rc` gibt es nicht, eingehängt wird jedes Mal von Hand.
+**Strg+C** bricht ein laufendes Programm ab (die Taste *Entf* tut das nicht).
+
+**Zweites Terminal — mit dem P8000-Terminal (ohne Telnet-Programm, auch unter Windows).**
+Das Programm `p8000emu` in der Betriebsart *Nur Terminal* (`p8000emu --mode terminal`) ist ein Arbeitsplatz mit dem
+Originalterminal und der Flachtastatur K7673; es spricht selbst Telnet.
+
+1. Im A5120-Emulator: *Einstellungen ▸ Schnittstellen*, Block **DFÜ/V.24**: Betriebsart *Telnet*, Rolle *Server*,
+   einen Port wählen (z. B. 5000), starten.
+2. Im Terminal: *Maschine ▸ Verbindung zum Rechner…*, Rechner `127.0.0.1` (oder die Adresse des PCs, auf dem der
+   Emulator läuft), denselben Port, *Verbinden*. Die Statuszeile zeigt „verbunden". Reihenfolge egal; der Server muss vor dem *Verbinden* laufen.
+3. Nach Strg+Z auf der A5120-Konsole meldet sich `login:` am Terminal. Anmelden als `root` (kein Kennwort).
+
+Die Strg-Tasten gehen an das Gastsystem: **Strg+Z** (EOF), **Strg+C** (Abbruch) wurden am Terminal geprüft; Strg+S/Strg+Q sind
+nicht erprobt. Strg wird am Terminal wie an der K7673 gedrückt (Wirtstaste oder in der Bildschirmtastatur einrasten lassen).
+Gleichwertig geht jedes andere Terminalprogramm, das Telnet (oder RFC 2217) spricht, z. B. PuTTY (Verbindungsart *Telnet*); der Gast meldet keine Baudrate, das ist unschädlich.
 
 ### Disketten formatieren und verwenden
 
