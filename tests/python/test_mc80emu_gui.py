@@ -251,9 +251,17 @@ def test_tastenbild_der_bildschirmtastatur():
     # Buchstaben: klein ohne, gross mit Umschaltung; Ziffern mit Zweitbelegung.
     assert (nach_text["Q"].code, nach_text["Q"].shift_code) == (ord("q"), ord("Q"))
     assert (nach_text["1"].code, nach_text["1"].shift_code) == (ord("1"), ord("!"))
-    # Unbekannte Codes senden nichts.
-    for name in ("↑", "↓", "←", "→", "CL", "CRLF"):
-        assert nach_text[name].kind == "dead" and nach_text[name].code is None, name
+    # Kursor, CL, CRLF: Codes laut Forum threadid=7918 (Kern setzt 0BH/0AH/08H/0CH/7FH/0DH).
+    assert nach_text["↑"].code == int(Qt.Key_Up) and nach_text["↓"].code == int(Qt.Key_Down)
+    assert nach_text["←"].code == int(Qt.Key_Left) and nach_text["→"].code == int(Qt.Key_Right)
+    assert nach_text["CL"].code == int(Qt.Key_Delete)
+    assert nach_text["CRLF"].code == k.CODE_CRLF
+    # Ziffernblock: eigene Codes (Präfix 1DH), nur ÷ bleibt ohne Code [?].
+    zb = {t.low: t for t in tasten if t.x >= 19.4}
+    assert zb["CL"].code == k.CODE_ZB_CL and zb["00"].code == k.CODE_ZB_00
+    assert zb["7"].code == k.CODE_ZB_ZEICHEN + ord("7")
+    assert zb["÷"].kind == "dead" and zb["÷"].code is None
+    assert any(t.code == k.CODE_ZB_LEER for t in tasten)
     # 61 alphanumerische + Sonderfunktionen, 8 Steuertasten, 20 im Ziffernblock [BDA S.12].
     assert len([t for t in tasten if t.x >= 19.4]) == 20
     assert len(s) == 8

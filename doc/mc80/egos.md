@@ -148,7 +148,8 @@ Sprungleiste **1FF7H** (MB_INIT) / **1FFAH** (MB_STATUS) / **1FFDH** (physischer
   Eine gesperrte Taste liefert 1BH [?].  Die genaue Zuordnung Taste → (Präfix, Code) liegt in der
   Tastatur-Firmware (U881), die nicht vorliegt; für M3 genügt: Zeichentasten mit Präfix 1CH, Groß/
   Klein über den Tausch, Sondertasten 1EH + Maske.  [?] ob die Tastatur das Präfix vor JEDEM Zeichen
-  oder nur bei Wechsel sendet — EGOS kommt mit beidem aus.
+  oder nur bei Wechsel sendet — EGOS kommt mit beidem aus.  **Forum: zwei Worte je Tastendruck**
+  (Präfix + Code), also vor jedem Anschlag; Zuordnung und Codes: `doc/mc80/tastatur_forum.md`.
 - **Rechner → Tastatur** (`OUT (D0H)`): **07H Piep** (WBN, Magnetband, und nach jeder Taste, wenn
   FB7FH Bit 7 = 0), **14H/12H** wenn FB7FH Bit 6 auf 1/0 wechselt (Anzeige/LED [?]).  Bit 5 war
   vorgesehen, die Ausgabe ist durch NOPs ersetzt [P 050B].
@@ -192,7 +193,7 @@ ihr NMI springt in ein INIT, das es nur mit `0800v2` gibt — und nur mit einem 
 | 1 | Anschluss 2800H→4000H ohne Erweiterungs-ROM (FFH oder 00H?) | M2/M5 (Spiele müssen per Name startbar sein) |
 | 2 | Wirkung der 256 Ausgaben auf 8CH im Einzelnen | Schaltplan `zve_bst_3o.pdf`; für M2 unerheblich |
 | 3 | Polarität des VIS-Lesepfads (Funktion 011) | M3 am Bild |
-| 4 | Tastaturcodes je Taste (Präfix/Code), Bedeutung 12H/14H | Tastaturfoto/Gerät; M3 nur Zeichenebene |
+| 4 | Tastaturcodes je Taste (Präfix/Code): **großteils geklärt** durch das Forum, s. `tastatur_forum.md` (offen: `÷`, CTRL-Zeichen, 12H) | Gerät |
 | 5 | ~~Ursache „erstes Byte ABH“ beim Lesen~~ — erledigt M7: AAH und ABH gehen (`kassette.md` §2.3) | — |
 | 6 | Laufwerk 2 und Block vor/zurück im EGOS nicht ausprogrammiert — gab es eine spätere Fassung? | Anwender |
 | 7 | Feinaufbau Verzeichniseintrag/Dateikopf auf der Kassette | M7/K1 |

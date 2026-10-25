@@ -16,14 +16,16 @@ Codes wie von der Wirtstastatur: ASCII für Zeichentasten (mit ``shift``/``ctrl`
 ``Qt::Key_F1``…``F8`` = Sondertaste 0…7.  Vor jedem Anschlag sendet der Kern das Präfix 1CH
 (bzw. 1EH bei Sondertasten) [Annahme, Merkposten M3].
 
-**Tasten ohne bekannten Code** (Kursor ↑ ↓ ← →, CL, CRLF, ÷, 00 und die unbeschriftete
-Taste des Ziffernblocks) lassen sich drücken, senden aber nichts — ihre Codes stehen in
-keiner vorliegenden Unterlage [?].  Welche der acht Steuertasten (21) welche Sondertaste
-0…7 ist, ist ebenfalls nicht belegt; die Nachbildung zählt zeilenweise [?].
+**Codes der Nicht-Zeichentasten** (Forum robotrontechnik.de threadid=7918, am Gerät
+gemessen): Kursor ↑ 0BH, ↓ 0AH, ← 08H, → 0CH, CL 7FH, CRLF 0DH (alle Präfix 1CH); im
+Ziffernblock (Präfix 1DH) CL 7FH, die unbeschriftete Taste 20H, „00“ = 30H zweimal.  Tasten
+ohne Qt-Gegenstück (CRLF, Ziffernblock) gehen als ``0x02000000 + n`` an den Kern
+(``Mc80Tastatur::TASTE_*``).  Nur ``÷`` bleibt ohne Code [?].  Welche der acht Steuertasten
+(21) welche Sondertaste 0…7 ist, ist nicht belegt; die Nachbildung zählt zeilenweise [?].
 
 **Anzeigen:** 17 Umschaltanzeige (folgt dem Feststeller der Nachbildung), 18 CTRL-Anzeige
 (folgt der angeklickten CTRL-Taste), 20 Bereitschaft der Tastatur (Bit 0 von
-``k1520_keyboard_leds`` = 14H/12H vom Rechner [?]).
+``k1520_keyboard_leds``: an nach dem Einschalten, aus nach 04H, an nach 05H vom Rechner).
 """
 
 from __future__ import annotations
@@ -40,6 +42,12 @@ KEY_RETURN = int(Qt.Key_Return)       # ENTER → 11H
 KEY_ESCAPE = int(Qt.Key_Escape)       # OFF   → 13H
 KEY_TAB = int(Qt.Key_Tab)             # 09H
 KEY_F1 = int(Qt.Key_F1)               # Sondertaste n = Key_F1 + n
+# Tasten ohne Qt-Gegenstück (= Mc80Tastatur::TASTE_*)
+CODE_CRLF = 0x02000001
+CODE_ZB_CL = 0x02000002
+CODE_ZB_00 = 0x02000003
+CODE_ZB_LEER = 0x02000004
+CODE_ZB_ZEICHEN = 0x02000100          # + ASCII: Zeichen im Ziffernblock (Präfix 1DH)
 
 LED_BEREIT = 0x01                     # Bit 0 der Anzeigemaske [?]
 
@@ -66,6 +74,12 @@ def _z(x, y, low, up="", name="", w=1.0, shape="round", style="dark") -> _Key:
 def _s(x, y, low, code, name, w=1.0, shape="round", style="light") -> _Key:
     """Sondertaste mit festem Kerncode (kein Umschalten)."""
     return _Key(x=x, y=y, low=low, code=code, w=w, shape=shape, style=style, name=name)
+
+
+def _zb(x, y, ch, name="") -> _Key:
+    """Ziffernblock-Zeichen: eigener Kerncode, damit der Kern das Präfix 1DH sendet."""
+    return _Key(x=x, y=y, low=ch, code=CODE_ZB_ZEICHEN + ord(ch), w=1.0, shape="rect",
+                style="dark", name=name or f"Ziffernblock {ch}")
 
 
 def _tot(x, y, low, name, w=1.0, shape="round", style="light") -> _Key:
@@ -97,16 +111,16 @@ def _build_layout_mc80() -> List[_Key]:
             k.append(t)
         else:
             k.append(_z(1.0 + i, 0.0, low, up))
-    k.append(_tot(14.0, 0.0, "↑", "Kursor hoch — Code unbekannt [?]"))
-    k.append(_tot(15.0, 0.0, "CL", "CL (Löschen) — Code unbekannt [?]"))
+    k.append(_s(14.0, 0.0, "↑", int(Qt.Key_Up), "Kursor hoch (0BH)"))
+    k.append(_s(15.0, 0.0, "CL", int(Qt.Key_Delete), "CL (Löschen, 7FH)"))
     # ── Reihe 1 ──────────────────────────────────────────────────────────────
     k.append(_Key(x=0.0, y=1.0, low="CTRL", w=1.5, shape="oval", style="light", kind="ctrl",
                   name="Control-Taste (19) — wirkt auf die nächste Taste"))
     for i, ch in enumerate("QWERTYUIOP"):
         k.append(_z(1.5 + i, 1.0, ch))
     k.append(_z(11.5, 1.0, "]", "}"))
-    k.append(_tot(12.5, 1.0, "←", "Kursor links — Code unbekannt [?]"))
-    k.append(_tot(13.5, 1.0, "→", "Kursor rechts — Code unbekannt [?]"))
+    k.append(_s(12.5, 1.0, "←", int(Qt.Key_Left), "Kursor links (08H)"))
+    k.append(_s(13.5, 1.0, "→", int(Qt.Key_Right), "Kursor rechts (0CH)"))
     k.append(_s(14.5, 1.0, "⇥", KEY_TAB, "Tabulator (09H)"))
     # ── Reihe 2 ──────────────────────────────────────────────────────────────
     k.append(_Key(x=0.8, y=2.0, low="⇩", style="light", kind="lock",
@@ -115,9 +129,9 @@ def _build_layout_mc80() -> List[_Key]:
         k.append(_z(1.8 + i, 2.0, ch))
     k.append(_z(10.8, 2.0, "\\", "|"))
     k.append(_z(11.8, 2.0, "[", "{"))
-    k.append(_tot(12.8, 2.0, "↓", "Kursor runter — Code unbekannt [?]"))
-    k.append(_tot(13.8, 2.0, "CRLF", "CRLF-Taste (23) — Code unbekannt [?]", w=1.7,
-                  shape="oval"))
+    k.append(_s(12.8, 2.0, "↓", int(Qt.Key_Down), "Kursor runter (0AH)"))
+    k.append(_s(13.8, 2.0, "CRLF", CODE_CRLF, "CRLF-Taste (23, 0DH)", w=1.7,
+                shape="oval"))
     # ── Reihe 3 ──────────────────────────────────────────────────────────────
     k.append(_Key(x=0.8, y=3.0, low="⇧", w=1.6, shape="oval", style="light", kind="shift",
                   name="Umschalttaste (16) für die zweite Ebene — Anzeige 17"))
@@ -142,21 +156,21 @@ def _build_layout_mc80() -> List[_Key]:
                     shape="rect"))
     # ── Ziffernblock (20 Tasten) ─────────────────────────────────────────────
     Z = 19.4
-    k.append(_tot(Z, 0.0, "CL", "Ziffernblock CL — Code unbekannt [?]", shape="rect"))
+    k.append(_s(Z, 0.0, "CL", CODE_ZB_CL, "Ziffernblock CL (7FH, Präfix 1DH)", shape="rect"))
     k.append(_tot(Z + 1, 0.0, "÷", "Ziffernblock ÷ — Code unbekannt [?]", shape="rect"))
     for i, ch in enumerate("*="):
-        k.append(_z(Z + 2 + i, 0.0, ch, name=f"Ziffernblock {ch}", shape="rect"))
+        k.append(_zb(Z + 2 + i, 0.0, ch))
     block = (("7", "8", "9", "-"), ("4", "5", "6", "+"), ("1", "2", "3", None))
     for r, zeile in enumerate(block):
         for c, ch in enumerate(zeile):
             if ch is None:
-                k.append(_tot(Z + c, 1.0 + r, "", "Ziffernblock, unbeschriftet — sendet nichts [?]",
-                              shape="rect"))
+                k.append(_s(Z + c, 1.0 + r, "", CODE_ZB_LEER,
+                            "Ziffernblock, unbeschriftet (20H, Präfix 1DH)", shape="rect"))
             else:
-                k.append(_z(Z + c, 1.0 + r, ch, name=f"Ziffernblock {ch}", shape="rect"))
-    k.append(_z(Z, 4.0, "0", name="Ziffernblock 0", shape="rect"))
-    k.append(_tot(Z + 1, 4.0, "00", "Ziffernblock 00 — Code unbekannt [?]", shape="rect"))
-    k.append(_z(Z + 2, 4.0, ",", name="Ziffernblock ,", shape="rect"))
+                k.append(_zb(Z + c, 1.0 + r, ch))
+    k.append(_zb(Z, 4.0, "0"))
+    k.append(_s(Z + 1, 4.0, "00", CODE_ZB_00, "Ziffernblock 00 (30H zweimal, Präfix 1DH)", shape="rect"))
+    k.append(_zb(Z + 2, 4.0, ","))
     k.append(_s(Z + 3, 4.0, "↵", KEY_RETURN, "Ziffernblock ↵ (als ENTER [?])", shape="rect"))
     return k
 
@@ -214,7 +228,7 @@ class KeyboardMc80Widget(KeyboardWidget):
     _HOST_NAME = {int(Qt.Key_Return): "ENTER", int(Qt.Key_Enter): "ENTER",
                   int(Qt.Key_Escape): "OFF", int(Qt.Key_Tab): "⇥",
                   int(Qt.Key_Up): "↑", int(Qt.Key_Down): "↓", int(Qt.Key_Left): "←",
-                  int(Qt.Key_Right): "→", int(Qt.Key_Space): ""}
+                  int(Qt.Key_Right): "→", int(Qt.Key_Space): "", int(Qt.Key_Delete): "CL"}
 
     def _keys_for_host_event(self, event) -> List[_Key]:
         key = int(event.key())
