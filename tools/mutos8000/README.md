@@ -9,7 +9,7 @@ Nur Python-Standardbibliothek, lauffähig mit `python3 -I`; das DiskTool wird nu
 | `m8kroot_lesen.py` | Befund der beschädigten `M8KROOT` (Superblock, Inodes, Baum, lesbare Bytes; `--inodes`, `--vergleich ORDNER`) |
 | `wurzel_quellbaum.py` | Quellbaum (Dateien, `.fileinfo`, `wega-dateiangaben.txt`) aus `M8KROOT` + Auszug von DISK-ROOT; Handangaben (Namen, `.profile`, Geräte) stehen als Daten im Skript |
 | `wurzel_pruefen.py` | unabhängiger Leser: Baum einer Wurzel (`.td0`/`.imd`) byteweise gegen einen Quellbaum |
-| `bau_alle.py` | **alle elf fertigen Disketten** (3 Ladedisketten, 2 Wurzeln, 6 Datendisketten) aus den Archiven nach `disks/a5120_16_MUTOS/` (s. u.) |
+| `bau_alle.py` | **alle vierzehn fertigen Disketten** (6 Ladedisketten, 2 Wurzeln, 6 Datendisketten) aus den Archiven nach `disks/a5120_16_MUTOS/` (s. u.) |
 | `bau_wurzel.py` | ganzer Nachbau: DISK-ROOT holen, Quellbaum, `create --fs mutos8k_fm --inodes 104 --blocks 250` (Swap-Bereich ab Block 250, §4.8), Zylinder 0 per `boot-get` von M8KCMD + `boot-put`, `put`, `check --full`, Prüfung |
 | `bau_aus_archiv.py` | baut die Wurzeldiskette aus einem **Archiv** (`.zip` oder ausgepackter Ordner): `bauangaben.yaml`, `zylinder0.bin`, `dateien/`; `check --full` und unabhängige Prüfung (Fehler bei Block >= `s_fsize`) |
 | `archiv_erzeugen.py` | erzeugt die eingecheckten Quell-Archive aus den Disketten (`archive --ohne-abbild`): `--art wurzel` (Vorgabe) → `…_m8k_root.zip`, `--art ladediskette` → `…_boot_udos.zip` aus der Original-Ladediskette `…_boot_udos.dmk` |
@@ -18,7 +18,7 @@ Nur Python-Standardbibliothek, lauffähig mit `python3 -I`; das DiskTool wird nu
 | `best_of.py` | stellt die **Best-of-Datendisketten** `cmd`/`usr`/`bin` aus den Originalabbildern beider Sätze zusammen (Tabelle `AUSWAHL` mit Herkunft und Grund je Datei, Gesundheitsprüfung) und liefert den FM-Zwischenstand für `archiv_erzeugen.py --art cmd\|usr\|bin` |
 | `bauangaben_{cmd,usr,bin}.yaml` | Vorlagen der Bauangaben der Datendisketten (Inodes, `bloecke: 494`) |
 | `bauangaben_ladediskette.yaml` | Vorlage der Bauangaben der Ladediskette (Profile, Muster der Laufwerkstyp-Konstante, Varianten); `archiv_erzeugen.py --art ladediskette` legt sie ins Archiv |
-| `mutos_patch.py` | Patchliste fuer `mutos_io` (8 x 512, Entwurf 39 §11.2), `ZDOS` (UDOS meldet nur Laufwerk A: an, §11.6) und `mutos_1216` (Wurzel-/Swap-/Pipe-Geraet, Swap-Lage, Grenzen, §11.4/§11.5); prueft jedes Altbyte, schreibt nur nach `-o` |
+| `mutos_patch.py` | (auch als Bibliothek: `anwenden(art, daten, optionen)`, vom Bau der Ladedisketten benutzt) Patchliste fuer `mutos_io` (8 x 512, Entwurf 39 §11.2), `ZDOS` (UDOS meldet nur Laufwerk A: an, §11.6) und `mutos_1216` (Wurzel-/Swap-/Pipe-Geraet, Swap-Lage, Grenzen, §11.4/§11.5); prueft jedes Altbyte, schreibt nur nach `-o` |
 | `versuche/*.dbg` | `k1520dbg`-Skripte der Messungen aus §11 (Wurzel in A: ueber die Maske, Kernelpatch `rootdev` 4,0, DISK-Satz 8 x 512); Aufruf in der Kopfzeile |
 
 ```sh
@@ -38,7 +38,7 @@ Einzelheiten: Entwurf 39 §4.7.6 und §4.8.
 Quellen (Originale, Archive) liegen in `disks/a5120_mutos8000/`, die **fertigen Disketten in `disks/a5120_16_MUTOS/`**:
 
 ```sh
-python3 -I tools/mutos8000/bau_alle.py --ueberschreiben            # baut alle elf neu nach disks/a5120_16_MUTOS/
+python3 -I tools/mutos8000/bau_alle.py --ueberschreiben            # baut alle vierzehn neu nach disks/a5120_16_MUTOS/
 python3 -I tools/mutos8000/bau_alle.py --nur-daten --ueberschreiben  # nur die sechs Datendisketten
 python3 -I tools/mutos8000/bau_alle.py --ziel-ordner aus/ --wurzel-quelle meine_wurzel --lade-quelle meine_lade
 ```
@@ -129,3 +129,26 @@ stehen im `.fileinfo` daneben), `bau_ladediskette.py meine_lade neu.hfe --laufwe
 (`k1520dbg --em em256 --laufwerke K5601,K5601,K5601 neu.hfe`), `BOOT MUTOS`, Wurzel erst NACH der Aufforderung in C: einlegen (`eject A`, `mount C … udos_ss77`, `r`).
 Das Archiv entsteht aus der Original-Ladediskette mit `python3 -I tools/mutos8000/archiv_erzeugen.py --art ladediskette --force`.
 Eingecheckt in `disks/a5120_16_MUTOS/` sind die drei Varianten `…_boot_udos_mf3200.hfe`, `…_boot_udos_k5601.hfe`, `…_boot_udos_mf3200_k5601.hfe`.
+
+### Ladedisketten-Varianten mit Patches (Ticket #22, Entwurf 39 §11.2/§11.5/§11.6)
+
+Drei weitere Varianten, ebenfalls aus **demselben Archiv**.  Das Archiv enthält weiter nur die Originaldateien; die Patches stehen als
+`patch_<variante>_<n>: <Datei> <Art> [opt=zahl ...]` in den Bauangaben (`bauangaben_ladediskette.yaml`, im Archiv als `bauangaben.yaml`) und werden **beim Bau**
+auf eine Kopie von `dateien/` angewandt (Funktionen aus `mutos_patch.py`, jedes Altbyte geprüft; die Gegenprobe vergleicht die gepatchten Dateien byteweise).
+
+| `--laufwerke` | Aufzeichnung / Konstante | Patches | Diskette in `disks/a5120_16_MUTOS/` |
+|---|---|---|---|
+| `k5601_nur_a` | MFM, `FFH` | `ZDOS` `zdos-einheit0` | `…_boot_udos_k5601_nur_a.hfe` |
+| `mf3200_k5601_nur_a` | FM, `FEH` | `ZDOS` `zdos-einheit0` | `…_boot_udos_mf3200_k5601_nur_a.hfe` |
+| `k5601_8x512` | MFM, `FFH` | `mutos_io` `io-8x512`, `ZDOS` `zdos-einheit0`, `mutos_1216` `kern swplo=352 nswap=256` | `…_boot_udos_k5601_8x512.hfe` |
+
+* **`…_nur_a`:** UDOS meldet beim Start nur A: an, damit darf **schon beim Einschalten** eine MUTOS-Diskette (Wurzel, Daten) in B:–D: liegen; ohne den Patch endet das in
+  `I/O ERROR C2 ON UNIT 00` bzw. `DISK INITIALIZATION ERROR C6`.  Nebenwirkung: UDOS kennt danach nur Laufwerk A:.  Wächter `cli_mutos8000_boot_ladediskette_k5601_nur_a`.
+* **`k5601_8x512`:** für den DISK-Satz (`…_{root,cc1,cc2,cmd}.td0`: MFM 250 kbit/s, 8 × 512 B, daher nur K5601; die 26 × 128-Disketten gehen mit dieser Ladediskette **nicht**).
+  Swap ab Block 352 = `s_fsize` von DISK-ROOT (352 + 256 = 608 = Blockgrenze 8 × 512); `wurzel_fsize_k5601_8x512: 352` steht in den Bauangaben, und der Bau bricht ab,
+  wenn `swplo` < `wurzel_fsize` (ein Test prüft die 352 am TD0).  Beispiel: `tools/dev.sh tool k1520dbg --em em256 --laufwerke K5601,K5601,K5601,K5601 …_k5601_8x512.hfe
+  -b …_cc1.td0 -c …_root.td0 -d …_cc2.td0`.  Wächter `cli_mutos8000_boot_ladediskette_k5601_8x512`.
+
+Die ersten drei Ladedisketten (`mf3200`, `k5601`, `mf3200_k5601`) tragen keine Patchzeile und sind byteweise unverändert (Wächter: eingecheckt = frischer Bau).
+Neue Variante: `variante_<name>` und `patch_<name>_<n>`-Zeilen in `bauangaben_ladediskette.yaml`, `VARIANTEN` in `bau_ladediskette.py`, `LADEDISKETTEN` in `bau_alle.py`,
+dann `archiv_erzeugen.py --art ladediskette --force`.

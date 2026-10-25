@@ -1,0 +1,48 @@
+# MUTOS 8000: Ladediskette "k5601_8x512" (mutos_io 8 x 512 B, ZDOS nur Einheit 0, Kernel Swap ab 352; Entwurf 39 11.2/11.5).
+# DISK-Satz (TD0, MFM 250 kbit/s, 8 x 512): DISK-ROOT in C:, CC1 in B: und CC2 in D: SCHON BEIM START.  Anmeldung, ls,
+# CC1 nach /usr (Uebersetzer), danach der Schreibrundgang auf CC2 (D:, rk3): schreiben, sync, umount, mount, lesen -
+# das Zurueckgelesene kommt nach dem umount von der Platte.  Alle Disketten als Kopie (COW), die eingecheckten bleiben heil.
+tool:      k1520dbg
+disk_path: %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_boot_udos_k5601_8x512.hfe
+timeout:   500
+run:       --em em256 --laufwerke K5601,K5601,K5601,K5601 %DISK% -b %CLI_DIR%/../../disks/a5120_mutos8000/a5120_mutos8000_cc1.td0 -c %CLI_DIR%/../../disks/a5120_mutos8000/a5120_mutos8000_root.td0 -d %CLI_DIR%/../../disks/a5120_mutos8000/a5120_mutos8000_cc2.td0
+stdin:
+  g 80000000
+  keys BOOT\sMUTOS\r
+  g 100000000
+  keys r
+  g 100000000
+  keys root\r
+  g 100000000
+  keys ls\s-l\s/\r
+  g 100000000
+  keys /bin/mount\s/dev/rk1\s/usr\r
+  g 100000000
+  keys ls\s/usr/bin\r
+  g 100000000
+  screen
+  keys /bin/mount\s/dev/rk3\s/mnt\r
+  g 100000000
+  keys echo\shallo\s>/mnt/t\r
+  g 100000000
+  keys sync\r
+  g 100000000
+  keys /bin/umount\s/dev/rk3\r
+  g 100000000
+  keys /bin/mount\s/dev/rk3\s/mnt\r
+  g 100000000
+  keys cat\s/mnt/t\r
+  g 100000000
+  screen
+  q
+exit:      0
+expect:    mem = 196608
+expect_re: single user login: root\s+\|
+expect_re: \|# ls -l /\s+\|
+expect_re: \|# ls /usr/bin\s+\|
+expect_re: \|# cat /mnt/t\s+\|\s*\|hallo\s+\|
+forbid:    panic
+forbid:    err on dev
+forbid:    not found
+forbid:    INITIALIZATION ERROR
+forbid:    I/O ERROR

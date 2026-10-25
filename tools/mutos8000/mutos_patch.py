@@ -95,6 +95,51 @@ def patch_io(d, liste, log):
         log.append("io %04X (Offset %04X) %s -> %s  %s" % (adr, o, alt.hex(" ")[:23], neu.hex(" ")[:23], grund))
 
 
+def patch_zdos(d, log):
+    for off, alt, neu, grund in ZDOS_NUR_EINHEIT0:
+        if bytes(d[off:off + len(alt)]) != alt:
+            sys.exit("ZDOS Offset %04X: Altbytes %s statt %s" % (off, bytes(d[off:off + len(alt)]).hex(" "), alt.hex(" ")))
+        d[off:off + len(neu)] = neu
+        log.append("zdos %04X %s -> %s  %s" % (off, alt.hex(" "), neu.hex(" "), grund))
+
+
+def patch_kern(d, werte, log):
+    """werte: dict aus root/swap/pipe (Minor 0..3), swplo, nswap, nblocks (None = nicht anfassen)."""
+    for name, key in (("root", "rootdev"), ("swap", "swapdev"), ("pipe", "pipedev")):
+        v = werte.get(name)
+        if v is not None:
+            if not 0 <= v <= 3:
+                sys.exit("--%s: Minor 0..3" % name)
+            off, n, alt = KERN[key]
+            setze(d, off, n, v, alt, key, log)
+    for key in ("swplo", "nswap", "nblocks"):
+        v = werte.get(key)
+        if v is not None:
+            off, n, alt = KERN[key]
+            setze(d, off, n, v, alt, key, log)
+    if not log:
+        sys.exit("nichts zu tun: mindestens eine Option angeben")
+
+
+def anwenden(art, daten, optionen=None):
+    """Bibliotheksaufruf (bau_ladediskette.py): Patch `art` (io-8x512 | zdos-einheit0 | kern) auf `daten` (bytes).
+
+    Ergebnis (neue bytes, Protokollzeilen).  Gleiche Pruefungen wie auf der Kommandozeile: jedes Altbyte muss
+    passen, sonst Abbruch (SystemExit) und es entsteht nichts."""
+    d = bytearray(daten)
+    log = []
+    optionen = optionen or {}
+    if art == "io-8x512":
+        patch_io(d, IO_8X512 + (IO_TEXT_RK0 if optionen.get("text_rk0") else []), log)
+    elif art == "zdos-einheit0":
+        patch_zdos(d, log)
+    elif art == "kern":
+        patch_kern(d, optionen, log)
+    else:
+        sys.exit("unbekannter Patch: %s" % art)
+    return bytes(d), log
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="art", required=True)
@@ -114,31 +159,12 @@ def main(argv=None):
     k.add_argument("--nswap", type=int, help="Zahl der Swap-Bloecke")
     k.add_argument("--nblocks", type=int, help="Blockgrenze des rk-Treibers (608 = 8 x 512)")
     a = ap.parse_args(argv)
-    d = bytearray(open(a.datei, "rb").read())
-    log = []
+    opt = {}
     if a.art == "io-8x512":
-        patch_io(d, IO_8X512 + (IO_TEXT_RK0 if a.text_rk0 else []), log)
-    elif a.art == "zdos-einheit0":
-        for off, alt, neu, grund in ZDOS_NUR_EINHEIT0:
-            if bytes(d[off:off + len(alt)]) != alt:
-                sys.exit("ZDOS Offset %04X: Altbytes %s statt %s" % (off, bytes(d[off:off + len(alt)]).hex(" "), alt.hex(" ")))
-            d[off:off + len(neu)] = neu
-            log.append("zdos %04X %s -> %s  %s" % (off, alt.hex(" "), neu.hex(" "), grund))
-    else:
-        for name, key in (("root", "rootdev"), ("swap", "swapdev"), ("pipe", "pipedev")):
-            v = getattr(a, name)
-            if v is not None:
-                if not 0 <= v <= 3:
-                    sys.exit("--%s: Minor 0..3" % name)
-                off, n, alt = KERN[key]
-                setze(d, off, n, v, alt, key, log)
-        for opt, key in (("swplo", "swplo"), ("nswap", "nswap"), ("nblocks", "nblocks")):
-            v = getattr(a, opt)
-            if v is not None:
-                off, n, alt = KERN[key]
-                setze(d, off, n, v, alt, key, log)
-        if not log:
-            sys.exit("nichts zu tun: mindestens eine Option angeben")
+        opt["text_rk0"] = a.text_rk0
+    elif a.art == "kern":
+        opt = {n: getattr(a, n) for n in ("root", "swap", "pipe", "swplo", "nswap", "nblocks")}
+    d, log = anwenden(a.art, open(a.datei, "rb").read(), opt)
     open(a.aus, "wb").write(d)
     print("\n".join(log))
     print("geschrieben:", a.aus)
