@@ -66,17 +66,30 @@ bool promptZeile(const P8000Machine& m, const std::string& bild) {
     return bild.find("Press RETURN") != std::string::npos;
 }
 
+/// Gemountete Platten fuers Schlussbild: nur LW 0 = der Pfad allein, sonst "LW0=... LW1=...".
+std::string hdListe(const P8000Machine& m)
+{
+    std::string r;
+    int n = 0;
+    for (int u = 0; u < P8000Wdc::LAUFWERKE; ++u) n += !m.hdPath(u).empty();
+    if (n == 0) return "(keine)";
+    if (n == 1 && !m.hdPath(0).empty()) return m.hdPath(0);
+    for (int u = 0; u < P8000Wdc::LAUFWERKE; ++u)
+        if (!m.hdPath(u).empty()) r += (r.empty() ? "" : " ") + ("LW" + std::to_string(u) + "=" + m.hdPath(u));
+    return r;
+}
+
 }  // namespace
 
 int bootTraceP8000(const K8915TraceOpts& o, const prnlst::Listing& prn, bool karte16,
                    const std::string& wdc, const std::string& hd, bool originalTerminal,
-                   const std::string& rtc)
+                   const std::string& rtc, const std::string& hd1, const std::string& hd2)
 {
     using T = k1520::p8000::Terminal;
     P8000Machine::Config cfg;
     cfg.karte16 = karte16;
     if (originalTerminal) cfg.terminal = P8000Machine::Config::TerminalArt::Original;
-    if (!wdc.empty() || !hd.empty()) {
+    if (!wdc.empty() || !hd.empty() || !hd1.empty() || !hd2.empty()) {
         if (!karte16) { fprintf(stderr, "ERROR: --wdc/--hd nur mit --machine p8000-16\n"); return 2; }
         using W = P8000Machine::Config::Wdc;
         const std::string w = wdc.empty() ? "4.2" : wdc;
@@ -85,6 +98,8 @@ int bootTraceP8000(const K8915TraceOpts& o, const prnlst::Listing& prn, bool kar
         else if (w == "3.4.05") cfg.wdc = W::V3_4_05;
         else { fprintf(stderr, "ERROR: --wdc %s unbekannt (4.2|4.0.05|3.4.05)\n", w.c_str()); return 2; }
         cfg.platte = hd;
+        cfg.platte1 = hd1;
+        cfg.platte2 = hd2;
     }
     if (!rtc.empty() && rtc != "aus") {
         if (!karte16) { fprintf(stderr, "ERROR: --rtc nur mit --machine p8000-16\n"); return 2; }
@@ -379,7 +394,7 @@ int bootTraceP8000(const K8915TraceOpts& o, const prnlst::Listing& prn, bool kar
         if (P8000Wdc* w = m.wdc())
             fprintf(stderr, "WDC:         %s, PC=%04X Status %d, %ld Kommandos, %ld Fehlermeldungen, Platte %s\n",
                     w->imReset() ? "im Reset" : "laeuft", w->cpu().PC, w->status(), wdc_kmd, wdc_fehler,
-                    m.hdPath(0).empty() ? "(keine)" : m.hdPath(0).c_str());
+                    hdListe(m).c_str());
 
         fprintf(stderr, "\nI/O-Ports (rd/wr):\n");
         for (int p = 0; p < 256; ++p)

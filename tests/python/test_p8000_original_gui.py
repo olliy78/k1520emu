@@ -101,7 +101,7 @@ def test_profil_modelle_arten_und_titel():
     schluessel = [m[0] for m in p.modelle]
     # Kern-Terminal-Modelle gibt es in der Oberflaeche nicht mehr (P23a)
     assert schluessel == ["p8000-ot", "p8000-16-ot", "p8000-8-ot", "p8000-term"]
-    assert [p.modell_art(k) for k in schluessel] == ["original", "original", "original", "einheit"]
+    assert [p.modell_art(k) for k in schluessel] == ["original"] * 3 + ["einheit"]
     assert [m[0] for m in p.ausstattungen()] == schluessel[:3] and p.einheit_modell() == "p8000-term"
     assert p.modell_maschine("p8000-ot") == "p8000" and p.modell_maschine("p8000-term") == "p8000-terminal"
     assert p.modell_tastatur("p8000-ot") == "k7673" and p.modell_tastatur("p8000-term") == "k7673"

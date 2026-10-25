@@ -142,8 +142,9 @@ P8000Machine::P8000Machine(const Config& cfg)
     if (cfg.wdc != Config::Wdc::Aus) {
         if (!k16_) throw std::invalid_argument("P8000: WDC nur mit 16-Bit-Karte (karte16=1)");
         if (cfg.taktwdc_hz == 0) throw std::invalid_argument("P8000: WDC-Takt 0");
-        if (!cfg.platte_typ.empty() && !k1520::winchester::typNachName(cfg.platte_typ))
-            throw std::invalid_argument("P8000: Plattentyp '" + cfg.platte_typ + "' unbekannt");
+        for (int u = 0; u < P8000Wdc::LAUFWERKE; ++u)
+            if (!cfg.plattenTyp(u).empty() && !k1520::winchester::typNachName(cfg.plattenTyp(u)))
+                throw std::invalid_argument("P8000: Plattentyp '" + cfg.plattenTyp(u) + "' unbekannt");
         P8000Wdc::Config wc;
         switch (cfg.wdc) {
             case Config::Wdc::V4_0_05: wc.firmware = P8000Wdc::Config::Firmware::V4_0_05; break;
@@ -151,17 +152,19 @@ P8000Machine::P8000Machine(const Config& cfg)
             default:                   wc.firmware = P8000Wdc::Config::Firmware::V4_2; break;
         }
         // P24: bis 4.0 legt das EPROM das Laufwerk fest — ein widersprechender Typ wird abgewiesen
-        if (const auto* rom = P8000Wdc::romLaufwerk(wc.firmware);
-            rom && !cfg.platte_typ.empty() && !(k1520::winchester::typNachName(cfg.platte_typ)->g == rom->g))
-            throw std::invalid_argument(std::string("P8000: ") + romTypText(wc.firmware) + ", plattentyp = " +
-                                        cfg.platte_typ + " widerspricht");
+        if (const auto* rom = P8000Wdc::romLaufwerk(wc.firmware))
+            for (int u = 0; u < P8000Wdc::LAUFWERKE; ++u)
+                if (!cfg.plattenTyp(u).empty() && !(k1520::winchester::typNachName(cfg.plattenTyp(u))->g == rom->g))
+                    throw std::invalid_argument(std::string("P8000: ") + romTypText(wc.firmware) + ", plattentyp = " +
+                                                cfg.plattenTyp(u) + " widerspricht");
         wc.takt_hz = cfg.taktwdc_hz;
         wc.ram_fuellwert = cfg.ram_fuellwert;
         wdc_ = std::make_unique<P8000Wdc>(wc);
         wdc_an_ = std::make_unique<P8000WdcAnschluss>(*k16_, *wdc_);
-        if (!cfg.platte.empty() && !hdMount(0, cfg.platte))
-            throw std::invalid_argument("P8000: Platte - " + hd_fehler_);
-    } else if (!cfg.platte.empty()) {
+        for (int u = 0; u < P8000Wdc::LAUFWERKE; ++u)
+            if (!cfg.plattePfad(u).empty() && !hdMountMit(u, cfg.plattePfad(u), cfg.platte_par_ergaenzen))
+                throw std::invalid_argument("P8000: Platte " + std::to_string(u) + " - " + hd_fehler_);
+    } else if (!cfg.platte.empty() || !cfg.platte1.empty() || !cfg.platte2.empty()) {
         throw std::invalid_argument("P8000: Platte ohne WDC (wdc=aus)");
     }
     // tty0, tty2, tty3 (und tty4–tty7) nach aussen (Reihenfolge = C-ABI-Index); tty1 haengt am
@@ -355,7 +358,7 @@ bool P8000Machine::hdMountMit(int unit, const std::string& path, bool par_ergaen
     const auto fw = firmwareVon(cfg_.wdc);
     pc.spurformat = P8000Wdc::spurformat(fw);
     const auto* rom = P8000Wdc::romLaufwerk(fw);
-    const k1520::winchester::Typ* konf = cfg_.platte_typ.empty() ? nullptr : k1520::winchester::typNachName(cfg_.platte_typ);
+    const k1520::winchester::Typ* konf = cfg_.plattenTyp(unit).empty() ? nullptr : k1520::winchester::typNachName(cfg_.plattenTyp(unit));
     if (rom) {
         // P24: das EPROM legt Koepfe/Zylinder/Sektoren fest; die Firmware liest nie einen PAR-Sektor.
         pc.geometrie = rom->g;

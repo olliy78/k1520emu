@@ -39,7 +39,7 @@ from app.ui.settings_widget import SettingsWidget
 from app.ui.drive_widget import DriveWidget
 from app import instanz
 from app.ui import k7673_layout
-from app.ui.platten_widget import PlattenWidget
+from app.ui.platten_widget import PlattenGruppe
 from app.ui.serial_widget import SerialWidget
 from app.ui.eprom_widget import EpromWidget
 from app.ui.keyboard import KeyboardWidget
@@ -89,6 +89,9 @@ class MainWindow(QMainWindow):
         """
         super().__init__()
         self.profil = profil or profile.VORGABE
+        # Bauart (P8000 | P8000 Compact; Voreinstellung, Ticket #15) und Zahl der Winchester.
+        self._bauart = self.profil.standard_bauart()
+        self._winchester = 1
         self.setWindowTitle(self._fenstertitel(self.profil.standard_modell()))
         self.setWindowIcon(QIcon.fromTheme("computer"))
         
@@ -96,7 +99,7 @@ class MainWindow(QMainWindow):
         # slot).  Starts from the machine's standard (A5120: 3× K5601, 4th slot
         # empty; K8915: 2× K5601) and is overridden by the restored config / the
         # Einstellungen → Laufwerke tab.
-        self._drive_types = self.profil.standard_laufwerke()
+        self._drive_types = self._standard_laufwerke()
         # Modell (A5120 / A5120.16, app/modell.py) — bestimmt den core-Parameter
         # ``em=``.  Vorgabe A5120 ohne Erweiterung, ueberschrieben von der
         # restaurierten Konfiguration / der Einstellungen → Allgemein-Auswahl.
@@ -105,7 +108,7 @@ class MainWindow(QMainWindow):
         self._rechner_war_da = True
         # Hardwarevarianten des Programms (PC 1715: Zeichensatz, Tastatur-ROM; AP-6) —
         # Konstruktorparameter des Kerns wie das Modell, ein Wechsel ist ein Kaltstart.
-        self._hardware = self.profil.hardware_standard(self._model)
+        self._hardware = self.profil.hardware_standard(self._model, self._bauart)
         # Stellung des Bildschirm-Schiebeschalters (Entwurf 33 §3.3, N6): nur mit
         # ``bildschirm == "beide"`` wirksam, sonst bloss gemerkt.
         self._schalter = "k7024"
@@ -231,6 +234,8 @@ class MainWindow(QMainWindow):
         self.settings_widget.crtChanged.connect(self._schedule_autosave)
         self.settings_widget.speedChanged.connect(self._on_speed_selected)
         self.settings_widget.driveTypesChanged.connect(self._on_drive_types_selected)
+        self.settings_widget.bauartChanged.connect(self._on_bauart_selected)
+        self.settings_widget.winchesterChanged.connect(self._on_winchester_selected)
         # Serielle Schnittstellen: jede Aenderung des Anwenders gehoert in die
         # Konfiguration; die Statuszeile bekommt ihre Felder fertig aus dem Reiter.
         self.serial_widget.changed.connect(self._schedule_autosave)
@@ -418,18 +423,21 @@ class MainWindow(QMainWindow):
         drives_scroll = QScrollArea()
         drives_scroll.setWidgetResizable(True)
         self.platten_widget = None
+        self.platten_gruppe = None
         if self.profil.platte:
             # P8000: unter den Disketten der Kasten fuer die Winchesterplatte.
             kasten = QWidget()
             kl = QVBoxLayout(kasten)
             kl.setContentsMargins(0, 0, 0, 0)
             kl.addWidget(self.drives_widget)
-            self.platten_widget = PlattenWidget(self.emulator)
-            self.platten_widget.set_firmware(self._hardware.get("wdc", "4.2"))
-            self.platten_widget.set_verfuegbar(self.profil.modell_hat_wdc(self._model))
-            self.platten_widget.meldung.connect(
+            self.platten_gruppe = PlattenGruppe(self.emulator)
+            self.platten_gruppe.set_firmware(self._hardware.get("wdc", "4.2"))
+            self.platten_gruppe.set_verfuegbar(self.profil.modell_hat_wdc(self._model))
+            self.platten_gruppe.set_anzahl(self._winchester)
+            self.platten_gruppe.meldung.connect(
                 lambda text: self.statusBar().showMessage(text, 8000))
-            kl.addWidget(self.platten_widget)
+            kl.addWidget(self.platten_gruppe)
+            self.platten_widget = self.platten_gruppe.kaesten[0]      # Laufwerk 0
             drives_scroll.setWidget(kasten)
         else:
             drives_scroll.setWidget(self.drives_widget)
@@ -569,7 +577,7 @@ class MainWindow(QMainWindow):
     def _fenstertitel(self, modell) -> str:
         """Titel je Modell (P8000: „P8000 Terminal“ für die Terminaleinheit); eine benannte
         Instanz (``--instance``) trägt ihren Namen mit, damit man die Fenster unterscheidet."""
-        titel = self.profil.modell_titel(modell)
+        titel = self.profil.modell_titel(modell, getattr(self, "_bauart", None))
         n = instanz.name()
         return f"{titel} [{n}]" if n else titel
 
@@ -1149,6 +1157,10 @@ class MainWindow(QMainWindow):
             if self.profil.betriebsart_wahl:
                 # Die Rechnerausstattung bleibt auch im Betrieb „nur Terminal“ gemerkt.
                 general["ausstattung"] = self.settings_widget.ausstattung_value()
+        if self.profil.bauarten:
+            general["bauart"] = self._bauart
+        if self.platten_gruppe is not None:
+            general["winchester"] = int(self._winchester)
         general.update(self._hardware)          # PC 1715: zeichensatz, tastatur
         if "bildschirm" in self._hardware:
             self._schalter_nachlesen()
@@ -1172,8 +1184,8 @@ class MainWindow(QMainWindow):
                      if self.profil.raf_wahl else None))
         if self.eprom_widget is not None:
             data["eprom"] = self._eprom_zustand()
-        if self.platten_widget is not None:
-            data["platte"] = self.platten_widget.zustand_lesen()
+        if self.platten_gruppe is not None:
+            data.update(self.platten_gruppe.zustand_lesen())      # platte, platte1, platte2
         data["lochstreifen"] = self._ptape_zustand_lesen()
         data["kassette"] = self._tape_zustand_lesen()
         return data
@@ -1402,15 +1414,28 @@ class MainWindow(QMainWindow):
                     general.get("ausstattung") or self._model)
             self.settings_widget.set_model_value(self._model)
             # Hardwarevarianten: fehlender Schluessel = Vorgabe (aeltere Konfigurationen).
-            self._hardware = self.profil.hardware_normalisieren(general, self._model)
+            if self.profil.bauarten:
+                roh = general.get("bauart")
+                if roh is None and str(general.get("model", "")).strip().lower() == "p8000-c-ot":
+                    roh = "compact"             # Stand vom 2026-10-23: die Bauart war ein Modell
+                self._bauart = self.profil.bauart_normalisieren(roh)
+                self.settings_widget.set_bauart_value(self._bauart)
+            if self.platten_gruppe is not None:
+                n = general.get("winchester")
+                if isinstance(n, bool) or not isinstance(n, int):
+                    n = PlattenGruppe.anzahl_aus_konfig(data)     # aelterer Stand: nur `platte:`
+                self._winchester = max(1, min(3, n))
+                self.platten_gruppe.set_anzahl(self._winchester)
+                self.settings_widget.set_winchester_value(self._winchester)
+            self._hardware = self.profil.hardware_normalisieren(general, self._model, self._bauart)
             self.settings_widget.set_hardware_value(self._hardware)
             # Schiebeschalter: fehlend oder unbekannt = K7024.  Die Maschine bekommt die Stellung
             # beim Erzeugen (``konfig["schalter"]``), das Feld zeigt sie hier.
             self._schalter = ("k7023" if str(general.get("bildschirm_schalter", "")).strip().lower()
                               == "k7023" else "k7024")
             self.settings_widget.set_bildschirm_schalter_value(self._schalter)
-            if self.platten_widget is not None:
-                self.platten_widget.set_firmware(self._hardware.get("wdc", "4.2"))
+            if self.platten_gruppe is not None:
+                self.platten_gruppe.set_firmware(self._hardware.get("wdc", "4.2"))
 
             # RAM-Disk (doc/design/22_raf512.md §7.2): fehlender Abschnitt/Schluessel
             # oder unbekannter Wert = keine RAF bzw. kein Stand-by — anders als bei
@@ -1463,7 +1488,7 @@ class MainWindow(QMainWindow):
             # panels for the present slots exist and the machine matches.  During
             # a config restore we never cold-restart here (power-on happens later).
             self._apply_drive_types(
-                data.get("drive_types") or self.profil.standard_laufwerke(),
+                data.get("drive_types") or self._standard_laufwerke(),
                 cold_restart=False, sichern=False)
 
             if "disks" in data:
@@ -1472,8 +1497,8 @@ class MainWindow(QMainWindow):
             # Winchesterplatte (P8000): fehlender Abschnitt = noch nicht entschieden
             # (das Programm legt KEINE Platte von selbst an — nur ueber den Plattenkasten),
             # vorhandener Abschnitt mit leerem Pfad = ausdruecklich keine Platte.
-            if "platte" in data and self.platten_widget is not None:
-                self.platten_widget.zustand_anwenden(data.get("platte"))
+            if self.platten_gruppe is not None:
+                self.platten_gruppe.zustand_anwenden(data)
 
             # (Ein alter Abschnitt ``terminal`` mit der Skalierung des frueheren Terminalwidgets
             # wird uebergangen; das Bild fuellt das Fenster wie bei den anderen Maschinen.)
@@ -2004,6 +2029,44 @@ class MainWindow(QMainWindow):
         self._apply_drive_types(types, cold_restart=True)
         self._schedule_autosave()
 
+    def _standard_laufwerke(self, bauart=None) -> list:
+        """Diskettenschacht ab Werk; mit Bauarten der der Bauart (P8000: 2, Compact: 3 K5601)."""
+        lw = self.profil.bauart_vorgabe(bauart or self._bauart).get("laufwerke")
+        return dt.normalize_list(lw) if lw else self.profil.standard_laufwerke()
+
+    def _on_bauart_selected(self, bauart: str):
+        """Voreinstellung P8000 / P8000 Compact gewaehlt (Ticket #15): wie die Modellwahl des A5120
+        UEBERNIMMT sie ihre Werte ohne Rueckfrage — MON-Fassungen, Hauptspeicher, RTC, Disketten-
+        laufwerke, Platinenindex und Zahl der Winchester —, auch beim erneuten Waehlen derselben Bauart.  Danach
+        ist jede Option einzeln aenderbar.  WDC-Firmware und Plattenparameter gehoeren
+        nicht dazu und bleiben.  Die Maschine wird neu aufgebaut (Kaltstart)."""
+        neu = self.profil.bauart_normalisieren(bauart)
+        if neu != self._bauart and not self._eprom_rueckfrage("Wechsel der Voreinstellung"):
+            self.settings_widget.set_bauart_value(self._bauart)
+            return
+        self._bauart = neu
+        vorgabe = self.profil.bauart_vorgabe(neu)
+        self._hardware = {**self._hardware,
+                          **{k: v for k, v in self.profil.hardware_standard(self._model, neu).items()
+                             if k in vorgabe}}
+        self._winchester = max(1, min(3, int(vorgabe.get("winchester", 1))))
+        self.settings_widget.set_hardware_value(self._hardware)
+        self.settings_widget.set_winchester_value(self._winchester)
+        self._apply_drive_types(self._standard_laufwerke(neu), cold_restart=True)
+        self._schedule_autosave()
+
+    def _on_winchester_selected(self, n: int):
+        """Zahl der Winchester-Laufwerke (1–3).  Kein Neubau: der Kern fuehrt immer drei Laufwerke,
+        ein neuer Kasten nimmt ein Abbild an (der WDC erkennt es nach Rueckstellen).  Ein
+        weggenommenes Laufwerk wird abgetrennt."""
+        n = max(1, min(3, int(n)))
+        if n == self._winchester:
+            return
+        self._winchester = n
+        if self.platten_gruppe is not None:
+            self.platten_gruppe.set_anzahl(n)
+        self._schedule_autosave()
+
     def _on_model_selected(self, model: str):
         """Das Modell-Auswahlfeld (A5120/A5120.16) geändert.
 
@@ -2106,9 +2169,9 @@ class MainWindow(QMainWindow):
     def _platte_rueckfrage(self, firmware: str) -> bool:
         """P24: passt die angeschlossene Platte nicht zur neuen WDC-Firmware (bis 4.0 legt das EPROM
         das Laufwerk fest), vor dem Neustart fragen statt still zu trennen.  True = weitermachen."""
-        if self.platten_widget is None:
+        if self.platten_gruppe is None:
             return True
-        problem = self.platten_widget.passt_nicht_zu(firmware)
+        problem = self.platten_gruppe.passt_nicht_zu(firmware)
         if not problem:
             return True
         return QMessageBox.question(
@@ -2476,12 +2539,14 @@ class MainWindow(QMainWindow):
         self.aup_widget.set_emulator(new_emu)
         self.drives_widget.set_drive_types(types, new_emu)  # rebuild panels, clear mounts
         self.drives_widget.load_mounts(surviving)           # remount into new machine
-        if self.platten_widget is not None:
-            # Die Platte gehoert der Maschine: die neue bekommt dieselbe Datei (wenn das Modell
-            # einen WDC hat — sonst bleibt der Kasten gesperrt, die Wahl aber gemerkt).
-            self.platten_widget.set_verfuegbar(self.profil.modell_hat_wdc(self._model))
-            self.platten_widget.set_firmware(self._hardware.get("wdc", "4.2"))
-            self.platten_widget.set_emulator(new_emu)
+        if self.platten_gruppe is not None:
+            # Die Platten gehoeren der Maschine: die neue bekommt dieselben Dateien (wenn das Modell
+            # einen WDC hat — sonst bleiben die Kaesten gesperrt, die Wahl aber gemerkt).
+            self.platten_gruppe.set_verfuegbar(self.profil.modell_hat_wdc(self._model))
+            self.platten_gruppe.set_firmware(self._hardware.get("wdc", "4.2"))
+            self.platten_gruppe.set_anzahl(self._winchester)
+            self.platten_gruppe.set_emulator(new_emu)
+            self.settings_widget.set_winchester_value(self._winchester)
         self.settings_widget.set_drive_types(types)         # keep dropdowns in sync (no re-emit)
         self.settings_widget.set_model_value(self._model)   # dito
         self.settings_widget.set_hardware_value(self._hardware)
@@ -2639,8 +2704,8 @@ class MainWindow(QMainWindow):
         return self.stand_sichern(pfad)
 
     def stand_sichern(self, pfad: str) -> bool:
-        if self.platten_widget is not None:
-            self.platten_widget.sichern()
+        if self.platten_gruppe is not None:
+            self.platten_gruppe.sichern()
         self.emulator.flush_disks()
         ok = self.emulator.state_save(pfad)
         self.statusBar().showMessage(
@@ -2842,9 +2907,9 @@ class MainWindow(QMainWindow):
         # Kassette: gebundene Dateien zurueckschreiben (der Kern tut es verzoegert).
         self.kassette_widget.sichern()
         # Winchester: geaenderte Spuren zurueckschreiben (der Kern tut es verzoegert).
-        if self.platten_widget is not None:
-            self.platten_widget.sichern()
-            self.platten_widget.freigeben()
+        if self.platten_gruppe is not None:
+            self.platten_gruppe.sichern()
+            self.platten_gruppe.freigeben()
         self._geschlossen = True
         # Erst NACH dem Speichern: `aktiv` soll den Zustand beim Beenden festhalten.
         self.serial_widget.beenden()

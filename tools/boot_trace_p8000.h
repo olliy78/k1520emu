@@ -18,13 +18,14 @@
  *  erfuellt, 1 = nicht erreicht (Stillstand woanders, Taktgrenze), 2 = `--until` nicht erfuellt. */
 /// @p karte16: 16-Bit-Karte samt Kopplung stecken (`--machine p8000-16`, AP P11; Weiteres P12).
 /// @p wdc/@p hd (nur mit @p karte16, AP P13d): WDC-Firmware ("" = aus, mit @p hd 4.2) bzw.
-/// Winchesterabbild an Laufwerk 0 (wird direkt beschrieben — eine Kopie uebergeben).
+/// Winchesterabbild an Laufwerk 0 (wird direkt beschrieben — eine Kopie uebergeben);
+/// @p hd1/@p hd2 (Ticket #15): Laufwerk 1 und 2 (`--hd1`/`--hd2`; `--hd0` = `--hd`).
 /// @p originalTerminal (`--konsole original`, AP P20c): tty1 am Originalterminal Typ 2 statt am
 /// Kern-Terminal; Tasten gehen dann mit Haltezeit ueber die K7673.
 /// @p rtc (`--rtc aus|u130x|rtc72421`, nur mit @p karte16, Entwurf 38): Uhrenkarte am 16-Bit-Teil.
 int bootTraceP8000(const K8915TraceOpts& o, const prnlst::Listing& prn, bool karte16 = false,
                    const std::string& wdc = "", const std::string& hd = "", bool originalTerminal = false,
-                   const std::string& rtc = "");
+                   const std::string& rtc = "", const std::string& hd1 = "", const std::string& hd2 = "");
 /// `--machine p8000-terminal` (AP P20d): das Originalterminal ohne Rechner — Netz-Ein bis zur
 /// Einschaltmeldung („ADM31/9600 baud…"), `--keys` tippt ueber die K7673 (Zeichen, `<CR>`),
 /// danach Bild, gesendete Bytes der Leitung XB5 und Zustand.  `-c` = Grenze in Z8-Takten

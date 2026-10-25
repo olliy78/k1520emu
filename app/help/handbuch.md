@@ -1725,8 +1725,18 @@ die *Betriebsart*. Was anders ist:
   **nur Terminal** (s. u.). Ein Wechsel startet die Maschine kalt. Alte Konfigurationen mit dem
   früheren schlanken Kern-Terminal werden beim Laden auf die Ausstattung mit Originalterminal
   abgebildet.
-* **ROM-Fassungen und Bestückung** — ebenfalls unter *Allgemein*: Platinenindex (8-Bit 3 /
-  16-Bit 4, oder beide 1), **MON8** 3.1/3.0, **MON16** 3.1/3.0/3.3, Hauptspeicher der
+* **Voreinstellung P8000 / P8000 Compact** — *Einstellungen ▸ Allgemein ▸ Modell*. Beide sind **Vorgabe-Sätze**, keine
+  eigenen Maschinen (wie A5120/A5130/K8924 beim A5120): die Wahl übernimmt ihre Werte ohne Rückfrage und baut die Maschine
+  neu auf; danach ist jede Option einzeln änderbar, auch das erneute Wählen derselben Voreinstellung setzt sie wieder.
+  **P8000** (Vorgabe): Platinenindex 1/1 (8-Bit 1 / 16-Bit 1), MON8 3.0, MON16 3.0, Hauptspeicher 4 × 256 KB, RTC U130X, 2 Diskettenlaufwerke K5601, 1 Winchester
+  K5504.50. **P8000 Compact** (1989, die P8000 im Tischgehäuse mit unveränderten Platinen): Platinenindex 3/4 (8-Bit 3 / 16-Bit 4), MON8 3.1, MON16 3.1, 4 × 1 MB, RTC U130X,
+  3 Diskettenlaufwerke K5601, 1 Winchester K5504.50. WDC-Firmware und Plattenparameter gehören nicht dazu und
+  bleiben. Der Platinenindex gehört zur Voreinstellung (MON8 3.0 meldet am Index 3/4 nach der RESET-Taste „Hardware Error in
+  Connection“), ist danach aber einzeln änderbar. Die Voreinstellung ist unabhängig von *Rechnerausstattung* und *Betriebsart*; der Fenstertitel folgt ihr
+  (*P8000 Emulator* / *P8000 Compact Emulator*). Die Epson RTC-72421 (Community-Nachbau) bleibt unter *RTC* wählbar, ist aber
+  nie Vorgabe. Nachgebildet ist nur die Variante mit 16-Bit-Teil und Originalterminal; eine 8-Bit-Compact und der WDOS-Adapter fehlen.
+* **ROM-Fassungen und Bestückung** — ebenfalls unter *Allgemein*: Platinenindex (beide 1 oder 8-Bit 3 /
+  16-Bit 4; die Voreinstellung setzt ihn), **MON8** 3.0/3.1, **MON16** 3.0/3.1/3.3, Hauptspeicher der
   16-Bit-Seite (256 KB, 1 MB, 2 MB) und **WDC-Firmware** 4.2/4.0.05/3.4.05. Wo eine Wahl am
   Modell nichts bewirkt, ist das Feld ausgegraut. Jeder Wechsel ist ein Kaltstart.
   Die **Uhrenkarte** (Gruppe *RTC*) steht im Abschnitt *Die Echtzeituhr*.
@@ -1753,7 +1763,18 @@ die *Betriebsart*. Was anders ist:
   schaltet die Mitschrift aus; ist die Datei nicht beschreibbar, meldet es die Statuszeile und die
   Mitschrift stoppt, der Emulator läuft weiter. Das Feld gilt für beide Betriebsarten (Computer mit
   Terminal und nur Terminal) und wird in der Konfiguration gemerkt.
-* **Winchesterplatte** — im Kasten *Laufwerke* unter den Disketten. **Anschließen…** hängt ein
+* **Mehrere Winchester** — *Einstellungen ▸ Laufwerke ▸ Winchester-Laufwerke*: 1 bis 3 (Vorgabe 1). Jedes Laufwerk bekommt im
+  Kasten *Laufwerke* einen eigenen Plattenkasten (*Laufwerk 0*, *1*, *2*) mit **Anschließen…**, **Neue Platte…**, **Abtrennen**
+  und eigener Lampe; die Platte jedes Laufwerks wird gemerkt. Die Zahl wirkt ohne Neustart der Maschine, der WDC erkennt neu
+  angeschlossene Platten aber erst beim Hochlauf (*Rückstellen* oder *Rechner ein*). Wer die Zahl verringert, trennt die
+  weggenommenen Laufwerke ab (vorher wird zurückgeschrieben). Ohne Winchesterkontroller (*ohne Winchester*, *nur 8-Bit-Teil*)
+  ist die Wahl gesperrt. Das Lämpchen *Platte* der Frontplatte leuchtet bei Zugriff auf irgendeines der Laufwerke; zwei
+  Instanzen können dieselbe Plattendatei nicht gleichzeitig belegen (Sperre je Datei). Unter WEGA ist eine zweite
+  Platte an Laufwerk 1 nutzbar — sie muss vom selben Typ sein wie Laufwerk 0 und braucht einen Kern mit `md10`.
+  Die mitgelieferte WEGA-3.1-Platte hat ihn schon und kommt mit einer fertigen zweiten Platte
+  (`p8000_wega31_usr2.avr.img.gz`; Abschnitt *Zweite Festplatte unter WEGA einrichten*); Laufwerk 2 kann WEGA
+  nicht ansprechen.
+* **Winchesterplatte** — im Kasten *Laufwerke* unter den Disketten (je Laufwerk einer). **Anschließen…** hängt ein
   vorhandenes Abbild an den WDC, **Neue Platte…** legt eines an (Typ K5504.50 u. a.; Wahl
   **Inhalt**: Vorgabe *Unformatiert, wie ein neues Laufwerk* — ohne Parametersatz, formatieren mit
   `sa.format` im Gast; oder *Formatiert mit Parametersatz (K5504.50, leer)*, nur für Sonderfälle),
@@ -1963,10 +1984,10 @@ gilt beim U880-Monitor gleich, beim U8000-Monitor nur Großbuchstaben (Handbuch 
 
 Wo die einzelnen Teile im Emulator eingestellt werden:
 
-* *Einstellungen ▸ Allgemein*: **Rechnerausstattung** (*Vollgerät*, *ohne Winchester*, *nur
+* *Einstellungen ▸ Allgemein*: **Modell** (Voreinstellung *P8000* oder *P8000 Compact*), **Rechnerausstattung** (*Vollgerät*, *ohne Winchester*, *nur
   8-Bit-Teil*), **Betriebsart** (*Computer mit Terminal* oder *nur Terminal*), **Hauptspeicher
   (16-Bit)**, ROM-Fassungen.
-* *Ansicht ▸ Laufwerke*: Disketten A: und B: sowie der **Plattenkasten** (*Anschließen…*, *Neue
+* *Ansicht ▸ Laufwerke*: Disketten A: und B: (Compact: auch C:) sowie die **Plattenkästen** (1–3, *Einstellungen ▸ Laufwerke ▸ Winchester-Laufwerke*) (*Anschließen…*, *Neue
   Platte…*, *Abtrennen*).
 * *Datei ▸ Diskette einlegen* (oder *Mount* im Laufwerkskasten): Diskette einlegen.
 * *Maschine ▸ Rückstellen*, *Maschine ▸ NMI-Taster*, *Maschine ▸ Verbindung zum Rechner…* (nur
@@ -2530,6 +2551,281 @@ unversehrt. Aufräumen später mit `rm -r /z/tmp`.
   schreibt man mit `sh -c '…'`.
 * `tar`-Disketten, die das DiskTool geschrieben hat, sind dort danach nur lesbar. Soll eine geändert werden:
   Archiv holen, auf dem PC ändern, neu teilen und auf neue Leerdisketten schreiben.
+
+### Zweite Festplatte unter WEGA einrichten
+
+Zur WEGA-3.1-Platte gehört eine **fertig vorbereitete zweite Platte**: `p8000_wega31_usr2.avr.img.gz` im Ordner
+`p8000_wega31/` der Beispieldisketten, ein leeres Dateisystem **`/usr2`** von rund 127 MB (248 220 Blöcke zu 512 Byte). Die
+mitgelieferte WEGA-3.1-Platte (`p8000_wega31_platte.avr.img.gz`) kennt sie schon: Kern, Gerätedateien und die
+Einträge zum Einhängen sind eingerichtet. **WEGA auf der mitgelieferten 3.1-Platte ist also bereits für das Einhängen einer zweiten Platte vorbereitet** — wer nur diese beiden Abbilder benutzt, muss nichts generieren.
+
+#### Die mitgelieferte zweite Platte anschließen
+
+1. *Einstellungen ▸ Laufwerke ▸ Winchester-Laufwerke* auf **2** stellen (die Voreinstellungen P8000 und P8000
+   Compact schließen von Haus aus nur **eine** Winchester an; auch das erneute Wählen einer Voreinstellung setzt die Zahl auf 1 zurück).
+2. Im Kasten *Laufwerke* beim Plattenkasten **Laufwerk 1** auf **Anschließen…** und `p8000_wega31_usr2.avr.img.gz`
+   wählen. Die Platte muss vom Typ **WEGA31-AVR** sein wie Laufwerk 0 (der Typ steht im Dateinamen, `.avr.`).
+3. *Maschine ▸ Rückstellen* (oder aus- und einschalten): der WDC erkennt eine im Betrieb angeschlossene Platte erst
+   beim Hochlauf. Startdiskette in A:, RETURN, RETURN, NMI wie gewohnt.
+
+Die Auswahl **3** trägt den Zusatz „wird aktuell nicht von WEGA unterstützt“: der Emulator kennt drei Laufwerke, WEGA
+kann aber nur zwei ansprechen.
+
+Fertig. Beim Mehrbenutzerstart erscheinen die Meldungen (hier mit Platte):
+
+    Checking second hard disk (md10) ...
+    Second hard disk found - checking /usr2
+    /dev/rmd10
+    File System: /usr2 Volume: 1
+    …
+
+Nach der Anmeldung steht `/usr2` in `/etc/mount` (`/usr2 on /dev/md10 …`), und alles, was dort abgelegt wird,
+liegt auf der zweiten Platte. Das Prüfen eines Dateisystems dieser Größe verlängert den Start um rund **5 Minuten**
+(etwa 290 Sekunden Maschinenzeit; ohne zweite Platte entfällt es). Bei jedem Start mit Platte prüft `fsck` `/usr2` neu; zum Herunterfahren hängt
+`/etc/umfs` sie vor `/usr` aus.
+
+#### Ohne zweite Platte
+
+Dieselbe Platte läuft auch mit **einem** Laufwerk, ohne Fehler beim Einhängen. Der Kern kennt `md10`, und ein
+Zugriff darauf ohne angeschlossenes Laufwerk erzeugt eine Meldung des Kerns, die sich nicht abschalten lässt.
+Deshalb fragt `/etc/rc_csh` beim Start **einmal** nach und rahmt die Kernzeilen ein:
+
+    Checking second hard disk (md10) ...
+    err on dev 0/10
+    bn=0 er=FF18,3
+    md: fatal error
+    Second hard disk not present - /usr2 not mounted.
+
+Die drei Zeilen dazwischen sind **der Kern, nicht ein Fehler des Systems**: Der Zugriff auf Laufwerk 1 ging ins
+Leere, `/usr2` bleibt ein leeres Verzeichnis auf der Wurzel, und nichts wird später eingehängt. Das Ergebnis der
+Abfrage steht in der Marke `/etc/md10.da`: nur wenn sie da ist, hängen `/etc/mfs` und `/etc/umfs` `md10`
+ein bzw. aus.
+
+#### Eigene Platte oder anderes Abbild: der lange Weg
+
+Das Folgende ist der Weg, den die mitgelieferten Abbilder schon hinter sich haben; man braucht ihn für eine **eigene
+zweite Platte** (andere Größe, anderer Inhalt), für eine **andere WEGA-Installation** oder um zu verstehen, was
+im Abbild steht. Der Winchesterkontroller kann mehrere Laufwerke bedienen, WEGA benutzt aber nur, was im **Kern**
+steht: die Aufteilung der Platten ist beim Generieren des Kerns fest eingetragen (`/usr/sys/h/mdsize.h`). Der
+Kern der **ursprünglichen** WEGA-3.1-Platte kannte für Laufwerk 1 nur Bereiche der Größe **0** — ohne neuen Kern
+geht es also nicht. Der Weg folgt dem WEGA-Systemhandbuch (Abschnitt 4.4 „Einbinden eines zweiten
+Hard-Disk-Laufwerks" und 5.5 „Generierung des Kerns"). Er ist im Emulator durchgespielt; derselbe Ablauf erzeugt
+die mitgelieferten Abbilder (`tools/p8000/zweite_platte_bereitstellen.sh`, Systemtest
+`P8000WegaZweitePlatte.Bereitstellen`), und die Wächter `OhneZweitePlatteLaeuftUnauffaellig` und
+`MitAusgelieferterZweiterPlatteEingebunden` (Label `wega_install`, `tools/dev.sh test-wega`) prüfen das Ergebnis.
+Die Befehle und Bildschirmauszüge unten stammen aus diesem Lauf. Auf der mitgelieferten Platte sind die Schritte 2
+bis 4 bereits getan; wer sie dort wiederholt, tut es auf eigene Verantwortung (`mknod` und die `ed`-Einträge
+würden doppelt).
+
+**Ein `/etc/fstab` gibt es in WEGA nicht.** An seiner Stelle stehen drei Dateien: die Shell-Prozedur
+**`/etc/mfs`** hängt die Dateisysteme ein (`/etc/rc_csh` ruft sie beim Übergang in den Mehrbenutzerbetrieb auf;
+`/etc/umfs` ist dieselbe Datei unter zweitem Namen und hängt aus), **`/etc/rc_csh`** prüft vorher jedes
+Dateisystem mit `fsck`, und **`/etc/checklist`** ist die Liste, die `fsck` ohne Argumente prüft.
+`/etc/mnttab` ist nur die Tabelle der gerade eingehängten Dateisysteme (beim Start geleert).
+
+**Voraussetzungen.**
+
+* Vollgerät mit WDC-Firmware **4.2** und installiertem WEGA auf **Laufwerk 0**.
+* *Einstellungen ▸ Laufwerke ▸ Winchester-Laufwerke* auf **2** (die Voreinstellungen P8000 und P8000 Compact
+  bringen 1 Laufwerk mit).
+* **Die zweite Platte muss vom selben Typ sein wie die erste.** Die Firmware 4.2 übernimmt beim Hochlauf den
+  Parametersatz von Laufwerk 0 und verlangt für Laufwerk 1 und 2 genau denselben; ein anderer Typ endet im
+  Hardwaretest mit `*** ERROR 52 3A` (Init-Fehler 38 + Laufwerk 1) und ist für WEGA nicht benutzbar. Zur
+  ausgelieferten WEGA-3.1-Platte gehört der Typ **WEGA31-AVR** (1380 Zylinder, 10 Köpfe), zu einer selbst
+  installierten Platte meist **K5504.50**.
+
+#### Eigene Platte, Schritt 1: anlegen und formatieren
+
+Im Plattenkasten *Laufwerk 1* **Neue Platte…**: Typ wie Laufwerk 0, Inhalt *Unformatiert* (Vorgabe). Danach
+*Maschine ▸ Rückstellen* oder aus- und einschalten — eine im Betrieb angeschlossene Platte erkennt der WDC erst
+beim Hochlauf. Startdiskette in A:, **RETURN**, **RETURN**, bei „Press NMI" den **NMI-Taster**. Weil Laufwerk 1
+noch keinen Parametersatz hat, startet WEGA nicht von selbst; der Hardwaretest endet mit
+
+    *** ERROR 52   3A  AAAA
+    MAXSEG=<0F>
+    *
+
+Am `*` **`O U`**, am `>` **`boot`**, am `:` das Formatierprogramm von der Platte:
+
+    : md(0,16000)sa.format
+    >>>  Format Hard-Disk 4.1  <<<
+    Firmwareversion 'WDC_4.2'
+    Number of Drives: 2  (Drive 0 1)
+    Error on RESET
+    Error in PAR&BTT on Drive 1 (PAR not ok) (BTT not ok)
+    No. of Drive formatted: 1
+    PAR --- Drivetype: 'WDC-Emulator'
+    PAR --- Cylinders: 1380  Heads: 10  Sectors: 18  Praecomp: 1380  Ramp: 1
+    Parameter for Drive ok ? (y/l/p/q)y
+      No Entries in Bad Track Table (BTT) of Drive 1
+    Manual Input of bad Track of Drive 1 (y/n/q) ? n
+      Format Begin: Cylinder (a/Start-Cylinder) a
+    Ready for Format Drive 1 from Cyl 0 Hd 0
+                               to Cyl 1379 Hd 9 ? (y/n/q) y
+    …
+    Rewrite PAR&BTT from WDC-RAM to HD-Drive 1 ? (y/n)y
+    End of 'sa.format' (y/n) ? y
+
+* **Laufwerksnummer `1`** — die Frage kommt nur, wenn der WDC zwei Laufwerke meldet.
+* `sa.format` schlägt den Parametersatz **von Laufwerk 0** vor; genau der ist richtig (**`y`**). Mit `l` käme die
+  Typliste — ein anderer Typ als der von Laufwerk 0 wäre aber der Fehler von oben.
+* Das Formatieren der ganzen Platte (13 800 Spuren) dauert rund 13 Milliarden Takte, also knapp eine Stunde
+  Maschinenzeit; im Emulator mit voller Geschwindigkeit wenige Minuten.
+
+Danach am `:` **`md(0,16000)wega`**: WEGA startet mit dem alten Kern im Einbenutzerbetrieb (`#1`); **`init 2`**,
+Datum und Zeit beantworten, als `wega` anmelden.
+
+#### Eigene Platte, Schritt 2: neuen Kern generieren (`sysgen`)
+
+    #1 cd /usr/sys/conf
+    #2 sysgen
+
+`sysgen` zeigt die bisherige Aufteilung (`file system layout`) und fragt alle Bereiche von Laufwerk 0 **neu**
+ab. **Hier die angezeigten Werte unverändert eingeben** — wer sie ändert, verlegt `/`, `/usr` oder `/z`, und
+WEGA findet seine Dateisysteme nicht mehr. Für die ausgelieferte WEGA-3.1-Platte:
+
+| Frage | Antwort |
+|---|---|
+| `Do you want to change system constants ? :` | `n` |
+| `Do you want to change file system layout ? :` | `y` |
+| `size of /usr :`, `/swap`, `/root`, `/tmp`, `/z` | `13000`, `3000`, `7000`, `4000`, `221220` |
+| `size of /md5 :` | `0` |
+| `Do you want to add an second harddisk ? :` | `y` |
+| `size of /md10 :` | `248220` (ganze Platte: 1379 Zylinder × 10 Köpfe × 18 Sektoren) |
+| `size of /md11 :` | `0` |
+| `Do you want to change version parameters ? :` | `n` |
+| `Do you want to add new driver to the system ? :` | `n` |
+
+Für eine K5504.50 ist die ganze Platte `92070` Blöcke (1023 × 5 × 18). Wer Laufwerk 1 teilen will, gibt
+`md11`, `md12` … Größen; die Bereiche liegen der Reihe nach ab Block 0. `sysgen` übersetzt und bindet:
+
+    New wega is building now ! Wait a minute !
+    …
+    New wega : /usr/sys/conf/wega
+    New boot is building now !
+    …
+    New boot : /usr/sys/conf/boot
+
+Den neuen Kern einsetzen, den alten aufheben (das neue `boot` wird nicht gebraucht, `/` liegt unverändert):
+
+    #3 cp /wega /wega.old
+    #4 cp /usr/sys/conf/wega /wega
+    #5 chmod 400 /wega
+    #6 sync
+
+Dann **`sync`** noch einmal und kalt starten (*Rückstellen* bzw. aus/ein, RETURN, RETURN, NMI). Jetzt haben
+beide Platten einen Parametersatz, WEGA startet wieder von selbst — mit dem neuen Kern. Startet er nicht, am
+`*` `O U`, `boot` und am `:` `md(0,16000)wega.old` (*nicht im Emulator geprüft*).
+
+#### Eigene Platte, Schritt 3: Gerätedateien, Dateisystem, einhängen
+
+Als `wega` angemeldet (die Zahlen vor den Befehlen sind der Prompt):
+
+    #1 /etc/mknod /dev/md10 b 0 10
+    #2 /etc/mknod /dev/rmd10 c 0 10
+    #3 /etc/chmog 640 bin 0 /dev/md10 /dev/rmd10
+    #4 mkdir /usr2
+    #5 /etc/mkfs /dev/rmd10 248220
+    isize = 65528
+    m/n = 1 72
+    #6 /etc/labelit /dev/rmd10 /usr2 1
+    #7 /etc/mount /dev/md10 /usr2
+    #8 /etc/mlf /usr2
+    #9 /etc/chmog 644 bin 0 /usr2/lost+found
+
+* Die Gerätenummern: Blockgerät `b 0 n`, Raw-Gerät `c 0 n`; **Laufwerk 1 hat die Bereiche `md10`–`md19`**
+  (Laufwerk 0: `md0`–`md9`). Ein zweiter Bereich hieße `md11`/`rmd11`.
+* `mkfs` nimmt die Größe aus `sysgen` (`/md10`). `labelit` gibt dem Dateisystem den Namen, den `fsck` beim
+  Start anzeigt. `/usr2` ist ein frei gewählter Name.
+
+#### Eigene Platte, Schritt 4: dauerhaft einbinden
+
+Zwei Dateien ändern, und zwar **bedingt**: ein Kern mit `md10` verträgt ein fehlendes Laufwerk 1 nur, wenn
+niemand darauf zugreift (jeder Zugriff erzeugt den Kernblock `md: fatal error`). Mit `vi` oder, wie im Test, mit
+`ed` (die Zeilen nach `a` werden mit **Tab** eingerückt, `.` allein beendet die Eingabe, `w` schreibt, `q`
+verlässt):
+
+    #10 ed /etc/mfs
+    /etc\/mount \/dev\/usr/a
+    			test -f /etc/md10.da && /etc/mount /dev/md10 /usr2
+    .
+    /etc\/umount \/dev\/tmp/a
+    			test -f /etc/md10.da && /etc/umount /dev/md10
+    .
+    w
+    q
+    #11 ed /etc/rc_csh
+    /dev\/rz/a
+    	echo "Checking second hard disk (md10) ..."
+    	rm -f /etc/md10.da
+    	dd if=/dev/rmd10 of=/dev/null count=1 >& /dev/null
+    	if ( $status == 0 ) then
+    		echo "Second hard disk found - checking /usr2"
+    		touch /etc/md10.da
+    		/etc/fsck -y -t /tmp/scratch /dev/rmd10
+    	else
+    		echo "Second hard disk not present - /usr2 not mounted."
+    	endif
+    .
+    w
+    q
+
+* `/etc/mfs` und `/etc/umfs` sind **eine** Datei (zwei Namen); der erste Eintrag hängt beim Start ein (nach
+  `/dev/usr`), der zweite beim Herunterfahren aus — **vor** `/dev/usr`, hinter `/dev/tmp`: zuletzt eingehängt,
+  zuerst ausgehängt.
+* In `/etc/rc_csh` gehört die Prüfung hinter die Zeile `… /dev/rz`: nur dort ist `/tmp` eingehängt, und für
+  Dateisysteme über 30 000 Blöcke verlangt das Systemhandbuch `fsck` mit `-t` und einer Hilfsdatei. WEGAs
+  Shell ist die C-Shell, `rc_csh` also csh-Syntax (`>&`, `if ( … ) then`); `mfs` ist dagegen eine
+  Bourne-Shell-Prozedur.
+* **`/etc/checklist` bleibt unverändert.** Sie ist die Liste für `fsck` ohne Argumente (interaktiv); ein Eintrag
+  `/dev/rmd10` liefe ohne Platte in einen Lesefehler, und `rc_csh` prüft die Platte ohnehin selbst.
+* Wer **ausschließlich mit zwei Platten** arbeitet, kann die Abfrage weglassen und die drei Zeilen
+  unbedingt eintragen (`/etc/mount /dev/md10 /usr2`, `/etc/umount /dev/md10`,
+  `/etc/fsck -y -t /tmp/scratch /dev/rmd10`); fehlt dann die Platte, meldet der Start Lesefehler.
+
+Probe und Daten:
+
+    #15 cp /etc/passwd /usr2/passwd.kopie
+    #16 echo zweite Platte LW1 > /usr2/notiz
+    #17 sum /etc/passwd /usr2/passwd.kopie
+    29362 1 /etc/passwd
+    29362 1 /usr2/passwd.kopie
+    #18 df; /etc/mount
+    …
+    /usr2   (/dev/md10 ):   240021 blocks   65507 i-nodes
+    …
+    /usr2 on /dev/md10 read/write on Sun Oct 18 12:05:12 2026
+
+Zum Schluss **`sync`** (zweimal) und neu starten.
+
+#### Eigene Platte, Schritt 5: nach dem Neustart
+
+Die Mehrbenutzer-Prüfung zeigt die neue Platte:
+
+    Checking second hard disk (md10) ...
+    Second hard disk found - checking /usr2
+    /dev/rmd10
+    File System: /usr2 Volume: 1
+    5 files 8 blocks 240021 free
+
+und nach der Anmeldung steht `/usr2` in der Tabelle — eingehängt beim Start, nicht von Hand:
+
+    #1 /etc/mount; cat /usr2/notiz; ls /usr2
+    …
+    /usr2 on /dev/md10 read/write on Sun Oct 18 12:00:03 2026
+    zweite Platte LW1
+    lost+found   notiz        passwd.kopie
+
+#### Was nicht geht oder nicht geprüft ist
+
+* **Zwei verschiedene Plattentypen** an einem WDC 4.2 — die Firmware lehnt Laufwerk 1 ab (`ERROR 52 3A`).
+* **Ein drittes Laufwerk unter WEGA:** Emulator und WDC kennen drei, aber `sa.format` 4.1 bricht bei mehr als
+  zwei Laufwerken ab, und die Kerntabelle (`wpar.c`) hat nur `md0`–`md19`, also zwei Laufwerke.
+* **Ohne `sysgen`**: der Kern der ursprünglichen WEGA-3.1-Platte führt `md10`–`md19` mit Größe 0 und weist jeden
+  Zugriff ab (aus dem Kern gelesen, im Emulator nicht ausprobiert). Die mitgelieferte Platte hat den neuen Kern
+  schon (`/wega`; der alte liegt als `/wega.old` daneben).
+* **Nicht geprüft:** WEGA 3.0, ein Paar K5504.50-Platten, mehrere Bereiche auf Laufwerk 1, Starten von
+  Laufwerk 1.
 
 ### Terminal und Tastatur
 

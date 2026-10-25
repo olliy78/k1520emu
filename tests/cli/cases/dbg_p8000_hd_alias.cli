@@ -1,0 +1,9 @@
+# --hd bleibt Alias fuer --hd0; LW 1 und 2 bleiben leer.
+nullfile hd0.img: 47185920
+tool:    k1520dbg
+run:     --machine p8000-16 --hd %hd0.img% -x %CLI_DIR%/scripts/p8000_wdc.dbg
+timeout: 120
+exit:    0
+forbid:  LW 0: -
+expect:  LW 1: -
+expect:  LW 2: -

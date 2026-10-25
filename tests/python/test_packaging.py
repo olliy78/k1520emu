@@ -1902,6 +1902,11 @@ def test_die_wega_platte_mit_kermit_benutzer_liegt_im_paket(payload):
     original = PROJECT_ROOT / "disks" / "p8000_wega31" / "p8000_wega31_platte.avr.img.gz"
     with gzip.open(platte, "rb") as f:
         assert f.read() == original.read_bytes()
+    # Die vorbereitete zweite Platte (Merkposten p8000 Nr. 65) reist als eigenes Abbild mit.
+    usr2 = ordner / "p8000_wega31_usr2.avr.img.gz.gz"
+    assert usr2.is_file(), "die zweite WEGA-3.1-Platte fehlt im Paket"
+    with gzip.open(usr2, "rb") as f:
+        assert f.read() == (original.parent / "p8000_wega31_usr2.avr.img.gz").read_bytes()
 
 
 # ─── Der Debugger im Paket (Entwurf §10a) ────────────────────────────────────

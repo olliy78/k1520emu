@@ -278,17 +278,22 @@ static bool p8000Konfig(const char* text, P8000Machine::Config& cfg, std::string
             else if (val == "3.4.05") cfg.wdc = Cfg::Wdc::V3_4_05;
             else if (val == "aus") cfg.wdc = Cfg::Wdc::Aus;
             else { fehler = "P8000: wdc = " + val + " unbekannt (4.2 | 4.0.05 | 3.4.05 | aus)"; return false; }
-        } else if (key == "platte") {
-            cfg.platte = val;          // Pfad des Abbilds an Laufwerk 0 (roh/LBA)
+        } else if (key == "platte" || key == "platte0") {
+            cfg.platte = val;          // Pfad des Abbilds an Laufwerk 0 (roh/LBA); `platte` = Alias
+        } else if (key == "platte1") {
+            cfg.platte1 = val;         // Laufwerk 1 (Ticket #15)
+        } else if (key == "platte2") {
+            cfg.platte2 = val;
         } else if (key == "plattepar") {
             // P24: Parametersatz ergaenzen (nur das WEGA-3.1-AVR-Abbild braucht das); Kern-Vorgabe
             // "ergaenzen" (Bestandstests), das Programm schickt "aus".
             if (val == "ergaenzen") cfg.platte_par_ergaenzen = true;
             else if (val == "aus") cfg.platte_par_ergaenzen = false;
             else { fehler = "P8000: plattepar = " + val + " unbekannt (ergaenzen | aus)"; return false; }
-        } else if (key == "plattentyp") {
-            if (!k1520::winchester::typNachName(val)) { fehler = "P8000: plattentyp = " + val + " unbekannt"; return false; }
-            cfg.platte_typ = val;
+        } else if (key == "plattentyp" || key == "plattentyp0" || key == "plattentyp1" || key == "plattentyp2") {
+            // plattentyp = Alias fuer plattentyp0 und Vorgabe der Laufwerke ohne eigenen Typ
+            if (!k1520::winchester::typNachName(val)) { fehler = "P8000: " + key + " = " + val + " unbekannt"; return false; }
+            (key == "plattentyp1" ? cfg.platte_typ1 : key == "plattentyp2" ? cfg.platte_typ2 : cfg.platte_typ) = val;
         } else {
             fehler = "P8000: unbekannter Schluessel '" + key + "'";
             return false;
