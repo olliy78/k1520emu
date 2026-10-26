@@ -1092,3 +1092,24 @@ filesystems:
     data_start:  { cyl: 1, head: 0 }
     leer:        true
     detect_rank: 901
+
+  # tar im MUTOS-8000-Layout, 8x512-Zuschnitt (DISK-Satz 1987, Ladediskette ..._k5601_8x512; Entwurf 39 A5c):
+  # dasselbe Rohgeraet /dev/rrkN, aber `mutos_io` rechnet hier linear - Block n = Zylinder 1 + n/8, Sektor-ID
+  # n mod 8 + 1 (`unix_layout: mutos8k_512`), 76 Zylinder = 608 Bloecke = 311 296 B (der Kernel lehnt Block >= 608 ab,
+  # auch auf einer 80-Zylinder-Diskette).  Zylinder 0 (26x128) bleibt unberuehrt.
+  - name:        tar_mutos8k_8x512_mfm
+    description: "tar-Strom im MUTOS-8000-Layout 8×512 (5¼″ MFM, DISK-Satz) — 608 Blöcke"
+    format:      mutos_ss77
+    type:        tar
+    unix_layout: mutos8k_512
+    data_start:  { cyl: 1, head: 0 }
+    detect_rank: 900
+
+  - name:        tar_mutos8k_8x512_mfm_leer
+    description: "tar-Diskette, leer (MUTOS-8000-Layout 8×512, MFM) — leeres tar-Archiv"
+    format:      mutos_ss77
+    type:        tar
+    unix_layout: mutos8k_512
+    data_start:  { cyl: 1, head: 0 }
+    leer:        true
+    detect_rank: 901

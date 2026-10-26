@@ -537,3 +537,63 @@ TEST(MutosFs, M8k_RootDisketteWirdNichtFalschErkannt) {
     auto dv = DiskVolume::open(t.path(), "", formate(), dateisysteme(), err, false);
     EXPECT_FALSE(dv && dv->hasFileSystem());
 }
+
+// ─── 8x512 (DISK-Satz): Gegenprobe am Emulator, Entwurf 39 A5c ───────────────────────────────────────
+
+namespace {
+uint32_t fnv1a(const std::string& d) {
+    uint32_t h = 0x811C9DC5u;
+    for (unsigned char c : d) { h ^= c; h *= 0x01000193u; }
+    return h;
+}
+}  // namespace
+
+TEST(MutosFs, M8x512_VonMutosGeschriebenesLiestDasDiskToolUndFsckIstSauber) {
+    // Die Diskette hat das DiskTool angelegt (`create --fs mutos8k_8x512_mfm`, bin/ed, d/od); danach hat MUTOS 8000
+    // unter der Ladediskette `k5601_8x512` ZUGESCHRIEBEN: `cp adb` (27 770 B, also mit Indirektblock), `mkdir neu`,
+    // `cp tar neu/tar2`, `rm d/od`, `echo hallo > hallo`, `sync`.  Blockabbildung und Dateisystem des DiskTool
+    // stimmen genau dann, wenn alles (Inhalt, Verzeichnisse, Freiliste) hier unverletzt ankommt.
+    k1520test::TempDisk t("mutos8000_8x512_geschrieben.td0");
+    std::string err;
+    auto dv = DiskVolume::open(t.path(), "", formate(), dateisysteme(), err, true);
+    ASSERT_TRUE(dv) << err;
+    EXPECT_EQ(dv->detection().filesystem, "mutos8k_8x512_mfm");
+    const auto l = liste(*dv);
+    EXPECT_EQ(l.at("adb").size, 27770u);
+    EXPECT_EQ(l.at("neu/tar2").size, 17000u);
+    EXPECT_EQ(l.at("bin/ed").size, 11472u);
+    EXPECT_EQ(l.at("hallo").size, 6u);
+    EXPECT_EQ(l.count("d/od"), 0u);                       // von MUTOS geloescht
+    const FsCheckReport& r = dv->check(FsCheckLevel::Voll, true);
+    EXPECT_EQ(r.alsText().find("Fehler"), std::string::npos) << r.alsText();
+    EXPECT_EQ(r.alsText().find("Warnung"), std::string::npos) << r.alsText();
+
+    const auto aus = std::filesystem::path(t.path()).parent_path() / "m8x512_aus";
+    std::filesystem::remove_all(aus);
+    ASSERT_TRUE(dv->extractAll(aus.string(), TransferOptions{})) << dv->lastError();
+    EXPECT_EQ(k1520test::readFileBytes((aus / "hallo").string()), "hallo\n");
+    // FNV-1a der Originale (DISK-CMD bin/adb und bin/tar, gelesen aus cmd_8x512)
+    EXPECT_EQ(fnv1a(k1520test::readFileBytes((aus / "adb").string())), 0x0278799Au);
+    EXPECT_EQ(fnv1a(k1520test::readFileBytes((aus / "neu/tar2").string())), 0xFB2F3506u);
+    std::filesystem::remove_all(aus);
+}
+
+TEST(MutosFs, M8x512_NeueDisketteNimmtDieBlockgrenzeDesKernelsEin) {
+    // Der Kernel lehnt Block >= 608 (76 Zylinder x 8) ab; auch auf einer 80-Zylinder-Diskette bekommt das
+    // Dateisystem ohne ausdrueckliches `--blocks` hoechstens 608 Bloecke (sonst lege es Dateien dahin, die MUTOS nie liest).
+    const auto dir = std::filesystem::temp_directory_path() / "mutos_8x512_neu_test";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    std::string err;
+    auto a = DiskVolume::create((dir / "a77.hfe").string(), "mutos8k_8x512_mfm", "t", formate(), dateisysteme(), err);
+    ASSERT_TRUE(a) << err;
+    auto b = DiskVolume::create((dir / "a80.hfe").string(), "mutos8k_8x512_mfm_80", "t", formate(), dateisysteme(), err);
+    ASSERT_TRUE(b) << err;
+    EXPECT_EQ(a->volumeInfo(0).total_bytes, b->volumeInfo(0).total_bytes);
+    EXPECT_LT(b->volumeInfo(0).total_bytes, 608u * 512u);              // 608 Bloecke inklusive Verwaltung
+    // ausdruecklich mehr ist erlaubt (zum Beispiel fuer ein Abbild ohne MUTOS)
+    auto c = DiskVolume::create((dir / "c80.hfe").string(), "mutos8k_8x512_mfm_80", "t", formate(), dateisysteme(), err, "", 0, 632);
+    ASSERT_TRUE(c) << err;
+    EXPECT_GT(c->volumeInfo(0).total_bytes, b->volumeInfo(0).total_bytes);
+    std::filesystem::remove_all(dir);
+}

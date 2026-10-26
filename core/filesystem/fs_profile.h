@@ -79,6 +79,12 @@ struct FsProfile {
     ///        Bloecke zu 4 Sektoren mit Verschraenkung 2 und 6 Sektoren Spurversatz
     ///        (@ref Mutos8kDev) - YAML `unix_layout: mutos8k`.
     bool mutos8k_layout = false;
+    /// @brief Nur `type: tar` mit @ref mutos8k_layout: MUTOS 8000 im **8×512-Zuschnitt** (DISK-Satz 1987,
+    ///        `mutos_io` fuer 8×512): das Rohgeraet ist die LINEARE Folge der 512-B-Sektoren ab @c data_cyl
+    ///        (Block n = Zylinder data_cyl + n/8, Sektor-ID n mod 8 + 1, keine Verschraenkung, kein
+    ///        Spurversatz) - YAML `unix_layout: mutos8k_512`.  Auch die Lage des Rohgeraets, nicht nur des
+    ///        tar-Stroms: dasselbe Blockgeraet traegt das UNIX-Dateisystem `mutos8k_8x512_mfm`.
+    bool mutos8k_linear = false;
 
     bool allow_img = true;     ///< als rohes Sektorabbild darstellbar (UDOS: nie)
     bool allow_hfe = true;

@@ -13,6 +13,8 @@ Dazu drei Ladedisketten mit Patches (Entwurf 39, 11.2/11.6): boot_udos_k5601_nur
 boot_udos_mf3200_k5601_nur_a.hfe (UDOS meldet nur A: an; MUTOS-Disketten schon beim Einschalten in B:-D:),
 boot_udos_k5601_8x512.hfe (zusaetzlich 8 x 512 B und Swap ab Block 352 fuer den DISK-Satz, nur K5601).
 
+Dazu zwei Disketten fuer den DISK-Satz (8 x 512) aus den TD0-Originalen (bau_8x512.py): root_8x512.hfe, cmd_8x512.hfe.
+
 Dazu die Datendisketten cmd (/mnt), usr (/usr), bin (/tmp) (Best-of) und cc1/cc2 (DISK-Satz, /usr) aus den Archiven best_<rolle>.zip, je FM
 (<rolle>_fm.hfe) und MFM (<rolle>_mfm.hfe); Entwurf 39 Abschnitt 10.
 
@@ -24,6 +26,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import bau_8x512  # noqa: E402
 import bau_aus_archiv  # noqa: E402
 import bau_ladediskette  # noqa: E402
 import m8k  # noqa: E402
@@ -39,6 +42,9 @@ LADEDISKETTEN = (("mf3200", "a5120_mutos8000_boot_udos_mf3200.hfe"),
 WURZELN = (("mf3200", "a5120_mutos8000_root_fm.hfe"),
            ("k5601", "a5120_mutos8000_root_mfm.hfe"))
 
+
+# DISK-Satz 8 x 512 (bau_8x512.py): Wurzel mit der lauffaehigen pwd und die Befehlsdiskette, aus den TD0-Originalen
+DISK_SATZ = tuple("a5120_mutos8000_" + n for n in bau_8x512.ZIELE.values())
 
 # (Rolle, Archivname ohne Pfad); je Rolle zwei Disketten: FM und MFM
 DATENDISKETTEN = ("cmd", "usr", "bin", "cc1", "cc2")
@@ -66,7 +72,8 @@ def main(argv=None):
 
     ordner = os.path.abspath(a.ziel_ordner)
     ziele = [os.path.join(ordner, n) for _, n in ([] if a.nur_daten else LADEDISKETTEN + WURZELN)] + \
-            [os.path.join(ordner, n) for n in datendisketten()]
+            [os.path.join(ordner, n) for n in datendisketten()] + \
+            [os.path.join(ordner, n) for n in ([] if a.nur_daten else DISK_SATZ)]
     vorhanden = [z for z in ziele if os.path.exists(z)]
     if vorhanden and not a.ueberschreiben:      # vorab, damit nicht die Haelfte gebaut wird
         raise SystemExit("vorhanden (--ueberschreiben): " + ", ".join(os.path.basename(z) for z in vorhanden))
@@ -81,6 +88,8 @@ def main(argv=None):
         if not os.path.exists(pfad):
             pfad = os.path.join(quelle, "best_" + rolle)
         bau_aus_archiv.bauen(pfad, os.path.join(ordner, name), ueberschreiben=True, laufwerke=laufwerke)
+    if not a.nur_daten:
+        bau_8x512.bauen(ordner, ueberschreiben=True)
     return 0
 
 

@@ -120,6 +120,18 @@ Tickets #10 (tar-Satz) und #11 (Platte), Zweig `tar_satz_platte`.  Kern: `core/f
     `dt_tar_mutos_*.cli`, und die **Abnahme unter MUTOS im Emulator** `cli_mutos8000_tar_disktool_geschrieben` (`tar tvf`/`tar xvf` einer DiskTool-Einzeldiskette +
     `cmp` gegen die Originale, DiskTool-Satz aus zwei Disketten ueber `dd | tar`, Grenzdatei `cmp`-gleich).
 
+18. **tar im MUTOS-8000-Layout 8×512 (2026-10-26, Entwurf 39 „A5c“, #22).**  Dasselbe wie Nr. 17, aber für den DISK-Satz (Ladediskette `k5601_8x512`): das Rohgerät ist dort die LINEARE Folge der 512-B-Sektoren ab Zylinder 1
+    (Block n = Zylinder 1 + n/8, ID n mod 8 + 1), **608 Blöcke = 311 296 B** je Diskette (Kernelgrenze, auch auf 80 Zylindern — kein `_80`-Profil).  Profile `tar_mutos8k_8x512_mfm` / `…_leer` (Format `mutos_ss77`).
+    * **`unix_layout: mutos8k_512` für `type: tar`** (`FsProfile::mutos8k_linear`): `TarSpaceQuelle` nimmt `WegaSpaceDev` (linear ab `data_start`) statt `Mutos8kDev`; alles Weitere (Vorprobe vor den Dateisystemen, Satzbildung, Null-Datenbereich,
+      Zyl. 0 unberührt, `tarFormate`) ist dieselbe Strecke wie bei Nr. 17.  `formatEinheitlich` prüft bei Layout-Profilen NUR ab `data_start` (Zyl. 0 = 26×128 ist kein Teil des Stroms).
+    * **Eindeutigkeit mit dem UNIX-Dateisystem `mutos8k_8x512_mfm` derselben Geometrie:** ein `wega_mutos`-Treffer geht vor (`unix_fs` in der Vorprobe) — Block 1 ist dort ein Superblock, beim tar Dateiinhalt; DISK-ROOT/CC1/CC2/CMD und eine
+      frische UNIX-Diskette bleiben, was sie sind (Wächter `TarMutos8x512.AnlegenMitCreate…`, `cli_dt_mutos_8x512_erkennung*`).  Eine leer formatierte (E5-)Diskette wird nicht zum tar.
+    * **Gast-Verhalten:** Archiv über 608 Blöcke endet sauber mit `Tar: tape write error` (beim 26×128 hängt es); Sätze nur per `dd` wie Nr. 17; `tar` braucht eine **lauffähige `pwd`** — die von DISK-ROOT (1987) hängt, siehe `root_8x512`.
+      Eine Datei, die per Zeile `echo … >/dev/console; dd if=/dev/console` auf die nächste Diskette wartet, braucht beim Weitermachen eine Zeile mit einem Zeichen (`x` + Enter; ein nacktes Enter zählt nicht).
+    * **Der Swap-Fehler von `mutos_io` 8×512 (behoben, siehe `doc/design/39_mutos8000.md` A5c):** ohne ihn stirbt jeder Lauf, der einen vierten Prozess braucht, mit `panic: IO err in swap` — `tar cvf` rief ihn sofort aus.
+    Fixtures `mutos8000_tar_8x512_{einzel,satz1,satz2}.dmk` (von MUTOS selbst geschrieben; `.img` geht nicht — MUTOS hinterlässt Gap-Anhänge), Wächter `TarMutos8x512.*`, `py_disktool_tar_mutos`, `dt_tar_mutos_8x512_*.cli`,
+    Abnahme unter MUTOS `cli_mutos8000_tar_8x512_disktool_geschrieben`.
+
 **Platte (#11)**
 
 12. **Eine Fassade `PlattenVolume`** (Partitionen `md0…md4` als oberste Ordner einer virtuellen Wurzel);

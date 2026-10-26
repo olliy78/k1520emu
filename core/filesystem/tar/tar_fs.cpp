@@ -187,8 +187,12 @@ QuellBefund quelleBeurteilen(const std::vector<uint8_t>& d, uint64_t kapazitaet)
 using tar::kBlock;
 
 TarSpaceQuelle::TarSpaceQuelle(SectorSpace& s, const FsProfile* p) : s_(s) {
-    if (p && p->type == FsType::Tar && p->mutos8k_layout)
-        dev_ = std::make_unique<Mutos8kDev>(s, p->data_cyl, p->data_head);
+    if (p && p->type == FsType::Tar && p->mutos8k_layout) {
+        if (p->mutos8k_linear)       // 8x512: lineare Folge ab data_start (die Blocknummer des Treibers)
+            dev_ = std::make_unique<WegaSpaceDev>(s, p->data_cyl, p->data_head);
+        else                         // 26x128: 4 Sektoren je Block, Verschraenkung 2, Spurversatz 6
+            dev_ = std::make_unique<Mutos8kDev>(s, p->data_cyl, p->data_head);
+    }
 }
 
 TarSpaceQuelle::~TarSpaceQuelle() = default;

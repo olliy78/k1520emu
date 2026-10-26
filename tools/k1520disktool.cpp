@@ -1485,7 +1485,7 @@ int cmd_create(const Optionen& o) {
         const FsProfile* pr = dateisysteme().find(o.fs);
         if (!pr || pr->type != FsType::Tar || !pr->leer) {
             std::cerr << "Fehler: --format gilt beim Anlegen nur mit --fs tar720_leer (leere tar-Diskette; "
-                         "ebenso tar_mutos8k_26x128_mfm_leer, tar_mutos8k_26x128_fm_leer)\n";
+                         "ebenso tar_mutos8k_26x128_mfm_leer, tar_mutos8k_26x128_fm_leer, tar_mutos8k_8x512_mfm_leer)\n";
             return kFehler;
         }
         auto t = DiskVolume::tarDisketteNeu(o.rest[1], o.format, formate(), dateisysteme(), err);

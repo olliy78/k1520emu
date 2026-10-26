@@ -299,7 +299,8 @@ def test_bau_alle_kennt_genau_die_fertigen_disketten():
     """disks/a5120_16_MUTOS/ und tools/mutos8000/bau_alle.py muessen dieselben Disketten nennen."""
     sys.path.insert(0, str(TOOLS))
     import bau_alle
-    im_skript = {n for _, n in bau_alle.LADEDISKETTEN + bau_alle.WURZELN} | set(bau_alle.datendisketten())
+    im_skript = {n for _, n in bau_alle.LADEDISKETTEN + bau_alle.WURZELN} | set(bau_alle.datendisketten()) \
+        | set(bau_alle.DISK_SATZ)
     im_ordner = {p.name for p in FERTIG.glob("*.hfe")}
     assert im_skript == im_ordner
 
@@ -434,6 +435,8 @@ def test_patchliste_passt_auf_die_dateien_der_ladediskette_und_ist_nicht_doppelt
     # Block -> Sektor: pos = bn & 7 (996DH), Zylinder-1 = bn >> 3 (996CH); Sektorlaenge-Wort [0003H] = 4
     assert neu[0x750:0x756] == bytes.fromhex("7D E6 07 32 6D 99") and neu[0x19A:0x19F] == bytes.fromhex("3E 04 00 00 00")
     assert neu[0x728:0x72A] == bytes([0, 2]) and neu[0x7B4:0x7B6] == bytes([0, 2])
+    # halber Schluss-Sektor eines Swap-Auftrags (Rest 0100H): Uebertrag beendet den Auftrag (98C0: OR A / SBC / JR C)
+    assert neu[0x7C0:0x7C6] == bytes.fromhex("B7 ED 52 38 28 28")
     assert sum(a != b for a, b in zip(alt, neu)) <= 80          # nur die Patchstellen
     r = subprocess.run([sys.executable, "-I", str(TOOLS / "mutos_patch.py"), "io-8x512", str(aus), "-o", str(tmp_path / "x")],
                        capture_output=True, text=True)
@@ -462,7 +465,9 @@ def _erwartet(name, variante):
         # Offsets laut Entwurf 39 11.2 (Tabelle), unabhaengig von mutos_patch.io_off
         stellen = [(0x19A, "3A 03 00 F6 01", "3E 04 00 00 00"), (0x728, "80 00", "00 02"), (0x7B4, "80 00", "00 02"),
                    (0x750, "29 29 06 08 11 00 0D AF ED 52", "7D E6 07 32 6D 99 CB 3C CB 1D"),
-                   (0x820, "1A", "08"), (0x824, "1A", "08"), (0x83F, "3A 6B 99 57 3A 6D", "3A 6D 99 C3 55 99")]
+                   (0x820, "1A", "08"), (0x824, "1A", "08"), (0x83F, "3A 6B 99 57 3A 6D", "3A 6D 99 C3 55 99"),
+                   # halber Schluss-Sektor eines Swap-Auftrags: Uebertrag beendet den Auftrag (98C0)
+                   (0x7C0, "AF ED 52 7C B5 28", "B7 ED 52 38 28 28")]
         for off, alt, neu in stellen:
             alt, neu = bytes.fromhex(alt), bytes.fromhex(neu)
             assert d[off:off + len(alt)] == alt
@@ -540,3 +545,33 @@ def test_eingecheckte_ladediskette_traegt_genau_die_erwarteten_patches(tmp_path,
     assert len(namen) == 18
     for n in namen:
         assert (holen / n).read_bytes() == _erwartet(n, variante), (variante, n)
+
+
+# ── 8x512: Wurzel und Befehlsdiskette aus den TD0-Originalen (bau_8x512.py, Entwurf 39 A5c) ──────────────
+
+def _holen(abbild, ziel):
+    subprocess.run([str(DISKTOOL), "get", str(abbild), "*", "--to", str(ziel)], check=True, capture_output=True)
+    return {str(p.relative_to(ziel)): p.read_bytes() for p in ziel.rglob("*")
+            if p.is_file() and not p.name.endswith(".fileinfo") and not p.name.endswith("wega-dateiangaben.txt")}
+
+
+@braucht_disktool
+def test_8x512_wurzel_und_befehle_sind_die_td0_originale_mit_der_alten_pwd(tmp_path, monkeypatch):
+    monkeypatch.setenv("K1520_DISKTOOL", str(DISKTOOL))
+    sys.path.insert(0, str(TOOLS))
+    import bau_8x512
+    ziele = bau_8x512.bauen(str(tmp_path / "bau"), ausgabe=lambda *_: None)
+    with zipfile.ZipFile(DISKS / "a5120_mutos8000_best_cmd.zip") as z:
+        pwd86 = z.read("dateien/bin/pwd")
+    orig_root = _holen(DISKS / "a5120_mutos8000_root.td0", tmp_path / "o_root")
+    neu_root = _holen(ziele["root"], tmp_path / "n_root")
+    assert neu_root["bin/pwd"] == pwd86 and orig_root["bin/pwd"] != pwd86          # nur die pwd ist getauscht
+    assert {k: v for k, v in neu_root.items() if k != "bin/pwd"} == {k: v for k, v in orig_root.items() if k != "bin/pwd"}
+    orig_cmd = _holen(DISKS / "a5120_mutos8000_cmd.td0", tmp_path / "o_cmd")
+    assert _holen(ziele["cmd"], tmp_path / "n_cmd") == orig_cmd and len(orig_cmd) == 19
+    for z in ziele.values():
+        r = subprocess.run([str(DISKTOOL), "info", z], capture_output=True, text=True)
+        assert "mutos8k_8x512_mfm" in r.stdout
+    # die eingecheckten Disketten sind dieselben Inhalte
+    assert _holen(FERTIG / "a5120_mutos8000_root_8x512.hfe", tmp_path / "e_root") == neu_root
+    assert _holen(FERTIG / "a5120_mutos8000_cmd_8x512.hfe", tmp_path / "e_cmd") == orig_cmd

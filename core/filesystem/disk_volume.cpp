@@ -1846,10 +1846,13 @@ bool satzContainer(const std::string& pfad, std::string& ext_klein) {
 
 /// Ist die Geometrie einheitlich (ein Spurformat fuer jede Spur)?  Nur dann ist "gleiches Format
 /// fuer alle Abbilder" ohne Sonderfall eine einzige Kapazitaet.
-bool formatEinheitlich(const DiskFormat& f, std::string& warum) {
+/// @param ab_zyl  erste Spur, ab der geprueft wird: bei einem tar-Profil mit Layout (MUTOS-Rohgeraet) zaehlt
+///                nur der Bereich ab data_start - Zylinder 0 (26x128-Etiketten/Ladespur) gehoert nicht zum Strom.
+bool formatEinheitlich(const DiskFormat& f, std::string& warum, uint8_t ab_zyl = 0) {
     if (f.tracks.empty()) { warum = "das Format hat keine Spuren"; return false; }
-    const TrackFormat& t0 = f.tracks.front();
-    for (uint8_t c = 0; c < f.numCylinders(); ++c)
+    const TrackFormat* erste = f.findTrack(ab_zyl, 0);
+    const TrackFormat& t0 = erste ? *erste : f.tracks.front();
+    for (uint8_t c = ab_zyl; c < f.numCylinders(); ++c)
         for (uint8_t h = 0; h < f.numHeads(); ++h) {
             const TrackFormat* t = f.findTrack(c, h);
             if (!t) { warum = "Spur " + std::to_string(c) + "/" + std::to_string(h) + " fehlt"; return false; }
@@ -1917,7 +1920,7 @@ std::unique_ptr<DiskVolume> DiskVolume::tarSatzNeu(const std::string& format,
     const FsProfile* prof = nullptr;
     if (!tarZielAufloesen(format, formats, fs_cat, fmt, prof, err)) return nullptr;
     std::string warum;
-    if (!formatEinheitlich(*fmt, warum)) {
+    if (!formatEinheitlich(*fmt, warum, prof->mutos8k_layout ? prof->data_cyl : 0)) {
         err = "Format '" + format + "' ist fuer einen tar-Satz nicht geeignet: " + warum;
         return nullptr;
     }
@@ -2230,7 +2233,7 @@ std::vector<TarFormatInfo> DiskVolume::tarFormate(const FormatCatalog& formats, 
         if (p.type != FsType::Tar || p.leer || !p.mutos8k_layout) continue;
         const DiskFormat* f = formats.find(p.format);
         std::string warum;
-        if (!f || !formatEinheitlich(*f, warum)) continue;
+        if (!f || !formatEinheitlich(*f, warum, p.data_cyl)) continue;
         DiskMedium leer(f->numCylinders(), f->numHeads(), f->predominantEncoding());
         SectorSpace raum(leer, *f);
         TarFormatInfo i;
@@ -4278,7 +4281,13 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
             // wie `sa.mkfs 1440` — Verschraenkung 1/72 wie auf den Lieferdisketten.
             // MUTOS (Blockraum ab Zylinder 1) traegt 3/500, wie CMD/CC1/CC2.
             const bool mutos = profil->mutos1700_layout || profil->data_cyl != 0;
-            auto w = WegaFileSystem::format(unixGeraet(*v.space, *profil), label, err,
+            auto geraet = unixGeraet(*v.space, *profil);
+            // MUTOS 8000: der Kernel lehnt Block >= 608 (76 Zylinder x 8) ab (rkstrategy, Entwurf 39 11.2) -
+            // auf einer 80-Zylinder-Diskette (632 Bloecke) waere alles dahinter fuer MUTOS nicht erreichbar.
+            // Ohne ausdrueckliches `--blocks` bekommt das Dateisystem deshalb hoechstens 608 Bloecke.
+            if (unix_bloecke == 0 && profil->data_cyl == 1 && !profil->mutos1700_layout && geraet->blocks() > 608)
+                unix_bloecke = 608;
+            auto w = WegaFileSystem::format(std::move(geraet), label, err,
                 unix_bloecke, mutos ? 3 : 1, mutos ? 500 : 72, 0, unix_inodes);
             if (!w) return nullptr;
             v.fs = std::move(w);

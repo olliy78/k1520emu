@@ -126,11 +126,12 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
     if (const yaml::Node* n = node.find("unix_layout")) {
         if (out.type == FsType::Tar) {
             // tar: nur die MUTOS-Blockabbildung (Rohgeraet /dev/rrkN, Entwurf 39 §4.6.3)
-            if (n->scalar != "mutos8k") {
-                why = "'unix_layout': '" + n->scalar + "' - fuer type: tar erlaubt ist nur mutos8k";
+            if (n->scalar != "mutos8k" && n->scalar != "mutos8k_512") {
+                why = "'unix_layout': '" + n->scalar + "' - fuer type: tar erlaubt sind mutos8k | mutos8k_512";
                 return false;
             }
             out.mutos8k_layout = true;
+            out.mutos8k_linear = n->scalar == "mutos8k_512";
         } else if (out.type != FsType::WegaMutos) {
             issues.push_back(where + ": 'unix_layout' gilt nur fuer type: wega_mutos - ignoriert");
         } else if (n->scalar == "mutos1700") {

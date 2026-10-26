@@ -1147,6 +1147,11 @@ Vier Anwender-Disketten (ROOT, CMD, CC1, CC2; `.TD0` und `.dmk`) plus die UDOS-L
    `tar_mutos8k_26x128_mfm`/`tar_mutos8k_26x128_fm` (+ `_leer`) erkennen, lesen und schreiben das (Satz ueber N Disketten zu 494 Bloecken); Einzelheiten und Waechter:
    `doc/merkposten/tar_satz.md` Nr. 17.  `unix_layout: mutos8k` gilt damit auch fuer `type: tar`.
 
+8. **8×512: Gegenprobe, Blockgrenze, Swap (2026-10-26, #22, Entwurf 39 A5c).**  Das UNIX-Dateisystem `mutos8k_8x512_mfm` ist am Emulator gegengeprüft (DiskTool schreibt → MUTOS liest und umgekehrt, `fsck` sauber; Fixture
+   `mutos8000_8x512_geschrieben.td0`, Wächter `MutosFs.M8x512_*`).  **`create` ohne `--blocks` begrenzt auf 608 Blöcke** (Kernel lehnt Block ≥ 608 ab; auf `mutos8k_8x512_mfm_80` wären es sonst 632).  tar im selben Layout:
+   `tar_mutos8k_8x512_mfm` (`doc/merkposten/tar_satz.md` Nr. 18).  **Der 8×512-`mutos_io`-Patch hatte einen Fehler bei Swap-Aufträgen, die kein Vielfaches von 512 B sind** (behoben, achte Patchstelle `98C0`; ohne ihn `panic: IO err in swap`).
+   **`…_cmd.td0` (83 Spuren) lässt sich in einem K5601 nicht einlegen, DISK-ROOT trägt die hängende `pwd` von 1987:** `tools/mutos8000/bau_8x512.py` baut `…_root_8x512.hfe` und `…_cmd_8x512.hfe` (Wächter `test_8x512_wurzel_und_befehle_…`).
+
 ## MUTOS 1700 (A7100) — dieselbe Klasse, zweite Familie (2026-10-23)
 
 Ordner `robotron/MUTOS/mutos1700/`: 12 TeleDisk-Abbilder.  **Acht sind `tar720`** (DOC1/2, MAN1/2, ROOT2, SYS1, USER1/2 —

@@ -106,6 +106,8 @@ TEST(FsCatalog, ProfilnamenSindEinStabilerVertrag) {
         // … und tar im MUTOS-8000-Layout (Rohgeraet /dev/rrkN, Entwurf 39): MFM (K5601) und FM (MF3200),
         // je mit der leeren Fassung.  Erkennung VOR den echten Dateisystemen (disk_volume.cpp).
         "tar_mutos8k_26x128_mfm", "tar_mutos8k_26x128_mfm_leer", "tar_mutos8k_26x128_fm", "tar_mutos8k_26x128_fm_leer",
+        // … und im 8x512-Zuschnitt (DISK-Satz, lineares Rohgeraet ab Zylinder 1, 608 Bloecke; Entwurf 39 A5c).
+        "tar_mutos8k_8x512_mfm", "tar_mutos8k_8x512_mfm_leer",
         // BCU 880: Arbeitsdiskette „ohne SYL“ (Name, `detect: false`) und die Startdiskette
         // „SYL auf Spur 1“ (erkannt am Lader; `nur_boot`).
         "bcu880", "bcu880_syl", "bcu880_kombi", "bcu880_kombi80", "bcu880_80",

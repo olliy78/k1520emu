@@ -1046,6 +1046,16 @@ k1520disktool tar-satz mutos1.hfe mutos2.hfe --format tar_mutos8k_26x128_mfm   #
 Unter MUTOS: `tar tvf /dev/rrk0`, `tar xvf /dev/rrk0`; ein Satz ueber `(dd if=/dev/rrk0 bs=512 count=494; <Diskette tauschen>; dd …) | tar xvf -`.  Ein `.img` ist ohne Angabe MFM.
 Einzelheiten, Fallen (`tape read error` am Mediumende, `sync` vor dem Tausch): `doc/merkposten/tar_satz.md` Nr. 17, `doc/design/39_mutos8000.md` A5b.
 
+**8x512 (DISK-Satz 1987, Ladediskette `…_k5601_8x512`): `tar_mutos8k_8x512_mfm`** (Format `mutos_ss77`, 5¼″ MFM) mit `…_leer`.  Dort rechnet der Treiber LINEAR: Block n = Zylinder 1 + n/8,
+Sektor-ID n mod 8 + 1, 76 Zylinder = **608 Blöcke = 311 296 B** je Diskette (der Kernel lehnt Block ≥ 608 ab, auch auf einer 80-Zylinder-Diskette).  Aufrufe wie oben mit dem anderen Namen:
+```
+k1520disktool create leer.hfe --fs tar_mutos8k_8x512_mfm_leer
+k1520disktool tar-satz-neu --format tar_mutos8k_8x512_mfm satz.hfe --put a.bin --put b.bin    # -> satz1.hfe, satz2.hfe, …  (je 608 Bloecke)
+k1520disktool tar-satz mutos1.hfe mutos2.hfe -l               # Layout wird am ersten Abbild erkannt (auch .img/.td0/.imd, nicht .cqm: gemischte Geometrie)
+```
+Unter MUTOS (8x512-Ladediskette): `tar tvf /dev/rrk0`, ein Satz `(dd if=/dev/rrk0 bs=512 count=608; <tauschen>; dd …) | tar xvf -`.  `tar` braucht dort die lauffähige `pwd` (die der DISK-ROOT-TD0 hängt:
+`bau_8x512.py` → `…_root_8x512.hfe`).  Das UNIX-Dateisystem derselben Geometrie ist `mutos8k_8x512_mfm` (`create` begrenzt es auf 608 Blöcke, auch auf `mutos8k_8x512_mfm_80`).  `doc/design/39_mutos8000.md` A5c.
+
 ### `tar-export`, `tar-put` und die leere tar-Diskette `tar720_leer`
 
 ```

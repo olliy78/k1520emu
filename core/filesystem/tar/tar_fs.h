@@ -35,7 +35,7 @@
 #include <string>
 #include <vector>
 
-class Mutos8kDev;
+class WegaBlockDev;
 
 namespace tar {
 
@@ -139,7 +139,7 @@ public:
     bool mutos() const { return dev_ != nullptr; }
 private:
     SectorSpace& s_;
-    std::unique_ptr<Mutos8kDev> dev_;   ///< nur beim MUTOS-Layout
+    std::unique_ptr<WegaBlockDev> dev_;   ///< nur beim MUTOS-Layout (Mutos8kDev bzw. lineares WegaSpaceDev)
 };
 
 /// @brief Strom im Speicher — der Mehrdisketten-Satz (die Strome hintereinander).
