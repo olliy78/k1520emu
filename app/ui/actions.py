@@ -89,6 +89,12 @@ _SPEC: List[Tuple] = [
      "vorher INIT eingeben, gestartet wird mit dem EGOS-Kommando des Programms",
      "_speicherabzug_laden", False),
 
+    # PCMC-Gegenstelle (nur MC80.30, Issue #24): rastend; macht die IFSS zum Telnet-Server und
+    # zeigt den Kasten „PCMC“.  KEIN Kuerzel (die Kuerzeltabelle des Handbuchs ist ein Vertrag).
+    ("pcmc", "&PCMC-Gegenstelle", "serial", None,
+     "Die PC-Gegenstelle zum PCMC-Programm des MC80 ein- oder ausschalten (Datenaustausch über "
+     "die IFSS; braucht das EPROM „mit PCMC-Erweiterung“)", "_pcmc_umschalten", True),
+
     # Bildschirminhalt des Originalterminals als reiner Text in die Zwischenablage (auch im
     # Kontextmenue des Bildes).  KEIN Kuerzel: ^C gehoert dem Gast.
     ("text_kopieren", "Bildschirminhalt als &Text kopieren", None, None,
@@ -193,6 +199,7 @@ KURZ = {
     "p8000emu": "P8000",
     "mc80emu": "MC80",
     "speicherabzug_laden": "Abzug laden",
+    "pcmc": "PCMC",
     "stand_speichern": "Stand sichern",
     "stand_laden": "Stand laden",
     "verbindung": "Verbindung",
@@ -227,6 +234,7 @@ NUR_FUER = {
     "verbindung": ("p8000",),
     "text_kopieren": ("p8000", "mc80"),
     "speicherabzug_laden": ("mc80",),    # Speicherabzug laden (AP M6)
+    "pcmc": ("mc80",),                   # PCMC-Gegenstelle (Issue #24)
     # Die jeweils ANDEREN Emulatoren.
     "k8915emu": ("a5120", "prg710", "pc1715", "p8000", "mc80"),
     "a5120emu": ("k8915", "prg710", "pc1715", "p8000", "mc80"),
@@ -259,7 +267,7 @@ REIHENFOLGE: List = [
     None,
     "einlegen", "auswerfen",
     None,
-    "stand_speichern", "stand_laden", "verbindung", "text_kopieren", "speicherabzug_laden",
+    "stand_speichern", "stand_laden", "verbindung", "text_kopieren", "speicherabzug_laden", "pcmc",
     None,
     "dock_drives", "dock_settings", "dock_screen", "dock_keyboard", "dock_eprom",
     None,
@@ -300,7 +308,7 @@ STANDARD_MC80: List = [
     None,
     "power", "reset",
     None,
-    "speicherabzug_laden",
+    "speicherabzug_laden", "pcmc",
     None,
     "dock_settings", "dock_keyboard",
     None,

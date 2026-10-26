@@ -1175,7 +1175,7 @@ class K1520Emulator:
                  em: Optional[str] = None, raf: Optional[str] = None,
                  ptape: bool = False, tape: bool = False, zeichensatz: str = "deutsch",
                  tastatur: Optional[str] = None, p8000: Optional[dict] = None,
-                 ausfuehrung: Optional[str] = None, spe=1, laderom: Optional[str] = None,
+                 ausfuehrung: Optional[str] = None, spe=1, pcmc=False, laderom: Optional[str] = None,
                  konfig: Optional[dict] = None, aup: bool = False,
                  aup_sonder: bool = False):
         """Initialize emulator instance.
@@ -1227,6 +1227,8 @@ class K1520Emulator:
                 Bei der Ausführung ``"kmbg"`` steckt sie ohnehin (dann ohne Wirkung).
             spe: nur MC80 (``"mc80"`` = MC80.30) — Zahl der
                 Speichererweiterungen SPE 2, ``1`` (Vorgabe) oder ``2`` (auch als Text).
+            pcmc: nur MC80.30 — das EPROM „mit PCMC-Erweiterung“ auf 2800H (Datenaustausch
+                PC ↔ MC80 über die IFSS, Issue #24); ``True``/``"1"`` stecken es.
             konfig: nur A5120 — Einzeloptionen als Wörterbuch (Entwurf 33), Schlüssel
                 ``ram`` (``k3526`` | ``k3525_1``/``_2``/``_4``), ``bildschirm`` (``k7024`` |
                 ``k7023`` | ``beide``), ``schalter`` (Anfangsstellung bei ``beide``),
@@ -1334,7 +1336,11 @@ class K1520Emulator:
                 handle = _lib.k1520_create_p8000_terminal(",".join(teile).encode("utf-8"))
             elif machine in MC80_VARIANTEN:
                 # Der MC80.2x kennt keinen Konfigurationstext (k1520_create_mc80 lehnt ihn ab).
-                konfig = None if machine in MC80_2X else f"spe={int(spe)}".encode("ascii")
+                if machine in MC80_2X:
+                    konfig = None
+                else:
+                    an = pcmc in (True, 1, "1")
+                    konfig = f"spe={int(spe)},pcmc={int(an)}".encode("ascii")
                 handle = _lib.k1520_create_mc80(MC80_VARIANTEN[machine], konfig)
             elif machine in PC1715_MODELLE:
                 names = (self._drive_types or [])[:4]

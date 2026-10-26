@@ -168,6 +168,7 @@ k1520_add_test(band_format    SRC peripherals/test_band_format.cpp
 k1520_add_test(kassette_medium      SRC peripherals/test_kassette_medium.cpp      LIBS k1520_kassette LABELS "${_lbl}")
 k1520_add_test(k52_codec            SRC peripherals/test_k52_codec.cpp            LIBS k1520_kassette LABELS "${_lbl}")
 k1520_add_test(kassetten_laufwerk   SRC peripherals/test_kassetten_laufwerk.cpp   LIBS k1520_kassette LABELS "${_lbl}")
+k1520_add_test(programmdatei        SRC peripherals/test_programmdatei.cpp        LIBS k1520_kassette LABELS "${_lbl}")
 k1520_add_test(track_codec    SRC peripherals/test_track_codec.cpp    LIBS k1520_floppy2 LABELS "${_lbl}")
 k1520_add_test(bit_codec      SRC peripherals/test_bit_codec.cpp      LIBS k1520_floppy2 LABELS "${_lbl}")
 # Zeichenbare Sicht auf eine Spur (Diskeditor, §19)

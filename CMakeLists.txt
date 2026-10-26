@@ -497,6 +497,7 @@ if(BUILD_K1520)
     add_library(k1520_kassette STATIC
         core/peripherals/kassette/kassetten_medium.cpp
         core/peripherals/kassette/k52_codec.cpp
+        core/peripherals/kassette/programmdatei.cpp
         core/peripherals/kassette/kassetten_laufwerk.cpp)
     target_include_directories(k1520_kassette PUBLIC ${CMAKE_SOURCE_DIR})
     add_library(k1520_k6022 STATIC core/cards/k6022/k6022.cpp)

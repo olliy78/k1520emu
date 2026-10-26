@@ -159,8 +159,8 @@ def test_modellwahl_gesperrte_modelle_und_spe(qapp, konfig_ordner):
     # .31 und .33 gibt es nicht mehr: alte Konfigurationen landen beim .30
     assert p.modell_normalisieren("mc80-33") == p.modell_normalisieren("mc80-31") == "mc80"
     assert not p.tape_wahl                                  # Kassette fest eingebaut
-    assert p.kern_parameter("mc80", {"spe": "2"}) == {"spe": "2"}
-    assert p.kern_parameter("mc80", {}) == {"spe": "1"}
+    assert p.kern_parameter("mc80", {"spe": "2"}) == {"spe": "2", "pcmc": "0"}
+    assert p.kern_parameter("mc80", {}) == {"spe": "1", "pcmc": "0"}
 
     w = _fenster(qapp)
     try:
@@ -182,7 +182,7 @@ def test_modellwahl_gesperrte_modelle_und_spe(qapp, konfig_ordner):
         assert w.drives_dock.isHidden()           # auch nach dem Neuaufbau
         w._on_hardware_selected("spe", "2")
         qapp.processEvents()
-        assert w._hardware == {"spe": "2"}
+        assert w._hardware == {"spe": "2", "pcmc": "0"}
         assert w.emulator.machine == "mc80"
         w._autosave_now()
         cfg = config_io.load_config(str(konfig_ordner / "mc80emu.yaml"))
@@ -329,7 +329,7 @@ def test_kassette_folgt_der_karte_und_legt_kompaktkassetten_an(qapp, konfig_ordn
             w._on_model_selected(modell)
             qapp.processEvents()
         assert w.emulator.machine == modell
-        # fest eingebaut: Karte da, Kasten sichtbar, kein Kästchen, nur Laufwerk 1
+        # fest eingebaut: Karte da, Kasten sichtbar, kein Kaestchen, nur Laufwerk 1
         assert w.settings_widget.tape_box.isHidden()
         assert w.emulator.tape_installed() and w.kassette_dock.isVisible()
         assert w.emulator.tape_status(1) is None

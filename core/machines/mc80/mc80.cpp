@@ -41,7 +41,7 @@ Mc80Machine::Mc80Machine(const Config& cfg)
 {
     zve_.attachToBus(bus_);
     for (int i = 0; i < cfg_.spe_karten; ++i) {
-        auto c = i == 0 ? Mc80Spe2::Config::mc8030()
+        auto c = i == 0 ? (cfg_.pcmc ? Mc80Spe2::Config::mc8030Pcmc() : Mc80Spe2::Config::mc8030())
                         : Mc80Spe2::Config::nurRam(static_cast<uint8_t>(1u << i));
         auto karte = std::make_unique<Mc80Spe2>(c);
         karte->attachToBus(bus_);

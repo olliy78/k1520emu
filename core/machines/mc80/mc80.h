@@ -42,6 +42,8 @@ public:
         Variante variante = Variante::Mc8030;
         /// Zahl der SPE 2 (1 oder 2): erste mit ROM und Segment 01H, zweite nur RAM, Segment 02H.
         int spe_karten = 1;
+        /// EPROM „mit PCMC-Erweiterung“ (2800H der ersten SPE 2): Menuepunkt PCMC im EGOS (Issue #24).
+        bool pcmc = false;
         /// Vorbelegung der dRAMs beim Einschalten.
         uint8_t ram_fill = 0x00;
     };

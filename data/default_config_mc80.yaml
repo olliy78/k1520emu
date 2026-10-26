@@ -67,6 +67,7 @@ window:
   - reset
   - ''
   - speicherabzug_laden
+  - pcmc
   - ''
   - dock_settings
   - dock_keyboard

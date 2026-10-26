@@ -364,6 +364,11 @@ K1520Handle k1520_create_mc80(int variante, const char* konfig) {
         } else if (key == "spe") {
             g_init_error = "MC80: spe = " + val + " unbekannt (1 | 2)";
             return nullptr;
+        } else if (key == "pcmc" && (val == "0" || val == "1")) {
+            cfg.pcmc = val == "1";
+        } else if (key == "pcmc") {
+            g_init_error = "MC80: pcmc = " + val + " unbekannt (0 | 1)";
+            return nullptr;
         } else {
             g_init_error = "MC80: unbekannter Schluessel '" + key + "'";
             return nullptr;

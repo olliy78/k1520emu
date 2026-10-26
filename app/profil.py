@@ -803,7 +803,7 @@ MC80 = Programmprofil(
     modelle=(("mc80", "mc80", None, "MC80.30", "mc80"),
              # MC80.2x (AP M11/M12): eigene Klasse, Bild 528 × 256 (Oszilloskop-Darstellung),
              # Matrixtastatur an der DPL, Kassette (MBI) fest eingebaut.  .21 und .22 sind im
-             # Kern gleich (die verschiedenen PFS-Sätze passen nicht zum BSYS, Merkposten Nr. 30).
+             # Kern gleich (die verschiedenen PFS-Saetze passen nicht zum BSYS, Merkposten Nr. 30).
              ("mc80-21", "mc80-21", None, "MC80.21 (Oszilloskop-Bild, BSYS)", "mc80-2x"),
              ("mc80-22", "mc80-22", None, "MC80.22 (Oszilloskop-Bild, BSYS)", "mc80-2x")),
     modell_alt=(("mc80-31", "mc80"), ("mc80-33", "mc80")),
@@ -812,6 +812,12 @@ MC80 = Programmprofil(
          "Zahl der Speicherkarten SPE 2: die erste trägt ROM und RAM-Segment 01H, eine zweite "
          "nur RAM (Segment 02H).  Ein Wechsel startet die Maschine kalt.",
          (("1", "eine SPE 2"), ("2", "zwei SPE 2")),
+         ("mc80",)),
+        ("pcmc", "PCMC-Erweiterung:",
+         "Das EPROM „mit PCMC-Erweiterung“ auf 2800H (3. Fassung der SPE 2): im EGOS gibt es dann "
+         "das Programm PCMC (Datenaustausch PC ↔ MC80 über die IFSS).  Die Gegenstelle am PC "
+         "schaltet *Maschine ▸ PCMC-Gegenstelle* ein.  Ein Wechsel startet die Maschine kalt.",
+         (("0", "ohne"), ("1", "mit PCMC-EPROM (2800H)")),
          ("mc80",)),
     ),
     modell_tipp=("MC80.30 (EGOS, Grafikbild) oder MC80.21/.22 "

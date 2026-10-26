@@ -81,3 +81,5 @@ Prüfsummen = MAME-Liste, wo dort geführt.
 | `segmente/seg_20_4000-h.bin` | 4096 | ecf38bb2 |
 | `segmente/testbild-0000-k7229.25-2.bin` | 2048 | a976d803 |
 | `segmente/testbild-0000-k7229.bin` | 2048 | a976d803 |
+| `pcmc/pcmc-2800.bin` | 1024 | PCMC-Erweiterung (EPROM 2800H, KW-WILLISOFT 2007; Quelle `pcmc/PCMC_ROM_2800.ASM`, Beschreibung `doc/mc80/pcmc.md`) |
+

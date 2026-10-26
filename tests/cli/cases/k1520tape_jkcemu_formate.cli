@@ -1,0 +1,14 @@
+# k1520tape put/get/bootband mit JKCEMU-Programmdateien: Kopf wird abgestreift bzw. angelegt.
+tool:   k1520tape
+tmpfile band.k52:
+tmpfile aus.z80:
+file prog.hex:
+  :0404000053594C5AA6
+  :00000001FF
+setup_run: create %band.k52%
+setup_run: put %band.k52% %prog.hex% --block 4
+setup_run: get %band.k52% %aus.z80% --as headersave --addr 0x400 --name PROG
+run:    ls %band.k52% --side A
+expect: Seite A: 2 Bloecke
+expect: Bandmarke
+exit:   0

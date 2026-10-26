@@ -27,3 +27,5 @@ Das gescannte **MC80.2x-Nutzerhandbuch** (43 MB, überwiegend Seitenbilder; Quel
 bei Zweifeln dort nachsehen — Seiten als Bild lesen, die Textebene ist fehlerhaft.
 
 Funde von ycdt.net (Sondertasten der 31E, Spielstart, nicht verwertbare Scan-Listings): `ycdt_funde.md`; Tastaturprotokoll aus dem Forum: `tastatur_forum.md`.
+
+PCMC (Datenaustausch PC <-> MC80 ueber die IFSS, Issue #24): `pcmc.md`.
