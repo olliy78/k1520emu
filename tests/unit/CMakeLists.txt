@@ -266,6 +266,10 @@ k1520_add_test(tar_satz      SRC filesystem/test_tar_satz.cpp
 k1520_add_test(tar_neu       SRC filesystem/test_tar_neu.cpp
                              LIBS k1520_fs LABELS "${_lbl}"
                              DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
+# tar im MUTOS-8000-Layout (Rohgeraet /dev/rrkN, Entwurf 39): Lesen echter MUTOS-Disketten, Schreiben, Gegenprobe
+k1520_add_test(tar_mutos     SRC filesystem/test_tar_mutos.cpp
+                             LIBS k1520_fs k1520_testsupport LABELS "${_lbl}"
+                             DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
 k1520_add_test(disk_volume   SRC filesystem/test_disk_volume.cpp
                              LIBS k1520_fs LABELS "${_lbl}"
                              DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")

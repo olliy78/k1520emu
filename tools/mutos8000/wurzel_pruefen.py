@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unabhaengige Pruefung einer Wurzeldiskette (Entwurf 39, 4.8): Baum eines heilen mutos8k_fm-Abbilds
+"""Unabhaengige Pruefung einer Wurzeldiskette (Entwurf 39, 4.8): Baum eines heilen mutos8k_26x128_fm-Abbilds
 (.td0/.imd; .hfe vorher mit `k1520disktool save-as x.hfe x.td0` umwandeln) byteweise gegen einen
 Quellbaum.  Eigener Leser (Formel 4.6.3), kein DiskTool-Code.  Exit 1 bei Abweichung."""
 import argparse

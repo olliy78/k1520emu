@@ -446,7 +446,7 @@ namespace {
 
 /// Die Formatliste fuer neue tar-Disketten: einmal aus dem (unveraenderlichen) Katalog gebildet.
 const std::vector<TarFormatInfo>& tarFormateListe() {
-    static const std::vector<TarFormatInfo> l = DiskVolume::tarFormate(kataloge().formate);
+    static const std::vector<TarFormatInfo> l = DiskVolume::tarFormate(kataloge().formate, kataloge().dateisysteme);
     return l;
 }
 

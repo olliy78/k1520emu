@@ -1,0 +1,10 @@
+# tar-satz-neu im MUTOS-Layout: eine 813-KiB-Datei braucht vier Disketten zu 494 Bloecken (252928 Byte).
+tool:   k1520disktool
+tmpfile m.hfe:
+run:    tar-satz-neu --format tar_mutos8k_26x128_mfm %m.hfe% --put %CLI_DIR%/../fixtures/disks/cpa_cpa780_combo5zoll_noclock.img=gross.img
+expect: Satz: 4 Abbild
+expect: 252928 Byte je Abbild
+expect: m4.hfe
+expect: gespeichert: 4 Abbild
+forbid: Fehler
+exit:   0
