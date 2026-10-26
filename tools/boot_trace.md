@@ -41,7 +41,7 @@ boot_trace [DISK] [optionen]
 | `--k3521 <adr\|aus>` / `--k3521-memdi bus\|memdi1\|memdi2` / `--k3521-datei <pfad>` | A5120: akkugepuffertes 4-KB-RAM K3521.30 an der 4-KB-Adresse (Hex, Raster 0..f000), /MEMDI-Quelle (nur mit `--k3521`), Ablagedatei genau 4096 B (nur mit `--k3521`); Merkposten `a5130_k8924` Nr. 16/17 |
 | `--aup` / `--aup-alpha led\|ohne\|mit` / `--aup-sonder` | A5120: AUP 062-8531 (Tastaturteil auf E/A 40H–43H) stecken; `--aup-alpha` = Annahme A3 (nur mit `--aup`); `--aup-sonder` steckt sie MIT Sonderschnittstelle (CTC B0H–B3H, SIO B4H–B7H, Kanal B nach außen, Kette hinter der K8025), impliziert `--aup`. Merkposten `a5130_k8924` Nr. 18/19 |
 | `--tape <k52>` / `--tape2 <k52>` / `--tape-card` | Kassettenkarte K5020 (zwei K5200; A5120/PRG 710/MC80 30H, K8915 D0H) vor dem ersten Lauf stecken; `.k52` an Gerät 1 bzw. 2 binden (fehlende Datei = leere Kassette), `--tape-card` nur die Karte (`doc/merkposten/kassette.md`) |
-| `--machine mc80\|mc80-30\|mc80-31` / `--spe 1\|2` | MC80 (.30/.31) mit 1 oder 2 SPE 2; `-c` 60 Mio., Stillstand 8 Mio. Takte (§9b) |
+| `--machine mc80\|mc80-30` / `--spe 1\|2` | MC80.30 mit 1 oder 2 SPE 2; `-c` 60 Mio., Stillstand 8 Mio. Takte (§9b) |
 | `--machine mc80-21\|mc80-22` | MC80.21/.22: DPL-Bild 8 × 32, Ziel = BSYS-Menü, Stillstand 4 Mio. Takte (§9c) |
 | `--until <cond>` | **anhalten, sobald `<cond>` gilt** (läuft über den Boot-Handoff hinaus bis zur Bedingung oder zum `-c`-Limit), dann Report (§3) |
 | `--coverage [file]` | **Code-Coverage**: ausgeführte ZVE1-Byte-Ranges + ZVE2-Adresszahl; mit `file` zusätzlich CSV `cpu,pc,hits` (§4) |
@@ -358,16 +358,16 @@ tools/dev.sh tool boot_trace --machine p8000 --quiet --json --keys '<CR><CR>' \
   (`tools/k1520dbg.md` §11d) — `boot_trace` lokalisiert, `k1520dbg` seziert.
 - Wächter: `bt_p8000_banner.cli`, `bt_p8000_tastatur.cli`, `bt_p8000_16_monitor.cli`.
 
-## 9b. MC80 (`--machine mc80|mc80-30|mc80-31 [--spe 1|2]`)
+## 9b. MC80 (`--machine mc80|mc80-30 [--spe 1|2]`)
 
 AP M8 (`doc/design/32_arbeitspakete_kassette_a5120alt_mc80.md`, Entwurf 31). Eine CPU (ZVE, EGOS-ROM
 0000H–1FFFH), kein Laufwerk, Bild = VIS 2a als Text (25 × 80, Mustervergleich `Mc80Machine::screenChar`).
-`mc80` = `mc80-30` = MC80.30, `mc80-31` = MC80.31 (mit den EPROM-Segmenten 10H/20H); `--spe` = Zahl der
+`mc80` = `mc80-30` = MC80.30 (mit den EPROM-Segmenten 10H/20H; kein .31 mehr); `--spe` = Zahl der
 SPE 2 (Vorgabe 1; die zweite hat nur RAM, Segment 02H). Kein Datenträger-Argument.
 
 ```sh
 tools/dev.sh tool boot_trace --machine mc80 --quiet --json                       # Exit 0 = Prompt
-tools/dev.sh tool boot_trace --machine mc80-31 --spe 2 --events /dev/null -l doc/mc80/egos.prn
+tools/dev.sh tool boot_trace --machine mc80 --spe 2 --events /dev/null -l doc/mc80/egos.prn
 tools/dev.sh tool boot_trace --machine mc80 --keys 'init<ET>' --until 'screen ~ ">INIT"'
 ```
 
@@ -382,13 +382,13 @@ tools/dev.sh tool boot_trace --machine mc80 --keys 'init<ET>' --until 'screen ~ 
   `<ET>` = Return, Grossbuchstaben mit Umschalt. Blockweise wie beim PC 1715 (ein Block endet mit `<ET>`
   und wird getippt, sobald die Maschine steht); je Taste 60 000 Takte (Tastatur liefert im
   Zeichentakt, 20 ms je Taste), danach 100 000 Nachlauf. Während der Eingabe zeigt Zeile 24 `>INIT`.
-- **`--tape-card`/`--tape`/`--tape2`**: K5020 an 30H–37H (am .31 mit K5200, am .30 umgebaut mit LW 1200 und
+- **`--tape-card`/`--tape`/`--tape2`**: K5020 an 30H–37H (seit 2026-10-26 fest eingebaut, umgebaut mit LW 1200 und
   Takt aus ASP-CTC K2; M7, `doc/mc80/kassette.md`). Ohne die Karte laufen die EGOS-Schreibzugriffe auf
   30H–37H ins Leere — sie stehen trotzdem im Ereignisprotokoll.
 - **Falle `CATA`**: läuft EGOS die ROM-Kette über die leeren SPE-Fassungen, ändert sich lange kein Bild
   und kein beobachteter Port → `Stillstand: JA`, aber `Prompt: nein`. Für solche Kommandos `--stall`
   hochsetzen oder `--until` nutzen.
-- Zusammenfassung: `Segment: 85H=.. RAM-Schutz ..`, JSON `{"machine":"mc80-30"|"mc80-31","seg":"0x01",…}`.
+- Zusammenfassung: `Segment: 85H=.. RAM-Schutz ..`, JSON `{"machine":"mc80-30","seg":"0x01",…}`.
   Weiter wie sonst: `--csv`, `--itrace`, `--coverage`, `-w/-W`, `--watch`, `--watchio`, `-d`, `--events[-cap]`,
   `-l doc/mc80/egos.prn` (Listing des EGOS-ROM, `tools/gen_mc80_egos_prn.py`).
 - Wächter: `bt_mc80_prompt.cli`, `bt_mc80_31_spe2.cli`, `bt_mc80_tastatur.cli`, `bt_mc80_tape.cli`.

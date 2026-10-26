@@ -86,9 +86,8 @@ TEST(Mc80Maschine, ResetFaehrtEgosErneut) {
     EXPECT_TRUE(l.besucht.test(0x07D4));
 }
 
-TEST(Mc80Maschine, Variante31UndZweiSpeKarten) {
+TEST(Mc80Maschine, ZweiSpeKarten) {
     Mc80Machine::Config c;
-    c.variante = Mc80Machine::Config::Variante::Mc8031;
     c.spe_karten = 2;
     Lauf l(c);
     EXPECT_EQ(l.m->speKarten(), 2);
@@ -96,9 +95,9 @@ TEST(Mc80Maschine, Variante31UndZweiSpeKarten) {
     EXPECT_TRUE(l.besucht.test(0x07D4));
 }
 
-TEST(Mc80Maschine, NochNichtNachgebildeteVariantenWerdenAbgelehnt) {
+TEST(Mc80Maschine, DieMc80_2xSindEineEigeneKlasseUndWerdenAbgelehnt) {
     using V = Mc80Machine::Config::Variante;
-    for (V v : {V::Mc8033, V::Mc8021, V::Mc8022}) {
+    for (V v : {V::Mc8021, V::Mc8022}) {
         Mc80Machine::Config c;
         c.variante = v;
         EXPECT_THROW(Mc80Machine m(c), std::invalid_argument) << Mc80Machine::variantenName(v);

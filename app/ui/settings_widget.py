@@ -593,19 +593,6 @@ class SettingsWidget(QWidget):
             typ = self.hardware_combos[rtc.SCHLUESSEL_TYP]
             self.rtc_stellen_button.setEnabled(
                 typ.isEnabled() and typ.currentData() != rtc.KEINE)
-        # MC80.2x: die Kassette (MBI) ist eingebaut — das Kaestchen steckt nichts.
-        fest = self.profil.modell_normalisieren(modell) in self.profil.tape_fest
-        if not hasattr(self, "tape_box"):      # beim ersten Aufruf (Aufbau) noch nicht da
-            return
-        self.tape_box.setEnabled(not fest)
-        if not hasattr(self, "_tape_tipp"):
-            self._tape_tipp = self.tape_box.toolTip()
-        if not fest:
-            self.tape_box.setToolTip(self._tape_tipp)
-        else:
-            self.tape_box.setToolTip(
-                "Beim MC80.21/.22 ist das Magnetbandinterface (MBI) mit dem Laufwerk SK 1200 "
-                "fest eingebaut; bedient wird es im Kasten „Kassette“.")
 
     # ── K3521 (batteriegepuffertes RAM) ──────────────────────────────────────
 

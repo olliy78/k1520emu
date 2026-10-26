@@ -10,9 +10,10 @@
  * (VIS 2a, C0H), ASP (SIO/CTC/PIO, D0H) und Tastatur (Zeichenebene an SIO A) seit M3,
  * Programmsegmente in M4, Kassette (K5020 als steckbare Option an 30H) seit M7.
  *
- * **Varianten:** .30 und .31 sind im Kern bis M7 gleich (Kassettenanschluss unterscheidet
- * sie erst dort).  .33 (AKM + PK 3: Treiber-ROM nur halb vorhanden, egos.md §3) und die
- * MC80.2x (.21/.22, Etappe 3) werden abgelehnt (`std::invalid_argument`).
+ * **Variante:** nur der MC80.30 (die Meldung „mc 80.30.“ am .30 und am .31 ist dieselbe; EPROM-
+ * Segmente 10H/20H und das Kassettenlaufwerk gehoeren zur Ausstattung).  Die Kassette (K5020 an
+ * 30H mit EINEM Laufwerk) ist fest eingebaut.  Die MC80.2x (.21/.22) sind die eigene Klasse
+ * `Mc80_2xMachine` und werden hier abgelehnt (`std::invalid_argument`).
  *
  * Interruptkette: ZVE (CTC → PIO) → ASP (SIO → CTC → PIO) [? Reihenfolge der KARTEN ist
  * nicht belegt (hardware_3x.md §7); EGOS benutzt nur ASP-Quellen, die Reihenfolge der
@@ -37,7 +38,7 @@
 class Mc80Machine : public K1520Machine {
 public:
     struct Config {
-        enum class Variante { Mc8030, Mc8031, Mc8033, Mc8021, Mc8022 };
+        enum class Variante { Mc8030, Mc8021, Mc8022 };
         Variante variante = Variante::Mc8030;
         /// Zahl der SPE 2 (1 oder 2): erste mit ROM und Segment 01H, zweite nur RAM, Segment 02H.
         int spe_karten = 1;
@@ -134,7 +135,7 @@ public:
     Mc80Tastatur& tastatur() { return tast_; }
     Mc80Spe2& spe(int i) { return *spe_.at(static_cast<size_t>(i)); }
     int       speKarten() const { return static_cast<int>(spe_.size()); }
-    /// EPROM-Segmente (.31: 10H und 20H; sonst leer).
+    /// EPROM-Segmente 10H und 20H.
     int       epromSegmente() const { return static_cast<int>(eprom_.size()); }
     Mc80EpromSegment& epromSegment(int i) { return *eprom_.at(static_cast<size_t>(i)); }
     K1520Bus& bus() { return bus_; }
@@ -158,9 +159,9 @@ protected:
     // ─── Kassette (AP M7, doc/mc80/kassette.md) ──────────────────────────────
     /// K5020 fest an 30H–37H (EGOS-Treiber 1000H–1FFFH, IX+2 = 30H).
     int  k5020Basis() const override { return 0x30; }
-    /// .31: K5020 + K5200 (Bustakt); .30: umgebaute K5020 + LW 1200, Takt von der ASP.
+    /// Umgebaute K5020 + Laufwerk (HiFi-Bauart), Schreibtakt von der ASP-CTC K2.
     void k5020Konfigurieren(K5020::Config& cfg) const override;
-    /// Hinten an die Kette (hinter die ASP); am .30 die Koppelbusleitung ASP-CTC K2 → Takt.
+    /// Hinten an die Kette (hinter die ASP); die Koppelbusleitung ASP-CTC K2 → Takt.
     void k5020Einketten(K5020& k) override;
 
 private:
@@ -172,7 +173,7 @@ private:
     K1520Bus bus_;
     Mc80Zve  zve_;
     std::vector<std::unique_ptr<Mc80Spe2>> spe_;
-    /// EPROM-Segmente 10H/20H (nur Variante .31E), lesen-nur, am Segmentfenster.
+    /// EPROM-Segmente 10H/20H, lesen-nur, am Segmentfenster.
     std::vector<std::unique_ptr<Mc80EpromSegment>> eprom_;
     Mc80Segmentfenster fenster_;
     Mc80Vis2a vis_;

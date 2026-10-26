@@ -396,7 +396,7 @@ def test_mc80_can_be_created_and_reports_its_type():
     die EGOS ab 0000H ausfuehrt; .33/.21/.22 und unbekannte Schluessel → NULL mit Grund."""
     from app.core_binding.k1520 import _lib, K1520Handle
 
-    for variante, konfig in ((0, None), (1, b"spe=2")):
+    for variante, konfig in ((0, None), (0, b"spe=2")):
         handle = _lib.k1520_create_mc80(variante, konfig)
         assert handle, _lib.k1520_last_init_error()
         h = K1520Handle(handle)
@@ -417,7 +417,7 @@ def test_mc80_can_be_created_and_reports_its_type():
     finally:
         _lib.k1520_destroy(h)
 
-    for variante, konfig, grund in ((2, None, b"MC80.33"), (9, None, b"Variante"),
+    for variante, konfig, grund in ((2, None, b"Variante"), (9, None, b"Variante"),
                                     (0, b"spe=3", b"spe"), (0, b"vis=1", b"vis"),
                                     (3, b"spe=1", b"MC80.2x")):
         assert not _lib.k1520_create_mc80(variante, konfig)

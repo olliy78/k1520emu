@@ -9,6 +9,11 @@ Herkunft (abgerufen 2026-10-13, Planung `doc/design/31_mc80.md`):
   = Magnetbandsoftware (K5020-Treiber)** — auf ycdt.net nicht vorhanden.
 - `mc8020/`: MAME-Satz `mc8020` (MC80.21/22): ZRE K2521 `s01–s03` (0000H–0BFFH, drei Fassungen),
   PFS K3820 `mo01, mo03–mo16` (2000H–5FFFH; `mo02` = 2400H fehlt auch am Gerät laut MAME).
+- `mc8020/karsten21/` (nur abgelegt, nicht eingebunden), `mc8020/karsten22/`: Karstens Abzüge der PFS-ROM-Karten eines MC80.21 (`MC802101…16`)
+  und eines MC80.22 (`MC802205…12`; die fehlenden Nummern waren nicht bestückt), aus
+  `~/projects/robotron/mc80/MC8030.zip` (`MC8020_ROMs/ROMS_Karsten`).  Sockel n = 2000H + n·400H; Zuordnung und
+  Unterschiede zu den MAME-Abzügen: `doc/merkposten/mc80.md` Nr. 30.  Eine Einbindung
+  scheiterte am Bandmenü (Nr. 30).
 - `segmente/`: Web-Archiv-Abzüge von k1520.com/ycdtotv.de (2022): MC80.31E-EPROM-Segmente 10H (a–d) und 20H
   (f–h, e fehlt) je 4 KB bei 4000H, `la80-print.bin` (MC80-LA), Testbild-ROM K7229.25.
 

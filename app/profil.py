@@ -127,7 +127,6 @@ class Programmprofil:
     k3521_wahl: bool = False
     #: Modelle mit fest eingebauter Kassette: das Kaestchen „Kassette“ ist dort ohne Wirkung
     #: (ausgegraut, der Kasten steht immer da) — MC80.21/.22 (MBI).
-    tape_fest: Tuple[str, ...] = ()
     #: Lampen der Frontplatte: ``"k8915"`` (Latch 61H, aktiv low) oder ``"p8000"``
     #: (Run/Unit16/Platte, aktiv high) — nur mit :attr:`frontplatte`.
     frontplatte_art: str = "k8915"
@@ -799,41 +798,34 @@ MC80 = Programmprofil(
     nenntakt_text="2,4576 MHz",
     tastatur="mc80",
     modellwahl=True,
-    # .30 und .31 laufen im Kern bis M7 gleich (die .31 hat zusaetzlich die EPROM-Segmente
-    # 10H/20H, M4); sie unterscheiden sich erst am Kassettenanschluss (M7).
+    # Es gibt nur EINEN MC80.3x: .30 und .31 melden sich beide als „mc 80.30.“ (gleiches ROM);
+    # die EPROM-Segmente 10H/20H gehoeren zur Ausstattung.  Alte Schluessel -> mc80.
     modelle=(("mc80", "mc80", None, "MC80.30", "mc80"),
-             ("mc80-31", "mc80-31", None, "MC80.31 (Programmsegmente 10H/20H)", "mc80"),
              # MC80.2x (AP M11/M12): eigene Klasse, Bild 528 × 256 (Oszilloskop-Darstellung),
              # Matrixtastatur an der DPL, Kassette (MBI) fest eingebaut.  .21 und .22 sind im
-             # Kern gleich (Unterschied nicht belegt, hardware_2x.md) [?].
+             # Kern gleich (die verschiedenen PFS-Sätze passen nicht zum BSYS, Merkposten Nr. 30).
              ("mc80-21", "mc80-21", None, "MC80.21 (Oszilloskop-Bild, BSYS)", "mc80-2x"),
              ("mc80-22", "mc80-22", None, "MC80.22 (Oszilloskop-Bild, BSYS)", "mc80-2x")),
-    # Der Kern lehnt diese Variante ab (Mc80Machine → std::invalid_argument).
-    gesperrte_modelle=(
-        ("mc80-33", "MC80.33 (AKM + PK 3)",
-         "Nicht wählbar: vom Treiber-ROM der AKM liegt nur die Hälfte vor (doc/mc80/egos.md §3)."),
-    ),
-    # Beim MC80.2x ist die Kassette (MBI) fest eingebaut: das Kaestchen ist ohne Wirkung.
-    tape_fest=("mc80-21", "mc80-22"),
+    modell_alt=(("mc80-31", "mc80"), ("mc80-33", "mc80")),
     hardware=(
         ("spe", "Speichererweiterung:",
          "Zahl der Speicherkarten SPE 2: die erste trägt ROM und RAM-Segment 01H, eine zweite "
          "nur RAM (Segment 02H).  Ein Wechsel startet die Maschine kalt.",
          (("1", "eine SPE 2"), ("2", "zwei SPE 2")),
-         ("mc80", "mc80-31")),
+         ("mc80",)),
     ),
-    modell_tipp=("MC80.30 oder MC80.31 (mit den EPROM-Programmsegmenten 10H/20H), MC80.21/.22 "
+    modell_tipp=("MC80.30 (EGOS, Grafikbild) oder MC80.21/.22 "
                  "(Mikrorechner mit Oszilloskop-Bild und Betriebssystem BSYS).  "
                  "Ein Wechsel erzeugt die Maschine neu (wie ein Kaltstart)."),
     eigene_aktionen=("speicherabzug_laden",),
     laufwerke=False,
     # Lochstreifen K6022 (E0H–E7H) kollidiert mit dem EPROM-Programmierer E0H–EFH; die RAF
-    # (88H/89H) liegt im E/A-Bereich der ZVE (80H–8FH) [?].  Kassette seit AP M7: K5020 an
-    # 30H (.30 LW 1200 mit Takt aus der ASP, .31 K5200), EGOS bedient nur Laufwerk 1.
+    # (88H/89H) liegt im E/A-Bereich der ZVE (80H–8FH) [?].  Die Kassette ist fest eingebaut
+    # (.30: K5020 an 30H mit EINEM Laufwerk, 2x: MBI) — kein Kaestchen.
     ptape_wahl=False,
-    tape_wahl=True,
+    tape_wahl=False,
     raf_wahl=False,
-    ueber_rechner="der Mikrorechner <b>MC80.30/31/21/22</b> des VEB Elektronik Gera",
+    ueber_rechner="der Mikrorechner <b>MC80.30/21/22</b> des VEB Elektronik Gera",
     andere="a5120",
     weitere=("k8915", "prg710", "pc1715", "p8000"),
 )

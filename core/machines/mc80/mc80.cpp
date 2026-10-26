@@ -9,13 +9,12 @@
 #include "core/cards/mc80/rom_segmente.h"
 #include "core/logger.h"
 #include <stdexcept>
+#include <string>
 
 const char* Mc80Machine::variantenName(Config::Variante v)
 {
     switch (v) {
         case Config::Variante::Mc8030: return "MC80.30";
-        case Config::Variante::Mc8031: return "MC80.31";
-        case Config::Variante::Mc8033: return "MC80.33";
         case Config::Variante::Mc8021: return "MC80.21";
         case Config::Variante::Mc8022: return "MC80.22";
     }
@@ -26,11 +25,7 @@ Mc80Machine::Config Mc80Machine::pruefe(const Config& cfg)
 {
     switch (cfg.variante) {
         case Config::Variante::Mc8030:
-        case Config::Variante::Mc8031:
             break;
-        case Config::Variante::Mc8033:
-            throw std::invalid_argument(
-                "MC80.33 ist noch nicht nachgebildet (AKM + PK 3; Treiber-ROM nur halb vorhanden)");
         case Config::Variante::Mc8021:
         case Config::Variante::Mc8022:
             throw std::invalid_argument(std::string(variantenName(cfg.variante)) +
@@ -53,8 +48,8 @@ Mc80Machine::Mc80Machine(const Config& cfg)
         fenster_.anmelden(karte.get());
         spe_.push_back(std::move(karte));
     }
-    if (cfg_.variante == Config::Variante::Mc8031) {
-        // MC80.31E: EPROM-Segmente 10H und 20H (doc/EPROMS/MC80/segmente/, je 4-KB-Abzug).
+    {
+        // EPROM-Segmente 10H und 20H (doc/EPROMS/MC80/segmente/, je 4-KB-Abzug).
         // Lage: d = 4000H (bytegleich doc/mc80/spiele/tetris_4000_4fff.bin), f = 4000H und
         // g = 5000H (= 2. Haelfte von hasi_4000_5fff.bin); b = 5000H, c = 6000H, h = 6000H nach
         // den Eigenbezuegen der Sprungziele; a = 7000H [?] (ohne Beleg), e (20H, 7000H?) fehlt.
@@ -82,6 +77,8 @@ Mc80Machine::Mc80Machine(const Config& cfg)
     });
     bus_.setInterruptChain({&zve_, &asp_});   // Kartenreihenfolge [?], hardware_3x.md §7
     hub_.registriere(asp_.anschluss());       // IFSS XS503 (SIO B) nach aussen, Entwurf 19
+    // Das Kassettenlaufwerk ist fest eingebaut (kein Zubehoer): K5020 gleich stecken.
+    if (!installK5020()) throw std::runtime_error("MC80: K5020 laesst sich nicht stecken: " + k5020Fehler());
     powerOn();
 }
 
@@ -172,19 +169,11 @@ int Mc80Machine::run(int max_cycles)
 
 void Mc80Machine::k5020Konfigurieren(K5020::Config& cfg) const
 {
-    if (cfg_.variante == Config::Variante::Mc8030) {
-        // Umgebaute K5020 + LW 1200 [Entwurf 31 §2, Forum 12849]: Schreibtakt ueber den
-        // Koppelbus aus ASP-CTC K2; Bitrate aus dem Profil LW 1200 [?] (doc/mc80/kassette.md §2).
-        cfg.takt = K5020::Takt::ExternerCtc;
-        cfg.profil1 = cfg.profil2 = kassette::ProfilId::LW1200;
-    } else {
-        // MC80.31: AKB K5020 + K5200 [hardware_3x.md §9] mit **19 cm/s** (6 000 Bit/s) [?]:
-        // EGOS' Leseinterrupt prueft jedes AAH mit gesperrten Interrupts 1,35 ms lang auf die
-        // Postambel (1C3A: DI, DJNZ 255) — bei 12 000 Bit/s kommen in der Zeit zwei Bytes, eins
-        // geht verloren; bei 6 000 Bit/s nicht (doc/mc80/kassette.md §2).
-        cfg.takt = K5020::Takt::Bustakt;
-        cfg.profil1 = cfg.profil2 = kassette::ProfilId::K5200_19;
-    }
+    // Umgebaute K5020 + Laufwerk in HiFi-Bauart (LW 1200) [Entwurf 31 §2, Forum 12849]:
+    // Schreibtakt ueber den Koppelbus aus ASP-CTC K2; Bitrate aus dem Profil LW 1200 [?]
+    // (doc/mc80/kassette.md §2).  Der MC80 hat nur dieses EINE Laufwerk.
+    cfg.takt = K5020::Takt::ExternerCtc;
+    cfg.profil1 = cfg.profil2 = kassette::ProfilId::LW1200;
     // EGOS vertraegt keine BOT-/EOT-Marke und keinen langen Vorspann (kassette.md §3).
     cfg.neue_kassette = kassette::Geometrie::kompaktkassette();
 }
@@ -192,8 +181,7 @@ void Mc80Machine::k5020Konfigurieren(K5020::Config& cfg) const
 void Mc80Machine::k5020Einketten(K5020& k)
 {
     K1520Machine::k5020Einketten(k);
-    if (cfg_.variante == Config::Variante::Mc8030)
-        k.setExternerTakt([this]() { return aspBandtakt(); });
+    k.setExternerTakt([this]() { return aspBandtakt(); });
 }
 
 bool Mc80Machine::aspBandtakt() const

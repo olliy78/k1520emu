@@ -322,13 +322,11 @@ K1520Handle k1520_create_mc80(int variante, const char* konfig) {
     Mc80Machine::Config cfg;
     switch (variante) {
         case 0: cfg.variante = Mc80Machine::Config::Variante::Mc8030; break;
-        case 1: cfg.variante = Mc80Machine::Config::Variante::Mc8031; break;
-        case 2: cfg.variante = Mc80Machine::Config::Variante::Mc8033; break;
         case 3: cfg.variante = Mc80Machine::Config::Variante::Mc8021; break;
         case 4: cfg.variante = Mc80Machine::Config::Variante::Mc8022; break;
         default:
             g_init_error = "Unbekannte MC80-Variante " + std::to_string(variante) +
-                           " (0 = .30, 1 = .31, 2 = .33, 3 = .21, 4 = .22)";
+                           " (0 = .30, 3 = .21, 4 = .22)";
             return nullptr;
     }
     // MC80.21/.22 (AP M11): eigene Maschine, keine Schluessel (SPE gibt es dort nicht).
