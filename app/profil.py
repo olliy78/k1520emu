@@ -515,7 +515,9 @@ A5120 = Programmprofil(
     # (folgt der Tastaturoption erst mit N7).  Alte Schluessel (a5120.16, a5120-alt …) sind unbekannt.
     modelle=tuple((k, "a5120", None, lbl, "k7637") for k, lbl, _t in _modell.MODELS),
     modell_vorgaben=tuple((k, tuple(v.items())) for k, v in _modell.VORGABEN.items()),
-    aup_wahl=True,
+    # AUP (Sparkasse) ist noch nicht anwenderreif (Firmware/SIMO/SIOS fehlen): in der Oberflaeche
+    # ausgeblendet, Kern und Tests bleiben.  Wieder anschalten: True (Entwurf 33 N10, Merkposten 18-20).
+    aup_wahl=False,
     k3521_wahl=True,
     # Optionen unter *Einstellungen ▸ Allgemein*.  Kaltstart noetig wie bei der Modellwahl.
     # Die Kassette ist das vorhandene Kaestchen (`tape_wahl`).  Das Lade-ROM „K8924 V0.9a
