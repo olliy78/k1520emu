@@ -14,7 +14,7 @@ und MON16 `p.test.s` (github.com/OlliL/P8000). Die Tests formulieren die Erwartu
 |---|---|---|
 | /CS = LAD1/2/3 (Code/Data/Stack), low-aktiv, mehrere zugleich; Befehl in AD8–15 (§1.1) | ja | `CsAusLad123` (alle 256 Low-Bytes schreibend und lesend), `SpezialEaTraegtDenBefehlImHohenAdressbyte` |
 | N/S-Eingang = Auswahlsignal, gewählte MMU sieht L (§1.1, §1.4) | ja | `Tabelle.*`, `OnBoardSperrtDieMmuAuswahl` |
-| SN6 nur an der Code-MMU, Data/Stack fest L (§1.1) | ja | `Zeile3_…`, `MehrereTreiberVerdrahtetesUnd`, `MmuEinOhneTreiberSchwebtAufEins` |
+| SN6 nur an der Code-MMU, Data/Stack fest L (§1.1) | ja | `Zeile3_…`, `MehrereTreiberVerdrahtetesUnd`, `MmuEinOhneTreiberAdressiertLokal` |
 | Auswahltabelle, 6 Zeilen (§1.2) | ja, Gatter wörtlich | `Zeile1_…` bis `Zeile6_…`; `GatterGebenHoechstensEineMmuUndFolgenDerTabelle` (16 Status × 2⁵); `AlleZyklusartenMalZustaende` (62 208 Zyklen je Gleichheitsregel: 16 Status × N/S × 8 SCR × 9 Segmente × 9 Offsets × 3 NBR × R/W, mit Ziel und Busadresse) |
 | Status 1001 wird nicht ausgewertet (§1.2) | ja | `Status1001WirdNichtAusgewertet`, Matrix |
 | NBR-Gleichheit → Stack (§1.2; **durch Originalplan bestätigt**, Fußnote [L1]) | ja, umschaltbar [L1] | `NbrGleichheitGehtAnStack`, `NbrGleichheitNachWegaGehtAnData`, Matrix mit beiden Regeln |
@@ -26,7 +26,7 @@ und MON16 `p.test.s` (github.com/OlliL/P8000). Die Tests formulieren die Erwartu
 | IMEML sperrt MMU-Auswahl, TRAD-Freigabe und SYSDS (§2, §3, §4.4) | ja | `OnBoardSperrtDieMmuAuswahl`, `SuppressVerhindertSchreibenNurAmHauptspeicher` |
 | On-Board-Zugriff = 1 Wartetakt (§7) | ja (`Zugriff::wartetakte`) | `OnBoardNurSegment0Unter8000` |
 | MMU aus: Busadresse = SN·64K + Offset, A23 = 0 (§3) | ja | `MmuAusPhysIstSegmentMal64K` (128 Segmente), Matrix |
-| MMU ein: A0–A7 vom Offset, A8–A23 aus TRAD (§3) | ja; offen = 1, mehrere = UND [L7] | `Tabelle.*`, `MmuEinOhneTreiberSchwebtAufEins`, `MehrereTreiberVerdrahtetesUnd` |
+| MMU ein: A0–A7 vom Offset, A8–A23 aus TRAD (§3) | ja; kein Treiber = Segment*64K+Offset (gemessen, Issue #23, nur Holen; Gegenprobe `tradLeerIstLokal=false` = FFFFH), mehrere = UND [L7] | `Tabelle.*`, `MmuEinOhneTreiberAdressiertLokal`, `MehrereTreiberVerdrahtetesUnd` |
 | „MMU ON wirkt nicht auf die MMU-Schaltkreise" (Handbuch §2.6) | ja (MMUs sehen jeden Zyklus) | `SupWirktAuchBeiMmuAusUndBeimLesen`, `MmuAusPhysIstSegmentMal64K` |
 | SUP sperrt SYSDS nur zum Speicherbus (§4.4) | ja; auch Lesen, auch MMU aus [L8] | `SuppressVerhindertSchreibenNurAmHauptspeicher`, `SupWirktAuchBeiMmuAusUndBeimLesen` |
 | SCR: 4 Bit r/w, Reset 0 (Bl. 9 D18) | ja; Bit 4–7 lesen 1 [L4] | `ScrVierBitLesbarObereBitsEinsResetNull` |
