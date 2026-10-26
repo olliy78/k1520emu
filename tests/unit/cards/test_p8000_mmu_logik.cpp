@@ -240,7 +240,7 @@ TEST(P8000MmuLogik, MmuEinOhneTreiberAdressiertLokal) {
 }
 
 TEST(P8000MmuLogik, MmuEinOhneTreiberGegenprobeSchwebtAufEins) {
-    // Die frühere Annahme (Schaltplan: TRAD offen = 1) bleibt als Option erhalten.
+    // Die fruehere Annahme (Schaltplan: TRAD offen = 1) bleibt als Option erhalten.
     L::Config cfg;
     cfg.tradLeerIstLokal = false;
     L l(cfg);
