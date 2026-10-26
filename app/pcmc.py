@@ -26,7 +26,7 @@ import socket
 import time
 from typing import Callable, Optional, Tuple
 
-#: Länge des Kopfes in der Datei und auf der Leitung.
+#: Laenge des Kopfes in der Datei und auf der Leitung.
 KOPF = 4
 
 IAC, DONT, DO, WONT, WILL, SB, SE = 255, 254, 253, 252, 251, 250, 240
@@ -124,7 +124,7 @@ class PcmcLeitung:
         self._puffer = bytearray()          # dekodierte Nutzbytes
         self._zst = 0                       # 0 Daten, 1 nach IAC, 2 nach Verb, 3 SB-Daten, 4 SB-IAC
         self._verb = 0
-        # BINARY in beide Richtungen: sonst wird 0DH als 0DH 00 übertragen.
+        # BINARY in beide Richtungen: sonst wird 0DH als 0DH 00 uebertragen.
         self._roh(bytes((IAC, WILL, OPT_BINARY, IAC, DO, OPT_BINARY)))
 
     def _roh(self, daten: bytes) -> None:

@@ -59,6 +59,10 @@ def test_vorgabe_aus_und_kasten_folgt_der_karte(qapp, konfig_ordner, maschine):
     try:
         box = w.settings_widget.tape_box
         assert box.text() == "Kassette (K5221, AKB K5020)"
+        if maschine == "mc80":
+            # MC80.21/.22: Kassette (MBI) fest eingebaut, schon ohne Haken gesteckt.
+            assert w.emulator.tape_installed()
+            return
         assert not box.isChecked() and not w.emulator.tape_installed()
         assert not w.kassette_dock.isVisible()
         assert not w.act_dock_kassette.isVisible()

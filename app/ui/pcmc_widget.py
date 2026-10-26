@@ -67,12 +67,12 @@ def _freier_port() -> int:
 
 
 class PcmcWidget(QWidget):
-    #: Eine Zeile für die Statuszeile des Fensters.
+    #: Eine Zeile fuer die Statuszeile des Fensters.
     meldung = Signal(str)
-    #: Aus dem Arbeitsfaden: (fertig, gesamt) und das Ende (Fehlertext, leer = geglückt).
+    #: Aus dem Arbeitsfaden: (fertig, gesamt) und das Ende (Fehlertext, leer = geglueckt).
     _fortschritt = Signal(int, int)
     _ende = Signal(str, str)
-    #: Die Gegenstelle wurde ein- bzw. ausgeschaltet (für die Aktion in Menü/Leiste).
+    #: Die Gegenstelle wurde ein- bzw. ausgeschaltet (fuer die Aktion in Menue/Leiste).
     umgeschaltet = Signal(bool)
 
     def __init__(self, emulator, parent=None):
@@ -224,7 +224,7 @@ class PcmcWidget(QWidget):
             self._vorher, self._vorher_block = k, vorher_block
             self._port = port
         elif st.zustand == SER_LAUSCHT and k.betriebsart == SER_TELNET and k.rolle == SER_SERVER:
-            # Ein vom Anwender (oder einem früheren Lauf) geöffneter Telnet-Server: mitbenutzen.
+            # Ein vom Anwender (oder einem frueheren Lauf) geoeffneter Telnet-Server: mitbenutzen.
             self._vorher, self._vorher_block = None, None
             self._port = st.port_aktiv
         else:
@@ -392,7 +392,7 @@ class PcmcWidget(QWidget):
     def _start_ordner(self) -> str:
         return self._ordner or str(paths.user_disks_dir())
 
-    # ── Übertragen ───────────────────────────────────────────────────────────
+    # ── Uebertragen ───────────────────────────────────────────────────────────
 
     def senden(self) -> None:
         b = self._sendebereich()
@@ -456,7 +456,7 @@ class PcmcWidget(QWidget):
         self._faden = None
         if fehler:
             if "geschlossen" in fehler or "unterbrochen" in fehler:
-                self._leitung_schliessen()      # beim nächsten Mal neu verbinden
+                self._leitung_schliessen()      # beim naechsten Mal neu verbinden
             self.status.setText(fehler)
             self.meldung.emit("PCMC: " + fehler)
             if fehler != "Abgebrochen":
