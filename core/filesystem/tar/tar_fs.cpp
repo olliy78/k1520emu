@@ -10,6 +10,7 @@
 
 #include "core/filesystem/tar/tar_fs.h"
 #include "core/filesystem/tar/tar_archiv.h"
+#include "core/filesystem/wega/wega_fs.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -185,7 +186,49 @@ QuellBefund quelleBeurteilen(const std::vector<uint8_t>& d, uint64_t kapazitaet)
 
 using tar::kBlock;
 
+TarSpaceQuelle::TarSpaceQuelle(SectorSpace& s, const FsProfile* p) : s_(s) {
+    if (p && p->type == FsType::Tar && p->mutos8k_layout)
+        dev_ = std::make_unique<Mutos8kDev>(s, p->data_cyl, p->data_head);
+}
+
+TarSpaceQuelle::~TarSpaceQuelle() = default;
+
+uint64_t TarSpaceQuelle::size() const {
+    return dev_ ? static_cast<uint64_t>(dev_->blocks()) * kBlock : s_.size();
+}
+
+bool TarSpaceQuelle::read(uint64_t off, uint8_t* dst, size_t n) const {
+    if (!dev_) return s_.read(off, dst, n);
+    if (off + n > size()) return false;
+    uint8_t blk[kBlock];
+    while (n) {
+        const size_t o = static_cast<size_t>(off % kBlock);
+        const size_t k = std::min<size_t>(n, kBlock - o);
+        if (!dev_->readBlock(static_cast<uint32_t>(off / kBlock), blk)) return false;
+        std::memcpy(dst, blk + o, k);
+        dst += k; off += k; n -= k;
+    }
+    return true;
+}
+
+bool TarSpaceQuelle::schreibe(uint64_t off, const uint8_t* src, size_t n) {
+    if (!dev_) return s_.write(off, src, n);
+    if (off + n > size()) return false;
+    uint8_t blk[kBlock];
+    while (n) {
+        const size_t o = static_cast<size_t>(off % kBlock);
+        const size_t k = std::min<size_t>(n, kBlock - o);
+        const uint32_t bn = static_cast<uint32_t>(off / kBlock);
+        if (k < kBlock && !dev_->readBlock(bn, blk)) return false;   // Teilblock: erst lesen
+        std::memcpy(blk + o, src, k);
+        if (!dev_->writeBlock(bn, blk)) return false;
+        src += k; off += k; n -= k;
+    }
+    return true;
+}
+
 bool TarSpaceQuelle::ort(uint64_t off, FsRecoverOrt& out) const {
+    if (dev_) return dev_->ort(static_cast<uint32_t>(off / kBlock), out);
     for (size_t i = 0; i < s_.trackCount(); ++i) {
         const SectorSpace::TrackRef t = s_.trackAt(i);
         if (off >= t.start && off < t.start + t.bytes && t.sector_size) {

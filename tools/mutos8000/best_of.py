@@ -6,7 +6,7 @@ Quellen (disks/a5120_mutos8000/):
   M8K-Satz  (Januar 1986, teils defekt):   m8k_cmd, m8k_usr, m8k_bin -> Kuerzel mcmd, musr, mbin
 Der Lader-Treiber `mutos_io` kann nur 26x128-Disketten (Verschraenkung 2, Spurversatz 6) lesen; die 8x512-Disketten
 des DISK-Satzes sind im Emulator nicht einbindbar (er=0,304).  Deshalb wird der INHALT beider Saetze auf
-26x128-Disketten (Profil mutos8k_fm/_mfm) neu verteilt.
+26x128-Disketten (Profil mutos8k_26x128_fm/_mfm) neu verteilt.
 
 Rollen (Mountpunkte der Wurzel, PATH der .profile = :/mnt/bin:/usr/bin:/bin:/etc:/mnt/etc:/tmp/bin:/mnt:/usr:/tmp):
   cmd  -> /mnt   bin/ + etc/ der Befehle (Gegenstueck M8KCMD)
@@ -239,7 +239,7 @@ def zusammenstellen(rolle, stand_ordner, ausgabe=print):
 
 
 def zwischenstand(rolle, ziel_hfe, ausgabe=print):
-    """Rolle -> FM-Abbild `ziel_hfe` (mutos8k_fm) und Entscheidungstext (Rueckgabe)."""
+    """Rolle -> FM-Abbild `ziel_hfe` (mutos8k_26x128_fm) und Entscheidungstext (Rueckgabe)."""
     tmp = tempfile.mkdtemp(prefix="m8k_best_stand_")
     try:
         stand = os.path.join(tmp, "stand")
@@ -248,7 +248,7 @@ def zwischenstand(rolle, ziel_hfe, ausgabe=print):
         z0 = os.path.join(tmp, "zylinder0.bin")
         # Zylinder 0 mit den Etiketten ERMAP/VOL1MUTOS: gleich dem der Wurzel (gleich M8KCMD)
         disktool("boot-get", m8k.fertig("root_fm.hfe"), z0)
-        disktool("create", ziel_hfe, "--fs", "mutos8k_fm", "--inodes", INODES[rolle], "--blocks", BLOECKE)
+        disktool("create", ziel_hfe, "--fs", "mutos8k_26x128_fm", "--inodes", INODES[rolle], "--blocks", BLOECKE)
         disktool("boot-put", ziel_hfe, z0)
         disktool("put", ziel_hfe, stand)
         ausgabe(disktool("check", ziel_hfe, "--full").strip().splitlines()[-1])

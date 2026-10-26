@@ -1028,6 +1028,24 @@ oeffnen, je Abbild schreiben.  Kern-API: `DiskVolume::tarSatzNeu/tarZuSatz/tarSa
 Ein `.img` mit kleiner, mehrdeutiger Geometrie wird beim Oeffnen geraten (Abbild hat keine Geometrie) — fuer
 Saetze `.hfe/.dmk/.cqm` bevorzugen.
 
+### tar im MUTOS-8000-Layout (`tar_mutos8k_26x128_mfm`, `tar_mutos8k_26x128_fm`)
+
+Die alten Namen (`mutos8k_fm`, `mutos8k_mfm`, `mutos77`, `mutos80`, `tar_mutos8k_{fm,mfm}[_leer]`) gelten als Alias (`aliases:` in `data/formats.yaml`, `FsCatalog::find`; Wächter `FsCatalog.AlteProfilnamenLoesenAlsAliasAufDasNeueProfilAuf`), stehen aber in keiner Liste und nie als Erkennungsergebnis.
+
+Das `tar` des MUTOS schreibt auf das Rohgeraet `/dev/rrkN` — in der Blockabbildung `Mutos8kDev` (ab Zylinder 1, verschraenkt), 494 Bloecke = 252 928 B je Diskette —, NICHT
+linear ab Zylinder 0 wie `tar720`.  Dafuer gibt es die Profile `tar_mutos8k_26x128_mfm` (K5601, Format `udos_ss77`) und `tar_mutos8k_26x128_fm` (8″, `mf3200_26x128`), je mit `…_leer`.  Gelesen und
+geschrieben wie jede tar-Diskette; das Layout erkennt `tar-satz`/`info` am ersten Abbild von selbst (tar-Kopf bei Block 0):
+
+```
+k1520disktool tar-formate                                     # nennt beide Profile (252928 B)
+k1520disktool create leer.hfe --fs tar_mutos8k_26x128_mfm_leer       # leere tar-Diskette (Datenbereich Null, Zyl. 0 bleibt E5); fm: tar_mutos8k_26x128_fm_leer
+k1520disktool tar-satz-neu --format tar_mutos8k_26x128_mfm satz.hfe --put a.bin --put b.bin    # -> satz1.hfe, satz2.hfe, …  (je 494 Bloecke)
+k1520disktool tar-satz mutos1.hfe mutos2.hfe -l               # von MUTOS (tar cf - | dd) geschriebener Satz
+k1520disktool tar-satz mutos1.hfe mutos2.hfe --format tar_mutos8k_26x128_mfm   # Layout vorgeben (z. B. .img, FM)
+```
+Unter MUTOS: `tar tvf /dev/rrk0`, `tar xvf /dev/rrk0`; ein Satz ueber `(dd if=/dev/rrk0 bs=512 count=494; <Diskette tauschen>; dd …) | tar xvf -`.  Ein `.img` ist ohne Angabe MFM.
+Einzelheiten, Fallen (`tape read error` am Mediumende, `sync` vor dem Tausch): `doc/merkposten/tar_satz.md` Nr. 17, `doc/design/39_mutos8000.md` A5b.
+
 ### `tar-export`, `tar-put` und die leere tar-Diskette `tar720_leer`
 
 ```

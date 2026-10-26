@@ -902,7 +902,7 @@ filesystems:
 
   # UDOS auf dem 8″-MF3200: dieselbe Spurlage (77 x 26 x 128), aber FM (Entwurf 39 §9.8).  Eigener Eintrag,
   # weil `create` das Aufzeichnungsverfahren aus dem Format nimmt; ohne ihn gaebe es UDOS nur in MFM
-  # (die FM-Ladediskette fuer MUTOS 8000 wurde sonst ueber das Profil mutos8k_fm angelegt).
+  # (die FM-Ladediskette fuer MUTOS 8000 wurde sonst ueber das Profil mutos8k_26x128_fm angelegt).
   - name:        udos_ss77_fm
     description: "UDOS 4.x einseitig — 77 Spuren 26×128 FM (8″ MF3200)"
     format:      mf3200_26x128
@@ -979,14 +979,16 @@ filesystems:
 
   # MUTOS 8000: dasselbe System-III-Dateisystem wie WEGA (Z8000, big endian), aber der Blockraum
   # beginnt auf Zylinder 1 (`data_start`); Zylinder 0 ist die 128-B-Ladespur.
-  - name:        mutos77
+  - name:        mutos8k_8x512_mfm
+    aliases:     [mutos77]
     description: "MUTOS 8000 (UNIX, A5120.16) — einseitig, Blockraum ab Zylinder 1 (bis Zyl. 76)"
     format:      mutos_ss77
     type:        wega_mutos
     data_start:  { cyl: 1, head: 0 }
     detect_rank: -10
 
-  - name:        mutos80
+  - name:        mutos8k_8x512_mfm_80
+    aliases:     [mutos80]
     description: "MUTOS 8000 (UNIX, A5120.16) — einseitig, Blockraum ab Zylinder 1 (bis Zyl. 79)"
     format:      mutos_ss80
     type:        wega_mutos
@@ -998,7 +1000,8 @@ filesystems:
   # 6 Sektoren Spurversatz ab (`unix_layout: mutos8k`, Mutos8kDev) - das ist NICHT die lineare
   # Sektorfolge der anderen Profile.  Eigener Eintrag, weil nur diese Abbildung die Blocknummern
   # des Dateisystems trifft (doc/design/39_mutos8000.md §4).
-  - name:        mutos8k_fm
+  - name:        mutos8k_26x128_fm
+    aliases:     [mutos8k_fm]
     description: "MUTOS 8000 (UNIX, A5120.16) — 8″ FM 26×128, Blockraum ab Zylinder 1 (verschraenkt)"
     format:      mf3200_26x128
     type:        wega_mutos
@@ -1008,7 +1011,8 @@ filesystems:
 
   # Dieselbe Wurzel fuer MFM-Laufwerke (K5601): Blockabbildung und Verschraenkung haengen nur an den
   # Sektornummern, nicht am Aufzeichnungsverfahren - 77 x 26 x 128 MFM statt FM (Entwurf 39 §9.13).
-  - name:        mutos8k_mfm
+  - name:        mutos8k_26x128_mfm
+    aliases:     [mutos8k_mfm]
     description: "MUTOS 8000 (UNIX, A5120.16) — 5¼″ MFM 26×128, Blockraum ab Zylinder 1 (verschraenkt)"
     format:      udos_ss77
     type:        wega_mutos
@@ -1041,5 +1045,50 @@ filesystems:
     description: "tar-Diskette, leer (720K) — leeres tar-Archiv"
     format:      k5601_9x512
     type:        tar
+    leer:        true
+    detect_rank: 901
+
+  # tar-Disketten im MUTOS-8000-Layout (Entwurf 39 Teil A, doc/merkposten/tar_satz.md Nr. 17):
+  # das V7-`tar` des MUTOS schreibt seinen Strom auf das ROHGERAET /dev/rrkN, also in 512-B-Bloecke
+  # des Treibers (`unix_layout: mutos8k`, Mutos8kDev): ab Zylinder 1, Verschraenkung 2, Spurversatz 6,
+  # 494 Bloecke = 252 928 B je Diskette.  Zylinder 0 bleibt unberuehrt.  Mehrdisketten-Saetze entstehen
+  # dort nur durch `dd` ueber mehrere Disketten - hier wie bei tar720 ein Strom ueber N Abbilder.
+  # Die Erkennung probt diese Profile VOR den echten Dateisystemen derselben Geometrie (UDOS haelt
+  # die Diskette sonst fuer eine Leerdiskette) und nimmt sie nur mit gueltigem tar-Kopf bei Block 0.
+  - name:        tar_mutos8k_26x128_mfm
+    aliases:     [tar_mutos8k_mfm]
+    description: "tar-Strom im MUTOS-8000-Layout (5¼″ MFM, 77×26×128) — 494 Blöcke"
+    format:      udos_ss77
+    type:        tar
+    unix_layout: mutos8k
+    data_start:  { cyl: 1, head: 0 }
+    detect_rank: 900
+
+  - name:        tar_mutos8k_26x128_mfm_leer
+    aliases:     [tar_mutos8k_mfm_leer]
+    description: "tar-Diskette, leer (MUTOS-8000-Layout, MFM) — leeres tar-Archiv"
+    format:      udos_ss77
+    type:        tar
+    unix_layout: mutos8k
+    data_start:  { cyl: 1, head: 0 }
+    leer:        true
+    detect_rank: 901
+
+  - name:        tar_mutos8k_26x128_fm
+    aliases:     [tar_mutos8k_fm]
+    description: "tar-Strom im MUTOS-8000-Layout (8″ FM, 77×26×128) — 494 Blöcke"
+    format:      mf3200_26x128
+    type:        tar
+    unix_layout: mutos8k
+    data_start:  { cyl: 1, head: 0 }
+    detect_rank: 900
+
+  - name:        tar_mutos8k_26x128_fm_leer
+    aliases:     [tar_mutos8k_fm_leer]
+    description: "tar-Diskette, leer (MUTOS-8000-Layout, FM) — leeres tar-Archiv"
+    format:      mf3200_26x128
+    type:        tar
+    unix_layout: mutos8k
+    data_start:  { cyl: 1, head: 0 }
     leer:        true
     detect_rank: 901

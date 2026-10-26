@@ -55,7 +55,7 @@ def test_archiv_enthaelt_bauangaben_ladecode_und_den_ganzen_baum():
         assert len(z.read("zylinder0.bin")) == 26 * 128
         blatt = z.read("dateien/wega-dateiangaben.txt").decode("utf-8")
         assert "dateien/dev/" in namen            # leeres Verzeichnis bleibt sichtbar
-    assert "fs: mutos8k_fm" in angaben and "inodes: 104" in angaben
+    assert "fs: mutos8k_fm" in angaben and "inodes: 104" in angaben   # die eingecheckten Archive tragen den alten Namen (gilt als Alias)
     assert "fs_mfm: mutos8k_mfm" in angaben      # dieselbe Wurzel fuer MFM-Laufwerke
     assert "bloecke: 250" in angaben and "zylinder0: zylinder0.bin" in angaben
     assert "AUSLAGERUNGSBEREICH" in angaben       # der Kommentar zu 250 ist der Sinn der Zahl
@@ -71,10 +71,10 @@ def test_bauangaben_werden_geprueft(tmp_path):
     sys.path.insert(0, str(TOOLS))
     import bau_aus_archiv
     f = tmp_path / "bauangaben.yaml"
-    f.write_text("fs: mutos8k_fm\ninodes: viele\nbloecke: 250\nzylinder0: z.bin\n")
+    f.write_text("fs: mutos8k_26x128_fm\ninodes: viele\nbloecke: 250\nzylinder0: z.bin\n")
     with pytest.raises(SystemExit, match="Zahl"):
         bau_aus_archiv.bauangaben_lesen(str(f))
-    f.write_text("fs: mutos8k_fm\n")
+    f.write_text("fs: mutos8k_26x128_fm\n")
     with pytest.raises(SystemExit, match="fehlt"):
         bau_aus_archiv.bauangaben_lesen(str(f))
 
@@ -150,7 +150,7 @@ def test_wurzel_fuer_mfm_laufwerke_hat_dieselbe_blockabbildung(tmp_path, monkeyp
     mfm = tmp_path / "mfm.hfe"
     bau_aus_archiv.bauen(str(ARCHIV), str(mfm), ausgabe=lambda *_: None, laufwerke="k5601")
     info = subprocess.run([str(DISKTOOL), "info", str(mfm)], capture_output=True, text=True).stdout
-    assert "Format:      udos_ss77" in info and "Dateisystem: mutos8k_mfm" in info     # MFM, nicht mf3200_26x128
+    assert "Format:      udos_ss77" in info and "Dateisystem: mutos8k_26x128_mfm" in info     # MFM, nicht mf3200_26x128
     # Blockabbildung gleich der FM-Fassung (nur die Anlagezeit ist fluechtig) ...
     assert _ohne_anlagezeit(_lesen(DISKTOOL, mfm, tmp_path, "mfm")) == \
         _ohne_anlagezeit(_lesen(DISKTOOL, WURZEL, tmp_path, "fm"))
@@ -379,7 +379,7 @@ def test_datendisketten_pwd_ist_die_aeltere_fassung():
 
 @braucht_disktool
 @pytest.mark.parametrize("rolle", sorted(ROLLEN))
-@pytest.mark.parametrize("laufwerke,suffix,profil", [("mf3200", "_fm", "mutos8k_fm"), ("k5601", "_mfm", "mutos8k_mfm")])
+@pytest.mark.parametrize("laufwerke,suffix,profil", [("mf3200", "_fm", "mutos8k_26x128_fm"), ("k5601", "_mfm", "mutos8k_26x128_mfm")])
 def test_datendiskette_aus_dem_archiv_ist_die_eingecheckte(tmp_path, monkeypatch, rolle, laufwerke, suffix, profil):
     monkeypatch.setenv("K1520_DISKTOOL", str(DISKTOOL))
     sys.path.insert(0, str(TOOLS))

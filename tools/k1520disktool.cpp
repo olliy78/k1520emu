@@ -704,7 +704,7 @@ int cmd_tar_satz_save(const Optionen& o) {
 
 /// @brief `tar-formate` — die Katalogformate, die sich fuer eine neue tar-Diskette / einen Satz eignen.
 int cmd_tar_formate(const Optionen&) {
-    for (const TarFormatInfo& f : DiskVolume::tarFormate(formate()))
+    for (const TarFormatInfo& f : DiskVolume::tarFormate(formate(), dateisysteme()))
         std::printf("%-24s %9llu B  %s%s  %s\n", f.name.c_str(), static_cast<unsigned long long>(f.bytes),
                     f.img ? "img " : "    ", f.hfe ? "hfe" : "   ", f.description.c_str());
     return kOk;
@@ -1484,7 +1484,8 @@ int cmd_create(const Optionen& o) {
         // `--format` nur fuer die leere tar-Diskette: GEWAEHLTES Katalogformat statt der 720K des Profils.
         const FsProfile* pr = dateisysteme().find(o.fs);
         if (!pr || pr->type != FsType::Tar || !pr->leer) {
-            std::cerr << "Fehler: --format gilt beim Anlegen nur mit --fs tar720_leer (leere tar-Diskette)\n";
+            std::cerr << "Fehler: --format gilt beim Anlegen nur mit --fs tar720_leer (leere tar-Diskette; "
+                         "ebenso tar_mutos8k_26x128_mfm_leer, tar_mutos8k_26x128_fm_leer)\n";
             return kFehler;
         }
         auto t = DiskVolume::tarDisketteNeu(o.rest[1], o.format, formate(), dateisysteme(), err);

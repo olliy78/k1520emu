@@ -59,6 +59,9 @@ inline bool isUdosFamily(FsType t) {
 struct FsProfile {
     std::string name;          ///< eindeutiger Katalogname (CLI, GUI, C-API)
     std::string description;   ///< Klartext fuer die Oberflaeche
+    /// @brief Frueher gueltige Namen (YAML `aliases:`): loesen in @ref FsCatalog::find auf dieses Profil auf,
+    ///        erscheinen aber in keiner Liste und nie als Erkennungsergebnis.
+    std::vector<std::string> aliases;
     std::string format;        ///< Name eines Eintrags aus `formats:`
     FsType      type = FsType::Cpm;
 

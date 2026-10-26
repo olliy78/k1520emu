@@ -925,11 +925,11 @@ Datendiskette gilt: 494 Blöcke, K5601 = MFM.
 
 Unter MUTOS selbst kann man nicht formatieren, nur `mkfs`.
 
-**Mit dem DiskTool** (Menü *Werkzeuge*): *Datei ▸ Neue Diskette* mit dem Dateisystem **`mutos8k_mfm`** (K5601; `mutos8k_fm`
+**Mit dem DiskTool** (Menü *Werkzeuge*): *Datei ▸ Neue Diskette* mit dem Dateisystem **`mutos8k_26x128_mfm`** (K5601; `mutos8k_26x128_fm`
 für MF3200) legt eine fertig formatierte Datendiskette samt Dateisystem an; Dateien holt und schreibt man wie bei jeder
 anderen Diskette (*Datei ▸ Abbild öffnen*). Auf der Kommandozeile:
 
-    k1520disktool create neu.hfe --fs mutos8k_mfm --blocks 494
+    k1520disktool create neu.hfe --fs mutos8k_26x128_mfm --blocks 494
     k1520disktool put neu.hfe datei.txt
     k1520disktool ls -l neu.hfe
 

@@ -88,6 +88,38 @@ Tickets #10 (tar-Satz) und #11 (Platte), Zweig `tar_satz_platte`.  Kern: `core/f
     Wächter `TarNeu.GeoeffneteTarDisketteSchreibtInsSelbeAbbildZurueck`, `…WaechstZumSatz`, `TarSatz.Einzeldiskette…`,
     `TarWrite.ZuGrossFuerEinAbbild…`, `py_disktool_tar_satz_gui` (`…_without_a_question`, `…_overflow_…`).
 
+17. **tar im MUTOS-8000-Layout (2026-10-25, Entwurf 39 Teil A „A5b“, #22).**  Das V7-`tar` des MUTOS schreibt seinen Strom auf
+    das **Rohgeraet** `/dev/rrkN`, nicht linear ab Zylinder 0: 512-B-Bloecke des Treibers ab Zylinder 1, Verschraenkung 2,
+    Spurversatz 6 (`Mutos8kDev`), **494 Bloecke = 252 928 B je Diskette**, Zylinder 0 bleibt unberuehrt.  Mehrdisketten gibt es dort
+    nur ueber `dd` (`tar cf - … | dd of=/dev/rrk0 bs=512 count=494`, Folgediskette `skip=494`).  Dafuer vier Profile in
+    `data/formats.yaml` (`type: tar`, `unix_layout: mutos8k`, `data_start` Zyl. 1): `tar_mutos8k_26x128_mfm` (Format `udos_ss77`, K5601),
+    `tar_mutos8k_26x128_fm` (`mf3200_26x128`, 8″) und je eine `…_leer`.  Festlegungen: (Namensschema `mutos8k_<Sektoren>x<Bytes>_<fm|mfm>`, 2026-10-26.  Die alten Namen (`mutos8k_fm`, `mutos8k_mfm`, `mutos77`, `mutos80`, `tar_mutos8k_{fm,mfm}[_leer]`) gelten als Alias (`aliases:` in `data/formats.yaml`, `FsCatalog::find`; Wächter `FsCatalog.AlteProfilnamenLoesenAlsAliasAufDasNeueProfilAuf`), stehen aber in keiner Liste und nie als Erkennungsergebnis.)
+    * **Ein Strom-Zugriff, ein Ort**: `TarSpaceQuelle(SectorSpace&, const FsProfile*)` rechnet bei `mutos8k_layout` ueber `Mutos8kDev`,
+      sonst linear; **jeder** Zugriff des `DiskVolume` auf den Datenstrom (Erkennung, Mounten, `linearBytes`, Kapazitaet, Satz speichern,
+      `satzInsAbbild`, Nullfuellung) geht ueber diese Klasse mit `profile_` — nie direkt `space->read/write/size()`.
+    * **Als „Format“ kann das Profil genannt werden**: `tarSatzNeu`/`tarDisketteNeu`/`openTarSatz(…, format)` nehmen ein Katalogformat
+      (linear, wie bisher) ODER den Namen eines tar-Profils mit Layout (`tar-satz-neu --format tar_mutos8k_26x128_mfm`); `tarFormate(formats, fs_cat)`
+      nennt sie mit der Kapazitaet des Rohgeraets (C-ABI/GUI-Liste „Neue tar-Diskette/Satz“ ohne Aenderung).  Linear bleibt `--format udos_ss77`.
+    * **Erkennung VOR den Dateisystemen** der Geometrie (`disk_volume.cpp`, Vorprobe hinter der Schleife): eine MUTOS-tar-Diskette ist fuer UDOS eine
+      leere Diskette (Zyl. 0 = E5).  Probiert wird `looksLikeTar` bei Block 0 (Pruefsumme, Name, Groesse) bzw. „Datenbereich ganz Null“ (`_leer`); nur ein
+      `wega_mutos`-Dateisystem derselben Geometrie geht vor.  Wächter: eine UDOS-/MUTOS-Diskette bleibt, was sie ist.  **Das Layout bestimmt das ERSTE
+      Abbild eines Satzes**; Folgedisketten beginnen mitten in einer Datei und sind nicht erkennbar (`openTarSatz` reicht es durch).
+    * **Neue Disketten tragen im Datenbereich Nullbloecke, Zyl. 0 bleibt wie formatiert (E5)**: MUTOS-`tar tvf` auf einer nie beschriebenen
+      (E5-)Diskette endet nicht sauber, eine Null-Diskette ist ein leeres Archiv.  Der Rest der letzten Diskette eines Satzes ist Null (wie linear).
+    * **`.img` kennt kein Aufzeichnungsverfahren**: 77 × 26 × 128 als `.img` wird ohne Angabe immer MFM (K5601); FM-`.img` nur mit `--fs`/vorgegebenem Profil.
+    * **Gast-Verhalten, kein Fehler** (Befund 2026-10-25): eine Diskette eines Satzes ist KEIN abgeschlossenes Archiv — `tar` liest zuletzt einen
+      Datensatz zu 8 Bloecken ueber die 494 hinaus und meldet `Tar: tape read error` (`err on dev 13/0 bn=488 er=0,305`); der Inhalt davor ist vollstaendig.
+      Ein Archiv ueber 494 Bloecke haengt MUTOS-`tar` ohne Meldung (kein Mediumende).  `tar` braucht `pwd` in `/bin`, `/usr/bin` oder `/mnt/bin`.
+    * **B1-Nebenbefund geklaert (kein DiskTool-/Emulatorfehler):** das offline mit `rawpack.py` (`sector_write`) gepackte Abbild las MUTOS an 16 Sektoren falsch,
+      weil es **vor dem Lesen von MUTOS selbst veraendert worden war**: MUTOS schreibt ueber das Blockgeraet `/dev/rk0` **verzoegert** (Pufferspeicher, `sync` noetig);
+      wurde die Diskette im Debugger (`mount A …`) getauscht, bevor die Puffer der vorigen Diskette geschrieben waren, landeten diese Bloecke auf der NEUEN Diskette
+      (nachgestellt: `dd of=/dev/rk0 seek=38`, Tausch, `sync` → Bloecke 38–41 der neuen Diskette ueberschrieben).  Ein frisch mit `rawpack` gepacktes Abbild liest MUTOS
+      fehlerfrei (zwei Laeufe, auch nach Tausch).  **Regel: vor jedem `mount A` im Debugger `sync` und warten; Rohgeraet `/dev/rrkN` ist ungepuffert.**
+    Wächter: `TarMutos.*` (`test_tar_mutos.cpp`: Abbildung mit EIGENER Formel, MUTOS-Fixtures `mutos8000_tar_*.dmk`, Satz-Rundlauf in hfe/dmk/img und FM,
+    System-`tar`-Gegenprobe, Zyl. 0 unberuehrt, Erkennung, Formatliste), `FsCatalog.ProfilnamenSindEinStabilerVertrag`, `py_disktool_tar_mutos`,
+    `dt_tar_mutos_*.cli`, und die **Abnahme unter MUTOS im Emulator** `cli_mutos8000_tar_disktool_geschrieben` (`tar tvf`/`tar xvf` einer DiskTool-Einzeldiskette +
+    `cmp` gegen die Originale, DiskTool-Satz aus zwei Disketten ueber `dd | tar`, Grenzdatei `cmp`-gleich).
+
 **Platte (#11)**
 
 12. **Eine Fassade `PlattenVolume`** (Partitionen `md0…md4` als oberste Ordner einer virtuellen Wurzel);
