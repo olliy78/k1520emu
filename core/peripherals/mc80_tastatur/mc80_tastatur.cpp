@@ -12,6 +12,9 @@ void Mc80Tastatur::reset()
     queue_.clear();
     bis_zeichen_ = 0;
     bis_taste_   = 0;
+    bereit_ = true;
+    dauerton_ = false;
+    umschaltung_gesperrt_ = false;
 }
 
 void Mc80Tastatur::anschlag(uint8_t praefix, uint8_t code)
@@ -30,6 +33,8 @@ void Mc80Tastatur::sondertaste(int n)
     anschlag(PRAEFIX_SONDER, n == 7 ? 0x00 : static_cast<uint8_t>(0x40 >> n));
 }
 
+void Mc80Tastatur::ziffernblock(uint8_t code) { anschlag(PRAEFIX_EBENE2, code & 0x7F); }
+
 void Mc80Tastatur::funktionstaste(uint8_t code) { anschlag(PRAEFIX_FUNKTION, code & 0x7F); }
 
 void Mc80Tastatur::tippe(const char* text)
@@ -42,20 +47,40 @@ void Mc80Tastatur::tippe(const char* text)
 
 bool Mc80Tastatur::qtTaste(uint32_t k, bool shift, bool ctrl)
 {
-    // Qt::Key_* der Sondertasten (qnamespace.h)
+    if (!bereit_) return false;   // 04H: Matrix gesperrt, bis 05H sie freigibt
+    if (umschaltung_gesperrt_) { shift = false; ctrl = false; }   // 0EH
+    // Qt::Key_* der Sondertasten (qnamespace.h); Codes der Nicht-Zeichentasten [Forum]
     switch (k) {
         case 0x01000004: case 0x01000005: zeichen(ENTER); return true;   // Return, Enter
-        case 0x01000000: zeichen(OFF);   return true;                    // Escape [?]
-        case 0x01000003: zeichen(0x08);  return true;                    // Backspace [?]
+        case 0x01000000: zeichen(OFF);   return true;                    // Escape
+        case 0x01000003: zeichen(0x08);  return true;                    // Rueckschritt = <-
         case 0x01000001: zeichen(0x09);  return true;                    // Tab
+        case 0x01000012: zeichen(0x08);  return true;                    // Kursor links
+        case 0x01000013: zeichen(0x0B);  return true;                    // Kursor hoch
+        case 0x01000014: zeichen(0x0C);  return true;                    // Kursor rechts
+        case 0x01000015: zeichen(0x0A);  return true;                    // Kursor runter
+        case 0x01000007: zeichen(0x7F);  return true;                    // Entf = CL
+        case TASTE_CRLF:    zeichen(0x0D); return true;
+        case TASTE_ZB_CL:   ziffernblock(0x7F); return true;
+        case TASTE_ZB_LEER: ziffernblock(0x20); return true;
+        case TASTE_ZB_00:   // 1DH, 30H zweimal [Forum]; zweites Paar im Zeichenabstand
+            ziffernblock('0');
+            queue_.push_back({PRAEFIX_EBENE2, false});
+            queue_.push_back({'0', false});
+            return true;
         default: break;
     }
+    if (k >= TASTE_ZB_ZEICHEN && k < TASTE_ZB_ZEICHEN + 0x80) {
+        ziffernblock(static_cast<uint8_t>(k - TASTE_ZB_ZEICHEN));
+        return true;
+    }
     if (k >= 0x01000030 && k <= 0x01000037) { sondertaste(static_cast<int>(k - 0x01000030)); return true; }
-    if (k >= 0x80) return false;   // Kursortasten u. a.: Codes der Tastatur unbekannt [?]
+    if (k >= 0x80) return false;   // sonstige Wirtstasten: keine Entsprechung
     uint8_t c = static_cast<uint8_t>(k);
     const bool buchstabe = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
     if (buchstabe) {
-        if (ctrl) { zeichen(static_cast<uint8_t>(c & 0x1F)); return true; }
+        // CTRL: Praefix 1FH, EGOS setzt Bit 7.  Das gesendete Zeichen (Kappe) ist [?].
+        if (ctrl) { funktionstaste(static_cast<uint8_t>(c & ~0x20)); return true; }
         c = shift ? static_cast<uint8_t>(c & ~0x20) : static_cast<uint8_t>(c | 0x20);
     }
     if (c < 0x20 && c != 0x08 && c != 0x09 && c != 0x0D) return false;
@@ -81,12 +106,18 @@ bool Mc80Tastatur::takt(int takte)
 
 void Mc80Tastatur::vomRechner(uint8_t b)
 {
+    // Steuerworte der Tastatur-Firmware [Forum, Beitrag 037, am Geraet getestet]
     switch (b & 0x7F) {
-        case 0x07: ++summer_; break;
-        case 0x14: anzeige_ = true; break;
-        case 0x12: anzeige_ = false; break;
+        case 0x07: ++summer_; dauerton_ = false; break;   // Piep, schaltet Dauerton aus
+        case 0x10: dauerton_ = true; break;
+        case 0x0E: umschaltung_gesperrt_ = true; break;
+        case 0x0F: umschaltung_gesperrt_ = false; break;
+        case 0x04: bereit_ = false; antwort(NAK); break;
+        case 0x05: bereit_ = true;  antwort(ACK); break;
+        case 0x13: case 0x14: break;   // Autorepeat aus/ein: wirkungslos (Firmwarefehler)
         default:
-            LOG_DEBUG("MC80-TAST", "Zeichen %02XH vom Rechner ohne Wirkung", b);
+            antwort(CAN);              // jedes andere 7-Bit-Wort: CAN, sonst ohne Funktion
+            LOG_DEBUG("MC80-TAST", "Zeichen %02XH vom Rechner: Antwort CAN", b);
             break;
     }
 }

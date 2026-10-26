@@ -255,7 +255,7 @@ int main(int argc, char** argv){
     for (int i=1;i<argc;++i){
         if (!strcmp(argv[i],"--machine") && i+1<argc){
             if (!dbgm::parseMachine(argv[++i], art)){
-                fprintf(stderr,"unbekannte Maschine '%s' (a5120 | k8915 | k8915-g2 | prg710 | prg710-1 | pc1715 | pc1715w | p8000 | p8000-16 | mc80 | mc80-30 | mc80-31 | mc80-21 | mc80-22)\n",argv[i]); return 2; } }
+                fprintf(stderr,"unbekannte Maschine '%s' (a5120 | k8915 | k8915-g2 | prg710 | prg710-1 | pc1715 | pc1715w | p8000 | p8000-16 | mc80 | mc80-30 | mc80-21 | mc80-22)\n",argv[i]); return 2; } }
         else if (!strcmp(argv[i],"--spe") && i+1<argc){ mc80_spe=atoi(argv[++i]);
             if (mc80_spe<1 || mc80_spe>2){ fprintf(stderr,"--spe: 1 oder 2\n"); return 2; } }
         else if (!strcmp(argv[i],"--skip-selftest")) skip_selftest=true;
@@ -3198,7 +3198,7 @@ int main(int argc, char** argv){
         }
         else if ((cmd=="help"||cmd=="h"||cmd=="?") && t.size()>1 && (t[1]=="mc80"||t[1]=="MC80")){
             fprintf(stderr,
-              "  MC80 (--machine mc80|mc80-30|mc80-31 [--spe 1|2])  eine CPU (U880, EGOS-ROM 0000H-1FFFH), Segmentfenster 4000H-BFFFH\n"
+              "  MC80 (--machine mc80|mc80-30 [--spe 1|2])  eine CPU (U880, EGOS-ROM 0000H-1FFFH), Segmentfenster 4000H-BFFFH\n"
               "    map               Segmentregister 85H, RAM-Schutz, welche SPE-2-/EPROM-Segmente sichtbar sind\n"
               "    d/u/x/e/wp        Speicher in CPU-SICHT (das gerade freigegebene Segment)\n"
               "    load <datei> <A>  Datei in den Speicher (CPU-Sicht; Segment vorher waehlen)\n"
@@ -3337,7 +3337,7 @@ int main(int argc, char** argv){
               "  K8915   map | bank <1|2> <A> [N] | help k8915   (--machine k8915 | k8915-g2)\n"
               "  PRG     map | help prg   (--machine prg710|prg710-1)\n"
               "  PC1715  map | help pc1715   (--machine pc1715)\n"
-              "  MC80    map | dev | help mc80   (--machine mc80|mc80-30|mc80-31 [--spe 1|2])\n"
+              "  MC80    map | dev | help mc80   (--machine mc80|mc80-30 [--spe 1|2])\n"
               "  P8000   map|adp | dma | kopp | mmu | xlat | ml | mp | segt | bsegt | term | help p8000   (--machine p8000|p8000-16)\n"
 
               "  A5120.16 cpu [zve1|zve2|u8000] ; dev em ; fcw ; psa ; bmode ; bvi ; bint16 ; emlog\n"

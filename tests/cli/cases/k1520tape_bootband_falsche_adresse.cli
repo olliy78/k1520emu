@@ -1,0 +1,9 @@
+# bootband weist ein Abbild mit anderer Anfangsadresse als 0400H ab (das Lade-ROM laedt nach 0400H).
+tool:   k1520tape
+tmpfile band.k52:
+file boot.hex:
+  :0408000053594C5AA2
+  :00000001FF
+run:    bootband %boot.hex% %band.k52%
+expect: nicht 0400H
+exit:   1

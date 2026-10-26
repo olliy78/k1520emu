@@ -388,6 +388,11 @@ k1520_add_test(mc80_kassette SRC test_mc80_kassette.cpp
                           LIBS k1520_mc80 k1520_logger
                           LABELS "${_lbl}" DEFS LOG_LEVEL=2)
 
+# MC80 (Issue #24): EPROM mit PCMC-Erweiterung (2800H), Datenaustausch PC <-> MC80 ueber die IFSS.
+k1520_add_test(mc80_pcmc SRC test_mc80_pcmc.cpp
+                          LIBS k1520_mc80 k1520_logger
+                          LABELS "${_lbl}" DEFS LOG_LEVEL=2)
+
 # MC80 (AP M5): Spiele-Speicherabzuege doc/mc80/spiele/ laden und ueber die EGOS-Kette starten.
 k1520_add_test(mc80_spiele SRC test_mc80_spiele.cpp
                           LIBS k1520_mc80 k1520_logger

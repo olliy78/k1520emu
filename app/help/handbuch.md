@@ -1300,7 +1300,7 @@ zu je 128 Byte** hintereinander nach **0400H**. Steht in 0400H–0402H die Kennu
 springt es nach **0434H**; sonst geht es in den Fehlerpfad. Gesamtfrist rund 136 s.
 
 Es startet also nur ein Band, das genau so aufgebaut ist: ein **Bootband**. Eines baut man
-mit `k1520tape bootband <programm.bin> <band.k52> [A|B]` (legt 4 × 128 Byte an, die Datei
+mit `k1520tape bootband <programm.bin> <band.k52> [A|B] [--format F]` (legt 4 × 128 Byte an, die Datei
 wird auf 512 Byte aufgefüllt); das Programm muss bei Versatz 34H einsetzen und `SYL` am
 Anfang tragen. Als Beispiel dienen `tools/kassette/bandtest/` (Quelle, `build.py`) und das
 fertige Demo-Band `a5120_bandtest/bandtest_boot.k52`.
@@ -1325,6 +1325,52 @@ Ehrlich dazu:
 | SCPX | nur die Bibliothek `KMBG.REL` und das Prüfprogramm `KMBGTEST` |
 | CP/A | kein Treiber |
 | EGOS (MC80) | Kommandos `KINIT`, `WRITE`, `READ` (Abschnitt *Der MC80 Emulator*) |
+
+### Dateiformate der Kassette
+
+**Was der Emulator selbst speichert: `.k52`.** Das ist das eigene Bandformat dieses
+Projekts, entworfen für genau dieses Gerät (es gibt keine fremde Vorlage). Eine `.k52`
+ist das **ganze Band** mit beiden Seiten, so wie die Software es über die Karte
+beschrieben hat:
+
+* **Kopf:** Kennung `K52T`, Fassung, Aufnahmegeschwindigkeit, Aufzeichnungsdichte
+  (Vorgabe 31,5 Bit/mm) und die Maße des Bandes (Länge, Vorspann, Marken).
+* **Je Seite (A und B):** der Schreibschutz und die Blöcke in Bandreihenfolge, jeder mit
+  seiner **Lücke** davor (in µm) und seinen **rohen Bytes** `AAH | Daten | CRC | AAH`.
+* **Verlustfrei:** auch ein Block mit falscher Prüfsumme oder fremder Präambel bleibt
+  genau so erhalten. Laden und Speichern ergibt dieselben Bytes zurück. Eine beschädigte
+  oder unbekannte Datei wird abgewiesen, nie halb gelesen.
+* **Längen, nicht Zeiten:** ein mit 38 cm/s beschriebenes Band liest sich bei 19 cm/s
+  nur langsamer. Die Kopfstelle (wo das Band gerade steht) gehört zur Kassette im Gerät
+  und steht **nicht** in der Datei.
+
+Der Inhalt der Blöcke ist Sache des Gastprogramms (BCU 880, `KMBG.REL`, EGOS); die
+Karte kennt keinen Rahmen. Deshalb gibt es **kein fremdes Dateiformat, das direkt als
+Band taugt**.
+
+**Programmdateien, die `k1520tape` versteht.** Zum Übernehmen von Programmen kennt das
+Kommandozeilenwerkzeug `k1520tape` (`put`, `get`, `bootband`) die Dateiformate des
+Emulators JKCEMU. Sie enthalten ein Speicherabbild mit Kopf; `put` und `bootband`
+streifen den Kopf ab, `get --as` setzt einen davor:
+
+| Format | Endung | Inhalt |
+|--------|--------|--------|
+| roh | beliebig | nur die Bytes, keine Adresse |
+| Headersave | `.z80` | 32-Byte-Kopf (Anfang, Ende, Start, Typ, Name), dann die Bytes |
+| KCC | `.kcc` `.kcb` `.kcm` `.jtc` | 128-Byte-Kopf (Name, Anfang, Ende, Start), dann die Bytes |
+| KC-TAP | `.tap` | KC-Kassettenblöcke zu 129 Byte; nur die erste Teilaufnahme wird übernommen |
+| Intel-HEX | `.hex` `.ihx` | Textzeilen mit Adresse und Prüfsumme |
+
+`--format` wählt das Format ausdrücklich (`auto`, `roh`, `headersave`, `kcc`, `kctap`,
+`hex`); ohne Angabe erkennt `k1520tape` Headersave, KC-TAP und Intel-HEX am Inhalt, KCC
+an der Endung. Ein Bootband aus einer Datei mit Adresse (`bootband`) verlangt **0400H**
+als Anfangsadresse, weil das Lade-ROM dorthin lädt.
+
+**Nicht unterstützt:** Tonsignal- und Tape-Dateien (WAV, CSW, TZX/CDT, ZX-TAP) und
+KC-BASIC-Dateien. Sie beschreiben ein Audiosignal bzw. Rechner, die es hier nicht gibt;
+die K5020 ist ein digitaler Anschluss ohne Tonkanal. Die Oberfläche arbeitet nur mit
+`.k52`; Dateien in den Formaten oben werden mit `k1520tape` auf ein Band gelegt (Einzelheiten:
+`doc/kassette/jkcemu_formate.md`, `tools/k1520tape.md`).
 
 ## Rechtsklick auf das Bild: Text kopieren, Zwischenablage einfügen
 
@@ -1733,6 +1779,44 @@ anders ist:
   „mc 80.30. microcomputer“ und „Version 3.0“, unten steht `OK` und der Prompt `>`.
   **Erst `INIT` eingeben** (mit ENTER): das legt die Kommandokette im RAM an; Tasten,
   die vor dem Ende von INIT kommen, gehen verloren.
+* **PCMC — Programme zwischen PC und MC80 übertragen** (nur MC80.30). *Einstellungen ▸ Allgemein ▸
+  PCMC-Erweiterung* steckt das EPROM „mit PCMC-Erweiterung“ (2800H, 3. Fassung der SPE 2); im
+  EGOS gibt es dann das Kommando **PCMC** (Menü: `E` = Datei vom PC empfangen, `S` = Datei zum
+  PC senden, OFF = Ende; 4800 Bd 8N1 über die IFSS). Die PC-Seite ist *Maschine ▸ PCMC-Gegenstelle*
+  (auch in der Symbolleiste): sie macht die IFSS zu einem Telnet-Server auf der Schleife und zeigt
+  den Kasten **PCMC** als Reiter neben der Kassette; *Ausschalten* stellt die IFSS-Einstellung
+  (Reiter *Schnittstellen*) wieder her. Eine schon belegte IFSS fasst die Gegenstelle nicht an.
+  * **Zum MC80 senden:** am MC80 `PCMC`, dann `E`. Im Kasten *Datei laden…* (`.bin`). Trägt die
+    Datei den **Adresskopf** (4 Byte: Startadresse und Länge−1, je niedrig/hoch), stehen Start- und
+    Endadresse in den Feldern und lassen sich ändern; ohne Kopf bleiben sie leer und müssen
+    ausgefüllt werden (eine neue Startadresse verschiebt die Endadresse mit). Dann *Senden*.
+  * **Vom MC80 holen:** am MC80 `PCMC`, dann `S`. Start- und Endadresse eintragen, *Empfangen…*
+    und die Zieldatei wählen; sie wird **mit Adresskopf** gespeichert und lässt sich später an
+    dieselbe Stelle zurücksenden. Eine Hex-Ansicht gibt es nicht.
+  * Die Übertragung läuft in Maschinenzeit (4800 Bd, rund 480 Byte/s): große Dateien gehen mit
+    schnellerem Takt schneller. Jedes Byte wird zurückgemeldet; ein Fehler oder eine Frist von 20 s
+    ohne Antwort bricht ab. Kein Tastenkürzel.
+  * **Schritt für Schritt (Beispiel Tetris holen und zurückspielen):**
+    1. *Einstellungen ▸ Allgemein ▸ PCMC-Erweiterung* auf „mit PCMC-EPROM (2800H)“ stellen
+       (der Rechner startet dabei neu), *Maschine ▸ PCMC-Gegenstelle* einschalten — der Reiter
+       **PCMC** erscheint neben der Kassette.
+    2. Am MC80 `INIT`, dann `pcmc` + ENTER. Es meldet sich „PC-MC v.0.2“ mit dem Hauptmenü.
+       Die Tasten wirken wie die Tastatur des MC80: `e`/`s` klein tippen.
+    3. **Programm auf den MC80:** am MC80 `e`. Im Kasten *Datei laden…* (z. B.
+       `tetris_4000_4fff.bin`, hat keinen Adresskopf) — *Start* `4000` eintragen, *Ende* folgt aus
+       der Dateilänge (`4FFF`) — *Senden*. Nach rund 10 s Maschinenzeit steht in der Statuszeile
+       „4096 Byte nach 4000H gesendet“; das Programm liegt Byte für Byte im Speicher.
+    4. Zurück ins Menü (am MC80 beliebige Taste, dann Menü), mit **OFF** das PCMC verlassen und das
+       Programm wie gewohnt starten (`te` + ENTER, die Spiele brauchen vorher `INIT`).
+    5. **Programm vom MC80 holen:** `pcmc` ▸ `s`. Im Kasten *Start* `4000` und *Ende* `4FFF`
+       eintragen, *Empfangen…*, Zieldatei wählen. Die Datei enthält vorn den Adresskopf
+       `00 40 FF 0F` und danach die 4096 Byte; sie lässt sich mit *Datei laden…* wieder öffnen
+       (Start/Ende erscheinen dann von selbst) und mit `e` zurückspielen.
+    6. Ein Programm, das nur auf Kassette oder im EPROM liegt, holt man genauso: erst am MC80 in den
+       Arbeitsspeicher bringen (z. B. `READ`), dann bei `s` dessen Bereich angeben.
+    Läuft die Übertragung nicht an, zuerst prüfen: Gegenstelle eingeschaltet, am MC80 *vorher* `e`
+    bzw. `s` gedrückt (sonst bricht der Emulator nach 20 s mit „Keine Antwort vom MC80“ ab), und
+    die IFSS nicht anderweitig belegt (Reiter *Schnittstellen*).
 * **Programme laden** — *Maschine ▸ Speicherabzug laden…* lädt eine Binärdatei ab einer
   Adresse in den Arbeitsspeicher (erfragt wird die Adresse; steht sie im Dateinamen wie
   bei `tetris_4000_4fff.bin`, ist sie vorgeschlagen). Gestartet wird mit dem

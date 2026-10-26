@@ -45,7 +45,7 @@ namespace dbgm {
 using IntSource = A5120Machine::IntSource;
 
 /** @brief Maschinenwahl aus `--machine`; false bei unbekanntem Namen. */
-enum class Art { A5120, K8915, K8915G2, Prg710, Prg710_1, Pc1715, Pc1715W, P8000, P8000_16, Mc80_30, Mc80_31, Mc80_21, Mc80_22 };
+enum class Art { A5120, K8915, K8915G2, Prg710, Prg710_1, Pc1715, Pc1715W, P8000, P8000_16, Mc80_30, Mc80_21, Mc80_22 };
 inline bool parseMachine(const std::string& s, Art& art) {
     if (s == "a5120" || s == "A5120")       { art = Art::A5120;    return true; }
     if (s == "k8915" || s == "K8915")       { art = Art::K8915;    return true; }
@@ -55,7 +55,6 @@ inline bool parseMachine(const std::string& s, Art& art) {
     if (s == "pc1715" || s == "PC1715")     { art = Art::Pc1715;   return true; }
     if (s == "pc1715w" || s == "PC1715W")   { art = Art::Pc1715W;  return true; }   // AP-W3
     if (s == "mc80" || s == "mc80-30" || s == "MC80" || s == "MC80.30") { art = Art::Mc80_30; return true; }   // AP M8
-    if (s == "mc80-31" || s == "MC80.31")   { art = Art::Mc80_31;  return true; }
     if (s == "mc80-21" || s == "MC80.21")   { art = Art::Mc80_21;  return true; }   // AP M12
     if (s == "mc80-22" || s == "MC80.22")   { art = Art::Mc80_22;  return true; }
     if (s == "p8000" || s == "P8000")       { art = Art::P8000;    return true; }   // AP P12a: nur 8-Bit-Seite
@@ -298,10 +297,8 @@ public:
             c.karte16 = (art == Art::P8000_16);
             p8_ = std::make_unique<P8000Machine>(c);
         }
-        else if (art == Art::Mc80_30 || art == Art::Mc80_31) {   // AP M8: Variante .30/.31, 1 oder 2 SPE 2
+        else if (art == Art::Mc80_30) {   // AP M8: 1 oder 2 SPE 2
             Mc80Machine::Config c;
-            c.variante = art == Art::Mc80_31 ? Mc80Machine::Config::Variante::Mc8031
-                                             : Mc80Machine::Config::Variante::Mc8030;
             c.spe_karten = mc80_spe;
             mc_ = std::make_unique<Mc80Machine>(c);
         }
@@ -339,7 +336,7 @@ public:
     bool einCpu() const { return a5_ == nullptr; }
     const char* name() const {
         if (m2_) return Mc80_2xMachine::variantenName(m2_->variante());
-        return mc_ ? (mc_->variante() == Mc80Machine::Config::Variante::Mc8031 ? "MC80.31" : "MC80.30") : p8_ ? "P8000" : k8_ ? (gen2(*k8_) ? "K8915 Gen 2" : "K8915") : pc_ ? "PC 1715" : p7_ ? (isPrg1() ? "PRG 710-1" : "PRG 710") : "A5120"; }
+        return mc_ ? "MC80.30" : p8_ ? "P8000" : k8_ ? (gen2(*k8_) ? "K8915 Gen 2" : "K8915") : pc_ ? "PC 1715" : p7_ ? (isPrg1() ? "PRG 710-1" : "PRG 710") : "A5120"; }
     /// Anzeigename der (Haupt-)CPU in Meldungen: am A5120 „ZVE1“ (es gibt zwei).
     const char* cpuName() const { return a5_ ? "ZVE1" : p8_ ? "U880" : mc_ ? "ZVE" : m2_ ? "ZRE" : "CPU"; }
     A5120Machine* a5120() { return a5_.get(); }

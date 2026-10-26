@@ -708,6 +708,8 @@ BSYS (ROM ver2) meldet sich mit dem Menü, speichert/lädt über die Kassette.  
 `keyboard_mc80_2x.py` (Tastenlage [?], logisch nach der Codetabelle), Kassette fest eingebaut (`tape_fest`, nur Laufwerk 1),
 `k1520_create_mc80(3|4)` ohne Konfigurationstext; `boot_trace`/`k1520dbg --machine mc80-21|mc80-22` (Abbruch am BSYS-Menü,
 Marke in Spalte 5 zählt nicht als Bildänderung).
+**PCMC (Issue #24, 2026-10-26):** optionales EPROM „mit PCMC-Erweiterung“ auf 2800H (`Config::pcmc`, Profil-Hardwarewahl `pcmc`) +
+PC-Gegenstelle (`app/pcmc.py`, Kasten `app/ui/pcmc_widget.py`, Aktion *Maschine ▸ PCMC-Gegenstelle*; IFSS als Telnet-Server auf der Schleife) — `doc/mc80/pcmc.md`.
 **Vor Arbeiten daran: `doc/merkposten/mc80.md` lesen** (Segmentport 85H, Leerbereich 00H, `Z80CTC::setIntAusVerwirftAnforderung`
 nur an der ASP-CTC, EPROM-Segmente, Kassettentakt-Annahmen, MC80.2x-Zeitmodell und RETI-Verteilung, offene Fragen).
 Plan: `doc/design/31_mc80.md`.

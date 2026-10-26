@@ -46,6 +46,7 @@ from app.ui.keyboard import KeyboardWidget
 from app.ui.focus import release_focus, ScreenFocusGuard
 from app.ui.help_window import HelpWindow
 from app.ui.kassette_widget import KassetteWidget
+from app.ui.pcmc_widget import PcmcWidget
 from app.ui.keyboard_k7633 import AupWidget
 from app.ui.lochstreifen_widget import LochstreifenWidget
 from app.ui import status_bar
@@ -277,7 +278,7 @@ class MainWindow(QMainWindow):
         # ergibt und nicht fuenfzig.
         for dock in (self.screen_dock, self.keyboard_dock,
                      self.drives_dock, self.settings_dock, self.eprom_dock,
-                     self.lochstreifen_dock, self.kassette_dock, self.aup_dock):
+                     self.lochstreifen_dock, self.kassette_dock, self.pcmc_dock, self.aup_dock):
             if dock is None:
                 continue
             dock.visibilityChanged.connect(lambda *_: self._kasten_sichtbarkeit())
@@ -511,6 +512,19 @@ class MainWindow(QMainWindow):
         self.kassette_dock.visibilityChanged.connect(
             lambda sichtbar: sichtbar and self.kassette_widget.aktualisieren())
 
+        # ── PCMC-Dock (Issue #24): die PC-Gegenstelle des MC80, sichtbar nur, solange sie an ist ──
+        self.pcmc_widget = PcmcWidget(self.emulator)
+        self.pcmc_widget.block_lesen = lambda: self.serial_widget.zustand_lesen().get("IFSS")
+        self.pcmc_dock = QDockWidget("PCMC", self)
+        self.pcmc_dock.setObjectName("pcmc_dock")
+        self.pcmc_dock.setWidget(self.pcmc_widget)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.pcmc_dock)
+        self.tabifyDockWidget(self.kassette_dock, self.pcmc_dock)
+        self.pcmc_dock.hide()
+        self.pcmc_widget.meldung.connect(
+            lambda t: self.statusBar().showMessage(t, 8000))
+        self.pcmc_widget.umgeschaltet.connect(self._pcmc_angezeigt)
+
         # ── AUP-Dock (Entwurf 33 N10e): wie die Kassette nur bei gesteckter Karte ──
         self.aup_widget = AupWidget(self.emulator)
         self.aup_dock = QDockWidget("AUP", self)
@@ -555,6 +569,7 @@ class MainWindow(QMainWindow):
         self._lochstreifen_kasten()
         self._kassette_kasten()
         self._aup_kasten()
+        self._pcmc_kasten()
 
         # Startaufteilung: rechte Spalte (Laufwerke) so schmal wie moeglich, ohne
         # horizontales Scrollen; Bildschirm breit.  Tastatur auf Minimalhoehe.
@@ -917,6 +932,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, "act_speicherabzug_laden"):   # nur MC80 (AP M6)
             emu_menu.addSeparator()
             emu_menu.addAction(self.act_speicherabzug_laden)
+            emu_menu.addAction(self.act_pcmc)
             emu_menu.addAction(self.act_text_kopieren)
         if self.eprom_dock is not None:          # nur im Profil mit EPROMmer
             emu_menu.addSeparator()
@@ -1179,7 +1195,7 @@ class MainWindow(QMainWindow):
         data = config_io.build_config(
             self.screen_widget.params, general, self.drives_widget.get_mounts(),
             self._gather_window_state(), drive_types=self._drive_types,
-            schnittstellen=self.serial_widget.zustand_lesen(),
+            schnittstellen=self.pcmc_widget.fuer_konfig(self.serial_widget.zustand_lesen()),
             machine=({"raf": self._raf, "raf_standby": bool(self._raf_standby)}
                      if self.profil.raf_wahl else None))
         if self.eprom_widget is not None:
@@ -1529,6 +1545,7 @@ class MainWindow(QMainWindow):
             self._lochstreifen_kasten()
             self._kassette_kasten()
             self._aup_kasten()
+            self._pcmc_kasten()
         finally:
             self._loading_config = False
 
@@ -2396,6 +2413,48 @@ class MainWindow(QMainWindow):
             dock.raise_()
         self.aup_widget.aktualisieren()
 
+    def _pcmc_moeglich(self) -> bool:
+        """Hat das Modell eine IFSS fuer PCMC?  (MC80.30; der MC80.2x hat keine serielle Schnittstelle.)"""
+        return self.profil.maschine == "mc80" and self.profil.modell_normalisieren(self._model) == "mc80"
+
+    def _pcmc_kasten(self) -> None:
+        """Aktion und Kasten an Modell und EPROM-Wahl anpassen (nach jedem Neuaufbau/jeder Konfiguration)."""
+        akt = getattr(self, "act_pcmc", None)
+        if akt is None:
+            return
+        moeglich = self._pcmc_moeglich()
+        self.pcmc_widget.set_rom(moeglich and self._hardware.get("pcmc") == "1")
+        akt.setEnabled(moeglich)
+        if not moeglich and self.pcmc_widget.an:
+            self.pcmc_widget.ausschalten()
+        if not self.pcmc_widget.an:
+            self.pcmc_dock.hide()
+        self._pcmc_aktion_setzen(self.pcmc_widget.an)
+
+    def _pcmc_aktion_setzen(self, an: bool) -> None:
+        akt = getattr(self, "act_pcmc", None)
+        if akt is not None and akt.isChecked() != an:
+            akt.blockSignals(True)
+            akt.setChecked(an)
+            akt.blockSignals(False)
+
+    def _pcmc_umschalten(self, an: bool) -> None:
+        """Aktion *PCMC-Gegenstelle*: IFSS als Telnet-Server oeffnen und den Kasten zeigen."""
+        if an:
+            if not self.pcmc_widget.einschalten():
+                self._pcmc_aktion_setzen(False)
+                QMessageBox.warning(self, "PCMC", self.pcmc_widget.status.text())
+        else:
+            self.pcmc_widget.ausschalten()
+
+    def _pcmc_angezeigt(self, an: bool) -> None:
+        self._pcmc_aktion_setzen(an)
+        if an:
+            self.pcmc_dock.show()
+            self.pcmc_dock.raise_()
+        else:
+            self.pcmc_dock.hide()
+
     def _kassette_kasten(self, zeigen: bool = False):
         """Kasten und Menüeintrag nur bei gesteckter Karte; *zeigen* holt ihn nach vorn."""
         dock = getattr(self, "kassette_dock", None)
@@ -2503,6 +2562,8 @@ class MainWindow(QMainWindow):
         # Die Schnittstellen gehoeren zur Maschine (der Kern haengt den Hub an sie):
         # Stand merken, die alten beenden (Kabel ab, Port frei), an der neuen
         # wieder aufnehmen — ein Wechsel der Laufwerke soll keine Verbindung kosten.
+        pcmc_an = self.pcmc_widget.an
+        self.pcmc_widget.ausschalten()      # stellt die IFSS-Einstellung des Anwenders wieder her
         serielle = self.serial_widget.zustand_lesen()
         self.serial_widget.alles_beenden()
         # Der EPROMmer-Sockel gehoert zur Maschine — das gesteckte PROM samt Inhalt
@@ -2560,6 +2621,10 @@ class MainWindow(QMainWindow):
         self._lochstreifen_kasten()
         self.settings_widget.set_tape_value(self._tape)
         self._kassette_kasten()
+        self.pcmc_widget.set_emulator(new_emu)
+        self._pcmc_kasten()
+        if pcmc_an and self._pcmc_moeglich():
+            self.pcmc_widget.einschalten()
         self.settings_widget.set_aup_value(self._aup, self._aup_sonder, self._aup_alpha)
         self._aup_kasten()
         # Die Statuszeile fuehrt je bestuecktem Steckplatz ein Feld — ein
@@ -2900,6 +2965,7 @@ class MainWindow(QMainWindow):
         # stammen, das kein Speichern ausgeloest hat.
         self._autosave_timer.stop()
         self._autosave_now()
+        self.pcmc_widget.ausschalten()
         # Stand-by: RAF-Inhalt in die Ablage (doc/design/22_raf512.md §7.1).
         self._raf_sichern()
         # Lochstreifen: was gestanzt ist, gehoert jetzt in die gebundene Datei.

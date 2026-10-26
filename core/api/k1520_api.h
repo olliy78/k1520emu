@@ -254,10 +254,10 @@ K1520_API K1520Handle k1520_create_p8000_terminal(const char* konfig);
  *        Kassette = `k1520_tape_*` mit Laufwerk 0 (SK 1200 der MBI; `k1520_tape_installed` = 1
  *        ohne `k1520_tape_install`).
  *
- * @param variante  0 = MC80.30, 1 = MC80.31, 3 = MC80.21, 4 = MC80.22; 2 = MC80.33 ist noch
- *                  nicht nachgebildet → NULL mit Grund.
+ * @param variante  0 = MC80.30 (Kassette K5020 mit einem Laufwerk fest eingebaut), 3 = MC80.21,
+ *                  4 = MC80.22; alles andere → NULL mit Grund.
  * @param konfig    Schluessel=Wert-Liste, durch Komma getrennt (NULL/"" = Vorgabe); Schluessel
- *                  (nur .30/.31): `spe` (1 | 2: Zahl der SPE 2; die zweite = RAM-Segment 02H).
+ *                  (nur .30): `spe` (1 | 2: Zahl der SPE 2; die zweite = RAM-Segment 02H).
  *                  Der MC80.2x kennt keine Schluessel.
  *                  Unbekannte Schluessel/Werte → NULL, Grund in k1520_last_init_error.
  * k1520_machine_type() = 6.  Keine Laufwerke.  `k1520_create(K1520_MACHINE_MC80)` = MC80.30.

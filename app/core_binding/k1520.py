@@ -413,7 +413,7 @@ _lib.k1520_create_p8000_terminal.argtypes = [ctypes.c_char_p]
 _lib.k1520_create_p8000_terminal.restype = K1520Handle
 
 # k1520_create_mc80(variante, konfig) -> K1520Handle   (Entwurf 31, AP M2)
-#   variante 0 = MC80.30, 1 = MC80.31 (2 = .33 → NULL), 3/4 = .21/.22 (konfig muss NULL sein); sonst "spe=1|2"
+#   variante 0 = MC80.30 (alles andere ausser 3/4 → NULL), 3/4 = .21/.22 (konfig muss NULL sein); sonst "spe=1|2"
 _lib.k1520_create_mc80.argtypes = [ctypes.c_int, ctypes.c_char_p]
 _lib.k1520_create_mc80.restype = K1520Handle
 
@@ -840,7 +840,7 @@ def _utf8(path) -> bytes:
 # Maschinentypen (K1520MachineType in core/api/k1520_api.h) — Name → Wert.
 MACHINE_TYPES = {"a5120": 0, "a5120-alt": 0, "a5120-kmbg": 0, "prg710": 1, "prg710-1": 1, "k8915": 2, "k8915-g2": 2, "pc1715": 3,
                  "pc1715-k7221": 3, "pc1715w": 3, "p8000": 4, "p8000-terminal": 5,
-                 "mc80": 6, "mc80-31": 6, "mc80-21": 6, "mc80-22": 6}
+                 "mc80": 6, "mc80-21": 6, "mc80-22": 6}
 # (Variante, Bildschirm) fuer k1520_create_pc1715: Variante 0 = PC 1715, 1 = PC 1715W (AP-W3);
 # Bildschirm 0 = K7222 80×24, 1 = K7221 64×16 (am 1715W abgelehnt).
 # AP-6: waehlbare ROM-Fassungen → Parameter von k1520_create_pc1715_ex.
@@ -912,10 +912,10 @@ def a5120_konfig_text(konfig: dict) -> str:
 K7023_COLS, K7023_ROWS = 64, 16
 # Variante fuer k1520_create_prg710 (nur die PRG-Namen).
 PRG_VARIANTEN = {"prg710": 0, "prg710-1": 1}
-# Variante fuer k1520_create_mc80 (Entwurf 31, AP M6/M12): "mc80" = MC80.30, "mc80-31" = MC80.31,
-# "mc80-21"/"mc80-22" = MC80.21/.22 (eigene Klasse Mc80_2xMachine, kennt keinen Schluessel
-# "spe=").  Die .33 (Variante 2) lehnt der Kern ab — die Oberflaeche fuehrt sie gesperrt.
-MC80_VARIANTEN = {"mc80": 0, "mc80-31": 1, "mc80-21": 3, "mc80-22": 4}
+# Variante fuer k1520_create_mc80 (Entwurf 31, AP M6/M12): "mc80" = MC80.30 (Kassette fest
+# eingebaut), "mc80-21"/"mc80-22" = MC80.21/.22 (eigene Klasse Mc80_2xMachine, kennt keinen
+# Schluessel "spe=").
+MC80_VARIANTEN = {"mc80": 0, "mc80-21": 3, "mc80-22": 4}
 #: Die Varianten des MC80.2x (Bild 528 × 256, 32 × 8 Zeichen, Tastatur als Matrix, MBI).
 MC80_2X = ("mc80-21", "mc80-22")
 # Bauform fuer k1520_create_k8915 (doc/design/24_k8915_varianten.md R5); "k8915" bleibt V3.
@@ -1175,7 +1175,7 @@ class K1520Emulator:
                  em: Optional[str] = None, raf: Optional[str] = None,
                  ptape: bool = False, tape: bool = False, zeichensatz: str = "deutsch",
                  tastatur: Optional[str] = None, p8000: Optional[dict] = None,
-                 ausfuehrung: Optional[str] = None, spe=1, laderom: Optional[str] = None,
+                 ausfuehrung: Optional[str] = None, spe=1, pcmc=False, laderom: Optional[str] = None,
                  konfig: Optional[dict] = None, aup: bool = False,
                  aup_sonder: bool = False):
         """Initialize emulator instance.
@@ -1189,7 +1189,7 @@ class K1520Emulator:
             machine: ``"a5120"`` (Vorgabe), ``"k8915"``, ``"k8915-g2"`` (K8915 Gen 2), ``"prg710"`` oder
                 ``"prg710-1"``, ``"pc1715"``, ``"pc1715-k7221"`` (PC 1715 mit dem
                 Bildschirm K7221, 64×16), ``"pc1715w"``, ``"mc80"`` (MC80.30) oder
-                ``"mc80-31"``, ``"mc80-21"``/``"mc80-22"`` — siehe :data:`MACHINE_TYPES`.
+                ``"mc80-21"``/``"mc80-22"`` — siehe :data:`MACHINE_TYPES`.
             zeichensatz: nur PC 1715 — Bestückung der ZG-EPROMs, ``"deutsch"``
                 (S619 + S602, Vorgabe), ``"polnisch"`` oder ``"kyrillisch"``; beim
                 ``"pc1715w"`` ohne Wirkung (der Satz kommt von Diskette).
@@ -1225,8 +1225,10 @@ class K1520Emulator:
             tape: Kassettenkarte K5020 (zwei K5200; A5120 30H, K8915 D0H, PRG 710 30H,
                 PC 1715 D0H) stecken, wie ``ptape`` direkt nach dem Anlegen.  Fehler → ValueError.
                 Bei der Ausführung ``"kmbg"`` steckt sie ohnehin (dann ohne Wirkung).
-            spe: nur MC80 (``"mc80"`` = MC80.30, ``"mc80-31"`` = MC80.31) — Zahl der
+            spe: nur MC80 (``"mc80"`` = MC80.30) — Zahl der
                 Speichererweiterungen SPE 2, ``1`` (Vorgabe) oder ``2`` (auch als Text).
+            pcmc: nur MC80.30 — das EPROM „mit PCMC-Erweiterung“ auf 2800H (Datenaustausch
+                PC ↔ MC80 über die IFSS, Issue #24); ``True``/``"1"`` stecken es.
             konfig: nur A5120 — Einzeloptionen als Wörterbuch (Entwurf 33), Schlüssel
                 ``ram`` (``k3526`` | ``k3525_1``/``_2``/``_4``), ``bildschirm`` (``k7024`` |
                 ``k7023`` | ``beide``), ``schalter`` (Anfangsstellung bei ``beide``),
@@ -1334,7 +1336,11 @@ class K1520Emulator:
                 handle = _lib.k1520_create_p8000_terminal(",".join(teile).encode("utf-8"))
             elif machine in MC80_VARIANTEN:
                 # Der MC80.2x kennt keinen Konfigurationstext (k1520_create_mc80 lehnt ihn ab).
-                konfig = None if machine in MC80_2X else f"spe={int(spe)}".encode("ascii")
+                if machine in MC80_2X:
+                    konfig = None
+                else:
+                    an = pcmc in (True, 1, "1")
+                    konfig = f"spe={int(spe)},pcmc={int(an)}".encode("ascii")
                 handle = _lib.k1520_create_mc80(MC80_VARIANTEN[machine], konfig)
             elif machine in PC1715_MODELLE:
                 names = (self._drive_types or [])[:4]

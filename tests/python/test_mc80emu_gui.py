@@ -129,7 +129,7 @@ def test_profil_und_titel(qapp, konfig_ordner):
     assert p.nenntakt_hz == 2_457_600 and p.nenntakt_text == "2,4576 MHz"
     assert p.modellwahl and not p.frontplatte and not p.eprommer and not p.terminal
     assert not p.laufwerke and not p.raf_wahl and not p.ptape_wahl
-    assert p.tape_wahl, "Kassette K5020 an 30H seit AP M7"
+    assert not p.tape_wahl, "Kassette fest eingebaut: kein Kästchen"
     w = _fenster(qapp)
     try:
         assert w.windowTitle() == "MC80 Emulator"
@@ -154,33 +154,39 @@ def test_profil_und_titel(qapp, konfig_ordner):
 def test_modellwahl_gesperrte_modelle_und_spe(qapp, konfig_ordner):
     from app import config_io, profil
     p = profil.profil("mc80")
-    assert [m[0] for m in p.modelle] == ["mc80", "mc80-31", "mc80-21", "mc80-22"]
-    assert [g[0] for g in p.gesperrte_modelle] == ["mc80-33"]       # .21/.22 seit AP M12 frei
-    assert p.modell_normalisieren("mc80-33") == "mc80"      # gesperrt = unbekannt
-    assert p.kern_parameter("mc80", {"spe": "2"}) == {"spe": "2"}
-    assert p.kern_parameter("mc80", {}) == {"spe": "1"}
+    assert [m[0] for m in p.modelle] == ["mc80", "mc80-21", "mc80-22"]
+    assert not p.gesperrte_modelle
+    # .31 und .33 gibt es nicht mehr: alte Konfigurationen landen beim .30
+    assert p.modell_normalisieren("mc80-33") == p.modell_normalisieren("mc80-31") == "mc80"
+    assert not p.tape_wahl                                  # Kassette fest eingebaut
+    assert p.kern_parameter("mc80", {"spe": "2"}) == {"spe": "2", "pcmc": "0"}
+    assert p.kern_parameter("mc80", {}) == {"spe": "1", "pcmc": "0"}
 
     w = _fenster(qapp)
     try:
         combo = w.settings_widget.model_combo
         assert not combo.isHidden()
-        for gesperrt in ("mc80-33",):
-            i = combo.findData(gesperrt)
-            assert i >= 0 and not combo.model().item(i).isEnabled(), gesperrt
-        for frei in ("mc80-31", "mc80-21", "mc80-22"):
+        for weg in ("mc80-31", "mc80-33"):
+            assert combo.findData(weg) < 0, weg
+        assert w.emulator.tape_installed()                  # ohne Kaestchen da
+        assert w.settings_widget.tape_box.isHidden()
+        for frei in ("mc80-21", "mc80-22"):
             i = combo.findData(frei)
             assert i >= 0 and combo.model().item(i).isEnabled(), frei
-        w._on_model_selected("mc80-31")
+        w._on_model_selected("mc80-21")
         qapp.processEvents()
-        assert w.emulator.machine == "mc80-31"
+        assert w.emulator.machine == "mc80-21"
+        w._on_model_selected("mc80")
+        qapp.processEvents()
+        assert w.emulator.machine == "mc80"
         assert w.drives_dock.isHidden()           # auch nach dem Neuaufbau
         w._on_hardware_selected("spe", "2")
         qapp.processEvents()
-        assert w._hardware == {"spe": "2"}
-        assert w.emulator.machine == "mc80-31"
+        assert w._hardware == {"spe": "2", "pcmc": "0"}
+        assert w.emulator.machine == "mc80"
         w._autosave_now()
         cfg = config_io.load_config(str(konfig_ordner / "mc80emu.yaml"))
-        assert cfg["general"]["model"] == "mc80-31"
+        assert cfg["general"]["model"] == "mc80"
         assert str(cfg["general"]["spe"]) == "2"
         assert "disks" not in cfg or not cfg["disks"]
     finally:
@@ -189,9 +195,9 @@ def test_modellwahl_gesperrte_modelle_und_spe(qapp, konfig_ordner):
 
 def test_bindung_kennt_beide_varianten_und_die_spe_zahl():
     from app.core_binding.k1520 import K1520Emulator, MACHINE_TYPES
-    assert MACHINE_TYPES["mc80"] == MACHINE_TYPES["mc80-31"] == 6
+    assert MACHINE_TYPES["mc80"] == 6 and "mc80-31" not in MACHINE_TYPES
     assert MACHINE_TYPES["mc80-21"] == MACHINE_TYPES["mc80-22"] == 6
-    for maschine, spe in (("mc80", 1), ("mc80-31", 2), ("mc80", "2")):
+    for maschine, spe in (("mc80", 1), ("mc80", 2), ("mc80", "2")):
         emu = K1520Emulator(machine=maschine, spe=spe)
         assert emu.machine == maschine and emu.machine_type() == 6
         assert emu.framebuffer_size() == (512, 256)
@@ -251,9 +257,17 @@ def test_tastenbild_der_bildschirmtastatur():
     # Buchstaben: klein ohne, gross mit Umschaltung; Ziffern mit Zweitbelegung.
     assert (nach_text["Q"].code, nach_text["Q"].shift_code) == (ord("q"), ord("Q"))
     assert (nach_text["1"].code, nach_text["1"].shift_code) == (ord("1"), ord("!"))
-    # Unbekannte Codes senden nichts.
-    for name in ("↑", "↓", "←", "→", "CL", "CRLF"):
-        assert nach_text[name].kind == "dead" and nach_text[name].code is None, name
+    # Kursor, CL, CRLF: Codes laut Forum threadid=7918 (Kern setzt 0BH/0AH/08H/0CH/7FH/0DH).
+    assert nach_text["↑"].code == int(Qt.Key_Up) and nach_text["↓"].code == int(Qt.Key_Down)
+    assert nach_text["←"].code == int(Qt.Key_Left) and nach_text["→"].code == int(Qt.Key_Right)
+    assert nach_text["CL"].code == int(Qt.Key_Delete)
+    assert nach_text["CRLF"].code == k.CODE_CRLF
+    # Ziffernblock: eigene Codes (Praefix 1DH), nur ÷ bleibt ohne Code [?].
+    zb = {t.low: t for t in tasten if t.x >= 19.4}
+    assert zb["CL"].code == k.CODE_ZB_CL and zb["00"].code == k.CODE_ZB_00
+    assert zb["7"].code == k.CODE_ZB_ZEICHEN + ord("7")
+    assert zb["÷"].kind == "dead" and zb["÷"].code is None
+    assert any(t.code == k.CODE_ZB_LEER for t in tasten)
     # 61 alphanumerische + Sonderfunktionen, 8 Steuertasten, 20 im Ziffernblock [BDA S.12].
     assert len([t for t in tasten if t.x >= 19.4]) == 20
     assert len(s) == 8
@@ -304,9 +318,9 @@ def test_speicherabzug_laden_und_tetris_starten(qapp, konfig_ordner):
 # ── Kassette (AP M7) ─────────────────────────────────────────────────────────
 
 @requires_core
-@pytest.mark.parametrize("modell", ["mc80", "mc80-31"])
+@pytest.mark.parametrize("modell", ["mc80"])
 def test_kassette_folgt_der_karte_und_legt_kompaktkassetten_an(qapp, konfig_ordner, tmp_path, modell):
-    """K5020 an 30H: Kasten „Kassette“ nur mit Karte; eine neu angelegte .k52 ist eine
+    """K5020 an 30H (fest eingebaut, EIN Laufwerk): Kasten „Kassette“; eine neu angelegte .k52 ist eine
     Kompaktkassette ohne BOT-/EOT-Marke mit 80 mm Vorspann (doc/mc80/kassette.md §3)."""
     import struct
     w = _fenster(qapp)
@@ -315,13 +329,10 @@ def test_kassette_folgt_der_karte_und_legt_kompaktkassetten_an(qapp, konfig_ordn
             w._on_model_selected(modell)
             qapp.processEvents()
         assert w.emulator.machine == modell
-        box = w.settings_widget.tape_box
-        assert not box.isChecked() and not w.emulator.tape_installed()
-        assert not w.kassette_dock.isVisible()
-        box.setChecked(True)
-        qapp.processEvents()
+        # fest eingebaut: Karte da, Kasten sichtbar, kein Kaestchen, nur Laufwerk 1
+        assert w.settings_widget.tape_box.isHidden()
         assert w.emulator.tape_installed() and w.kassette_dock.isVisible()
-        assert w.emulator.machine == modell
+        assert w.emulator.tape_status(1) is None
         band = tmp_path / "egos.k52"
         assert w.kassette_widget.laufwerke[0].einlegen(str(band))
         assert w.emulator.tape_status(0)["loaded"] and band.exists()
@@ -364,9 +375,9 @@ def test_mc80_2x_modell_bild_tastatur_und_kassettenkasten(qapp, konfig_ordner, m
         assert emu.machine == modell and emu.machine_type() == 6
         assert emu.framebuffer_size() == (528, 256)
         assert isinstance(w.keyboard_widget, KeyboardMc80_2xWidget)
-        # SPE-Wahl gilt nicht fuer die .2x; die Kassette ist fest eingebaut (Kasten da, Kaestchen aus).
+        # SPE-Wahl gilt nicht fuer die .2x; die Kassette ist fest eingebaut (Kasten da, kein Kaestchen).
         assert not w.settings_widget.hardware_combos["spe"].isEnabled()
-        assert not w.settings_widget.tape_box.isEnabled()
+        assert w.settings_widget.tape_box.isHidden()
         assert emu.tape_installed() and w.kassette_dock.toggleViewAction().isVisible()
         assert w.kassette_widget.laufwerke[1].isHidden()             # nur das SK 1200
         assert not w.kassette_widget.laufwerke[0].isHidden()

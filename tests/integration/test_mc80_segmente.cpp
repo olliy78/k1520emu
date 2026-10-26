@@ -18,7 +18,7 @@ struct Egos31 {
     std::unique_ptr<Mc80Machine> m;
     Egos31() {
         Mc80Machine::Config c;
-        c.variante = Mc80Machine::Config::Variante::Mc8031;
+        c.variante = Mc80Machine::Config::Variante::Mc8030;
         m = std::make_unique<Mc80Machine>(c);
     }
     void fahre(uint64_t takte) {
@@ -80,8 +80,7 @@ Lauf starte(Egos31& e, const char* kdo, int befehle)
     return l;
 }
 
-TEST(Mc80Segmente, NurDieVariante31HatEpromSegmente) {
-    EXPECT_EQ(Mc80Machine{}.epromSegmente(), 0);   // .30
+TEST(Mc80Segmente, DieMaschineHatDieEpromSegmente) {
     Egos31 e;
     ASSERT_EQ(e.m->epromSegmente(), 2);
     EXPECT_EQ(e.m->epromSegment(0).segmentBit(), 0x10);
