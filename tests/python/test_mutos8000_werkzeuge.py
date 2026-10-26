@@ -56,8 +56,8 @@ def test_archiv_enthaelt_bauangaben_ladecode_und_den_ganzen_baum():
         assert len(z.read("zylinder0.bin")) == 26 * 128
         blatt = z.read("dateien/wega-dateiangaben.txt").decode("utf-8")
         assert "dateien/dev/" in namen            # leeres Verzeichnis bleibt sichtbar
-    assert "fs: mutos8k_fm" in angaben and "inodes: 104" in angaben   # die eingecheckten Archive tragen den alten Namen (gilt als Alias)
-    assert "fs_mfm: mutos8k_mfm" in angaben      # dieselbe Wurzel fuer MFM-Laufwerke
+    assert re.search(r"^fs: mutos8k_(26x128_)?fm$", angaben, re.M) and "inodes: 104" in angaben   # alter Name gilt als Alias
+    assert re.search(r"^fs_mfm: mutos8k_(26x128_)?mfm$", angaben, re.M)      # dieselbe Wurzel fuer MFM-Laufwerke
     assert "bloecke: 250" in angaben and "zylinder0: zylinder0.bin" in angaben
     assert "AUSLAGERUNGSBEREICH" in angaben       # der Kommentar zu 250 ist der Sinn der Zahl
     zeilen = [z for z in blatt.splitlines() if z and not z.startswith("#")]
