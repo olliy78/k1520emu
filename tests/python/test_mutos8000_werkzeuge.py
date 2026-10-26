@@ -4,6 +4,7 @@ dieselbe Diskette (bis auf die Anlagezeit), und eine getauschte Datei im Archiv 
 
 import os
 import shutil
+import re
 import subprocess
 import sys
 import zipfile
@@ -307,7 +308,7 @@ def test_bau_alle_kennt_genau_die_fertigen_disketten():
 
 # ─── Best-of-Datendisketten (Entwurf 39, Abschnitt 10) ───────────────────────
 
-ROLLEN = {"cmd": 56, "usr": 48, "bin": 16, "cc1": 48, "cc2": 16}      # Rolle -> Inodes laut Bauangaben
+ROLLEN = {"cmd": 56, "usr": 40, "bin": 16, "cc1": 48, "cc2": 16, "nroff": 24}      # Rolle -> Inodes laut Bauangaben
 
 
 def _archiv(rolle):
@@ -332,7 +333,8 @@ def test_datendisketten_archiv_ist_vollstaendig_und_ohne_abbild(rolle):
         for n in _dateien(rolle):
             assert "dateien/%s.fileinfo" % n in namen
             assert n in entsch                     # jede Datei hat ihre dokumentierte Herkunft
-    assert "fs: mutos8k_fm" in angaben and "fs_mfm: mutos8k_mfm" in angaben
+    # die Archive tragen den alten Namen (gilt als Alias) oder den neuen mit Geometrie, je nach Zeitpunkt der Erzeugung
+    assert re.search(r"^fs: mutos8k_(26x128_)?fm$", angaben, re.M) and re.search(r"^fs_mfm: mutos8k_(26x128_)?mfm$", angaben, re.M)
     assert "inodes: %d" % ROLLEN[rolle] in angaben and "bloecke: 494" in angaben
 
 
@@ -358,7 +360,7 @@ def test_datendisketten_auswahl_deckt_die_m8k_originale_ab_und_meidet_beschaedig
     fehlt_cmd = namen("a5120_mutos8000_m8k_cmd.td0") - cmd - {"bin/" + n for n in bin_}
     assert fehlt_cmd == set()                        # adb steht auf bin (Platz), mt/tar kommen von dort
     fehlt_usr = namen("a5120_mutos8000_m8k_usr.td0") - usr
-    assert fehlt_usr == {"bin/ed", "include/grp.h"}  # ed liegt auf cmd; grp.h ist in keinem Satz heil
+    assert fehlt_usr == {"bin/ed"}  # ed liegt auf cmd (hier waeren nur 6 KB frei)
     with zipfile.ZipFile(_archiv("usr")) as z:
         for n in _dateien("usr"):
             if n.endswith(".h"):

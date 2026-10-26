@@ -47,7 +47,7 @@ WURZELN = (("mf3200", "a5120_mutos8000_root_fm.hfe"),
 DISK_SATZ = tuple("a5120_mutos8000_" + n for n in bau_8x512.ZIELE.values())
 
 # (Rolle, Archivname ohne Pfad); je Rolle zwei Disketten: FM und MFM
-DATENDISKETTEN = ("cmd", "usr", "bin", "cc1", "cc2")
+DATENDISKETTEN = ("cmd", "usr", "bin", "cc1", "cc2", "nroff")
 
 
 def datendisketten():
@@ -66,7 +66,7 @@ def main(argv=None):
     ap.add_argument("--wurzel-quelle", default=m8k.disk("m8k_root.zip"), help="Archiv oder Ordner der Wurzel")
     ap.add_argument("--daten-quelle", default=None,
                     help="Ordner mit best_<rolle>.zip (Vorgabe disks/a5120_mutos8000/) oder ausgepackte Ordner best_<rolle>/")
-    ap.add_argument("--nur-daten", action="store_true", help="nur die zehn Datendisketten (cmd, usr, bin, cc1, cc2; FM und MFM)")
+    ap.add_argument("--nur-daten", action="store_true", help="nur die zwoelf Datendisketten (cmd, usr, bin, cc1, cc2, nroff; FM und MFM)")
     ap.add_argument("--ueberschreiben", action="store_true", help="vorhandene Disketten ersetzen")
     a = ap.parse_args(argv)
 

@@ -1,0 +1,33 @@
+# MUTOS 8000: Textverarbeitung nroff (Diskette nroff, /usr; Abzug ronny_nroff, Entwurf 39 Abschnitt 10).  nroff sucht fest
+# /usr/lib/tmac und /usr/lib/term; Befehle (cat, echo) kommen von cmd auf /mnt.  Formatiert wird mit der Terminaltabelle 1152.
+tool:      k1520dbg
+disk_path: %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_boot_udos_k5601.hfe
+timeout:   600
+run:       --em em256 --laufwerke K5601,K5601,K5601 %DISK%
+stdin:
+  g 80000000
+  keys BOOT\sMUTOS\r
+  g 100000000
+  eject A
+  mount C %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_root_mfm.hfe udos_ss77
+  keys r
+  g 100000000
+  keys root\r
+  g 100000000
+  mount A %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_nroff_mfm.hfe udos_ss77
+  mount B %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_cmd_mfm.hfe udos_ss77
+  keys /etc/mount\s/dev/rk0\s/usr\r
+  g 50000000
+  keys /etc/mount\s/dev/rk1\s/mnt\r
+  g 50000000
+  keys echo\s'.ll\s30'\s>\s/tmp/t.nr\r
+  g 80000000
+  keys echo\s'Hallo\sWelt\sdies\sist\sein\snroff\sTest\smit\sBlocksatz\sund\sUmbruch.'\s>>\s/tmp/t.nr\r
+  g 80000000
+  keys nroff\s-T1152\s/tmp/t.nr\r
+  g 300000000
+  screen
+  q
+exit:      0
+expect_re: Hallo Welt
+expect_re: Test\s+mit\s+Blocksatz\s+und\s+Um-\s+\|\s+\|bruch\.

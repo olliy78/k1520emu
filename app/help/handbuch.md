@@ -838,6 +838,7 @@ einen Mehrbenutzerbetrieb gibt es noch nicht.
 | `a5120_mutos8000_usr_mfm.hfe` | C-Übersetzer (`cc`, `as`, `ld`) | `/usr` |
 | `a5120_mutos8000_bin_mfm.hfe` | `adb`, `mt`, `tar` | `/tmp` |
 | `a5120_mutos8000_cc1_mfm.hfe`, `a5120_mutos8000_cc2_mfm.hfe` | Inhalt der Original-Compilerdisketten (cc1: `as`, `cc`, `ld`, `ed`, Header, `c0`, `c1`; cc2: `c2`, `cpp`, `libc.a`, `nm`) | `/usr` (nur eine zugleich) |
+| `a5120_mutos8000_nroff_mfm.hfe` | Textformatierer `nroff` mit Makropaketen (`tmac.s` …) und Terminaltabellen; Aufruf z. B. `nroff -T1152 datei` | `/usr` (nur eine zugleich) |
 
 Im **GitHub-Repository** (`disks/a5120_16_MUTOS/`) liegen außerdem die Fassungen für **MF3200**
 (8″, FM; Dateien mit `_fm` im Namen), gemischte Bestückungen und weitere Ladedisketten. Eine Diskette
