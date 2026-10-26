@@ -25,3 +25,5 @@ Das gescannte **MC80.2x-Nutzerhandbuch** (43 MB, überwiegend Seitenbilder; Quel
 `~/projects/robotron/tiffe_de_Robotron/www.tiffe.de/Robotron/MC80.2X/`).  Was nur dort steht
 (Geräteadresstabelle, Speichertabelle, Bilder/Tabellen 3.x), ist in `hardware_2x.md` ausgewertet;
 bei Zweifeln dort nachsehen — Seiten als Bild lesen, die Textebene ist fehlerhaft.
+
+Funde von ycdt.net (Sondertasten der 31E, Spielstart, nicht verwertbare Scan-Listings): `ycdt_funde.md`; Tastaturprotokoll aus dem Forum: `tastatur_forum.md`.
