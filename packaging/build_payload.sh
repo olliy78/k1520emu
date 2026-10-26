@@ -74,7 +74,8 @@ a5120_mutos8000_cmd_mfm.hfe
 a5120_mutos8000_usr_mfm.hfe
 a5120_mutos8000_bin_mfm.hfe
 a5120_mutos8000_cc1_mfm.hfe
-a5120_mutos8000_cc2_mfm.hfe"
+a5120_mutos8000_cc2_mfm.hfe
+a5120_mutos8000_nroff_mfm.hfe"
 
 usage() {
     cat <<EOF

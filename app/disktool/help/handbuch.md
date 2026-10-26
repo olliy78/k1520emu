@@ -365,6 +365,38 @@ die Datei plus zwei Nullblöcke (die Auffüllung der Diskette hat dann eine). Di
 exportiert man einzeln (ein Folgeteil immer ganz, bis zum Abbildende). Nach dem `cat` der exportierten
 Teile bleibt daher höchstens Nullauffüllung am Ende des Archivs übrig, die `tar` ignoriert.
 
+### tar-Disketten von MUTOS 8000 (A5120.16)
+
+Das `tar` von MUTOS 8000 schreibt seinen Strom nicht ab Zylinder 0 und nicht in Sektorfolge, sondern auf
+das **Rohgerät** des MUTOS-Treibers: ab Zylinder 1, bei 26 × 128 Byte **verschränkt** (Verschränkung 2,
+6 Sektoren Spurversatz je Zylinder), bei 8 × 512 Byte linear. Das Werkzeug erkennt das selbst
+und zeigt es als eigenes Dateisystem:
+
+| Angezeigt als | Diskette | Blöcke je Diskette |
+|---|---|---|
+| `tar_mutos8k_26x128_mfm` | K5601 (5¼″, MFM), 26 × 128 | 494 (252 928 Byte) |
+| `tar_mutos8k_26x128_fm` | MF3200 (8″, FM), 26 × 128 | 494 |
+| `tar_mutos8k_8x512_mfm` | K5601, 8 × 512 (DISK-Satz) | 608 (311 296 Byte) |
+
+Mehrere Disketten eines Satzes (MUTOS kennt keine Folgedisketten, man teilt den Strom mit `dd` auf) öffnet man wie jeden
+tar-Satz: **Datei ▸ tar-Satz öffnen…**. Das Layout wird an der ersten Diskette erkannt. Lesen,
+Dateien hinzufügen und löschen, Speichern (auch über eine Diskette hinaus als Satz) gehen wie oben beschrieben;
+das Ergebnis liest MUTOS selbst mit `tar tvf`/`tar xvf`.
+**Datei ▸ Neue tar-Diskette / tar-Satz…** und **Neue Diskette** (`…_leer`) bieten die Formate an; eine neue
+Diskette trägt im Datenbereich Nullblöcke, damit MUTOS sie als leeres Archiv liest (eine nie beschriebene
+E5-Diskette endet bei `tar tvf` nicht sauber). Als Container gehen `.hfe`, `.dmk`, `.img` (immer MFM), `.td0`
+und `.imd`; `.cqm` nicht beim 8 × 512-Format (gemischte Geometrie). Auf der Kommandozeile:
+
+    k1520disktool create leer.hfe --fs tar_mutos8k_26x128_mfm_leer
+    k1520disktool tar-satz-neu --format tar_mutos8k_26x128_mfm satz.hfe --put datei1 --put ordner
+    k1520disktool tar-satz v1.hfe v2.hfe -l           # Satz lesen; --to ORDNER holt alles heraus
+    k1520disktool tar-export v1.hfe teil.tar          # Strom als .tar
+
+Kein Dateisystem im üblichen Sinn: die Diskette ist ein Archiv. Das **UNIX-Dateisystem** derselben Disketten
+(`mkfs` unter MUTOS) heißt `mutos8k_26x128_mfm` bzw. `…_fm` und `mutos8k_8x512_mfm`; die früheren Namen
+`mutos8k_mfm`, `mutos8k_fm`, `mutos77` gelten weiter als Alias. Anleitung für den Gast (Befehle, Fallstricke, Disketten
+wechseln): Handbuch des Emulators, Abschnitt *MUTOS 8000 (A5120.16)*.
+
 ## P8000-Platten (WEGA)
 
 Ein **Plattenabbild** des P8000 (`.img` oder gepackt `.img.gz`, etwa `…k5504.img.gz`) öffnet

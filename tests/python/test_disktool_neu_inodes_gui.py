@@ -53,7 +53,7 @@ def test_dateisystemwechsel_setzt_die_vorgabe_neu(qt_app):
     _waehle(dlg, "mutos1700_720")
     dlg.haken.setChecked(True)
     dlg.zahl.setValue(272)
-    _waehle(dlg, "mutos77")
+    _waehle(dlg, "mutos8k_8x512_mfm")
     assert not dlg.haken.isChecked() and dlg.zahl.value() == 192 and dlg.inodes() == 0
 
 

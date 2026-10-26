@@ -1,0 +1,10 @@
+# create --fs tar_mutos8k_26x128_fm_leer: leere tar-Diskette im MUTOS-Layout (FM, 8-Zoll); Zylinder 0 bleibt wie
+# formatiert, der Datenbereich ist Null.  Beim Wiederoeffnen erkennt die Erkennung sie vor UDOS.
+tool:   k1520disktool
+tmpfile leer.hfe:
+setup_run: create %leer.hfe% --fs tar_mutos8k_26x128_fm_leer
+run:    info %leer.hfe%
+expect: tar_mutos8k_26x128_fm_leer
+expect: mf3200_26x128
+forbid: udos
+exit:   0

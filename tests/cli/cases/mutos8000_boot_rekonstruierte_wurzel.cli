@@ -1,5 +1,5 @@
 # MUTOS 8000 auf dem A5120.16 (Entwurf 39 §3a): UDOS-Ladediskette + REKONSTRUIERTE Wurzeldiskette
-# (disks/a5120_16_MUTOS/a5120_mutos8000_root_fm.hfe, 26x128, Profil mutos8k_fm).
+# (disks/a5120_16_MUTOS/a5120_mutos8000_root_fm.hfe, 26x128, Profil mutos8k_26x128_fm).
 # Der Kernel (mutos_1216) liest ueber den U880-Treiber mutos_io /etc/init, startet die Anmeldung,
 # `root` meldet sich an, `ls -l /` listet die Wurzel.  Ein Rueckfall in den Zustand mit M8KROOT
 # (Abbild beschaedigt, Wurzel-Inode 83FE) endete bei ENOTDIR an /etc/init und zeigte nur einen Punkt.

@@ -1,0 +1,66 @@
+# MUTOS 8000 (8x512, DISK-Satz) liest tar-Disketten, die das DiskTool geschrieben hat (Entwurf 39 A5c, Merkposten tar_satz.md Nr. 18).
+# Ladediskette `..._k5601_8x512` (mutos_io 8x512 mit dem Swap-Patch fuer halbe Schluss-Sektoren), B: = Befehlsdiskette `cmd_8x512`
+# (/mnt, tar), C: = Wurzel `root_8x512` (pwd von 1986 - die von 1987 haengt und mit ihr `tar`), A:/D: = tar-Disketten
+# im Layout tar_mutos8k_8x512_mfm (Block n = Zylinder 1 + n/8, 608 Bloecke je Diskette).  Die Quelldateien sind echte MUTOS-Programme
+# (adb 27 770 B, ed 11 472 B, od 5 552 B) von cmd_8x512:
+#  1. Einzeldiskette (adb + od): `tar tvf`, `tar xvf /dev/rrk0 a.bin` und cmp gegen das Original,
+#  2. Satz aus zwei Disketten (10 x adb, dann adb und ed; k.bin liegt ueber die Grenze bei Block 608) per `dd | tar xvf -`.
+tool:      k1520dbg
+disk_path: %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_boot_udos_k5601_8x512.hfe
+timeout:   900
+tmpfile s.hfe:
+tmpfile s1.hfe:
+tmpfile t.hfe:
+tmpfile t1.hfe:
+tmpfile t2.hfe:
+setup_run: @k1520disktool get %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_cmd_8x512.hfe bin/adb bin/ed bin/od --to src
+setup_run: @k1520disktool tar-satz-neu --format tar_mutos8k_8x512_mfm %s.hfe% --put src/bin/adb=a.bin --put src/bin/od=o.bin
+setup_run: @k1520disktool tar-satz-neu --format tar_mutos8k_8x512_mfm %t.hfe% --put src/bin/adb=a1.bin --put src/bin/adb=a2.bin --put src/bin/adb=a3.bin --put src/bin/adb=a4.bin --put src/bin/adb=a5.bin --put src/bin/adb=a6.bin --put src/bin/adb=a7.bin --put src/bin/adb=a8.bin --put src/bin/adb=a9.bin --put src/bin/adb=a10.bin --put src/bin/adb=k.bin --put src/bin/ed=e.bin
+run:       --em em256 --laufwerke K5601,K5601,K5601,K5601 %DISK% -b %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_cmd_8x512.hfe -c %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_root_8x512.hfe
+stdin:
+  g 80000000
+  keys BOOT\sMUTOS\r
+  g 100000000
+  keys r
+  g 100000000
+  keys root\r
+  g 100000000
+  keys /bin/mount\s/dev/rk1\s/mnt\r
+  g 50000000
+  mount A %s1.hfe% mutos_ss77
+  keys cd\s/mnt\r
+  g 50000000
+  keys /mnt/bin/tar\stvf\s/dev/rrk0\r
+  gscreen "o.bin" 300000000
+  screen
+  keys /mnt/bin/tar\sxvf\s/dev/rrk0\sa.bin\r
+  gscreen "x a.bin," 400000000
+  keys /bin/cmp\sa.bin\s/mnt/bin/adb;\secho\sCMP1=\$?\r
+  gscreen "CMP1=0" 300000000
+  screen
+  keys /bin/rm\sa.bin\r
+  g 30000000
+  mount A %t1.hfe% mutos_ss77
+  mount D %t2.hfe% mutos_ss77
+  keys (/bin/dd\sif=/dev/rrk0\sbs=512\scount=608;/bin/dd\sif=/dev/rrk3\sbs=512\scount=608)|/mnt/bin/tar\sxvf\s-\sk.bin\se.bin\r
+  gscreen "x e.bin," 1500000000
+  keys /bin/cmp\sk.bin\s/mnt/bin/adb;\secho\sCMP2=\$?\r
+  gscreen "CMP2=0" 300000000
+  keys /bin/cmp\se.bin\s/mnt/bin/ed;\secho\sCMP3=\$?\r
+  gscreen "CMP3=0" 300000000
+  screen
+  q
+exit:      0
+expect:    a.bin
+expect:    o.bin
+expect:    CMP1=0
+expect:    CMP2=0
+expect:    CMP3=0
+forbid:    panic
+forbid:    err on dev
+forbid:    differ
+forbid:    EOF
+forbid:    cannot open
+forbid:    checksum error
+forbid:    pwd failed
+forbid:    not found

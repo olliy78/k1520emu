@@ -6,7 +6,7 @@ Quellen (disks/a5120_mutos8000/):
   M8K-Satz  (Januar 1986, teils defekt):   m8k_cmd, m8k_usr, m8k_bin -> Kuerzel mcmd, musr, mbin
 Der Lader-Treiber `mutos_io` kann nur 26x128-Disketten (Verschraenkung 2, Spurversatz 6) lesen; die 8x512-Disketten
 des DISK-Satzes sind im Emulator nicht einbindbar (er=0,304).  Deshalb wird der INHALT beider Saetze auf
-26x128-Disketten (Profil mutos8k_fm/_mfm) neu verteilt.
+26x128-Disketten (Profil mutos8k_26x128_fm/_mfm) neu verteilt.
 
 Rollen (Mountpunkte der Wurzel, PATH der .profile = :/mnt/bin:/usr/bin:/bin:/etc:/mnt/etc:/tmp/bin:/mnt:/usr:/tmp):
   cmd  -> /mnt   bin/ + etc/ der Befehle (Gegenstueck M8KCMD)
@@ -37,10 +37,18 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import m8k  # noqa: E402
 
 QUELLEN = {"dcmd": "cmd", "cc1": "cc1", "cc2": "cc2", "droot": "root",
-           "mcmd": "m8k_cmd", "musr": "m8k_usr", "mbin": "m8k_bin"}
+           "mcmd": "m8k_cmd", "musr": "m8k_usr", "mbin": "m8k_bin",
+           "rusr": "ronny_usr", "rnroff": "ronny_nroff"}
+# "rusr": zweiter Abzug der M8K-Systemdiskette /usr (2008, ronny_usr.td0).  Dessen Blocktafel (Block 1) ist unlesbar, das
+# DiskTool oeffnet ihn nicht; die Dateien werden daher mit dem Leser aus m8k.py blockweise aus beiden Abzuegen
+# zusammengesetzt (zuerst ronny_usr, fehlende Bloecke aus m8k_usr).  Er traegt die Header, die in m8k_usr und DISK-CC1 beschaedigt sind.
+MISCH = {"rusr": ("ronny_usr", "m8k_usr")}
+# "rnroff": Textverarbeitung (nroff, Makros, Terminaltabellen), nur auf diesem Abzug (ronny_nroff.td0, Januar 1986)
 
 # (Ziel, Quelle, Pfad in der Quelle, Grund)
 D, M = "DISK-Satz 1987 (neuer, heil)", "nur im M8K-Satz heil"
+R = "heil nur im zweiten M8K-Abzug (ronny_usr, 2008)"
+RN = "nur auf dem Abzug ronny_nroff (Januar 1986)"
 AUSWAHL = {
     "cmd": [
         ("bin/ar", "dcmd", "bin/ar", D + " (in allen Saetzen gleich)"),
@@ -91,9 +99,8 @@ AUSWAHL = {
         ("include/execargs.h", "cc1", "include/execargs.h", D + "; M8KUSR-Fassung ist Programmdaten statt Text"),
         ("include/math.h", "cc1", "include/math.h", D + "; M8KUSR-Fassung ist Programmdaten statt Text"),
         ("include/pwd.h", "cc1", "include/pwd.h", D + "; M8KUSR-Fassung ist Programmdaten statt Text"),
-        ("include/sgtty.h", "cc1", "include/sgtty.h",
-         "GEKUERZT auf die lesbaren ersten 512 B (struct sgttyb/tchars); die restlichen 1729 B sind in BEIDEN Saetzen "
-         "Programmdaten statt Text - weder DISK-CC1 noch M8KUSR hat eine heile Fassung"),
+        ("include/grp.h", "rusr", "include/grp.h", R),
+        ("include/sgtty.h", "rusr", "include/sgtty.h", R + "; auf DISK-CC1 und M8KUSR ab Byte 512 Programmdaten statt Text"),
         ("include/signal.h", "cc1", "include/signal.h", D + "; M8KUSR-Fassung ist Programmdaten statt Text"),
         ("include/stdio.h", "cc1", "include/stdio.h", D + "; M8KUSR-Fassung ist Programmdaten statt Text"),
         ("include/symbol.h", "cc1", "include/symbol.h", D + "; M8KUSR-Fassung ist Programmdaten statt Text"),
@@ -118,8 +125,7 @@ AUSWAHL = {
         ("bin/ld", "cc1", "bin/ld", D),
     ] + [("include/" + h, "cc1", "include/" + h, D) for h in
          ("a.out.h", "ar.h", "ctype.h", "execargs.h", "math.h", "pwd.h", "signal.h", "stdio.h", "symbol.h", "time.h")] + [
-        ("include/sgtty.h", "cc1", "include/sgtty.h",
-         "GEKUERZT auf die lesbaren ersten 512 B; der Rest (1729 B) ist in beiden Saetzen Programmdaten statt Text"),
+        ("include/sgtty.h", "rusr", "include/sgtty.h", R + "; die Fassung von DISK-CC1 ist ab Byte 512 Programmdaten statt Text"),
         ("lib/c0", "cc1", "lib/c0", D),
         ("lib/c1", "cc1", "lib/c1", D),
     ],
@@ -131,6 +137,13 @@ AUSWAHL = {
         ("lib/libc.a", "cc2", "lib/libc.a", D + " (140 Glieder)"),
         ("lib/mcrt0.o", "cc2", "lib/mcrt0.o", D),
     ],
+    # nroff: Text-Formatierer mit Makropaketen und Terminaltabellen.  nroff sucht fest /usr/lib/tmac und /usr/lib/term, die
+    # Diskette gehoert also wie cc1/cc2 auf /usr.  Die Befehle cat/ed/ls/mv/rm/convert/icheck der Originaldiskette liegen
+    # schon auf cmd und werden nicht wiederholt.  Das Original traegt nroff mit Modus 0664 (nicht ausfuehrbar): hier 0755.
+    "nroff": [("bin/nroff", "rnroff", "bin/nroff", RN + "; Modus von 0664 auf 0755")] + [
+        ("lib/term/" + n, "rnroff", "lib/term/" + n, RN) for n in ("tab1152", "tab1157")] + [
+        ("lib/tmac/" + n, "rnroff", "lib/tmac/" + n, RN) for n in
+        ("tmac.s", "tmac.scover", "tmac.sdisp", "tmac.silrefs", "tmac.skeep")],
     "bin": [
         ("adb", "dcmd", "bin/adb", D + "; M8KCMD 27846 B ist die aeltere Fassung, M8KBIN ab 7680 B beschaedigt; "
                                   "wegen der Platzgrenze von cmd (2 Bloecke zu viel) hier statt auf cmd"),
@@ -144,16 +157,19 @@ VERZEICHNISSE = {
     "usr": {"": "1986-01-09 22:37", "bin": "1986-01-09 22:14", "include": "1986-01-09 22:25",
             "include/sys": "1986-01-09 22:34", "lib": "1986-01-09 22:31"},
     "bin": {"": "1986-01-30 10:18"},
+    "nroff": {"": "1986-01-30 10:31", "bin": "1986-01-30 10:31", "lib": "1986-01-16 16:35", "lib/term": "1986-01-16 16:33",
+              "lib/tmac": "1986-01-16 16:25"},
     "cc1": {"": "1987-03-17 21:56", "bin": "1987-03-17 21:56", "include": "1987-03-17 21:56", "lib": "1987-03-17 21:56"},
     "cc2": {"": "1987-03-17 22:28", "bin": "1987-03-17 22:28", "lib": "1987-03-17 22:28"},
 }
-INODES = {"cmd": 56, "usr": 48, "bin": 16, "cc1": 48, "cc2": 16}      # wie M8KCMD/M8KUSR; die Zusatzdiskette braucht 3 Dateien
+INODES = {"cmd": 56, "usr": 40, "bin": 16, "cc1": 48, "cc2": 16, "nroff": 24}      # wie M8KCMD/M8KUSR; die Zusatzdiskette braucht 3 Dateien
 BLOECKE = 494                                    # ganze 8-Zoll-Diskette (76 Spuren x 26 / 4); kein Auslagerungsbereich
-ROLLEN = ("cmd", "usr", "bin", "cc1", "cc2")
-# Dateien, von denen nur der lesbare Anfang existiert: Ziel -> Laenge
-KUERZEN = {"include/sgtty.h": 512}
+ROLLEN = ("cmd", "usr", "bin", "cc1", "cc2", "nroff")
+MODUS = {"bin/nroff": 0o100755}       # Ziel -> Modus, der den der Quelle ersetzt
+# Dateien, von denen nur der lesbare Anfang existiert: Ziel -> Laenge (seit dem zweiten Abzug ronny_usr keine mehr)
+KUERZEN = {}
 # Bewusst WEGGELASSEN (in keinem Satz heil): bin/c_beispiel.c (DISK-CC1, ab Byte 1155 Programmdaten),
-# include/grp.h (nur M8KUSR, Programmdaten), bin/mkdir.tot (DISK-ROOT, Duplikat von mkdir)
+# bin/mkdir.tot (DISK-ROOT, Duplikat von mkdir)
 
 
 def epoche(text):
@@ -184,6 +200,55 @@ def verzeichnis_info(name, zeit):
             % (name or ".", t, t, t))
 
 
+def misch_holen(kz, muster, ziel):
+    """Dateien aus zwei Abzuegen blockweise zusammensetzen (s. MISCH); schreibt Datei und .fileinfo wie `get --fileinfo`."""
+    import struct
+    vorn, hinten = (m8k.Mutos8kDev(m8k.td0_laden(m8k.disk(n + ".td0"))) for n in MISCH[kz])
+
+    class Misch:
+        def __init__(self, *devs):
+            self.devs = devs
+
+        def block(self, b):
+            for d in self.devs:
+                try:
+                    return d.block(b)
+                except KeyError:
+                    pass
+            raise KeyError(b)
+
+    def lesbar(*devs):
+        f = m8k.Dateisystem.__new__(m8k.Dateisystem)
+        f.dev = Misch(*devs)
+        f.isize, f.fsize = struct.unpack(">HI", f.dev.block(1)[:6])
+        return f
+    # Verzeichnisbaum aus dem Abzug mit heilem Verzeichnisteil (hinten), Inhalte bevorzugt aus dem zweiten Abzug (vorn)
+    fs = lesbar(vorn, hinten)
+    baum_fs = lesbar(hinten, vorn)
+    baum = {}
+
+    def lauf(ino, pfad):
+        for i, n in baum_fs.eintraege(ino):
+            baum[pfad + n] = i
+            if baum_fs.inode(i)[0] & 0xF000 == 0x4000:
+                lauf(i, pfad + n + "/")
+    lauf(2, "")
+    for pfad in muster:
+        mode, nl, uid, gid, size, _ad = fs.inode(baum[pfad])
+        daten = fs.inhalt(baum[pfad])
+        if len(daten) != size:
+            raise SystemExit("%s (%s): gelesen %d von %d B" % (pfad, kz, len(daten), size))
+        z = os.path.join(ziel, pfad)
+        os.makedirs(os.path.dirname(z), exist_ok=True)
+        open(z, "wb").write(daten)
+        t = fs.dev.block(2 + (baum[pfad] - 1) // 8)[((baum[pfad] - 1) % 8) * 64:][:64]
+        # Zeitfelder des Inodes: 12 B Kopf, 13 x 3 B Adressen, 1 B Erzeugung, dann atime, mtime, ctime je 4 B (mtime bei 56)
+        atime, mtime, ctime = struct.unpack(">III", t[52:64])
+        open(z + ".fileinfo", "w", encoding="utf-8").write(
+            "fs=wega_mutos\nname=%s\nart=-\nmode=%07o\nuid=%d\ngid=%d\nnlink=%d\ninode=%d\nmtime=%d\natime=%d\nctime=%d\n"
+            % (pfad, mode, uid, gid, nl, baum[pfad], mtime, atime, ctime))
+
+
 def holen(tmp):
     """Alle benoetigten Dateien je Quelle mit EINEM `get --fileinfo` holen: tmp/<kuerzel>/<pfad>."""
     ordner = {}
@@ -193,6 +258,10 @@ def holen(tmp):
             continue
         ziel = os.path.join(tmp, "quelle_" + kz)
         os.makedirs(ziel)
+        if kz in MISCH:
+            misch_holen(kz, muster, ziel)
+            ordner[kz] = ziel
+            continue
         disktool("get", m8k.disk(abbild + ".td0"), *muster, "--to", ziel, "--fileinfo")
         ordner[kz] = ziel
     return ordner
@@ -220,6 +289,8 @@ def zusammenstellen(rolle, stand_ordner, ausgabe=print):
             os.makedirs(os.path.dirname(z), exist_ok=True)
             shutil.copyfile(quelle, z)
             info = open(quelle + ".fileinfo", encoding="utf-8").read()
+            if ziel in MODUS:
+                info = "".join(("mode=%07o\n" % MODUS[ziel]) if x.startswith("mode=") else x + "\n" for x in info.splitlines())
             open(z + ".fileinfo", "w", encoding="utf-8").write(fileinfo_umschreiben(info, ziel))
             zeilen.append("%-22s %7d B  %-5s %-22s %s" % (ziel, len(daten), kz, QUELLEN[kz] + ":" + pfad, grund))
         for pfad, zeit in VERZEICHNISSE[rolle].items():
@@ -239,7 +310,7 @@ def zusammenstellen(rolle, stand_ordner, ausgabe=print):
 
 
 def zwischenstand(rolle, ziel_hfe, ausgabe=print):
-    """Rolle -> FM-Abbild `ziel_hfe` (mutos8k_fm) und Entscheidungstext (Rueckgabe)."""
+    """Rolle -> FM-Abbild `ziel_hfe` (mutos8k_26x128_fm) und Entscheidungstext (Rueckgabe)."""
     tmp = tempfile.mkdtemp(prefix="m8k_best_stand_")
     try:
         stand = os.path.join(tmp, "stand")
@@ -248,7 +319,7 @@ def zwischenstand(rolle, ziel_hfe, ausgabe=print):
         z0 = os.path.join(tmp, "zylinder0.bin")
         # Zylinder 0 mit den Etiketten ERMAP/VOL1MUTOS: gleich dem der Wurzel (gleich M8KCMD)
         disktool("boot-get", m8k.fertig("root_fm.hfe"), z0)
-        disktool("create", ziel_hfe, "--fs", "mutos8k_fm", "--inodes", INODES[rolle], "--blocks", BLOECKE)
+        disktool("create", ziel_hfe, "--fs", "mutos8k_26x128_fm", "--inodes", INODES[rolle], "--blocks", BLOECKE)
         disktool("boot-put", ziel_hfe, z0)
         disktool("put", ziel_hfe, stand)
         ausgabe(disktool("check", ziel_hfe, "--full").strip().splitlines()[-1])

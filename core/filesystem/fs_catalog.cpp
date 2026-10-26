@@ -83,7 +83,7 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
                         "containers", "detect_rank", "detect", "leer", "boot_header", "dir_boot", "nur_boot",
                         "block_size", "dir_entries", "skew", "max_blocks", "os",
                         "sides_separate", "boot_track", "directory_track",
-                        "bitmap_track", "usable_tracks", "unix_layout"},
+                        "bitmap_track", "usable_tracks", "unix_layout", "aliases"},
                        where, issues);
 
     // ── name (Pflicht) ──
@@ -124,7 +124,15 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
 
     // ── unix_layout (nur wega_mutos) ──
     if (const yaml::Node* n = node.find("unix_layout")) {
-        if (out.type != FsType::WegaMutos) {
+        if (out.type == FsType::Tar) {
+            // tar: nur die MUTOS-Blockabbildung (Rohgeraet /dev/rrkN, Entwurf 39 §4.6.3)
+            if (n->scalar != "mutos8k" && n->scalar != "mutos8k_512") {
+                why = "'unix_layout': '" + n->scalar + "' - fuer type: tar erlaubt sind mutos8k | mutos8k_512";
+                return false;
+            }
+            out.mutos8k_layout = true;
+            out.mutos8k_linear = n->scalar == "mutos8k_512";
+        } else if (out.type != FsType::WegaMutos) {
             issues.push_back(where + ": 'unix_layout' gilt nur fuer type: wega_mutos - ignoriert");
         } else if (n->scalar == "mutos1700") {
             out.mutos1700_layout = true;
@@ -149,6 +157,12 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
         why = "'data_start': Spur c" + std::to_string(out.data_cyl) + "h"
             + std::to_string(out.data_head) + " gibt es im Format '" + out.format + "' nicht";
         return false;
+    }
+
+    // ── aliases: frueher gueltige Namen (Vertrag: Konfigurationen, Archive, Skripte) ──
+    if (const yaml::Node* n = node.find("aliases")) {
+        if (!stringList(*n, out.aliases))
+            { why = "'aliases' muss eine Liste von Namen sein"; return false; }
     }
 
     // ── containers ──
@@ -395,6 +409,9 @@ FsCatalog FsCatalog::load(const std::vector<std::string>& paths,
 
 const FsProfile* FsCatalog::find(const std::string& name) const {
     for (const auto& p : profiles_) if (p.name == name) return &p;
+    // Alte Namen: erst nach allen echten Namen, damit ein Alias nie ein Profil verdeckt.
+    for (const auto& p : profiles_)
+        if (std::find(p.aliases.begin(), p.aliases.end(), name) != p.aliases.end()) return &p;
     return nullptr;
 }
 

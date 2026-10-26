@@ -1,0 +1,8 @@
+# Zwei von MUTOS selbst (tar cf - | dd) geschriebene Disketten bilden EINEN Strom: 35 Dateien, bin/date
+# beginnt auf Diskette 1 und endet auf Diskette 2.
+tool:   k1520disktool
+run:    tar-satz %CLI_DIR%/../fixtures/disks/mutos8000_tar_satz1.dmk %CLI_DIR%/../fixtures/disks/mutos8000_tar_satz2.dmk -l
+expect: bin/date
+expect: usr/lib/libc.a
+forbid: Fehler
+exit:   0

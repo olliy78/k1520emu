@@ -95,14 +95,19 @@ TEST(FsCatalog, ProfilnamenSindEinStabilerVertrag) {
         // (doc/design/27_wega_dateisystem.md) — ein Eintrag fuer die 720-K-Diskette.
         "wega720",
         // MUTOS 8000 (A5120.16): dasselbe Dateisystem, Blockraum ab Zylinder 1.
-        "mutos77", "mutos80", "mutos1700_720", "mutos1700_a7100", "mutos8k_fm",
+        "mutos8k_8x512_mfm", "mutos8k_8x512_mfm_80", "mutos1700_720", "mutos1700_a7100", "mutos8k_26x128_fm",
         // … dieselbe 8k-Wurzel in MFM (K5601); Rang -10, damit sie vor udos_ss77 gewinnt.
-        "mutos8k_mfm",
+        "mutos8k_26x128_mfm",
         // tar-Disketten (P8000-Lieferungen ohne Dateisystem, nur lesbar): letzter
         // Erkennungsversuch hinter allen echten Dateisystemen (disk_volume.cpp).
         "tar720",
         // … und die LEERE tar-Diskette (ganz Null; nimmt genau ein .tar auf, `leer: true`).
         "tar720_leer",
+        // … und tar im MUTOS-8000-Layout (Rohgeraet /dev/rrkN, Entwurf 39): MFM (K5601) und FM (MF3200),
+        // je mit der leeren Fassung.  Erkennung VOR den echten Dateisystemen (disk_volume.cpp).
+        "tar_mutos8k_26x128_mfm", "tar_mutos8k_26x128_mfm_leer", "tar_mutos8k_26x128_fm", "tar_mutos8k_26x128_fm_leer",
+        // … und im 8x512-Zuschnitt (DISK-Satz, lineares Rohgeraet ab Zylinder 1, 608 Bloecke; Entwurf 39 A5c).
+        "tar_mutos8k_8x512_mfm", "tar_mutos8k_8x512_mfm_leer",
         // BCU 880: Arbeitsdiskette „ohne SYL“ (Name, `detect: false`) und die Startdiskette
         // „SYL auf Spur 1“ (erkannt am Lader; `nur_boot`).
         "bcu880", "bcu880_syl", "bcu880_kombi", "bcu880_kombi80", "bcu880_80",
@@ -117,6 +122,27 @@ TEST(FsCatalog, ProfilnamenSindEinStabilerVertrag) {
         EXPECT_NE(std::find(erwartet.begin(), erwartet.end(), p.name), erwartet.end())
             << "Unerwartetes Dateisystem '" << p.name << "' — Erwartungsliste mitpflegen";
     EXPECT_EQ(cat.profiles().size(), erwartet.size());
+}
+
+TEST(FsCatalog, AlteProfilnamenLoesenAlsAliasAufDasNeueProfilAuf) {
+    // Vertrag: Konfigurationen, Archive und Skripte nennen die alten MUTOS-8000-Namen weiter.
+    std::string fatal;
+    FsCatalog cat = FsCatalog::load({shippedCatalog()}, formate(), &fatal);
+    ASSERT_TRUE(fatal.empty()) << fatal;
+    const std::vector<std::pair<std::string, std::string>> paare = {
+        {"mutos77", "mutos8k_8x512_mfm"},          {"mutos80", "mutos8k_8x512_mfm_80"},
+        {"mutos8k_fm", "mutos8k_26x128_fm"},       {"mutos8k_mfm", "mutos8k_26x128_mfm"},
+        {"tar_mutos8k_fm", "tar_mutos8k_26x128_fm"}, {"tar_mutos8k_fm_leer", "tar_mutos8k_26x128_fm_leer"},
+        {"tar_mutos8k_mfm", "tar_mutos8k_26x128_mfm"}, {"tar_mutos8k_mfm_leer", "tar_mutos8k_26x128_mfm_leer"},
+    };
+    for (const auto& [alt, neu] : paare) {
+        const FsProfile* a = cat.find(alt);
+        const FsProfile* n = cat.find(neu);
+        ASSERT_NE(n, nullptr) << neu;
+        EXPECT_EQ(a, n) << alt << " muss auf dasselbe Profil wie " << neu << " aufloesen";
+        // Ein Alias ist KEIN eigener Eintrag: nie in der Liste, nie als Profilname.
+        for (const auto& p : cat.profiles()) EXPECT_NE(p.name, alt);
+    }
 }
 
 TEST(FsCatalog, JedesProfilVerweistAufEinVorhandenesFormat) {

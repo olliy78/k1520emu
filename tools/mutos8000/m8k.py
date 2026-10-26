@@ -280,7 +280,7 @@ class BeschaedigteWurzel:
 # --------------------------------------------------------------------------- heile Abbilder
 
 class Dateisystem:
-    """Unabhaengiger Leser fuer heile mutos8k_fm-Abbilder (Formel 4.6.3; kein DiskTool-Code)."""
+    """Unabhaengiger Leser fuer heile mutos8k_26x128_fm-Abbilder (Formel 4.6.3; kein DiskTool-Code)."""
 
     def __init__(self, pfad):
         self.dev = Mutos8kDev(spuren_laden(pfad))
