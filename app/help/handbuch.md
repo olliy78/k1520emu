@@ -936,6 +936,122 @@ anderen Diskette (*Datei ▸ Abbild öffnen*). Auf der Kommandozeile:
 Dieselbe Diskette nie gleichzeitig im DiskTool und im Emulator offen halten. Eine so angelegte Diskette
 hängt MUTOS ohne `mkfs` direkt ein.
 
+### Dateien mit `tar` auf Diskette sichern und zurücklesen
+
+MUTOS hat ein V7-`tar` (Diskette `bin`, Programm `tar`). Es schreibt **ohne Dateisystem** einen
+nackten Archivstrom auf das **Rohgerät** einer Diskette: **`/dev/rrk0` = A:, `/dev/rrk1` = B:,
+`/dev/rrk3` = D:** (`/dev/rrk2` ist die Wurzel, nie benutzen). Die Diskette muss nur formatiert sein, ein
+`mkfs` ist weder nötig noch erwünscht. Eine solche **tar-Diskette** liest das DiskTool (siehe unten und
+dessen Handbuch), und umgekehrt kann MUTOS eine vom DiskTool geschriebene lesen.
+
+Vier Regeln für jeden Aufruf:
+
+* **`f` mit Gerät angeben** (`tar cvf /dev/rrk1 …`) — das Vorgabegerät `/dev/mt0` gibt es nicht.
+* **Relative Namen** aus dem passenden Verzeichnis (`cd /usr; tar cvf … include`). Absolute Namen werden beim
+  Auspacken wieder absolut zurückgeschrieben und überschreiben dabei Vorhandenes.
+* **`tar` ruft `pwd` und (beim Auspacken von Verzeichnissen) `mkdir`.** Fehlen sie in `/bin`, `/usr/bin` oder
+  `/mnt/bin`, meldet es `pwd failed!` bzw. `tar: cannot find mkdir!` und jede weitere Datei scheitert.
+* **Vor jedem Diskettenwechsel `sync`.** MUTOS puffert Schreibzugriffe über `/dev/rkN` und würde sie sonst auf
+  die **neue** Diskette schreiben. Das Rohgerät `/dev/rrkN` ist ungepuffert, aber `sync` schadet nie.
+
+Die Kapazität einer tar-Diskette ist **494 Blöcke zu 512 Byte = 252 928 Byte** (Format 26 × 128, s. u. für 8 × 512);
+das Archiv braucht je Datei einen Kopfblock und rundet die Daten auf 512 Byte auf. Ein einzelner `tar`-Lauf, der
+das Ende der Diskette erreicht, **hängt stumm** (Strg+C holt den Prompt zurück) — größere Archive gehen nur mit
+mehreren Disketten (unten).
+
+**Einmalig vorbereiten (drei K5601, Format 26 × 128).** Die Wurzel hat nur etwa 46 KB frei, die
+Programme liegen auf `cmd` und `bin`. Die vier nötigen Programme kopiert man einmal dauerhaft in `/bin` der
+Wurzel (Arbeitskopie der Wurzel verwenden!):
+
+1. `cmd` in A:, `bin` in B: einlegen.
+2. `/etc/mount /dev/rk0 /mnt`, dann `/etc/mount /dev/rk1 /tmp` (die Shell darf dabei **nicht** in `/tmp` stehen,
+   sonst `mount: Mount device busy`; im Zweifel vorher `cd /`).
+3. `cp /tmp/tar /mnt/bin/pwd /mnt/bin/dd /mnt/bin/mkdir /bin`, danach `sync`. Danach `df /dev/rk2`: etwa 25 Blöcke frei.
+4. `/etc/umount /dev/rk0` und `/etc/umount /dev/rk1`. Beide Laufwerke sind wieder frei.
+
+Mehr passt nicht in die Wurzel: `cmp` und `rm` bleiben auf `cmd` (zum Vergleichen und Aufräumen `cmd` wieder in A:
+einhängen). Die Wurzel auch als **Arbeitsplatz** knapp halten — `tar … | dd` legt seine Pipe dort ab und braucht
+mindestens etwa 10 freie Blöcke (`no space on dev 4/2` heißt: Wurzel voll).
+
+**Eine Diskette schreiben, listen, auspacken.** Beispiel: `usr` in A: (nach `/usr` eingehängt), eine leere
+formatierte Diskette in B: (Laufwerkskasten *Leere Diskette* — ein `.hfe` mit Format *udos_ss77*, oder im DiskTool
+*Neue Diskette* mit `tar_mutos8k_26x128_mfm_leer`; beides geht):
+
+    # cd /usr
+    # tar cvf /dev/rrk1 include lib/crt0.o
+    a include/sys/stat.h 2 blocks
+    …
+    # cd /
+    # sync
+    # tar tvf /dev/rrk1                  (Tar: blocksize = 8 — dann die Liste)
+    # cd /tmp
+    # tar xvf /dev/rrk1 include/stdio.h lib/crt0.o     (nur eine Auswahl: die Wurzel ist das Ziel und klein)
+
+`tar` legt die Verzeichnisse beim Auspacken selbst an. Zum Vergleichen `cmd` einhängen und `cmp datei original`
+— keine Ausgabe heißt gleich. Aufräumen mit `rm -r /tmp/include /tmp/lib`. Die Diskette bleibt nach dem Auswerfen
+und Wiedereinlegen lesbar; die Sektoren stehen ab Zylinder 1 (Zylinder 0 bleibt unberührt).
+
+Eine **nie beschriebene** formatierte Diskette (nur Füllbytes) endet mit `tar tvf` nicht sauber; die vom DiskTool
+angelegten `…_leer`-Disketten tragen deshalb im Datenbereich Nullblöcke und gelten als leeres Archiv.
+
+**Mehrere Disketten (Multi-Volume).** `tar` selbst kennt keine Folgedisketten. Man teilt den Strom mit `dd`
+selbst auf Disketten zu je **494 Blöcken** auf. Dazu muss der Strom beide Male **gleich** erzeugt werden (nichts
+an den Quelldateien ändern). Beispiel mit `usr` in A: und leeren Disketten nacheinander in B::
+
+    # cd /
+    # tar cf - usr bin | dd of=/dev/rrk1 bs=512 count=494
+    494+0 records in
+    494+0 records out
+    # sync                               (Diskette 1 aus B: nehmen, Diskette 2 einlegen)
+    # tar cf - usr bin | dd of=/dev/rrk1 bs=512 skip=494 count=494
+    183+0 records in
+    183+0 records out
+    # sync
+
+Eine dritte Diskette folgt mit `skip=988`. Die letzte Diskette trägt den Rest samt Endmarke. **Zurücklesen**
+nach einem Auspacken (Ziel ist die Wurzel; die Archivdisketten liegen in A: und B:, `usr` vorher aushängen):
+
+    # cd /tmp
+    # (dd if=/dev/rrk0 bs=512 count=494; dd if=/dev/rrk1 bs=512 count=494) | tar xvf - bin/date usr/include/time.h
+
+Der Strom darf dabei über die Diskettengrenze laufen (`bin/date` beginnt auf Diskette 1 und endet auf Diskette 2).
+Mit nur drei Laufwerken passt ein komplettes Auspacken größerer Sätze nicht in die Wurzel — man packt eine
+**Auswahl** aus oder hängt eine große Datendiskette als Ziel ein (dann `cd` dorthin). Ein Auflisten über beide
+Disketten (`… | tar tvf -`) läuft ohne Fehler, dauert aber mehrere Milliarden Takte und sieht wie ein Hänger aus.
+Gibt man eine **einzelne** Satzdiskette an `tar tvf`, endet die Liste mit `err on dev 13/0 … er=0,305` und
+`Tar: tape read error`: sie ist kein abgeschlossenes Archiv, der Inhalt davor ist vollständig.
+
+**Im DiskTool.** Eine so geschriebene Diskette erkennt das DiskTool als **`tar_mutos8k_26x128_mfm`**
+(MF3200: `…_fm`) und öffnet mehrere Disketten eines Satzes mit **Datei ▸ tar-Satz öffnen…** als EINEN Strom.
+Auf der Kommandozeile:
+
+    k1520disktool tar-satz v1.hfe v2.hfe -l          # Dateiliste des Satzes
+    k1520disktool tar-satz v1.hfe v2.hfe --to ordner # alles herausholen
+    k1520disktool tar-satz-neu --format tar_mutos8k_26x128_mfm satz.hfe --put datei1 --put ordner
+
+Das DiskTool **schreibt** diese Disketten ebenfalls (Dateien hinzufügen, löschen, über eine Diskette hinaus als
+Satz speichern); MUTOS liest das Ergebnis mit `tar tvf`/`tar xvf` bzw. der `dd`-Pipeline. Der Weg ist also in
+beiden Richtungen offen: Dateien vom PC auf eine tar-Diskette und von dort nach MUTOS, oder umgekehrt.
+
+**Das zweite Sektorformat, 8 × 512 (DISK-Satz).** Mit der Ladediskette `a5120_mutos8000_boot_udos_k5601_8x512.hfe`
+arbeitet MUTOS mit 8 Sektoren zu 512 Byte. Die tar-Diskette trägt dann **608 Blöcke = 311 296 Byte**; die Blöcke
+liegen **linear** ab Zylinder 1 (Block n auf Zylinder 1 + n/8, Sektor n mod 8 + 1), ohne Verschränkung. Das DiskTool
+kennt sie als **`tar_mutos8k_8x512_mfm`** (leer: `…_leer`). Über das Ende hinaus meldet `tar` hier sauber
+`Tar: tape write error` (statt zu hängen). Der Ablauf ist derselbe; mit der Satzbestückung
+Ladediskette in A:, **`…_cmd_8x512.hfe` in B:** (`/mnt`), **`…_root_8x512.hfe` in C:**, D: leer (nach dem Start
+nimmt man die Ladediskette aus A: und legt dort die tar-Diskette ein):
+
+    # /bin/mount /dev/rk1 /mnt
+    # cd /
+    # /mnt/bin/tar cvf /dev/rrk3 etc bin                   (leere Diskette in D:)
+    # /mnt/bin/tar tvf /dev/rrk3
+    # /mnt/bin/tar cf - etc bin mnt | /bin/dd of=/dev/rrk3 bs=512 count=608     (Folgedisketten: skip=608, …)
+    # (/bin/dd if=/dev/rrk0 bs=512 count=608; /bin/dd if=/dev/rrk3 bs=512 count=608) | /mnt/bin/tar xvf - dateiname
+
+Hier liegt `tar` auf `cmd` und die Wurzel ist die gelieferte `…_root_8x512.hfe` (mit der `pwd` von 1986: die `pwd`
+der alten DISK-ROOT-Diskette hängt, und mit ihr `tar`). Die Original-`.td0`-Disketten dieses Satzes lassen sich bis
+auf `cmd.td0` einlegen; die Hintergründe stehen in `doc/design/39_mutos8000.md` (A5c).
+
 ### Sicherungskopien
 
 * **Die Datei kopieren** — das ist die ganze Diskette. Erst die Diskette **auswerfen** (oder den Rechner
