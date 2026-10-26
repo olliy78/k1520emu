@@ -21,7 +21,9 @@
  * Systemtakt.
  *
  * Kanal A: /DCD und /CTS sind fest aktiv (die Tastatur steht immer; WR3 = 61H verlangt
- * Auto-Enables).  Kanal B: offen (kein IFSS-Geraet) [Annahme].
+ * Auto-Enables).  Kanal B: IFSS XS503 (20-mA-Stromschleife, ohne Steuerleitungen) geht ueber einen
+ * `SerialAnschluss` an den `SerialHub` der Maschine (Entwurf 19); Takt CTC K1 → ÷2 → SIO B
+ * (K0 → SIO A, hardware_3x.md §6.2).  Die Tastatur an Kanal A bleibt fest verdrahtet.
  */
 
 #pragma once
@@ -29,7 +31,9 @@
 #include "core/primitives/z80_ctc.h"
 #include "core/primitives/z80_pio.h"
 #include "core/primitives/z80_sio.h"
+#include "core/serial/anschluss.h"
 #include <cstdint>
+#include <memory>
 
 class Mc80Asp : public BusDevice, public InterruptSlave {
 public:
@@ -39,6 +43,7 @@ public:
 
     Mc80Asp();
     explicit Mc80Asp(const Config& cfg);
+    ~Mc80Asp();
 
     void attachToBus(K1520Bus& bus);
     void reset();
@@ -67,11 +72,18 @@ public:
     bool hatGesendet() const;
     uint8_t nimmGesendet();
 
+    /// Der Anschluss IFSS (SIO B, XS503) fuer den SerialHub.
+    k1520::serial::SerialAnschluss& anschluss();
+    /// Hat der Hub SIO B beruehrt (Interruptkette neu bewerten)?  Liest und loescht.
+    bool nimmSeriellGeaendert() { const bool g = seriell_geaendert_; seriell_geaendert_ = false; return g; }
+
     Z80SIO& sio() { return sio_; }
     Z80CTC& ctc() { return ctc_; }
     Z80PIO& pio() { return pio_; }
 
 private:
+    class Anschluss;
+    friend class Anschluss;
     void updateInternalChain();
 
     Config cfg_;
@@ -79,4 +91,6 @@ private:
     Z80CTC ctc_{"MC80-ASP-CTC"};
     Z80PIO pio_{"MC80-ASP-PIO"};
     bool   iei_in_ = false;
+    bool   seriell_geaendert_ = false;
+    std::unique_ptr<Anschluss> anschluss_;
 };

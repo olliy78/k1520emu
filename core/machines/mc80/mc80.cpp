@@ -81,6 +81,7 @@ Mc80Machine::Mc80Machine(const Config& cfg)
         for (auto& k : eprom_) k->setSegmentRegister(m);
     });
     bus_.setInterruptChain({&zve_, &asp_});   // Kartenreihenfolge [?], hardware_3x.md §7
+    hub_.registriere(asp_.anschluss());       // IFSS XS503 (SIO B) nach aussen, Entwurf 19
     powerOn();
 }
 
@@ -120,6 +121,8 @@ void Mc80Machine::resetHardware()
     k6022Reset();
     k5020Reset();
     rafReset();
+    hub_.gastZurueckgesetzt();   // XOFF-/RTS-Halt des alten Gastes gilt nicht weiter
+    serial_naechst_ = 0;
     bus_.clearNMI();
     bus_.releaseINT();
     bus_.markIntDirty();
@@ -154,6 +157,10 @@ int Mc80Machine::run(int max_cycles)
         }
         dirty |= k6022Takt(used);
         dirty |= k5020Takt(used);
+        if (total_cycles_ >= serial_naechst_) {
+            serial_naechst_ = hub_.takt(total_cycles_);
+            dirty |= asp_.nimmSeriellGeaendert();
+        }
         if (dirty) bus_.markIntDirty();
     }
     k6022AutoFlush();

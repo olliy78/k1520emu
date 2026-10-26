@@ -114,7 +114,10 @@ public:
     bool isHeadLoaded() const override { return false; }
     void setDiskWriteProtect(int, bool) override {}
 
-    // ─── Serielle Schnittstellen (ASP, M3) ───────────────────────────────────
+    // ─── Serielle Schnittstellen (ASP: IFSS XS503 an SIO B → SerialHub) ──────
+    k1520::serial::SerialHub* serialHub() override { return &hub_; }
+    std::vector<k1520::serial::SerialAnschluss*> serielleAnschluesse() override
+    { return {&asp_.anschluss()}; }
     void setDFUECallback(SerialCb) override {}
     void dfueSend(uint8_t) override {}
 
@@ -143,6 +146,11 @@ public:
     void setBusTrace(K1520Bus::BusTrace cb) { bus_.setTraceCallback(std::move(cb)); }
     /// Koppelbus ASP → K5020 (MC80.30): ASP-CTC K2 laeuft als Zaehler (EGOS MB_INIT `47H,02H`).
     bool aspBandtakt() const;
+
+    /// Der MC80 hat nur EIN Kassettenlaufwerk (HiFi-Laufwerk): Laufwerk 2 der K5020 ist nicht
+    /// angeschlossen (EGOS spricht nur Laufwerk 1 an, Merkposten mc80.md Nr. 14).
+    kassette::KassettenLaufwerk* kassettenLaufwerk(int drive) override
+    { return drive == 0 ? K1520Machine::kassettenLaufwerk(0) : nullptr; }
 
 protected:
     K1520Bus& systemBus() override { return bus_; }
@@ -178,4 +186,6 @@ private:
     std::atomic<bool> stop_{false};
     std::atomic<bool> nmi_taster_{false};
     uint64_t total_cycles_ = 0;
+    k1520::serial::SerialHub hub_{k1520::serial::PHI_NENN};
+    uint64_t serial_naechst_ = 0;   ///< naechster Blick der Wandler (Taktzahl)
 };

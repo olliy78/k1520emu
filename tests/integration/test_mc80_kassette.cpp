@@ -230,6 +230,16 @@ TEST(Mc80K5020, EgosStelltDieKarteBeimStartEin) {
     EXPECT_TRUE(m->k5020()->taktLiegtAn());
 }
 
+// Der MC80 hat nur EIN Laufwerk (HiFi-Kassettenlaufwerk); Laufwerk 2 der K5020 ist nicht da.
+TEST(Mc80KassetteLaufwerk, NurEinLaufwerk) {
+    for (auto v : {Variante::Mc8030, Variante::Mc8031}) {
+        auto m = maschine(v);
+        ASSERT_TRUE(m->installK5020());
+        EXPECT_NE(m->kassettenLaufwerk(0), nullptr);
+        EXPECT_EQ(m->kassettenLaufwerk(1), nullptr);
+    }
+}
+
 // ─── Abnahme ueber EGOS ───────────────────────────────────────────────────────
 
 class Mc80Kassette : public ::testing::TestWithParam<Variante> {};
