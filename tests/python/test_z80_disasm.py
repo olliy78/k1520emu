@@ -346,20 +346,26 @@ def test_listing_modus_unveraendert(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# W3: aus Abzug + Karte entsteht die Quelle von mutos_io reproduzierbar
+# W3: aus Abzug + Karte entsteht der Ausgangsstand der Quelle von mutos_io
+# (seit M4 ist src/mutosio.mac der Master und wird von Hand weiterentwickelt;
+#  die Karte belegt nur, dass der Ausgangsstand reproduzierbar war)
 # ---------------------------------------------------------------------------
-def test_mutos_io_quelle_entsteht_aus_abzug_und_karte(tmp_path):
+def test_mutos_io_karte_erzeugt_den_ausgangsstand(tmp_path):
     with zipfile.ZipFile(ARCHIV) as z:
         abzug = tmp_path / "mutos_io"
         abzug.write_bytes(z.read("dateien/mutos_io"))
-    quelle = (MUTOSIO / "src" / "mutosio.mac").read_text()
     karte = MUTOSIO / "karte.txt"
     ohne = mac(abzug, karte=karte)
     mit = mac(abzug, "--adr", karte=karte)
-    # Die eingecheckte Quelle ist die Ausgabe der Karte - mit oder ohne Adresskommentare
-    # (Kommentare der Karte `kom`/`ik` stehen in beiden Fassungen).
-    assert quelle in (ohne, mit), "src/mutosio.mac weicht von der Ausgabe aus Abzug + karte.txt ab"
     # Beide Fassungen unterscheiden sich nur in den Adresskommentaren
     def kahl(t):
         return [z.split("\t;")[0] for z in t.splitlines()]
     assert kahl(ohne) == kahl(mit)
+    # jede Marke der Karte steht in der erzeugten Quelle
+    namen = [z.split()[2] for z in karte.read_text().splitlines() if z.startswith("name ")]
+    assert namen and all(f"\n{n}:" in ohne for n in namen)
+    # und die Master-Quelle kennt dieselben Marken (Umbenennen ist erlaubt, Verlieren nicht stillschweigend)
+    master = (MUTOSIO / "src" / "mutosio.mac").read_text()
+    fehlend = [n for n in namen if f"\n{n}:" not in master]
+    assert len(fehlend) <= 3, fehlend
+

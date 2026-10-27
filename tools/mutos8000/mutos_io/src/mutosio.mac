@@ -12,6 +12,32 @@ FILLFF	MACRO	N
 ; ---- Segment 9000H .. 922CH ----
 	.PHASE	9000H
 SEG9000:
+; ==========================================================================
+; mutos_io - U880-Seite von MUTOS 8000 (Robotron A5120.16, Erweiterungsmodul EM)
+; ==========================================================================
+; UDOS-Programm (Typ P, Stand 16.01.1986) auf der Ladediskette; wird vom Skript MUTOS
+; nach dem Kernel mutos_1216 (Z8000) gestartet.  Aufgabe: E/A-Prozessor des Kernels -
+; Platte, Drucker, Konsole/Tastatur, serielle Leitungen laufen ueber den U880.
+; 
+; Ablauf (Messungen: doc/merkposten/mutos_io_analyse.md, Entwurf 39 Abschnitt 11):
+; 1. Der Kernel legt eine 14-Byte-NACHRICHT im EM-Speicher ab, ihren Zeiger bei
+; EM-Offset 4006H, und setzt A33 Bit 4 (INT-16) -> PIO A32 -> ISR_ANFRAGE.
+; 2. ISR_ANFRAGE kopiert die Nachricht in den Geraeteblock (DCB) und setzt das
+; Anforderungsbit der Einheit in der Maske ihrer KLASSE.
+; 3. HAUPT arbeitet die Klassen reihum ab und ruft den Handler der Einheit.
+; 4. Der Handler fuehrt den Auftrag aus (Platte: UDOS-Nukleus 0BFDH; Konsole: 0BEBH).
+; 5. MELDEN schreibt Status (+3) und Zaehlung (+8/9) in die Nachricht im EM und
+; gibt den Vektor des DCB an den Z8000 (OUT ADH) - falls dessen Ebene es zulaesst.
+; 
+; Fuenf Klassen (Nachricht +0 = 2 * Klasse): 0 Platte, 1 Drucker, 2 Konsole/tty,
+; 3 Roh-Floppy (im Betrieb nie benutzt), 4 Eingabe (Tastatur, SIO; nur intern).
+; Ports (A5120.16): A8H..ABH PIO A32, ACH Status-8, ADH Vektor, AFH Attributspeicher;
+; 0DH CTC (Takt), 50H..53H SIO, 5CH/5DH Tastatur-SIO; Ausfuehrung Entwurf 17 Abschnitt 7.
+; 
+; Bau: python3 tools/mutos8000/mutos_io/build.py ; Diskette: ladediskette.py diskette ...
+; Wartung: DIESE Datei ist der Master (von Hand aendern, dann build.py --check).
+; Ausgangsstand: Abzug + karte.txt (z80_disasm2.py --format mac --karte); Karte nur noch Nachweis.
+; 
 	LD SP,0CB68H
 	CALL MASKE
 	CALL INIT
@@ -20,14 +46,20 @@ SEG9000:
 	XOR A
 	LD (V_KLASSE),A
 	CALL KLASSE_SETZEN
+; --- HAUPT: Hauptschleife -------------------------------------------------
+; IX = Beschreiber der laufenden Klasse (V_AKTUELL = KLASSEN + 4*k):
+; +0 Anforderungsmaske (Bit n = Einheit n will bedient werden)
+; +1 Fertigmaske       (Bit n = Einheit n ist fertig, Meldung an den Z8000)
+; +2/3 Zeiger auf die Handlertabelle (8 x [DCB-Zeiger, Handler])
 HAUPT:
-	LD IX,(V_AKTUELL)
+	LD IX,(V_AKTUELL)	; Beschreiber der laufenden Klasse
 	LD A,(IX+0)
 	OR A
 	JR Z,HAUPT_B
-	CALL BIT_NUMMER
-	CALL EINTRAG_HOLEN
+	CALL BIT_NUMMER	; C = niedrigste gesetzte Einheit
+	CALL EINTRAG_HOLEN	; IX = DCB, HL = Handler
 	JP (HL)
+; Anforderungen dieser Klasse erledigt: naechste Klasse, nach Fertigmeldungen sehen
 HAUPT_B:
 	CALL KLASSE_WEITER
 	LD IX,(V_AKTUELL)
@@ -39,6 +71,11 @@ HAUPT_B:
 	JP MELDEN
 HAUPT_NEU:
 	JR HAUPT
+; --- MELDEN: Fertigmeldung einer Einheit an den Z8000 ---------------------
+; IX = DCB.  IX+9 = Status (0 = laeuft noch -> nichts tun).  Zugestellt wird nur,
+; wenn Befehl Bit 7 gesetzt ist (ohne Interrupt, Z8000 fragt den Status selbst ab)
+; oder /VI = 1 (kein Vektor steht an) UND Ebene des Z8000 (A33 Bit 0-2) < IX+1.
+; Sonst bleibt der Auftrag stehen und wird im naechsten Umlauf erneut versucht.
 MELDEN:
 	LD A,(IX+9)
 	OR A
@@ -51,11 +88,11 @@ MELDEN:
 	IN A,(0A8H)
 	BIT 3,A
 	JR Z,MEL_ENDE
-	AND 07H
+	AND 07H	; Ebene des Z8000 < DCB-Schwelle?
 	CP B
 	JR NC,MEL_ENDE
 MEL_DATEN:
-	LD A,(IX+8)
+	LD A,(IX+8)	; Befehl lesen (0)? -> Daten Z80-Puffer -> EM
 	AND 7FH
 	CP 00H
 	JR NZ,MEL_STATUS
@@ -68,6 +105,7 @@ MEL_DATEN:
 	LDIR
 	LD A,2CH
 	OUT (0A9H),A
+; Ergebnis in die Nachricht im EM: +3 Status, +8/9 uebertragene Zahl
 MEL_STATUS:
 	LD L,(IX+4)
 	LD H,(IX+5)
@@ -88,7 +126,8 @@ MEL_STATUS:
 	BIT 7,(IX+8)
 	JR NZ,MEL_IRQ
 	LD A,(IX+0)
-	OUT (0ADH),A
+	OUT (0ADH),A	; OUT ADH: Vektor -> VI an den U8001
+; Vektor des DCB an den Z8000, dann Auftrag beendet (IX+22 Bit 0 loeschen)
 MEL_IRQ:
 	LD A,2CH
 	OUT (0A9H),A
@@ -100,6 +139,9 @@ MEL_IRQ:
 MEL_ENDE:
 	EI
 	JP HAUPT_NEU
+; --- EING_TASTE: Klasse 4 Einheit 0: Tastenzeichen an den Z8000 ----------
+; Zeichen aus dem Ring QUEUE_TASTE; Ebene < 4 und /VI frei erforderlich.
+; Zeichen -> Status-8 (ACH), Vektor 22H -> ADH.  Ring leer: Anforderungsbit loeschen.
 EING_TASTE:
 	DI
 	IN A,(0A8H)
@@ -122,10 +164,15 @@ ET_LEER:
 ET_ENDE:
 	EI
 	JP HAUPT_B
+; Warteschlange der Tastatur leeren (04 04 00 00)
 WARTESCHL0_INIT:
 	LD HL,QUEUE_TASTE
 	CALL QUEUE_INIT
 	RET
+; --- PLATTE: Klasse 0, Handler fuer Einheit 0..3 (Minor) ------------------
+; Baut den Nukleus-Auftrag (IY = AUF0): IY+0 Laufwerk = TAB_RK_LAUFWERK[Minor],
+; IY+1 Befehl 0BH lesen / 0FH schreiben, IY+2/3 Puffer, IY+11/12 Blocknummer,
+; Rueckrufe auf PLATTE_FERTIG; dann BLOCK_START.  V_BUSY schuetzt die Platte.
 PLATTE:
 	DI
 	LD A,(V_BUSY)
@@ -134,7 +181,7 @@ PLATTE:
 	EI
 	JP HAUPT_B
 PL_FREI:
-	LD A,01H
+	LD A,01H	; V_BUSY := 1 (Platte belegt)
 	LD (V_BUSY),A
 	EI
 	LD IY,AUF0
@@ -179,6 +226,8 @@ PL_BEFEHL:
 	CALL BLOCK_START
 	POP IX
 	JP ENDE_LOESCHEN
+; --- PLATTE_FERTIG: Rueckruf des Nukleus nach dem Plattenauftrag ----------
+; IX+14/15 = uebertragene Zahl, IX+9 = 1 (gut) oder Fehlercode, Fertigbit setzen.
 PLATTE_FERTIG:
 	DI
 	CALL REGS_RETTEN
@@ -204,6 +253,8 @@ PF_STATUS:
 	CALL REGS_HOLEN
 	EI
 	RET
+; UDOS-Nukleus auf 128-Byte-Sektoren: [0003H] bit 0 setzen; V_BUSY := 0
+; (8x512-Fassung: dort steht 4 statt OR 01H, siehe Entwurf 39 Abschnitt 11.2)
 NUKLEUS_INIT:
 	LD A,(0003H)
 	OR 01H
@@ -211,6 +262,7 @@ NUKLEUS_INIT:
 	LD A,00H
 	LD (V_BUSY),A
 	RET
+; --- DRUCKER: Klasse 1: Ausgabe ueber den UDOS-Druckertreiber 0EB00H ------
 DRUCKER:
 	LD IY,AUF1
 	LD (IY+1),0FH
@@ -251,6 +303,7 @@ DF_STATUS:
 	CALL REGS_HOLEN
 	EI
 	RET
+; --- KONSOLE_AUS: Klasse 2 Einheit 0: je Zeichen UDOS-Ausgabe 0BEBH -------
 KONSOLE_AUS:
 	LD L,(IX+2)
 	LD H,(IX+3)
@@ -281,6 +334,11 @@ SEG9000E:
 ; ---- Segment 9400H .. A2AFH ----
 	.PHASE	9400H
 SEG9400:
+; --- INIT: Hardware-Initialisierung --------------------------------------
+; Attributspeicher (AFH): alle 16 Seiten := 0FH (gesperrt; Attribute sind negiert).
+; PIO A32: Port A Vektor EAH, Modus 3, Eingang, Interrupt bei INT-16 (Bit 4);
+; Port B Vektor ECH, Interrupt bei /PE (Bit 7, Paritaetsfehler).  CTC 0DH Kanal 1:
+; A7H/C0H = Zeitgeber 50 Hz, Vektor 0FE2.  Dann Tastatur, Warteschlangen, SIO.
 INIT:
 	LD E,10H
 	LD BC,00AFH
@@ -317,6 +375,7 @@ INIT_ATTR:
 	CALL INIT_TTY3
 	CALL NUKLEUS_INIT
 	RET
+; Tastatur: CTC 58H Kanal 0 Zeitkonstante 1 (9600 Baud), SIO 5CH/5DH polled, 8 Bit
 INIT_TASTATUR:
 	LD A,05H
 	OUT (58H),A
@@ -337,6 +396,9 @@ TAB_PIO_A:
 	DB	0EAH,0CFH,0FFH,0B7H,0EFH
 TAB_PIO_B:
 	DB	0ECH,0CFH,80H,97H,7FH
+; --- ISR_TAKT: Zeitgeber 50 Hz (CTC 0DH Kanal 1) --------------------------
+; Fragt die Tastatur ab (TASTE_LESEN) und legt Zeichen in QUEUE_TASTE; zaehlt V_TAKT
+; und meldet bei Ebene < 6 und /VI frei den Tickzaehler (ACH) mit Vektor 02H.
 ISR_TAKT:
 	CALL REGS_RETTEN
 	CALL TASTE_LESEN
@@ -366,6 +428,7 @@ IT_ENDE:
 	CALL REGS_HOLEN
 	EI
 	RETI
+; --- ISR_PARITAET: Paritaetsfehler (PIO B Bit 7): PR-Impuls loescht das FF ---
 ISR_PARITAET:
 	PUSH AF
 	LD A,6CH
@@ -375,6 +438,11 @@ ISR_PARITAET:
 	POP AF
 	EI
 	RETI
+; --- ISR_ANFRAGE: der Z8000 hat eine Nachricht abgelegt (INT-16) -----------
+; Zeiger holen aus EM-Seite 4 Offset 6 (4006H), Zeiger loeschen, 14 Byte Nachricht
+; nach A5A8, Byte 0 waehlt den Beschreiber (KLASSE_ADR), Byte 1 den DCB (EINTRAG_HOLEN),
+; Nachricht nach DCB+6, IX+22 Bit 0 'Auftrag laeuft'; Befehl 1 (schreiben): Daten sofort
+; EM -> Z80-Puffer; Anforderungsbit der Einheit setzen.
 ISR_ANFRAGE:
 	CALL REGS_RETTEN
 	LD BC,40AFH
@@ -457,6 +525,8 @@ IA_ZAEHLER:
 	EI
 	RETI
 	FILLFF	141
+; --- Klassen-Verwaltung ----------------------------------------------------
+; V_KLASSE zaehlt 0,2,4,6,8 (je 4 Byte Beschreiber); V_AKTUELL zeigt auf KLASSEN+...
 KLASSE_WEITER:
 	LD A,(V_KLASSE)
 	INC A
@@ -469,6 +539,7 @@ KLASSE_SETZEN:
 	CALL KLASSE_ADR
 	LD (V_AKTUELL),HL
 	RET
+; HL := KLASSEN + 2*A (A = 2*Klasse -> 4 Byte je Beschreiber)
 KLASSE_ADR:
 	SLA A
 	LD HL,KLASSEN
@@ -476,6 +547,7 @@ KLASSE_ADR:
 	LD C,A
 	ADD HL,BC
 	RET
+; C := Nummer des niedrigsten gesetzten Bits von A
 BIT_NUMMER:
 	LD C,0FFH
 BN_SCHL:
@@ -483,6 +555,7 @@ BN_SCHL:
 	RRA
 	JR NC,BN_SCHL
 	RET
+; IX := DCB und HL := Handler der Einheit C aus der Tabelle (IX+2/3 + 4*C)
 EINTRAG_HOLEN:
 	SLA C
 	SLA C
@@ -501,6 +574,7 @@ EINTRAG_HOLEN:
 	LD D,(HL)
 	EX DE,HL
 	RET
+; Bit (A and 7) im Byte (HL) setzen
 BIT_SETZEN:
 	AND 07H
 	LD B,A
@@ -512,6 +586,7 @@ BS_SCHL:
 	OR (HL)
 	LD (HL),A
 	RET
+; Bit (A and 7) im Byte (HL) loeschen
 BIT_LOESCHEN:
 	AND 07H
 	LD B,A
@@ -523,6 +598,7 @@ BL_SCHL:
 	AND (HL)
 	LD (HL),A
 	RET
+; Auftrag fertig: Anforderungsbit loeschen, Fertigbit setzen, zurueck in die Schleife
 ENDE_WIEDER:
 	DI
 	LD HL,(V_AKTUELL)
@@ -533,6 +609,7 @@ ENDE_WIEDER:
 	CALL BIT_SETZEN
 	EI
 	JP HAUPT_B
+; Anforderungsbit loeschen (Auftrag laeuft im Nukleus weiter)
 ENDE_LOESCHEN:
 	DI
 	LD HL,(V_AKTUELL)
@@ -540,6 +617,7 @@ ENDE_LOESCHEN:
 	CALL BIT_LOESCHEN
 	EI
 	JP HAUPT_B
+; Leerhandler fuer Einheiten ohne Geraet (im Betrieb nie angefordert)
 IGNORIEREN:
 	DI
 	LD HL,(V_AKTUELL)
@@ -550,6 +628,10 @@ IGNORIEREN:
 	CALL BIT_LOESCHEN
 	EI
 	JP HAUPT_B
+; --- EM-Zugriff -------------------------------------------------------------
+; SEITE_ABBILDEN: EM-Adresse HL auf das Z80-Fenster 4000H-7FFFH abbilden: zwei benachbarte
+; 4-KB-Seiten ueber OUT (C),A an AFH (B = Seite); A14/A15 der EM-Adresse kommen aus dem
+; Attribut.  Rueckgabe HL = Fensteradresse.
 SEITE_ABBILDEN:
 	LD A,H
 	AND 30H
@@ -581,6 +663,7 @@ SEITE_ABBILDEN:
 	OR 40H
 	LD H,A
 	RET
+; EM_PARAMETER: HL = Fenster der Nachricht, BC = Zaehlung, DE = Z80-Puffer, A = Segment
 EM_PARAMETER:
 	LD H,(IX+12)
 	LD L,(IX+13)
@@ -591,6 +674,8 @@ EM_PARAMETER:
 	LD E,(IX+2)
 	LD A,(IX+11)
 	RET
+; EM_BUS: Segment A (0-3) waehlen, /TRQ8 aktiv (OUT A9H = 48H+n) und warten, bis der
+; U880 den Bus hat (IN A8H Bit 6)
 EM_BUS:
 	AND 03H
 	OR 48H
@@ -600,6 +685,8 @@ EB_WARTEN:
 	BIT 6,A
 	RET NZ
 	JR EB_WARTEN
+; --- Warteschlangen (Ringe QUEUE_*: +0 Schreib-, +1 Leseindex, Daten ab +4 bis 2BH) ---
+; QUEUE_PUSH: Zeichen A in den Ring HL
 QUEUE_PUSH:
 	LD B,A
 	LD C,(HL)
@@ -609,6 +696,7 @@ QUEUE_PUSH:
 	ADD HL,BC
 	LD (HL),A
 	RET
+; QUEUE_POP: Z = leer, sonst A = naechstes Zeichen
 QUEUE_POP:
 	LD A,(HL)
 	INC HL
@@ -622,6 +710,7 @@ QUEUE_POP:
 	LD A,(HL)
 	OR A
 	RET
+; Index weiterschalten, Umlauf bei 2BH auf 04
 QUEUE_WEITER:
 	LD A,2BH
 	INC (HL)
@@ -629,6 +718,7 @@ QUEUE_WEITER:
 	RET NC
 	LD (HL),04H
 	RET
+; Ring initialisieren (04 04 00 00)
 QUEUE_INIT:
 	LD A,04H
 	LD (HL),A
@@ -640,6 +730,8 @@ QUEUE_INIT:
 	INC HL
 	LD (HL),A
 	RET
+; --- TASTE_LESEN: Tastatur-SIO 5DH Bit 0 = Zeichen da, 5CH holen; FFH -> CR ---
+; Codes < 20H ueber TAB_TASTE, Praefix 9xH/BxH, Codes ab 80H verworfen.  Z = nichts.
 TASTE_LESEN:
 	IN A,(5DH)
 	AND 01H
@@ -681,6 +773,7 @@ TL_BX:
 	LD A,B
 	AND 1FH
 	JR TL_UMSETZEN
+; REGS_RETTEN / REGS_HOLEN: AF, BC, DE, IX (und HL) fuer ISRs und Rueckrufe sichern
 REGS_RETTEN:
 	EX (SP),HL
 	PUSH AF
@@ -696,10 +789,19 @@ REGS_HOLEN:
 	POP AF
 	EX (SP),HL
 	RET
+; Tastencode-Tabelle fuer Codes 00H-1FH (Steuerzeichen -> ASCII)
 TAB_TASTE:
 	DB	00H,09H,02H,03H,04H,05H,7FH,07H,7FH,09H,0AH,0BH,0CH,0DH,0EH,0FH
 	DB	10H,11H,12H,15H,14H,15H,16H,17H,18H,19H,1AH,7FH,1CH,1DH,1EH,0FFH
 	FILLFF	139
+; --- PLATTEN-BLOCKABBILDUNG (Entwurf 39 Abschnitt 4.6.3 / 11.2) ------------------
+; BLOCK_START: Kernelblock (512 B = 4 Sektoren zu 128 B) -> Zylinder/Sektor; je 128 Byte ein
+; Nukleus-Aufruf (CALL 0BFDH -> JP 0700H) mit Rueckruf BLOCK_RUECKRUF.
+; Block b: l = 4*b logischer Sektor, Zyl. = l div 26 + 1, pos = l mod 26;
+; Verschraenkung 2 (erst 13 ungerade, dann 13 gerade), Spurversatz 6 je Zylinder.
+; NUK_AUFTRAG (996EH) ist der Auftragsblock des Nukleus: +0 Laufwerk/Befehl, +2/3 Puffer,
+; +4/5 Laenge, +6/7 Rueckruf fertig, +8/9 Rueckruf Fehler, +10 Status, +11 Laufwerk<<5 | ID-1,
+; +12 Zylinder.
 BLOCK_START:
 	LD (V_AUFTRAG_IY),IY
 	LD L,(IY+2)
@@ -778,6 +880,7 @@ BS_MOD26:
 	CALL 0BFDH
 	POP IY
 	RET
+; BLOCK_RUECKRUF: je fertigem 128-Byte-Sektor; Rest abziehen; 0 -> BR_FERTIG, sonst weiter
 BLOCK_RUECKRUF:
 	DI
 	CALL REGS_RETTEN
@@ -829,6 +932,7 @@ BR_FERTIG:
 	LD IY,(V_IY_SICHER)
 	EI
 	RET
+; Fehlerrueckruf: Status des Nukleus an den Auftraggeber (im Betrieb nie gelaufen)
 BR_ABBRUCH:
 	LD A,(V_STATUS)
 	LD (IY+10),A
@@ -840,6 +944,7 @@ BR_ABBRUCH:
 	LD IY,(V_IY_SICHER)
 	EI
 	RET
+; SEKTOR_WEITER: naechster logischer Sektor (pos+1; bei 26: Zylinder+1, Versatz+6 mod 26)
 SEKTOR_WEITER:
 	LD A,(V_POS)
 	INC A
@@ -860,6 +965,7 @@ SW_VERSATZ:
 SW_ENDE:
 	LD (V_POS),A
 	RET
+; SEKTOR_BERECHNEN: physische Sektor-ID aus pos/Versatz (Verschraenkung 2), Zylinder = rel+1
 SEKTOR_BERECHNEN:
 	LD A,(V_VERSATZ)
 	LD D,A
@@ -888,6 +994,7 @@ SB_FERTIG:
 	XOR A
 	LD (V_STATUS),A
 	RET
+; Arbeitsvariablen der Blockabbildung; ab 996EH Auftragsblock fuer den Nukleus (13 Byte)
 V_VERSATZ:
 	DB	00H
 V_ZYL:
@@ -915,6 +1022,11 @@ V_AUFTRAG_IY:
 V_IY_SICHER:
 	DB	00H,00H
 	FILLFF	126
+; --- ROH: Klasse 3, Roh-Floppy-Befehle (im Betrieb NIE benutzt) ------------------
+; Kommandoblock bei 01B5H (liegt am A5120 im UDOS-Nukleus!), Start ueber OUT (1CH) (am A5120
+; unbelegt).  Befehlstabelle TAB_KMD, Fehlertabelle TAB_FEHLER.  Vermutlich Rest einer
+; anderen Floppy-Hardware (WD179x-aehnliche Statusbits).  Nicht nachbilden, solange der Kernel
+; keinen Geraeteknoten dafuer hat (Analyse Abschnitt 8).
 ROH:
 	DI
 	LD A,(V_BUSY)
@@ -1005,9 +1117,12 @@ KMD_BITS:
 	DB	00H
 KMD_FEHLERBITS:
 	DB	00H
+; Befehlstabelle: 8 x [Befehl, Maske lo, Maske hi, Controllerbefehl]
 TAB_KMD:
 	DB	0AH,03H,35H,07H,0EH,03H,27H,0BH,60H,10H,07H,13H,24H,02H,35H,23H
 	DB	26H,06H,39H,23H,44H,12H,25H,43H,46H,16H,29H,43H,50H,08H,01H,83H
+; Fehlertabelle: 8 x [Statusmaske, Fehlercode F1..F8]; die ersten 6: Bit gesetzt = Fehler,
+; die letzten 2: Bit geloescht = Fehler
 TAB_FEHLER:
 	DB	80H,0F1H,40H,0F2H,10H,0F3H,08H,0F4H,20H,0F5H,04H,0F6H,08H,0F7H,20H,0F8H
 KMD_BEFEHL:
@@ -1135,6 +1250,8 @@ KMD_INIT:
 	LDIR
 	RET
 	FILLFF	214
+; --- Eingabe-Handler Klasse 4 Einheit 1..3: Zeichen der seriellen Leitungen ----------
+; HL = Ring, B = Vektor an den Z8000 (26H/2AH/2EH), C = Einheit; im Betrieb nie gelaufen
 EING_TTY1:
 	LD HL,QUEUE_TTY1
 	LD B,26H
@@ -1172,6 +1289,7 @@ EZ_LEER:
 EZ_ENDE:
 	EI
 	JP HAUPT_B
+; Ringe der Leitungen tty1..tty3 initialisieren; SIO initialisieren
 INIT_TTY1:
 	LD HL,QUEUE_TTY1
 	CALL QUEUE_INIT
@@ -1185,6 +1303,7 @@ INIT_TTY3:
 	LD HL,QUEUE_TTY3
 	CALL QUEUE_INIT
 	RET
+; --- Klasse 2 Einheit 1..3: serielle Ausgabe (alle ueber SIO Kanal A!) ------------
 TTY1_AUS:
 	LD IY,AUF3
 	LD HL,TTY1_FERTIG
@@ -1196,6 +1315,7 @@ TTY2_AUS:
 TTY3_AUS:
 	LD IY,AUF5
 	LD HL,TTY3_FERTIG
+; TTY_AUS: Auftrag fuer SIO_SENDEN aufbauen (IY = AUF3..AUF5), HL = Fertig-Rueckruf
 TTY_AUS:
 	LD (IY+1),0FH
 	LD A,(IX+2)
@@ -1247,6 +1367,8 @@ TF_MELDEN:
 	CALL REGS_HOLEN
 	EI
 	RET
+; --- INIT_SIO: SIO 50H-53H: 7 Bit, ungerade Paritaet, 1 Stopp, x16; CTC 5AH Kanal 2 = 9600 Baud ---
+; IM-2-Tabelle 0F30H-0F3EH: Kanal B Tx 9F18/Rx 9E61, Kanal A Tx 9EFB/Rx 9E3E
 INIT_SIO:
 	LD A,07H
 	OUT (5AH),A
@@ -1277,6 +1399,7 @@ TAB_SIO_A:
 	DB	18H,04H,45H,05H,28H,03H,41H,01H,1EH
 TAB_SIO_B:
 	DB	18H,02H,30H,04H,45H,05H,28H,03H,41H,01H,1EH
+; --- ISR_SIO_A_RX / ISR_SIO_B_RX: Zeichen in Ring QUEUE_TTY1 / QUEUE_TTY2, Klasse 4 melden ---
 ISR_SIO_A_RX:
 	CALL REGS_RETTEN
 	IN A,(51H)
@@ -1311,6 +1434,8 @@ ISB_ENDE:
 	CALL REGS_HOLEN
 	EI
 	RETI
+; --- SIO_SENDEN: Zeichenfolge (Zeiger/Zaehler in V_SIO_*) senden; Tx-leer-ISR sendet weiter ---
+; Gesendet wird IMMER ueber Kanal A (50H/51H), auch fuer tty2/tty3 (Befund, nicht beabsichtigt?)
 SIO_SENDEN:
 	LD (V_SIO_IY),IY
 	LD L,(IY+2)
@@ -1399,6 +1524,10 @@ V_SIO_IY2:
 V_SIO_RUECK:
 	DB	00H,00H
 	FILLFF	208
+; --- MASKE: Bedienmaske beim Start: Laufwerk -> rk-Nummer (Entwurf 39 Abschnitt 11.4) --------
+; Zeigt 'floppy - drive 0 1 2 3' / 'mutos - rk 0 1 2 3', Eingabe pro Spalte 0-3, 'r' = weiter.
+; Ergebnis: TAB_RK_LAUFWERK[rk] = Laufwerk.  Texte: laengenvorangestellte Zeichenketten
+; (Ausgabe mit UDOS 0BF1H), die drei Fehlertexte sind je 30 Byte lang.
 MASKE:
 	JP MASKE_START
 T_STRICH:
@@ -1427,12 +1556,15 @@ T_BOOT_ENTF:
 T_WURZEL_EINL:
 	DB	23H
 	DB	'insert mutos8000 root - disk on rk2'
+; Fehlertexte (je 30 Byte, werden mit MELDUNG_AUSGEBEN in die Meldezeile FF60H kopiert)
 T_FEHL_NICHT_ZUGEORDNET:
 	DB	'* * error : not assign rk  * *'
 T_FEHL_ZAHL:
 	DB	'* * error : number (0...3) * *'
 T_FEHL_DOPPELT:
 	DB	'* * error : rk - duplikate * *'
+; Eingabepuffer der Maske (4 Byte), danach TAB_RK_LAUFWERK (rk -> Laufwerk), letzte Taste,
+; und die Adressen der Ziffern in den Textzeilen
 V_EINGABE:
 	DB	00H,01H,02H,03H
 TAB_RK_LAUFWERK:
@@ -1629,6 +1761,7 @@ MASKE_KOPF2:
 	LD HL,T_STRICH
 	CALL 0BF1H
 	RET
+; Meldung (30 Byte ab HL) nach FF60H kopieren, Signalton an die Tastatur
 MELDUNG_AUSGEBEN:
 	LD DE,0FF60H
 	LD BC,001EH
@@ -1648,6 +1781,10 @@ SEG9400E:
 ; ---- Segment A400H .. A5A7H ----
 	.PHASE	0A400H
 SEGA400:
+; ==== Segment A400: Arbeitsdaten (Vorbesetzung der Datei) ====
+; V_KLASSE (Index 0,2,4,6,8), V_AKTUELL (Zeiger auf den laufenden Beschreiber), V_ANFRAGE_EINTRAG,
+; KLASSEN = 5 Beschreiber a 4 Byte [Anforderungsmaske, Fertigmaske, Zeiger Handlertabelle],
+; Handlertabellen TAB_KL0..4 (8 x [DCB, Handler]), 7 DCBs a 23 Byte, 6 Nukleus-Auftraege a 13 Byte.
 V_KLASSE:
 	DB	00H
 V_AKTUELL:
@@ -1756,6 +1893,9 @@ TAB_KL4:
 	DW	IGNORIEREN
 	DW	AUF0
 	DW	IGNORIEREN
+; DCBs: +0 Vektor, +1 Ebene, +2/3 Z80-Puffer, +4/5 EM-Adresse der Nachricht, +6..19 Nachrichtenkopie,
+; +20/21 Zaehlung, +22 Bit 0 'Auftrag laeuft'.  DCB0 Platte, DCB1 Drucker, DCB2 Roh-Floppy,
+; DCB3 Konsole, DCB4..6 tty1..3.
 DCB0:
 	DB	0AH,05H,0B6H,0A8H,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH
 	DB	0FFH,0FFH,0FFH,0FFH,00H,00H,00H
@@ -1777,6 +1917,7 @@ DCB5:
 DCB6:
 	DB	30H,04H,36H,0A7H,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH
 	DB	0FFH,0FFH,0FFH,0FFH,00H,00H,00H
+; AUF0..AUF5: Auftragsbloecke (IY) fuer den Nukleus bzw. die Treiber, je 13 Byte
 AUF0:
 	DB	00H,0AH,0B6H,0A8H
 AUF0_STATUS1:
@@ -1812,6 +1953,7 @@ SEGA400E:
 ; ---- Segment C8B6H .. C967H ----
 	.PHASE	0C8B6H
 SEGC8B6:
+; ==== Segment C8B6: Warteschlangen (je 44 Byte: Tastatur, tty1, tty2, tty3) und Zaehler ====
 QUEUE_TASTE:
 	DB	04H,04H,00H,00H,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH
 	FILLFF	28
@@ -1824,6 +1966,7 @@ QUEUE_TTY2:
 QUEUE_TTY3:
 	DB	04H,04H,00H,00H,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH,0FFH
 	FILLFF	28
+; V_TAKT: Zaehler der Zeitgeber-Ticks; V_BUSY: Platte belegt (Roh-Floppy: Zustand 0/2)
 V_TAKT:
 	DB	01H
 V_BUSY:
