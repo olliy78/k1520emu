@@ -5,8 +5,8 @@
  *
  * DREI Tests:
  *   - `OhneZweitePlatte` und `MitZweiterPlatte` (Waechter, laufen immer): die AUSGELIEFERTE Platte
- *     (`p8000_wega31_platte.avr.img.gz`) ist fuer zwei Platten vorbereitet (Kern mit md10, /dev/md10, /usr2, bedingte
- *     Einbindung in `/etc/rc_csh` + `/etc/mfs`); die AUSGELIEFERTE zweite Platte (`p8000_wega31_usr2.avr.img.gz`,
+ *     (`p8000_wega31_platte.img.gz`) ist fuer zwei Platten vorbereitet (Kern mit md10, /dev/md10, /usr2, bedingte
+ *     Einbindung in `/etc/rc_csh` + `/etc/mfs`); die AUSGELIEFERTE zweite Platte (`p8000_wega31_usr2.img.gz`,
  *     sa.format + mkfs + labelit /usr2) kommt an LW 1.  Ohne LW 1 laeuft das System ohne fsck-/mount-Fehler und zeigt
  *     die drei Meldungszeilen; mit LW 1 wird /usr2 geprueft, eingehaengt, beschrieben und ist nach einem Neustart da.
  *   - `Bereitstellen` (nur mit `K1520_ZP_AUSGANG` + `K1520_ZP_AUS`, sonst uebersprungen): erzeugt beide Auslieferungs-
@@ -63,8 +63,8 @@ namespace {
 void stumm() { k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::ERROR); }
 
 constexpr int kStufenStand = 2;   // anheben, wenn sich der Ablauf bis zu einem Zustand aendert
-const std::string kPlatte0Quelle = P8000_WEGA31_DIR "/p8000_wega31_platte.avr.img.gz";
-const std::string kPlatte1Quelle = P8000_WEGA31_DIR "/p8000_wega31_usr2.avr.img.gz";
+const std::string kPlatte0Quelle = P8000_WEGA31_DIR "/p8000_wega31_platte.img.gz";
+const std::string kPlatte1Quelle = P8000_WEGA31_DIR "/p8000_wega31_usr2.img.gz";
 const std::string kStartQuelle = P8000_WEGA31_DIR "/p8000_wega31_udos_boot.dmk";
 
 /// Ausgangsplatte des Bereitstellens (die UNVERAENDERTE WEGA-3.1-Platte); sonst die ausgelieferte.
@@ -362,7 +362,7 @@ constexpr const char* kMeldPruefen = "Checking second hard disk (md10) ...";
 constexpr const char* kMeldGefunden = "Second hard disk found - checking /usr2";
 constexpr const char* kMeldFehlt = "Second hard disk not present - /usr2 not mounted.";
 
-/// Erzeugt `p8000_wega31_platte.avr.img.gz` (fuer zwei Platten vorbereitet) und `p8000_wega31_usr2.avr.img.gz` in
+/// Erzeugt `p8000_wega31_platte.img.gz` (fuer zwei Platten vorbereitet) und `p8000_wega31_usr2.img.gz` in
 /// $K1520_ZP_AUS aus der unveraenderten Platte $K1520_ZP_AUSGANG.  Sonst darf sich am Abbild nichts aendern.
 TEST(P8000WegaZweitePlatte, Bereitstellen) {
     stumm();
@@ -412,8 +412,8 @@ TEST(P8000WegaZweitePlatte, Bereitstellen) {
     m.flushDisks();
     std::error_code ec;
     std::filesystem::create_directories(aus, ec);
-    ASSERT_TRUE(kopiere(a.platte0, std::string(aus) + "/p8000_wega31_platte.avr.img.gz"));
-    ASSERT_TRUE(kopiere(a.platte1, std::string(aus) + "/p8000_wega31_usr2.avr.img.gz"));
+    ASSERT_TRUE(kopiere(a.platte0, std::string(aus) + "/p8000_wega31_platte.img.gz"));
+    ASSERT_TRUE(kopiere(a.platte1, std::string(aus) + "/p8000_wega31_usr2.img.gz"));
     std::fprintf(stderr, "  [Auslieferungsabbilder in %s]\n", aus);
 }
 

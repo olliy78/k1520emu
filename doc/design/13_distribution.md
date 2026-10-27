@@ -935,7 +935,7 @@ mit eigenem Starter und Startmenü-Eintrag.  Verdrahtet:
   `release.yml` (beide Jobs) wie in `doc/ci_pipeline.md` §4.3; `windows-ci.yml`: `dumpbin
   /exports` (Muster `k1520k_*`), `/dependents` im Auslieferungsbau, Paket- und Setup-Prüfung.
 - **Die WEGA-3.1-Platte mit dem Benutzer `kermit` liegt im Paket** (`share/disks/p8000_wega31/
-  p8000_wega31_platte.avr.img.gz.gz`, Regel „alle `p8000_*`-Platten" in `build_payload.sh`);
+  p8000_wega31_platte.img.gz.gz`, Regel „alle `p8000_*`-Platten" in `build_payload.sh`);
   Wächter `test_die_wega_platte_mit_kermit_benutzer_liegt_im_paket`.
 - **Nicht lokal belegt:** Inno-Setup-Lauf und MSVC (`windows-ci.yml`, `release.yml`) — nur
   die CI; lokal `tools/dev.sh win` für die MinGW-Seite.

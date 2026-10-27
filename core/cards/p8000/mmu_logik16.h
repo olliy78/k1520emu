@@ -54,8 +54,11 @@
  *       (1D20) und TRPL takten mit der Flanke der SAMMELleitung /SEGT (inaktiv → aktiv) mitten im
  *       verletzenden Zyklus ⇒ verletzt das Holen selbst, steht in IF1L noch der Vorgaenger (wie
  *       ISN/IOFF der Z8010).  Eine zweite MMU, die bei schon gezogener Leitung zieht, taktet nicht.
- *  [L7] Unbeschaltetes TRAD (MMU ON, keine MMU treibt) liest sich als 1 (TTL offen) ⇒ A8–A23 =
- *       FFFFH.  Treiben mehrere MMUs (TRNS = 0 oder MST = 0), gilt verdrahtetes UND; ebenso beim
+ *  [L7] MMU ON, aber keine MMU treibt TRAD: auf der echten Karte wird Segment*64K+Offset adressiert
+ *       (Messung Issue #23, `OlliL/P8000 mame/tests/07-…`, MON16 3.x, nur HOLEN in einer 256-B-Seite
+ *       gemessen; Handbuch und Schaltplan sagen „nichts").  Frueher: offen = 1 ⇒ A8–A23 = FFFFH;
+ *       umschaltbar ueber `Config::tradLeerIstLokal`.  Offen: Daten-Zugriffe, Seitenwechsel, Segment >= 64
+ *       (Deutung Busspeicherung statt Umschaltung ist nicht ausgeschlossen).  Treiben mehrere MMUs (TRNS = 0 oder MST = 0), gilt verdrahtetes UND; ebenso beim
  *       Lesen mehrerer per /CS gewaehlter MMUs und bei gleichen IDs in der Trap-Quittung.
  *  [L8] /SUP sperrt SYSDS (Bl. 9) fuer JEDEN Hauptspeicherzyklus — Schreiben wirkt nicht, Lesen
  *       liefert den offenen Bus (welches Datum: karte16.h [K7]) —, auch bei MMU aus; der
@@ -91,6 +94,7 @@ public:
         bool     nbrGleichheitStack = true;   ///< [L1]
         bool     csBeimReset = true;          ///< [L5]
         bool     if1lAuchStatus1100 = false;  ///< [L6]
+        bool     tradLeerIstLokal = true;     ///< [L7] MMU ON ohne Treiber: Segment*64K+Offset (Messung 2026-10-26)
         uint8_t  nbrStart = 0x00;             ///< DS8282 nach Netz-Ein (real unbestimmt)
         uint8_t  leer8 = 0xFF;                ///< offener Bus (Byte)
         uint16_t leer16 = 0xFFFF;             ///< offener Bus (AD0–15)

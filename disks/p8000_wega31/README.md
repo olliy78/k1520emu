@@ -1,6 +1,6 @@
 # WEGA 3.1 für den P8000
 
-Eine fertig installierte Platte und die Startdiskette dazu.  **Installationsdisketten für WEGA 3.1 gibt es
+Eine fertig installierte Platte, eine zweite Platte und die offizielle Startdiskette dazu.  **Installationsdisketten für WEGA 3.1 gibt es
 hier nicht**: die einzige vorliegende Quelle ist ein Plattenabbild.  Wie bei `disks/` insgesamt gilt:
 die Tests benutzen diese Dateien nicht, und der Emulator schreibt zurück.
 
@@ -8,9 +8,9 @@ die Tests benutzen diese Dateien nicht, und der Emulator schreibt zurück.
 
 | Datei | Inhalt |
 |-------|--------|
-| `p8000_wega31_platte.avr.img.gz` | **Fertig installierte Platte**, Geometrie 1380/10/18 (127 MB → rund 6 MB gepackt), Typkürzel `avr` = `WEGA31-AVR`; **seit 2026-10-18 mit Kermit** (s. u.), **seit 2026-10-23 für zwei Platten vorbereitet** (s. u.) |
-| `p8000_wega31_usr2.avr.img.gz` | **Zweite Platte** für Laufwerk 1, gleicher Typ `WEGA31-AVR` (WDC 4.2 verlangt für alle Laufwerke denselben Parametersatz): formatiert (`sa.format`), `mkfs` 248 220 Blöcke, `labelit` als `/usr2`, leer bis auf `lost+found` (127 MB → 0,6 MB gepackt) |
-| `p8000_wega31_udos_boot.dmk` | UDOS-Startdiskette.  Dieselbe Datei wie `../wega30/p8000_wega30_udos_boot.dmk`: sie bringt nur UDOS und die Koppelsoftware für den 8-Bit-Teil, WEGA selbst kommt von der Platte |
+| `p8000_wega31_platte.img.gz` | **Fertig installierte Platte**, Geometrie 1380/10/18 (127 MB → rund 6 MB gepackt), Typ `WEGA31-AVR` (steht nicht im Dateinamen: die Geometrie liefert der Parametersatz in Sektor 0, sonst die Dateigröße); **seit 2026-10-18 mit Kermit** (s. u.), **seit 2026-10-23 für zwei Platten vorbereitet** (s. u.) |
+| `p8000_wega31_usr2.img.gz` | **Zweite Platte** für Laufwerk 1, gleicher Typ `WEGA31-AVR` (WDC 4.2 verlangt für alle Laufwerke denselben Parametersatz): formatiert (`sa.format`), `mkfs` 248 220 Blöcke, `labelit` als `/usr2`, leer bis auf `lost+found` (127 MB → 0,6 MB gepackt) |
+| `p8000_wega31_udos_boot.dmk` | **Offizielle WEGA-3.1-Startdiskette** (`w31start`, 80×2×16×256, MFM): UDOS mit Koppelsoftware für den 8-Bit-Teil, `boot`, `wega`, die `sa.*`-Programme (mit `sa.diags` 28 962 Byte, `sa.format`, `sa.mkfs`, `sa.install` …) und die Monitor-EPROM-Abzüge `MON8_*_3.1`/`MON16_*_3.1`.  Bis 2026-10-27 lag hier dieselbe Datei wie bei WEGA 3.0; seither das echte 3.1-Original.  WEGA selbst kommt von der Platte |
 
 ## Herkunft
 
@@ -23,6 +23,15 @@ PAR/BTT-Sektor ersetzt — `"DEFEKT"`, leere BTT, `"PARMTR"`, Kennung `WDC-Emula
 Vorkompensation 1380, Ramp 1, `ztk` 203/209, Grenzen 251/253/241/243 (Werte aus
 `winchester::typen()`, `Platte::parSektor`).  Zylinder 0 liegt außerhalb des Blockraums; WEGA
 bemerkt die Änderung nicht.  Damit braucht die Platte die Einstellung *Parametersatz ergänzen* nicht.
+
+## Startdiskette: Herkunft und `sa.diags`
+
+`p8000_wega31_udos_boot.dmk` ist `w31start.cqm` (CopyQM-Abbild der Original-Startdiskette,
+`~/projects/robotron/P8000/discs/`), mit `k1520disktool save-as` nach DMK gewandelt (Inhalt unverändert, 1 024 016 B wie die übrigen Disketten).
+**`sa.diags` (Hardwaretest) starten:** `O U` am 8-Bit-Prompt, `O U` am 16-Bit-Prompt, am folgenden `> ` **nicht Enter**
+(das lädt den Lader `boot` und bringt WEGA in den Einbenutzerbetrieb), sondern `sa.diags` eintippen — es ist selbst ein sekundärer Lader.
+Im Menü `t`, dann einen Testschritt wählen (7 = MMU) und Enter.  Am `:`-Prompt nach `boot` geht es **nicht** (`Cannot load offset segs yet`).
+Hintergrund: `doc/merkposten/p8000.md` Nr. 66.
 
 ## Benutzen
 

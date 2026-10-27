@@ -19,6 +19,7 @@ P8000MmuLogik16::Config mmuConfig(const P8000Karte16::Config& c) {
     m.index = c.index == P8000Karte16::Config::Index::I1 ? P8000MmuLogik16::Config::Index::I1
                                                          : P8000MmuLogik16::Config::Index::I4;
     m.nbrGleichheitStack = c.nbr_gleichheit_stack;
+    m.tradLeerIstLokal = c.trad_leer_ist_lokal;
     m.csBeimReset = c.cs_beim_reset;
     m.if1lAuchStatus1100 = c.if1l_auch_status1100;
     m.nbrStart = c.nbr_start;

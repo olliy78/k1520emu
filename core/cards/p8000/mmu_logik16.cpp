@@ -131,7 +131,7 @@ P8000MmuLogik16::Zugriff P8000MmuLogik16::bilde(const Z8kBusCycle& c, const Eing
     z.unterdrueckt = z.sup != 0;   // [L8]
     if (scr_ & SCR_MMU_ON) {
         z.mmuAdresse = true;
-        uint16_t trad = 0xFFFF;    // offen = 1 [L7]
+        uint16_t trad = 0xFFFF;    // offen = 1 (nur bei tradLeerIstLokal = false) [L7]
         bool erster = true;
         uint16_t erste = 0;
         for (int i = 0; i < 3; ++i) {
@@ -141,7 +141,10 @@ P8000MmuLogik16::Zugriff P8000MmuLogik16::bilde(const Z8kBusCycle& c, const Eing
             else if (t != erste) z.konflikt = true;
             trad &= t;
         }
-        z.adresse = (uint32_t(trad) << 8) | (c.addr & 0xFF);
+        if (z.treiber == 0 && cfg_.tradLeerIstLokal)   // [L7] gemessen, nicht nach Schaltplan
+            z.adresse = (uint32_t(c.seg & 0x7F) << 16) | c.addr;
+        else
+            z.adresse = (uint32_t(trad) << 8) | (c.addr & 0xFF);
     } else {
         z.adresse = (uint32_t(c.seg & 0x7F) << 16) | c.addr;   // BUSA16–22 = SN0–6, A23 = 0
     }

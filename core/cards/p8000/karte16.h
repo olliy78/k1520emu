@@ -98,6 +98,7 @@ public:
         bool     unterdrueckt_liest_offset = true;  ///< [K7]
         // MMU-Steuerlogik (mmu_logik16.h [L1], [L5], [L6])
         bool     nbr_gleichheit_stack = true;
+        bool     trad_leer_ist_lokal = true;      ///< [L7] MMU ON ohne Treiber: Segment*64K+Offset
         bool     cs_beim_reset = true;
         bool     if1l_auch_status1100 = false;
         uint8_t  nbr_start = 0x00;
