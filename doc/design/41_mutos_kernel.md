@@ -163,6 +163,19 @@ Jedes AP endet mit Dokumentation + Commit; Abnahme = der Wächter in der Spalte.
 Reihenfolge: K0 → K1 (entscheidet über alles Weitere) → K2/K3 parallel → K4 → K5 → K6/K7 abwechselnd.  Delegation (Projektregel): Disassembler, Objektleser, Abgleichwerkzeug und Matchen einzelner Funktionen an Sonnet-Agenten (`cpp-coder`/`boot-disasm-analyst`),
 Linkkarte und Entscheidungen bei uns; Bau-Kollisionen beachten (Worktrees).
 
+
+## 6a. Stand der Arbeitspakete (2026-10-27)
+
+| AP | Stand | Commit | Nachweis |
+|----|-------|--------|----------|
+| K0 | fertig | cd569d97 | `doc/mutos_kernel/befund.md` |
+| K1 | fertig | 365c33d1 | `k1_cc_im_gast.md`: cc/as/ld im Gast, ~1,2 Min./Datei |
+| K2 | fertig | 4e30f6c8 | `objformat.md`, `objformat.py`; libc-Signaturen: Kernel enthaelt keine libc-Funktion, nur dieselbe Aufrufkonvention `csv`/`cret` |
+| K3 | fertig (Rundlauf gegen z8kasm bitgleich) | efac5218 | `z8kdis`, `as_dialekt.md`; Rundlauf gegen den Gast-`as` = K4 |
+| K11 (make) | fertig | 9b2d1e07 | `tools/mutos8000/kernel/make/`; Grenzen: `/tmp` braucht eigene Diskette, Quellen mit Zeit 1987 |
+| K4 | in Arbeit | | Rundlauf Kernel gegen Gast-`as` |
+| K6a | in Arbeit | | Lauf-Abdeckung, Strukturbefund |
+
 ## 7. Risiken
 
 * **Compiler/Kernel passen nicht zusammen:** der MUTOS-`cc` (Disketten, 1986/87) kann eine andere Version sein als die, die den Kernel erzeugt hat (bei WEGA vermutet).  Dann ist Stufe C nur „funktional gleich", nicht bytegleich — Stufe A bleibt gültig.  Früh messen (K1).
