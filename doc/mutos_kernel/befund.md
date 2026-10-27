@@ -27,3 +27,11 @@ WEGA 3.1 hat `scc/sld/cas` (segmentiert) und `cc/ld/as` (nichtsegmentiert) -- be
 ## Offen / zu messen
 * Ob `scc`/`cas`/`sld` aus WEGA 3.1 den MUTOS-Kernel bytegleich erzeugen (gleiche Familie?) — Test: WEGA-Modul bauen, mit Funktionen in `mutos_1216` vergleichen.
 * Ob `mutos_1216` aus WEGA-ähnlichen Quellen stammt (Abgleich der Funktionen, K6 §5.3).
+
+## WEGA-Werkzeuge sind NICHT die MUTOS-Werkzeuge (gemessen, 2026-10-27)
+
+Vergleich `md2/{bin,lib}` der WEGA-3.1-Platte gegen die MUTOS-Disketten: alle Dateien verschieden (cc 14208 gegen 6536 B, as 74536 gegen 35814, ld 21732 gegen 10726).
+* **WEGA:** a.out mit Magic `E707`/`E711`, 32-Bit-Groessenfelder; `cc` ist ein Zilog-Treiber ueber `/lib/{cpp,cparse,gopt,codgen,popt,clist}` und `/bin/cas`.
+* **MUTOS:** Magic `E807`, 16-Bit-Felder (16-B-Kopf), V7-/PCC-Aufteilung `cpp, c0, c1, c2, as, ld`.
+* Zwei verschiedene Werkzeugfamilien: MUTOS-Binaerdateien laufen nicht unter WEGA (anderes Kopfformat), WEGA-`cc` erzeugt anderen Code.
+  WEGA taugt als **Quellreferenz** (Namen, Struktur), nicht als Bausystem fuer den MUTOS-Kernel -- ausser ein Test zeigt bytegleiche Ergebnisse.
