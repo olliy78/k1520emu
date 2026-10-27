@@ -937,7 +937,12 @@ class MainWindow(QMainWindow):
         if sitzung is not None:
             schaden = sitzung.defect_tracks
             try:
-                sitzung.close()
+                if not sitzung.close() and not schaden:
+                    # Rest ohne Schadstelle: die Rueckfuehrung kam nicht voran
+                    # (Entwurf 40 H8) — sonst bliebe er unbemerkt.
+                    self._fehler("Physische Diskette", ("Die Diskette wurde abgemeldet, aber nicht alles Geänderte kam auf die "
+                 "Scheibe:\n\n    " + sitzung.nicht_zurueckgeschrieben + "\n\n"
+                 "Die Diskette ist an diesen Stellen nicht auf dem Stand des Gastsystems."))
             except Exception:                        # noqa: BLE001
                 pass
         if not self._physisch:
@@ -1768,12 +1773,18 @@ class MainWindow(QMainWindow):
         from PySide6.QtGui import QCursor
         from PySide6.QtWidgets import QApplication
         QApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
+        # Schadstellen meldet der Schadstellen-Weg selbst; hier nur der stille Rest.
+        schaden = sitzung.defect_tracks
         try:
-            sitzung.close()
+            vollstaendig = sitzung.close() or bool(schaden)
         except Exception:
-            pass
+            vollstaendig = True
         finally:
             QApplication.restoreOverrideCursor()
+        if not vollstaendig:
+            self._fehler("Physische Diskette", ("Die Diskette wurde abgemeldet, aber nicht alles Geänderte kam auf die "
+                 "Scheibe:\n\n    " + sitzung.nicht_zurueckgeschrieben + "\n\n"
+                 "Die Diskette ist an diesen Stellen nicht auf dem Stand des Gastsystems."))
 
     def create_disk(self, path, filesystem: str, label: str = "",
                     boot_image=None, inodes: int = 0) -> bool:

@@ -225,22 +225,60 @@ class PhysicalSession:
         self.gemeldete_defekte = ""      # auf der neuen Diskette gilt nichts von vorher
         return self.sync.rewrite_all()
 
-    def close(self, timeout: float = 30.0) -> None:
+    #: Was beim letzten :meth:`close` nicht zurueckgeschrieben werden konnte (leer = alles).
+    nicht_zurueckgeschrieben: str = ""
+
+    def close(self, timeout: float = 30.0) -> bool:
         """Sitzung beenden — **erst** den Faden, dann den Synchronisierer.
 
         Ausstehende Änderungen werden vorher zurückgeschrieben; das kann dauern
         (je Spur eine knappe Sekunde) und ist der Grund, warum das Abmelden
         überhaupt wartet: eine verlorene Änderung fiele sonst niemandem auf.
+
+        *timeout* ist die Frist **ohne Fortschritt**, nicht die Gesamtdauer: nach
+        einem FORMAT im unbegrenzten Tempo stehen 80 und mehr Spuren aus (an der
+        Hardware gemessen, Entwurf 40 H8) — eine feste Frist von 30 s verwarf davon
+        still gut die Hälfte.  Gewartet wird, solange die Zahl der ausstehenden
+        Spuren sinkt; eine Schadstelle beendet das Warten sofort (sie wird nicht
+        mehr besser).
+
+        Returns:
+            ``True``, wenn nichts Geändertes zurückblieb.  Sonst steht der Rest in
+            :attr:`nicht_zurueckgeschrieben`.
         """
         if self._zu:
-            return
+            return not self.nicht_zurueckgeschrieben
         self._zu = True
+        self.nicht_zurueckgeschrieben = ""
         try:
             if self.writable:
-                self.sync.flush(int(timeout * 1000))
-        except Exception:                        # noqa: BLE001
-            pass
+                self._zurueckschreiben(timeout)
+        except Exception as e:                   # noqa: BLE001
+            self.nicht_zurueckgeschrieben = f"Rückführung scheiterte: {e}"
         try:
             self.worker.stop(timeout)
         finally:
             self.sync.close()
+        return not self.nicht_zurueckgeschrieben
+
+    def _zurueckschreiben(self, frist_s: float) -> None:
+        """``flush`` in Scheiben, solange es vorangeht (s. :meth:`close`)."""
+        import time
+        letzte, seit = None, time.monotonic()
+        while True:
+            if self.sync.flush(2000):
+                return
+            st = self.sync.stats
+            if st.tracks_defect:
+                self.nicht_zurueckgeschrieben = (
+                    f"{st.tracks_dirty} Spur(en) nicht zurückgeschrieben, schadhaft: "
+                    f"{self.sync.defect_tracks}")
+                return
+            stand = (st.tracks_dirty, st.writes_done, st.verifies_done)
+            if stand != letzte:
+                letzte, seit = stand, time.monotonic()
+            elif time.monotonic() - seit > frist_s:
+                self.nicht_zurueckgeschrieben = (
+                    f"{st.tracks_dirty} Spur(en) nicht zurückgeschrieben "
+                    f"(seit {frist_s:.0f} s kein Fortschritt): {self.sync.last_error}")
+                return

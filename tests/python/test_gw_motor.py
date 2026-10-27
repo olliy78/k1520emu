@@ -116,3 +116,29 @@ def test_lesen_wiederholt_bei_fehlendem_index_ebenfalls(monkeypatch):
     monkeypatch.setattr(d, "_read_track", roh)
     assert d.read_track(1, 0) == (b"x", 8)
     assert len(versuche) == 2
+
+
+def test_vom_adapter_freigegebene_auswahl_wird_neu_eingestellt(monkeypatch):
+    """Die Firmware gibt das Laufwerk nach ~10 s Ruhe frei („No drive unit selected").
+
+    An der Hardware gemessen (tests/hardware, H2): der erste Auftrag nach einer Pause
+    scheiterte, weil `Device` sich noch fuer gewaehlt hielt.  Es muss neu waehlen und
+    den Auftrag wiederholen.
+    """
+    d, usb, pausen = _geraet()
+    d.select()
+    d._motor_an = True
+    versuche = []
+
+    def roh(cyl, head, cells, bitcells):
+        versuche.append(1)
+        if len(versuche) == 1:
+            raise RuntimeError("Seek: No drive unit selected")
+        d.select()                               # wie der echte Auftrag
+
+    monkeypatch.setattr(d, "_write_track", roh)
+    d.write_track(5, 0, b"", 0)
+
+    assert len(versuche) == 2
+    assert usb.befehle.count(("select", 0)) == 2     # erneut gewaehlt
+    assert d._motor_an is False                      # Motorzustand nicht mehr geglaubt
