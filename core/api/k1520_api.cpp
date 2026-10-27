@@ -1081,6 +1081,14 @@ void k1520_mem_write(K1520Handle h, uint16_t addr, uint8_t data) {
     toMachine(h)->memWriteDebug(addr, data);
 }
 
+bool k1520_debug_cpu(K1520Handle h, int cpu, uint16_t* pc, uint16_t* sp) {
+    auto* a = dynamic_cast<A5120Machine*>(toMachine(h));
+    if (!a || !pc || !sp || cpu < 0 || cpu > 1) return false;
+    *pc = cpu == 0 ? a->cpuPC() : a->zve2PC();
+    *sp = cpu == 0 ? a->cpuSP() : a->zve2SP();
+    return true;
+}
+
 int k1520_mem_load(K1520Handle h, uint16_t addr, const char* path) {
     if (!h || !path) return -1;
     std::ifstream f(path, std::ios::binary);

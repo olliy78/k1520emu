@@ -635,6 +635,11 @@ _lib.k1520_version.restype = ctypes.c_char_p
 _lib.k1520_mem_read.argtypes = [K1520Handle, ctypes.c_uint16]
 _lib.k1520_mem_read.restype = ctypes.c_uint8
 
+# k1520_debug_cpu(K1520Handle, cpu: int, pc: uint16*, sp: uint16*) -> bool
+_lib.k1520_debug_cpu.argtypes = [K1520Handle, ctypes.c_int,
+                                 ctypes.POINTER(ctypes.c_uint16), ctypes.POINTER(ctypes.c_uint16)]
+_lib.k1520_debug_cpu.restype = ctypes.c_bool
+
 # k1520_mem_write(K1520Handle, addr: uint16, data: uint8) -> void
 _lib.k1520_mem_write.argtypes = [K1520Handle, ctypes.c_uint16, ctypes.c_uint8]
 _lib.k1520_mem_write.restype = None
@@ -2497,6 +2502,13 @@ class K1520Emulator:
     def mem_read(self, addr: int) -> int:
         """Read one byte through the bus (memory map of the running machine)."""
         return _lib.k1520_mem_read(self._handle, ctypes.c_uint16(addr))
+
+    def debug_cpu(self, cpu: int = 0) -> Optional[tuple]:
+        """``(pc, sp)`` von ZVE1 (0) bzw. ZVE2 (1) des A5120; ``None`` an anderen Maschinen."""
+        pc, sp = ctypes.c_uint16(), ctypes.c_uint16()
+        if not _lib.k1520_debug_cpu(self._handle, cpu, ctypes.byref(pc), ctypes.byref(sp)):
+            return None
+        return pc.value, sp.value
 
     def mem_write(self, addr: int, data: int):
         """Write one byte through the bus."""
