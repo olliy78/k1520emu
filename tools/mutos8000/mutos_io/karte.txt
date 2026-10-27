@@ -56,3 +56,5 @@ db C8B6 C967
 # 9DE3: SIO-Init-Folgen (OTIR nach Port 51H/53H)
 db 9E2A 9E32
 db 9E33 9E3D
+# Arbeitsvariablen der SIO-Sendeschleife (9E84)
+db 9F26 9F2F
