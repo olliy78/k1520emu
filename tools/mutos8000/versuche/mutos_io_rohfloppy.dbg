@@ -1,0 +1,31 @@
+# mutos_io Klasse 3 (Roh-Floppy 9A00/9B00): im Betrieb NIE gelaufen (Abdeckung, mutos_io_abdeckung.dbg).  Hier eine Anforderung von Hand eingeschoben:
+#   A411 = Anforderungsmaske der Klasse 3 (Bit 0 = Einheit 0), DCB2 = A4E7 (IX+7 Einheit, IX+8 Befehl 0AH, IX+9 Status 0, IX+14/15 Zaehler 0)
+# Erwartung (abgeleitet): 9A00 -> 9B46 -> Tabelle 9B16 (0AH: FDC-Befehl 07H) -> schreibt Kommandoblock 01B5H -> OUT (1CH),0 -> wartet auf IX+8 Bit 1
+# (01BDH) -> Zeitablauf, Status C2H.  Port 1CH ist am A5120 von keiner Karte belegt.
+#   tools/dev.sh tool k1520dbg --em em256 --laufwerke K5601,K5601,K5601 disks/a5120_16_MUTOS/a5120_mutos8000_boot_udos_k5601.hfe -x tools/mutos8000/versuche/mutos_io_rohfloppy.dbg
+g 80000000
+keys BOOT\sMUTOS\r
+g 100000000
+eject A
+mount C disks/a5120_16_MUTOS/a5120_mutos8000_root_mfm.hfe udos_ss77
+keys r
+g 100000000
+keys root\r
+g 100000000
+iow 0x1C
+lp 0x9A00 IX [IX+7] [IX+8]
+lp 0x9B46 IY [IY+1]
+lp 0x9B6D A
+lp 0x9BEE SP
+lp 0x9BF0 A
+lp 0x9C00 IY
+lp 0x9A7E IX
+d 0x1B5 16
+e 0xA4EE 00 0A
+e 0xA4EF 0A
+e 0xA411 01
+g 3000000
+d 0x1B5 16
+d 0xA4E7 24
+iol
+q

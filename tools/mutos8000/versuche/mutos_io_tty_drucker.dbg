@@ -1,0 +1,29 @@
+# mutos_io: Drucker (/dev/lp = Klasse 1, 91A8 -> CALL 0EB00H) und tty1 (/dev/tty1 = Klasse 2 Einheit 1, 9D57 -> 9E84 -> SIO).
+# Es gibt nur die Geraeteknoten console, tty1, lp/lp0, rlp/rlp0, rk*, rrk*, swap (ls -l /dev); tty2/tty3 sind unter MUTOS nicht
+# ansprechbar (kein mknod in /bin).  Protokoll: 91A8 (Druckerauftrag), 91D9 (CALL 0EB00H), 9D57 (tty1), 9E84, 9EBE (OUT (50H),A: Sendebyte),
+# 9F09 (Auftrag fertig), 9DA2/91E1 Fertig-Rueckrufe.  OUT 52H (SIO Kanal B senden) kommt in der Quelle gar nicht vor.
+#   tools/dev.sh tool k1520dbg --em em256 --laufwerke K5601,K5601,K5601 disks/a5120_16_MUTOS/a5120_mutos8000_boot_udos_k5601.hfe -x tools/mutos8000/versuche/mutos_io_tty_drucker.dbg
+lp 0x91A8 IX [IX+7] [IX+8] [IX+14]w [IX+2]w
+lp 0x91D9 IY [IY+2]w [IY+4]w
+lp 0x91E1 SP
+lp 0x9D57 IX [IX+7] [IX+8] [IX+14]w
+lp 0x9E84 IY [IY+2]w [IY+4]w
+lp 0x9EBE A
+lp 0x9F09 SP
+lp 0x9DA2 SP
+lp 0x9D70 IY
+g 80000000
+keys BOOT\sMUTOS\r
+g 100000000
+eject A
+mount C disks/a5120_16_MUTOS/a5120_mutos8000_root_mfm.hfe udos_ss77
+keys r
+g 100000000
+keys root\r
+g 100000000
+keys cat\s/etc/motd\s>\s/dev/lp\r
+g 100000000
+keys cat\s/etc/motd\s>\s/dev/tty1\r
+g 100000000
+screen
+q
