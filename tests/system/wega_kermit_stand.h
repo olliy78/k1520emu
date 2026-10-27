@@ -115,7 +115,7 @@ const std::map<std::string, std::string>& testdateien() {
 
 std::string quellPlatte() {
     if (const char* e = std::getenv("K1520_WEGA31_PLATTE"); e && *e) return e;
-    return P8000_WEGA31_DIR "/p8000_wega31_platte.avr.img.gz";
+    return P8000_WEGA31_DIR "/p8000_wega31_platte.img.gz";
 }
 std::string quellStart() { return P8000_WEGA31_DIR "/p8000_wega31_udos_boot.dmk"; }
 

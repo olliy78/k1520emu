@@ -1772,7 +1772,7 @@ die *Betriebsart*. Was anders ist:
   Instanzen können dieselbe Plattendatei nicht gleichzeitig belegen (Sperre je Datei). Unter WEGA ist eine zweite
   Platte an Laufwerk 1 nutzbar — sie muss vom selben Typ sein wie Laufwerk 0 und braucht einen Kern mit `md10`.
   Die mitgelieferte WEGA-3.1-Platte hat ihn schon und kommt mit einer fertigen zweiten Platte
-  (`p8000_wega31_usr2.avr.img.gz`; Abschnitt *Zweite Festplatte unter WEGA einrichten*); Laufwerk 2 kann WEGA
+  (`p8000_wega31_usr2.img.gz`; Abschnitt *Zweite Festplatte unter WEGA einrichten*); Laufwerk 2 kann WEGA
   nicht ansprechen.
 * **Winchesterplatte** — im Kasten *Laufwerke* unter den Disketten (je Laufwerk einer). **Anschließen…** hängt ein
   vorhandenes Abbild an den WDC, **Neue Platte…** legt eines an (Typ K5504.50 u. a.; Wahl
@@ -2554,17 +2554,17 @@ unversehrt. Aufräumen später mit `rm -r /z/tmp`.
 
 ### Zweite Festplatte unter WEGA einrichten
 
-Zur WEGA-3.1-Platte gehört eine **fertig vorbereitete zweite Platte**: `p8000_wega31_usr2.avr.img.gz` im Ordner
+Zur WEGA-3.1-Platte gehört eine **fertig vorbereitete zweite Platte**: `p8000_wega31_usr2.img.gz` im Ordner
 `p8000_wega31/` der Beispieldisketten, ein leeres Dateisystem **`/usr2`** von rund 127 MB (248 220 Blöcke zu 512 Byte). Die
-mitgelieferte WEGA-3.1-Platte (`p8000_wega31_platte.avr.img.gz`) kennt sie schon: Kern, Gerätedateien und die
+mitgelieferte WEGA-3.1-Platte (`p8000_wega31_platte.img.gz`) kennt sie schon: Kern, Gerätedateien und die
 Einträge zum Einhängen sind eingerichtet. **WEGA auf der mitgelieferten 3.1-Platte ist also bereits für das Einhängen einer zweiten Platte vorbereitet** — wer nur diese beiden Abbilder benutzt, muss nichts generieren.
 
 #### Die mitgelieferte zweite Platte anschließen
 
 1. *Einstellungen ▸ Laufwerke ▸ Winchester-Laufwerke* auf **2** stellen (die Voreinstellungen P8000 und P8000
    Compact schließen von Haus aus nur **eine** Winchester an; auch das erneute Wählen einer Voreinstellung setzt die Zahl auf 1 zurück).
-2. Im Kasten *Laufwerke* beim Plattenkasten **Laufwerk 1** auf **Anschließen…** und `p8000_wega31_usr2.avr.img.gz`
-   wählen. Die Platte muss vom Typ **WEGA31-AVR** sein wie Laufwerk 0 (der Typ steht im Dateinamen, `.avr.`).
+2. Im Kasten *Laufwerke* beim Plattenkasten **Laufwerk 1** auf **Anschließen…** und `p8000_wega31_usr2.img.gz`
+   wählen. Die Platte muss vom Typ **WEGA31-AVR** sein wie Laufwerk 0 (der Typ steht im Parametersatz der Platte, nicht im Dateinamen).
 3. *Maschine ▸ Rückstellen* (oder aus- und einschalten): der WDC erkennt eine im Betrieb angeschlossene Platte erst
    beim Hochlauf. Startdiskette in A:, RETURN, RETURN, NMI wie gewohnt.
 

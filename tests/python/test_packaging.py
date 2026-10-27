@@ -1891,7 +1891,7 @@ def test_die_wega_platte_mit_kermit_benutzer_liegt_im_paket(payload):
 
     stage = _stage(payload)
     ordner = stage / "payload" / "share" / "disks" / "p8000_wega31"
-    platte = ordner / "p8000_wega31_platte.avr.img.gz.gz"
+    platte = ordner / "p8000_wega31_platte.img.gz.gz"
     assert platte.is_file(), "die WEGA-3.1-Platte fehlt im Paket"
     assert (ordner / "README.md").is_file(), "das README des Plattenordners reist nicht mit"
     with gzip.open(platte, "rb") as aussen:
@@ -1899,14 +1899,14 @@ def test_die_wega_platte_mit_kermit_benutzer_liegt_im_paket(payload):
     assert b"\nkermit:" in abbild and b":/usr/kermit:/bin/sh" in abbild, \
         "der Benutzer kermit fehlt auf der ausgelieferten Platte"
     # Und sie ist die eingecheckte (nicht eine veraltete Fassung).
-    original = PROJECT_ROOT / "disks" / "p8000_wega31" / "p8000_wega31_platte.avr.img.gz"
+    original = PROJECT_ROOT / "disks" / "p8000_wega31" / "p8000_wega31_platte.img.gz"
     with gzip.open(platte, "rb") as f:
         assert f.read() == original.read_bytes()
     # Die vorbereitete zweite Platte (Merkposten p8000 Nr. 65) reist als eigenes Abbild mit.
-    usr2 = ordner / "p8000_wega31_usr2.avr.img.gz.gz"
+    usr2 = ordner / "p8000_wega31_usr2.img.gz.gz"
     assert usr2.is_file(), "die zweite WEGA-3.1-Platte fehlt im Paket"
     with gzip.open(usr2, "rb") as f:
-        assert f.read() == (original.parent / "p8000_wega31_usr2.avr.img.gz").read_bytes()
+        assert f.read() == (original.parent / "p8000_wega31_usr2.img.gz").read_bytes()
 
 
 # ─── Der Debugger im Paket (Entwurf §10a) ────────────────────────────────────

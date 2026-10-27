@@ -9,13 +9,17 @@ eingelegte Diskette bzw. angeschlossene Platte zurück. Für Experimente also vo
 | Datei | Inhalt |
 |-------|--------|
 | `p8000_wega30_platte.k5504.img.gz` | **Fertig installierte Platte** K5504.50 (1024/5/18), gzip-gepackt (47 MB → 3,6 MB).  Stand `p15_7_sync` der Installation (`P8000WegaInstall`, `~/.cache/k1520emu/p8000_wega/`): WEGA auf der Platte, Urlader in Block 0, Mehrbenutzerbetrieb eingerichtet |
-| `p8000_wega30_udos_boot.dmk` | UDOS-Startdiskette (`w30start`): Urlader, `boot`, `wega` (Kern 3.2 vom 12.02.88), `sa.*` |
+| `p8000_wega30_udos_boot.dmk` | **Offizielle WEGA-3.0-Startdiskette** (`w30start`, 80×2×16×256, MFM): Urlader, `boot`, `wega` (Kern 3.2 vom 12.02.88), `sa.*` (`sa.diags` 25 598 Byte).  Seit 2026-10-27 aus `~/projects/robotron/P8000/discs/w30start.cqm` (Inhalt gegenüber dem früheren Stand getauscht, Dateiname unverändert) |
 | `p8000_wega30_udos_boot2.dmk` | zweiter Stand der Startdiskette (`w30strt2`, andere README/INHALT) |
 | `p8000_wega30_root1…5.dmk` | Wurzeldateisystem: `/`, `/bin`, `/etc`, `/lib` |
 | `p8000_wega30_usr1…9.dmk` | `/usr`: Programme, Bibliotheken, Handbuchseiten, SCCS … |
 | `p8000_wega30_doc1.dmk` | Dokumentation (`*.z`) |
 
 Inhalt je Diskette: `doc/p8000/wega_datentraeger.md` §3.
+
+**Startdiskette (2026-10-27):** `p8000_wega30_udos_boot.dmk` ist `w30start.cqm` mit `k1520disktool save-as` nach DMK gewandelt.
+`sa.diags` startet man wie in `../wega31/README.md` beschrieben (am `> ` nach dem zweiten `O U` direkt `sa.diags` tippen); in
+dieser Fassung steht der Eintrittspunkt `_main` bei 0x9052, in der 3.1-Fassung bei 0x8000.
 
 ## Herkunft
 
