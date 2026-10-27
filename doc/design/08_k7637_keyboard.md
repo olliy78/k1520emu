@@ -188,7 +188,7 @@ Da das K7637-EPROM (2KB) nicht vorliegt, werden die Tastencodes aus der Dokument
 
 ```cpp
 // keytable.h – Rekonstruierte K7637 Code-Tabelle
-// Quelle: K7637-Dokumentation + CPA-BIOS Analyse (z80_disasm3.py)
+// Quelle: K7637-Dokumentation + CPA-BIOS Analyse (z80_disasm3.py, inzwischen ersetzt durch z80_disasm2.py)
 
 // CTAB0a: Normal (kein Shift)
 static constexpr uint8_t CTAB0_NORMAL[128] = {

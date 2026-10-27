@@ -8,8 +8,6 @@ Doku erklärt **welchen wofür** und wie man sie einsetzt.
 | **`z80_disasm2.py`** | generischer, vollständiger Disassembler für **Listings** | **kanonisch** |
 | **`z80dis_min.h`** | eingebauter Ein-Instruktions-Decoder (C++) für `k1520dbg` | header-only |
 | `disasm_difftest.py` | Regressionswächter: vergleicht `z80_disasm2.py` gegen `z80dis` | Verifikation |
-| `z80_disasm.py` | Zweitmeinung (z80dis-basiert), ORG fest 0x0100 | nur Orakel |
-| `z80_disasm3.py` | mit hartkodierten FORMAT.COM-Labels | nur format.com |
 
 Faustregel: **`z80_disasm2.py` für jede Datei/jedes Listing**, der **eingebaute
 Decoder** für interaktives Debuggen (`k1520dbg u/s/n`), `disasm_difftest.py` **vor
@@ -44,6 +42,43 @@ Kontrollfluss ab `--org`/`--entry` und markiert nicht erreichten Bytes als Daten
 wird, **muss** als `--entry` geseedet werden — sonst erscheint er als `DB`-Bytes
 (siehe das ZVE2-Beispiel unten). `--linear` erzwingt zusätzliche lineare
 Dekodierung des gesamten Images.
+
+### `--format mac` — assemblierbarer M80-Quelltext aus Abzug + Karte
+
+Statt eines Listings entsteht eine `.MAC`-Quelle (Marken `Lxxxx`, `DB`/`DW`/Text,
+`FILLFF`-Makro, je Ladesegment `.PHASE` mit `SEGnnnn:`/`SEGnnnnE:` und Auffüllung
+auf 256 B wie bei UDOS-Dateien). Richtig ist, was beim Neubau **bytegleich**
+herauskommt; ob eine Stelle Code oder Daten ist, darf falsch sein. Undokumentierte
+oder nicht eindeutig assemblierbare Befehle (SLL, ED-Dubletten, IXH/IXL, `ED 63/6B`)
+kommen als `DB`.
+
+```
+--format mac            statt Listing
+--karte DATEI           Kartendatei (unten)
+--seg ADR:OFFSET:LAENGE Ladesegment (wiederholbar); ohne: ORG:0:Dateilänge
+--entry/--label/--comment/--linear/--range   wie im Listing (label = name, comment = ik)
+--adr                   Adresskommentar "; 9000" hinter jedem Befehl
+--auffuellen N          Segmente auf Vielfaches von N auffüllen (Zweierpotenz, 0 = aus; Vorgabe 256)
+--[no-]zeiger           LD rr,nn-Zeiger als Code-Einstieg (Vorgabe an)
+--[no-]folge            Befehl hinter JP/JR/RET als Einstieg versuchen (Vorgabe an)
+```
+
+Die Codeverfolgung bricht an `FFH`-Läufen ab (Fülldaten sind kein `RST 38H`-Code).
+Kartendatei (hex, `#` = Kommentar; Beispiel `tools/mutos8000/mutos_io/karte.txt`):
+
+```
+seg <adr> <dateioffset> <länge>   code <adr>…   db|dw|dwc|str|txt <von> <bis>
+name <adr> <marke>   kom <adr> <text>   ik <adr> <text>   eq <marke> <adr>
+```
+
+`dwc` = Wortetabelle, deren Ziele zugleich Code-Einstiege sind; `str` = Zeichenketten
+mit Längenbyte; `kom` = Kommentarzeile **vor** der Stelle (mehrfach möglich), `ik` =
+Zeilenkommentar **hinter** der Zeile. So entsteht z. B. die Quelle von `mutos_io`
+reproduzierbar (Wächter `tests/python/test_z80_disasm.py`):
+
+```sh
+python3 -I tools/z80_disasm2.py --format mac --karte tools/mutos8000/mutos_io/karte.txt mutos_io > mutosio.mac
+```
 
 ### Kanonischer Aufruf für das ZRE-Boot-ROM (K2526)
 
@@ -124,11 +159,9 @@ Verifikationsstand 2026-06-05: zre.rom (1024 Offsets) und format.com (17408 Offs
 
 ## 4. Zweitwerkzeuge
 
-* **`z80_disasm.py`** — z80dis-basierte Zweitmeinung, ORG fest auf `0x0100` (CP/M).
-  Dient v. a. als Orakel hinter `disasm_difftest.py`. Kanonisch bleibt
-  `z80_disasm2.py`.
-* **`z80_disasm3.py`** — enthält hartkodierte FORMAT.COM-Labels (WBOOT/BDOS/…).
-  Nicht generisch; nur für `format.com` sinnvoll.
+`z80_disasm.py` und `z80_disasm3.py` (format.com-spezifisch) sowie `mutos_io/dis.py`
+sind seit 2026-10-27 gelöscht — **ein Disassembler, ein Ort**. Als Orakel dient
+`disasm_difftest.py` mit dem Drittanbieterpaket `z80dis`.
 
 ---
 

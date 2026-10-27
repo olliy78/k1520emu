@@ -1,7 +1,38 @@
 #!/usr/bin/env python3
 """
-Comprehensive Z80 Disassembler for Robotron A5120 format.com
-Multi-pass with string detection, data area identification, proper labeling.
+z80_disasm2.py - DER Z80-Disassembler der Werkzeugkiste (Entwurf 40, W1-W3)
+===========================================================================
+
+Zwei Ausgabearten (--format):
+
+  listing  (Vorgabe) Listing `ADDR  hexbytes  Befehl  ; Kommentar` fuer Analysen.
+           Recursive descent ab --org/--entry, optional --linear/--range,
+           ASCII-Zeichenketten.  Die Klasse Z80Disassembler wird von
+           gen_*_prn.py und disasm_difftest.py importiert - API nicht aendern.
+  mac      ASSEMBLIERBARER M80-Quelltext (Marken, DB/DW/Text, FILLFF-Makro,
+           .PHASE je Ladesegment, Segmentmarken SEGnnnn/SEGnnnnE, Auffuellung
+           auf 256 B).  Richtig ist, was beim Neubau BYTEGLEICH herauskommt;
+           ob eine Stelle als Code oder Daten gefuehrt wird, darf falsch sein.
+           Aufteilung, Namen und Kommentare stehen in einer Kartendatei
+           (--karte), damit sich die Quelle aus Abzug + Karte reproduzierbar
+           erzeugen laesst.
+
+Kartendatei (hexadezimale Zahlen; `#` beginnt eine Kommentarzeile):
+
+    seg  <adresse> <datei-offset> <laenge>   ein Ladesegment der Datei
+    code <adresse> [<adresse> ...]           Einstieg(e) der Codeverfolgung
+    db   <von> <bis>                         Daten, Bytes        (bis einschl.)
+    dw   <von> <bis>                         Daten, Woerter (Adressen -> Marken)
+    dwc  <von> <bis>                         wie dw, die Ziele sind zugleich Code-Einstiege
+    str  <von> <bis>                         Zeichenketten mit vorangestelltem Laengenbyte
+    txt  <von> <bis>                         Text (Zeichen als 'abc', Rest als Zahlen)
+    name <adresse> <marke>                   eigene Marke statt Lxxxx
+    kom  <adresse> <text>                    Kommentarzeile VOR der Stelle (mehrfach moeglich)
+    ik   <adresse> <text>                    Zeilenkommentar HINTER dem Befehl/der Datenzeile
+    eq   <marke> <adresse>                   Marke ausserhalb der Segmente (EQU)
+
+Nicht eindeutig assemblierbare oder undokumentierte Befehle (SLL, ED-Dubletten,
+DD/FD-Halbregister, ED 63/6B-Langform ...) gibt der mac-Modus als DB aus.
 """
 
 import sys
@@ -613,12 +644,581 @@ def render(dis, data, org, user_labels, user_comments, string_regions, title):
     return '\n'.join(out)
 
 
+
+# ============================================================================
+# Format "mac": assemblierbarer M80-Quelltext (Entwurf 40, W1-W3)
+#
+# Eigener tabellengetriebener Dekoder: er liefert Befehlsvorlagen mit {a}/{j}
+# fuer Adresswoerter bzw. Sprungziele, die Marken setzt erst die Ausgabe ein.
+# Was M80 nicht bytegleich zurueckuebersetzen wuerde (undokumentiert, Dubletten),
+# kommt als DB heraus - das ist der Grund, warum der Rundlauf haelt.
+# ============================================================================
+
+R8 = ['B', 'C', 'D', 'E', 'H', 'L', '(HL)', 'A']
+RP = ['BC', 'DE', 'HL', 'SP']
+RP2 = ['BC', 'DE', 'HL', 'AF']
+CC = ['NZ', 'Z', 'NC', 'C', 'PO', 'PE', 'P', 'M']
+ALU = ['ADD A,', 'ADC A,', 'SUB ', 'SBC A,', 'AND ', 'XOR ', 'OR ', 'CP ']
+ROT = ['RLC', 'RRC', 'RL', 'RR', 'SLA', 'SRA', 'SLL', 'SRL']
+BITOP = ['BIT', 'RES', 'SET']
+
+
+def hx(v, n=2):
+    """Hexzahl im M80-Stil: fuehrende 0, wenn die erste Ziffer ein Buchstabe ist."""
+    s = f"{v:0{n}X}"
+    return ('0' + s if s[0] in 'ABCDEF' else s) + 'H'
+
+
+class Undokumentiert(Exception):
+    """Kein (eindeutig assemblierbarer) Befehl: @laenge Bytes werden als DB ausgegeben."""
+
+    def __init__(self, laenge):
+        super().__init__(laenge)
+        self.laenge = laenge
+
+
+class Speicher:
+    """Die Ladesegmente im Adressraum; ausserhalb: unbekannt."""
+
+    def __init__(self):
+        self.b = {}
+
+    def laden(self, adr, daten):
+        for i, x in enumerate(daten):
+            self.b[adr + i] = x
+
+    def __contains__(self, a):
+        return a in self.b
+
+    def __getitem__(self, a):
+        return self.b[a]
+
+
+def entschluesseln(m, a):
+    """Ein Befehl bei @a.  Rueckgabe (vorlage, laenge, ziele, ende, abs_ziel).
+
+    @vorlage ist Text mit {a} fuer ein Adresswort (nn) bzw. {j} fuer ein
+    Sprungziel; @ziele sind Code-Folgeadressen, @ende ist wahr hinter einem
+    unbedingten Sprung/Ruecksprung, @abs_ziel ('j'|'c', adr) bzw. adr bzw. None.
+    Raises Undokumentiert (DB-Ausgabe) und IndexError (Segmentende).
+    """
+    def b(n):
+        if a + n not in m:
+            raise IndexError
+        return m[a + n]
+
+    def w(n):
+        return b(n) | (b(n + 1) << 8)
+
+    def d(n):
+        v = b(n)
+        return f"+{v}" if v < 128 else f"-{256 - v}"
+
+    op = b(0)
+    if op == 0xCB:
+        x = b(1)
+        r = R8[x & 7]
+        if x < 0x40:
+            if (x >> 3) == 6:               # SLL: undokumentiert
+                raise Undokumentiert(2)
+            return f"{ROT[x >> 3]} {r}", 2, [], False, None
+        return f"{BITOP[(x >> 6) - 1]} {(x >> 3) & 7},{r}", 2, [], False, None
+    if op in (0xDD, 0xFD):
+        ix = 'IX' if op == 0xDD else 'IY'
+        x = b(1)
+        if x == 0xCB:
+            y = b(3)
+            b(2)
+            if (y & 7) != 6 or (0x30 <= y < 0x38):
+                raise Undokumentiert(4)
+            t = f"({ix}{d(2)})"
+            if y < 0x40:
+                return f"{ROT[y >> 3]} {t}", 4, [], False, None
+            return f"{BITOP[(y >> 6) - 1]} {(y >> 3) & 7},{t}", 4, [], False, None
+
+        def rr(i):
+            return ix if i == 2 else RP[i]
+        if x == 0x21:
+            return f"LD {ix},{{a}}", 4, [], False, w(2)
+        if x == 0x22:
+            return f"LD ({{a}}),{ix}", 4, [], False, w(2)
+        if x == 0x2A:
+            return f"LD {ix},({{a}})", 4, [], False, w(2)
+        if x == 0x23:
+            return f"INC {ix}", 2, [], False, None
+        if x == 0x2B:
+            return f"DEC {ix}", 2, [], False, None
+        if x in (0x09, 0x19, 0x29, 0x39):
+            return f"ADD {ix},{rr((x >> 4) & 3)}", 2, [], False, None
+        if x == 0xE1:
+            return f"POP {ix}", 2, [], False, None
+        if x == 0xE5:
+            return f"PUSH {ix}", 2, [], False, None
+        if x == 0xE3:
+            return f"EX (SP),{ix}", 2, [], False, None
+        if x == 0xE9:
+            return f"JP ({ix})", 2, [], True, None
+        if x == 0xF9:
+            return f"LD SP,{ix}", 2, [], False, None
+        if x == 0x36:
+            return f"LD ({ix}{d(2)}),{hx(b(3))}", 4, [], False, None
+        if x in (0x34, 0x35):
+            return f"{'INC' if x == 0x34 else 'DEC'} ({ix}{d(2)})", 3, [], False, None
+        if (x & 0xC7) == 0x46 and x != 0x76:
+            return f"LD {R8[(x >> 3) & 7]},({ix}{d(2)})", 3, [], False, None
+        if (x & 0xF8) == 0x70 and x != 0x76:
+            return f"LD ({ix}{d(2)}),{R8[x & 7]}", 3, [], False, None
+        if (x & 0xC7) == 0x86:
+            return f"{ALU[(x >> 3) & 7]}({ix}{d(2)})", 3, [], False, None
+        raise Undokumentiert(1)             # DD/FD-Schattenpraefix bzw. Halbregister
+    if op == 0xED:
+        x = b(1)
+        if (x & 0xC7) == 0x40 and x != 0x70:
+            return f"IN {R8[(x >> 3) & 7]},(C)", 2, [], False, None
+        if (x & 0xC7) == 0x41 and x != 0x71:
+            return f"OUT (C),{R8[(x >> 3) & 7]}", 2, [], False, None
+        if (x & 0xCF) == 0x42:
+            return f"SBC HL,{RP[(x >> 4) & 3]}", 2, [], False, None
+        if (x & 0xCF) == 0x4A:
+            return f"ADC HL,{RP[(x >> 4) & 3]}", 2, [], False, None
+        if (x & 0xCF) in (0x43, 0x4B):
+            if (x >> 4) & 3 == 2:           # Langform LD (nn),HL: M80 nimmt die Kurzform
+                b(3)
+                raise Undokumentiert(4)
+            if (x & 0xCF) == 0x43:
+                return f"LD ({{a}}),{RP[(x >> 4) & 3]}", 4, [], False, w(2)
+            return f"LD {RP[(x >> 4) & 3]},({{a}})", 4, [], False, w(2)
+        t = {0x44: 'NEG', 0x45: 'RETN', 0x4D: 'RETI', 0x46: 'IM 0', 0x56: 'IM 1',
+             0x5E: 'IM 2', 0x47: 'LD I,A', 0x4F: 'LD R,A', 0x57: 'LD A,I',
+             0x5F: 'LD A,R', 0x67: 'RRD', 0x6F: 'RLD', 0xA0: 'LDI', 0xA1: 'CPI',
+             0xA2: 'INI', 0xA3: 'OUTI', 0xA8: 'LDD', 0xA9: 'CPD', 0xAA: 'IND',
+             0xAB: 'OUTD', 0xB0: 'LDIR', 0xB1: 'CPIR', 0xB2: 'INIR', 0xB3: 'OTIR',
+             0xB8: 'LDDR', 0xB9: 'CPDR', 0xBA: 'INDR', 0xBB: 'OTDR'}.get(x)
+        if t is None:
+            raise Undokumentiert(2)
+        return t, 2, [], x in (0x45, 0x4D), None
+    x = op >> 6
+    y = (op >> 3) & 7
+    z = op & 7
+    if x == 1:
+        if op == 0x76:
+            return "HALT", 1, [], False, None
+        return f"LD {R8[y]},{R8[z]}", 1, [], False, None
+    if x == 2:
+        return f"{ALU[y]}{R8[z]}", 1, [], False, None
+    if x == 0:
+        if z == 0:
+            if y == 0:
+                return "NOP", 1, [], False, None
+            if y == 1:
+                return "EX AF,AF'", 1, [], False, None
+            e = b(1)
+            t = (a + 2 + (e - 256 if e >= 128 else e)) & 0xFFFF
+            if y == 2:
+                return "DJNZ {j}", 2, [t], False, ('j', t)
+            if y == 3:
+                return "JR {j}", 2, [t], True, ('j', t)
+            return f"JR {CC[y - 4]},{{j}}", 2, [t], False, ('j', t)
+        if z == 1:
+            if y & 1:
+                return f"ADD HL,{RP[y >> 1]}", 1, [], False, None
+            return f"LD {RP[y >> 1]},{{a}}", 3, [], False, w(1)
+        if z == 2:
+            if y < 4:
+                return ['LD (BC),A', 'LD A,(BC)', 'LD (DE),A', 'LD A,(DE)'][y], 1, [], False, None
+            return ['LD ({a}),HL', 'LD HL,({a})', 'LD ({a}),A', 'LD A,({a})'][y - 4], 3, [], False, w(1)
+        if z == 3:
+            return f"{'DEC' if y & 1 else 'INC'} {RP[y >> 1]}", 1, [], False, None
+        if z == 4:
+            return f"INC {R8[y]}", 1, [], False, None
+        if z == 5:
+            return f"DEC {R8[y]}", 1, [], False, None
+        if z == 6:
+            return f"LD {R8[y]},{hx(b(1))}", 2, [], False, None
+        return ['RLCA', 'RRCA', 'RLA', 'RRA', 'DAA', 'CPL', 'SCF', 'CCF'][y], 1, [], False, None
+    # x == 3
+    if z == 0:
+        return f"RET {CC[y]}", 1, [], False, None
+    if z == 1:
+        if y & 1:
+            return ['RET', 'EXX', 'JP (HL)', 'LD SP,HL'][y >> 1], 1, [], y in (1, 5), None
+        return f"POP {RP2[y >> 1]}", 1, [], False, None
+    if z == 2:
+        return f"JP {CC[y]},{{j}}", 3, [w(1)], False, ('j', w(1))
+    if z == 3:
+        if y == 0:
+            return "JP {j}", 3, [w(1)], True, ('j', w(1))
+        if y == 2:
+            return f"OUT ({hx(b(1))}),A", 2, [], False, None
+        if y == 3:
+            return f"IN A,({hx(b(1))})", 2, [], False, None
+        if y == 4:
+            return "EX (SP),HL", 1, [], False, None
+        if y == 5:
+            return "EX DE,HL", 1, [], False, None
+        if y == 6:
+            return "DI", 1, [], False, None
+        return "EI", 1, [], False, None     # y == 7 (y == 1 ist CB, oben erledigt)
+    if z == 4:
+        return f"CALL {CC[y]},{{j}}", 3, [w(1)], False, ('c', w(1))
+    if z == 5:
+        if y & 1:
+            if y == 1:
+                return "CALL {j}", 3, [w(1)], False, ('c', w(1))
+            raise Undokumentiert(1)         # DD/ED/FD sind oben erledigt
+        return f"PUSH {RP2[y >> 1]}", 1, [], False, None
+    if z == 6:
+        return f"{ALU[y]}{hx(b(1))}", 2, [], False, None
+    return f"RST {hx(y * 8)}", 1, [y * 8], False, None
+
+
+def _zahl(s):
+    s = s.strip()
+    if s.lower().endswith('h'):
+        s = s[:-1]
+    return int(s, 16)
+
+
+def lies_karte(pfad):
+    k = {'seg': [], 'code': [], 'db': [], 'dw': [], 'dwc': [], 'txt': [], 'str': [],
+         'name': {}, 'kom': {}, 'ik': {}, 'eq': {}}
+    with open(pfad, encoding='utf-8') as f:
+        for nr, z in enumerate(f, 1):
+            z = z.rstrip('\n')
+            if not z.strip() or z.lstrip().startswith('#'):
+                continue
+            t = z.split(None, 2)
+            try:
+                if t[0] == 'seg':
+                    _, a, o, l = z.split()
+                    k['seg'].append((_zahl(a), _zahl(o), _zahl(l)))
+                elif t[0] == 'code':
+                    k['code'] += [_zahl(x) for x in z.split()[1:]]
+                elif t[0] in ('db', 'dw', 'dwc', 'txt', 'str'):
+                    _, v, bis = z.split()[:3]
+                    k[t[0]].append((_zahl(v), _zahl(bis)))
+                elif t[0] == 'name':
+                    k['name'][_zahl(t[1])] = t[2].split()[0]
+                elif t[0] in ('kom', 'ik'):
+                    k[t[0]].setdefault(_zahl(t[1]), []).append(t[2] if len(t) > 2 else '')
+                elif t[0] == 'eq':
+                    k['eq'][t[1]] = _zahl(t[2].split()[0])
+                else:
+                    raise ValueError(f"unbekannte Anweisung '{t[0]}'")
+            except (ValueError, IndexError) as e:
+                raise SystemExit(f"{pfad}:{nr}: {e}: {z}")
+    k['dw'] += k['dwc']
+    return k
+
+
+def karte_leer():
+    return {'seg': [], 'code': [], 'db': [], 'dw': [], 'dwc': [], 'txt': [], 'str': [],
+            'name': {}, 'kom': {}, 'ik': {}, 'eq': {}}
+
+
+class MacAbzug:
+    """Codeverfolgung + Ausgabe eines Abzugs als M80-Quelle."""
+
+    def __init__(self, daten, karte, zeiger=True, folge=True, linear=()):
+        self.k = k = karte
+        self.m = m = Speicher()
+        self.segs = []                      # (adresse, ende) in Dateireihenfolge
+        for a, o, l in k['seg']:
+            m.laden(a, daten[o:o + l])
+            self.segs.append((a, a + min(l, max(0, len(daten) - o))))
+        self.kind = {}                      # adresse -> ('i', laenge, vorlage, abs_ziel)
+        self.ziele_marke = set()
+        self.seen = set()
+        self.gesperrt = set()
+        for art in ('db', 'dw', 'txt', 'str'):
+            for v, bis in k[art]:
+                self.gesperrt.update(range(v, bis + 1))
+        work = list(k['code'])
+        for v, bis in k['dwc']:
+            for a in range(v, bis, 2):
+                if a in m and a + 1 in m:
+                    t = m[a] | (m[a + 1] << 8)
+                    if t in m and t not in self.gesperrt:
+                        work.append(t)
+        self._verfolge(work, zeiger, folge)
+        for von, bis in linear:
+            self._linear(von, bis)
+
+    def _verfolge(self, work, zeiger, folge):
+        m, kind, seen, gesperrt = self.m, self.kind, self.seen, self.gesperrt
+        while work:
+            a = work.pop()
+            while a in m and a not in seen and a not in gesperrt:
+                try:
+                    vorlage, n, ziele, ende, absz = entschluesseln(m, a)
+                except (Undokumentiert, IndexError):
+                    break
+                if any((a + i) in gesperrt or (a + i) not in m for i in range(n)):
+                    break
+                # FF-Lauf (Fuellbytes): RST 38H gefolgt von FFH ist kein Code
+                if n == 1 and all(m.b.get(a + i) == 0xFF for i in range(4)):
+                    break
+                kind[a] = ('i', n, vorlage, absz)
+                seen.update(range(a, a + n))
+                for t in ziele:
+                    if t in m:
+                        self.ziele_marke.add(t)
+                        work.append(t)
+                # Zeiger auf Code: LD rr,nn / LD (nn),.. mit Ziel im Segment
+                if zeiger and isinstance(absz, int) and vorlage.startswith('LD ') and \
+                        vorlage.endswith(',{a}') and absz in m and absz not in gesperrt:
+                    work.append(absz)
+                if ende:
+                    # Hinter einem unbedingten Ende beginnt meist der naechste Einstieg
+                    nxt = a + n
+                    if folge and nxt in m and nxt not in gesperrt and m[nxt] != 0xFF:
+                        work.append(nxt)
+                    break
+                a += n
+
+    def _linear(self, von, bis):
+        """Alles noch nicht Erfasste in [von, bis) linear dekodieren (Undokumentiertes als DB)."""
+        m, kind, seen, gesperrt = self.m, self.kind, self.seen, self.gesperrt
+        a = von
+        while a < bis:
+            if a in kind:
+                a += kind[a][1]
+                continue
+            if a not in m or a in seen or a in gesperrt:
+                a += 1
+                continue
+            try:
+                vorlage, n, ziele, ende, absz = entschluesseln(m, a)
+            except Undokumentiert as u:
+                n = u.laenge
+                vorlage, ziele, absz = None, [], None
+            except IndexError:
+                a += 1
+                continue
+            if any((a + i) in gesperrt or (a + i) not in m or (a + i) in seen for i in range(n)):
+                a += 1
+                continue
+            if vorlage is None:
+                vorlage = "DB\t" + ",".join(hx(m[a + i]) for i in range(n))
+            kind[a] = ('i', n, vorlage, absz)
+            seen.update(range(a, a + n))
+            for t in ziele:
+                if t in m:
+                    self.ziele_marke.add(t)
+            a += n
+
+    # ---- Ausgabe ----------------------------------------------------------
+    def _art(self, x):
+        for nm in ('dw', 'txt', 'str', 'db'):
+            for v, bis in self.k[nm]:
+                if v <= x <= bis:
+                    return nm
+        return None
+
+    def ausgabe(self, adr=False, auffuellen=256, praefix='L'):
+        m, k, kind = self.m, self.k, self.kind
+        marke = dict(k['name'])
+        refs = {t for t in self.ziele_marke if t in m}
+        for e in kind.values():
+            absz = e[3]
+            if isinstance(absz, tuple):
+                absz = absz[1]
+            if isinstance(absz, int) and absz in m:
+                refs.add(absz)
+        for v, bis in k['dw']:
+            for a in range(v, bis + 1, 2):
+                if a + 1 in m:
+                    t = m[a] | (m[a + 1] << 8)
+                    if t in m:
+                        refs.add(t)
+        for a in refs:
+            marke.setdefault(a, f"{praefix}{a:04X}")
+
+        strstart = set()
+        for v, bis in k['str']:
+            a = v
+            while a <= bis and a in m:
+                strstart.add(a)
+                a += 1 + m[a]
+
+        # Erster Durchgang: die Elemente je Segment festlegen.  Datenlaeufe
+        # enden an Marken, Befehlen, Kommentaren und Wechseln der Kartenart.
+        stoppt = set(marke) | set(kind) | set(k['kom']) | set(k['ik'])
+        elemente = []                       # (adresse, art, daten)
+        for sa, se in self.segs:
+            a = sa
+            while a < se:
+                e = kind.get(a)
+                if e:
+                    elemente.append((a, 'i', e))
+                    a += e[1]
+                    continue
+                art = 'db'
+                for nm in ('dw', 'txt', 'str'):
+                    for v, bis in k[nm]:
+                        if v <= a <= bis:
+                            art = 'txt' if nm == 'str' and a not in strstart else nm
+                if art == 'dw' and a + 1 < se:
+                    elemente.append((a, 'dw', None))
+                    a += 2
+                    continue
+                if art == 'str':
+                    ende = a + 1
+                elif art == 'dw':
+                    ende = a + 2
+                else:
+                    ende = a + 1
+                    while ende < se and ende not in stoppt and \
+                            self._art(ende - 1) == self._art(ende):
+                        ende += 1
+                        if ende - a >= 16 and art == 'db':
+                            break
+                bs = [m[x] for x in range(a, min(ende, se))]
+                if art == 'db' and bs[0] == 0xFF:
+                    n = 0
+                    while a + n < se and (a + n) not in stoppt and m[a + n] == 0xFF \
+                            and self._art(a) == self._art(a + n):
+                        n += 1
+                    if n >= 8:
+                        elemente.append((a, 'fill', n))
+                        a += n
+                        continue
+                if art == 'str':
+                    elemente.append((a, 'strlen', bs))
+                elif art == 'txt':
+                    elemente.append((a, 'txt', bs))
+                else:
+                    elemente.append((a, 'db', bs))
+                a += len(bs)
+
+        # Marken nur dort, wo ein Element beginnt (sonst haengt die Marke in der
+        # Luft - Bezuege dorthin werden als Zahl ausgegeben)
+        starts = {e[0] for e in elemente}
+        gueltig = {a: n for a, n in marke.items() if a in starts}
+
+        def sym(a):
+            if a in gueltig:
+                return gueltig[a]
+            for n, v in k['eq'].items():
+                if v == a:
+                    return n
+            return None
+
+        def ausdruck(a):
+            s = sym(a)
+            return s if s else hx(a, 4)
+
+        pad = hx(auffuellen, 3) if auffuellen else None
+        out = ["\t.Z80", "\tCSEG", "",
+               "; N Fuellbytes FFH (UDOS-Segmente haben unbenutzte Luecken)",
+               "FILLFF\tMACRO\tN", "\tREPT\tN", "\tDB\t0FFH", "\tENDM", "\tENDM", ""]
+        for n, v in sorted(k['eq'].items(), key=lambda x: x[1]):
+            out.append(f"{n}\tEQU\t{hx(v, 4)}")
+        eidx = 0
+        for sa, se in self.segs:
+            out.append(f"\n; ---- Segment {sa:04X}H .. {se - 1:04X}H ----")
+            out.append(f"\t.PHASE\t{hx(sa, 4)}")
+            out.append(f"SEG{sa:04X}:")
+            while eidx < len(elemente) and elemente[eidx][0] < se:
+                a, art, d = elemente[eidx]
+                eidx += 1
+                for z in k['kom'].get(a, ()):
+                    out.append(f"; {z}")
+                if a in gueltig:
+                    out.append(f"{gueltig[a]}:")
+                ik = "; ".join(k['ik'].get(a, ()))
+                zeig = adr and art == 'i'       # Adresskommentare nur hinter Befehlen
+                if zeig or ik:
+                    tail = "\t; " + " ".join(x for x in ((f"{a:04X}" if zeig else ""), ik) if x)
+                else:
+                    tail = ""
+                if art == 'i':
+                    _, n, vorlage, absz = d
+                    if absz is None:
+                        text = vorlage
+                    elif isinstance(absz, tuple):
+                        text = vorlage.format(j=ausdruck(absz[1]))
+                    else:
+                        text = vorlage.format(a=ausdruck(absz))
+                    out.append(f"\t{text}{tail}")
+                elif art == 'dw':
+                    t = m[a] | (m[a + 1] << 8)
+                    out.append(f"\tDW\t{ausdruck(t) if t in m or sym(t) else hx(t, 4)}{tail}")
+                elif art == 'fill':
+                    out.append(f"\tFILLFF\t{d}{tail}")
+                elif art == 'strlen':
+                    out.append(f"\tDB\t{hx(d[0])}{tail}")
+                elif art == 'txt':
+                    out.append(self._text(d) + tail)
+                else:
+                    out.append("\tDB\t" + ",".join(hx(v) for v in d) + tail)
+            out.append(f"SEG{sa:04X}E:")
+            if pad:
+                out.append(f"\tREPT\t({pad}-(($-SEG{sa:04X}) AND {hx(auffuellen - 1)})) AND {hx(auffuellen - 1)}")
+                out.append("\tDB\t0FFH")
+                out.append("\tENDM")
+            out.append("\t.DEPHASE")
+        out.append("\tEND")
+        return "\n".join(out) + "\n"
+
+    @staticmethod
+    def _text(bs):
+        """Zeichenkette als DB mit Anfuehrungszeichen; Steuerzeichen als Zahlen."""
+        teile, cur = [], ''
+        for v in bs:
+            if 0x20 <= v < 0x7F and v not in (0x27, 0x22):
+                cur += chr(v)
+            else:
+                if cur:
+                    teile.append(f"'{cur}'")
+                    cur = ''
+                teile.append(hx(v))
+        if cur:
+            teile.append(f"'{cur}'")
+        return "\tDB\t" + ",".join(teile)
+
+
+def mac_main(args, data, org):
+    k = lies_karte(args.karte) if args.karte else karte_leer()
+    for spec in args.seg:
+        try:
+            a, o, l = spec.split(":")
+            k['seg'].append((_parse_int(a), _parse_int(o), _parse_int(l)))
+        except ValueError:
+            raise SystemExit(f"--seg erwartet ADR:DATEIOFFSET:LAENGE, nicht '{spec}'")
+    if not k['seg']:
+        k['seg'].append((org, 0, len(data)))
+    k['code'] += [_parse_int(x) for x in args.entry]
+    for spec in args.label:
+        name, a = spec.split("=", 1)
+        k['name'][_parse_int(a)] = name.strip()
+    for spec in args.comment:
+        a, txt = spec.split("=", 1)
+        k['ik'].setdefault(_parse_int(a), []).append(txt)
+    if not k['code'] and not k['dwc']:
+        k['code'].append(k['seg'][0][0])
+    lin = []
+    for r in args.ranges:
+        a, b = r.split(":")
+        lin.append((_parse_int(a), _parse_int(b)))
+    if args.linear:
+        for sa, so, sl in k['seg']:
+            lin.append((sa, sa + sl))
+    zeiger = True if args.zeiger is None else args.zeiger
+    folge = True if args.folge is None else args.folge
+    abz = MacAbzug(data, k, zeiger=zeiger, folge=folge, linear=lin)
+    sys.stdout.write(abz.ausgabe(adr=args.adr, auffuellen=args.auffuellen))
+
+
 def main():
     import argparse
     ap = argparse.ArgumentParser(
         description="Generic Z80 disassembler for the a5120emu toolbox. "
-                    "Recursive-descent from entry points plus optional linear ranges.")
+                    "Recursive-descent from entry points plus optional linear ranges. "
+                    "--format mac erzeugt assemblierbaren M80-Quelltext (siehe Modulkopf).")
     ap.add_argument("file", help="binary image to disassemble (ROM/.COM/EPROM dump)")
+    ap.add_argument("--format", choices=("listing", "mac"), default="listing",
+                    help="listing (Vorgabe) oder mac (assemblierbarer M80-Text)")
     ap.add_argument("--org", default="0", help="origin/load address (hex 0x.. / ..H or dec). Default 0")
     ap.add_argument("--entry", action="append", default=[], metavar="ADDR",
                     help="extra recursive-descent entry point, e.g. an IM2 ISR or a "
@@ -631,12 +1231,30 @@ def main():
                     help="symbolic label for an address (repeatable)")
     ap.add_argument("--comment", action="append", default=[], metavar="ADDR=TEXT",
                     help="inline comment at an address (repeatable)")
-    ap.add_argument("--no-strings", action="store_true", help="disable ASCII string detection")
+    ap.add_argument("--no-strings", action="store_true", help="disable ASCII string detection (listing)")
     ap.add_argument("--title", default=None, help="title line for the listing header")
+    mac = ap.add_argument_group("nur --format mac")
+    mac.add_argument("--karte", metavar="DATEI", help="Kartendatei (seg/code/db/dw/dwc/str/txt/name/kom/ik/eq)")
+    mac.add_argument("--seg", action="append", default=[], metavar="ADR:OFFSET:LAENGE",
+                     help="Ladesegment (Zahlen hex 0x../..H oder dez; wiederholbar, "
+                          "ersetzt das Standardsegment ORG:0:Dateilaenge)")
+    mac.add_argument("--adr", action="store_true", help="Adresskommentar '; 9000' hinter jedem Befehl")
+    mac.add_argument("--auffuellen", type=lambda x: _parse_int(x), default=256, metavar="N",
+                     help="Segmente mit FFH auf ein Vielfaches von N Bytes auffuellen "
+                          "(Zweierpotenz, 0 = nicht; Vorgabe 256 wie UDOS-Dateien)")
+    mac.add_argument("--zeiger", action=argparse.BooleanOptionalAction, default=None,
+                     help="LD rr,nn-Zeiger als Code-Einstiege verfolgen (Vorgabe: an im Format mac)")
+    mac.add_argument("--folge", action=argparse.BooleanOptionalAction, default=None,
+                     help="Befehl hinter unbedingtem Sprung/RET als Einstieg versuchen (Vorgabe: an im Format mac)")
     args = ap.parse_args()
 
     org = _parse_int(args.org)
     data = read_binary(args.file)
+    if args.format == "mac":
+        mac_main(args, data, org)
+        return
+    if args.karte or args.seg or args.adr:
+        ap.error("--karte/--seg/--adr gelten nur mit --format mac")
     dis = Z80Disassembler(data, org=org)
 
     # Recursive descent from ORG plus user entry points.

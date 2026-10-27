@@ -17,7 +17,7 @@ die Marken SEGnnnn / SEGnnnnE stehen in src/mutosio.mac, ihre Werte liefert die
 Symboltabelle des M80-Listings.  Alles Uebrige (Datum, Typ, Eigenschaften, mem=)
 kommt aus der Vorlage (der .fileinfo im Archiv) - geaendert wird nur, was ein
 anderer Inhalt zwingend aendert.  Erstbau ohne Aenderung == Archivdatei
-(Wächter tests/cli/ ... `cli_mutos_io_bau`).
+(Waechter tests/cli/ ... `cli_mutos_io_bau`).
 """
 import argparse
 import os

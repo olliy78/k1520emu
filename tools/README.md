@@ -83,8 +83,7 @@ Sie bilden die Innereien von `k1520dbg` und `boot_trace` und sind **einzeln gete
 
 | Skript | Zweck |
 |---|---|
-| **`z80_disasm2.py`** | **Kanonischer** generischer Z80-Disassembler (`--org`, wiederholbare `--entry`/`--label`) — [z80_disasm.md](z80_disasm.md) |
-| `z80_disasm.py` · `z80_disasm3.py` | Ältere, format.com-spezifische Fassungen (ORG bzw. Labels fest verdrahtet). Nur als Zweitmeinung |
+| **`z80_disasm2.py`** | **Der** Z80-Disassembler: Listing (`--org`, `--entry`, `--label`) und `--format mac` = assemblierbarer M80-Quelltext aus Abzug + Kartendatei (`--karte`) — [z80_disasm.md](z80_disasm.md). Wächter `tests/python/test_z80_disasm.py` |
 | `disasm_difftest.py` | Regressionswächter: `z80_disasm2.py` gegen das `z80dis`-Paket. Vor jedem Umbau der Disassembler-Engine laufen lassen |
 | `eprom_to_h.py` | EPROM-Binärdatei → committetes C-Array (`*_data.h`) |
 | `img_to_hfe.py` | Rohes `.img` → HFE-v1-Diskettenabbild |
