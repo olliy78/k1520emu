@@ -50,7 +50,9 @@ def test_rundlauf_mit_allen_vorschlaegen_bleibt_bitgleich(kernel, tmp_path):
     v = dis("--karte", str(KARTE), "--vorschlaege", str(kernel))
     assert v.returncode == 0, v.stderr
     zeilen = [z for z in v.stdout.splitlines() if z.startswith("code ")]
-    assert len(zeilen) > 100
+    # Die Zahl schrumpft, je mehr die Karte aus Laufbelegen kennt (K6a: 40);
+    # geprueft wird der Rundlauf, nicht die Menge.
+    assert len(zeilen) >= 10
     karte = tmp_path / "karte_voll.txt"
     karte.write_text(KARTE.read_text() + "\n".join(zeilen) + "\n")
     r = dis("--karte", str(karte), "--pruefen", str(kernel))
