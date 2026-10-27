@@ -1,0 +1,14 @@
+# Karte des Kernels mutos_1216 (Entwurf 41, K3).  Format: Kopf von tools/z8000/z8kdis.h.
+# Abbild: 36352 Byte, Ladeadresse 0 (disks/a5120_mutos8000/a5120_mutos8000_boot_udos.zip, dateien/mutos_1216).
+# Aufruf:  build/z8kdis --karte tools/mutos8000/kernel/karte.txt --statistik mutos_1216
+# Nur Belegtes (doc/mutos_kernel/befund.md): Vektortabelle und Einstieg 027E; alles Weitere
+# kommt aus der Ablaufverfolgung (Sprung- und Aufrufziele), nichts ist geraten.
+seg 0 0 8E00
+# Programmstatus-Feld: 7 Eintraege zu je 8 Byte (Reset 027E mit FCW C000, 6 Traps FCW 40xx -> 030E)
+psa 0 7
+# Eintrag 7 (VI) hat nur reserviert + FCW; die 128 Vektoren [Kennung, Handler] folgen ab 3C
+kom 38 VI-Eintrag: reserviert, FCW; ab 3C folgen 128 Vektoren [Kennung, Handler]
+dw 38 3B
+vek 3C 23B
+name 27E start
+code 27E

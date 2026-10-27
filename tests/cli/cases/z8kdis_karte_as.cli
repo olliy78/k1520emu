@@ -1,0 +1,21 @@
+# z8kdis --format as: Kartendatei (Namen, Kommentare, Ablauf) und MUTOS-as-Schreibweise.
+# Abbild: 21001234 = LD R0,#%1234 | 5F000008 = CALL %0008 | 9E08 9E08 = RET RET
+tool:   z8kdis
+run:    --karte %karte.txt% --format as %bild%
+nullfile bild: 12
+
+file karte.txt:
+  code 0
+  name 0 start
+  kom 0 Eintritt
+  eq PORT 1F
+
+poke:   %bild% 0 210012345F0000089E089E08
+expect: mutos module
+expect: $NONSEGMENTED
+expect: start:
+expect: ! Eintritt !
+expect: PORT	:= %1F
+expect: 	ld	r0,#%1234
+expect: 	call	L0008
+exit:   0
