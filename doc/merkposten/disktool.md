@@ -1126,10 +1126,10 @@ Vier Anwender-Disketten (ROOT, CMD, CC1, CC2; `.TD0` und `.dmk`) plus die UDOS-L
    vier Disketten mit 0x53 gefüllt, ohne Dateisystem), **Block 0 = Zylinder 1 Sektor 1**, einseitig 8×512.
    Block 0 trägt Z8000-Code (Urlader), Block 1 den Superblock.  Dafür bekam `WegaSpaceDev` einen Startoffset
    aus `data_start` des Profils (`data_cyl/data_head`), und zwar in Erkennung, `mount` und `format`.
-2. **Zwei Katalogformate/-profile** (`mutos_ss77`/`mutos77`: Zyl. 1–76, `mutos_ss80`/`mutos80`: Zyl. 1–79).
+2. **Zwei Katalogformate/-profile** (seit 2026-10-26 `mutos8k_8x512_mfm` bzw. `mutos8k_8x512_mfm_80`, Schema `mutos8k_<Sektoren>x<Bytes>_<fm|mfm>`; Die alten Namen (`mutos8k_fm`, `mutos8k_mfm`, `mutos77`, `mutos80`, `tar_mutos8k_{fm,mfm}[_leer]`) gelten als Alias (`aliases:` in `data/formats.yaml`, `FsCatalog::find`; Wächter `FsCatalog.AlteProfilnamenLoesenAlsAliasAufDasNeueProfilAuf`), stehen aber in keiner Liste und nie als Erkennungsergebnis.) (`mutos_ss77`/`mutos8k_8x512_mfm`: Zyl. 1–76, `mutos_ss80`/`mutos8k_8x512_mfm_80`: Zyl. 1–79).
    CMD trägt hinter Zylinder 76 noch Altbestand (9×512, 1×2048) — das Format ignoriert ihn (`stray_tracks`).
    Das Dateisystem ist kleiner als die Diskette (`s_fsize` 312/320/352 Blöcke), das ist so gewollt.
-3. **Verschränkung der Freiliste**: CMD/CC1/CC2 haben `s_m/s_n = 3/500`, ROOT 1/96.  `create --fs mutos77` nimmt 3/500.
+3. **Verschränkung der Freiliste**: CMD/CC1/CC2 haben `s_m/s_n = 3/500`, ROOT 1/96.  `create --fs mutos8k_8x512_mfm` nimmt 3/500.
    `s_isize` zählt wie bei WEGA Block 0 und 1 mit (14 → 96 Inodes); ROOT hat 12 (nicht fsize/25+2).
 4. **fsck**: CMD/CC1/CC2 ohne Befund; ROOT meldet 2 Warnungen, die im ORIGINAL stehen
    (`s_tinode` veraltet, Inode 26 ohne Namen) — keine Falschmeldung, nicht „reparieren".
@@ -1137,11 +1137,20 @@ Vier Anwender-Disketten (ROOT, CMD, CC1, CC2; `.TD0` und `.dmk`) plus die UDOS-L
    Offen: die A5120.16 bootet MUTOS noch nicht im Emulator (Entwurf 17 §9: Kern liegt in den Systemspuren der
    UDOS-Ladediskette, `BOOT MUTOS`); das DiskTool kann den Bootbereich schon herausholen (`boot-get`).
 
-6. **Profile `mutos8k_mfm` und `udos_ss77_fm` (2026-10-24, #22):** `mutos8k_mfm` = dieselbe 8k-Wurzel in MFM (Format `udos_ss77`, Rang −10 → gewinnt vor dem UDOS-Profil
+6. **Profile `mutos8k_26x128_mfm` und `udos_ss77_fm` (2026-10-24, #22):** `mutos8k_26x128_mfm` = dieselbe 8k-Wurzel in MFM (Format `udos_ss77`, Rang −10 → gewinnt vor dem UDOS-Profil
    derselben Spurlage, eine UDOS-Diskette bleibt UDOS); `udos_ss77_fm` = UDOS auf 77 × 26 × 128 **FM** (Format `mf3200_26x128`, 8″ MF3200), nötig, weil `create` das Verfahren aus dem
    Format nimmt. Wächter `MutosFs.M8k_MfmUndFmErkennungUndUdosBleibtUdos`, `FsCatalog` (Namensliste). Die Ladedisketten baut `tools/mutos8000/bau_ladediskette.py` aus dem Archiv
    `…_boot_udos.zip`. **Fallstrick: `get` schreibt einen leeren Datumsvermerk als `erst=-`/`geaend=-`, `put` liest `-` als „heute“** — das Erzeugerskript schreibt `______` aus, sonst wäre
    der Bau tagesabhängig. Wächter `test_mutos8000_werkzeuge.py`, `cli_mutos8000_boot_ladediskette_*`.
+
+7. **tar auf MUTOS-Disketten (2026-10-25, #22):** MUTOS-`tar` schreibt auf das Rohgeraet, also in dieselbe Blockabbildung `Mutos8kDev` (nicht linear). Die Profile
+   `tar_mutos8k_26x128_mfm`/`tar_mutos8k_26x128_fm` (+ `_leer`) erkennen, lesen und schreiben das (Satz ueber N Disketten zu 494 Bloecken); Einzelheiten und Waechter:
+   `doc/merkposten/tar_satz.md` Nr. 17.  `unix_layout: mutos8k` gilt damit auch fuer `type: tar`.
+
+8. **8×512: Gegenprobe, Blockgrenze, Swap (2026-10-26, #22, Entwurf 39 A5c).**  Das UNIX-Dateisystem `mutos8k_8x512_mfm` ist am Emulator gegengeprüft (DiskTool schreibt → MUTOS liest und umgekehrt, `fsck` sauber; Fixture
+   `mutos8000_8x512_geschrieben.td0`, Wächter `MutosFs.M8x512_*`).  **`create` ohne `--blocks` begrenzt auf 608 Blöcke** (Kernel lehnt Block ≥ 608 ab; auf `mutos8k_8x512_mfm_80` wären es sonst 632).  tar im selben Layout:
+   `tar_mutos8k_8x512_mfm` (`doc/merkposten/tar_satz.md` Nr. 18).  **Der 8×512-`mutos_io`-Patch hatte einen Fehler bei Swap-Aufträgen, die kein Vielfaches von 512 B sind** (behoben, achte Patchstelle `98C0`; ohne ihn `panic: IO err in swap`).
+   **`…_cmd.td0` (83 Spuren) lässt sich in einem K5601 nicht einlegen, DISK-ROOT trägt die hängende `pwd` von 1987:** `tools/mutos8000/bau_8x512.py` baut `…_root_8x512.hfe` und `…_cmd_8x512.hfe` (Wächter `test_8x512_wurzel_und_befehle_…`).
 
 ## MUTOS 1700 (A7100) — dieselbe Klasse, zweite Familie (2026-10-23)
 
@@ -1185,18 +1194,18 @@ liefen schon), drei tragen ein UNIX-Dateisystem, eines (`ROOT1_G`) ist ein besch
 ## MUTOS 8000 M8K-Satz (8″ FM 26×128, 2026-10-23, #22)
 
 Ausführliche Formatbeschreibung, Belege und Tabellen: **`doc/design/39_mutos8000.md` §4.6**.  Das Wichtigste:
-1. **CMD/USR** (`mutos8k_fm`, `unix_layout: mutos8k`, `Mutos8kDev`): 512-B-Block = 4 logische Sektoren zu 128 B, 26 je Spur über alle Spuren ab Zyl. 1,
+1. **CMD/USR** (`mutos8k_26x128_fm`, `unix_layout: mutos8k`, `Mutos8kDev`): 512-B-Block = 4 logische Sektoren zu 128 B, 26 je Spur über alle Spuren ab Zyl. 1,
    Verschränkung 2 (13 ungerade, dann 13 gerade IDs) und **6 Sektoren Spurversatz je Zylinder**: `ID = ((platz + 6·(Zyl−1)) mod 26) + 1`.  Nicht die lineare Folge —
    Block 6 überschreitet die Spurgrenze.  Beleg: Wurzel/Baum/Freiliste, 23 `a.out` mit Größe = 16+Text+Daten+Symbole.  Nichts im Code darf hier
    `WegaSpaceDev`/lineare Offsets voraussetzen.
 2. **Quelldefekte gehören der Quelle** (TD0 = SCP-Fluss): CMD `bin/pr`, USR `bin/ed`/`lib/c0`/`lib/c1` (fehlende bzw. CRC-Sektoren), BIN `wc`/`size` nur E5-Füllung,
    `passwd` gekürzt (fsck sieht letzteres nicht).  Die Wächter pinnen genau diese Dateien; nicht „reparieren".
-3. **BIN** ist gewöhnliches `mutos77` (Zusatzsektor ID 126 auf Zyl. 0 = TD0-Pseudosektor, bleibt beim Zurückschreiben erhalten).
+3. **BIN** ist gewöhnliches `mutos8k_8x512_mfm` (Zusatzsektor ID 126 auf Zyl. 0 = TD0-Pseudosektor, bleibt beim Zurückschreiben erhalten).
 4. **ROOT wird NICHT erkannt (richtig so)**: 1-Bit-Verschiebung ab Offset 1 und Fremdtabelle in Offset 80–127 jedes 128-B-Sektors; Wurzel-Modus `83FE` statt `41FF`
    ist der Grund für ENOTDIR im Emulator-Boot.  Wächter `MutosFs.M8k_*` (Fixtures `mutos8000_m8k_*.td0`).
-5. **Rekonstruierte Wurzel** `disks/a5120_16_MUTOS/a5120_mutos8000_root_fm.hfe` (Entwurf 39 §4.7.6/§4.8): mit `create --fs mutos8k_fm --inodes 104 --blocks 250`, `boot-put` (Zylinder 0 von M8KCMD)
+5. **Rekonstruierte Wurzel** `disks/a5120_16_MUTOS/a5120_mutos8000_root_fm.hfe` (Entwurf 39 §4.7.6/§4.8): mit `create --fs mutos8k_26x128_fm --inodes 104 --blocks 250`, `boot-put` (Zylinder 0 von M8KCMD)
    und `put <quellordner>` (`.fileinfo` je Datei/Verzeichnis + `wega-dateiangaben.txt` für die 19 Knoten) gebaut — kein Code nötig; **bootet im Emulator bis zur Shell**
    (Wächter `cli_mutos8000_boot_rekonstruierte_wurzel`).  **`--blocks 250` ist Pflicht** (`create --blocks N` = `s_fsize` N, nur WEGA/MUTOS, C-ABI `k1520d_create_ex2`;
    `MutosFs.Blocks_*`): hinter Block 250 liegt der Swap-Bereich des Kernels auf rk2 — mit `s_fsize` 494 wurden `/bin/sh`-Blöcke vom Auslagern überschrieben, `fsck` sah nichts, `date` hing.
-   Die GUI („Neue Diskette“) bietet `--blocks` nicht an (Vorgabe/Obergrenze, der Blockraum, ist nicht in der C-ABI; Anwendungsfall nur dieser Nachbau).  Container `.hfe`, weil der Emulator `.td0` nicht zurückschreibt; `create … .dmk` im Profil `mutos8k_fm` hat 62 Sektoren mit CRC-Fehler
+   Die GUI („Neue Diskette“) bietet `--blocks` nicht an (Vorgabe/Obergrenze, der Blockraum, ist nicht in der C-ABI; Anwendungsfall nur dieser Nachbau).  Container `.hfe`, weil der Emulator `.td0` nicht zurückschreibt; `create … .dmk` im Profil `mutos8k_26x128_fm` hat 62 Sektoren mit CRC-Fehler
    (nicht verfolgt).  Die Datei ist eine Rekonstruktion: Programme aus DISK-ROOT, `mount`/`umount` Ersatz, sechs Gerätenamen + `login`/`motd`/`mount`/`mtab` abgeleitet.

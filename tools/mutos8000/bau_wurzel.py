@@ -4,7 +4,7 @@
 Fahrplan (alles in einem Temp-Verzeichnis, an Kopien der eingecheckten Abbilder):
   1. DISK-ROOT mit `k1520disktool get` in einen Ordner auszug holen,
   2. Quellbaum bauen (wurzel_quellbaum.py: M8KROOT zurueckgeschoben + DISK-ROOT-Programme),
-  3. `create --fs mutos8k_fm --inodes 104 --blocks 250`,
+  3. `create --fs mutos8k_26x128_fm --inodes 104 --blocks 250`,
   4. Zylinder 0 von M8KCMD mit `boot-get` holen und mit `boot-put` einspielen,
   5. `put` des Quellbaums (Modi, Eigentuemer, Zeiten, Geraete aus .fileinfo/wega-dateiangaben.txt),
   6. `check --full`,
@@ -98,7 +98,7 @@ def main(argv=None):
         bau = os.path.join(tmp, "bau.hfe")
         if os.path.exists(bau):
             os.remove(bau)
-        disktool("create", bau, "--fs", "mutos8k_fm", "--inodes", INODES, "--blocks", BLOECKE)
+        disktool("create", bau, "--fs", "mutos8k_26x128_fm", "--inodes", INODES, "--blocks", BLOECKE)
         boot = os.path.join(tmp, "cmdboot.bin")
         disktool("boot-get", kopie["m8k_cmd.td0"], boot)
         disktool("boot-put", bau, boot)

@@ -9,8 +9,9 @@ Nur Python-Standardbibliothek, lauffähig mit `python3 -I`; das DiskTool wird nu
 | `m8kroot_lesen.py` | Befund der beschädigten `M8KROOT` (Superblock, Inodes, Baum, lesbare Bytes; `--inodes`, `--vergleich ORDNER`) |
 | `wurzel_quellbaum.py` | Quellbaum (Dateien, `.fileinfo`, `wega-dateiangaben.txt`) aus `M8KROOT` + Auszug von DISK-ROOT; Handangaben (Namen, `.profile`, Geräte) stehen als Daten im Skript |
 | `wurzel_pruefen.py` | unabhängiger Leser: Baum einer Wurzel (`.td0`/`.imd`) byteweise gegen einen Quellbaum |
-| `bau_alle.py` | **alle achtzehn fertigen Disketten** (6 Ladedisketten, 2 Wurzeln, 10 Datendisketten) aus den Archiven nach `disks/a5120_16_MUTOS/` (s. u.) |
-| `bau_wurzel.py` | ganzer Nachbau: DISK-ROOT holen, Quellbaum, `create --fs mutos8k_fm --inodes 104 --blocks 250` (Swap-Bereich ab Block 250, §4.8), Zylinder 0 per `boot-get` von M8KCMD + `boot-put`, `put`, `check --full`, Prüfung |
+| `bau_alle.py` | **alle zwanzig fertigen Disketten** (6 Ladedisketten, 2 Wurzeln, 10 Datendisketten, 2 Disketten des DISK-Satzes) aus den Archiven bzw. TD0-Originalen nach `disks/a5120_16_MUTOS/` (s. u.) |
+| `bau_8x512.py` | baut für den DISK-Satz (8 × 512, Ladediskette `k5601_8x512`) `…_root_8x512.hfe` (DISK-ROOT mit der lauffähigen `pwd` von 1986 — die von 1987 hängt, und mit ihr `tar`) und `…_cmd_8x512.hfe` (DISK-CMD auf sauberem 77-Zylinder-Medium; die TD0 hat 83 Spuren, ein K5601 erreicht 80) aus den TD0-Originalen (Entwurf 39 A5c) |
+| `bau_wurzel.py` | ganzer Nachbau: DISK-ROOT holen, Quellbaum, `create --fs mutos8k_26x128_fm --inodes 104 --blocks 250` (Swap-Bereich ab Block 250, §4.8), Zylinder 0 per `boot-get` von M8KCMD + `boot-put`, `put`, `check --full`, Prüfung |
 | `bau_aus_archiv.py` | baut die Wurzeldiskette aus einem **Archiv** (`.zip` oder ausgepackter Ordner): `bauangaben.yaml`, `zylinder0.bin`, `dateien/`; `check --full` und unabhängige Prüfung (Fehler bei Block >= `s_fsize`) |
 | `archiv_erzeugen.py` | erzeugt die eingecheckten Quell-Archive aus den Disketten (`archive --ohne-abbild`): `--art wurzel` (Vorgabe) → `…_m8k_root.zip`, `--art ladediskette` → `…_boot_udos.zip` aus der Original-Ladediskette `…_boot_udos.dmk` |
 | `bauangaben.yaml` | Vorlage der Bauangaben (fs, `fs_mfm`, Inodes, Blöcke = Swap-Grenze, Ladecode-Datei) |
@@ -38,7 +39,7 @@ Einzelheiten: Entwurf 39 §4.7.6 und §4.8.
 Quellen (Originale, Archive) liegen in `disks/a5120_mutos8000/`, die **fertigen Disketten in `disks/a5120_16_MUTOS/`**:
 
 ```sh
-python3 -I tools/mutos8000/bau_alle.py --ueberschreiben            # baut alle achtzehn neu nach disks/a5120_16_MUTOS/
+python3 -I tools/mutos8000/bau_alle.py --ueberschreiben            # baut alle zwanzig neu nach disks/a5120_16_MUTOS/
 python3 -I tools/mutos8000/bau_alle.py --nur-daten --ueberschreiben  # nur die zehn Datendisketten
 python3 -I tools/mutos8000/bau_alle.py --ziel-ordner aus/ --wurzel-quelle meine_wurzel --lade-quelle meine_lade
 ```
@@ -88,7 +89,7 @@ Das Archiv entsteht aus der eingecheckten Diskette mit `python3 -I tools/mutos80
 ### Wurzel für MFM-Laufwerke (K5601)
 
 `python3 -I tools/mutos8000/bau_aus_archiv.py --laufwerke k5601 <archiv> <ziel.hfe>` baut dieselbe Wurzel in **MFM** statt FM
-(Profil `mutos8k_mfm` aus `fs_mfm` der Bauangaben; Vorgabe `--laufwerke mf3200` = FM, `mutos8k_fm`). Blockabbildung (Verschränkung 2,
+(Profil `mutos8k_26x128_mfm` aus `fs_mfm` der Bauangaben; Vorgabe `--laufwerke mf3200` = FM, `mutos8k_26x128_fm`). Blockabbildung (Verschränkung 2,
 Spurversatz 6) und Inhalt sind gleich, nur das Aufzeichnungsverfahren der 77 × 26 × 128 Sektoren ist ein anderes (Entwurf 39 §4.6.3).
 Eingecheckt in `disks/a5120_16_MUTOS/`: `…_root_mfm.hfe`. Die Anlagezeit (`s_time`) ist das Einzige, was zwei Bauten unterscheidet.
 

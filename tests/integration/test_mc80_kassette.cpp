@@ -46,7 +46,7 @@ struct Mc80MitBand {
     std::vector<uint8_t> nachInit;   // 4000H–41FFH nach INIT
 
     explicit Mc80MitBand(Variante v) : m(maschine(v)) {
-        EXPECT_TRUE(m->installK5020()) << m->k5020Fehler();
+        EXPECT_NE(m->k5020(), nullptr) << "die K5020 ist fest eingebaut";
         if (!m->k5020()) return;
         // Eine neue Kassette, wie sie das Laufwerk am MC80 anlegt (Kompaktkassette ohne Marken).
         band = std::make_shared<KassettenMedium>(m->k5020()->laufwerk(0).neueKassette());
@@ -159,47 +159,32 @@ void ladenUndStarten(Mc80MitBand& r, const std::vector<uint8_t>& prog) {
 
 // ─── Karte am MC80-Bus ───────────────────────────────────────────────────────
 
-TEST(Mc80K5020, SteckbarNachDemAnlegenNichtNachDemErstenLauf) {
-    auto m = maschine(Variante::Mc8031);
-    ASSERT_TRUE(m->installK5020()) << m->k5020Fehler();
+TEST(Mc80K5020, FestEingebautAn30HBisSiebenUndNurEinmal) {
+    auto m = maschine(Variante::Mc8030);
+    ASSERT_NE(m->k5020(), nullptr);
     for (int p = 0x30; p <= 0x37; ++p) {
         const BusDevice* d = m->bus().ioOwner(static_cast<uint8_t>(p));
         ASSERT_NE(d, nullptr) << std::hex << p;
         EXPECT_EQ(std::string(d->deviceName()).rfind("K5020", 0), 0u) << d->deviceName();
     }
     EXPECT_FALSE(m->installK5020()) << "doppelt";
-
-    auto n = maschine(Variante::Mc8030);
-    n->run(1000);
-    EXPECT_FALSE(n->installK5020());
-    EXPECT_NE(n->k5020Fehler().find("vor dem ersten Lauf"), std::string::npos) << n->k5020Fehler();
 }
 
-TEST(Mc80K5020, ModelleUnterscheidenTaktProfilUndKassette) {
-    auto m30 = maschine(Variante::Mc8030);
-    auto m31 = maschine(Variante::Mc8031);
-    ASSERT_TRUE(m30->installK5020());
-    ASSERT_TRUE(m31->installK5020());
-    const K5020& k30 = *m30->k5020();
-    const K5020& k31 = *m31->k5020();
-    EXPECT_EQ(k30.config().basis, 0x30);
-    EXPECT_EQ(k31.config().basis, 0x30);
-    EXPECT_EQ(k30.config().takt, K5020::Takt::ExternerCtc);
-    EXPECT_EQ(k31.config().takt, K5020::Takt::Bustakt);
-    EXPECT_EQ(k30.laufwerk(0).profil().id, ProfilId::LW1200);
-    EXPECT_EQ(k31.laufwerk(0).profil().id, ProfilId::K5200_19);
-    for (const K5020* k : {&k30, &k31}) {
-        const auto& g = k->laufwerk(0).neueKassette();
-        EXPECT_EQ(g, kassette::Geometrie::kompaktkassette());
-        EXPECT_EQ(g.marke_um, 0u) << "keine BOT-/EOT-Marke";
-        KassettenMedium neu(g);
-        EXPECT_FALSE(neu.aebAktiv(neu.botEnde() + 1000)) << "hinter dem Vorspann kein AEB";
-    }
+TEST(Mc80K5020, TaktProfilUndKassette) {
+    auto m = maschine(Variante::Mc8030);
+    const K5020& k = *m->k5020();
+    EXPECT_EQ(k.config().basis, 0x30);
+    EXPECT_EQ(k.config().takt, K5020::Takt::ExternerCtc);
+    EXPECT_EQ(k.laufwerk(0).profil().id, ProfilId::LW1200);
+    const auto& g = k.laufwerk(0).neueKassette();
+    EXPECT_EQ(g, kassette::Geometrie::kompaktkassette());
+    EXPECT_EQ(g.marke_um, 0u) << "keine BOT-/EOT-Marke";
+    KassettenMedium neu(g);
+    EXPECT_FALSE(neu.aebAktiv(neu.botEnde() + 1000)) << "hinter dem Vorspann kein AEB";
 }
 
 TEST(Mc80K5020, Mc8030SchreibtaktKommtVonAspCtcKanal2) {
     auto m = maschine(Variante::Mc8030);
-    ASSERT_TRUE(m->installK5020());
     EXPECT_FALSE(m->aspBandtakt()) << "nach dem Einschalten zaehlt K2 nicht";
     EXPECT_FALSE(m->k5020()->taktLiegtAn());
     m->bus().ioWrite(0xD6, 0x47);   // EGOS MB_INIT 1F96: Zaehler, Zeitkonstante folgt
@@ -212,15 +197,10 @@ TEST(Mc80K5020, Mc8030SchreibtaktKommtVonAspCtcKanal2) {
     m->bus().ioWrite(0xD6, 0xA7);   // Zeitgeber statt Zaehler: kein Bandtakt
     m->bus().ioWrite(0xD6, 0x10);
     EXPECT_FALSE(m->k5020()->taktLiegtAn());
-
-    auto m31 = maschine(Variante::Mc8031);
-    ASSERT_TRUE(m31->installK5020());
-    EXPECT_TRUE(m31->k5020()->taktLiegtAn()) << ".31: Bustakt, ohne ASP";
 }
 
 TEST(Mc80K5020, EgosStelltDieKarteBeimStartEin) {
     auto m = maschine(Variante::Mc8030);
-    ASSERT_TRUE(m->installK5020());
     while (m->totalCycles() < 4'000'000) m->run(5000);
     // MB_INIT (1F8D): Vektoren B0H/B4H (Daten-PIO A/B), B8H/B6H (Steuer-PIO A/B), ASP-CTC K2 zaehlt.
     EXPECT_EQ(m->k5020()->pioDaten().debugState().port[0].vector, 0xB0);
@@ -228,6 +208,13 @@ TEST(Mc80K5020, EgosStelltDieKarteBeimStartEin) {
     EXPECT_EQ(m->k5020()->pioSteuer().debugState().port[0].vector, 0xB8);
     EXPECT_EQ(m->k5020()->pioSteuer().debugState().port[1].vector, 0xB6);
     EXPECT_TRUE(m->k5020()->taktLiegtAn());
+}
+
+// Der MC80 hat nur EIN Laufwerk (HiFi-Kassettenlaufwerk); Laufwerk 2 der K5020 ist nicht da.
+TEST(Mc80KassetteLaufwerk, NurEinLaufwerk) {
+    auto m = maschine(Variante::Mc8030);
+    EXPECT_NE(m->kassettenLaufwerk(0), nullptr);
+    EXPECT_EQ(m->kassettenLaufwerk(1), nullptr);
 }
 
 // ─── Abnahme ueber EGOS ───────────────────────────────────────────────────────
@@ -242,16 +229,16 @@ TEST_P(Mc80Kassette, SpeichernUndLaden) {
     ladenUndStarten(r, prog);
 }
 
-INSTANTIATE_TEST_SUITE_P(Modelle, Mc80Kassette, ::testing::Values(Variante::Mc8030, Variante::Mc8031),
+INSTANTIATE_TEST_SUITE_P(Modelle, Mc80Kassette, ::testing::Values(Variante::Mc8030),
                          [](const ::testing::TestParamInfo<Variante>& i) {
-                             return std::string(i.param == Variante::Mc8030 ? "Mc8030" : "Mc8031");
+                             return std::string("Mc8030");
                          });
 
 // EGOS 1BF0–1C03: ein erstes Byte AAH laeuft durch die Postambelprobe (BMS noch 1 → Datenbyte),
 // ABH wird ohne sie angenommen, anderes verworfen.  Die Karte reicht Praeambeln unveraendert durch —
 // ein Band, dessen Bloecke mit ABH beginnen, muss sich genauso laden lassen.
 TEST(Mc80KassettePraeambel, LiestAuchPraeambelABH) {
-    Mc80MitBand r(Variante::Mc8031);
+    Mc80MitBand r(Variante::Mc8030);
     const auto prog = programm();
     speichern(r, prog);
     if (::testing::Test::HasFatalFailure()) return;

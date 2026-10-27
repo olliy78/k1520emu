@@ -51,7 +51,10 @@ def konfig_ordner(tmp_path, monkeypatch):
 def _fenster(qapp):
     from app import profil
     from app.ui.main_window import MainWindow
-    w = MainWindow(None, profil=profil.profil("a5120"))
+    import dataclasses
+    # Die Option ist im ausgelieferten Profil ausgeblendet (aup_wahl=False); die Oberflaeche
+    # selbst bleibt unter Test.
+    w = MainWindow(None, profil=dataclasses.replace(profil.profil("a5120"), aup_wahl=True))
     w.show()
     qapp.processEvents()
     return w
@@ -122,10 +125,9 @@ def test_vorgabe_aus_bei_allen_modellen_und_kasten_folgt_der_karte(qapp, konfig_
         _zu(w, qapp)
 
 
-def test_nur_das_a5120_profil_bietet_die_option(qapp, konfig_ordner):
+def test_kein_profil_bietet_die_option_derzeit_an(qapp, konfig_ordner):
     from app import profil
-    assert profil.profil("a5120").aup_wahl
-    for m in ("k8915", "prg710", "pc1715", "p8000", "mc80"):
+    for m in ("a5120", "k8915", "prg710", "pc1715", "p8000", "mc80"):
         assert not profil.profil(m).aup_wahl
 
 

@@ -103,3 +103,32 @@ TEST(Mc80Asp, KetteSioVorCtcVorPio) {
 }
 
 }  // namespace
+
+// ─── IFSS XS503 an SIO B (Anschluss fuer den SerialHub) ──────────────────────
+
+TEST(Mc80Asp, IfssAnSioBLiefertFormatSendetUndEmpfaengt) {
+    Asp a;
+    // CTC K1 als Zaehler, Zeitkonstante 4: ÷4 des halben Systemtakts, ÷2 Flipflop, ×16 SIO
+    // = 9600 Bd (wie K0 fuer die Tastatur, hardware_3x.md §6.2).  SIO B: ×16, 8N1.
+    for (uint8_t b : {0x47, 0x04}) a.out(0xD5, b);
+    for (uint8_t b : {0x18, 0x04, 0x44, 0x03, 0xC1, 0x05, 0xEA}) a.out(0xD3, b);
+    auto& an = a.asp.anschluss();
+    EXPECT_STREQ(an.name(), "IFSS");
+    EXPECT_FALSE(an.v24());
+    const auto f = an.format();
+    ASSERT_TRUE(f.gueltig);
+    EXPECT_EQ(f.baud_nenn, 9600u);
+    EXPECT_EQ(f.daten, 8);
+
+    // Rechner -> aussen
+    EXPECT_FALSE(an.senderHatZeichen());
+    a.out(0xD2, 0x55);
+    ASSERT_TRUE(an.senderHatZeichen());
+    EXPECT_EQ(an.senderNimm(), 0x55);
+    EXPECT_TRUE(a.asp.nimmSeriellGeaendert());
+
+    // aussen -> Rechner
+    ASSERT_TRUE(an.empfaengerFrei());
+    an.empfange(0x41);
+    EXPECT_EQ(a.in(0xD2), 0x41);
+}

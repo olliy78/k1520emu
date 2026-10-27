@@ -695,6 +695,10 @@ public:
     /// @brief Die Katalogformate, die sich fuer eine neue tar-Diskette / einen tar-Satz eignen
     ///        (einheitliche Geometrie, mindestens zwei Bloecke), in Katalogreihenfolge.
     static std::vector<TarFormatInfo> tarFormate(const FormatCatalog& formats);
+    /// @brief Wie oben, zusaetzlich die tar-Profile mit Layout (`tar_mutos8k_26x128_mfm`, `tar_mutos8k_26x128_fm`): ihr
+    ///        Name steht dort als "Format" und wird von @ref tarSatzNeu / @ref tarDisketteNeu /
+    ///        @ref openTarSatz so angenommen; @c bytes ist die Kapazitaet des Rohgeraets (494 Bloecke).
+    static std::vector<TarFormatInfo> tarFormate(const FormatCatalog& formats, const FsCatalog& fs_cat);
 
     /**
      * @brief Eine neue LEERE tar-Diskette im Katalogformat @p format als Datei @p pfad anlegen.
@@ -732,7 +736,9 @@ public:
 
     /// @brief Die ganze lineare Sektorfolge (Zylinder, Kopf, Sektor) — auch einer roh
     ///        geoeffneten Diskette, sofern ihre Geometrie bekannt ist.
-    bool linearBytes(std::vector<uint8_t>& out) const;
+    /// @param layout  tar-Profil, nach dem der Strom gelesen wird (MUTOS-Layout: Bloecke des Rohgeraets
+    ///                ab Zylinder 1); nullptr = das Profil der Diskette, sonst die lineare Folge.
+    bool linearBytes(std::vector<uint8_t>& out, const FsProfile* layout = nullptr) const;
 
     /// @brief Warum das letzte @ref insert / @ref insertAll abgelehnt wurde.
     ///        Nur aussagekraeftig, wenn der Aufruf `false` lieferte.

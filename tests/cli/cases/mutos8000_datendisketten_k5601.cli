@@ -3,7 +3,7 @@
 # in A: (usr -> /usr) und B: (cmd -> /mnt); mount, ein Programm von /mnt, der C-Uebersetzer von /usr (cc -> c0/c1/c2/as/ld,
 # ein Programm erzeugen und starten), umount.  Der Lader (mutos_io) liest nur 26x128 (Verschraenkung 2, Spurversatz 6);
 # die 8x512-Disketten des DISK-Satzes meldet er mit "err on dev 4/1 bn=1 er=0,304".  "er=0,302" heisst "Laufwerk nicht bereit"
-# (UDOS-Nukleus C2): leeres Laufwerk, etwa weil der Mount abgelehnt wurde (`mutos8k_fm` ist kein Mount-Format, nur `udos_ss77`
+# (UDOS-Nukleus C2): leeres Laufwerk, etwa weil der Mount abgelehnt wurde (`mutos8k_26x128_fm` ist kein Mount-Format, nur `udos_ss77`
 # nimmt 26x128 in FM wie MFM), oder ein Laufwerk ohne Typ in [0FCAH] (rk3, siehe mutos8000_datendisketten_mf3200_d.cli).
 tool:      k1520dbg
 disk_path: %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_boot_udos_k5601.hfe

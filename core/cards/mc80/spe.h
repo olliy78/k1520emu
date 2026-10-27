@@ -74,6 +74,10 @@ public:
 
         /// Erste SPE 2 des MC80.30/.31: ROM spe_1/spe_2, Segment 1, Tore B0H–B3H.
         static Config mc8030();
+        /// Wie mc8030(), dazu das EPROM „mit PCMC-Erweiterung“ auf 2800H (3. Fassung der SPE 2,
+        /// Datenaustausch PC <-> MC80 ueber die IFSS; doc/mc80/pcmc.md).  Der Abzug 2400H ist
+        /// derselbe wie ohne PCMC (die RAM-Kettung auf 2800H steht schon darin).
+        static Config mc8030Pcmc();
         /// Weitere SPE 2 nur mit RAM (Segment @p bit), ohne ROM-Block und ohne Tore [?].
         static Config nurRam(uint8_t bit);
     };

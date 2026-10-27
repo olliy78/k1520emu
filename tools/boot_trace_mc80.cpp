@@ -67,10 +67,10 @@ bool promptZeile(const std::string& bild, int cols, int rows) {
 
 }  // namespace
 
-int bootTraceMc80(const K8915TraceOpts& o, const prnlst::Listing& prn, bool v31)
+int bootTraceMc80(const K8915TraceOpts& o, const prnlst::Listing& prn)
 {
     Mc80Machine::Config cfg;
-    cfg.variante = v31 ? Mc80Machine::Config::Variante::Mc8031 : Mc80Machine::Config::Variante::Mc8030;
+    cfg.variante = Mc80Machine::Config::Variante::Mc8030;
     cfg.spe_karten = o.spe;
     Mc80Machine m(cfg);
     const int cols = Mc80Machine::TEXT_SPALTEN, rows = 25;
@@ -375,7 +375,7 @@ int bootTraceMc80(const K8915TraceOpts& o, const prnlst::Listing& prn, bool v31)
         fprintf(stderr,
             "{\"machine\":\"%s\",\"stall\":%s,\"prompt\":%s,\"cycles\":%llu,\"final_pc\":\"0x%04X\","
             "\"seg\":\"0x%02X\",\"instr\":%llu,\"events\":%ld,\"ints\":%ld,",
-            v31 ? "mc80-31" : "mc80-30", stillstand ? "true" : "false", prompt ? "true" : "false",
+            "mc80-30", stillstand ? "true" : "false", prompt ? "true" : "false",
             (unsigned long long)cycles, m.cpuPC(), m.zve().segmentRegister(),
             (unsigned long long)instr, ev_total, ints);
         if (o.until.kind != untilcond::UntilCond::NONE)

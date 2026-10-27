@@ -1,0 +1,9 @@
+# Zwei von MUTOS 8000 selbst (tar cf - | dd, Ladediskette k5601_8x512) geschriebene Disketten bilden EINEN Strom:
+# 54 Dateien (etc, bin, mnt), mnt/bin/tar beginnt auf Diskette 1 (Block 586) und endet auf Diskette 2.
+tool:   k1520disktool
+run:    tar-satz %CLI_DIR%/../fixtures/disks/mutos8000_tar_8x512_satz1.dmk %CLI_DIR%/../fixtures/disks/mutos8000_tar_8x512_satz2.dmk -l
+expect: mnt/bin/tar
+expect: etc/passwd
+expect: bin/sync
+forbid: Fehler
+exit:   0

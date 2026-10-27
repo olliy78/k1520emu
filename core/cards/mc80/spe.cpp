@@ -6,6 +6,7 @@
 
 #include "core/cards/mc80/spe.h"
 #include "core/cards/mc80/rom_spe2.h"
+#include "core/cards/mc80/rom_pcmc.h"
 #include "core/logger.h"
 #include <algorithm>
 
@@ -14,6 +15,21 @@ Mc80Spe2::Config Mc80Spe2::Config::mc8030()
     Config c;
     c.rom     = MC80_SPE2_ROM;
     c.rom_len = sizeof(MC80_SPE2_ROM);
+    return c;
+}
+
+Mc80Spe2::Config Mc80Spe2::Config::mc8030Pcmc()
+{
+    // 2000H–27FFH wie gehabt, 2800H–2BFFH das PCMC-EPROM.  Der Puffer lebt so lange wie das
+    // Programm (die Karte haelt nur den Zeiger).
+    static const std::vector<uint8_t> rom = [] {
+        std::vector<uint8_t> r(MC80_SPE2_ROM, MC80_SPE2_ROM + sizeof(MC80_SPE2_ROM));
+        r.insert(r.end(), MC80_PCMC_ROM_2800, MC80_PCMC_ROM_2800 + sizeof(MC80_PCMC_ROM_2800));
+        return r;
+    }();
+    Config c;
+    c.rom     = rom.data();
+    c.rom_len = static_cast<uint16_t>(rom.size());
     return c;
 }
 

@@ -28,11 +28,14 @@
 #pragma once
 #include "core/filesystem/file_system.h"
 #include "core/filesystem/sector_space.h"
+#include "core/filesystem/fs_profile.h"
 
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
+
+class WegaBlockDev;
 
 namespace tar {
 
@@ -117,17 +120,26 @@ public:
     virtual bool groesseSetzen(uint64_t n) { (void)n; return false; }
 };
 
-/// @brief Strom ueber der linearen Sektorfolge einer Diskette.
+/// @brief Strom ueber der Sektorfolge einer Diskette.
+///
+/// Ohne Profil (oder mit einem linearen) ist es die lineare Folge ab Sektor 0 (P8000-Lieferdisketten,
+/// `tar720`).  Mit einem Profil `unix_layout: mutos8k` ist es das **Rohgeraet des MUTOS-8000-Treibers**:
+/// 512-B-Bloecke ab Zylinder @c data_cyl, Verschraenkung 2, Spurversatz 6 (@ref Mutos8kDev) - so legt
+/// das MUTOS-`tar cf /dev/rrk0` seinen Strom ab, und nur so liest es ihn wieder (Entwurf 39 §4.6.3).
 class TarSpaceQuelle : public TarQuelle {
 public:
-    explicit TarSpaceQuelle(SectorSpace& s) : s_(s) {}
-    uint64_t size() const override { return s_.size(); }
-    bool read(uint64_t off, uint8_t* dst, size_t n) const override { return s_.read(off, dst, n); }
+    explicit TarSpaceQuelle(SectorSpace& s, const FsProfile* p = nullptr);
+    ~TarSpaceQuelle() override;
+    uint64_t size() const override;
+    bool read(uint64_t off, uint8_t* dst, size_t n) const override;
     bool ort(uint64_t off, FsRecoverOrt& out) const override;
     bool beschreibbar() const override { return true; }
-    bool schreibe(uint64_t off, const uint8_t* src, size_t n) override { return s_.write(off, src, n); }
+    bool schreibe(uint64_t off, const uint8_t* src, size_t n) override;
+    /// @brief Gilt die MUTOS-Blockabbildung statt der linearen Folge?
+    bool mutos() const { return dev_ != nullptr; }
 private:
     SectorSpace& s_;
+    std::unique_ptr<WegaBlockDev> dev_;   ///< nur beim MUTOS-Layout (Mutos8kDev bzw. lineares WegaSpaceDev)
 };
 
 /// @brief Strom im Speicher — der Mehrdisketten-Satz (die Strome hintereinander).

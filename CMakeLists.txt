@@ -497,6 +497,7 @@ if(BUILD_K1520)
     add_library(k1520_kassette STATIC
         core/peripherals/kassette/kassetten_medium.cpp
         core/peripherals/kassette/k52_codec.cpp
+        core/peripherals/kassette/programmdatei.cpp
         core/peripherals/kassette/kassetten_laufwerk.cpp)
     target_include_directories(k1520_kassette PUBLIC ${CMAKE_SOURCE_DIR})
     add_library(k1520_k6022 STATIC core/cards/k6022/k6022.cpp)
@@ -576,7 +577,7 @@ if(BUILD_K1520)
     add_library(k1520_mc80_karten STATIC core/cards/mc80/zve3x.cpp core/cards/mc80/spe.cpp
         core/cards/mc80/vis2a.cpp core/cards/mc80/asp.cpp core/cards/mc80/egos_text.cpp
         core/peripherals/mc80_tastatur/mc80_tastatur.cpp)
-    target_link_libraries(k1520_mc80_karten PUBLIC k1520_z80 k1520_ctc k1520_pio k1520_sio k1520_bus k1520_logger)
+    target_link_libraries(k1520_mc80_karten PUBLIC k1520_z80 k1520_ctc k1520_pio k1520_sio k1520_bus k1520_logger k1520_serial)
     target_include_directories(k1520_mc80_karten PUBLIC ${CMAKE_SOURCE_DIR})
     # MC80.21/.22 (AP M11, doc/mc80/hardware_2x.md): Displaylogik DPL + Magnetbandinterface MBI
     add_library(k1520_mc80_2x_karten STATIC core/cards/mc80/dpl.cpp core/cards/mc80/mbi.cpp)

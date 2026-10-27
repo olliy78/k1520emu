@@ -50,6 +50,14 @@ IO_8X512 = [
     (0x9924, bytes.fromhex("1A"), bytes.fromhex("08"), "Ueberlauf: 8 statt 26 abziehen"),
     (0x993F, bytes.fromhex("3A 6B 99 57 3A 6D"), bytes.fromhex("3A 6D 99 C3 55 99"),
      "Sektor = pos (ohne Verschraenkung/Versatz), weiter bei 9955H"),
+    # Swap-Auftraege des Kernels sind Vielfache von 256 B (z. B. 0D00H = 3328 B): mit 128-B-Sektoren ging das auf,
+    # mit 512-B-Sektoren bleibt am Ende ein halber Sektor (Rest 0100H).  Die Schleife prueft nur 'Rest = 0' - mit Rest
+    # 0100H - 0200H wird der Zaehler negativ, sie liest weiter, der Zylinder laeuft davon, der Treiber meldet 305
+    # (Zylinder stimmt nicht) und der Kernel stirbt mit 'panic: IO err in swap' (Entwurf 39 A5c).  Neu: ist der Rest
+    # nach dem Abziehen kleiner als 0 (Uebertrag) ODER 0, ist der Auftrag fertig; der letzte Sektor wird ganz
+    # gelesen/geschrieben (im Staging-Puffer ist Platz, beim Schreiben landen 256 B Restinhalt im Swap - unschaedlich).
+    (0x98C0, bytes.fromhex("AF ED 52 7C B5 28"), bytes.fromhex("B7 ED 52 38 28 28"),
+     "Rest - 0200H: Uebertrag (Rest < 0200H) beendet den Auftrag ebenso wie 0 (halber Schluss-Sektor des Swap)"),
 ]
 IO_TEXT_RK0 = [(0xA0C9, b"2", b"0", "Meldetext 'insert ... root - disk on rk2' -> rk0")]
 

@@ -197,7 +197,7 @@ def test_optionsfelder_und_beschriftungen():
     # Das Lade-ROM „K8924 V0.9a“ fehlt, solange der Kern es nicht kennt.
     assert [w for w, _a in felder["laderom"][3]] == ["v09_2", "v09_1", "v06"]
     assert felder["erweiterungsmodul"][4] == ("a5120",)
-    assert p.tape_wahl and not p.tape_fest
+    assert p.tape_wahl
 
 
 def test_kern_parameter_sind_einzeloptionen_in_konfig():

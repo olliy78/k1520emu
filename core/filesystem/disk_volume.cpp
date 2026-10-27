@@ -1276,6 +1276,7 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
                 // in der Erkennung machten sie nur jede dieser Disketten mehrdeutig.
                 if (!p->detect) continue;
                 if (p->type == FsType::Tar) {
+                    if (p->mutos8k_layout) continue;     // eigene Probe, siehe unten (tar im MUTOS-Layout)
                     (p->leer ? tar_leer_kandidaten : tar_kandidaten).emplace_back(p, f);
                     continue;
                 }
@@ -1310,6 +1311,48 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
             if (passend.empty() || hier.front()->detect_rank < passend.front()->detect_rank) {
                 passend    = std::move(hier);
                 dv->format_ = f;
+            }
+        }
+
+        // ── tar im MUTOS-Layout (tar_mutos8k_*) ───────────────────────────────
+        // Das MUTOS-`tar` schreibt seinen Strom auf das Rohgeraet: ab Zylinder 1, verschraenkt.
+        // Die Diskette bleibt dabei eine formatierte 26x128-Diskette, UDOS (oder CP/A) sieht dort
+        // nur eine leere Diskette (Zylinder 0 ist unberuehrt) - deshalb wird dieses Layout VOR dem
+        // Urteil der Dateisysteme probiert und gewinnt, wenn bei Block 0 ein gueltiger tar-Kopf
+        // steht (Pruefsumme, druckbarer Name, plausible Groesse) bzw. der Datenbereich ganz Null ist.
+        // Nur ein MUTOS-Dateisystem (wega_mutos) auf derselben Geometrie geht vor.
+        {
+            bool unix_fs = false;
+            for (const FsProfile* p : passend)
+                if (p->type == FsType::WegaMutos) unix_fs = true;
+            DiskMedium& med = dv->disk_->medium();
+            // Eine nur teilweise geladene physische Diskette: "ganz Null" laesst sich erst nach dem
+            // vollen Lesen sagen - die Leer-Probe entfaellt dort (wie bei tar720_leer).
+            const bool teilweise = med.loader() != nullptr && !med.complete();
+            bool gefunden = false;
+            for (const bool leer_probe : {false, true}) {
+                if (unix_fs || gefunden) break;
+                if (leer_probe && teilweise) break;
+                for (const DiskFormat* f : kandidaten) {
+                    for (const FsProfile* p : fs_cat.forFormat(f->name)) {
+                        if (p->type != FsType::Tar || !p->mutos8k_layout || !p->detect
+                            || p->leer != leer_probe || !p->allowsContainer(ext)) continue;
+                        SectorSpace probe(med, *f);
+                        const TarSpaceQuelle quelle(probe, p);
+                        if (quelle.size() == 0) continue;
+                        std::string warum;
+                        const bool ja = leer_probe ? TarFileSystem::istLeer(quelle, &warum)
+                                                   : TarFileSystem::looksLikeTar(quelle, &warum);
+                        if (!ja) { dv->merkeAblehnung(p->name, f->name, warum); continue; }
+                        passend.clear();
+                        passend.push_back(p);
+                        dv->format_ = f;
+                        dv->abgeleitet_.reset();
+                        gefunden = true;
+                        break;
+                    }
+                    if (gefunden) break;
+                }
             }
         }
 
@@ -1568,11 +1611,11 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
         } else if (dv->profile_->type == FsType::Tar && dv->profile_->leer) {
             // Die leere tar-Diskette bleibt beschreibbar (mit genau einem .tar); ob
             // geschrieben wird, entscheidet der Schreibschutz wie bei jeder Diskette.
-            auto t = TarFileSystem::mountLeer(std::make_unique<TarSpaceQuelle>(*v.space), warum);
+            auto t = TarFileSystem::mountLeer(std::make_unique<TarSpaceQuelle>(*v.space, dv->profile_), warum);
             if (!t) { err = warum; return roh(warum); }
             v.fs = std::move(t);
         } else if (dv->profile_->type == FsType::Tar) {
-            auto t = TarFileSystem::mount(std::make_unique<TarSpaceQuelle>(*v.space), warum);
+            auto t = TarFileSystem::mount(std::make_unique<TarSpaceQuelle>(*v.space, dv->profile_), warum);
             if (!t) { err = warum; return roh(warum); }
             // Ein ABGESCHLOSSENES Archiv (Kopf + Endmarke) ist schreibbar, der Schreibschutz
             // folgt dann dem Wunsch des Aufrufers; Folgeteil und abgeschnittenes Archiv
@@ -1646,8 +1689,9 @@ const DiskFormat* DiskVolume::rohFormat() const {
     return formate_ ? formate_->find(detection_.format) : nullptr;
 }
 
-bool DiskVolume::linearBytes(std::vector<uint8_t>& out) const {
+bool DiskVolume::linearBytes(std::vector<uint8_t>& out, const FsProfile* layout) const {
     if (tar_satz_ && satz_) { out = satz_->bytes; return true; }     // der Strom, nicht das erste Abbild
+    if (!layout && profile_ && profile_->type == FsType::Tar) layout = profile_;
     std::unique_ptr<SectorSpace> eigen;
     const SectorSpace* raum = volumes_.empty() ? nullptr : volumes_[0].space.get();
     if (!raum && disk_) {
@@ -1657,11 +1701,45 @@ bool DiskVolume::linearBytes(std::vector<uint8_t>& out) const {
         }
     }
     if (!raum) return fail("Die Geometrie dieser Diskette ist nicht erkannt - kein Datenstrom lesbar");
-    out.resize(static_cast<size_t>(raum->size()));
-    if (!raum->read(0, out.data(), out.size()))
+    // MUTOS-Layout: der Strom ist das Rohgeraet (Bloecke), nicht die lineare Sektorfolge.
+    SectorSpace& rw = const_cast<SectorSpace&>(*raum);     // Lesezugriff; die Quelle haelt nur eine Referenz
+    const TarSpaceQuelle q(rw, layout);
+    out.resize(static_cast<size_t>(q.size()));
+    if (!q.read(0, out.data(), out.size()))
         return fail("Datenstrom nicht lesbar: " + raum->lastError());
     return true;
 }
+
+namespace {
+/// Das tar-Profil FUER EINEN STROM: die leere Variante (`..._leer`) steht fuer dieselbe Lage wie
+/// ihre nicht leere; geliefert wird das nicht leere Profil gleicher Lage (MUTOS-Layout bzw. linear).
+const FsProfile* tarStromProfil(const FsCatalog& cat, const FsProfile* p) {
+    const bool mutos = p && p->mutos8k_layout;
+    for (const FsProfile& q : cat.profiles()) {
+        if (q.type != FsType::Tar || q.leer || q.mutos8k_layout != mutos) continue;
+        if (!mutos || q.format == p->format) return &q;
+    }
+    return nullptr;
+}
+
+/// Loest die Angabe `format` eines NEUEN tar-Mediums auf: ein Katalogformat (lineares tar, wie
+/// bisher) oder der Name eines tar-Profils mit Layout (`tar_mutos8k_26x128_mfm`, `tar_mutos8k_26x128_fm`).
+bool tarZielAufloesen(const std::string& name, const FormatCatalog& formats, const FsCatalog& cat,
+                      const DiskFormat*& fmt, const FsProfile*& prof, std::string& err) {
+    if (const FsProfile* p = cat.find(name); p && p->type == FsType::Tar && p->mutos8k_layout) {
+        prof = tarStromProfil(cat, p);
+        fmt  = formats.find(p->format);
+        if (!prof || !fmt) { err = "Im Katalog fehlt das tar-Profil oder das Format zu '" + name + "'"; return false; }
+        return true;
+    }
+    fmt = formats.find(name);
+    if (!fmt) { err = "Format '" + name + "' steht nicht im Katalog"; return false; }
+    prof = tarStromProfil(cat, nullptr);
+    if (!prof) { err = "Im Katalog steht kein Dateisystem vom Typ tar"; return false; }
+    return true;
+}
+
+}  // namespace
 
 std::unique_ptr<DiskVolume> DiskVolume::openTarSatz(const std::vector<std::string>& pfade,
                                                     const FormatCatalog& formats,
@@ -1670,14 +1748,13 @@ std::unique_ptr<DiskVolume> DiskVolume::openTarSatz(const std::vector<std::strin
                                                     const std::string& format) {
     if (pfade.empty()) { err = "kein Abbild angegeben"; return nullptr; }
     const DiskFormat* vorgabe = nullptr;
+    const FsProfile* prof = nullptr;       // tar-Profil des Satzes; MUTOS-Layout nur, wenn vorgegeben/erkannt
     if (!format.empty()) {
-        vorgabe = formats.find(format);
-        if (!vorgabe) { err = "Format '" + format + "' steht nicht im Katalog"; return nullptr; }
+        if (!tarZielAufloesen(format, formats, fs_cat, vorgabe, prof, err)) return nullptr;
+    } else {
+        prof = tarStromProfil(fs_cat, nullptr);
+        if (!prof) { err = "Im Katalog steht kein Dateisystem vom Typ tar"; return nullptr; }
     }
-    const FsProfile* prof = nullptr;
-    for (const FsProfile& p : fs_cat.profiles())
-        if (p.type == FsType::Tar && !p.leer) { prof = &p; break; }
-    if (!prof) { err = "Im Katalog steht kein Dateisystem vom Typ tar"; return nullptr; }
 
     std::unique_ptr<DiskVolume> erste;
     std::vector<uint8_t> strom;
@@ -1700,8 +1777,13 @@ std::unique_ptr<DiskVolume> DiskVolume::openTarSatz(const std::vector<std::strin
             v = DiskVolume::open(pfad, "", formats, fs_cat, e, true, /*roh_erlaubt=*/true);
             if (!v) { err = pfad + ": " + e; return nullptr; }
         }
+        // Das Layout bestimmt das ERSTE Abbild (tar-Kopf bei Block 0): die Folgedisketten eines Satzes
+        // beginnen mitten in einer Datei und sind fuer sich nicht erkennbar.
+        if (!erste && !vorgabe && v->profile_ && v->profile_->type == FsType::Tar
+            && v->profile_->mutos8k_layout)
+            prof = tarStromProfil(fs_cat, v->profile_);
         std::vector<uint8_t> d;
-        if (!v->linearBytes(d)) { err = pfad + ": " + v->lastError(); return nullptr; }
+        if (!v->linearBytes(d, prof->mutos8k_layout ? prof : nullptr)) { err = pfad + ": " + v->lastError(); return nullptr; }
         strom.insert(strom.end(), d.begin(), d.end());
         if (!erste) erste = std::move(v);
     }
@@ -1719,7 +1801,7 @@ std::unique_ptr<DiskVolume> DiskVolume::openTarSatz(const std::vector<std::strin
     // das Volume sichert, verteilt und speichert ihn.  Schreibschutz bleibt Vorgabe (read_only_).
     auto satz = std::make_shared<TarSatzSpeicher>();
     satz->bytes   = std::move(strom);
-    satz->mindest = v.space->size();
+    satz->mindest = TarSpaceQuelle(*v.space, prof).size();
     auto t = TarFileSystem::mount(std::make_unique<TarSatzQuelle>(satz), warum);
     if (!t && TarSatzQuelle(satz).size() > 0) {
         // Ein leer gespeicherter Satz (alles Null) ist ein gueltiger, leerer Satz.
@@ -1764,10 +1846,13 @@ bool satzContainer(const std::string& pfad, std::string& ext_klein) {
 
 /// Ist die Geometrie einheitlich (ein Spurformat fuer jede Spur)?  Nur dann ist "gleiches Format
 /// fuer alle Abbilder" ohne Sonderfall eine einzige Kapazitaet.
-bool formatEinheitlich(const DiskFormat& f, std::string& warum) {
+/// @param ab_zyl  erste Spur, ab der geprueft wird: bei einem tar-Profil mit Layout (MUTOS-Rohgeraet) zaehlt
+///                nur der Bereich ab data_start - Zylinder 0 (26x128-Etiketten/Ladespur) gehoert nicht zum Strom.
+bool formatEinheitlich(const DiskFormat& f, std::string& warum, uint8_t ab_zyl = 0) {
     if (f.tracks.empty()) { warum = "das Format hat keine Spuren"; return false; }
-    const TrackFormat& t0 = f.tracks.front();
-    for (uint8_t c = 0; c < f.numCylinders(); ++c)
+    const TrackFormat* erste = f.findTrack(ab_zyl, 0);
+    const TrackFormat& t0 = erste ? *erste : f.tracks.front();
+    for (uint8_t c = ab_zyl; c < f.numCylinders(); ++c)
         for (uint8_t h = 0; h < f.numHeads(); ++h) {
             const TrackFormat* t = f.findTrack(c, h);
             if (!t) { warum = "Spur " + std::to_string(c) + "/" + std::to_string(h) + " fehlt"; return false; }
@@ -1831,10 +1916,11 @@ std::unique_ptr<DiskVolume> DiskVolume::tarSatzNeu(const std::string& format,
                                                    const std::string& basisname,
                                                    const FormatCatalog& formats,
                                                    const FsCatalog& fs_cat, std::string& err) {
-    const DiskFormat* fmt = formats.find(format);
-    if (!fmt) { err = "Format '" + format + "' steht nicht im Katalog"; return nullptr; }
+    const DiskFormat* fmt = nullptr;
+    const FsProfile* prof = nullptr;
+    if (!tarZielAufloesen(format, formats, fs_cat, fmt, prof, err)) return nullptr;
     std::string warum;
-    if (!formatEinheitlich(*fmt, warum)) {
+    if (!formatEinheitlich(*fmt, warum, prof->mutos8k_layout ? prof->data_cyl : 0)) {
         err = "Format '" + format + "' ist fuer einen tar-Satz nicht geeignet: " + warum;
         return nullptr;
     }
@@ -1848,10 +1934,6 @@ std::unique_ptr<DiskVolume> DiskVolume::tarSatzNeu(const std::string& format,
         return nullptr;
     }
     if (ext == "hfe" && !fmt->allow_hfe) { err = "Format '" + format + "' ist nicht als .hfe darstellbar"; return nullptr; }
-    const FsProfile* prof = nullptr;
-    for (const FsProfile& p : fs_cat.profiles())
-        if (p.type == FsType::Tar && !p.leer) { prof = &p; break; }
-    if (!prof) { err = "Im Katalog steht kein Dateisystem vom Typ tar"; return nullptr; }
 
     std::unique_ptr<DiskVolume> dv(new DiskVolume);
     dv->disk_ = DiskImage::createBlank(fmt->physicalCylinders(), fmt->numHeads(), fmt->predominantEncoding());
@@ -1860,7 +1942,7 @@ std::unique_ptr<DiskVolume> DiskVolume::tarSatzNeu(const std::string& format,
     v.head  = SectorSpace::kAllHeads;
     v.space = std::make_unique<SectorSpace>(dv->disk_->medium(), *fmt);
     auto satz = std::make_shared<TarSatzSpeicher>();
-    satz->mindest = v.space->size();
+    satz->mindest = TarSpaceQuelle(*v.space, prof).size();
     satz->bytes.assign(static_cast<size_t>(satz->mindest), 0);
     auto t = TarFileSystem::mountLeer(std::make_unique<TarSatzQuelle>(satz), err);
     if (!t) return nullptr;
@@ -1897,7 +1979,7 @@ bool DiskVolume::tarZuSatz(const std::string& basisname) {
     if (!linearBytes(strom)) return false;
     auto satz = std::make_shared<TarSatzSpeicher>();
     satz->bytes   = std::move(strom);
-    satz->mindest = volumes_[0].space->size();
+    satz->mindest = TarSpaceQuelle(*volumes_[0].space, profile_).size();
     std::string w;
     std::unique_ptr<TarFileSystem> neu;
     {
@@ -1931,7 +2013,7 @@ TarSatzPlan DiskVolume::tarSatzPlanen(const std::string& basisname) const {
     if (ext == "hfe" && !f->allow_hfe) return nein("Das Format ist nicht als .hfe darstellbar.");
 
     // Nutzlaenge: der Strom ohne die Nullen hinter der Endmarke (das fuellt das letzte Abbild).
-    p.kapazitaet = volumes_[0].space->size();
+    p.kapazitaet = TarSpaceQuelle(*volumes_[0].space, profile_).size();
     if (p.kapazitaet == 0) return nein("Die Kapazitaet eines Abbilds ist 0.");
     uint64_t laenge = satz_->bytes.size();
     if (const TarFileSystem* t = tarFs(); t && t->schreibbar() && !t->leer()) {
@@ -2023,7 +2105,8 @@ bool DiskVolume::tarSatzSpeichern(const std::string& basisname, std::vector<std:
                 std::fill(scheibe.begin() + static_cast<std::ptrdiff_t>(ab), scheibe.end(), 0);
             }
             SectorSpace raum(img->medium(), *f);
-            if (!raum.write(0, scheibe.data(), scheibe.size())) {
+            TarSpaceQuelle ziel_strom(raum, profile_);      // MUTOS-Layout: Bloecke des Rohgeraets
+            if (!ziel_strom.schreibe(0, scheibe.data(), scheibe.size())) {
                 aufraeumen();
                 return fail("Abbild " + std::to_string(i + 1) + " nicht beschreibbar: " + raum.lastError());
             }
@@ -2093,7 +2176,7 @@ bool DiskVolume::satzInsAbbild(const TarSatzPlan& p) {
     std::copy_n(satz_->bytes.begin(), n, scheibe.begin());
 
     const DiskMedium sicherung = disk_->medium();
-    if (!volumes_[0].space->write(0, scheibe.data(), scheibe.size())) {
+    if (!TarSpaceQuelle(*volumes_[0].space, profile_).schreibe(0, scheibe.data(), scheibe.size())) {
         const std::string grund = volumes_[0].space->lastError();
         disk_->medium().restoreFrom(sicherung);
         return fail("Abbild nicht beschreibbar: " + grund + " - die Datei wurde nicht veraendert.");
@@ -2142,6 +2225,28 @@ std::vector<TarFormatInfo> DiskVolume::tarFormate(const FormatCatalog& formats) 
     return aus;
 }
 
+std::vector<TarFormatInfo> DiskVolume::tarFormate(const FormatCatalog& formats, const FsCatalog& fs_cat) {
+    std::vector<TarFormatInfo> aus = tarFormate(formats);
+    // Dazu die tar-Profile mit Layout: "Format" ist dort der Profilname (tarZielAufloesen), die Kapazitaet
+    // die des Rohgeraets (Bloecke ab Zylinder 1), nicht die der ganzen Diskette.
+    for (const FsProfile& p : fs_cat.profiles()) {
+        if (p.type != FsType::Tar || p.leer || !p.mutos8k_layout) continue;
+        const DiskFormat* f = formats.find(p.format);
+        std::string warum;
+        if (!f || !formatEinheitlich(*f, warum, p.data_cyl)) continue;
+        DiskMedium leer(f->numCylinders(), f->numHeads(), f->predominantEncoding());
+        SectorSpace raum(leer, *f);
+        TarFormatInfo i;
+        i.name        = p.name;
+        i.description = p.description;
+        i.bytes       = TarSpaceQuelle(raum, &p).size();
+        i.img         = f->allow_img && p.allow_img;
+        i.hfe         = f->allow_hfe && p.allow_hfe;
+        aus.push_back(std::move(i));
+    }
+    return aus;
+}
+
 std::unique_ptr<DiskVolume> DiskVolume::tarDisketteNeu(const std::string& pfad,
                                                        const std::string& format,
                                                        const FormatCatalog& formats,
@@ -2152,14 +2257,19 @@ std::unique_ptr<DiskVolume> DiskVolume::tarDisketteNeu(const std::string& pfad,
         auto probe = tarSatzNeu(format, pfad, formats, fs_cat, err);
         if (!probe) return nullptr;
     }
-    const DiskFormat* fmt = formats.find(format);
+    const DiskFormat* fmt = nullptr;
+    const FsProfile* prof = nullptr;
+    if (!tarZielAufloesen(format, formats, fs_cat, fmt, prof, err)) return nullptr;
     {
         std::string grund;
         auto img = DiskImage::create(pfad, *fmt, false, fmt->predominantEncoding(), &grund);
         if (!img) { err = "Abbild nicht anlegbar: " + pfad + (grund.empty() ? "" : " (" + grund + ")"); return nullptr; }
         SectorSpace raum(img->medium(), *fmt);
-        const std::vector<uint8_t> nullen(static_cast<size_t>(raum.size()), 0);
-        if (!raum.write(0, nullen.data(), nullen.size())) { err = "Nullfuellung nicht schreibbar: " + raum.lastError(); return nullptr; }
+        // Nur der Datenbereich wird Null (MUTOS-Layout: Zylinder 0 bleibt wie formatiert): MUTOS-`tar`
+        // liest eine nie beschriebene (E5-)Diskette nicht sauber zu Ende, eine Null-Diskette ist ein leeres Archiv.
+        TarSpaceQuelle strom(raum, prof);
+        const std::vector<uint8_t> nullen(static_cast<size_t>(strom.size()), 0);
+        if (!strom.schreibe(0, nullen.data(), nullen.size())) { err = "Nullfuellung nicht schreibbar: " + raum.lastError(); return nullptr; }
         if (!img->flush()) { err = img->lastError(); return nullptr; }
     }
     auto v = openTarSatz({pfad}, formats, fs_cat, err, format);
@@ -2186,7 +2296,7 @@ TarDateiUrteil DiskVolume::tarDateiBeurteilen(const std::string& tarpfad) const 
     std::string err;
     if (!leseGanz(tarpfad, d, err)) return nein(err);
     u.groesse     = d.size();
-    u.kapazitaet  = volumes_[0].space->size();
+    u.kapazitaet  = TarSpaceQuelle(*volumes_[0].space, profile_).size();
     u.als_datei   = true;
     // "Leer": noch nie beschrieben (ganz Null) ODER alles wieder geloescht.
     u.ziel_leer   = t->leer() || list().empty();
@@ -4149,12 +4259,14 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
             // tar720_leer: ganz Null (DiskImage::create fuellt mit 0xE5 wie eine CP/M-Diskette).
             // tar braucht keinen UDOS-Gap, also geht auch .img/.cqm/.td0/.imd; das Medium bleibt gueltig
             // formatiert (Adressmarken, CRCs), nur die Nutzdaten sind Null.
-            const std::vector<uint8_t> nullen(static_cast<size_t>(v.space->size()), 0);
-            if (!v.space->write(0, nullen.data(), nullen.size())) {
+            // Im MUTOS-Layout nur der Datenbereich ab Zylinder 1 (Zylinder 0 bleibt unberuehrt).
+            TarSpaceQuelle strom(*v.space, profil);
+            const std::vector<uint8_t> nullen(static_cast<size_t>(strom.size()), 0);
+            if (!strom.schreibe(0, nullen.data(), nullen.size())) {
                 err = "Nullfuellung nicht schreibbar: " + v.space->lastError();
                 return nullptr;
             }
-            auto t = TarFileSystem::mountLeer(std::make_unique<TarSpaceQuelle>(*v.space), err);
+            auto t = TarFileSystem::mountLeer(std::make_unique<TarSpaceQuelle>(*v.space, profil), err);
             if (!t) return nullptr;
             v.fs = std::move(t);
         } else if (profil->type == FsType::Udos) {
@@ -4169,7 +4281,13 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
             // wie `sa.mkfs 1440` — Verschraenkung 1/72 wie auf den Lieferdisketten.
             // MUTOS (Blockraum ab Zylinder 1) traegt 3/500, wie CMD/CC1/CC2.
             const bool mutos = profil->mutos1700_layout || profil->data_cyl != 0;
-            auto w = WegaFileSystem::format(unixGeraet(*v.space, *profil), label, err,
+            auto geraet = unixGeraet(*v.space, *profil);
+            // MUTOS 8000: der Kernel lehnt Block >= 608 (76 Zylinder x 8) ab (rkstrategy, Entwurf 39 11.2) -
+            // auf einer 80-Zylinder-Diskette (632 Bloecke) waere alles dahinter fuer MUTOS nicht erreichbar.
+            // Ohne ausdrueckliches `--blocks` bekommt das Dateisystem deshalb hoechstens 608 Bloecke.
+            if (unix_bloecke == 0 && profil->data_cyl == 1 && !profil->mutos1700_layout && geraet->blocks() > 608)
+                unix_bloecke = 608;
+            auto w = WegaFileSystem::format(std::move(geraet), label, err,
                 unix_bloecke, mutos ? 3 : 1, mutos ? 500 : 72, 0, unix_inodes);
             if (!w) return nullptr;
             v.fs = std::move(w);

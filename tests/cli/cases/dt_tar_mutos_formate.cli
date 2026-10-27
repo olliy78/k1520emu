@@ -1,0 +1,7 @@
+# tar-formate nennt die tar-Profile im MUTOS-8000-Layout (Rohgeraet /dev/rrkN: 494 Bloecke = 252928 Byte).
+tool:   k1520disktool
+run:    tar-formate
+expect: tar_mutos8k_26x128_mfm
+expect: tar_mutos8k_26x128_fm
+expect: 252928
+exit:   0

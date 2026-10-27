@@ -168,6 +168,7 @@ k1520_add_test(band_format    SRC peripherals/test_band_format.cpp
 k1520_add_test(kassette_medium      SRC peripherals/test_kassette_medium.cpp      LIBS k1520_kassette LABELS "${_lbl}")
 k1520_add_test(k52_codec            SRC peripherals/test_k52_codec.cpp            LIBS k1520_kassette LABELS "${_lbl}")
 k1520_add_test(kassetten_laufwerk   SRC peripherals/test_kassetten_laufwerk.cpp   LIBS k1520_kassette LABELS "${_lbl}")
+k1520_add_test(programmdatei        SRC peripherals/test_programmdatei.cpp        LIBS k1520_kassette LABELS "${_lbl}")
 k1520_add_test(track_codec    SRC peripherals/test_track_codec.cpp    LIBS k1520_floppy2 LABELS "${_lbl}")
 k1520_add_test(bit_codec      SRC peripherals/test_bit_codec.cpp      LIBS k1520_floppy2 LABELS "${_lbl}")
 # Zeichenbare Sicht auf eine Spur (Diskeditor, §19)
@@ -264,6 +265,10 @@ k1520_add_test(tar_satz      SRC filesystem/test_tar_satz.cpp
 # tar neu anlegen mit Format, .tar als Datei vs. Container (Entwurf 37 T3)
 k1520_add_test(tar_neu       SRC filesystem/test_tar_neu.cpp
                              LIBS k1520_fs LABELS "${_lbl}"
+                             DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
+# tar im MUTOS-8000-Layout (Rohgeraet /dev/rrkN, Entwurf 39): Lesen echter MUTOS-Disketten, Schreiben, Gegenprobe
+k1520_add_test(tar_mutos     SRC filesystem/test_tar_mutos.cpp
+                             LIBS k1520_fs k1520_testsupport LABELS "${_lbl}"
                              DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
 k1520_add_test(disk_volume   SRC filesystem/test_disk_volume.cpp
                              LIBS k1520_fs LABELS "${_lbl}"

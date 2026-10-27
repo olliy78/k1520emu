@@ -62,10 +62,7 @@ Speichern unter und für die echte Diskette.
 **Kassette** — die beiden Kassettenlaufwerke, nur solange die Kassetten-Karte steckt
 (siehe *Kassette* unten).
 
-**AUP** — Sparkassentastatur K7633, Kundentastatur, Schlüsselschalter und Lampen,
-nur solange die AUP steckt (siehe *AUP (Sparkasse)* unten; nur im A5120 Emulator).
-
-**Einstellungen** — vier Reiter: *Allgemein* (Modell, Takt, RAM-Disk, Lochstreifen, Kassette, AUP), *Laufwerke*
+**Einstellungen** — vier Reiter: *Allgemein* (Modell, Takt, RAM-Disk, Lochstreifen, Kassette), *Laufwerke*
 (welcher Laufwerkstyp in welchem Steckplatz steckt), *Schnittstellen* (die seriellen
 Anschlüsse des Rechners nach außen, ein Block je Schnittstelle — siehe *Serielle
 Schnittstellen* unten) und *CRT* (das Aussehen der Bildröhre).
@@ -838,6 +835,7 @@ einen Mehrbenutzerbetrieb gibt es noch nicht.
 | `a5120_mutos8000_usr_mfm.hfe` | C-Übersetzer (`cc`, `as`, `ld`) | `/usr` |
 | `a5120_mutos8000_bin_mfm.hfe` | `adb`, `mt`, `tar` | `/tmp` |
 | `a5120_mutos8000_cc1_mfm.hfe`, `a5120_mutos8000_cc2_mfm.hfe` | Inhalt der Original-Compilerdisketten (cc1: `as`, `cc`, `ld`, `ed`, Header, `c0`, `c1`; cc2: `c2`, `cpp`, `libc.a`, `nm`) | `/usr` (nur eine zugleich) |
+| `a5120_mutos8000_nroff_mfm.hfe` | Textformatierer `nroff` mit Makropaketen (`tmac.s` …) und Terminaltabellen; Aufruf z. B. `nroff -T1152 datei` | `/usr` (nur eine zugleich) |
 
 Im **GitHub-Repository** (`disks/a5120_16_MUTOS/`) liegen außerdem die Fassungen für **MF3200**
 (8″, FM; Dateien mit `_fm` im Namen), gemischte Bestückungen und weitere Ladedisketten. Eine Diskette
@@ -925,16 +923,132 @@ Datendiskette gilt: 494 Blöcke, K5601 = MFM.
 
 Unter MUTOS selbst kann man nicht formatieren, nur `mkfs`.
 
-**Mit dem DiskTool** (Menü *Werkzeuge*): *Datei ▸ Neue Diskette* mit dem Dateisystem **`mutos8k_mfm`** (K5601; `mutos8k_fm`
+**Mit dem DiskTool** (Menü *Werkzeuge*): *Datei ▸ Neue Diskette* mit dem Dateisystem **`mutos8k_26x128_mfm`** (K5601; `mutos8k_26x128_fm`
 für MF3200) legt eine fertig formatierte Datendiskette samt Dateisystem an; Dateien holt und schreibt man wie bei jeder
 anderen Diskette (*Datei ▸ Abbild öffnen*). Auf der Kommandozeile:
 
-    k1520disktool create neu.hfe --fs mutos8k_mfm --blocks 494
+    k1520disktool create neu.hfe --fs mutos8k_26x128_mfm --blocks 494
     k1520disktool put neu.hfe datei.txt
     k1520disktool ls -l neu.hfe
 
 Dieselbe Diskette nie gleichzeitig im DiskTool und im Emulator offen halten. Eine so angelegte Diskette
 hängt MUTOS ohne `mkfs` direkt ein.
+
+### Dateien mit `tar` auf Diskette sichern und zurücklesen
+
+MUTOS hat ein V7-`tar` (Diskette `bin`, Programm `tar`). Es schreibt **ohne Dateisystem** einen
+nackten Archivstrom auf das **Rohgerät** einer Diskette: **`/dev/rrk0` = A:, `/dev/rrk1` = B:,
+`/dev/rrk3` = D:** (`/dev/rrk2` ist die Wurzel, nie benutzen). Die Diskette muss nur formatiert sein, ein
+`mkfs` ist weder nötig noch erwünscht. Eine solche **tar-Diskette** liest das DiskTool (siehe unten und
+dessen Handbuch), und umgekehrt kann MUTOS eine vom DiskTool geschriebene lesen.
+
+Vier Regeln für jeden Aufruf:
+
+* **`f` mit Gerät angeben** (`tar cvf /dev/rrk1 …`) — das Vorgabegerät `/dev/mt0` gibt es nicht.
+* **Relative Namen** aus dem passenden Verzeichnis (`cd /usr; tar cvf … include`). Absolute Namen werden beim
+  Auspacken wieder absolut zurückgeschrieben und überschreiben dabei Vorhandenes.
+* **`tar` ruft `pwd` und (beim Auspacken von Verzeichnissen) `mkdir`.** Fehlen sie in `/bin`, `/usr/bin` oder
+  `/mnt/bin`, meldet es `pwd failed!` bzw. `tar: cannot find mkdir!` und jede weitere Datei scheitert.
+* **Vor jedem Diskettenwechsel `sync`.** MUTOS puffert Schreibzugriffe über `/dev/rkN` und würde sie sonst auf
+  die **neue** Diskette schreiben. Das Rohgerät `/dev/rrkN` ist ungepuffert, aber `sync` schadet nie.
+
+Die Kapazität einer tar-Diskette ist **494 Blöcke zu 512 Byte = 252 928 Byte** (Format 26 × 128, s. u. für 8 × 512);
+das Archiv braucht je Datei einen Kopfblock und rundet die Daten auf 512 Byte auf. Ein einzelner `tar`-Lauf, der
+das Ende der Diskette erreicht, **hängt stumm** (Strg+C holt den Prompt zurück) — größere Archive gehen nur mit
+mehreren Disketten (unten).
+
+**Einmalig vorbereiten (drei K5601, Format 26 × 128).** Die Wurzel hat nur etwa 46 KB frei, die
+Programme liegen auf `cmd` und `bin`. Die vier nötigen Programme kopiert man einmal dauerhaft in `/bin` der
+Wurzel (Arbeitskopie der Wurzel verwenden!):
+
+1. `cmd` in A:, `bin` in B: einlegen.
+2. `/etc/mount /dev/rk0 /mnt`, dann `/etc/mount /dev/rk1 /tmp` (die Shell darf dabei **nicht** in `/tmp` stehen,
+   sonst `mount: Mount device busy`; im Zweifel vorher `cd /`).
+3. `cp /tmp/tar /mnt/bin/pwd /mnt/bin/dd /mnt/bin/mkdir /bin`, danach `sync`. Danach `df /dev/rk2`: etwa 25 Blöcke frei.
+4. `/etc/umount /dev/rk0` und `/etc/umount /dev/rk1`. Beide Laufwerke sind wieder frei.
+
+Mehr passt nicht in die Wurzel: `cmp` und `rm` bleiben auf `cmd` (zum Vergleichen und Aufräumen `cmd` wieder in A:
+einhängen). Die Wurzel auch als **Arbeitsplatz** knapp halten — `tar … | dd` legt seine Pipe dort ab und braucht
+mindestens etwa 10 freie Blöcke (`no space on dev 4/2` heißt: Wurzel voll).
+
+**Eine Diskette schreiben, listen, auspacken.** Beispiel: `usr` in A: (nach `/usr` eingehängt), eine leere
+formatierte Diskette in B: (Laufwerkskasten *Leere Diskette* — ein `.hfe` mit Format *udos_ss77*, oder im DiskTool
+*Neue Diskette* mit `tar_mutos8k_26x128_mfm_leer`; beides geht):
+
+    # cd /usr
+    # tar cvf /dev/rrk1 include lib/crt0.o
+    a include/sys/stat.h 2 blocks
+    …
+    # cd /
+    # sync
+    # tar tvf /dev/rrk1                  (Tar: blocksize = 8 — dann die Liste)
+    # cd /tmp
+    # tar xvf /dev/rrk1 include/stdio.h lib/crt0.o     (nur eine Auswahl: die Wurzel ist das Ziel und klein)
+
+`tar` legt die Verzeichnisse beim Auspacken selbst an. Zum Vergleichen `cmd` einhängen und `cmp datei original`
+— keine Ausgabe heißt gleich. Aufräumen mit `rm -r /tmp/include /tmp/lib`. Die Diskette bleibt nach dem Auswerfen
+und Wiedereinlegen lesbar; die Sektoren stehen ab Zylinder 1 (Zylinder 0 bleibt unberührt).
+
+Eine **nie beschriebene** formatierte Diskette (nur Füllbytes) endet mit `tar tvf` nicht sauber; die vom DiskTool
+angelegten `…_leer`-Disketten tragen deshalb im Datenbereich Nullblöcke und gelten als leeres Archiv.
+
+**Mehrere Disketten (Multi-Volume).** `tar` selbst kennt keine Folgedisketten. Man teilt den Strom mit `dd`
+selbst auf Disketten zu je **494 Blöcken** auf. Dazu muss der Strom beide Male **gleich** erzeugt werden (nichts
+an den Quelldateien ändern). Beispiel mit `usr` in A: und leeren Disketten nacheinander in B::
+
+    # cd /
+    # tar cf - usr bin | dd of=/dev/rrk1 bs=512 count=494
+    494+0 records in
+    494+0 records out
+    # sync                               (Diskette 1 aus B: nehmen, Diskette 2 einlegen)
+    # tar cf - usr bin | dd of=/dev/rrk1 bs=512 skip=494 count=494
+    183+0 records in
+    183+0 records out
+    # sync
+
+Eine dritte Diskette folgt mit `skip=988`. Die letzte Diskette trägt den Rest samt Endmarke. **Zurücklesen**
+nach einem Auspacken (Ziel ist die Wurzel; die Archivdisketten liegen in A: und B:, `usr` vorher aushängen):
+
+    # cd /tmp
+    # (dd if=/dev/rrk0 bs=512 count=494; dd if=/dev/rrk1 bs=512 count=494) | tar xvf - bin/date usr/include/time.h
+
+Der Strom darf dabei über die Diskettengrenze laufen (`bin/date` beginnt auf Diskette 1 und endet auf Diskette 2).
+Mit nur drei Laufwerken passt ein komplettes Auspacken größerer Sätze nicht in die Wurzel — man packt eine
+**Auswahl** aus oder hängt eine große Datendiskette als Ziel ein (dann `cd` dorthin). Ein Auflisten über beide
+Disketten (`… | tar tvf -`) läuft ohne Fehler, dauert aber mehrere Milliarden Takte und sieht wie ein Hänger aus.
+Gibt man eine **einzelne** Satzdiskette an `tar tvf`, endet die Liste mit `err on dev 13/0 … er=0,305` und
+`Tar: tape read error`: sie ist kein abgeschlossenes Archiv, der Inhalt davor ist vollständig.
+
+**Im DiskTool.** Eine so geschriebene Diskette erkennt das DiskTool als **`tar_mutos8k_26x128_mfm`**
+(MF3200: `…_fm`) und öffnet mehrere Disketten eines Satzes mit **Datei ▸ tar-Satz öffnen…** als EINEN Strom.
+Auf der Kommandozeile:
+
+    k1520disktool tar-satz v1.hfe v2.hfe -l          # Dateiliste des Satzes
+    k1520disktool tar-satz v1.hfe v2.hfe --to ordner # alles herausholen
+    k1520disktool tar-satz-neu --format tar_mutos8k_26x128_mfm satz.hfe --put datei1 --put ordner
+
+Das DiskTool **schreibt** diese Disketten ebenfalls (Dateien hinzufügen, löschen, über eine Diskette hinaus als
+Satz speichern); MUTOS liest das Ergebnis mit `tar tvf`/`tar xvf` bzw. der `dd`-Pipeline. Der Weg ist also in
+beiden Richtungen offen: Dateien vom PC auf eine tar-Diskette und von dort nach MUTOS, oder umgekehrt.
+
+**Das zweite Sektorformat, 8 × 512 (DISK-Satz).** Mit der Ladediskette `a5120_mutos8000_boot_udos_k5601_8x512.hfe`
+arbeitet MUTOS mit 8 Sektoren zu 512 Byte. Die tar-Diskette trägt dann **608 Blöcke = 311 296 Byte**; die Blöcke
+liegen **linear** ab Zylinder 1 (Block n auf Zylinder 1 + n/8, Sektor n mod 8 + 1), ohne Verschränkung. Das DiskTool
+kennt sie als **`tar_mutos8k_8x512_mfm`** (leer: `…_leer`). Über das Ende hinaus meldet `tar` hier sauber
+`Tar: tape write error` (statt zu hängen). Der Ablauf ist derselbe; mit der Satzbestückung
+Ladediskette in A:, **`…_cmd_8x512.hfe` in B:** (`/mnt`), **`…_root_8x512.hfe` in C:**, D: leer (nach dem Start
+nimmt man die Ladediskette aus A: und legt dort die tar-Diskette ein):
+
+    # /bin/mount /dev/rk1 /mnt
+    # cd /
+    # /mnt/bin/tar cvf /dev/rrk3 etc bin                   (leere Diskette in D:)
+    # /mnt/bin/tar tvf /dev/rrk3
+    # /mnt/bin/tar cf - etc bin mnt | /bin/dd of=/dev/rrk3 bs=512 count=608     (Folgedisketten: skip=608, …)
+    # (/bin/dd if=/dev/rrk0 bs=512 count=608; /bin/dd if=/dev/rrk3 bs=512 count=608) | /mnt/bin/tar xvf - dateiname
+
+Hier liegt `tar` auf `cmd` und die Wurzel ist die gelieferte `…_root_8x512.hfe` (mit der `pwd` von 1986: die `pwd`
+der alten DISK-ROOT-Diskette hängt, und mit ihr `tar`). Die Original-`.td0`-Disketten dieses Satzes lassen sich bis
+auf `cmd.td0` einlegen; die Hintergründe stehen in `doc/design/39_mutos8000.md` (A5c).
 
 ### Sicherungskopien
 
@@ -1113,42 +1227,6 @@ Arbeitsdiskette „ohne SYL“ in B:. Was belegt ist:
   V0.6 wie das Original. Die Disketten „ohne SYL“ starten mit keinem vorhandenen
   Lade-ROM (`doc/a5120_alt/laderom.md` §5.2) — sie sind Arbeitsdisketten.
 
-## AUP (Sparkasse)
-
-*Einstellungen ▸ Allgemein ▸ AUP (Sparkasse)* steckt den Adapter Universelle Ports
-**AUP 062-8531** in den A5120 (nur im A5120 Emulator, bei allen drei Modellen ab Werk
-aus; **ein Modell „K8924 Sparkasse“ gibt es nicht**, es ist diese Option). Ein
-Wechsel schaltet die Maschine aus und baut sie neu auf. Die Karte belegt E/A
-**40H–43H**; die Tastatur des Modells (K7636/K7637) bleibt, wie sie ist — die AUP
-bringt die Sparkassentastatur **K7633** und die **Kundentastatur** zusätzlich.
-
-Die Unterfelder: *mit Sonderschnittstelle* steckt CTC B0H–B3H und SIO B4H–B7H mit;
-SIO-Kanal B erscheint im Reiter *Schnittstellen* als vierter Anschluss
-(*Sonderschnittstelle*). *Alpha-Tabelle* wählt, welche Codetabelle der K7633 gilt:
-*folgt der ALPHA-Lampe* (Vorgabe), *immer ohne* oder *immer mit Alpha*. Das ist eine
-**Annahme** — die Unterlagen sagen nicht, wer zwischen den Tabellen umschaltet.
-
-Mit gesteckter Karte erscheint der Kasten **AUP** (neben *Laufwerke*, *Ansicht ▸ AUP*
-holt ihn zurück):
-
-* **SS1 / SS2** sind die beiden Schlüsselschalter; Einschalten sendet AAH bzw. A9H an
-  den Rechner. Die Stellung wird nach jedem Neuaufbau aus der Maschine gelesen.
-* **Lampen** SEL, ALPHA, GET (LED der Kundentastatur) und Fehler. Die Fehlerlampe
-  blinkt, solange der Rechner sie eingeschaltet hat. **Hupe** blitzt kurz auf und
-  gibt, wo das System es zulässt, einen kurzen Ton.
-* **Tastatur K7633:** ein Raster nach den Positionsnamen der Unterlagen
-  (Zeile A–F, Spalte 01–13) — **nicht** die Geometrie der Tastatur: die Beschriftung
-  der Kappen steht nur auf einem Foto. Jede Taste zeigt ihren Positionsnamen und den
-  Code ohne Alpha; der Hinweistext nennt Position und beide Codes.
-* **Kundentastatur:** der Ziffernblock; die zwei Tasten *F3D* und *F3F* senden beide
-  den Code 19H, ihre Bedeutung ist offen.
-
-Bedient wird mit der Maus (gedrückt halten wirkt wie eine gehaltene Taste). **Die
-Tasten des PCs sind der AUP nicht zugeordnet** — die Unterlagen geben keine
-Zuordnung her, und es gibt wie überall kein Tastenkürzel. Die Karte gehört nicht in
-den Zwischenstand. Ob der Rechner die Karte abfragt, hängt von seiner Software ab
-(das Prüfprogramm `AUPTEST.COM` zeigt die Codes am Bildschirm).
-
 ## K3521 (batteriegepuffertes RAM)
 
 *Einstellungen ▸ Allgemein ▸ K3521 (batteriegepuffertes RAM)* steckt bis zu **vier**
@@ -1222,7 +1300,7 @@ zu je 128 Byte** hintereinander nach **0400H**. Steht in 0400H–0402H die Kennu
 springt es nach **0434H**; sonst geht es in den Fehlerpfad. Gesamtfrist rund 136 s.
 
 Es startet also nur ein Band, das genau so aufgebaut ist: ein **Bootband**. Eines baut man
-mit `k1520tape bootband <programm.bin> <band.k52> [A|B]` (legt 4 × 128 Byte an, die Datei
+mit `k1520tape bootband <programm.bin> <band.k52> [A|B] [--format F]` (legt 4 × 128 Byte an, die Datei
 wird auf 512 Byte aufgefüllt); das Programm muss bei Versatz 34H einsetzen und `SYL` am
 Anfang tragen. Als Beispiel dienen `tools/kassette/bandtest/` (Quelle, `build.py`) und das
 fertige Demo-Band `a5120_bandtest/bandtest_boot.k52`.
@@ -1247,6 +1325,52 @@ Ehrlich dazu:
 | SCPX | nur die Bibliothek `KMBG.REL` und das Prüfprogramm `KMBGTEST` |
 | CP/A | kein Treiber |
 | EGOS (MC80) | Kommandos `KINIT`, `WRITE`, `READ` (Abschnitt *Der MC80 Emulator*) |
+
+### Dateiformate der Kassette
+
+**Was der Emulator selbst speichert: `.k52`.** Das ist das eigene Bandformat dieses
+Projekts, entworfen für genau dieses Gerät (es gibt keine fremde Vorlage). Eine `.k52`
+ist das **ganze Band** mit beiden Seiten, so wie die Software es über die Karte
+beschrieben hat:
+
+* **Kopf:** Kennung `K52T`, Fassung, Aufnahmegeschwindigkeit, Aufzeichnungsdichte
+  (Vorgabe 31,5 Bit/mm) und die Maße des Bandes (Länge, Vorspann, Marken).
+* **Je Seite (A und B):** der Schreibschutz und die Blöcke in Bandreihenfolge, jeder mit
+  seiner **Lücke** davor (in µm) und seinen **rohen Bytes** `AAH | Daten | CRC | AAH`.
+* **Verlustfrei:** auch ein Block mit falscher Prüfsumme oder fremder Präambel bleibt
+  genau so erhalten. Laden und Speichern ergibt dieselben Bytes zurück. Eine beschädigte
+  oder unbekannte Datei wird abgewiesen, nie halb gelesen.
+* **Längen, nicht Zeiten:** ein mit 38 cm/s beschriebenes Band liest sich bei 19 cm/s
+  nur langsamer. Die Kopfstelle (wo das Band gerade steht) gehört zur Kassette im Gerät
+  und steht **nicht** in der Datei.
+
+Der Inhalt der Blöcke ist Sache des Gastprogramms (BCU 880, `KMBG.REL`, EGOS); die
+Karte kennt keinen Rahmen. Deshalb gibt es **kein fremdes Dateiformat, das direkt als
+Band taugt**.
+
+**Programmdateien, die `k1520tape` versteht.** Zum Übernehmen von Programmen kennt das
+Kommandozeilenwerkzeug `k1520tape` (`put`, `get`, `bootband`) die Dateiformate des
+Emulators JKCEMU. Sie enthalten ein Speicherabbild mit Kopf; `put` und `bootband`
+streifen den Kopf ab, `get --as` setzt einen davor:
+
+| Format | Endung | Inhalt |
+|--------|--------|--------|
+| roh | beliebig | nur die Bytes, keine Adresse |
+| Headersave | `.z80` | 32-Byte-Kopf (Anfang, Ende, Start, Typ, Name), dann die Bytes |
+| KCC | `.kcc` `.kcb` `.kcm` `.jtc` | 128-Byte-Kopf (Name, Anfang, Ende, Start), dann die Bytes |
+| KC-TAP | `.tap` | KC-Kassettenblöcke zu 129 Byte; nur die erste Teilaufnahme wird übernommen |
+| Intel-HEX | `.hex` `.ihx` | Textzeilen mit Adresse und Prüfsumme |
+
+`--format` wählt das Format ausdrücklich (`auto`, `roh`, `headersave`, `kcc`, `kctap`,
+`hex`); ohne Angabe erkennt `k1520tape` Headersave, KC-TAP und Intel-HEX am Inhalt, KCC
+an der Endung. Ein Bootband aus einer Datei mit Adresse (`bootband`) verlangt **0400H**
+als Anfangsadresse, weil das Lade-ROM dorthin lädt.
+
+**Nicht unterstützt:** Tonsignal- und Tape-Dateien (WAV, CSW, TZX/CDT, ZX-TAP) und
+KC-BASIC-Dateien. Sie beschreiben ein Audiosignal bzw. Rechner, die es hier nicht gibt;
+die K5020 ist ein digitaler Anschluss ohne Tonkanal. Die Oberfläche arbeitet nur mit
+`.k52`; Dateien in den Formaten oben werden mit `k1520tape` auf ein Band gelegt (Einzelheiten:
+`doc/kassette/jkcemu_formate.md`, `tools/k1520tape.md`).
 
 ## Rechtsklick auf das Bild: Text kopieren, Zwischenablage einfügen
 
@@ -1301,7 +1425,7 @@ Alles, was man einstellt, landet fortlaufend in
 kann also den A5120 mit drei Laufwerken und sichtbarer Tastatur und den K8915 mit
 zwei Laufwerken ohne Tastatur nebeneinander führen. Gemerkt werden Bildröhre,
 Takt, Modell, RAM-Disk (samt Stand-by), Lochstreifen-Karte samt Leser- und
-Stanzerdatei, Kassetten-Karte samt den Dateien beider Laufwerke, AUP-Option (A5120), Laufwerksbestückung, eingelegte Disketten, die seriellen Schnittstellen
+Stanzerdatei, Kassetten-Karte samt den Dateien beider Laufwerke, Laufwerksbestückung, eingelegte Disketten, die seriellen Schnittstellen
 (samt dem, was lief), Größe und Lage des Fensters
 (auch „maximiert"), die Lage und Breite der Kästen samt der Trennlinien
 dazwischen, und der Inhalt der Symbolleiste.
@@ -1655,6 +1779,44 @@ anders ist:
   „mc 80.30. microcomputer“ und „Version 3.0“, unten steht `OK` und der Prompt `>`.
   **Erst `INIT` eingeben** (mit ENTER): das legt die Kommandokette im RAM an; Tasten,
   die vor dem Ende von INIT kommen, gehen verloren.
+* **PCMC — Programme zwischen PC und MC80 übertragen** (nur MC80.30). *Einstellungen ▸ Allgemein ▸
+  PCMC-Erweiterung* steckt das EPROM „mit PCMC-Erweiterung“ (2800H, 3. Fassung der SPE 2); im
+  EGOS gibt es dann das Kommando **PCMC** (Menü: `E` = Datei vom PC empfangen, `S` = Datei zum
+  PC senden, OFF = Ende; 4800 Bd 8N1 über die IFSS). Die PC-Seite ist *Maschine ▸ PCMC-Gegenstelle*
+  (auch in der Symbolleiste): sie macht die IFSS zu einem Telnet-Server auf der Schleife und zeigt
+  den Kasten **PCMC** als Reiter neben der Kassette; *Ausschalten* stellt die IFSS-Einstellung
+  (Reiter *Schnittstellen*) wieder her. Eine schon belegte IFSS fasst die Gegenstelle nicht an.
+  * **Zum MC80 senden:** am MC80 `PCMC`, dann `E`. Im Kasten *Datei laden…* (`.bin`). Trägt die
+    Datei den **Adresskopf** (4 Byte: Startadresse und Länge−1, je niedrig/hoch), stehen Start- und
+    Endadresse in den Feldern und lassen sich ändern; ohne Kopf bleiben sie leer und müssen
+    ausgefüllt werden (eine neue Startadresse verschiebt die Endadresse mit). Dann *Senden*.
+  * **Vom MC80 holen:** am MC80 `PCMC`, dann `S`. Start- und Endadresse eintragen, *Empfangen…*
+    und die Zieldatei wählen; sie wird **mit Adresskopf** gespeichert und lässt sich später an
+    dieselbe Stelle zurücksenden. Eine Hex-Ansicht gibt es nicht.
+  * Die Übertragung läuft in Maschinenzeit (4800 Bd, rund 480 Byte/s): große Dateien gehen mit
+    schnellerem Takt schneller. Jedes Byte wird zurückgemeldet; ein Fehler oder eine Frist von 20 s
+    ohne Antwort bricht ab. Kein Tastenkürzel.
+  * **Schritt für Schritt (Beispiel Tetris holen und zurückspielen):**
+    1. *Einstellungen ▸ Allgemein ▸ PCMC-Erweiterung* auf „mit PCMC-EPROM (2800H)“ stellen
+       (der Rechner startet dabei neu), *Maschine ▸ PCMC-Gegenstelle* einschalten — der Reiter
+       **PCMC** erscheint neben der Kassette.
+    2. Am MC80 `INIT`, dann `pcmc` + ENTER. Es meldet sich „PC-MC v.0.2“ mit dem Hauptmenü.
+       Die Tasten wirken wie die Tastatur des MC80: `e`/`s` klein tippen.
+    3. **Programm auf den MC80:** am MC80 `e`. Im Kasten *Datei laden…* (z. B.
+       `tetris_4000_4fff.bin`, hat keinen Adresskopf) — *Start* `4000` eintragen, *Ende* folgt aus
+       der Dateilänge (`4FFF`) — *Senden*. Nach rund 10 s Maschinenzeit steht in der Statuszeile
+       „4096 Byte nach 4000H gesendet“; das Programm liegt Byte für Byte im Speicher.
+    4. Zurück ins Menü (am MC80 beliebige Taste, dann Menü), mit **OFF** das PCMC verlassen und das
+       Programm wie gewohnt starten (`te` + ENTER, die Spiele brauchen vorher `INIT`).
+    5. **Programm vom MC80 holen:** `pcmc` ▸ `s`. Im Kasten *Start* `4000` und *Ende* `4FFF`
+       eintragen, *Empfangen…*, Zieldatei wählen. Die Datei enthält vorn den Adresskopf
+       `00 40 FF 0F` und danach die 4096 Byte; sie lässt sich mit *Datei laden…* wieder öffnen
+       (Start/Ende erscheinen dann von selbst) und mit `e` zurückspielen.
+    6. Ein Programm, das nur auf Kassette oder im EPROM liegt, holt man genauso: erst am MC80 in den
+       Arbeitsspeicher bringen (z. B. `READ`), dann bei `s` dessen Bereich angeben.
+    Läuft die Übertragung nicht an, zuerst prüfen: Gegenstelle eingeschaltet, am MC80 *vorher* `e`
+    bzw. `s` gedrückt (sonst bricht der Emulator nach 20 s mit „Keine Antwort vom MC80“ ab), und
+    die IFSS nicht anderweitig belegt (Reiter *Schnittstellen*).
 * **Programme laden** — *Maschine ▸ Speicherabzug laden…* lädt eine Binärdatei ab einer
   Adresse in den Arbeitsspeicher (erfragt wird die Adresse; steht sie im Dateinamen wie
   bei `tetris_4000_4fff.bin`, ist sie vorgeschlagen). Gestartet wird mit dem

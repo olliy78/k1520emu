@@ -5,11 +5,63 @@
  */
 
 #include "core/cards/mc80/asp.h"
+#include "core/serial/sio_format.h"
 
 Mc80Asp::Mc80Asp() : Mc80Asp(Config{}) {}
 
-Mc80Asp::Mc80Asp(const Config& cfg) : cfg_(cfg)
+// ─── Anschluss IFSS (SIO B) ──────────────────────────────────────────────────
+
+class Mc80Asp::Anschluss : public k1520::serial::SerialAnschluss {
+public:
+    explicit Anschluss(Mc80Asp& k) : k_(k) {}
+    const char* name() const override { return "IFSS"; }
+    const char* stecker() const override { return "XS503"; }
+    bool v24() const override { return false; }   // Stromschleife, V.24 nur als Variante [KDT89 S.35]
+
+    k1520::serial::SerialFormat format() const override {
+        // CTC K1 teilt den halben Systemtakt (Eingang = 2 Takte je Impuls), das ÷2-Flipflop
+        // dahinter halbiert nochmals; die SIO teilt selbst durch ihren WR4-Faktor.
+        return k1520::serial::serialFormatAusSio(kanal(), 2 * k_.ctc_.teilerTakte(1));
+    }
+    bool senderHatZeichen() const override { return kanal().senderHatZeichen(); }
+    uint8_t senderNimm() override {
+        uint8_t b = kanal().txGet();
+        const uint8_t bits = kanal().format().tx_bits;
+        if (bits < 8) b &= static_cast<uint8_t>((1u << bits) - 1);
+        k_.updateInternalChain();
+        k_.seriell_geaendert_ = true;
+        return b;
+    }
+    bool empfaengerFrei() const override { return kanal().empfaengerFrei(); }
+    void empfange(uint8_t b) override {
+        kanal().rxByte(b);
+        k_.updateInternalChain();
+        k_.seriell_geaendert_ = true;
+    }
+    bool breakGesendet() const override { return kanal().breakSenden(); }
+    void breakEmpfang(bool aktiv) override {
+        kanal().setzeBreakEmpfang(aktiv);
+        k_.updateInternalChain();
+        k_.seriell_geaendert_ = true;
+    }
+
+private:
+    Z80SIO::Channel& kanal() const { return k_.sio_.channelB(); }
+    Mc80Asp& k_;
+};
+
+Mc80Asp::~Mc80Asp() = default;
+
+k1520::serial::SerialAnschluss& Mc80Asp::anschluss() { return *anschluss_; }
+
+Mc80Asp::Mc80Asp(const Config& cfg) : cfg_(cfg), anschluss_(std::make_unique<Anschluss>(*this))
 {
+    // Eingang der CTC-Kanaele = halber Systemtakt (nur Auskunft fuer teilerTakte, kein Takten).
+    ctc_.setzeEingangsPeriode(0, 2);
+    ctc_.setzeEingangsPeriode(1, 2);
+    // IFSS ohne Steuerleitungen: /CTS und /DCD liegen fest aktiv (wie die Tastatur an A).
+    sio_.channelB().setzeDCD(true);
+    sio_.channelB().setzeCTS(true);
     sio_.channelA().setzeDCD(true);
     sio_.channelA().setzeCTS(true);
     ctc_.setIntAusVerwirftAnforderung(true);   // EGOS TASTE_ISR 046FH, s. z80_ctc.h
