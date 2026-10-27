@@ -1,0 +1,70 @@
+# Pruefung von make im MUTOS-Gast: baut make selbst und fuehrt dann test/Makefile aus
+# (Ausgabe in README.md).  Quelldiskette QUELLE enthaelt make.c, Makefile, t1.c, t2.c,
+# fertig1..14 (Textdateien "ENDE<n>" als Marken fuer gscreen).  Mit --rw und KOPIEN der
+# Plattenabbilder aufrufen (siehe README), sonst geht das Ergebnis verloren.
+# make im MUTOS-Gast bauen (und danach pruefen).  Aufruf siehe README.md:
+#   tools/dev.sh tool k1520dbg --em em256 --laufwerke K5601,K5601,K5601,K5601 \
+#     disks/a5120_16_MUTOS/a5120_mutos8000_boot_udos_k5601.hfe -x bau_make.dbg
+# TMPDISK = leere mutos8k_26x128_mfm-Diskette fuer /tmp (die Wurzel ist fuer die cc-Zwischendateien zu klein).
+# DISKS und QUELLE (Quelldiskette mit make.c, fertig1..8) vor dem Lauf ersetzen.
+g 80000000
+keys BOOT\sMUTOS\r
+g 100000000
+eject A
+mount A TMPDISK udos_ss77
+mount B DISKS/a5120_mutos8000_usr_mfm.hfe udos_ss77
+mount C DISKS/a5120_mutos8000_root_mfm.hfe udos_ss77
+mount D QUELLE udos_ss77
+keys r
+g 100000000
+keys root\r
+g 100000000
+keys /etc/mount\s/dev/rk1\s/usr\r
+g 30000000
+keys /etc/mount\s/dev/rk3\s/mnt\r
+g 30000000
+keys /etc/mount\s/dev/rk0\s/tmp\r
+g 30000000
+keys cd\s/mnt\r
+g 20000000
+keys PATH=/bin:/usr/bin:.\r
+g 20000000
+keys date\s8710270000\r
+g 30000000
+keys cc\s-c\smake.c;cat\sfertig1\r
+gscreen "ENDE1" 4000000000
+screen
+keys cc\s-o\smake\smake.o;cat\sfertig2\r
+gscreen "ENDE2" 4000000000
+screen
+keys ls\s-l;cat\sfertig3\r
+gscreen "ENDE3" 300000000
+screen
+keys make\s-n;cat\sfertig4\r
+gscreen "ENDE4" 4000000000
+screen
+keys make;cat\sfertig5\r
+gscreen "ENDE5" 4000000000
+screen
+keys make;cat\sfertig6\r
+gscreen "ENDE6" 4000000000
+screen
+keys ./prog;cat\sfertig7\r
+gscreen "ENDE7" 4000000000
+screen
+keys cat\st2.c\s>t2n.c;cat\st2n.c\s>t2.c;cat\sfertig8\r
+gscreen "ENDE8" 4000000000
+screen
+keys make\s-n;cat\sfertig9\r
+gscreen "ENDE9" 4000000000
+screen
+keys make;cat\sfertig10\r
+gscreen "ENDE10" 4000000000
+screen
+keys ./prog;cat\sfertig11\r
+gscreen "ENDE11" 4000000000
+screen
+keys ls\s-l;cat\sfertig12\r
+gscreen "ENDE12" 4000000000
+screen
+q
