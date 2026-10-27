@@ -54,7 +54,7 @@ Original); wo sie scheitert, bleibt die Assemblerquelle aus A stehen — so mach
 
 > **Befund K0 (2026-10-27, `doc/mutos_kernel/befund.md`):** der Kernel laeuft **nichtsegmentiert** (Trap-FCWs ohne SEG-Bit, 996 Kurz-`CALL`, ein 64-KB-Raum; nur der
 > Reset-Eintrag hat `C000`), die MUTOS-Werkzeuge sind nichtsegmentiert -- die Kette `cc/as/ld` von den Disketten ist also voraussichtlich die richtige.
-> Die erste Fassung dieser Anmerkung (\"segmentiert, WEGA `scc` noetig\") war falsch.  Offen: Start-Stub bei `027E`, Zugriff auf 192 KB ohne MMU (Entwurf 17).
+> Die erste Fassung dieser Anmerkung ("segmentiert, WEGA `scc` noetig") war falsch.  Offen: Start-Stub bei `027E`, Zugriff auf 192 KB ohne MMU (Entwurf 17).
 
 ## 3. Was es schon gibt — und warum das alles verändert
 
@@ -147,6 +147,7 @@ Jedes AP endet mit Dokumentation + Commit; Abnahme = der Wächter in der Spalte.
 |----|--------|--------------------|
 | **K0** | Bestandsaufnahme: Abbild vermessen (Segmente/Bereiche, Vektortabelle, Textpool, Zeigertabellen), Header `a.out.h`/`symbol.h` der Disketten lesen, Werkzeugversionen (`what`/Strings in `cc`,`as`,`ld`,`libc.a`) und Plattform-Angaben ermitteln, WEGA-Repo + Platte als Referenz einrichten | `doc/mutos_kernel/befund.md` |
 | **K1** | Werkzeugkette im Emulator: Quelltext rein, `.o` raus, automatisiert; Messung der Übersetzungsdauer; Vorversuche a–c | `tools/mutos8000/kernel/cc_im_emulator.py`, Probeübersetzung bytegleich reproduzierbar |
+| *K1 Stand 2026-10-27* | cc/as/ld laufen im Gast (`doc/mutos_kernel/k1_cc_im_gast.md`): ~1,2 Min. Maschinenzeit je Kleinstdatei, Binden ~1 Min. | `tools/mutos8000/kernel/probe/cc_probe.dbg` |
 | **K2** | `a.out`-/Objektformat lesen (`ld`-Eingabe/-Ausgabe, Symbol-/Relokationsformat), Leser/Schreiber in Python; **Linkkarte des Kernels** aus Abbild + WEGA-Reihenfolge (Hypothese) | `tools/mutos8000/kernel/objformat.py`, Test mit den Objekten aus `libc.a` (erstes Un-link-Übungsstück) |
 | **K3** | Z8000-Kommandodisassembler (`tools/z8000/z8kdis`): Karte, Segmente, `--format as` (MUTOS-`as`-Syntax), Rundlauf `--pruefen`; Prüflinge: ein `crt0.o`, `libc.a`-Mitglieder, ein kleines Testprogramm | Tests `tests/python/test_z8000_dis.py` (Befehlsvollständigkeit gegen Tabelle, Rundlauf) |
 | **K4** | Kernel als rohe Assemblerquelle (eine Datei, `ORG`/Segmente), `as`+`ld`-Rundlauf == Abbild (**Entwurf-40-M2-Stand**) | `build.py --check` |
