@@ -175,7 +175,7 @@ Linkkarte und Entscheidungen bei uns; Bau-Kollisionen beachten (Worktrees).
 | K11 (make) | fertig | 9b2d1e07 | `tools/mutos8000/kernel/make/`; Grenzen: `/tmp` braucht eigene Diskette, Quellen mit Zeit 1987 |
 | K6b | fertig | 30c41f5e | `kernel_namen.md`: 247 Funktionen (108 sicher, 87 wahrscheinlich, 52 vermutet), `sysent` (8B58, 63 Eintraege), Layouts `user` (FC00), `proc` (28 B), `inode` (74 B), `file`, `buf`, `mount` |
 | K4 | fertig: **36 352 von 36 352 Byte bytegleich** (9 Stuecke, Gast-`as`, ~3 Min. Wanduhr) | | `rundlauf_gast.py`, `gast_as.py`, `z8kdis --teile/--teil`; `as_dialekt.md` |
-| K7-Pilot | in Arbeit | | C-Rueckbau kleiner Funktionen, Compilerfrage |
+| K7-Pilot | fertig | be8d3eca | **Compilerfrage beantwortet:** MUTOS-`cc -O` erzeugt bytegleiche Kernelfunktionen (22/25 gleich, 3 nahe: DJNZ-Form bei `bcopy`/`clrbuf`, `chkmem`); ohne `-O` 0/25; `c_rueckbau.md` |
 | K6a | fertig | 10ea95b7 | Code 28 % -> 85 %, 235 Funktionen (207 mit `call csv`), `bdevsw`/`cdevsw`/`sysent`/Konfigworte belegt, Modulreihenfolge = WEGA-Linkreihenfolge (Hypothese); `kernel_struktur.md`, `cover` fuer U8001 im Debugger |
 
 ## 7. Risiken
