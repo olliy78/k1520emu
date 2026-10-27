@@ -101,6 +101,7 @@
 #include <fstream>
 #include <iostream>
 #include <algorithm>
+#include <unordered_map>
 #include <regex>
 #include <filesystem>
 #include <system_error>
@@ -630,6 +631,10 @@ int main(int argc, char** argv){
     bool cov_on=false; int cov_lo=0, cov_hi=0xFFFF;
     std::vector<uint32_t> cov_cnt(65536,0);
     std::set<uint16_t> cov_exp;
+    // Abdeckung des U8001 (`cover` im Kontext `cpu u8000`): je Befehlsanfang Zaehler, getrennt nach
+    // Betriebsart (System/Normal).  Schluessel = seg<<16|off, Bit 31 = Systembetrieb.
+    bool cov16_on=false;
+    std::unordered_map<uint32_t,uint32_t> cov16_cnt;
 
     // ─── A5120.16: U8001-Kontext (S5) ─────────────────────────────────────────
     int  cpu_ctx = 1;                           // 1 = ZVE1, 2 = ZVE2, 3 = U8001 (`cpu …`)
@@ -1368,6 +1373,7 @@ int main(int argc, char** argv){
             if (z.inReset() || z.halted() || z.stopped() || z.busAck() || z.inRepeat()) return false;
             const uint32_t key = pcKey16(z);
             if (hist_on){ if (hist16_lo<0 || (key>=(uint32_t)hist16_lo && key<=(uint32_t)hist16_hi)) hist16[key]++; return false; }
+            if (cov16_on) cov16_cnt[key | (z.systemMode()? 0x80000000u : 0u)]++;
             bool skip = (resume_skip16 >= 0 && key == (uint32_t)resume_skip16);
             resume_skip16 = -1;
             // Aufrufstapel: vor dem Befehl einordnen, CALL vormerken (Dekodieren kostet —
@@ -3620,6 +3626,23 @@ int main(int argc, char** argv){
                             trace_z80only?" [nur Z80, ohne U8001-Zeilen]":"", trace_cap); } }
             else fprintf(stderr,"  trace <file> [lo hi] [z80] | trace off\n"); }
         // Abdeckung: cover on [lo hi] | off | reset | expect lst|clear|<lo> <hi> | report [datei] [unhit|hit|all]
+        else if (cmd=="cover" && cpu_ctx==3){
+            // U8001-Kontext: cover on|off|reset|report [datei]; Zeilen "SS:OOOO S|N Zaehler" (S = System, N = Normal),
+            // aufsteigend nach Segment, Offset, Betriebsart (Eingabe fuer tools/mutos8000/kernel/lauf/).
+            const std::string sub = t.size()>1? t[1] : "status";
+            if (sub=="on"){ cov16_on=true; fprintf(stderr,"  cover ON (U8001, jeder ausgefuehrte Befehl)\n"); }
+            else if (sub=="off"){ cov16_on=false; fprintf(stderr,"  cover off (U8001; Zaehler bleiben)\n"); }
+            else if (sub=="reset"){ cov16_cnt.clear(); fprintf(stderr,"  cover: U8001-Zaehler geloescht\n"); }
+            else if (sub=="report"){
+                std::vector<std::pair<uint32_t,uint32_t>> v(cov16_cnt.begin(),cov16_cnt.end());
+                std::sort(v.begin(),v.end(),[](const std::pair<uint32_t,uint32_t>& a,const std::pair<uint32_t,uint32_t>& b){
+                    return (a.first&0x7FFFFFFFu)!=(b.first&0x7FFFFFFFu) ? (a.first&0x7FFFFFFFu)<(b.first&0x7FFFFFFFu) : a.first>b.first; });
+                FILE* out=stderr; bool tofile=false;
+                if (t.size()>=3){ out=fopen(t[2].c_str(),"w"); tofile=(out!=nullptr);
+                    if (!out){ fprintf(stderr,"  cannot open %s for writing\n",t[2].c_str()); out=stderr; } }
+                for (auto& kv: v) fprintf(out,"%02X:%04X %c %u\n",(kv.first>>16)&0x7F,kv.first&0xFFFF,(kv.first&0x80000000u)?'S':'N',kv.second);
+                if (tofile){ fclose(out); fprintf(stderr,"  cover U8001: %zu Eintraege -> %s\n",v.size(),t[2].c_str()); } }
+            else fprintf(stderr,"  cover (U8001) %s, %zu Eintraege; cover on | off | reset | report [datei]\n",cov16_on?"ON":"off",cov16_cnt.size()); }
         else if (cmd=="cover"){
             const std::string sub = t.size()>1? t[1] : "status";
             auto codeFromListing = [&](int lo,int hi)->int{

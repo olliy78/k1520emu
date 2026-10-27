@@ -1,0 +1,12 @@
+# U8001-Abdeckung: `cover on` im Kontext `cpu u8000` zaehlt die Befehlsanfaenge des U8001;
+# `cover report [datei]` schreibt Zeilen "SS:OOOO S|N Zaehler" (Eingabe fuer tools/mutos8000/kernel/lauf).
+tool:      k1520dbg
+disk:      cpa_cpa780_k5601_noclock.img
+setup_run: @k1520disktool put %DISK% %CLI_DIR%/../fixtures/cpm/em16abl.com
+run:       --em em256 %DISK% -x %CLI_DIR%/scripts/u8000_cover.dbg
+timeout:   120
+exit:      0
+forbid:    unknown command
+expect:    cover ON (U8001
+expect_re: 00:[0-9A-F]{4} N [1-9][0-9]*
+expect_re: cover \(U8001\) off, [1-9][0-9]* Eintraege

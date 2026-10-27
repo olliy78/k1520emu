@@ -12,3 +12,29 @@ dw 38 3B
 vek 3C 23B
 name 27E start
 code 27E
+# ---- Daten und Tabellen (K6a, belegt durch Aufbau und Laufwerte; doc/mutos_kernel/kernel_struktur.md) ----
+kom 875A Datenteil des Abbilds: ab hier Tabellen und Texte (letzter Code: Sprung 8756)
+dw 875A 8765
+name 8766 bdevsw
+kom 8766 bdevsw: je 4 Worte [open, close, strategy, d_tab]; Major 0 = Plattentreiber 7E16.., Major 4 = rk (6ADA/6AFE/6B06, Tab 8E82)
+dw 8766 8795
+name 8796 cdevsw
+kom 8796 cdevsw: je 7 Worte [open, close, read, write, ioctl, 2438 (=Stopp/nulldev), tty-Zeiger]; 242A = nodev; Major 0 tty, 1 mem, 7 .., 10 = Rohzugriff Major 0, 13 = rrk
+dw 8796 8875
+kom 887C rootdev (Major 4, Minor 02), 887E swapdev, 8880 pipedev, 8884 swplo (4 Byte), 8888 nswap (2 Byte)
+dw 8876 88C5
+kom 88C6 Texte (Zeichenketten NUL-beendet) und Vorbesetzung, siehe textpool.txt
+db 88C6 8B51
+name 8B56 sysent
+kom 8B56 sysent: je 4 Byte [Funktion, Argumentzahl<<8]; 0B2A/0B38 = nosys/nullsys; Zuordnung Nr.<->Funktion nach V7-Argumentzahlen
+dw 8B52 8C56
+db 8C57 8DFF
+# ---- Code, der nur ueber die Tabellen erreichbar ist (nicht im Lauf ausgefuehrt): Prolog 'call csv' bestaetigt ----
+code 7E16 7E94 7F94 84E4 851C 85B0 616C 6A52 6C52 6C70 6C8E 6CC6 6CEC 6D12 6444 64DA 6570
+# ---- erzeugt von tools/mutos8000/kernel/lauf/abdeckung_zu_karte.py aus abdeckung_gesamt.txt (61 Einstiege) ----
+code 0980 156E 2438 2842 39BA 39E2 3D6A 3DA2 3EB2 3F3C 4080 4198
+code 48A6 49F6 4AD4 4BD0 4C14 4C24 4CC6 4CF4 4D0C 4D32 4D4A 4D6A
+code 4D76 4DBC 4E84 4F1C 4F78 4FB0 501C 5100 5132 51B2 51C4 52BE
+code 52F2 53FE 542C 54AA 5556 55AE 60CC 618E 61B0 61D2 620E 623C
+code 6274 69CE 6ADA 6AFE 6B06 6BCA 6DF0 70F0 7106 7130 714A 7C06
+code 7C1E

@@ -1,0 +1,33 @@
+# Karte des Kernels mutos_1216 (Entwurf 41, K3).  Format: Kopf von tools/z8000/z8kdis.h.
+# Abbild: 36352 Byte, Ladeadresse 0 (disks/a5120_mutos8000/a5120_mutos8000_boot_udos.zip, dateien/mutos_1216).
+# Aufruf:  build/z8kdis --karte tools/mutos8000/kernel/karte.txt --statistik mutos_1216
+# Nur Belegtes (doc/mutos_kernel/befund.md): Vektortabelle und Einstieg 027E; alles Weitere
+# kommt aus der Ablaufverfolgung (Sprung- und Aufrufziele), nichts ist geraten.
+seg 0 0 8E00
+# Programmstatus-Feld: 7 Eintraege zu je 8 Byte (Reset 027E mit FCW C000, 6 Traps FCW 40xx -> 030E)
+psa 0 7
+# Eintrag 7 (VI) hat nur reserviert + FCW; die 128 Vektoren [Kennung, Handler] folgen ab 3C
+kom 38 VI-Eintrag: reserviert, FCW; ab 3C folgen 128 Vektoren [Kennung, Handler]
+dw 38 3B
+vek 3C 23B
+name 27E start
+code 27E
+# ---- Daten und Tabellen (K6a, belegt durch Aufbau und Laufwerte; doc/mutos_kernel/kernel_struktur.md) ----
+kom 875A Datenteil des Abbilds: ab hier Tabellen und Texte (letzter Code: Sprung 8756)
+dw 875A 8765
+name 8766 bdevsw
+kom 8766 bdevsw: je 4 Worte [open, close, strategy, d_tab]; Major 0 = Plattentreiber 7E16.., Major 4 = rk (6ADA/6AFE/6B06, Tab 8E82)
+dw 8766 8795
+name 8796 cdevsw
+kom 8796 cdevsw: je 7 Worte [open, close, read, write, ioctl, 2438 (=Stopp/nulldev), tty-Zeiger]; 242A = nodev; Major 0 tty, 1 mem, 7 .., 10 = Rohzugriff Major 0, 13 = rrk
+dw 8796 8875
+kom 887C rootdev (Major 4, Minor 02), 887E swapdev, 8880 pipedev, 8884 swplo (4 Byte), 8888 nswap (2 Byte)
+dw 8876 88C5
+kom 88C6 Texte (Zeichenketten NUL-beendet) und Vorbesetzung, siehe textpool.txt
+db 88C6 8B51
+name 8B56 sysent
+kom 8B56 sysent: je 4 Byte [Funktion, Argumentzahl<<8]; 0B2A/0B38 = nosys/nullsys; Zuordnung Nr.<->Funktion nach V7-Argumentzahlen
+dw 8B52 8C56
+db 8C57 8DFF
+# ---- Code, der nur ueber die Tabellen erreichbar ist (nicht im Lauf ausgefuehrt): Prolog 'call csv' bestaetigt ----
+code 7E16 7E94 7F94 84E4 851C 85B0 616C 6A52 6C52 6C70 6C8E 6CC6 6CEC 6D12 6444 64DA 6570
