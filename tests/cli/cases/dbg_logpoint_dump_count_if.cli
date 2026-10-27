@@ -1,0 +1,20 @@
+# Logpoint mit Zusaetzen (2026-10-27, mutos_io-Analyse): `dump AUSDRUCK N [w]` gibt einen
+# Speicherblock als Zeile aus, `count N` verstummt nach N Ausgaben (Treffer werden weiter
+# gezaehlt, `lpl` zeigt sie), `if BEDINGUNG` druckt nur bei erfuellter Bedingung.
+# 0135H (LD A,(HL)) liegt in einer Schleife; 0136H (OR A) wird mit falscher Bedingung gesetzt.
+tool:   k1520dbg
+disk:   cpa_cpa780_k5601_clock.img
+run:    %DISK%
+stdin:
+  lp 0x0135 A dump 0x0135 4 count 2
+  lp 0x0136 A if A==0x1234
+  lp 0x0137 dump 0x0135 2 w if 1
+  g 300000
+  lpl
+  q
+expect_re: \[lp\] c[0-9]+ +0135: 7E .*dump@0135: 7E B7 3E 87
+expect:    [lp] 0135: Limit 2 erreicht
+expect_re: 0137: .*dump@0135: B77E
+expect_re: 0135 A  dump 0x0135 4 count 2  \[Treffer=[0-9]+ ausgegeben=2\]
+expect_re: 0136 A  if A==0x1234  \[Treffer=0 ausgegeben=0\]
+forbid_re: \[lp\] c[0-9]+ +0136:

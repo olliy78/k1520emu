@@ -588,8 +588,16 @@ int main(int argc, char** argv){
     long  trace_lines= 0;                        // lines written this session
     long  trace_cap  = 2000000;                  // safety cap (~prevents runaway files)
     bool  trace_capped = false;
+    bool  trace_z80only = false;                // `trace <f> … z80`: keine U8001-Zeilen (T3)
     // logpoints: at PC, print (PC + optional exprs) and CONTINUE — gdb dprintf.
     std::map<uint16_t,std::vector<std::string>> logpoints;
+    // Zusaetze eines Logpoints (2026-10-27, mutos_io): Speicherblock ausgeben, nach N
+    // Ausgaben verstummen, nur bei erfuellter Bedingung.  Getrennt von den Ausdruecken,
+    // damit der Bestand (logpoints/logpoints16 = Ausdruckslisten) unveraendert bleibt.
+    struct LpOpt { std::string dumpExpr; int dumpN=0; bool dumpW=false;
+                   long count=-1; long hits=0; long printed=0; bool muted=false; std::string cond; };
+    std::map<uint16_t,LpOpt> lp_opt1;
+    std::map<uint32_t,LpOpt> lp_opt16;
     // §11 interrupt trace: log every ACCEPTED INT/NMI (no stopping) — the SCPX .COM bug
     // is a CTC-interrupt corrupting the EC0D mini-stack, so a timeline of INTs vs the
     // matcher window is exactly what's needed. Reuses eventbp::classify (like `bint`).
@@ -613,6 +621,15 @@ int main(int argc, char** argv){
     // `hist` profiles straight through breakpoints instead of tripping them.
     bool hist_on=false; int hist_lo=-1, hist_hi=-1;
     std::map<uint16_t,uint32_t> hist1, hist2;
+
+    // ─── Abdeckung (`cover`, 2026-10-27): welche Befehlsadressen des ZVE1 liefen? ─
+    // Gezaehlt wird je AUSGEFUEHRTEM Befehl (Anfangsadresse) im Per-Befehl-Rueckruf, ohne
+    // Haltepunkte.  "Erwartet" = Befehlsadressen, die laufen koennten: aus den geladenen
+    // Listings/Quellen (`-l`/`lst`, nur Befehlszeilen, keine DB/DW) oder von Hand.
+    bool key_wait=false;                         // `keywait on`: keys wartet auf Abholung (A5120/K7637)
+    bool cov_on=false; int cov_lo=0, cov_hi=0xFFFF;
+    std::vector<uint32_t> cov_cnt(65536,0);
+    std::set<uint16_t> cov_exp;
 
     // ─── A5120.16: U8001-Kontext (S5) ─────────────────────────────────────────
     int  cpu_ctx = 1;                           // 1 = ZVE1, 2 = ZVE2, 3 = U8001 (`cpu …`)
@@ -873,10 +890,29 @@ int main(int argc, char** argv){
     // Logpoint hit: print PC + disasm + evaluated exprs to the console, then continue.
     auto logHit = [&](const Z80& z, const std::vector<std::string>& exprs){
         Snap s=grab(z);
+        // Zusaetze: Bedingung, Zaehler, Speicherblock (lp_opt1; fehlt der Eintrag = wie frueher)
+        LpOpt* lo=nullptr; { auto it=lp_opt1.find(z.PC); if(it!=lp_opt1.end()) lo=&it->second; }
+        if (lo){
+            if (!lo->cond.empty() && !evalCond(s,lo->cond)) return;
+            ++lo->hits;
+            if (lo->count>=0 && lo->printed>=lo->count){
+                if (!lo->muted){ lo->muted=true; fprintf(stderr,"[lp] %04X: Limit %ld erreicht - weitere Treffer stumm (gezaehlt, siehe lpl)\n",z.PC,lo->count); }
+                return; }
+            ++lo->printed;
+        }
         char dis[120]; disasmAt(z.PC,dis,sizeof dis);
         fprintf(stderr,"[lp] %c%-9lld %s",rcpfx(),rc(z.cycles),dis);
         for (auto& e: exprs){ bool ok; long v=readOperand(s,e,ok);
             fprintf(stderr,"  %s=%ld(0x%lX)",e.c_str(),v,(unsigned long)(v&0xFFFF)); }
+        if (lo && lo->dumpN>0){
+            bool ok; long a=readOperand(s,lo->dumpExpr,ok);
+            if (!ok) fprintf(stderr,"  dump %s=?",lo->dumpExpr.c_str());
+            else { fprintf(stderr,"  dump@%04lX:",(unsigned long)(a&0xFFFF));
+                for (int i=0;i<lo->dumpN;++i){
+                    if (lo->dumpW){ unsigned w=m.memReadDebug((uint16_t)(a+2*i)) | (m.memReadDebug((uint16_t)(a+2*i+1))<<8);
+                        fprintf(stderr," %04X",w); }
+                    else fprintf(stderr," %02X",m.memReadDebug((uint16_t)(a+i))); } }
+        }
         std::string p=prnFor(z.PC); if(!p.empty()) fprintf(stderr,"  ; %s",p.c_str());
         fprintf(stderr,"\n");
     };
@@ -953,6 +989,7 @@ int main(int argc, char** argv){
         callstack.onInstruction(pc,[&](uint16_t a){ return m.memReadDebug(a); });
         // "run and log" (no stopping): continuous file trace + logpoints fire first.
         traceToFile(1,z);
+        if (cov_on && (int)pc>=cov_lo && (int)pc<=cov_hi) ++cov_cnt[pc];
         { auto lit=logpoints.find(pc); if(lit!=logpoints.end()) logHit(z,lit->second); }
         // event breakpoints: interrupt / NMI accepted (state signature) or RETI (opcode).
         // Klassifikation in tools/event_bp.h (unit-getestet, inkl. NMI-bei-IFF1=0-Grenzfall).
@@ -1284,9 +1321,28 @@ int main(int argc, char** argv){
         return b; };
     // Logpoint des U8001: drucken und weiterlaufen (wie ZVE1 `[lp]`).
     auto logHit16 = [&](const Z8000& z, const std::vector<std::string>& exprs){
+        LpOpt* lo=nullptr; { auto it=lp_opt16.find(pcKey16(z)); if(it!=lp_opt16.end()) lo=&it->second; }
+        if (lo){
+            if (!lo->cond.empty() && !evalCond16(lo->cond)) return;
+            ++lo->hits;
+            if (lo->count>=0 && lo->printed>=lo->count){
+                if (!lo->muted){ lo->muted=true; fprintf(stderr,"[lp] U8001: Limit %ld erreicht - weitere Treffer stumm (gezaehlt, siehe lpl)\n",lo->count); }
+                return; }
+            ++lo->printed;
+        }
         char l[200]; disasm16(z.pcSeg, z.pc, l, sizeof l);
         fprintf(stderr,"[lp] %c%-9lld %s",rcpfx(),rc(m.cpuCycles()),l);
         for (auto& e: exprs) fprintf(stderr,"%s",exprText16(e).c_str());
+        if (lo && lo->dumpN>0){
+            bool ok; long long a=eval16(lo->dumpExpr,ok);
+            if (!ok) fprintf(stderr,"  dump %s=?",lo->dumpExpr.c_str());
+            else { uint8_t sg; uint16_t off; dbg16::decodeAddr(a, z.pcSeg, sg, off);
+                fprintf(stderr,"  dump@%s:",dbg16::addrText(sg,off,true).c_str());
+                const int unit = lo->dumpW? 2 : 1;
+                for (int i=0;i<lo->dumpN;++i){
+                    if (lo->dumpW) fprintf(stderr," %02X%02X",rdb16(sg,uint16_t(off+unit*i),false),rdb16(sg,uint16_t(off+unit*i+1),false));
+                    else fprintf(stderr," %02X",rdb16(sg,uint16_t(off+i),false)); } }
+        }
         fprintf(stderr,"\n"); };
     // Der Befehl, der gerade lief (bzw. zuletzt lief): Beginn aus Z8000::lastPc().
     auto lastInsn16 = [&]()->std::string{
@@ -1322,7 +1378,7 @@ int main(int argc, char** argv){
             if (l.dec.insn && l.dec.insn->has(z8k::Z8K_CALL))
                 cs16.noteCall(key, key16(z.pcSeg, uint16_t(z.pc + l.bytes)), sp);
             // „laufen und mitschreiben" zuerst (kein Halt): Datei-Trace, Logpoints, mark.
-            if (trace_fp && trace_lines < trace_cap){ traceLine16To(trace_fp, z); ++trace_lines; }
+            if (trace_fp && !trace_z80only && trace_lines < trace_cap){ traceLine16To(trace_fp, z); ++trace_lines; }
             if (!logpoints16.empty()){ auto lit=logpoints16.find(key); if (lit!=logpoints16.end()) logHit16(z,lit->second); }
             if (mark16>=0 && key==(uint32_t)mark16){ rel_origin=m.cpuCycles(); rel_armed=true; mark16=-1;
                 fprintf(stderr,"[mark] relative origin set at U8001 PC=%s (abs cyc=%llu)\n",
@@ -2224,7 +2280,19 @@ int main(int argc, char** argv){
             // als Qt-Code (→ 0x00, Taste verpufft) — als Rohbyte senden (QK_RAW_BASE);
             // das CP/A-BIOS reicht Codes < 20H unveraendert durch.
             if (code < 0x20) code |= 0x02000000u;
-            m.keyPress(code,false,false); go(600000); if(hit) return;
+            m.keyPress(code,false,false);
+            if (key_wait && m.a5120() && !m.a5120()->k7636()){
+                // Erst warten, bis das Zeichen im Empfang der K8025 (Kanal A) steht (die K7637 sendet
+                // mit 9600 Bd), dann, bis der Gast es geholt hat.  Gedeckelt: holt keiner ab, geht es
+                // nach 5 Mio. Takten (~2 s) mit Hinweis weiter, statt zu haengen.
+                uint64_t used=0; bool seen=false;
+                while (used<60000 && !seen){ goSilent(1000); used+=1000; if(hit) return;
+                    seen = m.a5120()->kbdSioState().ch[0].rxQueued>0; }
+                used=0;
+                while (seen && used<5000000 && m.a5120()->kbdSioState().ch[0].rxQueued>0){ goSilent(1000); used+=1000; if(hit) return; }
+                if (!seen) { goSilent(2000); if(hit) return; }   // schon geholt, bevor wir es sahen
+                else if (used>=5000000) fprintf(stderr,"   (keywait: Zeichen %02X wurde nicht abgeholt)\n",code & 0xFF);
+            } else { go(600000); if(hit) return; }
             m.keyRelease(code);          go(150000); if(hit) return;
         }
     };
@@ -2385,6 +2453,32 @@ int main(int argc, char** argv){
     };
 
     auto parseNum=[&](const std::string& s)->long{ return resolveAddr(s); };
+    // Argumente von `lp A …` zerlegen: Ausdruecke, `dump AUSDRUCK N [w]`, `count N`, `if BEDINGUNG…`.
+    // Ausdruecke enthalten keine Leerzeichen (wie bisher); `if` nimmt den Rest der Zeile.
+    auto parseLpArgs = [&](const std::vector<std::string>& r, std::vector<std::string>& ex, LpOpt& o)->bool{
+        for (size_t i=0;i<r.size();++i){
+            if (r[i]=="dump"){
+                if (i+2>=r.size()){ fprintf(stderr,"  ? lp A … dump AUSDRUCK N [w]\n"); return false; }
+                o.dumpExpr=r[i+1]; o.dumpN=(int)parseNum(r[i+2]); i+=2;
+                if (i+1<r.size() && (r[i+1]=="w"||r[i+1]=="word")){ o.dumpW=true; ++i; }
+                if (o.dumpN<=0 || o.dumpN>4096){ fprintf(stderr,"  ? dump: N muss 1..4096 sein\n"); return false; }
+            } else if (r[i]=="count"){
+                if (i+1>=r.size()){ fprintf(stderr,"  ? lp A … count N\n"); return false; }
+                o.count=parseNum(r[i+1]); ++i;
+            } else if (r[i]=="if"){
+                for (size_t j=i+1;j<r.size();++j){ if(j>i+1) o.cond+=" "; o.cond+=r[j]; }
+                if (o.cond.empty()){ fprintf(stderr,"  ? lp A … if BEDINGUNG\n"); return false; }
+                break;
+            } else ex.push_back(r[i]);
+        }
+        return true; };
+    auto lpOptText = [](const LpOpt& o)->std::string{
+        std::string s;
+        if (o.dumpN>0) s+=" dump "+o.dumpExpr+" "+std::to_string(o.dumpN)+(o.dumpW?" w":"");
+        if (o.count>=0) s+=" count "+std::to_string(o.count);
+        if (!o.cond.empty()) s+=" if "+o.cond;
+        return s; };
+
     // "A" or "A..B" → address range (symbols/hex allowed on both ends).
     auto parseRange=[&](const std::string& tok, uint16_t& lo, uint16_t& hi){
         size_t dd=tok.find("..");
@@ -2620,13 +2714,15 @@ int main(int argc, char** argv){
             fprintf(stderr,"  break-on-%s U8001 %s\n", cmd=="bint"?"VI/NVI":cmd=="bnmi"?"NMI":"IRET", f?"ON":"off");
             return true; }
         if ((cmd=="logpoint"||cmd=="lp") && t.size()>1){ dbg16::Addr16 a; if(!parse16(t[1],a)) return true;
-            std::vector<std::string> ex(t.begin()+2,t.end());
+            std::vector<std::string> rest(t.begin()+2,t.end()), ex; LpOpt o;
+            if (!parseLpArgs(rest,ex,o)) return true;
             logpoints16[a.key()]=ex;
+            if (o.dumpN>0||o.count>=0||!o.cond.empty()) lp_opt16[a.key()]=o; else lp_opt16.erase(a.key());
             std::string sx; for(auto& e: ex) sx+=" "+e;
-            fprintf(stderr,"  logpoint U8001 @%s%s%s\n",dbg16::addrText(a.seg,a.off,true).c_str(),ex.empty()?"":" exprs:",sx.c_str());
+            fprintf(stderr,"  logpoint U8001 @%s%s%s%s\n",dbg16::addrText(a.seg,a.off,true).c_str(),ex.empty()?"":" exprs:",sx.c_str(),lpOptText(o).c_str());
             return true; }
         if (cmd=="lpd" && t.size()>1){ dbg16::Addr16 a; if(!parse16(t[1],a)) return true;
-            logpoints16.erase(a.key()); fprintf(stderr,"  logpoint U8001 deleted\n"); return true; }
+            logpoints16.erase(a.key()); lp_opt16.erase(a.key()); fprintf(stderr,"  logpoint U8001 deleted\n"); return true; }
         if (cmd=="mark" && t.size()>1){ dbg16::Addr16 a; if(!parse16(t[1],a)) return true;
             mark16=(long)a.key(); fprintf(stderr,"  mark armed at U8001 PC=%s\n",dbg16::addrText(a.seg,a.off,true).c_str()); return true; }
         if (cmd=="hist" && t.size()>1){
@@ -3301,8 +3397,12 @@ int main(int argc, char** argv){
               "                          print write/read/both | break write/read/both\n"
               "          wd <A>|all  wl  delete (covering A) / list mem watches\n"
               "          iow/iob <P>     io port: print / break ; iod <P> wl-io: iol\n"
-              "  LOG     logpoint <A> [expr..]  print + CONTINUE (dprintf) ; lpd <A> ; lpl\n"
-              "          trace <file> [lo hi]   log every executed instr to file ; trace off\n"
+              "  LOG     logpoint <A> [expr..] [dump <expr> <N> [w]] [count <N>] [if <cond>]  print + CONTINUE (dprintf)\n"
+              "                         dump = Speicherblock (N Bytes, mit w Woerter) ab Adresse <expr>; count = nach N Ausgaben stumm ;\n"
+              "                         if = nur bei erfuellter Bedingung ; lpd <A> ; lpl (zeigt Treffer/ausgegeben)\n"
+              "          trace <file> [lo hi] [z80]  log every executed instr to file ('z80': ohne U8001-Zeilen) ; trace off\n"
+              "          cover on [lo hi] | off | reset | expect lst [lo hi] | expect clear | report [datei] [unhit|hit|all]\n"
+              "                         Abdeckung ZVE1: welche Befehlsadressen liefen, NIE getroffene als Bereiche\n"
               "          itrace <file>          log every accepted INT/NMI (cycle, int@PC, ISR, SP,\n"
               "                                 Vektor + Quellgeraet/SPURIOUS) ; itrace off\n"
               "  INSPECT r [2]     registers (ZVE1, +ZVE2) ; rj / rj2 registers as JSON (ZVE1/ZVE2)\n"
@@ -3476,35 +3576,119 @@ int main(int argc, char** argv){
         // logpoints (dprintf-style: print + continue, never stop) on ZVE1
         else if ((cmd=="logpoint"||cmd=="lp") && t.size()>1){
             uint16_t a=(uint16_t)parseNum(t[1]);
-            std::vector<std::string> ex(t.begin()+2,t.end());
+            std::vector<std::string> rest(t.begin()+2,t.end()), ex; LpOpt o;
+            if (parseLpArgs(rest,ex,o)){
             logpoints[a]=ex;
-            fprintf(stderr,"  logpoint @%04X%s%s\n",a, ex.empty()?"":" exprs:",
-                    ex.empty()?"":[&]{ std::string s; for(auto&e:ex){s+=" "+e;} return s; }().c_str()); }
-        else if (cmd=="lpd" && t.size()>1){ logpoints.erase((uint16_t)parseNum(t[1])); fprintf(stderr,"  logpoint deleted\n"); }
+            if (o.dumpN>0||o.count>=0||!o.cond.empty()) lp_opt1[a]=o; else lp_opt1.erase(a);
+            fprintf(stderr,"  logpoint @%04X%s%s%s\n",a, ex.empty()?"":" exprs:",
+                    ex.empty()?"":[&]{ std::string s; for(auto&e:ex){s+=" "+e;} return s; }().c_str(), lpOptText(o).c_str()); } }
+        else if (cmd=="lpd" && t.size()>1){ uint16_t a=(uint16_t)parseNum(t[1]); logpoints.erase(a); lp_opt1.erase(a); fprintf(stderr,"  logpoint deleted\n"); }
         else if (cmd=="lpl"){
             if(logpoints.empty() && logpoints16.empty()) fprintf(stderr,"  (no logpoints)\n");
             for(auto&kv:logpoints16){ std::string sy=symAt16(kv.first);
                 fprintf(stderr,"    U8001 %s%s%s%s ",dbg16::addrText(uint8_t(kv.first>>16),uint16_t(kv.first),true).c_str(),
                         sy.empty()?"":" <",sy.c_str(),sy.empty()?"":">");
-                for(auto&e:kv.second) fprintf(stderr,"%s ",e.c_str()); fprintf(stderr,"\n"); }
+                for(auto&e:kv.second) fprintf(stderr,"%s ",e.c_str());
+                auto oi=lp_opt16.find(kv.first);
+                if (oi!=lp_opt16.end()) fprintf(stderr,"%s  [Treffer=%ld ausgegeben=%ld]",lpOptText(oi->second).c_str(),oi->second.hits,oi->second.printed);
+                fprintf(stderr,"\n"); }
             for(auto&kv:logpoints){ std::string s=symFor(kv.first);
                 fprintf(stderr,"    %04X%s%s%s ",kv.first,s.empty()?"":" <",s.c_str(),s.empty()?"":">");
-                for(auto&e:kv.second) fprintf(stderr,"%s ",e.c_str()); fprintf(stderr,"\n"); } }
+                for(auto&e:kv.second) fprintf(stderr,"%s ",e.c_str());
+                auto oi=lp_opt1.find(kv.first);
+                if (oi!=lp_opt1.end()) fprintf(stderr,"%s  [Treffer=%ld ausgegeben=%ld]",lpOptText(oi->second).c_str(),oi->second.hits,oi->second.printed);
+                fprintf(stderr,"\n"); } }
         // continuous trace-to-file: `trace <file> [lo hi]` ; `trace off`
         else if (cmd=="trace"){
             if (t.size()>=2 && t[1]=="off"){
                 if(trace_fp){ fclose(trace_fp); fprintf(stderr,"  trace off (%ld line(s) written)\n",trace_lines); }
                 else fprintf(stderr,"  trace was not on\n");
-                trace_fp=nullptr; trace_lo=trace_hi=-1; trace_lines=0; trace_capped=false; }
+                trace_fp=nullptr; trace_lo=trace_hi=-1; trace_lines=0; trace_capped=false; trace_z80only=false; }
             else if (t.size()>=2){
                 if(trace_fp) fclose(trace_fp);
                 trace_fp=fopen(t[1].c_str(),"w"); trace_lines=0; trace_capped=false;
-                trace_lo=trace_hi=-1;
+                trace_lo=trace_hi=-1; trace_z80only=false;
                 if(!trace_fp){ fprintf(stderr,"  cannot open %s for writing\n",t[1].c_str()); }
-                else { if(t.size()>=4){ trace_lo=(int)(uint16_t)parseNum(t[2]); trace_hi=(int)(uint16_t)parseNum(t[3]); }
-                    fprintf(stderr,"  trace -> %s%s (every executed instr; cap %ld lines, 'trace off' to stop)\n",
-                            t[1].c_str(), trace_lo>=0?(" in ["+std::to_string(trace_lo)+","+std::to_string(trace_hi)+"]").c_str():"", trace_cap); } }
-            else fprintf(stderr,"  trace <file> [lo hi] | trace off\n"); }
+                else {
+                    // Rest: [lo hi] [z80] — `z80` darf auch allein oder vor dem Fenster stehen.
+                    std::vector<std::string> num;
+                    for (size_t i=2;i<t.size();++i){
+                        if (t[i]=="z80") trace_z80only=true; else num.push_back(t[i]); }
+                    if(num.size()>=2){ trace_lo=(int)(uint16_t)parseNum(num[0]); trace_hi=(int)(uint16_t)parseNum(num[1]); }
+                    fprintf(stderr,"  trace -> %s%s%s (every executed instr; cap %ld lines, 'trace off' to stop)\n",
+                            t[1].c_str(), trace_lo>=0?(" in ["+std::to_string(trace_lo)+","+std::to_string(trace_hi)+"]").c_str():"",
+                            trace_z80only?" [nur Z80, ohne U8001-Zeilen]":"", trace_cap); } }
+            else fprintf(stderr,"  trace <file> [lo hi] [z80] | trace off\n"); }
+        // Abdeckung: cover on [lo hi] | off | reset | expect lst|clear|<lo> <hi> | report [datei] [unhit|hit|all]
+        else if (cmd=="cover"){
+            const std::string sub = t.size()>1? t[1] : "status";
+            auto codeFromListing = [&](int lo,int hi)->int{
+                int n=0;
+                for (auto& kv: prn.by_addr)
+                    if ((int)kv.first>=lo && (int)kv.first<=hi && maclst::isCodeLine(kv.second)){ cov_exp.insert(kv.first); ++n; }
+                return n; };
+            if (sub=="on"){
+                cov_lo=0; cov_hi=0xFFFF;
+                if (t.size()>=4){ cov_lo=(int)(uint16_t)parseNum(t[2]); cov_hi=(int)(uint16_t)parseNum(t[3]); }
+                cov_on=true;
+                fprintf(stderr,"  cover ON [%04X..%04X] (zaehlt jeden ausgefuehrten ZVE1-Befehl; 'cover report' zeigt die nie getroffenen)\n",cov_lo,cov_hi); }
+            else if (sub=="off"){ cov_on=false; fprintf(stderr,"  cover off (Zaehler bleiben, 'cover reset' loescht sie)\n"); }
+            else if (sub=="reset"){ std::fill(cov_cnt.begin(),cov_cnt.end(),0u); fprintf(stderr,"  cover: Zaehler geloescht\n"); }
+            else if (sub=="expect"){
+                if (t.size()>=3 && t[2]=="clear"){ cov_exp.clear(); fprintf(stderr,"  cover: erwartete Adressen geloescht\n"); }
+                else if (t.size()>=3 && t[2]=="lst"){
+                    int lo=0,hi=0xFFFF;
+                    if (t.size()>=5){ lo=(int)(uint16_t)parseNum(t[3]); hi=(int)(uint16_t)parseNum(t[4]); }
+                    if (prn.by_addr.empty()) fprintf(stderr,"  cover expect lst: kein Listing geladen (-l datei.prn|.mac)\n");
+                    else { int n=codeFromListing(lo,hi);
+                        fprintf(stderr,"  cover: %d Befehlsadresse(n) aus dem Listing in [%04X..%04X] erwartet (gesamt %zu)\n",n,lo,hi,cov_exp.size()); } }
+                else fprintf(stderr,"  ? cover expect lst [lo hi] | cover expect clear\n"); }
+            else if (sub=="report"){
+                std::string file, mode="unhit";
+                for (size_t i=2;i<t.size();++i){
+                    if (t[i]=="unhit"||t[i]=="hit"||t[i]=="all") mode=t[i]; else file=t[i]; }
+                // Ohne ausdrueckliche Erwartung: das geladene Listing (innerhalb des Fensters).
+                std::set<uint16_t> expd = cov_exp; bool implicit=false;
+                if (expd.empty() && !prn.by_addr.empty()){
+                    for (auto& kv: prn.by_addr)
+                        if ((int)kv.first>=cov_lo && (int)kv.first<=cov_hi && maclst::isCodeLine(kv.second)) expd.insert(kv.first);
+                    implicit=true; }
+                // Vereinigung aller bekannten Adressen, je mit Status
+                std::map<uint16_t,bool> st;      // Adresse -> getroffen?
+                for (uint16_t a: expd) st[a]=cov_cnt[a]>0;
+                for (int a=0;a<65536;++a) if (cov_cnt[a]>0) st[(uint16_t)a]=true;
+                size_t nexp=expd.size(), nhit=0, nunhit=0; unsigned long long sum=0;
+                for (uint16_t a: expd){ if (cov_cnt[a]>0) ++nhit; else ++nunhit; }
+                for (int a=0;a<65536;++a) sum+=cov_cnt[a];
+                FILE* out = stderr; bool tofile=false;
+                if (!file.empty()){ out=fopen(file.c_str(),"w"); tofile=(out!=nullptr);
+                    if (!out){ fprintf(stderr,"  cannot open %s for writing\n",file.c_str()); out=stderr; } }
+                char head[256];
+                if (nexp) snprintf(head,sizeof head,"cover: %zu von %zu erwarteten Befehlsadressen getroffen, %zu NIE%s; %llu Befehle gezaehlt",
+                                   nhit,nexp,nunhit,implicit?" (Erwartung = geladenes Listing)":"",sum);
+                else snprintf(head,sizeof head,"cover: %llu Befehle gezaehlt; keine erwarteten Adressen (Listing mit -l laden oder 'cover expect lst') - nur getroffene werden gezeigt",sum);
+                fprintf(out,"%s\n",head);
+                // Bereiche gleichen Status entlang der sortierten Adressfolge
+                bool want_hit = (mode=="hit"||mode=="all"), want_un = (mode=="unhit"||mode=="all");
+                auto flush=[&](uint16_t a0,uint16_t a1,bool hit,size_t n){
+                    if (hit? !want_hit : !want_un) return;
+                    std::string sy=symFor(a0), src=prnFor(a0);
+                    if (a0==a1) fprintf(out,"  %s %04X            (%zu)%s%s%s%s\n",hit?"hit  ":"NIE  ",a0,n,
+                            sy.empty()?"":" <",sy.c_str(),sy.empty()?"":">",src.empty()?"":("  ; "+src).c_str());
+                    else fprintf(out,"  %s %04X-%04X       (%zu)%s%s%s%s\n",hit?"hit  ":"NIE  ",a0,a1,n,
+                            sy.empty()?"":" <",sy.c_str(),sy.empty()?"":">",src.empty()?"":("  ; "+src).c_str()); };
+                bool have=false, cur=false; uint16_t r0=0,r1=0; size_t rn=0;
+                for (auto& kv: st){
+                    if (have && kv.second==cur){ r1=kv.first; ++rn; continue; }
+                    if (have) flush(r0,r1,cur,rn);
+                    have=true; cur=kv.second; r0=r1=kv.first; rn=1; }
+                if (have) flush(r0,r1,cur,rn);
+                if (tofile){ fclose(out); fprintf(stderr,"%s\n  -> %s\n",head,file.c_str()); } }
+            else {
+                size_t ndist=0; for (uint32_t c: cov_cnt) if (c) ++ndist;
+                fprintf(stderr,"  cover %s [%04X..%04X], %zu verschiedene Befehlsadresse(n) getroffen, %zu erwartet\n"
+                               "  cover on [lo hi] | off | reset | expect lst [lo hi] | expect clear | report [datei] [unhit|hit|all]\n",
+                        cov_on?"ON":"off",cov_lo,cov_hi,ndist,cov_exp.size()); } }
         // §11 interrupt trace to file (non-stopping)
         else if (cmd=="itrace"){
             if (t.size()>=2 && t[1]=="off"){
@@ -4475,6 +4659,42 @@ int main(int argc, char** argv){
                 else { emlog_fp=fopen(t[1].c_str(),"w"); emlog_file=emlog_fp!=nullptr;
                     if(!emlog_fp) fprintf(stderr,"  cannot open %s\n",t[1].c_str());
                     else fprintf(stderr,"  emlog -> %s\n",t[1].c_str()); } } }
+        // emmsg: eine Nachricht wie der Z8000-Kernel von mutos_1216 in den EM legen und INT-16 ausloesen
+        // (doc/merkposten/mutos_io_analyse.md §3): 14 Byte ab EM-Adresse ADR (Segment 0), Zeiger
+        // (Z8000-Wort, hoeherwertiges Byte zuerst) in die Zelle 0006H - das ist der "EM-Offset 4006H"
+        // des U880 (Fenster 4000H-7FFFH, Seite 4, Attribut 0CH => A14/A15 = 0, Segment 0 =>
+        // Zelle 0006H) -, dann A33 Bit 4 als Impuls (gesetzt, sofort wieder geloescht): die PIO A32 des
+        // EM ist PEGELgetriggert (Mode 3, aktiv high) und merkt die Anforderung; bliebe das Bit stehen,
+        // loeste jede Pegelaenderung am Port A (z. B. Bus-Abgabe) nach der ISR erneut aus und die
+        // ISR laese einen Zeiger 0.  Bytes sind HEX wie bei `e`.
+        else if (cmd=="emmsg"){
+            if (!em){ fprintf(stderr,"  (kein EM - Start mit --em em256|em064)\n"); }
+            else if (t.size()>=2 && t[1]=="int"){ em->setInt16(true); em->setInt16(false);
+                fprintf(stderr,"  INT-16 (A33 Bit 4) gepulst\n"); }
+            else if (t.size()<2) fprintf(stderr,"  ? emmsg <ADR> [b0 .. b13] [ptr=ZELLE] [noint] | emmsg int\n");
+            else {
+                uint32_t adr=(uint32_t)parseNum(t[1]) & 0xFFFF, ptr=0x0006; bool doint=true; std::vector<uint8_t> msg;
+                for (size_t i=2;i<t.size();++i){
+                    if (t[i]=="noint") doint=false;
+                    else if (t[i].rfind("ptr=",0)==0) ptr=(uint32_t)strtol(t[i].c_str()+4,nullptr,0);
+                    else msg.push_back((uint8_t)strtol(t[i].c_str(),nullptr,16)); }
+                if (msg.size()>14){ fprintf(stderr,"  ? hoechstens 14 Nachrichtenbytes (%zu angegeben)\n",msg.size()); }
+                else {
+                    msg.resize(14,0);
+                    if (em->peek(ptr)||em->peek(ptr+1))
+                        fprintf(stderr,"  (Hinweis: Zeiger bei %05X war nicht 0 - die vorige Nachricht ist nicht abgeholt)\n",ptr);
+                    for (int i=0;i<14;++i) em->poke(adr+i,msg[i]);
+                    em->poke(ptr,(uint8_t)(adr>>8)); em->poke(ptr+1,(uint8_t)adr);
+                    fprintf(stderr,"  Nachricht @EM:%04X =",adr);
+                    for (uint8_t b: msg) fprintf(stderr," %02X",b);
+                    fprintf(stderr,"\n  Zeiger EM:%04X := %04X (hoeherwertiges Byte zuerst)",ptr,adr);
+                    if (doint){ em->setInt16(true); em->setInt16(false);
+                        fprintf(stderr,"; INT-16 gepulst\n"); }
+                    else fprintf(stderr,"; ohne INT-16\n"); } } }
+        else if (cmd=="keywait"){
+            key_wait = (t.size()>1)? (t[1]!="off") : !key_wait;
+            fprintf(stderr,"  keywait %s (keys: naechstes Zeichen erst, wenn der Gast das vorige aus dem Tastatur-SIO geholt hat; nur A5120/K7637)\n",
+                    key_wait?"ON":"off"); }
         else fprintf(stderr,"  ? unknown command '%s' (try help)\n",cmd.c_str());
     }
     if (trace_fp){ fclose(trace_fp); fprintf(stderr,"trace closed (%ld line(s))\n",trace_lines); }

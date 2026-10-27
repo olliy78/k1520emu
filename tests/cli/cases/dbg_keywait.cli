@@ -1,0 +1,19 @@
+# `keywait on`: keys tippt das naechste Zeichen erst, wenn der Gast das vorige aus dem Tastatur-SIO
+# (K8025 Kanal A) geholt hat - fuer Gaeste, die schneller tippen als sie abholen (mutos_io-Bedienmaske).
+# Vorgabe (off) unveraendert; ohne Abholung geht es nach ~2 s mit Hinweis weiter, statt zu haengen.
+tool:   k1520dbg
+disk:   cpa_cpa780_k5601_noclock.img
+run:    %DISK%
+stdin:
+  gscreen "A>" 150000000
+  keywait
+  keywait off
+  keywait on
+  keys XYZ
+  g 400000
+  screen find "XYZ"
+  q
+expect:    keywait ON
+expect:    keywait off
+expect:    found at row
+forbid:    nicht abgeholt
