@@ -174,7 +174,7 @@ Linkkarte und Entscheidungen bei uns; Bau-Kollisionen beachten (Worktrees).
 | K3 | fertig (Rundlauf gegen z8kasm bitgleich) | efac5218 | `z8kdis`, `as_dialekt.md`; Rundlauf gegen den Gast-`as` = K4 |
 | K11 (make) | fertig | 9b2d1e07 | `tools/mutos8000/kernel/make/`; Grenzen: `/tmp` braucht eigene Diskette, Quellen mit Zeit 1987 |
 | K4 | in Arbeit | | Rundlauf Kernel gegen Gast-`as` |
-| K6a | in Arbeit | | Lauf-Abdeckung, Strukturbefund |
+| K6a | fertig | 10ea95b7 | Code 28 % -> 85 %, 235 Funktionen (207 mit `call csv`), `bdevsw`/`cdevsw`/`sysent`/Konfigworte belegt, Modulreihenfolge = WEGA-Linkreihenfolge (Hypothese); `kernel_struktur.md`, `cover` fuer U8001 im Debugger |
 
 ## 7. Risiken
 
