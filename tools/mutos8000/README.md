@@ -20,6 +20,7 @@ Nur Python-Standardbibliothek, lauffähig mit `python3 -I`; das DiskTool wird nu
 | `bauangaben_{cmd,usr,bin}.yaml` | Vorlagen der Bauangaben der Datendisketten (Inodes, `bloecke: 494`) |
 | `bauangaben_ladediskette.yaml` | Vorlage der Bauangaben der Ladediskette (Profile, Muster der Laufwerkstyp-Konstante, Varianten); `archiv_erzeugen.py --art ladediskette` legt sie ins Archiv |
 | `mutos_patch.py` | (auch als Bibliothek: `anwenden(art, daten, optionen)`, vom Bau der Ladedisketten benutzt) Patchliste fuer `mutos_io` (8 x 512, Entwurf 39 §11.2), `ZDOS` (UDOS meldet nur Laufwerk A: an, §11.6) und `mutos_1216` (Wurzel-/Swap-/Pipe-Geraet, Swap-Lage, Grenzen, §11.4/§11.5); prueft jedes Altbyte, schreibt nur nach `-o` |
+| `mutos_io/` | Quelle, Bau und Ladedisketten-Pipeline von `mutos_io` (U880-Seite): `mutos_io/README.md`, Entwurf 40 |
 | `versuche/*.dbg` | `k1520dbg`-Skripte der Messungen aus §11 (Wurzel in A: ueber die Maske, Kernelpatch `rootdev` 4,0, DISK-Satz 8 x 512); Aufruf in der Kopfzeile |
 
 ```sh

@@ -1,4 +1,16 @@
 	.Z80
+; ---- Variante (Entwurf 40 M5; ladediskette.py setzt den Wert beim Bau) ----------
+; K8X512 = 0: 26 x 128 B je Spur (M8K-Satz, rekonstruierte Wurzel; Auslieferungszustand)
+; K8X512 = 1:  8 x 512 B je Spur (DISK-Satz, Entwurf 39 Abschnitt 11.2); entspricht
+;              mutos_patch.py io-8x512, bytegleich (Waechter cli_mutosio_variante_8x512)
+K8X512	EQU	0
+	IF	K8X512
+SEKLEN	EQU	0200H		; Bytes je Nukleus-Aufruf = ein Sektor
+SPT	EQU	8		; Sektoren je Spur
+	ELSE
+SEKLEN	EQU	0080H
+SPT	EQU	26
+	ENDIF
 	CSEG
 
 ; N Fuellbytes FFH (UDOS-Segmente haben unbenutzte Luecken)
@@ -256,8 +268,15 @@ PF_STATUS:
 ; UDOS-Nukleus auf 128-Byte-Sektoren: [0003H] bit 0 setzen; V_BUSY := 0
 ; (8x512-Fassung: dort steht 4 statt OR 01H, siehe Entwurf 39 Abschnitt 11.2)
 NUKLEUS_INIT:
+	IF	K8X512
+	LD A,04H	; Sektorlaenge/128 = 4 (512 B); der Nukleus liest sie aus [0003H]
+	NOP
+	NOP
+	NOP
+	ELSE
 	LD A,(0003H)
-	OR 01H
+	OR 01H	; 128 B
+	ENDIF
 	LD (0003H),A
 	LD A,00H
 	LD (V_BUSY),A
@@ -821,7 +840,7 @@ BS_GROSS:
 	XOR A
 	LD (IY+4),A
 	LD (IY+5),A
-	LD HL,0080H
+	LD HL,SEKLEN
 	LD (V_LAENGE),HL
 	LD HL,BLOCK_RUECKRUF
 	LD (V_RUECKRUF_OK),HL
@@ -839,6 +858,26 @@ BS_GROSS:
 	LD (V_SEKTOR),A
 	LD L,(IY+11)
 	LD H,(IY+12)
+	IF	K8X512
+	; 8 x 512: logischer Sektor = Blocknummer; pos = bn and 7, rel = bn / 8, kein Versatz
+	LD A,L
+	AND 07H
+	LD (V_POS),A
+	SRL H
+	RR L
+	SRL H
+	RR L
+	SRL H
+	RR L
+	LD A,L
+	LD (V_ZYL),A
+	XOR A
+	LD (V_VERSATZ),A
+	REPT	23		; Fuellung: gleiche Laenge wie die 26 x 128-Fassung (Patchvorlage)
+	NOP
+	ENDM
+	ELSE
+	; 26 x 128: l = 4*bn (logischer 128-B-Sektor); l div 26 = Zylinder-relativ, l mod 26 = pos
 	ADD HL,HL
 	ADD HL,HL
 	LD B,08H
@@ -873,6 +912,7 @@ BS_MOD26:
 	ADD HL,DE
 	LD A,L
 	LD (V_VERSATZ),A
+	ENDIF
 	CALL SEKTOR_BERECHNEN
 	CALL SEKTOR_WEITER
 	PUSH IY
@@ -895,16 +935,23 @@ BLOCK_RUECKRUF:
 	JR Z,BR_ABBRUCH
 	LD L,(IY+4)
 	LD H,(IY+5)
-	LD DE,0080H
+	LD DE,SEKLEN
 	ADD HL,DE
 	LD (IY+4),L
 	LD (IY+5),H
 	LD HL,(V_REST)
+	IF	K8X512
+	OR A		; Rest - 0200H; Uebertrag = halber Schluss-Sektor eines Swap-Auftrags (Entwurf 39 A5c)
+	SBC HL,DE
+	JR C,BR_FERTIG
+	JR Z,BR_FERTIG
+	ELSE
 	XOR A
 	SBC HL,DE
 	LD A,H
 	OR L
 	JR Z,BR_FERTIG
+	ENDIF
 	LD (V_REST),HL
 	LD HL,(V_PUFFER)
 	ADD HL,DE
@@ -948,9 +995,9 @@ BR_ABBRUCH:
 SEKTOR_WEITER:
 	LD A,(V_POS)
 	INC A
-	CP 1AH
+	CP SPT
 	JR C,SW_ENDE
-	SUB 1AH
+	SUB SPT
 	LD (V_POS),A
 	LD HL,V_ZYL
 	INC (HL)
@@ -967,9 +1014,15 @@ SW_ENDE:
 	RET
 ; SEKTOR_BERECHNEN: physische Sektor-ID aus pos/Versatz (Verschraenkung 2), Zylinder = rel+1
 SEKTOR_BERECHNEN:
+	IF	K8X512
+	LD A,(V_POS)	; 8 x 512: Sektor-ID-1 = pos, keine Verschraenkung
+	JP SB_FERTIG
+	DB	99H		; Rest der ersetzten 7 Byte (Hochbyte von V_POS); der Rest bis SB_VERSCHR ist tot
+	ELSE
 	LD A,(V_VERSATZ)
 	LD D,A
 	LD A,(V_POS)
+	ENDIF
 	ADD A,A
 	CP 1AH
 	JR C,SB_VERSCHR
