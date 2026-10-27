@@ -3,6 +3,22 @@
 Stand 2026-10-27, Zweig `MUTOS8000`.  **Nur Konzept** — nichts umgesetzt, Entscheidungen des Anwenders stehen in §9 aus.
 Bezug: Entwurf 39 (MUTOS auf dem A5120.16), Entwurf 40 (`mutos_io`, gleiche Methode für die U880-Seite).
 
+## 0. Primärziel: MUTOS baut sich selbst (Anwender, 2026-10-27)
+
+Das erste Ziel ist **nicht** ein Linux-Rückbau, sondern **Selbsthosting**: der Kernel `mutos_1216` entsteht **unter MUTOS8000 selbst** aus Quellen, mit `cc`, `as`, `ld`, `ar`, `sh`.
+Linux-Werkzeuge (Disassembler, Abgleich, ggf. Interpreter) sind nur Hilfsmittel auf dem Weg dorthin, nicht das Ergebnis.  Daraus folgt:
+
+* **Der Quellbaum muss auf MUTOS-Disketten passen und dort übersetzbar sein** (Floppy 26×128 = 250 Blöcke Wurzel, Datendisketten 494 Blöcke; Hauptspeicher 192 KB, je Prozess 64 KB).
+  Stufe C ist nicht „nice to have": Assemblerquellen allein (K4/K5) sind groß und der Assembler ist langsam — die Größen- und Zeitmessung gehört früh in K1.
+* **Vorhanden unter MUTOS** (gemessen, Befund): `sh cc as ld ar ed cp mv mkdir rm size strip nm cat ls sync tar` (+ `c0 c1 c2 cpp`, `libc.a`).
+  **Fehlt:** `make`, `sed`, `awk`, `grep`, `diff`, `cmp` (cmp ist in `cmd` vorhanden, `diff` nicht).  Der Bau läuft also über ein **Shell-Skript** (`build.sh` je Modul, Neubau komplett);
+  fehlende Werkzeuge sind selbst Kandidaten für Eigenbau, falls nötig.
+* **Verteilung der Quellen:** mehrere Datendisketten (Quellen, Objekte, Ausgabe), Einhängen mit `/etc/mount`; die Datenträger werden mit dem DiskTool befüllt (Linux-Seite ist Hilfe, der Bau selbst läuft im Gast).
+* **Abnahme:** im Gast `sh build.sh` → neuer `mutos_1216`; Bytevergleich mit dem Original (`cmp`), dann Boot mit dem selbstgebauten Kernel bis `login:`.
+  Zweite Abnahmestufe: der selbstgebaute Kernel baut den Kernel erneut (Fixpunkt).
+* **Reihenfolge ändert sich:** K1 (Werkzeuge im Emulator, Zeit/Platz messen) steht vorn und ist **kein Orakel unter mehreren**, sondern der Hauptweg; der Linux-Interpreter (K9) bleibt Beschleuniger für das Matchen, nicht Voraussetzung.
+  Neues AP **K11**: Selbstbau-Skript, Quellplatzbedarf, Datenträgerschnitt, Ausführung im Gast.
+
 ## 1. Ziel
 
 Vom Kernel `mutos_1216` (Z8000, nichtsegmentiert, 36 352 B, Rohabbild ab Adresse 0) zu einer Quelle, die **mit den originalen
@@ -138,6 +154,7 @@ Jedes AP endet mit Dokumentation + Commit; Abnahme = der Wächter in der Spalte.
 | **K6** | Namen und Kommentare (Karte): Abgleich mit WEGA (§5.3), Lauf-Abdeckung (`k1520dbg`), `adb` am laufenden System; Etappen wie `mutos_io` M4 (Start/Trap/Zeit → Prozess/Swap → Dateisystem/`iget`/`alloc` → Treiber `rk`/`tty` → Konfiguration) | kommentierte Quelle + Kapitel in diesem Entwurf |
 | **K7** | Compilerkunde und Rückübersetzung nach C, Blätter zuerst; Match je Funktion gegen K5-Objekt | je Funktion Match-Quote (Liste), Modul `.c` → `.o` == Original-`.o` |
 | **K8** | Gesamtbau aus C (Rückfälle in Assembler), Boot im Emulator bis `login:`, Swap-/Mehrbenutzertest; danach erst Änderungen (z. B. `mutos_patch`-Inhalte als Quellvarianten, Wurzel in rk0, Mehrbenutzer/tty1 — Entwurf 39 „Offen") | Wächter `cli_mutos_kernel_bau` |
+| **K11** | Selbstbau im Gast: `build.sh`, Datenträgerschnitt (Quellen/Objekte/Ausgabe), Zeitmessung, Fixpunkt-Test (§0) | Wächter `cli_mutos_selbstbau` |
 | **K9** | Nativer Z8000-Benutzer-Interpreter für die Werkzeuge (optional, §5.1 ii) | Beschleunigung des K7-Matchens |
 | **K10** | Merkposten `doc/merkposten/mutos_kernel.md`, `CLAUDE.md`-Eintrag, `README`, `test_auswahl.py`-Label | |
 
