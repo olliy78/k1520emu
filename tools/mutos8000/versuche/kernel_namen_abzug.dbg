@@ -1,0 +1,22 @@
+# AP K6b: Tabellen des laufenden Kernels abziehen (proc, inode, file, u, ...).  Aufruf:
+#   tools/dev.sh tool k1520dbg --em em256 --laufwerke K5601,K5601,K5601 disks/a5120_16_MUTOS/a5120_mutos8000_boot_udos_k5601.hfe -x tools/mutos8000/versuche/kernel_namen_abzug.dbg
+# Hinweis: nach dem Anmelden laeuft nur proc[0]; ein Abzug mit mehreren Prozessen braucht laengere Laeufe.
+g 80000000
+keys BOOT\sMUTOS\r
+g 100000000
+eject A
+mount A disks/a5120_16_MUTOS/a5120_mutos8000_root_mfm.hfe udos_ss77
+keys r
+g 100000000
+keys root\r
+g 100000000
+keys ls\s-l\s/\s>\s/dev/null\r
+g 60000000
+d em:A11C 128
+d em:907A 160
+d em:9EEE 48
+d em:FC00 256
+d em:8A8C 4
+d em:8DC0 32
+d em:A07E 36
+q
