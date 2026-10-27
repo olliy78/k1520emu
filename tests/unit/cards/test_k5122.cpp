@@ -531,6 +531,38 @@ TEST_F(K5122Test, StreamingRead_UnformatierteSpur_GapFluss) {
 }
 
 /**
+ * @test K5122Test/RauschspurOhneSektorGibtDenBusFrei
+ * @brief Eine Spur MIT Bytes, aber OHNE Sektor ist unformatiert — wie eine leere.
+ *
+ * So liegt eine geloeschte Spur im Medium, wenn ein echtes Laufwerk (Greaseweazle) sie
+ * gelesen hat: Rauschen ohne Adressmarke.  Frueher pruefte startReadTransfer nur
+ * `empty()`; die Rauschspur lief in den Zweig fuer formatierte Spuren, der Lesestrom
+ * aus null Sektoren meldete trotzdem Marken (DMA-Anforderung), die ZVE2 hielt den Bus,
+ * der Index-Timeout der ZVE1 kam nie — CP/A-FORMAT stand an der echten Diskette
+ * (doc/design/40_hardware_testgruppe.md §11).
+ */
+TEST_F(K5122Test, RauschspurOhneSektorGibtDenBusFrei) {
+    auto path = tmpImg1();
+    ASSERT_TRUE(card.mountDisk(0, path, fmt1));
+    TrackImage rauschen;
+    rauschen.encoding = Encoding::FM;
+    for (size_t i = 0; i < 3600; ++i)
+        rauschen.bytes.push_back(static_cast<uint8_t>((i * 37u + 11u) ^ (i >> 3)));
+    rauschen.marks.assign(rauschen.bytes.size(), MarkType::None);
+    ASSERT_TRUE(TrackCodec::parseTrack(rauschen).empty());
+    ASSERT_TRUE(card.drive(0).writeTrackAt(0, 0, rauschen));
+
+    card.ioWrite(0x18, 0xEE);                     // D0
+    strobeRead(0);
+    auto stream = readStream(3000);
+    EXPECT_TRUE(std::find(stream.begin(), stream.end(), 0xFE) == stream.end());
+    EXPECT_TRUE(std::all_of(stream.begin(), stream.end(), [](uint8_t b) { return b == 0x4E; }))
+        << "wie eine leere Spur: markenloser Gap-Fluss";
+
+    std::filesystem::remove(path);
+}
+
+/**
  * @test K5122Test/StreamingRead_ZyklischWrapAround
  * @brief Nach dem Ende der Spur beginnt der Strom erneut von vorn (Wrap-around).
  *
