@@ -39,6 +39,23 @@ UDOS-Ladediskette kommt.  Maßstab: **der Erstbau ohne Änderung ist bytegleich*
 | **M5** | Die vorhandenen Patches (`mutos_patch.py io-8x512`) **als Quellvarianten** (Bedingte Assemblierung `IF K8X512`) nachbauen und gegen die gepatchten Dateien auf Bytegleichheit prüfen — das ist der Nachweis, dass die Quelle Änderungen trägt.  Danach erst neue Änderungen. | Wächter: Variante == `mutos_patch`-Ergebnis |
 | **M6** | Merkposten `doc/merkposten/mutos_io.md` (Festlegungen + Wächter), Eintrag in `CLAUDE.md` und `tools/mutos8000/README.md`, `test_auswahl.py` (Fachlabel), Commit je AP. | |
 
+### Werkzeugpflege in diesem Paket (Auftrag des Anwenders, 2026-10-27)
+
+**Ausgangslage:** es gibt schon `tools/z80_disasm.py`, `z80_disasm2.py` (wird mit ausgeliefert, `test_packaging`) und `z80_disasm3.py`
+(CP/A-`.COM`-Annotierer) — und M1 hat mit `tools/mutos8000/mutos_io/dis.py` einen **vierten** geschrieben, statt den
+vorhandenen zu erweitern.  Das war ein Fehler im Vorgehen; `dis.py` ist nur als Seed gedacht und wird **nicht** dauerhaft
+neben den anderen stehen.  Regel ab jetzt: **vor jedem Werkzeugbau zuerst die vorhandenen ansehen und erweitern; ein Disassembler, ein Ort.**
+
+| AP | Inhalt | Ergebnis / Wächter |
+|----|--------|--------------------|
+| **W1** | **`z80_disasm2.py` zum einen Disassembler ausbauen** (Ablage bleibt, weil ausgeliefert): `--format listing\|mac` (assemblierbarer M80-Text mit Marken, `DB`/`DW`/Text, `FILLFF`), Segmente (`--seg adr:offset:laenge`, mehrere je Datei), **Kartendatei** (`code`/`db`/`dw`/`dwc`/`str`/`txt`/`name`/`eq`, Format aus `mutos_io/karte.txt`), Wurzeln aus Zeigertabellen (`dwc`) und `LD rr,nn`-Zeigern, Abbruch an FF-Läufen, **`--pruefen`-Rundlauf** (Ergebnis assemblieren, byteweise vergleichen) | Tests `tests/python/test_z80_disasm.py`: Befehlsvollständigkeit gegen eine Tabelle aller Z80-Opcodes (inkl. DD/FD/ED/CB, undokumentierte als `DB`), Rundlauf an mehreren Prüflingen (`sertest.com`, `romread.com`, `mutosio.bin`), Karten-/Segmentfälle |
+| **W2** | `dis.py` und `mutos_io/karte.txt`-Format dorthin überführen; **`z80_disasm.py` und `z80_disasm3.py` stilllegen** (3 ist ein reiner CP/A-Annotierer → als Kartendatei + Aufruf von W1 abbilden oder entfernen), Verweise in Doku/Paket nachziehen (`packaging/*`, `test_packaging.py`, `doc/*.md`) | ein Disassembler; `rg z80_disasm` nennt nur noch ihn |
+| **W3** | **Kommentieren/Umbenennen als Werkzeug statt Einmalskript:** `--karte` trägt Namen und Kommentare (`name`, `kom`, `ik` für Zeilenkommentare), damit sich eine Quelle aus Abzug + Karte **reproduzierbar** erzeugen lässt; Wächter: Quelle aus Karte == eingecheckte Quelle | `mutos_io` und künftig K8915/PRG-710-Abzüge nach demselben Weg |
+| **W4** | Weitere Lücken, die bei M4 auffallen, **sofort im Werkzeug** schließen (z. B. Textformate mit Längenbyte `str`, Variablenbereiche, Rückwärtssuche nach Zeigern auf Marken mitten im Befehl) und in `tools/how_to_debug_and_trace.md` festhalten | Merkposten `doc/merkposten/mutos_io.md` |
+
+Reihenfolge: W1 **vor** dem Kommentieren (M4), weil M4 genau die Funktionen braucht (Namen, Kommentare, Karte); `dis.py` trägt
+bis dahin als Übergang.  Der Rundlauf aus M2 (`build.py --check`) bleibt der Maßstab für jede Werkzeugänderung.
+
 ## Entscheidungen / Risiken
 
 * **Reihenfolge M1→M2→M4:** erst die rohe Quelle bytegleich bauen, dann kommentieren.  Kommentare sind
