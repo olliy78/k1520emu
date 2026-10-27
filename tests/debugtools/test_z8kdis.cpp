@@ -274,4 +274,61 @@ TEST(Z8kdisAs, DialektNachCcS) {
     EXPECT_EQ(t.find("%ed"), std::string::npos);
     // Keine Grossbuchstaben-Mnemonik
     EXPECT_EQ(t.find("\tCALL"), std::string::npos);
+    // `$ABS` lieferte im Gast-as gar keinen Text (AP K4) und darf nie geschrieben werden
+    EXPECT_EQ(t.find("$ABS"), std::string::npos) << t;
+}
+
+// ── As-Ausgabe in Stuecken (AP K4) ───────────────────────────────────────────
+
+TEST(Z8kdisAs, TeilAusgabeMachtFremdeMarkenZuKonstanten) {
+    const char* q =
+        "  ORG 0\n"
+        "  A1: LD R0,#%0001\n"
+        "      CALL B1\n"
+        "      RET\n"
+        "  B1: LD R1,#%0002\n"
+        "      JR NZ,B1\n"
+        "      RET\n";
+    Analyse an = analysiere(baue(q), "code 0\n", 0, Format::As);
+    // Stueck 2 beginnt bei B1 (Adresse 0A: LD 4 + CALL 4 + RET 2): A1 liegt ausserhalb, B1 drinnen
+    an.opt.teil = true; an.opt.teilVon = 0xA; an.opt.teilBis = 0x100;
+    std::string t = an.ausgeben();
+    EXPECT_EQ(t.find("\tcall"), std::string::npos) << t;           // der CALL gehoert zu Stueck 1
+    EXPECT_NE(t.find("L000A:\n"), std::string::npos) << t;          // eigene Marke bleibt Marke
+    EXPECT_NE(t.find("\tjr\tne,L000A\n"), std::string::npos) << t;
+    an.opt.teilVon = 0; an.opt.teilBis = 0xA;
+    t = an.ausgeben();
+    EXPECT_NE(t.find("\tL000A\t:= %A\n"), std::string::npos) << t;  // Marke ausserhalb: absolute Konstante
+    EXPECT_NE(t.find("\tcall\tL000A\n"), std::string::npos) << t;
+}
+
+TEST(Z8kdisAs, SchnitteLaufenNieQuerUeberEinenRelativenSprung) {
+    std::string q = "  ORG 0\n  S: LD R0,#%0001\n";
+    for (int i = 0; i < 30; ++i) q += "  NOP\n";
+    q += "  JR NZ,S\n";                                           // Schleife ueber ~60 Byte
+    for (int i = 0; i < 30; ++i) q += "  NOP\n";
+    q += "  RET\n";
+    Analyse an = analysiere(baue(q), "code 0\n", 0, Format::As);
+    auto s = an.schnitte(16);
+    ASSERT_GE(s.size(), 2u);
+    uint32_t schleifeEnde = 4 + 60 + 2;                             // Ende des JR
+    for (const auto& st : s) {                                      // kein Stueck beginnt innerhalb (0, schleifeEnde)
+        if (st.first == 0) continue;
+        EXPECT_GE(st.first, schleifeEnde) << st.first;
+    }
+    EXPECT_EQ(s.front().first, 0u);
+    EXPECT_EQ(s.back().second, an.einheiten().back().adr + an.einheiten().back().len);
+}
+
+TEST(Z8kdisAs, JrAnDerReichweitengrenzeWirdZuWort) {
+    // Rueckwaerts 127 Woerter: die CPU kann es, der Gast-as lehnt es ab -> WV mit Kommentar
+    std::string q = "  ORG 0\n  S: NOP\n";
+    for (int i = 0; i < 125; ++i) q += "  NOP\n";                   // 126 NOP = 252 Byte bis hinter S+NOP
+    q += "  JR NZ,S\n  RET\n";
+    auto bin = baue(q);
+    Analyse an = analysiere(bin, "code 0\n", 0, Format::As);
+    std::string t = an.ausgeben();
+    EXPECT_EQ(t.find("\tjr\tne"), std::string::npos) << t;
+    EXPECT_NE(t.find("! jr ne,"), std::string::npos) << t;
+    EXPECT_NE(t.find("\tWV %EE81\n"), std::string::npos) << t;
 }

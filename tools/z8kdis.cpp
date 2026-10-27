@@ -31,6 +31,9 @@ void usage() {
         "                        as  = Quelle im Dialekt des MUTOS-as (PLZ/ASM)\n"
         "                        z8k = Quelle fuer z8kasm (Zilog-Syntax)\n"
         "  --modul NAME          Modulname der as-Ausgabe (Vorgabe mutos)\n"
+        "  --teil VON:BIS        as-Ausgabe nur fuer den Adressbereich [VON,BIS) (hex); Marken ausserhalb = Konstanten\n"
+        "  --teile MAXBYTES      (hex) Schnitte fuer --teil auf stdout (Zeilen `VON BIS`, hex), hoechstens MAXBYTES je Stueck,\n"
+        "                        nie quer ueber einen relativen Sprung (JR/DJNZ/CALR)\n"
         "  --segmentiert         U8001-Modus (Vorgabe nichtsegmentiert)\n"
         "  --statistik           Statistik (Code/Daten/unerreicht) auf stderr\n"
         "  --vorschlaege         Kandidaten fuer weitere Code-Einstiege als Kartenzeilen (nur Hinweis);\n"
@@ -54,6 +57,7 @@ int main(int argc, char** argv) {
     std::string datei, kartePfad, aus;
     uint32_t base = 0;
     bool stat = false, pruefen = false, vorschlag = false;
+    uint32_t teile = 0;
     std::vector<uint32_t> entries;
     std::vector<std::pair<uint32_t, uint32_t>> psa;
     std::vector<z8kdis::KarteSeg> segs;
@@ -88,6 +92,15 @@ int main(int argc, char** argv) {
             else { usage(); return 2; }
         }
         else if (a == "--modul") an.opt.modul = arg();
+        else if (a == "--teil") {
+            std::string s = arg();
+            size_t p = s.find(':');
+            if (p == std::string::npos || !z8kdis::Karte::zahl(s.substr(0, p), x) || !z8kdis::Karte::zahl(s.substr(p + 1), y)) {
+                std::fprintf(stderr, "z8kdis: --teil VON:BIS erwartet\n"); return 2;
+            }
+            an.opt.teil = true; an.opt.teilVon = x; an.opt.teilBis = y;
+        }
+        else if (a == "--teile") { if (!z8kdis::Karte::zahl(arg(), x)) { usage(); return 2; } teile = x; }
         else if (a == "--segmentiert") an.opt.segmentiert = true;
         else if (a == "--statistik") stat = true;
         else if (a == "--pruefen") pruefen = true;
@@ -113,6 +126,10 @@ int main(int argc, char** argv) {
     an.laden(daten, base);
     an.analysieren();
 
+    if (teile) {
+        for (const auto& t : an.schnitte(teile)) std::printf("%X %X\n", unsigned(t.first), unsigned(t.second));
+        return 0;
+    }
     if (vorschlag) {
         auto v = an.vorschlaege();
         for (const auto& e : v)

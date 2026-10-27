@@ -149,6 +149,8 @@ struct Optionen {
     bool segmentiert = false;       ///< U8001-Modus (Vorgabe nichtsegmentiert)
     Format format = Format::Listing;
     std::string modul = "mutos";    ///< Modulname der As-Ausgabe
+    bool teil = false;              ///< As-Ausgabe nur fuer [teilVon, teilBis) (AP K4: Kernel in Stuecken)
+    uint32_t teilVon = 0, teilBis = 0;
 };
 
 struct Statistik {
@@ -787,6 +789,52 @@ private:
     // ── Dialekt des MUTOS-as (PLZ/ASM) ───────────────────────────────────────
     std::string asQuelle() const;
 
+public:
+    /// Schnittstellen fuer die As-Ausgabe in Stuecken (`opt.teil`): Bereiche [von, bis) von hoechstens
+    /// `maxBytes` Byte (ein einzelner Brocken darf groesser sein), geschnitten nur an Einheitengrenzen,
+    /// die kein relativer Sprung (JR/DJNZ/DBJNZ/CALR) ueberspannt -- der as kennt ueber Stuecke hinweg nur
+    /// absolute Konstanten, und fuer einen relativen Sprung ginge das nicht (`ILLEGAL VALUE`, gemessen).
+    std::vector<std::pair<uint32_t, uint32_t>> schnitte(uint32_t maxBytes) const {
+        std::set<uint32_t> verboten;                   // Schnitt c ist verboten, wenn lo < c <= hi
+        std::vector<std::pair<uint32_t, uint32_t>> iv;
+        for (const Einheit& e : einheiten_) {
+            if (e.typ != Einheit::Befehl || !e.line.dec.insn || !e.line.hasTarget) continue;
+            bool rel = false;
+            for (int i = 0; i < e.line.dec.nops; ++i) {
+                z8k::Kind k = e.line.dec.op[i].kind;
+                if (k == z8k::Kind::RA16 || k == z8k::Kind::RA8 || k == z8k::Kind::RA7 || k == z8k::Kind::RA12) rel = true;
+            }
+            if (!rel) continue;
+            uint32_t tg = lin(e.line.targetSeg, e.line.target);
+            iv.push_back({std::min(e.adr, tg), std::max(e.adr, tg)});
+        }
+        std::sort(iv.begin(), iv.end());
+        std::vector<std::pair<uint32_t, uint32_t>> r;
+        if (einheiten_.empty()) return r;
+        uint32_t von = einheiten_.front().adr, ende = einheiten_.back().adr + einheiten_.back().len;
+        size_t k = 0;
+        uint32_t reichweite = 0;                       // groesstes hi der Intervalle mit lo < c
+        uint32_t letzterSchnitt = von;
+        for (const Einheit& e : einheiten_) {
+            uint32_t c = e.adr;
+            while (k < iv.size() && iv[k].first < c) reichweite = std::max(reichweite, iv[k++].second);
+            if (c == von) continue;
+            bool frei = !(reichweite >= c);
+            if (frei && c - letzterSchnitt >= maxBytes) { r.push_back({letzterSchnitt, c}); letzterSchnitt = c; }
+        }
+        r.push_back({letzterSchnitt, ende});
+        return r;
+    }
+private:
+
+    /// JR mit Wortabstand <= -127 oder >= 127: der Gast-as lehnt ihn ab (nur -127 im Kernel belegt; die Grenzen
+    /// -128/+127 sind aus Vorsicht mit erfasst, ein JR dort kommt im Kernel nicht vor).
+    static bool asLehntSprungAb(const Einheit& e) {
+        if (!e.line.dec.insn || std::strcmp(e.line.dec.insn->mn, "JR") || !e.line.hasTarget) return false;
+        int d = (int(e.line.target) - int(e.adr + e.len)) / 2;
+        return d <= -127 || d >= 127;
+    }
+
     std::multimap<uint32_t, std::string> psaKom_;
     std::set<int> gesehen_;
     std::map<uint32_t, std::string> demotiert_;   // Befehle ohne kanonische Kodierung (Text zur Anzeige)
@@ -812,25 +860,23 @@ inline std::string Analyse::asQuelle() const {
         std::snprintf(b, sizeof b, "\t%s\t:= %%%X\n", autoName(a).c_str(), unsigned(a & 0xFFFF));
         o += b;
     }
-    o += "G\t_" + opt.modul + "\tPR\nE\n";
-    uint32_t letzterEnde = ~0u;
+    std::string rumpf = "G\t_" + opt.modul + "\tPR\nE\n";
     for (const Einheit& e : einheiten_) {
-        if (e.adr != letzterEnde) {
-            std::snprintf(b, sizeof b, "$ABS %%%X\n", unsigned(e.adr & 0xFFFF));
-            o += b;
-        }
-        letzterEnde = e.adr + e.len;
+        if (opt.teil && (e.adr < opt.teilVon || e.adr >= opt.teilBis)) continue;
+        // `$ABS` wird NICHT geschrieben (K4, gegen den Gast-as gemessen): der as legt dann gar keinen Text an.
+        // Luecken gibt es nicht -- was die Karte nicht als Code fuehrt, bleibt DW/DB, das Abbild ist lueckenlos.
         auto pk = psaKom_.equal_range(e.adr);
-        for (auto it = pk.first; it != pk.second; ++it) o += "! " + it->second + " !\n";
+        for (auto it = pk.first; it != pk.second; ++it) rumpf += "! " + it->second + " !\n";
         auto kk = karte.kom.equal_range(e.adr);
-        for (auto it = kk.first; it != kk.second; ++it) o += "! " + it->second + " !\n";
+        for (auto it = kk.first; it != kk.second; ++it) rumpf += "! " + it->second + " !\n";
         auto dm = demotiert_.find(e.adr);
-        if (dm != demotiert_.end()) o += "! nicht kanonisch kodiert: " + dm->second + " !\n";
+        if (dm != demotiert_.end()) rumpf += "! nicht kanonisch kodiert: " + dm->second + " !\n";
         auto m = marke_.find(e.adr);
-        if (m != marke_.end()) o += m->second + ":\n";
+        if (m != marke_.end()) rumpf += m->second + ":\n";
         std::string text;
-        if (e.typ == Einheit::Befehl && e.line.dec.insn->has(z8k::Z8K_ALT)) {
-            // Zweitkodierung (LDB.L): der as hat keine Schreibweise dafuer -> Woerter
+        if (e.typ == Einheit::Befehl && (e.line.dec.insn->has(z8k::Z8K_ALT) || asLehntSprungAb(e))) {
+            // Zweitkodierung (LDB.L): der as hat keine Schreibweise dafuer -> Woerter.  Ebenso ein JR an der
+            // Reichweitengrenze (K4, gemessen: der as meldet fuer -127 Woerter `ILLEGAL VALUE`, die CPU kann es).
             Einheit w = e; w.typ = Einheit::Dw; w.wortMarke.assign(e.len / 2, false);
             text = "! " + befehlText(e.line, e.adr, true) + " !\n\t" + datenText(w, true);
         } else {
@@ -843,8 +889,28 @@ inline std::string Analyse::asQuelle() const {
         // Mnemonik und Operanden durch Tabulator getrennt wie bei cc
         size_t sp = text.find(' ');
         if (e.typ == Einheit::Befehl && sp != std::string::npos && text.compare(0, 1, "!") != 0) text[sp] = '\t';
-        o += "\t" + text + ik + "\n";
+        rumpf += "\t" + text + ik + "\n";
     }
+    if (opt.teil) {
+        // Stueckweise Ausgabe: Marken ausserhalb des Stuecks sind fuer den as absolute Konstanten
+        // (die Stuecke werden spaeter auf dem Host auf ihre Ladeadresse gesetzt; Marken IM Stueck
+        // bleiben echte Marken und werden dort mit der Relokation verschoben).
+        std::map<std::string, uint32_t> aussen;
+        for (const auto& kv : marke_)
+            if (kv.first < opt.teilVon || kv.first >= opt.teilBis) aussen[kv.second] = kv.first;
+        std::set<std::string> benutzt;
+        std::string tok;
+        for (size_t i = 0; i <= rumpf.size(); ++i) {
+            char c = i < rumpf.size() ? rumpf[i] : ' ';
+            if (std::isalnum(static_cast<unsigned char>(c)) || c == '_') tok += c;
+            else { if (!tok.empty() && aussen.count(tok)) benutzt.insert(tok); tok.clear(); }
+        }
+        for (const std::string& n : benutzt) {
+            std::snprintf(b, sizeof b, "\t%s\t:= %%%X\n", n.c_str(), unsigned(aussen[n] & 0xFFFF));
+            o += b;
+        }
+    }
+    o += rumpf;
     o += "end _" + opt.modul + "\nend " + opt.modul + "\n";
     return o;
 }

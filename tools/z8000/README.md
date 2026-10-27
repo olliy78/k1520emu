@@ -119,6 +119,7 @@ derselben Tabelle/demselben Dekoder (`z8k_disasm.h`); Kern header-only in **`z8k
 tools/dev.sh tool z8kdis --karte tools/mutos8000/kernel/karte.txt --statistik mutos_1216          # Listing
 tools/dev.sh tool z8kdis --karte K --format as --modul mutos mutos_1216 -o kernel.s               # MUTOS-as (PLZ/ASM)
 tools/dev.sh tool z8kdis --karte K --pruefen mutos_1216                                           # Rundlauf
+tools/dev.sh tool z8kdis --karte K --teile 1000 mutos_1216 ; ... --format as --teil VON:BIS ...   # as-Quelle in Stuecken (K4)
 tools/dev.sh tool z8kdis --karte K --vorschlaege mutos_1216                                       # Code-Kandidaten (nur Hinweis)
 tools/dev.sh tool z8kdis --segmentiert --base 30000 --entry 30040 fw.bin   # U8001; Adressen linear: Segment*10000+Offset
 ```
@@ -133,7 +134,9 @@ tools/dev.sh tool z8kdis --segmentiert --base 30000 --entry 30040 fw.bin   # U80
 * **Rundlauf** (`--pruefen`): Quelle (z8kasm-Schreibweise) -> `z8k::assemble` -> Vergleich mit dem Abbild.  Befehle, die der Assembler nicht
   **bitgleich** zurueckbaut (nicht ausgewertete Felder, `LDB.L`, ungerade Registerpaare), werden vorab zu Daten (`nicht kanonisch kodiert` im Listing).
 * **`--format as`**: Schreibweise des MUTOS-`as` (Zilog PLZ/ASM, kleingeschrieben, ein Unterprogramm, `WV`/`BV`) -- Belege und Unsicherheiten:
-  `doc/mutos_kernel/as_dialekt.md`.  **Der Rundlauf gegen den Gast-`as` steht aus (K4).**
+  `doc/mutos_kernel/as_dialekt.md`.  **Rundlauf gegen den Gast-`as` (K4, `tools/mutos8000/kernel/rundlauf_gast.py`): Kernel bytegleich**;
+  der `as` laeuft bei ~1400 Marken in `symbol table overflow`, deshalb `--teile MAXHEX`/`--teil VON:BIS` (Stuecke, Fremdmarken = Konstanten,
+  nie quer ueber JR/DJNZ/CALR; JR bei -127 Woertern wird `WV`, der `as` lehnt es ab).
 * Waechter: `tests/debugtools/test_z8kdis.cpp` (inkl. jedes erste Wort beider Modi, 16 x 4096 Befehle, bitgleich), `cli_z8kdis_*`,
   `tests/python/test_z8kdis_kernel.py` (Kernel `mutos_1216` aus dem Ladedisketten-Archiv).
 
