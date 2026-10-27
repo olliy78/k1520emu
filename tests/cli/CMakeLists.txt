@@ -73,6 +73,15 @@ foreach(_prog IN LISTS _cpm_programme)
         TIMEOUT 180 SKIP_RETURN_CODE 77 LABELS "cli;fast")
 endforeach()
 
+# mutos_io (U880-Seite von MUTOS 8000, Entwurf 40): die Quelle baut die eingecheckte mutosio.bin und
+# reproduziert Datei + .fileinfo der Ladedisketten-Archivs bytegleich.  Ohne Werkzeugkette Exit 77.
+add_test(NAME cli_mutosio_bin_passt_zur_quelle
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/mutos8000/mutos_io/build.py" --check)
+add_test(NAME cli_mutosio_gleicht_dem_archiv
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/mutos8000/mutos_io/ladediskette.py" pruefen)
+set_tests_properties(cli_mutosio_bin_passt_zur_quelle cli_mutosio_gleicht_dem_archiv PROPERTIES
+    TIMEOUT 180 SKIP_RETURN_CODE 77 LABELS "cli;fast")
+
 # SCPX-Pruefprogramm KMBGTEST (AP K8, mit KMBG.REL gebunden): .com passt zur Quelle.
 add_test(NAME cli_kmbgtest_com_passt_zur_quelle
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/kassette/kmbgtest/build.py" --check)

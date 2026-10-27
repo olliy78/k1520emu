@@ -421,6 +421,7 @@ def ausgabe(m, k, kind, ziele_marke, seen, gesperrt, seg_ende, name_prefix='L'):
                 out.append("\tDB\t" + ",".join(hx(v) for v in bs))
             a += len(bs)
         # Segment endet auf der Sektorgrenze der UDOS-Datei (256 B), Fuellbyte FFH
+        out.append(f"SEG{sa:04X}E:")
         out.append(f"\tREPT\t(100H-(($-SEG{sa:04X}) AND 0FFH)) AND 0FFH")
         out.append("\tDB\t0FFH")
         out.append("\tENDM")
