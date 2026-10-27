@@ -35,3 +35,16 @@ Vergleich `md2/{bin,lib}` der WEGA-3.1-Platte gegen die MUTOS-Disketten: alle Da
 * **MUTOS:** Magic `E807`, 16-Bit-Felder (16-B-Kopf), V7-/PCC-Aufteilung `cpp, c0, c1, c2, as, ld`.
 * Zwei verschiedene Werkzeugfamilien: MUTOS-Binaerdateien laufen nicht unter WEGA (anderes Kopfformat), WEGA-`cc` erzeugt anderen Code.
   WEGA taugt als **Quellreferenz** (Namen, Struktur), nicht als Bausystem fuer den MUTOS-Kernel -- ausser ein Test zeigt bytegleiche Ergebnisse.
+
+## Speichermodell: Prozess = eigenes 64-KB-Segment (gemessen 2026-10-27)
+
+* EM nach dem Boot: `A33=C0` = **Segmentweiche Modus 2: die Segmentnummer kommt von den SN-Leitungen des U8001** (`dev em`).
+  Ein Z8001 im nichtsegmentierten Betrieb gibt auf SN die Segmentnummer seines PC aus; ein Prozess erreicht nur sein Segment,
+  ein Wechsel (`ldctl` FCW, segmentiertes `iret`) ist privilegiert.  Das wirkt wie eine grobe Speicherverwaltung ohne MMU.
+* `cover` im U8001-Kontext waehrend `ls -l /bin | cat` (Segment, S/N, Adressen, Befehle):
+  `00 S 4828 / 874860` (Kernel) — `01 N 1382 / 18787`, `02 N 988 / 7031`, `03 N 2766 / 55084` (drei Anwenderprozesse: sh, ls, cat).
+* `mem = 196608` = 3 x 64 KB = Segmente 1–3 fuer Anwender; Segment 0 = Kernel (System, Vektoren mit Segment 0).
+* Folge: bis zu drei Prozesse liegen gleichzeitig im Speicher und wechseln ohne Plattenzugriff; ab dem vierten lagert `sched`/`swap`
+  ganze Prozesse nach rk2 ab Block 250 aus.  Geteilte Texte gibt es nicht (`xlock`/`xunlock` sind Leerfunktionen, `expand` ebenso).
+* Offen: ob ein Prozess immer ein ganzes Segment belegt (Karte `malloc` in welcher Einheit), wie `copyin`/`copyout` das Fremdsegment erreichen
+  (vermutlich kurz segmentiert mit `<<seg>>`-Adresse), Swap-Verhalten mit vier und mehr Prozessen gemessen.
