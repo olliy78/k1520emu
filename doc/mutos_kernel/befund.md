@@ -11,19 +11,18 @@ Gemessen an den Disketten-Archiven (`disks/a5120_mutos8000/…_best_{usr,cc1,cc2
   `$NONSEG[MENTED]` und `SEG`, `ld` schreibt `$SECTION %s_d` (Zilog-Modulformat).
 * Es gibt auf den Disketten **kein `scc`, `sld`, `cas`, `scrt0.o`, `slibc.a`**.
 
-## Der Kernel ist segmentiert
+## Der Kernel laeuft NICHTSEGMENTIERT (Berichtigung, gleicher Tag)
 
-`mutos_1216`: Vektortabelle mit 4-Wort-Einträgen (`FCW C000`, Segment `0000`, Offset), also Z8001-Modus (Entwurf 39).
+Erste Fassung dieses Befunds hielt ihn wegen der 4-Wort-Vektortabelle fuer segmentiert -- falsch.  Das Z8001 liest seine PSA immer im 4-Wort-Format;
+entscheidend ist das FCW-Bit 15 (SEG) des Eintrags.  Gemessen an `mutos_1216`:
+* Eintrag 0 (Reset): FCW `C000` (System + SEG) -> `027E`.  Alle Trap-Eintraege (`0008`..`0030`): FCW `4004`, `4008`, `4018`, `4024`, `4028`, `400C` = SEG **geloescht**,
+  alle auf dieselbe Routine `030E` (die Low-Bits sind vermutlich eine Trap-Kennung -- noch zu belegen).
+* Alle 996 `CALL`-Befehle (`5F00`) im Code haben die Kurzform ohne Segmentwort; Speicherbedarf endet bei `CEFF` = ein 64-KB-Raum.
+* Der Rechner hat keine MMU; das Z8001 laeuft ohne MMU auch segmentiert (Segmentbits direkt auf dem Bus) -- die fehlende MMU entscheidet nichts.
 
-**Folge: der MUTOS-`cc` von den Disketten kann diesen Kernel nicht erzeugt haben.**  Er stammt aus einer segmentierten Kette
-(Zilog-/WEGA-Familie: `scc` → `cas` → `sld`).  Der WEGA-Kernel wird so gebaut (`uts/conf/Makefile`: `scc`; `make.wega`:
-`sld -Ns -o wega -e start -X -i -Ms62 wpar.o event.o mch.o u.o ver.o fpe.o conf.o ../sys/LIB1 ../dev/LIB2`; `mch.s` beginnt mit `$segmented`).
-
-## Referenz-Werkzeuge: WEGA-3.1-Platte
-
-`disks/p8000_wega31/p8000_wega31_platte.avr.img.gz`, Teil `md2`: `bin/{as,cas,cc,ld,scc,sld}`, `lib/{cpp,crt0.o,scrt0.o,libc.a,slibc.a}`;
-Handbuch `md0/man/man1/{as,cas,cc,ld,scc,sld}.1`; Kernelquellen `md0/sys/conf/{wega,make.wega}`.  Läuft im Emulator (`tools/dev.sh test-wega`).
-Das ist die **einzige bekannte segmentierte Kette** — sie ist der Kandidat für Stufe A/C (nicht die MUTOS-Disketten).
+**Folge:** die MUTOS-Werkzeuge (`cc`, `as`, `ld`, nichtsegmentiert) sind voraussichtlich die richtige Kette; WEGA `scc/cas/sld` ist nur Vergleichsreferenz.
+Offen: segmentierter Start-Stub (`027E`..) und wie der Kernel die 192 KB (`mem = 196608`) ohne MMU erreicht (EM-Speichermodell, Entwurf 17).
+WEGA 3.1 hat `scc/sld/cas` (segmentiert) und `cc/ld/as` (nichtsegmentiert) -- beide auf `md2` der Platte, falls ein Vergleich noetig wird.
 
 ## Offen / zu messen
 * Ob `scc`/`cas`/`sld` aus WEGA 3.1 den MUTOS-Kernel bytegleich erzeugen (gleiche Familie?) — Test: WEGA-Modul bauen, mit Funktionen in `mutos_1216` vergleichen.

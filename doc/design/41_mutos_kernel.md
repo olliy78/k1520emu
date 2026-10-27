@@ -5,7 +5,7 @@ Bezug: Entwurf 39 (MUTOS auf dem A5120.16), Entwurf 40 (`mutos_io`, gleiche Meth
 
 ## 1. Ziel
 
-Vom Kernel `mutos_1216` (Z8000, segmentiert, 36 352 B, Rohabbild ab Adresse 0) zu einer Quelle, die **mit den originalen
+Vom Kernel `mutos_1216` (Z8000, nichtsegmentiert, 36 352 B, Rohabbild ab Adresse 0) zu einer Quelle, die **mit den originalen
 MUTOS-Werkzeugen** (`cpp`, `c0`/`c1`/`c2`, `as`, `ld` von den Disketten cc1/cc2/usr) wieder einen funktionierenden Kernel ergibt.
 Drei Stufen, jede für sich nützlich und jede mit einem **mechanischen Maßstab**:
 
@@ -36,10 +36,9 @@ Original); wo sie scheitert, bleibt die Assemblerquelle aus A stehen — so mach
 * **Emulator-Seite:** A5120.16 mit EM256/U8001 läuft, MUTOS bootet bis `login`, Wurzel + Datendisketten beschreibbar (Entwurf 39).
   Z8000-Werkzeuge im Repo: `core/primitives/z8000.*`, `tools/z8000/z8k_disasm.h`/`z8k_asm.h`, `z8kasm`, Debugger `k1520dbg --em em256`, `cpu u8000`.
 
-> **Korrektur nach K0 (2026-10-27, `doc/mutos_kernel/befund.md`):** die Werkzeuge auf den MUTOS-Disketten sind **nichtsegmentiert** (`c1` erzeugt nur
-> `$NONSEGMENTED`), der Kernel ist **segmentiert**.  Die Kette für Stufe A/C ist deshalb voraussichtlich **`scc`/`cas`/`sld` der WEGA-3.1-Platte**
-> (`disks/p8000_wega31`, mit Handbuch), nicht `cc`/`as`/`ld` von den MUTOS-Disketten.  Aussagen unten, die „MUTOS-`cc`" nennen, sind in diesem Sinn zu lesen;
-> ob die WEGA-Kette den MUTOS-Kernel bytegleich ergibt, ist der erste Messpunkt von K1.
+> **Befund K0 (2026-10-27, `doc/mutos_kernel/befund.md`):** der Kernel laeuft **nichtsegmentiert** (Trap-FCWs ohne SEG-Bit, 996 Kurz-`CALL`, ein 64-KB-Raum; nur der
+> Reset-Eintrag hat `C000`), die MUTOS-Werkzeuge sind nichtsegmentiert -- die Kette `cc/as/ld` von den Disketten ist also voraussichtlich die richtige.
+> Die erste Fassung dieser Anmerkung (\"segmentiert, WEGA `scc` noetig\") war falsch.  Offen: Start-Stub bei `027E`, Zugriff auf 192 KB ohne MMU (Entwurf 17).
 
 ## 3. Was es schon gibt — und warum das alles verändert
 
@@ -164,7 +163,6 @@ Linkkarte und Entscheidungen bei uns; Bau-Kollisionen beachten (Worktrees).
 
 ## 9. Zu klären (Anwender)
 
-0. **Werkzeugkette:** WEGA-`scc`/`cas`/`sld` als Referenz akzeptieren (siehe Korrektur in §2)?  Gibt es einen segmentierten MUTOS-Compiler, der uns fehlt?
 1. **Maßstab:** bytegleich (Beweis) oder „funktional gleich" genügt? Empfehlung: bytegleich für A, Match-Quote für C.
 2. **Umfang des Abbilds:** nur `mutos_1216` (dieser Stand 1986) oder auch die andere Fassung (Foto `MUTOS8000_4_k.jpg`, ältere `mutos_io`-Fassung)? Sind weitere Kernelabzüge vorhanden?
 3. **Abstimmung mit Oliver Lehmann:** Nutzung seiner `uts`-Quellen als Referenz erlaubt/erwünscht? Zusammenarbeit bei der Werkzeug-Rückübersetzung (gleiches Ziel, sein Handoff vom 2026-10-16)?
