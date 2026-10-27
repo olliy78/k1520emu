@@ -1,0 +1,58 @@
+# Karte von mutos_io (Entwurf 40).  Format: siehe dis.py.
+seg 9000 0 22D
+seg 9400 300 EB0
+seg A400 1200 1A8
+seg C8B6 1400 B2
+code 9000 9400
+# Bedienmaske (laengenvorangestellte Zeichenketten), Tabellen
+str A003 A0CB
+txt A0CC A125
+db A126 A129
+db A12A A12D
+db A12E A12E
+dw A12F A136
+# 944F: OTIR-Tabellen der Initialisierung (SIO-Kanal-B-Folge, PIO/CTC-Folgen)
+db 9468 9473
+db 9474 9478
+db 9479 947D
+# Tastencode-Tabelle (32 Eintraege), danach Fuellbytes bis 97FF
+db 9755 9774
+db 9775 97FF
+# Arbeitsvariablen von sub_9800 / Auftragsblock des Nukleus (IY = 996EH), Rest FFH
+db 996B 9981
+db 9B12 9B15
+db 9B16 9B35
+db 9B36 9B45
+# ---- Segment A400: Arbeitsdaten (Anforderungsklassen, Geraetebloecke, Auftragsbloecke) ----
+db A400 A400
+dw A401 A404
+db A405 A406
+dw A407 A408
+db A409 A40A
+dw A40B A40C
+db A40D A40E
+dw A40F A410
+db A411 A412
+dw A413 A414
+db A415 A416
+dw A417 A418
+dwc A419 A4B8
+db A4B9 A5A7
+name A4B9 DCB0
+name A4D0 DCB1
+name A4E7 DCB2
+name A4FE DCB3
+name A515 DCB4
+name A52C DCB5
+name A543 DCB6
+name A55A AUF0
+name A567 AUF1
+name A574 AUF2
+name A581 AUF3
+name A58E AUF4
+name A59B AUF5
+# ---- Segment C8B6: Warteschlangen und Zaehler ----
+db C8B6 C967
+# 9DE3: SIO-Init-Folgen (OTIR nach Port 51H/53H)
+db 9E2A 9E32
+db 9E33 9E3D
