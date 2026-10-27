@@ -3,7 +3,7 @@
 `mutos_io` ist das UDOS-Programm (U880), das den Z8000-Kernel von MUTOS 8000 mit Platte, Konsole,
 Drucker und seriellen Leitungen verbindet.  **Master ist `src/mutosio.mac`** (kommentiert, mit sprechenden
 Namen).  Semantik und Messungen: `doc/merkposten/mutos_io_analyse.md`; Festlegungen: `doc/merkposten/mutos_io.md`;
-Entwurf: `doc/design/40_mutos_io_quelle.md`.
+Entwurf: `doc/design/40_mutos_io_quelle.md`.  **Vollständige Anleitung (Voraussetzungen, Schritte, Fehlerbilder): `doc/mutos_io_bauanleitung.md`.**
 
 ## Eine Aenderung machen (der Weg)
 
