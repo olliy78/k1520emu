@@ -955,8 +955,16 @@ void K5122::startReadTransfer() {
 
     // IBM-Format-Track aus dem Drive-Cache holen (unveraendert fuer den Write-Pfad).
     const TrackImage& ibm_track = drv.track(current_head_);
+    auto sektoren = TrackCodec::parseTrack(ibm_track);
 
-    if (ibm_track.empty()) {
+    // Unformatiert heisst: KEIN Sektor — nicht erst: keine Bytes.  Eine Leerdiskette aus
+    // einer Datei hat leere Spuren; eine geloeschte Spur, die ein echtes Laufwerk (Grease-
+    // weazle) gelesen hat, traegt dagegen Rauschen, also Bytes ohne Sektor.  Die lief
+    // frueher in den Zweig darunter: Lesestrom aus null Sektoren, aber
+    // `stream_has_marks_ = true` — die ZVE2 hielt den Bus, der Index-Timeout der ZVE1
+    // kam nie, CP/A-FORMAT stand (Entwurf 40 §11, Waechter
+    // K5122Test.RauschspurOhneSektorGibtDenBusFrei).
+    if (ibm_track.empty() || sektoren.empty()) {
         // Diskette liegt ein, Spur ist aber unbeschrieben: der Datenseparator laeuft
         // frei mit und liefert weiter Bytes — nur eben ohne Adressmarke (kein MKE).
         // Genau das streamen wir (markenloser 0x4E-Fluss); die Leseroutine findet
@@ -993,7 +1001,6 @@ void K5122::startReadTransfer() {
     // Treuer FM/MFM-Lese-Stream mit 4×A1-Sync (der gemeinsame Modus fuer ROM-Boot-Read und
     // SYL-Lader, s. buildFaithfulReadTrack).  Resync-Offset (markPos-4 MFM / -1 FM) und der
     // FM/MFM-Verfahrens-Match stecken in romReadResyncTarget/ioRead; Codierung aus eff_enc.
-    auto sektoren    = TrackCodec::parseTrack(ibm_track);
     read_stream_track_  = TrackCodec::buildFaithfulReadTrack(
         sektoren, eff_enc, /*luecke2_vom_medium=*/ibm_track.encoding == Encoding::MFM);
     cur_sector_size_ = sektoren.empty() ? 128 : sektoren.front().size;

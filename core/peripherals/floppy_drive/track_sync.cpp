@@ -639,6 +639,25 @@ bool TrackSync::completeRead(uint32_t id, const uint8_t* cells, size_t len,
         return true;
     }
 
+    // ── Rauschen ist keine Spur ──────────────────────────────────────────────
+    // Eine geloeschte oder nie beschriebene Spur liefert am echten Laufwerk Rauschen,
+    // und darin findet der Dekoder ab und zu eine scheinbare FM-Marke (gemessen an
+    // einer mit `gw erase` geloeschten Diskette: Sektorkoepfe wie Zyl. 123 / Kopf 157,
+    // ID-CRC falsch).  Als formatierte Spur uebernommen brachte das CP/A-FORMAT zum
+    // Stehen: die ZVE2 suchte in der Spur einen passenden Kopf und gab den Bus nie
+    // wieder frei (Entwurf 40 §11, H8).  Und weil die CRC falsch ist, wurde jede
+    // solche Spur dreimal gelesen.  Deshalb: traegt die Spur keinen EINZIGEN Sektorkopf
+    // mit heiler ID-CRC, ist sie unformatiert — die Marken werden verworfen, die Bytes
+    // bleiben, wiederholt wird nicht.  Ein echter Leseausrutscher hat daneben immer
+    // heile Koepfe und laeuft weiter durch die Wiederholung unten.
+    {
+        bool kopf_heil = false;
+        for (const LogicalSector& s : TrackCodec::parseTrack(spur))
+            if (s.id_crc_ok) { kopf_heil = true; break; }
+        if (!kopf_heil)
+            for (MarkType& m : spur.marks) m = MarkType::None;
+    }
+
     // ── Fehlerhafte Pruefsumme: NOCH EINMAL lesen ────────────────────────────
     // Eine Umdrehung reicht auf einer gealterten Diskette nicht immer.  Wiederholt
     // wird nur, solange Sektoren mit falscher CRC dabei sind; uebernommen wird der

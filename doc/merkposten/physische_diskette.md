@@ -237,5 +237,34 @@ Was man beim Weiterarbeiten wissen muss:
   Waechter: `test_archive_sichert_diskette_und_verzeichnisse`,
   `test_archive_ueberschreibt_nicht_von_selbst`,
   `test_archive_ohne_label_nimmt_den_datentraegernamen`.
+- **Eine Spur ohne Sektor ist unformatiert — auch wenn sie Bytes traegt** (2026-10-27,
+  Entwurf 40 §11).  Eine geloeschte Spur liefert am echten Laufwerk Rauschen; aus einer
+  Datei kommt dagegen eine LEERE Spur.  `K5122::startReadTransfer` prueft deshalb
+  `sektoren.empty()`, nicht nur `empty()` — sonst haelt die ZVE2 in ihrer Kopfsuche den Bus,
+  der Index-Timeout der ZVE1 kommt nie, CP/A-FORMAT steht.  Und `TrackSync::completeRead`
+  verwirft die Marken einer Spur **ohne einen einzigen heilen Sektorkopf** (Scheinsektoren
+  aus Rauschen) und liest sie nicht nochmal.  Waechter
+  `K5122Test.RauschspurOhneSektorGibtDenBusFrei`,
+  `TrackSync.EineSpurOhneHeilenSektorkopfGiltAlsUnformatiert`.  **Ein `.hfe`-Ersatzlaufwerk
+  sieht das nie** — dafuer gibt es die Hardware-Gruppe.
+- **Abmelden wartet, solange die Rueckfuehrung VORANKOMMT** (2026-10-27).  Die Frist von
+  `PhysicalSession.close()` gilt ohne Fortschritt, nicht insgesamt: nach FORMAT im
+  unbegrenzten Tempo stehen 80–100 Spuren aus, die feste 30-s-Frist verwarf davon still gut
+  die Haelfte.  `close()` liefert `False` + `nicht_zurueckgeschrieben`; Laufwerkskasten,
+  DiskTool und `--physical` melden den Rest.  Waechter
+  `py_gw_physical::test_abmelden_wartet_den_ganzen_rueckstand_ab`.
+  **Reihenfolge: erst `close()`, dann `unmount_disk`** (so `DrivesWidget.on_toggle`).
+  Umgekehrt loest `unmount_disk` das Medium vom `TrackSync` (`detach`), und der Rueckstand
+  ist STILL weg — an der Hardware gemessen: 57 von 118 Spuren nie geschrieben.
+- **Die Firmware gibt das Laufwerk nach ≈ 10 s Ruhe frei** („Seek: No drive unit
+  selected").  `Device._mit_indexwiederholung` waehlt dann neu und wiederholt den Auftrag;
+  Waechter `test_gw_motor.py::test_vom_adapter_freigegebene_auswahl_wird_neu_eingestellt`.
+- **`gw write` taugt nicht zum Aufspielen eines Abbilds** auf diese Hardware (220 ms Spur
+  ueber die Index-Naht, Spur 0 danach 23/26).  Die Hardware-Gruppe spielt mit
+  `Device.write_track` auf.
+- **Hardware-Testgruppe** (2026-10-27): `tests/hardware/`, `tools/dev.sh test-hardware
+  [--schreiben]`, Entwurf `doc/design/40_hardware_testgruppe.md`.  Nicht in ctest.  Neben
+  Boot/FORMAT/DiskTool/Rundlauf die Format-Matrix aus `format_all.py` (inkl. einseitig und
+  Doppelschritt) und das Gast-TEMPO (1×/10×/unbegrenzt).
 - **Offen:** das Merken der Sitzungsparameter (Laufwerk und Zellrate muessen bei
   jedem Einlegen neu gewaehlt werden).
