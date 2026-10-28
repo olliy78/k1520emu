@@ -266,6 +266,14 @@ Gemessen 2026-10-27 an Greaseweazle F1 (Firmware 1.6) + K5601, Laufwerk `a`:
 * **CP/M füllt auf 128-Byte-Sätze auf** — ein Bytevergleich nach `get` braucht Größen als
   Vielfache von 128 (Testfehler, kein Produktfehler).
 
+* **Stand der Läufe (2026-10-27/28, nach den Behebungen):** Format-Matrix H4m **47/47** (24 min;
+  alle K5601-Menüs + Geometrien S/T/U/V/W, Smoke bis Spur 2, Sektorzahl je Spur auf der Scheibe
+  gleich der des Abbilds); H2–H8 grün, H4-Kette dreimal hintereinander grün, H8.1 in 1×/10×/
+  unbegrenzt grün (Rückstand am FORMAT-Ende 0 / 9 / 15 Spuren), H8.2 Auswerfen mit 119 Spuren
+  Rückstand: 119 s, nichts verloren.  H1 wird übersprungen, wenn die Diskette nicht durchgehend
+  formatiert ist (nach einem Schreiblauf der Regelfall) — für H1 eine formatierte Diskette
+  einlegen oder H2 vorweg fahren.
+
 ## 12. Betriebsarten K5600.10/.20-Kompatibilität
 
 Das K5601 bedient 40-Spur-Disketten im Doppelschritt und einseitig. Abgedeckt auf zwei Wegen:
