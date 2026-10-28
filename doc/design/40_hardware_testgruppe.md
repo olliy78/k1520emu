@@ -187,6 +187,10 @@ der vollen Prüfung und **jeder Sektor samt Anhang hinter der Daten-CRC**.
 | H9.6 | zu große Datei (1 MiB): abgewiesen, keine Spur geschrieben (Transaktion) |
 | H9.7 | Kommandozeile `--physical`: `put`/`ls`/`get`/`rm`/`check` |
 
+**Am Gerät (2026-10-28): 18/18 grün** in 34 min.  Geschrieben wurden genau die Spuren, die
+sich laut Orakel ändern — CP/A 11, UDOS 11, WEGA 24 —, jede geprüft, kein misslungener
+Vergleich, keine Lesewiederholung.
+
 Dieselben Szenarien laufen **ohne Hardware** in der Regression
 (`py_disktool_physisch_gegenprobe`, Ersatzlaufwerk über einer Kopie, 9 Fälle, ~3 s).
 
