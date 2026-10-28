@@ -222,8 +222,8 @@ register struct proc *p;
 {
 	register struct text *xp;
 	register a;
-	register x;
 	register t;
+	register x;
 
 	if ((a = malloc(coremap, p->p_size)) == NULL)
 		return(0);
@@ -333,7 +333,7 @@ retry:
 	for (rpp = &proc[0]; rpp <= proctop; rpp++) {
 		if (rpp->p_stat == 0 && p == NULL)
 			p = rpp;
-		if (rpp->p_pid == mpid || rpp->p_uid == mpid)
+		if (rpp->p_pid == mpid || rpp->p_pgrp == mpid)
 			goto retry;
 	}
 	rpp = p;

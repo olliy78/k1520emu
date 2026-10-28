@@ -13,7 +13,8 @@
 #define NCALL	9		/* aus callout CE58..CE8E (54 Byte, 6 Byte je Eintrag) gefolgert */
 #define HZ	50
 #define MAXMEM	64
-#define MAXUPRC	25		/* geraten */
+#define NPROC	30		/* proc[] A11C..A464: 0x348 / 0x1C (K7c: fork) */
+#define MAXUPRC	15		/* K7c: fork vergleicht a mit 15 */
 #define SSIZE	5		/* geraten */
 #define CMAPSIZ	50		/* geraten */
 #define SMAPSIZ	50		/* geraten */

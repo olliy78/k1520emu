@@ -1,0 +1,308 @@
+/* sig.c -- Signale (Kernel mutos_1216, 0B3A..1122): signal, psignal, issig, stop, psig, fsig, grow, ptrace, procxmt.
+ * NSIG 17: Signal n in 1..16 (Bit n-1 im Wort p_sig), u_signal[17] bei u+D2.  core() steht im Kernel bei 0D56 (hinter fsig).
+ * Daten: ipc (V7 struct ipc) = A620: ip_lock A620, ip_req A622, ip_addr A624, ip_data A626; Text 8A10 "core".
+ * K6b nannte 0F12 `core` -- es ist procxmt (Gegenstueck zu ptrace), core selbst ist 0D56.
+ * Assembler: savfp (03F8) / restfp (03FE) sind in mch.s. */
+#include "param.h"
+#include "systm.h"
+#include "dir.h"
+#include "user.h"
+#include "proc.h"
+#include "text.h"
+#include "inode.h"
+#include "reg.h"
+
+extern char regloc[];
+struct ipc {
+	int	ip_lock;
+	int	ip_req;
+	int	ip_addr;
+	int	ip_data;
+} ipc;
+
+/* KERNEL 0B3A */
+signal(pgrp, sig)
+register pgrp;
+{
+	register struct proc *p;
+
+	if (pgrp == 0)
+		return;
+	for (p = &proc[0]; p <= proctop; p++)
+		if (p->p_pgrp == pgrp)
+			psignal(p, sig);
+}
+
+/* KERNEL 0B6E */
+psignal(p, sig)
+register struct proc *p;
+register unsigned sig;
+{
+	if (sig >= NSIG)
+		return;
+	if (sig)
+		p->p_sig |= 1 << (sig-1);
+	if (p->p_pri > PUSER)
+		p->p_pri = PUSER;
+	if (p->p_stat == SSLEEP && p->p_pri > PZERO)
+		setrun(p);
+}
+
+/* KERNEL 0BC8 */
+issig()
+{
+	register n;
+	register struct proc *p;
+
+	p = u.u_procp;
+	while (p->p_sig) {
+		n = fsig(p);
+		if ((u.u_signal[n] & 1) == 0 || (p->p_flag & STRC))
+			return(n);
+		p->p_sig &= ~(1 << (n-1));
+	}
+	return(0);
+}
+
+/* KERNEL 0C18 */
+stop()
+{
+	register struct proc *pp, *cp;
+
+loop:
+	cp = u.u_procp;
+	if (cp->p_ppid != 1)
+		for (pp = &proc[0]; pp <= proctop; pp++)
+			if (pp->p_pid == cp->p_ppid) {
+				wakeup((caddr_t)pp);
+				cp->p_stat = SSTOP;
+				swtch();
+				if ((cp->p_flag & STRC) == 0 || procxmt())
+					return;
+				goto loop;
+			}
+	exit(fsig(u.u_procp));
+}
+
+/* KERNEL 0C7C */
+psig()
+{
+	register n, p;
+	register struct proc *rp;
+
+	rp = u.u_procp;
+	if (u.u_fpsaved == 0) {
+		savfp(u.u_fparea);
+		u.u_fpsaved = 1;
+	}
+	if (rp->p_flag & STRC)
+		stop();
+	n = fsig(rp);
+	if (n == 0)
+		return;
+	rp->p_sig &= ~(1 << (n-1));
+	if ((p = u.u_signal[n]) != 0) {
+		u.u_error = 0;
+		if (n != SIGILL && n != SIGTRAP)
+			u.u_signal[n] = 0;
+		sendsig(p, n);
+		return;
+	}
+	switch (n) {
+	case SIGQUIT:
+	case SIGILL:
+	case SIGTRAP:
+	case SIGIOT:
+	case SIGEMT:
+	case SIGFPE:
+	case SIGBUS:
+	case SIGSEG:
+	case SIGSYS:
+		if (core())
+			n += 0200;
+	}
+	exit(n);
+}
+
+/* KERNEL 0D2C */
+fsig(p)
+struct proc *p;
+{
+	register n, i;
+
+	n = p->p_sig;
+	for (i = 1; i < NSIG; i++) {
+		if (n & 1)
+			return(i);
+		n >>= 1;
+	}
+	return(0);
+}
+
+/* KERNEL 0D56 */
+core()
+{
+	register struct inode *ip;
+	register s;
+
+	u.u_error = 0;
+	u.u_dirp = "core";
+	ip = namei(uchar, 1);
+	if (ip == NULL) {
+		if (u.u_error)
+			return(0);
+		ip = maknode(0666);
+		if (ip == NULL)
+			return(0);
+	}
+	if (access(ip, IWRITE) == 0 && (ip->i_mode & IFMT) == IFREG && u.u_uid == u.u_ruid) {
+		itrunc(ip);
+		u.u_offset = 0;
+		u.u_base = (caddr_t)&u;
+		u.u_count = 0x400;
+		u.u_segflg = 1;
+		writei(ip);
+		u.u_base = 0;
+		u.u_count = u.u_dsize << 8;
+		u.u_segflg = 0;
+		writei(ip);
+		s = u.u_ar0[8] & 0xFF00;
+		u.u_base = (caddr_t)s;
+		u.u_count = -s;
+		writei(ip);
+	}
+	iput(ip);
+	return(u.u_error == 0);
+}
+
+/* KERNEL 0E38 */
+grow()
+{
+	register i;
+
+	return(0);
+}
+
+/* KERNEL 0E42 */
+ptrace()
+{
+	register struct proc *p;
+	register struct a {
+		int	req;
+		int	pid;
+		int	addr;
+		int	data;
+	} *uap;
+
+	uap = (struct a *)u.u_ap;
+	if (uap->req <= 0) {
+		u.u_procp->p_flag |= STRC;
+		return;
+	}
+	for (p = &proc[0]; p <= proctop; p++)
+		if (p->p_stat == SSTOP && p->p_pid == uap->pid && u.u_procp->p_pid == p->p_ppid)
+			goto found;
+	u.u_error = ESRCH;
+	return;
+found:
+	while (ipc.ip_lock)
+		sleep((caddr_t)&ipc, 25);
+	ipc.ip_lock = p->p_pid;
+	ipc.ip_data = uap->data;
+	ipc.ip_addr = uap->addr;
+	ipc.ip_req = uap->req;
+	p->p_flag &= ~SWTED;
+	setrun(p);
+	while (ipc.ip_req > 0)
+		sleep((caddr_t)&ipc, 25);
+	u.u_r.r_val1 = ipc.ip_data;
+	if (ipc.ip_req < 0)
+		u.u_error = EIO;
+	ipc.ip_lock = 0;
+	wakeup((caddr_t)&ipc);
+}
+
+/* KERNEL 0F12 */
+procxmt()
+{
+	register i;
+	register int *p;
+	register struct text *xp;
+
+	if (ipc.ip_lock != u.u_procp->p_pid)
+		return(0);
+	i = ipc.ip_req;
+	ipc.ip_req = 0;
+	wakeup((caddr_t)&ipc);
+	switch (i) {
+
+	case 1:
+	case 2:
+		if (fubyte((caddr_t)ipc.ip_addr) == -1)
+			goto error;
+		ipc.ip_data = fuword((caddr_t)ipc.ip_addr);
+		break;
+
+	case 3:
+		i = (int)ipc.ip_addr;
+		if (i < 0 || i >= 0x400)
+			goto error;
+		ipc.ip_data = ((int *)&u)[i>>1];
+		break;
+
+	case 4:
+		if (xp = u.u_procp->p_textp) {
+			if (xp->x_count != 1 || xp->x_iptr->i_mode & ISVTX)
+				goto error;
+			xp->x_iptr->i_flag &= ~ITEXT;
+		}
+		estabur(u.u_tsize, u.u_dsize, u.u_ssize, u.u_sep, 6);
+		i = suword((caddr_t)ipc.ip_addr, 0);
+		suword((caddr_t)ipc.ip_addr, ipc.ip_data);
+		estabur(u.u_tsize, u.u_dsize, u.u_ssize, u.u_sep, 2);
+		if (i < 0)
+			goto error;
+		if (xp)
+			xp->x_flag |= XWRIT;
+		break;
+
+	case 5:
+		if (suword((caddr_t)ipc.ip_addr, 0) < 0)
+			goto error;
+		suword((caddr_t)ipc.ip_addr, ipc.ip_data);
+		break;
+
+	case 6:
+		p = &((int *)&u)[ipc.ip_addr>>1];
+		for (i = 0; i < 16; i++)
+			if (p == &u.u_ar0[regloc[i]])
+				goto ok;
+		if (p == &u.u_ar0[10]) {
+			ipc.ip_data &= ~0x4800;
+			ipc.ip_data |= 0x1000;
+			goto ok;
+		}
+		goto error;
+	ok:
+		*p = ipc.ip_data;
+		break;
+
+	case 9:
+		u.u_ar0[10] |= 0x800;
+	case 7:
+		if ((int)ipc.ip_addr != 1)
+			u.u_ar0[12] = ipc.ip_addr;
+		u.u_procp->p_sig = 0;
+		if (ipc.ip_data)
+			psignal(u.u_procp, ipc.ip_data);
+		return(1);
+
+	case 8:
+		exit(fsig(u.u_procp));
+
+	default:
+	error:
+		ipc.ip_req = -1;
+	}
+	return(0);
+}

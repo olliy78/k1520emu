@@ -8,6 +8,7 @@
  * GERATEN: u_rsav (0..11, 9 Worte, aus u_segflg bei 12 gefolgert), u_signal[17] (aus dem Platz D2..F3), die
  * Fuellfelder u_x54 (14 Byte ohne Zugriff) und u_x104 (Rest ab 104h, 35 Zugriffe auf 104 -- vermutlich u_state --,
  * 10A Signalzustellung, 112.. Profil u. a.: noch keinem Namen zugeordnet).  Nur nichtsegmentierter Aufbau.
+ * K7c: ab 104 jetzt u_ar0 (104), u_prof (10A, Skalierung 110), u_x156, u_fpsaved (15A), u_fparea (15C..).
  * Gliedernamen tragen Praefix u_ (V7-cc: ein Namensraum fuer Glieder und Variablen). */
 #ifndef USER_H
 #define USER_H
@@ -46,9 +47,9 @@ struct user {
 	struct file	*u_ofile[NOFILE];	/* 062 */
 	char		u_pofile[NOFILE];	/* 08A */
 	int		u_arg[5];	/* 09E */
-	int		u_tsize;	/* 0A8 */
-	int		u_dsize;	/* 0AA */
-	int		u_ssize;	/* 0AC */
+	unsigned	u_tsize;	/* 0A8 */
+	unsigned	u_dsize;	/* 0AA */
+	unsigned	u_ssize;	/* 0AC */
 	label_t		u_qsav;		/* 0AE */
 	label_t		u_ssav;		/* 0C0 */
 	int		u_signal[17];	/* 0D2 geraten: 17 Eintraege */
@@ -56,7 +57,26 @@ struct user {
 	time_t		u_stime;	/* 0F8 */
 	time_t		u_cutime;	/* 0FC */
 	time_t		u_cstime;	/* 100 */
-	char		u_x104[0x2FC - 4];	/* 104.. Rest bis zum Stapel, nicht zugeordnet (Kernelstapel oben) */
+	int		*u_ar0;		/* 104 Zeiger auf den Registerrahmen des Traps (trap.c, sendsig; K7c) */
+	char		u_x106[4];	/* 106 ohne Zugriff */
+	struct {			/* 10A Profil (trap: addupc(pc, &u_prof, ticks)); Skalierung bei 110 ist belegt */
+		int		*pr_base;
+		unsigned	pr_size;
+		unsigned	pr_off;
+		unsigned	pr_scale;
+	} u_prof;
+	char		u_x112;		/* 112 */
+	char		u_sep;		/* 113 Byte, exec (getxfile) */
+	char		u_x114[4];	/* 114..117 */
+	int		u_ex[20];	/* 118 u_exdata: Kopf der ausgefuehrten Datei (Magic E807/E707); Worte 118 (mag), 11A, 11C, 11E, 122 (Einsprung),
+					   128 (Einsprung grosser Kopf), 134/136/138 (Text/Daten/BSS des grossen Kopfes) */
+	char		u_exname[14];	/* 140 Kommandoname (exec kopiert ihn nach u_dbuf) */
+	time_t		u_start;	/* 14E Startzeit (fork) */
+	char		u_x152[4];	/* 152..155 */
+	int		u_cmask;	/* 156 umask (V7 u_cmask; main loescht es, sys4.c umask) */
+	int		u_x158;		/* 158 ohne Zugriff */
+	int		u_fpsaved;	/* 15A Gleitpunktzustand gesichert (trap, swtch, newproc: savfp(u_fparea)) */
+	char		u_fparea[0x3FC - 0x15C];	/* 15C.. bis zum Stapel */
 };
 extern struct user	u;			/* FC00 */
 /* Fehlernummern: belegt EPERM 1, EBADF 9, ENFILE 23, EMFILE 24, ENOMEM 12; Rest V7 (nicht einzeln gemessen). */
