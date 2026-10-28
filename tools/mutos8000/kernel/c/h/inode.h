@@ -17,6 +17,8 @@ struct inode {
 	daddr_t		i_lastr;	/* +46 */
 };
 extern struct inode	inode[];
+#define NADDR	13
+#define PIPSIZ	4096
 #define ILOCK	01
 #define IUPD	02
 #define IACC	04

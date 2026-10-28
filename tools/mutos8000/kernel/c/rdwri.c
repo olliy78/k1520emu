@@ -30,7 +30,8 @@ register struct inode *ip;
 	dev = (dev_t)ip->i_addr[0];
 	type = ip->i_mode & IFMT;
 	if (type == IFCHR || type == 0030000) {
-		return((*cdevsw[major(dev)].d_read)(dev));
+		(*cdevsw[major(dev)].d_read)(dev);
+		return;
 	}
 	do {
 		lbn = bn = u.u_offset >> BSHIFT;

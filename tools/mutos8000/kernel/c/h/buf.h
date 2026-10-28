@@ -1,4 +1,4 @@
-/* buf.h -- Puffer, 24 Byte, 20 Stueck ab 8E9A, Daten A628+512*i.  Alle Felder ausser b_resid am Lauf belegt. */
+/* buf.h -- Puffer, 24 Byte, 20 Stueck ab 8E9A, Daten A628+512*i.  Alle Felder am Kernel belegt (b_resid: readi, physio). */
 #ifndef BUF_H
 #define BUF_H
 #include "types.h"
@@ -12,9 +12,9 @@ struct buf {
 	unsigned	b_bcount;	/* +0C */
 	caddr_t		b_addr;		/* +0E */
 	daddr_t		b_blkno;	/* +10 */
-	char		b_error;	/* +14 */
-	char		b_pad15;	/* +15 Fuellfeld */
-	unsigned	b_resid;	/* +16 geraten (V7) */
+	char		b_xmem;		/* +14 (physio/swap: Segmentbyte der Adresse, K7b) */
+	char		b_error;	/* +15 (geterror: 15(bp); K7b korrigiert, vorher +14) */
+	unsigned	b_resid;	/* +16 */
 };
 extern struct buf	buf[NBUF];
 extern struct buf	bfreelist;		/* A518 */
@@ -29,4 +29,5 @@ extern struct buf	bfreelist;		/* A518 */
 #define B_AGE		0200
 #define B_ASYNC		0400
 #define B_DELWRI	01000
+#define B_TAPE		02000
 #endif

@@ -27,7 +27,7 @@ daddr_t bn;
 
 	if (bn < 0) {
 		u.u_error = EFBIG;
-		return((daddr_t)0);
+		return(0);
 	}
 	dev = ip->i_dev;
 	rablock = 0;
@@ -58,7 +58,7 @@ daddr_t bn;
 	}
 	if (j == 0) {
 		u.u_error = EFBIG;
-		return((daddr_t)0);
+		return(0);
 	}
 	nb = ip->i_addr[13-j];
 	if (nb == 0) {
@@ -73,7 +73,7 @@ daddr_t bn;
 		bp = bread(dev, nb);
 		if (bp->b_flags & B_ERROR) {
 			brelse(bp);
-			return((daddr_t)0);
+			return(0);
 		}
 		bap = (daddr_t *)bp->b_addr;
 		sh -= 7;

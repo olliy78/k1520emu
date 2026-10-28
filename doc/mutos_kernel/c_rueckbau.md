@@ -94,3 +94,38 @@ Fuer `bcopy` (243A) fand keine der acht Formen (`do..while(--i)`, `while(--i>=0)
 
 ## Offen / naechste Schritte
 `swapin`, `swtch`, `newproc`, `bmap`, `readi`, `iomove`, `bcopy`.  Alle Datenanteile der Module sind in den Dateikoepfen mit Kerneladresse vermerkt (Eingabe fuer K5).
+
+
+# AP K7b (2026-10-28): Dateisystem und Puffer -- iget, alloc, nami, pipe, bio, Reste von subr/rdwri
+
+Dateien: `tools/mutos8000/kernel/c/{iget,alloc,nami,pipe,bio}.c`, `subr.c`/`rdwri.c` (bmap, readi, iomove nachgefuehrt), Versuche `k7bvar.c`, `k7bv2.c`;
+Header `h/{buf,inode}.h` ergaenzt, neu `h/user_ext.h` (Felder von `u`, die `user.h` noch nicht benennt).  Quelle der Funktionskoerper: Disassemblat `kernel/s/*.s` plus V7/WEGA-Form.
+**35 von 47 Funktionen bytegleich**, die uebrigen 12 sind "nahe" (ein bis wenige erklaerte Befehle, kein einziger Fall mit anderer Struktur).
+
+## Trefferliste (cc -O, gegen mutos_1216)
+Status: **gleich** = alle Woerter (ohne Relokationen); **nahe** = nur die genannte c2-Abweichung; offen = keine.
+* `iget.c` 5/8: iget 1122, iexpand 126A, iput 12FE, maknode 1652, wdir 16C2 gleich.  **nahe:** iupdat 1372 (A), itrunc 14F6 (B), tloop 15B2 (B).
+* `alloc.c` 4/7: free 3086, badblock 316A (intern, `static`, liegt im Bereich von free), ifree 335A, getfs 339E gleich.  **nahe:** alloc 2F48 (B), ialloc 319E (B, C), update 3400 (B).
+* `nami.c` 1/1: namei 36A0 gleich (768 B).  `schar` gibt es im Kernel nicht; `uchar` 39BA steht hinter namei in `pipe.c`.
+* `pipe.c` 8/8: uchar 39BA, pipe 39E2, readp 3A68, writep 3AFE, plock 3BBE, prele 3BE0, getc 3BFC, putc 3C80 gleich.  (K6b: `openp`/`closep` = V7 `readp`/`writep`; `getc`/`putc` sind die Zeichenlisten-Routinen, `cfreelist` D266.)
+* `bio.c` 17/19: bread 57D4, breada 581A, bwrite 58F0, bdwrite 594A, bawrite 5984, brelse 599A, incore 5A22, getblk 5A64, geteblk 5B70, iowait 5BFC, notavail 5C2E, iodone 5C62, clrbuf 5C86, swap 5D4A, bflush 5F10, physio 5F56, geterror 60A8 gleich.
+  **nahe:** mapalloc 5CAE und mapstart 5CF6 (D; Warteschlange `mapq` D57C mit 4 Eintraegen, Merker D584, Mailbox-Wort bei Adresse 6, Aufruf von 065E).  `binit` (07D2) liegt im Kernel in `main.c` (K7c).
+* `subr.c`/`rdwri.c`: bmap 20FE nahe (B), readi 2460 nahe (E), iomove 2780 nahe (F), bcopy 243A nahe (F).
+
+## Die Abweichungen sind alle Eigenheiten des Kernel-`c2`, nicht der Quelle
+Der Kernel wurde mit einem **aelteren `c2`** (Peephole-Optimierer) gebaut als dem auf den Disketten: er kennt weniger Zusammenfassungen, nur DJNZ kennt er in bestimmten Faellen.
+* **(A)** `ldb rl3,@r2 ; xorb rh3,rh3 ; testb rl3` (Kernel) statt `testb @r2`: iupdat `s_ronly`.  Versuche `k7bvar.c` (`||`, `!= 0`, Hilfsvariable) und `k7bv2.c` (vc1..vc4) liefern keine der beiden Formen anders.
+* **(B)** Wert nicht weiterverwenden: Kernel `ldl rr4,@r2 ; ldl bn,rr4 ; testl bn(r14)` bzw. `push bn(r14)` statt `testl rr4` / `push r3` (itrunc, tloop, alloc `bno`, ialloc `ino`, bmap an drei Stellen, update `ld r2,fp(r14)`).  Zuweisung-in-Bedingung, `!x`, `x == 0` aendern daran nichts (`k7bv2.c` vb1..vb3).
+* **(C)** ialloc: Anfangswert `adr = SUPERB+1` ergibt im Kernel `ldl rr2,#2`, hier immer `ldk r3,#2 ; exts rr2` (alle Schreibweisen va1..va7 gleich).
+* **(D)** mapalloc/mapstart: Kernel `test @r2`, hier `ld r3,@r2 ; test r3` (Vorwaertsverwendung desselben Elements).
+* **(E)** readi: Kernel hat ein ueberzaehliges `testl rr2` hinter `subl`, das `c2` hier weglaesst.
+* **(F)** Schleifen: bcopy (Kernel `dec/jr ne`, hier `djnz`), iomove Schreibast (Kernel `dec/jr ne`, hier Kopftest-Form, mit `do..while(--n)` `djnz`), siehe K7a.
+Folgerung fuer den Neubau (K5): die C-Quellen sind funktional und bis auf diese Stellen byteweise richtig; fuer ein bytegleiches Abbild bleibt Plan B (Nachbesserung der `.s` an den 12 Stellen oder altes `c2`).
+
+## Gelernt (fuer weitere Module)
+* Registerfolge: erst die `register`-Parameter in Reihenfolge, dann lokale `register`; automatische Variablen stehen mit der **zuerst deklarierten am hoechsten Stapelplatz** (`iget`: ip, mp, oip, bp, dp = R13..R9).
+* `(bp->b_flags & B_ERROR) != 0` ergibt `ld/and/jr`, `if (bp->b_flags & B_ERROR)` ergibt `bit` -- iget verlangt die erste, alle anderen Stellen die zweite Form (alloc: `== 0`).
+* `while (plock(ip), ip->i_size == 0) {...}` legt den Schleifenkopf **hinter** den Sprung ueber den Rumpf (readp); `plock` am Ende des Rumpfes ergibt eine andere Blockfolge.
+* Wortbreite von `(unsigned)up + 0xFF >> 8` entscheidet `srl`/`sra` (swap).  Lange Argumente brauchen die Umwandlung `(daddr_t)` an der Aufrufstelle (update: `getblk(dev, (daddr_t)SUPERB)` = `ldk;exts;pushl`).
+* Mehrere Gastlaeufe laufen parallel (eigener Arbeitsordner je Lauf); je Lauf Minuten statt der frueher geschaetzten zehn.
+* Buffer: `b_xmem` +14, `b_error` **+15** (K7a: +14 falsch), `B_TAPE` 02000; Inode: `NADDR` 13, `PIPSIZ` 4096.  `u+156` = umask, `u+113` = Byte `u_sep`, `u+104` Zeiger (bei K7c `u_ar0`).

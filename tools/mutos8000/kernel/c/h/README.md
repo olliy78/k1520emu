@@ -30,3 +30,9 @@ Stufen: **belegt** = an Kernelcode gemessen (Zugriff mit Offset, durch bytegleic
 Verwendung im Modul: Kopf `#include "param.h" "systm.h" "dir.h" "user.h" ...` in V7-Reihenfolge; `proc.h`, `inode.h` usw. vor `user.h`
 nur, wenn `user.h` deren Struktur braucht -- Zeiger auf unvollstaendige Strukturen genuegen (`struct proc *u_procp`).
 Neue Felder: erst im Kernel messen, dann hier das Fuellfeld ersetzen und diese Tabelle fuehren; **nie** ein Feld "raten und stehen lassen".
+
+## K7b (2026-10-28): Aenderungen an `buf.h`, `inode.h`, neu `user_ext.h`
+* `buf.h`: **`b_error` liegt bei +15, nicht +14** (geterror `15(bp)`, physio `clrb 15`); +14 ist `b_xmem` (physio/swap: Segmentbyte von `b_addr`); `B_TAPE` 02000 (bdwrite); `b_resid` jetzt belegt (readi, physio).  Stufe: belegt.
+* `inode.h`: `NADDR` 13 (itrunc/iexpand), `PIPSIZ` 4096 (writep).  Stufe: belegt.
+* `user_ext.h` (neu, nur Zugriffe auf feste Abstaende von `u`, keine Strukturaenderung): `U_CMASK` u+156 (umask), `U_SEP` u+113 (Byte), `U_P104` u+104 (Zeiger).  K7c hat `user.h` inzwischen um `u_ar0` (104) und `u_x156` erweitert -- sobald diese Namen feststehen, die drei Makros ersetzen.
+* `conf.h`, `filsys.h`, `mount.h`, `dir.h`, `ino.h`: unveraendert; durch iget/alloc/nami/getfs/update bestaetigt (filsys: s_nfree +6, s_free +8, s_ninode +D0, s_inode +D2, s_flock +19A, s_ilock +19B, s_fmod +19C, s_ronly +19D, s_time +19E, s_tfree +1A2, s_tinode +1A6; dinode 64 Byte mit atime +34h, mtime +38h, ctime +3Ch).
