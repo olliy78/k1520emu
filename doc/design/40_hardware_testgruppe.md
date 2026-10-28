@@ -165,6 +165,40 @@ Rückstand höchstens 0,1 s nachgeholt).
   `PhysicalSession.close()` ohne vorheriges `flush` — die ganze Scheibe muss danach formatiert
   sein.  Anlass: `close()` wartete höchstens 30 s und verwarf den Rest still (§11).
 
+### H9 — k1520DiskTool live an der echten Diskette: CP/A, UDOS, WEGA
+
+Geprüft wird das **DiskTool**, nicht der Emulator.  Je Dateisystem wird ein Abbild aufgespielt
+(`cpa_cpa780_k5601_clock.hfe`, `disks/a5120_udos43/…entwickler.hfe` = `udos_ds77` mit
+Verkettung im Gap hinter der Daten-CRC, `disks/p8000_wega30/…doc1.dmk` = `wega720`), danach
+arbeitet das DiskTool **live** (`open_physical`).
+
+**Orakel ist das DiskTool an einer Dateikopie desselben Abbilds**: dieselben Schritte
+(`tests/hardware/disktool_szenario.py`) an Datei und Laufwerk müssen dasselbe ergeben —
+Format, Dateisystem, Verzeichnis (Größe/Typ/Eigenschaften/Nutzer), alle Dateibytes, der Befund
+der vollen Prüfung und **jeder Sektor samt Anhang hinter der Daten-CRC**.
+
+| Fall | Inhalt |
+|---|---|
+| H9.1 | live geöffnet == Datei (vor der Änderung) |
+| H9.2 | ändern: einfügen klein/groß (CP/A > 16 KiB = 3 Extents, WEGA > 10 Blöcke = indirekt, UDOS 20 KiB Kette), überschreiben mit anderer Länge, löschen, Eigenschaften (`set_cpm/udos/unix_attrs`), bei WEGA Verzeichnisse; Rückführung vollständig, jede Spur geprüft, keine Schadstelle, **genau die geänderten Spuren** geschrieben |
+| H9.3 | frisch neu eingehängt (neue Sitzung, nichts im Speicher) == Datei-Orakel danach |
+| H9.4 | unabhängige Gegenprobe: `gw` dekodiert je Spur dieselben Sektoren wie im Orakel-Abbild |
+| H9.5 | schreibgeschützt geöffnet: Änderung abgewiesen, keine Spur geschrieben |
+| H9.6 | zu große Datei (1 MiB): abgewiesen, keine Spur geschrieben (Transaktion) |
+| H9.7 | Kommandozeile `--physical`: `put`/`ls`/`get`/`rm`/`check` |
+
+Dieselben Szenarien laufen **ohne Hardware** in der Regression
+(`py_disktool_physisch_gegenprobe`, Ersatzlaufwerk über einer Kopie, 9 Fälle, ~3 s).
+
+Zwei Festlegungen dafür:
+* **Feste Uhr:** WEGA stempelt Superblock und Verzeichnis-Inodes mit „jetzt“; ohne festen Wert
+  unterscheiden sich Orakel und Laufwerk um die Sekunden zwischen den Läufen (gemessen: 4
+  Sektoren).  `K1520_FS_UHR=<Unix-Sekunden>` setzt die Uhr des WEGA-Dateisystems fest (nur wenn
+  keine eingesetzt ist); das Szenario setzt sie, Quelldateien bekommen dieselbe mtime.
+* **Nicht `udos_boot_scp.hfe`:** dem Mitschnitt fehlt Sektor 13 auf Spur 51/0, und genau dorthin
+  legt der Belegungsplan die erste neue Datei — das DiskTool verweigert dann zu Recht die ganze
+  Operation (Transaktion), schon an der Datei.
+
 ### Weitere Maschinen (Ausbau)
 
 Die Fahrer sind maschinenneutral (Profil: Bootdiskette, Tastenfolge, Prompt); als nächste

@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 
@@ -514,6 +515,11 @@ private:
 
 uint32_t WegaFileSystem::jetzt() const {
     if (uhr_) return uhr_();
+    // Testhaken fuer Gegenproben ueber die C-ABI (tests/hardware/disktool_szenario.py):
+    // dieselben Aenderungen an Datei und echter Diskette sollen sektorgleich sein, also
+    // dieselben Zeitstempel tragen.  Ohne die Variable gilt die Wirtsuhr.
+    if (const char* e = std::getenv("K1520_FS_UHR"); e && *e)
+        return static_cast<uint32_t>(std::strtoul(e, nullptr, 10));
     return static_cast<uint32_t>(std::time(nullptr));
 }
 

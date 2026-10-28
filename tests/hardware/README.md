@@ -24,3 +24,5 @@ EINEM Prozess gehalten werden (nicht parallel starten).
 | `test_h5_disktool` | DiskTool live (API + `--physical`), fsck, frisch neu einhängen |
 | `test_h6_rundlauf` | Emulator ↔ DiskTool an derselben Diskette |
 | `test_h7_betriebsarten` | Doppelschritt (K5600.10/.20-Kompatibilität) über die Sitzung |
+| `test_h8_tempo` | Gast-Tempo 1×/10×/unbegrenzt, Auswerfen mit Rückstand |
+| `test_h9_disktool_dateisysteme` | **DiskTool live** an CP/A, UDOS, WEGA gegen ein Datei-Orakel (Szenarien: `disktool_szenario.py`) |
