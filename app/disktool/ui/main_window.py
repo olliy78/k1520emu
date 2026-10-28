@@ -2737,8 +2737,8 @@ class MainWindow(QMainWindow):
         """Dateiname fuer eine NEUE Diskette erfragen — ein neuer Name oder eine vorhandene
         Datei zum Ueberschreiben (Qt fragt dann nach).  ``""`` = abgebrochen.
 
-        Bewusst Qts eigener Dialog statt des systemeigenen: unter GNOME erschien der
-        GTK-Waehler so, dass sich nur vorhandene Abbilder waehlen liessen.  Das Namensfeld ist
+        Qts eigener Dialog (wie seit app/ui_dateidialoge.py alle; hier zusaetzlich ausdruecklich,
+        damit es auch ohne den Programmstart gilt).  Das Namensfeld ist
         vorbelegt, die Endung folgt dem gewaehlten Filter, wenn keine eingetippt wird.
         """
         dlg = QFileDialog(self, titel, self._disketten_ordner(), filter_)

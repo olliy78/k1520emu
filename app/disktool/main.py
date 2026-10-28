@@ -43,11 +43,13 @@ if "--physical" in sys.argv[1:]:
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
+from app.ui_dateidialoge import qt_dateidialoge
 
 from app.disktool.ui.main_window import MainWindow
 
 
 def main() -> int:
+    qt_dateidialoge()               # Qts eigene Dateidialoge (app/ui_dateidialoge.py)
     app = QApplication(sys.argv)
     # Organisation UND Name: erst damit legt QSettings eine Datei an — und nur
     # dann merkt sich das Fenster Groesse, Leisten und zuletzt geoeffnete Abbilder

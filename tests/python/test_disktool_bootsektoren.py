@@ -265,7 +265,7 @@ def test_dialog_fuer_die_neue_diskette_nimmt_einen_neuen_namen(qt_app, tmp_path,
     Anlass: unter GNOME liess der GTK-Dialog nur vorhandene Abbilder waehlen.
     """
     from PySide6.QtCore import QTimer
-    from PySide6.QtWidgets import QApplication, QFileDialog
+    from PySide6.QtWidgets import QApplication, QFileDialog, QLineEdit
     from app.disktool.ui import main_window as mw
 
     monkeypatch.setattr(mw.MainWindow, "_disketten_ordner", lambda self: str(tmp_path))
@@ -280,8 +280,11 @@ def test_dialog_fuer_die_neue_diskette_nimmt_einen_neuen_namen(qt_app, tmp_path,
                                name=d.selectedFiles())
                 d.selectNameFilter("DMK-Abbild (*.dmk)")
                 d.filterSelected.emit("DMK-Abbild (*.dmk)")
+                QApplication.processEvents()      # Filterwechsel ganz abarbeiten (sonst Wettlauf)
                 gesehen["nach_filter"] = d.selectedFiles()
-                d.selectFile("meine_diskette")
+                # wie der Anwender: den Namen ins Namensfeld tippen
+                d.findChild(QLineEdit, "fileNameEdit").setText("meine_diskette")
+                QApplication.processEvents()
                 d.accept()
                 return
         QTimer.singleShot(20, antworten)
