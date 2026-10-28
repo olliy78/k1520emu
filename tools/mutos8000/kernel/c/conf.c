@@ -29,15 +29,6 @@ int syopen(), syread(), sywrite(), syioctl(), mmread(), mmwrite();
 int lpopen(), lpclose(), lpwrite();
 int ttyopen(), ttread(), ttwrite(), ttyinput(), ttkick();
 
-struct linesw {
-	int	(*l_open)();
-	int	(*l_close)();
-	int	(*l_read)();
-	int	(*l_write)();
-	int	(*l_ioctl)();
-	int	(*l_input)();
-	int	(*l_output)();
-};
 
 struct bdevsw bdevsw[] = {
 	{ fdopen,  fdclose,  fdstrategy, &fdtab },
@@ -67,10 +58,9 @@ struct cdevsw cdevsw[] = {
 };
 
 struct linesw linesw[] = {
-	{ ttyopen, nulldev, ttread, ttwrite, nodev, ttyinput, ttkick }
+	{ ttyopen, nulldev, ttread, ttwrite, nodev, ttyinput, ttkick, { 0, 0, 0 } }
 };
 
-int cf_x876[3] = { 0, 0, 0 };			/* 8876 */
 dev_t rootdev = 0x0402;				/* 887C */
 dev_t swapdev = 0x0402;				/* 887E */
 dev_t pipedev = 0x0402;				/* 8880 */

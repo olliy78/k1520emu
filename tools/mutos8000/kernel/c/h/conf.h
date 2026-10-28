@@ -17,6 +17,18 @@ struct cdevsw {
 	int		(*d_stop)();
 	struct tty	*d_ttys;
 };
+/* K7e: Leitungsdisziplin, 20 Byte je Eintrag (ttioctl: MULT #20; Tabelle 8868, ein Eintrag; die letzten drei Worte sind 0) */
+struct linesw {
+	int		(*l_open)();
+	int		(*l_close)();
+	int		(*l_read)();
+	int		(*l_write)();
+	int		(*l_ioctl)();
+	int		(*l_input)();
+	int		(*l_output)();
+	int		l_x[3];
+};
+extern struct linesw	linesw[];
 extern struct bdevsw	bdevsw[];
 extern struct cdevsw	cdevsw[];
 /* Gerateetabelle (devtab, V7 iobuf): Kopf der Puffer des Geraets; Aufbau nur soweit getblk ihn benutzt. */

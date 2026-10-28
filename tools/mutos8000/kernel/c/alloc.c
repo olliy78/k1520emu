@@ -14,7 +14,7 @@
 #include "buf.h"
 
 int updlock;
-static badblock();
+badblock();
 
 /* KERNEL 2F48 */
 struct buf *
@@ -100,8 +100,7 @@ daddr_t bno;
 	fp->s_fmod = 1;
 }
 
-/* KERNEL-intern 316A badblock */
-static
+/* KERNEL 316A -- im Kernel ohne Symbol (static); hier global, damit vergleich.py die Funktion im Objekt findet */
 badblock(fp, bn, dev)
 register struct filsys *fp;
 daddr_t bn;

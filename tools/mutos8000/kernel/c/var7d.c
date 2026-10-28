@@ -23,7 +23,7 @@ register struct tty *tp;
 		return(1);
 	switch (c) {
 	case 0x10:
-		if (tp->t_eol == 0)
+		if (tp->t_page == 0)
 			break;
 	case 0x12:
 	case 0x17:
@@ -50,7 +50,7 @@ register struct tty *tp;
 		return(1);
 	else if (c == 0x12 || c == 0x17)
 		return(1);
-	else if (c == 0x10 && tp->t_eol)
+	else if (c == 0x10 && tp->t_page)
 		return(1);
 	return(0);
 }

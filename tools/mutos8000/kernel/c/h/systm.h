@@ -23,7 +23,7 @@ extern char		curpri;
 extern struct inode	*rootdir;
 extern struct proc	*proctop;
 extern struct sysent {
-	int	sy_narg;
+	char	sy_narg;
 	int	(*sy_call)();
 } sysent[];
 struct inode	*iget();

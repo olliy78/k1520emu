@@ -93,7 +93,7 @@ exece()
 			if ((nc & 0777) == 0) {
 				if (bp)
 					bdwrite(bp);
-				bp = getblk(swapdev, bno + (nc>>BSHIFT) + swplo);
+				bp = getblk(swapdev, (daddr_t)bno + (nc>>BSHIFT) + swplo);
 				cp = bp->b_addr;
 			}
 			nc++;
@@ -125,7 +125,7 @@ exece()
 			if ((nc & 0777) == 0) {
 				if (bp)
 					brelse(bp);
-				bp = bread(swapdev, bno + (nc>>BSHIFT) + swplo);
+				bp = bread(swapdev, (daddr_t)bno + (nc>>BSHIFT) + swplo);
 				bp->b_flags |= B_AGE;
 				bp->b_flags &= ~B_DELWRI;
 				cp = bp->b_addr;
@@ -142,7 +142,7 @@ bad:
 		brelse(bp);
 	if (u.u_error)
 		for (nc = 0; nc < SIZE_OF_BLK; nc++) {
-			bp = getblk(swapdev, bno + nc + swplo);
+			bp = getblk(swapdev, (daddr_t)bno + nc + swplo);
 			bp->b_flags |= B_AGE;
 			bp->b_flags &= ~B_DELWRI;
 			brelse(bp);

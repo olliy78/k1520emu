@@ -204,7 +204,20 @@ Der Kernel-Quellcode steckt hier wieder in einer Tabelle der Daten: **conf.c ist
 `ttioctl` 6E7A (738 B, Sprungtabelle ueber cmd/6 und die Befehlstabelle 8D3A..), `ttyinput` 7222 (912 B) mit den Teilfunktionen 75B2, 769A, 772E, 78A8 und `ttyoutput` 7A34 (534 B, Sprungtabelle 8D46, Tabellen 8D1A/8D52) -- alle in System-III-Form, noch ohne Zeichenvorlage;
 `fdstart` 7FDC, `fdioctl` 85B0.  Dazu die Blockanordnung von lpwrite/lpcanon/lpintr/ttread/ttyspec (Kernel-c2).
 
-# GESAMTUEBERSICHT C-Rueckbau (Stand 2026-10-28, nach K7a-K7d)
+# AP K7e (2026-10-28): restliche Funktionen in C, sysent
+
+Dateien: neu `c/clock.c`, `c/sysent.c`; erweitert `tty2.c` (ttioctl, ttyinput samt ttycol/ttyecho/ttyrub/unputc, ttyoutput, Tabellen), `dev0.c` (fdstart, fdintr 821A, fdadj 8468, fdioctl), `alloc.c` (badblock mit Marke);
+Header `h/tty.h` (Glieder 1C..21, 26, 2D, 34 benannt, Flag-Makros), `h/conf.h` (`struct linesw`, 20 Byte), `h/systm.h` (`sy_narg` char).  Ein Gastlauf (r1: clock, tty2, alloc, sig, sysent, conf mit -O; r2: dev0 ohne -O).
+* **Daten bytegleich:** `sysent.c` (8B58, 64 Eintraege, `datenvergleich.py`: 0 abweichende Woerter) und weiterhin `conf.c` (nach Umzug von `linesw` nach `conf.h` mit den drei Nullworten, 0 Abweichungen).  Die Eintraege 64/65 hinter der Tabelle sind Text ("tm..."), kein sysent.
+* **gleich:** `badblock` 316A (Marke gesetzt; `alloc.c` 4/7), `unputc` 78A8, `fdadj` 8468.  **nahe:** `ttycol` 75B2 (1 Wort).  Weitere Stufen siehe Uebersicht.
+* **Zurueckgebaut, aber nicht bytegleich:** `clock` 2842 (die Form stimmt; Kernel ruft am Anfang ein Hilfsstueck 040C, `lbolt` wird ueber R2 verglichen -- Eigenheit des aelteren c2), `ttioctl` 6E7A (der Kernel-Compiler legt die
+  switch-Verteilung ueber `cmd/6` und eine Sprungtabelle 8D3A an, unser cc nicht), `ttyinput` 7222, `ttyecho` 769A, `ttyrub` 772E, `ttyoutput` 7A34 (Sprungtabelle 8D46; Fallverteilung im Kernel ueber `c-8`, in `c` hier anders gebaut),
+  `fdstart`, `fdintr`, `fdioctl` (Mailbox-Zustandsautomat; ohne -O uebersetzt, Abweichungen vor allem Registerzuteilung und Konstanten-Vergleiche ueber R2).  Funktional nach System III/Mailbox belegt, Namen frei.
+* **`procxmt` 0F12:** schon aus K7c in `sig.c`, Status offen (kein Zusatzlauf).
+* **Gleiche Kernelbefunde:** ttyoutput/ttyrub nutzen `t_dtab` (1E) als Tabulatorspalte bei XTABS; `t_width` (20) 0 = 255; Seitenbremse ueber `t_page` (21) und `t_cnt2c`.  `fdintr` hat keinen Aufrufer in der Aufrufkarte (Interrupt) -- fehlt in `funktionen.txt`, wird von `uebersicht.py` nicht gezaehlt.
+* **Nicht erreicht (Zeit):** exece/getxfile (nur `swplo`-Typ: `(daddr_t)bno` ergaenzt, ungeprueft), trap, malloc, newproc/swtch, readi, bmap: keine neuen Quellformen versucht.
+
+# GESAMTUEBERSICHT C-Rueckbau (Stand 2026-10-28, nach K7a-K7e)
 
 Quelle: `werkzeug/uebersicht.py KERNEL <Objektverzeichnisse> --md` (Universum `kernel/lauf/funktionen.txt`, Modulgrenzen `linkkarte.txt`, Status je Funktion; Schwelle "nahe" = hoechstens 30 abweichende Woerter, ein verschobenes Wort
 zaehlt alle folgenden mit).  Status: **gleich** = alle Woerter wie im Kernel; **nahe** = Eigenheit des aelteren Kernel-`c2`/`c1` (siehe K7b "A..F", K7d); **offen** = in C vorhanden, aber weiter entfernt; **kein C** = noch nicht zurueckgebaut;
@@ -215,16 +228,16 @@ zaehlt alle folgenden mit).  Status: **gleich** = alle Woerter wie im Kernel; **
 | low | 0 | 0 | 0 | 0 | 26 | 26 |
 | main | 2 | 1 | 0 | 0 | 0 | 3 |
 | trap | 0 | 0 | 1 | 0 | 0 | 1 |
-| sig | 7 | 0 | 0 | 1 | 0 | 8 |
+| sig | 7 | 0 | 1 | 0 | 0 | 8 |
 | iget | 5 | 1 | 2 | 0 | 0 | 8 |
 | prf | 5 | 0 | 0 | 0 | 0 | 5 |
 | slp | 9 | 0 | 2 | 0 | 0 | 11 |
 | subr | 2 | 1 | 1 | 0 | 0 | 4 |
 | rdwri | 2 | 1 | 1 | 0 | 0 | 4 |
-| clock | 1 | 0 | 0 | 1 | 0 | 2 |
+| clock | 1 | 0 | 1 | 0 | 0 | 2 |
 | fio | 8 | 0 | 0 | 0 | 0 | 8 |
 | malloc | 0 | 1 | 1 | 0 | 0 | 2 |
-| alloc | 3 | 0 | 3 | 1 | 0 | 7 |
+| alloc | 4 | 0 | 3 | 0 | 0 | 7 |
 | machdep | 3 | 0 | 1 | 0 | 0 | 4 |
 | nami | 1 | 0 | 0 | 0 | 0 | 1 |
 | pipe | 8 | 0 | 0 | 0 | 0 | 8 |
@@ -237,9 +250,9 @@ zaehlt alle folgenden mit).  Status: **gleich** = alle Woerter wie im Kernel; **
 | tty | 10 | 0 | 0 | 0 | 0 | 10 |
 | dev1 | 5 | 0 | 2 | 0 | 0 | 7 |
 | rk | 13 | 0 | 0 | 0 | 0 | 13 |
-| mbx | 10 | 1 | 1 | 7 | 0 | 19 |
-| dev0 | 4 | 2 | 1 | 2 | 0 | 9 |
-| **Summe** | 165 | 12 | 20 | 12 | 26 | 235 |
+| mbx | 11 | 3 | 5 | 0 | 0 | 19 |
+| dev0 | 4 | 2 | 3 | 0 | 0 | 9 |
+| **Summe** | 167 | 14 | 28 | 0 | 26 | 235 |
 
 Zu den Modulnamen: Grenzen sind die Linkreihenfolge-Hypothese aus K5 (`linkkarte.txt`); `mbx` ist darin der Block ttyopen..ttwrite (6D44..7E16), `dev1` Konsole-Rest + Drucker, `low` der gesamte Handassembler (26 Funktionen:
 Start 027E, Trap-Eintritt 030E, spl*, fubyte/fuword/subyte/suword, copyin/copyout/copyseg/clearseg, savu/resume, savfp/restfp, mapaddr, addupc ...).
