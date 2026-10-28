@@ -154,6 +154,13 @@ struct FsProfile {
     uint8_t bitmap_track    = 23;    ///< Belegungskarte (17H)
     uint8_t usable_tracks   = 0;     ///< 0 = aus der Geometrie
 
+    /// @brief Nur @ref FsType::Udos1715 — verlangte Fuellung hinter dem Belegungsplan
+    ///        (Spur 17H Sektor 0, Bytes 158H…176H): "00" PC 1715, "77" P8000, "ff" A5120
+    ///        (UDOS 5.0); leer = jede.  Das einzige Merkmal, das die NDOS-Disketten der
+    ///        drei Rechner trennt — die Profile sind sonst deckungsgleich
+    ///        (doc/udos1715_diskettenformat.md §3.0a).  Gilt auch beim Anlegen.
+    std::string ndos_fill;
+
     /// @brief Nur @ref FsType::Udos1715 — belegt Spur 0 der Urlader (Systemdiskette)?
     ///
     /// Auf einer Systemdiskette liegen dort Urlader und BFOS

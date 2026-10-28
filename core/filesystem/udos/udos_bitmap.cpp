@@ -25,6 +25,28 @@ bool bitOf(const std::vector<uint8_t>& raw, uint8_t track, uint8_t sector_id) {
 
 }  // namespace
 
+// ─── NDOS-Fuellsitte (Spur 17H Sektor 0, Bytes 158H…176H) ────────────────────
+
+NdosFuellung ndosFuellung(const std::vector<uint8_t>& raw) {
+    if (raw.size() < 375) return NdosFuellung::Fremd;
+    const auto anfang = raw.begin() + 344, ende = raw.begin() + 375;
+    if (std::all_of(anfang, ende, [](uint8_t b) { return b == 0x00; })) return NdosFuellung::Null;
+    if (std::all_of(anfang, ende, [](uint8_t b) { return b == 0xFF; })) return NdosFuellung::FF;
+    if (std::all_of(anfang, ende, [](uint8_t b) { return b == 0x00 || b == 0x77; }))
+        return NdosFuellung::Nachlauf77;
+    return NdosFuellung::Fremd;
+}
+
+const char* ndosFuellungKuerzel(NdosFuellung f) {
+    switch (f) {
+        case NdosFuellung::Null:       return "00";
+        case NdosFuellung::Nachlauf77: return "77";
+        case NdosFuellung::FF:         return "ff";
+        case NdosFuellung::Fremd:      break;
+    }
+    return "?";
+}
+
 // ─── Laden / Speichern ───────────────────────────────────────────────────────
 
 namespace {
@@ -180,9 +202,11 @@ bool UdosBitmap::looksValid(const std::vector<uint8_t>& raw, uint8_t expect_secs
         // vor 344 und damit hier mitten im Belegungsplan; sie bleiben das
         // Unterscheidungsmerkmal, s. u.).  Geprueft wird deshalb nur, dass dort NICHTS
         // ANDERES steht — die Trennung zu ZDOS traegt der Zaehlerabgleich.
-        for (size_t i = 344; i < 375; ++i)
-            if (raw[i] != 0x00 && raw[i] != 0x77)
-                return sag("Bereich hinter dem Belegungsplan ist weder 0 noch Nachlauf");
+        // Dritte Sitte: **UDOS 5.0 am A5120** (BIZ Schwerin 1997) fuellt den GANZEN
+        // Bereich mit 0xFF = die Spuren 80…87 als belegt, also nie vergeben.  Welche der
+        // drei es ist, entscheidet das Profil (`ndos_fill`), nicht diese Probe.
+        if (ndosFuellung(raw) == NdosFuellung::Fremd)
+            return sag("Bereich hinter dem Belegungsplan ist weder 0 noch Nachlauf");
         // Belegt + frei muss die Kapazitaet ergeben — bei NDOS sind beide Zaehler echt.
         const uint32_t kapazitaet = static_cast<uint32_t>(raw[378]) * raw[379];
         const uint32_t belegt = static_cast<uint32_t>(raw[375] | (raw[376] << 8));
@@ -208,7 +232,8 @@ bool UdosBitmap::looksValid(const std::vector<uint8_t>& raw, uint8_t expect_secs
 }
 
 UdosBitmap UdosBitmap::makeEmpty(uint8_t sectors_per_track, uint8_t tracks,
-                                 const std::string& label, UdosMapSitte sitte) {
+                                 const std::string& label, UdosMapSitte sitte,
+                                 NdosFuellung fuellung) {
     UdosBitmap b;
     b.raw_.assign(kUdosBitmapBytes, 0);
     b.sitte_ = sitte;
@@ -234,9 +259,17 @@ UdosBitmap UdosBitmap::makeEmpty(uint8_t sectors_per_track, uint8_t tracks,
         for (size_t i = 336; i < 347; ++i) b.raw_[i] = 0x33;
         b.raw_[347] = 0xF7;
         for (size_t i = 348; i < 375; ++i) b.raw_[i] = 0x77;
-    }   // NDOS laesst den Bereich hinter dem Belegungsplan auf 00.
+    } else if (fuellung == NdosFuellung::Nachlauf77) {
+        // P8000: 158H…15BH bleiben 00, ab 15CH der ZDOS-Rest 77H (wie auf der WEGA-Startdiskette).
+        for (size_t i = 348; i < 375; ++i) b.raw_[i] = 0x77;
+    } else if (fuellung == NdosFuellung::FF) {
+        for (size_t i = 344; i < 375; ++i) b.raw_[i] = 0xFF;   // UDOS 5.0 am A5120
+    }   // PC 1715 laesst den Bereich hinter dem Belegungsplan auf 00.
 
-    b.raw_[377] = 0x00;
+    // Byte 179H: PC 1715 traegt 00, P8000 und UDOS 5.0 tragen 01 (beide Originaldisketten).
+    // UDOS 5.0 verlangt es — mit 00 meldet das System nach „UDOS VERSION 5.0" ERROR C4 und
+    // kennt kein Laufwerk mehr (am Emulator gegengeprueft 2026-10-28).
+    b.raw_[377] = (sitte == UdosMapSitte::Ndos1715 && fuellung != NdosFuellung::Null) ? 0x01 : 0x00;
     b.raw_[378] = sectors_per_track;
     b.raw_[379] = tracks;
     b.raw_[382] = b.raw_[383] = 0x00;

@@ -56,6 +56,7 @@ Tests nehmen ihre Kopie unter `tests/fixtures/disks/`, s. §3).
 | `cpa_cpa780_k5601_noclock-raf` | A5120 · CP/A + RAF-Treiber | — | nur im Arbeitsverzeichnis; Handbuch/CLAUDE.md verweisen darauf |
 | `scpx17_cpa780_k5601.hfe` | A5120 · SCPX 1.7 (16×256) | ✔ | |
 | `a5120_udos43_k5601_entwickler.hfe` | A5120 · UDOS 4.3 | ✔ | |
+| `a5120_udos50_k5601_system.hfe` | A5120 · UDOS 5.0 (NDOS-Dateisystem) | ✔ | umgewandelt, nicht gebaut (`doc/udos_programme.md` §8) |
 | `scpx17_5x1024_k5601_hardy.hfe` | A5120 · SCPX 1.7 (5×1024) mit HARDY | — | |
 | `k8915scpx_boot1.hfe` | K8915 · SCPX 8915 | ✔ | |
 | `prg710_udos43_k5601_system.hfe` · `prg710-1_udos43_k5601_v43_189.hfe` | PRG 710 / 710-1 · UDOS 4.3 | ✔ ✔ | |

@@ -72,6 +72,28 @@ enum class UdosMapSitte : uint8_t {
     Ndos1715
 };
 
+/**
+ * @brief Fuellung einer NDOS-Karte zwischen Belegungsplan und Zaehlern.
+ *
+ * Bytes 344…374 (158H…176H) von Spur 17H Sektor 0 — dahinter beginnt bei 375 (177H) der
+ * „belegt"-Zaehler.  Der Formatierer jedes Rechners fuellt sie anders, und das ist das
+ * einzige Merkmal, an dem sich die Disketten der drei bekannten NDOS-Rechner unterscheiden
+ * (doc/udos1715_diskettenformat.md §3.0a):
+ *   - `Null`   PC 1715 (UDOS1715):    durchgehend 00
+ *   - `Nachlauf77` P8000 (UDOS 2.2):  00 00 00 00, dann 27 × 77H (der ZDOS-Nachlauf)
+ *   - `FF`     A5120 (UDOS 5.0):      durchgehend FFH (Spuren 80…87 als belegt)
+ *   - `Fremd`  keines davon — keine NDOS-Karte.
+ */
+enum class NdosFuellung : uint8_t { Null, Nachlauf77, FF, Fremd };
+
+/// @brief Die Fuellsitte einer NDOS-Karte (@p raw = die 384 Byte, s. @ref NdosFuellung).
+///        Gemischtes 00/77 zaehlt als `Nachlauf77`, damit jede bisher gelesene Diskette
+///        genau EINER Sitte zufaellt; ein einzelnes FFH zwischen anderem ist `Fremd`.
+NdosFuellung ndosFuellung(const std::vector<uint8_t>& raw);
+
+/// @brief Kuerzel einer Fuellsitte, wie in `data/formats.yaml` (`ndos_fill`): "00" | "77" | "ff".
+const char* ndosFuellungKuerzel(NdosFuellung f);
+
 /// @brief Anzahl der Spureintraege, die die Karte in dieser Sitte fuehrt.
 inline constexpr uint8_t udosMapTrackSlots(UdosMapSitte s) {
     return s == UdosMapSitte::Ndos1715 ? 80 : 78;
@@ -129,9 +151,13 @@ public:
     std::vector<uint8_t>&       raw()       { return raw_; }
 
     /// @brief Frisch angelegte Karte (alles frei, Systemspuren noch nicht gesperrt).
+    ///        @p fuellung gilt nur fuer `Ndos1715`: so fuellt der jeweilige Formatierer
+    ///        den Bereich hinter dem Plan, und daran erkennt das DiskTool die Diskette
+    ///        hinterher als PC 1715 / P8000 / A5120 (@ref NdosFuellung).
     static UdosBitmap makeEmpty(uint8_t sectors_per_track, uint8_t tracks,
                                 const std::string& label,
-                                UdosMapSitte sitte = UdosMapSitte::Zdos);
+                                UdosMapSitte sitte = UdosMapSitte::Zdos,
+                                NdosFuellung fuellung = NdosFuellung::Null);
 
 private:
     std::vector<uint8_t> raw_ = std::vector<uint8_t>(kUdosBitmapBytes, 0);

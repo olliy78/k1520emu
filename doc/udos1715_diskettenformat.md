@@ -173,6 +173,7 @@ Zählern nicht mit `00`, sondern mit dem **`77H`-Rest der ZDOS-Sitte**:
 ```
 PC 1715:  158H…176H = 00 …
 P8000:    158H…15BH = 00 00 00 00 · 15CH…176H = 27 × 77H · 179H = 01
+A5120:    158H…176H = 31 × FFH            (UDOS 5.0, BIZ FmSZBw Schwerin 1997)
 ```
 
 Damit taugt das Füllmuster **nicht** als Unterscheidungsmerkmal zu ZDOS (der frühere
@@ -185,13 +186,47 @@ Text sagte das; er war zu eng gefasst). Was bleibt:
   ZDOS rechnet gegen die Konstante 2464 (§3.1).
 * Sektorgröße und Spurlänge trennen ohnehin (26×128 gegen 32×256).
 
-Geprüft wird deshalb nur noch, dass hinter dem Belegungsplan **`00` oder `77H`** steht,
-und Byte `179H` gar nicht mehr — beim P8000 trägt es `01`.
-Wächter: `Udos1715P8000.*` auf der Fixture `udosP8000_640k_wega.hfe` — sie liegt
-als `.hfe` vor, weil 13 ihrer Sektoren hinter der Daten-CRC die Schreibnaht eines
-nachträglich überschriebenen Sektors tragen (`4E xx yy yy …`).  Bis 2026-09-29 verweigerte
-`rawCompatible()` deshalb `.img`; seit `doc/design/16_k8915.md` AP-E5b erkennt es den reinen
-Schreibnachlauf, und die Diskette ist — wie §8 es sagt — als `.img` exportierbar.
+Geprüft wird deshalb nur noch, dass hinter dem Belegungsplan **`00` oder `77H`** steht
+— oder **durchgehend `FFH`** —, und Byte `179H` gar nicht mehr — beim P8000 trägt es `01`.
+
+**Die Füllung entscheidet seit 2026-10-28 auch, als WAS die Diskette angezeigt wird**:
+drei Katalogprofile auf derselben Geometrie, `udos1715` (`ndos_fill: "00"`), `udos_p8000`
+(`"77"`, gemischtes 00/77 eingeschlossen) und `udos50` (`"ff"`). Jede Karte, die die Probe
+besteht, fällt genau einem davon zu — die Erkennung bleibt eindeutig. `create` schreibt die
+Füllung des gewählten Profils (`UdosBitmap::makeEmpty`). Wächter: `NdosSitte.*`.
+
+Die dritte Sitte kommt von **UDOS 5.0 am A5120** (2026-10-28, Diskette
+`disks/a5120_udos50/`): FFH sind rechnerisch die Belegungsbits der nicht vorhandenen
+Spuren 80…87, also „belegt, nie vergeben". Nur **durchgehend** zugelassen; ein
+einzelnes FFH zwischen `00`/`77H` ist keine der drei Sitten und bleibt ein
+Ablehnungsgrund. Bis dahin galt die Diskette als „kein gültiger Belegungsplan" und die
+Erkennung fiel auf eine leere `scpx640` zurück. Wächter: `Udos1715A5120.*` auf
+`udos50_640k_a5120_system.img`.
+
+### 3.0b Eine UDOS-5.0-Bootdiskette bauen — drei Bedingungen (2026-10-28)
+
+Eine leere `udos50`-Diskette + Bootabbild + die Dateien des Originals startet erst, wenn
+alle drei gelten.  Gefunden durch Eingrenzen im Emulator (Original geleert und neu befüllt
+bootet, frisch angelegte Diskette nicht → sektorweise gemischt):
+
+1. **Zweiter Bootteil in der Verzeichnisspur.**  Der Monitor von UDOS 5.0 lädt beim
+   Kaltstart 300H Byte ab **Spur 16H Sektor 07** nach 4000H und springt nur hinein, wenn
+   bei 4002H `"BO"` steht (`BOOT FOR UDOS V 5.0!`); sonst `ERROR: 45`.  Die Sektoren
+   07–09 gehören deshalb zum Bootabbild (hinter Spur 0 Kopf 0, zusammen 4864 Byte), die
+   Verzeichnissätze liegen unter UDOS 5.0 auf **05, 0A, 01, 06, 0B** (nicht auf der
+   Handbuchlage 05, 0A, 0F, 04, 09 …), und `mkfs` führt Spur 16H und 17H ganz als belegt
+   — wie die Originaldiskette (`Udos1715FileSystem::zweiterBootteil`).
+2. **Verzeichnis von vorn füllen** (§4 „in den nächsten Record").  Der Urlader BFOS liest
+   die Sätze der Reihe nach und hört am ersten leeren auf; ein Eintrag hinter einer Lücke
+   ist für ihn nicht da (`CAT` dagegen liest alle).  Das DiskTool hängte bis dahin jeden
+   Eintrag an den LETZTEN Satz — gilt für alle NDOS-Disketten.
+3. **Byte `179H` = `01`** im Belegungsplan (P8000 ebenso, PC 1715 `00`).  Mit `00` meldet
+   das System nach `UDOS VERSION 5.0` sofort `ERROR C4` und kennt kein Laufwerk.
+
+**Nicht** nötig sind die Bytes ab `28H` im DIRECTORY-Descriptor (`01 20 50`, FFH,
+„IMPLEMENTET BY MATTHIAS PAESZLER" bei `60H`) — die frühere Vermutung war falsch
+(Gegenprobe: der Descriptor der frischen Diskette in die startfähige getauscht, sie
+startet).  Wächter: `py_disktool_bootsektoren` (baut und bootet), `Udos1715A5120.*`.
 
 > **Der Systembereich ist beim P8000 größer.** Gesperrt ist dort jeweils der ganze
 > **Kopf 0** (Sektoren 0…15) der Spuren 0 (Urlader/BFOS), **21** (Bootspur), 22

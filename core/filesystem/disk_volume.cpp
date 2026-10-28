@@ -291,6 +291,22 @@ std::vector<SectorSpace::TrackRef> systemspuren(const SectorSpace& raum, const F
         // Handbuch §1.2.2: „Spur 00, Sektor 00…0F — URLADER und BFOS".  Sektor 00…0F
         // sind die 16 Sektoren der VORDERseite (§1.1), also genau Spur 0 Kopf 0.
         spur(0);
+        // UDOS 5.0: zweiter Bootteil in der Verzeichnisspur (16H, Sektor 07–09), im
+        // Bootabbild hinter Spur 0 — ohne ihn endet der Kaltstart mit ERROR 45.
+        uint8_t erster = 0, anzahl = 0;
+        if (Udos1715FileSystem::zweiterBootteil(p, erster, anzahl)) {
+            const int i = raum.trackIndexOf(p.directory_track, 0);
+            if (i >= 0) {
+                SectorSpace::TrackRef t = raum.trackAt(static_cast<size_t>(i));
+                if (static_cast<int>(erster) + anzahl <= t.sectors) {
+                    t.start   += static_cast<uint64_t>(erster) * t.sector_size;
+                    t.first_id = static_cast<uint8_t>(t.first_id + erster);
+                    t.sectors  = anzahl;
+                    t.bytes    = static_cast<uint64_t>(anzahl) * t.sector_size;
+                    out.push_back(t);
+                }
+            }
+        }
         return out;
     }
 
@@ -4166,7 +4182,7 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
 
     if (profil->boot_header == "bcu" && profil->detect && boot_image.empty()) {
         err = "'" + fs_name + "' wird am BCU-System in den Systemspuren erkannt - ohne Bootabbild "
-              "(--boot, z. B. disks/bootsektoren/boot_bcu12_ohnesyl.bin) legte das Werkzeug eine "
+              "(--boot, z. B. data/bootsektoren/boot_bcu12_ohnesyl.bin) legte das Werkzeug eine "
               "Diskette an, die es beim naechsten Oeffnen nicht mehr als BCU-Diskette erkennt.";
         return nullptr;
     }

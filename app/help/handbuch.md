@@ -1206,6 +1206,13 @@ Urlader und Bootabbild mit; ohne `Y` bleibt der Bildschirm beim Kaltstart schwar
 Die Laufwerkstypen (`SET DISKCON`) setzen Grenzen — Matrix in
 `doc/udos_diskettenformat.md` §12.3 (bootfähig herstellbar: `41`, `31` und `41` am 8″).
 
+**UDOS 5.0** (Beispieldiskette `a5120_udos50/a5120_udos50_k5601_system.hfe`). Startet im
+gewöhnlichen A5120 mit K5601; nach dem Startbild fragt `DATE` nach dem Datum (`TTMMJJ`, z. B.
+`281097`). Danach kommen Groß- und Kleinbuchstaben **vertauscht** an: die Frage
+„OK ? (Y/N)" mit kleinem `y` beantworten, Kommandos klein tippen (`status` erscheint als
+`STATUS`). Das Dateisystem ist das des PC 1715 (16×256, eine Diskettenseite); das DiskTool
+liest und beschreibt es, und anders als bei UDOS 4.3 taugt auch ein `.img`.
+
 **BCU 880 V1.2.** Die Startdisketten „SYL auf Spur 1“ sind reine Startdisketten: SYL-Lader
 auf Zylinder 1, das System auf Zylinder 2–4, **kein** Dateisystem für Anwenderdateien
 (Abschnitt *BCU 880*, Quelle `doc/a5120_alt/bcu.md` §2). Gearbeitet wird mit der

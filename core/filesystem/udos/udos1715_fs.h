@@ -147,6 +147,21 @@ public:
     static bool looksLikeUdos1715(const SectorSpace& space, const FsProfile& prof,
                                   std::string* why);
 
+    /**
+     * @brief Zweiter Bootteil in der Verzeichnisspur — nur **UDOS 5.0** (Profil mit
+     *        `ndos_fill: "ff"`).
+     *
+     * Der Monitor von UDOS 5.0 laedt beim Kaltstart (Befehl `O`) 300H Byte ab Spur 16H
+     * Sektor 07 nach 4000H und springt nur hinein, wenn dort die Kennung `"BO"` steht
+     * (`BOOT FOR UDOS V 5.0!`) — sonst `ERROR: 45`.  Diese drei Sektoren gehoeren deshalb
+     * zum Bootabbild (hinter Spur 0) und duerfen keine Verzeichnissaetze tragen.
+     *
+     * @param[out] erster Sektorindex (0-basiert, Kopf 0) des ersten Sektors
+     * @param[out] anzahl Zahl der Sektoren
+     * @return false = das Profil kennt keinen zweiten Bootteil (PC 1715, P8000)
+     */
+    static bool zweiterBootteil(const FsProfile& prof, uint8_t& erster, uint8_t& anzahl);
+
     /// @brief Gueltiger Name?  Bis 32 Zeichen, **muss mit einem Buchstaben beginnen**
     ///        (Handbuch §3.1).
     static bool validName(const std::string& name, std::string* why);
