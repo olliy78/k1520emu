@@ -447,6 +447,8 @@ Ein A5120 mit `A5120Machine::Config::em` (`core/cards/em/`, CPU-Primitive
 `k1520dbg --em em256` + `cpu u8000` (`tools/k1520dbg.md` §12), `boot_trace --em`. Plan
 und Stand: `doc/design/17_a5120_16.md`. Beim Zusammenführen mit dem Zweig K8915
 (2026-10-02) festgelegt:
+- **EM1024 (2026-10-28) ist Neuentwicklung, nicht historisch** (1 MB, `em=em1024`, U880-Fenster-Bits SG2P/SG3P im Zusatzlatch MODADR+8;
+  EM064/EM256 bitgleich): `doc/design/42_em1024.md`.
 - **Bus-/MEMDI ist ein JE ZUGRIFF getriebenes Signal** (`K1520Bus::MemdiDriver`), es gibt
   kein `setMEMDI` mehr; die ZRE 045-8762 des K8915 führt /MEMDI nur als Kartenzustand.
 - **Save-State v7** = SIO-Block mit Break/Ext-Latch (K8915-Zweig) + EM-Block; beide Zweige

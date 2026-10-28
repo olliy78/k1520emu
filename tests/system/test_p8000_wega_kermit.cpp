@@ -1,7 +1,7 @@
 /**
  * @file test_p8000_wega_kermit.cpp
  * @brief Kermit auf WEGA 3.1 (Entwurf 36 AP K1): C-Kermit 4.2(030) steht auf der ausgelieferten Platte
- *        `disks/p8000_wega31/p8000_wega31_platte.avr.img.gz` (/usr/bin/kermit, setuid root) und der
+ *        `disks/p8000_wega31/p8000_wega31_platte.img.gz` (/usr/bin/kermit, setuid root) und der
  *        Benutzer `kermit` (Kennwort `kermit`, Shell `/bin/sh` mit `.profile` = `exec /usr/bin/kermit` seit
  *        K7, Home `/usr/kermit` mit `.kermrc`: `server`, `exit`) macht aus einem getty-Anschluss einen
  *        Kermit-Server.
@@ -60,7 +60,7 @@ std::string rtrim(std::string s) {
 
 /// Entpackte Plattenkopie (Temp) aus der ausgelieferten oder per Umgebung genannten Datei.
 bool plattenKopie(const std::string& ziel, std::string* quelle) {
-    std::string q = P8000_WEGA31_DIR "/p8000_wega31_platte.avr.img.gz";
+    std::string q = P8000_WEGA31_DIR "/p8000_wega31_platte.img.gz";
     if (const char* e = std::getenv("K1520_WEGA31_PLATTE"); e && *e) q = e;
     *quelle = q;
     std::vector<uint8_t> d;

@@ -223,18 +223,30 @@ TEST(P8000MmuLogik, MmuAusPhysIstSegmentMal64K) {
             }
 }
 
-TEST(P8000MmuLogik, MmuEinOhneTreiberSchwebtAufEins) {
-    // [L7] Code-MMU URS = 0 sieht Segment 64+ nicht ⇒ niemand treibt TRAD.
+TEST(P8000MmuLogik, MmuEinOhneTreiberAdressiertLokal) {
+    // [L7] Code-MMU URS = 0 sieht Segment 64+ nicht ⇒ niemand treibt TRAD.  Gemessen (Issue #23,
+    // Holen nach MR := 0 der Code-MMU bei ONH = 1): Segment*64K+Offset, nicht FFFFH.
     L l;
     kennaufbau(l);
     l.ioSchreiben(L::P_SCR, L::SCR_MMU_ON | L::SCR_BDMEM_AUS);
     const auto a = l.zyklus(zyk(ST_DATA, true, 0x45, 0x1234));
     EXPECT_EQ(a.wahl, W::Code);
     EXPECT_EQ(a.treiber, 0);
-    EXPECT_EQ(a.adresse, 0xFFFF34u);
+    EXPECT_EQ(a.adresse, 0x451234u);
     // Nach MR := 0 (MON16 ENTRY_) treibt keine MMU mehr.
     sout(l, ALL_MMU, Z8010::CMD_MR, 0);
-    EXPECT_EQ(l.zyklus(zyk(ST_DATA, true, 0x01, 0x5678)).adresse, 0xFFFF78u);
+    EXPECT_EQ(l.zyklus(zyk(ST_DATA, true, 0x01, 0x5678)).adresse, 0x015678u);
+    EXPECT_EQ(l.zyklus(zyk(ST_INSTR, true, 0x00, 0x9024)).adresse, 0x009024u);   // Test 07, Lauf 2
+}
+
+TEST(P8000MmuLogik, MmuEinOhneTreiberGegenprobeSchwebtAufEins) {
+    // Die fruehere Annahme (Schaltplan: TRAD offen = 1) bleibt als Option erhalten.
+    L::Config cfg;
+    cfg.tradLeerIstLokal = false;
+    L l(cfg);
+    kennaufbau(l);
+    l.ioSchreiben(L::P_SCR, L::SCR_MMU_ON | L::SCR_BDMEM_AUS);
+    EXPECT_EQ(l.zyklus(zyk(ST_DATA, true, 0x45, 0x1234)).adresse, 0xFFFF34u);
 }
 
 TEST(P8000MmuLogik, MehrereTreiberVerdrahtetesUnd) {
@@ -824,7 +836,7 @@ TEST(P8000MmuLogikMatrix, AlleZyklusartenMalZustaende) {
                                     ASSERT_FALSE(z.unterdrueckt);   // Limit FF, keine Schutzbits
                                     uint32_t adr;
                                     if (!(scr & L::SCR_MMU_ON)) adr = (uint32_t(seg) << 16) | off;
-                                    else if (soll == W::Code && (seg & 0x40)) adr = 0xFFFF00u | (off & 0xFF);
+                                    else if (soll == W::Code && (seg & 0x40)) adr = (uint32_t(seg) << 16) | off;   // [L7] kein Treiber
                                     else {
                                         const int m = soll == W::Code ? 0 : soll == W::Data ? 1 : 2;
                                         adr = (uint32_t(kennbasis(m, seg)) << 8) + off;

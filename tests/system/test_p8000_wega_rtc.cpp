@@ -7,7 +7,7 @@
  * Zwei Platten:
  *   - W30: Zwischenstand `p15_7_sync` (ausserhalb des Repos, aus den WEGA-3.0-Disketten installiert; sein
  *     Kern ist byteweise der der ausgelieferten `disks/p8000_wega30`-Platte).  Ohne ihn uebersprungen.
- *   - W31: die ausgelieferte `disks/p8000_wega31/p8000_wega31_platte.avr.img.gz` (Kern mit `u130.o`/`rtc72421`).
+ *   - W31: die ausgelieferte `disks/p8000_wega31/p8000_wega31_platte.img.gz` (Kern mit `u130.o`/`rtc72421`).
  *
  * VERKUERZUNG (Entwurf 38 §11 „Verkuerzung"): Der Kaltstart (MON8 -> Koppelsoftware -> MON16 -> WEGA-Kern) kostet
  * ~6 Maschinenminuten und liegt VOR dem ersten Lesen der Karte.  Er wird deshalb je Platte EINMAL gefahren und als
@@ -146,7 +146,7 @@ std::vector<uint8_t> ohneRtcAbschnitt(const std::vector<uint8_t>& b) {
 std::string stufenStempel(Platte p) {
     std::error_code ec;
     const std::string q = p == Platte::W30 ? stufenPfad("p15_7_sync", "platte.img")
-                                           : std::string(P8000_WEGA31_DIR "/p8000_wega31_platte.avr.img.gz");
+                                           : std::string(P8000_WEGA31_DIR "/p8000_wega31_platte.img.gz");
     return std::to_string(kStufenStand) + " " + std::to_string(std::filesystem::file_size(q, ec)) + " " +
            std::to_string(std::filesystem::last_write_time(q, ec).time_since_epoch().count());
 }
@@ -251,7 +251,7 @@ struct Rechner {
         l.start = k1520test::tempPath("k1520_rtc_start.dmk");
         std::vector<uint8_t> d;
         std::string f;
-        if (!k1520::gzip::laden(P8000_WEGA31_DIR "/p8000_wega31_platte.avr.img.gz", d, nullptr, &f)) {
+        if (!k1520::gzip::laden(P8000_WEGA31_DIR "/p8000_wega31_platte.img.gz", d, nullptr, &f)) {
             *fehler = "SKIP:W31-Platte nicht lesbar: " + f;
             return false;
         }

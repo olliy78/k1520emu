@@ -329,7 +329,8 @@ int main(int argc, char** argv){
         const std::string e = em_opt;
         if      (e=="em256") mcfg.em = A5120Machine::Config::Em::em256;
         else if (e=="em064") mcfg.em = A5120Machine::Config::Em::em064;
-        else if (e!="none"){ fprintf(stderr,"--em: unbekanntes Modul '%s' (none|em064|em256)\n",em_opt); return 2; }
+        else if (e=="em1024") mcfg.em = A5120Machine::Config::Em::em1024;
+        else if (e!="none"){ fprintf(stderr,"--em: unbekanntes Modul '%s' (none|em064|em256|em1024)\n",em_opt); return 2; }
     }
     if (ausf_opt || lw_opt || laderom_opt || tastatur_opt || ram_opt || bildschirm_opt || schalter_opt || k3521_opt || k3521_memdi_opt || k3521_datei_opt){
         if (art!=dbgm::Art::A5120){ fprintf(stderr,"--ausfuehrung/--laufwerke gibt es nur am A5120 (ebenso --laderom/--tastatur/--ram/--bildschirm/--schalter/--k3521*)\n"); return 2; }
@@ -3343,7 +3344,7 @@ int main(int argc, char** argv){
         else if ((cmd=="help"||cmd=="h"||cmd=="?") && t.size()>1 &&
                  (t[1]=="u8000"||t[1]=="u8001"||t[1]=="em"||t[1]=="16")){
             fprintf(stderr,
-              "  A5120.16 / U8001 (Start mit --em em256|em064)\n"
+              "  A5120.16 / U8001 (Start mit --em em256|em064|em1024)\n"
               "    cpu [zve1|zve2|u8000]   CPU-Kontext; u8000 schaltet um:\n"
               "      r / rj   Register (R0..R15, FCW, PSAP, Zustand) ;  set R3|RR2|RH0|PC|PCSEG|FCW <v>\n"
               "      s [N] / n [N] / fin / gu <A>   Schritt, ueber CALL/Blockbefehl, heraus, bis A\n"
@@ -4256,10 +4257,11 @@ int main(int argc, char** argv){
                     w=="sio2"?"DFUE":"kbd/prn", w=="sio2"?"A33":"A32");
                 showSio(titel,s); }
             else if (w=="em"){
-                if (!em) fprintf(stderr,"  (kein EM - Start mit --em em256|em064)\n");
+                if (!em) fprintf(stderr,"  (kein EM - Start mit --em em256|em064|em1024)\n");
                 else {
                     const Z8000& z=z16();
                     fprintf(stderr,"  EM %s an MODADR %02XH  %s-Bit-Mode (A29)  LED V1(RAMEN)=%d V2(8-Bit)=%d\n",
+                            em->config().variante==EM::Variante::EM1024?"EM1024 (U8001, 1 MB, Neuentwicklung)":
                             em->config().variante==EM::Variante::EM256?"EM256 (U8001, 256 KB)":"EM064 (U8002, 64 KB)",
                             em->config().modadr, em->mode8()?"8":"16", em->ledV1(), em->ledV2());
                     fprintf(stderr,"  A22 Seiten (PEN WE A15 A14):");
@@ -4268,6 +4270,8 @@ int main(int argc, char** argv){
                     fprintf(stderr,"\n  A33=%02X (SegMode %u, SG=%u, INT16=%d, A53-Freigabe=%d)  A35=%02X  A36/Status8=%02X  A34/Vektor8=%02X%s\n",
                             em->steuer16(), em->segMode(), (em->steuer16()>>5)&3, (em->steuer16()>>4)&1, (em->steuer16()>>3)&1,
                             em->status16(), em->status8(), em->vector8(), em->viPending()?" (VI anstehend)":"");
+                    if (em->config().variante==EM::Variante::EM1024)
+                        fprintf(stderr,"  Zusatzlatch MODADR+8: SG3P:SG2P=%u (Fenster-Segment = %u)\n", em->segmentX(), em->segment()|(em->segmentX()<<2));
                     fprintf(stderr,"  PIO B: SG=%u RAMEN=%d STOP=%d RESET16=%d TRQ8=%d PR=%d /PE=%d\n",
                             em->segment(), em->ramEnabled(), em->stop16(), em->reset16(), em->trq8(),
                             em->prLine(), !em->parityError());
@@ -4691,7 +4695,7 @@ int main(int argc, char** argv){
         // loeste jede Pegelaenderung am Port A (z. B. Bus-Abgabe) nach der ISR erneut aus und die
         // ISR laese einen Zeiger 0.  Bytes sind HEX wie bei `e`.
         else if (cmd=="emmsg"){
-            if (!em){ fprintf(stderr,"  (kein EM - Start mit --em em256|em064)\n"); }
+            if (!em){ fprintf(stderr,"  (kein EM - Start mit --em em256|em064|em1024)\n"); }
             else if (t.size()>=2 && t[1]=="int"){ em->setInt16(true); em->setInt16(false);
                 fprintf(stderr,"  INT-16 (A33 Bit 4) gepulst\n"); }
             else if (t.size()<2) fprintf(stderr,"  ? emmsg <ADR> [b0 .. b13] [ptr=ZELLE] [noint] | emmsg int\n");

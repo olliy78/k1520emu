@@ -48,7 +48,7 @@ public:
 
         /// Erweiterungsmodul des A5120.16 (doc/design/17_a5120_16.md).  Vorgabe
         /// `none`: ohne EM ist die Maschine bitgleich der A5120 von vorher.
-        enum class Em { none, em064, em256 };
+        enum class Em { none, em064, em256, em1024 /* Neuentwicklung */ };
         Em em = Em::none;
         /// Leseadresse des Attributspeichers A22 (EM::A22Lesart).  Vorgabe = belegte
         /// Lesart (Scan 9005/2); die Handbuchlesart nur als Gegenprobe (G1-Test).

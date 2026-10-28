@@ -14,7 +14,7 @@
  *
  * Ausgangspunkt ist ein EINGEFRORENER Zustand (Save-State + Plattenabbild, `~/.cache/k1520emu/
  * p8000_wega`, tests/support/p8000_wega.h): Kopie der ausgelieferten Platte
- * `disks/p8000_wega31/p8000_wega31_platte.avr.img.gz`, in die das DiskTool vorab die Testdateien
+ * `disks/p8000_wega31/p8000_wega31_platte.img.gz`, in die das DiskTool vorab die Testdateien
  * nach `/usr/kermit` legt, einmal kalt gebootet bis `login:` an der Konsole (~390 s Maschinenzeit).
  * Fehlt er oder hat sich die Platte geaendert, wird er hier gebaut.  Gearbeitet wird immer an
  * Temp-Kopien.

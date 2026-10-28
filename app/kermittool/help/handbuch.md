@@ -582,7 +582,7 @@ danach mit `set parity none` zurücknehmen.
 ## Kermit Einrichtung unter WEGA
 
 Dieser Abschnitt richtet Kermit auf einer WEGA-3.1-Platte ein. Auf der mitgelieferten Platte
-`p8000_wega31_platte.avr.img.gz` (im Paket im Ordner `p8000_wega31`) ist das schon geschehen. Wer diese
+`p8000_wega31_platte.img.gz` (im Paket im Ordner `p8000_wega31`) ist das schon geschehen. Wer diese
 Platte benutzt, braucht nur den Schnellstart. Die übrigen Unterabschnitte erklären, was auf der Platte
 eingerichtet ist und wie man das auf einer anderen Platte selbst einrichtet.
 

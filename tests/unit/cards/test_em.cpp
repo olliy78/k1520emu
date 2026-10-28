@@ -372,3 +372,49 @@ TEST(EM, SystemReset_PioHochohmig_DramUndA22Bleiben) {
     EXPECT_EQ(r.em.attribute(4), 0x0);
     EXPECT_EQ(r.em.peek(0x1234), 0x77);
 }
+
+// ─── EM1024 (Neuentwicklung, 1 MB, Entwurf 42) ───────────────────────────────────
+
+/**
+ * @test EM/EM1024_FensterErreichtAlle16Segmente
+ * @brief Segment = SG3P:SG2P:SG1P:SG0P; SG2P/SG3P kommen aus dem Zusatzlatch MODADR+8,
+ *   System-/RESET loescht es.  Zelle = Segment*64K + (A15-8, A14-8, AB13..0).
+ */
+TEST(EM, EM1024_FensterErreichtAlle16Segmente) {
+    EM::Config c; c.variante = EM::Variante::EM1024;
+    Rig r(c);
+    EXPECT_EQ(r.em.size(), 1024u * 1024u);
+    r.pioInit();
+    r.attr(4, 0x4);                               // A15-8 = 1, A14-8 = 0
+    r.portB(RESET16);                             // Segment 0, RAMEN
+    for (uint8_t sx = 0; sx < 4; ++sx) {
+        r.bus.ioWrite(0xB0, sx);                  // SG3P:SG2P
+        for (uint8_t sl = 0; sl < 4; ++sl) {
+            r.portB(RESET16 | sl);
+            const uint32_t seg = uint32_t(sx) * 4 + sl;
+            r.bus.memWrite(0x4123, uint8_t(0x40 + seg));
+            EXPECT_EQ(r.em.peek((seg << 16) | 0x8123), 0x40 + seg) << "Segment " << seg;
+            EXPECT_EQ(r.bus.memRead(0x4123), 0x40 + seg);
+        }
+    }
+    EXPECT_EQ(r.bus.ioRead(0xB0), 0xFF);          // Bit 0/1 = Latch (SG3P:SG2P = 3), Rest H
+    r.em.reset();
+    EXPECT_EQ(r.em.segmentX(), 0);                // /RESET loescht
+}
+
+/**
+ * @test EM/EM256_HatKeinZusatzlatch_UndSpiegeltUnveraendert
+ * @brief EM256 bleibt bitgleich: MODADR+8 ist nicht angemeldet, das Fenster kennt nur
+ *   SG0/SG1 (256 KB).
+ */
+TEST(EM, EM256_HatKeinZusatzlatch_UndSpiegeltUnveraendert) {
+    Rig r;                                        // EM256
+    r.pioInit();
+    r.attr(4, 0x0);
+    r.portB(RESET16 | SG0);
+    r.bus.ioWrite(0xB0, 3);                       // ins Leere
+    EXPECT_EQ(r.em.segmentX(), 0);
+    r.bus.memWrite(0x4010, 0x77);
+    EXPECT_EQ(r.em.peek((1u << 16) | 0xC010), 0x77);
+    EXPECT_EQ(r.em.size(), 256u * 1024u);
+}

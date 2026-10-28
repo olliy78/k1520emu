@@ -1,7 +1,7 @@
 # P8000 16-Bit-Karte — MMU-Steuerlogik: Abdeckung (AP P9b)
 
-Stand 2026-10-07. Umsetzung `core/cards/p8000/mmu_logik16.{h,cpp}` (`P8000MmuLogik16`),
-Wächter `tests/unit/cards/test_p8000_mmu_logik.cpp` (`P8000MmuLogik*`, 43 Fälle). Quelle der
+Stand 2026-10-27 (Issue #23: [L7] nach Messung von OlliL geändert). Umsetzung `core/cards/p8000/mmu_logik16.{h,cpp}` (`P8000MmuLogik16`),
+Wächter `tests/unit/cards/test_p8000_mmu_logik.cpp` (`P8000MmuLogik*`, 44 Fälle; dazu `OlliTest07_*` in `test_p8000_karte16.cpp`). Quelle der
 Sollwerte: `schaltplan_16bit.md` (Rang 1), `hw_16bit.md` (Rang 2), Gegenprobe WEGA `mch.s`/`mmu.h`
 und MON16 `p.test.s` (github.com/OlliL/P8000). Die Tests formulieren die Erwartung als **Tabelle**
 (§1.2 des Plans), der Code bildet die **Gatter** von Bl. 5 nach — so prüft der eine den anderen.
@@ -14,7 +14,7 @@ und MON16 `p.test.s` (github.com/OlliL/P8000). Die Tests formulieren die Erwartu
 |---|---|---|
 | /CS = LAD1/2/3 (Code/Data/Stack), low-aktiv, mehrere zugleich; Befehl in AD8–15 (§1.1) | ja | `CsAusLad123` (alle 256 Low-Bytes schreibend und lesend), `SpezialEaTraegtDenBefehlImHohenAdressbyte` |
 | N/S-Eingang = Auswahlsignal, gewählte MMU sieht L (§1.1, §1.4) | ja | `Tabelle.*`, `OnBoardSperrtDieMmuAuswahl` |
-| SN6 nur an der Code-MMU, Data/Stack fest L (§1.1) | ja | `Zeile3_…`, `MehrereTreiberVerdrahtetesUnd`, `MmuEinOhneTreiberSchwebtAufEins` |
+| SN6 nur an der Code-MMU, Data/Stack fest L (§1.1) | ja | `Zeile3_…`, `MehrereTreiberVerdrahtetesUnd`, `MmuEinOhneTreiberAdressiertLokal` |
 | Auswahltabelle, 6 Zeilen (§1.2) | ja, Gatter wörtlich | `Zeile1_…` bis `Zeile6_…`; `GatterGebenHoechstensEineMmuUndFolgenDerTabelle` (16 Status × 2⁵); `AlleZyklusartenMalZustaende` (62 208 Zyklen je Gleichheitsregel: 16 Status × N/S × 8 SCR × 9 Segmente × 9 Offsets × 3 NBR × R/W, mit Ziel und Busadresse) |
 | Status 1001 wird nicht ausgewertet (§1.2) | ja | `Status1001WirdNichtAusgewertet`, Matrix |
 | NBR-Gleichheit → Stack (§1.2; **durch Originalplan bestätigt**, Fußnote [L1]) | ja, umschaltbar [L1] | `NbrGleichheitGehtAnStack`, `NbrGleichheitNachWegaGehtAnData`, Matrix mit beiden Regeln |
@@ -26,7 +26,7 @@ und MON16 `p.test.s` (github.com/OlliL/P8000). Die Tests formulieren die Erwartu
 | IMEML sperrt MMU-Auswahl, TRAD-Freigabe und SYSDS (§2, §3, §4.4) | ja | `OnBoardSperrtDieMmuAuswahl`, `SuppressVerhindertSchreibenNurAmHauptspeicher` |
 | On-Board-Zugriff = 1 Wartetakt (§7) | ja (`Zugriff::wartetakte`) | `OnBoardNurSegment0Unter8000` |
 | MMU aus: Busadresse = SN·64K + Offset, A23 = 0 (§3) | ja | `MmuAusPhysIstSegmentMal64K` (128 Segmente), Matrix |
-| MMU ein: A0–A7 vom Offset, A8–A23 aus TRAD (§3) | ja; offen = 1, mehrere = UND [L7] | `Tabelle.*`, `MmuEinOhneTreiberSchwebtAufEins`, `MehrereTreiberVerdrahtetesUnd` |
+| MMU ein: A0–A7 vom Offset, A8–A23 aus TRAD (§3) | ja; kein Treiber = Segment*64K+Offset (gemessen, Issue #23, nur Holen; Gegenprobe `tradLeerIstLokal=false` = FFFFH), mehrere = UND [L7] | `Tabelle.*`, `MmuEinOhneTreiberAdressiertLokal`, `MehrereTreiberVerdrahtetesUnd` |
 | „MMU ON wirkt nicht auf die MMU-Schaltkreise" (Handbuch §2.6) | ja (MMUs sehen jeden Zyklus) | `SupWirktAuchBeiMmuAusUndBeimLesen`, `MmuAusPhysIstSegmentMal64K` |
 | SUP sperrt SYSDS nur zum Speicherbus (§4.4) | ja; auch Lesen, auch MMU aus [L8] | `SuppressVerhindertSchreibenNurAmHauptspeicher`, `SupWirktAuchBeiMmuAusUndBeimLesen` |
 | SCR: 4 Bit r/w, Reset 0 (Bl. 9 D18) | ja; Bit 4–7 lesen 1 [L4] | `ScrVierBitLesbarObereBitsEinsResetNull` |
@@ -50,6 +50,7 @@ und MON16 `p.test.s` (github.com/OlliL/P8000). Die Tests formulieren die Erwartu
 |---|---|---|
 | MON16 `p.test.s` vor Schritt 84 | Erkennung Index ≥ 1: `ld r12,@<01>0100` im System-Mode, Code-MMU verletzt ⇒ unterdrückt ⇒ offener Bus ≠ 0 ⇒ SEG-USR-Weg, **SBR-Test 84 entfällt** | `Mon16ErkennungIndexAbEins` — stützt [L3] und [L8] zugleich: ohne [L8] läse r12 = 0, MON16 nähme Index 0 an und prüfte FFC9 |
 | MON16 `SEGMENT_TRAP_TEST` | Testschritte 85–90 (Limit/Read-Only, Data/Stack, je 62 Segmente, Durchreich-MMUs 80/81/82 parallel) | `Mon16Testschritte85bis90` |
+| MON16 `p.test.s` / `sa.test.s` (3.1) `CODE_TRAP` | Code-MMU wird **vor** `outb S_BNK` abgeschaltet: der Fetch dazwischen läuft bei SCR.ONH = 1 ohne treibende MMU (die compact-Fassung `p8000c` vertauscht beide Zeilen). OlliL, Issue #23: auf der echten Karte liest er Segment·64K+Offset, nicht FFFFH | `MmuEinOhneTreiberAdressiertLokal`, `MmuEinOhneTreiberGegenprobeSchwebtAufEins`; Nachbau von `mame/tests/07-p8000-16-fetch-with-mmu-off` (Lauf 2) im MON16-Rig: `OlliTest07_HolenBeiMmuEinOhneCodeMmu_KehrtZumMonitorZurueck` (`BREAK AT 9028`) und `OlliTest07_GegenprobeAlteAnnahmeFFFFH_KehrtNichtZurueck` |
 | WEGA `mmu.h`, `mch.s` | Konstanten F6/FA/FC/F0, nichtsegmentierter Anwender in 3F, Kern nur über die Code-MMU | `CsAusLad123`, `WegaNichtsegmentierterAnwender` |
 | WEGA `mch.s` `nsseg`/`getmem`/`putmem` | `cpb rh7,NBREAK; jr ugt` ⇒ Gleichheit = Data in der Software — **folgenlos**: `estabur()` (`ureg.c`) hält den Block mit Adress-High = NBR frei (`u_break = sg_limit_daten + 1`, `nd + ns ≤ 255`), er liegt immer in der Lücke zwischen Daten und Stack | [L1], `NbrGleichheitNachWegaGehtAnData` |
 
@@ -67,3 +68,12 @@ und MON16 `p.test.s` (github.com/OlliL/P8000). Die Tests formulieren die Erwartu
 4. **IF1L-Stufe 1** [L6]: Y4 (1100) oder Y5 (1101)?
 5. **Lesewert unterdrückter Hauptspeicherlesezyklen** [L8] und von 6000–7FFF (Frage §11.2).
 6. Nicht hier: CTC0-K3 zählt Stackzyklen, NMI-Identifier, Paritäts-FF (SCR.3) — Karte16 (P10).
+
+7. **TRAD ohne Treiber bei MMU ON** [L7] (Issue #23, OlliL 2026-10-26): gemessen ist **nur das Holen** eines
+   `outb` direkt nach `MR := 0` der Code-MMU, Programm in EINER 256-B-Seite und EINEM Segment (0 und 1),
+   Data-/Stack-MMU im Reset-Zustand bzw. `%00`. Umgesetzt für **alle** Speicherzyklen
+   (`Config::tradLeerIstLokal`, Vorgabe an; aus = frühere Annahme FFFFH). **Nicht gemessen:** Daten-Lesen und
+   -Schreiben bei MMU ON und allen MMUs aus, Segmente ≥ 64, MMU-Modi mit nicht passendem N/S-Pegel, ein Fetch über
+   eine Seiten- oder Segmentgrenze. Die Deutung „der Bus hält den zuletzt getriebenen Wert" (Tristate ohne Pull-up)
+   erklärt die Messung ebenso — Test: kritischen Fetch auf `%9100` legen (Programm ab `%90FC`) bzw. in anderes Segment.
+   Handbuch und Schaltplan (Bl. 8/9) sagen „nichts" und liegen für diesen Fall daneben.

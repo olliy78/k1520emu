@@ -549,3 +549,70 @@ TEST(P8000Karte16, Mon16_3_0_LaeuftDenHardwaretestEbenso) {
         EXPECT_TRUE(nr == "52" || nr == "53" || nr == "54") << t.substr(p, 40);
     }
 }
+
+// ─── Olli-Test 07 (Issue #23): Holen bei MMU ON, Code-MMU aus ──────────────────────────────
+// Nachbau von OlliL/P8000 `mame/tests/07-p8000-16-fetch-with-mmu-off`, Lauf 2 (Segment 0,
+// Daten-/Stack-MMU auf %00): Programm per MON16-Befehl D eintippen, mit G starten.  Auf der
+// echten Karte kommt `BREAK AT 9028` — der Fetch des `outb #%FFC1,rh0` bei ONH = 1 und
+// abgeschalteter Code-MMU liest Segment*64K+Offset.  Mit der alten Annahme [L7] (TRAD offen =
+// FFFFH) kehrt der Monitor nie zurueck.
+namespace {
+std::string olliTest07(bool lokal, uint64_t wartetakte) {
+    P8000Karte16::Config c;
+    c.trad_leer_ist_lokal = lokal;
+    P8000Karte16 k(c);
+    k.setResetEingang(false);
+    std::string t;
+    auto lauf = [&](uint64_t n) {
+        const uint64_t ende = k.zeit() + n;
+        while (k.zeit() < ende) {
+            k.schritt();
+            for (int i = 0; i < 4; ++i)
+                while (k.anschluss(i).senderHatZeichen()) {
+                    const char ch = char(k.anschluss(i).senderNimm());
+                    if (i == 1) t += ch;
+                }
+        }
+    };
+    auto bis = [&](const std::string& text, uint64_t max) {
+        const uint64_t ende = k.zeit() + max;
+        while (k.zeit() < ende) {
+            lauf(10'000);
+            if (t.find(text) != std::string::npos) return true;
+        }
+        return false;
+    };
+    auto zeile = [&](const std::string& s) {
+        for (char ch : s + "\r") {
+            while (!k.anschluss(1).empfaengerFrei()) lauf(1'000);
+            k.anschluss(1).empfange(uint8_t(ch));
+            lauf(60'000);   // 9600 Bd ≈ 4 600 Takte je Zeichen, Echo abwarten
+        }
+        lauf(400'000);
+    };
+    if (!bis("Press NMI", 20'000'000)) return "KEIN MONITOR\n" + t;
+    k.nmiTaste();
+    if (!bis("MAXSEG=<0F>", 600'000'000)) return "KEIN HARDWARETEST\n" + t;
+    if (!bis("* ", 50'000'000)) return "KEIN PROMPT\n" + t;
+    t.clear();
+    zeile("D 9000");
+    for (const char* w : {"2100", "0000", "3A07", "00FA", "3A07", "00F6", "2100", "8000", "3A07", "00FC",
+                          "2100", "0200", "3A06", "FFC1", "2100", "0000", "3A07", "00FC", "3A06", "FFC1",
+                          "7F00"})
+        zeile(w);
+    zeile("Q");
+    zeile("G 9000");
+    bis("BREAK AT", wartetakte);
+    return t;
+}
+}  // namespace
+
+TEST(P8000Karte16, OlliTest07_HolenBeiMmuEinOhneCodeMmu_KehrtZumMonitorZurueck) {
+    const std::string t = olliTest07(true, 50'000'000);
+    EXPECT_NE(t.find("BREAK AT 9028"), std::string::npos) << t;
+}
+
+TEST(P8000Karte16, OlliTest07_GegenprobeAlteAnnahmeFFFFH_KehrtNichtZurueck) {
+    const std::string t = olliTest07(false, 50'000'000);
+    EXPECT_EQ(t.find("BREAK AT"), std::string::npos) << t;
+}

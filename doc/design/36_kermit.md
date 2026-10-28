@@ -12,7 +12,7 @@ Merkposten (seit AP K7): `doc/merkposten/kermit.md`.
   C-Kermit **4.2(030)** — Quellen (`ck*.c`, `makefile`, Handbuch `ckermi.doc/.man/.nr`) **und ein fertiges
   Z8000-Binary `kermit`** (78 560 B, Stand 1988-02-04, setuid root, a.out-Kennung `E711` = 0411, `/bin/ls` hat
   `E707`).  `kermit4.cqm` enthält nur `src.030.tar.z`/`src.070.tar.z` (Quellen 4.2(030)/(070), compress-gepackt).
-- **Auf der Platte** `disks/p8000_wega31/p8000_wega31_platte.avr.img.gz` ist Kermit **nicht** installiert
+- **Auf der Platte** `disks/p8000_wega31/p8000_wega31_platte.img.gz` ist Kermit **nicht** installiert
   (`md0` = `/usr`, 537 KB frei; `md2` = `/`, 379 KB frei).  `cu` und `uucp` sind vorhanden.
 - **Anmeldeweg:** `/etc/inittab` startet `/etc/GETTY` auf tty0, tty2, tty4–7 (Zustand 2); `/etc/passwd` kennt
   schon einen Benutzer mit Programm statt Shell: `uucp:…:/usr/lib/uucp/uucico`.  Dasselbe Muster trägt einen
@@ -55,7 +55,7 @@ Merkposten (seit AP K7): `doc/merkposten/kermit.md`.
 | Server-Benutzer | `kermit` in `/etc/passwd`: uid ≠ 0 bevorzugt (Prüfen: Kermit braucht root nur für Sperrdateien; uid 7 `kermit`, gid 1), Kennwort **`kermit`** (Stand K1: ein leeres Kennwort geht nicht — System-III-`login` verlangt dann „Choose one“; das Login-Skript sendet Name und Kennwort; getty meldet sich nach der Sitzung mit gerader Parität, Bit 7 vor dem Vergleich löschen), Home `/usr/kermit`, Shell **`/bin/sh`** mit `.profile` = `exec /usr/bin/kermit` (K7: C-Kermit führt `G D/E/T` über die Login-Shell aus — mit Shell `/usr/bin/kermit` kam die Gebrauchsanweisung statt `ls -l`). |
 | Start | `/usr/kermit/.kermrc`: `set file type binary`, `server`, `exit` (K7: **kein** `set file names literal` — damit gibt C-Kermit 4.2 keine Datei her, §6.5). |
 | Client am WEGA | Anmelden wie gewohnt (Konsole/tty0/tty2), `kermit`, `set line /dev/tty3`, `set speed 9600`, `set file type binary`, `send`/`get`/`remote dir` gegen den PC-Server — als Text in `README`/Handbuch `Kermit` beschreiben, kein Gastcode. |
-| Platte | `disks/p8000_wega31/p8000_wega31_platte.avr.img.gz` **einmal** neu packen, nachdem K1 grün ist (jede Fassung ≈ 6 MB in der Git-Historie); `disks/p8000_wega31/README.md` und `doc/p8000/` ergänzen.  Das Paket zieht die Datei automatisch mit. |
+| Platte | `disks/p8000_wega31/p8000_wega31_platte.img.gz` **einmal** neu packen, nachdem K1 grün ist (jede Fassung ≈ 6 MB in der Git-Historie); `disks/p8000_wega31/README.md` und `doc/p8000/` ergänzen.  Das Paket zieht die Datei automatisch mit. |
 | Einspielen | über das DiskTool (`k1520disktool put <abbild> --as md0/bin/kermit`, `attr` für Rechte/Besitzer; Platte ist schreibgeschützt bis `--force`/Freigabe, vorher `<abbild>~`-Sicherung), **nicht** über einen Emulatorlauf — reproduzierbar und billig. Anschließend Probe am laufenden WEGA (Test, s. K1/K7). |
 
 ## 4. Teil B — PC-Seite

@@ -39,13 +39,14 @@ static uint8_t a53Vorlast(const EM::Config& cfg) { return uint8_t((cfg.a53_vorla
 static Z8kConfig z8kConfigFor(const EM::Config& cfg) {
     Z8kConfig z;
     // EM256: U8001 (segmentiert); EM064: U8002 (Handbuch §1.2, Plan §6).
-    z.model = cfg.variante == EM::Variante::EM256 ? Z8kModel::Z8001 : Z8kModel::Z8002;
+    z.model = cfg.variante != EM::Variante::EM064 ? Z8kModel::Z8001 : Z8kModel::Z8002;
     return z;
 }
 
 EM::EM(K1520Bus& bus, const Config& cfg)
     : bus_(bus), cfg_(cfg),
-      dram_(cfg.variante == Variante::EM256 ? 256u * 1024u : 64u * 1024u, 0xFF),
+      dram_(cfg.variante == Variante::EM1024 ? 1024u * 1024u
+            : cfg.variante == Variante::EM256 ? 256u * 1024u : 64u * 1024u, 0xFF),
       u8k_(z8kConfigFor(cfg))
 {
     attr_.fill(0x0F);
@@ -59,9 +60,12 @@ EM::EM(K1520Bus& bus, const Config& cfg)
 
 void EM::attachToBus() {
     bus_.registerIO(this, cfg_.modadr, 8);
+    if (cfg_.variante == Variante::EM1024)
+        bus_.registerIO(this, uint8_t(cfg_.modadr + kRegSegX), 1);   // Zusatzlatch SG2P/SG3P
     bus_.addMemdiDriver(this);
     LOG_INFO("EM", "%s an MODADR %02XH-%02XH",
-             cfg_.variante == Variante::EM256 ? "EM256" : "EM064",
+             cfg_.variante == Variante::EM1024 ? "EM1024 (Neuentwicklung)"
+             : cfg_.variante == Variante::EM256 ? "EM256" : "EM064",
              cfg_.modadr, cfg_.modadr + 7);
 }
 
@@ -85,6 +89,7 @@ void EM::reset() {
     pio_a_in_ = pio_b_in_ = 0xFF;
     per_ff_ = false;
     guthaben_ = 0;
+    segx_ = 0;             // Zusatzlatch SG2P/SG3P: /RESET loescht, Vorgabe = bisheriges Verhalten
     updateFromPio();
 }
 
@@ -104,6 +109,9 @@ uint8_t EM::ioRead(uint8_t port) {
         case 6:                            // A35 ueber Treiber A11
             v = status16_;
             emit(Ereignis::Status16Lesen, port, v, false);
+            break;
+        case kRegSegX:                     // nur EM1024 angemeldet
+            v = uint8_t(0xFC | segx_);
             break;
         case 7:
             v = readA22();
@@ -137,6 +145,10 @@ void EM::ioWrite(uint8_t port, uint8_t data) {
                 u8k_.setVI(true);              // Netz 28 → VI (pegelgetriggert)
                 updatePioInputs();
             }
+            break;
+        case kRegSegX:                     // nur EM1024 angemeldet
+            segx_ = data & 0x03;
+            rebuildMap();
             break;
         case 7:
             writeA22(data);
@@ -203,6 +215,8 @@ void EM::rebuildMap() {
         uint32_t base = (a & kAttrNA15 ? 0u : 0x8000u) | (a & kAttrNA14 ? 0u : 0x4000u);
         if (cfg_.variante == Variante::EM256)
             base |= uint32_t(seg_) << 16;      // SG1·128K + SG0·64K
+        else if (cfg_.variante == Variante::EM1024)
+            base |= uint32_t(seg_ | (segx_ << 2)) << 16;   // SG3..SG0 · 64K
         page_base_[p] = base;
         if (on && !(a & kAttrNPen)) men_mask_ |= uint16_t(1u << p);
         if (!(a & kAttrNWe))        we_mask_  |= uint16_t(1u << p);
@@ -354,9 +368,10 @@ uint32_t EM::cellFor16(const Z8kBusCycle& c) const {
         case 1:  sg = (c.isInstructionFetch() ? 1u : 0u)              // SG0 = INSTR (Status 12/13)
                     | (c.system ? 0u : 2u);                           // SG1 = N/S (H = Normal)
                  break;
-        default: sg = c.seg & 3u;                                    // SG0/SG1 = SN0/SN1
-                 break;
+        default: sg = c.seg & (cfg_.variante == Variante::EM1024 ? 15u : 3u);
+                 break;                                              // SG0..SG3 = SN0..SN3 (EM256: nur SN0/SN1, Rest gespiegelt)
     }
+    // Modus 0/1 liefern nur 2 Bit (A33 Bit 5/6 bzw. INSTR/N-S): auch am EM1024 nur Segment 0..3.
     // EM064: SG0/SG1 gehen nicht in die Matrix ⇒ Modulo 64 KB spiegelt.
     return ((sg << 16) | c.addr) % uint32_t(dram_.size());
 }
@@ -524,6 +539,7 @@ void EM::serialize(std::vector<uint8_t>& o) const {
     put(o, u8k_.fcw); put(o, u8k_.pc); put(o, u8k_.pcSeg);
     put(o, u8k_.psapSeg); put(o, u8k_.psapOff); put(o, u8k_.refresh); put(o, u8k_.cycles);
     put(o, u8k_.runState());
+    if (cfg_.variante == Variante::EM1024) put(o, segx_);   // nur die Neuentwicklung; EM064/256 bitgleich
 }
 
 bool EM::deserialize(const uint8_t*& p, const uint8_t* end) {
@@ -553,6 +569,8 @@ bool EM::deserialize(const uint8_t*& p, const uint8_t* end) {
         !get(q, end, z.pcSeg) || !get(q, end, z.psapSeg) || !get(q, end, z.psapOff) ||
         !get(q, end, z.refresh) || !get(q, end, z.cycles) || !get(q, end, rs))
         return false;
+    uint8_t segx = 0;
+    if (cfg_.variante == Variante::EM1024 && !get(q, end, segx)) return false;
 
     // Alles gelesen — jetzt uebernehmen.
     std::memcpy(dram_.data(), dram, n);
@@ -563,6 +581,7 @@ bool EM::deserialize(const uint8_t*& p, const uint8_t* end) {
     status16_ = f[5]; per_ff_ = f[6]; last_mem_page_ = f[7]; pio_a_in_ = f[8];
     pio_b_in_ = f[9]; a53_ = f[10]; a54_zaehlt_ = f[11];
     guthaben_ = guthaben;
+    segx_ = segx & 0x03;
     std::copy(std::begin(z.Rg), std::end(z.Rg), std::begin(u8k_.Rg));
     u8k_.R14[0] = z.R14[0]; u8k_.R14[1] = z.R14[1];
     u8k_.R15[0] = z.R15[0]; u8k_.R15[1] = z.R15[1];
