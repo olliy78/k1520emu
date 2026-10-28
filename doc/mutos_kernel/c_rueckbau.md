@@ -162,3 +162,87 @@ Header `h/user.h` (ab 104h aufgeloest), `h/param.h` (NPROC 30, MAXUPRC 15).  Sta
 ## Handassembler (nicht in C)
 csv/cret, savu 0614, resume 0620, spl0..spl7/splx, fubyte/fuword/subyte/suword, copyin/copyout/copyseg/clearseg, savfp 03F8/restfp 03FE, addupc 0414, idle, mapaddr 065E,
 Trap-Eintritt 030E, start 027E, 6432 (Geraeteinit, dev1).
+
+# AP K7d (2026-10-28): Treiber und Konfiguration -- rk, mem, /dev/tty, tty, lp, Major 0 (fd), conf
+
+Dateien: `tools/mutos8000/kernel/c/{rk,tty,tty2,lp,dev0,conf}.c`, Varianten `var7d.c`, `var7d2.c`, Header `h/mbx.h` (neu), `h/tty.h` (jetzt gemessen), `h/user_ext.h` (U_TTYP/U_TTYD),
+neues Werkzeug `werkzeug/datenvergleich.py` (Datenteil eines `.o` gegen den Kernel, Relokationen als Wildcard) und `werkzeug/uebersicht.py` (Gesamtuebersicht unten).
+Der Kernel-Quellcode steckt hier wieder in einer Tabelle der Daten: **conf.c ist als C-Datei mit initialisierten Tabellen bytegleich** (`datenvergleich.py KERNEL conf.o 8766`: 352 Byte, 0 abweichende Woerter, 130 Adressfelder als Wildcard).
+
+## Trefferliste (cc -O, je Funktion bytegleich gegen mutos_1216; Stand nach drei Gastlaeufen)
+* `rk.c` **13/13**: mmread 69CE, mmwrite 6A52 (cdevsw[2], /dev/mem, /dev/kmem, /dev/null: Segment ueber `usrseg` 8DC0, Minor 1 = Kernelraum, 2 = null), rkopen 6ADA, rkclose 6AFE, rkstrategy 6B06, rkstart 6B60, rkintr 6BCA,
+  rkread 6C52, rkwrite 6C70, syopen 6C8E, syread 6CC6, sywrite 6CEC, syioctl 6D12 (/dev/tty = cdevsw[1], V7 sys.c: leitet an `cdevsw[major(u_ttyd)]` weiter).
+  rkstart/rkintr/rkstrategy sind V7-`rk.c` mit der Mailbox statt der Controllerregister: Auftrag in D532 ([Befehl 0, Einheit, Richtung, Status | Segment, Adresse, Zaehler, Blocknummer]), Start ueber `mapalloc(mp, 0)` (5CAE),
+  Ende ueber `rkintr` (Status 1 = ok, C8 = Einheit fehlt -> ENXIO, sonst `deverror` und bis zu drei Wiederholungen, Fehlerzaehler in `rktab.b_resid` 8E98).  `rktab` 8E82 und `fdtab` 8E6A sind `struct buf`-Koepfe
+  (b_bcount = "Auftrag aktiv").  Blockgrenze 0x260 (608 Bloecke = 76 Spuren zu 8 Bloecken, passt zur Geraetegroesse).
+* `tty.c` **11/11** (60CC..6432): tcopen 60CC, tcclose 616C, tcread 618E, tcwrite 61B0, tcxint 61D2, tcrint 620E, tcioctl 623C, ttstart 6274, ttxfer 633A, putchar 6384, ttyinit 6432.
+  Namen der Wrapper frei (`tc...`), Kernfunktionen nach V7/System III.  Die Konsole `putchar` fuehrt einen Ring (8DE8..8E68, Zeiger 8C96) und wartet bis zu 10000 Schleifen auf die Leitung 0.
+  **DJNZ-Fund:** die Wartschleife wird nur mit `do { if (hp->mb_stat) break; } while (--t != 0);` zum Kernel-`DJNZ` (mit `while (--t)` oder `for` entsteht `DEC/JR NZ`) -- die Formen sind in `var7d2.c` (pcA..pcE).
+* `tty2.c` **11/13** (6D44..7E16 ohne Eingabe-/Ausgabeweg): ttyopen 6D44, ttinit 6D8C, ttyclose 6DD0, ioctl 6DF0 (Systemaufruf 54: FIOCLEX 6601/FIONCLEX 6602, sonst `cdevsw[major].d_ioctl`), ttywait 715C, ttyflush 71A4,
+  bitset 7948, ttflow 79E0, ttrstrt 7C4A (Zeitgeberfunktion, die `ttstart` an `timeout` uebergibt), ttkick 7C62, ttwrite 7DA6 gleich.  **nahe:** ttyspec 797A (18 von 51 Woertern, Blockreihenfolge der Endabfragen `0x12/0x17/0x10`),
+  ttread 7C90 (Eigenheit des Kernel-c2, siehe unten: der frueh liegende `return(0)` springt mit `JR` auf das letzte `JP cret`, hier `JP cret` -- ein Wort mehr, danach ist alles verschoben).
+* `lp.c` **4/7**: lpopen 6444, lpclose 64DA, lpoutput 680E, lpxfer 690A gleich.  **offen:** lpwrite 6570 (42 von 124 Woertern), lpcanon 6668 (104 von 212), lpintr 6874 (21 von 75) -- alle drei nur in der Blockanordnung:
+  der Kernel-`c2` legt hinter `JP cret` liegende Fortsetzungsbloecke ans Funktionsende und fuehrt gleiche Endstuecke (`INC R15,#2 ; JP cret`) zusammen, unser `c2` tut das hier nicht (derselbe Befund wie bei K7b "A..F").
+  Struktur der Funktionen (V7-`lp.c`, Mailbox-Befehl 2, Zeilenpuffer 128 Byte, Drucker 0/1, Merker 0x80 = Ausgabe laeuft, 0x40 = Schlaf) ist belegt: die Schalterliste von lpcanon (`{ } ` | ~` Reihenfolge der Faelle = Quellreihenfolge, die Verzweigungskette steht aufsteigend sortiert) stimmt.
+* `dev0.c` (Major 0, cdevsw[10], nie gelaufen) **4/7 gleich, 3 nahe**: fdsub 7F00, fdstrategy 7F94, fdread 84E4, fdwrite 851C gleich; fdopen 7E16, fdclose 7E94, fdphys 8554 nahe.
+  **Dieses Modul ist im Kernel ohne `-O` uebersetzt** (alle Spruenge `JP`, der Rumpf hinter einem `JP` am Funktionsanfang); verglichen wird `dev0.o`, nicht `dev0O.o`.  Der aeltere Compiler vergleicht Registervariablen mit Konstanten ueber `R2`
+  (`LD R2,R13 ; CP R2,#1` statt `CP R13,#1`) -- das ist die einzige Abweichung der drei "nahen" Funktionen.  **Nicht zurueckgebaut:** fdstart 7FDC (574 B, Zustandsautomat ueber `fdtab`+C = 8E76 mit Mailbox-Befehl 6, Seek) und fdioctl 85B0 (426 B, Sprungtabelle).
+  Art des Geraets: die Mailbox-Befehle 1/6, `fdopen`s Anlage und die Abschlussbefehle 0x51/0x61 in `fdclose` deuten auf ein Diskettenlaufwerk der U880-Seite (Befund 39 §11); in dieser Version nie erreicht.
+* `conf.c` Daten bytegleich: bdevsw (Major 0 = fd, 1..3 `nodev`, 4 = rk, Abschluss), cdevsw (14 Eintraege + Abschluss), `linesw` (ttyopen, nulldev, ttread, ttwrite, nodev, ttyinput, ttkick), `rootdev/swapdev/pipedev` 0402, `swplo` 250, `nswap` 244,
+  die 22 Adressen der ps/pstat-Tabelle (888C..88B7, davor ein Nullwort 888A), 6 Nullworte, `proctop` 8A8C bei 88C4.  **Korrektur an K6b:** der Drucker ist `cdevsw[5]` (nicht 7), Major 13 = rk roh, Major 10 = fd roh, `cdevsw[0]` = tty ueber `tc...`.
+  Nicht in conf.c: sysent 8B58 (63 Eintraege) -- bleibt ein eigenes Datenstueck; die Datenreihenfolge im Abbild haengt an der Linkreihenfolge (K5).
+
+## Neue Befunde
+* **Die tty-Struktur ist System III/ZEUS, nicht V7:** EINE Eingabewarteschlange `t_inq` (die kanonische Verarbeitung geschieht im Eingabeweg `ttyinput`, `t_delct` zaehlt Zeilenenden, Trenner ist 0xFF im Zeichenstrom), Zeichenfolge `t_intrc..t_brkc` (03, 1C, 11, 13, 1A, FF),
+  Vorgabe-Flags 0518H.  Layout in `h/tty.h`.
+* **Mailbox je Leitung/Drucker ist dieselbe 14-Byte-Struktur wie die der Platte** (`h/mbx.h`); `mb_stat` wirkt bei tty/lp als "Leitung frei"-Merker.
+* **Handassembler/nicht C-erreichbar in diesem AP: keiner.**  Alle Treiberfunktionen haben `call csv` (kein OUT/IN mit festem Port im Treibercode -- der Verkehr laeuft vollstaendig ueber die Mailbox und `mapalloc`/`mapstart` in bio.c;
+  die Eintritte der Geraeteinterrupts liegen im Trap-Eintritt 030E, Assembler aus K7c).
+* **Gast-`cpp`:** Makronamen sind nur auf 8 Zeichen signifikant (`USER_EXT_K7D` == `USER_EXT_H`) -- Include-Waechter kurz und verschieden waehlen.  Ein Name darf in Initialisierern erst nach einer Deklaration (`int f();`) vorkommen (conf.c).
+
+## Offen aus K7d
+`ttioctl` 6E7A (738 B, Sprungtabelle ueber cmd/6 und die Befehlstabelle 8D3A..), `ttyinput` 7222 (912 B) mit den Teilfunktionen 75B2, 769A, 772E, 78A8 und `ttyoutput` 7A34 (534 B, Sprungtabelle 8D46, Tabellen 8D1A/8D52) -- alle in System-III-Form, noch ohne Zeichenvorlage;
+`fdstart` 7FDC, `fdioctl` 85B0.  Dazu die Blockanordnung von lpwrite/lpcanon/lpintr/ttread/ttyspec (Kernel-c2).
+
+# GESAMTUEBERSICHT C-Rueckbau (Stand 2026-10-28, nach K7a-K7d)
+
+Quelle: `werkzeug/uebersicht.py KERNEL <Objektverzeichnisse> --md` (Universum `kernel/lauf/funktionen.txt`, Modulgrenzen `linkkarte.txt`, Status je Funktion; Schwelle "nahe" = hoechstens 30 abweichende Woerter, ein verschobenes Wort
+zaehlt alle folgenden mit).  Status: **gleich** = alle Woerter wie im Kernel; **nahe** = Eigenheit des aelteren Kernel-`c2`/`c1` (siehe K7b "A..F", K7d); **offen** = in C vorhanden, aber weiter entfernt; **kein C** = noch nicht zurueckgebaut;
+**Assembler** = Funktion ohne `call csv` (mch.s-Art), bleibt Assembler.
+
+| Modul | gleich | nahe | offen | kein C | Assembler | Summe |
+|-------|-------:|-----:|------:|-------:|----------:|------:|
+| low | 0 | 0 | 0 | 0 | 26 | 26 |
+| main | 2 | 1 | 0 | 0 | 0 | 3 |
+| trap | 0 | 0 | 1 | 0 | 0 | 1 |
+| sig | 7 | 0 | 0 | 1 | 0 | 8 |
+| iget | 5 | 1 | 2 | 0 | 0 | 8 |
+| prf | 5 | 0 | 0 | 0 | 0 | 5 |
+| slp | 9 | 0 | 2 | 0 | 0 | 11 |
+| subr | 2 | 1 | 1 | 0 | 0 | 4 |
+| rdwri | 2 | 1 | 1 | 0 | 0 | 4 |
+| clock | 1 | 0 | 0 | 1 | 0 | 2 |
+| fio | 8 | 0 | 0 | 0 | 0 | 8 |
+| malloc | 0 | 1 | 1 | 0 | 0 | 2 |
+| alloc | 3 | 0 | 3 | 1 | 0 | 7 |
+| machdep | 3 | 0 | 1 | 0 | 0 | 4 |
+| nami | 1 | 0 | 0 | 0 | 0 | 1 |
+| pipe | 8 | 0 | 0 | 0 | 0 | 8 |
+| sys3 | 10 | 1 | 0 | 0 | 0 | 11 |
+| sys1 | 6 | 0 | 2 | 0 | 0 | 8 |
+| sys4 | 9 | 0 | 0 | 0 | 0 | 9 |
+| sys2 | 16 | 1 | 2 | 0 | 0 | 19 |
+| text | 9 | 0 | 0 | 0 | 0 | 9 |
+| bio | 17 | 2 | 0 | 0 | 0 | 19 |
+| tty | 10 | 0 | 0 | 0 | 0 | 10 |
+| dev1 | 5 | 0 | 2 | 0 | 0 | 7 |
+| rk | 13 | 0 | 0 | 0 | 0 | 13 |
+| mbx | 10 | 1 | 1 | 7 | 0 | 19 |
+| dev0 | 4 | 2 | 1 | 2 | 0 | 9 |
+| **Summe** | 165 | 12 | 20 | 12 | 26 | 235 |
+
+Zu den Modulnamen: Grenzen sind die Linkreihenfolge-Hypothese aus K5 (`linkkarte.txt`); `mbx` ist darin der Block ttyopen..ttwrite (6D44..7E16), `dev1` Konsole-Rest + Drucker, `low` der gesamte Handassembler (26 Funktionen:
+Start 027E, Trap-Eintritt 030E, spl*, fubyte/fuword/subyte/suword, copyin/copyout/copyseg/clearseg, savu/resume, savfp/restfp, mapaddr, addupc ...).
+**Fuer einen Gesamtbau fehlen noch** (kein C): `clock` 2842 (522 B) und `badblock` 316A (liegt in alloc.c ohne eigene Marke), `procxmt` 0F12 (524 B), `ttioctl`/`ttyinput`+4 Teilfunktionen/`ttyoutput`, `fdstart`/`fdioctl`;
+dazu die **Datenstuecke** (sysent 8B58, Zeichenketten 88C6..8B51, Zeichenkettenreste der Module, BSS-Zuteilung 8DC0..D586) und der **Assembleranteil** `low` (aus K5/K4 als `.s`).
+Die **offenen** Funktionen (20) und **nahen** (12) sind funktional gleich, nicht bytegleich: fuer ein bytegleiches Abbild bleibt Plan B (Nachbesserung der `.s` an den benannten Stellen oder ein `c2` im Gast, der Blockreihenfolge und Endstueckzusammenfuehrung des Kernel-Compilers nachbildet).

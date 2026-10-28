@@ -37,3 +37,14 @@ Neue Felder: erst im Kernel messen, dann hier das Fuellfeld ersetzen und diese T
 * `inode.h`: `NADDR` 13 (itrunc/iexpand), `PIPSIZ` 4096 (writep).  Stufe: belegt.
 * `user_ext.h` (neu, nur Zugriffe auf feste Abstaende von `u`, keine Strukturaenderung): `U_CMASK` u+156 (umask), `U_SEP` u+113 (Byte), `U_P104` u+104 (Zeiger).  K7c hat `user.h` inzwischen um `u_ar0` (104) und `u_x156` erweitert -- sobald diese Namen feststehen, die drei Makros ersetzen.
 * `conf.h`, `filsys.h`, `mount.h`, `dir.h`, `ino.h`: unveraendert; durch iget/alloc/nami/getfs/update bestaetigt (filsys: s_nfree +6, s_free +8, s_ninode +D0, s_inode +D2, s_flock +19A, s_ilock +19B, s_fmod +19C, s_ronly +19D, s_time +19E, s_tfree +1A2, s_tinode +1A6; dinode 64 Byte mit atime +34h, mtime +38h, ctime +3Ch).
+
+## K7d (2026-10-28): neu `mbx.h`, `tty.h` jetzt gemessen, `user_ext.h` um zwei Zeilen
+* `mbx.h` (neu): Mailbox-Eintrag zur U880-Seite, 14 Byte -- `mb_cmd` 0 (Platte 0, Drucker 2, Terminal 4), `mb_unit` 1, `mb_dir` 2, `mb_stat` 3, `mb_seg` 4 (Wort), `mb_addr` 6, `mb_cnt` 8, `mb_blk` A (long).
+  Belegt durch rkstart (Platte, fest bei D532), ttxfer/putchar (je Leitung ab D26A), lpxfer (ab D516), fd (D558).  Bei tty/lp ist `mb_stat` zugleich "Leitung bereit".
+* `tty.h` (jetzt belegt statt Platzhalter): 60-Byte-`struct tty` (A530, 4 Leitungen) mit **einer** Eingabewarteschlange `t_inq` (+0), `t_outq` (+6), `t_oproc` (+C), `t_pgrp` +10, `t_obuf` +12,
+  `t_dev` +14, Zeichen `t_erase`/`t_kill` +18/+19, `t_flags` +1A, `t_eof`..`t_brkc` +20..+27, `t_state` +28, `t_lstate` +2A, `t_cnt2c` +2C, `t_delct` +2E, `t_ocnt` +36, `t_hwp` +38, `t_hwf` +3A.
+  Geraten/ungeklaert: +0E, +16, +1C..+1F, +30..+35 (Zugriffe nur in ttyinput/ttioctl, die noch nicht zurueckgebaut sind).  Das ist der System-III/ZEUS-Aufbau, **nicht** der V7-Platzhalter von K7a (der alte Inhalt ist ersetzt).
+  `struct clist` steht jetzt in `tty.h` (pipe.c hat eine eigene gleichlautende Fassung, bitte nicht beide einbinden).
+* `user_ext.h`: `U_TTYP` (u+114) und `U_TTYD` (u+116) fuer syopen/ttyopen (Kontrollterminal).  **Falle des Gast-`cpp`:** Namen sind nur auf 8 Zeichen signifikant -- ein Include-Waechter `USER_EXT_K7D`
+  kollidierte mit `USER_EXT_H` und schaltete den ganzen Zusatz still ab ("U_TTYP undefined").  Waechter daher kurz und eindeutig (`UXK7D_H`).
+* `conf.h` unveraendert (bdevsw 8 Byte, cdevsw 14 Byte durch conf.c bestaetigt: Datenbytes 8766..88C5 gleich).

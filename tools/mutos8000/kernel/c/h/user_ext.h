@@ -9,3 +9,9 @@
 #define U_SEP	(*((char *)&u + 0x113))
 #define U_P104	(*(char **)((char *)&u + 0x104))
 #endif
+/* K7d: Kontrollterminal des Prozesses (V7 u_ttyp / u_ttyd), im Fuellfeld u_x114 (syopen/syread/sywrite/syioctl, 6C8E..6D44) */
+#ifndef UXK7D_H
+#define UXK7D_H
+#define U_TTYP	(*(int *)((char *)&u + 0x114))
+#define U_TTYD	(*(int *)((char *)&u + 0x116))
+#endif

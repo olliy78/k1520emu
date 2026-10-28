@@ -179,6 +179,7 @@ Linkkarte und Entscheidungen bei uns; Bau-Kollisionen beachten (Worktrees).
 | K7a | teilweise: Header `c/h/`, 28 von 35 Funktionen bytegleich (prf 5/5, fio 8/8, slp 8/11, subr 5/7, rdwri 2/4); DJNZ: `bcopy` nicht erreicht (Plan B) | | `c_rueckbau.md` (AP K7a), `vergleich.py -m` |
 | K7b | teilweise: 35 von 47 Funktionen bytegleich (iget 5/8, alloc 4/7, nami 1/1, pipe 8/8, bio 17/19, bmap/readi/iomove/bcopy nahe); Rest = Eigenheiten des aelteren Kernel-`c2` | | `c_rueckbau.md` (AP K7b) |
 | K7c | teilweise: main, trap, sig, sys1-4, text, machdep, malloc, ureg, slp-Rest -- 82 von 97 Funktionen bytegleich; offen exece, getxfile, trap, procxmt, swtch, newproc, rdwr, malloc | | `c_rueckbau.md` (AP K7c) |
+| K7d | teilweise: Treiber und Konfiguration -- rk/mem/syXXX 13/13, tty 11/11, tty2 11/13, lp 4/7, dev0 4/7 (+3 nahe; Modul ohne `-O` uebersetzt), **conf.c Datenbytes 8766..88C5 gleich**; offen ttioctl, ttyinput+Teile, ttyoutput, fdstart, fdioctl; Gesamtuebersicht am Ende von c_rueckbau.md | | `c_rueckbau.md` (AP K7d) |
 | K6a | fertig | 10ea95b7 | Code 28 % -> 85 %, 235 Funktionen (207 mit `call csv`), `bdevsw`/`cdevsw`/`sysent`/Konfigworte belegt, Modulreihenfolge = WEGA-Linkreihenfolge (Hypothese); `kernel_struktur.md`, `cover` fuer U8001 im Debugger |
 
 ## 7. Risiken
