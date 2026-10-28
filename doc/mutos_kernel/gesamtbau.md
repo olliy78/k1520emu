@@ -59,6 +59,11 @@ auf D (/mnt), Objekte, `lk` und `cc`-Zwischendateien auf A (/tmp); die Wurzel is
 
 **Stand (gemessen):** `make` im Gast uebersetzt alle 31 C-Dateien und bindet; Bauzeit im Gast **736 s Wanduhr** bei sechs parallelen Laeufen
 (allein bei hoher Last des Wirts ueber 25 Min.).  Erster Lauf: `ld` meldete fehlende Marken (`low`-Globale ohne Nachbarmodul, Anfangswerte,
-`cf_*`-Namen); behoben im Skript, **der letzte Lauf mit Boot-Nachweis war beim Abschluss dieses Commits noch nicht fertig -- ungeprueft:**
-`gesamtbau.py --arbeit DIR --objekte DIR/obj --natuerlich --boot`.  Der natuerliche Kernel hat KEIN `pad`: die BSS schwimmt (ab Ende der Daten),
+`cf_*`-Namen); behoben im Skript.  Der natuerliche Kernel hat KEIN `pad`: die BSS schwimmt (ab Ende der Daten),
 muss aber unter D256 enden (das Skript prueft das).  Die ps/pstat-Tabelle zeigt dann auf falsche Adressen.
+
+**Boot-Nachweis (2026-10-28):** zweiter Lauf `make` im Gast: `lk` Text 34 384 B, Daten 19 212 B; Kernel Text+Daten 36 038 B (Original 36 288),
+BSS 8CC6..D15C (unter der Grenze D256).  Auf die Ladediskette gespielt (`boot_pruefen`), **bootet bis `#`, alle neun Arbeitstests bestanden**:
+`ls -l /`, `ls /etc | cat`, `cat t.c | cat | cat`, `cc -c t.c` (164 B), `date`, Datei schreiben/lesen in `/tmp`, `cc t2.c; a.out; a.out | cat`
+(`summe = 5050` zweimal), `cc -O -c prf.c` (1600 B).  Damit ist der **Selbstbau** belegt: der Kernel entsteht im MUTOS-Gast mit `make`, `cc`, `as`, `ld`
+aus den Quellen und laeuft.  Einziger Host-Schritt: Kopf (16 B) abschneiden; `dd` liegt auf der cmd-Diskette und war im Bau nicht eingelegt (naechster Schritt).
