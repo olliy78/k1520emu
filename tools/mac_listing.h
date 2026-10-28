@@ -26,6 +26,12 @@
  *     Spruenge) werden als „variabel" markiert. Der Versatz-Abgleich (`@auto`)
  *     vergleicht nur die relokationsunabhaengigen Bytes.
  *
+ *   - **MACRO/REPT/ENDM, .PHASE/.DEPHASE, IF** (2026-10-27, mutos_io): Makros und
+ *     `REPT` werden beim Assemblieren expandiert (Zeilen der Expansion tragen die
+ *     aufrufende Quellzeile), `.PHASE` liefert die Laufadresse, `IF` mit aufloesbarem
+ *     Ausdruck waehlt einen Zweig (sonst: alle).  Beleg: `mutosio.mac` ergibt bytegleich
+ *     `mutosio.orig` (Test `MacListing.AssemblesMutosIoBytegleichZumOriginal`).
+ *
  * Header-only, haengt nur an prn_listing.h/z80dis_min.h + STL → unit-testbar.
  *
  * @license MIT
@@ -43,6 +49,7 @@
 #include <sstream>
 #include <algorithm>
 #include <cctype>
+#include <functional>
 
 namespace maclst {
 
@@ -516,15 +523,114 @@ inline bool assemble(const std::string& path, long addr_offset,
     res.lines = (int)raw.size();
 
     SymTab syms;
+    // MACRO-Definitionen (Name in Grossschreibung) bleiben ueber beide Durchlaeufe.
+    struct Macro { std::vector<std::string> params; std::vector<std::string> body; };
+    std::map<std::string,Macro> macros;
     // ── Zwei Durchlaeufe: erst Adressen/Labels, dann Bytes (Vorwaertsbezuege). ──
     for (int pass = 0; pass < 2; ++pass){
         long loc = 0;
+        long phase_shift = 0;          // .PHASE: Laufadresse minus physische Adresse
         bool ended = false;
+        // Text, den Zeilen aus einer Makro-/REPT-Expansion in der Tabelle tragen:
+        // die aufrufende Quellzeile (nicht 141 Mal "DB 0FFH").
+        std::string outer;
+        struct CondFrame { bool parent_active = true, active = true, unknown = false; };
+        std::vector<CondFrame> condStack;
         if (pass == 1){ res.code = res.unknown = res.anchors = res.resyncs = 0; res.problems.clear(); }
-        for (const std::string& line : raw){
+        std::function<void(const std::vector<std::string>&, int)> runLines;
+        runLines = [&](const std::vector<std::string>& lines, int depth){
+        for (size_t li = 0; li < lines.size(); ++li){
+            const std::string& line = lines[li];
             if (ended) break;
             SrcLine sl;
             if (!splitSource(line, sl)) continue;
+
+            // ── Bedingte Assemblierung ────────────────────────────────────────────
+            // IF/IFT/IFE/IFF mit voll aufloesbarem Ausdruck (z. B. `K8X512 EQU 0`) wird
+            // wirklich ausgewertet, damit nur der gewaehlte Zweig Bytes erzeugt.  Ist
+            // ein Symbol unbekannt (fremder Build, Merker aus der Befehlszeile), bleibt
+            // es beim alten Verhalten: ALLE Zweige werden mitassembliert, die Mxxxx-
+            // Anker fangen den Versatz ab.  IFDEF/IFNDEF/IFB… gelten immer als unbekannt.
+            {   const std::string& mn = sl.mnem;
+                bool is_if = (mn=="IF"||mn=="IFT"||mn=="IFE"||mn=="IFF");
+                bool is_other_if = (mn=="IF1"||mn=="IF2"||mn=="IFDEF"||mn=="IFNDEF"||mn=="IFB"
+                                    ||mn=="IFNB"||mn=="IFIDN"||mn=="IFDIF");
+                if (is_if || is_other_if){
+                    bool parent = condStack.empty() || condStack.back().active;
+                    CondFrame fr; fr.parent_active = parent;
+                    if (!parent){ fr.active = false; fr.unknown = true; }
+                    else if (is_if){
+                        bool unres = false;
+                        long v = evalExpr(sl.ops, syms, loc, &unres);
+                        if (unres) { fr.unknown = true; fr.active = true; }
+                        else { bool t = (mn=="IF"||mn=="IFT") ? (v != 0) : (v == 0); fr.active = t; }
+                    } else { fr.unknown = true; fr.active = true; }
+                    condStack.push_back(fr);
+                    continue;
+                }
+                if (mn=="ELSE"){
+                    if (!condStack.empty()){ CondFrame& fr = condStack.back();
+                        if (fr.parent_active && !fr.unknown) fr.active = !fr.active; }
+                    continue;
+                }
+                if (mn=="ENDIF"||mn=="ENDC"){ if (!condStack.empty()) condStack.pop_back(); continue; }
+                if (!condStack.empty() && !condStack.back().active) continue;   // abgeschalteter Zweig
+            }
+
+            // ── MACRO / REPT: Rumpf einsammeln (verschachtelt), dann expandieren ──
+            if (sl.mnem=="MACRO" || sl.mnem=="REPT"){
+                std::vector<std::string> body; int nest = 1; size_t j = li + 1;
+                for (; j < lines.size(); ++j){
+                    SrcLine b;
+                    if (splitSource(lines[j], b)){
+                        if (b.mnem=="MACRO" || b.mnem=="REPT" || b.mnem=="IRP" || b.mnem=="IRPC") ++nest;
+                        else if (b.mnem=="ENDM" && --nest == 0) break;
+                    }
+                    body.push_back(lines[j]);
+                }
+                li = j;                                   // hinter das ENDM
+                if (sl.mnem=="MACRO"){
+                    Macro mc;
+                    for (const std::string& p : detail::splitOperands(sl.ops))
+                        if (!trim(p).empty()) mc.params.push_back(upper(trim(p)));
+                    mc.body = body;
+                    if (!sl.label.empty()) macros[sl.label] = mc;
+                } else if (depth < 8){
+                    long n = evalExpr(sl.ops, syms, loc);
+                    std::string saved = outer; if (outer.empty()) outer = trim(line);
+                    for (long k = 0; k < n && k < 70000; ++k) runLines(body, depth+1);
+                    outer = saved;
+                }
+                continue;
+            }
+            if (sl.mnem=="ENDM") continue;                // verwaister Abschluss
+            {   auto mit = macros.find(sl.mnem);
+                if (mit != macros.end() && depth < 8){
+                    std::vector<std::string> args;
+                    for (const std::string& a : detail::splitOperands(sl.ops)) args.push_back(trim(a));
+                    std::vector<std::string> body;
+                    for (const std::string& bl : mit->second.body){
+                        // Parameternamen als ganze Bezeichner ersetzen (ohne Gross/Klein)
+                        std::string o; size_t k = 0;
+                        while (k < bl.size()){
+                            if (isIdentStart(bl[k])){
+                                size_t a0 = k; while (k < bl.size() && isIdentChar(bl[k])) ++k;
+                                std::string id = bl.substr(a0, k-a0), up = upper(id), rep = id;
+                                for (size_t pi = 0; pi < mit->second.params.size(); ++pi)
+                                    if (mit->second.params[pi] == up){ rep = pi < args.size()? args[pi] : ""; break; }
+                                o += rep;
+                            } else o.push_back(bl[k++]);
+                        }
+                        body.push_back(o);
+                    }
+                    // Label der Aufrufzeile gehoert der Adresse vor der Expansion
+                    if (!sl.label.empty()) syms[sl.label] = loc;
+                    std::string saved = outer; if (outer.empty()) outer = trim(line);
+                    runLines(body, depth+1);
+                    outer = saved;
+                    continue;
+                }
+            }
 
             // Label: EQU/SET definieren einen Wert, sonst die aktuelle Adresse.
             // Wertzuweisende Pseudobefehle. `SET` ist doppelt belegt: als MACRO-80-
@@ -550,7 +656,12 @@ inline bool assemble(const std::string& path, long addr_offset,
                 continue;
             }
             if (sl.mnem=="ORG"){ loc = evalExpr(sl.ops, syms, loc) & 0xFFFF; continue; }
-            if (sl.mnem==".PHASE"){ loc = evalExpr(sl.ops, syms, loc) & 0xFFFF; continue; }
+            // .PHASE: der Code liegt physisch hier, laeuft aber unter anderer Adresse
+            // (UDOS-Programme mit mehreren Segmenten, z. B. mutos_io).  Tabelle und
+            // Symbole tragen die LAUFadresse; .DEPHASE kehrt zur physischen zurueck.
+            if (sl.mnem==".PHASE"){ long n = evalExpr(sl.ops, syms, loc) & 0xFFFF;
+                phase_shift = n - loc; loc = n; continue; }
+            if (sl.mnem==".DEPHASE"){ loc -= phase_shift; phase_shift = 0; continue; }
             if (sl.mnem=="END"){ ended = true; continue; }
             if (sl.mnem=="DS" || sl.mnem=="DEFS"){ loc += evalExpr(sl.ops, syms, loc); continue; }
             // Bedingte Assemblierung: wir kennen die Bedingungssymbole des fremden
@@ -576,7 +687,7 @@ inline bool assemble(const std::string& path, long addr_offset,
                 if (sl.mnem=="DC" && !bytes.empty()) bytes.back() |= 0x80;
                 if (pass==1){
                     uint16_t a = (uint16_t)(loc + addr_offset);
-                    out.by_addr.emplace(a, trim(line));
+                    out.by_addr.emplace(a, outer.empty()? trim(line) : outer);
                     ++res.code;
                     res.first = std::min(res.first, a); res.last = std::max(res.last, a);
                     if (img) for (size_t i=0;i<bytes.size();++i){
@@ -639,7 +750,7 @@ inline bool assemble(const std::string& path, long addr_offset,
             }
             if (pass==1){
                 uint16_t a = (uint16_t)(loc + addr_offset);
-                out.by_addr.emplace(a, trim(line));
+                out.by_addr.emplace(a, outer.empty()? trim(line) : outer);
                 ++res.code;
                 res.first = std::min(res.first, a); res.last = std::max(res.last, a);
                 if (img){
@@ -673,9 +784,38 @@ inline bool assemble(const std::string& path, long addr_offset,
             }
             loc += enc->len;
         }
+        };
+        runLines(raw, 0);
     }
     if (res.first == 0xFFFF) res.first = 0;
     return true;
+}
+
+/**
+ * Beginnt die aufbereitete Quellzeile @p src (wie sie in der Adresstabelle steht) mit
+ * einem Z80-BEFEHL (im Gegensatz zu DB/DW/DS/Makroaufruf = Daten)?  Fuer die
+ * Abdeckung des Debuggers (`cover expect lst`): nur Befehlsadressen sind "erwartet".
+ */
+inline bool isCodeLine(const std::string& src){
+    // Die Tabelle fuehrt die Zeile ohne fuehrenden Tab: ein erstes Wort in Spalte 1 ist
+    // dann kein Label.  Also von Hand: optionales `LABEL:` abtrennen, Rest einrueckeln.
+    std::string body = trim(src);
+    {   size_t i = 0;
+        while (i < body.size() && (isIdentChar(body[i]) || body[i]=='$')) ++i;
+        if (i > 0 && i < body.size() && body[i]==':') body = body.substr(i+1);
+    }
+    SrcLine sl;
+    if (!splitSource("\t" + trim(body), sl)) return false;
+    static const std::set<std::string> z80 = {
+        "LD","PUSH","POP","EX","EXX","LDI","LDIR","LDD","LDDR","CPI","CPIR","CPD","CPDR",
+        "ADD","ADC","SUB","SBC","AND","OR","XOR","CP","INC","DEC","DAA","CPL","NEG","CCF",
+        "SCF","NOP","HALT","DI","EI","IM","RLCA","RLA","RRCA","RRA","RLC","RL","RRC","RR",
+        "SLA","SRA","SLL","SRL","RLD","RRD","BIT","SET","RES","JP","JR","DJNZ","CALL","RET",
+        "RETI","RETN","RST","IN","INI","INIR","IND","INDR","OUT","OUTI","OTIR","OUTD","OTDR" };
+    // `NAME SET wert` ist keine Befehlszeile (Label + SET), der Z80-Befehl `SET b,r` hat keins
+    // - hier wie dort ist die Zeile nur Code, wenn sie eine Adresse belegt; Pseudo-SET
+    // erzeugt keine Adresseintraege und kommt gar nicht in die Tabelle.
+    return z80.count(sl.mnem) != 0;
 }
 
 // ─── Versatz-Abgleich (`@auto`) ──────────────────────────────────────────────

@@ -57,6 +57,7 @@ bestehen bleiben soll (z. B. Formatier-Versuche) — dann auf einer eigenen Kopi
 | **`boot_trace`** | Nicht-interaktiver Boot-/DMA-Tracer: Report mit Histogrammen, `[03F8]`-Done-Flag und VRAM-Banner; `--until`, `--coverage`/`--diff`, `--csv`, `--fold`, `--itrace`, Log-Gates | **[boot_trace.md](boot_trace.md)** |
 | `format_driver` | Skriptgesteuerter Treiber für interaktive Gastprogramme: bootet CP/A mit zwei Disketten, sendet Tastenfolgen, gibt zwischen den Schritten den 80×24-Text aus. Rückgrat der Formatier-Pipeline (`FORMAT.COM`/`FORMATB.COM`) | `doc/format.md` |
 | `z8kasm` | Assembler/Disassembler für den U8001/U8002 (Z8001/Z8002) in Zilog-Syntax, aus **einer** Befehlstabelle (`z8000/z8k_table.h`, auch Takte für den CPU-Kern) | **[z8000/README.md](z8000/README.md)** |
+| `z8kdis` | Z8000-Disassembler fuer ganze Abzuege: Kartendatei (wie `z80_disasm2.py`), Ablaufverfolgung, Marken, `--format as` (MUTOS-`as`, PLZ/ASM), Rundlauf `--pruefen` (Entwurf 41, K3) | **[z8000/README.md](z8000/README.md)** |
 | `kbd_test` | Tastatur-/Boot-Smoke: bootet, tippt Text + Enter, gibt Bildschirm, Tastatur-Portverkehr (0x5C/0x5D mit Quell-PC) und ein PC-Histogramm aus | unten |
 | `floppy_diag` | Lese-Diagnose am **laufenden** OS: verfolgt jeden ZVE2-Lesezugriff über `0x1F7D` — gesuchte (cyl, head, sector, size) und ob das IDAM gefunden wurde | — |
 | `mk_disk_template` | Erzeugt gültig vorformatierte **einseitige** Leerdisketten (HFE) im CP/A-Systemlayout — 8″-FM/MFM und 5¼″-SS | `tests/fixtures/README.md` |
@@ -83,8 +84,7 @@ Sie bilden die Innereien von `k1520dbg` und `boot_trace` und sind **einzeln gete
 
 | Skript | Zweck |
 |---|---|
-| **`z80_disasm2.py`** | **Kanonischer** generischer Z80-Disassembler (`--org`, wiederholbare `--entry`/`--label`) — [z80_disasm.md](z80_disasm.md) |
-| `z80_disasm.py` · `z80_disasm3.py` | Ältere, format.com-spezifische Fassungen (ORG bzw. Labels fest verdrahtet). Nur als Zweitmeinung |
+| **`z80_disasm2.py`** | **Der** Z80-Disassembler: Listing (`--org`, `--entry`, `--label`) und `--format mac` = assemblierbarer M80-Quelltext aus Abzug + Kartendatei (`--karte`) — [z80_disasm.md](z80_disasm.md). Wächter `tests/python/test_z80_disasm.py` |
 | `disasm_difftest.py` | Regressionswächter: `z80_disasm2.py` gegen das `z80dis`-Paket. Vor jedem Umbau der Disassembler-Engine laufen lassen |
 | `eprom_to_h.py` | EPROM-Binärdatei → committetes C-Array (`*_data.h`) |
 | `img_to_hfe.py` | Rohes `.img` → HFE-v1-Diskettenabbild |

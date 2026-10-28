@@ -100,6 +100,18 @@ lpl
 lpd 0x0135
 trace dbg_smoke_trace.txt 0x0130 0x0140
 trace off
+trace dbg_smoke_trace_z80.txt z80
+trace off
+lp 0x0135 A dump HL 4 w count 1 if 1
+lpl
+lpd 0x0135
+cover on 0x0000 0x7FFF
+cover
+cover expect clear
+cover expect lst
+cover report dbg_smoke_cover.txt all
+cover reset
+cover off
 itrace dbg_smoke_itrace.txt
 itrace off
 
@@ -144,6 +156,9 @@ screen select
 # Genau so muss es sein; der lebende Pfad haengt an py_dbg_konsole.
 console
 keys \s
+keywait on
+keywait off
+emmsg int
 
 # ── Snapshots / Reverse / Zustand auf Platte ───────────────────────────────
 snap vorher

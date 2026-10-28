@@ -1,0 +1,23 @@
+# mutos_io: Nachrichtenweg Z8000 -> U880 -> Z8000 mit Logpoints (laufen und mitschreiben).
+# 94E1: HL = Nachrichtenzeiger (Byte-getauscht), DE nach 94D5 = 0 war in EM-Seite 4 Offset 6 eingetragen
+# 9558: Nachricht ist in die Kontrollblock-Kopie (IX+6..IX+19) kopiert; IX = Kontrollblock
+# 903D: Fertigmeldung der Klasse IX; 90A3: OUT (0ADH),A mit A = Vektor des Kontrollblocks
+#   tools/dev.sh tool k1520dbg --em em256 --laufwerke K5601,K5601,K5601 disks/a5120_16_MUTOS/a5120_mutos8000_boot_udos_k5601.hfe -x tools/mutos8000/versuche/mutos_io_nachricht.dbg
+lp 0x94E1 HL [0x4006]w
+lp 0x9558 IX [IX+6] [IX+7] [IX+8] [IX+9] [IX+10] [IX+11] [IX+12] [IX+13] [IX+14] [IX+15] [IX+16] [IX+17] [IX+18] [IX+19] [IX+22]
+lp 0x90FC IX [IX+7] [IX+8] [IX+14]w [IX+18]w
+lp 0x9160 IY [IY+0] [IY+1] [IY+2]w [IY+4]w [IY+11] [IY+12]
+lp 0x9163 SP
+lp 0x9078 IX [IX+0] [IX+1] [IX+7] [IX+8] [IX+9] [IX+14]w [IX+22]
+lp 0x90A3 A IX [IX+4]w [IX+9] [IX+14]w
+g 80000000
+keys BOOT\sMUTOS\r
+g 100000000
+eject A
+mount C disks/a5120_16_MUTOS/a5120_mutos8000_root_mfm.hfe udos_ss77
+keys r
+g 100000000
+keys root\r
+g 100000000
+screen
+q

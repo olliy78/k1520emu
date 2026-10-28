@@ -12,7 +12,8 @@ k1520_add_test(dbg_commands      SRC test_dbg_commands.cpp      LABELS "${_lbl}"
 k1520_add_test(coverage_diff     SRC test_coverage_diff.cpp     LABELS "${_lbl}")  # tools/coverage_diff.h
 k1520_add_test(callstack_tracker SRC test_callstack_tracker.cpp LABELS "${_lbl}")  # tools/callstack_tracker.h
 k1520_add_test(prn_listing       SRC test_prn_listing.cpp       LABELS "${_lbl}")  # tools/prn_listing.h
-k1520_add_test(mac_listing       SRC test_mac_listing.cpp       LABELS "")  # tools/mac_listing.h
+k1520_add_test(mac_listing       SRC test_mac_listing.cpp       LABELS ""
+               DEFS "MUTOSIO_DIR=\"${CMAKE_SOURCE_DIR}/tools/mutos8000/mutos_io\"")  # tools/mac_listing.h
 k1520_add_test(dbg_u8000         SRC test_dbg_u8000.cpp         LIBS k1520_z8000 LABELS "${_lbl}")  # tools/dbg_u8000.h
 k1520_add_test(dbg_p8000         SRC test_dbg_p8000.cpp         LIBS k1520_p8000 k1520_logger LABELS "${_lbl}")  # tools/dbg_p8000.h (P8000: ADP, UA858, Kopplung, MMU)
 
@@ -21,6 +22,8 @@ k1520_add_test(z8k_table         SRC test_z8k_table.cpp         LABELS "${_lbl}"
 k1520_add_test(z8k_disasm        SRC test_z8k_disasm.cpp        LABELS "${_lbl}")  # tools/z8000/z8k_disasm.h
 k1520_add_test(z8k_asm           SRC test_z8k_asm.cpp           LABELS "${_lbl}"   # tools/z8000/z8k_asm.h
                DEFS "Z8K_FIXTURE_DIR=\"${CMAKE_SOURCE_DIR}/tests/fixtures/z8000\"")
+
+k1520_add_test(z8kdis            SRC test_z8kdis.cpp            LABELS "${_lbl}")  # tools/z8000/z8kdis.h (Entwurf 41, K3)
 
 # Z8/UB8840 (P8000 AP P19c): Disassembler/Assembler tools/z8/, Debuggersicht tools/dbg_z8.h
 k1520_add_test(z8_asm            SRC test_z8_asm.cpp            LABELS "${_lbl}")  # tools/z8/z8_disasm.h + z8_asm.h

@@ -1,0 +1,11 @@
+# z8kdis: Fehler in der Kartendatei mit Zeilennummer, Exit-Code 1
+tool:   z8kdis
+run:    --karte %karte.txt% %bild%
+nullfile bild: 4
+
+file karte.txt:
+  code 0
+  unsinn 1 2
+
+expect: Karte Zeile 2
+exit:   1

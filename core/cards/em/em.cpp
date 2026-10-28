@@ -484,6 +484,13 @@ void EM::write16(const Z8kBusCycle& c, uint16_t v) {
     }
 }
 
+void EM::setInt16(bool level) {
+    a33_ = uint8_t(level ? (a33_ | 0x10) : (a33_ & ~0x10));
+    LOG_DEBUG("EM", "Host: INT-16 %d (A33=%02X)", level ? 1 : 0, a33_);
+    emit(Ereignis::A33A35, 0, uint16_t((status16_ << 8) | a33_), false);
+    updatePioInputs();
+}
+
 // ─── Save-State ──────────────────────────────────────────────────────────────
 namespace {
 constexpr uint8_t kEmStateVersion = 1;

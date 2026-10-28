@@ -109,6 +109,37 @@ nach Adresse sortiert:
   Wächter `Z8kAsm.SymboldateiNurMarkenMitSegment`, `cli_z8kasm_symbole`,
   `cli_dbg_u8000_symbole`.
 
+## `z8kdis` — Abzug + Karte -> Quelle (Entwurf 41, AP K3)
+
+Kommandozeilen-Disassembler fuer ganze Abzuege (das Z8000-Gegenstueck zu `tools/z80_disasm2.py`), gebaut auf
+derselben Tabelle/demselben Dekoder (`z8k_disasm.h`); Kern header-only in **`z8kdis.h`**, CLI `tools/z8kdis.cpp`.
+**Das** ist der Ort fuer Abzug-Disassemblate; `z8kasm -d` bleibt der Einzeiler fuer kleine Firmware.
+
+```sh
+tools/dev.sh tool z8kdis --karte tools/mutos8000/kernel/karte.txt --statistik mutos_1216          # Listing
+tools/dev.sh tool z8kdis --karte K --format as --modul mutos mutos_1216 -o kernel.s               # MUTOS-as (PLZ/ASM)
+tools/dev.sh tool z8kdis --karte K --pruefen mutos_1216                                           # Rundlauf
+tools/dev.sh tool z8kdis --karte K --teile 1000 mutos_1216 ; ... --format as --teil VON:BIS ...   # as-Quelle in Stuecken (K4)
+tools/dev.sh tool z8kdis --karte K --vorschlaege mutos_1216                                       # Code-Kandidaten (nur Hinweis)
+tools/dev.sh tool z8kdis --segmentiert --base 30000 --entry 30040 fw.bin   # U8001; Adressen linear: Segment*10000+Offset
+```
+
+* **Karte** (Kopf von `z8kdis.h`): wie die Z80-Karte (`seg code db dw dwc str txt name kom ik eq`), dazu `lin` (linear lesen),
+  `psa ADR N` (Programmstatus-Feld, je 8 Byte [res, FCW, Segment, Offset]; der Offset ist Code-Einstieg) und
+  `vek VON BIS` (Vektoren je 4 Byte [Kennung, Handler]).  Zahlen hexadezimal; `--entry`, `--psa`, `--seg` ersetzen Kartenzeilen.
+* **Ablauf**: Einstiege aus Karte/`psa`/`vek`/`dwc`; verfolgt `jp jr call calr djnz dbjnz`, endet an `ret`/`iret`/`jp`/`jr` ohne Bedingung.
+  Alles Nicht-Erreichte bleibt `DW` (gerade) bzw. `DB`.  Kein Raten: `--vorschlaege` listet Zeiger-Kandidaten, uebernommen wird nichts.
+* **Marken**: `Lxxxx` fuer jedes Sprung-/Aufrufziel und jede Direktadresse; indizierte Adressen unter `0100` gelten als Strukturversatz und
+  bekommen keine Marke; `dw` setzt Namen nur ein, wo es die Marke ohnehin gibt (`dwc`/`psa`/`vek` legen an).
+* **Rundlauf** (`--pruefen`): Quelle (z8kasm-Schreibweise) -> `z8k::assemble` -> Vergleich mit dem Abbild.  Befehle, die der Assembler nicht
+  **bitgleich** zurueckbaut (nicht ausgewertete Felder, `LDB.L`, ungerade Registerpaare), werden vorab zu Daten (`nicht kanonisch kodiert` im Listing).
+* **`--format as`**: Schreibweise des MUTOS-`as` (Zilog PLZ/ASM, kleingeschrieben, ein Unterprogramm, `WV`/`BV`) -- Belege und Unsicherheiten:
+  `doc/mutos_kernel/as_dialekt.md`.  **Rundlauf gegen den Gast-`as` (K4, `tools/mutos8000/kernel/rundlauf_gast.py`): Kernel bytegleich**;
+  der `as` laeuft bei ~1400 Marken in `symbol table overflow`, deshalb `--teile MAXHEX`/`--teil VON:BIS` (Stuecke, Fremdmarken = Konstanten,
+  nie quer ueber JR/DJNZ/CALR; JR bei -127 Woertern wird `WV`, der `as` lehnt es ab).
+* Waechter: `tests/debugtools/test_z8kdis.cpp` (inkl. jedes erste Wort beider Modi, 16 x 4096 Befehle, bitgleich), `cli_z8kdis_*`,
+  `tests/python/test_z8kdis_kernel.py` (Kernel `mutos_1216` aus dem Ladedisketten-Archiv).
+
 ## Quellen, Lücken, Unsicherheiten
 
 Maßgeblich: Zilog *Z8000 CPU User's Reference Manual* — OCR-Fassung

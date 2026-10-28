@@ -282,6 +282,18 @@ public:
      */
     void injectParityError();
 
+    /**
+     * @brief Testhaken: A33 Bit 4 (INT-16) setzen/loeschen, als haette der U8001 es mit
+     *        einem OUT geschrieben (A33 Bit 4 -> PIO A32 Port A Bit 4 -> Interrupt des U880).
+     *
+     * Der Rest von A33 (Ebene Bit 0-2, Segmentwahl, Freigabe A53) und A35 bleiben
+     * unveraendert; das Ereignis `A33A35` wird gemeldet (`by16` = falsch).  Dient dem
+     * Debugger (`emmsg`), um dem U880-Programm eine Anforderung zu stellen, ohne dass der
+     * Kernel auf dem U8001 laeuft.  Das Verhalten der Karte bei U8001-Zugriffen aendert
+     * sich nicht.
+     */
+    void setInt16(bool level);
+
     // ─── Zustand (Tests, Debugger, spaeter Oberflaeche) ───────────────────────
     const Config& config() const { return cfg_; }
     const Z80PIO& pio() const    { return pio_; }

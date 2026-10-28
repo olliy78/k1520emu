@@ -1,0 +1,36 @@
+# K3: `cc -S` an p1.c/p2.c im MUTOS-Gast -- Belegmaterial fuer den as-Dialekt (doc/mutos_kernel/as_dialekt.md).
+# Ergebnis liegt eingecheckt neben dem Skript: p1.s (vollstaendig), p2.s (abgeschnitten, s. as_dialekt.md).
+# Vorbereitung (PROBE = ein Arbeitsordner):
+#   Kopien von disks/a5120_16_MUTOS/a5120_mutos8000_{usr,root}_mfm.hfe als PROBE/usr.hfe, PROBE/root.hfe und
+#   a5120_mutos8000_boot_udos_k5601.hfe als PROBE/boot.hfe (der Lauf SCHREIBT: --rw, nie die Originale!)
+#   build/k1520disktool create PROBE/quelle.hfe --fs mutos8k_26x128_mfm --inodes 24
+#   build/k1520disktool put PROBE/quelle.hfe p1.c p2.c fertig1 fertig2 fertig3 fertig4   (fertigN = Datei mit Inhalt ENDEN)
+# Lauf:  tools/dev.sh tool k1520dbg --rw --em em256 --laufwerke K5601,K5601,K5601,K5601 PROBE/boot.hfe -x cc_S_probe.dbg
+# Zurueckholen: build/k1520disktool get PROBE/quelle.hfe p1.s p2.s --to ZIEL     (Dauer ~3 Min. Maschinenzeit je cc -S)
+g 80000000
+keys BOOT\sMUTOS\r
+g 100000000
+eject A
+mount B PROBE/usr.hfe udos_ss77
+mount C PROBE/root.hfe udos_ss77
+mount D PROBE/quelle.hfe udos_ss77
+keys r
+g 100000000
+keys root\r
+g 100000000
+keys /etc/mount\s/dev/rk1\s/usr\r
+g 30000000
+keys /etc/mount\s/dev/rk3\s/mnt\r
+keys cd\s/mnt\r
+g 20000000
+keys PATH=/bin:/usr/bin:.\r
+g 20000000
+keys cc\s-S\sp1.c;cat\sfertig1\r
+gscreen "ENDE1" 1500000000
+keys cc\s-S\sp2.c;cat\sfertig2\r
+gscreen "ENDE2" 1500000000
+keys ls\s-l;sync;cat\sfertig3\r
+gscreen "ENDE3" 300000000
+screen
+g 60000000
+q

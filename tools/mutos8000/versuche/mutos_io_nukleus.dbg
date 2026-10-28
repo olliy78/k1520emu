@@ -1,0 +1,11 @@
+# mutos_io: die UDOS-Nukleus-Einsprunge, die mutos_io benutzt (0BE8 Taste, 0BEB Zeichen aus, 0BF1 Text aus, 0BFD Platte, 0EB00 Drucker)
+# Nach BOOT MUTOS (Maske von mutos_io steht) disassembliert.
+g 80000000
+keys BOOT\sMUTOS\r
+g 100000000
+u 0xBE8 24
+u 0xBFD 3
+u 0xEB00 3
+u 0x700 20
+d 0x1B5 16
+q

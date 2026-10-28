@@ -1,0 +1,10 @@
+# Abdeckung des U8001 (`cover` im Kontext u8000): em16abl.com laufen lassen, Bericht schreiben.
+gscreen "A>" 150000000
+cpu u8000
+cover on
+keys EM16ABL\r
+g 100000000
+cover off
+cover report
+cover
+q

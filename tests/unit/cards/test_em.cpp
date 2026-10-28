@@ -326,6 +326,32 @@ TEST(EM, Paritaet_Testhaken_PeUndPr_Interrupt) {
     EXPECT_EQ(r.bus.ioRead(kPB) & 0x80, 0x80);
 }
 
+// ─── Host-Haken INT-16 ────────────────────────────────────────────────────────
+
+/**
+ * @test EM/Int16_Testhaken_SetztPioA4_UndLoeschtEs
+ * @brief `setInt16` wirkt wie ein U8001-OUT auf A33 Bit 4: PIO A32 Port A Bit 4 folgt,
+ *   die uebrigen A33-Bits (Ebene) und A35 bleiben, und bei scharfer Maske (Mode 3,
+ *   Bit 4 ueberwacht, aktiv HIGH) steht ein Interrupt an.
+ */
+TEST(EM, Int16_Testhaken_SetztPioA4_UndLoeschtEs) {
+    Rig r;
+    r.pioInit();
+    EXPECT_EQ(r.bus.ioRead(kPA) & 0x10, 0x00);
+    r.bus.ioWrite(kPAc, 0x20);                         // Vektor
+    r.bus.ioWrite(kPAc, 0xCF); r.bus.ioWrite(kPAc, 0xFF);   // Mode 3, alles Eingang
+    r.bus.ioWrite(kPAc, 0xB7); r.bus.ioWrite(kPAc, 0xEF);   // Int, aktiv HIGH, OR, nur Bit 4
+    const uint8_t a33_vorher = r.em.steuer16();
+    r.em.setInt16(true);
+    EXPECT_EQ(r.bus.ioRead(kPA) & 0x10, 0x10);
+    EXPECT_EQ(r.em.steuer16(), uint8_t(a33_vorher | 0x10));
+    r.em.setIEI(true);
+    EXPECT_TRUE(r.em.hasInterrupt());
+    r.em.setInt16(false);
+    EXPECT_EQ(r.bus.ioRead(kPA) & 0x10, 0x00);
+    EXPECT_EQ(r.em.steuer16(), a33_vorher);
+}
+
 // ─── Reset ───────────────────────────────────────────────────────────────────
 
 /**

@@ -111,6 +111,8 @@ bint16 on
 bint16 off
 emlog on
 emlog off
+emmsg 0x2000 01 02 noint
+emmsg int
 g 20000
 hist 20000
 snap eins

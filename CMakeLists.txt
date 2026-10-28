@@ -640,6 +640,10 @@ if(BUILD_K1520)
     add_executable(z8kasm tools/z8kasm.cpp)
     target_include_directories(z8kasm PRIVATE ${CMAKE_SOURCE_DIR})
 
+    # z8kdis: Z8000-Disassembler mit Kartendatei, MUTOS-as-Ausgabe und Rundlauf (Entwurf 41, K3)
+    add_executable(z8kdis tools/z8kdis.cpp)
+    target_include_directories(z8kdis PRIVATE ${CMAKE_SOURCE_DIR})
+
     # boot_trace: standalone boot diagnostic tool (LOG_LEVEL=5 for full trace)
     add_executable(boot_trace tools/boot_trace.cpp tools/boot_trace_k8915.cpp tools/boot_trace_prg710.cpp tools/boot_trace_pc1715.cpp tools/boot_trace_mc80.cpp tools/boot_trace_mc80_2x.cpp tools/boot_trace_p8000.cpp)
     target_link_libraries(boot_trace PRIVATE k1520_a5120 k1520_k8915 k1520_prg710 k1520_pc1715 k1520_mc80 k1520_p8000 k1520_floppy k1520_logger)

@@ -58,6 +58,7 @@ System-Interpreter.
 | `test_serial_gui.py` | Dock „Schnittstellen" (AP-S7, beide Programme): Blockzustände, Knopftexte, Sperren im Betrieb, Host-Etikett, Statuszeilenfelder (tatsächliche Ports; nur VERBUNDEN, nie versuchende Clients/Datei), Konfiguration `schnittstellen:` und Wiederaufnahme (§7.4a), Maschinenwechsel; echte Loopback-Sockets mit freien Ports. Aufräumen siehe `_zu()` (Zeitgeber + Fokusfilter stilllegen, sonst wird die Datei mit jedem Fenster langsamer) |
 | `test_serial_pyserial.py` | Interop (AP-S8): pyserial `rfc2217://` gegen den Emulator-Server — Echo-Gast über die BIOS-Sprungleiste, Bytes beidseitig, Baud (Gast maßgeblich), Steuerleitungen gekreuzt, RTS-Halt. Ohne `pyserial` übersprungen |
 | `test_programme.py` | Nachbarprogramme starten (`app/programme.py`): Befehlszeile, Abkopplung, Startdatei der Werkzeugkonsole, Werkzeugmenü beider Oberflächen |
+| `test_z80_disasm.py` | `tools/z80_disasm2.py` (Entwurf 40 W1–W3): alle Opcodes gegen eine unabhängige Längentabelle (Undokumentiertes ⇒ `DB`), Rundlauf `--format mac` → M80/LINKMT → bytegleich (sertest, romread, gesamter Befehlsraum; ohne CP/M-Werkzeugkette übersprungen), Karten-/Segmentfälle, Quelle von `mutos_io` aus Abzug + `karte.txt` |
 
 ## Laufzeitregeln für neue Python-Tests
 

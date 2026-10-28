@@ -714,6 +714,13 @@ PC-Gegenstelle (`app/pcmc.py`, Kasten `app/ui/pcmc_widget.py`, Aktion *Maschine 
 nur an der ASP-CTC, EPROM-Segmente, Kassettentakt-Annahmen, MC80.2x-Zeitmodell und RETI-Verteilung, offene Fragen).
 Plan: `doc/design/31_mc80.md`.
 
+## mutos_io (U880-Seite von MUTOS 8000) - Quelle und Pipeline (Entwurf 40, 2026-10-27)
+
+`tools/mutos8000/mutos_io/src/mutosio.mac` ist die **kommentierte, wieder assemblierbare Quelle** des UDOS-Programms `mutos_io` (Master; baut bytegleich zur Originaldatei).
+Weg einer Aenderung: Quelle aendern -> `build.py` -> `ladediskette.py diskette ...` -> im Emulator pruefen (`tests/python/test_mutos_io_pipeline.py` geht ihn mit einer Textaenderung ab).
+Variante 8 x 512 per `K8X512`-Schalter (Beweis gegen `mutos_patch.py io-8x512`). **Vor Arbeiten daran: `tools/mutos8000/mutos_io/README.md` und `doc/merkposten/mutos_io.md` lesen**;
+Semantik am Emulator belegt: `doc/merkposten/mutos_io_analyse.md`. Es gibt nur EINEN Z80-Disassembler: `tools/z80_disasm2.py` (`--format mac --karte`) - nicht noch einen schreiben.
+
 ## Boot-ROM debugging workflow
 
 Der volle CP/A-Kaltstart läuft (Boot-ROM → SYL-Lader → Zweitlader → CP/A-Bootsystem →
