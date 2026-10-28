@@ -33,8 +33,15 @@ constexpr size_t kFirstbl = 0x80;
 /// @brief Die 9 Datenrecords der DIRECTORY einer frisch formatierten Diskette —
 ///        woertlich aus Handbuch §1.2.1 (Interleave 5 innerhalb der ersten 16 Sektoren).
 constexpr uint8_t kDirRecords[] = {0x05, 0x0A, 0x0F, 0x04, 0x09, 0x0E, 0x03, 0x08, 0x0D};
+/// @brief Die Datenrecords der DIRECTORY unter **UDOS 5.0** (A5120): fuenf, Lage wie auf
+///        der Originaldiskette (Spur 16H).  Anders als oben, weil die Sektoren 07–09 den
+///        zweiten Bootteil tragen (@ref Udos1715FileSystem::zweiterBootteil).
+constexpr uint8_t kDirRecords50[] = {0x05, 0x0A, 0x01, 0x06, 0x0B};
 /// @brief Zeigersektor der DIRECTORY (§1.2.1).
 constexpr uint8_t kDirPointerBlock = 0x02;
+
+/// @brief UDOS 5.0 am A5120 — erkannt an der FFH-Fuellung hinter dem Belegungsplan.
+bool istUdos50(const FsProfile& p) { return p.ndos_fill == "ff"; }
 
 uint16_t le16(const uint8_t* p) { return static_cast<uint16_t>(p[0] | (p[1] << 8)); }
 void     put16(uint8_t* p, uint16_t v) {
@@ -151,6 +158,15 @@ bool Udos1715FileSystem::looksLikeUdos1715(const SectorSpace& space, const FsPro
         return sag(err);
     if (!b.looksValid(spt, 0, why)) return false;
 
+    // Welcher Rechner: allein die Fuellung hinter dem Plan (158H…176H) unterscheidet
+    // PC 1715 / P8000 / A5120 — ohne diese Probe waeren die drei Profile mehrdeutig.
+    if (!prof.ndos_fill.empty()) {
+        const char* ist = ndosFuellungKuerzel(ndosFuellung(b.raw()));
+        if (prof.ndos_fill != ist)
+            return sag(std::string("Spur 17H Sektor 0, Bytes 158H-176H: Fuellung ") + ist
+                       + ", Profil verlangt " + prof.ndos_fill);
+    }
+
     // Zweite, unabhaengige Probe: der Descriptor der Verzeichnisdatei liegt fest auf
     // Spur 16H Sektor 00 und weist sich als Typ D mit Recordlaenge 100H aus, und sein
     // FIRSTBL zeigt in die Verzeichnisspur (§2/§5).
@@ -166,6 +182,14 @@ bool Udos1715FileSystem::looksLikeUdos1715(const SectorSpace& space, const FsPro
     const UdosPointer firstbl = UdosPointer::fromBytes(sec.data.data() + kFirstbl);
     if (firstbl.track != prof.directory_track || firstbl.sector_index >= spt)
         return sag("FIRSTBL des Verzeichnisses zeigt nicht in die Verzeichnisspur");
+    return true;
+}
+
+bool Udos1715FileSystem::zweiterBootteil(const FsProfile& prof, uint8_t& erster,
+                                         uint8_t& anzahl) {
+    if (!istUdos50(prof)) return false;
+    erster = 0x07;
+    anzahl = 3;
     return true;
 }
 
@@ -639,10 +663,22 @@ bool Udos1715FileSystem::appendDirEntry(const std::string& name, bool secret,
     if (kette.empty()) return fail("Verzeichnisdatei hat keinen einzigen Record");
 
     const size_t noetig = 3 + name.size();      // Flagbyte + Name + Zeiger
-    UdosPointer  ziel   = kette.back();
 
     // §4: „Passt eine Dateieintragung nicht mehr in einen DIRECTORY-Record, so erfolgt
-    // die Eintragung VOLLSTAENDIG in den naechsten Record."
+    // die Eintragung VOLLSTAENDIG in den naechsten Record."  Das Verzeichnis fuellt sich
+    // also VON VORN, ohne leere Saetze dazwischen: Ziel ist der letzte Satz mit
+    // Eintraegen (bzw. der erste), passt es dort nicht, der Satz dahinter.  Frueher ging
+    // jeder Eintrag in den LETZTEN Satz der Kette — `CAT` stoert das nicht (es liest alle
+    // Saetze), der Urlader von UDOS 5.0 aber hoert am ersten leeren Satz auf und findet
+    // `OS` nicht: Kaltstart mit ERROR 45 (doc/udos1715_diskettenformat.md §4).
+    size_t idx = 0;
+    for (size_t i = 0; i < kette.size(); ++i) {
+        std::vector<uint8_t> s;
+        if (!readSector(kette[i], s)) return false;
+        if (!s.empty() && s[0] != 0xFF && s[0] != 0x00) idx = i;
+    }
+    UdosPointer ziel = kette[idx];
+
     auto passtIn = [&](const std::vector<uint8_t>& satz, size_t& ende) {
         ende = 0;
         while (ende < satz.size() && satz[ende] != 0xFF) {
@@ -658,6 +694,10 @@ bool Udos1715FileSystem::appendDirEntry(const std::string& name, bool secret,
     if (!readSector(ziel, satz)) return false;
 
     size_t ende = 0;
+    if (!passtIn(satz, ende) && idx + 1 < kette.size()) {
+        ziel = kette[idx + 1];                  // der naechste (noch leere) Satz der Kette
+        if (!readSector(ziel, satz)) return false;
+    }
     if (!passtIn(satz, ende)) {
         if (!growDirectory(ziel)) return false;
         if (!readSector(ziel, satz)) return false;
@@ -932,23 +972,42 @@ bool Udos1715FileSystem::setAttributes(const std::string& name, const UdosAttrs&
 // ─── Anlegen ─────────────────────────────────────────────────────────────────
 
 bool Udos1715FileSystem::mkfs() {
-    bitmap_ = UdosBitmap::makeEmpty(secs_per_track_, tracks_, label_, UdosMapSitte::Ndos1715);
+    const NdosFuellung fuell = prof_.ndos_fill == "77" ? NdosFuellung::Nachlauf77
+                             : prof_.ndos_fill == "ff" ? NdosFuellung::FF : NdosFuellung::Null;
+    bitmap_ = UdosBitmap::makeEmpty(secs_per_track_, tracks_, label_, UdosMapSitte::Ndos1715,
+                                    fuell);
+
+    // Satzlage der DIRECTORY: Handbuch §1.2.1, unter UDOS 5.0 die der Originaldiskette.
+    const bool u50 = istUdos50(prof_);
+    const std::vector<uint8_t> saetze = u50
+        ? std::vector<uint8_t>(std::begin(kDirRecords50), std::end(kDirRecords50))
+        : std::vector<uint8_t>(std::begin(kDirRecords), std::end(kDirRecords));
 
     // Die 13 festen Sektoren aus §2 — und auf einer Systemdiskette Spur 0 dazu.
     bitmap_.setUsed(prof_.directory_track, 0 + 1, true);                  // Descriptor
     bitmap_.setUsed(prof_.directory_track, kDirPointerBlock + 1, true);   // Zeigersektor
-    for (uint8_t s : kDirRecords) bitmap_.setUsed(prof_.directory_track, s + 1, true);
+    for (uint8_t s : saetze) bitmap_.setUsed(prof_.directory_track, s + 1, true);
     bitmap_.setUsed(prof_.bitmap_track, 0 + 1, true);
     bitmap_.setUsed(prof_.bitmap_track, 1 + 1, true);
     if (prof_.system_track0)
         for (uint8_t s = 0; s < secs_per_track_; ++s) bitmap_.setUsed(0, s + 1, true);
+    // UDOS 5.0 fuehrt Verzeichnis- und Planspur GANZ als belegt (so die Originaldiskette):
+    // dort liegt der zweite Bootteil (Sektor 07–09), und das Verzeichnis waechst dort.
+    // Spur 0 Kopf 0 (Urlader + BFOS) ebenso — ohne sie gibt es keinen Kaltstart.
+    if (u50) {
+        for (uint8_t s = 0; s < secs_per_track_; ++s) {
+            bitmap_.setUsed(prof_.directory_track, s + 1, true);
+            bitmap_.setUsed(prof_.bitmap_track, s + 1, true);
+        }
+        for (uint8_t s = 0; s < 16 && s < secs_per_track_; ++s) bitmap_.setUsed(0, s + 1, true);
+    }
 
     const UdosPointer descriptor = directoryDescriptor();
     const UdosPointer zeiger{kDirPointerBlock, prof_.directory_track};
 
-    // Alle 9 Records leer anlegen; der erste traegt den Eintrag der Verzeichnisdatei
+    // Alle Records leer anlegen; der erste traegt den Eintrag der Verzeichnisdatei
     // selbst — geheim, Typ D, genau wie auf dem Referenzdatentraeger.
-    for (size_t i = 0; i < sizeof(kDirRecords); ++i) {
+    for (size_t i = 0; i < saetze.size(); ++i) {
         std::vector<uint8_t> satz(kSector, 0x00);
         if (i == 0) {
             const std::string name = "DIRECTORY";
@@ -961,15 +1020,15 @@ bool Udos1715FileSystem::mkfs() {
         } else {
             satz[0] = 0xFF;
         }
-        if (!writeSector(UdosPointer{kDirRecords[i], prof_.directory_track}, satz))
+        if (!writeSector(UdosPointer{saetze[i], prof_.directory_track}, satz))
             return false;
     }
 
-    // Zeigersektor der Verzeichnisdatei: Descriptor + die 9 Records.
+    // Zeigersektor der Verzeichnisdatei: Descriptor + die Records.
     {
         Udos1715PointerBlock blk;
         blk.entries.push_back(descriptor);
-        for (uint8_t s : kDirRecords)
+        for (uint8_t s : saetze)
             blk.entries.push_back(UdosPointer{s, prof_.directory_track});
         blk.back    = descriptor;
         blk.forward = UdosPointer{};
@@ -978,13 +1037,13 @@ bool Udos1715FileSystem::mkfs() {
 
     // Descriptor der Verzeichnisdatei.
     std::vector<uint8_t> h(kSector, 0x00);
-    const UdosPointer erster{kDirRecords[0], prof_.directory_track};
-    const UdosPointer letzter{kDirRecords[sizeof(kDirRecords) - 1], prof_.directory_track};
+    const UdosPointer erster{saetze.front(), prof_.directory_track};
+    const UdosPointer letzter{saetze.back(), prof_.directory_track};
     h[0x06] = erster.sector_index;  h[0x07] = erster.track;   // Eintrag im 1. Record
     h[0x08] = erster.sector_index;  h[0x09] = erster.track;
     h[0x0A] = letzter.sector_index; h[0x0B] = letzter.track;
     h[0x0C] = 0x40;                                           // Typ D
-    put16(h.data() + 0x0D, static_cast<uint16_t>(sizeof(kDirRecords)));
+    put16(h.data() + 0x0D, static_cast<uint16_t>(saetze.size()));
     put16(h.data() + 0x0F, static_cast<uint16_t>(kSector));
     put16(h.data() + 0x11, 0);                                // wie auf der Referenz
     h[0x13] = 0xF0;                                           // WELS

@@ -83,7 +83,7 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
                         "containers", "detect_rank", "detect", "leer", "boot_header", "dir_boot", "nur_boot",
                         "block_size", "dir_entries", "skew", "max_blocks", "os",
                         "sides_separate", "boot_track", "directory_track",
-                        "bitmap_track", "usable_tracks", "unix_layout", "aliases"},
+                        "bitmap_track", "usable_tracks", "unix_layout", "aliases", "ndos_fill"},
                        where, issues);
 
     // ── name (Pflicht) ──
@@ -320,6 +320,15 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
             } else {
                 out.system_track0 = b;
             }
+        }
+        if (const yaml::Node* n = node.find("ndos_fill")) {
+            const std::string w = n->isScalar() ? n->scalar : "";
+            if (w != "00" && w != "77" && w != "ff")
+                { why = "'ndos_fill' muss \"00\", \"77\" oder \"ff\" sein"; return false; }
+            if (out.type != FsType::Udos1715)
+                issues.push_back(where + ": 'ndos_fill' gilt nur fuer type: udos1715 - ignoriert");
+            else
+                out.ndos_fill = w;
         }
         // Bei UDOS1715 ist die Spur der ganze Zylinder — zwei getrennte Seiten gibt es
         // dort nicht (doc/udos1715_diskettenformat.md §1.1).

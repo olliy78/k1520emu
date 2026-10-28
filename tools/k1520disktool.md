@@ -409,8 +409,8 @@ eine gewöhnliche Dateidiskette.  Das Bootabbild wird vor dem Schreiben geprüft
 Selbstprüfung bzw. Kennung „BCU 880“):
 
 ```sh
-k1520disktool create start.hfe  --fs bcu880_syl --boot disks/bootsektoren/boot_bcu12_syl_k7023.bin   # K7024: …_k7024.bin
-k1520disktool create arbeit.hfe --fs bcu880     --boot disks/bootsektoren/boot_bcu12_ohnesyl.bin
+k1520disktool create start.hfe  --fs bcu880_syl --boot data/bootsektoren/boot_bcu12_syl_k7023.bin   # K7024: …_k7024.bin
+k1520disktool create arbeit.hfe --fs bcu880     --boot data/bootsektoren/boot_bcu12_ohnesyl.bin
 k1520disktool put arbeit.hfe PIP.COM STAT.COM
 ```
 
@@ -422,7 +422,7 @@ Die Systemspuren des K8915 sind Zylinder 0–1 beidseitig (5×1024, 20480 B) mit
 CP/A-Datendiskette ab Zylinder 0 (keine Systemspuren):
 
 ```sh
-k1520disktool boot-get disk900.hfe boot.bin                  # oder disks/bootsektoren/boot_scpx8915_55k.bin
+k1520disktool boot-get disk900.hfe boot.bin                  # oder data/bootsektoren/boot_scpx8915_55k.bin
 k1520disktool create neu.hfe --fs scpx8915 --boot boot.bin   # .img geht ebenso
 k1520disktool put neu.hfe auszug                             # Systemprogramme (DISGEN, FORMAT …)
 # eine mit FORMAT.COM formatierte Diskette nachträglich bootfähig machen:
@@ -432,7 +432,7 @@ k1520disktool boot-put formatiert.hfe boot.bin --fs scpx8915
 Ein Abbild ohne gültigen Ladekopf — etwa ein CP/A-Abbild des A5120 — oder kürzer als
 der Ladekopf verlangt (12 Sektoren) wird **abgewiesen**, bevor etwas geschrieben wird;
 dasselbe gilt für `boot-put` auf eine Diskette, die schon einen K8915-Ladekopf trägt.
-Fertige Abbilder: `disks/bootsektoren/boot_scpx8915_55k.bin` (BIOS „55 K“), `…_v24.bin` (V24 XON/XOFF).
+Fertige Abbilder: `data/bootsektoren/boot_scpx8915_55k.bin` (BIOS „55 K“), `…_v24.bin` (V24 XON/XOFF).
 
 Ein **kürzeres** Abbild ist erlaubt (der Rest bleibt formatierte Leerspur), ein
 **längeres** ist ein Fehler — und zwar bevor irgendetwas angelegt wird:
@@ -841,6 +841,15 @@ $ k1520disktool put    neu.img auszug/
 | `udos1715` | 80 Spuren doppelseitig, 16×256 | 640 KB |
 | `udos1715_ss80` | 80 Spuren einseitig, 16×256 | 320 KB |
 | `udos1715_ss40` | 40 Spuren einseitig, 16×256 | 160 KB |
+| `udos_p8000` | wie `udos1715`, Füllung des **P8000** (UDOS 2.2) | 640 KB |
+| `udos50` | wie `udos1715`, Füllung des **A5120 unter UDOS 5.0** | 640 KB |
+
+Die drei 640-KB-Profile beschreiben dieselbe Diskette.  Unterschieden werden sie an
+**einer** Stelle: Spur 17H (23), Sektor 0 — dem ersten Sektor des Belegungsplans —,
+Bytes 158H…176H zwischen den 80 Spureinträgen und dem „belegt"-Zähler.  Der PC 1715
+füllt sie mit `00`, der P8000 mit `00 00 00 00` + 27 × `77H`, UDOS 5.0 mit `FFH`
+(Katalogfeld `ndos_fill`).  `ls`/`info` nennen deshalb den Rechner, und `create` schreibt
+die Füllung des gewählten Profils.
 
 Voller Aufbau: `doc/udos1715_diskettenformat.md` — er stammt aus dem Handbuch, das
 auf so einer Diskette selbst liegt (`UDOS.TEXT`).

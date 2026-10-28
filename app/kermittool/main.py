@@ -28,11 +28,13 @@ if "--paths" in sys.argv[1:]:
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
+from app.ui_dateidialoge import qt_dateidialoge
 
 from app.kermittool.ui.main_window import MainWindow
 
 
 def main() -> int:
+    qt_dateidialoge()               # Qts eigene Dateidialoge (app/ui_dateidialoge.py)
     app = QApplication(sys.argv)
     app.setOrganizationName("k1520emu")
     app.setApplicationName("K1520 Kermit")

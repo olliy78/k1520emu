@@ -189,6 +189,7 @@ TEST(FsCheckKeineFalschmeldungen, JedeUnversehrteFixturePrueftOhneBefund) {
         // schweigen, und genau das wird hier mitgeprueft.
         "udos_boot_scp.hfe",            "udos_ds77_k5601_fremdsync.hfe",
         "udos1715_640k_pc1715_system.img", "udosP8000_640k_wega.hfe",
+        "udos50_640k_a5120_system.img",
     };
 
     for (const char* name : disketten) {
@@ -956,6 +957,7 @@ TEST(FsCheckGegenprobe, DerAusgelieferteKatalogIstEindeutig) {
         "scpx17_cpa780_k5601.hfe",      "scpx17_5x1024_k5601_hardy_norm.hfe",
         "scp1700_640k_a7100_system.hfe",
         "udos_boot_scp.hfe",            "udos1715_640k_pc1715_system.img",
+        "udos50_640k_a5120_system.img",
         // K8915 (AP-E5a): `scpx8915` steht mit `detect: false` im Katalog und darf
         // die drei Systemdisketten nicht mehrdeutig machen.
         "k8915scpx_boot1.hfe",
@@ -2221,5 +2223,49 @@ TEST(FsCheckKeineFalschmeldungen, EineErkannteDisketteHatKeineBefundeDerEbene0) 
         const FsCheckReport& r = v->check(FsCheckLevel::Schnell, true);
         for (const FsFinding& f : r.findings)
             EXPECT_NE(FsLayer::Erkennung, f.layer) << name << ": " << f.id;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NDOS: drei Rechner, ein Dateisystem — getrennt an EINER Stelle (2026-10-28)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// PC 1715, P8000 und A5120 (UDOS 5.0) legen ihre Disketten Feld fuer Feld gleich an;
+// verschieden ist nur die Fuellung hinter dem Belegungsplan (Spur 17H Sektor 0, Bytes
+// 158H…176H: 00 / 77H / FFH).  Daran haengen die drei Profile `udos1715`, `udos_p8000`,
+// `udos50` — jede Diskette muss genau EINES treffen, sonst waere die Anzeige geraten.
+
+/// @test Die drei echten Disketten werden als ihr Rechner erkannt, jeweils eindeutig.
+TEST(NdosSitte, DreiRechnerWerdenAnDerFuellungUnterschieden) {
+    const std::pair<const char*, const char*> faelle[] = {
+        {"udos1715_640k_pc1715_system.img", "udos1715"},
+        {"udosP8000_640k_wega.hfe",         "udos_p8000"},
+        {"udos50_640k_a5120_system.img",    "udos50"},
+    };
+    for (const auto& [datei, profil] : faelle) {
+        auto v = oeffne(fixture(datei));
+        ASSERT_TRUE(v) << datei;
+        EXPECT_EQ(v->detection().filesystem, profil) << datei;
+        EXPECT_TRUE(v->detection().unambiguous)
+            << datei << ": auch moeglich " << v->detection().alternatives.size();
+    }
+}
+
+/// @test `create --fs <profil>` schreibt die Fuellung seines Rechners — die frische
+///       Diskette wird beim Oeffnen wieder als DIESER Rechner erkannt.
+TEST(NdosSitte, AngelegteDisketteTraegtDieFuellungIhresRechners) {
+    for (const char* profil : {"udos1715", "udos_p8000", "udos50"}) {
+        const std::string pfad = k1520test::tempPath(std::string("k1520_ndos_") + profil + ".img");
+        struct Weg { std::string p; ~Weg() { std::error_code e; std::filesystem::remove(p, e); } }
+            weg{pfad};
+        {
+            std::string err;
+            auto neu = DiskVolume::create(pfad, profil, "SITTE", formate(), dateisysteme(), err);
+            ASSERT_TRUE(neu) << profil << ": " << err;
+        }
+        auto v = oeffne(pfad);
+        ASSERT_TRUE(v) << profil;
+        EXPECT_EQ(v->detection().filesystem, profil);
+        EXPECT_TRUE(v->detection().unambiguous) << profil;
     }
 }

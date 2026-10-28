@@ -19,9 +19,9 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 import diskbau as db  # noqa: E402
 
-V6 = db.Diskette(__file__, 'pc1715_scp1715_v0006_system.hfe', fs='scp1715', boot='bootabbild_v0006.bin')
-V7 = db.Diskette(__file__, 'pc1715_scp1715_v0007_system.hfe', fs='scpx640', boot='bootabbild_v0007.bin')
-CPZ = db.Diskette(__file__, 'pc1715_cpz22_system.hfe', fs='scpx640', boot='bootabbild_cpz22.bin')
+V6 = db.Diskette(__file__, 'pc1715_scp1715_v0006_system.hfe', fs='scp1715', boot='boot_pc1715_scp1715_v0006.bin')
+V7 = db.Diskette(__file__, 'pc1715_scp1715_v0007_system.hfe', fs='scpx640', boot='boot_pc1715_scp1715_v0007.bin')
+CPZ = db.Diskette(__file__, 'pc1715_cpz22_system.hfe', fs='scpx640', boot='boot_pc1715_cpz22.bin')
 HIER = V6.hier
 
 GEMEINSAM_SCP = ('TP.COM', 'TPHT.OVR', 'TPOVLY1.OVR', 'TPDRUCK.OVR', 'TPINSCPA.COM', 'WM.COM', 'DIENST.COM', 'BASIC.COM',

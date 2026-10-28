@@ -335,7 +335,7 @@ Stand 2026-10-16.  Wächter: `BootIntegrationBcu.LieferdisketteBootetImModellBcu
 
 | Datei in `disks/` | Herkunft |
 |-------------------|----------|
-| `a5120_bcu/a5120_bcu12_k5600-10_start-syl.hfe` | seit §11 **gebaut**: `create --fs bcu880_syl --boot disks/bootsektoren/boot_bcu12_syl_k7023.bin`, zurückgewandelt = Beleg `satz2_SYL_auf_Spur1/disk.img` (vorher: `save-as … --fs cpa_auto`) (die Diskette trägt kein Dateisystem, das `--fs` braucht nur die Wandlung) |
+| `a5120_bcu/a5120_bcu12_k5600-10_start-syl.hfe` | seit §11 **gebaut**: `create --fs bcu880_syl --boot data/bootsektoren/boot_bcu12_syl_k7023.bin`, zurückgewandelt = Beleg `satz2_SYL_auf_Spur1/disk.img` (vorher: `save-as … --fs cpa_auto`) (die Diskette trägt kein Dateisystem, das `--fs` braucht nur die Wandlung) |
 | `a5120_bcu/a5120_bcu12_k5600-10_arbeit-sys1.hfe` | Beleg `satz2_OhneSYL.1/disk.img` („SYS1“), `save-as` (CP/M erkannt) |
 | `a5120_bcu/bcu_kassette_formatiert.k52` | im Lauf von `BcuKassette.FormatiertSchreibtLiest` nach `B:INIT` (Gerät 2) mit `K1520_BEISPIELBAND=<pfad>` geschrieben: Seite A ein Block = Bandmarke `AA 00 00 AA`, 134 392 µm hinter dem Bandanfang |
 | `a5120_bandtest/bandtest_boot.k52` | Kopie der Fixture `tests/fixtures/kassette/bandtest_boot.k52` — **Demo, Eigenbau** (`tools/kassette/bandtest/`) |
@@ -377,7 +377,7 @@ Verzeichnis ab Zylinder 2, und dort liegt bei dieser Diskette das System (§2). 
 
 | Profil | Aufbau | Erkennung | Bootabbild (`boot-get`/`boot-put`/`create --boot`) |
 |---|---|---|---|
-| `bcu880_syl` | Zylinder 0 leer, **1 = SYL-Lader** (6 Sektoren), 2–4 = System; **kein Dateibereich** (`nur_boot`) | automatisch, **SYL-Lader als positiver Nachweis** (Kennung + CRC 0407–06FD gegen 06FE/06FF) | 5 Zylinder = 16 640 B (`disks/bootsektoren/boot_bcu12_syl_k7023.bin`, `…_k7024.bin`) |
+| `bcu880_syl` | Zylinder 0 leer, **1 = SYL-Lader** (6 Sektoren), 2–4 = System; **kein Dateibereich** (`nur_boot`) | automatisch, **SYL-Lader als positiver Nachweis** (Kennung + CRC 0407–06FD gegen 06FE/06FF) | 5 Zylinder = 16 640 B (`data/bootsektoren/boot_bcu12_syl_k7023.bin`, `…_k7024.bin`) |
 | `bcu880` | System auf Zylinder 0–1 („ohne SYL“, so schreibt es SYSGEN), Dateisystem ab Zylinder 2 | nur `--fs bcu880` (`detect: false`; die Diskette liest die Erkennung ohnehin als `cpa_auto`) | 2 Zylinder = 6 656 B (`boot_bcu12_ohnesyl.bin`) |
 
 - **Eine Startdiskette trägt keine Dateien** (`FsProfile::nur_boot`): `put`/`rm`/`attr`/`mkdir`/Rettung
@@ -389,11 +389,11 @@ Verzeichnis ab Zylinder 2, und dort liegt bei dieser Diskette das System (§2). 
   (Offset 5/6 = Bytes ab Zylinder 2); `bcu880` verlangt die Kennung „BCU 880“. Ein CP/A-Bootabbild, ein
   „ohne SYL“-Abbild auf einer Startdiskette oder ein beschädigter Lader gibt eine Diskette, die heil
   aussieht und nicht startet — deshalb Ablehnung, und `create` legt dann **nichts** an.
-- **Bau:** `k1520disktool create neu.hfe --fs bcu880_syl --boot disks/bootsektoren/boot_bcu12_syl_k7023.bin`
+- **Bau:** `k1520disktool create neu.hfe --fs bcu880_syl --boot data/bootsektoren/boot_bcu12_syl_k7023.bin`
   ergibt die ausgelieferte Startdiskette **sektorgleich** zum Beleg (Wächter
   `DisktoolBcu.BautDieStartdisketteSektorgleichNach`). K7023 (64×16, Satz 2) und K7024 (80×24, Satz 1)
   unterscheiden sich im Bildtreiber, nicht im Aufbau; das Abbild entscheidet, welches Gerät es bedient.
-  Arbeitsdiskette: `create arbeit.hfe --fs bcu880 --boot disks/bootsektoren/boot_bcu12_ohnesyl.bin`, dann
+  Arbeitsdiskette: `create arbeit.hfe --fs bcu880 --boot data/bootsektoren/boot_bcu12_ohnesyl.bin`, dann
   `put` — von BCU gelistet, Warmstart (`^C`) von ihr geht (`DisktoolBcu.GebauteDisketteBootetUndListetDieDateien`).
 - **Packaging:** `tools/bcu_a5120/build.py` (von `packaging/build_payload.sh` für die Beispieldisketten
   vorausgesetzt, Wächter `cli_bcu_a5120`) **baut** die Startdiskette jetzt aus dem Bootabbild mit
@@ -427,7 +427,7 @@ Puffer ab 0900H); Laufwerke nur A–D.
 **EIGENBAU, kein Beleg und nicht am Gerät erprobt** — im Emulator nachgewiesen
 (`DisktoolBcu.KombidisketteBootetUndArbeitet`). Frage war, ob eine einseitige 40-Spur-Diskette zugleich
 startet und Dateien trägt. Ja, mit zwei Änderungen am System der Startdiskette (`tools/bcu_kombi_bau.py`,
-Bootabbild 5 Zylinder, `disks/bootsektoren/boot_bcu12_kombi_k7023.bin` bzw. `_k7024.bin`):
+Bootabbild 5 Zylinder, `data/bootsektoren/boot_bcu12_kombi_k7023.bin` bzw. `_k7024.bin`):
 
 1. **Verzeichnis hinter das System (Zylinder 5).** Das BIOS legt A:–D: auf eine gemeinsame Tabelle (DPB EC82H,
    40 Spuren, OFF 2). Die zweite Tabelle EC73H (80 Spuren) ist im Original **unbenutzt** (kein Laufwerkskopf
@@ -448,7 +448,7 @@ geänderten Tabelle (EC3DH → EC73H, OFF = 5 bei Ladeadresse D680H). Das Bootab
 `bcu880_kombi` (oder umgekehrt) wird abgewiesen.
 
 ```sh
-k1520disktool create kombi.hfe --fs bcu880_kombi --boot disks/bootsektoren/boot_bcu12_kombi_k7023.bin
+k1520disktool create kombi.hfe --fs bcu880_kombi --boot data/bootsektoren/boot_bcu12_kombi_k7023.bin
 k1520disktool put kombi.hfe datei.txt            # liegt ab Zylinder 5; BCU sieht sie in A:
 ```
 

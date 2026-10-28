@@ -53,6 +53,9 @@ ENV_DEFAULT_CONFIG = "K1520_DEFAULT_CONFIG"   # Auslieferungskonfiguration (Date
 
 #: Name des Formatkatalogs (identisch mit ``kCatalogFileName`` im Kern).
 FORMATS_FILE = "formats.yaml"
+#: Katalog der hinterlegten Bootabbilder des DiskTools (Ticket #25).  Liegt neben dem
+#: Formatkatalog; die Abbilder selbst im Unterordner ``bootsektoren/`` daneben.
+BOOTSEKTOR_FILE = "bootsektor.yaml"
 
 #: Name der mitgelieferten Auslieferungskonfiguration des A5120 Emulators
 #: (``data/default_config_a5120.yaml`` im Quellbaum, ``share/k1520emu/`` in einer
@@ -275,6 +278,39 @@ def formats_file() -> Optional[Path]:
         if p.is_file():
             return p.resolve()
     return None
+
+
+# ─── Bootabbilder des DiskTools (Ticket #25) ────────────────────────────────
+
+def bootsektor_candidates() -> List[Path]:
+    """Mitgelieferter Bootabbild-Katalog: Installation vor Quellbaum.
+
+    Die ``.bin``-Dateien liegen im Ordner ``bootsektoren/`` NEBEN der gefundenen
+    Datei (``share/k1520emu/bootsektoren`` bzw. ``data/bootsektoren``); Pfade im
+    Katalog sind relativ zu ihm.  Eine eigene Ergänzung des Anwenders steht
+    getrennt davon in :func:`bootsektor_user_file` — sie kommt HINZU, statt den
+    mitgelieferten Katalog zu ersetzen.
+    """
+    base = base_dir()
+    return [base / "share" / "k1520emu" / BOOTSEKTOR_FILE,   # Installation
+            base / "data" / BOOTSEKTOR_FILE]                 # Quellbaum
+
+
+def bootsektor_file() -> Optional[Path]:
+    """Erster existierender mitgelieferter Bootabbild-Katalog — oder ``None``."""
+    for p in bootsektor_candidates():
+        if p.is_file():
+            return p.resolve()
+    return None
+
+
+def bootsektor_user_file() -> Path:
+    """Ergänzungen des Anwenders: ``<config_dir>/bootsektor.yaml`` (muss nicht existieren).
+
+    Dieselbe Form wie der mitgelieferte Katalog; ``file:``-Pfade sind relativ zu
+    DIESER Datei (oder absolut).  Ein Update der Installation überschreibt sie nicht.
+    """
+    return config_dir() / BOOTSEKTOR_FILE
 
 
 # ─── Auslieferungskonfiguration ──────────────────────────────────────────────
@@ -751,6 +787,7 @@ def describe() -> str:
     except FileNotFoundError:
         kermit_lib = "NICHT GEFUNDEN"
     fmt = formats_file()
+    boot_kat = bootsektor_file()
     vorgabe = default_config_file()
     vorgabe_k8915 = default_config_file("default_config_k8915.yaml")
     vorgabe_prg710 = default_config_file("default_config_prg710.yaml")
@@ -768,6 +805,8 @@ def describe() -> str:
         f"Kernbibliothek:    {lib}",
         f"Kermit-Bibliothek: {kermit_lib}",
         f"Formatkatalog:     {fmt if fmt else 'NICHT GEFUNDEN (der Kern sucht weiter selbst)'}",
+        f"Bootabbilder:      {boot_kat if boot_kat else 'NICHT GEFUNDEN'}"
+        f" (+ {bootsektor_user_file()}, falls vorhanden)",
         f"Disketten (Paket): {bundled if bundled else '—'}",
         f"Disketten (Nutzer):{user_disks_dir()}",
         f"Dateien (DiskTool):{user_files_dir()}",

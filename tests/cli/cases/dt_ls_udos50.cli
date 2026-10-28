@@ -1,0 +1,7 @@
+# Drei Rechner, ein NDOS-Dateisystem: angezeigt wird der Rechner, erkannt an der Fuellung
+# hinter dem Belegungsplan (Spur 17H Sektor 0, Bytes 158H-176H = FFH bei UDOS 5.0).
+tool:   k1520disktool
+disk:   udos50_640k_a5120_system.img
+run:    ls %DISK%
+expect: Dateisystem: udos50 (erkannt)
+exit:   0

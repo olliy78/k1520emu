@@ -170,12 +170,14 @@ if len(CLI_DISKS) > _ANZAHL_LAUFWERKE:
     sys.exit(2)
 
 from PySide6.QtWidgets import QApplication
+from app.ui_dateidialoge import qt_dateidialoge
 from PySide6.QtCore import QTimer
 from app.ui.main_window import MainWindow
 
 
 def main():
     """Main entry point."""
+    qt_dateidialoge()               # Qts eigene Dateidialoge (app/ui_dateidialoge.py)
     app = QApplication(sys.argv)
 
     # Set application metadata

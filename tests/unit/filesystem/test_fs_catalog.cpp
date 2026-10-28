@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <string>
 
 #include "core/filesystem/fs_catalog.h"
@@ -81,6 +82,8 @@ TEST(FsCatalog, ProfilnamenSindEinStabilerVertrag) {
         // (MUTOS-Ladediskette, Entwurf 39 9.13).
         "udos_ss77_fm",
         "udos1715", "udos1715_ss80", "udos1715_ss40",
+        // dieselbe NDOS-Diskette, unterschieden nur an der Fuellung hinter dem Plan
+        "udos_p8000", "udos50",
         // CP/M-86 des A7100: eigener Eintrag, weil die CP/A-Regel hier NICHT gilt
         // (sie bildet das CP/A-BIOS nach, nicht das SCP1700).
         "scp1700",
@@ -245,7 +248,16 @@ TEST(FsCatalog, Udos1715ProfileSindImgFaehigUndEinseitigGezaehlt) {
         EXPECT_EQ(f->findTrack(0, 0)->bytes_per_sec, 256)
             << p.name << ": NDOS verlangt 256-B-Sektoren (Handbuch §1.1)";
     }
-    EXPECT_EQ(gefunden, 3) << "die drei Formate aus Handbuch §1.2";
+    // Die drei Formate aus Handbuch §1.2 — und fuer das 640K-Format zwei weitere Profile
+    // (P8000, UDOS 5.0 am A5120), die sich nur in `ndos_fill` unterscheiden.
+    EXPECT_EQ(gefunden, 5);
+    std::map<std::string, std::string> fuellung;
+    for (const auto& p : cat.profiles())
+        if (p.type == FsType::Udos1715 && p.format == "k5601_16x256") fuellung[p.name] = p.ndos_fill;
+    const std::map<std::string, std::string> soll = {
+        {"udos1715", "00"}, {"udos_p8000", "77"}, {"udos50", "ff"}};
+    EXPECT_EQ(fuellung, soll) << "jedes 640K-NDOS-Profil braucht eine EIGENE Fuellung, "
+                                 "sonst ist die Erkennung mehrdeutig";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

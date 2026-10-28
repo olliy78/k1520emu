@@ -1407,6 +1407,9 @@ def test_payload_enthaelt_alles_zum_starten(payload):
         "payload/app/main.py", "payload/app/paths.py",
         "payload/app/core_binding/k1520.py", "payload/app/ui/main_window.py",
         "payload/share/k1520emu/formats.yaml",
+        # Bootabbilder des DiskTools (Ticket #25): ohne sie bleibt „Bootdiskette erstellen" grau.
+        "payload/share/k1520emu/bootsektor.yaml",
+        "payload/share/k1520emu/bootsektoren/boot_cpa780.bin",
         # Ohne die Auslieferungskonfiguration geht der Emulator nach der
         # Erstinstallation in den eingebauten Vorgaben auf (kein Absturz, aber
         # eine andere Oberflaeche als die gewollte) und *Ansicht > Standard

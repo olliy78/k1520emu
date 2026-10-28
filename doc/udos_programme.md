@@ -305,3 +305,27 @@ UDOS-Maschinen **eine** Bootdiskette (A5120, PRG 710, PRG 710-1); die frühere E
   lädt `ADM_O2`) melden sich; `ASM TEST.S` → `LINK TEST.OBJ` erzeugt `TESTP`; `BASIC` rechnet `PRINT 2+3` → `5`.
   **Nicht geprüft:** ein Übersetzungslauf von `PLZSYS`/`PLZCG` mit echtem PL/Z-Quelltext, `SG` bis zum fertigen Kern,
   `SYD`/`EDI` im Einsatz, `TRANSFER` mit CP/M-Diskette. Neu bauen: `python3 tools/udos_a5120/build.py --tool build/k1520disktool`.
+
+## 8. UDOS 5.0 für den A5120 (`disks/a5120_udos50/a5120_udos50_k5601_system.hfe`, 2026-10-28)
+
+Eingegangen als `.img`/`.dmk`/`.cqm`/`.TD0` samt Verzeichnisliste des Absenders; Original und Liste in
+`tools/udos50_a5120/original/`. **Umgewandelt, nicht neu gebaut** (`build.py`, Wächter `cli_udos50_a5120`) — der
+DIRECTORY-Descriptor trägt Angaben, die das DiskTool nicht anlegt (`doc/udos1715_diskettenformat.md` §3.0a).
+Startbild „UDOS_5.0 … BIZ FmSZBw Schwerin", Diskette vom 19.03.1997, Verzeichnisvermerk „IMPLEMENTET BY MATTHIAS PAESZLER".
+
+- **Dateisystem:** NDOS wie PC 1715/P8000 (Profil `udos50`, an der FFH-Füllung hinter dem Plan erkannt), 80 × 2 × 16 × 256, 67 Dateien, 412 KB frei. `.img` vollständig
+  (sektorgleich mit der `.dmk`); Belegungsplan mit FFH-Nachlauf.
+- **Systemkern UDOS 5.0:** `OS`, `DDOS`, `ZDOS`, `FORMAT` (V 5.0), `COPY.DISK`, `SET`, `STATUS`, `REORG` (repariert den
+  Belegungsplan), `CAT`, `MOVE`, `COPY`, `COMPARE`, `EXTRACT`, `DELETE`, `RENAME`, `ERROR`, `DEBUG.OV`, `FILE.DEBUG`, `FIDE`,
+  `KEY`/`KEYLOAD`/`KEYSAVE`, `CODE`, `DATE`, `DATUM`, `IMAGE`, `IMAGE7800`, `LADT`, `MASTER`, `SPLIT`, `DOSBU`, `PRINT`/`PRINTER`,
+  `SCREEN 2.0` mit `OVR.DOCU`/`OVR.PROG`. `OS.INIT` zeigt das Startbild und belegt Tasten (0 = MOVE … 9 = X *).
+- **Kopplung/Treiber:** `WEGA`/`P8` (P8000-Remoteprogramm V 2.00, 18.12.89 — A5120 als Terminal an der P8000/WEGA, `TERM P81/P82`),
+  `P8T` (Tastaturanpassung), `X8` + `ASSDRIVER` (K8025 IFSS/Port 52 X5, 9600 Bd), `RD` (RAM-Floppy 256 K), `K6314`
+  (Druckeranpassung), `TELEX` + `FSM`/`FSM.1`/`FSM.DOK` (Fernschreibtreiber und Bedienprogramm, NVA 1989), `FSME`
+  (Fernschreib-Kopplung, UDOS 4.2/4.3), `VUEEIN` + `VUE.PAR` (Fachprogramm DPS-ATZ-65, Leitungsparameter).
+- **Spiele:** `MM` (Mastermind, 4 Ziffern, 13 Versuche), `CH`/`CHUS` + `CH.MEM` (Schach).
+- **Geprüft (2026-10-28, Emulator, Standard-A5120):** Kaltstart bis Datumsabfrage und `%`; `STATUS`, `CAT`, `MM`, `CH` (Brett),
+  `K6314`, `SCREEN`, `FSM` (aktiviert TELEX, Statuszeile mit Datum/Uhr) melden sich. `VUEEIN` startet mit verschobener
+  Bildaufteilung. **Nicht geprüft:** Zugeingabe bei `CH`, `WEGA`/`P8`/`X8` gegen eine Gegenstelle, `RD`, `FORMAT`.
+- **Bedienung:** Groß-/Kleinschreibung kommt nach dem Start **vertauscht** an (`status` ergibt `STATUS`); die Datumsfrage
+  von `DATE` nimmt deshalb nur ein kleines `y` an. Datum als `TTMMJJ`.

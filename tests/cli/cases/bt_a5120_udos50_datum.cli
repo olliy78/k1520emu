@@ -1,0 +1,9 @@
+# UDOS 5.0 am A5120 (BIZ Schwerin 1997): NDOS-Dateisystem auf 16x256 (Profil udos50) bootet
+# vom rohen Sektorabbild bis zur Datumsabfrage (~25 Mio. Takte).  Das .img braucht die Geometrie
+# von aussen; die Vorgabe cpa780 laesst den Urlader ins Leere laufen.
+tool:    boot_trace
+disk:    udos50_640k_a5120_system.img
+run:     --quiet --json -L /dev/null --format k5601_16x256 --until 'screen ~ "Neues Datum"' -c 100000000 %DISK%
+timeout: 120
+exit:    0
+expect:  "met":true

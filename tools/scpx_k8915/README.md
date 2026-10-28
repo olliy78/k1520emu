@@ -6,7 +6,7 @@ Diskette „901“; deren Handschrift-Name steht nicht mehr im Dateinamen, die D
 
 | Quelle | Inhalt |
 |--------|--------|
-| `bootabbild.bin` | Systemspuren (= `disks/bootsektoren/boot_scpx8915_v24.bin`) |
+| `bootabbild.bin` | Systemspuren (= `data/bootsektoren/boot_scpx8915_v24.bin`) |
 | `inhalt/` | von 901: `DISGEN` (Systemgenerator 1.9), `FORMAT`, `POWER`, **`RADE`** (RAM-Disk E: v 1.5, nutzt die zweiten 64 KB; Autostart); von 900: `PIP`, `STAT`, `SUBM`, `DUMP`, `SOFTKEY` |
 | `tools/scp_gemeinsam/` | TP 3.0, WM, DIENST, BASIC, PASCAL, M80/LINKMT/MLOAD/Z1/ZSID, RAMTEST, DIMA, UNERA, DISKCOPY |
 | Beigaben | SERTEST, RAFCPM, RAF512, LBREAD, LBPUNCH, RAFTEST, RAFQUICK |

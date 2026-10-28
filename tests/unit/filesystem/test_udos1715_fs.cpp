@@ -109,7 +109,7 @@ Diskette referenz() { return oeffne(fixture(kFixture)); }
 /// @brief Die P8000-Diskette; als `.hfe` bringt sie ihre Geometrie selbst mit.
 Diskette p8000(bool nur_lesen = true, const std::string& pfad = "") {
     Diskette d;
-    const FsProfile* p = dateisysteme().find("udos1715");
+    const FsProfile* p = dateisysteme().find("udos_p8000");
     if (!p) { d.error = "Dateisystem unbekannt"; return d; }
     const DiskFormat* f = formate().find(p->format);
     if (!f) { d.error = "Format unbekannt"; return d; }
@@ -792,7 +792,7 @@ TEST(Udos1715Segmente, ZuVieleSegmenteWerdenAbgewiesen) {
 // liegen bei ZDOS vor Offset 344 und damit hier mitten im Belegungsplan.
 
 TEST(Udos1715P8000, WegaStartdisketteWirdErkannt) {
-    const FsProfile* p = dateisysteme().find("udos1715");
+    const FsProfile* p = dateisysteme().find("udos_p8000");
     ASSERT_NE(p, nullptr);
     const DiskFormat* f = formate().find(p->format);
     ASSERT_NE(f, nullptr);
@@ -848,7 +848,7 @@ TEST(Udos1715P8000, HinterDemBelegungsplanStehtDerZdosNachlauf) {
 TEST(Udos1715P8000, KarteUndDateienStimmenSektorgenau) {
     Diskette d = p8000();
     ASSERT_TRUE(d) << d.error;
-    const FsProfile* prof = dateisysteme().find("udos1715");
+    const FsProfile* prof = dateisysteme().find("udos_p8000");
     ASSERT_NE(prof, nullptr);
 
     std::set<std::pair<int, int>> aus_karte;
@@ -1054,4 +1054,127 @@ TEST(Udos1715P8000, DerSystembereichBleibtUnangetastet) {
         ASSERT_TRUE(d.fs->bitmap().used(o.t, o.s))
             << "Spur " << int(o.t) << " Sektor " << int(o.s)
             << " gehoerte keiner Datei und wurde trotzdem vergeben";
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UDOS 5.0 am A5120 (BIZ FmSZBw Schwerin, 1997)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Ein A5120-UDOS, das NICHT das ZDOS des A5120 benutzt (Kontrollblock hinter der
+// Daten-CRC), sondern das NDOS des PC 1715 und der P8000 — Zeigersektoren, 16x256,
+// Verzeichnis 16H, Plan 17H.  Abweichend ist allein die Fuellung hinter dem
+// Belegungsplan: durchgehend 0xFF (= Spuren 80…87 belegt).  Bis 2026-10-28 war die
+// Diskette deshalb „kein gueltiger UDOS1715-Diskettenbelegungsplan“ und wurde als
+// leere scpx640 erkannt.  Quelle: tools/udos50_a5120/original/ (sektorgleich mit der
+// mitgelieferten .dmk).
+
+namespace {
+constexpr const char* kFixtureUdos50 = "udos50_640k_a5120_system.img";
+/// @brief Linearer Ort des DIRECTORY-Descriptors (Spur 16H Sektor 0) = Datei-Offset.
+constexpr uint64_t kUdos50Verzeichniskopf = 0x16u * 32u * 256u;
+}  // namespace
+
+TEST(Udos1715A5120, Udos50DisketteWirdErkannt) {
+    const FsProfile* p = dateisysteme().find("udos50");
+    ASSERT_NE(p, nullptr);
+    const DiskFormat* f = formate().find(p->format);
+    ASSERT_NE(f, nullptr);
+    auto disk = DiskImage::open(fixture(kFixtureUdos50), *f, true);
+    ASSERT_TRUE(disk);
+    SectorSpace raum(disk->medium(), *f);
+
+    std::string warum;
+    EXPECT_TRUE(Udos1715FileSystem::looksLikeUdos1715(raum, *p, &warum)) << warum;
+}
+
+TEST(Udos1715A5120, DatentraegerAngabenStimmen) {
+    Diskette d = oeffne(fixture(kFixtureUdos50), true, "udos50");
+    ASSERT_TRUE(d) << d.error;
+
+    const FsInfo i = d.fs->info();
+    EXPECT_EQ(i.label, "");
+    EXPECT_EQ(i.files, 67);
+    EXPECT_EQ(i.total_bytes, 80u * 32u * 256u);
+    EXPECT_EQ(i.used_bytes,  911u * 256u);
+    EXPECT_EQ(i.free_bytes, 1649u * 256u);
+    for (const auto& w : i.warnings) ADD_FAILURE() << "unerwartete Warnung: " << w;
+
+    // Stichproben gegen die Liste des Absenders (original/a5120-udos5.txt).
+    std::vector<uint8_t> os, init;
+    ASSERT_TRUE(d.fs->read("OS", os)) << d.fs->lastError();
+    EXPECT_EQ(os.size(), 5632u);
+    ASSERT_TRUE(d.fs->read("OS.INIT", init)) << d.fs->lastError();
+    const std::string text(init.begin(), init.end());
+    EXPECT_NE(text.find("UDOS_5.0"), std::string::npos);
+}
+
+TEST(Udos1715A5120, HinterDemBelegungsplanStehtDurchgehendFF) {
+    Diskette d = oeffne(fixture(kFixtureUdos50), true, "udos50");
+    ASSERT_TRUE(d) << d.error;
+    const std::vector<uint8_t>& roh = d.fs->bitmap().raw();
+    ASSERT_EQ(roh.size(), kUdosBitmapBytes);
+
+    EXPECT_EQ(d.fs->bitmap().sitte(), UdosMapSitte::Ndos1715);
+    for (size_t i = 344; i < 375; ++i) EXPECT_EQ(roh[i], 0xFF) << "Offset " << i;
+    EXPECT_EQ(d.fs->bitmap().storedUsed(),  911);
+    EXPECT_EQ(d.fs->bitmap().storedFree(), 1649);
+    EXPECT_EQ(d.fs->bitmap().countUsed(),   911);
+    EXPECT_EQ(d.fs->bitmap().countFree(),  1649);
+}
+
+TEST(Udos1715A5120, EinzelnesFFZwischenNullenIstKeineSitte) {
+    // Die FF-Sitte gilt nur DURCHGEHEND; ein einzelnes 0xFF ist weder PC 1715 (00)
+    // noch P8000 (77) noch UDOS 5.0 — das bleibt ein Ablehnungsgrund.
+    Diskette d = oeffne(fixture(kFixtureUdos50), true, "udos50");
+    ASSERT_TRUE(d) << d.error;
+    std::vector<uint8_t> roh = d.fs->bitmap().raw();
+    std::string warum;
+    ASSERT_TRUE(UdosBitmap::looksValid(roh, 32, 80, &warum, UdosMapSitte::Ndos1715)) << warum;
+
+    std::fill(roh.begin() + 344, roh.begin() + 375, 0x00);
+    ASSERT_TRUE(UdosBitmap::looksValid(roh, 32, 80, &warum, UdosMapSitte::Ndos1715)) << warum;
+    roh[350] = 0xFF;
+    EXPECT_FALSE(UdosBitmap::looksValid(roh, 32, 80, &warum, UdosMapSitte::Ndos1715));
+}
+
+TEST(Udos1715A5120, SchreibenLoeschenLaesstPlanUndVerzeichniskopfStehen) {
+    // Ein Rundlauf auf dem Original darf weder den Verzeichniskopf (ab 28H `01 20 50` + FF,
+    // dahinter „IMPLEMENTET BY …“ — das DiskTool legt ihn so nie an) noch den FF-Nachlauf
+    // des Plans anruehren.  Auf einer Kopie.
+    const std::string kopie = k1520test::tempPath("k1520_test_udos50.img");
+    std::error_code ec;
+    std::filesystem::copy_file(fixture(kFixtureUdos50), kopie,
+                               std::filesystem::copy_options::overwrite_existing, ec);
+    ASSERT_FALSE(ec) << ec.message();
+    struct Weg { std::string p; ~Weg() { std::error_code e; std::filesystem::remove(p, e); } }
+        weg{kopie};
+
+    Diskette d = oeffne(kopie, /*nur_lesen=*/false, "udos50");
+    ASSERT_TRUE(d) << d.error;
+
+    auto kopf = [&] {
+        std::vector<uint8_t> b(256);
+        EXPECT_TRUE(d.space->read(kUdos50Verzeichniskopf, b.data(), b.size()));
+        return std::vector<uint8_t>(b.begin() + 0x28, b.end());
+    };
+    const std::vector<uint8_t> kopf_vorher = kopf();
+    ASSERT_EQ(kopf_vorher[0], 0x01);
+    ASSERT_EQ(kopf_vorher[1], 0x20);
+    ASSERT_EQ(kopf_vorher[2], 0x50);
+    const std::vector<uint8_t> plan_vorher = d.fs->bitmap().raw();
+
+    const std::vector<uint8_t> inhalt = {'U', 'D', 'O', 'S', '5', 0x0D};
+    WriteOptions wo;
+    wo.udos_type = "A";
+    ASSERT_TRUE(d.fs->write("TEST50", inhalt, wo)) << d.fs->lastError();
+    std::vector<uint8_t> zurueck;
+    ASSERT_TRUE(d.fs->read("TEST50", zurueck)) << d.fs->lastError();
+    EXPECT_EQ(zurueck, inhalt);
+    EXPECT_EQ(kopf(), kopf_vorher) << "Verzeichniskopf nach dem Schreiben veraendert";
+
+    ASSERT_TRUE(d.fs->erase("TEST50")) << d.fs->lastError();
+    EXPECT_EQ(d.fs->bitmap().raw(), plan_vorher)
+        << "Belegungsplan (inkl. FF-Nachlauf) hat sich veraendert";
+    EXPECT_EQ(kopf(), kopf_vorher) << "Verzeichniskopf nach dem Loeschen veraendert";
+    EXPECT_EQ(d.fs->info().files, 67);
 }

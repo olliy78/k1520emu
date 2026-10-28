@@ -20,9 +20,9 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 import diskbau as db  # noqa: E402
 
-D710 = db.Diskette(__file__, 'prg710_scpx15_system.hfe', fs='scpx640', boot='bootabbild_710.bin',
+D710 = db.Diskette(__file__, 'prg710_scpx15_system.hfe', fs='scpx640', boot='boot_prg710_scpx15.bin',
                    create_args=['--prg', '710'])
-D7101 = db.Diskette(__file__, 'prg710-1_scpx17_system.hfe', fs='scpx640', boot='bootabbild_710-1.bin',
+D7101 = db.Diskette(__file__, 'prg710-1_scpx17_system.hfe', fs='scpx640', boot='boot_prg710-1_scpx17.bin',
                     create_args=['--prg', '710-1'])
 HIER = D710.hier
 

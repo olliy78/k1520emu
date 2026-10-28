@@ -366,12 +366,15 @@ TEST(OsmEchtdaten, ErkennungUeberDieGanzeSammlung) {
         std::string err;
         auto v = DiskVolume::open(pfad, "", formate(), dateisysteme(), err, true, true);
         ASSERT_TRUE(v) << stamm << ": " << err;
-        const std::string fs_name = v->hasFileSystem() ? v->detection().filesystem : "";
+        std::string fs_name = v->hasFileSystem() ? v->detection().filesystem : "";
         const auto it = erwartet().find(stamm);
         if (it != erwartet().end()) {
             EXPECT_EQ(fs_name, it->second) << stamm;
             if (!fs_name.empty()) EXPECT_TRUE(v->detection().unambiguous) << stamm;
         } else {
+            // NDOS-Disketten der Sammlung: seit 2026-10-28 nach der Fuellung hinter dem
+            // Plan getrennt (PC-1715-, P8000- oder UDOS-5.0-Sitte) - gezaehlt wird die Familie.
+            if (fs_name == "udos_p8000" || fs_name == "udos50") fs_name = "udos1715";
             ++zahl[fs_name];
             EXPECT_TRUE(fs_name == "tar720" || fs_name == "wega720" || fs_name == "udos1715")
                 << stamm << " → " << fs_name;

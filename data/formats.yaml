@@ -622,7 +622,7 @@ formats:
 #
 #  Nur type: cpm      block_size, dir_entries, skew, os
 #  Nur type: udos/    sides_separate, boot_track, directory_track, bitmap_track,
-#           udos1715  usable_tracks   (udos1715 zusaetzlich: system_track0;
+#           udos1715  usable_tracks   (udos1715 zusaetzlich: system_track0, ndos_fill;
 #                     sides_separate ist dort immer false — die Spur ist der Zylinder)
 #
 #  ┌─────────────────────────────────────────────────────────────────────────┐
@@ -924,10 +924,37 @@ filesystems:
   #   * feste Lage: Verzeichnis Spur 16H, Belegungsplan Spur 17H Sektor 0/1
   # Die drei zugelassenen Formate stehen woertlich im Handbuch §1.2.
 
+  # ── Drei Rechner, ein Dateisystem: PC 1715 · P8000 · A5120 (UDOS 5.0) ─────
+  # Die drei folgenden Eintraege sind inhaltlich GLEICH (Geometrie, Lage von Verzeichnis
+  # und Plan, Zeigersektoren).  Unterscheiden lassen sich die Disketten nur an EINER
+  # Stelle: Spur 17H (23), Sektor 0 = erster Sektor des Belegungsplans, Bytes 158H…176H
+  # (344…374) — zwischen den 80 Spureintraegen (18H…157H) und dem „belegt"-Zaehler
+  # (177H).  Jeder Formatierer fuellt sie anders (`ndos_fill`):
+  #     "00"  PC 1715  (UDOS1715)   158H…176H = 31 × 00
+  #     "77"  P8000    (UDOS 2.2)   158H…15BH = 00, 15CH…176H = 27 × 77H (ZDOS-Rest)
+  #     "ff"  A5120    (UDOS 5.0)   158H…176H = 31 × FFH (Spuren 80…87 als belegt)
+  # Erkannt wird die Diskette ueber dieses Feld, angelegt wird sie damit ebenso
+  # (doc/udos1715_diskettenformat.md §3.0a, core/filesystem/udos/udos_bitmap.h).
+
   - name:        udos1715
-    description: "UDOS1715/NDOS — 80 Spuren doppelseitig, 16×256 (640K, Standard)"
+    description: "UDOS1715/NDOS (PC 1715) — 80 Spuren doppelseitig, 16×256 (640K, Standard)"
     format:      k5601_16x256
     type:        udos1715
+    ndos_fill:   "00"     # Spur 17H Sektor 0, 158H…176H = 00
+    detect_rank: -10
+
+  - name:        udos_p8000
+    description: "UDOS 2.2/NDOS (P8000) — 80 Spuren doppelseitig, 16×256 (640K)"
+    format:      k5601_16x256
+    type:        udos1715
+    ndos_fill:   "77"     # Spur 17H Sektor 0, 158H…15BH = 00, 15CH…176H = 77H
+    detect_rank: -10
+
+  - name:        udos50
+    description: "UDOS 5.0/NDOS (A5120) — 80 Spuren doppelseitig, 16×256 (640K)"
+    format:      k5601_16x256
+    type:        udos1715
+    ndos_fill:   "ff"     # Spur 17H Sektor 0, 158H…176H = FFH
     detect_rank: -10
 
   - name:        udos1715_ss80

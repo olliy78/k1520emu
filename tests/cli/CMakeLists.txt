@@ -138,6 +138,15 @@ add_test(NAME cli_udos_a5120
 set_tests_properties(cli_udos_a5120 PROPERTIES
     TIMEOUT 180 LABELS "cli;fast")
 
+# Waechter „die UDOS-5.0-Diskette des A5120 in disks/ ist sektorgleich mit dem Original in
+# tools/udos50_a5120/original/“ (umgewandelt, nicht neu gebaut - Begruendung im Skript).  Neu:
+#   python3 tools/udos50_a5120/build.py --tool build/k1520disktool
+add_test(NAME cli_udos50_a5120
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/udos50_a5120/build.py"
+            --check --tool "$<TARGET_FILE:k1520disktool>" ${_beigaben_emulator})
+set_tests_properties(cli_udos50_a5120 PROPERTIES
+    TIMEOUT 180 LABELS "cli;fast")
+
 # Waechter „die CP/A-Systemdiskette des A5120 in disks/ ist der Inhalt von tools/cpa_a5120/“
 # (doc/disketten_bestand.md).  Zieht auch nach, wenn eine Beigabe (SERTEST, EM256*, RAF*, LB*)
 # neu gebaut wurde.  Neu bauen:

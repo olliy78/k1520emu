@@ -123,11 +123,12 @@ def lies(disktool, abbild, name, tmp):
 
 
 #: Unterordner von ``disks/`` je Diskette (Schema ``<maschine>_<system>``, wie ``p8000_wega30``).
-#: EINE Wahrheit fuer Bauskripte und Waechter; Bootabbilder liegen in ``disks/bootsektoren/``.
+#: EINE Wahrheit fuer Bauskripte und Waechter; Bootabbilder liegen in ``data/bootsektoren/``.
 ORDNER = {
     'a5120_cpa_k5601_system.hfe': 'a5120_cpa',
     'a5120_scpx17_k5601_system.hfe': 'a5120_scpx17',
     'a5120_udos43_k5601_entwickler.hfe': 'a5120_udos43',
+    'a5120_udos50_k5601_system.hfe': 'a5120_udos50',
     'k8915_scpx8915_v24_system.hfe': 'k8915_scpx8915',
     'pc1715_cpa1715_system.hfe': 'pc1715_cpa1715',
     'pc1715_cpz22_system.hfe': 'pc1715_cpz22',

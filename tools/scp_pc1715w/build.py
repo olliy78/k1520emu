@@ -4,7 +4,7 @@
 build.py  -  die SCP-3.0-Systemdiskette des PC 1715W bauen   (disks/pc1715w_scp30_system.hfe)
 
 SCP 3.0 (R-BWS) V0003 (28.03.89), Lader PC 1715W V0001, Format 5 x 1024 (`scp1715`, vier Systemspuren
-`bootabbild.bin`).  Basis ist die bisherige Systemdiskette; dazu kommen das auf SCP 3 zugeschnittene Textprogramm V1/3B samt
+`data/bootsektoren/boot_pc1715w_scp30.bin`).  Basis ist die bisherige Systemdiskette; dazu kommen das auf SCP 3 zugeschnittene Textprogramm V1/3B samt
 Installer TPINSTD (aus der SCP-3.0-Programmdiskette), gemeinsame Programme (tools/scp_gemeinsam/: WM, BASIC, Pascal, M80 …)
 und SERTEST.  Alle Programme wurden am PC-1715W-Emulator unter SCP 3.0 gestartet (Nachweis: README.md).
 
@@ -17,7 +17,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 import diskbau as db  # noqa: E402
 
-DISK = db.Diskette(__file__, 'pc1715w_scp30_system.hfe', fs='scp1715', boot='bootabbild.bin')
+DISK = db.Diskette(__file__, 'pc1715w_scp30_system.hfe', fs='scp1715', boot='boot_pc1715w_scp30.bin')
 HIER = DISK.hier
 
 
