@@ -129,3 +129,36 @@ Folgerung fuer den Neubau (K5): die C-Quellen sind funktional und bis auf diese 
 * Wortbreite von `(unsigned)up + 0xFF >> 8` entscheidet `srl`/`sra` (swap).  Lange Argumente brauchen die Umwandlung `(daddr_t)` an der Aufrufstelle (update: `getblk(dev, (daddr_t)SUPERB)` = `ldk;exts;pushl`).
 * Mehrere Gastlaeufe laufen parallel (eigener Arbeitsordner je Lauf); je Lauf Minuten statt der frueher geschaetzten zehn.
 * Buffer: `b_xmem` +14, `b_error` **+15** (K7a: +14 falsch), `B_TAPE` 02000; Inode: `NADDR` 13, `PIPSIZ` 4096.  `u+156` = umask, `u+113` = Byte `u_sep`, `u+104` Zeiger (bei K7c `u_ar0`).
+
+# AP K7c (2026-10-28): main, trap, sig, sys1-4, text, machdep, malloc, ureg, slp-Rest
+
+Dateien: `tools/mutos8000/kernel/c/{main,malloc,machdep,text,ureg,sig,trap,sys1,sys2,sys3,sys4}.c`, `slp.c` ergaenzt, `var7c.c` (Varianten),
+Header `h/user.h` (ab 104h aufgeloest), `h/param.h` (NPROC 30, MAXUPRC 15).  Stand: **82 von 97 Funktionen bytegleich** (cc -O, `vergleich.py`).
+
+## Trefferliste (Funktion: Status)
+* `text.c` 10/10: xswap 562C (K6b: xalloc), xfree, xalloc-Stumpf 5790, 579C, xlock, xunlock, xccdec, xumount, xrele, 57CC.
+* `sys3.c` 8/8: fstat, stat, stat1, dup, smount, sumount, getmdev, exec.
+* `sys4.c` 22/24: gtime, ftime, stime, setuid, getuid, setgid, getgid, getpid, sync, nice, unlink, chdir, chroot, chmod, chown, kill, times, profil,
+  alarm (5100, nicht nice), pause, umask, utime.  Offen: `chdirec` 4EB0 (Layout der Fehlerbloecke), `ssig` 4FB0 (Kernel laedt `uap` nach dem Speichern
+  nochmals vom Stack, `c2` hier nicht).
+* `sys2.c` 10/11: read, write, open, creat, copen, close, seek, link, mknod, saccess.  Offen: `rdwr` 51D6 (Kernel prueft FPIPE mit AND, hier BITB; Variante rdwrA).
+* `sig.c` 8/10: signal, psignal, issig, stop, psig, fsig, grow, ptrace.  `core` 0D56: 2 Woerter (Rest des Layouts); `procxmt` 0F12 (K6b: core): 67 Woerter,
+  Fallverteilung/Registerzuteilung offen.
+* `sys1.c` 6/8: setregs, rexit, exit, wait, fork, sbreak.  Offen: `exece` 41AC (201 von 383 Woertern), `getxfile` 44B6 (177 von 401): die zwei Kopfformate
+  (Magic E807 klein/16 B, E707 gross/40 B) und der Text-busy-Block liegen im Kernel in anderer Anordnung; Locals-Reihenfolge ist angepasst (zuerst deklariert = hoechste Adresse).
+* `slp.c` 9/11: swapin jetzt gleich (Deklarationsreihenfolge xp, a, t, x).  Offen: `swtch` 1DA4, `newproc` 1EA2.
+* `main.c` 2/3: main, iinit gleich; `binit` 1 Wort (b_error liegt im Objekt bei +15 statt +14; Variante mit `b_pad15` uebersetzt nicht, Feld ist nicht lesbar).
+* `trap.c` 2/3: nosys, nullsys gleich; `trap` 087A 37 von 343 Woertern (Rahmen, Fallverteilung ueber 10..31 stimmen; Rest: Layout der Faelle 10/11/15).
+* `machdep.c` 3/4: kstub 35AC, sendsig, sigret gleich; `startup` 34F6 noch 45 Woerter (Konstante 0xFCFF).
+* `ureg.c` 2/3: cinit, sureg gleich; `estabur` 3D42 (LDK-Form fuer ENOMEM nicht getroffen, Varianten in var7c.c).
+* `malloc.c` 0/2: `mfree` bis auf 1 Wort; `malloc` 24 Woerter (der Kernel hat nach `m_size -= size` ein `test r2`).
+
+## Befunde
+* **Nutzerraumzugriffe vertauscht in der Karte**: 04CC liest ein Byte (fubyte), 04DA ein Wort (fuword), 0508 schreibt ein Byte (subyte), 0514 ein Wort (suword).
+* 3630 ist `sigret` (Rueckkehr aus dem Signal, sysent 0), nicht `backup`; 0F12 ist `procxmt`, `core` ist 0D56; 5100 `alarm`.
+* Prozess-Layout: `u_ar0` (u+104) zeigt auf den Trap-Rahmen (ar0[8] = Nutzer-SP, [10] FCW, [11] Segment-PC, [12] PC); 256-Byte-Klicks, Prozess = 64-KB-Segment.
+* Compilerregel: zuerst deklarierte Stack-Locals liegen an der hoechsten Adresse; `<<` auf unsigned liefert SLL, auf int SLA.
+
+## Handassembler (nicht in C)
+csv/cret, savu 0614, resume 0620, spl0..spl7/splx, fubyte/fuword/subyte/suword, copyin/copyout/copyseg/clearseg, savfp 03F8/restfp 03FE, addupc 0414, idle, mapaddr 065E,
+Trap-Eintritt 030E, start 027E, 6432 (Geraeteinit, dev1).
