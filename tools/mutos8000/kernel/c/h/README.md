@@ -1,0 +1,32 @@
+# Gemeinsame Header fuer den C-Rueckbau des MUTOS-Kernels (AP K7a)
+
+Eine Wahrheit fuer alle Module `c/<modul>.c`: V7-Stil (Glieder mit Vorsatz `p_`, `i_`, `u_` ... wegen des V7-`cc`, der Strukturglieder,
+Tags und Variablen in EINEM Namensraum fuehrt, siehe `../../make/README.md`), nur K&R (kein `void`, keine Prototypen, kein `enum`,
+`#define` statt `# define`).  Die Header liegen im Gast flach neben den Quellen (`gast_lauf.sh` kopiert `h/*.h` dorthin;
+`#include "param.h"` genuegt).  Alles Globale ist `extern`, erst die Module definieren (`struct proc *slpque[64]` in `slp.c` usw.).
+Namen und Reihenfolge nach V7/WEGA (`OlliL/P8000`, `WEGA/src/head/sys`); Abstaende und Groessen nur dort belegt, wo der Kernel sie zeigt.
+
+Stufen: **belegt** = an Kernelcode gemessen (Zugriff mit Offset, durch bytegleiche Funktionen bestaetigt, Zahlen in `../../../../../doc/mutos_kernel/kernel_namen.md`),
+**V7** = Reihenfolge nach V7, Groesse durch die Strukturlaenge gedeckt, **geraten** = nicht gemessen (Fuellfeld oder V7-Annahme, vor Gebrauch pruefen).
+
+| Header | Belegt | Geraten / offen |
+|--------|--------|-----------------|
+| `types.h` | `dev_t int`, `daddr_t long`, `ino_t unsigned`, `time_t/off_t long`, Zeiger 16 Bit | `label_t` = 9 Worte (aus u_segflg bei +12h) |
+| `param.h` | NOFILE 20, NINODE/NFILE 50, NBUF 20, NMOUNT 5, NCALL 9 (aus callout CE58..CE8E), HZ 50, BSIZE 512, NINDIR 128, PZERO 25, NZERO 20, PUSER 50, Fehlernummern, `major/minor/makedev` | NSIG 17 (psignal: `CP #11h`; u_signal[17]; kein SIGCLD/SIGPWR), MAXUPRC, SSIZE, CMAPSIZ, SMAPSIZ, NCARGS |
+| `user.h` | `u` bei FC00; Abstaende u_segflg 12 .. u_cstime 100 (Liste im Kopf der Datei, mit Zahl der Zugriffe) | `u_rsav` (0..11), `u_signal[17]`, Fuellfeld `u_x54[14]` (ohne Zugriff), `u_x104` (Rest ab 104h: 104h 35 Zugriffe, 10Ah Signale, 112.. Profil) |
+| `proc.h` | alle Felder bis `p_link`, 28 Byte; `p_sig` ist EIN Wort (+06, psignal), `p_uid` +08, `p_pgrp` +0A (newproc/wait) -- korrigiert gegenueber `kernel_namen.md` | `p_textp`, `p_clktim` (V7/WEGA-Reihenfolge) |
+| `inode.h` | 74 Byte; `i_flag`, `i_count`, `i_dev`, `i_number`, `i_uid` (+0A), `i_addr[13]` je 4 Byte (+12), `i_lastr` (+46) | `i_mode`, `i_nlink`, `i_gid`, `i_size` (V7-Reihenfolge) |
+| `file.h` | 8 Byte; `f_flag`, `f_count`, `f_un` (+4; erstes Wort `f_chan`, V7-Multiplex; closef reicht es an close weiter) | `f_inode` (+2) |
+| `buf.h` | 24 Byte, alle Felder; `b_resid` bei +16h (readi: `BSIZE - b_resid`) | `b_pad15` |
+| `conf.h` | `bdevsw` 8 Byte (open, close, strategy, d_tab), `cdevsw` 14 Byte (open, close, read, write, ioctl, stop, tty), `devtab` nach V7 (b_forw/b_back wie buf) | Aufbau `devtab` jenseits `b_forw/b_back` |
+| `filsys.h` | `s_ronly` bei +19Dh (aus access), Abstaende bis dorthin | Felder dahinter |
+| `mount.h` | 6 Byte: `m_dev`, `m_bufp`, `m_inodp` | Reihenfolge der letzten zwei (V7) |
+| `text.h` | x_daddr 0, x_caddr 2, x_size 4, x_iptr 6, x_count 8, x_ccount 9, x_flag 0Ah (aus swapin/sched) | Rest; xlock/xunlock... sind Stubs |
+| `callo.h` | c_time 0, c_arg 2, c_func 4 (aus timeout) | |
+| `systm.h` | Adressen im Kopf der Datei | `sysent`-Feldnamen |
+| `dir.h`, `map.h`, `ino.h` | dir: 16 Byte | map, ino: V7 |
+| `tty.h`, `reg.h` | nichts | **Platzhalter**, Platzhalter-Struktur nach V7; Module `tty`/`trap` muessen messen |
+
+Verwendung im Modul: Kopf `#include "param.h" "systm.h" "dir.h" "user.h" ...` in V7-Reihenfolge; `proc.h`, `inode.h` usw. vor `user.h`
+nur, wenn `user.h` deren Struktur braucht -- Zeiger auf unvollstaendige Strukturen genuegen (`struct proc *u_procp`).
+Neue Felder: erst im Kernel messen, dann hier das Fuellfeld ersetzen und diese Tabelle fuehren; **nie** ein Feld "raten und stehen lassen".
