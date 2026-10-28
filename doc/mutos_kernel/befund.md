@@ -87,3 +87,18 @@ kann also nicht im selben Segment liegen.  Die Vermutung "zwei kleine Prozesse t
 Prozesse sind gegeneinander geschuetzt, weil das Segment nur der Kernel wechseln kann.  Die Vergabe in 256-Byte-Stuecken (`coremap`) dient der Groesse,
 nicht dem Teilen.  Folge: hoechstens drei Prozesse gleichzeitig im Speicher, jeder weitere wird ganz ausgelagert (hier: `init`, `sh`, zwei `wache`, `schreib`).
 Nicht geprueft: Schutz des Kernels vor einem Prozess (Segment 0 ist fuer N-Betrieb nicht erreichbar, E/A-Befehle sind privilegiert -- erwartet, nicht versucht).
+
+## Belegung des Kernelsegments 0 und freier Platz (gemessen 2026-10-28)
+
+| Bereich | Groesse | Inhalt | Beleg |
+|---------|---------|--------|-------|
+| 0000-8DC0 | 36 288 B | Text + initialisierte Daten (Datei 36 352 B mit Fuellung bis 8E00) | Linkkarte K5 |
+| 8DC0-D532 | 18 290 B | BSS: u. a. Puffer 20 x 512 (A628..CE28), Pufferkoepfe 20 x 24, Inodes 50 x 74 (907A..9EEE), Dateien 50 x 8, proc 30 x 28 (A11C..), mount, coremap/swapmap, slpque, Zeichenlisten, tty | `start` loescht 8DC0..D586; K6b/K7 |
+| D532-D586 | 84 B | Postfach (Adresse fest in `mutos_io`) | linkbau.md |
+| **D586-EC00** | **5 754 B** | **unbenutzt** | `start` loescht ihn nicht; kein Kernelbefehl adressiert ihn; Speicherabzug nach Boot und nach `cc`/Pipe/`schreib` byteweise gleich |
+| EC00-FC00 | 4 096 B | ausgelagerte u-Bereiche (4 x 1 KB, `resume` 0620: EC00 + Index x 400H) | Disassemblat |
+| FC00-FFFF | 1 024 B | `u` des laufenden Prozesses samt Kernelstapel (R15 startet bei 0) | `start`, `resume` |
+
+Frei sind also **5 754 B** zusammenhaengend oberhalb des Postfachs, dazu 64 B Fuellung am Abbildende.  Das reicht z. B. fuer **10 weitere Puffer**
+(je 512 B Daten + 24 B Kopf = 5 360 B, also 30 statt 20) oder ~75 weitere Inodes.  Ein Ausbau muss das Postfach bei D532 festhalten: die zusaetzlichen
+Tabellen gehoeren HINTER das Postfach (eigener Abschnitt ab D586), nicht an das Ende des BSS.
