@@ -3629,7 +3629,7 @@ int main(int argc, char** argv){
         // Abdeckung: cover on [lo hi] | off | reset | expect lst|clear|<lo> <hi> | report [datei] [unhit|hit|all]
         else if (cmd=="cover" && cpu_ctx==3){
             // U8001-Kontext: cover on|off|reset|report [datei]; Zeilen "SS:OOOO S|N Zaehler" (S = System, N = Normal),
-            // aufsteigend nach Segment, Offset, Betriebsart (Eingabe fuer tools/mutos8000/kernel/lauf/).
+            // aufsteigend nach Segment, Offset, Betriebsart (Eingabe fuer kernel/lauf/ im Projekt mutos8k).
             const std::string sub = t.size()>1? t[1] : "status";
             if (sub=="on"){ cov16_on=true; fprintf(stderr,"  cover ON (U8001, jeder ausgefuehrte Befehl)\n"); }
             else if (sub=="off"){ cov16_on=false; fprintf(stderr,"  cover off (U8001; Zaehler bleiben)\n"); }
@@ -4687,7 +4687,7 @@ int main(int argc, char** argv){
                     if(!emlog_fp) fprintf(stderr,"  cannot open %s\n",t[1].c_str());
                     else fprintf(stderr,"  emlog -> %s\n",t[1].c_str()); } } }
         // emmsg: eine Nachricht wie der Z8000-Kernel von mutos_1216 in den EM legen und INT-16 ausloesen
-        // (doc/merkposten/mutos_io_analyse.md §3): 14 Byte ab EM-Adresse ADR (Segment 0), Zeiger
+        // (mutos8k: doc/merkposten/mutos_io_analyse.md §3): 14 Byte ab EM-Adresse ADR (Segment 0), Zeiger
         // (Z8000-Wort, hoeherwertiges Byte zuerst) in die Zelle 0006H - das ist der "EM-Offset 4006H"
         // des U880 (Fenster 4000H-7FFFH, Seite 4, Attribut 0CH => A14/A15 = 0, Segment 0 =>
         // Zelle 0006H) -, dann A33 Bit 4 als Impuls (gesetzt, sofort wieder geloescht): die PIO A32 des

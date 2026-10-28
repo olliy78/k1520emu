@@ -1,5 +1,5 @@
 # MUTOS 8000: Datendisketten einbinden (Entwurf 39 Abschnitt 10, Ticket #22).  Drei K5601; Ladediskette in A:, Wurzel in C:.
-# Nach der Anmeldung kommen die Best-of-Disketten (tools/mutos8000/best_of.py, bau_aus_archiv.py --laufwerke k5601)
+# Nach der Anmeldung kommen die Best-of-Disketten (mutos8k:tools/best_of.py, bau_aus_archiv.py --laufwerke k5601)
 # in A: (usr -> /usr) und B: (cmd -> /mnt); mount, ein Programm von /mnt, der C-Uebersetzer von /usr (cc -> c0/c1/c2/as/ld,
 # ein Programm erzeugen und starten), umount.  Der Lader (mutos_io) liest nur 26x128 (Verschraenkung 2, Spurversatz 6);
 # die 8x512-Disketten des DISK-Satzes meldet er mit "err on dev 4/1 bn=1 er=0,304".  "er=0,302" heisst "Laufwerk nicht bereit"

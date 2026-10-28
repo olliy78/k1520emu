@@ -2231,4 +2231,3 @@ def test_mutos8000_nur_der_k5601_satz_im_paket():
         "a5120_mutos8000_%s_mfm.hfe" % r for r in ("root", "bin", "cmd", "usr", "cc1", "cc2", "nroff")}
     for name in block:
         assert ausgelieferte_diskette(name).is_file(), name
-    assert "*/a5120_mutos8000/*) continue" in text          # --disks all laesst die Quellen aus

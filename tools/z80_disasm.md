@@ -64,7 +64,7 @@ kommen als `DB`.
 ```
 
 Die Codeverfolgung bricht an `FFH`-Läufen ab (Fülldaten sind kein `RST 38H`-Code).
-Kartendatei (hex, `#` = Kommentar; Beispiel `tools/mutos8000/mutos_io/karte.txt`):
+Kartendatei (hex, `#` = Kommentar; Beispiel `tests/fixtures/mutos8000/mutosio_quelle/karte.txt`):
 
 ```
 seg <adr> <dateioffset> <länge>   code <adr>…   db|dw|dwc|str|txt <von> <bis>
@@ -77,7 +77,7 @@ Zeilenkommentar **hinter** der Zeile. So entsteht z. B. die Quelle von `mutos_io
 reproduzierbar (Wächter `tests/python/test_z80_disasm.py`):
 
 ```sh
-python3 -I tools/z80_disasm2.py --format mac --karte tools/mutos8000/mutos_io/karte.txt mutos_io > mutosio.mac
+python3 -I tools/z80_disasm2.py --format mac --karte tests/fixtures/mutos8000/mutosio_quelle/karte.txt mutos_io > mutosio.mac
 ```
 
 ### Kanonischer Aufruf für das ZRE-Boot-ROM (K2526)

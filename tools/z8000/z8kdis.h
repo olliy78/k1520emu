@@ -12,7 +12,7 @@
  *   listing  Adresse, Bytes, Befehl, Kommentar — zum Lesen.
  *   z8k      Quelle fuer tools/z8000/z8k_asm.h (z8kasm).  Wird fuer den Rundlauf
  *            (`pruefen`) benutzt: sie ist das einzige, was wir HIER wieder zu Bytes machen koennen.
- *   as       Quelle im Dialekt des MUTOS-`as` (Zilog PLZ/ASM V1.0), s. doc/mutos_kernel/as_dialekt.md.
+ *   as       Quelle im Dialekt des MUTOS-`as` (Zilog PLZ/ASM V1.0), s. as_dialekt.md im Projekt mutos8k.
  *            Der Rundlauf gegen den Gast-`as` steht noch aus.
  *
  * Kartendatei (Zahlen hexadezimal, auch `%1F`/`0x1F`; `#` beginnt eine Kommentarzeile):
@@ -877,7 +877,7 @@ private:
     static bool druckbar(uint8_t c) { return c >= 0x20 && c < 0x7F && c != '\'' && c != '\\' && c != '"' && c != ';'; }
 
     /// Datenzeile.  as: je Wert eine eigene Anweisung `BV %xx;BV %xx` bzw. `WV %xxxx;WV ...` wie `cc -S`
-    /// (belegt, doc/mutos_kernel/as_dialekt.md); sonst z8kasm-Schreibweise `DB a,b` / `DW a,b`.
+    /// (belegt, as_dialekt.md (mutos8k)); sonst z8kasm-Schreibweise `DB a,b` / `DW a,b`.
     std::string datenText(const Einheit& e, bool as) const {
         std::string s;
         auto bv = [&](const std::string& z, bool erst) {
@@ -1158,7 +1158,7 @@ inline std::string Analyse::asEinheit(const Einheit& e) const {
 
 inline std::string Analyse::asQuelle() const {
     if (link_ && !opt.modul.empty()) { std::string m; if (asModul(m)) return m; }
-    // Geruest nach `cc -S` (Beleg: doc/mutos_kernel/as_dialekt.md): Modulkopf, Abkuerzungen, EIN globales
+    // Geruest nach `cc -S` (Beleg: as_dialekt.md (mutos8k)): Modulkopf, Abkuerzungen, EIN globales
     // Unterprogramm um das ganze Abbild (alle Marken sind dort lokal), Daten inline als BV/WV.
     // UNBELEGT bleibt: ob der as Daten innerhalb eines Unterprogramms und `$ABS` so annimmt.
     std::string o;

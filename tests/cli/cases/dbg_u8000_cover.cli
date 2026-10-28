@@ -1,5 +1,5 @@
 # U8001-Abdeckung: `cover on` im Kontext `cpu u8000` zaehlt die Befehlsanfaenge des U8001;
-# `cover report [datei]` schreibt Zeilen "SS:OOOO S|N Zaehler" (Eingabe fuer tools/mutos8000/kernel/lauf).
+# `cover report [datei]` schreibt Zeilen "SS:OOOO S|N Zaehler" (Eingabe fuer mutos8k:tools/kernel/lauf).
 tool:      k1520dbg
 disk:      cpa_cpa780_k5601_noclock.img
 setup_run: @k1520disktool put %DISK% %CLI_DIR%/../fixtures/cpm/em16abl.com

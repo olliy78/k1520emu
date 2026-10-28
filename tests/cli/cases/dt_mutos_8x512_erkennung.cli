@@ -1,7 +1,7 @@
 # Das UNIX-Dateisystem des DISK-Satzes (8x512) bleibt UNIX und wird nie zum tar (auch die 80-Zylinder-Wurzel);
 # die Gegenprobe der tar-Profile auf derselben Geometrie mutos_ss77 verdraengt nichts.
 tool:   k1520disktool
-run:    info %CLI_DIR%/../../disks/a5120_mutos8000/a5120_mutos8000_cc1.td0
+run:    info %CLI_DIR%/../../tests/fixtures/mutos8000/a5120_mutos8000_cc1.td0
 expect: mutos8k_8x512_mfm
 forbid: tar_mutos8k
 exit:   0

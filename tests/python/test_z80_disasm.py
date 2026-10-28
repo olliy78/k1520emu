@@ -12,7 +12,6 @@ Dazu der Waechter von W3: aus Abzug + Karte entsteht die Quelle von mutos_io."""
 import importlib.util
 import subprocess
 import sys
-import zipfile
 
 import pytest
 
@@ -20,8 +19,8 @@ from conftest import PROJECT_ROOT
 
 TOOLS = PROJECT_ROOT / "tools"
 WERKZEUG = TOOLS / "z80_disasm2.py"
-MUTOSIO = TOOLS / "mutos8000" / "mutos_io"
-ARCHIV = PROJECT_ROOT / "disks" / "a5120_mutos8000" / "a5120_mutos8000_boot_udos.zip"
+MUTOSIO = PROJECT_ROOT / "tests" / "fixtures" / "mutos8000" / "mutosio_quelle"   # eingefroren aus mutos8k
+ABZUG = PROJECT_ROOT / "tests" / "fixtures" / "mutos8000" / "mutos_io"      # der Abzug selbst
 
 
 def _lade(name, pfad):
@@ -351,9 +350,7 @@ def test_listing_modus_unveraendert(tmp_path):
 #  die Karte belegt nur, dass der Ausgangsstand reproduzierbar war)
 # ---------------------------------------------------------------------------
 def test_mutos_io_karte_erzeugt_den_ausgangsstand(tmp_path):
-    with zipfile.ZipFile(ARCHIV) as z:
-        abzug = tmp_path / "mutos_io"
-        abzug.write_bytes(z.read("dateien/mutos_io"))
+    abzug = ABZUG
     karte = MUTOSIO / "karte.txt"
     ohne = mac(abzug, karte=karte)
     mit = mac(abzug, "--adr", karte=karte)

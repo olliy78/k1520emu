@@ -13,7 +13,7 @@ k1520_add_test(coverage_diff     SRC test_coverage_diff.cpp     LABELS "${_lbl}"
 k1520_add_test(callstack_tracker SRC test_callstack_tracker.cpp LABELS "${_lbl}")  # tools/callstack_tracker.h
 k1520_add_test(prn_listing       SRC test_prn_listing.cpp       LABELS "${_lbl}")  # tools/prn_listing.h
 k1520_add_test(mac_listing       SRC test_mac_listing.cpp       LABELS ""
-               DEFS "MUTOSIO_DIR=\"${CMAKE_SOURCE_DIR}/tools/mutos8000/mutos_io\"")  # tools/mac_listing.h
+               DEFS "MUTOSIO_DIR=\"${CMAKE_SOURCE_DIR}/tests/fixtures/mutos8000/mutosio_quelle\"")  # tools/mac_listing.h
 k1520_add_test(dbg_u8000         SRC test_dbg_u8000.cpp         LIBS k1520_z8000 LABELS "${_lbl}")  # tools/dbg_u8000.h
 k1520_add_test(dbg_p8000         SRC test_dbg_p8000.cpp         LIBS k1520_p8000 k1520_logger LABELS "${_lbl}")  # tools/dbg_p8000.h (P8000: ADP, UA858, Kopplung, MMU)
 

@@ -6,7 +6,7 @@
 # Beide Disketten werden von k1520dbg als Kopie (COW) gemountet — die eingecheckten Abbilder bleiben heil.
 # Die Wartezeiten sind grosszuegig (Anmeldeaufforderung ca. 12 Mio. Takte nach `r`).
 tool:      k1520dbg
-disk_path: %CLI_DIR%/../../disks/a5120_mutos8000/a5120_mutos8000_boot_udos.dmk
+disk_path: %CLI_DIR%/../../tests/fixtures/mutos8000/a5120_mutos8000_boot_udos.dmk
 timeout:   300
 run:       --em em256 %DISK%
 stdin:

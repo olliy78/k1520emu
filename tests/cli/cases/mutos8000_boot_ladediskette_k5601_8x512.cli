@@ -5,7 +5,7 @@
 tool:      k1520dbg
 disk_path: %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_boot_udos_k5601_8x512.hfe
 timeout:   500
-run:       --em em256 --laufwerke K5601,K5601,K5601,K5601 %DISK% -b %CLI_DIR%/../../disks/a5120_mutos8000/a5120_mutos8000_cc1.td0 -c %CLI_DIR%/../../disks/a5120_mutos8000/a5120_mutos8000_root.td0 -d %CLI_DIR%/../../disks/a5120_mutos8000/a5120_mutos8000_cc2.td0
+run:       --em em256 --laufwerke K5601,K5601,K5601,K5601 %DISK% -b %CLI_DIR%/../../tests/fixtures/mutos8000/a5120_mutos8000_cc1.td0 -c %CLI_DIR%/../../tests/fixtures/mutos8000/a5120_mutos8000_root.td0 -d %CLI_DIR%/../../tests/fixtures/mutos8000/a5120_mutos8000_cc2.td0
 stdin:
   g 80000000
   keys BOOT\sMUTOS\r

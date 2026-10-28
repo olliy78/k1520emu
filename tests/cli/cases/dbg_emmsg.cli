@@ -1,6 +1,6 @@
 # `emmsg`: Nachricht wie der Z8000-Kernel von mutos_1216 in den EM legen (14 Byte ab ADR, Zeiger
 # als Z8000-Wort in die Zelle 0006H = U880-Sicht 4006H) und INT-16 (A33 Bit 4) pulsen.
-# Die Auswirkung auf einen echten U880-Handler zeigt tools/mutos8000 (Entwurf 39); hier nur die Ablage
+# Die Auswirkung auf einen echten U880-Handler zeigt mutos8k:tools (Entwurf 39); hier nur die Ablage
 # und der Impuls (emlog), ohne EM-Programm im Gast.
 tool:   k1520dbg
 disk:   cpa_cpa780_k5601_clock.img

@@ -1,32 +1,30 @@
 """Waechter fuer z8kdis am echten Abzug (Entwurf 41, AP K3): der Kernel `mutos_1216` (36352 Byte,
 Ladeadresse 0) aus dem Ladedisketten-Archiv wird mit der eingecheckten Karte
-`tools/mutos8000/kernel/karte.txt` disassembliert; der Rundlauf (Disassemblat -> z8kasm -> Bytes)
+`tests/fixtures/mutos8000/kernel_karte.txt` disassembliert; der Rundlauf (Disassemblat -> z8kasm -> Bytes)
 muss das Abbild bitgleich zurueckgeben, auch mit allen Code-Vorschlaegen als Einstiegen.
 
 Der Rundlauf gegen den Gast-`as` (Dialekt des MUTOS-as) steht noch aus -- hier prueft nur die eigene
-Befehlstabelle (doc/mutos_kernel/as_dialekt.md)."""
+Befehlstabelle (as_dialekt.md im Projekt mutos8k)."""
 
 import re
 import subprocess
-import zipfile
-
 import pytest
 
 from conftest import PROJECT_ROOT
 
-ARCHIV = PROJECT_ROOT / "disks" / "a5120_mutos8000" / "a5120_mutos8000_boot_udos.zip"
-KARTE = PROJECT_ROOT / "tools" / "mutos8000" / "kernel" / "karte.txt"
+FIX = PROJECT_ROOT / "tests" / "fixtures" / "mutos8000"
+ARCHIV = FIX / "mutos_1216"      # eingefroren aus mutos8k (README dort)
+KARTE = FIX / "kernel_karte.txt"
 Z8KDIS = PROJECT_ROOT / "build" / "z8kdis"
 
 pytestmark = pytest.mark.skipif(not Z8KDIS.exists() or not ARCHIV.exists(),
-                                reason="z8kdis nicht gebaut oder Ladedisketten-Archiv fehlt")
+                                reason="z8kdis nicht gebaut oder Kernel-Fixture fehlt")
 
 
 @pytest.fixture(scope="module")
 def kernel(tmp_path_factory):
     ziel = tmp_path_factory.mktemp("kernel") / "mutos_1216"
-    with zipfile.ZipFile(ARCHIV) as z:
-        ziel.write_bytes(z.read("dateien/mutos_1216"))
+    ziel.write_bytes(ARCHIV.read_bytes())
     assert ziel.stat().st_size == 36352
     return ziel
 
