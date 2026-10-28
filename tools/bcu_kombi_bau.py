@@ -5,7 +5,7 @@ bcu_kombi_bau.py  -  EIGENBAU: BCU-880-Diskette, die startet UND ein Dateisystem
 =====================================================================================
 
 KEIN Beleg fuer irgendein Originalgeraet: eine solche Diskette gab es nicht.  Sie entsteht aus dem
-Bootabbild einer Startdiskette „SYL auf Spur 1“ (disks/bootsektoren/boot_bcu12_syl_*.bin, 5 Zylinder)
+Bootabbild einer Startdiskette „SYL auf Spur 1“ (data/bootsektoren/boot_bcu12_syl_*.bin, 5 Zylinder)
 durch zwei Aenderungen — beide im Emulator nachgewiesen (Test DisktoolBcu.Kombidiskette*), am Geraet
 ungeprueft (doc/a5120_alt/bcu.md §12):
 

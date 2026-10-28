@@ -10,7 +10,8 @@ Formatier-Experimente. Der Inhalt darf sich jederzeit ändern.
 ## Ordnerschema
 
 Jede Diskette liegt in einem Ordner **`<maschine>_<system>`** (wie `p8000_wega30/`); der Dateiname
-bleibt unverändert. Die Systemspuren zum Wiedereinspielen liegen gesammelt in **`bootsektoren/`**.
+bleibt unverändert. Die Systemspuren zum Wiedereinspielen liegen seit Ticket #25 **nicht mehr hier**, sondern in
+**`data/bootsektoren/`** neben ihrem Katalog `data/bootsektor.yaml` (s. u.) — von dort bietet sie das DiskTool an.
 Die Zuordnung Datei → Ordner steht für die Bauskripte in `tools/disketten_beigaben.py` (`ORDNER`,
 `diskpfad()`); `--out` der `build.py` ist die Wurzel `disks/`. Im Paket liegen die Abbilder weiter flach.
 
@@ -34,6 +35,7 @@ Erklärung der Segmente in `tests/fixtures/README.md`.
 | `pc1715_udos1715/udos1715_640k_pc1715_system.hfe` | **UDOS1715/NDOS** (PC 1715), Systemdiskette „SYSTEM", 80×32×256 — dieselbe Diskette liegt als `.img` unter `tests/fixtures/disks/` | MFS 1.6 |
 | `prg710_udos43/prg710_udos43_k5601_system.hfe` | **UDOS 4.3 für den PRG 710**, beidseitig: Seite 0 Kommandos, Treiber, Assembler, Editor `SCREEN`, `PROG`; Seite 1 MRS-700-Umgebung (`MRS`, `MPSS`, `EDI`, `PROM`, E/A-Treiber) und Dokumente. Gebaut aus `tools/prg_disketten/`, `check --full` ohne Befund | PRG 710 (K5601) |
 | `a5120_udos43/a5120_udos43_k5601_entwickler.hfe` | **UDOS 4.3 für den A5120** (UDOS BC.5120, 08/90), startfähig, **mit allen Entwicklerwerkzeugen** der Entwicklerdiskette (ASM/LINK, EDIT/EDI/SEDIT, SYD, BASIC, PL/Z, TRANSFER, REORG, LW, SG samt `POS_*`-Kernen). Bestand der Altdiskette `udos_boot_scp` ohne `UPRO`/`ESPRO`. Gebaut aus `tools/udos_a5120/`, `check --full` ohne Befund | A5120 (K5601) |
+| `a5120_udos50/a5120_udos50_k5601_system.hfe` | **UDOS 5.0 für den A5120** (BIZ FmSZBw Schwerin, 03/1997), startfähig; Dateisystem **NDOS** wie PC 1715/P8000 (16×256, Zeigersektoren). Systemkern, `SCREEN 2.0`, P8000-Remoteprogramm `WEGA`/`P8`, `K6314`, `RD`, Fernschreibpaket `TELEX`/`FSM`, Spiele `MM`/`CH`; 67 Dateien, 412 KB frei. **Umgewandelt** aus dem Original in `tools/udos50_a5120/original/` (`build.py`, Wächter `cli_udos50_a5120`) — ein Neubau aus Einzeldateien bootet nicht (`doc/udos_programme.md` §8). Großschreibung nach dem Start vertauscht: Datumsfrage mit kleinem `y` bestätigen | A5120 (K5601) |
 | `prg710-1_udos43/prg710-1_udos43_k5601_v43_189.hfe` | **UDOS 4.3 für den PRG 710-1**, **derselbe Inhalt** wie die 710-Diskette; verschieden nur Systemspuren und `OS`-Kennung (`UDOS PG710-1`). Gebaut aus `tools/prg_disketten/`, `check --full` ohne Befund | PRG 710-1 (K5601) |
 | **`pc1715_cpa1715/pc1715_cpa1715_system.hfe`** | **DIE CP/A-1715-Diskette der Auslieferung.** Bootet mit `@OS.COM` = BIOS 24.05.88, 4 LW; daneben `OS2LWUHR` (24.05.88, 2 LW, Uhr, ohne Monitor) und `OS0189` (03.01.89, 3 LW), vom `A>` aus zu starten. Dazu FORMATPX, CPA1715G, STAT, POWER, DIENST, DISKCOPY, UNERA, DIMA, TLC, WM mit deutscher Hilfe, TP 3.0 mit TPDRUCK/TPINSCPA, BASIC, Turbo Pascal, M80/LINKMT/Z1/ZSID und `LIESMICH.TXT`. Gebaut aus `tools/cpa_pc1715/` (Wächter `cli_cpa_pc1715`); die BIOS-Quelltexte der früheren Bootdiskette liegen als Fixture `tests/fixtures/disks/pc1715_cpa1715_boot_4lw.hfe` | PC 1715 (K5601) |
 | **`a5120_scpx17/a5120_scpx17_k5601_system.hfe`** | **SCPX 1526 V 1.7 (52K) für den A5120**, 5×1024 (K5601). `SYSP` erzeugt Systeme für andere Tastatur/Bildschirm/Laufwerke (alle BIOS-Module dabei), `INIT`, `MODF`, `SYSG`; dazu TP 3.0, WM (deutsche Hilfe), BASIC, Turbo Pascal, M80/LINKMT/Z1/ZSID, EM256-/RAF-/Lochband-/Serien-Prüfprogramme, `LIESMICH.TXT`. Gebaut aus `tools/scpx_a5120/` (`cli_scpx_a5120`) | A5120 (K5601) |
@@ -46,16 +48,15 @@ Erklärung der Segmente in `tests/fixtures/README.md`.
 | **`pc1715_cpz22/pc1715_cpz22_system.hfe`** | **CP/Z 2.2** („52K CP/Z 2.2 ZOAZ MRL“ 06.12.88), 16×256, mit `CPZINIT`/`CPZGEN`/`CPZDUP`, Turbo Pascal, WordStar; dazu WM, BASIC, `TLC`, SERTEST | PC 1715 (K5601) |
 | **`pc1715w_scp30/pc1715w_scp30_system.hfe`** | **SCP 3.0 (CP/M 3) V0003 28.03.89, Lader PC 1715W**, 5×1024; Zeichensätze `SC6xx.ZGF`, Textprogramm V1/3B + `TPINSTD`, WM, BASIC, Pascal, SERTEST V0.3. Aus `tools/scp_pc1715w/` (`cli_scp_pc1715w`) | PC 1715W (U8272) |
 | **`p8000_osm30/p8000_osm30_system.hfe`** | **OS/M 3.0 (ZFT/KEAW, 15.01.1988) für den P8000, 8-Bit-Teil** (CP/M 2.2), Format 5 (80×2×16×256, 640K, Profil `osm640`) mit OS/M-Urlader; Systemdiskette der pofo-Sammlung (`osm30`) mit ihren 32 Dateien (SYSGEN, SETFD, FORMAT, COPYDISK, ASM, DDT, ED, TP, POWER, REDABAS, `BIOS.L` …) plus `LIESMICH.TXT` und `KERMIT.COM`; 34 Dateien, 104 KB frei. Startet im `p8000emu` (Diskette in A:, Kaltstart, am Monitor zweimal RETURN). Aus `tools/osm_p8000/` (`cli_osm_p8000`) | P8000 (8-Bit-Teil) |
-| **`a5120_bcu/a5120_bcu12_k5600-10_start-syl.hfe`** | **BCU 880 V1.2** (FZW/BL), Startdiskette „SYL auf Spur 1“ (Satz 2, Bild 64×16) — startet im Modell **„A5120 BCU 880 (Lade-ROM V0.6)“**, Laufwerke **K5600.10**. Keine Dateidiskette. Mit dem DiskTool **gebaut** (`create --fs bcu880_syl --boot bootsektoren/boot_bcu12_syl_k7023.bin`), sektorgleich zum Beleg `doc/a5120_alt/bcu/satz2_SYL_auf_Spur1/disk.img` | A: K5600.10 |
+| **`a5120_bcu/a5120_bcu12_k5600-10_start-syl.hfe`** | **BCU 880 V1.2** (FZW/BL), Startdiskette „SYL auf Spur 1“ (Satz 2, Bild 64×16) — startet im Modell **„A5120 BCU 880 (Lade-ROM V0.6)“**, Laufwerke **K5600.10**. Keine Dateidiskette. Mit dem DiskTool **gebaut** (`create --fs bcu880_syl --boot data/bootsektoren/boot_bcu12_syl_k7023.bin`), sektorgleich zum Beleg `doc/a5120_alt/bcu/satz2_SYL_auf_Spur1/disk.img` | A: K5600.10 |
 | **`a5120_bcu/a5120_bcu12_k5600-10_arbeit-sys1.hfe`** | BCU 880 V1.2 „ohne SYL“ („SYS1“): Arbeitsdiskette mit PIP, STAT, INIT, `KMBG.REL`, MBASIC, DDT, EPROM u. a. (19 Dateien); in B:, nach dem Start auch in A: (Warmstart). Wandlung von `satz2_OhneSYL.1/disk.img` | B: K5600.10 |
-| `a5120_bcu/a5120_bcu12_k5600-10_kombi40-eigenbau.hfe` | **EIGENBAU, kein Original** (`doc/a5120_alt/bcu.md` §12): Startdiskette **mit** Dateisystem — bootet wie die Startdiskette, Verzeichnis ab Zylinder 5 (nur in **A:** sichtbar), Warmstart funktioniert. Gebaut mit `create --fs bcu880_kombi --boot bootsektoren/boot_bcu12_kombi_k7023.bin`. Nicht im Paket | A: K5600.10 |
-| `a5120_bcu/a5120_bcu12_k5600-10_arbeit40-eigenbau.hfe` | **EIGENBAU**: 40-Spur-Arbeitsdiskette für K5600.10 (B:), mit dem DiskTool gebaut (`create --fs bcu880 --boot bootsektoren/boot_bcu12_ohnesyl.bin`) und mit den 19 Dateien der Arbeitsdiskette gefüllt; Verzeichnis ab Zylinder 2, BCU-System auf Zylinder 0–1 (Warmstart-Quelle in A:). Nicht im Paket | B: K5600.10 |
+| `a5120_bcu/a5120_bcu12_k5600-10_kombi40-eigenbau.hfe` | **EIGENBAU, kein Original** (`doc/a5120_alt/bcu.md` §12): Startdiskette **mit** Dateisystem — bootet wie die Startdiskette, Verzeichnis ab Zylinder 5 (nur in **A:** sichtbar), Warmstart funktioniert. Gebaut mit `create --fs bcu880_kombi --boot data/bootsektoren/boot_bcu12_kombi_k7023.bin`. Nicht im Paket | A: K5600.10 |
+| `a5120_bcu/a5120_bcu12_k5600-10_arbeit40-eigenbau.hfe` | **EIGENBAU**: 40-Spur-Arbeitsdiskette für K5600.10 (B:), mit dem DiskTool gebaut (`create --fs bcu880 --boot data/bootsektoren/boot_bcu12_ohnesyl.bin`) und mit den 19 Dateien der Arbeitsdiskette gefüllt; Verzeichnis ab Zylinder 2, BCU-System auf Zylinder 0–1 (Warmstart-Quelle in A:). Nicht im Paket | B: K5600.10 |
 | `a5120_bcu/a5120_bcu12_k5600-20_kombi80-eigenbau.hfe` | **EIGENBAU**: wie die Kombidiskette, aber **80 Spuren** für K5600.20 (A: Verzeichnis ab Zylinder 5, 243 KB). Nicht im Paket | A: K5600.20 |
 | `a5120_bcu/a5120_bcu12_k5600-20_arbeit80-eigenbau.hfe` | **EIGENBAU**: 80-Spur-Arbeitsdiskette für B: neben der 80-Spur-Kombidiskette (Verzeichnis ab Zylinder 2, 248 KB nutzbar), die 19 Dateien der Arbeitsdiskette. Nicht im Paket | B: K5600.20 |
 | `a5120_bcu/a5120_bcu21_k5600-10_eigenbau-syl-v21.hfe` | **EIGENBAU, kein Original** (`doc/a5120_alt/bcu.md` §9): BCU 880 **V2.1** im SYL-Aufbau (V1.2-Lader und -Plattentreiber), bootet im Modell BCU bis `A>`; Nur Startdiskette. Nicht im Paket | A: K5600.10 |
 | `a5120_bcu/bcu_kassette_formatiert.k52` | Kassette, formatiert von BCU-INIT (eine Bandmarke); unter BCU Gerät 2 = F: | Kassette (K5020) |
 | `a5120_bandtest/bandtest_boot.k52` | **Demo, Eigenbau**: Bootband für das Lade-ROM des A5120 (`tools/kassette/bandtest/`), schreibt `KASSETTE OK` — Kassette in Gerät 1, keine Diskette, Kaltstart | Kassette (K5020) |
-| `bootsektoren/bootsec_cpa780.bin` | Bootsektor einer cpa780-Diskette (512 B) | — |
 
 Die BCU-Disketten (fünf davon Eigenbau: Kombi 40/80 Spuren, Arbeitsdiskette 40/80 Spuren, V2.1) und die beiden Bänder legt `tools/bcu_a5120/build.py` an (Wächter `cli_bcu_a5120`; die formatierte
 Kassette entsteht im Test `BcuKassette.FormatiertSchreibtLiest` mit `K1520_BEISPIELBAND=<pfad>`, Herkunft und Bedienung
@@ -93,16 +94,22 @@ die Wächter `cli_*` melden eine alte Fassung). `python3 tools/disketten_beigabe
 Beide Platten starten im `p8000emu` bis `WEGA login:` — Bedienung und Herkunft in der README des Ordners.
 Platten sind **gzip-gepackt** (`.img.gz`); der Emulator liest und schreibt sie so (Merkposten p8000 Nr. 56).
 
-## Bootsektoren (`bootsektoren/`) — Systemspuren zum Wiedereinspielen
+## Bootsektoren (`data/bootsektoren/`) — Systemspuren zum Wiedereinspielen
 
 Bootfähig wird eine Diskette durch die **Systemspuren** vor dem Dateisystem; das
 Lade-ROM liest Spur 0 blind ein, lange bevor es ein Dateisystem gibt. Diese Bytebänder
-liegen hier als `.bin` — damit legt das DiskTool eine **bootfähige** Diskette an:
+liegen als `.bin` in **`data/bootsektoren/`** (Installation: `share/k1520emu/bootsektoren/`),
+verzeichnet in **`data/bootsektor.yaml`** — dort steht zu jedem Abbild Beschreibung und
+Dateisystem, und von dort bietet das DiskTool sie unter *Neue Diskette ▸ Bootdiskette
+erstellen* an (Ticket #25).  Es sind genau die Systemspuren, aus denen die Bauskripte
+`tools/<…>/build.py` die Systemdisketten dieses Ordners bauen.  Auf der Kommandozeile:
 
 ```sh
-tools/dev.sh tool k1520disktool create neu.hfe --fs cpa780 --boot disks/bootsektoren/boot_cpa780.bin
+tools/dev.sh tool k1520disktool create neu.hfe --fs cpa780 --boot data/bootsektoren/boot_cpa780.bin
 tools/dev.sh tool k1520disktool put    neu.hfe auszug/          # @OS.COM und der Rest
 ```
+
+Herkunft der ältesten Abbilder (die übrigen stammen aus den Systemdisketten, die sie bauen):
 
 | Datei | Größe | System | Herkunft |
 |-------|-------|--------|----------|
@@ -113,7 +120,7 @@ tools/dev.sh tool k1520disktool put    neu.hfe auszug/          # @OS.COM und de
 | `boot_scpx8915_55k.bin` | 20480 | SCPX 8915 V5.3, Fassung „55 K“ (K8915; Zylinder 0–1 beidseitig 5×1024, **Ladekopf mit CRC**) | `k8915scpx_cpa800_k5601_bios55k-disk900.hfe` |
 | `boot_scpx8915_v24.bin` | 20480 | SCPX 8915 V5.3, Fassung „V24 XON/XOFF“ | `tests/fixtures/disks/k8915scpx_boot1.hfe` (Diskette 901) |
 
-K8915: `create neu.hfe --fs scpx8915 --boot disks/bootsektoren/boot_scpx8915_55k.bin` — der Name `scpx8915`
+K8915: `create neu.hfe --fs scpx8915 --boot data/bootsektoren/boot_scpx8915_55k.bin` — der Name `scpx8915`
 ist nötig (seine Systemspuren = Zylinder 0–1), und das Abbild muss einen gültigen
 K8915-Ladekopf tragen (ein CP/A-Abbild des A5120 wird abgewiesen).
 
@@ -128,7 +135,7 @@ die Diskette.
 >
 > ```sh
 > k1520disktool get    a5120_udos43_k5601_entwickler.hfe --to auszug     # Dateien + Beiblatt
-> k1520disktool create neu.hfe --fs udos_ds77 --label UDOS.SYS.4.3 --boot disks/bootsektoren/boot_udos43.bin
+> k1520disktool create neu.hfe --fs udos_ds77 --label UDOS.SYS.4.3 --boot data/bootsektoren/boot_udos43.bin
 > k1520disktool put    neu.hfe auszug
 > ```
 >

@@ -4,7 +4,7 @@
 build.py  -  die SCPX-Systemdiskette des K8915 bauen   (disks/k8915_scpx8915_v24_system.hfe)
 
 SCPX 8915 V 5.3, Anpassung „V24 (XON/XOFF)“ (die fruehere Diskette „901“; der Handschrift-Name der Diskette soll nicht
-mehr im Dateinamen stehen).  Systemspuren `bootabbild.bin` (= disks/boot_scpx8915_v24.bin), System- und Dienstdateien in
+mehr im Dateinamen stehen).  Systemspuren `data/bootsektoren/boot_scpx8915_v24.bin`, System- und Dienstdateien in
 `inhalt/` (DISGEN, FORMAT, POWER, RADE von 901; DUMP, PIP, SOFTKEY, STAT, SUBM von 900), dazu gemeinsame Programme
 (tools/scp_gemeinsam/) und die eigenen Pruefprogramme.  Nicht dabei: die Datentraegerkennung `***901.VOL`/`-SICHERH.901`.
 Alle Programme wurden am K8915-Emulator gestartet (Nachweis: README.md).
@@ -18,7 +18,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 import diskbau as db  # noqa: E402
 
-DISK = db.Diskette(__file__, 'k8915_scpx8915_v24_system.hfe', fs='scpx8915', boot='bootabbild.bin')
+DISK = db.Diskette(__file__, 'k8915_scpx8915_v24_system.hfe', fs='scpx8915', boot='boot_scpx8915_v24.bin')
 HIER = DISK.hier
 
 

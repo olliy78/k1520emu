@@ -1,0 +1,145 @@
+# ══════════════════════════════════════════════════════════════════════════════
+#  Hinterlegte Bootabbilder des k1520DiskTools  (Ticket #25)
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Eine Bootdiskette ist ein leeres Dateisystem plus ein Byteband in den
+# SYSTEMSPUREN (Urlader, Betriebssystemkern).  Im DiskTool: Datei ▸ Neue Diskette ▸
+# „Bootdiskette erstellen"; angeboten werden die Einträge, deren `filesystem` zum
+# gewählten Dateisystem passt — der erste ist vorgewählt, als letzter folgt immer
+# „Eigene .bin-Datei auswählen…".
+#
+# Je Eintrag:
+#   description  Text im Auswahlfeld
+#   filesystem   Dateisystem aus data/formats.yaml (`filesystems:`, Feld `name`)
+#   file         die .bin-Datei, relativ zu DIESER Datei (oder absolut)
+#
+# Liegt neben formats.yaml (Quellbaum `data/`, Installation `share/k1520emu/`), die
+# Abbilder im Ordner `bootsektoren/` daneben.  EIGENE Einträge gehören NICHT hierher
+# (ein Update überschreibt diese Datei), sondern in eine Datei gleichen Namens und
+# gleicher Form im Konfigurationsordner (`python3 app/main.py --paths`, Zeile
+# „Bootabbilder"); dort sind `file:`-Pfade relativ zu jener Datei.  Ein Eintrag, der
+# nicht taugt (Dateisystem unbekannt, Datei fehlt, größer als die Systemspuren),
+# wird übergangen und im Protokoll genannt.
+#
+# Aufgenommen ist nur, was eine STARTFÄHIGE Diskette ergibt: jedes Abbild hier baut
+# eine der Systemdisketten unter disks/ (tools/<…>/build.py, Wächter `cli_*`) oder ist
+# deren Beleg.  Ein Abbild allein macht noch kein laufendes System — die Dateien
+# (etwa `@OS.COM`, `OS`) kommen danach mit „Dateien einfügen" dazu.
+# Wächter dieser Datei: tests/python/test_disktool_bootsektoren.py.
+#
+# NICHT aufgenommen (2026-10-28): UDOS1715 (PC 1715) und UDOS 2.2 (P8000) — dort ist der
+# Weg „leere Diskette + Systemspuren + Dateien" nicht am Emulator geprüft.  UDOS 5.0 ist
+# geprüft (tests/python/test_disktool_bootsektoren.py bootet eine so gebaute Diskette).
+
+version: 1
+
+bootsektoren:
+
+  # ── A5120 ──────────────────────────────────────────────────────────────────
+  - description: "CP/A — A5120, K5601 (lädt @OS.COM)"
+    filesystem:  cpa780
+    file:        bootsektoren/boot_cpa780.bin
+
+  - description: "SCPX 1526 V1.7 — A5120, 5×1024"
+    filesystem:  scpx798
+    file:        bootsektoren/boot_scpx798.bin
+
+  - description: "SCPX 1526 V1.7 — A5120, 16×256"
+    filesystem:  scpx640
+    file:        bootsektoren/boot_scpx640.bin
+
+  - description: "UDOS 4.3 — A5120 (UDOS BC.5120)"
+    filesystem:  udos_ds77
+    file:        bootsektoren/boot_udos43.bin
+
+  # UDOS 5.0: Spur 0 Kopf 0 (Urlader + BFOS) UND der zweite Bootteil aus Spur 16H Sektor 07–09
+  # (4096 + 768 Byte) — Udos1715FileSystem::zweiterBootteil.  Danach mindestens OS, DDOS,
+  # ZDOS, OS.INIT einspielen (am einfachsten den ganzen Inhalt von disks/a5120_udos50/).
+  - description: "UDOS 5.0 — A5120 (BIZ FmSZBw Schwerin 1997)"
+    filesystem:  udos50
+    file:        bootsektoren/boot_udos50.bin
+
+  # ── BCU 880 am frühen A5120 (Lade-ROM V0.6) ────────────────────────────────
+  - description: "BCU 880 V1.2 Startdiskette „SYL auf Spur 1“ — Bildschirm K7023"
+    filesystem:  bcu880_syl
+    file:        bootsektoren/boot_bcu12_syl_k7023.bin
+
+  - description: "BCU 880 V1.2 Startdiskette „SYL auf Spur 1“ — Bildschirm K7024"
+    filesystem:  bcu880_syl
+    file:        bootsektoren/boot_bcu12_syl_k7024.bin
+
+  - description: "BCU 880 V1.2 Kombidiskette 40 Spuren — Bildschirm K7023"
+    filesystem:  bcu880_kombi
+    file:        bootsektoren/boot_bcu12_kombi_k7023.bin
+
+  - description: "BCU 880 V1.2 Kombidiskette 40 Spuren — Bildschirm K7024"
+    filesystem:  bcu880_kombi
+    file:        bootsektoren/boot_bcu12_kombi_k7024.bin
+
+  - description: "BCU 880 V1.2 Kombidiskette 80 Spuren — Bildschirm K7023"
+    filesystem:  bcu880_kombi80
+    file:        bootsektoren/boot_bcu12_kombi80_k7023.bin
+
+  - description: "BCU 880 V1.2 Kombidiskette 80 Spuren — Bildschirm K7024"
+    filesystem:  bcu880_kombi80
+    file:        bootsektoren/boot_bcu12_kombi80_k7024.bin
+
+  - description: "BCU 880 V1.2 Arbeitsdiskette (System für den Warmstart)"
+    filesystem:  bcu880
+    file:        bootsektoren/boot_bcu12_ohnesyl.bin
+
+  - description: "BCU 880 V1.2 Arbeitsdiskette 80 Spuren (System für den Warmstart)"
+    filesystem:  bcu880_80
+    file:        bootsektoren/boot_bcu12_ohnesyl.bin
+
+  # ── K8915 ──────────────────────────────────────────────────────────────────
+  - description: "SCPX 8915 V5.3 „V24 (XON/XOFF)“ — K8915"
+    filesystem:  scpx8915
+    file:        bootsektoren/boot_scpx8915_v24.bin
+
+  - description: "SCPX 8915 V5.3 „55 K“ — K8915"
+    filesystem:  scpx8915
+    file:        bootsektoren/boot_scpx8915_55k.bin
+
+  # ── PRG 710 / 710-1 ────────────────────────────────────────────────────────
+  - description: "UDOS 4.3 — PRG 710"
+    filesystem:  udos_ds77
+    file:        bootsektoren/boot_prg710_udos43.bin
+
+  - description: "UDOS 4.3 — PRG 710-1"
+    filesystem:  udos_ds77
+    file:        bootsektoren/boot_prg710-1_udos43.bin
+
+  - description: "SCPX V1.5 — PRG 710"
+    filesystem:  scpx640
+    file:        bootsektoren/boot_prg710_scpx15.bin
+
+  - description: "SCPX 1526 V1.7 — PRG 710-1"
+    filesystem:  scpx640
+    file:        bootsektoren/boot_prg710-1_scpx17.bin
+
+  # ── PC 1715 / 1715W ────────────────────────────────────────────────────────
+  - description: "CP/A 1715 — PC 1715 (Bootkopf im Verzeichnis)"
+    filesystem:  cpa1715
+    file:        bootsektoren/boot_pc1715_cpa1715.bin
+
+  - description: "SCP 1715 V0006 — PC 1715, 5×1024"
+    filesystem:  scp1715
+    file:        bootsektoren/boot_pc1715_scp1715_v0006.bin
+
+  - description: "SCP 1715 V0007 — PC 1715, 16×256"
+    filesystem:  scpx640
+    file:        bootsektoren/boot_pc1715_scp1715_v0007.bin
+
+  - description: "CP/Z 2.2 — PC 1715, 16×256"
+    filesystem:  scpx640
+    file:        bootsektoren/boot_pc1715_cpz22.bin
+
+  - description: "SCP 3.0 — PC 1715W, 5×1024"
+    filesystem:  scp1715
+    file:        bootsektoren/boot_pc1715w_scp30.bin
+
+  # ── P8000 ──────────────────────────────────────────────────────────────────
+  - description: "OS/M 3.0 — P8000 (8-Bit-Teil), Format 5"
+    filesystem:  osm640
+    file:        bootsektoren/boot_p8000_osm30.bin

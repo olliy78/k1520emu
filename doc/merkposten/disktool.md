@@ -135,8 +135,11 @@ Was beim Weiterarbeiten zu wissen ist:
   Spielart des PC 1715 (2026-08-18, `doc/udos1715_diskettenformat.md` §3.0a).**
   Die beiden Maschinen sind unverwandt (der P8000 startet mit dieser Diskette sein
   Hauptsystem **WEGA**); geteilt wird allein die Sitte, nach der eine Diskette
-  angelegt ist.  Das Dateisystemprofil heißt trotzdem `udos1715` — nach dem Ort der
-  Entschlüsselung, nicht nach der Maschine.  Eine WEGA-Startdiskette des **P8000**
+  angelegt ist.  Das Dateisystemprofil hieß bis 2026-10-28 für alle `udos1715`; seitdem
+  gibt es **drei** 640K-Profile `udos1715` / `udos_p8000` / `udos50`, getrennt allein an der
+  Füllung hinter dem Plan (`ndos_fill` = `00`/`77`/`ff`, `NdosFuellung`; Wächter
+  `NdosSitte.*`, `FsCatalog.Udos1715ProfileSindImgFaehigUndEinseitigGezaehlt`).  Gemischtes
+  00/77 zählt als P8000, damit jede bisher lesbare Diskette genau einem Profil zufällt.  Eine WEGA-Startdiskette des **P8000**
   (UDOS 2.2, 80×32×256, 250 kbit/s MFM) galt als unlesbar.  Sie ist Feld für Feld eine
   NDOS-Diskette; nur ihr Formatierer lässt zwischen Belegungsplan und Zählern den
   **`77H`-Nachlauf der ZDOS-Sitte** stehen (`179H` = `01`), und darauf bestand
@@ -155,6 +158,36 @@ Was beim Weiterarbeiten zu wissen ist:
   gegengeprüft (Datei einfügen → 4 Spuren zurückgeschrieben und geprüft, frisch
   zurückgelesen byteweise gleich, löschen → 2 Spuren; Vollmessung zeigt genau die
   gemeldeten Spuren geändert, danach aus der Sicherung wiederhergestellt).
+- **Hinterlegte Bootabbilder — `data/bootsektor.yaml` + `data/bootsektoren/` (2026-10-28,
+  Ticket #25).**  *Neue Diskette* bietet unter „Bootdiskette erstellen" die Abbilder des
+  gewählten Dateisystems an (erster vorgewählt, zuletzt „Eigene .bin-Datei auswählen…"),
+  ohne Eintrag ist der Haken grau; der Speichern-Dialog kommt erst nach „Diskette
+  anlegen".  Drei Festlegungen: **(1) EIN Ort für alle Systemspuren** — die Bauskripte
+  (`tools/diskbau.py::BOOTSEKTOREN`, `cpa_a5120`, `udos_a5120`, `prg_disketten`, `bcu_a5120`,
+  `cpa_pc1715`) lesen dieselben Dateien, die das DiskTool anbietet; die früheren Kopien
+  unter `tools/*/bootabbild*.bin` und `disks/bootsektoren/` sind weg.  Damit beweisen die
+  Wächter `cli_*` zugleich, dass jeder Katalogeintrag eine startfähige Diskette ergibt.
+  **(2) Aufgenommen wird nur, was eine startfähige Diskette ergibt** — die NDOS-Profile
+  PC 1715 und P8000 fehlen, weil dort ungeprüft; UDOS 5.0 ist drin und bootet
+  (`py_disktool_bootsektoren`).  **(3) Eigene Einträge in
+  `<config_dir>/bootsektor.yaml`** kommen HINZU; was nicht taugt (Dateisystem unbekannt,
+  Datei fehlt, zu groß), wird übergangen und ins Protokoll geschrieben, nie angeboten.
+  Wächter `py_disktool_bootsektoren` (auch: keine verwaiste `.bin` im Ordner).
+- **UDOS 5.0 am A5120 ist auf der Diskette NDOS, nicht ZDOS (2026-10-28,
+  `doc/udos1715_diskettenformat.md` §3.0a, `doc/udos_programme.md` §8).**  Dritte Sitte
+  nach PC 1715 und P8000: Zeigersektoren, 16×256, Spur = Zylinder, `.img` vollständig.
+  Unterschied allein die Füllung hinter dem Belegungsplan, **durchgehend `FFH`** (Spuren
+  80…87 belegt).  Nur durchgehend zugelassen, nicht byteweise gemischt.  **Eine
+  Bootdiskette baut das DiskTool seit 2026-10-28 selbst** (Katalog `bootsektor.yaml`,
+  Abbild `boot_udos50.bin`), dafür mussten drei Dinge stimmen (`doc/udos1715_diskettenformat.md`
+  §3.0b): **zweiter Bootteil in Spur 16H Sektor 07–09** (gehört zum Bootabbild, Verzeichnis-
+  sätze dort 05/0A/01/06/0B, Spur 16H/17H ganz belegt), **Verzeichnis von vorn füllen**
+  (BFOS hört am ersten leeren Satz auf — galt für alle NDOS-Disketten falsch) und **Byte
+  `179H` = `01`** (sonst `ERROR C4`).  Die frühere Vermutung „Verzeichniskopf ab `28H`" war
+  falsch.  Die Beispieldiskette wird trotzdem **umgewandelt, nicht neu gebaut**
+  (`tools/udos50_a5120/build.py`, Wächter `cli_udos50_a5120`: sektorgleich mit dem Original),
+  weil die leere Datei `ERR1` (0 Records) mit `put` nicht ablegbar ist.  Wächter:
+  `Udos1715A5120.*`, `bt_a5120_udos50_datum`, `py_disktool_bootsektoren`.
 - **UDOS1715/NDOS — die zweite UDOS-Ausprägung (2026-08-17,
   `doc/udos1715_diskettenformat.md`, Entwurf §21).**  Die Disketten des **PC 1715**
   tragen dasselbe Betriebssystem, aber ein anderes Dateisystem, weil der **µPD765**
@@ -224,7 +257,7 @@ Was beim Weiterarbeiten zu wissen ist:
   (`DiskVolume::insert/erase/setAttributes/makeDirectory/insertAll/applyRepairs/recoverRestore`), freier Platz 0:
   BCU sucht sein Verzeichnis ab Zylinder 2, dort liegt das System; eine Datei ab Zylinder 5 wäre nie sichtbar.
   `boot_header: bcu | bcu_syl` — Bootabbild wird vor `create`/`boot-put` geprüft.  Bootabbilder
-  `disks/bootsektoren/boot_bcu12_*.bin` sind `boot-get` der Belege (`build.py --check`).  Wächter `DisktoolBcu.*`.
+  `data/bootsektoren/boot_bcu12_*.bin` sind `boot-get` der Belege (`build.py --check`).  Wächter `DisktoolBcu.*`.
 - **PC 1715 / 1715W: der Bootkopf kann IM VERZEICHNIS stehen (2026-10-04, AP-D,
   `doc/design/21_pc1715.md`, `doc/pc1715/disketten.md` §3).**  Der Urlader S502 prüft von Spur 0
   Sektor 1 nur das Wort `F002H`/`F003H` (Bytes `02|03 F0`).  Zwei Profile (`boot_header: pc1715`):

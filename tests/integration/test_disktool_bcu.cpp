@@ -93,9 +93,9 @@ void schreibe(const std::string& p, const std::vector<uint8_t>& d) {
     f.write(reinterpret_cast<const char*>(d.data()), static_cast<std::streamsize>(d.size()));
 }
 
-/// Ein ausgeliefertes Bootabbild aus disks/bootsektoren/.
+/// Ein ausgeliefertes Bootabbild aus data/bootsektoren/ (neben disks/).
 std::string bootbin(const char* name) {
-    return (fs::path(A5120_LIEFERDISKETTEN) / "bootsektoren" / name).string();
+    return (fs::path(A5120_LIEFERDISKETTEN) / ".." / "data" / "bootsektoren" / name).string();
 }
 
 std::unique_ptr<DiskVolume> oeffne(const std::string& pfad, const char* fs_name = "",

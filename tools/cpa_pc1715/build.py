@@ -7,7 +7,7 @@ build.py  -  die CP/A-Systemdiskette des PC 1715 (mit mehreren BIOS-Fassungen) b
   disks/pc1715_cpa1715_system.hfe
 
 DIE CP/A-Diskette der Auslieferung fuer den PC 1715 (Gegenstueck zu tools/cpa_a5120/).  CP/A 1715
-hat keine Systemspuren: der Bootkopf (128 B, `bootabbild.bin`; zaehlen nur Platz 0 und der F0-Platz ab 0x60, Platz 1/2 sind mit E5 geleert) steht im Verzeichnis, und der
+hat keine Systemspuren: der Bootkopf (128 B, `data/bootsektoren/boot_pc1715_cpa1715.bin`; zaehlen nur Platz 0 und der F0-Platz ab 0x60, Platz 1/2 sind mit E5 geleert) steht im Verzeichnis, und der
 Lader liest `@OS.COM` als ERSTE Datei.  Daneben liegen weitere BIOS-Fassungen unter eigenem Namen,
 die man vom A>-Prompt startet (Versuch 2026-10-09: voller BIOS-Neustart, auch aus der 4-LW-Fassung):
 
@@ -44,7 +44,7 @@ a5120 = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(a5120)
 
 NAME = 'pc1715_cpa1715_system.hfe'
-BOOT = os.path.join(HIER, 'bootabbild.bin')
+BOOT = os.path.join(REPO, 'data', 'bootsektoren', 'boot_pc1715_cpa1715.bin')
 LIESMICH = 'LIESMICH.TXT'
 
 

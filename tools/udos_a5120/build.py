@@ -47,7 +47,7 @@ import disketten_beigaben as _db  # noqa: E402  (Ordner je Diskette)
 DISKETTEN = {
     '': ('a5120_udos43_k5601_entwickler.hfe', 'UDOS.A5120'),
 }
-BOOT = os.path.join(HIER, 'bootabbild.bin')
+BOOT = os.path.join(REPO, 'data', 'bootsektoren', 'boot_udos43.bin')
 
 
 def _lauf(tool, *args):

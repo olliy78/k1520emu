@@ -19,7 +19,7 @@ Beschreibung einer Diskette:
 
     import diskbau as db
     DISK = db.Diskette(__file__, 'a5120_scpx17_k5601_system.hfe', fs='scpx798',
-                       boot='bootabbild.bin',            # Systemspuren (None = keine)
+                       boot='boot_scpx798.bin',          # Systemspuren aus data/bootsektoren/ (None = keine)
                        create_args=[],                   # z. B. ['--prg', '710']
                        erste=[])                         # Dateien, die zuerst eingespielt werden muessen
     def soll(): ...                                      # {Diskettenname: Bytes}
@@ -36,6 +36,9 @@ import tempfile
 TOOLS = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(TOOLS)
 GEMEINSAM = os.path.join(TOOLS, 'scp_gemeinsam')
+#: Die Systemspuren aller Systemdisketten liegen an EINER Stelle - derselben, aus der das DiskTool
+#: seine hinterlegten Bootabbilder anbietet (data/bootsektor.yaml, Ticket #25).
+BOOTSEKTOREN = os.path.join(REPO, 'data', 'bootsektoren')
 
 sys.path.insert(0, TOOLS)
 import disketten_beigaben as _beigaben  # noqa: E402
@@ -93,7 +96,7 @@ class Diskette:
     def __init__(self, skript, name, fs, boot=None, create_args=(), erste=()):
         self.hier = os.path.dirname(os.path.abspath(skript))
         self.name, self.fs, self.create_args, self.erste = name, fs, list(create_args), list(erste)
-        self.boot = os.path.join(self.hier, boot) if boot else None
+        self.boot = os.path.join(BOOTSEKTOREN, boot) if boot else None
 
     # -- Werkzeug ---------------------------------------------------------------------------------------------
     @staticmethod

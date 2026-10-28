@@ -4,7 +4,7 @@
 build.py  -  die SCPX-Systemdiskette des A5120 bauen   (disks/a5120_scpx17_k5601_system.hfe)
 
 SCPX 1526 V 1.7 (52K), Format 5 x 1024 (`scpx798`, K5601).  Basis: die Hardy-Diskette `scpx17_5x1024_k5601_hardy`
-(Systemspuren `bootabbild.bin` = disks/boot_scpx798.bin, System- und Dienstdateien in `inhalt/`).  Dazu kommen
+(Systemspuren `data/bootsektoren/boot_scpx798.bin`, System- und Dienstdateien in `inhalt/`).  Dazu kommen
 gemeinsame Programme (tools/scp_gemeinsam/), die eigenen Pruefprogramme (EM256*, RAF*, SERTEST, ROMREAD, Lochband,
 KMBGTEST samt der Kassettenbibliothek KMBG.REL)
 und eine zu den A5120-Anschluessen passende TLC.PAR.  Die Programme wurden am A5120-Emulator unter SCPX gestartet
@@ -19,7 +19,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 import diskbau as db  # noqa: E402
 
-DISK = db.Diskette(__file__, 'a5120_scpx17_k5601_system.hfe', fs='scpx798', boot='bootabbild.bin')
+DISK = db.Diskette(__file__, 'a5120_scpx17_k5601_system.hfe', fs='scpx798', boot='boot_scpx798.bin')
 HIER = DISK.hier
 
 

@@ -13,7 +13,7 @@ Die beiden Disketten gehen auf die Belege doc/a5120_alt/bcu/satz2_SYL_auf_Spur1/
 satz2_OhneSYL.1/disk.img zurueck (NIE aendern):
 
   * Die **Arbeitsdiskette** ist der Beleg, mit dem DiskTool unveraendert nach .hfe gewandelt
-    (`save-as`).  Ihre Systemspuren sind das Bootabbild disks/bootsektoren/boot_bcu12_ohnesyl.bin.
+    (`save-as`).  Ihre Systemspuren sind das Bootabbild data/bootsektoren/boot_bcu12_ohnesyl.bin.
   * Die **Startdiskette** wird GEBAUT: `create --fs bcu880_syl --boot boot_bcu12_syl_k7023.bin`
     (das Bootabbild = Zylinder 0-4 des Belegs; das DiskTool prueft Lader und Selbstpruefung vor dem
     Anlegen).  Gegenprobe: zurueck nach .img muss der Beleg sein, Sektor fuer Sektor — damit ist
@@ -53,7 +53,7 @@ import disketten_beigaben as _db  # noqa: E402  (Ordner je Diskette)
 
 BELEGE = os.path.join(REPO, 'doc', 'a5120_alt', 'bcu')
 
-BOOTSEKTOREN = os.path.join(REPO, 'disks', 'bootsektoren')
+BOOTSEKTOREN = os.path.join(REPO, 'data', 'bootsektoren')
 
 #: Diskette in disks/ -> (Beleg, Zusatzargumente der Wandlung)  — ueber `save-as` gewandelt
 DISKETTEN = {
@@ -88,7 +88,7 @@ KOMBI_ABBILDER = {
     'boot_bcu12_kombi80_k7023.bin': ('boot_bcu12_syl_k7023.bin', 80),
     'boot_bcu12_kombi80_k7024.bin': ('boot_bcu12_syl_k7024.bin', 80),
 }
-#: Bootabbild in disks/bootsektoren/ -> Beleg, dem es mit `boot-get` entnommen ist
+#: Bootabbild in data/bootsektoren/ -> Beleg, dem es mit `boot-get` entnommen ist
 BOOTABBILDER = {
     'boot_bcu12_syl_k7023.bin': os.path.join(BELEGE, 'satz2_SYL_auf_Spur1', 'disk.img'),
     'boot_bcu12_syl_k7024.bin': os.path.join(BELEGE, 'satz1_SYL_auf_Spur1', 'disk.img'),
@@ -139,7 +139,7 @@ def _bauen(tool, beleg, fs, boot, ziel, tmp):
 
 
 def _bootabbilder_ok(tool, tmp):
-    """Die Bootabbilder in disks/bootsektoren/ sind `boot-get` ihrer Belege (Kombi: gebaut aus dem Startabbild)."""
+    """Die Bootabbilder in data/bootsektoren/ sind `boot-get` ihrer Belege (Kombi: gebaut aus dem Startabbild)."""
     ok = True
     sys.path.insert(0, os.path.join(REPO, 'tools'))
     import bcu_kombi_bau

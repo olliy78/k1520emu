@@ -6,7 +6,7 @@ anderen Systemdisketten des Pakets). Anwenderbeschreibung: `inhalt/LIESMICH.TXT`
 
 | Quelle | Inhalt |
 |--------|--------|
-| `bootabbild.bin` | Systemspuren (= `disks/bootsektoren/boot_scpx798.bin`, aus der Hardy-Diskette) |
+| `bootabbild.bin` | Systemspuren (= `data/bootsektoren/boot_scpx798.bin`, aus der Hardy-Diskette) |
 | `inhalt/` | System und Dienste der Hardy-Diskette: `SYL17`/`CCPBD17`/`BIOSG617,G717,K617,K717.SYS`, `SYSP`, `SYSG`, `INIT`, `MODF`, `MODX`, `SEPR`, `PIP`, `POWER`, `STAT`, `HARDY` |
 | `tools/scp_gemeinsam/` | TP 3.0 (+TPINSCPA), WM, DIENST, BASIC, PASCAL, M80/LINKMT/MLOAD/Z1/ZSID, RAMTEST, DIMA, UNERA, DISKCOPY, TLC (+ `TLC.PAR` für K8025 A, 9600 Bd — im Emulator mit dem TLC-Installationsmenü erzeugt), EM256TST |
 | Beigaben | SERTEST, ROMREAD, EM256ADR, EM16ABL, EM256FUL, RAFCPM, RAF512, LBREAD, LBPUNCH, KMBGTEST + KMBG.REL (Kassette K5020, `tools/kassette/kmbgtest/`, Bibliothek `doc/kassette/fex/KMBG.REL`) (`tools/disketten_beigaben.py`), RAFTEST (Adresse 88H/89H), RAFQUICK |

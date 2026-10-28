@@ -47,6 +47,7 @@ GW=yes
 DISKS_DEFAULT="a5120_cpa_k5601_system.hfe
 a5120_scpx17_k5601_system.hfe
 a5120_udos43_k5601_entwickler.hfe
+a5120_udos50_k5601_system.hfe
 k8915_scpx8915_v24_system.hfe
 prg710_udos43_k5601_system.hfe
 prg710-1_udos43_k5601_v43_189.hfe
@@ -556,6 +557,13 @@ cp "$REPO/tools/kermit80/COPYRIGHT.txt" \
     || die "app/kermittool/help/handbuch.md fehlt in der Payload"
 
 cp "$REPO/data/formats.yaml" "$STAGE/payload/share/k1520emu/formats.yaml"
+# Hinterlegte Bootabbilder des DiskTools (Ticket #25): Katalog + die .bin daneben in
+# bootsektoren/ — app/paths.py::bootsektor_file sucht share/k1520emu/ vor data/.
+cp "$REPO/data/bootsektor.yaml" "$STAGE/payload/share/k1520emu/bootsektor.yaml" \
+    || die "data/bootsektor.yaml fehlt"
+mkdir -p "$STAGE/payload/share/k1520emu/bootsektoren"
+cp "$REPO"/data/bootsektoren/*.bin "$STAGE/payload/share/k1520emu/bootsektoren/" \
+    || die "data/bootsektoren/*.bin fehlen"
 # Auslieferungskonfiguration: der Zustand nach der Erstinstallation und das Ziel
 # von *Ansicht > Standard zuruecksetzen* (app/config_io.py::standard_konfiguration)
 # — je Programm eine (A5120, K8915, PRG710, PC1715, P8000 und MC80 Emulator; app/profil.py).

@@ -9,7 +9,7 @@ build.py  -  die beiden UDOS-Lieferdisketten der PRG 710 / 710-1 aus EINEM Ordne
 
 Beide tragen dasselbe UDOS 4.3 und dieselben Programme; verschieden sind nur
 
-  * die Systemspuren (Tastatur-/MKE-Treiber des Geraets)  -> variante/<geraet>/bootabbild.bin
+  * die Systemspuren (Tastatur-/MKE-Treiber des Geraets)  -> data/bootsektoren/boot_prg<geraet>_udos43.bin
   * die Datei OS (nur die Kennung `UDOS PRG710` / `UDOS PG710-1`) -> variante/<geraet>/Side0/OS
 
 Alles andere liegt EINMAL in `inhalt/Side0` und `inhalt/Side1` (mit `.fileinfo`, das die
@@ -34,6 +34,11 @@ import tempfile
 
 HIER = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HIER))
+
+
+def _bootabbild(geraet):
+    """Systemspuren des Geraets (`710` / `710-1`) - in data/bootsektoren/ wie alle anderen."""
+    return os.path.join(REPO, 'data', 'bootsektoren', f'boot_prg{geraet}_udos43.bin')
 sys.path.insert(0, os.path.join(REPO, 'tools'))
 import disketten_beigaben as _db  # noqa: E402  (Ordner je Diskette)
 
@@ -87,7 +92,7 @@ def bauen(tool, geraet, ausgabe):
         quelle = os.path.join(tmp, 'q')
         _sammeln(geraet, quelle)
         _lauf(tool, 'create', ziel, '--fs', 'udos_ds77', '--label', label,
-              '--boot', os.path.join(HIER, 'variante', geraet, 'bootabbild.bin'),
+              '--boot', _bootabbild(geraet),
               '--prg', geraet)
         _lauf(tool, 'put', ziel, quelle, '--no-backup')
     pruefung = _lauf(tool, 'check', ziel, '--full')
@@ -113,7 +118,7 @@ def pruefen(tool, geraet, ausgabe):
         boot = os.path.join(tmp, 'boot.bin')
         _lauf(tool, 'boot-get', diskette, boot)
         boot_ok = (open(boot, 'rb').read()
-                   == open(os.path.join(HIER, 'variante', geraet, 'bootabbild.bin'), 'rb').read())
+                   == open(_bootabbild(geraet), 'rb').read())
     ok = True
     for n in sorted(set(soll) | set(ist)):
         if n not in ist:

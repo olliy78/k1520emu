@@ -504,10 +504,13 @@ Daraus folgt:
 Disketten vom **PC 1715** tragen UDOS mit dem Treiber **NDOS** statt ZDOS. Das
 Werkzeug erkennt sie von selbst und nennt sie `udos1715`.
 
-Dieselben Disketten schreibt auch der **EAW P8000** (dort UDOS 2.2, z. B. seine
-WEGA-Startdiskette). Die beiden Rechner haben nichts miteinander zu tun — sie legen
-ihre Disketten nur gleich an; der Name `udos1715` benennt das Dateisystem, nicht die
-Maschine. Für die Bedienung macht es keinen Unterschied.
+Dieselben Disketten schreiben auch der **EAW P8000** (dort UDOS 2.2, z. B. seine
+WEGA-Startdiskette) und der **A5120 unter UDOS 5.0**. Die Rechner haben nichts
+miteinander zu tun — sie legen ihre Disketten nur gleich an. Das Werkzeug zeigt
+trotzdem, von welchem Rechner eine Diskette stammt: **`udos1715`** (PC 1715),
+**`udos_p8000`** (P8000) oder **`udos50`** (A5120, UDOS 5.0). Erkannt wird das an
+einer einzigen Stelle, der Füllung hinter dem Belegungsplan (Spur 17H, Sektor 0,
+Bytes 158H–176H: `00`, `77` bzw. `FF`). Für die Bedienung macht es keinen Unterschied.
 
 Drei Dinge sind dort anders als bei den A5120-Disketten:
 
@@ -525,7 +528,11 @@ UDOS/ZDOS; Eigenschaften-Dialog und Beiblatt gelten unverändert.
 
 Angelegt wird eine solche Diskette mit dem Dateisystem `udos1715`
 (80 Spuren beidseitig, 640 KB), `udos1715_ss80` (320 KB) oder `udos1715_ss40`
-(160 KB).
+(160 KB); `udos_p8000` und `udos50` legen dieselbe 640-KB-Diskette mit der Füllung
+des jeweiligen Rechners an. Für **UDOS 5.0** gibt es ein hinterlegtes Bootabbild: mit
+„Bootdiskette erstellen“ und danach den Dateien der Beispieldiskette
+`a5120_udos50/a5120_udos50_k5601_system.hfe` (mindestens `OS`, `DDOS`, `ZDOS`, `OS.INIT`)
+entsteht eine startfähige Diskette.
 
 ## Was eine Datei außer ihren Bytes hat
 
@@ -593,8 +600,10 @@ führt und jede Datei für sich vollständig haben will, schaltet es ein.
 
 ## Neue Disketten und Bootdisketten
 
-*Datei ▸ Neue Diskette* (Strg+N) legt eine formatierte, leere Diskette an. Gefragt
-werden Dateisystem, Datei und Datenträgername.
+*Datei ▸ Neue Diskette* (Strg+N) legt eine formatierte, leere Diskette an. Im
+Auswahlfenster wählt man das Dateisystem und — falls gewünscht — das Bootabbild; erst
+nach **Diskette anlegen** fragt das Werkzeug nach der Datei (neuer Name oder eine
+vorhandene zum Überschreiben) und nach dem Datenträgernamen.
 
 Bei den **UNIX-Dateisystemen** (WEGA, MUTOS 8000, MUTOS 1700) steht im Auswahlfenster
 unter dem Dateisystem der Haken **Abweichende Anzahl von Inodes**. Das Zahlenfeld zeigt zunächst
@@ -605,15 +614,36 @@ die Diskette passen; die Inode-Liste selbst belegt Blöcke, die für Daten fehle
 bleibt mehr Platz für Daten, größer lassen sich mehr (kleine) Dateien ablegen. Auf der
 Kommandozeile heißt es `create --inodes N`.
 
-Wo es Systemspuren gibt, wird zusätzlich gefragt, ob die Diskette **bootfähig**
-sein soll. Dann braucht es ein Bootabbild (`.bin`) — das holt man sich mit
-*Diskette ▸ Bootabbild sichern* aus einer vorhandenen Bootdiskette. Passt das
-Abbild nicht in die Systemspuren, wird gar nichts angelegt und die Meldung nennt
-beide Größen.
+Darunter steht der Haken **Bootdiskette erstellen** mit einem Auswahlfeld daneben. Das
+Feld bietet die **hinterlegten Bootabbilder** des gewählten Dateisystems an — die
+Systemspuren aller mitgelieferten Systemdisketten (CP/A, SCPX, UDOS 4.3, BCU 880,
+SCPX 8915, PRG 710, SCP 1715, CP/Z, SCP 3.0, OS/M, UDOS 5.0). Der erste passende ist vorgewählt;
+mehrere gibt es, wo dasselbe Dateisystem auf verschiedenen Rechnern bootet (`scpx640`:
+A5120, PRG 710/710-1, PC 1715). Der letzte Eintrag, **Eigene .bin-Datei auswählen…**,
+fragt sofort nach einer Datei — etwa einem Abbild, das man mit *Diskette ▸ Bootabbild
+sichern* aus einer vorhandenen Bootdiskette geholt hat. Gibt es für das Dateisystem
+keinen hinterlegten Eintrag (Datendisketten wie `cpa800`, aber auch `udos1715` und
+`udos_p8000`, für die der Weg noch nicht geprüft ist), ist der Haken grau. Passt ein eigenes Abbild nicht in
+die Systemspuren, wird gar nichts angelegt und die Meldung nennt beide Größen.
+
+Die Auswahl steht in der Datei `bootsektor.yaml` neben dem Formatkatalog, die Abbilder
+im Ordner `bootsektoren/` daneben (*Hilfe* bzw. `--paths` nennt den Ort). **Eigene
+Einträge** gehören in eine Datei gleichen Namens im Konfigurationsordner — sie kommt zu
+den mitgelieferten hinzu und übersteht ein Update:
+
+    version: 1
+    bootsektoren:
+      - description: "Mein CP/A mit Sondertreiber"
+        filesystem:  cpa780
+        file:        meine_abbilder/cpa_sonder.bin
+
+`filesystem` ist ein Name aus der Dateisystemliste des Dialogs, `file` ein Pfad relativ
+zu dieser Datei. Ein Eintrag, der nicht taugt, erscheint nicht im Feld; den Grund nennt
+das Protokoll.
 
 Für den **K8915** (SCPX 8915) heißt das Dateisystem `scpx8915`; das Bootabbild muss den
 Ladekopf einer K8915-Systemdiskette tragen — ein A5120-Abbild wird abgewiesen, bevor
-etwas angelegt wird. Fertige Abbilder liegen im Ordner `disks/` des Quellbaums.
+etwas angelegt wird.
 
 Für den **PC 1715** und den **1715W** (SCP 3.0) heißt es `scp1715`; **CP/A 1715** hat keine
 Systemspuren, sein Bootkopf steht in den ersten Verzeichnisplätzen (`cpa1715`, Bootabbild =

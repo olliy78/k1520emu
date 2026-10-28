@@ -48,6 +48,7 @@ from PySide6.QtWidgets import (
 
 from app import paths
 from app.disktool.ui.archiv_dialog import ArchivDialog
+from app.disktool import bootsektoren
 from app.disktool.ui.neu_dialog import NeuDialog
 from app.disktool.archive import NAMENLOS, create_archive, dateiname
 
@@ -2707,11 +2708,17 @@ class MainWindow(QMainWindow):
             return
         # tar720 (mit Inhalt) laesst sich nicht anlegen — angeboten wird die LEERE tar-Diskette.
         eintraege = neu_eintraege()
-        dlg = NeuDialog(eintraege, self)
+        # Hinterlegte Bootabbilder (bootsektor.yaml, Ticket #25); was nicht taugt, steht im Protokoll.
+        abbilder, warnungen = bootsektoren.brauchbare(
+            {f.name: f.boot_capacity for f in filesystems()})
+        for w in warnungen:
+            self.log(f"Bootabbilder: {w}")
+        dlg = NeuDialog(eintraege, abbilder, self, ordner=self._disketten_ordner())
         if dlg.exec() != QDialog.Accepted:
             return
         fs = dlg.dateisystem()
         inodes = dlg.inodes()           # 0 = Vorgabe (nur WEGA/MUTOS)
+        boot = dlg.bootabbild()         # None = gewoehnliche Diskette
         pfad, _ = QFileDialog.getSaveFileName(
             self, "Neue Diskette anlegen", self._disketten_ordner(),
             "HFE-Abbild (*.hfe);;DMK-Abbild (*.dmk);;Sektorabbild (*.img);;"
@@ -2723,41 +2730,8 @@ class MainWindow(QMainWindow):
             self._fehler("Neue Diskette", grund)
             return
 
-        # Bootfaehig? — nur, wo es Systemspuren gibt (eine Datendiskette wie cpa800
-        # beginnt auf Zylinder 0 und kann gar nicht booten).
-        boot = self._bootabbild_waehlen(fs)
-        if boot is False:          # Auswahl abgebrochen → gar nichts anlegen
-            self.log("Neue Diskette: abgebrochen (kein Bootabbild ausgewählt)")
-            return
-
         label, _ = QInputDialog.getText(self, "Neue Diskette", "Datenträgername:")
-        self.create_disk(pfad, fs, label or "", boot or None, inodes)
-
-    def _bootabbild_waehlen(self, filesystem: str):
-        """Bootabbild für eine neue Diskette erfragen.
-
-        Returns:
-            Pfad (str) · ``None`` = gewöhnliche Diskette · ``False`` = abgebrochen,
-            es soll gar nichts angelegt werden.
-        """
-        platz = next((f.boot_capacity for f in filesystems() if f.name == filesystem), 0)
-        if platz <= 0:
-            return None
-
-        frage = QMessageBox.question(
-            self, "Neue Diskette",
-            f"Soll die Diskette bootfähig sein?\n\n"
-            f"Die Systemspuren von „{filesystem}\" fassen {platz} Byte. "
-            f"Ein Bootabbild (.bin) holt man mit „Bootabbild sichern\" aus einer "
-            f"vorhandenen Bootdiskette.",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-        if frage != QMessageBox.Yes:
-            return None
-
-        pfad, _ = QFileDialog.getOpenFileName(
-            self, "Bootabbild auswählen", self._disketten_ordner(),
-            "Bootabbild (*.bin);;Alle Dateien (*)")
-        return pfad or False
+        self.create_disk(pfad, fs, label or "", str(boot) if boot else None, inodes)
 
     def _speichern_unter_dialog(self) -> None:
         if self.tool is None:
