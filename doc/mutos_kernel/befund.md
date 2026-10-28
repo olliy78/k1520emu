@@ -68,3 +68,22 @@ Vergleich `md2/{bin,lib}` der WEGA-3.1-Platte gegen die MUTOS-Disketten: alle Da
 **Berichtigung zu `kernel_namen.md`:** nach `/dev` ist cdevsw[1] = `/dev/tty` (Kontrollterminal, V7 `sy`), cdevsw[2] = `mem` (V7 `mmread` arbeitet mit `passc`/`cpass`);
 die Namen `mm*` (6C8E..) und `dev2*` (69CE..) sind vertauscht, `lp` ist cdevsw[5], nicht [7].  Der `fd`-Treiber benutzt `mapalloc` (also ebenfalls die Mailbox zur U880-Seite);
 welches Geraet er bedient, ist offen.
+
+## Schutzversuch: koennen sich Prozesse ohne MMU gegenseitig ueberschreiben? (gemessen 2026-10-28)
+
+`tools/mutos8000/kernel/versuch_schutz/` (`wache.c`, `schreib.c`, `lauf.sh`): zwei `wache` im Hintergrund (4-KB-Puffer mit 5A, Pruefung alle 2 s),
+dann `schreib`, das alles zwischen seinem Datenende und seinem Stapel mit AA fuellt.  Ergebnis am Bildschirm:
+```
+wache A pid=22 buf=12C6..22C5 sp=FFB6
+wache B pid=23 buf=12C6..22C5 sp=FFB6
+schreib pid=24 end=1534 top=FEB6
+schreib: 59778 Bytes ueberschrieben
+wache B: heil
+```
+(`wache A` war schon vor `schreib` fertig; `wache B` lief waehrend `schreib` und blieb heil.)  Abdeckung je Segment: S0 Kernel, N1/N2/N3 Anwender.
+
+**Befund:** jeder Prozess hat den GANZEN 64-KB-Raum seines Segments (Stapel bei FFB6, beide `wache` liegen auf denselben Adressen), ein zweiter Prozess
+kann also nicht im selben Segment liegen.  Die Vermutung "zwei kleine Prozesse teilen sich ein Segment und koennen sich ueberschreiben" ist **widerlegt**:
+Prozesse sind gegeneinander geschuetzt, weil das Segment nur der Kernel wechseln kann.  Die Vergabe in 256-Byte-Stuecken (`coremap`) dient der Groesse,
+nicht dem Teilen.  Folge: hoechstens drei Prozesse gleichzeitig im Speicher, jeder weitere wird ganz ausgelagert (hier: `init`, `sh`, zwei `wache`, `schreib`).
+Nicht geprueft: Schutz des Kernels vor einem Prozess (Segment 0 ist fuer N-Betrieb nicht erreichbar, E/A-Befehle sind privilegiert -- erwartet, nicht versucht).
