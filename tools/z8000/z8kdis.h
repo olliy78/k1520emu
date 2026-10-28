@@ -31,6 +31,15 @@
  *   ik   <adr> <text>                    Zeilenkommentar HINTER der Zeile
  *   eq   <marke> <wert>                  Marke ausserhalb der Segmente (EQU)
  *
+ * Linkkarte (AP K5, Entwurf 41 §4.2; gleiche Datei oder eigene, `--karte` darf mehrfach stehen):
+ *   modul <name> <tvon> <tbis> <dvon> <dbis>   ein Modul in Linkreihenfolge: Text [tvon,tbis), Daten [dvon,dbis)
+ *                                        (hex, Ende AUSSCHLIESSLICH; `- -` = leer)
+ *   bss  <von> <bis>                     Bereich der Common-/BSS-Variablen (Ende = `_end`)
+ *   konst <adr> ...                      Befehle, deren Direktwert KEINE Adresse ist
+ *   konstwert <wert> ...                 Werte, die nie Adressen sind (z. B. FCW C000)
+ *   adr  <adr> ...                       Befehle, deren Direktwert im Textbereich eine Adresse ist
+ *   dwp  <von> <bis>                     Woerter (Adresse bis einschl.), die Adressen sind
+ *
  * @license MIT
  */
 #pragma once
@@ -67,6 +76,13 @@ struct Karte {
     std::map<uint32_t, std::string> name;
     std::multimap<uint32_t, std::string> kom, ik;
     std::vector<std::pair<std::string, uint32_t>> eq;
+    // Linkkarte
+    struct Modul { std::string name; uint32_t tvon = 0, tbis = 0, dvon = 0, dbis = 0; };
+    std::vector<Modul> moduln;
+    bool bssGesetzt = false;
+    uint32_t bssVon = 0, bssBis = 0;
+    std::set<uint32_t> konst, konstWert, adr;
+    std::vector<std::pair<uint32_t, uint32_t>> dwp;
 
     static bool zahl(const std::string& s, uint32_t& v) {
         std::string t = s;
@@ -129,6 +145,28 @@ struct Karte {
                 ls >> t;
                 if (!zahl(t, x)) return fail("adr text erwartet");
                 (kw == "kom" ? kom : ik).insert({x, rest()});
+            } else if (kw == "modul") {
+                while (ls >> t && t[0] != '#') a.push_back(t);
+                auto num = [&](const std::string& q, uint32_t& v) { if (q == "-") { v = 0; return true; } return zahl(q, v); };
+                Modul m;
+                if (a.size() != 5 || !num(a[1], m.tvon) || !num(a[2], m.tbis) || !num(a[3], m.dvon) || !num(a[4], m.dbis) ||
+                    m.tbis < m.tvon || m.dbis < m.dvon)
+                    return fail("modul name tvon tbis dvon dbis");
+                m.name = a[0];
+                moduln.push_back(m);
+            } else if (kw == "bss") {
+                while (ls >> t && t[0] != '#') a.push_back(t);
+                if (a.size() != 2 || !zahl(a[0], x) || !zahl(a[1], y) || y < x) return fail("von bis erwartet");
+                bssGesetzt = true; bssVon = x; bssBis = y;
+            } else if (kw == "konst" || kw == "konstwert" || kw == "adr") {
+                while (ls >> t && t[0] != '#') {
+                    if (!zahl(t, x)) return fail("Zahl erwartet");
+                    (kw == "konst" ? konst : kw == "konstwert" ? konstWert : adr).insert(x);
+                }
+            } else if (kw == "dwp") {
+                while (ls >> t && t[0] != '#') a.push_back(t);
+                if (a.size() != 2 || !zahl(a[0], x) || !zahl(a[1], y) || y < x) return fail("von bis erwartet");
+                dwp.push_back({x, y});
             } else if (kw == "eq") {
                 std::string m; ls >> m >> t;
                 if (m.empty() || !zahl(t, x)) return fail("marke wert erwartet");
@@ -217,9 +255,12 @@ public:
         // Marken: alles, worauf gezeigt wird
         for (const auto& kv : karte.name) gewuenscht_.insert(kv.first);
         for (uint32_t a : karte.code) gewuenscht_.insert(a);
+        link_ = !karte.moduln.empty();
+        if (link_) linkVorbereiten();
         for (auto& kv : code_) {
             const z8k::Line& l = kv.second;
             if (l.hasTarget) gewuenscht_.insert(lin(l.targetSeg, l.target));
+            if (link_) { linkOperanden(kv.first, l); continue; }
             for (int i = 0; i < l.dec.nops; ++i) {
                 const z8k::Operand& o = l.dec.op[i];
                 // Indizierte Adressen unterhalb von 0100 sind meist Strukturversaetze (`4(R2)`),
@@ -228,6 +269,7 @@ public:
                     if (!o.shortSeg) gewuenscht_.insert(lin(l.dec.seg ? o.seg : 0, o.value));
             }
         }
+        if (link_) linkWoerter();
         for (const auto& kv : wortArt_) {
             uint32_t v;
             // Art 1 (dw): nur Namen einsetzen, wo es die Marke ohnehin gibt -- sonst wuerde jede
@@ -242,6 +284,12 @@ public:
             if (einheitStart_.count(a)) {
                 auto n = karte.name.find(a);
                 marke_[a] = n != karte.name.end() ? n->second : autoName(a);
+                // Linkmodus: der as/ld unterscheidet nur 8 Zeichen -- laengere Namen bekommen die Adressmarke
+                if (link_) {
+                    // nur die ersten 8 Zeichen zaehlen: zu lange oder in 8 Zeichen doppelte Namen -> Adressmarke
+                    std::string k = marke_[a].substr(0, 8);
+                    if (marke_[a].size() > 8 || !acht_.insert(k).second) { langName_[a] = marke_[a]; marke_[a] = autoName(a); }
+                }
             } else {
                 ++stat.marken_mitten;
             }
@@ -289,6 +337,25 @@ public:
             if (ok && n >= minBefehle) r.push_back({a, k.second, n});
         }
         return r;
+    }
+
+    /// Alle Operanden der Befehle, die Adressen sein koennen (DA, X, IMW, IML): eine Zeile je Operand
+    /// `ADR ART WERT BEFEHL` -- Grundlage der Linkkarte (AP K5, Entwurf 41 §4.2).
+    std::string referenzen() const {
+        std::string o; char b[160];
+        for (const auto& kv : code_) {
+            const z8k::Line& l = kv.second;
+            for (int i = 0; i < l.dec.nops; ++i) {
+                const z8k::Operand& op = l.dec.op[i];
+                const char* art = op.kind == z8k::Kind::DA ? "DA" : op.kind == z8k::Kind::X ? "X" :
+                                  op.kind == z8k::Kind::IMW ? "IMW" : op.kind == z8k::Kind::IML ? "IML" : nullptr;
+                if (!art) continue;
+                std::snprintf(b, sizeof b, "%04X %s %04X %s\n", unsigned(kv.first & 0xFFFF), art,
+                              unsigned(op.value & 0xFFFF), l.text.c_str());
+                o += b;
+            }
+        }
+        return o;
     }
 
     /// Tabellenzeilen (Insn::index), die als Code dekodiert wurden (vor der Kanonisch-Pruefung) -- fuer Tests.
@@ -368,6 +435,107 @@ private:
     std::vector<Einheit> einheiten_;
     std::set<uint32_t> einheitStart_;
     std::map<uint32_t, std::string> marke_;
+    // ── Linkmodus (AP K5) ──
+    bool link_ = false;
+    uint32_t datenAb_ = 0, bssVon_ = 0, bssBis_ = 0;
+    std::set<uint32_t> bssRef_;                    ///< gerade Basisadressen der referenzierten BSS-Variablen
+    std::set<uint32_t> callZiel_;                  ///< Ziele von CALL (Funktionsanfaenge)
+    std::set<std::string> acht_;
+    std::map<uint32_t, std::string> langName_;     ///< Namen ueber 8 Zeichen (nur Kommentar)
+
+    bool inBss(uint32_t v) const { return v >= bssVon_ && v < bssBis_; }
+
+    std::string bssName(uint32_t basis) const {
+        auto n = karte.name.find(basis);
+        return n != karte.name.end() && n->second.size() <= 8 ? n->second : autoName(basis);
+    }
+
+    /// Adresse v als Symbolausdruck, wenn sie im Linkmodus ein Symbol ist (Marke, BSS-Variable, `_end`).
+    bool symbolText(uint32_t v, std::string& t) const {
+        if (v == bssBis_ && bssBis_) { t = "_end"; return true; }
+        if (inBss(v)) { t = bssName(v & ~1u) + ((v & 1) ? "+%1" : ""); return true; }
+        auto m = marke_.find(v);
+        if (m == marke_.end()) return false;
+        t = m->second;
+        return true;
+    }
+
+    /// Ist der Direktwert-Operand i des Befehls bei pc eine Adresse?  (Regeln: Kopf der Karte / Entwurf 41 §4.2)
+    bool immAdresse(uint32_t pc, const z8k::Line& l, int i) const {
+        const z8k::Operand& o = l.dec.op[i];
+        if (o.kind != z8k::Kind::IMW) return false;
+        uint32_t v = o.value & 0xFFFF;
+        if (karte.konst.count(pc)) return false;
+        if (karte.adr.count(pc)) return true;
+        if (karte.konstWert.count(v)) return false;
+        if (v >= datenAb_ && v <= bssBis_) return true;
+        if (v < 0x100) return false;
+        const char* mn = l.dec.insn->mn;
+        // Funktionszeiger werden nur mit PUSH/LD uebergeben; `AND R2,#%7F00` trifft zufaellig einen Funktionsanfang
+        return (!std::strcmp(mn, "PUSH") || !std::strcmp(mn, "LD")) &&
+               (callZiel_.count(v) || karte.name.count(v) || std::find(karte.code.begin(), karte.code.end(), v) != karte.code.end());
+    }
+
+    void linkAdresse(uint32_t v) {                 // Ziel einer Adresse vormerken
+        if (v == bssBis_ && bssBis_) return;
+        if (inBss(v)) bssRef_.insert(v & ~1u);
+        else if (imAbbild(v)) gewuenscht_.insert(v);
+    }
+
+    void linkVorbereiten() {
+        datenAb_ = ~0u;
+        for (const auto& m : karte.moduln) if (m.dbis > m.dvon) datenAb_ = std::min(datenAb_, m.dvon);
+        if (datenAb_ == ~0u) datenAb_ = 0;
+        bssVon_ = karte.bssGesetzt ? karte.bssVon : 0;
+        bssBis_ = karte.bssGesetzt ? karte.bssBis : 0;
+        for (const auto& kv : code_) {
+            const z8k::Line& l = kv.second;
+            if (l.hasTarget && l.dec.insn && !std::strcmp(l.dec.insn->mn, "CALL")) callZiel_.insert(l.target);
+        }
+        for (const auto& m : karte.moduln) {          // Modulgrenzen sind Zeilengrenzen
+            if (imAbbild(m.tvon)) gewuenscht_.insert(m.tvon);
+            if (m.dbis > m.dvon && imAbbild(m.dvon)) gewuenscht_.insert(m.dvon);
+        }
+    }
+
+    void linkOperanden(uint32_t pc, const z8k::Line& l) {
+        for (int i = 0; i < l.dec.nops; ++i) {
+            const z8k::Operand& o = l.dec.op[i];
+            uint32_t v = o.value & 0xFFFF;
+            if (o.kind == z8k::Kind::DA && !o.shortSeg) {
+                linkAdresse(v);
+            } else if (o.kind == z8k::Kind::X && !o.shortSeg) {
+                if (v >= datenAb_ && v < bssBis_) linkAdresse(v);
+            } else if (immAdresse(pc, l, i)) {
+                linkAdresse(v);
+            }
+        }
+    }
+
+    /// Datenwoerter, die Adressen sind: Marken bzw. BSS-Symbole vormerken.
+    void linkWoerter() {
+        for (const auto& kv : wortArt_) {
+            uint32_t v;
+            if (!wort(kv.first, v)) continue;
+            if (kv.second == 1 && v >= datenAb_ && v <= bssBis_ && !karte.konstWert.count(v)) linkAdresse(v);
+        }
+        for (const auto& r : karte.dwp)
+            for (uint32_t a = r.first; a <= r.second; a += 2) {
+                uint32_t v;
+                if (wort(a, v)) linkAdresse(v);
+            }
+    }
+
+    /// Ist das Datenwort bei a (Wert v) eine Adresse?  (nach der Markenbildung)
+    bool wortIstAdresse(uint32_t a, uint32_t v) const {
+        for (const auto& r : karte.dwp) if (a >= r.first && a <= r.second) return true;
+        auto w = wortArt_.find(a);
+        if (w == wortArt_.end() || w->second == 0) return false;
+        if (w->second == 2) return true;
+        if (karte.konstWert.count(v)) return false;
+        if (v >= datenAb_ && v <= bssBis_) return true;
+        return v >= 0x400 && marke_.count(v) && (callZiel_.count(v) || karte.name.count(v) || code_.count(v));
+    }
 
     static uint32_t lin(unsigned seg, uint32_t off) { return (uint32_t(seg) << 16) | (off & 0xFFFF); }
     uint32_t zielAdr(uint32_t wortAdr, uint32_t v) const {
@@ -394,6 +562,12 @@ private:
                     wortArt_[a] = d.art == Art::Dwc ? 2 : 1;
                     if (d.art == Art::Dwc) wortCode_.insert(a);
                 }
+            }
+        // dwp: Woerter, die Adressen sind -- als Wortdaten fuehren (auch wo die Karte `db` sagt)
+        for (const auto& r : karte.dwp)
+            for (uint32_t a = r.first; a <= r.second; a += 2) {
+                decl_[a] = Art::Dw; decl_[a + 1] = Art::Dw;
+                wortArt_[a] = 1;
             }
         // PSA: je 8 Byte [reserviert, FCW, Segment, Offset]; der Offset ist ein Code-Einstieg.
         static const char* const psaName[8] = {"Reset", "Erweiterter Befehl", "Privilegierter Befehl",
@@ -620,6 +794,19 @@ private:
             switch (o.kind) {
             case z8k::Kind::CC: t = as ? asBedingung(z8k::ccName(o.value)) : std::string(z8k::ccName(o.value)); break;
             case z8k::Kind::DA: case z8k::Kind::X: {
+                if (as && link_ && !o.shortSeg) {
+                    // Linkmodus: nur Adressen im Abbild/BSS werden Symbole; Strukturversaetze (X < Datenanfang) und
+                    // absolute Adressen oberhalb des BSS (u-Bereich, Postfach) bleiben Zahlen
+                    uint32_t v = o.value & 0xFFFF;
+                    std::string st;
+                    if ((o.kind == z8k::Kind::DA || (v >= datenAb_ && v < bssBis_)) && symbolText(v, st)) {
+                        t = st;
+                        if (o.kind == z8k::Kind::X) t += "(" + fest(z8k::detail::regName(z8k::Kind::RW, o.reg)) + ")";
+                    } else {
+                        t = fest(z8k::formatOperand(o, l.dec.seg, pcSeg, next));
+                    }
+                    break;
+                }
                 uint32_t ad = lin(l.dec.seg ? o.seg : 0, o.value);
                 auto m = marke_.find(ad);
                 bool strukturVersatz = (o.kind == z8k::Kind::X && o.value < 0x100);   // s. analysieren()
@@ -634,6 +821,12 @@ private:
             case z8k::Kind::RA16: case z8k::Kind::RA8: case z8k::Kind::RA7: case z8k::Kind::RA12: {
                 uint16_t tg = uint16_t(next + o.disp);
                 t = zielText(lin(pcSeg, tg), z8k::formatOperand(o, l.dec.seg, pcSeg, next));
+                break;
+            }
+            case z8k::Kind::IMW: {
+                std::string st;
+                if (as && link_ && immAdresse(pc, l, i) && symbolText(o.value & 0xFFFF, st)) t = "#" + st;
+                else t = fest(z8k::formatOperand(o, l.dec.seg, pcSeg, next));
                 break;
             }
             default: t = fest(z8k::formatOperand(o, l.dec.seg, pcSeg, next));
@@ -701,7 +894,12 @@ private:
             for (uint32_t k = 0; k < e.len; k += 2) {
                 uint32_t v = 0; wort(e.adr + k, v);
                 std::string z = hex(v, 4);
-                if (e.wortMarke[k / 2]) z = zielText(zielAdr(e.adr + k, v), z);
+                if (as && link_) {
+                    std::string st;
+                    if (wortIstAdresse(e.adr + k, v) && symbolText(v, st)) z = st;
+                } else if (e.wortMarke[k / 2]) {
+                    z = zielText(zielAdr(e.adr + k, v), z);
+                }
                 s += wv(z, k == 0);
             }
             break;
@@ -788,6 +986,8 @@ private:
 
     // ── Dialekt des MUTOS-as (PLZ/ASM) ───────────────────────────────────────
     std::string asQuelle() const;
+    std::string asEinheit(const Einheit& e) const;
+    bool asModul(std::string& aus) const;
 
 public:
     /// Schnittstellen fuer die As-Ausgabe in Stuecken (`opt.teil`): Bereiche [von, bis) von hoechstens
@@ -840,7 +1040,124 @@ private:
     std::map<uint32_t, std::string> demotiert_;   // Befehle ohne kanonische Kodierung (Text zur Anzeige)
 };
 
+
+inline bool Analyse::asModul(std::string& aus) const {
+    // Modulausgabe (AP K5): Text [tvon,tbis) als EIN Unterprogramm, Daten [dvon,dbis) dahinter im Datenabschnitt.
+    // Fremde Marken sind fuer `as -u` undefinierte Symbole (Aufloesung durch ld); eigene, anderswo benutzte werden GLOBAL.
+    const auto& mods = karte.moduln;
+    auto sauber = [](const std::string& n) { std::string r = "p_"; for (char c : n) r += std::isalnum(static_cast<unsigned char>(c)) ? c : '_'; return r; };
+    char b[160];
+    auto eigener = [&](const Karte::Modul& m, uint32_t a) {
+        return (a >= m.tvon && a < m.tbis) || (a >= m.dvon && a < m.dbis);
+    };
+    auto rumpfVon = [&](const Karte::Modul& m, std::string& text, std::string& daten) {
+        for (const Einheit& e : einheiten_) {
+            if (e.adr >= m.tvon && e.adr < m.tbis) text += asEinheit(e);
+            else if (e.adr >= m.dvon && e.adr < m.dbis) daten += asEinheit(e);
+        }
+    };
+    auto tokens = [](const std::string& t, std::set<std::string>& out) {
+        std::string tok;
+        for (size_t i = 0; i <= t.size(); ++i) {
+            char c = i < t.size() ? t[i] : ' ';
+            if (std::isalnum(static_cast<unsigned char>(c)) || c == '_') tok += c;
+            else { if (!tok.empty()) out.insert(tok); tok.clear(); }
+        }
+    };
+    if (opt.modul == "bss") {
+        // Gemeinsame Variablen (BSS): eine Vereinbarung je Symbol, Groesse = Abstand zum naechsten
+        std::set<uint32_t> basen = bssRef_;
+        basen.insert(bssVon_);
+        // Der ld teilt echte Gemeinsame Variablen in Hash-Reihenfolge zu (gemessen) -- nicht in der des Abbilds.  Deshalb
+        // werden sie hier als nullgefuellte GLOBAL-Vereinbarungen in der Adressfolge ans Ende des Datenabschnitts gelegt;
+        // das Abbild ist nur Text+Daten (die Nullen dahinter sind im Original BSS), `_end` stimmt ebenfalls.
+        aus = "bss module\n$NONSEGMENTED\nconstant\n\tG\t:= global\n\tA\t:= array\n\tB\t:= byte\n";
+        for (auto it = basen.begin(); it != basen.end(); ++it) {
+            auto nx = std::next(it);
+            uint32_t ende = nx == basen.end() ? bssBis_ : *nx;
+            std::snprintf(b, sizeof b, "G\t%s\tA[%%%X B]\n", bssName(*it).c_str(), unsigned(ende - *it));
+            aus += b;
+        }
+        aus += "end bss\n";
+        return true;
+    }
+    const Karte::Modul* mm = nullptr;
+    for (const auto& m : mods) if (m.name == opt.modul) mm = &m;
+    if (!mm) return false;
+    std::string text, daten;
+    rumpfVon(*mm, text, daten);
+    // fremd benutzte eigene Marken -> GLOBAL
+    std::set<std::string> fremd;
+    for (const auto& m : mods) {
+        if (&m == mm) continue;
+        std::string t, d; rumpfVon(m, t, d);
+        tokens(t, fremd); tokens(d, fremd);
+    }
+    std::set<std::string> eigen;
+    tokens(text, eigen); tokens(daten, eigen);
+    std::string o = mm->name + " module\n$NONSEGMENTED\nconstant\n"
+        "\tFP\t:= r14\n\tSP\t:= r15\n\tX\t:= external\n\tG\t:= global\n\tI\t:= internal\n\tA\t:= array\n"
+        "\tPR\t:= procedure\n\tE\t:= entry\n\tB\t:= byte\n\tW\t:= word\n\tBV\t:= bval\n\tWV\t:= wval\n"
+        "\tLV\t:= lval\n\tL\t:= label\n";
+    std::set<std::string> definiert;
+    std::string globale;
+    for (const auto& kv : marke_) {
+        if (!eigener(*mm, kv.first)) continue;
+        definiert.insert(kv.second);
+        if (fremd.count(kv.second)) globale += "G\n" + kv.second + "\tL\n";
+    }
+    for (const auto& eq : karte.eq)
+        if (eigen.count(eq.first)) { std::snprintf(b, sizeof b, "\t%s\t:= %%%X\n", eq.first.c_str(), unsigned(eq.second)); o += b; }
+    for (uint32_t a : gewuenscht_) {
+        if (marke_.count(a)) continue;
+        std::string n = autoName(a);
+        if (eigen.count(n)) { std::snprintf(b, sizeof b, "\t%s\t:= %%%X\n", n.c_str(), unsigned(a & 0xFFFF)); o += b; }
+    }
+    o += globale;
+    std::string pn = "_" + sauber(mm->name);
+    if (!text.empty()) {
+        o += "G\t" + pn + "\tPR\nE\n" + text + "end " + pn + "\n";
+    } else {
+        o += "G\t" + pn + "\tPR\nE\nend " + pn + "\n";
+    }
+    if (!daten.empty()) o += "I\n" + daten;
+    o += "end " + mm->name + "\n";
+    aus = o;
+    return true;
+}
+
+inline std::string Analyse::asEinheit(const Einheit& e) const {
+    std::string r;
+        auto pk = psaKom_.equal_range(e.adr);
+        for (auto it = pk.first; it != pk.second; ++it) r += "! " + it->second + " !\n";
+        auto kk = karte.kom.equal_range(e.adr);
+        for (auto it = kk.first; it != kk.second; ++it) r += "! " + it->second + " !\n";
+        auto dm = demotiert_.find(e.adr);
+        if (dm != demotiert_.end()) r += "! nicht kanonisch kodiert: " + dm->second + " !\n";
+        auto m = marke_.find(e.adr);
+        if (m != marke_.end()) r += m->second + ":\n";
+        std::string text;
+        if (e.typ == Einheit::Befehl && (e.line.dec.insn->has(z8k::Z8K_ALT) || asLehntSprungAb(e))) {
+            // Zweitkodierung (LDB.L): der as hat keine Schreibweise dafuer -> Woerter.  Ebenso ein JR an der
+            // Reichweitengrenze (K4, gemessen: der as meldet fuer -127 Woerter `ILLEGAL VALUE`, die CPU kann es).
+            Einheit w = e; w.typ = Einheit::Dw; w.wortMarke.assign(e.len / 2, false);
+            text = "! " + befehlText(e.line, e.adr, true) + " !\n\t" + datenText(w, true);
+        } else {
+            text = e.typ == Einheit::Befehl ? befehlText(e.line, e.adr, true) : datenText(e, true);
+        }
+        std::string ik;
+        auto ii = karte.ik.equal_range(e.adr);
+        for (auto it = ii.first; it != ii.second; ++it) ik += (ik.empty() ? "\t! " : " ") + it->second;
+        if (!ik.empty()) ik += " !";
+        // Mnemonik und Operanden durch Tabulator getrennt wie bei cc
+        size_t sp = text.find(' ');
+        if (e.typ == Einheit::Befehl && sp != std::string::npos && text.compare(0, 1, "!") != 0) text[sp] = '\t';
+        r += "\t" + text + ik + "\n";
+    return r;
+}
+
 inline std::string Analyse::asQuelle() const {
+    if (link_ && !opt.modul.empty()) { std::string m; if (asModul(m)) return m; }
     // Geruest nach `cc -S` (Beleg: doc/mutos_kernel/as_dialekt.md): Modulkopf, Abkuerzungen, EIN globales
     // Unterprogramm um das ganze Abbild (alle Marken sind dort lokal), Daten inline als BV/WV.
     // UNBELEGT bleibt: ob der as Daten innerhalb eines Unterprogramms und `$ABS` so annimmt.
@@ -865,31 +1182,7 @@ inline std::string Analyse::asQuelle() const {
         if (opt.teil && (e.adr < opt.teilVon || e.adr >= opt.teilBis)) continue;
         // `$ABS` wird NICHT geschrieben (K4, gegen den Gast-as gemessen): der as legt dann gar keinen Text an.
         // Luecken gibt es nicht -- was die Karte nicht als Code fuehrt, bleibt DW/DB, das Abbild ist lueckenlos.
-        auto pk = psaKom_.equal_range(e.adr);
-        for (auto it = pk.first; it != pk.second; ++it) rumpf += "! " + it->second + " !\n";
-        auto kk = karte.kom.equal_range(e.adr);
-        for (auto it = kk.first; it != kk.second; ++it) rumpf += "! " + it->second + " !\n";
-        auto dm = demotiert_.find(e.adr);
-        if (dm != demotiert_.end()) rumpf += "! nicht kanonisch kodiert: " + dm->second + " !\n";
-        auto m = marke_.find(e.adr);
-        if (m != marke_.end()) rumpf += m->second + ":\n";
-        std::string text;
-        if (e.typ == Einheit::Befehl && (e.line.dec.insn->has(z8k::Z8K_ALT) || asLehntSprungAb(e))) {
-            // Zweitkodierung (LDB.L): der as hat keine Schreibweise dafuer -> Woerter.  Ebenso ein JR an der
-            // Reichweitengrenze (K4, gemessen: der as meldet fuer -127 Woerter `ILLEGAL VALUE`, die CPU kann es).
-            Einheit w = e; w.typ = Einheit::Dw; w.wortMarke.assign(e.len / 2, false);
-            text = "! " + befehlText(e.line, e.adr, true) + " !\n\t" + datenText(w, true);
-        } else {
-            text = e.typ == Einheit::Befehl ? befehlText(e.line, e.adr, true) : datenText(e, true);
-        }
-        std::string ik;
-        auto ii = karte.ik.equal_range(e.adr);
-        for (auto it = ii.first; it != ii.second; ++it) ik += (ik.empty() ? "\t! " : " ") + it->second;
-        if (!ik.empty()) ik += " !";
-        // Mnemonik und Operanden durch Tabulator getrennt wie bei cc
-        size_t sp = text.find(' ');
-        if (e.typ == Einheit::Befehl && sp != std::string::npos && text.compare(0, 1, "!") != 0) text[sp] = '\t';
-        rumpf += "\t" + text + ik + "\n";
+        rumpf += asEinheit(e);
     }
     if (opt.teil) {
         // Stueckweise Ausgabe: Marken ausserhalb des Stuecks sind fuer den as absolute Konstanten

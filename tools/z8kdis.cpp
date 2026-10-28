@@ -24,7 +24,7 @@ void usage() {
         "Aufruf: z8kdis [optionen] abbild.bin\n"
         "  --base ADR            Ladeadresse (hex, Vorgabe 0); ohne --seg/Karte-seg ein Segment\n"
         "  --seg ADR:OFFSET:LEN  Ladesegment (hex, mehrfach); Adresse = Ladeadresse, Offset in der Datei\n"
-        "  --karte DATEI         Kartendatei (Kopf von tools/z8000/z8kdis.h)\n"
+        "  --karte DATEI         Kartendatei (Kopf von tools/z8000/z8kdis.h); mehrfach moeglich (z. B. dazu die Linkkarte)\n"
         "  --entry ADR           Einstieg der Codeverfolgung (hex, mehrfach)\n"
         "  --psa ADR[:ANZAHL]    Programmstatus-Feld ab ADR (je 8 Byte; Vorgabe 8 Eintraege)\n"
         "  --format listing|as|z8k   Ausgabe (Vorgabe listing)\n"
@@ -38,6 +38,7 @@ void usage() {
         "  --statistik           Statistik (Code/Daten/unerreicht) auf stderr\n"
         "  --vorschlaege         Kandidaten fuer weitere Code-Einstiege als Kartenzeilen (nur Hinweis);\n"
         "                        die Statistik auf stderr zeigt zusaetzlich den Stand MIT allen Vorschlaegen\n"
+        "  --referenzen          alle Adress-Operanden der Befehle: `ADR ART WERT BEFEHL` (Linkkarte, AP K5)\n"
         "  --pruefen             Rundlauf: Ausgabe (z8k) wieder zu Bytes, vergleichen; keine Ausgabe\n"
         "  -o DATEI              Ausgabe in Datei statt Standardausgabe\n");
 }
@@ -54,9 +55,10 @@ bool lies(const std::string& p, std::string& out) {
 
 int main(int argc, char** argv) {
     z8kdis::Analyse an;
-    std::string datei, kartePfad, aus;
+    std::string datei, aus;
+    std::vector<std::string> kartePfade;
     uint32_t base = 0;
-    bool stat = false, pruefen = false, vorschlag = false;
+    bool stat = false, pruefen = false, vorschlag = false, referenzen = false;
     uint32_t teile = 0;
     std::vector<uint32_t> entries;
     std::vector<std::pair<uint32_t, uint32_t>> psa;
@@ -75,7 +77,7 @@ int main(int argc, char** argv) {
             }
             segs.push_back({x, y, z});
         }
-        else if (a == "--karte") kartePfad = arg();
+        else if (a == "--karte") kartePfade.push_back(arg());
         else if (a == "--entry") { if (!z8kdis::Karte::zahl(arg(), x)) { usage(); return 2; } entries.push_back(x); }
         else if (a == "--psa") {
             std::string s = arg(); uint32_t n = 8;
@@ -104,6 +106,7 @@ int main(int argc, char** argv) {
         else if (a == "--segmentiert") an.opt.segmentiert = true;
         else if (a == "--statistik") stat = true;
         else if (a == "--pruefen") pruefen = true;
+        else if (a == "--referenzen") referenzen = true;
         else if (a == "--vorschlaege") vorschlag = true;
         else if (a == "-o") aus = arg();
         else if (a == "-h" || a == "--help") { usage(); return 0; }
@@ -114,7 +117,7 @@ int main(int argc, char** argv) {
 
     std::string bin;
     if (!lies(datei, bin)) { std::fprintf(stderr, "z8kdis: %s nicht lesbar\n", datei.c_str()); return 1; }
-    if (!kartePfad.empty()) {
+    for (const auto& kartePfad : kartePfade) {          // mehrere Karten werden hintereinander gelesen
         std::string k, err;
         if (!lies(kartePfad, k)) { std::fprintf(stderr, "z8kdis: Karte %s nicht lesbar\n", kartePfad.c_str()); return 1; }
         if (!an.karte.lesen(k, err)) { std::fprintf(stderr, "z8kdis: %s\n", err.c_str()); return 1; }
@@ -130,6 +133,7 @@ int main(int argc, char** argv) {
         for (const auto& t : an.schnitte(teile)) std::printf("%X %X\n", unsigned(t.first), unsigned(t.second));
         return 0;
     }
+    if (referenzen) { std::fputs(an.referenzen().c_str(), stdout); return 0; }
     if (vorschlag) {
         auto v = an.vorschlaege();
         for (const auto& e : v)

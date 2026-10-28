@@ -332,3 +332,60 @@ TEST(Z8kdisAs, JrAnDerReichweitengrenzeWirdZuWort) {
     EXPECT_NE(t.find("! jr ne,"), std::string::npos) << t;
     EXPECT_NE(t.find("\tWV %EE81\n"), std::string::npos) << t;
 }
+
+// ── Linkkarte / Modulausgabe (AP K5) ─────────────────────────────────────────
+TEST(Z8kdisLink, ModulMitGlobalenUndFremdenSymbolen) {
+    // Zwei Module: m1 ruft eine Funktion in m2 und liest eine Variable im BSS; m2 wird von m1 benutzt (GLOBAL).
+    const char* q =
+        "  ORG 0\n"
+        "  A1: CALL B1\n"
+        "      LD R0,%8100\n"
+        "      PUSH @R15,#B1\n"
+        "      LD R1,#%0010\n"          // kleine Zahl: Konstante, keine Adresse
+        "      RET\n"
+        "  B1: NOP\n"
+        "      RET\n"
+        "  D1: DW %1234\n"
+        "  DE: DW %0000\n";
+    const char* karte =
+        "name 0 a1\nname 12 b1\n"
+        "code 0\n"
+        "dw 16 19\n"
+        "modul m1 0 12 - -\n"
+        "modul m2 12 16 16 1A\n"
+        "bss 8100 8104\n";
+    auto bin = baue(q);
+    Analyse an = analysiere(bin, karte, 0, Format::As);
+    an.opt.modul = "m1";
+    std::string t = an.ausgeben();
+    EXPECT_NE(t.find("\tcall\tb1\n"), std::string::npos) << t;       // fremde Marke bleibt Name
+    EXPECT_NE(t.find("L8100"), std::string::npos) << t;               // BSS-Variable als Symbol
+    EXPECT_NE(t.find("push\t@r15,#%0012"), std::string::npos) << t;  // Direktwert unter 0100 ist nie eine Adresse
+    EXPECT_NE(t.find("#%0010"), std::string::npos) << t;              // kleine Zahl bleibt Zahl
+    EXPECT_EQ(t.find("\nb1:"), std::string::npos) << t;               // b1 gehoert nicht zu m1
+    an.opt.modul = "m2";
+    t = an.ausgeben();
+    EXPECT_NE(t.find("G\nb1\tL\n"), std::string::npos) << t;          // von m1 benutzt -> GLOBAL
+    EXPECT_NE(t.find("b1:\n"), std::string::npos) << t;
+    EXPECT_NE(t.find("\nI\n"), std::string::npos) << t;               // Daten im Datenabschnitt
+    an.opt.modul = "bss";
+    t = an.ausgeben();
+    EXPECT_NE(t.find("G\tL8100\tA[%4 B]"), std::string::npos) << t;   // Gemeinsame Variable mit Groesse
+}
+
+TEST(Z8kdisLink, KarteLiestLinkkartenZeilen) {
+    Karte k; std::string err;
+    EXPECT_TRUE(k.lesen("modul a 0 10 - -\nmodul b 10 20 20 30\nbss 100 200\nkonstwert 8000 8800\nkonst 4\nadr 6\ndwp 10 12\n", err)) << err;
+    ASSERT_EQ(k.moduln.size(), 2u);
+    EXPECT_EQ(k.moduln[1].dbis, 0x30u);
+    EXPECT_TRUE(k.bssGesetzt);
+    EXPECT_EQ(k.konstWert.size(), 2u);
+    EXPECT_FALSE(k.lesen("modul a 0 10\n", err));
+}
+
+TEST(Z8kdisLink, ReferenzenListetAdressOperanden) {
+    Analyse an = analysiere(baue(kProgramm), "code 0\n");
+    std::string r = an.referenzen();
+    EXPECT_NE(r.find(" DA "), std::string::npos) << r;                // CALL SUB
+    EXPECT_NE(r.find(" IMW 1234 "), std::string::npos) << r;
+}

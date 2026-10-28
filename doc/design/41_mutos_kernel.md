@@ -181,6 +181,7 @@ Linkkarte und Entscheidungen bei uns; Bau-Kollisionen beachten (Worktrees).
 | K7c | teilweise: main, trap, sig, sys1-4, text, machdep, malloc, ureg, slp-Rest -- 82 von 97 Funktionen bytegleich; offen exece, getxfile, trap, procxmt, swtch, newproc, rdwr, malloc | | `c_rueckbau.md` (AP K7c) |
 | K7d | teilweise: Treiber und Konfiguration -- rk/mem/syXXX 13/13, tty 11/11, tty2 11/13, lp 4/7, dev0 4/7 (+3 nahe; Modul ohne `-O` uebersetzt), **conf.c Datenbytes 8766..88C5 gleich**; offen ttioctl, ttyinput+Teile, ttyoutput, fdstart, fdioctl; Gesamtuebersicht am Ende von c_rueckbau.md | | `c_rueckbau.md` (AP K7d) |
 | K7e | teilweise: alle Funktionen jetzt in C (kein C: 0) -- clock, ttioctl/ttyinput+Teile/ttyoutput, fdstart/fdintr/fdioctl, badblock; **sysent 8B58 Daten bytegleich**; Gesamtstand 167 gleich / 14 nahe / 28 offen / 26 Assembler | | `c_rueckbau.md` (AP K7e) |
+| K5 | fertig: **36 352 von 36 352 Byte bytegleich aus 29 Modulen** (`as -u` + `ld -s` im Gast, ~4 Min.); **Verschiebe-Test bestanden** (`nop` in `prf`, Kernel bootet bis `#`, `ls -l /`) | | `linkbau.py`, `linkkarte.txt`, `s/*.s`, `z8kdis --modul`; Befunde (Commons in Hash-Folge, Postfach ab D256 absolut, Daten nicht nach Modulen trennbar): `doc/mutos_kernel/linkbau.md` |
 | K6a | fertig | 10ea95b7 | Code 28 % -> 85 %, 235 Funktionen (207 mit `call csv`), `bdevsw`/`cdevsw`/`sysent`/Konfigworte belegt, Modulreihenfolge = WEGA-Linkreihenfolge (Hypothese); `kernel_struktur.md`, `cover` fuer U8001 im Debugger |
 
 ## 7. Risiken

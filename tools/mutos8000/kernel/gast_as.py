@@ -144,3 +144,62 @@ def gast_assemblieren(arbeit, teile, ausgabe=None, kommando=">asm.out;as %s.s >/
         obj = open(ob, "rb").read() if os.path.exists(ob) else None
         erg[n] = (err, obj)
     return erg
+
+
+def gast_befehle(arbeit, quellen, befehle, rueck, frist=3_000_000_000, extra_dateien=None, ausgabe=None):
+    """Allgemeiner Gastlauf (AP K5): `quellen` {name: bytes|str} kommen auf die Quelldiskette D (im Gast /mnt = Arbeitsordner),
+    `befehle` laufen nacheinander in der Shell (Rueckmeldung je Befehl ueber eine Marke), danach werden die Dateien
+    `rueck` aus /tmp (eigene leere Diskette A) geholt.  Rueckgabe {name: bytes oder None}.
+    Befehle schreiben ihre Meldungen selbst nach /tmp/<name> (`>/tmp/x.err 2>&1`)."""
+    pruefe_hilfsmittel()
+    arbeit = os.path.abspath(arbeit)
+    os.makedirs(arbeit, exist_ok=True)
+    for ziel, quelle in PLATTEN.items():
+        shutil.copyfile(os.path.join(DISKS, quelle), os.path.join(arbeit, ziel))
+    q = os.path.join(arbeit, "q")
+    shutil.rmtree(q, ignore_errors=True)
+    os.makedirs(q)
+    for n, t in quellen.items():
+        with open(os.path.join(q, n), "wb") as f:
+            f.write(t if isinstance(t, bytes) else t.encode("latin-1"))
+    for i in range(1, len(befehle) + 1):
+        with open(os.path.join(q, "fertig%d" % i), "w") as f:
+            f.write("ENDE%d\n" % i)
+    with open(os.path.join(q, "fertigs"), "w") as f:
+        f.write("ENDES\n")
+    for img in ("tmp.hfe", "quelle.hfe"):
+        p = os.path.join(arbeit, img)
+        if os.path.exists(p):
+            os.remove(p)
+    rc, o = _lauf([DISKTOOL, "create", os.path.join(arbeit, "tmp.hfe"), "--fs", "mutos8k_26x128_mfm", "--inodes", "200"])
+    if rc:
+        raise RuntimeError("create tmp: " + o)
+    rc, o = _lauf([DISKTOOL, "create", os.path.join(arbeit, "quelle.hfe"), "--fs", "mutos8k_26x128_mfm", "--inodes",
+                   str(len(quellen) + len(befehle) + 40)])
+    if rc:
+        raise RuntimeError("create quelle: " + o)
+    dateien = [os.path.join(q, f) for f in sorted(os.listdir(q))]
+    for i in range(0, len(dateien), 20):
+        rc, o = _lauf([DISKTOOL, "put", os.path.join(arbeit, "quelle.hfe")] + dateien[i:i + 20])
+        if rc:
+            raise RuntimeError("put: " + o)
+    skript = os.path.join(arbeit, "lauf.dbg")
+    with open(skript, "w") as f:
+        f.write(dbg_skript(arbeit, befehle, "%s", frist))
+    log = os.path.join(arbeit, "lauf.log")
+    t0 = time.time()
+    with open(log, "w") as lf:
+        subprocess.run([DEV, "tool", "k1520dbg", "--rw", "--em", "em256", "--laufwerke", "K5601,K5601,K5601,K5601",
+                        os.path.join(arbeit, "boot.hfe"), "-x", skript], stdout=lf, stderr=subprocess.STDOUT, cwd=WURZEL)
+    if ausgabe is not None:
+        ausgabe["dauer"] = time.time() - t0
+        ausgabe["log"] = log
+    holen = os.path.join(arbeit, "zurueck")
+    shutil.rmtree(holen, ignore_errors=True)
+    os.makedirs(holen)
+    erg = {}
+    for n in rueck:
+        _lauf([DISKTOOL, "get", os.path.join(arbeit, "tmp.hfe"), n, "--to", holen])
+        pf = os.path.join(holen, n)
+        erg[n] = open(pf, "rb").read() if os.path.exists(pf) else None
+    return erg
