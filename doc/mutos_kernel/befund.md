@@ -48,3 +48,23 @@ Vergleich `md2/{bin,lib}` der WEGA-3.1-Platte gegen die MUTOS-Disketten: alle Da
   ganze Prozesse nach rk2 ab Block 250 aus.  Geteilte Texte gibt es nicht (`xlock`/`xunlock` sind Leerfunktionen, `expand` ebenso).
 * Offen: ob ein Prozess immer ein ganzes Segment belegt (Karte `malloc` in welcher Einheit), wie `copyin`/`copyout` das Fremdsegment erreichen
   (vermutlich kurz segmentiert mit `<<seg>>`-Adresse), Swap-Verhalten mit vier und mehr Prozessen gemessen.
+
+## Geraetetabellen und Treiber (aus dem Abbild gelesen, 2026-10-28)
+
+`bdevsw` 8766 (8 B je Eintrag) und `cdevsw` 8796 (14 B), abgeglichen mit den Knoten in `/dev` der Wurzel:
+
+| Tabelle | Major | Treiber | `/dev` | im Lauf |
+|---------|-------|---------|--------|---------|
+| bdevsw | 0 | `fd*` (7E16..85B0, Tab 8E6A) | — | nie |
+| bdevsw | 4 | `rk` (Disketten ueber `mutos_io`) | rk0-3, swap | ja |
+| cdevsw | 0 | Konsole + tty1 (60CC..) | console 0,0; tty1 0,1 | Konsole ja, tty1 nein |
+| cdevsw | 1 | 6C8E..6D12 | tty 1,0 | — |
+| cdevsw | 2 | open/close `nulldev`, read/write ueber `passc`/`cpass` (69CE/6A52) | mem 2,0; kmem 2,1; null 2,2 | — |
+| cdevsw | 5 | `lp` (6444..690A) | lp/lp0 5,0; rlp/rlp0 5,4 | nie |
+| cdevsw | 10 | `fd` roh (84E4/851C ueber `physio`) | — | nie |
+| cdevsw | 13 | `rk` roh | rrk0-3 | ja |
+| cdevsw | 15 | `ttopen/ttread/ttwrite`, Zusatzworte 7222/7C62 | — | nie |
+
+**Berichtigung zu `kernel_namen.md`:** nach `/dev` ist cdevsw[1] = `/dev/tty` (Kontrollterminal, V7 `sy`), cdevsw[2] = `mem` (V7 `mmread` arbeitet mit `passc`/`cpass`);
+die Namen `mm*` (6C8E..) und `dev2*` (69CE..) sind vertauscht, `lp` ist cdevsw[5], nicht [7].  Der `fd`-Treiber benutzt `mapalloc` (also ebenfalls die Mailbox zur U880-Seite);
+welches Geraet er bedient, ist offen.
