@@ -5,7 +5,7 @@ Waechter fuer ``data/bootsektor.yaml`` + ``data/bootsektoren/``:
   * jede .bin im Ordner ist eingetragen (kein verwaistes Abbild)
   * mit jedem Eintrag laesst sich eine Diskette anlegen, deren Systemspuren das Abbild tragen
 und fuer den Dialog „Neue Diskette": Haken gesperrt ohne Eintrag, erster Treffer vorgewaehlt,
-„Eigene .bin-Datei auswählen…" als letzter Eintrag, Dateidialog erst NACH „Diskette anlegen".
+„Eigene .bin-Datei auswaehlen…" als letzter Eintrag, Dateidialog erst NACH „Diskette anlegen".
 """
 
 from pathlib import Path
@@ -186,7 +186,7 @@ def test_dateisystemwechsel_nimmt_den_haken_zurueck(qt_app):
 
 def test_dateidialog_kommt_erst_nach_diskette_anlegen(qt_app, tmp_path, monkeypatch):
     """Reihenfolge: Dialog (mit Bootabbild) → Speichern-Dialog → Datentraegername → Diskette."""
-    from PySide6.QtWidgets import QDialog, QFileDialog, QInputDialog
+    from PySide6.QtWidgets import QDialog, QInputDialog
     from app.disktool.ui import main_window as mw
     from app.disktool.ui.neu_dialog import NeuDialog
 
@@ -199,12 +199,12 @@ def test_dateidialog_kommt_erst_nach_diskette_anlegen(qt_app, tmp_path, monkeypa
         dlg.boot_haken.setChecked(True)
         return QDialog.Accepted
 
-    def speichern(*a, **k):
+    def speichern(self, *a, **k):
         ablauf.append("speichern")
-        return str(ziel), ""
+        return str(ziel)
 
     monkeypatch.setattr(NeuDialog, "exec", exec_)
-    monkeypatch.setattr(QFileDialog, "getSaveFileName", speichern)
+    monkeypatch.setattr(mw.MainWindow, "_neue_datei_waehlen", speichern)
     monkeypatch.setattr(QInputDialog, "getText", lambda *a, **k: (ablauf.append("name") or "", True))
     monkeypatch.setattr(mw.MainWindow, "_darf_verwerfen", lambda self: True)
 
@@ -257,3 +257,44 @@ def test_udos50_bootdiskette_aus_dem_katalog_startet(tmp_path):
         assert "ERROR" not in emu.screen_text()
     finally:
         del emu
+
+
+def test_dialog_fuer_die_neue_diskette_nimmt_einen_neuen_namen(qt_app, tmp_path, monkeypatch):
+    """Ein SPEICHERN-Dialog (neuer Name oder Ueberschreiben), nicht der systemeigene, Name vorbelegt.
+
+    Anlass: unter GNOME liess der GTK-Dialog nur vorhandene Abbilder waehlen.
+    """
+    from PySide6.QtCore import QTimer
+    from PySide6.QtWidgets import QApplication, QFileDialog
+    from app.disktool.ui import main_window as mw
+
+    monkeypatch.setattr(mw.MainWindow, "_disketten_ordner", lambda self: str(tmp_path))
+    w = mw.MainWindow()
+    gesehen = {}
+
+    def antworten():
+        for d in QApplication.topLevelWidgets():
+            if isinstance(d, QFileDialog) and d.isVisible():
+                gesehen.update(modus=d.acceptMode(), datei=d.fileMode(),
+                               nativ=not d.testOption(QFileDialog.DontUseNativeDialog),
+                               name=d.selectedFiles())
+                d.selectNameFilter("DMK-Abbild (*.dmk)")
+                d.filterSelected.emit("DMK-Abbild (*.dmk)")
+                gesehen["nach_filter"] = d.selectedFiles()
+                d.selectFile("meine_diskette")
+                d.accept()
+                return
+        QTimer.singleShot(20, antworten)
+
+    try:
+        QTimer.singleShot(20, antworten)
+        pfad = w._neue_datei_waehlen("Neue Diskette anlegen", "neue_diskette.hfe",
+                                     "HFE-Abbild (*.hfe);;DMK-Abbild (*.dmk)")
+    finally:
+        w._close_tool()
+    assert gesehen["modus"] == QFileDialog.AcceptSave
+    assert gesehen["datei"] == QFileDialog.AnyFile
+    assert not gesehen["nativ"]
+    assert Path(gesehen["name"][0]).name == "neue_diskette.hfe"
+    assert Path(gesehen["nach_filter"][0]).name == "neue_diskette.dmk"
+    assert Path(pfad) == tmp_path / "meine_diskette.dmk"          # Endung aus dem Filter

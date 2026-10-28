@@ -2719,10 +2719,10 @@ class MainWindow(QMainWindow):
         fs = dlg.dateisystem()
         inodes = dlg.inodes()           # 0 = Vorgabe (nur WEGA/MUTOS)
         boot = dlg.bootabbild()         # None = gewoehnliche Diskette
-        pfad, _ = QFileDialog.getSaveFileName(
-            self, "Neue Diskette anlegen", self._disketten_ordner(),
-            "HFE-Abbild (*.hfe);;DMK-Abbild (*.dmk);;Sektorabbild (*.img);;"
-            "CopyQM-Abbild (*.cqm);;TeleDisk-Abbild (*.td0);;ImageDisk-Abbild (*.imd)")
+        pfad = self._neue_datei_waehlen("Neue Diskette anlegen", "neue_diskette.hfe",
+                                        "HFE-Abbild (*.hfe);;DMK-Abbild (*.dmk);;Sektorabbild (*.img);;"
+                                        "CopyQM-Abbild (*.cqm);;TeleDisk-Abbild (*.td0);;"
+                                        "ImageDisk-Abbild (*.imd)")
         if not pfad:
             return
         grund = self._container_grund(pfad, fs)
@@ -2732,6 +2732,35 @@ class MainWindow(QMainWindow):
 
         label, _ = QInputDialog.getText(self, "Neue Diskette", "Datenträgername:")
         self.create_disk(pfad, fs, label or "", str(boot) if boot else None, inodes)
+
+    def _neue_datei_waehlen(self, titel: str, vorschlag: str, filter_: str) -> str:
+        """Dateiname fuer eine NEUE Diskette erfragen — ein neuer Name oder eine vorhandene
+        Datei zum Ueberschreiben (Qt fragt dann nach).  ``""`` = abgebrochen.
+
+        Bewusst Qts eigener Dialog statt des systemeigenen: unter GNOME erschien der
+        GTK-Waehler so, dass sich nur vorhandene Abbilder waehlen liessen.  Das Namensfeld ist
+        vorbelegt, die Endung folgt dem gewaehlten Filter, wenn keine eingetippt wird.
+        """
+        dlg = QFileDialog(self, titel, self._disketten_ordner(), filter_)
+        dlg.setOption(QFileDialog.DontUseNativeDialog, True)
+        dlg.setAcceptMode(QFileDialog.AcceptSave)
+        dlg.setFileMode(QFileDialog.AnyFile)
+        dlg.setLabelText(QFileDialog.Accept, "Anlegen")
+        dlg.setDefaultSuffix(Path(vorschlag).suffix.lstrip("."))
+        dlg.selectFile(vorschlag)
+
+        def filter_gewaehlt(f: str) -> None:
+            # "HFE-Abbild (*.hfe)" -> Vorgabeendung hfe, und der vorgeschlagene Name zieht mit
+            endung = f[f.rfind("*.") + 2:].rstrip(")") if "*." in f else ""
+            if endung:
+                dlg.setDefaultSuffix(endung)
+                if not dlg.selectedFiles() or Path(dlg.selectedFiles()[0]).stem == Path(vorschlag).stem:
+                    dlg.selectFile(f"{Path(vorschlag).stem}.{endung}")
+        dlg.filterSelected.connect(filter_gewaehlt)
+
+        if dlg.exec() != QDialog.Accepted or not dlg.selectedFiles():
+            return ""
+        return dlg.selectedFiles()[0]
 
     def _speichern_unter_dialog(self) -> None:
         if self.tool is None:

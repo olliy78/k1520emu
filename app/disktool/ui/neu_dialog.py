@@ -9,7 +9,7 @@ Der Haken sitzt NICHT bei anderen Dateisystemen — dort gibt es keine Inode-Lis
 Darunter „Bootdiskette erstellen" (Ticket #25): Haken plus Auswahlfeld mit den
 hinterlegten Bootabbildern des gewaehlten Dateisystems (``bootsektor.yaml``,
 :mod:`app.disktool.bootsektoren`), der erste Treffer vorgewaehlt, als letzter Eintrag
-„Eigene .bin-Datei auswählen…" (das fruehere Verhalten).  Gibt es fuer das Dateisystem
+„Eigene .bin-Datei auswaehlen…" (das fruehere Verhalten).  Gibt es fuer das Dateisystem
 keinen Eintrag, ist der Haken gesperrt.  Der Dateidialog fuer die neue Diskette kommt
 erst NACH „Diskette anlegen" — der Dialog selbst fragt nur ab, was angelegt wird.
 """
