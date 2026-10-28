@@ -40,7 +40,7 @@ def _lauf(args, **kw):
     return r.returncode, r.stdout.decode("latin-1")
 
 
-def dbg_skript(arbeit, teile, kommando=">asm.out;as %s.s >/tmp/%s.err 2>&1;cat asm.out >/tmp/%s.o", frist=3_000_000_000):
+def dbg_skript(arbeit, teile, kommando=">asm.out;as %s.s >/tmp/%s.err 2>&1;cat asm.out >/tmp/%s.o", frist=3_000_000_000, schirm=False):
     """Skript fuer k1520dbg.  Je Teil ein Befehl, danach `cat fertigN` (eigene Marke ENDE<N>, eindeutig)."""
     z = []
     z.append("# erzeugt von gast_as.py -- nicht von Hand aendern")
@@ -74,6 +74,8 @@ def dbg_skript(arbeit, teile, kommando=">asm.out;as %s.s >/tmp/%s.err 2>&1;cat a
     z.append("keys sync;cat\\sfertigs\\r")
     z.append('gscreen "ENDES" 300000000')
     z.append("g 60000000")
+    if schirm:
+        z.append("screen")
     z.append("q")
     return "\n".join(z) + "\n"
 
@@ -112,7 +114,7 @@ def gast_assemblieren(arbeit, teile, ausgabe=None, kommando=">asm.out;as %s.s >/
                    str(4 * len(namen) + 24)])
     if rc:
         raise RuntimeError("create quelle: " + o)
-    dateien = [os.path.join(q, f) for f in sorted(os.listdir(q))]
+    dateien = [os.path.join(q, f) for f in sorted(os.listdir(q)) if not f.endswith(".fileinfo")]    # Angabendateien holt `put` selbst
     for i in range(0, len(dateien), 20):
         rc, o = _lauf([DISKTOOL, "put", os.path.join(arbeit, "quelle.hfe")] + dateien[i:i + 20])
         if rc:
@@ -146,7 +148,7 @@ def gast_assemblieren(arbeit, teile, ausgabe=None, kommando=">asm.out;as %s.s >/
     return erg
 
 
-def gast_befehle(arbeit, quellen, befehle, rueck, frist=3_000_000_000, extra_dateien=None, ausgabe=None):
+def gast_befehle(arbeit, quellen, befehle, rueck, frist=3_000_000_000, extra_dateien=None, ausgabe=None, boot_hfe=None, schirm=False):
     """Allgemeiner Gastlauf (AP K5): `quellen` {name: bytes|str} kommen auf die Quelldiskette D (im Gast /mnt = Arbeitsordner),
     `befehle` laufen nacheinander in der Shell (Rueckmeldung je Befehl ueber eine Marke), danach werden die Dateien
     `rueck` aus /tmp (eigene leere Diskette A) geholt.  Rueckgabe {name: bytes oder None}.
@@ -156,6 +158,8 @@ def gast_befehle(arbeit, quellen, befehle, rueck, frist=3_000_000_000, extra_dat
     os.makedirs(arbeit, exist_ok=True)
     for ziel, quelle in PLATTEN.items():
         shutil.copyfile(os.path.join(DISKS, quelle), os.path.join(arbeit, ziel))
+    if boot_hfe:        # K8: eigene Ladediskette (mit dem selbst gebauten Kernel) statt der Auslieferung
+        shutil.copyfile(boot_hfe, os.path.join(arbeit, "boot.hfe"))
     q = os.path.join(arbeit, "q")
     shutil.rmtree(q, ignore_errors=True)
     os.makedirs(q)
@@ -178,14 +182,14 @@ def gast_befehle(arbeit, quellen, befehle, rueck, frist=3_000_000_000, extra_dat
                    str(len(quellen) + len(befehle) + 40)])
     if rc:
         raise RuntimeError("create quelle: " + o)
-    dateien = [os.path.join(q, f) for f in sorted(os.listdir(q))]
+    dateien = [os.path.join(q, f) for f in sorted(os.listdir(q)) if not f.endswith(".fileinfo")]    # Angabendateien holt `put` selbst
     for i in range(0, len(dateien), 20):
         rc, o = _lauf([DISKTOOL, "put", os.path.join(arbeit, "quelle.hfe")] + dateien[i:i + 20])
         if rc:
             raise RuntimeError("put: " + o)
     skript = os.path.join(arbeit, "lauf.dbg")
     with open(skript, "w") as f:
-        f.write(dbg_skript(arbeit, befehle, "%s", frist))
+        f.write(dbg_skript(arbeit, befehle, "%s", frist, schirm))
     log = os.path.join(arbeit, "lauf.log")
     t0 = time.time()
     with open(log, "w") as lf:
