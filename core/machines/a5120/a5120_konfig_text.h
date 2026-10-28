@@ -88,7 +88,8 @@ inline bool wert(A5120Machine::Config& cfg, const std::string& schluessel_in,
         if      (v == "none")  cfg.em = C::Em::none;
         else if (v == "em064") cfg.em = C::Em::em064;
         else if (v == "em256") cfg.em = C::Em::em256;
-        else { err = "em: unbekannt '" + v + "' (none|em064|em256)"; return false; }
+        else if (v == "em1024") cfg.em = C::Em::em1024;
+        else { err = "em: unbekannt '" + v + "' (none|em064|em256|em1024)"; return false; }
     } else if (k == "k3521") {
         // Liste kommagetrennter Hex-Basen (bis 4 Karten, N10h): "8000" oder "8000,9000".
         cfg.k3521_basis = -1;

@@ -735,7 +735,7 @@ def test_unknown_em_name_is_refused():
     assert b"em999" in _lib.k1520_last_init_error()
 
 
-@pytest.mark.parametrize("variant,model", [("em256", 1), ("em064", 2)])
+@pytest.mark.parametrize("variant,model", [("em256", 1), ("em064", 2), ("em1024", 1)])
 def test_machine_with_em_after_power_on(variant, model):
     """Netz-Ein: 8-Bit-Mode (V2 an), RAMEN aus (V1 aus), U8001 im RESET16."""
     from app.core_binding.k1520 import K1520Emulator

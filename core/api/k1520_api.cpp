@@ -484,8 +484,9 @@ K1520Handle k1520_create_with_em(K1520MachineType type,
             if (names[i] && names[i][0]) cfg.drive_profiles[i] = names[i];
         if (e == "em064")         cfg.em = A5120Machine::Config::Em::em064;
         else if (e == "em256")         cfg.em = A5120Machine::Config::Em::em256;
+        else if (e == "em1024")        cfg.em = A5120Machine::Config::Em::em1024;   // Neuentwicklung
         else {
-            g_init_error = "Unbekanntes Erweiterungsmodul '" + e + "' (none|em064|em256)";
+            g_init_error = "Unbekanntes Erweiterungsmodul '" + e + "' (none|em064|em256|em1024)";
             return nullptr;
         }
         K1520Machine* m = new A5120Machine(cfg);   // Handle = K1520Machine* (s. toMachine)
@@ -611,7 +612,11 @@ int k1520_a5120_tastatur(K1520Handle h) {
 const char* k1520_em_variant(K1520Handle h) {
     const EM* em = emOf(h);
     if (!em) return "";
-    return em->config().variante == EM::Variante::EM256 ? "em256" : "em064";
+    switch (em->config().variante) {
+        case EM::Variante::EM1024: return "em1024";
+        case EM::Variante::EM256:  return "em256";
+        default:                   return "em064";
+    }
 }
 
 bool k1520_em_led_v1(K1520Handle h) {
