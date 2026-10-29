@@ -19,7 +19,12 @@ STATISCHES Disassemblat (tools/z80_disasm2.py, rekursiver Abstieg) mit den SIOS-
   * CALL 0036H / LD DE,n / ADD HL,DE / PUSH HL / RET(I): Fortsetzung bei (Folgeadresse + n)
   * CALL 0042H mit L = ungerader Index: Sprung ueber die Tabelle 0800H (Wort + 0800H)
   * RST 08H (SVC) hat EIN Kennbyte hinter dem Befehl
-Aufruf:  python3 tools/sios_a5120/gen_prn.py
+Aufruf:  python3 tools/sios_a5120/gen_prn.py            (SIOS 1.1: sysare11.prn + syl_lader.prn)
+         python3 tools/sios_a5120/gen_prn.py --variante 09   (SIOS 0.9: sysare09.prn)
+         python3 tools/sios_a5120/gen_prn.py --abbild X.hfe --datei NAME --laenge 0x6C00 --ausgabe out.prn
+Variante 09 (SIOS1526_SYLp.hfe, Datei SYSARE09): gleiche Ladeadresse/Einsprung, 216 Sektoren (6C00H) = 27 Bloecke.
+Namen und Kommentare der Fassung 1.1 werden dort nur uebernommen, wo der ganze 1-KB-Block bitgleich ist
+(Seite 0 unter 0100H, wenn Block 0 gleich ist).
 """
 import os
 import sys
@@ -35,6 +40,10 @@ import dump  # noqa: E402
 ABBILD = os.path.join(HERE, "original", "SIOS1526_SYLs.hfe")
 OUT_SYS = os.path.join(ROOT, "doc/sios/sysare11.prn")
 OUT_SYL = os.path.join(ROOT, "doc/sios/syl_lader.prn")
+DATEI_NAME = "SYSARE11"
+NBLOCK = 34
+VARIANTE = "11"
+GLEICH = None             # Menge der Blockindizes, die mit 1.1 bitgleich sind (nur Variante 09)
 
 SYS_ANF = 0x0800          # Ladeadresse
 SYS_LEN = 0x8800          # 272 Sektoren
@@ -45,7 +54,7 @@ RELOC = 0x08              # Hochbyte-Versatz (Seite) der Vorlage 0840H.. gegenue
 def lade():
     ab = dump.Abbild(ABBILD)
     syl = ab.linear(0, 1)[:512]
-    e = [x for x in dump.etiketten(ab) if x["name"] == "SYSARE11"][0]
+    e = [x for x in dump.etiketten(ab) if x["name"] == DATEI_NAME][0]
     datei = dump.datei_bytes(ab, e)
     img = datei[SYS_AB_SEKTOR * 128: SYS_AB_SEKTOR * 128 + SYS_LEN]
     assert len(img) == SYS_LEN
@@ -118,7 +127,7 @@ def seeds(mem):
     for a in range(0x274, 0x280, 2):                     # IM-2-Tabelle (Vorlage 088CH.. + 0800H)
         w = (mem[0x88C + a - 0x274] | mem[0x88D + a - 0x274] << 8) + 0x800
         s[w & 0xFFFF] = None
-    for k in range(34):                                  # Modulinit bei Block+2
+    for k in range(NBLOCK):                              # Modulinit bei Block+2
         s[0x800 + 0x400 * k + 2] = None
     return s
 
@@ -293,7 +302,7 @@ MODUL_INFO = {
 def modul_kopf(k, mem):
     a = SYS_ANF + 0x400 * k
     t = f"Block {k:2d}: Kopf {mem[a]:02X} {mem[a + 1]:02X}, CRC {mem[a + 0x3FE]:02X}{mem[a + 0x3FF]:02X}"
-    return t + (" - " + MODUL_INFO[k] if k in MODUL_INFO else "")
+    return t + (" - " + MODUL_INFO[k] if k in MODUL_INFO and VARIANTE == "11" else "")
 
 
 def fmt_daten(mem, a, e, text):
@@ -329,10 +338,19 @@ HDR_SYS = """; =================================================================
 ; ============================================================================"""
 
 
+def uebernehmen(a):
+    """Namen/Kommentare der Fassung 1.1 gelten nur in bitgleichen Bloecken (Variante 09)."""
+    if VARIANTE == "11":
+        return True
+    if a < 0x800:
+        return 0 in GLEICH and a < 0x100
+    return (a - SYS_ANF) // 0x400 in GLEICH
+
+
 def rendere(mem, dis, tentativ):
     out = [HDR_SYS, "", "\tORG\t0000H", ""]
     daten = {a: (e, t) for a, e, t in DATEN}
-    for k in range(34):                       # Kopf und CRC jedes Blocks sind Daten
+    for k in range(NBLOCK):                   # Kopf und CRC jedes Blocks sind Daten
         a = SYS_ANF + 0x400 * k
         daten[a] = (a + 2, modul_kopf(k, mem))
         daten[a + 0x3FE] = (a + 0x400, "CRC-CCITT")
@@ -343,7 +361,7 @@ def rendere(mem, dis, tentativ):
             out.append(f"{0x100:04X}  {'':<14}\tDS\t{0x800 - 0x100}\t\t;Laufzeitdaten 0100H-07FFH (Systemzellen, Tabellen, Stapel)")
             addr = 0x800
             continue
-        if addr in NAMEN:
+        if addr in NAMEN and uebernehmen(addr):
             out.append(f"{NAMEN[addr]}:")
         if addr in daten:
             e, t = daten[addr]
@@ -353,17 +371,18 @@ def rendere(mem, dis, tentativ):
         if addr in dis.instructions:
             m, ln, raw = dis.instructions[addr]
             hexb = " ".join(f"{b:02X}" for b in raw)
-            kom = KOMMENTAR.get(addr, "") or dis.auto_kom.get(addr, "")
+            kom = (KOMMENTAR.get(addr, "") if uebernehmen(addr) else "") or dis.auto_kom.get(addr, "")
             if addr in tentativ:
                 kom = (kom + " " if kom else "") + "[vermutet]"
             out.append(f"{addr:04X}  {hexb:<14}\t{m}" + (f"\t\t;{kom}" if kom else ""))
             addr += ln
             continue
         e = addr + 1
-        while (e < ende and e not in dis.instructions and e not in daten and e not in NAMEN
-               and e - addr < 16 and e not in KOMMENTAR):
+        while (e < ende and e not in dis.instructions and e not in daten
+               and not (e in NAMEN and uebernehmen(e)) and e - addr < 16
+               and not (e in KOMMENTAR and uebernehmen(e))):
             e += 1
-        out += fmt_daten(mem, addr, e, KOMMENTAR.get(addr, ""))
+        out += fmt_daten(mem, addr, e, KOMMENTAR.get(addr, "") if uebernehmen(addr) else "")
         addr = e
     out += ["", "\tEND"]
     return out
@@ -373,8 +392,9 @@ def erzeuge_sys(syl, img):
     mem = bauen(img)
     dis = SiosDis(mem, org=0)
     s = seeds(mem)
-    s[0x27AB] = None                          # zur Laufzeit in die IM-2-Tabelle gepatcht
-    s[0x6A53] = None                          # zur Laufzeit JP 6A53H bei 0000H [Lauf]
+    if VARIANTE == "11":
+        s[0x27AB] = None                      # zur Laufzeit in die IM-2-Tabelle gepatcht
+        s[0x6A53] = None                      # zur Laufzeit JP 6A53H bei 0000H [Lauf]
     tent = abdecken(dis, mem, s)
     zeilen = rendere(mem, dis, tent)
     open(OUT_SYS, "w", encoding="utf-8").write("\n".join(zeilen) + "\n")
@@ -445,9 +465,46 @@ def erzeuge_syl(syl):
 
 
 def main():
+    global ABBILD, OUT_SYS, SYS_LEN, DATEI_NAME, NBLOCK, VARIANTE, GLEICH, HDR_SYS
+    import argparse
+    ap = argparse.ArgumentParser(description="Listings des SIOS-1526-Systembereichs")
+    ap.add_argument("--variante", choices=["11", "09"], default="11")
+    ap.add_argument("--abbild")
+    ap.add_argument("--datei")
+    ap.add_argument("--laenge", type=lambda x: int(x, 0))
+    ap.add_argument("--ausgabe")
+    a = ap.parse_args()
+    if a.variante == "09":
+        VARIANTE = "09"
+        ABBILD = os.path.join(HERE, "original", "SIOS1526_SYLp.hfe")
+        OUT_SYS = os.path.join(ROOT, "doc/sios/sysare09.prn")
+        DATEI_NAME, SYS_LEN = "SYSARE09", 0x6C00
+        # Bloecke, die mit 1.1 bitgleich sind (fuer die uebernommenen Namen/Kommentare)
+        ref = os.path.join(HERE, "original", "SIOS1526_SYLs.hfe")
+        ab1 = dump.Abbild(ref)
+        e1 = [x for x in dump.etiketten(ab1) if x["name"] == "SYSARE11"][0]
+        d1 = dump.datei_bytes(ab1, e1)[SYS_AB_SEKTOR * 128:]
+        HDR_SYS = HDR_SYS.replace("SIOS 1526/1.1", "SIOS 1526/0.9").replace("sysare11.prn", "sysare09.prn") \
+            .replace("SYSARE11", "SYSARE09").replace("SIOS1526_SYLs.hfe", "SIOS1526_SYLp.hfe") \
+            .replace("272 Sektoren = 8800H", "216 Sektoren = 6C00H").replace("0800H-8FFFH", "0800H-73FFH") \
+            .replace("34 Bloecke", "27 Bloecke")
+    if a.abbild:
+        ABBILD = a.abbild
+    if a.datei:
+        DATEI_NAME = a.datei
+    if a.laenge:
+        SYS_LEN = a.laenge
+    if a.ausgabe:
+        OUT_SYS = a.ausgabe
+    NBLOCK = SYS_LEN // 0x400
     syl, img = lade()
+    if VARIANTE == "09":
+        GLEICH = {k for k in range(NBLOCK) if k < len(d1) // 0x400
+                  and img[k * 0x400:(k + 1) * 0x400] == d1[k * 0x400:(k + 1) * 0x400]}
+        print("bitgleich mit 1.1 (gleiche Blocklage):", sorted(GLEICH))
     erzeuge_sys(syl, img)
-    erzeuge_syl(syl)
+    if VARIANTE == "11" and not a.abbild:
+        erzeuge_syl(syl)
 
 
 if __name__ == "__main__":
