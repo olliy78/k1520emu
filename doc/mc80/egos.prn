@@ -5554,7 +5554,7 @@ L26C9:
 26CD  18 E5         	JR L26B4
 
 ; ---- RKET [EGOS S.11-12] ---------------------------------------------------------------------
-26CF  01 2E 01      	DB	01H,2EH,01H		;Kennbyte 01 'RKET', Distanz 012EH -> naechstes Objekt bei 2800H (Erweiterungs-ROM der SPE 2; ohne Inhalt Kettenende, s. egos.md)
+26CF  01 2E 01      	DB	01H,2EH,01H		;Kennbyte 01 'RKET', Distanz 012EH -> naechstes Objekt bei 2800H (PCMC-EPROM).  Der MAME-Abzug ist die PCMC-Fassung des 2400H-EPROMs; ausgeliefert stand hier 192EH -> 4000H (RAM-Anfang), s. egos.md
 26D2  52 4B 45 54   	DB	'RKET'		;Name
 26D6  FF            	DB	0FFH		;Endebyte
 RKET:

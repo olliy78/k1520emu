@@ -180,7 +180,8 @@ DATEN = [
     (0x260A, 0x2611, "kette", "Kennbyte 01 'CAT'"),
     (0x261E, 0x2626, "kette", "Kennbyte 01 'CATA'"),
     (0x26CF, 0x26D7, "kette", "Kennbyte 01 'RKET', Distanz 012EH -> naechstes Objekt bei 2800H "
-                              "(Erweiterungs-ROM der SPE 2; ohne Inhalt Kettenende, s. egos.md)"),
+                              "(PCMC-EPROM).  Der MAME-Abzug ist die PCMC-Fassung des 2400H-EPROMs; "
+                              "ausgeliefert stand hier 192EH -> 4000H (RAM-Anfang), s. egos.md"),
     (0x273D, 0x2800, "fuell", "unbelegt"),
 ]
 

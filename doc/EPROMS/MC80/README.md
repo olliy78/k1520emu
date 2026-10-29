@@ -7,6 +7,11 @@ Herkunft (abgerufen 2026-10-13, Planung `doc/design/31_mc80.md`):
 - `mc8030_mame/`: MAME-Satz `mc8030` (MESS 0.151, Internet Archive „MESS0.151RomCollectionByGhostware“),
   ZVE 0000H–1FFFH (`zve_1…4`, 4×2716) und SPE 2000H–27FFH (`spe_1/2`, 2×2708). **`zve_3/zve_4` = 1000H–1FFFH
   = Magnetbandsoftware (K5020-Treiber)** — auf ycdt.net nicht vorhanden.
+- `spe_2_auslieferung.rom`: **rekonstruierte Auslieferungsfassung** des 2400H-EPROMs = `mc8030_mame/spe_2.rom`
+  mit Byte 2D1H = 19H statt 01H (RKET kettet auf 4000H statt auf das PCMC-EPROM bei 2800H).  Der MAME-Abzug
+  ist die für PCMC umgebaute Fassung (bytegleich zu `PCMC_komplett/MC8030_ROM_2800h/MC8030_ROM_2400.BIN`;
+  Hinweis von DL, Forum robotrontechnik.de Thread 24593 Beitrag 048).  Aus ihr wird `core/cards/mc80/rom_spe2.h`
+  erzeugt; `doc/merkposten/mc80.md` Nr. 2.
 - `mc8020/`: MAME-Satz `mc8020` (MC80.21/22): ZRE K2521 `s01–s03` (0000H–0BFFH, drei Fassungen),
   PFS K3820 `mo01, mo03–mo16` (2000H–5FFFH; `mo02` = 2400H fehlt auch am Gerät laut MAME).
 - `mc8020/karsten21/` (nur abgelegt, nicht eingebunden), `mc8020/karsten22/`: Karstens Abzüge der PFS-ROM-Karten eines MC80.21 (`MC802101…16`)
@@ -67,6 +72,7 @@ Prüfsummen = MAME-Liste, wo dort geführt.
 | `mc8020/s03_v2.rom` | 1024 | 5b64ee7b |
 | `mc8030_mame/spe_1.rom` | 1024 | 826f609c |
 | `mc8030_mame/spe_2.rom` | 1024 | 98320040 |
+| `spe_2_auslieferung.rom` | 1024 | 59661827 |
 | `mc8030_mame/zve_1.rom` | 2048 | 31ec0159 |
 | `mc8030_mame/zve_2.rom` | 2048 | 5104983d |
 | `mc8030_mame/zve_3.rom` | 2048 | 4bcfd727 |

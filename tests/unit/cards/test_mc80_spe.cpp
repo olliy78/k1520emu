@@ -1,7 +1,7 @@
 /**
  * @file test_mc80_spe.cpp
  * @brief SPE 2 des MC80.3x + Segmentfenster (AP M2): ROM 2000H–27FFH, Leerbereich
- *        2800H–3FFFH = 00H, ROM-Block nicht segmentabhaengig, RAM-Segment 4000H–BFFFH ueber das
+ *        2800H–3FFFH = FFH, ROM-Block nicht segmentabhaengig, RAM-Segment 4000H–BFFFH ueber das
  *        Segmentregister, 1-KB-Sperren B0H–B3H (A10–A15), nach Reset frei.
  *        doc/mc80/hardware_3x.md §3.2/§4, doc/mc80/egos.md §1 Punkte 4–5.
  */
@@ -40,10 +40,19 @@ TEST_F(Mc80SpeTest, RomBlock2000Bis27FF) {
     EXPECT_EQ(bus.memRead(0x2000), MC80_SPE2_ROM[0]);
 }
 
-TEST_F(Mc80SpeTest, LeerbereichLiest00) {
-    // M1: nur mit 00H laeuft die ROM-Kette ueber 2048 leere Objekte bis 4000H weiter.
+TEST_F(Mc80SpeTest, LeerbereichLiestFF) {
+    // Unbestueckte Fassungen 2800H–3FFFH: FFH (fuer EGOS ein Kettenende).
     for (uint32_t a = 0x2800; a < 0x4000; ++a)
-        ASSERT_EQ(bus.memRead(static_cast<uint16_t>(a)), 0x00) << std::hex << a;
+        ASSERT_EQ(bus.memRead(static_cast<uint16_t>(a)), 0xFF) << std::hex << a;
+}
+
+TEST_F(Mc80SpeTest, RketKettetImAusgeliefertenRomNach4000) {
+    // RKET (26CFH) ist das letzte ROM-Kettenglied; ausgeliefert kettet es direkt auf den
+    // RAM-Anfang (26D2H + 192EH = 4000H), nicht ueber den Leerbereich.  Der MAME-Abzug traegt
+    // hier 01H = die PCMC-Fassung (Forum robotrontechnik.de, Thread 24593, Beitrag 048).
+    EXPECT_EQ(bus.memRead(0x26CF), 0x01);
+    const uint16_t dist = bus.memRead(0x26D0) | (bus.memRead(0x26D1) << 8);
+    EXPECT_EQ(0x26D2 + dist, 0x4000);
 }
 
 TEST_F(Mc80SpeTest, RomBlockHaengtNichtAmSegmentregister) {
@@ -82,7 +91,7 @@ TEST_F(Mc80SpeTest, SegmentumschaltungWaehltDieKarte) {
 
 TEST_F(Mc80SpeTest, FensterGrenzen) {
     segment(0x01);
-    EXPECT_EQ(bus.memRead(0x3FFF), 0x00);        // Leerbereich, nicht RAM
+    EXPECT_EQ(bus.memRead(0x3FFF), 0xFF);        // Leerbereich, nicht RAM
     bus.memWrite(0x3FFF, 0x99);
     EXPECT_EQ(spe1.ramPeek(0x4000), 0x00);
     bus.memWrite(0xC000, 0x99);                   // gehoert der ZVE (hier: niemand)

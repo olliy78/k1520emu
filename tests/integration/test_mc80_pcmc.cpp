@@ -115,7 +115,8 @@ struct Pc {
 
 TEST(Mc80Pcmc, OhneErweiterungKeinPcmc) {
     Pc p(false);
-    EXPECT_EQ(p.m->memReadDebug(0x2800), 0x00);
+    EXPECT_EQ(p.m->memReadDebug(0x2800), 0xFF);
+    EXPECT_EQ(p.m->memReadDebug(0x26D1), 0x19);   // RKET kettet nach 4000H
 }
 
 TEST(Mc80Pcmc, MitErweiterungStehtPcmcImEprom) {
@@ -123,6 +124,10 @@ TEST(Mc80Pcmc, MitErweiterungStehtPcmcImEprom) {
     EXPECT_EQ(p.m->memReadDebug(0x2800), 0x01);   // Kennbyte
     EXPECT_EQ(p.m->memReadDebug(0x2803), 'P');
     EXPECT_EQ(p.m->memReadDebug(0x2807), 0xFF);
+    // Zum Umbau gehoert das getauschte 2400H-EPROM: RKET kettet auf PCMC (26D2H + 012EH),
+    // PCMC weiter auf den RAM-Anfang (2803H + 17FDH).
+    EXPECT_EQ(p.m->memReadDebug(0x26D1), 0x01);
+    EXPECT_EQ(p.m->memReadDebug(0x2801) | (p.m->memReadDebug(0x2802) << 8), 0x4000 - 0x2803);
 }
 
 TEST(Mc80Pcmc, EmpfangVomPcLaedtInDenRam) {

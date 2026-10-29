@@ -26,15 +26,16 @@ Quellenkürzel wie in `hardware_3x.md`; zusätzlich **[P xxxx]** = Adresse in `e
 3. **Die ROM selbst ist eine RAM-Kette.**  Jede Suche (Kommando, Treiber, RESET-Routine, CAT) beginnt
    bei **0AFEH im Segment 1** [P 0924, 262F, 078E]: CON → INIT → (03) → KLOG → KINIT → READ →
    WRITE → (03) → (1BH, Segmentprogramme) → RELAD → DIR → LADT → DEFINE → ACT → DEACT → (03) →
-   CAT → CATA → RKET → **2800H**.  Ein Name endet am ersten Byte ≥ 7FH (FFH, im ROM auch B0H)
+   CAT → CATA → RKET → **4000H** (Auslieferung; im MAME-Abzug = PCMC-Fassung → 2800H, s. Punkt 4).  Ein Name endet am ersten Byte ≥ 7FH (FFH, im ROM auch B0H)
    [P 0958].  FEH-Einträge wechseln Adresse und Segment [P 097D].
-4. **Folge für M2 — Anschluss 2800H→4000H:** RAM-Programme (Spiele `TE`, `HASI`) werden nur
-   gefunden, wenn die Kette von 2800H bis 4000H weiterläuft.  Mit dem MAME-Satz allein steht dort
-   nichts: liest der Leerbereich **FFH, endet die Kette** (C7H „nicht gefunden“); liest er **00H**,
-   läuft sie über 2048 leere Kennbyte-00-Objekte (je 3 Byte) genau auf 4000H [nachgerechnet:
-   1800H = 3·2048].  Die ycdt-Erweiterung `3s` kettet mit einer RESET-Routine bei 3940H nach
-   4000H.  Wie es am Gerät ohne Erweiterungs-ROM aussah, ist offen [?] → M2 entscheidet (Vorschlag:
-   Leerbereich 2800H–3FFFH liest 00H, wie MAME; gegen die Spiele in M5 prüfen).
+4. **Anschluss an den RAM (berichtigt 2026-10-29):** RAM-Programme (Spiele, eigene Kommandos) werden
+   nur gefunden, wenn die ROM-Kette bei 4000H weiterläuft.  Ausgeliefert kettet RKET (26CFH) mit der
+   Distanz 192EH direkt dorthin (26D2H + 192EH = 4000H).  Der MAME-Abzug `spe_2.rom` trägt 012EH (→ 2800H):
+   er ist das für **PCMC** umgebaute 2400H-EPROM (KW-WILLISOFT, `Wichtige Info.txt`; Forum
+   robotrontechnik.de Thread 24593 Beitrag 048).  Früher hatte M2 das mit einem Leerbereich aus 00H
+   überbrückt (2048 Scheinobjekte à 3 Byte, 1800H = 3·2048) — CATA zeigte die alle.  Jetzt: Auslieferungs-
+   fassung `doc/EPROMS/MC80/spe_2_auslieferung.rom`, Leerbereich FFH, PCMC-Option patcht 26D1H auf 01H.
+   Die ycdt-Erweiterung `3s` kettet anders (RKET → 2740H, RESET-Routine, weiter über 3940H nach 4000H).
 5. **SPE-2-Zustand nach Reset (M0 offener Punkt 3): frei.**  Kein Befehl in 0000H–27FFH greift auf
    B0H–B3H zu, das RESET führt aber sofort Code aus dem SPE-2-ROM (RESET-Routine 25BDH) aus und
    beschreibt das SPE-2-RAM (INIT 4000H ff.).  Also sind ROM und RAM der SPE 2 nach Reset

@@ -56,7 +56,12 @@ public:
     static constexpr uint16_t ROM_GROESSE = 0x2000;   ///< 8 Fassungen 2708
     static constexpr uint16_t RAM_BASIS   = 0x4000;
     static constexpr uint32_t RAM_GROESSE = 0x8000;   ///< 32 KB = ein Segment
-    static constexpr uint8_t  LEER        = 0x00;     ///< Lesewert unbestueckter Fassungen
+    /// Lesewert unbestueckter Fassungen.  FFH = Kettenende fuer EGOS; die Kette braucht den
+    /// Leerbereich nicht, weil RKET im ausgelieferten ROM direkt nach 4000H kettet.
+    static constexpr uint8_t  LEER        = 0xFF;
+    /// Hohes Byte der Kettendistanz von RKET (26CFH): 19H = Auslieferung (-> 4000H),
+    /// 01H = PCMC-Umbau (-> 2800H).
+    static constexpr uint16_t RKET_DISTANZ_HI = 0x26D1;
 
     enum class Sperrart : uint8_t { Schreibschutz, Zugriff };
 

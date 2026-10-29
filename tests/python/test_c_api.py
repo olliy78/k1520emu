@@ -404,7 +404,7 @@ def test_mc80_can_be_created_and_reports_its_type():
             assert _lib.k1520_machine_type(h) == 6
             assert (_lib.k1520_fb_width(h), _lib.k1520_fb_height(h)) == (512, 256)
             assert _lib.k1520_mem_read(h, 0x0000) == 0xC3      # JP 0776H (RESET)
-            assert _lib.k1520_mem_read(h, 0x2800) == 0x00      # leere SPE-2-Fassung
+            assert _lib.k1520_mem_read(h, 0x2800) == 0xFF      # leere SPE-2-Fassung
             assert _lib.k1520_run(h, 100_000) > 0
         finally:
             _lib.k1520_destroy(h)
