@@ -975,3 +975,33 @@ def test_verdrehte_fremddiskette_wird_ueber_die_naht_vollstaendig_gelesen(fixtur
         VerdrehtesLaufwerk(pfad, versatz_zellen=versatz, naht=True))
     assert vor_kopf == 46, (f"nur {vor_kopf} von 46 Dateien gelesen — der "
                                 "Schnitt liegt nicht vor einem Sektorkopf")
+
+
+def test_abmelden_wartet_den_ganzen_rueckstand_ab(hfe):
+    """Frist von ``close()`` = Frist OHNE Fortschritt, nicht Gesamtdauer (Entwurf 40 H8).
+
+    Nach einem FORMAT im unbegrenzten Tempo stehen am echten Laufwerk 80 und mehr
+    Spuren aus.  Mit der frueheren festen Frist (30 s) verwarf das Auswerfen im
+    Laufwerkskasten davon still gut die Haelfte.  Hier: jede Spur kostet Zeit, der
+    ganze Rueckstand dauert ein Vielfaches der Frist — und muss trotzdem ankommen.
+    """
+    import time
+    from gw_fake import fake_session
+    sitzung = fake_session(hfe, writable=True, read_ahead=True)
+    st = sitzung.sync.stats
+    ende = time.monotonic() + 60
+    while st.tracks_known < st.tracks_total and time.monotonic() < ende:
+        time.sleep(0.05)
+        st = sitzung.sync.stats
+    assert st.tracks_known == st.tracks_total
+    sitzung.device.verzoegerung = 0.02             # Schreiben + Pruef-Lesen je ~40 ms
+    n = sitzung.rewrite_all()
+    assert n == st.tracks_total
+    sitzung.device.geschrieben.clear()
+
+    t0 = time.monotonic()
+    ok = sitzung.close(timeout=0.5)
+    assert time.monotonic() - t0 > 0.5, "der Rueckstand war kuerzer als die Frist"
+    assert len(set(sitzung.device.geschrieben)) == n, (
+        f"nur {len(set(sitzung.device.geschrieben))} von {n} Spuren zurueckgeschrieben")
+    assert ok, sitzung.nicht_zurueckgeschrieben

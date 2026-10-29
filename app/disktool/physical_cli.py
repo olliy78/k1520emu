@@ -511,7 +511,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                   + (f"; {_st.read_crc_bad} Spur(en) blieben fehlerhaft"
                      if _st.read_crc_bad else " — danach fehlerfrei"),
                   file=sys.stderr)
-        sitzung.close()
+        if not sitzung.close():
+            print(f"FEHLER: {sitzung.nicht_zurueckgeschrieben}", file=sys.stderr)
+            rc = rc or 1
     return rc
 
 

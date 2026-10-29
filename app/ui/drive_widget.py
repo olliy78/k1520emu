@@ -817,12 +817,18 @@ class DriveWidget(QWidget):
         from PySide6.QtWidgets import QApplication
         from PySide6.QtGui import QCursor
         QApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
+        schaden = sitzung.defect_tracks        # meldet _update_physical_status selbst
         try:
-            sitzung.close()
+            vollstaendig = sitzung.close() or bool(schaden)
         except Exception:
-            pass
+            vollstaendig = True
         finally:
             QApplication.restoreOverrideCursor()
+        if not vollstaendig:
+            # Ein verworfener Rest faellt sonst niemandem auf (Entwurf 40 H8).
+            QMessageBox.warning(self, "Physisches Laufwerk", ("Die Diskette wurde abgemeldet, aber nicht alles Geänderte kam auf die "
+                 "Scheibe:\n\n    " + sitzung.nicht_zurueckgeschrieben + "\n\n"
+                 "Die Diskette ist an diesen Stellen nicht auf dem Stand des Gastsystems."))
 
     def _update_physical_status(self, drive: int):
         """Füllstandszeile einer physischen Diskette nachführen.

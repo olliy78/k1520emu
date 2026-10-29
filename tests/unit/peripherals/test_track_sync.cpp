@@ -1172,3 +1172,33 @@ TEST(TrackSync, EinLaufenderVorausleseauftragWirdNichtAbgebrochen) {
     SyncJob k;
     EXPECT_FALSE(sync.takeJob(k, 100));         // der naechste aber wartet
 }
+
+// ─── Rauschen ist keine Spur (Entwurf 40 §11) ─────────────────────────────────
+//
+// Eine geloeschte Spur liefert am echten Laufwerk Rauschen; der Dekoder findet darin
+// gelegentlich einen Scheinsektor mit falscher ID-CRC.  Als formatierte Spur
+// uebernommen, hielt das CP/A-FORMAT an (die ZVE2 gab den Bus nie frei) — und jede
+// solche Spur wurde wegen der CRC dreimal gelesen.
+
+TEST(TrackSync, EineSpurOhneHeilenSektorkopfGiltAlsUnformatiert) {
+    DiskMedium scheibe = echteDiskette();
+    // Spur 4/1 wird zu „Rauschen": die ID-CRC jedes Sektorkopfs verbogen.
+    TrackImage spur = scheibe.peek(4, 1);
+    for (const LogicalSector& s : TrackCodec::parseTrack(spur)) {
+        const size_t crc = s.id_pos + 5;            // Marke + C H R N, dann die CRC
+        spur.bytes[crc] = static_cast<uint8_t>(spur.bytes[crc] ^ 0xFF);
+    }
+    for (const LogicalSector& s : TrackCodec::parseTrack(spur)) ASSERT_FALSE(s.id_crc_ok);
+    scheibe.loadTrack(4, 1, std::move(spur));
+
+    DiskMedium abbild;
+    TrackSync  sync(spec(), abbild);
+    Ersatzfaden faden(sync, scheibe);
+    faden.start();
+    const TrackImage& gelesen = abbild.track(4, 1);
+    EXPECT_TRUE(TrackCodec::parseTrack(gelesen).empty()) << "Scheinsektoren uebernommen";
+    for (MarkType m : gelesen.marks) EXPECT_EQ(m, MarkType::None);
+    EXPECT_EQ(faden.leseversuche(4, 1), 1) << "Rauschen wird nicht wiederholt";
+    EXPECT_EQ(sync.stats().read_crc_bad, 0u);
+    faden.stop();
+}

@@ -709,6 +709,15 @@ K1520_API uint8_t     k1520_mem_read(K1520Handle h, uint16_t addr);
 /** @brief Write memory through the machine bus for diagnostics. */
 K1520_API void        k1520_mem_write(K1520Handle h, uint16_t addr, uint8_t data);
 /**
+ * @brief PC and SP of a CPU of the A5120 for diagnostics (additive).
+ *
+ * @p cpu 0 = ZVE1 (main Z80), 1 = ZVE2 (DMA Z80).  Used by the hardware test group
+ * (doc/design/40_hardware_testgruppe.md) to locate a guest stall without a debugger.
+ * Not thread-safe (like mem_read).
+ * @return false on other machines or an invalid @p cpu.
+ */
+K1520_API bool        k1520_debug_cpu(K1520Handle h, int cpu, uint16_t* pc, uint16_t* sp);
+/**
  * @brief Load a binary file byte by byte into memory starting at @p addr (additive, all machines).
  *
  * Goes through the same path as k1520_mem_write (machine bus / CPU view, so on the MC80 it

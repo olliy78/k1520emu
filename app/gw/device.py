@@ -370,7 +370,17 @@ class Device:
             try:
                 return vorgang()
             except Exception as e:                # noqa: BLE001
-                if versuch == _INDEX_WIEDERHOLUNGEN or "no index" not in str(e).lower():
+                text = str(e).lower()
+                if versuch == _INDEX_WIEDERHOLUNGEN:
+                    raise
+                if "no drive unit selected" in text or "no bus type" in text:
+                    # Die Firmware gibt Auswahl und Motor nach etwa 10 s Ruhe von sich
+                    # aus frei (an der Hardware gemessen, tests/hardware H2).  Ohne dies
+                    # scheiterte der erste Auftrag nach einer Pause des Gastes.
+                    self._gewaehlt = False
+                    self._motor_an = False
+                    continue
+                if "no index" not in text:
                     raise
                 self._neu_anfahren()
 

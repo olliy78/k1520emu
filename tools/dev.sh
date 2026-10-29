@@ -39,6 +39,12 @@
 #                                     --alles erzwingt alles, --trocken druckt nur den Plan,
 #                                     --dateien <pfad>... ersetzt den git diff (Planprobe).
 #   tools/dev.sh test-python [args]   NUR die Python-Ebene (C-ABI + GUI, Label python)
+#   tools/dev.sh test-hardware [--schreiben] [pytest-args]
+#                                     ECHTE Diskette am Greaseweazle (tests/hardware/, Entwurf 40):
+#                                     NICHT in der Regression. Ohne --schreiben nur lesend (H0/H1,
+#                                     H3.1); --schreiben BESCHREIBT die eingelegte Diskette (vorher
+#                                     Sicherung nach out/hw_sicherung/; --keine-sicherung,
+#                                     --zurueckspielen). Lang (Stunden): in den Hintergrund.
 #   tools/dev.sh test-oracle [args]   U8001/U8002-Primitive gegen MAMEs z8000 (Differenz-
 #                                     pruefung, Label mame_oracle, eigenes build_oracle/,
 #                                     braucht beim ersten Mal Netz)
@@ -339,6 +345,12 @@ case "$cmd" in
         build_dir build
         c_ylw ">> ctest (build/, -j$JOBS) NUR Python-Tests (Label python)"
         run_ctest build -L python -j"$JOBS" "$@" ;;
+    test-hardware)
+        # Hardware-Gruppe (Entwurf 40): braucht die gebaute Bibliothek, aber kein ctest.
+        build_dir build
+        c_ylw ">> pytest tests/hardware (echtes Laufwerk; --schreiben beschreibt die Diskette)"
+        LD_LIBRARY_PATH="$PROJECT_DIR/build${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+            "$PROJECT_DIR/venv/bin/python" -m pytest "$PROJECT_DIR/tests/hardware" -p no:cacheprovider -v "$@" ;;
     test-level)
         # Testebenen (Labels, siehe tests/CMakeLists.txt):
         #   unit debugtools integration cli system python  —  quer dazu: fast slow
