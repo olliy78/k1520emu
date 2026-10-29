@@ -111,7 +111,74 @@ struct Pc {
     }
 };
 
+/// Ein Glied der EGOS-Kette, wie RS0 (egos.prn 092EH) sie liest.
+struct Glied { uint16_t adr; uint8_t kennbyte; std::string name; };
+
+/// ROM-Kette ab 0AFEH ablaufen wie RS0: Kennbyte >= 1DH = Ende, naechstes Glied = Adresse hinter
+/// der Distanz + Distanz.  Abbruch an 4000H (RAM-Anfang, dort beginnt der Teil von INIT/RKET);
+/// `ende` = Adresse, an der die ROM-Kette aufhoert.
+std::vector<Glied> romKette(Mc80Machine& m, uint16_t& ende) {
+    std::vector<Glied> r;
+    uint16_t a = 0x0AFE;
+    while (a < 0x4000 && r.size() < 64) {
+        const uint8_t kb = m.memReadDebug(a);
+        if (kb >= 0x1D) break;
+        Glied g{a, kb, {}};
+        for (uint16_t n = a + 3; m.memReadDebug(n) < 0x7F; ++n) g.name += char(m.memReadDebug(n));
+        r.push_back(g);
+        const uint16_t dist = m.memReadDebug(a + 1) | (m.memReadDebug(a + 2) << 8);
+        const uint16_t weiter = static_cast<uint16_t>(a + 3 + dist);
+        EXPECT_GT(weiter, a) << "Kette laeuft rueckwaerts bei " << std::hex << a;
+        if (weiter <= a) break;
+        a = weiter;
+    }
+    ende = a;
+    return r;
+}
+
+std::vector<std::string> namen(const std::vector<Glied>& k) {
+    std::vector<std::string> r;
+    for (const auto& g : k) r.push_back(g.kennbyte == 0x01 || g.kennbyte == 0x02 ? g.name : "(" + std::to_string(g.kennbyte) + ")");
+    return r;
+}
+
+const std::vector<std::string> ROM_KETTE = {
+    "CON", "INIT", "(3)", "KLOG", "KINIT", "READ", "WRITE", "(3)", "(27)", "RELAD", "DIR", "LADT",
+    "DEFINE", "ACT", "DEACT", "(3)", "CAT", "CATA", "RKET"};
+
 }  // namespace
+
+TEST(Mc80Pcmc, KetteOhneErweiterungFuehrtVonRketNach4000) {
+    auto m = maschine(false);
+    uint16_t ende = 0;
+    const auto k = romKette(*m, ende);
+    EXPECT_EQ(namen(k), ROM_KETTE);
+    EXPECT_EQ(ende, 0x4000) << std::hex << ende;
+    for (const auto& g : k) EXPECT_LT(g.adr, 0x2800) << g.name << " im Leerbereich";
+}
+
+TEST(Mc80Pcmc, KetteMitErweiterungFuehrtUeberPcmcNach4000) {
+    auto m = maschine(true);
+    uint16_t ende = 0;
+    const auto k = romKette(*m, ende);
+    auto soll = ROM_KETTE;
+    soll.push_back("PCMC");
+    EXPECT_EQ(namen(k), soll);
+    ASSERT_FALSE(k.empty());
+    EXPECT_EQ(k.back().adr, 0x2800);
+    EXPECT_EQ(ende, 0x4000) << std::hex << ende;
+}
+
+TEST(Mc80Pcmc, CatFindetPcmcUndLaeuftBisZumPrompt) {
+    Pc p(true);
+    p.boot();
+    p.tippe("cat\n", 0);
+    for (int i = 0; i < 400 && p.m->textZeile(24) != ">"; ++i) p.fahre(100'000);
+    EXPECT_EQ(p.m->textZeile(24), ">") << p.bild();
+    EXPECT_TRUE(p.text("%01 %01.26CF")) << p.bild();   // RKET
+    EXPECT_TRUE(p.text("PCMC")) << p.bild();
+    EXPECT_TRUE(p.text("%01 %01.2800")) << p.bild();
+}
 
 TEST(Mc80Pcmc, OhneErweiterungKeinPcmc) {
     Pc p(false);
