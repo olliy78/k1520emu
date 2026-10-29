@@ -1,6 +1,6 @@
 /**
  * @file test_sios_fs.cpp
- * @brief GoogleTests fuer @ref SiosFileSystem — SIOS 1526 (A5120/A5130/K8924), lesend.
+ * @brief GoogleTests fuer @ref SiosFileSystem — SIOS 1526 (A5120/A5130/K8924), Lesen und Schreiben (D4).
  *
  * ### Woher die Sollwerte stammen
  * Alle Werte sind an den fuenf Originalabbildern gemessen und stehen in
@@ -24,6 +24,8 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <string>
@@ -358,36 +360,448 @@ TEST(SiosFs, UnbekannterNameUndFirstSector) {
     EXPECT_EQ(ort.sector, 54 % 26 + 1);
 }
 
-// ─── Nur lesen ───────────────────────────────────────────────────────────────
+// ─── Schreiben (D4) ──────────────────────────────────────────────────────────
 
-TEST(SiosFs, SchreibenIstGesperrt) {
+namespace {
+
+/// @brief Beschreibbare Kopie einer Fixture (oder nur ein freier Pfad); raeumt sich weg.
+struct Kopie {
+    std::string pfad;
+    Kopie(const char* fix, const std::string& name) {
+        pfad = k1520test::tempPath(name);
+        std::error_code ec;
+        fs::remove(pfad, ec);
+        if (fix) fs::copy_file(fixture(fix), pfad, fs::copy_options::overwrite_existing, ec);
+        EXPECT_FALSE(ec);
+    }
+    ~Kopie() { std::error_code ec; fs::remove(pfad, ec); }
+};
+
+std::vector<uint8_t> muster(size_t n, uint8_t start = 1) {
+    std::vector<uint8_t> v(n);
+    for (size_t i = 0; i < n; ++i) v[i] = static_cast<uint8_t>(start + i * 7);
+    return v;
+}
+
+void schreibeDatei(const std::string& pfad, const std::vector<uint8_t>& d) {
+    std::ofstream o(pfad, std::ios::binary);
+    o.write(reinterpret_cast<const char*>(d.data()), static_cast<std::streamsize>(d.size()));
+}
+
+std::vector<uint8_t> leseDatei2(const std::string& pfad) {
+    std::ifstream i(pfad, std::ios::binary);
+    return std::vector<uint8_t>(std::istreambuf_iterator<char>(i), std::istreambuf_iterator<char>());
+}
+
+/// @brief Neue leere SIOS-Diskette (Datei) ueber DiskVolume::create.
+std::unique_ptr<DiskVolume> neueDiskette(const std::string& pfad, const char* fsname,
+                                         const std::string& label, std::string& err,
+                                         const std::string& boot = "") {
+    return DiskVolume::create(pfad, fsname, label, formate(), dateisysteme(), err, boot);
+}
+
+int befunde(DiskVolume& v) { return v.checkReport().zaehlerAb(FsSeverity::Warnung); }
+int befunde(const SiosFileSystem& f) { return f.check(FsCheckLevel::Schnell, false).zaehlerAb(FsSeverity::Warnung); }
+
+bool geloescht(Diskette& d, int sektor) {
+    for (const LogicalSector& ls : d.space->trackSectors(0, 0))
+        if (ls.id == sektor) return ls.deleted;
+    ADD_FAILURE() << "Sektor " << sektor << " fehlt";
+    return false;
+}
+
+}  // namespace
+
+TEST(SiosFsSchreiben, LeereDisketteHatDenInhaltVonParagraph10) {
+    Kopie k(nullptr, "k1520_test_sios_leer.hfe");
     std::string err;
-    auto v = oeffne("sios1526_dp1.hfe", err);
-    ASSERT_TRUE(v) << err;
-    EXPECT_TRUE(v->readOnly());
-    v->setReadOnly(false);                           // laesst sich nicht aufheben
-    EXPECT_TRUE(v->readOnly());
-    EXPECT_TRUE(v->readOnlyForced());
-    EXPECT_NE(v->lastError().find("SIOS"), std::string::npos) << v->lastError();
-
-    auto d = direkt(fixture("sios1526_dp1.hfe"), "sios_ss40");
+    {
+        auto v = neueDiskette(k.pfad, "sios_ss40", "test01", err);
+        ASSERT_TRUE(v) << err;
+        EXPECT_TRUE(v->list().empty());
+        EXPECT_EQ(befunde(*v), 0) << v->checkReport().alsText();
+    }
+    auto d = direkt(k.pfad, "sios_ss40");
     ASSERT_TRUE(d.fs) << d.error;
-    EXPECT_FALSE(d.fs->write("X", {1, 2, 3}, WriteOptions{}));
-    EXPECT_NE(d.fs->lastError().find("SIOS"), std::string::npos);
-    EXPECT_FALSE(d.fs->erase("PHASELB"));
-    EXPECT_FALSE(d.fs->mkfs());
-    FitReport fit;
-    EXPECT_TRUE(d.fs->wouldFit({}, fit));            // Auskunft, kein Fehler
-    EXPECT_FALSE(fit.fits);
-    EXPECT_NE(fit.detail.find("SIOS"), std::string::npos);
+    EXPECT_EQ(d.fs->volumeName(), "TEST01");
+    EXPECT_EQ(d.fs->spuren(), 40);
 
-    // Anlegen einer leeren SIOS-Diskette: erst D4
-    const std::string pfad = k1520test::tempPath("k1520_test_sios_neu.hfe");
-    std::string e2;
-    EXPECT_FALSE(DiskVolume::create(pfad, "sios_ss40", "TEST", formate(), dateisysteme(), e2));
-    EXPECT_NE(e2.find("SIOS"), std::string::npos);
+    // Spur 0 Byte fuer Byte (§10)
+    auto sektor = [&](int id) { SectorData s; EXPECT_TRUE(d.space->readSector(0, 0, static_cast<uint8_t>(id), s)); return s.data; };
+    for (int id = 1; id <= 4; ++id) EXPECT_EQ(sektor(id), std::vector<uint8_t>(128, 0x40)) << id;
+    std::vector<uint8_t> ermap(128, 0x40);
+    for (size_t i = 80; i < 128; ++i) ermap[i] = 0;
+    const uint8_t er[5] = {0xC5, 0xD9, 0xD4, 0xC1, 0xD7};
+    std::copy(er, er + 5, ermap.begin());
+    EXPECT_EQ(sektor(5), ermap);
+    std::vector<uint8_t> leer6(128, 0x40);
+    for (size_t i = 80; i < 128; ++i) leer6[i] = 0;
+    EXPECT_EQ(sektor(6), leer6);
+    const std::vector<uint8_t> v1 = sektor(7);
+    EXPECT_EQ(d.fs->etikettenText(7).substr(0, 10), "VOL1TEST01");
+    EXPECT_EQ(v1[70], 0xD4);                       // 'M'
+    EXPECT_EQ(v1[76], 0xF0);
+    EXPECT_EQ(v1[77], 0xF1);
+    EXPECT_EQ(v1[79], 0xE6);                       // 'W'
+    for (size_t i = 80; i < 128; ++i) EXPECT_EQ(v1[i], 0) << i;
+    for (int id = 8; id <= 26; ++id) {
+        std::vector<uint8_t> soll(128, 0x40);
+        soll[0] = 0xC4;
+        for (size_t i = 80; i < 128; ++i) soll[i] = 0;
+        EXPECT_EQ(sektor(id), soll) << id;
+    }
+    // Datenmarken: 1..7 normal, 8..26 geloescht
+    for (int id = 1; id <= 26; ++id) EXPECT_EQ(geloescht(d, id), id >= 8) << id;
+    // Datenspuren: 26 x 128, natuerliche Folge, E5
+    for (int cyl : {1, 20, 39}) {
+        const auto& sl = d.space->trackSectors(static_cast<uint8_t>(cyl), 0);
+        ASSERT_EQ(sl.size(), 26u) << cyl;
+        for (size_t i = 0; i < sl.size(); ++i) {
+            EXPECT_EQ(sl[i].id, i + 1) << cyl;
+            EXPECT_EQ(sl[i].data, std::vector<uint8_t>(128, 0xE5));
+            EXPECT_FALSE(sl[i].deleted);
+        }
+    }
+}
+
+TEST(SiosFsSchreiben, AnlegenMitAchtzigSpurenUndNameRegeln) {
+    Kopie k(nullptr, "k1520_test_sios_leer80.hfe");
+    std::string err;
+    auto v = neueDiskette(k.pfad, "sios_ss80", "", err);
+    ASSERT_TRUE(v) << err;
+    EXPECT_EQ(befunde(*v), 0);
+    Kopie k2(nullptr, "k1520_test_sios_leer_x.hfe");
+    EXPECT_FALSE(neueDiskette(k2.pfad, "sios_ss40", "ZUVIELE1", err));       // 7 Zeichen
+    EXPECT_NE(err.find("SIOS"), std::string::npos) << err;
+    EXPECT_FALSE(neueDiskette(k2.pfad, "sios_ss40", "A\xC3\xA4" "B", err));
+    // --boot ist (noch) nicht umgesetzt
+    EXPECT_FALSE(neueDiskette(k2.pfad, "sios_ss40", "X", err, "/dev/null"));
+    EXPECT_NE(err.find("SIOS"), std::string::npos) << err;
+}
+
+TEST(SiosFsSchreiben, RundlaufPhysischeDatei) {
+    Kopie k(nullptr, "k1520_test_sios_rund.hfe");
+    std::string err;
+    { auto v = neueDiskette(k.pfad, "sios_ss40", "RUND", err); ASSERT_TRUE(v) << err; }
+    const std::vector<uint8_t> a = muster(128 * 30), b = muster(128, 9), c = muster(128 * 26, 3);
+    WriteOptions wo;
+    {
+        auto d = direkt(k.pfad, "sios_ss40", false);
+        ASSERT_TRUE(d.fs) << d.error;
+        ASSERT_TRUE(d.fs->write("alpha", a, wo)) << d.fs->lastError();
+        ASSERT_TRUE(d.fs->write("BETA.1", b, wo));
+        ASSERT_TRUE(d.fs->write("GAMMA", c, wo));
+        const auto l = d.fs->list();
+        ASSERT_EQ(l.size(), 3u);
+        // erste Luecke ab Spur 1: ALPHA 2 Spuren (30 Sektoren), BETA 1, GAMMA 1
+        EXPECT_EQ(finde(l, "ALPHA")->extent, "BOE 01001 EOE 02026 EOD 02005");
+        EXPECT_EQ(finde(l, "BETA.1")->extent, "BOE 03001 EOE 03026 EOD 03002");
+        EXPECT_EQ(finde(l, "GAMMA")->extent, "BOE 04001 EOE 04026 EOD 05001");
+        EXPECT_EQ(finde(l, "ALPHA")->record_len, 128);
+        std::vector<uint8_t> x;
+        ASSERT_TRUE(d.fs->read("ALPHA", x));
+        EXPECT_EQ(x, a);                                // 128-Vielfaches: bytegleich (EOD begrenzt)
+        ASSERT_TRUE(d.fs->read("beta.1", x));
+        EXPECT_EQ(x, b);
+        ASSERT_TRUE(d.fs->read("GAMMA", x));
+        EXPECT_EQ(x, c);
+        EXPECT_EQ(befunde(*d.fs), 0);
+
+        // Datenmarken der Etikettensaetze: 8,9,10 aktiv (FB), 11.. geloescht
+        for (int id = 8; id <= 26; ++id) EXPECT_EQ(geloescht(d, id), id >= 11) << id;
+        // HDR1-Text wie die Originale (Formatdokument §4.1)
+        EXPECT_EQ(d.fs->etikettenText(8),
+                  "HDR1 ALPHA            00128 01001 02026    E                              02005 ");
+        // Rest bis EOE bleibt E5 (frische Diskette)
+        SectorData s;
+        ASSERT_TRUE(d.space->readSector(2, 0, 10, s));
+        EXPECT_EQ(s.data, std::vector<uint8_t>(128, 0xE5));
+        // Unvollstaendiger letzter Sektor wird mit E5 aufgefuellt
+        ASSERT_TRUE(d.fs->write("KURZ", muster(130), WriteOptions{}));
+        ASSERT_TRUE(d.fs->read("KURZ", x));
+        ASSERT_EQ(x.size(), 256u);
+        EXPECT_TRUE(std::equal(x.begin(), x.begin() + 130, muster(130).begin()));
+        EXPECT_EQ(x[130], 0xE5);
+        // leere Datei: eine Spur, EOD = BOE
+        ASSERT_TRUE(d.fs->write("NIX", {}, WriteOptions{}));
+        EXPECT_EQ(finde(d.fs->list(), "NIX")->extent, "BOE 06001 EOE 06026 EOD 06001");
+        d.disk->flush();
+    }
+    // Neu oeffnen (Container-Rueckschreiben) - alles bleibt
+    {
+        auto d = direkt(k.pfad, "sios_ss40");
+        ASSERT_TRUE(d.fs) << d.error;
+        EXPECT_EQ(d.fs->list().size(), 5u);
+    }
+}
+
+TEST(SiosFsSchreiben, LoeschenUndWiederverwenden) {
+    Kopie k(nullptr, "k1520_test_sios_rm.hfe");
+    std::string err;
+    { auto v = neueDiskette(k.pfad, "sios_ss40", "RM", err); ASSERT_TRUE(v) << err; }
+    auto d = direkt(k.pfad, "sios_ss40", false);
+    ASSERT_TRUE(d.fs) << d.error;
+    ASSERT_TRUE(d.fs->write("A", muster(128), WriteOptions{}));
+    ASSERT_TRUE(d.fs->write("B", muster(128), WriteOptions{}));
+    const std::string b_vorher = d.fs->etikettenText(9);
+    ASSERT_TRUE(d.fs->erase("a"));
+    auto l = d.fs->list();
+    ASSERT_EQ(l.size(), 1u);
+    EXPECT_EQ(l[0].name, "B");
+    // HDR1 -> DDR1, Rest des Satzes bleibt, Marke F8
+    const std::string t = d.fs->etikettenText(8);
+    EXPECT_EQ(t.substr(0, 10), "DDR1 A    ") << t;
+    EXPECT_TRUE(geloescht(d, 8));
+    EXPECT_EQ(d.fs->etikettenText(9), b_vorher);
+    // Daten bleiben stehen
+    SectorData s;
+    ASSERT_TRUE(d.space->readSector(1, 0, 1, s));
+    EXPECT_EQ(s.data, muster(128));
+    EXPECT_FALSE(d.fs->erase("A"));                      // nicht mehr da
+    EXPECT_EQ(befunde(*d.fs), 0);
+    // freier Platz: Spur 1 und Etikett 8 werden wiederverwendet
+    ASSERT_TRUE(d.fs->write("C", muster(128, 5), WriteOptions{}));
+    EXPECT_EQ(finde(d.fs->list(), "C")->extent, "BOE 01001 EOE 01026 EOD 01002");
+    EXPECT_EQ(d.fs->etikettenText(8).substr(0, 7), "HDR1 C ");
+    EXPECT_FALSE(geloescht(d, 8));
+}
+
+TEST(SiosFsSchreiben, UeberschreibenUndAblehnungen) {
+    Kopie k(nullptr, "k1520_test_sios_abl.hfe");
+    std::string err;
+    { auto v = neueDiskette(k.pfad, "sios_ss40", "ABL", err); ASSERT_TRUE(v) << err; }
+    auto d = direkt(k.pfad, "sios_ss40", false);
+    ASSERT_TRUE(d.fs) << d.error;
+    WriteOptions wo, ow;
+    ow.overwrite = true;
+    ASSERT_TRUE(d.fs->write("X", muster(128), wo));
+    EXPECT_FALSE(d.fs->write("x", muster(128), wo));                 // existiert
+    EXPECT_NE(d.fs->lastError().find("existiert"), std::string::npos);
+    ASSERT_TRUE(d.fs->write("X", muster(128 * 40, 2), ow));          // ersetzt, braucht 2 Spuren
+    std::vector<uint8_t> x;
+    ASSERT_TRUE(d.fs->read("X", x));
+    EXPECT_EQ(x, muster(128 * 40, 2));
+    EXPECT_EQ(d.fs->list().size(), 1u);
+    // Namen
+    for (const char* schlecht : {"", "NEUNZEICHEN", "A B", "AE\xC3\xA4"}) {
+        EXPECT_FALSE(d.fs->write(schlecht, muster(128), wo)) << schlecht;
+        EXPECT_NE(d.fs->lastError().find("SIOS"), std::string::npos) << schlecht;
+    }
+    EXPECT_EQ(d.fs->list().size(), 1u);
+    // zu gross: Spur 1..37 nutzbar, X belegt 2 -> 35 frei
+    EXPECT_FALSE(d.fs->write("RIESIG", std::vector<uint8_t>(128u * 26 * 36, 1), wo));
+    EXPECT_NE(d.fs->lastError().find("zusammenhaengend"), std::string::npos) << d.fs->lastError();
+    EXPECT_TRUE(d.fs->write("PASST", std::vector<uint8_t>(128u * 26 * 35, 1), wo)) << d.fs->lastError();
+    // alle Spuren 1..37 belegt: noch eine Datei geht nicht
+    EXPECT_FALSE(d.fs->write("ZU", muster(1), wo));
+    EXPECT_EQ(befunde(*d.fs), 0);
+    // Reserve: Spur 38/39 unberuehrt
+    for (int cyl : {38, 39}) {
+        SectorData s;
+        ASSERT_TRUE(d.space->readSector(static_cast<uint8_t>(cyl), 0, 1, s));
+        EXPECT_EQ(s.data, std::vector<uint8_t>(128, 0xE5));
+    }
+}
+
+TEST(SiosFsSchreiben, NeunzehnEtikettenDannVoll) {
+    Kopie k(nullptr, "k1520_test_sios_19.hfe");
+    std::string err;
+    { auto v = neueDiskette(k.pfad, "sios_ss40", "VOLL", err); ASSERT_TRUE(v) << err; }
+    auto d = direkt(k.pfad, "sios_ss40", false);
+    ASSERT_TRUE(d.fs) << d.error;
+    for (int i = 0; i < 19; ++i)
+        ASSERT_TRUE(d.fs->write("F" + std::to_string(i), muster(128), WriteOptions{})) << i;
+    EXPECT_FALSE(d.fs->write("F19", muster(128), WriteOptions{}));
+    EXPECT_NE(d.fs->lastError().find("gefuellt"), std::string::npos) << d.fs->lastError();
+}
+
+TEST(SiosFsSchreiben, PlatzpruefungOhneSchreiben) {
+    Kopie k(nullptr, "k1520_test_sios_fit.hfe");
+    std::string err;
+    { auto v = neueDiskette(k.pfad, "sios_ss40", "FIT", err); ASSERT_TRUE(v) << err; }
+    auto d = direkt(k.pfad, "sios_ss40");
+    ASSERT_TRUE(d.fs) << d.error;
+    FitReport r;
+    PlannedFile gross; gross.name = "G"; gross.size = 128u * 26 * 40;
+    ASSERT_TRUE(d.fs->wouldFit({gross}, r));
+    EXPECT_FALSE(r.fits);
+    EXPECT_NE(r.detail.find("zusammenhaengend"), std::string::npos) << r.detail;
+    PlannedFile ok1; ok1.name = "A"; ok1.size = 5000;
+    PlannedFile ok2; ok2.name = "B"; ok2.size = 100;
+    ASSERT_TRUE(d.fs->wouldFit({ok1, ok2}, r));
+    EXPECT_TRUE(r.fits) << r.detail;
+    EXPECT_EQ(r.dir_needed, 2);
+    EXPECT_EQ(r.dir_free, 19);
+    EXPECT_TRUE(d.fs->list().empty());
+}
+
+TEST(SiosFsSchreiben, FehlspurkartenEintragSperrt) {
+    Kopie k("sios1526_dp1.hfe", "k1520_test_sios_ermap.hfe");
+    auto d = direkt(k.pfad, "sios_ss40", false);
+    ASSERT_TRUE(d.fs) << d.error;
+    SectorData s;
+    ASSERT_TRUE(d.space->readSector(0, 0, 5, s));
+    s.data[6] = 0xF0;
+    s.data[7] = 0xF7;                                 // irgendein Eintrag
+    ASSERT_TRUE(d.space->writeSector(0, 0, 5, s.data));
+    EXPECT_FALSE(d.fs->write("NEU", muster(128), WriteOptions{}));
+    EXPECT_NE(d.fs->lastError().find("Fehlspurkarte"), std::string::npos) << d.fs->lastError();
+}
+
+// ─── Bibliotheken ────────────────────────────────────────────────────────────
+
+TEST(SiosFsSchreiben, BibliothekObjektAnhaengenUndLoeschen) {
+    Kopie k("sios1526_sg1.hfe", "k1520_test_sios_bib.hfe");     // PHASELB: 3 Objekte, ND 0087, Groesse 156
+    auto d = direkt(k.pfad, "sios_ss40", false);
+    ASSERT_TRUE(d.fs) << d.error;
+    std::vector<uint8_t> vorher;
+    ASSERT_TRUE(d.fs->read("PHASELB", vorher));
+    const std::vector<uint8_t> obj = muster(128 * 5 + 7, 11);    // 6 Sektoren
+    WriteOptions wo;
+    ASSERT_TRUE(d.fs->write("phaselb/neu", obj, wo)) << d.fs->lastError();
+    auto l = d.fs->list();
+    const FileEntry* e = finde(l, "PHASELB/NEU");
+    ASSERT_TRUE(e);
+    EXPECT_EQ(e->extent, "AADR 0087 ML 03");                    // ND 0087 hex, ML = 6/2
+    EXPECT_EQ(e->size, 6u * 128);
+    std::vector<uint8_t> gelesen;
+    ASSERT_TRUE(d.fs->read("PHASELB/NEU", gelesen));
+    ASSERT_EQ(gelesen.size(), 768u);
+    EXPECT_TRUE(std::equal(obj.begin(), obj.end(), gelesen.begin()));
+    EXPECT_EQ(gelesen[obj.size()], 0xE5);
+    // die alten Objekte unveraendert: nur Verzeichnissektor (Sektor 2) und die neuen Sektoren aendern sich
+    std::vector<uint8_t> nachher;
+    ASSERT_TRUE(d.fs->read("PHASELB", nachher));
+    ASSERT_EQ(nachher.size(), vorher.size());
+    for (size_t i = 0; i < vorher.size(); ++i) {
+        const size_t sek = i / 128;                              // 0-basiert; AADR = sek + 1
+        const bool verz = sek == 1, neu = sek >= 0x87 - 1 && sek < 0x87 - 1 + 6;
+        if (!verz && !neu) ASSERT_EQ(nachher[i], vorher[i]) << i;
+    }
+    // Verzeichnis: 4. Eintrag, Fuss ND/NV (Formatdokument §7.2)
+    const std::vector<uint8_t> dir(nachher.begin() + 128, nachher.begin() + 256);
+    EXPECT_EQ(std::string(dir.begin() + 24, dir.begin() + 27), "NEU");
+    EXPECT_EQ(dir[24 + 5], 0x87);
+    EXPECT_EQ(dir[24 + 6], 0x00);
+    EXPECT_EQ(dir[24 + 7], 3);
+    EXPECT_EQ(dir[122], 0x8D);
+    EXPECT_EQ(dir[123], 0x00);                                   // ND 0087 + 6
+    EXPECT_EQ((dir[120] << 8) | dir[121], 0x0200 + 8 * 4);       // NV
+    EXPECT_EQ(dir[124], 0x9C);                                   // Groesse unveraendert
+    EXPECT_EQ(befunde(*d.fs), 0);
+
+    // doppelt ablehnen, ueberschreiben = alt wird blank, neu wird angehaengt
+    EXPECT_FALSE(d.fs->write("PHASELB/NEU", obj, wo));
+    WriteOptions ow;
+    ow.overwrite = true;
+    ASSERT_TRUE(d.fs->write("PHASELB/NEU", muster(128, 2), ow)) << d.fs->lastError();
+    l = d.fs->list();
+    int neu_zahl = 0;
+    for (const FileEntry& f : l) if (f.name == "PHASELB/NEU") ++neu_zahl;
+    EXPECT_EQ(neu_zahl, 1);
+    EXPECT_EQ(finde(l, "PHASELB/NEU")->extent, "AADR 008D ML 01");
+
+    // Loeschen: Name blank, AADR/ML bleiben
+    ASSERT_TRUE(d.fs->erase("PHASELB/neu"));
+    l = d.fs->list();
+    EXPECT_FALSE(finde(l, "PHASELB/NEU"));
+    EXPECT_TRUE(finde(l, "PHASELB/SGEN"));
+    std::vector<uint8_t> bib;
+    ASSERT_TRUE(d.fs->read("PHASELB", bib));
+    EXPECT_EQ(bib[128 + 4 * 8 + 5], 0x8D);                       // 5. Eintrag: AADR bleibt
+    EXPECT_EQ(bib[128 + 4 * 8 + 0], 0x20);                       // Name blank
+    EXPECT_FALSE(d.fs->erase("PHASELB/NEU"));
+    EXPECT_EQ(befunde(*d.fs), 0);
+}
+
+TEST(SiosFsSchreiben, BibliothekAblehnungen) {
+    Kopie k("sios1526_dp1.hfe", "k1520_test_sios_bib2.hfe");     // 15 Eintraege, voll
+    auto d = direkt(k.pfad, "sios_ss40", false);
+    ASSERT_TRUE(d.fs) << d.error;
+    WriteOptions wo;
+    EXPECT_FALSE(d.fs->write("PHASELB/XYZ", muster(128), wo));
+    EXPECT_NE(d.fs->lastError().find("voll"), std::string::npos) << d.fs->lastError();
+    EXPECT_FALSE(d.fs->write("NOLB/XYZ", muster(128), wo));
+    EXPECT_NE(d.fs->lastError().find("nicht gefunden"), std::string::npos);
+    EXPECT_FALSE(d.fs->write("PHASELB/ZUVIELE", muster(128), wo));    // 6 Zeichen
+    EXPECT_FALSE(d.fs->write("PHASELB/", muster(128), wo));
+    EXPECT_FALSE(d.fs->write("PHASELB/A/B", muster(128), wo));
+    // loeschen im vollen Verzeichnis geht trotzdem (nur der Name wird blank)
+    ASSERT_TRUE(d.fs->erase("PHASELB/CATM")) << d.fs->lastError();
+    EXPECT_FALSE(finde(d.fs->list(), "PHASELB/CATM"));
+
+    Kopie k2("sios1526_sg1.hfe", "k1520_test_sios_bib3.hfe");
+    auto d2 = direkt(k2.pfad, "sios_ss40", false);
+    ASSERT_TRUE(d2.fs) << d2.error;
+    EXPECT_FALSE(d2.fs->write("SYSORG09/ABC", muster(128), wo));      // keine Bibliothek
+    // PHASELB: 156 - 0x87 + 1 = 22 Sektoren frei
+    EXPECT_FALSE(d2.fs->write("PHASELB/GROSS", muster(128 * 23), wo));
+    EXPECT_NE(d2.fs->lastError().find("Platz"), std::string::npos) << d2.fs->lastError();
+    EXPECT_TRUE(d2.fs->write("PHASELB/PASST", muster(128 * 22), wo)) << d2.fs->lastError();
+    EXPECT_FALSE(d2.fs->write("PHASELB/NOCH", muster(128), wo));
+    EXPECT_EQ(befunde(*d2.fs), 0);
+}
+
+// ─── Ueber DiskVolume (Container, Originale unveraendert) ────────────────────
+
+TEST(SiosFsSchreiben, UeberDiskVolumeUndOriginalBleibt) {
+    const std::string orig = fixture("sios1526_dp1.hfe");
+    const auto vorher = leseDatei2(orig);
+    Kopie k("sios1526_dp1.hfe", "k1520_test_sios_dv.hfe");
+    const std::string quelle = k1520test::tempPath("k1520_test_sios_dv_q.bin");
+    schreibeDatei(quelle, muster(300));
+    {
+        std::string err;
+        auto v = DiskVolume::open(k.pfad, "", formate(), dateisysteme(), err, false);
+        ASSERT_TRUE(v) << err;
+        EXPECT_FALSE(v->readOnly());
+        EXPECT_FALSE(v->readOnlyForced());
+        TransferOptions to;
+        // DP1 ist voll (Spur 1..37 durch PHASELB): put einer physischen Datei scheitert mit Grund
+        EXPECT_FALSE(v->insert(quelle, FileRef{0, "NEU"}, to));
+        EXPECT_NE(v->lastError().find("SIOS"), std::string::npos) << v->lastError();
+        EXPECT_FALSE(v->insert(quelle, FileRef{0, "PHASELB/XX"}, to));   // Verzeichnis voll
+        ASSERT_TRUE(v->erase(FileRef{0, "PHASELB"})) << v->lastError();
+        ASSERT_TRUE(v->insert(quelle, FileRef{0, "NEU"}, to)) << v->lastError();
+        EXPECT_EQ(befunde(*v), 0) << v->checkReport().alsText();
+        ASSERT_TRUE(v->flush()) << v->lastError();
+    }
+    {
+        std::string err;
+        auto v = DiskVolume::open(k.pfad, "", formate(), dateisysteme(), err);
+        ASSERT_TRUE(v) << err;
+        const auto l = v->list();
+        ASSERT_EQ(l.size(), 1u);
+        EXPECT_EQ(l[0].name, "NEU");
+        EXPECT_EQ(l[0].size, 384u);
+        EXPECT_EQ(befunde(*v), 0) << v->checkReport().alsText();
+    }
     std::error_code ec;
-    fs::remove(pfad, ec);
+    fs::remove(quelle, ec);
+    EXPECT_EQ(leseDatei2(orig), vorher);                 // Fixture unangetastet
+}
+
+TEST(SiosFsSchreiben, ContainerDmkUndImg) {
+    for (const char* ext : {"dmk", "img"}) {
+        Kopie k(nullptr, std::string("k1520_test_sios_c.") + ext);
+        const std::string quelle = k1520test::tempPath("k1520_test_sios_c_q.bin");
+        schreibeDatei(quelle, muster(256));
+        std::string err;
+        {
+            auto v = neueDiskette(k.pfad, "sios_ss40", "CONT", err);
+            ASSERT_TRUE(v) << ext << ": " << err;
+            TransferOptions to;
+            ASSERT_TRUE(v->insert(quelle, FileRef{0, "DATEI"}, to)) << v->lastError();
+            ASSERT_TRUE(v->flush()) << v->lastError();
+        }
+        std::error_code ec;
+        fs::remove(quelle, ec);
+        auto v = DiskVolume::open(k.pfad, "sios_ss40", formate(), dateisysteme(), err);
+        ASSERT_TRUE(v) << ext << ": " << err;
+        ASSERT_EQ(v->list().size(), 1u) << ext;
+        EXPECT_EQ(v->list()[0].size, 256u);
+        EXPECT_EQ(befunde(*v), 0) << ext;
+    }
 }
 
 // ─── Pruefung ────────────────────────────────────────────────────────────────

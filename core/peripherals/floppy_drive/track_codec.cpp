@@ -566,7 +566,8 @@ std::vector<LogicalSector> parseTrack(const TrackImage& track) {
 static bool schreibeDatenfeld(TrackImage& track, size_t dataPos, uint16_t secSize,
                               const std::vector<uint8_t>& data,
                               const std::vector<uint8_t>& tail,
-                              const uint16_t* crc_woertlich) {
+                              const uint16_t* crc_woertlich,
+                              int dam = -1) {
     const size_t n = track.bytes.size();
     const bool isMfm = (track.encoding == Encoding::MFM);
 
@@ -585,6 +586,9 @@ static bool schreibeDatenfeld(TrackImage& track, size_t dataPos, uint16_t secSiz
     }
 
     // ── Phase 2: schreiben ───────────────────────────────────────────────────
+    // Datenmarke umstellen (SIOS: HDR1 = FB, freier/geloeschter Etikettensatz = F8); die CRC
+    // unten rechnet mit der NEUEN Marke.
+    if (dam >= 0) track.bytes[dataPos] = static_cast<uint8_t>(dam);
     std::copy(data.begin(), data.end(), track.bytes.begin() + static_cast<long>(dataPos + 1));
 
     // CRC ueber [A1 A1 A1 <Marke>] + Daten (MFM) bzw. [<Marke>] + Daten (FM).  Die Marke wird
@@ -608,9 +612,24 @@ static bool schreibeDatenfeld(TrackImage& track, size_t dataPos, uint16_t secSiz
     return true;
 }
 
+static bool writeSectorMitMarke(TrackImage& track, uint8_t sector_id,
+                                const std::vector<uint8_t>& data,
+                                const std::vector<uint8_t>& tail, int dam);
+
 bool writeSector(TrackImage& track, uint8_t sector_id,
                  const std::vector<uint8_t>& data,
                  const std::vector<uint8_t>& tail) {
+    return writeSectorMitMarke(track, sector_id, data, tail, -1);
+}
+
+bool writeSectorDam(TrackImage& track, uint8_t sector_id,
+                    const std::vector<uint8_t>& data, bool deleted) {
+    return writeSectorMitMarke(track, sector_id, data, {}, deleted ? 0xF8 : 0xFB);
+}
+
+static bool writeSectorMitMarke(TrackImage& track, uint8_t sector_id,
+                                const std::vector<uint8_t>& data,
+                                const std::vector<uint8_t>& tail, int dam) {
     const size_t n = track.bytes.size();
     if (n == 0 || track.marks.size() != n) return false;
 
@@ -631,7 +650,7 @@ bool writeSector(TrackImage& track, uint8_t sector_id,
         }
         break;
     }
-    return schreibeDatenfeld(track, dataPos, secSize, data, tail, nullptr);
+    return schreibeDatenfeld(track, dataPos, secSize, data, tail, nullptr, dam);
 }
 
 /**

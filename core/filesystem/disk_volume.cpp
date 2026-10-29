@@ -962,6 +962,9 @@ std::string zielName(const std::string& quelle, FsType typ,
                      const std::map<std::string, CpmAngabe>& beiblatt) {
     const std::string datei = fs::path(quelle).filename().string();
     if (isUdosFamily(typ)) return datei;
+    // SIOS: der Linux-Name ist der Diskettenname (das Dateisystem macht Grossbuchstaben daraus
+    // und prueft Laenge/Zeichen); ein Bibliotheksobjekt wird mit `--as LIB/NAME` ausdruecklich benannt.
+    if (typ == FsType::Sios) return datei;
     // Das `.fileinfo` gehoert zu GENAU dieser Datei und geht dem Sammelbeiblatt
     // vor — es wandert mit ihr mit, das Beiblatt bleibt beim Umsortieren zurueck.
     FileAngaben ein;
@@ -1676,9 +1679,6 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
             auto x = SiosFileSystem::mount(*v.space, *dv->profile_, warum);
             if (!x) { err = warum; return roh(warum); }
             v.fs = std::move(x);
-            // Nur lesbar (Arbeitspaket D4 schreibt): unaufhebbar gesperrt wie ein Folgeteil-tar.
-            dv->read_only_ = true;
-            dv->disk_->setWriteProtect(true);
         } else if (dv->profile_->type == FsType::Tar && dv->profile_->leer) {
             // Die leere tar-Diskette bleibt beschreibbar (mit genau einem .tar); ob
             // geschrieben wird, entscheidet der Schreibschutz wie bei jeder Diskette.
@@ -1738,14 +1738,12 @@ std::string DiskVolume::containerName() const {
 }
 
 std::string DiskVolume::schreibschutzText() const {
-    if (profile_ && profile_->type == FsType::Sios) return SiosFileSystem::schreibsperre();
     if (const TarFileSystem* t = tarFs(); t && !t->schreibbar()) return t->nurLesbarGrund();
     return kSchreibschutz;
 }
 
 bool DiskVolume::readOnlyForced() const {
     if (nur_lesen_erzwungen_) return true;
-    if (profile_ && profile_->type == FsType::Sios) return true;
     if (!profile_ || profile_->type != FsType::Tar) return false;
     const TarFileSystem* t = tarFs();
     return !t || !t->schreibbar();
@@ -2984,8 +2982,9 @@ bool DiskVolume::extractMit(const FileRef& ref, const std::string& dest_path,
     // WEGA wie UDOS immer: Modus, Besitzer und Zeit stehen nirgends in der Linux-Datei,
     // und ein Systemverzeichnis (bin/, etc/) ohne seine Rechte ist unbrauchbar.
     if (!isUdosFamily(profile_->type) && !istUnix() && !cpm_fileinfo_) return true;
-    // SIOS: nur lesend - die Etikettenfelder stehen im Verzeichnis (`ls -l`); eine Angabendatei
-    // haette ohne Schreibpfad (D4) keinen Abnehmer.
+    // SIOS: keine Angabendatei - die Etikettenfelder stehen im Verzeichnis (`ls -l`), und der
+    // Schreibpfad (D4) legt jede Datei mit Satzlaenge 128 an; es gibt nichts, was eine
+    // `.fileinfo` ueberliefern koennte, das nicht schon in den Bytes steckt.
     if (profile_->type == FsType::Sios) return true;
 
     if (bekannt) return schreibeAngabenDatei(*bekannt, dest_path);
@@ -4139,8 +4138,7 @@ void DiskVolume::setReadOnly(bool ro) {
     // Eine nur GEMESSENE Geometrie laesst sich nicht freigeben: wir haben sie geraten,
     // nicht belegt.  Ein Schreibvorgang wuerde beim geringsten Irrtum an der falschen
     // Stelle landen — und die Diskette ist in aller Regel ein Einzelstueck.
-    if (!ro && profile_ && (profile_->type == FsType::Tar || profile_->type == FsType::Sios)
-        && readOnlyForced()) {
+    if (!ro && profile_ && profile_->type == FsType::Tar && readOnlyForced()) {
         last_error_ = schreibschutzText();
         return;
     }
@@ -4229,9 +4227,9 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
     const DiskFormat* fmt = formats.find(profil->format);
     if (!fmt) { err = "Format '" + profil->format + "' steht nicht im Katalog"; return nullptr; }
 
-    if (profil->type == FsType::Sios) {
-        err = SiosFileSystem::schreibsperre();
-        err += " - eine leere SIOS-Diskette anzulegen kommt mit Arbeitspaket D4";
+    if (profil->type == FsType::Sios && !boot_image.empty()) {
+        err = "SIOS: eine bootfaehige Systemdiskette (--boot, SYL-Lader in Spur 0) ist noch nicht "
+              "unterstuetzt - angelegt wird die Datendiskette";
         return nullptr;
     }
 
@@ -4362,6 +4360,10 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
             auto u = Udos1715FileSystem::format(*v.space, *profil, label, err);
             if (!u) return nullptr;
             v.fs = std::move(u);
+        } else if (profil->type == FsType::Sios) {
+            auto x = SiosFileSystem::format(*v.space, *profil, label, err);
+            if (!x) return nullptr;
+            v.fs = std::move(x);
         } else if (profil->type == FsType::WegaMutos) {
             // wie `sa.mkfs 1440` — Verschraenkung 1/72 wie auf den Lieferdisketten.
             // MUTOS (Blockraum ab Zylinder 1) traegt 3/500, wie CMD/CC1/CC2.

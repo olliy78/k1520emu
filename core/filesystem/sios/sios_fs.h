@@ -1,6 +1,6 @@
 /**
  * @file sios_fs.h
- * @brief SIOS 1526 — das Dateisystem der IBM-Etikettendisketten des A5120/A5130/K8924 (LESEND).
+ * @brief SIOS 1526 — das Dateisystem der IBM-Etikettendisketten des A5120/A5130/K8924.
  *
  * Vollstaendig beschrieben in **`doc/sios_diskettenformat.md`** (Arbeitspaket D1).  Kurz:
  *
@@ -12,8 +12,13 @@
  * * Eine **Bibliothek** (Name endet auf `LB`) traegt in ihrem zweiten Sektor ein Verzeichnis
  *   ihrer Objekte (8-Byte-Eintraege, Fuss mit ND).  Sie erscheinen als `PHASELB/INIT`.
  *
- * **Schreiben ist (noch) nicht Teil dieser Klasse** (Arbeitspaket D4): `write`/`erase`/`mkfs`
- * lehnen sauber ab, und @ref DiskVolume haelt die Diskette schreibgeschuetzt.
+ * **Schreiben (Arbeitspaket D4).**  Physische Dateien: freier zusammenhaengender Spurbereich
+ * (erste passende Luecke ab Spur 1, hoechstens bis Spur 37), HDR1 in den ersten freien
+ * Etikettensektor, dessen Datenmarke dabei F8 -> FB wird; Loeschen = HDR1 -> DDR1 und Marke F8.
+ * Bibliotheksobjekte (`PHASELB/NAME`): nur ANHAENGEN hinter ND und als geloescht kennzeichnen
+ * (Name blank, AADR/ML bleiben); Annahmen und Ablehnungsgruende stehen in `sios_fs.cpp` und in
+ * `doc/merkposten/disktool.md`.  Alles Unbelegte (ERMAP-Fehlspuren, Verzeichnisfortsetzung,
+ * Satzlaenge <> 128, NV bei 15 Eintraegen) wird abgelehnt statt geraten.
  *
  * @see doc/sios_diskettenformat.md
  * @see doc/design/43_sios1526.md
@@ -83,6 +88,11 @@ public:
     static std::unique_ptr<SiosFileSystem> mount(SectorSpace& space, const FsProfile& prof,
                                                  std::string& err);
 
+    /// @brief Leere Datendiskette anlegen (Spur 0 nach Formatdokument §10); die Datenspuren
+    ///        muessen schon als 26 x 128 B (E5) formatiert sein.  @p label <= 6 Zeichen DKOI.
+    static std::unique_ptr<SiosFileSystem> format(SectorSpace& space, const FsProfile& prof,
+                                                  const std::string& label, std::string& err);
+
     std::vector<FileEntry> list() const override;
     bool firstSector(const std::string& name, FsRecoverOrt& out) const override;
     bool read(const std::string& name, std::vector<uint8_t>& out) override;
@@ -113,11 +123,27 @@ public:
     /// @brief Zylinder der Diskette (Spur 0 mitgezaehlt).
     int spuren() const { return tracks_; }
 
-    /// @brief Der Grund der Schreibsperre (Wortlaut fuer Meldungen).
-    static const char* schreibsperre();
+    /// @brief ASCII -> DKOI; false = Zeichen nicht darstellbar.
+    static bool dkoiKodieren(char c, uint8_t& out);
+
+    /// @brief Hoechste nutzbare Spur (Spur 0 + 1..37; die beiden aeusseren sind Reserve, §1).
+    int letzteNutzSpur() const;
 
 private:
     SiosFileSystem(SectorSpace& space, const FsProfile& prof) : space_(space), prof_(prof) {}
+
+    // ─── Schreiben ───────────────────────────────────────────────────────────
+    struct Bib;                 ///< eine geladene Bibliothek (Verzeichnissektor + Fuss)
+    struct Belegung;            ///< Zustand der Diskette fuer die Planung
+    struct Aufgabe;             ///< das Ergebnis der Planung einer Datei
+    bool belegungLesen(Belegung& b, std::string& grund) const;
+    bool bibLaden(const SiosEtikett& e, Bib& out, std::string& grund) const;
+    bool plane(Belegung& b, const std::string& name, uint64_t bytes, bool ueberschreiben,
+               Aufgabe& a, std::string& grund) const;
+    bool ausfuehren(const Aufgabe& a, const std::vector<uint8_t>& daten);
+    bool datenSchreiben(int linear_erster, const std::vector<uint8_t>& daten, int sektoren);
+    bool etikettSchreiben(int sektor, const std::vector<uint8_t>& text80, bool aktiv);
+    bool spur0Anlegen(bool bootbereich);
 
     /// @brief Ein Etikett bzw. Bibliotheksobjekt samt der FileEntry-Sicht.
     struct Eintrag {

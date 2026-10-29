@@ -1,9 +1,10 @@
 # Ein Bibliotheksobjekt (PHASELB/INIT) herausholen: der Name mit Schraegstrich wird im Zielordner zu
-# PHASELB_INIT (flach, ohne Hinweis), Inhalt roh, kein .fileinfo (nur lesend).  Zurueckschreiben ist
-# gesperrt (Arbeitspaket D4) und scheitert mit einem Grund statt still.
+# PHASELB_INIT (flach, ohne Hinweis), Inhalt roh, kein .fileinfo.  Zurueckschreiben unter dem
+# flachen Namen scheitert mit Grund (D4: Name > 8 Zeichen); als Objekt braeuchte es `--as PHASELB/INIT`.
 tool:   k1520disktool
 disk:   sios1526_dp1.hfe
 setup_run: get %DISK% --to aus PHASELB/INIT
 run:    put %DISK% aus --force
-expect: SIOS: schreibender Zugriff noch nicht unterstuetzt
+expect: PHASELB_INIT
+expect: ungueltig
 exit:   3

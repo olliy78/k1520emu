@@ -1,0 +1,9 @@
+# SIOS 1526 (D4): Objekt aus einer Bibliothek loeschen (Name blank, AADR/ML bleiben, Datenteil bleibt).
+tool:   k1520disktool
+disk:   sios1526_sg1.hfe
+setup_run: rm %DISK% PHASELB/SOPH
+run:    ls -l %DISK%
+expect: PHASELB/SGEN
+expect: PHASELB/SYSD
+forbid: PHASELB/SOPH
+exit:   0

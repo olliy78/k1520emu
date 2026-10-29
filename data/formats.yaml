@@ -921,14 +921,14 @@ filesystems:
   # Nachweis (Spur 0: ERMAP in Sektor 5 UND VOL1 in Sektor 7, EBCDIC/DKOI).  Die Probe steht
   # ausserhalb des Rangwettbewerbs (disk_volume.cpp): ein Treffer verdraengt CP/M-Profile ohne
   # eigenen Nachweis, aber nie WEGA/MUTOS, UDOS oder BCU - deren Disketten sind teils SIOS-
-  # initialisiert.  Derzeit nur LESEND (Arbeitspaket D2/D3).
+  # initialisiert.  Lesen D2/D3, Schreiben und Anlegen D4 (Datendiskette ohne Systemlader).
   - name:        sios_ss40
-    description: "SIOS 1526 — IBM-Etikettendiskette, 40 Spuren einseitig, 26×128 (nur lesend)"
+    description: "SIOS 1526 — IBM-Etikettendiskette, 40 Spuren einseitig, 26×128"
     format:      k5601_ss40_26x128
     type:        sios
 
   - name:        sios_ss80
-    description: "SIOS 1526 — IBM-Etikettendiskette, 80 Spuren einseitig, 26×128 (nur lesend)"
+    description: "SIOS 1526 — IBM-Etikettendiskette, 80 Spuren einseitig, 26×128"
     format:      k5601_ss80_26x128
     type:        sios
 
