@@ -8,9 +8,9 @@
  * "Q240"): SIOS programmiert das Schutz-RAM ueber AB0 (B2 = 1) und schaltet es dann scharf
  * (B2 = 0); mit dem alten Tabellenmodell holte die ZVE1 danach nur noch 00H.
  *
- * STAND (S3): der Absturz ist behoben, SIOS laeuft jetzt bis in seinen Task-Wechsler
- * (Warteschleife 1CD4H-1CE4H, ISR 1E48H laeuft je OUT 00H), zeigt aber noch keine
- * Systemzeile.  Die Waechter stehen deshalb DISABLED_, bis die Ursache gefunden ist.
+ * Zweite Voraussetzung: der CTC kennt keinen Einzelschuss (Kanal 3 = Zaehler mit D3=1 als
+ * 100-ms-Takt; ohne ihn hing der Monitor in 1CD4H, doc/sios/README.md "Befund S2b").
+ * SIOS 0.9 (K7636): noch DISABLED_, Laufwerks-/Abbildfrage S4.
  */
 #include <gtest/gtest.h>
 
@@ -40,7 +40,7 @@ void bootetBisSystemzeile(const char* disk, const char* tastatur, const char* ve
 
 }  // namespace
 
-TEST(SiosBoot, DISABLED_V11_ZeigtSystemzeile) {
+TEST(SiosBoot, V11_ZeigtSystemzeile) {
     bootetBisSystemzeile("sios1526_syls.hfe", "k7637", "SIOS 1526/1.1");
 }
 

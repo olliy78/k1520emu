@@ -470,7 +470,14 @@ void Z80CTC::clkTrg(int channel, bool rising_edge) {
  * 1. Activates the ZC/TO output pulse (low level) for one clock cycle
  * 2. Invokes the ZC/TO callback if registered
  * 3. Sets the interrupt pending flag if interrupts are enabled
- * 4. Stops the timer if in CLK_TRG mode (single-shot timer)
+ *
+ * Der Kanal laeuft danach weiter (Nachladen aus dem Zeitkonstantenregister macht der Aufrufer):
+ * der CTC kennt KEINEN Einzelschuss.  D3 (CLK/TRG-Triggerung) ist laut U857-Beschreibung
+ * "nur fuer Zeitgeber-Kanaele von Bedeutung" und STARTET den Zeitgeber per Flanke; danach
+ * beginnt die Zaehloperation bei jedem Nulldurchgang erneut (doc/trascripted/CTC_U875D.md,
+ * Bit 3 und Abschn. Zeitkonstantenregister).  Frueher stoppte der Kanal hier bei gesetztem
+ * D3 - SIOS 1526 programmiert seinen 100-ms-Kanal 3 als Zaehler mit D3=1 (EDH) und hing
+ * danach ohne Zeitgeber in 1CD4H.
  *
  * The ZC/TO pulse can be used to trigger other CTC channels or external devices.
  * In the A5120, ZC/TO pulses are used for baud rate generation for serial ports.
@@ -483,8 +490,6 @@ void Z80CTC::fireZCTO(int ch) {
     if (zcto_cb_) zcto_cb_(ch, false);
 
     if (c.control & CTRL_INT_EN) c.int_pending = true;
-
-    if (c.control & CTRL_CLK_TRG) c.running = false;
 }
 
 /**
