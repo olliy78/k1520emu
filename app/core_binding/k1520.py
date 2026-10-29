@@ -231,6 +231,14 @@ _lib.k1520_set_key_repeat_realtime.restype = None
 _lib.k1520_keyboard_leds.argtypes = [K1520Handle]
 _lib.k1520_keyboard_leds.restype = ctypes.c_uint32
 
+# k1520_kbd_bedienelement_set(K1520Handle, kennung: int, geraet_passt: bool) -> int
+_lib.k1520_kbd_bedienelement_set.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_bool]
+_lib.k1520_kbd_bedienelement_set.restype = ctypes.c_int
+
+# k1520_kbd_bedienelement_get(K1520Handle, geraet_passt: bool*) -> int
+_lib.k1520_kbd_bedienelement_get.argtypes = [K1520Handle, ctypes.POINTER(ctypes.c_bool)]
+_lib.k1520_kbd_bedienelement_get.restype = ctypes.c_int
+
 # k1520_mount_disk(K1520Handle, drive: int, path: const char*, format: const char*, wp: bool) -> bool
 _lib.k1520_mount_disk.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_bool]
 _lib.k1520_mount_disk.restype = ctypes.c_bool
@@ -883,6 +891,9 @@ A5120_KONFIG_WERTE = {
     "aup_alpha": ("led", "ohne", "mit"),
     # AUP-Sonderschnittstelle (N10d): CTC B0H-B3H + SIO B4H-B7H, vierter serieller Anschluss.
     "aup_sonder": ("0", "1"),
+    # Bedienelement (Sicherheitsstecker) der K7637 (AP S3b): 0 = keins, 1..6 = Bedienerkennung.
+    "bedienelement": ("0", "1", "2", "3", "4", "5", "6"),
+    "bedienelement_geraet": ("passt", "falsch"),
 }
 # Reihenfolge der Kartenzahl, wie k1520_a5120_bildschirm sie meldet.
 A5120_BILDSCHIRME = ("k7024", "k7023", "beide")
@@ -2129,6 +2140,18 @@ class K1520Emulator:
         K8915 (K7672): Register 21H — Bit 3 = Senden frei (XON), Bit 0 = ``ESC [?13h``.
         """
         return int(_lib.k1520_keyboard_leds(self._handle))
+
+    def set_bedienelement(self, kennung: int, geraet_passt: bool = True) -> bool:
+        """Bedienelement der K7637 stecken (1..6) oder ziehen (0).
+
+        Wirkt beim nächsten Lauf und erzeugt die Codes der wechselnden Sonderleitungen.
+        ``False`` ohne K7637 (andere Maschine, K7636) oder bei ungültiger Kennung.
+        """
+        return _lib.k1520_kbd_bedienelement_set(self._handle, int(kennung), bool(geraet_passt)) == 0
+
+    def bedienelement(self) -> int:
+        """Gestecktes Bedienelement 0..6; -1 ohne K7637."""
+        return int(_lib.k1520_kbd_bedienelement_get(self._handle, None))
 
     def mount_disk(self, drive: int, path: str, format_name: str, write_protect: bool = False) -> bool:
         """

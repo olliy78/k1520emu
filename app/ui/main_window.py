@@ -570,6 +570,7 @@ class MainWindow(QMainWindow):
         self._kassette_kasten()
         self._aup_kasten()
         self._pcmc_kasten()
+        self._bedienelement_pflegen()
 
         # Startaufteilung: rechte Spalte (Laufwerke) so schmal wie moeglich, ohne
         # horizontales Scrollen; Bildschirm breit.  Tastatur auf Minimalhoehe.
@@ -923,6 +924,8 @@ class MainWindow(QMainWindow):
         emu_menu.addAction(self.act_reset)
         if hasattr(self, "act_nmi"):            # nur im Profil mit Frontplatte
             emu_menu.addAction(self.act_nmi)
+        if hasattr(self, "act_bedienelement"):      # nur A5120-Profil (AP S3b)
+            emu_menu.addAction(self.act_bedienelement)
         if hasattr(self, "act_stand_speichern"):    # nur P8000 (P8KS)
             emu_menu.addSeparator()
             emu_menu.addAction(self.act_stand_speichern)
@@ -1546,6 +1549,7 @@ class MainWindow(QMainWindow):
             self._kassette_kasten()
             self._aup_kasten()
             self._pcmc_kasten()
+            self._bedienelement_pflegen()
         finally:
             self._loading_config = False
 
@@ -1746,6 +1750,38 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Ausgeschaltet.", 4000)
         # Statusanzeige sofort aktualisieren (Tempo eingefroren bzw. auf „—").
         self._update_status()
+
+    def _bedienelement_kennung(self) -> int:
+        """Eingestellte Bedienerkennung (0 = keins; auch 0, wenn die Tastatur keine K7637 ist)."""
+        if not self.profil.hardware_wirkt("bedienelement", self._model, self._hardware):
+            return 0
+        try:
+            return int(self._hardware.get("bedienelement", "0"))
+        except ValueError:
+            return 0
+
+    def _bedienelement_pflegen(self):
+        """Aktion *Bedienelement gesteckt* an die frisch gebaute Maschine angleichen: wählbar nur
+        mit eingestellter Kennung; die Maschine startet mit gestecktem Element (Konfiguration)."""
+        akt = getattr(self, "act_bedienelement", None)
+        if akt is None:
+            return
+        kennung = self._bedienelement_kennung()
+        akt.blockSignals(True)
+        akt.setEnabled(kennung != 0)
+        akt.setChecked(kennung != 0)
+        akt.blockSignals(False)
+
+    def _on_bedienelement(self, gesteckt: bool):
+        """Bedienelement zur Laufzeit stecken/ziehen (AP S3b): die K7637 meldet den Wechsel
+        wie eine Taste über die serielle Strecke; ohne Rechenlauf wirkt es beim nächsten Takt."""
+        kennung = self._bedienelement_kennung()
+        if not kennung:
+            return
+        if not self.emulator.set_bedienelement(kennung if gesteckt else 0):
+            return
+        self.statusBar().showMessage(
+            f"Bedienelement {kennung:02d} gesteckt." if gesteckt else "Bedienelement gezogen.", 4000)
 
     def _on_nmi(self):
         """NMI-Taster der Frontplatte (nur K8915, `app/ui/actions.py` NUR_FUER).
@@ -2623,6 +2659,7 @@ class MainWindow(QMainWindow):
         self._kassette_kasten()
         self.pcmc_widget.set_emulator(new_emu)
         self._pcmc_kasten()
+        self._bedienelement_pflegen()
         if pcmc_an and self._pcmc_moeglich():
             self.pcmc_widget.einschalten()
         self.settings_widget.set_aup_value(self._aup, self._aup_sonder, self._aup_alpha)

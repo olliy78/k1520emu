@@ -296,6 +296,10 @@ class Programmprofil:
                     # Der Versatz wirkt nur mit gesteckter Karte; der gemerkte Wert bleibt.
                     hw = hardware if hardware is not None else self.hardware_standard(modell)
                     return hw.get("rtc", "keine") != "keine"
+                if k == "bedienelement" and self.modell_vorgaben:
+                    # Nur die K7637 hat ein Bedienelement (die K7636 meldet kein TYP).
+                    hw = hardware if hardware is not None else self.hardware_standard(modell)
+                    return hw.get("tastatur") == "k7637"
                 if k == "erweiterungsmodul" and self.modell_vorgaben:
                     hw = hardware if hardware is not None else self.hardware_standard(modell)
                     return hw.get("ram") == "k3526"
@@ -336,6 +340,9 @@ class Programmprofil:
                 "laderom": hardware["laderom"],
                 "em": self.modell_em(modell, hardware) or "none",
             }
+            # Bedienelement der K7637 (AP S3b): nur wenn gesteckt UND die K7637 da ist.
+            if hardware.get("bedienelement", "0") != "0" and hardware["tastatur"] == "k7637":
+                konfig["bedienelement"] = hardware["bedienelement"]
             # Anfangsstellung des Schiebeschalters: nur mit zwei Karten (sonst Fehler im Kern).
             if hardware["bildschirm"] == "beide":
                 konfig["schalter"] = schalter if schalter in ("k7024", "k7023") else "k7024"
@@ -535,6 +542,14 @@ A5120 = Programmprofil(
         ("tastatur", "Tastatur:",
          "K7636 parallel am U-Bus der K2526, K7637 seriell am Kanal der K8025.",
          (("k7636", "K7636 (parallel)"), ("k7637", "K7637 (seriell)")), ()),
+        ("bedienelement", "Bedienelement:",
+         "Sicherheitsstecker der K7637 (Bediensicherung, 8 Codierstopfen): Stopfen 1–3 sind die "
+         "Bedienerkennung, die die Tastatur nach TYP und beim Stecken/Ziehen als Code meldet.  "
+         "Nur mit der K7637; ohne Element (Vorgabe) bleibt alles wie bisher.  "
+         "*Maschine ▸ Bedienelement gesteckt* zieht/steckt es im Betrieb.",
+         (("0", "keins"), ("1", "01 Chefschalter"), ("2", "02 1. Bedienebene"),
+          ("3", "03 (Stopfen 1+2)"), ("4", "04 (Stopfen 3)"), ("5", "05 (Stopfen 1+3)"),
+          ("6", "06 5. Bedienebene")), ()),
         ("laderom", "Lade-ROM:",
          "Lade-ROM der K2526.  V0.6 liest die BCU-Disketten „SYL auf Spur 1“.",
          (("v09_2", "V0.9_2"), ("v09_1", "V0.9_1"), ("v06", "V0.6")), ()),

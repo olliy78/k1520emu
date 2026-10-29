@@ -134,6 +134,13 @@ A5120Machine::A5120Machine(const Config& cfg)
         k7636_ = std::make_unique<K7636>();
         zre_.setUBusGeraet(k7636_.get());
     }
+    // Bedienelement (Kaltstart-Vorgabe): nur merken, die K7637 meldet es beim Einschalten.
+    if (!k7636_ && cfg.bedienelement != 0) {
+        if (cfg.bedienelement < 0 || cfg.bedienelement > 6)
+            throw std::invalid_argument("Bedienelement: Kennung 0..6 erwartet");
+        kbd_.setBedienelement(cfg.bedienelement, cfg.bedienelement_geraet_passt);
+        bedien_stand_.store(cfg.bedienelement | (cfg.bedienelement_geraet_passt ? 0 : 0x100));
+    }
 
     // Erweiterungsmodul (A5120.16) — nur auf ausdruecklichen Wunsch.
     if (cfg.em != Config::Em::none) {
@@ -750,8 +757,20 @@ bool A5120Machine::loadState(const std::string& path) {
     return restoreState(s);
 }
 
+bool A5120Machine::setBedienelement(int kennung, bool geraet_passt) {
+    if (k7636_ || kennung < 0 || kennung > 6) return false;
+    const int st = kennung | (geraet_passt ? 0 : 0x100);
+    bedien_stand_.store(st, std::memory_order_relaxed);
+    bedien_neu_.store(st, std::memory_order_release);
+    return true;
+}
+
 int A5120Machine::run(int max_cycles) {
     bestueckungAbschliessen();
+    {
+        const int st = bedien_neu_.exchange(-1, std::memory_order_acquire);
+        if (st >= 0) kbd_.setBedienelement(st & 0xFF, (st & 0x100) == 0);
+    }
     // Drain key queue
     {
         std::lock_guard<std::mutex> lk(key_mutex_);
