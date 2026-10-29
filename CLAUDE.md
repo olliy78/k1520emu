@@ -596,7 +596,7 @@ Option am 16-Bit-Teil: **U130X** (Original, Armbanduhr-Chip, `FEF1`–`FEFF`) od
 „RTC: …"). Kern-Vorgabe bleibt **aus**.  Drei Festlegungen: **die Uhr zählt in MASCHINENZEIT** und springt beim Start nie
 zurück (`max(Stand + Abwesenheit, Wirtszeit)`, Batteriedatei) — sonst Dateizeiten aus der Zukunft bei schneller Emulation;
 **die Oberfläche speist UTC** (WEGA 3.1 rechnet mit `TZ=MEZ-1MES` selbst um); der 2019-Mangel des echten U130X wird
-**nicht** nachgebildet.  Nur die WEGA-**3.1**-Platte hat einen Uhrentreiber (Lehmanns timer-1.1, Märzfehler in
+**nicht** nachgebildet.  Nur die WEGA-**3.1**-Platte hat einen Uhrentreiber (timer-1.1 von OlliL, Märzfehler in
 `timegm.c` ist Gastcode).  **Vor Arbeiten daran: `doc/merkposten/p8000.md` Nr. 59 lesen**; Entwurf `doc/design/38_p8000_rtc.md`.
 
 ## RAM-Floppy RAF 128/512/2M (alle Maschinen; PC 1715 nur mechanisch, s. Merkposten pc1715)

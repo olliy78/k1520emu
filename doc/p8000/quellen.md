@@ -105,7 +105,7 @@ Header der Z8001-Dateien (`boot`, `sa.*`, `wega`): UDOS-Ladeformat mit Segment-H
 
 ## 2. Web-Recherche
 
-### 2.1 pofo.de — Olli Lehmann (OlliL), die zentrale Quelle
+### 2.1 pofo.de — OlliL, die zentrale Quelle
 
 Server: `http://www.pofo.de/` (HTTPS liefert falsches Zertifikat; HTTP genügt, `curl -k`).
 Lizenz: kein Hinweis auf Impressum/Seiten; private Archivseite, Material unter Original-EAW-Urheberrecht

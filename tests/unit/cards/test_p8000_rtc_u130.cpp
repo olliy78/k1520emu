@@ -4,7 +4,7 @@
  *        Siebensegment-/COM-/Takt-Modell, Zustandsautomat der Armbanduhr, Zeitquelle/Versatz/
  *        Batteriedatei/Save-State, unbestueckt = bitgleich — und der ECHTE Treibercode:
  *        `u130get/u130set/u130start` samt `invalue/rdvalue/outvalue` aus
- *        `sa.timer/common/u130.c` (O. Lehmann, BSD) sowie `gettime()` samt eigenem
+ *        `sa.timer/common/u130.c` (OlliL, BSD) sowie `gettime()` samt eigenem
  *        `invalue/rdvalue` aus dem Original-Kern `uts/sys/timer.c` (P. Hoge 1988), beide gegen die
  *        Karte ueber die E/A-Zyklen der `Karte16`.
  */
