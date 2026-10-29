@@ -94,144 +94,85 @@
 
 /**
  * @class MemIOProtect
- * @brief Q240 Speicher-/E/A-Schutz (Memory/IO Protection) emulation.
+ * @brief Q240 Speicher-/E/A-Schutz der K2526 (Originalschaltung Abschn. 6.11, Bauelement A19).
  *
- * The Q240 chip divides the 64 KB address space into 1024 segments of
- * 64 bytes each and protects individual segments from unauthorised read
- * and/or write access.  Protection is stored in an internal 1 KB SRAM
- * (one byte per segment): bit 0 = write-protect, bit 1 = read-protect.
+ * Das Schutz-RAM A19 hat 1024 x 1 Bit: ein Bit je 64-Byte-Segment des 64-KB-Raums
+ * (Index = Adresse >> 6).  "1" = Bereich 1 (Betriebssystem, geschuetzt),
+ * "0" = Bereich 2 (Anwender).
  *
- * Operation modes:
+ * Zwei Zustaende, gewaehlt durch BS-PIO B2 = /SPS-ESR:
  * @code
- *   /SPS-ESR inactive (B2=1): normal operation
- *     – CPU memory accesses are checked against the protection table
- *     – Violation: SPS-Ind flag set, NMI asserted
- *   /SPS-ESR active   (B2=0): protection-table programming mode
- *     – CPU writes to address A → protection table entry[A>>6] = data
- *     – CPU reads  from address A → protection table entry[A>>6]
- *     – Regular memory is bypassed; protection is NOT enforced
+ *   B2 = 1 (Einschalt-/Reset-Zustand, "Schreiben"):
+ *     Schutzfunktionen unwirksam, der Speicher arbeitet normal.  Bei JEDEM
+ *     ZVE1-Speicherzugriff (Lesen, Schreiben, Opcode-/Operandabruf) wird das
+ *     Schutz-RAM an Index (A >> 6) mit AB0 beschrieben (/CS ist low).
+ *   B2 = 0 ("scharf"):
+ *     Das FF "Befehlsaufruf" haelt den Bereich des laufenden Befehls (gesetzt mit
+ *     dem M1 des Befehls aus dem Schutz-RAM).  Lesen wird nie beeinflusst.
+ *     - Schreiben eines Anwender-Befehls (Bereich 2) in ein Bereich-1-Segment:
+ *       /MEMDI = 0, der Schreibzugriff findet nicht statt, FF "SPS-Indikator"
+ *       wird gesetzt (BS-PIO A3, aktiv LOW).
+ *     - Jeder E/A-Befehl eines Anwender-Befehls: NMI (BS-PIO A2 bleibt high).
  * @endcode
  *
- * Protection byte layout per segment (index = addr >> 6):
- * @code
- *   bit 0: write-protect (WP) – 1 = write blocked
- *   bit 1: read-protect  (RP) – 1 = read  blocked
- * @endcode
+ * Zugriffe der ZVE2 (DMA, /BAO) und Refresh sind von der Schaltung ausgenommen und
+ * laufen gar nicht durch diese Klasse.  /RESET loescht die FFs und stellt B2 = 1 ein,
+ * das Schutz-RAM behaelt seinen Inhalt (reset()).
  *
- * Usage in K2526:
- * @code
- *   // Program protection table (e.g. protect segment at 0x0400):
- *   spa_.enableTableWrite(true);       // /SPS-ESR asserted (B2=0)
- *   spa_.writeEntry(0x0400, 0x01);     // WP only, no RP
- *   spa_.enableTableWrite(false);      // /SPS-ESR released
- *
- *   // Check access (called from CPU callbacks):
- *   if (spa_.isWriteProtected(addr)) { handleSPSViolation(); return; }
- *
- *   // Reset violation indicator (/RES-SPA, port 02H):
- *   spa_.resetViolation();
- * @endcode
- *
- * @see K2526::handleSPSViolation()
- * @see doc/design/03_k2526_zre.md Section 7
+ * @see K2526::handleSPSViolation(), doc/merkposten/a5120_alt.md (Q240)
  */
 class MemIOProtect {
 public:
-    /// Number of 64-byte segments in the full 64 KB address space.
+    /// Anzahl der 64-Byte-Segmente im 64-KB-Raum.
     static constexpr int SEGMENTS = 1024;
 
-    /**
-     * @brief Enable or disable protection-table write mode (/SPS-ESR).
-     *
-     * When enabled (active = true), CPU memory accesses go to the
-     * protection table rather than actual memory (table programming mode).
-     *
-     * @param active true = /SPS-ESR asserted (table write enabled)
-     */
-    void enableTableWrite(bool active) { table_write_enabled_ = active; }
+    /// B2 = /SPS-ESR: true = B2 high = Schutz-RAM beschreibbar, Schutz unwirksam.
+    void setProgrammieren(bool b2_high) { programmieren_ = b2_high; }
+    bool programmieren() const { return programmieren_; }
+    /// B2 low: Speicher- und E/A-Schutz scharf.
+    bool scharf() const { return !programmieren_; }
 
-    /**
-     * @brief Query whether protection-table write mode is active.
-     * @return true when /SPS-ESR is asserted and table writes are enabled
-     */
-    bool isTableWriteEnabled() const { return table_write_enabled_; }
+    /// Schutz-RAM beschreiben: Index (addr >> 6) := AB0 (nur bei B2 = 1 aufzurufen).
+    void programmiere(uint16_t addr) { tab_[addr >> 6] = addr & 1; }
 
-    /**
-     * @brief Reset violation indicator without clearing the protection table.
-     *
-     * Called by /RES-SPA (port 02H) to acknowledge a protection violation
-     * and allow the Z80 to resume normal operation after the NMI handler.
-     */
-    void resetViolation() { sps_ind_ = false; }
+    /// Schutz-RAM-Bit des Segments von @p addr: true = Bereich 1 (Betriebssystem).
+    bool bereich1(uint16_t addr) const { return tab_[addr >> 6] != 0; }
 
-    /**
-     * @brief Full power-on reset: clear all protection entries and violation flag.
-     *
-     * Called at powerOn() to ensure a clean protection state at system start.
-     */
-    void reset() {
-        prot_table_.fill(0x00);
-        sps_ind_             = false;
-        table_write_enabled_ = false;
+    /// FF "Befehlsaufruf": Bereich des laufenden Befehls (M1-Adresse), true = Bereich 1.
+    void befehlsaufruf(uint16_t m1_addr) { befehl_bereich1_ = bereich1(m1_addr); }
+    void setBefehlBereich1(bool b) { befehl_bereich1_ = b; }
+    bool befehlBereich1() const { return befehl_bereich1_; }
+
+    /// Wuerde /MEMDI = 0 gebildet (Schreibzyklus nach @p addr)?  Nur bei scharf, Befehl
+    /// aus Bereich 2, Ziel Bereich 1 und solange das SPS-Indikator-FF nicht steht
+    /// (Rueckkopplung A34/9 -> A33/9 hebt /MEMDI = 0 nach der ersten Verletzung auf).
+    bool schreibenGesperrt(uint16_t addr) const {
+        return !programmieren_ && !befehl_bereich1_ && !sps_ind_ && bereich1(addr);
     }
 
-    /**
-     * @brief Check whether a memory address is write-protected.
-     * @param addr 16-bit bus address
-     * @return true if segment containing @p addr has WP bit set
-     */
-    bool isWriteProtected(uint16_t addr) const {
-        return (prot_table_[addr >> 6] & 0x01) != 0;
-    }
+    /// E/A-Befehl aus Bereich 2 bei scharfem Schutz = unerlaubt (-> NMI).
+    bool eaUnerlaubt() const { return !programmieren_ && !befehl_bereich1_; }
 
-    /**
-     * @brief Check whether a memory address is read-protected.
-     * @param addr 16-bit bus address
-     * @return true if segment containing @p addr has RP bit set
-     */
-    bool isReadProtected(uint16_t addr) const {
-        return (prot_table_[addr >> 6] & 0x02) != 0;
-    }
-
-    /**
-     * @brief Write a protection byte to the table (table-write mode only).
-     *
-     * Stores @p flags at the table entry for the segment containing @p addr.
-     * Should only be called when isTableWriteEnabled() is true; K2526
-     * ensures this via the CPU callback.
-     *
-     * @param addr 16-bit address – determines segment index (addr >> 6)
-     * @param flags Protection flags: bit0=WP, bit1=RP
-     */
-    void writeEntry(uint16_t addr, uint8_t flags) {
-        prot_table_[addr >> 6] = flags;
-    }
-
-    /**
-     * @brief Read a protection byte from the table (for readback in table-write mode).
-     * @param addr 16-bit address – determines segment index (addr >> 6)
-     * @return Protection byte stored for that segment
-     */
-    uint8_t readEntry(uint16_t addr) const {
-        return prot_table_[addr >> 6];
-    }
-
-    /**
-     * @brief Set the SPS violation indicator flag (called on access violation).
-     */
+    /// FF "SPS-Indikator" (Merkmal unerlaubter Speicherzugriff), loeschbar mit /RES-SPA.
     void setViolation() { sps_ind_ = true; }
-
-    /**
-     * @brief Query whether a protection violation has been detected.
-     * @return true if a violation occurred since the last resetViolation() call
-     */
+    void resetViolation() { sps_ind_ = false; }
     bool isSPSViolation() const { return sps_ind_; }
 
+    /// /RESET: FFs loeschen, B2 = 1; der RAM-Inhalt (tab_) bleibt.
+    void reset() {
+        sps_ind_         = false;
+        programmieren_   = true;
+        befehl_bereich1_ = false;
+    }
+
+    /// Schutz-RAM loeschen (nur Tests; Hardware: Inhalt nach Netz-Ein undefiniert).
+    void loescheTabelle() { tab_.fill(0); }
+
 private:
-    /// 1024-entry protection table: one byte per 64-byte segment (bit0=WP, bit1=RP).
-    std::array<uint8_t, SEGMENTS> prot_table_{};
-    bool table_write_enabled_ = false;  ///< true when /SPS-ESR is asserted
-    bool sps_ind_             = false;  ///< true after a protection violation
+    std::array<uint8_t, SEGMENTS> tab_{};  ///< A19: je Segment 0/1
+    bool programmieren_   = true;   ///< B2 = 1
+    bool befehl_bereich1_ = false;  ///< FF Befehlsaufruf
+    bool sps_ind_         = false;  ///< FF SPS-Indikator
 };
 
 /**
@@ -247,7 +188,7 @@ private:
  * - ZVE1: main Z80 CPU; accesses memory via Q240 protection check
  * - ZVE2: second Z80 DMA-CPU, shares the K1520 bus with ZVE1; stalled by
  *   /WAIT-ZVE2 (B3) and held in reset by port 0x04 bit0=0
- * - Q240 (MemIOProtect): 1024-segment memory protection; violation raises
+ * - Q240 (MemIOProtect): 1024 x 1 bit protection RAM (B2=1 programs via AB0, B2=0 arms); violation sets SPS-Ind
  *   SPS-Ind (BS-PIO A3) and asserts NMI; /RES-SPA (port 02H) clears it
  * - U-Bus registers: keyboard scan-code / valid-flag inputs, lamp outputs
  * - InterruptSlave: combined CTC → BS-PIO daisy-chain for the K1520 interrupt system
@@ -261,10 +202,9 @@ private:
  *   the A5120Machine run loop calls zve2Step() instead of afs_.dmaUpdate().
  *   ZVE2 shares all memory and I/O with ZVE1 (same bus_ callbacks).
  *
- * Q240 protection (MemIOProtect spa_):
- *   Protection table is written when /SPS-ESR (B2=0) is asserted.  ZVE1 memory
- *   accesses are checked against the table on every read/write.  ZVE2 bypasses
- *   protection (it runs privileged DMA code under OS control).
+ * Q240 protection (MemIOProtect spa_), s. dort: B2=1 programmiert das Schutz-RAM
+ *   ueber AB0 jedes ZVE1-Speicherzugriffs, B2=0 schaltet den Schutz scharf.  ZVE2
+ *   (DMA) ist ausgenommen.
  *
  * Typical usage:
  * @code
@@ -484,7 +424,7 @@ public:
      * @brief Execute one Z80 instruction (ZVE1 step).
      * @return Number of T-cycles consumed by the instruction
      */
-    int      cpuStep()                { return cpu_.step(); }
+    int      cpuStep()                { spa_.befehlsaufruf(cpu_.PC); return cpu_.step(); }  // M1: FF "Befehlsaufruf"
 
     /**
      * @brief Reset ZVE1 to address 0x0000.
@@ -726,11 +666,14 @@ private:
      * @brief Handle a ZVE1 memory-protection violation (Q240 logic).
      *
      * Sets the SPS-Ind violation flag, updates the BS-PIO Port A input
-     * (A3=1), and asserts NMI to allow the OS to handle the violation.
+     * (A3=0, aktiv low); the BS-PIO port A interrupt (if enabled) reports it.
      * Called from the ZVE1 readByte/writeByte callbacks when a protected
      * segment is accessed.
      */
     void handleSPSViolation();
+
+    /// Unerlaubter E/A-Befehl aus dem Anwenderbereich: NMI (nicht der SPS-Indikator).
+    void handleEAVerletzung();
 
     /**
      * @brief Update BS-PIO Port A input bits from current internal state.

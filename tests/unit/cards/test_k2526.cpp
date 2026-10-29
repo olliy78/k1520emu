@@ -12,8 +12,8 @@
  *  - **BS-PIO** – an internal Z80 PIO for control signals (Port A: MEMDI, SPS-Ind; Port B: /LD-ROM,
  *    /INT-BS, /SPS-ESR, /WAIT-ZVE2, /SA)
  *  - **CTC** – a Z80 CTC for timing
- *  - **Q240 SPA (Speicher-Schutz-Anlage)** – a 64-entry, 64-byte-granularity memory protection table
- *    enforced on ZVE1 accesses (ZVE2 is privileged and bypasses it)
+ *  - **Q240 SPA (Speicher-/E/A-Schutz)** – 1024 x 1 bit protection RAM (64-byte segments); B2=1
+ *    programmes it via AB0, B2=0 arms the protection (ZVE2 is privileged and bypasses it)
  *
  * I/O port map (on the K1520 bus, decoded by K2526):
  *  - 0x00–0x07: U-Bus sub-devices
@@ -39,8 +39,8 @@
  * | ZVE1 (CPU) interface     | Reset, PC, IFF1, cpuStep(), cpuNMI()                        |
  * | ZVE2 (DMA-CPU)           | Reset/release, step, wait signal, PC starts at 0           |
  * | /WAIT-ZVE2 (BS-PIO B3)  | B3=0 stalls ZVE2 (zve2Step returns 0); B3=1 resumes it     |
- * | Q240 memory protection   | Write-protect, read-protect, table-write mode, violation/NMI|
- * | /INT-BS (port 0x00)      | Sets BS-PIO B1 low; /RES-SPA (port 0x02) clears it         |
+ * | Q240 memory protection   | B2=1 AB0 programming, B2=0 arm, SPS-Ind, E/A -> NMI         |
+ * | /INT-BS (port 0x00)      | Pulses BS-PIO B1 (active high) -> PIO interrupt             |
  * | /SA power-off (B4)       | B4=0 asserts shutdown request; B4=1 leaves it inactive      |
  *
  * @see core/cards/k2526/k2526.h
@@ -794,12 +794,16 @@ TEST(K2526, ZVE2_Wait_DoesNotAffectZVE1)
     EXPECT_GT(card.cpuPC(), 0x0000u);
 }
 
-// ─── Q240 Memory Protection (MemIOProtect / spa_) ────────────────────────────
+// ─── Q240 Speicher-/E/A-Schutz (MemIOProtect / spa_), Originalschaltung 6.11 ──
 //
-// Fixture: K2526 + K3526 RAM on the bus.  The boot ROM is disabled so all
-// of the 64 KB address range can be accessed through K3526 RAM.
-// cpu().writeByte / cpu().readByte invoke the ZVE1 memory callbacks which
-// include the Q240 protection check (unlike bus.memWrite/Read which bypass it).
+// Fixture: K2526 + K3526 RAM am Bus, Lade-ROM abgeschaltet.  cpu().readByte/writeByte/
+// readPort/writePort sind die ZVE1-Callbacks MIT Schutzlogik (bus.memWrite umgeht sie).
+// Der M1-Befehlsbereich (FF "Befehlsaufruf") wird von cpuStep() gesetzt; die meisten
+// Tests setzen ihn direkt ueber spa().befehlsaufruf(pc).
+//
+//   B2 = 1: Schutz unwirksam, jeder Speicherzugriff schreibt Schutz-RAM[A>>6] := AB0
+//   B2 = 0: scharf; Anwender-Befehl (Bereich 2) darf kein Bereich-1-Segment beschreiben,
+//           E/A aus Bereich 2 -> NMI; Lesen nie beeinflusst
 
 class K2526Protection : public ::testing::Test {
 protected:
@@ -808,23 +812,30 @@ protected:
     K3526    ops;
 
     void SetUp() override {
-        ops.attachToBus(bus);     // RAM 0x0000–0xFFFF
-        zre.attachToBus(bus);     // ports 0x00–0x0F
-        zre.powerOn();            // boot ROM at 0x0000–0x03FF; Q240 cleared
-        // Disable ROM with all other Port B outputs inactive (B2=1, B3=1, B4=1).
-        bus.ioWrite(BSPIO_PORTB_DATA, PORTB_SAFE_ROMOFF);
-        ops.fill(0xAA);           // pre-fill RAM with test pattern
+        ops.attachToBus(bus);     // RAM 0x0000-0xFFFF
+        zre.attachToBus(bus);     // ports 0x00-0x0F
+        zre.powerOn();            // Lade-ROM bei 0000H-03FFH; Q240: B2=1
+        bus.ioWrite(BSPIO_PORTB_DATA, PORTB_SAFE_ROMOFF);   // ROM aus, B2=1
+        ops.fill(0xAA);
     }
+
+    /// Segment als Bereich 1 (BS) programmieren: Zugriff mit ungerader Adresse (AB0=1).
+    void markiereBS(uint16_t seg_start) { zre.cpu().readByte(seg_start | 1); }
+    /// Segment als Bereich 2 (Anwender) programmieren: gerade Adresse (AB0=0).
+    void markiereAnwender(uint16_t seg_start) { zre.cpu().readByte(seg_start & ~1); }
+    void scharf()       { bus.ioWrite(BSPIO_PORTB_DATA, PORTB_SPSESR_ACT); }
+    void entschaerfen() { bus.ioWrite(BSPIO_PORTB_DATA, PORTB_SAFE_ROMOFF); }
+    /// Befehl aus dem Segment von @p pc starten (M1).
+    void befehlAus(uint16_t pc) { zre.spa().befehlsaufruf(pc); }
 };
 
 /**
- * @test K2526Protection/NoProtection_ReadWriteOk
- * @brief With an empty Q240 protection table, ZVE1 read/write access is transparent.
- * @par Pass criterion  writeByte succeeds; readByte returns written value; isSPSViolation() == false.
+ * @test K2526Protection/Reset_StartetMitB2Eins
+ * @brief Einschaltzustand: B2 = 1 (Schutz unwirksam), Speicher arbeitet normal.
  */
-TEST_F(K2526Protection, NoProtection_ReadWriteOk)
+TEST_F(K2526Protection, Reset_StartetMitB2Eins)
 {
-    // With an empty protection table ZVE1 accesses should be transparent.
+    EXPECT_TRUE(zre.spa().programmieren());
     zre.cpu().writeByte(0x0400, 0x55);
     EXPECT_EQ(ops.rawPtr()[0x0400], 0x55);
     EXPECT_EQ(zre.cpu().readByte(0x0400), 0x55);
@@ -832,194 +843,290 @@ TEST_F(K2526Protection, NoProtection_ReadWriteOk)
 }
 
 /**
- * @test K2526Protection/SpsEsr_EnablesTableWrite
- * @brief Asserting /SPS-ESR (BS-PIO B2=0) enables Q240 table-write mode.
- * @par Pass criterion  spa().isTableWriteEnabled() == true while B2=0; false after release.
+ * @test K2526Protection/SpsEsr_SchaltetScharf
+ * @brief B2 = 0 schaltet den Schutz scharf, B2 = 1 wieder aus.
  */
-TEST_F(K2526Protection, SpsEsr_EnablesTableWrite)
+TEST_F(K2526Protection, SpsEsr_SchaltetScharf)
 {
-    // B2=0 (active low, PORTB_SPSESR_ACT) must activate table-write mode.
-    bus.ioWrite(BSPIO_PORTB_DATA, PORTB_SPSESR_ACT);   // /SPS-ESR asserted
-    EXPECT_TRUE(zre.spa().isTableWriteEnabled());
-
-    bus.ioWrite(BSPIO_PORTB_DATA, PORTB_SAFE_ROMOFF);  // /SPS-ESR released
-    EXPECT_FALSE(zre.spa().isTableWriteEnabled());
+    scharf();
+    EXPECT_TRUE(zre.spa().scharf());
+    entschaerfen();
+    EXPECT_TRUE(zre.spa().programmieren());
 }
 
 /**
- * @test K2526Protection/TableWrite_StoresProtectionFlags
- * @brief In table-write mode, a ZVE1 writeByte stores to the Q240 SRAM, not to RAM.
- * @par Pass criterion  spa().readEntry(0x0400) == 0x01; RAM byte at 0x0400 unchanged (0xAA).
+ * @test K2526Protection/B2Eins_ProgrammiertUeberAB0
+ * @brief Bei B2 = 1 schreibt jeder ZVE1-Speicherzugriff AB0 an Schutz-RAM[A>>6]; Speicher normal.
  */
-TEST_F(K2526Protection, TableWrite_StoresProtectionFlags)
+TEST_F(K2526Protection, B2Eins_ProgrammiertUeberAB0)
 {
-    // Activate table-write mode; ZVE1 write goes to Q240 SRAM, not RAM.
-    bus.ioWrite(BSPIO_PORTB_DATA, PORTB_SPSESR_ACT);   // /SPS-ESR active
-    zre.cpu().writeByte(0x0400, 0x01);                  // WP for segment 16
-    bus.ioWrite(BSPIO_PORTB_DATA, PORTB_SAFE_ROMOFF);  // /SPS-ESR released
+    EXPECT_EQ(zre.cpu().readByte(0x0401), 0xAA);        // Lesen liefert RAM, nicht Tabelle
+    EXPECT_TRUE(zre.spa().bereich1(0x0400));
+    EXPECT_TRUE(zre.spa().bereich1(0x043F));            // gleiches Segment
+    EXPECT_FALSE(zre.spa().bereich1(0x0440));           // naechstes Segment unberuehrt
 
-    EXPECT_EQ(zre.spa().readEntry(0x0400), 0x01);       // protection table written
-    EXPECT_EQ(ops.rawPtr()[0x0400], 0xAA);              // RAM unchanged
+    zre.cpu().readByte(0x0400);                         // gerade Adresse -> "0"
+    EXPECT_FALSE(zre.spa().bereich1(0x0400));
+
+    zre.cpu().writeByte(0x0481, 0x12);                  // Schreibzugriff programmiert ebenfalls
+    EXPECT_TRUE(zre.spa().bereich1(0x0480));
+    EXPECT_EQ(ops.rawPtr()[0x0481], 0x12);
+    zre.cpu().writeByte(0x0480, 0x34);
+    EXPECT_FALSE(zre.spa().bereich1(0x0480));
 }
 
 /**
- * @test K2526Protection/TableWrite_ReadReturnsProtectionByte
- * @brief In table-write mode, ZVE1 readByte returns the Q240 protection entry, not RAM data.
- * @par Pass criterion  readByte(0x0800) == 0x03 (the protection entry); no violation raised.
+ * @test K2526Protection/LesenLiefertImmerSpeicher
+ * @brief Regression SIOS: bei B2 = 0 wie B2 = 1 liefert Lesen/Opcode-Abruf den Speicher.
  */
-TEST_F(K2526Protection, TableWrite_ReadReturnsProtectionByte)
+TEST_F(K2526Protection, LesenLiefertImmerSpeicher)
 {
-    // Pre-program entry; in table-write mode ZVE1 reads return the table byte.
-    zre.spa().writeEntry(0x0800, 0x03);                 // WP+RP at segment 32
-
-    bus.ioWrite(BSPIO_PORTB_DATA, PORTB_SPSESR_ACT);   // /SPS-ESR active
-    uint8_t val = zre.cpu().readByte(0x0800);
-    bus.ioWrite(BSPIO_PORTB_DATA, PORTB_SAFE_ROMOFF);  // /SPS-ESR released
-
-    EXPECT_EQ(val, 0x03);
-    EXPECT_FALSE(zre.isSPSViolation());                 // table-read: no violation
+    bus.memWrite(static_cast<uint16_t>(0x0800), 0x3C);
+    EXPECT_EQ(zre.cpu().readByte(0x0800), 0x3C);
+    scharf();
+    befehlAus(0x0800);
+    EXPECT_EQ(zre.cpu().readByte(0x0800), 0x3C);
+    EXPECT_FALSE(zre.isSPSViolation());
 }
 
 /**
- * @test K2526Protection/WriteProtect_BlocksZVE1Write
- * @brief A Q240 write-protect entry (bit 0) prevents ZVE1 writeByte from modifying RAM.
- * @par Pass criterion  RAM byte unchanged (0xBB); isSPSViolation() == true.
+ * @test K2526Protection/Scharf_AnwenderBefehlDarfBSNichtBeschreiben
+ * @brief Anwender-Befehl schreibt in Bereich-1-Segment: unterdrueckt, SPS-Ind gesetzt, A3 low, kein NMI.
  */
-TEST_F(K2526Protection, WriteProtect_BlocksZVE1Write)
+TEST_F(K2526Protection, Scharf_AnwenderBefehlDarfBSNichtBeschreiben)
 {
-    zre.spa().writeEntry(0x0400, 0x01);   // WP for segment at 0x0400
+    markiereBS(0x0400);
+    markiereAnwender(0x0800);
     ops.fill(0xBB);
+    scharf();
+    befehlAus(0x0800);                                  // Befehl aus Bereich 2
 
-    zre.cpu().writeByte(0x0400, 0x55);    // blocked – protection violation
-    EXPECT_EQ(ops.rawPtr()[0x0400], 0xBB); // RAM unchanged
+    zre.cpu().writeByte(0x0400, 0x55);
+    EXPECT_EQ(ops.rawPtr()[0x0400], 0xBB);
     EXPECT_TRUE(zre.isSPSViolation());
+    EXPECT_EQ(bus.ioRead(BSPIO_PORTA_DATA) & 0x08, 0) << "SPS-Ind (A3) aktiv low";
+    EXPECT_FALSE(bus.isNMI()) << "Speicherverletzung meldet ueber die PIO, nicht per NMI";
+}
+
+/** @test K2526Protection/Scharf_AnwenderDarfAnwenderBeschreiben */
+TEST_F(K2526Protection, Scharf_AnwenderDarfAnwenderBeschreiben)
+{
+    markiereBS(0x0400);
+    markiereAnwender(0x0800);
+    markiereAnwender(0x0C00);
+    scharf();
+    befehlAus(0x0800);
+    zre.cpu().writeByte(0x0C10, 0x66);
+    EXPECT_EQ(ops.rawPtr()[0x0C10], 0x66);
+    EXPECT_FALSE(zre.isSPSViolation());
+}
+
+/** @test K2526Protection/Scharf_BSBefehlDarfUeberallSchreiben */
+TEST_F(K2526Protection, Scharf_BSBefehlDarfUeberallSchreiben)
+{
+    markiereBS(0x0400);
+    markiereAnwender(0x0800);
+    scharf();
+    befehlAus(0x0400);                                  // Befehl aus Bereich 1
+    zre.cpu().writeByte(0x0400, 0x11);
+    zre.cpu().writeByte(0x0800, 0x22);
+    EXPECT_EQ(ops.rawPtr()[0x0400], 0x11);
+    EXPECT_EQ(ops.rawPtr()[0x0800], 0x22);
+    EXPECT_FALSE(zre.isSPSViolation());
 }
 
 /**
- * @test K2526Protection/ReadProtect_BlocksZVE1Read
- * @brief A Q240 read-protect entry (bit 1) causes ZVE1 readByte to return 0xFF (open-drain).
- * @par Pass criterion  readByte(0x0800) == 0xFF; isSPSViolation() == true.
+ * @test K2526Protection/Scharf_AbrufDurchCpuStep
+ * @brief cpuStep() setzt das FF Befehlsaufruf aus der M1-Adresse (PC vor dem Befehl).
  */
-TEST_F(K2526Protection, ReadProtect_BlocksZVE1Read)
+TEST_F(K2526Protection, Scharf_AbrufDurchCpuStep)
 {
-    zre.spa().writeEntry(0x0800, 0x02);   // RP for segment at 0x0800
-    ops.fill(0xCC);
-
-    uint8_t val = zre.cpu().readByte(0x0800);
-    EXPECT_EQ(val, 0xFF);                 // blocked → open-drain 0xFF
+    markiereBS(0x0400);
+    markiereAnwender(0x0800);
+    ops.fill(0xBB);
+    const uint8_t code[] = {0x32, 0x00, 0x04};          // LD (0400H),A
+    for (int i = 0; i < 3; ++i) bus.memWrite(static_cast<uint16_t>(0x0800 + i), code[i]);
+    for (int i = 0; i < 3; ++i) bus.memWrite(static_cast<uint16_t>(0x0408 + i), code[i]);
+    scharf();
+    zre.cpuReset();
+    zre.cpu().PC = 0x0800;
+    zre.cpu().A  = 0x77;
+    zre.cpuStep();
+    EXPECT_EQ(ops.rawPtr()[0x0400], 0xBB);
     EXPECT_TRUE(zre.isSPSViolation());
+    // Derselbe Befehl aus einem BS-Segment geht durch.
+    bus.clearNMI();
+    zre.spa().resetViolation();
+    zre.cpu().PC = 0x0408;
+    zre.cpuStep();
+    EXPECT_EQ(ops.rawPtr()[0x0400], 0x77);
+}
+
+/** @test K2526Protection/B2Eins_SchuetztNicht */
+TEST_F(K2526Protection, B2Eins_SchuetztNicht)
+{
+    markiereBS(0x0400);
+    befehlAus(0x0800);
+    zre.cpu().writeByte(0x0401, 0x55);
+    EXPECT_EQ(ops.rawPtr()[0x0401], 0x55);
+    EXPECT_FALSE(zre.isSPSViolation());
 }
 
 /**
- * @test K2526Protection/Violation_SetsNMI
- * @brief A Q240 protection violation asserts the NMI line on the bus.
- * @par Pass criterion  bus.isNMI() == true after a write-protect violation.
+ * @test K2526Protection/ResSpa_LoeschtIndikator
+ * @brief /RES-SPA (Port 02H) loescht SPS-Indikator (A3 wieder high); Schutz-RAM bleibt.
  */
-TEST_F(K2526Protection, Violation_SetsNMI)
+TEST_F(K2526Protection, ResSpa_LoeschtIndikator)
 {
-    zre.spa().writeEntry(0x0400, 0x01);   // WP for segment at 0x0400
-    zre.cpu().writeByte(0x0400, 0x55);    // trigger violation
+    markiereBS(0x0400);
+    markiereAnwender(0x0800);
+    scharf();
+    befehlAus(0x0800);
+    zre.cpu().writeByte(0x0400, 0x55);
+    ASSERT_TRUE(zre.isSPSViolation());
 
-    EXPECT_TRUE(zre.isSPSViolation());
+    bus.ioWrite(0x02, 0x00);
+    EXPECT_FALSE(zre.isSPSViolation());
+    EXPECT_NE(bus.ioRead(BSPIO_PORTA_DATA) & 0x08, 0) << "A3 Ruhepegel high";
+    EXPECT_TRUE(zre.spa().bereich1(0x0400));
+}
+
+/**
+ * @test K2526Protection/Indikator_HebtSperreAufBisResSpa
+ * @brief Rueckkopplung A34/9: nach der ersten Verletzung wird /MEMDI nicht erneut aktiv.
+ */
+TEST_F(K2526Protection, Indikator_HebtSperreAufBisResSpa)
+{
+    markiereBS(0x0400);
+    markiereAnwender(0x0800);
+    scharf();
+    befehlAus(0x0800);
+    zre.cpu().writeByte(0x0400, 0x11);                  // gesperrt
+    zre.cpu().writeByte(0x0400, 0x22);                  // Merkmal steht: geht durch
+    EXPECT_EQ(ops.rawPtr()[0x0400], 0x22);
+    bus.ioWrite(0x02, 0x00);                            // /RES-SPA (am Bus, ohne E/A-Schutz)
+    zre.cpu().writeByte(0x0400, 0x33);                  // Sperre wieder aktiv
+    EXPECT_EQ(ops.rawPtr()[0x0400], 0x22);
+}
+
+/**
+ * @test K2526Protection/Scharf_EAAusAnwenderbereichLoestNMI
+ * @brief IN/OUT aus Bereich 2 bei scharfem Schutz: NMI, SPS-Ind unberuehrt, Zugriff ohne Wirkung.
+ */
+TEST_F(K2526Protection, Scharf_EAAusAnwenderbereichLoestNMI)
+{
+    markiereAnwender(0x0800);
+    scharf();
+    befehlAus(0x0800);
+    ASSERT_FALSE(bus.isNMI());
+    zre.cpu().writePort(0x0003, 0x5A);
+    EXPECT_TRUE(bus.isNMI());
+    EXPECT_FALSE(zre.isSPSViolation());
+    EXPECT_NE(bus.ioRead(BSPIO_PORTA_DATA) & 0x04, 0) << "A2 high = unerlaubter E/A (fluechtig)";
+    bus.clearNMI();
+    EXPECT_EQ(zre.cpu().readPort(0x0006), 0xFF);        // abgebrochen
     EXPECT_TRUE(bus.isNMI());
 }
 
-/**
- * @test K2526Protection/RESSPA_ClearsViolation
- * @brief Writing to port 0x02 (/RES-SPA) clears the Q240 violation flag and NMI.
- * @par Pass criterion  isSPSViolation() == false; bus.isNMI() == false after port 0x02 write.
- */
-TEST_F(K2526Protection, RESSPA_ClearsViolation)
+/** @test K2526Protection/Scharf_EAAusBSBereichErlaubt */
+TEST_F(K2526Protection, Scharf_EAAusBSBereichErlaubt)
 {
-    zre.spa().writeEntry(0x0400, 0x01);
-    zre.cpu().writeByte(0x0400, 0x55);    // trigger violation
-    ASSERT_TRUE(zre.isSPSViolation());
+    markiereBS(0x0400);
+    scharf();
+    befehlAus(0x0400);
+    zre.cpu().writePort(0x0003, 0x5A);
+    EXPECT_FALSE(bus.isNMI());
+}
 
-    bus.ioWrite(0x02, 0x00);              // /RES-SPA clears violation
-    EXPECT_FALSE(zre.isSPSViolation());
+/** @test K2526Protection/B2Eins_EAErlaubt */
+TEST_F(K2526Protection, B2Eins_EAErlaubt)
+{
+    markiereAnwender(0x0800);
+    befehlAus(0x0800);
+    zre.cpu().writePort(0x0003, 0x5A);
     EXPECT_FALSE(bus.isNMI());
 }
 
 /**
- * @test K2526Protection/RESSPA_ClearsSPSIndOnBSPIO
- * @brief After a violation, BS-PIO Port A bit 3 (SPS-Ind) is set; /RES-SPA clears it.
- * @par Pass criterion  Port A bit 3 == 1 after violation; == 0 after port 0x02 write.
+ * @test K2526Protection/Reset_BehaeltTabelle_LoeschtFFsUndB2
+ * @brief /RESET (powerOn): Schutz-RAM bleibt, FFs aus, B2 = 1.
  */
-TEST_F(K2526Protection, RESSPA_ClearsSPSIndOnBSPIO)
+TEST_F(K2526Protection, Reset_BehaeltTabelle_LoeschtFFsUndB2)
 {
-    // Trigger a violation – BS-PIO A3 (SPS-Ind) must be set.
-    zre.spa().writeEntry(0x0400, 0x01);
+    markiereBS(0x0400);
+    markiereAnwender(0x0800);
+    scharf();
+    befehlAus(0x0800);
     zre.cpu().writeByte(0x0400, 0x55);
     ASSERT_TRUE(zre.isSPSViolation());
 
-    uint8_t port_a = bus.ioRead(BSPIO_PORTA_DATA);
-    EXPECT_NE(port_a & 0x08, 0) << "SPS-Ind (A3) must be set after violation";
-
-    bus.ioWrite(0x02, 0x00);              // /RES-SPA
-
-    port_a = bus.ioRead(BSPIO_PORTA_DATA);
-    EXPECT_EQ(port_a & 0x08, 0) << "SPS-Ind (A3) must be clear after /RES-SPA";
+    zre.powerOn();
+    EXPECT_FALSE(zre.isSPSViolation());
+    EXPECT_TRUE(zre.spa().programmieren());
+    EXPECT_TRUE(zre.spa().bereich1(0x0400));
+    EXPECT_FALSE(zre.spa().bereich1(0x0800));
 }
 
 /**
  * @test K2526Protection/ZVE2_BypassesProtection
- * @brief ZVE2 (privileged DMA CPU) bypasses Q240 protection; reads and writes always succeed.
- * @par Pass criterion  zve2().writeByte(0x0400, 0x77) succeeds; readByte returns 0x77;
- *   isSPSViolation() == false throughout.
+ * @brief ZVE2 (DMA) wird nicht gefiltert und programmiert das Schutz-RAM nicht.
  */
 TEST_F(K2526Protection, ZVE2_BypassesProtection)
 {
-    // ZVE2 runs privileged DMA code and must bypass Q240 protection entirely.
-    zre.spa().writeEntry(0x0400, 0x03);   // WP+RP for segment at 0x0400
+    markiereBS(0x0400);
+    markiereAnwender(0x0800);
+    scharf();
+    befehlAus(0x0800);
     ops.fill(0xDD);
 
-    zre.zve2().writeByte(0x0400, 0x77);   // must succeed despite WP
+    zre.zve2().writeByte(0x0400, 0x77);
     EXPECT_EQ(ops.rawPtr()[0x0400], 0x77);
     EXPECT_FALSE(zre.isSPSViolation());
+    EXPECT_EQ(zre.zve2().readByte(0x0400), 0x77);
 
-    uint8_t val = zre.zve2().readByte(0x0400);
-    EXPECT_EQ(val, 0x77);
-    EXPECT_FALSE(zre.isSPSViolation());
+    entschaerfen();
+    zre.zve2().readByte(0x0C01);                        // ungerade, aber ZVE2: keine Programmierung
+    EXPECT_FALSE(zre.spa().bereich1(0x0C00));
 }
 
 /**
  * @test K2526Protection/SegmentBoundary_64ByteAligned
- * @brief Q240 protection segments are 64 bytes wide; the last byte of segment 0 is at 0x003F,
- *   and the first byte of segment 1 is at 0x0040.
- * @par Pass criterion  Write to 0x003F triggers violation; write to 0x0040 does not.
+ * @brief Segmente sind 64 Byte breit (Index = A >> 6).
  */
 TEST_F(K2526Protection, SegmentBoundary_64ByteAligned)
 {
-    // Segment 0 covers bytes 0x0000–0x003F (64 bytes); segment 1 starts at 0x0040.
-    zre.spa().writeEntry(0x0000, 0x01);   // WP for segment 0
-
-    // Last byte of segment 0 (0x003F) must be protected.
+    markiereBS(0x0000);                                 // Segment 0
+    markiereAnwender(0x0040);                           // Segment 1
+    markiereAnwender(0x0800);
+    scharf();
+    befehlAus(0x0800);
     zre.cpu().writeByte(0x003F, 0x11);
     EXPECT_TRUE(zre.isSPSViolation());
-    bus.ioWrite(0x02, 0x00);              // clear violation
-
-    // First byte of segment 1 (0x0040) must be unprotected.
+    bus.ioWrite(0x02, 0x00);
     zre.cpu().writeByte(0x0040, 0x22);
     EXPECT_FALSE(zre.isSPSViolation());
     EXPECT_EQ(ops.rawPtr()[0x0040], 0x22);
 }
 
 /**
- * @test K2526Protection/MultipleViolations_OnlyOneNMI
- * @brief Repeated protection violations do not re-assert NMI once it is already pending.
- * @par Pass criterion  bus.isNMI() == true; isSPSViolation() == true after second violation.
+ * @test K2526Protection/SIOS_Scharfschaltfolge_BleibtImBereich1
+ * @brief Nachbildung SIOS 0AFFH: IN A,(0AH); RES 2,A; NOP; OUT (0AH),A; EI; RET.
+ *   Opcode-Abruf liefert bei jedem B2 den Speicher; das Segment des Befehlsstroms bleibt "1"
+ *   (letzter Abruf vor dem Scharfschalten: Operand 0B05H, ungerade).
  */
-TEST_F(K2526Protection, MultipleViolations_OnlyOneNMI)
+TEST_F(K2526Protection, SIOS_Scharfschaltfolge_BleibtImBereich1)
 {
-    // Repeated violations must not re-assert NMI once it is already pending.
-    zre.spa().writeEntry(0x0400, 0x01);
-    zre.cpu().writeByte(0x0400, 0x11);    // first violation
-    ASSERT_TRUE(bus.isNMI());
-
-    // A second violation does not generate a second NMI edge (already pending).
-    zre.cpu().writeByte(0x0400, 0x22);
-    EXPECT_TRUE(zre.isSPSViolation());    // still set
-    EXPECT_TRUE(bus.isNMI());             // still pending
+    const uint8_t code[] = {0xDB, 0x0A, 0xCB, 0x97, 0x00, 0xD3, 0x0A, 0xFB, 0xC9};
+    const uint16_t org = 0x0AFF;
+    for (size_t i = 0; i < sizeof(code); ++i) bus.memWrite(static_cast<uint16_t>(org + i), code[i]);
+    zre.cpuReset();
+    zre.cpu().PC = org;
+    zre.cpu().SP = 0x0400;
+    for (int i = 0; i < 4; ++i) zre.cpuStep();          // IN, RES, NOP, OUT
+    EXPECT_TRUE(zre.spa().scharf());
+    EXPECT_EQ(zre.cpuPC(), org + 7);
+    EXPECT_TRUE(zre.spa().bereich1(0x0B04));            // Segment 0B00-0B3F: "1"
+    EXPECT_TRUE(zre.spa().bereich1(0x0AFF));            // Segment 0AC0-0AFF: "1"
 }
 
 // ─── /INT-BS (port 00H) ───────────────────────────────────────────────────────
@@ -1041,58 +1148,28 @@ TEST(K2526, IntBS_Port00_DoesNotCrash)
 }
 
 /**
- * @test K2526/IntBS_Port00_SetsBSPIOPortB1Low
- * @brief After writing to port 0x00, BS-PIO Port B bit 1 (/INT-BS) is asserted low.
- * @par Pass criterion  (bus.ioRead(BSPIO_PORTB_DATA) & 0x02) == 0.
+ * @test K2526/IntBS_Port00_PulstB1_PIOMerktInterrupt
+ * @brief OUT 00H ist ein IMPULS auf B1; die wie SIOS programmierte PIO (Bitmodus, ODER,
+ *   aktiv HIGH, Maske nur B1) merkt ihn sich.  Ruhepegel B1 = 0.
  */
-TEST(K2526, IntBS_Port00_SetsBSPIOPortB1Low)
+TEST(K2526, IntBS_Port00_PulstB1_PIOMerktInterrupt)
 {
     K1520Bus bus;
     K2526 card(bus);
     card.attachToBus(bus);
     card.powerOn();
+    EXPECT_EQ(bus.ioRead(BSPIO_PORTB_DATA) & 0x02, 0) << "Ruhepegel B1 = 0";
 
-    // After port 00H write, BS-PIO Port B input B1 (/INT-BS) must be 0 (asserted).
+    bus.ioWrite(0x0B, 0x76);   // Vektor
+    bus.ioWrite(0x0B, 0xB7);   // Int. ein, ODER, aktiv HIGH, Maske folgt
+    bus.ioWrite(0x0B, 0xFD);   // nur B1 ueberwacht
+    card.setIEI(true);
+    ASSERT_FALSE(card.hasInterrupt());
+
     bus.ioWrite(0x00, 0x00);
-    uint8_t portb = bus.ioRead(BSPIO_PORTB_DATA);
-    EXPECT_EQ(portb & 0x02, 0) << "/INT-BS (B1) must be low after port 00H write";
-}
-
-/**
- * @test K2526/IntBS_InitiallyInactive
- * @brief Before any port 0x00 write, /INT-BS (Port B bit 1) is inactive (high).
- * @par Pass criterion  (bus.ioRead(BSPIO_PORTB_DATA) & 0x02) != 0.
- */
-TEST(K2526, IntBS_InitiallyInactive)
-{
-    K1520Bus bus;
-    K2526 card(bus);
-    card.attachToBus(bus);
-    card.powerOn();
-
-    // Before port 00H write, /INT-BS (B1) must be high (inactive, pull-up).
-    uint8_t portb = bus.ioRead(BSPIO_PORTB_DATA);
-    EXPECT_NE(portb & 0x02, 0) << "/INT-BS (B1) must be high (inactive) at power-on";
-}
-
-/**
- * @test K2526/IntBS_RESSPA_ClearsIntBs
- * @brief /RES-SPA (port 0x02) clears the /INT-BS latch, restoring B1 to high (inactive).
- * @par Pass criterion  (bus.ioRead(BSPIO_PORTB_DATA) & 0x02) != 0 after port 0x02 write.
- */
-TEST(K2526, IntBS_RESSPA_ClearsIntBs)
-{
-    K1520Bus bus;
-    K2526 card(bus);
-    card.attachToBus(bus);
-    card.powerOn();
-
-    bus.ioWrite(0x00, 0x00);                         // assert /INT-BS
-    ASSERT_EQ(bus.ioRead(BSPIO_PORTB_DATA) & 0x02, 0); // verify B1=0
-
-    bus.ioWrite(0x02, 0x00);                         // /RES-SPA clears INT-BS latch
-    uint8_t portb = bus.ioRead(BSPIO_PORTB_DATA);
-    EXPECT_NE(portb & 0x02, 0) << "/INT-BS must be inactive (B1=1) after /RES-SPA";
+    EXPECT_TRUE(card.hasInterrupt()) << "OUT 00H muss den Interrupt anmelden";
+    EXPECT_EQ(bus.ioRead(BSPIO_PORTB_DATA) & 0x02, 0) << "B1 faellt nach dem Impuls zurueck";
+    EXPECT_FALSE(card.isSPSViolation());
 }
 
 // ─── /SA (power-off, BS-PIO B4) ───────────────────────────────────────────────
