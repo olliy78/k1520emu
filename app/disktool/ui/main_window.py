@@ -132,10 +132,11 @@ def neu_eintraege():
 
     Der blosse Name (`osm800`) sagt dem Anwender nichts; die Beschreibung des
     Katalogs („OS/M (P8000) 800K, Format 7 ...") steht dabei.  tar720 mit Inhalt
-    laesst sich nicht anlegen - angeboten wird nur die LEERE tar-Diskette.
+    laesst sich nicht anlegen - angeboten wird nur die LEERE tar-Diskette.  SIOS (``sios``)
+    ist bis Arbeitspaket D4 nur lesbar und wird nicht angeboten.
     """
     return [(f.name, f"{f.name} \u2014 {f.description}" if f.description else f.name)
-            for f in filesystems() if f.type != "tar" or f.leer]
+            for f in filesystems() if (f.type != "tar" or f.leer) and f.type != "sios"]
 
 
 class MainWindow(QMainWindow):

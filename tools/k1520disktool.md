@@ -1,6 +1,6 @@
 # `k1520disktool` — Dateiaustausch mit K1520-Disketten
 
-Holt Dateien von CP/A-, SCPX-, **UDOS**-, **UDOS1715**- und **SCP1700**-Disketten
+Holt Dateien von CP/A-, SCPX-, **UDOS**-, **UDOS1715**-, **SCP1700**- und (lesend) **SIOS-1526**-Disketten
 (CP/M-86 des A7100) und schreibt sie zurück —
 auf `.img`, `.hfe`, `.dmk`, `.cqm` (CopyQM), `.td0` (TeleDisk) und `.imd` (ImageDisk).  Dieselbe Bibliothek treibt die Oberfläche
 (`run_disktool.sh`); Feinentwurf: `doc/design/13_k1520disktool.md`.
@@ -1193,3 +1193,24 @@ Frage, wenn ein Dialog am falschen Ort aufgeht.
 **F1 öffnet das Handbuch** — links das Inhaltsverzeichnis, oben ein Suchfeld. Es ist
 eine gewöhnliche Markdown-Datei, `app/disktool/help/handbuch.md`; wer etwas ergänzen
 will, ändert sie und startet neu, ohne Code anzufassen.
+
+## SIOS 1526 (nur lesend)
+
+IBM-Etikettendisketten des SIOS 1526 (A5120/A5130/K8924, 26×128 MFM einseitig, 40 oder 80 Spuren) werden an `ERMAP` + `VOL1` in Spur 0
+erkannt (Profile `sios_ss40`/`sios_ss80`).  Beschreibung des Formats: `doc/sios_diskettenformat.md`.
+
+```
+$ k1520disktool ls -l SIOS1526_DP1.hfe
+Dateisystem: sios_ss40 (erkannt) - 1 Seite - MWD051
+Name                 Typ   Satz  Groesse  Kz  Lage
+PHASELB              B      128   123136  E   BOE 01001 EOE 37026 EOD 38001
+PHASELB/CATM         O      128     4608      AADR 0013 ML 12
+...
+$ k1520disktool get SIOS1526_DP1.hfe --to aus PHASELB/INIT    # -> aus/PHASELB_INIT (roh)
+$ k1520disktool boot-get SIOS1526_SYLs.hfe sylspur0.bin       # Spur 0 (SYL-Lader + Etiketten)
+```
+
+Typ `F` = physische Datei (Groesse = Sektoren `BOE..EOD-1`), `B` = Bibliothek (Name endet auf `LB`), `O` = Objekt einer Bibliothek.  Kz =
+Kennzeichen aus HDR1 (`P` Schreibschutz, `E` Austausch, `C` auf der Folgediskette fortgesetzt).  Alles Schreibende (`put`, `rm`, `create --fs sios_*`, `boot-put`)
+wird mit „SIOS: schreibender Zugriff noch nicht unterstuetzt“ abgelehnt.  Ein Abbild, dessen Geometrie zu keinem Katalogformat passt (`SIOS1526_SYLp.hfe`),
+braucht `--fs sios_ss40`.

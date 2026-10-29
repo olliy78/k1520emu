@@ -1487,7 +1487,7 @@ class DiskTool:
 
     @property
     def filesystem_type(self) -> str:
-        """``'cpm'`` | ``'udos'`` | ``'udos1715'`` | ``''`` — die Familie.
+        """``'cpm'`` | ``'udos'`` | ``'udos1715'`` | ``'sios'`` | ``''`` — die Familie.
 
         Die Oberfläche braucht sie, um zu wissen, *welche* Dateiangaben es
         überhaupt gibt.  Leer, wenn der Name in keinem Katalog steht (abgeleitete
@@ -1513,6 +1513,11 @@ class DiskTool:
     def ist_udos(self) -> bool:
         """UDOS-Familie (ZDOS, NDOS): Kopfsektorangaben."""
         return self.filesystem_type.startswith("udos")
+
+    @property
+    def ist_sios(self) -> bool:
+        """SIOS 1526 (IBM-Etiketten, nur lesbar): ``Entry.type`` ist hier F/B/O, KEIN UDOS-Typ."""
+        return self.filesystem_type == "sios"
 
     @property
     def ist_cpm(self) -> bool:
@@ -2460,6 +2465,7 @@ class PlatteTool:
     ist_wega = True
     ist_tar = False
     ist_udos = False
+    ist_sios = False
     ist_cpm = False
     ist_cqm = False
     ist_td0 = False

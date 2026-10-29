@@ -1242,3 +1242,34 @@ Ausführliche Formatbeschreibung, Belege und Tabellen: **`doc/design/39_mutos800
    `MutosFs.Blocks_*`): hinter Block 250 liegt der Swap-Bereich des Kernels auf rk2 — mit `s_fsize` 494 wurden `/bin/sh`-Blöcke vom Auslagern überschrieben, `fsck` sah nichts, `date` hing.
    Die GUI („Neue Diskette“) bietet `--blocks` nicht an (Vorgabe/Obergrenze, der Blockraum, ist nicht in der C-ABI; Anwendungsfall nur dieser Nachbau).  Container `.hfe`, weil der Emulator `.td0` nicht zurückschreibt; `create … .dmk` im Profil `mutos8k_26x128_fm` hat 62 Sektoren mit CRC-Fehler
    (nicht verfolgt).  Die Datei ist eine Rekonstruktion: Programme aus DISK-ROOT, `mount`/`umount` Ersatz, sechs Gerätenamen + `login`/`motd`/`mount`/`mtab` abgeleitet.
+
+## SIOS 1526 (A5120/A5130/K8924) — lesend (2026-10-29, D2/D3, Entwurf 43, Format `doc/sios_diskettenformat.md`)
+
+`FsType::Sios` (Typname `sios`), `core/filesystem/sios/sios_fs.{h,cpp}`, Prüfung `check/sios_check.cpp`.  IBM-Etikettendiskette,
+26×128 MFM einseitig: Spur 0 = EBCDIC/DKOI-Etiketten, Dateien = zusammenhängende Spurbereiche, Bibliotheken (`…LB`) mit eigenem Verzeichnis.
+Festlegungen:
+
+1. **Kein eigenes Format, zwei Profile.** `sios_ss40`/`sios_ss80` stehen auf `k5601_ss40_26x128`/`k5601_ss80_26x128` (Rang 0).
+   Erkannt wird NUR am positiven Nachweis **ERMAP in Sektor 5 UND VOL1 in Sektor 7** (`SiosFileSystem::looksLikeSios`).  Die Probe läuft in
+   `disk_volume.cpp` **NACH** dem Rangwettbewerb (`sios_kandidaten`, wie die tar-Kandidaten) und verdrängt nur CP/M-Profile **ohne** eigenen Nachweis (kein
+   „nicht eindeutig“, keine Gegenprobe).  **Nicht im Wettbewerb mitlaufen lassen:** SIOS-INITIALISIERT sind auch fremde Systeme — die BCU-880-Startdisketten
+   (`bcu12_…syl-spur1-satz*.img`: VOL1 `ROBINI`, Platzhalter-HDR1 `DATA` mit EOE 73026, CP/M-System) und die MUTOS-8000-Disketten (VOL1 `MUTOS`, UNIX ab Zylinder 1).
+   Mit niedrigem `detect_rank` schlug SIOS je nach Reihenfolge der Kandidatenformate das MUTOS-Profil (rot: `cli_mutos8000_tar_disktool_geschrieben`, `ls` lieferte
+   „0 Dateien“).  Wächter `SiosFs.NurMitNachweisErkannt` (BCU-Fixtures + `disks/a5120_16_MUTOS/…usr_mfm.hfe`).
+2. **Aktiv ist, was als Text `HDR1` trägt** — die gelöschte Datenmarke F8 wird nicht ausgewertet (Formatdokument §4.4).  EBCDIC wird mit der DKOI-Tabelle
+   (`SiosFileSystem::dkoi`, fünf Abweichungen) gelesen.  Dateigröße = Sektoren `BOE..EOD-1`; liegt EOD außerhalb `[BOE, EOE+1]` oder fehlt es, gilt EOE (Warnung
+   `sios.hdr1.eod`).  `SYSARE09` (SYLp) liefert deshalb 8 Sektoren weniger als der belegte Bereich — Formatdokument §11 Nr. 12, bewusst dem Etikett gefolgt.
+3. **Namen: flach mit Schrägstrich.** Die Bibliothek erscheint als Datei `PHASELB` (Typ `B`), ihre Objekte als `PHASELB/INIT` (Typ `O`; Länge = Abstand zum nächsten
+   AADR bzw. ND, gelöschte Einträge mit leerem Namen bleiben unsichtbar, ihr AADR zählt als Grenze).  Kein Verzeichnisbaum wie bei WEGA: ein physisches `PHASELB`
+   und ein Ordner `PHASELB/` kollidierten im Zielordner.  `get`/`extractAll` machen daraus `PHASELB_INIT` (`zielNamen`, ohne Hinweiszeile).  Es wird nur der
+   Verzeichnissektor AADR 2 gelesen (Fortsetzung bei > 15 Einträgen ist offen, Formatdokument §11 Nr. 5).
+4. **Nur lesend, unaufhebbar** (`readOnlyForced`, Text `SiosFileSystem::schreibsperre`): `write`/`erase`/`mkfs`, `create --fs sios_*` und `setReadOnly(false)` lehnen
+   mit „SIOS: schreibender Zugriff noch nicht unterstuetzt (Arbeitspaket D4)" ab; `wouldFit` meldet `fits=false` mit dem Text (sonst blieb `put <ordner>` ohne Meldung).
+   „Neue Diskette“ der GUI bietet `sios` nicht an.  Schreiben, `create`, `.fileinfo` und GUI-Eigenschaften sind D4–D6.
+5. **`boot-get` = die ganze Spur 0** (SYL-Lader S. 1–4 bei Systemdisketten, dazu ERMAP/VOL1/HDR1).  `ls -l` hat eine eigene Spaltenfolge
+   (`FileEntry::extent` trägt Lage als Text).  `.fileinfo` entsteht nicht.
+6. **`SIOS1526_SYLp.hfe` wird nicht automatisch erkannt**: 40-Spur-Diskette aus dem 80er-Laufwerk (Zylinder 40–68 unformatiert, Streusektor c15h1) passt zu keinem
+   Katalogformat; mit `--fs sios_ss40` liest sie (Wächter `SiosFs.SylpIstNurMitFsErkennbar` hält den Befund fest — wird die Geometrieerkennung toleranter, Test und Doku nachziehen).
+7. **Prüfung** (`sios.hdr1.ungueltig` Fehler, `sios.hdr1.ueberlappt` Fehler, `sios.hdr1.eod` Warnung) bewusst klein; ERMAP-Nummern, VOL1-Felder und Bibliotheksfuß-NV
+   werden nicht geprüft (nicht belegt — „Falschmeldungen sind schlimmer als fehlende").  Wächter `SiosFsCheck.*` (alle fünf Originale ohne Befund).
+8. Fixtures: `tests/fixtures/disks/sios1526_{dp1,dp2,sg1,syls,sylp}.hfe` (Kopien von `tools/sios_a5120/original/`).  Tests `SiosFs.*`, `SiosFsCheck.*`, `cli_dt_*sios*`.

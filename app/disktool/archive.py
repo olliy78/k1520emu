@@ -343,7 +343,9 @@ def inhaltsverzeichnis(tool: "DiskTool", quelle: str = "",
     # Typ => UDOS" machte aus jeder WEGA-Diskette eine UDOS-Diskette.
     # UNIX-Sicht (ls -l, unix:-Schluessel): WEGA und tar-Disketten (nur lesbar)
     hat_wega = tool.ist_wega or tool.ist_tar
-    hat_udos = (not hat_wega) and (tool.ist_udos or any(e.type for e in eintraege))
+    # SIOS: `type` ist F/B/O (Datei/Bibliothek/Objekt), kein UDOS-Typ.
+    hat_udos = (not hat_wega) and (
+        tool.ist_udos or (not getattr(tool, "ist_sios", False) and any(e.type for e in eintraege)))
     hat_cpm = (not hat_wega) and (
         any(e.user or e.attrs in ("RO", "SYS", "ARC") for e in eintraege)
         or not hat_udos)
