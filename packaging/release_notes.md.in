@@ -1,10 +1,12 @@
 # K1520emu @TAG@
 
-Hardwarenahe Emulation des **Robotron A5120**, eines Z80-Bürocomputers des VEB Robotron
-Dresden (DDR, 1982). Nachgebildet wird nicht das Betriebssystem, sondern der **K1520-Bus
-mit seinen Steckkarten** — es gibt keine BIOS-Traps: Boot-ROM, BIOS und Betriebssystem
-laufen als echter Z80-Code. Deshalb bootet die Maschine mehrere Original-Betriebssysteme
-von Original-Disketten: **CP/A**, **SCPX** und **UDOS**.
+Hardwarenahe Emulation von Rechnern aus dem **K1520-Bausteinsystem** der DDR — **A5120**
+(auch A5130/K8924), **K8915**, **PRG 710**, **PC 1715**, **MC80** — und des **EAW P8000**.
+Nachgebildet wird nicht das Betriebssystem, sondern die **Hardware mit ihren Steckkarten**: es
+gibt keine BIOS-Traps, Boot-ROM, BIOS und Betriebssystem laufen als echter Maschinencode.
+Deshalb booten die Original-Betriebssysteme von Original-Disketten, z. B. **CP/A**, **SCPX**,
+**UDOS**, **SCP 1715**, **MUTOS 8000** und **WEGA**. Dazu **k1520DiskTool**, **K1520 Kermit**
+und der Debugger **`k1520dbg`**.
 
 Beschreibung, Aufbau und Entwicklungsstand: **[Projektseite mit README](https://github.com/olliy78/k1520emu#readme)**
 
@@ -17,37 +19,51 @@ Beschreibung, Aufbau und Entwicklungsstand: **[Projektseite mit README](https://
 
 ## Was ist neu in @VERSION@
 
-Der Schwerpunkt dieser Vorabversion liegt auf **echten Disketten** und auf dem, was man
-mit ihnen anstellen kann, wenn sie beschädigt oder von einem fremden Rechner sind.
+Gegenüber 0.3.0 ist der Rechnerpark deutlich gewachsen: ein sechstes Programm, neue
+Ausführungen des A5120, neue Optionen — und das DiskTool versteht viele weitere Formate.
 
-- **Echte Diskette am Greaseweazle-Adapter.** Ein angeschlossenes 5,25″- oder 8″-Laufwerk
-  wird **spurweise nach Bedarf** gelesen und beschrieben — der Zwischenschritt „ganze
-  Diskette in eine Datei" entfällt, eine Diskette ist in Sekunden statt Minuten offen.
-  Beide Programme können es, an echter Hardware nachgewiesen. Geschrieben gilt dabei erst
-  nach dem **Zurücklesen**, sodass Schadstellen auffallen statt unbemerkt zu bleiben.
-- **Dateisystemprüfung und Reparatur im k1520DiskTool** (`fsck`): Eine Diskette wird beim
-  Öffnen geprüft, Befunde lassen sich einzeln reparieren, und **gelöschte Dateien** kann
-  man wiederfinden und herausholen — bei CP/M, ZDOS und NDOS. Vorausgewählt ist dabei nur,
-  was keine Daten verwirft.
-- **Drei weitere Dateisysteme gelesen und geschrieben:** **UDOS1715/NDOS** (PC 1715),
-  **SCP1700/CP/M-86** (A7100) und die NDOS-Ausprägung der **P8000**.
-- **Fremd beschriebene Disketten** — an einem anderen K1520-Rechner geschriebene UDOS-
-  Disketten waren bisher unlesbar; Sync-Gruppe, CRC-Sitte und Spurnaht sind nachgezogen.
-- **Diskeditor**: die Diskette Sektor für Sektor ansehen und ändern, Spuren einfügen und
-  löschen, den UDOS-Anhang hinter der Prüfsumme bearbeiten.
-- **Bootfähige Disketten anlegen** — CP/A, SCPX und UDOS, aus einer Leerdiskette heraus.
-- **Zwei neue Programme für den P8000:** `p8000emu` (U880 + U8001, UDOS und WEGA, Winchester,
-  Originalterminal mit Flachtastatur K7673.09; Betriebsart „nur Terminal“ = der Arbeitsplatz ohne
-  Rechner, per serieller Leitung mit einem zweiten `p8000emu` verbunden, mehrere Plätze möglich). Es liegen
-  keine P8000-Disketten bei.
-- **Nachgebildete K7637-Tastatur** im Emulator: das Tastenfeld zeigt mit, jede PC-Taste
-  spricht die Taste an ihrer Stelle an.
-- **Überarbeitete Oberflächen** in beiden Programmen: einrichtbare Symbolleiste,
-  Zustandszeile statt Zähler, mitgeliefertes Handbuch, erkanntes Diskettenformat — und ein
-  Menü *Werkzeuge*, über das beide Programme einander und eine Konsole für Debugger und
-  Kommandozeile starten.
-- **Der Debugger `k1520dbg` liegt jetzt bei** (Linux und Windows), mit Konsolenmodus und
-  eigenem Handbuch.
+**Neue und erweiterte Rechner**
+
+- **`mc80emu`** — der Mikrorechner **MC80** (VEB Elektronik Gera): MC80.30 mit EGOS und Grafikbild,
+  dazu **MC80.21/.22** mit Oszilloskop-Anzeige und BSYS; Kassette fest eingebaut, optional die
+  **PCMC-Erweiterung** samt PC-Gegenstelle.
+- **A5120 als Baukasten:** **A5130** und **K8924** als wählbare Modelle, die Optionen (RAM-Karte,
+  Bildschirmkarte K7023/K7024, Tastatur K7636/K7637, Lade-ROM, Erweiterungsmodul) auch einzeln
+  einstellbar; **frühe A5120 mit BCU 880**; **K3521**-RAM-Karten.
+- **A5120.16:** neues **EM1024** (1 MB), außerdem **MUTOS 8000** mit fertigen Disketten und
+  Kurzanleitung im Handbuch; **UDOS 5.0** für den A5120.
+- **P8000:** **P8000 Compact** als Voreinstellung (bis zu drei Winchester, zweite Platte unter WEGA),
+  optionale **Uhrenkarte** (U130X / RTC-72421), **OS/M 3.0**, offizielle WEGA-Startdisketten;
+  Disketten unter WEGA (format/mkfs/mount/tar) sind nachgewiesen.
+
+**Neue Optionen und Programme**
+
+- **Kassette K5020/K5200** für A5120, K8915, PRG 710 und PC 1715: Boot von Band, Schreiben und
+  Lesen unter SCPX/BCU, Bandwerkzeug `k1520tape` (auch JKCEMU-Programmdateien).
+- **K1520 Kermit** — neues Programm für den Dateiaustausch mit der **WEGA** des P8000 (oder jedem
+  Kermit) über Telnet/RFC 2217, als Client und als Server, mit Oberfläche und Kommandozeile.
+  **Kermit-80** liegt als Beigabe auf den Disketten der CP/M-Rechner; die mitgelieferte
+  WEGA-3.1-Platte hat den Benutzer `kermit` schon eingerichtet.
+
+**DiskTool und Diskettenformate**
+
+- Weitere Abbildformate: **CopyQM (`.cqm`)**, **TeleDisk (`.td0`)** und **ImageDisk (`.imd`)** —
+  lesen und schreiben; dazu **tar-Disketten** (auch mehrteilige Sätze) und **P8000-Plattenabbilder**.
+- Weitere Dateisysteme: **OS/M**, **BCU 880**, **MUTOS 8000/1700**; UNIX-Angaben werden bei
+  WEGA-Dateien vollständig übernommen.
+- Dateien lassen sich per **Ziehen und Ablegen** übernehmen; Anlegen einer Diskette mit hinterlegten
+  Bootabbildern.
+
+**Emulator und Werkzeuge**
+
+- **Oberfläche schneller:** CRT-Darstellung abschaltbar, Bildrate einstellbar; HFE-Laden etwa doppelt
+  so schnell. Qts eigener Dateidialog statt des Desktop-Dialogs.
+- **Greaseweazle:** robusteres Schreiben (Motoranlauf, Index-Neuversuch), Hardware-Testgruppe an
+  echter Diskette.
+- **Debugger `k1520dbg`:** `cover`, `mount`/`eject` zur Laufzeit, Logpoints; neuer
+  Z8000-Disassembler `z8kdis`.
+- **Korrekturen** u. a.: AltGr wird nicht mehr als Strg gemeldet, einseitige `.hfe` mit
+  256-Byte-Seitenschlitzen, 8-Zoll-FM mit 250 kbit/s, EI-Schatten und RETI in weiteren Maschinen.
 
 Alles im Einzelnen: der Änderungsverlauf am Ende dieser Seite.
 
@@ -90,8 +106,9 @@ registriert; beim Entfernen bleibt nichts zurück. Danach startet der Emulator o
 rund 150 MB (Linux) bzw. 116 MB (Windows) belegt. Systempython und Systempakete werden
 nicht angefasst.
 
-Sechs Beispieldisketten sind dabei — je eine startfähige für CP/A, SCPX und UDOS sowie zwei
-Combo-Disketten mit Fremdlaufwerkstypen. Sie landen beim ersten Start im Diskettenordner.
+Beispieldisketten mit Betriebssystemen für die meisten Rechner sind dabei (Übersicht:
+`disks/README.md`); sie landen beim ersten Start im Diskettenordner. Für den P8000 liegen
+WEGA 3.0/3.1 und OS/M 3.0 bei.
 
 ## Gut zu wissen
 
@@ -101,8 +118,8 @@ Combo-Disketten mit Fremdlaufwerkstypen. Sie landen beim ersten Start im Diskett
 - **Deinstallieren:** Windows über *Einstellungen → Apps* oder den Startmenü-Eintrag,
   Linux mit `./install.sh --uninstall`. Die Arbeitsdisketten bleiben dabei stehen —
   sie liegen außerhalb der Installation, im Diskettenordner.
-- **Mitgeliefert ist außerdem das `k1520DiskTool`** — damit holt man Dateien von CP/A-,
-  SCPX- und UDOS-Disketten heraus und schreibt sie zurück (`.img`, `.hfe`, `.dmk`).
+- **Mitgeliefert ist außerdem das `k1520DiskTool`** — damit holt man Dateien von Disketten
+  und Plattenabbildern heraus und schreibt sie zurück (`.img`, `.hfe`, `.dmk`, `.cqm`, `.td0`, `.imd`).
 - **Und `K1520 Kermit`** — Dateiaustausch mit der WEGA des P8000 (oder einem anderen
   Kermit) über Telnet oder RFC 2217, als Client und als Server; mit Oberfläche
   (Startmenü) und Kommandozeile (`k1520kermit-cli`). Die mitgelieferte

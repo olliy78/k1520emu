@@ -27,10 +27,15 @@ Im Beispielordner liegen **WEGA 3.0 und WEGA 3.1** (`p8000_wega30/`, `p8000_wega
 fertig installierte Platte (`*.img.gz` — im Plattenkasten über „Anschließen…" einbinden), die
 UDOS-Startdiskette und für WEGA 3.0 der ganze Installationssatz; die `README.md` im Ordner sagt,
 wie man davon startet. Eine leere Platte legen Sie über „Neue Platte…" an.
-Sechster ist der Mikrorechner **MC80.30/31** des VEB Elektronik Gera (`mc80emu`, Startmenü
-„MC80 Emulator"; Modell unter „Einstellungen ▸ Allgemein"). Er hat keine Diskettenlaufwerke:
-EGOS meldet sich nach dem Einschalten, Programme kommen über „Maschine ▸ Speicherabzug laden…"
-(nach `INIT`) in den Arbeitsspeicher.
+Sechster ist der Mikrorechner **MC80** des VEB Elektronik Gera (`mc80emu`, Startmenü
+„MC80 Emulator"; Modell MC80.30, MC80.21 oder MC80.22 unter „Einstellungen ▸ Allgemein"). Er hat keine
+Diskettenlaufwerke: EGOS (MC80.30) bzw. BSYS (MC80.21/.22) meldet sich nach dem Einschalten,
+Programme kommen über die fest eingebaute Kassette oder bei der MC80.30 über „Maschine ▸
+Speicherabzug laden…" (nach `INIT`) in den Arbeitsspeicher.
+
+Im `a5120emu` wählen Sie unter „Einstellungen ▸ Allgemein" das **Modell** A5120, A5130 oder K8924 —
+es setzt nur Vorgaben für die Einzeloptionen (Speicher, Bildschirmkarte, Tastatur, Lade-ROM,
+Kassette, Erweiterungsmodul), die sich auch einzeln ändern lassen.
 
 ### K8915: eine eigene Bootdiskette
 
@@ -169,8 +174,8 @@ Assembler stehen als Beispielzeilen darin).
 | Konfiguration | `~/.config/k1520emu/a5120emu.yaml`, `k8915emu.yaml`, `prg710emu.yaml`, `pc1715emu.yaml`, `p8000emu.yaml`, `mc80emu.yaml` (je Programm) |
 
 Die Beispieldisketten werden beim ersten Start einer Fassung in einen eigenen
-Unterordner des Diskettenordners ausgepackt (`Beispieldisketten_v03`, bei einer
-Vorabversion `Beispieldisketten_v03-beta.2`), gegliedert nach `<maschine>_<system>/`.  Der Emulator schreibt Änderungen an einer eingelegten Diskette
+Unterordner des Diskettenordners ausgepackt (`Beispieldisketten_v04`, bei einer
+Vorabversion `Beispieldisketten_v04-beta.1`), gegliedert nach `<maschine>_<system>/`.  Der Emulator schreibt Änderungen an einer eingelegten Diskette
 dorthin zurück — die Originale im Programmverzeichnis bleiben unangetastet und
 ein Update überschreibt nichts davon.
 

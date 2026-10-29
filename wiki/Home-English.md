@@ -9,12 +9,12 @@ instead of being replaced by operating-system simulations.
 
 | Computer | Operating systems |
 |---|---|
-| robotron A5120 (including A5120.16) | CP/A, SCPX, UDOS, BCU 880 |
+| robotron A5120 (also as A5130/K8924, A5120.16 with EM064/EM256/EM1024, early version) | CP/A, SCPX, UDOS, BCU 880, MUTOS 8000 |
 | robotron K8915 (V3 and V2) | SCPX 8915 |
 | PRG 710 / PRG 710-1 | UDOS, SCPX |
 | robotron PC 1715 / PC 1715W | SCP 1715, CP/A, CP/Z, UDOS 1715, SCP 3.0 |
-| MC80.30 / MC80.31 | EGOS |
-| EAW P8000 | UDOS, WEGA (UNIX) |
+| MC80.30 / MC80.21 / MC80.22 | EGOS, BSYS |
+| EAW P8000 (incl. Compact) | UDOS, OS/M, WEGA (UNIX) |
 
 The project also includes DiskTool for reading and writing disk images, the
 `k1520dbg` debugger, and Kermit file transfer for WEGA. Ready-to-use packages for

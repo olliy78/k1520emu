@@ -9,12 +9,12 @@ Betriebssystem-Nachbau.
 
 | Rechner | Betriebssysteme |
 |---|---|
-| robotron A5120 (einschließlich A5120.16) | CP/A, SCPX, UDOS, BCU 880 |
+| robotron A5120 (auch als A5130/K8924, A5120.16 mit EM064/EM256/EM1024, frühe Ausführung) | CP/A, SCPX, UDOS, BCU 880, MUTOS 8000 |
 | robotron K8915 (V3 und V2) | SCPX 8915 |
 | PRG 710 / PRG 710-1 | UDOS, SCPX |
 | robotron PC 1715 / PC 1715W | SCP 1715, CP/A, CP/Z, UDOS 1715, SCP 3.0 |
-| MC80.30 / MC80.31 | EGOS |
-| EAW P8000 | UDOS, WEGA (UNIX) |
+| MC80.30 / MC80.21 / MC80.22 | EGOS, BSYS |
+| EAW P8000 (auch Compact) | UDOS, OS/M, WEGA (UNIX) |
 
 Enthalten sind außerdem ein DiskTool zum Lesen und Schreiben von Diskettenabbildern,
 der Debugger `k1520dbg` und Kermit zum Dateiaustausch mit WEGA. Die fertigen Pakete

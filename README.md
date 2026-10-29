@@ -23,16 +23,18 @@ und auch Formatieren mit dem originalen `FORMAT.COM` funktioniert.
 
 | Rechner | Betriebssysteme |
 |---|---|
-| **robotron A5120** (auch A5120.16 mit 16-Bit-Erweiterung, frühe Ausführungen 64×16 und Kassette) | CP/A, SCPX, UDOS, BCU 880 |
+| **robotron A5120** — dazu als wählbare Modelle **A5130** und **K8924**; **A5120.16** mit 16-Bit-Erweiterung (EM064/EM256/EM1024); frühe Ausführungen (16×64, K3525, Kassette) | CP/A, SCPX, UDOS 4.3 und 5.0, BCU 880, MUTOS 8000 |
 | **robotron K8915** (V3 und V2) | SCPX 8915 |
 | **PRG 710 / PRG 710-1** (Numerik-Programmiergeräte) | UDOS, SCPX |
 | **robotron PC 1715 / PC 1715W** | SCP 1715, CP/A, CP/Z, UDOS 1715, SCP 3.0 |
-| **MC80.30 / MC80.31** (VEB Elektronik Gera, Programm `mc80emu`) | EGOS |
-| **EAW P8000** (8- und 16-Bit-Teil, Winchester) | UDOS, WEGA (UNIX) |
+| **MC80.30 / MC80.21 / MC80.22** (VEB Elektronik Gera, Programm `mc80emu`) | EGOS, BSYS |
+| **EAW P8000** (8- und 16-Bit-Teil, Winchester, auch **P8000 Compact**) | UDOS, OS/M, WEGA 3.0/3.1 (UNIX) |
 
-Dazu steckbare Optionen wie RAM-Floppy, Lochstreifen und Kassette, serielle Schnittstellen nach außen
-(Telnet, RFC 2217, Datei) und echte Disketten über einen
-[Greaseweazle](https://github.com/keirf/greaseweazle)-Adapter.
+Dazu steckbare Optionen — **Kassette K5020/K5200**, RAM-Floppy, Lochstreifen, K3521-RAM, beim
+P8000 eine **Uhrenkarte** —, serielle Schnittstellen nach außen (Telnet, RFC 2217, Datei) und
+echte Disketten über einen [Greaseweazle](https://github.com/keirf/greaseweazle)-Adapter.
+Auf den Beispieldisketten liegt für die CP/M-Rechner auch **Kermit-80** für den
+Dateiaustausch über die serielle Schnittstelle.
 
 ## k1520DiskTool — Dateien zwischen PC und Diskette
 
@@ -40,8 +42,11 @@ Ein eigenes Programm mit Oberfläche und Kommandozeile, das Dateien von Diskette
 holt und zurückschreibt, ohne dass der Emulator laufen muss — praktisch, um Quelltexte am
 PC zu bearbeiten und dann im Emulator zu übersetzen, oder um eine Diskette zu sichern.
 
-- Dateisysteme **CP/A, SCPX, UDOS, UDOS 1715/NDOS, SCP1700** (A7100) und **WEGA**, in den
-  Abbildformaten `.img`, `.hfe` und `.dmk`; Geometrie und Dateisystem erkennt es selbst.
+- Dateisysteme **CP/A, SCPX, UDOS, UDOS 1715/NDOS, SCP1700** (A7100), **OS/M**, **BCU 880**,
+  **WEGA** und **MUTOS 8000/1700** sowie **tar-Disketten** (auch mehrteilige Sätze) und
+  P8000-Plattenabbilder; Geometrie und Dateisystem erkennt es selbst.
+- Abbildformate `.img`, `.hfe`, `.dmk` sowie **CopyQM (`.cqm`), TeleDisk (`.td0`) und
+  ImageDisk (`.imd`)**; Dateien lassen sich per Ziehen und Ablegen übernehmen.
 - Auflisten, herausholen, einfügen, löschen, leere oder bootfähige Disketten anlegen.
 - **Diskeditor** bis hinunter auf den einzelnen Sektor, **Dateisystemprüfung** mit
   Reparatur und **Rettung gelöschter Dateien**.
@@ -66,13 +71,14 @@ Z80-Programme.
 ## Die Programme und ihre Handbücher
 
 - **Emulator** — je Rechner ein eigenes Programm (`a5120emu`, `k8915emu`, `prg710emu`,
-  `pc1715emu`, `p8000emu`) mit gemeinsamer Oberfläche: Bildröhre, Laufwerke,
+  `pc1715emu`, `p8000emu`, `mc80emu`) mit gemeinsamer Oberfläche: Bildröhre, Laufwerke,
   Bildschirmtastatur.
   **[Handbuch des Emulators](app/help/handbuch.md)** (auch im Programm unter *Hilfe*)
 - **k1520DiskTool** —
   **[Handbuch des DiskTools](app/disktool/help/handbuch.md)** ·
   [Kommandozeile](tools/k1520disktool.md)
-- **K1520 Kermit** — Dateiaustausch mit der WEGA des P8000 (oder jedem Kermit) über Telnet/RFC 2217 —
+- **K1520 Kermit** — Dateiaustausch mit der WEGA des P8000 (oder jedem Kermit) über Telnet/RFC 2217,
+  als Client und als Server, auch mit Anmeldung —
   **[Handbuch](app/kermittool/help/handbuch.md)** (mit der Einrichtung unter WEGA) ·
   [Kommandozeile](tools/k1520kermit.md)
 - **Debugger `k1520dbg`** —
@@ -93,7 +99,7 @@ python3 -m pip install -r requirements.txt -r requirements-dev.txt
 tools/dev.sh build           # C++-Kern bauen
 tools/dev.sh test            # Regressionsrunde
 bash run_a5120emu.sh         # bzw. run_k8915emu.sh, run_prg710emu.sh, run_pc1715emu.sh,
-                             #      run_p8000emu.sh, run_disktool.sh, run_kermit.sh
+                             #      run_p8000emu.sh, run_mc80emu.sh, run_disktool.sh, run_kermit.sh
 ```
 
 Voraussetzungen: C++17-Compiler, CMake ≥ 3.16, Python ≥ 3.8; gebaut und geprüft auf Linux
