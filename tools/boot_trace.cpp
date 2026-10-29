@@ -322,6 +322,7 @@ int main(int argc, char** argv) {
     const char* laderom_opt = nullptr;        // --laderom v06|v09_1|v09_2 (AP A7)
     const char* format_opt  = nullptr;        // --format NAME: Katalogformat fuer .img (AP A7)
     const char* tastatur_opt = nullptr;       // --tastatur k7636|k7637 (AP A7)
+    int         bedien_opt = 0;               // --bedienelement 0..6: Sicherheitsstecker der K7637 (AP S3b)
     const char* ram_opt = nullptr;            // --ram k3526|k3525_1|k3525_2|k3525_4 (Entwurf 33 N4)
     const char* bildschirm_opt = nullptr;     // --bildschirm k7024|k7023|beide
     const char* schalter_opt = nullptr;       // --schalter k7024|k7023: Anfangsstellung bei beide
@@ -463,6 +464,7 @@ int main(int argc, char** argv) {
         else if (!strcmp(argv[i], "--laderom") && i+1 < argc) { laderom_opt = argv[++i]; nur_a5120.push_back("--laderom"); }
         else if (!strcmp(argv[i], "--format") && i+1 < argc) { format_opt = argv[++i]; nur_a5120.push_back("--format"); }
         else if (!strcmp(argv[i], "--tastatur") && i+1 < argc) { tastatur_opt = argv[++i]; nur_a5120.push_back("--tastatur"); }
+        else if (!strcmp(argv[i], "--bedienelement") && i+1 < argc) { bedien_opt = atoi(argv[++i]); nur_a5120.push_back("--bedienelement"); }
         else if (!strcmp(argv[i], "--ram") && i+1 < argc) { ram_opt = argv[++i]; nur_a5120.push_back("--ram"); }
         else if (!strcmp(argv[i], "--bildschirm") && i+1 < argc) { bildschirm_opt = argv[++i]; nur_a5120.push_back("--bildschirm"); }
         else if (!strcmp(argv[i], "--schalter") && i+1 < argc) { schalter_opt = argv[++i]; nur_a5120.push_back("--schalter"); }
@@ -680,6 +682,7 @@ int main(int argc, char** argv) {
       if (!dbgm::steckeRaf(machine, raf_opt, err)) { fprintf(stderr, "--raf: %s\n", err.c_str()); return 2; }
       if (!dbgm::steckeK6022(machine, ptape_opt, err)) { fprintf(stderr, "--ptape: %s\n", err.c_str()); return 2; }
       if (!dbgm::steckeK5020(machine, tape_opt, tape1_opt, tape2_opt, err)) { fprintf(stderr, "--tape: %s\n", err.c_str()); return 2; } }
+    if (bedien_opt && !machine.setBedienelement(bedien_opt)) { fprintf(stderr, "--bedienelement: 0..6, nur mit K7637\n"); return 2; }
     machine.powerOn();
 
     // ── A5120.16 (S5): EM-Transaktionen (--em) und U8001-Befehle (--cpu u8000) ──

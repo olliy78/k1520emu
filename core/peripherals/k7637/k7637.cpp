@@ -139,6 +139,22 @@ int K7637::fallingEdges(uint8_t byte) {
     return edges;
 }
 
+void K7637::sendSlCodes(uint8_t maske) {
+    for (int i = 0; i < 4; ++i)
+        if ((maske >> i) & 1 && SL_CODE[i] != 0x00) sendByte(SL_CODE[i]);
+}
+
+void K7637::setBedienelement(int kennung, bool geraet_passt) {
+    if (kennung < 0 || kennung > 6) kennung = 0;
+    stopfen_kennung_      = kennung;
+    stopfen_geraet_passt_ = geraet_passt;
+    const uint8_t neu = slMaskeFuer(kennung, geraet_passt);
+    // Trigger: bei jeder Pegelaenderung (Stecken wie Ziehen) der Code der Leitung.
+    // Vor dem Einschalten (Kaltstart-Vorgabe) nur merken: service() meldet dann TYP + Codes.
+    if (!einschalt_offen_) sendSlCodes(static_cast<uint8_t>(neu ^ sl_low_));
+    sl_low_ = neu;
+}
+
 void K7637::applyCommandByte(uint8_t byte) {
     // Der Zaehler D7:1 ist auf 15 voreingestellt und zaehlt je Flanke herunter;
     // sein (negierter) Stand ist das Kommando.  Ueber zwei Bytes hinweg zaehlt er
@@ -156,6 +172,9 @@ void K7637::applyCommandByte(uint8_t byte) {
             // (die Betriebsanzeige E54 haengt an der Spannung, nicht am Kommando).
             led_mask_         = 0;
             beep_until_cycle_ = 0;
+            // Nach TYP (schon in processTxCommands() gesendet) die Codes der
+            // Low-Leitungen der Bediensicherung.
+            sendSlCodes(sl_low_);
             break;
 
         case 13:                          // 20H      Fehleranzeige blinken an/aus
@@ -302,6 +321,12 @@ void K7637::sendByteAt(uint8_t byte, uint64_t at_cycle) {
 bool K7637::service(uint64_t now_cycles) {
     cur_cycle_ = now_cycles;
     bool touched = false;
+    // Einschalten: mit gestecktem Bedienelement meldet sich die Tastatur von
+    // selbst mit TYP und den SL-Codes.  Ohne Element (Vorgabe) bleibt es still.
+    if (einschalt_offen_) {
+        einschalt_offen_ = false;
+        if (sl_low_) { sendByte(TYPE_CODE); sendSlCodes(sl_low_); }
+    }
     // Dauerfunktion: solange die Taste gehalten ist, alle 100 ms erneut senden.
     // Nur Dauerfunktionscodes setzen repeat_aktiv_ (s. keyPress).
     if (repeat_aktiv_) {

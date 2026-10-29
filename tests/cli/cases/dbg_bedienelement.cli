@@ -1,0 +1,19 @@
+# k1520dbg --bedienelement (AP S3b): Sicherheitsstecker der K7637; `kbd` zeigt den Stand,
+# `kbd stecker N` steckt/zieht zur Laufzeit.
+tool:    k1520dbg
+disk:    cpa_cpa780_k5601_noclock.hfe
+run:     --bedienelement 2 %DISK%
+stdin:
+  kbd
+  kbd stecker 0
+  kbd
+  kbd stecker 6 falsch
+  kbd
+  kbd stecker 9
+  q
+expect:  Bedienelement: 2
+expect:  Bedienelement 0 gezogen
+expect:  Bedienelement: 0
+expect:  Bedienelement: 6 (Geraetekennung falsch)
+expect:  ? kbd stecker <0..6> [falsch]
+forbid:  unknown command

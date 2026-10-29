@@ -982,3 +982,104 @@ TEST(K7637, SerializeRoundTrip) {
     ASSERT_TRUE(sio2.ioRead(1) & 0x01);
     EXPECT_EQ(sio2.ioRead(0), 0x42);       // the restored byte arrives
 }
+
+// ─── Bediensicherung (Sicherheitsstecker, AP S3b) ───────────────────────────
+
+namespace {
+void sendeKommando(K7637& kb, Z80SIO& sio, uint8_t b) { sio.ioWrite(0, b); kb.processTxCommands(); }
+std::vector<uint8_t> erwartet(std::initializer_list<uint8_t> l) { return std::vector<uint8_t>(l); }
+// Codes der Low-Leitungen fuer eine Kennung (Stopfen n -> SLn), aus der ROM-Tabelle A9 AA AB.
+std::vector<uint8_t> slCodes(int kennung) {
+    std::vector<uint8_t> v;
+    for (int i = 0; i < 3; ++i) if ((kennung >> i) & 1) v.push_back(K7637::SL_CODE[i]);
+    return v;
+}
+}  // namespace
+
+/// @test K7637Bediensicherung/CodesStehenImRomAbzug
+/// @par Pass criterion  A9H AAH ABH 00H wie in CTAB1 (648H) und CTAB2 (758H) des ROM-Abzugs.
+TEST(K7637Bediensicherung, CodesStehenImRomAbzug) {
+    EXPECT_EQ(K7637::SL_CODE[0], 0xA9);
+    EXPECT_EQ(K7637::SL_CODE[1], 0xAA);
+    EXPECT_EQ(K7637::SL_CODE[2], 0xAB);
+    EXPECT_EQ(K7637::SL_CODE[3], 0x00);
+}
+
+/// @test K7637Bediensicherung/VorgabeKeinsLiefertNurTyp
+/// @par Pass criterion  Kommando 00H ergibt genau TYP (wie bisher), kein Zusatzbyte, nichts beim Einschalten.
+TEST(K7637Bediensicherung, VorgabeKeinsLiefertNurTyp) {
+    Z80SIO sio; sio.setIEI(true);
+    K7637 kb; kb.connect(sio, 0);
+    EXPECT_EQ(kb.bedienelement(), 0);
+    EXPECT_TRUE(drainRx(kb, sio).empty());
+    sendeKommando(kb, sio, 0x00);
+    EXPECT_EQ(drainRx(kb, sio), erwartet({0x80}));
+}
+
+/// @test K7637Bediensicherung/TypUndCodesNachKommando00JeKennung
+/// @par Pass criterion  Je Kennung 0..6: nach 00H kommt TYP und dann die Codes der Low-Leitungen SL1..SL3.
+TEST(K7637Bediensicherung, TypUndCodesNachKommando00JeKennung) {
+    for (int k = 0; k <= 6; ++k) {
+        Z80SIO sio; sio.setIEI(true);
+        K7637 kb; kb.connect(sio, 0);
+        kb.setBedienelement(k);
+        deliver(kb);                                // erster service(): Einschaltmeldung einreihen
+        drainRx(kb, sio);                           // ... zustellen und verwerfen
+        sendeKommando(kb, sio, 0x00);
+        std::vector<uint8_t> soll{0x80};
+        for (uint8_t c : slCodes(k)) soll.push_back(c);
+        EXPECT_EQ(drainRx(kb, sio), soll) << "Kennung " << k;
+    }
+}
+
+/// @test K7637Bediensicherung/EinschaltenMeldetTypUndCodes
+/// @par Pass criterion  Kaltstart mit Element 3 (Stopfen 1+2): TYP A9 AA ohne jedes Kommando.
+TEST(K7637Bediensicherung, EinschaltenMeldetTypUndCodes) {
+    Z80SIO sio; sio.setIEI(true);
+    K7637 kb; kb.connect(sio, 0);
+    kb.setBedienelement(3);
+    deliver(kb);                                    // erster service(): Meldung einreihen
+    EXPECT_EQ(drainRx(kb, sio), erwartet({0x80, 0xA9, 0xAA}));
+}
+
+/// @test K7637Bediensicherung/SteckenUndZiehenErzeugtCodes
+/// @par Pass criterion  Stecken 1 -> A9; Wechsel auf 2 -> A9 (SL1 steigt) und AA (SL2 faellt); Ziehen -> AA.
+TEST(K7637Bediensicherung, SteckenUndZiehenErzeugtCodes) {
+    Z80SIO sio; sio.setIEI(true);
+    K7637 kb; kb.connect(sio, 0);
+    drainRx(kb, sio);                               // Betrieb (Einschalten ohne Element: still)
+    kb.setBedienelement(1);
+    EXPECT_EQ(drainRx(kb, sio), erwartet({0xA9}));
+    kb.setBedienelement(2);
+    EXPECT_EQ(drainRx(kb, sio), erwartet({0xA9, 0xAA}));
+    kb.setBedienelement(0);
+    EXPECT_EQ(drainRx(kb, sio), erwartet({0xAA}));
+    kb.setBedienelement(0);                         // keine Aenderung, keine Codes
+    EXPECT_TRUE(drainRx(kb, sio).empty());
+}
+
+/// @test K7637Bediensicherung/SteckenWartetAufDieSerielleStrecke
+/// @par Pass criterion  Die Codes kommen im Abstand einer Bytezeit, nicht sofort.
+TEST(K7637Bediensicherung, SteckenWartetAufDieSerielleStrecke) {
+    Z80SIO sio; sio.setIEI(true);
+    K7637 kb; kb.connect(sio, 0);
+    deliver(kb);
+    kb.setBedienelement(3);
+    kb.service(g_clk + 100);                        // < eine Bytezeit (2604)
+    EXPECT_FALSE(sio.ioRead(1) & 0x01);
+    kb.service(g_clk + 2700);
+    EXPECT_TRUE(sio.ioRead(1) & 0x01);
+}
+
+/// @test K7637Bediensicherung/FalscheGeraetekennungLiefertNichts
+/// @par Pass criterion  Mit geraet_passt=false bleiben alle SL High: nach 00H nur TYP, kein Code beim Stecken.
+TEST(K7637Bediensicherung, FalscheGeraetekennungLiefertNichts) {
+    Z80SIO sio; sio.setIEI(true);
+    K7637 kb; kb.connect(sio, 0);
+    deliver(kb);
+    kb.setBedienelement(6, false);
+    EXPECT_TRUE(drainRx(kb, sio).empty());
+    sendeKommando(kb, sio, 0x00);
+    EXPECT_EQ(drainRx(kb, sio), erwartet({0x80}));
+    EXPECT_EQ(kb.slLowMaske(), 0);
+}

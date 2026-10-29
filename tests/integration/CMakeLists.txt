@@ -110,6 +110,10 @@ k1520_add_test(em16_abl SRC test_em16_abl.cpp LIBS ${_libs} k1520_fs
 k1520_add_test(kbd_nach_reset SRC test_kbd_nach_reset.cpp LIBS ${_libs}
                               LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 120)
 
+# Bedienelement (Sicherheitsstecker) der K7637 (AP S3b): Maschine + CP/A bootet mit Element.
+k1520_add_test(bediensicherung SRC test_bediensicherung.cpp LIBS ${_libs}
+                               LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 120)
+
 # PRG 710 / 710-1 (doc/design/20_prg710.md AP-P1c): beide Varianten bauen, Netz-Ein + Takte,
 # Verdrahtung der Speicherverwaltung, Marken-FF-Polaritaet.  Kein Diskettenlauf.
 k1520_add_test(prg710_maschine SRC test_prg710_maschine.cpp

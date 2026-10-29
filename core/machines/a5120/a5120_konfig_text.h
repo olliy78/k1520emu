@@ -25,6 +25,8 @@
  *   aup_alpha   = led | ohne | mit   Annahme A3: wer die K7633-Tabelle waehlt (nur mit aup=1)
  *   aup_sonder  = 0 | 1           AUP-Sonderschnittstelle: CTC B0H-B3H + SIO B4H-B7H, Kanal B nach aussen
  *                                 (vierte Schnittstelle des SerialHub), nur mit aup=1 (Entwurf 33 N10d)
+ *   bedienelement = 0 | 1..6    Bedienelement (Sicherheitsstecker) der K7637, 0 = keins (Vorgabe); AP S3b
+ *   bedienelement_geraet = passt | falsch   Geraetekennung des Elements (falsch: alle SL High)
  *   (die Ablagedatei der K3521 steht NICHT im Text — Werte werden kleingeschrieben und
  *    Leerraum entfernt; Pfad ueber k1520_k3521_datei bzw. --k3521-datei)
  */
@@ -134,9 +136,16 @@ inline bool wert(A5120Machine::Config& cfg, const std::string& schluessel_in,
         if      (v == "1" || v == "ja")   cfg.aup_sonder = true;
         else if (v == "0" || v == "nein") cfg.aup_sonder = false;
         else { err = "aup_sonder: unbekannt '" + v + "' (0|1)"; return false; }
+    } else if (k == "bedienelement") {
+        if (v.size() == 1 && v[0] >= '0' && v[0] <= '6') cfg.bedienelement = v[0] - '0';
+        else { err = "bedienelement: unbekannt '" + v + "' (0..6)"; return false; }
+    } else if (k == "bedienelement_geraet") {
+        if      (v == "passt")  cfg.bedienelement_geraet_passt = true;
+        else if (v == "falsch") cfg.bedienelement_geraet_passt = false;
+        else { err = "bedienelement_geraet: unbekannt '" + v + "' (passt|falsch)"; return false; }
     } else {
         err = "A5120-Konfiguration: unbekannter Schluessel '" + k +
-              "' (ausfuehrung|ram|bildschirm|schalter|tastatur|laderom|kassette|em|k3521|k3521_memdi|aup|aup_alpha|aup_sonder)";
+              "' (ausfuehrung|ram|bildschirm|schalter|tastatur|laderom|kassette|em|k3521|k3521_memdi|aup|aup_alpha|aup_sonder|bedienelement|bedienelement_geraet)";
         return false;
     }
     return true;
@@ -158,6 +167,10 @@ inline bool pruefe(const A5120Machine::Config& cfg, bool schalter_gesetzt, std::
     }
     if (!cfg.aup && cfg.aup_sonder) {
         err = "aup_sonder: nur mit aup=1";
+        return false;
+    }
+    if (cfg.bedienelement != 0 && cfg.tastatur == A5120Machine::Config::Tastatur::K7636) {
+        err = "bedienelement: nur an der K7637 (nicht mit tastatur=k7636)";
         return false;
     }
     return true;

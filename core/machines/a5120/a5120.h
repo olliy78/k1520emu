@@ -109,6 +109,13 @@ public:
         /// nachtraegliche Installation ueber @ref installK5020 bleibt davon unberuehrt.
         bool kassette = false;
 
+        /// Bedienelement (Sicherheitsstecker) der K7637, AP S3b: 0 = keins (Vorgabe, CP/A/SCPX/UDOS
+        /// unveraendert), 1..6 = Bedienerkennung (1 = Chefschalter … 6 = 5. Bedienebene).
+        /// `bedienelement_geraet_passt = false`: Geraetekennung falsch, alle SL bleiben High.
+        /// Nur an der K7637 wirksam.  Zur Laufzeit: @ref setBedienelement.
+        int  bedienelement = 0;
+        bool bedienelement_geraet_passt = true;
+
         /**
          * @brief Gestecktes Lade-ROM der K2526 (doc/a5120_alt/laderom.md, AP A7).
          *
@@ -361,6 +368,12 @@ public:
     // Keyboard (enqueued thread-safely, consumed in run())
     void keyPress(uint32_t qt_keycode, bool shift, bool ctrl) override;
     void keyRelease(uint32_t qt_keycode) override;
+    /// Bedienelement der K7637 stecken/ziehen (0 = keins, 1..6); thread-sicher (wirkt am Anfang
+    /// des naechsten run()).  false, wenn die Maschine keine K7637 hat (K7636) oder @p kennung
+    /// ausserhalb 0..6 liegt.
+    bool setBedienelement(int kennung, bool geraet_passt = true);
+    int  bedienelement() const { return bedien_stand_.load(std::memory_order_relaxed) & 0xFF; }
+    bool bedienelementGeraetPasst() const { return (bedien_stand_.load(std::memory_order_relaxed) & 0x100) == 0; }
     void setKeyRepeatRealtime(bool an) override {
         kbd_.setRepeatRealtime(an);
         if (k7636_) k7636_->setRepeatRealtime(an);
@@ -714,6 +727,10 @@ private:
     std::atomic<bool>  stop_{false};
 
     mutable std::mutex key_mutex_;
+    // Bedienelement: bedien_stand_ = Kennung | 0x100 (Geraet passt NICHT); bedien_neu_ = -1 oder
+    // ein noch nicht an die K7637 uebergebener Stand (run() uebernimmt ihn).
+    std::atomic<int> bedien_stand_{0};
+    std::atomic<int> bedien_neu_{-1};
     std::deque<KeyEvent> key_queue_;
 
     int boot_trace_count_ = 0;

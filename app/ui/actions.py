@@ -67,6 +67,13 @@ _SPEC: List[Tuple] = [
      "aus, Selbsttest von vorn.  Unter SCPX springt die CPU ins RAM bei 0066H "
      "(wie am Gerät, meist ein Absturz).  P8000: NMI-Taste (U880 bzw. — bei "
      "angeschalteter 16-Bit-Karte — U8001, dort „Press NMI“)", "_on_nmi", False),
+    # Bedienelement (Sicherheitsstecker) der K7637 stecken/ziehen (nur A5120-Profil, AP S3b):
+    # rastend, "an" = gesteckt.  Wirkt nur, wenn unter Einstellungen eine Bedienerkennung
+    # gewaehlt ist.  KEIN Kuerzel (die Kuerzeltabelle des Handbuchs ist ein Vertrag).
+    ("bedienelement", "&Bedienelement gesteckt", None, None,
+     "Das Bedienelement (Sicherheitsstecker) der K7637 stecken oder ziehen — die Tastatur meldet "
+     "den Wechsel als Code.  Die Kennung steht unter Einstellungen ▸ Allgemein ▸ Bedienelement",
+     "_on_bedienelement", True),
     # Zwischenstand der Maschine (nur P8000, P8KS).  KEIN Kuerzel (die Kuerzeltabelle des
     # Handbuchs ist ein Vertrag); zuverlaessig nur am Prompt, siehe Handbuch.
     ("stand_speichern", "Zwischenstand &sichern…", "config-save", None,
@@ -192,6 +199,7 @@ KURZ = {
     "power": "Power",
     "reset": "Reset",
     "nmi": "NMI",
+    "bedienelement": "Stecker",
     "k8915emu": "K8915",
     "a5120emu": "A5120",
     "prg710emu": "PRG710",
@@ -229,6 +237,7 @@ POWER_TEXT = {True: "Rechner &ausschalten", False: "Rechner &einschalten"}
 #: `app/profil.py`, die sie haben).  Alle uebrigen haben alle.
 NUR_FUER = {
     "nmi": ("k8915", "p8000"),           # NMI-Taster der Frontplatte
+    "bedienelement": ("a5120",),         # Sicherheitsstecker der K7637 (AP S3b)
     "stand_speichern": ("p8000",),       # Zwischenstand (P8KS)
     "stand_laden": ("p8000",),
     "verbindung": ("p8000",),
@@ -267,7 +276,7 @@ REIHENFOLGE: List = [
     None,
     "einlegen", "auswerfen",
     None,
-    "stand_speichern", "stand_laden", "verbindung", "text_kopieren", "speicherabzug_laden", "pcmc",
+    "bedienelement", "stand_speichern", "stand_laden", "verbindung", "text_kopieren", "speicherabzug_laden", "pcmc",
     None,
     "dock_drives", "dock_settings", "dock_screen", "dock_keyboard", "dock_eprom",
     None,

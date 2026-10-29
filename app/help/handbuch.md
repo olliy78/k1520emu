@@ -717,6 +717,19 @@ Die Bildschirmtastatur wechselt mit dieser Option, nicht mit dem Modell. Zur K76
   nicht ab — es erscheint als erstes Zeichen der ersten Eingabezeile. Erst eine
   leere Zeile eingeben.
 
+### Bedienelement
+
+Das *Bedienelement* ist der Sicherheitsstecker der Bediensicherung der K7637 (acht
+Codierstopfen). Stopfen 1–3 geben die **Bedienerkennung** (01 = Chefschalter, 02 =
+1. Bedienebene, 03 = 1+2, 04 = Stopfen 3, 05 = 1+3, 06 = 2+3 = 5. Bedienebene); die
+Stopfen 4–8 (Gerätekennung) gelten als passend. Die Tastatur meldet nach dem
+Typzeichen (80H) die Codes der gesteckten Stopfen (A9H, AAH, ABH) und im Betrieb
+jeden Wechsel (Stecken wie Ziehen). Vorgabe ist **keins** — CP/A, SCPX und UDOS
+bemerken dann nichts. Die Wahl gilt nur mit der K7637 und erzeugt die Maschine neu.
+*Maschine ▸ Bedienelement gesteckt* zieht und steckt das gewählte Element im Betrieb
+(kein Tastenkürzel); die Aktion ist erst mit einer gewählten Kennung wählbar.
+Gespeichert wird die Wahl als `general.bedienelement`.
+
 ### RAM
 
 *RAM* wählt die Speicherkarten: **1x K3525 16KB**, **2x K3525 32KB**, **4x K3525
