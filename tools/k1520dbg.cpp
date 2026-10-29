@@ -230,7 +230,7 @@ int main(int argc, char** argv){
     const char* laderom_opt = nullptr; // --laderom v06|v09_1|v09_2: Lade-ROM der K2526 (AP A7)
     const char* format_opt = nullptr;  // --format NAME: Katalogformat fuer .img (zuerst versucht)
     const char* tastatur_opt = nullptr; // --tastatur k7636|k7637: Tastatur (A5120, AP A7)
-    int bedien_opt = 0;                 // --bedienelement 0..6: Sicherheitsstecker der K7637 (AP S3b)
+    int bedien_opt = 0;                 // --sicherheitsstecker 0..6: Sicherheitsstecker der K7637 (AP S3b)
     const char* ram_opt = nullptr;        // --ram k3526|k3525_1|k3525_2|k3525_4 (Entwurf 33 N4)
     const char* bildschirm_opt = nullptr; // --bildschirm k7024|k7023|beide
     const char* schalter_opt = nullptr;   // --schalter k7024|k7023: Anfangsstellung bei beide
@@ -274,7 +274,7 @@ int main(int argc, char** argv){
         else if (!strcmp(argv[i],"--laderom") && i+1<argc) laderom_opt=argv[++i];
         else if (!strcmp(argv[i],"--format") && i+1<argc) format_opt=argv[++i];
         else if (!strcmp(argv[i],"--tastatur") && i+1<argc) tastatur_opt=argv[++i];
-        else if (!strcmp(argv[i],"--bedienelement") && i+1<argc) bedien_opt=atoi(argv[++i]);
+        else if (!strcmp(argv[i],"--sicherheitsstecker") && i+1<argc) bedien_opt=atoi(argv[++i]);
         else if (!strcmp(argv[i],"--ram") && i+1<argc) ram_opt=argv[++i];
         else if (!strcmp(argv[i],"--bildschirm") && i+1<argc) bildschirm_opt=argv[++i];
         else if (!strcmp(argv[i],"--schalter") && i+1<argc) schalter_opt=argv[++i];
@@ -429,7 +429,7 @@ int main(int argc, char** argv){
     }
     if (bedien_opt){
         auto* a5 = dynamic_cast<A5120Machine*>(&m.base());
-        if (!a5 || !a5->setBedienelement(bedien_opt)){ fprintf(stderr,"--bedienelement: 0..6, nur am A5120 mit K7637\n"); return 2; }
+        if (!a5 || !a5->setSicherheitsstecker(bedien_opt)){ fprintf(stderr,"--sicherheitsstecker: 0..6, nur am A5120 mit K7637\n"); return 2; }
     }
     { std::string err;   // ebenfalls vor dem ersten Lauf
       if (!dbgm::steckeK6022(m.base(), ptape_opt, err)){ fprintf(stderr,"--ptape: %s\n",err.c_str()); return 2; }
@@ -4530,16 +4530,16 @@ int main(int argc, char** argv){
                 }
             }
         }
-        else if (cmd=="kbd"){   // K7637: Bedienelement (Sicherheitsstecker) stecken/ziehen (AP S3b)
+        else if (cmd=="kbd"){   // K7637: Sicherheitsstecker (Sicherheitsstecker) stecken/ziehen (AP S3b)
             A5120Machine* a5 = m.a5120();
             if (!a5 || a5->k7636()) fprintf(stderr,"  kbd: nur am A5120 mit K7637\n");
             else if (t.size()>=3 && t[1]=="stecker"){
                 const int n = atoi(t[2].c_str());
-                if (!a5->setBedienelement(n, !(t.size()>=4 && t[3]=="falsch"))) fprintf(stderr,"  ? kbd stecker <0..6> [falsch]\n");
-                else fprintf(stderr,"  Bedienelement %d %s (wirkt beim naechsten Lauf)\n",n,n?"gesteckt":"gezogen");
+                if (!a5->setSicherheitsstecker(n, !(t.size()>=4 && t[3]=="falsch"))) fprintf(stderr,"  ? kbd stecker <0..6> [falsch]\n");
+                else fprintf(stderr,"  Sicherheitsstecker %d %s (wirkt beim naechsten Lauf)\n",n,n?"gesteckt":"gezogen");
             }
-            else fprintf(stderr,"  Bedienelement: %d%s   (kbd stecker <0..6> [falsch]; 0 = ziehen)\n",
-                         a5->bedienelement(), a5->bedienelementGeraetPasst()?"":" (Geraetekennung falsch)");
+            else fprintf(stderr,"  Sicherheitsstecker: %d%s   (kbd stecker <0..6> [falsch]; 0 = ziehen)\n",
+                         a5->sicherheitsstecker(), a5->sicherheitssteckerGeraetPasst()?"":" (Geraetekennung falsch)");
         }
         else if (cmd=="tape"){   // Kassette K5020/K5200 (--tape): Status, Blockliste, Blockinhalt
             K5020* kk = m.base().k5020();

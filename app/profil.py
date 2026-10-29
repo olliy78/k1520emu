@@ -275,6 +275,9 @@ class Programmprofil:
         aus = self.hardware_standard(modell, bauart)
         for k, _b, _t, werte, _m in self.hardware:
             v = str(daten.get(k, "")).strip().lower()
+            if k == "sicherheitsstecker" and k not in daten:
+                # Rueckfall: der Schluessel hiess auf dem Entwicklungszweig kurz "bedienelement".
+                v = str(daten.get("bedienelement", "")).strip().lower()
             for w, _a in werte:        # Gross-/Kleinschreibung egal ("1M@0"), Wert wie im Profil
                 if v == w.lower():
                     aus[k] = w
@@ -296,8 +299,8 @@ class Programmprofil:
                     # Der Versatz wirkt nur mit gesteckter Karte; der gemerkte Wert bleibt.
                     hw = hardware if hardware is not None else self.hardware_standard(modell)
                     return hw.get("rtc", "keine") != "keine"
-                if k == "bedienelement" and self.modell_vorgaben:
-                    # Nur die K7637 hat ein Bedienelement (die K7636 meldet kein TYP).
+                if k == "sicherheitsstecker" and self.modell_vorgaben:
+                    # Nur die K7637 hat einen Sicherheitsstecker (die K7636 meldet kein TYP).
                     hw = hardware if hardware is not None else self.hardware_standard(modell)
                     return hw.get("tastatur") == "k7637"
                 if k == "erweiterungsmodul" and self.modell_vorgaben:
@@ -340,9 +343,9 @@ class Programmprofil:
                 "laderom": hardware["laderom"],
                 "em": self.modell_em(modell, hardware) or "none",
             }
-            # Bedienelement der K7637 (AP S3b): nur wenn gesteckt UND die K7637 da ist.
-            if hardware.get("bedienelement", "0") != "0" and hardware["tastatur"] == "k7637":
-                konfig["bedienelement"] = hardware["bedienelement"]
+            # Sicherheitsstecker der K7637 (AP S3b): nur wenn gesteckt UND die K7637 da ist.
+            if hardware.get("sicherheitsstecker", "0") != "0" and hardware["tastatur"] == "k7637":
+                konfig["sicherheitsstecker"] = hardware["sicherheitsstecker"]
             # Anfangsstellung des Schiebeschalters: nur mit zwei Karten (sonst Fehler im Kern).
             if hardware["bildschirm"] == "beide":
                 konfig["schalter"] = schalter if schalter in ("k7024", "k7023") else "k7024"
@@ -542,12 +545,12 @@ A5120 = Programmprofil(
         ("tastatur", "Tastatur:",
          "K7636 parallel am U-Bus der K2526, K7637 seriell am Kanal der K8025.",
          (("k7636", "K7636 (parallel)"), ("k7637", "K7637 (seriell)")), ()),
-        ("bedienelement", "Bedienelement:",
+        ("sicherheitsstecker", "Sicherheitsstecker:",
          "Sicherheitsstecker der K7637 (Bediensicherung, 8 Codierstopfen): Stopfen 1–3 sind die "
          "Bedienerkennung, die die Tastatur nach TYP und beim Stecken/Ziehen als Code meldet.  "
-         "Nur mit der K7637; ohne Element (Vorgabe) bleibt alles wie bisher.  "
-         "*Maschine ▸ Bedienelement gesteckt* zieht/steckt es im Betrieb.",
-         (("0", "keins"), ("1", "01 Chefschalter"), ("2", "02 1. Bedienebene"),
+         "Nur mit der K7637; ohne Stecker (Vorgabe) bleibt alles wie bisher.  "
+         "*Maschine ▸ Sicherheitsstecker gesteckt* zieht/steckt ihn im Betrieb.",
+         (("0", "keiner"), ("1", "01 Chefschalter"), ("2", "02 1. Bedienebene"),
           ("3", "03 (Stopfen 1+2)"), ("4", "04 (Stopfen 3)"), ("5", "05 (Stopfen 1+3)"),
           ("6", "06 5. Bedienebene")), ()),
         ("laderom", "Lade-ROM:",

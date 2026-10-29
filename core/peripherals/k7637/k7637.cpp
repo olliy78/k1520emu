@@ -144,7 +144,7 @@ void K7637::sendSlCodes(uint8_t maske) {
         if ((maske >> i) & 1 && SL_CODE[i] != 0x00) sendByte(SL_CODE[i]);
 }
 
-void K7637::setBedienelement(int kennung, bool geraet_passt) {
+void K7637::setSicherheitsstecker(int kennung, bool geraet_passt) {
     if (kennung < 0 || kennung > 6) kennung = 0;
     stopfen_kennung_      = kennung;
     stopfen_geraet_passt_ = geraet_passt;
@@ -321,7 +321,7 @@ void K7637::sendByteAt(uint8_t byte, uint64_t at_cycle) {
 bool K7637::service(uint64_t now_cycles) {
     cur_cycle_ = now_cycles;
     bool touched = false;
-    // Einschalten: mit gestecktem Bedienelement meldet sich die Tastatur von
+    // Einschalten: mit gestecktem Sicherheitsstecker meldet sich die Tastatur von
     // selbst mit TYP und den SL-Codes.  Ohne Element (Vorgabe) bleibt es still.
     if (einschalt_offen_) {
         einschalt_offen_ = false;

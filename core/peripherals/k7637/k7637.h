@@ -153,8 +153,8 @@ public:
      */
     static int fallingEdges(uint8_t byte);
 
-    // ── Bediensicherung (Sicherheitsstecker / Bedienelement, AP S3b) ───────
-    // Das Bedienelement hat 8 Codierstopfen.  Stopfen 1-3 = Bedienerkennung
+    // ── Bediensicherung (Sicherheitsstecker, Robotron: Bedienelement, AP S3b) ───────
+    // Der Sicherheitsstecker hat 8 Codierstopfen.  Stopfen 1-3 = Bedienerkennung
     // (binaer: 1 = Chefschalter, 2 = 1. Bedienebene, 3 = 1+2, 4 = Stopfen 3,
     // 5 = 1+3, 6 = 2+3 = 5. Bedienebene), Stopfen 4-8 = Geraetekennung (in der
     // Tastatur gegen Drahtbruecken geprueft; nur bei Uebereinstimmung erreichen
@@ -166,13 +166,13 @@ public:
     // 758H..75BH = A9H AAH ABH 00H (00H = keine Ausgabe).
     static constexpr uint8_t SL_CODE[4] = {0xA9, 0xAA, 0xAB, 0x00};
 
-    /// Bedienelement stecken: 0 = keins, 1..6 = Bedienerkennung.  Zur Laufzeit
+    /// Sicherheitsstecker stecken: 0 = keins, 1..6 = Bedienerkennung.  Zur Laufzeit
     /// aufgerufen erzeugt es die Codes der wechselnden Leitungen (serielle
     /// Taktung wie bei Tasten).  @p geraet_passt = false: Geraetekennung
     /// stimmt nicht, alle SL bleiben High.  Nur im Lauffaden aufrufen.
-    void setBedienelement(int kennung, bool geraet_passt = true);
-    int  bedienelement() const { return stopfen_kennung_; }
-    bool bedienelementGeraetPasst() const { return stopfen_geraet_passt_; }
+    void setSicherheitsstecker(int kennung, bool geraet_passt = true);
+    int  sicherheitsstecker() const { return stopfen_kennung_; }
+    bool sicherheitssteckerGeraetPasst() const { return stopfen_geraet_passt_; }
     /// Pegel der Sonderleitungen als Maske (Bit n = SLn+1 liegt Low).
     uint8_t slLowMaske() const { return sl_low_; }
 

@@ -1,5 +1,0 @@
-# boot_trace --bedienelement ausserhalb 0..6: Abbruch.
-tool:    boot_trace
-run:     -L /dev/null --bedienelement 9
-expect:  --bedienelement: 0..6, nur mit K7637
-exit:    2

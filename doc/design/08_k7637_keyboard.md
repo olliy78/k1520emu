@@ -640,13 +640,13 @@ derselben Funktion, die der Kern beim Tastendruck benutzt.
 
 ---
 
-## 7a. Bediensicherung (Sicherheitsstecker / Bedienelement, AP S3b, 2026-10-29)
+## 7a. Sicherheitsstecker (Bediensicherung, AP S3b, 2026-10-29)
 
-Das Bedienelement hat 8 Codierstopfen (Handbuchauszug `doc/sios/handbuch_auszug.md` §2): Stopfen 1–3 =
+Der Sicherheitsstecker (Robotron: Bedienelement, in der Bediensicherungsbaugruppe der Tastatur) hat 8 Codierstopfen (Handbuchauszug `doc/sios/handbuch_auszug.md` §2): Stopfen 1–3 =
 Bedienerkennung (binär: 1 = Chefschalter, 2 = 1. Bedienebene, 3 = 1+2, 4 = Stopfen 3, 5 = 1+3, 6 = 2+3 =
 5. Bedienebene), Stopfen 4–8 = Gerätekennung (in der Tastatur gegen Drahtbrücken geprüft; nur bei
 Übereinstimmung erreichen Stopfen 1–3 die Sonderleitungen SL1–SL3).  **Modellannahme:** Stopfen n legt SLn
-auf Low; ohne Element liegen alle SL High.  Verhalten der Tastatur:
+auf Low; ohne Stecker liegen alle SL High.  Verhalten der Tastatur:
 
 * nach dem Einschalten und nach jedem Kommando 00H (Software-RESET): TYP (80H), dann die Codes aller Low
   liegenden SL in der Reihenfolge SL1..SL4;
@@ -655,17 +655,17 @@ auf Low; ohne Element liegen alle SL High.  Verhalten der Tastatur:
   **SL1 = A9H, SL2 = AAH, SL3 = ABH, SL4 = 00H** (00H = keine Ausgabe).  Das Modell kennt den ROM nicht,
   `K7637::SL_CODE` trägt die Werte (Wächter `CodesStehenImRomAbzug`; Quelle im Kommentar).
 
-Umsetzung: `K7637::setBedienelement(kennung 0..6, geraet_passt)`; Stecken/Ziehen und die Meldungen laufen
+Umsetzung: `K7637::setSicherheitsstecker(kennung 0..6, geraet_passt)`; Stecken/Ziehen und die Meldungen laufen
 über dieselbe 9600-Bd-Strecke wie Tasten (`sendByte`, nicht vordrängeln).  `geraet_passt = false`: alle SL
-bleiben High.  **Vorgabe: keins** — dann bleibt die Bytefolge bitgleich wie vorher (nur TYP nach 00H, nichts
-beim Einschalten); CP/A bootet mit gestecktem Element unverändert (`K7637BediensicherungMaschine.CpaBootetMitElement`).
+bleiben High.  **Vorgabe: keiner** — dann bleibt die Bytefolge bitgleich wie vorher (nur TYP nach 00H, nichts
+beim Einschalten); CP/A bootet mit gestecktem Stecker unverändert (`K7637SicherheitssteckerMaschine.CpaBootetMitElement`).
 Der Zustand steht NICHT im Zwischenstand (Konfiguration, kein Laufzeitzustand der Tastatur).
-`A5120Machine::Config::bedienelement`/`bedienelement_geraet_passt` (Kaltstart), `setBedienelement` (thread-sicher,
-wirkt am Anfang des nächsten `run()`), Konfigurationstext `bedienelement=0..6;bedienelement_geraet=passt|falsch`,
-C-ABI `k1520_kbd_bedienelement_set/_get`, Python `K1520Emulator.set_bedienelement/bedienelement`,
-`boot_trace`/`k1520dbg --bedienelement N`, Debuggerbefehl `kbd stecker <0..6> [falsch]`, Oberfläche
-*Einstellungen ▸ Allgemein ▸ Bedienelement* (`general.bedienelement`) + Aktion *Maschine ▸ Bedienelement
-gesteckt*.  Nur an der K7637 (K7636: kein Element, mangels ROM-Abzug später).
+`A5120Machine::Config::sicherheitsstecker`/`sicherheitsstecker_geraet_passt` (Kaltstart), `setSicherheitsstecker` (thread-sicher,
+wirkt am Anfang des nächsten `run()`), Konfigurationstext `sicherheitsstecker=0..6;sicherheitsstecker_geraet=passt|falsch`,
+C-ABI `k1520_kbd_sicherheitsstecker_set/_get`, Python `K1520Emulator.set_sicherheitsstecker/sicherheitsstecker`,
+`boot_trace`/`k1520dbg --sicherheitsstecker N`, Debuggerbefehl `kbd stecker <0..6> [falsch]`, Oberfläche
+*Einstellungen ▸ Allgemein ▸ Sicherheitsstecker* (`general.sicherheitsstecker`) + Aktion *Maschine ▸ Sicherheitsstecker
+gesteckt*.  Nur an der K7637 (K7636: kein Stecker, mangels ROM-Abzug später).
 
 ---
 
@@ -675,7 +675,7 @@ gesteckt*.  Nur an der K7637 (K7636: kein Element, mangels ROM-Abzug später).
 |-----|----|
 | Tastencodes, Ctrl, ET1≠ENTER, Kursor, Wiederholung, LED-Kommandos, Byte-Laufzeit | `tests/unit/peripherals/test_k7637.cpp` |
 | Dauerfunktion nur für die ROM-Liste 650H, in Maschinenzeit — Oberfläche: Echtzeit (§2.2a) | `K7637.Dauerfunktion_*`, `KeyboardIntegration.HeldSpaceRepeatsHeldLetterDoesNot` |
-| Bediensicherung (§7a): TYP + SL-Codes je Kennung, Stecken/Ziehen, Gerätekennung, Vorgabe keins | `K7637Bediensicherung.*`, `K7637BediensicherungMaschine.*`, `cli_dbg_bedienelement`, `py_bedienelement` |
+| Bediensicherung (§7a): TYP + SL-Codes je Kennung, Stecken/Ziehen, Gerätekennung, Vorgabe keiner | `K7637Sicherheitsstecker.*`, `K7637SicherheitssteckerMaschine.*`, `cli_dbg_sicherheitsstecker`, `py_sicherheitsstecker` |
 | Rohcode-Weg (§5.2) | `K7637.RawCode_IsSentVerbatim`, `K7637.RawCode_IgnoresCtrl` |
 | Kommandodekodierung über Flankenzählung (§2.3) | `K7637.CommandDecoding_CountsFallingEdges`, `K7637.CommandDecoding_IgnoresTheByteValue`, `K7637.PreCommand_NeedsTheSecondByte` |
 | Anzeigen und Ton (§2.4) | `K7637.LedCommands_ToggleTheirDisplay`, `K7637.ErrorDisplay_TogglesAndBeepsWhenSwitchedOn`, `K7637.BeepCommand_RunsForAboutOneSecond`, `K7637.ResetCommand_ClearsAllDisplays`, `K7637.EveryCommandByteIsAcknowledged` |

@@ -46,7 +46,7 @@ Verbraucher der Ebene, die ich gefunden habe: `1DC6H` (1.1): bit1 (Chef) gesetzt
 = /SPS-ESR (Schutz aus); `1421H`: bit1 steuert die Eingabefeld-Aufbereitung ("_"-Marke).  Weitere Pruefungen der Ebenen 2..6
 (Programmierstatus fuer MEM/POU/PLO/LOD/NEW) habe ich **nicht** gefunden — vermutlich ueber andere Zeiger (IX/IY) oder Tabellen.
 
-## 4. Ohne Bedienelement
+## 4. Ohne Sicherheitsstecker
 
 Kein SL-Code kommt, 076BH und (00CBH) bit1..6 bleiben 0 (RAM-Vorbelegung, Loeschen bei Start [?]); es gibt **keine Pruefung auf
 Eintreffen** des Codes und keinen Timeout: das System laeuft in den Monitorstatus ohne Ebenen (passt zu Handbuch S. 40).  Der
