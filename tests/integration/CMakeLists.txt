@@ -294,6 +294,10 @@ k1520_add_test(boot_bcu SRC test_boot_bcu.cpp LIBS ${_libs}
                         LABELS "${_lbl}" DEFS LOG_LEVEL=2
                         "A5120_LIEFERDISKETTEN=\"${CMAKE_SOURCE_DIR}/disks\"" TIMEOUT 120)
 
+# SIOS 1526 (Entwurf 43, AP S3): Kaltstart bis zur Systemzeile; Waechter vorerst DISABLED_.
+k1520_add_test(sios_boot SRC test_sios_boot.cpp LIBS ${_libs}
+                         LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 300)
+
 # DiskTool fuer BCU 880 (doc/a5120_alt/bcu.md §11): Startdiskette „SYL auf Spur 1“ erkennen/bauen,
 # Arbeitsdiskette bauen und fuellen, beide im Geraet (Lade-ROM V0.6), SYSGEN im Emulator.
 k1520_add_test(disktool_bcu SRC test_disktool_bcu.cpp
