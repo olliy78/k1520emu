@@ -996,33 +996,33 @@ std::vector<uint8_t> slCodes(int kennung) {
 }
 }  // namespace
 
-/// @test K7637Bediensicherung/CodesStehenImRomAbzug
+/// @test K7637Sicherheitsstecker/CodesStehenImRomAbzug
 /// @par Pass criterion  A9H AAH ABH 00H wie in CTAB1 (648H) und CTAB2 (758H) des ROM-Abzugs.
-TEST(K7637Bediensicherung, CodesStehenImRomAbzug) {
+TEST(K7637Sicherheitsstecker, CodesStehenImRomAbzug) {
     EXPECT_EQ(K7637::SL_CODE[0], 0xA9);
     EXPECT_EQ(K7637::SL_CODE[1], 0xAA);
     EXPECT_EQ(K7637::SL_CODE[2], 0xAB);
     EXPECT_EQ(K7637::SL_CODE[3], 0x00);
 }
 
-/// @test K7637Bediensicherung/VorgabeKeinsLiefertNurTyp
+/// @test K7637Sicherheitsstecker/VorgabeKeinsLiefertNurTyp
 /// @par Pass criterion  Kommando 00H ergibt genau TYP (wie bisher), kein Zusatzbyte, nichts beim Einschalten.
-TEST(K7637Bediensicherung, VorgabeKeinsLiefertNurTyp) {
+TEST(K7637Sicherheitsstecker, VorgabeKeinsLiefertNurTyp) {
     Z80SIO sio; sio.setIEI(true);
     K7637 kb; kb.connect(sio, 0);
-    EXPECT_EQ(kb.bedienelement(), 0);
+    EXPECT_EQ(kb.sicherheitsstecker(), 0);
     EXPECT_TRUE(drainRx(kb, sio).empty());
     sendeKommando(kb, sio, 0x00);
     EXPECT_EQ(drainRx(kb, sio), erwartet({0x80}));
 }
 
-/// @test K7637Bediensicherung/TypUndCodesNachKommando00JeKennung
+/// @test K7637Sicherheitsstecker/TypUndCodesNachKommando00JeKennung
 /// @par Pass criterion  Je Kennung 0..6: nach 00H kommt TYP und dann die Codes der Low-Leitungen SL1..SL3.
-TEST(K7637Bediensicherung, TypUndCodesNachKommando00JeKennung) {
+TEST(K7637Sicherheitsstecker, TypUndCodesNachKommando00JeKennung) {
     for (int k = 0; k <= 6; ++k) {
         Z80SIO sio; sio.setIEI(true);
         K7637 kb; kb.connect(sio, 0);
-        kb.setBedienelement(k);
+        kb.setSicherheitsstecker(k);
         deliver(kb);                                // erster service(): Einschaltmeldung einreihen
         drainRx(kb, sio);                           // ... zustellen und verwerfen
         sendeKommando(kb, sio, 0x00);
@@ -1032,52 +1032,52 @@ TEST(K7637Bediensicherung, TypUndCodesNachKommando00JeKennung) {
     }
 }
 
-/// @test K7637Bediensicherung/EinschaltenMeldetTypUndCodes
+/// @test K7637Sicherheitsstecker/EinschaltenMeldetTypUndCodes
 /// @par Pass criterion  Kaltstart mit Element 3 (Stopfen 1+2): TYP A9 AA ohne jedes Kommando.
-TEST(K7637Bediensicherung, EinschaltenMeldetTypUndCodes) {
+TEST(K7637Sicherheitsstecker, EinschaltenMeldetTypUndCodes) {
     Z80SIO sio; sio.setIEI(true);
     K7637 kb; kb.connect(sio, 0);
-    kb.setBedienelement(3);
+    kb.setSicherheitsstecker(3);
     deliver(kb);                                    // erster service(): Meldung einreihen
     EXPECT_EQ(drainRx(kb, sio), erwartet({0x80, 0xA9, 0xAA}));
 }
 
-/// @test K7637Bediensicherung/SteckenUndZiehenErzeugtCodes
+/// @test K7637Sicherheitsstecker/SteckenUndZiehenErzeugtCodes
 /// @par Pass criterion  Stecken 1 -> A9; Wechsel auf 2 -> A9 (SL1 steigt) und AA (SL2 faellt); Ziehen -> AA.
-TEST(K7637Bediensicherung, SteckenUndZiehenErzeugtCodes) {
+TEST(K7637Sicherheitsstecker, SteckenUndZiehenErzeugtCodes) {
     Z80SIO sio; sio.setIEI(true);
     K7637 kb; kb.connect(sio, 0);
     drainRx(kb, sio);                               // Betrieb (Einschalten ohne Element: still)
-    kb.setBedienelement(1);
+    kb.setSicherheitsstecker(1);
     EXPECT_EQ(drainRx(kb, sio), erwartet({0xA9}));
-    kb.setBedienelement(2);
+    kb.setSicherheitsstecker(2);
     EXPECT_EQ(drainRx(kb, sio), erwartet({0xA9, 0xAA}));
-    kb.setBedienelement(0);
+    kb.setSicherheitsstecker(0);
     EXPECT_EQ(drainRx(kb, sio), erwartet({0xAA}));
-    kb.setBedienelement(0);                         // keine Aenderung, keine Codes
+    kb.setSicherheitsstecker(0);                         // keine Aenderung, keine Codes
     EXPECT_TRUE(drainRx(kb, sio).empty());
 }
 
-/// @test K7637Bediensicherung/SteckenWartetAufDieSerielleStrecke
+/// @test K7637Sicherheitsstecker/SteckenWartetAufDieSerielleStrecke
 /// @par Pass criterion  Die Codes kommen im Abstand einer Bytezeit, nicht sofort.
-TEST(K7637Bediensicherung, SteckenWartetAufDieSerielleStrecke) {
+TEST(K7637Sicherheitsstecker, SteckenWartetAufDieSerielleStrecke) {
     Z80SIO sio; sio.setIEI(true);
     K7637 kb; kb.connect(sio, 0);
     deliver(kb);
-    kb.setBedienelement(3);
+    kb.setSicherheitsstecker(3);
     kb.service(g_clk + 100);                        // < eine Bytezeit (2604)
     EXPECT_FALSE(sio.ioRead(1) & 0x01);
     kb.service(g_clk + 2700);
     EXPECT_TRUE(sio.ioRead(1) & 0x01);
 }
 
-/// @test K7637Bediensicherung/FalscheGeraetekennungLiefertNichts
+/// @test K7637Sicherheitsstecker/FalscheGeraetekennungLiefertNichts
 /// @par Pass criterion  Mit geraet_passt=false bleiben alle SL High: nach 00H nur TYP, kein Code beim Stecken.
-TEST(K7637Bediensicherung, FalscheGeraetekennungLiefertNichts) {
+TEST(K7637Sicherheitsstecker, FalscheGeraetekennungLiefertNichts) {
     Z80SIO sio; sio.setIEI(true);
     K7637 kb; kb.connect(sio, 0);
     deliver(kb);
-    kb.setBedienelement(6, false);
+    kb.setSicherheitsstecker(6, false);
     EXPECT_TRUE(drainRx(kb, sio).empty());
     sendeKommando(kb, sio, 0x00);
     EXPECT_EQ(drainRx(kb, sio), erwartet({0x80}));
