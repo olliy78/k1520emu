@@ -50,8 +50,18 @@ Stand 2026-10-29.  Arbeitsauszug für Entwurf 43 (`doc/design/43_sios1526.md`), 
 - Codierung [K7637 §3.2]: 8 Bit, davon **3 Bit Bedienerkennung** (Stopfen 1–3) und **5 Bit Gerätekennung**
   (Stopfen 4–8).  Die Gerätekennung wird **in Hardware** gegen Drahtbrücken auf der BES geprüft; nur wenn sie
   stimmt, kommen die drei Bedienerbits auf die Sonderleitungen **SL1–SL3**.
-  Bedienerkennung: `xx/01` = **Chefschalter**, `xx/02`…`xx/06` = 1.–5. Bedienebene (Stopfenbild im Scan
-  schlecht lesbar — am Bild prüfen).
+  Bedienerkennung = **Binärzahl der Stopfen 1–3** (am Bild K7637-Doku S. 14 geprüft):
+
+  | Kennung | Stopfen 3 2 1 | Funktion |
+  |---------|---------------|----------|
+  | xx/01 | – – o | **Chefschalter** |
+  | xx/02 | – o – | 1. Bedienebene |
+  | xx/03 | – o o | 2. Bedienebene |
+  | xx/04 | o – – | 3. Bedienebene |
+  | xx/05 | o – o | 4. Bedienebene |
+  | xx/06 | o o – | 5. Bedienebene |
+
+  Annahme [?]: Stopfen n legt (bei passender Gerätekennung) SLn auf Low; ohne Element liegen alle SL high.
 - Übertragung [K7637 §2.1.1–2.1.2]: nach Einschalten und nach Kommando 00H (Software-RESET) sendet die
   Tastatur **TYP**, danach **die Codes der SL-Leitungen, die auf Low liegen**; im Betrieb wird bei **jeder
   Pegeländerung** einer SL-Leitung deren Code gesendet (Triggerverhalten).  Codes im Tastatur-ROM, `00H` =
