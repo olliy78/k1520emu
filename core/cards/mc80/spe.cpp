@@ -20,10 +20,15 @@ Mc80Spe2::Config Mc80Spe2::Config::mc8030()
 
 Mc80Spe2::Config Mc80Spe2::Config::mc8030Pcmc()
 {
-    // 2000H–27FFH wie gehabt, 2800H–2BFFH das PCMC-EPROM.  Der Puffer lebt so lange wie das
-    // Programm (die Karte haelt nur den Zeiger).
+    // Der Umbau von KW-WILLISOFT besteht aus ZWEI EPROMs: das PCMC-EPROM wird bei 2800H
+    // gesteckt, und das 2400H-EPROM wird gegen eine Fassung getauscht, in der RKET (das letzte
+    // ROM-Kettenglied, 26CFH) nicht mehr nach 4000H, sondern nach 2800H kettet (Distanz 192EH ->
+    // 012EH, Byte 26D1H; PCMC_komplett/MC8030_ROM_2800h/Wichtige Info.txt).  Ohne den Tausch
+    // erschiene PCMC nicht in der Kette.  Der Puffer lebt so lange wie das Programm (die Karte
+    // haelt nur den Zeiger).
     static const std::vector<uint8_t> rom = [] {
         std::vector<uint8_t> r(MC80_SPE2_ROM, MC80_SPE2_ROM + sizeof(MC80_SPE2_ROM));
+        r[RKET_DISTANZ_HI - ROM_BASIS] = 0x01;   // 26D2H + 012EH = 2800H
         r.insert(r.end(), MC80_PCMC_ROM_2800, MC80_PCMC_ROM_2800 + sizeof(MC80_PCMC_ROM_2800));
         return r;
     }();

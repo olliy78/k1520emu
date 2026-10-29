@@ -77,10 +77,9 @@ TEST(Mc80Boot, KommandoInitUndCataUeberDieTastatur) {
     e.tippe("cata", 500'000);
     EXPECT_EQ(e.m->textZeile(24), ">CATA") << bildText(*e.m);
     e.tippe("\n", 0);
-    // CATA rollt je Zeile einmal (VIS-Kommando + ~43 ms Wartezeit).  Hinter RKET laeuft die
-    // Kette durch die 2048 leeren 00H-Objekte bis 4000H (egos.md §1.4) — bis RKET warten.
+    // CATA rollt je Zeile einmal (VIS-Kommando + ~43 ms Wartezeit) — bis RKET warten.
     for (int i = 0; i < 400 && findeZeile(*e.m, "RKET") < 0; ++i) e.fahre(100'000);
-    e.fahre(500'000);
+    e.fahre(2'000'000);
     const std::string t = bildText(*e.m);
     // CATA listet die RAM-/ROM-Kette mit Kennbyte, Segment und Adresse (egos.md §1.3)
     EXPECT_GE(findeZeile(*e.m, "KLOG"), 0) << t;
@@ -89,12 +88,12 @@ TEST(Mc80Boot, KommandoInitUndCataUeberDieTastatur) {
     EXPECT_GE(findeZeile(*e.m, "%01.1000"), 0) << t;   // KLOG bei 1000H im Segment 1
     EXPECT_NE(e.m->vis().rollzaehler(), 0) << "das Bild muss gerollt haben";
     EXPECT_GE(e.m->bellCount(), piep_vorher);
-    // Nach 23 Zeilen wartet CATA auf ENTER (egos.prn 26BFH: SL_TST bis 11H) — die naechste Seite
-    // setzt die leeren Objekte hinter 2800H fort.
-    EXPECT_LT(findeZeile(*e.m, "%01.280C"), 0) << t;
-    e.tippe("\n", 0);
-    for (int i = 0; i < 100 && findeZeile(*e.m, "%01.280C") < 0; ++i) e.fahre(100'000);
-    EXPECT_GE(findeZeile(*e.m, "%00 %01.280C"), 0) << bildText(*e.m);
+    // Hinter RKET geht es direkt im RAM weiter (Glied von INIT bei 4000H), nicht durch
+    // Scheinobjekte im Leerbereich 2800H–3FFFH (Forum robotrontechnik.de, Thread 24593, 048).
+    EXPECT_GE(findeZeile(*e.m, "%01.4000"), 0) << t;
+    EXPECT_LT(findeZeile(*e.m, "%01.28"), 0) << t;
+    EXPECT_LT(findeZeile(*e.m, "%01.3"), 0) << t;
+    EXPECT_EQ(e.m->textZeile(24), ">") << "CATA ist durchgelaufen\n" << t;
 }
 
 TEST(Mc80Boot, KommandoCatLaeuftBisZumEndeDerKette) {

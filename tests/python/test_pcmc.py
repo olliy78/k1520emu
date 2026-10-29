@@ -127,9 +127,11 @@ def test_bindung_steckt_das_pcmc_eprom_nur_auf_wunsch():
     from app.core_binding.k1520 import K1520Emulator
     ohne = K1520Emulator(machine="mc80")
     mit = K1520Emulator(machine="mc80", pcmc=True)
-    assert ohne.mem_read(0x2800) == 0x00                   # leere Fassung
+    assert ohne.mem_read(0x2800) == 0xFF                   # leere Fassung
     assert mit.mem_read(0x2800) == 0x01 and bytes(mit.mem_read(0x2803 + i) for i in range(4)) == b"PCMC"
-    assert mit.mem_read(0x2400) == ohne.mem_read(0x2400)   # 2400H unveraendert (Kettung schon drin)
+    # Zum Umbau gehoert das getauschte 2400H-EPROM: nur die RKET-Kettung (26D1H) unterscheidet sich.
+    assert ohne.mem_read(0x26D1) == 0x19 and mit.mem_read(0x26D1) == 0x01
+    assert all(mit.mem_read(a) == ohne.mem_read(a) for a in range(0x2400, 0x2800) if a != 0x26D1)
 
 
 # ── Oberflaeche, Ende zu Ende ────────────────────────────────────────────────

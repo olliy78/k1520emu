@@ -8,8 +8,10 @@ liegen in `doc/EPROMS/MC80/pcmc/` (`pcmc-2800.bin`, `PCMC_ROM_2800.ASM`).
 
 * EPROM 2708 **ab 2800H** (3. Fassung der SPE 2; ausgeliefert waren nur 2000H und 2400H bestueckt).  Der Abzug
   `2400H` mit der geaenderten RAM-Kettung (damit PCMC unter CATA erscheint) ist **bytegleich** zu `spe_2.rom`
-  der MAME-Sammlung — im Kern aendert sich nur 2800H (`Mc80Spe2::Config::mc8030Pcmc`, `Mc80Machine::Config::pcmc`,
-  C-ABI-Schluessel `pcmc=1`).
+  der MAME-Sammlung — der MAME-Abzug IST also die umgebaute Fassung.  Eingebunden ist seit 2026-10-29 die
+  Auslieferungsfassung (`doc/EPROMS/MC80/spe_2_auslieferung.rom`, RKET → 4000H); die Option
+  (`Mc80Spe2::Config::mc8030Pcmc`, `Mc80Machine::Config::pcmc`, C-ABI-Schluessel `pcmc=1`) steckt das
+  2800H-EPROM **und** tauscht 2400H, d. h. setzt Byte 26D1H auf 01H (RKET → 2800H → PCMC → 4000H).
 * Programm im ROM, 8 Byte RAM bei F300H (`ramz1`/`ramz2`) fuer die Adressanzeige.
 * Leitung: IFSS XS503 = ASP **SIO B** (D2H Daten, D3H Steuer), CTC K1 (D5H), **4800 Bd 8N1** (WR4 = 44H, x16;
   CTC-Zeitkonstante 1, Eingang halber Systemtakt, ÷2).  Am PC ein IFSS-USB-Wandler (virtueller COM-Port).
