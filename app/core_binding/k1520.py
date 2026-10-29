@@ -607,7 +607,7 @@ _lib.k1520_raf_load.restype = ctypes.c_bool
 _lib.k1520_raf_save.argtypes = [K1520Handle, ctypes.c_char_p]
 _lib.k1520_raf_save.restype = ctypes.c_bool
 
-# k1520_em_variant(K1520Handle) -> const char*   ("" | "em064" | "em256")
+# k1520_em_variant(K1520Handle) -> const char*   ("" | "em064" | "em256" | "em1024")
 _lib.k1520_em_variant.argtypes = [K1520Handle]
 _lib.k1520_em_variant.restype = ctypes.c_char_p
 
@@ -873,7 +873,7 @@ A5120_KONFIG_WERTE = {
     "tastatur": ("k7637", "k7636"),
     "laderom": ("v09_2", "v09_1", "v06"),
     "kassette": ("0", "1"),
-    "em": ("none", "em064", "em256"),
+    "em": ("none", "em064", "em256", "em1024"),
     # K3521.30 (N10b): "aus" oder die Startadresse als 4-stellige Hex-Zahl im 4-KB-Raster;
     # bis zu vier Basen mit '+' verbunden (N10h, a5120_konfig_text prueft jeden Teil).
     "k3521": ("aus",) + tuple(f"{i * 0x1000:04x}" for i in range(16)),
@@ -1215,7 +1215,7 @@ class K1520Emulator:
                 Bei ``machine="p8000-terminal"`` (Originalterminal ohne Rechner) die Schlüssel
                 von ``k1520_create_p8000_terminal``, z. B. ``{"rolle": "client", "port": 5001}``.
             em: Erweiterungsmodul des A5120.16 — ``None``/``"none"`` = ohne EM,
-                ``"em064"`` oder ``"em256"``.  Nur am A5120 (sonst ValueError).
+                ``"em064"``, ``"em256"`` oder ``"em1024"`` (Neuentwicklung, 1 MB).  Nur am A5120 (sonst ValueError).
             raf: RAM-Floppy — ``None``/``"none"`` = ohne, ``"raf128"``, ``"raf512"``
                 oder ``"raf2m"``; an jeder Maschine.  Wird direkt nach dem Anlegen
                 gesteckt (vor dem ersten Lauf); Fehler → ValueError.
@@ -2479,7 +2479,7 @@ class K1520Emulator:
 
     # ─── A5120.16 ──────────────────────────────────────────────────────────
     def em_variant(self) -> str:
-        """Bestückung des Erweiterungsmoduls: "" (keins), "em064" oder "em256"."""
+        """Bestückung des Erweiterungsmoduls: "" (keins), "em064", "em256" oder "em1024"."""
         v = _lib.k1520_em_variant(self._handle)
         return v.decode("ascii") if v else ""
 

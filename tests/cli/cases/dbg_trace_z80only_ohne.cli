@@ -1,0 +1,22 @@
+# Gegenprobe zu dbg_trace_z80only: ohne `z80` stehen U8001-Zeilen (`T3`) in der Datei.
+tool:      k1520dbg
+disk:      cpa_cpa780_k5601_noclock.img
+setup_run: @k1520disktool put %DISK% %CLI_DIR%/../fixtures/cpm/em16abl.com
+run:       --em em256 %DISK%
+tmpfile trace.txt:
+stdin:
+  gscreen "A>" 150000000
+  bmode 16
+  keys EM16ABL\r
+  bmode off
+  cpu u8000
+  n
+  s 3
+  trace %trace.txt%
+  g 2000000
+  trace off
+  q
+capture_file: trace.txt
+timeout:   120
+expect_re: (?m)^T3 
+expect_re: (?m)^T1 

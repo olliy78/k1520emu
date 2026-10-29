@@ -941,5 +941,5 @@ was bei versehentlichem Einsprung zu einem deterministischen Stack-Overflow füh
 | K2526-Designdokumentation | `doc/design/03_k2526_zre.md` |
 | K5122-Designdokumentation | `doc/design/07_k5122_afs.md` |
 | Disassembler-Skript | `disasm_k2526.py` |
-| Z80-Disassembler (vollständig) | `tools/z80_disasm3.py` |
+| Z80-Disassembler (vollständig) | `tools/z80_disasm3.py` (stillgelegt 2026-10-27, ersetzt durch `tools/z80_disasm2.py`) |
 | EPROM-Analyseskript | `analyze_eprom.py` |

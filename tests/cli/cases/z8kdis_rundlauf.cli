@@ -1,0 +1,8 @@
+# z8kdis --pruefen: Disassemblat -> z8kasm -> Bytes == Abbild (segmentierte Firmware).
+# Die Befehle mit ungeradem Registerpaar (README Luecke 9) werden Daten -- bitgleich bleibt es trotzdem.
+tool:   z8kdis
+run:    --segmentiert --base 30000 --entry 30040 --statistik --pruefen %CLI_DIR%/../fixtures/z8000/fw_march.z8001asm.bin
+
+expect: Rundlauf: 518 Bytes verglichen, 0 abweichend
+expect: nicht kanonisch (-> Daten)
+exit:   0

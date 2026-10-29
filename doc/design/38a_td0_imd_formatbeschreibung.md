@@ -297,19 +297,19 @@ Pfadkuerzel: `R=~/projects/robotron`, `A=~/projects/A5120.16/docs/tiffe/MUTOS`.
 Erste gepackte Bytes (ab Offset 12): `77 6B 3A C6 7D F2 B9 7C 76 DB 7F D1 E7 EB 37 BC ...`. Entpackt (Strombeginn hinter dem Dateikopf): `EB DF AE 00 6B 09 0B 02 2A 33 45 43 20 31 38 33 34 20 20 44 43 50 ...` = Kommentar-CRC 0xDFEB, Laenge 0x00AE, Datum Jahr 107 = 2007, Monat-Byte 9 (0-basiert = Oktober; der Kommentartext nennt 11.11.2007, beides unabhaengig), Tag 11, 02:42:51, Text "EC 1834  DCP Version  3.20, Stand: 17.08.88". Die ersten 14 Literalsymbole stehen im Anfangsbaum mit den Bitfolgen `01110111 01101011 00111010 110001100 111110111 110010101 110010111 110001110 110110110 110111111 111010001 111001111 110101100 110111101` (die Codes ändern sich schon nach dem ersten Symbol, weil der Baum adaptiv ist). Die ersten Trefferbefehle im Strom: (Laenge 3, Distanz−1 = 18, obere 6 Bit = 0), (3, 90, 1), (7, 111, 1). Gesamt: 464 430 Byte entpackt, 160 Spuren, 15 Baumneuaufbauten.
 Erster Spur-Record entpackt: `09 00 00 34`, danach Sektorkoepfe: `00 00 01 02 00 0C | EB ..` (hier Spur 0, 9 Sektoren).
 
-**Methode 0**: `A/ronny/mutos_ronny/ROOT.td0` Spur Zyl 1 Kopf-Byte 0x80 (FM, Seite 0), Sektor ID (1,0,9), N=0, Flags 0, CRC8 0x71, Datenblock: Methode 0, 128 B: `00 0F 00 00 00 FA 00 1F 00 00 00 64 00 00 00 61 ...`.
+**Methode 0**: `m8k2_root.td0` Spur Zyl 1 Kopf-Byte 0x80 (FM, Seite 0), Sektor ID (1,0,9), N=0, Flags 0, CRC8 0x71, Datenblock: Methode 0, 128 B: `00 0F 00 00 00 FA 00 1F 00 00 00 64 00 00 00 61 ...`.
 
 **Methode 1**: dieselbe Datei, Zyl 0, Kopf-Byte 0x80, Sektor ID (0,0,1), N=0, CRC8 0xD1, Datenblock `Laenge 05 00, Methode 01`, Nutzdaten `40 00 E5 E5` -> 64 × (E5 E5) = 128 Byte E5.
 
 **Methode 2 (nur Wiederholung)**: `R/PC1715/discs/scp07.td0` Zyl 1 Kopf 0, ID (1,0,6), N=1 (256 B), CRC8 0x76, Nutzdaten `01 80 E5 E5 00 00`: c=1, n=0x80, Muster E5E5 -> 256 × E5; Abschluss `00 00` (Literal der Laenge 0).
 
-**Methode 2 (gemischt)**: `A/ronny/mutos_ronny/ROOT.td0` Zyl 0, ID (0,0,5), N=0, CRC8 0xD2, Nutzdaten (18 Byte) `00 05 C5 D9 D4 C1 D7 | 01 25 40 40 | 00 01 40 | 01 18 00 00`: Literal 5 Byte `C5 D9 D4 C1 D7`, dann 37 × `40 40`, dann Literal `40`, dann 24 × `00 00`. Entpackt 5 + 74 + 1 + 48 = 128 Byte.
+**Methode 2 (gemischt)**: `m8k2_root.td0` Zyl 0, ID (0,0,5), N=0, CRC8 0xD2, Nutzdaten (18 Byte) `00 05 C5 D9 D4 C1 D7 | 01 25 40 40 | 00 01 40 | 01 18 00 00`: Literal 5 Byte `C5 D9 D4 C1 D7`, dann 37 × `40 40`, dann Literal `40`, dann 24 × `00 00`. Entpackt 5 + 74 + 1 + 48 = 128 Byte.
 
 **Endesatz**: scp07.td0 endet mit `FF xx yy zz`; im Korpus ist Byte 1/2 der Zylinder/Kopf der letzten Spur.
 
 **Kleinstdatei**: `R/sonst/BC25/Quellen/BC25/DISK___1.035/!IMAGE/DISK_1.TD0` (20 Byte): `54 44 00 1F 15 02 05 00 00 02 4D CB | 00 00 01 97 | FF 00 01 97` = Kopf (Rate 500, 8"), eine Spur mit 0 Sektoren (Zyl 0, Seite 1, CRC8 0x97), Endesatz.
 
-**Duplikatsektoren / Pseudosektoren**: `A/ronny/mutos_ronny/USR_CCom.td0`, Zyl 5 Kopf-Byte 0x80: 13 Sektoren, Nummern 4,11,15,16,21,22,22,23,23,24,24,25,26 (doppelte 22–24); Zyl 0: Sektor R=105, Flags 0x40.
+**Duplikatsektoren / Pseudosektoren**: `m8k2_usr.td0`, Zyl 5 Kopf-Byte 0x80: 13 Sektoren, Nummern 4,11,15,16,21,22,22,23,23,24,24,25,26 (doppelte 22–24); Zyl 0: Sektor R=105, Flags 0x40.
 
 **Sektor-IDs mit abweichendem Zylinder**: `A/DISK_CMD.TD0` Zyl 81 Seite 0 -> Sektor-ID C=89, N=4 (2048 B), Methode 1.
 

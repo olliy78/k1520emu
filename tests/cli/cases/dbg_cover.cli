@@ -1,0 +1,37 @@
+# Abdeckung: `cover` zaehlt gelaufene ZVE1-Befehlsadressen; `cover report` nennt die NIE
+# getroffenen, zusammengefasst in Bereiche; "erwartet" kommt aus dem geladenen Listing/Quelltext
+# (`-l`, hier eine kleine .mac mit MACRO/REPT/.PHASE/.DEPHASE - nur BEFEHLSzeilen zaehlen, DB nicht).
+# 0135H (LD A,(HL)) laeuft im Uhrenprogramm, 7000H/7001H nie.
+tool:   k1520dbg
+disk:   cpa_cpa780_k5601_clock.img
+file erw.mac:
+  FILLX MACRO N
+    REPT N
+    DB 0
+    ENDM
+    ENDM
+    .PHASE 0135H
+    LD A,(HL)
+    .DEPHASE
+    .PHASE 7000H
+    NOP
+    NOP
+    FILLX 3
+    DB 1,2
+    .DEPHASE
+tmpfile rep.txt:
+run:    %DISK% -l %erw.mac%
+stdin:
+  cover on 0x0000 0x7FFF
+  g 200000
+  cover report %rep.txt%
+  cover report hit
+  cover off
+  q
+capture_file: rep.txt
+expect:    assembliert: 7 Zeile(n)
+expect:    0 unbekannt
+expect:    cover: 1 von 3 erwarteten Befehlsadressen getroffen, 2 NIE
+expect_re: NIE +7000-7001 +\(2\)
+expect_re: hit +0[0-9A-F]{3}
+forbid:    7002

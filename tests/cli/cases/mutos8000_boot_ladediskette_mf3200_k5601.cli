@@ -1,4 +1,4 @@
-# MUTOS 8000: aus dem Archiv gebaute UDOS-Ladediskette (tools/mutos8000/bau_ladediskette.py, --laufwerke mf3200_k5601)
+# MUTOS 8000: aus dem Archiv gebaute UDOS-Ladediskette (mutos8k:tools/bau_ladediskette.py, --laufwerke mf3200_k5601)
 # bootet MUTOS bis zur Shell.  Laufwerke MF3200,K5601,K5601; Wurzel in C: je nach Laufwerkstyp
 # (root_mfm.hfe).  Die Laufwerkstyp-Konstante steht in den Systemspuren der Ladediskette (Entwurf 39 9.13);
 # passen Aufzeichnung (FM/MFM) oder Konstante nicht zur Laufwerksbestueckung, erscheint kein "single user login".

@@ -25,13 +25,13 @@ inline const std::vector<std::string>& names() {
         "bint","bnmi","breti","bbusrq","bxfer",
         // watch / log
         "wp","wpr","wpa","wb","wbr","wba","wd","wl","iow","iob","iod","iol",
-        "logpoint","lp","lpd","lpl","trace","itrace",
+        "logpoint","lp","lpd","lpl","trace","itrace","cover",
         // inspect
         "r","rj","rj2","where","w","hist","bt","d","dump","e","u","x","list","l","set","disp","undisp","vars","dev","ivt",
         // memory / symbols / listings
         "load","save","sym","lst","verify",
         // misc
-        "mark","keys","keyuntil","screen","gscreen","bscreen","dialog","console",
+        "mark","keys","keywait","keyuntil","screen","gscreen","bscreen","dialog","console",
         "reset","disk","alias","unalias","source","help","q","quit",
         // K8915 (--machine k8915): A8H-Speicherbild, DRAM-Baenke direkt
         "map","bank",
@@ -40,7 +40,7 @@ inline const std::vector<std::string>& names() {
         // Kassette (--tape)
         "tape",
         // A5120.16 (U8001-Kontext)
-        "cpu","a","fcw","psa","bmode","bvi","bint16","emlog",
+        "cpu","a","fcw","psa","bmode","bvi","bint16","emlog","emmsg",
         // P8000 (--machine p8000|p8000-16): ADP, UA858, Kopplung, MMU, Terminal
         "adp","dma","kopp","mmu","xlat","ml","mp","segt","bsegt","term","wdc","rtc","nmi","trap","btrap","status",
     };

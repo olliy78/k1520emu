@@ -17,7 +17,7 @@
  *                    loaded code (0x0437). Reports I/O-port activity, VRAM writes,
  *                    a loaded-code PC histogram, and the screen as text.
  *
- *     --em [em256|em064]  A5120.16: Maschine MIT Erweiterungsmodul; jede
+ *     --em [em256|em064|em1024]  A5120.16: Maschine MIT Erweiterungsmodul; jede
  *                    Kommunikationstransaktion der Karte (PIO A32, A33–A36, A22,
  *                    Quittungen, Moduswechsel, TREN/BUSRQ/BUSAK, RESET16, NVI) wird
  *                    eine Zeile "EM …" (Vorgabe em256)
@@ -315,7 +315,7 @@ int main(int argc, char** argv) {
     bool      json_summary  = false;         // --json: one machine-readable summary line at the end
     bool      quiet         = false;          // --quiet: suppress the human narrative/report
     bool      fold_on       = false;          // --fold: collapse identical consecutive -w/-z lines
-    const char* em_variant  = nullptr;        // --em [em256|em064]: A5120.16 + EM-Transaktionen
+    const char* em_variant  = nullptr;        // --em [em256|em064|em1024]: A5120.16 + EM-Transaktionen
     bool      trace_u8000   = false;          // --cpu u8000: jeden U8001-Befehl zeigen
     const char* ausf_opt    = nullptr;        // --ausfuehrung neu|alt|kmbg (AP A6)
     const char* lw_opt      = nullptr;        // --laufwerke P0,P1,…  (AP A6)
@@ -474,7 +474,7 @@ int main(int argc, char** argv) {
         else if (!strcmp(argv[i], "--aup-alpha") && i+1 < argc) { aup_opt = true; aup_alpha_opt = argv[++i]; nur_a5120.push_back("--aup-alpha"); }
         else if (!strcmp(argv[i], "--em")) {
             em_variant = "em256";
-            if (i+1 < argc && (!strcmp(argv[i+1],"em256") || !strcmp(argv[i+1],"em064")))
+            if (i+1 < argc && (!strcmp(argv[i+1],"em256") || !strcmp(argv[i+1],"em064") || !strcmp(argv[i+1],"em1024")))
                 em_variant = argv[++i];
         }
         else if (!strcmp(argv[i], "--cpu") && i+1 < argc) {
@@ -646,8 +646,9 @@ int main(int argc, char** argv) {
 
     if (trace_u8000 && !em_variant) em_variant = "em256";
     A5120Machine::Config mcfg;
-    if (em_variant) mcfg.em = !strcmp(em_variant,"em064") ? A5120Machine::Config::Em::em064
-                                                          : A5120Machine::Config::Em::em256;
+    if (em_variant) mcfg.em = !strcmp(em_variant,"em064")  ? A5120Machine::Config::Em::em064
+                            : !strcmp(em_variant,"em1024") ? A5120Machine::Config::Em::em1024
+                                                           : A5120Machine::Config::Em::em256;
     { std::string err;
       if (!dbgm::parseAusfuehrung(ausf_opt, lw_opt, mcfg, err, laderom_opt, tastatur_opt, ram_opt, bildschirm_opt, schalter_opt, k3521_opt, k3521_memdi_opt, k3521_datei_opt)) { fprintf(stderr, "%s\n", err.c_str()); return 2; }
       if (aup_opt && (!a5120konfig::wert(mcfg, "aup", "1", err) ||

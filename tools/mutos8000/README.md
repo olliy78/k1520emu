@@ -1,5 +1,8 @@
 # MUTOS 8000: Auswertung von M8KROOT und Nachbau der Wurzeldiskette
 
+> Dieses Verzeichnis enthaelt NUR den Diskettenbau aus den Originalen (`disks/a5120_mutos8000/`).  Forschung, Kernel-/`mutos_io`-Rekonstruktion
+> und das Bausystem aus rekonstruierten Quellen liegen im Projekt `~/projects/mutos8k`.
+
 Werkzeuge zu `doc/design/39_mutos8000.md` (§4.6.3 Blockabbildung, §4.7.6 Befund M8KROOT, §4.8 rekonstruierte Wurzel).
 Nur Python-Standardbibliothek, lauffähig mit `python3 -I`; das DiskTool wird nur über `tools/dev.sh tool k1520disktool` gerufen.
 
@@ -20,7 +23,6 @@ Nur Python-Standardbibliothek, lauffähig mit `python3 -I`; das DiskTool wird nu
 | `bauangaben_{cmd,usr,bin}.yaml` | Vorlagen der Bauangaben der Datendisketten (Inodes, `bloecke: 494`) |
 | `bauangaben_ladediskette.yaml` | Vorlage der Bauangaben der Ladediskette (Profile, Muster der Laufwerkstyp-Konstante, Varianten); `archiv_erzeugen.py --art ladediskette` legt sie ins Archiv |
 | `mutos_patch.py` | (auch als Bibliothek: `anwenden(art, daten, optionen)`, vom Bau der Ladedisketten benutzt) Patchliste fuer `mutos_io` (8 x 512, Entwurf 39 §11.2), `ZDOS` (UDOS meldet nur Laufwerk A: an, §11.6) und `mutos_1216` (Wurzel-/Swap-/Pipe-Geraet, Swap-Lage, Grenzen, §11.4/§11.5); prueft jedes Altbyte, schreibt nur nach `-o` |
-| `versuche/*.dbg` | `k1520dbg`-Skripte der Messungen aus §11 (Wurzel in A: ueber die Maske, Kernelpatch `rootdev` 4,0, DISK-Satz 8 x 512); Aufruf in der Kopfzeile |
 
 ```sh
 python3 -I tools/mutos8000/m8kroot_lesen.py                  # Befund nach §4.7.6

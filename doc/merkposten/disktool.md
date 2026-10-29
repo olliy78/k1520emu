@@ -1172,7 +1172,7 @@ Vier Anwender-Disketten (ROOT, CMD, CC1, CC2; `.TD0` und `.dmk`) plus die UDOS-L
 
 6. **Profile `mutos8k_26x128_mfm` und `udos_ss77_fm` (2026-10-24, #22):** `mutos8k_26x128_mfm` = dieselbe 8k-Wurzel in MFM (Format `udos_ss77`, Rang −10 → gewinnt vor dem UDOS-Profil
    derselben Spurlage, eine UDOS-Diskette bleibt UDOS); `udos_ss77_fm` = UDOS auf 77 × 26 × 128 **FM** (Format `mf3200_26x128`, 8″ MF3200), nötig, weil `create` das Verfahren aus dem
-   Format nimmt. Wächter `MutosFs.M8k_MfmUndFmErkennungUndUdosBleibtUdos`, `FsCatalog` (Namensliste). Die Ladedisketten baut `tools/mutos8000/bau_ladediskette.py` aus dem Archiv
+   Format nimmt. Wächter `MutosFs.M8k_MfmUndFmErkennungUndUdosBleibtUdos`, `FsCatalog` (Namensliste). Die Ladedisketten baut `bau_ladediskette.py` (jetzt im Projekt mutos8k) aus dem Archiv
    `…_boot_udos.zip`. **Fallstrick: `get` schreibt einen leeren Datumsvermerk als `erst=-`/`geaend=-`, `put` liest `-` als „heute“** — das Erzeugerskript schreibt `______` aus, sonst wäre
    der Bau tagesabhängig. Wächter `test_mutos8000_werkzeuge.py`, `cli_mutos8000_boot_ladediskette_*`.
 
@@ -1183,7 +1183,7 @@ Vier Anwender-Disketten (ROOT, CMD, CC1, CC2; `.TD0` und `.dmk`) plus die UDOS-L
 8. **8×512: Gegenprobe, Blockgrenze, Swap (2026-10-26, #22, Entwurf 39 A5c).**  Das UNIX-Dateisystem `mutos8k_8x512_mfm` ist am Emulator gegengeprüft (DiskTool schreibt → MUTOS liest und umgekehrt, `fsck` sauber; Fixture
    `mutos8000_8x512_geschrieben.td0`, Wächter `MutosFs.M8x512_*`).  **`create` ohne `--blocks` begrenzt auf 608 Blöcke** (Kernel lehnt Block ≥ 608 ab; auf `mutos8k_8x512_mfm_80` wären es sonst 632).  tar im selben Layout:
    `tar_mutos8k_8x512_mfm` (`doc/merkposten/tar_satz.md` Nr. 18).  **Der 8×512-`mutos_io`-Patch hatte einen Fehler bei Swap-Aufträgen, die kein Vielfaches von 512 B sind** (behoben, achte Patchstelle `98C0`; ohne ihn `panic: IO err in swap`).
-   **`…_cmd.td0` (83 Spuren) lässt sich in einem K5601 nicht einlegen, DISK-ROOT trägt die hängende `pwd` von 1987:** `tools/mutos8000/bau_8x512.py` baut `…_root_8x512.hfe` und `…_cmd_8x512.hfe` (Wächter `test_8x512_wurzel_und_befehle_…`).
+   **`…_cmd.td0` (83 Spuren) lässt sich in einem K5601 nicht einlegen, DISK-ROOT trägt die hängende `pwd` von 1987:** `bau_8x512.py` (mutos8k) baut `…_root_8x512.hfe` und `…_cmd_8x512.hfe` (Wächter `test_8x512_wurzel_und_befehle_…`).
 
 ## MUTOS 1700 (A7100) — dieselbe Klasse, zweite Familie (2026-10-23)
 
