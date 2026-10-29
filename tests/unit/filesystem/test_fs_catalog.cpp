@@ -118,7 +118,7 @@ TEST(FsCatalog, ProfilnamenSindEinStabilerVertrag) {
         // und — bei 800K — die leere Diskette, die sonst `cpa800` ab c0h0 waere.  Erkannt nur
         // mit Urlader; `osm640` ist deckungsgleich mit `scpx640`.
         "osm640", "osm800",
-        // SIOS 1526 (doc/sios_diskettenformat.md): nur lesend, Erkennung am Nachweis ERMAP + VOL1.
+        // SIOS 1526 (doc/sios_diskettenformat.md): Erkennung am Nachweis ERMAP + VOL1.
         "sios_ss40", "sios_ss80",
     };
     for (const auto& n : erwartet)

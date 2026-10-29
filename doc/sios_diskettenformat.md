@@ -560,6 +560,7 @@ Offen für das Anlegen: der Inhalt des Fehlspurkartensektors bei defekten Spuren
 | 11 | Satzlängen 256/512/1024 **physisch** (INIT-Menü 0…3), 8″-Varianten, 80-Spur-„Double Tracks" (in V 1.1 nicht möglich) — nicht an Abbildern gemessen | INIT |
 | 12 | `SYSARE09` EOD 10009, aber nicht-E5-Daten bis Spur 10 Sektor 16 | SIOS-Schreibpfad (EOD-Fortschreibung) |
 | 13 | Der `D`-Etikettensatz (nie benutzt) — erzeugt INIT genau diesen Satz (Pos. 1 `C4` + Blanks) oder ein anderer Prozess? | INIT |
+| 15 | **D4 (2026-10-29), gewählte Deutungen, nicht am Systemcode belegt:** Bibliothek wird nur angehängt (Verzeichnisplatz = erster freier, NV = 0200H + 8·Plätze nur bis 14 Plätze), Löschen = Name 20H, ML = Sektoren/2, neue HDR1 mit `E` an Pos. 44 und Satzlänge 128, erster freier Etikettensektor, erste Spurlücke ab Spur 1 bis 37 | DiskTool-Schreibpfad; LBSV/FGEN gegenprüfen (Rundlauf im Emulator S6) |
 | 14 | Mehrere Bibliotheken je Diskette (LBSV `NEWLB` Anlage 4.1/4.2) — Reihenfolge der HDR1-Sektoren ohne Lücken oder mit `DDR`-Lücken? | FGEN/LBSV-Etikettenlogik |
 
 **Für die DiskTool-Stufen D2–D4 reicht der heutige Stand:** Erkennung über VOL1 (`VOL1` an Spur 0 Sektor 7 + 26 × 128 + ERMAP in Sektor 5), Auflisten

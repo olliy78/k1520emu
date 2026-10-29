@@ -1,6 +1,6 @@
 # `k1520disktool` — Dateiaustausch mit K1520-Disketten
 
-Holt Dateien von CP/A-, SCPX-, **UDOS**-, **UDOS1715**-, **SCP1700**- und (lesend) **SIOS-1526**-Disketten
+Holt Dateien von CP/A-, SCPX-, **UDOS**-, **UDOS1715**-, **SCP1700**- und **SIOS-1526**-Disketten
 (CP/M-86 des A7100) und schreibt sie zurück —
 auf `.img`, `.hfe`, `.dmk`, `.cqm` (CopyQM), `.td0` (TeleDisk) und `.imd` (ImageDisk).  Dieselbe Bibliothek treibt die Oberfläche
 (`run_disktool.sh`); Feinentwurf: `doc/design/13_k1520disktool.md`.
@@ -1194,7 +1194,7 @@ Frage, wenn ein Dialog am falschen Ort aufgeht.
 eine gewöhnliche Markdown-Datei, `app/disktool/help/handbuch.md`; wer etwas ergänzen
 will, ändert sie und startet neu, ohne Code anzufassen.
 
-## SIOS 1526 (nur lesend)
+## SIOS 1526
 
 IBM-Etikettendisketten des SIOS 1526 (A5120/A5130/K8924, 26×128 MFM einseitig, 40 oder 80 Spuren) werden an `ERMAP` + `VOL1` in Spur 0
 erkannt (Profile `sios_ss40`/`sios_ss80`).  Beschreibung des Formats: `doc/sios_diskettenformat.md`.
@@ -1211,6 +1211,16 @@ $ k1520disktool boot-get SIOS1526_SYLs.hfe sylspur0.bin       # Spur 0 (SYL-Lade
 ```
 
 Typ `F` = physische Datei (Groesse = Sektoren `BOE..EOD-1`), `B` = Bibliothek (Name endet auf `LB`), `O` = Objekt einer Bibliothek.  Kz =
-Kennzeichen aus HDR1 (`P` Schreibschutz, `E` Austausch, `C` auf der Folgediskette fortgesetzt).  Alles Schreibende (`put`, `rm`, `create --fs sios_*`, `boot-put`)
-wird mit „SIOS: schreibender Zugriff noch nicht unterstuetzt“ abgelehnt.  Ein Abbild, dessen Geometrie zu keinem Katalogformat passt (`SIOS1526_SYLp.hfe`),
+Kennzeichen aus HDR1 (`P` Schreibschutz, `E` Austausch, `C` auf der Folgediskette fortgesetzt).  **Schreiben (D4):**
+
+```
+$ k1520disktool create neu.hfe --fs sios_ss40 --label TEST01     # leere Datendiskette (INIT-gleich)
+$ k1520disktool put neu.hfe daten.bin --as ALPHA                 # physische Datei, Spurbereich ab Spur 1
+$ k1520disktool put dp2.hfe objekt.bin --as PHASELB/NEU          # Objekt ans Ende einer Bibliothek (ML = Sektoren/2, Annahme)
+$ k1520disktool rm neu.hfe ALPHA                                  # HDR1 -> DDR1, Daten bleiben
+$ k1520disktool rm dp2.hfe PHASELB/NEU                            # Name blank, AADR/ML bleiben
+```
+
+Namen: Datei 1–8, Objekt 1–5 Zeichen (Großbuchstaben/Ziffern/Satzzeichen des DKOI-Satzes), Satzlänge immer 128.  Abgelehnt (mit Meldung) wird: Bibliothek mit
+mehr als 14 Einträgen, Fehlspurkarte mit Einträgen, voll belegte Spuren 1–37, `create --boot`, `boot-put`.  Gelöschter Bibliotheksplatz kehrt nicht zurück.  Ein Abbild, dessen Geometrie zu keinem Katalogformat passt (`SIOS1526_SYLp.hfe`),
 braucht `--fs sios_ss40`.

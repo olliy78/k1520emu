@@ -85,6 +85,11 @@ public:
                      const std::vector<uint8_t>& data,
                      const std::vector<uint8_t>& tail = {});
 
+    /// @brief Wie @ref writeSector (ohne Nachspann), setzt aber die Datenmarke: @p deleted =
+    ///        F8 (geloescht), sonst FB.  Nur SIOS braucht das (Etikettenspur).
+    bool writeSectorDam(uint8_t cyl, uint8_t head, uint8_t id,
+                        const std::vector<uint8_t>& data, bool deleted);
+
     // ─── Spuren des Raums (Dateisysteme brauchen die Reihenfolge) ────────────
 
     /**
