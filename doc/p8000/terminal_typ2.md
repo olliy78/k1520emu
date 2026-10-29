@@ -9,7 +9,7 @@ gefolgert), **[U]** unsicher/Vermutung. Quellenkürzel:
 | Kürzel | Quelle |
 |---|---|
 | HB | `~/projects/robotron/P8000/doc/P8000_Hardwarehandbuch.pdf` (V1.3, 06/1988), Kap. 4; Zeilenangaben „HB Z.“ = `pdftotext -layout` |
-| SLP | **Stromlaufplan Terminal Typ 2**, Nachzeichnung (gEDA) von O. Lehmann 2009, pofo.de `notes/plaene/eigene/P8000_Terminal_Typ2/` — lokal `~/projects/robotron/P8000/pofo_terminal/Typ2/Stromlaufplan.pdf` (3 Blatt: Bl. 1 Stromversorgung, Bl. 2 Rechner/Schnittstellen/Tastatur, Bl. 3 CRTC/BWS/ZG/Video); **keine EAW-Originalzeichnung** |
+| SLP | **Stromlaufplan Terminal Typ 2**, Nachzeichnung (gEDA) von OlliL 2009, pofo.de `notes/plaene/eigene/P8000_Terminal_Typ2/` — lokal `~/projects/robotron/P8000/pofo_terminal/Typ2/Stromlaufplan.pdf` (3 Blatt: Bl. 1 Stromversorgung, Bl. 2 Rechner/Schnittstellen/Tastatur, Bl. 3 CRTC/BWS/ZG/Video); **keine EAW-Originalzeichnung** |
 | STL | Stückliste dazu (`…/Typ2/Stueckliste.pdf`, „p8000/Terminal LP2, bestueckt“, st 889005) |
 | FW | Firmware-Quelle 5.0, `~/projects/robotron/P8000/github_P8000/firmware/TERMINAL/p8t.{init,main,up,esc,vt100}.s` (OlliL/P8000) |
 | ABZ | Abzug `doc/p8000/eproms/TERMINAL/P8T_1_5.0` (4096 B); Disassemblat `tools/z8_disasm.py` |

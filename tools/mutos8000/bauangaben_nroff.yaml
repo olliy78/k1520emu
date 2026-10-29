@@ -1,4 +1,4 @@
-# Bauangaben der MUTOS-8000-Datendiskette nroff (Textverarbeitung nroff vom Abzug ronny_nroff, Entwurf 39 Abschnitt 10; Mountpunkt /usr).
+# Bauangaben der MUTOS-8000-Datendiskette nroff (Textverarbeitung nroff vom Abzug m8k2_nroff, Entwurf 39 Abschnitt 10; Mountpunkt /usr).
 # Vorlage fuer tools/mutos8000/archiv_erzeugen.py --art nroff; bau_aus_archiv.py liest sie aus dem Archiv.
 # Nur "schluessel: wert", ein Wert je Zeile.
 fs: mutos8k_26x128_fm

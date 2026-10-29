@@ -38,17 +38,17 @@ import m8k  # noqa: E402
 
 QUELLEN = {"dcmd": "cmd", "cc1": "cc1", "cc2": "cc2", "droot": "root",
            "mcmd": "m8k_cmd", "musr": "m8k_usr", "mbin": "m8k_bin",
-           "rusr": "ronny_usr", "rnroff": "ronny_nroff"}
-# "rusr": zweiter Abzug der M8K-Systemdiskette /usr (2008, ronny_usr.td0).  Dessen Blocktafel (Block 1) ist unlesbar, das
+           "rusr": "m8k2_usr", "rnroff": "m8k2_nroff"}
+# "rusr": zweiter Abzug der M8K-Systemdiskette /usr (2008, m8k2_usr.td0).  Dessen Blocktafel (Block 1) ist unlesbar, das
 # DiskTool oeffnet ihn nicht; die Dateien werden daher mit dem Leser aus m8k.py blockweise aus beiden Abzuegen
-# zusammengesetzt (zuerst ronny_usr, fehlende Bloecke aus m8k_usr).  Er traegt die Header, die in m8k_usr und DISK-CC1 beschaedigt sind.
-MISCH = {"rusr": ("ronny_usr", "m8k_usr")}
-# "rnroff": Textverarbeitung (nroff, Makros, Terminaltabellen), nur auf diesem Abzug (ronny_nroff.td0, Januar 1986)
+# zusammengesetzt (zuerst m8k2_usr, fehlende Bloecke aus m8k_usr).  Er traegt die Header, die in m8k_usr und DISK-CC1 beschaedigt sind.
+MISCH = {"rusr": ("m8k2_usr", "m8k_usr")}
+# "rnroff": Textverarbeitung (nroff, Makros, Terminaltabellen), nur auf diesem Abzug (m8k2_nroff.td0, Januar 1986)
 
 # (Ziel, Quelle, Pfad in der Quelle, Grund)
 D, M = "DISK-Satz 1987 (neuer, heil)", "nur im M8K-Satz heil"
-R = "heil nur im zweiten M8K-Abzug (ronny_usr, 2008)"
-RN = "nur auf dem Abzug ronny_nroff (Januar 1986)"
+R = "heil nur im zweiten M8K-Abzug (m8k2_usr, 2008)"
+RN = "nur auf dem Abzug m8k2_nroff (Januar 1986)"
 AUSWAHL = {
     "cmd": [
         ("bin/ar", "dcmd", "bin/ar", D + " (in allen Saetzen gleich)"),
@@ -166,7 +166,7 @@ INODES = {"cmd": 56, "usr": 40, "bin": 16, "cc1": 48, "cc2": 16, "nroff": 24}   
 BLOECKE = 494                                    # ganze 8-Zoll-Diskette (76 Spuren x 26 / 4); kein Auslagerungsbereich
 ROLLEN = ("cmd", "usr", "bin", "cc1", "cc2", "nroff")
 MODUS = {"bin/nroff": 0o100755}       # Ziel -> Modus, der den der Quelle ersetzt
-# Dateien, von denen nur der lesbare Anfang existiert: Ziel -> Laenge (seit dem zweiten Abzug ronny_usr keine mehr)
+# Dateien, von denen nur der lesbare Anfang existiert: Ziel -> Laenge (seit dem zweiten Abzug m8k2_usr keine mehr)
 KUERZEN = {}
 # Bewusst WEGGELASSEN (in keinem Satz heil): bin/c_beispiel.c (DISK-CC1, ab Byte 1155 Programmdaten),
 # bin/mkdir.tot (DISK-ROOT, Duplikat von mkdir)

@@ -52,8 +52,14 @@ public:
     /// Bestueckung der Speicherkarte.
     enum class Variante : uint8_t {
         EM064,   ///< 062-9001: 64 KB, SG0/SG1 gehen nicht in die Matrix ⇒ 4× gespiegelt
-        EM256    ///< 062-9000: 256 KB, Zelle = SG1·128K + SG0·64K + Adresse
+        EM256,   ///< 062-9000: 256 KB, Zelle = SG1·128K + SG0·64K + Adresse
+        /// **Neuentwicklung, nicht historisch** (kein Robotron-Vorbild bekannt): 1 MB DRAM,
+        /// 16 Segmente.  Zelle = SN3..SN0·64K + Adresse; das U880-Fenster bekommt
+        /// SG2P/SG3P ueber das Zusatzlatch MODADR+8 (@ref kRegSegX).  Entwurf 42.
+        EM1024
     };
+    /// Offset des Zusatzregisters SG2P/SG3P (nur EM1024): MODADR+8, Bit 0 = SG2P, Bit 1 = SG3P.
+    static constexpr uint8_t kRegSegX = 8;
 
     /**
      * @brief Welche Seite adressiert A22 beim LESEN an MODADR+7?
@@ -282,6 +288,18 @@ public:
      */
     void injectParityError();
 
+    /**
+     * @brief Testhaken: A33 Bit 4 (INT-16) setzen/loeschen, als haette der U8001 es mit
+     *        einem OUT geschrieben (A33 Bit 4 -> PIO A32 Port A Bit 4 -> Interrupt des U880).
+     *
+     * Der Rest von A33 (Ebene Bit 0-2, Segmentwahl, Freigabe A53) und A35 bleiben
+     * unveraendert; das Ereignis `A33A35` wird gemeldet (`by16` = falsch).  Dient dem
+     * Debugger (`emmsg`), um dem U880-Programm eine Anforderung zu stellen, ohne dass der
+     * Kernel auf dem U8001 laeuft.  Das Verhalten der Karte bei U8001-Zugriffen aendert
+     * sich nicht.
+     */
+    void setInt16(bool level);
+
     // ─── Zustand (Tests, Debugger, spaeter Oberflaeche) ───────────────────────
     const Config& config() const { return cfg_; }
     const Z80PIO& pio() const    { return pio_; }
@@ -291,6 +309,7 @@ public:
     bool     trq8() const        { return trq8_; }        ///< TRQ8 = ¬/TRQ8 (PIO B5)
     bool     tren() const        { return tren_; }        ///< TREN = ¬µ0 (µ0 nur nach MSET/MREQ aktiv)
     uint8_t  segment() const     { return seg_; }         ///< SG1P:SG0P (PIO B1:B0)
+    uint8_t  segmentX() const    { return segx_; }        ///< SG3P:SG2P (nur EM1024, sonst 0)
     bool     parityError() const { return per_ff_; }   ///< FF A46 (Merker, /PE = PIO B7 = 0)
     bool     prLine() const      { return pr_; }       ///< PR (PIO B6): haelt A46 zurueckgesetzt
     /// Vorlast von A53 (A3 fest H, A0..A2 ueber X12).
@@ -362,6 +381,7 @@ private:
 
     // PIO B (Pins)
     uint8_t seg_      = 3;
+    uint8_t segx_     = 0;      ///< SG3P:SG2P (EM1024, Zusatzlatch; System-/RESET loescht)
     bool    ramen_    = false;
     bool    reset16_  = true;
     bool    trq8_     = false;

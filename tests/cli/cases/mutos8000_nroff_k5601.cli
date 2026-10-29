@@ -1,4 +1,4 @@
-# MUTOS 8000: Textverarbeitung nroff (Diskette nroff, /usr; Abzug ronny_nroff, Entwurf 39 Abschnitt 10).  nroff sucht fest
+# MUTOS 8000: Textverarbeitung nroff (Diskette nroff, /usr; Abzug m8k2_nroff, Entwurf 39 Abschnitt 10).  nroff sucht fest
 # /usr/lib/tmac und /usr/lib/term; Befehle (cat, echo) kommen von cmd auf /mnt.  Formatiert wird mit der Terminaltabelle 1152.
 tool:      k1520dbg
 disk_path: %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_boot_udos_k5601.hfe

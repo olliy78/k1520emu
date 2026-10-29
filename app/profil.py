@@ -539,8 +539,10 @@ A5120 = Programmprofil(
          "Lade-ROM der K2526.  V0.6 liest die BCU-Disketten „SYL auf Spur 1“.",
          (("v09_2", "V0.9_2"), ("v09_1", "V0.9_1"), ("v06", "V0.6")), ()),
         ("erweiterungsmodul", "Erweiterungsmodul:",
-         "EM064/EM256 mit dem U8001 (A5120.16): nur am A5120 und nur mit der K3526 (64 KB) als RAM.",
-         (("none", "keines"), ("em064", "EM064"), ("em256", "EM256 + U8001")), ("a5120",)),
+         "EM064/EM256 mit dem U8001 (A5120.16): nur am A5120 und nur mit der K3526 (64 KB) als RAM.  "
+         "EM1024 (1 MB) ist eine Neuentwicklung ohne historisches Vorbild.",
+         (("none", "keines"), ("em064", "EM064"), ("em256", "EM256 + U8001"),
+          ("em1024", "EM1024 (Neuentwicklung, 1 MB)")), ("a5120",)),
     ),
     modell_tipp=("Das Modell setzt Vorgaben für Bildschirm, RAM, Tastatur, Lade-ROM, Erweiterungsmodul, "
                  "Kassette und Laufwerke; danach lässt sich jede Einzelheit ändern.  Wählt man das "

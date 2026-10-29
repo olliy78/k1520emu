@@ -526,6 +526,69 @@ TEST(EM16, EM064_U8002_SegmenteGespiegelt) {
 }
 
 /**
+ * @test EM16/EM1024_Modus2_SN0bis3_SegmenteSpiegelnErstAb16
+ * @brief EM1024 (Neuentwicklung): Modus 2 nimmt SN0..SN3 (SN >= 16 spiegelt auf SN & 15),
+ *   die Zellen jenseits 256 KB sind erreichbar.  Save-State traegt das Zusatzlatch und
+ *   weist eine EM256 ab.
+ */
+TEST(EM16, EM1024_Modus2_SN0bis3_SegmenteSpiegelnErstAb16) {
+    EM::Config c; c.variante = EM::Variante::EM1024;
+    Rig r(c);
+    EXPECT_TRUE(r.em.u8001().isZ8001());
+    std::string fw = std::string(kKopf) + "  LD R0,#%00C0\n  OUT %0080,R0\n";
+    const char* hex = "0123456789ABCDEF";
+    for (int sn : {4, 7, 8, 12, 15, 17}) {
+        // Wert %D0xx mit xx = SN (zweistellig hex), Ziel <<SN>>%0F04
+        std::string v = std::string("%D0") + hex[(sn >> 4) & 15] + hex[sn & 15];
+        fw += "  LD R1,#" + v + "\n  LD <<" + std::to_string(sn) + ">>%0F04,R1\n";
+    }
+    fw += "  LD R0,#%0000\n  OUT %0080,R0\n  HALT\n";
+    r.load(fw);
+    r.vektor(0, 0, 0x0100);
+    r.start();
+    r.lauf(3000);
+    ASSERT_TRUE(r.em.u8001().halted());
+    EXPECT_EQ(r.w(4u * 0x10000 + 0x0F04), 0xD004);
+    EXPECT_EQ(r.w(7u * 0x10000 + 0x0F04), 0xD007);
+    EXPECT_EQ(r.w(8u * 0x10000 + 0x0F04), 0xD008);
+    EXPECT_EQ(r.w(12u * 0x10000 + 0x0F04), 0xD00C);
+    EXPECT_EQ(r.w(15u * 0x10000 + 0x0F04), 0xD00F);
+    EXPECT_EQ(r.w(1u * 0x10000 + 0x0F04), 0xD011);     // SN 17 -> Zelle in Segment 1
+    // Save-State mit gesetztem Zusatzlatch.
+    r.bus.ioWrite(0xB0, 2);
+    std::vector<uint8_t> blob;
+    r.em.serialize(blob);
+    Rig b(c);
+    const uint8_t* p = blob.data();
+    ASSERT_TRUE(b.em.deserialize(p, blob.data() + blob.size()));
+    EXPECT_EQ(p, blob.data() + blob.size());
+    EXPECT_EQ(b.em.segmentX(), 2);
+    EXPECT_EQ(b.w(15u * 0x10000 + 0x0F04), 0xD00F);
+    Rig e256;
+    p = blob.data();
+    EXPECT_FALSE(e256.em.deserialize(p, blob.data() + blob.size()));
+}
+
+/**
+ * @test EM16/EM1024_Modus0_ErreichtNurSegment0bis3
+ * @brief Modus 0 (A33 Bit 5/6) liefert nur zwei Segmentbits: auch am EM1024 nur Segment 0..3.
+ */
+TEST(EM16, EM1024_Modus0_ErreichtNurSegment0bis3) {
+    EM::Config c; c.variante = EM::Variante::EM1024;
+    Rig r(c);
+    r.load(std::string(kKopf) +
+           "  LD R1,#%A003\n  LD R0,#%0060\n  OUT %0080,R0\n  LD <<0>>%0F00,R1\n"
+           "  LD R0,#%0000\n  OUT %0080,R0\n  HALT\n");
+    for (uint32_t a = 0; a < 0x1000; ++a) r.em.poke(3u * 0x10000 + a, r.em.peek(a));   // Kopie des Codes
+    r.vektor(0, 0, 0x0100);
+    r.start();
+    r.lauf(1000);
+    ASSERT_TRUE(r.em.u8001().halted());
+    EXPECT_EQ(r.w(3u * 0x10000 + 0x0F00), 0xA003);
+    EXPECT_EQ(r.w(7u * 0x10000 + 0x0F00), 0xFFFF);     // nichts in Segment 7
+}
+
+/**
  * @test EM16/SaveState_MittenImLaufGleicherFortgang
  * @brief serialize/deserialize mitten im Lauf (U8001 mit laufendem LDIR): die
  *   wiederhergestellte Karte laeuft bitgleich weiter.

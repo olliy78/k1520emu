@@ -337,3 +337,91 @@ TEST(MacListing, SetIsInstructionWithoutLabelAndPseudoOpWithOne){
     ASSERT_TRUE(b.ok);
     EXPECT_EQ(bytesAt(b.img, 0x0000, 2), (std::vector<uint8_t>{0x3E,0x07}));
 }
+
+// ─── MACRO / REPT / .PHASE / .DEPHASE (2026-10-27, mutos_io) ──────────────────
+TEST(MacListing, ExpandsMacroAndReptAndAnnotatesWithCallSite){
+    auto a = run("FILL\tMACRO\tN\n"
+                 "\tREPT\tN\n"
+                 "\tDB\t0FFH\n"
+                 "\tENDM\n"
+                 "\tENDM\n"
+                 "\t.PHASE\t9000H\n"
+                 "S1:\tNOP\n"
+                 "\tFILL\t3\n"
+                 "\tREPT\t(10H-(($-S1) AND 0FH)) AND 0FH\n"
+                 "\tDB\t0AAH\n"
+                 "\tENDM\n"
+                 "\tRET\n", 0, false);
+    ASSERT_TRUE(a.ok);
+    EXPECT_EQ(a.res.unknown, 0);
+    EXPECT_EQ(bytesAt(a.img, 0x9000, 5), (std::vector<uint8_t>{0x00,0xFF,0xFF,0xFF,0xAA}));
+    EXPECT_EQ(a.img.byte.at(0x900F), 0xAA);              // bis zur 16er-Grenze aufgefuellt
+    EXPECT_EQ(a.img.byte.at(0x9010), 0xC9);              // RET danach
+    // Zeilen der Expansion tragen die Aufrufzeile, nicht den Rumpf
+    EXPECT_NE(a.lst.by_addr.at(0x9002).find("FILL"), std::string::npos);
+    EXPECT_NE(a.lst.by_addr.at(0x9005).find("REPT"), std::string::npos);
+    EXPECT_EQ(a.lst.by_addr.at(0x9000).find("MACRO"), std::string::npos);
+}
+
+TEST(MacListing, PhaseSegmentsKeepRunAddressAndDephaseReturnsToPhysical){
+    auto a = run("\t.PHASE\t9000H\n"
+                 "\tNOP\n"                // 9000
+                 "\t.DEPHASE\n"
+                 "\tNOP\n"                // physisch 0002 (nach 2 Bytes? nein: 0001)
+                 "\t.PHASE\t0A400H\n"
+                 "\tNOP\n"                // A400
+                 "\t.DEPHASE\n", 0, false);
+    ASSERT_TRUE(a.ok);
+    EXPECT_EQ(a.img.byte.count(0x9000), 1u);
+    EXPECT_EQ(a.img.byte.count(0x0001), 1u);
+    EXPECT_EQ(a.img.byte.count(0xA400), 1u);
+}
+
+// Der Pruefstein: die Quelle von mutos_io, mit den eigenen Mitteln assembliert,
+// muss die Originaldatei bytegleich ergeben (vier .PHASE-Segmente, in Adressfolge
+// hintereinander in der Datei).  Gilt als Beleg, dass die Zuordnung Adresse<->Zeile
+// ueber alle Segmente belastbar ist.
+TEST(MacListing, AssemblesMutosIoBytegleichZumOriginal){
+    const std::string dir = MUTOSIO_DIR;
+    std::ifstream orig(dir + "/mutosio.orig", std::ios::binary);
+    if (!orig) GTEST_SKIP() << "mutosio.orig nicht da";
+    std::vector<uint8_t> want((std::istreambuf_iterator<char>(orig)), {});
+    prnlst::Listing lst; maclst::Result res; maclst::Image img;
+    ASSERT_TRUE(maclst::assemble(dir + "/src/mutosio.mac", 0, lst, res, &img, false));
+    EXPECT_EQ(res.unknown, 0);
+    std::vector<uint8_t> got; for (auto& kv : img.byte) got.push_back(kv.second);
+    ASSERT_EQ(got.size(), want.size());
+    size_t diff = 0, first = 0;
+    for (size_t i = 0; i < got.size(); ++i) if (got[i] != want[i]){ if(!diff) first = i; ++diff; }
+    EXPECT_EQ(diff, 0u) << "erste Abweichung bei Dateioffset " << first;
+    // Segmentgrenzen: Adresse 9000, 9400, A400, C8B6 tragen Zeilen
+    for (uint16_t a : {0x9000, 0x9400, 0xA400, 0xC8B6}) EXPECT_EQ(lst.by_addr.count(a), 1u) << std::hex << a;
+}
+
+// Bedingte Assemblierung: aufloesbare Bedingung waehlt EINEN Zweig, unbekanntes
+// Symbol laesst (wie bisher) alle Zweige mitlaufen.
+TEST(MacListing, ConditionalsSelectOneBranchWhenResolvableElseAssembleAll){
+    auto a = run("FLAG\tEQU\t0\n"
+                 "\tIF\tFLAG\n\tLD A,1\n\tELSE\n\tLD A,2\n\tENDIF\n"
+                 "\tIFE\tFLAG\n\tNOP\n\tENDIF\n", 0, false);
+    ASSERT_TRUE(a.ok);
+    EXPECT_EQ(bytesAt(a.img, 0, 3), (std::vector<uint8_t>{0x3E,0x02,0x00}));
+    EXPECT_EQ(a.img.byte.size(), 3u);
+    auto b = run("\tIF\tFREMD\n\tNOP\n\tELSE\n\tRET\n\tENDIF\n", 0, false);
+    ASSERT_TRUE(b.ok);
+    EXPECT_EQ(bytesAt(b.img, 0, 2), (std::vector<uint8_t>{0x00,0xC9}));
+}
+
+// Fuer `cover expect lst`: nur BEFEHLSzeilen der Adresstabelle zaehlen als erwartet,
+// Daten (DB/DW/DS) und Makroaufrufe nicht; ein vorangestelltes Label stoert nicht.
+TEST(MacListing, IsCodeLineSeparatesInstructionsFromData){
+    EXPECT_TRUE (maclst::isCodeLine("LD A,(HL)"));
+    EXPECT_TRUE (maclst::isCodeLine("HAUPT: LD IX,(V_AKTUELL)"));
+    EXPECT_TRUE (maclst::isCodeLine("SET 0,(IY+1)"));
+    EXPECT_TRUE (maclst::isCodeLine("JP (HL)  ; Absprung"));
+    EXPECT_FALSE(maclst::isCodeLine("DB 0FFH"));
+    EXPECT_FALSE(maclst::isCodeLine("TAB: DW 1,2"));
+    EXPECT_FALSE(maclst::isCodeLine("FILLFF 141"));
+    EXPECT_FALSE(maclst::isCodeLine("REPT (100H-(($-SEG9000) AND 0FFH)) AND 0FFH"));
+    EXPECT_FALSE(maclst::isCodeLine(""));
+}

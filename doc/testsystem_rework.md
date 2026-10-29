@@ -490,7 +490,7 @@ andere Projekt; in dieser Arbeitskopie waren sie damit ohnehin kaputt.
 | `.git/config` (`core.hooksPath`) | `/home/olliy/projects/a5120emu/.git/hooks` | `.githooks` (relativ, von Git zur Arbeitsbaumwurzel aufgelöst) |
 | `SETUP.md` | `cd /home/olliy/projects/a5120emu` | `cd <Projektverzeichnis>` + Hinweis, dass alle Pfade relativ sind |
 | `tools/analyze_eprom.py`, `tools/disasm_k2526.py`, `tools/analyze_vram.py` | absoluter Pfad zu EPROM/Quellen | `ROOT = Path(__file__).resolve().parents[1]` |
-| `tools/z80_disasm.py`, `tools/z80_disasm3.py` | absoluter Vorgabepfad zu `format.com` | `ROOT`-relativ, zusätzlich per Argument überschreibbar |
+| `tools/z80_disasm.py`, `tools/z80_disasm3.py` (inzwischen gelöscht, ersetzt durch `z80_disasm2.py`) | absoluter Vorgabepfad zu `format.com` | `ROOT`-relativ, zusätzlich per Argument überschreibbar |
 | `tools/bootsec/bootsec_analyze.py` | absoluter Pfad | `ROOT`-relativ + `sys.argv[1]`-Override |
 | `.vscode/settings.json` | `autoApprove`-Regex mit vier absoluten Pfaden (u. a. auf das entfernte `src/`) | Eintrag entfernt |
 

@@ -448,6 +448,8 @@ Ein A5120 mit `A5120Machine::Config::em` (`core/cards/em/`, CPU-Primitive
 `k1520dbg --em em256` + `cpu u8000` (`tools/k1520dbg.md` §12), `boot_trace --em`. Plan
 und Stand: `doc/design/17_a5120_16.md`. Beim Zusammenführen mit dem Zweig K8915
 (2026-10-02) festgelegt:
+- **EM1024 (2026-10-28) ist Neuentwicklung, nicht historisch** (1 MB, `em=em1024`, U880-Fenster-Bits SG2P/SG3P im Zusatzlatch MODADR+8;
+  EM064/EM256 bitgleich): `doc/design/42_em1024.md`.
 - **Bus-/MEMDI ist ein JE ZUGRIFF getriebenes Signal** (`K1520Bus::MemdiDriver`), es gibt
   kein `setMEMDI` mehr; die ZRE 045-8762 des K8915 führt /MEMDI nur als Kartenzustand.
 - **Save-State v7** = SIO-Block mit Break/Ext-Latch (K8915-Zweig) + EM-Block; beide Zweige
@@ -595,7 +597,7 @@ Option am 16-Bit-Teil: **U130X** (Original, Armbanduhr-Chip, `FEF1`–`FEFF`) od
 „RTC: …"). Kern-Vorgabe bleibt **aus**.  Drei Festlegungen: **die Uhr zählt in MASCHINENZEIT** und springt beim Start nie
 zurück (`max(Stand + Abwesenheit, Wirtszeit)`, Batteriedatei) — sonst Dateizeiten aus der Zukunft bei schneller Emulation;
 **die Oberfläche speist UTC** (WEGA 3.1 rechnet mit `TZ=MEZ-1MES` selbst um); der 2019-Mangel des echten U130X wird
-**nicht** nachgebildet.  Nur die WEGA-**3.1**-Platte hat einen Uhrentreiber (Lehmanns timer-1.1, Märzfehler in
+**nicht** nachgebildet.  Nur die WEGA-**3.1**-Platte hat einen Uhrentreiber (timer-1.1 von OlliL, Märzfehler in
 `timegm.c` ist Gastcode).  **Vor Arbeiten daran: `doc/merkposten/p8000.md` Nr. 59 lesen**; Entwurf `doc/design/38_p8000_rtc.md`.
 
 ## RAM-Floppy RAF 128/512/2M (alle Maschinen; PC 1715 nur mechanisch, s. Merkposten pc1715)
@@ -714,6 +716,18 @@ PC-Gegenstelle (`app/pcmc.py`, Kasten `app/ui/pcmc_widget.py`, Aktion *Maschine 
 **Vor Arbeiten daran: `doc/merkposten/mc80.md` lesen** (Segmentport 85H, Leerbereich 00H, `Z80CTC::setIntAusVerwirftAnforderung`
 nur an der ASP-CTC, EPROM-Segmente, Kassettentakt-Annahmen, MC80.2x-Zeitmodell und RETI-Verteilung, offene Fragen).
 Plan: `doc/design/31_mc80.md`.
+
+## MUTOS 8000: Diskettenbau HIER, Forschung in mutos8k (Stand 2026-10-29)
+
+**Der Diskettensatz entsteht in DIESEM Projekt, ohne jede Abhaengigkeit zu mutos8k:** `python3 -I tools/mutos8000/bau_alle.py` baut aus den
+eingecheckten Originalen und Archiven `disks/a5120_mutos8000/` (TD0/DMK/ZIP; Ladediskette = `boot_udos.zip` + `mutos_patch.py`) die Disketten
+nach `disks/a5120_16_MUTOS/` (Bedienung: `tools/mutos8000/README.md`, Wächter `tests/python/test_mutos8000_werkzeuge.py`).  Das Projekt
+**`~/projects/mutos8k`** (`README.md`, `CLAUDE.md`, `doc/README.md` dort lesen) hat daneben ein EIGENES, unabhaengiges Bausystem, das Disketten aus
+rekonstruierten Quellen (Kernel, `mutos_io`) baut; dort liegen auch Kernel-/`mutos_io`-Rueckbau und Forschung.  Beide Bausysteme sind gewollt - nicht
+zusammenlegen.  Hier ausserdem: Emulator, EM1024 (`doc/design/42_em1024.md`), Werkzeuge (`z8kdis`, `z80_disasm2.py`, Debugger), DiskTool samt
+MUTOS-Dateisystem.  Anleitung "MUTOS im Emulator benutzen": `doc/design/39_mutos8000.md`.  Eingefrorene Testeingaben (Kernel, `mutos_io`, Karten):
+`tests/fixtures/mutos8000/` (README dort); die Disketten-Originale der cli-Tests liegen in `disks/a5120_mutos8000/`.
+Es gibt nur EINEN Z80-Disassembler: `tools/z80_disasm2.py` (`--format mac --karte`) - nicht noch einen schreiben.
 
 ## Boot-ROM debugging workflow
 

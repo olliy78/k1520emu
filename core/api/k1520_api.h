@@ -133,7 +133,7 @@ K1520_API K1520Handle k1520_create_a5120_konfig(int ausfuehrung, int laderom, in
  *               - `tastatur`   k7637 | k7636
  *               - `laderom`    v09_2 | v09_1 | v06
  *               - `kassette`   0 | 1 (K5020 fest gesteckt)
- *               - `em`         none | em064 | em256 (nur mit ram=k3526)
+ *               - `em`         none | em064 | em256 | em1024 (Neuentwicklung; nur mit ram=k3526)
  *               - `k3521`      aus (Vorgabe) | Hex-Adresse im 4-KB-Raster 0..f000 (akkugepuffertes
  *                              4-KB-RAM K3521.30; Ablagedatei: k1520_k3521_datei)
  *               - `k3521_memdi` bus (Vorgabe) | memdi1 | memdi2 (nur mit k3521)
@@ -577,14 +577,14 @@ K1520_API int  k1520_serial_classify_host(const char* host);
  * @brief Wie k1520_create_configured, zusaetzlich mit Erweiterungsmodul.
  *
  * @param em  "none" / NULL / "" = A5120 ohne EM, "em064" (U8002, 64 KB),
- *            "em256" (U8001, 256 KB) = A5120.16.  Unbekannter Name → NULL
+ *            "em256" (U8001, 256 KB) = A5120.16, "em1024" (1 MB, Neuentwicklung).  Unbekannter Name → NULL
  *            (Grund in k1520_last_init_error).
  */
 K1520_API K1520Handle k1520_create_with_em(K1520MachineType type,
                                            const char* drive0, const char* drive1,
                                            const char* drive2, const char* drive3,
                                            const char* em);
-/** @brief Bestueckung: "" (kein EM), "em064" oder "em256". */
+/** @brief Bestueckung: "" (kein EM), "em064", "em256" oder "em1024". */
 K1520_API const char* k1520_em_variant(K1520Handle h);
 /** @brief LED V1 der Steuerkarte — zeigt RAMEN (nicht den Paritaetsfehler). */
 K1520_API bool k1520_em_led_v1(K1520Handle h);

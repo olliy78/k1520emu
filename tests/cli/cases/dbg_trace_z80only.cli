@@ -1,0 +1,25 @@
+# `trace <datei> z80` schreibt nur Z80-Zeilen: am lebenden U8001 (em16abl) fuellen sonst
+# die U8001-Zeilen (`T3`) den 2-Mio.-Deckel (mutos_io-Analyse, 2026-10-27).
+# Gegenprobe ohne den Schalter: dbg_trace_z80only_ohne.cli (T3 kommt vor).
+tool:      k1520dbg
+disk:      cpa_cpa780_k5601_noclock.img
+setup_run: @k1520disktool put %DISK% %CLI_DIR%/../fixtures/cpm/em16abl.com
+run:       --em em256 %DISK%
+tmpfile trace.txt:
+stdin:
+  gscreen "A>" 150000000
+  bmode 16
+  keys EM16ABL\r
+  bmode off
+  cpu u8000
+  n
+  s 3
+  trace %trace.txt% z80
+  g 2000000
+  trace off
+  q
+capture_file: trace.txt
+timeout:   120
+expect:    [nur Z80, ohne U8001-Zeilen]
+expect_re: T1 c[0-9]+
+forbid_re: (?m)^T3
