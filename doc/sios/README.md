@@ -79,3 +79,43 @@ also 6C00H Byte = 216 Sektoren statt 272).  SYSARE09 hat 27 Systembloecke (0800H
 (Kennungen 00-05, 10-12, 70-73, 40/41, 30-35, 30-33; Kopfflags 92/82/91/81 statt 90/94/84), Systemzeile `MONITOR ===== SIOS 1526/0.9 (M)`
 bei 0EECH.  Block 0 (0800H-0BFFH) und Blocks mit gleicher CRC wie bei 1.1 (z. B. 0ffa, 001b, 49a8, 07c8) sind bitgleich.
 Listing fuer 0.9 nicht erzeugt (`gen_prn.py` ist auf SYLs ausgelegt).
+
+## Befund S2b (Warteschleife 1CD4H) - Ursache: CTC-Kanal 3 stoppt nach dem ersten ZC/TO
+
+Stand 2026-10-29, Zweig `sios-s3`.  **[Lauf]** = `k1520dbg`, **[Code]** = Listing.
+
+**Was 1CD4H wartet.**  SVC `RST 08H` mit Kennbyte 60H (Bit6 = synchron, Bit5 = Parameter ab 0104H) ist ein Geraeteauftrag.
+Geraeteeintraege: 16 x 16H Byte ab 0111H; Eintrag E: `E+0/E+1` = Zeiger auf die Geraeteroutine, `E+2` = Kommando/Folgeschritt,
+`E+3` = Flags (Bit2 = Auftrag laeuft, Bit3 = Ereignis, Bit5 = Zeitablauf, Bit4 = Wiederholung), `E+5` = Zeitgeber (Einheit 100 ms).
+Geraetetabelle 0300H.. liefert je Index die Eintragsadresse (Index 2 = 0124H = **DFUE, SIO A33**, Routine 84AAH; Index 1 = 010EH, Routine 204EH).
+Ablauf (1CC2H..1CE4H): `SET 2,(E+3)`, `SET 3,(E+3)`, `OUT (00H)` -> ISR 1E48H tastet alle Eintraege ab und ruft die Routine auf
+(`CALL 001DH`), dann Schleife `BIT 2,(HL) / JR NZ` mit RETI-Trampolin (laesst Interrupts durch).  Der Monitor (0E7FH..0EA2H)
+macht das fuer jedes vorhandene Geraet (Index 14H abwaerts) **vor** der Systemzeile.  Haengepunkt [Lauf]: Index 2, HL=0129H.
+Die DFUE-Routine erledigt im 1. Durchlauf nur den Kanal-Reset (`8599: OUT (51H),18H`) und setzt `0128H = 04`; der 2. Durchlauf (SIO-Aufbau,
+Bit2 loeschen bei 864FH/86E5H) findet erst bei der **naechsten** Abtastung statt (`0128H != 0` ruft die Routine bedingungslos).
+
+**Wer die naechste Abtastung ausloest.**  Die **ISR CTC-Kanal 3 (0D6AH, Vektor 7EH)**: 100-ms-Takt (SIOS: ZC/TO2 -> CLK/TRG3, `ED`/`30H` =
+Zaehlmodus, 48 Impulse; 5120 Takte x 48 = 100 ms), zaehlt die Uhr (00F2H..) und die Geraete-Zeitgeber (0DF9H: Zaehler `E+5` -1, bei 0
+`SET 5,(E+3)` + `OUT (00H)`).  Ohne diesen Takt gibt es keine Neuabtastung, kein Zeitablauf, keine Uhr [Code].
+
+**Emulatorfehler [Lauf, belegt].**  `Z80CTC::fireZCTO()` (`core/primitives/z80_ctc.cpp` Z. 487) stoppt den Kanal bei gesetztem
+D3 (`CTRL_CLK_TRG`) - auch im **Zaehlmodus** (D6=1), wo D3 laut Datenblatt ohne Bedeutung ist.  SIOS programmiert Kanal 3 mit `0EDH`
+(D6=1 Zaehler, D3=1): `dev ctc` zeigt `ch3 ctl=ED TC=30 cnt=48 run=0`; die ISR 0D6AH lief genau **einmal** (c15,146 Mio.,
+`bp 0D6A`), danach nie wieder (60 Mio. Takte, `itrace`: kein Vektor 7EH mehr).  CP/A, UDOS, SCPX programmieren Kanal 3 ohne D3 und
+sind nicht betroffen.
+Gegenprobe [Lauf]: bei 092FH (`OUT (0FH),A`) `set A 0xE5` (D3 = 0), dann `g 120000000` -> **Bildschirm zeigt
+`MONITOR ===== SIOS 1526/1.1 (M)_`**, `dev ctc`: `ch3 ctl=E5 cnt=33 run=1`, Uhr `00F2H = 08`, 253 ISR 1E48H, keine Haenger.
+Gegenprobe 2 [Lauf]: am Haengepunkt `set PC 0x1CCE` (= erzwungenes `OUT 00H`) -> 0128H/0129H werden 00 (DFUE fertig), die Kette
+schreitet zum Index 1 weiter - die Abtastung ist also der fehlende Anstoss.
+
+**Korrekturvorschlag (nicht umgesetzt).**  `core/primitives/z80_ctc.cpp`, `fireZCTO()`:
+`if ((c.control & CTRL_CLK_TRG) && !(c.control & CTRL_COUNTER)) c.running = false;`
+(Zaehlmodus laedt neu und zaehlt weiter; das Einmal-Verhalten bleibt dem Zeitgebermodus mit Trigger).  Ein gleichartiger Test gehoert
+nach `tests/unit/primitives/test_ctc.cpp` (Zaehlmodus mit D3 = 1: nach dem ersten ZC/TO weiter `running`, zweiter ZC/TO nach TC weiteren
+Flanken), danach die Waechter `SiosBoot.*` (bootetBisSystemzeile) einschalten.  Zu pruefen: die Stapelpfade `clockTick` (Z. 330-430)
+benutzen `zcto_active`/`running`, nicht D3 - dort keine zweite Stelle gefunden.
+
+**Widerlegt [Lauf]:** (a) Tastatur: TYP 80H wird gelesen (2C57H), die Initialisierung (5DH, ~35 000 Lesezugriffe waren die Warteschleife
+2C46H bis zum Empfang) ist durch; SL-Codes fehlen nicht, SIOS wartet nicht darauf.  (c) Floppy: kein Zugriff an K5122.  (d) /INT-BS:
+ISR 1E48H laeuft 9 x (1 x Scharfmachen, 8 x je Geraeteauftrag), jeweils unmittelbar nach `OUT 00H`.  (e) kein NMI (0A8FH nie erreicht).
+Bemerkenswert fuer Folgeschritte: SIOS liest `IN (56H)` = FEH (DIL A41/PIO A31) und programmiert SIO A33 Kanal B (`53H`: 02, 80, 01, 04).

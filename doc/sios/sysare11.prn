@@ -1468,7 +1468,7 @@ ISR_BSPIO_A_KOERPER:
 0D67  D3 02         	OUT (02H),A
 0D69  D7            	RST 10H
 ISR_CTC3:
-0D6A  FB            	EI		;ISR CTC-Kanal 3 (Vektor 7EH)
+0D6A  FB            	EI		;ISR CTC-Kanal 3 (Vektor 7EH) = 100-ms-Takt (48 x ZC/TO2): Uhr 00F2H.., Zeitgeber der Geraeteeintraege (0DF9H) [Lauf S2b]
 0D6B  F5            	PUSH AF
 0D6C  C5            	PUSH BC
 0D6D  D5            	PUSH DE
@@ -1555,7 +1555,7 @@ ISR_CTC3:
 0DF6  3C            	INC A
 0DF7  27            	DAA
 0DF8  77            	LD (HL),A
-0DF9  21 15 01      	LD HL,0115H
+0DF9  21 15 01      	LD HL,0115H		;Geraete-Zeitgeber: je Eintrag (16 x 16H ab 0115H) Zaehler -1; bei 0 SET 5 im Flagbyte (Eintrag+3) und OUT 00H = Neuabtastung durch ISR 1E48H [Code]
 0DFC  06 10         	LD B,10H
 0DFE  11 16 00      	LD DE,0016H
 0E01  7E            	LD A,(HL)
@@ -3412,14 +3412,14 @@ SVC:
 1CBE  03            	INC BC
 1CBF  FD E5         	PUSH IY
 1CC1  E1            	POP HL
-1CC2  CB D6         	SET 2,(HL)
+1CC2  CB D6         	SET 2,(HL)		;SVC-Auftrag: Flagbyte des Eintrags Bit2 (Auftrag laeuft) + Bit3 (Ereignis) setzen, OUT 00H = ISR 1E48H ruft die Behandlungsroutine des Geraets [Lauf S2b]
 1CC4  CB DE         	SET 3,(HL)
 1CC6  FD 21 FE 00   	LD IY,00FEH
 1CCA  FD CB 00 BE   	RES 7,(IY+0)
 1CCE  D3 00         	OUT (00H),A
 1CD0  CB 71         	BIT 6,C
 1CD2  28 12         	JR Z,1CE6H
-1CD4  D5            	PUSH DE
+1CD4  D5            	PUSH DE		;Warteschleife (Kennbyte Bit6): wartet bis die Geraeteroutine Bit2 im Flagbyte loescht; RETI-Trampolin laesst Interrupts durch. Haengt ohne CTC3-Takt (Eintrag 0127H = DFUE) [Lauf S2b]
 1CD5  E5            	PUSH HL
 1CD6  CD 36 00      	CALL 0036H
 1CD9  11 07 00      	LD DE,0007H
@@ -14226,7 +14226,7 @@ FLOPPY_NEUSTART:
 84A5  60            	LD H,B
 84A6  01 02 05      	LD BC,0502H
 84A9  AA            	XOR D
-84AA  21 28 01      	LD HL,0128H
+84AA  21 28 01      	LD HL,0128H		;Geraeteroutine DFUE (SIO A33): Eintrag 0126H/0127H = Zeiger; 0128H = Kommando (Folgeschritt), 0129H = Flags; 1. Durchlauf nur Kanal-Reset (OUT 51H,18H), setzt 0128H=04, 2. Durchlauf erst nach Neuabtastung [Lauf S2b]
 84AD  7E            	LD A,(HL)
 84AE  B7            	OR A
 84AF  11 28 02      	LD DE,0228H
