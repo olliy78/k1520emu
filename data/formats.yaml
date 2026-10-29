@@ -914,6 +914,24 @@ filesystems:
     type:        udos
     usable_tracks: 40
 
+  # ══ SIOS 1526 (A5120/A5130/K8924) ══════════════════════════════════════════
+  # IBM-Etikettendiskette (doc/sios_diskettenformat.md): dieselbe Rohgeometrie wie die
+  # K5601-Formate "W" und "S" (26x128 MFM einseitig, natuerliche Folge), deshalb KEIN eigenes
+  # Format - nur ein Dateisystemprofil je Spurzahl.  Erkannt wird ausschliesslich am POSITIVEN
+  # Nachweis (Spur 0: ERMAP in Sektor 5 UND VOL1 in Sektor 7, EBCDIC/DKOI).  Die Probe steht
+  # ausserhalb des Rangwettbewerbs (disk_volume.cpp): ein Treffer verdraengt CP/M-Profile ohne
+  # eigenen Nachweis, aber nie WEGA/MUTOS, UDOS oder BCU - deren Disketten sind teils SIOS-
+  # initialisiert.  Derzeit nur LESEND (Arbeitspaket D2/D3).
+  - name:        sios_ss40
+    description: "SIOS 1526 — IBM-Etikettendiskette, 40 Spuren einseitig, 26×128 (nur lesend)"
+    format:      k5601_ss40_26x128
+    type:        sios
+
+  - name:        sios_ss80
+    description: "SIOS 1526 — IBM-Etikettendiskette, 80 Spuren einseitig, 26×128 (nur lesend)"
+    format:      k5601_ss80_26x128
+    type:        sios
+
   # ══ UDOS1715 / NDOS (PC 1715) ══════════════════════════════════════════════
   # Dieselbe Betriebssystemfamilie, ANDERES Dateisystem: der uPD765 des PC 1715
   # erreicht die Bytes hinter der Daten-CRC nicht, deshalb steht die Verkettung in

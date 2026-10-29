@@ -135,7 +135,7 @@ class PropertiesDialog(QDialog):
         # WEGA steht dort eine Dateiart (-/d/c), die man leicht fuer einen UDOS-Typ haelt.
         if tool.ist_wega or entry.ist_unix:
             self.art = "wega"
-        elif tool.ist_udos or entry.type:
+        elif tool.ist_udos or (entry.type and not getattr(tool, "ist_sios", False)):
             self.art = "udos"
         else:
             self.art = "cpm"
