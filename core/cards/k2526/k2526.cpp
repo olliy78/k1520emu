@@ -311,10 +311,11 @@ void K2526::ioWrite(uint8_t port, uint8_t data)
         switch (port) {
             case 0x00:
                 // /INT-BS: OS-Ebenen-Wechsel anfordern.  Der Decoder A27 liefert nur
-                // einen IMPULS waehrend des E/A-Zyklus (kein Zustand); SIOS programmiert
-                // BS-PIO B im Bitmodus ODER/aktiv HIGH (Steuerwort B7H, Maske FDH):
-                // B1 steigt kurz auf 1 und faellt zurueck.  Die PIO merkt sich die
-                // erfuellte Bedingung (pending).  Ein dauernd gehaltener Pegel loeste
+                // einen IMPULS waehrend des E/A-Zyklus (kein Zustand): B1 ist aktiv LOW
+                // (Ruhepegel HIGH, Abschn. 6.10.2) und faellt kurz auf 0.  SIOS
+                // programmiert BS-PIO B im Bitmodus ODER/aktiv HIGH (Steuerwort B7H,
+                // Maske FDH) - die Bedingung tritt also an der RUECKflanke des Impulses
+                // ein, bei jedem OUT 00H erneut.  Ein dauernd gehaltener Pegel loeste
                 // nur einmal aus - SIOS wartete dann in 1CD4H ewig auf seine ISR.
                 int_bs_active_ = true;
                 bs_pio_.portBWrite(buildPortBInputs());
@@ -536,8 +537,8 @@ uint8_t K2526::buildPortBInputs() const
 {
     const uint8_t bruecken = bruecken_quelle_ ? bruecken_quelle_() : cfg_.config_bridges;
     uint8_t val = static_cast<uint8_t>((bruecken & 0x07) << 5);
-    if (int_bs_active_)
-        val |= 0x02;   // B1 = 1 nur waehrend des OUT-00H-Impulses (aktiv HIGH an der PIO)
+    if (!int_bs_active_)
+        val |= 0x02;   // B1 = 1 (Ruhepegel); 0 nur waehrend des OUT-00H-Impulses
     return val;
 }
 

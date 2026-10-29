@@ -1149,8 +1149,9 @@ TEST(K2526, IntBS_Port00_DoesNotCrash)
 
 /**
  * @test K2526/IntBS_Port00_PulstB1_PIOMerktInterrupt
- * @brief OUT 00H ist ein IMPULS auf B1; die wie SIOS programmierte PIO (Bitmodus, ODER,
- *   aktiv HIGH, Maske nur B1) merkt ihn sich.  Ruhepegel B1 = 0.
+ * @brief OUT 00H ist ein LOW-Impuls auf B1 (/INT-BS aktiv LOW, Ruhepegel HIGH); die wie
+ *   SIOS programmierte PIO (Bitmodus, ODER, aktiv HIGH, Maske nur B1) meldet den Interrupt
+ *   an der Rueckflanke - bei jedem OUT 00H erneut.
  */
 TEST(K2526, IntBS_Port00_PulstB1_PIOMerktInterrupt)
 {
@@ -1158,17 +1159,28 @@ TEST(K2526, IntBS_Port00_PulstB1_PIOMerktInterrupt)
     K2526 card(bus);
     card.attachToBus(bus);
     card.powerOn();
-    EXPECT_EQ(bus.ioRead(BSPIO_PORTB_DATA) & 0x02, 0) << "Ruhepegel B1 = 0";
+    EXPECT_EQ(bus.ioRead(BSPIO_PORTB_DATA) & 0x02, 0x02) << "Ruhepegel B1 = 1";
 
     bus.ioWrite(0x0B, 0x76);   // Vektor
     bus.ioWrite(0x0B, 0xB7);   // Int. ein, ODER, aktiv HIGH, Maske folgt
     bus.ioWrite(0x0B, 0xFD);   // nur B1 ueberwacht
     card.setIEI(true);
+    bus.setInterruptChain({&card});
+    // Ruhepegel HIGH erfuellt die Bedingung schon beim Scharfmachen (Mode-3-Neubewertung):
+    // genau eine Meldung, die das BS quittiert.
+    ASSERT_TRUE(card.hasInterrupt()) << "Bedingung beim Scharfmachen bereits erfuellt";
+    EXPECT_EQ(bus.interruptAcknowledge(), 0x76);
+    card.onRETI();
     ASSERT_FALSE(card.hasInterrupt());
 
-    bus.ioWrite(0x00, 0x00);
-    EXPECT_TRUE(card.hasInterrupt()) << "OUT 00H muss den Interrupt anmelden";
-    EXPECT_EQ(bus.ioRead(BSPIO_PORTB_DATA) & 0x02, 0) << "B1 faellt nach dem Impuls zurueck";
+    for (int i = 0; i < 3; ++i) {
+        bus.ioWrite(0x00, 0x00);
+        EXPECT_TRUE(card.hasInterrupt()) << "OUT 00H Nr. " << i << " muss den Interrupt anmelden";
+        EXPECT_EQ(bus.ioRead(BSPIO_PORTB_DATA) & 0x02, 0x02) << "B1 steigt nach dem Impuls zurueck";
+        EXPECT_EQ(bus.interruptAcknowledge(), 0x76);
+        card.onRETI();
+        EXPECT_FALSE(card.hasInterrupt());
+    }
     EXPECT_FALSE(card.isSPSViolation());
 }
 
