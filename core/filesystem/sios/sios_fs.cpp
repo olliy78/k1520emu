@@ -144,7 +144,7 @@ std::vector<SiosEtikett> SiosFileSystem::etiketten() const {
         SectorData s;
         if (!space_.readSector(0, 0, static_cast<uint8_t>(sek), s) || s.data.size() != kSiosSektor)
             continue;
-        // Aktiv ist nur ein Satz mit HDR1 (die gelöschte Datenmarke F8 ist doppelte Kodierung
+        // Aktiv ist nur ein Satz mit HDR1 (die geloeschte Datenmarke F8 ist doppelte Kodierung
         // desselben Zustands und wird nicht ausgewertet, Formatdokument §4.4).
         if (dkoiText(s.data, 0, 4) != "HDR1") continue;
 
