@@ -58,6 +58,7 @@ bestehen bleiben soll (z. B. Formatier-Versuche) — dann auf einer eigenen Kopi
 | `format_driver` | Skriptgesteuerter Treiber für interaktive Gastprogramme: bootet CP/A mit zwei Disketten, sendet Tastenfolgen, gibt zwischen den Schritten den 80×24-Text aus. Rückgrat der Formatier-Pipeline (`FORMAT.COM`/`FORMATB.COM`) | `doc/format.md` |
 | `z8kasm` | Assembler/Disassembler für den U8001/U8002 (Z8001/Z8002) in Zilog-Syntax, aus **einer** Befehlstabelle (`z8000/z8k_table.h`, auch Takte für den CPU-Kern) | **[z8000/README.md](z8000/README.md)** |
 | `z8kdis` | Z8000-Disassembler fuer ganze Abzuege: Kartendatei (wie `z80_disasm2.py`), Ablaufverfolgung, Marken, `--format as` (MUTOS-`as`, PLZ/ASM), Rundlauf `--pruefen` (Entwurf 41, K3) | **[z8000/README.md](z8000/README.md)** |
+| `mutos8000/` | MUTOS 8000: Diskettenbau aus den Originalen `disks/a5120_mutos8000/` nach `disks/a5120_16_MUTOS/` (`python3 -I tools/mutos8000/bau_alle.py`, README dort); Forschung/Rekonstruktion in `~/projects/mutos8k` |
 | `kbd_test` | Tastatur-/Boot-Smoke: bootet, tippt Text + Enter, gibt Bildschirm, Tastatur-Portverkehr (0x5C/0x5D mit Quell-PC) und ein PC-Histogramm aus | unten |
 | `floppy_diag` | Lese-Diagnose am **laufenden** OS: verfolgt jeden ZVE2-Lesezugriff über `0x1F7D` — gesuchte (cyl, head, sector, size) und ob das IDAM gefunden wurde | — |
 | `mk_disk_template` | Erzeugt gültig vorformatierte **einseitige** Leerdisketten (HFE) im CP/A-Systemlayout — 8″-FM/MFM und 5¼″-SS | `tests/fixtures/README.md` |

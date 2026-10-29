@@ -1,0 +1,12 @@
+# Bauangaben der MUTOS-8000-Datendiskette cc2 (Inhalt von DISK-CC2, Entwurf 39 Abschnitt 10; Mountpunkt /usr).
+# Vorlage fuer tools/mutos8000/archiv_erzeugen.py --art cc2; bau_aus_archiv.py liest sie aus dem Archiv.
+# Nur "schluessel: wert", ein Wert je Zeile.
+fs: mutos8k_26x128_fm
+# Dieselbe Diskette in MFM (bau_aus_archiv.py --laufwerke k5601)
+fs_mfm: mutos8k_26x128_mfm
+inodes: 16
+# Dateisystemgroesse (s_fsize) in Bloecken: die ganze 8-Zoll-Diskette (76 Spuren x 26 Sektoren / 4).  Anders als die Wurzel
+# (Auslagerungsbereich ab Block 250 auf rk2) ist auf einer Datendiskette nichts zu schuetzen: /dev/swap ist 4,2.
+bloecke: 494
+# Zylinder 0 mit den Etiketten ERMAP / VOL1MUTOS (gleich dem von M8KCMD und der Wurzel), Rohbytes aus `boot-get`.
+zylinder0: zylinder0.bin

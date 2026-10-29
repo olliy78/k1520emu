@@ -66,7 +66,7 @@ bandtest_boot.k52"
 # MUTOS 8000 (A5120.16, 2026-10-25): NUR der K5601-Satz — Ladediskette mit "nur_a" (Wurzel und
 # Datendisketten duerfen schon beim Einschalten in B:/C: liegen) und die dazu passenden MFM-Disketten.
 # Die Fassungen fuer MF3200 (FM), die anderen Ladedisketten (mf3200, 8x512, ...) und die Quellen in
-# MUTOS-Originale/Quellen liegen im Projekt mutos8k, nicht hier: gleiche Inhalte in anderer Aufzeichnung
+# disks/a5120_mutos8000/ (.td0, .zip) liegen nur im Repository: gleiche Inhalte in anderer Aufzeichnung
 # waeren im Paket reine Redundanz.  Gilt auch fuer --disks all.
 MUTOS_PAKET="a5120_mutos8000_boot_udos_k5601_nur_a.hfe
 a5120_mutos8000_root_mfm.hfe
@@ -600,6 +600,7 @@ case "$DISKS" in
                         \( -name '*.hfe' -o -name '*.img' -o -name '*.dmk' -o -name '*.img.gz' -o -name '*.k52' \) \
                         | sort); do
             case "$d" in
+                */a5120_mutos8000/*) continue ;;                       # Quellen/Originale des MUTOS-Satzes
                 */a5120_16_MUTOS/*) case " $(echo $MUTOS_PAKET) " in
                                         *" $(basename "$d") "*) ;; *) continue ;; esac ;;
             esac

@@ -1,5 +1,5 @@
 tool:   k1520disktool
-run:    info %CLI_DIR%/../../tests/fixtures/mutos8000/a5120_mutos8000_root.td0
+run:    info %CLI_DIR%/../../disks/a5120_mutos8000/a5120_mutos8000_root.td0
 expect: mutos8k_8x512_mfm_80
 forbid: tar_mutos8k
 exit:   0

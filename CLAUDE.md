@@ -716,13 +716,16 @@ PC-Gegenstelle (`app/pcmc.py`, Kasten `app/ui/pcmc_widget.py`, Aktion *Maschine 
 nur an der ASP-CTC, EPROM-Segmente, Kassettentakt-Annahmen, MC80.2x-Zeitmodell und RETI-Verteilung, offene Fragen).
 Plan: `doc/design/31_mc80.md`.
 
-## MUTOS 8000: Forschung im Projekt mutos8k (Stand 2026-10-28)
+## MUTOS 8000: Diskettenbau HIER, Forschung in mutos8k (Stand 2026-10-29)
 
-Kernel-/`mutos_io`-Rueckbau, Quellen, Original-Abzuege und die Werkzeuge, die daraus die Disketten bauen, liegen im Projekt
-**`~/projects/mutos8k`** (`README.md`, `CLAUDE.md`, `doc/README.md` dort lesen).  Hier bleiben Emulator, EM1024 (`doc/design/42_em1024.md`),
-Werkzeuge (`z8kdis`, `z80_disasm2.py`, Debugger), DiskTool samt MUTOS-Dateisystem und die **fertigen Disketten** `disks/a5120_16_MUTOS/`
-(Lieferweg: Neubau in mutos8k mit `./mk disketten` -> `disks/gebaut`, dann hierher kopieren).  Die Anleitung "MUTOS im Emulator benutzen"
-ist `doc/design/39_mutos8000.md`.  Eingefrorene Testeingaben (Kernel, `mutos_io`, Karten, drei TD0 + DMK): `tests/fixtures/mutos8000/` (README dort).
+**Der Diskettensatz entsteht in DIESEM Projekt, ohne jede Abhaengigkeit zu mutos8k:** `python3 -I tools/mutos8000/bau_alle.py` baut aus den
+eingecheckten Originalen und Archiven `disks/a5120_mutos8000/` (TD0/DMK/ZIP; Ladediskette = `boot_udos.zip` + `mutos_patch.py`) die Disketten
+nach `disks/a5120_16_MUTOS/` (Bedienung: `tools/mutos8000/README.md`, Wächter `tests/python/test_mutos8000_werkzeuge.py`).  Das Projekt
+**`~/projects/mutos8k`** (`README.md`, `CLAUDE.md`, `doc/README.md` dort lesen) hat daneben ein EIGENES, unabhaengiges Bausystem, das Disketten aus
+rekonstruierten Quellen (Kernel, `mutos_io`) baut; dort liegen auch Kernel-/`mutos_io`-Rueckbau und Forschung.  Beide Bausysteme sind gewollt - nicht
+zusammenlegen.  Hier ausserdem: Emulator, EM1024 (`doc/design/42_em1024.md`), Werkzeuge (`z8kdis`, `z80_disasm2.py`, Debugger), DiskTool samt
+MUTOS-Dateisystem.  Anleitung "MUTOS im Emulator benutzen": `doc/design/39_mutos8000.md`.  Eingefrorene Testeingaben (Kernel, `mutos_io`, Karten):
+`tests/fixtures/mutos8000/` (README dort); die Disketten-Originale der cli-Tests liegen in `disks/a5120_mutos8000/`.
 Es gibt nur EINEN Z80-Disassembler: `tools/z80_disasm2.py` (`--format mac --karte`) - nicht noch einen schreiben.
 
 ## Boot-ROM debugging workflow
