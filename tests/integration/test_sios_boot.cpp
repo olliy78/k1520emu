@@ -20,8 +20,31 @@
 #include "tests/support/keyboard.h"
 #include "tests/support/machine_run.h"
 #include "tests/support/screen.h"
+#include "core/filesystem/disk_volume.h"
+#include "core/filesystem/fs_catalog.h"
+#include "core/peripherals/floppy_drive/format_catalog.h"
 
 namespace {
+
+const FormatCatalog& formate() {
+    static FormatCatalog c = [] {
+        std::string f;
+        FormatCatalog k = FormatCatalog::loadDefault(&f);
+        EXPECT_TRUE(f.empty()) << f;
+        return k;
+    }();
+    return c;
+}
+
+const FsCatalog& dateisysteme() {
+    static FsCatalog c = [] {
+        std::string f;
+        FsCatalog k = FsCatalog::loadDefault(formate(), &f);
+        EXPECT_TRUE(f.empty()) << f;
+        return k;
+    }();
+    return c;
+}
 
 using k1520test::TempDisk;
 
@@ -134,4 +157,54 @@ TEST(SiosMonitor, CalMeldetNfndWennProgrammFehlt) {
     r.tippe("CATM");
     r.taste(kET1);
     EXPECT_TRUE(r.warte("NFND", 150'000'000LL)) << r.schirm();
+}
+
+// --- INIT (AP S6/D4, doc/sios/befund_init.md) ----------------------------------------------------
+// Programm INIT von DP1 in A: (Programmlaufwerk 04), Zieldiskette in B: (05).  Die Zieldiskette
+// wird vollstaendig neu beschrieben (INIT ALL = Y).
+TEST(SiosInit, InitialisiertDiskette) {
+    A5120Machine::Config c = SiosRechner::cfg();
+    c.drive_profiles = {"K5600.20", "K5600.10", "none", "none"};   // dp2 = 40 Spuren
+    A5120Machine m(c);
+    m.powerOn();
+    TempDisk syls("sios1526_syls.hfe");
+    TempDisk prog("sios1526_dp1.hfe", "sios_init_prog.hfe");
+    TempDisk ziel("sios1526_dp2.hfe", "sios_init_ziel.hfe");
+    ASSERT_TRUE(m.mountDisk(0, syls.path(), "k5601_ss80_26x128", false)) << m.lastError();
+    ASSERT_TRUE(k1520test::runSmallUntil(m, "(M)", 300'000'000LL, 100'000)) << k1520test::vramText(m);
+    ASSERT_TRUE(m.mountDisk(0, prog.path(), "k5601_ss40_26x128", false)) << m.lastError();
+    ASSERT_TRUE(m.mountDisk(1, ziel.path(), "k5601_ss40_26x128", false)) << m.lastError();
+    auto warte = [&](const std::string& t, long long takte = 60'000'000LL) {
+        return k1520test::runSmallUntil(m, t, takte, 5'000);
+    };
+    k1520test::typeString(m, "CAL");
+    k1520test::typeKey(m, kET1);
+    ASSERT_TRUE(warte("CAL_")) << k1520test::vramText(m);
+    k1520test::typeString(m, "INIT");
+    k1520test::typeKey(m, kET1);
+    ASSERT_TRUE(warte("DISKETTE", 150'000'000LL)) << k1520test::vramText(m);
+    k1520test::runSmallUntil(m, "ZZZZ", 25'000'000LL, 5'000);   // Frage 8" abwarten (befund_init.md 4)
+    k1520test::typeString(m, "N");
+    k1520test::typeKey(m, kET1);
+    for (int i = 0; i < 5; ++i) {            // Menue 1, Satzlaenge, Folge, 2 x Defektspur
+        k1520test::runSmallUntil(m, "\x01", 20'000'000LL, 5'000);
+        k1520test::typeKey(m, kET1);
+    }
+    k1520test::typeString(m, "Y");
+    k1520test::typeKey(m, kET1);
+    // INIT schreibt alle 40 Spuren und liest sie zurueck (~2 min Geraetezeit).
+    const bool fertig = warte("FINISHED", 1'500'000'000LL);
+    const std::string v = k1520test::vramText(m);
+    ASSERT_TRUE(fertig) << v;
+    EXPECT_EQ(v.find("ERR"), std::string::npos) << v;
+
+    // Gegenprobe mit dem DiskTool-Kern: die von SIOS initialisierte Diskette ist eine
+    // SIOS-Diskette (ERMAP + VOL1 in Spur 0) und die Pruefung findet nichts.
+    ASSERT_TRUE(m.unmountDisk(1));
+    std::string err;
+    auto vol = DiskVolume::open(ziel.path(), "", formate(), dateisysteme(), err);
+    ASSERT_TRUE(vol) << err;
+    ASSERT_TRUE(vol->hasFileSystem()) << "nicht als SIOS erkannt";
+    EXPECT_EQ(vol->profile().name, "sios_ss40");
+    EXPECT_EQ(vol->check(FsCheckLevel::Schnell, false).zaehlerAb(FsSeverity::Warnung), 0);
 }

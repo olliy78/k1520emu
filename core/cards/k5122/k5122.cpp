@@ -678,9 +678,19 @@ void K5122::handleCtrlPortAWrite(uint8_t data) {
             // Steht noch ein ungeschriebener Format-Strom an (Verify direkt nach dem
             // Write, bevor die write-idle-Erkennung committet hat), zuerst die Spur sichern
             // — sonst laese der Verify die alte (Vor-Format-)Spur.
+            const bool vom_schreiben = write_mode_;
             if (write_mode_ && !write_buf_.empty()) commitFormatTrack();
             write_mode_ = false;
             startReadTransfer();
+            // Nach einem Marken-Impuls MITTEN IM LESEN steht im Daten-PIO B noch ein Altbyte,
+            // das der Gast zuerst verwirft (Boot-ROM "1 verwerfen + 3", 4 x A1 im Lesestrom).
+            // Kommt der Impuls unmittelbar aus dem SCHREIBEN, ist der PIO-B-Puffer leer: das
+            // erste IN liefert bereits das erste A1 der Marke (K5122-Doku 5.3/5.5).  SIOS-INIT
+            // liest nach dem Formatieren deshalb mit 3 x IN + INIR (doc/sios/befund_init_schreiben.md).
+            if (vom_schreiben && transferring_ && cur_track_ && stream_has_marks_
+                && effReadEnc() == Encoding::MFM && !cur_track_->empty()) {
+                head_pos_ = (head_pos_ + 1) % cur_track_->size();
+            }
         }
     }
 
@@ -707,6 +717,18 @@ void K5122::handleCtrlPortAWrite(uint8_t data) {
         bus_.releaseBUSRQ();
         LOG_DEBUG("K5122", "/STR=1 von ZVE2: Busbesitz beendet, ZVE2 haelt an");
         return;
+    }
+
+    // /STR 0->1 (Anschluss inaktiv, K5122-Doku 4.3/5.6.1) beendet einen laufenden
+    // Schreibtransfer in JEDEM Kontext (ZVE1 wie ZVE2) und gibt /BUSRQ frei.  Sonst blieb
+    // nach einer Wiederholung von SIOS-INIT der Schreibmodus samt /BUSRQ stehen und die
+    // Index-ISR auf ZVE1 kam nie dran (doc/sios/befund_init_schreiben.md, D2).
+    if (write_mode_ && !(prev_ctrl_a_ & 0x08) && (data & 0x08)) {
+        if (!write_buf_.empty()) commitFormatTrack();
+        write_mode_ = transferring_ = byte_ready_ = dma_pending_ = false;
+        byte_acc_ = 0;
+        bus_.releaseBUSRQ();
+        LOG_DEBUG("K5122", "/STR=1 im Schreibmodus: Schreiben beendet, BUSRQ frei");
     }
 
     // ── /STR (bit3) fallende Flanke: Strobe ──────────────────────────────────
