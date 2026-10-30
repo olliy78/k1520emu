@@ -58,8 +58,8 @@ A8H (EM), E0–E7H (K6022).  40–43H und B0–B7H sind frei.  (Die OSS liegt au
 
 | Befehl | Register | Wirkung |
 |---|---|---|
-| `IN 41H` | Gültigkeitsregister A5 | zeigt an, dass ein gültiger Tastencode bereitsteht — **für beide Tastaturen unterschiedlich**, so dass die ZRE erkennt, auf welcher Tastatur gedrückt wurde. **Welche Bits** [?]. |
-| `IN 42H` | Tastencoderegister A6 | liefert den Tastencode; **das Lesen löscht das Gültigkeitssignal** (A6-23 → A16-12 → A5), danach darf die AUP-CPU den nächsten Code eintragen. |
+| `IN 41H` | Gültigkeitsregister A5 | zeigt an, dass ein gültiger Tastencode bereitsteht — **für beide Tastaturen unterschiedlich**, so dass die ZRE erkennt, auf welcher Tastatur gedrückt wurde. **Belegt (2026-10-30, Treiber T-K7633, `doc/sios/module_k7633_kut.md`): Bit 1 = Terminal K7633, Bit 0 = Kundentastatur**, Rest egal (`AND 03H`). |
+| `IN 42H` | Tastencoderegister A6 | liefert den Tastencode; **das Lesen löscht das Gültigkeitssignal** (A6-23 → A16-12 → A5), danach darf die AUP-CPU den nächsten Code eintragen.  **Nach /RESET und nach `OUT 43H,FFH` steht das Typzeichen `80H \| Variante` darin**, ohne Gültigkeitsbit (der Treiber liest es ohne Test bis zu 65535 Mal; Low-Nibble der K7633 [?], Vorgabe 0). |
 | `OUT 43H` | Kommandobyteregister A4 | Kommando an die Tastaturen, von der AUP-CPU zyklisch gelesen („laufend aktualisiert … sofort ausgewertet“). |
 | `IN 40H` | — | nicht beschrieben [?]. |
 
@@ -80,7 +80,20 @@ erkannt wurde (Entprellung) [SRC S. 5].
 | 0 | SEL-LED: 1 = aus, 0 = ein |
 
 **FFH = RESET AUP** — „dient der Synchronisation beider Mikrorechnersysteme“, die übrigen Kommandos steuern unmittelbar die
-optischen/akustischen Anzeigen [SRC S. 6].
+optischen/akustischen Anzeigen [SRC S. 6].  **Gegenprobe am laufenden SIOS (2026-10-30):** der Treiber schreibt `FFH` auch als
+gewöhnliches Lampenbyte „alles aus“ (Bit 7 = 1, Rest 1) — Reset und „alle Lampen aus“ sind nicht zu unterscheiden; deshalb meldet
+das Modell nach `FFH` KEINEN Anlauf der Schlüsselschalter (ein erneuter Code kippte dort den Zustand).
+
+**Annahmen-Stand nach dem Treiberbefund (T-K7633, SYSORG09, Gegenprobe `SiosSgen.GeneriertEinSystemMitK7633UndBootetAmAup`):**
+
+| Annahme | Stand |
+|---|---|
+| A1 Gültigkeitsbits | **widerlegt und korrigiert**: Bit 1 = K7633, Bit 0 = Kunde (`Config::bit_terminal/bit_kunde`) |
+| TYP nach Reset | **belegt, neu**: `80H \| Config::typ` ohne Gültigkeit; Low-Nibble [?] |
+| A7 Schlüssel nur beim Einschalten | **widerlegt**: jede Drehung (ein und aus) meldet AAH (SS1) / A9H (SS2); der Treiber kippt je Code. Stecken/Abziehen unbekannt (Anwendervorgabe: nicht erkennbar). Anlauf nach /RESET: je eingeschalteter Schalter ein Code nach dem Typzeichen — [?] |
+| A5 Hupe, A6 Kennung, Lampenbyte | **bestätigt** (Bit 0 SEL, 1 ALPHA, 4 GET, 5 Fehler, 6 Hupe einmalig, 7 immer 1) |
+| A3 Alpha | **gestützt**: Tabellenwahl folgt dem ALPHA-Bit des Kommandos (SIOS führt den Zustand nach, F05 sendet A1H in beiden Tabellen) |
+| A2, A4, A8 | unverändert (A4 Entprellzeit [?]) |
 
 ### 1.4 Innenleben (nur zur Einordnung, nicht nachzubilden) [SRC AUP S. 3–5]
 
