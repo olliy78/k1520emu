@@ -113,7 +113,8 @@ Das Programm schreibt (`INITIAL DISK IS WORKING`, ZVE2-Formatstrom am Datenport 
 - INIT formatiert mit voller IBM-Spur (80 x 4E, 12 x 00, **3 x C2 + FC = Indexmarke**, 50 x 4E, Sektoren) und liest zur
   Prüfung mit eigener ZVE2-Routine (A3xxH-A5xxH: `IN A,(16H)` je Byte, `CP FCH` bei `A30EH`, ID-Lesen per `INIR` ab
   `A517H`, `CP 42H` bei `A524H`).  Die Sektorkennung (A1 FE 00 00 01 00) kommt richtig an.
-- Verdacht: die Verify-Routine erwartet die **Indexmarke (C2 C2 C2 FC)** am Spuranfang; der A5120-Lesestrom
+- **Berichtigt (befund_init.md):** kein Indexmarken-Problem; INIT schreibt hier keine Indexmarke.  Der Hang kommt von A1-Versatz im Kontrolllesen und dem OUT-14H-Pacing.  `N` erst nach dem Erscheinen von `8" DISKETTE` und ca. 20 Mio. Takten tippen, sonst formatiert INIT als 8" (FM).
+- (alter Verdacht, widerlegt) die Verify-Routine erwartet die **Indexmarke (C2 C2 C2 FC)** am Spuranfang; der A5120-Lesestrom
   (`buildFaithfulReadTrack`) enthält keine Indexmarke und beginnt mit dem ersten A1 des ersten Sektors
   (`K5122::startReadTransfer`, "enge Verify-Resync-Routine" von SCPX-INIT).  Nicht bestätigt: der Haltepunkt
   `b2 A30E` wurde auf Spur 0 nie erreicht, der Abbruch kommt auf einem anderen Pfad (`A54FH`).  **Offen**, nächster Schritt:

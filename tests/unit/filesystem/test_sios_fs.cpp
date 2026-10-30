@@ -35,6 +35,7 @@
 #include "core/filesystem/fs_catalog.h"
 #include "core/filesystem/sios/sios_fs.h"
 #include "core/peripherals/floppy_drive/disk_image.h"
+#include "core/peripherals/floppy_drive/track_codec.h"
 #include "tests/support/temp_path.h"
 
 namespace fs = std::filesystem;
@@ -843,4 +844,22 @@ TEST(SiosFsCheck, UeberlappendeBereicheWerdenGemeldet) {
         EXPECT_GE(r.zaehlerAb(FsSeverity::Fehler), 1);
     }
     fs::remove(pfad, ec);
+}
+
+// Die Originalspur 0 traegt F8 auf S. 9-26; der treue Lesestrom des K5122 muss sie als F8 mit
+// gueltiger CRC liefern (sonst meldet der SIOS-Treiber Status 90H, doc/sios/befund_init.md).
+TEST(SiosFs, Dp1Spur0LesestromFuehrtF8) {
+    auto d = direkt(fixture("sios1526_dp1.hfe"), "sios_ss40");
+    ASSERT_TRUE(d.disk) << d.error;
+    const auto sek = TrackCodec::parseTrack(d.disk->medium().track(0, 0));
+    int geloescht = 0;
+    for (const auto& s : sek) if (s.deleted) ++geloescht;
+    ASSERT_GE(geloescht, 1) << "Fixture traegt kein F8";
+    const TrackImage strom = TrackCodec::buildFaithfulReadTrack(sek, Encoding::MFM);
+    const auto zurueck = TrackCodec::parseTrack(strom);
+    ASSERT_EQ(zurueck.size(), sek.size());
+    for (size_t i = 0; i < sek.size(); ++i) {
+        EXPECT_EQ(zurueck[i].deleted, sek[i].deleted) << "Sektor " << int(sek[i].id);
+        EXPECT_TRUE(zurueck[i].data_crc_ok) << "Sektor " << int(sek[i].id);
+    }
 }

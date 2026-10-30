@@ -192,7 +192,8 @@ bool writeSector(TrackImage& track, uint8_t sector_id,
  *        neuen Marke gerechnet.  Gebraucht von SIOS (Etikettenspur: HDR1 = FB, frei = F8).
  */
 bool writeSectorDam(TrackImage& track, uint8_t sector_id,
-                    const std::vector<uint8_t>& data, bool deleted);
+                    const std::vector<uint8_t>& data, bool deleted,
+                    const std::vector<uint8_t>& tail = {});
 
 /**
  * @brief Wie @ref writeSector, aber ueber die LAUFENDE NUMMER des Sektors in der Spur.
