@@ -121,6 +121,8 @@ public:
     /// @brief Alle geloeschten DDR1-Etiketten (Felder wie bei HDR1; `gueltig` = Bereich auf
     ///        dieser Diskette sinnvoll).  Nie leere Platzhalter ("D" + Blanks): die haben keine Adressen.
     std::vector<SiosEtikett> geloeschteEtiketten() const;
+    /// @brief Ein Bibliotheksobjekt ("LIB/NAME", ohne Beachtung der Gross-/Kleinschreibung); false = gibt es nicht.
+    bool objektInfo(const std::string& name, SiosObjekt& out, SiosEtikett* lib = nullptr) const;
     /// @brief VOL1-Feld Pos. @p von..@p bis (1-basiert, einschliesslich), DKOI-dekodiert, rechts bereinigt.
     std::string vol1Feld(int von, int bis) const;
     /// @brief Das Verzeichnis einer Bibliothek; false = keine lesbare Bibliothek.

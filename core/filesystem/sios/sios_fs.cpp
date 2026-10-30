@@ -146,6 +146,25 @@ std::string SiosFileSystem::vol1Feld(int von, int bis) const {
     return rtrim(dkoiText(s.data, static_cast<size_t>(von - 1), static_cast<size_t>(bis)));
 }
 
+bool SiosFileSystem::objektInfo(const std::string& name, SiosObjekt& out, SiosEtikett* lib_aus) const {
+    const size_t schraeg = name.find('/');
+    if (schraeg == std::string::npos) return false;
+    const std::string lib = upper(name.substr(0, schraeg)), obj = upper(name.substr(schraeg + 1));
+    for (const SiosEtikett& e : etiketten()) {
+        if (upper(e.name) != lib) continue;
+        std::vector<SiosObjekt> os;
+        if (!bibliothek(e, os)) return false;
+        for (const SiosObjekt& o : os)
+            if (!o.name.empty() && upper(o.name) == obj) {
+                out = o;
+                if (lib_aus) *lib_aus = e;
+                return true;
+            }
+        return false;
+    }
+    return false;
+}
+
 bool SiosFileSystem::markeGeloescht(int sektor) const {
     for (const auto& ls : space_.trackSectors(0, 0))
         if (ls.id == sektor) return ls.deleted;

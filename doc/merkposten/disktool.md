@@ -1294,4 +1294,13 @@ Festlegungen:
    `recover --full` leer liefern.  Lebendes Etikett im Bereich → Bruchstück, nicht wiederherstellbar; Etikett wiederherstellen = derselbe Sektor `DDR1`→`HDR1` + Marke FB,
    alle Bedingungen unmittelbar vorher neu; Namensvetter nur mit `--restore N=NAME`.  Objekt: **nur** mit Anwendername (1–5 Zeichen, nicht vorhanden, Platz muss AADR tragen und blank sein) —
    der Name ist nicht ableitbar, nie raten.  Stolperstein: `write` nimmt den **niedrigsten** freien Etikettensatz, auch einen `DDR1` — eine neu angelegte Datei überschreibt also das Etikett (nicht den Bereich) einer zuvor gelöschten; dessen Fund ist dann weg, auch wenn die Daten noch dastehen (Oberflächensuche nach Etikettenlosem gibt es bei SIOS nicht).
+7b. **Oberfläche (D6, 2026-10-30, Wächter `py_disktool_sios_gui`, `test_sios_label_fields_through_the_abi`)**:
+   (a) `DiskView._set_sios`: Bibliotheken (Typ `B`) sind Ordner mit `DIR_ROLE`, Objekte (`O`, Name `LIB/OBJ`) darunter mit Kurzname, `REF_ROLE` bleibt der VOLLE Name —
+   Holen/Löschen/Eigenschaften brauchen das so.  Ablegen: `tree.drop_ziel` = Bibliothek unter dem Mauszeiger, `insert_paths(..., sios_lib=…)` setzt den Präfix `LIB/`;
+   „Schreiben“ nimmt die angeklickte Bibliothek (oder die des angeklickten Objekts) via `DiskView.sios_ziel()`, sonst physische Datei.
+   (b) `PropertiesDialog.art == "sios"` (vorher fiel SIOS fälschlich auf die CP/M-Attribute): nur Anzeige (VOL1 + HDR1 bzw. AADR/ML), Knopf „Übernehmen“ aus.  C-ABI **additiv**
+   `k1520d_sios_info`/`k1520d_sios_file`, Python `DiskTool.sios_volume()`/`sios_datei(name)`, Kern `DiskVolume::siosFs()`, `SiosFileSystem::objektInfo`/`vol1Feld`.
+   (c) Diskeditor: `hexdump(..., kodierung="ebcdic")`, `ebcdic_zeichen` = `cp500` + 6AH→`/` (nur ASCII-Bereich, sonst `.`); Wahlfeld „Text“; SIOS Spur 0 = EBCDIC von selbst,
+   sonst ASCII; ausdrückliche Wahl je Diskette (QSettings-Schlüssel `diskeditor/kodierung_<sha1 des Pfads>`, ohne benannte Anwendung nur im Prozess, damit Tests nichts schreiben).
+   Offen: Etiketten sind nicht bearbeitbar (kein „Datenträgername ändern“ im Dialog).
 8. Fixtures: `tests/fixtures/disks/sios1526_{dp1,dp2,sg1,syls,sylp}.hfe` (Kopien von `tools/sios_a5120/original/`).  Tests `SiosFs.*`, `SiosFsCheck.*`, `cli_dt_*sios*`.
