@@ -196,3 +196,10 @@ PROGRAM ==: ERR FD 6  SEQU SYSORG09 98FF     D50
 Generierdiskette weitergeht (HDR1-Kennzeichen `EC01` auf SG1).  Darauf liegen 22 Module: LOG KM, LBE, MB, SLE, HLE 2/4, SIM,
 DFUE-A/I/V, V24, IFSS1–3, BSC7LZ/LV/CZ/CV, BSC8CZ/CV, FUELLM, FIX.  Ein Wechsel auf die gleiche Diskette hilft nicht —
 die Fortsetzung fehlt in allen bekannten Sammlungen.  Wächter `SiosSgen.ModulAufDerFolgedisketteVerlangtDenNaechstenDatentraeger`.
+
+## Nachtrag 2: die erzeugte Diskette bootet (2026-10-30, Zweig sios-rest)
+
+`SiosSgen.GeneriertEineSystemdiskette` (T-K7637 + Eintraege 22..24) endet nicht mehr bei `SGEN FINISHED`, sondern bootet das Ergebnis: **SIOS 1526/0.9** (nur `SYSORG09` im
+Quellsatz) an der **K7637** in einem **K5600.10** (die Diskette ist 40-spurig; 0.9 doppelschrittet nicht), Stecker 01, `DAT` zeigt `00.00.00`.  In einem K5600.20 bootet sie nicht
+(gleiche Grenze wie `sios09_3xk5600_10_parallel`, bedienung.md Abschn. 7).  Ein mit SGEN erzeugtes System ist also immer ein 0.9-System fuer 40-Spur-Laufwerke; das Tastaturmodul
+(T-K7637 / T-K7636 / T-K7633) entscheidet, welche Tastatur es bedient, nicht die Versionsnummer.  Ein 1.1-System (`SYSARE11`) ist nicht erzeugbar: SG1 traegt nur `SYSORG09`.

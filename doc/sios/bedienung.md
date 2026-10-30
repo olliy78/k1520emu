@@ -120,7 +120,7 @@ Das Programm schreibt (`INITIAL DISK IS WORKING`, ZVE2-Formatstrom am Datenport 
   (`K5122::startReadTransfer`, "enge Verify-Resync-Routine" von SCPX-INIT).  Nicht bestätigt: der Haltepunkt
   `b2 A30E` wurde auf Spur 0 nie erreicht, der Abbruch kommt auf einem anderen Pfad (`A54FH`).  **Offen**, nächster Schritt:
   ZVE2-Pfad ab `A4ABH`/`A517H` bis zum Fehlersprung (`A5F6H`/`A5F9H`) verfolgen.
-- Rundlauf SIOS <-> DiskTool (`create --fs sios_ss40`, `put`, `ls`) ist daher noch **nicht** gefahren.
+- Rundlauf SIOS <-> DiskTool (`create --fs sios_ss40`, `put`, `ls`) ist inzwischen gefahren (Abschn. 8).
 
 ## 6. SIOS 0.9 (K7636, S4)
 
@@ -152,16 +152,17 @@ siehe Spalte „CAL").  Stecker 01.  Medien kommen aus `disks/a5120_sios1526/` (
 | 1.1 | `sios11_3xk5601_seriell` und `…_sl1` | 3 × K5600.20 | K7637 | ja | ja |
 | 1.1 | `sios11_3xk5601_seriell` | 3 × K5601 | K7636 (parallel) | **nein**, Bild `ERR KB 2  UNIT` | – |
 | 1.1 | `sios11_3xk5601_seriell` | 3 × K5600.10 | K7637 | **nein** (80-Zylinder-Medium im 40er-Laufwerk; Bild bleibt leer) | – |
-| 0.9 | `sios09_3xk5601_parallel` (Original SYLp, Spur n auf Position n) | 3 × K5601 oder K5600.20 | K7636 | ja | **nein**¹ |
-| 0.9 | `sios09_3xk5600_10_parallel` (bereinigte 40-Spur-Fassung) | 3 × K5600.10 | K7636 | ja | **nein**¹ |
+| 0.9 | `sios09_3xk5601_parallel` (Original SYLp, Spur n auf Position n) | 3 × K5601 oder K5600.20 | K7636 | ja | **ja**¹ |
+| 0.9 | `sios09_3xk5600_10_parallel` (bereinigte 40-Spur-Fassung) | 3 × K5600.10 | K7636 | ja | **ja**¹ |
 | 0.9 | `sios09_3xk5600_10_parallel` | K5601 / K5600.20 | K7636 | **nein** (SIOS 0.9 doppelschrittet nicht; Spur n läge auf Position 2n) | – |
 | 0.9 | `sios09_3xk5600_10_parallel` | K5600.10 | K7637 | **nein**, Bild `ERR KB 2  UNIT` | – |
 | beide | – | 8″ (MF3200/MF6400) | – | **nicht geprüft**: die Systemspuren sind 5¼″-MFM 26 × 128, ein sinnvolles 8″-Medium (FM) ist nicht herzustellen, ohne Bytes des SIOS-Codes zu ändern | – |
 
-¹ Bei 0.9 funktionieren Systemzeile und `DAT`/`CLK` (Wächter `SiosBeispiel.V09_*`).  `CAL <Name>` nimmt das Kommando an (der Prompt `CAL_` erscheint),
-reagiert aber auf das ET1 hinter dem Programmnamen nicht: weder Ladevorgang noch `ERR FD 1 NFND` (auch nicht für einen nicht vorhandenen Namen
-und auch nicht ohne `ASN`).  DP1/DP2 sind SIOS-1.1-Programme (`DIDI V 1.1`); ob 0.9 sie laden kann, ist **offen** — Ursache nicht geklärt, kein
-Kernfehler belegt.  Für Programme also SIOS 1.1 nehmen.
+¹ Bei 0.9 laufen Systemzeile, `DAT`/`CLK`, `ASN` und **`CAL`** (Stand 2026-10-30, nach der /IEO-Korrektur; Wächter `SiosRest.V09_CalLaedtProgrammeUndMeldetNfnd`):
+`ASN 0315 66`, `CAL DIDI` lädt `DIDI 1520 (SIEX) V 1.1` von der DP1 (die Programme der DP1/DP2 sind also für 0.9 und 1.1 brauchbar), ein zweites `CAL` geht,
+ein unbekannter Name gibt `ERR FD 1  NFND`.  **Bedienfalle:** nach der Fehlermeldung nimmt 0.9 keine Taste an, bis **CI** gedrückt ist — an der K7636 die Taste
+F54 (`K7636::QK_TASTE_BASE | 0x5B`, Code AFH), nicht der K7637-Rohcode.  Der frühere Befund „ET1 nach dem Namen ohne Reaktion“ war entweder diese Sperre oder
+ein Folgefehler der Interruptkette; er ist nicht mehr reproduzierbar.  Auch die K5600.10-Bestückung (`sios09_3xk5600_10_parallel`) lädt `DIDI`.
 
 **SL1_1 gegenüber SYLs.**  Beide tragen `SYSARE11` auf `ROBINI`.  SL1_1 (Quelle `~/projects/robotron/PC1715/discs/real_discs/SL1_1_1x80X26.img`, nur als
 rohes `.img` vorhanden, daneben die Rohaufnahme `SL1_1.scp`, nicht übernommen): BOE 01001 EOE **10026** EOD 10025, Kennzeichen `P    871`, 33 280 Byte
@@ -171,29 +172,37 @@ stört das nicht (`SiosBeispiel.V11_Kurz_3xK5601_Seriell_MitCal`).
 
 ## 8. Datendisketten in der Vorgabe (3 × K5601), INIT und Rundlauf mit dem DiskTool
 
-**INIT** (V 1.4, Programm von DP1; zweiter Sondierungsstand 2026-10-30, `SiosVorgabe.InitMit*`), Ziel in B: (K5601):
+**INIT** (V 1.4, Programm von DP1; Stand 2026-10-30, `SiosVorgabe.InitMit*`, `SiosRest.Init*`), Ziel in B: (K5601):
 
-* **80-Zylinder-Leerdiskette** (Geometrie des K5601, vom Emulator mit „Leere Diskette“ angelegt): INIT läuft bis `INITIAL DISK IS FINISHED
-  DEFEKTIVE TRACKS :   ,   ,`, ohne Fehler (Eingaben: `N` bei `"8" DISKETTE`, nach ~20 Mio. Takten 5 × ET1, `Y`).  Der DiskTool-Kern erkennt die Diskette
-  als `sios_ss40`, Prüfung ohne Warnung.  **Aber:** INIT schreibt 40 Spuren auf die Positionen 0..39 (einfacher Schritt), nicht doppelschrittig;
-  ob SIOS Spuren > 0 dieser Diskette im doppelschrittigen Betrieb wieder liest, ist **nicht geprüft**.
+* **80-Zylinder-Leerdiskette** (Geometrie des K5601, vom Emulator mit „Leere Diskette“ angelegt), Menü `1 DOUBLE DENSITY`: INIT läuft bis
+  `INITIAL DISK IS FINISHED DEFEKTIVE TRACKS :   ,   ,`, ohne Fehler (Eingaben: `N` bei `"8" DISKETTE`, nach ~20 Mio. Takten 5 × ET1, `Y`).  Der DiskTool-Kern erkennt die
+  Diskette als `sios_ss40`, Prüfung ohne Warnung.  INIT schreibt **40 Spuren auf die Positionen 0..39 (einfacher Schritt)**; die übrigen 40 Zylinder bleiben unformatiert.
+  **Geprüft:** SIOS legt auf so einer Diskette (COPD) eine Datei über Spur 0 hinaus an (Spur 1 liegt auf Position 1), `DIDI` (Device 5) liest Satz 8 wieder, und das DiskTool
+  holt dieselben Bytes (`SiosRest.InitEinfachImK5601_DateiUeberSpur0HinausLesbar`).  Warum SIOS hier einfach schrittet, bei den 40-Zylinder-Abbildern (DP1, vom Emulator
+  als Doppelschritt eingebunden) aber doppelt, ist nicht ermittelt [?]; beide Fälle laufen.
 * **40-Zylinder-Leerdiskette** im K5601: `ERR 9B  > 2 DEFEKTIV TRACKS : 01, 03, 05,` (Halbspuren: jede zweite Position hat keine Spur).  Dafür braucht INIT das K5600.10.
-* Menüpunkt `2 DOUBLE DENSITY, DOUBLE TRACKS`: die Eingabe `2` (und `N`) am Prompt `5,25" DISKETTE` ergibt `ERR 90`; wo die Auswahl wirklich
-  eintritt, ist **nicht ermittelt**.  Mit ET1 (Vorgabe) bleibt es bei 40 Spuren.
+* **Menü `2  DOUBLE DENSITY ,DOUBLE TRACKS`**: ein waehlbares 80-Zylinder-Format (V 1.4).  Die Eingabe gehört an das **Menü**
+  (nach `N` + ET1 erscheint die Überschrift `5,25" DISKETTE`; erst nach einem weiteren ET1 das Menü mit den Zeilen 1 und 2): `2`, ET1.  An der Frage nach 8″ ergab sie `ERR 90`.
+  Danach zeigt die Anweisungsliste `(01...76)` statt `(01...37)`, INIT formatiert alle Zylinder (Positionen 0..79, einfacher Schritt), die Diskette ist für das DiskTool
+  `sios_ss80` (`SiosRest.InitDoubleTracksLegtEine80ZylinderDisketteAn`).  Das Handbuch (Auszug §7) nennt „Double Tracks“ für V 1.1 „nicht möglich“ — die V 1.4 kann es.
 
 **Empfehlung für Anwender:** Datendisketten mit dem DiskTool anlegen — `k1520disktool create neu.hfe --fs sios_ss40 --label TEST01` (40-Zylinder-`.hfe`,
 im K5601 mit Doppelschritt eingebunden wie DP1/DP2), Dateien mit `put … --as NAME`.
 
-**Rundlauf D4** (`SiosVorgabe.DidiZeigtDenKennsatzEinerMitDiskToolAngelegtenDatei`): Diskette mit `create` + `put ALPHA` (256 Byte) in C:; `ASN 0315 66`,
-`CAL DIDI`, Device `6`, Form `A`, Name `ALPHA`: SIOS zeigt den Kennsatz
+**Rundlauf D4 (erledigt 2026-10-30).**
+
+*DiskTool → SIOS* (`SiosRest.DidiZeigtDieDatensaetzeEinerDiskToolDatei`): Diskette mit `create` + `put ALPHA` in C:; `ASN 0315 66`, `CAL DIDI`, Device `6`, Form `A`, Name `ALPHA`:
+SIOS zeigt den Kennsatz (`HDR1 ALPHA            00128 01001 01026    E`, EOD je nach Dateigröße).  **Der frühere Befund „DIDI springt danach zum Monitor“ war Bedienung:**
+die Satznummer verlangt **fünf Stellen** (`00001`).  Ein kurzes `1` wird nicht angenommen, das Feld bleibt stehen (so entstand der Eindruck); ein leeres ET1 geht zu
+`KEY POSITION` / `KEY` (Suche über Schlüssel).  Mit `00001` und ET1 fragt DIDI `CHECK` (ET1, ET2, A ET2), das nächste ET1 zeigt Satz 1, jedes weitere den folgenden:
 
 ```
- HDR1 ALPHA            00128 01001 01026    E
-   01003
+SATZ 01 ........................................................................   (die 128 Bytes des Satzes, umgebrochen)
+           ALPHA                          00001
 ```
 
-also Satzlänge 128, BOE 01001, EOE 01026, EOD 01003 — wie das DiskTool sie eingetragen hat.  **Nicht belegt:** die Anzeige der Datensätze.  DIDI
-kehrt nach der Satznummer ohne Anzeige zum Monitor zurück, **auch an der Original-DP2** (`PHASELB`) und mit CI vorweg; die Ursache ist offen
-(Emulator oder Bedienung), der Datenpfad (Spuren ≥ 1 der DiskTool-Diskette im Doppelschritt) ist damit noch nicht durch SIOS gegengeprüft.
-Hinweis: Programme von A: nach dem Tausch der Systemdiskette (`DIDI` mit programme1 in A:) endeten mit `ERR FD 3  R/W`; zuverlässig ist der Weg
-`ASN 0315 66` mit programme1 in B:.
+Der Inhalt ist Byte für Byte der des `put`.
+
+*SIOS → DiskTool* (`SiosRest.VonSiosGeschriebeneDateiLiestDasDiskTool`): `COPD` ist ein Plattenkopierer (`COPY FROM DRIVE 4 -->DRIVE 5`, Menü A COPY ALL / O COPY ONE FILE /
+P COPY PART / X, Y Verzeichnis); bedient: Quelldiskette in A:, Ziel in B:, `C` ET1, `USE DISK` ET1, `PRINT DICTIONARY` ET2 (sonst `ERR: PR 01`), dasselbe fürs Ziel, `A` ET1, `N` ET1.
+Danach holt `k1520disktool get ziel.hfe ALPHA` die Datei byteweise gleich zurück, `check` meldet nichts.  (Der Menüpunkt `O` nimmt `M,Z,N1,N2` an, kopierte im Versuch aber nichts.)
