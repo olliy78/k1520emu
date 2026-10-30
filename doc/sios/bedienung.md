@@ -125,3 +125,5 @@ Das Programm schreibt (`INITIAL DISK IS WORKING`, ZVE2-Formatstrom am Datenport 
   `b2 A30E` wurde auf Spur 0 nie erreicht, der Abbruch kommt auf einem anderen Pfad (`A54FH`).  **Offen**, nächster Schritt:
   ZVE2-Pfad ab `A4ABH`/`A517H` bis zum Fehlersprung (`A5F6H`/`A5F9H`) verfolgen.
 - Rundlauf SIOS <-> DiskTool (`create --fs sios_ss40`, `put`, `ls`) ist daher noch **nicht** gefahren.
+
+SYSD/SGEN (Fehlersperre, Version `09`, Auswahlbild): siehe `sgen.md`.
