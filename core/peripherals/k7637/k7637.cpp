@@ -274,6 +274,10 @@ uint8_t K7637::translateKey(int qt_keycode, bool shift, bool ctrl) {
         case QK_TAB:       return 0x91;   // ->|  Tabulator      → cp37: 0x91→kcurwr
         case QK_BACKTAB:   return 0x9B;   // |<-  Tab rueckwaerts  → cp37: 0x9B→kcurwl
         case QK_ESCAPE:    return 0x1B;   // ESC-Taste (ASCII)
+        // Pause/Untbr → ET2 (0xFE): die Taste hat die PC-Tastatur nicht, SIOS 1526 braucht sie aber
+        // allein (Monitoreingabe abbrechen, Programm "MON."; doc/sios/bedienung.md).  Fuer CP/A
+        // ist 0xFE der Strg-Vorsatz (cp37) - wer ihn dort braucht, nimmt Strg+Buchstabe.
+        case QK_PAUSE:     return 0xFE;   // ET2
         case QK_DELETE:    return 0xBB;   // DELCH key           → cp37: 0xBB→spcdel
         case QK_UP:        return 0x94;   // cursor up           → cp37: 0x94→kcurup
         case QK_DOWN:      return 0x95;   // cursor down         → cp37: 0x95→kcurdw

@@ -266,6 +266,24 @@ TEST(K7637, KeyPress_Escape_Sends_ESC) {
 }
 
 /**
+ * @test K7637/KeyPress_Pause_Sends_ET2_0xFE
+ * @brief Pause (QK_PAUSE) ist die PC-Taste fuer ET2 (0xFE) - SIOS 1526 braucht ET2 allein
+ *        (Eingabe abbrechen, Programm beenden), doc/sios/bedienung.md.
+ * @par Pass criterion  drainRx liefert genau ein Byte == 0xFE; ET1 (Return) bleibt 0xFF.
+ */
+TEST(K7637, KeyPress_Pause_Sends_ET2_0xFE) {
+    Z80SIO sio;
+    sio.setIEI(true);
+    K7637 kb;
+    kb.connect(sio, 0);
+
+    kb.keyPress(0x01000008, false, false);   // Qt::Key_Pause
+    auto bytes = drainRx(kb, sio);
+    ASSERT_EQ(bytes.size(), 1u);
+    EXPECT_EQ(bytes[0], 0xFE);
+}
+
+/**
  * @test K7637/KeyPress_Tab_Sends_0x91
  * @brief Die Tabulatortaste des PC spricht die Taste an IHRER Stelle an: `->|`
  *        (Reihe 3, Position 1, physisch 0x91), Umschalt+Tab deren Gegenstueck

@@ -269,6 +269,7 @@ private:
     static constexpr int QK_RETURN    = 0x01000004;
     static constexpr int QK_ENTER     = 0x01000005;
     static constexpr int QK_DELETE    = 0x01000007;
+    static constexpr int QK_PAUSE     = 0x01000008;   // Pause → ET2 (0xFE)
     static constexpr int QK_LEFT      = 0x01000012;
     static constexpr int QK_UP        = 0x01000013;
     static constexpr int QK_RIGHT     = 0x01000014;

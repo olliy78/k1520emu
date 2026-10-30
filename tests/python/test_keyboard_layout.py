@@ -195,6 +195,24 @@ def test_click_sends_the_physical_code(widget):
     assert seen == [(kbd.raw(0xB9), False, False)]
 
 
+def test_right_click_on_et2_sends_0xFE_alone(widget):
+    """SIOS 1526 braucht ET2 (0xFE) allein; der Linksklick bleibt der Strg-Vorsatz.
+
+    Rechtsklick auf ET2 sendet 0xFE als Rohcode OHNE Strg-Flag und rastet nichts
+    ein (der naechste Linksklick auf eine Taste ist kein Strg-Zeichen).
+    """
+    seen = _recorder(widget)
+    gelost = []
+    widget.keyReleased.connect(gelost.append)
+    et2 = next(k for k in widget._keys if k.low == "ET2")
+    _click(widget, et2, button=Qt.RightButton)
+    assert seen == [(kbd.raw(0xFE), False, False)]
+    assert gelost == [kbd.raw(0xFE)]
+    assert not widget._ctrl
+    _click(widget, et2)                       # Linksklick: Strg-Vorsatz wie bisher
+    assert widget._ctrl and len(seen) == 1
+
+
 def test_shift_applies_to_exactly_one_key(widget):
     """SHIFT ist ein Einmal-Modifikator: '1'→'!', danach wieder '1'."""
     seen = _recorder(widget)
