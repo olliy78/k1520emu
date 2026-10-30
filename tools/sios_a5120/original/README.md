@@ -11,5 +11,9 @@ Herkunft: Diskettensammlung DL, `~/projects/robotron/Diskettensammlung_von_DL/Di
 | `SIOS1526_DP1.hfe` | 40 Zyl. × 1 Seite, 26 × 128 B MFM | VOL1 `MWD051`, HDR1 `PHASELB` (Spur 1–37): CATM CODK COCA COPD DINH DIMO DIKA DMPM EDIT FGEN INIT DIDI KORP LBSV CODP | `bca0b4af…` |
 | `SIOS1526_DP2.hfe` | wie DP1 | VOL1 `MWD051`, HDR1 `PHASELB`: LINK MBAS PRMF PRDI PHAK RAMT SUS0 SGEN SOPH SYSD TEXT MTES SORD | `cca40745…` |
 | `SIOS1526_SG1.hfe` | wie DP1 | VOL1 `MWD002`, HDR1 `SYSORG09` (Satzlänge 1024, Spur 1–28: Generiermodule GRUN, 636, 637, BAB, ARI, DEZ, …) + HDR1 `PHASELB` (Spur 29–34: SGEN SOPH SYSD); `DDR1`-Etiketten = gelöschte Einträge DATA10…DATA26 | `74bb0cc0…` |
+| `SIOS1526_SL1_1.img` | 80 Zyl. × 1 Seite, 26 × 128 B, **rohes `.img`** (266 240 B; F8-Marken der Etikettenspur fehlen) | VOL1 `ROBINI`, HDR1 `SYSARE11` BOE 01001 EOE **10026** EOD 10025 (zehn Spuren, Kennzeichen `P    871`) — **SIOS 1526/1.1**, kürzer generiert als SYLs (zwölf Spuren) | `0182a547…` |
+
+`SIOS1526_SL1_1.img` stammt aus `~/projects/robotron/PC1715/discs/real_discs/SL1_1_1x80X26.img` (Dateidatum 2020-01-05, übernommen 2026-10-30);
+daneben liegt dort die Rohaufnahme `SL1_1.scp` (37 MB), die hier **nicht** übernommen wurde.  Daraus entsteht mit `build.py` die `.hfe` der Beispieldisketten.
 
 Befund und Plan: `doc/design/43_sios1526.md`.

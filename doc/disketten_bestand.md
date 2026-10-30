@@ -57,7 +57,7 @@ Tests nehmen ihre Kopie unter `tests/fixtures/disks/`, s. §3).
 | `scpx17_cpa780_k5601.hfe` | A5120 · SCPX 1.7 (16×256) | ✔ | |
 | `a5120_udos43_k5601_entwickler.hfe` | A5120 · UDOS 4.3 | ✔ | |
 | `a5120_udos50_k5601_system.hfe` | A5120 · UDOS 5.0 (NDOS-Dateisystem) | ✔ | umgewandelt, nicht gebaut (`doc/udos_programme.md` §8) |
-| `tools/sios_a5120/original/SIOS1526_{SYLs,SYLp,DP1,DP2,SG1}.hfe` (nicht in `disks/`) | A5120/A5130/K8924 · SIOS 1526 1.1 / 0.9, Programm- und Generierdisketten | — | IBM-Etikettendisketten 26×128, Fixtures `tests/fixtures/disks/sios1526_*.hfe`; Beispielsatz `disks/a5120_sios1526/` folgt (Entwurf 43, S8) |
+| `a5120_sios1526/a5120_sios11_3xk5601_seriell.hfe` (+ `_sl1`) · `a5120_sios09_3xk5601_parallel.hfe` · `a5120_sios09_3xk5600_10_parallel.hfe` · `a5120_sios_programme1/2.hfe` · `a5120_sios_generierung.hfe` | A5120/A5130/K8924 · SIOS 1526 1.1 / 0.9, Programm- und Generierdisketten | ✔ | IBM-Etikettendisketten 26×128; Vorgabe 3 × K5601 + K7637; Bau `tools/sios_a5120/build.py` aus `original/` (Wächter `cli_sios_a5120`), Fixtures `tests/fixtures/disks/sios1526_*.hfe` |
 | `scpx17_5x1024_k5601_hardy.hfe` | A5120 · SCPX 1.7 (5×1024) mit HARDY | — | |
 | `k8915scpx_boot1.hfe` | K8915 · SCPX 8915 | ✔ | |
 | `prg710_udos43_k5601_system.hfe` · `prg710-1_udos43_k5601_v43_189.hfe` | PRG 710 / 710-1 · UDOS 4.3 | ✔ ✔ | |

@@ -300,7 +300,8 @@ k1520_add_test(boot_bcu SRC test_boot_bcu.cpp LIBS ${_libs}
 
 # SIOS 1526 (Entwurf 43, AP S3): Kaltstart bis zur Systemzeile; Waechter vorerst DISABLED_.
 k1520_add_test(sios_boot SRC test_sios_boot.cpp LIBS ${_libs} k1520_fs
-                         LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 300)
+                         LABELS "${_lbl}" DEFS LOG_LEVEL=2
+                         "A5120_LIEFERDISKETTEN=\"${CMAKE_SOURCE_DIR}/disks\"" TIMEOUT 900)
 
 k1520_add_test(sios_sgen SRC test_sios_sgen.cpp LIBS ${_libs} k1520_fs
                          LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 600)
