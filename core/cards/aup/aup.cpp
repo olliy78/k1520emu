@@ -54,6 +54,7 @@ private:
 AUP::AUP() : AUP(Config{}) {}
 
 AUP::AUP(const Config& cfg) : cfg_(cfg) {
+    a6_ = static_cast<uint8_t>(0x80 | (cfg_.typ & 0x0F));   // TYP nach dem Einschalten
     if (cfg_.sonder) {
         ctc_ = std::make_unique<Z80CTC>("AUP-CTC-A12");
         sio_ = std::make_unique<Z80SIO>("AUP-SIO-A13");
@@ -71,7 +72,7 @@ void AUP::attachToBus(K1520Bus& bus) {
 }
 
 void AUP::reset() {
-    allesLoeschen();      // [A6] /RESET wirkt wie FFH
+    allesLoeschen(true);  // [A6] /RESET wirkt wie FFH, dazu der Anlauf der Schluesselschalter [A7a]
     kommando_ = 0xFF;
     if (cfg_.sonder) {    // systemweiter /RESET: Baustein-Reset (wie K8025::reset)
         ctc_->reset();
@@ -185,10 +186,17 @@ bool AUP::taste(Tastatur t, int pos, bool gedrueckt) {
     return true;
 }
 
-void AUP::allesLoeschen() {
+void AUP::allesLoeschen(bool anlauf) {
     a5_ = 0;
     wartend_.clear();
     wiederhol_pos_ = -1;
+    a6_ = static_cast<uint8_t>(0x80 | (cfg_.typ & 0x0F));   // TYP (belegt), ohne Gueltigkeitsbit
+    typ_offen_ = true;
+    // [A7a] [?] Anlauf (nur /RESET): eingeschaltete Schluesselschalter einmal melden, nach dem Typzeichen.
+    if (anlauf)
+        for (int n = 1; n <= 2; ++n)
+            if (schluessel_[n - 1].load())
+                wartend_.push_back({Tastatur::K7633, static_cast<uint8_t>(code(Tastatur::K7633, n - 1, false)), 0, true});
 }
 
 void AUP::aktualisieren() {
@@ -202,7 +210,11 @@ void AUP::aktualisieren() {
         const int k = static_cast<int>(e.t);
         bool& g = gehalten_[k][e.pos];
         if (!e.gedrueckt) {
+            const bool war = g;
             g = false;
+            // Schluesselschalter: auch das Ausdrehen meldet den Code (der Treiber kippt je Code).
+            if (war && e.t == Tastatur::K7633 && e.pos < 2 && static_cast<int>(wartend_.size()) < kSchlange)
+                wartend_.push_back({e.t, static_cast<uint8_t>(code(e.t, e.pos, false)), t + takte(cfg_.entprell_us)});
             if (e.t == Tastatur::K7633 && e.pos == wiederhol_pos_) wiederhol_pos_ = -1;
             continue;
         }
@@ -222,7 +234,7 @@ void AUP::aktualisieren() {
         if (c > 0) wartend_.push_back({Tastatur::K7633, static_cast<uint8_t>(c), t});
         wiederhol_ab_ = t + takte(cfg_.wiederhol_us);
     }
-    if (a5_ == 0 && !wartend_.empty() && wartend_.front().ab <= t) {
+    if (a5_ == 0 && !wartend_.empty() && wartend_.front().ab <= t && !(wartend_.front().anlauf && typ_offen_)) {
         const Code& c = wartend_.front();
         a6_ = c.code;
         a5_ = c.t == Tastatur::K7633 ? cfg_.bit_terminal : cfg_.bit_kunde;
@@ -233,7 +245,7 @@ void AUP::aktualisieren() {
 void AUP::kommandoAusfuehren(uint8_t d) {
     if (!(d & 0x80)) { ++verworfen_; return; }   // [A6] Kennung fehlt
     if (d == 0xFF) {                             // RESET AUP
-        allesLoeschen();
+        allesLoeschen(false);   // kein Anlauf: FFH ist auch das Lampenbyte "alles aus" (siehe aup.h)
         kommando_ = 0xFF;
         return;
     }
@@ -257,6 +269,7 @@ uint8_t AUP::ioRead(uint8_t port) {
         case 2: {
             aktualisieren();
             const uint8_t v = a6_;
+            typ_offen_ = false;    // Typzeichen abgeholt: Anlaufcodes duerfen folgen
             a5_ = 0;          // Lesen loescht die Gueltigkeit (A6-23 -> A16-12 -> A5)
             return v;
         }

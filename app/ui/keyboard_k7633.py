@@ -16,7 +16,7 @@ ein Ziffernblock; die Anordnung (7-8-9 oben) ist Darstellung, die Positionen 3CH
 die des Belegs.  Die beiden Tasten F3D/F3F tragen beide den Code 19H (Bedeutung offen).
 
 **Schluesselschalter** SS1/SS2 sind keine Tasten, sondern Schalter (``k1520_aup_schluessel``,
-Einschalten sendet AAH bzw. A9H); ihre Stellung wird nach Neuaufbau, ``restore`` und Start aus
+jede Drehung - ein UND aus - sendet AAH bzw. A9H); ihre Stellung wird nach Neuaufbau, ``restore`` und Start aus
 dem Kern gelesen (``k1520_aup_schluessel_stand``).
 
 **Lampen** (``k1520_aup_lampen``): SEL, ALPHA, GET und Fehler.  Die Fehlerlampe BLINKT -
@@ -93,6 +93,7 @@ class AupWidget(QWidget):
 
     #: ``(tastatur, position, gedrueckt)`` - nach dem Aufruf des Kerns, fuer Mitleser.
     taste = Signal(int, int, bool)
+    schluesselGedreht = Signal(int, bool)   # (n, an): Stellung geaendert (Kasten oder Menueaktion)
 
     def __init__(self, emulator, parent=None):
         super().__init__(parent)
@@ -110,9 +111,10 @@ class AupWidget(QWidget):
         self.schluessel = {}
         for n in (1, 2):
             c = QCheckBox(f"SS{n}")
-            c.setToolTip(f"Schlüsselschalter SS{n}: Einschalten sendet "
+            c.setToolTip(f"Schlüsselschalter SS{n}: jede Drehung (ein und aus) sendet "
                          f"{'AAH' if n == 1 else 'A9H'} an die ZRE")
             c.toggled.connect(lambda an, n=n: self._schluessel(n, an))
+            c.toggled.connect(lambda an, n=n: self.schluesselGedreht.emit(n, bool(an)))
             self.schluessel[n] = c
             kopf.addWidget(c)
         kopf.addStretch(1)

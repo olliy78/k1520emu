@@ -282,6 +282,78 @@ TEST(SiosSgen, GeneriertEineSystemdiskette) {
 }
 
 
+// Gegenprobe zum AUP-/K7633-Modell (doc/sios/module_k7633_kut.md): ein System mit T-K7633 + KUT
+// (statt T-K7637) generieren und an einem A5120/K8924 mit AUP booten.  Beleg fuer die Gueltigkeitsbits
+// (Bit 1 = Terminal), das Typzeichen nach Reset und die Schluesselschalter (SS2 -> (00CBH) Bit 1).
+// Die Zieldiskette ist 40-spurig und bootet nur in einem K5600.10 (SIOS 0.9, wie Sios09Rechner).
+TEST(SiosSgen, GeneriertEinSystemMitK7633UndBootetAmAup) {
+    const std::string ziel = vorbereiteteZieldiskette();
+    TempDisk sys("sios1526_dp2.hfe", "sios_sgen_k7633_system.hfe");
+    {
+        Rechner r("sios1526_dp2.hfe");
+        TempDisk sg1("sios1526_sg1.hfe", "sios_sgen_sg1_k7633.hfe");
+        sgenBisAuswahl(r, sg1);
+        //          GRUND T-K7633 KUT BAB        (Eintraege 0 4 5 6; 22 23 24 = PH-FD640, LOG FD2, LOG FD1)
+        markiere(r, "X   XXX               " "XXX");
+        ASSERT_TRUE(r.ein40(1, ziel));
+        ASSERT_TRUE(r.ein40(0, sg1.path()));
+        r.taste(kET1);
+        r.ruhe(100'000'000LL);
+        r.taste(kET1);
+        ASSERT_TRUE(r.warte("SGEN FINISHED", 600'000'000LL)) << r.schirm();
+        ASSERT_TRUE(r.m.unmountDisk(1));
+    }
+    std::filesystem::copy_file(ziel, sys.path(), std::filesystem::copy_options::overwrite_existing);
+
+    A5120Machine::Config c;
+    c.drive_profiles = {"K5600.10", "K5600.20", "none", "none"};
+    c.aup = true;
+    A5120Machine m(c);
+    m.powerOn();
+    ASSERT_TRUE(m.mountDisk(0, sys.path(), "k5601_ss40_26x128", false)) << m.lastError();
+    // Die Systemzeile heisst, der Treiber hat das Typzeichen 80H bekommen (sonst Fehler nach ~0,5 s).
+    ASSERT_TRUE(k1520test::runSmallUntil(m, "SIOS 1526/0.9 (M)_", 300'000'000LL, 100'000))
+        << k1520test::vramText(m);
+
+    using T = AUP::Tastatur;
+    auto lauf = [&](long long n) { k1520test::runSmallUntil(m, "\x01", n, 5'000); };
+    auto drueck = [&](int pos) {
+        ASSERT_TRUE(m.aup()->taste(T::K7633, pos, true));
+        lauf(1'000'000);
+        m.aup()->taste(T::K7633, pos, false);
+        lauf(1'000'000);
+    };
+    auto positionVon = [](int code) {
+        for (int p = 0; p < 0x48; ++p)
+            if (AUP::code(T::K7633, p, true) == code) return p;
+        return -1;
+    };
+    auto cb = [&] { return m.memReadDebug(0x00CB); };
+
+    // Schluesselschalter SS2 (A9H) kippt Bit 1 von (00CBH), bei jeder Drehung.
+    EXPECT_EQ(cb() & 0x02, 0);
+    ASSERT_TRUE(m.aup()->schluessel(2, true));
+    lauf(5'000'000);
+    EXPECT_EQ(cb() & 0x02, 0x02) << "SS2 ein";
+
+    // Tasten ueber die K7633: F05 (A1H) schaltet ALPHA (Lampe folgt dem Kommando), dann DAT + ET1.
+    drueck(0x27);
+    EXPECT_NE(m.aup()->lampen() & AUP::kLampeAlpha, 0);
+    for (char ch : std::string("DAT")) {
+        const int p = positionVon(ch);
+        ASSERT_GE(p, 0) << ch;
+        drueck(p);
+    }
+    drueck(0x40);   // ET1 = FFH
+    EXPECT_TRUE(k1520test::runSmallUntil(m, "DAT     00.00.00", 60'000'000LL, 5'000)) << k1520test::vramText(m);
+    drueck(0x41);   // ET2 = FEH
+    EXPECT_TRUE(k1520test::runSmallUntil(m, "(M)_", 60'000'000LL, 5'000)) << k1520test::vramText(m);
+
+    ASSERT_TRUE(m.aup()->schluessel(2, false));
+    lauf(5'000'000);
+    EXPECT_EQ(cb() & 0x02, 0) << "SS2 aus";
+}
+
 // SYSORG09 geht ueber zwei Disketten (HDR1-Kennzeichen "EC01" = auf der naechsten fortgesetzt): SG1
 // traegt nur die Saetze bis 91.  Wird ein Modul dahinter gewaehlt (hier SLE, Satz 98), verlangt SGEN
 // den naechsten Datentraeger: ERR FD 6 SEQU (Handbuch S. 25/26 "der naechste Datentraeger ist

@@ -730,6 +730,15 @@ bemerken dann nichts. Die Wahl gilt nur mit der K7637 und erzeugt die Maschine n
 (kein Tastenkürzel); die Aktion ist erst mit einer gewählten Kennung wählbar.
 Gespeichert wird die Wahl als `general.sicherheitsstecker`.
 
+### Schlüsselschalter (AUP/K7633)
+
+Mit gesteckter AUP (Terminaltastatur K7633) zeigt *Maschine* zwei rastende Aktionen,
+*Schlüsselschalter Anwender (SS1)* und *Schlüsselschalter Administrator (SS2)*, ohne
+Tastenkürzel; dieselben Schalter stehen im Kasten *AUP*. **Jede Drehung — Einschalten wie
+Ausschalten — meldet dem Gast einen Code** (SS1 = AAH, SS2 = A9H, das System kippt je Code
+ein Bit). Stecken und Abziehen des Schlüssels ist nicht erkennbar, nur die Drehung. Nach
+einem Reset meldet die AUP jeden eingeschalteten Schalter einmal, nach dem Typzeichen (80H).
+
 ### RAM
 
 *RAM* wählt die Speicherkarten: **1x K3525 16KB**, **2x K3525 32KB**, **4x K3525

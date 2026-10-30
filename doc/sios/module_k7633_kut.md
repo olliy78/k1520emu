@@ -3,8 +3,8 @@
 Stand 2026-10-30.  Quelle: `tools/sios_a5120/original/SIOS1526_SG1.hfe`, Datei `SYSORG09`; Werkzeug
 `tools/sios_a5120/modul.py` (`liste`, `get`, `pruefen`, `prn`); Listings `doc/sios/t_k7633.prn`, `doc/sios/kut.prn`
 (Namen/Kommentare in `tools/sios_a5120/modul_text.py`).  Stärke: **[Code]** aus dem Listing gelesen (statisch, nicht am
-laufenden SIOS), **[Schluss]** gefolgert, **[?]** offen.  Das SIOS mit diesen Modulen läuft im Emulator noch nicht
-(NFND-Abbruch in SYSD/SGEN), also **keine** Laufbelege.
+laufenden SIOS), **[Schluss]** gefolgert, **[?]** offen.  Laufbelege (ab 2026-10-30, nach der /IEO-Korrektur) stehen in
+Abschn. 8; Abschn. 1-7 sind die statische Analyse.
 
 ## 1. Modulformat [Code, mit Gegenprobe]
 
@@ -98,3 +98,20 @@ SLE/HLE/SIM noch Sparkassentexte; auf die Sonderschnittstelle (B0H-B7H) greift k
 3. Verbraucher von (00CBH) Bit 1/Bit 2 im Systemcode (Programmiermodus MEM/POU/…) suchen.
 4. Diskette 2 (SG2) für SLE/HLE/SIM/V24-Module beschaffen.
 5. Gegenprobe am laufenden SIOS, sobald NFND gelöst: Haltepunkt `27BF`, IN 41 = 02/01.
+
+## 8. Gegenprobe am laufenden SIOS (2026-10-30, Zweig sios-aup) [Lauf]
+
+Wächter `SiosSgen.GeneriertEinSystemMitK7633UndBootetAmAup` (`tests/integration/test_sios_sgen.cpp`): SGEN (SG1, Version 09) mit
+GRUND + **T-K7633** + KUT + BAB + PH-FD640 + LOG FD2 + LOG FD1 (statt T-K7637) läuft bis `SGEN FINISHED`; die erzeugte 40-Spur-Diskette
+bootet in einem **K5600.10** an einem A5120 mit AUP bis `MONITOR ===== SIOS 1526/0.9 (M)_` (das System ist 0.9: SYSORG09; im K5600.20
+bootet die 40-Spur-Diskette nicht, wie bei SYLp).  Belegt damit am laufenden System:
+
+- **TYP**: `IN 42H` = 80H an PC 2035H (Init-Schleife), ohne Gültigkeitsbit; ohne das Typzeichen käme der Fehler nach ~0,5 s.
+- **Gültigkeitsbit 1 = Terminal**: Tasten über die K7633 (ALPHA = F05, D, A, T, ET1 = Position 40H) ergeben `DAT     00.00.00`,
+  ET2 (41H) bringt `(M)_` zurück.
+- **Schlüsselschalter SS2 -> Bit 1 von (00CBH)**: 0 vor, 1 nach dem Einschalten, wieder 0 nach dem Ausschalten (kippt je Drehung).
+- **ALPHA-Lampe** folgt dem Kommando (Bit 1 = 0 nach F05); die Tabelle „mit Alpha“ kommt aus dem Kommando.
+- **NEU: `OUT 43H,FFH` ist auch das Lampenbyte „alles aus“** (PC 2C7CH im laufenden System, lange nach der Initialisierung).  Ein Modell, das
+  FFH als Reset behandelt UND danach das Typzeichen/den Schlüsselanlauf erneut meldet oder Tastenwartende verwirft, stört das System.
+  Das Modell: FFH löscht Gültigkeit und Schlange und legt das Typzeichen nach A6, meldet aber keinen Anlauf.
+- Offen: Typ-Low-Nibble der K7633 (Vorgabe 0), ob die AUP-Firmware nach FFH wirklich die Schlange verwirft, Anlauf der Schlüsselschalter nach /RESET.

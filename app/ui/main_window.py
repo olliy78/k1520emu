@@ -530,6 +530,7 @@ class MainWindow(QMainWindow):
         self.aup_dock = QDockWidget("AUP", self)
         self.aup_dock.setObjectName("aup_dock")
         self.aup_dock.setWidget(self.aup_widget)
+        self.aup_widget.schluesselGedreht.connect(self._schluessel_angezeigt)
         self.addDockWidget(Qt.RightDockWidgetArea, self.aup_dock)
         self.tabifyDockWidget(self.drives_dock, self.aup_dock)
         self.aup_dock.visibilityChanged.connect(
@@ -926,6 +927,9 @@ class MainWindow(QMainWindow):
             emu_menu.addAction(self.act_nmi)
         if hasattr(self, "act_sicherheitsstecker"):      # nur A5120-Profil (AP S3b)
             emu_menu.addAction(self.act_sicherheitsstecker)
+        for _n in ("schluessel_anwender", "schluessel_admin"):    # AUP/K7633, nur bei gesteckter AUP
+            if hasattr(self, "act_" + _n):
+                emu_menu.addAction(getattr(self, "act_" + _n))
         if hasattr(self, "act_stand_speichern"):    # nur P8000 (P8KS)
             emu_menu.addSeparator()
             emu_menu.addAction(self.act_stand_speichern)
@@ -2448,6 +2452,35 @@ class MainWindow(QMainWindow):
             dock.show()
             dock.raise_()
         self.aup_widget.aktualisieren()
+        self._schluessel_aktionen_pflegen(gesteckt)
+
+    def _schluessel_aktionen_pflegen(self, gesteckt: bool):
+        """Menueaktionen der Schluesselschalter: nur bei gesteckter AUP sichtbar, Stand aus dem Kern."""
+        for n, name in ((1, "schluessel_anwender"), (2, "schluessel_admin")):
+            akt = getattr(self, "act_" + name, None)
+            if akt is None:
+                continue
+            akt.setVisible(gesteckt)
+            akt.blockSignals(True)
+            akt.setChecked(bool(gesteckt and self.aup_widget.schluessel[n].isChecked()))
+            akt.blockSignals(False)
+
+    def _schluessel_angezeigt(self, n: int, an: bool):
+        akt = getattr(self, "act_" + ("schluessel_anwender", "schluessel_admin")[n - 1], None)
+        if akt is not None and akt.isChecked() != bool(an):
+            akt.blockSignals(True)
+            akt.setChecked(bool(an))
+            akt.blockSignals(False)
+
+    def _schluessel_drehen(self, n: int, an: bool):
+        """Aktion -> Kasten (der ruft den Kern); der Kasten bleibt die EINE Stelle, die den Kern bedient."""
+        self.aup_widget.schluessel[n].setChecked(bool(an))
+
+    def _on_schluessel_anwender(self, an: bool):
+        self._schluessel_drehen(1, an)
+
+    def _on_schluessel_admin(self, an: bool):
+        self._schluessel_drehen(2, an)
 
     def _pcmc_moeglich(self) -> bool:
         """Hat das Modell eine IFSS fuer PCMC?  (MC80.30; der MC80.2x hat keine serielle Schnittstelle.)"""

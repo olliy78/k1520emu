@@ -699,7 +699,7 @@ K1520_API bool        k1520_aup_sonder(K1520Handle h);
 /** @brief Taste druecken (@p gedrueckt != 0) oder loesen (fadensicher); false ohne Karte oder
  *  wenn an der Position keine Taste ist. */
 K1520_API bool        k1520_aup_taste(K1520Handle h, int tastatur, int pos, int gedrueckt);
-/** @brief Schluesselschalter @p n (1 = SS1, 2 = SS2) ein/aus; Einschalten sendet seinen Code. */
+/** @brief Schluesselschalter @p n (1 = SS1, 2 = SS2) ein/aus; JEDE Drehung (ein und aus) sendet seinen Code. */
 K1520_API bool        k1520_aup_schluessel(K1520Handle h, int n, int an);
 /** @brief Stellung des Schluesselschalters: 1/0; -1 ohne Karte oder bei falschem @p n. */
 K1520_API int         k1520_aup_schluessel_stand(K1520Handle h, int n);
