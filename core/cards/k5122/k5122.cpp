@@ -1222,6 +1222,7 @@ std::vector<LogicalSector> K5122::parseFormatStream(const std::vector<uint8_t>& 
         if ((mark == 0xFB || mark == 0xF8) && have_idam) {  // DAM: … FB <data…>
             const size_t data_start = j + 1;
             const size_t take = std::min<size_t>(cur.size, b.size() - data_start);
+            cur.deleted = (mark == 0xF8);                   // geloeschte Datenmarke fuehren
             cur.data.assign(b.begin() + data_start, b.begin() + data_start + take);
             cur.data.resize(cur.size, 0xE5);                // unvollstaendig → mit 0xE5 fuellen
             sektoren.push_back(cur);
@@ -1451,6 +1452,7 @@ void K5122::commitWriteField() {
     ziel->data.assign(write_buf_.begin() + data_start,
                       write_buf_.begin() + data_start + take);
     ziel->data.resize(ziel->size, 0x00);
+    ziel->deleted = (write_buf_[data_start - 1] == 0xF8);   // DAM F8 = geloescht
 
     // ── Sektor-Nachspann aus dem Schreibstrom uebernehmen ────────────────────
     // Der Strom eines Datenfelds lautet gemessen (UDOS, 128-B-Sektor):

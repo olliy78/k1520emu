@@ -78,3 +78,24 @@ Datenfeld mit F8 schreiben, Lesestrom muss F8 + gueltige CRC liefern) bzw. `Sios
 - Der erste ZVE1-Wartezweig `9ED3` (Abfrage `[9C94]`, 16-Bit-Zaehler BC) lief im Erstversuch einmal in den Zeitablauf (`9EDE`),
   das ist die Wiederholungsschleife (`[9C98]` = 5 Versuche), kein Emulatorfehler.
 - bedienung.md Abschnitt 4 ("Verdacht Indexmarke") bitte nach diesem Befund berichtigen (hier nicht geaendert).
+
+## 4. Nachtrag 2026-10-30 (Zweig sios-k5122): Korrektur A, Hypothese B, Bedienfehler
+
+- **Korrektur A umgesetzt** (F8 durchgaengig): `buildFaithfulReadTrack` (Marke + CRC, MFM/FM), `commitWriteField`,
+  `parseFormatStream`, Wait-Zweig `waitFeldSchreiben` (Lesen lieferte dort F8 schon).  Waechter
+  `TrackCodecGeloescht.FaithfulRead_FuehrtF8MitGueltigerCrc`, `K5122Test.FormatWrite_GeloeschteDatenmarkeBleibt`,
+  `SiosFs.Dp1Spur0LesestromFuehrtF8`.  Regression test 4109/4109, test-format, test-matrix 94/94 gruen.
+- **Hypothese B (OUT 14H im Lesemodus = Byte-Slot) ist nach Doku NICHT belegt**: `doc/trascripted/Floppy Anschlußsteuerung K 5122.md`
+  §5.5 (Abb. 7: /ASTB-FF "waehrend des Lesens gesperrt"), §5.6.1 (Decoder A3.3: /BUSRQ nur aus /ARDY,/BRDY-Kombination, Lesen =
+  Ausgang 01, Schreiben = 02), `07_k5122_afs.md` §7.6.  Nicht umgesetzt.  Die Gegenprobe `e 0xA4C0 DB 16` bleibt wirksam (Spur 0
+  wird kontrollgelesen), ist aber eine Gastcode-Aenderung.
+- **Bedienfehler in §0**: die Taste `N` auf "8" DISKETTE Y" ging in den Skripten verloren, wenn sie unmittelbar nach dem
+  Erscheinen der Frage kam; INIT formatierte dann als 8"-Standard (FM, 26 Sektoren FB) -- daher die "FM-Spur 0" und das ERR 96
+  (Etikettentreiber: Status 84H beim ersten Lesen).  **Vor `N` ca. 20 Mio. Takte laufen lassen und `5,25" DISKETTE` abwarten**;
+  dann folgen 5 x ET1 (Menue, Satzlaenge, Folge, 2 x Defektspur) und `Y` ET1 bei INIT ALL.  Die Originale sind MFM auch auf Spur 0.
+- **Stand mit 5,25"-Menue**: ohne Patch ERR 9C (A1-Versatz, wie §1).  Mit Patch A4C0 laeuft Spur 0, dann haengt INIT auf **Spur 1**:
+  ZVE1 wartet bei 9E89, ZVE2 steht in der Schleife `A3AC..A3B2` (OUT (14H) bei /WE inaktiv, wartet auf Bit 7 von [9C93], das
+  ZVE1 setzt) und `dev` zeigt K5122 `READING`, `/BUSRQ-pend=yes`, Kopf bleibt stehen (headPos 12/5174).  Die OUT (14H) dieser
+  Schleife sind die Pacing-Takte vor dem Schreiben; im Lesemodus des Emulators verbrauchen sie keinen Byte-Slot, die Zeit
+  steht, kein Indexpuls -> Verklemmung.  **Das ist dasselbe Thema wie B (Rolle von OUT 14H bei /WE = 1), aber hier mit Doku-Stuetze
+  fuer eine Handshake-Nachbildung (ARDY/ASTB-Takt im Schreibbetrieb)**: naechster Schritt, nicht umgesetzt.
