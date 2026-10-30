@@ -1221,6 +1221,11 @@ $ k1520disktool rm neu.hfe ALPHA                                  # HDR1 -> DDR1
 $ k1520disktool rm dp2.hfe PHASELB/NEU                            # Name blank, AADR/ML bleiben
 ```
 
+Prüfung: `k1520disktool fsck <abbild>` kennt `sios.hdr1.ungueltig` und `sios.hdr1.ueberlappt` (Fehler) sowie `sios.hdr1.eod`
+(Warnung); ERMAP-Nummern, VOL1-Felder und der Bibliotheksfuß werden nicht geprüft (nicht belegt).  Container: `.hfe`/`.dmk` für den Emulator;
+`.img`/`.cqm`/`.td0`/`.imd` gehen, **verlieren aber die gelöschten Datenmarken F8** der Etikettensektoren ab Sektor 9.  Erkennung nur mit Nachweis
+(ERMAP + VOL1), BCU-880- und MUTOS-Disketten behalten ihr Profil.
+
 Namen: Datei 1–8, Objekt 1–5 Zeichen (Großbuchstaben/Ziffern/Satzzeichen des DKOI-Satzes), Satzlänge immer 128.  Abgelehnt (mit Meldung) wird: Bibliothek mit
 mehr als 14 Einträgen, Fehlspurkarte mit Einträgen, voll belegte Spuren 1–37, `create --boot`, `boot-put`.  Gelöschter Bibliotheksplatz kehrt nicht zurück.  Ein Abbild, dessen Geometrie zu keinem Katalogformat passt (`SIOS1526_SYLp.hfe`),
 braucht `--fs sios_ss40`.
