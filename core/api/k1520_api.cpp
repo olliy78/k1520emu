@@ -732,13 +732,13 @@ uint32_t k1520_keyboard_leds(K1520Handle h) {
 
 int k1520_kbd_sicherheitsstecker_set(K1520Handle h, int kennung, bool geraet_passt) {
     auto* a = h ? dynamic_cast<A5120Machine*>(toMachine(h)) : nullptr;
-    if (!a || a->k7636()) return -1;
+    if (!a) return -1;
     return a->setSicherheitsstecker(kennung, geraet_passt) ? 0 : -2;
 }
 
 int k1520_kbd_sicherheitsstecker_get(K1520Handle h, bool* geraet_passt) {
     auto* a = h ? dynamic_cast<A5120Machine*>(toMachine(h)) : nullptr;
-    if (!a || a->k7636()) return -1;
+    if (!a) return -1;
     if (geraet_passt) *geraet_passt = a->sicherheitssteckerGeraetPasst();
     return a->sicherheitsstecker();
 }

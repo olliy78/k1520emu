@@ -10,11 +10,12 @@
  *
  * Zweite Voraussetzung: der CTC kennt keinen Einzelschuss (Kanal 3 = Zaehler mit D3=1 als
  * 100-ms-Takt; ohne ihn hing der Monitor in 1CD4H, doc/sios/README.md "Befund S2b").
- * SIOS 0.9 (K7636): noch DISABLED_, Laufwerks-/Abbildfrage S4.
+ * SIOS 0.9 (K7636, S4): bootet ohne weitere Kernaenderung; Tasten nur mit Sicherheitsstecker.
  */
 #include <gtest/gtest.h>
 
 #include "core/machines/a5120/a5120.h"
+#include "core/peripherals/k7636/k7636.h"
 #include "core/peripherals/k7637/k7637.h"
 #include "tests/support/fixtures.h"
 #include "tests/support/keyboard.h"
@@ -48,15 +49,17 @@ const FsCatalog& dateisysteme() {
 
 using k1520test::TempDisk;
 
-void bootetBisSystemzeile(const char* disk, const char* tastatur, const char* version) {
+void bootetBisSystemzeile(const char* disk, const char* tastatur, const char* version,
+                          const char* laufwerk = "K5600.20",
+                          const char* format = "k5601_ss80_26x128") {
     A5120Machine::Config cfg;
-    cfg.drive_profiles = {"K5600.20", "K5600.20", "none", "none"};
+    cfg.drive_profiles = {laufwerk, "K5600.20", "none", "none"};
     cfg.tastatur = std::string(tastatur) == "k7636" ? A5120Machine::Config::Tastatur::K7636
                                                     : A5120Machine::Config::Tastatur::K7637;
     A5120Machine m(cfg);
     m.powerOn();
     TempDisk a(disk);
-    ASSERT_TRUE(m.mountDisk(0, a.path(), "k5601_ss80_26x128", false)) << m.lastError();
+    ASSERT_TRUE(m.mountDisk(0, a.path(), format, false)) << m.lastError();
     const bool ok = k1520test::runSmallUntil(m, "MONITOR", 300'000'000LL, 100'000);
     const std::string v = k1520test::vramText(m);
     EXPECT_TRUE(ok) << "keine Systemzeile:\n" << v;
@@ -97,14 +100,77 @@ struct SiosRechner {
     std::string schirm() { return k1520test::vramText(m); }
 };
 
+/// SIOS 0.9 am K7636 (S4): SYLp-Original in A: (K5600.20), DP1 in B:, Stecker nach Wunsch.
+struct Sios09Rechner {
+    A5120Machine m;
+    TempDisk a{"sios1526_sylp.hfe"};
+    TempDisk b{"sios1526_dp1.hfe", "sios_dp1_b09.hfe"};
+    static A5120Machine::Config cfg(int stecker) {
+        A5120Machine::Config c;
+        c.drive_profiles = {"K5600.20", "K5600.20", "none", "none"};
+        c.tastatur = A5120Machine::Config::Tastatur::K7636;
+        c.sicherheitsstecker = stecker;
+        return c;
+    }
+    explicit Sios09Rechner(int stecker) : m(cfg(stecker)) {
+        m.powerOn();
+        EXPECT_TRUE(m.mountDisk(0, a.path(), "k5601_ss80_26x128", false)) << m.lastError();
+        EXPECT_TRUE(m.mountDisk(1, b.path(), "k5601_ss40_26x128", false)) << m.lastError();
+        EXPECT_TRUE(k1520test::runSmallUntil(m, "(M)", 300'000'000LL, 100'000))
+            << k1520test::vramText(m);
+    }
+    void tippe(const std::string& t) { k1520test::typeString(m, t); }
+    void taste(uint32_t code) { k1520test::typeKey(m, code); }
+    bool warte(const std::string& t, long long takte = 60'000'000LL) {
+        return k1520test::runSmallUntil(m, t, takte, 5'000);
+    }
+    std::string schirm() { return k1520test::vramText(m); }
+};
+constexpr uint32_t kRueckgabe09 = 0x01000004;                 // Qt::Key_Return -> ET1 (FFH)
+constexpr uint32_t kET2_09 = K7636::QK_TASTE_BASE | 0x67;     // Taste A00 = ET2 (FEH)
+
 }  // namespace
 
 TEST(SiosBoot, V11_ZeigtSystemzeile) {
     bootetBisSystemzeile("sios1526_syls.hfe", "k7637", "SIOS 1526/1.1");
 }
 
-TEST(SiosBoot, DISABLED_V09_ZeigtSystemzeile) {
+// SIOS 0.9 am K7636 (S4).  Das Original SYLp (80 Zyl. x 2 Seiten ausgelesen, 40-Spur-Inhalt) bootet
+// im K5600.20 unveraendert (Spur n liegt auf Position n, also OHNE Doppelschritt); die bereinigte
+// 40-Spur-Fassung (Fixture sios1526_sylp40.hfe) im K5600.10, dem Laufwerk, fuer das SIOS 0.9
+// einfach schrittet.  Im K5600.20 liefe sie nur mit Doppelschritt, den SIOS nicht fordert: kein Fall.
+TEST(SiosBoot, V09_ZeigtSystemzeile) {
     bootetBisSystemzeile("sios1526_sylp.hfe", "k7636", "SIOS 1526/0.9");
+}
+TEST(SiosBoot, V09_Bereinigt_K560010) {
+    bootetBisSystemzeile("sios1526_sylp40.hfe", "k7636", "SIOS 1526/0.9", "K5600.10",
+                         "k5601_ss40_26x128");
+}
+
+// SIOS 0.9 / K7636 (S4): die Zeitgeber-ISR fragt Port 01H/06H ab.  Mit Sicherheitsstecker 1 (Chefschalter;
+// Code A9H wie bei der K7637, Annahme [?]) nimmt der Monitor die Tasten an: DAT zeigt Kommando und Wert.
+TEST(SiosMonitor, V09_DatMitK7636) {
+    Sios09Rechner r(1);
+    r.tippe("DAT");
+    r.taste(kRueckgabe09);
+    EXPECT_TRUE(r.warte("DAT     00.00.00")) << r.schirm();
+    r.taste(kET2_09);
+    EXPECT_TRUE(r.warte("(M)_")) << r.schirm();
+    r.tippe("CLK");
+    r.taste(kRueckgabe09);
+    EXPECT_TRUE(r.warte("CLK     00.00.")) << r.schirm();
+    r.taste(kET2_09);
+    EXPECT_TRUE(r.warte("(M)_")) << r.schirm();
+}
+
+// GASTVERHALTEN: ohne Stecker ist die Bedienebene 0, und der Tastaturcode-Prozessor (28EEH..2935H, 00CBH
+// and FEH = 0) verwirft jede Zeichentaste.  Die Tasten kommen an (K7636 liefert sie), SIOS ignoriert sie.
+TEST(SiosMonitor, V09_OhneSteckerIgnoriertDieTasten) {
+    Sios09Rechner r(0);
+    r.tippe("CLK");
+    r.taste(kRueckgabe09);
+    EXPECT_FALSE(r.warte("CLK     00.", 30'000'000LL)) << r.schirm();
+    EXPECT_NE(r.schirm().find("(M)_"), std::string::npos) << r.schirm();
 }
 
 // DAT / CLK: die Systemzeile zeigt Kommando und Wert; ET2 bricht ab (Eingabe wieder leer).

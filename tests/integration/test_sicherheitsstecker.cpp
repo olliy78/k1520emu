@@ -54,17 +54,18 @@ TEST(K7637SicherheitssteckerMaschine, KonfigText) {
     A5120Machine::Config c2;
     EXPECT_FALSE(a5120konfig::text(c2, "sicherheitsstecker=9", err));
     A5120Machine::Config c3;
-    EXPECT_FALSE(a5120konfig::text(c3, "sicherheitsstecker=1;tastatur=k7636", err));
-    EXPECT_NE(err.find("K7637"), std::string::npos) << err;
+    EXPECT_TRUE(a5120konfig::text(c3, "sicherheitsstecker=1;tastatur=k7636", err)) << err;   // S4: auch K7636
+    EXPECT_EQ(c3.sicherheitsstecker, 1);
 }
 
-/// @test K7637SicherheitssteckerMaschine/K7636HatKeinElement
-/// @par Pass criterion  An der K7636 (kein K7637) meldet der Setter false.
-TEST(K7637SicherheitssteckerMaschine, K7636HatKeinElement) {
+/// @test K7637SicherheitssteckerMaschine/K7636NimmtDenSteckerAn
+/// @par Pass criterion  Seit S4 (Annahme [?], gleiche Codes) akzeptiert auch die K7636 den Stecker.
+TEST(K7637SicherheitssteckerMaschine, K7636NimmtDenSteckerAn) {
     A5120Machine::Config cfg;
     cfg.tastatur = A5120Machine::Config::Tastatur::K7636;
     A5120Machine m{cfg};
-    EXPECT_FALSE(m.setSicherheitsstecker(1));
+    EXPECT_TRUE(m.setSicherheitsstecker(1));
+    EXPECT_EQ(m.sicherheitsstecker(), 1);
 }
 
 /// @test K7637SicherheitssteckerMaschine/CpaBootetMitElement

@@ -300,9 +300,9 @@ class Programmprofil:
                     hw = hardware if hardware is not None else self.hardware_standard(modell)
                     return hw.get("rtc", "keine") != "keine"
                 if k == "sicherheitsstecker" and self.modell_vorgaben:
-                    # Nur die K7637 hat einen Sicherheitsstecker (die K7636 meldet kein TYP).
+                    # K7637 (belegt) und K7636 (Annahme [?], gleiche Codes, S4): beide Tastaturen.
                     hw = hardware if hardware is not None else self.hardware_standard(modell)
-                    return hw.get("tastatur") == "k7637"
+                    return hw.get("tastatur") in ("k7636", "k7637")
                 if k == "erweiterungsmodul" and self.modell_vorgaben:
                     hw = hardware if hardware is not None else self.hardware_standard(modell)
                     return hw.get("ram") == "k3526"
@@ -343,8 +343,8 @@ class Programmprofil:
                 "laderom": hardware["laderom"],
                 "em": self.modell_em(modell, hardware) or "none",
             }
-            # Sicherheitsstecker der K7637 (AP S3b): nur wenn gesteckt UND die K7637 da ist.
-            if hardware.get("sicherheitsstecker", "0") != "0" and hardware["tastatur"] == "k7637":
+            # Sicherheitsstecker (AP S3b, K7636 seit S4): nur wenn gesteckt.
+            if hardware.get("sicherheitsstecker", "0") != "0":
                 konfig["sicherheitsstecker"] = hardware["sicherheitsstecker"]
             # Anfangsstellung des Schiebeschalters: nur mit zwei Karten (sonst Fehler im Kern).
             if hardware["bildschirm"] == "beide":
@@ -546,9 +546,9 @@ A5120 = Programmprofil(
          "K7636 parallel am U-Bus der K2526, K7637 seriell am Kanal der K8025.",
          (("k7636", "K7636 (parallel)"), ("k7637", "K7637 (seriell)")), ()),
         ("sicherheitsstecker", "Sicherheitsstecker:",
-         "Sicherheitsstecker der K7637 (Bediensicherung, 8 Codierstopfen): Stopfen 1–3 sind die "
+         "Sicherheitsstecker (Bediensicherung, 8 Codierstopfen): Stopfen 1–3 sind die "
          "Bedienerkennung, die die Tastatur nach TYP und beim Stecken/Ziehen als Code meldet.  "
-         "Nur mit der K7637; ohne Stecker (Vorgabe) bleibt alles wie bisher.  "
+         "K7637 belegt, K7636 mit denselben Codes als Annahme; ohne Stecker (Vorgabe) bleibt alles wie bisher.  "
          "*Maschine ▸ Sicherheitsstecker gesteckt* zieht/steckt ihn im Betrieb.",
          (("0", "keiner"), ("1", "01 Chefschalter"), ("2", "02 1. Bedienebene"),
           ("3", "03 (Stopfen 1+2)"), ("4", "04 (Stopfen 3)"), ("5", "05 (Stopfen 1+3)"),

@@ -90,8 +90,30 @@ void K7636::reset(bool kommando)
     repeat_aktiv_ = false;
     halte_taste_ = 0;
     naechster_code_ = 0;
-    einreihen(TYP, cur_cycle_ + (kommando ? ANTWORT_ZEIT : 0), true);    // Einschalten/Reset: erst das Typzeichen (SL1–SL6: X2 offen)
+    eingeschaltet_ = true;
+    kommando_reset_ = kommando;
+    einreihen(TYP, cur_cycle_ + (kommando ? ANTWORT_ZEIT : 0), true);    // Einschalten/Reset: erst das Typzeichen
+    sendSlCodes(sl_low_);                                  // wie K7637: nach TYP die Codes der Low-Leitungen
     liefere();
+}
+
+void K7636::sendSlCodes(uint8_t maske)
+{
+    // Als "Antwort"-Eintraege: sie zaehlen nicht gegen die Pufferttiefe der Tasten und gehen nie verloren.
+    for (int i = 0; i < 3; ++i)
+        if ((maske >> i) & 1) einreihen(SL_CODE[i], cur_cycle_ + (kommando_reset_ ? ANTWORT_ZEIT : 0), true);
+}
+
+void K7636::setSicherheitsstecker(int kennung, bool geraet_passt)
+{
+    if (kennung < 0 || kennung > 6) kennung = 0;
+    stopfen_kennung_ = kennung;
+    stopfen_geraet_passt_ = geraet_passt;
+    const uint8_t neu = (kennung >= 1 && geraet_passt) ? static_cast<uint8_t>(kennung & 7) : 0;
+    // Pegelwechsel (Stecken wie Ziehen) meldet die Leitung mit ihrem Code (Trigger).
+    // Vor dem Einschalten (reset() noch nie gelaufen) nur merken: reset() sendet dann TYP + Codes.
+    if (eingeschaltet_) { sendSlCodes(static_cast<uint8_t>(neu ^ sl_low_)); liefere(); }
+    sl_low_ = neu;
 }
 
 void K7636::kommando(uint8_t d)

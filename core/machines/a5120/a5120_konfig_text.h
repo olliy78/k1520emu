@@ -169,10 +169,6 @@ inline bool pruefe(const A5120Machine::Config& cfg, bool schalter_gesetzt, std::
         err = "aup_sonder: nur mit aup=1";
         return false;
     }
-    if (cfg.sicherheitsstecker != 0 && cfg.tastatur == A5120Machine::Config::Tastatur::K7636) {
-        err = "sicherheitsstecker: nur an der K7637 (nicht mit tastatur=k7636)";
-        return false;
-    }
     return true;
 }
 

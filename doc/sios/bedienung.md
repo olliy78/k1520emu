@@ -125,3 +125,18 @@ Das Programm schreibt (`INITIAL DISK IS WORKING`, ZVE2-Formatstrom am Datenport 
   `b2 A30E` wurde auf Spur 0 nie erreicht, der Abbruch kommt auf einem anderen Pfad (`A54FH`).  **Offen**, nächster Schritt:
   ZVE2-Pfad ab `A4ABH`/`A517H` bis zum Fehlersprung (`A5F6H`/`A5F9H`) verfolgen.
 - Rundlauf SIOS <-> DiskTool (`create --fs sios_ss40`, `put`, `ls`) ist daher noch **nicht** gefahren.
+
+## 6. SIOS 0.9 (K7636, S4)
+
+Stand 2026-10-30.  Aufbau: A5120, Laufwerke K5600.20, **K7636** (`--tastatur k7636`), **Sicherheitsstecker 1**,
+A: = `sios1526_sylp.hfe` (Original, `k5601_ss80_26x128`), B: = `sios1526_dp1.hfe`.  Systemzeile (letzte Zeile):
+
+```
+MONITOR ===== SIOS 1526/0.9 (M)_
+```
+
+Tasten: Zeichen als ASCII (die K7636.01 liefert Versalien ueber die Umschaltstufe), **ET1** = FFH (Wirtstaste Return),
+**ET2** = FEH (Taste A00 der K7636; `K7636::QK_TASTE_BASE | 0x67`).  `DAT` ET1 zeigt `DAT     00.00.00`, `CLK` ET1 die laufende Uhr,
+ET2 bricht ab (`SiosMonitor.V09_DatMitK7636`).  **Ohne Sicherheitsstecker ignoriert 0.9 alle Zeichentasten** (Bedienebene 0,
+`28EEH..2935H`) — Stecker 01 einstellen.  Der Stecker meldet an der K7636 TYP, dann A9H/AAH/ABH (Annahme [?]).
+Medium: das Original (80 Zyl. x 2 Seiten ausgelesen) in K5600.20; die bereinigte 40-Spur-Fassung `sios1526_sylp40.hfe` in K5600.10.
