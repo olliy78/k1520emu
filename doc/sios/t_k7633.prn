@@ -1,0 +1,1505 @@
+; ============================================================================
+; t_k7633.prn - SIOS 1526, Modul T-K7633 (SYSORG09 Position 22, 3 Saetze, Variante 3)
+; Terminaltastatur K7633 an der AUP 062-8531 (E/A 40H-43H) + Kundentastatur-Empfang.
+; Quelle: tools/sios_a5120/original/SIOS1526_SG1.hfe, Datei SYSORG09.  Erzeugt mit
+;   python3 tools/sios_a5120/modul.py prn T-K7633 doc/sios/t_k7633.prn --org 2000H
+; Ladeadresse ist NICHT festgelegt (SGEN legt das Modul in 1-KB-Bloecke); hier 2000H wie T-K7637.
+; Der Code ist lageunabhaengig: D = Seite des Moduls beim Aufruf von Block+2; relative Spruenge
+; (LD DE,n / CALL 002BH) und Aufrufe (CALL 003BH) gelten ab Folgeadresse.
+; [Code] aus dem Listing gelesen, [?] Deutung.  Ports: 41H/42H lesen, 43H schreiben, 00H = INT-BS.
+; ============================================================================
+
+	ORG	2000H
+
+2000  10 93		DB	10H,93H		;Satzkopf: Gruppe 1, Lauf 0, Flags/Variante 93H
+INIT:
+2002  AF            	XOR A		;INIT (Block+2): Zeiger (0110H)=Ereignisroutine +004FH, (010EH)=Befehlsroutine +04AAH; Geraetetabelle (0301H)=0EH (Geraet 1 = Dialog, Eintrag 010EH)
+2003  6F            	LD L,A
+2004  62            	LD H,D
+2005  01 4F 00      	LD BC,004FH
+2008  09            	ADD HL,BC
+2009  22 10 01      	LD (0110H),HL
+200C  6F            	LD L,A
+200D  62            	LD H,D
+200E  01 AA 04      	LD BC,04AAH
+2011  09            	ADD HL,BC
+2012  22 0E 01      	LD (010EH),HL
+2015  3E 0E         	LD A,0EH
+2017  32 01 03      	LD (0301H),A
+201A  3E 02         	LD A,02H
+201C  32 15 01      	LD (0115H),A
+201F  3E E6         	LD A,E6H
+2021  32 FD 00      	LD (00FDH),A
+2024  AF            	XOR A
+2025  6F            	LD L,A
+2026  62            	LD H,D
+2027  01 A4 07      	LD BC,07A4H		;IM-2-Tabelle: Slot 027CH (CTC-Kanal 2, Vektor 7CH) := ISR_ZEIT (+07A4H) - Abfrage im Zeittakt, KEIN AUP-Interrupt
+202A  09            	ADD HL,BC
+202B  22 7C 02      	LD (027CH),HL
+202E  3D            	DEC A		;A=FFH: OUT (43H),FFH = RESET AUP (Kommandobyte)
+202F  D3 43         	OUT (43H),A
+2031  67            	LD H,A
+2032  6F            	LD L,A
+2033  DB 42         	IN A,(42H)		;Typabfrage: IN A,(42H) bis High-Nibble = 80H (Zaehler HL=FFFFH, ca. 65535 Lesezugriffe); KEIN Test von IN 41H davor
+2035  47            	LD B,A
+2036  E6 F0         	AND F0H
+2038  FE 80         	CP 80H
+203A  28 0B         	JR Z,2047H
+203C  2B            	DEC HL
+203D  7C            	LD A,H
+203E  B7            	OR A
+203F  20 F2         	JR NZ,2033H
+2041  11 9B 0B      	LD DE,0B9BH		;Zeitablauf: relativer Sprung nach 2BE2H (Fehlerausgabe BC=2032H DE=424BH)
+2044  CD 2B 00      	CALL 002BH
+2047  78            	LD A,B		;Low-Nibble des Typzeichens -> (00B1H)
+2048  E6 0F         	AND 0FH
+204A  32 B1 00      	LD (00B1H),A
+204D  FB            	EI
+204E  C9            	RET
+GERAET_EREIGNIS:
+204F  3A 13 01      	LD A,(0113H)		;Geraeteroutine (Ereignis/Abtastung durch ISR 1E48H): Lampenbyte neu bilden
+2052  CB 6F         	BIT 5,A
+2054  28 41         	JR Z,2097H
+2056  3E 02         	LD A,02H
+2058  32 15 01      	LD (0115H),A
+205B  21 13 01      	LD HL,0113H
+205E  CB AE         	RES 5,(HL)
+2060  21 CA 00      	LD HL,00CAH		;(00CAH): Bit0 = SEL-Zustand, Bit1 = ALPHA-Zustand (getoggelt von den Codes A0H/A1H); A = 03H XOR (00CAH) OR FCH
+2063  3E 03         	LD A,03H
+2065  AE            	XOR (HL)
+2066  F6 FC         	OR FCH
+2068  23            	INC HL
+2069  CB 7E         	BIT 7,(HL)		;(00CBH) Bit7 (Fehlersperre) gesetzt -> Lampenbit 5 loeschen (= Fehlerlampe EIN, 0 = ein)
+206B  28 02         	JR Z,206FH
+206D  CB AF         	RES 5,A
+206F  21 BA 01      	LD HL,01BAH		;(01BAH) Bit0 (Kundeneingabe aktiv) -> Lampenbit 4 loeschen (= GET-LED EIN)
+2072  CB 46         	BIT 0,(HL)
+2074  28 02         	JR Z,2078H
+2076  CB A7         	RES 4,A
+2078  21 4E 00      	LD HL,004EH		;(004EH) Bit2 (Hupanforderung) -> gelesen+geloescht, Lampenbit 6 loeschen (= Hupe EIN, einmalig)
+207B  CB 56         	BIT 2,(HL)
+207D  CB 96         	RES 2,(HL)
+207F  28 02         	JR Z,2083H
+2081  CB B7         	RES 6,A
+2083  21 6A 07      	LD HL,076AH		;Vergleich mit Abbild (076AH); nur bei Aenderung: (076AH):=A, OUT (43H),A = Kommandobyte (Bit7 immer 1)
+2086  BE            	CP (HL)
+2087  28 03         	JR Z,208CH
+2089  77            	LD (HL),A
+208A  D3 43         	OUT (43H),A
+208C  3A 12 01      	LD A,(0112H)
+208F  B7            	OR A
+2090  C8            	RET Z
+2091  11 3D 01      	LD DE,013DH
+2094  CD 2B 00      	CALL 002BH
+2097  3A 17 01      	LD A,(0117H)
+209A  FE FF         	CP FFH
+209C  28 51         	JR Z,20EFH
+209E  21 17 01      	LD HL,0117H
+20A1  CB 56         	BIT 2,(HL)
+20A3  28 1B         	JR Z,20C0H
+20A5  3A 12 01      	LD A,(0112H)
+20A8  FE 10         	CP 10H
+20AA  11 28 01      	LD DE,0128H
+20AD  CC 2B 00      	CALL Z,002BH
+20B0  0E 0A         	LD C,0AH
+20B2  11 0F 0B      	LD DE,0B0FH
+20B5  CD 3B 00      	CALL 003BH
+20B8  CB 7E         	BIT 7,(HL)
+20BA  11 8D 01      	LD DE,018DH
+20BD  C4 2B 00      	CALL NZ,002BH
+20C0  21 13 01      	LD HL,0113H
+20C3  CB 56         	BIT 2,(HL)
+20C5  28 1C         	JR Z,20E3H
+20C7  3A 17 01      	LD A,(0117H)
+20CA  B7            	OR A
+20CB  20 16         	JR NZ,20E3H
+20CD  2A 18 01      	LD HL,(0118H)
+20D0  CB FE         	SET 7,(HL)
+20D2  21 14 01      	LD HL,0114H
+20D5  CB 96         	RES 2,(HL)
+20D7  21 00 00      	LD HL,0000H
+20DA  22 DE 00      	LD (00DEH),HL
+20DD  11 6A 01      	LD DE,016AH
+20E0  CD 2B 00      	CALL 002BH
+20E3  3A 12 01      	LD A,(0112H)
+20E6  B7            	OR A
+20E7  11 E7 00      	LD DE,00E7H
+20EA  C4 2B 00      	CALL NZ,002BH
+20ED  18 0D         	JR 20FCH
+20EF  2A 18 01      	LD HL,(0118H)
+20F2  3A B1 00      	LD A,(00B1H)
+20F5  77            	LD (HL),A
+20F6  11 66 01      	LD DE,0166H
+20F9  CD 2B 00      	CALL 002BH
+20FC  21 13 01      	LD HL,0113H
+20FF  CB 9E         	RES 3,(HL)
+2101  21 17 01      	LD HL,0117H
+2104  CB 56         	BIT 2,(HL)
+2106  28 13         	JR Z,211BH
+2108  0E 05         	LD C,05H
+210A  11 B7 0A      	LD DE,0AB7H
+210D  CD 3B 00      	CALL 003BH
+2110  CB 55         	BIT 2,L
+2112  20 07         	JR NZ,211BH
+2114  2A 18 01      	LD HL,(0118H)
+2117  CB FE         	SET 7,(HL)
+2119  18 C2         	JR 20DDH
+211B  21 17 01      	LD HL,0117H
+211E  CB 5E         	BIT 3,(HL)
+2120  28 55         	JR Z,2177H
+2122  06 14         	LD B,14H
+2124  21 9F 00      	LD HL,009FH
+2127  36 00         	LD (HL),00H
+2129  2D            	DEC L
+212A  10 FB         	DJNZ 2127H
+212C  3E 50         	LD A,50H
+212E  32 8D 00      	LD (008DH),A
+2131  2A DC 00      	LD HL,(00DCH)
+2134  22 8E 00      	LD (008EH),HL
+2137  3A 17 01      	LD A,(0117H)
+213A  CB 57         	BIT 2,A
+213C  28 31         	JR Z,216FH
+213E  0E 0C         	LD C,0CH
+2140  11 81 0A      	LD DE,0A81H
+2143  CD 3B 00      	CALL 003BH
+2146  3A 1C 01      	LD A,(011CH)
+2149  4F            	LD C,A
+214A  3E 9F         	LD A,9FH
+214C  91            	SUB C
+214D  3C            	INC A
+214E  12            	LD (DE),A
+214F  1C            	INC E
+2150  AF            	XOR A
+2151  12            	LD (DE),A
+2152  3A 17 01      	LD A,(0117H)
+2155  CB 57         	BIT 2,A
+2157  28 16         	JR Z,216FH
+2159  CB 47         	BIT 0,A
+215B  28 0C         	JR Z,2169H
+215D  06 00         	LD B,00H
+215F  2A 1A 01      	LD HL,(011AH)
+2162  09            	ADD HL,BC
+2163  2B            	DEC HL
+2164  11 9F 00      	LD DE,009FH
+2167  ED B8         	LDDR
+2169  11 03 0A      	LD DE,0A03H
+216C  CD 3B 00      	CALL 003BH
+216F  21 14 01      	LD HL,0114H
+2172  CB C6         	SET 0,(HL)
+2174  CB FE         	SET 7,(HL)
+2176  C9            	RET
+2177  21 FE 00      	LD HL,00FEH
+217A  CB 56         	BIT 2,(HL)
+217C  28 3D         	JR Z,21BBH
+217E  2A 1A 01      	LD HL,(011AH)
+2181  22 B3 00      	LD (00B3H),HL
+2184  3A 1C 01      	LD A,(011CH)
+2187  5F            	LD E,A
+2188  32 B5 00      	LD (00B5H),A
+218B  3A 17 01      	LD A,(0117H)
+218E  CB 4F         	BIT 1,A
+2190  28 3C         	JR Z,21CEH
+2192  CB 47         	BIT 0,A
+2194  20 38         	JR NZ,21CEH
+2196  3A 17 01      	LD A,(0117H)
+2199  CB 57         	BIT 2,A
+219B  06 01         	LD B,01H
+219D  28 04         	JR Z,21A3H
+219F  3A C3 00      	LD A,(00C3H)
+21A2  47            	LD B,A
+21A3  16 00         	LD D,00H
+21A5  19            	ADD HL,DE
+21A6  10 FD         	DJNZ 21A5H
+21A8  AF            	XOR A
+21A9  ED 5B 1A 01   	LD DE,(011AH)
+21AD  ED 52         	SBC HL,DE
+21AF  EB            	EX DE,HL
+21B0  36 00         	LD (HL),00H
+21B2  23            	INC HL
+21B3  1B            	DEC DE
+21B4  AF            	XOR A
+21B5  B2            	OR D
+21B6  B3            	OR E
+21B7  28 15         	JR Z,21CEH
+21B9  18 F5         	JR 21B0H
+21BB  21 14 01      	LD HL,0114H
+21BE  CB 56         	BIT 2,(HL)
+21C0  28 BC         	JR Z,217EH
+21C2  2A EC 00      	LD HL,(00ECH)
+21C5  22 B3 00      	LD (00B3H),HL
+21C8  3A B0 00      	LD A,(00B0H)
+21CB  32 B5 00      	LD (00B5H),A
+21CE  21 B8 00      	LD HL,00B8H
+21D1  CB EE         	SET 5,(HL)
+21D3  C9            	RET
+STEUERCODE_10H:
+21D4  FE 10         	CP 10H		;[?] Steuercode 10H (Ereignis-Abschluss: Eingabe/Ende-Text-Behandlung)
+21D6  20 36         	JR NZ,220EH
+21D8  3A FE 00      	LD A,(00FEH)
+21DB  E6 0C         	AND 0CH
+21DD  28 05         	JR Z,21E4H
+21DF  AF            	XOR A
+21E0  32 12 01      	LD (0112H),A
+21E3  C9            	RET
+21E4  2A 18 01      	LD HL,(0118H)
+21E7  CB FE         	SET 7,(HL)
+21E9  CB F6         	SET 6,(HL)
+21EB  21 B8 00      	LD HL,00B8H
+21EE  CB AE         	RES 5,(HL)
+21F0  2E FE         	LD L,FEH
+21F2  CB DE         	SET 3,(HL)
+21F4  3A 13 01      	LD A,(0113H)
+21F7  CB 57         	BIT 2,A
+21F9  28 52         	JR Z,224DH
+21FB  21 14 01      	LD HL,0114H
+21FE  CB D6         	SET 2,(HL)
+2200  2A B3 00      	LD HL,(00B3H)
+2203  22 EC 00      	LD (00ECH),HL
+2206  3A B5 00      	LD A,(00B5H)
+2209  32 B0 00      	LD (00B0H),A
+220C  18 3F         	JR 224DH
+220E  FE 91         	CP 91H
+2210  11 50 01      	LD DE,0150H
+2213  CC 2B 00      	CALL Z,002BH
+2216  21 B8 00      	LD HL,00B8H
+2219  CB 6E         	BIT 5,(HL)
+221B  28 56         	JR Z,2273H
+221D  FE 20         	CP 20H
+221F  11 86 01      	LD DE,0186H
+2222  DC 2B 00      	CALL C,002BH
+2225  4F            	LD C,A
+2226  07            	RLCA
+2227  38 06         	JR C,222FH
+2229  11 52 02      	LD DE,0252H
+222C  CD 2B 00      	CALL 002BH
+222F  21 17 01      	LD HL,0117H
+2232  CB 56         	BIT 2,(HL)
+2234  20 0D         	JR NZ,2243H
+2236  21 B5 00      	LD HL,00B5H
+2239  3A 1C 01      	LD A,(011CH)
+223C  96            	SUB (HL)
+223D  2A 18 01      	LD HL,(0118H)
+2240  23            	INC HL
+2241  23            	INC HL
+2242  77            	LD (HL),A
+2243  3A 12 01      	LD A,(0112H)
+2246  E6 3F         	AND 3FH
+2248  2A 18 01      	LD HL,(0118H)
+224B  23            	INC HL
+224C  77            	LD (HL),A
+224D  AF            	XOR A
+224E  32 12 01      	LD (0112H),A
+2251  32 B2 00      	LD (00B2H),A
+2254  21 B8 00      	LD HL,00B8H
+2257  36 80         	LD (HL),80H
+2259  2A 18 01      	LD HL,(0118H)
+225C  7D            	LD A,L
+225D  B4            	OR H
+225E  28 02         	JR Z,2262H
+2260  CB 86         	RES 0,(HL)
+2262  21 14 01      	LD HL,0114H
+2265  CB 86         	RES 0,(HL)
+2267  2D            	DEC L
+2268  CB 96         	RES 2,(HL)
+226A  CB 9E         	RES 3,(HL)
+226C  25            	DEC H
+226D  6C            	LD L,H
+226E  22 B9 00      	LD (00B9H),HL
+2271  AF            	XOR A
+2272  C9            	RET
+2273  FE C0         	CP C0H
+2275  11 03 01      	LD DE,0103H
+2278  DC 2B 00      	CALL C,002BH
+227B  21 BA 00      	LD HL,00BAH
+227E  7E            	LD A,(HL)
+227F  2D            	DEC L
+2280  86            	ADD A,(HL)
+2281  4F            	LD C,A
+2282  3A 1C 01      	LD A,(011CH)
+2285  91            	SUB C
+2286  30 07         	JR NC,228FH
+2288  2A 18 01      	LD HL,(0118H)
+228B  CB FE         	SET 7,(HL)
+228D  18 B4         	JR 2243H
+228F  79            	LD A,C
+2290  2A 18 01      	LD HL,(0118H)
+2293  23            	INC HL
+2294  23            	INC HL
+2295  77            	LD (HL),A
+2296  21 17 01      	LD HL,0117H
+2299  CB 4E         	BIT 1,(HL)
+229B  28 47         	JR Z,22E4H
+229D  CB 6E         	BIT 5,(HL)
+229F  20 0E         	JR NZ,22AFH
+22A1  ED 5B 1A 01   	LD DE,(011AH)
+22A5  3A 1C 01      	LD A,(011CH)
+22A8  D5            	PUSH DE
+22A9  11 28 00      	LD DE,0028H
+22AC  CD 2B 00      	CALL 002BH
+22AF  CB 76         	BIT 6,(HL)
+22B1  2A 1A 01      	LD HL,(011AH)
+22B4  3E 04         	LD A,04H
+22B6  28 01         	JR Z,22B9H
+22B8  87            	ADD A,A
+22B9  47            	LD B,A
+22BA  3D            	DEC A
+22BB  85            	ADD A,L
+22BC  6F            	LD L,A
+22BD  30 01         	JR NC,22C0H
+22BF  24            	INC H
+22C0  11 9F 00      	LD DE,009FH
+22C3  1A            	LD A,(DE)
+22C4  CB 47         	BIT 0,A
+22C6  3E 0C         	LD A,0CH
+22C8  28 01         	JR Z,22CBH
+22CA  1A            	LD A,(DE)
+22CB  ED 67         	RRD
+22CD  1B            	DEC DE
+22CE  1A            	LD A,(DE)
+22CF  ED 67         	RRD
+22D1  1B            	DEC DE
+22D2  2B            	DEC HL
+22D3  10 F5         	DJNZ 22CAH
+22D5  18 0D         	JR 22E4H
+22D7  D1            	POP DE
+22D8  3D            	DEC A
+22D9  83            	ADD A,E
+22DA  30 01         	JR NC,22DDH
+22DC  14            	INC D
+22DD  5F            	LD E,A
+22DE  21 9F 00      	LD HL,009FH
+22E1  44            	LD B,H
+22E2  ED B8         	LDDR
+22E4  21 17 01      	LD HL,0117H
+22E7  CB 56         	BIT 2,(HL)
+22E9  28 A2         	JR Z,228DH
+22EB  0E 09         	LD C,09H
+22ED  11 D4 08      	LD DE,08D4H
+22F0  CD 3B 00      	CALL 003BH
+22F3  EB            	EX DE,HL
+22F4  36 04         	LD (HL),04H
+22F6  21 1C 01      	LD HL,011CH
+22F9  3E A0         	LD A,A0H
+22FB  96            	SUB (HL)
+22FC  46            	LD B,(HL)
+22FD  6F            	LD L,A
+22FE  26 00         	LD H,00H
+2300  7E            	LD A,(HL)
+2301  FE 2A         	CP 2AH
+2303  28 23         	JR Z,2328H
+2305  FE 20         	CP 20H
+2307  28 1F         	JR Z,2328H
+2309  FE 2D         	CP 2DH
+230B  28 1B         	JR Z,2328H
+230D  FE 2E         	CP 2EH
+230F  28 09         	JR Z,231AH
+2311  FE 2C         	CP 2CH
+2313  28 05         	JR Z,231AH
+2315  4F            	LD C,A
+2316  E6 F0         	AND F0H
+2318  18 04         	JR 231EH
+231A  36 20         	LD (HL),20H
+231C  18 0A         	JR 2328H
+231E  FE 30         	CP 30H
+2320  20 05         	JR NZ,2327H
+2322  79            	LD A,C
+2323  FE 3A         	CP 3AH
+2325  38 04         	JR C,232BH
+2327  74            	LD (HL),H
+2328  2C            	INC L
+2329  10 D5         	DJNZ 2300H
+232B  3A 9F 00      	LD A,(009FH)
+232E  FE 2B         	CP 2BH
+2330  28 09         	JR Z,233BH
+2332  FE 2D         	CP 2DH
+2334  28 05         	JR Z,233BH
+2336  3E 20         	LD A,20H
+2338  32 9F 00      	LD (009FH),A
+233B  3A 17 01      	LD A,(0117H)
+233E  CB 4F         	BIT 1,A
+2340  28 14         	JR Z,2356H
+2342  ED 5B 1A 01   	LD DE,(011AH)
+2346  3A 1C 01      	LD A,(011CH)
+2349  4F            	LD C,A
+234A  3D            	DEC A
+234B  83            	ADD A,E
+234C  30 01         	JR NC,234FH
+234E  14            	INC D
+234F  5F            	LD E,A
+2350  21 9F 00      	LD HL,009FH
+2353  44            	LD B,H
+2354  ED B8         	LDDR
+2356  11 16 08      	LD DE,0816H
+2359  CD 3B 00      	CALL 003BH
+235C  3A 12 01      	LD A,(0112H)
+235F  E6 3F         	AND 3FH
+2361  2A 18 01      	LD HL,(0118H)
+2364  23            	INC HL
+2365  77            	LD (HL),A
+2366  0E 0A         	LD C,0AH
+2368  11 59 08      	LD DE,0859H
+236B  CD 3B 00      	CALL 003BH
+236E  CB 46         	BIT 0,(HL)
+2370  11 D7 FE      	LD DE,FED7H
+2373  CC 2B 00      	CALL Z,002BH
+2376  3E 91         	LD A,91H
+2378  32 12 01      	LD (0112H),A
+237B  D3 00         	OUT (00H),A
+237D  C9            	RET
+237E  FE 19         	CP 19H
+2380  28 0A         	JR Z,238CH
+2382  FE 09         	CP 09H
+2384  28 06         	JR Z,238CH
+2386  21 12 01      	LD HL,0112H
+2389  36 00         	LD (HL),00H
+238B  C9            	RET
+238C  21 B8 00      	LD HL,00B8H
+238F  CB A6         	RES 4,(HL)
+2391  2C            	INC L
+2392  74            	LD (HL),H
+2393  2C            	INC L
+2394  74            	LD (HL),H
+2395  11 F7 07      	LD DE,07F7H
+2398  CD 3B 00      	CALL 003BH
+239B  AF            	XOR A
+239C  32 12 01      	LD (0112H),A
+239F  21 14 01      	LD HL,0114H
+23A2  CB 46         	BIT 0,(HL)
+23A4  C8            	RET Z
+23A5  11 77 FD      	LD DE,FD77H
+23A8  CD 2B 00      	CALL 002BH
+23AB  4F            	LD C,A
+23AC  FE 09         	CP 09H
+23AE  28 04         	JR Z,23B4H
+23B0  FE 19         	CP 19H
+23B2  20 4E         	JR NZ,2402H
+23B4  21 17 01      	LD HL,0117H
+23B7  CB 56         	BIT 2,(HL)
+23B9  11 C2 00      	LD DE,00C2H
+23BC  C4 2B 00      	CALL NZ,002BH
+23BF  2A 1A 01      	LD HL,(011AH)
+23C2  3A 1C 01      	LD A,(011CH)
+23C5  47            	LD B,A
+23C6  36 00         	LD (HL),00H
+23C8  23            	INC HL
+23C9  10 FB         	DJNZ 23C6H
+23CB  2A 1A 01      	LD HL,(011AH)
+23CE  22 B3 00      	LD (00B3H),HL
+23D1  3A 1C 01      	LD A,(011CH)
+23D4  32 B5 00      	LD (00B5H),A
+23D7  AF            	XOR A
+23D8  32 12 01      	LD (0112H),A
+23DB  C9            	RET
+23DC                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+23EC                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+23FC                	DB	F3H,0BH
+23FE  1C 76		DB	1CH,76H		;CRC-CCITT
+2400  11 93		DB	11H,93H		;Satzkopf: Gruppe 1, Lauf 1, Flags/Variante 93H
+2402  79            	LD A,C
+2403  FE 11         	CP 11H
+2405  28 08         	JR Z,240FH
+2407  FE 12         	CP 12H
+2409  11 4B 00      	LD DE,004BH
+240C  C4 2B 00      	CALL NZ,002BH
+240F  E6 03         	AND 03H
+2411  47            	LD B,A
+2412  04            	INC B
+2413  0E 30         	LD C,30H
+2415  21 17 01      	LD HL,0117H
+2418  CB 56         	BIT 2,(HL)
+241A  28 0B         	JR Z,2427H
+241C  C5            	PUSH BC
+241D  11 6C 00      	LD DE,006CH
+2420  CD 3B 00      	CALL 003BH
+2423  C1            	POP BC
+2424  D0            	RET NC
+2425  18 2E         	JR 2455H
+2427  3A B5 00      	LD A,(00B5H)
+242A  B7            	OR A
+242B  20 07         	JR NZ,2434H
+242D  21 CB 00      	LD HL,00CBH
+2430  CB FE         	SET 7,(HL)
+2432  18 A3         	JR 23D7H
+2434  2A B3 00      	LD HL,(00B3H)
+2437  36 30         	LD (HL),30H
+2439  23            	INC HL
+243A  22 B3 00      	LD (00B3H),HL
+243D  21 B5 00      	LD HL,00B5H
+2440  35            	DEC (HL)
+2441  20 12         	JR NZ,2455H
+2443  3A 17 01      	LD A,(0117H)
+2446  CB 67         	BIT 4,A
+2448  28 0B         	JR Z,2455H
+244A  3E EE         	LD A,EEH
+244C  32 12 01      	LD (0112H),A
+244F  11 E1 FD      	LD DE,FDE1H
+2452  CD 2B 00      	CALL 002BH
+2455  05            	DEC B
+2456  20 BD         	JR NZ,2415H
+2458  18 D8         	JR 2432H
+245A  21 17 01      	LD HL,0117H
+245D  CB 56         	BIT 2,(HL)
+245F  20 20         	JR NZ,2481H
+2461  3A 17 01      	LD A,(0117H)
+2464  CB 67         	BIT 4,A
+2466  11 6B FF      	LD DE,FF6BH
+2469  CC 2B 00      	CALL Z,002BH
+246C  21 12 01      	LD HL,0112H
+246F  7E            	LD A,(HL)
+2470  FE 10         	CP 10H
+2472  11 5F FF      	LD DE,FF5FH
+2475  D4 2B 00      	CALL NC,002BH
+2478  C6 E0         	ADD A,E0H
+247A  77            	LD (HL),A
+247B  11 B5 FD      	LD DE,FDB5H
+247E  CD 2B 00      	CALL 002BH
+2481  C5            	PUSH BC
+2482  11 07 00      	LD DE,0007H
+2485  CD 3B 00      	CALL 003BH
+2488  C1            	POP BC
+2489  D0            	RET NC
+248A  AF            	XOR A
+248B  32 12 01      	LD (0112H),A
+248E  C9            	RET
+248F  C5            	PUSH BC
+2490  0E 0A         	LD C,0AH
+2492  11 2F 07      	LD DE,072FH
+2495  CD 3B 00      	CALL 003BH
+2498  C1            	POP BC
+2499  CB 7E         	BIT 7,(HL)
+249B  11 AC FD      	LD DE,FDACH
+249E  C4 2B 00      	CALL NZ,002BH
+24A1  71            	LD (HL),C
+24A2  11 CA 06      	LD DE,06CAH
+24A5  CD 3B 00      	CALL 003BH
+24A8  37            	SCF
+24A9  C9            	RET
+GERAET_BEFEHL:
+24AA  AF            	XOR A		;Geraetebefehl-Routine (SVC-Parameter ab 0050H: Befehlscode); Befehl 01H = Hupe: (004EH) Bit2 setzen
+24AB  32 A3 04      	LD (04A3H),A
+24AE  21 17 01      	LD HL,0117H
+24B1  4E            	LD C,(HL)
+24B2  21 50 00      	LD HL,0050H
+24B5  CB BE         	RES 7,(HL)
+24B7  7E            	LD A,(HL)
+24B8  FE 01         	CP 01H
+24BA  20 06         	JR NZ,24C2H
+24BC  21 4E 00      	LD HL,004EH
+24BF  CB D6         	SET 2,(HL)
+24C1  C9            	RET
+24C2  FE 6D         	CP 6DH
+24C4  28 02         	JR Z,24C8H
+24C6  FE 6E         	CP 6EH
+24C8  11 06 02      	LD DE,0206H
+24CB  CC 2B 00      	CALL Z,002BH
+24CE  FE 27         	CP 27H
+24D0  28 1F         	JR Z,24F1H
+24D2  FE 20         	CP 20H
+24D4  38 0A         	JR C,24E0H
+24D6  FE 27         	CP 27H
+24D8  30 06         	JR NC,24E0H
+24DA  AF            	XOR A
+24DB  32 14 01      	LD (0114H),A
+24DE  18 11         	JR 24F1H
+24E0  01 30 20      	LD BC,2030H
+24E3  11 4B 42      	LD DE,424BH
+24E6  2E 2B         	LD L,2BH
+24E8  CD 42 00      	CALL 0042H
+24EB  11 E2 00      	LD DE,00E2H
+24EE  CD 2B 00      	CALL 002BH
+24F1  ED 5B 52 00   	LD DE,(0052H)
+24F5  2E 1D         	LD L,1DH
+24F7  AF            	XOR A
+24F8  B3            	OR E
+24F9  B2            	OR D
+24FA  C4 42 00      	CALL NZ,0042H
+24FD  3A 50 00      	LD A,(0050H)
+2500  47            	LD B,A
+2501  FE 27         	CP 27H
+2503  20 05         	JR NZ,250AH
+2505  ED 53 DE 00   	LD (00DEH),DE
+2509  C9            	RET
+250A  2A 51 00      	LD HL,(0051H)
+250D  22 C0 00      	LD (00C0H),HL
+2510  2A 53 00      	LD HL,(0053H)
+2513  22 C2 00      	LD (00C2H),HL
+2516  0E 00         	LD C,00H
+2518  78            	LD A,B
+2519  E6 03         	AND 03H
+251B  28 28         	JR Z,2545H
+251D  78            	LD A,B
+251E  FE 21         	CP 21H
+2520  28 06         	JR Z,2528H
+2522  11 39 06      	LD DE,0639H
+2525  CD 2B 00      	CALL 002BH
+2528  CB E9         	SET 5,C
+252A  3A C0 00      	LD A,(00C0H)
+252D  5F            	LD E,A
+252E  E6 0F         	AND 0FH
+2530  3C            	INC A
+2531  32 C0 00      	LD (00C0H),A
+2534  CB 7B         	BIT 7,E
+2536  28 04         	JR Z,253CH
+2538  CB F1         	SET 6,C
+253A  18 09         	JR 2545H
+253C  3D            	DEC A
+253D  CB 5F         	BIT 3,A
+253F  11 9B FF      	LD DE,FF9BH
+2542  C4 2B 00      	CALL NZ,002BH
+2545  3A C0 00      	LD A,(00C0H)
+2548  B7            	OR A
+2549  28 95         	JR Z,24E0H
+254B  CB D9         	SET 3,C
+254D  2A C1 00      	LD HL,(00C1H)
+2550  AF            	XOR A
+2551  B4            	OR H
+2552  B5            	OR L
+2553  20 07         	JR NZ,255CH
+2555  78            	LD A,B
+2556  FE 20         	CP 20H
+2558  28 2D         	JR Z,2587H
+255A  18 84         	JR 24E0H
+255C  3A C0 00      	LD A,(00C0H)
+255F  CB 69         	BIT 5,C
+2561  28 08         	JR Z,256BH
+2563  3E 04         	LD A,04H
+2565  CB 71         	BIT 6,C
+2567  28 02         	JR Z,256BH
+2569  3E 08         	LD A,08H
+256B  5F            	LD E,A
+256C  16 00         	LD D,00H
+256E  2A C1 00      	LD HL,(00C1H)
+2571  19            	ADD HL,DE
+2572  2B            	DEC HL
+2573  B7            	OR A
+2574  ED 5B C1 00   	LD DE,(00C1H)
+2578  ED 52         	SBC HL,DE
+257A  11 B5 00      	LD DE,00B5H
+257D  DC 2B 00      	CALL C,002BH
+2580  CB C9         	SET 1,C
+2582  78            	LD A,B
+2583  FE 20         	CP 20H
+2585  20 33         	JR NZ,25BAH
+2587  CB D1         	SET 2,C
+2589  3A C0 00      	LD A,(00C0H)
+258C  FE 15         	CP 15H
+258E  30 CA         	JR NC,255AH
+2590  2A 54 00      	LD HL,(0054H)
+2593  AF            	XOR A
+2594  B5            	OR L
+2595  B4            	OR H
+2596  28 22         	JR Z,25BAH
+2598  CB C1         	SET 0,C
+259A  3A C0 00      	LD A,(00C0H)
+259D  CB 49         	BIT 1,C
+259F  28 11         	JR Z,25B2H
+25A1  C5            	PUSH BC
+25A2  06 00         	LD B,00H
+25A4  ED 5B 52 00   	LD DE,(0052H)
+25A8  4F            	LD C,A
+25A9  ED B0         	LDIR
+25AB  C1            	POP BC
+25AC  11 8B 00      	LD DE,008BH
+25AF  CD 2B 00      	CALL 002BH
+25B2  2A 54 00      	LD HL,(0054H)
+25B5  22 C1 00      	LD (00C1H),HL
+25B8  18 F2         	JR 25ACH
+25BA  CB 49         	BIT 1,C
+25BC  28 EE         	JR Z,25ACH
+25BE  CB 69         	BIT 5,C
+25C0  28 09         	JR Z,25CBH
+25C2  CB 71         	BIT 6,C
+25C4  3E 04         	LD A,04H
+25C6  28 01         	JR Z,25C9H
+25C8  87            	ADD A,A
+25C9  18 03         	JR 25CEH
+25CB  3A C0 00      	LD A,(00C0H)
+25CE  2A C1 00      	LD HL,(00C1H)
+25D1  18 0B         	JR 25DEH
+25D3  2E 2D         	LD L,2DH
+25D5  55            	LD D,L
+25D6  CD 42 00      	CALL 0042H
+25D9  2E 31         	LD L,31H
+25DB  CD 42 00      	CALL 0042H
+25DE  47            	LD B,A
+25DF  36 00         	LD (HL),00H
+25E1  23            	INC HL
+25E2  10 FB         	DJNZ 25DFH
+25E4  18 C6         	JR 25ACH
+25E6  3A C0 00      	LD A,(00C0H)
+25E9  B7            	OR A
+25EA  28 A2         	JR Z,258EH
+25EC  78            	LD A,B
+25ED  FE 25         	CP 25H
+25EF  28 06         	JR Z,25F7H
+25F1  FE 22         	CP 22H
+25F3  20 0E         	JR NZ,2603H
+25F5  CB E1         	SET 4,C
+25F7  AF            	XOR A
+25F8  2A C1 00      	LD HL,(00C1H)
+25FB  B4            	OR H
+25FC  B5            	OR L
+25FD  28 8F         	JR Z,258EH
+25FF  06 01         	LD B,01H
+2601  18 1B         	JR 261EH
+2603  CB D1         	SET 2,C
+2605  78            	LD A,B
+2606  FE 26         	CP 26H
+2608  20 02         	JR NZ,260CH
+260A  CB C1         	SET 0,C
+260C  3A C3 00      	LD A,(00C3H)
+260F  B7            	OR A
+2610  28 D8         	JR Z,25EAH
+2612  AF            	XOR A
+2613  2A C1 00      	LD HL,(00C1H)
+2616  B4            	OR H
+2617  B5            	OR L
+2618  28 23         	JR Z,263DH
+261A  3A C3 00      	LD A,(00C3H)
+261D  47            	LD B,A
+261E  3A C0 00      	LD A,(00C0H)
+2621  5F            	LD E,A
+2622  16 00         	LD D,00H
+2624  19            	ADD HL,DE
+2625  10 FD         	DJNZ 2624H
+2627  2B            	DEC HL
+2628  B7            	OR A
+2629  ED 5B C1 00   	LD DE,(00C1H)
+262D  ED 52         	SBC HL,DE
+262F  38 04         	JR C,2635H
+2631  CB C9         	SET 1,C
+2633  18 08         	JR 263DH
+2635  01 30 36      	LD BC,3630H
+2638  2E 27         	LD L,27H
+263A  CD 42 00      	CALL 0042H
+263D  21 C4 00      	LD HL,00C4H
+2640  71            	LD (HL),C
+2641  21 C4 00      	LD HL,00C4H
+2644  4E            	LD C,(HL)
+2645  21 A3 04      	LD HL,04A3H
+2648  CB 7E         	BIT 7,(HL)
+264A  11 19 01      	LD DE,0119H
+264D  C4 2B 00      	CALL NZ,002BH
+2650  21 14 01      	LD HL,0114H
+2653  CB 56         	BIT 2,(HL)
+2655  20 2F         	JR NZ,2686H
+2657  CB 59         	BIT 3,C
+2659  20 54         	JR NZ,26AFH
+265B  CB 51         	BIT 2,C
+265D  28 27         	JR Z,2686H
+265F  21 04 01      	LD HL,0104H
+2662  36 00         	LD (HL),00H
+2664  2C            	INC L
+2665  36 0D         	LD (HL),0DH
+2667  CB 41         	BIT 0,C
+2669  28 02         	JR Z,266DH
+266B  CB 96         	RES 2,(HL)
+266D  2C            	INC L
+266E  36 A3         	LD (HL),A3H
+2670  2C            	INC L
+2671  36 04         	LD (HL),04H
+2673  2E 0A         	LD L,0AH
+2675  3A C3 00      	LD A,(00C3H)
+2678  77            	LD (HL),A
+2679  2C            	INC L
+267A  3A C0 00      	LD A,(00C0H)
+267D  77            	LD (HL),A
+267E  2A C1 00      	LD HL,(00C1H)
+2681  22 08 01      	LD (0108H),HL
+2684  CF 23         	RST 08H		;SVC, Kennbyte 23H
+2686  21 4E 00      	LD HL,004EH
+2689  CB CE         	SET 1,(HL)
+268B  21 04 01      	LD HL,0104H
+268E  74            	LD (HL),H
+268F  2C            	INC L
+2690  3A C4 00      	LD A,(00C4H)
+2693  4F            	LD C,A
+2694  77            	LD (HL),A
+2695  2C            	INC L
+2696  36 A0         	LD (HL),A0H
+2698  2C            	INC L
+2699  36 04         	LD (HL),04H
+269B  2A C1 00      	LD HL,(00C1H)
+269E  22 08 01      	LD (0108H),HL
+26A1  3A C0 00      	LD A,(00C0H)
+26A4  32 0A 01      	LD (010AH),A
+26A7  AF            	XOR A
+26A8  32 0B 01      	LD (010BH),A
+26AB  CF 23         	RST 08H		;SVC, Kennbyte 23H
+26AD  18 1F         	JR 26CEH
+26AF  CB 51         	BIT 2,C
+26B1  28 D3         	JR Z,2686H
+26B3  21 04 01      	LD HL,0104H
+26B6  36 00         	LD (HL),00H
+26B8  2C            	INC L
+26B9  36 0A         	LD (HL),0AH
+26BB  2C            	INC L
+26BC  36 A3         	LD (HL),A3H
+26BE  2C            	INC L
+26BF  36 04         	LD (HL),04H
+26C1  2E 08         	LD L,08H
+26C3  3A C0 00      	LD A,(00C0H)
+26C6  77            	LD (HL),A
+26C7  2C            	INC L
+26C8  36 00         	LD (HL),00H
+26CA  CF 22         	RST 08H		;SVC, Kennbyte 22H
+26CC  18 B8         	JR 2686H
+26CE  3A 5A 00      	LD A,(005AH)
+26D1  CB 5F         	BIT 3,A
+26D3  C0            	RET NZ
+26D4  3A A0 04      	LD A,(04A0H)
+26D7  E6 C0         	AND C0H
+26D9  20 4C         	JR NZ,2727H
+26DB  CB 51         	BIT 2,C
+26DD  28 07         	JR Z,26E6H
+26DF  3A A3 04      	LD A,(04A3H)
+26E2  CB 47         	BIT 0,A
+26E4  20 07         	JR NZ,26EDH
+26E6  3A A0 04      	LD A,(04A0H)
+26E9  CB 47         	BIT 0,A
+26EB  28 0D         	JR Z,26FAH
+26ED  C5            	PUSH BC
+26EE  DF            	RST 18H
+26EF  C1            	POP BC
+26F0  18 E2         	JR 26D4H
+26F2  21 4E 00      	LD HL,004EH
+26F5  CB 4E         	BIT 1,(HL)
+26F7  CB 8E         	RES 1,(HL)
+26F9  C8            	RET Z
+26FA  3A DF 00      	LD A,(00DFH)
+26FD  B7            	OR A
+26FE  28 20         	JR Z,2720H
+2700  CB 59         	BIT 3,C
+2702  20 12         	JR NZ,2716H
+2704  CB 51         	BIT 2,C
+2706  28 0E         	JR Z,2716H
+2708  3A A4 04      	LD A,(04A4H)
+270B  2A DE 00      	LD HL,(00DEH)
+270E  77            	LD (HL),A
+270F  23            	INC HL
+2710  3A A5 04      	LD A,(04A5H)
+2713  77            	LD (HL),A
+2714  18 0A         	JR 2720H
+2716  3A A2 04      	LD A,(04A2H)
+2719  2A DE 00      	LD HL,(00DEH)
+271C  77            	LD (HL),A
+271D  23            	INC HL
+271E  36 00         	LD (HL),00H
+2720  3A A3 04      	LD A,(04A3H)
+2723  CB 7F         	BIT 7,A
+2725  20 42         	JR NZ,2769H
+2727  CB 59         	BIT 3,C
+2729  3A A0 04      	LD A,(04A0H)
+272C  20 0A         	JR NZ,2738H
+272E  CB 7F         	BIT 7,A
+2730  11 0B FF      	LD DE,FF0BH
+2733  C4 2B 00      	CALL NZ,002BH
+2736  18 1C         	JR 2754H
+2738  CB 7F         	BIT 7,A
+273A  28 18         	JR Z,2754H
+273C  CB 77         	BIT 6,A
+273E  CB B7         	RES 6,A
+2740  20 EE         	JR NZ,2730H
+2742  3A A3 04      	LD A,(04A3H)
+2745  CB 7F         	BIT 7,A
+2747  20 20         	JR NZ,2769H
+2749  21 CB 00      	LD HL,00CBH
+274C  CB FE         	SET 7,(HL)
+274E  11 32 FF      	LD DE,FF32H
+2751  CD 2B 00      	CALL 002BH
+2754  2A CE 00      	LD HL,(00CEH)
+2757  22 CC 00      	LD (00CCH),HL
+275A  CB 59         	BIT 3,C
+275C  3A A1 04      	LD A,(04A1H)
+275F  20 05         	JR NZ,2766H
+2761  32 C7 00      	LD (00C7H),A
+2764  18 03         	JR 2769H
+2766  32 C6 00      	LD (00C6H),A
+2769  21 14 01      	LD HL,0114H
+276C  CB 96         	RES 2,(HL)
+276E  21 00 50      	LD HL,5000H
+2771  22 8C 00      	LD (008CH),HL
+2774  2A DC 00      	LD HL,(00DCH)
+2777  22 8E 00      	LD (008EH),HL
+277A  CB 51         	BIT 2,C
+277C  11 01 00      	LD DE,0001H
+277F  C4 3B 00      	CALL NZ,003BH
+2782  C9            	RET
+2783  CD 36 00      	CALL 0036H
+2786  01 1D 00      	LD BC,001DH
+2789  09            	ADD HL,BC
+278A  E5            	PUSH HL
+278B  0E 00         	LD C,00H
+278D  11 34 04      	LD DE,0434H
+2790  CD 3B 00      	CALL 003BH
+2793  3E CE         	LD A,CEH
+2795  32 50 00      	LD (0050H),A
+2798  AF            	XOR A
+2799  32 51 00      	LD (0051H),A
+279C  3A A3 04      	LD A,(04A3H)
+279F  32 52 00      	LD (0052H),A
+27A2  E9            	JP (HL)
+27A3                	DB	C9H
+ISR_ZEIT:
+27A4  FB            	EI		;ISR Zeittakt (CTC-Kanal 2): EI, Register retten
+27A5  F5            	PUSH AF
+27A6  C5            	PUSH BC
+27A7  D5            	PUSH DE
+27A8  E5            	PUSH HL
+27A9  21 14 01      	LD HL,0114H
+27AC  CB 7E         	BIT 7,(HL)
+27AE  28 0F         	JR Z,27BFH
+27B0  3A BA 00      	LD A,(00BAH)
+27B3  B7            	OR A
+27B4  11 6A 00      	LD DE,006AH
+27B7  C4 2B 00      	CALL NZ,002BH
+27BA  21 14 01      	LD HL,0114H
+27BD  CB BE         	RES 7,(HL)
+ISR_ABFRAGE:
+27BF  DB 41         	IN A,(41H)		;IN A,(41H) AND 03H: Bit1 -> Terminaltaste (TASTE_CODE), nur Bit0 -> Kundentastatur (KUT_CODE); beide Bits: erst Bit1
+27C1  E6 03         	AND 03H
+27C3  28 14         	JR Z,27D9H
+27C5  CB 4F         	BIT 1,A
+27C7  20 02         	JR NZ,27CBH
+27C9  18 22         	JR 27EDH
+27CB  DD E5         	PUSH IX		;Bit1: relativer Aufruf von TASTE_CODE (28C7H)
+27CD  FD E5         	PUSH IY
+27CF  11 F2 00      	LD DE,00F2H
+27D2  CD 2B 00      	CALL 002BH
+27D5  FD E1         	POP IY
+27D7  DD E1         	POP IX
+27D9  21 FB 00      	LD HL,00FBH		;Zeitgeber-Zelle (00FBH) herabzaehlen (Fortsetzung der ISR), RETI am Ende (281EH)
+27DC  7E            	LD A,(HL)
+27DD  B7            	OR A
+27DE  28 3A         	JR Z,281AH
+27E0  35            	DEC (HL)
+27E1  20 37         	JR NZ,281AH
+27E3  3A FC 00      	LD A,(00FCH)
+27E6  26 02         	LD H,02H
+27E8  B7            	OR A
+27E9  28 28         	JR Z,2813H
+27EB  18 15         	JR 2802H
+27ED  11 2A 03      	LD DE,032AH		;Bit0: relativer Sprung nach KUT_CODE (2B1DH)
+27F0  CD 2B 00      	CALL 002BH
+27F3                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+27FE  10 59		DB	10H,59H		;CRC-CCITT
+2800  12 83		DB	12H,83H		;Satzkopf: Gruppe 1, Lauf 2, Flags/Variante 83H
+2802  FE 16         	CP 16H
+2804  28 0D         	JR Z,2813H
+2806  FE 2B         	CP 2BH
+2808  28 09         	JR Z,2813H
+280A  FE 42         	CP 42H
+280C  28 05         	JR Z,2813H
+280E  FE 58         	CP 58H
+2810  28 01         	JR Z,2813H
+2812  25            	DEC H
+2813  C6 05         	ADD A,05H
+2815  6F            	LD L,A
+2816  CB F6         	SET 6,(HL)
+2818  D3 00         	OUT (00H),A
+281A  E1            	POP HL
+281B  D1            	POP DE
+281C  C1            	POP BC
+281D  F1            	POP AF
+281E  ED 4D         	RETI
+2820  18 B3         	JR 27D5H
+2822  18 B5         	JR 27D9H
+2824  21 9F 00      	LD HL,009FH
+2827  44            	LD B,H
+2828  4F            	LD C,A
+2829  3A 14 01      	LD A,(0114H)
+282C  CB 47         	BIT 0,A
+282E  28 07         	JR Z,2837H
+2830  3A 17 01      	LD A,(0117H)
+2833  CB 57         	BIT 2,A
+2835  20 02         	JR NZ,2839H
+2837  36 20         	LD (HL),20H
+2839  2E B8         	LD L,B8H
+283B  CB 66         	BIT 4,(HL)
+283D  28 04         	JR Z,2843H
+283F  2E 9F         	LD L,9FH
+2841  36 2D         	LD (HL),2DH
+2843  2E B8         	LD L,B8H
+2845  CB 76         	BIT 6,(HL)
+2847  28 14         	JR Z,285DH
+2849  18 04         	JR 284FH
+284B  18 D3         	JR 2820H
+284D  18 D3         	JR 2822H
+284F  3A 14 01      	LD A,(0114H)
+2852  CB 7F         	BIT 7,A
+2854  28 50         	JR Z,28A6H
+2856  79            	LD A,C
+2857  FE 01         	CP 01H
+2859  00            	NOP
+285A  28 4A         	JR Z,28A6H
+285C  0D            	DEC C
+285D  0D            	DEC C
+285E  2E AF         	LD L,AFH
+2860  11 9E 00      	LD DE,009EH
+2863  7D            	LD A,L
+2864  91            	SUB C
+2865  6F            	LD L,A
+2866  1A            	LD A,(DE)
+2867  FE 2C         	CP 2CH
+2869  28 0C         	JR Z,2877H
+286B  FE 20         	CP 20H
+286D  28 08         	JR Z,2877H
+286F  FE 2D         	CP 2DH
+2871  28 04         	JR Z,2877H
+2873  FE 2E         	CP 2EH
+2875  20 04         	JR NZ,287BH
+2877  1D            	DEC E
+2878  04            	INC B
+2879  18 EB         	JR 2866H
+287B  ED A0         	LDI
+287D  1D            	DEC E
+287E  1D            	DEC E
+287F  7D            	LD A,L
+2880  FE B0         	CP B0H
+2882  28 1D         	JR Z,28A1H
+2884  7B            	LD A,E
+2885  FE 8F         	CP 8FH
+2887  20 09         	JR NZ,2892H
+2889  E5            	PUSH HL
+288A  6C            	LD L,H
+288B  22 8C 00      	LD (008CH),HL
+288E  22 8E 00      	LD (008EH),HL
+2891  E1            	POP HL
+2892  FE 8B         	CP 8BH
+2894  20 D0         	JR NZ,2866H
+2896  21 CB 00      	LD HL,00CBH
+2899  CB FE         	SET 7,(HL)
+289B  18 04         	JR 28A1H
+289D  18 AC         	JR 284BH
+289F  18 AC         	JR 284DH
+28A1  04            	INC B
+28A2  78            	LD A,B
+28A3  32 B9 00      	LD (00B9H),A
+28A6  21 14 01      	LD HL,0114H
+28A9  CB 7E         	BIT 7,(HL)
+28AB  11 05 01      	LD DE,0105H
+28AE  CC 2B 00      	CALL Z,002BH
+28B1  CB BE         	RES 7,(HL)
+28B3  21 B8 00      	LD HL,00B8H
+28B6  CB 76         	BIT 6,(HL)
+28B8  28 E5         	JR Z,289FH
+28BA  2E B2         	LD L,B2H
+28BC  7E            	LD A,(HL)
+28BD  74            	LD (HL),H
+28BE  32 12 01      	LD (0112H),A
+28C1  D3 00         	OUT (00H),A
+28C3  18 DA         	JR 289FH
+28C5  18 D6         	JR 289DH
+TASTE_CODE:
+28C7  DB 42         	IN A,(42H)		;IN A,(42H) = Tastencode (Lesen loescht Gueltigkeit); in (006FH) abgelegt, Flag (006EH) Bit3 geloescht
+28C9  21 6E 00      	LD HL,006EH
+28CC  CB 9E         	RES 3,(HL)
+28CE  23            	INC HL
+28CF  77            	LD (HL),A
+28D0  21 14 01      	LD HL,0114H
+28D3  47            	LD B,A
+28D4  E6 F0         	AND F0H
+28D6  FE A0         	CP A0H		;High-Nibble A0H (Bit3 gesetzt = A8H-AFH) -> SCHLUESSEL_SL, sonst weiter
+28D8  20 08         	JR NZ,28E2H
+28DA  CB 58         	BIT 3,B
+28DC  11 1C 02      	LD DE,021CH
+28DF  C4 2B 00      	CALL NZ,002BH
+28E2  3A 12 01      	LD A,(0112H)
+28E5  B7            	OR A
+28E6  21 CB 00      	LD HL,00CBH
+28E9  20 25         	JR NZ,2910H
+28EB  3A B2 00      	LD A,(00B2H)
+28EE  B7            	OR A
+28EF  28 0B         	JR Z,28FCH
+28F1  3A B8 00      	LD A,(00B8H)
+28F4  CB 6F         	BIT 5,A
+28F6  28 18         	JR Z,2910H
+28F8  AF            	XOR A
+28F9  32 B2 00      	LD (00B2H),A
+28FC  7E            	LD A,(HL)
+28FD  E6 FE         	AND FEH
+28FF  18 26         	JR 2927H
+2901  78            	LD A,B
+2902  FE 20         	CP 20H
+2904  38 32         	JR C,2938H
+2906  CB 7F         	BIT 7,A
+2908  20 2E         	JR NZ,2938H
+290A  11 64 00      	LD DE,0064H
+290D  CD 2B 00      	CALL 002BH
+2910  78            	LD A,B
+2911  E6 F0         	AND F0H
+2913  FE A0         	CP A0H
+2915  28 3D         	JR Z,2954H
+2917  78            	LD A,B
+2918  FE 10         	CP 10H
+291A  20 15         	JR NZ,2931H
+291C  32 12 01      	LD (0112H),A
+291F  D3 00         	OUT (00H),A
+2921  11 AE FE      	LD DE,FEAEH
+2924  CD 2B 00      	CALL 002BH
+2927  CB 17         	RL A
+2929  28 06         	JR Z,2931H
+292B  38 E3         	JR C,2910H
+292D  18 D2         	JR 2901H
+292F  18 94         	JR 28C5H
+2931  21 CB 00      	LD HL,00CBH
+2934  CB FE         	SET 7,(HL)
+2936  18 E9         	JR 2921H
+2938  2E B8         	LD L,B8H
+293A  CB 6E         	BIT 5,(HL)
+293C  20 0C         	JR NZ,294AH
+293E  FE 11         	CP 11H
+2940  28 02         	JR Z,2944H
+2942  FE 12         	CP 12H
+2944  11 96 00      	LD DE,0096H
+2947  CC 2B 00      	CALL Z,002BH
+294A  E6 F0         	AND F0H
+294C  FE A0         	CP A0H
+294E  11 D5 00      	LD DE,00D5H
+2951  C4 2B 00      	CALL NZ,002BH
+SCHLUESSEL_GRUPPE_A0:
+2954  2E CA         	LD L,CAH		;Codes A0H-A7H: Bit n von (00CAH) toggeln (n = Code-A0H): A0H = SEL (F10), A1H = ALPHA (F05); Codes A8H-AFH: (00CBH) siehe SCHLUESSEL_SL
+2956  78            	LD A,B
+2957  CB 5F         	BIT 3,A
+2959  20 0D         	JR NZ,2968H
+295B  3C            	INC A
+295C  E6 0F         	AND 0FH
+295E  47            	LD B,A
+295F  AF            	XOR A
+2960  37            	SCF
+2961  17            	RLA
+2962  10 FD         	DJNZ 2961H
+2964  AE            	XOR (HL)
+2965  77            	LD (HL),A
+2966  18 C7         	JR 292FH
+2968  2C            	INC L
+2969  E6 07         	AND 07H
+296B  3C            	INC A
+296C  FE 08         	CP 08H
+296E  20 EE         	JR NZ,295EH
+2970  CB BE         	RES 7,(HL)
+2972  18 F2         	JR 2966H
+2974  2E B8         	LD L,B8H		;Zifferneingabe: Zeichen '-' (2DH) und 30H-39H gueltig; Eingabepuffer ab 009FH abwaerts
+2976  CB 6E         	BIT 5,(HL)
+2978  11 16 01      	LD DE,0116H
+297B  C4 2B 00      	CALL NZ,002BH
+297E  78            	LD A,B
+297F  FE 2D         	CP 2DH
+2981  28 09         	JR Z,298CH
+2983  0E 30         	LD C,30H
+2985  B9            	CP C
+2986  38 A9         	JR C,2931H
+2988  FE 3A         	CP 3AH
+298A  30 A5         	JR NC,2931H
+298C  CB 66         	BIT 4,(HL)
+298E  20 A1         	JR NZ,2931H
+2990  3A BA 00      	LD A,(00BAH)
+2993  FE 10         	CP 10H
+2995  30 46         	JR NC,29DDH
+2997  78            	LD A,B
+2998  FE 2D         	CP 2DH
+299A  28 6F         	JR Z,2A0BH
+299C  48            	LD C,B
+299D  11 E1 01      	LD DE,01E1H
+29A0  CD 3B 00      	CALL 003BH
+29A3  11 F7 01      	LD DE,01F7H
+29A6  CD 3B 00      	CALL 003BH
+29A9  3A 14 01      	LD A,(0114H)
+29AC  CB 47         	BIT 0,A
+29AE  28 C2         	JR Z,2972H
+29B0  11 FA FD      	LD DE,FDFAH
+29B3  CD 2B 00      	CALL 002BH
+29B6  3A 17 01      	LD A,(0117H)
+29B9  CB 57         	BIT 2,A
+29BB  28 B5         	JR Z,2972H
+29BD  11 AF 01      	LD DE,01AFH
+29C0  CD 3B 00      	CALL 003BH
+29C3  0E 0A         	LD C,0AH
+29C5  11 FC 01      	LD DE,01FCH
+29C8  CD 3B 00      	CALL 003BH
+29CB  CB 7E         	BIT 7,(HL)
+29CD  28 A3         	JR Z,2972H
+29CF  3E A0         	LD A,A0H
+29D1  32 12 01      	LD (0112H),A
+29D4  D3 00         	OUT (00H),A
+29D6  21 CB 00      	LD HL,00CBH
+29D9  CB FE         	SET 7,(HL)
+29DB  18 95         	JR 2972H
+29DD  18 27         	JR 2A06H
+29DF                	DB	00H
+29E0  0E 30         	LD C,30H
+29E2  47            	LD B,A
+29E3  C5            	PUSH BC
+29E4  11 9A 01      	LD DE,019AH
+29E7  CD 3B 00      	CALL 003BH
+29EA  C1            	POP BC
+29EB  C5            	PUSH BC
+29EC  11 AE 01      	LD DE,01AEH
+29EF  CD 3B 00      	CALL 003BH
+29F2  C1            	POP BC
+29F3  C5            	PUSH BC
+29F4  11 A6 01      	LD DE,01A6H
+29F7  CD 3B 00      	CALL 003BH
+29FA  C1            	POP BC
+29FB  3E 12         	LD A,12H
+29FD  B8            	CP B
+29FE  11 9C 01      	LD DE,019CH
+2A01  CC 3B 00      	CALL Z,003BH
+2A04  18 A3         	JR 29A9H
+2A06  78            	LD A,B
+2A07  FE 2D         	CP 2DH
+2A09  20 D0         	JR NZ,29DBH
+2A0B  CB E6         	SET 4,(HL)
+2A0D  21 14 01      	LD HL,0114H
+2A10  CB 46         	BIT 0,(HL)
+2A12  11 A1 01      	LD DE,01A1H
+2A15  CC 3B 00      	CALL Z,003BH
+2A18  3E 2D         	LD A,2DH
+2A1A  32 9F 00      	LD (009FH),A
+2A1D  3A 14 01      	LD A,(0114H)
+2A20  1F            	RRA
+2A21  30 86         	JR NC,29A9H
+2A23  18 91         	JR 29B6H
+2A25  18 89         	JR 29B0H
+2A27  18 80         	JR 29A9H
+2A29  21 12 01      	LD HL,0112H
+2A2C  70            	LD (HL),B
+2A2D  21 B8 00      	LD HL,00B8H
+2A30  CB 6E         	BIT 5,(HL)
+2A32  28 16         	JR Z,2A4AH
+2A34  D3 00         	OUT (00H),A
+2A36  78            	LD A,B
+2A37  FE C0         	CP C0H
+2A39  38 A0         	JR C,29DBH
+2A3B  2A CA 00      	LD HL,(00CAH)
+2A3E  22 CE 00      	LD (00CEH),HL
+2A41  21 17 01      	LD HL,0117H
+2A44  CB 56         	BIT 2,(HL)
+2A46  28 09         	JR Z,2A51H
+2A48  18 63         	JR 2AADH
+2A4A  78            	LD A,B
+2A4B  FE C0         	CP C0H
+2A4D  30 04         	JR NC,2A53H
+2A4F  D3 00         	OUT (00H),A
+2A51  18 88         	JR 29DBH
+2A53  CB F6         	SET 6,(HL)
+2A55  11 29 01      	LD DE,0129H
+2A58  CD 3B 00      	CALL 003BH
+2A5B  2A CA 00      	LD HL,(00CAH)
+2A5E  22 CE 00      	LD (00CEH),HL
+2A61  21 BA 00      	LD HL,00BAH
+2A64  34            	INC (HL)
+2A65  3A 14 01      	LD A,(0114H)
+2A68  CB 47         	BIT 0,A
+2A6A  28 04         	JR Z,2A70H
+2A6C  D3 00         	OUT (00H),A
+2A6E  18 B5         	JR 2A25H
+2A70  3A 12 01      	LD A,(0112H)
+2A73  32 B2 00      	LD (00B2H),A
+2A76  AF            	XOR A
+2A77  32 12 01      	LD (0112H),A
+2A7A  3E 11         	LD A,11H
+2A7C  BE            	CP (HL)
+2A7D  28 A8         	JR Z,2A27H
+2A7F  2E B8         	LD L,B8H
+2A81  CB 66         	BIT 4,(HL)
+2A83  20 A2         	JR NZ,2A27H
+2A85  11 90 00      	LD DE,0090H
+2A88  2E 91         	LD L,91H
+2A8A  01 0F 00      	LD BC,000FH
+2A8D  ED B0         	LDIR
+2A8F  3E 20         	LD A,20H
+2A91  12            	LD (DE),A
+2A92  18 93         	JR 2A27H
+2A94  21 17 01      	LD HL,0117H
+2A97  CB 56         	BIT 2,(HL)
+2A99  28 39         	JR Z,2AD4H
+2A9B  21 CB 00      	LD HL,00CBH
+2A9E  CB 46         	BIT 0,(HL)
+2AA0  28 0B         	JR Z,2AADH
+2AA2  32 12 01      	LD (0112H),A
+2AA5  D3 00         	OUT (00H),A
+2AA7  11 28 FD      	LD DE,FD28H
+2AAA  CD 2B 00      	CALL 002BH
+2AAD  C5            	PUSH BC
+2AAE  0E 0A         	LD C,0AH
+2AB0  11 11 01      	LD DE,0111H
+2AB3  CD 3B 00      	CALL 003BH
+2AB6  C1            	POP BC
+2AB7  CB 7E         	BIT 7,(HL)
+2AB9  20 0B         	JR NZ,2AC6H
+2ABB  70            	LD (HL),B
+2ABC  C5            	PUSH BC
+2ABD  11 AF 00      	LD DE,00AFH
+2AC0  CD 3B 00      	CALL 003BH
+2AC3  C1            	POP BC
+2AC4  18 E1         	JR 2AA7H
+2AC6  3E A0         	LD A,A0H
+2AC8  32 12 01      	LD (0112H),A
+2ACB  D3 00         	OUT (00H),A
+2ACD  21 CB 00      	LD HL,00CBH
+2AD0  CB FE         	SET 7,(HL)
+2AD2  18 D3         	JR 2AA7H
+2AD4  3A B5 00      	LD A,(00B5H)
+2AD7  B7            	OR A
+2AD8  28 F3         	JR Z,2ACDH
+2ADA  2A B3 00      	LD HL,(00B3H)
+2ADD  70            	LD (HL),B
+2ADE  23            	INC HL
+2ADF  22 B3 00      	LD (00B3H),HL
+2AE2  21 B5 00      	LD HL,00B5H
+2AE5  35            	DEC (HL)
+2AE6  28 02         	JR Z,2AEAH
+2AE8  18 BD         	JR 2AA7H
+2AEA  3A 17 01      	LD A,(0117H)
+2AED  CB 67         	BIT 4,A
+2AEF  28 B6         	JR Z,2AA7H
+2AF1  3E EE         	LD A,EEH
+2AF3  32 12 01      	LD (0112H),A
+2AF6  D3 00         	OUT (00H),A
+2AF8  18 AD         	JR 2AA7H
+2AFA  CB BE         	RES 7,(HL)
+2AFC  18 A9         	JR 2AA7H
+SCHLUESSEL_SL:
+2AFE  21 CB 00      	LD HL,00CBH		;Codes A8H-AFH: AFH = (00CBH) Bit7 loeschen (Fehlerlampe/Sperre, Taste F12); A8H = Bit0 toggeln; sonst (Code AND 3)<<1 XOR (00CBH): A9H (SS2) kippt Bit1, AAH (SS1) kippt Bit2
+2B01  78            	LD A,B
+2B02  FE AF         	CP AFH
+2B04  28 F4         	JR Z,2AFAH
+2B06  FE A8         	CP A8H
+2B08  20 0C         	JR NZ,2B16H
+2B0A  CB 46         	BIT 0,(HL)
+2B0C  20 04         	JR NZ,2B12H
+2B0E  CB C6         	SET 0,(HL)
+2B10  18 95         	JR 2AA7H
+2B12  CB 86         	RES 0,(HL)
+2B14  18 91         	JR 2AA7H
+2B16  E6 03         	AND 03H
+2B18  17            	RLA
+2B19  AE            	XOR (HL)
+2B1A  77            	LD (HL),A
+2B1B  18 F7         	JR 2B14H
+KUT_CODE:
+2B1D  21 BA 01      	LD HL,01BAH		;KUT_CODE: nur wenn (01BAH) Bit0 (Kundeneingabe aktiv) - sonst Rueckkehr zur ISR (Code bleibt unabgeholt)
+2B20  CB 46         	BIT 0,(HL)
+2B22  11 B1 FC      	LD DE,FCB1H
+2B25  CC 2B 00      	CALL Z,002BH
+2B28  CB 47         	BIT 0,A
+2B2A  28 F6         	JR Z,2B22H
+2B2C  DB 42         	IN A,(42H)		;IN A,(42H) = Code der Kundentastatur
+2B2E  FE 19         	CP 19H		;Code 19H = Korrektur: Puffer (01B4H, Laenge 01B6H) mit 00H loeschen, Zeiger/Zaehler zurueck
+2B30  20 18         	JR NZ,2B4AH
+2B32  3A B6 01      	LD A,(01B6H)
+2B35  32 BD 01      	LD (01BDH),A
+2B38  47            	LD B,A
+2B39  2A B4 01      	LD HL,(01B4H)
+2B3C  22 BB 01      	LD (01BBH),HL
+2B3F  36 00         	LD (HL),00H
+2B41  23            	INC HL
+2B42  10 FB         	DJNZ 2B3FH
+2B44  11 8F FC      	LD DE,FC8FH
+2B47  CD 2B 00      	CALL 002BH
+2B4A  2A BB 01      	LD HL,(01BBH)		;sonst Zeichen in Puffer (01BBH)++, Restzaehler (01BDH)--; bei 0: (01ACH)=FFH, OUT (00H) = Eingabe fertig
+2B4D  77            	LD (HL),A
+2B4E  23            	INC HL
+2B4F  22 BB 01      	LD (01BBH),HL
+2B52  21 BD 01      	LD HL,01BDH
+2B55  35            	DEC (HL)
+2B56  20 EC         	JR NZ,2B44H
+2B58  3E FF         	LD A,FFH
+2B5A  32 AC 01      	LD (01ACH),A
+2B5D  D3 00         	OUT (00H),A
+2B5F  18 E3         	JR 2B44H
+2B61  3A BA 00      	LD A,(00BAH)
+2B64  B7            	OR A
+2B65  28 05         	JR Z,2B6CH
+2B67  21 CB 00      	LD HL,00CBH
+2B6A  CB FE         	SET 7,(HL)
+2B6C  11 74 FA      	LD DE,FA74H
+2B6F  CD 2B 00      	CALL 002BH
+2B72  CD 36 00      	CALL 0036H
+2B75  01 0E 00      	LD BC,000EH
+2B78  09            	ADD HL,BC
+2B79  E5            	PUSH HL
+2B7A  0E 02         	LD C,02H
+2B7C  11 45 00      	LD DE,0045H
+2B7F  CD 3B 00      	CALL 003BH
+2B82  E9            	JP (HL)
+2B83                	DB	C9H
+2B84  21 B8 00      	LD HL,00B8H
+2B87  CB 7E         	BIT 7,(HL)
+2B89  CB BE         	RES 7,(HL)
+2B8B  C8            	RET Z
+2B8C  3A 14 01      	LD A,(0114H)
+2B8F  CB 47         	BIT 0,A
+2B91  C0            	RET NZ
+2B92  21 BA 00      	LD HL,00BAH
+2B95  74            	LD (HL),H
+2B96  06 10         	LD B,10H
+2B98  2E 9F         	LD L,9FH
+2B9A  36 00         	LD (HL),00H
+2B9C  2D            	DEC L
+2B9D  10 FB         	DJNZ 2B9AH
+2B9F  C9            	RET
+2BA0  2E BA         	LD L,BAH
+2BA2  34            	INC (HL)
+2BA3  3E 10         	LD A,10H
+2BA5  96            	SUB (HL)
+2BA6  30 06         	JR NC,2BAEH
+2BA8  35            	DEC (HL)
+2BA9  2E CB         	LD L,CBH
+2BAB  CB FE         	SET 7,(HL)
+2BAD  C9            	RET
+2BAE  C6 A0         	ADD A,A0H
+2BB0  6F            	LD L,A
+2BB1  71            	LD (HL),C
+2BB2  3A 14 01      	LD A,(0114H)
+2BB5  CB 47         	BIT 0,A
+2BB7  C0            	RET NZ
+2BB8  79            	LD A,C
+2BB9  11 90 00      	LD DE,0090H
+2BBC  21 91 00      	LD HL,0091H
+2BBF  01 0F 00      	LD BC,000FH
+2BC2  ED B0         	LDIR
+2BC4  12            	LD (DE),A
+2BC5  C9            	RET
+2BC6                	DB	00H
+2BC7  3A 00 03      	LD A,(0300H)
+2BCA  26 02         	LD H,02H
+2BCC  6F            	LD L,A
+2BCD  AF            	XOR A
+2BCE  06 05         	LD B,05H
+2BD0  BD            	CP L
+2BD1  28 05         	JR Z,2BD8H
+2BD3  C6 16         	ADD A,16H
+2BD5  10 F9         	DJNZ 2BD0H
+2BD7  25            	DEC H
+2BD8  79            	LD A,C
+2BD9  85            	ADD A,L
+2BDA  6F            	LD L,A
+2BDB  7E            	LD A,(HL)
+2BDC  5D            	LD E,L
+2BDD  54            	LD D,H
+2BDE  2C            	INC L
+2BDF  66            	LD H,(HL)
+2BE0  6F            	LD L,A
+2BE1  C9            	RET
+FEHLER_TYP:
+2BE2  FB            	EI		;Fehlerausgabe TYP-Zeitablauf: EI, BC=2032H DE=424BH, Fehlerbehandlung 002BH-Tabelle L=2BH/13H
+2BE3  01 32 20      	LD BC,2032H
+2BE6  11 4B 42      	LD DE,424BH
+2BE9  2E 2B         	LD L,2BH
+2BEB  CD 42 00      	CALL 0042H
+2BEE  2E 13         	LD L,13H
+2BF0  CD 42 00      	CALL 0042H
+2BF3  AA            	XOR D
+2BF4  05            	DEC B
+2BF5  68            	LD L,B
+2BF6  01 00 00      	LD BC,0000H
+2BF9  00            	NOP
+2BFA  00            	NOP
+2BFB  00            	NOP
+2BFC  00            	NOP
+2BFD  00            	NOP
+2BFE  8E 28		DB	8EH,28H		;CRC-CCITT
+
+	END

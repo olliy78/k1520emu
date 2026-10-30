@@ -1,0 +1,210 @@
+; ============================================================================
+; kut.prn - SIOS 1526, Modul KUT (SYSORG09 Position 25, 1 Satz, Variante 1)
+; Geraetetreiber Kundentastatur (Geraetenummer 8, Eintrag 01A8H).  Erzeugt mit
+;   python3 tools/sios_a5120/modul.py prn KUT doc/sios/kut.prn --org 2C00H
+; Hat KEINEN eigenen Eingabeport: die Codes liest der Empfangsteil im Modul T-K7633 (2B1D).
+; Einziger E/A: OUT (43H) fuer das Lampenbyte (GET-LED).  Befund: doc/sios/module_k7633_kut.md
+; ============================================================================
+
+	ORG	2C00H
+
+2C00  10 81		DB	10H,81H		;Satzkopf: Gruppe 1, Lauf 0, Flags/Variante 81H
+INIT:
+2C02  AF            	XOR A		;INIT: (01AAH)=Ereignisroutine +001BH, (01A8H)=Befehlsroutine +0090H; Geraetetabelle (0308H)=A8H = Geraet 8 (Eintrag 01A8H)
+2C03  6F            	LD L,A
+2C04  62            	LD H,D
+2C05  01 1B 00      	LD BC,001BH
+2C08  09            	ADD HL,BC
+2C09  22 AA 01      	LD (01AAH),HL
+2C0C  6F            	LD L,A
+2C0D  62            	LD H,D
+2C0E  01 90 00      	LD BC,0090H
+2C11  09            	ADD HL,BC
+2C12  22 A8 01      	LD (01A8H),HL
+2C15  3E A8         	LD A,A8H
+2C17  32 08 03      	LD (0308H),A
+2C1A  C9            	RET
+GERAET_EREIGNIS:
+2C1B  21 AD 01      	LD HL,01ADH		;Ereignis (ISR 1E48H): (01ADH) Bit2 gesetzt? Eingabe-Zustand (01B1H): 0 = laeuft, FFH = abbrechen
+2C1E  CB 56         	BIT 2,(HL)
+2C20  28 0E         	JR Z,2C30H
+2C22  3A B1 01      	LD A,(01B1H)
+2C25  47            	LD B,A
+2C26  B7            	OR A
+2C27  20 07         	JR NZ,2C30H
+2C29  2A B2 01      	LD HL,(01B2H)
+2C2C  CB FE         	SET 7,(HL)
+2C2E  18 3E         	JR 2C6EH
+2C30  3A B1 01      	LD A,(01B1H)
+2C33  FE FF         	CP FFH
+2C35  20 0D         	JR NZ,2C44H
+2C37  2A B2 01      	LD HL,(01B2H)
+2C3A  36 A0         	LD (HL),A0H
+2C3C  21 AD 01      	LD HL,01ADH
+2C3F  CB 96         	RES 2,(HL)
+2C41  CB 9E         	RES 3,(HL)
+2C43  C9            	RET
+2C44  3A AC 01      	LD A,(01ACH)
+2C47  B7            	OR A
+2C48  20 24         	JR NZ,2C6EH
+2C4A  21 AD 01      	LD HL,01ADH
+2C4D  CB 9E         	RES 3,(HL)
+2C4F  78            	LD A,B		;Befehl 01H in (01B1H): Eingabe starten: (01BAH) Bit0 := 1 (aktiv -> GET-LED ueber T-K7633), Puffer (01B4H, Laenge 01B6H) loeschen
+2C50  FE 01         	CP 01H
+2C52  C0            	RET NZ
+2C53  21 BA 01      	LD HL,01BAH
+2C56  CB C6         	SET 0,(HL)
+2C58  2A B4 01      	LD HL,(01B4H)
+2C5B  22 BB 01      	LD (01BBH),HL
+2C5E  3A B6 01      	LD A,(01B6H)
+2C61  32 BD 01      	LD (01BDH),A
+2C64  47            	LD B,A
+2C65  AF            	XOR A
+2C66  77            	LD (HL),A
+2C67  23            	INC HL
+2C68  10 FC         	DJNZ 2C66H
+2C6A  C9            	RET
+2C6B                	DB	FEH,02H,C0H
+EINGABE_ENDE:
+2C6E  21 BA 01      	LD HL,01BAH		;Eingabe beenden: (01BAH) Bit0 := 0, Lampenbyte (076AH) Bit4 setzen (GET inaktiv), OUT (43H)
+2C71  CB 86         	RES 0,(HL)
+2C73  21 6A 07      	LD HL,076AH
+2C76  7E            	LD A,(HL)
+2C77  CB E7         	SET 4,A
+2C79  77            	LD (HL),A
+2C7A  D3 43         	OUT (43H),A		;OUT (43H),A mit gesetztem Bit4 (GET-LED aus), sonst Bits aus (076AH)
+2C7C  21 AD 01      	LD HL,01ADH
+2C7F  CB 96         	RES 2,(HL)
+2C81  CB 9E         	RES 3,(HL)
+2C83  2A B2 01      	LD HL,(01B2H)
+2C86  CB 86         	RES 0,(HL)
+2C88  AF            	XOR A
+2C89  32 AC 01      	LD (01ACH),A
+2C8C  32 B1 01      	LD (01B1H),A
+2C8F  C9            	RET
+GERAET_BEFEHL:
+2C90  21 50 00      	LD HL,0050H		;Befehlsroutine (SVC, Befehlscode in (0050H)): 2DH = Eingabe mit Laenge (0051H) in Puffer (0052H); 2EH = SVC-Block (Geraet 08H, Befehl 00H), sonst Fehler
+2C93  CB BE         	RES 7,(HL)
+2C95  7E            	LD A,(HL)
+2C96  FE 6D         	CP 6DH
+2C98  28 02         	JR Z,2C9CH
+2C9A  FE 6E         	CP 6EH
+2C9C  11 7A 00      	LD DE,007AH
+2C9F  CC 2B 00      	CALL Z,002BH
+2CA2  FE 2E         	CP 2EH
+2CA4  20 12         	JR NZ,2CB8H
+2CA6  21 04 01      	LD HL,0104H
+2CA9  36 08         	LD (HL),08H
+2CAB  2C            	INC L
+2CAC  36 00         	LD (HL),00H
+2CAE  2C            	INC L
+2CAF  36 B8         	LD (HL),B8H
+2CB1  2C            	INC L
+2CB2  36 01         	LD (HL),01H
+2CB4  CF 20         	RST 08H		;SVC, Kennbyte 20H
+2CB6  18 64         	JR 2D1CH
+2CB8  FE 2D         	CP 2DH		;Befehl 2DH: Pufferlaenge pruefen, Fehler '06' ueber 0042H-Tabelle (BC=3630H L=27H)
+2CBA  20 1C         	JR NZ,2CD8H
+2CBC  3A 51 00      	LD A,(0051H)
+2CBF  5F            	LD E,A
+2CC0  16 00         	LD D,00H
+2CC2  2A 52 00      	LD HL,(0052H)
+2CC5  19            	ADD HL,DE
+2CC6  2B            	DEC HL
+2CC7  ED 5B 52 00   	LD DE,(0052H)
+2CCB  B7            	OR A
+2CCC  ED 52         	SBC HL,DE
+2CCE  01 30 36      	LD BC,3630H
+2CD1  2E 27         	LD L,27H
+2CD3  DC 42 00      	CALL C,0042H
+2CD6  18 16         	JR 2CEEH
+2CD8  01 30 20      	LD BC,2030H
+2CDB  11 43 4B      	LD DE,4B43H
+2CDE  2E 2B         	LD L,2BH
+2CE0  CD 42 00      	CALL 0042H
+2CE3  2E 2D         	LD L,2DH
+2CE5  55            	LD D,L
+2CE6  CD 42 00      	CALL 0042H
+2CE9  2E 31         	LD L,31H
+2CEB  CD 42 00      	CALL 0042H
+2CEE  21 BA 01      	LD HL,01BAH
+2CF1  CB FE         	SET 7,(HL)
+2CF3  21 04 01      	LD HL,0104H		;SVC-Block 0104H.. aufbauen (Geraet 08H, Befehl 01H), (0108H)=Puffer, (010AH)=Laenge, RST 08H Kennbyte 23H
+2CF6  36 08         	LD (HL),08H
+2CF8  2C            	INC L
+2CF9  36 01         	LD (HL),01H
+2CFB  2C            	INC L
+2CFC  36 B8         	LD (HL),B8H
+2CFE  2C            	INC L
+2CFF  36 01         	LD (HL),01H
+2D01  2A 52 00      	LD HL,(0052H)
+2D04  22 08 01      	LD (0108H),HL
+2D07  3A 51 00      	LD A,(0051H)
+2D0A  3A 51 00      	LD A,(0051H)
+2D0D  32 0A 01      	LD (010AH),A
+2D10  AF            	XOR A
+2D11  32 0B 01      	LD (010BH),A
+2D14  CF 23         	RST 08H		;SVC, Kennbyte 23H
+2D16  3A 5A 00      	LD A,(005AH)
+2D19  CB 5F         	BIT 3,A
+2D1B  C0            	RET NZ
+2D1C  21 BA 01      	LD HL,01BAH
+2D1F  CB 7E         	BIT 7,(HL)
+2D21  CB BE         	RES 7,(HL)
+2D23  C8            	RET Z
+2D24  3A B8 01      	LD A,(01B8H)
+2D27  CB 47         	BIT 0,A
+2D29  28 05         	JR Z,2D30H
+2D2B  C5            	PUSH BC
+2D2C  DF            	RST 18H
+2D2D  C1            	POP BC
+2D2E  18 F4         	JR 2D24H
+2D30  C9            	RET
+2D31                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2D41                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2D51                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2D61                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2D71                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2D81                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2D91                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2DA1                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2DB1                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2DC1                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2DD1                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2DE1                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2DF1                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2E01                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2E11                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2E21                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2E31                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2E41                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2E51                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2E61                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2E71                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2E81                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2E91                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2EA1                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2EB1                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2EC1                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2ED1                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2EE1                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2EF1                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2F01                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2F11                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2F21                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2F31                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2F41                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2F51                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2F61                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2F71                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2F81                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2F91                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2FA1                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2FB1                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2FC1                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2FD1                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2FE1                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2FF1                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+2FFE  17 3A		DB	17H,3AH		;CRC-CCITT
+
+	END
