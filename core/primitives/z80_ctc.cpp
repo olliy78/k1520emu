@@ -584,7 +584,9 @@ bool Z80CTC::hasInterrupt() const {
  * @return true if interrupts can pass to downstream devices, false if blocked
  */
 bool Z80CTC::getIEO() const {
-    return iei_ && !anyPending();
+    // Datenblatt (U875/Z80-CTC, Daisy Chain): /IEO bleibt low, solange ein Kanal anfordert ODER in
+    // Bedienung ist (IUS) — bis zum RETI.  Sonst loescht ein fremdes RETI den IUS des Nachbarn.
+    return iei_ && !anyPending() && !anyIus();
 }
 
 /**
@@ -633,12 +635,11 @@ uint8_t Z80CTC::getVector() const {
  * is being serviced.
  */
 void Z80CTC::onRETI() {
-    // RETI loescht das IUS-Bit des Kanals in Bedienung.  Massgeblich ist nur der IEI-Eingang
-    // der CTC (kein hoeheres Geraet in Bedienung); eine bloss ANSTEHENDE Anforderung eines
-    // hoeheren Kanals derselben CTC sperrt dabei nicht, sonst bliebe der Kanal in Bedienung
-    // (Fund A8/M11: Zeilenende-Kanal der DPL stand still).  Bis 2026-10-16 galt dies nur
-    // mit dem Schalter setRetiNachIus; seitdem ist es die Vorgabe (A8b).
-    if (!iei_) return;
+    // RETI loescht das IUS-Bit des Kanals in Bedienung.  Ob dieser Baustein das RETI ueberhaupt
+    // sieht (kein hoeheres Geraet in Bedienung), entscheidet der Aufrufer (K1520Bus::signalRETI,
+    // Karten: erster Baustein in Bedienung); eine bloss ANSTEHENDE Anforderung eines hoeheren
+    // Kanals sperrt nicht (Fund A8/M11: Zeilenende-Kanal der DPL stand still; A8b).
+    if (!iei_) return;   // hoeheres Geraet in Bedienung: das RETI gehoert ihm
     for (auto& c : ch_) {
         if (c.ius) {
             c.ius = false;

@@ -626,7 +626,8 @@ uint8_t K2526::getVector() const
  */
 void K2526::onRETI()
 {
-    ctc_.onRETI();
-    bs_pio_.onRETI();
-    LOG_DEBUG("K2526", "RETI: weitergeleitet an CTC und BS-PIO");
+    // /IEO sperrt bis zum RETI: nur der erste Baustein in Bedienung (CTC vor BS-PIO) nimmt es an.
+    if (ctc_.inBedienung())            ctc_.onRETI();
+    else if (bs_pio_.inBedienung())    bs_pio_.onRETI();
+    LOG_DEBUG("K2526", "RETI: weitergeleitet an CTC/BS-PIO (erster in Bedienung)");
 }

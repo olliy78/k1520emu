@@ -259,16 +259,17 @@ bool Z80SIO::hasInterrupt() const {
     // liefert die reine Vektorbasis → die ISR wird endlos erneut angesprungen.
     // Analog zu Z80CTC::anyServiceable() und Z80PIO::hasInterrupt() (f3b7ab1).
     //
-    // NUR die Anforderungsseite.  getIEO() bleibt bewusst unveraendert: die
-    // Kettenseite ist bei allen drei Bausteinen gleich („sperrt bei ANSTEHENDEM,
-    // nicht bei laufendem Interrupt") — sie hier allein umzustellen, wuerde die
-    // Bausteine gegeneinander verstimmen.  Bewertung: doc/testsystem_rework.md §8.
+    // NUR die Anforderungsseite; die Kettenseite (getIEO) sperrt seit der /IEO-Korrektur
+    // (2026-10-30) auch bei IUS.  Bewertung: doc/testsystem_rework.md §8.
     return channelRequests(ch_a_) || channelRequests(ch_b_);
 }
 
 bool Z80SIO::getIEO() const {
     // IEO is blocked (low) when this device has a pending acknowledged interrupt
     if (iei_ && (channelHasInterrupt(ch_a_) || channelHasInterrupt(ch_b_)))
+        return false;
+    // Datenblatt: /IEO bleibt low, solange ein Kanal in Bedienung ist (IUS), bis zum RETI.
+    if (iei_ && (ch_a_.ius || ch_b_.ius))
         return false;
     return true;
 }
@@ -459,8 +460,8 @@ uint8_t Z80SIO::rr2Vektor() const {
 
 void Z80SIO::onRETI() {
     // Wie Z80CTC/Z80PIO::onRETI (A8b): RETI loescht das IUS-Bit des Kanals in Bedienung,
-    // wenn kein hoeheres Geraet in Bedienung ist (iei_).  Eine bloss anstehende Anforderung
-    // von Kanal A darf B nicht an der Freigabe hindern.
+    // wenn kein hoeheres Geraet in Bedienung ist (entscheidet der Aufrufer).  Eine bloss
+    // anstehende Anforderung von Kanal A darf B nicht an der Freigabe hindern.
     if (!iei_) return;
     if (ch_a_.ius) {
         ch_a_.ius = false;

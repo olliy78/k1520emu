@@ -193,6 +193,7 @@ public:
      * that was being serviced, allowing lower-priority interrupts.
      */
     void    onRETI() override;
+    bool    inService() const override { return inBedienung(); }
 
     // ─── External port access (from other devices or tests) ────────────────
     

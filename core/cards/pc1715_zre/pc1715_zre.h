@@ -135,6 +135,7 @@ public:
     bool        hasInterrupt() const override { return ctcMitInt() || sio_.hasInterrupt(); }
     uint8_t     getVector() const override;
     void        onRETI() override;
+    bool        inService() const override { return (!cfg_.w && ctc_.inBedienung()) || sio_.inBedienung(); }
     const char* intDeviceName() const override;
 
     // ─── Lebenslauf ──────────────────────────────────────────────────────────

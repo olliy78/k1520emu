@@ -276,8 +276,9 @@ uint8_t K5122::getVector() const {
 }
 
 void K5122::onRETI() {
-    ctrl_pio_.onRETI();
-    data_pio_.onRETI();
+    // Nur der erste Baustein in Bedienung (Steuer-PIO vor Daten-PIO) nimmt das RETI an.
+    if (ctrl_pio_.inBedienung())      ctrl_pio_.onRETI();
+    else if (data_pio_.inBedienung()) data_pio_.onRETI();
 }
 
 // ─── Disk-Management ─────────────────────────────────────────────────────────

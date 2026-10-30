@@ -990,10 +990,6 @@ Sektorfolge, zwei defekte Spuren (leer lassen) und „INIT ALL" (`Y`); am Ende s
   (DIDI, DINH): der Bildschirm wird geleert, die Lampe blinkt, nichts geht mehr. Das ist
   Verhalten des Gastprogramms (es setzt ein Merkbit, bei dem SIOS „Havarie" annimmt), kein
   Emulatorfehler nach heutigem Wissen. **Programme mit ET2 verlassen**, nicht mit `CAN`.
-* **Zweites `CAL` nach einem Programmende** meldet `ERR FD 1 NFND`, solange die Diskette
-  nicht neu eingelegt wird: SIOS glaubt den Kopf noch an der Stelle des letzten Ladens; die Ursache wird noch
-  untersucht. Abhilfe: die Programmdiskette in B: auswerfen und wieder einlegen (oder vor jedem Programm
-  einen frischen Start).
 * **Programmdiskette nach dem Start in A: tauschen** (Systemdiskette heraus) endete beim Laden von `DIDI` mit
   `ERR FD 3  R/W`; für Programme ist `ASN 0315 66` mit der Programmdiskette in B: der getestete Weg.
 

@@ -110,8 +110,8 @@ uint8_t AUP::getVector() const {
 
 void AUP::onRETI() {
     if (!sio_) return;
-    sio_->onRETI();
-    ctc_->onRETI();
+    if (sio_->inBedienung())      sio_->onRETI();   // SIO vor CTC
+    else if (ctc_->inBedienung()) { ctc_->setIEI(true); ctc_->onRETI(); }
     kette();
 }
 

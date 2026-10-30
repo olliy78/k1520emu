@@ -170,6 +170,7 @@ public:
      * fiel es erst mit SERTEST.COM auf.  Waechter `K8025.RetiGibtDenSioWiederFrei`.
      */
     void    onRETI() override;
+    bool    inService() const override { return sio_dfue_.inBedienung() || sio_kbd_printer_.inBedienung() || ctc_a34_.inBedienung(); }
 
     /// @brief Anfordernder Baustein (Debugger): SIO A33 (DFUE), SIO A32 (Tastatur) oder CTC A34.
     const char* intDeviceName() const override {

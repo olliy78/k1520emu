@@ -277,8 +277,10 @@ TEST_F(P8000Karte16_, Kette_Ctc0VorPio2_QuittungLiefertVektorAmLowByte) {
     ack.st = Z8kStatus::ViAck;
     EXPECT_EQ(k.busLesen(ack), 0xFF22) << "CTC0 K1 zuerst";
     EXPECT_TRUE(k.ctc0().debugState().ch[1].ius);
-    // Vorbestand der Primitive (P5e Abweichung 3): getIEO sperrt nach der Quittung nicht bis
-    // RETI — CTC1 meldet sich trotz CTC0 in Bedienung.  Hier nur die Reihenfolge festgehalten.
+    // /IEO sperrt bis zum RETI (seit 2026-10-30): CTC1 kommt erst nach dem RETI der CTC0-ISR dran.
+    EXPECT_EQ(k.busLesen(ack) & 0xFF, 0xFF) << "CTC1 darf in die ISR der CTC0 nicht eintreten";
+    out(L::P_RETI, 0xED); out(L::P_RETI, 0x4D);
+    k.peripherieBus().markIntDirty();
     EXPECT_EQ(k.busLesen(ack) & 0xFF, 0x2C) << "danach CTC1 K2";
 }
 

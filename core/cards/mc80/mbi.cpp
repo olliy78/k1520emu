@@ -216,8 +216,8 @@ uint8_t Mc80Mbi::getVector() const
 
 void Mc80Mbi::onRETI()
 {
-    ctc_.onRETI();
-    pio_.onRETI();
+    if (ctc_.inBedienung())      ctc_.onRETI();   // erster Baustein in Bedienung (CTC vor PIO)
+    else if (pio_.inBedienung()) pio_.onRETI();
     updateInternalChain();
 }
 

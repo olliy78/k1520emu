@@ -220,6 +220,35 @@ TEST(SiosMonitor, CalStartetProgrammVonDp1) {
     EXPECT_TRUE(r.warte("SIOS 1526/1.1 (P)")) << r.schirm();
 }
 
+// Zweites CAL nach Programmende ohne Neu-Mount: bis zur /IEO-Korrektur (2026-10-30) meldete es
+// "ERR FD 1 NFND" (Befund doc/sios/befund_nfnd_84h.md: das RETI einer fremden ISR loeschte den IUS
+// des BS-PIO B, OUT 00H trat in die laufende INT-BS-ISR ein).  CI = 0xAF beendet DIDI, ET2 -> Monitor.
+constexpr uint32_t kCI = K7637::QK_RAW_BASE | 0xAF;
+TEST(SiosMonitor, ZweitesCalNachProgrammende) {
+    SiosRechner r;
+    r.tippe("ASN");
+    r.taste(kET1);
+    r.tippe("0315");
+    r.taste(kET1);
+    EXPECT_TRUE(r.warte("0315_     50")) << r.schirm();
+    r.tippe("66");
+    r.taste(kET1);
+    r.taste(kET2);
+    EXPECT_TRUE(r.warte("(M)_")) << r.schirm();
+    for (int lauf = 1; lauf <= 2; ++lauf) {
+        r.tippe("CAL");
+        r.taste(kET1);
+        EXPECT_TRUE(r.warte("CAL_")) << r.schirm();
+        r.tippe("DIDI");
+        r.taste(kET1);
+        ASSERT_TRUE(r.warte("DIDI 1520", 200'000'000LL)) << "Lauf " << lauf << ":\n" << r.schirm();
+        EXPECT_EQ(r.schirm().find("NFND"), std::string::npos) << r.schirm();
+        r.taste(kCI);
+        r.taste(kET2);
+        ASSERT_TRUE(r.warte("(M)_", 100'000'000LL)) << "Lauf " << lauf << ":\n" << r.schirm();
+    }
+}
+
 // Ohne ASN sucht CAL auf Diskette 1 (SYLs); CATM liegt nur auf DP1 -> "ERR FD 1 NFND".
 TEST(SiosMonitor, CalMeldetNfndWennProgrammFehlt) {
     SiosRechner r;
