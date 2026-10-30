@@ -2292,7 +2292,9 @@ int main(int argc, char** argv){
             // Steuerzeichen (\x03 = ^C, \e = ESC, \t …) kennt K7637::translateKey nicht
             // als Qt-Code (→ 0x00, Taste verpufft) — als Rohbyte senden (QK_RAW_BASE);
             // das CP/A-BIOS reicht Codes < 20H unveraendert durch.
-            if (code < 0x20) code |= 0x02000000u;
+            // Ebenso 80H..FFH (\xFF = ET1, \xB0 = M ...): translateKey kennt nur 20H..7EH als Zeichen,
+            // alles andere ware ein Qt-Code und ergaebe 00H (Taste verpufft; SIOS-Befund S5).
+            if (code < 0x20 || (code >= 0x80 && code <= 0xFF)) code |= 0x02000000u;
             m.keyPress(code,false,false);
             if (key_wait && m.a5120() && !m.a5120()->k7636()){
                 // Erst warten, bis das Zeichen im Empfang der K8025 (Kanal A) steht (die K7637 sendet
