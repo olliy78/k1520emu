@@ -22,7 +22,7 @@ Erzeugt nach `disks/a5120_sios1526/` (Namensschema `a5120_sios<version>_<anzahl>
 |----------|--------|------------|
 | `a5120_sios11_3xk5601_seriell.hfe` | `SIOS1526_SYLs.hfe` | bytegleich |
 | `a5120_sios11_3xk5601_seriell_sl1.hfe` | `SIOS1526_SL1_1.img` | `k1520disktool save-as` (rohes Abbild → `.hfe`; F8-Marken fehlen) |
-| `a5120_sios09_3xk5601_parallel.hfe` | `SIOS1526_SYLp.hfe` | bytegleich |
+| `a5120_sios09_3xk5601_parallel.hfe` | `SIOS1526_SYLp.hfe` + leere Spuren 40–79 der `SYLs` | `sylp_bereinigen.main80` (80 Zylinder einseitig; Zyl. 0–39 bitgleich; das Original passt zu keinem Katalogformat) |
 | `a5120_sios09_3xk5600_10_parallel.hfe` | `SIOS1526_SYLp.hfe` | `sylp_bereinigen.py` (Seite 0, Zylinder 0..39) |
 | `a5120_sios_programme1.hfe` / `_programme2` / `_generierung` | `DP1` / `DP2` / `SG1` | bytegleich |
 

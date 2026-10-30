@@ -38,7 +38,7 @@ Sicherheitsstecker 01.
 |-------|--------|------------|
 | `a5120_sios11_3xk5601_seriell.hfe` | SIOS 1.1 (`SYSARE11`, 12 Spuren), Original SYLs bytegleich | 3 × K5601 (auch K5600.20), K7637 |
 | `a5120_sios11_3xk5601_seriell_sl1.hfe` | SIOS 1.1, kürzer generiert (10 Spuren), aus dem rohen `.img` `SL1_1` | 3 × K5601 (auch K5600.20), K7637 |
-| `a5120_sios09_3xk5601_parallel.hfe` | SIOS 0.9, Original SYLp (80 Zyl. × 2 Seiten ausgelesen) bytegleich | 3 × K5601 oder K5600.20, K7636 |
+| `a5120_sios09_3xk5601_parallel.hfe` | SIOS 0.9, aus SYLp: 80 Zyl. einseitig, Zyl. 0–39 bitgleich, Rest leer formatiert | 3 × K5601 oder K5600.20, K7636 |
 | `a5120_sios09_3xk5600_10_parallel.hfe` | SIOS 0.9, bereinigte 40-Spur-Fassung (`sylp_bereinigen.py`) | 3 × K5600.10, K7636 |
 | `a5120_sios_programme1.hfe` | DP1: Programmbibliothek `PHASELB` (CATM … INIT, DIDI … CODP), 40 Spuren | Datendiskette, in B:/C: |
 | `a5120_sios_programme2.hfe` | DP2: `PHASELB` (LINK … SYSD, SGEN …) | wie oben |

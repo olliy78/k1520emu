@@ -152,7 +152,7 @@ siehe Spalte „CAL").  Stecker 01.  Medien kommen aus `disks/a5120_sios1526/` (
 | 1.1 | `sios11_3xk5601_seriell` und `…_sl1` | 3 × K5600.20 | K7637 | ja | ja |
 | 1.1 | `sios11_3xk5601_seriell` | 3 × K5601 | K7636 (parallel) | **nein**, Bild `ERR KB 2  UNIT` | – |
 | 1.1 | `sios11_3xk5601_seriell` | 3 × K5600.10 | K7637 | **nein** (80-Zylinder-Medium im 40er-Laufwerk; Bild bleibt leer) | – |
-| 0.9 | `sios09_3xk5601_parallel` (Original SYLp, Spur n auf Position n) | 3 × K5601 oder K5600.20 | K7636 | ja | **ja**¹ |
+| 0.9 | `sios09_3xk5601_parallel` (aus SYLp, 80 Zyl. einseitig: Zyl. 0–39 sektorgleich, Spur n auf Position n) | 3 × K5601 oder K5600.20 | K7636 | ja | **ja**¹ |
 | 0.9 | `sios09_3xk5600_10_parallel` (bereinigte 40-Spur-Fassung) | 3 × K5600.10 | K7636 | ja | **ja**¹ |
 | 0.9 | `sios09_3xk5600_10_parallel` | K5601 / K5600.20 | K7636 | **nein** (SIOS 0.9 doppelschrittet nicht; Spur n läge auf Position 2n) | – |
 | 0.9 | `sios09_3xk5600_10_parallel` | K5600.10 | K7637 | **nein**, Bild `ERR KB 2  UNIT` | – |
