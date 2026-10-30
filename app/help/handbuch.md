@@ -724,8 +724,10 @@ Tastatur) hat acht Codierstopfen. Stopfen 1–3 geben die **Bedienerkennung** (0
 1. Bedienebene, 03 = 1+2, 04 = Stopfen 3, 05 = 1+3, 06 = 2+3 = 5. Bedienebene); die
 Stopfen 4–8 (Gerätekennung) gelten als passend. Die Tastatur meldet nach dem
 Typzeichen (80H) die Codes der gesteckten Stopfen (A9H, AAH, ABH) und im Betrieb
-jeden Wechsel (Stecken wie Ziehen). Vorgabe ist **keiner** — CP/A, SCPX und UDOS
-bemerken dann nichts. Die Wahl gilt nur mit der K7637 und erzeugt die Maschine neu.
+jeden Wechsel (Stecken wie Ziehen). Vorgabe ist **01 Chefschalter**: unter SIOS volle Rechte
+(Arbeiten und Programmiererstatus, z. B. `MEM`, `POU`); mit 02 oder ohne Stecker weist SIOS diese
+Kommandos ab. CP/A, SCPX und UDOS werten den Stecker nicht aus. Die Wahl gilt mit der K7637 und
+der K7636 und erzeugt die Maschine neu.
 *Maschine ▸ Sicherheitsstecker gesteckt* zieht und steckt den gewählten Stecker im Betrieb
 (kein Tastenkürzel); die Aktion ist erst mit einer gewählten Kennung wählbar.
 Gespeichert wird die Wahl als `general.sicherheitsstecker`.
@@ -871,8 +873,8 @@ Beschreiben übernimmt das DiskTool (Abschnitt „SIOS 1526" in dessen Handbuch)
 
 1. *Einstellungen ▸ Allgemein ▸ Modell*: **A5120** (oder A5130/K8924). Laufwerke **K5601** (A:, B:, C:) und
    **Tastatur K7637 (seriell)** sind die Vorgabe; es muss nichts umgestellt werden.
-2. **Sicherheitsstecker** (*Einstellungen ▸ Allgemein*, Abschnitt „Sicherheitsstecker" oben): **01** wählen.
-   01 ist der *Chefschalter* und gibt den Programmierer-Status. Ohne Stecker kommt SIOS trotzdem bis zur
+2. **Sicherheitsstecker** (*Einstellungen ▸ Allgemein*): steht in der Vorgabe auf **01** (*Chefschalter*,
+   Programmierer-Status) — nichts zu tun, außer er wurde umgestellt. Ohne Stecker kommt SIOS trotzdem bis zur
    Systemzeile, aber in den Monitorstatus ohne Bedienebenen. *Maschine ▸ Sicherheitsstecker gesteckt*
    zieht und steckt ihn im Betrieb.
 3. Diskettensatz einlegen: `a5120_sios11_3xk5601_seriell.hfe` in **A:**, `a5120_sios_programme1.hfe` in **B:**,

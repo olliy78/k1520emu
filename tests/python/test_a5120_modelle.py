@@ -184,7 +184,7 @@ def test_vorgaben_je_modell():
     c = p.modell_vorgabe("k8924")
     assert c["tastatur"] == "k7637" and c["laufwerke"] == ["K5601"] * 3 + ["none"]
     assert p.hardware_standard("a5130") == {"ram": "k3526", "bildschirm": "k7024", "tastatur": "k7636",
-                                            "sicherheitsstecker": "0", "laderom": "v09_2", "erweiterungsmodul": "none"}
+                                            "sicherheitsstecker": "1", "laderom": "v09_2", "erweiterungsmodul": "none"}
 
 
 def test_optionsfelder_und_beschriftungen():
@@ -205,7 +205,7 @@ def test_kern_parameter_sind_einzeloptionen_in_konfig():
     kern = p.kern_parameter("a5130", {})
     assert list(kern) == ["konfig"]
     assert kern["konfig"] == {"ram": "k3526", "bildschirm": "k7024", "tastatur": "k7636",
-                              "laderom": "v09_2", "em": "none"}
+                              "laderom": "v09_2", "em": "none", "sicherheitsstecker": "1"}
     hw = {"ram": "k3525_2", "tastatur": "k7636", "laderom": "v06", "erweiterungsmodul": "em256"}
     # Erweiterungsmodul nur mit K3526 ...
     assert p.kern_parameter("a5120", hw)["konfig"]["em"] == "none"
@@ -249,7 +249,7 @@ def test_hardware_normalisieren_prueft_jede_option_einzeln():
     p = _profil()
     n = p.hardware_normalisieren({"ram": "k3525_4", "tastatur": "quatsch", "laderom": "v06"}, "a5130")
     assert n == {"ram": "k3525_4", "bildschirm": "k7024", "tastatur": "k7636", "laderom": "v06",
-                 "erweiterungsmodul": "none", "sicherheitsstecker": "0"}
+                 "erweiterungsmodul": "none", "sicherheitsstecker": "1"}
     assert p.hardware_normalisieren({}, "k8924")["tastatur"] == "k7637"
 
 

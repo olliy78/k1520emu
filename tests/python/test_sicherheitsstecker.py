@@ -95,10 +95,11 @@ def test_alter_konfigschluessel_bedienelement_wird_noch_gelesen(window):
     assert hw["sicherheitsstecker"] == "2"           # der neue Schluessel gewinnt
 
 
-def test_vorgabe_keins_und_aktion_gesperrt(window):
-    assert window._hardware["sicherheitsstecker"] == "0"
-    assert window.emulator.sicherheitsstecker() == 0
-    assert not window.act_sicherheitsstecker.isEnabled()
+def test_vorgabe_chefschalter_und_aktion_steckt(window):
+    """Vorgabe 01 (Chefschalter): unter SIOS volle Rechte (Arbeiten + Programmiererstatus)."""
+    assert window._hardware["sicherheitsstecker"] == "1"
+    assert window.emulator.sicherheitsstecker() == 1
+    assert window.act_sicherheitsstecker.isEnabled() and window.act_sicherheitsstecker.isChecked()
     assert not window.act_sicherheitsstecker.shortcut().toString()      # kein Kuerzel
 
 

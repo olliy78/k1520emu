@@ -39,14 +39,17 @@ _LEER = "none"
 VORGABEN = {
     A5120: {"ram": "k3526", "bildschirm": "k7024", "tastatur": "k7637", "laderom": "v09_2",
             "erweiterungsmodul": "none", "kassette": "0", "aup": "0",
+            "sicherheitsstecker": "1",
             "k3521_anzahl": "0",
             "laufwerke": (_K5601, _K5601, _K5601, _LEER)},
     A5130: {"ram": "k3526", "bildschirm": "k7024", "tastatur": "k7636", "laderom": "v09_2",
             "erweiterungsmodul": "none", "kassette": "0", "aup": "0",
+            "sicherheitsstecker": "1",
             "k3521_anzahl": "0",
             "laufwerke": (_K5601, _K5601, _K5601, _K5601)},
     K8924: {"ram": "k3526", "bildschirm": "k7024", "tastatur": "k7637", "laderom": "v09_2",
             "erweiterungsmodul": "none", "kassette": "0", "aup": "0",
+            "sicherheitsstecker": "1",
             "k3521_anzahl": "0",
             "laufwerke": (_K5601, _K5601, _K5601, _LEER)},
 }

@@ -657,7 +657,7 @@ auf Low; ohne Stecker liegen alle SL High.  Verhalten der Tastatur:
 
 Umsetzung: `K7637::setSicherheitsstecker(kennung 0..6, geraet_passt)`; Stecken/Ziehen und die Meldungen laufen
 über dieselbe 9600-Bd-Strecke wie Tasten (`sendByte`, nicht vordrängeln).  `geraet_passt = false`: alle SL
-bleiben High.  **Vorgabe: keiner** — dann bleibt die Bytefolge bitgleich wie vorher (nur TYP nach 00H, nichts
+bleiben High.  **Vorgabe im Kern: keiner** (in der Oberfläche seit 2026-10-30 **01 Chefschalter**, `app/modell.py`) — dann bleibt die Bytefolge bitgleich wie vorher (nur TYP nach 00H, nichts
 beim Einschalten); CP/A bootet mit gestecktem Stecker unverändert (`K7637SicherheitssteckerMaschine.CpaBootetMitElement`).
 Der Zustand steht NICHT im Zwischenstand (Konfiguration, kein Laufzeitzustand der Tastatur).
 `A5120Machine::Config::sicherheitsstecker`/`sicherheitsstecker_geraet_passt` (Kaltstart), `setSicherheitsstecker` (thread-sicher,

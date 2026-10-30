@@ -548,7 +548,7 @@ A5120 = Programmprofil(
         ("sicherheitsstecker", "Sicherheitsstecker:",
          "Sicherheitsstecker (Bediensicherung, 8 Codierstopfen): Stopfen 1–3 sind die "
          "Bedienerkennung, die die Tastatur nach TYP und beim Stecken/Ziehen als Code meldet.  "
-         "K7637 belegt, K7636 mit denselben Codes als Annahme; ohne Stecker (Vorgabe) bleibt alles wie bisher.  "
+         "K7637 belegt, K7636 mit denselben Codes als Annahme.  Vorgabe 01 Chefschalter: unter SIOS volle Rechte (Arbeiten und Programmiererstatus, z. B. MEM/POU); CP/A, SCPX und UDOS werten den Stecker nicht aus.  "
          "*Maschine ▸ Sicherheitsstecker gesteckt* zieht/steckt ihn im Betrieb.",
          (("0", "keiner"), ("1", "01 Chefschalter"), ("2", "02 1. Bedienebene"),
           ("3", "03 (Stopfen 1+2)"), ("4", "04 (Stopfen 3)"), ("5", "05 (Stopfen 1+3)"),
