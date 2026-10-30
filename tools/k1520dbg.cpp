@@ -4532,9 +4532,9 @@ int main(int argc, char** argv){
                 }
             }
         }
-        else if (cmd=="kbd"){   // K7637: Sicherheitsstecker (Sicherheitsstecker) stecken/ziehen (AP S3b)
+        else if (cmd=="kbd"){   // K7637/K7636: Sicherheitsstecker stecken/ziehen (AP S3b)
             A5120Machine* a5 = m.a5120();
-            if (!a5 || a5->k7636()) fprintf(stderr,"  kbd: nur am A5120 mit K7637\n");
+            if (!a5) fprintf(stderr,"  kbd: nur am A5120\n");
             else if (t.size()>=3 && t[1]=="stecker"){
                 const int n = atoi(t[2].c_str());
                 if (!a5->setSicherheitsstecker(n, !(t.size()>=4 && t[3]=="falsch"))) fprintf(stderr,"  ? kbd stecker <0..6> [falsch]\n");

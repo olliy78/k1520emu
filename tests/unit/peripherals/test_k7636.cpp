@@ -382,3 +382,55 @@ TEST(K7636K2526, CpaTastaturerkennungLiefertTyp80)
     ASSERT_EQ(zre.ioRead(0x01) & 8, 0);
     EXPECT_EQ(zre.ioRead(0x06) & 0xF0, 0x80);
 }
+
+// ── Bediensicherung (Sicherheitsstecker, S4; Codes wie K7637 als Annahme [?]) ─────────────────
+
+/// @test K7636.SicherheitssteckerVorgabeKeins
+/// @par Pass criterion  Ohne Stecker (Vorgabe) liefert das Einschalten nur das Typzeichen.
+TEST(K7636, SicherheitssteckerVorgabeKeins)
+{
+    K7636 k;
+    k.ubusReset();
+    EXPECT_EQ(lies06(k), K7636::TYP);
+    EXPECT_EQ(status(k), K7636::STATUS_RUHE);
+    EXPECT_EQ(k.sicherheitsstecker(), 0);
+}
+
+/// @test K7636.SicherheitssteckerMeldetNachTypDieLowLeitungen
+/// @par Pass criterion  Kennung 5 (Stopfen 1+3): TYP, A9H, ABH; nach Kommando 00H wieder genauso.
+TEST(K7636, SicherheitssteckerMeldetNachTypDieLowLeitungen)
+{
+    K7636 k;
+    k.setSicherheitsstecker(5);                          // vor dem Einschalten: nur merken
+    EXPECT_EQ(status(k), K7636::STATUS_RUHE);
+    k.ubusReset();
+    EXPECT_EQ(lies06(k), K7636::TYP);
+    EXPECT_EQ(lies06(k), 0xA9);
+    EXPECT_EQ(lies06(k), 0xAB);
+    EXPECT_EQ(status(k), K7636::STATUS_RUHE);
+    k.ubusWrite(0x03, 0x00);                             // Reset per Kommando
+    k.service(10 * MS);
+    EXPECT_EQ(lies06(k), K7636::TYP);
+    EXPECT_EQ(lies06(k), 0xA9);
+    EXPECT_EQ(lies06(k), 0xAB);
+}
+
+/// @test K7636.SicherheitssteckerSteckenUndZiehenIstEinToggleCode
+/// @par Pass criterion  Zur Laufzeit meldet jede Pegelaenderung den Code der Leitung; Falsche Geraetekennung schweigt.
+TEST(K7636, SicherheitssteckerSteckenUndZiehenIstEinToggleCode)
+{
+    K7636 k;
+    einschalten(k);
+    k.setSicherheitsstecker(2);                          // SL2 -> AAH
+    EXPECT_EQ(lies06(k), 0xAA);
+    k.setSicherheitsstecker(3);                          // SL1 kommt dazu
+    EXPECT_EQ(lies06(k), 0xA9);
+    k.setSicherheitsstecker(0);                          // Ziehen: beide wechseln
+    EXPECT_EQ(lies06(k), 0xA9);
+    EXPECT_EQ(lies06(k), 0xAA);
+    k.setSicherheitsstecker(0);                          // keine Aenderung, keine Codes
+    EXPECT_EQ(status(k), K7636::STATUS_RUHE);
+    k.setSicherheitsstecker(6, false);                   // falsche Geraetekennung: alle SL High
+    EXPECT_EQ(status(k), K7636::STATUS_RUHE);
+    EXPECT_EQ(k.slLowMaske(), 0);
+}

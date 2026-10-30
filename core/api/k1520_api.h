@@ -325,17 +325,17 @@ K1520_API void k1520_set_key_repeat_realtime(K1520Handle h, bool realtime);
  */
 K1520_API uint32_t k1520_keyboard_leds(K1520Handle h);
 /**
- * @brief Sicherheitsstecker (Sicherheitsstecker) der K7637 stecken/ziehen (AP S3b, Entwurf 43).
+ * @brief Sicherheitsstecker (Sicherheitsstecker) der K7637 (und, als Annahme, der K7636) stecken/ziehen (AP S3b, Entwurf 43).
  *
  * @param kennung 0 = keins (gezogen), 1..6 = Bedienerkennung (1 = Chefschalter, 2 = 1. Bedienebene,
  *                3 = 1+2, 4 = Stopfen 3, 5 = 1+3, 6 = 5. Bedienebene).
  * @param geraet_passt false = Geraetekennung stimmt nicht, alle Sonderleitungen bleiben High.
- * @return 0 = ok; -1 = Maschine hat keine K7637 (anderer Typ oder K7636); -2 = Kennung ungueltig.
+ * @return 0 = ok; -1 = keine A5120-Maschine; -2 = Kennung ungueltig.
  * Wirkt am Anfang des naechsten k1520_run; erzeugt die Codes der wechselnden Leitungen (A9H, AAH,
  * ABH) ueber die serielle Tastaturstrecke.  Kaltstart-Vorgabe: Konfigurationstext `sicherheitsstecker=N`.
  */
 K1520_API int k1520_kbd_sicherheitsstecker_set(K1520Handle h, int kennung, bool geraet_passt);
-/** @brief Gesteckter Sicherheitsstecker 0..6; -1 ohne K7637.  *geraet_passt (optional, darf NULL sein). */
+/** @brief Gesteckter Sicherheitsstecker 0..6; -1 ohne A5120.  *geraet_passt (optional, darf NULL sein). */
 K1520_API int k1520_kbd_sicherheitsstecker_get(K1520Handle h, bool* geraet_passt);
 /**
  * @brief Welchen physischen K7637-Code erzeugt dieser Tastencode?

@@ -112,7 +112,7 @@ public:
         /// Sicherheitsstecker (Sicherheitsstecker) der K7637, AP S3b: 0 = keins (Vorgabe, CP/A/SCPX/UDOS
         /// unveraendert), 1..6 = Bedienerkennung (1 = Chefschalter … 6 = 5. Bedienebene).
         /// `sicherheitsstecker_geraet_passt = false`: Geraetekennung falsch, alle SL bleiben High.
-        /// Nur an der K7637 wirksam.  Zur Laufzeit: @ref setSicherheitsstecker.
+        /// An der K7636 als Annahme [?] mit denselben Codes (kein ROM-Abzug).  Zur Laufzeit: @ref setSicherheitsstecker.
         int  sicherheitsstecker = 0;
         bool sicherheitsstecker_geraet_passt = true;
 

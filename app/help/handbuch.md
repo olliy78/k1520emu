@@ -836,10 +836,9 @@ Bürorechner A5120/A5130/K8924 (Robotron). Es zeigt in der untersten Bildschirmz
 Programmbibliothek (`PHASELB`) auf der Diskette. Wie alles in diesem Emulator läuft der
 Original-Z80-Code unverändert; es gibt keine Abkürzungen.
 
-> **Stand.** SIOS 1526/1.1 startet bis zur Systemzeile, die Monitorkommandos und mehrere
+> **Stand.** SIOS 1526/1.1 und 0.9 starten bis zur Systemzeile, die Monitorkommandos und mehrere
 > Programme laufen. **Noch nicht** möglich: das Formatieren einer Leerdiskette mit `INIT`
-> (bricht mit `ERR 9B`/`9C` ab), SIOS 0.9 (startet noch nicht bis zur Systemzeile) und
-> die Systemgenerierung `SGEN`. Fertige Beispieldisketten folgen im Ordner
+> (bricht mit `ERR 9B`/`9C` ab) und die Systemgenerierung `SGEN`. Fertige Beispieldisketten folgen im Ordner
 > `disks/a5120_sios1526/`; bis dahin brauchen Sie Abbilder Ihrer eigenen SIOS-Disketten.
 
 ### Welche Disketten gehören dazu
@@ -859,7 +858,9 @@ Beschreiben übernimmt das DiskTool (Abschnitt „SIOS 1526" in dessen Handbuch)
 2. **Laufwerke:** die Systemdiskette hat 80 Spuren einseitig — Laufwerk **K5600.20**
    (5¼″, 80 Spuren). Die 40-Spur-Programmdisketten dürfen im selben Laufwerk liegen; der
    Emulator übersetzt die Spurdichte selbst (Doppelschritt, siehe „Wenn die Diskette nicht
-   zum Laufwerk passt").
+   zum Laufwerk passt"). Die **SIOS-0.9**-Diskette (`SYLp`) ist dagegen als Auslesung
+   zu nehmen, wie sie ist (Spur n auf Position n): ebenfalls **K5600.20**; eine bereinigte
+   40-Spur-Fassung gehört in ein **K5600.10**.
 3. **Tastatur:** **K7637** für SIOS 1.1, **K7636** für SIOS 0.9 (die beiden Systeme sind
    für verschiedene Tastaturen erzeugt).
 4. **Sicherheitsstecker** (*Einstellungen ▸ Allgemein*, Abschnitt „Sicherheitsstecker" oben):
@@ -960,7 +961,10 @@ Eine fertig initialisierte Datendiskette legt stattdessen das DiskTool an
   ein 40-Spur-Laufwerk (K5600.10). Im 80-Spur-Laufwerk schreibt INIT auf Halbspuren und
   meldet Fehler. Bei der Frage `8" DISKETTE` mit **N** antworten — erst, wenn die Frage
   steht; sonst formatiert INIT im 8″-Format (FM).
-* **SIOS 0.9** (K7636) startet noch nicht bis zur Systemzeile.
+* **SIOS 0.9** (K7636) startet bis `MONITOR ===== SIOS 1526/0.9 (M)_`. Ohne Sicherheitsstecker
+  verwirft SIOS jede Zeichentaste (Bedienebene 0) — bei 0.9 den Stecker 01 einstellen. Der
+  Stecker an der K7636 meldet dieselben Codes wie an der K7637 (Annahme, es gibt keinen
+  K7636-ROM-Abzug).
 * **`CAN` im Programm** (nach `M` und `CAN`) kann je nach Programm im *Systemstopp* enden
   (DIDI, DINH): der Bildschirm wird geleert, die Lampe blinkt, nichts geht mehr. Das ist
   Verhalten des Gastprogramms (es setzt ein Merkbit, bei dem SIOS „Havarie" annimmt), kein

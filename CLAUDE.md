@@ -721,7 +721,7 @@ Plan: `doc/design/31_mc80.md`.
 
 Sparkassen-/Betriebssystem des A5120/A5130/K8924; fünf Originalabbilder unter `tools/sios_a5120/original/` (SYLs = 1.1, SYLp = 0.9, DP1/DP2, SG1).
 **Stand:** SIOS 1.1 (K7637, Sicherheitsstecker 01) bootet bis `MONITOR ===== SIOS 1526/1.1 (M)_`; DAT/CLK/ASN/CAL/M/ET2 und mehrere Programme laufen;
-DiskTool-Dateisystem `sios` liest und schreibt (`sios_ss40`/`sios_ss80`).  `INIT` formatiert Disketten (K5600.10 für 40 Spuren).  Offen: SIOS 0.9, SGEN, Beispieldisketten.
+DiskTool-Dateisystem `sios` liest und schreibt (`sios_ss40`/`sios_ss80`).  `INIT` formatiert Disketten (K5600.10 für 40 Spuren).  **SIOS 0.9 (K7636, `SYLp`) bootet seit S4** bis `MONITOR ===== SIOS 1526/0.9 (M)_` (Sicherheitsstecker auch an der K7636, Annahme [?]; ohne Stecker ignoriert 0.9 die Tasten).  Offen: SGEN, Beispieldisketten.
 **Kernfehler dabei behoben** (gelten für alle Maschinen): **Q240** nach Abschn. 6.11 neu nachgebildet (B2 = 1: jeder Zugriff schreibt `Schutz-RAM[A>>6] := AB0`),
 **/INT-BS als Impuls**, **Z80CTC ohne Einzelschuss** (D3 nur im Zeitgeberbetrieb), **gelöschte Datenmarke F8** im K5122-Lese-/Schreibpfad; K5122: **nach dem Schreiben 3×A1** (kein Altbyte im PIO B), **/STR=1 beendet Schreiben** in jedem Kontext.
 Dazu Wirtstaste **Pause** = ET2 (kein Kürzel) und Rechtsklick auf ET2 der Bildschirmtastatur.

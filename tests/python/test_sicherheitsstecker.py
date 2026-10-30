@@ -46,10 +46,12 @@ def test_unbekannte_kennung_im_konfigtext():
         _emu(konfig={"sicherheitsstecker": 9})
 
 
-def test_k7636_hat_kein_element():
+def test_k7636_nimmt_den_stecker_an():
+    # S4: die K7636 meldet dieselben Codes (Annahme [?], kein ROM-Abzug).
     e = _emu(konfig={"tastatur": "k7636"})
-    assert e.sicherheitsstecker() == -1
-    assert not e.set_sicherheitsstecker(1)
+    assert e.sicherheitsstecker() == 0
+    assert e.set_sicherheitsstecker(1)
+    assert e.sicherheitsstecker() == 1
 
 
 def test_andere_maschine_meldet_nicht_vorhanden():
@@ -118,9 +120,9 @@ def test_einstellung_wird_gespeichert(window, qapp):
     assert window._gather_config()["general"]["sicherheitsstecker"] == "6"
 
 
-def test_k7636_graut_das_feld_aus(window, qapp):
+def test_k7636_laesst_das_feld_wirken(window, qapp):
+    # S4: auch die K7636 nimmt den Stecker an (Annahme [?], gleiche Codes wie die K7637).
     box = window.settings_widget.hardware_combos["tastatur"]
     box.setCurrentIndex(box.findData("k7636"))
     qapp.processEvents()
-    assert not window.profil.hardware_wirkt("sicherheitsstecker", window._model, window._hardware)
-    assert not window.act_sicherheitsstecker.isEnabled()
+    assert window.profil.hardware_wirkt("sicherheitsstecker", window._model, window._hardware)
