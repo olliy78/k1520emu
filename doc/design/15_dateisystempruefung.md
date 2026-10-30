@@ -794,6 +794,37 @@ die Zahl der wirklich vorhandenen Adressen setzen).
 
 ---
 
+## 10a. SIOS 1526 (A5120/A5130/K8924)   ✅ *(2026-10-30, D5)*
+
+`check/sios_check.cpp` (Prüfung), `check/sios_recover.cpp` (Rettung).  Nur, was `doc/sios_diskettenformat.md` sicher trägt.
+
+| Kennung | Bedeutung | Schwere |
+|---|---|---|
+| `sios.hdr1.ungueltig` | BOE/EOE keine Adressen, in Spur 0, EOE vor BOE oder hinter der Diskette | Fehler |
+| `sios.hdr1.ueberlappt` | zwei aktive Bereiche teilen Sektoren | Fehler |
+| `sios.hdr1.eod` | EOD fehlt oder liegt außerhalb `[BOE, EOE+1]` | Warnung |
+| `sios.ermap.fehlt` / `sios.vol1.fehlt` | Spur 0 Sektor 5 / 7 ohne `ERMAP` / `VOL1` (die Erkennung verlangt beide — Befund nur, wenn sie nach dem Mounten verschwinden) | Fehler |
+| `sios.bib.verzeichnis` | Verzeichnissektor (AADR 2) nicht lesbar | Warnung |
+| `sios.bib.aadr` | AADR eines Eintrags außerhalb `[19, ND)` | Warnung |
+| `sios.bib.reihenfolge` | AADR nicht aufsteigend | Warnung |
+| `sios.bib.doppelt` | zwei **benannte** Objekte am selben AADR (gelöschte, Name blank, zählen nicht) | Fehler |
+| `sios.bib.nd` | Fuß-ND < 19 oder > Bibliotheksgröße + 1 | Warnung |
+| `sios.marke.aktiv` | aktives `HDR1` mit gelöschter Datenmarke F8 — Reparatur `sios.marke.setzen` (empfohlen, ohne Datenverlust) | Hinweis |
+| `sios.marke.frei` | freier/`DDR1`-Satz mit Marke FB — dieselbe Reparatur | Hinweis |
+
+Die Marken werden nur beurteilt, wenn **irgendein** Etikettensektor F8 trägt (sonst ist der Container ein `.img` ohne Marken — jede
+leere Diskette meldete sonst 19 Hinweise).  Nicht geprüft (nicht belegt): ERMAP-Nummern, VOL1-Felder außer der Kennung, NV, die
+Gleichung ND = AADR + 2·ML des letzten Eintrags (gilt nur für 22 von 31 gemessenen Einträgen).
+
+**Rettung** (`recover`): (1) `DDR1`-Etiketten mit erhaltenem Bereich (`d == 0`) — ein Bereich hinter dem Diskettenende (die
+17 Platzhalter `DATA10..DATA26` der SG1: 01001..73026) oder ohne Adressen ist **kein Fund**; (2) gelöschte Objekte lebender
+Bibliotheken (`d == 1`, Name blank, AADR/ML da; Länge = Abstand zum nächsten AADR).  Güte: lebendes Etikett im Bereich →
+Bruchstück und nicht wiederherstellbar; Bereich mit anderem gelöschten Etikett geteilt → wahrscheinlich; Oberflächensuche zusätzlich:
+nur Füllbytes → Bruchstück, schlechte CRC → wahrscheinlich.  Wiederherstellen: Etikett = derselbe Sektor wird wieder `HDR1`
+(Marke FB), Bedingungen unmittelbar vorher neu geprüft, bei lebendem Namensvetter nur mit `--restore N=NAME`; Objekt **nur** mit
+vergebenem Namen (1–5 Zeichen, nicht vorhanden; der Verzeichnisplatz muss noch den AADR tragen und blank sein).  Wächter
+`SiosFsCheck.*`, `SiosRecover.*`, `cli_dt_recover_sios_*`.
+
 ## 11. Ebene 0 — „Warum wurde denn nichts erkannt?"   ✅ *(umgesetzt 2026-08-19)*
 
 Der bisher unangenehmste Fall ist der, in dem das Werkzeug gar nicht erst hineinkommt:

@@ -209,8 +209,18 @@ Schreibschutz, `E` Austausch, `C` Fortsetzung auf der Folgediskette).
   Etikettenspur und gelöschten Datenmarken in den freien Etikettensektoren.
 * **Prüfen** (`fsck`, beim Öffnen die Schnellprüfung): Befunde `sios.hdr1.ungueltig`
   (Fehler), `sios.hdr1.ueberlappt` (Fehler: zwei Dateien teilen sich Sektoren) und
-  `sios.hdr1.eod` (Warnung: Dateiende liegt außerhalb des Bereichs; es gilt dann `EOE`).
-  Die Prüfung ist bewusst klein — gemeldet wird nur, was belegt ist.
+  `sios.hdr1.eod` (Warnung: Dateiende liegt außerhalb des Bereichs; es gilt dann `EOE`);
+  dazu bei Bibliotheken `sios.bib.aadr`, `.reihenfolge`, `.nd` (Warnung) und `.doppelt`
+  (Fehler: zwei benannte Objekte am selben Anfang; gelöschte zählen nicht), `sios.ermap.fehlt`
+  und `sios.vol1.fehlt` (Fehler) sowie die **Hinweise** `sios.marke.aktiv`/`sios.marke.frei`: die
+  Datenmarke eines Etikettensektors (aktiv FB, frei F8) passt nicht zum Inhalt — Reparatur:
+  Marke setzen, ohne Datenverlust. Gemeldet wird nur, was belegt ist.
+* **Retten** (*Gelöschtes retten…*, `recover`): gefunden werden gelöschte Dateien (Name, Größe
+  und Bereich bleiben im Etikett stehen) und gelöschte Bibliotheksobjekte (nur der **Name**
+  ist verloren). *In den Ordner holen* geht immer. *Auf der Diskette wiederherstellen*: eine
+  Datei nur, wenn kein lebendes Etikett den Bereich inzwischen berührt; ein Objekt nur mit
+  einem von Ihnen vergebenen Namen. Die 17 Platzhalter `DATA10…` der SG1 (Bereich hinter dem
+  Diskettenende) sind kein Fund.
 * **Spur 0 als Ganzes** (`boot-get`): holt die Etikettenspur samt Lader heraus.
 
 **Was abgelehnt wird — jeweils mit Grund**

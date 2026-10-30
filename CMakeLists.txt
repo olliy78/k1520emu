@@ -265,6 +265,7 @@ if(BUILD_K1520)
         core/filesystem/check/udos1715_check.cpp
         core/filesystem/check/udos1715_recover.cpp
         core/filesystem/check/sios_check.cpp
+        core/filesystem/check/sios_recover.cpp
     )
     target_link_libraries(k1520_fs PUBLIC k1520_geometry k1520_floppy2 k1520_util k1520_gzip)
     target_include_directories(k1520_fs PUBLIC ${CMAKE_SOURCE_DIR})

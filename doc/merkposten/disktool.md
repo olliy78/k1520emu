@@ -1282,6 +1282,16 @@ Festlegungen:
    (`FileEntry::extent` trägt Lage als Text).  `.fileinfo` entsteht nicht (auch nicht bei D4).
 6. **`SIOS1526_SYLp.hfe` wird nicht automatisch erkannt**: 40-Spur-Diskette aus dem 80er-Laufwerk (Zylinder 40–68 unformatiert, Streusektor c15h1) passt zu keinem
    Katalogformat; mit `--fs sios_ss40` liest sie (Wächter `SiosFs.SylpIstNurMitFsErkennbar` hält den Befund fest — wird die Geometrieerkennung toleranter, Test und Doku nachziehen).
-7. **Prüfung** (`sios.hdr1.ungueltig` Fehler, `sios.hdr1.ueberlappt` Fehler, `sios.hdr1.eod` Warnung) bewusst klein; ERMAP-Nummern, VOL1-Felder und Bibliotheksfuß-NV
-   werden nicht geprüft (nicht belegt — „Falschmeldungen sind schlimmer als fehlende").  Wächter `SiosFsCheck.*` (alle fünf Originale ohne Befund).
+7. **Prüfung** (D5, 2026-10-30; Kennungen sind ein Vertrag): `sios.hdr1.ungueltig` Fehler, `sios.hdr1.ueberlappt` Fehler, `sios.hdr1.eod` Warnung,
+   `sios.ermap.fehlt`/`sios.vol1.fehlt` Fehler (nur nach dem Mounten möglich — die Erkennung verlangt beide), `sios.bib.aadr`/`.reihenfolge`/`.nd`/`.verzeichnis`
+   Warnung, `sios.bib.doppelt` Fehler (nur zwei **benannte** Objekte; gelöschte = Name blank zählen nicht), `sios.marke.aktiv`/`.frei` **Hinweis** mit
+   Reparatur `sios.marke.setzen` (empfohlen, kein Datenverlust, `SiosFileSystem::repair` prüft unmittelbar vorher, dass die Marke noch zum Inhalt passt).
+   **Marken werden nur beurteilt, wenn irgendein Etikettensektor F8 trägt** (sonst `.img`/`.cqm`/`.td0`/`.imd` ohne Marken → 19 Falschmeldungen je Leerdiskette).
+   Nicht geprüft (nicht belegt): ERMAP-Nummern, VOL1-Felder, NV, ND = AADR + 2·ML (nur 22 von 31 Einträgen).  Wächter `SiosFsCheck.*`
+   (alle fünf Originale **ganz ohne Befund und Hinweis**, je Kennung ein kaputtes Abbild).
+7a. **Rettung** (D5, `check/sios_recover.cpp`, Wächter `SiosRecover.*`, `cli_dt_recover_sios_*`): Fund `d==0` = `DDR1` mit gültigem Bereich, `d==1` = gelöschtes Objekt
+   (Name blank, AADR/ML). **Ein DDR1-Bereich hinter dem Diskettenende ist KEIN Fund** — die SG1 trägt 17 solche Platzhalter (`DATA10..26`, 01001..73026), die Originale müssen
+   `recover --full` leer liefern.  Lebendes Etikett im Bereich → Bruchstück, nicht wiederherstellbar; Etikett wiederherstellen = derselbe Sektor `DDR1`→`HDR1` + Marke FB,
+   alle Bedingungen unmittelbar vorher neu; Namensvetter nur mit `--restore N=NAME`.  Objekt: **nur** mit Anwendername (1–5 Zeichen, nicht vorhanden, Platz muss AADR tragen und blank sein) —
+   der Name ist nicht ableitbar, nie raten.  Stolperstein: `write` nimmt den **niedrigsten** freien Etikettensatz, auch einen `DDR1` — eine neu angelegte Datei überschreibt also das Etikett (nicht den Bereich) einer zuvor gelöschten; dessen Fund ist dann weg, auch wenn die Daten noch dastehen (Oberflächensuche nach Etikettenlosem gibt es bei SIOS nicht).
 8. Fixtures: `tests/fixtures/disks/sios1526_{dp1,dp2,sg1,syls,sylp}.hfe` (Kopien von `tools/sios_a5120/original/`).  Tests `SiosFs.*`, `SiosFsCheck.*`, `cli_dt_*sios*`.
