@@ -67,6 +67,22 @@ _SPEC: List[Tuple] = [
      "aus, Selbsttest von vorn.  Unter SCPX springt die CPU ins RAM bei 0066H "
      "(wie am Gerät, meist ein Absturz).  P8000: NMI-Taste (U880 bzw. — bei "
      "angeschalteter 16-Bit-Karte — U8001, dort „Press NMI“)", "_on_nmi", False),
+    # Sicherheitsstecker der K7637 stecken/ziehen (nur A5120-Profil, AP S3b):
+    # rastend, "an" = gesteckt.  Wirkt nur, wenn unter Einstellungen eine Bedienerkennung
+    # gewaehlt ist.  KEIN Kuerzel (die Kuerzeltabelle des Handbuchs ist ein Vertrag).
+    ("sicherheitsstecker", "&Sicherheitsstecker gesteckt", None, None,
+     "Den Sicherheitsstecker der K7637 stecken oder ziehen — die Tastatur meldet "
+     "den Wechsel als Code.  Die Kennung steht unter Einstellungen ▸ Allgemein ▸ Sicherheitsstecker",
+     "_on_sicherheitsstecker", True),
+    # Schluesselschalter der AUP/K7633 (nur A5120-Profil, nur bei gesteckter AUP): rastend, "an" =
+    # eingeschaltet.  Jede Drehung (ein UND aus) meldet der K7633 einen Code (SS1 AAH, SS2 A9H);
+    # Stecken/Abziehen des Schluessels ist nicht erkennbar.  KEIN Kuerzel.
+    ("schluessel_anwender", "Schlüsselschalter &Anwender (SS1)", None, None,
+     "Schlüsselschalter SS1 der Terminaltastatur K7633 ein-/ausdrehen — jede Drehung meldet "
+     "den Code AAH.  Nur mit gesteckter AUP", "_on_schluessel_anwender", True),
+    ("schluessel_admin", "Schlüsselschalter A&dministrator (SS2)", None, None,
+     "Schlüsselschalter SS2 der Terminaltastatur K7633 ein-/ausdrehen — jede Drehung meldet "
+     "den Code A9H.  Nur mit gesteckter AUP", "_on_schluessel_admin", True),
     # Zwischenstand der Maschine (nur P8000, P8KS).  KEIN Kuerzel (die Kuerzeltabelle des
     # Handbuchs ist ein Vertrag); zuverlaessig nur am Prompt, siehe Handbuch.
     ("stand_speichern", "Zwischenstand &sichern…", "config-save", None,
@@ -192,6 +208,9 @@ KURZ = {
     "power": "Power",
     "reset": "Reset",
     "nmi": "NMI",
+    "sicherheitsstecker": "Stecker",
+    "schluessel_anwender": "SS1",
+    "schluessel_admin": "SS2",
     "k8915emu": "K8915",
     "a5120emu": "A5120",
     "prg710emu": "PRG710",
@@ -229,6 +248,9 @@ POWER_TEXT = {True: "Rechner &ausschalten", False: "Rechner &einschalten"}
 #: `app/profil.py`, die sie haben).  Alle uebrigen haben alle.
 NUR_FUER = {
     "nmi": ("k8915", "p8000"),           # NMI-Taster der Frontplatte
+    "sicherheitsstecker": ("a5120",),         # Sicherheitsstecker der K7637 (AP S3b)
+    "schluessel_anwender": ("a5120",),        # Schluesselschalter der AUP/K7633
+    "schluessel_admin": ("a5120",),
     "stand_speichern": ("p8000",),       # Zwischenstand (P8KS)
     "stand_laden": ("p8000",),
     "verbindung": ("p8000",),
@@ -267,7 +289,7 @@ REIHENFOLGE: List = [
     None,
     "einlegen", "auswerfen",
     None,
-    "stand_speichern", "stand_laden", "verbindung", "text_kopieren", "speicherabzug_laden", "pcmc",
+    "sicherheitsstecker", "schluessel_anwender", "schluessel_admin", "stand_speichern", "stand_laden", "verbindung", "text_kopieren", "speicherabzug_laden", "pcmc",
     None,
     "dock_drives", "dock_settings", "dock_screen", "dock_keyboard", "dock_eprom",
     None,

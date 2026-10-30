@@ -530,6 +530,7 @@ class MainWindow(QMainWindow):
         self.aup_dock = QDockWidget("AUP", self)
         self.aup_dock.setObjectName("aup_dock")
         self.aup_dock.setWidget(self.aup_widget)
+        self.aup_widget.schluesselGedreht.connect(self._schluessel_angezeigt)
         self.addDockWidget(Qt.RightDockWidgetArea, self.aup_dock)
         self.tabifyDockWidget(self.drives_dock, self.aup_dock)
         self.aup_dock.visibilityChanged.connect(
@@ -570,6 +571,7 @@ class MainWindow(QMainWindow):
         self._kassette_kasten()
         self._aup_kasten()
         self._pcmc_kasten()
+        self._sicherheitsstecker_pflegen()
 
         # Startaufteilung: rechte Spalte (Laufwerke) so schmal wie moeglich, ohne
         # horizontales Scrollen; Bildschirm breit.  Tastatur auf Minimalhoehe.
@@ -923,6 +925,11 @@ class MainWindow(QMainWindow):
         emu_menu.addAction(self.act_reset)
         if hasattr(self, "act_nmi"):            # nur im Profil mit Frontplatte
             emu_menu.addAction(self.act_nmi)
+        if hasattr(self, "act_sicherheitsstecker"):      # nur A5120-Profil (AP S3b)
+            emu_menu.addAction(self.act_sicherheitsstecker)
+        for _n in ("schluessel_anwender", "schluessel_admin"):    # AUP/K7633, nur bei gesteckter AUP
+            if hasattr(self, "act_" + _n):
+                emu_menu.addAction(getattr(self, "act_" + _n))
         if hasattr(self, "act_stand_speichern"):    # nur P8000 (P8KS)
             emu_menu.addSeparator()
             emu_menu.addAction(self.act_stand_speichern)
@@ -1546,6 +1553,7 @@ class MainWindow(QMainWindow):
             self._kassette_kasten()
             self._aup_kasten()
             self._pcmc_kasten()
+            self._sicherheitsstecker_pflegen()
         finally:
             self._loading_config = False
 
@@ -1746,6 +1754,38 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Ausgeschaltet.", 4000)
         # Statusanzeige sofort aktualisieren (Tempo eingefroren bzw. auf „—").
         self._update_status()
+
+    def _sicherheitsstecker_kennung(self) -> int:
+        """Eingestellte Bedienerkennung (0 = keins; auch 0, wenn die Tastatur keine K7637 ist)."""
+        if not self.profil.hardware_wirkt("sicherheitsstecker", self._model, self._hardware):
+            return 0
+        try:
+            return int(self._hardware.get("sicherheitsstecker", "0"))
+        except ValueError:
+            return 0
+
+    def _sicherheitsstecker_pflegen(self):
+        """Aktion *Sicherheitsstecker gesteckt* an die frisch gebaute Maschine angleichen: wählbar nur
+        mit eingestellter Kennung; die Maschine startet mit gestecktem Element (Konfiguration)."""
+        akt = getattr(self, "act_sicherheitsstecker", None)
+        if akt is None:
+            return
+        kennung = self._sicherheitsstecker_kennung()
+        akt.blockSignals(True)
+        akt.setEnabled(kennung != 0)
+        akt.setChecked(kennung != 0)
+        akt.blockSignals(False)
+
+    def _on_sicherheitsstecker(self, gesteckt: bool):
+        """Sicherheitsstecker zur Laufzeit stecken/ziehen (AP S3b): die K7637 meldet den Wechsel
+        wie eine Taste über die serielle Strecke; ohne Rechenlauf wirkt es beim nächsten Takt."""
+        kennung = self._sicherheitsstecker_kennung()
+        if not kennung:
+            return
+        if not self.emulator.set_sicherheitsstecker(kennung if gesteckt else 0):
+            return
+        self.statusBar().showMessage(
+            f"Sicherheitsstecker {kennung:02d} gesteckt." if gesteckt else "Sicherheitsstecker gezogen.", 4000)
 
     def _on_nmi(self):
         """NMI-Taster der Frontplatte (nur K8915, `app/ui/actions.py` NUR_FUER).
@@ -2412,6 +2452,35 @@ class MainWindow(QMainWindow):
             dock.show()
             dock.raise_()
         self.aup_widget.aktualisieren()
+        self._schluessel_aktionen_pflegen(gesteckt)
+
+    def _schluessel_aktionen_pflegen(self, gesteckt: bool):
+        """Menueaktionen der Schluesselschalter: nur bei gesteckter AUP sichtbar, Stand aus dem Kern."""
+        for n, name in ((1, "schluessel_anwender"), (2, "schluessel_admin")):
+            akt = getattr(self, "act_" + name, None)
+            if akt is None:
+                continue
+            akt.setVisible(gesteckt)
+            akt.blockSignals(True)
+            akt.setChecked(bool(gesteckt and self.aup_widget.schluessel[n].isChecked()))
+            akt.blockSignals(False)
+
+    def _schluessel_angezeigt(self, n: int, an: bool):
+        akt = getattr(self, "act_" + ("schluessel_anwender", "schluessel_admin")[n - 1], None)
+        if akt is not None and akt.isChecked() != bool(an):
+            akt.blockSignals(True)
+            akt.setChecked(bool(an))
+            akt.blockSignals(False)
+
+    def _schluessel_drehen(self, n: int, an: bool):
+        """Aktion -> Kasten (der ruft den Kern); der Kasten bleibt die EINE Stelle, die den Kern bedient."""
+        self.aup_widget.schluessel[n].setChecked(bool(an))
+
+    def _on_schluessel_anwender(self, an: bool):
+        self._schluessel_drehen(1, an)
+
+    def _on_schluessel_admin(self, an: bool):
+        self._schluessel_drehen(2, an)
 
     def _pcmc_moeglich(self) -> bool:
         """Hat das Modell eine IFSS fuer PCMC?  (MC80.30; der MC80.2x hat keine serielle Schnittstelle.)"""
@@ -2623,6 +2692,7 @@ class MainWindow(QMainWindow):
         self._kassette_kasten()
         self.pcmc_widget.set_emulator(new_emu)
         self._pcmc_kasten()
+        self._sicherheitsstecker_pflegen()
         if pcmc_an and self._pcmc_moeglich():
             self.pcmc_widget.einschalten()
         self.settings_widget.set_aup_value(self._aup, self._aup_sonder, self._aup_alpha)

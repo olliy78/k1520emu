@@ -1,0 +1,229 @@
+; ============================================================================
+; syl_lader.prn  -  SYL-Lader der SIOS-1526-Systemdiskette (Spur 0, Sektor 1-4), 0400H-05FFH
+; Das Lade-ROM (A26) laedt die 4 Sektoren nach 0400H und ruft 0437H.  Der Lader liest
+; die Systemdatei (272 Sektoren ab Spur 2) nach 0800H und kehrt ins Lade-ROM zurueck.
+; Erzeugt von tools/sios_a5120/gen_prn.py.  [Lauf] = am Emulator belegt.
+; ============================================================================
+
+	ORG	0400H
+
+SYL_KENNUNG:
+0400                	DB	53H,59H,4CH,04H,00H,88H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H		;'SYL' (vom Lade-ROM bei 01B6H geprueft); 0403H=04 (OUT 12H, Bit2 = MFM-Pfad), 0404H/0405H = 8800H Byte, 0406H = 00 (Ladeadresse 0800H; <>0 -> 4000H, OUT EEH=3CH)
+CRC_CCITT:
+0410  FD 7E 00      	LD A,(IY+0)		;CRC-CCITT je Byte: BC (B hoch) fortschreiben, IY Zeiger, E Anzahl [Lauf: gleiche Rechnung wie CRC_BLOCK im System]
+0413  A8            	XOR B
+0414  47            	LD B,A
+0415  0F            	RRCA
+0416  0F            	RRCA
+0417  0F            	RRCA
+0418  0F            	RRCA
+0419  E6 0F         	AND 0FH
+041B  A8            	XOR B
+041C  47            	LD B,A
+041D  0F            	RRCA
+041E  0F            	RRCA
+041F  0F            	RRCA
+0420  57            	LD D,A
+0421  E6 1F         	AND 1FH
+0423  A9            	XOR C
+0424  4F            	LD C,A
+0425  7A            	LD A,D
+0426  0F            	RRCA
+0427  E6 F0         	AND F0H
+0429  A9            	XOR C
+042A  4F            	LD C,A
+042B  7A            	LD A,D
+042C  E6 E0         	AND E0H
+042E  A8            	XOR B
+042F  41            	LD B,C
+0430  4F            	LD C,A
+0431  FD 23         	INC IY
+0433  1D            	DEC E
+0434  20 DA         	JR NZ,0410H
+0436  C9            	RET
+SYL_START:
+0437  FD 21 10 04   	LD IY,0410H		;Einsprung vom Lade-ROM (CALL 0437H aus 0174H): CRC ueber 0410H..05E9H (2 x EDH Byte), Soll in 05FEH/05FFH
+043B  1E ED         	LD E,EDH
+043D  01 FF FF      	LD BC,FFFFH
+0440  CD 10 04      	CALL 0410H
+0443  CD 10 04      	CALL 0410H
+0446  2A FE 05      	LD HL,(05FEH)
+0449  ED 42         	SBC HL,BC
+044B  28 28         	JR Z,0475H
+044D  C3 40 01      	JP 0140H		;CRC falsch -> JP 0140H (Lade-ROM: naechstes Laufwerk)
+SEKTORZAHL_128:
+0450  CB 24         	SLA H		;Sektorlaenge 128 B: Bytezahl*2, High/Low getauscht = Sektorzahl (8800H -> 0110H = 272)
+0452  CB 15         	RL L
+0454  30 01         	JR NC,0457H
+0456  24            	INC H
+0457  06 80         	LD B,80H
+0459  0C            	INC C
+045A  18 63         	JR 04BFH
+LADEN_FERTIG:
+045C  2A F0 03      	LD HL,(03F0H)		;Fertig: AAWA (004CH) := Endzeiger [03F0H] = 9000H; (0069H) := Endzeiger-0400H; OUT 11H,03H; DI; K5122 abwaehlen; RET ins Lade-ROM (0177H)
+045F  22 4C 00      	LD (004CH),HL
+0462  25            	DEC H
+0463  25            	DEC H
+0464  25            	DEC H
+0465  25            	DEC H
+0466  22 69 00      	LD (0069H),HL
+0469  3E 03         	LD A,03H
+046B  D3 11         	OUT (11H),A
+046D  F3            	DI
+046E  3E FF         	LD A,FFH
+0470  D3 10         	OUT (10H),A
+0472  D3 18         	OUT (18H),A
+0474  C9            	RET
+LADEN_PARAMETER:
+0475  21 00 08      	LD HL,0800H		;Ladeadresse HL=0800H nach [03F0H] (laufender Zeiger) und [03FAH] (Start; das Lade-ROM springt spaeter nach [03FAH]+9DH = 089DH)
+0478  3A 06 04      	LD A,(0406H)
+047B  B7            	OR A
+047C  28 06         	JR Z,0484H
+047E  3E 3C         	LD A,3CH
+0480  D3 EE         	OUT (EEH),A
+0482  26 40         	LD H,40H
+0484  22 F0 03      	LD (03F0H),HL
+0487  22 FA 03      	LD (03FAH),HL
+048A  2A 04 04      	LD HL,(0404H)		;HL = (0404H) Bytezahl; A = (0403H) -> OUT 12H; B = A; Pfadbyte [03FDH]=85H (MFM)/E=7EH
+048D  3A 03 04      	LD A,(0403H)
+0490  D3 12         	OUT (12H),A
+0492  47            	LD B,A
+0493  CB 57         	BIT 2,A
+0495  3E 85         	LD A,85H
+0497  1E 7E         	LD E,7EH
+0499  20 05         	JR NZ,04A0H
+049B  1E 82         	LD E,82H
+049D  32 FD 03      	LD (03FDH),A
+LADEN_GROESSE:
+04A0  78            	LD A,B
+04A1  E6 03         	AND 03H
+04A3  57            	LD D,A
+04A4  06 00         	LD B,00H
+04A6  4A            	LD C,D
+04A7  28 A7         	JR Z,0450H
+04A9  CB 1F         	RR A
+04AB  28 12         	JR Z,04BFH
+04AD  3E B2         	LD A,B2H
+04AF  32 3D 02      	LD (023DH),A
+04B2  30 09         	JR NC,04BDH
+04B4  CB 3C         	SRL H
+04B6  0C            	INC C
+04B7  32 3F 02      	LD (023FH),A
+04BA  32 41 02      	LD (0241H),A
+04BD  CB 3C         	SRL H
+SPUR_SCHLEIFE:
+04BF  ED 43 F0 07   	LD (07F0H),BC		;(07F0H) = BC; [03F3H] = 02H = erste Spur; BC=0001H; C = Sektoren je Spur aus Tabelle 057EH (Index = Groessencode)
+04C3  3E 02         	LD A,02H
+04C5  32 F3 03      	LD (03F3H),A
+04C8  01 01 00      	LD BC,0001H
+04CB  7B            	LD A,E
+04CC  59            	LD E,C
+04CD  ED 53 F5 03   	LD (03F5H),DE
+04D1  82            	ADD A,D
+04D2  16 05         	LD D,05H
+04D4  5F            	LD E,A
+04D5  1A            	LD A,(DE)
+04D6  4F            	LD C,A
+04D7  16 02         	LD D,02H
+04D9  7C            	LD A,H
+04DA  65            	LD H,L
+04DB  6F            	LD L,A
+SPUR_NAECHSTE:
+04DC  AF            	XOR A		;HL -= Sektoren je Spur; Rest <0 -> letzte Spur mit dem Rest; (07F2H) = Sektoren dieser Spur
+04DD  7D            	LD A,L
+04DE  ED 42         	SBC HL,BC
+04E0  22 FC 07      	LD (07FCH),HL
+04E3  38 03         	JR C,04E8H
+04E5  79            	LD A,C
+04E6  18 07         	JR 04EFH
+04E8  01 5C 04      	LD BC,045CH
+04EB  ED 43 69 05   	LD (0569H),BC
+04EF  B7            	OR A
+04F0  CA 5C 04      	JP Z,045CH
+04F3  32 F2 07      	LD (07F2H),A
+04F6  3E 07         	LD A,07H
+04F8  32 F6 07      	LD (07F6H),A
+04FB  3E AD         	LD A,ADH
+04FD  D3 10         	OUT (10H),A
+SCHRITT:
+04FF  3E 2D         	LD A,2DH		;Schrittimpulse an K5122 (Port 10H: 2DH/ADH), D = Schrittzahl 2: Spur 2 anfahren
+0501  D3 10         	OUT (10H),A
+0503  3E AD         	LD A,ADH
+0505  D3 10         	OUT (10H),A
+0507  06 28         	LD B,28H
+0509  0D            	DEC C
+050A  20 FD         	JR NZ,0509H
+050C  10 FB         	DJNZ 0509H
+050E  15            	DEC D
+050F  20 EE         	JR NZ,04FFH
+SEKTOREN_LESEN:
+0511  CD 94 01      	CALL 0194H		;CALL 0194H (Lade-ROM: ZVE2 starten, liest die Spur nach 0700H..), Interrupt-Vektoren von Port 11H freigeben
+0514  3E 97         	LD A,97H
+0516  D3 11         	OUT (11H),A
+0518  3E FF         	LD A,FFH
+051A  D3 11         	OUT (11H),A
+WARTE_ZVE2:
+051C  7E            	LD A,(HL)		;wartet auf [03F8H]: 0 = laeuft, 1 = Fehler, sonst fertig
+051D  B7            	OR A
+051E  28 FC         	JR Z,051CH
+0520  3D            	DEC A
+0521  28 48         	JR Z,056BH
+0523  21 00 07      	LD HL,0700H
+0526  3A F2 07      	LD A,(07F2H)
+0529  FD 2A F0 03   	LD IY,(03F0H)
+SEKTOR_PRUEFEN:
+052D  08            	EX AF,AF'		;je Sektor: CRC (CALL 0410H) ueber die gelesenen Daten gegen die Tabelle ab 0700H pruefen; bei Fehler -> 0575H
+052E  ED 5B F0 07   	LD DE,(07F0H)
+0532  3A FD 03      	LD A,(03FDH)
+0535  01 84 BF      	LD BC,BF84H
+0538  CB 4F         	BIT 1,A
+053A  20 03         	JR NZ,053FH
+053C  01 95 E2      	LD BC,E295H
+053F  7B            	LD A,E
+0540  5A            	LD E,D
+0541  F5            	PUSH AF
+0542  CD 10 04      	CALL 0410H
+0545  F1            	POP AF
+0546  3D            	DEC A
+0547  20 F8         	JR NZ,0541H
+0549  7E            	LD A,(HL)
+054A  B8            	CP B
+054B  20 28         	JR NZ,0575H
+054D  23            	INC HL
+054E  7E            	LD A,(HL)
+054F  B9            	CP C
+0550  20 23         	JR NZ,0575H
+0552  08            	EX AF,AF'
+0553  3D            	DEC A
+0554  23            	INC HL
+0555  20 D6         	JR NZ,052DH
+0557  FD 22 F0 03   	LD (03F0H),IY		;Spur fertig: Zeiger [03F0H] = IY; [03F3H] (Spur) += 1; weiter 04DCH
+055B  21 F3 03      	LD HL,03F3H
+055E  34            	INC (HL)
+055F  16 01         	LD D,01H
+0561  2A FC 07      	LD HL,(07FCH)
+0564  ED 4B F2 07   	LD BC,(07F2H)
+0568  C3 DC 04      	JP 04DCH
+WIEDERHOLUNG:
+056B  3E FF         	LD A,FFH
+056D  21 F9 03      	LD HL,03F9H
+0570  BE            	CP (HL)
+0571  16 01         	LD D,01H
+0573  28 8A         	JR Z,04FFH
+FEHLER_ZAEHLER:
+0575  21 F6 07      	LD HL,07F6H		;Fehler: Wiederholungszaehler [07F6H] (7) -1; 0 -> JP 0140H (Lade-ROM-Fehlerweg)
+0578  35            	DEC (HL)
+0579  20 96         	JR NZ,0511H
+057B  C3 40 01      	JP 0140H
+SEKTORZAHL_TAB:
+057E                	DB	1AH,0FH,08H,04H,2CH,1AH,0FH,08H,00H,00H,00H,00H,00H,00H,00H,00H		;Sektoren je Spur nach Groessencode: 1A 0F 08 04 2C | 1A 0F 08 (26/15/8/4, 44)
+058E                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+059E                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+05AE                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+05BE                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+05CE                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+05DE                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+05EE                	DB	00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H,00H
+05FE                	DB	9EH,29H		;CRC-CCITT des Laders
+
+	END

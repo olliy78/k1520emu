@@ -61,6 +61,7 @@ public:
     bool        hasInterrupt() const override;
     uint8_t     getVector() const override;
     void        onRETI() override;
+    bool        inService() const override { return sio_.inBedienung() || ctc_.inBedienung() || pio_.inBedienung(); }
     const char* intDeviceName() const override;
 
     // ─── Tastaturkanal (SIO A) ───────────────────────────────────────────────

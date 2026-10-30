@@ -717,6 +717,19 @@ PC-Gegenstelle (`app/pcmc.py`, Kasten `app/ui/pcmc_widget.py`, Aktion *Maschine 
 nur an der ASP-CTC, EPROM-Segmente, Kassettentakt-Annahmen, MC80.2x-Zeitmodell und RETI-Verteilung, offene Fragen).
 Plan: `doc/design/31_mc80.md`.
 
+## SIOS 1526 (Zweig `SIOS1526`, Stand 2026-10-30)
+
+> **/IEO sperrt bei IUS (2026-10-30):** `getIEO()` von CTC/PIO/SIO ist low, solange ein Kanal anfordert ODER in Bedienung ist; RETI geht nur an den ersten Baustein in Bedienung (`InterruptSlave::inService()`). Nicht aufweichen (Wächter `RetiChain.*`, `SiosMonitor.ZweitesCalNachProgrammende`); zweites CAL und SGEN laufen seither.
+
+Sparkassen-/Betriebssystem des A5120/A5130/K8924; fünf Originalabbilder unter `tools/sios_a5120/original/` (SYLs = 1.1, SYLp = 0.9, DP1/DP2, SG1).
+**Stand:** SIOS 1.1 (K7637, Sicherheitsstecker 01) bootet bis `MONITOR ===== SIOS 1526/1.1 (M)_`; DAT/CLK/ASN/CAL/M/ET2 und mehrere Programme laufen;
+DiskTool-Dateisystem `sios` liest und schreibt (`sios_ss40`/`sios_ss80`).  `INIT` formatiert Disketten (K5600.10 für 40 Spuren; im K5601 geht eine 80-Zylinder-Leerdiskette).  **SIOS 0.9 (K7636, `SYLp`) bootet seit S4** bis `MONITOR ===== SIOS 1526/0.9 (M)_` (Sicherheitsstecker auch an der K7636, Annahme [?]; ohne Stecker ignoriert 0.9 die Tasten).  **SGEN** erzeugt ein 0.9-System (S7, `doc/sios/sgen.md`; mit T-K7637 bootet es im K5600.10).  **Beispieldisketten (S8): `disks/a5120_sios1526/`** (`tools/sios_a5120/build.py`, Schema `a5120_sios<version>_<anzahl>x<laufwerk>_<tastatur>.hfe`, Vorgabe 3 × K5601 + K7637 + Stecker 01, Matrix `doc/sios/bedienung.md` §7, Wächter `SiosVorgabe.*`/`SiosBeispiel.*`/`cli_sios_a5120`).  Seit 2026-10-30 (Zweig `sios-rest`, Wächter `SiosRest.*`): DIDI zeigt Sätze (Satznummer 5-stellig), Rundlauf DiskTool ↔ SIOS in beiden Richtungen, 0.9-`CAL`, Diskettentausch in A:, INIT-Menü 2 (80 Zylinder), SGEN-System (T-K7637) bootet im K5600.10.  Im `a5120emu` ist **Sicherheitsstecker 01** Vorgabe (`app/modell.py`, Kern bleibt „keiner“).  DiskTool D5 (Prüfung `sios.bib.*`/`sios.marke.*`, Rettung gelöschter `DDR1`/Objekte) und D6 (Bibliotheken als Ordner, Eigenschaften, EBCDIC-Textspalte) fertig, s. `doc/merkposten/disktool.md` 7–7b.  Offen: `--boot`.
+**Kernfehler dabei behoben** (gelten für alle Maschinen): **Q240** nach Abschn. 6.11 neu nachgebildet (B2 = 1: jeder Zugriff schreibt `Schutz-RAM[A>>6] := AB0`),
+**/INT-BS als Impuls**, **Z80CTC ohne Einzelschuss** (D3 nur im Zeitgeberbetrieb), **gelöschte Datenmarke F8** im K5122-Lese-/Schreibpfad; K5122: **nach dem Schreiben 3×A1** (kein Altbyte im PIO B), **/STR=1 beendet Schreiben** in jedem Kontext.
+Dazu Wirtstaste **Pause** = ET2 (kein Kürzel) und Rechtsklick auf ET2 der Bildschirmtastatur.
+**Vor Arbeiten daran: `doc/merkposten/sios.md` lesen** (Festlegungen mit Wächtern, CAN-Systemstopp = Gastverhalten, INIT-Befund, Bedienfallen).
+Plan und Stand: `doc/design/43_sios1526.md`; Format `doc/sios_diskettenformat.md`; Unterlagen `doc/sios/`.
+
 ## MUTOS 8000: Diskettenbau HIER, Forschung in mutos8k (Stand 2026-10-29)
 
 **Der Diskettensatz entsteht in DIESEM Projekt, ohne jede Abhaengigkeit zu mutos8k:** `python3 -I tools/mutos8000/bau_alle.py` baut aus den

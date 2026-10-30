@@ -266,6 +266,24 @@ TEST(K7637, KeyPress_Escape_Sends_ESC) {
 }
 
 /**
+ * @test K7637/KeyPress_Pause_Sends_ET2_0xFE
+ * @brief Pause (QK_PAUSE) ist die PC-Taste fuer ET2 (0xFE) - SIOS 1526 braucht ET2 allein
+ *        (Eingabe abbrechen, Programm beenden), doc/sios/bedienung.md.
+ * @par Pass criterion  drainRx liefert genau ein Byte == 0xFE; ET1 (Return) bleibt 0xFF.
+ */
+TEST(K7637, KeyPress_Pause_Sends_ET2_0xFE) {
+    Z80SIO sio;
+    sio.setIEI(true);
+    K7637 kb;
+    kb.connect(sio, 0);
+
+    kb.keyPress(0x01000008, false, false);   // Qt::Key_Pause
+    auto bytes = drainRx(kb, sio);
+    ASSERT_EQ(bytes.size(), 1u);
+    EXPECT_EQ(bytes[0], 0xFE);
+}
+
+/**
  * @test K7637/KeyPress_Tab_Sends_0x91
  * @brief Die Tabulatortaste des PC spricht die Taste an IHRER Stelle an: `->|`
  *        (Reihe 3, Position 1, physisch 0x91), Umschalt+Tab deren Gegenstueck
@@ -981,4 +999,105 @@ TEST(K7637, SerializeRoundTrip) {
     b.service(6000);                       // past the 9600-baud byte-time
     ASSERT_TRUE(sio2.ioRead(1) & 0x01);
     EXPECT_EQ(sio2.ioRead(0), 0x42);       // the restored byte arrives
+}
+
+// ─── Bediensicherung (Sicherheitsstecker, AP S3b) ───────────────────────────
+
+namespace {
+void sendeKommando(K7637& kb, Z80SIO& sio, uint8_t b) { sio.ioWrite(0, b); kb.processTxCommands(); }
+std::vector<uint8_t> erwartet(std::initializer_list<uint8_t> l) { return std::vector<uint8_t>(l); }
+// Codes der Low-Leitungen fuer eine Kennung (Stopfen n -> SLn), aus der ROM-Tabelle A9 AA AB.
+std::vector<uint8_t> slCodes(int kennung) {
+    std::vector<uint8_t> v;
+    for (int i = 0; i < 3; ++i) if ((kennung >> i) & 1) v.push_back(K7637::SL_CODE[i]);
+    return v;
+}
+}  // namespace
+
+/// @test K7637Sicherheitsstecker/CodesStehenImRomAbzug
+/// @par Pass criterion  A9H AAH ABH 00H wie in CTAB1 (648H) und CTAB2 (758H) des ROM-Abzugs.
+TEST(K7637Sicherheitsstecker, CodesStehenImRomAbzug) {
+    EXPECT_EQ(K7637::SL_CODE[0], 0xA9);
+    EXPECT_EQ(K7637::SL_CODE[1], 0xAA);
+    EXPECT_EQ(K7637::SL_CODE[2], 0xAB);
+    EXPECT_EQ(K7637::SL_CODE[3], 0x00);
+}
+
+/// @test K7637Sicherheitsstecker/VorgabeKeinsLiefertNurTyp
+/// @par Pass criterion  Kommando 00H ergibt genau TYP (wie bisher), kein Zusatzbyte, nichts beim Einschalten.
+TEST(K7637Sicherheitsstecker, VorgabeKeinsLiefertNurTyp) {
+    Z80SIO sio; sio.setIEI(true);
+    K7637 kb; kb.connect(sio, 0);
+    EXPECT_EQ(kb.sicherheitsstecker(), 0);
+    EXPECT_TRUE(drainRx(kb, sio).empty());
+    sendeKommando(kb, sio, 0x00);
+    EXPECT_EQ(drainRx(kb, sio), erwartet({0x80}));
+}
+
+/// @test K7637Sicherheitsstecker/TypUndCodesNachKommando00JeKennung
+/// @par Pass criterion  Je Kennung 0..6: nach 00H kommt TYP und dann die Codes der Low-Leitungen SL1..SL3.
+TEST(K7637Sicherheitsstecker, TypUndCodesNachKommando00JeKennung) {
+    for (int k = 0; k <= 6; ++k) {
+        Z80SIO sio; sio.setIEI(true);
+        K7637 kb; kb.connect(sio, 0);
+        kb.setSicherheitsstecker(k);
+        deliver(kb);                                // erster service(): Einschaltmeldung einreihen
+        drainRx(kb, sio);                           // ... zustellen und verwerfen
+        sendeKommando(kb, sio, 0x00);
+        std::vector<uint8_t> soll{0x80};
+        for (uint8_t c : slCodes(k)) soll.push_back(c);
+        EXPECT_EQ(drainRx(kb, sio), soll) << "Kennung " << k;
+    }
+}
+
+/// @test K7637Sicherheitsstecker/EinschaltenMeldetTypUndCodes
+/// @par Pass criterion  Kaltstart mit Element 3 (Stopfen 1+2): TYP A9 AA ohne jedes Kommando.
+TEST(K7637Sicherheitsstecker, EinschaltenMeldetTypUndCodes) {
+    Z80SIO sio; sio.setIEI(true);
+    K7637 kb; kb.connect(sio, 0);
+    kb.setSicherheitsstecker(3);
+    deliver(kb);                                    // erster service(): Meldung einreihen
+    EXPECT_EQ(drainRx(kb, sio), erwartet({0x80, 0xA9, 0xAA}));
+}
+
+/// @test K7637Sicherheitsstecker/SteckenUndZiehenErzeugtCodes
+/// @par Pass criterion  Stecken 1 -> A9; Wechsel auf 2 -> A9 (SL1 steigt) und AA (SL2 faellt); Ziehen -> AA.
+TEST(K7637Sicherheitsstecker, SteckenUndZiehenErzeugtCodes) {
+    Z80SIO sio; sio.setIEI(true);
+    K7637 kb; kb.connect(sio, 0);
+    drainRx(kb, sio);                               // Betrieb (Einschalten ohne Element: still)
+    kb.setSicherheitsstecker(1);
+    EXPECT_EQ(drainRx(kb, sio), erwartet({0xA9}));
+    kb.setSicherheitsstecker(2);
+    EXPECT_EQ(drainRx(kb, sio), erwartet({0xA9, 0xAA}));
+    kb.setSicherheitsstecker(0);
+    EXPECT_EQ(drainRx(kb, sio), erwartet({0xAA}));
+    kb.setSicherheitsstecker(0);                         // keine Aenderung, keine Codes
+    EXPECT_TRUE(drainRx(kb, sio).empty());
+}
+
+/// @test K7637Sicherheitsstecker/SteckenWartetAufDieSerielleStrecke
+/// @par Pass criterion  Die Codes kommen im Abstand einer Bytezeit, nicht sofort.
+TEST(K7637Sicherheitsstecker, SteckenWartetAufDieSerielleStrecke) {
+    Z80SIO sio; sio.setIEI(true);
+    K7637 kb; kb.connect(sio, 0);
+    deliver(kb);
+    kb.setSicherheitsstecker(3);
+    kb.service(g_clk + 100);                        // < eine Bytezeit (2604)
+    EXPECT_FALSE(sio.ioRead(1) & 0x01);
+    kb.service(g_clk + 2700);
+    EXPECT_TRUE(sio.ioRead(1) & 0x01);
+}
+
+/// @test K7637Sicherheitsstecker/FalscheGeraetekennungLiefertNichts
+/// @par Pass criterion  Mit geraet_passt=false bleiben alle SL High: nach 00H nur TYP, kein Code beim Stecken.
+TEST(K7637Sicherheitsstecker, FalscheGeraetekennungLiefertNichts) {
+    Z80SIO sio; sio.setIEI(true);
+    K7637 kb; kb.connect(sio, 0);
+    deliver(kb);
+    kb.setSicherheitsstecker(6, false);
+    EXPECT_TRUE(drainRx(kb, sio).empty());
+    sendeKommando(kb, sio, 0x00);
+    EXPECT_EQ(drainRx(kb, sio), erwartet({0x80}));
+    EXPECT_EQ(kb.slLowMaske(), 0);
 }

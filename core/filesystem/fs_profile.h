@@ -44,7 +44,11 @@ enum class FsType : uint8_t {
     WegaMutos,
     /// @brief Tar-Strom direkt auf der Diskette (kein Dateisystem), nur lesbar.
     ///        @see core/filesystem/tar/tar_fs.h
-    Tar
+    Tar,
+    /// @brief SIOS 1526 (A5120/A5130/K8924): IBM-Etikettendiskette, 26x128 B, Spur 0 = Etiketten
+    ///        (VOL1/HDR1), Dateien = zusammenhaengende Spurbereiche, Bibliotheken mit Verzeichnis.
+    ///        Derzeit nur LESEND.  @see doc/sios_diskettenformat.md
+    Sios
 };
 
 /// @brief Gehoert der Typ zur UDOS-Familie? (gemeinsame Kopfsektorfelder, Typ/Props)

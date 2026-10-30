@@ -1,0 +1,208 @@
+# SIOS 1526/1.1 im Emulator bedienen (AP S5/S6)
+
+Stand 2026-10-30.  Belegt am laufenden System (k1520dbg, `tests/integration/test_sios_boot.cpp`
+`SiosMonitor.*`).  Aufbau: A5120, Laufwerke K5600.20, K7637, **Sicherheitsstecker 1** (Chefschalter),
+A: = `sios1526_syls.hfe` (Format `k5601_ss80_26x128`), B: = `sios1526_dp1.hfe` (Format `k5601_ss40_26x128`,
+40-Spur-Diskette im 80er-Laufwerk, Doppelschritt automatisch).
+
+## 1. Tasten
+
+Die K7637 sendet physische Codes; SIOS 1.1 nimmt sie in der Rx-ISR `2D12H` entgegen (Zeichen < 20H
+verworfen, 9xH -> Low-Nibble, Bx -> `AND 1FH`, alles andere unverändert).
+
+| SIOS-Taste | K7637-Code | Emulator: Wirtstaste | Bildschirmtastatur | Beleg |
+|---|---|---|---|---|
+| Zeichen (Kommandos, Namen, Ziffern) | ASCII 20H-7EH | Tastatur | Tasten | `DAT`, `CAL` ... getippt |
+| **ET1** (Eingabe abschließen) | FFH | Return | ET1 | `DAT` ET1 zeigt das Datum |
+| **ET2** (Abbruch / Programm "MON.") | FEH | **Pause** (neu) | **Rechtsklick auf ET2** (neu); Linksklick bleibt Strg-Vorsatz | ET2 holt die Systemzeile zurück, in DIDI/INIT Rückkehr |
+| **M** (Monitortaste) | B0H (-> 10H) | -- | Taste M (Reihe 0) | `(M)` -> `(P)` im laufenden DIDI |
+| **CI** (Fehler löschen) | AFH = "RESET" der Bildschirmtastatur | -- | RESET (Fehlerlampe sitzt darüber) | [Code] `RES 7,(00CBH)` ist die Fehlersperre, `tastatur_bediensicherung.md` §2/§3; Handbuch: CI = Fehlerlöschung. Am Bildschirm nicht gegengeprüft |
+| Cursor | 94H-97H (-> 4-7) | Pfeiltasten | Pfeile | [Code] ISR |
+| S, S1-S9 | **[?]** vermutlich PF-Tasten C1H-CCH (Klasse >= C0H "Abschlusstaste", `2A2FH`/`2A42H`) | F1-F12 | PF 1-PF 12 | Zuordnung PF n <-> S n **nicht belegt** (keine Anwenderfoto-Beschriftung, Programm-abhängig) |
+| Selektortasten | A0H-A3H | -- | 0 1 2 3 (Reihe 0) | Klasse A0H-A7H |
+| INS MD / DEL CH | A8H / BBH | Entf = DEL CH | INS MD ... | **Achtung:** A8H ist für SIOS ein Sicherheitscode (Bit 0 von 00CBH kippt) -- INS MD auf der K7637.50 meiden |
+
+Neu in dieser Arbeit (alles aus bekannten Codes, nichts erfunden):
+- Wirtstaste **Pause** -> 0FEH (`K7637::QK_PAUSE`, `translateKey`; Wächter `K7637.KeyPress_Pause_Sends_ET2_0xFE`,
+  `test_keyboard_map`).  Für CP/A ist 0FEH der Strg-Vorsatz (cp37); dort weiter Strg+Buchstabe nehmen.
+- **Rechtsklick auf ET2** der Bildschirmtastatur sendet 0FEH allein, ohne Strg-Flag (Wächter
+  `test_right_click_on_et2_sends_0xFE_alone`).  Der Linksklick ändert sich nicht.
+- Kürzelregel unberührt: kein neues Tastenkürzel (Pause ist keine QAction).
+- **k1520dbg:** `keys \xNN` sendete Codes >= 80H bisher als Qt-Taste (-> Code 00H, Taste verpuffte), nur < 20H
+  ging roh.  Jetzt gehen 80H-FFH als Rohcode (`tools/k1520dbg.cpp`) -- sonst war weder ET1 (`\xFF`) noch M (`\xB0`) tippbar.
+
+## 2. Getestete Abläufe (Bildschirmzeilen wörtlich, Leerstellen als Leerstellen)
+
+Systemzeile (letzte Zeile, Spalte 32 ff.):
+
+```
+MONITOR ===== SIOS 1526/1.1 (M)_
+```
+
+**DAT / CLK** -- Kommando tippen, ET1; ET2 bricht ab:
+
+```
+DAT ET1   ->  MONITOR ===== SIOS 1526/1.1 (M)_DAT     00.00.00     (Datum noch nicht gesetzt)
+ET1       ->  MONITOR ===== SIOS 1526/1.1 (M)_DAT_                 (Eingabefeld; ET2 = abbrechen)
+CLK ET1   ->  MONITOR ===== SIOS 1526/1.1 (M)_CLK     00.00.09     (Sekunden zaehlen)
+```
+
+**ASN** -- Gerätezuweisung; Standard 0315 = Diskette 1 (physisch 50), `66` = Diskette 2 = **B:**:
+
+```
+ASN ET1   ->  ...(M)_ASN     _
+0315 ET1  ->  ...(M)_ASN 0315_     50
+66 ET1    ->  ...(M)_ASN 0316_     00     (naechste Zeile der Tabelle; ET2 beendet)
+```
+
+**CAL** -- Programm aus dem PHASELB des Programmlaufwerks laden und starten.  Ohne `ASN 0315 66` ist
+Programmlaufwerk A: (SYLs enthält nur SYSARE11):
+
+```
+CAL ET1  CATM ET1  ->  MONITOR ===.ERR.FD.1 .NFND       (ERR FD 1 NFND: Programm nicht gefunden)
+```
+
+Mit `ASN 0315 66`, B: = DP1, `CAL DIDI`:
+
+```
+                            DIDI 1520 (SIEX) V 1.1
+        ================================================================
+         DEVICE            :                 ET1,ET2(MON.)
+        ================================================================
+         DEVICE            :                 4,5,6,7
+         FORM OF DISPLAY   :                 A,H
+         NAME OF FILE      :                 1-8 CHARACTERS
+         RECORD NUMBER     :                 00001-65532,LAST=99999
+         KEY POSITION      :                 1-9999
+         KEY               :                 1-32 CHARACTERS
+```
+
+**M** im Programm -> Monitor mit geladenem Programm: `MONITOR ===== SIOS 1526/1.1 (P)_` (Bildschirm des
+Programms bleibt stehen).  **ET2** im Programm -> Rückkehr `(M)`.  Auch geladen werden können CATM (Bandverwaltung
+`CATM 1520(SIEX) V0.3`, Menü A-F, F = Monitor), DINH, ... (alle 15 Objekte von DP1).
+
+## 3. Befunde / Offenes
+
+1. **`CAN` nach `M` hält das System an.**  `(P)` + `CAN` ET1 leert den Bildschirm samt Systemzeile; ZVE1 landet in
+   `1DEFH` (`DI`, Lampenport 0BH toggelt in Warteschleife `1E00H`).  Weg dorthin: SVC `90H` (`RST 08H` bei `0CD1H`) ->
+   Klasse 10H -> `1D7EH` -> `1DEFH`.  Ob das Verhalten des echten SIOS ist (CANCEL als Havarie) oder ein
+   Emulatorfehler, ist **ungeklärt**.
+2. ~~Zweites `CAL` nach Programmende -> `NFND`~~ **behoben (2026-10-30, /IEO-Korrektur)**: Neu-Einlegen ist nicht mehr noetig (`SiosMonitor.ZweitesCalNachProgrammende`).
+3. **INIT** (siehe unten).
+
+## 4. INIT (Leerdiskette initialisieren) -- Stand: läuft durch (2026-10-30)
+
+**Seit 2026-10-30 läuft INIT bis `INITIAL DISK IS FINISHED`** (Wächter `SiosInit.InitialisiertDiskette`;
+B: = K5600.10 für die 40-Spur-Zieldiskette).  Ursachen waren zwei K5122-Fehler (Altbyte nach dem Schreiben,
+/STR beendet Schreiben) und ein Aufbaufehler (40-Spur-Medium im 80er-Laufwerk = Halbspuren), siehe
+`befund_init_schreiben.md`.  Der folgende Abschnitt ist der historische Befund.
+
+Bedienung (INIT 1520 (SIEX) **V 1.4**, nicht 1.1 wie im Handbuch), Programm von DP1 in A:, Leerdiskette in B: (= 05):
+
+```
+CAL ET1  INIT ET1                       "8" DISKETTE   Y"   ->  N ET1
+(Menue 5,25" DISKETTE: 1 DOUBLE DENSITY)                    ->  ET1 (=1)
+STATEMENTS: 1 PHYSICAL RECORD LENGTH (0=128) ET1,  2 SEQUENCE (01) ET1,
+            3/4 DESTROYED TRACK (leer) ET1, ET1,  5 INIT ALL (Y) ET1
+```
+
+Das Programm schreibt (`INITIAL DISK IS WORKING`, ZVE2-Formatstrom am Datenport 14H) und meldet dann
+`ERR 9C`; mit "INIT ALL = N" (nur Spur 00): `ERR 9B  > 2 DEFEKTIV TRACKS : 00, .., ..`.  Befund:
+
+- Spur 00 wird als gültige MFM-Spur geschrieben (26 Sektoren zu 128 B, IDs 1-26, CRC gut -- `disk verify`/`info`),
+  die **Rückleseprüfung von INIT hält die Spur trotzdem für defekt**.
+- INIT formatiert mit voller IBM-Spur (80 x 4E, 12 x 00, **3 x C2 + FC = Indexmarke**, 50 x 4E, Sektoren) und liest zur
+  Prüfung mit eigener ZVE2-Routine (A3xxH-A5xxH: `IN A,(16H)` je Byte, `CP FCH` bei `A30EH`, ID-Lesen per `INIR` ab
+  `A517H`, `CP 42H` bei `A524H`).  Die Sektorkennung (A1 FE 00 00 01 00) kommt richtig an.
+- **Berichtigt (befund_init.md):** kein Indexmarken-Problem; INIT schreibt hier keine Indexmarke.  Der Hang kommt von A1-Versatz im Kontrolllesen und dem OUT-14H-Pacing.  `N` erst nach dem Erscheinen von `8" DISKETTE` und ca. 20 Mio. Takten tippen, sonst formatiert INIT als 8" (FM).
+- (alter Verdacht, widerlegt) die Verify-Routine erwartet die **Indexmarke (C2 C2 C2 FC)** am Spuranfang; der A5120-Lesestrom
+  (`buildFaithfulReadTrack`) enthält keine Indexmarke und beginnt mit dem ersten A1 des ersten Sektors
+  (`K5122::startReadTransfer`, "enge Verify-Resync-Routine" von SCPX-INIT).  Nicht bestätigt: der Haltepunkt
+  `b2 A30E` wurde auf Spur 0 nie erreicht, der Abbruch kommt auf einem anderen Pfad (`A54FH`).  **Offen**, nächster Schritt:
+  ZVE2-Pfad ab `A4ABH`/`A517H` bis zum Fehlersprung (`A5F6H`/`A5F9H`) verfolgen.
+- Rundlauf SIOS <-> DiskTool (`create --fs sios_ss40`, `put`, `ls`) ist inzwischen gefahren (Abschn. 8).
+
+## 6. SIOS 0.9 (K7636, S4)
+
+Stand 2026-10-30.  Aufbau: A5120, Laufwerke K5600.20, **K7636** (`--tastatur k7636`), **Sicherheitsstecker 1**,
+A: = `sios1526_sylp.hfe` (Original, `k5601_ss80_26x128`), B: = `sios1526_dp1.hfe`.  Systemzeile (letzte Zeile):
+
+```
+MONITOR ===== SIOS 1526/0.9 (M)_
+```
+
+Tasten: Zeichen als ASCII (die K7636.01 liefert Versalien ueber die Umschaltstufe), **ET1** = FFH (Wirtstaste Return),
+**ET2** = FEH (Taste A00 der K7636; `K7636::QK_TASTE_BASE | 0x67`).  `DAT` ET1 zeigt `DAT     00.00.00`, `CLK` ET1 die laufende Uhr,
+ET2 bricht ab (`SiosMonitor.V09_DatMitK7636`).  **Ohne Sicherheitsstecker ignoriert 0.9 alle Zeichentasten** (Bedienebene 0,
+`28EEH..2935H`) — Stecker 01 einstellen.  Der Stecker meldet an der K7636 TYP, dann A9H/AAH/ABH (Annahme [?]).
+Medium: das Original (80 Zyl. x 2 Seiten ausgelesen) in K5600.20; die bereinigte 40-Spur-Fassung `sios1526_sylp40.hfe` in K5600.10.
+
+SYSD/SGEN (Fehlersperre, Version `09`, Auswahlbild): siehe `sgen.md`.
+
+## 7. Bestückungsmatrix (AP S8, 2026-10-30)
+
+Geprüft mit `tests/integration/test_sios_boot.cpp` (`SiosVorgabe.*`, `SiosBeispiel.*`, Sondierung `SiosMatrix.DISABLED_Sondierung`):
+Kaltstart bis zur Systemzeile, danach `ASN 0315 66` und `CAL DIDI` von `a5120_sios_programme1.hfe` in B: (DP1; bei 0.9 stattdessen `DAT`,
+siehe Spalte „CAL").  Stecker 01.  Medien kommen aus `disks/a5120_sios1526/` (Bau `tools/sios_a5120/build.py`).
+
+| SIOS | Systemdiskette (`a5120_sios…`) | Laufwerke | Tastatur | Boot | CAL DIDI |
+|------|-------------------------------|-----------|----------|:----:|:--------:|
+| 1.1 | `sios11_3xk5601_seriell` (SYLs) | 3 × K5601 | K7637 (seriell) | ja | ja |
+| 1.1 | `sios11_3xk5601_seriell_sl1` (SL1_1, kürzere Generierung) | 3 × K5601 | K7637 | ja | ja |
+| 1.1 | `sios11_3xk5601_seriell` und `…_sl1` | 3 × K5600.20 | K7637 | ja | ja |
+| 1.1 | `sios11_3xk5601_seriell` | 3 × K5601 | K7636 (parallel) | **nein**, Bild `ERR KB 2  UNIT` | – |
+| 1.1 | `sios11_3xk5601_seriell` | 3 × K5600.10 | K7637 | **nein** (80-Zylinder-Medium im 40er-Laufwerk; Bild bleibt leer) | – |
+| 0.9 | `sios09_3xk5601_parallel` (aus SYLp, 80 Zyl. einseitig: Zyl. 0–39 sektorgleich, Spur n auf Position n) | 3 × K5601 oder K5600.20 | K7636 | ja | **ja**¹ |
+| 0.9 | `sios09_3xk5600_10_parallel` (bereinigte 40-Spur-Fassung) | 3 × K5600.10 | K7636 | ja | **ja**¹ |
+| 0.9 | `sios09_3xk5600_10_parallel` | K5601 / K5600.20 | K7636 | **nein** (SIOS 0.9 doppelschrittet nicht; Spur n läge auf Position 2n) | – |
+| 0.9 | `sios09_3xk5600_10_parallel` | K5600.10 | K7637 | **nein**, Bild `ERR KB 2  UNIT` | – |
+| beide | – | 8″ (MF3200/MF6400) | – | **nicht geprüft**: die Systemspuren sind 5¼″-MFM 26 × 128, ein sinnvolles 8″-Medium (FM) ist nicht herzustellen, ohne Bytes des SIOS-Codes zu ändern | – |
+
+¹ Bei 0.9 laufen Systemzeile, `DAT`/`CLK`, `ASN` und **`CAL`** (Stand 2026-10-30, nach der /IEO-Korrektur; Wächter `SiosRest.V09_CalLaedtProgrammeUndMeldetNfnd`):
+`ASN 0315 66`, `CAL DIDI` lädt `DIDI 1520 (SIEX) V 1.1` von der DP1 (die Programme der DP1/DP2 sind also für 0.9 und 1.1 brauchbar), ein zweites `CAL` geht,
+ein unbekannter Name gibt `ERR FD 1  NFND`.  **Bedienfalle:** nach der Fehlermeldung nimmt 0.9 keine Taste an, bis **CI** gedrückt ist — an der K7636 die Taste
+F54 (`K7636::QK_TASTE_BASE | 0x5B`, Code AFH), nicht der K7637-Rohcode.  Der frühere Befund „ET1 nach dem Namen ohne Reaktion“ war entweder diese Sperre oder
+ein Folgefehler der Interruptkette; er ist nicht mehr reproduzierbar.  Auch die K5600.10-Bestückung (`sios09_3xk5600_10_parallel`) lädt `DIDI`.
+
+**SL1_1 gegenüber SYLs.**  Beide tragen `SYSARE11` auf `ROBINI`.  SL1_1 (Quelle `~/projects/robotron/PC1715/discs/real_discs/SL1_1_1x80X26.img`, nur als
+rohes `.img` vorhanden, daneben die Rohaufnahme `SL1_1.scp`, nicht übernommen): BOE 01001 EOE **10026** EOD 10025, Kennzeichen `P    871`, 33 280 Byte
+= **zehn Spuren**; SYLs: EOE **12026**, `P    000`, 39 936 Byte = zwölf Spuren.  SL1 ist also zwei Spuren (6 656 Byte, Module) kürzer generiert;
+11 273 Byte unterscheiden sich im gemeinsamen Bereich.  Das `.img` verliert die F8-Marken der Etikettenspur (Sektor ≥ 9); der Boot und `CAL`
+stört das nicht (`SiosBeispiel.V11_Kurz_3xK5601_Seriell_MitCal`).
+
+## 8. Datendisketten in der Vorgabe (3 × K5601), INIT und Rundlauf mit dem DiskTool
+
+**INIT** (V 1.4, Programm von DP1; Stand 2026-10-30, `SiosVorgabe.InitMit*`, `SiosRest.Init*`), Ziel in B: (K5601):
+
+* **80-Zylinder-Leerdiskette** (Geometrie des K5601, vom Emulator mit „Leere Diskette“ angelegt), Menü `1 DOUBLE DENSITY`: INIT läuft bis
+  `INITIAL DISK IS FINISHED DEFEKTIVE TRACKS :   ,   ,`, ohne Fehler (Eingaben: `N` bei `"8" DISKETTE`, nach ~20 Mio. Takten 5 × ET1, `Y`).  Der DiskTool-Kern erkennt die
+  Diskette als `sios_ss40`, Prüfung ohne Warnung.  INIT schreibt **40 Spuren auf die Positionen 0..39 (einfacher Schritt)**; die übrigen 40 Zylinder bleiben unformatiert.
+  **Geprüft:** SIOS legt auf so einer Diskette (COPD) eine Datei über Spur 0 hinaus an (Spur 1 liegt auf Position 1), `DIDI` (Device 5) liest Satz 8 wieder, und das DiskTool
+  holt dieselben Bytes (`SiosRest.InitEinfachImK5601_DateiUeberSpur0HinausLesbar`).  Warum SIOS hier einfach schrittet, bei den 40-Zylinder-Abbildern (DP1, vom Emulator
+  als Doppelschritt eingebunden) aber doppelt, ist nicht ermittelt [?]; beide Fälle laufen.
+* **40-Zylinder-Leerdiskette** im K5601: `ERR 9B  > 2 DEFEKTIV TRACKS : 01, 03, 05,` (Halbspuren: jede zweite Position hat keine Spur).  Dafür braucht INIT das K5600.10.
+* **Menü `2  DOUBLE DENSITY ,DOUBLE TRACKS`**: ein waehlbares 80-Zylinder-Format (V 1.4).  Die Eingabe gehört an das **Menü**
+  (nach `N` + ET1 erscheint die Überschrift `5,25" DISKETTE`; erst nach einem weiteren ET1 das Menü mit den Zeilen 1 und 2): `2`, ET1.  An der Frage nach 8″ ergab sie `ERR 90`.
+  Danach zeigt die Anweisungsliste `(01...76)` statt `(01...37)`, INIT formatiert alle Zylinder (Positionen 0..79, einfacher Schritt), die Diskette ist für das DiskTool
+  `sios_ss80` (`SiosRest.InitDoubleTracksLegtEine80ZylinderDisketteAn`).  Das Handbuch (Auszug §7) nennt „Double Tracks“ für V 1.1 „nicht möglich“ — die V 1.4 kann es.
+
+**Empfehlung für Anwender:** Datendisketten mit dem DiskTool anlegen — `k1520disktool create neu.hfe --fs sios_ss40 --label TEST01` (40-Zylinder-`.hfe`,
+im K5601 mit Doppelschritt eingebunden wie DP1/DP2), Dateien mit `put … --as NAME`.
+
+**Rundlauf D4 (erledigt 2026-10-30).**
+
+*DiskTool → SIOS* (`SiosRest.DidiZeigtDieDatensaetzeEinerDiskToolDatei`): Diskette mit `create` + `put ALPHA` in C:; `ASN 0315 66`, `CAL DIDI`, Device `6`, Form `A`, Name `ALPHA`:
+SIOS zeigt den Kennsatz (`HDR1 ALPHA            00128 01001 01026    E`, EOD je nach Dateigröße).  **Der frühere Befund „DIDI springt danach zum Monitor“ war Bedienung:**
+die Satznummer verlangt **fünf Stellen** (`00001`).  Ein kurzes `1` wird nicht angenommen, das Feld bleibt stehen (so entstand der Eindruck); ein leeres ET1 geht zu
+`KEY POSITION` / `KEY` (Suche über Schlüssel).  Mit `00001` und ET1 fragt DIDI `CHECK` (ET1, ET2, A ET2), das nächste ET1 zeigt Satz 1, jedes weitere den folgenden:
+
+```
+SATZ 01 ........................................................................   (die 128 Bytes des Satzes, umgebrochen)
+           ALPHA                          00001
+```
+
+Der Inhalt ist Byte für Byte der des `put`.
+
+*SIOS → DiskTool* (`SiosRest.VonSiosGeschriebeneDateiLiestDasDiskTool`): `COPD` ist ein Plattenkopierer (`COPY FROM DRIVE 4 -->DRIVE 5`, Menü A COPY ALL / O COPY ONE FILE /
+P COPY PART / X, Y Verzeichnis); bedient: Quelldiskette in A:, Ziel in B:, `C` ET1, `USE DISK` ET1, `PRINT DICTIONARY` ET2 (sonst `ERR: PR 01`), dasselbe fürs Ziel, `A` ET1, `N` ET1.
+Danach holt `k1520disktool get ziel.hfe ALPHA` die Datei byteweise gleich zurück, `check` meldet nichts.  (Der Menüpunkt `O` nimmt `M,Z,N1,N2` an, kopierte im Versuch aber nichts.)

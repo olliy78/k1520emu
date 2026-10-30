@@ -1,0 +1,16 @@
+# SIOS-1526-Programmdiskette DP1 (IBM-Etiketten, Bibliothek PHASELB): Erkennung ueber ERMAP + VOL1 in
+# Spur 0, `ls -l` zeigt Datentraegername, die physische Bibliothek (BOE/EOE/EOD) und ihre Objekte
+# als Pfad `PHASELB/INIT` mit AADR/ML (doc/sios_diskettenformat.md §4, §7).  Kein CP/A, kein UDOS.
+tool:   k1520disktool
+disk:   sios1526_dp1.hfe
+run:    ls -l %DISK%
+expect: sios_ss40 (erkannt)
+expect: MWD051
+expect: BOE 01001 EOE 37026 EOD 38001
+expect: PHASELB/CATM
+expect: PHASELB/INIT
+expect: AADR 0295 ML 20
+expect: PHASELB/CODP
+forbid: DEFEKT
+forbid: nicht eindeutig
+exit:   0

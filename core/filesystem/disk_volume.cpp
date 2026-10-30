@@ -15,6 +15,7 @@
 #include "core/filesystem/cpm/cpm_fs.h"
 #include "core/filesystem/geometry_probe.h"
 #include "core/filesystem/prg_boot.h"
+#include "core/filesystem/sios/sios_fs.h"
 #include "core/filesystem/udos/udos1715_fs.h"
 #include "core/filesystem/udos/udos_fs.h"
 #include "core/filesystem/wega/wega_fs.h"
@@ -307,6 +308,13 @@ std::vector<SectorSpace::TrackRef> systemspuren(const SectorSpace& raum, const F
                 }
             }
         }
+        return out;
+    }
+
+    if (p.type == FsType::Sios) {
+        // Etikettenspur: bei einer Systemdiskette SYL-Lader (Sektor 1-4) + VOL1/HDR1 der
+        // Systemdatei - die ganze Spur 0 ist der Bootbereich, so wie sie ist.
+        spur(0);
         return out;
     }
 
@@ -954,6 +962,9 @@ std::string zielName(const std::string& quelle, FsType typ,
                      const std::map<std::string, CpmAngabe>& beiblatt) {
     const std::string datei = fs::path(quelle).filename().string();
     if (isUdosFamily(typ)) return datei;
+    // SIOS: der Linux-Name ist der Diskettenname (das Dateisystem macht Grossbuchstaben daraus
+    // und prueft Laenge/Zeichen); ein Bibliotheksobjekt wird mit `--as LIB/NAME` ausdruecklich benannt.
+    if (typ == FsType::Sios) return datei;
     // Das `.fileinfo` gehoert zu GENAU dieser Datei und geht dem Sammelbeiblatt
     // vor — es wandert mit ihr mit, das Beiblatt bleibt beim Umsortieren zurueck.
     FileAngaben ein;
@@ -1273,6 +1284,8 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
         std::map<const FsProfile*, int> belegte_plaetze;   // nur CP/M: belegte Plaetze
         // tar-Disketten: LETZTER Versuch, nach der CP/A-Regel (siehe unten)
         std::vector<std::pair<const FsProfile*, const DiskFormat*>> tar_kandidaten;
+        // SIOS 1526: eigene Probe nach der Schleife (siehe unten), nicht im Rangwettbewerb
+        std::vector<std::pair<const FsProfile*, const DiskFormat*>> sios_kandidaten;
         // … und die LEERE tar-Diskette (ganz Null): VOR der CP/A-Regel, siehe unten
         std::vector<std::pair<const FsProfile*, const DiskFormat*>> tar_leer_kandidaten;
         auto besterRang = [&](const DiskFormat* f) {
@@ -1291,6 +1304,10 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
                 // unterscheidet (leere SCPX-8915-Diskette ≡ leere CP/A-Datendiskette);
                 // in der Erkennung machten sie nur jede dieser Disketten mehrdeutig.
                 if (!p->detect) continue;
+                if (p->type == FsType::Sios) {       // eigene Probe NACH der Schleife (siehe unten)
+                    sios_kandidaten.emplace_back(p, f);
+                    continue;
+                }
                 if (p->type == FsType::Tar) {
                     if (p->mutos8k_layout) continue;     // eigene Probe, siehe unten (tar im MUTOS-Layout)
                     (p->leer ? tar_leer_kandidaten : tar_kandidaten).emplace_back(p, f);
@@ -1327,6 +1344,40 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
             if (passend.empty() || hier.front()->detect_rank < passend.front()->detect_rank) {
                 passend    = std::move(hier);
                 dv->format_ = f;
+            }
+        }
+
+        // ── SIOS 1526: ERMAP + VOL1 in Spur 0 sind ein POSITIVER Nachweis ──────
+        // Dieselbe 26x128-Geometrie tragen CP/A, UDOS, BCU ...; was dort als CP/M "plausibel"
+        // wirkt (Spurfuellung 0xE5 = leeres Verzeichnis), ist auf einer Etikettendiskette Zufall.
+        // Ein Treffer verdraengt deshalb die CP/M-Profile OHNE eigenen Nachweis - keine Alternative,
+        // keine Gegenprobe.  Er steht ausserhalb des Rangwettbewerbs der Schleife und kommt nur zum
+        // Zug, wenn dort nichts Staerkeres gefunden wurde: Disketten, die zwar SIOS-INITIALISIERT
+        // sind (ERMAP/VOL1), aber ein anderes System tragen - die BCU-880-Startdisketten (VOL1
+        // `ROBINI`, 8"-Platzhalter-HDR1 `DATA`, CP/M-System) und die MUTOS-8000-Disketten (VOL1
+        // `MUTOS`, UNIX-Dateisystem ab Zylinder 1) - behalten ihren eigenen Nachweis (SYL-Lader,
+        // Kennung, Superblock), SIOS wird dort nie probiert.  (Wuerde SIOS im Rangwettbewerb
+        // mitlaufen, schluege es je nach Reihenfolge der Kandidatenformate das MUTOS-Profil.)
+        if (!sios_kandidaten.empty()) {
+            bool staerker = false;
+            for (const FsProfile* p : passend) {
+                if (p->type != FsType::Cpm || p->boot_header == "osm" || p->dir_boot
+                    || p->boot_header == "bcu_syl" || p->boot_header == "bcu_kombi"
+                    || p->boot_header == "bcu_kombi80" || (p->boot_header == "bcu" && p->detect))
+                    staerker = true;
+            }
+            if (!staerker) {
+                for (const auto& [p, f] : sios_kandidaten) {
+                    SectorSpace probe(dv->disk_->medium(), *f);
+                    std::string warum;
+                    if (!SiosFileSystem::looksLikeSios(probe, &warum)) {
+                        dv->merkeAblehnung(p->name, f->name, warum);
+                        continue;
+                    }
+                    passend = {p};
+                    dv->format_ = f;
+                    break;
+                }
             }
         }
 
@@ -1624,6 +1675,10 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
             auto w = WegaFileSystem::mount(unixGeraet(*v.space, *dv->profile_), warum);
             if (!w) { err = warum; return roh(warum); }
             v.fs = std::move(w);
+        } else if (dv->profile_->type == FsType::Sios) {
+            auto x = SiosFileSystem::mount(*v.space, *dv->profile_, warum);
+            if (!x) { err = warum; return roh(warum); }
+            v.fs = std::move(x);
         } else if (dv->profile_->type == FsType::Tar && dv->profile_->leer) {
             // Die leere tar-Diskette bleibt beschreibbar (mit genau einem .tar); ob
             // geschrieben wird, entscheidet der Schreibschutz wie bei jeder Diskette.
@@ -1697,6 +1752,11 @@ bool DiskVolume::readOnlyForced() const {
 const TarFileSystem* DiskVolume::tarFs() const {
     if (!profile_ || profile_->type != FsType::Tar || volumes_.empty()) return nullptr;
     return dynamic_cast<const TarFileSystem*>(volumes_[0].fs.get());
+}
+
+const SiosFileSystem* DiskVolume::siosFs() const {
+    if (!profile_ || profile_->type != FsType::Sios || volumes_.empty()) return nullptr;
+    return dynamic_cast<const SiosFileSystem*>(volumes_[0].fs.get());
 }
 
 const DiskFormat* DiskVolume::rohFormat() const {
@@ -2927,6 +2987,10 @@ bool DiskVolume::extractMit(const FileRef& ref, const std::string& dest_path,
     // WEGA wie UDOS immer: Modus, Besitzer und Zeit stehen nirgends in der Linux-Datei,
     // und ein Systemverzeichnis (bin/, etc/) ohne seine Rechte ist unbrauchbar.
     if (!isUdosFamily(profile_->type) && !istUnix() && !cpm_fileinfo_) return true;
+    // SIOS: keine Angabendatei - die Etikettenfelder stehen im Verzeichnis (`ls -l`), und der
+    // Schreibpfad (D4) legt jede Datei mit Satzlaenge 128 an; es gibt nichts, was eine
+    // `.fileinfo` ueberliefern koennte, das nicht schon in den Bytes steckt.
+    if (profile_->type == FsType::Sios) return true;
 
     if (bekannt) return schreibeAngabenDatei(*bekannt, dest_path);
 
@@ -3614,7 +3678,9 @@ std::vector<std::string> DiskVolume::zielNamen(const std::vector<FileEntry>& ein
                 if (hinweise)
                     hinweise->push_back("Name '" + eintraege[i].qualifiedName()
                                         + "' kollidiert im Zielordner, gespeichert als '" + n + "'");
-            } else if (!unveraendert && hinweise) {
+            } else if (!unveraendert && hinweise
+                       && !(profile_ && profile_->type == FsType::Sios)) {
+                // (SIOS: "PHASELB/INIT" -> "PHASELB_INIT" ist die Regel, kein Hinweis wert.)
                 hinweise->push_back("Name '" + eintraege[i].qualifiedName()
                                     + "' enthaelt Pfadzeichen, gespeichert als '" + n + "'");
             }
@@ -4166,6 +4232,12 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
     const DiskFormat* fmt = formats.find(profil->format);
     if (!fmt) { err = "Format '" + profil->format + "' steht nicht im Katalog"; return nullptr; }
 
+    if (profil->type == FsType::Sios && !boot_image.empty()) {
+        err = "SIOS: eine bootfaehige Systemdiskette (--boot, SYL-Lader in Spur 0) ist noch nicht "
+              "unterstuetzt - angelegt wird die Datendiskette";
+        return nullptr;
+    }
+
     if (profil->type == FsType::Tar && !profil->leer) {
         err = "Eine tar-Diskette mit Inhalt entsteht nicht per Anlegen: anlegen laesst sich nur die "
               "LEERE tar-Diskette (tar720_leer), danach Dateien einfuegen oder ein .tar schreiben.";
@@ -4293,6 +4365,10 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
             auto u = Udos1715FileSystem::format(*v.space, *profil, label, err);
             if (!u) return nullptr;
             v.fs = std::move(u);
+        } else if (profil->type == FsType::Sios) {
+            auto x = SiosFileSystem::format(*v.space, *profil, label, err);
+            if (!x) return nullptr;
+            v.fs = std::move(x);
         } else if (profil->type == FsType::WegaMutos) {
             // wie `sa.mkfs 1440` — Verschraenkung 1/72 wie auf den Lieferdisketten.
             // MUTOS (Blockraum ab Zylinder 1) traegt 3/500, wie CMD/CC1/CC2.

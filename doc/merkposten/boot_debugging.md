@@ -127,6 +127,12 @@ analysis: `doc/analyse_zre_rom_boot.md`, `doc/analyse_bootloader.md`, `doc/K1520
 adds an I/O-port read/write histogram, VRAM write count + range, a loaded-code PC
 histogram, and an 80-col text dump of VRAM (`0xF800`) so the screen banner is visible.
 
+### K5122: gelöschte Datenmarke F8 (2026-10-30, Zweig sios-k5122)
+`LogicalSector::deleted` wird durchgängig geführt: `commitWriteField`/`parseFormatStream`/`waitFeldSchreiben` setzen es aus der
+geschriebenen Marke, `buildFaithfulReadTrack` schreibt Marke UND CRC mit F8 (MFM/FM). SIOS-Treiber vergleicht die Marke (Status 90H).
+Wächter: `TrackCodecGeloescht.*`, `K5122Test.FormatWrite_GeloeschteDatenmarkeBleibt`, `SiosFs.Dp1Spur0LesestromFuehrtF8`.
+OUT (14H) als Byte-Slot im Lesemodus ist nach Doku NICHT belegt (`doc/sios/befund_init.md` §4).
+
 ### MC80 (`--machine mc80|mc80-30|mc80-31 [--spe 1|2]`, AP M8)
 
 `boot_trace` (`tools/boot_trace_mc80.{h,cpp}`, `tools/boot_trace.md` §9b) und `k1520dbg` (`tools/k1520dbg.md` §11e)

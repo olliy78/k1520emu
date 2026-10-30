@@ -107,6 +107,7 @@ public:
     bool    hasInterrupt() const override { return iei_ && intLeitung() && !s_.ius; }
     uint8_t getVector() const override;            ///< Quittung: IP → IUS, liefert den Vektor
     void    onRETI() override;
+    bool    inService() const override { return s_.ius; }
     const char* intDeviceName() const override { return "Z80-DMA"; }
 
     // ─── Abfragen (Tests/Debugger, alle ohne Seiteneffekt) ─────────────────

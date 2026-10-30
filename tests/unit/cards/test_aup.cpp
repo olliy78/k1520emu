@@ -69,7 +69,7 @@ TEST(AUP, CodeErstNachEntprellzeitUndLesenLoescht) {
     s.warte(10);
     EXPECT_EQ(s.in(0x41), 0x00) << "nach 10 ms noch nicht (Annahme A4: 16 ms)";
     s.warte(10);
-    EXPECT_EQ(s.in(0x41), 0x01) << "Bit 0 = K7633 (Annahme A1)";
+    EXPECT_EQ(s.in(0x41), 0x02) << "Bit 1 = K7633 (A1, belegt: Treiber T-K7633)";
     EXPECT_EQ(s.in(0x42), 0x30);
     EXPECT_EQ(s.in(0x41), 0x00) << "IN 42 loescht die Gueltigkeit";
     EXPECT_EQ(s.in(0x42), 0x30) << "A6 behaelt den Code";
@@ -81,7 +81,7 @@ TEST(AUP, CodeErstNachEntprellzeitUndLesenLoescht) {
 TEST(AUP, KundentastaturHatEigenesBit) {
     Pruefstand s;
     s.tippe(T::Kunde, 0x40);   // '5'
-    EXPECT_EQ(s.in(0x41), 0x02);
+    EXPECT_EQ(s.in(0x41), 0x01) << "Bit 0 = Kundentastatur (A1, belegt)";
     EXPECT_EQ(s.in(0x42), 0x35);
 }
 
@@ -92,7 +92,7 @@ TEST(AUP, SchlangeLiefertNacheinander) {
     s.aup.taste(T::Kunde, 0x41, true);  s.aup.taste(T::Kunde, 0x41, false);   // '2'
     s.in(0x41);
     s.warte(20);
-    const std::pair<uint8_t, uint8_t> soll[] = {{0x02, 0x31}, {0x01, 0xC0}, {0x02, 0x32}};
+    const std::pair<uint8_t, uint8_t> soll[] = {{0x01, 0x31}, {0x02, 0xC0}, {0x01, 0x32}};
     for (auto [bit, code] : soll) {
         EXPECT_EQ(s.in(0x41), bit);
         EXPECT_EQ(s.in(0x42), code);
@@ -106,10 +106,10 @@ TEST(AUP, OhneAbholenBleibtDerCodeStehen) {
     s.aup.taste(T::K7633, 0x14, true);
     s.aup.taste(T::K7633, 0x14, false);
     s.warte(100);
-    EXPECT_EQ(s.in(0x41), 0x01);
+    EXPECT_EQ(s.in(0x41), 0x02);
     EXPECT_EQ(s.in(0x42), 0x31) << "der erste bleibt, bis er abgeholt ist";
     s.warte(20);
-    EXPECT_EQ(s.in(0x41), 0x01);
+    EXPECT_EQ(s.in(0x41), 0x02);
     EXPECT_EQ(s.in(0x42), 0x34);
 }
 
@@ -184,8 +184,9 @@ TEST(AUP, FFhLoeschtGueltigkeitUndSchlange) {
     EXPECT_EQ(s.aup.lampen(), 0);
     s.warte(100);
     EXPECT_EQ(s.in(0x41), 0x00);
+    EXPECT_EQ(s.in(0x42), 0x80) << "nach FFH liefert IN 42H zuerst das Typzeichen";
     s.tippe(T::K7633, 0x15);
-    EXPECT_EQ(s.in(0x41), 0x01) << "nach dem Reset wieder bereit";
+    EXPECT_EQ(s.in(0x41), 0x02) << "danach wieder bereit";
     EXPECT_EQ(s.in(0x42), 0x37);
 }
 
@@ -196,6 +197,32 @@ TEST(AUP, ResetWieFFh) {
     s.aup.reset();
     EXPECT_EQ(s.aup.kommando(), 0xFF);
     EXPECT_EQ(s.in(0x41), 0x00);
+    EXPECT_EQ(s.in(0x42), 0x80) << "/RESET: Typzeichen";
+}
+
+TEST(AUP, TypzeichenOhneGueltigkeitsbitLowNibbleAusConfig) {
+    uint64_t uhr = 0;
+    K1520Bus bus;
+    AUP::Config c;
+    c.uhr = &uhr;
+    c.typ = 0x3;
+    AUP a(c);
+    a.attachToBus(bus);
+    EXPECT_EQ(bus.ioRead(0x41), 0x00) << "ohne Gueltigkeitsbit";
+    for (int i = 0; i < 3; ++i) EXPECT_EQ(bus.ioRead(0x42), 0x83) << "der Treiber liest es mehrfach";
+    bus.ioWrite(0x43, 0xFF);
+    EXPECT_EQ(bus.ioRead(0x42), 0x83);
+}
+
+TEST(AUP, TypzeichenBleibtBisZumNaechstenTastencode) {
+    Pruefstand s;
+    EXPECT_EQ(s.in(0x42), 0x80) << "nach dem Einschalten";
+    s.tippe(T::K7633, 0x13);
+    EXPECT_EQ(s.in(0x41), 0x02);
+    EXPECT_EQ(s.in(0x42), 0x31) << "der Tastencode ersetzt das Typzeichen";
+    s.out(0x43, 0xFF);
+    EXPECT_EQ(s.in(0x41), 0x00) << "FFH: auch als Lampenbyte \"alles aus\" harmlos";
+    EXPECT_EQ(s.in(0x42), 0x80);
 }
 
 TEST(AUP, AlphaFolgtDerLedAnnahmeA3) {
@@ -225,12 +252,12 @@ TEST(AUP, DauerfunktionWiederholt) {
     s.aup.taste(T::K7633, 0x1A, true);   // A07 = 20H
     s.in(0x41);
     s.warte(20);
-    EXPECT_EQ(s.in(0x41), 0x01);
+    EXPECT_EQ(s.in(0x41), 0x02);
     EXPECT_EQ(s.in(0x42), 0x20);
     s.warte(300);
     EXPECT_EQ(s.in(0x41), 0x00) << "vor der ersten Wiederholung (500 ms)";
     s.warte(300);
-    EXPECT_EQ(s.in(0x41), 0x01);
+    EXPECT_EQ(s.in(0x41), 0x02);
     EXPECT_EQ(s.in(0x42), 0x20);
     int n = 0;
     for (int i = 0; i < 10; ++i) {   // 1 s: alle 100 ms eine
@@ -243,24 +270,63 @@ TEST(AUP, DauerfunktionWiederholt) {
     EXPECT_EQ(s.in(0x41), 0x00);
 }
 
-TEST(AUP, SchluesselschalterSendenBeimEinschalten) {
+TEST(AUP, SchluesselschalterMeldenJedeDrehung) {
     Pruefstand s;
     EXPECT_FALSE(s.aup.schluesselAn(1));
     ASSERT_TRUE(s.aup.schluessel(1, true));
     EXPECT_TRUE(s.aup.schluesselAn(1)) << "sofort, ohne Gastzugriff";
     s.in(0x41);
     s.warte(20);
-    EXPECT_EQ(s.in(0x42), 0xAA);
+    EXPECT_EQ(s.in(0x41), 0x02);
+    EXPECT_EQ(s.in(0x42), 0xAA) << "SS1 ein";
+    s.aup.schluessel(2, true);
+    s.in(0x41);
+    s.warte(20);
+    EXPECT_EQ(s.in(0x42), 0xA9) << "SS2 ein";
+    s.aup.schluessel(1, false);
+    EXPECT_FALSE(s.aup.schluesselAn(1));
+    EXPECT_TRUE(s.aup.schluesselAn(2));
+    s.in(0x41);
+    s.warte(20);
+    EXPECT_EQ(s.in(0x41), 0x02);
+    EXPECT_EQ(s.in(0x42), 0xAA) << "SS1 aus: derselbe Code (der Treiber kippt)";
+    s.aup.schluessel(2, false);
+    s.in(0x41);
+    s.warte(20);
+    EXPECT_EQ(s.in(0x42), 0xA9) << "SS2 aus";
+    s.warte(100);
+    EXPECT_EQ(s.in(0x41), 0x00) << "je Drehung genau ein Code";
+    EXPECT_FALSE(s.aup.schluessel(3, true));
+}
+
+TEST(AUP, EingeschalteteSchluesselMeldenSichNachResetUndTyp) {
+    Pruefstand s;
     s.aup.schluessel(2, true);
     s.in(0x41);
     s.warte(20);
     EXPECT_EQ(s.in(0x42), 0xA9);
-    s.aup.schluessel(1, false);
-    EXPECT_FALSE(s.aup.schluesselAn(1));
-    EXPECT_TRUE(s.aup.schluesselAn(2));
+    s.aup.reset();   // /RESET: SS2 steht noch auf ein
+    s.warte(20);
+    EXPECT_EQ(s.in(0x41), 0x00) << "Typzeichen zuerst";
+    EXPECT_EQ(s.in(0x42), 0x80);
+    s.warte(20);
+    EXPECT_EQ(s.in(0x41), 0x02);
+    EXPECT_EQ(s.in(0x42), 0xA9) << "Anlauf: SS2 ist eingeschaltet";
     s.warte(100);
-    EXPECT_EQ(s.in(0x41), 0x00) << "Ausschalten sendet nichts (Annahme A7)";
-    EXPECT_FALSE(s.aup.schluessel(3, true));
+    EXPECT_EQ(s.in(0x41), 0x00) << "SS1 aus: nichts";
+}
+
+TEST(AUP, KommandoFFhMeldetKeinenAnlauf) {
+    // SIOS schreibt FFH auch als Lampenbyte "alles aus"; ein erneuter Schluesselcode kippte dort den Zustand.
+    Pruefstand s;
+    s.aup.schluessel(2, true);
+    s.in(0x41);
+    s.warte(20);
+    EXPECT_EQ(s.in(0x42), 0xA9);
+    s.out(0x43, 0xFF);
+    s.in(0x42);
+    s.warte(100);
+    EXPECT_EQ(s.in(0x41), 0x00);
 }
 
 // ─── Waechter: Codetabellen gegen eine zweite Abschrift des Belegs ─────────────

@@ -783,8 +783,8 @@ TEST(Z80CTC, MultipleChannels_IndependentTiming) {
  *
  * When D3=1 (CTRL_CLK_TRG) is set in Timer mode the channel does not start
  * automatically after loading the time constant.  Instead it waits for a
- * qualifying CLK/TRG edge (polarity selected by D4) and then runs for exactly
- * one period (one-shot behaviour: stops after the first ZC/TO).
+ * qualifying CLK/TRG edge (polarity selected by D4); from then on it runs like a
+ * software-triggered timer (no one-shot: see TimerMode_ClkTrgLaeuftNachNulldurchgangWeiter).
  *
  * Configuration: Timer mode (D6=0), prescaler ÷16 (D5=0),
  *                CLK/TRG trigger (D3=1), rising edge (D4=1), TC=2.
@@ -816,6 +816,43 @@ TEST(Z80CTC, TimerMode_ClkTrgStartsTimer) {
 
     ctc.clockTick();                  // tick 32 relative to trigger → zero crossing
     EXPECT_EQ(fired, 1);
+}
+
+/**
+ * @brief Ein per CLK/TRG gestarteter Zeitgeber laeuft nach dem Nulldurchgang weiter.
+ *
+ * U857: "Bei Nulldurchgang des Kanals beginnt die Zaehloperation mit dem Inhalt des
+ * Zeitkonstantenregisters erneut"; D3 bestimmt nur den START.  Weitere Triggerflanken
+ * aendern am laufenden Zeitgeber nichts.
+ */
+TEST(Z80CTC, TimerMode_ClkTrgLaeuftNachNulldurchgangWeiter) {
+    Z80CTC ctc;
+    int fired = 0;
+    ctc.setZCTOCallback([&](int, bool level) { if (!level) ++fired; });
+    configChannel(ctc, 0, 0x1D, 2);   // 32 Takte je Periode nach dem Trigger
+    ctc.clkTrg(0, true);
+    for (int i = 0; i < 32 * 3; ++i) {
+        ctc.clockTick();
+        if (i == 40) ctc.clkTrg(0, true);   // Flanke waehrend des Laufs: ohne Wirkung
+    }
+    EXPECT_EQ(fired, 3);
+}
+
+/**
+ * @brief Zaehler mit gesetztem D3 (SIOS 1526: Kanal 3 = EDH, TC 30H) zaehlt dauernd.
+ *
+ * D3 ist im Zaehlbetrieb ohne Bedeutung; der Kanal darf nach dem ersten ZC/TO nicht stehen.
+ */
+TEST(Z80CTC, CounterMode_D3OhneBedeutung_ZaehltDauernd) {
+    Z80CTC ctc;
+    int fired = 0;
+    ctc.setZCTOCallback([&](int ch, bool level) { if (ch == 3 && !level) ++fired; });
+    configChannel(ctc, 3, 0xED, 0x30);   // INT, Zaehler, ÷256, steigend, D3, TC folgt
+    for (int i = 0; i < 0x30 * 4; ++i) {
+        ctc.clkTrg(3, true);
+        ctc.clkTrg(3, false);
+    }
+    EXPECT_EQ(fired, 4);
 }
 
 // =============================================================================
@@ -911,7 +948,7 @@ TEST(Z80CTC, DebugStateReflectsChannelAndDaisyChain) {
         auto d = ctc.debugState();
         EXPECT_TRUE(d.ch[2].ius);           // under service
         EXPECT_FALSE(d.ch[2].intPending);   // cleared on acknowledge
-        EXPECT_TRUE(d.ieo);                 // no longer pending → IEO high again
+        EXPECT_FALSE(d.ieo);                // in Bedienung (IUS) → IEO bleibt low bis zum RETI
     }
 }
 

@@ -177,6 +177,24 @@ bool SectorSpace::writeSector(uint8_t cyl, uint8_t head, uint8_t id,
     return true;
 }
 
+bool SectorSpace::writeSectorDam(uint8_t cyl, uint8_t head, uint8_t id,
+                                 const std::vector<uint8_t>& data, bool deleted) {
+    const int slot = slotOf(cyl, head);
+    if (slot < 0) {
+        last_error_ = "Spur " + std::to_string(cyl) + "/" + std::to_string(head)
+                    + " gehoert nicht zu diesem Datentraeger";
+        return false;
+    }
+    TrackImage& t = medium_.mutableTrack(slots_[static_cast<size_t>(slot)].phys, head);
+    if (!TrackCodec::writeSectorDam(t, id, data, deleted)) {
+        last_error_ = "Sektor " + std::to_string(id) + " auf Spur " + std::to_string(cyl)
+                    + "/" + std::to_string(head) + " nicht beschreibbar (fehlt, falsche "
+                      "Laenge oder unformatiert)";
+        return false;
+    }
+    return true;
+}
+
 // ─── linear ──────────────────────────────────────────────────────────────────
 
 int64_t SectorSpace::offsetOf(uint8_t cyl, uint8_t head) const {

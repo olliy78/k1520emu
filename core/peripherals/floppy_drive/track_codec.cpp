@@ -566,7 +566,8 @@ std::vector<LogicalSector> parseTrack(const TrackImage& track) {
 static bool schreibeDatenfeld(TrackImage& track, size_t dataPos, uint16_t secSize,
                               const std::vector<uint8_t>& data,
                               const std::vector<uint8_t>& tail,
-                              const uint16_t* crc_woertlich) {
+                              const uint16_t* crc_woertlich,
+                              int dam = -1) {
     const size_t n = track.bytes.size();
     const bool isMfm = (track.encoding == Encoding::MFM);
 
@@ -585,6 +586,9 @@ static bool schreibeDatenfeld(TrackImage& track, size_t dataPos, uint16_t secSiz
     }
 
     // ── Phase 2: schreiben ───────────────────────────────────────────────────
+    // Datenmarke umstellen (SIOS: HDR1 = FB, freier/geloeschter Etikettensatz = F8); die CRC
+    // unten rechnet mit der NEUEN Marke.
+    if (dam >= 0) track.bytes[dataPos] = static_cast<uint8_t>(dam);
     std::copy(data.begin(), data.end(), track.bytes.begin() + static_cast<long>(dataPos + 1));
 
     // CRC ueber [A1 A1 A1 <Marke>] + Daten (MFM) bzw. [<Marke>] + Daten (FM).  Die Marke wird
@@ -608,9 +612,25 @@ static bool schreibeDatenfeld(TrackImage& track, size_t dataPos, uint16_t secSiz
     return true;
 }
 
+static bool writeSectorMitMarke(TrackImage& track, uint8_t sector_id,
+                                const std::vector<uint8_t>& data,
+                                const std::vector<uint8_t>& tail, int dam);
+
 bool writeSector(TrackImage& track, uint8_t sector_id,
                  const std::vector<uint8_t>& data,
                  const std::vector<uint8_t>& tail) {
+    return writeSectorMitMarke(track, sector_id, data, tail, -1);
+}
+
+bool writeSectorDam(TrackImage& track, uint8_t sector_id,
+                    const std::vector<uint8_t>& data, bool deleted,
+                    const std::vector<uint8_t>& tail) {
+    return writeSectorMitMarke(track, sector_id, data, tail, deleted ? 0xF8 : 0xFB);
+}
+
+static bool writeSectorMitMarke(TrackImage& track, uint8_t sector_id,
+                                const std::vector<uint8_t>& data,
+                                const std::vector<uint8_t>& tail, int dam) {
     const size_t n = track.bytes.size();
     if (n == 0 || track.marks.size() != n) return false;
 
@@ -631,7 +651,7 @@ bool writeSector(TrackImage& track, uint8_t sector_id,
         }
         break;
     }
-    return schreibeDatenfeld(track, dataPos, secSize, data, tail, nullptr);
+    return schreibeDatenfeld(track, dataPos, secSize, data, tail, nullptr, dam);
 }
 
 /**
@@ -895,15 +915,18 @@ TrackImage buildFaithfulReadTrack(const std::vector<LogicalSector>& sectors, Enc
         // ── DAM ───────────────────────────────────────────────────────────────
         fill(0x00, kSync);
         if (isMfm) fill(0xA1, kReadA1);
-        pushMark(0xFB, MarkType::Data);
+        // Geloeschte Datenmarke (F8) wie auf dem Medium fuehren: Marke UND CRC (SIOS-Treiber
+        // vergleicht die Marke, doc/sios/befund_init.md Abschnitt 2).
+        const uint8_t dam = sec.deleted ? 0xF8 : 0xFB;
+        pushMark(dam, MarkType::Data);
         uint16_t dataCrc;
         if (isMfm) {
-            std::vector<uint8_t> in = {0xA1, 0xA1, 0xA1, 0xFB};
+            std::vector<uint8_t> in = {0xA1, 0xA1, 0xA1, dam};
             in.insert(in.end(), sec.data.begin(), sec.data.end());
             dataCrc = crc16(in.data(), in.size(), 0xFF, 0xFF);
         } else {
             std::vector<uint8_t> in; in.reserve(1 + sec.data.size());
-            in.push_back(0xFB);
+            in.push_back(dam);
             in.insert(in.end(), sec.data.begin(), sec.data.end());
             dataCrc = crc16Ccitt(in.data(), in.size());
         }

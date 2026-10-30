@@ -1,0 +1,121 @@
+# SIOS 1526 - Arbeitsgrundlage (AP S1)
+
+Stand 2026-10-29.  Entwurf: `doc/design/43_sios1526.md`, Handbuchauszug: `handbuch_auszug.md`.
+Markierungen: **[Lauf]** am Emulator belegt (`k1520dbg`), **[Code]** aus dem Code gelesen,
+**[Doku]** aus `doc/trascripted/Zentrale Recheneinheit_K2526_K2527.md`, **[?]** Annahme.
+
+## Dateien
+
+| Datei | Inhalt |
+|-------|--------|
+| `tools/sios_a5120/dump.py` | `bild` (lineares Abbild 26*128 B je Spur), `labels` (VOL1/HDR1/DDR1, DKOI ~ cp500), `get` (HDR1-Datei herausholen). Nutzt `app/core_binding/k1520disk.py` wie `tools/k8915_sysload.py` |
+| `tools/sios_a5120/gen_prn.py` | erzeugt beide Listings aus `original/SIOS1526_SYLs.hfe`; Namen/Kommentare stehen im Skript (`NAMEN`, `KOMMENTAR`, `MODUL_INFO`) |
+| `doc/sios/sysare11.prn` | SIOS 1526/1.1, 0000H-8FFFH, fuer `k1520dbg -l` / `boot_trace -l` (`lst doc/sios/sysare11.prn`) |
+| `doc/sios/syl_lader.prn` | SYL-Lader 0400H-05FFH |
+
+Neu bauen: `python3 tools/sios_a5120/gen_prn.py`.  Das Listing ist **statisch** (rekursiver Abstieg, 28 KB von 34 KB als Code;
+58 Einstiege aus Luecken tentativ zusammengesetzt und mit `[vermutet]` markiert).  Alle zur Laufzeit bis 20,9 Mio. Takte
+ausgefuehrten Befehle (693 Adressen) sind im Listing enthalten und fallen auf Befehlsanfaenge.
+
+## Ladeablauf (SYLs, SIOS 1.1) [Lauf]
+
+1. **Lade-ROM** (A26) liest Spur 0 Sektor 1-4 nach 0400H, prueft `SYL` bei 0400H und ruft `CALL 0437H` (ROM 0174H).
+2. **SYL-Lader** (`syl_lader.prn`): CRC-CCITT ueber 0410H..05E9H gegen 05FEH/05FFH.  Kopf: 0403H = 04 (OUT 12H),
+   0404H/0405H = **8800H Byte** (SYLp: 6C00H), 0406H = 00 -> Ladeadresse **0800H** (sonst 4000H + OUT EEH).
+   Sektorzahl = 8800H/128 = **272**, gelesen **ab Spur 2** (Datei-Sektor 26; Spur 1 der Datei SYSARE11 wird nicht geladen -
+   dort steht eine zweite `SYL`-Kopie) nach **0800H..8FFFH**, 26 Sektoren je Spur, Spur 12 nur 12 Sektoren.  Je Sektor ZVE2-Lesen
+   nach 0700H, CRC pruefen, 7 Wiederholungen.  Ende (045CH): **AAWA (004CH) = 9000H**, (0069H) = AAWA-0400H, `RET` ins ROM.
+3. **Lade-ROM** (0177H): `LD HL,(03FAH)` (= 0800H) -> (0462H); ROM aus (Port 0AH Bit0); fuellt 00BAH..03FFH; `JP 0074H`:
+   `LD HL,(0462H) / LD L,9DH / JP (HL)` -> **Systemstart 089DH**.
+4. **SYSTART** (089DH, Cycle 14,87 Mio): EI, I=02, 0400H-07FFH loeschen; BS-PIO/CTC einrichten; Seite 0 aus der Vorlage
+   0840H..088BH aufbauen (RST-Sprungziele +0800H; NMI 0066H = JP 0A8FH); IM-2-Tabelle ab 0274H aus Vorlage 088CH; Suche `INDEX`
+   (AAWO, 006CH); dann **Blockpruefung**: 34 Bloecke zu 1 KB mit CRC-CCITT (Kopf 2 Byte, 1022 Byte, CRC 2 Byte; ~5,9 Mio. Takte);
+   Blocks mit Folge-Nummer 0 haben einen Moduleinsprung bei Block+2 (`CALL 005DH`, [Lauf] 10 Aufrufe: 0800, 2000, 3000, 4000,
+   4400, 4800, 5000, 6000, 7000, 8400).
+5. 0A3F: `LD DE,0075H / CALL 003BH` = relativer Aufruf von **0ABAH** (Speicher in 64-B-Schritten lesen), danach **0AFFH** (s. u.).
+
+## Besonderheiten des Codes
+
+- **Positionsunabhaengig durch Systemroutinen auf Seite 0**: `CALL 002BH` (DE=n: Sprung nach Folgeadresse+n), `CALL 003BH`
+  (Aufruf Folgeadresse+n), `CALL 0033H/0036H` (DE/HL = Folgeadresse), `CALL 0042H` mit L=2i+1 (Sprung ueber Wortetabelle 0800H,
+  Eintrag+0800H; z. B. L=19H/1BH = CRC_INIT/CRC_BLOCK 0B08H/0B0BH, L=2BH = Fehleranzeige 0B32H, L=1FH 0D17H).
+- `RST 08H` (SVC) hat **ein Kennbyte** hinter dem Befehl; `OUT 00H` loest /INT-BS (BS-PIO B1, ISR 1E48H) aus der Makroebene aus.
+- Fehlerkennung als ASCII in BC/DE: `LD BC,3032H / LD DE,5953H` = "02"/"SY" (`ERR SY 02`).
+- Seite 0 nach SYSTART (aus Lauf): 0008 RST08 -> 1BA5, 0010 -> 0E7F (Monitor), 0018 -> 1AC8, 0028 -> 14D2, 0066 -> 0A8F;
+  0060 ERAM (FF7FH), 0062 AGM = 0800H, 004C AAWA = 9000H, 006C AAWO, 0300..0315 Geraetetabelle, IM-2-Tabelle 0274..027F:
+  BS-PIO A 0D4B, BS-PIO B 1E48, CTC2 0A8C (-> 27AB gepatcht), CTC3 0D6A.
+- Module (Ports): 5000-5FFF K8025 (58H, 5EH/5FH), 6000-6FFF K5122 (10H-17H), 8400-8FFF SIO A33/DFUE (50H/51H, 56H, 0CH),
+  3000-3FFF Port 40H/0AH [?]; 2000-2FFF viele `OUT 00H`.  Port 40H wird bei 301EH und 36CBH beschrieben (nicht im Lauf erreicht).
+
+## Befund fuer S2 (warum keine Systemzeile)
+
+**Ursache gefunden: Polaritaet/Modell von BS-PIO Port B Bit 2 (/SPS-ESR) im K2526-Kern.**
+
+- Nach der Blockpruefung bei 0AFFH (Cycle 20 924 616): `IN A,(0AH) / RES 2,A / NOP / OUT (0AH),A / EI / RET` [Lauf].
+- Der Kern (`k2526.cpp` onBSPIOPortBOut, `K2526(...)` readByte/writeByte) deutet **B2 = 0 als Schutztabellen-Schreibmodus**
+  und liefert dann fuer jeden ZVE1-**Lesezugriff - auch den Opcode-Abruf -** `spa_.readEntry()` (= 0): ab 0B04H holt die
+  ZVE1 nur noch NOPs, der PC laeuft 0B05H..9000H durch, dort `RST 38H`-Flut.  Das ist die beobachtete Absturzkette
+  (die Kette 0A42 CALL 003B -> 0ABA -> 0AFF ist der Normalweg, `RET` bei 0B07H wird nie als solches geholt).
+- **Hardware laut [Doku] 6.11/B2 (Zeilen 891, 932):** B2 = **high** (Einschaltzustand) = Schutz-RAM zum **Beschreiben** frei,
+  "Schutzfunktionen unwirksam"; erst **B2 = low schaltet Speicher- und E/A-Schutz scharf**.  Programmiert wird das 1-KB-RAM A19
+  (1 Bit je 64-Byte-Segment, 1 = BS/geschuetzt) **ueber AB0 des Adressbus** (nicht ueber ein Datenbyte), d. h. durch normale
+  Speicherzugriffe.  Genau das tut SIOS: 0ABAH liest `LD A,(HL)` in 64-B-Schritten, ab HL=0001H (AB0=1) ueber den ganzen
+  64-KB-Raum = alles BS, dann ab 0340H (AB0=0, 3 Segmente) und AAWA..ERAM (004CH ist 64-B-ausgerichtet, AB0=0) = Anwenderbereich,
+  zuletzt AAWO-Bereich; danach 0AFFH `RES 2` = Schutz ein.  Schutzregel: Befehle aus einem BS-Segment duerfen BS und Anwender
+  beschreiben, Befehle aus einem Anwender-Segment nur Anwender; Verletzung -> /MEMDI, SPS-Indikator (PIO A3, Interrupt) bzw. NMI
+  bei E/A.  Der Kern modelliert dagegen ein WP/RP-Byte je Segment aus dem **Datenbyte**, Polaritaet vertauscht.
+- Gegenprobe [Lauf]: `b 0x0B04` / `set A 0x16` (B2 bleibt 1) -> SIOS laeuft weiter, aber die Schutztabelle bleibt unprogrammiert;
+  danach BS-PIO-A-Interrupt (SPS-Indikator A3=0 steht an, Maske F7H, ISR 0D4B trampolint per RETI nach 0D56 und wird vor dem
+  ersten Befehl erneut angenommen), SP faellt von 0400H auf 0272H, Spinschleife 0C7DH `BIT 7,(HL)` HL=00CBH, Bildschirm leer
+  (nach 320 Mio. Takten).  Das ist ein Folgeeffekt der fehlenden Schutz-Emulation, nicht die eigentliche Ursache.
+- S3-Vorschlag: `MemIOProtect` nach [Doku] 6.11 nachbilden (B2=1: Zugriff schreibt `tab[A>>6] = A & 1`, Speicher normal;
+  B2=0: Pruefung nach Bereich des M1-Befehls; Lesen/Opcode-Abruf nie umleiten; /RES-SPA Port 02H loescht den Indikator) mit
+  Einheitstest am Baustein und Wächter `SiosBoot.V11_ZeigtSystemzeile`.  CP/A, UDOS, SCPX beruehren B2 nicht (Lade-ROM laesst B2=1).
+
+## SIOS 0.9 (SYLp)
+
+Gleiche Ladeadresse 0800H, gleicher Einsprung 089DH; der SYL-Lader unterscheidet sich in **einem Byte** (0405H: 6CH statt 88H,
+also 6C00H Byte = 216 Sektoren statt 272).  SYSARE09 hat 27 Systembloecke (0800H..73FFH, 33 280 B Datei) mit anderer Modulfolge
+(Kennungen 00-05, 10-12, 70-73, 40/41, 30-35, 30-33; Kopfflags 92/82/91/81 statt 90/94/84), Systemzeile `MONITOR ===== SIOS 1526/0.9 (M)`
+bei 0EECH.  Block 0 (0800H-0BFFH) und Blocks mit gleicher CRC wie bei 1.1 (z. B. 0ffa, 001b, 49a8, 07c8) sind bitgleich.
+Listing fuer 0.9 nicht erzeugt (`gen_prn.py` ist auf SYLs ausgelegt).
+
+## Befund S2b (Warteschleife 1CD4H) - Ursache: CTC-Kanal 3 stoppt nach dem ersten ZC/TO
+
+Stand 2026-10-29, Zweig `sios-s3`.  **[Lauf]** = `k1520dbg`, **[Code]** = Listing.
+
+**Was 1CD4H wartet.**  SVC `RST 08H` mit Kennbyte 60H (Bit6 = synchron, Bit5 = Parameter ab 0104H) ist ein Geraeteauftrag.
+Geraeteeintraege: 16 x 16H Byte ab 0111H; Eintrag E: `E+0/E+1` = Zeiger auf die Geraeteroutine, `E+2` = Kommando/Folgeschritt,
+`E+3` = Flags (Bit2 = Auftrag laeuft, Bit3 = Ereignis, Bit5 = Zeitablauf, Bit4 = Wiederholung), `E+5` = Zeitgeber (Einheit 100 ms).
+Geraetetabelle 0300H.. liefert je Index die Eintragsadresse (Index 2 = 0124H = **DFUE, SIO A33**, Routine 84AAH; Index 1 = 010EH, Routine 204EH).
+Ablauf (1CC2H..1CE4H): `SET 2,(E+3)`, `SET 3,(E+3)`, `OUT (00H)` -> ISR 1E48H tastet alle Eintraege ab und ruft die Routine auf
+(`CALL 001DH`), dann Schleife `BIT 2,(HL) / JR NZ` mit RETI-Trampolin (laesst Interrupts durch).  Der Monitor (0E7FH..0EA2H)
+macht das fuer jedes vorhandene Geraet (Index 14H abwaerts) **vor** der Systemzeile.  Haengepunkt [Lauf]: Index 2, HL=0129H.
+Die DFUE-Routine erledigt im 1. Durchlauf nur den Kanal-Reset (`8599: OUT (51H),18H`) und setzt `0128H = 04`; der 2. Durchlauf (SIO-Aufbau,
+Bit2 loeschen bei 864FH/86E5H) findet erst bei der **naechsten** Abtastung statt (`0128H != 0` ruft die Routine bedingungslos).
+
+**Wer die naechste Abtastung ausloest.**  Die **ISR CTC-Kanal 3 (0D6AH, Vektor 7EH)**: 100-ms-Takt (SIOS: ZC/TO2 -> CLK/TRG3, `ED`/`30H` =
+Zaehlmodus, 48 Impulse; 5120 Takte x 48 = 100 ms), zaehlt die Uhr (00F2H..) und die Geraete-Zeitgeber (0DF9H: Zaehler `E+5` -1, bei 0
+`SET 5,(E+3)` + `OUT (00H)`).  Ohne diesen Takt gibt es keine Neuabtastung, kein Zeitablauf, keine Uhr [Code].
+
+**Emulatorfehler [Lauf, belegt].**  `Z80CTC::fireZCTO()` (`core/primitives/z80_ctc.cpp` Z. 487) stoppt den Kanal bei gesetztem
+D3 (`CTRL_CLK_TRG`) - auch im **Zaehlmodus** (D6=1), wo D3 laut Datenblatt ohne Bedeutung ist.  SIOS programmiert Kanal 3 mit `0EDH`
+(D6=1 Zaehler, D3=1): `dev ctc` zeigt `ch3 ctl=ED TC=30 cnt=48 run=0`; die ISR 0D6AH lief genau **einmal** (c15,146 Mio.,
+`bp 0D6A`), danach nie wieder (60 Mio. Takte, `itrace`: kein Vektor 7EH mehr).  CP/A, UDOS, SCPX programmieren Kanal 3 ohne D3 und
+sind nicht betroffen.
+Gegenprobe [Lauf]: bei 092FH (`OUT (0FH),A`) `set A 0xE5` (D3 = 0), dann `g 120000000` -> **Bildschirm zeigt
+`MONITOR ===== SIOS 1526/1.1 (M)_`**, `dev ctc`: `ch3 ctl=E5 cnt=33 run=1`, Uhr `00F2H = 08`, 253 ISR 1E48H, keine Haenger.
+Gegenprobe 2 [Lauf]: am Haengepunkt `set PC 0x1CCE` (= erzwungenes `OUT 00H`) -> 0128H/0129H werden 00 (DFUE fertig), die Kette
+schreitet zum Index 1 weiter - die Abtastung ist also der fehlende Anstoss.
+
+**Korrekturvorschlag (nicht umgesetzt).**  `core/primitives/z80_ctc.cpp`, `fireZCTO()`:
+`if ((c.control & CTRL_CLK_TRG) && !(c.control & CTRL_COUNTER)) c.running = false;`
+(Zaehlmodus laedt neu und zaehlt weiter; das Einmal-Verhalten bleibt dem Zeitgebermodus mit Trigger).  Ein gleichartiger Test gehoert
+nach `tests/unit/primitives/test_ctc.cpp` (Zaehlmodus mit D3 = 1: nach dem ersten ZC/TO weiter `running`, zweiter ZC/TO nach TC weiteren
+Flanken), danach die Waechter `SiosBoot.*` (bootetBisSystemzeile) einschalten.  Zu pruefen: die Stapelpfade `clockTick` (Z. 330-430)
+benutzen `zcto_active`/`running`, nicht D3 - dort keine zweite Stelle gefunden.
+
+**Widerlegt [Lauf]:** (a) Tastatur: TYP 80H wird gelesen (2C57H), die Initialisierung (5DH, ~35 000 Lesezugriffe waren die Warteschleife
+2C46H bis zum Empfang) ist durch; SL-Codes fehlen nicht, SIOS wartet nicht darauf.  (c) Floppy: kein Zugriff an K5122.  (d) /INT-BS:
+ISR 1E48H laeuft 9 x (1 x Scharfmachen, 8 x je Geraeteauftrag), jeweils unmittelbar nach `OUT 00H`.  (e) kein NMI (0A8FH nie erreicht).
+Bemerkenswert fuer Folgeschritte: SIOS liest `IN (56H)` = FEH (DIL A41/PIO A31) und programmiert SIO A33 Kanal B (`53H`: 02, 80, 01, 04).

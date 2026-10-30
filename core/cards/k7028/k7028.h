@@ -88,6 +88,7 @@ public:
     bool        hasInterrupt() const override;
     uint8_t     getVector() const override;
     void        onRETI() override;
+    bool        inService() const override { return sio1_.inBedienung() || sio2_.inBedienung() || ctc1_.inBedienung() || ctc2_.inBedienung(); }
     const char* intDeviceName() const override;
 
     // ─── Lebenslauf / Takt ───────────────────────────────────────────────────

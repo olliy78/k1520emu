@@ -980,3 +980,12 @@ Vier Tests in `tests/unit/primitives/test_reti.cpp` halten den Zustand fest:
 hängt — Z80SIO-, K7637-, K8025- und Tastatur-Tests (71 Fälle) — sowie die tastaturgetriebenen
 Systemläufe (SCPX INIT/MODF/SYSP, HARDY, UDOS), die jede Eingabe über die 9600-Baud-Strecke
 des K7637 schicken.  Dort hätte ein verschlucktes Zeichen sofort auffallen müssen.
+
+### Nachtrag 2026-10-30: Kettenseite umgestellt (Zweig sios-ieo)
+`getIEO()` aller drei Bausteine sperrt jetzt auch bei IUS (Datenblatt: /IEO low bis RETI).  Der Wächter
+`RetiChain.IeoBlocksOnPendingNotOnService` ist ersetzt durch `RetiChain.IeoLowWaehrendIusUndNachRetiWiederHigh_{Ctc,Pio,Sio}`,
+`RetiDesUnterenLoeschtNichtDenIusDesOberen`, `RetiNimmtNurDerBausteinMitIusUndFreiemIeiAn`,
+`RetiWirdTrotzAnstehenderAnforderungWeiterObenAngenommen`.  Folgeaenderung: `K1520Bus::signalRETI` und die Karten (K2526,
+K2521, K5122, K8025, K7028, AUP, PC1715-ZRE, MC80-Karten, EM) geben das RETI nur dem ersten Baustein in Bedienung
+(`InterruptSlave::inService()`); ein Baustein hinter einem bloss anstehenden bekommt dafuer `setIEI(true)` (ED-Holezyklus).
+Angepasst: `Z80CTC.DebugStateReflectsChannelAndDaisyChain`, `P8000Karte16_.Kette_Ctc0VorPio2_*`.  Befund `doc/sios/befund_nfnd_84h.md`.

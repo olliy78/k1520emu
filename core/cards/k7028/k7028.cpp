@@ -247,11 +247,11 @@ uint8_t K7028::getVector() const
 
 void K7028::onRETI()
 {
-    // Das RETI erkennt nur der Baustein mit gesetztem IUS und freiem IEI.
-    sio1_.onRETI();
-    sio2_.onRETI();
-    ctc1_.onRETI();
-    ctc2_.onRETI();
+    // Das RETI erkennt nur der erste Baustein in Bedienung (SIO1, SIO2, CTC1, CTC2).
+    if (sio1_.inBedienung())      sio1_.onRETI();
+    else if (sio2_.inBedienung()) { sio2_.setIEI(true); sio2_.onRETI(); }
+    else if (ctc1_.inBedienung()) { ctc1_.setIEI(true); ctc1_.onRETI(); }
+    else if (ctc2_.inBedienung()) { ctc2_.setIEI(true); ctc2_.onRETI(); }
     updateInternalChain();
 }
 

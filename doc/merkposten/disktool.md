@@ -1242,3 +1242,65 @@ Ausführliche Formatbeschreibung, Belege und Tabellen: **`doc/design/39_mutos800
    `MutosFs.Blocks_*`): hinter Block 250 liegt der Swap-Bereich des Kernels auf rk2 — mit `s_fsize` 494 wurden `/bin/sh`-Blöcke vom Auslagern überschrieben, `fsck` sah nichts, `date` hing.
    Die GUI („Neue Diskette“) bietet `--blocks` nicht an (Vorgabe/Obergrenze, der Blockraum, ist nicht in der C-ABI; Anwendungsfall nur dieser Nachbau).  Container `.hfe`, weil der Emulator `.td0` nicht zurückschreibt; `create … .dmk` im Profil `mutos8k_26x128_fm` hat 62 Sektoren mit CRC-Fehler
    (nicht verfolgt).  Die Datei ist eine Rekonstruktion: Programme aus DISK-ROOT, `mount`/`umount` Ersatz, sechs Gerätenamen + `login`/`motd`/`mount`/`mtab` abgeleitet.
+
+## SIOS 1526 (A5120/A5130/K8924) — lesen und schreiben (2026-10-29, D2–D4, Entwurf 43, Format `doc/sios_diskettenformat.md`)
+
+`FsType::Sios` (Typname `sios`), `core/filesystem/sios/sios_fs.{h,cpp}`, Prüfung `check/sios_check.cpp`.  IBM-Etikettendiskette,
+26×128 MFM einseitig: Spur 0 = EBCDIC/DKOI-Etiketten, Dateien = zusammenhängende Spurbereiche, Bibliotheken (`…LB`) mit eigenem Verzeichnis.
+Festlegungen:
+
+1. **Kein eigenes Format, zwei Profile.** `sios_ss40`/`sios_ss80` stehen auf `k5601_ss40_26x128`/`k5601_ss80_26x128` (Rang 0).
+   Erkannt wird NUR am positiven Nachweis **ERMAP in Sektor 5 UND VOL1 in Sektor 7** (`SiosFileSystem::looksLikeSios`).  Die Probe läuft in
+   `disk_volume.cpp` **NACH** dem Rangwettbewerb (`sios_kandidaten`, wie die tar-Kandidaten) und verdrängt nur CP/M-Profile **ohne** eigenen Nachweis (kein
+   „nicht eindeutig“, keine Gegenprobe).  **Nicht im Wettbewerb mitlaufen lassen:** SIOS-INITIALISIERT sind auch fremde Systeme — die BCU-880-Startdisketten
+   (`bcu12_…syl-spur1-satz*.img`: VOL1 `ROBINI`, Platzhalter-HDR1 `DATA` mit EOE 73026, CP/M-System) und die MUTOS-8000-Disketten (VOL1 `MUTOS`, UNIX ab Zylinder 1).
+   Mit niedrigem `detect_rank` schlug SIOS je nach Reihenfolge der Kandidatenformate das MUTOS-Profil (rot: `cli_mutos8000_tar_disktool_geschrieben`, `ls` lieferte
+   „0 Dateien“).  Wächter `SiosFs.NurMitNachweisErkannt` (BCU-Fixtures + `disks/a5120_16_MUTOS/…usr_mfm.hfe`).
+2. **Aktiv ist, was als Text `HDR1` trägt** — die gelöschte Datenmarke F8 wird nicht ausgewertet (Formatdokument §4.4).  EBCDIC wird mit der DKOI-Tabelle
+   (`SiosFileSystem::dkoi`, fünf Abweichungen) gelesen.  Dateigröße = Sektoren `BOE..EOD-1`; liegt EOD außerhalb `[BOE, EOE+1]` oder fehlt es, gilt EOE (Warnung
+   `sios.hdr1.eod`).  `SYSARE09` (SYLp) liefert deshalb 8 Sektoren weniger als der belegte Bereich — Formatdokument §11 Nr. 12, bewusst dem Etikett gefolgt.
+3. **Namen: flach mit Schrägstrich.** Die Bibliothek erscheint als Datei `PHASELB` (Typ `B`), ihre Objekte als `PHASELB/INIT` (Typ `O`; Länge = Abstand zum nächsten
+   AADR bzw. ND, gelöschte Einträge mit leerem Namen bleiben unsichtbar, ihr AADR zählt als Grenze).  Kein Verzeichnisbaum wie bei WEGA: ein physisches `PHASELB`
+   und ein Ordner `PHASELB/` kollidierten im Zielordner.  `get`/`extractAll` machen daraus `PHASELB_INIT` (`zielNamen`, ohne Hinweiszeile).  Es wird nur der
+   Verzeichnissektor AADR 2 gelesen (Fortsetzung bei > 15 Einträgen ist offen, Formatdokument §11 Nr. 5).
+4. **Schreiben (D4, 2026-10-29)** — `write`/`erase`/`mkfs`/`format`/`wouldFit` in `sios_fs.cpp`; erst planen (`plane`, nur Lesen), dann Daten, zuletzt der Verwaltungssatz.
+   * **Physische Datei**: Name 1–8 Zeichen, nach Großschreibung im DKOI-Zeichensatz (`dkoiKodieren`; kein Blank, kein `/`).  Platz = **erste** freie Spurlücke ab Spur 1 bis
+     **Spur 37** (`letzteNutzSpur` = min(Zylinder,38)−1: Spur 0 + 1..37 laut Handbuch, die beiden äußeren sind Reserve; bei 80 Spuren gilt dieselbe Grenze, denn INIT V1.1 kennt nur 40 und
+     SYLs/DP1 enden bei 37).  HDR1 wie bei PHASELB der Datendisketten (Satzlänge 128, `E` an Pos. 44, EOD = erster freier Sektor hinter den Daten) in den **ersten** freien Etikettensektor
+     (8..26; frei = kein HDR1, also auch `DDR1`/`D`); Datenmarke dieses Sektors F8→FB über `SectorSpace::writeSectorDam` / `TrackCodec::writeSectorDam` (neu; CRC mit neuer Marke).  Rest des Bereichs bleibt unberührt (E5 auf frischer Diskette), der letzte Datensektor wird mit E5 aufgefüllt.
+   * **Löschen** = `HDR1`→`DDR1` (nur Byte 1 `H`→`D`, Rest des Satzes bleibt wie bei SG1 `DATAnn`) und Marke F8; Daten bleiben.  Überschreiben (`--force`) = alter Satz DDR1 + neuer Bereich.
+   * **Bibliotheksobjekt** `LIB/NAME` (Name 1–5 ASCII): **nur anhängen hinter ND** (AADR = ND, Verzeichnisplatz = erster freier, Fuß-ND += Sektoren, NV = `0200H + 8·Plätze`), **Löschen** = Name blank (20H), AADR/ML und Datenteil bleiben (Handbuch DELET; kein Nachrücken, kein Verdichten — der Platz kehrt erst mit COPY zurück, den wir nicht haben).
+     **ML = Sektoren/2 (mindestens 1) ist eine ANNAHME** (Formatdokument §7.3/§11 Nr. 6: ML ≤ ⌈len/2⌉ in allen 31 Messwerten, 22× gleich).
+   * **Abgelehnt mit Grund** (Unbelegtes wird nicht geraten): ERMAP mit Einträgen (Format unbekannt, §11 Nr. 1) · beschädigtes Etikett · Satzlänge ≠ 128 (eine Linux-Datei sagt sie nicht) ·
+     Bibliothek mit mehr als **14** belegten Plätzen (der 15. Platz ließe NV raten: DP1 trägt dort `0300H` statt `0278H`; Verzeichnisfortsetzung unbekannt, §11 Nr. 5) oder mit NV nach unbekannter Regel oder unplausiblem Fuß ·
+     Objekt größer als der freie Rest der Bibliothek · Objekt in Nicht-Bibliothek · leere Objekte · 20. physische Datei.  `put <ordner>` läuft über `wouldFit` (Plan vorab, Stapel = Medium-Momentaufnahme + Rückrollen wie bei allen).
+   * **`create --fs sios_ss40|sios_ss80 [--label NAME]`**: Spur 0 nach Formatdokument §10 (S.1–4 = 40H, ERMAP, S.6 leer, VOL1 mit `M`/`01`/`W`, S.8–26 `D`+Blanks mit Marke F8), Datenspuren E5 (die Standard-Leerdiskette).
+     Name ≤ 6 Zeichen DKOI.  Alle Container: **`.img`/`.cqm`/`.td0`/`.imd` werden zugelassen** — `rawCompatible()` verbietet sie nicht, aber die F8-Marken gehen verloren (aktiv = Text `HDR1`, der Leser wertet F8 nicht aus, §4.4); ob das echte SIOS F8 prüft, ist offen (§11 Nr. 4) — für Emulator-Betrieb `.hfe`/`.dmk` nehmen.
+     `--boot` (SYL-Lader + SYSARE) wird mit Meldung abgelehnt.  Keine `.fileinfo` (nichts, was nicht in den Bytes steckt).  Der Schreibschutz ist normal aufhebbar (keine Sperre mehr).
+   Wächter: `SiosFsSchreiben.*` (Leerdiskette Byte für Byte, Rundläufe, rm, Wiederverwendung, Ablehnungen, Bibliothek, Container dmk/img, Original unverändert), `cli_dt_put_sios_*`.
+5. **`boot-get` = die ganze Spur 0** (SYL-Lader S. 1–4 bei Systemdisketten, dazu ERMAP/VOL1/HDR1).  `ls -l` hat eine eigene Spaltenfolge
+   (`FileEntry::extent` trägt Lage als Text).  `.fileinfo` entsteht nicht (auch nicht bei D4).
+6. **`SIOS1526_SYLp.hfe` wird nicht automatisch erkannt**: 40-Spur-Diskette aus dem 80er-Laufwerk (Zylinder 40–68 unformatiert, Streusektor c15h1) passt zu keinem
+   Katalogformat; mit `--fs sios_ss40` liest sie (Wächter `SiosFs.SylpIstNurMitFsErkennbar` hält den Befund fest — wird die Geometrieerkennung toleranter, Test und Doku nachziehen).
+7. **Prüfung** (D5, 2026-10-30; Kennungen sind ein Vertrag): `sios.hdr1.ungueltig` Fehler, `sios.hdr1.ueberlappt` Fehler, `sios.hdr1.eod` Warnung,
+   `sios.ermap.fehlt`/`sios.vol1.fehlt` Fehler (nur nach dem Mounten möglich — die Erkennung verlangt beide), `sios.bib.aadr`/`.reihenfolge`/`.nd`/`.verzeichnis`
+   Warnung, `sios.bib.doppelt` Fehler (nur zwei **benannte** Objekte; gelöschte = Name blank zählen nicht), `sios.marke.aktiv`/`.frei` **Hinweis** mit
+   Reparatur `sios.marke.setzen` (empfohlen, kein Datenverlust, `SiosFileSystem::repair` prüft unmittelbar vorher, dass die Marke noch zum Inhalt passt).
+   **Marken werden nur beurteilt, wenn irgendein Etikettensektor F8 trägt** (sonst `.img`/`.cqm`/`.td0`/`.imd` ohne Marken → 19 Falschmeldungen je Leerdiskette).
+   Nicht geprüft (nicht belegt): ERMAP-Nummern, VOL1-Felder, NV, ND = AADR + 2·ML (nur 22 von 31 Einträgen).  Wächter `SiosFsCheck.*`
+   (alle fünf Originale **ganz ohne Befund und Hinweis**, je Kennung ein kaputtes Abbild).
+7a. **Rettung** (D5, `check/sios_recover.cpp`, Wächter `SiosRecover.*`, `cli_dt_recover_sios_*`): Fund `d==0` = `DDR1` mit gültigem Bereich, `d==1` = gelöschtes Objekt
+   (Name blank, AADR/ML). **Ein DDR1-Bereich hinter dem Diskettenende ist KEIN Fund** — die SG1 trägt 17 solche Platzhalter (`DATA10..26`, 01001..73026), die Originale müssen
+   `recover --full` leer liefern.  Lebendes Etikett im Bereich → Bruchstück, nicht wiederherstellbar; Etikett wiederherstellen = derselbe Sektor `DDR1`→`HDR1` + Marke FB,
+   alle Bedingungen unmittelbar vorher neu; Namensvetter nur mit `--restore N=NAME`.  Objekt: **nur** mit Anwendername (1–5 Zeichen, nicht vorhanden, Platz muss AADR tragen und blank sein) —
+   der Name ist nicht ableitbar, nie raten.  Stolperstein: `write` nimmt den **niedrigsten** freien Etikettensatz, auch einen `DDR1` — eine neu angelegte Datei überschreibt also das Etikett (nicht den Bereich) einer zuvor gelöschten; dessen Fund ist dann weg, auch wenn die Daten noch dastehen (Oberflächensuche nach Etikettenlosem gibt es bei SIOS nicht).
+7b. **Oberfläche (D6, 2026-10-30, Wächter `py_disktool_sios_gui`, `test_sios_label_fields_through_the_abi`)**:
+   (a) `DiskView._set_sios`: Bibliotheken (Typ `B`) sind Ordner mit `DIR_ROLE`, Objekte (`O`, Name `LIB/OBJ`) darunter mit Kurzname, `REF_ROLE` bleibt der VOLLE Name —
+   Holen/Löschen/Eigenschaften brauchen das so.  Ablegen: `tree.drop_ziel` = Bibliothek unter dem Mauszeiger, `insert_paths(..., sios_lib=…)` setzt den Präfix `LIB/`;
+   „Schreiben“ nimmt die angeklickte Bibliothek (oder die des angeklickten Objekts) via `DiskView.sios_ziel()`, sonst physische Datei.
+   (b) `PropertiesDialog.art == "sios"` (vorher fiel SIOS fälschlich auf die CP/M-Attribute): nur Anzeige (VOL1 + HDR1 bzw. AADR/ML), Knopf „Übernehmen“ aus.  C-ABI **additiv**
+   `k1520d_sios_info`/`k1520d_sios_file`, Python `DiskTool.sios_volume()`/`sios_datei(name)`, Kern `DiskVolume::siosFs()`, `SiosFileSystem::objektInfo`/`vol1Feld`.
+   (c) Diskeditor: `hexdump(..., kodierung="ebcdic")`, `ebcdic_zeichen` = `cp500` + 6AH→`/` (nur ASCII-Bereich, sonst `.`); Wahlfeld „Text“; SIOS Spur 0 = EBCDIC von selbst,
+   sonst ASCII; ausdrückliche Wahl je Diskette (QSettings-Schlüssel `diskeditor/kodierung_<sha1 des Pfads>`, ohne benannte Anwendung nur im Prozess, damit Tests nichts schreiben).
+   Offen: Etiketten sind nicht bearbeitbar (kein „Datenträgername ändern“ im Dialog).
+8. Fixtures: `tests/fixtures/disks/sios1526_{dp1,dp2,sg1,syls,sylp}.hfe` (Kopien von `tools/sios_a5120/original/`).  Tests `SiosFs.*`, `SiosFsCheck.*`, `cli_dt_*sios*`.

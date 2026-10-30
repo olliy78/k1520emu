@@ -22,8 +22,9 @@
  *    wurde (Entprellung ueber zwei Matrixdurchlaeufe).
  *
  * ANNAHMEN (unbelegt, Schaltplan/EPROM fehlen — Merkposten a5130_k8924, als Config gefuehrt):
- *  - [A1] Bitlage des Gueltigkeitsregisters: Bit 0 = Terminaltastatur K7633, Bit 1 = Kundentastatur,
- *         alle uebrigen Bits 0, aktiv high (@ref Config::bit_terminal, @ref Config::bit_kunde).
+ *  - [A1] BELEGT (Treiber T-K7633, doc/sios/module_k7633_kut.md): Gueltigkeitsregister Bit 1 =
+ *         Terminaltastatur K7633, Bit 0 = Kundentastatur, alle uebrigen Bits 0, aktiv high
+ *         (@ref Config::bit_terminal, @ref Config::bit_kunde).
  *  - [A2] `IN 40H` und `IN 43H` liefern FFH (nicht beschrieben); `OUT 40H..42H` wirkungslos.
  *  - [A3] Alpha-Umschaltung: die AUP waehlt die Tabelle "mit Alpha", solange das Kommandobyte die
  *         ALPHA-LED einschaltet (Bit 1 = 0) — @ref Alpha::NachLed.  Fest "ohne"/"mit" waehlbar.
@@ -33,8 +34,16 @@
  *  - [A6] Kommando mit Bit 7 = 0 (Kennung fehlt) wird verworfen.  /RESET wirkt wie FFH.
  *  - [A7] Positionen mit Code 00H liefern nichts (unbelegte Positionen; B07/B12 tragen einen Namen,
  *         aber Code 00H — vielleicht die Alpha-Taste, unbelegt).  Gesendet wird beim Druecken,
- *         nicht beim Loslassen; ein Schluesselschalter (SS1/SS2 = Position 00H/01H, AAH/A9H) sendet
- *         beim Einschalten seinen Code, das Ausschalten sendet nichts.
+ *         nicht beim Loslassen.  Ein Schluesselschalter (SS1/SS2 = Position 00H/01H, AAH/A9H) sendet
+ *         bei JEDER Drehung (ein UND aus) seinen Code — der Treiber kippt bei jedem Code, Beleg
+ *         doc/sios/module_k7633_kut.md §2 (Anwendervorgabe: Stecken/Abziehen ist nicht erkennbar).
+ *  - [A7a] [?] Anlauf: nach /RESET (NICHT nach dem Kommando FFH) meldet die AUP jeden EINGESCHALTETEN
+ *         Schluesselschalter einmal, NACH dem ersten Lesen des Typzeichens (wie die K7637 ihre SL-Codes).
+ *         Nicht nach FFH: SIOS schreibt FFH auch als gewoehnliches Lampenbyte "alles aus" (am laufenden
+ *         System beobachtet: OUT 43H,FFH ausserhalb der Initialisierung), ein erneuter Code kippte den Zustand.
+ *  - TYP (belegt): nach FFH und /RESET liefert `IN 42H` das Typzeichen 80H | Config::typ (Low-Nibble
+ *         [?] Variante), ohne Gueltigkeitsbit; der Treiber liest es bis zu 65535 Mal.  A6 behaelt es,
+ *         bis der naechste Tastencode kommt.
  *  - [A8] Tastendruecke gehen nicht verloren: sie warten in einer Schlange (hoechstens
  *         @ref kSchlange), bis die ZRE den vorigen Code abgeholt hat.  Am Geraet wartet die AUP-CPU
  *         ebenfalls (Eingang DI3 "A6 noch nicht abgeholt"); ob sie dabei Tasten verliert, ist offen.
@@ -99,8 +108,9 @@ public:
         uint32_t takt_hz = 2'457'600;           ///< CPU-Takt der Maschine (Zeitumrechnung)
         const uint64_t* uhr = nullptr;          ///< Maschinenzeit in Takten (nullptr = steht bei 0)
         Alpha    alpha = Alpha::NachLed;        ///< [A3]
-        uint8_t  bit_terminal = 0x01;           ///< [A1] Gueltigkeitsbit K7633
-        uint8_t  bit_kunde    = 0x02;           ///< [A1] Gueltigkeitsbit Kundentastatur
+        uint8_t  bit_terminal = 0x02;           ///< [A1] Gueltigkeitsbit K7633 (belegt)
+        uint8_t  bit_kunde    = 0x01;           ///< [A1] Gueltigkeitsbit Kundentastatur (belegt)
+        uint8_t  typ = 0;                       ///< Low-Nibble des Typzeichens 80H | typ [?] (K7633: Vorgabe 0)
         uint32_t entprell_us     = 16'000;      ///< [A4]
         uint32_t wiederhol_ab_us = 500'000;     ///< [A4] erste Wiederholung einer Dauerfunktionstaste
         uint32_t wiederhol_us    = 100'000;     ///< [A4] Abstand der Wiederholungen
@@ -148,6 +158,7 @@ public:
     bool    hasInterrupt() const override;
     uint8_t getVector() const override;
     void    onRETI() override;
+    bool    inService() const override { return sio_ && (sio_->inBedienung() || ctc_->inBedienung()); }
     const char* intDeviceName() const override;
 
     // ─── Von aussen ──────────────────────────────────────────────────────────
@@ -156,7 +167,8 @@ public:
      * @return false bei unbekannter Tastatur/Position (keine Taste dort).
      */
     bool taste(Tastatur t, int pos, bool gedrueckt);
-    /** @brief Schluesselschalter @p n (1 = SS1, 2 = SS2) ein/aus = Position 00H/01H der K7633. */
+    /** @brief Schluesselschalter @p n (1 = SS1, 2 = SS2) ein/aus = Position 00H/01H der K7633;
+     *         jede Drehung (ein und aus) meldet den Code AAH (SS1) / A9H (SS2). */
     bool schluessel(int n, bool an) { return (n == 1 || n == 2) && taste(Tastatur::K7633, n - 1, an); }
     /** @brief Stellung eines Schluesselschalters (sofort nach @ref schluessel, fadensicher). */
     bool schluesselAn(int n) const;
@@ -179,14 +191,14 @@ public:
 
 private:
     struct Ereignis { Tastatur t; uint8_t pos; bool gedrueckt; };
-    struct Code { Tastatur t; uint8_t code; uint64_t ab; };
+    struct Code { Tastatur t; uint8_t code; uint64_t ab; bool anlauf = false; };
 
     uint64_t jetzt() const { return cfg_.uhr ? *cfg_.uhr : 0; }
     uint64_t takte(uint32_t us) const { return uint64_t(cfg_.takt_hz) * us / 1'000'000u; }
     /// Ereignisse einarbeiten, Wiederholung, naechsten Code nach A6 — bei jedem Gastzugriff.
     void aktualisieren();
     void kommandoAusfuehren(uint8_t d);
-    void allesLoeschen();
+    void allesLoeschen(bool anlauf);   ///< Reset/FFH: Gueltigkeit, Schlange, Typzeichen; @p anlauf: Schluesselcodes [A7a]
 
     class Sonder;   // SerialAnschluss von SIO-Kanal B (aup.cpp)
     void kette();   ///< IEI durch SIO -> CTC reichen
@@ -209,6 +221,7 @@ private:
 
     uint8_t  a5_ = 0;                  ///< Gueltigkeit
     uint8_t  a6_ = 0;                  ///< Tastencode (bleibt nach dem Lesen stehen)
+    bool     typ_offen_ = true;        ///< A6 traegt das Typzeichen, noch nicht gelesen (haelt nur Anlaufcodes)
     uint8_t  kommando_ = 0xFF;
     uint32_t hupe_ = 0;
     uint32_t verworfen_ = 0;

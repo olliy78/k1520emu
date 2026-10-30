@@ -57,28 +57,27 @@ K2526::K2526(K1520Bus& bus, const A5120Config& cfg)
     : bus_(bus), cfg_(cfg)
 {
     // ── ZVE1 (Haupt-CPU) mit K1520-Bus und Q240-Schutz verdrahten ───────────
-    // Alle Speicherzugriffe von ZVE1 werden durch die Q240-Schutzlogik (spa_)
-    // gefiltert.  Lesezugriffe auf geschuetzte Segmente geben 0xFF zurueck und
-    // loesen eine NMI aus; Schreibzugriffe werden verworfen.
-    // Wenn /SPS-ESR aktiv ist (spa_.isTableWriteEnabled()), gehen Lese-/
-    // Schreibzugriffe in die Schutztabelle, nicht in den Speicher.
+    // Alle Zugriffe von ZVE1 laufen durch die Q240-Schutzlogik (spa_, Abschn. 6.11):
+    //  - B2 = 1 (Reset-Zustand): Speicher arbeitet normal; JEDER Speicherzugriff
+    //    (auch Opcode-/Operandabruf — der /CS des Schutz-RAMs liegt an jedem
+    //    Speicherzyklus) beschreibt Schutz-RAM[A>>6] := AB0.  Beleg: SIOS 1526
+    //    legt vor dem Scharfschalten ein NOP ein (0B03H), damit das letzte Byte des
+    //    Befehlsstroms (OUT-Operand 0B05H) eine UNGERADE Adresse hat und das eigene
+    //    Segment "1" (Betriebssystem) bleibt.
+    //  - B2 = 0 (scharf): Lesen und Opcode-Abruf werden NIE beeinflusst; ein Schreiben
+    //    eines Anwender-Befehls in ein Betriebssystem-Segment entfaellt (/MEMDI = 0) und
+    //    setzt den SPS-Indikator; E/A-Befehle des Anwenderbereichs loesen NMI aus.
+    // ZVE2 (DMA, /BAO) und Refresh sind ausgenommen (eigene Callbacks unten).
     cpu_.readByte = [this](uint16_t a) -> uint8_t {
-        if (spa_.isTableWriteEnabled())
-            return spa_.readEntry(a);          // table-programming mode: read table
-        if (spa_.isReadProtected(a)) {
-            handleSPSViolation();
-            return 0xFF;                       // blocked access returns open-drain
-        }
+        if (spa_.programmieren()) spa_.programmiere(a);
         return bus_.memRead(a);
     };
     cpu_.writeByte = [this](uint16_t a, uint8_t d) {
-        if (spa_.isTableWriteEnabled()) {
-            spa_.writeEntry(a, d);             // table-programming mode: write table
-            return;
-        }
-        if (spa_.isWriteProtected(a)) {
+        if (spa_.programmieren()) {
+            spa_.programmiere(a);
+        } else if (spa_.schreibenGesperrt(a)) {
             handleSPSViolation();
-            return;                            // blocked write silently dropped
+            return;                            // /MEMDI = 0: Schreiben findet nicht statt
         }
         bus_.memWrite(a, d);
         // /WR-Strobe (Port A A5) NACH dem Schreiben pulsen: die Speicher-Ausbau-
@@ -87,8 +86,18 @@ K2526::K2526(K1520Bus& bus, const A5120Config& cfg)
         pulseWriteStrobe();
     };
     // Volle E/A-Adresse auf den Bus: AB8–15 wertet der Attributspeicher des EM256 aus.
-    cpu_.readPort     = [this](uint16_t p)           { return bus_.ioRead(p); };
-    cpu_.writePort    = [this](uint16_t p, uint8_t d){ bus_.ioWrite(p, d); };
+    // E/A-Schutz: ein E/A-Befehl aus dem Anwenderbereich bei scharfem Schutz ist
+    // unerlaubt: NMI (fluechtig, BS-PIO A2 bleibt high), der Zugriff wird abgebrochen
+    // (IN liefert FFH, OUT bleibt ohne Wirkung).  Die Doku nennt "abgebrochen"
+    // (6.11.1) und /MEMDI = 0 (6.11.3); ob das Geraet den Zyklus noch sieht, ist offen [?].
+    cpu_.readPort     = [this](uint16_t p) -> uint8_t {
+        if (spa_.eaUnerlaubt()) { handleEAVerletzung(); return 0xFF; }
+        return bus_.ioRead(p);
+    };
+    cpu_.writePort    = [this](uint16_t p, uint8_t d) {
+        if (spa_.eaUnerlaubt()) { handleEAVerletzung(); return; }
+        bus_.ioWrite(p, d);
+    };
     cpu_.retiCallback = [this]()                     { bus_.signalRETI(); };
 
     // ── ZVE2 (DMA-CPU) mit K1520-Bus verdrahten (ohne Q240-Schutz) ──────────
@@ -162,7 +171,7 @@ void K2526::powerOn()
     bs_pio_.reset();   // wird direkt darunter neu programmiert (Mode 3 + Richtungen)
 
     // ── Q240 Schutztabelle zuruecksetzen ────────────────────────────────────
-    spa_.reset();
+    spa_.reset();          // FFs aus, B2 = 1; das Schutz-RAM behaelt seinen Inhalt (/RESET)
     sps_ind_      = false;
     // Port-A-Eingaenge: pull-high, ABER die dynamischen Bus-Strobes /M1 (A0) und
     // /RDY (A6) liegen im laufenden System praktisch dauernd aktiv (aktiv-LOW):
@@ -183,7 +192,7 @@ void K2526::powerOn()
                             //   gebooteten Zustand die alte ZVE2 stehen lassen und der
                             //   Boot-DMA-Handshake nicht neu anlaufen (Kaltstart-Fix).
     shutdown_req_ = false;
-    LOG_INFO("K2526", "Q240: Schutztabelle zurueckgesetzt (alle Segmente ungeschuetzt)");
+    LOG_INFO("K2526", "Q240: Reset - B2=1 (Schutz unwirksam), FFs geloescht");
 
     // ── BS-PIO im Bitmode (Mode 3) initialisieren ─────────────────────────
     // Port A (08H Data, 09H Ctrl): Richtungsmaske 0x7F
@@ -301,11 +310,16 @@ void K2526::ioWrite(uint8_t port, uint8_t data)
         if (ubus_geraet_) ubus_geraet_->ubusWrite(port, data);
         switch (port) {
             case 0x00:
-                // /INT-BS: OS-Ebenen-Wechsel anfordern.
-                // Aktiviert den /INT-BS-Eingang (B1=0) der BS-PIO, was einen
-                // BS-PIO-Interrupt ausloest, sofern der OS ihn konfiguriert hat.
-                // Der int_bs_active_-Zustand bleibt bis zum naechsten /RES-SPA erhalten.
+                // /INT-BS: OS-Ebenen-Wechsel anfordern.  Der Decoder A27 liefert nur
+                // einen IMPULS waehrend des E/A-Zyklus (kein Zustand): B1 ist aktiv LOW
+                // (Ruhepegel HIGH, Abschn. 6.10.2) und faellt kurz auf 0.  SIOS
+                // programmiert BS-PIO B im Bitmodus ODER/aktiv HIGH (Steuerwort B7H,
+                // Maske FDH) - die Bedingung tritt also an der RUECKflanke des Impulses
+                // ein, bei jedem OUT 00H erneut.  Ein dauernd gehaltener Pegel loeste
+                // nur einmal aus - SIOS wartete dann in 1CD4H ewig auf seine ISR.
                 int_bs_active_ = true;
+                bs_pio_.portBWrite(buildPortBInputs());
+                int_bs_active_ = false;
                 bs_pio_.portBWrite(buildPortBInputs());
                 LOG_INFO("K2526", "U-Bus OUT 00H (/INT-BS): OS-Ebenen-Wechsel angefordert");
                 break;
@@ -408,16 +422,14 @@ void K2526::onBSPIOPortBOut(uint8_t data)
         LOG_INFO("K2526", "Lade-ROM REAKTIVIERT: BS-PIO B0=/LD-ROM=1 (PortB=0x%02X)", data);
     }
 
-    // ── B2: /SPS-ESR – Q240 Schutztabellen-Schreibmodus ─────────────────
-    // B2=0 (active low): ZVE1-Speicherzugriffe gehen in Schutztabelle.
-    // B2=1: normaler Betrieb, Q240 prueft Zugriffe gegen Schutztabelle.
-    bool sps_esr = !(data & 0x04);
-    if (spa_.isTableWriteEnabled() != sps_esr) {
-        spa_.enableTableWrite(sps_esr);
-        LOG_INFO("K2526", "Q240 /SPS-ESR=%d: Schutztabellen-%s (PortB=0x%02X)",
-                 (int)!sps_esr,
-                 sps_esr ? "Schreibmodus aktiv" : "Pruefmodus aktiv",
-                 data);
+    // ── B2: /SPS-ESR – Q240 ─────────────────────────────────────────────
+    // B2=1: Schutz-RAM beschreibbar (ueber AB0 der Speicherzugriffe), Schutz
+    // unwirksam.  B2=0: Speicher- und E/A-Schutz scharf (Abschn. 6.10.2, 6.11).
+    const bool b2_high = (data & 0x04) != 0;
+    if (spa_.programmieren() != b2_high) {
+        spa_.setProgrammieren(b2_high);
+        LOG_INFO("K2526", "Q240 /SPS-ESR=%d: Schutz %s (PortB=0x%02X)",
+                 (int)b2_high, b2_high ? "unwirksam (Schutz-RAM programmierbar)" : "SCHARF", data);
     }
 
     // ── B3: /WAIT-ZVE2 – ZVE2 anhalten/freigeben ─────────────────────────
@@ -444,18 +456,29 @@ void K2526::onBSPIOPortBOut(uint8_t data)
  * @brief Handle a ZVE1 memory-protection violation (Q240 logic).
  *
  * Called from the ZVE1 readByte/writeByte callbacks when a protected segment
- * is accessed.  Sets the SPS-Ind flag (BS-PIO A3 input) and asserts NMI so
- * the OS can handle the violation.  The NMI is cleared by /RES-SPA (port 02H).
+ * is written.  Sets the SPS-Indikator FF (BS-PIO A3 input, aktiv low); it is
+ * cleared by /RES-SPA (port 02H).
  */
 void K2526::handleSPSViolation()
 {
     if (!sps_ind_) {
         sps_ind_ = true;
         spa_.setViolation();
-        updatePortAInputs();
-        bus_.assertNMI();
-        LOG_WARN("K2526", "Q240 SPS-Verletzung! SPS-Ind gesetzt, NMI assertiert");
+        updatePortAInputs();   // A3 low -> BS-PIO-A-Interrupt (kein NMI: das gilt nur fuer E/A)
+        LOG_WARN("K2526", "Q240 SPS-Verletzung! SPS-Indikator gesetzt (A3 low)");
     }
+}
+
+/**
+ * @brief Unerlaubter E/A-Befehl (Anwenderbereich, Schutz scharf): NMI.
+ *
+ * Fluechtig (Abschn. 6.10.2 A2): der SPS-Indikator wird nicht gesetzt, A2 bleibt high;
+ * /MEMDI = 0 wird mit dem /NMI-Quittungs-M1 aufgehoben (run loop: clearNMI).
+ */
+void K2526::handleEAVerletzung()
+{
+    bus_.assertNMI();
+    LOG_WARN("K2526", "Q240: unerlaubter E/A-Befehl aus dem Anwenderbereich - NMI");
 }
 
 /**
@@ -468,10 +491,13 @@ void K2526::handleSPSViolation()
  */
 void K2526::updatePortAInputs()
 {
+    // A3 = SPS-Indikator ist AKTIV LOW (Abschn. 6.10.2): Ruhepegel high, Verletzung low.
+    // SIOS programmiert Steuerwort 97H (aktiv low) + Maske F7H; ein Ruhepegel low
+    // loeste dort dauernd den Interrupt aus.
     if (sps_ind_)
-        port_a_inputs_ |= 0x08;    // A3=1: SPS violation active
+        port_a_inputs_ &= ~0x08u;  // A3=0: Verletzung
     else
-        port_a_inputs_ &= ~0x08u;  // A3=0: no violation
+        port_a_inputs_ |= 0x08;    // A3=1: Ruhe
     bs_pio_.portAWrite(port_a_inputs_);
 }
 
@@ -512,8 +538,7 @@ uint8_t K2526::buildPortBInputs() const
     const uint8_t bruecken = bruecken_quelle_ ? bruecken_quelle_() : cfg_.config_bridges;
     uint8_t val = static_cast<uint8_t>((bruecken & 0x07) << 5);
     if (!int_bs_active_)
-        val |= 0x02;   // B1=1 when /INT-BS inactive (pull-up)
-    // B1=0 when int_bs_active_ (latch pulled low by port 00H write)
+        val |= 0x02;   // B1 = 1 (Ruhepegel); 0 nur waehrend des OUT-00H-Impulses
     return val;
 }
 
@@ -601,7 +626,8 @@ uint8_t K2526::getVector() const
  */
 void K2526::onRETI()
 {
-    ctc_.onRETI();
-    bs_pio_.onRETI();
-    LOG_DEBUG("K2526", "RETI: weitergeleitet an CTC und BS-PIO");
+    // /IEO sperrt bis zum RETI: nur der erste Baustein in Bedienung (CTC vor BS-PIO) nimmt es an.
+    if (ctc_.inBedienung())            ctc_.onRETI();
+    else if (bs_pio_.inBedienung())    bs_pio_.onRETI();
+    LOG_DEBUG("K2526", "RETI: weitergeleitet an CTC/BS-PIO (erster in Bedienung)");
 }
