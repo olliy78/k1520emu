@@ -334,8 +334,11 @@ std::string holeDatei(const std::string& abbild, const std::string& name, const 
     fs::create_directories(aus);
     TransferOptions to;
     EXPECT_TRUE(v->extractAll(aus.string(), to)) << v->lastError();
-    std::ifstream f(aus / name, std::ios::binary);
-    std::string got((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    std::string got;
+    {   // Datei VOR dem Loeschen schliessen: Windows verweigert remove_all auf offene Dateien.
+        std::ifstream f(aus / name, std::ios::binary);
+        got.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+    }
     fs::remove_all(aus);
     return got;
 }
