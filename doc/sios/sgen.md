@@ -182,3 +182,17 @@ auf der Zieldiskette von Hand (Menü, Etikett `SYSARE09` mit EOE) und SGEN danac
 **Folge für S7:** Bestückungen ohne fertiges Abbild lassen sich mit SGEN noch nicht herstellen.  Die vorhandenen Abbilder (SYLs = 1.1/K7637,
 SYLp = 0.9/K7636) bleiben die Systemdisketten.  Bei der Erkundung ist **kein Emulatorfehler** aufgefallen; die Auffälligkeiten (Fehlersperre,
 veraltete Kopfspur, K5600.10/.20) sind Gast-/Aufbauverhalten.
+
+## Nachtrag: die Folgediskette (2026-10-30)
+
+Wird in SGEN ein Modul jenseits von Satz 91 gewählt (geprüft mit `SLE`, Satz 98), bricht die Erzeugung ab mit
+
+```
+PROGRAM ==: ERR FD 6  SEQU SYSORG09 98FF     D50
+```
+
+`SEQU` = „bei Arbeit mit einem Laufwerk ist der nächste Datenträger erforderlich“ (Handbuch S. 25/26), Datenträgerwechsel
+„next = Nächster DT ist einzulegen“ (S. 100).  Damit ist am laufenden SIOS belegt, dass `SYSORG09` auf einer zweiten
+Generierdiskette weitergeht (HDR1-Kennzeichen `EC01` auf SG1).  Darauf liegen 22 Module: LOG KM, LBE, MB, SLE, HLE 2/4, SIM,
+DFUE-A/I/V, V24, IFSS1–3, BSC7LZ/LV/CZ/CV, BSC8CZ/CV, FUELLM, FIX.  Ein Wechsel auf die gleiche Diskette hilft nicht —
+die Fortsetzung fehlt in allen bekannten Sammlungen.  Wächter `SiosSgen.ModulAufDerFolgedisketteVerlangtDenNaechstenDatentraeger`.

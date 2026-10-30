@@ -184,7 +184,7 @@ Positionen 1-basiert, EBCDIC/DKOI, Zahlen **ASCII-Ziffernstil in EBCDIC** (`F0�
 | 40–42 | 3 | blank | | |
 | 43 | 1 | Schreibschutz | `P` bei `SYSARE11`/`SYSARE09` | IBM: P = geschützt [?]; sonst blank |
 | 44 | 1 | Austauschkennzeichen | `E` bei allen Dateien der Datendisketten | IBM „E = Exchange"; bei den Systemdisketten blank [SRC] |
-| 45 | 1 | Mehrdisketten-Kennzeichen | `C` bei `SYSORG09` | IBM: **C = Datei wird auf der nächsten Diskette fortgesetzt** (continued), `L` = letzte [?] |
+| 45 | 1 | Mehrdisketten-Kennzeichen | `C` bei `SYSORG09` | IBM: **C = Datei wird auf der nächsten Diskette fortgesetzt** (continued), `L` = letzte.  **Am laufenden SIOS belegt (2026-10-30):** SGEN meldet beim Zugriff auf Satz 98 `ERR FD 6 SEQU SYSORG09 98…` = „nächster Datenträger erforderlich“ (Handbuch S. 25/26, 100); Wächter `SiosSgen.ModulAufDerFolgedisketteVerlangtDenNaechstenDatentraeger` |
 | 46–47 | 2 | Folgenummer der Diskette | `01` bei `SYSORG09` | Nummer dieser Diskette in der Folge |
 | 48–53 | 6 | (Datum? / ?) | blank; bei `SYSARE*` `000004` | in IBM „Erstellungsdatum"; hier `000004` [?] |
 | 54–57 | 4 | logische Satzlänge | `1024` bei `SYSORG09`, sonst blank | wiederholt die Satzlänge, wenn ≠ 128 [?] |

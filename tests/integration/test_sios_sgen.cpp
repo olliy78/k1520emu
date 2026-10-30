@@ -280,3 +280,26 @@ TEST(SiosSgen, GeneriertEineSystemdiskette) {
     r.taste(kET1);                                 // -> SGEN IS WORKING
     ASSERT_TRUE(r.warte("SGEN FINISHED", 600'000'000LL)) << r.schirm();
 }
+
+
+// SYSORG09 geht ueber zwei Disketten (HDR1-Kennzeichen "EC01" = auf der naechsten fortgesetzt): SG1
+// traegt nur die Saetze bis 91.  Wird ein Modul dahinter gewaehlt (hier SLE, Satz 98), verlangt SGEN
+// den naechsten Datentraeger: ERR FD 6 SEQU (Handbuch S. 25/26 "der naechste Datentraeger ist
+// erforderlich", S. 100 Datentraegerwechsel).  Belegt damit: es gab eine Folgediskette.
+TEST(SiosSgen, ModulAufDerFolgedisketteVerlangtDenNaechstenDatentraeger) {
+    const std::string ziel = vorbereiteteZieldiskette();
+    Rechner r("sios1526_dp2.hfe");
+    TempDisk sg1("sios1526_sg1.hfe", "sios_sgen_sg1_folge.hfe");
+    sgenBisAuswahl(r, sg1);
+    //          GRUND T-K7637                 KUT BAB   ... SLE (Eintrag 29)
+    markiere(r, "XX   XX               " "XXX" "     " "X");
+    ASSERT_TRUE(r.ein40(1, ziel));
+    ASSERT_TRUE(r.ein40(0, sg1.path()));
+    r.taste(kET1);                                 // -> ***LISTING***
+    r.ruhe(100'000'000LL);
+    r.taste(kET1);                                 // -> SGEN IS WORKING
+    ASSERT_TRUE(r.warte("SEQU", 600'000'000LL)) << r.schirm();
+    const std::string v = r.schirm();
+    EXPECT_NE(v.find("ERR FD 6  SEQU SYSORG09 98"), std::string::npos) << v;
+    EXPECT_EQ(v.find("FINISHED"), std::string::npos) << v;
+}
