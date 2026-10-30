@@ -19,9 +19,12 @@
 
 #include "core/filesystem/disk_volume.h"
 #include "core/filesystem/geometry_probe.h"
+#include "core/filesystem/sios/sios_fs.h"
 #include "core/filesystem/wega/platten_volume.h"
 
 #include <algorithm>
+#include <cctype>
+#include <cstdio>
 #include <memory>
 #include <string>
 #include <vector>
@@ -425,6 +428,74 @@ extern "C" const char* k1520d_container_info(K1520Disk h, const char* key) {
         w = Td0Codec::infoField(*t, k);
     } else if (const ImdCodec::SourceInfo* i = v.imdInfo()) {
         w = ImdCodec::infoField(*i, k);
+    }
+    return halte(H(h)->s_container, std::move(w));
+}
+
+// ─── SIOS 1526: Etikettenfelder ────────────────────
+
+extern "C" const char* k1520d_sios_info(K1520Disk h, const char* key) {
+    if (!h || !key) return "";
+    const SiosFileSystem* f = H(h)->vol->siosFs();
+    if (!f) return halte(H(h)->s_container, "");
+    const std::string k = key;
+    std::string w;
+    if (k == "vol_name") w = f->vol1Feld(5, 10);
+    else if (k == "vol_zugriff") w = f->vol1Feld(11, 11);
+    else if (k == "vol_aufzeichnung") w = f->vol1Feld(71, 71);
+    else if (k == "vol_seiten") w = f->vol1Feld(72, 72);
+    else if (k == "vol_satzlaenge") w = f->vol1Feld(76, 76);
+    else if (k == "vol_sektorfolge") w = f->vol1Feld(77, 78);
+    else if (k == "vol_version") w = f->vol1Feld(80, 80);
+    else if (k == "etiketten_belegt") w = std::to_string(f->etiketten().size());
+    else if (k == "etiketten_gesamt") w = std::to_string(kSiosSektoren - 7);
+    return halte(H(h)->s_container, std::move(w));
+}
+
+extern "C" const char* k1520d_sios_file(K1520Disk h, const char* name, const char* key) {
+    if (!h || !name || !key) return "";
+    const SiosFileSystem* f = H(h)->vol->siosFs();
+    if (!f) return halte(H(h)->s_container, "");
+    const std::string n = name, k = key;
+    std::string w;
+    auto gross = [](std::string s) {
+        for (char& c : s) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+        return s;
+    };
+    auto hex = [](int v, int stellen) {
+        char b[16];
+        std::snprintf(b, sizeof b, "%0*X", stellen, v);
+        return std::string(b);
+    };
+    if (n.find('/') != std::string::npos) {
+        SiosObjekt o;
+        SiosEtikett lib;
+        if (f->objektInfo(n, o, &lib)) {
+            if (k == "art") w = "objekt";
+            else if (k == "bibliothek") w = lib.name;
+            else if (k == "aadr") w = hex(o.aadr, 4);
+            else if (k == "ml") w = hex(o.ml, 2);
+            else if (k == "laenge") w = std::to_string(o.laenge);
+        }
+    } else {
+        for (const SiosEtikett& e : f->etiketten()) {
+            if (gross(e.name) != gross(n)) continue;
+            auto z = [&](char c) { return c == ' ' ? std::string() : std::string(1, c); };
+            const bool lib = e.name.size() > 2 && e.name.compare(e.name.size() - 2, 2, "LB") == 0
+                             && e.satzlaenge == kSiosSektor;
+            if (k == "art") w = lib ? "bibliothek" : "datei";
+            else if (k == "etikett") w = std::to_string(e.sektor);
+            else if (k == "satzlaenge") w = std::to_string(e.satzlaenge);
+            else if (k == "boe") w = e.boe_text;
+            else if (k == "eoe") w = e.eoe_text;
+            else if (k == "eod") w = e.eod_text;
+            else if (k == "sektoren") w = std::to_string(e.anzahl());
+            else if (k == "schutz") w = z(e.schutz);
+            else if (k == "austausch") w = z(e.austausch);
+            else if (k == "fortsetzung") w = z(e.fortsetzung);
+            else if (k == "folge") w = e.folge;
+            break;
+        }
     }
     return halte(H(h)->s_container, std::move(w));
 }

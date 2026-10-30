@@ -134,7 +134,44 @@ std::string SiosFileSystem::etikettenText(int sektor) const {
     return dkoiText(s.data, 0, 80);
 }
 
-std::vector<SiosEtikett> SiosFileSystem::etiketten() const {
+std::vector<SiosEtikett> SiosFileSystem::etiketten() const { return etikettenMit("HDR1"); }
+
+std::vector<SiosEtikett> SiosFileSystem::geloeschteEtiketten() const { return etikettenMit("DDR1"); }
+
+std::string SiosFileSystem::vol1Feld(int von, int bis) const {
+    SectorData s;
+    if (von < 1 || bis < von || bis > 80
+        || !space_.readSector(0, 0, kVol1Sektor, s) || s.data.size() != kSiosSektor)
+        return {};
+    return rtrim(dkoiText(s.data, static_cast<size_t>(von - 1), static_cast<size_t>(bis)));
+}
+
+bool SiosFileSystem::objektInfo(const std::string& name, SiosObjekt& out, SiosEtikett* lib_aus) const {
+    const size_t schraeg = name.find('/');
+    if (schraeg == std::string::npos) return false;
+    const std::string lib = upper(name.substr(0, schraeg)), obj = upper(name.substr(schraeg + 1));
+    for (const SiosEtikett& e : etiketten()) {
+        if (upper(e.name) != lib) continue;
+        std::vector<SiosObjekt> os;
+        if (!bibliothek(e, os)) return false;
+        for (const SiosObjekt& o : os)
+            if (!o.name.empty() && upper(o.name) == obj) {
+                out = o;
+                if (lib_aus) *lib_aus = e;
+                return true;
+            }
+        return false;
+    }
+    return false;
+}
+
+bool SiosFileSystem::markeGeloescht(int sektor) const {
+    for (const auto& ls : space_.trackSectors(0, 0))
+        if (ls.id == sektor) return ls.deleted;
+    return false;
+}
+
+std::vector<SiosEtikett> SiosFileSystem::etikettenMit(const char* kennung) const {
     std::vector<SiosEtikett> out;
     for (int sek = kErsterEtikettenSektor; sek <= kSiosSektoren; ++sek) {
         SectorData s;
@@ -142,7 +179,7 @@ std::vector<SiosEtikett> SiosFileSystem::etiketten() const {
             continue;
         // Aktiv ist nur ein Satz mit HDR1 (die geloeschte Datenmarke F8 ist doppelte Kodierung
         // desselben Zustands und wird nicht ausgewertet, Formatdokument §4.4).
-        if (dkoiText(s.data, 0, 4) != "HDR1") continue;
+        if (dkoiText(s.data, 0, 4) != kennung) continue;
 
         SiosEtikett e;
         e.sektor = sek;
@@ -160,6 +197,9 @@ std::vector<SiosEtikett> SiosFileSystem::etiketten() const {
         e.eoe = adresse(e.eoe_text);
         e.eod = adresse(e.eod_text);
 
+        // Ein DDR1-Platzhalter ("D" + Blanks, nie benutzt) hat keine Adressen - kein Etikett.
+        if (kennung[0] == 'D' && e.boe_text.find_first_not_of(' ') == std::string::npos
+            && e.eoe_text.find_first_not_of(' ') == std::string::npos) continue;
         if (e.boe < 0 || e.eoe < 0) {
             e.gueltig = false;
             e.problem = "BOE '" + e.boe_text + "' / EOE '" + e.eoe_text + "' sind keine Adressen";

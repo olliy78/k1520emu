@@ -104,6 +104,13 @@ public:
     FsInfo info() const override;
     /// @brief Schnellpruefung der Etiketten (`core/filesystem/check/sios_check.cpp`).
     FsCheckReport check(FsCheckLevel level, bool nachladen) const override;
+    /// @brief Einzige Reparatur: `sios.marke.setzen` (Datenmarke eines Etikettensektors).
+    bool repair(const FsRepair& r) override;
+    /// @brief Rettung (`core/filesystem/check/sios_recover.cpp`): DDR1-Etiketten und
+    ///        geloeschte Bibliotheksobjekte.
+    FsRecoverReport recoverScan(FsRecoverLevel level, bool nachladen) const override;
+    bool recoverRead(const FsRecoverFind& f, std::vector<uint8_t>& out) const override;
+    bool recoverRestore(const FsRecoverFind& f, const std::string& name) override;
 
     // ─── Innenansicht (Diagnose, Tests) ──────────────────────────────────────
 
@@ -111,6 +118,13 @@ public:
     const std::string& volumeName() const { return label_; }
     /// @brief Alle aktiven HDR1-Etiketten in Sektorreihenfolge.
     std::vector<SiosEtikett> etiketten() const;
+    /// @brief Alle geloeschten DDR1-Etiketten (Felder wie bei HDR1; `gueltig` = Bereich auf
+    ///        dieser Diskette sinnvoll).  Nie leere Platzhalter ("D" + Blanks): die haben keine Adressen.
+    std::vector<SiosEtikett> geloeschteEtiketten() const;
+    /// @brief Ein Bibliotheksobjekt ("LIB/NAME", ohne Beachtung der Gross-/Kleinschreibung); false = gibt es nicht.
+    bool objektInfo(const std::string& name, SiosObjekt& out, SiosEtikett* lib = nullptr) const;
+    /// @brief VOL1-Feld Pos. @p von..@p bis (1-basiert, einschliesslich), DKOI-dekodiert, rechts bereinigt.
+    std::string vol1Feld(int von, int bis) const;
     /// @brief Das Verzeichnis einer Bibliothek; false = keine lesbare Bibliothek.
     bool bibliothek(const SiosEtikett& lib, std::vector<SiosObjekt>& out, int* nd = nullptr,
                     std::string* warum = nullptr) const;
@@ -154,6 +168,10 @@ private:
     std::vector<Eintrag> eintraege() const;
     bool sektorLesen(int linear, std::vector<uint8_t>& out) const;
     bool findEintrag(const std::string& name, Eintrag& out) const;
+
+    std::vector<SiosEtikett> etikettenMit(const char* kennung) const;
+    /// @brief Hat Etikettensektor @p sektor die geloeschte Datenmarke F8?  false auch bei .img (keine Marken).
+    bool markeGeloescht(int sektor) const;
 
     SectorSpace& space_;
     FsProfile    prof_;

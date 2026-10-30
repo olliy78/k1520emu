@@ -133,7 +133,9 @@ class PropertiesDialog(QDialog):
         # dieselben Kopfsektorangaben — nur CP/M nicht.
         # Die Art kommt aus dem Dateisystem, nicht aus dem Typfeld des Eintrags: bei
         # WEGA steht dort eine Dateiart (-/d/c), die man leicht fuer einen UDOS-Typ haelt.
-        if tool.ist_wega or entry.ist_unix:
+        if getattr(tool, "ist_sios", False):
+            self.art = "sios"          # nur Anzeige: VOL1 und HDR1 bzw. AADR/ML
+        elif tool.ist_wega or entry.ist_unix:
             self.art = "wega"
         elif tool.ist_udos or (entry.type and not getattr(tool, "ist_sios", False)):
             self.art = "udos"
@@ -145,7 +147,7 @@ class PropertiesDialog(QDialog):
         lay = QVBoxLayout(self)
         lay.addWidget(self._kopf())
         lay.addWidget({"wega": self._wega_teil, "udos": self._udos_teil,
-                       "cpm": self._cpm_teil}[self.art](), 1)
+                       "cpm": self._cpm_teil, "sios": self._sios_teil}[self.art](), 1)
 
         self.hinweis = QLabel("")
         self.hinweis.setWordWrap(True)
@@ -168,7 +170,8 @@ class PropertiesDialog(QDialog):
         self.knoepfe.button(QDialogButtonBox.Close).setText("Schließen")
         self.knoepfe.accepted.connect(self.uebernehmen)
         self.knoepfe.rejected.connect(self.reject)
-        self.knoepfe.button(QDialogButtonBox.Save).setEnabled(not tool.read_only)
+        self.knoepfe.button(QDialogButtonBox.Save).setEnabled(
+            not tool.read_only and self.art != "sios")
         lay.addWidget(self.knoepfe)
 
     # ════════════════════════════════════════════════════════════════════════
@@ -475,6 +478,74 @@ class PropertiesDialog(QDialog):
         form.addRow(hinweis)
         return kasten
 
+    def _sios_teil(self) -> QWidget:
+        """SIOS 1526: die Felder des Datenträger- und des Dateikennsatzes (nur Anzeige).
+
+        Ein Etikett wird nicht von Hand umgeschrieben — Name, Bereich und Kennzeichen
+        entstehen beim Anlegen; das Dialogfeld zeigt, was auf der Etikettenspur steht.
+        ``self.sios`` hält die Werte (Schlüssel wie ``k1520d_sios_file``) für Tests.
+        """
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(0, 0, 0, 0)
+        self.sios = {"vol": self.tool.sios_volume(),
+                     "datei": self.tool.sios_datei(self.entry.name)}
+        d, v = self.sios["datei"], self.sios["vol"]
+
+        if d.get("art") == "objekt":
+            kasten = QGroupBox("Bibliotheksobjekt")
+            form = QFormLayout(kasten)
+            form.addRow("Bibliothek", QLabel(d["bibliothek"]))
+            form.addRow("AADR", self._nur_anzeige(
+                d["aadr"], "Sektornummer (ab 1) des ersten Sektors in der Bibliothek, hex"))
+            form.addRow("ML", self._nur_anzeige(
+                d["ml"], "Byte 7 des Verzeichniseintrags (vermutlich Speicherlänge in 256-B-Seiten), hex"))
+            form.addRow("Länge", QLabel(f"{d['laenge']} Sektoren (Abstand zum nächsten AADR)"))
+            lay.addWidget(kasten)
+        elif d:
+            kasten = QGroupBox("Dateikennsatz (HDR1)")
+            form = QFormLayout(kasten)
+            form.addRow("Art", QLabel("Bibliothek" if d["art"] == "bibliothek" else "Datei"))
+            form.addRow("Etikettensektor", QLabel(f"Spur 0, Sektor {d['etikett']}"))
+            form.addRow("Satzlänge", QLabel(f"{d['satzlaenge']} Byte"))
+            form.addRow("BOE (Beginn)", QLabel(d["boe"]))
+            form.addRow("EOE (Ende des Bereichs)", QLabel(d["eoe"]))
+            form.addRow("EOD (Ende der Daten)", QLabel(d["eod"] or "— (fehlt oder ungültig)"))
+            form.addRow("Datensektoren", QLabel(str(d["sektoren"])))
+            kz = QLabel(self._sios_kennzeichen(d))
+            kz.setWordWrap(True)
+            form.addRow("Kennzeichen", kz)
+            lay.addWidget(kasten)
+
+        if v:
+            kasten = QGroupBox("Datenträger (VOL1)")
+            form = QFormLayout(kasten)
+            form.addRow("Name", QLabel(v["vol_name"]))
+            form.addRow("Zugriffskennzeichen",
+                        QLabel(v["vol_zugriff"] or "— (frei)"))
+            form.addRow("Aufzeichnung", QLabel(v["vol_aufzeichnung"] or "—"))
+            form.addRow("Sektorfolge", QLabel(v["vol_sektorfolge"] or "—"))
+            form.addRow("Etikettenstandard", QLabel(v["vol_version"] or "—"))
+            form.addRow("Etikettensätze",
+                        QLabel(f"{v['etiketten_belegt']} von {v['etiketten_gesamt']} belegt"))
+            lay.addWidget(kasten)
+        lay.addStretch(1)
+        return w
+
+    @staticmethod
+    def _sios_kennzeichen(d: dict) -> str:
+        teile = []
+        if d.get("schutz"):
+            teile.append(f"{d['schutz']} — geschützt")
+        if d.get("austausch"):
+            teile.append(f"{d['austausch']} — Austauschdatei")
+        if d.get("fortsetzung") == "C":
+            teile.append("C — auf der Folgediskette fortgesetzt"
+                         + (f" (Folge {d['folge']})" if d.get("folge") else ""))
+        elif d.get("fortsetzung"):
+            teile.append(f"{d['fortsetzung']} (Mehrdisketten-Kennzeichen)")
+        return "; ".join(teile) or "keine"
+
     @staticmethod
     def _nur_anzeige(text: str, warum: str) -> QLabel:
         w = QLabel(text)
@@ -502,6 +573,8 @@ class PropertiesDialog(QDialog):
         """
         e = self.entry
         aend: dict = {}
+        if self.art == "sios":
+            return aend
         if self.wega:
             text = self.f_oktal.text().strip() or "0"
             try:

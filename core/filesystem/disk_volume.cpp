@@ -1754,6 +1754,11 @@ const TarFileSystem* DiskVolume::tarFs() const {
     return dynamic_cast<const TarFileSystem*>(volumes_[0].fs.get());
 }
 
+const SiosFileSystem* DiskVolume::siosFs() const {
+    if (!profile_ || profile_->type != FsType::Sios || volumes_.empty()) return nullptr;
+    return dynamic_cast<const SiosFileSystem*>(volumes_[0].fs.get());
+}
+
 const DiskFormat* DiskVolume::rohFormat() const {
     if (gemessenes_format_) return &*gemessenes_format_;
     if (format_) return format_;

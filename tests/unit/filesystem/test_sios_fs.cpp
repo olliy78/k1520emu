@@ -863,3 +863,220 @@ TEST(SiosFs, Dp1Spur0LesestromFuehrtF8) {
         EXPECT_TRUE(zurueck[i].data_crc_ok) << "Sektor " << int(sek[i].id);
     }
 }
+
+// ─── Pruefung D5: Kennungen, je ein gezielt kaputtes Abbild ──────────────────
+
+namespace {
+
+bool hat(const FsCheckReport& r, const std::string& id) {
+    for (const FsFinding& f : r.findings) if (f.id == id) return true;
+    return false;
+}
+
+/// @brief Sektor aendern: @p f bekommt die 128 Nutzbytes, die Datenmarke bleibt wie sie war.
+template <class F>
+void aendere(Diskette& d, uint8_t cyl, uint8_t sek, F f) {
+    SectorData s;
+    ASSERT_TRUE(d.space->readSector(cyl, 0, sek, s));
+    bool del = false;
+    if (cyl == 0) for (const auto& ls : d.space->trackSectors(0, 0)) if (ls.id == sek) del = ls.deleted;
+    f(s.data);
+    ASSERT_TRUE(d.space->writeSectorDam(cyl, 0, sek, s.data, del));
+}
+
+}  // namespace
+
+TEST(SiosFsCheck, OriginaleHabenGarKeineBefundeAuchKeineHinweise) {
+    for (const char* datei : {"sios1526_dp1.hfe", "sios1526_dp2.hfe", "sios1526_sg1.hfe",
+                              "sios1526_syls.hfe"}) {
+        auto d = direkt(fixture(datei), std::string(datei) == "sios1526_syls.hfe" ? "sios_ss80" : "sios_ss40");
+        ASSERT_TRUE(d.fs) << datei << d.error;
+        const FsCheckReport r = d.fs->check(FsCheckLevel::Schnell, false);
+        EXPECT_TRUE(r.findings.empty()) << datei << "\n" << r.alsText();
+    }
+    auto p = direkt(fixture("sios1526_sylp.hfe"), "sios_ss40");
+    ASSERT_TRUE(p.fs) << p.error;
+    EXPECT_TRUE(p.fs->check(FsCheckLevel::Schnell, false).findings.empty());
+}
+
+TEST(SiosFsCheck, KopfEtikettenFehlen) {
+    Kopie k("sios1526_dp1.hfe", "k1520_test_sios_kopf.hfe");
+    auto d = direkt(k.pfad, "sios_ss40", false);
+    ASSERT_TRUE(d.fs) << d.error;
+    aendere(d, 0, 5, [](std::vector<uint8_t>& b) { std::fill(b.begin(), b.begin() + 5, 0x40); });
+    aendere(d, 0, 7, [](std::vector<uint8_t>& b) { std::fill(b.begin(), b.begin() + 4, 0x40); });
+    const FsCheckReport r = d.fs->check(FsCheckLevel::Schnell, false);
+    EXPECT_TRUE(hat(r, "sios.ermap.fehlt")) << r.alsText();
+    EXPECT_TRUE(hat(r, "sios.vol1.fehlt")) << r.alsText();
+}
+
+TEST(SiosFsCheck, BibliotheksVerzeichnisGegenBelegung) {
+    Kopie k("sios1526_dp1.hfe", "k1520_test_sios_bibcheck.hfe");   // PHASELB ab Spur 1; Verz. = Spur 1 Sektor 2
+    auto d = direkt(k.pfad, "sios_ss40", false);
+    ASSERT_TRUE(d.fs) << d.error;
+    // Geloeschter Eintrag (Name blank) mit gleichem AADR wie der Nachbar zaehlt NICHT.
+    aendere(d, 1, 2, [](std::vector<uint8_t>& b) {
+        std::fill(b.begin() + 8, b.begin() + 13, 0x20);
+        b[8 + 5] = b[5]; b[8 + 6] = b[6];
+    });
+    EXPECT_FALSE(hat(d.fs->check(FsCheckLevel::Schnell, false), "sios.bib.doppelt"));
+    // Zwei benannte Objekte am selben AADR.
+    aendere(d, 1, 2, [](std::vector<uint8_t>& b) { b[8] = 'C'; b[9] = 'O'; });
+    EXPECT_TRUE(hat(d.fs->check(FsCheckLevel::Schnell, false), "sios.bib.doppelt"));
+    // AADR vor dem Datenteil.
+    aendere(d, 1, 2, [](std::vector<uint8_t>& b) { b[8 + 5] = 0x05; b[8 + 6] = 0x00; });
+    EXPECT_TRUE(hat(d.fs->check(FsCheckLevel::Schnell, false), "sios.bib.aadr"));
+    // AADR nicht aufsteigend: Eintrag 2 bekommt 0083, Eintrag 3 (war 0083) 0037.
+    aendere(d, 1, 2, [](std::vector<uint8_t>& b) {
+        b[8 + 5] = 0x83; b[8 + 6] = 0x00;
+        b[16 + 5] = 0x37; b[16 + 6] = 0x00;
+    });
+    EXPECT_TRUE(hat(d.fs->check(FsCheckLevel::Schnell, false), "sios.bib.reihenfolge"));
+    // Fuss-ND hinter dem Ende (Groesse 962).
+    aendere(d, 1, 2, [](std::vector<uint8_t>& b) { b[122] = 0xFF; b[123] = 0x7F; });
+    EXPECT_TRUE(hat(d.fs->check(FsCheckLevel::Schnell, false), "sios.bib.nd"));
+}
+
+TEST(SiosFsCheck, DatenmarkenUndReparatur) {
+    Kopie k("sios1526_sg1.hfe", "k1520_test_sios_marken.hfe");
+    auto d = direkt(k.pfad, "sios_ss40", false);
+    ASSERT_TRUE(d.fs) << d.error;
+    SectorData s9, s12;
+    ASSERT_TRUE(d.space->readSector(0, 0, 9, s9));      // PHASELB, aktiv
+    ASSERT_TRUE(d.space->readSector(0, 0, 12, s12));    // frei
+    ASSERT_TRUE(d.space->writeSectorDam(0, 0, 9, s9.data, true));      // aktiv mit F8
+    ASSERT_TRUE(d.space->writeSectorDam(0, 0, 12, s12.data, false));   // frei mit FB
+    FsCheckReport r = d.fs->check(FsCheckLevel::Schnell, false);
+    ASSERT_TRUE(hat(r, "sios.marke.aktiv")) << r.alsText();
+    ASSERT_TRUE(hat(r, "sios.marke.frei")) << r.alsText();
+    EXPECT_EQ(r.zaehlerAb(FsSeverity::Warnung), 0);      // nur Hinweise
+    for (const FsFinding& f : r.findings) {
+        ASSERT_EQ(f.repairs.size(), 1u);
+        EXPECT_TRUE(f.repairs[0].empfohlen);
+        EXPECT_FALSE(f.repairs[0].datenverlust);
+        ASSERT_TRUE(d.fs->repair(f.repairs[0])) << d.fs->lastError();
+    }
+    EXPECT_TRUE(d.fs->check(FsCheckLevel::Schnell, false).findings.empty());
+    EXPECT_FALSE(geloescht(d, 9));
+    EXPECT_TRUE(geloescht(d, 12));
+    // Eine veraltete Reparatur wird abgelehnt statt Unsinn zu schreiben.
+    FsRepair alt;
+    alt.kind = "sios.marke.setzen"; alt.a = 9; alt.b = 1;      // aktiv, will aber F8
+    EXPECT_FALSE(d.fs->repair(alt));
+}
+
+// ─── Rettung D5 ──────────────────────────────────────────────────────────────
+
+TEST(SiosRecover, OriginaleHabenNichtsZuRettenAuchDieDdr1PlatzhalterNicht) {
+    for (const char* datei : {"sios1526_dp1.hfe", "sios1526_dp2.hfe", "sios1526_sg1.hfe",
+                              "sios1526_syls.hfe"}) {
+        std::string err;
+        auto v = oeffne(datei, err);
+        ASSERT_TRUE(v) << datei << err;
+        // SG1 traegt 17 DDR1 mit Bereich 01001..73026 (> Diskette): kein Fund.
+        const FsRecoverReport& r = v->recoverScan(FsRecoverLevel::Oberflaeche, true);
+        EXPECT_TRUE(r.leer()) << datei << "\n" << r.alsText();
+    }
+}
+
+TEST(SiosRecover, GeloeschteDateiRettenUndWiederherstellen) {
+    Kopie k("sios1526_sg1.hfe", "k1520_test_sios_rec1.hfe");
+    auto d = direkt(k.pfad, "sios_ss40", false);
+    ASSERT_TRUE(d.fs) << d.error;
+    std::vector<uint8_t> vorher;
+    ASSERT_TRUE(d.fs->read("SYSORG09", vorher));
+    ASSERT_TRUE(d.fs->erase("SYSORG09"));
+    EXPECT_FALSE(finde(d.fs->list(), "SYSORG09"));
+
+    FsRecoverReport r = d.fs->recoverScan(FsRecoverLevel::Verzeichnis, true);
+    ASSERT_EQ(r.funde.size(), 1u) << r.alsText();
+    const FsRecoverFind f = r.funde[0];
+    EXPECT_EQ(f.name, "SYSORG09");
+    EXPECT_EQ(f.quality, FsRecoverQuality::Sicher);
+    EXPECT_TRUE(f.wiederherstellbar);
+    EXPECT_EQ(f.size, vorher.size());
+    EXPECT_EQ(f.cyl, 1);
+    std::vector<uint8_t> geholt;
+    ASSERT_TRUE(d.fs->recoverRead(f, geholt));
+    EXPECT_EQ(geholt, vorher);
+
+    // Unter anderem Namen zurueck; die Marke wird FB (aktiv).
+    ASSERT_TRUE(d.fs->recoverRestore(f, "alt")) << d.fs->lastError();
+    EXPECT_TRUE(finde(d.fs->list(), "ALT"));
+    EXPECT_FALSE(geloescht(d, 8));
+    std::vector<uint8_t> zurueck;
+    ASSERT_TRUE(d.fs->read("ALT", zurueck));
+    EXPECT_EQ(zurueck, vorher);
+    EXPECT_TRUE(d.fs->check(FsCheckLevel::Schnell, false).findings.empty());
+    EXPECT_TRUE(d.fs->recoverScan(FsRecoverLevel::Verzeichnis, true).leer());
+}
+
+TEST(SiosRecover, BelegterBereichIstBruchstueckUndNichtWiederherstellbar) {
+    Kopie k("sios1526_sg1.hfe", "k1520_test_sios_rec2.hfe");
+    auto d = direkt(k.pfad, "sios_ss40", false);
+    ASSERT_TRUE(d.fs) << d.error;
+    // A (Sektor 10, Spur 35) und B (Sektor 11, Spur 36) anlegen und loeschen; ein neues, zwei
+    // Spuren grosses NEU nimmt A's Etikettensatz UND die Spuren 35-36: B's DDR1 bleibt, B's Bereich ist weg.
+    ASSERT_TRUE(d.fs->write("A", muster(128 * 3, 5), WriteOptions{})) << d.fs->lastError();
+    ASSERT_TRUE(d.fs->write("B", muster(128 * 3, 6), WriteOptions{})) << d.fs->lastError();
+    ASSERT_TRUE(d.fs->erase("A"));
+    ASSERT_TRUE(d.fs->erase("B"));
+    ASSERT_TRUE(d.fs->write("NEU", muster(128 * 30, 7), WriteOptions{})) << d.fs->lastError();
+    const FsRecoverReport r = d.fs->recoverScan(FsRecoverLevel::Verzeichnis, true);
+    ASSERT_EQ(r.funde.size(), 1u) << r.alsText();
+    EXPECT_EQ(r.funde[0].quality, FsRecoverQuality::Bruchstueck);
+    EXPECT_FALSE(r.funde[0].wiederherstellbar);
+    EXPECT_NE(r.funde[0].warum_nicht.find("NEU"), std::string::npos);
+    EXPECT_FALSE(d.fs->recoverRestore(r.funde[0], ""));
+    EXPECT_NE(d.fs->lastError().find("NEU"), std::string::npos);
+    EXPECT_FALSE(finde(d.fs->list(), "B"));                    // unveraendert
+    std::vector<uint8_t> roh;
+    EXPECT_TRUE(d.fs->recoverRead(r.funde[0], roh));            // Holen geht trotzdem
+    EXPECT_FALSE(roh.empty());
+}
+
+TEST(SiosRecover, NurFuellbytesIstNurInDerOberflaechensucheSichtbar) {
+    Kopie k("sios1526_sg1.hfe", "k1520_test_sios_rec3.hfe");
+    auto d = direkt(k.pfad, "sios_ss40", false);
+    ASSERT_TRUE(d.fs) << d.error;
+    ASSERT_TRUE(d.fs->write("LEER", std::vector<uint8_t>(128, 0xE5), WriteOptions{}));
+    ASSERT_TRUE(d.fs->erase("LEER"));
+    const FsRecoverReport v = d.fs->recoverScan(FsRecoverLevel::Verzeichnis, true);
+    ASSERT_EQ(v.funde.size(), 1u);
+    EXPECT_EQ(v.funde[0].quality, FsRecoverQuality::Sicher);
+    const FsRecoverReport o = d.fs->recoverScan(FsRecoverLevel::Oberflaeche, true);
+    ASSERT_EQ(o.funde.size(), 1u);
+    EXPECT_EQ(o.funde[0].quality, FsRecoverQuality::Bruchstueck);
+    EXPECT_NE(o.funde[0].detail.find("Fuellbytes"), std::string::npos);
+}
+
+TEST(SiosRecover, GeloeschtesObjektBrauchtEinenNamen) {
+    Kopie k("sios1526_sg1.hfe", "k1520_test_sios_rec4.hfe");
+    auto d = direkt(k.pfad, "sios_ss40", false);
+    ASSERT_TRUE(d.fs) << d.error;
+    std::vector<uint8_t> vorher;
+    ASSERT_TRUE(d.fs->read("PHASELB/SOPH", vorher));
+    ASSERT_TRUE(d.fs->erase("PHASELB/SOPH"));
+    const FsRecoverReport r = d.fs->recoverScan(FsRecoverLevel::Verzeichnis, true);
+    ASSERT_EQ(r.funde.size(), 1u) << r.alsText();
+    const FsRecoverFind f = r.funde[0];
+    EXPECT_TRUE(f.name.empty());
+    EXPECT_EQ(f.type, "Objekt");
+    EXPECT_EQ(f.size, vorher.size());
+    EXPECT_FALSE(f.vorschlag.empty());
+    std::vector<uint8_t> geholt;
+    ASSERT_TRUE(d.fs->recoverRead(f, geholt));
+    EXPECT_EQ(geholt, vorher);
+
+    EXPECT_FALSE(d.fs->recoverRestore(f, ""));                  // Name nicht ableitbar
+    EXPECT_FALSE(d.fs->recoverRestore(f, "SGEN"));              // lebt schon
+    EXPECT_FALSE(d.fs->recoverRestore(f, "ZUVIEL"));            // > 5 Zeichen
+    EXPECT_FALSE(finde(d.fs->list(), "PHASELB/SOPH"));
+    ASSERT_TRUE(d.fs->recoverRestore(f, "soph")) << d.fs->lastError();
+    ASSERT_TRUE(finde(d.fs->list(), "PHASELB/SOPH"));
+    std::vector<uint8_t> nachher;
+    ASSERT_TRUE(d.fs->read("PHASELB/SOPH", nachher));
+    EXPECT_EQ(nachher, vorher);
+    EXPECT_TRUE(d.fs->check(FsCheckLevel::Schnell, false).findings.empty());
+    EXPECT_TRUE(d.fs->recoverScan(FsRecoverLevel::Verzeichnis, true).leer());
+}

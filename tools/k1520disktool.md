@@ -1221,8 +1221,15 @@ $ k1520disktool rm neu.hfe ALPHA                                  # HDR1 -> DDR1
 $ k1520disktool rm dp2.hfe PHASELB/NEU                            # Name blank, AADR/ML bleiben
 ```
 
-Prüfung: `k1520disktool fsck <abbild>` kennt `sios.hdr1.ungueltig` und `sios.hdr1.ueberlappt` (Fehler) sowie `sios.hdr1.eod`
-(Warnung); ERMAP-Nummern, VOL1-Felder und der Bibliotheksfuß werden nicht geprüft (nicht belegt).  Container: `.hfe`/`.dmk` für den Emulator;
+Prüfung: `k1520disktool fsck <abbild>` kennt `sios.hdr1.ungueltig`, `sios.hdr1.ueberlappt` (Fehler), `sios.hdr1.eod`, die
+Bibliotheksbefunde `sios.bib.aadr`/`.reihenfolge`/`.nd`/`.verzeichnis` (Warnung) und `.doppelt` (Fehler), `sios.ermap.fehlt`/`sios.vol1.fehlt`
+(Fehler) sowie die Hinweise `sios.marke.aktiv`/`.frei` (Datenmarke F8/FB passt nicht zum Etikett; `fsck --repair` setzt sie, ohne Datenverlust).
+ERMAP-Nummern, NV und VOL1-Felder außer der Kennung werden nicht geprüft (nicht belegt).
+
+Rettung: `k1520disktool recover <abbild> [--full] [--to ordner] [--restore N[=NAME]]` findet gelöschte Dateien (`DDR1` mit
+erhaltenem Bereich, Name und Größe bleiben) und gelöschte Bibliotheksobjekte (Name leer, nur Abstand zum nächsten AADR als Länge).
+Die 17 `DATA10..26`-Platzhalter der SG1 (Bereich hinter dem Diskettenende) sind kein Fund.  `--restore` einer Datei trägt `HDR1` mit Marke FB
+wieder ein, wenn kein lebendes Etikett den Bereich berührt; ein Objekt kommt **nur** mit vergebenem Namen zurück (`--restore 0=SOPH`).  Container: `.hfe`/`.dmk` für den Emulator;
 `.img`/`.cqm`/`.td0`/`.imd` gehen, **verlieren aber die gelöschten Datenmarken F8** der Etikettensektoren ab Sektor 9.  Erkennung nur mit Nachweis
 (ERMAP + VOL1), BCU-880- und MUTOS-Disketten behalten ihr Profil.
 

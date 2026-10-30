@@ -209,8 +209,32 @@ Schreibschutz, `E` Austausch, `C` Fortsetzung auf der Folgediskette).
   Etikettenspur und gelöschten Datenmarken in den freien Etikettensektoren.
 * **Prüfen** (`fsck`, beim Öffnen die Schnellprüfung): Befunde `sios.hdr1.ungueltig`
   (Fehler), `sios.hdr1.ueberlappt` (Fehler: zwei Dateien teilen sich Sektoren) und
-  `sios.hdr1.eod` (Warnung: Dateiende liegt außerhalb des Bereichs; es gilt dann `EOE`).
-  Die Prüfung ist bewusst klein — gemeldet wird nur, was belegt ist.
+  `sios.hdr1.eod` (Warnung: Dateiende liegt außerhalb des Bereichs; es gilt dann `EOE`);
+  dazu bei Bibliotheken `sios.bib.aadr`, `.reihenfolge`, `.nd` (Warnung) und `.doppelt`
+  (Fehler: zwei benannte Objekte am selben Anfang; gelöschte zählen nicht), `sios.ermap.fehlt`
+  und `sios.vol1.fehlt` (Fehler) sowie die **Hinweise** `sios.marke.aktiv`/`sios.marke.frei`: die
+  Datenmarke eines Etikettensektors (aktiv FB, frei F8) passt nicht zum Inhalt — Reparatur:
+  Marke setzen, ohne Datenverlust. Gemeldet wird nur, was belegt ist.
+* **Bibliotheken als Ordner:** `PHASELB`, `SOURCELB` und `RELOCLB` erscheinen als aufklappbare
+  Ordner, ihre Objekte darunter (`INIT`, `FGEN` …). Holen und Löschen gehen wie bei allen
+  Dateien; **Ablegen** auf eine Bibliothek (oder bei angeklickter Bibliothek bzw. angeklicktem
+  Objekt *Schreiben*) macht aus der Datei ein Objekt dieser Bibliothek (Name 1–5 Zeichen). Ohne
+  Ordner bleibt es eine physische Datei.
+* **Eigenschaften** (Doppelklick): bei einer Datei die Felder des Dateikennsatzes — Satzlänge,
+  BOE, EOE, EOD, Kennzeichen P/E und das Mehrdisketten-Kennzeichen (`C` = die Datei wird auf
+  der Folgediskette fortgesetzt) —, bei einem Objekt AADR und ML, dazu die Felder des
+  Datenträgerkennsatzes VOL1 (Name, Zugriffskennzeichen, Aufzeichnung, Etikettenstandard). Nur
+  Anzeige: Etiketten schreibt man nicht von Hand um.
+* **Diskeditor, Textspalte:** neben der CRC wählen Sie *Text: ASCII / EBCDIC/DKOI*. Auf Spur 0
+  einer SIOS-Diskette steht EBCDIC von selbst (dort lesen Sie `VOL1`, `HDR1` im Klartext), auf den
+  Datenspuren ASCII. Eine ausdrückliche Wahl wird je Diskette gemerkt. DKOI ist EBCDIC mit
+  fünf Abweichungen (`[ ! ] ^ /`).
+* **Retten** (*Gelöschtes retten…*, `recover`): gefunden werden gelöschte Dateien (Name, Größe
+  und Bereich bleiben im Etikett stehen) und gelöschte Bibliotheksobjekte (nur der **Name**
+  ist verloren). *In den Ordner holen* geht immer. *Auf der Diskette wiederherstellen*: eine
+  Datei nur, wenn kein lebendes Etikett den Bereich inzwischen berührt; ein Objekt nur mit
+  einem von Ihnen vergebenen Namen. Die 17 Platzhalter `DATA10…` der SG1 (Bereich hinter dem
+  Diskettenende) sind kein Fund.
 * **Spur 0 als Ganzes** (`boot-get`): holt die Etikettenspur samt Lader heraus.
 
 **Was abgelehnt wird — jeweils mit Grund**
