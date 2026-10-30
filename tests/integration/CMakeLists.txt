@@ -302,6 +302,9 @@ k1520_add_test(boot_bcu SRC test_boot_bcu.cpp LIBS ${_libs}
 k1520_add_test(sios_boot SRC test_sios_boot.cpp LIBS ${_libs} k1520_fs
                          LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 300)
 
+k1520_add_test(sios_sgen SRC test_sios_sgen.cpp LIBS ${_libs} k1520_fs
+                         LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 600)
+
 # DiskTool fuer BCU 880 (doc/a5120_alt/bcu.md §11): Startdiskette „SYL auf Spur 1“ erkennen/bauen,
 # Arbeitsdiskette bauen und fuellen, beide im Geraet (Lade-ROM V0.6), SYSGEN im Emulator.
 k1520_add_test(disktool_bcu SRC test_disktool_bcu.cpp

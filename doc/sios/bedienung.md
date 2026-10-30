@@ -140,3 +140,5 @@ Tasten: Zeichen als ASCII (die K7636.01 liefert Versalien ueber die Umschaltstuf
 ET2 bricht ab (`SiosMonitor.V09_DatMitK7636`).  **Ohne Sicherheitsstecker ignoriert 0.9 alle Zeichentasten** (Bedienebene 0,
 `28EEH..2935H`) — Stecker 01 einstellen.  Der Stecker meldet an der K7636 TYP, dann A9H/AAH/ABH (Annahme [?]).
 Medium: das Original (80 Zyl. x 2 Seiten ausgelesen) in K5600.20; die bereinigte 40-Spur-Fassung `sios1526_sylp40.hfe` in K5600.10.
+
+SYSD/SGEN (Fehlersperre, Version `09`, Auswahlbild): siehe `sgen.md`.
