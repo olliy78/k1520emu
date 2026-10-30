@@ -27,6 +27,13 @@ Die Zuordnung Datei → Ordner steht für die Bauskripte in `tools/disketten_bei
 `<system>_<diskformat>_<laufwerkskonfiguration>_<merkmale>.<ext>` — identisch zu den Fixtures,
 Erklärung der Segmente in `tests/fixtures/README.md`.
 
+## SIOS 1526 (noch keine Beispieldisketten)
+
+Die fünf Originalabbilder (SYLs = SIOS 1.1, SYLp = 0.9, DP1/DP2 = Programmdisketten, SG1 = Generierdiskette) liegen **nicht hier**, sondern
+unter `tools/sios_a5120/original/` (Herkunft, Prüfsummen dort); unveränderliche Testkopien als `tests/fixtures/disks/sios1526_*.hfe`.
+Ein Ordner `a5120_sios1526/` für den Anwender folgt mit AP S8 (Entwurf 43); bis dahin die Originale **nie direkt mounten** (der Emulator öffnet r/w).
+Bedienung: Handbuch des Emulators, Abschnitt „SIOS 1526“.
+
 ## Disketten
 
 | Datei | System | Laufwerke A: / B: / C: |

@@ -828,6 +828,146 @@ So geht es:
   V2.1-System läuft nur als **Eigenbau** (V1.2-Lader mit V2.1-System und
   V1.2-Plattentreiber, `tools/bcu_v21_eigenbau.py`) — **kein Original**.
 
+## SIOS 1526 (A5120, A5130, K8924)
+
+**SIOS 1526** ist das formular- und dialogorientierte Betriebssystem der Sparkassen- und
+Bürorechner A5120/A5130/K8924 (Robotron). Es zeigt in der untersten Bildschirmzeile eine
+**Systemzeile**, nimmt Kommandos des *Monitors* entgegen und lädt Programme aus einer
+Programmbibliothek (`PHASELB`) auf der Diskette. Wie alles in diesem Emulator läuft der
+Original-Z80-Code unverändert; es gibt keine Abkürzungen.
+
+> **Stand.** SIOS 1526/1.1 startet bis zur Systemzeile, die Monitorkommandos und mehrere
+> Programme laufen. **Noch nicht** möglich: das Formatieren einer Leerdiskette mit `INIT`
+> (bricht mit `ERR 9B`/`9C` ab), SIOS 0.9 (startet noch nicht bis zur Systemzeile) und
+> die Systemgenerierung `SGEN`. Fertige Beispieldisketten folgen im Ordner
+> `disks/a5120_sios1526/`; bis dahin brauchen Sie Abbilder Ihrer eigenen SIOS-Disketten.
+
+### Welche Disketten gehören dazu
+
+* **Systemdiskette** (`SYSARE11` für SIOS 1.1, `SYSARE09` für 0.9): Spur 0 trägt den
+  Lader, ab Spur 1 steht das System. Sie bootet, ohne dass ein Programm geladen wäre.
+* **Programmdisketten** (z. B. „DP1" und „DP2"): jeweils eine Bibliothek `PHASELB` mit
+  ausführbaren Programmen. 40 Spuren, einseitig, 26 Sektoren zu 128 Byte.
+* **Generierdiskette** (z. B. „SG1"): die Module für `SGEN`.
+
+Alle sind IBM-Etikettendisketten (kein CP/M-Dateisystem). Lesen, Auflisten und
+Beschreiben übernimmt das DiskTool (Abschnitt „SIOS 1526" in dessen Handbuch).
+
+### Einrichten
+
+1. *Einstellungen ▸ Allgemein ▸ Modell*: **A5120** (oder A5130/K8924).
+2. **Laufwerke:** die Systemdiskette hat 80 Spuren einseitig — Laufwerk **K5600.20**
+   (5¼″, 80 Spuren). Die 40-Spur-Programmdisketten dürfen im selben Laufwerk liegen; der
+   Emulator übersetzt die Spurdichte selbst (Doppelschritt, siehe „Wenn die Diskette nicht
+   zum Laufwerk passt").
+3. **Tastatur:** **K7637** für SIOS 1.1, **K7636** für SIOS 0.9 (die beiden Systeme sind
+   für verschiedene Tastaturen erzeugt).
+4. **Sicherheitsstecker** (*Einstellungen ▸ Allgemein*, Abschnitt „Sicherheitsstecker" oben):
+   **01** wählen. 01 ist der *Chefschalter* und gibt den Programmierer-Status. Ohne Stecker
+   kommt SIOS trotzdem bis zur Systemzeile, aber in den Monitorstatus ohne Bedienebenen.
+   *Maschine ▸ Sicherheitsstecker gesteckt* zieht und steckt ihn im Betrieb.
+5. Systemdiskette in **A:**, Programmdiskette in **B:**, Maschine einschalten.
+
+### Start bis zur Systemzeile
+
+Der Lader holt das System (rund 35 KB), prüft es blockweise und baut die Seite 0 auf; der
+Bildschirm wird gelöscht. Das dauert einige Sekunden Emulationszeit (rund 22 Millionen
+Takte). Danach steht in der letzten Zeile
+
+```
+MONITOR ===== SIOS 1526/1.1 (M)_
+```
+
+`(M)` heißt: Monitor ohne geladenes Programm; mit geladenem Programm steht dort `(P)`.
+
+### Tasten
+
+| SIOS-Taste | Am Emulator | Bildschirmtastatur |
+|------------|-------------|--------------------|
+| Zeichen (Kommandos, Namen, Ziffern) | die normalen Tasten | Tasten |
+| **ET1** (Eingabe abschließen, Code FFH) | Return | ET1 |
+| **ET2** (Abbruch / „MON.", Code FEH) | Pause | **Rechtsklick auf ET2** (Linksklick bleibt der Steuer-Vorsatz) |
+| **M** (Monitortaste, Code B0H) | — | Taste M |
+| **CI** (Fehler löschen, Code AFH) | — | RESET |
+| Cursor | Pfeiltasten | Pfeile |
+| DEL CH | Entf | DEL CH |
+
+Die Tasten S, S1–S9 (Programmfunktionstasten) liegen vermutlich auf PF 1–PF 12; die
+Zuordnung ist nicht belegt und hängt vom Programm ab. **INS MD meiden:** sein Code (A8H) ist
+für SIOS ein Sicherheitscode und verstellt die Bediensicherung.
+
+Für SIOS gilt, was für jeden Gast gilt: dieser Emulator kennt keine zusätzlichen
+Tastenkürzel; Pause ist die Wirtstaste für ET2, kein Menükürzel.
+
+### Monitorkommandos
+
+Kommando tippen, mit ET1 abschließen. **ET2** bricht eine Eingabe ab.
+
+* `DAT` — zeigt das Datum (`00.00.00`, solange es nicht gesetzt ist); ein weiteres ET1
+  öffnet das Eingabefeld.
+* `CLK` — zeigt die Uhrzeit; die Sekunden laufen.
+* `ASN` — Geräte zuweisen. SIOS führt die Zuordnungen als Tabelle; ET1 blättert, ET2
+  beendet. Das Programmlaufwerk (logisches Gerät 0315) steht auf Diskette 1. **`ASN 0315 66`**
+  macht Diskette 2 (Laufwerk **B:**) zum Programmlaufwerk — nötig, wenn A: die
+  Systemdiskette ist und die Programme auf B: liegen.
+* `CAL <Programm>` — Programm aus der `PHASELB` des Programmlaufwerks laden und starten,
+  etwa `CAL DIDI`. Ist es dort nicht enthalten, meldet SIOS `ERR FD 1 NFND`.
+* `RUN`, `NEW`, `MEM`, `POU`, `PLO`, `LOD`, `GOO`, `SYC`, `TYP`, `REW`, `FOR`, `CLE`, `OFF` —
+  weitere interne Befehle laut SIOS-Bedienhandbuch (hier nicht alle ausprobiert).
+* `CAN` — Abbruch des geladenen Programms. Siehe „Bekannte Grenzen".
+
+Laufwerke heißen bei SIOS **04, 05, 06** (Diskette 1–3) und **0D, 0E** (Kassette 1, 2).
+Die Systemdiskette ist 04 (A:), die zweite Diskette 05 (B:).
+
+Beispielablauf mit der Programmdiskette in B:
+
+```
+ASN ET1   0315 ET1   66 ET1   ET2        (Programmlaufwerk = B:)
+CAL ET1   DIDI ET1                        (Programm laden und starten)
+M                                         (Monitor mit geladenem Programm: (P))
+ET2                                       (zurück zum Programm, dann (M))
+```
+
+### Programme der Programmdisketten
+
+Auf den beiden Programmdisketten liegen (Namen so, wie `CAL` sie erwartet):
+
+* Diskette 1: `CATM` (Bandverwaltung), `CODK`, `COCA`, `COPD`, `DINH`, `DIMO`, `DIKA`, `DMPM`,
+  `EDIT` (Texteditor), `FGEN` (Kennsätze/Dateien anlegen, `CHANGE VOL1`), `INIT`
+  (Diskette initialisieren), `DIDI` (Dialogprogramm), `KORP`, `LBSV` (Bibliotheksdienst),
+  `CODP` (Disketten physisch kopieren).
+* Diskette 2: `LINK`, `MBAS`, `PRMF`, `PRDI`, `PHAK`, `RAMT`, `SUS0`, `SGEN`
+  (Systemgenerierung), `SOPH`, `SYSD` (zeigt die eingebundenen Module), `TEXT`, `MTES`, `SORD`.
+
+Wofür die Kürzel im Einzelnen stehen, steht im SIOS-Bedienhandbuch; hier ist nur belegt, was
+oben genannt ist. `DIDI`, `DINH` und `CATM` laden und melden sich (`DIDI 1520 (SIEX) V 1.1`
+mit einem Auswahlmenü).
+
+### INIT: eine Leerdiskette initialisieren
+
+`INIT` formatiert das Ziel in **Laufwerk 05** (B:). Beim Menü `"8" DISKETTE Y` zuerst
+**warten, bis die Frage wirklich auf dem Bildschirm steht** (rund 20 Millionen Takte nach dem
+Aufruf), dann **`N`** + ET1 für 5¼″ — wird `N` zu früh getippt, geht es verloren und INIT
+formatiert wie ein 8″-Laufwerk. Danach folgen die Menüpunkte mit ET1: Aufzeichnung (1 = doppelte
+Dichte), Satzlänge (leer = 128), Sektorfolge, zwei defekte Spuren (leer lassen) und
+„INIT ALL" (`Y`). **Das Programm läuft im Emulator derzeit nicht bis zum Ende** (siehe unten).
+Eine fertig initialisierte Datendiskette legt stattdessen das DiskTool an
+(`create --fs sios_ss40`).
+
+### Bekannte Grenzen
+
+* **`INIT` läuft nicht durch.** Das Kontrolllesen der ersten Spur schlägt fehl (`ERR 9C`, bei
+  „INIT ALL = N" `ERR 9B`). Ursache bekannt, noch nicht behoben.
+* **SIOS 0.9** (K7636) startet noch nicht bis zur Systemzeile.
+* **`CAN` im Programm** (nach `M` und `CAN`) kann je nach Programm im *Systemstopp* enden
+  (DIDI, DINH): der Bildschirm wird geleert, die Lampe blinkt, nichts geht mehr. Das ist
+  Verhalten des Gastprogramms (es setzt ein Merkbit, bei dem SIOS „Havarie" annimmt), kein
+  Emulatorfehler nach heutigem Wissen. **Programme mit ET2 verlassen**, nicht mit `CAN`.
+* **Zweites `CAL` nach einem Programmende** meldet `ERR FD 1 NFND`, solange die Diskette
+  nicht neu eingelegt wird: SIOS glaubt den Kopf noch an der Stelle des letzten Ladens.
+  Abhilfe: die Programmdiskette in B: auswerfen und wieder einlegen (oder vor jedem Programm
+  einen frischen Start).
+
 ## MUTOS 8000 (A5120.16)
 
 MUTOS 8000 ist ein UNIX für den 16-Bit-Teil des A5120.16 (U8001). Dieser Abschnitt ist eine

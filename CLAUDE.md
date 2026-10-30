@@ -717,6 +717,17 @@ PC-Gegenstelle (`app/pcmc.py`, Kasten `app/ui/pcmc_widget.py`, Aktion *Maschine 
 nur an der ASP-CTC, EPROM-Segmente, Kassettentakt-Annahmen, MC80.2x-Zeitmodell und RETI-Verteilung, offene Fragen).
 Plan: `doc/design/31_mc80.md`.
 
+## SIOS 1526 (Zweig `SIOS1526`, Stand 2026-10-30)
+
+Sparkassen-/Betriebssystem des A5120/A5130/K8924; fünf Originalabbilder unter `tools/sios_a5120/original/` (SYLs = 1.1, SYLp = 0.9, DP1/DP2, SG1).
+**Stand:** SIOS 1.1 (K7637, Sicherheitsstecker 01) bootet bis `MONITOR ===== SIOS 1526/1.1 (M)_`; DAT/CLK/ASN/CAL/M/ET2 und mehrere Programme laufen;
+DiskTool-Dateisystem `sios` liest und schreibt (`sios_ss40`/`sios_ss80`).  Offen: `INIT` (ERR 9B/9C), SIOS 0.9, SGEN, Beispieldisketten.
+**Vier Kernfehler dabei behoben** (gelten für alle Maschinen): **Q240** nach Abschn. 6.11 neu nachgebildet (B2 = 1: jeder Zugriff schreibt `Schutz-RAM[A>>6] := AB0`),
+**/INT-BS als Impuls**, **Z80CTC ohne Einzelschuss** (D3 nur im Zeitgeberbetrieb), **gelöschte Datenmarke F8** im K5122-Lese-/Schreibpfad.
+Dazu Wirtstaste **Pause** = ET2 (kein Kürzel) und Rechtsklick auf ET2 der Bildschirmtastatur.
+**Vor Arbeiten daran: `doc/merkposten/sios.md` lesen** (Festlegungen mit Wächtern, CAN-Systemstopp = Gastverhalten, INIT-Befund, Bedienfallen).
+Plan und Stand: `doc/design/43_sios1526.md`; Format `doc/sios_diskettenformat.md`; Unterlagen `doc/sios/`.
+
 ## MUTOS 8000: Diskettenbau HIER, Forschung in mutos8k (Stand 2026-10-29)
 
 **Der Diskettensatz entsteht in DIESEM Projekt, ohne jede Abhaengigkeit zu mutos8k:** `python3 -I tools/mutos8000/bau_alle.py` baut aus den

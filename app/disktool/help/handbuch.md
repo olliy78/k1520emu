@@ -5,7 +5,7 @@ Version {{VERSION}}
 Dieses Werkzeug holt Dateien von Disketten der K1520-Rechner (A5120, A5130, PC 1715 …)
 auf den heutigen Rechner und schreibt sie zurück. Es liest und schreibt die
 Dateisysteme von **CP/A**, **SCPX**, **UDOS/ZDOS**, **UDOS1715/NDOS** und
-**SCP1700** (CP/M-86 des A7100) in den
+**SCP1700** (CP/M-86 des A7100) und die Etikettendisketten des **SIOS 1526** in den
 Abbildformaten `.hfe`, `.dmk`, `.img`, `.cqm` (CopyQM), `.td0` (TeleDisk) und `.imd` (ImageDisk; soweit das Medium darstellbar ist).
 Dazu kommen die UNIX-Disketten des P8000: **WEGA** (mit Modus, Besitzer und Zeit je
 Datei), **tar-Disketten** ohne Dateisystem und **Plattenabbilder** (`.img.gz`) mit ihren
@@ -172,6 +172,70 @@ Die Diskette selbst ist allerdings ungewöhnlich gebaut — ihre erste Spur ist 
 halber Geschwindigkeit in einem anderen Aufzeichnungsverfahren geschrieben als der
 Rest. Das Werkzeug führt das mit, auch beim Zurückschreiben; zu sehen ist es im
 Diskeditor und in der Formatzeile.
+
+## SIOS 1526 — die Etikettendisketten von A5120, A5130 und K8924
+
+Disketten des Betriebssystems **SIOS 1526** erkennt das Werkzeug von selbst und nennt
+sie `sios_ss40` (40 Spuren) bzw. `sios_ss80` (80 Spuren): einseitig, 26 Sektoren zu
+128 Byte, MFM. Erkannt werden sie nur am **positiven Nachweis** — die Fehlspurkarte `ERMAP`
+in Spur 0 Sektor 5 *und* der Volumenetikett-Satz `VOL1` in Sektor 7. Das ist Absicht:
+auch fremde Systeme (BCU 880, MUTOS 8000) sind nach demselben IBM-Schema initialisiert und
+behalten ihr eigenes Profil.
+
+**Wie die Diskette gebaut ist.** Kein Dateiverzeichnis wie bei CP/M, sondern Spur 0 als
+*Etikettenspur* im IBM-Schema (Text in DKOI, der Robotron-Abwandlung von EBCDIC):
+`VOL1` trägt den Datenträgernamen, jede Datei hat einen `HDR1`-Satz mit Anfang und Ende (BOE,
+EOE, EOD). Eine **physische Datei** ist ein zusammenhängender Spurbereich; eine **Bibliothek**
+(`PHASELB` für Programme, `SOURCELB`, `RELOCLB`) ist eine physische Datei mit eigenem
+Verzeichnis darin.
+
+**Im Fenster und auf der Kommandozeile** erscheinen die Bibliotheken als Datei (Typ `B`),
+ihre Objekte darunter als **`PHASELB/INIT`** (Typ `O`); eine gewöhnliche physische Datei hat
+den Typ `F`. Der Schrägstrich ist Teil des Namens, kein Ordner. Beim Herausholen entsteht
+daraus `PHASELB_INIT`. Die Spalte *Kz* zeigt das Kennzeichen aus dem Etikett (`P`
+Schreibschutz, `E` Austausch, `C` Fortsetzung auf der Folgediskette).
+
+**Was geht**
+
+* **Auflisten und Herausholen** (`ls`, `get`): physische Dateien und Objekte, byteweise roh.
+  Die Größe einer Datei ist der Bereich bis `EOD` (belegte Sektoren).
+* **Hineinlegen** (`put`): als physische Datei (Name 1–8 Zeichen) in die erste freie
+  Spurlücke ab Spur 1 bis Spur 37, oder als Objekt (`PHASELB/NEU`, Name 1–5 Zeichen) *hinten*
+  an eine Bibliothek.
+* **Löschen** (`rm`): eine Datei wird zum gelöschten Etikett (`DDR1`) — die Daten
+  bleiben. Ein Objekt verliert seinen Namen; sein Platz in der Bibliothek kehrt nicht zurück.
+* **Leere Datendiskette anlegen** (*Neue Diskette*, `create --fs sios_ss40` oder
+  `sios_ss80`, wahlweise `--label NAME`): so, wie SIOS-`INIT` sie anlegt, mit
+  Etikettenspur und gelöschten Datenmarken in den freien Etikettensektoren.
+* **Prüfen** (`fsck`, beim Öffnen die Schnellprüfung): Befunde `sios.hdr1.ungueltig`
+  (Fehler), `sios.hdr1.ueberlappt` (Fehler: zwei Dateien teilen sich Sektoren) und
+  `sios.hdr1.eod` (Warnung: Dateiende liegt außerhalb des Bereichs; es gilt dann `EOE`).
+  Die Prüfung ist bewusst klein — gemeldet wird nur, was belegt ist.
+* **Spur 0 als Ganzes** (`boot-get`): holt die Etikettenspur samt Lader heraus.
+
+**Was abgelehnt wird — jeweils mit Grund**
+
+* **Bootfähige Diskette anlegen** (`create --boot`, `boot-put`): noch nicht möglich.
+* **Bibliothek mit mehr als 14 Einträgen** und alles mit Fehlspurkarte-Einträgen:
+  das Format dahinter ist nicht belegt, es würde geraten.
+* **Satzlänge ≠ 128**: eine Datei auf dem Wirtsrechner sagt sie nicht.
+* **Objekt größer als der freie Rest** der Bibliothek, leere Objekte, eine zwanzigste
+  Datei, ein beschädigtes Etikett.
+* **Kein Verdichten:** gelöschten Platz in einer Bibliothek holt nur das Original-Programm
+  `COPY` zurück.
+
+**Container.** `.hfe` und `.dmk` sind die richtigen Abbilder für den Emulator. `.img`
+(und `.cqm`, `.td0`, `.imd`) lassen sich zwar verwenden, **verlieren aber die gelöschten
+Datenmarken (F8)**, die SIOS in den Etikettensektoren ab Sektor 9 setzt; das Werkzeug liest
+sie nicht aus, ob SIOS selbst darauf besteht, ist offen. Für den Emulator `.hfe`/`.dmk`.
+
+**Eine Besonderheit:** die Systemdiskette `SYSARE09` (SIOS 0.9) ist eine
+40-Spur-Diskette, die im 80-Spur-Laufwerk zweiseitig ausgelesen wurde; sie passt zu keinem
+Katalogformat und wird nur erkannt, wenn Sie im Kopfbereich das Dateisystem `sios_ss40`
+wählen (Kommandozeile: `--fs sios_ss40`).
+
+Das Format im Einzelnen: `doc/sios_diskettenformat.md`; Bedienung des Systems im Emulator:
+Handbuch des Emulators, Abschnitt „SIOS 1526".
 
 ## OS/M-Disketten — das CP/M des P8000
 
