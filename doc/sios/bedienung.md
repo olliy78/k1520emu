@@ -94,7 +94,12 @@ Programms bleibt stehen).  **ET2** im Programm -> Rückkehr `(M)`.  Auch geladen
    40-Spur-DP1 im 80er-Laufwerk; **ungeklärt**.  Test-Umgehung: je Programm ein frischer Start.
 3. **INIT** (siehe unten).
 
-## 4. INIT (Leerdiskette initialisieren) -- Stand: bricht ab
+## 4. INIT (Leerdiskette initialisieren) -- Stand: läuft durch (2026-10-30)
+
+**Seit 2026-10-30 läuft INIT bis `INITIAL DISK IS FINISHED`** (Wächter `SiosInit.InitialisiertDiskette`;
+B: = K5600.10 für die 40-Spur-Zieldiskette).  Ursachen waren zwei K5122-Fehler (Altbyte nach dem Schreiben,
+/STR beendet Schreiben) und ein Aufbaufehler (40-Spur-Medium im 80er-Laufwerk = Halbspuren), siehe
+`befund_init_schreiben.md`.  Der folgende Abschnitt ist der historische Befund.
 
 Bedienung (INIT 1520 (SIEX) **V 1.4**, nicht 1.1 wie im Handbuch), Programm von DP1 in A:, Leerdiskette in B: (= 05):
 

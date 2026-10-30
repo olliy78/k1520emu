@@ -956,8 +956,10 @@ Eine fertig initialisierte Datendiskette legt stattdessen das DiskTool an
 
 ### Bekannte Grenzen
 
-* **`INIT` läuft nicht durch.** Das Kontrolllesen der ersten Spur schlägt fehl (`ERR 9C`, bei
-  „INIT ALL = N" `ERR 9B`). Ursache bekannt, noch nicht behoben.
+* **`INIT` braucht ein passendes Laufwerk.** Eine 40-Spur-Diskette (5¼″, wie DP1/DP2) gehört in
+  ein 40-Spur-Laufwerk (K5600.10). Im 80-Spur-Laufwerk schreibt INIT auf Halbspuren und
+  meldet Fehler. Bei der Frage `8" DISKETTE` mit **N** antworten — erst, wenn die Frage
+  steht; sonst formatiert INIT im 8″-Format (FM).
 * **SIOS 0.9** (K7636) startet noch nicht bis zur Systemzeile.
 * **`CAN` im Programm** (nach `M` und `CAN`) kann je nach Programm im *Systemstopp* enden
   (DIDI, DINH): der Bildschirm wird geleert, die Lampe blinkt, nichts geht mehr. Das ist
