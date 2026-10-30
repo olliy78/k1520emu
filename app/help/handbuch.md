@@ -837,37 +837,51 @@ Programmbibliothek (`PHASELB`) auf der Diskette. Wie alles in diesem Emulator l�
 Original-Z80-Code unverändert; es gibt keine Abkürzungen.
 
 > **Stand.** SIOS 1526/1.1 und 0.9 starten bis zur Systemzeile, die Monitorkommandos und mehrere
-> Programme laufen. **Noch nicht** möglich: das Formatieren einer Leerdiskette mit `INIT`
-> (bricht mit `ERR 9B`/`9C` ab) und die Systemgenerierung `SGEN`. Fertige Beispieldisketten folgen im Ordner
-> `disks/a5120_sios1526/`; bis dahin brauchen Sie Abbilder Ihrer eigenen SIOS-Disketten.
+> Programme laufen. Fertige Disketten liegen bei den Beispieldisketten im Ordner `a5120_sios1526/`.
+> **Noch nicht** möglich: die Systemgenerierung `SGEN` (endet in einem Fehler). Mit SIOS **0.9** lassen
+> sich bisher keine Programme laden (siehe „Bekannte Grenzen“).
 
 ### Welche Disketten gehören dazu
 
-* **Systemdiskette** (`SYSARE11` für SIOS 1.1, `SYSARE09` für 0.9): Spur 0 trägt den
-  Lader, ab Spur 1 steht das System. Sie bootet, ohne dass ein Programm geladen wäre.
-* **Programmdisketten** (z. B. „DP1" und „DP2"): jeweils eine Bibliothek `PHASELB` mit
+Im Ordner `a5120_sios1526/` der Beispieldisketten. Der Name einer **Systemdiskette** zeigt die Bestückung,
+für die sie getestet ist: `a5120_sios<Version>_<Anzahl>x<Laufwerk>_<Tastatur>.hfe`.
+
+* **`a5120_sios11_3xk5601_seriell.hfe`** — SIOS 1.1 (`SYSARE11`) für die **Vorgabe: drei K5601 und
+  serielle Tastatur K7637**. Daneben `…_seriell_sl1.hfe`, eine kürzer generierte Fassung von SIOS 1.1
+  (zehn statt zwölf Spuren Systemteil) für dieselbe Bestückung.
+* `a5120_sios09_3xk5601_parallel.hfe` — SIOS 0.9 für **K5601 (auch K5600.20) und parallele Tastatur K7636**;
+  `a5120_sios09_3xk5600_10_parallel.hfe` — SIOS 0.9 für **drei K5600.10** und K7636.
+* **Programmdisketten** `a5120_sios_programme1.hfe` (u. a. `DIDI`, `INIT`, `FGEN`, `EDIT`) und
+  `a5120_sios_programme2.hfe` (u. a. `SYSD`, `SGEN`, `LINK`): jeweils eine Bibliothek `PHASELB` mit
   ausführbaren Programmen. 40 Spuren, einseitig, 26 Sektoren zu 128 Byte.
-* **Generierdiskette** (z. B. „SG1"): die Module für `SGEN`.
+* **Generierdiskette** `a5120_sios_generierung.hfe`: die Module für `SGEN`.
 
 Alle sind IBM-Etikettendisketten (kein CP/M-Dateisystem). Lesen, Auflisten und
 Beschreiben übernimmt das DiskTool (Abschnitt „SIOS 1526" in dessen Handbuch).
 
-### Einrichten
+### Einrichten (Vorgabe: drei K5601, serielle Tastatur)
 
-1. *Einstellungen ▸ Allgemein ▸ Modell*: **A5120** (oder A5130/K8924).
-2. **Laufwerke:** die Systemdiskette hat 80 Spuren einseitig — Laufwerk **K5600.20**
-   (5¼″, 80 Spuren). Die 40-Spur-Programmdisketten dürfen im selben Laufwerk liegen; der
-   Emulator übersetzt die Spurdichte selbst (Doppelschritt, siehe „Wenn die Diskette nicht
-   zum Laufwerk passt"). Die **SIOS-0.9**-Diskette (`SYLp`) ist dagegen als Auslesung
-   zu nehmen, wie sie ist (Spur n auf Position n): ebenfalls **K5600.20**; eine bereinigte
-   40-Spur-Fassung gehört in ein **K5600.10**.
-3. **Tastatur:** **K7637** für SIOS 1.1, **K7636** für SIOS 0.9 (die beiden Systeme sind
-   für verschiedene Tastaturen erzeugt).
-4. **Sicherheitsstecker** (*Einstellungen ▸ Allgemein*, Abschnitt „Sicherheitsstecker" oben):
-   **01** wählen. 01 ist der *Chefschalter* und gibt den Programmierer-Status. Ohne Stecker
-   kommt SIOS trotzdem bis zur Systemzeile, aber in den Monitorstatus ohne Bedienebenen.
-   *Maschine ▸ Sicherheitsstecker gesteckt* zieht und steckt ihn im Betrieb.
-5. Systemdiskette in **A:**, Programmdiskette in **B:**, Maschine einschalten.
+1. *Einstellungen ▸ Allgemein ▸ Modell*: **A5120** (oder A5130/K8924). Laufwerke **K5601** (A:, B:, C:) und
+   **Tastatur K7637 (seriell)** sind die Vorgabe; es muss nichts umgestellt werden.
+2. **Sicherheitsstecker** (*Einstellungen ▸ Allgemein*, Abschnitt „Sicherheitsstecker" oben): **01** wählen.
+   01 ist der *Chefschalter* und gibt den Programmierer-Status. Ohne Stecker kommt SIOS trotzdem bis zur
+   Systemzeile, aber in den Monitorstatus ohne Bedienebenen. *Maschine ▸ Sicherheitsstecker gesteckt*
+   zieht und steckt ihn im Betrieb.
+3. Diskettensatz einlegen: `a5120_sios11_3xk5601_seriell.hfe` in **A:**, `a5120_sios_programme1.hfe` in **B:**,
+   `a5120_sios_programme2.hfe` in **C:**. (Die Programmdisketten haben 40 Spuren; der Emulator übersetzt
+   die Spurdichte im K5601 selbst, siehe „Wenn die Diskette nicht zum Laufwerk passt".)
+4. Maschine einschalten und auf die Systemzeile warten (siehe unten).
+
+**Andere Bestückungen** (jeweils nur das, was getestet ist):
+
+| Bestückung | Systemdiskette | Hinweis |
+|------------|----------------|---------|
+| 3 × K5600.20, K7637 | `a5120_sios11_3xk5601_seriell.hfe` | wie die Vorgabe (80 Spuren) |
+| 3 × K5601 oder K5600.20, **K7636** (parallel) | `a5120_sios09_3xk5601_parallel.hfe` | SIOS **0.9**; Stecker 01 nötig, sonst verwirft 0.9 jede Taste |
+| 3 × K5600.10, K7636 | `a5120_sios09_3xk5600_10_parallel.hfe` | SIOS 0.9, 40-Spur-Laufwerke |
+
+SIOS 1.1 verlangt die K7637 (mit K7636 meldet es `ERR KB 2  UNIT`) und ein 80-Spur-Laufwerk; SIOS 0.9
+verlangt die K7636. 8″-Laufwerke sind nicht geprüft.
 
 ### Start bis zur Systemzeile
 
@@ -920,7 +934,7 @@ Kommando tippen, mit ET1 abschließen. **ET2** bricht eine Eingabe ab.
 Laufwerke heißen bei SIOS **04, 05, 06** (Diskette 1–3) und **0D, 0E** (Kassette 1, 2).
 Die Systemdiskette ist 04 (A:), die zweite Diskette 05 (B:).
 
-Beispielablauf mit der Programmdiskette in B:
+Beispielablauf mit der Programmdiskette in B: (liegt sie in C:, lautet die Zuweisung `ASN 0315 7C`)
 
 ```
 ASN ET1   0315 ET1   66 ET1   ET2        (Programmlaufwerk = B:)
@@ -946,33 +960,42 @@ mit einem Auswahlmenü).
 
 ### INIT: eine Leerdiskette initialisieren
 
-`INIT` formatiert das Ziel in **Laufwerk 05** (B:). Beim Menü `"8" DISKETTE Y` zuerst
-**warten, bis die Frage wirklich auf dem Bildschirm steht** (rund 20 Millionen Takte nach dem
+`INIT` formatiert das Ziel in **Laufwerk 05** (B:); die Programmdiskette `a5120_sios_programme1.hfe` liegt dabei in
+A: (erst nach dem Start der Systemzeile gegen die Systemdiskette tauschen). Beim Menü `"8" DISKETTE Y`
+zuerst **warten, bis die Frage wirklich auf dem Bildschirm steht** (rund 20 Millionen Takte nach dem
 Aufruf), dann **`N`** + ET1 für 5¼″ — wird `N` zu früh getippt, geht es verloren und INIT
-formatiert wie ein 8″-Laufwerk. Danach folgen die Menüpunkte mit ET1: Aufzeichnung (1 = doppelte
-Dichte), Satzlänge (leer = 128), Sektorfolge, zwei defekte Spuren (leer lassen) und
-„INIT ALL" (`Y`). **Das Programm läuft im Emulator derzeit nicht bis zum Ende** (siehe unten).
-Eine fertig initialisierte Datendiskette legt stattdessen das DiskTool an
-(`create --fs sios_ss40`).
+formatiert wie ein 8″-Laufwerk. Danach folgen mit ET1: Menü `5,25" DISKETTE`, Satzlänge (leer = 128),
+Sektorfolge, zwei defekte Spuren (leer lassen) und „INIT ALL" (`Y`); am Ende steht
+`INITIAL DISK IS FINISHED`.
+
+* Ziel in der **Vorgabe (K5601)**: eine **80-Zylinder-Leerdiskette** („Leere Diskette" im Laufwerkskasten) wird
+  fehlerfrei initialisiert; das DiskTool erkennt sie danach als SIOS-Diskette. INIT schreibt dabei 40 Spuren
+  auf die Zylinder 0–39; ob SIOS Spuren über Spur 0 daraus im Doppelschritt wieder liest, ist nicht geprüft.
+* Eine **40-Zylinder-Leerdiskette** im K5601 bekommt Halbspuren: INIT meldet `ERR 9B  > 2 DEFEKTIV TRACKS`.
+  40-Spur-Ziele gehören in ein **K5600.10**.
+* **Empfehlung für Datendisketten:** mit dem DiskTool anlegen (`k1520disktool create neu.hfe --fs sios_ss40 --label NAME`,
+  Dateien mit `put`). SIOS im K5601 sieht eine so angelegte Datei: `DIDI` (Device 6 für Laufwerk C:, Form `A`, Name der Datei)
+  zeigt ihren Kennsatz (`HDR1 …`). Die Anzeige der Datensätze selbst ist bisher nicht belegt.
 
 ### Bekannte Grenzen
 
-* **`INIT` braucht ein passendes Laufwerk.** Eine 40-Spur-Diskette (5¼″, wie DP1/DP2) gehört in
-  ein 40-Spur-Laufwerk (K5600.10). Im 80-Spur-Laufwerk schreibt INIT auf Halbspuren und
-  meldet Fehler. Bei der Frage `8" DISKETTE` mit **N** antworten — erst, wenn die Frage
-  steht; sonst formatiert INIT im 8″-Format (FM).
-* **SIOS 0.9** (K7636) startet bis `MONITOR ===== SIOS 1526/0.9 (M)_`. Ohne Sicherheitsstecker
+* **`INIT` und die Spurdichte:** siehe oben — 40-Spur-Ziele nur im K5600.10, im K5601 eine 80-Zylinder-Leerdiskette.
+  Bei der Frage `8" DISKETTE` mit **N** antworten — erst, wenn die Frage steht; sonst formatiert INIT im 8″-Format (FM).
+* **SIOS 0.9** (K7636) startet bis `MONITOR ===== SIOS 1526/0.9 (M)_`, `DAT` und `CLK` laufen. Ohne Sicherheitsstecker
   verwirft SIOS jede Zeichentaste (Bedienebene 0) — bei 0.9 den Stecker 01 einstellen. Der
   Stecker an der K7636 meldet dieselben Codes wie an der K7637 (Annahme, es gibt keinen
-  K7636-ROM-Abzug).
+  K7636-ROM-Abzug). **`CAL` lädt bei 0.9 nichts:** das Kommando wird angenommen, das ET1 hinter dem
+  Programmnamen bleibt ohne Wirkung (keine Meldung); die Ursache ist nicht geklärt. Programme also unter SIOS 1.1 starten.
 * **`CAN` im Programm** (nach `M` und `CAN`) kann je nach Programm im *Systemstopp* enden
   (DIDI, DINH): der Bildschirm wird geleert, die Lampe blinkt, nichts geht mehr. Das ist
   Verhalten des Gastprogramms (es setzt ein Merkbit, bei dem SIOS „Havarie" annimmt), kein
   Emulatorfehler nach heutigem Wissen. **Programme mit ET2 verlassen**, nicht mit `CAN`.
 * **Zweites `CAL` nach einem Programmende** meldet `ERR FD 1 NFND`, solange die Diskette
-  nicht neu eingelegt wird: SIOS glaubt den Kopf noch an der Stelle des letzten Ladens.
-  Abhilfe: die Programmdiskette in B: auswerfen und wieder einlegen (oder vor jedem Programm
+  nicht neu eingelegt wird: SIOS glaubt den Kopf noch an der Stelle des letzten Ladens; die Ursache wird noch
+  untersucht. Abhilfe: die Programmdiskette in B: auswerfen und wieder einlegen (oder vor jedem Programm
   einen frischen Start).
+* **Programmdiskette nach dem Start in A: tauschen** (Systemdiskette heraus) endete beim Laden von `DIDI` mit
+  `ERR FD 3  R/W`; für Programme ist `ASN 0315 66` mit der Programmdiskette in B: der getestete Weg.
 
 ## MUTOS 8000 (A5120.16)
 

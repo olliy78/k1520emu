@@ -27,12 +27,24 @@ Die Zuordnung Datei → Ordner steht für die Bauskripte in `tools/disketten_bei
 `<system>_<diskformat>_<laufwerkskonfiguration>_<merkmale>.<ext>` — identisch zu den Fixtures,
 Erklärung der Segmente in `tests/fixtures/README.md`.
 
-## SIOS 1526 (noch keine Beispieldisketten)
+## SIOS 1526 (`a5120_sios1526/`)
 
-Die fünf Originalabbilder (SYLs = SIOS 1.1, SYLp = 0.9, DP1/DP2 = Programmdisketten, SG1 = Generierdiskette) liegen **nicht hier**, sondern
-unter `tools/sios_a5120/original/` (Herkunft, Prüfsummen dort); unveränderliche Testkopien als `tests/fixtures/disks/sios1526_*.hfe`.
-Ein Ordner `a5120_sios1526/` für den Anwender folgt mit AP S8 (Entwurf 43); bis dahin die Originale **nie direkt mounten** (der Emulator öffnet r/w).
-Bedienung: Handbuch des Emulators, Abschnitt „SIOS 1526“.
+Gebaut mit `tools/sios_a5120/build.py` aus den Originalen in `tools/sios_a5120/original/` (Wächter `cli_sios_a5120`, Bedienung
+`tools/sios_a5120/README.md`).  Namensschema der Systemdisketten: `a5120_sios<version>_<anzahl>x<laufwerk>_<tastatur>.hfe` — die Bestückung, für die
+sie belegt booten (Matrix mit den nicht laufenden Fällen: `doc/sios/bedienung.md` §7).  **Vorgabe des Emulators: 3 × K5601 + serielle Tastatur K7637**,
+Sicherheitsstecker 01.
+
+| Datei | Inhalt | Bestückung |
+|-------|--------|------------|
+| `a5120_sios11_3xk5601_seriell.hfe` | SIOS 1.1 (`SYSARE11`, 12 Spuren), Original SYLs bytegleich | 3 × K5601 (auch K5600.20), K7637 |
+| `a5120_sios11_3xk5601_seriell_sl1.hfe` | SIOS 1.1, kürzer generiert (10 Spuren), aus dem rohen `.img` `SL1_1` | 3 × K5601 (auch K5600.20), K7637 |
+| `a5120_sios09_3xk5601_parallel.hfe` | SIOS 0.9, Original SYLp (80 Zyl. × 2 Seiten ausgelesen) bytegleich | 3 × K5601 oder K5600.20, K7636 |
+| `a5120_sios09_3xk5600_10_parallel.hfe` | SIOS 0.9, bereinigte 40-Spur-Fassung (`sylp_bereinigen.py`) | 3 × K5600.10, K7636 |
+| `a5120_sios_programme1.hfe` | DP1: Programmbibliothek `PHASELB` (CATM … INIT, DIDI … CODP), 40 Spuren | Datendiskette, in B:/C: |
+| `a5120_sios_programme2.hfe` | DP2: `PHASELB` (LINK … SYSD, SGEN …) | wie oben |
+| `a5120_sios_generierung.hfe` | SG1: Generiermodule `SYSORG09` + SGEN | wie oben |
+
+Die Disketten **nie direkt mounten** (der Emulator öffnet r/w); die Tests arbeiten mit Kopien.  Bedienung: Handbuch des Emulators, Abschnitt „SIOS 1526“.
 
 ## Disketten
 

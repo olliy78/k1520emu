@@ -142,3 +142,62 @@ ET2 bricht ab (`SiosMonitor.V09_DatMitK7636`).  **Ohne Sicherheitsstecker ignori
 Medium: das Original (80 Zyl. x 2 Seiten ausgelesen) in K5600.20; die bereinigte 40-Spur-Fassung `sios1526_sylp40.hfe` in K5600.10.
 
 SYSD/SGEN (Fehlersperre, Version `09`, Auswahlbild): siehe `sgen.md`.
+
+## 7. Bestückungsmatrix (AP S8, 2026-10-30)
+
+Geprüft mit `tests/integration/test_sios_boot.cpp` (`SiosVorgabe.*`, `SiosBeispiel.*`, Sondierung `SiosMatrix.DISABLED_Sondierung`):
+Kaltstart bis zur Systemzeile, danach `ASN 0315 66` und `CAL DIDI` von `a5120_sios_programme1.hfe` in B: (DP1; bei 0.9 stattdessen `DAT`,
+siehe Spalte „CAL").  Stecker 01.  Medien kommen aus `disks/a5120_sios1526/` (Bau `tools/sios_a5120/build.py`).
+
+| SIOS | Systemdiskette (`a5120_sios…`) | Laufwerke | Tastatur | Boot | CAL DIDI |
+|------|-------------------------------|-----------|----------|:----:|:--------:|
+| 1.1 | `sios11_3xk5601_seriell` (SYLs) | 3 × K5601 | K7637 (seriell) | ja | ja |
+| 1.1 | `sios11_3xk5601_seriell_sl1` (SL1_1, kürzere Generierung) | 3 × K5601 | K7637 | ja | ja |
+| 1.1 | `sios11_3xk5601_seriell` und `…_sl1` | 3 × K5600.20 | K7637 | ja | ja |
+| 1.1 | `sios11_3xk5601_seriell` | 3 × K5601 | K7636 (parallel) | **nein**, Bild `ERR KB 2  UNIT` | – |
+| 1.1 | `sios11_3xk5601_seriell` | 3 × K5600.10 | K7637 | **nein** (80-Zylinder-Medium im 40er-Laufwerk; Bild bleibt leer) | – |
+| 0.9 | `sios09_3xk5601_parallel` (Original SYLp, Spur n auf Position n) | 3 × K5601 oder K5600.20 | K7636 | ja | **nein**¹ |
+| 0.9 | `sios09_3xk5600_10_parallel` (bereinigte 40-Spur-Fassung) | 3 × K5600.10 | K7636 | ja | **nein**¹ |
+| 0.9 | `sios09_3xk5600_10_parallel` | K5601 / K5600.20 | K7636 | **nein** (SIOS 0.9 doppelschrittet nicht; Spur n läge auf Position 2n) | – |
+| 0.9 | `sios09_3xk5600_10_parallel` | K5600.10 | K7637 | **nein**, Bild `ERR KB 2  UNIT` | – |
+| beide | – | 8″ (MF3200/MF6400) | – | **nicht geprüft**: die Systemspuren sind 5¼″-MFM 26 × 128, ein sinnvolles 8″-Medium (FM) ist nicht herzustellen, ohne Bytes des SIOS-Codes zu ändern | – |
+
+¹ Bei 0.9 funktionieren Systemzeile und `DAT`/`CLK` (Wächter `SiosBeispiel.V09_*`).  `CAL <Name>` nimmt das Kommando an (der Prompt `CAL_` erscheint),
+reagiert aber auf das ET1 hinter dem Programmnamen nicht: weder Ladevorgang noch `ERR FD 1 NFND` (auch nicht für einen nicht vorhandenen Namen
+und auch nicht ohne `ASN`).  DP1/DP2 sind SIOS-1.1-Programme (`DIDI V 1.1`); ob 0.9 sie laden kann, ist **offen** — Ursache nicht geklärt, kein
+Kernfehler belegt.  Für Programme also SIOS 1.1 nehmen.
+
+**SL1_1 gegenüber SYLs.**  Beide tragen `SYSARE11` auf `ROBINI`.  SL1_1 (Quelle `~/projects/robotron/PC1715/discs/real_discs/SL1_1_1x80X26.img`, nur als
+rohes `.img` vorhanden, daneben die Rohaufnahme `SL1_1.scp`, nicht übernommen): BOE 01001 EOE **10026** EOD 10025, Kennzeichen `P    871`, 33 280 Byte
+= **zehn Spuren**; SYLs: EOE **12026**, `P    000`, 39 936 Byte = zwölf Spuren.  SL1 ist also zwei Spuren (6 656 Byte, Module) kürzer generiert;
+11 273 Byte unterscheiden sich im gemeinsamen Bereich.  Das `.img` verliert die F8-Marken der Etikettenspur (Sektor ≥ 9); der Boot und `CAL`
+stört das nicht (`SiosBeispiel.V11_Kurz_3xK5601_Seriell_MitCal`).
+
+## 8. Datendisketten in der Vorgabe (3 × K5601), INIT und Rundlauf mit dem DiskTool
+
+**INIT** (V 1.4, Programm von DP1; zweiter Sondierungsstand 2026-10-30, `SiosVorgabe.InitMit*`), Ziel in B: (K5601):
+
+* **80-Zylinder-Leerdiskette** (Geometrie des K5601, vom Emulator mit „Leere Diskette“ angelegt): INIT läuft bis `INITIAL DISK IS FINISHED
+  DEFEKTIVE TRACKS :   ,   ,`, ohne Fehler (Eingaben: `N` bei `"8" DISKETTE`, nach ~20 Mio. Takten 5 × ET1, `Y`).  Der DiskTool-Kern erkennt die Diskette
+  als `sios_ss40`, Prüfung ohne Warnung.  **Aber:** INIT schreibt 40 Spuren auf die Positionen 0..39 (einfacher Schritt), nicht doppelschrittig;
+  ob SIOS Spuren > 0 dieser Diskette im doppelschrittigen Betrieb wieder liest, ist **nicht geprüft**.
+* **40-Zylinder-Leerdiskette** im K5601: `ERR 9B  > 2 DEFEKTIV TRACKS : 01, 03, 05,` (Halbspuren: jede zweite Position hat keine Spur).  Dafür braucht INIT das K5600.10.
+* Menüpunkt `2 DOUBLE DENSITY, DOUBLE TRACKS`: die Eingabe `2` (und `N`) am Prompt `5,25" DISKETTE` ergibt `ERR 90`; wo die Auswahl wirklich
+  eintritt, ist **nicht ermittelt**.  Mit ET1 (Vorgabe) bleibt es bei 40 Spuren.
+
+**Empfehlung für Anwender:** Datendisketten mit dem DiskTool anlegen — `k1520disktool create neu.hfe --fs sios_ss40 --label TEST01` (40-Zylinder-`.hfe`,
+im K5601 mit Doppelschritt eingebunden wie DP1/DP2), Dateien mit `put … --as NAME`.
+
+**Rundlauf D4** (`SiosVorgabe.DidiZeigtDenKennsatzEinerMitDiskToolAngelegtenDatei`): Diskette mit `create` + `put ALPHA` (256 Byte) in C:; `ASN 0315 66`,
+`CAL DIDI`, Device `6`, Form `A`, Name `ALPHA`: SIOS zeigt den Kennsatz
+
+```
+ HDR1 ALPHA            00128 01001 01026    E
+   01003
+```
+
+also Satzlänge 128, BOE 01001, EOE 01026, EOD 01003 — wie das DiskTool sie eingetragen hat.  **Nicht belegt:** die Anzeige der Datensätze.  DIDI
+kehrt nach der Satznummer ohne Anzeige zum Monitor zurück, **auch an der Original-DP2** (`PHASELB`) und mit CI vorweg; die Ursache ist offen
+(Emulator oder Bedienung), der Datenpfad (Spuren ≥ 1 der DiskTool-Diskette im Doppelschritt) ist damit noch nicht durch SIOS gegengeprüft.
+Hinweis: Programme von A: nach dem Tausch der Systemdiskette (`DIDI` mit programme1 in A:) endeten mit `ERR FD 3  R/W`; zuverlässig ist der Weg
+`ASN 0315 66` mit programme1 in B:.

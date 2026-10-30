@@ -148,6 +148,15 @@ add_test(NAME cli_udos50_a5120
 set_tests_properties(cli_udos50_a5120 PROPERTIES
     TIMEOUT 180 LABELS "cli;fast")
 
+# Waechter „die SIOS-1526-Beispieldisketten in disks/a5120_sios1526/ sind aus tools/sios_a5120/original/
+# abgeleitet“ (bytegleich bzw. bereinigt/umgewandelt).  Neu:
+#   python3 tools/sios_a5120/build.py --tool build/k1520disktool
+add_test(NAME cli_sios_a5120
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/sios_a5120/build.py"
+            --check --tool "$<TARGET_FILE:k1520disktool>" ${_beigaben_emulator})
+set_tests_properties(cli_sios_a5120 PROPERTIES
+    TIMEOUT 180 LABELS "cli;fast")
+
 # Waechter „die CP/A-Systemdiskette des A5120 in disks/ ist der Inhalt von tools/cpa_a5120/“
 # (doc/disketten_bestand.md).  Zieht auch nach, wenn eine Beigabe (SERTEST, EM256*, RAF*, LB*)
 # neu gebaut wurde.  Neu bauen:
