@@ -846,9 +846,8 @@ Programmbibliothek (`PHASELB`) auf der Diskette. Wie alles in diesem Emulator l�
 Original-Z80-Code unverändert; es gibt keine Abkürzungen.
 
 > **Stand.** SIOS 1526/1.1 und 0.9 starten bis zur Systemzeile, die Monitorkommandos und mehrere
-> Programme laufen. Fertige Disketten liegen bei den Beispieldisketten im Ordner `a5120_sios1526/`.
-> **Noch nicht** möglich: die Systemgenerierung `SGEN` (endet in einem Fehler). Mit SIOS **0.9** lassen
-> sich bisher keine Programme laden (siehe „Bekannte Grenzen“).
+> Programme laufen (bei 1.1 wie bei 0.9). Fertige Disketten liegen bei den Beispieldisketten im Ordner
+> `a5120_sios1526/`. Auch die Systemgenerierung `SGEN` läuft; ihre Grenzen stehen unter „Bekannte Grenzen“.
 
 ### Welche Disketten gehören dazu
 
@@ -912,7 +911,7 @@ MONITOR ===== SIOS 1526/1.1 (M)_
 | **ET1** (Eingabe abschließen, Code FFH) | Return | ET1 |
 | **ET2** (Abbruch / „MON.", Code FEH) | Pause | **Rechtsklick auf ET2** (Linksklick bleibt der Steuer-Vorsatz) |
 | **M** (Monitortaste, Code B0H) | — | Taste M |
-| **CI** (Fehler löschen, Code AFH) | — | RESET |
+| **CI** (Fehler löschen, Code AFH) | — | RESET (an der K7636: Taste F54) |
 | Cursor | Pfeiltasten | Pfeile |
 | DEL CH | Entf | DEL CH |
 
@@ -979,28 +978,42 @@ Sektorfolge, zwei defekte Spuren (leer lassen) und „INIT ALL" (`Y`); am Ende s
 
 * Ziel in der **Vorgabe (K5601)**: eine **80-Zylinder-Leerdiskette** („Leere Diskette" im Laufwerkskasten) wird
   fehlerfrei initialisiert; das DiskTool erkennt sie danach als SIOS-Diskette. INIT schreibt dabei 40 Spuren
-  auf die Zylinder 0–39; ob SIOS Spuren über Spur 0 daraus im Doppelschritt wieder liest, ist nicht geprüft.
+  auf die Zylinder 0–39. Eine auf so einer Diskette von SIOS (z. B. mit `COPD`) angelegte Datei liest SIOS über Spur 0
+  hinaus wieder (`DIDI` zeigt die Sätze), und das DiskTool liest dieselben Bytes.
+* **Menüpunkt `2  DOUBLE DENSITY, DOUBLE TRACKS`** (INIT V 1.4): die `2` gehört an das **Menü** hinter `5,25" DISKETTE`
+  (erst ET1 für die Überschrift, dann `2`, ET1) — nicht an die Frage nach 8″, dort ergibt sie `ERR 90`. Das Ergebnis
+  ist eine echte **80-Zylinder-Diskette** (Spuren 01…76); das DiskTool erkennt sie als `sios_ss80`.
 * Eine **40-Zylinder-Leerdiskette** im K5601 bekommt Halbspuren: INIT meldet `ERR 9B  > 2 DEFEKTIV TRACKS`.
   40-Spur-Ziele gehören in ein **K5600.10**.
 * **Empfehlung für Datendisketten:** mit dem DiskTool anlegen (`k1520disktool create neu.hfe --fs sios_ss40 --label NAME`,
   Dateien mit `put`). SIOS im K5601 sieht eine so angelegte Datei: `DIDI` (Device 6 für Laufwerk C:, Form `A`, Name der Datei)
-  zeigt ihren Kennsatz (`HDR1 …`). Die Anzeige der Datensätze selbst ist bisher nicht belegt.
+  zeigt ihren Kennsatz (`HDR1 …`). **Sätze anzeigen:** nach dem Namen die **Satznummer fünfstellig** eintragen (`00001`; ein
+  kurzes `1` wird nicht angenommen und das Feld bleibt stehen), ET1; die Frage `CHECK` mit ET1 bestätigen, jedes weitere ET1 zeigt
+  den nächsten Satz. Ein leeres ET1 bei der Satznummer springt zu `KEY POSITION` (Suche über Schlüssel).
+* **Der Rückweg:** was SIOS schreibt, liest das DiskTool. `COPD` (Disketten kopieren: Quelle in A:, Ziel in B:, `C`, Diskette bestätigen,
+  Druck mit ET2 abwählen, `A` COPY ALL, `N`) schreibt alle Spuren mit dem SIOS-Treiber; `k1520disktool get` holt die Datei byteweise
+  gleich zurück.
 
 ### Bekannte Grenzen
 
 * **`INIT` und die Spurdichte:** siehe oben — 40-Spur-Ziele nur im K5600.10, im K5601 eine 80-Zylinder-Leerdiskette.
   Bei der Frage `8" DISKETTE` mit **N** antworten — erst, wenn die Frage steht; sonst formatiert INIT im 8″-Format (FM).
-* **SIOS 0.9** (K7636) startet bis `MONITOR ===== SIOS 1526/0.9 (M)_`, `DAT` und `CLK` laufen. Ohne Sicherheitsstecker
-  verwirft SIOS jede Zeichentaste (Bedienebene 0) — bei 0.9 den Stecker 01 einstellen. Der
-  Stecker an der K7636 meldet dieselben Codes wie an der K7637 (Annahme, es gibt keinen
-  K7636-ROM-Abzug). **`CAL` lädt bei 0.9 nichts:** das Kommando wird angenommen, das ET1 hinter dem
-  Programmnamen bleibt ohne Wirkung (keine Meldung); die Ursache ist nicht geklärt. Programme also unter SIOS 1.1 starten.
+* **SIOS 0.9** (K7636) startet bis `MONITOR ===== SIOS 1526/0.9 (M)_`; `DAT`, `CLK`, `ASN` und `CAL` laufen (`CAL DIDI` von der
+  Programmdiskette in B: nach `ASN 0315 66`; ein unbekannter Name gibt `ERR FD 1  NFND`, den **CI** — an der K7636 die Taste F54 —
+  löscht). Ohne Sicherheitsstecker verwirft SIOS jede Zeichentaste (Bedienebene 0) — bei 0.9 den Stecker 01 einstellen. Der
+  Stecker an der K7636 meldet dieselben Codes wie an der K7637 (Annahme, es gibt keinen K7636-ROM-Abzug).
+* **SGEN** (Generierdiskette `a5120_sios_generierung.hfe` in A:, `CAL SGEN` — dort liegt `SYSORG09`; vor jedem Plattenzugriff des
+  Programms die Diskette neu einlegen; Version `09` eintippen, Menüpunkt 1, Module markieren, ET1) erzeugt ein SIOS-**0.9**-System.
+  Das Ziel in B: ist eine mit `INIT` formatierte 40-Spur-Diskette, auf der die Systemdatei `SYSARE09` (12 Spuren, Kennzeichen `P`)
+  bereits als Kennsatz angelegt ist (z. B. mit dem DiskTool). Mit dem Modul `T-K7637` bootet es an der K7637 bis zur Systemzeile — **nur in einem K5600.10**
+  (40-Spur-Laufwerk); SIOS 0.9 doppelschrittet nicht. Module jenseits von Satz 91 liegen auf einer zweiten Generierdiskette, die es in den
+  bekannten Sammlungen nicht gibt (`ERR FD 6  SEQU`). Ein 1.1-System (`SYSARE11`) lässt sich nicht erzeugen: die Generierdiskette trägt nur `SYSORG09`.
 * **`CAN` im Programm** (nach `M` und `CAN`) kann je nach Programm im *Systemstopp* enden
   (DIDI, DINH): der Bildschirm wird geleert, die Lampe blinkt, nichts geht mehr. Das ist
   Verhalten des Gastprogramms (es setzt ein Merkbit, bei dem SIOS „Havarie" annimmt), kein
   Emulatorfehler nach heutigem Wissen. **Programme mit ET2 verlassen**, nicht mit `CAN`.
-* **Programmdiskette nach dem Start in A: tauschen** (Systemdiskette heraus) endete beim Laden von `DIDI` mit
-  `ERR FD 3  R/W`; für Programme ist `ASN 0315 66` mit der Programmdiskette in B: der getestete Weg.
+* **Programmdiskette nach dem Start in A: tauschen** (Systemdiskette heraus, Programmdiskette hinein, `CAL DIDI` ohne `ASN`) geht;
+  bequemer bleibt `ASN 0315 66` mit der Programmdiskette in B:.
 
 ## MUTOS 8000 (A5120.16)
 

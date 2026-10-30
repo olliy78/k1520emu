@@ -279,6 +279,23 @@ TEST(SiosSgen, GeneriertEineSystemdiskette) {
     r.ruhe(100'000'000LL);
     r.taste(kET1);                                 // -> SGEN IS WORKING
     ASSERT_TRUE(r.warte("SGEN FINISHED", 600'000'000LL)) << r.schirm();
+    ASSERT_TRUE(r.m.unmountDisk(1));
+
+    // Die erzeugte Diskette ist ein SIOS-0.9-System (SYSORG09) mit T-K7637: sie bootet in einem K5600.10
+    // (40-Spur-Diskette, einfacher Schritt; AUP-Gegenprobe) an der K7637 bis zur Systemzeile und nimmt Tasten an.
+    TempDisk sys("sios1526_dp2.hfe", "sios_sgen_k7637_system.hfe");
+    std::filesystem::copy_file(ziel, sys.path(), std::filesystem::copy_options::overwrite_existing);
+    A5120Machine::Config c;
+    c.drive_profiles = {"K5600.10", "K5600.20", "none", "none"};
+    c.sicherheitsstecker = 1;
+    A5120Machine m(c);
+    m.powerOn();
+    ASSERT_TRUE(m.mountDisk(0, sys.path(), "k5601_ss40_26x128", false)) << m.lastError();
+    ASSERT_TRUE(k1520test::runSmallUntil(m, "SIOS 1526/0.9 (M)_", 300'000'000LL, 100'000))
+        << k1520test::vramText(m);
+    k1520test::typeString(m, "DAT");
+    k1520test::typeKey(m, kET1);
+    EXPECT_TRUE(k1520test::runSmallUntil(m, "DAT     00.00.00", 60'000'000LL, 5'000)) << k1520test::vramText(m);
 }
 
 

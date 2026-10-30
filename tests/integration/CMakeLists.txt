@@ -303,6 +303,10 @@ k1520_add_test(sios_boot SRC test_sios_boot.cpp LIBS ${_libs} k1520_fs
                          LABELS "${_lbl}" DEFS LOG_LEVEL=2
                          "A5120_LIEFERDISKETTEN=\"${CMAKE_SOURCE_DIR}/disks\"" TIMEOUT 900)
 
+k1520_add_test(sios_rest SRC test_sios_rest.cpp LIBS ${_libs} k1520_fs
+                         LABELS "${_lbl}" DEFS LOG_LEVEL=2
+                         "A5120_LIEFERDISKETTEN=\"${CMAKE_SOURCE_DIR}/disks\"" TIMEOUT 900)
+
 k1520_add_test(sios_sgen SRC test_sios_sgen.cpp LIBS ${_libs} k1520_fs
                          LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 600)
 
