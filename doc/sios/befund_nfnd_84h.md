@@ -57,3 +57,41 @@ den Unterschied zur echten Maschine also nicht.
 **Die Einordnung "Gastverhalten" ist damit nicht bewiesen, nur nicht widerlegt:** ein ausgeliefertes System, das bei
 jedem zweiten Programmstart scheitert, ist unplausibel.  Offen bleibt, warum `6494H` vor dem Aufbau des ID-Blocks
 laeuft — vor allem, ob ein Laufwerks-/K5122-Status diesen Zweig ausloest, den die Hardware anders melden wuerde.
+
+## Ursache gefunden: Kettenseite `getIEO()` ignoriert IUS (2026-10-30, Analyse `/tmp/sp/nfnd2/`)
+
+**Ergebnis (Staerke: hoch, Gegenprobe im Emulator):** Emulatorabweichung, kein Gastverhalten.  `Z80CTC::getIEO` (`z80_ctc.cpp:586`,
+`iei_ && !anyPending()`) und `Z80PIO::getIEO` (`z80_pio.cpp:421`) geben den nachgeordneten Baustein frei, waehrend ein Kanal in
+Bedienung ist (IUS).  Auf der Hardware bleibt IEO bis zum RETI gesperrt (`doc/testsystem_rework.md` §8 nennt das selbst).  Folge: ein RETI
+einer fremden ISR loescht zugleich den IUS des BS-PIO B (`K2526::onRETI` ruft beide, der PIO sieht IEI = 1), und `OUT 00H` (INT-BS) tritt
+**in die noch laufende INT-BS-ISR ein**.
+
+**Mechanismus (Adressen [Code] `sysare11`, [Lauf] Takte):**
+1. 6086H/60FEH: Zweig haengt NUR an `(IX+5)` (= 016BH) Bit 1 und Einheit `(IX+4)`/Bit 5 — kein Portlesen.  Bit 1 klar → 6107H (Phase 1,
+   ID-Block erst bei 63B3H); gesetzt → DE=03A9H → `CALL 002BH` (002BH = `EX (SP),HL / ADD HL,DE / EX (SP),HL / RET`, also *relativer Ruecksprung*)
+   → 60EBH+03A9H = **6494H**, ZVE2 starten.  Der Zweig ist die Phase 2 des Planers.
+2. Phase 1 laeuft in der INT-BS-ISR (1E48H, `CALL 001DH` bei 1E15H).  Sie setzt bei 6131H..6138H `(IX+5) := (… AND D6H) OR 10H` —
+   Anforderungsbit 4 **vor** dem Motoranlauf-Warten 617CH..6186H (wartet, bis `(041CH)` = 04H, 5 Indexpulse ≈ 2,46 Mio. Takte; Zeitschranke
+   BC=0000 ≈ 2,9 Mio. Takte, danach `CALL 002BH` DE=FF35H → 60C0H → `LD B,84H` = **84H ist die Zeitschranke dieses Wartens**).
+3. [Lauf] 281EH (RETI der CTC-Kanal-2-ISR, alle ~5140 Takte): vorher BS-PIO B `ius=1`, nachher `ius=0`.  Der naechste `OUT 00H` (0E0DH in der
+   100-ms-ISR) wird sofort angenommen (1E48H bei c37597699, SP=03B8H, **ohne** dass die erste ISR (SP=03C4H) beendet ist).  Planer
+   1E26H..1E3BH: Bit 4 gesetzt, Budget `(00FDH)` E6H−99H = 4DH → SET 1 → Treiber → 60FEH → 6494H, **bevor** 63B3H den ID-Block aufbaut.
+4. ZVE2 sucht mit dem Rest des letzten Lesens (CAL 2: `FE 1E 00 10`, CRC 6392H = trifft) und setzt bei 6B1DH `(041CH) := 3`.  Das Warten
+   in 617CH vergleicht auf Gleichheit mit 04H und sieht die Zahl nie mehr (3, 2, 1, 0) → Zeitschranke → 60C0H → 84H → `ERR FD 1 NFND`.
+   Im ersten CAL steht dort Null: kein Treffer, `(041CH)` zaehlt 9→4, Warten endet normal.
+5. SYSD (`92CBH D50`) gleiches Muster: Entry 0150H, `(IX+9)=80H`, Phase 1 bei c87772979, 6494H mit Rest-ID `FE 01 00 01` (c87927665),
+   84H bei c90882252 (= +3,1 Mio. Takte, die Zeitschranke).  SGEN (`9464H D66`): im Debugger-Skript nicht nachgestellt (Kopfspur-Abfolge
+   haengt dort); gleiche Familie dokumentiert (sgen.md §1 Nr. 2 „veraltete Kopfspur", Neu-Mounten heilt), **nicht einzeln belegt**.
+
+**Gegenproben (alle am unveraenderten Emulator ausser der letzten):**
+- `e 0x403 00` vor dem Zugriff heilt CAL 2 und SYSD (SYSD laeuft dann bis `START ->ET1`), `e 0xFD 00` ab 6150H fuer 6 Mio. Takte (Planer
+  kann nicht gewaehren, danach `e 0xFD E6`) heilt CAL 2: der ID-Block wird richtig aufgebaut (`FE 00 00 05 …`), DIDI laeuft.
+- **Scratch-Bau** (`/tmp/sp/nfnd2/src`, nicht unter `core/`): `getIEO()` zusaetzlich `&& !IUS` in Z80CTC (`!anyIus()`) **und** Z80PIO
+  (`porta_.iei && (porta_.ius || portb_.ius)` → false): zweites `CAL DIDI` laeuft, SYSD laeuft bis `34 K-BYTE`, erstes CAL und Boot
+  unveraendert.  Nur CTC allein heilt **nicht** (der RETI der K5122-/PIO-ISR loescht den IUS des BS-PIO weiter).  Z80SIO nicht noetig.
+- Port-Status (RDYL, Index, TR00) gehen nicht in den Zweig ein; die frueheren Spin-up-Versuche (50/150 ms) konnten ihn deshalb nicht aendern.
+
+**Fix-Vorschlag (nicht umgesetzt):** `getIEO()` in `z80_ctc.cpp`/`z80_pio.cpp` (und aus Konsistenz `z80_sio.cpp`) sperrt auch bei IUS;
+`RetiChain.IeoBlocksOnPendingNotOnService` kippt dann absichtlich.  Risiko: Boot-Invarianten, K8915/PRG 710/PC 1715/MC80/P8000
+(dieselben Bausteine) — nur nach `tools/dev.sh test-merge --alles`.  **Offen:** SGEN einzeln nachstellen; ob das SIO die Sperre braucht
+(Tastatur-ISR bei verschachtelten Kartenketten); PIO-Nachweis ohne CTC-Anteil.
