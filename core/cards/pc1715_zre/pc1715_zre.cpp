@@ -320,8 +320,9 @@ const char* Pc1715Zre::intDeviceName() const
 
 void Pc1715Zre::onRETI()
 {
-    if (!cfg_.w) ctc_.onRETI();
-    sio_.onRETI();
+    // Erster Baustein in Bedienung (CTC vor SIO; am 1715W ohne CTC0 in der Kette).
+    if (!cfg_.w && ctc_.inBedienung()) ctc_.onRETI();
+    else if (sio_.inBedienung())       { sio_.setIEI(true); sio_.onRETI(); }
 }
 
 // ─── Bild ────────────────────────────────────────────────────────────────────

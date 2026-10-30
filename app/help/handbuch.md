@@ -969,10 +969,6 @@ Eine fertig initialisierte Datendiskette legt stattdessen das DiskTool an
   (DIDI, DINH): der Bildschirm wird geleert, die Lampe blinkt, nichts geht mehr. Das ist
   Verhalten des Gastprogramms (es setzt ein Merkbit, bei dem SIOS „Havarie" annimmt), kein
   Emulatorfehler nach heutigem Wissen. **Programme mit ET2 verlassen**, nicht mit `CAN`.
-* **Zweites `CAL` nach einem Programmende** meldet `ERR FD 1 NFND`, solange die Diskette
-  nicht neu eingelegt wird: SIOS glaubt den Kopf noch an der Stelle des letzten Ladens.
-  Abhilfe: die Programmdiskette in B: auswerfen und wieder einlegen (oder vor jedem Programm
-  einen frischen Start).
 
 ## MUTOS 8000 (A5120.16)
 

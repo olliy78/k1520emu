@@ -5,6 +5,11 @@ Stand 2026-10-30.  Belegt am laufenden System (`tests/integration/test_sios_sgen
 Systemdatei endet in `ERR FD 1 NFND` auf der Ausgabediskette — **S7 ist nur teilweise erreicht**, eine generierte
 Systemdiskette entsteht noch nicht.  Ursache offen (Abschn. 5).
 
+> **Nachtrag 2026-10-30:** Die Abbrueche `ERR FD 1 NFND` (SYSD 92CBH, SGEN 9464H) und die Pflicht zum Neu-Einlegen (Abschn. 1.2) waren
+> ein Emulatorfehler (/IEO sperrte nicht bei IUS, `befund_nfnd_84h.md`) und sind behoben.  SYSD zeigt die Modulliste (GRUND, T-K7637, BAB,
+> BIN ARI, DEZ ARI, BCD ARI, SD 3-I, LOG-FD2, DFUE-A; `34 K-BYTE`), SGEN meldet `SGEN FINISHED`
+> (`SiosSgen.SysdZeigtKopfDerSystemdiskette`, `SiosSgen.GeneriertEineSystemdiskette`).  Abschn. 2 und 5 unten sind Vorgeschichte.
+
 ## 1. Bedienfallen (gelten für beide Programme)
 
 1. **Fehlersperre beim Programmstart.**  SYSD, SGEN (und der zweite Bildschirm danach) starten mit gesetztem Bit 7 in `00CBH`

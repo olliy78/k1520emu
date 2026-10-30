@@ -201,9 +201,8 @@ void markiere(Rechner& r, const std::string& wahl) {
 }  // namespace
 
 // SYSD auf der Systemdiskette (SYLs in A: = Laufwerk 04), Programm von DP2 in B: (ASN 0315 66).
-// Nach CI + ET1 fragt es "PRINT Y/N:"; "N" zeigt den Kopf der Systemdiskette.  Die
-// Modulliste folgt in der Fassung 1.8 (Bildschirmfoto robotrontechnik.de); hier endet SYSD V 1.5
-// mit "ERR FD 1 NFND" (sgen.md Abschn. 2).
+// Nach CI + ET1 fragt es "PRINT Y/N:"; "N" zeigt Kopf und Modulliste der Systemdiskette.  Bis zur
+// /IEO-Korrektur (2026-10-30) endete SYSD V 1.5 hier mit "ERR FD 1 NFND" (sgen.md Abschn. 2).
 TEST(SiosSgen, SysdZeigtKopfDerSystemdiskette) {
     Rechner r("sios1526_dp2.hfe");
     r.tippe("ASN");
@@ -235,6 +234,11 @@ TEST(SiosSgen, SysdZeigtKopfDerSystemdiskette) {
     EXPECT_NE(v.find("SYSTEM-LOADER"), std::string::npos) << v;
     EXPECT_NE(v.find("BOE: 01001"), std::string::npos) << v;
     EXPECT_NE(v.find("EOE: 12026"), std::string::npos) << v;
+    // Modulliste (Bildschirm woertlich, doc/sios/sgen.md Abschn. 2), nach dem Kopf; die Zeilen stehen in
+    // Spalte 9 (vramText traegt die Spalten 1:1, Leerzeichen als Leerstellen).
+    for (const char* m : {"GRUND", "T-K7637", "BAB", "BIN ARI", "DEZ ARI", "BCD ARI", "SD 3-I",
+                          "LOG-FD2", "DFUE-A", "START ->ET1 / MONITOR ->ET2", "34 K-BYTE"})
+        EXPECT_NE(v.find(m), std::string::npos) << m << "\n" << v;
 }
 
 // SGEN von SG1 (SYSORG09 + PHASELB) bis zur Modulauswahl.  Die Liste kommt aus dem Verzeichnis
@@ -262,7 +266,7 @@ TEST(SiosSgen, SgenZeigtDieModulliste) {
 // Ziel: eine generierte Systemdiskette erzeugen und booten.  Heute endet SGEN nach "SGEN IS
 // WORKING" mit "ERR FD 1  NFND  ....  D66" (Ausgabelaufwerk); es loescht dabei das Etikett
 // SYSARE09 (HDR1 -> DDR1) und sucht danach etwas, das es auf der Diskette nicht findet.
-TEST(SiosSgen, DISABLED_GeneriertEineSystemdiskette) {
+TEST(SiosSgen, GeneriertEineSystemdiskette) {
     const std::string ziel = vorbereiteteZieldiskette();
     Rechner r("sios1526_dp2.hfe");
     TempDisk sg1("sios1526_sg1.hfe", "sios_sgen_sg1.hfe");

@@ -129,6 +129,7 @@ public:
      * that was being serviced, allowing lower-priority interrupts.
      */
     void    onRETI() override;
+    bool    inService() const override { return inBedienung(); }
 
     /**
      * @brief Advance the internal timer counters (system clock).
@@ -362,6 +363,8 @@ private:
      * @return true if any int_pending is set.
      */
     bool    anyPending() const;
+    /// true, wenn ein Kanal in Bedienung ist (IUS gesetzt, bis zum RETI).
+    bool    anyIus() const { for (const auto& c : ch_) if (c.ius) return true; return false; }
 
     /**
      * @brief Check if any channel can be vectored now (pending, iei, not under service).

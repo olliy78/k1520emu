@@ -948,7 +948,7 @@ TEST(Z80CTC, DebugStateReflectsChannelAndDaisyChain) {
         auto d = ctc.debugState();
         EXPECT_TRUE(d.ch[2].ius);           // under service
         EXPECT_FALSE(d.ch[2].intPending);   // cleared on acknowledge
-        EXPECT_TRUE(d.ieo);                 // no longer pending → IEO high again
+        EXPECT_FALSE(d.ieo);                // in Bedienung (IUS) → IEO bleibt low bis zum RETI
     }
 }
 

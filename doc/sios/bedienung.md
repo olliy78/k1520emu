@@ -87,11 +87,7 @@ Programms bleibt stehen).  **ET2** im Programm -> Rückkehr `(M)`.  Auch geladen
    `1DEFH` (`DI`, Lampenport 0BH toggelt in Warteschleife `1E00H`).  Weg dorthin: SVC `90H` (`RST 08H` bei `0CD1H`) ->
    Klasse 10H -> `1D7EH` -> `1DEFH`.  Ob das Verhalten des echten SIOS ist (CANCEL als Havarie) oder ein
    Emulatorfehler, ist **ungeklärt**.
-2. **Ein zweites `CAL` nach Programmende liefert `ERR FD 1 NFND`**, solange die Diskette nicht neu eingelegt wird
-   (`mount` im Debugger heilt es).  Beim zweiten `CAL` liest SIOS dauernd dieselbe Spur (Zylinder 58, Wiederholung)
-   statt das Verzeichnis (Spur 1) anzufahren, der Kopf steht noch dort, wo das erste Programm geladen wurde.  Verdacht:
-   SIOS hält die Kopfposition selbst (Bezug nach Programmlauf zurückgesetzt) und der Doppelschritt-Abbildung der
-   40-Spur-DP1 im 80er-Laufwerk; **ungeklärt**.  Test-Umgehung: je Programm ein frischer Start.
+2. ~~Zweites `CAL` nach Programmende -> `NFND`~~ **behoben (2026-10-30, /IEO-Korrektur)**: Neu-Einlegen ist nicht mehr noetig (`SiosMonitor.ZweitesCalNachProgrammende`).
 3. **INIT** (siehe unten).
 
 ## 4. INIT (Leerdiskette initialisieren) -- Stand: läuft durch (2026-10-30)

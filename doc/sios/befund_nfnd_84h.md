@@ -95,3 +95,9 @@ einer fremden ISR loescht zugleich den IUS des BS-PIO B (`K2526::onRETI` ruft be
 `RetiChain.IeoBlocksOnPendingNotOnService` kippt dann absichtlich.  Risiko: Boot-Invarianten, K8915/PRG 710/PC 1715/MC80/P8000
 (dieselben Bausteine) — nur nach `tools/dev.sh test-merge --alles`.  **Offen:** SGEN einzeln nachstellen; ob das SIO die Sperre braucht
 (Tastatur-ISR bei verschachtelten Kartenketten); PIO-Nachweis ohne CTC-Anteil.
+
+## Ergebnis (2026-10-30, Zweig sios-ieo)
+`getIEO()` in CTC, PIO und SIO sperrt jetzt auch bei IUS; `K1520Bus::signalRETI` verteilt das RETI nur an den ersten Baustein in
+Bedienung (neue `InterruptSlave::inService()`), Karten mit mehreren Bausteinen ebenso.  Zweites `CAL DIDI` ohne Neu-Mount laeuft
+(`SiosMonitor.ZweitesCalNachProgrammende`), SYSD zeigt die Modulliste, SGEN laeuft bis `SGEN FINISHED`.  Die Einordnung
+"Gastverhalten" oben ist damit widerlegt: Emulatorabweichung.

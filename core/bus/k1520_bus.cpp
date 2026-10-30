@@ -251,8 +251,16 @@ void K1520Bus::assertRESET()  {
 
 void K1520Bus::signalRETI() {
     LOG_DEBUG("K1520Bus", "RETI-Signal: alle Geraete in Daisy-Chain benachrichtigt");
-    for (auto* dev : int_chain_)
-        dev->onRETI();
+    // RETI-Dekodierung nach dem Datenblatt: ein Geraet mit ANSTEHENDER Anforderung gibt seinen /IEO
+    // waehrend des ED-Holezyklus frei, nur ein Geraet IN BEDIENUNG sperrt (/IEO low bis zum RETI).
+    // Das RETI nimmt also das erste Geraet in Bedienung an; alle dahinter haben /IEI low.
+    bool iei = true;
+    for (auto* dev : int_chain_) {
+        const bool bedient = dev->inService();
+        dev->setIEI(iei);
+        if (iei) dev->onRETI();
+        if (bedient) iei = false;
+    }
     int_dirty_ = true;   // IUS geloescht → Chain neu bewerten
     updateInterruptChain();
 }

@@ -335,6 +335,7 @@ public:
      * so that the next lower-priority interrupt can be acknowledged.
      */
     void    onRETI() override;
+    bool    inService() const override { return ctc_.inBedienung() || bs_pio_.inBedienung(); }
 
     /// @brief Anfordernder Baustein (Debugger): System-CTC oder BS-PIO.
     const char* intDeviceName() const override {

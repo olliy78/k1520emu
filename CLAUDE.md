@@ -719,6 +719,8 @@ Plan: `doc/design/31_mc80.md`.
 
 ## SIOS 1526 (Zweig `SIOS1526`, Stand 2026-10-30)
 
+> **/IEO sperrt bei IUS (2026-10-30):** `getIEO()` von CTC/PIO/SIO ist low, solange ein Kanal anfordert ODER in Bedienung ist; RETI geht nur an den ersten Baustein in Bedienung (`InterruptSlave::inService()`). Nicht aufweichen (Wächter `RetiChain.*`, `SiosMonitor.ZweitesCalNachProgrammende`); zweites CAL und SGEN laufen seither.
+
 Sparkassen-/Betriebssystem des A5120/A5130/K8924; fünf Originalabbilder unter `tools/sios_a5120/original/` (SYLs = 1.1, SYLp = 0.9, DP1/DP2, SG1).
 **Stand:** SIOS 1.1 (K7637, Sicherheitsstecker 01) bootet bis `MONITOR ===== SIOS 1526/1.1 (M)_`; DAT/CLK/ASN/CAL/M/ET2 und mehrere Programme laufen;
 DiskTool-Dateisystem `sios` liest und schreibt (`sios_ss40`/`sios_ss80`).  `INIT` formatiert Disketten (K5600.10 für 40 Spuren).  **SIOS 0.9 (K7636, `SYLp`) bootet seit S4** bis `MONITOR ===== SIOS 1526/0.9 (M)_` (Sicherheitsstecker auch an der K7636, Annahme [?]; ohne Stecker ignoriert 0.9 die Tasten).  **SGEN** läuft bis zur Modulauswahl, die Erzeugung endet in `ERR FD 1 NFND` (S7, `doc/sios/sgen.md`).  Offen: SGEN, Beispieldisketten.
