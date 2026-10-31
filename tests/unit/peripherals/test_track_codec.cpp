@@ -1217,3 +1217,21 @@ TEST_P(TrackCodecA0, GeloeschteMarkeStehtAlsF8AufDemMedium) {
 
 INSTANTIATE_TEST_SUITE_P(FmMfm, TrackCodecA0,
                          ::testing::Values(Encoding::FM, Encoding::MFM));
+
+// Geloeschte Datenmarke F8 im treuen Lesestrom: Marke UND CRC (SIOS-Treiber vergleicht die Marke).
+TEST(TrackCodecGeloescht, FaithfulRead_FuehrtF8MitGueltigerCrc) {
+    for (Encoding enc : {Encoding::MFM, Encoding::FM}) {
+        LogicalSector s = makeSector(0, 0, 1, 128);
+        s.deleted = true;
+        TrackImage t = TrackCodec::buildFaithfulReadTrack({s}, enc);
+        auto p = TrackCodec::parseTrack(t);
+        ASSERT_EQ(p.size(), 1u);
+        EXPECT_TRUE(p[0].deleted) << (enc == Encoding::MFM ? "MFM" : "FM");
+        EXPECT_TRUE(p[0].data_crc_ok) << "CRC muss mit F8 gerechnet sein";
+        size_t dam = SIZE_MAX;
+        for (size_t i = 0; i < t.marks.size(); ++i)
+            if (t.marks[i] == MarkType::Data) { dam = i; break; }
+        ASSERT_NE(dam, SIZE_MAX);
+        EXPECT_EQ(t.bytes[dam], 0xF8);
+    }
+}

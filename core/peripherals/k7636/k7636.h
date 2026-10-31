@@ -82,6 +82,18 @@ public:
     void setRepeatRealtime(bool an) { repeat_uhr_.setEchtzeit(an); }
     void setRepeatClockSource(TastenUhr::Quelle q) { repeat_uhr_.setQuelle(q); }
 
+    // ── Bediensicherung (Sicherheitsstecker), wie K7637 ──────────────────────────────
+    // Annahme [?]: es gibt keinen K7636-ROM-Abzug; SIOS 0.9 wertet A8H..AFH als Maske aus
+    // (doc/sios/tastatur_bediensicherung.md), daher dieselben Codes wie die K7637: Stopfen n
+    // legt SLn (n = 1..3) auf Low, Code A9H/AAH/ABH nach TYP und bei jeder Pegelaenderung.
+    static constexpr uint8_t SL_CODE[3] = {0xA9, 0xAA, 0xAB};
+    /// 0 = keins, 1..6 = Bedienerkennung.  Zur Laufzeit: Codes der wechselnden Leitungen.
+    /// @p geraet_passt = false: Geraetekennung falsch, alle SL bleiben High.
+    void setSicherheitsstecker(int kennung, bool geraet_passt = true);
+    int  sicherheitsstecker() const { return stopfen_kennung_; }
+    bool sicherheitssteckerGeraetPasst() const { return stopfen_geraet_passt_; }
+    uint8_t slLowMaske() const { return sl_low_; }
+
     // ── Anzeigen (fuer die Bildschirmtastatur und Tests) ──────────────────────
     bool codeBereit() const       { return out_valid_; }
     bool shiftLampe() const       { return lock_ || kommando_shift_; }   ///< LED C99
@@ -111,6 +123,13 @@ private:
     bool liefere();
     void kommando(uint8_t data);
     bool aufloesen(uint32_t k, bool shift, uint8_t& code) const;
+
+    void sendSlCodes(uint8_t maske);
+    int     stopfen_kennung_ = 0;
+    bool    stopfen_geraet_passt_ = true;
+    bool    eingeschaltet_ = false;     ///< reset() lief schon (Stecken meldet dann sofort)
+    bool    kommando_reset_ = false;    ///< Reset per Kommando (Antwortzeit statt sofort)
+    uint8_t sl_low_ = 0;            ///< wirksame Low-Maske der SL1..SL3
 
     std::deque<Eintrag> puffer_;
     bool     out_valid_ = false;

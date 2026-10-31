@@ -24,6 +24,7 @@ sind nur nicht mehr in jeder einzelnen Anfrage geladen.
 | `mc80.md` | `core/machines/mc80/` + `core/cards/mc80/`, `peripherals/mc80_tastatur`, `Z80CTC::setIntAusVerwirftAnforderung`, Programm `mc80emu` — sechste Maschine MC80.3x (direkt hier angelegt; `CLAUDE.md` trägt nur den Kurzabsatz „Sechste Maschine: MC80“) |
 | `kermit.md` | `kermit/` (Bibliothek `libk1520kermit`, C-ABI `k1520k_*`), `tools/k1520kermit.cpp`, `app/kermittool/`, WEGA-Gegenstelle C-Kermit 4.2 auf `disks/p8000_wega31` — Protokollregeln gegen C-Kermit 4.2, adaptive Fristen, Platteneinrichtung (direkt hier angelegt, AP K7) |
 | `td0_imd.md` | `core/peripherals/floppy_drive/{td0,imd}_codec` + `sector_track_io`, Container `.td0`/`.imd` — TeleDisk/ImageDisk (Clean-Room aus HxC, MIT; direkt hier angelegt) |
+| `sios.md` | SIOS 1526 (A5120/A5130/K8924): Q240/CTC/F8-Kernkorrekturen, Sicherheitsstecker, Tasten ET1/ET2/M, DiskTool-Dateisystem `sios`, Befunde CAN/INIT (Entwurf 43; direkt hier angelegt; `CLAUDE.md` traegt nur den Kurzabsatz „SIOS 1526“) |
 
 ## Warum ausgelagert
 

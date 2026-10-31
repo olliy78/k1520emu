@@ -59,6 +59,7 @@ _SPECIAL_KEYS = {
     int(Qt.Key_Tab),
     int(Qt.Key_Backtab),           # Umschalt+Tab — Qt schickt eine EIGENE Taste
     int(Qt.Key_Escape),
+    int(Qt.Key_Pause),             # ET2 (0xFE), s. K7637::translateKey
     int(Qt.Key_Delete),
     int(Qt.Key_Up),
     int(Qt.Key_Down),
@@ -144,6 +145,7 @@ _HOST_SPECIAL = {
     int(Qt.Key_Tab):       0x91,   # →| — die Taste an der Tabulatorstelle (Reihe 3)
     int(Qt.Key_Backtab):   0x9B,   # |← — Umschalt+Tab, ihre Gegenstueck-Taste
     int(Qt.Key_Escape):    0x1B,   # ESC-Taste
+    int(Qt.Key_Pause):     0xFE,   # ET2 allein (SIOS: Eingabe abbrechen / Programm beenden)
     int(Qt.Key_Backspace): 0x9F,   # |←| — DIE Ruecktaste der K7637 (Reihe 2, Pos. 14)
     int(Qt.Key_Delete):    0xBB,   # DEL CH
     int(Qt.Key_Up):        0x94,
@@ -791,6 +793,18 @@ class KeyboardWidget(QWidget):
     # ── Maus ────────────────────────────────────────────────────────────────
 
     def mousePressEvent(self, event):
+        if event.button() == Qt.RightButton:
+            # Rechtsklick auf ET2 sendet den Code 0xFE ALLEIN (SIOS 1526: Eingabe
+            # abbrechen / Programm beenden); der Linksklick bleibt der Strg-Vorsatz
+            # der anderen Betriebssysteme.  Am PC dafuer: Taste Pause.
+            key = self._key_at(event.position() if hasattr(event, "position")
+                               else event.pos())
+            if key is not None and key.kind == "ctrl" and key.low == "ET2":
+                self._pressed = key
+                self._pressed_code = int(raw(0xFE))
+                self.update()
+                self.keyPressed.emit(int(raw(0xFE)), False, False)
+                return
         if event.button() != Qt.LeftButton:
             super().mousePressEvent(event)
             return
@@ -824,6 +838,9 @@ class KeyboardWidget(QWidget):
         self.keyPressed.emit(int(code), shift_active, self._ctrl)
 
     def mouseReleaseEvent(self, event):
+        if event.button() == Qt.RightButton and self._pressed_code == int(raw(0xFE)):
+            self._release_pressed()
+            return
         if event.button() != Qt.LeftButton:
             super().mouseReleaseEvent(event)
             return

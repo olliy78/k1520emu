@@ -300,6 +300,23 @@ K1520_API const char* k1520d_detected_fs(K1520Disk h);
  */
 K1520_API const char* k1520d_container_info(K1520Disk h, const char* key);
 
+/* ─── SIOS 1526: Etikettenfelder (additiv, nur lesend) ────────────────────────
+ *
+ * Fuer den Eigenschaften-Dialog.  Beide Funktionen liefern "" (kein Fehler), wenn die Diskette kein
+ * SIOS-Dateisystem traegt, die Datei nicht existiert oder der Schluessel unbekannt ist.  Der Zeiger gilt bis
+ * zum naechsten Aufruf einer dieser beiden Funktionen fuer diese Diskette.
+ *
+ * k1520d_sios_info (Datentraeger, VOL1): "vol_name" (Pos. 5-10), "vol_zugriff" (11), "vol_aufzeichnung" (71),
+ *   "vol_seiten" (72), "vol_satzlaenge" (76), "vol_sektorfolge" (77-78), "vol_version" (80),
+ *   "etiketten_belegt" / "etiketten_gesamt" (Zahlen, 19 Etikettensektoren 8..26).
+ * k1520d_sios_file (@p name wie in der Liste, "PHASELB" bzw. "PHASELB/INIT"): "art" ("datei" | "bibliothek" | "objekt");
+ *   Dateien/Bibliotheken: "etikett" (Sektor 8..26), "satzlaenge", "boe", "eoe", "eod" (Text "TTSSS"), "sektoren",
+ *   "schutz" (Pos. 43), "austausch" (44), "fortsetzung" (45, "C" = auf der Folgediskette fortgesetzt), "folge" (46-47);
+ *   Objekte: "bibliothek", "aadr" (hex, 4 Stellen), "ml" (hex, 2 Stellen), "laenge" (Sektoren).
+ */
+K1520_API const char* k1520d_sios_info(K1520Disk h, const char* key);
+K1520_API const char* k1520d_sios_file(K1520Disk h, const char* name, const char* key);
+
 /* ─── tar-Disketten: Export (additiv) ─────────────────────────────────────────
  * Regeln: DiskVolume::tarExport (core/filesystem/disk_volume.h).  Eine `.tar` kommt ueber
  * @ref k1520d_tar_datei_ablegen in eine tar-Diskette (als Datei oder als Container). */

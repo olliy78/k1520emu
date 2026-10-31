@@ -151,6 +151,14 @@ ORDNER = {
     'a5120_bcu12_k5600-10_arbeit40-eigenbau.hfe': 'a5120_bcu',
     'bcu_kassette_formatiert.k52': 'a5120_bcu',
     'bandtest_boot.k52': 'a5120_bandtest',
+    # SIOS 1526 (tools/sios_a5120/build.py, doc/design/43_sios1526.md S8)
+    'a5120_sios11_3xk5601_seriell.hfe': 'a5120_sios1526',
+    'a5120_sios11_3xk5601_seriell_sl1.hfe': 'a5120_sios1526',
+    'a5120_sios09_3xk5601_parallel.hfe': 'a5120_sios1526',
+    'a5120_sios09_3xk5600_10_parallel.hfe': 'a5120_sios1526',
+    'a5120_sios_programme1.hfe': 'a5120_sios1526',
+    'a5120_sios_programme2.hfe': 'a5120_sios1526',
+    'a5120_sios_generierung.hfe': 'a5120_sios1526',
 }
 
 

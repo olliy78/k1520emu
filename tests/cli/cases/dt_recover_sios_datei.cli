@@ -1,0 +1,14 @@
+# SIOS 1526 (D5): eine geloeschte physische Datei (HDR1 -> DDR1) ist mit Namen, Groesse und
+# Sicher-Guete zu finden, `--to` holt sie ohne Schreibzugriff heraus, und `--restore` traegt
+# sie auf der Diskette wieder ein (Datenmarke FB, die Pruefung schweigt).
+#
+# Die 17 DDR1-Platzhalter DATA10..DATA26 der SG1 (Bereich 01001..73026, hinter dem Ende der
+# Diskette) duerfen KEIN Fund sein: genau ein Fund hier.
+tool:   k1520disktool
+disk:   sios1526_sg1.hfe
+setup_run: rm %DISK% SYSORG09 --no-backup
+setup_run: recover %DISK% --restore 0=ALT --no-backup
+run:    recover %DISK%
+expect: nichts zu retten
+forbid: DATA10
+exit:   0

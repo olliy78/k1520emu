@@ -421,6 +421,8 @@ void Z80PIO::setIEI(bool v) {
 bool Z80PIO::getIEO() const {
     if (porta_.iei && porta_.pending) return false;
     if (portb_.iei && portb_.pending) return false;
+    // Datenblatt: /IEO bleibt low, solange ein Port in Bedienung ist (IUS), bis zum RETI.
+    if (porta_.iei && (porta_.ius || portb_.ius)) return false;
     return porta_.iei;
 }
 
@@ -534,9 +536,10 @@ void Z80PIO::onRETI() {
     // (setIEI rechnet beides ein).  Sonst bliebe B in Bedienung, wenn A gerade anfordert,
     // und sperrte sich selbst bis zum naechsten RETI (Befund A8: BCU-KMBG verlor das
     // Kassettenecho der Daten-PIO B, waehrend A das naechste Byte verlangte).
-    if (porta_.iei && porta_.ius) {
+    // Ob der Baustein das RETI sieht, entscheidet der Aufrufer (inService()/K1520Bus::signalRETI).
+    if (porta_.ius) {
         porta_.ius = false;
-    } else if (porta_.iei && portb_.ius) {
+    } else if (portb_.ius) {
         portb_.ius = false;
     }
 }

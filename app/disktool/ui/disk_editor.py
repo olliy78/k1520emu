@@ -91,18 +91,50 @@ def _monospace() -> QFont:
     return f
 
 
-def hexdump(data: bytes, breite: int = HEX_BREITE) -> str:
-    """``data`` als Hexdump: Offset, Hexbytes, ASCII-Deutung.
+#: Gemerkte Textspalten-Wahl je Diskette (Pfad), falls QSettings nicht zur Verfuegung steht.
+_KODIERUNG_MERKER: dict = {}
+
+
+def _einstellungen():
+    """``QSettings`` nur, wenn die Anwendung sich benannt hat (Tests tun das nicht)."""
+    from PySide6.QtCore import QCoreApplication, QSettings
+    if not QCoreApplication.organizationName():
+        return None
+    return QSettings()
+
+
+#: Textspalte des Hexdumps: ``"ascii"`` oder ``"ebcdic"`` (DKOI, SIOS-Etikettenspur).
+KODIERUNGEN = ("ascii", "ebcdic")
+
+
+def ebcdic_zeichen(b: int) -> str:
+    """Das Zeichen zu einem EBCDIC-/DKOI-Byte; ``.`` für alles, was kein ASCII-Zeichen ist.
+
+    DKOI ist EBCDIC mit fünf Abweichungen (``doc/sios_diskettenformat.md`` §2): Python
+    ``cp500`` liefert für 4AH/4FH/5AH/5FH bereits ``[ ! ] ^``, nur 6AH (``¦``) muss von
+    Hand auf ``/``.  Die Kleinbuchstaben des EBCDIC (81H…) bleiben Kleinbuchstaben.
+    """
+    if b == 0x6A:
+        return "/"
+    z = bytes([b]).decode("cp500")
+    return z if 32 <= ord(z) < 127 else "."
+
+
+def hexdump(data: bytes, breite: int = HEX_BREITE, kodierung: str = "ascii") -> str:
+    """``data`` als Hexdump: Offset, Hexbytes, Textdeutung (ASCII oder EBCDIC/DKOI).
 
     Feste Spalten — :func:`parse_hexdump` liest sie positionsgenau zurück, damit ein
-    ``.`` in der ASCII-Spalte nicht als Hexziffer missverstanden werden kann.
+    ``.`` in der Textspalte nicht als Hexziffer missverstanden werden kann.
     """
     zeilen = []
     for ab in range(0, len(data), breite):
         teil = data[ab:ab + breite]
         hexteil = " ".join(f"{b:02X}" for b in teil)
         hexteil = hexteil.ljust(breite * 3 - 1)
-        ascii_teil = "".join(chr(b) if 32 <= b < 127 else "." for b in teil)
+        if kodierung == "ebcdic":
+            ascii_teil = "".join(ebcdic_zeichen(b) for b in teil)
+        else:
+            ascii_teil = "".join(chr(b) if 32 <= b < 127 else "." for b in teil)
         zeilen.append(f"{ab:04X}  {hexteil}  {ascii_teil}")
     return "\n".join(zeilen)
 
@@ -780,6 +812,10 @@ class DiskEditorWindow(QDialog):
         # sondern das DATEISYSTEM — deshalb einmal beim Oeffnen bestimmt.  Nur ZDOS
         # (A5120) hat einen; UDOS1715/NDOS haelt alles im Sektor.
         self.udos = (tool.filesystem_type == "udos")
+        # Textspalte ASCII <-> EBCDIC/DKOI.  Die Vorgabe richtet sich nach der Diskette
+        # (SIOS: Spur 0 ist EBCDIC), eine ausdrueckliche Wahl wird je Diskette gemerkt.
+        self.ist_sios = bool(getattr(tool, "ist_sios", False))
+        self._kodierung_wahl: Optional[str] = self._kodierung_gemerkt()
 
         self.surface = DiskSurface()
         self.surface.sector_clicked.connect(self.select_sector)
@@ -826,6 +862,17 @@ class DiskEditorWindow(QDialog):
         wahlzeile.addWidget(QLabel("Daten-CRC:"))
         wahlzeile.addWidget(self.crc_feld)
         wahlzeile.addWidget(self.crc_urteil)
+        wahlzeile.addSpacing(16)
+        # Textspalte des Hexdumps: ASCII oder EBCDIC/DKOI (die SIOS-Etikettenspur).
+        self.kodierung_wahl = QComboBox()
+        self.kodierung_wahl.addItem("ASCII", "ascii")
+        self.kodierung_wahl.addItem("EBCDIC/DKOI", "ebcdic")
+        self.kodierung_wahl.setToolTip(
+            "Zeichenvorrat der Textspalte rechts im Hexdump.  EBCDIC/DKOI: SIOS-Disketten "
+            "(Spur 0 mit Etiketten VOL1/HDR1); die Wahl wird je Diskette gemerkt.")
+        self.kodierung_wahl.currentIndexChanged.connect(self._kodierung_gewaehlt)
+        wahlzeile.addWidget(QLabel("Text:"))
+        wahlzeile.addWidget(self.kodierung_wahl)
         wahlzeile.addStretch(1)
 
         # ── UDOS-Nachspann: die Dateiverkettung, aenderbar ───────────────────
@@ -1109,7 +1156,8 @@ class DiskEditorWindow(QDialog):
 
         self.crc_feld.setText(f"{crc:04X}")
         self._im_umbau = True                 # kein Auffrischen beim Befuellen
-        self.hex.setPlainText(hexdump(daten))
+        self._kodierung_anzeigen(cyl)
+        self.hex.setPlainText(hexdump(daten, kodierung=self.kodierung()))
         self._im_umbau = False
         self._enable(True)
         self._crc_bewerten()
@@ -1236,6 +1284,49 @@ class DiskEditorWindow(QDialog):
         if 0 <= neu < len(sektoren):
             self.select_sector(seite, spur, sektoren[neu].index)
 
+    # ── Textspalte: ASCII <-> EBCDIC/DKOI ────────────────────────────────────
+
+    def kodierung(self) -> str:
+        """Die gerade angezeigte Kodierung der Textspalte (``"ascii"`` | ``"ebcdic"``)."""
+        return self.kodierung_wahl.currentData() or "ascii"
+
+    def _kodierung_schluessel(self) -> str:
+        import hashlib
+        pfad = str(Path(str(self.tool.path)).resolve())
+        return "diskeditor/kodierung_" + hashlib.sha1(pfad.encode("utf-8")).hexdigest()[:16]
+
+    def _kodierung_gemerkt(self) -> Optional[str]:
+        """Die für diese Diskette gemerkte Wahl; ``None`` = nie gewählt."""
+        try:
+            s = _einstellungen()
+            if s is not None:
+                wert = s.value(self._kodierung_schluessel(), "", str)
+                if wert in KODIERUNGEN:
+                    return wert
+            return _KODIERUNG_MERKER.get(str(self.tool.path))
+        except Exception:     # noqa: BLE001 - Einstellungen sind Komfort, nie Voraussetzung
+            return None
+
+    def _kodierung_anzeigen(self, cyl: int) -> None:
+        """Wahlfeld auf die wirksame Kodierung stellen (ohne Rückkopplung)."""
+        wirksam = self._kodierung_wahl or ("ebcdic" if self.ist_sios and cyl == 0 else "ascii")
+        self.kodierung_wahl.blockSignals(True)
+        self.kodierung_wahl.setCurrentIndex(KODIERUNGEN.index(wirksam))
+        self.kodierung_wahl.blockSignals(False)
+
+    def _kodierung_gewaehlt(self, _index: int = 0) -> None:
+        """Der Anwender hat umgeschaltet: merken und die Textspalte neu zeichnen."""
+        wahl = self.kodierung()
+        self._kodierung_wahl = wahl
+        _KODIERUNG_MERKER[str(self.tool.path)] = wahl
+        try:
+            s = _einstellungen()
+            if s is not None:
+                s.setValue(self._kodierung_schluessel(), wahl)
+        except Exception:     # noqa: BLE001
+            pass
+        self._ascii_auffrischen()
+
     def _hex_geaendert(self) -> None:
         """ASCII-Spalte nachziehen und die CRC neu bewerten."""
         self._ascii_auffrischen()
@@ -1255,7 +1346,7 @@ class DiskEditorWindow(QDialog):
             daten = parse_hexdump(text)
         except ValueError:
             return
-        neu = hexdump(daten)
+        neu = hexdump(daten, kodierung=self.kodierung())
         if neu == text:
             return
 

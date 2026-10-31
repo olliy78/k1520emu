@@ -153,7 +153,41 @@ public:
      */
     static int fallingEdges(uint8_t byte);
 
+    // ── Bediensicherung (Sicherheitsstecker, Robotron: Bedienelement, AP S3b) ───────
+    // Der Sicherheitsstecker hat 8 Codierstopfen.  Stopfen 1-3 = Bedienerkennung
+    // (binaer: 1 = Chefschalter, 2 = 1. Bedienebene, 3 = 1+2, 4 = Stopfen 3,
+    // 5 = 1+3, 6 = 2+3 = 5. Bedienebene), Stopfen 4-8 = Geraetekennung (in der
+    // Tastatur gegen Drahtbruecken geprueft; nur bei Uebereinstimmung erreichen
+    // Stopfen 1-3 die Sonderleitungen SL1-SL3).  Annahme: Stopfen n legt SLn auf
+    // Low; ohne Element liegen alle SL High.  Die Tastatur sendet nach TYP die
+    // Codes aller Low-Leitungen (SL1..SL4) und im Betrieb bei JEDER Pegel-
+    // aenderung einer SL deren Code (Trigger — auch beim Ziehen).
+    // Codes: ROM-Abzug robotron-k7637_50-2716.bin, CTAB1 648H..64BH bzw. CTAB2
+    // 758H..75BH = A9H AAH ABH 00H (00H = keine Ausgabe).
+    static constexpr uint8_t SL_CODE[4] = {0xA9, 0xAA, 0xAB, 0x00};
+
+    /// Sicherheitsstecker stecken: 0 = keins, 1..6 = Bedienerkennung.  Zur Laufzeit
+    /// aufgerufen erzeugt es die Codes der wechselnden Leitungen (serielle
+    /// Taktung wie bei Tasten).  @p geraet_passt = false: Geraetekennung
+    /// stimmt nicht, alle SL bleiben High.  Nur im Lauffaden aufrufen.
+    void setSicherheitsstecker(int kennung, bool geraet_passt = true);
+    int  sicherheitsstecker() const { return stopfen_kennung_; }
+    bool sicherheitssteckerGeraetPasst() const { return stopfen_geraet_passt_; }
+    /// Pegel der Sonderleitungen als Maske (Bit n = SLn+1 liegt Low).
+    uint8_t slLowMaske() const { return sl_low_; }
+
 private:
+    static uint8_t slMaskeFuer(int kennung, bool geraet_passt) {
+        return (kennung >= 1 && kennung <= 7 && geraet_passt)
+            ? static_cast<uint8_t>(kennung & 7) : 0;
+    }
+    /// Codes der Low-Leitungen in Reihenfolge SL1..SL4 senden (nach TYP).
+    void sendSlCodes(uint8_t maske);
+    int     stopfen_kennung_      = 0;
+    bool    stopfen_geraet_passt_ = true;
+    uint8_t sl_low_               = 0;     // wirksame Low-Maske der SL1..SL3
+    bool    einschalt_offen_      = true;  // TYP + SL-Codes nach dem Einschalten noch ausstehend
+
     // Translate a keycode + modifiers to the A5120 scancode byte.  Zustandslos
     // (nur Konstanten), deshalb statisch — s. codeFor().
     static uint8_t translateKey(int qt_keycode, bool shift, bool ctrl);
@@ -235,6 +269,7 @@ private:
     static constexpr int QK_RETURN    = 0x01000004;
     static constexpr int QK_ENTER     = 0x01000005;
     static constexpr int QK_DELETE    = 0x01000007;
+    static constexpr int QK_PAUSE     = 0x01000008;   // Pause → ET2 (0xFE)
     static constexpr int QK_LEFT      = 0x01000012;
     static constexpr int QK_UP        = 0x01000013;
     static constexpr int QK_RIGHT     = 0x01000014;

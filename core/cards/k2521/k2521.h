@@ -90,6 +90,7 @@ public:
     bool        hasInterrupt() const override  { return ctc_.hasInterrupt() || pio_.hasInterrupt(); }
     uint8_t     getVector() const override;
     void        onRETI() override;
+    bool        inService() const override { return ctc_.inBedienung() || pio_.inBedienung(); }
     const char* intDeviceName() const override;
 
     // ─── Lebenslauf ──────────────────────────────────────────────────────────

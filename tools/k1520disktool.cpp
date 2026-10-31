@@ -512,6 +512,15 @@ int cmd_ls(const Optionen& o) {
                         e.unix_nlink, e.unix_uid, e.unix_gid, groesse.c_str(),
                         e.date.c_str(), e.name.c_str(), e.damaged ? "  [DEFEKT]" : "");
         }
+    } else if (v->fsType() == FsType::Sios) {
+        // SIOS: Typ F = Datei, B = Bibliothek, O = Objekt einer Bibliothek (`PHASELB/INIT`);
+        // Kz = Schutz/Austausch/Fortsetzung aus HDR1 (P/E/C); Lage = BOE/EOE/EOD bzw. AADR/ML.
+        std::cout << "Name                 Typ   Satz  Groesse  Kz  Lage\n";
+        for (const FileEntry& e : liste)
+            std::printf("%-20s %-3s %6u %8llu  %-3s %s%s\n", e.name.c_str(), e.type.c_str(),
+                        static_cast<unsigned>(e.record_len),
+                        static_cast<unsigned long long>(e.size), e.attributes.c_str(),
+                        e.extent.c_str(), e.damaged ? "  [DEFEKT]" : "");
     } else {
         if (seiten) std::cout << "Seite ";
         std::cout << "Name                 Typ   Groesse  Eigensch. Start Datum\n";

@@ -121,6 +121,6 @@ const char* Mc80Zve::intDeviceName() const
 
 void Mc80Zve::onRETI()
 {
-    ctc_.onRETI();
-    pio_.onRETI();
+    if (ctc_.inBedienung())      ctc_.onRETI();   // erster Baustein in Bedienung (CTC vor PIO)
+    else if (pio_.inBedienung()) pio_.onRETI();
 }

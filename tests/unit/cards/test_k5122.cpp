@@ -1421,3 +1421,39 @@ TEST_F(K5122Test, TrackEncoding_NichtGemountet_KeinMatch) {
     ASSERT_FALSE(s.mounted);
     EXPECT_FALSE(s.encodingMatch);   // ohne Diskette nie Match
 }
+
+/**
+ * @test K5122Test/FormatWrite_GeloeschteDatenmarkeBleibt
+ * @brief Ein Formatstrom mit DAM F8 ergibt ein Medium mit deleted=true (SIOS: freie
+ *        Etikettensaetze tragen F8), CRC gueltig.
+ */
+TEST_F(K5122Test, FormatWrite_GeloeschteDatenmarkeBleibt) {
+    DiskFormat fmt; fmt.name = "fmt_f8_2c1h4x256";
+    fmt.tracks.push_back({0, 1, 0, 0, 4, 256});
+    auto path = makeTmpImg(fmt, "_f8");
+    ASSERT_TRUE(card.mountDisk(0, path, fmt));
+    card.ioWrite(0x18, 0xEE);
+
+    std::vector<LogicalSector> soll;
+    for (uint8_t id = 1; id <= 4; ++id) {
+        LogicalSector s; s.cyl = 0; s.head = 0; s.id = id; s.size = 256;
+        s.data.assign(256, static_cast<uint8_t>(0xA0 + id));
+        s.deleted = (id == 3);
+        soll.push_back(s);
+    }
+    TrackImage stream = TrackCodec::buildTrack(soll, Encoding::MFM);
+
+    card.ioWrite(0x10, 0xFF);
+    card.ioWrite(0x10, 0xF4);
+    for (uint8_t b : stream.bytes) card.ioWrite(0x14, b);
+    card.ioWrite(0x10, 0xFF);
+    card.ioWrite(0x10, 0xF5);                       // Lese-Strobe committet
+
+    auto parsed = TrackCodec::parseTrack(card.drive(0).mutableTrack(0));
+    ASSERT_EQ(parsed.size(), 4u);
+    for (auto& s : parsed) {
+        EXPECT_EQ(s.deleted, s.id == 3) << "Sektor " << int(s.id);
+        EXPECT_TRUE(s.data_crc_ok);
+    }
+    std::filesystem::remove(path);
+}

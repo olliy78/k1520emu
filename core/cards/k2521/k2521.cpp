@@ -156,8 +156,8 @@ const char* K2521::intDeviceName() const
 
 void K2521::onRETI()
 {
-    ctc_.onRETI();
-    pio_.onRETI();
+    if (ctc_.inBedienung())      ctc_.onRETI();   // erster Baustein in Bedienung (CTC vor PIO)
+    else if (pio_.inBedienung()) pio_.onRETI();
 }
 
 // ─── Speicher ────────────────────────────────────────────────────────────────

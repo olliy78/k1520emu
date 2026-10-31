@@ -150,6 +150,7 @@ public:
     bool    hasInterrupt() const override  { return pio_.hasInterrupt(); }
     uint8_t getVector() const override     { return pio_.getVector(); }
     void    onRETI() override              { pio_.onRETI(); }
+    bool    inService() const override     { return pio_.inBedienung(); }
 
     // ─── 16-Bit-Seite: U8001 und Maschinenzeit ──────────────────────────────
     /**

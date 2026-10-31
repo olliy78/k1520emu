@@ -1,6 +1,6 @@
 # `k1520disktool` — Dateiaustausch mit K1520-Disketten
 
-Holt Dateien von CP/A-, SCPX-, **UDOS**-, **UDOS1715**- und **SCP1700**-Disketten
+Holt Dateien von CP/A-, SCPX-, **UDOS**-, **UDOS1715**-, **SCP1700**- und **SIOS-1526**-Disketten
 (CP/M-86 des A7100) und schreibt sie zurück —
 auf `.img`, `.hfe`, `.dmk`, `.cqm` (CopyQM), `.td0` (TeleDisk) und `.imd` (ImageDisk).  Dieselbe Bibliothek treibt die Oberfläche
 (`run_disktool.sh`); Feinentwurf: `doc/design/13_k1520disktool.md`.
@@ -1193,3 +1193,46 @@ Frage, wenn ein Dialog am falschen Ort aufgeht.
 **F1 öffnet das Handbuch** — links das Inhaltsverzeichnis, oben ein Suchfeld. Es ist
 eine gewöhnliche Markdown-Datei, `app/disktool/help/handbuch.md`; wer etwas ergänzen
 will, ändert sie und startet neu, ohne Code anzufassen.
+
+## SIOS 1526
+
+IBM-Etikettendisketten des SIOS 1526 (A5120/A5130/K8924, 26×128 MFM einseitig, 40 oder 80 Spuren) werden an `ERMAP` + `VOL1` in Spur 0
+erkannt (Profile `sios_ss40`/`sios_ss80`).  Beschreibung des Formats: `doc/sios_diskettenformat.md`.
+
+```
+$ k1520disktool ls -l SIOS1526_DP1.hfe
+Dateisystem: sios_ss40 (erkannt) - 1 Seite - MWD051
+Name                 Typ   Satz  Groesse  Kz  Lage
+PHASELB              B      128   123136  E   BOE 01001 EOE 37026 EOD 38001
+PHASELB/CATM         O      128     4608      AADR 0013 ML 12
+...
+$ k1520disktool get SIOS1526_DP1.hfe --to aus PHASELB/INIT    # -> aus/PHASELB_INIT (roh)
+$ k1520disktool boot-get SIOS1526_SYLs.hfe sylspur0.bin       # Spur 0 (SYL-Lader + Etiketten)
+```
+
+Typ `F` = physische Datei (Groesse = Sektoren `BOE..EOD-1`), `B` = Bibliothek (Name endet auf `LB`), `O` = Objekt einer Bibliothek.  Kz =
+Kennzeichen aus HDR1 (`P` Schreibschutz, `E` Austausch, `C` auf der Folgediskette fortgesetzt).  **Schreiben (D4):**
+
+```
+$ k1520disktool create neu.hfe --fs sios_ss40 --label TEST01     # leere Datendiskette (INIT-gleich)
+$ k1520disktool put neu.hfe daten.bin --as ALPHA                 # physische Datei, Spurbereich ab Spur 1
+$ k1520disktool put dp2.hfe objekt.bin --as PHASELB/NEU          # Objekt ans Ende einer Bibliothek (ML = Sektoren/2, Annahme)
+$ k1520disktool rm neu.hfe ALPHA                                  # HDR1 -> DDR1, Daten bleiben
+$ k1520disktool rm dp2.hfe PHASELB/NEU                            # Name blank, AADR/ML bleiben
+```
+
+Prüfung: `k1520disktool fsck <abbild>` kennt `sios.hdr1.ungueltig`, `sios.hdr1.ueberlappt` (Fehler), `sios.hdr1.eod`, die
+Bibliotheksbefunde `sios.bib.aadr`/`.reihenfolge`/`.nd`/`.verzeichnis` (Warnung) und `.doppelt` (Fehler), `sios.ermap.fehlt`/`sios.vol1.fehlt`
+(Fehler) sowie die Hinweise `sios.marke.aktiv`/`.frei` (Datenmarke F8/FB passt nicht zum Etikett; `fsck --repair` setzt sie, ohne Datenverlust).
+ERMAP-Nummern, NV und VOL1-Felder außer der Kennung werden nicht geprüft (nicht belegt).
+
+Rettung: `k1520disktool recover <abbild> [--full] [--to ordner] [--restore N[=NAME]]` findet gelöschte Dateien (`DDR1` mit
+erhaltenem Bereich, Name und Größe bleiben) und gelöschte Bibliotheksobjekte (Name leer, nur Abstand zum nächsten AADR als Länge).
+Die 17 `DATA10..26`-Platzhalter der SG1 (Bereich hinter dem Diskettenende) sind kein Fund.  `--restore` einer Datei trägt `HDR1` mit Marke FB
+wieder ein, wenn kein lebendes Etikett den Bereich berührt; ein Objekt kommt **nur** mit vergebenem Namen zurück (`--restore 0=SOPH`).  Container: `.hfe`/`.dmk` für den Emulator;
+`.img`/`.cqm`/`.td0`/`.imd` gehen, **verlieren aber die gelöschten Datenmarken F8** der Etikettensektoren ab Sektor 9.  Erkennung nur mit Nachweis
+(ERMAP + VOL1), BCU-880- und MUTOS-Disketten behalten ihr Profil.
+
+Namen: Datei 1–8, Objekt 1–5 Zeichen (Großbuchstaben/Ziffern/Satzzeichen des DKOI-Satzes), Satzlänge immer 128.  Abgelehnt (mit Meldung) wird: Bibliothek mit
+mehr als 14 Einträgen, Fehlspurkarte mit Einträgen, voll belegte Spuren 1–37, `create --boot`, `boot-put`.  Gelöschter Bibliotheksplatz kehrt nicht zurück.  Ein Abbild, dessen Geometrie zu keinem Katalogformat passt (`SIOS1526_SYLp.hfe`),
+braucht `--fs sios_ss40`.

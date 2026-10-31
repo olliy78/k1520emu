@@ -110,6 +110,10 @@ k1520_add_test(em16_abl SRC test_em16_abl.cpp LIBS ${_libs} k1520_fs
 k1520_add_test(kbd_nach_reset SRC test_kbd_nach_reset.cpp LIBS ${_libs}
                               LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 120)
 
+# Sicherheitsstecker (Sicherheitsstecker) der K7637 (AP S3b): Maschine + CP/A bootet mit Element.
+k1520_add_test(sicherheitsstecker SRC test_sicherheitsstecker.cpp LIBS ${_libs}
+                               LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 120)
+
 # PRG 710 / 710-1 (doc/design/20_prg710.md AP-P1c): beide Varianten bauen, Netz-Ein + Takte,
 # Verdrahtung der Speicherverwaltung, Marken-FF-Polaritaet.  Kein Diskettenlauf.
 k1520_add_test(prg710_maschine SRC test_prg710_maschine.cpp
@@ -293,6 +297,18 @@ k1520_add_test(boot_alt SRC test_boot_alt.cpp LIBS ${_libs}
 k1520_add_test(boot_bcu SRC test_boot_bcu.cpp LIBS ${_libs}
                         LABELS "${_lbl}" DEFS LOG_LEVEL=2
                         "A5120_LIEFERDISKETTEN=\"${CMAKE_SOURCE_DIR}/disks\"" TIMEOUT 120)
+
+# SIOS 1526 (Entwurf 43, AP S3): Kaltstart bis zur Systemzeile; Waechter vorerst DISABLED_.
+k1520_add_test(sios_boot SRC test_sios_boot.cpp LIBS ${_libs} k1520_fs
+                         LABELS "${_lbl}" DEFS LOG_LEVEL=2
+                         "A5120_LIEFERDISKETTEN=\"${CMAKE_SOURCE_DIR}/disks\"" TIMEOUT 900)
+
+k1520_add_test(sios_rest SRC test_sios_rest.cpp LIBS ${_libs} k1520_fs
+                         LABELS "${_lbl}" DEFS LOG_LEVEL=2
+                         "A5120_LIEFERDISKETTEN=\"${CMAKE_SOURCE_DIR}/disks\"" TIMEOUT 900)
+
+k1520_add_test(sios_sgen SRC test_sios_sgen.cpp LIBS ${_libs} k1520_fs
+                         LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 600)
 
 # DiskTool fuer BCU 880 (doc/a5120_alt/bcu.md §11): Startdiskette „SYL auf Spur 1“ erkennen/bauen,
 # Arbeitsdiskette bauen und fuellen, beide im Geraet (Lade-ROM V0.6), SYSGEN im Emulator.

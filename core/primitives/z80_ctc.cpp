@@ -470,7 +470,14 @@ void Z80CTC::clkTrg(int channel, bool rising_edge) {
  * 1. Activates the ZC/TO output pulse (low level) for one clock cycle
  * 2. Invokes the ZC/TO callback if registered
  * 3. Sets the interrupt pending flag if interrupts are enabled
- * 4. Stops the timer if in CLK_TRG mode (single-shot timer)
+ *
+ * Der Kanal laeuft danach weiter (Nachladen aus dem Zeitkonstantenregister macht der Aufrufer):
+ * der CTC kennt KEINEN Einzelschuss.  D3 (CLK/TRG-Triggerung) ist laut U857-Beschreibung
+ * "nur fuer Zeitgeber-Kanaele von Bedeutung" und STARTET den Zeitgeber per Flanke; danach
+ * beginnt die Zaehloperation bei jedem Nulldurchgang erneut (doc/trascripted/CTC_U875D.md,
+ * Bit 3 und Abschn. Zeitkonstantenregister).  Frueher stoppte der Kanal hier bei gesetztem
+ * D3 - SIOS 1526 programmiert seinen 100-ms-Kanal 3 als Zaehler mit D3=1 (EDH) und hing
+ * danach ohne Zeitgeber in 1CD4H.
  *
  * The ZC/TO pulse can be used to trigger other CTC channels or external devices.
  * In the A5120, ZC/TO pulses are used for baud rate generation for serial ports.
@@ -483,8 +490,6 @@ void Z80CTC::fireZCTO(int ch) {
     if (zcto_cb_) zcto_cb_(ch, false);
 
     if (c.control & CTRL_INT_EN) c.int_pending = true;
-
-    if (c.control & CTRL_CLK_TRG) c.running = false;
 }
 
 /**
@@ -579,7 +584,9 @@ bool Z80CTC::hasInterrupt() const {
  * @return true if interrupts can pass to downstream devices, false if blocked
  */
 bool Z80CTC::getIEO() const {
-    return iei_ && !anyPending();
+    // Datenblatt (U875/Z80-CTC, Daisy Chain): /IEO bleibt low, solange ein Kanal anfordert ODER in
+    // Bedienung ist (IUS) — bis zum RETI.  Sonst loescht ein fremdes RETI den IUS des Nachbarn.
+    return iei_ && !anyPending() && !anyIus();
 }
 
 /**
@@ -628,12 +635,11 @@ uint8_t Z80CTC::getVector() const {
  * is being serviced.
  */
 void Z80CTC::onRETI() {
-    // RETI loescht das IUS-Bit des Kanals in Bedienung.  Massgeblich ist nur der IEI-Eingang
-    // der CTC (kein hoeheres Geraet in Bedienung); eine bloss ANSTEHENDE Anforderung eines
-    // hoeheren Kanals derselben CTC sperrt dabei nicht, sonst bliebe der Kanal in Bedienung
-    // (Fund A8/M11: Zeilenende-Kanal der DPL stand still).  Bis 2026-10-16 galt dies nur
-    // mit dem Schalter setRetiNachIus; seitdem ist es die Vorgabe (A8b).
-    if (!iei_) return;
+    // RETI loescht das IUS-Bit des Kanals in Bedienung.  Ob dieser Baustein das RETI ueberhaupt
+    // sieht (kein hoeheres Geraet in Bedienung), entscheidet der Aufrufer (K1520Bus::signalRETI,
+    // Karten: erster Baustein in Bedienung); eine bloss ANSTEHENDE Anforderung eines hoeheren
+    // Kanals sperrt nicht (Fund A8/M11: Zeilenende-Kanal der DPL stand still; A8b).
+    if (!iei_) return;   // hoeheres Geraet in Bedienung: das RETI gehoert ihm
     for (auto& c : ch_) {
         if (c.ius) {
             c.ius = false;

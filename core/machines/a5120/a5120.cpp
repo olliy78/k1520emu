@@ -134,6 +134,14 @@ A5120Machine::A5120Machine(const Config& cfg)
         k7636_ = std::make_unique<K7636>();
         zre_.setUBusGeraet(k7636_.get());
     }
+    // Sicherheitsstecker (Kaltstart-Vorgabe): nur merken, die K7637 meldet es beim Einschalten.
+    if (cfg.sicherheitsstecker != 0) {
+        if (cfg.sicherheitsstecker < 0 || cfg.sicherheitsstecker > 6)
+            throw std::invalid_argument("Sicherheitsstecker: Kennung 0..6 erwartet");
+        if (k7636_) k7636_->setSicherheitsstecker(cfg.sicherheitsstecker, cfg.sicherheitsstecker_geraet_passt);
+        else        kbd_.setSicherheitsstecker(cfg.sicherheitsstecker, cfg.sicherheitsstecker_geraet_passt);
+        bedien_stand_.store(cfg.sicherheitsstecker | (cfg.sicherheitsstecker_geraet_passt ? 0 : 0x100));
+    }
 
     // Erweiterungsmodul (A5120.16) — nur auf ausdruecklichen Wunsch.
     if (cfg.em != Config::Em::none) {
@@ -750,8 +758,23 @@ bool A5120Machine::loadState(const std::string& path) {
     return restoreState(s);
 }
 
+bool A5120Machine::setSicherheitsstecker(int kennung, bool geraet_passt) {
+    if (kennung < 0 || kennung > 6) return false;
+    const int st = kennung | (geraet_passt ? 0 : 0x100);
+    bedien_stand_.store(st, std::memory_order_relaxed);
+    bedien_neu_.store(st, std::memory_order_release);
+    return true;
+}
+
 int A5120Machine::run(int max_cycles) {
     bestueckungAbschliessen();
+    {
+        const int st = bedien_neu_.exchange(-1, std::memory_order_acquire);
+        if (st >= 0) {
+            if (k7636_) k7636_->setSicherheitsstecker(st & 0xFF, (st & 0x100) == 0);
+            else        kbd_.setSicherheitsstecker(st & 0xFF, (st & 0x100) == 0);
+        }
+    }
     // Drain key queue
     {
         std::lock_guard<std::mutex> lk(key_mutex_);

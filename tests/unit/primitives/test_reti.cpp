@@ -14,7 +14,7 @@
  * verzeichnis (printf-Pruefungen, kein Build-Target, lief nie mit).  Am
  * 2026-08-07 nach GoogleTest ueberfuehrt und registriert — dabei kam heraus, dass
  * seine IEO-Erwartung nicht dem implementierten Verhalten entspricht, siehe
- * `IeoBlocksOnPendingNotOnService` am Dateiende.
+ * die `IeoLowWaehrendIus…`-Faelle am Dateiende.
  */
 
 #include <gtest/gtest.h>
@@ -212,7 +212,7 @@ TEST(RetiChain, BusAcknowledgeFollowsTheDaisyChainOrder) {
 //
 // Alle drei Bausteine halten diesen Vertrag: CTC ueber anyServiceable(), PIO seit
 // f3b7ab1, SIO seit dem Angleich vom 2026-08-07.  Die KETTENseite (getIEO) ist
-// davon unberuehrt — siehe IeoBlocksOnPendingNotOnService am Dateiende.
+// davon unberuehrt — siehe die IeoLowWaehrendIus-Faelle am Dateiende.
 
 TEST(RetiChain, CtcRequestIsIusGatedUntilReti) {
     Z80CTC ctc("CTC");
@@ -261,43 +261,126 @@ TEST(RetiChain, SioRequestIsIusGatedUntilReti) {
     EXPECT_TRUE(sio.hasInterrupt()) << "nach RETI muss die wartende Anforderung wieder gelten";
 }
 
-// ─── Dokumentierte Abweichung vom Z80-Daisy-Chain-Standard ───────────────────
+// ─── /IEO sperrt bis zum RETI (Datenblatt-Daisy-Chain) ───────────────────────
+//
+// Bis 2026-10-30 sperrte getIEO() nur bei ANSTEHENDER Anforderung (Waechter
+// `IeoBlocksOnPendingNotOnService`).  Datenblatt (Z80-CTC/PIO/SIO, Daisy Chain):
+// /IEO bleibt low, solange ein Kanal anfordert ODER in Bedienung ist, bis zum RETI.
+// Sonst loescht das RETI einer fremden ISR den IUS des Nachbarn (SIOS: OUT 00H trat in
+// die laufende INT-BS-ISR ein, `doc/sios/befund_nfnd_84h.md`).
 
-/**
- * @test RetiChain/IeoBlocksOnPendingNotOnService
- * @brief Haelt fest, dass IEO NUR bei anstehendem, nicht bei laufendem Interrupt sperrt.
- *
- * Alle drei Bausteine implementieren `getIEO()` als „IEI && kein Interrupt
- * ANSTEHEND" (`z80_ctc.cpp:381`, `z80_pio.cpp:382`, `z80_sio.cpp:192`).  Nach
- * der Quittung ist `pending` geloescht und `ius` gesetzt — IEO gibt also wieder
- * frei, obwohl die ISR noch laeuft.  Auf echter Hardware bliebe IEO gesperrt,
- * bis `RETI` das IUS zuruecknimmt; nachrangige Bausteine koennten die laufende
- * ISR also nicht unterbrechen.
- *
- * Der Schutz greift hier eine Ebene tiefer: `getVector()` verweigert die
- * Quittung, solange IUS steht (die Tests oben) — die Verschachtelung wird also
- * je Baustein verhindert, nicht ueber die Kette.  Fuer den A5120 hat sich das als
- * ausreichend erwiesen (voller CP/A-Boot + alle Integrationstests gruen).
- *
- * Dieser Test ist bewusst ein WAECHTER DES IST-ZUSTANDS: schlaegt er fehl, wurde
- * das IEO-Verhalten geaendert — dann gehoert dieser Kommentar korrigiert und die
- * Kette braucht neue Tests.  Bewertung: `doc/testsystem_rework.md` §8.
- */
-TEST(RetiChain, IeoBlocksOnPendingNotOnService) {
+TEST(RetiChain, IeoLowWaehrendIusUndNachRetiWiederHigh_Ctc) {
+    Z80CTC ctc("CTC");
+    armCtc(ctc);
+    for (int i = 0; i < 80; ++i) ctc.clockTick();
+    EXPECT_FALSE(ctc.getIEO()) << "anstehend sperrt IEO";
+    ctc.getVector();
+    EXPECT_FALSE(ctc.getIEO()) << "in Bedienung (IUS) sperrt IEO bis zum RETI";
+    ctc.onRETI();
+    EXPECT_TRUE(ctc.getIEO());
+}
+
+TEST(RetiChain, IeoLowWaehrendIusUndNachRetiWiederHigh_Pio) {
+    Z80PIO pio("PIO");
+    armPio(pio, 0x90);
+    pio.portAWrite(0x01);
+    EXPECT_FALSE(pio.getIEO());
+    pio.getVector();
+    EXPECT_FALSE(pio.getIEO()) << "Port A in Bedienung sperrt IEO";
+    pio.onRETI();
+    EXPECT_TRUE(pio.getIEO());
+}
+
+TEST(RetiChain, IeoLowWaehrendIusUndNachRetiWiederHigh_Sio) {
+    Z80SIO sio("SIO");
+    armSio(sio);
+    sio.channelA().rxByte(0x42);
+    sio.getVector();
+    EXPECT_FALSE(sio.getIEO()) << "Kanal in Bedienung sperrt IEO";
+    sio.onRETI();
+    EXPECT_TRUE(sio.getIEO());
+}
+
+// Zwei Bausteine: das RETI des unteren darf den IUS des oberen nicht loeschen, und der
+// niedrigere kommt erst nach dem RETI des hoeheren dran.
+TEST(RetiChain, RetiDesUnterenLoeschtNichtDenIusDesOberen) {
     K1520Bus bus;
     Z80CTC ctc("CTC");
+    Z80PIO pio("PIO");
     bus.registerIO(&ctc, 0x00, 4);
-    bus.setInterruptChain({&ctc});
+    bus.registerIO(&pio, 0x04, 4);
+    bus.setInterruptChain({&ctc, &pio});
     armCtc(ctc);
+    armPio(pio, 0x90);
     bus.updateInterruptChain();
 
     for (int i = 0; i < 80; ++i) ctc.clockTick();
-    EXPECT_FALSE(ctc.getIEO()) << "anstehender Interrupt sperrt IEO";
+    ASSERT_EQ(bus.interruptAcknowledge(), 0x20);   // CTC in Bedienung
+    bus.updateInterruptChain();
+    pio.portAWrite(0x01);                           // PIO fordert an, CTC bedient noch
+    bus.updateInterruptChain();
+    EXPECT_FALSE(pio.hasInterrupt() && bus.interruptAcknowledge() == 0x90)
+        << "PIO darf in die laufende CTC-ISR nicht eintreten";
+    bus.updateInterruptChain();
 
-    ctc.getVector();                           // pending → 0, ius → 1
-    EXPECT_TRUE(ctc.getIEO())
-        << "IST-Zustand: IEO gibt nach der Quittung wieder frei (IUS wird ignoriert)";
+    // Ein RETI beendet die CTC-ISR (nur sie nimmt es an) — der PIO ist noch nicht dran.
+    bus.signalRETI();
+    EXPECT_TRUE(ctc.getIEO()) << "CTC nach RETI frei";
+    EXPECT_EQ(bus.interruptAcknowledge(), 0x90) << "jetzt kommt der PIO dran";
+    bus.signalRETI();                               // RETI der PIO-ISR
+    EXPECT_TRUE(pio.getIEO());
+}
 
-    ctc.onRETI();
+TEST(RetiChain, RetiNimmtNurDerBausteinMitIusUndFreiemIeiAn) {
+    K1520Bus bus;
+    Z80CTC ctc("CTC");
+    Z80PIO pio("PIO");
+    bus.registerIO(&ctc, 0x00, 4);
+    bus.registerIO(&pio, 0x04, 4);
+    bus.setInterruptChain({&ctc, &pio});
+    armCtc(ctc);
+    armPio(pio, 0x90);
+    bus.updateInterruptChain();
+
+    // PIO in Bedienung, danach fordert die CTC (hoehere Prioritaet) an und wird bedient.
+    pio.portAWrite(0x01);
+    bus.updateInterruptChain();
+    ASSERT_EQ(bus.interruptAcknowledge(), 0x90);
+    bus.updateInterruptChain();
+    for (int i = 0; i < 80; ++i) ctc.clockTick();
+    bus.updateInterruptChain();
+    ASSERT_EQ(bus.interruptAcknowledge(), 0x20);   // CTC unterbricht die PIO-ISR (hoehere Prio)
+    bus.updateInterruptChain();
+    EXPECT_FALSE(pio.getIEO());
+    bus.signalRETI();                               // RETI der CTC-ISR: nur die CTC nimmt es
     EXPECT_TRUE(ctc.getIEO());
+    EXPECT_FALSE(pio.getIEO()) << "PIO noch in Bedienung: das RETI gehoerte der CTC";
+    bus.signalRETI();                               // RETI der PIO-ISR
+    EXPECT_TRUE(pio.getIEO());
+}
+
+// Das RETI der ISR eines Bausteins in Bedienung wird auch dann angenommen, wenn ein hoeherer
+// Baustein gerade nur ANSTEHT (Datenblatt: ein anfordernder Baustein gibt /IEO im ED-Holezyklus
+// frei).  Sonst bliebe der Baustein ewig in Bedienung und sperrte alles dahinter.
+TEST(RetiChain, RetiWirdTrotzAnstehenderAnforderungWeiterObenAngenommen) {
+    K1520Bus bus;
+    Z80CTC ctc("CTC");
+    Z80PIO pio("PIO");
+    bus.registerIO(&ctc, 0x00, 4);
+    bus.registerIO(&pio, 0x04, 4);
+    bus.setInterruptChain({&ctc, &pio});
+    armCtc(ctc);
+    armPio(pio, 0x90);
+    bus.updateInterruptChain();
+
+    pio.portAWrite(0x01);
+    bus.updateInterruptChain();
+    ASSERT_EQ(bus.interruptAcknowledge(), 0x90);   // PIO in Bedienung
+    bus.updateInterruptChain();
+    for (int i = 0; i < 80; ++i) ctc.clockTick();  // CTC steht an (hoehere Prioritaet)
+    bus.updateInterruptChain();
+    ASSERT_TRUE(ctc.hasInterrupt());
+    bus.signalRETI();
+    EXPECT_FALSE(pio.inBedienung()) << "RETI der PIO-ISR wurde wegen anstehender CTC verworfen";
+    EXPECT_TRUE(ctc.hasInterrupt());
 }

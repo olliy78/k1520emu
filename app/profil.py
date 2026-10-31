@@ -275,6 +275,9 @@ class Programmprofil:
         aus = self.hardware_standard(modell, bauart)
         for k, _b, _t, werte, _m in self.hardware:
             v = str(daten.get(k, "")).strip().lower()
+            if k == "sicherheitsstecker" and k not in daten:
+                # Rueckfall: der Schluessel hiess auf dem Entwicklungszweig kurz "bedienelement".
+                v = str(daten.get("bedienelement", "")).strip().lower()
             for w, _a in werte:        # Gross-/Kleinschreibung egal ("1M@0"), Wert wie im Profil
                 if v == w.lower():
                     aus[k] = w
@@ -296,6 +299,10 @@ class Programmprofil:
                     # Der Versatz wirkt nur mit gesteckter Karte; der gemerkte Wert bleibt.
                     hw = hardware if hardware is not None else self.hardware_standard(modell)
                     return hw.get("rtc", "keine") != "keine"
+                if k == "sicherheitsstecker" and self.modell_vorgaben:
+                    # K7637 (belegt) und K7636 (Annahme [?], gleiche Codes, S4): beide Tastaturen.
+                    hw = hardware if hardware is not None else self.hardware_standard(modell)
+                    return hw.get("tastatur") in ("k7636", "k7637")
                 if k == "erweiterungsmodul" and self.modell_vorgaben:
                     hw = hardware if hardware is not None else self.hardware_standard(modell)
                     return hw.get("ram") == "k3526"
@@ -336,6 +343,9 @@ class Programmprofil:
                 "laderom": hardware["laderom"],
                 "em": self.modell_em(modell, hardware) or "none",
             }
+            # Sicherheitsstecker (AP S3b, K7636 seit S4): nur wenn gesteckt.
+            if hardware.get("sicherheitsstecker", "0") != "0":
+                konfig["sicherheitsstecker"] = hardware["sicherheitsstecker"]
             # Anfangsstellung des Schiebeschalters: nur mit zwei Karten (sonst Fehler im Kern).
             if hardware["bildschirm"] == "beide":
                 konfig["schalter"] = schalter if schalter in ("k7024", "k7023") else "k7024"
@@ -535,6 +545,14 @@ A5120 = Programmprofil(
         ("tastatur", "Tastatur:",
          "K7636 parallel am U-Bus der K2526, K7637 seriell am Kanal der K8025.",
          (("k7636", "K7636 (parallel)"), ("k7637", "K7637 (seriell)")), ()),
+        ("sicherheitsstecker", "Sicherheitsstecker:",
+         "Sicherheitsstecker (Bediensicherung, 8 Codierstopfen): Stopfen 1–3 sind die "
+         "Bedienerkennung, die die Tastatur nach TYP und beim Stecken/Ziehen als Code meldet.  "
+         "K7637 belegt, K7636 mit denselben Codes als Annahme.  Vorgabe 01 Chefschalter: unter SIOS volle Rechte (Arbeiten und Programmiererstatus, z. B. MEM/POU); CP/A, SCPX und UDOS werten den Stecker nicht aus.  "
+         "*Maschine ▸ Sicherheitsstecker gesteckt* zieht/steckt ihn im Betrieb.",
+         (("0", "keiner"), ("1", "01 Chefschalter"), ("2", "02 1. Bedienebene"),
+          ("3", "03 (Stopfen 1+2)"), ("4", "04 (Stopfen 3)"), ("5", "05 (Stopfen 1+3)"),
+          ("6", "06 5. Bedienebene")), ()),
         ("laderom", "Lade-ROM:",
          "Lade-ROM der K2526.  V0.6 liest die BCU-Disketten „SYL auf Spur 1“.",
          (("v09_2", "V0.9_2"), ("v09_1", "V0.9_1"), ("v06", "V0.6")), ()),

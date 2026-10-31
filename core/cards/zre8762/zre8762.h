@@ -102,6 +102,7 @@ public:
     bool        hasInterrupt() const override  { return ctc_.hasInterrupt(); }
     uint8_t     getVector() const override     { return ctc_.getVector(); }
     void        onRETI() override              { ctc_.onRETI(); }
+    bool        inService() const override     { return ctc_.inBedienung(); }
     const char* intDeviceName() const override { return "ZRE-CTC"; }
 
     // ─── Lebenslauf ──────────────────────────────────────────────────────────

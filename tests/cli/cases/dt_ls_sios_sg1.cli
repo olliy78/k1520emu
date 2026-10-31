@@ -1,0 +1,12 @@
+# SIOS-1526-SGEN-Diskette SG1: SYSORG09 (Satzlaenge 1024, auf der Folgediskette fortgesetzt: EC) und
+# eine zweite Bibliothek PHASELB; die 17 DDR1-Platzhalter (geloescht) erscheinen nicht.
+tool:   k1520disktool
+disk:   sios1526_sg1.hfe
+run:    ls -l %DISK%
+expect: MWD002
+expect_re: SYSORG09 +F +1024 +93184 +EC
+expect: PHASELB/SGEN
+expect: PHASELB/SOPH
+expect: PHASELB/SYSD
+forbid: DATA10
+exit:   0

@@ -193,6 +193,15 @@ public:
      * and allow lower-priority interrupts to proceed.
      */
     virtual void onRETI() {}
+
+    /**
+     * @brief Ist in diesem Geraet eine Interruptbedienung im Gang (IUS gesetzt, noch kein RETI)?
+     *
+     * Datenblatt-Daisy-Chain: ein Geraet in Bedienung haelt /IEO low (getIEO() = false), bis das RETI
+     * seiner ISR gelaufen ist; nur DIESES Geraet nimmt das RETI an, alle dahinter haben /IEI low.
+     * K1520Bus::signalRETI() verteilt danach.  Vorgabe false (Geraete ohne Bedienungszustand).
+     */
+    virtual bool inService() const { return false; }
 };
 
 

@@ -1,0 +1,13 @@
+# SIOS 1526 (D4): ein Objekt in eine vorhandene Bibliothek (SG1 PHASELB) anhaengen und wieder
+# loeschen.  Neuer Eintrag steht hinter ND (AADR 0087), ML = Sektoren / 2 (Annahme, Formatdokument §11 Nr. 6);
+# nach dem Loeschen ist der Name weg, die uebrigen Objekte stehen unveraendert da.
+tool:   k1520disktool
+disk:   sios1526_sg1.hfe
+file o.bin:
+  Ein kleines Objekt fuer die Bibliothek.
+setup_run: put %DISK% %o.bin% --as PHASELB/neu
+run:    ls -l %DISK%
+expect: PHASELB/NEU
+expect: AADR 0087 ML 01
+expect: PHASELB/SGEN
+exit:   0

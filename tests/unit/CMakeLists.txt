@@ -236,6 +236,10 @@ k1520_add_test(udos_fs       SRC filesystem/test_udos_fs.cpp
 k1520_add_test(udos1715_fs   SRC filesystem/test_udos1715_fs.cpp
                              LIBS k1520_fs LABELS "${_lbl}"
                              DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
+# SIOS 1526 (A5120/A5130/K8924), lesend - doc/sios_diskettenformat.md
+k1520_add_test(sios_fs       SRC filesystem/test_sios_fs.cpp
+                             LIBS k1520_fs LABELS "${_lbl}"
+                             DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
 k1520_add_test(scp1700_fs    SRC filesystem/test_scp1700_fs.cpp
                              LIBS k1520_fs LABELS "${_lbl}"
                              DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")

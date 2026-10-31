@@ -132,10 +132,11 @@ def neu_eintraege():
 
     Der blosse Name (`osm800`) sagt dem Anwender nichts; die Beschreibung des
     Katalogs („OS/M (P8000) 800K, Format 7 ...") steht dabei.  tar720 mit Inhalt
-    laesst sich nicht anlegen - angeboten wird nur die LEERE tar-Diskette.
+    laesst sich nicht anlegen - angeboten wird nur die LEERE tar-Diskette.  SIOS (``sios``)
+    wird seit Arbeitspaket D4 als leere Datendiskette angeboten (ohne Systemlader).
     """
     return [(f.name, f"{f.name} \u2014 {f.description}" if f.description else f.name)
-            for f in filesystems() if f.type != "tar" or f.leer]
+            for f in filesystems() if (f.type != "tar" or f.leer)]
 
 
 class MainWindow(QMainWindow):
@@ -2021,7 +2022,8 @@ class MainWindow(QMainWindow):
         if ok and name:
             self.platte_mkdir(f"{ziel}/{name}")
 
-    def insert_paths(self, paths: List[str], volume: int = 0) -> bool:
+    def insert_paths(self, paths: List[str], volume: int = 0,
+                     sios_lib: Optional[str] = None) -> bool:
         """Einzelne Dateien auf eine Seite schreiben.
 
         Zwei Sonderfälle, beide aus `doc/bug_disktool_Programmdatei.md` §2.5:
@@ -2055,6 +2057,12 @@ class MainWindow(QMainWindow):
         praefix = ""
         if self.tool.volume_count > 1:
             praefix = f"{self.tool.volume_dir(volume)}/"
+        if self.tool.ist_sios:
+            # Bibliothek angeklickt oder daraufgezogen: die Dateien werden ihre Objekte
+            # (``LIB/NAME``); sonst physische Dateien.
+            lib = sios_lib if sios_lib is not None else self.disk_view.sios_ziel()
+            if lib:
+                praefix = f"{lib}/"
         # Die Angaben, die im Dialog fuer ALLE gelten sollen; None = noch keine.
         vorlage: Optional[dict] = None
         geschrieben = 0
@@ -3227,6 +3235,12 @@ class MainWindow(QMainWindow):
             ziel = self.disk_view.tree.drop_ziel
             self.disk_view.tree.drop_ziel = ""
             self._platte_einfuegen(pfade, ziel)
+            return
+        if self.tool is not None and self.tool.ist_sios:
+            # Wie bei der Platte: der Ordner (die Bibliothek) UNTER dem Mauszeiger zaehlt.
+            lib = self.disk_view.tree.drop_ziel
+            self.disk_view.tree.drop_ziel = ""
+            self.insert_paths(pfade, volume, sios_lib=lib)
             return
         self.insert_paths(pfade, volume)
 

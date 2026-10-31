@@ -1,0 +1,9 @@
+# SIOS 1526 (D4): ein zu langer Name wird mit Begruendung abgelehnt, die Diskette bleibt unveraendert.
+tool:   k1520disktool
+disk:   sios1526_sg1.hfe
+file a.bin:
+  Inhalt.
+run:    put %DISK% %a.bin% --as ZUVIELEZEICHEN
+expect: SIOS
+expect: ungueltig
+exit:   1

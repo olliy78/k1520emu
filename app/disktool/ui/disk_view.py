@@ -250,6 +250,9 @@ class DiskView(QWidget):
         if ist_platte(tool):
             self._set_platte(tool, entries)
             return
+        if getattr(tool, "ist_sios", False):
+            self._set_sios(tool, entries)
+            return
         self._spalten_setzen(DISK_SPALTEN)
         self.titel.setText(f"Diskette — {tool.filesystem}")
         # Leer formatiert oder mit unpassendem Format geoeffnet: beides sieht hier
@@ -279,6 +282,60 @@ class DiskView(QWidget):
             # Bibliothek beim Nachtragen (`load_entry_details(i)`), und Namen sind
             # bei UDOS ueber beide Seiten hinweg nicht eindeutig.
             self._zeilen[nr] = item
+
+    def _set_sios(self, tool, entries) -> None:
+        """SIOS 1526: Bibliotheken als aufklappbare Ordner, ihre Objekte darunter.
+
+        Der Kern liefert die Objekte flach als ``PHASELB/INIT`` (Typ ``O``); hier wird
+        daraus der Baum.  Die Referenz bleibt der volle Name — Holen, Loeschen und
+        Eigenschaften sprechen den Kern damit an, wie er sie versteht.  Eine Bibliothek
+        traegt ``DIR_ROLE``: darauf Abgelegtes wird zum Objekt dieser Bibliothek.
+        """
+        self._spalten_setzen(DISK_SPALTEN)
+        self.titel.setText(f"Diskette — {tool.filesystem}")
+        self.tree.leer_text = "" if entries else "Keine Dateien gefunden"
+        self._zeilen = {}
+        ordner = {}
+        # Erst die Dateien und Bibliotheken, dann die Objekte (Reihenfolge des Kerns ist
+        # Etikettenreihenfolge; Objekte stehen dort ohnehin hinter ihrer Bibliothek).
+        for nr, e in enumerate(entries):
+            if e.type == "O" and "/" in e.name:
+                continue
+            item = QTreeWidgetItem(self.tree, self._spalten(e))
+            item.setData(0, REF_ROLE, e.ref)
+            item.setData(0, VOLUME_ROLE, e.volume)
+            if e.type == "B":
+                item.setData(0, DIR_ROLE, True)
+                ordner[e.name.upper()] = item
+                item.setExpanded(True)
+            if e.damaged:
+                item.setText(1, "DEFEKT")
+            self._zeilen[nr] = item
+        for nr, e in enumerate(entries):
+            if not (e.type == "O" and "/" in e.name):
+                continue
+            lib, _, kurz = e.name.partition("/")
+            eltern = ordner.get(lib.upper())
+            spalten = self._spalten(e)
+            if eltern is not None:
+                spalten[0] = kurz
+            item = QTreeWidgetItem(eltern if eltern is not None else self.tree, spalten)
+            item.setData(0, REF_ROLE, e.ref)
+            item.setData(0, VOLUME_ROLE, e.volume)
+            self._zeilen[nr] = item
+
+    def sios_ziel(self) -> str:
+        """Bibliothek, in die „Schreiben" legt: die angeklickte Bibliothek bzw. die
+        Bibliothek des angeklickten Objekts.  Leer = physische Datei (Vorgabe)."""
+        gewaehlt = self.tree.selectedItems()
+        item = self.tree.currentItem() if self.tree.currentItem() in gewaehlt else None
+        if item is None and len(gewaehlt) == 1:
+            item = gewaehlt[0]
+        while item is not None:
+            if item.data(0, DIR_ROLE):
+                return item.data(0, REF_ROLE) or ""
+            item = item.parent()
+        return ""
 
     def _set_platte(self, tool, entries) -> None:
         """Plattenbaum: die Partitionen md0… als oberste Ordner, darunter echte Ordner.
@@ -355,6 +412,8 @@ class DiskView(QWidget):
         if item is None:
             return
         for spalte, text in enumerate(self._spalten(e)):
+            if spalte == 0 and item.parent() is not None:
+                continue            # ein Objekt unter seiner Bibliothek traegt nur den Kurznamen
             item.setText(spalte, text)
         if e.damaged:
             item.setText(1, "DEFEKT")

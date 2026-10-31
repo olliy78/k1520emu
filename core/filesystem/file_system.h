@@ -76,6 +76,10 @@ struct FileEntry {
     uint32_t    unix_ctime = 0;  ///< Inode-Aenderungszeit (`chmod`/`chown` setzen sie)
     uint16_t    unix_rdev  = 0;  ///< Geraetedatei (c/b): major<<8 | minor, sonst 0
 
+    /// @brief SIOS: Lage als Text — Datei `"BOE 01001 EOE 12026 EOD 12013"`, Bibliotheksobjekt
+    ///        `"AADR 0013 ML 12"`.  Leer bei allen anderen Dateisystemen.
+    std::string extent;
+
     /// @brief Eindeutige Bezeichnung innerhalb des Volumes ("NAME.TYP" bzw. "3:NAME.TYP").
     std::string qualifiedName() const {
         return user == 0 ? name : std::to_string(user) + ":" + name;

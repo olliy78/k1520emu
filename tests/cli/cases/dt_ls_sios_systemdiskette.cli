@@ -1,0 +1,12 @@
+# SIOS-1526-Systemdiskette (SIOS 1.1): 80 Zylinder einseitig -> Profil sios_ss80; HDR1 SYSARE11 mit
+# Schreibschutzkennzeichen P; die Dateigroesse folgt EOD (298 Sektoren), nicht EOE.
+tool:   k1520disktool
+disk:   sios1526_syls.hfe
+run:    ls -l %DISK%
+expect: sios_ss80 (erkannt)
+expect: ROBINI
+expect: SYSARE11
+expect: BOE 01001 EOE 12026 EOD 12013
+expect_re: SYSARE11 +F +128 +38144 +P
+forbid: DEFEKT
+exit:   0

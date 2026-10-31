@@ -209,6 +209,10 @@ _lib.k1520d_detected_format.argtypes = [_H]
 _lib.k1520d_detected_format.restype = _CS
 _lib.k1520d_container_info.argtypes = [_H, _CS]
 _lib.k1520d_container_info.restype = _CS
+_lib.k1520d_sios_info.argtypes = [_H, _CS]
+_lib.k1520d_sios_info.restype = _CS
+_lib.k1520d_sios_file.argtypes = [_H, _CS, _CS]
+_lib.k1520d_sios_file.restype = _CS
 _lib.k1520d_detected_fs.argtypes = [_H]
 _lib.k1520d_detected_fs.restype = _CS
 _lib.k1520d_detection_unambiguous.argtypes = [_H]
@@ -1485,9 +1489,32 @@ class DiskTool:
                 keys.append("rate")
         return {k: _s(_lib.k1520d_container_info(self._h, _b(k))) for k in keys}
 
+    #: Schluessel der SIOS-Datentraegerfelder (``k1520d_sios_info``).
+    SIOS_VOL_FELDER = ("vol_name", "vol_zugriff", "vol_aufzeichnung", "vol_seiten",
+                       "vol_satzlaenge", "vol_sektorfolge", "vol_version",
+                       "etiketten_belegt", "etiketten_gesamt")
+    SIOS_DATEI_FELDER = ("art", "etikett", "satzlaenge", "boe", "eoe", "eod", "sektoren",
+                         "schutz", "austausch", "fortsetzung", "folge")
+    SIOS_OBJEKT_FELDER = ("art", "bibliothek", "aadr", "ml", "laenge")
+
+    def sios_volume(self) -> dict:
+        """VOL1-Felder und Etikettenzahl einer SIOS-Diskette (leer, wenn es keine ist)."""
+        if not self.ist_sios:
+            return {}
+        return {k: _s(_lib.k1520d_sios_info(self._h, _b(k))) for k in self.SIOS_VOL_FELDER}
+
+    def sios_datei(self, name: str) -> dict:
+        """HDR1-Felder einer Datei/Bibliothek bzw. AADR/ML eines Objekts (``LIB/NAME``);
+        leer, wenn es sie nicht gibt."""
+        if not self.ist_sios:
+            return {}
+        felder = self.SIOS_OBJEKT_FELDER if "/" in name else self.SIOS_DATEI_FELDER
+        werte = {k: _s(_lib.k1520d_sios_file(self._h, _b(name), _b(k))) for k in felder}
+        return werte if werte.get("art") else {}
+
     @property
     def filesystem_type(self) -> str:
-        """``'cpm'`` | ``'udos'`` | ``'udos1715'`` | ``''`` — die Familie.
+        """``'cpm'`` | ``'udos'`` | ``'udos1715'`` | ``'sios'`` | ``''`` — die Familie.
 
         Die Oberfläche braucht sie, um zu wissen, *welche* Dateiangaben es
         überhaupt gibt.  Leer, wenn der Name in keinem Katalog steht (abgeleitete
@@ -1513,6 +1540,11 @@ class DiskTool:
     def ist_udos(self) -> bool:
         """UDOS-Familie (ZDOS, NDOS): Kopfsektorangaben."""
         return self.filesystem_type.startswith("udos")
+
+    @property
+    def ist_sios(self) -> bool:
+        """SIOS 1526 (IBM-Etiketten, nur lesbar): ``Entry.type`` ist hier F/B/O, KEIN UDOS-Typ."""
+        return self.filesystem_type == "sios"
 
     @property
     def ist_cpm(self) -> bool:
@@ -2460,6 +2492,7 @@ class PlatteTool:
     ist_wega = True
     ist_tar = False
     ist_udos = False
+    ist_sios = False
     ist_cpm = False
     ist_cqm = False
     ist_td0 = False

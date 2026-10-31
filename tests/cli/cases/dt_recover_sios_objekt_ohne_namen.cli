@@ -1,0 +1,9 @@
+# SIOS 1526 (D5): ein geloeschtes Objekt ohne vom Anwender vergebenen Namen wird NICHT
+# wiederhergestellt - der Name ist verloren und laesst sich nicht ableiten.
+tool:   k1520disktool
+disk:   sios1526_sg1.hfe
+setup_run: rm %DISK% PHASELB/SOPH --no-backup
+run:    recover %DISK% --restore 0 --no-backup
+expect: Name
+expect: ableiten
+exit:   1

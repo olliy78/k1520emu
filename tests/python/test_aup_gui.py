@@ -291,3 +291,26 @@ def test_echte_maschine_taste_und_schluessel_kommen_an(qapp, konfig_ordner):
         w.aup_widget.tasten[(K7633, 0x42)].released.emit()
     finally:
         _zu(w, qapp)
+
+
+def test_menueaktionen_der_schluesselschalter(qapp, konfig_ordner):
+    """Zwei rastende Aktionen im Menue Maschine, nur bei gesteckter AUP, ohne Kuerzel; sie drehen die Schalter im Kern."""
+    w = _fenster(qapp)
+    try:
+        a1, a2 = w.act_schluessel_anwender, w.act_schluessel_admin
+        assert a1.isCheckable() and a2.isCheckable()
+        assert a1.shortcut().isEmpty() and a2.shortcut().isEmpty()
+        assert not a1.isVisible() or not w.emulator.aup_installed      # ohne AUP nicht angeboten
+        w.settings_widget.aup_box.setChecked(True)
+        qapp.processEvents()
+        assert w.emulator.aup_installed
+        assert not a1.isChecked() and not a2.isChecked()
+        a2.trigger()
+        assert a2.isChecked() and w.emulator.aup_schluessel_stand(2) is True
+        assert w.aup_widget.schluessel[2].isChecked()
+        w.aup_widget.schluessel[2].setChecked(False)                    # Kasten -> Aktion
+        assert not a2.isChecked() and w.emulator.aup_schluessel_stand(2) is False
+        a1.trigger()
+        assert w.emulator.aup_schluessel_stand(1) is True
+    finally:
+        _zu(w, qapp)

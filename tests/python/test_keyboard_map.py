@@ -45,7 +45,7 @@ def test_digits_and_symbols():
 
 @pytest.mark.parametrize("key", [
     Qt.Key_Return, Qt.Key_Enter, Qt.Key_Backspace, Qt.Key_Tab, Qt.Key_Backtab,
-    Qt.Key_Escape,
+    Qt.Key_Escape, Qt.Key_Pause,
     Qt.Key_Delete, Qt.Key_Up, Qt.Key_Down, Qt.Key_Left, Qt.Key_Right,
 ])
 def test_special_keys_pass_through_unchanged(key):
@@ -99,6 +99,7 @@ def test_non_ascii_text_is_dropped():
     (Qt.Key_Tab,       0x91, "→| — die Taste an der Tabulatorstelle"),
     (Qt.Key_Backtab,   0x9B, "|← — Umschalt+Tab"),
     (Qt.Key_Escape,    0x1B, "ESC-Taste"),
+    (Qt.Key_Pause,     0xFE, "ET2 allein (SIOS)"),
     (Qt.Key_Up,        0x94, "Kursor aufwärts"),
     (Qt.Key_Down,      0x95, "Kursor abwärts"),
     (Qt.Key_Left,      0x96, "Kursor links"),

@@ -153,6 +153,17 @@ TEST(AupMaschine, CpaGastZeigtCodesUndSchaltetLampen) {
     EXPECT_TRUE(runSmallUntil(m, "KT 35 '5'", kFrist)) << vramLines(m);
     m.aup()->schluessel(1, true);
     EXPECT_TRUE(runSmallUntil(m, "TT AA", kFrist)) << vramLines(m);
+    // Jede Drehung meldet den Code: SS1 wieder aus = zweites AAH, dann SS2 ein = A9H.
+    m.aup()->schluessel(1, false);
+    m.aup()->schluessel(2, true);
+    EXPECT_TRUE(runSmallUntil(m, "TT A9", kFrist)) << vramLines(m);
+    {
+        const std::string v = vramLines(m);
+        const auto p1 = v.find("TT AA");
+        ASSERT_NE(p1, std::string::npos);
+        EXPECT_NE(v.find("TT AA", p1 + 1), std::string::npos) << "Ausdrehen meldet AAH ein zweites Mal\n" << v;
+    }
+    m.aup()->schluessel(2, false);
 
     // Lampen ueber die Rechnertastatur: S = SEL, A = ALPHA (danach Tabelle "mit Alpha").
     typeString(m, "s");

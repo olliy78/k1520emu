@@ -45,6 +45,7 @@
 #include <vector>
 
 class TarFileSystem;
+class SiosFileSystem;
 struct TarSatzSpeicher;
 
 /**
@@ -586,6 +587,8 @@ public:
     bool istTar() const { return profile_ && profile_->type == FsType::Tar; }
     /// @brief Das tar-Dateisystem dieser Diskette; nullptr, wenn es keine tar-Diskette ist.
     const TarFileSystem* tarFs() const;
+    /// @brief Das SIOS-Dateisystem (nur bei Profil `sios`), sonst nullptr.
+    const SiosFileSystem* siosFs() const;
 
     /**
      * @brief Den tar-Strom der Diskette als `.tar` herausschreiben (`tar-export`).

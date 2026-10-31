@@ -1,0 +1,12 @@
+# SIOS 1526 (D5): Fund auflisten und herausholen, ohne die Diskette zu beschreiben.
+tool:   k1520disktool
+disk:   sios1526_sg1.hfe
+setup_run: rm %DISK% SYSORG09 --no-backup
+run:    recover %DISK% --to gerettet
+expect: SYSORG09
+expect: 93184
+expect: sicher
+expect: Etikett Sektor 8 (DDR1)
+expect: 1 Fund(e)
+forbid: DATA10
+exit:   0

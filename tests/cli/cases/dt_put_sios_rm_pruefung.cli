@@ -1,0 +1,17 @@
+# SIOS 1526 (D4): Datei loeschen (HDR1 -> DDR1, Daten bleiben), der Platz wird wiederverwendet,
+# die Dateisystempruefung bleibt ohne Befund.
+tool:   k1520disktool
+disk:   sios1526_dp2.hfe
+tmpfile neu.hfe:
+file a.bin:
+  Erste Datei.
+file b.bin:
+  Zweite Datei.
+setup_run: create %neu.hfe% --fs sios_ss40 --label RM
+setup_run: put %neu.hfe% %a.bin% --as ERSTE
+setup_run: rm %neu.hfe% ERSTE
+setup_run: put %neu.hfe% %b.bin% --as ZWEITE
+run:    check %neu.hfe%
+expect: ohne Befund
+forbid: sios.hdr1
+exit:   0

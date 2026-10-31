@@ -169,6 +169,7 @@ public:
     bool    hasInterrupt() const override;
     uint8_t getVector() const override;
     void    onRETI() override;
+    bool    inService() const override { return ctrl_pio_.inBedienung() || data_pio_.inBedienung(); }
     /// @brief Anfordernder Baustein (Debugger): Steuer- oder Daten-PIO.
     const char* intDeviceName() const override {
         if (ctrl_pio_.hasInterrupt()) return "K5122 ctrl-PIO";

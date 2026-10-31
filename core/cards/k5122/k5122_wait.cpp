@@ -400,10 +400,12 @@ void K5122::waitFeldSchreiben()
     // Datenfeld im Strom: MFM hinter der A1-Gruppe die DAM (FB/F8), FM die erste FB/F8.
     const bool fm = waitVerfahrenGemerkt() == Encoding::FM;
     size_t daten = SIZE_MAX;
+    bool geloescht = false;
     for (size_t i = 0; i < write_buf_.size(); ++i) {
         const uint8_t b = write_buf_[i];
         if ((b == 0xFB || b == 0xF8) && (fm || (i > 0 && write_buf_[i - 1] == 0xA1))) {
             daten = i + 1;
+            geloescht = (b == 0xF8);   // geschriebene Datenmarke fuehren
             break;
         }
     }
@@ -426,8 +428,8 @@ void K5122::waitFeldSchreiben()
     TrackImage& spur = drv.mutableTrack(current_head_);
     // An Ort und Stelle (Luecken, Spurlaenge, Nachbarsektoren bleiben; die CRC rechnet
     // writeSector neu).  Stoesst der Nachlauf an eine Marke, ohne ihn.
-    bool ok = !spur.empty() && TrackCodec::writeSector(spur, wr_id_, inhalt, nachlauf);
-    if (!ok && !spur.empty()) ok = TrackCodec::writeSector(spur, wr_id_, inhalt, {});
+    bool ok = !spur.empty() && TrackCodec::writeSectorDam(spur, wr_id_, inhalt, geloescht, nachlauf);
+    if (!ok && !spur.empty()) ok = TrackCodec::writeSectorDam(spur, wr_id_, inhalt, geloescht, {});
     if (!ok) {
         LOG_WARN("K5122", "WAIT: Datenfeld S=%u nicht in Spur D%d C=%u H=%u", wr_id_,
                  selected_drive_, static_cast<unsigned>(drv.currentCylinder()),

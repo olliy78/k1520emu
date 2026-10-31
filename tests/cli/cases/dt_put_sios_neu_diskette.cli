@@ -1,0 +1,22 @@
+# SIOS 1526 (D4): leere Datendiskette anlegen, zwei physische Dateien einfuegen, auflisten und pruefen.
+# Name wird gross geschrieben (--as klein), die Dateien liegen spurbuendig ab Spur 1 (BOE 01001),
+# EOD = erster freier Sektor hinter den Daten; die Pruefung ist ohne Befund (doc/sios_diskettenformat.md §4, §10).
+tool:   k1520disktool
+disk:   sios1526_dp2.hfe
+tmpfile neu.hfe:
+file a.bin:
+  Erste Datei fuer die SIOS-Diskette.
+file b.bin:
+  Zweite Datei.
+setup_run: create %neu.hfe% --fs sios_ss40 --label test01
+setup_run: put %neu.hfe% %a.bin% --as alpha
+setup_run: put %neu.hfe% %b.bin% --as BETA
+run:    ls -l %neu.hfe%
+expect: sios_ss40
+expect: TEST01
+expect: ALPHA
+expect: BOE 01001 EOE 01026 EOD 01002
+expect: BETA
+expect: BOE 02001 EOE 02026 EOD 02002
+forbid: DEFEKT
+exit:   0

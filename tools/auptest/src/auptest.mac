@@ -11,8 +11,10 @@
 ;            Bit4 GET-LED, Bit1 ALPHA-LED, Bit0 SEL-LED (jeweils 0 = an); FFH = Reset
 ; Kein Interrupt: das Programm fragt ab.
 ;
-; ANNAHME (wie im Emulator, core/cards/aup/aup.h A1): Bit 0 = K7633, Bit 1 =
+; BELEGT (Treiber T-K7633, doc/sios/module_k7633_kut.md): Bit 1 = K7633, Bit 0 =
 ; Kundentastatur, die uebrigen Bits 0.  Ohne Karte liest IN 41H FFH -> "keine AUP".
+; Nach dem Reset (FFH) liefert IN 42H zuerst das Typzeichen 80H|typ (ohne Gueltigkeit);
+; das Programm holt es ab, sonst haelt die AUP die Tastencodes zurueck.
 ;
 ; Ausgabe je Taste eine Zeile:  "TT xx" (K7633) bzw. "KT xx" (Kundentastatur),
 ; bei druckbarem Code dahinter das Zeichen in Hochkommas.  Bedienung an der
@@ -39,11 +41,12 @@ START:
 	CALL	PUTS
 	IN	A,(AUPGUE)
 	LD	B,A
-	AND	0FCH		; Annahme A1: Bits 2..7 sind 0
+	AND	0FCH		; Bits 2..7 sind 0
 	JP	NZ,KEINE
 	LD	A,0FFH		; Reset der AUP, alle Lampen aus
 	LD	(KMD),A
 	OUT	(AUPKMD),A
+	IN	A,(AUPCOD)	; Typzeichen 80H|typ abholen
 	LD	DE,M_HILFE
 	CALL	PUTS
 
@@ -56,7 +59,7 @@ SCHLEIFE:
 	LD	(CODE),A
 	LD	DE,M_TT
 	LD	A,B
-	AND	01H
+	AND	02H		; Bit 1 = K7633
 	JR	NZ,TT
 	LD	DE,M_KT
 TT:	CALL	PUTS
@@ -120,7 +123,12 @@ RESET:	LD	A,0FFH
 	LD	(KMD),A
 SENDE:	LD	A,(KMD)
 SENDE1:	OUT	(AUPKMD),A
+	CP	0FFH
+	JR	NZ,SENDE2
 	PUSH	AF
+	IN	A,(AUPCOD)	; nach Reset: Typzeichen abholen
+	POP	AF
+SENDE2:	PUSH	AF
 	LD	DE,M_KMD
 	CALL	PUTS
 	POP	AF

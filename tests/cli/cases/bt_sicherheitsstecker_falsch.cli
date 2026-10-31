@@ -1,0 +1,5 @@
+# boot_trace --sicherheitsstecker ausserhalb 0..6: Abbruch.
+tool:    boot_trace
+run:     -L /dev/null --sicherheitsstecker 9
+expect:  --sicherheitsstecker: 0..6, nur mit K7637
+exit:    2

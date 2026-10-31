@@ -460,6 +460,9 @@ public:
      * that was being serviced, allowing lower-priority interrupts.
      */
     void    onRETI() override;
+    /// Ist ein Kanal in Bedienung (IUS)?
+    bool    inBedienung() const { return ch_a_.ius || ch_b_.ius; }
+    bool    inService() const override { return inBedienung(); }
 
     /**
      * @brief Access Channel A.

@@ -1,0 +1,9 @@
+# SIOS 1526 (D5): ein geloeschtes Bibliotheksobjekt (Name blank, AADR/ML bleiben) ist ein Fund
+# OHNE Namen; zurueck geht es nur mit einem vom Anwender vergebenen Namen.
+tool:   k1520disktool
+disk:   sios1526_sg1.hfe
+setup_run: rm %DISK% PHASELB/SOPH --no-backup
+setup_run: recover %DISK% --restore 0=SOPH --no-backup
+run:    ls %DISK%
+expect: PHASELB/SOPH
+exit:   0

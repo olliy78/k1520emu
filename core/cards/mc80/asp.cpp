@@ -141,9 +141,9 @@ uint8_t Mc80Asp::getVector() const
 void Mc80Asp::onRETI()
 {
     // Nur der hoechste Baustein in Bedienung nimmt das RETI an (Daisy-Chain).
-    sio_.onRETI();
-    ctc_.onRETI();
-    pio_.onRETI();
+    if (sio_.inBedienung())      sio_.onRETI();
+    else if (ctc_.inBedienung()) { ctc_.setIEI(true); ctc_.onRETI(); }
+    else if (pio_.inBedienung()) { pio_.setIEI(true); pio_.onRETI(); }
     updateInternalChain();
 }
 

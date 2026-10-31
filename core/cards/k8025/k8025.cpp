@@ -357,9 +357,10 @@ uint8_t K8025::getVector() const
 
 void K8025::onRETI()
 {
-    sio_dfue_.onRETI();
-    sio_kbd_printer_.onRETI();
-    ctc_a34_.onRETI();
+    // Nur der erste Baustein in Bedienung (SIO A33, SIO A32, CTC A34) nimmt das RETI an.
+    if (sio_dfue_.inBedienung())             sio_dfue_.onRETI();
+    else if (sio_kbd_printer_.inBedienung()) { sio_kbd_printer_.setIEI(true); sio_kbd_printer_.onRETI(); }
+    else if (ctc_a34_.inBedienung())         { ctc_a34_.setIEI(true); ctc_a34_.onRETI(); }
     updateInternalChain();
 }
 

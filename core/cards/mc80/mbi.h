@@ -80,6 +80,7 @@ public:
     bool        hasInterrupt() const override { return ctc_.hasInterrupt() || pio_.hasInterrupt(); }
     uint8_t     getVector() const override;
     void        onRETI() override;
+    bool        inService() const override { return ctc_.inBedienung() || pio_.inBedienung(); }
     /**
      * @brief RETI nach dem Datenblatt: ist ein Kanal/Port der Karte in Bedienung, nimmt die Karte
      *        das RETI an (hoechster Kanal in Bedienung, auch wenn ein hoeherer gerade anfordert)

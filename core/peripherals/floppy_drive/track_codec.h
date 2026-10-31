@@ -187,6 +187,15 @@ bool writeSector(TrackImage& track, uint8_t sector_id,
                  const std::vector<uint8_t>& tail = {});
 
 /**
+ * @brief Wie @ref writeSector (ohne Nachspann), setzt aber zugleich die Datenmarke:
+ *        @p deleted = DAM F8 (geloeschtes Datenfeld), sonst FB.  Die Daten-CRC wird mit der
+ *        neuen Marke gerechnet.  Gebraucht von SIOS (Etikettenspur: HDR1 = FB, frei = F8).
+ */
+bool writeSectorDam(TrackImage& track, uint8_t sector_id,
+                    const std::vector<uint8_t>& data, bool deleted,
+                    const std::vector<uint8_t>& tail = {});
+
+/**
  * @brief Wie @ref writeSector, aber ueber die LAUFENDE NUMMER des Sektors in der Spur.
  *
  * Zwei Gruende, warum die ID dafuer nicht taugt: eine Spur darf dieselbe ID mehrfach

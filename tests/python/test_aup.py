@@ -77,12 +77,13 @@ def test_taste_kommt_beim_gast_an():
     """Ohne Gastprogramm: der Kern liest 41H/42H wie die ZRE (io_read stempelt die Zeit)."""
     e = _emu(aup=True)
     e.power_on()
+    assert e.io_read(0x42) == 0x80          # Typzeichen nach /RESET, ohne Gueltigkeitsbit
     assert e.aup_taste(e.AUP_KUNDE, 0x42, True)
     assert e.aup_taste(e.AUP_KUNDE, 0x42, False)
     assert not e.aup_taste(e.AUP_KUNDE, 0x38, True)
     assert e.io_read(0x41) == 0x00          # Zeitstempel, Entprellung laeuft
     e.run(200_000)                          # > 16 ms Maschinenzeit
-    assert e.io_read(0x41) == 0x02          # Bit 1 = Kundentastatur (Annahme A1)
+    assert e.io_read(0x41) == 0x01          # Bit 0 = Kundentastatur (A1, belegt)
     assert e.io_read(0x42) == 0x31
     assert e.io_read(0x41) == 0x00
 
@@ -148,3 +149,19 @@ def test_sonderschnittstelle_im_hub_einstellbar():
     assert e.serial_configure(3, loop=True)
     assert e.serial_config(3).loop
     assert e.serial_status(3) is not None
+
+
+def test_schluesselschalter_jede_drehung_meldet_den_code():
+    e = _emu(aup=True)
+    e.power_on()
+    assert e.io_read(0x42) == 0x80
+    assert e.aup_schluessel(2, True)
+    e.io_read(0x41)
+    e.run(200_000)
+    assert e.io_read(0x41) == 0x02          # Bit 1 = Terminal
+    assert e.io_read(0x42) == 0xA9          # SS2 ein
+    assert e.aup_schluessel(2, False)
+    e.io_read(0x41)
+    e.run(200_000)
+    assert e.io_read(0x41) == 0x02
+    assert e.io_read(0x42) == 0xA9          # SS2 aus: derselbe Code (der Treiber kippt)

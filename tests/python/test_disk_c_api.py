@@ -687,3 +687,22 @@ def test_ein_befund_nennt_die_seite_der_udos_diskette(fixture_disks, tmp_path):
         assert treffer[0].severity == GEFAHR
         assert treffer[0].volume == 1, "der Befund muss Seite 1 nennen"
         assert treffer[0].object, "und die betroffene Datei"
+
+
+def test_sios_label_fields_through_the_abi(fixture_disks):
+    """`k1520d_sios_info` / `k1520d_sios_file`: VOL1, HDR1, AADR/ML - und leer ausserhalb von SIOS."""
+    from app.core_binding.k1520disk import DiskTool
+
+    with DiskTool.open(fixture_disks / "sios1526_sg1.hfe") as d:
+        vol = d.sios_volume()
+        assert vol["vol_name"] == "MWD002" and vol["vol_version"] == "W"
+        assert vol["etiketten_belegt"] == "2" and vol["etiketten_gesamt"] == "19"
+        h = d.sios_datei("SYSORG09")
+        assert (h["satzlaenge"], h["boe"], h["eoe"], h["eod"], h["fortsetzung"]) == \
+            ("1024", "01001", "28026", "29001", "C")
+        assert d.sios_datei("sysorg09") == h                  # Gross-/Kleinschreibung egal
+        o = d.sios_datei("PHASELB/SGEN")
+        assert (o["art"], o["bibliothek"], o["aadr"]) == ("objekt", "PHASELB", "0013")
+        assert d.sios_datei("GIBTSNICHT") == {} and d.sios_datei("PHASELB/NIX") == {}
+    with DiskTool.open(fixture_disks / "cpa_cpa780_k5601_clock.img") as d:
+        assert d.sios_volume() == {} and d.sios_datei("PIP.COM") == {}
