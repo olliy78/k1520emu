@@ -62,8 +62,8 @@ Beschafft wird die Laufzeit mit **[`uv`](https://github.com/astral-sh/uv)** — 
 einzelnen statischen Binary (~15–20 MB), das es für Linux, Windows und macOS gibt:
 
 ```sh
-uv python install 3.12          # relocatable CPython ins Benutzerprofil
-uv venv --python 3.12 "$ROOT/venv"
+uv python install 3.14          # relocatable CPython ins Benutzerprofil
+uv venv --python 3.14 "$ROOT/venv"
 uv pip install --python "$ROOT/venv" --require-hashes -r "$ROOT/requirements.lock"
 ```
 
@@ -285,7 +285,7 @@ Uninstallable=yes                          ; Eintrag unter HKCU\…\Uninstall
   und einen zweiten Installationsweg mit eigenen Fehlern.
 - **Python kommt direkt von python-build-standalone, nicht über `uv`.**
   `uv python install` legt zum Schluss einen **Junction** auf die Nebenversion an
-  (`python\cpython-3.12-…`). Wo OneDrive „Dateien bei Bedarf" läuft, verweigert dessen
+  (`python\cpython-3.14-…`). Wo OneDrive „Dateien bei Bedarf" läuft, verweigert dessen
   Filtertreiber das: `os error 448` / `STATUS_UNTRUSTED_MOUNT_POINT`, „der Pfad kann
   nicht durchlaufen werden, da er einen nicht vertrauenswürdigen Bereitstellungspunkt
   enthält" (astral-sh/uv #19616) — der Fehlschlag auf dem Testgerät am 2026-08-14.
@@ -525,7 +525,7 @@ Gemessen am ersten Linux-Paket (6 Beispieldisketten, `--disks default`):
 | 6 Beispieldisketten (`.hfe`, komprimiert) | ~1 MB | im Paket |
 | **Download des Pakets** | **1,9 MB** | |
 | `uv` | ~15–20 MB | einmalig bei Installation |
-| CPython 3.12 (relocatable) | ~30 MB | einmalig bei Installation |
+| CPython 3.14 (relocatable) | ~30 MB | einmalig bei Installation |
 | PySide6-Essentials + PyYAML | ~76 MB | einmalig bei Installation |
 | **Netzbedarf Erstinstallation** | **~120 MB** | |
 | Belegter Platz, ungeschlankt | 406 MB | gemessen |

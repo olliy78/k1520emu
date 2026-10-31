@@ -7,7 +7,7 @@
 
 # Python-Fassung der Laufzeitumgebung.  Dieselbe beim Schnueren (requirements.lock
 # wird dafuer aufgeloest) wie beim Installieren — sonst passen die Wheels nicht.
-K1520_PY_VERSION=${K1520_PY_VERSION:-3.12}
+K1520_PY_VERSION=${K1520_PY_VERSION:-3.14}
 
 # ─── Meldungen ───────────────────────────────────────────────────────────────
 # Farben nur, wenn die Ausgabe wirklich ein Terminal ist — in Protokollen und

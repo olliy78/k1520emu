@@ -126,7 +126,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.14'
           cache: pip
           cache-dependency-path: |
             requirements.txt
@@ -318,7 +318,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.14'
 
       # -DK1520_FORMATS_DEFAULT= ist NICHT verhandelbar: sonst traegt jede
       # ausgelieferte Bibliothek den absoluten Pfad des Baurechners als
@@ -473,7 +473,7 @@ jobs:
           done
           # Die Greaseweazle-Anbindung liegt als fertiges wheel BEI der Payload,
           # nicht darin: der Assistent spielt sie in die Laufzeitumgebung ein.
-          # Plattformunabhaengig muss sie sein — ein cp312-win_amd64-wheel hiesse,
+          # Plattformunabhaengig muss sie sein — ein cp314-win_amd64-wheel hiesse,
           # dass die C-Erweiterung doch mitgebaut wurde (packaging/gw_pins.txt).
           ls "$paket"/wheels/greaseweazle-*-py3-none-any.whl >/dev/null 2>&1 \
               || { echo "FEHLER: kein plattformunabhaengiges Greaseweazle-wheel" >&2; exit 1; }
