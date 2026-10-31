@@ -216,12 +216,47 @@ TEST(DisktoolMicrodos, Profil200KUnd1715) {
         EXPECT_EQ(0, dv->check(FsCheckLevel::Voll, true).zaehlerAb(FsSeverity::Warnung));
     }
     {
+        // 1715: Bootabbild = 128-B-Kopf + MICRODOS.SYS (erste Datei); mit dem vollen Bootabbild
+        // entsteht sofort eine erkannte, saubere Systemdiskette, boot-get gibt es bitgleich zurueck.
         TempPfad pfad("k1520_microdos_1715.hfe");
+        std::vector<uint8_t> vorher;
         {
             auto dv = neu(pfad, "microdos1715", "boot_microdos_1715.bin");
             ASSERT_NE(dv, nullptr);
-            EXPECT_EQ(dv->bootAreaSize(), 128u);
-            // Ohne MICRODOS.SYS ist es (noch) keine MicroDOS-Diskette, der Kopf allein ist cpa1715.
+            EXPECT_EQ(dv->bootAreaSize(), 128u + 16384u);
+            ASSERT_TRUE(dv->readBootImage(vorher));
+            EXPECT_EQ(vorher, datei(bootBin("boot_microdos_1715.bin")));
+            ASSERT_TRUE(lege(*dv, "A.TXT", std::vector<uint8_t>(5000, 'a'))) << dv->lastError();
+            ASSERT_TRUE(dv->flush());
+        }
+        auto dv = oeffne(pfad.get());
+        ASSERT_NE(dv, nullptr);
+        EXPECT_EQ(dv->detection().filesystem, "microdos1715");
+        EXPECT_EQ(dv->list().size(), 2u);
+        std::vector<uint8_t> nachher;
+        ASSERT_TRUE(dv->readBootImage(nachher));
+        EXPECT_EQ(vorher, nachher);
+        EXPECT_EQ(0, dv->check(FsCheckLevel::Voll, true).zaehlerAb(FsSeverity::Warnung));
+        // MICRODOS.SYS liegt in den ersten Datenbloecken (dort liest sie der Urlader)
+        EXPECT_EQ(hole(*dv, "MICRODOS.SYS").size(), 14336u);
+    }
+    {
+        // Nur der Kopf (128 B): ohne MICRODOS.SYS noch keine MicroDOS-Diskette; die Datei danach
+        // als ERSTE Datei einfuegen genuegt (der Kopf allein ist cpa1715).
+        TempPfad pfad("k1520_microdos_1715k.hfe");
+        std::vector<uint8_t> kopf = datei(bootBin("boot_microdos_1715.bin"));
+        kopf.resize(128);
+        TempPfad kopfDatei("k1520_microdos_1715_kopf.bin");
+        {
+            std::ofstream o(kopfDatei.get(), std::ios::binary);
+            o.write(reinterpret_cast<const char*>(kopf.data()), static_cast<std::streamsize>(kopf.size()));
+        }
+        std::string err;
+        {
+            auto dv = DiskVolume::create(pfad.get(), "microdos1715", "", formate(), dateisysteme(), err,
+                                         kopfDatei.get());
+            ASSERT_NE(dv, nullptr) << err;
+            EXPECT_EQ(dv->bootAreaSize(), 128u + 16384u);
             ASSERT_TRUE(lege(*dv, "MICRODOS.SYS", std::vector<uint8_t>(14336, 's'))) << dv->lastError();
             ASSERT_TRUE(dv->flush());
         }

@@ -338,6 +338,8 @@ std::vector<SectorSpace::TrackRef> systemspuren(const SectorSpace& raum, const F
 uint64_t systemspurBytes(const SectorSpace& raum, const FsProfile& p) {
     // MicroDOS 1526: 256 B Lader (acht Plaetze) + Systemdatei MicroDOS.SYS (bis 16 KB).
     if (p.dir_boot && p.boot_header == "microdos") return 256 + CpmFileSystem::kMicroDosSysMax;
+    // MicroDOS 1715: 128 B Bootkopf + MICRODOS.SYS (erste Datei, gleich hinter dem Verzeichnis).
+    if (p.dir_boot && p.boot_header == "microdos1715") return 128 + CpmFileSystem::kMicroDosSysMax;
     if (p.dir_boot) return 128;          // Bootbereich im Verzeichnis: vier Plaetze
     uint64_t n = 0;
     for (const SectorSpace::TrackRef& t : systemspuren(raum, p))
@@ -4478,8 +4480,8 @@ bool DiskVolume::readBootImage(std::vector<uint8_t>& out, int volume) const {
             out.clear();
             return fail("Bootbereich im Verzeichnis nicht lesbar");
         }
-        if (profile_->boot_header == "microdos") {
-            // Lader + Systemdatei: das ist, was MSYSGEN auf eine neue Diskette legt.
+        if (profile_->boot_header == "microdos" || profile_->boot_header == "microdos1715") {
+            // Lader/Kopf + Systemdatei: das ist, was MSYSGEN auf eine neue Diskette legt.
             std::vector<uint8_t> sys;
             if (cpm->readSystemDatei(sys)) out.insert(out.end(), sys.begin(), sys.end());
         }
@@ -4546,6 +4548,9 @@ bool DiskVolume::writeBootImage(const std::vector<uint8_t>& img, int volume) {
         if (!cpm->writeBootSlots(img)) return fail(cpm->lastError());
         if (profile_->boot_header == "microdos" && img.size() > 256
             && !cpm->writeSystemDatei(std::vector<uint8_t>(img.begin() + 256, img.end())))
+            return fail(cpm->lastError());
+        if (profile_->boot_header == "microdos1715" && img.size() > 128
+            && !cpm->writeSystemDatei(std::vector<uint8_t>(img.begin() + 128, img.end())))
             return fail(cpm->lastError());
         return true;
     }

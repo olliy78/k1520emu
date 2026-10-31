@@ -1,0 +1,23 @@
+MicroDOS 1715 - Systemdiskette fuer den PC 1715 (K5601, 80 Spuren, 2 Seiten, 5 x 1024)
+=====================================================================================
+
+MicroDOS (Wilhelm-Pieck-Universitaet Rostock, Vers. 2.6 vom 01.05.86) ist CP/M-2.2-kompatibel.
+Start: Diskette in Laufwerk A:, Kaltstart.  Meldung "48K MicroDOS Vers 2.6", Prompt A>.
+(INITIAL.SUB ist eine leere Zeile; deshalb erscheint der Prompt zweimal.)
+
+Bedienung (Handbuch mdosb15.txt):
+  D          Verzeichnis, D B: das von B:          E NAME   loeschen (fragt "delete - Y<CR>")
+  B:         Laufwerk wechseln                     >B:DATEI ... > : Ausgabe in eine Datei umlenken
+  Strg+C     Warmstart
+
+Neue Diskette:
+  FORMAT15   Laufwerk (eine Taste, A-D), Format (eine Taste, 5 = 5x1024 DS 80 Spuren), Warnung "Y".
+             Danach fragt FORMAT15 wieder nach dem Laufwerk; es hat keinen Ausgang.  Mit Strg+C zurueck
+             zum Betriebssystem (Einzelheiten und Stolperstein: doc/merkposten/microdos1715.md).
+  MSYSG15A   Systemgenerierung fuer MFS 1.6 (K5601): Bildschirm (2 = 2K, 80x24; 1 = 1K, 64x16), Drucker
+             (1 V.24, 2 IFSS), je Laufwerk logisch/Einheit/Format (4 = 5x1024x80x2), dann das Ziellaufwerk.
+             Ergebnis: MICRODOS.SYS auf der formatierten Zieldiskette = bootfaehige Systemdiskette.
+             (MSYSG15B fuer MFS 1.2 / K5600 liegt nicht vor.)
+
+Weitere Programme: POWER (Dateiverwaltung), SELDSK15, SELPRT, OC15, KTP15, K6311SEL, HARDCOPY, MKEYINST.
+Emulator: pc1715emu (PC 1715, Bildschirm K7222 oder K7221).
