@@ -1043,8 +1043,9 @@ dieses `INITIAL.SUB` nicht).
 
 **Leere Diskette formatieren** (Knopf *Leere Diskette* im Laufwerkskasten B:, dann am Prompt):
 
-1. `FORMAT20`, Laufwerk `B` mit Return; **Format `3`** (5 × 1024 B) **mit Return**; `Richtig (J/N)` mit `J`.
-   Das dauert rund 200 Millionen Takte; am Ende `Formatierung beendet! Wiederholung (J/N)?` mit `N`.
+1. `FORMAT20`, Laufwerk `B` (**eine Taste, ohne Return** -- ein Return danach nimmt schon die Vorgabe 3 an); die **Formatziffer
+   mit Return** (`3` = 5 × 1024 B beim K5601; das Menü hängt vom Laufwerkstyp der Generierung ab, Beispiel K5600.10: `1` =
+   26 × 128 B); `Richtig (J/N)` mit `J`. Das dauert rund 200 Millionen Takte; am Ende `Formatierung beendet! Wiederholung (J/N)?` mit `N`.
 2. `D B:` zeigt danach `no files`.
 
 **Bootdiskette erzeugen** (die Diskette in B: ist formatiert): `MSYSG20`. Die Fragen werden mit der Ziffer **ohne**
@@ -1054,6 +1055,24 @@ Zusatzkanal `3` (V.24); je Laufwerk logisch `A`, physisch `1`, Typ `3` (K5601; `
 letzten `N`; Zielfrage `B`, `Richtig (J/N)` mit `J`. Es folgt das Generierungsprotokoll, `Wiederholung` mit `N`.
 Auf B: liegt nun `MicroDOS.SYS` samt Urlader; die Diskette bootet als A: (ohne `INITIAL.SUB`: gleich `A>`).
 Das alles baut `tools/microdos/ablauf.py` selbsttätig nach (`tools/microdos/build.py` erzeugt daraus die mitgelieferten Disketten).
+
+**Dienstprogramme und Kommandos** (durchgespielt, Wächter `py_microdos_bedienung`): `SELDSK20` stellt Format und Typ je
+Laufwerk um (falsches Format: `Bdos error … ST= 56`); `O B:2` verschiebt das Verzeichnis, `S B:` macht B: zum Systemlaufwerk
+(Programme mit Systemattribut werden dort gefunden), `U 3` zeigt `3A>`, `<DATEI.SUB` führt eine Kommandodatei aus (der
+volle Name mit Typ; `;`-Zeilen sind Kommentar), `^S`/`^Q` halten die Ausgabe an, `^D` im Debugger `MZSID` öffnet `>A>`,
+`^P` schickt die Ausgabe zusätzlich an den Drucker. `POWER` ist das Dateiprogramm (`DIR`, `COPY`, `ERA`, `TYPE`, `?`), `MKEY20`
+belegt die Funktionstasten (PF10 → `DBASE`, …), `MKINST20` erzeugt aus einer Eingabedatei (`<MYKEY`) eine neue `MKEY20.SPR`,
+`HARDCOPY` kopiert Spuren (`A`, `B`, `03`), `KTL` zeigt logische Tastencodes (Ende mit `a`), `KTP` den physischen Code der
+**K7636** (U-Bus; an der K7637 nur `FF`). `MATH.COM` der Sammlung ist **kein Rechner**, sondern der Force-Two-Installer für
+WordStar. **Offen/unklar:** `>DATEI` legt die Datei an, sie bleibt aber 0 Byte; `^F` am Prompt erscheint nur als `^F`.
+
+**Drucker und Zusatzkanal.** `SELPRT20` (Schnittstelle, Typenrad, Druckertest mit den Codes 20H–7FH): **IFSS** → Schnittstelle
+*Drucker* (X3), **V.24** → *DFÜ/V.24* (X6), **PIO** → E/A 54H–57H, die der Emulator nur als PIO der K8025 kennt: die Zeichen
+verschwinden, **nicht modelliert**. Zusatzkanal (`SELAUX20`/`MSYSG20`): V.24 sendet und empfängt (Schleife), **IFSP** (ALB K6025,
+E/A 90H–97H) ist **nicht modelliert**, IFSS erreicht die Gegenstelle nicht (offen). Das Gerät **K7634** (Tastatur) gibt es im
+Emulator nicht; K7023 (1K-Bildschirm) wählen Sie in *Einstellungen ▸ Allgemein ▸ Bildschirmkarte*. Systemdisketten mit
+**128-Byte-Sektoren** (Lade-ROM V0.6): mit den K5600.10-Laufwerken `FORMAT20` Eintrag `1`, `SELDSK20` B auf Typ 1/Format 1,
+`MSYSG20` mit Format `1` — bootet.
 
 **Fallen.** `PIP.COM` der Sammlung ist abgeschnitten (4096 statt rund 7,9 KB) und läuft ins Leere — nutzen Sie `DIP`
 (`DIP B:=A:DATEI.COM`; mit nur *einem* Zielnamen wartet es danach auf `Load System Disk on Drive A:, then Type (cr)`:
@@ -1065,6 +1084,15 @@ das DiskTool (Profile `microdos800`, `microdos200`); die Systemdatei liegt an fe
 Die Diskette `pc1715_microdos_k5601_system.hfe` startet MicroDOS 2.6 im `pc1715emu` (Modell PC 1715, Bildschirm K7222). Nach dem
 Kaltstart erscheint zweimal `A>`. `D` zeigt das Verzeichnis, `B:` wechselt das Laufwerk, `E NAME` löscht, `>B:DATEI` leitet die
 Ausgabe in eine Datei um (`>` beendet das). Am PC 1715W bootet MicroDOS nicht.
+
+**Programme** (durchgespielt, Wächter `py_microdos1715_bedienung`): `SELDSK15` (Typ 3 = MFS 1.6, Format 7 = 5 × 1024 × 80 × 2),
+`KTP15` (`b` → `E062`, Return → `E09E`, Ende mit `a`), `K6311SEL` (sendet `ESC R 2`, `ESC [ 0 SP K` an den Drucker), `MKEYINST`
+(`<DATEI` erzeugt `MKEY.SPR`), `POWER`, `HARDCOPY` (Strg+C beendet). `OC15` meldet `System und OC passen nicht zusammen !`
+(Gastverhalten). **Drucker:** nur **V.24** (`MSYSG15A` Drucker `1`) kommt an der Schnittstelle *Drucker* an; **IFSS** braucht die
+Zusatzkarte (E/A 10H–17H), die der Emulator nicht hat. `SELPRT` bleibt nach der Typenradwahl stehen (offen).
+**1K-Bildschirm:** `MSYSG15A` Bildschirm `1` erzeugt ein System, das am Modell *PC 1715 (K7221, 64 × 16)* ohne Umbruch bei Spalte 64
+läuft. **FORMAT15-Menü** 0–5 (0–2 einseitig, 3–5 doppelseitig; 16 × 256, 9 × 512, 5 × 1024): alle formatieren fehlerfrei.
+Nach `SELDSK15` mit einem einseitigen 80-Spur-Format hängt `D B:` (offen).
 
 **Neue Systemdiskette:** eine leere Diskette in Laufwerk B: einlegen (*Leere Diskette*), `FORMAT15` starten, Laufwerk `B` und Format `5`
 wählen (je eine Taste, ohne Return), die Warnung mit `Y` bestätigen und `FORMATTING COMPLETE` abwarten. FORMAT15 hat keinen Ausgang:

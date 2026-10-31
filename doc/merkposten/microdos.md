@@ -33,7 +33,7 @@ Python-Weg (Qt-Return) geht es.
    Die ausgelieferten Disketten tragen deshalb kein `PIP.COM`.
    DIP mit **einem** Zielnamen (`DIP B:=A:X.COM`) kopiert und wartet danach auf `Load System Disk on Drive A:, then Type (cr)` — Gastverhalten,
    Return druecken.  `D B:` auf unformatierter B: -> `Bdos error on B: … ST=49 T=0 S=1  ignore - <Y/N>` (richtig, `N` tippen).
-3. **FORMAT20: bestanden** auf echter Leerdiskette (unformatiert, Geometrie K5601).  Ablauf: `FORMAT20`, Laufwerk `B`, Format `3` (= 5 x 1024 B,
+3. **FORMAT20: bestanden** auf echter Leerdiskette (unformatiert, Geometrie K5601).  Ablauf: `FORMAT20`, Laufwerk `B` (**EINE Taste ohne Return** -- ein Return danach nimmt die Vorgabe 3 an; die ausgelieferten Disketten sind mit dieser Tastenfolge entstanden, `ablauf.formatiere` behaelt sie fuer Format 3 bei), Formatziffer (3 = 5 x 1024 B,
    80 Zyl., 2 Seiten; 1 = 16x256, 2 = 9x512) **mit Return**, `Richtig (J/N)` = `J`, ca. 2 Mio. Takte je Spur (~200 M gesamt), `Formatierung
    beendet! Wiederholung (J/N)?` = `N`.  Danach `D B:` = `no files`.
 4. **MSYSG20: bestanden**, Bootdiskette bootet kalt als A:.  Menuefolge (jeweils Ziffer/Buchstabe OHNE Return): Tastatur `4` (K7637.51; 3 = K7636.01),
@@ -45,8 +45,7 @@ Python-Weg (Qt-Return) geht es.
    Nach dem Schreiben **`flush_disks()`** (Schreibpause ~0,5 s Maschinenzeit abwarten), erst dann ist die `.hfe` vollstaendig.
    Die neue Diskette hat **kein INITIAL.SUB** -> sofort `A>` ohne MKEY-Hinweis; `FORMAT20.COM`, `DIP` usw. gehoeren nicht dazu (mit DIP/PIP
    nachkopieren).
-5. **Stichproben:** `MKINST20`, `SELDSK20`, `SELPRT20`, `SELAUX20`, `MSYSG20`: nur MSYSG20/FORMAT20 durchgespielt (oben); `SELDSK20` etc. nicht.
-   `DIP`, `KTP`, `D`, `E` ok.
+5. **Dienstprogramme/Kommandos: siehe Abschnitt "Bedienung der Programme" (2026-10-31).**
 
 ## Auslieferung (2026-10-31)
 
@@ -116,4 +115,46 @@ Das Skript legt das Original nie schreibend ein (Temp-Kopie), B: entsteht mit `c
 - Bei Debugger-Sitzungen `keys \r` auf K7637; bei K7636 braucht der Debugger-`keys` einen Rohcode.
 - MSYSG20 und FORMAT20 lesen die Taste ohne Return; die Formatwahl in FORMAT20 aber **mit** Return.
 - Die Generierung nennt Laufwerk C/D als `MFS 1.2/1` (Vorgabe), solange man sie nicht eingestellt hat — unschaedlich.
-- Offen: SELDSK20/SELPRT20/SELAUX20/MKINST20 nicht durchgespielt, Drucker (IFSS/V.24/PIO) nicht getestet.
+- Offen: siehe Abschnitt "Offen" am Ende.
+
+## Bedienung der Programme (2026-10-31, Waechter `py_microdos_bedienung`, `py_microdos_generierungen`, `py_microdos_hardware`, `py_microdos_format20`)
+
+Alles am echten Gast bedient (Tasten, Bildschirmtext), Wirkung wie im Handbuch geprueft -- bestanden, ausser den Zeilen unter "Offen".
+- **SELDSK20**: Antworten Laufwerk/Einheit/Typ/Format je EINE Taste; falsches Format auf B: -> `Bdos error on B:` `ST= 56` (ID-Feld), das
+  richtige (Typ 3, Format 8) liest wieder.  Typmenue: MFS 1.2/1.4/1.6/MF 3200/MF 6400; die Formatliste haengt vom Typ ab (MF 3200: 2 Eintraege).
+- **Resident**: `O B:2` verschiebt das Verzeichnis (`D B:` = no files), `O B:0` zurueck; `O` zeigt alle vier; `S B:` -> Programme mit
+  Systemattribut von B: sind von A: aus startbar (`KTL?` vorher); `U 3` -> Prompt `3A>`; `<CMD.SUB` fuehrt aus (`;`-Zeile wird nur
+  gezeigt; **`<CMD` ohne Typ -> `CMD?`**, der Name ist voll anzugeben); `^S` haelt an, `^Q` setzt fort (in POWER `TYPE`); `^D` in `MZSID`
+  -> `>A>`, `D` laeuft, Rueckkehr in `>`; `^P` -> Ausgabe zusaetzlich an den Drucker (nochmal `^P` schaltet ab); `^C` Warmstart.
+- **POWER** 3.03 (Pavel Breder; Prompt `A=`, Befehlsliste mit `?`): `DIR`, `COPY` (fragt `destination drive :`), `ERA` (`ERASE (Y/N)`), `EXIT`.
+- **MKEY20.SPR** (`MKEY20`): PF10 -> `DBASE`, PF11 -> `POWER`, `M` -> `o d:1` laut Datei `MKEY20`; Tasten ueber `RAW_BASE | Code`
+  (`0x02000000`).  **MKINST20** mit `<MYKEY` (Eingabedatei, erste Zeile `MKINST20`) erzeugt eine neue `MKEY20.SPR` (vorher `E MKEY20.SPR`, `Y`).
+- **HARDCOPY**: `A`, `B`, `03`, Return, `J` kopiert Spuren 0-2 (Verzeichnis von B: ist danach das von A:); `Wiederholung (J/N)`.
+- **KTL** zeigt logische Codes (`b` = 62, Return = 0D, Ende bei `a`); **KTP** liest Port 01H/06H (U-Bus, K7636): `b` = 62, Return = `FF` (ET1);
+  an der K7637 nur `FF`.  **`MATH.COM` ist der Force-Two-WordStar-Installer, kein Rechner.**
+- **SELPRT20**: Schnittstelle (1 IFSS, 2 V.24, 3 PIO), Typenrad, `Drucker bereit (ENTER)`, Test 20H-7FH (96 Zeichen), `Richtig (J/N)`.
+  **Wege: Drucker IFSS -> Hub-Schnittstelle 2 `Drucker` (X3, SIO A32-A, E/A 5CH); Drucker V.24 -> 0 `DFUE/V.24` (X6).
+  Drucker PIO -> E/A 54H..57H = PIO A31 der K8025 (DIL-Schalter-Register): NICHT MODELLIERT** -- der Treiber laeuft durch, nichts erreicht
+  die Aussenwelt.  `SELAUX20`-Menue: IFSS (ASS K 8025), IFSP (ALB K 6025), V.24 (ASS K 8025).
+- **Zusatzkanal** (Testprogramm `AUXT.COM` = BDOS 4 'X', BDOS 3, BDOS 2): V.24 -> DFUE/V.24, sendet UND empfaengt (Schleife: `X` kommt zurueck);
+  **IFSP -> OUT 95H / IN 91H: ALB K6025 (E/A 90H..97H) nicht modelliert**; **IFSS -> OUT 5CH, kommt nirgends an** (auch bei Drucker IFSS auf
+  demselben Kanal; offen, ob Gastverhalten -- der Treiber initialisiert den Kanal nicht selbst).
+- **Generierungen** (FORMAT20 + MSYSG20 auf Leerdiskette, ~10 s): Drucker V.24/PIO, Zusatzkanal V.24/IFSP/IFSS (oben); **Bildschirm K7023
+  (`1`, Option `bildschirm=k7023`)** bootet; **Tastatur K7636** bootet mit `tastatur=k7636`; **K7634.54/.51**: wird generiert, der Emulator hat
+  am A5120 keine K7634 (nur K7637/K7636) -> Schirm voller `A>`, **nicht modelliert**.
+- **128-Byte-Systemdiskette** (msysgen Anhang B): mit K5600.10-Laufwerken `FORMAT20` Eintrag 1 (26x128x40x1), `SELDSK20` B auf Typ 1/Format 1 (sonst
+  `Schreibfehler !` in MSYSG20: das laufende System schreibt mit dem alten Format), `MSYSG20` Typ 1/Format 1 fuer A und B -> bootet mit Lade-ROM
+  V0.6 **und** V0.9_2; mit den K5601-Vorgabelaufwerken bootet sie nicht.  DiskTool: Geometrie `k5601_ss40_26x128` erkannt, **kein Dateisystemprofil**
+  (Verzeichnisplatz 0 traegt FEh) -- nicht angefasst (DiskTool-Profile bearbeitet ein anderer Zweig).
+- **FORMAT20-Menues** (alle 14 Eintraege formatieren, Gast liest zurueck): MFS 1.2: 26x128 / 16x256 / 5x1024 (je x40x1); MFS 1.4: 16x256 / 9x512 /
+  5x1024 (x80x1); MFS 1.6: 16x256 / 9x512 / 5x1024 (x80x2); MF 3200: 26x128 / [Eintrag 2 leer] / 4x1024 (x77x1); MF 6400: 26x128 / 4x1024 / 8x1024
+  (x77x1).  **Befund MF 6400 Eintrag 3 (8x1024x77): ab etwa Spur 52 `Defekte Spuren !`** (Ursache offen; Waechter haelt den Ist-Zustand).
+  DiskTool erkennt leere Formate nur mehrdeutig (`cpa_auto`), `16x256x80x2` -> `scpx640`, `5x1024x80x2` -> `cpa800`.
+
+## Offen (2026-10-31)
+- `>DATEI`: Verzeichniseintrag entsteht, Datei bleibt 0 Byte, auch nach `^C`; `^F` am Prompt/`>`-Prompt wird als `^F` ausgegeben (Handbuch 4.2/4.8
+  beschreibt anderes) -- Gast oder Emulator ungeklaert (Waechter haelt den Ist-Zustand).
+- Zusatzkanal IFSS; MF 6400 8x1024; PIO-Drucker und IFSP ohne Gegenstelle; K7634 fehlt.
+- **MSYSG15B** (1715 mit K5600/MFS 1.2): nur im Handbuch genannt.  Durchsuchung aller `.hfe/.img/.dmk/.td0/.cqm` und Zip-Inhalte unter `~/projects/robotron`
+  (1286 Abbilder, u. a. GOTEK-Sticks, `mpm-kc85_de/.../MicroDOS_sys.zip`, `Disketten_Images_RT`) per `k1520disktool ls`: **kein `MSYSG15B`**; `MSYSG15A` steht
+  nur auf `MicroDOS1715.hfe` und `MicroDOS1715_LW_C.hfe`; die `MSYSG.COM` der KC85-Abbilder gehoeren zu MicroDOS fuer KC85 (andere Hardware).
