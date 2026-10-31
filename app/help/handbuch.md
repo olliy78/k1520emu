@@ -1060,6 +1060,19 @@ Das alles baut `tools/microdos/ablauf.py` selbsttätig nach (`tools/microdos/bui
 Return). `D B:` auf unformatierter Diskette meldet `Bdos error on B:` — mit `N` quittieren. Das Dateisystem kennt
 das DiskTool (Profile `microdos800`, `microdos200`); die Systemdatei liegt an festen Sektoren.
 
+## MicroDOS 1715 (PC 1715)
+
+Die Diskette `pc1715_microdos_k5601_system.hfe` startet MicroDOS 2.6 im `pc1715emu` (Modell PC 1715, Bildschirm K7222). Nach dem
+Kaltstart erscheint zweimal `A>`. `D` zeigt das Verzeichnis, `B:` wechselt das Laufwerk, `E NAME` löscht, `>B:DATEI` leitet die
+Ausgabe in eine Datei um (`>` beendet das). Am PC 1715W bootet MicroDOS nicht.
+
+**Neue Systemdiskette:** eine leere Diskette in Laufwerk B: einlegen (*Leere Diskette*), `FORMAT15` starten, Laufwerk `B` und Format `5`
+wählen (je eine Taste, ohne Return), die Warnung mit `Y` bestätigen und `FORMATTING COMPLETE` abwarten. FORMAT15 hat keinen Ausgang:
+**die Maschine neu starten**, nicht Strg+C. Danach `MSYSG15A`: Bildschirm `2`, Drucker `2`, Laufwerk `A` Einheit `1` Format `4`, `J`,
+Laufwerk `B` Einheit `2` Format `4`, `N`, Ziel `B`. Auf B: steht dann `MICRODOS.SYS`, die Diskette bootet allein.
+
+Das DiskTool kennt das Dateisystem als `microdos1715`; unter *Neue Diskette* entsteht sie mit dem Bootabbild „MicroDOS 1715“ auch ohne Emulator.
+
 ## MUTOS 8000 (A5120.16)
 
 MUTOS 8000 ist ein UNIX für den 16-Bit-Teil des A5120.16 (U8001). Dieser Abschnitt ist eine

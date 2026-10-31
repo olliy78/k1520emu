@@ -739,6 +739,10 @@ DiskTool kopiert die Beigaben nach). Wächter `py_microdos_ablauf` (Kaltstart bi
 `microdos800`/`microdos200` + fsck ohne Warnung). DiskTool-Profile `microdos800|200|1715` (Lader im Verzeichnis). Gastverhalten: `PIP.COM` der Sammlung
 ist abgeschnitten (4096 B), `INITIAL.SUB` hält bei `A>MKEY20` an (ein Return). **Vor Arbeiten daran: `doc/merkposten/microdos.md` lesen.**
 
+**MicroDOS 1715** (2026-10-31): Vers. 2.6 bootet am PC 1715 (K7222, 4 × K5601); `FORMAT15` + `MSYSG15A` bauen aus einer Leerdiskette eine bootende Systemdiskette
+(`tools/microdos/ablauf1715.py`, Auslieferung `disks/pc1715_microdos/` aus `tools/microdos/build1715.py`). DiskTool-Profil `microdos1715`: Bootabbild = 128-B-Kopf +
+`MICRODOS.SYS` (muss in die ersten Datenblöcke). **Nach FORMAT15 RESET, nicht Strg+C.** 1715W bootet nicht. **Vor Arbeiten daran: `doc/merkposten/microdos1715.md` lesen.**
+
 ## MUTOS 8000: Diskettenbau HIER, Forschung in mutos8k (Stand 2026-10-29)
 
 **Der Diskettensatz entsteht in DIESEM Projekt, ohne jede Abhaengigkeit zu mutos8k:** `python3 -I tools/mutos8000/bau_alle.py` baut aus den
