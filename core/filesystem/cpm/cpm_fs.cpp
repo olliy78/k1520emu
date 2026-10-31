@@ -827,6 +827,28 @@ bool CpmFileSystem::readSystemDatei(std::vector<uint8_t>& out) const {
     return false;
 }
 
+std::vector<uint16_t> CpmFileSystem::systemDateiBloecke(uint32_t anzahl) const {
+    std::vector<uint16_t> aus;
+    if (prof_.boot_header == "microdos1715") {
+        for (uint32_t k = 0; k < anzahl; ++k) aus.push_back(static_cast<uint16_t>(dir_blocks_ + k));
+        return aus;
+    }
+    if (prof_.boot_header != "microdos") return aus;
+    const int start = space_.trackIndexOf(prof_.data_cyl, prof_.data_head);
+    if (start < 0 || secs_per_track_ < 4) return {};
+    const uint64_t spur_bytes = static_cast<uint64_t>(secs_per_track_) * sector_size_;
+    const uint64_t je_spur    = 4ull * sector_size_;
+    for (uint8_t c = 1; c <= 4 && aus.size() < anzahl; ++c) {
+        const int ti = space_.trackIndexOf(c, 0);
+        if (ti < start) return {};
+        const uint64_t ab = static_cast<uint64_t>(ti - start) * spur_bytes;
+        if (ab % prof_.block_size || je_spur % prof_.block_size) return {};
+        for (uint64_t b = ab / prof_.block_size; b < (ab + je_spur) / prof_.block_size && aus.size() < anzahl; ++b)
+            aus.push_back(static_cast<uint16_t>(b));
+    }
+    return aus;
+}
+
 bool CpmFileSystem::writeSystemDatei(const std::vector<uint8_t>& data) {
     if (prof_.boot_header == "microdos1715") return writeSystemDatei1715(data);
     if (prof_.boot_header != "microdos")

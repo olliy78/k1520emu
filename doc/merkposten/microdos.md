@@ -38,7 +38,7 @@ Python-Weg (Qt-Return) geht es.
    beendet! Wiederholung (J/N)?` = `N`.  Danach `D B:` = `no files`.
 4. **MSYSG20: bestanden**, Bootdiskette bootet kalt als A:.  Menuefolge (jeweils Ziffer/Buchstabe OHNE Return): Tastatur `4` (K7637.51; 3 = K7636.01),
    Bildschirm `2` (K7024), Drucker `1` (IFSS; 2 V.24, 3 PIO), Typenrad `1` (PICA), Zusatzkanal `3` (V.24 K8025), je Laufwerk: logisch `A`,
-   physisch `1`, Typ `3` (MFS 1.6 = K5601; 2 = MFS 1.4 K5600.20, 1 = MFS 1.2 K5600.10), Format `8` (5 x 1024, 80 Zyl., 2 Seiten; Liste haengt
+   physisch `1`, Typ `3` (MFS 1.6 = K5601; 2 = MFS 1.4 K5600.20, 1 = MFS 1.2 K5600.10 (nur dies ergibt das 200K-System)), Format `8` (5 x 1024, 80 Zyl., 2 Seiten; Liste haengt
    vom Typ ab), `Wiederholung (J/N)` `J`/`N` (nach `N` beim zweiten Laufwerk B; dort 2, 3, 8); dann Zielfrage `B`, `Richtig (J/N)` `J`.
    Es folgt das Generierungsprotokoll (Tabelle Tastatur/Bildschirm/Drucker/Laufwerke A-D) mit `Wiederholung (J/N)` -> `N`.  Ergebnis: B:
    enthaelt nur `MicroDOS.SYS` (+ SYL-Urlader in Spur 0/Sektor 1, kein Systemspuren-Bereich).
@@ -59,6 +59,46 @@ Originaldiskette (ohne `INITIAL.SUB`, `PIP.COM`, `MicroDOS.SYS`, WordStar/MailMe
 - FORMAT20 bietet nur, was das BIOS der **Quelle** fuer B: kennt; die Geometrie der Leerdiskette folgt dem Laufwerk des Emulators.
 Der Bau ist deterministisch (zweimal gebaut = gleiche Bytes); `build.py --check` laeuft im Waechter `py_microdos_ablauf`.  Im Paket nur mit `--disks all`
 (wie SIOS; `DISKS_DEFAULT` ist eine feste Auswahl, `py_packaging` prueft sie).
+
+## Bootabbilder des DiskTools (2026-10-31, Waechter `py_microdos_bootabbilder`)
+
+`data/bootsektoren/boot_microdos_*.bin` (Lader 256 B + MicroDOS.SYS 16 KB) sind Auszuege der Originalabzuege (`boot-get`); eine damit per
+`create --fs ... --boot` gebaute und per `put` befuellte Diskette **bootet bis `A>`** (gemessen, 5 Abbilder).  Das System ist FEST auf
+Tastatur und Laufwerke generiert (MSYSG20-Tabellen in `MicroDOS.SYS`; die Abbilder unterscheiden sich nur dort -- die Lader sind in allen vier
+1526-Abbildern bytegleich):
+
+| Abbild | Profil | Tastatur | Laufwerke (Emulator) | aus |
+|---|---|---|---|---|
+| `boot_microdos_1526.bin` | microdos800 | K7637 seriell | Vorgabe 4 x K5601 | MicroDOS1526s |
+| `boot_microdos_1526_k7636.bin` | microdos800 | K7636 parallel | Vorgabe 4 x K5601 | MicroDOS1526p |
+| `boot_microdos_1526_200k.bin` | microdos200 | K7637 | **2 x K5600.10** | MicroDOS1526s_5600 |
+| `boot_microdos_1526_200k_k7636.bin` | microdos200 | K7636 | 2 x K5600.10 | MicroDOS1526p_5600 |
+| `boot_microdos_1715.bin` | microdos1715 | (PC 1715) | K5601, 2K-Bildschirm K7222 | MicroDOS1715 |
+
+- **200K = K5600.10, nicht K5600.20** (frueher stand in `data/bootsektor.yaml` und Doku K5600.20 -- falsch).  Gemessen: mit K5600.20 oder dem
+  Vorgabe-K5601 bleibt das 200K-System bei den Ladepunkten stehen (kein Banner nach 300 M Takten); mit 2 x K5600.10 bootet es.  Passt zur
+  Geometrie: 40 Spuren x 5 x 1024 B einseitig = 200 KB = `k5601_ss40_5x1024`, MFS 1.2 (= K5600.10) in der Generierung.
+- Beschreibungen im Dialog "Neue Diskette" nennen Tastatur und Laufwerke; die K7636-Abbilder sind seit 2026-10-31 dabei (vorher nur K7637).
+- Der erste Treffer je Profil (Vorwahl) ist die K7637-Fassung.
+
+## Pruefung / Rettung / Archiv (2026-10-31)
+
+- **`cpm.dir.geloescht`** auf den Originalen ("1 freier Platz traegt noch einen lesbaren Eintrag"): ECHTER Rest, aber nicht wiederherstellbar --
+  Platz 93 der `MicroDOS1526s` ist `WSNEW.COM`, geloescht, mit 0 Saetzen und lauter 0-Zeigern (ein geloeschter leerer Eintrag); `recover`
+  findet dort nichts.  Die Meldung zaehlt jetzt nur Reste mit mindestens einem brauchbaren Blockzeiger (dieselbe Regel wie `recover`); die
+  Originale pruefen "ohne Befund".  Wächter `DisktoolMicrodos.GeloeschtHinweisNurBeiWiederherstellbaremRest`.
+- **`cpm.system.ort`** (Warnung): `MicroDOS.SYS` (1526) nicht an den Bloecken Zylinder 1-4 Kopf 0 Sektor 1-4 bzw. `MICRODOS.SYS` (1715) nicht in den ersten
+  Datenbloecken -- die Diskette bootet nicht.  **`cpm.system.fehlt`** (Warnung): 1526-Diskette mit SYL-Lader ohne `MicroDOS.SYS`.  Keine Reparatur
+  (es gaebe nur "neu schreiben"; `boot-put` ist der Weg).  Keine Meldung auf den vier 1526- und der 1715-Originaldiskette, den gebauten Disketten
+  und Datendisketten (`microdos*_daten`).  Wächter `DisktoolMicrodos.PruefungMeldetSystemdateiAmFalschenOrt`.
+- **Rettung** (`recover`, `--restore`): fuer 800/200/1715 getestet -- geloeschte Datei wird unter ihrem Namen gefunden (Guete sicher), Inhalt bitgleich,
+  `--restore` traegt sie ein, danach fsck sauber, Lader + Systemdatei byteweise unveraendert; auch die Suchtiefe Oberflaeche bietet
+  Lader/System nie als Fund an (`DisktoolMicrodos.RettungFindetGeloeschteDateienUndLaesstSystemUnberuehrt`, GUI: `py_disktool_microdos`).
+- **Archiv** (`archive.py`): ZIP = Abbild + `dateien/` + `cpm-dateiangaben.txt` (Nutzerbereich, R/O, SYS, ARC) + Inventar.  Das Beiblatt fuehrt nur
+  Dateien MIT Angaben (daher steht `MicroDOS.SYS` des 1526 nicht darin, `MICRODOS.SYS` des 1715 mit `S`).  Rueckweg: `dateien/` per `insert_all` auf eine
+  neue Systemdiskette (ohne die schon vorhandene Systemdatei) stellt Namen, Nutzerbereiche und Attribute bitgleich wieder her.  Getestet fuer alle drei
+  Profile (`py_disktool_microdos::test_archiv_*`).
+- Fallstrick im Test: das DiskTool uebertraegt `.txt/.dat/.doc/...` standardmaessig als TEXT (LF -> CR LF); Bytemuster-Tests brauchen andere Endungen.
 
 ## Nachspielen
 

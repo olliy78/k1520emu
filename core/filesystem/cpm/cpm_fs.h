@@ -161,6 +161,13 @@ public:
     bool writeSystemDatei(const std::vector<uint8_t>& data);
     /// @brief Ist @p p die Systemdatei dieses Profils (1526: `MicroDOS.SYS` gemischt, 1715: `MICRODOS.SYS`, Grossschrift)?
     bool istSystemDateiName(const uint8_t* p) const;
+    /**
+     * @brief Die Bloecke, an denen der Urlader die Systemdatei dieses Profils ERWARTET (die ersten @p anzahl).
+     *
+     * 1526: Sektoren 1…4 der Zylinder 1…4 Kopf 0; 1715: die ersten Datenbloecke hinter dem Verzeichnis.
+     * Leer, wenn die Geometrie das nicht hergibt.  Die Pruefung (`cpm.system.ort`) vergleicht damit.
+     */
+    std::vector<uint16_t> systemDateiBloecke(uint32_t anzahl) const;
     /// @brief Inhalt von `MicroDOS.SYS` (auf Satzgrenze, wie eingetragen); false, wenn die Datei fehlt.
     bool readSystemDatei(std::vector<uint8_t>& out) const;
     /// @}

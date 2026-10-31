@@ -74,7 +74,8 @@ Tasten: ASCII, Return `0x01000004`, Strg+Buchstabe ueber `key_press(code, False,
 - **`MICRODOS.SYS` muss in die ersten Datenbloecke** (der Urlader liest sie von dort; Bloecke 2…8 bei 2048-B-Block, 128 Verzeichnisplaetze).  Eine per
   `put` NACH anderen Dateien eingefuegte `MICRODOS.SYS` liegt woanders und die Diskette bootet **nicht** (Bild leer).  Deshalb nur ueber
   `create --boot`/`boot-put` bzw. als erste Datei einer leeren Diskette; `put` auf ein vorhandenes `MICRODOS.SYS` wird verweigert
-  („existiert bereits“) — kein stilles Zerbrechen.  Offen: `fsck`-Hinweis, wenn `MICRODOS.SYS` nicht vorne liegt.
+  („existiert bereits“) — kein stilles Zerbrechen.  `fsck` meldet seit 2026-10-31 `cpm.system.ort` (Warnung), wenn `MICRODOS.SYS` nicht vorne liegt
+  (Wächter `DisktoolMicrodos.PruefungMeldetSystemdateiAmFalschenOrt`); keine Meldung auf `MicroDOS1715.hfe`/`_LW_C`.
 - Der Bootkopf allein (ohne `MICRODOS.SYS`) ist `cpa1715` (gleicher Kopf wie CP/A 1715); `put` braucht dann `--fs microdos1715`.
 - `FORMAT15`: der Bildschirm bleibt nach `COMPLETE` stehen; `bis('COMPLETE')` genuegt, nicht auf einen Prompt warten.
 - Der Banner steht im 64-Spalten-Bild gebrochen (K7221); Suchtexte dort kuerzer waehlen.

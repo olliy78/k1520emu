@@ -1239,11 +1239,15 @@ braucht `--fs sios_ss40`.
 
 ### MicroDOS 1526 / 1715
 
-Profile `microdos800` (80 Zyl. DS, 104 Plätze), `microdos200` (K5600.20, 64 Plätze), `microdos1715` (PC 1715). Der SYL-Lader steht
+Profile `microdos800` (80 Zyl. DS, 104 Plätze), `microdos200` (K5600.10, 64 Plätze), `microdos1715` (PC 1715). `fsck` prüft zusätzlich, ob `MicroDOS.SYS` am Ort des Laders liegt (`cpm.system.ort`, `cpm.system.fehlt`). Der SYL-Lader steht
 in den ersten Verzeichnisplätzen, `MicroDOS.SYS` an festen Sektoren; `boot-get` liefert Lader + Systemdatei (16 640 B):
 
 ```
 k1520disktool boot-get MicroDOS1526s.hfe boot.bin
 k1520disktool create neu.hfe --fs microdos800 --boot boot.bin   # oder data/bootsektoren/boot_microdos_1526.bin
+# Hinterlegte Abbilder -- das System ist fest auf Tastatur und Laufwerke generiert (alle bootend geprueft):
+#   boot_microdos_1526.bin / _k7636.bin            800K, Tastatur K7637 bzw. K7636, 4 x K5601
+#   boot_microdos_1526_200k.bin / _200k_k7636.bin  200K, K7637 bzw. K7636, 2 x K5600.10 (NICHT K5600.20)
+#   boot_microdos_1715.bin                         PC 1715
 k1520disktool put neu.hfe PIP.COM ; k1520disktool attr neu.hfe PIP.COM --arc
 ```

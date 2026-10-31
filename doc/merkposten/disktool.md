@@ -1316,5 +1316,12 @@ Festlegungen:
    Ausnahme nur für diesen Namen (`microDosSysName`). Bootabbild = Lader 256 B + Systemdatei; `writeSystemDatei` verweigert, wenn
    die Blöcke belegt sind. Beim 1715 ist `MICRODOS.SYS` eine gewöhnliche Datei in den ERSTEN Datenblöcken (`writeSystemDatei1715`), Bootabbild = 128 B Kopf + `MICRODOS.SYS` (14 464 B; Kopf allein geht weiter, `put` danach nur als erste Datei — `doc/merkposten/microdos1715.md`).
 4. Fremdes Bootabbild (ohne „SYL"+„MicroDOS" bzw. ohne `03/02 F0`) wird VOR dem Anlegen abgewiesen.
-5. Bootabbilder `data/bootsektoren/boot_microdos_{1526,1526_200k,1715}.bin` (Belege aus den Sammlungsabzügen, in `data/bootsektor.yaml`).
+5. Bootabbilder `data/bootsektoren/boot_microdos_{1526,1526_k7636,1526_200k,1526_200k_k7636,1715}.bin` (Belege aus den Sammlungsabzügen, in `data/bootsektor.yaml`).
+   Das System ist fest auf Tastatur und Laufwerke generiert (K7637/K7636; 800K = 4 × K5601, **200K = 2 × K5600.10**, nicht K5600.20) — `py_microdos_bootabbilder`
+   bootet jedes im Emulator bis `A>`; Tabelle in `doc/merkposten/microdos.md`.
    Originalabzüge prüft `DisktoolMicrodos.OriginalabzuegeDerSammlung` nur mit `K1520_MICRODOS_DIR`.
+6. **`cpm.system.ort` / `cpm.system.fehlt`** (Warnung, keine Reparatur): `MicroDOS.SYS` nicht am Ort des Laders bzw. beim 1526 mit Lader ganz fehlend
+   (`CpmFileSystem::systemDateiBloecke`; Wächter `DisktoolMicrodos.PruefungMeldetSystemdateiAmFalschenOrt`). `cpm.dir.geloescht` zählt nur Reste mit
+   brauchbarem Blockzeiger (ein geloeschter LEERER Eintrag wie `WSNEW.COM` auf MicroDOS1526s ist kein Fund für `recover`).
+7. Rettung und Archiv (ZIP + `cpm-dateiangaben.txt`, Rückweg per `insert_all`) sind für alle drei Profile abgesichert (`DisktoolMicrodos.Rettung*`,
+   `py_disktool_microdos`). Das Beiblatt führt nur Dateien mit Angaben.

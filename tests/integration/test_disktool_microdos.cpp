@@ -199,7 +199,7 @@ TEST(DisktoolMicrodos, BootabbildRundlaufUndSchreibenLaesstLaderUnangetastet) {
     EXPECT_EQ(0, dv->check(FsCheckLevel::Voll, true).zaehlerAb(FsSeverity::Warnung));
 }
 
-/// @test 200K (K5600.20, 1-KB-Bloecke, 64 Plaetze) und 1715 (Bootkopf, MICRODOS.SYS als Datei).
+/// @test 200K (K5600.10, 1-KB-Bloecke, 64 Plaetze) und 1715 (Bootkopf, MICRODOS.SYS als Datei).
 TEST(DisktoolMicrodos, Profil200KUnd1715) {
     {
         TempPfad pfad("k1520_microdos_200k.hfe");
@@ -302,4 +302,195 @@ TEST(DisktoolMicrodos, OriginalabzuegeDerSammlung) {
         EXPECT_EQ(dv->list().size(), z.dateien) << z.datei;
         EXPECT_EQ(0, dv->check(FsCheckLevel::Voll, true).zaehlerAb(FsSeverity::Warnung)) << z.datei;
     }
+}
+
+// ─── Rettung (recover) und Pruefung des Systemortes ─────────────────────────────────────────────
+
+namespace {
+
+std::vector<uint8_t> muster(size_t n, uint8_t salz) {
+    std::vector<uint8_t> d(n);
+    for (size_t i = 0; i < n; ++i) d[i] = static_cast<uint8_t>((i * 7 + salz) & 0xFF);
+    return d;
+}
+
+/// Bootabbild + Dateisystem je Profil; die Rettungsprobe laeuft fuer alle drei.
+struct Profil { const char* fs; const char* bin; };
+const Profil kProfile[] = {{"microdos800", "boot_microdos_1526.bin"},
+                           {"microdos200", "boot_microdos_1526_200k.bin"},
+                           {"microdos1715", "boot_microdos_1715.bin"}};
+
+}  // namespace
+
+/// @test Datei loeschen -> recover findet sie unter ihrem Namen, Inhalt bitgleich -> --restore traegt sie
+///       wieder ein; Lader und MicroDOS.SYS bleiben dabei byteweise unberuehrt, fsck bleibt sauber.
+///       (Suchtiefe Verzeichnis UND Oberflaeche: letztere darf Lader/System nie als Fund anbieten.)
+TEST(DisktoolMicrodos, RettungFindetGeloeschteDateienUndLaesstSystemUnberuehrt) {
+    for (const Profil& p : kProfile) {
+        SCOPED_TRACE(p.fs);
+        TempPfad pfad("k1520_microdos_rettung.hfe");
+        std::vector<uint8_t> boot_vorher;
+        const std::vector<uint8_t> inhalt_a = muster(3000, 1), inhalt_b = muster(1500, 2);
+        {
+            auto dv = neu(pfad, p.fs, p.bin);
+            ASSERT_NE(dv, nullptr);
+            dv->setBackup(false);
+            ASSERT_TRUE(lege(*dv, "A.TXT", inhalt_a)) << dv->lastError();
+            ASSERT_TRUE(lege(*dv, "B.TXT", inhalt_b)) << dv->lastError();
+            ASSERT_TRUE(dv->readBootImage(boot_vorher));
+            FileRef a;
+            a.name = "A.TXT";
+            ASSERT_TRUE(dv->erase(a)) << dv->lastError();
+            ASSERT_TRUE(dv->flush()) << dv->lastError();
+        }
+        auto dv = oeffne(pfad.get(), true);
+        ASSERT_NE(dv, nullptr);
+        dv->setBackup(false);
+        for (FsRecoverLevel stufe : {FsRecoverLevel::Verzeichnis, FsRecoverLevel::Oberflaeche}) {
+            const FsRecoverReport& r = dv->recoverScan(stufe, true);
+            int treffer = 0;
+            for (const FsRecoverFind& f : r.funde) {
+                // Lader/MicroDOS.SYS sind belegt -- sie duerfen in keinem Fund auftauchen
+                EXPECT_NE(f.name, "MicroDOS.SYS");
+                EXPECT_NE(f.name, "MICRODOS.SYS");
+                if (f.name == "A.TXT") ++treffer;
+            }
+            EXPECT_EQ(treffer, 1);
+        }
+        const FsRecoverReport& r = dv->recoverScan(FsRecoverLevel::Verzeichnis, true);
+        int fund = -1;
+        for (size_t i = 0; i < r.funde.size(); ++i)
+            if (r.funde[i].name == "A.TXT") fund = static_cast<int>(i);
+        ASSERT_GE(fund, 0);
+        EXPECT_EQ(r.funde[fund].quality, FsRecoverQuality::Sicher);
+        EXPECT_TRUE(r.funde[fund].wiederherstellbar) << r.funde[fund].warum_nicht;
+        std::vector<uint8_t> gelesen;
+        ASSERT_TRUE(dv->recoverRead(fund, gelesen));
+        gelesen.resize(std::min<size_t>(gelesen.size(), inhalt_a.size()));
+        EXPECT_EQ(gelesen, inhalt_a);
+
+        ASSERT_TRUE(dv->recoverRestore(fund, "")) << dv->lastError();
+        ASSERT_TRUE(dv->flush()) << dv->lastError();
+        auto n = oeffne(pfad.get());
+        ASSERT_NE(n, nullptr);
+        EXPECT_EQ(n->detection().filesystem, p.fs);
+        std::vector<uint8_t> a_neu = hole(*n, "A.TXT");
+        a_neu.resize(std::min<size_t>(a_neu.size(), inhalt_a.size()));
+        EXPECT_EQ(a_neu, inhalt_a);
+        EXPECT_GE(hole(*n, "B.TXT").size(), inhalt_b.size());
+        std::vector<uint8_t> boot_nachher;
+        ASSERT_TRUE(n->readBootImage(boot_nachher));
+        EXPECT_EQ(boot_vorher, boot_nachher);
+        const FsCheckReport& c = n->check(FsCheckLevel::Voll, true);
+        EXPECT_EQ(0, c.zaehlerAb(FsSeverity::Warnung)) << kennungen(c);
+    }
+}
+
+/// @test `cpm.dir.geloescht` meldet nur Reste, aus denen `recover` etwas holen kann: ein geloeschter
+///       LEERER Eintrag (0 Saetze, Zeiger 0 -- so auf MicroDOS1526s) ist keine Wiederherstellung wert.
+TEST(DisktoolMicrodos, GeloeschtHinweisNurBeiWiederherstellbaremRest) {
+    TempPfad pfad("k1520_microdos_leerrest.hfe");
+    {
+        auto dv = neu(pfad, "microdos800", "boot_microdos_1526.bin");
+        ASSERT_NE(dv, nullptr);
+        dv->setBackup(false);
+        // CP/M legt keine leere Datei an; der Rest entsteht also von Hand wie auf MicroDOS1526s
+        // ('WSNEW.COM', geloescht, Nutzerbyte E5, 0 Saetze, alle Zeiger 0) in Platz 9.
+        std::vector<uint8_t> sek;
+        uint16_t crc = 0;
+        ASSERT_TRUE(dv->readSectorAt(0, 0, 0, sek, crc));
+        const size_t o = 9 * 32;
+        ASSERT_EQ(sek[o], 0xE5);
+        const char name[] = "WSNEW   COM";
+        sek[o] = 0xE5;
+        for (int i = 0; i < 11; ++i) sek[o + 1 + i] = static_cast<uint8_t>(name[i]);
+        for (int i = 12; i < 32; ++i) sek[o + i] = 0;
+        ASSERT_TRUE(dv->writeSectorAt(0, 0, 0, sek, nullptr));
+        ASSERT_TRUE(dv->flush());
+    }
+    {
+        auto dv = oeffne(pfad.get());
+        ASSERT_NE(dv, nullptr);
+        EXPECT_EQ(kennungen(dv->check(FsCheckLevel::Voll, true)).find("cpm.dir.geloescht"), std::string::npos);
+        EXPECT_TRUE(dv->recoverScan(FsRecoverLevel::Verzeichnis, true).funde.empty());
+    }
+    {
+        auto dv = oeffne(pfad.get(), true);
+        dv->setBackup(false);
+        ASSERT_TRUE(lege(*dv, "X.TXT", muster(2500, 3)));
+        FileRef f;
+        f.name = "X.TXT";
+        ASSERT_TRUE(dv->erase(f));
+        ASSERT_TRUE(dv->flush());
+    }
+    auto dv = oeffne(pfad.get());
+    EXPECT_NE(kennungen(dv->check(FsCheckLevel::Voll, true)).find("cpm.dir.geloescht"), std::string::npos);
+    EXPECT_FALSE(dv->recoverScan(FsRecoverLevel::Verzeichnis, true).funde.empty());
+}
+
+/// @test `cpm.system.ort`: MicroDOS.SYS (1526) bzw. MICRODOS.SYS (1715) nicht am Ort des Urladers ->
+///       Warnung; auf gesunden Systemdisketten, Datendisketten und nach put/rm anderer Dateien nie.
+TEST(DisktoolMicrodos, PruefungMeldetSystemdateiAmFalschenOrt) {
+    // 1715: nach einer anderen Datei eingefuegt liegt MICRODOS.SYS nicht vorne
+    {
+        TempPfad pfad("k1520_microdos_ort1715.hfe"), kopf("k1520_microdos_ort1715.bin");
+        std::vector<uint8_t> k = datei(bootBin("boot_microdos_1715.bin"));
+        k.resize(128);
+        schreibe(kopf.get(), k);
+        {
+            std::string err;
+            auto dv = DiskVolume::create(pfad.get(), "microdos1715", "", formate(), dateisysteme(), err, kopf.get());
+            ASSERT_NE(dv, nullptr) << err;
+            dv->setBackup(false);
+            ASSERT_TRUE(lege(*dv, "X.COM", muster(3000, 4))) << dv->lastError();
+            ASSERT_TRUE(lege(*dv, "MICRODOS.SYS", muster(14336, 5))) << dv->lastError();
+            ASSERT_TRUE(dv->flush());
+        }
+        auto dv = oeffne(pfad.get());
+        ASSERT_EQ(dv->detection().filesystem, "microdos1715");
+        const std::string k1 = kennungen(dv->check(FsCheckLevel::Voll, true));
+        EXPECT_NE(k1.find("cpm.system.ort"), std::string::npos) << k1;
+    }
+    // 1526: Zeiger der Systemdatei verbogen / Eintrag geloescht (Lader bleibt)
+    for (int fall = 0; fall < 2; ++fall) {
+        TempPfad pfad("k1520_microdos_ort1526.hfe");
+        {
+            auto dv = neu(pfad, "microdos800", "boot_microdos_1526.bin");
+            ASSERT_NE(dv, nullptr);
+            dv->setBackup(false);
+            std::vector<uint8_t> sek;
+            uint16_t crc = 0;
+            ASSERT_TRUE(dv->readSectorAt(0, 0, 0, sek, crc));
+            const size_t o = 8 * 32;                    // Platz 8 = MicroDOS.SYS (0-7 gehoeren dem Lader)
+            ASSERT_EQ(sek[o + 1], 'M');
+            if (fall == 0) sek[o + 16] = static_cast<uint8_t>(sek[o + 16] + 2);   // erster Zeiger 5 -> 7
+            else           sek[o] = 0xE5;
+            ASSERT_TRUE(dv->writeSectorAt(0, 0, 0, sek, nullptr));
+            ASSERT_TRUE(dv->flush());
+        }
+        auto dv = oeffne(pfad.get());
+        const std::string k1 = kennungen(dv->check(FsCheckLevel::Voll, true));
+        EXPECT_NE(k1.find(fall == 0 ? "cpm.system.ort" : "cpm.system.fehlt"), std::string::npos) << k1;
+    }
+    // gesunde Systemdisketten und eine Datendiskette: nie
+    for (const Profil& p : kProfile) {
+        TempPfad pfad("k1520_microdos_ortok.hfe");
+        auto dv = neu(pfad, p.fs, p.bin);
+        ASSERT_NE(dv, nullptr);
+        dv->setBackup(false);
+        ASSERT_TRUE(lege(*dv, "A.TXT", muster(4000, 6)));
+        ASSERT_TRUE(lege(*dv, "B.TXT", muster(900, 7)));
+        FileRef f;
+        f.name = "A.TXT";
+        ASSERT_TRUE(dv->erase(f));
+        ASSERT_TRUE(dv->flush());
+        const std::string k1 = kennungen(dv->check(FsCheckLevel::Voll, true));
+        EXPECT_EQ(k1.find("cpm.system"), std::string::npos) << p.fs << ": " << k1;
+    }
+    TempPfad daten("k1520_microdos_ortdaten.hfe");
+    std::string err;
+    auto dd = DiskVolume::create(daten.get(), "microdos800_daten", "", formate(), dateisysteme(), err);
+    ASSERT_NE(dd, nullptr) << err;
+    ASSERT_TRUE(lege(*dd, "T.TXT", muster(300, 8)));
+    EXPECT_EQ(kennungen(dd->check(FsCheckLevel::Voll, true)).find("cpm.system"), std::string::npos);
 }

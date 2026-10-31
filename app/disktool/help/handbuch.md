@@ -694,7 +694,10 @@ Besonderheiten: Das Verzeichnis beginnt gleich auf der ersten Spur, **den Lader 
 Datei und wird nie überschrieben), und die Systemdatei **`MicroDOS.SYS`** liegt an festen Sektoren (Spuren 1–4) — sie ist deshalb Teil des
 *Bootabbilds* (Lader + System, 16 KB), nicht eine Datei zum Einfügen. Erkannt wird eine Diskette nur mit Lader (`microdos800`, `microdos200`,
 `microdos1715`); eine Datendiskette gleicher Geometrie heißt `cpa800`. Eine neue Systemdiskette entsteht über *Neue Diskette ▸ Bootdiskette*
-mit dem mitgelieferten Abbild „MicroDOS 1526".
+mit einem der mitgelieferten Abbilder. **Das System ist fest auf Tastatur und Laufwerke eingestellt** (Generierung MSYSG): die Auswahl nennt sie —
+800K: Tastatur K7637 (seriell) oder K7636 (parallel), vier Laufwerke K5601; 200K: dieselben Tastaturen, zwei Laufwerke **K5600.10** (nicht K5600.20).
+Im Emulator muss die Bestückung dazu passen, sonst bleibt das Laden bei den Punkten stehen. Die Prüfung meldet, wenn
+`MicroDOS.SYS` nicht dort liegt, wo der Lader sie holt (die Diskette würde nicht starten).
 
 ## Neue Disketten und Bootdisketten
 

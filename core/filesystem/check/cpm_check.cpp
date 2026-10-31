@@ -293,7 +293,18 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
         if (d.free()) {
             bool alles_e5 = true;
             for (int k = 1; k < 32; ++k) if (p[k] != 0xE5) { alles_e5 = false; break; }
-            if (!alles_e5) ++geloescht;
+            // Nur ein Rest mit mindestens einem brauchbaren Blockzeiger ist wiederherstellbar (dieselbe
+            // Regel wie `recover`); ein geloeschter LEERER Eintrag (0 Saetze, Zeiger 0 - z. B.
+            // 'WSNEW.COM' auf MicroDOS1526s) wuerde sonst "wiederherstellbar" melden und dort nichts finden.
+            if (!alles_e5) {
+                bool brauchbar = false;
+                for (uint32_t k = 0; k < ptrs_per_entry_; ++k) {
+                    const uint32_t blk = wide_ptr_ ? static_cast<uint32_t>(p[16 + 2 * k] | (p[17 + 2 * k] << 8))
+                                                    : p[16 + k];
+                    if (blk != 0 && blk >= dir_blocks_ && blk < total_blocks_) brauchbar = true;
+                }
+                if (brauchbar) ++geloescht;
+            }
             continue;
         }
 
@@ -477,6 +488,42 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
             rep.a = wer[k].second;
             rep.b = blk;
             f.repairs.push_back(rep);
+        }
+    }
+
+    // ── MicroDOS: liegt die Systemdatei dort, wo der Urlader sie holt? ──────
+    //
+    // Der SYL-Lader (1526) liest Zylinder 1-4 Kopf 0 Sektor 1-4 fest, der Urlader des 1715 die
+    // ersten Datenbloecke hinter dem Verzeichnis.  Steht MicroDOS.SYS woanders (z. B. per `put`
+    // NACH anderen Dateien eingefuegt), sieht die Diskette heil aus und bootet nicht.  Geprueft wird
+    // nur, wo der Name die Systemdatei eindeutig macht; Datendisketten (ohne Lader) und Disketten ohne
+    // diese Datei bleiben stumm - ausser einer 1526-Diskette MIT Lader, der die Datei fehlt.
+    if (prof_.boot_header == "microdos" || prof_.boot_header == "microdos1715") {
+        bericht.schritt("cpm.schritt.systemort",
+                        "MicroDOS: liegt die Systemdatei am Ort, den der Urlader liest?");
+        std::vector<const CpmDirEntry*> teile;
+        for (const CpmDirEntry& d : verz) {
+            if (d.free() || d.boot || d.user != 0) continue;
+            if (istSystemDateiName(roh.data() + static_cast<size_t>(d.index) * 32)) teile.push_back(&d);
+        }
+        std::sort(teile.begin(), teile.end(),
+                  [](const CpmDirEntry* x, const CpmDirEntry* y) { return x->extent < y->extent; });
+        std::vector<uint16_t> ist;
+        for (const CpmDirEntry* d : teile)
+            for (uint16_t blk : d->blocks) if (blk != 0) ist.push_back(blk);
+        if (!ist.empty()) {
+            const std::vector<uint16_t> soll = systemDateiBloecke(static_cast<uint32_t>(ist.size()));
+            if (soll != ist)
+                b.add("cpm.system.ort", FsSeverity::Warnung, FsLayer::Verwaltung, "Systemdatei",
+                      std::string(prof_.boot_header == "microdos" ? "MicroDOS.SYS" : "MICRODOS.SYS")
+                      + " liegt nicht an den Bloecken, die der Urlader liest ("
+                      + (prof_.boot_header == "microdos" ? "Zylinder 1-4 Kopf 0, Sektor 1-4"
+                                                         : "die ersten Datenbloecke hinter dem Verzeichnis")
+                      + ") - die Diskette bootet so nicht; mit boot-put neu schreiben");
+        } else if (teile.empty() && prof_.boot_header == "microdos" && roh.size() >= 0x100
+                   && sylKopf(roh.data(), roh.size())) {
+            b.add("cpm.system.fehlt", FsSeverity::Warnung, FsLayer::Verwaltung, "Systemdatei",
+                  "Die Diskette traegt den SYL-Lader, aber keine MicroDOS.SYS - der Lader findet kein System");
         }
     }
 

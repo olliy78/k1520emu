@@ -144,13 +144,23 @@ bootsektoren:
     file:        bootsektoren/boot_microdos_1715.bin
 
   # ── MicroDOS 1526 (Rostock) — Lader im Verzeichnis + MicroDOS.SYS an festem Ort ─────────
-  - description: "MicroDOS 1526 — A5120/A5130, 800K (SYL-Lader + MicroDOS.SYS)"
+  # Das System ist FEST auf Tastatur und Laufwerke generiert (MSYSG20, Tabellen in MicroDOS.SYS):
+  # bootet nur mit der genannten Bestueckung (doc/merkposten/microdos.md).
+  - description: "MicroDOS 1526 — A5120/A5130, 800K, Tastatur K7637 seriell, 4 x K5601 (SYL-Lader + MicroDOS.SYS)"
     filesystem:  microdos800
     file:        bootsektoren/boot_microdos_1526.bin
 
-  - description: "MicroDOS 1526 — A5120/A5130, 200K (K5600.20, SYL-Lader + MicroDOS.SYS)"
+  - description: "MicroDOS 1526 — A5120/A5130, 800K, Tastatur K7636 parallel, 4 x K5601 (SYL-Lader + MicroDOS.SYS)"
+    filesystem:  microdos800
+    file:        bootsektoren/boot_microdos_1526_k7636.bin
+
+  - description: "MicroDOS 1526 — A5120/A5130, 200K, Tastatur K7637 seriell, 2 x K5600.10 (SYL-Lader + MicroDOS.SYS)"
     filesystem:  microdos200
     file:        bootsektoren/boot_microdos_1526_200k.bin
+
+  - description: "MicroDOS 1526 — A5120/A5130, 200K, Tastatur K7636 parallel, 2 x K5600.10 (SYL-Lader + MicroDOS.SYS)"
+    filesystem:  microdos200
+    file:        bootsektoren/boot_microdos_1526_200k_k7636.bin
 
   # ── P8000 ──────────────────────────────────────────────────────────────────
   - description: "OS/M 3.0 — P8000 (8-Bit-Teil), Format 5"

@@ -2576,7 +2576,7 @@ Bytezahl im Archiv.  Der Kopf der Datei erklärt jeden Schlüssel im Klartext
 
 **Befund** an `MicroDOS1526{s,p}[_5600].hfe`, `MicroDOS1715[_LW_C].hfe` (Sammlung D. L., Doku `Doc/MicroDOS/*.txt`):
 
-| | 1526 DS 80 Zyl. (5×1024) | 1526 SS 40 Zyl. (K5600.20, 5×1024) | 1715 DS (5×1024) |
+| | 1526 DS 80 Zyl. (5×1024) | 1526 SS 40 Zyl. (K5600.10, 5×1024) | 1715 DS (5×1024) |
 |---|---|---|---|
 | Verzeichnis ab | c0h0 Sektor 1 (Offset 0, **keine Systemspuren**) | dto. | dto. |
 | Blockgröße | 2048 | 1024 | 2048 |
@@ -2599,5 +2599,16 @@ Bytezahl im Archiv.  Der Kopf der Datei erklärt jeden Schlüssel im Klartext
 * **Erkennung** nur mit positivem Nachweis (SYL-Lader bzw. Bootkopf + Datei `MICRODOS.SYS` bei 1715), sonst bleibt die
   Geometrie `cpa800`; `microdos800_daten`/`microdos200_daten` (`detect: false`) für Disketten ohne Lader. Profile in
   `data/formats.yaml`: `microdos800`, `microdos200`, `microdos1715`; `boot_header: microdos|microdos1715` + `dir_boot`.
-* Offen: der Selbstlauf im Emulator (Boot der gebauten Diskette) liegt beim Parallelagenten; die Parameterbytes im SYL-Sektor
-  werden unverändert aus einer Originaldiskette übernommen (Deutung oben, nicht verifiziert für andere Laufwerksfolgen).
+* **Parameterbytes im SYL-Sektor — am Ladercode belegt** (2026-10-31; Disassembly der 256 B, `tools/z80_disasm2.py --org 0x400`; der Sektor wird
+  nach 0400H geladen, Einsprung 0437H, Prüfsummenroutine 0410H, die Prüfung selbst steht als `NOP`×3 — Rostocker Eingriff). Bytes `+06…+0E`:
+  `00 BC | FE | 01 | 00 | 01 | 03 | 04 | 05`. `+06/+07` (Ladeadresse BC00H) und `+08…+0C` werden nach `[03F0H…03F6H]` kopiert — das ist der
+  Parameterblock der Boot-ROM-Leseroutine (`doc/analyse_zre_rom_boot.md`): `[03F2]`=FEH (Adressmarke), `[03F3]`=Zylinder 1, `[03F4]`=Kopf 0,
+  `[03F5]`=erste Sektor-ID 1, `[03F6]`=Size-Code 3 (1024 B). `+0D`=04 → `[07F2]` = Sektorzahl je Spur (Sektor 1…4, aufsteigend; die ROM-Routine zählt die
+  ID hoch bis `[07F2]`), `+0E`=05 = Endzylinder (exklusiv). Nach jeder Spur: Ladeadresse += Sektorzahl × (Sektorlänge/256) — der Code rotiert die Sektorzahl
+  `(+0C)+7`-mal (A=04 → 10H, also +1000H) — und der Zylinder wird erhöht (`+09`). Ergebnis: **Zylinder 1…4, Kopf 0, Sektor 1…4, je 1024 B →
+  BC00H…FBFFH**, dann `JP BD00H` (INIT). Die frühere Deutung „Sektorfolge 1,3,4,5" war falsch (`+0B…+0E` sind Sektor-ID 1, Size-Code 3, Sektorzahl 4,
+  Endzylinder 5). Fehlerweg: bis zu 7 Wiederholungen (`[07F6]`), dann Meldung „MicroDOS Loader No read" und Halt. **Die 200K-Variante trägt
+  dieselben Bytes** (die 256-B-Lader aller vier 1526-Abbilder sind bytegleich): ihre Systemdatei liegt ebenfalls auf c1…c4 h0 Sektor 1…4, nur mit
+  1-KB-Blöcken (16 statt 8 Zeiger). Die Unterschiede der Abbilder liegen ausschließlich in `MicroDOS.SYS` (Tastatur-/Laufwerkstabellen, 40…139 Byte).
+* Der Selbstlauf im Emulator ist belegt: jedes der fünf Bootabbilder bootet bis `A>` (`py_microdos_bootabbilder`); Bestückung je Abbild in
+  `doc/merkposten/microdos.md`. Die Prüfung meldet `cpm.system.ort`/`cpm.system.fehlt`, wenn die Systemdatei nicht am Ort des Laders liegt.
