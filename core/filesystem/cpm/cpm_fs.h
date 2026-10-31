@@ -159,6 +159,8 @@ public:
      * Bloecke muessen frei sein (oder der alten `MicroDOS.SYS` gehoeren).
      */
     bool writeSystemDatei(const std::vector<uint8_t>& data);
+    /// @brief Ist @p p die Systemdatei dieses Profils (1526: `MicroDOS.SYS` gemischt, 1715: `MICRODOS.SYS`, Grossschrift)?
+    bool istSystemDateiName(const uint8_t* p) const;
     /// @brief Inhalt von `MicroDOS.SYS` (auf Satzgrenze, wie eingetragen); false, wenn die Datei fehlt.
     bool readSystemDatei(std::vector<uint8_t>& out) const;
     /// @}
@@ -259,6 +261,7 @@ private:
 
     SectorSpace& space_;
     FsProfile    prof_;
+    bool writeSystemDatei1715(const std::vector<uint8_t>& data);   ///< MicroDOS 1715: erste Datenbloecke
     bool         syl_aktiv_ = false;   ///< MicroDOS 1526: steht der SYL-Lader in den Plaetzen 0…7?
 
     uint64_t data_start_   = 0;    ///< Byte-Offset des Datenbereichs im Sektorraum

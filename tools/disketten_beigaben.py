@@ -131,6 +131,7 @@ ORDNER = {
     'a5120_udos50_k5601_system.hfe': 'a5120_udos50',
     'k8915_scpx8915_v24_system.hfe': 'k8915_scpx8915',
     'pc1715_cpa1715_system.hfe': 'pc1715_cpa1715',
+    'pc1715_microdos_k5601_system.hfe': 'pc1715_microdos',
     'pc1715_cpz22_system.hfe': 'pc1715_cpz22',
     'pc1715_scp1715_v0006_system.hfe': 'pc1715_scp1715_v0006',
     'pc1715_scp1715_v0007_system.hfe': 'pc1715_scp1715_v0007',

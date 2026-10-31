@@ -139,7 +139,7 @@ bootsektoren:
     filesystem:  scp1715
     file:        bootsektoren/boot_pc1715w_scp30.bin
 
-  - description: "MicroDOS 1715 — PC 1715 (Bootkopf im Verzeichnis; MICRODOS.SYS als erste Datei einfügen)"
+  - description: "MicroDOS 1715 — PC 1715 (Bootkopf im Verzeichnis + MICRODOS.SYS als erste Datei)"
     filesystem:  microdos1715
     file:        bootsektoren/boot_microdos_1715.bin
 

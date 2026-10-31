@@ -294,6 +294,16 @@ bool CpmFileSystem::microDosSysName(const uint8_t* p) {
     return true;
 }
 
+bool CpmFileSystem::istSystemDateiName(const uint8_t* p) const {
+    if (prof_.boot_header != "microdos1715") return microDosSysName(p);
+    // MicroDOS 1715: gewoehnlicher Name in Grossschrift, die Endung traegt das SYS-Bit (Bit 7 von Byte 10).
+    static const char kName[11] = {'M', 'I', 'C', 'R', 'O', 'D', 'O', 'S', 'S', 'Y', 'S'};
+    if (p[0] != 0) return false;
+    for (int i = 0; i < 11; ++i)
+        if ((p[1 + i] & 0x7F) != static_cast<uint8_t>(kName[i])) return false;
+    return true;
+}
+
 size_t CpmFileSystem::bootBytes() const {
     return prof_.boot_header == "microdos" ? 256 : 128;
 }
@@ -804,7 +814,7 @@ bool CpmFileSystem::readSystemDatei(std::vector<uint8_t>& out) const {
     if (!readDirectory(roh)) return false;
     for (int i = 0; i < prof_.dir_entries; ++i) {
         const uint8_t* p = roh.data() + static_cast<size_t>(i) * 32;
-        if (bootPlatz(i, p) || !microDosSysName(p) || (p[12] & 0x1F) != 0 || p[14] != 0) continue;
+        if (bootPlatz(i, p) || !istSystemDateiName(p) || (p[12] & 0x1F) != 0 || p[14] != 0) continue;
         const size_t bytes = static_cast<size_t>(p[15]) * kRecordBytes;
         for (uint32_t k = 0; k < ptrs_per_entry_ && out.size() < bytes; ++k) {
             const uint16_t b = wide_ptr_ ? static_cast<uint16_t>(p[16 + 2 * k] | (p[17 + 2 * k] << 8))
@@ -818,6 +828,7 @@ bool CpmFileSystem::readSystemDatei(std::vector<uint8_t>& out) const {
 }
 
 bool CpmFileSystem::writeSystemDatei(const std::vector<uint8_t>& data) {
+    if (prof_.boot_header == "microdos1715") return writeSystemDatei1715(data);
     if (prof_.boot_header != "microdos")
         return fail("Das Profil '" + prof_.name + "' hat keine MicroDOS-Systemdatei");
     if (data.empty() || data.size() > kMicroDosSysMax)
@@ -883,6 +894,63 @@ bool CpmFileSystem::writeSystemDatei(const std::vector<uint8_t>& data) {
     uint8_t e[32] = {};
     static const char kName[11] = {'M', 'i', 'c', 'r', 'o', 'D', 'O', 'S', 'S', 'Y', 'S'};
     for (int i = 0; i < 11; ++i) e[1 + i] = static_cast<uint8_t>(kName[i]);
+    e[15] = static_cast<uint8_t>(inhalt.size() / kRecordBytes);
+    for (size_t k = 0; k < bloecke.size(); ++k) {
+        if (wide_ptr_) { e[16 + 2 * k] = bloecke[k] & 0xFF; e[17 + 2 * k] = bloecke[k] >> 8; }
+        else e[16 + k] = static_cast<uint8_t>(bloecke[k]);
+    }
+    return writeDirEntry(slot, e);
+}
+
+bool CpmFileSystem::writeSystemDatei1715(const std::vector<uint8_t>& data) {
+    if (data.empty() || data.size() > kMicroDosSysMax)
+        return fail("MICRODOS.SYS muss 1…" + std::to_string(kMicroDosSysMax) + " Byte gross sein");
+    // Der Urlader liest MICRODOS.SYS von den ERSTEN Datenbloecken (gleich hinter dem Verzeichnis); die
+    // Datei ist sonst eine gewoehnliche Datei (Nutzer 0, SYS-Bit an der Endung).  Gemessen an der
+    // Originaldiskette und an einer von MSYSG15A erzeugten: Bloecke dir_blocks_ ... aufsteigend.
+    const uint32_t noetig = static_cast<uint32_t>((data.size() + prof_.block_size - 1) / prof_.block_size);
+    if (noetig > ptrs_per_entry_) return fail("MICRODOS.SYS passt nicht in einen Verzeichnisplatz");
+
+    std::vector<uint8_t> roh;
+    if (!readDirectory(roh)) return false;
+    for (int i = 0; i < prof_.dir_entries; ++i) {
+        uint8_t* p = roh.data() + static_cast<size_t>(i) * 32;
+        if (!bootPlatz(i, p) && istSystemDateiName(p)) {
+            p[0] = 0xE5;
+            if (!writeDirEntry(i, p)) return false;
+        }
+    }
+    const std::vector<bool> karte = allocationMap();
+    std::vector<uint16_t> bloecke;
+    for (uint32_t k = 0; k < noetig; ++k) {
+        const uint32_t b = dir_blocks_ + k;
+        if (b >= total_blocks_ || karte[b])
+            return fail("Block " + std::to_string(b) + " ist belegt - MICRODOS.SYS muss in die ersten Datenbloecke "
+                        "gleich hinter dem Verzeichnis (der Urlader liest sie dort); die Datei dort erst entfernen");
+        bloecke.push_back(static_cast<uint16_t>(b));
+    }
+    int slot = -1;
+    for (int i = 0; i < prof_.dir_entries && slot < 0; ++i)
+        if (roh[static_cast<size_t>(i) * 32] == 0xE5
+            && !bootPlatz(i, roh.data() + static_cast<size_t>(i) * 32)) slot = i;
+    if (slot < 0) return fail("Verzeichnis voll");
+
+    std::vector<uint8_t> inhalt = data;
+    if (inhalt.size() % kRecordBytes) inhalt.resize((inhalt.size() / kRecordBytes + 1) * kRecordBytes, 0);
+    for (size_t i = 0; i < bloecke.size(); ++i) {
+        std::vector<uint8_t> block(prof_.block_size, 0);
+        const size_t ab = i * prof_.block_size;
+        if (ab < inhalt.size())
+            std::copy(inhalt.begin() + static_cast<long>(ab),
+                      inhalt.begin() + static_cast<long>(std::min(inhalt.size(), ab + prof_.block_size)),
+                      block.begin());
+        if (!writeAt(static_cast<uint64_t>(bloecke[i]) * prof_.block_size, block.data(), block.size()))
+            return false;
+    }
+    uint8_t e[32] = {};
+    static const char kName[11] = {'M', 'I', 'C', 'R', 'O', 'D', 'O', 'S', 'S', 'Y', 'S'};
+    for (int i = 0; i < 11; ++i) e[1 + i] = static_cast<uint8_t>(kName[i]);
+    e[10] |= 0x80;                                  // SYS-Attribut (Bit 7 des zweiten Endungszeichens)
     e[15] = static_cast<uint8_t>(inhalt.size() / kRecordBytes);
     for (size_t k = 0; k < bloecke.size(); ++k) {
         if (wide_ptr_) { e[16 + 2 * k] = bloecke[k] & 0xFF; e[17 + 2 * k] = bloecke[k] >> 8; }

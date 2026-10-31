@@ -1314,7 +1314,7 @@ Festlegungen:
    Daten als Einträge (Befund `cpm.block.ausserhalb`), ein zu kleines versteckt Dateien.
 3. **`MicroDOS.SYS` liegt an festen Sektoren (c1–c4 h0, Sektor 1–4)** und heißt gemischt geschrieben: Prüfung/Rettung kennen die
    Ausnahme nur für diesen Namen (`microDosSysName`). Bootabbild = Lader 256 B + Systemdatei; `writeSystemDatei` verweigert, wenn
-   die Blöcke belegt sind. Beim 1715 ist `MICRODOS.SYS` eine gewöhnliche (erste) Datei, Bootabbild = 128 B Kopf.
+   die Blöcke belegt sind. Beim 1715 ist `MICRODOS.SYS` eine gewöhnliche Datei in den ERSTEN Datenblöcken (`writeSystemDatei1715`), Bootabbild = 128 B Kopf + `MICRODOS.SYS` (14 464 B; Kopf allein geht weiter, `put` danach nur als erste Datei — `doc/merkposten/microdos1715.md`).
 4. Fremdes Bootabbild (ohne „SYL"+„MicroDOS" bzw. ohne `03/02 F0`) wird VOR dem Anlegen abgewiesen.
 5. Bootabbilder `data/bootsektoren/boot_microdos_{1526,1526_200k,1715}.bin` (Belege aus den Sammlungsabzügen, in `data/bootsektor.yaml`).
    Originalabzüge prüft `DisktoolMicrodos.OriginalabzuegeDerSammlung` nur mit `K1520_MICRODOS_DIR`.

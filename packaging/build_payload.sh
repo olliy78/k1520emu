@@ -54,6 +54,7 @@ prg710-1_udos43_k5601_v43_189.hfe
 prg710_scpx15_system.hfe
 prg710-1_scpx17_system.hfe
 pc1715_cpa1715_system.hfe
+pc1715_microdos_k5601_system.hfe
 pc1715_scp1715_v0006_system.hfe
 pc1715_scp1715_v0007_system.hfe
 pc1715_cpz22_system.hfe
