@@ -139,6 +139,19 @@ bootsektoren:
     filesystem:  scp1715
     file:        bootsektoren/boot_pc1715w_scp30.bin
 
+  - description: "MicroDOS 1715 — PC 1715 (Bootkopf im Verzeichnis; MICRODOS.SYS als erste Datei einfügen)"
+    filesystem:  microdos1715
+    file:        bootsektoren/boot_microdos_1715.bin
+
+  # ── MicroDOS 1526 (Rostock) — Lader im Verzeichnis + MicroDOS.SYS an festem Ort ─────────
+  - description: "MicroDOS 1526 — A5120/A5130, 800K (SYL-Lader + MicroDOS.SYS)"
+    filesystem:  microdos800
+    file:        bootsektoren/boot_microdos_1526.bin
+
+  - description: "MicroDOS 1526 — A5120/A5130, 200K (K5600.20, SYL-Lader + MicroDOS.SYS)"
+    filesystem:  microdos200
+    file:        bootsektoren/boot_microdos_1526_200k.bin
+
   # ── P8000 ──────────────────────────────────────────────────────────────────
   - description: "OS/M 3.0 — P8000 (8-Bit-Teil), Format 5"
     filesystem:  osm640

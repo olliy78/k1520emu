@@ -119,6 +119,18 @@ std::unique_ptr<CpmFileSystem> CpmFileSystem::mount(SectorSpace& space,
     }
 
     fs->buildSkewTable();
+
+    // MicroDOS 1526: der SYL-Lader belegt die ersten acht Verzeichnisplaetze.  Ob er DA ist,
+    // entscheidet, ob sie Bootbereich oder (Datendiskette) gewoehnliche Plaetze sind.
+    if (prof.dir_boot && prof.boot_header == "microdos1715") {
+        // MicroDOS 1715: Platz 0 = Bootkopf, 1…3 = Parametersaetze mit Nutzerbyte 10H (nicht F0).
+        std::vector<uint8_t> kopf(32, 0);
+        fs->syl_aktiv_ = fs->readAt(0, kopf.data(), kopf.size()) && bootKopf(kopf.data(), kopf.size());
+    }
+    if (prof.dir_boot && prof.boot_header == "microdos") {
+        std::vector<uint8_t> kopf(fs->bootBytes(), 0);
+        fs->syl_aktiv_ = fs->readAt(0, kopf.data(), kopf.size()) && sylKopf(kopf.data(), kopf.size());
+    }
     return fs;
 }
 
@@ -268,19 +280,75 @@ uint16_t CpmFileSystem::osmTypenFuer(const SectorSpace& raum) {
     return 0;
 }
 
+bool CpmFileSystem::sylKopf(const uint8_t* p, size_t n) {
+    if (n < 0x100 || p[0] != 'S' || p[1] != 'Y' || p[2] != 'L') return false;
+    static const char kText[8] = {'M', 'i', 'c', 'r', 'o', 'D', 'O', 'S'};
+    return std::search(p, p + 0x100, kText, kText + 8) != p + 0x100;
+}
+
+bool CpmFileSystem::microDosSysName(const uint8_t* p) {
+    static const char kName[11] = {'M', 'i', 'c', 'r', 'o', 'D', 'O', 'S', 'S', 'Y', 'S'};
+    if (p[0] != 0) return false;
+    for (int i = 0; i < 11; ++i)
+        if ((p[1 + i] & 0x7F) != static_cast<uint8_t>(kName[i])) return false;
+    return true;
+}
+
+size_t CpmFileSystem::bootBytes() const {
+    return prof_.boot_header == "microdos" ? 256 : 128;
+}
+
+bool CpmFileSystem::bootKopfPasst(const uint8_t* p, size_t n) const {
+    return prof_.boot_header == "microdos" ? sylKopf(p, n) : bootKopf(p, n);
+}
+
 bool CpmFileSystem::bootPlatz(int index, const uint8_t* p) const {
     if (!prof_.dir_boot) return false;
+    if (prof_.boot_header == "microdos") return syl_aktiv_ && index >= 0 && index < 8;
+    if (prof_.boot_header == "microdos1715") return syl_aktiv_ && index >= 0 && index < 4;
     if (index == 0) return bootKopf(p, 32);
     return index >= 1 && index <= 3 && p[0] == 0xF0;
 }
 
 bool CpmFileSystem::readBootSlots(std::vector<uint8_t>& out) const {
-    out.assign(128, 0xE5);
+    out.assign(bootBytes(), 0xE5);
     return readAt(0, out.data(), out.size());
 }
 
 bool CpmFileSystem::writeBootSlots(const std::vector<uint8_t>& img) {
     if (!prof_.dir_boot) return fail("Das Profil '" + prof_.name + "' hat keinen Bootbereich im Verzeichnis");
+    if (prof_.boot_header == "microdos") {
+        // Plaetze 0…7 als Ganzes; jeder muss frei oder schon Lader sein.
+        if (img.size() < 256 || !sylKopf(img.data(), img.size()))
+            return fail("Das Bootabbild traegt keinen MicroDOS-SYL-Lader (\"SYL\" und der Text "
+                        "\"MicroDOS\" in den ersten 256 Byte)");
+        std::vector<uint8_t> alt;
+        if (!readBootSlots(alt)) return false;
+        for (int i = 0; i < 8; ++i) {
+            const uint8_t* a = alt.data() + static_cast<size_t>(i) * 32;
+            if (a[0] != 0xE5 && !bootPlatz(i, a))
+                return fail("Verzeichnisplatz " + std::to_string(i) + " traegt einen Dateieintrag - "
+                            "der Lader wuerde ihn ueberschreiben");
+        }
+        if (!writeAt(0, img.data(), 256)) return false;
+        syl_aktiv_ = true;
+        return true;
+    }
+    if (prof_.boot_header == "microdos1715") {
+        if (img.size() < 128 || !bootKopf(img.data(), img.size()))
+            return fail("Das Bootabbild traegt keinen PC-1715-Bootkopf (Wort F002H/F003H, Bytes 02|03 F0)");
+        std::vector<uint8_t> alt;
+        if (!readBootSlots(alt)) return false;
+        for (int i = 0; i < 4; ++i) {
+            const uint8_t* q = alt.data() + static_cast<size_t>(i) * 32;
+            if (q[0] != 0xE5 && !bootPlatz(i, q))
+                return fail("Verzeichnisplatz " + std::to_string(i) + " traegt einen Dateieintrag - "
+                            "der Bootbereich wuerde ihn ueberschreiben");
+        }
+        if (!writeAt(0, img.data(), 128)) return false;
+        syl_aktiv_ = true;
+        return true;
+    }
     if (img.size() < 128 || !bootKopf(img.data(), img.size()))
         return fail("Das Bootabbild traegt keinen PC-1715-Bootkopf (Wort F002H/F003H, Bytes 02|03 F0)");
 
@@ -662,7 +730,8 @@ bool CpmFileSystem::write(const std::string& name, const std::vector<uint8_t>& d
         std::vector<uint8_t> roh;
         if (!readDirectory(roh)) return false;
         for (int i = 0; i < prof_.dir_entries && slots.size() < plaetze_noetig; ++i)
-            if (roh[static_cast<size_t>(i) * 32] == 0xE5) slots.push_back(i);
+            if (roh[static_cast<size_t>(i) * 32] == 0xE5
+                && !bootPlatz(i, roh.data() + static_cast<size_t>(i) * 32)) slots.push_back(i);
     }
     if (slots.size() < plaetze_noetig)
         return fail("Verzeichnis voll: '" + ziel_name + "' braucht "
@@ -727,6 +796,99 @@ bool CpmFileSystem::write(const std::string& name, const std::vector<uint8_t>& d
         rest_saetze -= hier;
     }
     return true;
+}
+
+bool CpmFileSystem::readSystemDatei(std::vector<uint8_t>& out) const {
+    out.clear();
+    std::vector<uint8_t> roh;
+    if (!readDirectory(roh)) return false;
+    for (int i = 0; i < prof_.dir_entries; ++i) {
+        const uint8_t* p = roh.data() + static_cast<size_t>(i) * 32;
+        if (bootPlatz(i, p) || !microDosSysName(p) || (p[12] & 0x1F) != 0 || p[14] != 0) continue;
+        const size_t bytes = static_cast<size_t>(p[15]) * kRecordBytes;
+        for (uint32_t k = 0; k < ptrs_per_entry_ && out.size() < bytes; ++k) {
+            const uint16_t b = wide_ptr_ ? static_cast<uint16_t>(p[16 + 2 * k] | (p[17 + 2 * k] << 8))
+                                         : p[16 + k];
+            if (b == 0 || !readBlock(b, out)) return false;
+        }
+        out.resize(std::min(out.size(), bytes));
+        return true;
+    }
+    return false;
+}
+
+bool CpmFileSystem::writeSystemDatei(const std::vector<uint8_t>& data) {
+    if (prof_.boot_header != "microdos")
+        return fail("Das Profil '" + prof_.name + "' hat keine MicroDOS-Systemdatei");
+    if (data.empty() || data.size() > kMicroDosSysMax)
+        return fail("MicroDOS.SYS muss 1…" + std::to_string(kMicroDosSysMax) + " Byte gross sein");
+
+    // Die Sektoren 1…4 der Zylinder 1…4 (Kopf 0) als Bloecke: das ist, was SYL und INIT lesen.
+    const int start = space_.trackIndexOf(prof_.data_cyl, prof_.data_head);
+    if (start < 0) return fail("Datenbereich nicht auffindbar");
+    const uint64_t spur_bytes = static_cast<uint64_t>(secs_per_track_) * sector_size_;
+    const uint64_t je_spur    = 4ull * sector_size_;
+    std::vector<uint16_t> bloecke;
+    for (uint8_t c = 1; c <= 4 && bloecke.size() * prof_.block_size < data.size(); ++c) {
+        const int ti = space_.trackIndexOf(c, 0);
+        if (ti < start || secs_per_track_ < 4)
+            return fail("Zylinder " + std::to_string(c) + " Kopf 0 mit vier Sektoren fehlt - "
+                        "der SYL-Lader findet MicroDOS.SYS dort nicht");
+        const uint64_t ab = static_cast<uint64_t>(ti - start) * spur_bytes;
+        if (ab % prof_.block_size || je_spur % prof_.block_size)
+            return fail("Blockgroesse " + std::to_string(prof_.block_size)
+                        + " passt nicht auf die Systemspuren");
+        for (uint64_t b = ab / prof_.block_size; b < (ab + je_spur) / prof_.block_size; ++b)
+            bloecke.push_back(static_cast<uint16_t>(b));
+    }
+    const uint32_t noetig = static_cast<uint32_t>(
+        (data.size() + prof_.block_size - 1) / prof_.block_size);
+    if (bloecke.size() > noetig) bloecke.resize(noetig);
+    if (bloecke.size() > ptrs_per_entry_) return fail("MicroDOS.SYS passt nicht in einen Verzeichnisplatz");
+
+    // Eine vorhandene MicroDOS.SYS weicht (nur das Nutzerbyte), dann muessen die Bloecke frei sein.
+    std::vector<uint8_t> roh;
+    if (!readDirectory(roh)) return false;
+    for (int i = 0; i < prof_.dir_entries; ++i) {
+        uint8_t* p = roh.data() + static_cast<size_t>(i) * 32;
+        if (!bootPlatz(i, p) && microDosSysName(p)) {
+            p[0] = 0xE5;
+            if (!writeDirEntry(i, p)) return false;
+        }
+    }
+    const std::vector<bool> karte = allocationMap();
+    for (uint16_t b : bloecke)
+        if (b < dir_blocks_ || b >= total_blocks_ || karte[b])
+            return fail("Block " + std::to_string(b) + " (Systemspur) ist belegt - MicroDOS.SYS muss an den "
+                        "festen Ort der Sektoren 1-4 von Zylinder 1-4; die Datei dort erst entfernen");
+
+    int slot = -1;
+    for (int i = 0; i < prof_.dir_entries && slot < 0; ++i)
+        if (roh[static_cast<size_t>(i) * 32] == 0xE5
+            && !bootPlatz(i, roh.data() + static_cast<size_t>(i) * 32)) slot = i;
+    if (slot < 0) return fail("Verzeichnis voll");
+
+    std::vector<uint8_t> inhalt = data;
+    if (inhalt.size() % kRecordBytes) inhalt.resize((inhalt.size() / kRecordBytes + 1) * kRecordBytes, 0);
+    for (size_t i = 0; i < bloecke.size(); ++i) {
+        std::vector<uint8_t> block(prof_.block_size, 0);
+        const size_t ab = i * prof_.block_size;
+        if (ab < inhalt.size())
+            std::copy(inhalt.begin() + static_cast<long>(ab),
+                      inhalt.begin() + static_cast<long>(std::min(inhalt.size(), ab + prof_.block_size)),
+                      block.begin());
+        if (!writeAt(static_cast<uint64_t>(bloecke[i]) * prof_.block_size, block.data(), block.size()))
+            return false;
+    }
+    uint8_t e[32] = {};
+    static const char kName[11] = {'M', 'i', 'c', 'r', 'o', 'D', 'O', 'S', 'S', 'Y', 'S'};
+    for (int i = 0; i < 11; ++i) e[1 + i] = static_cast<uint8_t>(kName[i]);
+    e[15] = static_cast<uint8_t>(inhalt.size() / kRecordBytes);
+    for (size_t k = 0; k < bloecke.size(); ++k) {
+        if (wide_ptr_) { e[16 + 2 * k] = bloecke[k] & 0xFF; e[17 + 2 * k] = bloecke[k] >> 8; }
+        else e[16 + k] = static_cast<uint8_t>(bloecke[k]);
+    }
+    return writeDirEntry(slot, e);
 }
 
 bool CpmFileSystem::wouldFit(const std::vector<PlannedFile>& files, FitReport& out) const {
