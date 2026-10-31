@@ -46,6 +46,25 @@ Sicherheitsstecker 01.
 
 Die Disketten **nie direkt mounten** (der Emulator öffnet r/w); die Tests arbeiten mit Kopien.  Bedienung: Handbuch des Emulators, Abschnitt „SIOS 1526“.
 
+## MicroDOS 1526 (`a5120_microdos1526/`)
+
+**Selbst gebaut**, nicht die Sammlungsabzüge: `tools/microdos/build.py` startet die Originale (`tools/microdos/original/`, byteglich zu
+`MicroDOS1526{s,p}[_5600].hfe`) im Emulator, formatiert eine Leerdiskette (FORMAT20), erzeugt mit MSYSG20 `MicroDOS.SYS` + SYL-Lader für die
+gewünschte Tastatur/Laufwerke und kopiert die Beigaben per DiskTool nach.  Beigaben: FORMAT20, DIP, MSYSG20, SELDSK20/SELPRT20/SELAUX20,
+MKINST20, KTL/KTP, POWER, MKEY20, HARDCOPY, MATH und die Handbuchtexte (`*.DOC`); **ohne** `PIP.COM` (in der Sammlung abgeschnitten, 4096 statt rund 7,9 KB; `DIP` ersetzt es) und `INITIAL.SUB` (das hielte beim Start in MKEY20 an,
+bis man Return drückt), WordStar/MailMerge und Nutzerbereich 1 (DataStar, Wörterbücher; nur im Original).  Wächter `py_microdos_ablauf`
+(Kaltstart bis `A>`, Beigaben vorhanden, `build.py --check`: bytegleich zum Bau, Erkennung `microdos800`/`microdos200`, fsck ohne Warnung).
+Neu bauen: `LD_LIBRARY_PATH=build venv/bin/python3 -I tools/microdos/build.py --tool build/k1520disktool` (~30 s).
+
+| Datei | Bestückung |
+|-------|------------|
+| `a5120_microdos26_k5601_seriell.hfe` | 4 × K5601 (80 Zyl. DS, 5 × 1024 B, 800K), Tastatur K7637 (Vorgabe) |
+| `a5120_microdos26_k5601_parallel.hfe` | wie oben, Tastatur K7636 (`--tastatur k7636`) |
+| `a5120_microdos26_k5600_10_seriell.hfe` | K5600.10 (40 Spuren einseitig, 200K), K7637 |
+| `a5120_microdos26_k5600_10_parallel.hfe` | K5600.10, K7636 |
+
+Falsche Tastatur oder falsches Laufwerk: Ladeschirm bleibt bei den Punkten stehen bzw. `A>`-Rauschen (`doc/merkposten/microdos.md`).
+
 ## Disketten
 
 | Datei | System | Laufwerke A: / B: / C: |

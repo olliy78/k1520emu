@@ -1017,6 +1017,49 @@ Sektorfolge, zwei defekte Spuren (leer lassen) und „INIT ALL" (`Y`); am Ende s
 * **Programmdiskette nach dem Start in A: tauschen** (Systemdiskette heraus, Programmdiskette hinein, `CAL DIDI` ohne `ASN`) geht;
   bequemer bleibt `ASN 0315 66` mit der Programmdiskette in B:.
 
+## MicroDOS 1526 (A5120, A5130)
+
+**MicroDOS** (Vers. 2.6 vom 01.03.87, Rostocker Anpassung) ist ein CP/M-2.2-kompatibles Betriebssystem für den
+A5120. Der Original-Z80-Code läuft unverändert; Kaltstart, Bedienung, Formatieren und Systemgenerierung sind
+durchgespielt. Bedienung im Handbuchtext der Sammlung (`MDOSB20.DOC`, `MSYSGEN.DOC`, `MKEY.DOC` — liegen auf der Diskette).
+
+**Disketten** im Ordner `a5120_microdos1526/` der Beispieldisketten, `a5120_microdos26_<Laufwerk>_<Tastatur>.hfe`.
+Die Bestückung muss zur Diskette passen:
+
+| Diskette | Laufwerke | Tastatur (*Einstellungen ▸ Allgemein*) |
+|----------|-----------|-----------------------------------------|
+| `…_k5601_seriell.hfe` | **K5601** (Vorgabe, 80 Zyl., 800K) | **K7637** (seriell, Vorgabe) |
+| `…_k5601_parallel.hfe` | K5601 | **K7636** (parallel) |
+| `…_k5600_10_seriell.hfe` | **K5600.10** (40 Spuren, 200K) für A: und B: | K7637 |
+| `…_k5600_10_parallel.hfe` | K5600.10 | K7636 |
+
+Die Diskette in **A:** einlegen, einschalten. Nach rund 110 Millionen Takten steht
+`48K MicroDOS Vers 2.6`, dann der Prompt `A>`. Bei falscher Tastatur oder falschem Laufwerk bleibt der Ladeschirm
+bei den Punkten stehen, oder der Schirm füllt sich mit `A>`. Die Disketten tragen die Hilfsprogramme `FORMAT20`,
+`DIP` (Kopieren), `MSYSG20` (Systemgenerierung), `SELDSK20`/`SELPRT20`/`SELAUX20`, `MKINST20`, `KTP`/`KTL` und die
+Handbuchtexte (`D` zeigt das Verzeichnis, `D B:` das von B:). Die Originaldisketten der Sammlung führen beim Start
+`INITIAL.SUB` aus und halten bei `A>MKEY20` an: **ein Return** bringt den Prompt (die mitgelieferten Disketten haben
+dieses `INITIAL.SUB` nicht).
+
+**Leere Diskette formatieren** (Knopf *Leere Diskette* im Laufwerkskasten B:, dann am Prompt):
+
+1. `FORMAT20`, Laufwerk `B` mit Return; **Format `3`** (5 × 1024 B) **mit Return**; `Richtig (J/N)` mit `J`.
+   Das dauert rund 200 Millionen Takte; am Ende `Formatierung beendet! Wiederholung (J/N)?` mit `N`.
+2. `D B:` zeigt danach `no files`.
+
+**Bootdiskette erzeugen** (die Diskette in B: ist formatiert): `MSYSG20`. Die Fragen werden mit der Ziffer **ohne**
+Return beantwortet: Tastatur `4` (K7637.51; `3` = K7636.01), Bildschirm `2` (K7024), Drucker `1` (IFSS), Typenrad `1`,
+Zusatzkanal `3` (V.24); je Laufwerk logisch `A`, physisch `1`, Typ `3` (K5601; `1` = K5600.10), Format `8` (K5601: 5 × 1024,
+80 Zyl., 2 Seiten; K5600.10: `4`), `Wiederholung (J/N)`: `J` für das nächste Laufwerk (B: mit `2`, `3`, `8`), nach dem
+letzten `N`; Zielfrage `B`, `Richtig (J/N)` mit `J`. Es folgt das Generierungsprotokoll, `Wiederholung` mit `N`.
+Auf B: liegt nun `MicroDOS.SYS` samt Urlader; die Diskette bootet als A: (ohne `INITIAL.SUB`: gleich `A>`).
+Das alles baut `tools/microdos/ablauf.py` selbsttätig nach (`tools/microdos/build.py` erzeugt daraus die mitgelieferten Disketten).
+
+**Fallen.** `PIP.COM` der Sammlung ist abgeschnitten (4096 statt rund 7,9 KB) und läuft ins Leere — nutzen Sie `DIP`
+(`DIP B:=A:DATEI.COM`; mit nur *einem* Zielnamen wartet es danach auf `Load System Disk on Drive A:, then Type (cr)`:
+Return). `D B:` auf unformatierter Diskette meldet `Bdos error on B:` — mit `N` quittieren. Das Dateisystem kennt
+das DiskTool (Profile `microdos800`, `microdos200`); die Systemdatei liegt an festen Sektoren.
+
 ## MUTOS 8000 (A5120.16)
 
 MUTOS 8000 ist ein UNIX für den 16-Bit-Teil des A5120.16 (U8001). Dieser Abschnitt ist eine

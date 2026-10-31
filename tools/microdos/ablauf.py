@@ -19,7 +19,7 @@ Aufruf:
           [--ohne-probe] [--still]
 
 Ergebnis: ZIELVERZEICHNIS/microdos26_boot_<tastatur>.hfe.  Voraussetzung: gebaute libk1520core
-(`tools/dev.sh build`); ohne --quelle dient das Original aus disks/a5120_microdos1526/ (zur Tastatur passend).
+(`tools/dev.sh build`); ohne --quelle dient das Original aus tools/microdos/original/ (zur Tastatur passend).
 
 Die Tastatur der QUELLE und die der ZIELDISKETTE sind getrennt waehlbar (--tastatur gilt fuer die Ziel-
 diskette; die Quelle wird passend zu --tastatur gewaehlt: K7637 = "seriell", K7636 = "parallel").
@@ -36,11 +36,12 @@ HIER = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HIER))
 sys.path.insert(0, REPO)
 
-#: Ordner der Original-Systemdisketten (byteglich zu den Abbildern aus der Sammlung)
-ORIGINALE = os.path.join(REPO, 'disks', 'a5120_microdos1526')
+#: Ordner der Original-Systemdisketten (byteglich zu den Abbildern aus der Sammlung; die ausgelieferten
+#: Disketten in disks/a5120_microdos1526/ baut tools/microdos/build.py daraus)
+ORIGINALE = os.path.join(HIER, 'original')
 QUELLEN = {
-    'k7637': 'a5120_microdos26_k5601_seriell.hfe',
-    'k7636': 'a5120_microdos26_k5601_parallel.hfe',
+    'k7637': 'MicroDOS1526s.hfe',
+    'k7636': 'MicroDOS1526p.hfe',
 }
 
 # Taste "Return" des Emulators (Qt::Key_Return); alles andere geht als ASCII
@@ -63,6 +64,11 @@ class Sitzung:
         if b_pfad:
             if not self.emu.create_disk(1, b_pfad, ''):
                 raise RuntimeError('B: anlegen: ' + str(self.emu.last_error()))
+        # Der Drucker (Schnittstelle 0) geht ins Nichts: das Drucker-BIOS der 40-Spur-Systemdisketten wartet
+        # beim Protokoll von MSYSG20 sonst endlos auf CTS (Schleife IN 51H / BIT 5); eine Datei meldet VERBUNDEN.
+        from app.core_binding import k1520
+        if self.emu.serial_configure(0, betriebsart=k1520.SER_DATEI, datei=os.devnull):
+            self.emu.serial_start(0)
         self.emu.power_on()
 
     # ── Bild ────────────────────────────────────────────────────────────────
@@ -202,36 +208,45 @@ def generiere(s, **kw):
         raise RuntimeError('MSYSG20 kehrte nicht zum Prompt zurueck:\n' + s.bild())
 
 
-def probe_kaltstart(pfad, tastatur, still=True):
+def probe_kaltstart(pfad, tastatur, still=True, laufwerke=None):
     """Die erzeugte Diskette als A: kalt starten; liefert das Ergebnis von "D"."""
     with tempfile.TemporaryDirectory() as t:
         kopie = os.path.join(t, 'a.hfe')
         shutil.copy(pfad, kopie)
-        s = Sitzung(tastatur, kopie, still=still)
+        s = Sitzung(tastatur, kopie, still=still, laufwerke=laufwerke)
         s.kaltstart_bis_prompt()
         return s.kommando('D')
 
 
-def bauen(zielordner, quelle=None, tastatur='k7637', probe=True, still=True):
-    """Gesamtablauf; liefert den Pfad der fertigen Bootdiskette."""
+def bauen(zielordner, quelle=None, tastatur='k7637', probe=True, still=True,
+          laufwerke=None, generierung=None, dateiname=None, format_nr='3', ziel_tastatur=None):
+    """Gesamtablauf; liefert den Pfad der fertigen Bootdiskette.
+
+    laufwerke   Laufwerkstypen des Emulators (None = Vorgabe 4 x K5601; K5600.10: ["K5600.10"]*2+[None]*2)
+    generierung Ueberschreibungen fuer MSYSG20 (``laufwerke=[(logisch, physisch, Typ, Format), ...]``)
+    ziel_tastatur Tastatur der ERZEUGTEN Diskette (Vorgabe: ``tastatur``); die Sitzung selbst laeuft mit ``tastatur``
+                (FORMAT20 bietet nur die Formate, die das BIOS der Quelle fuer B: kennt -- die "parallele" Originaldiskette
+                kennt nur 40 Spuren einseitig, darum laeuft die Sitzung dort mit der seriellen Quelle)
+    format_nr   FORMAT20-Eintrag (3 = 5 x 1024 B, beim K5600.10 mit 40 Spuren einseitig)
+    """
     quelle = quelle or os.path.join(ORIGINALE, QUELLEN[tastatur])
     if not os.path.isfile(quelle):
         raise FileNotFoundError(quelle)
     os.makedirs(zielordner, exist_ok=True)
-    ziel = os.path.join(zielordner, 'microdos26_boot_%s.hfe' % tastatur)
+    ziel = os.path.join(zielordner, dateiname or 'microdos26_boot_%s.hfe' % tastatur)
     with tempfile.TemporaryDirectory() as t:
         a = os.path.join(t, 'a.hfe')
         b = os.path.join(t, 'b.hfe')
         shutil.copy(quelle, a)             # das Original wird nie beschrieben
-        s = Sitzung(tastatur, a, b, still=still)
+        s = Sitzung(tastatur, a, b, still=still, laufwerke=laufwerke)
         s.kaltstart_bis_prompt()
         s.sage('1. Kaltstart der Systemdiskette: ok')
-        formatiere(s)
+        formatiere(s, format_nr=format_nr)
         s.sage('2. FORMAT20 B: ok')
         # Eine formatierte, leere Diskette: D meldet "no files"
         if 'no files' not in s.kommando('D B:'):
             raise RuntimeError('B: nach FORMAT20 nicht leer:\n' + s.bild())
-        generiere(s, tastatur=tastatur)
+        generiere(s, **{'tastatur': ziel_tastatur or tastatur, **(generierung or {})})
         s.sage('3. MSYSG20 -> B: ok')
         if 'MicroDOS.SYS' not in s.kommando('D B:'):
             raise RuntimeError('MicroDOS.SYS fehlt auf B::\n' + s.bild())
@@ -239,7 +254,7 @@ def bauen(zielordner, quelle=None, tastatur='k7637', probe=True, still=True):
         s.emu.flush_disks()
         shutil.copy(b, ziel)
     if probe:
-        d = probe_kaltstart(ziel, tastatur, still)
+        d = probe_kaltstart(ziel, ziel_tastatur or tastatur, still, laufwerke)
         if 'MicroDOS.SYS' not in d:
             raise RuntimeError('neue Diskette bootet nicht richtig:\n' + d)
         if not still:

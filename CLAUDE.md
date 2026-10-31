@@ -730,6 +730,15 @@ Dazu Wirtstaste **Pause** = ET2 (kein Kürzel) und Rechtsklick auf ET2 der Bilds
 **Vor Arbeiten daran: `doc/merkposten/sios.md` lesen** (Festlegungen mit Wächtern, CAN-Systemstopp = Gastverhalten, INIT-Befund, Bedienfallen).
 Plan und Stand: `doc/design/43_sios1526.md`; Format `doc/sios_diskettenformat.md`; Unterlagen `doc/sios/`.
 
+## MicroDOS 1526 (Zweig `microdos`, Stand 2026-10-31)
+
+Rostocker CP/M-2.2-Anpassung (Vers. 2.6) auf dem A5120-Kern, **kein Emulatorfehler, kein Kernpatch**; vier Bootdisketten in
+`disks/a5120_microdos1526/` (K5601 80 Zyl. / K5600.10 40 Spuren x Tastatur K7637 seriell / K7636 parallel), **selbst gebaut** von
+`tools/microdos/build.py` (Originale der Sammlung in `tools/microdos/original/`; `ablauf.py` treibt FORMAT20 -> MSYSG20 im Emulator, das
+DiskTool kopiert die Beigaben nach). Wächter `py_microdos_ablauf` (Kaltstart bis `A>`, `build.py --check` byteweise + Erkennung
+`microdos800`/`microdos200` + fsck ohne Warnung). DiskTool-Profile `microdos800|200|1715` (Lader im Verzeichnis). Gastverhalten: `PIP.COM` der Sammlung
+ist abgeschnitten (4096 B), `INITIAL.SUB` hält bei `A>MKEY20` an (ein Return). **Vor Arbeiten daran: `doc/merkposten/microdos.md` lesen.**
+
 ## MUTOS 8000: Diskettenbau HIER, Forschung in mutos8k (Stand 2026-10-29)
 
 **Der Diskettensatz entsteht in DIESEM Projekt, ohne jede Abhaengigkeit zu mutos8k:** `python3 -I tools/mutos8000/bau_alle.py` baut aus den

@@ -159,6 +159,11 @@ ORDNER = {
     'a5120_sios_programme1.hfe': 'a5120_sios1526',
     'a5120_sios_programme2.hfe': 'a5120_sios1526',
     'a5120_sios_generierung.hfe': 'a5120_sios1526',
+    # MicroDOS 1526 (tools/microdos/build.py)
+    'a5120_microdos26_k5601_seriell.hfe': 'a5120_microdos1526',
+    'a5120_microdos26_k5601_parallel.hfe': 'a5120_microdos1526',
+    'a5120_microdos26_k5600_10_seriell.hfe': 'a5120_microdos1526',
+    'a5120_microdos26_k5600_10_parallel.hfe': 'a5120_microdos1526',
 }
 
 

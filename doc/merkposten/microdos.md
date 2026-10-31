@@ -3,8 +3,9 @@
 Rostocker Anpassung von MicroDOS (CP/M-2.2-kompatibel, Vers. 2.6 vom 01.03.87) auf dem A5120-Kern.
 **Kein Emulatorfehler gefunden, kein Kernpatch noetig.** Handbuch: `~/projects/robotron/Diskettensammlung_von_DL/Diskettenarbeit/Doc/MicroDOS/`
 (`mdosb20.txt`, `msysgen.txt`, `mkey.txt`, latin1).  Waechter: `tests/python/test_microdos_ablauf.py` (`py_microdos_ablauf`),
-Skript: `tools/microdos/ablauf.py`, Disketten: `disks/a5120_microdos1526/` (byteglich zu `Disketten_Images_RT/MicroDOS1526{s,p}[_5600].hfe`;
-`robotron/A5120/discs/MicroDOS1526.hfe` ist bytegleich zur seriellen K5601-Fassung).
+Skript: `tools/microdos/ablauf.py`, Bau der Auslieferung: `tools/microdos/build.py`.  **Originale** der Sammlung: `tools/microdos/original/MicroDOS1526{s,p}[_5600].hfe`
+(byteglich zu `Disketten_Images_RT/...`; `robotron/A5120/discs/MicroDOS1526.hfe` ist bytegleich zur seriellen K5601-Fassung).  **Ausgeliefert**
+(`disks/a5120_microdos1526/`) werden seit 2026-10-31 die GEBAUTEN Disketten (siehe Abschnitt Auslieferung).
 
 ## Zuordnung Abbild -> Bestueckung
 
@@ -25,8 +26,11 @@ Python-Weg (Qt-Return) geht es.
 1. **Kaltstart: bestanden** (alle vier Abbilder, ~110 M Maschinentakte).  Banner `IIPL/ISW`, `48K MicroDOS Vers 2.6 01.03.87`.  Danach laeuft
    `INITIAL.SUB` (MKEY20-Hinweis) und bleibt bei `A>MKEY20` stehen: **ein Return** bringt den echten Prompt `A>`.
 2. **Bedienung: bestanden.** `D`, `D B:`, `E x` (fragt `delete - <Y/N>`), `B:`/`A:` Laufwerkswechsel, `DIP` (Hilfeschirm, kopiert),
-   `KTP`, `S`/`U`/`O`.  Fallen: **`PIP.COM` der Diskette hat keine Ausgabe und laeuft in einer Kopierschleife (04CE-Neustarts, 0A27-0A4B)** —
-   auf beiden Tastaturvarianten; Ursache offen (Gastprogramm oder Kernfrage nicht entschieden; DIP ist der Ersatz und kopiert fehlerfrei).
+   `KTP`, `S`/`U`/`O`.  Fallen: **`PIP.COM` der Sammlung ist ABGESCHNITTEN - Gastdatei, kein Emulatorfehler** (2026-10-31 geklaert): das Verzeichnis
+   fuehrt 32 Saetze (RC=20H, zwei 2K-Bloecke = 4096 B); es ist DR PIP 1.5 fuer CP/M 2.0 (`COPYRIGHT 1979 ... PIP VERS 1.5`), dessen Code aber bei
+   `CALL 1A40H`/`1D84H`/`1ECCH` (Daten bis 1F6FH) ueber das Dateiende 1100H hinaus laeuft; ein vollstaendiges Abbild waere rund 7,9 KB.
+   Folge: Lauf ins Leere (`04CE`-Neustarts, PC streut ueber 0100-1B12), keine Ausgabe.  Nicht suchen; DIP ist der Ersatz und kopiert fehlerfrei.
+   Die ausgelieferten Disketten tragen deshalb kein `PIP.COM`.
    DIP mit **einem** Zielnamen (`DIP B:=A:X.COM`) kopiert und wartet danach auf `Load System Disk on Drive A:, then Type (cr)` — Gastverhalten,
    Return druecken.  `D B:` auf unformatierter B: -> `Bdos error on B: … ST=49 T=0 S=1  ignore - <Y/N>` (richtig, `N` tippen).
 3. **FORMAT20: bestanden** auf echter Leerdiskette (unformatiert, Geometrie K5601).  Ablauf: `FORMAT20`, Laufwerk `B`, Format `3` (= 5 x 1024 B,
@@ -44,11 +48,24 @@ Python-Weg (Qt-Return) geht es.
 5. **Stichproben:** `MKINST20`, `SELDSK20`, `SELPRT20`, `SELAUX20`, `MSYSG20`: nur MSYSG20/FORMAT20 durchgespielt (oben); `SELDSK20` etc. nicht.
    `DIP`, `KTP`, `D`, `E` ok.
 
+## Auslieferung (2026-10-31)
+
+`tools/microdos/build.py` (`--check` = Waechter) baut je Variante `a5120_microdos26_<k5601|k5600_10>_<seriell|parallel>.hfe`: Sitzung auf der SERIELLEN
+Quelle (K7637; die "parallele" Originaldiskette kennt in FORMAT20 nur 40 Spuren einseitig - `ablauf.bauen(ziel_tastatur=...)` beantwortet MSYSG20 trotzdem
+mit K7636), FORMAT20 Format 3, MSYSG20 (K5601: Typ 3/Format 8; K5600.10: Typ 1/Format **4**, 5 x 1024 B 40 Spuren), danach per DiskTool die Beigaben der
+Originaldiskette (ohne `INITIAL.SUB`, `PIP.COM`, `MicroDOS.SYS`, WordStar/MailMerge, Nutzerbereich 1).  Zwei Fallen beim Bau:
+- Das **Drucker-BIOS der 5600-Quelle wartet bei MSYSG20s Protokoll endlos auf CTS** (Schleife `IN 51H / BIT 5` bei E79BH) -> `Sitzung` legt Schnittstelle 0 auf
+  eine Datei (`os.devnull`; Datei meldet VERBUNDEN).  Loop hilft nicht.
+- FORMAT20 bietet nur, was das BIOS der **Quelle** fuer B: kennt; die Geometrie der Leerdiskette folgt dem Laufwerk des Emulators.
+Der Bau ist deterministisch (zweimal gebaut = gleiche Bytes); `build.py --check` laeuft im Waechter `py_microdos_ablauf`.  Im Paket nur mit `--disks all`
+(wie SIOS; `DISKS_DEFAULT` ist eine feste Auswahl, `py_packaging` prueft sie).
+
 ## Nachspielen
 
 ```sh
 tools/dev.sh build
 LD_LIBRARY_PATH=build venv/bin/python3 -I tools/microdos/ablauf.py /pfad/ziel [--tastatur k7636] [--quelle ABBILD.hfe] [--ohne-probe]
+# Auslieferung neu bauen: LD_LIBRARY_PATH=build venv/bin/python3 -I tools/microdos/build.py --tool build/k1520disktool
 # -> /pfad/ziel/microdos26_boot_k7637.hfe   (~6 s)
 ```
 Das Skript legt das Original nie schreibend ein (Temp-Kopie), B: entsteht mit `create_disk(1, pfad, "")` (Leerdiskette).  Tasten: Qt-Return
@@ -59,4 +76,4 @@ Das Skript legt das Original nie schreibend ein (Temp-Kopie), B: entsteht mit `c
 - Bei Debugger-Sitzungen `keys \r` auf K7637; bei K7636 braucht der Debugger-`keys` einen Rohcode.
 - MSYSG20 und FORMAT20 lesen die Taste ohne Return; die Formatwahl in FORMAT20 aber **mit** Return.
 - Die Generierung nennt Laufwerk C/D als `MFS 1.2/1` (Vorgabe), solange man sie nicht eingestellt hat — unschaedlich.
-- Offen: PIP.COM-Schleife (s. 2), SELDSK20/SELPRT20/SELAUX20/MKINST20 nicht durchgespielt, Drucker (IFSS/V.24/PIO) nicht getestet.
+- Offen: SELDSK20/SELPRT20/SELAUX20/MKINST20 nicht durchgespielt, Drucker (IFSS/V.24/PIO) nicht getestet.
