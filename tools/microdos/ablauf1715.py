@@ -164,6 +164,22 @@ def formatiere(s, laufwerk='B', format_nr=FORMAT15_5x1024_DS):
     s.neustart()
 
 
+def seldsk15(s, laufwerk, einheit, typ, format_nr):
+    """SELDSK15 bedienen (jede Antwort EINE Taste ohne Return); Typ 3 = MFS 1.6, Format 7 = 5 x 1024 x 80 x 2."""
+    s.tippe('SELDSK15\r')
+    for erwartet, antwort in (('logische Laufwerk', laufwerk), ('physische', einheit), ('Laufwerkstyp', typ),
+                              ('Formate sind', format_nr)):
+        if not s.bis(erwartet):
+            raise RuntimeError('SELDSK15: %r fehlt:\n%s' % (erwartet, s.bild()))
+        s.tippe(antwort)
+        s.lauf(3_000_000)
+    if not s.bis('Wiederholung'):
+        raise RuntimeError('SELDSK15: Wiederholung fehlt:\n' + s.bild())
+    s.tippe('N')
+    if not s.bis_prompt():
+        raise RuntimeError('SELDSK15 kehrte nicht zum Prompt zurueck:\n' + s.bild())
+
+
 #: Vorgabe der Generierung: Bildschirm 2 = 2K (K7222, 80 x 24), Drucker 2 = IFSS (1 = V.24),
 #: Laufwerke A und B je Einheit 1/2 im Format 4 (= 5 x 1024, 80 Spuren, 2 Seiten).
 VORGABE = dict(bildschirm='2', drucker='2', laufwerke=[('A', '1', '4'), ('B', '2', '4')], ziel='B')

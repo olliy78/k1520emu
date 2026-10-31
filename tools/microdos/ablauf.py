@@ -54,10 +54,15 @@ TASTATUR_ZIFFER = {'k7634_54': '1', 'k7634_51': '2', 'k7636': '3', 'k7637': '4'}
 class Sitzung:
     """Ein A5120 mit MicroDOS an der Tastatur: tippen, auf Bildschirmtext warten, Bild lesen."""
 
-    def __init__(self, tastatur, a_pfad, b_pfad=None, still=True, laufwerke=None):
+    def __init__(self, tastatur, a_pfad, b_pfad=None, still=True, laufwerke=None, konfig=None, laderom=None):
+        """``konfig``: Einzeloptionen des A5120 (``{"bildschirm": "k7023", ...}``, ersetzt ``tastatur``/``laderom``);
+        ``laderom``: ``"v06"`` fuer die Systemdisketten mit 128-Byte-Sektoren (Urlader 0.6)."""
         from app.core_binding.k1520 import K1520Emulator
         self.still = still
-        self.emu = K1520Emulator(drive_types=laufwerke, tastatur=tastatur)
+        if konfig is not None:
+            self.emu = K1520Emulator(drive_types=laufwerke, konfig=dict({"tastatur": tastatur}, **konfig))
+        else:
+            self.emu = K1520Emulator(drive_types=laufwerke, tastatur=tastatur, laderom=laderom)
         # "cpa800" ist nur der Katalogname fuer das Einlegen; HFE traegt die Geometrie selbst
         if not self.emu.mount_disk(0, a_pfad, 'cpa800', False):
             raise RuntimeError('A: einlegen: ' + str(self.emu.last_error()))
@@ -146,11 +151,15 @@ def formatiere(s, laufwerk='B', format_nr='3'):
     s.tippe('FORMAT20\r')
     if not s.bis('Auf welchem Laufwerk'):
         raise RuntimeError('FORMAT20 meldet sich nicht:\n' + s.bild())
-    s.tippe(laufwerk + '\r')
-    # Format 3 wird mit Return bestaetigt; danach fragt FORMAT20 "Richtig (J/N)"
+    if format_nr == '3':
+        # Die Vorgabe 3 (5 x 1024 B): das Laufwerk ist EINE Taste, das Return danach nimmt schon die Vorgabe an
+        # (so sind die ausgelieferten Disketten entstanden, ihre Bytes haengen an dieser Tastenfolge)
+        s.tippe(laufwerk + '\r')
+    else:
+        s.tippe(laufwerk)            # Laufwerk = eine Taste OHNE Return
     if not s.bis('Wie soll die'):
         raise RuntimeError('Formatfrage fehlt:\n' + s.bild())
-    s.tippe(format_nr + '\r')
+    s.tippe(format_nr + '\r')        # Formatziffer MIT Return; danach "Richtig (J/N)"
     if not s.bis('Richtig (J/N)'):
         raise RuntimeError('Formatbestaetigung fehlt:\n' + s.bild())
     s.tippe('J')
