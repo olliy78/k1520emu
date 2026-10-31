@@ -686,6 +686,16 @@ Nutzerbereich 0 ohne Attribute ist der Normalfall, den auch das echte CP/M erzeu
 und beides lässt sich jederzeit über *Eigenschaften* nachtragen. Wer eine Sammlung
 führt und jede Datei für sich vollständig haben will, schaltet es ein.
 
+## MicroDOS — das CP/M der Rostocker Anpassung
+
+MicroDOS 1526 (A5120/A5130) und MicroDOS 1715 (PC 1715) sind CP/M-2.2-Abkömmlinge: Dateien mit Nutzerbereich, **R/O**-, **SYS**- und
+**ARC**-Attribut wie gewohnt (*Eigenschaften*, `attr --arc`; das **Archivieren** packt sie samt Beiblatt `cpm-dateiangaben.txt`).
+Besonderheiten: Das Verzeichnis beginnt gleich auf der ersten Spur, **den Lader trägt der Anfang des Verzeichnisses** (er erscheint nicht als
+Datei und wird nie überschrieben), und die Systemdatei **`MicroDOS.SYS`** liegt an festen Sektoren (Spuren 1–4) — sie ist deshalb Teil des
+*Bootabbilds* (Lader + System, 16 KB), nicht eine Datei zum Einfügen. Erkannt wird eine Diskette nur mit Lader (`microdos800`, `microdos200`,
+`microdos1715`); eine Datendiskette gleicher Geometrie heißt `cpa800`. Eine neue Systemdiskette entsteht über *Neue Diskette ▸ Bootdiskette*
+mit dem mitgelieferten Abbild „MicroDOS 1526".
+
 ## Neue Disketten und Bootdisketten
 
 *Datei ▸ Neue Diskette* (Strg+N) legt eine formatierte, leere Diskette an. Im

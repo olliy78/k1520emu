@@ -130,9 +130,38 @@ public:
     /// @brief Ist Verzeichnisplatz @p index (Rohbytes @p p) Bootbereich?  Platz 0 mit
     ///        Bootkopf, oder Platz 1…3 mit Nutzerbyte `F0` (Parametersaetze ab Byte
     ///        0x64 des ersten Sektors).  Immer false, wenn das Profil `dir_boot` nicht traegt.
+    ///        **MicroDOS 1526** (`boot_header: microdos`): die Plaetze 0…7 (256 B), solange
+    ///        der SYL-Lader dort steht (@ref sylKopf) — ohne Lader ist es eine Datendiskette.
     bool bootPlatz(int index, const uint8_t* p) const;
-    /// @brief Die ersten 128 Byte des Verzeichnisses (4 Plaetze) — das „Bootabbild".
+    /// @brief Die ersten @ref bootBytes Byte des Verzeichnisses — das „Bootabbild"
+    ///        (PC 1715: 128 B = 4 Plaetze; MicroDOS 1526: 256 B = 8 Plaetze).
     bool readBootSlots(std::vector<uint8_t>& out) const;
+    /// @brief Umfang des Bootbereichs im Verzeichnis in Byte (128, MicroDOS 1526: 256).
+    size_t bootBytes() const;
+    /// @brief Traegt @p p den Bootkopf, den DIESES Profil verlangt (PC-1715-Kopf bzw. SYL-Lader)?
+    bool bootKopfPasst(const uint8_t* p, size_t n) const;
+
+    /// @name MicroDOS 1526 (Rostocker CP/M-Anpassung, doc/design/13_k1520disktool.md §16)
+    /// @{
+    /// @brief SYL-Lader von MicroDOS: „SYL" bei 0 und der Text „MicroDOS" in den ersten 256 B.
+    static bool sylKopf(const uint8_t* p, size_t n);
+    /// @brief Ist der 32-B-Platz @p p die Systemdatei `MicroDOS.SYS` (Nutzer 0, gemischte
+    ///        Schreibung — fuer das normale Kommando unerreichbar, deshalb geschuetzt)?
+    static bool microDosSysName(const uint8_t* p);
+    /// @brief Hoechstgroesse der Systemdatei: 4 Spuren zu 4 Sektoren (INIT, BDOS, BIOS) = 16 KB.
+    static constexpr size_t kMicroDosSysMax = 16384;
+    /**
+     * @brief `MicroDOS.SYS` an den FESTEN Ort schreiben, den der SYL-Lader erwartet.
+     *
+     * Der Lader liest Zylinder 1 Kopf 0 Sektor 1…4 nach BC00H und springt nach BD00H; INIT
+     * holt BDOS/BIOS von Zylinder 2…4 Kopf 0 (je Sektor 1…4).  Die Datei ist also kein
+     * beliebiger Dateiinhalt: ihre Bloecke sind die Sektoren 1…4 jener vier Spuren.  Die
+     * Bloecke muessen frei sein (oder der alten `MicroDOS.SYS` gehoeren).
+     */
+    bool writeSystemDatei(const std::vector<uint8_t>& data);
+    /// @brief Inhalt von `MicroDOS.SYS` (auf Satzgrenze, wie eingetragen); false, wenn die Datei fehlt.
+    bool readSystemDatei(std::vector<uint8_t>& out) const;
+    /// @}
     /**
      * @brief Bootkopf (Platz 0) und Parametersaetze (Plaetze 1…3 mit Nutzerbyte `F0` im
      *        Abbild) schreiben; die uebrigen Plaetze des ersten Sektors bleiben, wie sie sind.
@@ -230,6 +259,7 @@ private:
 
     SectorSpace& space_;
     FsProfile    prof_;
+    bool         syl_aktiv_ = false;   ///< MicroDOS 1526: steht der SYL-Lader in den Plaetzen 0…7?
 
     uint64_t data_start_   = 0;    ///< Byte-Offset des Datenbereichs im Sektorraum
     uint64_t data_bytes_   = 0;

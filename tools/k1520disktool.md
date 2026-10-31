@@ -1236,3 +1236,14 @@ wieder ein, wenn kein lebendes Etikett den Bereich berührt; ein Objekt kommt **
 Namen: Datei 1–8, Objekt 1–5 Zeichen (Großbuchstaben/Ziffern/Satzzeichen des DKOI-Satzes), Satzlänge immer 128.  Abgelehnt (mit Meldung) wird: Bibliothek mit
 mehr als 14 Einträgen, Fehlspurkarte mit Einträgen, voll belegte Spuren 1–37, `create --boot`, `boot-put`.  Gelöschter Bibliotheksplatz kehrt nicht zurück.  Ein Abbild, dessen Geometrie zu keinem Katalogformat passt (`SIOS1526_SYLp.hfe`),
 braucht `--fs sios_ss40`.
+
+### MicroDOS 1526 / 1715
+
+Profile `microdos800` (80 Zyl. DS, 104 Plätze), `microdos200` (K5600.20, 64 Plätze), `microdos1715` (PC 1715). Der SYL-Lader steht
+in den ersten Verzeichnisplätzen, `MicroDOS.SYS` an festen Sektoren; `boot-get` liefert Lader + Systemdatei (16 640 B):
+
+```
+k1520disktool boot-get MicroDOS1526s.hfe boot.bin
+k1520disktool create neu.hfe --fs microdos800 --boot boot.bin   # oder data/bootsektoren/boot_microdos_1526.bin
+k1520disktool put neu.hfe PIP.COM ; k1520disktool attr neu.hfe PIP.COM --arc
+```

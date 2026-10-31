@@ -325,7 +325,7 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
             if (u < 0x20 || u == 0x7F) { steuerzeichen = true; continue; }
             if (u != ' ') leer = false;
             const char c = static_cast<char>(u);
-            if (c >= 'a' && c <= 'z') klein = true;
+            if (c >= 'a' && c <= 'z' && !CpmFileSystem::microDosSysName(p)) klein = true;   // MicroDOS.SYS ist gemischt geschrieben
             // Das Leerzeichen ist Fuellzeichen und darf nicht als Trenner zaehlen.
             if (c != ' ' && verboten.find(c) != std::string::npos && !trenner) trenner = c;
         }

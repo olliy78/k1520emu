@@ -2571,3 +2571,33 @@ Bytezahl im Archiv.  Der Kopf der Datei erklärt jeden Schlüssel im Klartext
   Mitglied der `.zip` ist genau einmal erklärt.
 * `test_archive_verzeichnis_nennt_den_namen_auf_der_diskette` — der
   CP/M-Nutzerbereich in beiden Schreibweisen.
+
+## 25. MicroDOS 1526 / 1715 (Rostock) — CP/M mit Lader im Verzeichnis (2026-10-31)
+
+**Befund** an `MicroDOS1526{s,p}[_5600].hfe`, `MicroDOS1715[_LW_C].hfe` (Sammlung D. L., Doku `Doc/MicroDOS/*.txt`):
+
+| | 1526 DS 80 Zyl. (5×1024) | 1526 SS 40 Zyl. (K5600.20, 5×1024) | 1715 DS (5×1024) |
+|---|---|---|---|
+| Verzeichnis ab | c0h0 Sektor 1 (Offset 0, **keine Systemspuren**) | dto. | dto. |
+| Blockgröße | 2048 | 1024 | 2048 |
+| Plätze (gemessen: ab dort Daten) | **104** (nicht 128/192) | 64 | 128 |
+| Zeiger | 16 Bit (400 Blöcke) | 8 Bit | 16 Bit |
+| Lader | `SYL`-Sektor = Plätze 0…7 (256 B) | dto. | Bootkopf `03 F0` = Plätze 0…3, Nutzerbyte der Plätze 1…3 = `10H` |
+
+* **Der Lader steckt im Verzeichnis** wie beim CP/A 1715, nur größer. Der SYL-Sektor (1024 B) trägt „SYL", Parameterbytes
+  (`+7..`: `bc fe 01 00 | 01 03 04 05 | 00`; `[040CH]`=Spuranzahl−1… wird in `[03F0H]` kopiert: Ladeadresse BC00H, 4 Sektoren,
+  Sektor-IDs 1,3,4,5 sind die Reihenfolge-Tabelle), Code ab 0410H (CRC-Schleife, LDIR der Meldung „MicroDOS Loader No read"),
+  `JP BD00H`. Er liest **Zylinder 1 Kopf 0 Sektor 1…4 nach BC00H** und springt nach BD00H (= INIT); INIT holt BDOS/BIOS von
+  Zylinder 2…4 (Anhang A der `msysgen.txt`: 4 Spuren × 4 Sektoren = 16 KB).
+* **`MicroDOS.SYS` (Attribut SYS, 16 KB) ist eine Datei, liegt aber an FESTEN Sektoren** (c1…c4 h0, Sektor 1–4, bei 2-KB-Blöcken
+  Blöcke 5,6,10,11,15,16,20,21). Name in **gemischter Schreibung**; das Wächter-Regelwerk „Namen groß" nimmt sie aus
+  (`CpmFileSystem::microDosSysName`). Das Bootabbild des Werkzeugs ist deshalb **Lader (256 B) + Systemdatei (≤ 16 KB)**
+  (16 640 B); `create --boot`/`boot-put` schreibt beides (`writeSystemDatei`, prüft, dass die Blöcke frei sind).
+* Dateiattribute wie CP/M 2.2 (t1' R/O, t2' SYS, t3' ARC — Hochbits von Typ[0..2]); `attr --arc` und die Archivfunktion der
+  Oberfläche (`archive.py`/`archiv_meta.py`: Dateien + `cpm-dateiangaben.txt` mit Nutzerbereich/RO/SYS/ARC) sind die
+  allgemeinen CP/M-Wege und gelten unverändert.
+* **Erkennung** nur mit positivem Nachweis (SYL-Lader bzw. Bootkopf + Datei `MICRODOS.SYS` bei 1715), sonst bleibt die
+  Geometrie `cpa800`; `microdos800_daten`/`microdos200_daten` (`detect: false`) für Disketten ohne Lader. Profile in
+  `data/formats.yaml`: `microdos800`, `microdos200`, `microdos1715`; `boot_header: microdos|microdos1715` + `dir_boot`.
+* Offen: der Selbstlauf im Emulator (Boot der gebauten Diskette) liegt beim Parallelagenten; die Parameterbytes im SYL-Sektor
+  werden unverändert aus einer Originaldiskette übernommen (Deutung oben, nicht verifiziert für andere Laufwerksfolgen).
