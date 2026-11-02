@@ -300,7 +300,7 @@ std::vector<k1520::serial::SerialAnschluss*> A5120Machine::serielleAnschluesse()
     for (int i = 0; i < K8025::SchnittstellenAnzahl; ++i)
         v.push_back(&ass_.anschluss(static_cast<K8025::Schnittstelle>(i)));
     if (k7636_) v.push_back(&ass_.anschluss(K8025::ZifssA32A));   // Index 3, nur mit K7636
-    if (aup_sonder_) v.push_back(aup_->anschluss());   // Index 3 (N10d)
+    if (aup_sonder_) v.push_back(aup_->anschluss());   // Index 3, mit K7636 Index 4 (N10d)
     return v;
 }
 
