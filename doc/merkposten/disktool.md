@@ -1316,7 +1316,7 @@ Festlegungen:
    Ausnahme nur für diesen Namen (`microDosSysName`). Bootabbild = Lader 256 B + Systemdatei; `writeSystemDatei` verweigert, wenn
    die Blöcke belegt sind. Beim 1715 ist `MICRODOS.SYS` eine gewöhnliche Datei in den ERSTEN Datenblöcken (`writeSystemDatei1715`), Bootabbild = 128 B Kopf + `MICRODOS.SYS` (14 464 B; Kopf allein geht weiter, `put` danach nur als erste Datei — `doc/merkposten/microdos1715.md`).
 4. Fremdes Bootabbild (ohne „SYL"+„MicroDOS" bzw. ohne `03/02 F0`) wird VOR dem Anlegen abgewiesen.
-5. Bootabbilder `data/bootsektoren/boot_microdos_{1526,1526_k7636,1526_200k,1526_200k_k7636,1715}.bin` (Belege aus den Sammlungsabzügen, in `data/bootsektor.yaml`).
+5. Bootabbilder `data/bootsektoren/boot_microdos_{1526,1526_k7636,1526_200k,1526_200k_k7636,1526_128,1715}.bin` (`1526_128` = Profil `microdos128`, 26x128 B, K5600.10, Lade-ROM V0.6 und V0.9_2; Lage Entwurf 13 §25.4: Zeiger 3-17+19, Block 18 Nullen) (Belege aus den Sammlungsabzügen, in `data/bootsektor.yaml`).
    Das System ist fest auf Tastatur und Laufwerke generiert (K7637/K7636; 800K = 4 × K5601, **200K = 2 × K5600.10**, nicht K5600.20) — `py_microdos_bootabbilder`
    bootet jedes im Emulator bis `A>`; Tabelle in `doc/merkposten/microdos.md`.
    Originalabzüge prüft `DisktoolMicrodos.OriginalabzuegeDerSammlung` nur mit `K1520_MICRODOS_DIR`.

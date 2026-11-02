@@ -151,8 +151,11 @@ Alles am echten Gast bedient (Tasten, Bildschirmtext), Wirkung wie im Handbuch g
   (`k5601_ss40_26x128`, Block 1 KB, 64 Plaetze, Erkennung am SYL-Lader 0.6 mit Text "MicroDOS Loader"; Spur 0 Sektor 1-2 = Lader/Plaetze 0-7, Verzeichnis ab Sektor 1,
   MicroDOS.SYS in den Bloecken 3-17 und **19** -- MSYSG20 laesst Block 18 aus, das System liegt aber in den linearen Sektoren 26..155 = Bloecke 3-19; darum sperrt
   `CpmFileSystem::allocationMap` 3-19, sonst koennte `put` das System ueberschreiben).  ls/get/put/rm/fsck/boot-get gehen (Diskette bootet nach `put`);
-  **Bootabbild schreiben nicht** (Lage nur an EINER Diskette gemessen), `cpm.system.ort` schweigt fuer 128-B-Sektoren.  Waechter
-  `test_systemdiskette_mit_128_byte_sektoren_bootet_...` (DiskTool-Teil), `FsCatalog.ProfilnamenSindEinStabilerVertrag`.
+  **Bootabbild schreiben geht seit 2026-11-03** (`boot_microdos_1526_128.bin` = 256 B Lader + 16 384 B Datei; Lage am Ladercode belegt, Entwurf 13 §25.4: BEIDE Lader --
+  V0.9 in den Plaetzen 0-7 und SYL 0.6 auf Zylinder 1 -- laden Zylinder 1-5 Kopf 0 ganz nach B900H und springen nach BD00H; `writeSystemDatei128` traegt Zeiger 3-17 und 19 ein
+  wie MSYSG20 und fuellt Block 18 mit Nullen; `cpm.system.ort` gilt auch hier; Lader der anderen Sektorlaenge werden abgewiesen).  Waechter
+  `test_systemdiskette_mit_128_byte_sektoren_bootet_...` (DiskTool-Teil), `DisktoolMicrodos.Systemdiskette128BootabbildRundlaufUndFremdeLader`,
+  `test_128_byte_bootabbild_bootet_mit_beiden_lade_roms`, `FsCatalog.ProfilnamenSindEinStabilerVertrag`.
 - **FORMAT20-Menues** (alle 14 Eintraege formatieren, Gast liest zurueck): MFS 1.2: 26x128 / 16x256 / 5x1024 (je x40x1); MFS 1.4: 16x256 / 9x512 /
   5x1024 (x80x1); MFS 1.6: 16x256 / 9x512 / 5x1024 (x80x2); MF 3200: 26x128 / [Eintrag 2 leer] / 4x1024 (x77x1); MF 6400: 26x128 / 4x1024 / 8x1024
   (x77x1).  **MF 6400 Eintrag 3 (8x1024x77): `Defekte Spuren !` -- GEKLAERT 2026-11-01:** Spur 1-76 sind in MFM sauber (je 8 Sektoren, CRC ok, 167 936 Zellen = eine

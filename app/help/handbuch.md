@@ -1076,7 +1076,7 @@ Gerät), mit der **K7636** ist X4 frei und erscheint in *Einstellungen ▸ Schni
 Emulator nicht; K7023 (1K-Bildschirm) wählen Sie in *Einstellungen ▸ Allgemein ▸ Bildschirmkarte*. Systemdisketten mit
 **128-Byte-Sektoren** (Lade-ROM V0.6): mit den K5600.10-Laufwerken `FORMAT20` Eintrag `1`, `SELDSK20` B auf Typ 1/Format 1,
 `MSYSG20` mit Format `1` — bootet. Das DiskTool erkennt sie als `microdos128` (lesen, schreiben, prüfen; ein Bootabbild lässt sich
-herausholen, aber nicht schreiben). `FORMAT20` für den 8″-Antrieb MF 6400 Eintrag 3 (8 × 1024 B) meldet `Defekte Spuren !`: Spur 0
+herausholen und auf eine neue Diskette schreiben: *Neue Diskette ▸ Bootdiskette*). `FORMAT20` für den 8″-Antrieb MF 6400 Eintrag 3 (8 × 1024 B) meldet `Defekte Spuren !`: Spur 0
 wird immer in FM formatiert und passt in dieser Größe nicht auf eine Umdrehung.
 
 **Fallen.** `PIP.COM` der Sammlung ist abgeschnitten (4096 statt rund 7,9 KB) und läuft ins Leere — nutzen Sie `DIP`

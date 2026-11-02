@@ -18,12 +18,13 @@ pytest.importorskip("PySide6")
 
 BOOT = PROJECT_ROOT / "data" / "bootsektoren"
 
-#: (Dateisystem, Bootabbild, Name der Systemdatei) -- alle fuenf hinterlegten Abbilder
+#: (Dateisystem, Bootabbild, Name der Systemdatei) -- alle hinterlegten Abbilder
 PROFILE = [
     ("microdos800", "boot_microdos_1526.bin", "MicroDOS.SYS"),
     ("microdos800", "boot_microdos_1526_k7636.bin", "MicroDOS.SYS"),
     ("microdos200", "boot_microdos_1526_200k.bin", "MicroDOS.SYS"),
     ("microdos200", "boot_microdos_1526_200k_k7636.bin", "MicroDOS.SYS"),
+    ("microdos128", "boot_microdos_1526_128.bin", "MicroDOS.SYS"),
     ("microdos1715", "boot_microdos_1715.bin", "MICRODOS.SYS"),
 ]
 IDS = [p[1] for p in PROFILE]
@@ -122,6 +123,8 @@ def test_beschreibung_nennt_tastatur_und_laufwerke(qt_app):
     assert any("K7637" in t and "K5600.10" in t for t in t200), t200
     assert any("K7636" in t and "K5600.10" in t for t in t200), t200
     assert not any("K5600.20" in t for t in t200 + t800)
+    t128 = [e.description for e in nach_fs["microdos128"]]
+    assert any("K7637" in t and "K5600.10" in t and "V0.6" in t for t in t128), t128
 
 
 # ─── Bedienung: Einfuegen, Attribute, Loeschen, Pruefen, Retten ─────────────────
@@ -207,7 +210,7 @@ def test_einfuegen_attribute_loeschen_pruefen_retten(window, tmp_path, monkeypat
 
 # ─── Archiv mit Rueckweg ───────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("fs,bin_,sysname", PROFILE[::2], ids=["800", "200", "1715"])
+@pytest.mark.parametrize("fs,bin_,sysname", [PROFILE[0], PROFILE[2], PROFILE[5]], ids=["800", "200", "1715"])
 def test_archiv_traegt_dateien_attribute_und_den_rueckweg(window, tmp_path, fs, bin_, sysname):
     """ZIP = Abbild + `dateien/` + `cpm-dateiangaben.txt`; die Beiblattangaben (Nutzerbereich, R/O,
     SYS, ARC) kommen beim Einfuegen des ausgepackten Ordners auf eine neue Diskette zurueck."""

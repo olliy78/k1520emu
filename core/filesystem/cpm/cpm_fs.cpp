@@ -834,6 +834,12 @@ std::vector<uint16_t> CpmFileSystem::systemDateiBloecke(uint32_t anzahl) const {
         return aus;
     }
     if (prof_.boot_header != "microdos") return aus;
+    if (sector_size_ == 128) {
+        // Die Eintragung von MSYSG20 (Anhang B der msysgen.txt, am Ladercode belegt: doc/design/13 §25.4).
+        if (secs_per_track_ != 26 || prof_.block_size != 1024 || anzahl > 16) return {};
+        for (uint32_t k = 0; k < anzahl; ++k) aus.push_back(kMicroDos128Bloecke[k]);
+        return aus;
+    }
     const int start = space_.trackIndexOf(prof_.data_cyl, prof_.data_head);
     if (start < 0 || secs_per_track_ < 4) return {};
     const uint64_t spur_bytes = static_cast<uint64_t>(secs_per_track_) * sector_size_;
@@ -855,9 +861,7 @@ bool CpmFileSystem::writeSystemDatei(const std::vector<uint8_t>& data) {
         return fail("Das Profil '" + prof_.name + "' hat keine MicroDOS-Systemdatei");
     if (data.empty() || data.size() > kMicroDosSysMax)
         return fail("MicroDOS.SYS muss 1…" + std::to_string(kMicroDosSysMax) + " Byte gross sein");
-    if (sector_size_ == 128)
-        return fail("MicroDOS-Systemdiskette mit 128-Byte-Sektoren: die Lage der Systemdatei ist nur gemessen, "
-                    "nicht erschlossen - Bootabbild schreiben ist hier nicht moeglich (MSYSG20 im Emulator verwenden)");
+    if (sector_size_ == 128) return writeSystemDatei128(data);
 
     // Die Sektoren 1…4 der Zylinder 1…4 (Kopf 0) als Bloecke: das ist, was SYL und INIT lesen.
     const int start = space_.trackIndexOf(prof_.data_cyl, prof_.data_head);
@@ -916,6 +920,65 @@ bool CpmFileSystem::writeSystemDatei(const std::vector<uint8_t>& data) {
         if (!writeAt(static_cast<uint64_t>(bloecke[i]) * prof_.block_size, block.data(), block.size()))
             return false;
     }
+    uint8_t e[32] = {};
+    static const char kName[11] = {'M', 'i', 'c', 'r', 'o', 'D', 'O', 'S', 'S', 'Y', 'S'};
+    for (int i = 0; i < 11; ++i) e[1 + i] = static_cast<uint8_t>(kName[i]);
+    e[15] = static_cast<uint8_t>(inhalt.size() / kRecordBytes);
+    for (size_t k = 0; k < bloecke.size(); ++k) {
+        if (wide_ptr_) { e[16 + 2 * k] = bloecke[k] & 0xFF; e[17 + 2 * k] = bloecke[k] >> 8; }
+        else e[16 + k] = static_cast<uint8_t>(bloecke[k]);
+    }
+    return writeDirEntry(slot, e);
+}
+
+bool CpmFileSystem::writeSystemDatei128(const std::vector<uint8_t>& data) {
+    // 26 x 128 B, Block 1 KB: Lade-ROM V0.6 holt den Lader SYL 0.6 von Zylinder 1 Sektor 1-6, der laedt 128 Sektoren
+    // ab Zylinder 1 Sektor 1 nach B900H und springt nach BD00H; der Lader in den Verzeichnisplaetzen 0-7 (V0.9)
+    // liest Zylinder 1-5 ganz (5 x 26 Sektoren) an dieselbe Stelle.  Das System liegt also in den linearen Sektoren
+    // 26..155, die der Eintrag von MSYSG20 ueber die Bloecke 3-17 und 19 erfasst; Block 18 (Sektor 144-151) gehoert
+    // zum geladenen Bereich und muss Nullen tragen (Fuellbytes des Systemabbilds).
+    if (secs_per_track_ != 26 || prof_.block_size != 1024 || ptrs_per_entry_ < 16)
+        return fail("MicroDOS-Systemdiskette 26x128: erwartet 26 Sektoren je Spur, Block 1 KB, 16 Zeiger je Platz");
+    std::vector<uint16_t> bloecke(kMicroDos128Bloecke, kMicroDos128Bloecke + 16);
+    const uint32_t noetig = static_cast<uint32_t>((data.size() + prof_.block_size - 1) / prof_.block_size);
+    if (bloecke.size() > noetig) bloecke.resize(noetig);
+
+    // Eine vorhandene MicroDOS.SYS weicht (nur das Nutzerbyte); alles andere in 3..19 darf nicht belegt sein.
+    std::vector<uint8_t> roh;
+    if (!readDirectory(roh)) return false;
+    for (int i = 0; i < prof_.dir_entries; ++i) {
+        uint8_t* p = roh.data() + static_cast<size_t>(i) * 32;
+        if (!bootPlatz(i, p) && microDosSysName(p)) {
+            p[0] = 0xE5;
+            if (!writeDirEntry(i, p)) return false;
+        }
+    }
+    const std::vector<bool> karte = allocationMap(false);
+    for (uint32_t b = 3; b <= 19; ++b)
+        if (b >= total_blocks_ || karte[b])
+            return fail("Block " + std::to_string(b) + " (Systemspur) ist belegt - MicroDOS.SYS muss an die festen "
+                        "Sektoren von Zylinder 1-5; die Datei dort erst entfernen");
+    int slot = -1;
+    for (int i = 0; i < prof_.dir_entries && slot < 0; ++i)
+        if (roh[static_cast<size_t>(i) * 32] == 0xE5
+            && !bootPlatz(i, roh.data() + static_cast<size_t>(i) * 32)) slot = i;
+    if (slot < 0) return fail("Verzeichnis voll");
+
+    std::vector<uint8_t> inhalt = data;
+    if (inhalt.size() % kRecordBytes) inhalt.resize((inhalt.size() / kRecordBytes + 1) * kRecordBytes, 0);
+    for (size_t i = 0; i < bloecke.size(); ++i) {
+        std::vector<uint8_t> block(prof_.block_size, 0);
+        const size_t ab = i * prof_.block_size;
+        if (ab < inhalt.size())
+            std::copy(inhalt.begin() + static_cast<long>(ab),
+                      inhalt.begin() + static_cast<long>(std::min(inhalt.size(), ab + prof_.block_size)),
+                      block.begin());
+        if (!writeAt(static_cast<uint64_t>(bloecke[i]) * prof_.block_size, block.data(), block.size()))
+            return false;
+    }
+    const std::vector<uint8_t> nullen(prof_.block_size, 0);
+    if (!writeAt(static_cast<uint64_t>(kMicroDos128Luecke) * prof_.block_size, nullen.data(), nullen.size()))
+        return false;
     uint8_t e[32] = {};
     static const char kName[11] = {'M', 'i', 'c', 'r', 'o', 'D', 'O', 'S', 'S', 'Y', 'S'};
     for (int i = 0; i < 11; ++i) e[1 + i] = static_cast<uint8_t>(kName[i]);
@@ -1047,7 +1110,7 @@ bool CpmFileSystem::mkfs() {
 
 // ─── Zustand ─────────────────────────────────────────────────────────────────
 
-std::vector<bool> CpmFileSystem::allocationMap() const {
+std::vector<bool> CpmFileSystem::allocationMap(bool mitSystembereich) const {
     std::vector<bool> karte(total_blocks_, false);
     for (uint32_t b = 0; b < dir_blocks_; ++b) karte[b] = true;   // Verzeichnis
     for (const CpmDirEntry& d : directory()) {
@@ -1059,7 +1122,7 @@ std::vector<bool> CpmFileSystem::allocationMap() const {
     // Sektoren 26..155 (Spur 1-5 ganz), also in den Bloecken 3..19 zu je 8 Sektoren.  MSYSG20 traegt
     // aber nur 16 Bloecke ein und laesst Block 18 aus (gemessen an einer vom Gast erzeugten Diskette):
     // ein `put` koennte ihn vergeben und das System zerstoeren.  Darum gilt der ganze Bereich als belegt.
-    if (prof_.boot_header == "microdos" && sector_size_ == 128)
+    if (mitSystembereich && prof_.boot_header == "microdos" && sector_size_ == 128)
         for (uint32_t b = 3; b <= 19 && b < total_blocks_; ++b) karte[b] = true;
     return karte;
 }

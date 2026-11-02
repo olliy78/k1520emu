@@ -162,6 +162,12 @@ bootsektoren:
     filesystem:  microdos200
     file:        bootsektoren/boot_microdos_1526_200k_k7636.bin
 
+  # 26 x 128 B (msysgen Anhang B): beide Lader (V0.9 in den Plaetzen 0-7, SYL 0.6 auf Zylinder 1) und das System
+  # in Zylinder 1-5; bootet mit Lade-ROM V0.6 UND V0.9_2, aber nur mit K5600.10-Laufwerken (Format 1, 26 x 128).
+  - description: "MicroDOS 1526 — A5120/A5130, 100K 26x128, Tastatur K7637 seriell, 2 x K5600.10, Lade-ROM V0.6 oder V0.9_2 (SYL + MicroDOS.SYS)"
+    filesystem:  microdos128
+    file:        bootsektoren/boot_microdos_1526_128.bin
+
   # ── P8000 ──────────────────────────────────────────────────────────────────
   - description: "OS/M 3.0 — P8000 (8-Bit-Teil), Format 5"
     filesystem:  osm640

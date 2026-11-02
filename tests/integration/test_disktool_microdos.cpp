@@ -199,6 +199,49 @@ TEST(DisktoolMicrodos, BootabbildRundlaufUndSchreibenLaesstLaderUnangetastet) {
     EXPECT_EQ(0, dv->check(FsCheckLevel::Voll, true).zaehlerAb(FsSeverity::Warnung));
 }
 
+/// @test 128-Byte-Systemdiskette (Lade-ROM V0.6): create --boot, Erkennung, Pruefung, put ueber den Systembereich
+///       hinweg (Block 18 bleibt Nullen), boot-get ist bitgleich; Lader der anderen Sektorlaenge werden abgewiesen.
+TEST(DisktoolMicrodos, Systemdiskette128BootabbildRundlaufUndFremdeLader) {
+    TempPfad pfad("k1520_microdos_128.hfe");
+    const std::vector<uint8_t> bild = datei(bootBin("boot_microdos_1526_128.bin"));
+    ASSERT_EQ(bild.size(), 16640u);
+    {
+        auto dv = neu(pfad, "microdos128", "boot_microdos_1526_128.bin");
+        ASSERT_NE(dv, nullptr);
+        dv->setBackup(false);
+        EXPECT_EQ(dv->bootAreaSize(), 256u + 16384u);
+        std::vector<uint8_t> v;
+        ASSERT_TRUE(dv->readBootImage(v));
+        EXPECT_EQ(v, bild);
+        ASSERT_TRUE(lege(*dv, "A.TXT", std::vector<uint8_t>(5000, 'a'))) << dv->lastError();
+        ASSERT_TRUE(dv->flush()) << dv->lastError();
+    }
+    auto dv = oeffne(pfad.get());
+    ASSERT_NE(dv, nullptr);
+    EXPECT_EQ(dv->detection().filesystem, "microdos128");
+    for (FsCheckLevel stufe : {FsCheckLevel::Schnell, FsCheckLevel::Voll}) {
+        const FsCheckReport& r = dv->check(stufe, true);
+        EXPECT_EQ(0, r.zaehlerAb(FsSeverity::Warnung)) << kennungen(r);
+    }
+    EXPECT_EQ(dv->list().size(), 2u);
+    EXPECT_EQ(hole(*dv, "A.TXT").size(), 5120u);
+    std::vector<uint8_t> nachher;
+    ASSERT_TRUE(dv->readBootImage(nachher));
+    EXPECT_EQ(nachher, bild);                       // boot-get -> create -> boot-get bitgleich
+
+    // Die Datei darf die Systembloecke nicht erreichen: A.TXT liegt ab Block 20.
+    // Fremde Lader: 1024-B-Lader auf dem 128-Profil und umgekehrt, CP/A-Lader.
+    for (const auto& z : {std::make_pair("microdos128", "boot_microdos_1526.bin"),
+                          std::make_pair("microdos800", "boot_microdos_1526_128.bin"),
+                          std::make_pair("microdos200", "boot_microdos_1526_128.bin")}) {
+        TempPfad p2("k1520_microdos_fremd.hfe");
+        std::string err;
+        auto d = DiskVolume::create(p2.get(), z.first, "", formate(), dateisysteme(), err, bootBin(z.second));
+        EXPECT_EQ(d, nullptr) << z.first << " + " << z.second;
+        EXPECT_NE(err.find("Lader"), std::string::npos) << err;
+    }
+}
+
 /// @test 200K (K5600.10, 1-KB-Bloecke, 64 Plaetze) und 1715 (Bootkopf, MICRODOS.SYS als Datei).
 TEST(DisktoolMicrodos, Profil200KUnd1715) {
     {

@@ -480,6 +480,17 @@ std::string microdosBootabbildproblem(const FsProfile& p, const std::vector<uint
         return "Das Bootabbild traegt keinen MicroDOS-SYL-Lader (\"SYL\" und der Text \"MicroDOS\" in den "
                "ersten 256 Byte) - es stammt nicht von einer MicroDOS-Systemdiskette.  Ein CP/A- oder "
                "SCPX-Bootabbild startet unter MicroDOS nicht.";
+    // Sektorlaenge des Laders: Parameterbyte +0C = Size-Code (0 = 128 B, 3 = 1024 B), +0D = Sektoren je Spur
+    // (26 bzw. 4).  Ein Lader der anderen Sorte liest auf dieser Diskette die falschen Sektoren
+    // (doc/design/13_k1520disktool.md §25.4).
+    const bool lader128 = img[0x0C] == 0 && img[0x0D] == 26;
+    const bool lader1k  = img[0x0C] == 3 && img[0x0D] == 4;
+    const bool profil128 = p.name == "microdos128";
+    if (profil128 ? !lader128 : !lader1k)
+        return std::string("Das Bootabbild traegt einen MicroDOS-Lader fuer ")
+               + (lader128 ? "26 Sektoren zu 128 Byte (Systemdiskette fuer Lade-ROM V0.6 / K5125)"
+                  : lader1k ? "4 Sektoren zu 1024 Byte" : "eine unbekannte Sektorfolge")
+               + ", das Profil '" + p.name + "' verlangt " + (profil128 ? "den 128-Byte-Lader." : "den 1024-Byte-Lader.");
     if (img.size() > 256 + CpmFileSystem::kMicroDosSysMax)
         return "Das Bootabbild ist " + std::to_string(img.size()) + " Byte gross; MicroDOS fasst 256 Byte "
                "Lader und hoechstens " + std::to_string(CpmFileSystem::kMicroDosSysMax)

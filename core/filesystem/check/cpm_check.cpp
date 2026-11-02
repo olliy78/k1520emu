@@ -511,15 +511,14 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
         std::vector<uint16_t> ist;
         for (const CpmDirEntry* d : teile)
             for (uint16_t blk : d->blocks) if (blk != 0) ist.push_back(blk);
-        if (!ist.empty() && sector_size_ == 128) {
-            // 128-Byte-Sektoren: Lage der Systemdatei ist nicht erschlossen (nur eine gemessene Diskette) - keine Aussage.
-        } else if (!ist.empty()) {
+        if (!ist.empty()) {
             const std::vector<uint16_t> soll = systemDateiBloecke(static_cast<uint32_t>(ist.size()));
             if (soll != ist)
                 b.add("cpm.system.ort", FsSeverity::Warnung, FsLayer::Verwaltung, "Systemdatei",
                       std::string(prof_.boot_header == "microdos" ? "MicroDOS.SYS" : "MICRODOS.SYS")
                       + " liegt nicht an den Bloecken, die der Urlader liest ("
-                      + (prof_.boot_header == "microdos" ? "Zylinder 1-4 Kopf 0, Sektor 1-4"
+                      + (prof_.boot_header == "microdos" ? (sector_size_ == 128 ? "Zylinder 1-5 Kopf 0 (Bloecke 3-17 und 19)"
+                                                                              : "Zylinder 1-4 Kopf 0, Sektor 1-4")
                                                          : "die ersten Datenbloecke hinter dem Verzeichnis")
                       + ") - die Diskette bootet so nicht; mit boot-put neu schreiben");
         } else if (teile.empty() && prof_.boot_header == "microdos" && roh.size() >= 0x100

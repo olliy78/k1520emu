@@ -150,6 +150,11 @@ public:
     static bool microDosSysName(const uint8_t* p);
     /// @brief Hoechstgroesse der Systemdatei: 4 Spuren zu 4 Sektoren (INIT, BDOS, BIOS) = 16 KB.
     static constexpr size_t kMicroDosSysMax = 16384;
+    /// @brief MicroDOS-Systemdiskette 26x128 B (Lade-ROM V0.6): die 16 Bloecke, die MSYSG20 fuer MicroDOS.SYS
+    ///        eintraegt (3-17 und 19; der Eintrag fasst nur 16 Zeiger, das System selbst liegt in den
+    ///        linearen Sektoren 26..155 = Bloecke 3..19), und der nicht eingetragene, aber belegte Block 18.
+    static constexpr uint16_t kMicroDos128Bloecke[16] = {3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,19};
+    static constexpr uint16_t kMicroDos128Luecke = 18;
     /**
      * @brief `MicroDOS.SYS` an den FESTEN Ort schreiben, den der SYL-Lader erwartet.
      *
@@ -159,6 +164,8 @@ public:
      * Bloecke muessen frei sein (oder der alten `MicroDOS.SYS` gehoeren).
      */
     bool writeSystemDatei(const std::vector<uint8_t>& data);
+    /// @brief Zweig von @ref writeSystemDatei fuer 26x128 B (siehe kMicroDos128Bloecke).
+    bool writeSystemDatei128(const std::vector<uint8_t>& data);
     /// @brief Ist @p p die Systemdatei dieses Profils (1526: `MicroDOS.SYS` gemischt, 1715: `MICRODOS.SYS`, Grossschrift)?
     bool istSystemDateiName(const uint8_t* p) const;
     /**
@@ -247,7 +254,9 @@ public:
 
     /// @brief Belegungskarte aus dem Verzeichnis rekonstruiert (true = belegt).
     ///        CP/M speichert sie nirgends — sie wird bei jedem Mounten neu gebaut.
-    std::vector<bool> allocationMap() const;
+    ///        @p mitSystembereich = false laesst die feste Reservierung der MicroDOS-128-Systemspuren
+    ///        weg (nur `writeSystemDatei` braucht die reine Verzeichnissicht).
+    std::vector<bool> allocationMap(bool mitSystembereich = true) const;
 
 private:
     CpmFileSystem(SectorSpace& space, const FsProfile& prof);
