@@ -762,6 +762,20 @@ filesystems:
     dir_boot:    true
     boot_header: microdos
 
+  # `microdos128` - die Systemdiskette fuer Lade-ROM V0.6 / K5125 (msysgen Anhang B): 40 Spuren einseitig,
+  # 26 x 128 B, Block 1 KB (8 Sektoren), 64 Plaetze.  SYL-Lader 0.6 (256 B, Text "MicroDOS Loader") in den
+  # Plaetzen 0-7 ist der positive Nachweis.  MicroDOS.SYS liegt in den linearen Sektoren 26..155 (Spur 1-5),
+  # MSYSG20 traegt nur 16 Bloecke ein (3-17, 19; Block 18 fehlt) - `allocationMap` sperrt 3-19.  Bootabbild
+  # lesen geht, schreiben nicht (Lage nur gemessen).
+  - name:        microdos128
+    description: "MicroDOS 1526 (A5120/A5130) 100K SS 40 Spuren, 26x128 - SYL-Lader 0.6 im Verzeichnis, 64 Plaetze"
+    format:      k5601_ss40_26x128
+    type:        cpm
+    block_size:  1024
+    dir_entries: 64
+    dir_boot:    true
+    boot_header: microdos
+
   - name:        microdos800_daten
     description: "MicroDOS 800K DS, 5×1024 - Datendiskette ohne Lader, 104 Plaetze"
     format:      cpa800

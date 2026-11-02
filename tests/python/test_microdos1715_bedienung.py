@@ -126,6 +126,53 @@ def test_seldsk15_stellt_b_auf_das_gewaehlte_format(tmp_path):
     assert "ST= 56" in s.bild(), s.bild()
 
 
+def test_seldsk15_nach_falschem_zugriff_bleibt_b_bis_zum_neustart_kaputt(tmp_path):
+    """GEKLAERT (2026-11-01): ein Zugriff mit falschem Format (16x256x40x1 auf einer 5x1024x80x2-Diskette) endet mit ST=56
+    ('ID nicht gefunden', BIOS-Marke EEH in F16F, EB3A) und laesst den Kopf von B: NICHT auf Spur 0 zurueck: /TO (PIO-B Bit 7)
+    ist danach 1, der MicroDOS-BIOS faehrt bei Fehlern nie auf Spur 0 und merkt sich Spur 0.  Jeder weitere Zugriff liest
+    daher im falschen Zylinder -- auch mit dem richtigen Format und nach ^C -- bis zum Neustart.  Gastverhalten (Kopf
+    folgt exakt den Schrittimpulsen des BIOS); ohne vorherigen Zugriff ist das Umstellen beliebig oft moeglich."""
+    s = ablauf1715.Sitzung(str(ORIGINAL), str(ORIGINAL))
+    s.kaltstart_bis_prompt()
+    _seldsk15(s, "2", "3", "2")
+    _seldsk15(s, "2", "3", "7")                       # nur umstellen: unkritisch
+    assert "MICRODOS.SYS" in s.kommando("D B:")
+    _seldsk15(s, "2", "3", "2")
+    s.tippe("D B:\r")
+    assert s.bis("ignore - Y", frist=100_000_000), s.bild()
+    s.tippe("N")
+    assert s.bis_prompt(), s.bild()
+    _seldsk15(s, "2", "3", "7")
+    s.tippe("D B:\r")
+    assert s.bis("Bdos error on B:", frist=100_000_000), s.bild()      # richtiges Format, trotzdem ST=56
+    assert "ST= 56" in s.bild(), s.bild()
+
+
+@braucht_disktool
+def test_selprt_ueberschreibt_den_bildschirmtreiber_dieses_systems(tmp_path):
+    """GEKLAERT (2026-11-01): SELPRT.COM der Sammlung kopiert nach der Typenradwahl 95 Byte Umsetzungstabelle nach E6FEH
+    (LD DE,E6FEH / LDIR).  In dieser MICRODOS.SYS liegt dort Treibercode (Bildschirmtreiber E696ff), keine Tabelle: die CPU
+    laeuft danach in die Tabelle (der Eintrag 76H = HALT bei E753) und steht -- 'Drucker bereit (ENTER)' erscheint nie.
+    Unabhaengig vom Druckerweg (V.24 wie IFSS); SELPRT und MICRODOS.SYS der Sammlung gehoeren nicht zusammen."""
+    ordner = tmp_path / "prog"
+    ordner.mkdir()
+    _disktool("get", ORIGINAL, "SELPRT.COM", "--to", ordner)
+    com = (ordner / "SELPRT.COM").read_bytes()
+    assert bytes.fromhex("11FEE6EDB0") in com                        # LD DE,E6FEH ; LDIR
+    tabelle1 = com[0x2E4 - 0x100 + 0x5F: 0x2E4 - 0x100 + 0x5F + 16]
+    s = ablauf1715.Sitzung(str(ORIGINAL))
+    s.kaltstart_bis_prompt()
+    ram = bytes(s.emu.mem_read(a) for a in range(0xE6C0, 0xE780))
+    assert tabelle1 not in ram                                       # dort liegt keine Tabelle ...
+    assert ram[0xE6FE - 0xE6C0] != tabelle1[0]                       # ... sondern Code
+    s.tippe("SELPRT\r"); s.lauf(30_000_000)
+    s.tippe("1"); s.lauf(30_000_000)
+    s.tippe("\r"); s.lauf(80_000_000)
+    assert "Drucker bereit" not in s.bild() and "Richtig" not in s.bild()
+    nachher = bytes(s.emu.mem_read(a) for a in range(0xE6FE, 0xE6FE + 0x5F))
+    assert nachher == com[0x2E4 - 0x100 + 0x5F: 0x2E4 - 0x100 + 2 * 0x5F]   # Tabelle 1 steht jetzt im Treiber
+
+
 # ── KTP15, OC15, HARDCOPY, POWER, MKEYINST ───────────────────────────────────
 
 def test_ktp15_zeigt_den_physischen_tastencode_und_endet_bei_a(tmp_path):

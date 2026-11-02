@@ -855,6 +855,9 @@ bool CpmFileSystem::writeSystemDatei(const std::vector<uint8_t>& data) {
         return fail("Das Profil '" + prof_.name + "' hat keine MicroDOS-Systemdatei");
     if (data.empty() || data.size() > kMicroDosSysMax)
         return fail("MicroDOS.SYS muss 1…" + std::to_string(kMicroDosSysMax) + " Byte gross sein");
+    if (sector_size_ == 128)
+        return fail("MicroDOS-Systemdiskette mit 128-Byte-Sektoren: die Lage der Systemdatei ist nur gemessen, "
+                    "nicht erschlossen - Bootabbild schreiben ist hier nicht moeglich (MSYSG20 im Emulator verwenden)");
 
     // Die Sektoren 1…4 der Zylinder 1…4 (Kopf 0) als Bloecke: das ist, was SYL und INIT lesen.
     const int start = space_.trackIndexOf(prof_.data_cyl, prof_.data_head);
@@ -1052,6 +1055,12 @@ std::vector<bool> CpmFileSystem::allocationMap() const {
         for (uint16_t b : d.blocks)
             if (b != 0 && b < total_blocks_) karte[b] = true;
     }
+    // MicroDOS-Systemdiskette mit 128-Byte-Sektoren (msysgen Anhang B): das System liegt in den linearen
+    // Sektoren 26..155 (Spur 1-5 ganz), also in den Bloecken 3..19 zu je 8 Sektoren.  MSYSG20 traegt
+    // aber nur 16 Bloecke ein und laesst Block 18 aus (gemessen an einer vom Gast erzeugten Diskette):
+    // ein `put` koennte ihn vergeben und das System zerstoeren.  Darum gilt der ganze Bereich als belegt.
+    if (prof_.boot_header == "microdos" && sector_size_ == 128)
+        for (uint32_t b = 3; b <= 19 && b < total_blocks_; ++b) karte[b] = true;
     return karte;
 }
 

@@ -85,13 +85,20 @@ Tasten: ASCII, Return `0x01000004`, Strg+Buchstabe ueber `key_press(code, False,
 
 ## Bedienung der Programme (2026-10-31, Waechter `py_microdos1715_bedienung`, `py_microdos1715_format15`, `py_microdos1715_format15b`)
 - `SELDSK15`: Laufwerk/Einheit/Typ (1 MFS 1.2 .. 5 MF 6400)/Format je EINE Taste; Liste fuer MFS 1.6: 1 26x128x40, 2 16x256x40, 3 5x1024x40, 4 16x256x80x1, 5 5x1024x80x1,
-  6 16x256x80x2, 7 5x1024x80x2.  Falsches Format -> `Bdos error on B: ST= 56`; **nach einem falschen Zugriff laesst sich B: im selben Lauf nicht mehr auf 7
-  zurueckstellen (ST=56 bis zum Neustart)** -- Ursache offen.  **Mit einem einseitigen 80-Spur-Format (Liste 4/5) haengt `D B:`** (> 1 Mrd. Takte keine Antwort,
-  auch auf einer mit FORMAT15 Eintrag 0/2 passend formatierten Diskette); doppelseitig (6/7) laeuft.
+  6 16x256x80x2, 7 5x1024x80x2.  Falsches Format -> `Bdos error on B: ST= 56`; **nach einem falschen ZUGRIFF laesst sich B: im selben Lauf nicht mehr auf 7
+  zurueckstellen -- GEKLAERT 2026-11-01:** ST=56 ist 'ID nicht gefunden' (BIOS setzt F16F := EEH, EB3A).  Nach dem Fehlzugriff steht der Kopf von B: nicht auf Spur 0
+  (PIO-B Bit 7 = /TO = 1 gleich nach der Laufwerkswahl; in der Gegenprobe 0), der BIOS-Fehlerpfad faehrt nicht zurueck und merkt sich Spur 0, jeder weitere Zugriff liest im
+  falschen Zylinder, auch nach ^C -- erst der Neustart hilft.  Reines Umstellen ohne Zugriff ist unkritisch.  Gastverhalten (der Kopf folgt exakt den Schrittimpulsen des
+  BIOS), am Geraet nicht nachgemessen.  Waechter `test_seldsk15_nach_falschem_zugriff_bleibt_b_bis_zum_neustart_kaputt`.
+  **`D B:` mit einseitigem 80-Spur-Format (Liste 4/5): NICHT als Haenger reproduziert** -- auf einer mit FORMAT15 Eintrag 2 formatierten Diskette und SELDSK 5 kehrt `D B:`
+  sofort zum Prompt zurueck, zeigt aber weder Verzeichnis noch `no files` (bei Format 7 `no files`).  Geprueft: Rueckkehr, Bild; nicht geklaert, warum die Meldung fehlt.
 - `KTP15`: `b` -> `E062`, Return -> `E09E`, Ende bei `a`.  `K6311SEL`: Zeichensatz (1 ASCII, 2 deutsch) und Breite (1-3) je MIT Return; sendet `ESC R 2`, `ESC [ 0 SP K` an den V.24-Drucker.
 - `MKEYINST` (Vers. 2.0): `<DATEI` mit erster Zeile `MKEYINST` erzeugt `MKEY.SPR`; die Wirkung der Belegung nicht geprueft.  `OC15`: `System und OC passen nicht zusammen !`
   (auch auf der Originaldiskette).  `HARDCOPY`: Maske `Source:`/Ziel/Spuren, Strg+C beendet.  `POWER` wie am 1526 (Prompt `A=`).  `SELPRT`: bleibt nach der Typenradziffer
-  (mit/ohne Return) ohne Druckertest stehen, CPU im BDOS-Console-In (HALT) -- **offen**.
+  ohne Druckertest stehen -- GEKLAERT 2026-11-01: SELPRT.COM kopiert die gewaehlte 95-Byte-Umsetzungstabelle mit `LD DE,E6FEH / LDIR` nach E6FEH; in der
+  MICRODOS.SYS dieser Sammlung liegt dort Bildschirmtreibercode (E696ff), keine Tabelle.  Die CPU laeuft danach in die Tabelle (Eintrag 76H = HALT bei E753),
+  'Drucker bereit (ENTER)' erscheint nie.  Auch mit V.24-Generierung; SELPRT und MICRODOS.SYS der Sammlung gehoeren nicht zusammen (Gastdatei).  Waechter
+  `test_selprt_ueberschreibt_den_bildschirmtreiber_dieses_systems`.
 - **Drucker**: V.24 (`MSYSG15A` Drucker `1`, DTR-Protokoll) -> Schnittstelle 0 `Drucker` (X4): `^P` und `K6311SEL` kommen an.  **IFSS (Drucker `2`): Treiber nutzt E/A 14H/16H =
   Zusatzkarte (2 x IFSS/V.24, Entwurf 21: nicht gebaut) -> NICHT MODELLIERT**; `D` mit `^P` laeuft, es geht nichts hinaus.  Zusatzkanal V.24 nicht getestet.
 - **FORMAT15-Menue** 0-5 (`PLEASE SELECT FORMAT`): alle sechs formatieren (`FORMATTING COMPLETE`, ~10 s); DiskTool: Eintrag 3 `scpx640`, 5 `cpa800`, die anderen mehrdeutig (`cpa_auto`).

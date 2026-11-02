@@ -1064,15 +1064,20 @@ volle Name mit Typ; `;`-Zeilen sind Kommentar), `^S`/`^Q` halten die Ausgabe an,
 belegt die Funktionstasten (PF10 → `DBASE`, …), `MKINST20` erzeugt aus einer Eingabedatei (`<MYKEY`) eine neue `MKEY20.SPR`,
 `HARDCOPY` kopiert Spuren (`A`, `B`, `03`), `KTL` zeigt logische Tastencodes (Ende mit `a`), `KTP` den physischen Code der
 **K7636** (U-Bus; an der K7637 nur `FF`). `MATH.COM` der Sammlung ist **kein Rechner**, sondern der Force-Two-Installer für
-WordStar. **Offen/unklar:** `>DATEI` legt die Datei an, sie bleibt aber 0 Byte; `^F` am Prompt erscheint nur als `^F`.
+WordStar. **Ausgabeumlenkung:** `>DATEI` sammelt die Bildschirmausgabe im Puffer; auf der Diskette steht sie erst nach dem
+**Schließen** — durch `^C` (am Zeilenanfang), durch ein nacktes `>` oder durch `^S` und danach `^F` (während einer
+laufenden Ausgabe). `^F` am Prompt ist kein Kommando und erscheint nur als `^F`.
 
 **Drucker und Zusatzkanal.** `SELPRT20` (Schnittstelle, Typenrad, Druckertest mit den Codes 20H–7FH): **IFSS** → Schnittstelle
 *Drucker* (X3), **V.24** → *DFÜ/V.24* (X6), **PIO** → E/A 54H–57H, die der Emulator nur als PIO der K8025 kennt: die Zeichen
 verschwinden, **nicht modelliert**. Zusatzkanal (`SELAUX20`/`MSYSG20`): V.24 sendet und empfängt (Schleife), **IFSP** (ALB K6025,
-E/A 90H–97H) ist **nicht modelliert**, IFSS erreicht die Gegenstelle nicht (offen). Das Gerät **K7634** (Tastatur) gibt es im
+E/A 90H–97H) ist **nicht modelliert**, **IFSS** sendet auf SIO A32 Kanal A (Stecker X4) — das ist mit der **K7637** der Tastaturkanal (nichts erreicht die Außenwelt, wie am
+Gerät), mit der **K7636** ist X4 frei und erscheint in *Einstellungen ▸ Schnittstellen* als vierter Anschluss „IFSS Zusatzkanal“. Das Gerät **K7634** (Tastatur) gibt es im
 Emulator nicht; K7023 (1K-Bildschirm) wählen Sie in *Einstellungen ▸ Allgemein ▸ Bildschirmkarte*. Systemdisketten mit
 **128-Byte-Sektoren** (Lade-ROM V0.6): mit den K5600.10-Laufwerken `FORMAT20` Eintrag `1`, `SELDSK20` B auf Typ 1/Format 1,
-`MSYSG20` mit Format `1` — bootet.
+`MSYSG20` mit Format `1` — bootet. Das DiskTool erkennt sie als `microdos128` (lesen, schreiben, prüfen; ein Bootabbild lässt sich
+herausholen, aber nicht schreiben). `FORMAT20` für den 8″-Antrieb MF 6400 Eintrag 3 (8 × 1024 B) meldet `Defekte Spuren !`: Spur 0
+wird immer in FM formatiert und passt in dieser Größe nicht auf eine Umdrehung.
 
 **Fallen.** `PIP.COM` der Sammlung ist abgeschnitten (4096 statt rund 7,9 KB) und läuft ins Leere — nutzen Sie `DIP`
 (`DIP B:=A:DATEI.COM`; mit nur *einem* Zielnamen wartet es danach auf `Load System Disk on Drive A:, then Type (cr)`:

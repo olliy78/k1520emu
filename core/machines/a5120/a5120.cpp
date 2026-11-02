@@ -280,6 +280,12 @@ void A5120Machine::wireBackplane() {
     ass_.setzeZreTakt([this] { return zre_.ctc().teilerTakte(0); });
     for (int i = 0; i < K8025::SchnittstellenAnzahl; ++i)
         hub_.registriere(ass_.anschluss(static_cast<K8025::Schnittstelle>(i)));
+    // Mit der K7636 am U-Bus ist der Stecker X4 (SIO A32 Kanal A) frei: MicroDOS' Zusatzkanal
+    // "IFSS" (MSYSG20) sendet dort auf E/A 5CH.  Mit der K7637 haengt die Tastatur am Kanal.
+    if (k7636_) {
+        ass_.benenne(K8025::ZifssA32A, "IFSS Zusatzkanal", "X4");
+        hub_.registriere(ass_.anschluss(K8025::ZifssA32A));
+    }
 }
 
 // Ausgelagert, damit die heisse Laufschleife nur den Vergleich traegt (Laufzeit, AP-S5).
@@ -293,6 +299,7 @@ std::vector<k1520::serial::SerialAnschluss*> A5120Machine::serielleAnschluesse()
     std::vector<k1520::serial::SerialAnschluss*> v;
     for (int i = 0; i < K8025::SchnittstellenAnzahl; ++i)
         v.push_back(&ass_.anschluss(static_cast<K8025::Schnittstelle>(i)));
+    if (k7636_) v.push_back(&ass_.anschluss(K8025::ZifssA32A));   // Index 3, nur mit K7636
     if (aup_sonder_) v.push_back(aup_->anschluss());   // Index 3 (N10d)
     return v;
 }

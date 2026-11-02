@@ -122,7 +122,7 @@ TEST(FsCatalog, ProfilnamenSindEinStabilerVertrag) {
         "sios_ss40", "sios_ss80",
         // MicroDOS 1526/1715 (Rostock): Lader im Verzeichnis (Erkennung am Lader) und die
         // Datendisketten ohne Lader (`detect: false`), Entwurf 13 §25.
-        "microdos800", "microdos200", "microdos800_daten", "microdos200_daten", "microdos1715",
+        "microdos800", "microdos200", "microdos128", "microdos800_daten", "microdos200_daten", "microdos1715",
     };
     for (const auto& n : erwartet)
         EXPECT_NE(cat.find(n), nullptr) << "Dateisystem '" << n << "' fehlt";

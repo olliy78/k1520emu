@@ -184,16 +184,52 @@ def test_ctrl_d_background_kommando_im_debugger_mzsid(tmp_path):
     assert "A:MicroDOS.SYS" in bild and bild.rstrip().endswith(">"), bild
 
 
-def test_ausgabeumlenkung_legt_die_datei_an_aber_ctrl_f_schliesst_sie_nicht(tmp_path):
-    """BEFUND (Gast, ungeklaert): `>datei` legt den Verzeichniseintrag an; Strg+F am Prompt wird nur als ^F
-    ausgegeben, die Datei bleibt 0 Byte.  Haelt fest, was der Emulator liefert -- aendert sich das, stimmt der
-    Merkposten nicht mehr."""
+def _datei_von(pfad, name, ordner):
+    """Datei per DiskTool von der (geflushten) Diskette holen; ``None``, wenn sie fehlt."""
+    ordner.mkdir(exist_ok=True)
+    env = dict(os.environ, LD_LIBRARY_PATH=str(PROJECT_ROOT / "build"))
+    subprocess.run([str(DISKTOOL), "get", str(pfad), name, "--fs", "microdos800", "--to", str(ordner)], capture_output=True, env=env)
+    f = ordner / name
+    return f.read_bytes() if f.exists() else None
+
+
+@braucht_disktool
+def test_ausgabeumlenkung_bis_ctrl_c_und_bis_zum_leeren_ausgabekommando(tmp_path):
+    """GEKLAERT (2026-11-01): `>DATEI` puffert; der Inhalt steht erst nach dem SCHLIESSEN auf der Diskette.  Geschlossen wird
+    durch ^C (Warmstart, Handbuch 4.8), durch ein nacktes `>` -- oder durch ^S ^F (s. naechster Test).  Am Prompt allein
+    ist ^F kein Close-Kommando: die Zeileneingabe (BDOS 10) kennt es nicht und gibt `^F` aus (Handbuch 4.2: 'nur wenn die
+    BDOS-Funktionen benutzt werden' -- es wird nur in der Warteschleife nach ^S ausgewertet, BDOS-Code CA36)."""
     s = _sitzung(tmp_path)
     s.kommando(">OUT.TXT")
     s.kommando("D")
     _ctrl(s, "f"); s.lauf(5_000_000)
-    assert "^F" in s.bild()
-    assert "OUT" in s.kommando("D")
+    assert "^F" in s.bild()                                    # am Prompt nur ausgegeben, nichts geschlossen
+    s.tippe("\r"); s.lauf(5_000_000)                           # die Zeile "^F" verwerfen: ^C wirkt nur am Zeilenanfang
+    _ctrl(s, "c"); s.lauf(50_000_000)                          # Warmstart schliesst die Datei
+    s.lauf(10_000_000); s.emu.flush_disks()
+    inhalt = _datei_von(tmp_path / "a.hfe", "OUT.TXT", tmp_path / "o1")
+    assert inhalt is not None and b"A:MicroDOS.SYS" in inhalt, inhalt
+    # nacktes `>` beendet die Umlenkung ebenfalls (legt dabei einen Platz ohne Namen an -- Gastverhalten)
+    s2 = _sitzung(tmp_path / "zwei")
+    s2.kommando(">OUT.TXT"); s2.kommando("D"); s2.kommando(">")
+    s2.lauf(10_000_000); s2.emu.flush_disks()
+    inhalt = _datei_von(tmp_path / "zwei" / "a.hfe", "OUT.TXT", tmp_path / "o2")
+    assert inhalt is not None and b"A:MicroDOS.SYS" in inhalt, inhalt
+
+
+@braucht_disktool
+def test_ctrl_s_ctrl_f_schliesst_die_ausgabedatei_im_programm(tmp_path):
+    """^F wirkt nur, wenn die Ausgabe mit ^S angehalten ist: danach ist die Datei zu und das Weitere (TYPE in POWER) fehlt."""
+    s = _sitzung(tmp_path)
+    s.kommando(">OUT.TXT")
+    s.tippe("POWER\r"); s.lauf(20_000_000)
+    s.tippe("TYPE MDOSB20.DOC\r"); s.lauf(1_000_000)
+    _ctrl(s, "s"); s.lauf(2_000_000)
+    _ctrl(s, "f"); s.lauf(3_000_000)
+    _ctrl(s, "q"); s.lauf(40_000_000)
+    s.emu.flush_disks()
+    inhalt = _datei_von(tmp_path / "a.hfe", "OUT.TXT", tmp_path / "o3")
+    assert inhalt is not None and 0 < len(inhalt) <= 512 and b"POWER" in inhalt, inhalt
 
 
 # ── POWER, MKEY20, MKINST20, HARDCOPY, KTL/KTP ──────────────────────────────

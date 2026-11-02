@@ -150,18 +150,35 @@ def test_zusatzkanal_ifsp_alb_k6025_ist_nicht_modelliert(tmp_path):
 
 
 @braucht_disktool
-def test_zusatzkanal_ifss_erreicht_die_gegenstelle_nicht_befund(tmp_path):
-    """BEFUND (Gastverhalten, nicht aufgeklaert): der Zusatzkanal-IFSS-Treiber schreibt auf 5CH (SIO A32 Kanal A = Tastatur-
-    empfaenger / Drucker-IFSS, Stecker X3), sendet aber nichts -- auch dann nicht, wenn derselbe Kanal als Drucker (IFSS)
-    gerade funktioniert.  Haelt den Ist-Zustand fest."""
+def test_zusatzkanal_ifss_sendet_auf_a32_kanal_a_das_ist_mit_der_k7637_die_tastatur(tmp_path):
+    """GEKLAERT (2026-11-01): der Zusatzkanal-IFSS-Treiber schreibt auf 5CH = SIO A32 Kanal A (Stecker X4).  Mit der K7637
+    haengt dort die Tastatur (A5120 mit K7637-System): das X geht an die Tastatur, nicht nach aussen -- am Geraet genauso.
+    Der Drucker (IFSS) liegt auf Kanal B (5EH) und geht."""
     pfad = _bauen(tmp_path, "aux_ifss", drucker="1", zusatzkanal="1")
     auxt = tmp_path / "AUXT.COM"
     auxt.write_bytes(AUXT)
     s = _boot(tmp_path, pfad, dateien=[auxt])
     ser = _seriell(s, tmp_path)
+    assert len(ser) == 3                                   # mit der K7637 gibt es keinen vierten Anschluss
     s.tippe("AUXT\r")
     s.lauf(60_000_000)
     assert all(not _lesen(p, 1, 0.3) for p in ser)
-    # der Drucker (IFSS) auf demselben Kanal dagegen geht
     _drucken(s)
     assert _lesen(ser[2], 20).startswith(b"D\r")
+
+
+@braucht_disktool
+def test_zusatzkanal_ifss_mit_k7636_geht_an_den_freien_stecker_x4(tmp_path):
+    """Mit der K7636 am U-Bus ist A32 Kanal A frei: die Maschine fuehrt ihn als vierten Anschluss 'IFSS Zusatzkanal' (X4)
+    heraus, das X des Zusatzkanals kommt dort an."""
+    pfad = ablauf.bauen(str(tmp_path), tastatur="k7637", probe=False, dateiname="aux7636.hfe",
+                        generierung=dict(tastatur="k7636", drucker="1", zusatzkanal="1"))
+    auxt = tmp_path / "AUXT.COM"
+    auxt.write_bytes(AUXT)
+    s = _boot(tmp_path, pfad, tastatur="k7636", dateien=[auxt])
+    ser = _seriell(s, tmp_path)
+    assert len(ser) == 4
+    s.tippe("AUXT\r")
+    s.lauf(60_000_000)
+    assert _lesen(ser[3], 1) == b"X"
+    assert all(not _lesen(p, 1, 0.3) for p in ser[:3])

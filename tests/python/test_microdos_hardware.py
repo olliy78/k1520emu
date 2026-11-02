@@ -91,3 +91,32 @@ def test_systemdiskette_mit_128_byte_sektoren_bootet_mit_dem_lade_rom_v06(tmp_pa
         t = ablauf.Sitzung("k7637", str(k), laufwerke=lw, laderom=laderom)
         t.kaltstart_bis_prompt()
         assert "MicroDOS.SYS" in t.kommando("D")
+    # DiskTool: Profil microdos128 (positiver Nachweis = SYL-Lader 0.6), lesen, schreiben, pruefen -- die Diskette bootet danach
+    if not DISKTOOL.exists():
+        return
+    env = dict(os.environ, LD_LIBRARY_PATH=str(PROJECT_ROOT / "build"))
+
+    def tool(*a):
+        r = subprocess.run([str(DISKTOOL), *map(str, a)], capture_output=True, text=True, env=env)
+        return r.returncode, r.stdout + r.stderr
+
+    rc, aus = tool("info", b)
+    assert rc == 0 and "microdos128" in aus, aus
+    rc, aus = tool("ls", "-l", b)
+    assert "MicroDOS.SYS" in aus and "16384" in aus, aus
+    rc, aus = tool("fsck", b, "--full")
+    assert rc == 0 and "ohne Befund" in aus and "cpm.system" not in aus, aus
+    # Bootabbild lesen (Lader 256 B + Systemdatei) geht; schreiben ist hier nicht moeglich (Lage nur gemessen)
+    assert tool("boot-get", b, tmp_path / "boot128.bin")[0] == 0
+    assert (tmp_path / "boot128.bin").stat().st_size == 256 + 16384
+    # put: Block 18 (von MSYSG20 nicht eingetragen, aber Systembereich) wird nicht vergeben
+    daten = tmp_path / "GROSS.DAT"
+    daten.write_bytes(bytes(range(256)) * 200)                  # 50 KB
+    c = tmp_path / "c.hfe"
+    shutil.copy(b, c)
+    assert tool("put", c, daten)[0] == 0
+    t = ablauf.Sitzung("k7637", str(c), laufwerke=lw, laderom="v06")
+    t.kaltstart_bis_prompt()
+    bild = t.kommando("D")
+    assert "MicroDOS.SYS" in bild and "GROSS" in bild, bild
+    assert tool("fsck", c, "--full")[1].count("Fehler") == 0

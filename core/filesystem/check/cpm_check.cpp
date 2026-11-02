@@ -511,7 +511,9 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
         std::vector<uint16_t> ist;
         for (const CpmDirEntry* d : teile)
             for (uint16_t blk : d->blocks) if (blk != 0) ist.push_back(blk);
-        if (!ist.empty()) {
+        if (!ist.empty() && sector_size_ == 128) {
+            // 128-Byte-Sektoren: Lage der Systemdatei ist nicht erschlossen (nur eine gemessene Diskette) - keine Aussage.
+        } else if (!ist.empty()) {
             const std::vector<uint16_t> soll = systemDateiBloecke(static_cast<uint32_t>(ist.size()));
             if (soll != ist)
                 b.add("cpm.system.ort", FsSeverity::Warnung, FsLayer::Verwaltung, "Systemdatei",

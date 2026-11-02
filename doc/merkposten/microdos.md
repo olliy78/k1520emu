@@ -137,24 +137,36 @@ Alles am echten Gast bedient (Tasten, Bildschirmtext), Wirkung wie im Handbuch g
   Drucker PIO -> E/A 54H..57H = PIO A31 der K8025 (DIL-Schalter-Register): NICHT MODELLIERT** -- der Treiber laeuft durch, nichts erreicht
   die Aussenwelt.  `SELAUX20`-Menue: IFSS (ASS K 8025), IFSP (ALB K 6025), V.24 (ASS K 8025).
 - **Zusatzkanal** (Testprogramm `AUXT.COM` = BDOS 4 'X', BDOS 3, BDOS 2): V.24 -> DFUE/V.24, sendet UND empfaengt (Schleife: `X` kommt zurueck);
-  **IFSP -> OUT 95H / IN 91H: ALB K6025 (E/A 90H..97H) nicht modelliert**; **IFSS -> OUT 5CH, kommt nirgends an** (auch bei Drucker IFSS auf
-  demselben Kanal; offen, ob Gastverhalten -- der Treiber initialisiert den Kanal nicht selbst).
+  **IFSP -> OUT 95H / IN 91H: ALB K6025 (E/A 90H..97H) nicht modelliert**; **IFSS -> OUT 5CH = SIO A32 Kanal A (Stecker X4)** -- GEKLAERT 2026-11-01:
+  mit der **K7637** ist das der Tastaturkanal (das X geht an die Tastatur, nichts nach aussen, am Geraet ebenso; der Drucker-IFSS liegt auf Kanal B,
+  5EH, und geht); mit der **K7636** ist X4 frei, die Maschine fuehrt A32-A dann als **vierten Anschluss "IFSS Zusatzkanal" (X4)** heraus
+  (`A5120Machine`, `K8025::ZifssA32A` wie am PRG 710; Index 3, ein AUP-Sonderanschluss rutscht auf 4).  Waechter
+  `test_zusatzkanal_ifss_sendet_auf_a32_kanal_a_...`, `..._mit_k7636_geht_an_den_freien_stecker_x4`.
 - **Generierungen** (FORMAT20 + MSYSG20 auf Leerdiskette, ~10 s): Drucker V.24/PIO, Zusatzkanal V.24/IFSP/IFSS (oben); **Bildschirm K7023
   (`1`, Option `bildschirm=k7023`)** bootet; **Tastatur K7636** bootet mit `tastatur=k7636`; **K7634.54/.51**: wird generiert, der Emulator hat
   am A5120 keine K7634 (nur K7637/K7636) -> Schirm voller `A>`, **nicht modelliert**.
-- **128-Byte-Systemdiskette** (msysgen Anhang B): mit K5600.10-Laufwerken `FORMAT20` Eintrag 1 (26x128x40x1), `SELDSK20` B auf Typ 1/Format 1 (sonst
+- **128-Byte-Systemdiskette (DiskTool-Profil `microdos128`, 2026-11-01)** (msysgen Anhang B): mit K5600.10-Laufwerken `FORMAT20` Eintrag 1 (26x128x40x1), `SELDSK20` B auf Typ 1/Format 1 (sonst
   `Schreibfehler !` in MSYSG20: das laufende System schreibt mit dem alten Format), `MSYSG20` Typ 1/Format 1 fuer A und B -> bootet mit Lade-ROM
-  V0.6 **und** V0.9_2; mit den K5601-Vorgabelaufwerken bootet sie nicht.  DiskTool: Geometrie `k5601_ss40_26x128` erkannt, **kein Dateisystemprofil**
-  (Verzeichnisplatz 0 traegt FEh) -- nicht angefasst (DiskTool-Profile bearbeitet ein anderer Zweig).
+  V0.6 **und** V0.9_2; mit den K5601-Vorgabelaufwerken bootet sie nicht.  DiskTool: Profil **`microdos128`**
+  (`k5601_ss40_26x128`, Block 1 KB, 64 Plaetze, Erkennung am SYL-Lader 0.6 mit Text "MicroDOS Loader"; Spur 0 Sektor 1-2 = Lader/Plaetze 0-7, Verzeichnis ab Sektor 1,
+  MicroDOS.SYS in den Bloecken 3-17 und **19** -- MSYSG20 laesst Block 18 aus, das System liegt aber in den linearen Sektoren 26..155 = Bloecke 3-19; darum sperrt
+  `CpmFileSystem::allocationMap` 3-19, sonst koennte `put` das System ueberschreiben).  ls/get/put/rm/fsck/boot-get gehen (Diskette bootet nach `put`);
+  **Bootabbild schreiben nicht** (Lage nur an EINER Diskette gemessen), `cpm.system.ort` schweigt fuer 128-B-Sektoren.  Waechter
+  `test_systemdiskette_mit_128_byte_sektoren_bootet_...` (DiskTool-Teil), `FsCatalog.ProfilnamenSindEinStabilerVertrag`.
 - **FORMAT20-Menues** (alle 14 Eintraege formatieren, Gast liest zurueck): MFS 1.2: 26x128 / 16x256 / 5x1024 (je x40x1); MFS 1.4: 16x256 / 9x512 /
   5x1024 (x80x1); MFS 1.6: 16x256 / 9x512 / 5x1024 (x80x2); MF 3200: 26x128 / [Eintrag 2 leer] / 4x1024 (x77x1); MF 6400: 26x128 / 4x1024 / 8x1024
-  (x77x1).  **Befund MF 6400 Eintrag 3 (8x1024x77): ab etwa Spur 52 `Defekte Spuren !`** (Ursache offen; Waechter haelt den Ist-Zustand).
+  (x77x1).  **MF 6400 Eintrag 3 (8x1024x77): `Defekte Spuren !` -- GEKLAERT 2026-11-01:** Spur 1-76 sind in MFM sauber (je 8 Sektoren, CRC ok, 167 936 Zellen = eine
+  Umdrehung); FORMAT20 formatiert **Spur 0 immer in FM** (die Eintraege 1 und 2 sind ganz FM), hier 8 x 1024 B = 139 264 Zellen > 83 968 Zellen einer 8"-FM-Umdrehung
+  (360/min, 500 kZellen/s) -- die Spur passt nicht auf den Umlauf (4 x 1024 FM = 68 160 passt).  Am Geraet ebenso zu erwarten (der Schreibstrom
+  ueberliefe den Index).  Gastverhalten, kein Emulatorfehler.  Waechter `test_format20_menueeintrag[MF6400-Eintrag3]` (Spurlaengen aus der HFE).
   DiskTool erkennt leere Formate nur mehrdeutig (`cpa_auto`), `16x256x80x2` -> `scpx640`, `5x1024x80x2` -> `cpa800`.
 
-## Offen (2026-10-31)
-- `>DATEI`: Verzeichniseintrag entsteht, Datei bleibt 0 Byte, auch nach `^C`; `^F` am Prompt/`>`-Prompt wird als `^F` ausgegeben (Handbuch 4.2/4.8
-  beschreibt anderes) -- Gast oder Emulator ungeklaert (Waechter haelt den Ist-Zustand).
-- Zusatzkanal IFSS; MF 6400 8x1024; PIO-Drucker und IFSP ohne Gegenstelle; K7634 fehlt.
+## Offen (2026-11-01)
+- **Ausgabeumlenkung `>DATEI` -- GEKLAERT:** der Puffer wird erst beim Schliessen geschrieben.  Schliessen: `^C` (BDOS-Zeileneingabe wertet es nur am **Zeilenanfang**
+  als Warmstart -- nach einem `^F` am Prompt steht schon ein Zeichen in der Zeile, daher blieb die Datei 0 Byte), nacktes `>` (legt zusaetzlich einen Platz mit leerem
+  Namen an, `cpm.dir.name`), oder **`^S` dann `^F`** (BDOS-Code CA21/CA36: `^F` wird nur in der Warteschleife nach `^S` ausgewertet; am Prompt macht die Zeileneingabe `^F`).
+  Handbuch 4.2/4.8 sagt nichts davon.  Waechter `test_ausgabeumlenkung_bis_ctrl_c_...`, `test_ctrl_s_ctrl_f_schliesst_...`.
+- PIO-Drucker und IFSP ohne Gegenstelle, K7634 fehlt (bewusst nicht nachgebaut).
 - **MSYSG15B** (1715 mit K5600/MFS 1.2): nur im Handbuch genannt.  Durchsuchung aller `.hfe/.img/.dmk/.td0/.cqm` und Zip-Inhalte unter `~/projects/robotron`
   (1286 Abbilder, u. a. GOTEK-Sticks, `mpm-kc85_de/.../MicroDOS_sys.zip`, `Disketten_Images_RT`) per `k1520disktool ls`: **kein `MSYSG15B`**; `MSYSG15A` steht
   nur auf `MicroDOS1715.hfe` und `MicroDOS1715_LW_C.hfe`; die `MSYSG.COM` der KC85-Abbilder gehoeren zu MicroDOS fuer KC85 (andere Hardware).
