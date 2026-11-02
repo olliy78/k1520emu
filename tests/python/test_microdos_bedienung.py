@@ -135,7 +135,7 @@ def test_offset_systemlaufwerk_benutzerbereich_und_eingabeumlenkung(tmp_path):
     bild = s.kommando("<CMD.SUB")
     assert "; Kommentar" in bild and "B:MicroDOS.SYS" in bild and "A: 0" in bild, bild
     assert "?" not in bild.split("<CMD.SUB")[-1], bild
-    # ohne Typ gibt es die Datei nicht (der Name ist maßgeblich, nicht nur der Stamm)
+    # ohne Typ gibt es die Datei nicht (der Name ist massgeblich, nicht nur der Stamm)
     assert "CMD?" in s.kommando("<CMD")
 
 
