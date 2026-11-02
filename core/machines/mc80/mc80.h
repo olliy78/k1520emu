@@ -85,7 +85,7 @@ public:
 
     // ─── Tastatur (Zeichenebene an SIO A) ────────────────────────────────────
     void keyPress(uint32_t keycode, bool shift, bool ctrl) override;
-    void keyRelease(uint32_t) override {}            // ein Anschlag je keyPress
+    void keyRelease(uint32_t k) override { tast_.loslassen(k); }   // beendet die Wiederholung
     void setKeyRepeatRealtime(bool) override {}       // Wiederholung macht die Tastatur
     /// Bit 0 = Tastaturanzeige (14H an / 12H aus) [?].
     uint8_t  keyboardLeds() const override { return tast_.anzeige() ? 1 : 0; }

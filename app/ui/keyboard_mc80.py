@@ -215,6 +215,9 @@ class KeyboardMc80Widget(KeyboardWidget):
         Feststeller der Nachbildung macht aus Buchstaben Großbuchstaben, die angeklickte
         CTRL-Taste wirkt wie die des Wirts.
         """
+        if int(event.key()) == int(Qt.Key_Pause):
+            # Strg+OFF ohne Strg+Esc: Windows faengt Strg+Esc ab (Startmenue), Pause ist frei.
+            return (int(Qt.Key_Escape), False, True)
         mapped = qt_event_to_core_key(event)
         if mapped is None:
             return None

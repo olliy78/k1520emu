@@ -2131,7 +2131,11 @@ anders ist:
   Leuchten links zeigen CTRL und Umschaltung, die rechts neben CL die Bereitschaft.
 * Die **PC-Tastatur**: Zeichen als Zeichen (EGOS tauscht in der Vorgabe Groß und
   Klein — „a“ erscheint als „A“), **Enter** = ENTER, **Esc** = OFF (Abbruch),
-  **Tab** = Tabulator, **F1–F8** = Steuertasten S0–S7. Die Pfeiltasten wirken nicht.
+  **Tab** = Tabulator, **F1–F8** = Steuertasten S0–S7, Pfeile, **Entf** = CL. **Strg** + Taste
+  sendet wie am Gerät den Präfix 1FH mit dem unumgeschalteten Code (**Strg+Esc = Strg+OFF**,
+  z. B. zum Verlassen des RAM-Editors). Windows fängt Strg+Esc ab (Startmenü): dort die
+  **Pause-Taste** benutzen, sie wirkt als Strg+OFF. Eine gehaltene Taste **wiederholt** sich
+  wie an der Originaltastatur (nach etwa 0,4 s, dann etwa 20 Zeichen je Sekunde).
 * **Text kopieren** — der Bildschirm ist eine Grafik; *Maschine ▸ Bildschirminhalt als
   Text kopieren* (oder Rechtsklick) erkennt die EGOS-Schrift wieder und liefert 25
   Textzeilen.

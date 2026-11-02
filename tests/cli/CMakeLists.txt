@@ -36,6 +36,8 @@ if (CMAKE_CROSSCOMPILING_EMULATOR)
     set(_cli_emulator --emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
 endif()
 
+set(_cli_langsam mutos8000_datendisketten_k5601 mutos8000_tar_disktool_geschrieben)
+
 foreach(_case IN LISTS _cli_cases)
     get_filename_component(_name "${_case}" NAME_WE)
     add_test(NAME cli_${_name}
@@ -49,7 +51,17 @@ foreach(_case IN LISTS _cli_cases)
                 --tool "z8kasm=$<TARGET_FILE:z8kasm>"
                 --tool "z8kdis=$<TARGET_FILE:z8kdis>"
                 --tool "k1520tape=$<TARGET_FILE:k1520tape>")
-    set_tests_properties(cli_${_name} PROPERTIES TIMEOUT 120 LABELS "cli;fast")
+    if (_name IN_LIST _cli_langsam)
+        # Spezialfaelle (2026-10-31): booten MUTOS 8000 und fahren ein ganzes Gastprogramm
+        # (C-Uebersetzer bzw. tar-Lesen); unter der Last der Standard-Regression (-j16) rissen
+        # sie die 120 s.  Darum Timeout +50 % und NICHT in der Standardrunde: Label
+        # format_integration (dev.sh test schliesst es aus; test-format/test-all/test-merge
+        # fahren es) plus fach_a5120 (Waechter py_testauswahl).  Kein "fast".
+        set_tests_properties(cli_${_name} PROPERTIES TIMEOUT 180
+            LABELS "cli;format_integration;fach_a5120")
+    else()
+        set_tests_properties(cli_${_name} PROPERTIES TIMEOUT 120 LABELS "cli;fast")
+    endif()
 endforeach()
 
 list(LENGTH _cli_cases _cli_count)

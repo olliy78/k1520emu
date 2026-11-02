@@ -99,7 +99,7 @@ ihn nie an.
 ## Was beim ersten Mal passiert
 
 Das Setup ist ~3 MB, die Installation lädt danach **einmalig ~120 MB** nach: einen eigenen
-Python 3.12 und Qt, beides **innerhalb der Installation**. Das braucht eine
+Python 3.14 und Qt, beides **innerhalb der Installation**. Das braucht eine
 Internetverbindung und ein paar Minuten — der Assistent sagt es vorher an und zeigt,
 wo er gerade steht. Ein vorhandenes Python auf dem Rechner wird nicht angefasst, nichts
 registriert; beim Entfernen bleibt nichts zurück. Danach startet der Emulator ohne Netz, und es sind

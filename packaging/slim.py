@@ -398,7 +398,7 @@ def cpython_baeume(root: Path) -> list:
     """Die CPython-Baeume unter `<root>/python` — es gibt ZWEI Anordnungen.
 
     `uv python install` legt den Baum in ein VERSIONIERTES Unterverzeichnis
-    (`<root>/python/cpython-3.12.11-linux-x86_64-gnu/`), der Windows-Assistent
+    (`<root>/python/cpython-3.14.10-linux-x86_64-gnu/`), der Windows-Assistent
     packt ihn dagegen direkt nach `<root>/python/` (das Archiv traegt `python`
     als oberste Ebene).
 
@@ -462,7 +462,7 @@ def slim_libpython(root: Path, cut: Cutter) -> None:
     Objekt die Bibliothek anzieht, fliegt sie raus.  Zieht eine kuenftige
     Abhaengigkeit sie doch, bleibt sie liegen.
     """
-    # Windows kennt das Problem nicht: dort ist `python312.dll` die Laufzeit
+    # Windows kennt das Problem nicht: dort ist `python314.dll` die Laufzeit
     # selbst und wird von `python.exe` gebraucht — es gibt keine ueberzaehlige
     # zweite Ausfertigung.
     if IST_WINDOWS:

@@ -32,12 +32,12 @@ Kappe in Großbuchstaben); der Code von `÷` im Ziffernblock.
 | 0EH / 0FH | CTRL-/Links-/Rechts-/Fixumschaltung sperren / freigeben | — |
 | 04H | Matrix sperren, Bereit-LED aus | 15H (NAK) |
 | 05H | Matrix freigeben, LED ein | 06H (ACK) |
-| 13H / 14H | Autorepeat aus/ein — wegen Firmwarefehlers wirkungslos | — |
+| 12H / 14H | Autorepeat ein / aus (Firmware `MC8030KB.bin`, s. `tastatur_firmware.md`; das Forum nannte 13H/14H wirkungslos) | — |
 | sonstige | ohne Funktion | 18H (CAN) |
 
 Nach dem Einschalten sendet die Tastatur 06H; die SIO ist dann noch nicht initialisiert, das
 Zeichen geht verloren (nicht nachgebildet).  **Achtung:** EGOS sendet 12H/14H, wenn FB7FH Bit 6
-wechselt; 12H ist nicht definiert und wird mit CAN beantwortet, das EGOS als Zeichen empfängt.
+wechselt; Laut Forum wird 12H mit CAN beantwortet; **der Firmware-Abzug nimmt 12H dagegen als Wiederholung-ein an (keine Antwort)** und ist so im Emulator umgesetzt.
 
 ## Weitere Befunde
 

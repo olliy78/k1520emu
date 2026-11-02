@@ -7,7 +7,7 @@
 ; iscc-Aufruf); Entwurf und Begruendungen: doc/design/13_distribution.md §5.1.
 ;
 ;   iscc /DVersion=1.2.3 /DVersionInfo=1.2.3.100 /DPaket="C:\...\k1520emu-1.2.3-windows-x86_64" \
-;        /DPyVersion=3.12.13 /DPyRelease=20260807 /DPySha256=… /DPySize=… \
+;        /DPyVersion=3.14.x /DPyRelease=20260807 /DPySha256=… /DPySize=… \
 ;        /DGwWheel=greaseweazle-1.23-py3-none-any.whl /DGwVersion=1.23 \
 ;        k1520emu.iss
 ;
