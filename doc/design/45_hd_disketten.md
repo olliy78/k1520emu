@@ -97,6 +97,10 @@ Was fehlt:
   Dateigröße gleich der mit `create --fs dos1200` erzeugten HFE, `check --full` ohne Befund, alle Dateien byteweise gleich, `gw convert
   --format ibm.1200` 2400/2400.  `--write put` (150 KB): 23 Spuren geschrieben und gegengelesen ohne Fehlvergleich; Fluss auf der
   Scheibe 2,4/3,6/4,8 µs (= 1,2M-Dichte bei 300 U/min); `gw read --format ibm.1200` 2400/2400, Dateien gleich.
+* **Gegenprobe, TEAC auf 360 U/min umgejumpert** (gemessen 359,1): dieselbe Diskette mit `--rate 500 --rpm 360` (Eintrag
+  „IBM-PC-Laufwerk") gelesen → Kopf 500/360, `check --full` ohne Befund, alle Dateien (auch die bei 300 U/min geschriebenen) gleich;
+  `--write put` 16 Spuren ohne Fehlvergleich, Fluss 2/3/4 µs, `gw read --format ibm.1200` 2400/2400.  Damit sind beide Wege
+  gegeneinander austauschbar: was das 300er-Laufwerk schreibt, liest das 360er, und umgekehrt.
 
 ## 4  Offen
 
