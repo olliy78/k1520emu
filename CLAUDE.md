@@ -730,6 +730,19 @@ Dazu Wirtstaste **Pause** = ET2 (kein Kürzel) und Rechtsklick auf ET2 der Bilds
 **Vor Arbeiten daran: `doc/merkposten/sios.md` lesen** (Festlegungen mit Wächtern, CAN-Systemstopp = Gastverhalten, INIT-Befund, Bedienfallen).
 Plan und Stand: `doc/design/43_sios1526.md`; Format `doc/sios_diskettenformat.md`; Unterlagen `doc/sios/`.
 
+## MicroDOS 1526 (Zweig `microdos`, Stand 2026-10-31)
+
+Rostocker CP/M-2.2-Anpassung (Vers. 2.6) auf dem A5120-Kern, **kein Emulatorfehler, kein Kernpatch**; vier Bootdisketten in
+`disks/a5120_microdos1526/` (K5601 80 Zyl. / K5600.10 40 Spuren x Tastatur K7637 seriell / K7636 parallel), **selbst gebaut** von
+`tools/microdos/build.py` (Originale der Sammlung in `tools/microdos/original/`; `ablauf.py` treibt FORMAT20 -> MSYSG20 im Emulator, das
+DiskTool kopiert die Beigaben nach). Wächter `py_microdos_ablauf` (Kaltstart bis `A>`, `build.py --check` byteweise + Erkennung
+`microdos800`/`microdos200` + fsck ohne Warnung). DiskTool-Profile `microdos800|200|1715` (Lader im Verzeichnis). Gastverhalten: `PIP.COM` der Sammlung
+ist abgeschnitten (4096 B), `INITIAL.SUB` hält bei `A>MKEY20` an (ein Return). **Vor Arbeiten daran: `doc/merkposten/microdos.md` lesen.**
+
+**MicroDOS 1715** (2026-10-31): Vers. 2.6 bootet am PC 1715 (K7222, 4 × K5601); `FORMAT15` + `MSYSG15A` bauen aus einer Leerdiskette eine bootende Systemdiskette
+(`tools/microdos/ablauf1715.py`, Auslieferung `disks/pc1715_microdos/` aus `tools/microdos/build1715.py`). DiskTool-Profil `microdos1715`: Bootabbild = 128-B-Kopf +
+`MICRODOS.SYS` (muss in die ersten Datenblöcke). **Nach FORMAT15 RESET, nicht Strg+C.** 1715W bootet nicht. **Vor Arbeiten daran: `doc/merkposten/microdos1715.md` lesen.**
+
 ## MUTOS 8000: Diskettenbau HIER, Forschung in mutos8k (Stand 2026-10-29)
 
 **Der Diskettensatz entsteht in DIESEM Projekt, ohne jede Abhaengigkeit zu mutos8k:** `python3 -I tools/mutos8000/bau_alle.py` baut aus den

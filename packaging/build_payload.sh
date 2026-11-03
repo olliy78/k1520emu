@@ -43,17 +43,23 @@ GW=yes
 # (cpa_a5120, cpa_pc1715, scpx_a5120, scpx_k8915, scpx_prg, scp_pc1715, scp_pc1715w; Inventur: doc/scp_inventur.md).
 # Seit 2026-10-16: BCU 880 am fruehen A5120 (tools/bcu_a5120/build.py: Start- und Arbeitsdiskette aus
 # den Belegen doc/a5120_alt/bcu/, formatierte BCU-Kassette) und das Demo-Bootband (Eigenbau, .k52).
+# Seit 2026-11-03: MicroDOS 1526 (tools/microdos/build.py, vier Bootdisketten; Auslieferung vom Anwender freigegeben).
 # Alles aus disks/: --disks all.
 DISKS_DEFAULT="a5120_cpa_k5601_system.hfe
 a5120_scpx17_k5601_system.hfe
 a5120_udos43_k5601_entwickler.hfe
 a5120_udos50_k5601_system.hfe
+a5120_microdos26_k5601_seriell.hfe
+a5120_microdos26_k5601_parallel.hfe
+a5120_microdos26_k5600_10_seriell.hfe
+a5120_microdos26_k5600_10_parallel.hfe
 k8915_scpx8915_v24_system.hfe
 prg710_udos43_k5601_system.hfe
 prg710-1_udos43_k5601_v43_189.hfe
 prg710_scpx15_system.hfe
 prg710-1_scpx17_system.hfe
 pc1715_cpa1715_system.hfe
+pc1715_microdos_k5601_system.hfe
 pc1715_scp1715_v0006_system.hfe
 pc1715_scp1715_v0007_system.hfe
 pc1715_cpz22_system.hfe

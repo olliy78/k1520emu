@@ -187,6 +187,14 @@ add_test(NAME cli_cpa_pc1715
 set_tests_properties(cli_cpa_pc1715 PROPERTIES
     TIMEOUT 180 LABELS "cli;fast")
 
+# Waechter „die MicroDOS-1715-Systemdiskette in disks/ ist der Inhalt von tools/microdos/inhalt1715/ + Bootabbild“.
+# Neu bauen: python3 tools/microdos/build1715.py --tool build/k1520disktool
+add_test(NAME cli_microdos1715
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/microdos/build1715.py"
+            --check --tool "$<TARGET_FILE:k1520disktool>" ${_beigaben_emulator})
+set_tests_properties(cli_microdos1715 PROPERTIES
+    TIMEOUT 180 LABELS "cli;fast")
+
 # Waechter „die SCPX-Systemdiskette des A5120 in disks/ ist der Inhalt von tools/scpx_a5120/“ (doc/scp_inventur.md).
 # Neu bauen: python3 tools/scpx_a5120/build.py --tool build/k1520disktool
 add_test(NAME cli_scpx_a5120

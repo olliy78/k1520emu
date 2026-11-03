@@ -2571,3 +2571,70 @@ Bytezahl im Archiv.  Der Kopf der Datei erklärt jeden Schlüssel im Klartext
   Mitglied der `.zip` ist genau einmal erklärt.
 * `test_archive_verzeichnis_nennt_den_namen_auf_der_diskette` — der
   CP/M-Nutzerbereich in beiden Schreibweisen.
+
+## 25. MicroDOS 1526 / 1715 (Rostock) — CP/M mit Lader im Verzeichnis (2026-10-31)
+
+**Befund** an `MicroDOS1526{s,p}[_5600].hfe`, `MicroDOS1715[_LW_C].hfe` (Sammlung D. L., Doku `Doc/MicroDOS/*.txt`):
+
+| | 1526 DS 80 Zyl. (5×1024) | 1526 SS 40 Zyl. (K5600.10, 5×1024) | 1715 DS (5×1024) |
+|---|---|---|---|
+| Verzeichnis ab | c0h0 Sektor 1 (Offset 0, **keine Systemspuren**) | dto. | dto. |
+| Blockgröße | 2048 | 1024 | 2048 |
+| Plätze (gemessen: ab dort Daten) | **104** (nicht 128/192) | 64 | 128 |
+| Zeiger | 16 Bit (400 Blöcke) | 8 Bit | 16 Bit |
+| Lader | `SYL`-Sektor = Plätze 0…7 (256 B) | dto. | Bootkopf `03 F0` = Plätze 0…3, Nutzerbyte der Plätze 1…3 = `10H` |
+
+* **Der Lader steckt im Verzeichnis** wie beim CP/A 1715, nur größer. Der SYL-Sektor (1024 B) trägt „SYL", Parameterbytes
+  (`+7..`: `bc fe 01 00 | 01 03 04 05 | 00`; `[040CH]`=Spuranzahl−1… wird in `[03F0H]` kopiert: Ladeadresse BC00H, 4 Sektoren,
+  Sektor-IDs 1,3,4,5 sind die Reihenfolge-Tabelle), Code ab 0410H (CRC-Schleife, LDIR der Meldung „MicroDOS Loader No read"),
+  `JP BD00H`. Er liest **Zylinder 1 Kopf 0 Sektor 1…4 nach BC00H** und springt nach BD00H (= INIT); INIT holt BDOS/BIOS von
+  Zylinder 2…4 (Anhang A der `msysgen.txt`: 4 Spuren × 4 Sektoren = 16 KB).
+* **`MicroDOS.SYS` (Attribut SYS, 16 KB) ist eine Datei, liegt aber an FESTEN Sektoren** (c1…c4 h0, Sektor 1–4, bei 2-KB-Blöcken
+  Blöcke 5,6,10,11,15,16,20,21). Name in **gemischter Schreibung**; das Wächter-Regelwerk „Namen groß" nimmt sie aus
+  (`CpmFileSystem::microDosSysName`). Das Bootabbild des Werkzeugs ist deshalb **Lader (256 B) + Systemdatei (≤ 16 KB)**
+  (16 640 B); `create --boot`/`boot-put` schreibt beides (`writeSystemDatei`, prüft, dass die Blöcke frei sind).
+* Dateiattribute wie CP/M 2.2 (t1' R/O, t2' SYS, t3' ARC — Hochbits von Typ[0..2]); `attr --arc` und die Archivfunktion der
+  Oberfläche (`archive.py`/`archiv_meta.py`: Dateien + `cpm-dateiangaben.txt` mit Nutzerbereich/RO/SYS/ARC) sind die
+  allgemeinen CP/M-Wege und gelten unverändert.
+* **Erkennung** nur mit positivem Nachweis (SYL-Lader bzw. Bootkopf + Datei `MICRODOS.SYS` bei 1715), sonst bleibt die
+  Geometrie `cpa800`; `microdos800_daten`/`microdos200_daten` (`detect: false`) für Disketten ohne Lader. Profile in
+  `data/formats.yaml`: `microdos800`, `microdos200`, `microdos1715`; `boot_header: microdos|microdos1715` + `dir_boot`.
+* **Parameterbytes im SYL-Sektor — am Ladercode belegt** (2026-10-31; Disassembly der 256 B, `tools/z80_disasm2.py --org 0x400`; der Sektor wird
+  nach 0400H geladen, Einsprung 0437H, Prüfsummenroutine 0410H, die Prüfung selbst steht als `NOP`×3 — Rostocker Eingriff). Bytes `+06…+0E`:
+  `00 BC | FE | 01 | 00 | 01 | 03 | 04 | 05`. `+06/+07` (Ladeadresse BC00H) und `+08…+0C` werden nach `[03F0H…03F6H]` kopiert — das ist der
+  Parameterblock der Boot-ROM-Leseroutine (`doc/analyse_zre_rom_boot.md`): `[03F2]`=FEH (Adressmarke), `[03F3]`=Zylinder 1, `[03F4]`=Kopf 0,
+  `[03F5]`=erste Sektor-ID 1, `[03F6]`=Size-Code 3 (1024 B). `+0D`=04 → `[07F2]` = Sektorzahl je Spur (Sektor 1…4, aufsteigend; die ROM-Routine zählt die
+  ID hoch bis `[07F2]`), `+0E`=05 = Endzylinder (exklusiv). Nach jeder Spur: Ladeadresse += Sektorzahl × (Sektorlänge/256) — der Code rotiert die Sektorzahl
+  `(+0C)+7`-mal (A=04 → 10H, also +1000H) — und der Zylinder wird erhöht (`+09`). Ergebnis: **Zylinder 1…4, Kopf 0, Sektor 1…4, je 1024 B →
+  BC00H…FBFFH**, dann `JP BD00H` (INIT). Die frühere Deutung „Sektorfolge 1,3,4,5" war falsch (`+0B…+0E` sind Sektor-ID 1, Size-Code 3, Sektorzahl 4,
+  Endzylinder 5). Fehlerweg: bis zu 7 Wiederholungen (`[07F6]`), dann Meldung „MicroDOS Loader No read" und Halt. **Die 200K-Variante trägt
+  dieselben Bytes** (die 256-B-Lader aller vier 1526-Abbilder sind bytegleich): ihre Systemdatei liegt ebenfalls auf c1…c4 h0 Sektor 1…4, nur mit
+  1-KB-Blöcken (16 statt 8 Zeiger). Die Unterschiede der Abbilder liegen ausschließlich in `MicroDOS.SYS` (Tastatur-/Laufwerkstabellen, 40…139 Byte).
+* Der Selbstlauf im Emulator ist belegt: jedes der fünf Bootabbilder bootet bis `A>` (`py_microdos_bootabbilder`); Bestückung je Abbild in
+  `doc/merkposten/microdos.md`. Die Prüfung meldet `cpm.system.ort`/`cpm.system.fehlt`, wenn die Systemdatei nicht am Ort des Laders liegt.
+
+
+### 25.4 Die 128-Byte-Variante (`microdos128`) — am Ladercode belegt (2026-11-03)
+
+Quelle: `msysgen.txt` Anhang B und eine mit MSYSG20 im Emulator erzeugte Diskette (K5600.10, `FORMAT20` Eintrag 1, `SELDSK20`, `MSYSG20` Format 1);
+Disassembly mit `tools/z80_disasm2.py --org 0x400`. **Zwei Lader, ein System:**
+
+* **Lade-ROM V0.9_2** holt den 256-B-Lader aus den Verzeichnisplätzen 0…7 (Spur 0 Sektor 1–2, Text „MicroDOS Loader“, gleicher Code wie im 1024-B-Lader).
+  Parameterbytes `+06…+0E` = `00 B9 | FE | 01 | 00 | 01 | 00 | 1A | 06`: Ladeadresse **B900H**, Marke FEH, **Zylinder 1 Kopf 0**, erste Sektor-ID 1, **Size-Code 0 (128 B)**,
+  **26 Sektoren je Spur**, Endzylinder 6 (exklusiv). Die Schleife addiert je Spur 26 × 128 = 0D00H (`RLCA` × (Size-Code+7) auf 1AH = 0DH). Ergebnis:
+  **Zylinder 1…5, Kopf 0, je 26 Sektoren zu 128 B = 16 640 B → B900H…F9FFH**, danach `JP BD00H` (INIT = Spur 1 Sektor 9 = B900H + 8 × 128).
+* **Lade-ROM V0.6** (kennt nur „SYL auf Zylinder 1“, wie beim BCU 880) holt Spur 1 Sektor 1–6 (768 B) nach 0400H: ein Allzweck-SYL-Lader (Kopf `SYL 00 | B9 00 | 40`): Ladeadresse **B900H**,
+  Länge **4000H** (= 128 Sektoren; der Code rechnet 4000H → 0080H), liest ab **Zylinder 1 Sektor 1** fortlaufend (nach Sektor 26 nächste Spur) und springt mit `JP (HL)`,
+  `HL = BD00H`. Beide Wege laden also dieselben Sektoren an dieselbe Stelle (Anhang B: Spur 1 „SYL 0.6“ Sektor 1–8, INIT 9–16, BDOS ab 17, BIOS bis Spur 5).
+* **Lage der Sektoren:** lineare Sektoren 26…155 (Spur 1…5 ganz). Gemessen: Sektor 26–31 SYL 0.6, 32–33 Füllbytes E5, 34–… INIT/BDOS/BIOS, Ende der Daten bei Sektor 138,
+  danach **Nullen bis Sektor 155** (Auffüllung des Systemabbilds). Das Lade-ROM V0.9_2 braucht nichts außerhalb dieser Spuren.
+* **Verzeichniseintrag:** Platz 8 (Spur 0 Sektor 3), Name `MicroDOS.SYS` (Typ-Bit 2 = SYS), 128 Sätze, Zeiger **3…17 und 19**. Block 18 fehlt. Erklärung: ein Platz fasst 16
+  Zeiger, das System überdeckt aber die Blöcke 3…19 (17 Blöcke, Block 3 beginnt bei Sektor 24, also zwei Sektoren VOR dem System; Block 19 endet bei Sektor 159). MSYSG20 schreibt das System
+  physisch (Spuren 1–5) und legt nur einen 16-Zeiger-Eintrag an; welchen Block es weglässt, ist an einer einzigen Diskette gemessen (Block 18 = Sektor 144–151, reine Nullauffüllung), aber
+  er liegt IM geladenen Bereich (der Lader holt 128 Sektoren = bis Sektor 153).
+* **Was das DiskTool tut:** `create --boot`/`boot-put` schreiben Lader (256 B) + das Bild als Datei in **dieselben Blöcke 3–17 und 19**, setzen dieselben 16 Zeiger und füllen **Block 18 mit
+  Nullen**; `allocationMap` sperrt 3…19 ganz (ein `put` vergibt Block 18 nie). Das Bootabbild ist 256 + 16 384 B: die ersten 256 B der Datei (Sektor 24–25) sind ungenutzt (E5) und
+  stehen nur für den Rundlauf `boot-get → create → boot-get` (bitgleich). Die Prüfung `cpm.system.ort` gilt jetzt auch hier (Soll = Zeiger 3–17, 19).
+* **Fremde Lader** werden vor dem Schreiben abgewiesen (`microdosBootabbildproblem`): Size-Code `+0C` / Sektoren je Spur `+0D` müssen zum Profil passen (0/26 für `microdos128`, 3/4 für `microdos800|200`).
+* Hardware-Bedingung: nur mit K5600.10-Laufwerken (`FORMAT20`-Format 1); in den K5601-Vorgabelaufwerken bootet die Diskette nicht (Laufwerkstabelle im System).
+  Abbild: `data/bootsektoren/boot_microdos_1526_128.bin`, Wächter `DisktoolMicrodos.Systemdiskette128…`, `test_128_byte_bootabbild_bootet_mit_beiden_lade_roms`.

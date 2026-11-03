@@ -303,6 +303,7 @@ def test_pc1715_disketten_sind_in_der_vorgabeauswahl():
     block = block[len('DISKS_DEFAULT="'):].split('"', 1)[0].split()
     soll = {"pc1715_scp1715_v0006_system.hfe", "pc1715_scp1715_v0007_system.hfe",
             "pc1715_cpa1715_system.hfe", "pc1715_cpz22_system.hfe",
+            "pc1715_microdos_k5601_system.hfe",
             "udos1715_640k_pc1715_system.hfe",
             "pc1715w_scp30_system.hfe"}
     assert soll <= set(block)
@@ -311,6 +312,18 @@ def test_pc1715_disketten_sind_in_der_vorgabeauswahl():
     vorgabe = (PACKAGING.parent / "data" / "default_config_pc1715.yaml").read_text(encoding="utf-8")
     assert not re.search(r"^disks:", vorgabe, re.M)
 
+
+def test_microdos1526_disketten_sind_in_der_vorgabeauswahl():
+    """MicroDOS 1526 (doc/merkposten/microdos.md): die vier gebauten Bootdisketten gehoeren wie
+    die des PC 1715 zur Vorgabeauswahl (Freigabe des Anwenders 2026-11-03)."""
+    text = (PACKAGING / "build_payload.sh").read_text(encoding="utf-8")
+    block = text[text.index('DISKS_DEFAULT="'):]
+    block = block[len('DISKS_DEFAULT="'):].split('"', 1)[0].split()
+    soll = {"a5120_microdos26_k5601_seriell.hfe", "a5120_microdos26_k5601_parallel.hfe",
+            "a5120_microdos26_k5600_10_seriell.hfe", "a5120_microdos26_k5600_10_parallel.hfe"}
+    assert soll <= set(block)
+    for name in soll:
+        assert ausgelieferte_diskette(name).is_file(), name
 
 def test_iss_hat_den_k8915_emulator_im_startmenue():
     iss = (PACKAGING / "k1520emu.iss").read_text(encoding="utf-8")

@@ -535,7 +535,9 @@ zurückrechnen, der er gehört.  Bei UDOS (§9) liegt das genau andersherum.
 | `cpm.block.luecke` | Nullzeiger vor einem belegten Zeiger innerhalb eines Extents (dünn besetzte Datei — bei CP/M 2.2 fast immer ein Schaden, aber nicht sicher) | Warnung |
 | `cpm.dir.leer` | Der Eintrag sagt *n* Sätze an, nennt aber keinen einzigen Block | Fehler |
 | `cpm.dir.sonderplatz` | *n* Plätze tragen eine Sonderfunktion (CP/M-3-Kennwort, Datenträgeretikett, Zeitstempel).  **Kein Schaden** — dieses Werkzeug wertet sie nur nicht aus.  Sie als Fehler zu melden hieße, auf jeder Diskette mit Zeitstempeln 32 Fehler zu behaupten | Info |
-| `cpm.dir.geloescht` | *n* freie Plätze tragen noch einen lesbaren Eintrag: wiederherstellbar (§13) | Info |
+| `cpm.dir.geloescht` | *n* freie Plätze tragen noch einen lesbaren Eintrag **mit brauchbarem Blockzeiger**: wiederherstellbar (§13); ein geloeschter leerer Eintrag zählt nicht | Info |
+| `cpm.system.ort` | MicroDOS: `MicroDOS.SYS` (1526: Zyl. 1–4 Kopf 0 Sektor 1–4) bzw. `MICRODOS.SYS` (1715: erste Datenblöcke) liegt nicht dort, wo der Lader sie holt — Diskette bootet nicht | Warnung |
+| `cpm.system.fehlt` | MicroDOS 1526: SYL-Lader vorhanden, `MicroDOS.SYS` fehlt | Warnung |
 | `cpm.verz.ungelesen` | Die Verzeichnisspur ist an einer physischen Diskette noch nicht gelesen — geprüft wurde nichts | Info |
 | `cpm.verz.unlesbar` / `cpm.bereich.fehlt` | Der Verzeichnisbereich bzw. `data_start` ist nicht erreichbar | Fehler |
 

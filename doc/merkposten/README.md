@@ -25,6 +25,8 @@ sind nur nicht mehr in jeder einzelnen Anfrage geladen.
 | `kermit.md` | `kermit/` (Bibliothek `libk1520kermit`, C-ABI `k1520k_*`), `tools/k1520kermit.cpp`, `app/kermittool/`, WEGA-Gegenstelle C-Kermit 4.2 auf `disks/p8000_wega31` — Protokollregeln gegen C-Kermit 4.2, adaptive Fristen, Platteneinrichtung (direkt hier angelegt, AP K7) |
 | `td0_imd.md` | `core/peripherals/floppy_drive/{td0,imd}_codec` + `sector_track_io`, Container `.td0`/`.imd` — TeleDisk/ImageDisk (Clean-Room aus HxC, MIT; direkt hier angelegt) |
 | `sios.md` | SIOS 1526 (A5120/A5130/K8924): Q240/CTC/F8-Kernkorrekturen, Sicherheitsstecker, Tasten ET1/ET2/M, DiskTool-Dateisystem `sios`, Befunde CAN/INIT (Entwurf 43; direkt hier angelegt; `CLAUDE.md` traegt nur den Kurzabsatz „SIOS 1526“) |
+| `microdos.md` | MicroDOS 1526 (Rostock) am A5120: Abbild -> Tastatur/Laufwerk, FORMAT20, MSYSG20-Menuefolge, `tools/microdos/ablauf.py`, Waechter `py_microdos_ablauf` (direkt hier angelegt) |
+| `microdos1715.md` | MicroDOS 1715 (Rostock) am PC 1715: FORMAT15/MSYSG15A-Ablauf, Motorregister-Stolperstein nach FORMAT15 (RESET statt Strg+C), `create --boot` = Kopf + MICRODOS.SYS, `tools/microdos/ablauf1715.py` + `build1715.py`, Waechter `py_microdos1715_ablauf`/`cli_microdos1715`/`DisktoolMicrodos.*` (direkt hier angelegt) |
 
 ## Warum ausgelagert
 

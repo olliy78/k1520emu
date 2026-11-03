@@ -692,7 +692,8 @@ K1520_API bool        k1520_k3521_akku_leer_n(K1520Handle h, int n, int leer);
 K1520_API bool        k1520_aup_install(K1520Handle h);
 K1520_API bool        k1520_aup_installed(K1520Handle h);
 /** @brief Wie k1520_aup_install, mit Sonderschnittstelle (N10d): CTC B0H-B3H + SIO B4H-B7H, Kette
- *  hinter der K8025, SIO-Kanal B als vierter serieller Anschluss (k1520_serial_*, Index 3). */
+ *  hinter der K8025, SIO-Kanal B als letzter serieller Anschluss (k1520_serial_*: Index 3, mit K7636 Index 4 -
+ *  dort ist Index 3 der IFSS-Zusatzkanal X4).  Ansprechen ueber den Namen, nicht ueber die Nummer. */
 K1520_API bool        k1520_aup_install_sonder(K1520Handle h);
 /** @brief Steckt die AUP MIT Sonderschnittstelle?  false ohne Karte. */
 K1520_API bool        k1520_aup_sonder(K1520Handle h);

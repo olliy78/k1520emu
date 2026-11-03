@@ -130,9 +130,54 @@ public:
     /// @brief Ist Verzeichnisplatz @p index (Rohbytes @p p) Bootbereich?  Platz 0 mit
     ///        Bootkopf, oder Platz 1…3 mit Nutzerbyte `F0` (Parametersaetze ab Byte
     ///        0x64 des ersten Sektors).  Immer false, wenn das Profil `dir_boot` nicht traegt.
+    ///        **MicroDOS 1526** (`boot_header: microdos`): die Plaetze 0…7 (256 B), solange
+    ///        der SYL-Lader dort steht (@ref sylKopf) — ohne Lader ist es eine Datendiskette.
     bool bootPlatz(int index, const uint8_t* p) const;
-    /// @brief Die ersten 128 Byte des Verzeichnisses (4 Plaetze) — das „Bootabbild".
+    /// @brief Die ersten @ref bootBytes Byte des Verzeichnisses — das „Bootabbild"
+    ///        (PC 1715: 128 B = 4 Plaetze; MicroDOS 1526: 256 B = 8 Plaetze).
     bool readBootSlots(std::vector<uint8_t>& out) const;
+    /// @brief Umfang des Bootbereichs im Verzeichnis in Byte (128, MicroDOS 1526: 256).
+    size_t bootBytes() const;
+    /// @brief Traegt @p p den Bootkopf, den DIESES Profil verlangt (PC-1715-Kopf bzw. SYL-Lader)?
+    bool bootKopfPasst(const uint8_t* p, size_t n) const;
+
+    /// @name MicroDOS 1526 (Rostocker CP/M-Anpassung, doc/design/13_k1520disktool.md §16)
+    /// @{
+    /// @brief SYL-Lader von MicroDOS: „SYL" bei 0 und der Text „MicroDOS" in den ersten 256 B.
+    static bool sylKopf(const uint8_t* p, size_t n);
+    /// @brief Ist der 32-B-Platz @p p die Systemdatei `MicroDOS.SYS` (Nutzer 0, gemischte
+    ///        Schreibung — fuer das normale Kommando unerreichbar, deshalb geschuetzt)?
+    static bool microDosSysName(const uint8_t* p);
+    /// @brief Hoechstgroesse der Systemdatei: 4 Spuren zu 4 Sektoren (INIT, BDOS, BIOS) = 16 KB.
+    static constexpr size_t kMicroDosSysMax = 16384;
+    /// @brief MicroDOS-Systemdiskette 26x128 B (Lade-ROM V0.6): die 16 Bloecke, die MSYSG20 fuer MicroDOS.SYS
+    ///        eintraegt (3-17 und 19; der Eintrag fasst nur 16 Zeiger, das System selbst liegt in den
+    ///        linearen Sektoren 26..155 = Bloecke 3..19), und der nicht eingetragene, aber belegte Block 18.
+    static constexpr uint16_t kMicroDos128Bloecke[16] = {3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,19};
+    static constexpr uint16_t kMicroDos128Luecke = 18;
+    /**
+     * @brief `MicroDOS.SYS` an den FESTEN Ort schreiben, den der SYL-Lader erwartet.
+     *
+     * Der Lader liest Zylinder 1 Kopf 0 Sektor 1…4 nach BC00H und springt nach BD00H; INIT
+     * holt BDOS/BIOS von Zylinder 2…4 Kopf 0 (je Sektor 1…4).  Die Datei ist also kein
+     * beliebiger Dateiinhalt: ihre Bloecke sind die Sektoren 1…4 jener vier Spuren.  Die
+     * Bloecke muessen frei sein (oder der alten `MicroDOS.SYS` gehoeren).
+     */
+    bool writeSystemDatei(const std::vector<uint8_t>& data);
+    /// @brief Zweig von @ref writeSystemDatei fuer 26x128 B (siehe kMicroDos128Bloecke).
+    bool writeSystemDatei128(const std::vector<uint8_t>& data);
+    /// @brief Ist @p p die Systemdatei dieses Profils (1526: `MicroDOS.SYS` gemischt, 1715: `MICRODOS.SYS`, Grossschrift)?
+    bool istSystemDateiName(const uint8_t* p) const;
+    /**
+     * @brief Die Bloecke, an denen der Urlader die Systemdatei dieses Profils ERWARTET (die ersten @p anzahl).
+     *
+     * 1526: Sektoren 1…4 der Zylinder 1…4 Kopf 0; 1715: die ersten Datenbloecke hinter dem Verzeichnis.
+     * Leer, wenn die Geometrie das nicht hergibt.  Die Pruefung (`cpm.system.ort`) vergleicht damit.
+     */
+    std::vector<uint16_t> systemDateiBloecke(uint32_t anzahl) const;
+    /// @brief Inhalt von `MicroDOS.SYS` (auf Satzgrenze, wie eingetragen); false, wenn die Datei fehlt.
+    bool readSystemDatei(std::vector<uint8_t>& out) const;
+    /// @}
     /**
      * @brief Bootkopf (Platz 0) und Parametersaetze (Plaetze 1…3 mit Nutzerbyte `F0` im
      *        Abbild) schreiben; die uebrigen Plaetze des ersten Sektors bleiben, wie sie sind.
@@ -209,7 +254,9 @@ public:
 
     /// @brief Belegungskarte aus dem Verzeichnis rekonstruiert (true = belegt).
     ///        CP/M speichert sie nirgends — sie wird bei jedem Mounten neu gebaut.
-    std::vector<bool> allocationMap() const;
+    ///        @p mitSystembereich = false laesst die feste Reservierung der MicroDOS-128-Systemspuren
+    ///        weg (nur `writeSystemDatei` braucht die reine Verzeichnissicht).
+    std::vector<bool> allocationMap(bool mitSystembereich = true) const;
 
 private:
     CpmFileSystem(SectorSpace& space, const FsProfile& prof);
@@ -230,6 +277,8 @@ private:
 
     SectorSpace& space_;
     FsProfile    prof_;
+    bool writeSystemDatei1715(const std::vector<uint8_t>& data);   ///< MicroDOS 1715: erste Datenbloecke
+    bool         syl_aktiv_ = false;   ///< MicroDOS 1526: steht der SYL-Lader in den Plaetzen 0…7?
 
     uint64_t data_start_   = 0;    ///< Byte-Offset des Datenbereichs im Sektorraum
     uint64_t data_bytes_   = 0;

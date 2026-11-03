@@ -1304,3 +1304,24 @@ Festlegungen:
    sonst ASCII; ausdrückliche Wahl je Diskette (QSettings-Schlüssel `diskeditor/kodierung_<sha1 des Pfads>`, ohne benannte Anwendung nur im Prozess, damit Tests nichts schreiben).
    Offen: Etiketten sind nicht bearbeitbar (kein „Datenträgername ändern“ im Dialog).
 8. Fixtures: `tests/fixtures/disks/sios1526_{dp1,dp2,sg1,syls,sylp}.hfe` (Kopien von `tools/sios_a5120/original/`).  Tests `SiosFs.*`, `SiosFsCheck.*`, `cli_dt_*sios*`.
+
+## MicroDOS 1526 / 1715 (Rostock) — CP/M, Lader im Verzeichnis (2026-10-31, Entwurf 13 §25)
+
+1. **Verzeichnis ab Offset 0, keine Systemspuren; die ersten 8 Plätze (1715: 4) gehören dem SYL-Lader/Bootkopf** (`dir_boot` +
+   `boot_header: microdos|microdos1715`, `CpmFileSystem::bootPlatz`). Der Lader ist der positive Nachweis der Erkennung — ohne ihn
+   ist dieselbe Geometrie `cpa800`/`cpa_auto` (Wächter `DisktoolMicrodos.ErzeugteSystemdisketteWirdErkanntUndPrueftSauber`).
+2. **Plätze 104 (1526 DS), 64 (SS 40), 128 (1715) — gemessen, nicht die CP/A-Regel (192/128).** Ein zu großes Verzeichnis liest
+   Daten als Einträge (Befund `cpm.block.ausserhalb`), ein zu kleines versteckt Dateien.
+3. **`MicroDOS.SYS` liegt an festen Sektoren (c1–c4 h0, Sektor 1–4)** und heißt gemischt geschrieben: Prüfung/Rettung kennen die
+   Ausnahme nur für diesen Namen (`microDosSysName`). Bootabbild = Lader 256 B + Systemdatei; `writeSystemDatei` verweigert, wenn
+   die Blöcke belegt sind. Beim 1715 ist `MICRODOS.SYS` eine gewöhnliche Datei in den ERSTEN Datenblöcken (`writeSystemDatei1715`), Bootabbild = 128 B Kopf + `MICRODOS.SYS` (14 464 B; Kopf allein geht weiter, `put` danach nur als erste Datei — `doc/merkposten/microdos1715.md`).
+4. Fremdes Bootabbild (ohne „SYL"+„MicroDOS" bzw. ohne `03/02 F0`) wird VOR dem Anlegen abgewiesen.
+5. Bootabbilder `data/bootsektoren/boot_microdos_{1526,1526_k7636,1526_200k,1526_200k_k7636,1526_128,1715}.bin` (`1526_128` = Profil `microdos128`, 26x128 B, K5600.10, Lade-ROM V0.6 und V0.9_2; Lage Entwurf 13 §25.4: Zeiger 3-17+19, Block 18 Nullen) (Belege aus den Sammlungsabzügen, in `data/bootsektor.yaml`).
+   Das System ist fest auf Tastatur und Laufwerke generiert (K7637/K7636; 800K = 4 × K5601, **200K = 2 × K5600.10**, nicht K5600.20) — `py_microdos_bootabbilder`
+   bootet jedes im Emulator bis `A>`; Tabelle in `doc/merkposten/microdos.md`.
+   Originalabzüge prüft `DisktoolMicrodos.OriginalabzuegeDerSammlung` nur mit `K1520_MICRODOS_DIR`.
+6. **`cpm.system.ort` / `cpm.system.fehlt`** (Warnung, keine Reparatur): `MicroDOS.SYS` nicht am Ort des Laders bzw. beim 1526 mit Lader ganz fehlend
+   (`CpmFileSystem::systemDateiBloecke`; Wächter `DisktoolMicrodos.PruefungMeldetSystemdateiAmFalschenOrt`). `cpm.dir.geloescht` zählt nur Reste mit
+   brauchbarem Blockzeiger (ein geloeschter LEERER Eintrag wie `WSNEW.COM` auf MicroDOS1526s ist kein Fund für `recover`).
+7. Rettung und Archiv (ZIP + `cpm-dateiangaben.txt`, Rückweg per `insert_all`) sind für alle drei Profile abgesichert (`DisktoolMicrodos.Rettung*`,
+   `py_disktool_microdos`). Das Beiblatt führt nur Dateien mit Angaben.
