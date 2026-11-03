@@ -864,11 +864,12 @@ k1520disktool --physical ls -l
 k1520disktool --physical save-as sicherung.hfe        # VOR jedem Schreibversuch
 k1520disktool --physical --write put NEU.TXT
 k1520disktool --physical --drive 0 --cyls 40 --double-step ls
+k1520disktool --physical --rate 500 --rpm 360 --drive-rpm 300 save-as hd.hfe   # 1,2M im 300-U/min-Laufwerk
 k1520disktool --physical archive archiv.zip --label "UDOS 4.3 Nr. 7"
 ```
 
 Befehle: `ls`, `info`, `check`, `get`, `put`, `rm`, `save-as`, `archive`, `rewrite`.
-Sitzungsschalter: `--drive a|b|0…3`, `--cyls`, `--heads`, `--rate`, `--rpm`,
+Sitzungsschalter: `--drive a|b|0…3`, `--cyls`, `--heads`, `--rate`, `--rpm`, `--drive-rpm`,
 `--double-step`, dazu `--fs`, `--raw`, `--no-verify`, `--label`, `-q`.
 
 * **`archive` ist der Weg für eine Sammlung**: es packt dasselbe Bündel wie die

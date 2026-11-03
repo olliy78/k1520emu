@@ -62,7 +62,45 @@ Was fehlt:
 | **H2** Greaseweazle | Rate/rpm aus dem Format an `TrackSync`/`app/gw`; HD-Laufwerk/`densel`; `physical_cli` ohne Handangaben; Oberfläche (physisch öffnen) | Python-Tests ohne Hardware; `tests/hardware/` Entwurf |
 | **H3** Gerät | Anwender liest/schreibt eine echte HD-Diskette (1,44M und/oder 1,2M) | Messprotokoll |
 
+## 3a  Messprotokoll H3 (2026-11-03, TEAC FD-55GFR, fest 300 U/min gejumpert, Greaseweazle F1 / FW 1.6, gw 1.23)
+
+* Gemessen 299,3 U/min.  Eine 48-tpi-Diskette ohne Doppelschritt: Rauschen auf c0h1–c13h1 (erwartet).
+* HD-Diskette enthielt SCPX 1526 V1.7 im 640K-Format (DD auf HD-Material): fehlerfrei gelesen, Sicherung
+  `out/hd_test/scpx640_auf_hd_original.hfe`.
+* **`gw write` streckt eine HFE NICHT auf die Laufwerksumdrehung** (`Flux: 167.9ms period`): eine 1,2M-HFE (500 kbit/s,
+  360 U/min) landete 20 % zu dicht.  Abhilfe von Hand: Kopf-Bitrate 417 (= 500·300/360) → 201,4 ms je Spur, korrekt.
+  Unser `Device.write_track` streckt dagegen schon auf die gemessene Umdrehung.
+* Zurücklesen mit `gw read --format ibm.1200` (mit/ohne `--adjust-speed`): 2400/2400 Sektoren, byteweise gleich dem
+  Original.
+* **Unser Lesepfad** (`app/gw/device.py`): PLL-Takt fest `1/(2·Rate)` → mit `--rate 500` nichts erkannt.  Mit
+  `--rate 417 --rpm 360`: `dos1200` erkannt, volle Prüfung ohne Befund, alle Dateien byteweise gleich.  Aber das gesicherte
+  Abbild trägt dann Kopf 250/300 bei doppelter Größe.
+* **Folgerung für H2:** Laufwerksdrehzahl ist eine Eigenschaft des LAUFWERKS (fest 300, fest 360, umschaltend), getrennt von
+  der des Formats.  PLL-Takt beim Lesen = `1/(2·Rate) · (Format-rpm / Laufwerks-rpm)`; das Abbild bleibt in der Zeitbasis
+  des Formats (Kopf 500/360).
+
+### Umsetzung H2 (Greaseweazle)
+
+* **Drei Angaben statt einer Rate** (`app/gw/session.py::AUFZEICHNUNGEN`): Rate und Drehzahl der DISKETTE, Drehzahl des
+  LAUFWERKS.  Dialogfeld „Aufzeichnung:" (vorher „Zellrate:"): 250/300/300 (5,25″ DD), 500/360/360 (8″), **500/360/300
+  („417 kbit/s", TEAC FD-55GFR fest 300)**, 500/360/360 (5,25″ HD im IBM-Laufwerk), 500/300/300 (3,5″ HD 1,44M).
+* **Lesen:** `Device.pll_takt()` = `1/(2·Rate) · Disk-rpm/Laufwerks-rpm` (500/360/300 → 1,2 µs); die Zellen liegen in der Zeitbasis
+  der Diskette (166 667 je Spur bei 1,2M).  **Schreiben** unverändert: Vorlage mit Zeitbasis `len/(2000·Rate)`, gestreckt auf die
+  gemessene Umdrehung.
+* **Kern:** `TrackSync` gibt Rate und Drehzahl der Diskette an das `DiskMedium` (`setNominalRateKbps/Rpm`) — `save-as` schreibt
+  Kopf 500 und 1,2M-Zellenzahl; der Emulator weist das Medium ab (AP H1).  `PhysicalSession.start(cell_rate_kbps, rpm, drive_rpm)`;
+  CLI `--rate/--rpm` (Diskette) + `--drive-rpm` (Vorgabe = `--rpm`).  Eine blosse Zahl 250/500 gilt wie bisher.
+* **Emulator:** der Dialog blendet die 5,25″-/3,5″-HD-Einträge aus (`fuer_emulator=True`) — klarer als die Abweisung nach dem
+  Einlesen; der 8″-Eintrag bleibt (MF6400, 360 U/min).
+* Wächter `test_gw_hd.py` (PLL-Takt, Dialog, `save-as` → Kopf 500).
+* **Hardwareprobe am TEAC (2026-11-03, bestanden):** `physical_cli --rate 500 --rpm 360 --drive-rpm 300 save-as` → Kopf 500/360,
+  Dateigröße gleich der mit `create --fs dos1200` erzeugten HFE, `check --full` ohne Befund, alle Dateien byteweise gleich, `gw convert
+  --format ibm.1200` 2400/2400.  `--write put` (150 KB): 23 Spuren geschrieben und gegengelesen ohne Fehlvergleich; Fluss auf der
+  Scheibe 2,4/3,6/4,8 µs (= 1,2M-Dichte bei 300 U/min); `gw read --format ibm.1200` 2400/2400, Dateien gleich.
+
 ## 4  Offen
 
 * Welche CP/A-HD-Formate es gab (Katalogeinträge erst mit Beleg).
-* Welches HD-Laufwerk der Anwender hat (3,5″ 1,44M oder 5,25″ 1,2M) — bestimmt H3.
+* 3,5″ 1,44M nur ohne Gerät geprüft (Anwender hat ein 5,25″-HD-Laufwerk).
+* Eine mit `gw write` (statt über unseren Weg) geschriebene 1,2M-HFE braucht an einem 300-U/min-Laufwerk eine Kopf-Bitrate 417 —
+  `gw write` streckt nicht.

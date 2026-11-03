@@ -28,12 +28,12 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox,
 # Der Teil OHNE Anzeige liegt in app/gw/session.py — die Kommandozeile
 # (`k1520disktool --physical`) braucht ihn ebenfalls und darf Qt nicht laden.
 # Hier weiterreichen, damit vorhandene Aufrufe unveraendert gelten.
-from app.gw.session import (LAUFWERKE, RATEN,        # noqa: F401  (Weitergabe)
-                            PhysicalSession, verfuegbarkeit)
+from app.gw.session import (AUFZEICHNUNGEN, LAUFWERKE, RATEN,   # noqa: F401  (Weitergabe)
+                            PhysicalSession, aufzeichnung, verfuegbarkeit)
 
 
 class PhysicalDiskDialog(QDialog):
-    """Abfrage vor dem Einlegen: Laufwerk, Zellrate, Schreibrecht.
+    """Abfrage vor dem Einlegen: Laufwerk, Aufzeichnung, Schreibrecht.
 
     Die Geometrie (Zylinder × Köpfe) kommt **nicht** von hier: im Emulator steht sie
     im Laufwerksprofil des Steckplatzes, im DiskTool wählt sie der Bediener über den
@@ -42,13 +42,17 @@ class PhysicalDiskDialog(QDialog):
 
     def __init__(self, parent=None, *, num_cyls: int = 80, num_heads: int = 2,
                  drive_label: str = "", allow_write: bool = True,
-                 writable: bool = False, titel: str = "", abbild: str = ""):
+                 writable: bool = False, titel: str = "", abbild: str = "",
+                 fuer_emulator: bool = False):
         """
         Args:
             num_cyls: **Zylinder des LAUFWERKS** (Vorbelegung des Feldes), nicht der
                 Diskette — die ergibt sich daraus mit den Haken.
             abbild: Geometrie des zu schreibenden Abbilds als Text; wird angezeigt,
                 damit man sieht, was man wohin schreibt.
+            fuer_emulator: HD-Aufzeichnungen ausblenden.  Der Kern weist eine
+                5,25″-HD-Diskette beim Einlegen ohnehin ab; die Wahl gar nicht erst
+                anzubieten ist klarer als eine Meldung nach dem Einlesen.
             allow_write: darf überhaupt geschrieben werden?
             writable: Vorbelegung des Hakens — **der Aufrufer entscheidet**, weil die
                 beiden Programme die Diskette verschieden anfassen.  Vorgabe **aus**:
@@ -82,9 +86,15 @@ class PhysicalDiskDialog(QDialog):
         form.addRow("Laufwerk am Kabel:", self._laufwerk)
 
         self._rate = QComboBox()
-        for wert, text in RATEN:
-            self._rate.addItem(text, wert)
-        form.addRow("Zellrate:", self._rate)
+        for a in AUFZEICHNUNGEN:
+            if fuer_emulator and a.hd:
+                continue
+            self._rate.addItem(a.text, a.schluessel)
+        self._rate.setToolTip(
+            "Wie die Diskette beschrieben wurde (Rate und Drehzahl) und wie schnell "
+            "sich das Laufwerk dreht.  Das Abbild liegt immer in der Zeitbasis der "
+            "Diskette.")
+        form.addRow("Aufzeichnung:", self._rate)
 
         # Wie weit nach innen gegangen wird.  Das ist zweierlei zugleich: die Bauart
         # des Laufwerks am Kabel (die kennt nur der Bediener) UND eine Begrenzung —
@@ -199,9 +209,12 @@ class PhysicalDiskDialog(QDialog):
     def auswahl(self) -> dict:
         """Die getroffene Auswahl als Argumente für :meth:`PhysicalSession.start`."""
         spuren, koepfe = self._geometrie_rechnen()
+        a = aufzeichnung(self._rate.currentData())
         return {
             "drive": self._laufwerk.currentData(),
-            "cell_rate_kbps": int(self._rate.currentData()),
+            "cell_rate_kbps": a.rate,
+            "rpm": a.disk_rpm,
+            "drive_rpm": a.drive_rpm,
             "num_cyls": spuren,
             "num_heads": koepfe,
             "double_step": self._doppelschritt.isChecked(),

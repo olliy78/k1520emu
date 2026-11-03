@@ -561,7 +561,8 @@ class DriveWidget(QWidget):
             # ist Oeffnen ein Lesevorgang.)
             wahl = PhysicalDiskDialog.frage(
                 self, num_cyls=cyls, num_heads=heads, writable=True,
-                drive_label=dt.short_label(self.drive_types[drive]))
+                drive_label=dt.short_label(self.drive_types[drive]),
+                fuer_emulator=True)
             if wahl is None:
                 return
             wahl.setdefault("cell_rate_kbps", rate)
@@ -575,7 +576,7 @@ class DriveWidget(QWidget):
                 set_unmounted()
 
             try:
-                sitzung = PhysicalSession.start(rpm=rpm, for_emulator=True, **wahl)
+                sitzung = PhysicalSession.start(for_emulator=True, **{"rpm": rpm, **wahl})
             except Exception as e:
                 QMessageBox.critical(self, "Physisches Laufwerk",
                                      f"Das Laufwerk ließ sich nicht öffnen:\n{e}")

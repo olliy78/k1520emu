@@ -304,10 +304,17 @@ class Device:
     motor_idle_s: float = 3.0
 
     def __init__(self, usb, drive, *, cell_rate_kbps: int = 250, revs: int = 1,
-                 double_step: bool = False):
+                 double_step: bool = False, disk_rpm: int = 0, drive_rpm: int = 0):
         self._usb = usb
         self._drive = drive
+        #: Rate der DISKETTE (nicht die, mit der sie am Laufwerk ankommt).
         self.cell_rate_kbps = cell_rate_kbps
+        #: Drehzahl, mit der die Diskette beschrieben wurde, und die des Laufwerks.
+        #: 0 = unbekannt = gleich (alter Weg).  Ein 300-U/min-Laufwerk liest eine
+        #: 360-U/min-Diskette um den Faktor drive/disk zu langsam: die Zellen sind
+        #: laenger, der PLL-Takt muss um disk/drive grosser sein (s. pll_takt).
+        self.disk_rpm = disk_rpm or drive_rpm or 0
+        self.drive_rpm = drive_rpm or disk_rpm or 0
         self.revs = revs
         #: **Doppelschritt**: die Spur *n* liegt auf dem physischen Zylinder *2n*.
         #:
@@ -324,6 +331,20 @@ class Device:
         self._ticks_per_rev = None
         #: austauschbar, damit Pruefungen ohne Wartezeit laufen
         self._schlafen = time.sleep
+
+    def pll_takt(self) -> float:
+        """Halbzellenlaenge in Sekunden, mit der die PLL einrasten soll.
+
+        ``1/(2*Rate)`` der DISKETTE, gestreckt um ``Disk-U/min / Laufwerks-U/min``:
+        das Laufwerk braucht fuer eine Umdrehung der Diskette laenger (oder
+        kuerzer), jede Zelle kommt entsprechend gedehnt an.  Die gelesenen
+        Bitzellen liegen danach in der Zeitbasis der Diskette -- eine Umdrehung
+        des Laufwerks ist eine Umdrehung der Diskette.
+        """
+        faktor = 1.0
+        if self.disk_rpm and self.drive_rpm:
+            faktor = self.disk_rpm / self.drive_rpm
+        return 5e-4 / self.cell_rate_kbps * faktor
 
     # ── Auswahl / Motor ─────────────────────────────────────────────────────
 
@@ -433,7 +454,7 @@ class Device:
         # anschliessend genau bei Index — sonst fehlte der Anfang der Spur.
         fluss = self._usb.read_track(revs=self.revs + 1)
         fluss.cue_at_index()
-        roh = PLLTrack(clock=5e-4 / self.cell_rate_kbps, data=fluss)
+        roh = PLLTrack(clock=self.pll_takt(), data=fluss)
         bits, _ = roh.get_revolution(0)
         eine = len(bits)
 
@@ -544,12 +565,16 @@ def finde_adapter() -> Adapter:
 
 def open_device(drive: str = "a", *, cell_rate_kbps: int = 250,
                 revs: int = 1, port: Optional[str] = None,
-                double_step: bool = False) -> Device:
+                double_step: bool = False, disk_rpm: int = 0,
+                drive_rpm: int = 0) -> Device:
     """Adapter öffnen und ein Laufwerk wählen.
 
     Args:
         drive: ``a``/``b`` (IBM-PC-Kabel mit Verdrehung) oder ``0``…``3`` (Shugart).
-        cell_rate_kbps: 250 für 5,25″ DD, 500 für 8″ MFM.
+        cell_rate_kbps: Rate der DISKETTE: 250 (5,25″ DD), 500 (8″ MFM, 5,25″/3,5″ HD).
+        disk_rpm / drive_rpm: Drehzahl der Diskette und des Laufwerks (0 = gleich).
+            Ein fest auf 300 U/min gestelltes Laufwerk liest eine 1,2M-Diskette
+            (500 kbit/s bei 360 U/min) mit 417 kbit/s.
         revs: Umdrehungen je Leseversuch (mehr = robuster, langsamer).
         port: Gerätedatei; ``None`` = selbst suchen.
         double_step: Spur *n* auf physischem Zylinder *2n* (40-Spur-Diskette im
@@ -573,4 +598,4 @@ def open_device(drive: str = "a", *, cell_rate_kbps: int = 250,
     except Exception as e:                     # noqa: BLE001
         raise KeinAdapter(f"Kein Greaseweazle gefunden: {e}") from e
     return Device(usb, util.Drive()(drive), cell_rate_kbps=cell_rate_kbps, revs=revs,
-                  double_step=double_step)
+                  double_step=double_step, disk_rpm=disk_rpm, drive_rpm=drive_rpm)
