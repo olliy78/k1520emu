@@ -806,6 +806,33 @@ Beim **Schreiben** entscheidet der Doppelschritt, in welchem Rechner die Diskett
 danach läuft: mit Haken auf jedem zweiten Zylinder — dann liest sie ein K5600.10;
 ohne Haken dicht hintereinander — dann liest sie ein K5601.
 
+### Aufzeichnung: Datenrate und Drehzahl
+
+Das Feld **Aufzeichnung** sagt, wie die Diskette beschrieben ist **und** wie schnell
+das Laufwerk dreht:
+
+| Eintrag | Diskette | Laufwerk |
+|---|---|---|
+| 250 kbit/s — 5,25″ doppelte Dichte | 250 kbit/s, 300 U/min | 300 U/min |
+| 500 kbit/s — 8″ MFM | 500 kbit/s, 360 U/min | 360 U/min |
+| 417 kbit/s — 5,25″ HD 1,2M im 300-U/min-Laufwerk | 500 kbit/s, 360 U/min | 300 U/min |
+| 500 kbit/s — 5,25″ HD 1,2M (IBM-PC-Laufwerk) | 500 kbit/s, 360 U/min | 360 U/min |
+| 500 kbit/s — 3,5″ HD 1,44M | 500 kbit/s, 300 U/min | 300 U/min |
+
+Eine 1,2M-Diskette ist für 360 U/min geschrieben. Dreht das Laufwerk nur mit 300 U/min,
+kommen ihre Daten mit 417 kbit/s am Lesekopf an — das rechnet das Werkzeug selbst um.
+Das gespeicherte Abbild ist in beiden Fällen dasselbe, und was ein 300er-Laufwerk
+schreibt, liest ein 360er-PC-Laufwerk und umgekehrt (am Gerät geprüft).
+
+Auf der Kommandozeile: `--rate` und `--rpm` beschreiben die Diskette, `--drive-rpm`
+das Laufwerk (Vorgabe = `--rpm`), z. B. `--rate 500 --rpm 360 --drive-rpm 300`.
+
+**TEAC FD-55GFR (5,25″ HD) fest auf 300 U/min:** dafür müssen die drei Jumper
+**I**, **IS** und **LG** gesteckt sein. So eingestellt ist das Laufwerk
+kompatibel zum **K5601** (Datenrate 250 kbit/s) und liest und schreibt zugleich
+**HD-Disketten von PC-Laufwerken** (1,2M, im Laufwerk 417 kbit/s) — im Dialog den
+Eintrag „417 kbit/s — 5,25″ HD 1,2M im 300-U/min-Laufwerk" wählen.
+
 ### Dasselbe auf der Kommandozeile
 
 ```sh
