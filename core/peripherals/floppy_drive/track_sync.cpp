@@ -142,6 +142,8 @@ bool TrackSync::ensureLoaded(uint8_t cyl, uint8_t head) {
     if (stop_ || !medium_) return false;
     if (medium_->state(cyl, head) != TrackState::Unknown) return true;
 
+    letzte_anforderung_.store(Uhr::now().time_since_epoch().count(),
+                              std::memory_order_relaxed);
     Eintrag& e = eintraege_[idx(cyl, head)];
     e.failed   = false;                 // ein ausdruecklicher Zugriff versucht es erneut
     if (e.job_id == 0) {
@@ -307,6 +309,20 @@ bool TrackSync::vorauslesenZurueckgestellt(Uhr::time_point jetzt) const {
     return jetzt < vorauslesenFreiAb();
 }
 
+Uhr::time_point TrackSync::schreibenFreiAb(Uhr::time_point jetzt) const {
+    const int64_t t = letzte_anforderung_.load(std::memory_order_relaxed);
+    if (t == 0 || !spec_.writable || spec_.writeback_hold_ms == 0) return Uhr::time_point{};
+    const auto bis = Uhr::time_point(Uhr::duration(t)) +
+                     std::chrono::milliseconds(spec_.writeback_hold_ms);
+    if (jetzt >= bis) return Uhr::time_point{};
+    // Nie unbegrenzt: eine Spur, die schon lange wartet (oder per flushPending auf
+    // "lange her" gesetzt wurde), hebt den Halt auf.
+    const auto grenze = std::chrono::milliseconds(kRueckfuehrungHaltHoechstMs);
+    for (const Eintrag& e : eintraege_)
+        if (e.dirty_pending && jetzt - e.dirty_since >= grenze) return Uhr::time_point{};
+    return bis;
+}
+
 bool TrackSync::waehleAuftrag(SyncJob& out) {
     if (!medium_) return false;
     const auto jetzt = Uhr::now();
@@ -325,7 +341,8 @@ bool TrackSync::waehleAuftrag(SyncJob& out) {
 
     // 2a) Pruef-Lesen einer eben geschriebenen Spur — VOR neuen Schreibvorgaengen.
     // Der Kopf steht noch dort, und die Spur gilt erst danach als erledigt (§7.1).
-    if (bester == SIZE_MAX && spec_.writable) {
+    const bool halt = schreibenFreiAb(jetzt) != Uhr::time_point{};
+    if (bester == SIZE_MAX && spec_.writable && !halt) {
         for (size_t i = 0; i < eintraege_.size(); ++i) {
             const Eintrag& e = eintraege_[i];
             if (e.job_id != 0 || !e.verify_pending) continue;
@@ -343,7 +360,7 @@ bool TrackSync::waehleAuftrag(SyncJob& out) {
     // hin und zurueck, und weil der Rueckstand waehrend eines Formatierlaufs waechst, wuerde
     // die Strecke immer laenger.  Der Fahrstuhl verhungert dabei niemanden — was in
     // einer Fahrtrichtung uebersprungen wird, holt die Rueckfahrt ab.
-    if (bester == SIZE_MAX && spec_.writable) {
+    if (bester == SIZE_MAX && spec_.writable && !halt) {
         auto faellig = [&](const Eintrag& e) {
             return e.job_id == 0 && e.dirty_pending && (jetzt - e.dirty_since >= ruhe);
         };
@@ -455,9 +472,14 @@ bool TrackSync::takeJob(SyncJob& out, int timeout_ms) {
         auto weckzeit = frist;
         if (spec_.writable) {
             const auto ruhe = std::chrono::milliseconds(spec_.write_settle_ms);
+            const auto halt_bis = schreibenFreiAb(Uhr::now());
             for (const Eintrag& e : eintraege_)
                 if (e.dirty_pending && e.job_id == 0)
-                    weckzeit = std::min(weckzeit, e.dirty_since + ruhe);
+                    weckzeit = std::min(weckzeit, std::max(e.dirty_since + ruhe, halt_bis));
+            // Ein Pruef-Lesen wartet ebenfalls bis zum Ende des Halts.
+            if (halt_bis != Uhr::time_point{})
+                for (const Eintrag& e : eintraege_)
+                    if (e.verify_pending && e.job_id == 0) { weckzeit = std::min(weckzeit, halt_bis); break; }
         }
         // Ruht das Vorauslesen nur wegen der Ruhefrist, muss der Faden an deren Ende
         // aufwachen (kein Gastzugriff weckt ihn dann noch).
