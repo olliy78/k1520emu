@@ -288,6 +288,8 @@ _ANLAUF_S = 0.75
 _ANLAUF_NACH_FEHLER_S = 1.5
 #: Zusaetzliche Versuche, wenn der Adapter beim Schreiben/Lesen keinen Index sieht.
 _INDEX_WIEDERHOLUNGEN = 2
+#: Ruhezeit, nach der die Laufwerkswahl als von der Firmware freigegeben gilt (gemessen ≈ 10 s).
+_WAHL_VERFAELLT_S = 6.0
 
 
 class Device:
@@ -350,6 +352,12 @@ class Device:
 
     def select(self) -> None:
         """Bus einstellen und Laufwerk wählen (einmal je Sitzung)."""
+        if (self._gewaehlt and self._letzte_arbeit
+                and time.monotonic() - self._letzte_arbeit > _WAHL_VERFAELLT_S):
+            # Die Firmware gibt die Wahl nach ≈ 10 s ohne Auftrag still frei (s.
+            # _neu_waehlen) — nicht erst am Fehler merken, sondern vorher neu waehlen.
+            self._neu_waehlen()
+            return
         if self._gewaehlt:
             return
         self._usb.set_bus_type(self._drive.bus.value)
@@ -405,8 +413,24 @@ class Device:
                     raise
                 self._neu_anfahren()
 
+    def _neu_waehlen(self) -> None:
+        """Laufwerk NEU waehlen, auch wenn wir es noch fuer gewaehlt halten.
+
+        Die Firmware gibt die Wahl nach etwa 10 s Ruhe von sich aus frei, OHNE dass sie
+        das meldet: ein Seek geht dann ins Leere (das Laufwerk wird nicht angesprochen)
+        und Lesen/Schreiben endet mit „No Index".  Beobachtet, wenn das Vorauslesen
+        fertig war und der Gast danach formatierte oder kopierte.
+        """
+        try:
+            self._usb.drive_deselect()
+        except Exception:                         # noqa: BLE001 — Wahl ist evtl. schon weg
+            pass
+        self._gewaehlt = False
+        self.select()
+
     def _neu_anfahren(self) -> None:
         """Motor aus, Pause, wieder an und die Drehzahl abwarten."""
+        self._neu_waehlen()
         try:
             self._usb.drive_motor(self._drive.unit_id, False)
         except Exception:                         # noqa: BLE001 — wir fahren ohnehin neu an

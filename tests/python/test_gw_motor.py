@@ -70,7 +70,8 @@ def test_fehlender_index_beim_schreiben_faehrt_den_motor_neu_an(monkeypatch):
 
     assert len(versuche) == 3
     # je Fehlschlag: Motor aus, dann an, dann die lange Anlaufzeit abwarten
-    assert usb.befehle == [("motor", False), ("motor", True)] * 2
+    # (seit der stillen Freigabe der Wahl wird dabei auch neu gewaehlt)
+    assert [b for b in usb.befehle if b[0] == "motor"] == [("motor", False), ("motor", True)] * 2
     assert pausen.count(dev._ANLAUF_NACH_FEHLER_S) == 2
 
 
@@ -142,3 +143,36 @@ def test_vom_adapter_freigegebene_auswahl_wird_neu_eingestellt(monkeypatch):
     assert len(versuche) == 2
     assert usb.befehle.count(("select", 0)) == 2     # erneut gewaehlt
     assert d._motor_an is False                      # Motorzustand nicht mehr geglaubt
+
+
+def test_stille_freigabe_der_auswahl_nach_ruhe_wird_vor_dem_auftrag_erkannt():
+    """Nach ≈ 10 s Ruhe gibt die Firmware die Wahl OHNE Fehlermeldung frei.
+
+    Der Seek geht dann ins Leere (das Laufwerk wird nicht angesprochen) und das
+    Schreiben endet mit „No Index" — an der Hardware beobachtet, wenn das Vorauslesen
+    fertig war und der Gast danach formatierte oder kopierte.  `select()` muss nach
+    einer Ruhezeit neu waehlen, statt sich fuer gewaehlt zu halten.
+    """
+    import time
+    d, usb, _ = _geraet()
+    d.select()
+    assert usb.befehle.count(("select", 0)) == 1
+    d._letzte_arbeit = time.monotonic() - 30.0       # lange nichts getan
+    d.select()
+    assert usb.befehle.count(("select", 0)) == 2
+
+
+def test_no_index_waehlt_das_laufwerk_beim_wiederholen_neu(monkeypatch):
+    d, usb, _ = _geraet()
+    d.select()
+    versuche = []
+
+    def roh(cyl, head, cells, bitcells):
+        versuche.append(1)
+        if len(versuche) == 1:
+            raise RuntimeError("GetFluxStatus: No Index")
+
+    monkeypatch.setattr(d, "_write_track", roh)
+    d.write_track(5, 0, b"", 0)
+    assert len(versuche) == 2
+    assert usb.befehle.count(("select", 0)) == 2

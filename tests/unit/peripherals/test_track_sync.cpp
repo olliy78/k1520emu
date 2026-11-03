@@ -213,6 +213,7 @@ TrackSyncSpec spec(bool schreibbar = false, bool vorauslesen = false,
     s.read_ahead         = vorauslesen;
     s.write_settle_ms    = 60;
     s.readahead_quiet_ms = 0;       // die Ruhefrist hat ihre eigenen Faelle
+    s.writeback_hold_ms  = 0;       // ebenso der Halt der Rueckfuehrung
     s.request_timeout_ms = 5000;
     s.verify_writes      = verify;
     return s;
@@ -1137,6 +1138,49 @@ TEST(TrackSync, DasVorauslesenRuhtInDerRuhefristNachEinemGastzugriff) {
     // Nach Ablauf kommt von selbst ein Vorausleseauftrag (der Faden schlaeft bis dahin).
     ASSERT_TRUE(sync.takeJob(j, 1000));
     EXPECT_EQ(j.prio, SyncPriority::Readahead);
+}
+
+TEST(TrackSync, DieRueckfuehrungRuhtSolangeDerGastUnbekannteSpurenAnfordert) {
+    // FORMAT liest vor dem Ueberschreiben jede Spur an: Schreibt/prueft der Adapter
+    // zwischendurch den Rueckstand weiter hinten, faehrt der Kopf dauernd hin und her.
+    // Nach einer Anforderung ruht die Rueckfuehrung deshalb eine Weile.
+    DiskMedium abbild;
+    TrackSyncSpec s = spec(true, false);
+    s.writeback_hold_ms = 400;
+    TrackSync sync(s, abbild);
+
+    abbild.setTrack(4, 0, baueSpur(4, 0, 6));       // Rueckstand (Ruhefrist 60 ms)
+    std::thread gast([&] { (void)abbild.track(6, 1); });
+    SyncJob j;
+    ASSERT_TRUE(sync.takeJob(j, 1000));
+    EXPECT_EQ(j.prio, SyncPriority::Demand);        // die Anforderung kommt zuerst
+    EXPECT_EQ(j.cyl, 6);
+    const auto t0 = std::chrono::steady_clock::now();
+    EXPECT_FALSE(sync.takeJob(j, 200));             // Rueckstand ruht noch im Halt
+    ASSERT_TRUE(sync.takeJob(j, 2000));             // danach wird er abgearbeitet
+    EXPECT_EQ(j.kind, SyncJobKind::Write);
+    EXPECT_EQ(j.cyl, 4);
+    EXPECT_GE(std::chrono::steady_clock::now() - t0, 150ms);
+    sync.shutdown();
+    gast.join();
+}
+
+TEST(TrackSync, FlushPendingHebtDenHaltDerRueckfuehrungAuf) {
+    DiskMedium abbild;
+    TrackSyncSpec s = spec(true, false);
+    s.writeback_hold_ms = 60000;                    // praktisch unbegrenzt
+    TrackSync sync(s, abbild);
+
+    abbild.setTrack(4, 0, baueSpur(4, 0, 6));
+    std::thread gast([&] { (void)abbild.track(6, 1); });
+    SyncJob j;
+    ASSERT_TRUE(sync.takeJob(j, 1000));             // Demand
+    std::thread flush([&] { (void)sync.flushPending(3000); });
+    ASSERT_TRUE(sync.takeJob(j, 2000));             // trotz Halt: sofort das Schreiben
+    EXPECT_EQ(j.kind, SyncJobKind::Write);
+    sync.shutdown();
+    flush.join();
+    gast.join();
 }
 
 TEST(TrackSync, EineAnforderungDesGastesWirdInDerRuhefristSofortBedient) {

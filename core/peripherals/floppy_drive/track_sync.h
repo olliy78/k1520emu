@@ -56,6 +56,12 @@
 /// Vorgabe der Ruhefrist vor dem Vorauslesen (Wirtszeit, Hardwarezugriff).
 constexpr uint32_t kReadaheadRuheMs = 4000;
 
+/// Vorgabe: so lange nach der letzten Gastanforderung einer unbekannten Spur ruht die
+/// Rueckfuehrung (Wirtszeit).  Der Gast bestimmt dann, wo der Kopf steht.
+constexpr uint32_t kRueckfuehrungHaltMs = 5000;
+/// Hoechstens so lange darf dieser Halt eine geaenderte Spur zurueckhalten.
+constexpr uint32_t kRueckfuehrungHaltHoechstMs = 300000;
+
 struct TrackSyncSpec {
     uint8_t  num_cyls  = 80;   ///< Reichweite des Laufwerks (K5601 80, K5600.10 40, …)
     uint8_t  num_heads = 2;
@@ -83,6 +89,19 @@ struct TrackSyncSpec {
      * nicht abgebrochen.  0 = keine Frist.
      */
     uint32_t readahead_quiet_ms = kReadaheadRuheMs;
+
+    /**
+     * @brief Ruhefrist der Rueckfuehrung (Schreiben + Pruef-Lesen) nach einer
+     *        Gastanforderung einer UNBEKANNTEN Spur.
+     *
+     * Fordert das Gastsystem laufend Spuren an (FORMAT liest vor dem Ueberschreiben),
+     * stuende der Kopf sonst zwischen dem Gast (vorn) und dem Rueckstand (hinten) und
+     * fuehre ununterbrochen hin und her.  Der Rueckstand wird nachgeholt, sobald der
+     * Gast so lange nichts mehr anfordert — spaetestens nach
+     * @ref kRueckfuehrungHaltHoechstMs je Spur und immer bei @ref TrackSync::flushPending.
+     * 0 = kein Halt.
+     */
+    uint32_t writeback_hold_ms = kRueckfuehrungHaltMs;
 
     /**
      * @brief Jede geschriebene Spur zuruecklesen und vergleichen (§7.1).
@@ -392,6 +411,10 @@ private:
     /// Zeitpunkt des letzten Gastzugriffs (steady_clock, Ticks; 0 = nie).  Atomar,
     /// weil @ref accessed je Spurzugriff aus dem Emulationsfaden kommt.
     std::atomic<int64_t>  letzter_zugriff_{0};
+    /// Zeitpunkt der letzten Anforderung einer unbekannten Spur durch den Gast (0 = nie).
+    std::atomic<int64_t>  letzte_anforderung_{0};
+    /// Ende des Rueckfuehrungs-Halts (Zeitpunkt{} = kein Halt).  Unter der Sperre.
+    std::chrono::steady_clock::time_point schreibenFreiAb(std::chrono::steady_clock::time_point jetzt) const;
     SyncStats zaehler_{};
     std::string letzter_fehler_;
 };
