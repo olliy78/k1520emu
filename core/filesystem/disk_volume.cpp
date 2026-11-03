@@ -125,8 +125,18 @@ bool cpmVerzeichnisPlausibel(DiskMedium& medium, const DiskFormat& f, const FsPr
     // Datendiskette zugleich `cpa800` und `cpa1715` — und damit „nicht eindeutig".
     if (p.dir_boot) {
         std::vector<uint8_t> kopf;
-        if (!cpm->readBootSlots(kopf) || !CpmFileSystem::bootKopf(kopf.data(), kopf.size()))
-            return nein("Verzeichnisplatz 0 traegt keinen PC-1715-Bootkopf (Wort F002H/F003H)");
+        if (!cpm->readBootSlots(kopf) || !cpm->bootKopfPasst(kopf.data(), kopf.size()))
+            return nein(p.boot_header == "microdos"
+                        ? "Sektor 1 traegt keinen MicroDOS-SYL-Lader (\"SYL\", Text \"MicroDOS\")"
+                        : "Verzeichnisplatz 0 traegt keinen PC-1715-Bootkopf (Wort F002H/F003H)");
+    }
+    // `microdos1715`: derselbe Bootkopf wie bei CP/A 1715 - der POSITIVE Nachweis ist hier die
+    // Systemdatei MICRODOS.SYS, sonst waere jede CP/A-1715-Diskette auch eine MicroDOS-Diskette.
+    if (p.boot_header == "microdos1715") {
+        bool da = false;
+        for (const CpmDirEntry& d : cpm->directory())
+            if (!d.free() && !d.boot && d.user == 0 && d.name == "MICRODOS.SYS") da = true;
+        if (!da) return nein("das Verzeichnis traegt keine MICRODOS.SYS (MicroDOS 1715)");
     }
 
     int gut = 0;
@@ -157,7 +167,7 @@ bool cpmVerzeichnisPlausibel(DiskMedium& medium, const DiskFormat& f, const FsPr
         }
         bool ok = !d.name.empty();
         for (char c : d.name)
-            if (c < 0x20 || c > 0x7E || (c >= 'a' && c <= 'z')) ok = false;
+            if (c < 0x20 || c > 0x7E || (c >= 'a' && c <= 'z' && d.name != "MicroDOS.SYS")) ok = false;
         for (uint16_t b : d.blocks)
             if (b >= cpm->totalBlocks()) ok = false;
         if (d.records > 0x80) ok = false;
@@ -326,6 +336,10 @@ std::vector<SectorSpace::TrackRef> systemspuren(const SectorSpace& raum, const F
 
 /// @brief Fassungsvermoegen der Systemspuren; 0 = es gibt keine.
 uint64_t systemspurBytes(const SectorSpace& raum, const FsProfile& p) {
+    // MicroDOS 1526: 256 B Lader (acht Plaetze) + Systemdatei MicroDOS.SYS (bis 16 KB).
+    if (p.dir_boot && p.boot_header == "microdos") return 256 + CpmFileSystem::kMicroDosSysMax;
+    // MicroDOS 1715: 128 B Bootkopf + MICRODOS.SYS (erste Datei, gleich hinter dem Verzeichnis).
+    if (p.dir_boot && p.boot_header == "microdos1715") return 128 + CpmFileSystem::kMicroDosSysMax;
     if (p.dir_boot) return 128;          // Bootbereich im Verzeichnis: vier Plaetze
     uint64_t n = 0;
     for (const SectorSpace::TrackRef& t : systemspuren(raum, p))
@@ -441,7 +455,8 @@ std::string osmBootabbildproblem(const FsProfile& p, const SectorSpace& raum,
 std::string pc1715Bootabbildproblem(const FsProfile& p, const SectorSpace& raum,
                                     const std::vector<uint8_t>& img) {
     if (p.type != FsType::Cpm) return {};
-    if (p.boot_header != "pc1715" && !pc1715HatKopf(raum)) return {};
+    if (p.boot_header == "microdos") return {};      // eigener Pruefer (microdosBootabbildproblem)
+    if (p.boot_header != "pc1715" && p.boot_header != "microdos1715" && !pc1715HatKopf(raum)) return {};
 
     if (!CpmFileSystem::bootKopf(img.data(), img.size()))
         return "Das Bootabbild traegt keinen PC-1715-Bootkopf (Wort F002H/F003H in Byte 0/1) - "
@@ -453,6 +468,35 @@ std::string pc1715Bootabbildproblem(const FsProfile& p, const SectorSpace& raum,
     return {};
 }
 
+
+// ─── MicroDOS 1526 (Rostock): SYL-Lader in den Verzeichnisplaetzen 0…7 ──────────────────────
+//
+// Bootabbild = 256 B Lader, optional gefolgt von der Systemdatei MicroDOS.SYS (bis 16 KB).
+// Ein A5120-CP/A-SYL (128-B-Sektoren, kein Text "MicroDOS") laedt hier nichts Brauchbares.
+
+std::string microdosBootabbildproblem(const FsProfile& p, const std::vector<uint8_t>& img) {
+    if (p.type != FsType::Cpm || p.boot_header != "microdos") return {};
+    if (img.size() < 256 || !CpmFileSystem::sylKopf(img.data(), img.size()))
+        return "Das Bootabbild traegt keinen MicroDOS-SYL-Lader (\"SYL\" und der Text \"MicroDOS\" in den "
+               "ersten 256 Byte) - es stammt nicht von einer MicroDOS-Systemdiskette.  Ein CP/A- oder "
+               "SCPX-Bootabbild startet unter MicroDOS nicht.";
+    // Sektorlaenge des Laders: Parameterbyte +0C = Size-Code (0 = 128 B, 3 = 1024 B), +0D = Sektoren je Spur
+    // (26 bzw. 4).  Ein Lader der anderen Sorte liest auf dieser Diskette die falschen Sektoren
+    // (doc/design/13_k1520disktool.md §25.4).
+    const bool lader128 = img[0x0C] == 0 && img[0x0D] == 26;
+    const bool lader1k  = img[0x0C] == 3 && img[0x0D] == 4;
+    const bool profil128 = p.name == "microdos128";
+    if (profil128 ? !lader128 : !lader1k)
+        return std::string("Das Bootabbild traegt einen MicroDOS-Lader fuer ")
+               + (lader128 ? "26 Sektoren zu 128 Byte (Systemdiskette fuer Lade-ROM V0.6 / K5125)"
+                  : lader1k ? "4 Sektoren zu 1024 Byte" : "eine unbekannte Sektorfolge")
+               + ", das Profil '" + p.name + "' verlangt " + (profil128 ? "den 128-Byte-Lader." : "den 1024-Byte-Lader.");
+    if (img.size() > 256 + CpmFileSystem::kMicroDosSysMax)
+        return "Das Bootabbild ist " + std::to_string(img.size()) + " Byte gross; MicroDOS fasst 256 Byte "
+               "Lader und hoechstens " + std::to_string(CpmFileSystem::kMicroDosSysMax)
+             + " Byte Systemdatei (4 Spuren zu 4 Sektoren).";
+    return {};
+}
 
 // ─── BCU 880 (frueher A5120): Startdiskette „SYL auf Spur 1“ und Arbeitsdiskette ──
 //
@@ -4280,6 +4324,8 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
         }
         err = bcuBootabbildproblem(*profil, boot);
         if (!err.empty()) return nullptr;
+        err = microdosBootabbildproblem(*profil, boot);
+        if (!err.empty()) return nullptr;
         err = prgBootabbildproblem(*profil, boot, nullptr);
         if (!err.empty()) return nullptr;
         if (boot.size() > platz) {
@@ -4445,6 +4491,11 @@ bool DiskVolume::readBootImage(std::vector<uint8_t>& out, int volume) const {
             out.clear();
             return fail("Bootbereich im Verzeichnis nicht lesbar");
         }
+        if (profile_->boot_header == "microdos" || profile_->boot_header == "microdos1715") {
+            // Lader/Kopf + Systemdatei: das ist, was MSYSGEN auf eine neue Diskette legt.
+            std::vector<uint8_t> sys;
+            if (cpm->readSystemDatei(sys)) out.insert(out.end(), sys.begin(), sys.end());
+        }
         return true;
     }
     SectorSpace& raum = *volumes_[static_cast<size_t>(volume)].space;
@@ -4500,10 +4551,18 @@ bool DiskVolume::writeBootImage(const std::vector<uint8_t>& img, int volume) {
         return fail(problem);
     if (const std::string problem = bcuBootabbildproblem(*profile_, img); !problem.empty())
         return fail(problem);
+    if (const std::string problem = microdosBootabbildproblem(*profile_, img); !problem.empty())
+        return fail(problem);
     if (profile_->dir_boot) {
         auto* cpm = dynamic_cast<CpmFileSystem*>(volumes_[static_cast<size_t>(volume)].fs.get());
         if (!cpm) return fail("Bootbereich im Verzeichnis: kein CP/M-Dateisystem");
         if (!cpm->writeBootSlots(img)) return fail(cpm->lastError());
+        if (profile_->boot_header == "microdos" && img.size() > 256
+            && !cpm->writeSystemDatei(std::vector<uint8_t>(img.begin() + 256, img.end())))
+            return fail(cpm->lastError());
+        if (profile_->boot_header == "microdos1715" && img.size() > 128
+            && !cpm->writeSystemDatei(std::vector<uint8_t>(img.begin() + 128, img.end())))
+            return fail(cpm->lastError());
         return true;
     }
     {

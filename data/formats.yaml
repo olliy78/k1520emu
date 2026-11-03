@@ -735,6 +735,75 @@ filesystems:
     dir_boot:    true
     boot_header: pc1715
 
+  # ══ MicroDOS 1526 / 1715 (Rostock, CP/M-2.2-Anpassung; doc/design/13_k1520disktool.md §16) ══
+  # Das Verzeichnis beginnt auf c0h0 Sektor 1 (Offset 0, keine Systemspuren im CP/M-Sinn).  Die
+  # ersten ACHT Plaetze (256 B) gehoeren dem SYL-Lader ("SYL", Text "MicroDOS Loader") - wie beim
+  # Bootkopf des PC 1715, nur groesser (`dir_boot` + `boot_header: microdos`).  Die Systemdatei
+  # MicroDOS.SYS (gemischte Schreibung, 16 KB) ist eine gewoehnliche Datei, liegt aber an
+  # festen Sektoren (c1..c4 h0, je Sektor 1-4) - dort liest sie SYL/INIT.  Die Verzeichnisgroesse
+  # ist NICHT die der CP/A-Regel (DS 80 Zyl.: 104 statt 192 Plaetze, 2 KB; gemessen: Platz 104 ff. = Daten): MicroDOS rechnet
+  # seinen DPB selbst (MSYSGEN/SELDSK).  Erkannt wird NUR mit SYL-Lader (positiver Nachweis);
+  # `*_daten` sind die Namen fuer Disketten OHNE Lader (`detect: false`, nur auf Anforderung).
+  - name:        microdos800
+    description: "MicroDOS 1526 (A5120/A5130) 800K DS, 5×1024 - SYL-Lader im Verzeichnis, 104 Plaetze"
+    format:      cpa800
+    type:        cpm
+    block_size:  2048
+    dir_entries: 104
+    dir_boot:    true
+    boot_header: microdos
+
+  - name:        microdos200
+    description: "MicroDOS 1526 (A5120/A5130) 200K SS 40 Spuren, 5×1024 - SYL-Lader im Verzeichnis, 64 Plaetze"
+    format:      k5601_ss40_5x1024
+    type:        cpm
+    block_size:  1024
+    dir_entries: 64
+    dir_boot:    true
+    boot_header: microdos
+
+  # `microdos128` - die Systemdiskette fuer Lade-ROM V0.6 / K5125 (msysgen Anhang B): 40 Spuren einseitig,
+  # 26 x 128 B, Block 1 KB (8 Sektoren), 64 Plaetze.  SYL-Lader 0.6 (256 B, Text "MicroDOS Loader") in den
+  # Plaetzen 0-7 ist der positive Nachweis.  MicroDOS.SYS liegt in den linearen Sektoren 26..155 (Spur 1-5),
+  # MSYSG20 traegt nur 16 Bloecke ein (3-17, 19; Block 18 fehlt) - `allocationMap` sperrt 3-19.  Bootabbild
+  # lesen geht, schreiben nicht (Lage nur gemessen).
+  - name:        microdos128
+    description: "MicroDOS 1526 (A5120/A5130) 100K SS 40 Spuren, 26x128 - SYL-Lader 0.6 im Verzeichnis, 64 Plaetze"
+    format:      k5601_ss40_26x128
+    type:        cpm
+    block_size:  1024
+    dir_entries: 64
+    dir_boot:    true
+    boot_header: microdos
+
+  - name:        microdos800_daten
+    description: "MicroDOS 800K DS, 5×1024 - Datendiskette ohne Lader, 104 Plaetze"
+    format:      cpa800
+    type:        cpm
+    block_size:  2048
+    dir_entries: 104
+    detect:      false
+
+  - name:        microdos200_daten
+    description: "MicroDOS 200K SS 40 Spuren, 5×1024 - Datendiskette ohne Lader, 64 Plaetze"
+    format:      k5601_ss40_5x1024
+    type:        cpm
+    block_size:  1024
+    dir_entries: 64
+    detect:      false
+
+  # `microdos1715` - MicroDOS des PC 1715: gleicher Bootkopf wie CP/A 1715 (02|03 F0), aber 128
+  # statt 192 Plaetze.  Positiver Nachweis ist die Datei MICRODOS.SYS (sonst waere jede CP/A-1715-
+  # Diskette auch eine MicroDOS-Diskette).
+  - name:        microdos1715
+    description: "MicroDOS 1715 (PC 1715) 800K DS - Bootkopf im Verzeichnis, 128 Plaetze"
+    format:      cpa800
+    type:        cpm
+    block_size:  2048
+    dir_entries: 128
+    dir_boot:    true
+    boot_header: microdos1715
+
   # `scp1715` — SCP 1715 und SCP 3.0 (1715W): vier Systemspuren (Urlader, CCP, BDOS, BIOS),
   # Verzeichnis ab c2h0 (die CP/A-Regel liest solche Disketten schon als `cpa_auto`; der
   # Eintrag ist der NAME fuer `create --fs scp1715 --boot` und der Ladekopf-Pruefer).

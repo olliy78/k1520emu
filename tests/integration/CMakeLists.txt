@@ -228,6 +228,11 @@ k1520_add_test(disktool_pc1715 SRC test_disktool_pc1715.cpp
                           LIBS k1520_pc1715 k1520_fs k1520_logger k1520_testsupport
                           LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 600)
 
+# DiskTool: MicroDOS 1526 / 1715 (Rostocker CP/M-Anpassung, Lader im Verzeichnis, MicroDOS.SYS an festem Ort).
+k1520_add_test(disktool_microdos SRC test_disktool_microdos.cpp
+                          LIBS k1520_fs k1520_logger k1520_testsupport
+                          LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 300)
+
 # PC 1715W Etappe 6+7 (AP-W3): S550 → SCP-3.0-Lader → SCP3.SYS → A>, Zeichensatz aus dem
 # ZG-RAM, DIR ueber die Tastatur, INIT.COM formatiert B:.
 k1520_add_test(pc1715w_boot SRC test_pc1715w_boot.cpp

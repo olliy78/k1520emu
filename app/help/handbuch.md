@@ -1017,6 +1017,95 @@ Sektorfolge, zwei defekte Spuren (leer lassen) und „INIT ALL" (`Y`); am Ende s
 * **Programmdiskette nach dem Start in A: tauschen** (Systemdiskette heraus, Programmdiskette hinein, `CAL DIDI` ohne `ASN`) geht;
   bequemer bleibt `ASN 0315 66` mit der Programmdiskette in B:.
 
+## MicroDOS 1526 (A5120, A5130)
+
+**MicroDOS** (Vers. 2.6 vom 01.03.87, Rostocker Anpassung) ist ein CP/M-2.2-kompatibles Betriebssystem für den
+A5120. Der Original-Z80-Code läuft unverändert; Kaltstart, Bedienung, Formatieren und Systemgenerierung sind
+durchgespielt. Bedienung im Handbuchtext der Sammlung (`MDOSB20.DOC`, `MSYSGEN.DOC`, `MKEY.DOC` — liegen auf der Diskette).
+
+**Disketten** im Ordner `a5120_microdos1526/` der Beispieldisketten, `a5120_microdos26_<Laufwerk>_<Tastatur>.hfe`.
+Die Bestückung muss zur Diskette passen:
+
+| Diskette | Laufwerke | Tastatur (*Einstellungen ▸ Allgemein*) |
+|----------|-----------|-----------------------------------------|
+| `…_k5601_seriell.hfe` | **K5601** (Vorgabe, 80 Zyl., 800K) | **K7637** (seriell, Vorgabe) |
+| `…_k5601_parallel.hfe` | K5601 | **K7636** (parallel) |
+| `…_k5600_10_seriell.hfe` | **K5600.10** (40 Spuren, 200K) für A: und B: | K7637 |
+| `…_k5600_10_parallel.hfe` | K5600.10 | K7636 |
+
+Die Diskette in **A:** einlegen, einschalten. Nach rund 110 Millionen Takten steht
+`48K MicroDOS Vers 2.6`, dann der Prompt `A>`. Bei falscher Tastatur oder falschem Laufwerk bleibt der Ladeschirm
+bei den Punkten stehen, oder der Schirm füllt sich mit `A>`. Die Disketten tragen die Hilfsprogramme `FORMAT20`,
+`DIP` (Kopieren), `MSYSG20` (Systemgenerierung), `SELDSK20`/`SELPRT20`/`SELAUX20`, `MKINST20`, `KTP`/`KTL` und die
+Handbuchtexte (`D` zeigt das Verzeichnis, `D B:` das von B:). Die Originaldisketten der Sammlung führen beim Start
+`INITIAL.SUB` aus und halten bei `A>MKEY20` an: **ein Return** bringt den Prompt (die mitgelieferten Disketten haben
+dieses `INITIAL.SUB` nicht).
+
+**Leere Diskette formatieren** (Knopf *Leere Diskette* im Laufwerkskasten B:, dann am Prompt):
+
+1. `FORMAT20`, Laufwerk `B` (**eine Taste, ohne Return** -- ein Return danach nimmt schon die Vorgabe 3 an); die **Formatziffer
+   mit Return** (`3` = 5 × 1024 B beim K5601; das Menü hängt vom Laufwerkstyp der Generierung ab, Beispiel K5600.10: `1` =
+   26 × 128 B); `Richtig (J/N)` mit `J`. Das dauert rund 200 Millionen Takte; am Ende `Formatierung beendet! Wiederholung (J/N)?` mit `N`.
+2. `D B:` zeigt danach `no files`.
+
+**Bootdiskette erzeugen** (die Diskette in B: ist formatiert): `MSYSG20`. Die Fragen werden mit der Ziffer **ohne**
+Return beantwortet: Tastatur `4` (K7637.51; `3` = K7636.01), Bildschirm `2` (K7024), Drucker `1` (IFSS), Typenrad `1`,
+Zusatzkanal `3` (V.24); je Laufwerk logisch `A`, physisch `1`, Typ `3` (K5601; `1` = K5600.10), Format `8` (K5601: 5 × 1024,
+80 Zyl., 2 Seiten; K5600.10: `4`), `Wiederholung (J/N)`: `J` für das nächste Laufwerk (B: mit `2`, `3`, `8`), nach dem
+letzten `N`; Zielfrage `B`, `Richtig (J/N)` mit `J`. Es folgt das Generierungsprotokoll, `Wiederholung` mit `N`.
+Auf B: liegt nun `MicroDOS.SYS` samt Urlader; die Diskette bootet als A: (ohne `INITIAL.SUB`: gleich `A>`).
+Das alles baut `tools/microdos/ablauf.py` selbsttätig nach (`tools/microdos/build.py` erzeugt daraus die mitgelieferten Disketten).
+
+**Dienstprogramme und Kommandos** (durchgespielt, Wächter `py_microdos_bedienung`): `SELDSK20` stellt Format und Typ je
+Laufwerk um (falsches Format: `Bdos error … ST= 56`); `O B:2` verschiebt das Verzeichnis, `S B:` macht B: zum Systemlaufwerk
+(Programme mit Systemattribut werden dort gefunden), `U 3` zeigt `3A>`, `<DATEI.SUB` führt eine Kommandodatei aus (der
+volle Name mit Typ; `;`-Zeilen sind Kommentar), `^S`/`^Q` halten die Ausgabe an, `^D` im Debugger `MZSID` öffnet `>A>`,
+`^P` schickt die Ausgabe zusätzlich an den Drucker. `POWER` ist das Dateiprogramm (`DIR`, `COPY`, `ERA`, `TYPE`, `?`), `MKEY20`
+belegt die Funktionstasten (PF10 → `DBASE`, …), `MKINST20` erzeugt aus einer Eingabedatei (`<MYKEY`) eine neue `MKEY20.SPR`,
+`HARDCOPY` kopiert Spuren (`A`, `B`, `03`), `KTL` zeigt logische Tastencodes (Ende mit `a`), `KTP` den physischen Code der
+**K7636** (U-Bus; an der K7637 nur `FF`). `MATH.COM` der Sammlung ist **kein Rechner**, sondern der Force-Two-Installer für
+WordStar. **Ausgabeumlenkung:** `>DATEI` sammelt die Bildschirmausgabe im Puffer; auf der Diskette steht sie erst nach dem
+**Schließen** — durch `^C` (am Zeilenanfang), durch ein nacktes `>` oder durch `^S` und danach `^F` (während einer
+laufenden Ausgabe). `^F` am Prompt ist kein Kommando und erscheint nur als `^F`.
+
+**Drucker und Zusatzkanal.** `SELPRT20` (Schnittstelle, Typenrad, Druckertest mit den Codes 20H–7FH): **IFSS** → Schnittstelle
+*Drucker* (X3), **V.24** → *DFÜ/V.24* (X6), **PIO** → E/A 54H–57H, die der Emulator nur als PIO der K8025 kennt: die Zeichen
+verschwinden, **nicht modelliert**. Zusatzkanal (`SELAUX20`/`MSYSG20`): V.24 sendet und empfängt (Schleife), **IFSP** (ALB K6025,
+E/A 90H–97H) ist **nicht modelliert**, **IFSS** sendet auf SIO A32 Kanal A (Stecker X4) — das ist mit der **K7637** der Tastaturkanal (nichts erreicht die Außenwelt, wie am
+Gerät), mit der **K7636** ist X4 frei und erscheint in *Einstellungen ▸ Schnittstellen* als vierter Anschluss „IFSS Zusatzkanal“. Das Gerät **K7634** (Tastatur) gibt es im
+Emulator nicht; K7023 (1K-Bildschirm) wählen Sie in *Einstellungen ▸ Allgemein ▸ Bildschirmkarte*. Systemdisketten mit
+**128-Byte-Sektoren** (Lade-ROM V0.6): mit den K5600.10-Laufwerken `FORMAT20` Eintrag `1`, `SELDSK20` B auf Typ 1/Format 1,
+`MSYSG20` mit Format `1` — bootet. Das DiskTool erkennt sie als `microdos128` (lesen, schreiben, prüfen; ein Bootabbild lässt sich
+herausholen und auf eine neue Diskette schreiben: *Neue Diskette ▸ Bootdiskette*). `FORMAT20` für den 8″-Antrieb MF 6400 Eintrag 3 (8 × 1024 B) meldet `Defekte Spuren !`: Spur 0
+wird immer in FM formatiert und passt in dieser Größe nicht auf eine Umdrehung.
+
+**Fallen.** `PIP.COM` der Sammlung ist abgeschnitten (4096 statt rund 7,9 KB) und läuft ins Leere — nutzen Sie `DIP`
+(`DIP B:=A:DATEI.COM`; mit nur *einem* Zielnamen wartet es danach auf `Load System Disk on Drive A:, then Type (cr)`:
+Return). `D B:` auf unformatierter Diskette meldet `Bdos error on B:` — mit `N` quittieren. Das Dateisystem kennt
+das DiskTool (Profile `microdos800`, `microdos200`); die Systemdatei liegt an festen Sektoren.
+
+## MicroDOS 1715 (PC 1715)
+
+Die Diskette `pc1715_microdos_k5601_system.hfe` startet MicroDOS 2.6 im `pc1715emu` (Modell PC 1715, Bildschirm K7222). Nach dem
+Kaltstart erscheint zweimal `A>`. `D` zeigt das Verzeichnis, `B:` wechselt das Laufwerk, `E NAME` löscht, `>B:DATEI` leitet die
+Ausgabe in eine Datei um (`>` beendet das). Am PC 1715W bootet MicroDOS nicht.
+
+**Programme** (durchgespielt, Wächter `py_microdos1715_bedienung`): `SELDSK15` (Typ 3 = MFS 1.6, Format 7 = 5 × 1024 × 80 × 2),
+`KTP15` (`b` → `E062`, Return → `E09E`, Ende mit `a`), `K6311SEL` (sendet `ESC R 2`, `ESC [ 0 SP K` an den Drucker), `MKEYINST`
+(`<DATEI` erzeugt `MKEY.SPR`), `POWER`, `HARDCOPY` (Strg+C beendet). `OC15` meldet `System und OC passen nicht zusammen !`
+(Gastverhalten). **Drucker:** nur **V.24** (`MSYSG15A` Drucker `1`) kommt an der Schnittstelle *Drucker* an; **IFSS** braucht die
+Zusatzkarte (E/A 10H–17H), die der Emulator nicht hat. `SELPRT` bleibt nach der Typenradwahl stehen (offen).
+**1K-Bildschirm:** `MSYSG15A` Bildschirm `1` erzeugt ein System, das am Modell *PC 1715 (K7221, 64 × 16)* ohne Umbruch bei Spalte 64
+läuft. **FORMAT15-Menü** 0–5 (0–2 einseitig, 3–5 doppelseitig; 16 × 256, 9 × 512, 5 × 1024): alle formatieren fehlerfrei.
+Nach `SELDSK15` mit einem einseitigen 80-Spur-Format hängt `D B:` (offen).
+
+**Neue Systemdiskette:** eine leere Diskette in Laufwerk B: einlegen (*Leere Diskette*), `FORMAT15` starten, Laufwerk `B` und Format `5`
+wählen (je eine Taste, ohne Return), die Warnung mit `Y` bestätigen und `FORMATTING COMPLETE` abwarten. FORMAT15 hat keinen Ausgang:
+**die Maschine neu starten**, nicht Strg+C. Danach `MSYSG15A`: Bildschirm `2`, Drucker `2`, Laufwerk `A` Einheit `1` Format `4`, `J`,
+Laufwerk `B` Einheit `2` Format `4`, `N`, Ziel `B`. Auf B: steht dann `MICRODOS.SYS`, die Diskette bootet allein.
+
+Das DiskTool kennt das Dateisystem als `microdos1715`; unter *Neue Diskette* entsteht sie mit dem Bootabbild „MicroDOS 1715“ auch ohne Emulator.
+
 ## MUTOS 8000 (A5120.16)
 
 MUTOS 8000 ist ein UNIX für den 16-Bit-Teil des A5120.16 (U8001). Dieser Abschnitt ist eine

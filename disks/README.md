@@ -46,6 +46,25 @@ Sicherheitsstecker 01.
 
 Die Disketten **nie direkt mounten** (der Emulator öffnet r/w); die Tests arbeiten mit Kopien.  Bedienung: Handbuch des Emulators, Abschnitt „SIOS 1526“.
 
+## MicroDOS 1526 (`a5120_microdos1526/`)
+
+**Selbst gebaut**, nicht die Sammlungsabzüge: `tools/microdos/build.py` startet die Originale (`tools/microdos/original/`, byteglich zu
+`MicroDOS1526{s,p}[_5600].hfe`) im Emulator, formatiert eine Leerdiskette (FORMAT20), erzeugt mit MSYSG20 `MicroDOS.SYS` + SYL-Lader für die
+gewünschte Tastatur/Laufwerke und kopiert die Beigaben per DiskTool nach.  Beigaben: FORMAT20, DIP, MSYSG20, SELDSK20/SELPRT20/SELAUX20,
+MKINST20, KTL/KTP, POWER, MKEY20, HARDCOPY, MATH und die Handbuchtexte (`*.DOC`); **ohne** `PIP.COM` (in der Sammlung abgeschnitten, 4096 statt rund 7,9 KB; `DIP` ersetzt es) und `INITIAL.SUB` (das hielte beim Start in MKEY20 an,
+bis man Return drückt), WordStar/MailMerge und Nutzerbereich 1 (DataStar, Wörterbücher; nur im Original).  Wächter `py_microdos_ablauf`
+(Kaltstart bis `A>`, Beigaben vorhanden, `build.py --check`: bytegleich zum Bau, Erkennung `microdos800`/`microdos200`, fsck ohne Warnung).
+Neu bauen: `LD_LIBRARY_PATH=build venv/bin/python3 -I tools/microdos/build.py --tool build/k1520disktool` (~30 s).
+
+| Datei | Bestückung |
+|-------|------------|
+| `a5120_microdos26_k5601_seriell.hfe` | 4 × K5601 (80 Zyl. DS, 5 × 1024 B, 800K), Tastatur K7637 (Vorgabe) |
+| `a5120_microdos26_k5601_parallel.hfe` | wie oben, Tastatur K7636 (`--tastatur k7636`) |
+| `a5120_microdos26_k5600_10_seriell.hfe` | K5600.10 (40 Spuren einseitig, 200K), K7637 |
+| `a5120_microdos26_k5600_10_parallel.hfe` | K5600.10, K7636 |
+
+Falsche Tastatur oder falsches Laufwerk: Ladeschirm bleibt bei den Punkten stehen bzw. `A>`-Rauschen (`doc/merkposten/microdos.md`).
+
 ## Disketten
 
 | Datei | System | Laufwerke A: / B: / C: |
@@ -64,6 +83,7 @@ Die Disketten **nie direkt mounten** (der Emulator öffnet r/w); die Tests arbei
 | **`prg710-1_scpx17/prg710-1_scpx17_system.hfe`** | **SCPX 1526 V 1.7 (52K) für den PRG 710-1**, 16×256, BIOS-Module `B17172xx`/`B17272xx`; sonst wie die 710-Diskette (ohne Anwenderdaten) | PRG 710-1 (K5601) |
 | **`pc1715_scp1715_v0006/pc1715_scp1715_v0006_system.hfe`** | **SCP 1715 V0006** (03/08/87, 48 KB), 5×1024; `INIT`, `SGEN`, `INSTSCP`, `PCTEST`, Werkzeuge, TP 3.0, WM, BASIC, Pascal, Fortran-80, M80/L80, `TLC`, SERTEST. Aus `tools/scp_pc1715/` (`cli_scp_pc1715`) | PC 1715 (K5601) |
 | **`pc1715_scp1715_v0007/pc1715_scp1715_v0007_system.hfe`** | **SCP 1715 V0007** (01/11/88, 50 KB, nachladbarer CCP), 16×256; sonst wie V0006 (ohne `PCTEST`) | PC 1715 (K5601) |
+| **`pc1715_microdos/pc1715_microdos_k5601_system.hfe`** | **MicroDOS 2.6 (01.05.86, Rostock) für den PC 1715**, CP/M-2.2-kompatibel, 5×1024 (K5601). `FORMAT15` (Leerdiskette formatieren), `MSYSG15A` (Systemgenerierung für MFS 1.6), `POWER`, `SELDSK15`, `SELPRT`, `LIESMICH.TXT`. Vom `tools/microdos/build1715.py` gebaut; Bedienung: `LIESMICH.TXT`, `doc/merkposten/microdos1715.md` | PC 1715 (K5601) |
 | **`pc1715_cpz22/pc1715_cpz22_system.hfe`** | **CP/Z 2.2** („52K CP/Z 2.2 ZOAZ MRL“ 06.12.88), 16×256, mit `CPZINIT`/`CPZGEN`/`CPZDUP`, Turbo Pascal, WordStar; dazu WM, BASIC, `TLC`, SERTEST | PC 1715 (K5601) |
 | **`pc1715w_scp30/pc1715w_scp30_system.hfe`** | **SCP 3.0 (CP/M 3) V0003 28.03.89, Lader PC 1715W**, 5×1024; Zeichensätze `SC6xx.ZGF`, Textprogramm V1/3B + `TPINSTD`, WM, BASIC, Pascal, SERTEST V0.3. Aus `tools/scp_pc1715w/` (`cli_scp_pc1715w`) | PC 1715W (U8272) |
 | **`p8000_osm30/p8000_osm30_system.hfe`** | **OS/M 3.0 (ZFT/KEAW, 15.01.1988) für den P8000, 8-Bit-Teil** (CP/M 2.2), Format 5 (80×2×16×256, 640K, Profil `osm640`) mit OS/M-Urlader; Systemdiskette der pofo-Sammlung (`osm30`) mit ihren 32 Dateien (SYSGEN, SETFD, FORMAT, COPYDISK, ASM, DDT, ED, TP, POWER, REDABAS, `BIOS.L` …) plus `LIESMICH.TXT` und `KERMIT.COM`; 34 Dateien, 104 KB frei. Startet im `p8000emu` (Diskette in A:, Kaltstart, am Monitor zweimal RETURN). Aus `tools/osm_p8000/` (`cli_osm_p8000`) | P8000 (8-Bit-Teil) |
