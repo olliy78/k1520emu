@@ -56,8 +56,8 @@ Originaldiskette (ohne `INITIAL.SUB`, `PIP.COM`, `MicroDOS.SYS`, WordStar/MailMe
 - Das **Drucker-BIOS der 5600-Quelle wartet bei MSYSG20s Protokoll endlos auf CTS** (Schleife `IN 51H / BIT 5` bei E79BH) -> `Sitzung` legt Schnittstelle 0 auf
   eine Datei (`os.devnull`; Datei meldet VERBUNDEN).  Loop hilft nicht.
 - FORMAT20 bietet nur, was das BIOS der **Quelle** fuer B: kennt; die Geometrie der Leerdiskette folgt dem Laufwerk des Emulators.
-Der Bau ist deterministisch (zweimal gebaut = gleiche Bytes); `build.py --check` laeuft im Waechter `py_microdos_ablauf`.  Im Paket nur mit `--disks all`
-(wie SIOS; `DISKS_DEFAULT` ist eine feste Auswahl, `py_packaging` prueft sie).
+Der Bau ist deterministisch (zweimal gebaut = gleiche Bytes); `build.py --check` laeuft im Waechter `py_microdos_ablauf`.  Seit 2026-11-03 gehoeren alle vier
+zur Vorgabeauswahl des Pakets (`DISKS_DEFAULT`, Freigabe des Anwenders; Waechter `test_microdos1526_disketten_sind_in_der_vorgabeauswahl`).
 
 ## Bootabbilder des DiskTools (2026-10-31, Waechter `py_microdos_bootabbilder`)
 
