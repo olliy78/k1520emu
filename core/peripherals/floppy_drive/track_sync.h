@@ -58,9 +58,9 @@ constexpr uint32_t kReadaheadRuheMs = 4000;
 
 /// Vorgabe: so lange nach der letzten Gastanforderung einer unbekannten Spur ruht die
 /// Rueckfuehrung (Wirtszeit).  Der Gast bestimmt dann, wo der Kopf steht.
-constexpr uint32_t kRueckfuehrungHaltMs = 1500;
+constexpr uint32_t kRueckfuehrungHaltMs = 5000;
 /// Hoechstens so lange darf dieser Halt eine geaenderte Spur zurueckhalten.
-constexpr uint32_t kRueckfuehrungHaltHoechstMs = 30000;
+constexpr uint32_t kRueckfuehrungHaltHoechstMs = 300000;
 
 struct TrackSyncSpec {
     uint8_t  num_cyls  = 80;   ///< Reichweite des Laufwerks (K5601 80, K5600.10 40, …)
