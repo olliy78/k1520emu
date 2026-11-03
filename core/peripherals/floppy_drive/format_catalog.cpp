@@ -111,7 +111,7 @@ bool buildFormat(const yaml::Node& node, DiskFormat& out, std::string& why,
     const std::string where = file + ":" + std::to_string(node.line);
     collectUnknownKeys(node,
                        {"name", "description", "drives", "default_for",
-                        "encoding", "containers", "step", "tracks"},
+                        "encoding", "containers", "step", "rate", "rpm", "tracks"},
                        where, issues);
 
     // ── name (Pflicht) ──
@@ -154,6 +154,20 @@ bool buildFormat(const yaml::Node& node, DiskFormat& out, std::string& why,
         if (v != 1 && v != 2)
             { why = "'step' kennt nur 1 (Einzelschritt) und 2 (Doppelschritt)"; return false; }
         out.step = static_cast<uint8_t>(v);
+    }
+
+    // ── rate / rpm (optional): Grundrate und Drehzahl des Formats ──
+    if (const yaml::Node* n = node.find("rate")) {
+        long v = 0;
+        if (!n->isScalar() || !yaml::toInt(n->scalar, v) || (v != 250 && v != 500))
+            { why = "'rate' (Format) muss 250 oder 500 sein"; return false; }
+        out.rate_kbps = static_cast<uint16_t>(v);
+    }
+    if (const yaml::Node* n = node.find("rpm")) {
+        long v = 0;
+        if (!n->isScalar() || !yaml::toInt(n->scalar, v) || (v != 300 && v != 360))
+            { why = "'rpm' muss 300 oder 360 sein"; return false; }
+        out.rpm = static_cast<uint16_t>(v);
     }
 
     // ── containers (optional) ──

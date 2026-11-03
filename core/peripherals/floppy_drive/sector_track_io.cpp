@@ -71,7 +71,8 @@ bool fromMedium(const DiskMedium& m, std::vector<TrackRecord>& out, std::string&
             if (secs.empty()) continue;   // Spur ohne Adressmarke = unformatiert
             TrackRecord tr;
             tr.cyl = c; tr.head = h; tr.enc = t.encoding;
-            tr.rate_kbps = guessRate(t.encoding, t.bytes.size());
+            tr.rate_kbps = m.nominalRateKbps() >= 500 && t.encoding == Encoding::MFM
+                               ? 500 : guessRate(t.encoding, t.bytes.size());
             for (const LogicalSector& s : secs) {
                 SectorRecord r;
                 r.c = s.cyl; r.h = s.head; r.r = s.id;
@@ -120,6 +121,22 @@ bool toMedium(const std::vector<TrackRecord>& tracks, DiskMedium& out, std::stri
 
     DiskMedium neu(static_cast<uint8_t>(maxC + 1), static_cast<uint8_t>(maxH + 1),
                    tracks.front().enc);
+
+    // PC-Hochdichte (MFM, 500 kbit/s, 512-B-Sektoren, 15 bzw. 18 je Spur) bekommt die
+    // Grundrate 500 und die passende Drehzahl ans Medium; die Spuren werden mit der
+    // Hochdichte-Umdrehung (10 416 / 12 500 B) gebaut.  8″ (500 kbit/s, andere Sektorzahl
+    // und -groesse) bleibt unveraendert (Rate 250, wie es immer lief).
+    for (const TrackRecord& tr : tracks) {
+        if (tr.sectors.empty()) continue;
+        bool hd = tr.enc == Encoding::MFM && tr.rate_kbps >= 500
+               && (tr.sectors.size() == 15 || tr.sectors.size() == 18);
+        for (const SectorRecord& s : tr.sectors) hd = hd && s.n == 2;
+        if (hd) {
+            neu.setNominalRateKbps(500);
+            neu.setNominalRpm(tr.sectors.size() == 15 ? 360 : 300);
+        }
+        break;   // die erste belegte Spur entscheidet
+    }
     for (const TrackRecord& tr : tracks) {
         if (tr.sectors.empty()) continue;
         std::vector<LogicalSector> ls;
@@ -134,7 +151,7 @@ bool toMedium(const std::vector<TrackRecord>& tracks, DiskMedium& out, std::stri
             if (!s.no_data) l.data = s.data;
             ls.push_back(std::move(l));
         }
-        neu.setTrack(tr.cyl, tr.head, TrackCodec::buildTrack(ls, tr.enc));
+        neu.setTrack(tr.cyl, tr.head, TrackCodec::buildTrack(ls, tr.enc, neu.nominalRateKbps()));
     }
     neu.clearDirty();
     out = std::move(neu);

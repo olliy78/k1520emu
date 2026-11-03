@@ -70,6 +70,20 @@ bool FloppyDriveV2::mount(std::unique_ptr<DiskImage> img, bool write_protect) {
 
     const DiskGeometry geo = img->geometry();
 
+    // Hochdichte (Grundrate 500 kbit/s, PC 1,2M/1,44M): kein Laufwerk der Robotron-Rechner
+    // kann das; die Zeitbasis stimmte nicht und die Diskette sahe heil aus.  Ausnahme ist
+    // ein 8″-Laufwerk (360 U/min) mit einer 360-U/min-Diskette -- der MF6400 laeuft selbst
+    // mit 500 kbit/s (HFE-Dateien tragen das im Kopf).  Entwurf 45 Abschnitt 2.
+    if (img->medium().nominalRateKbps() >= 500
+        && !(profile_.rpm == 360 && img->medium().nominalRpm() == 360)) {
+        last_error_ = "Hochdichte-Diskette (500 kbit/s, "
+                    + std::to_string(img->medium().nominalRpm())
+                    + " U/min) - Laufwerk '" + profile_.name
+                    + "' kann nur 250 kbit/s (Doppeldichte); die Diskette laesst sich "
+                      "im DiskTool bearbeiten, aber nicht im Emulator einlegen";
+        return false;
+    }
+
     // Spurdichte und Seitenzahl der Diskette gegen das Laufwerk stellen.  Beides ist
     // kein Ausschlusskriterium, sondern bestimmt, WIE die Diskette gelesen wird.
     const TrackPitch pitch      = trackPitchFor(geo, profile_);

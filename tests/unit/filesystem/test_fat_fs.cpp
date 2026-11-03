@@ -778,10 +778,91 @@ TEST(FatDiskVolume, ZweiGeometrienGleicherGroesseUnterscheidetDerBpb) {
     }
 }
 
-TEST(FatDiskVolume, HochdichteNurAlsImg) {
+// ── Hochdichte (Entwurf 45, AP H1): 500 kbit/s in allen Containern ────────────────────────────
+
+/// Kopfbytes 0x0C/0x0D (Bitrate) und 0x0E/0x0F (rpm) einer HFE-Datei.
+static void hfeKopf(const std::string& pfad, unsigned& rate, unsigned& rpm, unsigned& spuren) {
+    std::ifstream i(pfad, std::ios::binary);
+    std::vector<uint8_t> h(32);
+    i.read(reinterpret_cast<char*>(h.data()), 32);
+    rate   = h[0x0C] | (h[0x0D] << 8);
+    rpm    = h[0x0E] | (h[0x0F] << 8);
+    spuren = h[0x09];
+}
+
+TEST(FatDiskVolume, HdRundlaufInAllenContainern) {
+    struct F { const char* profil; unsigned rate_soll; unsigned rpm_soll; };
+    const F profile[] = {{"dos1440", 500, 300}, {"dos1200", 500, 360}};
+    for (const F& f : profile)
+        for (const char* ext : {"img", "hfe", "dmk", "imd", "td0", "cqm"}) {
+            const std::string was = std::string(f.profil) + "." + ext;
+            const std::string pfad = k1520test::tempPath("k1520_test_hd_" + was);
+            std::string err;
+            auto v = DiskVolume::create(pfad, f.profil, "HDTEST", formate(), dateisysteme(), err);
+            ASSERT_TRUE(v) << was << ": " << err;
+            const std::vector<uint8_t> daten = muster(40000);
+            const std::string quelle = k1520test::tempPath("k1520_test_hd_quelle.bin");
+            { std::ofstream o(quelle, std::ios::binary); o.write(reinterpret_cast<const char*>(daten.data()), static_cast<std::streamsize>(daten.size())); }
+            TransferOptions t; t.overwrite = true;
+            ASSERT_TRUE(v->insert(quelle, FileRef{0, "GROSS.BIN"}, t)) << was << ": " << v->lastError();
+            ASSERT_TRUE(v->flush()) << was;
+            v.reset();
+
+            auto w = volume(pfad, err);
+            ASSERT_TRUE(w) << was << ": " << err;
+            EXPECT_EQ(w->profile().name, f.profil) << was;
+            EXPECT_TRUE(w->istFat()) << was;
+            const std::string aus = k1520test::tempPath("k1520_test_hd_aus.bin");
+            TransferOptions tx; tx.overwrite = true;
+            ASSERT_TRUE(w->extract(FileRef{0, "GROSS.BIN"}, aus, tx)) << was << ": " << w->lastError();
+            std::ifstream i(aus, std::ios::binary);
+            const std::vector<uint8_t> gelesen((std::istreambuf_iterator<char>(i)), {});
+            EXPECT_EQ(gelesen, daten) << was;
+            w.reset();
+
+            // Das neu geoeffnete Medium traegt die Hochdichte-Zeitbasis (ausser .img: dort aus dem Format).
+            std::string e2;
+            auto img = DiskImage::open(pfad, *formate().find(dateisysteme().find(f.profil)->format), true);
+            if (img) {
+                EXPECT_EQ(img->medium().nominalRateKbps(), f.rate_soll) << was;
+                EXPECT_EQ(img->medium().nominalRpm(), f.rpm_soll) << was;
+            }
+            if (std::string(ext) == "hfe") {
+                unsigned rate = 0, rpm = 0, n = 0;
+                hfeKopf(pfad, rate, rpm, n);
+                EXPECT_EQ(rate, f.rate_soll) << "HFE-Kopf: Bitrate";
+                EXPECT_EQ(rpm, f.rpm_soll) << "HFE-Kopf: rpm";
+                // Zellen je Umdrehung = Rate x 2 x 60 000 / rpm  (1,44M: 200 000; 1,2M: 166 667)
+                const size_t zellen = (static_cast<size_t>(f.rate_soll) * 120000 + f.rpm_soll / 2) / f.rpm_soll;
+                std::ifstream h(pfad, std::ios::binary);
+                std::vector<uint8_t> kopf(1024);
+                h.read(reinterpret_cast<char*>(kopf.data()), 1024);
+                const unsigned len = kopf[512 + 2] | (kopf[512 + 3] << 8);   // LUT-Eintrag Zylinder 0
+                EXPECT_EQ(len / 2, (zellen / 8 + 255) / 256 * 256) << "Seitenlaenge in Byte";
+            }
+            std::error_code ec;
+            fs::remove(pfad, ec); fs::remove(quelle, ec); fs::remove(aus, ec);
+        }
+}
+
+TEST(FatDiskVolume, EdBleibtNurImg) {
     std::string err;
-    EXPECT_FALSE(DiskVolume::create(k1520test::tempPath("k1520_test_fat_hd.hfe"), "dos1440", "", formate(), dateisysteme(), err));
-    EXPECT_FALSE(DiskVolume::create(k1520test::tempPath("k1520_test_fat_hd.cqm"), "dos1440", "", formate(), dateisysteme(), err));
+    EXPECT_FALSE(DiskVolume::create(k1520test::tempPath("k1520_test_fat_ed.hfe"), "dos2880", "", formate(), dateisysteme(), err));
+    EXPECT_FALSE(DiskVolume::create(k1520test::tempPath("k1520_test_fat_ed.cqm"), "dos2880", "", formate(), dateisysteme(), err));
+}
+
+TEST(FatDiskVolume, HdSpurHatDieHochdichteUmdrehung) {
+    for (auto [profil, bytes] : {std::pair<const char*, size_t>{"dos1440", 12500}, {"dos1200", 10416}, {"dos720", 6250}}) {
+        const DiskFormat* f = formate().find(dateisysteme().find(profil)->format);
+        const std::string pfad = k1520test::tempPath(std::string("k1520_test_hd_umdr_") + profil + ".img");
+        std::string grund;
+        auto img = DiskImage::create(pfad, *f, false, f->predominantEncoding(), &grund);
+        ASSERT_TRUE(img) << grund;
+        EXPECT_EQ(img->medium().track(0, 0).bytes.size(), bytes) << profil;
+        EXPECT_EQ(img->medium().track(79, 1).bytes.size(), bytes) << profil;
+        img.reset();
+        std::error_code ec; fs::remove(pfad, ec);
+    }
 }
 
 TEST(FatDiskVolume, OrdnerEinfuegenUndAuspackenRundlauf) {

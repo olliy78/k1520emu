@@ -702,7 +702,7 @@ Das DiskTool liest und schreibt die Disketten, die ein PC-DOS, MS-DOS, **DCP** (
   die Linux-Datei über und kommt beim Einfügen von ihr zurück.  DOS kennt keine Zeitzone; gerechnet wird mit der Ortszeit.
 * **Platz:** Cluster werden aufgerundet, die Wurzel hat eine feste Zahl Einträge; passt etwas nicht, bleibt die Diskette
   unverändert.  Die Prüfung (Strg+F) findet Kreuzverweise, verlorene Cluster und beschädigte FAT-Kopien.
-* **Hochdichte-Disketten** (1,2M/1,44M/2,88M) lassen sich nur als `.img` anlegen und speichern.
+* **Hochdichte-Disketten** 1,2M und 1,44M lassen sich in allen Dateiformaten anlegen und speichern (`.img`, `.hfe`, `.dmk`, `.cqm`, `.td0`, `.imd`); 2,88M nur als `.img`.  Der Emulator nimmt sie nicht an (kein Laufwerk kann 500 kbit/s).
 
 **Bootfähige DOS-Diskette:** *Datei ▸ Neue Diskette*, Dateisystem `dos720`, Haken „Bootdiskette erstellen" und einen
 hinterlegten Lader wählen (DCP 3.3, DCP 3.20, DCP 3.2/PC 1834, MDISK).  Dann *Diskette ▸ Systemdateien übernehmen (DOS SYS)* und

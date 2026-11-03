@@ -13,6 +13,9 @@
 #    encoding     (optional) fm | mfm — Vorgabe für Spuren ohne eigenes encoding
 #    containers   (optional) img | hfe — darstellbare Dateitypen (Default: beide)
 #    step         (optional) 1 (Vorgabe) | 2 — Doppelschritt, siehe Kasten
+#    rate         (optional) 250 (Vorgabe) | 500 — Grundrate in kbit/s (PC-Hochdichte); das
+#                            Spurbereich-`rate: 125` unten ist ein Teiler DAVON
+#    rpm          (optional) 300 | 360 — Drehzahl; Vorgabe aus den Laufwerken (360 nur 8")
 #    tracks       (Pflicht)  Liste disjunkter Spurbereiche
 #
 #  ┌───────────────────────────────────────────────────────────────────────────┐
@@ -631,6 +634,8 @@ formats:
     description: "PC 5,25″ hochdichte Diskette — 80 Spuren doppelseitig, 15×512 (1,2M)"
     drives:      [K5601]
     encoding:    mfm
+    rate:        500        # kbit/s; ein Emulator-Laufwerk kann das nicht — das Einlegen wird abgewiesen
+    rpm:         360
     tracks:
       - { cyls: 0-79, heads: 0-1, sectors: 15, size: 512 }
 
@@ -638,6 +643,8 @@ formats:
     description: "PC 3,5″ hochdichte Diskette — 80 Spuren doppelseitig, 18×512 (1,44M)"
     drives:      [K5601]
     encoding:    mfm
+    rate:        500
+    rpm:         300
     tracks:
       - { cyls: 0-79, heads: 0-1, sectors: 18, size: 512 }
 
@@ -1323,17 +1330,15 @@ filesystems:
     description: "MS-DOS FAT12 1,2M — 80 Spuren doppelseitig, 15×512 (5,25″ HD)"
     format:      pc_hd_15x512
     type:        fat
-    containers:  [img]      # 500/1000 kbit/s: HFE/DMK koennte der Emulator-Stack nicht wahrheitsgemaess fuehren
     detect_rank: -20
   - name:        dos1440
     description: "MS-DOS FAT12 1,44M — 80 Spuren doppelseitig, 18×512 (3,5″ HD)"
     format:      pc_hd_18x512
     type:        fat
-    containers:  [img]      # 500/1000 kbit/s: HFE/DMK koennte der Emulator-Stack nicht wahrheitsgemaess fuehren
     detect_rank: -20
   - name:        dos2880
     description: "MS-DOS FAT12 2,88M — 80 Spuren doppelseitig, 36×512 (3,5″ ED)"
     format:      pc_ed_36x512
     type:        fat
-    containers:  [img]      # 500/1000 kbit/s: HFE/DMK koennte der Emulator-Stack nicht wahrheitsgemaess fuehren
+    containers:  [img]      # 1000 kbit/s (ED): der Stack kennt nur 250/500 - HFE/DMK/IMD/TD0/CQM waeren falsch beschriftet
     detect_rank: -20

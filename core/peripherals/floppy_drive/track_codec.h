@@ -116,7 +116,11 @@ GapParams gapsFor(Encoding enc);
 ///        (5,25″, 250 kbit/s, 300 U/min) bzw. 10 416 (8″ DD, 500 kbit/s, 360 U/min),
 ///        FM 3125 (125 kbit/s, 5,25″), 5208 (8″ SD, 360 U/min), 6250 (FM mit 250 kbit/s
 ///        am 5,25″-Laufwerk).  Passt keine, die groesste.
-size_t nominalTrackBytes(const std::vector<LogicalSector>& sectors, Encoding enc);
+///        Mit @p rate_kbps = 500 (PC-Hochdichte, @ref DiskMedium::nominalRateKbps): MFM 10 416
+///        (5,25″ 1,2M, 360 U/min) bzw. 12 500 (3,5″ 1,44M, 300 U/min).  Fuer 250 und beim 8″
+///        aendert sich nichts.
+size_t nominalTrackBytes(const std::vector<LogicalSector>& sectors, Encoding enc,
+                         uint16_t rate_kbps = 250);
 
 /**
  * @brief Normluecken fuer eine GANZE Spur aus @p sectors (IBM / FORMAT.COM).
@@ -127,7 +131,8 @@ size_t nominalTrackBytes(const std::vector<LogicalSector>& sectors, Encoding enc
  * passt, nie unter @ref kSectorTailBytes.  `track_len` = diese Umdrehung (Luecke 4b fuellt
  * bis zum Index).  Das Ergebnis passt damit in die Umdrehung, sobald das ueberhaupt geht.
  */
-GapParams normGaps(const std::vector<LogicalSector>& sectors, Encoding enc);
+GapParams normGaps(const std::vector<LogicalSector>& sectors, Encoding enc,
+                   uint16_t rate_kbps = 250);
 
 /**
  * @brief Baut eine vollstaendige Spur mit echten Marken und echten CRCs.
@@ -150,6 +155,9 @@ TrackImage buildTrack(const std::vector<LogicalSector>& sectors,
 // Datenfeld.  Aufrufer, die diese Felder nicht setzen (Vorgabe true/true/false/false),
 // bekommen bitgleich dieselbe Spur wie zuvor.
 TrackImage buildTrack(const std::vector<LogicalSector>& sectors, Encoding enc);
+/// @brief Wie oben, mit der Grundrate des Mediums (500 → Hochdichte-Umdrehung, s. @ref nominalTrackBytes).
+TrackImage buildTrack(const std::vector<LogicalSector>& sectors, Encoding enc,
+                      uint16_t rate_kbps);
 
 /**
  * @brief Parst eine Spur (FM oder MFM, aus track.encoding) in logische Sektoren zurueck.

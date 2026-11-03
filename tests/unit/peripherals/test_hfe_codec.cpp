@@ -436,6 +436,7 @@ TEST(HfeCodec, UeberabgetasteteAufnahme500kbitWirdGelesen) {
     HfeCodec::SourceInfo info;
     const DiskMedium m = loadHfe(path, &info);
     EXPECT_TRUE(info.oversampled);
+    EXPECT_EQ(m.nominalRateKbps(), 250) << "ueberabgetastete DD bleibt DD (Grundrate 250)";
 
     expectFourGoodSectors(m.track(0, 0), "500 kbit/s Seite 0");
     expectFourGoodSectors(m.track(0, 1), "500 kbit/s Seite 1");
@@ -446,6 +447,60 @@ TEST(HfeCodec, UeberabgetasteteAufnahme500kbitWirdGelesen) {
     EXPECT_FALSE(img->bindingWritable());
 
     std::filesystem::remove(path);
+}
+
+// Entwurf 45: Kopf-Bitrate 500 ist eine ECHTE Hochdichte-Aufnahme, wenn der Inhalt unter
+// Faktor 1 lesbar ist UND die Umdrehung 500-kbit/s-lang ist; dieselbe Datei mit nur
+// 250-kbit/s-Laenge (falsch beschrifteter Kopf) bleibt eine DD-Diskette.
+TEST(HfeCodec, HdKopf500GiltNurBeiPassenderUmdrehung) {
+    auto baue = [](uint8_t sektoren, uint16_t rate, uint16_t rpm) {
+        std::vector<LogicalSector> secs;
+        for (uint8_t i = 1; i <= sektoren; ++i) {
+            LogicalSector s; s.cyl = 0; s.head = 0; s.id = i; s.size = 512;
+            s.data.assign(512, static_cast<uint8_t>(i));
+            secs.push_back(std::move(s));
+        }
+        DiskMedium m(1, 1, Encoding::MFM);
+        m.setNominalRateKbps(rate);
+        m.setNominalRpm(rpm);
+        m.setTrack(0, 0, TrackCodec::buildTrack(secs, Encoding::MFM, rate));
+        return m;
+    };
+    const auto pfad = k1520test::tempPath("k1520_test_hfe_hd_kopf.hfe");
+
+    // (a) echte HD 1,44M: Kopf 500/300, ~200 000 Zellen, Rate bleibt 500
+    { DiskMedium m = baue(18, 500, 300); std::string err;
+      ASSERT_TRUE(HfeCodec::save(pfad, m, err)) << err;
+      std::ifstream f(pfad, std::ios::binary); std::vector<uint8_t> h(32);
+      f.read(reinterpret_cast<char*>(h.data()), 32);
+      EXPECT_EQ(h[0x0C] | (h[0x0D] << 8), 500);
+      EXPECT_EQ(h[0x0E] | (h[0x0F] << 8), 300);
+      DiskMedium back = loadHfe(pfad, nullptr);
+      EXPECT_EQ(back.nominalRateKbps(), 500);
+      EXPECT_EQ(back.nominalRpm(), 300);
+      const auto s = TrackCodec::parseTrack(back.track(0, 0));
+      ASSERT_EQ(s.size(), 18u);
+      for (const auto& x : s) EXPECT_TRUE(x.data_crc_ok && x.id_crc_ok);
+      EXPECT_EQ(back.track(0, 0).cell_factor, 1); }
+
+    // (b) DD-Spur mit auf 500 umgeschriebenem Kopf: 100 000 Zellen -> bleibt 250
+    { DiskMedium m = baue(9, 250, 300); std::string err;
+      ASSERT_TRUE(HfeCodec::save(pfad, m, err)) << err;
+      { std::fstream f(pfad, std::ios::in | std::ios::out | std::ios::binary);
+        f.seekp(0x0C); const char r[2] = {static_cast<char>(500 & 0xFF), static_cast<char>(500 >> 8)};
+        f.write(r, 2); }
+      DiskMedium back = loadHfe(pfad, nullptr);
+      EXPECT_EQ(back.nominalRateKbps(), 250);
+      const auto s = TrackCodec::parseTrack(back.track(0, 0));
+      EXPECT_EQ(s.size(), 9u); }
+
+    // (c) 250-kbit/s-Medien schreiben wie bisher: Kopf 250
+    { DiskMedium m = baue(9, 250, 300); std::string err;
+      ASSERT_TRUE(HfeCodec::save(pfad, m, err)) << err;
+      std::ifstream f(pfad, std::ios::binary); std::vector<uint8_t> h(32);
+      f.read(reinterpret_cast<char*>(h.data()), 32);
+      EXPECT_EQ(h[0x0C] | (h[0x0D] << 8), 250); }
+    std::filesystem::remove(pfad);
 }
 
 /**

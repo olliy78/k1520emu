@@ -191,6 +191,10 @@ bool DmkCodec::load(const std::string& path, DiskMedium& out, SourceInfo* info,
         }
     }
 
+    // DMK fuehrt keine Datenrate: PC-Hochdichte (15/18 x 512 MFM) am Inhalt erkennen, damit
+    // ein spaeteres .hfe/.imd/.td0 die wahre Rate (500) traegt (Entwurf 45).
+    out.detectHighDensityFromContent();
+
     out.clearDirty();
     if (info) info->write_allowed = (file[0] != 0xFF);
     return true;

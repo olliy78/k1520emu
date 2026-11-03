@@ -135,6 +135,58 @@ TEST(FloppyDriveV2, Mount_FalschesVerfahren_Inkompatibel) {
 
 // ─── Gruppe 2: track() liefert korrekte Sektoren ─────────────────────────────
 
+// Hochdichte (500 kbit/s, Entwurf 45): kein Robotron-Laufwerk kann das; nur der 8"-Fall
+// (360 U/min Laufwerk und Diskette) bleibt zulaessig.
+static std::unique_ptr<DiskImage> makeHdImage(uint8_t sectors, uint16_t rpm, const char* suffix) {
+    DiskFormat fmt;
+    fmt.name = std::string("test_hd") + suffix;
+    fmt.rate_kbps = 500;
+    fmt.rpm = rpm;
+    fmt.tracks.push_back({0, 1, 0, 1, sectors, 512});
+    const auto path = k1520test::tempPath("k1520_drv2_hd_" + std::string(suffix) + ".hfe");
+    std::string grund;
+    auto img = DiskImage::create(path, fmt, false, Encoding::MFM, &grund);
+    EXPECT_TRUE(img) << grund;
+    std::filesystem::remove(path);
+    return img;
+}
+
+TEST(FloppyDriveV2, Mount_Hochdichte_WirdMitKlartextAbgewiesen) {
+    for (const char* profil : {"K5601", "K5600.20"}) {
+        FloppyDriveV2 drv(builtinDriveProfile(profil));
+        auto img = makeHdImage(18, 300, "a");
+        ASSERT_NE(img, nullptr);
+        EXPECT_EQ(img->medium().nominalRateKbps(), 500);
+        EXPECT_FALSE(drv.mount(std::move(img))) << profil;
+        EXPECT_FALSE(drv.isMounted());
+        EXPECT_NE(std::string(drv.lastError()).find("Hochdichte"), std::string::npos) << drv.lastError();
+    }
+    FloppyDriveV2 drv(builtinDriveProfile("K5601"));
+    auto img = makeHdImage(15, 360, "b");
+    ASSERT_NE(img, nullptr);
+    EXPECT_FALSE(drv.mount(std::move(img))) << "1,2M (360 U/min) im 300-U/min-Laufwerk";
+}
+
+TEST(FloppyDriveV2, Mount_Achtzoll360_BleibtZulaessig) {
+    // MF6400: 500 kbit/s bei 360 U/min -- eine Diskette gleicher Zeitbasis passt
+    FloppyDriveV2 drv(builtinDriveProfile("MF6400"));
+    auto img = makeHdImage(15, 360, "c");
+    ASSERT_NE(img, nullptr);
+    EXPECT_TRUE(drv.mount(std::move(img))) << drv.lastError();
+    // und die 8"-Standarddiskette (Rate 250 im Medium, 360 U/min) sowieso
+    FloppyDriveV2 drv2(builtinDriveProfile("MF6400"));
+    DiskFormat f8;
+    f8.name = "test_8";
+    f8.drives = {"MF6400"};
+    f8.tracks.push_back({0, 1, 0, 0, 26, 256});
+    const auto p8 = k1520test::tempPath("k1520_drv2_8zoll.hfe");
+    auto i8 = DiskImage::create(p8, f8, false, Encoding::MFM, nullptr);
+    ASSERT_NE(i8, nullptr);
+    EXPECT_EQ(i8->medium().nominalRateKbps(), 250);
+    EXPECT_TRUE(drv2.mount(std::move(i8))) << drv2.lastError();
+    std::filesystem::remove(p8);
+}
+
 TEST(FloppyDriveV2, Track_NichtLeerNachMount) {
     auto fmt  = makeFormat_2cyl_1head_2sec();
     auto path = makeTmpImg(fmt);

@@ -234,6 +234,22 @@ void DiskMedium::restoreFrom(const DiskMedium& snapshot) {
         }
     default_enc_ = snapshot.default_enc_;
     rpm_         = snapshot.rpm_;
+    rate_        = snapshot.rate_;
+}
+
+bool DiskMedium::detectHighDensityFromContent() {
+    for (const TrackImage& t : tracks_) {
+        if (t.empty() || t.encoding != Encoding::MFM) continue;
+        const auto secs = TrackCodec::parseTrack(t);
+        if (secs.empty()) continue;
+        for (const LogicalSector& s : secs)
+            if (s.size != 512) return false;
+        if (secs.size() != 15 && secs.size() != 18) return false;
+        rate_ = 500;
+        rpm_  = (secs.size() == 15) ? 360 : 300;
+        return true;
+    }
+    return false;
 }
 
 // ─── Zustandsabfragen ────────────────────────────────────────────────────────

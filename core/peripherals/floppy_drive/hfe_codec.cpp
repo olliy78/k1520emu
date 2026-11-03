@@ -173,9 +173,16 @@ bool HfeCodec::load(const std::string& path, DiskMedium& out, SourceInfo* info,
     uint32_t hdr_guess = 1;
     if (bitrate >= kNominalBitrate + kNominalBitrate / 2)
         hdr_guess = (bitrate + kNominalBitrate / 2) / kNominalBitrate;
+    // Kopf-Bitrate ~500: entweder eine echte Hochdichte-Diskette (Faktor 1, Grundrate 500)
+    // ODER eine 2-fach ueberabgetastete DD-Diskette (Faktor 2, Grundrate 250).  Das
+    // entscheidet weiterhin die Faktor-Suche je Spur am Inhalt (der Faktor mit den meisten
+    // gueltigen CRCs gewinnt; hdr_guess = 2 ist nur der erste Kandidat); hier wird nur
+    // zusaetzlich festgehalten, ob sich daraus eine Grundrate 500 ergibt (siehe unten).
+    const bool kopf_500 = bitrate >= 450 && bitrate <= 600;
     uint32_t letzter_ok       = 0;    // zuletzt erfolgreicher Faktor (0 = noch keiner)
     uint32_t spuren_mit_marken = 0;   // formatierte Spuren insgesamt
     uint32_t spuren_gestreckt  = 0;   // davon mit Faktor > 1
+    uint32_t spuren_faktor1_lang = 0; // davon Faktor 1 bei Umdrehung >= 140000 Zellen (echte 500 kbit/s)
 
     const size_t lut_off = static_cast<size_t>(lut_block) * 512;
     if (lut_off + static_cast<size_t>(num_tracks) * 4 > file.size()) {
@@ -277,6 +284,11 @@ bool HfeCodec::load(const std::string& path, DiskMedium& out, SourceInfo* info,
               letzter_ok = bestes_f;
               ++spuren_mit_marken;
               if (bestes_f > 1) ++spuren_gestreckt;
+              // Eine DD-Spur mit Faktor 1 hat ~100 000 Zellen je Umdrehung; 500 kbit/s
+              // braucht mindestens 166 667 (360 U/min).  Die Laenge schuetzt vor einer
+              // Datei mit falschem Kopf (bitrate 500, aber 250-kbit/s-Inhalt).
+              if (bestes_f == 1 && len_bytes / 2 * 8 >= 140000)
+                  ++spuren_faktor1_lang;
           }
           // Markenlose Spur = unformatiert: als LEERE Spur ablegen, damit der
           // Controller gap-Flux streamt statt Rauschbytes zu liefern.
@@ -284,6 +296,13 @@ bool HfeCodec::load(const std::string& path, DiskMedium& out, SourceInfo* info,
           out.setTrack(c, h, std::move(bestes));
         }
     }
+
+    // Grundrate 500: Kopf sagt ~500, es gibt formatierte Spuren, keine ist gestreckt und
+    // alle sind so lang wie eine 500-kbit/s-Umdrehung.  Dann ist es eine echte HD-/8″-500-
+    // Aufnahme (Faktor 1) und KEINE ueberabgetastete DD-Diskette.
+    if (kopf_500 && spuren_mit_marken > 0 && spuren_gestreckt == 0
+        && spuren_faktor1_lang == spuren_mit_marken)
+        out.setNominalRateKbps(500);
 
     out.clearDirty();
 
@@ -327,9 +346,16 @@ bool HfeCodec::save(const std::string& path, const DiskMedium& in, std::string& 
     //
     //    Gerechnet wird in ZELLEN, nicht in Bytes: eine Spur mit halber Datenrate
     //    (@ref TrackImage::cell_factor) belegt je Byte doppelt so viele Zellen.
+    //    Mit Grundrate 500 (PC-Hochdichte, Entwurf 45) gilt allgemein
+    //    Zellen = Rate x 2 x 60 000 / Drehzahl: 1,44M (300 U/min) 200 000, 1,2M (360 U/min)
+    //    166 667.  Die Faelle mit Rate 250 (auch 8″ mit 360 U/min) bleiben bitgleich bei der
+    //    alten Fallunterscheidung.
     const bool acht_zoll = (in.nominalRpm() == 360);
+    const uint16_t rate  = in.nominalRateKbps();
     auto nennZellen = [&](const TrackImage& t) -> size_t {
         const bool fm = (t.empty() ? in.defaultEncoding() : t.encoding) == Encoding::FM;
+        if (rate >= 500)
+            return (static_cast<size_t>(rate) * 2 * 60000 + in.nominalRpm() / 2) / in.nominalRpm();
         if (!acht_zoll) return 100000;
         return fm ? 83334 : 166667;
     };
@@ -352,7 +378,7 @@ bool HfeCodec::save(const std::string& path, const DiskMedium& in, std::string& 
     hdr[0x09] = num_cyls;
     hdr[0x0A] = num_heads;
     hdr[0x0B] = (in.defaultEncoding() == Encoding::FM) ? 2 : 0;     // ISOIBM_FM / _MFM
-    wr16(hdr, 0x0C, kNominalBitrate);
+    wr16(hdr, 0x0C, rate);                                          // Grundrate des Mediums (250 | 500)
     wr16(hdr, 0x0E, acht_zoll ? 360 : 300);                         // rpm
     hdr[0x10] = 0;                                                  // iface
     hdr[0x11] = 1;                                                  // dnu

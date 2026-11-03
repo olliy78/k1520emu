@@ -975,7 +975,9 @@ k1520disktool attr dos.img IO.SYS --ro --hid --sys       # --arc, --mtime SEKUND
 * **Platz:** die Prüfung vor dem Schreiben rechnet Cluster (Rundung), neue Ordner und Verzeichnisplätze; die Wurzel hat
   eine feste Zahl Einträge (z. B. 112 bei 720K) — ein langer Name braucht mehrere.  Scheitert es, bleibt die Diskette
   unverändert.
-* **Hochdichte (1,2M/1,44M/2,88M) nur als `.img`.**  Alle anderen Größen als `.img`, `.hfe`, `.dmk`, `.cqm`, `.td0`, `.imd`.
+* **Hochdichte 1,2M/1,44M (500 kbit/s) gehen in allen Containern** (`.img`, `.hfe`, `.dmk`, `.cqm`, `.td0`, `.imd`); die Datenrate steht
+  dabei in der Datei (HFE-Kopf 500, IMD-Modus, TD0-Rate).  **2,88M (ED) nur als `.img`.**  Der Emulator weist HD-Disketten beim
+  Einlegen ab (kein Robotron-Laufwerk kann 500 kbit/s); im DiskTool lassen sie sich bearbeiten.
 * `check`/`fsck`: BPB, FAT-Kopien, Ketten, Kreuzverweise (Reparatur *kopiert* die gemeinsamen Cluster — ohne Datenverlust),
   verlorene Cluster (`FILEnnnn.CHK`), Größen, `.`/`..` — Kennungen `fat.*` (Entwurf 44 §9).  `recover` kennt FAT noch nicht.
 

@@ -177,26 +177,32 @@ size_t festeSpurBytes(const std::vector<LogicalSector>& sectors, Encoding enc,
 
 } // namespace
 
-size_t nominalTrackBytes(const std::vector<LogicalSector>& sectors, Encoding enc) {
+size_t nominalTrackBytes(const std::vector<LogicalSector>& sectors, Encoding enc,
+                         uint16_t rate_kbps) {
     // Die kleinste Umdrehung, in die die Spur mit einer brauchbaren Luecke 3 (≥ 16) passt.
     // Eine 5,25″-Spur mit gekuerzter Luecke 3 (10 × 512) bleibt so eine 5,25″-Spur; erst was
     // auch dann nicht passt (8″ DD 26 × 256), bekommt die laengere Umdrehung.
     constexpr size_t kMindestLuecke3 = 16;
     const GapParams g = gapsFor(enc);
     const size_t    n = festeSpurBytes(sectors, enc, g) + sectors.size() * kMindestLuecke3;
-    static const size_t kMfm[] = {6250, 10416};
-    static const size_t kFm[]  = {3125, 5208, 6250};
+    // 500 kbit/s (PC-Hochdichte): 10416 (5,25″ 360 U/min) und 12500 (3,5″ 300 U/min).  Die
+    // 12500 gibt es NUR hier — mit 250 kbit/s (und beim 8″) bleibt alles wie es war.
+    static const size_t kMfm[]   = {6250, 10416};
+    static const size_t kMfmHd[] = {10416, 12500};
+    static const size_t kFm[]    = {3125, 5208, 6250};
     const bool mfm = enc == Encoding::MFM;
-    const size_t* kand = mfm ? kMfm : kFm;
+    const bool hd  = mfm && rate_kbps >= 500;
+    const size_t* kand = hd ? kMfmHd : mfm ? kMfm : kFm;
     const size_t  zahl = mfm ? 2 : 3;
     for (size_t i = 0; i < zahl; ++i)
         if (n <= kand[i]) return kand[i];
     return kand[zahl - 1];   // ueberlange Spur: die groesste (sie laeuft dann ueber den Index)
 }
 
-GapParams normGaps(const std::vector<LogicalSector>& sectors, Encoding enc) {
+GapParams normGaps(const std::vector<LogicalSector>& sectors, Encoding enc,
+                   uint16_t rate_kbps) {
     GapParams g = gapsFor(enc);
-    const size_t umdrehung = nominalTrackBytes(sectors, enc);
+    const size_t umdrehung = nominalTrackBytes(sectors, enc, rate_kbps);
     const size_t fest      = festeSpurBytes(sectors, enc, g);
     size_t g3 = 0;
     for (const auto& s : sectors) g3 = std::max(g3, normGap3(enc, s.size));
@@ -388,6 +394,11 @@ TrackImage buildTrack(const std::vector<LogicalSector>& sectors,
 
 TrackImage buildTrack(const std::vector<LogicalSector>& sectors, Encoding enc) {
     return buildTrack(sectors, enc, normGaps(sectors, enc));
+}
+
+TrackImage buildTrack(const std::vector<LogicalSector>& sectors, Encoding enc,
+                      uint16_t rate_kbps) {
+    return buildTrack(sectors, enc, normGaps(sectors, enc, rate_kbps));
 }
 
 // ─── parseTrack ───────────────────────────────────────────────────────────────

@@ -183,7 +183,8 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
             else { why = "'containers': unbekannter Typ '" + c + "'"; return false; }
         }
         // „nur img": keine Sektorlisten-Container (CopyQM/TeleDisk/ImageDisk) - sie tragen eine
-        // Datenrate, die fuer die Hochdichte-Formate (500/1000 kbit/s) nicht stimmen wuerde.
+        // Datenrate; dos2880 (ED, 1000 kbit/s) kennt der Stack nicht.  (HD 500 kbit/s geht seit
+        // doc/design/45 in allen Containern, dort steht deshalb kein `containers:` mehr.)
         out.nur_img = out.allow_img && !out.allow_hfe && !out.allow_dmk;
     }
 

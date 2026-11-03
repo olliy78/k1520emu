@@ -112,6 +112,22 @@ public:
     uint16_t nominalRpm() const { return rpm_; }
     void     setNominalRpm(uint16_t rpm) { rpm_ = (rpm == 360) ? 360 : 300; }
 
+    /// @brief Grundrate des Mediums in kbit/s: 250 (Vorgabe: 5,25″/3,5″ DD, auch 8″ wie es
+    ///        schon immer lief) oder 500 (PC-Hochdichte 1,2M/1,44M, oder eine echte 500-kbit/s-
+    ///        Aufnahme aus einer HFE).  Die Rate steckt im Modell nur in der LAENGE einer
+    ///        Umdrehung; sie wird gebraucht, damit Container (HFE-Kopf, IMD-Modus, TD0-Rate)
+    ///        und der Emulator (weist 500 kbit/s ab) sie wahrheitsgemaess fuehren
+    ///        (doc/design/45_hd_disketten.md).  @ref TrackImage::cell_factor bleibt ein
+    ///        Teiler relativ zu DIESER Grundrate.
+    uint16_t nominalRateKbps() const { return rate_; }
+    void     setNominalRateKbps(uint16_t rate) { rate_ = (rate == 500) ? 500 : 250; }
+
+    /// @brief Erkennt am Inhalt eine PC-Hochdichte-Diskette (MFM, 512-B-Sektoren, 15 bzw.
+    ///        18 je Spur — das passt in keine DD-Umdrehung) und setzt dann Rate 500 und
+    ///        Drehzahl (15 -> 360, 18 -> 300).  Fuer Container ohne Rate im Kopf (DMK).
+    ///        @return true, wenn Hochdichte erkannt wurde.
+    bool detectHighDensityFromContent();
+
     /// @brief Geometrie + vorherrschendes Verfahren (fuer UI/Mount-Pruefung).
     DiskGeometry geometry() const;
 
@@ -266,6 +282,7 @@ private:
     uint8_t  num_heads_   = 0;
     Encoding default_enc_ = Encoding::MFM;
     uint16_t rpm_         = 300;
+    uint16_t rate_        = 250;
 
     std::vector<TrackImage> tracks_;
     std::vector<uint8_t>    dirty_;       ///< je Spur 0/1

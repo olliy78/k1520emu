@@ -23,8 +23,13 @@ Entwurf: `doc/design/44_fat12.md`.  Code: `core/filesystem/fat/fat_fs.{h,cpp}`, 
    verbraucht Wurzelplätze (112 bei 720K!).  Lange Namen werden nie gekürzt; `~N`-Kurznamen werden je Verzeichnis eindeutig vergeben.
 6. **Zeit ohne Zeitzone.**  `FileEntry::dos_mtime` = „Uhr wie sie zeigte" als Sekunden; Umrechnung nur über `utcZuOrtszeit`/`ortszeitZuUtc`
    (Ortszeit des Rechners).  Beim Auspacken setzt `extractMit` die Dateizeit, beim Einfügen kommt sie von der Datei.
-7. **HD nur `.img`** (`containers: [img]` → `FsProfile::nur_img`, sperrt auch cqm/td0/imd): der Stack kennt nur 250 kbit/s; ein HFE/DMK/IMD mit
-   falscher Datenrate sähe heil aus und wäre es nicht.
+7. **HD (1,2M/1,44M) in allen Containern, ED (2,88M) nur `.img`** (Entwurf 45 AP H1; `dos2880` behält `containers: [img]` → `nur_img`).
+   Rate/Drehzahl: `rate:`/`rpm:` am FORMAT (`pc_hd_15x512` 500/360, `pc_hd_18x512` 500/300), am Medium `nominalRateKbps()`; Spurlänge
+   `nominalTrackBytes(.., rate)` 10416/12500 nur bei Rate 500.  HFE-Kopf = Medium-Rate, Zellen = Rate×120000/rpm; Lesen: Kopf ~500 UND
+   Faktor 1 UND Umdrehung ≥ 140 000 Zellen → Grundrate 500, sonst bleibt es überabgetastete DD.  DMK erkennt HD am Inhalt
+   (`detectHighDensityFromContent`).  8″ behält Rate 250 im Medium (HFE-Kopf bitgleich wie bisher).  `FloppyDriveV2::mount` weist Rate 500 ab,
+   außer 360-U/min-Medium im 360-U/min-Laufwerk (MF6400).  Wächter `FatDiskVolume.HdRundlaufInAllenContainern`, `HfeCodec.HdKopf500…`,
+   `FloppyDriveV2.Mount_Hochdichte…`.
 8. **Jeder Schreibvorgang prüft Platz VORHER** (`wouldFit`) und lässt bei „kein Platz"/„Wurzel voll" die Diskette byteweise unverändert
    (`FatFs.EineVolleDisketteIstEineTransaktion`, `WurzelIstEndlich…`).  Einträge langer Namen verbrauchen Wurzelplätze mit.
 9. **Querverweis-Reparatur kopiert** (`fat.doppelt.trennen`), sie schneidet nicht ab: ohne Datenverlust, braucht freie Cluster.  Eine Kreuzung

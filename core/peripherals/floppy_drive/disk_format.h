@@ -107,6 +107,19 @@ struct DiskFormat {
      */
     uint8_t step = 1;
 
+    /**
+     * @brief Grundrate des FORMATS in kbit/s: 250 (Vorgabe) oder 500 (PC-Hochdichte).
+     *
+     * YAML: `rate:` auf Formatebene (nicht zu verwechseln mit dem Spurbereich-`rate: 125`,
+     * das relativ zu dieser Grundrate als @ref TrackFormat::cell_factor gilt).  8″-Formate
+     * tragen bewusst keine 500: sie liefen immer mit 250 + 360 U/min (HFE-Kopf bleibt
+     * bitgleich), ihre 500 kbit/s steckt nur in der Umdrehungslaenge.
+     */
+    uint16_t rate_kbps = 250;
+
+    /// @brief Drehzahl des FORMATS (300 | 360); 0 = aus den Laufwerken (@ref nominalRpmForDrives).
+    uint16_t rpm = 0;
+
     std::vector<TrackFormat> tracks;
 
     uint8_t  numHeads()     const;
