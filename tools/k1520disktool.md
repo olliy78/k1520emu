@@ -948,8 +948,55 @@ Zwei Dinge, die dabei auffallen können:
 
 * *„Verzeichnis nicht angelegt (Füllbyte 0xF6)"* — die Diskette ist formatiert, aber
   nie eingerichtet worden.  Sie gilt als leer, was sie auch ist.
-* *„die Diskette trägt ein MS-DOS-Dateisystem (FAT)"* — FORMAT.COM kann DOS-Disketten
-  anlegen (Menüpunkte `{MSDOS}`).  Die liest das Wirtssystem, nicht dieses Werkzeug.
+* *„die Diskette trägt ein MS-DOS-Dateisystem (FAT)"* — heute nur noch bei einem FAT-Dateisystem, das
+  keine Diskette sein kann (**FAT16/FAT32**, BPB ohne Sinn).  Gewöhnliche DOS-Disketten (FAT12) liest und
+  schreibt das Werkzeug, s. „MS-DOS / PC-DOS / DCP (FAT12)".
+
+## MS-DOS / PC-DOS / DCP (FAT12) — `dos160 … dos2880`
+
+Jede Diskette, die ein DOS (PC-DOS, MS-DOS, DCP des A7150/PC 1834, Windows) angelegt hat: 160K, 180K, 320K, 360K (40×2 und
+80×1), 640K, 720K, 800K, 1,2M, 1,44M, 2,88M.  Die Lage steht im **BPB** des Bootsektors, nicht im Katalog; BPB-lose Disketten
+(DOS 1.x/2.0) erkennt das Werkzeug an Größe und Medienkennung.  Voller Entwurf: `doc/design/44_fat12.md`.
+
+```sh
+k1520disktool ls  a7150_dcp33.hfe -l          # Attr (d r h s a), Größe, Datum, Pfad; (8.3-Kurzname) bei langem Namen
+k1520disktool get a7150_dcp33.hfe '*' --to x  # Ordner werden Ordner; die Dateizeit wird die der DOS-Datei
+k1520disktool put dos.img ordner              # rekursiv, auch leere Ordner; Datum der Linux-Datei wandert mit
+k1520disktool put dos.img datei --lfn         # lange Namen erzwingen (--no-lfn: nie; Vorgabe: automatisch)
+k1520disktool mkdir dos.img a/b/c ; rm dos.img 'a/*' a   # tiefste Pfade zuerst; ein Ordner nur leer
+k1520disktool attr dos.img IO.SYS --ro --hid --sys       # --arc, --mtime SEKUNDEN(UTC) gelten ebenso
+```
+
+* **Namen sind Pfade mit `/`**, Gross-/Kleinschreibung ist beim Suchen egal.  Lange Namen (VFAT) werden gelesen und
+  geschrieben; ob *automatisch* geschrieben wird, entscheidet die OEM-Kennung (Windows/Linux ja, DCP/MS-DOS 3–6 nein,
+  weil ein altes DOS die Einträge als versteckte Systemdateien mitschleppt).  Verboten: `\ / : * ? " < > |`, DOS-Gerätenamen
+  (`CON`, `NUL` …), Namen mit Punkt/Leerzeichen am Ende.
+* **Datum/Uhrzeit** hat DOS ohne Zeitzone; das Werkzeug rechnet mit der Ortszeit des Rechners (Genauigkeit 2 s).
+* **Platz:** die Prüfung vor dem Schreiben rechnet Cluster (Rundung), neue Ordner und Verzeichnisplätze; die Wurzel hat
+  eine feste Zahl Einträge (z. B. 112 bei 720K) — ein langer Name braucht mehrere.  Scheitert es, bleibt die Diskette
+  unverändert.
+* **Hochdichte (1,2M/1,44M/2,88M) nur als `.img`.**  Alle anderen Größen als `.img`, `.hfe`, `.dmk`, `.cqm`, `.td0`, `.imd`.
+* `check`/`fsck`: BPB, FAT-Kopien, Ketten, Kreuzverweise (Reparatur *kopiert* die gemeinsamen Cluster — ohne Datenverlust),
+  verlorene Cluster (`FILEnnnn.CHK`), Größen, `.`/`..` — Kennungen `fat.*` (Entwurf 44 §9).  `recover` kennt FAT noch nicht.
+
+### Bootfähige DOS-Diskette
+
+```sh
+# wie DOS `SYS`: Bootsektor + Systemdateien einer Systemdiskette auf eine LEERE Diskette
+k1520disktool create neu.img --fs dos720 --label MEINE
+k1520disktool sys    neu.img a7150_dcp33.hfe              # IO.SYS + DCDOS.SYS, Attribute und Zeit bleiben
+# oder von Hand: hinterlegter Lader, danach die Systemdateien in der Reihenfolge, die der Lader sucht
+k1520disktool create neu.img --fs dos720 --boot data/bootsektoren/boot_dos_dcp33_a7150.bin
+k1520disktool put neu.img IO.SYS DCDOS.SYS ; k1520disktool attr neu.img IO.SYS --ro --hid --sys
+k1520disktool boot-get a7150_dcp33.hfe lader.bin             # den Bootsektor einer vorhandenen Diskette sichern
+```
+
+Der Bootsektor trägt den **BPB der Diskette**: beim Schreiben (`create --boot`, `boot-put`, `sys`) ersetzt das Werkzeug dessen
+Felder durch die der Zieldiskette — ein DCP-Lader von 720K funktioniert so auch für 360K.  Hinterlegt sind die Lader
+`DCP 3.3`/`DCP 3.20` (A7150: `IO.SYS` + `DCDOS.SYS`), `DCP 3.2/3.3` (PC 1834/A7150: `BIO.COM` + `DOS.COM`) und `MDISK`
+(`data/bootsektoren/boot_dos_*.bin`).  Ohne `--boot` entsteht ein Sektor „Non-System disk or disk error" — eine reine
+Datendiskette, die der PC mit dieser Meldung ablehnt.  **`sys` verlangt eine leere Ziel­diskette** (die Lader erwarten die
+Systemdateien an den ersten Verzeichnisplätzen und zusammenhängend am Anfang des Datenbereichs).
 
 ## CopyQM (`.cqm`) lesen und schreiben
 

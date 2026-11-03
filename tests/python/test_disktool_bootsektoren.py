@@ -57,12 +57,19 @@ def test_mit_jedem_eintrag_entsteht_eine_diskette_mit_diesen_systemspuren(tmp_pa
     for fs, eintraege in nach_fs.items():
         for e in eintraege:
             n += 1
-            ziel = tmp_path / f"d{n}.hfe"
+            # HD/ED-FAT (1200/1440/2880) gibt es nur als .img (Entwurf 44), FAT ist dort auch sonst vollwertig
+            ziel = tmp_path / (f"d{n}.img" if fs.startswith("dos") else f"d{n}.hfe")
             with DiskTool.create(ziel, fs, "", str(e.path)) as d:
                 zurueck = tmp_path / f"d{n}.bin"
                 d.read_boot_image(zurueck)
             soll = e.path.read_bytes()
             ist = zurueck.read_bytes()
+            if fs.startswith("dos"):
+                # FAT: der BPB (Byte 11..35) gehoert der Diskette, nicht dem Lader
+                # (FatFileSystem::bootsektorMitBpb) - Sprung davor und Code dahinter sind das Abbild.
+                assert ist[:11] == soll[:11] and ist[36:len(soll)] == soll[36:], \
+                    f"{e.description}: Systemspuren tragen das Abbild nicht"
+                continue
             assert ist[:len(soll)] == soll, f"{e.description}: Systemspuren tragen das Abbild nicht"
 
 

@@ -172,3 +172,30 @@ bootsektoren:
   - description: "OS/M 3.0 — P8000 (8-Bit-Teil), Format 5"
     filesystem:  osm640
     file:        bootsektoren/boot_p8000_osm30.bin
+
+  # ── MS-DOS / DCP (FAT12) ─────────────────────────────────────────────────────
+  # EIN Bootsektor (512 Byte) in Sektor 0.  Sein BPB wird beim Schreiben durch den der Diskette
+  # ersetzt (FatFileSystem::bootsektorMitBpb) - derselbe Lader taugt fuer jede Groesse.  Der
+  # Lader sucht seine Systemdateien an den ERSTEN Verzeichnisplaetzen: IO.SYS/DCDOS.SYS bzw.
+  # BIO.COM/DOS.COM zuerst und zusammenhaengend einspielen (`put` in dieser Reihenfolge auf
+  # eine frische Diskette; Beispiel: tools/diskbau.py).  Mit nichts davon ergibt der Sektor eine
+  # Diskette, die „Keine Systemdiskette" meldet - so wie es sein soll.
+  - description: "DCP 3.3 — A7150 (IO.SYS + DCDOS.SYS)"
+    filesystem:  [dos160, dos180, dos320, dos360, dos360ss80, dos640, dos720, dos800, dos1200, dos1440, dos2880]
+    file:        bootsektoren/boot_dos_dcp33_a7150.bin
+
+  - description: "DCP 3.20 — A7150 (IO.SYS + DCDOS.SYS)"
+    filesystem:  [dos160, dos180, dos320, dos360, dos360ss80, dos640, dos720, dos800, dos1200, dos1440, dos2880]
+    file:        bootsektoren/boot_dos_dcp320_a7150.bin
+
+  - description: "DCP 3.2/3.3 — PC 1834 und A7150 MASM (BIO.COM + DOS.COM)"
+    filesystem:  [dos160, dos180, dos320, dos360, dos360ss80, dos640, dos720, dos800, dos1200, dos1440, dos2880]
+    file:        bootsektoren/boot_dos_dcp33_bio_pc1834.bin
+
+  - description: "DCP 3.2 — A7150 (BIO.COM + DOS.COM, andere Meldungen)"
+    filesystem:  [dos160, dos180, dos320, dos360, dos360ss80, dos640, dos720, dos800, dos1200, dos1440, dos2880]
+    file:        bootsektoren/boot_dos_dcp32_bio.bin
+
+  - description: "MDISK — A7150 (BIO.COM + DOS.COM, MS-DOS-Meldungen)"
+    filesystem:  [dos160, dos180, dos320, dos360, dos360ss80, dos640, dos720, dos800, dos1200, dos1440, dos2880]
+    file:        bootsektoren/boot_dos_mdisk_a7150.bin

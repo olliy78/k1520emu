@@ -123,6 +123,8 @@ TEST(FsCatalog, ProfilnamenSindEinStabilerVertrag) {
         // MicroDOS 1526/1715 (Rostock): Lader im Verzeichnis (Erkennung am Lader) und die
         // Datendisketten ohne Lader (`detect: false`), Entwurf 13 §25.
         "microdos800", "microdos200", "microdos128", "microdos800_daten", "microdos200_daten", "microdos1715",
+        // MS-DOS FAT12 (Entwurf 44): erkannt am BPB, `create --fs dosNNN` nimmt den Namen.
+        "dos160", "dos180", "dos320", "dos360", "dos360ss80", "dos640", "dos720", "dos800", "dos1200", "dos1440", "dos2880",
     };
     for (const auto& n : erwartet)
         EXPECT_NE(cat.find(n), nullptr) << "Dateisystem '" << n << "' fehlt";

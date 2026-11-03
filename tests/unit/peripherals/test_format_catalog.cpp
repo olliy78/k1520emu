@@ -123,6 +123,9 @@ TEST(FormatCatalog, Formatnamen_SindEinStabilerVertrag) {
         // 2026-08-18: SCP1700/CP/M-86 (A7100) — die einzige Geometrie des Katalogs,
         // die FM und MFM auf DERSELBEN Diskette mischt (Bootspur c0h0 in FM).
         "scp1700_640",
+        // MS-DOS FAT12 (Entwurf 44): PC-Geometrien mit 512-B-Sektoren.
+        "k5601_ds40_8x512", "k5601_ds40_9x512", "k5601_ds80_8x512",
+        "pc_hd_15x512", "pc_hd_18x512", "pc_ed_36x512",
     };
 
     for (const auto& name : expected)

@@ -879,9 +879,9 @@ Zwei Sonderfälle, die sonst als „unbekannt“ durchgingen und dem Bediener ni
   (Nutzerbereich > 15), die Diskette erscheint also leer, was sie auch ist. Die Anzeige
   sagt es: „Verzeichnis nicht angelegt (Füllbyte 0xF6)“.
 * **MS-DOS.** FORMAT.COM legt auf Wunsch DOS-Disketten an (die Menüpunkte mit `{MSDOS}`,
-  doc/format.md §3.3/§3.4). Ein BPB in Spur 0 Sektor 1 wird erkannt und benannt: „die
-  Diskette trägt ein MS-DOS-Dateisystem (FAT), Kennung 'CP/A1188' — dieses Werkzeug liest
-  CP/M und UDOS“. Gelesen wird sie nicht; dafür gibt es das Wirtssystem.
+  doc/format.md §3.3/§3.4). **Seit 2026-11-03 liest und schreibt das DiskTool FAT12** (Entwurf
+  `doc/design/44_fat12.md`); die Meldung „die Diskette trägt ein MS-DOS-Dateisystem (FAT)“ bleibt für
+  FAT16/FAT32 und BPB-Reste, die kein FAT12 sind.
 
 ### 12.4 …und wenn auch die Geometrie unbekannt ist: vermessen und **nur lesen**
 

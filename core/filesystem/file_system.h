@@ -76,6 +76,13 @@ struct FileEntry {
     uint32_t    unix_ctime = 0;  ///< Inode-Aenderungszeit (`chmod`/`chown` setzen sie)
     uint16_t    unix_rdev  = 0;  ///< Geraetedatei (c/b): major<<8 | minor, sonst 0
 
+    // ── nur FAT (MS-DOS) ─────────────────────────────────────────────────────
+    /// @brief Zeitstempel als Sekunden seit 1970 in ORTSZEIT-Rechnung (DOS fuehrt keine Zeitzone:
+    ///        das Datum steht so da, wie die Uhr des Rechners es zeigte); 0 = keiner.
+    int64_t     dos_mtime = 0;
+    /// @brief FAT: der 8.3-Kurzname, wenn @ref name ein langer Name ist ("" = identisch).
+    std::string short_name;
+
     /// @brief SIOS: Lage als Text — Datei `"BOE 01001 EOE 12026 EOD 12013"`, Bibliotheksobjekt
     ///        `"AADR 0013 ML 12"`.  Leer bei allen anderen Dateisystemen.
     std::string extent;
@@ -181,6 +188,18 @@ struct WriteOptions {
     bool cpm_system    = false;   ///< SYS (im `DIR` unsichtbar)
     bool cpm_archived  = false;   ///< ARCHIV
 
+    // ── nur FAT ──────────────────────────────────────────────────────────────
+    /// @brief Zeitstempel der neuen Datei (Ortszeit-Sekunden wie @ref FileEntry::dos_mtime); 0 = jetzt.
+    int64_t fat_mtime = 0;
+    /// @brief Attribute der neuen Datei: Bit0 R/O, Bit1 versteckt, Bit2 System, Bit5 Archiv
+    ///        (DOS-Attributbyte); ein Ueberschreiben behaelt die alten, wenn @ref fat_attr_gesetzt fehlt.
+    uint8_t fat_attr = 0x20;
+    bool    fat_attr_gesetzt = false;
+    /// @brief Lange Dateinamen (VFAT) schreiben?  -1 = automatisch (nur wenn die Diskette schon
+    ///        welche traegt oder von einem Windows-/Linux-Formatierer stammt), 0 = nie (Kurzname),
+    ///        1 = immer, wo der Name kein 8.3-Name ist.
+    int     fat_lfn = -1;
+
     // ── nur WEGA: was eine UNIX-Inode traegt ─────────────────────────────────
     /// @brief Zugriffsrechte (untere 12 Bit, z. B. 0755); 0 = Vorgabe 0644.
     uint16_t wega_mode = 0;
@@ -261,6 +280,21 @@ struct UnixAttrs {
     /// (`.fileinfo`); der Kern setzt ctime sonst bei jeder Aenderung auf „jetzt".
     bool     set_atime = false;  uint32_t atime = 0;
     bool     set_ctime = false;  uint32_t ctime = 0;
+};
+
+/**
+ * @struct FatAttrs
+ * @brief Die aenderbaren Angaben einer FAT-Datei: die vier Attributbits und der Zeitstempel.
+ *
+ * Gegenstueck zu @ref CpmAttrs.  Verzeichnis- und Datentraegerbit sind Struktur, keine Attribute.
+ * Nicht gesetzte Kennzeichen heissen „unveraendert lassen".
+ */
+struct FatAttrs {
+    bool set_read_only = false;  bool read_only = false;
+    bool set_hidden    = false;  bool hidden    = false;
+    bool set_system    = false;  bool system    = false;
+    bool set_archive   = false;  bool archive   = false;
+    bool set_mtime     = false;  int64_t mtime  = 0;    ///< Ortszeit-Sekunden seit 1970
 };
 
 /**
@@ -405,6 +439,12 @@ public:
      */
     virtual bool setAttributes(const std::string& name, const CpmAttrs&) {
         last_error_ = "Dieses Dateisystem fuehrt keine CP/M-Attribute";
+        return false;
+    }
+
+    /// @brief Attribute und Zeitstempel einer vorhandenen Datei aendern (nur FAT).
+    virtual bool setAttributes(const std::string& name, const FatAttrs&) {
+        last_error_ = "Dieses Dateisystem fuehrt keine DOS-Attribute";
         return false;
     }
 

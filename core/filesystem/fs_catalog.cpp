@@ -26,6 +26,7 @@ const char* fsTypeName(FsType t) {
         case FsType::WegaMutos:     return "wega_mutos";
         case FsType::Tar:      return "tar";
         case FsType::Sios:     return "sios";
+        case FsType::Fat:      return "fat";
     }
     return "?";
 }
@@ -113,7 +114,7 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
     // ── type (Pflicht) ──
     const yaml::Node* n_type = node.find("type");
     if (!n_type || !n_type->isScalar())
-        { why = "Pflichtfeld 'type' fehlt (cpm | udos | udos1715 | wega_mutos | tar | sios)"; return false; }
+        { why = "Pflichtfeld 'type' fehlt (cpm | udos | udos1715 | wega_mutos | tar | sios | fat)"; return false; }
     if      (n_type->scalar == "cpm")      out.type = FsType::Cpm;
     else if (n_type->scalar == "udos")     out.type = FsType::Udos;
     else if (n_type->scalar == "udos1715") out.type = FsType::Udos1715;
@@ -121,7 +122,8 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
                                            out.type = FsType::WegaMutos;
     else if (n_type->scalar == "tar")      out.type = FsType::Tar;
     else if (n_type->scalar == "sios")     out.type = FsType::Sios;
-    else { why = "'type': '" + n_type->scalar + "' - erlaubt sind cpm | udos | udos1715 | wega_mutos | tar | sios";
+    else if (n_type->scalar == "fat")      out.type = FsType::Fat;
+    else { why = "'type': '" + n_type->scalar + "' - erlaubt sind cpm | udos | udos1715 | wega_mutos | tar | sios | fat";
            return false; }
 
     // ── unix_layout (nur wega_mutos) ──
@@ -180,6 +182,9 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
             else if (c == "dmk") out.allow_dmk = true;
             else { why = "'containers': unbekannter Typ '" + c + "'"; return false; }
         }
+        // „nur img": keine Sektorlisten-Container (CopyQM/TeleDisk/ImageDisk) - sie tragen eine
+        // Datenrate, die fuer die Hochdichte-Formate (500/1000 kbit/s) nicht stimmen wuerde.
+        out.nur_img = out.allow_img && !out.allow_hfe && !out.allow_dmk;
     }
 
     long v = 0;
@@ -272,7 +277,8 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
             if (node.has(feld))
                 issues.push_back(where + ": '" + feld + "' gilt nur fuer die UDOS-Familie"
                                                         " - ignoriert");
-    } else if (out.type == FsType::WegaMutos || out.type == FsType::Tar || out.type == FsType::Sios) {
+    } else if (out.type == FsType::WegaMutos || out.type == FsType::Tar || out.type == FsType::Sios
+               || out.type == FsType::Fat) {
         // WEGA beschreibt sich selbst (Superblock): Blockgroesse 512, Inode-Liste und
         // Groesse stehen auf dem Datentraeger.  Eine Diskette = EIN Dateisystem ueber
         // beide Seiten, ab Block 0 (doc/design/27_wega_dateisystem.md §2).

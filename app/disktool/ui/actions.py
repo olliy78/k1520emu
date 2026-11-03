@@ -127,6 +127,11 @@ _SPEC: List[Tuple] = [
     ("bootabbild", "&Bootabbild sichern…", "boot", None,
      "Die Systemspuren als .bin sichern — damit lässt sich später eine neue "
      "Diskette bootfähig anlegen", "_bootabbild_sichern_dialog", False),
+    # MS-DOS `SYS`: nur an einer LEEREN FAT-Diskette sinnvoll (die Lader erwarten die Systemdateien
+    # an den ersten Verzeichnisplaetzen und zusammenhaengend am Anfang des Datenbereichs).
+    ("dos_sys", "&Systemdateien übernehmen… (DOS SYS)", None, None,
+     "Bei einer leeren MS-DOS-Diskette: Bootsektor und Systemdateien (IO.SYS, DCDOS.SYS …) von einer "
+     "Systemdiskette übernehmen — das macht sie bootfähig", "_dos_sys_dialog", False),
     ("diskeditor", "&Diskeditor…", "disk-editor", "Ctrl+E",
      "Die Diskette Spur für Spur und Sektor für Sektor ansehen und bearbeiten",
      "open_disk_editor", False),
@@ -220,6 +225,7 @@ KURZ = {'oeffnen': 'Öffnen',
     'gerade_spuren': 'Ungerade weg',
     'seite1_weg': 'Seite 1 weg',
     'bootabbild': 'Bootabbild',
+    'dos_sys': 'DOS SYS',
     'diskeditor': 'Diskeditor',
     'angaben': 'Diskette',
     'ordner': 'Ordner',

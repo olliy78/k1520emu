@@ -48,7 +48,11 @@ enum class FsType : uint8_t {
     /// @brief SIOS 1526 (A5120/A5130/K8924): IBM-Etikettendiskette, 26x128 B, Spur 0 = Etiketten
     ///        (VOL1/HDR1), Dateien = zusammenhaengende Spurbereiche, Bibliotheken mit Verzeichnis.
     ///        Derzeit nur LESEND.  @see doc/sios_diskettenformat.md
-    Sios
+    Sios,
+    /// @brief MS-DOS / PC-DOS / DCP (A7150) FAT12: BPB im Bootsektor, FAT, Wurzel- und
+    ///        Unterverzeichnisse, lange Namen.  Die Lage steht auf der Diskette (BPB) - das Profil
+    ///        benennt nur Geometrie und Namen.  @see core/filesystem/fat/fat_fs.h
+    Fat
 };
 
 /// @brief Gehoert der Typ zur UDOS-Familie? (gemeinsame Kopfsektorfelder, Typ/Props)
@@ -93,6 +97,9 @@ struct FsProfile {
     bool allow_img = true;     ///< als rohes Sektorabbild darstellbar (UDOS: nie)
     bool allow_hfe = true;
     bool allow_dmk = true;
+    /// @brief `containers: [img]` - ausschliesslich das rohe Sektorabbild; auch CopyQM/TeleDisk/ImageDisk
+    ///        (die eine Datenrate tragen) sind dann gesperrt.  Fuer die Hochdichte-FAT-Formate.
+    bool nur_img = false;
 
     int detect_rank = 0;       ///< kleiner = frueher bei mehrdeutiger Erkennung
     /// @brief false = **nur auf Anforderung** (`--fs NAME`, `create --fs NAME`), nie in
@@ -180,7 +187,7 @@ struct FsProfile {
         // CopyQM legt nur Sektor-Nutzdaten ab (wie .img): kein Gap-Anhang, keine
         // Sonderspuren — was ein .img nicht traegt, traegt auch ein .cqm nicht.
         // TeleDisk (.td0) und ImageDisk (.imd) sind ebenfalls Sektorlisten: dieselbe Grenze.
-        if (ext_lower == "cqm" || ext_lower == "td0" || ext_lower == "imd") return allow_img;
+        if (ext_lower == "cqm" || ext_lower == "td0" || ext_lower == "imd") return allow_img && !nur_img;
         return false;
     }
 };

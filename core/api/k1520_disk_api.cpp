@@ -17,6 +17,7 @@
 #include "core/api/k1520_sync_internal.h"
 #include "core/version.h"
 
+#include "core/filesystem/fat/fat_fs.h"
 #include "core/filesystem/disk_volume.h"
 #include "core/filesystem/geometry_probe.h"
 #include "core/filesystem/sios/sios_fs.h"
@@ -67,7 +68,7 @@ struct Handle {
     std::vector<std::string>    zielnamen;   ///< DiskVolume::zielNamen dazu (parallel)
     TrackView                   spur;        ///< Stand des letzten k1520d_track_scan
     // Puffer je Getter — die Rueckgabe gilt bis zum naechsten Aufruf DERSELBEN Funktion.
-    std::string s_error, s_name, s_type, s_attrs, s_date, s_dir, s_label, s_created,
+    std::string s_error, s_name, s_type, s_attrs, s_date, s_kurz, s_sys, s_dir, s_label, s_created,
                 s_segments, s_blocks, s_ziel;
     std::string s_fmt, s_fs, s_alt, s_remarks, s_fit, s_check, s_container, s_tarwarn;
     std::string s_satzbasis, s_pnamen, s_pueber, s_palt, s_hinweise, s_geschr, s_tgrund, s_physgrund;
@@ -775,6 +776,11 @@ extern "C" const char* k1520d_entry_date(K1520Disk h, int i) {
     return e ? halte(H(h)->s_date, e->date) : "";
 }
 
+extern "C" const char* k1520d_entry_short_name(K1520Disk h, int i) {
+    const FileEntry* e = eintrag(h, i);
+    return e ? halte(H(h)->s_kurz, e->short_name) : "";
+}
+
 extern "C" bool k1520d_entry_hidden(K1520Disk h, int i) {
     const FileEntry* e = eintrag(h, i);
     return e ? e->hidden : false;
@@ -849,6 +855,38 @@ extern "C" bool k1520d_set_cpm_attrs(K1520Disk h, const char* name,
     a.set_archived  = set_archived;  a.archived  = archived;
     a.set_user      = set_user;      a.user      = user;
     return H(h)->vol->setAttributes(FileRef::parse(name), a);
+}
+
+extern "C" bool k1520d_set_dos_attrs(K1520Disk h, const char* name,
+                                     bool set_read_only, bool read_only,
+                                     bool set_hidden,    bool hidden,
+                                     bool set_system,    bool system,
+                                     bool set_archive,   bool archive,
+                                     bool set_mtime,     int64_t mtime_utc) {
+    if (!h || !name) return false;
+    FatAttrs a;
+    a.set_read_only = set_read_only; a.read_only = read_only;
+    a.set_hidden    = set_hidden;    a.hidden    = hidden;
+    a.set_system    = set_system;    a.system    = system;
+    a.set_archive   = set_archive;   a.archive   = archive;
+    a.set_mtime     = set_mtime;     a.mtime     = fat::utcZuOrtszeit(mtime_utc);
+    return H(h)->vol->setAttributes(FileRef::parse(name), a);
+}
+
+extern "C" bool k1520d_dos_sys(K1520Disk ziel, K1520Disk quelle) {
+    if (!ziel || !quelle) return false;
+    std::string bericht;
+    const bool ok = H(ziel)->vol->dosSystemUebertragen(*H(quelle)->vol, bericht);
+    H(ziel)->s_sys = bericht;
+    return ok;
+}
+
+extern "C" const char* k1520d_dos_sys_report(K1520Disk ziel) {
+    return ziel ? H(ziel)->s_sys.c_str() : "";
+}
+
+extern "C" void k1520d_set_fat_lfn(K1520Disk h, int modus) {
+    if (h) H(h)->vol->setFatLfn(modus);
 }
 
 #define K1520D_ENTRY_UNIX(fn, typ, feld)                             \

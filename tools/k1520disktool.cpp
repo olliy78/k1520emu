@@ -38,6 +38,7 @@
 
 #include "core/filesystem/cpm/cpa_dpb.h"
 #include "core/filesystem/disk_volume.h"
+#include "core/filesystem/fat/fat_fs.h"
 #include "core/filesystem/prg_boot.h"
 #include "core/filesystem/geometry_probe.h"
 #include "core/filesystem/wega/platten_volume.h"
@@ -92,6 +93,8 @@ struct Optionen {
     bool cpm_sys_gesetzt = false, cpm_sys = false;   ///< --sys / --no-sys
     bool cpm_arc_gesetzt = false, cpm_arc = false;   ///< --arc / --no-arc
     bool cpm_user_gesetzt = false; int cpm_user = 0; ///< --user N
+    bool fat_hid_gesetzt = false, fat_hid = false;   ///< --hid / --no-hid (FAT: versteckt)
+    int  fat_lfn = -1;                               ///< --lfn / --no-lfn (FAT: lange Namen schreiben)
     // WEGA (UNIX): chmod/chown/touch an einer Datei — `attr --mode 0755 --uid 0 …`
     bool unix_mode_gesetzt = false;  int unix_mode = 0;             ///< --mode (oktal)
     bool unix_uid_gesetzt  = false;  int unix_uid  = 0;             ///< --uid
@@ -154,8 +157,11 @@ void gebrauch() {
         "         [--mode 0755 --uid N --gid N --mtime S]  ... WEGA: chmod/chown/touch\n"
         "         [--ro|--no-ro --sys|--no-sys]     ... CP/M-Attribute\n"
         "         [--arc|--no-arc] [--user 3]       ... und Nutzerbereich\n"
+        "         [--hid|--no-hid]                  ... FAT: versteckt; --ro/--sys/--arc/--mtime gelten dort auch\n"
         "         [--prg 710|710-1]                 ... Bootabbild muss fuer dieses PRG-Geraet sein\n"
         "  boot-get <abbild> <datei.bin>            Systemspuren herausschreiben\n"
+        "  sys    <ziel> <quelle>                   FAT/DOS: Bootsektor + Systemdateien einer Systemdiskette\n"
+        "                                           auf eine LEERE FAT-Diskette uebertragen (wie DOS `SYS`)\n"
         "  boot-put <abbild> <datei.bin>            Bootabbild in die Systemspuren\n"
         "         [--prg 710|710-1]                 ... (wie bei create)\n"
         "  boot-scpx <SYL17.SYS> <CCPBD17.SYS> <BIOS.SYS> <aus.bin> [--prg 710|710-1]\n"
@@ -264,6 +270,10 @@ bool zerlege(int argc, char** argv, int ab, Optionen& o, std::string& err) {
         else if (a == "--no-ro")   { o.cpm_ro_gesetzt  = true; o.cpm_ro  = false; }
         else if (a == "--sys")     { o.cpm_sys_gesetzt = true; o.cpm_sys = true; }
         else if (a == "--no-sys")  { o.cpm_sys_gesetzt = true; o.cpm_sys = false; }
+        else if (a == "--hid")     { o.fat_hid_gesetzt = true; o.fat_hid = true; }
+        else if (a == "--no-hid")  { o.fat_hid_gesetzt = true; o.fat_hid = false; }
+        else if (a == "--lfn")     { o.fat_lfn = 1; }
+        else if (a == "--no-lfn")  { o.fat_lfn = 0; }
         else if (a == "--arc")     { o.cpm_arc_gesetzt = true; o.cpm_arc = true; }
         else if (a == "--no-arc")  { o.cpm_arc_gesetzt = true; o.cpm_arc = false; }
         else if (a == "--mode")    { if (!wert("--mode"))   return false;
@@ -511,6 +521,21 @@ int cmd_ls(const Optionen& o) {
             std::printf("%-10s %3d %5d %5d %8s %-16s %s%s\n", e.attributes.c_str(),
                         e.unix_nlink, e.unix_uid, e.unix_gid, groesse.c_str(),
                         e.date.c_str(), e.name.c_str(), e.damaged ? "  [DEFEKT]" : "");
+        }
+    } else if (v->istFat()) {
+        // FAT: Attribute, Groesse, Zeitstempel, Pfad; `d` = Verzeichnis, in Klammern der 8.3-Kurzname
+        // eines langen Namens (das Lesen am DOS sieht nur diesen).
+        std::cout << "Attr      Groesse Datum               Name\n";
+        for (const FileEntry& e : liste) {
+            std::string a = e.type == "d" ? "d" : "-";
+            a += e.attributes.find("RO")  != std::string::npos ? 'r' : '-';
+            a += e.attributes.find("HID") != std::string::npos ? 'h' : '-';
+            a += e.attributes.find("SYS") != std::string::npos ? 's' : '-';
+            a += e.attributes.find("ARC") != std::string::npos ? 'a' : '-';
+            const std::string kurz = e.short_name.empty() ? "" : "  (" + e.short_name + ")";
+            std::printf("%-5s %12llu %-19s %s%s%s\n", a.c_str(),
+                        static_cast<unsigned long long>(e.size), e.date.c_str(), e.name.c_str(),
+                        kurz.c_str(), e.damaged ? "  [DEFEKT]" : "");
         }
     } else if (v->fsType() == FsType::Sios) {
         // SIOS: Typ F = Datei, B = Bibliothek, O = Objekt einer Bibliothek (`PHASELB/INIT`);
@@ -1301,6 +1326,7 @@ int cmd_put(const Optionen& o) {
     t.text      = o.text;
     t.overwrite = o.force;
     t.dry_run   = o.dry_run;
+    t.fat_lfn   = o.fat_lfn;
     // --force ist beim Einfuegen zweierlei: vorhandene Dateien ersetzen UND eine
     // ausdruecklich genannte Angabendatei als Nutzdatei durchlassen (§2.5).
     t.zubehoer_als_datei = o.force;
@@ -1406,8 +1432,8 @@ int cmd_rm(const Optionen& o) {
             if (passt(muster.name, e.qualifiedName()))
                 treffer.push_back(FileRef{e.volume, e.qualifiedName()});
         }
-        // WEGA: tiefste Pfade zuerst — ein Verzeichnis laesst sich erst leer loeschen.
-        if (v->istWega())
+        // WEGA/FAT: tiefste Pfade zuerst — ein Verzeichnis laesst sich erst leer loeschen.
+        if (v->hatBaum())
             std::sort(treffer.begin(), treffer.end(), [](const FileRef& a, const FileRef& b) {
                 return a.name > b.name;
             });
@@ -1541,6 +1567,27 @@ int cmd_boot_get(const Optionen& o) {
 }
 
 /// @brief `boot-put` — ein Bootabbild in die Systemspuren einer vorhandenen Diskette.
+/// @brief `sys <ziel> <quelle>` - DOS-SYS: Bootsektor und Systemdateien einer FAT-Systemdiskette uebertragen.
+int cmd_sys(const Optionen& o) {
+    if (o.rest.size() < 3) {
+        std::cerr << "Fehler: sys <Zielabbild> <Quellabbild> (Ziel: eine LEERE FAT-Diskette)\n";
+        return kFehler;
+    }
+    int rc = kOk;
+    auto ziel = oeffne(o, o.rest[1], rc, /*schreibend=*/true);
+    if (!ziel) return rc;
+    auto quelle = oeffne(o, o.rest[2], rc, /*schreibend=*/false);
+    if (!quelle) return rc;
+    std::string bericht;
+    if (!ziel->dosSystemUebertragen(*quelle, bericht)) {
+        std::cerr << "Fehler: " << ziel->lastError() << "\n";
+        return kFehler;
+    }
+    if (!ziel->flush()) { std::cerr << "Fehler: " << ziel->lastError() << "\n"; return kFehler; }
+    std::cout << "Bootsektor und Systemdateien nach " << o.rest[1] << ":\n" << bericht;
+    return kOk;
+}
+
 int cmd_boot_put(const Optionen& o) {
     if (o.rest.size() < 3) {
         std::cerr << "Fehler: Abbild und Bootabbild angeben\n";
@@ -1613,11 +1660,12 @@ int cmd_attr(const Optionen& o) {
                       || !o.udos_segmente.empty()
                       || !o.udos_mem.empty() || !o.udos_zusatz.empty()
                       || !o.udos_erst.empty() || !o.udos_geaend.empty();
-    const bool aendern_cpm = o.cpm_ro_gesetzt || o.cpm_sys_gesetzt
-                          || o.cpm_arc_gesetzt || o.cpm_user_gesetzt;
-    const bool aendern_unix = o.unix_mode_gesetzt || o.unix_uid_gesetzt
-                           || o.unix_gid_gesetzt || o.unix_mtime_gesetzt;
-    const bool aendern = aendern_udos || aendern_cpm || aendern_unix;
+    bool aendern_cpm = o.cpm_ro_gesetzt || o.cpm_sys_gesetzt
+                    || o.cpm_arc_gesetzt || o.cpm_user_gesetzt;
+    bool aendern_unix = o.unix_mode_gesetzt || o.unix_uid_gesetzt
+                     || o.unix_gid_gesetzt || o.unix_mtime_gesetzt;
+    const bool aendern_fat = o.fat_hid_gesetzt;
+    const bool aendern = aendern_udos || aendern_cpm || aendern_unix || aendern_fat;
 
     int rc = kOk;
     auto v = oeffne(o, o.rest[1], rc, /*schreibend=*/aendern);
@@ -1639,6 +1687,28 @@ int cmd_attr(const Optionen& o) {
     };
     if (!suche(-1)) {
         std::cerr << "Fehler: '" << o.rest[2] << "' steht nicht im Verzeichnis\n";
+        return kFehler;
+    }
+
+    if (v->istFat() && (aendern_cpm || aendern_unix || aendern_fat)) {
+        // FAT: R/O, versteckt, System, Archiv und Zeitstempel (--mtime = Sekunden seit 1970, UTC).
+        if (o.cpm_user_gesetzt || o.unix_mode_gesetzt || o.unix_uid_gesetzt || o.unix_gid_gesetzt) {
+            std::cerr << "Fehler: --user/--mode/--uid/--gid gibt es bei FAT-Disketten nicht\n";
+            return kFehler;
+        }
+        FatAttrs f;
+        f.set_read_only = o.cpm_ro_gesetzt;  f.read_only = o.cpm_ro;
+        f.set_system    = o.cpm_sys_gesetzt; f.system    = o.cpm_sys;
+        f.set_archive   = o.cpm_arc_gesetzt; f.archive   = o.cpm_arc;
+        f.set_hidden    = o.fat_hid_gesetzt; f.hidden    = o.fat_hid;
+        if (o.unix_mtime_gesetzt) { f.set_mtime = true; f.mtime = fat::utcZuOrtszeit(static_cast<int64_t>(o.unix_mtime)); }
+        if (!v->setAttributes(ref, f) || !v->flush()) {
+            std::cerr << "Fehler: " << v->lastError() << "\n";
+            return kFehler;
+        }
+        aendern_cpm = aendern_unix = false;
+    } else if (aendern_fat) {
+        std::cerr << "Fehler: --hid/--no-hid gibt es nur bei FAT-Disketten\n";
         return kFehler;
     }
 
@@ -2156,6 +2226,7 @@ int main(int argc, char** argv) {
     if (befehl == "attr")    return cmd_attr(o);
     if (befehl == "boot-get") return cmd_boot_get(o);
     if (befehl == "boot-put") return cmd_boot_put(o);
+    if (befehl == "sys") return cmd_sys(o);
     if (befehl == "boot-scpx") return cmd_boot_scpx(o);
     if (befehl == "info")    return cmd_info(o);
     if (befehl == "tar-satz") return cmd_tar_satz(o);

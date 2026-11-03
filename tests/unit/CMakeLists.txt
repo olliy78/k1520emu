@@ -240,6 +240,10 @@ k1520_add_test(udos1715_fs   SRC filesystem/test_udos1715_fs.cpp
 k1520_add_test(sios_fs       SRC filesystem/test_sios_fs.cpp
                              LIBS k1520_fs LABELS "${_lbl}"
                              DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
+# MS-DOS FAT12 (PC, A7150/DCP) - doc/design/44_fat12.md
+k1520_add_test(fat_fs        SRC filesystem/test_fat_fs.cpp
+                             LIBS k1520_fs LABELS "${_lbl}"
+                             DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
 k1520_add_test(scp1700_fs    SRC filesystem/test_scp1700_fs.cpp
                              LIBS k1520_fs LABELS "${_lbl}"
                              DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")

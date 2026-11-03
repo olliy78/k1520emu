@@ -686,6 +686,30 @@ Nutzerbereich 0 ohne Attribute ist der Normalfall, den auch das echte CP/M erzeu
 und beides lässt sich jederzeit über *Eigenschaften* nachtragen. Wer eine Sammlung
 führt und jede Datei für sich vollständig haben will, schaltet es ein.
 
+## MS-DOS-Disketten (FAT12) — PC, A7150/DCP, PC 1834
+
+Das DiskTool liest und schreibt die Disketten, die ein PC-DOS, MS-DOS, **DCP** (A7150, PC 1834) oder Windows angelegt hat:
+160K bis 1,44M (und 2,88M).  Die Lage steht im Bootsektor (BPB); das Dateisystem heißt in der Titelzeile `dos720`,
+`dos360` … je nach Größe.
+
+* **Ordner** erscheinen als aufklappbare Zeilen.  Auf einen Ordner geklickte oder gezogene Dateien landen darin; *Neuer
+  Ordner* legt ihn an (ohne angeklickten Ordner in der Wurzel).  *Alles holen/einfügen* nimmt den ganzen Baum mit, auch
+  leere Ordner.
+* **Lange Namen** (Windows ab 95) werden gelesen und geschrieben; im Tooltip steht der 8.3-Kurzname.  Eine DCP-Diskette
+  bekommt beim Schreiben Kurznamen — ein DOS 3.3 kennt keine langen.  Verboten sind `\ / : * ? " < > |` und DOS-Gerätenamen
+  (`CON`, `NUL` …).
+* **Angaben** (Doppelklick): R/O, versteckt, System, Archiv und Datum/Uhrzeit.  Das Datum der Datei geht beim Holen auf
+  die Linux-Datei über und kommt beim Einfügen von ihr zurück.  DOS kennt keine Zeitzone; gerechnet wird mit der Ortszeit.
+* **Platz:** Cluster werden aufgerundet, die Wurzel hat eine feste Zahl Einträge; passt etwas nicht, bleibt die Diskette
+  unverändert.  Die Prüfung (Strg+F) findet Kreuzverweise, verlorene Cluster und beschädigte FAT-Kopien.
+* **Hochdichte-Disketten** (1,2M/1,44M/2,88M) lassen sich nur als `.img` anlegen und speichern.
+
+**Bootfähige DOS-Diskette:** *Datei ▸ Neue Diskette*, Dateisystem `dos720`, Haken „Bootdiskette erstellen" und einen
+hinterlegten Lader wählen (DCP 3.3, DCP 3.20, DCP 3.2/PC 1834, MDISK).  Dann *Diskette ▸ Systemdateien übernehmen (DOS SYS)* und
+eine Systemdiskette wählen — der Bootsektor und `IO.SYS`/`DCDOS.SYS` (bzw. `BIO.COM`/`DOS.COM`) kommen mit Attributen
+und Zeit auf die **leere** Diskette; die Lader suchen sie an den ersten Verzeichnisplätzen.  Der Bootsektor trägt dabei den BPB
+der neuen Diskette: ein Lader einer 720K-Diskette taugt auch für 360K.
+
 ## MicroDOS — das CP/M der Rostocker Anpassung
 
 MicroDOS 1526 (A5120/A5130) und MicroDOS 1715 (PC 1715) sind CP/M-2.2-Abkömmlinge: Dateien mit Nutzerbereich, **R/O**-, **SYS**- und
