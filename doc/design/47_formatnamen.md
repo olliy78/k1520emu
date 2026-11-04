@@ -1,4 +1,4 @@
-# Entwurf 46 — Einheitliche Format- und Profilnamen, Anzeige für Anwender
+# Entwurf 47 — Einheitliche Format- und Profilnamen, Anzeige für Anwender
 
 Stand 2026-11-04.  Zweig `formatnamen`.  Anlass: die Namen in `data/formats.yaml` folgen drei bis fünf verschiedenen
 Schemata.  Manche verraten die Geometrie (`k5601_ds40_9x512`), andere nicht (`cpa780`, `cpa800`, `mf6400_600k`);

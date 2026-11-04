@@ -1,6 +1,6 @@
 /**
  * @file test_katalog_alias.cpp
- * @brief Wacher W3 (Entwurf 46): `aliases:` bei Formaten und Dateisystemprofilen.
+ * @brief Wacher W3 (Entwurf 47): `aliases:` bei Formaten und Dateisystemprofilen.
  *
  * FormatKatalogAlias.* / FsKatalogAlias.*  -  test-eigener Katalog `formats_alias.yaml`
  * KatalogAltnamen.*                         -  der AUSGELIEFERTE Katalog loest jeden alten Namen auf
