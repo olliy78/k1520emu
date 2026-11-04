@@ -319,7 +319,7 @@ def test_drive_lamp_tells_empty_from_mounted_from_busy(window, qapp, temp_disk):
     assert window.status_widget.lampe(0).zustand() == status_bar.LEER
 
     path = temp_disk("cpa_cpa780_k5601_clock.img")
-    assert window.drives_widget.mount_path(0, path, "cpa_ds80_5x1024_boot", False)
+    assert window.drives_widget.mount_path(0, path, "ds80_5x1024", False)
     window._update_drive_status()
     assert window.status_widget.lampe(0).zustand() in (status_bar.BELEGT,
                                                        status_bar.ZUGRIFF)
@@ -335,7 +335,7 @@ def test_status_bar_names_the_mounted_image_and_its_write_state(window, qapp,
     import os
 
     path = temp_disk("cpa_cpa780_k5601_clock.img")
-    assert window.drives_widget.mount_path(0, path, "cpa_ds80_5x1024_boot", False), \
+    assert window.drives_widget.mount_path(0, path, "ds80_5x1024", False), \
         window.emulator.last_error()
     qapp.processEvents()
     window._update_drive_status()
@@ -805,7 +805,7 @@ def test_a_disk_access_turns_the_lamp_red(window, qapp, temp_disk):
     from app.ui import status_bar
 
     path = temp_disk("cpa_cpa780_k5601_clock.img")
-    assert window.drives_widget.mount_path(0, path, "cpa_ds80_5x1024_boot", False)
+    assert window.drives_widget.mount_path(0, path, "ds80_5x1024", False)
     qapp.processEvents()
 
     window.emulator.is_disk_led_on = lambda drive: drive == 0
@@ -969,7 +969,7 @@ def test_a_raw_image_asks_for_its_format(window, qapp, monkeypatch, temp_disk):
                         staticmethod(lambda *a, **k: (path, "")))
     gefragt = []
     monkeypatch.setattr("app.ui.drive_widget.FormatDialog.frage",
-                        classmethod(lambda cls, *a, **k: (gefragt.append(k), "cpa_ds80_5x1024_boot")[1]))
+                        classmethod(lambda cls, *a, **k: (gefragt.append(k), "ds80_3t26x128-5x1024")[1]))
 
     window.drives_widget.toggle_mount(0)
     qapp.processEvents()
@@ -1243,7 +1243,7 @@ def test_reset_to_default_leaves_the_mounted_disks_alone(window, qapp, monkeypat
     from PySide6.QtWidgets import QMessageBox
 
     pfad = temp_disk("cpa_cpa780_k5601_clock.img")
-    assert window.drives_widget.mount_path(0, pfad, "cpa_ds80_5x1024_boot", False)
+    assert window.drives_widget.mount_path(0, pfad, "ds80_5x1024", False)
 
     monkeypatch.setattr(QMessageBox, "question",
                         staticmethod(lambda *a, **k: QMessageBox.Yes))
