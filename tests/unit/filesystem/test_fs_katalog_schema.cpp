@@ -149,9 +149,14 @@ TEST(FsKatalogSchema, UmbenennungstabelleStimmtMitDemKatalogUeberein) {
         ++n;
     }
     EXPECT_EQ(n, 58);
-    // Der Katalog hat kein Profil, das die Tabelle nicht kennt.
+    // Der Katalog hat kein Profil, das die Tabelle nicht kennt - ausser den nach Schema 47 neu
+    // angelegten, die nie einen Altnamen hatten (Z2: CPA1715_5600).
+    const std::set<std::string> ohneAltnamen = {"cpa1715_ss40_5x1024_boot"};
     for (const FsProfile& p : kataloge().dateisysteme.profiles())
-        EXPECT_EQ(neue.count(p.name), 1u) << p.name << " fehlt in profilnamen_neu.txt";
+        if (ohneAltnamen.count(p.name))
+            EXPECT_EQ(neue.count(p.name), 0u) << p.name << " hat keinen Altnamen, steht aber in der Tabelle";
+        else
+            EXPECT_EQ(neue.count(p.name), 1u) << p.name << " fehlt in profilnamen_neu.txt";
 }
 
 TEST(FsKatalogSchema, JederAlteProfilnameLoestWeiterAuf) {

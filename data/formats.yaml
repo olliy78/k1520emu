@@ -1012,6 +1012,21 @@ filesystems:
     dir_boot:    true
     boot_header: pc1715
 
+  # `cpa1715_ss40_5x1024_boot` — dasselbe fuer K5600.10 (40 Spuren einseitig, Block 1 KB, 64 Plaetze): Lader im
+  # Verzeichnis.  Geometrie und CP/M-Aufbau sind mit `microdos_ss40_5x1024_boot` identisch; positiv unterschieden
+  # wird nur ueber den Bootkopf (`boot_header: pc1715`, Wort F002H/F003H gegen MicroDOS-SYL).
+  - name:        cpa1715_ss40_5x1024_boot
+    description: "CP/A 1715 (PC 1715) - 200K SS 40 Spuren, 5×1024 (K5600.10), Lader im Verzeichnis, 64 Plaetze"
+    title:       "CP/A 1715 Systemdiskette"
+    capacity:    "200K"
+    machines:    ["PC 1715"]
+    format:      ss40_5x1024
+    type:        cpm
+    block_size:  1024
+    dir_entries: 64
+    dir_boot:    true
+    boot_header: pc1715
+
   # ══ MicroDOS 1526 / 1715 (Rostock, CP/M-2.2-Anpassung; doc/design/13_k1520disktool.md §16) ══
   # Das Verzeichnis beginnt auf c0h0 Sektor 1 (Offset 0, keine Systemspuren im CP/M-Sinn).  Die
   # ersten ACHT Plaetze (256 B) gehoeren dem SYL-Lader ("SYL", Text "MicroDOS Loader") - wie beim

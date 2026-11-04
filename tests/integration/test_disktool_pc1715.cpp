@@ -514,3 +514,95 @@ TEST(DisktoolPc1715, Scp30SonderplaetzeSindWederDateienNochBefund) {
         EXPECT_EQ(0, r.zaehlerAb(FsSeverity::Warnung)) << kennungen(r);
     }
 }
+
+// ─── CP/A 1715 auf 40 Spuren einseitig (Entwurf 47, Z2a) ────────────────────────────────────────
+//
+// `cpa1715_ss40_5x1024_boot` hat dieselbe Geometrie und denselben CP/M-Aufbau wie
+// `microdos_ss40_5x1024_boot`; unterschieden wird nur ueber den Bootkopf (positiver Nachweis).
+
+/// @test Synthetisch (laeuft in jeder Umgebung): neue Diskette im Profil, `put`, Erkennung ohne --fs;
+///       eine MicroDOS-Diskette gleicher Geometrie bleibt MicroDOS, eine Datendiskette bleibt Datendiskette.
+TEST(DisktoolPc1715, Cpa1715Ss40WirdVonMicrodosSs40UnterschiedenUndUmgekehrt) {
+    std::vector<uint8_t> kopf(128, 0);
+    kopf[0] = 0x03; kopf[1] = 0xF0; kopf[0x60] = 0xF0;
+    TempPfad kopfDatei("k1520_pc1715_ss40_kopf.bin");
+    schreibe(kopfDatei.get(), kopf);
+
+    TempPfad cpa("k1520_pc1715_ss40_cpa.hfe");
+    {
+        std::string err;
+        auto neu = DiskVolume::create(cpa.get(), "cpa1715_ss40_5x1024_boot", "", formate(), dateisysteme(), err,
+                                      kopfDatei.get());
+        ASSERT_NE(neu, nullptr) << err;
+        ASSERT_TRUE(lege(*neu, "@OS.COM", std::vector<uint8_t>(3000, 'o'))) << neu->lastError();
+        ASSERT_TRUE(neu->flush()) << neu->lastError();
+    }
+    {
+        auto dv = oeffne(cpa.get());
+        ASSERT_NE(dv, nullptr);
+        EXPECT_EQ(dv->detection().format, "ss40_5x1024");
+        EXPECT_EQ(dv->detection().filesystem, "cpa1715_ss40_5x1024_boot");
+        EXPECT_TRUE(dv->detection().unambiguous);
+        ASSERT_EQ(dv->list().size(), 1u);
+        EXPECT_EQ(dv->list()[0].name, "@OS.COM");
+        EXPECT_EQ(0, dv->check(FsCheckLevel::Voll, true).zaehlerAb(FsSeverity::Warnung));
+    }
+
+    // MicroDOS 200K: derselbe Aufbau, anderer Lader -> bleibt microdos.
+    const fs::path boot = fs::path(k1520test::diskPath("x.hfe")).parent_path() / ".." / ".." / ".."
+                        / "data" / "bootsektoren" / "boot_microdos_1526_200k.bin";
+    TempPfad md("k1520_pc1715_ss40_md.hfe");
+    {
+        std::string err;
+        auto neu = DiskVolume::create(md.get(), "microdos_ss40_5x1024_boot", "", formate(), dateisysteme(), err,
+                                      boot.lexically_normal().string());
+        ASSERT_NE(neu, nullptr) << err;
+        ASSERT_TRUE(lege(*neu, "X.TXT", std::vector<uint8_t>(2000, 'x'))) << neu->lastError();
+        ASSERT_TRUE(neu->flush()) << neu->lastError();
+    }
+    {
+        auto dv = oeffne(md.get());
+        ASSERT_NE(dv, nullptr);
+        EXPECT_EQ(dv->detection().filesystem, "microdos_ss40_5x1024_boot");
+        EXPECT_TRUE(dv->detection().unambiguous);
+    }
+
+    // Ohne Kopf: Datendiskette.
+    TempPfad daten("k1520_pc1715_ss40_daten.hfe");
+    {
+        std::string err;
+        auto neu = DiskVolume::create(daten.get(), "microdos_ss40_5x1024_daten", "", formate(), dateisysteme(), err);
+        ASSERT_NE(neu, nullptr) << err;
+        ASSERT_TRUE(lege(*neu, "T.TXT", std::vector<uint8_t>(300, 't'))) << neu->lastError();
+        ASSERT_TRUE(neu->flush());
+    }
+    auto dd = oeffne(daten.get());
+    ASSERT_NE(dd, nullptr);
+    EXPECT_NE(dd->detection().filesystem, "cpa1715_ss40_5x1024_boot");
+    EXPECT_NE(dd->detection().filesystem, "microdos_ss40_5x1024_boot");
+}
+
+/// @test Originalabzug der Sammlung (nicht im Repository; uebersprungen, wenn er fehlt): CPA1715_5600.hfe.
+TEST(DisktoolPc1715, Cpa1715_5600AusDerSammlung) {
+    const std::string quelle = "/home/olliy/projects/robotron/Diskettensammlung_von_DL/Diskettenarbeit/"
+                               "Disketten_Images_RT/CPA1715_5600.hfe";
+    if (!fs::exists(quelle)) GTEST_SKIP() << quelle << " fehlt";
+    TempPfad kopie("k1520_pc1715_5600.hfe");
+    std::error_code ec;
+    fs::copy_file(quelle, kopie.get(), fs::copy_options::overwrite_existing, ec);
+    ASSERT_FALSE(ec) << ec.message();
+
+    auto dv = oeffne(kopie.get());
+    ASSERT_NE(dv, nullptr);
+    EXPECT_EQ(dv->detection().filesystem, "cpa1715_ss40_5x1024_boot");
+    EXPECT_TRUE(dv->detection().unambiguous);
+    EXPECT_EQ(dv->list().size(), 12u);
+    const auto liste = dv->list();
+    EXPECT_TRUE(std::any_of(liste.begin(), liste.end(), [](const FileEntry& e) { return e.name == "@OS.COM"; }));
+    for (FsCheckLevel stufe : {FsCheckLevel::Schnell, FsCheckLevel::Voll}) {
+        const FsCheckReport& r = dv->check(stufe, true);
+        EXPECT_EQ(0, r.zaehlerAb(FsSeverity::Warnung)) << kennungen(r);
+        for (const FsFinding& f : r.findings)
+            EXPECT_TRUE(f.severity != FsSeverity::Fehler && f.severity != FsSeverity::Gefahr) << f.id;
+    }
+}
