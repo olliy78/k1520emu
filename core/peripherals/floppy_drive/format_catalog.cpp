@@ -111,7 +111,7 @@ bool buildFormat(const yaml::Node& node, DiskFormat& out, std::string& why,
     const std::string where = file + ":" + std::to_string(node.line);
     collectUnknownKeys(node,
                        {"name", "description", "drives", "default_for",
-                        "encoding", "containers", "step", "rate", "rpm", "tracks", "aliases"},
+                        "encoding", "containers", "step", "rate", "rpm", "tracks", "aliases", "title", "capacity"},
                        where, issues);
 
     // ── name (Pflicht) ──
@@ -123,6 +123,15 @@ bool buildFormat(const yaml::Node& node, DiskFormat& out, std::string& why,
     if (const yaml::Node* n = node.find("description")) {
         if (!n->isScalar()) { why = "'description' muss ein Text sein"; return false; }
         out.description = n->scalar;
+    }
+
+    if (const yaml::Node* n = node.find("title")) {
+        if (!n->isScalar()) { why = "'title' muss ein Text sein"; return false; }
+        out.title = n->scalar;
+    }
+    if (const yaml::Node* n = node.find("capacity")) {
+        if (!n->isScalar()) { why = "'capacity' muss ein Text sein"; return false; }
+        out.capacity = n->scalar;
     }
 
     if (const yaml::Node* n = node.find("aliases")) {

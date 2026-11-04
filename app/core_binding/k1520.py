@@ -302,6 +302,12 @@ _lib.k1520_drive_default_format.restype = ctypes.c_char_p
 # k1520_format_description(K1520Handle, name: const char*) -> const char*
 _lib.k1520_format_description.argtypes = [K1520Handle, ctypes.c_char_p]
 _lib.k1520_format_description.restype = ctypes.c_char_p
+_lib.k1520_format_title.argtypes = [K1520Handle, ctypes.c_char_p]
+_lib.k1520_format_title.restype = ctypes.c_char_p
+_lib.k1520_format_capacity.argtypes = [K1520Handle, ctypes.c_char_p]
+_lib.k1520_format_capacity.restype = ctypes.c_char_p
+_lib.k1520_format_resolve.argtypes = [K1520Handle, ctypes.c_char_p]
+_lib.k1520_format_resolve.restype = ctypes.c_char_p
 
 # k1520_formats_source(K1520Handle) -> const char*
 _lib.k1520_formats_source.argtypes = [K1520Handle]
@@ -2333,6 +2339,21 @@ class K1520Emulator:
     def format_description(self, name: str) -> str:
         """Human-readable description of a catalog format ("" if unknown)."""
         d = _lib.k1520_format_description(self._handle, name.encode("utf-8"))
+        return d.decode("utf-8") if d else ""
+
+    def format_title(self, name: str) -> str:
+        """Anzeigetitel eines Katalogformats ("" = nicht gepflegt)."""
+        d = _lib.k1520_format_title(self._handle, name.encode("utf-8"))
+        return d.decode("utf-8") if d else ""
+
+    def format_capacity(self, name: str) -> str:
+        """Marktbezeichnung der Kapazitaet ("800K"; "" = nicht gepflegt)."""
+        d = _lib.k1520_format_capacity(self._handle, name.encode("utf-8"))
+        return d.decode("utf-8") if d else ""
+
+    def format_resolve(self, name: str) -> str:
+        """Echter Katalogname zu name (Alias aufgeloest); "" wenn unbekannt."""
+        d = _lib.k1520_format_resolve(self._handle, name.encode("utf-8"))
         return d.decode("utf-8") if d else ""
 
     def formats_source(self) -> str:

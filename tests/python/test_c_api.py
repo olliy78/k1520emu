@@ -636,6 +636,16 @@ def test_format_catalogue_is_reachable_per_drive(emulator, drive):
         assert emulator.format_description(name)
 
 
+def test_format_display_fields_and_resolve(emulator):
+    """title/capacity/resolve sind erreichbar (Inhalt fuellt Entwurf 47 Schritt 5)."""
+    name = emulator.drive_formats(0)[0]
+    assert isinstance(emulator.format_title(name), str)
+    assert isinstance(emulator.format_capacity(name), str)
+    assert emulator.format_resolve(name) == name
+    assert emulator.format_resolve("gibt_es_nicht") == ""
+    assert emulator.format_title("gibt_es_nicht") == ""
+
+
 def test_formats_source_points_at_a_real_file(emulator):
     source = emulator.formats_source()
     assert source, "formats_source ist leer — Katalog nicht geladen"

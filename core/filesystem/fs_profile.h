@@ -67,6 +67,10 @@ inline bool isUdosFamily(FsType t) {
 struct FsProfile {
     std::string name;          ///< eindeutiger Katalogname (CLI, GUI, C-API)
     std::string description;   ///< Klartext fuer die Oberflaeche
+    std::string title;         ///< Klartextname fuer Auswahllisten (YAML `title:`, leer = nicht gepflegt)
+    std::string capacity;      ///< Marktbezeichnung als Anzeigewert, z. B. "800K" (YAML `capacity:`)
+    /// @brief Rechner, fuer die die Diskette gedacht ist (YAML `machines:`); leer = UNBEKANNT, nicht "alle".
+    std::vector<std::string> machines;
     /// @brief Frueher gueltige Namen (YAML `aliases:`): loesen in @ref FsCatalog::find auf dieses Profil auf,
     ///        erscheinen aber in keiner Liste und nie als Erkennungsergebnis.
     std::vector<std::string> aliases;

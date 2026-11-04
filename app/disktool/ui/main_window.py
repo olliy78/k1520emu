@@ -54,7 +54,7 @@ from app.disktool.archive import NAMENLOS, create_archive, dateiname
 
 from app.core_binding.k1520disk import (
     EBENE_ERKENNUNG, FEHLER, GEFAHR, WARNUNG, DiskTool, K1520DiskError, PlatteTool,
-    filesystems, ist_platte as ist_plattendatei,
+    filesystems, fs_resolve, ist_platte as ist_plattendatei,
 )
 from app.disktool.ui.actions import erzeuge_aktionen
 from app.disktool.ui.disk_editor import DiskEditorWindow
@@ -2223,6 +2223,7 @@ class MainWindow(QMainWindow):
         unverändert.
         """
         ext = str(path).lower().rsplit(".", 1)[-1]
+        filesystem = fs_resolve(filesystem) or filesystem   # alter Name (Alias) -> echter Name
         if ext in ("img", "cqm", "td0", "imd") and any(f.name == filesystem and f.type == "udos"
                                                       for f in filesystems()):
             if ext in ("cqm", "td0", "imd"):

@@ -222,6 +222,9 @@ k1520_add_test(fs_catalog    SRC filesystem/test_fs_catalog.cpp
 k1520_add_test(katalog_alias SRC filesystem/test_katalog_alias.cpp
                              LIBS k1520_fs LABELS "${_lbl}"
                              DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
+# Anzeigefelder title/capacity/machines (Entwurf 47, Waechter W5; Fuellung folgt in Schritt 5)
+k1520_add_test(katalog_anzeige SRC filesystem/test_katalog_anzeige.cpp
+                               LIBS k1520_fs LABELS "${_lbl}")
 # Namensschema der Formate (Entwurf 47, Waechter W1/W2)
 k1520_add_test(format_schema SRC filesystem/test_format_schema.cpp
                              LIBS k1520_fs LABELS "${_lbl}"

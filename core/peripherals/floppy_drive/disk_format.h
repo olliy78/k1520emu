@@ -83,6 +83,8 @@ struct TrackFormat {
 struct DiskFormat {
     std::string name;           ///< eindeutiger Katalogname (C-API, GUI, Tools)
     std::string description;    ///< Klartext fuer die GUI (leer erlaubt)
+    std::string title;          ///< Klartextname fuer Auswahllisten (YAML `title:`, leer = nicht gepflegt)
+    std::string capacity;       ///< Marktbezeichnung als Anzeigewert, z. B. "800K" (YAML `capacity:`; frei, keine Bytezahl)
     /// @brief Frueher gueltige Namen (YAML `aliases:`): loesen in @ref FormatCatalog::find auf
     ///        dieses Format auf; `name` bleibt der echte Katalogname.  Nie in Namenslisten.
     std::vector<std::string> aliases;

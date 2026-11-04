@@ -89,6 +89,20 @@ def test_filesystem_catalogue_is_reachable():
         assert f.description, f"{f.name} ohne Beschreibung"
 
 
+def test_fs_display_fields_and_resolve():
+    """Neue Anzeigefelder und Alias-Aufloesung (Entwurf 47, Schritt 4): additiv, nie None."""
+    from app.core_binding.k1520disk import filesystems, fs_resolve, format_resolve
+    for f in filesystems():
+        assert isinstance(f.title, str) and isinstance(f.capacity, str)
+        assert isinstance(f.machines, tuple)
+        assert fs_resolve(f.name) == f.name        # echter Name bleibt
+        assert format_resolve(f.format) == f.format
+    assert fs_resolve("gibt_es_nicht") == ""
+    assert format_resolve("gibt_es_nicht") == ""
+    assert fs_resolve("udos_ss77") == fs_resolve("udos_ss77")   # Alias darf aufloesen oder nicht
+    assert fs_resolve("udos_ds77") == "udos_ds77_26x128"        # Alias -> neuer Name
+
+
 def test_catalog_report_names_the_loaded_files():
     from app.core_binding.k1520disk import catalog_report
     text = catalog_report()

@@ -845,6 +845,27 @@ const char* k1520_format_description(K1520Handle h, const char* name) {
     return buf.c_str();
 }
 
+const char* k1520_format_title(K1520Handle h, const char* name) {
+    static thread_local std::string buf;
+    const DiskFormat* f = name ? toMachine(h)->formatCatalog().find(name) : nullptr;
+    buf = f ? f->title : std::string();
+    return buf.c_str();
+}
+
+const char* k1520_format_capacity(K1520Handle h, const char* name) {
+    static thread_local std::string buf;
+    const DiskFormat* f = name ? toMachine(h)->formatCatalog().find(name) : nullptr;
+    buf = f ? f->capacity : std::string();
+    return buf.c_str();
+}
+
+const char* k1520_format_resolve(K1520Handle h, const char* name) {
+    static thread_local std::string buf;
+    const DiskFormat* f = name ? toMachine(h)->formatCatalog().find(name) : nullptr;
+    buf = f ? f->name : std::string();
+    return buf.c_str();
+}
+
 const char* k1520_formats_source(K1520Handle h) {
     static thread_local std::string buf;
     buf.clear();

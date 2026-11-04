@@ -85,7 +85,7 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
                         "containers", "detect_rank", "detect", "leer", "boot_header", "dir_boot", "nur_boot",
                         "block_size", "dir_entries", "skew", "max_blocks", "os",
                         "sides_separate", "boot_track", "directory_track",
-                        "bitmap_track", "usable_tracks", "unix_layout", "aliases", "ndos_fill"},
+                        "bitmap_track", "usable_tracks", "unix_layout", "aliases", "ndos_fill", "title", "capacity", "machines"},
                        where, issues);
 
     // ── name (Pflicht) ──
@@ -97,6 +97,19 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
     if (const yaml::Node* n = node.find("description")) {
         if (!n->isScalar()) { why = "'description' muss ein Text sein"; return false; }
         out.description = n->scalar;
+    }
+
+    if (const yaml::Node* n = node.find("title")) {
+        if (!n->isScalar()) { why = "'title' muss ein Text sein"; return false; }
+        out.title = n->scalar;
+    }
+    if (const yaml::Node* n = node.find("capacity")) {
+        if (!n->isScalar()) { why = "'capacity' muss ein Text sein"; return false; }
+        out.capacity = n->scalar;
+    }
+    if (const yaml::Node* n = node.find("machines")) {
+        if (!stringList(*n, out.machines))
+            { why = "'machines' muss eine Liste von Rechnernamen sein"; return false; }
     }
 
     // ── format (Pflicht, muss im Formatkatalog existieren) ──

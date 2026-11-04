@@ -1,0 +1,39 @@
+# Test-EIGENER Katalog fuer KatalogAnzeige.*: Anzeigefelder title/capacity/machines
+# (Entwurf 47, Schritt 4).  Format a hat beide Felder, Format b keins; Profil a hat alle drei
+# (zwei Rechner), Profil b nur title (machines fehlt = unbekannt).
+version: 1
+
+formats:
+  - name:     anz_a
+    title:    Anzeigeformat A
+    capacity: 800K
+    drives:   [K5601]
+    encoding: mfm
+    tracks:
+      - { cyls: 0-79, heads: 0-1, sectors: 5, size: 1024 }
+
+  - name:     anz_b
+    drives:   [K5601]
+    encoding: mfm
+    tracks:
+      - { cyls: 0-79, heads: 0-1, sectors: 16, size: 256 }
+
+filesystems:
+  - name:        anzfs_neu_a
+    aliases:     [anzfs_alt_a]
+    title:       Anzeigeprofil A
+    capacity:    1,44M
+    machines:    [PC 1715, PC 1715W]
+    format:      anz_a
+    type:        cpm
+    data_start:  { cyl: 0, head: 0 }
+    block_size:  2048
+    dir_entries: 128
+
+  - name:        anzfs_neu_b
+    title:       Anzeigeprofil B
+    format:      anz_b
+    type:        cpm
+    data_start:  { cyl: 0, head: 0 }
+    block_size:  2048
+    dir_entries: 128

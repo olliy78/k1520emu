@@ -17,11 +17,18 @@
 #                            Spurbereich-`rate: 125` unten ist ein Teiler DAVON
 #    rpm          (optional) 300 | 360 — Drehzahl; Vorgabe aus den Laufwerken (360 nur 8")
 #    tracks       (Pflicht)  Liste disjunkter Spurbereiche
+#    title        (optional) Klartextname fuer Auswahllisten ("SCP 1715 Systemdiskette"); fehlend = leer
+#    capacity     (optional) Marktbezeichnung als Anzeigetext ("800K", "1,44M"); NICHT die Bytezahl,
+#                            frei formuliert und ungeprueft; fehlend = leer
 #    aliases      (optional) frueher gueltige Namen [alt1, alt2]; FormatCatalog::find loest sie
 #                            auf dieses Format auf (name() liefert den echten Namen).  Ein Alias
 #                            darf weder ein Katalogname noch doppelt noch der eigene Name sein
 #                            (sonst Hinweis + Alias verworfen).  Gleiches Feld gibt es bei den
 #                            `filesystems:`-Profilen.  Aliase sind dauerhaft.
+#    machines     (nur bei `filesystems:`-Profilen, optional) Liste der Rechner, fuer die die
+#                            Diskette gedacht ist.  LEER/fehlend heisst UNBEKANNT, nicht "alle".
+#                            Der geschlossene Wortschatz der Rechnernamen wird mit der Katalog-
+#                            fuellung festgelegt (Entwurf 47, Schritt 5).
 #
 #  ┌───────────────────────────────────────────────────────────────────────────┐
 #  │ `step: 2` — DOPPELSCHRITT (Austausch zwischen 96 tpi und 48 tpi)          │

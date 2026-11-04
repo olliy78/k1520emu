@@ -444,6 +444,12 @@ K1520_API const char* k1520_drive_format_name(K1520Handle h, int drive, int inde
 K1520_API const char* k1520_drive_default_format(K1520Handle h, int drive);
 /** @brief Human-readable description of a catalog format ("" if unknown). */
 K1520_API const char* k1520_format_description(K1520Handle h, const char* name);
+/** @brief Anzeigetitel eines Katalogformats (Katalogfeld `title`; "" = unbekannt/nicht gepflegt). */
+K1520_API const char* k1520_format_title(K1520Handle h, const char* name);
+/** @brief Marktbezeichnung der Kapazitaet ("800K", Katalogfeld `capacity`; "" = nicht gepflegt). */
+K1520_API const char* k1520_format_capacity(K1520Handle h, const char* name);
+/** @brief Echter Katalogname zu @p name (Alias aufgeloest); "" wenn unbekannt. */
+K1520_API const char* k1520_format_resolve(K1520Handle h, const char* name);
 /** @brief Colon-separated list of the loaded formats.yaml file(s) — diagnostics. */
 K1520_API const char* k1520_formats_source(K1520Handle h);
 /** @brief Return true if a disk image is mounted in the drive. */

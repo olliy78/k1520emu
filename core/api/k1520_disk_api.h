@@ -274,6 +274,15 @@ K1520_API const char* k1520d_last_open_error(void);
 K1520_API int         k1520d_fs_count(void);
 K1520_API const char* k1520d_fs_name(int i);
 K1520_API const char* k1520d_fs_description(const char* name);
+/// @brief Anzeigetitel (Katalogfeld `title`), Marktbezeichnung der Kapazitaet (`capacity`); "" = nicht gepflegt.
+K1520_API const char* k1520d_fs_title(const char* name);
+K1520_API const char* k1520d_fs_capacity(const char* name);
+/// @brief Rechner des Profils (`machines`), durch '\n' getrennt; "" = unbekannt (nicht "alle").
+K1520_API const char* k1520d_fs_machines(const char* name);
+/// @brief Echter Profilname zu @p name (Alias aufgeloest); "" wenn unbekannt.
+K1520_API const char* k1520d_fs_resolve(const char* name);
+/// @brief Dasselbe fuer Formate (Geometrie): echter Katalogname, "" wenn unbekannt.
+K1520_API const char* k1520d_format_resolve(const char* name);
 /// @brief Geometrie, auf der dieses Dateisystem liegt.
 K1520_API const char* k1520d_fs_format(const char* name);
 /// @brief "cpm" | "udos" | "udos1715" | "wega_mutos"

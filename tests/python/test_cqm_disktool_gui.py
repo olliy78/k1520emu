@@ -185,6 +185,8 @@ def test_udos_to_cqm_is_refused_before_the_core(window, tmp_path, monkeypatch):
     grund = MainWindow._container_grund(tmp_path / "x.cqm", "udos_ds77_26x128")
     assert "Sektorkontrollblöcke von UDOS" in grund
     assert MainWindow._container_grund(tmp_path / "x.hfe", "udos_ds77_26x128") == ""
+    # alter Name (Alias, Entwurf 47) loest dieselbe Sperre aus wie der neue
+    assert "Sektorkontrollblöcke von UDOS" in MainWindow._container_grund(tmp_path / "x.cqm", "udos_ds77")
     assert MainWindow._container_grund(tmp_path / "x.cqm", "udos1715_ds80_16x256") == ""
     assert MainWindow._container_grund(tmp_path / "x.cqm", "cpa_ds80_5x1024_daten") == ""
 

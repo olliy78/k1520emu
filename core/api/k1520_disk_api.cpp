@@ -359,6 +359,33 @@ extern "C" const char* k1520d_fs_description(const char* name) {
     return p ? p->description.c_str() : "";
 }
 
+extern "C" const char* k1520d_fs_title(const char* name) {
+    const FsProfile* p = name ? kataloge().dateisysteme.find(name) : nullptr;
+    return p ? p->title.c_str() : "";
+}
+
+extern "C" const char* k1520d_fs_capacity(const char* name) {
+    const FsProfile* p = name ? kataloge().dateisysteme.find(name) : nullptr;
+    return p ? p->capacity.c_str() : "";
+}
+
+extern "C" const char* k1520d_fs_machines(const char* name) {
+    const FsProfile* p = name ? kataloge().dateisysteme.find(name) : nullptr;
+    std::string w;
+    if (p) for (const std::string& m : p->machines) { if (!w.empty()) w += '\n'; w += m; }
+    return halte(g_scratch, std::move(w));
+}
+
+extern "C" const char* k1520d_fs_resolve(const char* name) {
+    const FsProfile* p = name ? kataloge().dateisysteme.find(name) : nullptr;
+    return p ? p->name.c_str() : "";
+}
+
+extern "C" const char* k1520d_format_resolve(const char* name) {
+    const DiskFormat* f = name ? kataloge().formate.find(name) : nullptr;
+    return f ? f->name.c_str() : "";
+}
+
 extern "C" const char* k1520d_fs_format(const char* name) {
     const FsProfile* p = name ? kataloge().dateisysteme.find(name) : nullptr;
     return p ? p->format.c_str() : "";

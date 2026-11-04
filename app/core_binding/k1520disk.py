@@ -185,6 +185,16 @@ _lib.k1520d_fs_name.argtypes = [ctypes.c_int]
 _lib.k1520d_fs_name.restype = _CS
 _lib.k1520d_fs_description.argtypes = [_CS]
 _lib.k1520d_fs_description.restype = _CS
+_lib.k1520d_fs_title.argtypes = [_CS]
+_lib.k1520d_fs_title.restype = _CS
+_lib.k1520d_fs_capacity.argtypes = [_CS]
+_lib.k1520d_fs_capacity.restype = _CS
+_lib.k1520d_fs_machines.argtypes = [_CS]
+_lib.k1520d_fs_machines.restype = _CS
+_lib.k1520d_fs_resolve.argtypes = [_CS]
+_lib.k1520d_fs_resolve.restype = _CS
+_lib.k1520d_format_resolve.argtypes = [_CS]
+_lib.k1520d_format_resolve.restype = _CS
 _lib.k1520d_fs_format.argtypes = [_CS]
 _lib.k1520d_fs_format.restype = _CS
 _lib.k1520d_fs_type.argtypes = [_CS]
@@ -746,6 +756,9 @@ class FileSystemInfo:
     description: str
     boot_capacity: int = 0   # Byte in den Systemspuren; 0 = nicht bootfaehig
     leer: bool = False       # nur tar: die LEERE tar-Diskette (nimmt genau ein .tar auf)
+    title: str = ""          # Anzeigetitel ('' = nicht gepflegt)
+    capacity: str = ""       # Marktbezeichnung ('800K'; '' = nicht gepflegt)
+    machines: tuple = ()     # Rechner; leer = UNBEKANNT, nicht 'alle'
 
     @property
     def bootable(self) -> bool:
@@ -765,8 +778,21 @@ def filesystems() -> List[FileSystemInfo]:
             description=_s(_lib.k1520d_fs_description(_b(name))),
             boot_capacity=int(_lib.k1520d_fs_boot_capacity(_b(name))),
             leer=bool(_lib.k1520d_fs_leer(_b(name))),
+            title=_s(_lib.k1520d_fs_title(_b(name))),
+            capacity=_s(_lib.k1520d_fs_capacity(_b(name))),
+            machines=tuple(m for m in _s(_lib.k1520d_fs_machines(_b(name))).split("\n") if m),
         ))
     return out
+
+
+def fs_resolve(name: str) -> str:
+    """Echter Profilname zu ``name`` (alter Name/Alias aufgeloest); '' wenn unbekannt."""
+    return _s(_lib.k1520d_fs_resolve(_b(name)))
+
+
+def format_resolve(name: str) -> str:
+    """Echter Formatname zu ``name`` (Alias aufgeloest); '' wenn unbekannt."""
+    return _s(_lib.k1520d_format_resolve(_b(name)))
 
 
 def unix_standard_inodes(filesystem: str) -> int:
