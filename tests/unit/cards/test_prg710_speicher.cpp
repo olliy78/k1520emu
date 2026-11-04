@@ -94,6 +94,23 @@ TEST_F(Prg710Speicher_, AndereSeitenMitSystemkarteSindLeer) {
     EXPECT_EQ(sp.opsPeek(0x5000), 0x00);
 }
 
+// BS620 (Entwurf 48 §2.4): E8H-Wert 04H = OPS-RAM sichtbar, nicht "Systemkarte" (= leer).
+TEST_F(Prg710Speicher_, Wert04SchaltetRamSichtbarStattLeer) {
+    freigabe(0x0F);
+    for (int n : {1, 7, 8, 9, 10}) {
+        outC(n, 0xE8, 0x04);
+        EXPECT_EQ(sp.ortVon(static_cast<uint16_t>(n << 12)).quelle, Q::Ops) << "Seite " << n;
+    }
+    sp.memWrite(0x7123, 0x5A);
+    EXPECT_EQ(sp.memRead(0x7123), 0x5A);
+    outC(7, 0xEA, 0x02);   // EAH wirkt weiter
+    EXPECT_EQ(sp.ortVon(0x7123).offset, 0x2123);
+    outC(7, 0xE8, 0x00);   // BS620 schaltet zwischen 00H und 04H um
+    EXPECT_EQ(sp.ortVon(0x7123).quelle, Q::Ops);
+    outC(5, 0xE8, 0x03);   // andere Halbbytes bleiben Systemkarte
+    EXPECT_EQ(sp.ortVon(0x5000).quelle, Q::Leer);
+}
+
 TEST_F(Prg710Speicher_, EahVerschiebtEineSeite) {
     freigabe(0x0F);
     sp.opsPoke(0x3123, 0xC3);

@@ -116,6 +116,7 @@ int bootTracePrg710(const K8915TraceOpts& o, bool v1, const prnlst::Listing& prn
     Prg710Machine::Config cfg;
     cfg.variante = v1 ? Prg710Machine::Config::Variante::Prg710_1
                       : Prg710Machine::Config::Variante::Prg710;
+    cfg.atp_zusatz = o.atp_zusatz;
     Prg710Machine m(cfg);
     { std::string err;
       if (!dbgm::steckeRaf(m, o.raf, err)) { fprintf(stderr, "--raf: %s\n", err.c_str()); return 2; }

@@ -10,6 +10,7 @@
  *   E8H  je Seite n (A12–A15 der E/A-Adresse): Herkunft
  *        unteres Halbbyte ≠ 0 → Systemkarte (Seite 0: ZRE 0000–0FFF, Seite F: VRAM F800–FFFF)
  *        unteres Halbbyte = 0 → OPS-RAM            (belegt: 0FH, 10H, F0H, FFH)
+ *        unteres Halbbyte = 4 → OPS-RAM sichtbar   (BS620, Entwurf 48 §2.4; Schreibschutz [?])
  *   E9H  unbelegt: Schreiben wird protokolliert, Lesen liefert FFH
  *   EAH  je Seite n: physische OPS-Seite (4 Bit)
  *   EBH  Freigabe: 0 = Abbildung aus (Grundzustand), ≠ 0 = Register wirken
@@ -41,6 +42,7 @@ public:
     static constexpr uint8_t  PORT_BASIS    = 0xE8;     ///< E8H–EBH
     static constexpr uint16_t VRAM_ANFANG   = 0xF800;   ///< Sichtfenster der K7024 (Seite F)
     static constexpr uint16_t ZRE_ENDE      = 0x1000;   ///< ZRE belegt 0000–0FFF (Seite 0)
+    static constexpr uint8_t  ATTR_RAM_GESCHUETZT = 0x04;   ///< E8H-Halbbyte 4: RAM sichtbar (BS620) [?]
 
     explicit Prg710Speicher(K1520Bus& bus) : bus_(bus) { reset(); }
 

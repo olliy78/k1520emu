@@ -51,6 +51,10 @@ public:
          *  Varianten gesteckt: `PROG`/`PROG.COM` liegen auch auf den 710-1-Disketten [?]
          *  (Plan §8.6). */
         bool eprommer = true;
+        /** ATP-Zusatz (Entwurf 48, AP-B1): SIO C0H–C3H mit Kanalschleife, Anzeige F4H/F5H,
+         *  Takt an CLK/TRG0/1 der CTC CCH–CFH.  Vorgabe AUS — UDOS/SCPX unveraendert;
+         *  BS600/BS620 verlangt sie im Selbsttest. */
+        bool atp_zusatz = false;
     };
 
     /// Takt der ZRE K2521 (2,4576 MHz).
@@ -159,6 +163,12 @@ public:
     K7609&           k7609()    { return k7609_; }
     K7672&           k7672()    { return k7672_; }   ///< nur am 710-1 an A32-B
     Ass590069&       ass590069() { return fs_; }     ///< Fernschreiber C4H–C7H (AP-P8c)
+    /// ATP-Zusatz stecken (vor dem ersten Lauf/Reset; false + Grund sonst).  Wie Config::atp_zusatz.
+    bool steckeAtpZusatz(std::string* fehler = nullptr);
+    bool atpZusatz() const { return atp_.zusatz(); }
+    /// Letzte Schreibzugriffe auf die Anzeige F4H/F5H der ATP (nur mit ATP-Zusatz).
+    const Atp590068::Anzeige& atpAnzeige() const { return atp_.anzeige(); }
+    Z80SIO&          atpSio()   { return atp_.diagSio(); }   ///< SIO C0H–C3H (nur mit ATP-Zusatz)
     K1520Bus&        bus()      { return bus_; }
     uint64_t         totalCycles() const { return total_cycles_; }
 

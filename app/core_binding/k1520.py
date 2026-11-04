@@ -24,7 +24,7 @@ import os
 import sys
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
 import threading
 import time
 
@@ -722,6 +722,14 @@ _lib.k1520_prg710_page.argtypes = [K1520Handle, ctypes.c_int,
 _lib.k1520_prg710_page.restype = ctypes.c_bool
 _lib.k1520_prg710_freigabe.argtypes = [K1520Handle]
 _lib.k1520_prg710_freigabe.restype = ctypes.c_int
+_lib.k1520_prg710_atp_install.argtypes = [K1520Handle]
+_lib.k1520_prg710_atp_install.restype = ctypes.c_bool
+_lib.k1520_prg710_atp_installed.argtypes = [K1520Handle]
+_lib.k1520_prg710_atp_installed.restype = ctypes.c_bool
+_lib.k1520_prg710_atp_display.argtypes = [
+    K1520Handle, ctypes.POINTER(ctypes.c_uint8), ctypes.POINTER(ctypes.c_uint8),
+    ctypes.POINTER(ctypes.c_uint32)]
+_lib.k1520_prg710_atp_display.restype = ctypes.c_bool
 
 # EPROMmer des PRG (ATP 590068, virtueller Sockel; doc/prg710/eprommer.md, AP-P7b)
 _lib.k1520_eprom_insert.argtypes = [K1520Handle, ctypes.c_char_p, ctypes.c_int]
@@ -1519,6 +1527,25 @@ class K1520Emulator:
         """PRG: Freigaberegister EBH (0 = Abbildung aus); sonst ``None``."""
         v = int(_lib.k1520_prg710_freigabe(self._handle))
         return v if v >= 0 else None
+
+    def prg_atp_zusatz_stecken(self) -> bool:
+        """PRG: ATP-Zusatz (SIO C0H-C3H mit Schleife, Anzeige F4H/F5H; BS600) stecken.
+
+        Nur vor dem ersten Lauf; ``False`` sonst oder bei anderer Maschine.
+        """
+        return bool(_lib.k1520_prg710_atp_install(self._handle))
+
+    def prg_atp_zusatz(self) -> bool:
+        """PRG: steckt der ATP-Zusatz?"""
+        return bool(_lib.k1520_prg710_atp_installed(self._handle))
+
+    def prg_atp_anzeige(self) -> Optional[Tuple[int, int, int]]:
+        """PRG: Anzeige der ATP als ``(F4H, F5H, Zahl der Zugriffe)``; ohne Zusatz ``None``."""
+        f4, f5, n = ctypes.c_uint8(), ctypes.c_uint8(), ctypes.c_uint32()
+        if not _lib.k1520_prg710_atp_display(
+                self._handle, ctypes.byref(f4), ctypes.byref(f5), ctypes.byref(n)):
+            return None
+        return f4.value, f5.value, n.value
 
     # ─── EPROMmer des PRG (virtueller Sockel, AP-P7b) ─────────────────────────
     #: Typnamen des Sockels (0 = leer); Schluessel wie k1520_eprom_type.

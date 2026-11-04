@@ -54,6 +54,8 @@
  * Monitore (Vorgabe 3.1; die Programmvorgabe des p8000emu ist 3.0/3.0).
  * `--rtc aus|u130x|rtc72421` (nur `--machine p8000-16`, Entwurf 38): Echtzeituhr-Karte am 16-Bit-Teil
  * (U130X = Originalkarte, rtc72421 = Nachbau); Befehl `rtc` zeigt Typ, Uhrzeit, Versatz, Zustand.
+ * `--atp-zusatz` steckt am PRG 710/710-1 den ATP-Zusatz (SIO C0H-C3H mit Schleife, Anzeige
+ * F4H/F5H, Takt an der CTC CCH-CFH; BS600, Entwurf 48).
  * `--ptape` steckt die Lochstreifen-Karte K6022 (SIF1000, E0H–E7H; alle Maschinen).
  * `--tape <k52>` / `--tape2 <k52>` / `--tape-card` steckt die Kassettenkarte K5020 (A5120/PRG 30H,
  *   K8915 D0H, PC 1715 D0H) und bindet die Kassettendatei an Geraet 1/2; Befehl `tape`.
@@ -248,6 +250,7 @@ int main(int argc, char** argv){
     const char* rtc_opt = nullptr; // --rtc aus|u130x|rtc72421: Uhrenkarte am 16-Bit-Teil (Entwurf 38)
     const char* hd_opt[3] = {nullptr,nullptr,nullptr}; // --hd/--hd0 <abbild>, --hd1, --hd2: Winchester an WDC-Laufwerk 0..2 (setzt --wdc 4.2)
     std::string ptape_in, ptape_out;   // --ptape-in/-out: Band einlegen / Stanzer an Datei binden
+    bool atp_opt = false;          // --atp-zusatz: ATP-Zusatz am PRG (Entwurf 48)
     bool ptape_opt = false;        // --ptape: Lochstreifen-Karte K6022 auf E0H–E7H (Entwurf 23)
     bool tape_opt = false;         // --tape/--tape2/--tape-card: Kassettenkarte K5020 (Entwurf 29)
     std::string tape1_opt, tape2_opt;
@@ -294,6 +297,7 @@ int main(int argc, char** argv){
         else if (!strcmp(argv[i],"--hd1") && i+1<argc) hd_opt[1]=argv[++i];
         else if (!strcmp(argv[i],"--hd2") && i+1<argc) hd_opt[2]=argv[++i];
         else if (!strcmp(argv[i],"--rtc") && i+1<argc) rtc_opt=argv[++i];
+        else if (!strcmp(argv[i],"--atp-zusatz")) atp_opt=true;
         else if (!strcmp(argv[i],"--ptape")) ptape_opt=true;
         else if (!strcmp(argv[i],"--tape-card")) tape_opt=true;
         else if (!strcmp(argv[i],"--tape") && i+1<argc) { tape_opt=true; tape1_opt=argv[++i]; }
@@ -431,6 +435,11 @@ int main(int argc, char** argv){
     if (bedien_opt){
         auto* a5 = dynamic_cast<A5120Machine*>(&m.base());
         if (!a5 || !a5->setSicherheitsstecker(bedien_opt)){ fprintf(stderr,"--sicherheitsstecker: 0..6, nur am A5120 mit K7637\n"); return 2; }
+    }
+    if (atp_opt){
+        std::string err;
+        if (!m.prg() || !m.prg()->steckeAtpZusatz(&err)){
+            fprintf(stderr,"--atp-zusatz: %s\n", m.prg() ? err.c_str() : "nur am PRG 710/710-1"); return 2; }
     }
     { std::string err;   // ebenfalls vor dem ersten Lauf
       if (!dbgm::steckeK6022(m.base(), ptape_opt, err)){ fprintf(stderr,"--ptape: %s\n",err.c_str()); return 2; }
