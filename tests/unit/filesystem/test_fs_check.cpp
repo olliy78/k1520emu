@@ -2300,7 +2300,7 @@ TEST(NdosSitte, KarteOhneGesetzteGeometrieWirdGelesen) {
                                             std::filesystem::remove(b, e); } } weg{gut, schlecht};
     ASSERT_TRUE(bauen(gut, true));
     ASSERT_TRUE(bauen(schlecht, false));
-    // Ein rohes 160K-.img traegt keine Geometrie (Erkennung rät 8x512) — deshalb das Profil vorgeben.
+    // Ein rohes 160K-.img traegt keine Geometrie (Erkennung raet 8x512) — deshalb das Profil vorgeben.
     std::string err;
     auto v = DiskVolume::open(gut, profil, formate(), dateisysteme(), err);
     ASSERT_TRUE(v) << err;

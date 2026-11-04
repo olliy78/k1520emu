@@ -130,7 +130,7 @@ def test_baum_hat_die_partitionen_als_oberste_ordner(offen):
 
 def test_statuszeile_nennt_den_freien_platz_je_partition(offen):
     text = offen.st_inhalt.text()
-    assert "md3:" in text and "KB frei" in text
+    assert "md3:" in text and " von " in text and " frei" in text
 
 
 # ─── Gesperrte Aktionen (mit Begruendung) ────────────────────────────────────

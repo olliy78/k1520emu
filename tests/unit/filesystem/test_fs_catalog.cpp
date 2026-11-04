@@ -93,7 +93,7 @@ TEST(FsCatalog, ProfilnamenSindEinStabilerVertrag) {
         "scpx8915_ds80_5x1024_boot",
         // PC 1715 (AP-D): CP/A 1715 mit Bootkopf IM Verzeichnis (erkannt nur mit Kopf) und
         // der Name fuer die SCP-1715-/SCP-3.0-Systemdiskette (`detect: false`).
-        "cpa1715_ds80_5x1024_boot", "scp1715_ds80_5x1024_boot",
+        "cpa1715_ds80_5x1024_boot", "cpa1715_ss40_5x1024_boot", "scp1715_ds80_5x1024_boot",
         // WEGA (P8000, UNIX System III): andere Familie, beschreibt sich selbst
         // (doc/design/27_wega_dateisystem.md) — ein Eintrag fuer die 720-K-Diskette.
         "wega_ds80_9x512",

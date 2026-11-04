@@ -236,7 +236,7 @@ TEST(A5120DiskApi, CreateDisk_LehntInkompatiblesFormatAb) {
     const std::string& path = path_disk.path();
 
     EXPECT_FALSE(m.createDisk(0, path, "cpa800", /*wp=*/false));
-    EXPECT_NE(m.lastError().find("cpa_ds80_5x1024_daten"), std::string::npos)     << m.lastError();
+    EXPECT_NE(m.lastError().find("cpa800"), std::string::npos)     << m.lastError();
     EXPECT_NE(m.lastError().find("K5600.20"), std::string::npos)  << m.lastError();
     EXPECT_FALSE(std::filesystem::exists(path));
 }

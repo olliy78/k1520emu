@@ -925,7 +925,7 @@ void rundreise(const char* bootdiskette, const char* format, const char* temp) {
  */
 TEST(K8915Scpx, DiskToolRundreiseFuenfMal1024OhneSystemspuren)
 {
-    rundreise("k8915scpx_cpa800_k5601_bios55k-disk900.hfe", "cpa_ds80_5x1024_daten", "k8915_dt_b1024.hfe");
+    rundreise("k8915scpx_cpa800_k5601_bios55k-disk900.hfe", "ds80_5x1024", "k8915_dt_b1024.hfe");
 }
 
 /**
@@ -1110,7 +1110,7 @@ TEST(K8915Scpx, ImgRundreiseDerSystemdisketteBootet)
     TempDisk img = TempDisk::empty("k8915_rundreise900.img");
     {
         Aufbau x("k8915scpx_cpa800_k5601_bios55k-disk900.hfe");
-        ASSERT_TRUE(x.m.saveDiskAs(0, img.path(), "cpa_ds80_5x1024_daten")) << x.m.lastError();
+        ASSERT_TRUE(x.m.saveDiskAs(0, img.path(), "ds80_5x1024")) << x.m.lastError();
     }
     K8915Machine m;
     ASSERT_TRUE(m.mountDisk(0, img.path(), "cpa800", false)) << m.lastError();

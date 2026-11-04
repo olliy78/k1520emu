@@ -598,7 +598,7 @@ TEST(BootIntegration, RestartFromInteractivePromptRebootsFromRom) {
 
         ASSERT_NO_FATAL_FAILURE(blankVram(machine));
         ASSERT_TRUE(machine.mountDisk(0, diskPath("cpa_cpa780_k5601_clock.img"),
-                                      "cpa_ds80_5x1024_boot", /*wp=*/false)) << machine.lastError();
+                                      "ds80_3t26x128-5x1024", /*wp=*/false)) << machine.lastError();
         if (power_cycle) machine.powerOn(); else machine.reset();
 
         EXPECT_TRUE(runUntilPC(machine, 0x1800, 40'000'000))
