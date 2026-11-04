@@ -1457,3 +1457,48 @@ TEST_F(K5122Test, FormatWrite_GeloeschteDatenmarkeBleibt) {
     }
     std::filesystem::remove(path);
 }
+
+/**
+ * @test K5122Test/HF_WaehltDenHohenTakt
+ * @brief /HF (Steuer-PIO Tor B Bit 2, Ausgang) waehlt den Takt, nicht das Laufwerk:
+ *        /HF = 0 = 500 kbit/s (8″-MFM, MF 6400), /HF = 1 = 250 kbit/s.  So setzt es
+ *        die Software: Lade-ROM fest 7FH (00DD), CP/A-BIOS je Auftrag 00H bzw. 04H
+ *        (biosdskt.mac `dfrcod`).  Ohne Ausgang (RESET) gilt der offene Pin als 1.
+ * @par Pass criterion  Byteperiode = Grundperiode (RESET, /HF = 1) → 39 (/HF = 0) → Grund-
+ *      periode; im Modus 3 mit Bit 2 als EINGANG bleibt sie trotz Latch 00H bei der Grundperiode; Save-State traegt /HF.
+ */
+TEST_F(K5122Test, HF_WaehltDenHohenTakt) {
+    auto path = tmpImg1();
+    ASSERT_TRUE(card.mountDisk(0, path, fmt1));
+    EXPECT_FALSE(card.debugState().hfHoch) << "nach RESET: Pin offen = /HF 1";
+    // Grundperiode = Laufwerk + Kodierung des Mediums (fmt1: 156 Takte); /HF = 0
+    // schaltet davon unabhaengig auf 500 kbit/s.
+    const int grund = card.debugState().bytePeriod;
+    EXPECT_GT(grund, 39);
+
+    card.ioWrite(0x13, 0xFF);   // Tor B Modus 3 (wie Lade-ROM 00CA)
+    card.ioWrite(0x13, 0xF3);   // Bit 2 (/HF) und Bit 3 (PRE) = Ausgang
+    card.ioWrite(0x12, 0x7F);   // Lade-ROM: /HF = 1
+    EXPECT_EQ(card.debugState().bytePeriod, grund);
+    card.ioWrite(0x12, 0x00);   // BIOS, 8″-MFM
+    EXPECT_TRUE(card.debugState().hfHoch);
+    EXPECT_EQ(card.debugState().bytePeriod, 39) << "500 kbit/s = 62 500 B/s";
+
+    std::vector<uint8_t> blob;
+    card.serialize(blob);
+    K1520Bus bus2;
+    K5122    card2{bus2};
+    ASSERT_TRUE(card2.mountDisk(0, path, fmt1));
+    const uint8_t* p = blob.data();
+    ASSERT_TRUE(card2.deserialize(p, blob.data() + blob.size()));
+    EXPECT_EQ(card2.debugState().bytePeriod, 39) << "/HF steckt im PIO-Zustand";
+
+    card.ioWrite(0x12, 0x04);   // BIOS, 5″-MFM / 8″-FM
+    EXPECT_EQ(card.debugState().bytePeriod, grund);
+
+    card.ioWrite(0x12, 0x00);
+    card.ioWrite(0x13, 0xFF);   // Modus 3 neu ...
+    card.ioWrite(0x13, 0xF7);   // ... Bit 2 jetzt EINGANG
+    EXPECT_FALSE(card.debugState().hfHoch) << "Latch 0 wirkt nicht auf einen Eingang";
+    EXPECT_EQ(card.debugState().bytePeriod, grund);
+}

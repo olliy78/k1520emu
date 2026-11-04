@@ -38,6 +38,7 @@
 #include "core/peripherals/floppy_drive/disk_format.h"
 #include "core/peripherals/floppy_drive/track_image.h"
 #include "core/peripherals/floppy_drive/track_codec.h"   // LogicalSector
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <memory>
@@ -300,6 +301,8 @@ public:
                                  ///< treuen Lesepfad: bei Mismatch findet ZVE2 spaeter kein IDAM
         int      indexAccum;     ///< aufgelaufene Index-Phase (Takte seit letztem Index-Puls);
                                  ///< commitFormatTrack setzt sie auf 0 (Index ans Spur-Ende koppeln)
+        bool     hfHoch;         ///< /HF = 0 an Tor B: hoher Takt (500 kbit/s, 8″-MFM)
+        int      bytePeriod;     ///< Takte je Datenbyte im BusRq-Weg (@ref currentBytePeriod)
         // ── /WAIT-Betrieb (K8915, AP-E4f) ──────────────────────────────────────
         // Im Wait-Betrieb wird nichts „gestreamt“; @ref transferring und @ref writeMode
         // bedeuten dort: Datenfluss zum Lesen (/STR = 0, /WE = 1, Scheibe dreht) bzw.
@@ -328,6 +331,8 @@ public:
                                     : Encoding::MFM;
         s.encodingMatch = s.mounted && (s.readEncoding == s.trackEncoding);
         s.indexAccum = index_cycle_acc_;
+        s.hfHoch = hfHoheFrequenz();
+        s.bytePeriod = currentBytePeriod();
         s.waitBetrieb = wait_betrieb_;
         if (wait_betrieb_) {
             const bool dreht = s.mounted && motorAtSpeed(selected_drive_);
@@ -472,9 +477,24 @@ private:
     /// @brief Aktuelle Byte-Periode (Takte/Datenbyte) — rotationsgekoppelt aus der
     ///        Datenrate des effektiven Verfahrens (MFM 78 / FM 156 @ 2,45 MHz).
     ///        Ersetzt die fruehere boot-getunte Konstante kBytePeriodCycles.
+    ///
+    ///        **/HF (Steuer-PIO Tor B Bit 2, Ausgang) waehlt den Takt** (Handbuch §4.3/§5.4):
+    ///        /HF = 0 = hohe Frequenz (1 MHz Schreibtakt) = MFM 500 kbit/s fuer 8″-MFM
+    ///        (MF 6400).  Gesetzt wird es von der SOFTWARE: das Lade-ROM schreibt fest 7FH
+    ///        (/HF = 1, 00DD), der CP/A-BIOS je Auftrag den Frequenzcode (biosdskt.mac
+    ///        `dfrcod`: 00H bei 8″-MFM, 04H bei 5″-MFM und 8″-FM).  Solange Bit 2 kein
+    ///        Ausgang ist (nach RESET), gilt der offene Pin als 1.  Die Ableitung aus
+    ///        dem Laufwerk allein (frueher versucht: „8″ ⇒ doppelt") liess das Lade-ROM
+    ///        haengen — das ROM liest 8″ nie mit hohem Takt.  Nur BusRq-Weg; der
+    ///        /WAIT-Weg rechnet weiter ueber @ref waitByteperiode.
     int currentBytePeriod() const {
+        if (!wait_betrieb_ && hfHoheFrequenz())
+            return static_cast<int>(cpu_hz_ / 62500u);   // 500 kbit/s = 62 500 B/s
         return drives_[selected_drive_].profile().bytePeriodCycles(effReadEnc(), cpu_hz_);
     }
+    /// @brief /HF = 0 an Tor B (nur wirksam, wenn Bit 2 als Ausgang programmiert ist).
+    ///        Der PIO-Zustand ist Teil des Save-States, /HF damit auch.
+    bool hfHoheFrequenz() const { return (ctrl_pio_.pinsB(0xFF) & 0x04) == 0; }
     /// @brief /STR=1-Abtastschwelle fuer das Lese-Transfer-Ende — ~2 Byteperioden,
     ///        MITSKALIERT mit dem rotationsgekoppelten Byte-Takt (statt fix 320).
     ///        Muss > kurzer /STR=1-Blips (Boot-ROM-Setup-Strobes ≤ ~18 Takte) und
@@ -503,8 +523,16 @@ private:
         // ZVE1 still — genau das liess FORMAT.COM auf einer leeren Spur einfrieren.
         // Die Anforderung verfaellt daher mit dem naechsten Byte, der Kopf dreht
         // weiter, und der Bus geht an ZVE1 zurueck.
+        //
+        // Frist = 2 Byteperioden, aber nie unter kUeberlaufMinTakte: bei /HF = 0
+        // (39 Takte je Byte) waeren 78 Takte zu knapp — die eben aus dem Reset
+        // gestartete ZVE2 erreicht ihr erstes IN (16H) nicht, das Byte verfaellt,
+        // /BUSRQ faellt, und ZVE1 laeuft FORMAT.COMs Steuerfolge ohne ZVE2 weiter
+        // (8″-MFM-Spur 2 wurde nie geschrieben, ZVE2 hing in der Fuellschleife 1D4E).
+        // Fuer 78/156 Takte je Byte bleibt alles wie zuvor (2 × 78 = 156).
+        const int frist = std::max(2 * period, kUeberlaufMinTakte);
         if (byte_ready_ && transferring_ && !write_mode_ && !stream_has_marks_
-            && byte_acc_ >= 2 * period) {
+            && byte_acc_ >= frist) {
             byte_ready_ = false;
             bus_.releaseBUSRQ();
             if (cur_track_ && !cur_track_->empty())
@@ -514,7 +542,7 @@ private:
         }
         // Gegen Ueberlauf/Runaway bei stehendem ZVE2 (Overrun) begrenzen — haelt die
         // Rasterphase beschraenkt; die Schreib-Idle-Erkennung (byte_ready_ bleibt) laeuft weiter.
-        if (byte_acc_ > 2 * period) byte_acc_ = 2 * period;
+        if (byte_acc_ > frist) byte_acc_ = frist;
     }
     /// @brief Konsumiert einen Byte-Slot beim Datenport-Zugriff (Spacing):
     ///        Phase um eine Byteperiode zuruecksetzen (statt hart auf 0), damit die
@@ -594,6 +622,8 @@ private:
     ///        die Leseroutine kein IDAM findet und per Index-Timeout terminiert (wie
     ///        echte HW), statt in einem gehaltenen /BUSRQ zu verklemmen.
     static constexpr size_t kUnformattedTrackBytes = 6250;
+    /// Mindestfrist des Ueberlaufs (Takte), s. advanceByteClock — = 2 × 78 (250 kbit/s).
+    static constexpr int kUeberlaufMinTakte = 156;
 
     // ─── BIOS-Schreibpfad (/WE-flankengesteuert) ──────────────────────────────
     // Der CP/A-BIOS-Schreibpfad startet den Transfer als /STR-Lesestrobe (IDAM-Suche)
