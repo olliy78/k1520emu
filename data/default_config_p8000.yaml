@@ -103,6 +103,7 @@ window:
   - ''
   - stand_speichern
   - stand_laden
+  - terminal
   - ''
   - dock_settings
   - dock_drives

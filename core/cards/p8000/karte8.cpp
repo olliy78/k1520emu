@@ -43,13 +43,14 @@ private:
 
 // ─── Anschluss je tty (Entwurf 19, Entwurf 25 §10.6) ─────────────────────────
 // tty0/1/2/3 = SIO0-A, SIO0-B, SIO1-A, SIO1-B; Takt: CTC1 K0, CTC1 K1, CTC1 K2, CTC0 K0,
-// danach ÷ 2 (7474 8D11/7D11).  Namen und Stecker nach der Geraetebeschriftung (X4…X7)
-// sind eine Annahme des Entwurfs („ttyN (X4…X7)").
+// danach ÷ 2 (7474 8D11/7D11).  Namen: "ttyN", tty1 "tty1 CONSOLE", tty3 "tty3 PRINTER"
+// (Schluessel der gespeicherten Konfiguration); Steckerangaben entfallen (Ticket #26).
 class P8000Karte8::Anschluss : public k1520::serial::SerialAnschluss {
 public:
     Anschluss(P8000Karte8& k, int tty) : k_(k), tty_(tty) {
         name_ = "tty" + std::to_string(tty);
-        stecker_ = "X" + std::to_string(4 + tty);
+        if (tty == 1) name_ += " CONSOLE";
+        else if (tty == 3) name_ += " PRINTER";
     }
     const char* name() const override { return name_.c_str(); }
     const char* stecker() const override { return stecker_.c_str(); }

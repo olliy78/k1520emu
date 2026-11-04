@@ -393,9 +393,9 @@ TEST(P8000WegaKermit, WegaClientGegenPcServer) {
     } join{server, *lausch};
 
     // tty3 (Druckerleitung, kein getty) als Telnet-CLIENT zum PC-Server.
-    ASSERT_EQ(a.kanal("tty3", Rolle::Client, pcPort), pcPort);
-    for (int i = 0; i < 200 && a.kanalZustand("tty3") != Zustand::Verbunden; ++i) a.laufe(400'000);
-    ASSERT_EQ(a.kanalZustand("tty3"), Zustand::Verbunden);
+    ASSERT_EQ(a.kanal("tty3 PRINTER", Rolle::Client, pcPort), pcPort);
+    for (int i = 0; i < 200 && a.kanalZustand("tty3 PRINTER") != Zustand::Verbunden; ++i) a.laufe(400'000);
+    ASSERT_EQ(a.kanalZustand("tty3 PRINTER"), Zustand::Verbunden);
 
     ASSERT_TRUE(a.anmeldenKonsole("wega", "root"));
     ASSERT_TRUE(a.bisPrompt(40'000'000)) << a.bild();

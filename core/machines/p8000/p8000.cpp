@@ -116,7 +116,7 @@ P8000Machine::P8000Machine(const Config& cfg)
                                                                   cfg.terminal_hw);
         hwterm_ = t.get();
         konsole_ = std::move(t);
-    } else {
+    } else if (cfg.terminal == Config::TerminalArt::Kern) {
         auto t = std::make_unique<k1520::p8000::KernTerminalGeraet>(karte_.anschluss(KONSOLE_TTY), cfg.takt8_hz);
         kern_ = t.get();
         konsole_ = std::move(t);
@@ -168,7 +168,7 @@ P8000Machine::P8000Machine(const Config& cfg)
         throw std::invalid_argument("P8000: Platte ohne WDC (wdc=aus)");
     }
     // tty0, tty2, tty3 (und tty4–tty7) nach aussen (Reihenfolge = C-ABI-Index); tty1 haengt am
-    // Kern-Terminal.
+    // Terminal, ausser bei TerminalArt::None (dann tty0..tty3 in natuerlicher Reihenfolge).
     for (auto* a : serielleAnschluesse()) hub_.registriere(*a);
 }
 
@@ -176,7 +176,7 @@ std::vector<k1520::serial::SerialAnschluss*> P8000Machine::serielleAnschluesse()
 {
     std::vector<k1520::serial::SerialAnschluss*> v;
     for (int t = 0; t < P8000Karte8::TTY_ANZAHL; ++t)
-        if (t != KONSOLE_TTY) v.push_back(&karte_.anschluss(t));
+        if (t != KONSOLE_TTY || !konsole_) v.push_back(&karte_.anschluss(t));
     if (k16_)
         for (int i = 0; i < P8000Karte16::TTY_ANZAHL; ++i) v.push_back(&k16_->anschluss(i));
     return v;
@@ -248,6 +248,11 @@ uint8_t P8000Machine::panelLamps() const
 
 // ─── Terminal ────────────────────────────────────────────────────────────────
 
+void P8000Machine::konsoleDa() const
+{
+    if (!konsole_) throw std::logic_error("P8000: ohne Terminal (terminal=none) - tty1 geht ueber den SerialHub");
+}
+
 k1520::p8000::Terminal& P8000Machine::terminal()
 {
     if (!kern_) throw std::logic_error("P8000: Originalterminal an tty1 - kein Kern-Terminal (konsole() benutzen)");
@@ -262,7 +267,7 @@ const k1520::p8000::Terminal& P8000Machine::terminal() const
 
 uint8_t P8000Machine::screenChar(int col, int row) const
 {
-    if (col < 0 || row < 0 || col >= k1520::p8000::Terminal::SPALTEN ||
+    if (!konsole_ || col < 0 || row < 0 || col >= k1520::p8000::Terminal::SPALTEN ||
         row >= k1520::p8000::Terminal::ZEILEN)
         return 0;
     const auto z = konsole_->zelle(row, col);
@@ -319,9 +324,10 @@ void P8000Machine::tastenAbgeben()
         if (e.code == 0x02000100 || e.code == 0x02000101) {
             const bool an = e.code == 0x02000100;
             if (kern_) kern_->terminal().setzeCapsLock(an);
-            else hwterm_->einheit().setzeCapsLock(an);
+            else if (hwterm_) hwterm_->einheit().setzeCapsLock(an);
             continue;
         }
+        if (!konsole_) continue;   // ohne Terminal gibt es keine Tastatur
         k1520::p8000::qtTasteAnTerminal(*konsole_, e.code, e.ctrl);
     }
 }
@@ -484,7 +490,7 @@ int P8000Machine::run(int max_cycles)
             if (wdc_->zugriffAktiv()) { hd_zugriff_t_ = total_cycles_; hd_zugriff_lw_ = wdc_->gewaehltesLaufwerk(); }
         }
 
-        konsole_->takt(static_cast<uint64_t>(n));
+        if (konsole_) konsole_->takt(static_cast<uint64_t>(n));
         if (total_cycles_ >= serial_naechst_) serial_naechst_ = hub_.takt(total_cycles_);
     }
     lw().autoFlush(total_cycles_);
@@ -543,7 +549,7 @@ void P8000Machine::configAbschnitt(std::vector<uint8_t>& out, uint8_t stand) con
         }
     }
     if (stand >= 4) {   // P8KS v4: Terminalart der Konsole (+ Zeichentakt-Teiler des Originals) am Ende
-        uint8_t art = hwterm_ ? 1 : 0;
+        uint8_t art = hwterm_ ? 1 : (konsole_ ? 0 : 2);   // 2 = ohne Terminal
         uint8_t teiler = hwterm_ ? static_cast<uint8_t>(cfg_.terminal_hw.hw.zeichentaktTeiler) : 0;
         a.num(art); a.num(teiler);
     }
@@ -561,8 +567,8 @@ std::vector<uint8_t> P8000Machine::stateBytes() const
     b.clear(); floppy_.serialize(b);  abschnitt(out, ABS_FLOPPY, b);
     b.clear(); karte_.serialize(b);   abschnitt(out, ABS_KARTE, b);
     b.clear();
-    konsole_->serialize(b);   // Kern: Terminal + Anschluss (bitgleich zu v3); Original: P8TH + Kopplung
-    abschnitt(out, ABS_TERMINAL, b);
+    if (konsole_) konsole_->serialize(b);   // Kern: Terminal + Anschluss (bitgleich zu v3); Original: P8TH + Kopplung
+    if (konsole_) abschnitt(out, ABS_TERMINAL, b);   // ohne Terminal: kein Abschnitt
     if (k16_) {
         b.clear(); k16_->serialize(b);      abschnitt(out, ABS_KARTE16, b);
         b.clear(); kopplung_->serialize(b); abschnitt(out, ABS_KOPPLUNG, b);
@@ -613,6 +619,7 @@ bool P8000Machine::wendeAbschnitteAn(const std::vector<uint8_t>& b)
     if (stand < 2 && k16_) { state_error_ = "P8KS v1 kennt keinen 16-Bit-Teil"; return false; }
     if (stand < 3 && wdc_) { state_error_ = "P8KS v" + std::to_string(stand) + " kennt keinen WDC"; return false; }
     if (stand < 4 && hwterm_) { state_error_ = "P8KS v" + std::to_string(stand) + " kennt kein Originalterminal"; return false; }
+    if (stand < 4 && !konsole_) { state_error_ = "P8KS v" + std::to_string(stand) + " kennt keine Maschine ohne Terminal"; return false; }
     std::vector<uint8_t> cfg;
     configAbschnitt(cfg, stand);
     if (!t[ABS_CONFIG].da || cfg.size() != static_cast<size_t>(t[ABS_CONFIG].e - t[ABS_CONFIG].p) ||
@@ -655,7 +662,7 @@ bool P8000Machine::wendeAbschnitteAn(const std::vector<uint8_t>& b)
                       [&](const uint8_t*& p, const uint8_t* e) { return wdc_->deserialize(p, e); })) return false;
     if (k16_ && k16_->rtc() &&
         !lade(ABS_RTC, "Uhrenkarte", [&](const uint8_t*& p, const uint8_t* e) { return k16_->rtc()->deserialize(p, e); })) return false;
-    if (!lade(ABS_TERMINAL, "Terminal", [&](const uint8_t*& p, const uint8_t* e) {
+    if (konsole_ && !lade(ABS_TERMINAL, "Terminal", [&](const uint8_t*& p, const uint8_t* e) {
             return konsole_->deserialize(p, e); })) return false;
     if (!lade(ABS_MASCHINE, "Maschine", [&](const uint8_t*& p, const uint8_t* e) {
             auto a = k1520::ZAr::leser(p, e);

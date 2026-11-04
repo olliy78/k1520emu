@@ -986,6 +986,9 @@ ctest, `boot_trace` und `k1520dbg` ohne jede Umgebungsvariable funktionieren.
 > 4×1024) eine Kapazität von nur `408333 / 156 ≈ 2617` Bytes gegenüber 4096 Bytes Nutzdaten —
 > das **bestehende, funktionierende Format würde abgelehnt**. V5 bleibt deshalb Warnung, bis
 > `DriveProfile` die Datenrate als eigenes Feld führt (Folgearbeit, nicht Teil dieses Umbaus).
+> Stand 2026-11-04: 8″-FM ist verdoppelt (`39_mutos8000.md` §9.11), und 8″-MFM mit 500 kbit/s
+> entsteht zur Laufzeit über den `/HF`-Ausgang der Steuer-PIO (`07_k5122_afs.md`), nicht über
+> das Profil — V5 kann die Laufzeitrate nicht kennen und bleibt deshalb Warnung.
 
 #### 8.6.6 Schichten-Umbau — Verfahren pro Spur durchziehen
 

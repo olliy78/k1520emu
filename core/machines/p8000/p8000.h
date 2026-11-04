@@ -130,7 +130,7 @@ public:
         bool        platte_par_ergaenzen = true;
 
         // ── Konsole tty1 (AP P20c) ──
-        enum class TerminalArt { Kern, Original };
+        enum class TerminalArt { Kern, Original, None };   // None: tty1 geht wie tty0/2/3 ueber den SerialHub nach aussen
         /// Vorgabe Kern-Terminal, bis P21/P22 umstellen (M1/M2-Waechter bleiben unveraendert).
         TerminalArt terminal = TerminalArt::Kern;
         /// Nur `Original`: Bestueckung des Terminals (Zeichensaetze, Zeichentakt-Teiler, Tastatur).
@@ -189,7 +189,7 @@ public:
     }
     /// LEDs der K7673 (Bit 0 ON/OFF, 1 CAPS LOCK, 2 MODE); Kern-Terminal 0.
     uint8_t keyboardLeds() const override;
-    uint32_t bellCount() const override { return konsole_->klingel(); }
+    uint32_t bellCount() const override { return konsole_ ? konsole_->klingel() : 0; }
 
     int machineType() const override { return 4; }   // K1520_MACHINE_P8000 (Entwurf §10.9)
     /// Bit 0 RUN-LED (K14), Bit 1 UNIT16 = U8001 laeuft (nicht im Reset), Bit 2 Plattenzugriff
@@ -237,6 +237,7 @@ public:
     k1520::serial::SerialHub* serialHub() override { return &hub_; }
     std::vector<k1520::serial::SerialAnschluss*> serielleAnschluesse() override;
     std::vector<std::string> festeSchnittstellen() const override {
+        if (!konsole_) return {};   // ohne Terminal: tty1 ist eine gewoehnliche Hub-Schnittstelle
         return {hwterm_ ? "Terminal P8000 Typ 2 (tty1)" : "Terminal P8000 (tty1)"};
     }
     // (mit 16-Bit-Karte zusaetzlich tty4–tty7 am Hub)
@@ -301,14 +302,15 @@ public:
     k1520::p8000::Terminal&       terminal();
     const k1520::p8000::Terminal& terminal() const;
     /// Die Konsole an tty1 hinter der gemeinsamen Schnittstelle (Kern- oder Originalterminal).
-    k1520::p8000::TerminalGeraet&       konsole()       { return *konsole_; }
-    const k1520::p8000::TerminalGeraet& konsole() const { return *konsole_; }
+    k1520::p8000::TerminalGeraet&       konsole()       { konsoleDa(); return *konsole_; }
+    const k1520::p8000::TerminalGeraet& konsole() const { konsoleDa(); return *konsole_; }
+    bool hatTerminal() const { return konsole_ != nullptr; }   ///< false bei TerminalArt::None
     bool hatOriginalTerminal() const { return hwterm_ != nullptr; }
     /// Das Originalterminal (Einheit samt Tastatur); nullptr mit Kern-Terminal.
     k1520::p8000::P8000TerminalEinheit*       originalTerminal()       { return hwterm_ ? &hwterm_->einheit() : nullptr; }
     const k1520::p8000::P8000TerminalEinheit* originalTerminal() const { return hwterm_ ? &hwterm_->einheit() : nullptr; }
     /// Zeile @p z (0–23) des Konsolen-Terminals als Text (80 Zeichen).
-    std::string terminalZeile(int z) const { return konsole_->text(z); }
+    std::string terminalZeile(int z) const { return konsole_ ? konsole_->text(z) : std::string(); }
     uint64_t totalCycles() const { return total_cycles_; }
     void     clearStop() { stop_.store(false); }
     uint16_t cpuPC() { return karte_.cpu().PC; }
@@ -347,7 +349,8 @@ private:
     uint64_t    hd_zugriff_t_ = 0;   ///< Maschinenzeit des letzten Plattenzugriffs (Lampe)
     int         hd_zugriff_lw_ = -1;  ///< Laufwerk des letzten Zugriffs (−1 = noch keiner)
     std::string hd_fehler_;
-    // Konsole tty1: genau eins von beiden (konsole_ besitzt es).
+    void konsoleDa() const;   // wirft logic_error bei TerminalArt::None
+    // Konsole tty1: genau eins von beiden (konsole_ besitzt es); bei None keins.
     std::unique_ptr<k1520::p8000::TerminalGeraet> konsole_;
     k1520::p8000::KernTerminalGeraet* kern_ = nullptr;
     k1520::p8000::HwTerminalGeraet*   hwterm_ = nullptr;

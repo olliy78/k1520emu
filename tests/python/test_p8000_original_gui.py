@@ -100,8 +100,10 @@ def test_profil_modelle_arten_und_titel():
     p = profil.profil("p8000")
     schluessel = [m[0] for m in p.modelle]
     # Kern-Terminal-Modelle gibt es in der Oberflaeche nicht mehr (P23a)
-    assert schluessel == ["p8000-ot", "p8000-16-ot", "p8000-8-ot", "p8000-term"]
-    assert [p.modell_art(k) for k in schluessel] == ["original"] * 3 + ["einheit"]
+    # Ticket #26: dazu die -nt-Modelle (nur Computer, ohne Terminal)
+    assert schluessel == ["p8000-ot", "p8000-16-ot", "p8000-8-ot",
+                          "p8000-nt", "p8000-16-nt", "p8000-8-nt", "p8000-term"]
+    assert [p.modell_art(k) for k in schluessel] == ["original"] * 3 + ["keins"] * 3 + ["einheit"]
     assert [m[0] for m in p.ausstattungen()] == schluessel[:3] and p.einheit_modell() == "p8000-term"
     assert p.modell_maschine("p8000-ot") == "p8000" and p.modell_maschine("p8000-term") == "p8000-terminal"
     assert p.modell_tastatur("p8000-ot") == "k7673" and p.modell_tastatur("p8000-term") == "k7673"
@@ -888,9 +890,9 @@ def test_schnittstellenreiter_bietet_ttys_als_server_mit_portvorschlaegen(qapp, 
     w = _fenster(qapp, modell="p8000-ot")
     try:
         namen = [b.info.name for b in w.serial_widget.bloecke()]
-        assert namen == ["tty0", "tty2", "tty3", "tty4", "tty5", "tty6", "tty7"]
+        assert namen == ["tty0", "tty2", "tty3 PRINTER", "tty4", "tty5", "tty6", "tty7"]
         ports = {n: w.emulator.serial_config(i).port for i, n in enumerate(namen)}
-        assert ports == {"tty0": 5000, "tty2": 5002, "tty3": 5003, "tty4": 5004,
+        assert ports == {"tty0": 5000, "tty2": 5002, "tty3 PRINTER": 5003, "tty4": 5004,
                          "tty5": 5005, "tty6": 5006, "tty7": 5007}
         assert all(w.emulator.serial_config(i).rolle == K.SER_SERVER for i in range(7))
         assert "Mehrplatzbetrieb" in w.serial_widget.hinweis and "nur Terminal" in w.serial_widget.hinweis

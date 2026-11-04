@@ -98,6 +98,13 @@ _SPEC: List[Tuple] = [
      "Telnet-/RFC-2217-Verbindung des Terminals zu einem Rechner herstellen oder trennen "
      "(nur im Modell „P8000 Terminal“)", "_verbindung_dialog", False),
 
+    # Neues Arbeitsplatz-Terminal an der ersten freien Schnittstelle (nur P8000, Betriebsarten
+    # „Computer mit Terminal“ und „nur Computer“).  KEIN Kuerzel (die Kuerzeltabelle des Handbuchs
+    # ist ein Vertrag).
+    ("terminal", "&Terminal", "serial", None,
+     "Ein weiteres Terminal starten: die erste freie Schnittstelle wird Telnet-Server, und ein neues "
+     "p8000emu (Betriebsart nur Terminal) verbindet sich damit", "_terminal_starten", False),
+
     # Speicherabzug in den RAM laden (nur MC80, AP M6: Spiele und Programme ohne Kassette).
     # KEIN Kuerzel (die Kuerzeltabelle des Handbuchs ist ein Vertrag).
     ("speicherabzug_laden", "&Speicherabzug laden…", "open", None,
@@ -222,6 +229,7 @@ KURZ = {
     "stand_speichern": "Stand sichern",
     "stand_laden": "Stand laden",
     "verbindung": "Verbindung",
+    "terminal": "Terminal",
     "text_kopieren": "Text kopieren",
     "eprom_einlegen": "PROM",
     "eprom_leer": "Leer",
@@ -254,6 +262,7 @@ NUR_FUER = {
     "stand_speichern": ("p8000",),       # Zwischenstand (P8KS)
     "stand_laden": ("p8000",),
     "verbindung": ("p8000",),
+    "terminal": ("p8000",),
     "text_kopieren": ("p8000", "mc80"),
     "speicherabzug_laden": ("mc80",),    # Speicherabzug laden (AP M6)
     "pcmc": ("mc80",),                   # PCMC-Gegenstelle (Issue #24)
@@ -289,7 +298,7 @@ REIHENFOLGE: List = [
     None,
     "einlegen", "auswerfen",
     None,
-    "sicherheitsstecker", "schluessel_anwender", "schluessel_admin", "stand_speichern", "stand_laden", "verbindung", "text_kopieren", "speicherabzug_laden", "pcmc",
+    "sicherheitsstecker", "schluessel_anwender", "schluessel_admin", "stand_speichern", "stand_laden", "verbindung", "terminal", "text_kopieren", "speicherabzug_laden", "pcmc",
     None,
     "dock_drives", "dock_settings", "dock_screen", "dock_keyboard", "dock_eprom",
     None,

@@ -56,6 +56,8 @@
 #   tools/dev.sh win   [ctest-args]   Cross-Bau nach Windows (MinGW) + Tests unter
 #                                     wine — lokale Vorpruefung der Portierung
 #   tools/dev.sh check                build/ + build_trace/ bauen + Frische melden
+#   tools/dev.sh clean [verz…]        NUR loeschen, nichts bauen.  Ohne Angabe: build, build_trace,
+#                                     build_win; sonst die genannten (trace|win|oracle|dist|alles)
 #   tools/dev.sh rebuild              build/ + build_trace/ von Grund auf neu (rm -rf)
 #   tools/dev.sh release <version>    Vorabversion (0.3.0-beta.1, 0.3.0-rc.1) oder Endfassung
 #                                     (0.3.0) veroeffentlichen: pruefen, testen, taggen, nach
@@ -380,6 +382,24 @@ case "$cmd" in
               -j"$JOBS" "$@" ;;
     check)
         for d in build build_trace; do [ -d "$d" ] && build_dir "$d" || c_ylw ">> $d: nicht vorhanden"; done ;;
+    clean)
+        # Nur loeschen (Platte frei machen); gebaut wird erst beim naechsten build/test.
+        _ziele=()
+        if [ $# -eq 0 ]; then _ziele=(build build_trace build_win); fi
+        for _a in "$@"; do
+            case "$_a" in
+                build)  _ziele+=(build) ;;
+                trace)  _ziele+=(build_trace) ;;
+                win)    _ziele+=(build_win) ;;
+                oracle) _ziele+=(build_oracle) ;;
+                dist)   _ziele+=(build_dist) ;;
+                alles)  _ziele+=(build build_trace build_win build_oracle build_dist) ;;
+                *)      c_red "unbekanntes Ziel: $_a (build|trace|win|oracle|dist|alles)"; exit 2 ;;
+            esac
+        done
+        for _d in "${_ziele[@]}"; do
+            if [ -d "$_d" ]; then c_ylw ">> rm -rf $_d ($(du -sh "$_d" | cut -f1))"; rm -rf "$_d"; fi
+        done ;;
     rebuild)
         c_ylw ">> rm -rf build build_trace + Neubau von Grund auf"
         rm -rf build build_trace build_win; build_dir build; build_dir build_trace ;;

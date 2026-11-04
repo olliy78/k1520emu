@@ -355,6 +355,11 @@ k1520_add_test(p8000_maschine SRC test_p8000_machine.cpp
                           LIBS k1520_p8000 k1520_logger k1520_testsupport
                           LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 300)
 
+# P8000 ohne Terminal (Ticket #26): tty1 am SerialHub, Save-State, Konfigtext.
+k1520_add_test(p8000_ohne_terminal SRC test_p8000_ohne_terminal.cpp
+                          LIBS k1520_p8000 k1520_logger k1520_testsupport k1520_serial k1520core
+                          LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 300)
+
 # P8000 Meilenstein M1 (doc/design/25_p8000.md §10.11 AP P7d): UDOS von der WEGA-Startdiskette.
 k1520_add_test(p8000_boot SRC test_p8000_boot.cpp
                           LIBS k1520_p8000 k1520_logger k1520_testsupport

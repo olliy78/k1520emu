@@ -353,7 +353,8 @@ int main(int argc, char** argv){
         if (art!=dbgm::Art::P8000 && art!=dbgm::Art::P8000_16){ fprintf(stderr,"--konsole gibt es nur am P8000\n"); return 2; }
         const std::string k = konsole_opt;
         if (k=="original") p8cfg.terminal = P8000Machine::Config::TerminalArt::Original;
-        else if (k!="kern"){ fprintf(stderr,"--konsole: '%s' unbekannt (kern|original)\n",konsole_opt); return 2; }
+        else if (k=="none") p8cfg.terminal = P8000Machine::Config::TerminalArt::None;
+        else if (k!="kern"){ fprintf(stderr,"--konsole: '%s' unbekannt (kern|original|none)\n",konsole_opt); return 2; }
     }
     if (plattepar_opt){
         const std::string v = plattepar_opt;
@@ -3020,6 +3021,7 @@ int main(int argc, char** argv){
             fprintf(stderr,"   Fehlerbyte (30C7) %02X   -> 'wdc log' fuer das Protokoll\n",rdw(0x30C7));
             return true; }
         if (cmd=="term"){
+            if (!pm.hatTerminal()){ fprintf(stderr,"  kein Terminal (--konsole none): tty1 liegt am SerialHub\n"); return true; }
             auto& tm=pm.konsole();
             fprintf(stderr,"  Terminal tty1 (%s): Cursor Zeile %d Spalte %d\n",
                     pm.hatOriginalTerminal()?"Originalterminal Typ 2, P8T 5.0":"Kern-Terminal",tm.zeile(),tm.spalte());

@@ -48,7 +48,6 @@ class P8000Karte16::Anschluss : public k1520::serial::SerialAnschluss {
 public:
     Anschluss(P8000Karte16& k, int i) : k_(k), i_(i) {
         name_ = "tty" + std::to_string(4 + i);
-        stecker_ = "X" + std::to_string(4 + i);
     }
     const char* name() const override { return name_.c_str(); }
     const char* stecker() const override { return stecker_.c_str(); }

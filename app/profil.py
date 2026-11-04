@@ -163,6 +163,8 @@ class Programmprofil:
     #: Konfiguration ist ueber den NAMEN verschluesselt; ohne diese Abbildung waeren
     #: Einstellungen unter einem alten Namen herrenlos (K8915: AP-S12).
     alte_schnittstellen: Tuple[Tuple[str, str], ...] = field(default_factory=tuple)
+    #: Schnittstellen, die die Aktion „Terminal“ nie belegt (Drucker).
+    terminal_ueberspringen: Tuple[str, ...] = ()
 
     # ── Modellwahl: Schluessel → Kern-Maschine / EM / Tastatur ───────────────
     # Ein Profil ohne `modelle` hat genau ein Modell: seine Maschine.
@@ -404,6 +406,11 @@ class Programmprofil:
                     "einstellen, dann <i>Verbinden</i> (oder Menü <i>Maschine ▸ Verbindung zum "
                     "Rechner…</i>).  Der Rechner bietet die Leitung als Server an, z. B. tty4 auf "
                     "Port 5004.")
+        if art == "keins":
+            return ("<b>Nur Computer:</b> der Rechner hat kein Originalterminal; die Konsole <b>tty1</b> "
+                    "steht hier wie tty0/tty2/tty3 als Schnittstelle zur Verfügung — <i>Starten</i> "
+                    "drücken (Vorschlag Port 5001) und mit PuTTY, Tera Term o. ä. verbinden "
+                    "(Telnet, rohe Verbindung).  Weitere Leitungen wie im Mehrplatzbetrieb.")
         if self.modell_arten and art in ("original", "kern") and self.modell_normalisieren(modell) != "p8000-8-ot":
             return ("<b>Mehrplatzbetrieb:</b> jede Leitung (tty0, tty2, tty3, tty4–7) kann als "
                     "<i>Server</i> für ein Arbeitsplatz-Terminal laufen — <i>Starten</i> drücken, "
@@ -415,7 +422,8 @@ class Programmprofil:
         return ""
 
     def modell_art(self, modell) -> str:
-        """Terminalart des Modells: ``"kern"`` | ``"original"`` | ``"einheit"`` (nur P8000)."""
+        """Terminalart des Modells: ``"kern"`` | ``"original"`` | ``"einheit"`` | ``"keins"``
+        (ohne Terminal, Konsole ueber die Schnittstellen; nur P8000)."""
         schluessel = self.modell_normalisieren(modell)
         for k, art in self.modell_arten:
             if k == schluessel:
@@ -432,8 +440,23 @@ class Programmprofil:
         return self.modell_art(modell) != "einheit"
 
     def ausstattungen(self) -> tuple:
-        """Die Modelle MIT Rechner (Auswahl „Rechnerausstattung“), als Zeilen von :attr:`modelle`."""
-        return tuple(m for m in self.modelle if self.modell_art(m[0]) != "einheit")
+        """Die Modelle MIT Rechner und Originalterminal (Auswahl „Rechnerausstattung“), als Zeilen
+        von :attr:`modelle` — die ``-nt``-Modelle (ohne Terminal) kommen ueber die Betriebsart."""
+        return tuple(m for m in self.modelle if self.modell_art(m[0]) in ("original", "kern"))
+
+    def modell_ohne_terminal(self, modell) -> bool:
+        """Ist es ein Rechner OHNE Originalterminal (Art ``keins``, Betriebsart „nur Computer“)?"""
+        return self.modell_art(modell) == "keins"
+
+    def ohne_terminal_von(self, modell) -> str:
+        """Das ``-nt``-Modell zur Ausstattung *modell* (``p8000-ot`` -> ``p8000-nt``)."""
+        k = self.modell_normalisieren(modell)
+        return k[:-3] + "-nt" if k.endswith("-ot") else k
+
+    def mit_terminal_von(self, modell) -> str:
+        """Die Ausstattung mit Originalterminal zu *modell* (``p8000-nt`` -> ``p8000-ot``)."""
+        k = self.modell_normalisieren(modell)
+        return k[:-3] + "-ot" if k.endswith("-nt") else k
 
     def einheit_modell(self) -> Optional[str]:
         """Schlüssel des Modells „nur Terminal“ (``None`` ohne ein solches)."""
@@ -445,7 +468,7 @@ class Programmprofil:
     def ausstattung_normalisieren(self, wert) -> str:
         """Eine bekannte Rechnerausstattung — Unbekanntes, Fehlendes und das Terminalmodell
         werden zur Vorgabe (der ersten)."""
-        k = self.modell_normalisieren(wert) if wert else ""
+        k = self.mit_terminal_von(wert) if wert else ""
         z = self.ausstattungen()
         return k if any(m[0] == k for m in z) else (z[0][0] if z else self.standard_modell())
 
@@ -687,10 +710,10 @@ PC1715 = Programmprofil(
 #: Modelle des P8000 mit einem Rechner / mit der 16-Bit-Karte (Wirkungsbereich der Hardwarewahl).
 #: Die Kern-Terminal-Modelle (``p8000``, ``p8000-16``, ``p8000-8``) gibt es in der Oberflaeche nicht
 #: mehr (P23a); im Kern bleiben sie als Testgegenstelle.
-_RECHNER = ("p8000-ot", "p8000-16-ot", "p8000-8-ot")
-_MIT16 = ("p8000-ot", "p8000-16-ot")
+_RECHNER = ("p8000-ot", "p8000-16-ot", "p8000-8-ot", "p8000-nt", "p8000-16-nt", "p8000-8-nt")
+_MIT16 = ("p8000-ot", "p8000-16-ot", "p8000-nt", "p8000-16-nt")
 #: Modelle mit Winchesterkontroller.
-_MIT_WDC = ("p8000-ot",)
+_MIT_WDC = ("p8000-ot", "p8000-nt")
 
 #: Bauarten (Voreinstellungen, Ticket #15; doc/p8000/compact.md): P8000 und P8000 Compact sind KEINE
 #: Maschinen, sondern Vorgabe-Saetze fuer Einzeloptionen — wie A5120/A5130/K8924 beim A5120.  Die Wahl
@@ -719,6 +742,9 @@ P8000 = Programmprofil(
     # 4 MHz (P8000Machine::Config::takt8_hz); 16-Bit-Karte und WDC laufen ebenfalls mit 4 MHz.
     nenntakt_hz=4_000_000,
     nenntakt_text="4 MHz",
+    # Terminal ohne Rechner: der Z8 des Originalterminals (Quarz 7,3728 MHz / 2; P8000TerminalEinheit::Z8_HZ)
+    # ist die Zeitbasis von `run()`, nicht der 4-MHz-Takt des Rechners.
+    modell_takte=(("p8000-term", 3_686_400, "3,6864 MHz"),),
     tastatur="k7673",
     frontplatte=True,
     frontplatte_art="p8000",
@@ -738,15 +764,25 @@ P8000 = Programmprofil(
     modelle=(("p8000-ot", "p8000", None, "Vollgerät (16-Bit-Teil und Winchester)", "k7673"),
              ("p8000-16-ot", "p8000", None, "ohne Winchester (16-Bit-Teil, nur UDOS)", "k7673"),
              ("p8000-8-ot", "p8000", None, "nur 8-Bit-Teil (UDOS, erste Baustufe)", "k7673"),
+             # Dieselben Ausstattungen OHNE Originalterminal (Ticket #26, Betriebsart „nur Computer“):
+             # tty1 (Konsole) geht ueber die Schnittstellen nach aussen.  Nicht in der Auswahl
+             # „Rechnerausstattung“ (`ausstattungen()`), sondern ueber die Betriebsart.
+             ("p8000-nt", "p8000", None, "Vollgerät, Konsole extern", "k7673"),
+             ("p8000-16-nt", "p8000", None, "ohne Winchester, Konsole extern", "k7673"),
+             ("p8000-8-nt", "p8000", None, "nur 8-Bit-Teil, Konsole extern", "k7673"),
              # Nur das Terminal: ein Arbeitsplatz, der sich ueber seine serielle Leitung mit dem
              # Rechner eines anderen Programms verbindet (Mehrplatzbetrieb).
              ("p8000-term", "p8000-terminal", None,
               "nur Terminal (Arbeitsplatz, ohne Rechner)", "k7673")),
     modell_kern=(("p8000-ot", (("karte16", "1"), ("wdc", "4.2"), ("terminal", "original"))),
                  ("p8000-16-ot", (("karte16", "1"), ("terminal", "original"))),
-                 ("p8000-8-ot", (("karte16", "0"), ("terminal", "original")))),
+                 ("p8000-8-ot", (("karte16", "0"), ("terminal", "original"))),
+                 ("p8000-nt", (("karte16", "1"), ("wdc", "4.2"), ("terminal", "none"))),
+                 ("p8000-16-nt", (("karte16", "1"), ("terminal", "none"))),
+                 ("p8000-8-nt", (("karte16", "0"), ("terminal", "none")))),
     modell_arten=(("p8000-ot", "original"), ("p8000-16-ot", "original"),
                   ("p8000-8-ot", "original"),
+                  ("p8000-nt", "keins"), ("p8000-16-nt", "keins"), ("p8000-8-nt", "keins"),
                   ("p8000-term", "einheit")),
     # `p8000-c-ot` (nur kurz im Umlauf, 2026-10-23) ist heute die Bauart `compact` mit Vollgeraet.
     modell_alt=(("p8000", "p8000-ot"), ("p8000-16", "p8000-16-ot"), ("p8000-8", "p8000-8-ot"),
@@ -756,7 +792,9 @@ P8000 = Programmprofil(
                  "Winchesterkontroller (WEGA); ohne Winchester = nur UDOS und Monitor; nur 8-Bit-Teil "
                  "= wie die erste Baustufe des Geräts (die Koppelsoftware meldet „Hardware Error in "
                  "Connection“).  Betriebsart: „Computer mit Terminal“ bringt den Rechner samt "
-                 "Originalterminal (Z8, Firmware P8T 5.0, Flachtastatur K7673.09) mit; „nur Terminal“ "
+                 "Originalterminal (Z8, Firmware P8T 5.0, Flachtastatur K7673.09) mit; „nur Computer“ "
+                 "lässt das Terminal weg und führt die Konsole (tty1) über Einstellungen ▸ "
+                 "Schnittstellen nach außen (Telnet/RFC 2217/Datei, z. B. PuTTY oder Tera Term); „nur Terminal“ "
                  "ist der Arbeitsplatz ohne Rechner, verbunden über die serielle Leitung mit einem "
                  "anderen P8000-Emulator.  Ein Wechsel erzeugt die Maschine neu (wie ein Kaltstart)."),
     # ROM-Fassungen und Platinenindex (Entwurf 25 §10.4); jeder Wechsel ist ein Kaltstart.
@@ -797,9 +835,16 @@ P8000 = Programmprofil(
          (("aus", "aus (Vorgabe)"), ("ergaenzen", "ergänzen (WEGA-3.1-AVR-Abbild)")),
          _MIT_WDC),
     ),
-    schnittstellen_ports=(("tty0", 5000), ("tty2", 5002), ("tty3", 5003), ("tty4", 5004),
+    schnittstellen_ports=(("tty0", 5000), ("tty1 CONSOLE", 5001), ("tty2", 5002), ("tty3 PRINTER", 5003),
+                          ("tty4", 5004),
                           ("tty5", 5005), ("tty6", 5006), ("tty7", 5007),
                           ("Terminal (XB5)", 5004)),
+    # Namen vor Ticket #26 (tty1/tty3 ohne Zusatz, auch mit Steckerangabe) auf die heutigen abbilden.
+    alte_schnittstellen=(("tty1", "tty1 CONSOLE"), ("tty3", "tty3 PRINTER"),
+                         ("tty0 (X4)", "tty0"), ("tty1 (X5)", "tty1 CONSOLE"), ("tty2 (X6)", "tty2"),
+                         ("tty3 (X7)", "tty3 PRINTER"), ("tty4 (X4)", "tty4"), ("tty5 (X5)", "tty5"),
+                         ("tty6 (X6)", "tty6"), ("tty7 (X7)", "tty7")),
+    terminal_ueberspringen=("tty3 PRINTER",),
     ueber_rechner="des 16-Bit-Arbeitsplatzcomputers <b>EAW P8000</b>",
     andere="a5120",
     weitere=("k8915", "prg710", "pc1715", "mc80"),
