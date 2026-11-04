@@ -128,7 +128,7 @@ k1520_add_test(prg710_boot SRC test_prg710_boot.cpp
                           LABELS "${_lbl}" DEFS LOG_LEVEL=2)
 
 # PRG 710-1 (Entwurf 48, AP-B1): ATP-Zusatz (SIO C0H-C3H mit Schleife, CTC-Takt, Anzeige F4H/F5H)
-# und der BS620-Selbsttest (Diskette nur lokal, sonst GTEST_SKIP).
+# und der BS620-Selbsttest (Fixture tests/fixtures/bs600/BS600.hfe).
 k1520_add_test(prg710_atp SRC test_prg710_atp.cpp
                           LIBS k1520_prg710 k1520_logger k1520_testsupport
                           LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 300)

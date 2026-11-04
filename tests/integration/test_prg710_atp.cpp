@@ -5,13 +5,11 @@
  *
  * `Prg710Atp.*` treibt die Bausteine ueber den Systembus, waehrend das ROM der Maschine in
  * seiner Tastaturabfrage laeuft.  `Prg710Bs620.SelbsttestOhneFehler` startet die echte
- * Diskette `BS600.hfe` (nur wenn lokal vorhanden, sonst GTEST_SKIP; Kopie ueber TempDisk).
+ * Diskette `tests/fixtures/bs600/BS600.hfe` (Kopie ueber TempDisk).
  */
 
 #include <gtest/gtest.h>
 
-#include <cstdlib>
-#include <filesystem>
 #include <string>
 
 #include "core/logger.h"
@@ -172,20 +170,13 @@ std::string bildText(Prg710Machine& m) {
     }
     return s;
 }
-std::string bs600Pfad() {
-    if (const char* e = std::getenv("BS600_HFE")) return e;
-    const char* h = std::getenv("HOME");
-    return std::string(h ? h : "") +
-           "/projects/robotron/Diskettensammlung_von_DL/Diskettenarbeit/Disketten_Images_RT/BS600.hfe";
-}
 }  // namespace
 
 TEST(Prg710Bs620, SelbsttestOhneFehler) {
     k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::ERROR);
-    const std::string quelle = bs600Pfad();
-    if (!std::filesystem::exists(quelle)) GTEST_SKIP() << "BS600.hfe nicht vorhanden: " << quelle;
-    auto kopie = k1520test::TempDisk::empty("bs620_selbsttest.hfe");
-    std::filesystem::copy_file(quelle, kopie.path(), std::filesystem::copy_options::overwrite_existing);
+    // Fixture tests/fixtures/bs600/BS600.hfe (BS620, vom Anwender freigegeben); nur ueber TempDisk.
+    k1520test::TempDisk kopie("../bs600/BS600.hfe", "bs620_selbsttest.hfe");
+    ASSERT_FALSE(k1520test::readFileBytes(kopie.path()).empty()) << "Fixture BS600.hfe fehlt";
 
     Prg710Machine m(cfg(true));
     m.powerOn();
