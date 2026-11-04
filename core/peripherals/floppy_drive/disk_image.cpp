@@ -129,7 +129,8 @@ std::unique_ptr<DiskImage> DiskImage::create(const std::string& path,
     // die uebersprungenen Zylinder bleiben unformatiert.
     img->medium_ = DiskMedium(fmt->physicalCylinders(), num_heads,
                               fmt->tracks.empty() ? enc : fmt->predominantEncoding());
-    img->medium_.setNominalRpm(nominalRpmForDrives(fmt->drives));
+    img->medium_.setNominalRpm(nominalRpmForFormat(*fmt));
+    img->medium_.setNominalRateKbps(fmt->rate_kbps);
 
     // Je Spurbereich eine gueltige IBM-Spur bauen (Verfahren PRO Bereich → Mischdichte).
     // Die Spurnummer im ID-Feld ist die LOGISCHE — so schreibt es auch das Gastsystem.
@@ -139,7 +140,7 @@ std::unique_ptr<DiskImage> DiskImage::create(const std::string& path,
             const TrackFormat* tf = fmt->findTrack(c, h);
             if (!tf) continue;   // Spur existiert im Format nicht → bleibt unformatiert
             TrackImage spur = TrackCodec::buildTrack(leereSektoren(*tf, c, h),
-                                                     tf->encoding);
+                                                     tf->encoding, fmt->rate_kbps);
             // Halbe Datenrate ist eine Eigenschaft des Spurbereichs (`rate: 125`) und
             // muss an der Spur haengen, sonst schriebe sie jeder Codec mit voller Rate.
             spur.cell_factor = tf->cell_factor;

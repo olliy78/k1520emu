@@ -16,6 +16,7 @@
 #include "core/filesystem/geometry_probe.h"
 #include "core/filesystem/prg_boot.h"
 #include "core/filesystem/sios/sios_fs.h"
+#include "core/filesystem/fat/fat_fs.h"
 #include "core/filesystem/udos/udos1715_fs.h"
 #include "core/filesystem/udos/udos_fs.h"
 #include "core/filesystem/wega/wega_fs.h"
@@ -23,6 +24,7 @@
 #include "core/peripherals/floppy_drive/track_codec.h"
 
 #include <algorithm>
+#include <chrono>
 #include <limits>
 #include <cctype>
 #include <cstdio>
@@ -336,6 +338,8 @@ std::vector<SectorSpace::TrackRef> systemspuren(const SectorSpace& raum, const F
 
 /// @brief Fassungsvermoegen der Systemspuren; 0 = es gibt keine.
 uint64_t systemspurBytes(const SectorSpace& raum, const FsProfile& p) {
+    // FAT: der Bootsektor (Sektor 0 der linearen Folge) - sein BPB gehoert dem Dateisystem.
+    if (p.type == FsType::Fat) return raum.trackCount() ? raum.trackAt(0).sector_size : 0;
     // MicroDOS 1526: 256 B Lader (acht Plaetze) + Systemdatei MicroDOS.SYS (bis 16 KB).
     if (p.dir_boot && p.boot_header == "microdos") return 256 + CpmFileSystem::kMicroDosSysMax;
     // MicroDOS 1715: 128 B Bootkopf + MICRODOS.SYS (erste Datei, gleich hinter dem Verzeichnis).
@@ -1338,6 +1342,16 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
                 if (p->allowsContainer(ext) && p->detect) r = std::min(r, p->detect_rank);
             return r;
         };
+        // Ein `.img` hat keine Geometrie in sich: dieselbe Dateigroesse heisst 40x2x9 ODER 80x1x9
+        // (360K), 80x1x16x256 ODER 40x2x8x512 (320K).  Jede Probe braucht deshalb ein Medium im
+        // Zuschnitt DES Kandidaten - sonst findet die Probe fuer 40x2 die Spuren eines 80x1-Mediums nicht.
+        auto mediumFuer = [&](const DiskFormat* f) {
+            if (!istImg || !dv->disk_) return;
+            const DiskFormat* offen = dv->disk_->diskFormat();
+            if (offen && offen->name == f->name) return;
+            std::optional<DiskFormat> of = *f;
+            if (auto d = DiskImage::open(path, of, read_only)) dv->disk_ = std::move(d);
+        };
         for (const DiskFormat* f : kandidaten) {
             if (!passend.empty() && besterRang(f) >= passend.front()->detect_rank) break;
             std::vector<const FsProfile*> hier;
@@ -1375,6 +1389,19 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
                     SectorSpace probe(dv->disk_->medium(), *f);
                     const auto geraet = unixGeraet(probe, *p);
                     ja = WegaFileSystem::looksLikeWega(*geraet, &warum);
+                } else if (p->type == FsType::Fat) {
+                    // Nur die FAT-Probe bekommt das Medium im Zuschnitt des Kandidaten; die
+                    // uebrigen Proben laufen unveraendert auf dem zuerst geoeffneten Medium.
+                    std::unique_ptr<DiskImage> eigenes;
+                    if (istImg && dv->disk_) {
+                        const DiskFormat* offen = dv->disk_->diskFormat();
+                        if (!offen || offen->name != f->name) {
+                            std::optional<DiskFormat> of = *f;
+                            eigenes = DiskImage::open(path, of, read_only);
+                        }
+                    }
+                    SectorSpace probe((eigenes ? eigenes : dv->disk_)->medium(), *f);
+                    ja = FatFileSystem::looksLikeFat(probe, &warum);
                 } else {
                     int belegt = 0;
                     ja = cpmVerzeichnisPlausibel(dv->disk_->medium(), *f, *p, &warum,
@@ -1644,6 +1671,7 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
         }
 
         if (passend.empty()) passend.push_back(&*dv->abgeleitet_);
+        if (dv->format_ && passend.front()->type == FsType::Fat) mediumFuer(dv->format_);      // das Medium im Zuschnitt des Siegers
         dv->profile_ = passend.front();
         dv->detection_.format      = dv->format_->name;
         dv->detection_.filesystem  = dv->profile_->name;
@@ -1721,6 +1749,10 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
             v.fs = std::move(w);
         } else if (dv->profile_->type == FsType::Sios) {
             auto x = SiosFileSystem::mount(*v.space, *dv->profile_, warum);
+            if (!x) { err = warum; return roh(warum); }
+            v.fs = std::move(x);
+        } else if (dv->profile_->type == FsType::Fat) {
+            auto x = FatFileSystem::mount(*v.space, *dv->profile_, warum);
             if (!x) { err = warum; return roh(warum); }
             v.fs = std::move(x);
         } else if (dv->profile_->type == FsType::Tar && dv->profile_->leer) {
@@ -3015,7 +3047,7 @@ bool DiskVolume::extractMit(const FileRef& ref, const std::string& dest_path,
 
     std::string err;
     // WEGA-Pfade tragen Unterverzeichnisse ("bin/ls") — die Ordner entstehen mit.
-    if (istUnix() && fs::path(dest_path).has_parent_path())
+    if (hatBaum() && fs::path(dest_path).has_parent_path())
         fs::create_directories(fs::path(dest_path).parent_path(), ec);
     if (!schreibeDatei(dest_path, d, err)) return fail(err);
 
@@ -3028,6 +3060,22 @@ bool DiskVolume::extractMit(const FileRef& ref, const std::string& dest_path,
     // Normalfall, den auch das echte CP/M erzeugt — es geht nichts verloren, und
     // eine Zubehoerdatei je Datei waere blosser Ballast.
     if (!profile_) return true;
+    // FAT: das Aenderungsdatum der Diskette wird das der Linux-Datei (DOS fuehrt Datum+Uhrzeit,
+    // sonst nichts) - eine `.fileinfo` gibt es nicht.
+    if (profile_->type == FsType::Fat) {
+        int64_t t = bekannt ? bekannt->dos_mtime : 0;
+        if (!bekannt)
+            for (const FileEntry& e : volumes_[static_cast<size_t>(ref.volume)].fs->list())
+                if (e.name == ref.name) { t = e.dos_mtime; break; }
+        if (t > 0) {
+            const int64_t utc = fat::ortszeitZuUtc(t);
+            std::error_code ec2;
+            fs::last_write_time(dest_path,
+                fs::file_time_type::clock::now() + (std::chrono::system_clock::from_time_t(static_cast<std::time_t>(utc))
+                                                    - std::chrono::system_clock::now()), ec2);
+        }
+        return true;
+    }
     // WEGA wie UDOS immer: Modus, Besitzer und Zeit stehen nirgends in der Linux-Datei,
     // und ein Systemverzeichnis (bin/, etc/) ohne seine Rechte ist unbrauchbar.
     if (!isUdosFamily(profile_->type) && !istUnix() && !cpm_fileinfo_) return true;
@@ -3078,6 +3126,17 @@ bool DiskVolume::insert(const std::string& src_path, const FileRef& ref,
     WriteOptions wo;
     wo.overwrite       = opt.overwrite;
     wo.text            = opt.text;
+    if (istFat()) {
+        // Datum/Uhrzeit der Linux-Datei wandern mit; lange Namen nach Wunsch des Aufrufers.
+        wo.fat_lfn = opt.fat_lfn >= 0 ? opt.fat_lfn : fat_lfn_;
+        std::error_code ec2;
+        const auto ft = fs::last_write_time(src_path, ec2);
+        if (!ec2) {
+            const auto sys = std::chrono::system_clock::now()
+                           + std::chrono::duration_cast<std::chrono::system_clock::duration>(ft - fs::file_time_type::clock::now());
+            wo.fat_mtime = fat::utcZuOrtszeit(static_cast<int64_t>(std::chrono::system_clock::to_time_t(sys)));
+        }
+    }
     // Liegt neben der Quelldatei ein Beiblatt (aus `extractAll`), kommen die
     // Kopfsektorangaben von dort — so behaelt auch eine EINZELN aus der Oberflaeche
     // heruebergezogene Systemdatei ihren Typ und ihr Speicherabbild.  Ausdrueckliche
@@ -3318,6 +3377,15 @@ bool DiskVolume::setAttributes(const FileRef& ref, const UdosAttrs& attrs) {
 bool DiskVolume::setAttributes(const FileRef& ref, const CpmAttrs& attrs) {
     if (read_only_) return fail(schreibschutzText());
     if (profile_ && profile_->nur_boot) return fail(kNurBoot);
+    if (!valid(ref.volume)) return fail("Seite " + std::to_string(ref.volume)
+                                        + " gibt es auf dieser Diskette nicht");
+    if (!volumes_[static_cast<size_t>(ref.volume)].fs->setAttributes(ref.name, attrs))
+        return fail(volumes_[static_cast<size_t>(ref.volume)].fs->lastError());
+    return true;
+}
+
+bool DiskVolume::setAttributes(const FileRef& ref, const FatAttrs& attrs) {
+    if (read_only_) return fail(schreibschutzText());
     if (!valid(ref.volume)) return fail("Seite " + std::to_string(ref.volume)
                                         + " gibt es auf dieser Diskette nicht");
     if (!volumes_[static_cast<size_t>(ref.volume)].fs->setAttributes(ref.name, attrs))
@@ -3680,7 +3748,7 @@ bool DiskVolume::planSector(uint8_t cyl, uint8_t head, const TrackCodec::NewSect
 
 std::vector<std::string> DiskVolume::zielNamen(const std::vector<FileEntry>& eintraege,
                                                std::vector<std::string>* hinweise) const {
-    const bool unix_ = istUnix();
+    const bool unix_ = hatBaum();
     std::vector<std::string> roh, orig;
     for (const FileEntry& e : eintraege) {
         std::string n = e.qualifiedName();
@@ -3759,6 +3827,11 @@ bool DiskVolume::extractAll(const std::string& dest_dir, const TransferOptions& 
             // Nutzdatei — sie wird mit ausgegeben (wie `CAT P=&`), aber nicht
             // extrahiert: beim Zurueckschreiben waere sie ein Fremdkoerper.
             if (e.type == "D") continue;
+            // FAT: Verzeichnisse werden Ordner; sonst keine Besonderheit.
+            if (istFat() && e.type == "d") {
+                fs::create_directories(ziel / e.name, ec);
+                continue;
+            }
             // WEGA: Verzeichnisse werden Ordner, Geraetedateien haben keinen Inhalt.
             if (istUnix()) {
                 if (e.type == "d") {
@@ -3875,8 +3948,8 @@ bool DiskVolume::sammleQuelldateien(const std::string& src_dir,
     std::error_code ec;
     if (!fs::is_directory(src_dir, ec)) return fail("Kein Ordner: " + src_dir);
 
-    if (volumes_.size() == 1 && istUnix()) {
-        // WEGA/tar haben einen Verzeichnisbaum: der ganze Ordner, rekursiv.
+    if (volumes_.size() == 1 && hatBaum()) {
+        // WEGA/tar/FAT haben einen Verzeichnisbaum: der ganze Ordner, rekursiv.
         for (const auto& e : fs::recursive_directory_iterator(src_dir, ec)) {
             if (e.is_directory()) continue;
             if (ist_zubehoer(e.path())) continue;
@@ -3970,7 +4043,7 @@ bool DiskVolume::checkFit(const std::string& src_dir, std::string& bericht) cons
             PlannedFile f;
             if (links.count(p)) { f.size = 0; f.volume = static_cast<int>(v); f.link = true;   // nur ein Eintrag
                                   f.name = wegaZielName(src_dir, p); plan.push_back(f); continue; }
-            f.name   = istUnix() ? wegaZielName(src_dir, p)
+            f.name   = hatBaum() ? wegaZielName(src_dir, p)
                               : zielName(p, profile_->type, cpm_beiblatt);
             f.size   = fs::file_size(p, ec);
             f.volume = static_cast<int>(v);
@@ -4032,8 +4105,8 @@ bool DiskVolume::insertAll(const std::string& src_dir, const TransferOptions& op
         disk_->medium() = sicherung;
         if (tar_satz_ && satz_) { satz_->bytes = satz_sicherung; satz_->revision = satz_rev; satzNeuMounten(); }
     };
-    // WEGA: auch die LEEREN Unterordner gehoeren zum Baum.
-    if (istUnix()) {
+    // WEGA/FAT: auch die LEEREN Unterordner gehoeren zum Baum.
+    if (hatBaum()) {
         std::error_code ec;
         // Sortiert: die Reihenfolge des Dateisystems bestimmt sonst, welches Verzeichnis welchen
         // Block bekommt (Abbild nicht reproduzierbar); Eltern stehen vor ihren Kindern ("a" < "a/b").
@@ -4060,7 +4133,7 @@ bool DiskVolume::insertAll(const std::string& src_dir, const TransferOptions& op
     std::vector<std::string> unix_nachziehen;     // Quellen, deren Angaben zuletzt gesetzt werden
     for (size_t v = 0; v < volumes_.size(); ++v) {
         for (const std::string& quelle : je_volume[v]) {
-            const std::string name = istUnix() ? wegaZielName(src_dir, quelle)
+            const std::string name = hatBaum() ? wegaZielName(src_dir, quelle)
                                                : zielName(quelle, profile_->type, cpm_beiblatt);
             if (const auto lk = links.find(quelle); lk != links.end()) {
                 if (!volumes_[0].fs->makeLink(wegaZielName(src_dir, lk->second), name)) {
@@ -4415,6 +4488,10 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
             auto x = SiosFileSystem::format(*v.space, *profil, label, err);
             if (!x) return nullptr;
             v.fs = std::move(x);
+        } else if (profil->type == FsType::Fat) {
+            auto x = FatFileSystem::format(*v.space, *profil, label, err);
+            if (!x) return nullptr;
+            v.fs = std::move(x);
         } else if (profil->type == FsType::WegaMutos) {
             // wie `sa.mkfs 1440` — Verschraenkung 1/72 wie auf den Lieferdisketten.
             // MUTOS (Blockraum ab Zylinder 1) traegt 3/500, wie CMD/CC1/CC2.
@@ -4483,6 +4560,11 @@ bool DiskVolume::readBootImage(std::vector<uint8_t>& out, int volume) const {
     if (bootAreaSize(volume) == 0) return fail(keineSystemspuren(*profile_));
 
     out.clear();
+    if (profile_->type == FsType::Fat) {
+        const auto* f = dynamic_cast<const FatFileSystem*>(volumes_[static_cast<size_t>(volume)].fs.get());
+        if (!f || !f->readBootSector(out)) { out.clear(); return fail("Bootsektor nicht lesbar"); }
+        return true;
+    }
     if (profile_->dir_boot) {
         // PC 1715 ohne Systemspuren: der Bootbereich sind die ersten vier Verzeichnisplaetze.
         const auto* cpm = dynamic_cast<const CpmFileSystem*>(
@@ -4536,6 +4618,14 @@ bool DiskVolume::writeBootImage(const std::vector<uint8_t>& img, int volume) {
 
     const uint64_t n = bootAreaSize(volume);
     if (n == 0) return fail(keineSystemspuren(*profile_));
+    if (profile_->type == FsType::Fat) {
+        // Ein FAT-Bootsektor traegt den BPB DIESER Diskette: der Code des Abbilds kommt hinein,
+        // Sektorgroesse/FAT-Lage/Gesamtgroesse/Medienkennung bleiben (FatFileSystem::bootsektorMitBpb).
+        auto* f = dynamic_cast<FatFileSystem*>(volumes_[static_cast<size_t>(volume)].fs.get());
+        if (!f) return fail("Kein FAT-Dateisystem");
+        if (!f->writeBootSector(img)) return fail(f->lastError());
+        return true;
+    }
     if (img.size() > n)
         return fail("Das Bootabbild ist " + std::to_string(img.size())
                     + " Byte gross, die Systemspuren von '" + profile_->name
@@ -4595,6 +4685,65 @@ bool DiskVolume::writeBootImage(const std::vector<uint8_t>& img, int volume) {
             if (!raum.writeSector(t.cyl, t.head, id, daten, nachspann))
                 return fail("Systemspuren nicht beschreibbar: " + raum.lastError());
         }
+    }
+    return true;
+}
+
+bool DiskVolume::dosSystemUebertragen(DiskVolume& quelle, std::string& bericht) {
+    bericht.clear();
+    if (read_only_) return fail(schreibschutzText());
+    if (!istFat() || !quelle.istFat() || volumes_.empty() || quelle.volumes_.empty())
+        return fail("SYS gibt es nur zwischen zwei MS-DOS-(FAT-)Disketten");
+    FileSystem& ziel = *volumes_[0].fs;
+    FileSystem& src  = *quelle.volumes_[0].fs;
+
+    // 1. Quelle: die Systemdateien (die ersten Wurzeleintraege mit S oder H) - in Verzeichnisreihenfolge.
+    std::vector<FileEntry> sys;
+    for (const FileEntry& e : src.list()) {
+        if (e.name.find('/') != std::string::npos) continue;            // nur die Wurzel
+        if (e.type == "d") break;
+        if (e.attributes.find("SYS") == std::string::npos && e.attributes.find("HID") == std::string::npos) break;
+        sys.push_back(e);
+    }
+    if (sys.empty())
+        return fail("Die Quelldiskette traegt keine Systemdateien (die ersten Eintraege der Wurzel mit Attribut "
+                    "System oder versteckt) - sie ist keine Systemdiskette.");
+    // 2. Ziel: leer.
+    for (const FileEntry& e : ziel.list())
+        return fail("Die Zieldiskette ist nicht leer ('" + e.name + "'): die Systemdateien muessen die ersten "
+                    "Verzeichnisplaetze und den Anfang des Datenbereichs belegen. Erst eine leere Diskette anlegen.");
+
+    // 3. Platz vorab (kein halbes Ergebnis).
+    std::vector<PlannedFile> plan;
+    for (const FileEntry& e : sys) { PlannedFile f; f.name = e.name; f.size = e.size; plan.push_back(f); }
+    FitReport r;
+    if (!ziel.wouldFit(plan, r)) return fail(ziel.lastError());
+    if (!r.fits) return fail("Die Systemdateien passen nicht auf diese Diskette: " + r.detail);
+
+    // 4. Bootsektor (BPB dieser Diskette bleibt), dann die Dateien.
+    std::vector<uint8_t> boot;
+    if (!quelle.readBootImage(boot)) return fail("Bootsektor der Quelle: " + quelle.lastError());
+    if (!writeBootImage(boot)) return false;
+    for (const FileEntry& e : sys) {
+        std::vector<uint8_t> d;
+        if (!src.read(e.name, d)) return fail("Quelle: " + src.lastError());
+        WriteOptions wo;
+        uint8_t a = 0;
+        if (e.attributes.find("RO")  != std::string::npos) a |= 0x01;
+        if (e.attributes.find("HID") != std::string::npos) a |= 0x02;
+        if (e.attributes.find("SYS") != std::string::npos) a |= 0x04;
+        if (e.attributes.find("ARC") != std::string::npos) a |= 0x20;
+        wo.fat_attr = a; wo.fat_attr_gesetzt = true;
+        wo.fat_mtime = e.dos_mtime;
+        wo.fat_lfn = 0;                                   // Systemdateien tragen nur Kurznamen
+        if (!ziel.write(e.name, d, wo)) return fail(ziel.lastError());
+        bericht += e.name + " (" + std::to_string(d.size()) + " Byte)\n";
+    }
+    // 5. Zusammenhaengend?  Ein Lader, der ab dem ersten Cluster am Stueck liest, scheitert sonst.
+    for (const FileEntry& e : sys) {
+        const std::string bl = ziel.blockList(e.name);
+        if (bl.find(' ') != std::string::npos)
+            bericht += "WARNUNG: " + e.name + " liegt nicht zusammenhaengend (Cluster " + bl + ") - der Lader liest sie nicht.\n";
     }
     return true;
 }

@@ -472,6 +472,9 @@ std::vector<uint8_t> fuellung(Muster m, size_t n, uint32_t seed) {
 DiskMedium baueMedium(unsigned cyls, unsigned heads, unsigned spt, unsigned ssz,
                       const std::vector<uint8_t>& raw, unsigned base = 1) {
     DiskMedium m(static_cast<uint8_t>(cyls), static_cast<uint8_t>(heads), Encoding::MFM);
+    // PC-Hochdichte (15/18 x 512) ist 500 kbit/s (Entwurf 45): so liest CqmCodec sie ein.
+    const bool hd = ssz == 512 && (spt == 15 || spt == 18);
+    if (hd) { m.setNominalRateKbps(500); m.setNominalRpm(spt == 15 ? 360 : 300); }
     size_t off = 0;
     for (unsigned c = 0; c < cyls; ++c)
         for (unsigned h = 0; h < heads; ++h) {
@@ -485,7 +488,7 @@ DiskMedium baueMedium(unsigned cyls, unsigned heads, unsigned spt, unsigned ssz,
                 secs.push_back(std::move(ls));
             }
             m.setTrack(static_cast<uint8_t>(c), static_cast<uint8_t>(h),
-                       TrackCodec::buildTrack(secs, Encoding::MFM));
+                       TrackCodec::buildTrack(secs, Encoding::MFM, m.nominalRateKbps()));
         }
     m.clearDirty();
     return m;

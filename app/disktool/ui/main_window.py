@@ -317,6 +317,7 @@ class MainWindow(QMainWindow):
         self.menue_schnitt.addAction(self.act_seite1_weg)
         m.addSeparator()
         m.addAction(self.act_bootabbild)
+        m.addAction(self.act_dos_sys)
         m.addAction(self.act_diskeditor)
         m.addSeparator()
         m.addAction(self.act_neu_beschreiben)
@@ -680,6 +681,9 @@ class MainWindow(QMainWindow):
         # auf Zylinder 0 und hat nichts zu sichern.
         self.act_bootabbild.setEnabled(mit_fs and not ist_platte(self.tool)
                                        and self.tool.boot_area_size(0) > 0)
+        # DOS SYS: nur an einer beschreibbaren FAT-Diskette (leer ist Sache des Kerns - er sagt es klar)
+        self.act_dos_sys.setEnabled(mit_fs and getattr(self.tool, "ist_fat", False)
+                                    and not self.tool.read_only)
         self.act_schreibschutz.setEnabled(offen)
         # Auch ohne offene Diskette waehlbar, wenn ein physisches Laufwerk im Spiel
         # ist: bei einer nicht erkannten Diskette ist das Uebersteuern der einzige Weg
@@ -797,12 +801,14 @@ class MainWindow(QMainWindow):
 
         # Die eine Aktion, die es NUR an der Platte gibt.
         a = self.act_platte_ordner
-        a.setVisible(platte)
-        schreibbar = platte and not self.tool.read_only
-        ziel = platte and bool(self.disk_view.platte_ziel())
+        fat = self.tool is not None and getattr(self.tool, "ist_fat", False)
+        a.setVisible(platte or fat)
+        schreibbar = (platte or fat) and not self.tool.read_only
+        # An einer FAT-Diskette gilt ohne angeklickten Ordner die Wurzel; an der Platte wird nie geraten.
+        ziel = fat or (platte and bool(self.disk_view.platte_ziel()))
         a.setEnabled(schreibbar and ziel)
         tipps.setdefault(a, a.toolTip())      # eigene Aktion: nie von anderen Stellen veraendert
-        if platte and not schreibbar:
+        if (platte or fat) and not schreibbar:
             a.setToolTip(f"{tipps[a]}\n\nGesperrt: erst den Schreibschutz aufheben.")
         elif platte and not ziel:
             a.setToolTip(f"{tipps[a]}\n\nGesperrt: erst den Ordner (oder die Partition) "
@@ -2000,7 +2006,7 @@ class MainWindow(QMainWindow):
 
     def platte_mkdir(self, name: str) -> bool:
         """Ordner auf der Platte anlegen (``name`` = voller Pfad, ``md3/neu``)."""
-        if self.tool is None or not ist_platte(self.tool):
+        if self.tool is None or not (ist_platte(self.tool) or getattr(self.tool, "ist_fat", False)):
             return False
         try:
             self.tool.mkdir(name)
@@ -2013,14 +2019,16 @@ class MainWindow(QMainWindow):
 
     def _platte_ordner_anlegen(self) -> None:
         ziel = self.disk_view.platte_ziel()
-        if not ziel:
+        fat = getattr(self.tool, "ist_fat", False)
+        if not ziel and not fat:
             self._leere_auswahl("Ordner anlegen")
             return
-        name, ok = QInputDialog.getText(self, "Ordner auf der Platte anlegen",
-                                        f"Name des neuen Ordners in {ziel}:")
+        wo = ziel or "der Wurzel"
+        name, ok = QInputDialog.getText(self, "Ordner anlegen",
+                                        f"Name des neuen Ordners in {wo}:")
         name = name.strip().strip("/")
         if ok and name:
-            self.platte_mkdir(f"{ziel}/{name}")
+            self.platte_mkdir(f"{ziel}/{name}" if ziel else name)
 
     def insert_paths(self, paths: List[str], volume: int = 0,
                      sios_lib: Optional[str] = None) -> bool:
@@ -2057,6 +2065,11 @@ class MainWindow(QMainWindow):
         praefix = ""
         if self.tool.volume_count > 1:
             praefix = f"{self.tool.volume_dir(volume)}/"
+        if getattr(self.tool, "ist_fat", False):
+            # Ordner angeklickt: die Dateien landen darin (sonst in der Wurzel).
+            ordner = self.disk_view.platte_ziel()
+            if ordner:
+                praefix = f"{ordner}/"
         if self.tool.ist_sios:
             # Bibliothek angeklickt oder daraufgezogen: die Dateien werden ihre Objekte
             # (``LIB/NAME``); sonst physische Dateien.
@@ -2845,6 +2858,36 @@ class MainWindow(QMainWindow):
             self, "Bootabbild sichern", vorschlag, "Bootabbild (*.bin)")
         if pfad:
             self.save_boot_image(pfad)
+
+    def _dos_sys_dialog(self) -> None:
+        """DOS ``SYS``: Bootsektor und Systemdateien einer Systemdiskette auf die offene (leere) Diskette."""
+        if self.tool is None or not getattr(self.tool, "ist_fat", False):
+            return
+        pfad, _ = QFileDialog.getOpenFileName(
+            self, "Systemdiskette wählen (Quelle)", self._neben_der_diskette(),
+            "Diskettenabbilder (*.img *.hfe *.dmk *.cqm *.td0 *.imd);;Alle Dateien (*)")
+        if pfad:
+            self.dos_sys_von(pfad)
+
+    def dos_sys_von(self, pfad) -> bool:
+        """Bootsektor + Systemdateien von ``pfad`` übernehmen (Ziel: die geöffnete, leere FAT-Diskette)."""
+        if self.tool is None:
+            return False
+        try:
+            quelle = DiskTool.open(pfad)
+        except K1520DiskError as e:
+            self._fehler("Systemdateien übernehmen", str(e))
+            return False
+        try:
+            bericht = self.tool.dos_sys(quelle)
+        except K1520DiskError as e:
+            self._fehler("Systemdateien übernehmen", str(e))
+            return False
+        finally:
+            quelle.close()
+        self._reload()
+        self.log("Bootsektor und Systemdateien übernommen:\n" + bericht.rstrip())
+        return True
 
     def _angaben_dialog(self) -> None:
         if self.tool is None:

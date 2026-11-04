@@ -743,6 +743,13 @@ ist abgeschnitten (4096 B), `INITIAL.SUB` hält bei `A>MKEY20` an (ein Return). 
 (`tools/microdos/ablauf1715.py`, Auslieferung `disks/pc1715_microdos/` aus `tools/microdos/build1715.py`). DiskTool-Profil `microdos1715`: Bootabbild = 128-B-Kopf +
 `MICRODOS.SYS` (muss in die ersten Datenblöcke). **Nach FORMAT15 RESET, nicht Strg+C.** 1715W bootet nicht. **Vor Arbeiten daran: `doc/merkposten/microdos1715.md` lesen.**
 
+## MS-DOS FAT12 im DiskTool (Stand 2026-11-03)
+
+`FatFileSystem` (`core/filesystem/fat/`) liest und schreibt PC-/DCP-Disketten (A7150, PC 1834): BPB-gesteuert, Unterverzeichnisse,
+lange Namen (VFAT), Attribute, Datum, Prüfung/Reparatur, Bootsektor mit BPB-Übernahme, `sys` (= DOS SYS) für Bootdisketten; Profile
+`dos160 … dos2880` (HD nur `.img`).  **Vor Arbeiten daran: `doc/merkposten/fat12.md` lesen** (`.img`-Geometrie über Kopfzahl des BPB +
+`mediumFuer`, Bootsektor-BPB-Regel, `sys` nur auf LEERE Diskette, Automatik für lange Namen nach OEM-Kennung); Entwurf `doc/design/44_fat12.md`.
+
 ## MUTOS 8000: Diskettenbau HIER, Forschung in mutos8k (Stand 2026-10-29)
 
 **Der Diskettensatz entsteht in DIESEM Projekt, ohne jede Abhaengigkeit zu mutos8k:** `python3 -I tools/mutos8000/bau_alle.py` baut aus den

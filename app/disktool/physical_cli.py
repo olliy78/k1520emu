@@ -78,8 +78,15 @@ Beispiele:
     s.add_argument("--cyls", type=int, default=80, help="Zylinder (Vorgabe 80)")
     s.add_argument("--heads", type=int, default=2, help="Koepfe (Vorgabe 2)")
     s.add_argument("--rate", type=int, default=250,
-                   help="Zellrate in kbit/s: 250 = 5,25″ DD, 500 = 8″/HD")
-    s.add_argument("--rpm", type=int, default=300, help="Drehzahl (Vorgabe 300)")
+                   help="Rate der DISKETTE in kbit/s: 250 = 5,25″ DD, 500 = 8″ / "
+                        "5,25″ HD 1,2M / 3,5″ HD")
+    s.add_argument("--rpm", type=int, default=300,
+                   help="Drehzahl, mit der die DISKETTE beschrieben wurde "
+                        "(Vorgabe 300; 5,25″ HD 1,2M und 8″: 360)")
+    s.add_argument("--drive-rpm", type=int, default=0,
+                   help="Drehzahl des LAUFWERKS (Vorgabe = --rpm).  Ein fest auf "
+                        "300 U/min gestelltes HD-Laufwerk (TEAC FD-55GFR) liest "
+                        "eine 1,2M-Diskette: --rate 500 --rpm 360 --drive-rpm 300")
     s.add_argument("--double-step", action="store_true",
                    help="40-Spur-Diskette in einem 80-Spur-Laufwerk")
 
@@ -420,6 +427,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         sitzung = PhysicalSession.start(
             drive=o.drive, cell_rate_kbps=o.rate, num_cyls=o.cyls,
             num_heads=o.heads, writable=o.write, rpm=o.rpm,
+            drive_rpm=o.drive_rpm,
             read_ahead=True, verify_writes=not o.no_verify,
             double_step=o.double_step)
     except GreaseweazleFehlt:

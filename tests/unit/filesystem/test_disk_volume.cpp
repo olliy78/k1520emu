@@ -337,6 +337,9 @@ TEST(DiskVolume, JedesKatalogformatHatNormspurenMitEinerUmdrehung) {
     int geprueft = 0;
     for (const DiskFormat& f : formate().formats()) {
         SCOPED_TRACE(f.name);
+        // 3,5″-HD/ED (1,44M/2,88M, FAT12): nur als `.img` gedacht (Entwurf 44) - der Stack
+        // kennt keine 300-U/min-Umdrehung bei 500/1000 kbit/s, eine `.hfe` davon ist keine Norm.
+        if (f.name == "pc_hd_18x512" || f.name == "pc_ed_36x512") continue;
         std::error_code ec;
         fs::remove(pfad, ec);
         ASSERT_NE(DiskImage::create(pfad, f, /*write_protect=*/false), nullptr);

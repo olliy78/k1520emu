@@ -268,6 +268,8 @@ _lib.k1520d_entry_attrs.argtypes = [_H, ctypes.c_int]
 _lib.k1520d_entry_attrs.restype = _CS
 _lib.k1520d_entry_date.argtypes = [_H, ctypes.c_int]
 _lib.k1520d_entry_date.restype = _CS
+_lib.k1520d_entry_short_name.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_entry_short_name.restype = _CS
 _lib.k1520d_entry_hidden.argtypes = [_H, ctypes.c_int]
 _lib.k1520d_entry_hidden.restype = ctypes.c_bool
 _lib.k1520d_entry_damaged.argtypes = [_H, ctypes.c_int]
@@ -319,6 +321,24 @@ _lib.k1520d_set_cpm_attrs.argtypes = [
     ctypes.c_bool, ctypes.c_int,
 ]
 _lib.k1520d_set_cpm_attrs.restype = ctypes.c_bool
+
+_lib.k1520d_set_dos_attrs.argtypes = [
+    _H, _CS,
+    ctypes.c_bool, ctypes.c_bool,
+    ctypes.c_bool, ctypes.c_bool,
+    ctypes.c_bool, ctypes.c_bool,
+    ctypes.c_bool, ctypes.c_bool,
+    ctypes.c_bool, ctypes.c_int64,
+]
+_lib.k1520d_set_dos_attrs.restype = ctypes.c_bool
+
+_lib.k1520d_set_fat_lfn.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_set_fat_lfn.restype = None
+
+_lib.k1520d_dos_sys.argtypes = [_H, _H]
+_lib.k1520d_dos_sys.restype = ctypes.c_bool
+_lib.k1520d_dos_sys_report.argtypes = [_H]
+_lib.k1520d_dos_sys_report.restype = _CS
 
 # ── WEGA-(UNIX-)Dateiangaben ─────────────────────────────────────────────────
 _lib.k1520d_entry_unix_mode.argtypes = [_H, ctypes.c_int]
@@ -801,6 +821,8 @@ class Entry:
     side_dir: str = ""    # 'Side0'/'Side1' — leer bei einseitigen Dateisystemen
     #: Dateiname im Wirtsdateisystem (ohne Pfadanteil, je Seite eindeutig) — fuer JEDEN Auszug.
     target_name: str = ""
+    #: FAT: der 8.3-Kurzname (mit Pfad), wenn ``name`` ein langer Name ist.
+    short_name: str = ""
 
     # ── UDOS-Kopfsektorangaben (bei CP/M alle 0 bzw. leer) ──────────────────
     # Sie stehen NICHT in den Bytes der Datei, steuern aber, wie UDOS sie laedt
@@ -857,6 +879,11 @@ class Entry:
     @property
     def archived(self) -> bool:
         return "ARC" in self.attrs
+
+    @property
+    def hidden_attr(self) -> bool:
+        """FAT: das Attribut „versteckt“ (``hidden`` fasst versteckt und System zusammen)."""
+        return "HID" in self.attrs
 
     @property
     def side_prefix(self) -> str:
@@ -1542,6 +1569,17 @@ class DiskTool:
         return self.filesystem_type.startswith("udos")
 
     @property
+    def ist_fat(self) -> bool:
+        """MS-DOS/PC-DOS/DCP-Diskette (FAT12): Verzeichnisbaum, DOS-Attribute (R/O, versteckt, System,
+        Archiv), Datum/Uhrzeit.  ``Entry.type`` ist ``'d'`` für ein Verzeichnis, sonst leer."""
+        return self.filesystem_type == "fat"
+
+    @property
+    def hat_baum(self) -> bool:
+        """Namen sind Pfade mit ``/`` (WEGA, tar, FAT)."""
+        return self.ist_wega or self.ist_tar or self.ist_fat
+
+    @property
     def ist_sios(self) -> bool:
         """SIOS 1526 (IBM-Etiketten, nur lesbar): ``Entry.type`` ist hier F/B/O, KEIN UDOS-Typ."""
         return self.filesystem_type == "sios"
@@ -1648,6 +1686,7 @@ class DiskTool:
             damaged=bool(_lib.k1520d_entry_damaged(self._h, i)),
             side_dir=self.volume_dir(v),
             target_name=_s(_lib.k1520d_entry_target_name(self._h, i)),
+            short_name=_s(_lib.k1520d_entry_short_name(self._h, i)),
             entry=int(_lib.k1520d_entry_start(self._h, i)),
             record_len=int(_lib.k1520d_entry_record_len(self._h, i)),
             block_len=int(_lib.k1520d_entry_block_len(self._h, i)),
@@ -2034,6 +2073,42 @@ class DiskTool:
                 archived is not None, bool(archived),
                 user is not None, int(user or 0)):
             raise K1520DiskError(self._fail())
+
+    def set_dos_attrs(self, name: str, *, read_only: Optional[bool] = None,
+                      hidden: Optional[bool] = None, system: Optional[bool] = None,
+                      archive: Optional[bool] = None, mtime: Optional[int] = None) -> None:
+        """FAT: Attribute und Zeitstempel (``mtime`` = Sekunden seit 1970, UTC) ändern.
+
+        Nicht angegebene Felder bleiben stehen.  Der Inhalt bleibt unangetastet.
+        """
+        if not _lib.k1520d_set_dos_attrs(
+                self._h, _b(name),
+                read_only is not None, bool(read_only),
+                hidden is not None, bool(hidden),
+                system is not None, bool(system),
+                archive is not None, bool(archive),
+                mtime is not None, int(mtime or 0)):
+            raise K1520DiskError(self._fail())
+
+    def dos_sys(self, quelle: "DiskTool") -> str:
+        """FAT (DOS ``SYS``): Bootsektor und Systemdateien von ``quelle`` auf **diese** (leere) Diskette.
+
+        Die Lader suchen ``IO.SYS``/``DCDOS.SYS`` (bzw. ``BIO.COM``/``DOS.COM``) an den ersten Verzeichnisplätzen
+        und lesen sie zusammenhängend — deshalb muss diese Diskette leer sein.
+
+        Returns:
+            Der Bericht (welche Dateien; eine Zeile ``WARNUNG`` bei nicht zusammenhängender Lage).
+
+        Raises:
+            K1520DiskError: Ziel nicht leer/nicht FAT/schreibgeschützt, Quelle ohne Systemdateien, kein Platz.
+        """
+        if not _lib.k1520d_dos_sys(self._h, quelle._h):
+            raise K1520DiskError(self._fail())
+        return _s(_lib.k1520d_dos_sys_report(self._h))
+
+    def set_fat_lfn(self, modus: int) -> None:
+        """FAT: lange Dateinamen beim Einfügen schreiben?  -1 automatisch, 0 nie, 1 immer."""
+        _lib.k1520d_set_fat_lfn(self._h, int(modus))
 
     def set_unix_attrs(self, name: str, *, mode: Optional[int] = None,
                        uid: Optional[int] = None, gid: Optional[int] = None,

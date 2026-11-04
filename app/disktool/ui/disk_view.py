@@ -253,6 +253,9 @@ class DiskView(QWidget):
         if getattr(tool, "ist_sios", False):
             self._set_sios(tool, entries)
             return
+        if getattr(tool, "ist_fat", False):
+            self._set_fat(tool, entries)
+            return
         self._spalten_setzen(DISK_SPALTEN)
         self.titel.setText(f"Diskette — {tool.filesystem}")
         # Leer formatiert oder mit unpassendem Format geoeffnet: beides sieht hier
@@ -281,6 +284,38 @@ class DiskView(QWidget):
             # Zeile ueber die LAUFENDE NUMMER merken: genau darueber spricht die
             # Bibliothek beim Nachtragen (`load_entry_details(i)`), und Namen sind
             # bei UDOS ueber beide Seiten hinweg nicht eindeutig.
+            self._zeilen[nr] = item
+
+    def _set_fat(self, tool, entries) -> None:
+        """MS-DOS (FAT12): Verzeichnisse als aufklappbare Ordner, Namen sind Pfade.
+
+        Der Kern liefert den ganzen Baum flach, Eltern vor ihren Kindern (``SUB/DATEI.TXT``);
+        die Referenz bleibt der volle Pfad — Holen, Loeschen und Eigenschaften sprechen den
+        Kern damit an, wie er sie versteht.  Ein Ordner traegt ``DIR_ROLE``: darauf Abgelegtes
+        landet in diesem Ordner.
+        """
+        self._spalten_setzen(DISK_SPALTEN)
+        self.titel.setText(f"Diskette — {tool.filesystem}")
+        self.tree.leer_text = "" if entries else "Keine Dateien gefunden"
+        self._zeilen = {}
+        knoten = {}
+        for nr, e in enumerate(entries):
+            teile = e.name.split("/")
+            eltern = knoten.get("/".join(teile[:-1])) if len(teile) > 1 else None
+            ist_ordner = e.type == "d"
+            spalten = [teile[-1], "Ordner" if ist_ordner else "", "" if ist_ordner else f"{e.size}",
+                       e.attrs, e.date]
+            item = QTreeWidgetItem(eltern if eltern is not None else self.tree, spalten)
+            item.setData(0, REF_ROLE, e.ref)
+            item.setData(0, VOLUME_ROLE, e.volume)
+            if ist_ordner:
+                item.setData(0, DIR_ROLE, True)
+                knoten[e.name] = item
+                item.setExpanded(True)
+            if e.short_name:
+                item.setToolTip(0, f"Kurzname: {e.short_name.split('/')[-1]}")
+            if e.damaged:
+                item.setText(1, "DEFEKT")
             self._zeilen[nr] = item
 
     def _set_sios(self, tool, entries) -> None:

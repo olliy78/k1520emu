@@ -14,6 +14,7 @@
  */
 
 #include "core/peripherals/floppy_drive/drive_profile.h"
+#include "core/peripherals/floppy_drive/disk_format.h"
 
 const DriveProfile& builtinDriveProfile(const std::string& name) {
     // Statische lokale Objekte — Lebensdauer bis Programmende.
@@ -135,6 +136,10 @@ const std::vector<std::string>& knownDriveProfileNames() {
         "K5601", "K5600.10", "K5600.20", "MF3200", "MF6400", "none"
     };
     return names;
+}
+
+uint16_t nominalRpmForFormat(const DiskFormat& fmt) {
+    return fmt.rpm ? fmt.rpm : nominalRpmForDrives(fmt.drives);
 }
 
 uint16_t nominalRpmForDrives(const std::vector<std::string>& drives) {

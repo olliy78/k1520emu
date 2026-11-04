@@ -465,6 +465,8 @@ K1520_API const char* k1520d_entry_attrs(K1520Disk h, int i);
 K1520_API const char* k1520d_entry_date(K1520Disk h, int i);
 K1520_API bool        k1520d_entry_hidden(K1520Disk h, int i);
 K1520_API bool        k1520d_entry_damaged(K1520Disk h, int i);
+/// @brief FAT: der 8.3-Kurzname (mit Pfad), wenn der Name ein langer ist; sonst "".
+K1520_API const char* k1520d_entry_short_name(K1520Disk h, int i);
 
 /* ─── UDOS-Kopfsektorangaben eines Eintrags ───────────────────────────────────
  * Eine UDOS-Datei traegt mehr als Name und Bytes; diese Angaben steuern, wie das
@@ -539,6 +541,34 @@ K1520_API bool k1520d_set_cpm_attrs(K1520Disk h, const char* name,
                                     bool set_system,    bool system,
                                     bool set_archived,  bool archived,
                                     bool set_user,      int  user);
+
+/**
+ * @brief FAT (MS-DOS): Attribute und Zeitstempel einer Datei/eines Verzeichnisses aendern.
+ *
+ * Nicht gesetzte Kennzeichen lassen den Wert stehen.  @p mtime_utc = Sekunden seit 1970 (UTC);
+ * DOS speichert die Uhrzeit ohne Zeitzone, umgerechnet wird mit der Ortszeit des Rechners.
+ */
+K1520_API bool k1520d_set_dos_attrs(K1520Disk h, const char* name,
+                                    bool set_read_only, bool read_only,
+                                    bool set_hidden,    bool hidden,
+                                    bool set_system,    bool system,
+                                    bool set_archive,   bool archive,
+                                    bool set_mtime,     int64_t mtime_utc);
+
+/**
+ * @brief FAT (DOS `SYS`): Bootsektor und Systemdateien der Diskette @p quelle auf die LEERE FAT-Diskette
+ *        @p ziel uebertragen (@ref DiskVolume::dosSystemUebertragen).
+ *
+ * Aendert nur @p ziel; die Quelle wird gelesen.  Bei Fehler false (Grund ueber @ref k1520d_last_error am
+ * Ziel); @ref k1520d_dos_sys_report liefert den Bericht des letzten gelungenen Aufrufs (welche Dateien,
+ * Warnungen).
+ */
+K1520_API bool k1520d_dos_sys(K1520Disk ziel, K1520Disk quelle);
+K1520_API const char* k1520d_dos_sys_report(K1520Disk ziel);
+
+/// @brief FAT: lange Dateinamen (VFAT) beim Einfuegen schreiben?  -1 = automatisch (Vorgabe),
+///        0 = nie, 1 = immer, wo der Name kein 8.3-Name ist.
+K1520_API void k1520d_set_fat_lfn(K1520Disk h, int modus);
 
 /* ─── WEGA-(UNIX-)Dateiangaben ─────────────────────────────────────────────────
  * Nur bei einer Diskette mit Dateisystemart "wega_mutos" (@ref k1520d_fs_type); sonst

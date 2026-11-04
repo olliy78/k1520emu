@@ -135,6 +135,8 @@ class PropertiesDialog(QDialog):
         # WEGA steht dort eine Dateiart (-/d/c), die man leicht fuer einen UDOS-Typ haelt.
         if getattr(tool, "ist_sios", False):
             self.art = "sios"          # nur Anzeige: VOL1 und HDR1 bzw. AADR/ML
+        elif getattr(tool, "ist_fat", False):
+            self.art = "fat"           # DOS: vier Attributbits und Zeitstempel
         elif tool.ist_wega or entry.ist_unix:
             self.art = "wega"
         elif tool.ist_udos or (entry.type and not getattr(tool, "ist_sios", False)):
@@ -147,7 +149,8 @@ class PropertiesDialog(QDialog):
         lay = QVBoxLayout(self)
         lay.addWidget(self._kopf())
         lay.addWidget({"wega": self._wega_teil, "udos": self._udos_teil,
-                       "cpm": self._cpm_teil, "sios": self._sios_teil}[self.art](), 1)
+                       "cpm": self._cpm_teil, "sios": self._sios_teil,
+                       "fat": self._fat_teil}[self.art](), 1)
 
         self.hinweis = QLabel("")
         self.hinweis.setWordWrap(True)
@@ -478,6 +481,36 @@ class PropertiesDialog(QDialog):
         form.addRow(hinweis)
         return kasten
 
+    def _fat_teil(self) -> QWidget:
+        """MS-DOS (FAT12): die vier Attributbits und der Zeitstempel."""
+        e = self.entry
+        kasten = QGroupBox("DOS-Attribute (FAT)")
+        form = QFormLayout(kasten)
+        if e.short_name:
+            form.addRow("Kurzname", self._nur_anzeige(
+                e.short_name, "So sieht ein DOS ohne lange Namen die Datei (8.3)."))
+        self.f_ro = QCheckBox("R/O — nur lesen")
+        self.f_ro.setChecked(e.read_only)
+        self.f_hid = QCheckBox("H — versteckt (im DIR unsichtbar)")
+        self.f_hid.setChecked(e.hidden_attr)
+        self.f_sys = QCheckBox("S — Systemdatei (im DIR unsichtbar)")
+        self.f_sys.setChecked(e.system)
+        self.f_arc = QCheckBox("A — archiviert (seit der letzten Sicherung geändert)")
+        self.f_arc.setChecked(e.archived)
+        for k in (self.f_ro, self.f_hid, self.f_sys, self.f_arc):
+            form.addRow("", k)
+        self.f_zeit = QLineEdit(e.date)
+        self.f_zeit.setToolTip(
+            "Datum und Uhrzeit, wie sie das DOS anzeigt (JJJJ-MM-TT HH:MM:SS, 1980 bis 2107). "
+            "DOS führt keine Zeitzone; die Uhr ist die des Rechners, an dem die Datei lag.")
+        form.addRow("Geändert", self.f_zeit)
+        hinweis = QLabel(
+            "Mehr führt FAT nicht: keine Besitzer, keine Rechte.  Ein Verzeichnis trägt "
+            "dieselben Bits; der Inhalt wird hier nie angefasst.")
+        hinweis.setWordWrap(True)
+        form.addRow(hinweis)
+        return kasten
+
     def _sios_teil(self) -> QWidget:
         """SIOS 1526: die Felder des Datenträger- und des Dateikennsatzes (nur Anzeige).
 
@@ -597,6 +630,22 @@ class PropertiesDialog(QDialog):
                 if neu != e.unix_mtime:
                     aend["mtime"] = neu
             return aend
+        if self.art == "fat":
+            if self.f_ro.isChecked() != e.read_only:        aend["read_only"] = self.f_ro.isChecked()
+            if self.f_hid.isChecked() != e.hidden_attr:     aend["hidden"] = self.f_hid.isChecked()
+            if self.f_sys.isChecked() != e.system:          aend["system"] = self.f_sys.isChecked()
+            if self.f_arc.isChecked() != e.archived:        aend["archive"] = self.f_arc.isChecked()
+            if self.f_zeit.text().strip() != e.date:
+                import datetime
+                try:
+                    t = datetime.datetime.strptime(self.f_zeit.text().strip(), "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    raise ValueError(f"geändert: '{self.f_zeit.text()}' ist kein Zeitpunkt "
+                                     "(JJJJ-MM-TT HH:MM:SS)") from None
+                if not 1980 <= t.year <= 2107:
+                    raise ValueError("geändert: DOS kennt nur 1980 bis 2107")
+                aend["mtime"] = int(t.timestamp())
+            return aend
         if not self.udos:
             if self.f_user.value() != e.user:      aend["user"] = self.f_user.value()
             if self.f_ro.isChecked() != e.read_only:  aend["read_only"] = self.f_ro.isChecked()
@@ -654,6 +703,8 @@ class PropertiesDialog(QDialog):
         try:
             if self.wega:
                 self.tool.set_unix_attrs(self.entry.ref, **aend)
+            elif self.art == "fat":
+                self.tool.set_dos_attrs(self.entry.ref, **aend)
             elif self.udos:
                 self.tool.set_udos_attrs(self.entry.ref, **aend)
             else:

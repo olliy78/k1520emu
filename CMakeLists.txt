@@ -248,6 +248,7 @@ if(BUILD_K1520)
         core/filesystem/udos/udos_fs.cpp
         core/filesystem/udos/udos1715_fs.cpp
         core/filesystem/sios/sios_fs.cpp
+        core/filesystem/fat/fat_fs.cpp
         core/filesystem/wega/wega_fs.cpp
         core/filesystem/tar/tar_fs.cpp
         core/filesystem/tar/tar_archiv.cpp

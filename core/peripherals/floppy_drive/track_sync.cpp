@@ -110,6 +110,10 @@ TrackSync::TrackSync(const TrackSyncSpec& spec, DiskMedium& medium)
 
     medium_->resize(spec_.num_cyls, spec_.num_heads);
     medium_->setDefaultEncoding(spec_.default_encoding);
+    // Rate und Drehzahl der DISKETTE ans Medium: sie landen im HFE-Kopf von save-as
+    // und entscheiden im Emulator ueber die Hochdichte-Abweisung (Entwurf 45, H2).
+    medium_->setNominalRateKbps(spec_.cell_rate_kbps);
+    medium_->setNominalRpm(spec_.rpm ? spec_.rpm : 300);
     medium_->markAllUnknown();         // nichts ist gelesen — DAS ist der Unterschied
     medium_->setLoader(this);
 

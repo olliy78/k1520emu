@@ -318,7 +318,8 @@ bool ImdCodec::encode(const DiskMedium& in, const SourceInfo* vorlage, std::vect
             const auto v = vorhanden.find(key);
             TrackRecord tr;
             if (v == vorhanden.end()) {
-                tr.cyl = c; tr.head = h; tr.enc = standard; tr.rate_kbps = 250;
+                tr.cyl = c; tr.head = h; tr.enc = standard;
+                tr.rate_kbps = (standard == Encoding::MFM && in.nominalRateKbps() >= 500) ? 500 : 250;
                 const auto m = vModi.find(key);
                 if (m != vModi.end()) modeToEncoding(m->second, tr.enc, tr.rate_kbps);
                 soll.push_back(std::move(tr));

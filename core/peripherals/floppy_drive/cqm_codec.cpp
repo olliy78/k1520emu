@@ -253,8 +253,13 @@ bool CqmCodec::loadBuffer(const std::vector<uint8_t>& datei, DiskMedium& out,
     out = DiskMedium(ncyls, nheads, Encoding::MFM);
     // 5,25″-HD (15 x 512) dreht mit 360 U/min, alles andere hier mit 300 (siehe
     // doc/design/35_cqm.md); nur fuer die Zellenzahl einer spaeteren .hfe von Belang.
-    out.setNominalRpm((si.density == 1 && si.secs_per_track == 15 && si.sector_size == 512)
-                          ? 360 : 300);
+    //
+    // Hochdichte (Dichte-Byte 1, 512-B-Sektoren, 15 oder 18 je Spur) ist 500 kbit/s: die Rate
+    // gehoert ans Medium, sonst schriebe eine .hfe/.imd daraus 250 kbit/s (Entwurf 45).
+    const bool hd = si.density == 1 && si.sector_size == 512
+                 && (si.secs_per_track == 15 || si.secs_per_track == 18);
+    out.setNominalRpm((hd && si.secs_per_track == 15) ? 360 : 300);
+    if (hd) out.setNominalRateKbps(500);
 
     size_t off = 0;
     for (uint8_t c = 0; c < ncyls; ++c) {
@@ -279,7 +284,8 @@ bool CqmCodec::loadBuffer(const std::vector<uint8_t>& datei, DiskMedium& out,
                 }
                 sektoren.push_back(std::move(ls));
             }
-            out.setTrack(c, h, TrackCodec::buildTrack(sektoren, Encoding::MFM));
+            out.setTrack(c, h, TrackCodec::buildTrack(sektoren, Encoding::MFM,
+                                                       out.nominalRateKbps()));
         }
     }
     out.clearDirty();

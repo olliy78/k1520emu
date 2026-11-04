@@ -129,6 +129,10 @@ struct TransferOptions {
     bool overwrite = false;   ///< vorhandene Zieldateien ersetzen
     bool dry_run   = false;   ///< nur planen und pruefen, nichts schreiben
 
+    /// @brief FAT: lange Dateinamen (VFAT) schreiben?  -1 = automatisch, 0 = nie, 1 = immer
+    ///        (siehe @ref WriteOptions::fat_lfn).
+    int  fat_lfn   = -1;
+
     /// @brief UDOS-Kopfsektorangaben, die eine Linux-Datei nicht mitbringt:
     ///        Typ ("A"/"P"/"P1"/"B"), Eigenschaften ("WS") und Startadresse.
     ///        Leer = Vorgabe (A/B, keine Eigenschaften, keine Startadresse).
@@ -436,6 +440,23 @@ public:
     /// @brief Wie @ref writeBootImage, aber aus einer Datei.
     bool writeBootImageFile(const std::string& path, int volume = 0);
 
+    /**
+     * @brief **DOS `SYS`**: aus einer FAT-Systemdiskette eine bootfaehige Diskette machen.
+     *
+     * Uebertragen werden der Bootsektor (sein BPB bleibt der DIESER Diskette, siehe
+     * @ref FatFileSystem::bootsektorMitBpb) und die Systemdateien der Quelle: die ersten
+     * Wurzeleintraege mit System- oder Versteckt-Attribut (`IO.SYS`, `DCDOS.SYS`; `IBMBIO.COM`,
+     * `IBMDOS.COM`; `MSDOS.SYS` …) samt Attributen und Zeitstempel, **in der Reihenfolge der Quelle**.
+     *
+     * Die Lader suchen die Dateien an den ERSTEN Verzeichnisplaetzen und lesen sie
+     * zusammenhaengend ab dem ersten Cluster; deshalb muss diese Diskette **leer** sein (keine
+     * Dateien, keine Verzeichnisse) - sonst Fehler, es wird nichts veraendert.  Bei zu wenig
+     * Platz ebenso.
+     *
+     * @param bericht  Klartext, was uebertragen wurde (auch die Warnung bei nicht zusammenhaengenden Dateien)
+     */
+    bool dosSystemUebertragen(DiskVolume& quelle, std::string& bericht);
+
     // ─── Auskunft ────────────────────────────────────────────────────────────
 
     const std::string&     path()      const { return path_; }
@@ -576,6 +597,13 @@ public:
     bool makeDirectory(const FileRef& ref);
     /// @brief Liegt ein WEGA-Dateisystem (Verzeichnisbaum, UNIX) vor?
     bool istWega() const { return profile_ && profile_->type == FsType::WegaMutos; }
+    /// @brief FAT: Vorgabe fuer lange Dateinamen beim Einfuegen (-1 automatisch, 0 nie, 1 immer),
+    ///        wenn @ref TransferOptions::fat_lfn nichts verlangt.
+    void setFatLfn(int modus) { fat_lfn_ = modus; }
+    /// @brief MS-DOS-FAT12-Diskette (Verzeichnisbaum, DOS-Attribute, Zeitstempel)?
+    bool istFat() const { return profile_ && profile_->type == FsType::Fat; }
+    /// @brief Hat die Diskette einen Verzeichnisbaum (Namen sind Pfade mit `/`)?  WEGA, tar oder FAT.
+    bool hatBaum() const { return istUnix() || istFat(); }
     /// @brief UNIX-Sicht (Modus/uid/gid, Pfade, `ls -l`): WEGA oder tar-Diskette.
     bool istUnix() const {
         return profile_ && (profile_->type == FsType::WegaMutos || profile_->type == FsType::Tar);
@@ -801,6 +829,8 @@ public:
     /// @brief Modus, Besitzer und Aenderungszeit einer WEGA-Datei aendern (`chmod`/`chown`/`touch`).
     ///        UDOS und CP/M melden das als Fehler.  Eine Transaktion im Dateisystem.
     bool setAttributes(const FileRef& ref, const UnixAttrs& attrs);
+    /// @brief DOS-Attribute und Zeitstempel einer FAT-Datei aendern.
+    bool setAttributes(const FileRef& ref, const FatAttrs& attrs);
 
     /// @brief Belegte Bloecke als Text (nur WEGA, sonst leer) — fuer den Eigenschaften-Dialog.
     std::string blockList(const FileRef& ref) const;
@@ -1003,6 +1033,7 @@ public:
     void noteError(const std::string& why) const { last_error_ = why; }
 
 private:
+    int fat_lfn_ = -1;     ///< siehe @ref setFatLfn
     std::vector<std::string> ziel_hinweise_;   ///< @ref lastTargetNotices
     DiskVolume() = default;
 

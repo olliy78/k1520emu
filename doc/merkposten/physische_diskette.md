@@ -268,3 +268,8 @@ Was man beim Weiterarbeiten wissen muss:
   Doppelschritt) und das Gast-TEMPO (1×/10×/unbegrenzt).
 - **Offen:** das Merken der Sitzungsparameter (Laufwerk und Zellrate muessen bei
   jedem Einlegen neu gewaehlt werden).
+- **Rate/Drehzahl der DISKETTE vs. Drehzahl des LAUFWERKS** (2026-11-03, Entwurf 45 H2): `cell_rate_kbps`/`rpm` an
+  `Sync`/`PhysicalSession.start` sind IMMER die der Diskette, `drive_rpm` die des Laufwerks (TEAC FD-55GFR fest 300:
+  `500/360/300`).  Nur `Device.pll_takt()` (Lesen) rechnet den Unterschied; das Abbild liegt immer in der Zeitbasis der
+  Diskette, `TrackSync` reicht Rate/Drehzahl ans Medium (HFE-Kopf!).  Nie die 417 als Rate an den Kern geben.  Wächter
+  `test_gw_hd.py`.

@@ -13,6 +13,9 @@
 #    encoding     (optional) fm | mfm — Vorgabe für Spuren ohne eigenes encoding
 #    containers   (optional) img | hfe — darstellbare Dateitypen (Default: beide)
 #    step         (optional) 1 (Vorgabe) | 2 — Doppelschritt, siehe Kasten
+#    rate         (optional) 250 (Vorgabe) | 500 — Grundrate in kbit/s (PC-Hochdichte); das
+#                            Spurbereich-`rate: 125` unten ist ein Teiler DAVON
+#    rpm          (optional) 300 | 360 — Drehzahl; Vorgabe aus den Laufwerken (360 nur 8")
 #    tracks       (Pflicht)  Liste disjunkter Spurbereiche
 #
 #  ┌───────────────────────────────────────────────────────────────────────────┐
@@ -601,6 +604,56 @@ formats:
     step:        2
     tracks:
       - { cyls: 0-39, heads: 0-1, sectors: 17, size: 256 }
+
+  # ══ MS-DOS / PC-DOS (FAT12) ═════════════════════════════════════════════════
+  # Die Geometrien der PC-Disketten, soweit sie noch fehlten (doc/design/44_fat12.md).  Die
+  # Hochdichte-Formate (1,2M/1,44M/2,88M) laufen mit 500/1000 kbit/s — der Emulator hat dafuer
+  # kein Laufwerk; sie sind reine Container-Formate des DiskTool (`.img`, sektorgenau).
+  - name:        k5601_ds40_8x512
+    description: "40 Spuren doppelseitig, 8×512 (MS-DOS 320K)"
+    drives:      [K5601]
+    encoding:    mfm
+    tracks:
+      - { cyls: 0-39, heads: 0-1, sectors: 8, size: 512 }
+
+  - name:        k5601_ds40_9x512
+    description: "40 Spuren doppelseitig, 9×512 (MS-DOS 360K, PC-Standard 5,25″)"
+    drives:      [K5601]
+    encoding:    mfm
+    tracks:
+      - { cyls: 0-39, heads: 0-1, sectors: 9, size: 512 }
+
+  - name:        k5601_ds80_8x512
+    description: "80 Spuren doppelseitig, 8×512 (MS-DOS 640K)"
+    drives:      [K5601]
+    encoding:    mfm
+    tracks:
+      - { cyls: 0-79, heads: 0-1, sectors: 8, size: 512 }
+
+  - name:        pc_hd_15x512
+    description: "PC 5,25″ hochdichte Diskette — 80 Spuren doppelseitig, 15×512 (1,2M)"
+    drives:      [K5601]
+    encoding:    mfm
+    rate:        500        # kbit/s; ein Emulator-Laufwerk kann das nicht — das Einlegen wird abgewiesen
+    rpm:         360
+    tracks:
+      - { cyls: 0-79, heads: 0-1, sectors: 15, size: 512 }
+
+  - name:        pc_hd_18x512
+    description: "PC 3,5″ hochdichte Diskette — 80 Spuren doppelseitig, 18×512 (1,44M)"
+    drives:      [K5601]
+    encoding:    mfm
+    rate:        500
+    rpm:         300
+    tracks:
+      - { cyls: 0-79, heads: 0-1, sectors: 18, size: 512 }
+
+  - name:        pc_ed_36x512
+    description: "PC 3,5″ extra-hochdichte Diskette — 80 Spuren doppelseitig, 36×512 (2,88M)"
+    drives:      [K5601]
+    encoding:    mfm
+    tracks:
+      - { cyls: 0-79, heads: 0-1, sectors: 36, size: 512 }
 
 # ═════════════════════════════════════════════════════════════════════════════
 #  DATEISYSTEME (k1520DiskTool)
@@ -1227,3 +1280,65 @@ filesystems:
     data_start:  { cyl: 1, head: 0 }
     leer:        true
     detect_rank: 901
+
+  # ══ MS-DOS / PC-DOS / DCP (FAT12) ══════════════════════════════════════════
+  # Eigener Grund fuer jeden Eintrag: das Dateisystem beschreibt sich selbst (BPB im Bootsektor) —
+  # das Profil benennt nur die Geometrie, auf der `create --fs dosNNN` anlegt.  Die Erkennung ist
+  # positiv (BPB + Sprung/FAT-Kopf), deshalb vor allen CP/M-Rueckfaellen (detect_rank -20).
+  # Doku: doc/design/44_fat12.md, doc/merkposten/fat12.md
+  - name:        dos160
+    description: "MS-DOS FAT12 160K — 40 Spuren einseitig, 8×512"
+    format:      k5601_ss40_8x512
+    type:        fat
+    detect_rank: -20
+  - name:        dos180
+    description: "MS-DOS FAT12 180K — 40 Spuren einseitig, 9×512"
+    format:      k5601_ss40_9x512
+    type:        fat
+    detect_rank: -20
+  - name:        dos320
+    description: "MS-DOS FAT12 320K — 40 Spuren doppelseitig, 8×512"
+    format:      k5601_ds40_8x512
+    type:        fat
+    detect_rank: -20
+  - name:        dos360
+    description: "MS-DOS FAT12 360K — 40 Spuren doppelseitig, 9×512 (PC-Standard 5,25″)"
+    format:      k5601_ds40_9x512
+    type:        fat
+    detect_rank: -20
+  - name:        dos360ss80
+    description: "MS-DOS FAT12 360K — 80 Spuren einseitig, 9×512"
+    format:      k5601_ss80_9x512
+    type:        fat
+    detect_rank: -20
+  - name:        dos640
+    description: "MS-DOS FAT12 640K — 80 Spuren doppelseitig, 8×512"
+    format:      k5601_ds80_8x512
+    type:        fat
+    detect_rank: -20
+  - name:        dos720
+    description: "MS-DOS FAT12 720K — 80 Spuren doppelseitig, 9×512 (3,5″ DD, A7150/DCP)"
+    format:      k5601_9x512
+    type:        fat
+    detect_rank: -20
+  - name:        dos800
+    description: "MS-DOS FAT12 800K — 80 Spuren doppelseitig, 10×512"
+    format:      k5601_10x512
+    type:        fat
+    detect_rank: -20
+  - name:        dos1200
+    description: "MS-DOS FAT12 1,2M — 80 Spuren doppelseitig, 15×512 (5,25″ HD)"
+    format:      pc_hd_15x512
+    type:        fat
+    detect_rank: -20
+  - name:        dos1440
+    description: "MS-DOS FAT12 1,44M — 80 Spuren doppelseitig, 18×512 (3,5″ HD)"
+    format:      pc_hd_18x512
+    type:        fat
+    detect_rank: -20
+  - name:        dos2880
+    description: "MS-DOS FAT12 2,88M — 80 Spuren doppelseitig, 36×512 (3,5″ ED)"
+    format:      pc_ed_36x512
+    type:        fat
+    containers:  [img]      # 1000 kbit/s (ED): der Stack kennt nur 250/500 - HFE/DMK/IMD/TD0/CQM waeren falsch beschriftet
+    detect_rank: -20

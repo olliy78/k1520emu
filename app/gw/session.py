@@ -21,7 +21,7 @@ Siehe doc/design/14_physische_diskette.md §11/§12.
 from __future__ import annotations
 
 import sys
-from typing import Tuple
+from typing import NamedTuple, Tuple
 
 
 #: Laufwerk am Kabel -> Beschriftung.  ``a``/``b`` ist das PC-Kabel mit Verdrehung,
@@ -33,9 +33,47 @@ LAUFWERKE = [("a", "A  (PC-Kabel, mit Verdrehung)"),
              ("2", "2  (Shugart)"),
              ("3", "3  (Shugart)")]
 
-#: Zellrate -> Beschriftung.  Die Rate gehoert zur Diskette, nicht zum Adapter.
-RATEN = [(250, "250 kbit/s — 5,25″ doppelte Dichte (K5601, K5600.x)"),
-         (500, "500 kbit/s — 8″ MFM (MF6400) und HD")]
+class Aufzeichnung(NamedTuple):
+    """Wie die Diskette beschrieben ist und wie das Laufwerk sie sieht.
+
+    ``rate`` und ``disk_rpm`` gehoeren zur DISKETTE (das Abbild liegt immer in
+    deren Zeitbasis, ihr Kopf traegt sie), ``drive_rpm`` zum LAUFWERK: ein fest auf
+    300 U/min gestelltes Laufwerk sieht eine 1,2M-Diskette mit 500*300/360 =
+    416,7 kbit/s (Entwurf 45 §3a).  Nur der PLL-Takt beim Lesen kennt den Unterschied.
+    """
+    schluessel: str
+    rate: int
+    disk_rpm: int
+    drive_rpm: int
+    hd: bool           #: im Emulator nicht einlegbar (Kern weist 5,25″-HD ab)
+    text: str
+
+
+#: Auswahl im Dialog.  Die ersten beiden sind die alten Eintraege (blosse Zahl 250/500).
+AUFZEICHNUNGEN = [
+    Aufzeichnung("250", 250, 300, 300, False,
+                 "250 kbit/s — 5,25″ doppelte Dichte (K5601, K5600.x)"),
+    Aufzeichnung("500", 500, 360, 360, False,
+                 "500 kbit/s — 8″ MFM (MF6400), 360 U/min"),
+    Aufzeichnung("417", 500, 360, 300, True,
+                 "417 kbit/s — 5,25″ HD 1,2M im 300-U/min-Laufwerk "
+                 "(z. B. TEAC FD-55GFR)"),
+    Aufzeichnung("500hd", 500, 360, 360, True,
+                 "500 kbit/s — 5,25″ HD 1,2M, 360 U/min (IBM-PC-Laufwerk)"),
+    Aufzeichnung("500hd35", 500, 300, 300, True,
+                 "500 kbit/s — 3,5″ HD 1,44M, 300 U/min"),
+]
+
+#: (Schluessel, Beschriftung) -- alte Form, fuer Aufrufer, die nur Text brauchen.
+RATEN = [(a.schluessel, a.text) for a in AUFZEICHNUNGEN]
+
+
+def aufzeichnung(schluessel) -> Aufzeichnung:
+    """Eintrag zum Schluessel; eine blosse Zahl (250/500) gilt wie bisher."""
+    for a in AUFZEICHNUNGEN:
+        if a.schluessel == str(schluessel):
+            return a
+    raise KeyError(schluessel)
 
 
 def verfuegbarkeit() -> Tuple[bool, str]:
@@ -85,13 +123,17 @@ class PhysicalSession:
     gemeldete_defekte: str = ""
 
     def __init__(self, sync, worker, device, *, drive: str, writable: bool,
-                 cell_rate_kbps: int, num_cyls: int = 0, num_heads: int = 0):
+                 cell_rate_kbps: int, num_cyls: int = 0, num_heads: int = 0,
+                 rpm: int = 300, drive_rpm: int = 0):
         self.sync = sync
         self.worker = worker
         self.device = device
         self.drive = drive
         self.writable = writable
         self.cell_rate_kbps = cell_rate_kbps
+        #: Drehzahl der DISKETTE und des LAUFWERKS (0 = gleich).
+        self.rpm = rpm
+        self.drive_rpm = drive_rpm or rpm
         # Die Geometrie, mit der eingelegt wurde.  `Stats` traegt nur die Spurzahl
         # als Produkt (tracks_total) — wer wissen will, wie viele KOEPFE es sind,
         # bekaeme sie von dort nicht zurueckgerechnet.
@@ -104,12 +146,16 @@ class PhysicalSession:
               num_cyls: int = 80, num_heads: int = 2, writable: bool = False,
               read_ahead: bool = True, for_emulator: bool = False,
               rpm: int = 300, verify_writes: bool = True,
-              double_step: bool = False) -> "PhysicalSession":
+              double_step: bool = False, drive_rpm: int = 0) -> "PhysicalSession":
         """Adapter öffnen, Sync anlegen, Arbeitsfaden starten.
 
         Es wird dabei **nichts gelesen** — Spuren kommen einzeln, sobald jemand sie
         anfasst.  Der Rückgabewert ist bereits „scharf"; anzumelden ist danach nur
         noch ``session.sync``.
+
+        ``cell_rate_kbps`` und ``rpm`` beschreiben die DISKETTE, ``drive_rpm`` das
+        Laufwerk (0 = gleich ``rpm``); das Abbild liegt immer in der Zeitbasis der
+        Diskette.
 
         Raises:
             app.gw.GwFehler: kein Paket, kein Adapter — Text ist anwendertauglich.
@@ -117,7 +163,8 @@ class PhysicalSession:
         from app.gw import Sync, TrackWorker, open_device
 
         device = open_device(drive, cell_rate_kbps=cell_rate_kbps,
-                             double_step=double_step)
+                             double_step=double_step, disk_rpm=rpm,
+                             drive_rpm=drive_rpm or rpm)
         sync = Sync(num_cyls=num_cyls, num_heads=num_heads,
                     cell_rate_kbps=cell_rate_kbps, rpm=rpm, writable=writable,
                     read_ahead=read_ahead, for_emulator=for_emulator,
@@ -131,7 +178,7 @@ class PhysicalSession:
             raise
         return cls(sync, worker, device, drive=drive, writable=writable,
                    cell_rate_kbps=cell_rate_kbps, num_cyls=num_cyls,
-                   num_heads=num_heads)
+                   num_heads=num_heads, rpm=rpm, drive_rpm=drive_rpm)
 
     @property
     def handle(self):

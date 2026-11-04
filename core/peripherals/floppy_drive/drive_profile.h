@@ -181,6 +181,10 @@ const DriveProfile& builtinDriveProfile(const std::string& name);
  */
 uint16_t nominalRpmForDrives(const std::vector<std::string>& drives);
 
+struct DiskFormat;
+/// @brief Drehzahl eines Katalogformats: `rpm:` des Formats, sonst @ref nominalRpmForDrives.
+uint16_t nominalRpmForFormat(const DiskFormat& fmt);
+
 /**
  * @brief Alle gueltigen Profilnamen (inkl. `"none"`).
  *

@@ -49,7 +49,7 @@ def cli(monkeypatch, hfe):
 
     def start(*, drive="a", cell_rate_kbps=250, num_cyls=80, num_heads=2,
               writable=False, read_ahead=True, for_emulator=False, rpm=300,
-              verify_writes=True, double_step=False):
+              verify_writes=True, double_step=False, drive_rpm=0):
         sync = Sync(num_cyls=geraet.num_cyls, num_heads=geraet.num_heads,
                     cell_rate_kbps=cell_rate_kbps, rpm=rpm, writable=writable,
                     read_ahead=read_ahead, verify_writes=verify_writes)
