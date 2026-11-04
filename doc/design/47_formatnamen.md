@@ -457,3 +457,12 @@ Festlegungen:
 | `dos1200` | `dos_ds80_15x512_hd` |
 | `dos1440` | `dos_ds80_18x512_hd` |
 | `dos2880` | `dos_ds80_36x512_ed` |
+
+## 12  Offene Folgepunkte aus Schritt 3
+
+- `app/disktool/ui/main_window.py::_container_grund` vergleicht `f.name == filesystem` ohne Alias-Auflösung; mit einem **alten**
+  Profilnamen als Eingabe greift die UDOS-Sperre für `.img` nicht.  Die Oberfläche liefert nur neue Namen, der Fehler ist
+  also nur über Skripte erreichbar.  Behebung in Schritt 4: die C-ABI bekommt eine Alias-Auflösung
+  (`k1520d_fs_resolve(name)` → echter Name), Python-Aufrufer lösen darüber auf.
+- Kommentare, die Format-Geometrie meinen, nennen teils den Profilnamen (Skript-Ersetzung in Schritt 3); bei Gelegenheit glätten.
+- Nach Schritt 3 steht ein Komplettlauf `tools/dev.sh test-merge --alles` samt `win` noch aus (Schritt 8).
