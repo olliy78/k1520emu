@@ -148,7 +148,7 @@ TEST_P(Prg710FormatBoot, ScpxFormatFuenfMal1024) {
     std::string err;
     auto dv = DiskVolume::open(neu.get(), "", formate, dateisysteme, err);
     ASSERT_NE(dv, nullptr) << err;
-    EXPECT_EQ(dv->detection().format, "scpx798") << dv->detection().remarks;
+    EXPECT_EQ(dv->detection().format, "ds80_2t16x256-5x1024") << dv->detection().remarks;
     EXPECT_EQ(dv->detection().remarks.find("unformatiert"), std::string::npos)
         << dv->detection().remarks;
     EXPECT_TRUE(dv->list().empty());

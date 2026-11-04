@@ -139,7 +139,7 @@ def test_forcing_a_filesystem_reopens_the_image(window, fixture_disks):
 
     assert window.open_image(bild)
     assert window.tool.filesystem == "scpx640"
-    assert window.tool.format == "cpa640"
+    assert window.tool.format == "ds80_16x256"
     erkannte_dateien = alle_namen(window.disk_view)
     assert "INIT.COM" in erkannte_dateien
 

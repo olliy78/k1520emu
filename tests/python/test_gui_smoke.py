@@ -162,7 +162,7 @@ def test_mounting_a_disk_updates_the_drive_panel(window, qapp, temp_disk):
 def test_drive_panel_shows_the_adaptation_notice(window, qapp, tmp_path):
     """Passt die Diskette nicht zum Laufwerk, steht der Hinweis im Laufwerkskasten."""
     drives = window.drives_widget
-    fmt, path = "k5601_ss40_26x128", str(tmp_path / "vierzig_spuren.img")
+    fmt, path = "ss40_26x128", str(tmp_path / "vierzig_spuren.img")
     assert window.emulator.create_disk(0, path, fmt, False), window.emulator.last_error()
     assert window.emulator.unmount_disk(0)
 
@@ -975,7 +975,7 @@ def test_a_raw_image_asks_for_its_format(window, qapp, monkeypatch, temp_disk):
     qapp.processEvents()
 
     assert gefragt, "beim rohen Sektorimage muss gefragt werden"
-    assert gefragt[0]["vorauswahl"] == "cpa780", \
+    assert gefragt[0]["vorauswahl"] == "ds80_3t26x128-5x1024", \
         "die Dateigröße ist das einzige Merkmal — sie trägt die Vorauswahl"
     assert window.drives_widget.is_mounted(0)
     assert window.emulator.disk_path(0) == path
@@ -1026,7 +1026,7 @@ def test_the_drive_panel_shows_the_detected_format(window, qapp, temp_disk):
     path = temp_disk("cpa_cpa780_k5601_noclock.hfe")
     assert drives.mount_path(0, path)
     qapp.processEvents()
-    assert drives._panels[0]._format_value.text() == "cpa780"
+    assert drives._panels[0]._format_value.text() == "ds80_3t26x128-5x1024"
 
 
 def test_an_unrecognisable_disk_is_called_unknown(window, qapp, tmp_path):
@@ -1060,7 +1060,7 @@ def test_saving_as_a_raw_image_uses_the_detected_format(window, qapp, monkeypatc
 
     drives._panels[0]._saveas_btn.click()
     qapp.processEvents()
-    assert gesehen == ["cpa780"], "das erkannte Format geht in den Export"
+    assert gesehen == ["ds80_3t26x128-5x1024"], "das erkannte Format geht in den Export"
     assert os.path.exists(ziel)
 
 

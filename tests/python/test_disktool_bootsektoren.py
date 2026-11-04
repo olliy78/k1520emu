@@ -256,7 +256,7 @@ def test_udos50_bootdiskette_aus_dem_katalog_startet(tmp_path):
 
     emu = K1520Emulator()
     try:
-        assert emu.mount_disk(0, str(ziel), "k5601_16x256", False), emu.last_error()
+        assert emu.mount_disk(0, str(ziel), "ds80_16x256", False), emu.last_error()
         emu.power_on()
         assert run_until_text(emu, "Neues Datum", max_cycles=120_000_000), (
             "UDOS 5.0 startet von der gebauten Diskette nicht:\n" + emu.screen_text())

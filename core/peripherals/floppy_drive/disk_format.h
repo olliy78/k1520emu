@@ -146,6 +146,17 @@ struct DiskFormat {
         return physical_cyl / step;
     }
 
+    /**
+     * @brief Katalogname, den dieses Format nach dem Namensschema haben MUSS (Entwurf 47 §1).
+     *
+     * `[fm_]<ss|ds><Zylinder>_<Zone>[-<Zone>...][_dstep][_id<N>][_hd|_ed]`; rein aus
+     * Spurliste/Kodierung/Schritt/Rate berechnet, ohne Katalogzugriff.  Der Katalog erzeugt
+     * seine Namen NICHT damit, der Waechter `FormatKatalogSchema` prueft sie dagegen.
+     * Regel `_ed`: Rate 500 => `_hd`; sonst 36 Sektoren x 512 Byte => `_ed` (der Katalog
+     * fuehrt fuer pc_ed keine eigene Rate).
+     */
+    std::string schemaName() const;
+
     /// @brief Ist dieses Profil in @ref drives gelistet?
     bool supportsDrive(const std::string& profile_name) const;
 

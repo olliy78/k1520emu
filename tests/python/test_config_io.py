@@ -53,7 +53,7 @@ def test_build_config_tolerates_none_arguments():
 
 
 def test_save_load_roundtrip(tmp_path):
-    disks = [{"drive": 0, "path": "/tmp/a.img", "format": "cpa780",
+    disks = [{"drive": 0, "path": "/tmp/a.img", "format": "ds80_3t26x128-5x1024",
               "write_protect": False}]
     window = {"width": 1024, "height": 680}
     original = cfg.build_config(CRTParams(), {"speed": 2.0}, disks, window,
@@ -177,3 +177,28 @@ def test_fehlende_migrationsstufe_ist_ein_fehler(monkeypatch):
     monkeypatch.setattr(cfg, "_MIGRATIONEN", {})
     with pytest.raises(ValueError):
         cfg.migriere({"version": 1})
+
+
+def test_alte_formatnamen_werden_beim_laden_auf_die_neuen_umgeschrieben(tmp_path):
+    """W8 (Entwurf 47): eine Konfiguration mit alten Formatnamen wird mit neuen geladen.
+
+    Gespeichert wird danach nur noch der neue Name; unbekannte Namen bleiben unberuehrt.
+    """
+    p = tmp_path / "alt.yaml"
+    p.write_text(
+        "version: 1\n"
+        "disks:\n"
+        "  - {drive: 0, path: a.hfe, format: cpa780, write_protect: false}\n"
+        "  - {drive: 1, path: b.hfe, format: cpa640, write_protect: true}\n"
+        "  - {drive: 2, path: c.hfe, format: scpx780_b}\n"
+        "  - {drive: 3, path: d.img, format: ds80_5x1024}\n"
+        "  - {drive: 3, path: e.img, format: gibt_es_nicht}\n",
+        encoding="utf-8")
+    daten = cfg.load_config(str(p))
+    assert [d["format"] for d in daten["disks"]] == [
+        "ds80_3t26x128-5x1024", "ds80_16x256", "ds80_6t26x128-5x1024",
+        "ds80_5x1024", "gibt_es_nicht"]
+    # Rundlauf: wieder geschrieben und gelesen bleibt es der neue Name
+    q = tmp_path / "neu.yaml"
+    cfg.save_config(str(q), daten)
+    assert cfg.load_config(str(q))["disks"][0]["format"] == "ds80_3t26x128-5x1024"

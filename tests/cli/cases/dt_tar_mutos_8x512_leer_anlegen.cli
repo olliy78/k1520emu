@@ -5,7 +5,7 @@ tmpfile leer.hfe:
 setup_run: create %leer.hfe% --fs tar_mutos8k_8x512_mfm_leer
 run:    info %leer.hfe%
 expect: tar_mutos8k_8x512_mfm_leer
-expect: mutos_ss77
+expect: ss77_1t26x128-8x512
 forbid: udos
 forbid: Dateisystem: mutos8k
 exit:   0

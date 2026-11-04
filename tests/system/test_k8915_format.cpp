@@ -90,7 +90,7 @@ TEST(K8915Format, LeerdisketteFormatDisgenKaltstart)
             std::string err;
             auto vol = DiskVolume::open(b.path(), "", k.formate, k.fs, err);
             ASSERT_TRUE(vol) << err;
-            EXPECT_EQ(vol->detection().format, "cpa800");
+            EXPECT_EQ(vol->detection().format, "ds80_5x1024");
             EXPECT_TRUE(vol->hasFileSystem());
             EXPECT_TRUE(vol->list().empty());
             EXPECT_TRUE(vol->check(FsCheckLevel::Voll, true).ohneBefund());

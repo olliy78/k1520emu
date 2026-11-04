@@ -15,7 +15,7 @@ from conftest import requires_disk
 
 pytestmark = requires_disk
 
-FORMAT = "k5601_ss40_16x256"          # 163840 Nutzbytes je Abbild
+FORMAT = "ss40_16x256"          # 163840 Nutzbytes je Abbild
 
 
 def _bytes(n, start=1):

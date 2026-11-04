@@ -133,7 +133,7 @@ TEST(CpaDpb, TabellenzeilenEntsprechenDemBios) {
 TEST(CpaDpb, ReproduziertNachgemessenesProfilCpa780) {
     Erkannt e = erkenne(fixture("cpa_cpa780_k5601_clock.hfe"));
     ASSERT_TRUE(e) << e.fehler;
-    EXPECT_EQ(e.format->name, "cpa780");
+    EXPECT_EQ(e.format->name, "ds80_3t26x128-5x1024");
 
     EXPECT_EQ(e.dpb.size_code, 3);
     EXPECT_EQ(e.dpb.row, CpaDpb::Ds80);
@@ -189,7 +189,7 @@ TEST(CpaDpb, LeereAchthundertkDisketteHatKeineSystemspurenUnd192Plaetze) {
     std::filesystem::remove(pfad);
     ASSERT_TRUE(e) << e.fehler;
 
-    EXPECT_EQ(e.format->name, "cpa800");
+    EXPECT_EQ(e.format->name, "ds80_5x1024");
     EXPECT_EQ(e.dpb.sys_tracks, 0);
     EXPECT_EQ(e.dpb.data_cyl, 0);
     EXPECT_EQ(e.dpb.dir_entries, 192);
@@ -204,8 +204,8 @@ TEST(CpaDpb, LeereAchthundertkDisketteHatKeineSystemspurenUnd192Plaetze) {
 TEST(CpaDpb, HundertachtundzwanzigByteSpurenBekommenVersatzSechs) {
     const std::string pfad =
         k1520test::tempPath("k1520_cpa_dpb_128.hfe");
-    const DiskFormat* fmt = formate().find("k5601_26x128");
-    if (!fmt) fmt = formate().find("k5601_ss80_26x128");
+    const DiskFormat* fmt = formate().find("ds80_26x128");
+    if (!fmt) fmt = formate().find("ss80_26x128");
     ASSERT_NE(fmt, nullptr) << "kein 26×128-Format im Katalog";
     ASSERT_NE(DiskImage::create(pfad, *fmt, /*write_protect=*/false), nullptr);
 

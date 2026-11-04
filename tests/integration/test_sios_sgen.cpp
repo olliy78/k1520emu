@@ -73,9 +73,9 @@ struct Rechner {
     Rechner(const char* b_fixture, bool b40 = false)
         : m(cfg(b40)), b(b_fixture, std::string("sios_sgen_b_") + b_fixture) {
         m.powerOn();
-        EXPECT_TRUE(m.mountDisk(0, a.path(), "k5601_ss80_26x128", false)) << m.lastError();
+        EXPECT_TRUE(m.mountDisk(0, a.path(), "ss80_26x128", false)) << m.lastError();
         EXPECT_TRUE(k1520test::runSmallUntil(m, "(M)", 300'000'000LL, 100'000));
-        EXPECT_TRUE(m.mountDisk(1, b.path(), "k5601_ss40_26x128", false)) << m.lastError();
+        EXPECT_TRUE(m.mountDisk(1, b.path(), "ss40_26x128", false)) << m.lastError();
     }
     void tippe(const std::string& s) { k1520test::typeString(m, s); }
     void taste(uint32_t c) { k1520test::typeKey(m, c); }
@@ -86,7 +86,7 @@ struct Rechner {
     std::string schirm() { return k1520test::vramText(m); }
     bool ein40(int drive, const std::string& pfad) {
         m.unmountDisk(drive);
-        return m.mountDisk(drive, pfad, "k5601_ss40_26x128", false);
+        return m.mountDisk(drive, pfad, "ss40_26x128", false);
     }
 };
 
@@ -110,10 +110,10 @@ const std::string& vorbereiteteZieldiskette() {
     TempDisk syls("sios1526_syls.hfe", "sios_sgen_init_syls.hfe");
     TempDisk prog("sios1526_dp1.hfe", "sios_sgen_init_prog.hfe");
     ziel = std::make_unique<TempDisk>("sios1526_dp2.hfe", "sios_sgen_init_ziel.hfe");
-    EXPECT_TRUE(m.mountDisk(0, syls.path(), "k5601_ss80_26x128", false));
+    EXPECT_TRUE(m.mountDisk(0, syls.path(), "ss80_26x128", false));
     EXPECT_TRUE(k1520test::runSmallUntil(m, "(M)", 300'000'000LL, 100'000));
-    EXPECT_TRUE(m.mountDisk(0, prog.path(), "k5601_ss40_26x128", false));
-    EXPECT_TRUE(m.mountDisk(1, ziel->path(), "k5601_ss40_26x128", false));
+    EXPECT_TRUE(m.mountDisk(0, prog.path(), "ss40_26x128", false));
+    EXPECT_TRUE(m.mountDisk(1, ziel->path(), "ss40_26x128", false));
     auto warte = [&](const std::string& t, long long n) {
         return k1520test::runSmallUntil(m, t, n, 5'000);
     };
@@ -290,7 +290,7 @@ TEST(SiosSgen, GeneriertEineSystemdiskette) {
     c.sicherheitsstecker = 1;
     A5120Machine m(c);
     m.powerOn();
-    ASSERT_TRUE(m.mountDisk(0, sys.path(), "k5601_ss40_26x128", false)) << m.lastError();
+    ASSERT_TRUE(m.mountDisk(0, sys.path(), "ss40_26x128", false)) << m.lastError();
     ASSERT_TRUE(k1520test::runSmallUntil(m, "SIOS 1526/0.9 (M)_", 300'000'000LL, 100'000))
         << k1520test::vramText(m);
     k1520test::typeString(m, "DAT");
@@ -327,7 +327,7 @@ TEST(SiosSgen, GeneriertEinSystemMitK7633UndBootetAmAup) {
     c.aup = true;
     A5120Machine m(c);
     m.powerOn();
-    ASSERT_TRUE(m.mountDisk(0, sys.path(), "k5601_ss40_26x128", false)) << m.lastError();
+    ASSERT_TRUE(m.mountDisk(0, sys.path(), "ss40_26x128", false)) << m.lastError();
     // Die Systemzeile heisst, der Treiber hat das Typzeichen 80H bekommen (sonst Fehler nach ~0,5 s).
     ASSERT_TRUE(k1520test::runSmallUntil(m, "SIOS 1526/0.9 (M)_", 300'000'000LL, 100'000))
         << k1520test::vramText(m);

@@ -167,9 +167,9 @@ TEST(SiosRest, DISABLED_Sond_Frei) {
     const bool v09 = std::getenv("SIOS_V09") != nullptr;
     Rig r(std::getenv("SIOS_LW") ? std::getenv("SIOS_LW") : "K5601", !v09);
     Kopie a(std::getenv("SIOS_SYS") ? std::getenv("SIOS_SYS") : (v09 ? kSys09 : kSys11), "fa.hfe"), b(kProg1, "fb.hfe"), c2(kProg2, "fc.hfe");
-    ASSERT_TRUE(r.mount(0, a.path, std::getenv("SIOS_SYS") ? "k5601_ss40_26x128" : "k5601_ss80_26x128"));
-    ASSERT_TRUE(r.mount(1, b.path, "k5601_ss40_26x128"));
-    ASSERT_TRUE(r.mount(2, daten, "k5601_ss40_26x128"));
+    ASSERT_TRUE(r.mount(0, a.path, std::getenv("SIOS_SYS") ? "ss40_26x128" : "ss80_26x128"));
+    ASSERT_TRUE(r.mount(1, b.path, "ss40_26x128"));
+    ASSERT_TRUE(r.mount(2, daten, "ss40_26x128"));
     ASSERT_TRUE(r.bootWarte());
     if (!std::getenv("SIOS_OHNE_ASN")) r.asn66();
     if (prog) { r.cal(prog); r.ruhe(150'000'000LL); r.zeige("Programm gestartet"); }
@@ -202,16 +202,16 @@ TEST(SiosRest, DISABLED_Sond_Frei) {
             const std::string w = k.substr(3);
             if (w == "leer80") {
                 static const std::string l = leerdiskette("K5601", "k1520_sios_rest_leer80.hfe");
-                r.mount(k[1] - '0', l, "k5601_ss80_26x128");
+                r.mount(k[1] - '0', l, "ss80_26x128");
             } else {
-                r.mount(k[1] - '0', w == "daten2" ? daten2 : daten, "k5601_ss40_26x128");
+                r.mount(k[1] - '0', w == "daten2" ? daten2 : daten, "ss40_26x128");
             }
         }
         else if (k.rfind("a=", 0) == 0) {   // Datei aus disks/ nach A: (alte Diskette ersetzen)
             static std::vector<std::unique_ptr<Kopie>> halter;
             halter.push_back(std::make_unique<Kopie>(k.substr(2), "tausch" + std::to_string(halter.size()) + ".hfe"));
             r.m.unmountDisk(0);
-            r.mount(0, halter.back()->path, "k5601_ss40_26x128");
+            r.mount(0, halter.back()->path, "ss40_26x128");
         }
     }
     r.zeige("Ende");
@@ -259,12 +259,12 @@ std::string saetze(int n) {
 struct Rig11 : Rig {
     Kopie a{kSys11, "w_a.hfe"}, p1{kProg1, "w_p1.hfe"};
     Rig11() : Rig("K5601", true) {
-        EXPECT_TRUE(mount(0, a.path, "k5601_ss80_26x128"));
+        EXPECT_TRUE(mount(0, a.path, "ss80_26x128"));
         EXPECT_TRUE(bootWarte()) << schirm();
     }
     void programmInA() {
         m.unmountDisk(0);
-        EXPECT_TRUE(mount(0, p1.path, "k5601_ss40_26x128"));
+        EXPECT_TRUE(mount(0, p1.path, "ss40_26x128"));
     }
 };
 
@@ -353,8 +353,8 @@ TEST(SiosRest, DidiZeigtDieDatensaetzeEinerDiskToolDatei) {
     const std::string daten = datendiskette("k1520_sios_rest_w1.hfe", {{"ALPHA", saetze(4)}});
     Rig11 r;
     Kopie b(kProg1, "w1_b.hfe");
-    ASSERT_TRUE(r.mount(1, b.path, "k5601_ss40_26x128"));
-    ASSERT_TRUE(r.mount(2, daten, "k5601_ss40_26x128"));
+    ASSERT_TRUE(r.mount(1, b.path, "ss40_26x128"));
+    ASSERT_TRUE(r.mount(2, daten, "ss40_26x128"));
     r.asn66();
     r.cal("DIDI");
     ASSERT_TRUE(r.warte("DIDI 1520 (SIEX) V 1.1", 400'000'000LL)) << r.schirm();
@@ -385,7 +385,7 @@ TEST(SiosRest, VonSiosGeschriebeneDateiLiestDasDiskTool) {
     const std::string ziel = datendiskette("k1520_sios_rest_w2z.hfe", {{"ZIEL", std::string(512, 'y')}});
     Rig11 r;
     r.programmInA();
-    ASSERT_TRUE(r.mount(1, ziel, "k5601_ss40_26x128"));
+    ASSERT_TRUE(r.mount(1, ziel, "ss40_26x128"));
     r.tippe("CAL");
     r.taste(r.et1);
     ASSERT_TRUE(r.warte("CAL_")) << r.schirm();
@@ -393,7 +393,7 @@ TEST(SiosRest, VonSiosGeschriebeneDateiLiestDasDiskTool) {
     r.taste(r.et1);
     ASSERT_TRUE(r.warte("LOAD DISKS", 300'000'000LL)) << r.schirm();
     r.m.unmountDisk(0);
-    ASSERT_TRUE(r.mount(0, daten, "k5601_ss40_26x128"));
+    ASSERT_TRUE(r.mount(0, daten, "ss40_26x128"));
     copdAlles(r);
     r.m.unmountDisk(0);
     r.m.unmountDisk(1);
@@ -416,8 +416,8 @@ TEST(SiosRest, VonSiosGeschriebeneDateiLiestDasDiskTool) {
 TEST(SiosRest, V09_CalLaedtProgrammeUndMeldetNfnd) {
     Rig r("K5601", false);
     Kopie a(kSys09, "w3_a.hfe"), b(kProg1, "w3_b.hfe");
-    ASSERT_TRUE(r.mount(0, a.path, "k5601_ss80_26x128"));
-    ASSERT_TRUE(r.mount(1, b.path, "k5601_ss40_26x128"));
+    ASSERT_TRUE(r.mount(0, a.path, "ss80_26x128"));
+    ASSERT_TRUE(r.mount(1, b.path, "ss40_26x128"));
     ASSERT_TRUE(r.bootWarte()) << r.schirm();
     r.tippe("CAL");
     r.taste(r.et1);
@@ -471,7 +471,7 @@ TEST(SiosRest, InitDoubleTracksLegtEine80ZylinderDisketteAn) {
     const std::string z = leerdiskette("K5601", "k1520_sios_rest_w5a.hfe");
     Rig11 r;
     r.programmInA();
-    ASSERT_TRUE(r.mount(1, z, "k5601_ss80_26x128"));
+    ASSERT_TRUE(r.mount(1, z, "ss80_26x128"));
     initiere(r, "2");
     r.m.unmountDisk(1);
     std::string err;
@@ -491,7 +491,7 @@ TEST(SiosRest, InitEinfachImK5601_DateiUeberSpur0HinausLesbar) {
     const std::string z = leerdiskette("K5601", "k1520_sios_rest_w5b_z.hfe");
     Rig11 r;
     r.programmInA();
-    ASSERT_TRUE(r.mount(1, z, "k5601_ss80_26x128"));
+    ASSERT_TRUE(r.mount(1, z, "ss80_26x128"));
     initiere(r, "1");
     r.tippe("CAL");
     r.taste(r.et1);
@@ -500,14 +500,14 @@ TEST(SiosRest, InitEinfachImK5601_DateiUeberSpur0HinausLesbar) {
     r.taste(r.et1);
     ASSERT_TRUE(r.warte("LOAD DISKS", 300'000'000LL)) << r.schirm();
     r.m.unmountDisk(0);
-    ASSERT_TRUE(r.mount(0, daten, "k5601_ss40_26x128"));
+    ASSERT_TRUE(r.mount(0, daten, "ss40_26x128"));
     copdAlles(r);
     r.m.unmountDisk(0);
     r.m.unmountDisk(1);
     // Frischer Start: die beschriebene Diskette in B:, DIDI (Programmdiskette in A:) liest sie mit SIOS-Treibern.
     Rig11 r2;
     r2.programmInA();
-    ASSERT_TRUE(r2.mount(1, z, "k5601_ss80_26x128"));
+    ASSERT_TRUE(r2.mount(1, z, "ss80_26x128"));
     r2.tippe("CAL");
     r2.taste(r2.et1);
     ASSERT_TRUE(r2.warte("CAL_")) << r2.schirm();

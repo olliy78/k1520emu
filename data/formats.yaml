@@ -61,7 +61,8 @@ formats:
 
   # ══ CP/A-Standardformate (5,25″, K5601) ════════════════════════════════════
 
-  - name:        cpa780
+  - name:        ds80_3t26x128-5x1024
+    aliases:     [cpa780]
     description: "CP/A 780K Bootdiskette — 128B-Systembereich, 1024B-Daten"
     drives:      [K5601]
     encoding:    mfm
@@ -74,7 +75,8 @@ formats:
       - { cyls: 1,    heads: 1,   sectors: 5,  size: 1024 }
       - { cyls: 2-79, heads: 0-1, sectors: 5,  size: 1024 }
 
-  - name:        cpa800
+  - name:        ds80_5x1024
+    aliases:     [cpa800]
     description: "CP/A 800K — 80 Spuren doppelseitig, durchgängig 5×1024"
     drives:      [K5601]
     default_for: [K5601]
@@ -86,21 +88,16 @@ formats:
   # (Einseitig wären es 320 KB — so stand es bis 2026-08-03 fälschlich im Katalog
   # und davor in den einkompilierten builtinFormats().)  Damit sind beide Formate
   # ausschließlich am zweiköpfigen K5601 fahrbar.
-  - name:        cpa640
-    description: "CP/A 640K — 80 Spuren doppelseitig, 16×256"
-    drives:      [K5601]
-    encoding:    mfm
-    tracks:
-      - { cyls: 0-79, heads: 0-1, sectors: 16, size: 256 }
-
-  - name:        cpa624
+  - name:        ds78_16x256
+    aliases:     [cpa624]
     description: "CP/A 624K — 78 Spuren doppelseitig, 16×256 (reduzierte Kapazität)"
     drives:      [K5601]
     encoding:    mfm
     tracks:
       - { cyls: 0-77, heads: 0-1, sectors: 16, size: 256 }
 
-  - name:        cpa200
+  - name:        ss80_5x1024
+    aliases:     [cpa200]
     description: "CP/A 400K — 80 Spuren einseitig, 5×1024 (K5600.20)"
     drives:      [K5601, K5600.20]
     default_for: [K5600.20]
@@ -108,7 +105,8 @@ formats:
     tracks:
       - { cyls: 0-79, heads: 0, sectors: 5, size: 1024 }
 
-  - name:        cpa200_boot
+  - name:        ss80_3t26x128-5x1024
+    aliases:     [cpa200_boot]
     description: "CP/A 400K bootfähig — 128B-Systemspuren 0-2, danach 5×1024"
     drives:      [K5601, K5600.20]
     encoding:    mfm
@@ -118,7 +116,8 @@ formats:
 
   # ══ SCPX-Varianten (5,25″, doppelseitig) ═══════════════════════════════════
 
-  - name:        scpx780
+  - name:        ds80_6t26x128-5x1024
+    aliases:     [scpx780, scpx780_b]
     description: "SCPX 780K — Systemspuren 0-2 mit 26×128, Daten 5×1024"
     drives:      [K5601]
     encoding:    mfm
@@ -126,15 +125,8 @@ formats:
       - { cyls: 0-2,  heads: 0-1, sectors: 26, size: 128  }
       - { cyls: 3-79, heads: 0-1, sectors: 5,  size: 1024 }
 
-  - name:        scpx780_b
-    description: "SCPX 780K Variante B — Geometrie wie scpx780"
-    drives:      [K5601]
-    encoding:    mfm
-    tracks:
-      - { cyls: 0-2,  heads: 0-1, sectors: 26, size: 128  }
-      - { cyls: 3-79, heads: 0-1, sectors: 5,  size: 1024 }
-
-  - name:        scpx798
+  - name:        ds80_2t16x256-5x1024
+    aliases:     [scpx798]
     description: "SCPX 798K — Systemzylinder 0 in 16×256, Daten 5×1024"
     drives:      [K5601]
     encoding:    mfm
@@ -154,7 +146,8 @@ formats:
   # Sektorlänge)" — `biosdsk.mac`, s. tests/fixtures/disks/cpa_cpa780_k5601_clock.prn.
   # Gemessen am Referenzdatenträger (Greaseweazle F1, 300 min⁻¹): FM-Flusszeiten
   # 4/8 µs auf c0h0, MFM 4/6/8 µs überall sonst.
-  - name:        scp1700_640
+  - name:        ds80_1t16x128fm-16x256
+    aliases:     [scp1700_640]
     description: "SCP1700/CP/M-86 640K — Bootspur c0h0 in FM 16×128, sonst 16×256 MFM"
     drives:      [K5601]
     encoding:    mfm
@@ -169,14 +162,16 @@ formats:
   # trotzdem EIN Format.  Beide Einträge sind an den Referenzdisketten gemessen
   # (`disks/udos_boot_*.hfe`, GeometryProbe).
 
-  - name:        udos_ds77
+  - name:        ds77_26x128
+    aliases:     [udos_ds77]
     description: "UDOS 4.x — 77 Spuren doppelseitig, 26×128 (je Seite ein Dateisystem)"
     drives:      [K5601]
     encoding:    mfm
     tracks:
       - { cyls: 0-76, heads: 0-1, sectors: 26, size: 128 }
 
-  - name:        udos_ss77
+  - name:        ss77_26x128
+    aliases:     [udos_ss77]
     description: "UDOS 4.x — 77 Spuren einseitig, 26×128"
     drives:      [K5601, K5600.20, MF6400]
     encoding:    mfm
@@ -185,7 +180,8 @@ formats:
 
   # MUTOS 8000 (A5120.16): Zylinder 0 traegt einen eigenen 26x128-Bereich (UDOS-Ladespur),
   # das UNIX-Dateisystem beginnt auf Zylinder 1 mit 8x512.  Gemessen an DISK_ROOT/CMD/CC1/CC2.
-  - name:        mutos_ss77
+  - name:        ss77_1t26x128-8x512
+    aliases:     [mutos_ss77]
     description: "MUTOS 8000 — Zylinder 0 26×128, Zylinder 1-76 einseitig 8×512"
     drives:      [K5601, K5600.20, MF6400]
     encoding:    mfm
@@ -193,7 +189,8 @@ formats:
       - { cyls: 0,    heads: 0, sectors: 26, size: 128 }
       - { cyls: 1-76, heads: 0, sectors: 8,  size: 512 }
 
-  - name:        mutos_ss80
+  - name:        ss80_1t26x128-8x512
+    aliases:     [mutos_ss80]
     description: "MUTOS 8000 — Zylinder 0 26×128, Zylinder 1-79 einseitig 8×512"
     drives:      [K5601, K5600.20]
     encoding:    mfm
@@ -208,7 +205,8 @@ formats:
   # fahrbar, das MFM-Format nur auf dem MF6400.  Das K5602 ist zum MF3200 voll
   # kompatibel und hat kein eigenes Profil.
 
-  - name:        mf3200
+  - name:        fm_ss77_4x1024
+    aliases:     [mf3200]
     description: "8″ 308K — 77 Spuren einseitig, 4×1024 FM (Einfachdichte)"
     drives:      [MF3200, MF6400]
     default_for: [MF3200]
@@ -216,7 +214,8 @@ formats:
     tracks:
       - { cyls: 0-76, heads: 0, sectors: 4, size: 1024 }
 
-  - name:        mf6400
+  - name:        ss77_8x1024
+    aliases:     [mf6400]
     description: "8″ 616K — 77 Spuren einseitig, 8×1024 MFM (Doppeldichte)"
     drives:      [MF6400]
     default_for: [MF6400]
@@ -238,7 +237,8 @@ formats:
   # `drives:` nennt deshalb jedes Profil, auf das die Geometrie wirklich passt.
 
   # ── CP/A auf einseitigen 5,25″-Laufwerken ─────────────────────────────────
-  - name:        cpa190
+  - name:        ss40_2t26x128-5x1024
+    aliases:     [cpa190]
     description: "CP/A S 190K — 40 Spuren einseitig, 26×128-Systemspuren + 5×1024"
     drives:      [K5600.10, K5600.20, K5601]
     encoding:    mfm
@@ -246,7 +246,8 @@ formats:
       - { cyls: 0-1,  heads: 0, sectors: 26, size: 128  }
       - { cyls: 2-39, heads: 0, sectors: 5,  size: 1024 }
 
-  - name:        cpa390
+  - name:        ss80_2t26x128-5x1024
+    aliases:     [cpa390]
     description: "CP/A S 390K — 80 Spuren einseitig, 26×128-Systemspuren + 5×1024"
     drives:      [K5600.20, K5601]
     encoding:    mfm
@@ -254,21 +255,24 @@ formats:
       - { cyls: 0-1,  heads: 0, sectors: 26, size: 128  }
       - { cyls: 2-79, heads: 0, sectors: 5,  size: 1024 }
 
-  - name:        k5601_ss80_16x256
+  - name:        ss80_16x256
+    aliases:     [k5601_ss80_16x256]
     description: "80 Spuren einseitig, 16×256 (SCP 308K; auch SCPX INIT 1)"
     drives:      [K5600.20, K5601]
     encoding:    mfm
     tracks:
       - { cyls: 0-79, heads: 0, sectors: 16, size: 256 }
 
-  - name:        k5601_ss40_9x512
+  - name:        ss40_9x512
+    aliases:     [k5601_ss40_9x512]
     description: "40 Spuren einseitig, 9×512 (DEC VT / VPPC / MSDOS 170-180K)"
     drives:      [K5600.10, K5600.20, K5601]
     encoding:    mfm
     tracks:
       - { cyls: 0-39, heads: 0, sectors: 9, size: 512 }
 
-  - name:        k5601_ss40_8x512
+  - name:        ss40_8x512
+    aliases:     [k5601_ss40_8x512]
     description: "40 Spuren einseitig, 8×512 (CP/M 86 / IBM CPC 156K)"
     drives:      [K5600.10, K5600.20, K5601]
     encoding:    mfm
@@ -276,21 +280,24 @@ formats:
       - { cyls: 0-39, heads: 0, sectors: 8, size: 512 }
 
   # Sektor-IDs, die NICHT bei 1 beginnen — genau dafuer gibt es first_sector.
-  - name:        k5601_ss40_9x512_id65
+  - name:        ss40_9x512_id65
+    aliases:     [k5601_ss40_9x512_id65]
     description: "40 Spuren einseitig, 9×512 ab Sektor-ID 65 (Schneider S)"
     drives:      [K5600.10, K5600.20, K5601]
     encoding:    mfm
     tracks:
       - { cyls: 0-39, heads: 0, sectors: 9, size: 512, first_sector: 65 }
 
-  - name:        k5601_ss40_9x512_id193
+  - name:        ss40_9x512_id193
+    aliases:     [k5601_ss40_9x512_id193]
     description: "K5601 §3.4 Format U H (Schneider D) — 40 Sp. einseitig 9×512, IDs C1-C9"
     drives:      [K5600.10, K5600.20, K5601]
     encoding:    mfm
     tracks:
       - { cyls: 0-39, heads: 0, sectors: 9, size: 512, first_sector: 193 }
 
-  - name:        k5601_ss40_10x512_id0
+  - name:        ss40_10x512_id0
+    aliases:     [k5601_ss40_10x512_id0]
     description: "40 Spuren einseitig, 10×512 ab Sektor-ID 0 (KAYPRO, 195K)"
     drives:      [K5600.10, K5600.20, K5601]
     encoding:    mfm
@@ -300,7 +307,8 @@ formats:
   # ── SCPX INIT.COM ─────────────────────────────────────────────────────────
   # INIT 3/4 (DD-DS/SS 5×1024) legt Zylinder 0 als 16×256 an — der Systemspur-
   # bereich, den SCPX zum Booten braucht.
-  - name:        scpx_ss80_5x1024
+  - name:        ss80_1t16x256-5x1024
+    aliases:     [scpx_ss80_5x1024]
     description: "SCPX INIT 4 — 80 Spuren einseitig, Zylinder 0 in 16×256, dann 5×1024"
     drives:      [K5600.20, K5601]
     encoding:    mfm
@@ -308,7 +316,8 @@ formats:
       - { cyls: 0,    heads: 0, sectors: 16, size: 256  }
       - { cyls: 1-79, heads: 0, sectors: 5,  size: 1024 }
 
-  - name:        scpx_ss40_5x1024
+  - name:        ss40_1t16x256-5x1024
+    aliases:     [scpx_ss40_5x1024]
     description: "SCPX INIT 4 auf 40 Spuren — Zylinder 0 in 16×256, dann 5×1024"
     drives:      [K5600.10, K5600.20, K5601]
     encoding:    mfm
@@ -320,14 +329,16 @@ formats:
   # Durchgaengig FM beim MF3200-Menue; das MF6400-Menue mischt FM-Systemspuren
   # mit MFM-Datenspuren — genau der Fall, fuer den TrackFormat ein eigenes
   # `encoding` je Spurbereich hat.
-  - name:        mf3200_26x128
+  - name:        fm_ss77_26x128
+    aliases:     [mf3200_26x128]
     description: "8″-Layout — 77 Spuren einseitig, 26×128 FM (243/250K)"
     drives:      [MF3200, MF6400, K5601]
     encoding:    fm
     tracks:
       - { cyls: 0-76, heads: 0, sectors: 26, size: 128 }
 
-  - name:        mf3200_296k
+  - name:        fm_ss77_3t26x128-4x1024
+    aliases:     [mf3200_296k]
     description: "8″-Layout CP/A BC — 26×128-Systemspuren 0-2, dann 4×1024, FM"
     drives:      [MF3200, MF6400, K5601]
     encoding:    fm
@@ -335,7 +346,8 @@ formats:
       - { cyls: 0-2,  heads: 0, sectors: 26, size: 128  }
       - { cyls: 3-76, heads: 0, sectors: 4,  size: 1024 }
 
-  - name:        mf3200_scp296k
+  - name:        fm_ss77_1t26x128-4x1024
+    aliases:     [mf3200_scp296k]
     description: "8″-Layout SCP — Systemspur 0 in 26×128, dann 4×1024, FM"
     drives:      [MF3200, MF6400, K5601]
     encoding:    fm
@@ -343,14 +355,16 @@ formats:
       - { cyls: 0,    heads: 0, sectors: 26, size: 128  }
       - { cyls: 1-76, heads: 0, sectors: 4,  size: 1024 }
 
-  - name:        mf3200_9x512
+  - name:        fm_ss77_9x512
+    aliases:     [mf3200_9x512]
     description: "8″-Layout — 77 Spuren einseitig, 9×512 FM (346K)"
     drives:      [MF3200, MF6400, K5601]
     encoding:    fm
     tracks:
       - { cyls: 0-76, heads: 0, sectors: 9, size: 512 }
 
-  - name:        mf3200_336k
+  - name:        fm_ss77_2t26x128-9x512
+    aliases:     [mf3200_336k]
     description: "8″-Layout — 26×128-Systemspuren 0-1, dann 9×512, FM (336K)"
     drives:      [MF3200, MF6400, K5601]
     encoding:    fm
@@ -358,7 +372,8 @@ formats:
       - { cyls: 0-1,  heads: 0, sectors: 26, size: 128 }
       - { cyls: 2-76, heads: 0, sectors: 9,  size: 512 }
 
-  - name:        mf3200_16x256
+  - name:        fm_ss77_3t26x128-16x256
+    aliases:     [mf3200_16x256]
     description: "8″-Layout — 26×128-Systemspuren 0-2, dann 16×256, FM (296K)"
     drives:      [MF3200, MF6400, K5601]
     encoding:    fm
@@ -366,56 +381,64 @@ formats:
       - { cyls: 0-2,  heads: 0, sectors: 26, size: 128 }
       - { cyls: 3-76, heads: 0, sectors: 16, size: 256 }
 
-  - name:        mf3200_9x512_80
+  - name:        fm_ss80_9x512
+    aliases:     [mf3200_9x512_80]
     description: "8″-Layout IH Mittweida — 9×512 FM ueber 80 Spuren (nur 5,25″-HW)"
     drives:      [K5601]
     encoding:    fm
     tracks:
       - { cyls: 0-79, heads: 0, sectors: 9, size: 512 }
 
-  - name:        mf6400_600k
+  - name:        ss77_2t26x128fm-8x1024
+    aliases:     [mf6400_600k]
     description: "8″-DD — FM-Systemspuren 0-1 (26×128), dann 8×1024 MFM (600K)"
     drives:      [MF6400, K5601]
     tracks:
       - { cyls: 0-1,  heads: 0, sectors: 26, size: 128,  encoding: fm  }
       - { cyls: 2-76, heads: 0, sectors: 8,  size: 1024, encoding: mfm }
 
-  - name:        mf6400_scp600k
+  - name:        ss77_1t26x128fm-8x1024
+    aliases:     [mf6400_scp600k]
     description: "8″-DD SCP — FM-Systemspur 0 (26×128), dann 8×1024 MFM"
     drives:      [MF6400, K5601]
     tracks:
       - { cyls: 0,    heads: 0, sectors: 26, size: 128,  encoding: fm  }
       - { cyls: 1-76, heads: 0, sectors: 8,  size: 1024, encoding: mfm }
 
-  - name:        mf6400_374k
+  - name:        ss77_2t26x128fm-40x128
+    aliases:     [mf6400_374k]
     description: "8″-DD — FM-Systemspuren 0-1 (26×128), dann 40×128 MFM (374K)"
     drives:      [MF6400, K5601]
     tracks:
       - { cyls: 0-1,  heads: 0, sectors: 26, size: 128, encoding: fm  }
       - { cyls: 2-76, heads: 0, sectors: 40, size: 128, encoding: mfm }
 
-  - name:        mf6400_40x128
+  - name:        ss77_40x128
+    aliases:     [mf6400_40x128]
     description: "8″-DD — 77 Spuren einseitig, 40×128 MFM (384K)"
     drives:      [MF6400, K5601]
     encoding:    mfm
     tracks:
       - { cyls: 0-76, heads: 0, sectors: 40, size: 128 }
 
-  - name:        mf6400_16x512
+  - name:        ss77_16x512
+    aliases:     [mf6400_16x512]
     description: "8″-DD — 77 Spuren einseitig, 16×512 MFM (616K)"
     drives:      [MF6400, K5601]
     encoding:    mfm
     tracks:
       - { cyls: 0-76, heads: 0, sectors: 16, size: 512 }
 
-  - name:        mf6400_600k_16x512
+  - name:        ss77_2t26x128fm-16x512
+    aliases:     [mf6400_600k_16x512]
     description: "8″-DD — FM-Systemspuren 0-1 (26×128), dann 16×512 MFM (600K)"
     drives:      [MF6400, K5601]
     tracks:
       - { cyls: 0-1,  heads: 0, sectors: 26, size: 128, encoding: fm  }
       - { cyls: 2-76, heads: 0, sectors: 16, size: 512, encoding: mfm }
 
-  - name:        mf6400_9x1024
+  - name:        ss77_9x1024
+    aliases:     [mf6400_9x1024]
     description: "8″-DD — 77 Spuren einseitig, 9×1024 MFM (692K)"
     drives:      [MF6400, K5601]
     encoding:    mfm
@@ -427,35 +450,40 @@ formats:
   # Viele §3-Formate teilen dieselbe ROHgeometrie; Systemspuren, Verzeichnis-
   # einträge und Sektor-Interleave ändern das Offset-Layout der .img nicht.
 
-  - name:        k5601_16x256
+  - name:        ds80_16x256
+    aliases:     [cpa640, k5601_16x256]
     description: "K5601 §3 Formate 4/5 — 80 Spuren doppelseitig, 16×256"
     drives:      [K5601]
     encoding:    mfm
     tracks:
       - { cyls: 0-79, heads: 0-1, sectors: 16, size: 256 }
 
-  - name:        k5601_16x256_77
+  - name:        ds77_16x256
+    aliases:     [k5601_16x256_77]
     description: "K5601 §3 Format 7 (ZIK-NK) — 77 Spuren doppelseitig, 16×256"
     drives:      [K5601]
     encoding:    mfm
     tracks:
       - { cyls: 0-76, heads: 0-1, sectors: 16, size: 256 }
 
-  - name:        k5601_26x128
+  - name:        ds80_26x128
+    aliases:     [k5601_26x128]
     description: "K5601 §3 Format 6 — 80 Spuren doppelseitig, 26×128"
     drives:      [K5601]
     encoding:    mfm
     tracks:
       - { cyls: 0-79, heads: 0-1, sectors: 26, size: 128 }
 
-  - name:        k5601_9x512
+  - name:        ds80_9x512
+    aliases:     [k5601_9x512]
     description: "K5601 §3 Formate E/F — 80 Spuren doppelseitig, 9×512"
     drives:      [K5601]
     encoding:    mfm
     tracks:
       - { cyls: 0-79, heads: 0-1, sectors: 9, size: 512 }
 
-  - name:        k5601_10x512
+  - name:        ds80_10x512
+    aliases:     [k5601_10x512]
     description: "K5601 §3 Formate G/J — 80 Spuren doppelseitig, 10×512"
     drives:      [K5601]
     encoding:    mfm
@@ -464,14 +492,16 @@ formats:
 
   # ══ K5601 §3.4 — einseitig (S) ═════════════════════════════════════════════
 
-  - name:        k5601_ss80_26x128
+  - name:        ss80_26x128
+    aliases:     [k5601_ss80_26x128]
     description: "K5601 §3.4 Format S — 80 Spuren einseitig, 26×128"
     drives:      [K5601, K5600.20]
     encoding:    mfm
     tracks:
       - { cyls: 0-79, heads: 0, sectors: 26, size: 128 }
 
-  - name:        k5601_ss80_9x512
+  - name:        ss80_9x512
+    aliases:     [k5601_ss80_9x512]
     description: "K5601 §3.4 Format S — 80 Spuren einseitig, 9×512"
     drives:      [K5601, K5600.20]
     encoding:    mfm
@@ -480,7 +510,8 @@ formats:
 
   # ══ K5601 §3.4 — 40 Spuren Einzelschritt, einseitig (W) ════════════════════
 
-  - name:        k5601_ss40_5x1024
+  - name:        ss40_5x1024
+    aliases:     [k5601_ss40_5x1024]
     description: "K5601 §3.4 Format W — 40 Spuren einseitig, 5×1024 (K5600.10, 200K)"
     drives:      [K5600.10, K5600.20, K5601]
     default_for: [K5600.10]
@@ -488,21 +519,24 @@ formats:
     tracks:
       - { cyls: 0-39, heads: 0, sectors: 5, size: 1024 }
 
-  - name:        k5601_ss40_26x128
+  - name:        ss40_26x128
+    aliases:     [k5601_ss40_26x128]
     description: "K5601 §3.4 Format W — 40 Spuren einseitig, 26×128"
     drives:      [K5600.10, K5600.20, K5601]
     encoding:    mfm
     tracks:
       - { cyls: 0-39, heads: 0, sectors: 26, size: 128 }
 
-  - name:        k5601_ss40_16x256
+  - name:        ss40_16x256
+    aliases:     [k5601_ss40_16x256]
     description: "K5601 §3.4 Format W — 40 Spuren einseitig, 16×256"
     drives:      [K5600.10, K5600.20, K5601]
     encoding:    mfm
     tracks:
       - { cyls: 0-39, heads: 0, sectors: 16, size: 256 }
 
-  - name:        k5601_ss40_15x256
+  - name:        ss40_15x256
+    aliases:     [k5601_ss40_15x256]
     description: "K5601 §3.4 Format W — 40 Spuren einseitig, 15×256"
     drives:      [K5600.10, K5600.20, K5601]
     encoding:    mfm
@@ -511,28 +545,32 @@ formats:
 
   # ══ K5601 §3.4 — 40 Spuren Einzelschritt, doppelseitig (V) ═════════════════
 
-  - name:        k5601_ds40_5x1024
+  - name:        ds40_5x1024
+    aliases:     [k5601_ds40_5x1024]
     description: "K5601 §3.4 Format V — 40 Spuren doppelseitig, 5×1024"
     drives:      [K5601]
     encoding:    mfm
     tracks:
       - { cyls: 0-39, heads: 0-1, sectors: 5, size: 1024 }
 
-  - name:        k5601_ds40_26x128
+  - name:        ds40_26x128
+    aliases:     [k5601_ds40_26x128]
     description: "K5601 §3.4 Format V — 40 Spuren doppelseitig, 26×128"
     drives:      [K5601]
     encoding:    mfm
     tracks:
       - { cyls: 0-39, heads: 0-1, sectors: 26, size: 128 }
 
-  - name:        k5601_ds40_16x256
+  - name:        ds40_16x256
+    aliases:     [k5601_ds40_16x256]
     description: "K5601 §3.4 Format V — 40 Spuren doppelseitig, 16×256"
     drives:      [K5601]
     encoding:    mfm
     tracks:
       - { cyls: 0-39, heads: 0-1, sectors: 16, size: 256 }
 
-  - name:        k5601_ds40_17x256
+  - name:        ds40_17x256
+    aliases:     [k5601_ds40_17x256]
     description: "K5601 §3.4 Format V — 40 Spuren doppelseitig, 17×256"
     drives:      [K5601]
     encoding:    mfm
@@ -546,7 +584,8 @@ formats:
   # `step: 2` sagt nur, auf welchem physischen Zylinder eine Spur liegt.
   # Dieselben Sektorlayouts wie V/W, nur physisch anders abgelegt.
 
-  - name:        k5601_ss40_5x1024_dstep
+  - name:        ss40_5x1024_dstep
+    aliases:     [k5601_ss40_5x1024_dstep]
     description: "K5601 §3.4 Format U 0 — 40 Sp. einseitig 5×1024, Doppelschritt"
     drives:      [K5600.20, K5601]
     encoding:    mfm
@@ -554,7 +593,8 @@ formats:
     tracks:
       - { cyls: 0-39, heads: 0, sectors: 5, size: 1024 }
 
-  - name:        k5601_ss40_26x128_dstep
+  - name:        ss40_26x128_dstep
+    aliases:     [k5601_ss40_26x128_dstep]
     description: "K5601 §3.4 Format U 2/3 — 40 Sp. einseitig 26×128, Doppelschritt"
     drives:      [K5600.20, K5601]
     encoding:    mfm
@@ -562,7 +602,8 @@ formats:
     tracks:
       - { cyls: 0-39, heads: 0, sectors: 26, size: 128 }
 
-  - name:        k5601_ss40_16x256_dstep
+  - name:        ss40_16x256_dstep
+    aliases:     [k5601_ss40_16x256_dstep]
     description: "K5601 §3.4 Format U 4/5 — 40 Sp. einseitig 16×256, Doppelschritt"
     drives:      [K5600.20, K5601]
     encoding:    mfm
@@ -570,7 +611,8 @@ formats:
     tracks:
       - { cyls: 0-39, heads: 0, sectors: 16, size: 256 }
 
-  - name:        k5601_ss40_15x256_dstep
+  - name:        ss40_15x256_dstep
+    aliases:     [k5601_ss40_15x256_dstep]
     description: "K5601 §3.4 Format U 6 (BAP2001) — 40 Sp. einseitig 15×256, Doppelschritt"
     drives:      [K5600.20, K5601]
     encoding:    mfm
@@ -578,7 +620,8 @@ formats:
     tracks:
       - { cyls: 0-39, heads: 0, sectors: 15, size: 256 }
 
-  - name:        k5601_ds40_5x1024_dstep
+  - name:        ds40_5x1024_dstep
+    aliases:     [k5601_ds40_5x1024_dstep]
     description: "K5601 §3.4 Format T 0 — 40 Sp. doppelseitig 5×1024, Doppelschritt"
     drives:      [K5601]
     encoding:    mfm
@@ -586,7 +629,8 @@ formats:
     tracks:
       - { cyls: 0-39, heads: 0-1, sectors: 5, size: 1024 }
 
-  - name:        k5601_ds40_26x128_dstep
+  - name:        ds40_26x128_dstep
+    aliases:     [k5601_ds40_26x128_dstep]
     description: "K5601 §3.4 Format T 3 — 40 Sp. doppelseitig 26×128, Doppelschritt"
     drives:      [K5601]
     encoding:    mfm
@@ -594,7 +638,8 @@ formats:
     tracks:
       - { cyls: 0-39, heads: 0-1, sectors: 26, size: 128 }
 
-  - name:        k5601_ds40_16x256_dstep
+  - name:        ds40_16x256_dstep
+    aliases:     [k5601_ds40_16x256_dstep]
     description: "K5601 §3.4 Format T 4/5/7 — 40 Sp. doppelseitig 16×256, Doppelschritt"
     drives:      [K5601]
     encoding:    mfm
@@ -602,7 +647,8 @@ formats:
     tracks:
       - { cyls: 0-39, heads: 0-1, sectors: 16, size: 256 }
 
-  - name:        k5601_ds40_17x256_dstep
+  - name:        ds40_17x256_dstep
+    aliases:     [k5601_ds40_17x256_dstep]
     description: "K5601 §3.4 Format T 6 (Spectra) — 40 Sp. doppelseitig 17×256, Doppelschritt"
     drives:      [K5601]
     encoding:    mfm
@@ -614,28 +660,32 @@ formats:
   # Die Geometrien der PC-Disketten, soweit sie noch fehlten (doc/design/44_fat12.md).  Die
   # Hochdichte-Formate (1,2M/1,44M/2,88M) laufen mit 500/1000 kbit/s — der Emulator hat dafuer
   # kein Laufwerk; sie sind reine Container-Formate des DiskTool (`.img`, sektorgenau).
-  - name:        k5601_ds40_8x512
+  - name:        ds40_8x512
+    aliases:     [k5601_ds40_8x512]
     description: "40 Spuren doppelseitig, 8×512 (MS-DOS 320K)"
     drives:      [K5601]
     encoding:    mfm
     tracks:
       - { cyls: 0-39, heads: 0-1, sectors: 8, size: 512 }
 
-  - name:        k5601_ds40_9x512
+  - name:        ds40_9x512
+    aliases:     [k5601_ds40_9x512]
     description: "40 Spuren doppelseitig, 9×512 (MS-DOS 360K, PC-Standard 5,25″)"
     drives:      [K5601]
     encoding:    mfm
     tracks:
       - { cyls: 0-39, heads: 0-1, sectors: 9, size: 512 }
 
-  - name:        k5601_ds80_8x512
+  - name:        ds80_8x512
+    aliases:     [k5601_ds80_8x512]
     description: "80 Spuren doppelseitig, 8×512 (MS-DOS 640K)"
     drives:      [K5601]
     encoding:    mfm
     tracks:
       - { cyls: 0-79, heads: 0-1, sectors: 8, size: 512 }
 
-  - name:        pc_hd_15x512
+  - name:        ds80_15x512_hd
+    aliases:     [pc_hd_15x512]
     description: "PC 5,25″ hochdichte Diskette — 80 Spuren doppelseitig, 15×512 (1,2M)"
     drives:      [K5601]
     encoding:    mfm
@@ -644,7 +694,8 @@ formats:
     tracks:
       - { cyls: 0-79, heads: 0-1, sectors: 15, size: 512 }
 
-  - name:        pc_hd_18x512
+  - name:        ds80_18x512_hd
+    aliases:     [pc_hd_18x512]
     description: "PC 3,5″ hochdichte Diskette — 80 Spuren doppelseitig, 18×512 (1,44M)"
     drives:      [K5601]
     encoding:    mfm
@@ -653,7 +704,8 @@ formats:
     tracks:
       - { cyls: 0-79, heads: 0-1, sectors: 18, size: 512 }
 
-  - name:        pc_ed_36x512
+  - name:        ds80_36x512_ed
+    aliases:     [pc_ed_36x512]
     description: "PC 3,5″ extra-hochdichte Diskette — 80 Spuren doppelseitig, 36×512 (2,88M)"
     drives:      [K5601]
     encoding:    mfm
@@ -698,7 +750,7 @@ filesystems:
 
   - name:        cpa780
     description: "CP/A 780K Bootdiskette — Dateisystem ab Zylinder 2"
-    format:      cpa780
+    format:      ds80_3t26x128-5x1024
     type:        cpm
     # NACHGEMESSEN an tests/fixtures/disks/cpa_cpa780_k5601_clock.img: das Verzeichnis
     # steht bei Byte 15104 = Anfang c2h0; die erste Datei belegt ab Block 2, also sind
@@ -710,7 +762,7 @@ filesystems:
 
   - name:        cpa800
     description: "CP/A 800K Datendiskette — Dateisystem ab Zylinder 0"
-    format:      cpa800
+    format:      ds80_5x1024
     type:        cpm
     # 192, nicht 128: FORMAT.COM nennt den Menuepunkt selbst „5×1024, Sp. 0-159;
     # 192 Dir.-Eintraege" (doc/format.md §3.1, Wahl 0), und das BIOS rechnet dasselbe
@@ -730,7 +782,7 @@ filesystems:
 
   - name:        scpx640
     description: "SCPX 640K (16×256) — Systemzylinder 0-1, Dateisystem ab Zylinder 2"
-    format:      cpa640
+    format:      ds80_16x256
     type:        cpm
     # NACHGEMESSEN an tests/fixtures/disks/scpx17_cpa780_k5601.hfe (Verzeichnis bei
     # c2h0 = Byte 16384) und deckungsgleich mit dem, was die CP/A-Regel ausrechnet
@@ -742,7 +794,7 @@ filesystems:
 
   - name:        scpx798
     description: "SCPX 798K — Systemzylinder 0 in 16×256, Dateisystem ab Zylinder 2"
-    format:      scpx798
+    format:      ds80_2t16x256-5x1024
     type:        cpm
     # NACHGEMESSEN an tests/fixtures/disks/scpx17_5x1024_k5601_hardy_norm.hfe.
     data_start:  { cyl: 2, head: 0 }
@@ -764,7 +816,7 @@ filesystems:
 
   - name:        scpx8915
     description: "SCPX 8915 (K8915) 780K — Systemzylinder 0-1, Dateisystem ab Zylinder 2"
-    format:      cpa800
+    format:      ds80_5x1024
     type:        cpm
     data_start:  { cyl: 2, head: 0 }
     block_size:  2048
@@ -786,7 +838,7 @@ filesystems:
   # bleibt `cpa800`.
   - name:        cpa1715
     description: "CP/A 1715 (PC 1715) — 800K ohne Systemspuren, Bootkopf im Verzeichnis"
-    format:      cpa800
+    format:      ds80_5x1024
     type:        cpm
     block_size:  2048
     dir_entries: 192
@@ -804,7 +856,7 @@ filesystems:
   # `*_daten` sind die Namen fuer Disketten OHNE Lader (`detect: false`, nur auf Anforderung).
   - name:        microdos800
     description: "MicroDOS 1526 (A5120/A5130) 800K DS, 5×1024 - SYL-Lader im Verzeichnis, 104 Plaetze"
-    format:      cpa800
+    format:      ds80_5x1024
     type:        cpm
     block_size:  2048
     dir_entries: 104
@@ -813,7 +865,7 @@ filesystems:
 
   - name:        microdos200
     description: "MicroDOS 1526 (A5120/A5130) 200K SS 40 Spuren, 5×1024 - SYL-Lader im Verzeichnis, 64 Plaetze"
-    format:      k5601_ss40_5x1024
+    format:      ss40_5x1024
     type:        cpm
     block_size:  1024
     dir_entries: 64
@@ -827,7 +879,7 @@ filesystems:
   # lesen geht, schreiben nicht (Lage nur gemessen).
   - name:        microdos128
     description: "MicroDOS 1526 (A5120/A5130) 100K SS 40 Spuren, 26x128 - SYL-Lader 0.6 im Verzeichnis, 64 Plaetze"
-    format:      k5601_ss40_26x128
+    format:      ss40_26x128
     type:        cpm
     block_size:  1024
     dir_entries: 64
@@ -836,7 +888,7 @@ filesystems:
 
   - name:        microdos800_daten
     description: "MicroDOS 800K DS, 5×1024 - Datendiskette ohne Lader, 104 Plaetze"
-    format:      cpa800
+    format:      ds80_5x1024
     type:        cpm
     block_size:  2048
     dir_entries: 104
@@ -844,7 +896,7 @@ filesystems:
 
   - name:        microdos200_daten
     description: "MicroDOS 200K SS 40 Spuren, 5×1024 - Datendiskette ohne Lader, 64 Plaetze"
-    format:      k5601_ss40_5x1024
+    format:      ss40_5x1024
     type:        cpm
     block_size:  1024
     dir_entries: 64
@@ -855,7 +907,7 @@ filesystems:
   # Diskette auch eine MicroDOS-Diskette).
   - name:        microdos1715
     description: "MicroDOS 1715 (PC 1715) 800K DS - Bootkopf im Verzeichnis, 128 Plaetze"
-    format:      cpa800
+    format:      ds80_5x1024
     type:        cpm
     block_size:  2048
     dir_entries: 128
@@ -868,7 +920,7 @@ filesystems:
   # `detect: false`: in der Erkennung braeuchte er keinen Platz — wie `scpx8915`.
   - name:        scp1715
     description: "SCP 1715 / SCP 3.0 (PC 1715, 1715W) 780K — Systemzylinder 0-1, Dateisystem ab Zylinder 2"
-    format:      cpa800
+    format:      ds80_5x1024
     type:        cpm
     data_start:  { cyl: 2, head: 0 }
     block_size:  2048
@@ -892,7 +944,7 @@ filesystems:
   # ohne Mehrdeutigkeit (disk_volume.cpp, „Deckungsgleiche Profile").
   - name:        osm640
     description: "OS/M (P8000) 640K, Format 5 (16×256) — Systemzylinder 0-1, Dateisystem ab Zylinder 2"
-    format:      cpa640
+    format:      ds80_16x256
     type:        cpm
     data_start:  { cyl: 2, head: 0 }
     block_size:  2048
@@ -908,7 +960,7 @@ filesystems:
   # (beide `detect: false`).
   - name:        osm800
     description: "OS/M (P8000) 800K, Format 7 (5×1024) — Systemzylinder 0-1, Dateisystem ab Zylinder 2"
-    format:      cpa800
+    format:      ds80_5x1024
     type:        cpm
     data_start:  { cyl: 2, head: 0 }
     block_size:  2048
@@ -925,7 +977,7 @@ filesystems:
   # die Erkennung liest solche Disketten schon als `cpa_auto`.
   - name:        bcu880
     description: "BCU 880 V1.2 — Arbeitsdiskette „ohne SYL“, System Zylinder 0-1, Dateisystem ab Zylinder 2"
-    format:      k5601_ss40_26x128
+    format:      ss40_26x128
     type:        cpm
     data_start:  { cyl: 2, head: 0 }
     block_size:  1024
@@ -941,7 +993,7 @@ filesystems:
   # 5 Systemzylinder: 0 (leer), 1 (Lader), 2-4 (System, 67 Sektoren).
   - name:        bcu880_syl
     description: "BCU 880 V1.2 — Startdiskette „SYL auf Spur 1“ (Lade-ROM V0.6), reine Startdiskette"
-    format:      k5601_ss40_26x128
+    format:      ss40_26x128
     type:        cpm
     data_start:  { cyl: 5, head: 0 }
     block_size:  1024
@@ -956,7 +1008,7 @@ filesystems:
   # SYL-Lader PLUS der geaenderten Laufwerkstabelle von A:.  Dateien sieht BCU nur in Laufwerk A:.
   - name:        bcu880_kombi
     description: "BCU 880 V1.2 — EIGENBAU: Startdiskette mit Dateisystem ab Zylinder 5 (nur als A:)"
-    format:      k5601_ss40_26x128
+    format:      ss40_26x128
     type:        cpm
     data_start:  { cyl: 5, head: 0 }
     block_size:  1024
@@ -971,7 +1023,7 @@ filesystems:
   # Werkzeug keinen Block vergibt, den BCU nie sieht.
   - name:        bcu880_kombi80
     description: "BCU 880 V1.2 — EIGENBAU, 80 Spuren (K5600.20): Startdiskette mit Dateisystem ab Zylinder 5 (nur als A:)"
-    format:      k5601_ss80_26x128
+    format:      ss80_26x128
     type:        cpm
     data_start:  { cyl: 5, head: 0 }
     block_size:  1024
@@ -985,7 +1037,7 @@ filesystems:
   # Bootabbild (boot_bcu12_ohnesyl.bin); das System selbst wird nicht gebraucht (der Warmstart liest A:).
   - name:        bcu880_80
     description: "BCU 880 V1.2 — EIGENBAU, 80 Spuren (K5600.20): Arbeitsdiskette, Dateisystem ab Zylinder 2, 248 Bloecke"
-    format:      k5601_ss80_26x128
+    format:      ss80_26x128
     type:        cpm
     data_start:  { cyl: 2, head: 0 }
     block_size:  1024
@@ -1003,7 +1055,7 @@ filesystems:
 
   - name:        scp1700
     description: "SCP1700/CP/M-86 (A7100) — Dateisystem ab Zylinder 2"
-    format:      scp1700_640
+    format:      ds80_1t16x128fm-16x256
     type:        cpm
     # `os:` bleibt bei cpm2.2 — CP/M-86 unterscheidet sich im VERZEICHNIS nicht;
     # was anders ist (Programmdateiformat .CMD, 8086-Code), liegt im Dateiinhalt.
@@ -1019,12 +1071,12 @@ filesystems:
 
   - name:        udos_ds77
     description: "UDOS 4.x doppelseitig — 77 Spuren 26×128, je Seite ein Dateisystem"
-    format:      udos_ds77
+    format:      ds77_26x128
     type:        udos
 
   - name:        udos_ss77
     description: "UDOS 4.x einseitig — 77 Spuren 26×128"
-    format:      udos_ss77
+    format:      ss77_26x128
     type:        udos
 
   # UDOS auf dem 8″-MF3200: dieselbe Spurlage (77 x 26 x 128), aber FM (Entwurf 39 §9.8).  Eigener Eintrag,
@@ -1032,12 +1084,12 @@ filesystems:
   # (die FM-Ladediskette fuer MUTOS 8000 wurde sonst ueber das Profil mutos8k_26x128_fm angelegt).
   - name:        udos_ss77_fm
     description: "UDOS 4.x einseitig — 77 Spuren 26×128 FM (8″ MF3200)"
-    format:      mf3200_26x128
+    format:      fm_ss77_26x128
     type:        udos
 
   - name:        udos_ss40
     description: "UDOS 4.x einseitig — 40 Spuren 26×128 (K5600.10)"
-    format:      k5601_ss40_26x128
+    format:      ss40_26x128
     type:        udos
     usable_tracks: 40
 
@@ -1051,12 +1103,12 @@ filesystems:
   # initialisiert.  Lesen D2/D3, Schreiben und Anlegen D4 (Datendiskette ohne Systemlader).
   - name:        sios_ss40
     description: "SIOS 1526 — IBM-Etikettendiskette, 40 Spuren einseitig, 26×128"
-    format:      k5601_ss40_26x128
+    format:      ss40_26x128
     type:        sios
 
   - name:        sios_ss80
     description: "SIOS 1526 — IBM-Etikettendiskette, 80 Spuren einseitig, 26×128"
-    format:      k5601_ss80_26x128
+    format:      ss80_26x128
     type:        sios
 
   # ══ UDOS1715 / NDOS (PC 1715) ══════════════════════════════════════════════
@@ -1083,34 +1135,34 @@ filesystems:
 
   - name:        udos1715
     description: "UDOS1715/NDOS (PC 1715) — 80 Spuren doppelseitig, 16×256 (640K, Standard)"
-    format:      k5601_16x256
+    format:      ds80_16x256
     type:        udos1715
     ndos_fill:   "00"     # Spur 17H Sektor 0, 158H…176H = 00
     detect_rank: -10
 
   - name:        udos_p8000
     description: "UDOS 2.2/NDOS (P8000) — 80 Spuren doppelseitig, 16×256 (640K)"
-    format:      k5601_16x256
+    format:      ds80_16x256
     type:        udos1715
     ndos_fill:   "77"     # Spur 17H Sektor 0, 158H…15BH = 00, 15CH…176H = 77H
     detect_rank: -10
 
   - name:        udos50
     description: "UDOS 5.0/NDOS (A5120) — 80 Spuren doppelseitig, 16×256 (640K)"
-    format:      k5601_16x256
+    format:      ds80_16x256
     type:        udos1715
     ndos_fill:   "ff"     # Spur 17H Sektor 0, 158H…176H = FFH
     detect_rank: -10
 
   - name:        udos1715_ss80
     description: "UDOS1715/NDOS — 80 Spuren einseitig, 16×256 (320K)"
-    format:      k5601_ss80_16x256
+    format:      ss80_16x256
     type:        udos1715
     detect_rank: -10
 
   - name:        udos1715_ss40
     description: "UDOS1715/NDOS — 40 Spuren einseitig, 16×256 (160K)"
-    format:      k5601_ss40_16x256
+    format:      ss40_16x256
     type:        udos1715
     usable_tracks: 40
     detect_rank: -10
@@ -1125,7 +1177,7 @@ filesystems:
 
   - name:        wega720
     description: "WEGA (UNIX System III, P8000) — 80 Spuren doppelseitig, 9×512 (720K)"
-    format:      k5601_9x512
+    format:      ds80_9x512
     type:        wega_mutos
     detect_rank: -10
 
@@ -1136,14 +1188,14 @@ filesystems:
   #    Zylinder 0 KOPF 1 (ROOT1GN).
   - name:        mutos1700_720
     description: "MUTOS 1700 (UNIX, A7100) — 80 Spuren doppelseitig 9×512, Dateisystem ab Zylinder 0"
-    format:      k5601_9x512
+    format:      ds80_9x512
     type:        wega_mutos
     unix_layout: mutos1700
     detect_rank: -10
 
   - name:        mutos1700_a7100
     description: "MUTOS 1700 (UNIX, A7100) — FM-Ladespur, Blockraum ab Zylinder 0 Kopf 1 (16×256)"
-    format:      scp1700_640
+    format:      ds80_1t16x128fm-16x256
     type:        wega_mutos
     unix_layout: mutos1700
     data_start:  { cyl: 0, head: 1 }
@@ -1154,7 +1206,7 @@ filesystems:
   - name:        mutos8k_8x512_mfm
     aliases:     [mutos77]
     description: "MUTOS 8000 (UNIX, A5120.16) — einseitig, Blockraum ab Zylinder 1 (bis Zyl. 76)"
-    format:      mutos_ss77
+    format:      ss77_1t26x128-8x512
     type:        wega_mutos
     data_start:  { cyl: 1, head: 0 }
     detect_rank: -10
@@ -1162,7 +1214,7 @@ filesystems:
   - name:        mutos8k_8x512_mfm_80
     aliases:     [mutos80]
     description: "MUTOS 8000 (UNIX, A5120.16) — einseitig, Blockraum ab Zylinder 1 (bis Zyl. 79)"
-    format:      mutos_ss80
+    format:      ss80_1t26x128-8x512
     type:        wega_mutos
     data_start:  { cyl: 1, head: 0 }
     detect_rank: -10
@@ -1175,7 +1227,7 @@ filesystems:
   - name:        mutos8k_26x128_fm
     aliases:     [mutos8k_fm]
     description: "MUTOS 8000 (UNIX, A5120.16) — 8″ FM 26×128, Blockraum ab Zylinder 1 (verschraenkt)"
-    format:      mf3200_26x128
+    format:      fm_ss77_26x128
     type:        wega_mutos
     unix_layout: mutos8k
     data_start:  { cyl: 1, head: 0 }
@@ -1186,7 +1238,7 @@ filesystems:
   - name:        mutos8k_26x128_mfm
     aliases:     [mutos8k_mfm]
     description: "MUTOS 8000 (UNIX, A5120.16) — 5¼″ MFM 26×128, Blockraum ab Zylinder 1 (verschraenkt)"
-    format:      udos_ss77
+    format:      ss77_26x128
     type:        wega_mutos
     unix_layout: mutos8k
     data_start:  { cyl: 1, head: 0 }
@@ -1202,7 +1254,7 @@ filesystems:
 
   - name:        tar720
     description: "tar-Strom ohne Dateisystem (P8000-Lieferdiskette) — 720K"
-    format:      k5601_9x512
+    format:      ds80_9x512
     type:        tar
     detect_rank: 900
 
@@ -1215,7 +1267,7 @@ filesystems:
   # 5x1024, passt nicht auf 9x512).  Anlegen: `create --fs tar720_leer`.
   - name:        tar720_leer
     description: "tar-Diskette, leer (720K) — leeres tar-Archiv"
-    format:      k5601_9x512
+    format:      ds80_9x512
     type:        tar
     leer:        true
     detect_rank: 901
@@ -1230,7 +1282,7 @@ filesystems:
   - name:        tar_mutos8k_26x128_mfm
     aliases:     [tar_mutos8k_mfm]
     description: "tar-Strom im MUTOS-8000-Layout (5¼″ MFM, 77×26×128) — 494 Blöcke"
-    format:      udos_ss77
+    format:      ss77_26x128
     type:        tar
     unix_layout: mutos8k
     data_start:  { cyl: 1, head: 0 }
@@ -1239,7 +1291,7 @@ filesystems:
   - name:        tar_mutos8k_26x128_mfm_leer
     aliases:     [tar_mutos8k_mfm_leer]
     description: "tar-Diskette, leer (MUTOS-8000-Layout, MFM) — leeres tar-Archiv"
-    format:      udos_ss77
+    format:      ss77_26x128
     type:        tar
     unix_layout: mutos8k
     data_start:  { cyl: 1, head: 0 }
@@ -1249,7 +1301,7 @@ filesystems:
   - name:        tar_mutos8k_26x128_fm
     aliases:     [tar_mutos8k_fm]
     description: "tar-Strom im MUTOS-8000-Layout (8″ FM, 77×26×128) — 494 Blöcke"
-    format:      mf3200_26x128
+    format:      fm_ss77_26x128
     type:        tar
     unix_layout: mutos8k
     data_start:  { cyl: 1, head: 0 }
@@ -1258,7 +1310,7 @@ filesystems:
   - name:        tar_mutos8k_26x128_fm_leer
     aliases:     [tar_mutos8k_fm_leer]
     description: "tar-Diskette, leer (MUTOS-8000-Layout, FM) — leeres tar-Archiv"
-    format:      mf3200_26x128
+    format:      fm_ss77_26x128
     type:        tar
     unix_layout: mutos8k
     data_start:  { cyl: 1, head: 0 }
@@ -1271,7 +1323,7 @@ filesystems:
   # auch auf einer 80-Zylinder-Diskette).  Zylinder 0 (26x128) bleibt unberuehrt.
   - name:        tar_mutos8k_8x512_mfm
     description: "tar-Strom im MUTOS-8000-Layout 8×512 (5¼″ MFM, DISK-Satz) — 608 Blöcke"
-    format:      mutos_ss77
+    format:      ss77_1t26x128-8x512
     type:        tar
     unix_layout: mutos8k_512
     data_start:  { cyl: 1, head: 0 }
@@ -1279,7 +1331,7 @@ filesystems:
 
   - name:        tar_mutos8k_8x512_mfm_leer
     description: "tar-Diskette, leer (MUTOS-8000-Layout 8×512, MFM) — leeres tar-Archiv"
-    format:      mutos_ss77
+    format:      ss77_1t26x128-8x512
     type:        tar
     unix_layout: mutos8k_512
     data_start:  { cyl: 1, head: 0 }
@@ -1293,57 +1345,57 @@ filesystems:
   # Doku: doc/design/44_fat12.md, doc/merkposten/fat12.md
   - name:        dos160
     description: "MS-DOS FAT12 160K — 40 Spuren einseitig, 8×512"
-    format:      k5601_ss40_8x512
+    format:      ss40_8x512
     type:        fat
     detect_rank: -20
   - name:        dos180
     description: "MS-DOS FAT12 180K — 40 Spuren einseitig, 9×512"
-    format:      k5601_ss40_9x512
+    format:      ss40_9x512
     type:        fat
     detect_rank: -20
   - name:        dos320
     description: "MS-DOS FAT12 320K — 40 Spuren doppelseitig, 8×512"
-    format:      k5601_ds40_8x512
+    format:      ds40_8x512
     type:        fat
     detect_rank: -20
   - name:        dos360
     description: "MS-DOS FAT12 360K — 40 Spuren doppelseitig, 9×512 (PC-Standard 5,25″)"
-    format:      k5601_ds40_9x512
+    format:      ds40_9x512
     type:        fat
     detect_rank: -20
   - name:        dos360ss80
     description: "MS-DOS FAT12 360K — 80 Spuren einseitig, 9×512"
-    format:      k5601_ss80_9x512
+    format:      ss80_9x512
     type:        fat
     detect_rank: -20
   - name:        dos640
     description: "MS-DOS FAT12 640K — 80 Spuren doppelseitig, 8×512"
-    format:      k5601_ds80_8x512
+    format:      ds80_8x512
     type:        fat
     detect_rank: -20
   - name:        dos720
     description: "MS-DOS FAT12 720K — 80 Spuren doppelseitig, 9×512 (3,5″ DD, A7150/DCP)"
-    format:      k5601_9x512
+    format:      ds80_9x512
     type:        fat
     detect_rank: -20
   - name:        dos800
     description: "MS-DOS FAT12 800K — 80 Spuren doppelseitig, 10×512"
-    format:      k5601_10x512
+    format:      ds80_10x512
     type:        fat
     detect_rank: -20
   - name:        dos1200
     description: "MS-DOS FAT12 1,2M — 80 Spuren doppelseitig, 15×512 (5,25″ HD)"
-    format:      pc_hd_15x512
+    format:      ds80_15x512_hd
     type:        fat
     detect_rank: -20
   - name:        dos1440
     description: "MS-DOS FAT12 1,44M — 80 Spuren doppelseitig, 18×512 (3,5″ HD)"
-    format:      pc_hd_18x512
+    format:      ds80_18x512_hd
     type:        fat
     detect_rank: -20
   - name:        dos2880
     description: "MS-DOS FAT12 2,88M — 80 Spuren doppelseitig, 36×512 (3,5″ ED)"
-    format:      pc_ed_36x512
+    format:      ds80_36x512_ed
     type:        fat
     containers:  [img]      # 1000 kbit/s (ED): der Stack kennt nur 250/500 - HFE/DMK/IMD/TD0/CQM waeren falsch beschriftet
     detect_rank: -20

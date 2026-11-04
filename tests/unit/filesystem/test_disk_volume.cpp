@@ -114,7 +114,7 @@ TEST(DiskVolume, ErkenntCpaBootdisketteVonSelbst) {
     auto dv = oeffne(fixture("cpa_cpa780_k5601_clock.hfe"), "", err);
     ASSERT_NE(dv, nullptr) << err;
 
-    EXPECT_EQ(dv->detection().format, "cpa780");
+    EXPECT_EQ(dv->detection().format, "ds80_3t26x128-5x1024");
     EXPECT_EQ(dv->detection().filesystem, "cpa780");
     EXPECT_TRUE(dv->detection().unambiguous);
     EXPECT_EQ(dv->volumeCount(), 1) << "eine CP/M-Diskette ist EIN Dateisystem";
@@ -188,7 +188,7 @@ TEST(DiskVolume, LehntAbbildOhneKatalogeintragMitDiagnoseAb) {
 
 /**
  * @test Eine Geometrie OHNE Katalogprofil wird trotzdem geoeffnet — per CP/A-Regel.
- * @par Kriterium  `k5601_ds40_26x128` hat keinen `filesystems:`-Eintrag; die Diskette
+ * @par Kriterium  `ds40_26x128` hat keinen `filesystems:`-Eintrag; die Diskette
  *                 laesst sich dennoch oeffnen, das Dateisystem heisst `cpa_auto`, und
  *                 die Meldung sagt, woher die Werte stammen.
  * @par Warum      Das ist der Kern des Rueckfalls: der Katalog nennt nur die Handvoll
@@ -198,7 +198,7 @@ TEST(DiskVolume, LehntAbbildOhneKatalogeintragMitDiagnoseAb) {
 TEST(DiskVolume, GeometrieOhneProfilWirdUeberDieCpaRegelGeoeffnet) {
     const std::string pfad =
         k1520test::tempPath("k1520_dv_ohne_profil.hfe");
-    const DiskFormat* fmt = formate().find("k5601_ds40_26x128");
+    const DiskFormat* fmt = formate().find("ds40_26x128");
     ASSERT_NE(fmt, nullptr);
     ASSERT_TRUE(dateisysteme().forFormat(fmt->name).empty())
         << "der Test setzt voraus, dass diese Geometrie KEIN benanntes Profil hat";
@@ -210,7 +210,7 @@ TEST(DiskVolume, GeometrieOhneProfilWirdUeberDieCpaRegelGeoeffnet) {
     fs::remove(pfad, ec);
 
     ASSERT_NE(dv, nullptr) << err;
-    EXPECT_EQ(dv->detection().format, "k5601_ds40_26x128");
+    EXPECT_EQ(dv->detection().format, "ds40_26x128");
     EXPECT_EQ(dv->detection().filesystem, "cpa_auto");
     EXPECT_NE(dv->detection().remarks.find("CP/A-Regel"), std::string::npos)
         << dv->detection().remarks;
@@ -236,7 +236,7 @@ TEST(DiskVolume, CpaAutoLaesstSichAusdruecklichAnfordern) {
     std::string err;
     auto dv = oeffne(fixture("cpa_cpa780_k5601_clock.hfe"), "cpa_auto", err);
     ASSERT_NE(dv, nullptr) << err;
-    EXPECT_EQ(dv->detection().format, "cpa780");
+    EXPECT_EQ(dv->detection().format, "ds80_3t26x128-5x1024");
     EXPECT_EQ(dv->detection().filesystem, "cpa_auto");
     EXPECT_EQ(dv->list().size(), 24u) << "dieselben Dateien wie mit dem Profil cpa780";
 }
@@ -250,7 +250,7 @@ TEST(DiskVolume, CpaAutoLaesstSichAusdruecklichAnfordern) {
  */
 TEST(DiskVolume, MsDosDisketteWirdAlsSolcheGemeldet) {
     const std::string pfad = k1520test::tempPath("k1520_dv_fat.hfe");
-    const DiskFormat* fmt = formate().find("k5601_9x512");
+    const DiskFormat* fmt = formate().find("ds80_9x512");
     ASSERT_NE(fmt, nullptr);
     {
         auto disk = DiskImage::create(pfad, *fmt, /*write_protect=*/false);
@@ -302,10 +302,10 @@ TEST(DiskVolume, JedesKatalogformatLaesstSichAnlegenUndWiederOeffnen) {
         auto dv = oeffne(pfad, "", err);
         EXPECT_NE(dv, nullptr) << "Format '" << f.name << "': " << err;
         if (dv) {
-            // Geometrisch identische Eintraege sind normal (cpa640 ≡ k5601_16x256),
+            // Geometrisch identische Eintraege sind normal (ds80_16x256 ≡ ds80_16x256),
             // und ein Format darf bis zu drei Zylinder mehr deklarieren als beschrieben
-            // sind (GeometryProbe, slack_cyls) — cpa624 (78 Zyl.) wird deshalb auch von
-            // cpa640 (80 Zyl.) erkannt.  Kopfzahl und Schrittweite muessen stimmen.
+            // sind (GeometryProbe, slack_cyls) — ds78_16x256 (78 Zyl.) wird deshalb auch von
+            // ds80_16x256 (80 Zyl.) erkannt.  Kopfzahl und Schrittweite muessen stimmen.
             const DiskFormat* e = formate().find(dv->detection().format);
             ASSERT_NE(e, nullptr);
             EXPECT_EQ(e->numHeads(), f.numHeads()) << f.name;
@@ -339,7 +339,7 @@ TEST(DiskVolume, JedesKatalogformatHatNormspurenMitEinerUmdrehung) {
         SCOPED_TRACE(f.name);
         // 3,5″-HD/ED (1,44M/2,88M, FAT12): nur als `.img` gedacht (Entwurf 44) - der Stack
         // kennt keine 300-U/min-Umdrehung bei 500/1000 kbit/s, eine `.hfe` davon ist keine Norm.
-        if (f.name == "pc_hd_18x512" || f.name == "pc_ed_36x512") continue;
+        if (f.name == "ds80_18x512_hd" || f.name == "ds80_36x512_ed") continue;
         std::error_code ec;
         fs::remove(pfad, ec);
         ASSERT_NE(DiskImage::create(pfad, f, /*write_protect=*/false), nullptr);
@@ -1880,7 +1880,7 @@ TEST(DiskVolume, Scpx8915SystemdiskettenHabenDenBiosDpb) {
         std::string err;
         auto dv = oeffne(fixture(name), "", err);
         ASSERT_NE(dv, nullptr) << name << ": " << err;
-        EXPECT_EQ(dv->detection().format, "cpa800") << name;
+        EXPECT_EQ(dv->detection().format, "ds80_5x1024") << name;
         EXPECT_EQ(dv->detection().filesystem, "cpa_auto") << name;
         EXPECT_TRUE(dv->detection().unambiguous) << name;
         EXPECT_EQ(dv->profile().data_cyl, 2) << name;
@@ -1999,7 +1999,7 @@ TEST(DiskVolume, Scpx8915HoechstensHundertachtundzwanzigPlaetze) {
  *        auch auf einer leeren Diskette, ohne eigenen Eintrag.
  */
 TEST(DiskVolume, Scpx8915SechzehnMal256HatDenBiosDpb) {
-    Weg w{leereDiskette("k5601_16x256", "k1520_dv_8915_b.hfe")};
+    Weg w{leereDiskette("ds80_16x256", "k1520_dv_8915_b.hfe")};
     std::string err;
     auto dv = oeffne(w.p, "", err);
     ASSERT_NE(dv, nullptr) << err;

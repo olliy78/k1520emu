@@ -81,8 +81,8 @@ def test_filesystem_catalogue_is_reachable():
     assert "cpa780" in names and "udos_ds77" in names
     assert names["cpa780"].type == "cpm"
     assert names["udos_ds77"].type == "udos"
-    assert names["scpx640"].format == "cpa640", (
-        "scpx640 und cpa640 teilen sich die Geometrie — genau dafür gibt es die "
+    assert names["scpx640"].format == "ds80_16x256", (
+        "scpx640 und ds80_16x256 teilen sich die Geometrie — genau dafür gibt es die "
         "eigene `filesystems:`-Sektion"
     )
     for f in filesystems():

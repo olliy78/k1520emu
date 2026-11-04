@@ -170,5 +170,5 @@ TEST(Pc1715wBoot, InitFormatiertLeerdisketteInB) {
     laufe(g.m, 40'000'000);
     tippeZeile(g.m, "dir b:");
     ASSERT_TRUE(laufeBisText(g.m, "B: DATE     COM", 30'000'000)) << bild(g.m);
-    EXPECT_EQ(g.m.detectedFormatName(1), "cpa800");
+    EXPECT_EQ(g.m.detectedFormatName(1), "ds80_5x1024");
 }

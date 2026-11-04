@@ -27,7 +27,7 @@ stdin:
   g 100000000
   keys /bin/mount\s/dev/rk1\s/mnt\r
   g 50000000
-  mount A %s1.hfe% mutos_ss77
+  mount A %s1.hfe% ss77_1t26x128-8x512
   keys cd\s/mnt\r
   g 50000000
   keys /mnt/bin/tar\stvf\s/dev/rrk0\r
@@ -40,8 +40,8 @@ stdin:
   screen
   keys /bin/rm\sa.bin\r
   g 30000000
-  mount A %t1.hfe% mutos_ss77
-  mount D %t2.hfe% mutos_ss77
+  mount A %t1.hfe% ss77_1t26x128-8x512
+  mount D %t2.hfe% ss77_1t26x128-8x512
   keys (/bin/dd\sif=/dev/rrk0\sbs=512\scount=608;/bin/dd\sif=/dev/rrk3\sbs=512\scount=608)|/mnt/bin/tar\sxvf\s-\sk.bin\se.bin\r
   gscreen "x e.bin," 1500000000
   keys /bin/cmp\sk.bin\s/mnt/bin/adb;\secho\sCMP2=\$?\r

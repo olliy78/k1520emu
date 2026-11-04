@@ -20,6 +20,7 @@
 #include "core/filesystem/fs_profile.h"
 #include "core/peripherals/floppy_drive/format_catalog.h"
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -45,7 +46,7 @@ public:
     /// @brief Profil per Name; nullptr, wenn unbekannt.
     const FsProfile* find(const std::string& name) const;
 
-    /// @brief Alle Profile, die auf der Geometrie @p format_name liegen.
+    /// @brief Alle Profile, die auf der Geometrie @p format_name liegen (Alias erlaubt).
     std::vector<const FsProfile*> forFormat(const std::string& format_name) const;
 
     const std::vector<FsProfile>&   profiles() const { return profiles_; }
@@ -58,4 +59,5 @@ private:
     std::vector<FsProfile>   profiles_;
     std::vector<std::string> issues_;
     std::vector<std::string> sources_;
+    std::map<std::string, std::string> format_aliases_;   ///< Formatalias -> echter Name
 };

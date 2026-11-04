@@ -39,7 +39,7 @@ def _abbildgroessen() -> dict:
     """Formatname → Bytezahl eines rohen Sektorabbilds (aus ``formats.yaml``).
 
     Gebraucht wird das, weil der Kern beim Mounten die Dateigröße NICHT gegen die
-    Geometrie prüft: ein 780K-Abbild lässt sich klaglos als ``cpa800`` einlegen —
+    Geometrie prüft: ein 780K-Abbild lässt sich klaglos als ``ds80_5x1024`` einlegen —
     und bootet dann nicht, weil die Spurbelegung nicht stimmt.  Bei ``.hfe``/``.dmk``
     steht die Geometrie in der Datei, bei einem rohen ``.img`` ist die Größe das
     einzige Merkmal.  Fehlt oder klemmt der Katalog, kommt ein leeres Verzeichnis
@@ -438,7 +438,7 @@ class DriveWidget(QWidget):
                 # als Platzhalter (A5120Machine::mountDisk).  Also der Standard
                 # des Laufwerkstyps — gefragt wird dafuer niemand.
                 formate = self._drive_formats(drive)
-                fmt = formate[0] if formate else "cpa800"
+                fmt = formate[0] if formate else "ds80_5x1024"
             wp = wp_check.isChecked()
             try:
                 if self.emulator.mount_disk(drive, path, fmt, wp):
@@ -984,7 +984,7 @@ class DriveWidget(QWidget):
             except Exception:
                 kandidaten = []
             if not kandidaten:
-                kandidaten = ["cpa800"]
+                kandidaten = ["ds80_5x1024"]
 
             # Bei einem rohen Sektorabbild entscheidet die DATEIGROESSE.  Der Kern
             # prueft sie beim Mounten nicht: ein 780K-Abbild laesst sich klaglos als
@@ -1058,7 +1058,7 @@ class DriveWidget(QWidget):
             except (TypeError, ValueError):
                 continue
             self.mount_path(drive, m.get("path") or "",
-                            m.get("format") or "cpa800",
+                            m.get("format") or "ds80_5x1024",
                             bool(m.get("write_protect", False)))
 
     def remount_all(self):

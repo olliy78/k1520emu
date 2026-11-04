@@ -11,6 +11,7 @@
 #include "core/peripherals/floppy_drive/disk_format.h"
 
 #include <algorithm>
+#include <tuple>
 
 uint8_t DiskFormat::numHeads() const {
     uint8_t h = 0;
@@ -69,4 +70,43 @@ bool DiskFormat::isMixedEncoding() const {
     for (const auto& t : tracks)
         if (t.encoding != first) return true;
     return false;
+}
+
+std::string DiskFormat::schemaName() const {
+    // Spurseiten in Zylinder-major/Kopf-minor-Reihenfolge; gleiche (Sektoren, Groesse,
+    // Kodierung) hintereinander bilden eine Zone.
+    struct Zone { unsigned secs, bytes; Encoding enc; unsigned first_id; unsigned n; };
+    std::vector<Zone> zonen;
+    const unsigned ncyl = numCylinders(), nhead = numHeads();
+    bool alle_fm = true, irgendein_track = false;
+    for (unsigned c = 0; c < ncyl; ++c)
+        for (unsigned h = 0; h < nhead; ++h) {
+            const TrackFormat* t = findTrack(static_cast<uint8_t>(c), static_cast<uint8_t>(h));
+            if (!t) continue;
+            irgendein_track = true;
+            if (t->encoding != Encoding::FM) alle_fm = false;
+            if (!zonen.empty() && zonen.back().secs == t->secs_per_track
+                && zonen.back().bytes == t->bytes_per_sec && zonen.back().enc == t->encoding) {
+                ++zonen.back().n;
+            } else {
+                zonen.push_back({t->secs_per_track, t->bytes_per_sec, t->encoding,
+                                 t->first_sector_id, 1});
+            }
+        }
+    std::string s;
+    if (irgendein_track && alle_fm) s += "fm_";
+    s += (nhead > 1 ? "ds" : "ss") + std::to_string(ncyl) + "_";
+    for (size_t i = 0; i < zonen.size(); ++i) {
+        const Zone& z = zonen[i];
+        if (i > 0) s += "-";
+        if (i + 1 < zonen.size()) s += std::to_string(z.n) + "t";
+        s += std::to_string(z.secs) + "x" + std::to_string(z.bytes);
+        if (z.enc == Encoding::FM && !alle_fm) s += "fm";
+    }
+    if (step == 2) s += "_dstep";
+    if (!zonen.empty() && zonen.back().first_id != 1)
+        s += "_id" + std::to_string(zonen.back().first_id);
+    if (rate_kbps == 500) s += "_hd";
+    else if (!zonen.empty() && zonen.back().secs == 36 && zonen.back().bytes == 512) s += "_ed";
+    return s;
 }

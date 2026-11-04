@@ -482,7 +482,7 @@ TEST(MutosFs, M8k_MfmUndFmErkennungUndUdosBleibtUdos) {
       fwrite(inhalt.data(), 1, inhalt.size(), f); fclose(f); }
     std::string err;
     struct Fall { const char* profil; const char* format; };
-    for (const Fall& fall : {Fall{"mutos8k_26x128_mfm", "udos_ss77"}, Fall{"mutos8k_26x128_fm", "mf3200_26x128"}}) {
+    for (const Fall& fall : {Fall{"mutos8k_26x128_mfm", "ss77_26x128"}, Fall{"mutos8k_26x128_fm", "fm_ss77_26x128"}}) {
         const std::string neu = (dir / (std::string(fall.profil) + ".hfe")).string();
         {
             auto dv = DiskVolume::create(neu, fall.profil, "m8k", formate(), dateisysteme(), err);
@@ -500,7 +500,7 @@ TEST(MutosFs, M8k_MfmUndFmErkennungUndUdosBleibtUdos) {
         EXPECT_EQ(std::vector<uint8_t>(b.begin(), b.end()), inhalt) << fall.profil;
     }
     // UDOS auf demselben MFM-Format und auf FM (Ladediskette): bleibt UDOS, wird nie als MUTOS-Wurzel gelesen
-    for (const Fall& fall : {Fall{"udos_ss77", "udos_ss77"}, Fall{"udos_ss77_fm", "mf3200_26x128"}}) {
+    for (const Fall& fall : {Fall{"udos_ss77", "ss77_26x128"}, Fall{"udos_ss77_fm", "fm_ss77_26x128"}}) {
         const std::string neu = (dir / (std::string(fall.profil) + ".hfe")).string();
         { auto dv = DiskVolume::create(neu, fall.profil, "", formate(), dateisysteme(), err);
           ASSERT_TRUE(dv) << err; ASSERT_TRUE(dv->flush()) << dv->lastError(); }

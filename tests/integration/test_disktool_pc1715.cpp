@@ -152,21 +152,21 @@ struct Abzug {
 
 static const Abzug kAbzuege[] = {
     // SCP 1715 V0006 (5×1024): Systemspuren, CP/A-Regel → `cpa_auto`
-    {"pc1715_scp1715_v0006_boot.hfe", "cpa800", "cpa_auto", 9},
+    {"pc1715_scp1715_v0006_boot.hfe", "ds80_5x1024", "cpa_auto", 9},
     // dieselbe + PCTEST.COM (AP-4f, Werkstest unter SCP)
-    {"pc1715_scp1715_v0006_pctest.hfe", "cpa800", "cpa_auto", 10},
+    {"pc1715_scp1715_v0006_pctest.hfe", "ds80_5x1024", "cpa_auto", 10},
     // SCP 1715 V0007 (16×256): zweites Format, Katalogprofil
-    {"pc1715_scp1715_v0007_cpa640_boot.hfe", "cpa640", "scpx640", 4},
+    {"pc1715_scp1715_v0007_cpa640_boot.hfe", "ds80_16x256", "scpx640", 4},
     // CP/A 1715: KEINE Systemspuren, Bootkopf im Verzeichnis — vorher „nicht erkannt"
-    {"pc1715_cpa1715_boot_4lw.hfe", "cpa800", "cpa1715", 49},
+    {"pc1715_cpa1715_boot_4lw.hfe", "ds80_5x1024", "cpa1715", 49},
     // CP/A 1715 aus der CPA-Workbench gebaut (AP-3b, Bootkopf F003H, PCTEST.COM dabei)
-    {"pc1715_cpa1715_workbench.hfe", "cpa800", "cpa1715", 22},
+    {"pc1715_cpa1715_workbench.hfe", "ds80_5x1024", "cpa1715", 22},
     // UDOS 1715
-    {"pc1715_udos1715_system.hfe", "k5601_16x256", "udos1715", 67},
+    {"pc1715_udos1715_system.hfe", "ds80_16x256", "udos1715", 67},
     // CP/Z 2.2
-    {"pc1715_cpz22_boot.hfe", "cpa640", "scpx640", 35},
+    {"pc1715_cpz22_boot.hfe", "ds80_16x256", "scpx640", 35},
     // SCP 3.0 (1715W)
-    {"pc1715w_scp30_system.hfe", "cpa800", "cpa_auto", 42},
+    {"pc1715w_scp30_system.hfe", "ds80_5x1024", "cpa_auto", 42},
 };
 
 /**

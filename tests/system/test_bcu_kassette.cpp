@@ -62,7 +62,7 @@ using kassette::Seite;
 #error "A5120_LIEFERDISKETTEN fehlt - k1520_add_test(... DEFS A5120_LIEFERDISKETTEN=\"<repo>/disks\")"
 #endif
 
-constexpr const char* kFormat = "k5601_ss40_26x128";
+constexpr const char* kFormat = "ss40_26x128";
 constexpr const char* kSystem = "bcu12_ss40-26x128_k5600-10_ohnesyl-sys1.img";
 constexpr uint32_t kZeilenende = K7636::QK_TASTE_BASE | 0x37;   // ↵ (A15, 0AH) — bcu.md §4
 constexpr uint32_t kDelLine    = K7636::QK_TASTE_BASE | 0x0F;   // 13H = ^S

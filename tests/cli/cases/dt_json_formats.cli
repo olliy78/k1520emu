@@ -4,5 +4,5 @@ disk_path: /dev/null
 run:    formats --json
 expect: "name":"cpa780"
 expect: "type":"udos"
-expect: "format":"cpa640"
+expect: "format":"ds80_16x256"
 exit:   0

@@ -63,7 +63,7 @@ TEST(GeometryProbe, ErkenntCpaBootdiskette) {
 
     auto t = GeometryProbe::matchAll(m, katalog().formats());
     ASSERT_FALSE(t.empty()) << "cpa780-Bootdiskette wurde nicht erkannt";
-    EXPECT_EQ(t.front().format->name, "cpa780");
+    EXPECT_EQ(t.front().format->name, "ds80_3t26x128-5x1024");
     EXPECT_EQ(t.size(), 1u) << "die gemischte Geometrie ist eindeutig";
     EXPECT_TRUE(t.front().remarks().empty()) << t.front().remarks();
 }
@@ -73,7 +73,7 @@ TEST(GeometryProbe, ErkenntGemischteScpxDiskette) {
     // DiskTool den Katalogeintrag scpx798 (vorher passte KEIN Format).
     const auto m = vermessen("scpx17_5x1024_k5601_hardy_norm.hfe");
     ASSERT_FALSE(m.empty());
-    EXPECT_EQ(bestesFormat(m), "scpx798");
+    EXPECT_EQ(bestesFormat(m), "ds80_2t16x256-5x1024");
 }
 
 TEST(GeometryProbe, ErkenntUdosDoppelseitigTrotzAltbestandUndSchaden) {
@@ -85,7 +85,7 @@ TEST(GeometryProbe, ErkenntUdosDoppelseitigTrotzAltbestandUndSchaden) {
 
     auto t = GeometryProbe::matchAll(m, katalog().formats());
     ASSERT_FALSE(t.empty()) << "UDOS-Referenzdiskette wurde nicht erkannt";
-    EXPECT_EQ(t.front().format->name, "udos_ds77");
+    EXPECT_EQ(t.front().format->name, "ds77_26x128");
     EXPECT_GT(t.front().stray_tracks, 0)  << "Altbestand hinter Spur 76 nicht bemerkt";
     EXPECT_EQ(t.front().defect_tracks, 1) << "die Spur mit fehlendem Sektor";
     EXPECT_NE(t.front().remarks().find("Altbestand"), std::string::npos)
@@ -99,14 +99,14 @@ TEST(GeometryProbe, MischtSeitenzahlNichtDurcheinander) {
     ASSERT_NE(disk, nullptr);
     const auto m = GeometryProbe::measure(disk->medium());
 
-    const DiskFormat* ss = katalog().find("k5601_ss80_26x128");
+    const DiskFormat* ss = katalog().find("ss80_26x128");
     ASSERT_NE(ss, nullptr);
     // Umgekehrter Fall: DS-Format auf SS-Medium (hier ueber ein kuenstliches Medium).
     DiskMedium einseitig(80, 1, Encoding::MFM);
     einseitig.setTrack(0, 0, disk->medium().track(0, 0));
     const auto m1 = GeometryProbe::measure(einseitig);
 
-    const DiskFormat* ds = katalog().find("k5601_26x128");
+    const DiskFormat* ds = katalog().find("ds80_26x128");
     ASSERT_NE(ds, nullptr);
     const GeometryMatch g = GeometryProbe::match(m1, *ds);
     EXPECT_FALSE(g.ok);
@@ -153,25 +153,25 @@ TEST(GeometryProbe, ZuVieleSektorenSindEinAnderesFormat) {
     ASSERT_NE(disk, nullptr);
     const auto m = GeometryProbe::measure(disk->medium());
 
-    const DiskFormat* kleiner = katalog().find("k5601_ss40_15x256");
+    const DiskFormat* kleiner = katalog().find("ss40_15x256");
     ASSERT_NE(kleiner, nullptr);
     const GeometryMatch g = GeometryProbe::match(m, *kleiner);
     EXPECT_FALSE(g.ok) << "16 Sektoren duerfen nicht als 15×256 durchgehen";
 }
 
 TEST(GeometryProbe, MehrdeutigkeitIstNormalUndWirdVollstaendigGemeldet) {
-    // formats.yaml enthaelt geometrisch identische Eintraege (cpa640 ≡ k5601_16x256).
-    // Beide MUESSEN gemeldet werden — welches Dateisystem darauf liegt, entscheidet
-    // Stufe 2, nicht die Geometrie.
+    // Mehrere Katalogformate koennen auf dieselbe Diskette passen (hier ein 16×256-Abbild);
+    // alle MUESSEN gemeldet werden — welches Dateisystem darauf liegt, entscheidet
+    // Stufe 2, nicht die Geometrie.  (Reine Namensdubletten gibt es seit Entwurf 47 nicht mehr,
+    // Waechter `FormatKatalogSchema.KeineDoppeltenSpurlisten`.)
     const auto m = vermessen("scpx17_cpa780_k5601.hfe");
     ASSERT_FALSE(m.empty());
 
     auto t = GeometryProbe::matchAll(m, katalog().formats());
-    ASSERT_GE(t.size(), 2u);
+    ASSERT_GE(t.size(), 1u);
     std::vector<std::string> namen;
     for (const auto& x : t) namen.push_back(x.format->name);
-    EXPECT_NE(std::find(namen.begin(), namen.end(), "cpa640"), namen.end());
-    EXPECT_NE(std::find(namen.begin(), namen.end(), "k5601_16x256"), namen.end());
+    EXPECT_NE(std::find(namen.begin(), namen.end(), "ds80_16x256"), namen.end());
     // Beste zuerst: die ohne Altbestand.
     EXPECT_EQ(t.front().stray_tracks, 0);
 }
@@ -188,7 +188,7 @@ TEST(GeometryProbe, MehrdeutigkeitIstNormalUndWirdVollstaendigGemeldet) {
  *                 Diskette „passt zu keinem Format" — wegen einer kaputten Spur.
  */
 TEST(GeometryProbe, EinzelneBeschaedigteSpurIstEinSchadenKeinAnderesFormat) {
-    const DiskFormat* f = katalog().find("k5601_ss40_9x512_id193");
+    const DiskFormat* f = katalog().find("ss40_9x512_id193");
     ASSERT_NE(f, nullptr);
 
     std::vector<MeasuredTrack> m;
@@ -219,7 +219,7 @@ TEST(GeometryProbe, EinFehlenderErsterSektorIstEinSchadenKeinAnderesFormat) {
     // WENIGER Sektoren, lueckenlos, und entsprechend spaeter beginnend.  Auf
     // `mixed_udos_ss40_over_cpa800.hfe` traegt Spur 25 die IDs 2…26 statt 1…26 —
     // daran fiel die Erkennung der ganzen Diskette durch, obwohl 39 Spuren stimmen.
-    const DiskFormat* f = katalog().find("k5601_ss40_26x128");
+    const DiskFormat* f = katalog().find("ss40_26x128");
     ASSERT_NE(f, nullptr);
 
     std::vector<MeasuredTrack> m;

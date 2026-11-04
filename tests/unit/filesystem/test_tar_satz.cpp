@@ -118,7 +118,7 @@ std::vector<uint8_t> inhalt(DiskVolume& v, const std::string& name) {
 TEST(TarSatz, VerteiltAufNAbbilderMitNummerVorDerEndung) {
     Ordner o("tarsatz_verteilen");
     std::string err;
-    auto v = DiskVolume::tarSatzNeu("k5601_ss40_16x256", o / "satz.hfe", formate(), dateisysteme(), err);
+    auto v = DiskVolume::tarSatzNeu("ss40_16x256", o / "satz.hfe", formate(), dateisysteme(), err);
     ASSERT_TRUE(v) << err;
     EXPECT_TRUE(v->tarSatz());
     EXPECT_FALSE(v->readOnly());
@@ -160,7 +160,7 @@ TEST(TarSatz, VerteiltAufNAbbilderMitNummerVorDerEndung) {
 TEST(TarSatz, LetztesAbbildMitNullenAufgefuellt) {
     Ordner o("tarsatz_nullen");
     std::string err;
-    auto v = DiskVolume::tarSatzNeu("k5601_ss40_16x256", o / "n.img", formate(), dateisysteme(), err);
+    auto v = DiskVolume::tarSatzNeu("ss40_16x256", o / "n.img", formate(), dateisysteme(), err);
     ASSERT_TRUE(v) << err;
     ASSERT_TRUE(einfuegen(*v, quelle(o, "x", muster(200000, 3)), "x"));
     ASSERT_TRUE(v->tarSatzSpeichern()) << v->lastError();
@@ -175,7 +175,7 @@ TEST(TarSatz, GegenprobeSystemTarUeberDieAbbildDatenbereiche) {
     if (std::system("tar --version > /dev/null 2>&1") != 0) GTEST_SKIP() << "kein tar im System";
     Ordner o("tarsatz_systemtar");
     std::string err;
-    auto v = DiskVolume::tarSatzNeu("k5601_ss40_16x256", o / "s.img", formate(), dateisysteme(), err);
+    auto v = DiskVolume::tarSatzNeu("ss40_16x256", o / "s.img", formate(), dateisysteme(), err);
     ASSERT_TRUE(v) << err;
     const auto a = muster(100000, 4), b = muster(90000, 5);
     ASSERT_TRUE(einfuegen(*v, quelle(o, "a.bin", a), "a.bin"));
@@ -199,7 +199,7 @@ TEST(TarSatz, GegenprobeSystemTarUeberDieAbbildDatenbereiche) {
 // ── Mehrere Formate und Container ────────────────────────────────────────────
 
 TEST(TarSatz, RundlaufInAllenContainernUndFormaten) {
-    const char* formen[] = {"k5601_9x512", "k5601_ss40_16x256", "k5601_ss40_26x128"};
+    const char* formen[] = {"ds80_9x512", "ss40_16x256", "ss40_26x128"};
     const char* exts[]   = {"img", "hfe", "dmk", "cqm"};
     for (const char* fm : formen)
         for (const char* ex : exts) {
@@ -228,7 +228,7 @@ TEST(TarSatz, GemischtesFormatIstKeinSatzformat) {
     EXPECT_NE(err.find("nicht geeignet"), std::string::npos) << err;
     auto w = DiskVolume::tarSatzNeu("gibt_es_nicht", "/tmp/x.img", formate(), dateisysteme(), err);
     EXPECT_FALSE(w);
-    auto x = DiskVolume::tarSatzNeu("k5601_9x512", "/tmp/x.bin", formate(), dateisysteme(), err);
+    auto x = DiskVolume::tarSatzNeu("ds80_9x512", "/tmp/x.bin", formate(), dateisysteme(), err);
     EXPECT_FALSE(x);
     EXPECT_NE(err.find("Endung"), std::string::npos) << err;
 }
@@ -284,7 +284,7 @@ TEST(TarSatz, SchrumpfenLoeschtAlteNummernNieStillschweigend) {
     Ordner o("tarsatz_altnummern");
     std::string err;
     {
-        auto v = DiskVolume::tarSatzNeu("k5601_ss40_16x256", o / "a.img", formate(), dateisysteme(), err);
+        auto v = DiskVolume::tarSatzNeu("ss40_16x256", o / "a.img", formate(), dateisysteme(), err);
         ASSERT_TRUE(v) << err;
         ASSERT_TRUE(einfuegen(*v, quelle(o, "g", muster(400000, 10)), "g"));
         ASSERT_TRUE(einfuegen(*v, quelle(o, "k", muster(500, 11)), "k"));
@@ -327,7 +327,7 @@ TEST(TarSatz, OffenerSatzIstGeschuetztUndNurMitFolgeteilenBearbeitbar) {
     Ordner o("tarsatz_schutz");
     std::string err;
     {
-        auto v = DiskVolume::tarSatzNeu("k5601_ss40_16x256", o / "p.img", formate(), dateisysteme(), err);
+        auto v = DiskVolume::tarSatzNeu("ss40_16x256", o / "p.img", formate(), dateisysteme(), err);
         ASSERT_TRUE(v) << err;
         ASSERT_TRUE(einfuegen(*v, quelle(o, "g", muster(400000, 12)), "g"));
         ASSERT_TRUE(v->tarSatzSpeichern());
@@ -353,7 +353,7 @@ TEST(TarSatz, OffenerSatzIstGeschuetztUndNurMitFolgeteilenBearbeitbar) {
 TEST(TarSatz, FehlerhafteAenderungLaesstDenStromUnveraendert) {
     Ordner o("tarsatz_fehler");
     std::string err;
-    auto v = DiskVolume::tarSatzNeu("k5601_9x512", o / "f.img", formate(), dateisysteme(), err);
+    auto v = DiskVolume::tarSatzNeu("ds80_9x512", o / "f.img", formate(), dateisysteme(), err);
     ASSERT_TRUE(v) << err;
     ASSERT_TRUE(einfuegen(*v, quelle(o, "ok", muster(700, 13)), "ok"));
     ASSERT_TRUE(v->tarSatzSpeichern());
@@ -367,7 +367,7 @@ TEST(TarSatz, FehlerhafteAenderungLaesstDenStromUnveraendert) {
 TEST(TarSatz, PhysischSchreibenIstFuerSaetzeGesperrtMitBegruendung) {
     Ordner o("tarsatz_gw");
     std::string err;
-    auto v = DiskVolume::tarSatzNeu("k5601_9x512", o / "g.img", formate(), dateisysteme(), err);
+    auto v = DiskVolume::tarSatzNeu("ds80_9x512", o / "g.img", formate(), dateisysteme(), err);
     ASSERT_TRUE(v) << err;
     const std::string grund = v->physischSchreibenGrund();
     EXPECT_FALSE(grund.empty());
@@ -391,7 +391,7 @@ TEST(TarSatz, PhysischSchreibenIstFuerSaetzeGesperrtMitBegruendung) {
 TEST(TarSatz, LeererSatzRundlauf) {
     Ordner o("tarsatz_leer");
     std::string err;
-    auto v = DiskVolume::tarSatzNeu("k5601_9x512", o / "l.dmk", formate(), dateisysteme(), err);
+    auto v = DiskVolume::tarSatzNeu("ds80_9x512", o / "l.dmk", formate(), dateisysteme(), err);
     ASSERT_TRUE(v) << err;
     EXPECT_TRUE(v->list().empty());
     ASSERT_TRUE(v->tarSatzSpeichern()) << v->lastError();
@@ -404,7 +404,7 @@ TEST(TarSatz, LeererSatzRundlauf) {
 TEST(TarSatz, AttributeUndOrdnerImSatz) {
     Ordner o("tarsatz_attr");
     std::string err;
-    auto v = DiskVolume::tarSatzNeu("k5601_ss40_16x256", o / "t.hfe", formate(), dateisysteme(), err);
+    auto v = DiskVolume::tarSatzNeu("ss40_16x256", o / "t.hfe", formate(), dateisysteme(), err);
     ASSERT_TRUE(v) << err;
     ASSERT_TRUE(v->makeDirectory(FileRef::parse("sub", 0))) << v->lastError();
     ASSERT_TRUE(einfuegen(*v, quelle(o, "f", muster(4000, 14)), "sub/f"));

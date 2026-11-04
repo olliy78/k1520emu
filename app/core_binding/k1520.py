@@ -10,7 +10,7 @@ Typical usage:
     
     emu = K1520Emulator()
     emu.power_on()
-    emu.mount_disk(0, "disk_b.img", "cpa800", False)
+    emu.mount_disk(0, "disk_b.img", "ds80_5x1024", False)
     
     # Run for 10000 CPU cycles
     cycles = emu.run(10000)
@@ -155,7 +155,7 @@ K1520Handle = ctypes.c_void_p
 
 # Legacy K5601 CP/A format names (kept for reference).  The authoritative,
 # drive-type-specific list is queried at runtime via K1520Emulator.drive_formats().
-DISK_FORMATS = ["cpa780", "cpa800", "cpa640", "cpa624"]
+DISK_FORMATS = ["ds80_3t26x128-5x1024", "ds80_5x1024", "ds80_16x256", "ds78_16x256"]
 
 # Core DriveProfile names per K5122 slot (see core builtinDriveProfile).
 # "none" marks an empty slot ("kein Laufwerk"); "" / None keeps the default (K5601).

@@ -935,7 +935,7 @@ TEST(K8915Scpx, DiskToolRundreiseFuenfMal1024OhneSystemspuren)
  */
 TEST(K8915Scpx, DiskToolRundreiseSechzehnMal256)
 {
-    rundreise("k8915scpx_boot1.hfe", "k5601_16x256", "k8915_dt_b256.hfe");
+    rundreise("k8915scpx_boot1.hfe", "ds80_16x256", "k8915_dt_b256.hfe");
 }
 
 /**

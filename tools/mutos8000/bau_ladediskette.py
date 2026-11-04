@@ -39,7 +39,7 @@ import bau_aus_archiv as basis  # noqa: E402
 PFLICHT = ("fs_fm", "fs_mfm", "systemspuren", "typ_muster", "typ_erwartet")
 VARIANTEN = ("mf3200", "k5601", "mf3200_k5601", "k5601_nur_a", "mf3200_k5601_nur_a", "k5601_8x512")
 # Aufzeichnung -> (Schluessel des Profils, erkanntes Katalogformat)
-AUFZEICHNUNG = {"fm": ("fs_fm", "mf3200_26x128"), "mfm": ("fs_mfm", "udos_ss77")}
+AUFZEICHNUNG = {"fm": ("fs_fm", "fm_ss77_26x128"), "mfm": ("fs_mfm", "ss77_26x128")}
 BEIBLATT = "udos-dateiangaben.txt"
 PATCH_ARTEN = ("io-8x512", "zdos-einheit0", "kern")
 ZAHLOPT = ("root", "swap", "pipe", "swplo", "nswap", "nblocks")

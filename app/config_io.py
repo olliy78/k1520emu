@@ -41,7 +41,7 @@ Example::
     disks:
       - drive: 0
         path: /home/user/projects/a5120emu_ui/disks/a5120_cpa_k5601_system.hfe
-        format: cpa780
+        format: ds80_3t26x128-5x1024
         write_protect: false
     window:
       width: 1024
@@ -71,6 +71,7 @@ Quellbaum, ``share/k1520emu/`` in einer Installation.  Sie ist der Zustand nach 
 Zurücksetzen die eingelegten Disketten in Ruhe.
 """
 
+import functools
 import os
 from typing import Callable, Dict
 
@@ -189,6 +190,44 @@ def ist_neuer_als_dieses_programm(data: dict) -> bool:
     return format_version(data) > CONFIG_VERSION
 
 
+@functools.lru_cache(maxsize=1)
+def _formatalias() -> Dict[str, str]:
+    """Alter Formatname -> echter Katalogname (``aliases:`` in ``formats.yaml``).
+
+    Fehlt oder klemmt der Katalog, kommt ein leeres Verzeichnis: dann bleibt jeder
+    Name, wie er ist (der Kern loest Aliase beim Einlegen ohnehin selbst auf).
+    """
+    try:
+        datei = paths.formats_file()
+        if datei is None:
+            return {}
+        with open(datei, "r", encoding="utf-8") as f:
+            katalog = yaml.safe_load(f) or {}
+        out: Dict[str, str] = {}
+        for fmt in katalog.get("formats") or []:
+            for alt in fmt.get("aliases") or []:
+                out[str(alt)] = str(fmt["name"])
+        return out
+    except Exception:
+        return {}
+
+
+def formatnamen_kanonisieren(data: dict) -> dict:
+    """Schreibt gespeicherte Diskettenformat-Namen (``disks[].format``) auf den neuen Namen um.
+
+    Keine Formatversion: die Umbenennung (Entwurf 47) ist nur ein anderer Wert im
+    selben Feld, und eine hoehere ``version:`` wuerde aeltere Programme aussperren.
+    Gespeichert wird danach nur noch der neue Name.
+    """
+    alias = _formatalias()
+    disks = data.get("disks")
+    if alias and isinstance(disks, list):
+        for d in disks:
+            if isinstance(d, dict) and isinstance(d.get("format"), str):
+                d["format"] = alias.get(d["format"], d["format"])
+    return data
+
+
 def migriere(data: dict) -> dict:
     """Die Migrationskette von der gelesenen bis zur eigenen Formatversion.
 
@@ -258,7 +297,7 @@ def load_config(path: str) -> dict:
         data = yaml.safe_load(f)
     if not isinstance(data, dict):
         return {}
-    return migriere(data) if data else {}
+    return formatnamen_kanonisieren(migriere(data)) if data else {}
 
 
 def standard_konfiguration(profil: "profile.Programmprofil" = None) -> dict:

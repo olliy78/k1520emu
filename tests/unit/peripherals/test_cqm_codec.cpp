@@ -934,7 +934,7 @@ TEST(CqmDiskImage, NichtDarstellbaresMediumLaesstDieDateiHeil) {
 TEST(CqmDiskImage, FlushUndCreateMitFormat) {
     std::string fatal;
     const FormatCatalog kat = FormatCatalog::loadDefault(&fatal);
-    const DiskFormat* fmt = kat.find("k5601_9x512");
+    const DiskFormat* fmt = kat.find("ds80_9x512");
     ASSERT_NE(fmt, nullptr) << fatal;
 
     const std::string p = k1520test::tempPath("k1520_test_cqm_create.cqm");
@@ -1089,13 +1089,13 @@ TEST(CqmEchtdaten, TarGegenstueckeStimmenByteweise) {
 }
 
 /// @test Das CQM-Medium ist spurweise bytegleich dem `.img`, das aus der .tar-Datei
-///       (rohe 720K-Sektoren) mit dem Katalogformat k5601_9x512 entsteht.
+///       (rohe 720K-Sektoren) mit dem Katalogformat ds80_9x512 entsteht.
 TEST(CqmEchtdaten, MediumGleichImgAusDerTar) {
     const std::string dir = cqmOrdner();
     if (dir.empty()) GTEST_SKIP() << "K1520_CQM_DIR nicht gesetzt";
     std::string fatal;
     const FormatCatalog kat = FormatCatalog::loadDefault(&fatal);
-    const DiskFormat* fmt = kat.find("k5601_9x512");
+    const DiskFormat* fmt = kat.find("ds80_9x512");
     ASSERT_NE(fmt, nullptr) << fatal;
 
     int verglichen = 0;

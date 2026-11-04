@@ -110,6 +110,8 @@ bool buildProfile(const yaml::Node& node, const FormatCatalog& formats, FsProfil
         why = "'format': '" + out.format + "' steht nicht im Formatkatalog";
         return false;
     }
+    // Immer der echte Katalogname, auch wenn das Profil das Format ueber einen Alias nennt.
+    out.format = fmt->name;
 
     // ── type (Pflicht) ──
     const yaml::Node* n_type = node.find("type");
@@ -373,6 +375,9 @@ FsCatalog FsCatalog::load(const std::vector<std::string>& paths,
                           std::string* fatal_error) {
     FsCatalog cat;
     if (fatal_error) fatal_error->clear();
+    // alter Formatname -> echter Name, damit forFormat() auch mit Aliasen gefragt werden kann
+    for (const DiskFormat& f : formats.formats())
+        for (const std::string& a : f.aliases) cat.format_aliases_[a] = f.name;
 
     std::vector<std::string> seen;
 
@@ -465,7 +470,10 @@ const FsProfile* FsCatalog::find(const std::string& name) const {
 
 std::vector<const FsProfile*> FsCatalog::forFormat(const std::string& format_name) const {
     std::vector<const FsProfile*> out;
-    for (const auto& p : profiles_) if (p.format == format_name) out.push_back(&p);
+    // Profile tragen immer den echten Formatnamen; ein Alias wird hier aufgeloest.
+    const auto al = format_aliases_.find(format_name);
+    const std::string& echt = al != format_aliases_.end() ? al->second : format_name;
+    for (const auto& p : profiles_) if (p.format == echt) out.push_back(&p);
     std::stable_sort(out.begin(), out.end(),
                      [](const FsProfile* a, const FsProfile* b) {
                          return a->detect_rank < b->detect_rank;

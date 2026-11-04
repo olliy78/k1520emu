@@ -1227,7 +1227,7 @@ TEST(TarEchtdaten, ExportCatUndRueckschreiben) {
     {
         const std::string basis = k1520test::tempPath("k1520_test_tare_n.cqm");
         std::string err;
-        auto satz = DiskVolume::tarSatzNeu("k5601_9x512", basis, formate(), dateisysteme(), err);
+        auto satz = DiskVolume::tarSatzNeu("ds80_9x512", basis, formate(), dateisysteme(), err);
         ASSERT_TRUE(satz) << err;
         ASSERT_TRUE(satz->tarDateiAblegen(ref.string(), TarDateiWeg::AlsContainer)) << satz->lastError();
         std::vector<std::string> geschrieben;

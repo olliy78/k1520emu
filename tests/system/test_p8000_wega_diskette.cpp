@@ -368,7 +368,7 @@ TEST(P8000WegaDiskette, FormatMountTarUndDiskTool) {
     std::vector<std::string> teile;
     {
         std::string err;
-        auto satz = DiskVolume::tarSatzNeu("k5601_9x512", dir + "/teil.hfe", formate(), dateisysteme(), err);
+        auto satz = DiskVolume::tarSatzNeu("ds80_9x512", dir + "/teil.hfe", formate(), dateisysteme(), err);
         ASSERT_TRUE(satz) << err;
         ASSERT_TRUE(satz->tarDateiAblegen(gesamt, TarDateiWeg::AlsContainer)) << satz->lastError();
         EXPECT_TRUE(satz->lastTarWarnung().empty()) << satz->lastTarWarnung();   // V7: keine Rueckfrage

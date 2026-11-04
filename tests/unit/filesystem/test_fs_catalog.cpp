@@ -183,10 +183,10 @@ TEST(FsCatalog, Cpa780BeginntBeiZylinder2) {
 /**
  * @test Auf der 16×256-Geometrie liegt GENAU EIN Profil OHNE positiven Nachweis — und es
  *       beginnt bei c2h0.
- * @par Kriterium  `forFormat("cpa640")` liefert `scpx640` (data_cyl 2) und sonst nur
+ * @par Kriterium  `forFormat("ds80_16x256")` liefert `scpx640` (data_cyl 2) und sonst nur
  *                 `osm640`, das ausschliesslich mit OS/M-Urlader erkannt wird und
  *                 deckungsgleich liegt (Entwurf 34 §6: keine Mehrdeutigkeit).
- * @par Warum      Bis 2026-08-11 stand daneben ein `cpa640` mit `data_cyl == 0`,
+ * @par Warum      Bis 2026-08-11 stand daneben ein `ds80_16x256` mit `data_cyl == 0`,
  *                 gedacht als Beispiel fuer „mehrere Dateisysteme je Geometrie".  Das
  *                 Beispiel war falsch: CP/A kann so eine Diskette nicht erzeugen, denn
  *                 fuer 256-B-Sektoren traegt `dtrsl1` ein FESTES Offset von 4 logischen
@@ -199,9 +199,12 @@ TEST(FsCatalog, SechzehnMalZweihundertsechsundfuenfzigHatNurEinProfilAbZylinderZ
     FsCatalog cat = FsCatalog::load({shippedCatalog()}, formate(), &fatal);
     ASSERT_TRUE(fatal.empty()) << fatal;
 
-    const auto auf640 = cat.forFormat("cpa640");
+    const auto auf640 = cat.forFormat("ds80_16x256");
     std::vector<const FsProfile*> ohne_nachweis;
     for (const FsProfile* p : auf640) {
+        // Seit Entwurf 47 teilt sich die Geometrie den Eintrag mit den NDOS-Profilen
+        // (frueher `k5601_16x256`); hier geht es nur um die CP/M-Profile.
+        if (p->type != FsType::Cpm) continue;
         EXPECT_EQ(p->data_cyl, 2) << p->name;
         EXPECT_EQ(p->dir_entries, 128) << p->name;
         EXPECT_EQ(p->block_size, 2048u) << p->name;
@@ -210,8 +213,10 @@ TEST(FsCatalog, SechzehnMalZweihundertsechsundfuenfzigHatNurEinProfilAbZylinderZ
     ASSERT_EQ(ohne_nachweis.size(), 1u) << "ein zweites Profil ohne Nachweis auf dieser "
                                            "Geometrie macht jede 16×256-Diskette wieder mehrdeutig";
     EXPECT_EQ(ohne_nachweis.front()->name, "scpx640");
-    EXPECT_EQ(auf640.size(), 2u);
-    EXPECT_EQ(cat.find("cpa640"), nullptr);
+    size_t cpm = 0;
+    for (const FsProfile* p : auf640) cpm += p->type == FsType::Cpm;
+    EXPECT_EQ(cpm, 2u);
+    EXPECT_EQ(cat.find("ds80_16x256"), nullptr);
 }
 
 TEST(FsCatalog, UdosProfileSindNiemalsImgFaehig) {
@@ -260,7 +265,7 @@ TEST(FsCatalog, Udos1715ProfileSindImgFaehigUndEinseitigGezaehlt) {
     EXPECT_EQ(gefunden, 5);
     std::map<std::string, std::string> fuellung;
     for (const auto& p : cat.profiles())
-        if (p.type == FsType::Udos1715 && p.format == "k5601_16x256") fuellung[p.name] = p.ndos_fill;
+        if (p.type == FsType::Udos1715 && p.format == "ds80_16x256") fuellung[p.name] = p.ndos_fill;
     const std::map<std::string, std::string> soll = {
         {"udos1715", "00"}, {"udos_p8000", "77"}, {"udos50", "ff"}};
     EXPECT_EQ(fuellung, soll) << "jedes 640K-NDOS-Profil braucht eine EIGENE Fuellung, "

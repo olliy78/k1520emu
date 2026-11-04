@@ -19,7 +19,7 @@ pytestmark = requires_disk
 
 pytest.importorskip("PySide6")
 
-FORMAT = "k5601_ss40_16x256"
+FORMAT = "ss40_16x256"
 KLEIN = 163840            # Nutzbytes dieses Formats
 
 
@@ -85,7 +85,7 @@ def satz_720(tmp_path):
     q = tmp_path / "g7"
     q.mkdir()
     (q / "gross.bin").write_bytes(_bytes(800000, 9))
-    with _tool().tar_satz_neu("k5601_9x512", tmp_path / "f.img") as t:
+    with _tool().tar_satz_neu("ds80_9x512", tmp_path / "f.img") as t:
         t.insert(str(q / "gross.bin"), "gross.bin")
         r = t.tar_satz_speichern()
     assert len(r["geschrieben"]) == 2
@@ -247,8 +247,8 @@ def test_new_dialog_lists_formats_and_kind(qt_app):
     from app.disktool.ui.tar_neu_dialog import EINZEL, SATZ, TarNeuDialog
     dlg = TarNeuDialog(_tool().tar_formate())
     namen = [dlg.wahl.itemData(i) for i in range(dlg.wahl.count())]
-    assert FORMAT in namen and "k5601_9x512" in namen
-    assert dlg.format() == "k5601_9x512" and dlg.art() == EINZEL
+    assert FORMAT in namen and "ds80_9x512" in namen
+    assert dlg.format() == "ds80_9x512" and dlg.art() == EINZEL
     dlg.r_satz.setChecked(True)
     assert dlg.art() == SATZ
     assert dlg.info()["bytes"] == 737280
@@ -306,7 +306,7 @@ def paket(tmp_path):
 
 def _neuer_satz(window, tmp_path, monkeypatch, name="z.img"):
     from app.disktool.ui.tar_neu_dialog import SATZ
-    assert window._tar_neu_oeffnen("k5601_9x512", SATZ, str(tmp_path / name))
+    assert window._tar_neu_oeffnen("ds80_9x512", SATZ, str(tmp_path / name))
 
 
 def test_tar_on_an_empty_archive_asks_and_files_it_as_a_file(window, paket, tmp_path, monkeypatch):

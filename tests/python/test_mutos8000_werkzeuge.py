@@ -151,7 +151,7 @@ def test_wurzel_fuer_mfm_laufwerke_hat_dieselbe_blockabbildung(tmp_path, monkeyp
     mfm = tmp_path / "mfm.hfe"
     bau_aus_archiv.bauen(str(ARCHIV), str(mfm), ausgabe=lambda *_: None, laufwerke="k5601")
     info = subprocess.run([str(DISKTOOL), "info", str(mfm)], capture_output=True, text=True).stdout
-    assert "Format:      udos_ss77" in info and "Dateisystem: mutos8k_26x128_mfm" in info     # MFM, nicht mf3200_26x128
+    assert "Format:      ss77_26x128" in info and "Dateisystem: mutos8k_26x128_mfm" in info     # MFM, nicht fm_ss77_26x128
     # Blockabbildung gleich der FM-Fassung (nur die Anlagezeit ist fluechtig) ...
     assert _ohne_anlagezeit(_lesen(DISKTOOL, mfm, tmp_path, "mfm")) == \
         _ohne_anlagezeit(_lesen(DISKTOOL, WURZEL, tmp_path, "fm"))
@@ -166,13 +166,13 @@ def test_wurzel_fuer_mfm_laufwerke_hat_dieselbe_blockabbildung(tmp_path, monkeyp
 
 # Variante -> (Katalogformat der Aufzeichnung, Laufwerkstyp-Konstante, eingecheckte Diskette)
 VARIANTEN = {
-    "mf3200": ("mf3200_26x128", 0x2A, "a5120_mutos8000_boot_udos_mf3200.hfe"),
-    "k5601": ("udos_ss77", 0xFF, "a5120_mutos8000_boot_udos_k5601.hfe"),
-    "mf3200_k5601": ("mf3200_26x128", 0xFE, "a5120_mutos8000_boot_udos_mf3200_k5601.hfe"),
+    "mf3200": ("fm_ss77_26x128", 0x2A, "a5120_mutos8000_boot_udos_mf3200.hfe"),
+    "k5601": ("ss77_26x128", 0xFF, "a5120_mutos8000_boot_udos_k5601.hfe"),
+    "mf3200_k5601": ("fm_ss77_26x128", 0xFE, "a5120_mutos8000_boot_udos_mf3200_k5601.hfe"),
     # Varianten mit Patches (Ticket #22): Aufzeichnung und Konstante wie die Grundvariante
-    "k5601_nur_a": ("udos_ss77", 0xFF, "a5120_mutos8000_boot_udos_k5601_nur_a.hfe"),
-    "mf3200_k5601_nur_a": ("mf3200_26x128", 0xFE, "a5120_mutos8000_boot_udos_mf3200_k5601_nur_a.hfe"),
-    "k5601_8x512": ("udos_ss77", 0xFF, "a5120_mutos8000_boot_udos_k5601_8x512.hfe"),
+    "k5601_nur_a": ("ss77_26x128", 0xFF, "a5120_mutos8000_boot_udos_k5601_nur_a.hfe"),
+    "mf3200_k5601_nur_a": ("fm_ss77_26x128", 0xFE, "a5120_mutos8000_boot_udos_mf3200_k5601_nur_a.hfe"),
+    "k5601_8x512": ("ss77_26x128", 0xFF, "a5120_mutos8000_boot_udos_k5601_8x512.hfe"),
 }
 # Variante -> {Datei: (Patchart, Optionen)}; die UEBRIGEN Dateien muessen die Archivdateien sein.
 ERWARTETE_PATCHES = {

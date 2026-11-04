@@ -86,46 +86,25 @@ TEST(FormatCatalog, Formatnamen_SindEinStabilerVertrag) {
     FormatCatalog cat = FormatCatalog::load({shippedCatalog()}, &fatal);
     ASSERT_TRUE(fatal.empty()) << fatal;
 
+    // Seit Entwurf 47 (Schritt 2) nach dem Geometrie-Schema benannt (`FormatKatalogSchema.*`);
+    // die alten Namen loesen als Aliase auf (`KatalogAltnamen.*`).
     const std::vector<std::string> expected = {
-        "cpa780", "cpa800", "cpa640", "cpa624", "cpa200", "cpa200_boot",
-        "scpx780", "scpx780_b", "scpx798", "mf3200", "mf6400",
-        // UDOS-Geometrien, an disks/udos_boot_*.hfe gemessen (k1520DiskTool,
-        // doc/design/13_k1520disktool.md §6).
-        "udos_ds77", "udos_ss77",
-        // MUTOS 8000 (A5120.16): Zylinder 0 26x128, dahinter 8x512
-        "mutos_ss77", "mutos_ss80",
-        "k5601_16x256", "k5601_16x256_77", "k5601_26x128",
-        "k5601_9x512", "k5601_10x512",
-        "k5601_ss80_26x128", "k5601_ss80_9x512",
-        "k5601_ss40_5x1024", "k5601_ss40_26x128",
-        "k5601_ss40_16x256", "k5601_ss40_15x256",
-        "k5601_ds40_5x1024", "k5601_ds40_26x128",
-        "k5601_ds40_16x256", "k5601_ds40_17x256",
-        // 2026-08-10 empirisch ergaenzt: jedes dieser Formate wurde vom
-        // Originalprogramm des jeweiligen Systems im Emulator geschrieben und
-        // danach vermessen (tests/system/drivers/make_all_formats.py).
-        "cpa190", "cpa390",
-        "k5601_ss80_16x256", "k5601_ss40_9x512", "k5601_ss40_8x512",
-        "k5601_ss40_9x512_id65", "k5601_ss40_9x512_id193", "k5601_ss40_10x512_id0",
-        "scpx_ss80_5x1024", "scpx_ss40_5x1024",
-        "mf3200_26x128", "mf3200_296k", "mf3200_scp296k", "mf3200_9x512",
-        "mf3200_336k", "mf3200_16x256", "mf3200_9x512_80",
-        "mf6400_600k", "mf6400_scp600k", "mf6400_374k", "mf6400_40x128",
-        "mf6400_16x512", "mf6400_600k_16x512", "mf6400_9x1024",
-        // 2026-08-11: die Doppelschritt-Austauschformate (`step: 2`, §3.4 T/U).
-        // Logisch identisch zu den V/W-Formaten daneben, physisch auf jedem
-        // zweiten Zylinder — deshalb eigene Eintraege statt eines Zusatzfeldes
-        // an den vorhandenen.
-        "k5601_ss40_5x1024_dstep", "k5601_ss40_26x128_dstep",
-        "k5601_ss40_16x256_dstep", "k5601_ss40_15x256_dstep",
-        "k5601_ds40_5x1024_dstep", "k5601_ds40_26x128_dstep",
-        "k5601_ds40_16x256_dstep", "k5601_ds40_17x256_dstep",
-        // 2026-08-18: SCP1700/CP/M-86 (A7100) — die einzige Geometrie des Katalogs,
-        // die FM und MFM auf DERSELBEN Diskette mischt (Bootspur c0h0 in FM).
-        "scp1700_640",
-        // MS-DOS FAT12 (Entwurf 44): PC-Geometrien mit 512-B-Sektoren.
-        "k5601_ds40_8x512", "k5601_ds40_9x512", "k5601_ds80_8x512",
-        "pc_hd_15x512", "pc_hd_18x512", "pc_ed_36x512",
+        "ds80_3t26x128-5x1024", "ds80_5x1024", "ds80_16x256", "ds78_16x256", "ss80_5x1024",
+        "ss80_3t26x128-5x1024", "ds80_6t26x128-5x1024", "ds80_2t16x256-5x1024",
+        "ds80_1t16x128fm-16x256", "ds77_26x128", "ss77_26x128", "ss77_1t26x128-8x512",
+        "ss80_1t26x128-8x512", "fm_ss77_4x1024", "ss77_8x1024", "ss40_2t26x128-5x1024",
+        "ss80_2t26x128-5x1024", "ss80_16x256", "ss40_9x512", "ss40_8x512", "ss40_9x512_id65",
+        "ss40_9x512_id193", "ss40_10x512_id0", "ss80_1t16x256-5x1024", "ss40_1t16x256-5x1024",
+        "fm_ss77_26x128", "fm_ss77_3t26x128-4x1024", "fm_ss77_1t26x128-4x1024", "fm_ss77_9x512",
+        "fm_ss77_2t26x128-9x512", "fm_ss77_3t26x128-16x256", "fm_ss80_9x512",
+        "ss77_2t26x128fm-8x1024", "ss77_1t26x128fm-8x1024", "ss77_2t26x128fm-40x128",
+        "ss77_40x128", "ss77_16x512", "ss77_2t26x128fm-16x512", "ss77_9x1024", "ds77_16x256",
+        "ds80_26x128", "ds80_9x512", "ds80_10x512", "ss80_26x128", "ss80_9x512", "ss40_5x1024",
+        "ss40_26x128", "ss40_16x256", "ss40_15x256", "ds40_5x1024", "ds40_26x128",
+        "ds40_16x256", "ds40_17x256", "ss40_5x1024_dstep", "ss40_26x128_dstep",
+        "ss40_16x256_dstep", "ss40_15x256_dstep", "ds40_5x1024_dstep", "ds40_26x128_dstep",
+        "ds40_16x256_dstep", "ds40_17x256_dstep", "ds40_8x512", "ds40_9x512", "ds80_8x512",
+        "ds80_15x512_hd", "ds80_18x512_hd", "ds80_36x512_ed",
     };
 
     for (const auto& name : expected)
@@ -144,7 +123,7 @@ TEST(FormatCatalog, Formatnamen_SindEinStabilerVertrag) {
  * @brief Eine Kapazitaetsangabe wie „640K" in `description:` muss zur tatsaechlichen
  *        Geometrie passen.
  *
- * Hintergrund: `cpa640`/`cpa624` waren jahrelang **einseitig** deklariert (schon in den
+ * Hintergrund: `ds80_16x256`/`ds78_16x256` waren jahrelang **einseitig** deklariert (schon in den
  * frueheren einkompilierten `builtinFormats()`) und lieferten damit 320 statt 640 KB —
  * der Widerspruch zum eigenen Namen fiel niemandem auf, weil ihn nichts geprueft hat.
  * Der Test liest die erste Zahl vor einem „K" aus der Beschreibung und vergleicht sie
@@ -285,11 +264,11 @@ TEST(FormatCatalog, ForDrive_NurExplizitGelisteteFormate) {
 
     const auto list = cat.forDrive(builtinDriveProfile("K5601"));
     ASSERT_FALSE(list.empty());
-    EXPECT_EQ(list.front()->name, "cpa800");            // default_for zuerst
+    EXPECT_EQ(list.front()->name, "ds80_5x1024");            // default_for zuerst
 
     for (const DiskFormat* f : list) {
         EXPECT_TRUE(f->supportsDrive("K5601")) << f->name;
-        EXPECT_NE(f->name, "mf3200") << "8″-FM-Format darf nicht am K5601 erscheinen";
+        EXPECT_NE(f->name, "fm_ss77_4x1024") << "8″-FM-Format darf nicht am K5601 erscheinen";
     }
 
     // Einseitiges Laufwerk bekommt kein doppelseitiges Format angeboten.

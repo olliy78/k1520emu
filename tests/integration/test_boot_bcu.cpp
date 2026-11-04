@@ -33,7 +33,7 @@ using k1520test::QK_RETURN;
 using k1520test::TempDisk;
 
 /// Format der BCU-Abbilder: 40 Spuren einseitig, 26×128 MFM (TD0-Kopf: 250 kbit/s, MFM).
-constexpr const char* kFormat = "k5601_ss40_26x128";
+constexpr const char* kFormat = "ss40_26x128";
 
 /// Bildschirm als Text — K7023 (16×64) oder K7024 (24×80); Bit 7 (Kursor) ausgeblendet.
 std::string bild(A5120Machine& m) {

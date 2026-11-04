@@ -64,7 +64,7 @@ inline std::string wegaDisketten() {
 inline std::string wegaDiskette(const std::string& kurz) { return wegaDisketten() + "/w30" + kurz + ".img"; }
 
 /// Katalogformat der WEGA-Dateisystemdisketten: 80 Zylinder, 2 Koepfe, 9 × 512 B, MFM.
-inline constexpr const char* kWegaFormat = "k5601_9x512";
+inline constexpr const char* kWegaFormat = "ds80_9x512";
 
 inline bool dateiDa(const std::string& p) { std::error_code ec; return wega_fs::exists(p, ec); }
 

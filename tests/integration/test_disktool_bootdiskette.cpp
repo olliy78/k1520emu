@@ -194,7 +194,7 @@ TEST(DiskToolBootdiskette, GebauteScpxDisketteBootetKalt) {
                                              "scpx640", ziel.get(), 16384));
 
     A5120Machine machine;
-    ASSERT_TRUE(machine.mountDisk(0, ziel.get(), "cpa640", /*wp=*/false))
+    ASSERT_TRUE(machine.mountDisk(0, ziel.get(), "ds80_16x256", /*wp=*/false))
         << machine.lastError();
     machine.powerOn();
 

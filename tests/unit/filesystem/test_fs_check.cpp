@@ -860,7 +860,7 @@ TEST(FsCheckUdosSchaden, EinGeloeschtesKartenbitIstGefahr) {
 // gibt.
 //
 // Getestet werden kann das nur mit einem EIGENEN Katalog: `data/formats.yaml` wird
-// bewusst eindeutig gehalten (`cpa640` wurde 2026-08-11 genau deshalb entfernt), und
+// bewusst eindeutig gehalten (`ds80_16x256` wurde 2026-08-11 genau deshalb entfernt), und
 // keines der 31 Abbilder im Baum meldet Alternativen.  Der Zusatzkatalog
 // `tests/fixtures/formats_mehrdeutig.yaml` stellt die Mehrdeutigkeit her, ohne den
 // ausgelieferten anzufassen.
@@ -2180,7 +2180,7 @@ TEST(FsCheck, EineUnerkannteDisketteNenntDieAblehnungsgruende) {
     ASSERT_TRUE(v);
     ASSERT_FALSE(v->hasFileSystem()) << "die Diskette darf hier nicht erkannt werden";
     // Die Geometrie steht trotzdem fest und gehoert in den Befund.
-    EXPECT_EQ("cpa780", v->detection().format);
+    EXPECT_EQ("ds80_3t26x128-5x1024", v->detection().format);
 
     const FsCheckReport& r = v->check(FsCheckLevel::Schnell, true);
     const std::vector<FsFinding> ab = mitId(r, "erkennung.abgelehnt");
@@ -2200,7 +2200,7 @@ TEST(FsCheck, EineUnerkannteDisketteNenntDieAblehnungsgruende) {
     const std::string t = ab.front().text;
     EXPECT_NE(std::string::npos, t.find("0xDC")) << t;
     EXPECT_NE(std::string::npos, t.find("nicht angelegt")) << t;
-    EXPECT_NE(std::string::npos, t.find("cpa780")) << t << " (Geometrie fehlt)";
+    EXPECT_NE(std::string::npos, t.find("ds80_3t26x128-5x1024")) << t << " (Geometrie fehlt)";
 
     // Zweimal pruefen liefert dasselbe — der Bericht wird bei jedem Lauf neu gebaut,
     // die Gruende duerfen sich dabei nicht haeufen.

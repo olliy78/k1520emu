@@ -110,15 +110,15 @@ private:
  * @test Scp1700.WirdOhneVorgabeErkannt
  * @brief Format und Dateisystem stehen ohne `--fs` fest.
  *
- * Die Datenspuren allein (16×256 MFM) passten auch zu `cpa640`, `k5601_16x256` und
+ * Die Datenspuren allein (16×256 MFM) passten auch zu `ds80_16x256`, `ds80_16x256` und
  * damit zu UDOS1715; die **FM-Bootspur** ist das Unterscheidungsmerkmal, und nur
- * `scp1700_640` beschreibt sie.
+ * `ds80_1t16x128fm-16x256` beschreibt sie.
  */
 TEST(Scp1700, WirdOhneVorgabeErkannt) {
     std::string err;
     auto dv = oeffne(fixture(kFixture), err);
     ASSERT_TRUE(dv) << err;
-    EXPECT_EQ(dv->detection().format,     "scp1700_640");
+    EXPECT_EQ(dv->detection().format,     "ds80_1t16x128fm-16x256");
     EXPECT_EQ(dv->detection().filesystem, "scp1700");
     EXPECT_EQ(dv->volumeCount(), 1) << "eine CP/M-86-Diskette ist EIN Dateisystem";
 }
@@ -131,7 +131,7 @@ TEST(Scp1700, WirdOhneVorgabeErkannt) {
  * ginge die Bootspur beim Zurueckschreiben mit doppelter Rate auf die Diskette.
  */
 TEST(Scp1700, BootspurIstFmMitHalberDatenrate) {
-    const DiskFormat* f = formate().find("scp1700_640");
+    const DiskFormat* f = formate().find("ds80_1t16x128fm-16x256");
     ASSERT_NE(f, nullptr);
     auto img = DiskImage::open(fixture(kFixture), *f, /*write_protect=*/true);
     ASSERT_TRUE(img);
@@ -162,7 +162,7 @@ TEST(Scp1700, BootspurIstFmMitHalberDatenrate) {
  * Diskette zu keinem Format (@ref MeasuredTrack::uniqueSectors).
  */
 TEST(Scp1700, BootspurZaehltVerschiedeneSektorenNichtDoppelte) {
-    const DiskFormat* f = formate().find("scp1700_640");
+    const DiskFormat* f = formate().find("ds80_1t16x128fm-16x256");
     ASSERT_NE(f, nullptr);
     auto img = DiskImage::open(fixture(kFixture), *f, true);
     ASSERT_TRUE(img);
@@ -320,7 +320,7 @@ TEST(Scp1700, SchreibenUndZurueckschreibenBleibtLesbar) {
     std::string err;
     auto neu = oeffne(kopie.pfad(), err);
     ASSERT_TRUE(neu) << err;
-    EXPECT_EQ(neu->detection().format,     "scp1700_640");
+    EXPECT_EQ(neu->detection().format,     "ds80_1t16x128fm-16x256");
     EXPECT_EQ(neu->detection().filesystem, "scp1700");
 
     const std::vector<FileEntry> dateien = neu->list();
@@ -339,7 +339,7 @@ TEST(Scp1700, SchreibenUndZurueckschreibenBleibtLesbar) {
     EXPECT_EQ(gelesen, text);
 
     // Und die Bootspur laeuft immer noch mit halber Rate.
-    const DiskFormat* f = formate().find("scp1700_640");
+    const DiskFormat* f = formate().find("ds80_1t16x128fm-16x256");
     ASSERT_NE(f, nullptr);
     auto img = DiskImage::open(kopie.pfad(), *f, true);
     ASSERT_TRUE(img);

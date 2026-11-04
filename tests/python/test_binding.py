@@ -106,7 +106,7 @@ def test_create_disk_writes_a_mountable_image(emulator, tmp_path):
 def test_disk_notice_reports_the_track_pitch_adaptation(emulator, tmp_path):
     """40-Spur-Diskette im 80-Spur-Laufwerk (Slot 0 = K5601) → Doppelschritt-Hinweis."""
     target = tmp_path / "vierzig_spuren.img"
-    assert emulator.create_disk(0, str(target), "k5601_ss40_26x128", False), \
+    assert emulator.create_disk(0, str(target), "ss40_26x128", False), \
         emulator.last_error()
     assert emulator.disk_notice(0) == "Double Step aktiviert"
 

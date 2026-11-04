@@ -170,7 +170,7 @@ TEST(TarMutos, LiestEineVonMutosGeschriebeneEinzeldiskette) {
     auto v = DiskVolume::open(d.path(), "", formate(), dateisysteme(), err);
     ASSERT_TRUE(v) << err;
     EXPECT_EQ(v->detection().filesystem, "tar_mutos8k_26x128_mfm");
-    EXPECT_EQ(v->detection().format, "udos_ss77");
+    EXPECT_EQ(v->detection().format, "ss77_26x128");
     ASSERT_EQ(namen(*v), std::vector<std::string>{"crt0.o"});
     EXPECT_EQ(inhalt(*v, "crt0.o").size(), 200u);
 }
@@ -207,7 +207,7 @@ TEST(TarMutos, SatzRundlaufInAllenContainernUndBeidenAufzeichnungen) {
         {"tar_mutos8k_26x128_mfm", "udos_ss77",     "hfe"},
         {"tar_mutos8k_26x128_mfm", "udos_ss77",     "dmk"},
         {"tar_mutos8k_26x128_mfm", "udos_ss77",     "img"},
-        {"tar_mutos8k_26x128_fm",  "mf3200_26x128", "hfe"},
+        {"tar_mutos8k_26x128_fm",  "fm_ss77_26x128", "hfe"},
     };
     for (const Fall& fa : faelle) {
         SCOPED_TRACE(std::string(fa.profil) + "." + fa.ext);
@@ -300,7 +300,7 @@ TEST(TarMutos, SatzBearbeitenDateiHinzufuegenUndEntfernen) {
 TEST(TarMutos, LeereDisketteHatNullenImDatenbereichUndLaesstZylinder0Liegen) {
     for (const char* profil : {"tar_mutos8k_26x128_mfm", "tar_mutos8k_26x128_fm"}) {
         SCOPED_TRACE(profil);
-        const std::string fmt = std::string(profil) == "tar_mutos8k_26x128_fm" ? "mf3200_26x128" : "udos_ss77";
+        const std::string fmt = std::string(profil) == "tar_mutos8k_26x128_fm" ? "fm_ss77_26x128" : "udos_ss77";
         Ordner o(std::string("tarmutos_leer_") + profil);
         std::string err;
         // Vergleichsstand: dieselbe Diskette frisch formatiert (E5), ohne tar
@@ -423,7 +423,7 @@ constexpr uint32_t kBloecke512 = 608;
 constexpr uint32_t kStromBytes512 = kBloecke512 * 512;
 
 std::vector<uint8_t> rohgeraet512(const std::string& pfad) {
-    const DiskFormat* f = formate().find("mutos_ss77");
+    const DiskFormat* f = formate().find("ss77_1t26x128-8x512");
     EXPECT_TRUE(f);
     std::optional<DiskFormat> of;
     if (fs::path(pfad).extension() == ".img") of = *f;
@@ -445,7 +445,7 @@ std::vector<uint8_t> rohgeraet512(const std::string& pfad) {
 }
 
 std::vector<uint8_t> zylinder0Mutos(const std::string& pfad) {
-    const DiskFormat* f = formate().find("mutos_ss77");
+    const DiskFormat* f = formate().find("ss77_1t26x128-8x512");
     std::optional<DiskFormat> of;
     if (fs::path(pfad).extension() == ".img") of = *f;
     auto img = DiskImage::open(pfad, of, true);
@@ -469,7 +469,7 @@ TEST(TarMutos8x512, LiestEineVonMutosGeschriebeneEinzeldiskette) {
     auto v = DiskVolume::open(d.path(), "", formate(), dateisysteme(), err);
     ASSERT_TRUE(v) << err;
     EXPECT_EQ(v->detection().filesystem, "tar_mutos8k_8x512_mfm");
-    EXPECT_EQ(v->detection().format, "mutos_ss77");
+    EXPECT_EQ(v->detection().format, "ss77_1t26x128-8x512");
     EXPECT_EQ(namen(*v), (std::vector<std::string>{"etc/group", "etc/ttys", "etc/passwd", "bin/sync"}));
     const auto ttys = inhalt(*v, "etc/ttys");
     EXPECT_EQ(std::string(ttys.begin(), ttys.end()), "1wconsole\n02tty1\n");
@@ -568,8 +568,8 @@ TEST(TarMutos8x512, LeereDisketteHatNullenImDatenbereichUndLaesstZylinder0Liegen
     std::string err;
     {   // Vergleichsstand: dieselbe Diskette frisch formatiert (E5), ohne tar
         std::string grund;
-        auto img = DiskImage::create(o / "ref.hfe", *formate().find("mutos_ss77"), false,
-                                     formate().find("mutos_ss77")->predominantEncoding(), &grund);
+        auto img = DiskImage::create(o / "ref.hfe", *formate().find("ss77_1t26x128-8x512"), false,
+                                     formate().find("ss77_1t26x128-8x512")->predominantEncoding(), &grund);
         ASSERT_TRUE(img) << grund;
     }
     auto v = DiskVolume::tarDisketteNeu(o / "t.hfe", "tar_mutos8k_8x512_mfm", formate(), dateisysteme(), err);
@@ -631,8 +631,8 @@ TEST(TarMutos8x512, AnlegenMitCreateUndAndereDisketteBleibenWasSieSind) {
         auto v = DiskVolume::create(o / "u.hfe", "mutos8k_8x512_mfm", "", formate(), dateisysteme(), err);
         ASSERT_TRUE(v) << err;
         std::string grund;
-        auto img = DiskImage::create(o / "e5.hfe", *formate().find("mutos_ss77"), false,
-                                     formate().find("mutos_ss77")->predominantEncoding(), &grund);
+        auto img = DiskImage::create(o / "e5.hfe", *formate().find("ss77_1t26x128-8x512"), false,
+                                     formate().find("ss77_1t26x128-8x512")->predominantEncoding(), &grund);
         ASSERT_TRUE(img) << grund;
     }
     auto u = DiskVolume::open(o / "u.hfe", "", formate(), dateisysteme(), err);

@@ -93,7 +93,7 @@ bool enthaelt(const std::vector<std::string>& v, const std::string& s) {
  *                 Zylinder hat keine logische Entsprechung.
  */
 TEST(Doppelschritt, RechnetLogischeSpurenInPhysischeZylinderUm) {
-    const DiskFormat* f = katalog().find("k5601_ss40_16x256_dstep");
+    const DiskFormat* f = katalog().find("ss40_16x256_dstep");
     ASSERT_NE(f, nullptr);
 
     EXPECT_EQ(f->step, 2);
@@ -105,7 +105,7 @@ TEST(Doppelschritt, RechnetLogischeSpurenInPhysischeZylinderUm) {
     EXPECT_EQ(f->logicalCylinder(4), 2);
     EXPECT_EQ(f->logicalCylinder(5), -1)  << "auf ungeraden Zylindern liegt nichts";
 
-    const DiskFormat* einzel = katalog().find("k5601_ss40_16x256");
+    const DiskFormat* einzel = katalog().find("ss40_16x256");
     ASSERT_NE(einzel, nullptr);
     EXPECT_EQ(einzel->step, 1);
     EXPECT_EQ(einzel->physicalCylinders(), 40);
@@ -123,7 +123,7 @@ TEST(Doppelschritt, RechnetLogischeSpurenInPhysischeZylinderUm) {
  */
 TEST(Doppelschritt, NeueDisketteLaesstJedenZweitenZylinderLeer) {
     TempPfad pfad("k1520_dstep_create.hfe");
-    const DiskFormat* f = katalog().find("k5601_ss40_16x256_dstep");
+    const DiskFormat* f = katalog().find("ss40_16x256_dstep");
     ASSERT_NE(f, nullptr);
 
     auto disk = DiskImage::create(pfad.get(), *f, /*write_protect=*/false);
@@ -153,17 +153,17 @@ TEST(Doppelschritt, NeueDisketteLaesstJedenZweitenZylinderLeer) {
  */
 TEST(Doppelschritt, WirdNurVomDoppelschrittFormatErkannt) {
     TempPfad pfad("k1520_dstep_erkennung.hfe");
-    const DiskFormat* f = katalog().find("k5601_ss40_16x256_dstep");
+    const DiskFormat* f = katalog().find("ss40_16x256_dstep");
     ASSERT_NE(f, nullptr);
     auto disk = DiskImage::create(pfad.get(), *f, /*write_protect=*/false);
     ASSERT_NE(disk, nullptr);
 
     const std::vector<std::string> t = treffer(disk->medium());
     ASSERT_FALSE(t.empty());
-    EXPECT_EQ(t.front(), "k5601_ss40_16x256_dstep");
-    EXPECT_FALSE(enthaelt(t, "k5601_ss40_16x256"))
+    EXPECT_EQ(t.front(), "ss40_16x256_dstep");
+    EXPECT_FALSE(enthaelt(t, "ss40_16x256"))
         << "das Einzelschritt-Format darf nicht mitpassen";
-    EXPECT_FALSE(enthaelt(t, "k5601_ss80_16x256"))
+    EXPECT_FALSE(enthaelt(t, "ss80_16x256"))
         << "ein 80-Spur-Format darf die Luecken nicht als Leerspuren durchgehen lassen";
 }
 
@@ -176,14 +176,14 @@ TEST(Doppelschritt, WirdNurVomDoppelschrittFormatErkannt) {
  */
 TEST(Doppelschritt, EinzelschrittDisketteWirdNichtVerwechselt) {
     TempPfad pfad("k1520_dstep_einzel.hfe");
-    const DiskFormat* f = katalog().find("k5601_ss40_16x256");
+    const DiskFormat* f = katalog().find("ss40_16x256");
     ASSERT_NE(f, nullptr);
     auto disk = DiskImage::create(pfad.get(), *f, /*write_protect=*/false);
     ASSERT_NE(disk, nullptr);
 
     const std::vector<std::string> t = treffer(disk->medium());
     ASSERT_FALSE(t.empty());
-    EXPECT_FALSE(enthaelt(t, "k5601_ss40_16x256_dstep"));
+    EXPECT_FALSE(enthaelt(t, "ss40_16x256_dstep"));
 }
 
 // ─── Adressierung: SectorSpace und .img rechnen dieselbe Abbildung ───────────
@@ -197,7 +197,7 @@ TEST(Doppelschritt, EinzelschrittDisketteWirdNichtVerwechselt) {
  */
 TEST(Doppelschritt, SectorSpaceSchreibtAufDenPhysischenZylinder) {
     TempPfad pfad("k1520_dstep_space.hfe");
-    const DiskFormat* f = katalog().find("k5601_ss40_16x256_dstep");
+    const DiskFormat* f = katalog().find("ss40_16x256_dstep");
     ASSERT_NE(f, nullptr);
     auto disk = DiskImage::create(pfad.get(), *f, /*write_protect=*/false);
     ASSERT_NE(disk, nullptr);
@@ -225,7 +225,7 @@ TEST(Doppelschritt, SectorSpaceSchreibtAufDenPhysischenZylinder) {
 TEST(Doppelschritt, ImgRundlaufBehaeltDieAbbildung) {
     TempPfad quelle("k1520_dstep_q.hfe");
     TempPfad roh("k1520_dstep.img");
-    const DiskFormat* f = katalog().find("k5601_ss40_16x256_dstep");
+    const DiskFormat* f = katalog().find("ss40_16x256_dstep");
     ASSERT_NE(f, nullptr);
 
     {
@@ -260,7 +260,7 @@ TEST(Doppelschritt, ImgRundlaufBehaeltDieAbbildung) {
 TEST(Doppelschritt, LaesstSichMountenUndBeschreiben) {
     TempPfad pfad("k1520_dstep_volume.hfe");
     TempPfad quelldatei("k1520_dstep_quelle.txt");
-    const DiskFormat* f = katalog().find("k5601_ds40_5x1024_dstep");
+    const DiskFormat* f = katalog().find("ds40_5x1024_dstep");
     ASSERT_NE(f, nullptr);
     ASSERT_NE(DiskImage::create(pfad.get(), *f, /*write_protect=*/false), nullptr);
 
@@ -269,7 +269,7 @@ TEST(Doppelschritt, LaesstSichMountenUndBeschreiben) {
     std::string err;
     auto dv = DiskVolume::open(pfad.get(), "", katalog(), dateisysteme(), err);
     ASSERT_NE(dv, nullptr) << err;
-    EXPECT_EQ(dv->detection().format, "k5601_ds40_5x1024_dstep");
+    EXPECT_EQ(dv->detection().format, "ds40_5x1024_dstep");
     EXPECT_EQ(dv->detection().filesystem, "cpa_auto");
     EXPECT_TRUE(dv->list().empty());
 

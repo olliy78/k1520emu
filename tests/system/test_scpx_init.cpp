@@ -49,7 +49,7 @@ using k1520test::vramText;
  *
  * Ablauf:
  *   1. A: = beschreibbare Kopie der Bootdiskette (Quelle fuer STAT.COM).
- *   2. B: = frisch via `A5120Machine::createDisk(..., "k5601_16x256", ...)` erzeugte LEERE
+ *   2. B: = frisch via `A5120Machine::createDisk(..., "ds80_16x256", ...)` erzeugte LEERE
  *      Diskette (Geometrie DD-DS 16×256 = 80 Zyl ×2 Koepfe ×16 Sekt ×256 B).
  *   3. SCPX booten, mit INIT B: **formatieren** (Default DD-DS 16×256) → `BAD TRACKS: - NO -`.
  *   4. Ctrl-C-Warmstart, damit CP/A B: nach dem Direkt-Format neu einloggt (sonst R/O).
@@ -69,7 +69,7 @@ TEST(ScpxInit, CreateFormatBThenPipCopyFromBootDisk) {
     A5120Machine machine;
     ASSERT_TRUE(machine.mountDisk(0, aPath, "cpa780", /*wp=*/false)) << machine.lastError();
     // Leere Zieldiskette DD-DS 16×256 erzeugen UND auf B: mounten (createDisk mountet gleich).
-    ASSERT_TRUE(machine.createDisk(1, bPath, "k5601_16x256", /*wp=*/false)) << machine.lastError();
+    ASSERT_TRUE(machine.createDisk(1, bPath, "ds80_16x256", /*wp=*/false)) << machine.lastError();
     machine.powerOn();
 
     ASSERT_TRUE(runSmallUntil(machine, "SCPX 1526 - V 1.7", 40'000'000))
@@ -169,7 +169,7 @@ TEST(ScpxInit, Builds5x1024SystemViaInitModfSyspAndBoots) {
     A5120Machine machine;
     ASSERT_TRUE(machine.mountDisk(0, aPath, "cpa780", /*wp=*/false)) << machine.lastError();
     // B: physisch 80-Zyl-DS-Blank (INIT formatiert die Sektorstruktur direkt auf 5×1024 um).
-    ASSERT_TRUE(machine.createDisk(1, bPath, "k5601_16x256", /*wp=*/false)) << machine.lastError();
+    ASSERT_TRUE(machine.createDisk(1, bPath, "ds80_16x256", /*wp=*/false)) << machine.lastError();
     machine.powerOn();
 
     ASSERT_TRUE(runSmallUntil(machine, "SCPX 1526 - V 1.7", 40'000'000)) << "SCPX-Banner nie erschienen";

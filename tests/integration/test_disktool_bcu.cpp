@@ -44,7 +44,7 @@ using k1520test::TempDisk;
 
 namespace {
 
-constexpr const char* kFormat = "k5601_ss40_26x128";
+constexpr const char* kFormat = "ss40_26x128";
 constexpr const char* kSatz2 = "bcu12_ss40-26x128_k5600-10_syl-spur1-satz2.img";   // K7023, 64x16
 constexpr const char* kSatz1 = "bcu12_ss40-26x128_k5600-10_syl-spur1-satz1.img";   // K7024, 80x24
 constexpr const char* kArbeit = "bcu12_ss40-26x128_k5600-10_ohnesyl-sys1.img";
@@ -528,8 +528,8 @@ TEST(DisktoolBcu, Kombidiskette80ArbeitetUeberZylinder40Hinaus) {
     cfg.drive_profiles = {"K5600.20", "K5600.20", "K5600.20", "none"};
     A5120Machine m(cfg);
     m.powerOn();
-    ASSERT_TRUE(m.mountDisk(0, kombi.get(), "k5601_ss80_26x128", false)) << m.lastError();
-    ASSERT_TRUE(m.mountDisk(1, arbeit.get(), "k5601_ss80_26x128", false)) << m.lastError();
+    ASSERT_TRUE(m.mountDisk(0, kombi.get(), "ss80_26x128", false)) << m.lastError();
+    ASSERT_TRUE(m.mountDisk(1, arbeit.get(), "ss80_26x128", false)) << m.lastError();
     const uint32_t ende = K7636::QK_TASTE_BASE | 0x37;
     bisPrompt(m, ende);
     befehl(m, "dir a:", ende);

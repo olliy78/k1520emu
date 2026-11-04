@@ -80,7 +80,7 @@ TEST(Pc1715Boot, Scp1715BisPrompt) {
     EXPECT_EQ(hell(10), 0);
 }
 
-/// SCP 1715 V0007 mit nachladbarem CCP, cpa640 (16 × 256).
+/// SCP 1715 V0007 mit nachladbarem CCP, ds80_16x256 (16 × 256).
 TEST(Pc1715Boot, Scp1715V0007Cpa640BisPrompt) {
     Gebootet g("pc1715_scp1715_v0007_cpa640_boot.hfe");
     ASSERT_TRUE(laufeBisPrompt(g.m, "A>", 40'000'000)) << bild(g.m);
@@ -100,7 +100,7 @@ TEST(Pc1715Boot, Cpa1715BisPrompt) {
     EXPECT_NE(zeile(g.m, 24).find("**CP/A**"), std::string::npos) << bild(g.m);
 }
 
-/// CP/Z 2.2 (cpa640).
+/// CP/Z 2.2 (ds80_16x256).
 TEST(Pc1715Boot, Cpz22BisPrompt) {
     Gebootet g("pc1715_cpz22_boot.hfe");
     ASSERT_TRUE(laufeBisPrompt(g.m, "A>", 40'000'000)) << bild(g.m);

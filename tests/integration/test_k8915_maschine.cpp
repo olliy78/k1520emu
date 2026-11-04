@@ -165,7 +165,7 @@ TEST(K8915Machine, LaufwerksanzeigenFolgenDerDiskette)
     ASSERT_TRUE(m.createDisk(1, img.pfad, "cpa800", false)) << m.lastError();
     EXPECT_EQ(m.diskContainer(1), "img");
     EXPECT_TRUE(m.isDiskRawCompatible(1));
-    EXPECT_EQ(m.detectedFormatName(1), "cpa800");
+    EXPECT_EQ(m.detectedFormatName(1), "ds80_5x1024");
     EXPECT_FALSE(m.isDiskRawCompatible(3)) << "unbestueckt";
     EXPECT_EQ(m.diskContainer(3), "");
 

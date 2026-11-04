@@ -14,7 +14,7 @@ from conftest import requires_disk
 
 pytestmark = requires_disk
 
-KLEIN = 163840            # Nutzbytes von k5601_ss40_16x256
+KLEIN = 163840            # Nutzbytes von ss40_16x256
 
 
 def _tool():
@@ -36,8 +36,8 @@ def _bytes(n, start=1):
 def test_format_list_names_uniform_formats_only():
     liste = _tool().tar_formate()
     namen = {f["name"]: f for f in liste}
-    assert namen["k5601_9x512"]["bytes"] == 737280
-    assert namen["k5601_ss40_16x256"]["bytes"] == KLEIN
+    assert namen["ds80_9x512"]["bytes"] == 737280
+    assert namen["ss40_16x256"]["bytes"] == KLEIN
     assert all(f["bytes"] >= 1024 for f in liste)
     assert any(f["img"] for f in liste) and any(f["hfe"] for f in liste)
 
@@ -45,7 +45,7 @@ def test_format_list_names_uniform_formats_only():
 def test_new_empty_disk_in_chosen_format_roundtrip(tmp_path):
     pfad = tmp_path / "klein.img"
     daten = _bytes(50000)
-    with _tool().tar_disk_neu(pfad, "k5601_ss40_16x256") as t:
+    with _tool().tar_disk_neu(pfad, "ss40_16x256") as t:
         assert t.tar_satz and not t.read_only
         assert pfad.stat().st_size == KLEIN                  # sofort da, genau dieser Name
         t.insert(str(_quelle(tmp_path, "a.bin", daten)), "a.bin")
@@ -53,7 +53,7 @@ def test_new_empty_disk_in_chosen_format_roundtrip(tmp_path):
         assert plan["einzel"] and plan["abbilder"] == 1 and plan["namen"] == [str(pfad)]
         r = t.tar_satz_speichern()
         assert r["geschrieben"] == [str(pfad)]
-    with _tool().open_tar_satz_format([pfad], "k5601_ss40_16x256") as w:
+    with _tool().open_tar_satz_format([pfad], "ss40_16x256") as w:
         assert [e.name for e in w.list()] == ["a.bin"]
         ziel = tmp_path / "aus.bin"
         w.extract("a.bin", str(ziel))
@@ -65,7 +65,7 @@ def test_new_empty_disk_in_chosen_format_roundtrip(tmp_path):
 def test_new_set_grows_to_numbered_images_and_attributes_survive(tmp_path):
     basis = tmp_path / "satz.hfe"
     gross = _bytes(300000, 3)
-    with _tool().tar_satz_neu("k5601_ss40_16x256", basis) as t:
+    with _tool().tar_satz_neu("ss40_16x256", basis) as t:
         assert t.tar_satz and not t.dirty
         t.insert(str(_quelle(tmp_path, "gross", gross)), "gross")
         t.set_unix_attrs("gross", mode=0o600, uid=25, gid=7)
@@ -84,11 +84,11 @@ def test_new_set_grows_to_numbered_images_and_attributes_survive(tmp_path):
 
 def test_old_numbers_are_kept_and_reported(tmp_path):
     basis = tmp_path / "s.img"
-    with _tool().tar_satz_neu("k5601_ss40_16x256", basis) as t:
+    with _tool().tar_satz_neu("ss40_16x256", basis) as t:
         t.insert(str(_quelle(tmp_path, "gross", _bytes(300000, 5))), "gross")
         t.tar_satz_speichern()
     # der Satz schrumpft: Abbild 2 gehoert nicht mehr dazu und bleibt liegen
-    with _tool().open_tar_satz_format([tmp_path / "s1.img", tmp_path / "s2.img"], "k5601_ss40_16x256") as t:
+    with _tool().open_tar_satz_format([tmp_path / "s1.img", tmp_path / "s2.img"], "ss40_16x256") as t:
         t.set_read_only(False)
         t.erase("gross")
         plan = t.tar_satz_planen()
@@ -135,7 +135,7 @@ def test_new_set_rejects_unfit_formats_and_names(tmp_path):
     with pytest.raises(K1520DiskError):
         _tool().tar_satz_neu("cpa780", tmp_path / "x.hfe")           # gemischtes Format
     with pytest.raises(K1520DiskError):
-        _tool().tar_disk_neu(tmp_path / "x.txt", "k5601_9x512")
+        _tool().tar_disk_neu(tmp_path / "x.txt", "ds80_9x512")
     assert not (tmp_path / "x.txt").exists()
 
 
@@ -146,7 +146,7 @@ def test_dropped_tar_as_file_or_as_container(tmp_path):
     paket = tmp_path / "paket.tar"
     subprocess.run(["tar", "--format=v7", "-cf", str(paket), "-C", str(tmp_path / "q"), "x.bin"], check=True)
     basis = tmp_path / "z.img"
-    with _tool().tar_satz_neu("k5601_9x512", basis) as t:
+    with _tool().tar_satz_neu("ds80_9x512", basis) as t:
         u = t.tar_datei_pruefen(paket)
         assert u["als_datei"] and u["als_container"] and u["ziel_leer"]
         assert not u["wird_satz"] and u["abbilder"] == 1
@@ -156,7 +156,7 @@ def test_dropped_tar_as_file_or_as_container(tmp_path):
         assert u["als_datei"] and not u["als_container"] and u["container_grund"]
         with pytest.raises(K1520DiskError):
             t.tar_datei_ablegen(paket, als_container=True)
-    with _tool().tar_satz_neu("k5601_9x512", basis) as t:           # Weg 2: der Inhalt WIRD das Archiv
+    with _tool().tar_satz_neu("ds80_9x512", basis) as t:           # Weg 2: der Inhalt WIRD das Archiv
         t.tar_datei_ablegen(paket, als_container=True)
         assert [e.name for e in t.list()] == ["x.bin"]
 
@@ -183,9 +183,9 @@ def test_container_beyond_one_disk_makes_a_set(tmp_path):
 def test_tar_check_without_writable_tar_volume_fails_clearly(tmp_path):
     from app.core_binding.k1520disk import K1520DiskError
     pfad = tmp_path / "s.img"
-    _tool().tar_disk_neu(pfad, "k5601_ss40_16x256").close()
+    _tool().tar_disk_neu(pfad, "ss40_16x256").close()
     paket = _quelle(tmp_path, "k.tar", bytes(1024))
-    with _tool().open_tar_satz_format([pfad], "k5601_ss40_16x256") as w:   # schreibgeschuetzt
+    with _tool().open_tar_satz_format([pfad], "ss40_16x256") as w:   # schreibgeschuetzt
         assert w.read_only
         with pytest.raises(K1520DiskError):
             w.tar_datei_pruefen(paket)

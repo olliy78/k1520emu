@@ -100,10 +100,10 @@ const FileEntry* finde(const std::vector<FileEntry>& l, const std::string& name)
 TEST(SiosFs, ErkennungJedesAbbild) {
     struct Soll { const char* datei; const char* profil; const char* format; const char* label; };
     const Soll soll[] = {
-        {"sios1526_dp1.hfe",  "sios_ss40", "k5601_ss40_26x128", "MWD051"},
-        {"sios1526_dp2.hfe",  "sios_ss40", "k5601_ss40_26x128", "MWD051"},
-        {"sios1526_sg1.hfe",  "sios_ss40", "k5601_ss40_26x128", "MWD002"},
-        {"sios1526_syls.hfe", "sios_ss80", "k5601_ss80_26x128", "ROBINI"},
+        {"sios1526_dp1.hfe",  "sios_ss40", "ss40_26x128", "MWD051"},
+        {"sios1526_dp2.hfe",  "sios_ss40", "ss40_26x128", "MWD051"},
+        {"sios1526_sg1.hfe",  "sios_ss40", "ss40_26x128", "MWD002"},
+        {"sios1526_syls.hfe", "sios_ss80", "ss80_26x128", "ROBINI"},
     };
     for (const Soll& s : soll) {
         std::string err;

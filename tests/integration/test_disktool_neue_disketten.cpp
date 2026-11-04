@@ -184,7 +184,7 @@ TEST(DiskToolNeueDisketten, CpaLiestDoppelschrittDiskette) {
 
     const std::string inhalt = "DOPPELSCHRITT GELESEN VON CPA";
     std::string erkannt;
-    ASSERT_NO_FATAL_FAILURE(legeAnUndBeschreibe(daten.get(), "k5601_ss40_5x1024_dstep",
+    ASSERT_NO_FATAL_FAILURE(legeAnUndBeschreibe(daten.get(), "ss40_5x1024_dstep",
                                                 "DSTEP.TXT", inhalt, &erkannt));
 
     A5120Machine machine;

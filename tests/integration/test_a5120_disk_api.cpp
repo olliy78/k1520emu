@@ -59,18 +59,18 @@ k1520test::TempDisk tmpPath(const std::string& name) {
  *
  * Ersetzt die frueher hartkodierte if-Kette `defaultFormatFor()`; die Zuordnung muss
  * unveraendert bleiben, sonst legt „Neue Diskette" ploetzlich eine andere Geometrie an.
- * @par Kriterium  K5601→cpa800, K5600.20→cpa200, K5600.10→k5601_ss40_5x1024,
+ * @par Kriterium  K5601→cpa800, K5600.20→ss80_5x1024, K5600.10→ss40_5x1024,
  *                 MF3200→mf3200, MF6400→mf6400.
  */
 TEST(A5120DiskApi, DefaultFormat_KommtAusDefaultFor) {
     A5120Machine m(withDrives("K5601", "K5600.20", "K5600.10", "MF3200"));
-    EXPECT_EQ(m.defaultFormatName(0), "cpa800");
-    EXPECT_EQ(m.defaultFormatName(1), "cpa200");
-    EXPECT_EQ(m.defaultFormatName(2), "k5601_ss40_5x1024");
-    EXPECT_EQ(m.defaultFormatName(3), "mf3200");
+    EXPECT_EQ(m.defaultFormatName(0), "ds80_5x1024");
+    EXPECT_EQ(m.defaultFormatName(1), "ss80_5x1024");
+    EXPECT_EQ(m.defaultFormatName(2), "ss40_5x1024");
+    EXPECT_EQ(m.defaultFormatName(3), "fm_ss77_4x1024");
 
     A5120Machine m2(withDrives("MF6400"));
-    EXPECT_EQ(m2.defaultFormatName(0), "mf6400");
+    EXPECT_EQ(m2.defaultFormatName(0), "ss77_8x1024");
 }
 
 /**
@@ -100,7 +100,7 @@ TEST(A5120DiskApi, CompatibleFormats_StandardZuerstUndNurPassende) {
     const auto list = m.compatibleFormats(0);
 
     ASSERT_FALSE(list.empty());
-    EXPECT_EQ(list.front(), "cpa200");                 // default_for
+    EXPECT_EQ(list.front(), "ss80_5x1024");                 // default_for
     EXPECT_EQ(list.front(), m.defaultFormatName(0));
 
     for (const auto& name : list) {
@@ -159,7 +159,7 @@ TEST(A5120DiskApi, CreateDisk_LeerdisketteAlsImgAbgelehnt) {
 /**
  * @test A5120DiskApi/CreateDisk_MitFormatnamenVorformatiert
  * @brief Mit gesetztem Formatnamen entsteht weiterhin eine vorformatierte Diskette
- *        im Standardformat des Slots (k5601_ss40_5x1024 = 40×1×5×1024 B).
+ *        im Standardformat des Slots (ss40_5x1024 = 40×1×5×1024 B).
  */
 TEST(A5120DiskApi, CreateDisk_MitFormatnamenVorformatiert) {
     A5120Machine m(withDrives("K5600.10"));
@@ -378,7 +378,7 @@ TEST(A5120DiskApi, KaputterKatalog_BrichtStartMitKlarerMeldungAb) {
  */
 TEST(A5120DiskApi, NachStartabbruch_BleibtMaschineWeiterBaubar) {
     A5120Machine m;
-    EXPECT_EQ(m.defaultFormatName(0), "cpa800");
+    EXPECT_EQ(m.defaultFormatName(0), "ds80_5x1024");
     EXPECT_FALSE(m.formatCatalog().sources().empty());
 }
 
@@ -400,7 +400,7 @@ TEST(A5120DiskApi, DetectedFormat_MisstDieEingelegteDiskette) {
     k1520test::TempDisk d("cpa_cpa780_k5601_noclock.hfe");
 
     ASSERT_TRUE(m.mountDisk(0, d.path(), "cpa800", /*wp=*/true)) << m.lastError();
-    EXPECT_EQ(m.detectedFormatName(0), "cpa780")
+    EXPECT_EQ(m.detectedFormatName(0), "ds80_3t26x128-5x1024")
         << "der beim Mounten genannte Name ist bei .hfe ein Platzhalter";
     m.unmountDisk(0);
 }
@@ -418,7 +418,7 @@ TEST(A5120DiskApi, DetectedFormat_RohabbildNenntDasErklaerteFormat) {
     k1520test::TempDisk d("cpa_cpa780_k5601_noclock.img");
 
     ASSERT_TRUE(m.mountDisk(0, d.path(), "cpa780", /*wp=*/true)) << m.lastError();
-    EXPECT_EQ(m.detectedFormatName(0), "cpa780");
+    EXPECT_EQ(m.detectedFormatName(0), "ds80_3t26x128-5x1024");
     m.unmountDisk(0);
 }
 
@@ -440,13 +440,12 @@ TEST(A5120DiskApi, DetectedFormat_LeerdisketteIstUnbekannt) {
 
 /**
  * @test A5120DiskApi/DetectedFormat_GleicheGeometrieUnterZweiNamenGiltAlsErkannt
- * @brief Zwei Katalogeintraege derselben Rohgeometrie sind KEINE Mehrdeutigkeit.
+ * @brief Dieselbe Rohgeometrie unter zwei frueheren Namen ist KEINE Mehrdeutigkeit.
  *
- * `cpa640` und `k5601_16x256` beschreiben bis auf den Namen dieselbe Diskette
- * (80×2×16×256 MFM).  Waere jeder zweite Treffer ein Abbruch, hiesse jede solche
- * Diskette „unbekannt" — und liesse sich nicht mehr als `.img` speichern, obwohl
- * beide Namen byteweise dasselbe Abbild ergaeben.
- * @par Kriterium  Eine 16×256-Diskette wird erkannt (einer der beiden Namen).
+ * `cpa640` und `k5601_16x256` waren bis auf den Namen dieselbe Diskette (80×2×16×256 MFM)
+ * und sind seit Entwurf 47 ein Eintrag (`ds80_16x256`, beide Namen Aliase).  Die Regel in
+ * `Laufwerke::detectedFormatName` (gleicher Sektorraum = erkannt) bleibt fuer kuenftige Dubletten.
+ * @par Kriterium  Eine 16×256-Diskette wird als `ds80_16x256` erkannt.
  */
 TEST(A5120DiskApi, DetectedFormat_GleicheGeometrieUnterZweiNamenGiltAlsErkannt) {
     A5120Machine m;
@@ -454,7 +453,6 @@ TEST(A5120DiskApi, DetectedFormat_GleicheGeometrieUnterZweiNamenGiltAlsErkannt) 
 
     ASSERT_TRUE(m.mountDisk(0, d.path(), "cpa800", /*wp=*/true)) << m.lastError();
     const std::string name = m.detectedFormatName(0);
-    EXPECT_TRUE(name == "cpa640" || name == "k5601_16x256")
-        << "erkannt wurde: '" << name << "'";
+    EXPECT_EQ(name, "ds80_16x256");
     m.unmountDisk(0);
 }

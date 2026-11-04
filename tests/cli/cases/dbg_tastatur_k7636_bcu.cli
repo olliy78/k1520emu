@@ -3,7 +3,7 @@
 # (erste Zeile leer: sie verbraucht das Typzeichen 80H aus dem Kaltstart, bcu.md §4).
 tool:    k1520dbg
 disk:    bcu12_ss40-26x128_k5600-10_syl-spur1-satz1.img
-run:     --tastatur k7636 --laufwerke K5600.10,K5600.10,K5600.10,none --laderom v06 --format k5601_ss40_26x128 %DISK%
+run:     --tastatur k7636 --laufwerke K5600.10,K5600.10,K5600.10,none --laderom v06 --format ss40_26x128 %DISK%
 stdin:
   gscreen "A>" 60000000
   keys \r

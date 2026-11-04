@@ -1412,6 +1412,19 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
                 hier.push_back(p);
             }
             if (hier.empty()) continue;
+            // Ein Dateisystem ANDERER Art mit schlechterem Rang faellt weg (`hier` ist nach
+            // detect_rank sortiert): das ist dieselbe Regel wie zwischen zwei Katalogformaten.
+            // Sie muss auch innerhalb EINES Formats gelten, seit gleiche Rohgeometrien
+            // (cpa640 ≡ k5601_16x256) nur noch ein Eintrag sind - sonst waere ein positiv
+            // erkanntes NDOS neben jedem leeren CP/M-Profil derselben Geometrie „mehrdeutig".
+            // Profile GLEICHER Art bleiben beieinander (Gegenprobe, FsCheckGegenprobe.*).
+            const int bester = hier.front()->detect_rank;
+            const FsType beste_art = hier.front()->type;
+            hier.erase(std::remove_if(hier.begin(), hier.end(),
+                                      [&](const FsProfile* q) {
+                                          return q->detect_rank > bester && q->type != beste_art;
+                                      }),
+                       hier.end());
             if (passend.empty() || hier.front()->detect_rank < passend.front()->detect_rank) {
                 passend    = std::move(hier);
                 dv->format_ = f;

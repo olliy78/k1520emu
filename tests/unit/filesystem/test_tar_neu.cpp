@@ -138,10 +138,10 @@ TEST(TarNeu, FormatlisteHatNurEinheitlicheFormateUndJedesLaesstSichAnlegen) {
     const auto l = DiskVolume::tarFormate(formate());
     ASSERT_FALSE(l.empty());
     EXPECT_LT(l.size(), formate().formats().size()) << "gemischte Formate (Systemspuren/Datenspuren) gehoeren nicht hinein";
-    ASSERT_TRUE(finde(l, "k5601_9x512"));
-    EXPECT_EQ(finde(l, "k5601_9x512")->bytes, 737280u);
-    ASSERT_TRUE(finde(l, "k5601_ss40_16x256"));
-    EXPECT_EQ(finde(l, "k5601_ss40_16x256")->bytes, 163840u);
+    ASSERT_TRUE(finde(l, "ds80_9x512"));
+    EXPECT_EQ(finde(l, "ds80_9x512")->bytes, 737280u);
+    ASSERT_TRUE(finde(l, "ss40_16x256"));
+    EXPECT_EQ(finde(l, "ss40_16x256")->bytes, 163840u);
     Ordner o("tarneu_formate");
     for (const auto& f : l) {
         EXPECT_GE(f.bytes, 1024u) << f.name;
@@ -159,7 +159,7 @@ TEST(TarNeu, LeereDisketteImGewaehltenFormatRundlauf) {
     std::string err;
     const std::string pfad = o / "klein.img";
     {
-        auto v = DiskVolume::tarDisketteNeu(pfad, "k5601_ss40_16x256", formate(), dateisysteme(), err);
+        auto v = DiskVolume::tarDisketteNeu(pfad, "ss40_16x256", formate(), dateisysteme(), err);
         ASSERT_TRUE(v) << err;
         EXPECT_TRUE(v->tarSatz());
         EXPECT_FALSE(v->readOnly());
@@ -183,7 +183,7 @@ TEST(TarNeu, LeereDisketteImGewaehltenFormatRundlauf) {
     }
     EXPECT_EQ(fs::file_size(pfad), 163840u);
     std::string e2;
-    auto w = DiskVolume::openTarSatz({pfad}, formate(), dateisysteme(), e2, "k5601_ss40_16x256");
+    auto w = DiskVolume::openTarSatz({pfad}, formate(), dateisysteme(), e2, "ss40_16x256");
     ASSERT_TRUE(w) << e2;
     EXPECT_EQ(namen(*w), (std::vector<std::string>{"a.bin"}));
     EXPECT_EQ(inhalt(*w, "a.bin"), muster(50000, 11));
@@ -196,7 +196,7 @@ TEST(TarNeu, WaechstDerInhaltUeberEineDisketteWirdBeimSpeichernEinSatz) {
     Ordner o("tarneu_waechst");
     std::string err;
     const std::string pfad = o / "w.hfe";
-    auto v = DiskVolume::tarDisketteNeu(pfad, "k5601_ss40_16x256", formate(), dateisysteme(), err);
+    auto v = DiskVolume::tarDisketteNeu(pfad, "ss40_16x256", formate(), dateisysteme(), err);
     ASSERT_TRUE(v) << err;
     ASSERT_TRUE(einfuegen(*v, quelle(o, "gross", muster(300000, 12)), "gross")) << v->lastError();
     const TarSatzPlan plan = v->tarSatzPlanen();
@@ -216,7 +216,7 @@ TEST(TarNeu, AbgelehnteFormateUndContainer) {
     EXPECT_FALSE(DiskVolume::tarDisketteNeu(o / "x.img", "gibt_es_nicht", formate(), dateisysteme(), err));
     EXPECT_NE(err.find("Katalog"), std::string::npos) << err;
     EXPECT_FALSE(fs::exists(o / "x.img")) << "bei einem Fehler entsteht keine Datei";
-    EXPECT_FALSE(DiskVolume::tarDisketteNeu(o / "x.txt", "k5601_9x512", formate(), dateisysteme(), err));
+    EXPECT_FALSE(DiskVolume::tarDisketteNeu(o / "x.txt", "ds80_9x512", formate(), dateisysteme(), err));
     EXPECT_FALSE(fs::exists(o / "x.txt"));
     // Ein gemischtes Format (nicht in der Liste) wird abgelehnt.
     const auto l = DiskVolume::tarFormate(formate());
@@ -233,13 +233,13 @@ TEST(TarNeu, OeffnenMitVorgegebenemFormatUndUnbekanntesFormat) {
     std::string err;
     const std::string pfad = o / "g.img";
     {
-        auto v = DiskVolume::tarDisketteNeu(pfad, "k5601_ss40_16x256", formate(), dateisysteme(), err);
+        auto v = DiskVolume::tarDisketteNeu(pfad, "ss40_16x256", formate(), dateisysteme(), err);
         ASSERT_TRUE(v) << err;
         ASSERT_TRUE(einfuegen(*v, quelle(o, "n", muster(2000, 13)), "n"));
         ASSERT_TRUE(v->tarSatzSpeichern());
     }
     std::string e2;
-    auto gut = DiskVolume::openTarSatz({pfad}, formate(), dateisysteme(), e2, "k5601_ss40_16x256");
+    auto gut = DiskVolume::openTarSatz({pfad}, formate(), dateisysteme(), e2, "ss40_16x256");
     ASSERT_TRUE(gut) << e2;
     EXPECT_EQ(namen(*gut), (std::vector<std::string>{"n"}));
     std::string e3;
@@ -254,7 +254,7 @@ TEST(TarNeu, TarAufLeereDisketteBietetBeideWegeAufNichtLeereNurDatei) {
     quelle(o, "x.bin", muster(3000, 14));
     ASSERT_TRUE(systemTar(o, o / "paket.tar", {"x.bin"}));
     std::string err;
-    auto v = DiskVolume::tarSatzNeu("k5601_9x512", o / "z.img", formate(), dateisysteme(), err);
+    auto v = DiskVolume::tarSatzNeu("ds80_9x512", o / "z.img", formate(), dateisysteme(), err);
     ASSERT_TRUE(v) << err;
 
     TarDateiUrteil u = v->tarDateiBeurteilen(o / "paket.tar");
@@ -289,7 +289,7 @@ TEST(TarNeu, ContainerWirdDasArchivEinesSatzes) {
     quelle(o, "b.bin", b);
     ASSERT_TRUE(systemTar(o, o / "paket.tar", {"a.bin", "b.bin"}));
     std::string err;
-    auto v = DiskVolume::tarSatzNeu("k5601_ss40_16x256", o / "c.img", formate(), dateisysteme(), err);
+    auto v = DiskVolume::tarSatzNeu("ss40_16x256", o / "c.img", formate(), dateisysteme(), err);
     ASSERT_TRUE(v) << err;
     ASSERT_TRUE(v->tarDateiAblegen(o / "paket.tar", TarDateiWeg::AlsContainer)) << v->lastError();
     EXPECT_EQ(namen(*v), (std::vector<std::string>{"a.bin", "b.bin"})) << "der Inhalt WIRD das Archiv";
@@ -361,7 +361,7 @@ TEST(TarNeu, ContainerPasstAufEinzelDisketteGehtInDasselbeAbbild) {
 TEST(TarNeu, FolgeteilUndUnbrauchbareDateienSindKeinContainer) {
     Ordner o("tarneu_folgeteil");
     std::string err;
-    auto v = DiskVolume::tarSatzNeu("k5601_ss40_16x256", o / "f.img", formate(), dateisysteme(), err);
+    auto v = DiskVolume::tarSatzNeu("ss40_16x256", o / "f.img", formate(), dateisysteme(), err);
     ASSERT_TRUE(v) << err;
     // Mitten in Daten: kein Kopf am Anfang.
     schreibeDatei(o / "teil.tar", muster(1024, 40));
@@ -387,10 +387,10 @@ TEST(TarNeu, SchreibschutzUndKeinTarVolumeSindKlareAbsagen) {
     ASSERT_TRUE(systemTar(o, o / "k.tar", {"k"}));
     std::string err;
     {
-        auto v = DiskVolume::tarDisketteNeu(o / "s.img", "k5601_ss40_16x256", formate(), dateisysteme(), err);
+        auto v = DiskVolume::tarDisketteNeu(o / "s.img", "ss40_16x256", formate(), dateisysteme(), err);
         ASSERT_TRUE(v) << err;
     }
-    auto w = DiskVolume::openTarSatz({o / "s.img"}, formate(), dateisysteme(), err, "k5601_ss40_16x256");
+    auto w = DiskVolume::openTarSatz({o / "s.img"}, formate(), dateisysteme(), err, "ss40_16x256");
     ASSERT_TRUE(w) << err;
     ASSERT_TRUE(w->readOnly());                                  // Vorgabe beim Oeffnen
     const TarDateiUrteil u = w->tarDateiBeurteilen(o / "k.tar");

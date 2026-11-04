@@ -57,7 +57,7 @@ using k1520test::TempDisk;
 
 void bootetBisSystemzeile(const char* disk, const char* tastatur, const char* version,
                           const char* laufwerk = "K5600.20",
-                          const char* format = "k5601_ss80_26x128") {
+                          const char* format = "ss80_26x128") {
     A5120Machine::Config cfg;
     cfg.drive_profiles = {laufwerk, "K5600.20", "none", "none"};
     cfg.tastatur = std::string(tastatur) == "k7636" ? A5120Machine::Config::Tastatur::K7636
@@ -92,8 +92,8 @@ struct SiosRechner {
     }
     SiosRechner() : m(cfg()) {
         m.powerOn();
-        EXPECT_TRUE(m.mountDisk(0, a.path(), "k5601_ss80_26x128", false)) << m.lastError();
-        EXPECT_TRUE(m.mountDisk(1, b.path(), "k5601_ss40_26x128", false)) << m.lastError();
+        EXPECT_TRUE(m.mountDisk(0, a.path(), "ss80_26x128", false)) << m.lastError();
+        EXPECT_TRUE(m.mountDisk(1, b.path(), "ss40_26x128", false)) << m.lastError();
         EXPECT_TRUE(k1520test::runSmallUntil(m, "(M)", 300'000'000LL, 100'000))
             << k1520test::vramText(m);
     }
@@ -120,8 +120,8 @@ struct Sios09Rechner {
     }
     explicit Sios09Rechner(int stecker) : m(cfg(stecker)) {
         m.powerOn();
-        EXPECT_TRUE(m.mountDisk(0, a.path(), "k5601_ss80_26x128", false)) << m.lastError();
-        EXPECT_TRUE(m.mountDisk(1, b.path(), "k5601_ss40_26x128", false)) << m.lastError();
+        EXPECT_TRUE(m.mountDisk(0, a.path(), "ss80_26x128", false)) << m.lastError();
+        EXPECT_TRUE(m.mountDisk(1, b.path(), "ss40_26x128", false)) << m.lastError();
         EXPECT_TRUE(k1520test::runSmallUntil(m, "(M)", 300'000'000LL, 100'000))
             << k1520test::vramText(m);
     }
@@ -150,7 +150,7 @@ TEST(SiosBoot, V09_ZeigtSystemzeile) {
 }
 TEST(SiosBoot, V09_Bereinigt_K560010) {
     bootetBisSystemzeile("sios1526_sylp40.hfe", "k7636", "SIOS 1526/0.9", "K5600.10",
-                         "k5601_ss40_26x128");
+                         "ss40_26x128");
 }
 
 // SIOS 0.9 / K7636 (S4): die Zeitgeber-ISR fragt Port 01H/06H ab.  Mit Sicherheitsstecker 1 (Chefschalter;
@@ -271,10 +271,10 @@ TEST(SiosInit, InitialisiertDiskette) {
     TempDisk syls("sios1526_syls.hfe");
     TempDisk prog("sios1526_dp1.hfe", "sios_init_prog.hfe");
     TempDisk ziel("sios1526_dp2.hfe", "sios_init_ziel.hfe");
-    ASSERT_TRUE(m.mountDisk(0, syls.path(), "k5601_ss80_26x128", false)) << m.lastError();
+    ASSERT_TRUE(m.mountDisk(0, syls.path(), "ss80_26x128", false)) << m.lastError();
     ASSERT_TRUE(k1520test::runSmallUntil(m, "(M)", 300'000'000LL, 100'000)) << k1520test::vramText(m);
-    ASSERT_TRUE(m.mountDisk(0, prog.path(), "k5601_ss40_26x128", false)) << m.lastError();
-    ASSERT_TRUE(m.mountDisk(1, ziel.path(), "k5601_ss40_26x128", false)) << m.lastError();
+    ASSERT_TRUE(m.mountDisk(0, prog.path(), "ss40_26x128", false)) << m.lastError();
+    ASSERT_TRUE(m.mountDisk(1, ziel.path(), "ss40_26x128", false)) << m.lastError();
     auto warte = [&](const std::string& t, long long takte = 60'000'000LL) {
         return k1520test::runSmallUntil(m, t, takte, 5'000);
     };
@@ -369,9 +369,9 @@ Ergebnis probiere(const Bestueckung& b, const char* tag, bool mitCal = true) {
     Lieferkopie p2(b.prog2 ? b.prog2 : kProg2, std::string(tag) + "_c.hfe");
     if (!a.ok() || !p1.ok() || !p2.ok()) { e.schirm = "Disketten fehlen"; return e; }
     // .hfe: die Geometrie steht in der Datei, der Formatname ist nur Platzhalter.
-    m.mountDisk(0, a.path(), "k5601_ss80_26x128", false);   // Platzhalter; .img: 80 x 26 x 128
-    m.mountDisk(1, p1.path(), "k5601_ss40_26x128", false);
-    m.mountDisk(2, p2.path(), "k5601_ss40_26x128", false);
+    m.mountDisk(0, a.path(), "ss80_26x128", false);   // Platzhalter; .img: 80 x 26 x 128
+    m.mountDisk(1, p1.path(), "ss40_26x128", false);
+    m.mountDisk(2, p2.path(), "ss40_26x128", false);
     e.bootet = k1520test::runSmallUntil(m, "(M)", 300'000'000LL, 100'000);
     e.schirm = k1520test::vramText(m);
     if (!e.bootet || !mitCal) return e;
@@ -460,9 +460,9 @@ struct LieferRechner {
         m.powerOn();
         EXPECT_TRUE(a.ok() && b.ok() && c.ok()) << "disks/a5120_sios1526/ unvollstaendig";
         // .hfe/.img: Geometrie aus der Datei bzw. 80 x 26 x 128; der Name ist nur Platzhalter.
-        EXPECT_TRUE(m.mountDisk(0, a.path(), "k5601_ss80_26x128", false)) << m.lastError();
-        EXPECT_TRUE(m.mountDisk(1, b.path(), "k5601_ss40_26x128", false)) << m.lastError();
-        EXPECT_TRUE(m.mountDisk(2, c.path(), "k5601_ss40_26x128", false)) << m.lastError();
+        EXPECT_TRUE(m.mountDisk(0, a.path(), "ss80_26x128", false)) << m.lastError();
+        EXPECT_TRUE(m.mountDisk(1, b.path(), "ss40_26x128", false)) << m.lastError();
+        EXPECT_TRUE(m.mountDisk(2, c.path(), "ss40_26x128", false)) << m.lastError();
         EXPECT_TRUE(k1520test::runSmallUntil(m, version, 300'000'000LL, 100'000))
             << k1520test::vramText(m);
     }
@@ -583,10 +583,10 @@ InitErgebnis initLauf(const std::string& ziel, const std::string& menue, const c
     m.powerOn();
     Lieferkopie syls("a5120_sios1526/a5120_sios11_3xk5601_seriell.hfe", std::string(tag) + "_s.hfe");
     Lieferkopie prog(kProg1, std::string(tag) + "_p.hfe");
-    EXPECT_TRUE(m.mountDisk(0, syls.path(), "k5601_ss80_26x128", false)) << m.lastError();
+    EXPECT_TRUE(m.mountDisk(0, syls.path(), "ss80_26x128", false)) << m.lastError();
     EXPECT_TRUE(k1520test::runSmallUntil(m, "(M)", 300'000'000LL, 100'000));
-    EXPECT_TRUE(m.mountDisk(0, prog.path(), "k5601_ss40_26x128", false)) << m.lastError();
-    EXPECT_TRUE(m.mountDisk(1, ziel, "k5601_ss80_26x128", false)) << m.lastError();
+    EXPECT_TRUE(m.mountDisk(0, prog.path(), "ss40_26x128", false)) << m.lastError();
+    EXPECT_TRUE(m.mountDisk(1, ziel, "ss80_26x128", false)) << m.lastError();
     auto warte = [&](const std::string& t, long long n = 60'000'000LL) {
         return k1520test::runSmallUntil(m, t, n, 5'000);
     };
@@ -664,7 +664,7 @@ TEST(SiosVorgabe, DidiZeigtDenKennsatzEinerMitDiskToolAngelegtenDatei) {
     LieferRechner r("a5120_sios1526/a5120_sios11_3xk5601_seriell.hfe", "K5601", true, "daten",
                     "(M)");
     r.m.unmountDisk(2);
-    EXPECT_TRUE(r.m.mountDisk(2, pfad, "k5601_ss40_26x128", false)) << r.m.lastError();
+    EXPECT_TRUE(r.m.mountDisk(2, pfad, "ss40_26x128", false)) << r.m.lastError();
     r.programmlaufwerk("66");
     r.aufruf("DIDI");
     ASSERT_TRUE(r.warte("DIDI 1520 (SIEX) V 1.1", 400'000'000LL)) << r.schirm();

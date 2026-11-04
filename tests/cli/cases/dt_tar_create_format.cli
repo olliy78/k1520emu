@@ -3,8 +3,8 @@
 tool:   k1520disktool
 tmpfile k.img:
 tmpfile k1.img:
-setup_run: create %k.img% --fs tar720_leer --format k5601_ss40_16x256
-run:    tar-satz-save %k.img% --format k5601_ss40_16x256 -o %k.img% --put %CLI_DIR%/../fixtures/p8000/tar_v7_klein.tar=klein.tar
+setup_run: create %k.img% --fs tar720_leer --format ss40_16x256
+run:    tar-satz-save %k.img% --format ss40_16x256 -o %k.img% --put %CLI_DIR%/../fixtures/p8000/tar_v7_klein.tar=klein.tar
 expect: Satz: 1 Abbild
 expect: gespeichert: 1 Abbild
 forbid: Fehler

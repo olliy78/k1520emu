@@ -5,6 +5,6 @@ tmpfile leer.hfe:
 setup_run: create %leer.hfe% --fs tar_mutos8k_26x128_fm_leer
 run:    info %leer.hfe%
 expect: tar_mutos8k_26x128_fm_leer
-expect: mf3200_26x128
+expect: fm_ss77_26x128
 forbid: udos
 exit:   0

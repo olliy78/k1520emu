@@ -41,7 +41,7 @@ class TarNeuDialog(QDialog):
                               f["name"])
         # 720K ist der Regelfall der P8000-Sammlung.
         for i, f in enumerate(formate):
-            if f["name"] == "k5601_9x512":
+            if f["name"] == "ds80_9x512":
                 self.wahl.setCurrentIndex(i)
         lay.addWidget(self.wahl)
 

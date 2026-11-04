@@ -122,9 +122,9 @@ def test_format_wird_ueber_die_dateigroesse_gewaehlt():
     sys.path.insert(0, str(PROJECT_ROOT))
     from app.ui.drive_widget import _abbildgroessen
     groessen = _abbildgroessen()
-    assert groessen.get("cpa780") == 813824
-    assert groessen.get("cpa800") == 819200
-    assert DISK780.stat().st_size == groessen["cpa780"]
+    assert groessen.get("ds80_3t26x128-5x1024") == 813824
+    assert groessen.get("ds80_5x1024") == 819200
+    assert DISK780.stat().st_size == groessen["ds80_3t26x128-5x1024"]
 
 
 @pytest.mark.skipif(not (PROJECT_ROOT / "build" / "libk1520core.so").exists(),
@@ -142,7 +142,7 @@ def test_diskette_liegt_im_laufwerk_und_die_maschine_bootet_davon():
         belegung = {m["drive"]: m for m in fenster.drives_widget.get_mounts()}
         assert 0 in belegung, "Laufwerk A: blieb leer"
         assert belegung[0]["path"] == str(DISK780)
-        assert belegung[0]["format"] == "cpa780", \
+        assert belegung[0]["format"] == "ds80_3t26x128-5x1024", \
             f"falsches Format gewaehlt: {belegung[0]['format']}"
 
         # Kaltstart: der Bildschirm muss CP/A zeigen (der Kaltstart lief schon in

@@ -546,7 +546,7 @@ TEST(HfeCodec, UeberabtastungTrotzFalscherHeaderRate) {
  *
  * Die Bootspur (c0h0) der SCP1700-Disketten des A7100 ist so aufgezeichnet: FM,
  * 16×128 B, 125 kbit/s — auf derselben Diskette, deren uebrige Spuren MFM mit
- * 250 kbit/s tragen (`data/formats.yaml`, `scp1700_640`).  Zwei Dinge muessen halten:
+ * 250 kbit/s tragen (`data/formats.yaml`, `ds80_1t16x128fm-16x256`).  Zwei Dinge muessen halten:
  * **jeder** Sektor kommt zurueck (auch der erste, der unmittelbar hinter dem
  * Index liegt), und die Spur behaelt ihren @ref TrackImage::cell_factor — sonst
  * ginge sie beim Zurueckschreiben mit doppelter Rate auf die Diskette.
