@@ -156,3 +156,60 @@ Jeder neue langsame Test braucht ein `fach_*`-Label (Wächter `py_testauswahl`);
   Laufwerk sie darstellen kann (`drives:` entscheidet das).
 - Bei den Dateisystemprofilen `microdos*`/`bcu880*` ist die Rollenbezeichnung (`syl`/`kombi`) Eigenbau-Wortschatz; vor
   Schritt 3 mit den Merkposten `microdos.md` und der BCU-880-Dokumentation abgleichen.
+
+## 8  Messergebnis Schritt 0
+
+Gemessen mit `k1520disktool measure`/`info` an Kopien der Fixtures (2026-11-04).
+
+| Profil | Fixture | gemessene Spuren | trifft Katalogformat | `format:` im Profil | stimmt? |
+|---|---|---|---|---|---|
+| `scp1715` | `pc1715_scp1715_v0006_boot.hfe` | c0-79 h0-1, alle 5×1024 MFM | `cpa800` | `cpa800` | ja |
+| `scp1715` (SCP 3.0) | `pc1715w_scp30_system.hfe` | c0-79 5×1024, c80-81 unformatiert | `cpa800` (4 unformatierte Spuren) | `cpa800` | ja |
+| `scpx8915` | `k8915scpx_boot1.hfe` | c0-79 5×1024 (1 Sektor mit CRC-Fehler) | `cpa800` | `cpa800` | ja |
+| `cpa1715` | `pc1715_cpa1715_boot_4lw.hfe` | c0-79 5×1024 | `cpa800` | `cpa800` | ja |
+| `microdos1715` | `pc1715_microdos_k5601_system.hfe` | c0-79 5×1024 | `cpa800` | `cpa800` | ja |
+| `microdos800` | `a5120_microdos26_k5601_seriell.hfe` | c0-79 5×1024 | `cpa800` | `cpa800` | ja |
+
+Keine der Disketten hat 128-B-Systemspuren: auch die Systemzylinder 0-1 von SCP 1715, SCP 3.0 und SCPX 8915 sind
+durchgehend 5×1024 MFM; die `scpx780`-Geometrie (Spur 0-2 mit 26×128) trifft **keine** davon.  `format: cpa800` ist
+also richtig; falsch ist nur die Beschreibung „Systemzylinder 0-1" im Sinne einer eigenen Geometrie.  Die
+Systemzylinder sind ein Merkmal des Dateisystemprofils (`data_start: cyl 2`), nicht des Formats.  Vorschlag: `format:`
+bei allen sechs unverändert lassen, keine Umhängung auf `scpx780`; die Profilnamen dürfen daher das Format
+`ds80_5x1024` tragen (`scp_1715_ds80_5x1024_boot`, `scpx_8915_ds80_5x1024_boot`).  Die 1715W-Fixture hat zwei
+zusätzliche unformatierte Zylinder (80-81), die das Format nicht ändern.
+
+## 9  Zusatzaufgaben (vom Anwender, 2026-11-04)
+
+Unabhängig vom Namensumbau (§1–§8); können vor, nach oder neben den Schritten 2–8 laufen.  Neue Aufgaben des
+Anwenders werden hier fortlaufend angehängt (Z1, Z2, …).
+
+### Z1  Statuszeile des DiskTools zeigt die Kapazität
+
+Heute (`app/disktool/ui/main_window.py::_inhalt_anzeigen`) steht dort `N Dateien · X KB frei` (je Volume, bei
+zweiseitigen UDOS-Disketten mit Seitenpräfix).  Gewünscht: **„7 Dateien - 64 KB von 640 KB frei"**.
+
+- **Einzeldiskette:** frei von gesamt, aus `FsInfo::free_bytes`/`total_bytes` (`core/filesystem/file_system.h`, liegt
+  schon vor; die Python-Bindung reicht heute nur `free` durch — `total` bzw. `used` ergänzen, additiv in der C-ABI
+  `k1520d_*`, `test_c_api.py` mitziehen).
+- **Mehrseitige Disketten (UDOS ds77):** je Seite „A: 64 KB von 320 KB frei"; die Gesamtkapazität ist die Summe, die
+  Anzeige bleibt je Seite (jede Seite ist ein eigenes Dateisystem).
+- **tar-Satz über mehrere Disketten:** die Anzeige bezieht sich auf das **Medium**, nicht auf ein Abbild.  Kapazität =
+  `TarSatzPlan::kapazitaet` (Nutzbytes EINES Abbilds) × Zahl der Abbilder, Belegung = Länge des tar-Stroms
+  (`TarSatzPlan::strom`).  Zusätzlich die Zahl der Disketten: „12 Dateien - 1,2 MB von 2,1 MB belegt (3 Disketten)".
+  Bei einem *abgeschlossenen* Archiv gibt es keinen freien Platz im Sinn eines Dateisystems (V7-Neuaufbau, Entwurf 37):
+  Anzeige dann „belegt von Kapazität", nicht „frei".  Leeres tar-Archiv: „0 Dateien - 0 KB von 720 KB".
+- **P8000-Plattenabbilder / Dateisysteme ohne Kapazitätsangabe** (`total_bytes == 0`): wie bisher nur „X KB frei",
+  nie „von 0 KB".
+- **Einheiten:** KB bis 1023 KB, darüber MB mit einer Nachkommastelle (`1,2 MB`; deutsche Schreibweise, Komma).  Die Zahl
+  in der Statuszeile ist **Nutzkapazität des Dateisystems**, nicht die Marktkapazität (`capacity:` aus §3, „800K") —
+  beide dürfen auseinanderfallen (Tooltip nennt die Marktbezeichnung, sobald §3 steht).
+- **Nicht vollständig geladene physische Diskette:** wie heute erst anzeigen, wenn alles beisammen ist
+  (`_inhalt_anzeigen` wird erst am Ende aufgerufen); bis dahin keine Teilzahl.
+- **Wächter Z1:** `py_disktool_statuszeile` — Einzeldiskette (CP/M `cpa_…_daten`: Format „N Dateien - X KB von Y KB frei",
+  X ≤ Y), zweiseitige UDOS (je Seite), tar-Satz mit 2 Abbildern (Summe, Zahl der Disketten), Dateisystem ohne
+  Kapazität (kein „von 0 KB"), roh geöffnet (Text unverändert).  Dazu ein Formatierer-Test für Einheiten/Komma
+  (`1023 KB`, `1,0 MB`, `0 KB`).  Der Formatierer gehört in eine eigene reine Funktion (kein Qt), damit er ohne GUI
+  prüfbar ist.
+- **Zuständig:** einfache Umsetzung, Sonnet-Agent; der tar-Satz-Fall braucht vorher einen Blick auf
+  `DiskVolume::tarSatzPlan` bzw. das offene Satzobjekt, wie die Kapazität des *geöffneten* Satzes (nicht des Plans)
+  zu holen ist.
