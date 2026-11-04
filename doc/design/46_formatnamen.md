@@ -261,3 +261,34 @@ eine Vermutung, keine Diagnose — zuerst messen.
 - **Ausdrücklich nicht:** die Erkennung „aufweichen", bis die Disketten durchgehen.  Falschmeldungen sind schlimmer als
   fehlende (Merkposten DiskTool); passt die Geometrie nicht eindeutig, wird das Profil enger geschnitten, nicht die
   Prüfung gelockert.
+
+**Messergebnis Z2 (2026-11-04, an Kopien im Scratchpad, `k1520disktool` + `DiskTool.open_raw`):**
+
+| Datei | gemessen | Katalogformat | Befund |
+|---|---|---|---|
+| `CPA1715_5600.hfe` | c0-39, Kopf 0, 5×1024 MFM | `k5601_ss40_5x1024` (trifft) | **Fall b: Profil fehlt** |
+| `UDOS_NDOS.hfe` | c0-39, Kopf 0, 16×256 MFM, IDs 1-16 | `k5601_ss40_16x256` (trifft) | **Fall b/c: Profil passt nicht — Plan ist kein NDOS-Plan, Ursache offen** |
+
+- Beide sind **einseitig** (`ss40`); der Spurblock der HFE ist nur der HFE-übliche Doppelseitenrahmen.  Die Formate gibt
+  es im Katalog, es fehlt kein Format.
+- **`CPA1715_5600`:** Inhalt ist ein CP/A-1715-Verzeichnis (`@OS.COM`, `CLS.COM`, `CPA1715G.COM`, `FORMATPX.COM`,
+  `PILOTS.*`, `POWER.COM`, `TP*.OVR` …).  Mit einem Probeprofil `format: k5601_ss40_5x1024`, `block_size: 1024`,
+  `dir_entries: 64`, `dir_boot: true`, `boot_header: pc1715` (Katalogkopie im Scratchpad, `K1520_FORMATS`) liest das
+  DiskTool **12 Dateien, `fsck` ohne Befund** außer „1 gelöschter Platz lesbar".  Ein Zwangsprofil `microdos200` liest
+  die Datei zwar auch, hält aber den PC-1715-Bootkopf für einen Eintrag (`2:p`, 7 864 320 B, `cpm.block.doppelt` ×3) —
+  das **MicroDOS-Bootkopfformat ist nicht das des CP/A 1715**.  Nach dem Schema wäre der Name
+  `cpa_1715_ss40_5x1024_boot` (Rolle: Lader im Verzeichnis).
+  **Achtung Erkennung:** Geometrie und CP/M-Aufbau sind mit `microdos200` identisch, nur der Bootkopf unterscheidet sie.
+  Das neue Profil braucht eine **positive** Unterscheidung über `boot_header` (`pc1715` gegen `microdos`) — ob die
+  Erkennung das schon leistet (wie bei `cpa1715` gegen `microdos800` auf 80 Spuren), vor dem Eintrag prüfen; die
+  Gegenprobe (`erkennung.alternative`) darf auf den bestehenden MicroDOS-Fixtures nicht anschlagen.
+- **`UDOS_NDOS`:** `udos1715_ss40` lehnt ab: *Karte nennt 0 Sektoren je Spur, gemessen 16*; `udos_ss40` (ZDOS):
+  *Karte nennt 184 Sektoren je Spur, gemessen 26*.  Der Belegungsplan liegt auf Spur 23 (2 × 256 B), Datenträgername
+  `SYSTEM G`.  Auffällig: `belegt + frei = 2459 + 5 = 2464` — das ist die **ZDOS-Konstante** (Entwurf UDOS §Zähler), nicht
+  die NDOS-Zählweise (dort die wirkliche Zahl); `raw[378]` (Sektoren/Spur) = 0, `raw[379]` (Spuren) = 74, obwohl das
+  Medium 40 Spuren hat; Bytes 24/25 der Karte `E7 D3`, sonst FF.  Das ist weder die NDOS-Karte (`32`/`80`) noch die
+  ZDOS-Karte (`26`/`77`) einer Fixture.  Hypothese: eine **UDOS-4.x-Karte, auf 16×256 umformatiert** (Zeigerketten statt
+  Gap-Verkettung, vgl. `project_udos1715_ndos`) oder eine von einem anderen Formatierer geschriebene Karte.  **Offen** —
+  ein Katalogeintrag allein löst das nicht; erst die Karte deuten (Vergleich mit `UDOS5.0`-/P8000-Fixtures, UDOS-Quellen
+  `~/projects/UDOS`).  Das ist ein Befund zum Lesepfad/zur Kartendeutung, bekommt einen eigenen Eintrag (Z2b).
+- **Fixtures:** unverändert offen (Freigabe des Anwenders).
