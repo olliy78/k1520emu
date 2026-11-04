@@ -1016,12 +1016,17 @@ class MainWindow(QMainWindow):
         if not self.tool.has_filesystem:
             self.st_inhalt.setText("kein Dateisystem — Diskette roh geöffnet")
             return
-        teile = [f"{len(getattr(self, '_eintraege', []))} Dateien"]
-        mehrseitig = self.tool.volume_count > 1
-        for v in self.tool.volumes():
-            wo = f"{v.dir}: " if mehrseitig else ""
-            teile.append(f"{wo}{v.free // 1024} KB frei")
-        self.st_inhalt.setText(" · ".join(teile))
+        plan = None
+        if self.tool.tar_satz:
+            # tar-Satz: Anzeige bezieht sich auf das Medium (alle Abbilder), nicht auf ein Abbild.
+            try:
+                plan = self.tool.tar_satz_planen()
+            except Exception:
+                plan = None
+        from app.groessen import inhalt_text
+        self.st_inhalt.setText(inhalt_text(
+            len(getattr(self, "_eintraege", [])), self.tool.volumes(),
+            self.tool.volume_count > 1, plan))
 
     def _bezeichnung(self) -> str:
         """Woher die offene Diskette kommt — Pfad oder echtes Laufwerk.
