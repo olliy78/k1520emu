@@ -9,7 +9,11 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <map>
+#include <regex>
+#include <set>
 #include <string>
+#include <tuple>
 
 #include "core/filesystem/fs_catalog.h"
 
@@ -75,6 +79,43 @@ TEST(KatalogAnzeige, AliasLiefertDieFelderDesNeuenProfils) {
     ASSERT_NE(p, nullptr);
     EXPECT_EQ(p->name, "anzfs_neu_a");
     EXPECT_EQ(p->title, "Anzeigeprofil A");
+}
+
+// W5: der AUSGELIEFERTE Katalog ist vollstaendig beschriftet (Entwurf 47, Schritt 5).
+TEST(KatalogAnzeige, AusgelieferterKatalogIstVollstaendig) {
+    std::string fatal;
+    const FormatCatalog fk = FormatCatalog::load({K1520_FORMATS_DEFAULT}, &fatal);
+    ASSERT_TRUE(fatal.empty()) << fatal;
+    const FsCatalog pk = FsCatalog::load({K1520_FORMATS_DEFAULT}, fk, &fatal);
+    ASSERT_TRUE(fatal.empty()) << fatal;
+
+    const std::regex kap("^\\d+(,\\d+)?[KM]$");
+    // Geschlossener Wortschatz der Rechnernamen (Kopfkommentar von data/formats.yaml).
+    const std::set<std::string> wortschatz = {
+        "A5120", "A5130", "K8924", "A5120.16", "K8915", "K8915 V2", "PRG 710", "PRG 710-1",
+        "PC 1715", "PC 1715W", "P8000", "A7100", "A7150", "PC 1834", "MC80"};
+
+    std::set<std::string> formatTitel;
+    for (const DiskFormat& f : fk.formats()) {
+        EXPECT_FALSE(f.title.empty()) << f.name;
+        EXPECT_TRUE(std::regex_match(f.capacity, kap)) << f.name << ": '" << f.capacity << "'";
+        // Eine Zeile der Formatliste muss eindeutig sein: (Kapazitaet, Titel).
+        EXPECT_TRUE(formatTitel.insert(f.capacity + "|" + f.title).second)
+            << f.name << ": Kapazitaet+Titel doppelt";
+    }
+    // Profile: (Kapazitaet, Rechner, Titel) unterscheidet zwei Zeilen der Auswahlliste.
+    std::set<std::string> zeilen;
+    for (const FsProfile& p : pk.profiles()) {
+        EXPECT_FALSE(p.title.empty()) << p.name;
+        EXPECT_TRUE(std::regex_match(p.capacity, kap)) << p.name << ": '" << p.capacity << "'";
+        std::string ms;
+        for (const std::string& m : p.machines) {
+            EXPECT_TRUE(wortschatz.count(m)) << p.name << ": unbekannter Rechner '" << m << "'";
+            ms += m + ",";
+        }
+        EXPECT_TRUE(zeilen.insert(p.capacity + "|" + ms + "|" + p.title).second)
+            << p.name << ": Kapazitaet+Rechner+Titel doppelt";
+    }
 }
 
 }  // namespace

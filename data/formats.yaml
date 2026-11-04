@@ -27,8 +27,10 @@
 #                            `filesystems:`-Profilen.  Aliase sind dauerhaft.
 #    machines     (nur bei `filesystems:`-Profilen, optional) Liste der Rechner, fuer die die
 #                            Diskette gedacht ist.  LEER/fehlend heisst UNBEKANNT, nicht "alle".
-#                            Der geschlossene Wortschatz der Rechnernamen wird mit der Katalog-
-#                            fuellung festgelegt (Entwurf 47, Schritt 5).
+#                            Wortschatz (geschlossen; Waechter KatalogAnzeige.*):
+#                              A5120, A5130, K8924, "A5120.16", K8915, "K8915 V2", "PRG 710",
+#                              "PRG 710-1", "PC 1715", "PC 1715W", P8000, A7100, A7150, "PC 1834", MC80
+#                            Nur eintragen, was belegt ist (Katalogbeschreibung, Merkposten); sonst [].
 #
 #  ┌───────────────────────────────────────────────────────────────────────────┐
 #  │ `step: 2` — DOPPELSCHRITT (Austausch zwischen 96 tpi und 48 tpi)          │
@@ -71,6 +73,8 @@ formats:
   - name:        ds80_3t26x128-5x1024
     aliases:     [cpa780]
     description: "CP/A 780K Bootdiskette — 128B-Systembereich, 1024B-Daten"
+    title:       "80 Spuren doppelseitig, Systembereich 26×128 + 5×1024"
+    capacity:    "780K"
     drives:      [K5601]
     encoding:    mfm
     tracks:
@@ -85,6 +89,8 @@ formats:
   - name:        ds80_5x1024
     aliases:     [cpa800]
     description: "CP/A 800K — 80 Spuren doppelseitig, durchgängig 5×1024"
+    title:       "80 Spuren doppelseitig, 5×1024"
+    capacity:    "800K"
     drives:      [K5601]
     default_for: [K5601]
     encoding:    mfm
@@ -98,6 +104,8 @@ formats:
   - name:        ds78_16x256
     aliases:     [cpa624]
     description: "CP/A 624K — 78 Spuren doppelseitig, 16×256 (reduzierte Kapazität)"
+    title:       "78 Spuren doppelseitig, 16×256"
+    capacity:    "624K"
     drives:      [K5601]
     encoding:    mfm
     tracks:
@@ -106,6 +114,8 @@ formats:
   - name:        ss80_5x1024
     aliases:     [cpa200]
     description: "CP/A 400K — 80 Spuren einseitig, 5×1024 (K5600.20)"
+    title:       "80 Spuren einseitig, 5×1024"
+    capacity:    "400K"
     drives:      [K5601, K5600.20]
     default_for: [K5600.20]
     encoding:    mfm
@@ -115,6 +125,8 @@ formats:
   - name:        ss80_3t26x128-5x1024
     aliases:     [cpa200_boot]
     description: "CP/A 400K bootfähig — 128B-Systemspuren 0-2, danach 5×1024"
+    title:       "80 Spuren einseitig, 3 Systemspuren 26×128 + 5×1024"
+    capacity:    "400K"
     drives:      [K5601, K5600.20]
     encoding:    mfm
     tracks:
@@ -126,6 +138,8 @@ formats:
   - name:        ds80_6t26x128-5x1024
     aliases:     [scpx780, scpx780_b]
     description: "SCPX 780K — Systemspuren 0-2 mit 26×128, Daten 5×1024"
+    title:       "80 Spuren doppelseitig, 3 Systemspuren 26×128 + 5×1024"
+    capacity:    "780K"
     drives:      [K5601]
     encoding:    mfm
     tracks:
@@ -135,6 +149,8 @@ formats:
   - name:        ds80_2t16x256-5x1024
     aliases:     [scpx798]
     description: "SCPX 798K — Systemzylinder 0 in 16×256, Daten 5×1024"
+    title:       "80 Spuren doppelseitig, 1 Systemspur 16×256 + 5×1024"
+    capacity:    "798K"
     drives:      [K5601]
     encoding:    mfm
     # GEMESSEN an tests/fixtures/disks/scpx17_5x1024_k5601_hardy_norm.hfe (GeometryProbe):
@@ -156,6 +172,8 @@ formats:
   - name:        ds80_1t16x128fm-16x256
     aliases:     [scp1700_640]
     description: "SCP1700/CP/M-86 640K — Bootspur c0h0 in FM 16×128, sonst 16×256 MFM"
+    title:       "80 Spuren doppelseitig, FM-Bootspur 16×128, sonst 16×256"
+    capacity:    "640K"
     drives:      [K5601]
     encoding:    mfm
     tracks:
@@ -172,6 +190,8 @@ formats:
   - name:        ds77_26x128
     aliases:     [udos_ds77]
     description: "UDOS 4.x — 77 Spuren doppelseitig, 26×128 (je Seite ein Dateisystem)"
+    title:       "77 Spuren doppelseitig, 26×128"
+    capacity:    "500K"
     drives:      [K5601]
     encoding:    mfm
     tracks:
@@ -180,6 +200,8 @@ formats:
   - name:        ss77_26x128
     aliases:     [udos_ss77]
     description: "UDOS 4.x — 77 Spuren einseitig, 26×128"
+    title:       "77 Spuren einseitig, 26×128"
+    capacity:    "250K"
     drives:      [K5601, K5600.20, MF6400]
     encoding:    mfm
     tracks:
@@ -190,6 +212,8 @@ formats:
   - name:        ss77_1t26x128-8x512
     aliases:     [mutos_ss77]
     description: "MUTOS 8000 — Zylinder 0 26×128, Zylinder 1-76 einseitig 8×512"
+    title:       "77 Spuren einseitig, 1 Systemspur 26×128 + 8×512"
+    capacity:    "307K"
     drives:      [K5601, K5600.20, MF6400]
     encoding:    mfm
     tracks:
@@ -199,6 +223,8 @@ formats:
   - name:        ss80_1t26x128-8x512
     aliases:     [mutos_ss80]
     description: "MUTOS 8000 — Zylinder 0 26×128, Zylinder 1-79 einseitig 8×512"
+    title:       "80 Spuren einseitig, 1 Systemspur 26×128 + 8×512"
+    capacity:    "319K"
     drives:      [K5601, K5600.20]
     encoding:    mfm
     tracks:
@@ -215,6 +241,8 @@ formats:
   - name:        fm_ss77_4x1024
     aliases:     [mf3200]
     description: "8″ 308K — 77 Spuren einseitig, 4×1024 FM (Einfachdichte)"
+    title:       "8″ 77 Spuren einseitig FM, 4×1024"
+    capacity:    "308K"
     drives:      [MF3200, MF6400]
     default_for: [MF3200]
     encoding:    fm
@@ -224,6 +252,8 @@ formats:
   - name:        ss77_8x1024
     aliases:     [mf6400]
     description: "8″ 616K — 77 Spuren einseitig, 8×1024 MFM (Doppeldichte)"
+    title:       "8″ 77 Spuren einseitig, 8×1024"
+    capacity:    "616K"
     drives:      [MF6400]
     default_for: [MF6400]
     encoding:    mfm
@@ -247,6 +277,8 @@ formats:
   - name:        ss40_2t26x128-5x1024
     aliases:     [cpa190]
     description: "CP/A S 190K — 40 Spuren einseitig, 26×128-Systemspuren + 5×1024"
+    title:       "40 Spuren einseitig, 2 Systemspuren 26×128 + 5×1024"
+    capacity:    "190K"
     drives:      [K5600.10, K5600.20, K5601]
     encoding:    mfm
     tracks:
@@ -256,6 +288,8 @@ formats:
   - name:        ss80_2t26x128-5x1024
     aliases:     [cpa390]
     description: "CP/A S 390K — 80 Spuren einseitig, 26×128-Systemspuren + 5×1024"
+    title:       "80 Spuren einseitig, 2 Systemspuren 26×128 + 5×1024"
+    capacity:    "390K"
     drives:      [K5600.20, K5601]
     encoding:    mfm
     tracks:
@@ -265,6 +299,8 @@ formats:
   - name:        ss80_16x256
     aliases:     [k5601_ss80_16x256]
     description: "80 Spuren einseitig, 16×256 (SCP 308K; auch SCPX INIT 1)"
+    title:       "80 Spuren einseitig, 16×256"
+    capacity:    "320K"
     drives:      [K5600.20, K5601]
     encoding:    mfm
     tracks:
@@ -273,6 +309,8 @@ formats:
   - name:        ss40_9x512
     aliases:     [k5601_ss40_9x512]
     description: "40 Spuren einseitig, 9×512 (DEC VT / VPPC / MSDOS 170-180K)"
+    title:       "40 Spuren einseitig, 9×512"
+    capacity:    "180K"
     drives:      [K5600.10, K5600.20, K5601]
     encoding:    mfm
     tracks:
@@ -281,6 +319,8 @@ formats:
   - name:        ss40_8x512
     aliases:     [k5601_ss40_8x512]
     description: "40 Spuren einseitig, 8×512 (CP/M 86 / IBM CPC 156K)"
+    title:       "40 Spuren einseitig, 8×512"
+    capacity:    "160K"
     drives:      [K5600.10, K5600.20, K5601]
     encoding:    mfm
     tracks:
@@ -290,6 +330,8 @@ formats:
   - name:        ss40_9x512_id65
     aliases:     [k5601_ss40_9x512_id65]
     description: "40 Spuren einseitig, 9×512 ab Sektor-ID 65 (Schneider S)"
+    title:       "40 Spuren einseitig, 9×512, Sektor-IDs ab 65"
+    capacity:    "180K"
     drives:      [K5600.10, K5600.20, K5601]
     encoding:    mfm
     tracks:
@@ -298,6 +340,8 @@ formats:
   - name:        ss40_9x512_id193
     aliases:     [k5601_ss40_9x512_id193]
     description: "K5601 §3.4 Format U H (Schneider D) — 40 Sp. einseitig 9×512, IDs C1-C9"
+    title:       "40 Spuren einseitig, 9×512, Sektor-IDs C1-C9"
+    capacity:    "180K"
     drives:      [K5600.10, K5600.20, K5601]
     encoding:    mfm
     tracks:
@@ -306,6 +350,8 @@ formats:
   - name:        ss40_10x512_id0
     aliases:     [k5601_ss40_10x512_id0]
     description: "40 Spuren einseitig, 10×512 ab Sektor-ID 0 (KAYPRO, 195K)"
+    title:       "40 Spuren einseitig, 10×512, Sektor-IDs ab 0"
+    capacity:    "195K"
     drives:      [K5600.10, K5600.20, K5601]
     encoding:    mfm
     tracks:
@@ -317,6 +363,8 @@ formats:
   - name:        ss80_1t16x256-5x1024
     aliases:     [scpx_ss80_5x1024]
     description: "SCPX INIT 4 — 80 Spuren einseitig, Zylinder 0 in 16×256, dann 5×1024"
+    title:       "80 Spuren einseitig, 1 Systemspur 16×256 + 5×1024"
+    capacity:    "399K"
     drives:      [K5600.20, K5601]
     encoding:    mfm
     tracks:
@@ -326,6 +374,8 @@ formats:
   - name:        ss40_1t16x256-5x1024
     aliases:     [scpx_ss40_5x1024]
     description: "SCPX INIT 4 auf 40 Spuren — Zylinder 0 in 16×256, dann 5×1024"
+    title:       "40 Spuren einseitig, 1 Systemspur 16×256 + 5×1024"
+    capacity:    "199K"
     drives:      [K5600.10, K5600.20, K5601]
     encoding:    mfm
     tracks:
@@ -339,6 +389,8 @@ formats:
   - name:        fm_ss77_26x128
     aliases:     [mf3200_26x128]
     description: "8″-Layout — 77 Spuren einseitig, 26×128 FM (243/250K)"
+    title:       "8″ 77 Spuren einseitig FM, 26×128"
+    capacity:    "250K"
     drives:      [MF3200, MF6400, K5601]
     encoding:    fm
     tracks:
@@ -347,6 +399,8 @@ formats:
   - name:        fm_ss77_3t26x128-4x1024
     aliases:     [mf3200_296k]
     description: "8″-Layout CP/A BC — 26×128-Systemspuren 0-2, dann 4×1024, FM"
+    title:       "8″ 77 Spuren einseitig FM, 3 Systemspuren 26×128 + 4×1024"
+    capacity:    "296K"
     drives:      [MF3200, MF6400, K5601]
     encoding:    fm
     tracks:
@@ -356,6 +410,8 @@ formats:
   - name:        fm_ss77_1t26x128-4x1024
     aliases:     [mf3200_scp296k]
     description: "8″-Layout SCP — Systemspur 0 in 26×128, dann 4×1024, FM"
+    title:       "8″ 77 Spuren einseitig FM, 1 Systemspur 26×128 + 4×1024"
+    capacity:    "296K"
     drives:      [MF3200, MF6400, K5601]
     encoding:    fm
     tracks:
@@ -365,6 +421,8 @@ formats:
   - name:        fm_ss77_9x512
     aliases:     [mf3200_9x512]
     description: "8″-Layout — 77 Spuren einseitig, 9×512 FM (346K)"
+    title:       "8″ 77 Spuren einseitig FM, 9×512"
+    capacity:    "346K"
     drives:      [MF3200, MF6400, K5601]
     encoding:    fm
     tracks:
@@ -373,6 +431,8 @@ formats:
   - name:        fm_ss77_2t26x128-9x512
     aliases:     [mf3200_336k]
     description: "8″-Layout — 26×128-Systemspuren 0-1, dann 9×512, FM (336K)"
+    title:       "8″ 77 Spuren einseitig FM, 2 Systemspuren 26×128 + 9×512"
+    capacity:    "336K"
     drives:      [MF3200, MF6400, K5601]
     encoding:    fm
     tracks:
@@ -382,6 +442,8 @@ formats:
   - name:        fm_ss77_3t26x128-16x256
     aliases:     [mf3200_16x256]
     description: "8″-Layout — 26×128-Systemspuren 0-2, dann 16×256, FM (296K)"
+    title:       "8″ 77 Spuren einseitig FM, 3 Systemspuren 26×128 + 16×256"
+    capacity:    "296K"
     drives:      [MF3200, MF6400, K5601]
     encoding:    fm
     tracks:
@@ -391,6 +453,8 @@ formats:
   - name:        fm_ss80_9x512
     aliases:     [mf3200_9x512_80]
     description: "8″-Layout IH Mittweida — 9×512 FM ueber 80 Spuren (nur 5,25″-HW)"
+    title:       "80 Spuren einseitig FM, 9×512"
+    capacity:    "360K"
     drives:      [K5601]
     encoding:    fm
     tracks:
@@ -399,6 +463,8 @@ formats:
   - name:        ss77_2t26x128fm-8x1024
     aliases:     [mf6400_600k]
     description: "8″-DD — FM-Systemspuren 0-1 (26×128), dann 8×1024 MFM (600K)"
+    title:       "8″ 77 Spuren einseitig, 2 Systemspuren 26×128 + 8×1024 (Systemspuren FM)"
+    capacity:    "600K"
     drives:      [MF6400, K5601]
     tracks:
       - { cyls: 0-1,  heads: 0, sectors: 26, size: 128,  encoding: fm  }
@@ -407,6 +473,8 @@ formats:
   - name:        ss77_1t26x128fm-8x1024
     aliases:     [mf6400_scp600k]
     description: "8″-DD SCP — FM-Systemspur 0 (26×128), dann 8×1024 MFM"
+    title:       "8″ 77 Spuren einseitig, 1 Systemspur 26×128 + 8×1024 (Systemspuren FM)"
+    capacity:    "600K"
     drives:      [MF6400, K5601]
     tracks:
       - { cyls: 0,    heads: 0, sectors: 26, size: 128,  encoding: fm  }
@@ -415,6 +483,8 @@ formats:
   - name:        ss77_2t26x128fm-40x128
     aliases:     [mf6400_374k]
     description: "8″-DD — FM-Systemspuren 0-1 (26×128), dann 40×128 MFM (374K)"
+    title:       "8″ 77 Spuren einseitig, 2 Systemspuren 26×128 + 40×128 (Systemspuren FM)"
+    capacity:    "374K"
     drives:      [MF6400, K5601]
     tracks:
       - { cyls: 0-1,  heads: 0, sectors: 26, size: 128, encoding: fm  }
@@ -423,6 +493,8 @@ formats:
   - name:        ss77_40x128
     aliases:     [mf6400_40x128]
     description: "8″-DD — 77 Spuren einseitig, 40×128 MFM (384K)"
+    title:       "8″ 77 Spuren einseitig, 40×128"
+    capacity:    "384K"
     drives:      [MF6400, K5601]
     encoding:    mfm
     tracks:
@@ -431,6 +503,8 @@ formats:
   - name:        ss77_16x512
     aliases:     [mf6400_16x512]
     description: "8″-DD — 77 Spuren einseitig, 16×512 MFM (616K)"
+    title:       "8″ 77 Spuren einseitig, 16×512"
+    capacity:    "616K"
     drives:      [MF6400, K5601]
     encoding:    mfm
     tracks:
@@ -439,6 +513,8 @@ formats:
   - name:        ss77_2t26x128fm-16x512
     aliases:     [mf6400_600k_16x512]
     description: "8″-DD — FM-Systemspuren 0-1 (26×128), dann 16×512 MFM (600K)"
+    title:       "8″ 77 Spuren einseitig, 2 Systemspuren 26×128 + 16×512 (Systemspuren FM)"
+    capacity:    "600K"
     drives:      [MF6400, K5601]
     tracks:
       - { cyls: 0-1,  heads: 0, sectors: 26, size: 128, encoding: fm  }
@@ -447,6 +523,8 @@ formats:
   - name:        ss77_9x1024
     aliases:     [mf6400_9x1024]
     description: "8″-DD — 77 Spuren einseitig, 9×1024 MFM (692K)"
+    title:       "8″ 77 Spuren einseitig, 9×1024"
+    capacity:    "692K"
     drives:      [MF6400, K5601]
     encoding:    mfm
     tracks:
@@ -460,6 +538,8 @@ formats:
   - name:        ds80_16x256
     aliases:     [cpa640, k5601_16x256]
     description: "K5601 §3 Formate 4/5 — 80 Spuren doppelseitig, 16×256"
+    title:       "80 Spuren doppelseitig, 16×256"
+    capacity:    "640K"
     drives:      [K5601]
     encoding:    mfm
     tracks:
@@ -468,6 +548,8 @@ formats:
   - name:        ds77_16x256
     aliases:     [k5601_16x256_77]
     description: "K5601 §3 Format 7 (ZIK-NK) — 77 Spuren doppelseitig, 16×256"
+    title:       "77 Spuren doppelseitig, 16×256"
+    capacity:    "616K"
     drives:      [K5601]
     encoding:    mfm
     tracks:
@@ -476,6 +558,8 @@ formats:
   - name:        ds80_26x128
     aliases:     [k5601_26x128]
     description: "K5601 §3 Format 6 — 80 Spuren doppelseitig, 26×128"
+    title:       "80 Spuren doppelseitig, 26×128"
+    capacity:    "520K"
     drives:      [K5601]
     encoding:    mfm
     tracks:
@@ -484,6 +568,8 @@ formats:
   - name:        ds80_9x512
     aliases:     [k5601_9x512]
     description: "K5601 §3 Formate E/F — 80 Spuren doppelseitig, 9×512"
+    title:       "80 Spuren doppelseitig, 9×512"
+    capacity:    "720K"
     drives:      [K5601]
     encoding:    mfm
     tracks:
@@ -492,6 +578,8 @@ formats:
   - name:        ds80_10x512
     aliases:     [k5601_10x512]
     description: "K5601 §3 Formate G/J — 80 Spuren doppelseitig, 10×512"
+    title:       "80 Spuren doppelseitig, 10×512"
+    capacity:    "800K"
     drives:      [K5601]
     encoding:    mfm
     tracks:
@@ -502,6 +590,8 @@ formats:
   - name:        ss80_26x128
     aliases:     [k5601_ss80_26x128]
     description: "K5601 §3.4 Format S — 80 Spuren einseitig, 26×128"
+    title:       "80 Spuren einseitig, 26×128"
+    capacity:    "260K"
     drives:      [K5601, K5600.20]
     encoding:    mfm
     tracks:
@@ -510,6 +600,8 @@ formats:
   - name:        ss80_9x512
     aliases:     [k5601_ss80_9x512]
     description: "K5601 §3.4 Format S — 80 Spuren einseitig, 9×512"
+    title:       "80 Spuren einseitig, 9×512"
+    capacity:    "360K"
     drives:      [K5601, K5600.20]
     encoding:    mfm
     tracks:
@@ -520,6 +612,8 @@ formats:
   - name:        ss40_5x1024
     aliases:     [k5601_ss40_5x1024]
     description: "K5601 §3.4 Format W — 40 Spuren einseitig, 5×1024 (K5600.10, 200K)"
+    title:       "40 Spuren einseitig, 5×1024"
+    capacity:    "200K"
     drives:      [K5600.10, K5600.20, K5601]
     default_for: [K5600.10]
     encoding:    mfm
@@ -529,6 +623,8 @@ formats:
   - name:        ss40_26x128
     aliases:     [k5601_ss40_26x128]
     description: "K5601 §3.4 Format W — 40 Spuren einseitig, 26×128"
+    title:       "40 Spuren einseitig, 26×128"
+    capacity:    "130K"
     drives:      [K5600.10, K5600.20, K5601]
     encoding:    mfm
     tracks:
@@ -537,6 +633,8 @@ formats:
   - name:        ss40_16x256
     aliases:     [k5601_ss40_16x256]
     description: "K5601 §3.4 Format W — 40 Spuren einseitig, 16×256"
+    title:       "40 Spuren einseitig, 16×256"
+    capacity:    "160K"
     drives:      [K5600.10, K5600.20, K5601]
     encoding:    mfm
     tracks:
@@ -545,6 +643,8 @@ formats:
   - name:        ss40_15x256
     aliases:     [k5601_ss40_15x256]
     description: "K5601 §3.4 Format W — 40 Spuren einseitig, 15×256"
+    title:       "40 Spuren einseitig, 15×256"
+    capacity:    "150K"
     drives:      [K5600.10, K5600.20, K5601]
     encoding:    mfm
     tracks:
@@ -555,6 +655,8 @@ formats:
   - name:        ds40_5x1024
     aliases:     [k5601_ds40_5x1024]
     description: "K5601 §3.4 Format V — 40 Spuren doppelseitig, 5×1024"
+    title:       "40 Spuren doppelseitig, 5×1024"
+    capacity:    "400K"
     drives:      [K5601]
     encoding:    mfm
     tracks:
@@ -563,6 +665,8 @@ formats:
   - name:        ds40_26x128
     aliases:     [k5601_ds40_26x128]
     description: "K5601 §3.4 Format V — 40 Spuren doppelseitig, 26×128"
+    title:       "40 Spuren doppelseitig, 26×128"
+    capacity:    "260K"
     drives:      [K5601]
     encoding:    mfm
     tracks:
@@ -571,6 +675,8 @@ formats:
   - name:        ds40_16x256
     aliases:     [k5601_ds40_16x256]
     description: "K5601 §3.4 Format V — 40 Spuren doppelseitig, 16×256"
+    title:       "40 Spuren doppelseitig, 16×256"
+    capacity:    "320K"
     drives:      [K5601]
     encoding:    mfm
     tracks:
@@ -579,6 +685,8 @@ formats:
   - name:        ds40_17x256
     aliases:     [k5601_ds40_17x256]
     description: "K5601 §3.4 Format V — 40 Spuren doppelseitig, 17×256"
+    title:       "40 Spuren doppelseitig, 17×256"
+    capacity:    "340K"
     drives:      [K5601]
     encoding:    mfm
     tracks:
@@ -594,6 +702,8 @@ formats:
   - name:        ss40_5x1024_dstep
     aliases:     [k5601_ss40_5x1024_dstep]
     description: "K5601 §3.4 Format U 0 — 40 Sp. einseitig 5×1024, Doppelschritt"
+    title:       "40 Spuren einseitig, 5×1024, Doppelschritt"
+    capacity:    "200K"
     drives:      [K5600.20, K5601]
     encoding:    mfm
     step:        2
@@ -603,6 +713,8 @@ formats:
   - name:        ss40_26x128_dstep
     aliases:     [k5601_ss40_26x128_dstep]
     description: "K5601 §3.4 Format U 2/3 — 40 Sp. einseitig 26×128, Doppelschritt"
+    title:       "40 Spuren einseitig, 26×128, Doppelschritt"
+    capacity:    "130K"
     drives:      [K5600.20, K5601]
     encoding:    mfm
     step:        2
@@ -612,6 +724,8 @@ formats:
   - name:        ss40_16x256_dstep
     aliases:     [k5601_ss40_16x256_dstep]
     description: "K5601 §3.4 Format U 4/5 — 40 Sp. einseitig 16×256, Doppelschritt"
+    title:       "40 Spuren einseitig, 16×256, Doppelschritt"
+    capacity:    "160K"
     drives:      [K5600.20, K5601]
     encoding:    mfm
     step:        2
@@ -621,6 +735,8 @@ formats:
   - name:        ss40_15x256_dstep
     aliases:     [k5601_ss40_15x256_dstep]
     description: "K5601 §3.4 Format U 6 (BAP2001) — 40 Sp. einseitig 15×256, Doppelschritt"
+    title:       "40 Spuren einseitig, 15×256, Doppelschritt"
+    capacity:    "150K"
     drives:      [K5600.20, K5601]
     encoding:    mfm
     step:        2
@@ -630,6 +746,8 @@ formats:
   - name:        ds40_5x1024_dstep
     aliases:     [k5601_ds40_5x1024_dstep]
     description: "K5601 §3.4 Format T 0 — 40 Sp. doppelseitig 5×1024, Doppelschritt"
+    title:       "40 Spuren doppelseitig, 5×1024, Doppelschritt"
+    capacity:    "400K"
     drives:      [K5601]
     encoding:    mfm
     step:        2
@@ -639,6 +757,8 @@ formats:
   - name:        ds40_26x128_dstep
     aliases:     [k5601_ds40_26x128_dstep]
     description: "K5601 §3.4 Format T 3 — 40 Sp. doppelseitig 26×128, Doppelschritt"
+    title:       "40 Spuren doppelseitig, 26×128, Doppelschritt"
+    capacity:    "260K"
     drives:      [K5601]
     encoding:    mfm
     step:        2
@@ -648,6 +768,8 @@ formats:
   - name:        ds40_16x256_dstep
     aliases:     [k5601_ds40_16x256_dstep]
     description: "K5601 §3.4 Format T 4/5/7 — 40 Sp. doppelseitig 16×256, Doppelschritt"
+    title:       "40 Spuren doppelseitig, 16×256, Doppelschritt"
+    capacity:    "320K"
     drives:      [K5601]
     encoding:    mfm
     step:        2
@@ -657,6 +779,8 @@ formats:
   - name:        ds40_17x256_dstep
     aliases:     [k5601_ds40_17x256_dstep]
     description: "K5601 §3.4 Format T 6 (Spectra) — 40 Sp. doppelseitig 17×256, Doppelschritt"
+    title:       "40 Spuren doppelseitig, 17×256, Doppelschritt"
+    capacity:    "340K"
     drives:      [K5601]
     encoding:    mfm
     step:        2
@@ -670,6 +794,8 @@ formats:
   - name:        ds40_8x512
     aliases:     [k5601_ds40_8x512]
     description: "40 Spuren doppelseitig, 8×512 (MS-DOS 320K)"
+    title:       "40 Spuren doppelseitig, 8×512"
+    capacity:    "320K"
     drives:      [K5601]
     encoding:    mfm
     tracks:
@@ -678,6 +804,8 @@ formats:
   - name:        ds40_9x512
     aliases:     [k5601_ds40_9x512]
     description: "40 Spuren doppelseitig, 9×512 (MS-DOS 360K, PC-Standard 5,25″)"
+    title:       "40 Spuren doppelseitig, 9×512"
+    capacity:    "360K"
     drives:      [K5601]
     encoding:    mfm
     tracks:
@@ -686,6 +814,8 @@ formats:
   - name:        ds80_8x512
     aliases:     [k5601_ds80_8x512]
     description: "80 Spuren doppelseitig, 8×512 (MS-DOS 640K)"
+    title:       "80 Spuren doppelseitig, 8×512"
+    capacity:    "640K"
     drives:      [K5601]
     encoding:    mfm
     tracks:
@@ -694,6 +824,8 @@ formats:
   - name:        ds80_15x512_hd
     aliases:     [pc_hd_15x512]
     description: "PC 5,25″ hochdichte Diskette — 80 Spuren doppelseitig, 15×512 (1,2M)"
+    title:       "80 Spuren doppelseitig, 15×512"
+    capacity:    "1,2M"
     drives:      [K5601]
     encoding:    mfm
     rate:        500        # kbit/s; ein Emulator-Laufwerk kann das nicht — das Einlegen wird abgewiesen
@@ -704,6 +836,8 @@ formats:
   - name:        ds80_18x512_hd
     aliases:     [pc_hd_18x512]
     description: "PC 3,5″ hochdichte Diskette — 80 Spuren doppelseitig, 18×512 (1,44M)"
+    title:       "80 Spuren doppelseitig, 18×512"
+    capacity:    "1,44M"
     drives:      [K5601]
     encoding:    mfm
     rate:        500
@@ -714,6 +848,8 @@ formats:
   - name:        ds80_36x512_ed
     aliases:     [pc_ed_36x512]
     description: "PC 3,5″ extra-hochdichte Diskette — 80 Spuren doppelseitig, 36×512 (2,88M)"
+    title:       "80 Spuren doppelseitig, 36×512"
+    capacity:    "2,88M"
     drives:      [K5601]
     encoding:    mfm
     tracks:
@@ -758,6 +894,9 @@ filesystems:
   - name:        cpa_ds80_5x1024_boot
     aliases:     [cpa780]
     description: "CP/A 780K Bootdiskette — Dateisystem ab Zylinder 2"
+    title:       "CP/A Systemdiskette"
+    capacity:    "780K"
+    machines:    [A5120]
     format:      ds80_3t26x128-5x1024
     type:        cpm
     # NACHGEMESSEN an tests/fixtures/disks/cpa_cpa780_k5601_clock.img: das Verzeichnis
@@ -771,6 +910,9 @@ filesystems:
   - name:        cpa_ds80_5x1024_daten
     aliases:     [cpa800]
     description: "CP/A 800K Datendiskette — Dateisystem ab Zylinder 0"
+    title:       "CP/A Datendiskette"
+    capacity:    "800K"
+    machines:    [A5120]
     format:      ds80_5x1024
     type:        cpm
     # 192, nicht 128: FORMAT.COM nennt den Menuepunkt selbst „5×1024, Sp. 0-159;
@@ -792,6 +934,9 @@ filesystems:
   - name:        scpx_ds80_16x256_boot
     aliases:     [scpx640]
     description: "SCPX 640K (16×256) — Systemzylinder 0-1, Dateisystem ab Zylinder 2"
+    title:       "SCPX Systemdiskette, 16×256"
+    capacity:    "640K"
+    machines:    [A5120]
     format:      ds80_16x256
     type:        cpm
     # NACHGEMESSEN an tests/fixtures/disks/scpx17_cpa780_k5601.hfe (Verzeichnis bei
@@ -805,6 +950,9 @@ filesystems:
   - name:        scpx_ds80_5x1024_boot
     aliases:     [scpx798]
     description: "SCPX 798K — Systemzylinder 0 in 16×256, Dateisystem ab Zylinder 2"
+    title:       "SCPX Systemdiskette, 5×1024"
+    capacity:    "798K"
+    machines:    [A5120]
     format:      ds80_2t16x256-5x1024
     type:        cpm
     # NACHGEMESSEN an tests/fixtures/disks/scpx17_5x1024_k5601_hardy_norm.hfe.
@@ -828,6 +976,9 @@ filesystems:
   - name:        scpx8915_ds80_5x1024_boot
     aliases:     [scpx8915]
     description: "SCPX 8915 (K8915) 780K — Systemzylinder 0-1, Dateisystem ab Zylinder 2"
+    title:       "SCPX 8915 Systemdiskette"
+    capacity:    "780K"
+    machines:    [K8915]
     format:      ds80_5x1024
     type:        cpm
     data_start:  { cyl: 2, head: 0 }
@@ -851,6 +1002,9 @@ filesystems:
   - name:        cpa1715_ds80_5x1024_boot
     aliases:     [cpa1715]
     description: "CP/A 1715 (PC 1715) — 800K ohne Systemspuren, Bootkopf im Verzeichnis"
+    title:       "CP/A 1715 Systemdiskette"
+    capacity:    "800K"
+    machines:    ["PC 1715"]
     format:      ds80_5x1024
     type:        cpm
     block_size:  2048
@@ -870,6 +1024,9 @@ filesystems:
   - name:        microdos_ds80_5x1024_boot
     aliases:     [microdos800]
     description: "MicroDOS 1526 (A5120/A5130) 800K DS, 5×1024 - SYL-Lader im Verzeichnis, 104 Plaetze"
+    title:       "MicroDOS Systemdiskette"
+    capacity:    "800K"
+    machines:    [A5120, A5130]
     format:      ds80_5x1024
     type:        cpm
     block_size:  2048
@@ -880,6 +1037,9 @@ filesystems:
   - name:        microdos_ss40_5x1024_boot
     aliases:     [microdos200]
     description: "MicroDOS 1526 (A5120/A5130) 200K SS 40 Spuren, 5×1024 - SYL-Lader im Verzeichnis, 64 Plaetze"
+    title:       "MicroDOS Systemdiskette, 40 Spuren"
+    capacity:    "200K"
+    machines:    [A5120, A5130]
     format:      ss40_5x1024
     type:        cpm
     block_size:  1024
@@ -895,6 +1055,9 @@ filesystems:
   - name:        microdos_ss40_26x128_boot
     aliases:     [microdos128]
     description: "MicroDOS 1526 (A5120/A5130) 100K SS 40 Spuren, 26x128 - SYL-Lader 0.6 im Verzeichnis, 64 Plaetze"
+    title:       "MicroDOS Systemdiskette, 40 Spuren 26×128"
+    capacity:    "100K"
+    machines:    [A5120, A5130]
     format:      ss40_26x128
     type:        cpm
     block_size:  1024
@@ -905,6 +1068,9 @@ filesystems:
   - name:        microdos_ds80_5x1024_daten
     aliases:     [microdos800_daten]
     description: "MicroDOS 800K DS, 5×1024 - Datendiskette ohne Lader, 104 Plaetze"
+    title:       "MicroDOS Datendiskette"
+    capacity:    "800K"
+    machines:    [A5120, A5130]
     format:      ds80_5x1024
     type:        cpm
     block_size:  2048
@@ -914,6 +1080,9 @@ filesystems:
   - name:        microdos_ss40_5x1024_daten
     aliases:     [microdos200_daten]
     description: "MicroDOS 200K SS 40 Spuren, 5×1024 - Datendiskette ohne Lader, 64 Plaetze"
+    title:       "MicroDOS Datendiskette, 40 Spuren"
+    capacity:    "200K"
+    machines:    [A5120, A5130]
     format:      ss40_5x1024
     type:        cpm
     block_size:  1024
@@ -926,6 +1095,9 @@ filesystems:
   - name:        microdos1715_ds80_5x1024_boot
     aliases:     [microdos1715]
     description: "MicroDOS 1715 (PC 1715) 800K DS - Bootkopf im Verzeichnis, 128 Plaetze"
+    title:       "MicroDOS Systemdiskette"
+    capacity:    "800K"
+    machines:    ["PC 1715"]
     format:      ds80_5x1024
     type:        cpm
     block_size:  2048
@@ -940,6 +1112,9 @@ filesystems:
   - name:        scp1715_ds80_5x1024_boot
     aliases:     [scp1715]
     description: "SCP 1715 / SCP 3.0 (PC 1715, 1715W) 780K — Systemzylinder 0-1, Dateisystem ab Zylinder 2"
+    title:       "SCP Systemdiskette"
+    capacity:    "780K"
+    machines:    ["PC 1715", "PC 1715W"]
     format:      ds80_5x1024
     type:        cpm
     data_start:  { cyl: 2, head: 0 }
@@ -965,6 +1140,9 @@ filesystems:
   - name:        osm_ds80_16x256_boot
     aliases:     [osm640]
     description: "OS/M (P8000) 640K, Format 5 (16×256) — Systemzylinder 0-1, Dateisystem ab Zylinder 2"
+    title:       "OS/M Systemdiskette, 16×256"
+    capacity:    "640K"
+    machines:    [P8000]
     format:      ds80_16x256
     type:        cpm
     data_start:  { cyl: 2, head: 0 }
@@ -982,6 +1160,9 @@ filesystems:
   - name:        osm_ds80_5x1024_boot
     aliases:     [osm800]
     description: "OS/M (P8000) 800K, Format 7 (5×1024) — Systemzylinder 0-1, Dateisystem ab Zylinder 2"
+    title:       "OS/M Systemdiskette, 5×1024"
+    capacity:    "800K"
+    machines:    [P8000]
     format:      ds80_5x1024
     type:        cpm
     data_start:  { cyl: 2, head: 0 }
@@ -1000,6 +1181,9 @@ filesystems:
   - name:        bcu880_ss40_26x128_arbeit
     aliases:     [bcu880]
     description: "BCU 880 V1.2 — Arbeitsdiskette „ohne SYL“, System Zylinder 0-1, Dateisystem ab Zylinder 2"
+    title:       "BCU 880 Arbeitsdiskette"
+    capacity:    "130K"
+    machines:    [A5120]
     format:      ss40_26x128
     type:        cpm
     data_start:  { cyl: 2, head: 0 }
@@ -1017,6 +1201,9 @@ filesystems:
   - name:        bcu880_ss40_26x128_syl
     aliases:     [bcu880_syl]
     description: "BCU 880 V1.2 — Startdiskette „SYL auf Spur 1“ (Lade-ROM V0.6), reine Startdiskette"
+    title:       "BCU 880 Startdiskette (SYL auf Spur 1)"
+    capacity:    "130K"
+    machines:    [A5120]
     format:      ss40_26x128
     type:        cpm
     data_start:  { cyl: 5, head: 0 }
@@ -1033,6 +1220,9 @@ filesystems:
   - name:        bcu880_ss40_26x128_kombi
     aliases:     [bcu880_kombi]
     description: "BCU 880 V1.2 — EIGENBAU: Startdiskette mit Dateisystem ab Zylinder 5 (nur als A:)"
+    title:       "BCU 880 Startdiskette mit Dateisystem (Eigenbau)"
+    capacity:    "130K"
+    machines:    [A5120]
     format:      ss40_26x128
     type:        cpm
     data_start:  { cyl: 5, head: 0 }
@@ -1049,6 +1239,9 @@ filesystems:
   - name:        bcu880_ss80_26x128_kombi
     aliases:     [bcu880_kombi80]
     description: "BCU 880 V1.2 — EIGENBAU, 80 Spuren (K5600.20): Startdiskette mit Dateisystem ab Zylinder 5 (nur als A:)"
+    title:       "BCU 880 Startdiskette mit Dateisystem, 80 Spuren (Eigenbau)"
+    capacity:    "260K"
+    machines:    [A5120]
     format:      ss80_26x128
     type:        cpm
     data_start:  { cyl: 5, head: 0 }
@@ -1064,6 +1257,9 @@ filesystems:
   - name:        bcu880_ss80_26x128_arbeit
     aliases:     [bcu880_80]
     description: "BCU 880 V1.2 — EIGENBAU, 80 Spuren (K5600.20): Arbeitsdiskette, Dateisystem ab Zylinder 2, 248 Bloecke"
+    title:       "BCU 880 Arbeitsdiskette, 80 Spuren (Eigenbau)"
+    capacity:    "260K"
+    machines:    [A5120]
     format:      ss80_26x128
     type:        cpm
     data_start:  { cyl: 2, head: 0 }
@@ -1083,6 +1279,9 @@ filesystems:
   - name:        scp1700_ds80_16x256_boot
     aliases:     [scp1700]
     description: "SCP1700/CP/M-86 (A7100) — Dateisystem ab Zylinder 2"
+    title:       "SCP 1700 (CP/M-86) Systemdiskette"
+    capacity:    "640K"
+    machines:    [A7100]
     format:      ds80_1t16x128fm-16x256
     type:        cpm
     # `os:` bleibt bei cpm2.2 — CP/M-86 unterscheidet sich im VERZEICHNIS nicht;
@@ -1100,12 +1299,18 @@ filesystems:
   - name:        udos_ds77_26x128
     aliases:     [udos_ds77]
     description: "UDOS 4.x doppelseitig — 77 Spuren 26×128, je Seite ein Dateisystem"
+    title:       "UDOS 4.x doppelseitig"
+    capacity:    "500K"
+    machines:    [A5120, "PRG 710", "PRG 710-1"]
     format:      ds77_26x128
     type:        udos
 
   - name:        udos_ss77_26x128
     aliases:     [udos_ss77]
     description: "UDOS 4.x einseitig — 77 Spuren 26×128"
+    title:       "UDOS 4.x einseitig"
+    capacity:    "250K"
+    machines:    [A5120, "PRG 710", "PRG 710-1"]
     format:      ss77_26x128
     type:        udos
 
@@ -1115,12 +1320,18 @@ filesystems:
   - name:        udos_fm_ss77_26x128
     aliases:     [udos_ss77_fm]
     description: "UDOS 4.x einseitig — 77 Spuren 26×128 FM (8″ MF3200)"
+    title:       "UDOS 4.x einseitig, 8″ FM"
+    capacity:    "250K"
+    machines:    [A5120, "PRG 710", "PRG 710-1"]
     format:      fm_ss77_26x128
     type:        udos
 
   - name:        udos_ss40_26x128
     aliases:     [udos_ss40]
     description: "UDOS 4.x einseitig — 40 Spuren 26×128 (K5600.10)"
+    title:       "UDOS 4.x einseitig, 40 Spuren"
+    capacity:    "130K"
+    machines:    [A5120, "PRG 710", "PRG 710-1"]
     format:      ss40_26x128
     type:        udos
     usable_tracks: 40
@@ -1136,12 +1347,18 @@ filesystems:
   - name:        sios_ss40_26x128
     aliases:     [sios_ss40]
     description: "SIOS 1526 — IBM-Etikettendiskette, 40 Spuren einseitig, 26×128"
+    title:       "SIOS 1526 Diskette, 40 Spuren"
+    capacity:    "130K"
+    machines:    [A5120, A5130, K8924]
     format:      ss40_26x128
     type:        sios
 
   - name:        sios_ss80_26x128
     aliases:     [sios_ss80]
     description: "SIOS 1526 — IBM-Etikettendiskette, 80 Spuren einseitig, 26×128"
+    title:       "SIOS 1526 Diskette, 80 Spuren"
+    capacity:    "260K"
+    machines:    [A5120, A5130, K8924]
     format:      ss80_26x128
     type:        sios
 
@@ -1170,6 +1387,9 @@ filesystems:
   - name:        udos1715_ds80_16x256
     aliases:     [udos1715]
     description: "UDOS1715/NDOS (PC 1715) — 80 Spuren doppelseitig, 16×256 (640K, Standard)"
+    title:       "UDOS 1715 (NDOS) doppelseitig"
+    capacity:    "640K"
+    machines:    ["PC 1715"]
     format:      ds80_16x256
     type:        udos1715
     ndos_fill:   "00"     # Spur 17H Sektor 0, 158H…176H = 00
@@ -1178,6 +1398,9 @@ filesystems:
   - name:        udos_p8000_ds80_16x256
     aliases:     [udos_p8000]
     description: "UDOS 2.2/NDOS (P8000) — 80 Spuren doppelseitig, 16×256 (640K)"
+    title:       "UDOS 2.2 (NDOS)"
+    capacity:    "640K"
+    machines:    [P8000]
     format:      ds80_16x256
     type:        udos1715
     ndos_fill:   "77"     # Spur 17H Sektor 0, 158H…15BH = 00, 15CH…176H = 77H
@@ -1186,6 +1409,9 @@ filesystems:
   - name:        udos50_ds80_16x256
     aliases:     [udos50]
     description: "UDOS 5.0/NDOS (A5120) — 80 Spuren doppelseitig, 16×256 (640K)"
+    title:       "UDOS 5.0 (NDOS)"
+    capacity:    "640K"
+    machines:    [A5120]
     format:      ds80_16x256
     type:        udos1715
     ndos_fill:   "ff"     # Spur 17H Sektor 0, 158H…176H = FFH
@@ -1194,6 +1420,9 @@ filesystems:
   - name:        udos1715_ss80_16x256
     aliases:     [udos1715_ss80]
     description: "UDOS1715/NDOS — 80 Spuren einseitig, 16×256 (320K)"
+    title:       "UDOS 1715 (NDOS) einseitig"
+    capacity:    "320K"
+    machines:    ["PC 1715"]
     format:      ss80_16x256
     type:        udos1715
     detect_rank: -10
@@ -1201,6 +1430,9 @@ filesystems:
   - name:        udos1715_ss40_16x256
     aliases:     [udos1715_ss40]
     description: "UDOS1715/NDOS — 40 Spuren einseitig, 16×256 (160K)"
+    title:       "UDOS 1715 (NDOS) einseitig, 40 Spuren"
+    capacity:    "160K"
+    machines:    ["PC 1715"]
     format:      ss40_16x256
     type:        udos1715
     usable_tracks: 40
@@ -1217,6 +1449,9 @@ filesystems:
   - name:        wega_ds80_9x512
     aliases:     [wega720]
     description: "WEGA (UNIX System III, P8000) — 80 Spuren doppelseitig, 9×512 (720K)"
+    title:       "WEGA (UNIX System III)"
+    capacity:    "720K"
+    machines:    [P8000]
     format:      ds80_9x512
     type:        wega_mutos
     detect_rank: -10
@@ -1229,6 +1464,9 @@ filesystems:
   - name:        mutos1700_ds80_9x512
     aliases:     [mutos1700_720]
     description: "MUTOS 1700 (UNIX, A7100) — 80 Spuren doppelseitig 9×512, Dateisystem ab Zylinder 0"
+    title:       "MUTOS 1700 (UNIX)"
+    capacity:    "720K"
+    machines:    [A7100]
     format:      ds80_9x512
     type:        wega_mutos
     unix_layout: mutos1700
@@ -1237,6 +1475,9 @@ filesystems:
   - name:        mutos1700_ds80_16x256
     aliases:     [mutos1700_a7100]
     description: "MUTOS 1700 (UNIX, A7100) — FM-Ladespur, Blockraum ab Zylinder 0 Kopf 1 (16×256)"
+    title:       "MUTOS 1700 (UNIX) mit FM-Ladespur"
+    capacity:    "640K"
+    machines:    [A7100]
     format:      ds80_1t16x128fm-16x256
     type:        wega_mutos
     unix_layout: mutos1700
@@ -1248,6 +1489,9 @@ filesystems:
   - name:        mutos8k_ss77_8x512
     aliases:     [mutos8k_8x512_mfm, mutos77]
     description: "MUTOS 8000 (UNIX, A5120.16) — einseitig, Blockraum ab Zylinder 1 (bis Zyl. 76)"
+    title:       "MUTOS 8000 (UNIX), 5¼″ 8×512, 77 Spuren"
+    capacity:    "307K"
+    machines:    ["A5120.16"]
     format:      ss77_1t26x128-8x512
     type:        wega_mutos
     data_start:  { cyl: 1, head: 0 }
@@ -1256,6 +1500,9 @@ filesystems:
   - name:        mutos8k_ss80_8x512
     aliases:     [mutos8k_8x512_mfm_80, mutos80]
     description: "MUTOS 8000 (UNIX, A5120.16) — einseitig, Blockraum ab Zylinder 1 (bis Zyl. 79)"
+    title:       "MUTOS 8000 (UNIX), 5¼″ 8×512, 80 Spuren"
+    capacity:    "319K"
+    machines:    ["A5120.16"]
     format:      ss80_1t26x128-8x512
     type:        wega_mutos
     data_start:  { cyl: 1, head: 0 }
@@ -1269,6 +1516,9 @@ filesystems:
   - name:        mutos8k_fm_ss77_26x128
     aliases:     [mutos8k_26x128_fm, mutos8k_fm]
     description: "MUTOS 8000 (UNIX, A5120.16) — 8″ FM 26×128, Blockraum ab Zylinder 1 (verschraenkt)"
+    title:       "MUTOS 8000 (UNIX), 8″ FM 26×128"
+    capacity:    "250K"
+    machines:    ["A5120.16"]
     format:      fm_ss77_26x128
     type:        wega_mutos
     unix_layout: mutos8k
@@ -1280,6 +1530,9 @@ filesystems:
   - name:        mutos8k_ss77_26x128
     aliases:     [mutos8k_26x128_mfm, mutos8k_mfm]
     description: "MUTOS 8000 (UNIX, A5120.16) — 5¼″ MFM 26×128, Blockraum ab Zylinder 1 (verschraenkt)"
+    title:       "MUTOS 8000 (UNIX), 5¼″ MFM 26×128"
+    capacity:    "250K"
+    machines:    ["A5120.16"]
     format:      ss77_26x128
     type:        wega_mutos
     unix_layout: mutos8k
@@ -1297,6 +1550,9 @@ filesystems:
   - name:        tar_ds80_9x512
     aliases:     [tar720]
     description: "tar-Strom ohne Dateisystem (P8000-Lieferdiskette) — 720K"
+    title:       "tar-Diskette (P8000-Lieferdiskette)"
+    capacity:    "720K"
+    machines:    [P8000]
     format:      ds80_9x512
     type:        tar
     detect_rank: 900
@@ -1311,6 +1567,9 @@ filesystems:
   - name:        tar_ds80_9x512_leer
     aliases:     [tar720_leer]
     description: "tar-Diskette, leer (720K) — leeres tar-Archiv"
+    title:       "tar-Diskette, leer"
+    capacity:    "720K"
+    machines:    [P8000]
     format:      ds80_9x512
     type:        tar
     leer:        true
@@ -1326,6 +1585,9 @@ filesystems:
   - name:        tar_ss77_26x128
     aliases:     [tar_mutos8k_26x128_mfm, tar_mutos8k_mfm]
     description: "tar-Strom im MUTOS-8000-Layout (5¼″ MFM, 77×26×128) — 494 Blöcke"
+    title:       "tar-Diskette im MUTOS-8000-Layout, 5¼″ MFM"
+    capacity:    "250K"
+    machines:    ["A5120.16"]
     format:      ss77_26x128
     type:        tar
     unix_layout: mutos8k
@@ -1335,6 +1597,9 @@ filesystems:
   - name:        tar_ss77_26x128_leer
     aliases:     [tar_mutos8k_26x128_mfm_leer, tar_mutos8k_mfm_leer]
     description: "tar-Diskette, leer (MUTOS-8000-Layout, MFM) — leeres tar-Archiv"
+    title:       "tar-Diskette im MUTOS-8000-Layout, 5¼″ MFM, leer"
+    capacity:    "250K"
+    machines:    ["A5120.16"]
     format:      ss77_26x128
     type:        tar
     unix_layout: mutos8k
@@ -1345,6 +1610,9 @@ filesystems:
   - name:        tar_fm_ss77_26x128
     aliases:     [tar_mutos8k_26x128_fm, tar_mutos8k_fm]
     description: "tar-Strom im MUTOS-8000-Layout (8″ FM, 77×26×128) — 494 Blöcke"
+    title:       "tar-Diskette im MUTOS-8000-Layout, 8″ FM"
+    capacity:    "250K"
+    machines:    ["A5120.16"]
     format:      fm_ss77_26x128
     type:        tar
     unix_layout: mutos8k
@@ -1354,6 +1622,9 @@ filesystems:
   - name:        tar_fm_ss77_26x128_leer
     aliases:     [tar_mutos8k_26x128_fm_leer, tar_mutos8k_fm_leer]
     description: "tar-Diskette, leer (MUTOS-8000-Layout, FM) — leeres tar-Archiv"
+    title:       "tar-Diskette im MUTOS-8000-Layout, 8″ FM, leer"
+    capacity:    "250K"
+    machines:    ["A5120.16"]
     format:      fm_ss77_26x128
     type:        tar
     unix_layout: mutos8k
@@ -1368,6 +1639,9 @@ filesystems:
   - name:        tar_ss77_8x512
     aliases:     [tar_mutos8k_8x512_mfm]
     description: "tar-Strom im MUTOS-8000-Layout 8×512 (5¼″ MFM, DISK-Satz) — 608 Blöcke"
+    title:       "tar-Diskette im MUTOS-8000-Layout, 8×512"
+    capacity:    "307K"
+    machines:    ["A5120.16"]
     format:      ss77_1t26x128-8x512
     type:        tar
     unix_layout: mutos8k_512
@@ -1377,6 +1651,9 @@ filesystems:
   - name:        tar_ss77_8x512_leer
     aliases:     [tar_mutos8k_8x512_mfm_leer]
     description: "tar-Diskette, leer (MUTOS-8000-Layout 8×512, MFM) — leeres tar-Archiv"
+    title:       "tar-Diskette im MUTOS-8000-Layout, 8×512, leer"
+    capacity:    "307K"
+    machines:    ["A5120.16"]
     format:      ss77_1t26x128-8x512
     type:        tar
     unix_layout: mutos8k_512
@@ -1392,66 +1669,99 @@ filesystems:
   - name:        dos_ss40_8x512
     aliases:     [dos160]
     description: "MS-DOS FAT12 160K — 40 Spuren einseitig, 8×512"
+    title:       "MS-DOS FAT12"
+    capacity:    "160K"
+    machines:    []
     format:      ss40_8x512
     type:        fat
     detect_rank: -20
   - name:        dos_ss40_9x512
     aliases:     [dos180]
     description: "MS-DOS FAT12 180K — 40 Spuren einseitig, 9×512"
+    title:       "MS-DOS FAT12"
+    capacity:    "180K"
+    machines:    []
     format:      ss40_9x512
     type:        fat
     detect_rank: -20
   - name:        dos_ds40_8x512
     aliases:     [dos320]
     description: "MS-DOS FAT12 320K — 40 Spuren doppelseitig, 8×512"
+    title:       "MS-DOS FAT12"
+    capacity:    "320K"
+    machines:    []
     format:      ds40_8x512
     type:        fat
     detect_rank: -20
   - name:        dos_ds40_9x512
     aliases:     [dos360]
     description: "MS-DOS FAT12 360K — 40 Spuren doppelseitig, 9×512 (PC-Standard 5,25″)"
+    title:       "MS-DOS FAT12"
+    capacity:    "360K"
+    machines:    []
     format:      ds40_9x512
     type:        fat
     detect_rank: -20
   - name:        dos_ss80_9x512
     aliases:     [dos360ss80]
     description: "MS-DOS FAT12 360K — 80 Spuren einseitig, 9×512"
+    title:       "MS-DOS FAT12, 80 Spuren einseitig"
+    capacity:    "360K"
+    machines:    []
     format:      ss80_9x512
     type:        fat
     detect_rank: -20
   - name:        dos_ds80_8x512
     aliases:     [dos640]
     description: "MS-DOS FAT12 640K — 80 Spuren doppelseitig, 8×512"
+    title:       "MS-DOS FAT12"
+    capacity:    "640K"
+    machines:    []
     format:      ds80_8x512
     type:        fat
     detect_rank: -20
   - name:        dos_ds80_9x512
     aliases:     [dos720]
     description: "MS-DOS FAT12 720K — 80 Spuren doppelseitig, 9×512 (3,5″ DD, A7150/DCP)"
+    title:       "MS-DOS FAT12"
+    capacity:    "720K"
+    machines:    [A7150, "PC 1834"]
     format:      ds80_9x512
     type:        fat
     detect_rank: -20
   - name:        dos_ds80_10x512
     aliases:     [dos800]
     description: "MS-DOS FAT12 800K — 80 Spuren doppelseitig, 10×512"
+    title:       "MS-DOS FAT12"
+    capacity:    "800K"
+    machines:    []
     format:      ds80_10x512
     type:        fat
     detect_rank: -20
   - name:        dos_ds80_15x512_hd
     aliases:     [dos1200]
     description: "MS-DOS FAT12 1,2M — 80 Spuren doppelseitig, 15×512 (5,25″ HD)"
+    title:       "MS-DOS FAT12"
+    capacity:    "1,2M"
+    machines:    []
     format:      ds80_15x512_hd
     type:        fat
     detect_rank: -20
   - name:        dos_ds80_18x512_hd
     aliases:     [dos1440]
     description: "MS-DOS FAT12 1,44M — 80 Spuren doppelseitig, 18×512 (3,5″ HD)"
+    title:       "MS-DOS FAT12"
+    capacity:    "1,44M"
+    machines:    []
     format:      ds80_18x512_hd
     type:        fat
     detect_rank: -20
   - name:        dos_ds80_36x512_ed
     aliases:     [dos2880]
     description: "MS-DOS FAT12 2,88M — 80 Spuren doppelseitig, 36×512 (3,5″ ED)"
+    title:       "MS-DOS FAT12"
+    capacity:    "2,88M"
+    machines:    []
     format:      ds80_36x512_ed
     type:        fat
     containers:  [img]      # 1000 kbit/s (ED): der Stack kennt nur 250/500 - HFE/DMK/IMD/TD0/CQM waeren falsch beschriftet
