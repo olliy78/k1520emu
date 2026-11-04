@@ -2269,3 +2269,43 @@ TEST(NdosSitte, AngelegteDisketteTraegtDieFuellungIhresRechners) {
         EXPECT_TRUE(v->detection().unambiguous) << profil;
     }
 }
+
+/// @test Z2b: eine NDOS-Karte ohne gesetzte Geometriebytes (+378 = 0, +379 = 74, Zaehler nach ZDOS-Art
+///       belegt + frei = 2464; so auf UDOS_NDOS.hfe der Sammlung) wird erkannt und gelesen — eng:
+///       fehlt die Zaehlersumme 2464, bleibt sie abgelehnt.
+TEST(NdosSitte, KarteOhneGesetzteGeometrieWirdGelesen) {
+    const char* profil = "udos1715_ss40_16x256";
+    const auto bauen = [&](const std::string& pfad, bool zdos_summe) {
+        {
+            std::string err;
+            auto neu = DiskVolume::create(pfad, profil, "SYSTEM G", formate(), dateisysteme(), err);
+            if (!neu) return false;
+        }
+        // .img einseitig 16x256: Spur 23 beginnt bei 23*16*256; Karte +375..+381 dort.
+        std::fstream f(pfad, std::ios::in | std::ios::out | std::ios::binary);
+        if (!f) return false;
+        const std::streamoff ab = 23 * 16 * 256;
+        std::vector<char> k(384);
+        f.seekg(ab); f.read(k.data(), 384);
+        const uint16_t frei = static_cast<uint8_t>(k[380]) | (static_cast<uint8_t>(k[381]) << 8);
+        const uint16_t belegt = static_cast<uint16_t>((zdos_summe ? 2464 : 2400) - frei);
+        k[375] = static_cast<char>(belegt & 0xFF); k[376] = static_cast<char>(belegt >> 8);
+        k[378] = 0; k[379] = 74;
+        f.seekp(ab); f.write(k.data(), 384);
+        return static_cast<bool>(f);
+    };
+    const std::string gut = k1520test::tempPath("k1520_ndos_geom_gut.img");
+    const std::string schlecht = k1520test::tempPath("k1520_ndos_geom_schlecht.img");
+    struct Weg { std::string a, b; ~Weg() { std::error_code e; std::filesystem::remove(a, e);
+                                            std::filesystem::remove(b, e); } } weg{gut, schlecht};
+    ASSERT_TRUE(bauen(gut, true));
+    ASSERT_TRUE(bauen(schlecht, false));
+    // Ein rohes 160K-.img traegt keine Geometrie (Erkennung rät 8x512) — deshalb das Profil vorgeben.
+    std::string err;
+    auto v = DiskVolume::open(gut, profil, formate(), dateisysteme(), err);
+    ASSERT_TRUE(v) << err;
+    EXPECT_TRUE(v->hasFileSystem());
+    std::string err2;
+    auto w = DiskVolume::open(schlecht, profil, formate(), dateisysteme(), err2);
+    EXPECT_TRUE(!w || !w->hasFileSystem());
+}

@@ -107,6 +107,9 @@ std::unique_ptr<Udos1715FileSystem> Udos1715FileSystem::mount(SectorSpace& space
                           UdosMapSitte::Ndos1715))
         return nullptr;
 
+    // Z2b: Karte ohne gesetzte Geometriebytes (UDOS_NDOS.hfe der Sammlung), s. Methode.
+    fs->bitmap_.ergaenzeUngesetzteGeometrie(fs->secs_per_track_, fs->tracks_);
+
     std::string warum;
     if (!fs->bitmap_.looksValid(fs->secs_per_track_, 0, &warum)) {
         err = "kein gueltiger UDOS1715-Diskettenbelegungsplan auf Spur "
@@ -156,6 +159,8 @@ bool Udos1715FileSystem::looksLikeUdos1715(const SectorSpace& space, const FsPro
     std::string err;
     if (!UdosBitmap::load(space, 0, prof.bitmap_track, b, err, UdosMapSitte::Ndos1715))
         return sag(err);
+    b.ergaenzeUngesetzteGeometrie(spt, prof.usable_tracks ? prof.usable_tracks
+                                                          : space.format().numCylinders());
     if (!b.looksValid(spt, 0, why)) return false;
 
     // Welcher Rechner: allein die Fuellung hinter dem Plan (158H…176H) unterscheidet

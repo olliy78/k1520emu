@@ -294,6 +294,33 @@ eine Vermutung, keine Diagnose — zuerst messen.
 - **Fixtures:** unverändert offen (Freigabe des Anwenders).
 
 
+### Z2b Ergebnis (2026-11-04) — `UDOS_NDOS.hfe`: NDOS, Karte ohne gesetzte Geometrie
+
+**Befund.** Das Dateisystem ist **NDOS** (Zeigersektoren), nicht ZDOS: Kopf-/Zeigersektoren auf Spur 22 (`22/0` Descriptor mit
+`05 16 05 16 0b 16`, `22/2` Zeigerliste `00 16 05 16 0a 16 01 16 06 16 0b 16 ff ff`, Verzeichnissektoren 05/0A/01/06/0B wie bei
+UDOS 5.0 der Fixture, Eintrag `DIRECTORY 00 16`), 256-B-Sektoren, Karte auf Spur 23 (Sektoren 0-1 = 512 B) im NDOS-Aufbau:
+Name `SYSTEM G` (+0..23), 80 Spureintraege je 4 B (+24..343, 16 Sektorbits MSB zuerst + 16 Auffuellbits = 1), danach `00`-Fuellung
+(+344..374 = Sitte `ndos_fill: "00"` wie PC 1715).  Abweichung allein in den Kopfbytes: `+375/376` = 0x099B (2459), `+378` = **0**,
+`+379` = 0x4A (**74**), `+380/381` = 5; `2459 + 5 = 2464` ist die **ZDOS-Konstante**, nicht die NDOS-Zaehlweise (dort wirkliche Zahl).
+Die Bits sind dagegen stimmig: Spur 0 `E7 D3` = genau **5 freie** Sektoren (= Freizaehler), Spuren 1-39 voll belegt, 40-79
+gesperrt; die Diskette ist wirklich bis auf 5 Sektoren voll (Datensektoren aller Spuren nicht gleichfoermig, bis auf Spur 21).
+
+**Deutung.** Der Formatierer (ein UDOS-4.x-Stand, der die ZDOS-Zaehlerroutine mitschleppte) hat Sektoren/Spur und Spurzahl der
+Karte nie gesetzt (0 bzw. ein Rest 74).  Kein Eigenleben des Dateisystems: Gegenprobe an einer Kopie mit von Hand gesetzten
+`+375=635, +378=16, +379=40, +380=5` -> `ls` 51 Dateien, `get` aller 51 (+ `.fileinfo`), `fsck` ohne Befund.  Das ist KEIN
+Formatierer-Artefakt der 77-Spur-Muster (74 passt zu keiner Geometrie dieser Diskette) und keine ZDOS-Karte (Nachlauf `33/F7/77` fehlt).
+
+**Entscheidung: umgesetzt, eng.**  `UdosBitmap::ergaenzeUngesetzteGeometrie(spt, tracks)` (`udos_bitmap.{h,cpp}`), aufgerufen in
+`Udos1715FileSystem::mount` und `looksLikeUdos1715` VOR `looksValid`.  Greift nur, wenn ALLES gilt: NDOS-Sitte, `+378 == 0`,
+Fuellung hinter dem Plan durchgehend `00`, `belegt + frei == 2464` UND Freizaehler == Auszaehlung der Plan-Bits.  Dann werden
+Sektoren/Spur, Spurzahl und beide Zaehler **im Speicher** aus der gemessenen Geometrie gesetzt; auf die Diskette kommt die Korrektur
+erst bei einem Schreibvorgang (`refreshCounters`).  Eine Karte mit `+378 == 0` war bisher in jedem Fall abgelehnt, es aendert sich
+also fuer keine bisher erkannte Diskette etwas (Wachter-Fixtures gruen, s. u.).  **Kein neues Profil / kein Katalogeintrag noetig**:
+die Diskette wird als `udos1715_ss40_16x256` (title/capacity/machines bestehen) erkannt.  Hinweis: `fsck` sieht die ergaenzte Karte
+und meldet die abweichenden Rohzaehler nicht (Befund liesse sich spaeter als Info `udos.karte.ungesetzt` ergaenzen).
+Waechter: `NdosSitte.KarteOhneGesetzteGeometrieWirdGelesen` (synthetisch, plus Gegenfall ohne 2464-Summe).  Datei kommt nicht
+ins Repository (Freigabe offen).
+
 ## 10  Umbenennungstabelle Formate (Schritt 2)
 
 Stand 2026-11-04.  Alle Formate in `data/formats.yaml` nach §1 umbenannt; der alte Name ist jeweils `aliases:` des neuen

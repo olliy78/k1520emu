@@ -179,6 +179,21 @@ void UdosBitmap::refreshCounters() {
     raw_[376] = static_cast<uint8_t>(belegt >> 8);
 }
 
+bool UdosBitmap::ergaenzeUngesetzteGeometrie(uint8_t spt, uint8_t tracks) {
+    if (sitte_ != UdosMapSitte::Ndos1715 || raw_.size() < kUdosBitmapBytes) return false;
+    if (spt == 0 || tracks == 0 || raw_[378] != 0) return false;
+    if (ndosFuellung(raw_) != NdosFuellung::Null) return false;
+    const uint32_t belegt = raw_[375] | (raw_[376] << 8);
+    const uint32_t frei   = raw_[380] | (raw_[381] << 8);
+    if (belegt + frei != kUdosCounterConstant) return false;
+    const std::vector<uint8_t> alt = raw_;
+    raw_[378] = spt;
+    raw_[379] = tracks;
+    if (static_cast<uint32_t>(countFree()) != frei) { raw_ = alt; return false; }
+    refreshCounters();
+    return true;
+}
+
 // ─── Plausibilitaet (Positivprobe der Erkennung) ─────────────────────────────
 
 bool UdosBitmap::looksValid(const std::vector<uint8_t>& raw, uint8_t expect_secs,

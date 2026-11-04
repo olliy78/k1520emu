@@ -150,6 +150,14 @@ public:
     const std::vector<uint8_t>& raw() const { return raw_; }
     std::vector<uint8_t>&       raw()       { return raw_; }
 
+    /// @brief NDOS-Karte, deren Formatierer die Geometriebytes nicht gesetzt hat (Z2b, Entwurf 47):
+    ///        +378 = 0, +379 sinnlos (74), die Zaehler nach ZDOS-Art (belegt + frei = 2464).
+    ///        Eng und positiv: nur bei NDOS-Sitte, +378 = 0, Fuellung 00, Zaehlersumme 2464 UND
+    ///        Freizaehler = Auszaehlung der Bits.  Dann werden Sektoren/Spur, Spurzahl und beide
+    ///        Zaehler IM SPEICHER aus der gemessenen Geometrie gesetzt (auf die Diskette kommt es
+    ///        nur bei einem Schreibvorgang).  Gibt zurueck, ob die Sitte vorlag.
+    bool ergaenzeUngesetzteGeometrie(uint8_t spt, uint8_t tracks);
+
     /// @brief Frisch angelegte Karte (alles frei, Systemspuren noch nicht gesperrt).
     ///        @p fuellung gilt nur fuer `Ndos1715`: so fuellt der jeweilige Formatierer
     ///        den Bereich hinter dem Plan, und daran erkennt das DiskTool die Diskette
