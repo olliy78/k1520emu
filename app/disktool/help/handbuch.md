@@ -730,6 +730,12 @@ Auswahlfenster wählt man das Dateisystem und — falls gewünscht — das Boota
 nach **Diskette anlegen** fragt das Werkzeug nach der Datei (neuer Name oder eine
 vorhandene zum Überschreiben) und nach dem Datenträgernamen.
 
+Die Liste zeigt je Zeile **Kapazität · Rechner · Titel** (zum Beispiel *800K · PC 1715 · SCP 1715
+Systemdiskette*), nach Kapazität sortiert. Das Feld **Für Rechner** darüber zeigt nur die Disketten
+dieses Rechners; Disketten, zu denen noch kein Rechner eingetragen ist, stehen nur unter *alle*.
+Der technische Name (`scp1715_ds80_5x1024_boot`, so heißt er auch auf der Kommandozeile) steht im
+Tooltip des Eintrags. Dasselbe gilt für das Auswahlfeld *Dateisystem* im Kopfbereich.
+
 Bei den **UNIX-Dateisystemen** (WEGA, MUTOS 8000, MUTOS 1700) steht im Auswahlfenster
 unter dem Dateisystem der Haken **Abweichende Anzahl von Inodes**. Das Zahlenfeld zeigt zunächst
 die Vorgabe (Blöcke ÷ 25 Blöcke für die Inode-Liste, wie `mkfs`) und ist gesperrt; mit dem Haken

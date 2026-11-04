@@ -17,6 +17,7 @@ from PySide6.QtCore import Qt, Signal, QTimer
 from app import drive_types as dt
 from app import paths
 from app.ui.focus import release_focus
+from app import katalog_anzeige as ka
 from app.ui.format_dialog import FormatDialog
 
 
@@ -211,10 +212,13 @@ class DriveWidget(QWidget):
             except Exception:
                 return ""
 
+        def anzeige(name: str):
+            return (self.emulator.format_capacity(name), self.emulator.format_title(name))
+
         wahl = FormatDialog.frage(
             self, formate=formate, vorauswahl=vorauswahl, erklaerung=erklaerung,
             titel=f"Diskettenformat — Laufwerk {chr(65 + drive)}:",
-            beschreibung=beschreibung)
+            beschreibung=beschreibung, anzeige=anzeige)
         return wahl or ""
 
     def _erkanntes_format(self, drive: int) -> str:
@@ -797,12 +801,14 @@ class DriveWidget(QWidget):
                 "formatagnostisch); nur als rohes Sektorimage (.img) laesst sie "
                 "sich nicht speichern.")
             return
-        label.setText(name)
         try:
             beschreibung = self.emulator.format_description(name)
+            anzeige = ka.zeile(self.emulator.format_capacity(name),
+                               (), self.emulator.format_title(name))
         except Exception:
-            beschreibung = ""
-        label.setToolTip(beschreibung or f"Erkanntes Diskettenformat: {name}")
+            beschreibung, anzeige = "", ""
+        label.setText(anzeige or name)
+        label.setToolTip(ka.tooltip(name, beschreibung))
 
     # ── Physisches Laufwerk (Greaseweazle) ───────────────────────────────────
 

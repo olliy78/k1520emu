@@ -18,7 +18,9 @@ from PySide6.QtWidgets import (
     QComboBox, QFrame, QGridLayout, QLabel, QSizePolicy,
 )
 
+from app import katalog_anzeige as ka
 from app.core_binding.k1520disk import filesystems
+from app.katalog_anzeige import profil_zeile
 from app.disktool.ui.schreibsperre import (
     PLATTE_FORMAT_FEST, dateisystem_anzeige, ist_platte,
 )
@@ -34,10 +36,20 @@ def auswahlliste() -> List[Tuple[str, str]]:
     (doc/design/13_k1520disktool.md §6.4).
     """
     eintraege = [("", "automatisch erkennen")]
-    eintraege += [(f.name, f"{f.name} — {f.description}") for f in filesystems()]
+    # Zeile = Kapazitaet · Rechner · Titel (Entwurf 47); der Name steht im Tooltip.
+    eintraege += [(f.name, profil_zeile(f)) for f in sorted(
+        filesystems(), key=lambda f: ka.sortierschluessel(f.capacity, f.machines, f.title))]
     eintraege.append(("cpa_auto", "cpa_auto — aus der Geometrie abgeleitet "
                                   "(Regel des CP/A-BIOS)"))
     return eintraege
+
+
+def auswahl_tooltip(name: str) -> str:
+    """Tooltip eines Eintrags der :func:`auswahlliste`: der technische Name."""
+    f = {f.name: f for f in filesystems()}.get(name)
+    if f is not None:
+        return ka.tooltip(name, f.description, f.machines)
+    return ka.tooltip(name) if name else "Das Dateisystem wird aus dem Abbild erkannt."
 
 
 class DiskHeader(QFrame):
@@ -67,8 +79,14 @@ class DiskHeader(QFrame):
 
         self.fs_wahl = QComboBox()
         self.fs_wahl.setToolTip("Die Erkennung übersteuern und neu öffnen")
+        katalog = {f.name: f for f in filesystems()}
         for name, text in auswahlliste():
             self.fs_wahl.addItem(text, name)
+            f = katalog.get(name)
+            self.fs_wahl.setItemData(
+                self.fs_wahl.count() - 1,
+                ka.tooltip(name, f.description, f.machines) if f else auswahl_tooltip(name),
+                Qt.ToolTipRole)
         self.fs_wahl.currentIndexChanged.connect(
             lambda *_: self.filesystem_gewaehlt.emit(self.fs_wahl.currentData() or ""))
 

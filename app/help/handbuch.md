@@ -187,6 +187,10 @@ hinter der Datenprüfsumme — dort legt UDOS seine Verkettung ab), und wenn das
 Format **unbekannt** ist. Im zweiten Fall wäre die Sektorreihenfolge des Abbilds
 geraten, und ein geratenes Abbild sieht heil aus und ist es nicht.
 
+Die Formatlisten (die Rückfrage bei `.img` und die Zeile *Format:* im Laufwerkskasten) zeigen
+**Kapazität · Titel** (zum Beispiel *800K · SCP 1715 Systemdiskette*), nach Kapazität sortiert. Der
+technische Katalogname steht im Tooltip.
+
 ## CopyQM-Abbilder
 
 Ein `.cqm` (Abbild des Programms CopyQM) lässt sich einlegen wie jedes andere Abbild und

@@ -49,8 +49,7 @@ def test_neu_dialog_bietet_osm_mit_verstaendlicher_beschriftung(qt_app):
     text = dict(neu_eintraege())
     for name in ("osm_ds80_16x256_boot", "osm_ds80_5x1024_boot"):
         assert name in text
-        assert text[name].startswith(f"{name} — OS/M (P8000)"), text[name]
-    assert "Format 5" in text["osm_ds80_16x256_boot"] and "Format 7" in text["osm_ds80_5x1024_boot"]
+        assert "OS/M" in text[name] and name not in text[name], text[name]
 
 
 def test_leere_800k_nennt_osm800_im_protokoll(window, tmp_path):

@@ -32,7 +32,7 @@ k1520disktool fsck   <abbild> [--full] [--repair[=…]]  prüfen UND reparieren
        [--dry-run]                                     … nur sagen, was geschähe
 k1520disktool recover <abbild> [--full] [--to ordner] gelöschte Dateien suchen
        [--list] [--restore N[=NAME]]                    … und retten bzw. eintragen
-k1520disktool formats                                  bekannte Dateisysteme
+k1520disktool formats                                  bekannte Dateisysteme (+ Kapazität, Rechner, Titel)
 ```
 
 Schalter: `--fs NAME` (Erkennung übersteuern), `--volume N` (Seite),

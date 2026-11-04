@@ -13,11 +13,13 @@ from __future__ import annotations
 
 from typing import List, Optional
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QButtonGroup, QComboBox, QDialog, QDialogButtonBox, QLabel, QRadioButton,
     QVBoxLayout,
 )
 
+from app import katalog_anzeige as ka
 from app.disktool.ui.tar_satz_speichern_dialog import groesse_text
 
 EINZEL = "einzel"
@@ -37,8 +39,8 @@ class TarNeuDialog(QDialog):
         lay.addWidget(QLabel("Format der Disketten (gilt für den ganzen Satz):"))
         self.wahl = QComboBox()
         for f in formate:
-            self.wahl.addItem(f"{f['beschreibung']} — {groesse_text(f['bytes'])}  ({f['name']})",
-                              f["name"])
+            self.wahl.addItem(f"{f['beschreibung']} — {groesse_text(f['bytes'])}", f["name"])
+            self.wahl.setItemData(self.wahl.count() - 1, ka.tooltip(f["name"]), Qt.ToolTipRole)
         # 720K ist der Regelfall der P8000-Sammlung.
         for i, f in enumerate(formate):
             if f["name"] == "ds80_9x512":

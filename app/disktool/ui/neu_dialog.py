@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QSpinBox, QVBoxLayout, QWidget,
 )
 
+from app import katalog_anzeige as ka
 from app.core_binding.k1520disk import filesystems, unix_standard_inodes
 from app.disktool.bootsektoren import Bootabbild
 
@@ -46,14 +47,25 @@ class NeuDialog(QDialog):
         self._eigene: Optional[Path] = None
         self.setWindowTitle("Neue Diskette")
         self.setMinimumWidth(520)
-        self._typ = {f.name: f.type for f in filesystems()}
+        info = {f.name: f for f in filesystems()}
+        self._typ = {n: f.type for n, f in info.items()}
+        self._info = info
+        self._eintraege = list(eintraege)
 
         lay = QVBoxLayout(self)
+        # Filter nach Rechner: nur Profile, die ihn nennen; Profile mit unbekanntem
+        # Rechner (leeres machines) erscheinen nur unter „alle".
+        lay.addWidget(QLabel("Für Rechner:"))
+        self.rechner_wahl = QComboBox()
+        self.rechner_wahl.addItem(ka.ALLE_RECHNER, ka.ALLE_RECHNER)
+        for r in ka.alle_rechner(info[n] for n, _t in self._eintraege if n in info):
+            self.rechner_wahl.addItem(r, r)
+        lay.addWidget(self.rechner_wahl)
         lay.addWidget(QLabel("Dateisystem:"))
         self.wahl = QComboBox()
-        for name, text in eintraege:
-            self.wahl.addItem(text, name)
         lay.addWidget(self.wahl)
+        self._wahl_fuellen()
+        self.rechner_wahl.currentIndexChanged.connect(lambda *_: self._wahl_fuellen())
 
         # Nur fuer UNIX-Dateisysteme sichtbar
         self.unix = QWidget()
@@ -99,9 +111,42 @@ class NeuDialog(QDialog):
         self.boot_wahl.activated.connect(self._boot_gewaehlt)
         self._fs_gewaehlt()
 
+    # ── Auswahlliste ─────────────────────────────────────────────────────────
+    def _wahl_fuellen(self) -> None:
+        """Dateisystemliste nach Rechner filtern, nach Kapazitaet/Rechner/Titel sortieren.
+
+        Zeile = Kapazitaet · Rechner · Titel; der Katalogname steht nur im Tooltip und
+        in den Daten.  Die Vorauswahl bleibt, wenn der Eintrag den Filter uebersteht.
+        """
+        rechner = self.rechner_wahl.currentData() or ka.ALLE_RECHNER
+        vorher = self.wahl.currentData()
+        zeilen = []
+        for name, text in self._eintraege:
+            f = self._info.get(name)
+            if f is None:                     # nicht im Katalog: Text unveraendert
+                if rechner == ka.ALLE_RECHNER:
+                    zeilen.append(((float("inf"), "", name), name, text, name))
+                continue
+            if not ka.passt_zu_rechner(f.machines, rechner):
+                continue
+            z = ka.zeile(f.capacity, f.machines, f.title) or f.description or name
+            zeilen.append((ka.sortierschluessel(f.capacity, f.machines, f.title), name, z,
+                           ka.tooltip(name, f.description, f.machines)))
+        zeilen.sort(key=lambda t: t[0])
+        self.wahl.blockSignals(True)
+        self.wahl.clear()
+        for _k, name, z, tip in zeilen:
+            self.wahl.addItem(z, name)
+            self.wahl.setItemData(self.wahl.count() - 1, tip, Qt.ToolTipRole)
+        i = self.wahl.findData(vorher) if vorher else -1
+        self.wahl.setCurrentIndex(i if i >= 0 else (0 if zeilen else -1))
+        self.wahl.blockSignals(False)
+        if hasattr(self, "unix"):             # beim ersten Fuellen existiert der Rest noch nicht
+            self._fs_gewaehlt()
+
     # ── Zustand ──────────────────────────────────────────────────────────────
     def dateisystem(self) -> str:
-        return self.wahl.currentData()
+        return self.wahl.currentData() or ""
 
     def inodes(self) -> int:
         """Gewaehlte Mindestzahl Inodes; 0 = Vorgabe (kein Haken oder kein UNIX-Typ)."""

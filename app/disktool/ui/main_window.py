@@ -50,6 +50,7 @@ from app import paths
 from app.disktool.ui.archiv_dialog import ArchivDialog
 from app.disktool import bootsektoren
 from app.disktool.ui.neu_dialog import NeuDialog
+from app.katalog_anzeige import profil_zeile
 from app.disktool.archive import NAMENLOS, create_archive, dateiname
 
 from app.core_binding.k1520disk import (
@@ -135,8 +136,7 @@ def neu_eintraege():
     laesst sich nicht anlegen - angeboten wird nur die LEERE tar-Diskette.  SIOS (``sios``)
     wird seit Arbeitspaket D4 als leere Datendiskette angeboten (ohne Systemlader).
     """
-    return [(f.name, f"{f.name} \u2014 {f.description}" if f.description else f.name)
-            for f in filesystems() if (f.type != "tar" or f.leer)]
+    return [(f.name, profil_zeile(f)) for f in filesystems() if (f.type != "tar" or f.leer)]
 
 
 class MainWindow(QMainWindow):

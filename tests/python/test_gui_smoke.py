@@ -1026,7 +1026,8 @@ def test_the_drive_panel_shows_the_detected_format(window, qapp, temp_disk):
     path = temp_disk("cpa_cpa780_k5601_noclock.hfe")
     assert drives.mount_path(0, path)
     qapp.processEvents()
-    assert drives._panels[0]._format_value.text() == "ds80_3t26x128-5x1024"
+    # Anzeige: Kapazitaet · Titel; der Katalogname steht im Tooltip (Entwurf 47)
+    assert "ds80_3t26x128-5x1024" in drives._panels[0]._format_value.toolTip()
 
 
 def test_an_unrecognisable_disk_is_called_unknown(window, qapp, tmp_path):

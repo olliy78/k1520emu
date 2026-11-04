@@ -22,6 +22,7 @@ Merkmal, das eine ``.img``-Datei über sich selbst preisgibt.
 
 from __future__ import annotations
 
+from app import katalog_anzeige as ka
 from typing import Callable, List, Optional
 
 from PySide6.QtCore import Qt
@@ -39,7 +40,8 @@ class FormatDialog(QDialog):
 
     def __init__(self, parent=None, *, formate: List[str], vorauswahl: str = "",
                  erklaerung: str = "", titel: str = "Diskettenformat",
-                 beschreibung: Optional[Callable[[str], str]] = None):
+                 beschreibung: Optional[Callable[[str], str]] = None,
+                 anzeige: Optional[Callable[[str], tuple]] = None):
         super().__init__(parent)
         self.setWindowTitle(titel)
         self.setModal(True)
@@ -51,16 +53,28 @@ class FormatDialog(QDialog):
             lay.addWidget(hinweis)
 
         self.liste = QListWidget()
+        # Zeile = Kapazitaet · Titel (Entwurf 47); ``anzeige(name) -> (kapazitaet, titel)``.
+        # Formate haben keine Rechnerliste.  Fehlt der Katalogtitel, dient der Langtext,
+        # zuletzt der Name.  Der Katalogname steht nur im Tooltip und in den Daten.
+        zeilen = []
         for name in formate:
-            text = name
+            kap, titel, d = "", "", ""
+            if anzeige:
+                try:
+                    kap, titel = anzeige(name)
+                except Exception:
+                    pass
             if beschreibung:
                 try:
                     d = beschreibung(name)
                 except Exception:
                     d = ""
-                if d:
-                    text = f"{name} — {d}"
+            text = ka.zeile(kap, (), titel) or d or name
+            zeilen.append((ka.sortierschluessel(kap, (), titel), name, text, d))
+        zeilen.sort(key=lambda z: z[0])
+        for _k, name, text, d in zeilen:
             eintrag = QListWidgetItem(text)
+            eintrag.setToolTip(ka.tooltip(name, d))
             # Der Klartext steht in der Zeile, der KATALOGNAME in den Daten: nur
             # der geht an den Kern, und nur er bleibt beim Umbenennen der
             # Beschreibung derselbe.
@@ -91,7 +105,8 @@ class FormatDialog(QDialog):
 
     @classmethod
     def frage(cls, parent, *, formate, vorauswahl: str = "", erklaerung: str = "",
-              titel: str = "Diskettenformat", beschreibung=None) -> Optional[str]:
+              titel: str = "Diskettenformat", beschreibung=None,
+              anzeige=None) -> Optional[str]:
         """Den Dialog zeigen; ``None`` bei Abbruch, sonst der Katalogname.
 
         Ohne Auswahlmöglichkeit (leere Liste) kommt sofort ``None`` zurück —
@@ -101,7 +116,8 @@ class FormatDialog(QDialog):
         if not formate:
             return None
         dlg = cls(parent, formate=formate, vorauswahl=vorauswahl,
-                  erklaerung=erklaerung, titel=titel, beschreibung=beschreibung)
+                  erklaerung=erklaerung, titel=titel, beschreibung=beschreibung,
+                  anzeige=anzeige)
         if dlg.exec() != QDialog.Accepted:
             return None
         return dlg.gewaehlt() or None

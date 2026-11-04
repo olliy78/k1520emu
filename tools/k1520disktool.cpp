@@ -1953,19 +1953,30 @@ int cmd_formats(const Optionen& o) {
                       << "{\"name\":" << jsonText(p.name)
                       << ",\"type\":" << jsonText(fsTypeName(p.type))
                       << ",\"format\":" << jsonText(p.format)
-                      << ",\"description\":" << jsonText(p.description) << "}";
+                      << ",\"description\":" << jsonText(p.description)
+                      << ",\"title\":" << jsonText(p.title)
+                      << ",\"capacity\":" << jsonText(p.capacity)
+                      << ",\"machines\":" << jsonListe(p.machines) << "}";
             erstes = false;
         }
         std::cout << "]\n";
         return kOk;
     }
-    std::printf("%-14s %-8s %-18s %s\n", "Name", "Typ", "Geometrie", "Beschreibung");
-    for (const FsProfile& p : dateisysteme().profiles())
-        std::printf("%-14s %-8s %-18s %s\n", p.name.c_str(), fsTypeName(p.type),
-                    p.format.c_str(), p.description.c_str());
+    // Kapazitaet, Rechner, Titel (Entwurf 47): was die Oberflaechen in ihren Listen zeigen.
+    // Eingegeben wird weiter der Name (oder ein Alias) in der ersten Spalte.
+    std::printf("%-14s %-8s %-18s %-7s %-22s %-34s %s\n", "Name", "Typ", "Geometrie", "Kap.",
+                "Rechner", "Titel", "Beschreibung");
+    for (const FsProfile& p : dateisysteme().profiles()) {
+        std::string rechner;
+        for (const std::string& m : p.machines) rechner += (rechner.empty() ? "" : ", ") + m;
+        std::printf("%-14s %-8s %-18s %-7s %-22s %-34s %s\n", p.name.c_str(), fsTypeName(p.type),
+                    p.format.c_str(), p.capacity.c_str(), rechner.c_str(), p.title.c_str(),
+                    p.description.c_str());
+    }
     // Steht in keinem Katalog, laesst sich aber ueberall angeben — sonst waere die
     // wichtigste Antwort auf „welche Dateisysteme gibt es?" gerade die unsichtbare.
-    std::printf("%-14s %-8s %-18s %s\n", CpaDpbRule::kName, "cpm", "(jede)",
+    std::printf("%-14s %-8s %-18s %-7s %-22s %-34s %s\n", CpaDpbRule::kName, "cpm", "(jede)",
+                "", "", "",
                 "aus der Geometrie nach der CP/A-Regel abgeleitet - Rueckfall beim "
                 "Oeffnen, mit --fs erzwingbar");
     return kOk;
