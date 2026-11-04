@@ -316,6 +316,12 @@ def test_bildschirmtastatur_sendet_gemerkte_umschalter_vor_der_taste(qapp, konfi
         assert kw.map_host_key(ev) == (taste(k.FTASTEN[3]), False, False)
         ev = QKeyEvent(QEvent.KeyPress, Qt.Key_A, Qt.NoModifier, "a")
         assert kw.map_host_key(ev) == (ord("a"), False, False)
+        # Ticket #27: Tasten, die qt_event_to_core_key nicht kennt, muessen trotzdem ankommen.
+        for qt_taste, p in ((Qt.Key_Insert, (5, 6)), (Qt.Key_Delete, (6, 6)),
+                            (Qt.Key_Home, (12, 7)), (Qt.Key_End, (6, 7)),
+                            (Qt.Key_PageUp, (5, 3)), (Qt.Key_PageDown, (3, 3))):
+            ev = QKeyEvent(QEvent.KeyPress, qt_taste, Qt.NoModifier)
+            assert kw.map_host_key(ev) == (taste(k.pos(*p)), False, False), qt_taste
     finally:
         _zu(w, qapp)
 

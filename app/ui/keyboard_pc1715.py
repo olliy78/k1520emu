@@ -289,6 +289,9 @@ _HOST_POS = {
     int(Qt.Key_Up): pos(5, 7), int(Qt.Key_Down): pos(3, 7),
     int(Qt.Key_Left): pos(12, 3), int(Qt.Key_Right): pos(6, 3),
     int(Qt.Key_Delete): pos(6, 6), int(Qt.Key_Insert): pos(5, 6),
+    # Cursorblock unten (Ticket #27): Pos1 |<-, Ende ->|, Bild hoch, Bild runter.
+    int(Qt.Key_Home): pos(12, 7), int(Qt.Key_End): pos(6, 7),
+    int(Qt.Key_PageUp): pos(5, 3), int(Qt.Key_PageDown): pos(3, 3),
 }
 _HOST_POS.update({int(Qt.Key_F1) + n - 1: FTASTEN[n] for n in range(1, 13)})
 #: Hosttasten, die der Kern als Zeichen uebersetzt — fuer die Hervorhebung.
@@ -418,13 +421,15 @@ class KeyboardPc1715Widget(KeyboardWidget):
     def map_host_key(self, event) -> Optional[Tuple[int, bool, bool]]:
         """Host-Taste → ``(code, shift, ctrl)`` für den Kern: Zeichen als ASCII (der Kern
         sucht Taste und Umschaltung), Pfeile/Entf/Einfg/F-Tasten als physische Taste."""
+        # Physische Tasten ZUERST: Einfg/Pos1/Ende/Bild kennt qt_event_to_core_key nicht
+        # und lieferte None, bevor diese Tabelle je befragt wurde (Ticket #27).
+        p = _HOST_POS.get(int(event.key()))
+        if p is not None:
+            return (taste(p), False, False)
         mapped = qt_event_to_core_key(event)
         if mapped is None:
             return None
         code, shift, ctrl = mapped
-        p = _HOST_POS.get(int(event.key()))
-        if p is not None:
-            return (taste(p), False, False)
         ctrl = ctrl or self._ctrl
         if self._shift and 0x61 <= code <= 0x7A and not ctrl:
             code -= 0x20          # angeklicktes SHIFT der Nachbildung
