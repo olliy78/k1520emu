@@ -108,7 +108,7 @@ def test_jeder_genannte_menuepfad_steht_in_der_oberflaeche(qapp, umgebung):
         reiter = {w.settings_widget.tabs.tabText(i) for i in range(w.settings_widget.tabs.count())}
         felder = [_glatt(l.text()).rstrip(":") for l in w.settings_widget.findChildren(QLabel)]
         modelle = [zeile[3] for zeile in w.profil.modelle]
-        betriebsarten = ["Computer mit Terminal", "nur Terminal"]
+        betriebsarten = ["Computer mit Terminal", "nur Terminal", "nur Computer (Konsole extern)"]
 
         fehlend = []
         for pfad in pfade:

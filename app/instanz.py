@@ -23,6 +23,33 @@ from typing import Optional
 
 ENV_INSTANZ = "K1520_INSTANZ"
 ENV_KONFIG = "K1520_KONFIG"
+#: ``--connect HOST:PORT`` (nur P8000 in der Betriebsart „nur Terminal“): die Leitung des Terminals
+#: verbindet sich fuer diesen Start mit diesem Rechner.
+ENV_VERBINDEN = "K1520_VERBINDEN"
+
+
+def verbinden_pruefen(wert: str):
+    """``HOST:PORT`` zerlegen; ``None`` bei einem unbrauchbaren Wert.
+
+    Der Host darf in eckigen Klammern stehen (``[::1]:5001``); der Port liegt in 1..65535.
+    """
+    if not isinstance(wert, str) or ":" not in wert:
+        return None
+    host, _, port = wert.strip().rpartition(":")
+    if host.startswith("[") and host.endswith("]"):
+        host = host[1:-1]
+    if not host or any(c.isspace() for c in host):
+        return None
+    try:
+        nr = int(port)
+    except ValueError:
+        return None
+    return (host, nr) if 1 <= nr <= 65535 else None
+
+
+def verbinden() -> Optional[tuple]:
+    """Die ``--connect``-Angabe dieses Starts als ``(host, port)``; ``None`` ohne (oder ungueltig)."""
+    return verbinden_pruefen(os.environ.get(ENV_VERBINDEN, ""))
 
 
 def name() -> str:

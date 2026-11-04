@@ -128,7 +128,8 @@ class SettingsWidget(QWidget):
             rolle.setFrameShape(QFrame.NoFrame)
             rolle.setWidget(schnittstellen)
             self.tabs.addTab(rolle, "Schnittstellen")
-        self.tabs.addTab(self._build_crt_tab(), "CRT")
+        self._crt_tab = self._build_crt_tab()
+        self.tabs.addTab(self._crt_tab, "CRT")
         layout.addWidget(self.tabs)
         self._modus_anpassen()
 
@@ -291,11 +292,15 @@ class SettingsWidget(QWidget):
         self.betriebsart_combo = QComboBox(inner)
         self.betriebsart_combo.addItem("Computer mit Terminal", "computer")
         self.betriebsart_combo.addItem("nur Terminal", "terminal")
+        self.betriebsart_combo.addItem("nur Computer (Konsole extern)", "computer-only")
         self.betriebsart_combo.setToolTip(
             "Computer mit Terminal: der Rechner samt seinem Terminal in einem Fenster.  "
             "Nur Terminal: der Arbeitsplatz ohne Rechner — er wird über die serielle Leitung "
             "(Maschine ▸ Verbindung zum Rechner…) mit dem Rechner eines anderen P8000-Emulators "
-            "verbunden.  Ein Wechsel schaltet die Maschine aus und neu ein.")
+            "verbunden.  Nur Computer: der Rechner ohne Originalterminal — die Konsole (tty1) wird "
+            "über Einstellungen ▸ Schnittstellen nach außen geführt (Telnet/RFC 2217/Datei) und "
+            "extern bedient, z. B. mit PuTTY oder Tera Term; Bildschirm, Tastatur und CRT-Einstellungen "
+            "entfallen.  Ein Wechsel schaltet die Maschine aus und neu ein.")
         self.betriebsart_combo.currentIndexChanged.connect(self._on_model_combo)
         # Voreinstellung (P8000 | P8000 Compact): ein Vorgabe-Satz wie die Modellwahl des A5120.
         # `activated` kommt nur bei Bedienung, auch beim erneuten Waehlen desselben Eintrags.
@@ -763,6 +768,10 @@ class SettingsWidget(QWidget):
         return (self.profil.betriebsart_wahl
                 and self.betriebsart_combo.currentData() == "terminal")
 
+    def _ohne_terminal_betrieb(self) -> bool:
+        return (self.profil.betriebsart_wahl
+                and self.betriebsart_combo.currentData() == "computer-only")
+
     def ausstattung_value(self) -> str:
         """Die gewählte Rechnerausstattung (auch im Betrieb „nur Terminal“ — sie wird gemerkt)."""
         return self.profil.ausstattung_normalisieren(self.model_combo.currentData())
@@ -779,6 +788,8 @@ class SettingsWidget(QWidget):
         „nur Terminal“ der Schlüssel des Terminalmodells)."""
         if self._terminal_betrieb():
             return self.profil.einheit_modell()
+        if self._ohne_terminal_betrieb():
+            return self.profil.ohne_terminal_von(self.model_combo.currentData())
         data = self.model_combo.currentData()
         return self.profil.modell_normalisieren(data)
 
@@ -788,9 +799,10 @@ class SettingsWidget(QWidget):
         schluessel = self.profil.modell_normalisieren(model)
         if self.profil.betriebsart_wahl:
             terminal = self.profil.modell_art(schluessel) == "einheit"
-            self.betriebsart_combo.setCurrentIndex(1 if terminal else 0)
+            ohne = self.profil.modell_ohne_terminal(schluessel)
+            self.betriebsart_combo.setCurrentIndex(1 if terminal else 2 if ohne else 0)
             if not terminal:                  # im Terminalbetrieb bleibt die gemerkte Ausstattung
-                idx = self.model_combo.findData(schluessel)
+                idx = self.model_combo.findData(self.profil.mit_terminal_von(schluessel))
                 self.model_combo.setCurrentIndex(idx if idx >= 0 else 0)
         else:
             idx = self.model_combo.findData(schluessel)
@@ -805,6 +817,17 @@ class SettingsWidget(QWidget):
         if self.profil.betriebsart_wahl:
             self.model_combo.setEnabled(not self._terminal_betrieb())
         hat = self.profil.modell_hat_rechner(self.model_value())
+        # „nur Computer“: kein Terminalbild -> CRT-Reiter und Mitschrift (am Terminalbild) ausgegraut.
+        ohne = self.profil.betriebsart_wahl and self._ohne_terminal_betrieb()
+        grund = ("Nicht verfügbar in der Betriebsart „nur Computer“: es gibt kein Terminalbild "
+                 "(die Konsole tty1 läuft über Einstellungen ▸ Schnittstellen nach außen)")
+        j = self.tabs.indexOf(self._crt_tab) if getattr(self, "_crt_tab", None) is not None else -1
+        if j >= 0:
+            self.tabs.setTabEnabled(j, not ohne)
+            self.tabs.setTabToolTip(j, grund if ohne else "")
+        if hasattr(self, "_mitschrift_zeile"):
+            self._mitschrift_zeile.setEnabled(not ohne)
+            self._mitschrift_zeile.setToolTip(grund if ohne else "")
         if getattr(self, "winchester_combo", None) is not None:
             self.winchester_combo.setEnabled(self.profil.modell_hat_wdc(self.model_value()))
         if getattr(self, "bauart_combo", None) is not None:

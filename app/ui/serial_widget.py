@@ -339,7 +339,7 @@ class SerialBlock(QFrame):
         self.punkt = QLabel(" ")
         self.punkt.setFixedSize(14, 14)
         kopf.addWidget(self.punkt)
-        self.titel = QLabel(f"<b>{info.name}</b> ({info.stecker})")
+        self.titel = QLabel(f"<b>{info.name}</b>" + (f" ({info.stecker})" if info.stecker else ""))
         kopf.addWidget(self.titel)
         kopf.addStretch()
         self.zustand_label = QLabel()

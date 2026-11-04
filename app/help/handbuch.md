@@ -2186,7 +2186,7 @@ die *Betriebsart*. Was anders ist:
   **Vollgerät** (16-Bit-Teil und Winchester, Vorgabe), **ohne Winchester** (nur UDOS und Monitor)
   oder **nur 8-Bit-Teil** (die Koppelsoftware meldet dort „Hardware Error in Connection" — das ist
   das Soll eines P8000 ohne 16-Bit-Karte). *Betriebsart*: **Computer mit Terminal** (Vorgabe) oder
-  **nur Terminal** (s. u.). Ein Wechsel startet die Maschine kalt. Alte Konfigurationen mit dem
+  **nur Terminal** oder **nur Computer (Konsole extern)** (s. u.). Ein Wechsel startet die Maschine kalt. Alte Konfigurationen mit dem
   früheren schlanken Kern-Terminal werden beim Laden auf die Ausstattung mit Originalterminal
   abgebildet.
 * **Voreinstellung P8000 / P8000 Compact** — *Einstellungen ▸ Allgemein ▸ Modell*. Beide sind **Vorgabe-Sätze**, keine
@@ -2311,6 +2311,14 @@ einer Nachbildung. Gewählt wird die *Betriebsart* unter *Einstellungen ▸ Allg
   führt zu einem Rechner (*Maschine ▸ Verbindung zum Rechner…*). Die gewählte Rechnerausstattung bleibt
   gemerkt und ist beim Zurückschalten wieder da. Dieselbe Wahl trifft der Start mit
   `p8000emu --mode terminal` (bzw. `--mode computer`).
+* **Nur Computer (Konsole extern)**: der Rechner **ohne** Originalterminal. Die Konsole tty1 steht
+  wie tty0/tty2/tty3 unter *Einstellungen ▸ Schnittstellen* (Block **tty1 CONSOLE**, Vorschlag Port 5001):
+  *Betriebsart Telnet*, *Rolle Server*, *Starten* — dann mit PuTTY, Tera Term o. ä. (rohe
+  Telnet-Verbindung) oder einem RFC-2217-Client bedienen, oder alles in eine Datei lenken. Im
+  Hauptbereich steht statt des Bildes ein Hinweis; alles, was am Terminalbild und an der
+  Terminaltastatur hängt (Bildschirmtastatur, *Bildschirminhalt als Text kopieren*, Vollbild, CRT-Reiter,
+  Mitschrift), ist **ausgegraut**. Die gewählte Rechnerausstattung (Vollgerät / ohne Winchester /
+  nur 8-Bit) gilt weiter. Start: `p8000emu --mode computer-only`.
 
 **Bild.** Das Terminal liefert das fertige Pixelbild (640 × 312); es wird nur neu geholt, wenn die
 Maschine ein neues Bild geliefert hat, und füllt den Bildschirmkasten wie bei den anderen Maschinen.
@@ -2359,6 +2367,17 @@ startet `getty` im Mehrbenutzerbetrieb auf der Konsole (tty1) und auf **tty0, tt
    `sync;sync` an der Konsole. Ohne laufendes Betriebssystem zeigt ein Test am Monitor, dass die
    Verbindung steht: `pw 25 05`, `pw 25 68`, `pw 24 54` am Rechner schreiben ein „T" auf die Leitung tty0 (Port-
    Ausgabebefehle des Monitors MON8; der Arbeitsplatz an tty0 zeigt das Zeichen).
+
+**Aktion *Maschine ▸ Terminal* (auch im Menü *Werkzeuge* und in der Symbolleiste „Terminal“, kein Tastenkürzel).** In den Betriebsarten *Computer mit
+Terminal* und *nur Computer* startet sie mit einem Klick einen weiteren Arbeitsplatz: die **erste Schnittstelle ohne angeschlossenes Terminal**
+(Reihenfolge wie unter *Einstellungen ▸ Schnittstellen*; verbundene Leitungen werden übersprungen; **tty3 PRINTER** bleibt dem Drucker vorbehalten, bei
+*Computer mit Terminal* gehört tty1 dem Originalterminal) wird Telnet-Server — beim ersten freien Port ab dem
+Vorschlag; lauscht sie schon, bleibt ihr Port —, und ein neues `p8000emu` in der Betriebsart *nur Terminal* verbindet sich damit. Jeder weitere Klick belegt
+die nächste Schnittstelle; sind alle belegt, meldet die Statuszeile „keine freie Schnittstelle mehr". Die Schnittstelle
+bleibt danach im Server-Betrieb (Konfiguration wie bei einer Handeinstellung). Von Hand geht dasselbe mit
+`p8000emu --mode terminal --connect HOST:PORT [--instance NAME]`: die Leitung des Terminals ist dann für diesen Start
+Telnet-Client auf diesem Ziel und versucht es jede Sekunde neu, bis der Rechner antwortet; die Angabe wird nicht in die
+Konfiguration übernommen. Terminals aus `--connect` laufen immer im Normaltakt; das Terminal rechnet mit dem Takt seines Z8 (3,6864 MHz).
 
 Mehrere Instanzen nebeneinander: `--instance NAME` (oder die Umgebungsvariable `K1520_INSTANZ`) legt eine
 eigene Konfiguration `p8000emu-NAME.yaml` an und setzt den Namen in den Fenstertitel; `--config DATEI`
@@ -2449,7 +2468,7 @@ gilt beim U880-Monitor gleich, beim U8000-Monitor nur Großbuchstaben (Handbuch 
 Wo die einzelnen Teile im Emulator eingestellt werden:
 
 * *Einstellungen ▸ Allgemein*: **Modell** (Voreinstellung *P8000* oder *P8000 Compact*), **Rechnerausstattung** (*Vollgerät*, *ohne Winchester*, *nur
-  8-Bit-Teil*), **Betriebsart** (*Computer mit Terminal* oder *nur Terminal*), **Hauptspeicher
+  8-Bit-Teil*), **Betriebsart** (*Computer mit Terminal*, *nur Terminal* oder *nur Computer (Konsole extern)*), **Hauptspeicher
   (16-Bit)**, ROM-Fassungen.
 * *Ansicht ▸ Laufwerke*: Disketten A: und B: (Compact: auch C:) sowie die **Plattenkästen** (1–3, *Einstellungen ▸ Laufwerke ▸ Winchester-Laufwerke*) (*Anschließen…*, *Neue
   Platte…*, *Abtrennen*).
@@ -3326,7 +3345,8 @@ die Firmware des Terminals und kein Fehler.
 
 * **Der Bildschirm bleibt leer.** Zuerst die Betriebsart: *nur Terminal* ohne Verbindung zum Rechner zeigt
   nur die Einschaltmeldung des Terminals. Mit *Maschine ▸ Verbindung zum Rechner…* verbinden (oder
-  *Computer mit Terminal* wählen). Nach dem Einschalten dauert es einen Moment, bis die Meldung erscheint.
+  *Computer mit Terminal* wählen). In der Betriebsart *nur Computer* gibt es gar kein Bild: die Konsole
+  läuft über *Einstellungen ▸ Schnittstellen*, Block tty1. Nach dem Einschalten dauert es einen Moment, bis die Meldung erscheint.
 * **Rechner nicht verbunden** (Statuszeile „Rechner: …"): Gegenstelle ist kein Server oder die Adresse
   stimmt nicht; ein Client versucht es selbst weiter. Der Server (Rechner) lauscht erst nach *Starten*
   im Reiter *Schnittstellen*.

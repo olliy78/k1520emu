@@ -171,7 +171,7 @@ def test_jede_hardwarewahl_baut_eine_maschine(qapp, umgebung):
                                     **p.kern_parameter(modell, hw))
                 emu.power_on()
                 assert emu.run(200_000) > 0, (schluessel, wert, modell)
-                assert emu.term_count() == 1
+                assert emu.term_count() == (0 if modell.endswith("-nt") else 1)
                 del emu
 
 

@@ -11,12 +11,13 @@ Konfiguration, Tastatur K7672, Frontplatte, NMI-Taster — `app/profil.py`),
 ``--machine p8000`` das des P8000 Emulators (Terminal, Winchester, Modellwahl),
 ``--machine mc80`` das des MC80 Emulators (MC80.30/31/21/22, ohne Laufwerke),
 (``--mode terminal`` stellt dort die Betriebsart „nur Terminal“ ein, ``--mode computer`` „Computer mit
-Terminal“); ohne Schalter ist es der A5120 Emulator.  Die Starter übergeben den Schalter
+Terminal“, ``--mode computer-only`` „nur Computer“ ohne Terminal, Konsole über tty1); ohne Schalter ist es der A5120 Emulator.  Die Starter übergeben den Schalter
 fest (``run_k8915emu.sh``, ``run_prg710emu.sh``, ``run_pc1715emu.sh``, ``run_p8000emu.sh``, ``run_mc80emu.sh``, ``bin/k8915emu``, Startmenü).
 
 Usage:
     python3 app/main.py [--machine a5120|k8915|prg710|pc1715|p8000|mc80]
-                        [--mode computer|terminal]  (nur p8000)
+                        [--mode computer|terminal|computer-only]  (nur p8000)
+                        [--connect HOST:PORT]  (nur p8000 mit --mode terminal)
                         [--instance NAME] [--config DATEI] [DISKETTE …]
 
 Requirements:
@@ -59,6 +60,7 @@ for _strom in (sys.stdout, sys.stderr):
 # die Diskettenpruefung reden schon vom Programm.  Der Schalter wird aus argv
 # entfernt, damit ihn keine spaetere Auswertung (Qt, Disketten) als Datei nimmt.
 from app import profil as _profile
+from app import instanz as _instanz
 
 _MASCHINE = ""
 _rest = []
@@ -72,13 +74,20 @@ for _arg in _args:
     elif _arg.startswith("--machine="):
         _MASCHINE = _arg.split("=", 1)[1]
     elif _arg == "--mode" or _arg.startswith("--mode="):
-        # Betriebsart des P8000 (computer | terminal) fuer diesen Start vorwaehlen; sie wird danach
+        # Betriebsart des P8000 (computer | terminal | computer-only) fuer diesen Start vorwaehlen; sie wird danach
         # wie jede Einstellung gemerkt.  Ueber die Umgebung an das Hauptfenster gereicht.
         _wert = next(_args, "") if _arg == "--mode" else _arg.split("=", 1)[1]
-        if _wert not in ("computer", "terminal"):
-            print("--mode: computer oder terminal", file=sys.stderr)
+        if _wert not in ("computer", "terminal", "computer-only"):
+            print("--mode: computer, terminal oder computer-only", file=sys.stderr)
             sys.exit(2)
         os.environ["K1520_BETRIEBSART"] = _wert
+    elif _arg == "--connect" or _arg.startswith("--connect="):
+        # Terminal (P8000, --mode terminal): Leitung fuer diesen Start mit HOST:PORT verbinden.
+        _wert = next(_args, "") if _arg == "--connect" else _arg.split("=", 1)[1]
+        if _instanz.verbinden_pruefen(_wert) is None:
+            print("--connect: HOST:PORT erwartet, z. B. 127.0.0.1:5001", file=sys.stderr)
+            sys.exit(2)
+        os.environ[_instanz.ENV_VERBINDEN] = _wert
     elif _arg in ("--instance", "--config"):
         # Mehrinstanzbetrieb (app/instanz.py): eigener Konfigurationsname bzw. -datei.  Ueber die
         # Umgebung weitergereicht, damit auch ein von hier gestartetes Kindprogramm sie kennt.
@@ -96,6 +105,10 @@ try:
     PROFIL = _profile.profil(_MASCHINE)
 except ValueError as _e:
     print(f"--machine: {_e}", file=sys.stderr)
+    sys.exit(2)
+if _instanz.ENV_VERBINDEN in os.environ and (
+        PROFIL.maschine != "p8000" or os.environ.get("K1520_BETRIEBSART") != "terminal"):
+    print("--connect gilt nur fuer p8000 zusammen mit --mode terminal", file=sys.stderr)
     sys.exit(2)
 sys.argv[1:] = _rest
 
@@ -126,8 +139,12 @@ _KOPF = {"a5120": "Emulator des Buerocomputers A5120 (K1520-Bus)",
          "p8000": "Emulator des 16-Bit-Arbeitsplatzcomputers P8000 (U880 + U8001, UDOS und WEGA)",
          "mc80": "Emulator der Mikrorechner MC80.30, .31, .21 und .22 (VEB Elektronik Gera)"}
 _P = PROFIL.programm
-_MODUS_HILFE = ("  {p} --mode MODUS      Betriebsart: computer (Rechner mit Terminal) oder terminal\n"
-                "                        (nur das Terminal, Verbindung zu einem anderen Rechner)\n"
+_MODUS_HILFE = ("  {p} --mode MODUS      Betriebsart: computer (Rechner mit Terminal), terminal\n"
+                "                        (nur das Terminal, Verbindung zu einem anderen Rechner) oder\n"
+                "                        computer-only (Rechner ohne Terminal, Konsole tty1 extern)\n"
+                "  {p} --connect HOST:PORT  nur mit --mode terminal: die Leitung des Terminals verbindet sich\n"
+                "                        als Telnet-Client mit diesem Rechner und versucht es wiederholt,\n"
+                "                        bis er antwortet (gilt nur fuer diesen Start)\n"
                 if PROFIL.maschine == "p8000" else "")
 HILFE = f"""{_P} — {_KOPF[PROFIL.maschine]}
 

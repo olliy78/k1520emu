@@ -228,7 +228,8 @@ static bool p8000Konfig(const char* text, P8000Machine::Config& cfg, std::string
         } else if (key == "terminal") {
             if (val == "kern") cfg.terminal = Cfg::TerminalArt::Kern;
             else if (val == "original") cfg.terminal = Cfg::TerminalArt::Original;
-            else { fehler = "P8000: terminal = " + val + " unbekannt (kern | original)"; return false; }
+            else if (val == "none") cfg.terminal = Cfg::TerminalArt::None;
+            else { fehler = "P8000: terminal = " + val + " unbekannt (kern | original | none)"; return false; }
         } else if (key == "vorlauf") {
             if (val.empty() || val.size() > 6 || val.find_first_not_of("0123456789") != std::string::npos) {
                 fehler = "P8000: vorlauf = " + val + " ungueltig (Millisekunden)"; return false;
@@ -1858,6 +1859,7 @@ TermSicht termOf(K1520Handle h, int i) {
     if (!h || i != 0) return t;
     K1520Machine* m = toMachine(h);
     t.p8 = dynamic_cast<P8000Machine*>(m);
+    if (t.p8 && !t.p8->hatTerminal()) { t.p8 = nullptr; return t; }   // terminal=none: tty1 liegt am SerialHub
     if (!t.p8) t.pt = dynamic_cast<P8000TerminalMachine*>(m);
     return t;
 }

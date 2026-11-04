@@ -29,7 +29,7 @@ import time
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QMessageBox, QDockWidget, QMenu, QFileDialog,
-    QScrollArea, QToolBar, QToolButton, QVBoxLayout
+    QScrollArea, QToolBar, QToolButton, QVBoxLayout, QStackedWidget, QLabel
 )
 from PySide6.QtCore import Qt, QTimer, QSize, QByteArray, QEvent
 from PySide6.QtGui import QAction, QActionGroup, QGuiApplication, QIcon
@@ -55,6 +55,7 @@ from app.ui.toolbar_config import ToolbarDialog
 from app.ui import actions as aktionen
 from app.ui_icons import icon
 from app.core_binding.k1520 import K1520Emulator, kern_sperre
+from app.core_binding import k1520 as K
 from app import config_io
 from app import drive_types as dt
 from app import paths
@@ -106,6 +107,11 @@ class MainWindow(QMainWindow):
         # restaurierten Konfiguration / der Einstellungen → Allgemein-Auswahl.
         # Nur im Profil mit Modellwahl (A5120); der K8915 bleibt immer ohne EM.
         self._model = self.profil.standard_modell()
+        #: ``(Schnittstellenname, Einstellung)`` der Leitung VOR ``--connect``: die Angabe gilt nur fuer
+        #: diesen Start und wird nicht in die Konfiguration zurueckgeschrieben.
+        self._verbinden_vorher = None
+        #: Leitungsindex -> Zeitpunkt, zu dem die Aktion „Terminal“ sie vergeben hat.
+        self._terminal_vergeben = {}
         self._rechner_war_da = True
         # Hardwarevarianten des Programms (PC 1715: Zeichensatz, Tastatur-ROM; AP-6) —
         # Konstruktorparameter des Kerns wie das Modell, ein Wechsel ist ein Kaltstart.
@@ -298,6 +304,7 @@ class MainWindow(QMainWindow):
         # window size + dock layout.
         self._load_or_create_default_config()
         self._betriebsart_vorwahl()
+        self._verbinden_vorwahl()
 
         # Disketten von der Kommandozeile — NACH der Konfiguration, damit sie
         # deren Belegung schlagen, und VOR power_on(), damit der Kaltstart schon
@@ -391,7 +398,20 @@ class MainWindow(QMainWindow):
 
         self.screen_dock = QDockWidget("Bildschirm", self)
         self.screen_dock.setObjectName("screen_dock")
-        self.screen_dock.setWidget(self.screen_widget)
+        # Bildschirm oder (Betriebsart „nur Computer“, Ticket #26) ein Hinweis: ohne Originalterminal
+        # gibt es kein Bild; die Konsole tty1 laeuft ueber die Schnittstellen nach aussen.
+        self.screen_stapel = QStackedWidget()
+        self.screen_stapel.addWidget(self.screen_widget)
+        self.konsole_extern_hinweis = QLabel(
+            "Betriebsart „nur Computer“: dieser Rechner hat kein Originalterminal.\n\n"
+            "Die Konsole (tty1) wird über die Schnittstelle tty1 bedient: Einstellungen ▸ "
+            "Schnittstellen ▸ tty1, Betriebsart Telnet/RFC 2217 (Server) oder Datei, "
+            "dann „Starten“ und z. B. mit PuTTY oder Tera Term verbinden.")
+        self.konsole_extern_hinweis.setWordWrap(True)
+        self.konsole_extern_hinweis.setAlignment(Qt.AlignCenter)
+        self.konsole_extern_hinweis.setMargin(24)
+        self.screen_stapel.addWidget(self.konsole_extern_hinweis)
+        self.screen_dock.setWidget(self.screen_stapel)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.screen_dock)
 
         # ── Tastatur-Dock (in der linken Spalte UNTER den Bildschirm) ────────
@@ -611,7 +631,7 @@ class MainWindow(QMainWindow):
         self.drives_dock.toggleViewAction().setVisible(lw)
         # Alles, was nur mit einem Rechner Sinn hat (Diskette, Platte, Zwischenstand, NMI), samt
         # den Lampen der Statuszeile; die Verbindung zum Rechner dagegen nur OHNE (Terminalbetrieb).
-        for n in ("nmi", "einlegen", "auswerfen", "stand_speichern", "stand_laden"):
+        for n in ("nmi", "einlegen", "auswerfen", "stand_speichern", "stand_laden", "terminal"):
             a = getattr(self, f"act_{n}", None)
             if a is not None:
                 sichtbar = lw if n in ("einlegen", "auswerfen") else hat
@@ -630,6 +650,37 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(self._fenstertitel(self._model))
         if hasattr(self, "act_verbindung"):
             self.act_verbindung.setEnabled(self.profil.modell_art(self._model) == "einheit")
+        self._terminal_bedienung_anzeigen()
+
+    def _terminal_bedienung_anzeigen(self):
+        """Betriebsart „nur Computer“ (Modellart ``keins``): alles, was am Terminalbild und an der
+        Terminaltastatur haengt, steht AUSGEGRAUT (mit Grund im Tooltip) statt weg; im Hauptbereich
+        steht der Hinweis auf die Schnittstelle tty1 statt eines leeren Bildes."""
+        ohne = self.profil.modell_ohne_terminal(self._model)
+        grund = ("Nicht verfügbar in der Betriebsart „nur Computer“: es gibt kein Terminal; die "
+                 "Konsole tty1 läuft über Einstellungen ▸ Schnittstellen nach außen")
+        self.screen_stapel.setCurrentWidget(
+            self.konsole_extern_hinweis if ohne else self.screen_widget)
+        self.keyboard_widget.setEnabled(not ohne)
+        for n in ("text_kopieren", "vollbild", "dock_keyboard"):
+            a = getattr(self, f"act_{n}", None)
+            if a is None:
+                continue
+            a.setEnabled(not ohne)
+            if ohne:
+                if not hasattr(a, "_tipp_vor_ohne"):
+                    a._tipp_vor_ohne = a.toolTip()
+                a.setToolTip(grund)
+            elif hasattr(a, "_tipp_vor_ohne"):
+                a.setToolTip(a._tipp_vor_ohne)
+                del a._tipp_vor_ohne
+        if ohne:
+            self.keyboard_widget.setToolTip(grund)
+            self.keyboard_dock.hide()
+            self.screen_widget.setToolTip(grund)
+        else:
+            self.keyboard_widget.setToolTip("")
+            self.screen_widget.setToolTip("")
 
     def _text_kopieren(self):
         """Menü *Maschine ▸ Bildschirminhalt als Text kopieren* (wie im Kontextmenü des Bildes)."""
@@ -654,8 +705,126 @@ class MainWindow(QMainWindow):
         from app.ui.verbindung_dialog import VerbindungDialog
         dlg = VerbindungDialog(self.emulator, 0, self)
         dlg.exec()
+        self._verbinden_vorher = None        # der Anwender hat die Leitung selbst eingestellt
         self._schedule_autosave()
         self._update_verbindung()
+
+    def _schnittstellen_fuer_konfig(self) -> dict:
+        """Der Abschnitt ``schnittstellen`` fuer die Konfiguration; die Leitung, die ``--connect`` fuer
+        diesen Start umgebogen hat, steht mit ihrer alten Einstellung darin."""
+        z = self.serial_widget.zustand_lesen()
+        if self._verbinden_vorher is not None:
+            name, alt = self._verbinden_vorher
+            if name in z:
+                z[name] = alt
+        return z
+
+    def _verbinden_vorwahl(self):
+        """``--connect HOST:PORT`` (Umgebung ``K1520_VERBINDEN``): die Leitung des Terminals wird fuer
+        diesen Start Telnet-Client auf diesem Ziel.  Der Client versucht es selbst weiter (Dauerversuch
+        alle 1 s), bis der Rechner antwortet.  Nur in der Betriebsart „nur Terminal“."""
+        ziel = instanz.verbinden()
+        if ziel is None or self.profil.modell_art(self._model) != "einheit":
+            return
+        info = self.emulator.serial_info(0)
+        if info is None:
+            return
+        self._verbinden_vorher = (info.name, self.serial_widget.zustand_lesen().get(info.name, {}))
+        self.emulator.serial_stop(0)
+        self.emulator.serial_configure(0, betriebsart=K.SER_TELNET, rolle=K.SER_CLIENT,
+                                       host=ziel[0], port=int(ziel[1]))
+        self.emulator.serial_start(0)
+        # Terminals aus --connect laufen immer im Normaltakt (die Vorgabedatei des Rechners hat 5x).
+        self.settings_widget.set_speed_value(1.0)
+        self._apply_speed(1.0)
+        blk = self.serial_widget.block(info.name)
+        if blk is not None:
+            blk.laden()
+        self.serial_widget.aktualisieren()
+        self._update_verbindung()
+
+    #: Wie lange eine fuer ein startendes Terminal vergebene Leitung als belegt gilt, auch wenn noch
+    #: kein Peer dranhaengt (zwei schnelle Klicks duerfen nicht dieselbe Leitung vergeben).
+    TERMINAL_VORMERKUNG_S = 10.0
+
+    def _erste_freie_schnittstelle(self):
+        """``(Index, Port)`` der ersten Anwenderschnittstelle in Hub-Reihenfolge, an die ein neues Terminal
+        kann; ``None`` wenn keine da ist.  *Port* ist der Port eines schon lauschenden Telnet-Servers
+        (dann kein neuer Start), sonst ``0`` (die Leitung muss erst als Server gestartet werden).
+
+        Uebersprungen werden: ``Programmprofil.terminal_ueberspringen`` (Drucker), Loop, jede Leitung mit
+        einem Peer (verbunden/verbindend, auch eine offene Datei), ein Server in anderer Art als Telnet
+        und Leitungen, die gerade fuer ein startendes Terminal vergeben wurden.
+        """
+        jetzt = time.monotonic()
+        # Reihenfolge: die Konsole (tty1, gibt es nur ohne Originalterminal) zuerst, dann der Hub.
+        reihenfolge = list(range(self.emulator.serial_count()))
+        for i in list(reihenfolge):
+            info = self.emulator.serial_info(i)
+            if info is not None and info.name.startswith("tty1 "):
+                reihenfolge.remove(i)
+                reihenfolge.insert(0, i)
+        for i in reihenfolge:
+            info = self.emulator.serial_info(i)
+            if info is None or info.name in self.profil.terminal_ueberspringen:
+                continue
+            st = self.emulator.serial_status(i)
+            k = self.emulator.serial_config(i)
+            if st is None or k is None or k.loop:
+                continue
+            if st.zustand in (K.SER_VERBUNDEN, K.SER_VERBINDET):
+                self._terminal_vergeben.pop(i, None)       # Peer dran: die Vormerkung hat ihren Zweck erfuellt
+                continue
+            if jetzt - self._terminal_vergeben.get(i, -1e9) < self.TERMINAL_VORMERKUNG_S:
+                continue
+            if st.zustand == K.SER_LAUSCHT:
+                if k.betriebsart == K.SER_TELNET and k.rolle == K.SER_SERVER and st.port_aktiv:
+                    return i, int(st.port_aktiv)
+                continue
+            if st.zustand in (K.SER_AUS, K.SER_FEHLER):
+                return i, 0
+        return None
+
+    def _terminal_starten(self):
+        """Aktion *Maschine ▸ Terminal*: die erste Leitung ohne Peer wird (falls noch kein Telnet-Server
+        lauscht) Telnet-Server, und ein neues ``p8000emu`` (Betriebsart nur Terminal) verbindet sich mit
+        ihrem Port.  Die Leitung bleibt danach im Server-Betrieb und wird wie jede Handeinstellung in die
+        Konfiguration gesichert."""
+        wahl = self._erste_freie_schnittstelle()
+        if wahl is None:
+            self.statusBar().showMessage("Terminal: keine freie Schnittstelle mehr", 5000)
+            return
+        i, port = wahl
+        info = self.emulator.serial_info(i)
+        if not port:
+            vorschlag = self.serial_widget.ports.get(info.name)
+            felder = dict(betriebsart=K.SER_TELNET, rolle=K.SER_SERVER)
+            if vorschlag:
+                felder["port"] = int(vorschlag)
+            # Start von Hand sucht ab dem eingestellten Port aufwaerts; gebunden wird der Port im Status.
+            if not (self.emulator.serial_configure(i, **felder) and self.emulator.serial_start(i)):
+                self.statusBar().showMessage(f"Terminal: {info.name} liess sich nicht starten", 5000)
+                return
+            st = self.emulator.serial_status(i)
+            port = int(st.port_aktiv) if st is not None and st.port_aktiv else 0
+            blk = self.serial_widget.block(info.name)
+            if blk is not None:
+                blk.laden()
+            self.serial_widget.aktualisieren()
+            self._schedule_autosave()
+            if not port:
+                self.statusBar().showMessage(f"Terminal: {info.name} hat keinen Port bekommen", 5000)
+                return
+        self._terminal_vergeben[i] = time.monotonic()
+        try:
+            programme.programm_starten(programme.P8000EMU, [
+                "--mode", "terminal", "--connect", f"127.0.0.1:{port}",
+                "--instance", f"terminal-{port}"])
+        except RuntimeError as e:
+            self._terminal_vergeben.pop(i, None)
+            self.statusBar().showMessage(f"Terminal: {e}", 8000)
+            return
+        self.statusBar().showMessage(f"Terminal gestartet: {info.name} auf Port {port}", 5000)
 
     def _update_verbindung(self):
         """Statuszeile: Zustand der Leitung zum Rechner (nur Terminaleinheit)."""
@@ -935,6 +1104,7 @@ class MainWindow(QMainWindow):
             emu_menu.addAction(self.act_stand_speichern)
             emu_menu.addAction(self.act_stand_laden)
             emu_menu.addAction(self.act_verbindung)
+            emu_menu.addAction(self.act_terminal)
             emu_menu.addAction(self.act_text_kopieren)
         if hasattr(self, "act_speicherabzug_laden"):   # nur MC80 (AP M6)
             emu_menu.addSeparator()
@@ -994,6 +1164,8 @@ class MainWindow(QMainWindow):
         tools_menu = menu_bar.addMenu("&Werkzeuge")
         tools_menu.addAction(self.act_disktool)
         tools_menu.addAction(self.act_kermit)
+        if hasattr(self, "act_terminal"):       # nur P8000: dieselbe Aktion wie im Menue Maschine
+            tools_menu.addAction(self.act_terminal)
         # Der jeweils andere Emulator (dasselbe Programm, anderes Profil).
         for maschine in (self.profil.andere,) + tuple(self.profil.weitere):
             tools_menu.addAction(getattr(self, f"act_{maschine}emu"))
@@ -1202,7 +1374,7 @@ class MainWindow(QMainWindow):
         data = config_io.build_config(
             self.screen_widget.params, general, self.drives_widget.get_mounts(),
             self._gather_window_state(), drive_types=self._drive_types,
-            schnittstellen=self.pcmc_widget.fuer_konfig(self.serial_widget.zustand_lesen()),
+            schnittstellen=self.pcmc_widget.fuer_konfig(self._schnittstellen_fuer_konfig()),
             machine=({"raf": self._raf, "raf_standby": bool(self._raf_standby)}
                      if self.profil.raf_wahl else None))
         if self.eprom_widget is not None:
@@ -2165,13 +2337,15 @@ class MainWindow(QMainWindow):
         self._schedule_autosave()
 
     def _betriebsart_vorwahl(self):
-        """``--mode computer|terminal`` (Umgebung ``K1520_BETRIEBSART``): die Betriebsart des P8000
+        """``--mode computer|terminal|computer-only`` (Umgebung ``K1520_BETRIEBSART``): die Betriebsart des P8000
         für diesen Start vorwählen — nach der Konfiguration, vor dem Einschalten."""
         art = os.environ.get("K1520_BETRIEBSART", "")
-        if not self.profil.betriebsart_wahl or art not in ("computer", "terminal"):
+        if not self.profil.betriebsart_wahl or art not in ("computer", "terminal", "computer-only"):
             return
         if art == "terminal":
             ziel = self.profil.einheit_modell()
+        elif art == "computer-only":
+            ziel = self.profil.ohne_terminal_von(self.settings_widget.ausstattung_value())
         else:
             ziel = self.settings_widget.ausstattung_value()
         if ziel and ziel != self._model:
@@ -2683,6 +2857,8 @@ class MainWindow(QMainWindow):
         self.settings_widget.set_bildschirm_schalter_value(self._schalter)
         # Der Takt haengt am Modell (PC 1715W: 3,9936 MHz).
         self.CPU_HZ, nenntakt = self.profil.modell_nenntakt(self._model)
+        if getattr(self, "run_timer", None) is not None:      # der Faden rechnet mit dem NEUEN Nenntakt
+            self.run_timer.set_tempo(self.CPU_HZ, self.speed_factor)
         self.settings_widget.set_nenntakt(nenntakt)
         self.status_widget.set_nenntakt(nenntakt)
         self.settings_widget.set_raf_value(self._raf)       # dito
