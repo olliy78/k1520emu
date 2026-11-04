@@ -213,3 +213,51 @@ zweiseitigen UDOS-Disketten mit Seitenpräfix).  Gewünscht: **„7 Dateien - 64
 - **Zuständig:** einfache Umsetzung, Sonnet-Agent; der tar-Satz-Fall braucht vorher einen Blick auf
   `DiskVolume::tarSatzPlan` bzw. das offene Satzobjekt, wie die Kapazität des *geöffneten* Satzes (nicht des Plans)
   zu holen ist.
+
+### Z2  Zwei Disketten der Sammlung lassen sich nicht öffnen
+
+Fundort: `/home/olliy/projects/robotron/Diskettensammlung_von_DL/Diskettenarbeit/Disketten_Images_RT/`
+— `CPA1715_5600.hfe` und `UDOS_NDOS.hfe`.  Beide sehen nach Aussage des Anwenders heil aus, das DiskTool öffnet sie
+nicht.  **Vermutung des Anwenders: es fehlen passende Katalogeinträge** (Format und/oder Dateisystemprofil).  Das ist
+eine Vermutung, keine Diagnose — zuerst messen.
+
+**Vorbefund (nur Dateikopf, nichts gemountet; 2026-11-04):**
+
+| Datei | Größe | HFE-Kopf |
+|---|---|---|
+| `CPA1715_5600.hfe` | 1 004 544 B | HFE v1, 40 Spuren, Seitenfeld = 1, 250 kbit/s, MFM-Kodierung 0 |
+| `UDOS_NDOS.hfe` | 1 004 544 B | identisch (gleiche Größe und Kopfwerte) |
+
+- Die Größe 1 004 544 B = 40 × 25 088 B entspricht **40 Spurblöcken** — also einer 40-Spur-Diskette (K5600.10, 48 tpi).
+  Der Kopf meldet *eine* Seite, der Spurblock ist aber so groß, wie ihn HFE für zwei Seiten anlegt (je 12 544 B pro
+  Seite verschränkt).  Ob die zweite Seite Daten trägt oder leer ist, ist offen — das entscheidet über `ss40` oder
+  `ds40` und gehört in die Messung.
+- Der Name `CPA1715_5600` nennt das Laufwerk **K5600** (einseitig, 40 Spuren).  Ein CP/A-1715-Profil gibt es heute nur
+  als `cpa1715` auf `cpa800` (80 Spuren doppelseitig); eine 40-Spur-Variante fehlt.  NDOS gibt es als
+  `udos1715_ss40` (16×256) — ob `UDOS_NDOS.hfe` dazu passt oder eine andere Sektorzahl hat, ist offen.
+
+**Vorgehen:**
+
+1. **Messen** (`tools/dev.sh tool k1520disktool measure <Kopie>` und `ls`, auf KOPIEN im Scratchpad — das Tool öffnet
+   r/w): Spurliste, Sektorgröße/-zahl je Zylinder und Kopf, Kodierung, `erkennung.abgelehnt`-Befund (Ebene 0 sagt, WARUM
+   nichts erkannt wurde).  Der Befund unterscheidet drei Fälle, die verschieden zu beheben sind:
+   a) **Format fehlt** (Geometrie nicht im Katalog) → Format ergänzen;
+   b) **Format da, Profil fehlt** (Dateisystem nicht zugeordnet) → Dateisystemprofil ergänzen (CP/A-1715-40-Spuren;
+      NDOS-Variante);
+   c) **Datei trägt einen Lesefehler** (CRC, Lücken, Fremd-Sync-Dialekt wie in `project_fremde_sync_sitte`) → das ist
+      dann kein Katalogthema, sondern ein Lesepfad-Befund und bekommt einen eigenen Eintrag.
+2. **Neue Einträge nach dem neuen Schema** (§1/§2) anlegen, nicht nach dem alten: Formatname aus der gemessenen Spurliste
+   (z. B. `ss40_5x1024`, falls so gemessen — bereits vorhanden als `k5601_ss40_5x1024`; dann nur das Profil neu), Profil
+   `<os>_<rechner>_<format>_<rolle>`; Titel/Kapazität/Rechner nach §3 gleich mitschreiben.  Wird Z2 vor Schritt 2/3
+   erledigt, die Einträge unter dem alten Namen anlegen und beim Umbenennen mitziehen (die Namensliste
+   `tests/fixtures/formatnamen_alt.txt` wächst dann um die beiden).
+3. **Fixtures:** beide Abbilder als eingefrorene Prüfeingabe unter `tests/fixtures/disks/` ablegen, **wenn Lizenz/Herkunft
+   es erlauben** (Herkunft in `tests/fixtures/README.md` vermerken; sie stammen aus der Sammlung des Anwenders —
+   Freigabe klären, bevor sie ins Repository kommen).  Sonst nur ein Test, der sie überspringt, wenn die Datei fehlt.
+4. **Wächter Z2:** `DiskVolume.Oeffnet<CPA1715_5600>` und `DiskVolume.Oeffnet<UDOS_NDOS>` — erkennt das erwartete
+   Profil, `ls` liefert Dateien, `fsck` ohne Fehlbefund; plus ein Katalogtest, dass das neue Profil dem Schema W4
+   entspricht.  Erkennung bleibt **eindeutig** (kein neues `erkennung.alternative` auf bestehenden Fixtures;
+   `FsCheckGegenprobe.DerAusgelieferteKatalogIstEindeutig` muss grün bleiben).
+- **Ausdrücklich nicht:** die Erkennung „aufweichen", bis die Disketten durchgehen.  Falschmeldungen sind schlimmer als
+  fehlende (Merkposten DiskTool); passt die Geometrie nicht eindeutig, wird das Profil enger geschnitten, nicht die
+  Prüfung gelockert.
