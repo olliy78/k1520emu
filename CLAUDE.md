@@ -440,6 +440,13 @@ bus/            →  K1520Bus (memory/IO dispatch, INT daisy-chain, BUSRQ, NMI, 
 - **C-API boundary** (`core/api/k1520_api.{h,cpp}`): the only surface the Python side sees; keep it `extern "C"` and ABI-stable. `A5120Machine` (`core/machines/a5120/a5120.{h,cpp}`) is the integration point exposing `run()`, disk mounting, framebuffer, keyboard, and debug accessors.
 - **EPROM/charset data** are committed as generated C arrays (`*_data.h`, `chargen_*.h`) produced from binaries by `tools/eprom_to_h.py`; they are not loaded at runtime. The K7024 character generator is the two-EPROM Latin set (`chargen_zg1.h` = pixel rows 0–7 / v171, `chargen_zg2.h` = rows 8–11 / v172); binaries under `doc/EPROMS/K7024/`.
 
+## Format- und Profilnamen (Entwurf 47, 2026-11-04)
+
+Katalogname = technischer Schlüssel mit Geometrie (`ds80_5x1024`, `cpa_ds80_5x1024_boot`), die Oberfläche zeigt
+`Kapazität · Rechner · Titel` (`title`/`capacity`/`machines`); alte Namen leben als `aliases:` weiter. Wächter prüfen
+Schema (`FormatKatalogSchema.*`, `FsKatalogSchema.*`), Aliase, Anzeige (`py_katalog_anzeige`).  **Vor Arbeiten daran:
+`doc/merkposten/formatnamen.md` lesen** (Profil ≠ Format, Aliase nie entfernen, `machines: []` = unbekannt).
+
 ## Variante A5120.16 (Erweiterungsmodul EM064/EM256 mit U8001)
 
 Ein A5120 mit `A5120Machine::Config::em` (`core/cards/em/`, CPU-Primitive
