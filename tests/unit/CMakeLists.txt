@@ -218,6 +218,10 @@ k1520_add_test(sector_space SRC filesystem/test_sector_space.cpp
 k1520_add_test(fs_catalog    SRC filesystem/test_fs_catalog.cpp
                              LIBS k1520_fs LABELS "${_lbl}"
                              DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
+# Aliase in Format-/Profilkatalog (Entwurf 46, Waechter W3) + eingefrorene Altnamenliste
+k1520_add_test(katalog_alias SRC filesystem/test_katalog_alias.cpp
+                             LIBS k1520_fs LABELS "${_lbl}"
+                             DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
 k1520_add_test(geometry_probe SRC filesystem/test_geometry_probe.cpp
                               LIBS k1520_fs LABELS "${_lbl}"
                               DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")

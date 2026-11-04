@@ -426,6 +426,32 @@ FsCatalog FsCatalog::load(const std::vector<std::string>& paths,
         }
     }
 
+    // Aliase pruefen (nach allen Dateien, ein User-Override kann Namen ersetzen): Alias gleich
+    // eigenem Namen, einem Profilnamen oder einem frueheren Alias wird gemeldet und verworfen.
+    {
+        std::vector<std::string> vergeben;
+        for (auto& p : cat.profiles_) {
+            std::vector<std::string> gut;
+            for (const auto& a : p.aliases) {
+                std::string grund;
+                if (a == p.name) grund = "ist der eigene Name";
+                else if (std::any_of(cat.profiles_.begin(), cat.profiles_.end(),
+                                     [&](const FsProfile& o) { return o.name == a; }))
+                    grund = "verdeckt ein Profil dieses Namens";
+                else if (std::find(vergeben.begin(), vergeben.end(), a) != vergeben.end())
+                    grund = "ist schon Alias eines anderen Profils";
+                if (!grund.empty()) {
+                    cat.issues_.push_back("Dateisystem '" + p.name + "': Alias '" + a
+                                          + "' verworfen - " + grund);
+                    continue;
+                }
+                vergeben.push_back(a);
+                gut.push_back(a);
+            }
+            p.aliases = std::move(gut);
+        }
+    }
+
     return cat;
 }
 

@@ -1,0 +1,35 @@
+# Test-EIGENER Katalog fuer FormatKatalogAlias.* / FsKatalogAlias.*: zwei Formate und zwei
+# Profile mit Aliasen (Vorbild: alte Namen vor einer Umbenennung).  Nicht der ausgelieferte Katalog.
+version: 1
+
+formats:
+  - name:    alias_neu_a
+    aliases: [alias_alt_a, alias_alt_a2]
+    drives:  [K5601]
+    encoding: mfm
+    tracks:
+      - { cyls: 0-79, heads: 0-1, sectors: 5, size: 1024 }
+
+  - name:    alias_neu_b
+    aliases: [alias_alt_b]
+    drives:  [K5601]
+    encoding: mfm
+    tracks:
+      - { cyls: 0-79, heads: 0-1, sectors: 16, size: 256 }
+
+filesystems:
+  - name:        fsalias_neu_a
+    aliases:     [fsalias_alt_a]
+    format:      alias_neu_a
+    type:        cpm
+    data_start:  { cyl: 0, head: 0 }
+    block_size:  2048
+    dir_entries: 128
+
+  - name:        fsalias_neu_b
+    aliases:     [fsalias_alt_b, fsalias_alt_b2]
+    format:      alias_neu_b
+    type:        cpm
+    data_start:  { cyl: 0, head: 0 }
+    block_size:  2048
+    dir_entries: 128

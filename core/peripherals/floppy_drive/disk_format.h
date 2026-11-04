@@ -83,6 +83,9 @@ struct TrackFormat {
 struct DiskFormat {
     std::string name;           ///< eindeutiger Katalogname (C-API, GUI, Tools)
     std::string description;    ///< Klartext fuer die GUI (leer erlaubt)
+    /// @brief Frueher gueltige Namen (YAML `aliases:`): loesen in @ref FormatCatalog::find auf
+    ///        dieses Format auf; `name` bleibt der echte Katalogname.  Nie in Namenslisten.
+    std::vector<std::string> aliases;
 
     /// @brief Namen der kompatiblen DriveProfile (§8.4) — **abschliessend**, keine Heuristik.
     std::vector<std::string> drives;

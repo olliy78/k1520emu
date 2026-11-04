@@ -111,7 +111,7 @@ bool buildFormat(const yaml::Node& node, DiskFormat& out, std::string& why,
     const std::string where = file + ":" + std::to_string(node.line);
     collectUnknownKeys(node,
                        {"name", "description", "drives", "default_for",
-                        "encoding", "containers", "step", "rate", "rpm", "tracks"},
+                        "encoding", "containers", "step", "rate", "rpm", "tracks", "aliases"},
                        where, issues);
 
     // ── name (Pflicht) ──
@@ -123,6 +123,11 @@ bool buildFormat(const yaml::Node& node, DiskFormat& out, std::string& why,
     if (const yaml::Node* n = node.find("description")) {
         if (!n->isScalar()) { why = "'description' muss ein Text sein"; return false; }
         out.description = n->scalar;
+    }
+
+    if (const yaml::Node* n = node.find("aliases")) {
+        if (!stringList(*n, out.aliases))
+            { why = "'aliases' muss eine Liste von Namen sein"; return false; }
     }
 
     // ── drives (Pflicht) ──
@@ -525,6 +530,33 @@ FormatCatalog FormatCatalog::load(const std::vector<std::string>& paths,
         }
     }
 
+    // Aliase pruefen (erst jetzt, weil ein User-Override Namen ersetzen kann): ein Alias
+    // gleich dem eigenen Namen, einem echten Katalognamen oder einem frueheren Alias wird
+    // gemeldet und verworfen — er darf nie ein Format verdecken.
+    {
+        std::vector<std::string> vergeben;
+        for (auto& f : cat.formats_) {
+            std::vector<std::string> gut;
+            for (const auto& a : f.aliases) {
+                std::string grund;
+                if (a == f.name) grund = "ist der eigene Name";
+                else if (std::any_of(cat.formats_.begin(), cat.formats_.end(),
+                                     [&](const DiskFormat& o) { return o.name == a; }))
+                    grund = "verdeckt ein Format dieses Namens";
+                else if (std::find(vergeben.begin(), vergeben.end(), a) != vergeben.end())
+                    grund = "ist schon Alias eines anderen Formats";
+                if (!grund.empty()) {
+                    cat.issues_.push_back("Format '" + f.name + "': Alias '" + a
+                                          + "' verworfen - " + grund);
+                    continue;
+                }
+                vergeben.push_back(a);
+                gut.push_back(a);
+            }
+            f.aliases = std::move(gut);
+        }
+    }
+
     if (cat.sources_.empty()) {
         if (fatal_error) {
             std::ostringstream os;
@@ -554,6 +586,9 @@ FormatCatalog FormatCatalog::load(const std::vector<std::string>& paths,
 const DiskFormat* FormatCatalog::find(const std::string& name) const {
     for (const auto& f : formats_)
         if (f.name == name) return &f;
+    // Alte Namen: erst nach allen echten Namen, damit ein Alias nie ein Format verdeckt.
+    for (const auto& f : formats_)
+        if (std::find(f.aliases.begin(), f.aliases.end(), name) != f.aliases.end()) return &f;
     return nullptr;
 }
 
