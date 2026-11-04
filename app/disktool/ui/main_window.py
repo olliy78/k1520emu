@@ -2359,7 +2359,17 @@ class MainWindow(QMainWindow):
                 text="Geänderte Spuren werden geschrieben und zurückgelesen…")
             if fehler is not None:
                 if not self._pruefe_defekte():
-                    self._fehler("Speichern", str(fehler))
+                    # Die Schadstelle kann schon gemeldet sein (Zeitgeber-Tick waehrend
+                    # des Wartens): dann ist "nichts Neues" kein Grund, den Schaden
+                    # als allgemeinen Fehler zu zeigen.  Eine bekannte Schadstelle
+                    # bekommt immer die Warnung samt Ausweg "neu beschreiben".
+                    bekannt = sitzung.defect_tracks
+                    if bekannt:
+                        QMessageBox.warning(
+                            self, "Schreibfehler",
+                            sitzung.defekt_meldung(bekannt, str(fehler)))
+                    else:
+                        self._fehler("Speichern", str(fehler))
                 return False
             self._pruefe_defekte()
             self._reload()
