@@ -4,7 +4,7 @@
 tool:   k1520disktool
 disk:   sios1526_dp1.hfe
 run:    ls -l %DISK%
-expect: sios_ss40 (erkannt)
+expect: sios_ss40_26x128 (erkannt)
 expect: MWD051
 expect: BOE 01001 EOE 37026 EOD 38001
 expect: PHASELB/CATM

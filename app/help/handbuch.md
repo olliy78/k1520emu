@@ -984,10 +984,10 @@ Sektorfolge, zwei defekte Spuren (leer lassen) und „INIT ALL" (`Y`); am Ende s
   hinaus wieder (`DIDI` zeigt die Sätze), und das DiskTool liest dieselben Bytes.
 * **Menüpunkt `2  DOUBLE DENSITY, DOUBLE TRACKS`** (INIT V 1.4): die `2` gehört an das **Menü** hinter `5,25" DISKETTE`
   (erst ET1 für die Überschrift, dann `2`, ET1) — nicht an die Frage nach 8″, dort ergibt sie `ERR 90`. Das Ergebnis
-  ist eine echte **80-Zylinder-Diskette** (Spuren 01…76); das DiskTool erkennt sie als `sios_ss80`.
+  ist eine echte **80-Zylinder-Diskette** (Spuren 01…76); das DiskTool erkennt sie als `sios_ss80_26x128`.
 * Eine **40-Zylinder-Leerdiskette** im K5601 bekommt Halbspuren: INIT meldet `ERR 9B  > 2 DEFEKTIV TRACKS`.
   40-Spur-Ziele gehören in ein **K5600.10**.
-* **Empfehlung für Datendisketten:** mit dem DiskTool anlegen (`k1520disktool create neu.hfe --fs sios_ss40 --label NAME`,
+* **Empfehlung für Datendisketten:** mit dem DiskTool anlegen (`k1520disktool create neu.hfe --fs sios_ss40_26x128 --label NAME`,
   Dateien mit `put`). SIOS im K5601 sieht eine so angelegte Datei: `DIDI` (Device 6 für Laufwerk C:, Form `A`, Name der Datei)
   zeigt ihren Kennsatz (`HDR1 …`). **Sätze anzeigen:** nach dem Namen die **Satznummer fünfstellig** eintragen (`00001`; ein
   kurzes `1` wird nicht angenommen und das Feld bleibt stehen), ET1; die Frage `CHECK` mit ET1 bestätigen, jedes weitere ET1 zeigt
@@ -1075,14 +1075,14 @@ E/A 90H–97H) ist **nicht modelliert**, **IFSS** sendet auf SIO A32 Kanal A (St
 Gerät), mit der **K7636** ist X4 frei und erscheint in *Einstellungen ▸ Schnittstellen* als vierter Anschluss „IFSS Zusatzkanal“. Das Gerät **K7634** (Tastatur) gibt es im
 Emulator nicht; K7023 (1K-Bildschirm) wählen Sie in *Einstellungen ▸ Allgemein ▸ Bildschirmkarte*. Systemdisketten mit
 **128-Byte-Sektoren** (Lade-ROM V0.6): mit den K5600.10-Laufwerken `FORMAT20` Eintrag `1`, `SELDSK20` B auf Typ 1/Format 1,
-`MSYSG20` mit Format `1` — bootet. Das DiskTool erkennt sie als `microdos128` (lesen, schreiben, prüfen; ein Bootabbild lässt sich
+`MSYSG20` mit Format `1` — bootet. Das DiskTool erkennt sie als `microdos_ss40_26x128_boot` (lesen, schreiben, prüfen; ein Bootabbild lässt sich
 herausholen und auf eine neue Diskette schreiben: *Neue Diskette ▸ Bootdiskette*). `FORMAT20` für den 8″-Antrieb MF 6400 Eintrag 3 (8 × 1024 B) meldet `Defekte Spuren !`: Spur 0
 wird immer in FM formatiert und passt in dieser Größe nicht auf eine Umdrehung.
 
 **Fallen.** `PIP.COM` der Sammlung ist abgeschnitten (4096 statt rund 7,9 KB) und läuft ins Leere — nutzen Sie `DIP`
 (`DIP B:=A:DATEI.COM`; mit nur *einem* Zielnamen wartet es danach auf `Load System Disk on Drive A:, then Type (cr)`:
 Return). `D B:` auf unformatierter Diskette meldet `Bdos error on B:` — mit `N` quittieren. Das Dateisystem kennt
-das DiskTool (Profile `microdos800`, `microdos200`); die Systemdatei liegt an festen Sektoren.
+das DiskTool (Profile `microdos_ds80_5x1024_boot`, `microdos_ss40_5x1024_boot`); die Systemdatei liegt an festen Sektoren.
 
 ## MicroDOS 1715 (PC 1715)
 
@@ -1104,7 +1104,7 @@ wählen (je eine Taste, ohne Return), die Warnung mit `Y` bestätigen und `FORMA
 **die Maschine neu starten**, nicht Strg+C. Danach `MSYSG15A`: Bildschirm `2`, Drucker `2`, Laufwerk `A` Einheit `1` Format `4`, `J`,
 Laufwerk `B` Einheit `2` Format `4`, `N`, Ziel `B`. Auf B: steht dann `MICRODOS.SYS`, die Diskette bootet allein.
 
-Das DiskTool kennt das Dateisystem als `microdos1715`; unter *Neue Diskette* entsteht sie mit dem Bootabbild „MicroDOS 1715“ auch ohne Emulator.
+Das DiskTool kennt das Dateisystem als `microdos1715_ds80_5x1024_boot`; unter *Neue Diskette* entsteht sie mit dem Bootabbild „MicroDOS 1715“ auch ohne Emulator.
 
 ## MUTOS 8000 (A5120.16)
 
@@ -1214,11 +1214,11 @@ Datendiskette gilt: 494 Blöcke, K5601 = MFM.
 
 Unter MUTOS selbst kann man nicht formatieren, nur `mkfs`.
 
-**Mit dem DiskTool** (Menü *Werkzeuge*): *Datei ▸ Neue Diskette* mit dem Dateisystem **`mutos8k_26x128_mfm`** (K5601; `mutos8k_26x128_fm`
+**Mit dem DiskTool** (Menü *Werkzeuge*): *Datei ▸ Neue Diskette* mit dem Dateisystem **`mutos8k_ss77_26x128`** (K5601; `mutos8k_fm_ss77_26x128`
 für MF3200) legt eine fertig formatierte Datendiskette samt Dateisystem an; Dateien holt und schreibt man wie bei jeder
 anderen Diskette (*Datei ▸ Abbild öffnen*). Auf der Kommandozeile:
 
-    k1520disktool create neu.hfe --fs mutos8k_26x128_mfm --blocks 494
+    k1520disktool create neu.hfe --fs mutos8k_ss77_26x128 --blocks 494
     k1520disktool put neu.hfe datei.txt
     k1520disktool ls -l neu.hfe
 
@@ -1263,8 +1263,8 @@ einhängen). Die Wurzel auch als **Arbeitsplatz** knapp halten — `tar … | dd
 mindestens etwa 10 freie Blöcke (`no space on dev 4/2` heißt: Wurzel voll).
 
 **Eine Diskette schreiben, listen, auspacken.** Beispiel: `usr` in A: (nach `/usr` eingehängt), eine leere
-formatierte Diskette in B: (Laufwerkskasten *Leere Diskette* — ein `.hfe` mit Format *udos_ss77*, oder im DiskTool
-*Neue Diskette* mit `tar_mutos8k_26x128_mfm_leer`; beides geht):
+formatierte Diskette in B: (Laufwerkskasten *Leere Diskette* — ein `.hfe` mit Format *udos_ss77_26x128*, oder im DiskTool
+*Neue Diskette* mit `tar_ss77_26x128_leer`; beides geht):
 
     # cd /usr
     # tar cvf /dev/rrk1 include lib/crt0.o
@@ -1310,13 +1310,13 @@ Disketten (`… | tar tvf -`) läuft ohne Fehler, dauert aber mehrere Milliarden
 Gibt man eine **einzelne** Satzdiskette an `tar tvf`, endet die Liste mit `err on dev 13/0 … er=0,305` und
 `Tar: tape read error`: sie ist kein abgeschlossenes Archiv, der Inhalt davor ist vollständig.
 
-**Im DiskTool.** Eine so geschriebene Diskette erkennt das DiskTool als **`tar_mutos8k_26x128_mfm`**
+**Im DiskTool.** Eine so geschriebene Diskette erkennt das DiskTool als **`tar_ss77_26x128`**
 (MF3200: `…_fm`) und öffnet mehrere Disketten eines Satzes mit **Datei ▸ tar-Satz öffnen…** als EINEN Strom.
 Auf der Kommandozeile:
 
     k1520disktool tar-satz v1.hfe v2.hfe -l          # Dateiliste des Satzes
     k1520disktool tar-satz v1.hfe v2.hfe --to ordner # alles herausholen
-    k1520disktool tar-satz-neu --format tar_mutos8k_26x128_mfm satz.hfe --put datei1 --put ordner
+    k1520disktool tar-satz-neu --format tar_ss77_26x128 satz.hfe --put datei1 --put ordner
 
 Das DiskTool **schreibt** diese Disketten ebenfalls (Dateien hinzufügen, löschen, über eine Diskette hinaus als
 Satz speichern); MUTOS liest das Ergebnis mit `tar tvf`/`tar xvf` bzw. der `dd`-Pipeline. Der Weg ist also in
@@ -1325,7 +1325,7 @@ beiden Richtungen offen: Dateien vom PC auf eine tar-Diskette und von dort nach 
 **Das zweite Sektorformat, 8 × 512 (DISK-Satz).** Mit der Ladediskette `a5120_mutos8000_boot_udos_k5601_8x512.hfe`
 arbeitet MUTOS mit 8 Sektoren zu 512 Byte. Die tar-Diskette trägt dann **608 Blöcke = 311 296 Byte**; die Blöcke
 liegen **linear** ab Zylinder 1 (Block n auf Zylinder 1 + n/8, Sektor n mod 8 + 1), ohne Verschränkung. Das DiskTool
-kennt sie als **`tar_mutos8k_8x512_mfm`** (leer: `…_leer`). Über das Ende hinaus meldet `tar` hier sauber
+kennt sie als **`tar_ss77_8x512`** (leer: `…_leer`). Über das Ende hinaus meldet `tar` hier sauber
 `Tar: tape write error` (statt zu hängen). Der Ablauf ist derselbe; mit der Satzbestückung
 Ladediskette in A:, **`…_cmd_8x512.hfe` in B:** (`/mnt`), **`…_root_8x512.hfe` in C:**, D: leer (nach dem Start
 nimmt man die Ladediskette aus A: und legt dort die tar-Diskette ein):
@@ -2851,10 +2851,10 @@ Projekt über `tools/dev.sh tool k1520disktool …`) erkennt die Disketten selbs
 
     $ k1520disktool info wega_fs.hfe
     Format:      k5601_9x512
-    Dateisystem: wega720
+    Dateisystem: wega_ds80_9x512
     Datentraeger: 2 Dateien, 7 KB belegt, 683 KB frei
     $ k1520disktool info tar_a.hfe
-    Dateisystem: tar720
+    Dateisystem: tar_ds80_9x512
 
     $ k1520disktool ls -l wega_fs.hfe
     -rw-rw-rw-   1     0     0       15 1989-05-30 18:56 hallo.txt
@@ -2884,7 +2884,7 @@ unverändert heraus; jede Diskette ist 737 280 Byte lang:
     $ k1520disktool tar-export tar_b.hfe teil_b.tar
 
 **In der Oberfläche (GUI):** `Datei ▸ Abbild öffnen` (`Strg+O`) — oder die `.hfe` auf das Fenster ziehen. Im
-Kopf steht das erkannte Dateisystem (`wega720` bzw. `tar720`); links die Dateien mit Modus, Besitzer und Zeit.
+Kopf steht das erkannte Dateisystem (`wega_ds80_9x512` bzw. `tar_ds80_9x512`); links die Dateien mit Modus, Besitzer und Zeit.
 Dateien markieren und mit `→|` in den Ordner rechts holen. Ein Mehrdisketten-Archiv öffnet `Datei ▸ tar-Satz
 öffnen…`, die `tar`-Datei einer einzelnen Diskette entsteht mit `Diskette ▸ Diskette als .tar exportieren…`.
 Ausführlich: Handbuch des DiskTool, Abschnitt *tar-Archive herausholen, bearbeiten und zurückschreiben*.
@@ -2945,7 +2945,7 @@ es täte). Das Zerschneiden mit `split` ist dafür nicht mehr nötig:
       teil2.hfe
     gespeichert: 2 Abbild(er)
 
-Passt das Archiv auf EINE Diskette, genügt `create teil.hfe --fs tar720_leer` und `tar-put teil.hfe alles.tar`
+Passt das Archiv auf EINE Diskette, genügt `create teil.hfe --fs tar_ds80_9x512_leer` und `tar-put teil.hfe alles.tar`
 (die Datei wird das Archiv der leeren Diskette; die Diskette bleibt danach bearbeitbar). In der GUI:
 `Datei ▸ Neue tar-Diskette / tar-Satz…` (Art *Satz*, Format 720K), die `.tar` auf die Diskettenansicht ziehen und
 *Ist ein fertiger tar-Container* wählen, dann speichern.

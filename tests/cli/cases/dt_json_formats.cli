@@ -2,7 +2,7 @@
 tool:   k1520disktool
 disk_path: /dev/null
 run:    formats --json
-expect: "name":"cpa780"
+expect: "name":"cpa_ds80_5x1024_boot"
 expect: "type":"udos"
 expect: "format":"ds80_16x256"
 exit:   0

@@ -18,7 +18,7 @@ pytestmark = requires_core
 def _placeholder(emu):
     """Selbstbeschreibende Container brauchen im Kern trotzdem einen Katalognamen."""
     formate = emu.drive_formats(0)
-    return formate[0] if formate else "cpa800"
+    return formate[0] if formate else "ds80_5x1024"
 
 
 @pytest.fixture

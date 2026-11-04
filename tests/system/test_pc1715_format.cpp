@@ -56,7 +56,7 @@ void taste(Pc1715Machine& m, char c) { tippe(m, std::string(1, c)); }
  * @brief SCP 1715 V0007: `INIT` → Laufwerk B → Format 3 (DD-DS 16 × 256 × 80) → `Y` → alle
  *        Spuren, „FORMATTING COMPLETE“ ohne „ERROR“.  Danach schreibt der Gast mit dem
  *        CCP-Kommando `SAVE 2 B:SAVED.COM` (V0007 hat kein PIP) und liest mit `DIR B:`;
- *        das DiskTool erkennt `scpx640`, findet SAVED.COM und bringt PROBE.TXT ein, die
+ *        das DiskTool erkennt `scpx_ds80_16x256_boot`, findet SAVED.COM und bringt PROBE.TXT ein, die
  *        eine frisch gebootete Maschine mit `DIR B:` sieht.
  *
  * **Bedienpause vor `Y` (AP-5d, Gastverhalten, kein Emulatorfehler):** das SCP-BIOS zaehlt
@@ -118,7 +118,7 @@ TEST(Pc1715Format, Scp1715InitFormatiertB) {
         auto dv = DiskVolume::open(b.path(), "", k.formate, k.fs, err, /*read_only=*/false);
         ASSERT_NE(dv, nullptr) << err;
         ASSERT_TRUE(dv->hasFileSystem()) << dv->detection().remarks;
-        EXPECT_EQ(dv->detection().filesystem, "scpx640") << dv->detection().remarks;
+        EXPECT_EQ(dv->detection().filesystem, "scpx_ds80_16x256_boot") << dv->detection().remarks;
         bool gefunden = false;
         for (const auto& e : dv->list()) gefunden |= (e.name.find("SAVED") != std::string::npos);
         EXPECT_TRUE(gefunden);
@@ -212,7 +212,7 @@ TEST(Pc1715Format, Cpa1715FormatpxFormatiertBUndPipKopiert) {
  * @brief UDOS 1715 (AP-5d): `FORMAT` → Drive `1` → 80 Spuren `J` → doppelseitig `J` →
  *        Disk-ID `TEST` → Systemdisk `N` → Bereit `J` (jede Antwort mit Return) auf einer
  *        echten Leerdiskette, alle 80 Zylinder mit Kontrolllesen, zurueck am `%`.  Danach
- *        `COPY TERMINE 1/TERMINE` und `CAT D=1`; das DiskTool erkennt `udos1715`, findet
+ *        `COPY TERMINE 1/TERMINE` und `CAT D=1`; das DiskTool erkennt `udos1715_ds80_16x256`, findet
  *        TERMINE, die Vollpruefung ist ohne Befund.
  *
  * Bedienung aus `HELP FORMAT` des Systems.  Die Leerdiskette in B: meldet UDOS beim Start
@@ -263,7 +263,7 @@ TEST(Pc1715Format, Udos1715FormatiertBUndKopiert) {
     auto dv = DiskVolume::open(b.path(), "", k.formate, k.fs, err);
     ASSERT_NE(dv, nullptr) << err;
     ASSERT_TRUE(dv->hasFileSystem()) << dv->detection().remarks;
-    EXPECT_EQ(dv->detection().filesystem, "udos1715") << dv->detection().remarks;
+    EXPECT_EQ(dv->detection().filesystem, "udos1715_ds80_16x256") << dv->detection().remarks;
     bool gefunden = false;
     for (const auto& e : dv->list()) gefunden |= (e.name == "TERMINE");
     EXPECT_TRUE(gefunden);

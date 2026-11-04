@@ -91,7 +91,7 @@ def bauen(tool, geraet, ausgabe):
     with tempfile.TemporaryDirectory() as tmp:
         quelle = os.path.join(tmp, 'q')
         _sammeln(geraet, quelle)
-        _lauf(tool, 'create', ziel, '--fs', 'udos_ds77', '--label', label,
+        _lauf(tool, 'create', ziel, '--fs', 'udos_ds77_26x128', '--label', label,
               '--boot', _bootabbild(geraet),
               '--prg', geraet)
         _lauf(tool, 'put', ziel, quelle, '--no-backup')

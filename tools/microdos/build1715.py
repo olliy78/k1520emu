@@ -9,7 +9,7 @@ build1715.py  -  die MicroDOS-1715-Systemdiskette bauen
 MicroDOS 1715 (PC 1715, K5601: 80 Spuren, 2 Seiten, 5 x 1024 B).  Das Bootabbild
 `data/bootsektoren/boot_microdos_1715.bin` ist der 128-B-Bootkopf (Verzeichnisplaetze 0-3) PLUS die
 Systemdatei MICRODOS.SYS (14 336 B, die erste Datei der Diskette - der Urlader liest sie von den ersten
-Datenbloecken).  `create --fs microdos1715 --boot` legt beides in einem Zug an; danach kommen die
+Datenbloecken).  `create --fs microdos1715_ds80_5x1024_boot --boot` legt beides in einem Zug an; danach kommen die
 Hilfsprogramme aus `inhalt1715/` (Herkunft: Originaldiskette MicroDOS1715.hfe der Sammlung Rostock/DL,
 unveraendert) und das LIESMICH.TXT.
 
@@ -77,7 +77,7 @@ def bauen(tool, ausgabe):
         for n, d in soll().items():
             with open(os.path.join(quelle, n), 'wb') as f:
                 f.write(d)
-        _lauf(tool, 'create', ziel, '--fs', 'microdos1715', '--boot', BOOT)    # Kopf + MICRODOS.SYS
+        _lauf(tool, 'create', ziel, '--fs', 'microdos1715_ds80_5x1024_boot', '--boot', BOOT)    # Kopf + MICRODOS.SYS
         _lauf(tool, 'put', ziel, quelle, '--no-backup')
     pruefung = _lauf(tool, 'check', ziel, '--full')
     if 'ohne Befund' not in pruefung:

@@ -1,6 +1,6 @@
 """H4 — FORMAT mit Vergleichs-Lesen, Systeminstallation und Kaltstart auf der ECHTEN Diskette.
 
-H4a: die Anwenderkette ueber die ganze Diskette (cpa780).
+H4a: die Anwenderkette ueber die ganze Diskette (cpa_ds80_5x1024_boot).
 H4m: die Format-Matrix von format_all.py (K5601 80 DS + Geometrien S/T/U/V/W =
      einseitig / 40 Spuren im Doppelschritt, Kompatibilitaet zu K5600.10/.20), je Format
      Smoke bis Spur 2.  Orakel: dasselbe Skript gegen eine LEERE Abbilddatei; der

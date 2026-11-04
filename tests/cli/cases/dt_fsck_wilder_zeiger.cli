@@ -12,8 +12,8 @@
 tool:   k1520disktool
 disk:   cpa_cpa780_k5601_noclock.img
 poke:   %DISK% 3b30 f00f
-setup_run: fsck %DISK% --fs cpa780 --repair
-run:    fsck %DISK% --fs cpa780 --repair=alle
+setup_run: fsck %DISK% --fs cpa_ds80_5x1024_boot --repair
+run:    fsck %DISK% --fs cpa_ds80_5x1024_boot --repair=alle
 expect: cpm.block.ausserhalb
 expect: cpm.zeiger.streichen
 expect: 1 Reparatur(en) ausgefuehrt

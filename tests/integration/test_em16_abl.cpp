@@ -60,7 +60,7 @@ const char*         kPause       = "-- weiter mit Taste";
     std::string f;
     static FormatCatalog fk = FormatCatalog::loadDefault(&f);
     static FsCatalog     fs = FsCatalog::loadDefault(fk, &f);
-    const FsProfile*  p  = fs.find("cpa780");
+    const FsProfile*  p  = fs.find("cpa_ds80_5x1024_boot");
     const DiskFormat* df = fk.find(p->format);
     auto disk = DiskImage::open(pfad, std::optional<DiskFormat>(*df), false);
     if (!disk) return ::testing::AssertionFailure() << "Abbild nicht ladbar";
@@ -213,7 +213,7 @@ namespace {
     std::string e;
     static FormatCatalog fk = FormatCatalog::loadDefault(&e);
     static FsCatalog     fs = FsCatalog::loadDefault(fk, &e);
-    const FsProfile*  p  = fs.find("cpa780");
+    const FsProfile*  p  = fs.find("cpa_ds80_5x1024_boot");
     const DiskFormat* df = fk.find(p->format);
     auto img = DiskImage::open(pfad, std::optional<DiskFormat>(*df), false);
     if (!img) return ::testing::AssertionFailure() << "Abbild nicht ladbar";

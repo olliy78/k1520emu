@@ -56,7 +56,7 @@ const FsCatalog& dateisysteme() {
 /// gelesenen Dateien auf Seite 1 an — `CAT` meldet „DRIVE 4“).
 std::vector<uint8_t> holeDatei(const std::string& abbild, const std::string& name, int seite = 0) {
     std::string err;
-    auto dv = DiskVolume::open(abbild, "udos_ds77", formate(), dateisysteme(), err);
+    auto dv = DiskVolume::open(abbild, "udos_ds77_26x128", formate(), dateisysteme(), err);
     EXPECT_NE(dv, nullptr) << err;
     if (!dv) return {};
     const std::string ziel = k1520test::tempPath("k1520_lochband_datei.bin");

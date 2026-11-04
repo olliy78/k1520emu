@@ -188,7 +188,7 @@ def test_alte_formatnamen_werden_beim_laden_auf_die_neuen_umgeschrieben(tmp_path
     p.write_text(
         "version: 1\n"
         "disks:\n"
-        "  - {drive: 0, path: a.hfe, format: cpa780, write_protect: false}\n"
+        "  - {drive: 0, path: a.hfe, format: ds80_3t26x128-5x1024, write_protect: false}\n"
         "  - {drive: 1, path: b.hfe, format: cpa640, write_protect: true}\n"
         "  - {drive: 2, path: c.hfe, format: scpx780_b}\n"
         "  - {drive: 3, path: d.img, format: ds80_5x1024}\n"

@@ -6,7 +6,7 @@ build.py  -  die UDOS-Systemdiskette des A5120 (mit Entwicklerwerkzeugen) aus EI
 
   disks/a5120_udos43_k5601_entwickler.hfe
 
-Startfaehige UDOS-4.3-Diskette fuer den A5120 (K5601, beidseitig, `udos_ds77`).  Sie vereint
+Startfaehige UDOS-4.3-Diskette fuer den A5120 (K5601, beidseitig, `udos_ds77_26x128`).  Sie vereint
 
   * den A5120-Bestand der Altdiskette `udos_boot_scp.hfe` (UDOS BC.5120, 08/90: OS, ZDOS, Kommandos,
     TAST/KEYS, SD, Druckertreiber, HELP) und
@@ -92,7 +92,7 @@ def bauen(tool, geraet, ausgabe):
     with tempfile.TemporaryDirectory() as tmp:
         quelle = os.path.join(tmp, 'q')
         _sammeln(geraet, quelle)
-        _lauf(tool, 'create', ziel, '--fs', 'udos_ds77', '--label', label,
+        _lauf(tool, 'create', ziel, '--fs', 'udos_ds77_26x128', '--label', label,
               '--boot', BOOT)
         _lauf(tool, 'put', ziel, quelle, '--no-backup')
     pruefung = _lauf(tool, 'check', ziel, '--full')

@@ -119,7 +119,7 @@ TEST(Scp1700, WirdOhneVorgabeErkannt) {
     auto dv = oeffne(fixture(kFixture), err);
     ASSERT_TRUE(dv) << err;
     EXPECT_EQ(dv->detection().format,     "ds80_1t16x128fm-16x256");
-    EXPECT_EQ(dv->detection().filesystem, "scp1700");
+    EXPECT_EQ(dv->detection().filesystem, "scp1700_ds80_16x256_boot");
     EXPECT_EQ(dv->volumeCount(), 1) << "eine CP/M-86-Diskette ist EIN Dateisystem";
 }
 
@@ -321,7 +321,7 @@ TEST(Scp1700, SchreibenUndZurueckschreibenBleibtLesbar) {
     auto neu = oeffne(kopie.pfad(), err);
     ASSERT_TRUE(neu) << err;
     EXPECT_EQ(neu->detection().format,     "ds80_1t16x128fm-16x256");
-    EXPECT_EQ(neu->detection().filesystem, "scp1700");
+    EXPECT_EQ(neu->detection().filesystem, "scp1700_ds80_16x256_boot");
 
     const std::vector<FileEntry> dateien = neu->list();
     EXPECT_EQ(dateien.size(), 46u) << "eine geloescht, eine geschrieben";

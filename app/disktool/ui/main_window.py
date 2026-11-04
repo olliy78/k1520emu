@@ -130,8 +130,8 @@ class _AblageFilter(QObject):
 def neu_eintraege():
     """(Name, Beschriftung) fuer „Neue Diskette": Katalogname plus Beschreibung.
 
-    Der blosse Name (`osm800`) sagt dem Anwender nichts; die Beschreibung des
-    Katalogs („OS/M (P8000) 800K, Format 7 ...") steht dabei.  tar720 mit Inhalt
+    Der blosse Name (`osm_ds80_5x1024_boot`) sagt dem Anwender nichts; die Beschreibung des
+    Katalogs („OS/M (P8000) 800K, Format 7 ...") steht dabei.  tar_ds80_9x512 mit Inhalt
     laesst sich nicht anlegen - angeboten wird nur die LEERE tar-Diskette.  SIOS (``sios``)
     wird seit Arbeitspaket D4 als leere Datendiskette angeboten (ohne Systemlader).
     """
@@ -677,7 +677,7 @@ class MainWindow(QMainWindow):
         self.act_neuer_ordner.setEnabled(self.folder_view.folder is not None)
         self.act_umbenennen.setEnabled(self.folder_view.umbenennbar() is not None)
 
-        # Systemspuren gibt es nicht ueberall — eine Datendiskette (cpa800) beginnt
+        # Systemspuren gibt es nicht ueberall — eine Datendiskette (cpa_ds80_5x1024_daten) beginnt
         # auf Zylinder 0 und hat nichts zu sichern.
         self.act_bootabbild.setEnabled(mit_fs and not ist_platte(self.tool)
                                        and self.tool.boot_area_size(0) > 0)
@@ -1222,7 +1222,7 @@ class MainWindow(QMainWindow):
         self._medium_meldungen()
         if self.tool.remarks:
             # Der Streifen kuerzt und verschwindet; das Protokoll behaelt den vollen
-            # Wortlaut (z. B. „ebenso gut osm800 ... --fs osm800" auf einer leeren 800K).
+            # Wortlaut (z. B. „ebenso gut osm_ds80_5x1024_boot ... --fs osm_ds80_5x1024_boot" auf einer leeren 800K).
             self.log_dock.append("Medium: " + self.tool.remarks.strip())
         if not self.tool.has_filesystem:
             self._roh_melden()
@@ -2727,7 +2727,7 @@ class MainWindow(QMainWindow):
     def _neu_dialog(self) -> None:
         if not self._darf_verwerfen():
             return
-        # tar720 (mit Inhalt) laesst sich nicht anlegen — angeboten wird die LEERE tar-Diskette.
+        # tar_ds80_9x512 (mit Inhalt) laesst sich nicht anlegen — angeboten wird die LEERE tar-Diskette.
         eintraege = neu_eintraege()
         # Hinterlegte Bootabbilder (bootsektor.yaml, Ticket #25); was nicht taugt, steht im Protokoll.
         abbilder, warnungen = bootsektoren.brauchbare(

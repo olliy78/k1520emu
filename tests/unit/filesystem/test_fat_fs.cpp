@@ -64,7 +64,7 @@ struct Diskette {
     std::string pfad;
     std::string profil;
 
-    explicit Diskette(const std::string& profilName = "dos720", const std::string& label = "TEST") {
+    explicit Diskette(const std::string& profilName = "dos_ds80_9x512", const std::string& label = "TEST") {
         profil = profilName;
         const FsProfile* p = dateisysteme().find(profilName);
         EXPECT_TRUE(p) << profilName;
@@ -154,7 +154,7 @@ TEST(FatFs, StandardBpbDerNormgroessen) {
 }
 
 TEST(FatFs, FormatiertAlleProfileUndMountetSieWieder) {
-    for (const char* name : {"dos160", "dos180", "dos320", "dos360", "dos360ss80", "dos640", "dos720", "dos800", "dos1200", "dos1440", "dos2880"}) {
+    for (const char* name : {"dos_ss40_8x512", "dos_ss40_9x512", "dos_ds40_8x512", "dos_ds40_9x512", "dos_ss80_9x512", "dos_ds80_8x512", "dos_ds80_9x512", "dos_ds80_10x512", "dos_ds80_15x512_hd", "dos_ds80_18x512_hd", "dos_ds80_36x512_ed"}) {
         Diskette d(name, "PRUEFUNG");
         ASSERT_TRUE(d.fat) << name;
         const FsInfo i = d.fat->info();
@@ -175,7 +175,7 @@ TEST(FatFs, FormatiertAlleProfileUndMountetSieWieder) {
 
 TEST(FatFs, ErkenntKeinCpmUndKeineLeereDiskette) {
     // Eine ganz mit 0xE5 gefuellte Diskette (frisch formatiertes CP/M) ist kein FAT.
-    Diskette d("dos720");
+    Diskette d("dos_ds80_9x512");
     ASSERT_TRUE(d.fat);
     const std::vector<uint8_t> e5(512, 0xE5);
     for (uint64_t o = 0; o < 20 * 512; o += 512) ASSERT_TRUE(d.raum->write(o, e5.data(), e5.size()));
@@ -237,7 +237,7 @@ TEST(FatFs, LoeschenGibtClusterFreiUndLoeschtNamenSpur) {
 }
 
 TEST(FatFs, EineVolleDisketteIstEineTransaktion) {
-    Diskette d("dos360");
+    Diskette d("dos_ds40_9x512");
     ASSERT_TRUE(d.fat);
     ASSERT_TRUE(d.fat->write("KLEIN.DAT", muster(1000), neu()));
     const std::vector<uint8_t> vorher = d.abzug();
@@ -249,7 +249,7 @@ TEST(FatFs, EineVolleDisketteIstEineTransaktion) {
 
 TEST(FatFs, DisketteBisZumLetztenClusterFuellen) {
     // Prueft die 12-Bit-Verpackung ueber die ganze FAT: gerade/ungerade Eintraege, letzte Cluster.
-    Diskette d("dos360");
+    Diskette d("dos_ds40_9x512");
     ASSERT_TRUE(d.fat);
     const uint32_t cb = d.fat->bpb().clusterBytes();
     const uint32_t frei = static_cast<uint32_t>(d.fat->info().free_bytes / cb);
@@ -339,7 +339,7 @@ TEST(FatFs, VerzeichnisWaechstUeberEinenClusterHinaus) {
 }
 
 TEST(FatFs, WurzelIstEndlichUndVollMeldetEs) {
-    Diskette d("dos160");        // 64 Eintraege in der Wurzel
+    Diskette d("dos_ss40_8x512");        // 64 Eintraege in der Wurzel
     ASSERT_TRUE(d.fat);
     int geschrieben = 0;
     for (int i = 0; i < 70; ++i) {
@@ -501,7 +501,7 @@ TEST(FatFs, OverwriteBehaeltAttributeSetztAberArchiv) {
 // ─── Platzpruefung ───────────────────────────────────────────────────────────
 
 TEST(FatFs, WouldFitRechnetClusterUndVerzeichnisse) {
-    Diskette d("dos360");
+    Diskette d("dos_ds40_9x512");
     ASSERT_TRUE(d.fat);
     const uint32_t cb = d.fat->bpb().clusterBytes();
     PlannedFile p; p.name = "A.DAT"; p.size = 3 * cb + 1;
@@ -656,7 +656,7 @@ TEST(FatFs, BootsektorMitBpbBehaeltCodeUndSetztDenBpbDerDiskette) {
     std::memcpy(&bild[3], "DCP  3.3", 8);
     for (int i = 0x36; i < 0x1E0; ++i) bild[static_cast<size_t>(i)] = static_cast<uint8_t>(i * 13);
     bild[510] = 0x55; bild[511] = 0xAA;
-    Diskette d("dos360");
+    Diskette d("dos_ds40_9x512");
     ASSERT_TRUE(d.fat);
     ASSERT_TRUE(d.fat->writeBootSector(bild)) << d.fat->lastError();
     std::vector<uint8_t> aus;
@@ -691,7 +691,7 @@ TEST(FatFs, BootsektorMitBpbLehntFremdesAb) {
 
 TEST(FatFs, LeseBpbloseDisketteAusDerMedienkennung) {
     // DOS 1.x/2.0: kein BPB im Bootsektor, nur die Medienkennung der FAT — 360K-Diskette
-    Diskette d("dos360");
+    Diskette d("dos_ds40_9x512");
     ASSERT_TRUE(d.fat);
     ASSERT_TRUE(d.fat->write("ALT.TXT", muster(700), neu(0)));
     std::vector<uint8_t> b;
@@ -709,7 +709,7 @@ TEST(FatFs, LeseBpbloseDisketteAusDerMedienkennung) {
 }
 
 TEST(FatFs, DatentraegernameSetzenUndLesen) {
-    Diskette d("dos720", "ERSTER");
+    Diskette d("dos_ds80_9x512", "ERSTER");
     ASSERT_TRUE(d.fat);
     EXPECT_EQ(d.fat->label(), "ERSTER");
     ASSERT_TRUE(d.fat->setLabel("zweiter"));
@@ -731,9 +731,9 @@ std::unique_ptr<DiskVolume> volume(const std::string& pfad, std::string& err, bo
 
 TEST(FatDiskVolume, AnlegenUndErkennenInAllenContainern) {
     struct F { const char* profil; const char* endung; };
-    const F faelle[] = {{"dos720", "img"}, {"dos720", "hfe"}, {"dos720", "dmk"}, {"dos360", "img"}, {"dos360", "hfe"},
-                        {"dos320", "img"}, {"dos640", "img"}, {"dos800", "img"}, {"dos160", "img"}, {"dos180", "hfe"},
-                        {"dos1440", "img"}, {"dos1200", "img"}, {"dos2880", "img"}, {"dos360ss80", "img"}};
+    const F faelle[] = {{"dos_ds80_9x512", "img"}, {"dos_ds80_9x512", "hfe"}, {"dos_ds80_9x512", "dmk"}, {"dos_ds40_9x512", "img"}, {"dos_ds40_9x512", "hfe"},
+                        {"dos_ds40_8x512", "img"}, {"dos_ds80_8x512", "img"}, {"dos_ds80_10x512", "img"}, {"dos_ss40_8x512", "img"}, {"dos_ss40_9x512", "hfe"},
+                        {"dos_ds80_18x512_hd", "img"}, {"dos_ds80_15x512_hd", "img"}, {"dos_ds80_36x512_ed", "img"}, {"dos_ss80_9x512", "img"}};
     for (const F& f : faelle) {
         const std::string pfad = k1520test::tempPath(std::string("k1520_test_fatvol_") + f.profil + "." + f.endung);
         std::string err;
@@ -767,7 +767,7 @@ TEST(FatDiskVolume, AnlegenUndErkennenInAllenContainern) {
 
 TEST(FatDiskVolume, ZweiGeometrienGleicherGroesseUnterscheidetDerBpb) {
     // 360K = 40x2x9 ODER 80x1x9: beide .img sind gleich gross, der BPB (Koepfe) entscheidet.
-    for (const char* profil : {"dos360", "dos360ss80", "dos320", "dos640", "dos800"}) {
+    for (const char* profil : {"dos_ds40_9x512", "dos_ss80_9x512", "dos_ds40_8x512", "dos_ds80_8x512", "dos_ds80_10x512"}) {
         const std::string pfad = k1520test::tempPath(std::string("k1520_test_fatvol_gleich_") + profil + ".img");
         std::string err;
         { auto v = DiskVolume::create(pfad, profil, "", formate(), dateisysteme(), err); ASSERT_TRUE(v) << profil << err; }
@@ -792,7 +792,7 @@ static void hfeKopf(const std::string& pfad, unsigned& rate, unsigned& rpm, unsi
 
 TEST(FatDiskVolume, HdRundlaufInAllenContainern) {
     struct F { const char* profil; unsigned rate_soll; unsigned rpm_soll; };
-    const F profile[] = {{"dos1440", 500, 300}, {"dos1200", 500, 360}};
+    const F profile[] = {{"dos_ds80_18x512_hd", 500, 300}, {"dos_ds80_15x512_hd", 500, 360}};
     for (const F& f : profile)
         for (const char* ext : {"img", "hfe", "dmk", "imd", "td0", "cqm"}) {
             const std::string was = std::string(f.profil) + "." + ext;
@@ -847,12 +847,12 @@ TEST(FatDiskVolume, HdRundlaufInAllenContainern) {
 
 TEST(FatDiskVolume, EdBleibtNurImg) {
     std::string err;
-    EXPECT_FALSE(DiskVolume::create(k1520test::tempPath("k1520_test_fat_ed.hfe"), "dos2880", "", formate(), dateisysteme(), err));
-    EXPECT_FALSE(DiskVolume::create(k1520test::tempPath("k1520_test_fat_ed.cqm"), "dos2880", "", formate(), dateisysteme(), err));
+    EXPECT_FALSE(DiskVolume::create(k1520test::tempPath("k1520_test_fat_ed.hfe"), "dos_ds80_36x512_ed", "", formate(), dateisysteme(), err));
+    EXPECT_FALSE(DiskVolume::create(k1520test::tempPath("k1520_test_fat_ed.cqm"), "dos_ds80_36x512_ed", "", formate(), dateisysteme(), err));
 }
 
 TEST(FatDiskVolume, HdSpurHatDieHochdichteUmdrehung) {
-    for (auto [profil, bytes] : {std::pair<const char*, size_t>{"dos1440", 12500}, {"dos1200", 10416}, {"dos720", 6250}}) {
+    for (auto [profil, bytes] : {std::pair<const char*, size_t>{"dos_ds80_18x512_hd", 12500}, {"dos_ds80_15x512_hd", 10416}, {"dos_ds80_9x512", 6250}}) {
         const DiskFormat* f = formate().find(dateisysteme().find(profil)->format);
         const std::string pfad = k1520test::tempPath(std::string("k1520_test_hd_umdr_") + profil + ".img");
         std::string grund;
@@ -881,7 +881,7 @@ TEST(FatDiskVolume, OrdnerEinfuegenUndAuspackenRundlauf) {
 
     const std::string img = (wurzel / "t.img").string();
     std::string err;
-    auto v = DiskVolume::create(img, "dos720", "RUNDLAUF", formate(), dateisysteme(), err);
+    auto v = DiskVolume::create(img, "dos_ds80_9x512", "RUNDLAUF", formate(), dateisysteme(), err);
     ASSERT_TRUE(v) << err;
     TransferOptions t;
     ASSERT_TRUE(v->insertAll((wurzel / "quelle").string(), t)) << v->lastError();
@@ -909,7 +909,7 @@ TEST(FatDiskVolume, SysUebertraegtBootsektorUndSystemdateienInReihenfolge) {
     const std::string ziel = k1520test::tempPath("k1520_test_fat_sys_ziel.img");
     std::string err;
     {
-        auto q = DiskVolume::create(quelle, "dos720", "SYSQUELLE", formate(), dateisysteme(), err);
+        auto q = DiskVolume::create(quelle, "dos_ds80_9x512", "SYSQUELLE", formate(), dateisysteme(), err);
         ASSERT_TRUE(q) << err;
         // ein DOS-artiger Bootsektor (Sprung 0x36, Name 'DCP  3.3')
         std::vector<uint8_t> bild(512, 0);
@@ -922,7 +922,7 @@ TEST(FatDiskVolume, SysUebertraegtBootsektorUndSystemdateienInReihenfolge) {
     }
     // Systemdateien und eine normale Datei einspielen (ueber die Kernschnittstelle des Dateisystems)
     {
-        const FsProfile* p = dateisysteme().find("dos720");
+        const FsProfile* p = dateisysteme().find("dos_ds80_9x512");
         const DiskFormat* fm = formate().find(p->format);
         auto img = DiskImage::open(quelle, *fm, false);
         ASSERT_TRUE(img);
@@ -938,7 +938,7 @@ TEST(FatDiskVolume, SysUebertraegtBootsektorUndSystemdateienInReihenfolge) {
         ASSERT_TRUE(img->flush());
     }
     {
-        auto z = DiskVolume::create(ziel, "dos360", "", formate(), dateisysteme(), err);
+        auto z = DiskVolume::create(ziel, "dos_ds40_9x512", "", formate(), dateisysteme(), err);
         ASSERT_TRUE(z) << err;
         auto q = volume(quelle, err);
         ASSERT_TRUE(q) << err;
@@ -970,8 +970,8 @@ TEST(FatDiskVolume, SysUebertraegtBootsektorUndSystemdateienInReihenfolge) {
 TEST(FatDiskVolume, SysOhneSystemdateienUndNichtFatWirdAbgewiesen) {
     const std::string a = k1520test::tempPath("k1520_test_fat_sys_a.img"), b = k1520test::tempPath("k1520_test_fat_sys_b.img");
     std::string err;
-    auto z = DiskVolume::create(a, "dos720", "", formate(), dateisysteme(), err);
-    auto q = DiskVolume::create(b, "dos720", "", formate(), dateisysteme(), err);
+    auto z = DiskVolume::create(a, "dos_ds80_9x512", "", formate(), dateisysteme(), err);
+    auto q = DiskVolume::create(b, "dos_ds80_9x512", "", formate(), dateisysteme(), err);
     ASSERT_TRUE(z && q) << err;
     std::string bericht;
     EXPECT_FALSE(z->dosSystemUebertragen(*q, bericht));
@@ -998,7 +998,7 @@ TEST(FatLieferdisketten, A7150UndPc1834WerdenErkanntUndPruefenOhneFehler) {
         std::string err;
         auto v = volume(p.string(), err);
         ASSERT_TRUE(v) << s.datei << ": " << err;
-        EXPECT_EQ(v->profile().name, "dos720") << s.datei;
+        EXPECT_EQ(v->profile().name, "dos_ds80_9x512") << s.datei;
         std::vector<uint8_t> boot;
         ASSERT_TRUE(v->readBootImage(boot));
         EXPECT_EQ(std::string(reinterpret_cast<char*>(&boot[3]), std::strlen(s.oem)), s.oem) << s.datei;
@@ -1017,7 +1017,7 @@ TEST(FatLieferdisketten, SystemdisketteLaesstSichUebertragen) {
     if (!fs::exists(q)) GTEST_SKIP() << "A7150_DCP33.hfe fehlt";
     const std::string ziel = k1520test::tempPath("k1520_test_fat_dcp_sys.img");
     std::string err;
-    auto z = DiskVolume::create(ziel, "dos720", "", formate(), dateisysteme(), err);
+    auto z = DiskVolume::create(ziel, "dos_ds80_9x512", "", formate(), dateisysteme(), err);
     ASSERT_TRUE(z) << err;
     auto src = volume(q.string(), err);
     ASSERT_TRUE(src) << err;

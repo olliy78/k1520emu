@@ -189,7 +189,7 @@ def test_stichprobe_erkennt_dasselbe_wie_die_vollmessung(fixture_disks, name):
     Dieselbe Diskette einmal als Datei (Vollmessung) und einmal „physisch"
     (Stichprobe) muss dasselbe Dateisystem ergeben.  Ohne diesen Vergleich blieb
     unbemerkt, dass die Stichprobe drei Disketten falsch erkannte — darunter eine
-    77-Spur-Diskette als 40-Spur (`udos_ss40` statt `udos_ss77`), womit die halbe
+    77-Spur-Diskette als 40-Spur (`udos_ss40_26x128` statt `udos_ss77_26x128`), womit die halbe
     Diskette unsichtbar gewesen waere.
 
     Ursache war, dass `GeometryProbe::match` Altbestand **duldet** und die Kandidaten
@@ -253,7 +253,7 @@ def test_eine_leere_spur_verdirbt_nicht_die_ganze_diskette(fixture_disks):
         worker = TrackWorker(s, geraet, poll_ms=20)
         worker.start()
         try:
-            with DiskTool.open_physical(s, "scpx640") as physisch:
+            with DiskTool.open_physical(s, "scpx_ds80_16x256_boot") as physisch:
                 for c, h in leer:            # ERST die leeren Spuren …
                     physisch.track(c, h)
                 for (c, h), bytes_soll in erwartet.items():   # … dann echte
@@ -279,7 +279,7 @@ def test_eine_datei_laesst_sich_auf_eine_echte_diskette_schreiben(fixture_disks)
 
     geraet = HfeDevice(ziel)          # das „Laufwerk" mit der ANDEREN Diskette
     with DiskTool.open(ziel) as vorher:
-        assert vorher.filesystem != "udos_ds77", "Zieldiskette trägt schon UDOS"
+        assert vorher.filesystem != "udos_ds77_26x128", "Zieldiskette trägt schon UDOS"
 
     with DiskTool.open(quelle) as datei:
         soll = sorted(e.side_prefix + e.name for e in datei.list())
@@ -305,7 +305,7 @@ def test_eine_datei_laesst_sich_auf_eine_echte_diskette_schreiben(fixture_disks)
         worker.start()
         try:
             with DiskTool.open_physical(s2) as danach:
-                assert danach.filesystem == "udos_ds77", \
+                assert danach.filesystem == "udos_ds77_26x128", \
                     f"auf der Diskette liegt {danach.filesystem}"
                 assert sorted(e.side_prefix + e.name
                               for e in danach.list()) == soll

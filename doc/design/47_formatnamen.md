@@ -374,3 +374,86 @@ Eintrags.  Zusammengelegt (identische Spurliste, Schritt/Rate/Drehzahl): `scpx78
 | `pc_hd_15x512` | `ds80_15x512_hd` |
 | `pc_hd_18x512` | `ds80_18x512_hd` |
 | `pc_ed_36x512` | `ds80_36x512_ed` |
+
+
+## 11  Umbenennungstabelle Profile (Schritt 3)
+
+Stand 2026-11-04.  Alle 58 Dateisystemprofile in `data/formats.yaml` nach §2 umbenannt; der alte Name steht in `aliases:` des neuen
+Eintrags (vorhandene Aliase `mutos77`/`mutos80`/`mutos8k_fm`/`mutos8k_mfm`/`tar_mutos8k_*` bleiben, der Alt-Name kommt davorgestellt).
+Maschinenlesbar: `tests/fixtures/profilnamen_neu.txt`; Wächter `FsKatalogSchema.*` (W4, `tests/unit/filesystem/test_fs_katalog_schema.cpp`).
+
+Festlegungen:
+
+- `<os>` aus der geschlossenen Liste cpa, scpx, scpx8915, cpa1715, scp1715, microdos, microdos1715, osm, bcu880, scp1700, udos, udos1715,
+  udos_p8000, udos50, sios, wega, mutos1700, mutos8k, tar, dos.  `udos1715` bleibt Familienname (kein `ndos_`; offene Anwenderfrage, §2).
+- `<rolle>`: `boot` = Systemspuren/Lader/Bootkopf (cpa780, scpx*, osm*, microdos*, scp1700, scp1715, cpa1715, scpx8915), `daten` = reine
+  Datendiskette (cpa800, microdos*_daten), `arbeit`/`syl`/`kombi` = BCU 880, `leer` = leere tar-Diskette.  Keine Rolle bei udos*, sios*,
+  wega*, mutos*, dos*, tar (mit Inhalt).
+- Die tar-Profile für MUTOS tragen jetzt `tar_`, nicht `tar_mutos8k_`; das Layout steckt in `unix_layout:`, der Name zeigt nur die Geometrie
+  (`tar_ss77_8x512`, `tar_fm_ss77_26x128`, …).  Der alte Name bleibt Alias.
+- Namensgleiche Profile entstehen nicht; Kollisionen gab es keine (verschiedene `os` bei gleicher Geometrie: `wega_ds80_9x512`/`mutos1700_ds80_9x512`,
+  `scp1700_ds80_16x256_boot`/`mutos1700_ds80_16x256`).  `bcu880`/`bcu880_80` und `bcu880_kombi`/`_kombi80` unterscheidet die Spurzahl im Formatteil.
+- Code: `DiskVolume`-Vergleich `p.name == "microdos128"` heißt jetzt `microdos_ss40_26x128_boot`; sonst lösen Eingaben per Alias auf, Erkennung
+  und Ausgaben (`detection().filesystem`, `fs_name`) liefern den neuen Namen.  `type:`-Werte (`udos1715`, `wega_mutos`, …) und `boot_header:`-Werte
+  (`microdos1715`, `pc1715`, …) sind KEINE Profilnamen und blieben unverändert.
+
+| alt | neu |
+|---|---|
+| `cpa780` | `cpa_ds80_5x1024_boot` |
+| `cpa800` | `cpa_ds80_5x1024_daten` |
+| `scpx640` | `scpx_ds80_16x256_boot` |
+| `scpx798` | `scpx_ds80_5x1024_boot` |
+| `scpx8915` | `scpx8915_ds80_5x1024_boot` |
+| `cpa1715` | `cpa1715_ds80_5x1024_boot` |
+| `microdos800` | `microdos_ds80_5x1024_boot` |
+| `microdos200` | `microdos_ss40_5x1024_boot` |
+| `microdos128` | `microdos_ss40_26x128_boot` |
+| `microdos800_daten` | `microdos_ds80_5x1024_daten` |
+| `microdos200_daten` | `microdos_ss40_5x1024_daten` |
+| `microdos1715` | `microdos1715_ds80_5x1024_boot` |
+| `scp1715` | `scp1715_ds80_5x1024_boot` |
+| `osm640` | `osm_ds80_16x256_boot` |
+| `osm800` | `osm_ds80_5x1024_boot` |
+| `bcu880` | `bcu880_ss40_26x128_arbeit` |
+| `bcu880_syl` | `bcu880_ss40_26x128_syl` |
+| `bcu880_kombi` | `bcu880_ss40_26x128_kombi` |
+| `bcu880_kombi80` | `bcu880_ss80_26x128_kombi` |
+| `bcu880_80` | `bcu880_ss80_26x128_arbeit` |
+| `scp1700` | `scp1700_ds80_16x256_boot` |
+| `udos_ds77` | `udos_ds77_26x128` |
+| `udos_ss77` | `udos_ss77_26x128` |
+| `udos_ss77_fm` | `udos_fm_ss77_26x128` |
+| `udos_ss40` | `udos_ss40_26x128` |
+| `sios_ss40` | `sios_ss40_26x128` |
+| `sios_ss80` | `sios_ss80_26x128` |
+| `udos1715` | `udos1715_ds80_16x256` |
+| `udos_p8000` | `udos_p8000_ds80_16x256` |
+| `udos50` | `udos50_ds80_16x256` |
+| `udos1715_ss80` | `udos1715_ss80_16x256` |
+| `udos1715_ss40` | `udos1715_ss40_16x256` |
+| `wega720` | `wega_ds80_9x512` |
+| `mutos1700_720` | `mutos1700_ds80_9x512` |
+| `mutos1700_a7100` | `mutos1700_ds80_16x256` |
+| `mutos8k_8x512_mfm` | `mutos8k_ss77_8x512` |
+| `mutos8k_8x512_mfm_80` | `mutos8k_ss80_8x512` |
+| `mutos8k_26x128_fm` | `mutos8k_fm_ss77_26x128` |
+| `mutos8k_26x128_mfm` | `mutos8k_ss77_26x128` |
+| `tar720` | `tar_ds80_9x512` |
+| `tar720_leer` | `tar_ds80_9x512_leer` |
+| `tar_mutos8k_26x128_mfm` | `tar_ss77_26x128` |
+| `tar_mutos8k_26x128_mfm_leer` | `tar_ss77_26x128_leer` |
+| `tar_mutos8k_26x128_fm` | `tar_fm_ss77_26x128` |
+| `tar_mutos8k_26x128_fm_leer` | `tar_fm_ss77_26x128_leer` |
+| `tar_mutos8k_8x512_mfm` | `tar_ss77_8x512` |
+| `tar_mutos8k_8x512_mfm_leer` | `tar_ss77_8x512_leer` |
+| `dos160` | `dos_ss40_8x512` |
+| `dos180` | `dos_ss40_9x512` |
+| `dos320` | `dos_ds40_8x512` |
+| `dos360` | `dos_ds40_9x512` |
+| `dos360ss80` | `dos_ss80_9x512` |
+| `dos640` | `dos_ds80_8x512` |
+| `dos720` | `dos_ds80_9x512` |
+| `dos800` | `dos_ds80_10x512` |
+| `dos1200` | `dos_ds80_15x512_hd` |
+| `dos1440` | `dos_ds80_18x512_hd` |
+| `dos2880` | `dos_ds80_36x512_ed` |

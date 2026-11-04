@@ -391,8 +391,8 @@ public:
     // nie angefasst — das Werkzeug behandelt sie deshalb als EIN Byteband:
     //
     //   * **CP/M** (CP/A, SCPX): alles vor dem Beginn des Dateisystems
-    //     (@ref FsProfile::data_cyl / data_head) — bei `cpa780` 15104 Byte.
-    //     Faengt das Dateisystem auf Zylinder 0 an (`cpa800`), gibt es keine
+    //     (@ref FsProfile::data_cyl / data_head) — bei `cpa_ds80_5x1024_boot` 15104 Byte.
+    //     Faengt das Dateisystem auf Zylinder 0 an (`cpa_ds80_5x1024_daten`), gibt es keine
     //     Systemspuren und damit keine Bootfaehigkeit.
     //   * **UDOS**: die Spuren 0–2 (Urlader + Nukleus) UND die Bootspur 21
     //     (`doc/udos_diskettenformat.md` §8.6) — je Seite, denn jede Seite ist ein
@@ -726,7 +726,7 @@ public:
     /// @brief Die Katalogformate, die sich fuer eine neue tar-Diskette / einen tar-Satz eignen
     ///        (einheitliche Geometrie, mindestens zwei Bloecke), in Katalogreihenfolge.
     static std::vector<TarFormatInfo> tarFormate(const FormatCatalog& formats);
-    /// @brief Wie oben, zusaetzlich die tar-Profile mit Layout (`tar_mutos8k_26x128_mfm`, `tar_mutos8k_26x128_fm`): ihr
+    /// @brief Wie oben, zusaetzlich die tar-Profile mit Layout (`tar_ss77_26x128`, `tar_fm_ss77_26x128`): ihr
     ///        Name steht dort als "Format" und wird von @ref tarSatzNeu / @ref tarDisketteNeu /
     ///        @ref openTarSatz so angenommen; @c bytes ist die Kapazitaet des Rohgeraets (494 Bloecke).
     static std::vector<TarFormatInfo> tarFormate(const FormatCatalog& formats, const FsCatalog& fs_cat);
@@ -738,7 +738,7 @@ public:
      * Nummer).  Zurueck kommt das Volume im Satzmodus mit EINEM Abbild: darauf lassen sich
      * Dateien ablegen und mit @ref tarSatzSpeichern wieder in @p pfad schreiben; waechst der Inhalt
      * ueber eine Diskette, wird beim Speichern ein nummerierter Satz daraus.  Gegenstueck fuer
-     * 720K bleibt `create(…, "tar720_leer")`.
+     * 720K bleibt `create(…, "tar_ds80_9x512_leer")`.
      */
     static std::unique_ptr<DiskVolume> tarDisketteNeu(const std::string& pfad,
                                                       const std::string& format,

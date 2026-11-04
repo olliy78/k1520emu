@@ -2,7 +2,7 @@
 tool:   k1520disktool
 disk:   cpa_cpa780_k5601_clock.img
 run:    ls %DISK% -l
-expect: cpa780 (erkannt)
+expect: cpa_ds80_5x1024_boot (erkannt)
 expect: 1 Seite
 expect: @OS.COM
 expect: PIP.COM

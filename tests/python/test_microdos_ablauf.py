@@ -2,7 +2,7 @@
 
 Waechter fuer doc/merkposten/microdos.md: die ausgelieferten Systemdisketten (disks/a5120_microdos1526/, gebaut von
 tools/microdos/build.py aus tools/microdos/original/) booten mit der dort genannten Bestueckung bis "A>" und tragen
-ihre Beigaben, `build.py --check` haelt sie auf dem Stand des Baus (Erkennung microdos800/200, fsck ohne Warnung),
+ihre Beigaben, `build.py --check` haelt sie auf dem Stand des Baus (Erkennung microdos_ds80_5x1024_boot/200, fsck ohne Warnung),
 und tools/microdos/ablauf.py baut aus einer Leerdiskette (FORMAT20 -> MSYSG20) eine selbst bootende Systemdiskette.
 """
 import os

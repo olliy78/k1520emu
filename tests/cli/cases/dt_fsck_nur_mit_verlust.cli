@@ -5,7 +5,7 @@
 tool:   k1520disktool
 disk:   cpa_cpa780_k5601_noclock.img
 poke:   %DISK% 3b30 f00f
-run:    fsck %DISK% --fs cpa780
+run:    fsck %DISK% --fs cpa_ds80_5x1024_boot
 expect: 1 Reparatur(en) moeglich
 expect: alle mit Datenverlust
 expect: --repair=alle

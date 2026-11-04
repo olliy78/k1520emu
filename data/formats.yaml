@@ -748,7 +748,8 @@ filesystems:
 
   # ══ CP/A ═══════════════════════════════════════════════════════════════════
 
-  - name:        cpa780
+  - name:        cpa_ds80_5x1024_boot
+    aliases:     [cpa780]
     description: "CP/A 780K Bootdiskette — Dateisystem ab Zylinder 2"
     format:      ds80_3t26x128-5x1024
     type:        cpm
@@ -760,7 +761,8 @@ filesystems:
     block_size:  2048
     dir_entries: 128
 
-  - name:        cpa800
+  - name:        cpa_ds80_5x1024_daten
+    aliases:     [cpa800]
     description: "CP/A 800K Datendiskette — Dateisystem ab Zylinder 0"
     format:      ds80_5x1024
     type:        cpm
@@ -780,7 +782,8 @@ filesystems:
 
   # ══ SCPX ═══════════════════════════════════════════════════════════════════
 
-  - name:        scpx640
+  - name:        scpx_ds80_16x256_boot
+    aliases:     [scpx640]
     description: "SCPX 640K (16×256) — Systemzylinder 0-1, Dateisystem ab Zylinder 2"
     format:      ds80_16x256
     type:        cpm
@@ -792,7 +795,8 @@ filesystems:
     block_size:  2048
     dir_entries: 128
 
-  - name:        scpx798
+  - name:        scpx_ds80_5x1024_boot
+    aliases:     [scpx798]
     description: "SCPX 798K — Systemzylinder 0 in 16×256, Dateisystem ab Zylinder 2"
     format:      ds80_2t16x256-5x1024
     type:        cpm
@@ -814,7 +818,8 @@ filesystems:
   # B: in 16×256 (DISGEN-Einstellung der Diskette 901) braucht nichts: `dtrsl1`
   # traegt dort ein FESTES Offset, die Regel liefert immer OFF 2 / 128 (DSM 311).
 
-  - name:        scpx8915
+  - name:        scpx8915_ds80_5x1024_boot
+    aliases:     [scpx8915]
     description: "SCPX 8915 (K8915) 780K — Systemzylinder 0-1, Dateisystem ab Zylinder 2"
     format:      ds80_5x1024
     type:        cpm
@@ -836,7 +841,8 @@ filesystems:
   # Verhalten (Plaetze unangetastet, Kopf als positiver Nachweis), kein Zahlenwert, den die
   # CP/A-Regel ausrechnen koennte.  Erkannt wird NUR mit Bootkopf; eine Datendiskette
   # bleibt `cpa800`.
-  - name:        cpa1715
+  - name:        cpa1715_ds80_5x1024_boot
+    aliases:     [cpa1715]
     description: "CP/A 1715 (PC 1715) — 800K ohne Systemspuren, Bootkopf im Verzeichnis"
     format:      ds80_5x1024
     type:        cpm
@@ -854,7 +860,8 @@ filesystems:
   # ist NICHT die der CP/A-Regel (DS 80 Zyl.: 104 statt 192 Plaetze, 2 KB; gemessen: Platz 104 ff. = Daten): MicroDOS rechnet
   # seinen DPB selbst (MSYSGEN/SELDSK).  Erkannt wird NUR mit SYL-Lader (positiver Nachweis);
   # `*_daten` sind die Namen fuer Disketten OHNE Lader (`detect: false`, nur auf Anforderung).
-  - name:        microdos800
+  - name:        microdos_ds80_5x1024_boot
+    aliases:     [microdos800]
     description: "MicroDOS 1526 (A5120/A5130) 800K DS, 5×1024 - SYL-Lader im Verzeichnis, 104 Plaetze"
     format:      ds80_5x1024
     type:        cpm
@@ -863,7 +870,8 @@ filesystems:
     dir_boot:    true
     boot_header: microdos
 
-  - name:        microdos200
+  - name:        microdos_ss40_5x1024_boot
+    aliases:     [microdos200]
     description: "MicroDOS 1526 (A5120/A5130) 200K SS 40 Spuren, 5×1024 - SYL-Lader im Verzeichnis, 64 Plaetze"
     format:      ss40_5x1024
     type:        cpm
@@ -877,7 +885,8 @@ filesystems:
   # Plaetzen 0-7 ist der positive Nachweis.  MicroDOS.SYS liegt in den linearen Sektoren 26..155 (Spur 1-5),
   # MSYSG20 traegt nur 16 Bloecke ein (3-17, 19; Block 18 fehlt) - `allocationMap` sperrt 3-19.  Bootabbild
   # lesen geht, schreiben nicht (Lage nur gemessen).
-  - name:        microdos128
+  - name:        microdos_ss40_26x128_boot
+    aliases:     [microdos128]
     description: "MicroDOS 1526 (A5120/A5130) 100K SS 40 Spuren, 26x128 - SYL-Lader 0.6 im Verzeichnis, 64 Plaetze"
     format:      ss40_26x128
     type:        cpm
@@ -886,7 +895,8 @@ filesystems:
     dir_boot:    true
     boot_header: microdos
 
-  - name:        microdos800_daten
+  - name:        microdos_ds80_5x1024_daten
+    aliases:     [microdos800_daten]
     description: "MicroDOS 800K DS, 5×1024 - Datendiskette ohne Lader, 104 Plaetze"
     format:      ds80_5x1024
     type:        cpm
@@ -894,7 +904,8 @@ filesystems:
     dir_entries: 104
     detect:      false
 
-  - name:        microdos200_daten
+  - name:        microdos_ss40_5x1024_daten
+    aliases:     [microdos200_daten]
     description: "MicroDOS 200K SS 40 Spuren, 5×1024 - Datendiskette ohne Lader, 64 Plaetze"
     format:      ss40_5x1024
     type:        cpm
@@ -905,7 +916,8 @@ filesystems:
   # `microdos1715` - MicroDOS des PC 1715: gleicher Bootkopf wie CP/A 1715 (02|03 F0), aber 128
   # statt 192 Plaetze.  Positiver Nachweis ist die Datei MICRODOS.SYS (sonst waere jede CP/A-1715-
   # Diskette auch eine MicroDOS-Diskette).
-  - name:        microdos1715
+  - name:        microdos1715_ds80_5x1024_boot
+    aliases:     [microdos1715]
     description: "MicroDOS 1715 (PC 1715) 800K DS - Bootkopf im Verzeichnis, 128 Plaetze"
     format:      ds80_5x1024
     type:        cpm
@@ -918,7 +930,8 @@ filesystems:
   # Verzeichnis ab c2h0 (die CP/A-Regel liest solche Disketten schon als `cpa_auto`; der
   # Eintrag ist der NAME fuer `create --fs scp1715 --boot` und der Ladekopf-Pruefer).
   # `detect: false`: in der Erkennung braeuchte er keinen Platz — wie `scpx8915`.
-  - name:        scp1715
+  - name:        scp1715_ds80_5x1024_boot
+    aliases:     [scp1715]
     description: "SCP 1715 / SCP 3.0 (PC 1715, 1715W) 780K — Systemzylinder 0-1, Dateisystem ab Zylinder 2"
     format:      ds80_5x1024
     type:        cpm
@@ -942,7 +955,8 @@ filesystems:
   # `create --fs osm640`) und die Pruefung des Bootabbilds (OS/M-Urlader mit FDCONF-Typ 5
   # statt beliebiger Bytes).  Deckungsgleich mit `scpx640` — bei Urlader gewinnt `osm640`
   # ohne Mehrdeutigkeit (disk_volume.cpp, „Deckungsgleiche Profile").
-  - name:        osm640
+  - name:        osm_ds80_16x256_boot
+    aliases:     [osm640]
     description: "OS/M (P8000) 640K, Format 5 (16×256) — Systemzylinder 0-1, Dateisystem ab Zylinder 2"
     format:      ds80_16x256
     type:        cpm
@@ -958,7 +972,8 @@ filesystems:
   # das Verzeichnis richtig; beim Oeffnen der leeren Diskette nennt die Erkennung es als
   # „ebenso gut osm800".  Nicht deckungsgleich mit `cpa800`, wohl aber mit `scp1715`/`scpx8915`
   # (beide `detect: false`).
-  - name:        osm800
+  - name:        osm_ds80_5x1024_boot
+    aliases:     [osm800]
     description: "OS/M (P8000) 800K, Format 7 (5×1024) — Systemzylinder 0-1, Dateisystem ab Zylinder 2"
     format:      ds80_5x1024
     type:        cpm
@@ -975,7 +990,8 @@ filesystems:
   # holt der Warmstart es), Verzeichnis ab Zylinder 2.  EIGENER GRUND: der Name fuer
   # `create --fs bcu880 --boot` und die Kennungspruefung des Bootabbilds.  `detect: false` —
   # die Erkennung liest solche Disketten schon als `cpa_auto`.
-  - name:        bcu880
+  - name:        bcu880_ss40_26x128_arbeit
+    aliases:     [bcu880]
     description: "BCU 880 V1.2 — Arbeitsdiskette „ohne SYL“, System Zylinder 0-1, Dateisystem ab Zylinder 2"
     format:      ss40_26x128
     type:        cpm
@@ -991,7 +1007,8 @@ filesystems:
   # ab Zylinder 2 — es liegt dort das System; die Diskette ist reine Startdiskette (`nur_boot`).
   # Erkannt wird sie am SYL-Lader (Kennung + Selbstpruefung-CRC) als POSITIVEM Nachweis.
   # 5 Systemzylinder: 0 (leer), 1 (Lader), 2-4 (System, 67 Sektoren).
-  - name:        bcu880_syl
+  - name:        bcu880_ss40_26x128_syl
+    aliases:     [bcu880_syl]
     description: "BCU 880 V1.2 — Startdiskette „SYL auf Spur 1“ (Lade-ROM V0.6), reine Startdiskette"
     format:      ss40_26x128
     type:        cpm
@@ -1006,7 +1023,8 @@ filesystems:
   # Dateien traegt.  Wie `bcu880_syl`, aber das System ist so geaendert, dass A: das Verzeichnis ab
   # Zylinder 5 sucht (OFF 5, DSM 112) und der Warmstart sein CCP von Zylinder 0 findet.  Erkannt am
   # SYL-Lader PLUS der geaenderten Laufwerkstabelle von A:.  Dateien sieht BCU nur in Laufwerk A:.
-  - name:        bcu880_kombi
+  - name:        bcu880_ss40_26x128_kombi
+    aliases:     [bcu880_kombi]
     description: "BCU 880 V1.2 — EIGENBAU: Startdiskette mit Dateisystem ab Zylinder 5 (nur als A:)"
     format:      ss40_26x128
     type:        cpm
@@ -1021,7 +1039,8 @@ filesystems:
   # = 243 Bloecke), B:-D: DSM 247.  Das BIOS haelt je Laufwerk nur 31 Byte Belegungsvektor
   # (= 248 Bloecke); die 80-Spur-Diskette mit OFF 2 hat 253 Bloecke — `max_blocks` kappt, damit das
   # Werkzeug keinen Block vergibt, den BCU nie sieht.
-  - name:        bcu880_kombi80
+  - name:        bcu880_ss80_26x128_kombi
+    aliases:     [bcu880_kombi80]
     description: "BCU 880 V1.2 — EIGENBAU, 80 Spuren (K5600.20): Startdiskette mit Dateisystem ab Zylinder 5 (nur als A:)"
     format:      ss80_26x128
     type:        cpm
@@ -1035,7 +1054,8 @@ filesystems:
   # Wird am BCU-System in den Systemspuren erkannt (Kennung „BCU 880“): eine 80-Spur-Diskette 26×128
   # ist sonst auch ein CP/A-Format (400K) mit anderen Bloecken.  Deshalb verlangt `create` ein
   # Bootabbild (boot_bcu12_ohnesyl.bin); das System selbst wird nicht gebraucht (der Warmstart liest A:).
-  - name:        bcu880_80
+  - name:        bcu880_ss80_26x128_arbeit
+    aliases:     [bcu880_80]
     description: "BCU 880 V1.2 — EIGENBAU, 80 Spuren (K5600.20): Arbeitsdiskette, Dateisystem ab Zylinder 2, 248 Bloecke"
     format:      ss80_26x128
     type:        cpm
@@ -1053,7 +1073,8 @@ filesystems:
   # 156 Datenspuren).  Ein eigener Eintrag ist nötig, weil `CpaDpbRule` hier
   # nicht gilt: die Regel bildet das CP/A-BIOS nach, nicht das SCP1700.
 
-  - name:        scp1700
+  - name:        scp1700_ds80_16x256_boot
+    aliases:     [scp1700]
     description: "SCP1700/CP/M-86 (A7100) — Dateisystem ab Zylinder 2"
     format:      ds80_1t16x128fm-16x256
     type:        cpm
@@ -1069,12 +1090,14 @@ filesystems:
   # Beide Seiten sind getrennte Dateisysteme (§2) und erscheinen im Werkzeug als
   # Side0/ und Side1/ EINES Datentraegers.
 
-  - name:        udos_ds77
+  - name:        udos_ds77_26x128
+    aliases:     [udos_ds77]
     description: "UDOS 4.x doppelseitig — 77 Spuren 26×128, je Seite ein Dateisystem"
     format:      ds77_26x128
     type:        udos
 
-  - name:        udos_ss77
+  - name:        udos_ss77_26x128
+    aliases:     [udos_ss77]
     description: "UDOS 4.x einseitig — 77 Spuren 26×128"
     format:      ss77_26x128
     type:        udos
@@ -1082,12 +1105,14 @@ filesystems:
   # UDOS auf dem 8″-MF3200: dieselbe Spurlage (77 x 26 x 128), aber FM (Entwurf 39 §9.8).  Eigener Eintrag,
   # weil `create` das Aufzeichnungsverfahren aus dem Format nimmt; ohne ihn gaebe es UDOS nur in MFM
   # (die FM-Ladediskette fuer MUTOS 8000 wurde sonst ueber das Profil mutos8k_26x128_fm angelegt).
-  - name:        udos_ss77_fm
+  - name:        udos_fm_ss77_26x128
+    aliases:     [udos_ss77_fm]
     description: "UDOS 4.x einseitig — 77 Spuren 26×128 FM (8″ MF3200)"
     format:      fm_ss77_26x128
     type:        udos
 
-  - name:        udos_ss40
+  - name:        udos_ss40_26x128
+    aliases:     [udos_ss40]
     description: "UDOS 4.x einseitig — 40 Spuren 26×128 (K5600.10)"
     format:      ss40_26x128
     type:        udos
@@ -1101,12 +1126,14 @@ filesystems:
   # ausserhalb des Rangwettbewerbs (disk_volume.cpp): ein Treffer verdraengt CP/M-Profile ohne
   # eigenen Nachweis, aber nie WEGA/MUTOS, UDOS oder BCU - deren Disketten sind teils SIOS-
   # initialisiert.  Lesen D2/D3, Schreiben und Anlegen D4 (Datendiskette ohne Systemlader).
-  - name:        sios_ss40
+  - name:        sios_ss40_26x128
+    aliases:     [sios_ss40]
     description: "SIOS 1526 — IBM-Etikettendiskette, 40 Spuren einseitig, 26×128"
     format:      ss40_26x128
     type:        sios
 
-  - name:        sios_ss80
+  - name:        sios_ss80_26x128
+    aliases:     [sios_ss80]
     description: "SIOS 1526 — IBM-Etikettendiskette, 80 Spuren einseitig, 26×128"
     format:      ss80_26x128
     type:        sios
@@ -1133,34 +1160,39 @@ filesystems:
   # Erkannt wird die Diskette ueber dieses Feld, angelegt wird sie damit ebenso
   # (doc/udos1715_diskettenformat.md §3.0a, core/filesystem/udos/udos_bitmap.h).
 
-  - name:        udos1715
+  - name:        udos1715_ds80_16x256
+    aliases:     [udos1715]
     description: "UDOS1715/NDOS (PC 1715) — 80 Spuren doppelseitig, 16×256 (640K, Standard)"
     format:      ds80_16x256
     type:        udos1715
     ndos_fill:   "00"     # Spur 17H Sektor 0, 158H…176H = 00
     detect_rank: -10
 
-  - name:        udos_p8000
+  - name:        udos_p8000_ds80_16x256
+    aliases:     [udos_p8000]
     description: "UDOS 2.2/NDOS (P8000) — 80 Spuren doppelseitig, 16×256 (640K)"
     format:      ds80_16x256
     type:        udos1715
     ndos_fill:   "77"     # Spur 17H Sektor 0, 158H…15BH = 00, 15CH…176H = 77H
     detect_rank: -10
 
-  - name:        udos50
+  - name:        udos50_ds80_16x256
+    aliases:     [udos50]
     description: "UDOS 5.0/NDOS (A5120) — 80 Spuren doppelseitig, 16×256 (640K)"
     format:      ds80_16x256
     type:        udos1715
     ndos_fill:   "ff"     # Spur 17H Sektor 0, 158H…176H = FFH
     detect_rank: -10
 
-  - name:        udos1715_ss80
+  - name:        udos1715_ss80_16x256
+    aliases:     [udos1715_ss80]
     description: "UDOS1715/NDOS — 80 Spuren einseitig, 16×256 (320K)"
     format:      ss80_16x256
     type:        udos1715
     detect_rank: -10
 
-  - name:        udos1715_ss40
+  - name:        udos1715_ss40_16x256
+    aliases:     [udos1715_ss40]
     description: "UDOS1715/NDOS — 40 Spuren einseitig, 16×256 (160K)"
     format:      ss40_16x256
     type:        udos1715
@@ -1175,7 +1207,8 @@ filesystems:
   # Erkennung ohne Magic (Plausibilitaet: Groessen, Listen, Wurzel mit . und ..);
   # detect_rank -10, damit die positive Probe vor dem CP/A-Rueckfall gewinnt.
 
-  - name:        wega720
+  - name:        wega_ds80_9x512
+    aliases:     [wega720]
     description: "WEGA (UNIX System III, P8000) — 80 Spuren doppelseitig, 9×512 (720K)"
     format:      ds80_9x512
     type:        wega_mutos
@@ -1186,14 +1219,16 @@ filesystems:
   #  - 720K-Diskette 9x512 ab Zylinder 0 (ROOT1_D, UUCP; Superblock in Block 1 = Byte 1024),
   #  - A7100-Diskette (Format `scp1700_640`: Zyl. 0 Kopf 0 = FM-Ladespur 16x128), Blockraum ab
   #    Zylinder 0 KOPF 1 (ROOT1GN).
-  - name:        mutos1700_720
+  - name:        mutos1700_ds80_9x512
+    aliases:     [mutos1700_720]
     description: "MUTOS 1700 (UNIX, A7100) — 80 Spuren doppelseitig 9×512, Dateisystem ab Zylinder 0"
     format:      ds80_9x512
     type:        wega_mutos
     unix_layout: mutos1700
     detect_rank: -10
 
-  - name:        mutos1700_a7100
+  - name:        mutos1700_ds80_16x256
+    aliases:     [mutos1700_a7100]
     description: "MUTOS 1700 (UNIX, A7100) — FM-Ladespur, Blockraum ab Zylinder 0 Kopf 1 (16×256)"
     format:      ds80_1t16x128fm-16x256
     type:        wega_mutos
@@ -1203,16 +1238,16 @@ filesystems:
 
   # MUTOS 8000: dasselbe System-III-Dateisystem wie WEGA (Z8000, big endian), aber der Blockraum
   # beginnt auf Zylinder 1 (`data_start`); Zylinder 0 ist die 128-B-Ladespur.
-  - name:        mutos8k_8x512_mfm
-    aliases:     [mutos77]
+  - name:        mutos8k_ss77_8x512
+    aliases:     [mutos8k_8x512_mfm, mutos77]
     description: "MUTOS 8000 (UNIX, A5120.16) — einseitig, Blockraum ab Zylinder 1 (bis Zyl. 76)"
     format:      ss77_1t26x128-8x512
     type:        wega_mutos
     data_start:  { cyl: 1, head: 0 }
     detect_rank: -10
 
-  - name:        mutos8k_8x512_mfm_80
-    aliases:     [mutos80]
+  - name:        mutos8k_ss80_8x512
+    aliases:     [mutos8k_8x512_mfm_80, mutos80]
     description: "MUTOS 8000 (UNIX, A5120.16) — einseitig, Blockraum ab Zylinder 1 (bis Zyl. 79)"
     format:      ss80_1t26x128-8x512
     type:        wega_mutos
@@ -1224,8 +1259,8 @@ filesystems:
   # 6 Sektoren Spurversatz ab (`unix_layout: mutos8k`, Mutos8kDev) - das ist NICHT die lineare
   # Sektorfolge der anderen Profile.  Eigener Eintrag, weil nur diese Abbildung die Blocknummern
   # des Dateisystems trifft (doc/design/39_mutos8000.md §4).
-  - name:        mutos8k_26x128_fm
-    aliases:     [mutos8k_fm]
+  - name:        mutos8k_fm_ss77_26x128
+    aliases:     [mutos8k_26x128_fm, mutos8k_fm]
     description: "MUTOS 8000 (UNIX, A5120.16) — 8″ FM 26×128, Blockraum ab Zylinder 1 (verschraenkt)"
     format:      fm_ss77_26x128
     type:        wega_mutos
@@ -1235,8 +1270,8 @@ filesystems:
 
   # Dieselbe Wurzel fuer MFM-Laufwerke (K5601): Blockabbildung und Verschraenkung haengen nur an den
   # Sektornummern, nicht am Aufzeichnungsverfahren - 77 x 26 x 128 MFM statt FM (Entwurf 39 §9.13).
-  - name:        mutos8k_26x128_mfm
-    aliases:     [mutos8k_mfm]
+  - name:        mutos8k_ss77_26x128
+    aliases:     [mutos8k_26x128_mfm, mutos8k_mfm]
     description: "MUTOS 8000 (UNIX, A5120.16) — 5¼″ MFM 26×128, Blockraum ab Zylinder 1 (verschraenkt)"
     format:      ss77_26x128
     type:        wega_mutos
@@ -1252,7 +1287,8 @@ filesystems:
   # Dateisystemen; detect_rank 900 ist nur die Dokumentation davon.  Alle bekannten
   # Abbilder sind 720K — fuer andere Geometrien gibt es kein Beispiel.
 
-  - name:        tar720
+  - name:        tar_ds80_9x512
+    aliases:     [tar720]
     description: "tar-Strom ohne Dateisystem (P8000-Lieferdiskette) — 720K"
     format:      ds80_9x512
     type:        tar
@@ -1265,7 +1301,8 @@ filesystems:
   # und dann VOR der CP/A-Regel (eine Null-Diskette liest die sonst als „CP/A, Verzeichnis
   # nicht angelegt").  Wer sie als CP/A will: `--fs cpa_auto` bzw. Dateisystem-Menue (cpa780 waere
   # 5x1024, passt nicht auf 9x512).  Anlegen: `create --fs tar720_leer`.
-  - name:        tar720_leer
+  - name:        tar_ds80_9x512_leer
+    aliases:     [tar720_leer]
     description: "tar-Diskette, leer (720K) — leeres tar-Archiv"
     format:      ds80_9x512
     type:        tar
@@ -1279,8 +1316,8 @@ filesystems:
   # dort nur durch `dd` ueber mehrere Disketten - hier wie bei tar720 ein Strom ueber N Abbilder.
   # Die Erkennung probt diese Profile VOR den echten Dateisystemen derselben Geometrie (UDOS haelt
   # die Diskette sonst fuer eine Leerdiskette) und nimmt sie nur mit gueltigem tar-Kopf bei Block 0.
-  - name:        tar_mutos8k_26x128_mfm
-    aliases:     [tar_mutos8k_mfm]
+  - name:        tar_ss77_26x128
+    aliases:     [tar_mutos8k_26x128_mfm, tar_mutos8k_mfm]
     description: "tar-Strom im MUTOS-8000-Layout (5¼″ MFM, 77×26×128) — 494 Blöcke"
     format:      ss77_26x128
     type:        tar
@@ -1288,8 +1325,8 @@ filesystems:
     data_start:  { cyl: 1, head: 0 }
     detect_rank: 900
 
-  - name:        tar_mutos8k_26x128_mfm_leer
-    aliases:     [tar_mutos8k_mfm_leer]
+  - name:        tar_ss77_26x128_leer
+    aliases:     [tar_mutos8k_26x128_mfm_leer, tar_mutos8k_mfm_leer]
     description: "tar-Diskette, leer (MUTOS-8000-Layout, MFM) — leeres tar-Archiv"
     format:      ss77_26x128
     type:        tar
@@ -1298,8 +1335,8 @@ filesystems:
     leer:        true
     detect_rank: 901
 
-  - name:        tar_mutos8k_26x128_fm
-    aliases:     [tar_mutos8k_fm]
+  - name:        tar_fm_ss77_26x128
+    aliases:     [tar_mutos8k_26x128_fm, tar_mutos8k_fm]
     description: "tar-Strom im MUTOS-8000-Layout (8″ FM, 77×26×128) — 494 Blöcke"
     format:      fm_ss77_26x128
     type:        tar
@@ -1307,8 +1344,8 @@ filesystems:
     data_start:  { cyl: 1, head: 0 }
     detect_rank: 900
 
-  - name:        tar_mutos8k_26x128_fm_leer
-    aliases:     [tar_mutos8k_fm_leer]
+  - name:        tar_fm_ss77_26x128_leer
+    aliases:     [tar_mutos8k_26x128_fm_leer, tar_mutos8k_fm_leer]
     description: "tar-Diskette, leer (MUTOS-8000-Layout, FM) — leeres tar-Archiv"
     format:      fm_ss77_26x128
     type:        tar
@@ -1321,7 +1358,8 @@ filesystems:
   # dasselbe Rohgeraet /dev/rrkN, aber `mutos_io` rechnet hier linear - Block n = Zylinder 1 + n/8, Sektor-ID
   # n mod 8 + 1 (`unix_layout: mutos8k_512`), 76 Zylinder = 608 Bloecke = 311 296 B (der Kernel lehnt Block >= 608 ab,
   # auch auf einer 80-Zylinder-Diskette).  Zylinder 0 (26x128) bleibt unberuehrt.
-  - name:        tar_mutos8k_8x512_mfm
+  - name:        tar_ss77_8x512
+    aliases:     [tar_mutos8k_8x512_mfm]
     description: "tar-Strom im MUTOS-8000-Layout 8×512 (5¼″ MFM, DISK-Satz) — 608 Blöcke"
     format:      ss77_1t26x128-8x512
     type:        tar
@@ -1329,7 +1367,8 @@ filesystems:
     data_start:  { cyl: 1, head: 0 }
     detect_rank: 900
 
-  - name:        tar_mutos8k_8x512_mfm_leer
+  - name:        tar_ss77_8x512_leer
+    aliases:     [tar_mutos8k_8x512_mfm_leer]
     description: "tar-Diskette, leer (MUTOS-8000-Layout 8×512, MFM) — leeres tar-Archiv"
     format:      ss77_1t26x128-8x512
     type:        tar
@@ -1343,57 +1382,68 @@ filesystems:
   # das Profil benennt nur die Geometrie, auf der `create --fs dosNNN` anlegt.  Die Erkennung ist
   # positiv (BPB + Sprung/FAT-Kopf), deshalb vor allen CP/M-Rueckfaellen (detect_rank -20).
   # Doku: doc/design/44_fat12.md, doc/merkposten/fat12.md
-  - name:        dos160
+  - name:        dos_ss40_8x512
+    aliases:     [dos160]
     description: "MS-DOS FAT12 160K — 40 Spuren einseitig, 8×512"
     format:      ss40_8x512
     type:        fat
     detect_rank: -20
-  - name:        dos180
+  - name:        dos_ss40_9x512
+    aliases:     [dos180]
     description: "MS-DOS FAT12 180K — 40 Spuren einseitig, 9×512"
     format:      ss40_9x512
     type:        fat
     detect_rank: -20
-  - name:        dos320
+  - name:        dos_ds40_8x512
+    aliases:     [dos320]
     description: "MS-DOS FAT12 320K — 40 Spuren doppelseitig, 8×512"
     format:      ds40_8x512
     type:        fat
     detect_rank: -20
-  - name:        dos360
+  - name:        dos_ds40_9x512
+    aliases:     [dos360]
     description: "MS-DOS FAT12 360K — 40 Spuren doppelseitig, 9×512 (PC-Standard 5,25″)"
     format:      ds40_9x512
     type:        fat
     detect_rank: -20
-  - name:        dos360ss80
+  - name:        dos_ss80_9x512
+    aliases:     [dos360ss80]
     description: "MS-DOS FAT12 360K — 80 Spuren einseitig, 9×512"
     format:      ss80_9x512
     type:        fat
     detect_rank: -20
-  - name:        dos640
+  - name:        dos_ds80_8x512
+    aliases:     [dos640]
     description: "MS-DOS FAT12 640K — 80 Spuren doppelseitig, 8×512"
     format:      ds80_8x512
     type:        fat
     detect_rank: -20
-  - name:        dos720
+  - name:        dos_ds80_9x512
+    aliases:     [dos720]
     description: "MS-DOS FAT12 720K — 80 Spuren doppelseitig, 9×512 (3,5″ DD, A7150/DCP)"
     format:      ds80_9x512
     type:        fat
     detect_rank: -20
-  - name:        dos800
+  - name:        dos_ds80_10x512
+    aliases:     [dos800]
     description: "MS-DOS FAT12 800K — 80 Spuren doppelseitig, 10×512"
     format:      ds80_10x512
     type:        fat
     detect_rank: -20
-  - name:        dos1200
+  - name:        dos_ds80_15x512_hd
+    aliases:     [dos1200]
     description: "MS-DOS FAT12 1,2M — 80 Spuren doppelseitig, 15×512 (5,25″ HD)"
     format:      ds80_15x512_hd
     type:        fat
     detect_rank: -20
-  - name:        dos1440
+  - name:        dos_ds80_18x512_hd
+    aliases:     [dos1440]
     description: "MS-DOS FAT12 1,44M — 80 Spuren doppelseitig, 18×512 (3,5″ HD)"
     format:      ds80_18x512_hd
     type:        fat
     detect_rank: -20
-  - name:        dos2880
+  - name:        dos_ds80_36x512_ed
+    aliases:     [dos2880]
     description: "MS-DOS FAT12 2,88M — 80 Spuren doppelseitig, 36×512 (3,5″ ED)"
     format:      ds80_36x512_ed
     type:        fat

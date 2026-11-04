@@ -9,7 +9,7 @@ build.py  -  die UDOS-5.0-Systemdiskette des A5120 aus dem Original umwandeln
 UDOS 5.0 fuer den A5120 (BIZ FmSZBw Schwerin, 03/1997, Startbild „UDOS_5.0“), K5601,
 80 x 2 x 16 x 256.  Das Dateisystem ist NICHT das ZDOS des A5120 (Kontrollblock hinter der
 Daten-CRC), sondern das NDOS des PC 1715 und der P8000: Zeigersektoren, Spur = ganzer Zylinder,
-Verzeichnis 16H, Belegungsplan 17H (Profil `udos50` = Fuellsitte 0xFF hinter dem Plan,
+Verzeichnis 16H, Belegungsplan 17H (Profil `udos50_ds80_16x256` = Fuellsitte 0xFF hinter dem Plan,
 doc/merkposten/disktool.md).  Deshalb ist das rohe Sektorabbild `original/a5120-udos5.img`
 vollstaendig - sektorgleich mit der ebenfalls gelieferten `.dmk`; `original/a5120-udos5.txt`
 ist das Verzeichnis, wie es der Absender aufgelistet hat.

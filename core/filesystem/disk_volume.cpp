@@ -108,11 +108,11 @@ bool cpmVerzeichnisPlausibel(DiskMedium& medium, const DiskFormat& f, const FsPr
         const BcuStart soll = p.boot_header == "bcu_kombi" ? BcuStart::Kombi
                             : p.boot_header == "bcu_kombi80" ? BcuStart::Kombi80 : BcuStart::Syl;
         if (art != soll)
-            return nein(art == BcuStart::Syl ? "das System hat keine Kombi-Aenderungen (Profil bcu880_syl)"
-                        : "das System traegt die Kombi-Aenderungen einer anderen Spurzahl (bcu880_kombi / bcu880_kombi80)");
+            return nein(art == BcuStart::Syl ? "das System hat keine Kombi-Aenderungen (Profil bcu880_ss40_26x128_syl)"
+                        : "das System traegt die Kombi-Aenderungen einer anderen Spurzahl (bcu880_ss40_26x128_kombi / bcu880_ss80_26x128_kombi)");
     }
 
-    // `bcu` MIT Erkennung (bcu880_80): eine leere 80-Spur-Diskette 26×128 ist auch eine CP/A-Diskette;
+    // `bcu` MIT Erkennung (bcu880_ss80_26x128_arbeit): eine leere 80-Spur-Diskette 26×128 ist auch eine CP/A-Diskette;
     // der POSITIVE Nachweis ist das BCU-System in den Systemspuren (Kennung „BCU 880“).
     if (p.boot_header == "bcu" && p.detect && !bcuSystemspuren(raum))
         return nein("die Systemspuren tragen keine BCU-880-Kennung");
@@ -124,7 +124,7 @@ bool cpmVerzeichnisPlausibel(DiskMedium& medium, const DiskFormat& f, const FsPr
         return nein("c0h0 Sektor 1 traegt keinen OS/M-Urlader (FD 21 48 0C ..., Kennung P8000SYS)");
 
     // `dir_boot`: der Bootkopf ist hier der POSITIVE Nachweis.  Ohne ihn waere jede
-    // Datendiskette zugleich `cpa800` und `cpa1715` — und damit „nicht eindeutig".
+    // Datendiskette zugleich `cpa_ds80_5x1024_daten` und `cpa1715_ds80_5x1024_boot` — und damit „nicht eindeutig".
     if (p.dir_boot) {
         std::vector<uint8_t> kopf;
         if (!cpm->readBootSlots(kopf) || !cpm->bootKopfPasst(kopf.data(), kopf.size()))
@@ -132,7 +132,7 @@ bool cpmVerzeichnisPlausibel(DiskMedium& medium, const DiskFormat& f, const FsPr
                         ? "Sektor 1 traegt keinen MicroDOS-SYL-Lader (\"SYL\", Text \"MicroDOS\")"
                         : "Verzeichnisplatz 0 traegt keinen PC-1715-Bootkopf (Wort F002H/F003H)");
     }
-    // `microdos1715`: derselbe Bootkopf wie bei CP/A 1715 - der POSITIVE Nachweis ist hier die
+    // `microdos1715_ds80_5x1024_boot`: derselbe Bootkopf wie bei CP/A 1715 - der POSITIVE Nachweis ist hier die
     // Systemdatei MICRODOS.SYS, sonst waere jede CP/A-1715-Diskette auch eine MicroDOS-Diskette.
     if (p.boot_header == "microdos1715") {
         bool da = false;
@@ -374,7 +374,7 @@ bool k8915Ladekopf(const uint8_t* p, size_t n, unsigned& sektoren) {
  *
  * Geprueft wird, wenn das Profil es verlangt (`boot_header: k8915`) ODER die Diskette
  * schon einen gueltigen Ladekopf traegt (dann ist es eine K8915-Systemdiskette, auch
- * wenn die Erkennung sie als `cpa800` fuehrt).  Das Abbild muss ausserdem die vom
+ * wenn die Erkennung sie als `cpa_ds80_5x1024_daten` fuehrt).  Das Abbild muss ausserdem die vom
  * Ladekopf verlangten Sektoren ganz enthalten.
  */
 std::string k8915Bootabbildproblem(const FsProfile& p, const SectorSpace& raum,
@@ -489,7 +489,7 @@ std::string microdosBootabbildproblem(const FsProfile& p, const std::vector<uint
     // (doc/design/13_k1520disktool.md §25.4).
     const bool lader128 = img[0x0C] == 0 && img[0x0D] == 26;
     const bool lader1k  = img[0x0C] == 3 && img[0x0D] == 4;
-    const bool profil128 = p.name == "microdos128";
+    const bool profil128 = p.name == "microdos_ss40_26x128_boot";
     if (profil128 ? !lader128 : !lader1k)
         return std::string("Das Bootabbild traegt einen MicroDOS-Lader fuer ")
                + (lader128 ? "26 Sektoren zu 128 Byte (Systemdiskette fuer Lade-ROM V0.6 / K5125)"
@@ -505,11 +505,11 @@ std::string microdosBootabbildproblem(const FsProfile& p, const std::vector<uint
 // ─── BCU 880 (frueher A5120): Startdiskette „SYL auf Spur 1“ und Arbeitsdiskette ──
 //
 // Zwei Aufbauten, ein Dateisystem (doc/a5120_alt/bcu.md §2, §5):
-//  * `bcu880_syl` — Zylinder 1 Sektoren 1-6 tragen den SYL-Lader (768 B), den das Lade-ROM V0.6
+//  * `bcu880_ss40_26x128_syl` — Zylinder 1 Sektoren 1-6 tragen den SYL-Lader (768 B), den das Lade-ROM V0.6
 //    nach 0400H holt; ab Zylinder 2 steht das System (Ladeadresse/Laenge im Lader).  Das BIOS
 //    sucht sein Verzeichnis ab Zylinder 2 (OFF = 2) — die Diskette ist deshalb eine reine
 //    Startdiskette (`nur_boot`), Dateien gehoeren auf die Arbeitsdiskette.
-//  * `bcu880`     — „ohne SYL“: System auf Zylinder 0-1 (so schreibt es SYSGEN), Verzeichnis
+//  * `bcu880_ss40_26x128_arbeit`     — „ohne SYL“: System auf Zylinder 0-1 (so schreibt es SYSGEN), Verzeichnis
 //    ab Zylinder 2.  Dient dem Warmstart (WBOOT liest von A: Zylinder 0-1).
 // Ein Abbild des falschen Aufbaus (oder ein CP/A-Bootabbild) liefert eine Diskette, die heil
 // aussieht und nicht startet — deshalb wird VOR dem Schreiben geurteilt.
@@ -620,13 +620,13 @@ std::string bcuBootabbildproblem(const FsProfile& p, const std::vector<uint8_t>&
         if (art != soll) {
             if (art != BcuStart::Syl && soll == BcuStart::Syl)
                 return "Das Bootabbild ist eine Kombidiskette (Verzeichnis ab Zylinder 5, OFF 5 fuer A:); "
-                       "'bcu880_syl' fuehrt kein Dateisystem - Profil bcu880_kombi bzw. bcu880_kombi80 waehlen.";
+                       "'bcu880_ss40_26x128_syl' fuehrt kein Dateisystem - Profil bcu880_ss40_26x128_kombi bzw. bcu880_ss80_26x128_kombi waehlen.";
             if (art == BcuStart::Syl)
                 return "Das Bootabbild traegt die Kombi-Aenderungen nicht (Laufwerkskopf A: auf eine Tabelle "
                        "mit OFF 5): ein Verzeichnis ab Zylinder 5 saehe BCU damit nie.  Bauen mit "
                        "tools/bcu_kombi_bau.py.";
-            return "Das Bootabbild ist fuer eine andere Spurzahl gebaut (40 Spuren: bcu880_kombi, "
-                   "80 Spuren: bcu880_kombi80).";
+            return "Das Bootabbild ist fuer eine andere Spurzahl gebaut (40 Spuren: bcu880_ss40_26x128_kombi, "
+                   "80 Spuren: bcu880_ss80_26x128_kombi).";
         }
         return {};
     }
@@ -1062,7 +1062,7 @@ std::string zusammen(const std::string& a, const std::string& b) {
 constexpr const char* kNurBoot =
     "Das ist eine reine Startdiskette (BCU 880 'SYL auf Spur 1'): das BIOS sucht sein "
     "Verzeichnis ab Zylinder 2, dort liegt hier das System - eine Datei, die ab Zylinder 5 "
-    "stuende, saehe das Geraet nie.  Dateien gehoeren auf eine Arbeitsdiskette (--fs bcu880).";
+    "stuende, saehe das Geraet nie.  Dateien gehoeren auf eine Arbeitsdiskette (--fs bcu880_ss40_26x128_arbeit).";
 constexpr const char* kSchreibschutz =
     "Die Diskette ist schreibgeschuetzt geoeffnet. Zum Aendern den Schreibschutz "
     "aufheben (in der Oberflaeche den Haken \"Nur lesen\" entfernen).";
@@ -1478,7 +1478,7 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
                 if (p->type == FsType::WegaMutos) unix_fs = true;
             DiskMedium& med = dv->disk_->medium();
             // Eine nur teilweise geladene physische Diskette: "ganz Null" laesst sich erst nach dem
-            // vollen Lesen sagen - die Leer-Probe entfaellt dort (wie bei tar720_leer).
+            // vollen Lesen sagen - die Leer-Probe entfaellt dort (wie bei tar_ds80_9x512_leer).
             const bool teilweise = med.loader() != nullptr && !med.complete();
             bool gefunden = false;
             for (const bool leer_probe : {false, true}) {
@@ -1514,7 +1514,7 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
         // so entscheidet das CP/A-BIOS selbst (`selsy`: Spur 0 durchgehend 0xE5 ⇒ an
         // der ersten Datenspur nachsehen).  Der Fall ist eine SCPX-8915-Diskette ohne
         // Systemspuren, auf die der K8915 geschrieben hat (festes OFF 2, 128 Plaetze
-        // ab c2h0): ohne diese Probe hielt `cpa800` (ab c0h0, 192 Plaetze) sie fuer
+        // ab c2h0): ohne diese Probe hielt `cpa_ds80_5x1024_daten` (ab c0h0, 192 Plaetze) sie fuer
         // leer — und das naechste `put` legte seine Bloecke ueber das Verzeichnis des
         // K8915.  Wer so eine Diskette bewusst anders lesen will: `--fs`.
         if (!passend.empty() && dv->format_) {
@@ -1548,14 +1548,14 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
             }
         }
 
-        // ── Die LEERE tar-Diskette (`tar720_leer`) ───────────────────────────
+        // ── Die LEERE tar-Diskette (`tar_ds80_9x512_leer`) ───────────────────────────
         // Eine Diskette, die ganz aus Nullen besteht, liest die CP/A-Regel sonst als
         // „CP/A, Verzeichnis nicht angelegt (Fuellbyte 0x00)".  Eine formatierte CP/A-
         // Diskette ist aber 0xE5 gefuellt; ganz Null ist die frisch angelegte tar-Diskette
-        // (`create --fs tar720_leer`) oder ein Medium, auf dem nichts steht.  Beides ist
+        // (`create --fs tar_ds80_9x512_leer`) oder ein Medium, auf dem nichts steht.  Beides ist
         // verlustfrei: wer in die Diskette ein .tar schreibt, ueberschreibt nur Nullen.
         // Der Preis ist ausdruecklich in Kauf genommen: eine mit Nullen gefuellte
-        // CP/A-Diskette erscheint als „tar720_leer"; `--fs cpa_auto` stellt es richtig.
+        // CP/A-Diskette erscheint als „tar_ds80_9x512_leer"; `--fs cpa_auto` stellt es richtig.
         // Eine nur teilweise geladene physische Diskette wird NICHT geprueft (ganz Null
         // laesst sich erst nach dem vollen Lesen sagen).
         if (passend.empty() && !dv->abgeleitet_ && !tar_leer_kandidaten.empty()) {
@@ -1649,7 +1649,7 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
         }
 
         // ── Deckungsgleiche Profile sind keine Mehrdeutigkeit (Entwurf 34 §6) ─
-        // Eine OS/M-640K-Systemdiskette passt auf `osm640` UND `scpx640`: gleiche
+        // Eine OS/M-640K-Systemdiskette passt auf `osm_ds80_16x256_boot` UND `scpx_ds80_16x256_boot`: gleiche
         // Geometrie, gleiche Lage, gleiche Bloecke, gleiches Verzeichnis — beide lesen
         // Byte fuer Byte dasselbe.  Das ist keine zweite Deutung, sondern derselbe
         // Datentraeger mit einem genaueren Namen; ohne diese Regel hiesse jede solche
@@ -1697,15 +1697,15 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
         // ≡ leere SCPX-8915-Diskette).  Kein Befund, aber ein Hinweis mit dem Ausweg —
         // wer die Diskette fuer den K8915 fuellen will, muss es jetzt sagen.
         // Nicht bei den 1715-Profilen: ihr Ladekopf (F002H/F003H) ist ein Nachweis, und
-        // `scp1715` ist keine Lesart einer leeren Datendiskette, sondern eine Systemdiskette.
+        // `scp1715_ds80_5x1024_boot` ist keine Lesart einer leeren Datendiskette, sondern eine Systemdiskette.
         if (dv->profile_->type == FsType::Cpm && !dv->abgeleitet_ && !dv->profile_->dir_boot
             && belegte_plaetze[dv->profile_] == 0) {
-            // `osm800` ist erkennbar, aber nur MIT Urlader — eine leere OS/M-Diskette
+            // `osm_ds80_5x1024_boot` ist erkennbar, aber nur MIT Urlader — eine leere OS/M-Diskette
             // (OS/M-FORMAT schreibt nur 0xE5) traegt keinen und ist von einer leeren
-            // `cpa800` nicht zu unterscheiden.  Wer sie fuer OS/M fuellt, muss es sagen,
+            // `cpa_ds80_5x1024_daten` nicht zu unterscheiden.  Wer sie fuer OS/M fuellt, muss es sagen,
             // sonst landet das erste `put` in den Systemzylindern (Entwurf 34 §4.3).
-            // Nur, wenn die Lage ABWEICHT: auf 640K ist `osm640` deckungsgleich mit
-            // `scpx640`, ein Hinweis waere dort blosses Rauschen.
+            // Nur, wenn die Lage ABWEICHT: auf 640K ist `osm_ds80_16x256_boot` deckungsgleich mit
+            // `scpx_ds80_16x256_boot`, ein Hinweis waere dort blosses Rauschen.
             auto andereLage = [&](const FsProfile* p) {
                 return p->data_cyl != dv->profile_->data_cyl
                     || p->data_head != dv->profile_->data_head
@@ -1888,7 +1888,7 @@ const FsProfile* tarStromProfil(const FsCatalog& cat, const FsProfile* p) {
 }
 
 /// Loest die Angabe `format` eines NEUEN tar-Mediums auf: ein Katalogformat (lineares tar, wie
-/// bisher) oder der Name eines tar-Profils mit Layout (`tar_mutos8k_26x128_mfm`, `tar_mutos8k_26x128_fm`).
+/// bisher) oder der Name eines tar-Profils mit Layout (`tar_ss77_26x128`, `tar_fm_ss77_26x128`).
 bool tarZielAufloesen(const std::string& name, const FormatCatalog& formats, const FsCatalog& cat,
                       const DiskFormat*& fmt, const FsProfile*& prof, std::string& err) {
     if (const FsProfile* p = cat.find(name); p && p->type == FsType::Tar && p->mutos8k_layout) {
@@ -2545,7 +2545,7 @@ bool DiskVolume::tarExport(const std::string& ziel, uint64_t* bytes) const {
                     "einzeln oeffnen (jede ergibt ihr Teilstueck, mit `cat` setzt man sie zusammen); "
                     "zum Auspacken genuegt `tar-satz --to`.");
     if (const TarFileSystem* t = tarFs(); t && t->leer())
-        return fail("Die Diskette ist leer (tar720 leer) - es gibt nichts zu exportieren.");
+        return fail("Die Diskette ist leer (tar_ds80_9x512 leer) - es gibt nichts zu exportieren.");
     if (profile_ && !istTar())
         return fail("Diese Diskette traegt ein Dateisystem (" + profile_->name + "), keinen tar-Strom.");
     std::vector<uint8_t> strom;
@@ -4370,7 +4370,7 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
 
     if (profil->type == FsType::Tar && !profil->leer) {
         err = "Eine tar-Diskette mit Inhalt entsteht nicht per Anlegen: anlegen laesst sich nur die "
-              "LEERE tar-Diskette (tar720_leer), danach Dateien einfuegen oder ein .tar schreiben.";
+              "LEERE tar-Diskette (tar_ds80_9x512_leer), danach Dateien einfuegen oder ein .tar schreiben.";
         return nullptr;
     }
 
@@ -4476,7 +4476,7 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
         v.head  = SectorSpace::kAllHeads;
         v.space = std::make_unique<SectorSpace>(dv->disk_->medium(), *fmt);
         if (profil->type == FsType::Tar) {
-            // tar720_leer: ganz Null (DiskImage::create fuellt mit 0xE5 wie eine CP/M-Diskette).
+            // tar_ds80_9x512_leer: ganz Null (DiskImage::create fuellt mit 0xE5 wie eine CP/M-Diskette).
             // tar braucht keinen UDOS-Gap, also geht auch .img/.cqm/.td0/.imd; das Medium bleibt gueltig
             // formatiert (Adressmarken, CRCs), nur die Nutzdaten sind Null.
             // Im MUTOS-Layout nur der Datenbereich ab Zylinder 1 (Zylinder 0 bleibt unberuehrt).

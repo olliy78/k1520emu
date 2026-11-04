@@ -20,12 +20,12 @@ BOOT = PROJECT_ROOT / "data" / "bootsektoren"
 
 #: (Dateisystem, Bootabbild, Name der Systemdatei) -- alle hinterlegten Abbilder
 PROFILE = [
-    ("microdos800", "boot_microdos_1526.bin", "MicroDOS.SYS"),
-    ("microdos800", "boot_microdos_1526_k7636.bin", "MicroDOS.SYS"),
-    ("microdos200", "boot_microdos_1526_200k.bin", "MicroDOS.SYS"),
-    ("microdos200", "boot_microdos_1526_200k_k7636.bin", "MicroDOS.SYS"),
-    ("microdos128", "boot_microdos_1526_128.bin", "MicroDOS.SYS"),
-    ("microdos1715", "boot_microdos_1715.bin", "MICRODOS.SYS"),
+    ("microdos_ds80_5x1024_boot", "boot_microdos_1526.bin", "MicroDOS.SYS"),
+    ("microdos_ds80_5x1024_boot", "boot_microdos_1526_k7636.bin", "MicroDOS.SYS"),
+    ("microdos_ss40_5x1024_boot", "boot_microdos_1526_200k.bin", "MicroDOS.SYS"),
+    ("microdos_ss40_5x1024_boot", "boot_microdos_1526_200k_k7636.bin", "MicroDOS.SYS"),
+    ("microdos_ss40_26x128_boot", "boot_microdos_1526_128.bin", "MicroDOS.SYS"),
+    ("microdos1715_ds80_5x1024_boot", "boot_microdos_1715.bin", "MICRODOS.SYS"),
 ]
 IDS = [p[1] for p in PROFILE]
 
@@ -116,14 +116,14 @@ def test_beschreibung_nennt_tastatur_und_laufwerke(qt_app):
     from app.core_binding.k1520disk import filesystems
     nach_fs, _ = bootsektoren.brauchbare({f.name: f.boot_capacity for f in filesystems()},
                                          [(PROJECT_ROOT / "data" / "bootsektor.yaml", False)])
-    t800 = [e.description for e in nach_fs["microdos800"]]
-    t200 = [e.description for e in nach_fs["microdos200"]]
+    t800 = [e.description for e in nach_fs["microdos_ds80_5x1024_boot"]]
+    t200 = [e.description for e in nach_fs["microdos_ss40_5x1024_boot"]]
     assert any("K7637" in t and "K5601" in t for t in t800), t800
     assert any("K7636" in t and "K5601" in t for t in t800), t800
     assert any("K7637" in t and "K5600.10" in t for t in t200), t200
     assert any("K7636" in t and "K5600.10" in t for t in t200), t200
     assert not any("K5600.20" in t for t in t200 + t800)
-    t128 = [e.description for e in nach_fs["microdos128"]]
+    t128 = [e.description for e in nach_fs["microdos_ss40_26x128_boot"]]
     assert any("K7637" in t and "K5600.10" in t and "V0.6" in t for t in t128), t128
 
 
@@ -243,7 +243,7 @@ def test_archiv_traegt_dateien_attribute_und_den_rueckweg(window, tmp_path, fs, 
         assert "dateien/cpm-dateiangaben.txt" in namen, namen
         blatt = z.read("dateien/cpm-dateiangaben.txt").decode("utf-8")
         # das Beiblatt fuehrt nur Dateien mit Angaben: MICRODOS.SYS (1715) traegt SYS, MicroDOS.SYS (1526) nicht
-        assert (sysname in blatt) == (fs == "microdos1715")
+        assert (sysname in blatt) == (fs == "microdos1715_ds80_5x1024_boot")
         assert f"dateien/{sysname}" in namen
         assert {"dateien/B.COM", "dateien/NUR.LES"} <= set(namen)
         auspack = tmp_path / "aus"

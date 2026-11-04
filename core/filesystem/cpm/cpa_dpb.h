@@ -16,9 +16,9 @@
  *
  * Damit ist jede CP/A-formatierte Diskette lesbar, ohne dass ihr Format im Katalog steht;
  * und die Werte sind nicht geschaetzt, sondern die des Originals.  Gegenprobe: die
- * Regel reproduziert die von Hand nachgemessenen Profile `cpa780` (4 Systemspuren,
- * 2 KB, 128 Eintraege) und `scpx798` exakt — siehe `tests/unit/filesystem/test_cpa_dpb.cpp`.
- * Und sie korrigierte einen geratenen Katalogwert: `cpa800` hat **192** Verzeichnisplaetze,
+ * Regel reproduziert die von Hand nachgemessenen Profile `cpa_ds80_5x1024_boot` (4 Systemspuren,
+ * 2 KB, 128 Eintraege) und `scpx_ds80_5x1024_boot` exakt — siehe `tests/unit/filesystem/test_cpa_dpb.cpp`.
+ * Und sie korrigierte einen geratenen Katalogwert: `cpa_ds80_5x1024_daten` hat **192** Verzeichnisplaetze,
  * am laufenden CP/A nachgewiesen (`DiskToolNeueDisketten.CpaFindetDateiJenseitsVonPlatz128`).
  *
  * ### Rangfolge im Werkzeug

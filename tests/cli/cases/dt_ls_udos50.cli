@@ -3,5 +3,5 @@
 tool:   k1520disktool
 disk:   udos50_640k_a5120_system.img
 run:    ls %DISK%
-expect: Dateisystem: udos50 (erkannt)
+expect: Dateisystem: udos50_ds80_16x256 (erkannt)
 exit:   0

@@ -7,7 +7,7 @@ file a.bin:
   Erste Datei.
 file b.bin:
   Zweite Datei.
-setup_run: create %neu.hfe% --fs sios_ss40 --label RM
+setup_run: create %neu.hfe% --fs sios_ss40_26x128 --label RM
 setup_run: put %neu.hfe% %a.bin% --as ERSTE
 setup_run: rm %neu.hfe% ERSTE
 setup_run: put %neu.hfe% %b.bin% --as ZWEITE

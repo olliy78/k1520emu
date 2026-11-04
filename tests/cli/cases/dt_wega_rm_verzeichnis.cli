@@ -5,7 +5,7 @@ tool:   k1520disktool
 tmpfile w.img:
 file a:
   inhalt
-setup_run: create %w.img% --fs wega720
+setup_run: create %w.img% --fs wega_ds80_9x512
 setup_run: put %w.img% %a% --as usr/x/a
 run:    rm %w.img% usr/x
 expect: ist nicht leer

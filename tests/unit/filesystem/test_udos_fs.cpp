@@ -71,7 +71,7 @@ struct Seite {
 };
 
 Seite oeffne(uint8_t head, const char* datei = "udos_boot_scp.hfe",
-             const char* fsname = "udos_ds77") {
+             const char* fsname = "udos_ds77_26x128") {
     Seite s;
     const FsProfile* p = dateisysteme().find(fsname);
     if (!p) { s.error = "Dateisystem unbekannt"; return s; }
@@ -153,7 +153,7 @@ TEST(UdosFileSystem, ErkenntBeideSeitenAlsUdos) {
     for (uint8_t h = 0; h < 2; ++h) {
         Seite s = oeffne(h);
         ASSERT_TRUE(s.space != nullptr);
-        const FsProfile* p = dateisysteme().find("udos_ds77");
+        const FsProfile* p = dateisysteme().find("udos_ds77_26x128");
         ASSERT_NE(p, nullptr);
         std::string warum;
         EXPECT_TRUE(UdosFileSystem::looksLikeUdos(*s.space, *p, h, &warum))
@@ -162,7 +162,7 @@ TEST(UdosFileSystem, ErkenntBeideSeitenAlsUdos) {
 }
 
 TEST(UdosFileSystem, ErkenntEineCpaDisketteNichtAlsUdos) {
-    const FsProfile* p = dateisysteme().find("udos_ds77");
+    const FsProfile* p = dateisysteme().find("udos_ds77_26x128");
     ASSERT_NE(p, nullptr);
     auto disk = DiskImage::open(fixture("cpa_cpa780_k5601_clock.hfe"), std::nullopt, true);
     ASSERT_NE(disk, nullptr);
@@ -362,7 +362,7 @@ private:
 
 Seite oeffneSchreibbar(const std::string& pfad, uint8_t head) {
     Seite s;
-    const FsProfile* p = dateisysteme().find("udos_ds77");
+    const FsProfile* p = dateisysteme().find("udos_ds77_26x128");
     if (!p) { s.error = "Dateisystem unbekannt"; return s; }
     const DiskFormat* f = formate().find(p->format);
     if (!f) { s.error = "Format unbekannt"; return s; }
@@ -626,7 +626,7 @@ TEST(UdosFileSystemWrite, MkfsLegtEinBenutzbaresDateisystemAn) {
         ASSERT_TRUE(leer->flush());
     }
 
-    const FsProfile* p = dateisysteme().find("udos_ds77");
+    const FsProfile* p = dateisysteme().find("udos_ds77_26x128");
     ASSERT_NE(p, nullptr);
     const DiskFormat* f = formate().find(p->format);
 

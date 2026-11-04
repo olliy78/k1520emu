@@ -3,7 +3,7 @@
 tool:   k1520disktool
 tmpfile leer.img:
 tmpfile aus.tar:
-setup_run: create %leer.img% --fs tar720_leer
+setup_run: create %leer.img% --fs tar_ds80_9x512_leer
 run:    tar-export %leer.img% %aus.tar%
 expect: leer
 exit:   1

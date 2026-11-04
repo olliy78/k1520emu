@@ -133,7 +133,7 @@ def test_ls_lang_zeigt_typ_und_freiplatz(cli, capsys):
     rc = cli("ls", "-l", "-q")
     aus = capsys.readouterr()
     assert rc == 0
-    assert "udos_ds77" in aus.out
+    assert "udos_ds77_26x128" in aus.out
     assert "Side0" in aus.out and "Side1" in aus.out
     assert "frei von" in aus.out
 
@@ -143,7 +143,7 @@ def test_info_nennt_die_herkunft(cli, capsys):
     aus = capsys.readouterr()
     assert rc == 0
     assert "echtes Laufwerk" in aus.out
-    assert "udos_ds77" in aus.out
+    assert "udos_ds77_26x128" in aus.out
 
 
 def test_get_holt_eine_datei_byteweise_gleich(cli, capsys, tmp_path, hfe):

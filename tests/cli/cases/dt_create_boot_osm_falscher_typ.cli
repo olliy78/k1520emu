@@ -8,6 +8,6 @@ poke:   %boot.bin% 0 fd21480c3100403a7e0c
 poke:   %boot.bin% 7e 7700
 poke:   %boot.bin% 80 5038303030535953
 poke:   %boot.bin% 3fff 00
-run:    create %neu.img% --fs osm640 --boot %boot.bin%
+run:    create %neu.img% --fs osm_ds80_16x256_boot --boot %boot.bin%
 expect: Laufwerkstyp 7
 exit:   1

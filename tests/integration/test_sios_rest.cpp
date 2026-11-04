@@ -107,7 +107,7 @@ struct Rig {
     }
 };
 
-/// Datendiskette wie `create --fs sios_ss40` + `put`.
+/// Datendiskette wie `create --fs sios_ss40_26x128` + `put`.
 std::string datendiskette(const std::string& name,
                           const std::vector<std::pair<std::string, std::string>>& dateien) {
     const std::string pfad = (fs::temp_directory_path() / name).string();
@@ -116,7 +116,7 @@ std::string datendiskette(const std::string& name,
     fs::create_directories(q);
     for (auto& [n, t] : dateien) std::ofstream(q / n, std::ios::binary) << t;
     std::string err;
-    auto v = DiskVolume::create(pfad, "sios_ss40", "TEST01", formate(), dateisysteme(), err);
+    auto v = DiskVolume::create(pfad, "sios_ss40_26x128", "TEST01", formate(), dateisysteme(), err);
     EXPECT_TRUE(v) << err;
     if (v) { TransferOptions to; EXPECT_TRUE(v->insertAll(q.string(), to)) << v->lastError(); }
     fs::remove_all(q);
@@ -466,7 +466,7 @@ TEST(SiosRest, ProgrammdisketteInATauschen) {
 
 // 5a. INIT-Menue "2 DOUBLE DENSITY, DOUBLE TRACKS" (V 1.4): die Eingabe gehoert an das MENUE hinter
 // "5,25" DISKETTE" (nicht an die Frage nach 8"; dort ergab sie ERR 90).  Ergebnis ist eine 80-Zylinder-
-// Diskette (Spuren 01...76 laut Anzeige), die das DiskTool als sios_ss80 erkennt.
+// Diskette (Spuren 01...76 laut Anzeige), die das DiskTool als sios_ss80_26x128 erkennt.
 TEST(SiosRest, InitDoubleTracksLegtEine80ZylinderDisketteAn) {
     const std::string z = leerdiskette("K5601", "k1520_sios_rest_w5a.hfe");
     Rig11 r;
@@ -478,7 +478,7 @@ TEST(SiosRest, InitDoubleTracksLegtEine80ZylinderDisketteAn) {
     auto v = DiskVolume::open(z, "", formate(), dateisysteme(), err);
     ASSERT_TRUE(v) << err;
     ASSERT_TRUE(v->hasFileSystem());
-    EXPECT_EQ(v->profile().name, "sios_ss80");
+    EXPECT_EQ(v->profile().name, "sios_ss80_26x128");
     EXPECT_EQ(v->check(FsCheckLevel::Schnell, false).zaehlerAb(FsSeverity::Warnung), 0);
     fs::remove(z);
 }

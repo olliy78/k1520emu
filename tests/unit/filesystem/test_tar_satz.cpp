@@ -223,7 +223,7 @@ TEST(TarSatz, RundlaufInAllenContainernUndFormaten) {
 
 TEST(TarSatz, GemischtesFormatIstKeinSatzformat) {
     std::string err;
-    auto v = DiskVolume::tarSatzNeu("cpa780", "/tmp/x.img", formate(), dateisysteme(), err);
+    auto v = DiskVolume::tarSatzNeu("ds80_3t26x128-5x1024", "/tmp/x.img", formate(), dateisysteme(), err);
     EXPECT_FALSE(v);
     EXPECT_NE(err.find("nicht geeignet"), std::string::npos) << err;
     auto w = DiskVolume::tarSatzNeu("gibt_es_nicht", "/tmp/x.img", formate(), dateisysteme(), err);
@@ -240,7 +240,7 @@ TEST(TarSatz, EinzeldisketteMitUeberlaufWirdBeimSpeichernZumSatz) {
     std::string err;
     const std::string einzel = o / "e.img";
     {
-        auto v = DiskVolume::create(einzel, "tar720_leer", "", formate(), dateisysteme(), err);
+        auto v = DiskVolume::create(einzel, "tar_ds80_9x512_leer", "", formate(), dateisysteme(), err);
         ASSERT_TRUE(v) << err;
         ASSERT_TRUE(einfuegen(*v, quelle(o, "klein", muster(1000, 8)), "klein")) << v->lastError();
         ASSERT_TRUE(v->flush());
@@ -375,7 +375,7 @@ TEST(TarSatz, PhysischSchreibenIstFuerSaetzeGesperrtMitBegruendung) {
     EXPECT_NE(grund.find("Einzelabbilder"), std::string::npos) << grund;
     // Eine gewoehnliche Diskette hat diesen Grund nicht.
     const std::string p = o / "e.img";
-    auto e = DiskVolume::create(p, "tar720_leer", "", formate(), dateisysteme(), err);
+    auto e = DiskVolume::create(p, "tar_ds80_9x512_leer", "", formate(), dateisysteme(), err);
     ASSERT_TRUE(e) << err;
     EXPECT_TRUE(e->physischSchreibenGrund().empty());
     // Mit ungespeicherten Aenderungen stimmt das Medium nicht mit dem Strom ueberein: erst speichern.

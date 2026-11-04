@@ -316,7 +316,7 @@ TEST(TarNeu, ContainerUeberDisketteGroesseWirdEinSatz) {
     // Eine Einzeldiskette (720K, frisch angelegt): der Container sprengt sie.
     std::string err;
     const std::string einzel = o / "e.img";
-    auto v = DiskVolume::create(einzel, "tar720_leer", "", formate(), dateisysteme(), err);
+    auto v = DiskVolume::create(einzel, "tar_ds80_9x512_leer", "", formate(), dateisysteme(), err);
     ASSERT_TRUE(v) << err;
     const TarDateiUrteil u = v->tarDateiBeurteilen(o / "gross.tar");
     ASSERT_TRUE(u.ok) << u.fehler;
@@ -342,7 +342,7 @@ TEST(TarNeu, ContainerPasstAufEinzelDisketteGehtInDasselbeAbbild) {
     std::string err;
     const std::string einzel = o / "p.img";
     {
-        auto v = DiskVolume::create(einzel, "tar720_leer", "", formate(), dateisysteme(), err);
+        auto v = DiskVolume::create(einzel, "tar_ds80_9x512_leer", "", formate(), dateisysteme(), err);
         ASSERT_TRUE(v) << err;
         const TarDateiUrteil u = v->tarDateiBeurteilen(o / "k.tar");
         ASSERT_TRUE(u.als_container) << u.container_grund;
@@ -414,7 +414,7 @@ TEST(TarNeu, LeereEinzelDisketteBietetBeideWegeUndJederFuehrtZumArchiv) {
         SCOPED_TRACE(als_container ? "Container" : "Datei");
         const std::string pfad = o / (als_container ? "c.hfe" : "d.hfe");
         {
-            auto v = DiskVolume::create(pfad, "tar720_leer", "", formate(), dateisysteme(), err);
+            auto v = DiskVolume::create(pfad, "tar_ds80_9x512_leer", "", formate(), dateisysteme(), err);
             ASSERT_TRUE(v) << err;
             const TarDateiUrteil u = v->tarDateiBeurteilen(o / "paket.tar");
             ASSERT_TRUE(u.ok) << u.fehler;
@@ -441,7 +441,7 @@ TEST(TarNeu, GeoeffneteTarDisketteSchreibtInsSelbeAbbildZurueck) {
     std::string err;
     const std::string pfad = o / "ariane1.cqm";
     {
-        auto v = DiskVolume::create(pfad, "tar720_leer", "", formate(), dateisysteme(), err);
+        auto v = DiskVolume::create(pfad, "tar_ds80_9x512_leer", "", formate(), dateisysteme(), err);
         ASSERT_TRUE(v) << err;
         ASSERT_TRUE(einfuegen(*v, quelle(o, "a", muster(2000, 61)), "a")) << v->lastError();
         ASSERT_TRUE(v->flush()) << v->lastError();
@@ -480,7 +480,7 @@ TEST(TarNeu, GeoeffneteTarDisketteWaechstZumSatz) {
     std::string err;
     const std::string pfad = o / "ariane1.img";
     {
-        auto v = DiskVolume::create(pfad, "tar720_leer", "", formate(), dateisysteme(), err);
+        auto v = DiskVolume::create(pfad, "tar_ds80_9x512_leer", "", formate(), dateisysteme(), err);
         ASSERT_TRUE(v) << err;
         ASSERT_TRUE(v->flush());
     }
@@ -513,7 +513,7 @@ TEST(TarNeu, TarDisketteSektorenSperreUndSpeichernUnter) {
     std::string err;
     const std::string pfad = o / "s.img";
     {
-        auto v = DiskVolume::create(pfad, "tar720_leer", "", formate(), dateisysteme(), err);
+        auto v = DiskVolume::create(pfad, "tar_ds80_9x512_leer", "", formate(), dateisysteme(), err);
         ASSERT_TRUE(v) << err;
         ASSERT_TRUE(einfuegen(*v, quelle(o, "a", muster(2000, 70)), "a")) << v->lastError();
         ASSERT_TRUE(v->flush()) << v->lastError();

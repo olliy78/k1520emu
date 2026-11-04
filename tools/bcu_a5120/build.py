@@ -14,7 +14,7 @@ satz2_OhneSYL.1/disk.img zurueck (NIE aendern):
 
   * Die **Arbeitsdiskette** ist der Beleg, mit dem DiskTool unveraendert nach .hfe gewandelt
     (`save-as`).  Ihre Systemspuren sind das Bootabbild data/bootsektoren/boot_bcu12_ohnesyl.bin.
-  * Die **Startdiskette** wird GEBAUT: `create --fs bcu880_syl --boot boot_bcu12_syl_k7023.bin`
+  * Die **Startdiskette** wird GEBAUT: `create --fs bcu880_ss40_26x128_syl --boot boot_bcu12_syl_k7023.bin`
     (das Bootabbild = Zylinder 0-4 des Belegs; das DiskTool prueft Lader und Selbstpruefung vor dem
     Anlegen).  Gegenprobe: zurueck nach .img muss der Beleg sein, Sektor fuer Sektor — damit ist
     der Bau aus dem Bootabbild bewiesen, und jeder kann sich mit demselben Aufruf eine neue
@@ -63,23 +63,23 @@ DISKETTEN = {
     # ist der Beleg des Baus, nicht einer Originaldiskette
     'a5120_bcu21_k5600-10_eigenbau-syl-v21.hfe':
         (os.path.join(REPO, 'tests', 'fixtures', 'disks',
-                      'bcu21_ss40-26x128_k5600-10_eigenbau-syl-v21.img'), ['--fs', 'bcu880_syl']),
+                      'bcu21_ss40-26x128_k5600-10_eigenbau-syl-v21.img'), ['--fs', 'bcu880_ss40_26x128_syl']),
 }
 #: Diskette in disks/ -> (Beleg, Dateisystem, Bootabbild) — mit `create --boot` GEBAUT
 GEBAUT = {
     'a5120_bcu12_k5600-10_start-syl.hfe':
-        (os.path.join(BELEGE, 'satz2_SYL_auf_Spur1', 'disk.img'), 'bcu880_syl',
+        (os.path.join(BELEGE, 'satz2_SYL_auf_Spur1', 'disk.img'), 'bcu880_ss40_26x128_syl',
          os.path.join(BOOTSEKTOREN, 'boot_bcu12_syl_k7023.bin')),
     # EIGENBAU (kein Beleg, doc/a5120_alt/bcu.md §12): Startdiskette MIT Dateisystem (nur als A:)
     'a5120_bcu12_k5600-10_kombi40-eigenbau.hfe':
-        (None, 'bcu880_kombi', os.path.join(BOOTSEKTOREN, 'boot_bcu12_kombi_k7023.bin')),
+        (None, 'bcu880_ss40_26x128_kombi', os.path.join(BOOTSEKTOREN, 'boot_bcu12_kombi_k7023.bin')),
     # dasselbe fuer 80 Spuren (K5600.20, 96 tpi)
     'a5120_bcu12_k5600-20_kombi80-eigenbau.hfe':
-        (None, 'bcu880_kombi80', os.path.join(BOOTSEKTOREN, 'boot_bcu12_kombi80_k7023.bin')),
+        (None, 'bcu880_ss80_26x128_kombi', os.path.join(BOOTSEKTOREN, 'boot_bcu12_kombi80_k7023.bin')),
 }
-#: Arbeitsdiskette 80 Spuren (EIGENBAU): `create --fs bcu880_80 --boot` + die Dateien der Beleg-Arbeitsdiskette
+#: Arbeitsdiskette 80 Spuren (EIGENBAU): `create --fs bcu880_ss80_26x128_arbeit --boot` + die Dateien der Beleg-Arbeitsdiskette
 ARBEIT80 = 'a5120_bcu12_k5600-20_arbeit80-eigenbau.hfe'
-#: Arbeitsdiskette 40 Spuren (EIGENBAU, K5600.10): `create --fs bcu880 --boot` + dieselben Dateien
+#: Arbeitsdiskette 40 Spuren (EIGENBAU, K5600.10): `create --fs bcu880_ss40_26x128_arbeit --boot` + dieselben Dateien
 ARBEIT40 = 'a5120_bcu12_k5600-10_arbeit40-eigenbau.hfe'
 #: Kombi-Bootabbild -> (Startabbild, Spurzahl) fuer tools/bcu_kombi_bau.py
 KOMBI_ABBILDER = {
@@ -231,10 +231,10 @@ def bauen(tool, wurzel):
             _bauen(tool, beleg, fs, boot, ziel, tmp)
             print(f'{name}: gebaut aus {os.path.relpath(boot, REPO)}')
         ziel = _db.diskpfad(wurzel, ARBEIT80)
-        _arbeit_neu(tool, ziel, tmp, 'bcu880_80')
+        _arbeit_neu(tool, ziel, tmp, 'bcu880_ss80_26x128_arbeit')
         print(f'{ARBEIT80}: gebaut (System + Dateien der Arbeitsdiskette)')
         ziel = _db.diskpfad(wurzel, ARBEIT40)
-        _arbeit_neu(tool, ziel, tmp, 'bcu880')
+        _arbeit_neu(tool, ziel, tmp, 'bcu880_ss40_26x128_arbeit')
         print(f'{ARBEIT40}: gebaut (System + Dateien der Arbeitsdiskette)')
     ziel = _db.diskpfad(wurzel, BOOTBAND)
     os.makedirs(os.path.dirname(ziel), exist_ok=True)
@@ -273,7 +273,7 @@ def pruefen(tool, wurzel):
                 print(f'{name}: ok')
             else:
                 print(f'{name}: ist nicht der Bau aus {os.path.relpath(boot, REPO)}'); ok = False
-        for name, fs in ((ARBEIT80, 'bcu880_80'), (ARBEIT40, 'bcu880')):
+        for name, fs in ((ARBEIT80, 'bcu880_ss80_26x128_arbeit'), (ARBEIT40, 'bcu880_ss40_26x128_arbeit')):
             ist = _db.diskpfad(wurzel, name)
             soll = os.path.join(tmp, name)
             _arbeit_neu(tool, soll, tmp, fs)

@@ -41,7 +41,7 @@ const char* kKeine      = "Keine RAF-Karte vorhanden!";
     std::string f, err;
     static const FormatCatalog fk = FormatCatalog::loadDefault(&f);
     static const FsCatalog     fs = FsCatalog::loadDefault(fk, &f);
-    auto vol = DiskVolume::open(pfad, "scpx640", fk, fs, err, /*read_only=*/false);
+    auto vol = DiskVolume::open(pfad, "scpx_ds80_16x256_boot", fk, fs, err, /*read_only=*/false);
     if (!vol) return ::testing::AssertionFailure() << err;
     FileRef ref;
     ref.name = datei;

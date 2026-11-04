@@ -5,7 +5,7 @@ disk:   cpa_cpa780_k5601_clock.img
 tmpfile kopie.dmk:
 setup_run: save-as %DISK% %kopie.dmk%
 run:    ls %kopie.dmk%
-expect: cpa780
+expect: cpa_ds80_5x1024_boot
 expect: PIP.COM
 expect: 24 Dateien
 exit:   0

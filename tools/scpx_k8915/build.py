@@ -18,7 +18,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 import diskbau as db  # noqa: E402
 
-DISK = db.Diskette(__file__, 'k8915_scpx8915_v24_system.hfe', fs='scpx8915', boot='boot_scpx8915_v24.bin')
+DISK = db.Diskette(__file__, 'k8915_scpx8915_v24_system.hfe', fs='scpx8915_ds80_5x1024_boot', boot='boot_scpx8915_v24.bin')
 HIER = DISK.hier
 
 

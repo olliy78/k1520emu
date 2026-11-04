@@ -58,16 +58,16 @@ K5600 = ['K5600.10'] * 2 + [None, None]
 #: Typ 1 = MFS 1.2 (K5600.10), Format 4 = 5 x 1024 B, 40 Spuren, 1 Seite.
 DISKETTEN = {
     'a5120_microdos26_k5601_seriell.hfe': dict(
-        tastatur='k7637', quelle='MicroDOS1526s.hfe', laufwerke=None, profil='microdos800',
+        tastatur='k7637', quelle='MicroDOS1526s.hfe', laufwerke=None, profil='microdos_ds80_5x1024_boot',
         generierung=dict(laufwerke=[('A', '1', '3', '8'), ('B', '2', '3', '8')])),
     'a5120_microdos26_k5601_parallel.hfe': dict(
-        tastatur='k7637', ziel_tastatur='k7636', quelle='MicroDOS1526s.hfe', laufwerke=None, profil='microdos800',
+        tastatur='k7637', ziel_tastatur='k7636', quelle='MicroDOS1526s.hfe', laufwerke=None, profil='microdos_ds80_5x1024_boot',
         generierung=dict(laufwerke=[('A', '1', '3', '8'), ('B', '2', '3', '8')])),
     'a5120_microdos26_k5600_10_seriell.hfe': dict(
-        tastatur='k7637', quelle='MicroDOS1526s_5600.hfe', laufwerke=K5600, profil='microdos200',
+        tastatur='k7637', quelle='MicroDOS1526s_5600.hfe', laufwerke=K5600, profil='microdos_ss40_5x1024_boot',
         generierung=dict(laufwerke=[('A', '1', '1', '4'), ('B', '2', '1', '4')])),
     'a5120_microdos26_k5600_10_parallel.hfe': dict(
-        tastatur='k7637', ziel_tastatur='k7636', quelle='MicroDOS1526s_5600.hfe', laufwerke=K5600, profil='microdos200',
+        tastatur='k7637', ziel_tastatur='k7636', quelle='MicroDOS1526s_5600.hfe', laufwerke=K5600, profil='microdos_ss40_5x1024_boot',
         generierung=dict(laufwerke=[('A', '1', '1', '4'), ('B', '2', '1', '4')])),
 }
 

@@ -121,7 +121,7 @@ TEST_P(Prg710FormatBoot, UdosBautBootfaehigeSystemdiskette) {
  * @test Prg710FormatBoot.ScpxFormatFuenfMal1024
  * @brief SCPX-`FORMAT.COM` mit Format 3 (DD-DS 5 × 1024) auf eine Leerdiskette in B: —
  *        eine Systemkopie bietet FORMAT dabei nicht an.  Das DiskTool erkennt danach
- *        `scpx798` (wie die PRG-Abzuege, §5.4) mit leerem Verzeichnis und ohne
+ *        `scpx_ds80_5x1024_boot` (wie die PRG-Abzuege, §5.4) mit leerem Verzeichnis und ohne
  *        unformatierte Spur.
  */
 TEST_P(Prg710FormatBoot, ScpxFormatFuenfMal1024) {

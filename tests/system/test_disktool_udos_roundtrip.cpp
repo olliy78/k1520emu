@@ -85,8 +85,8 @@ struct Seite {
 
 Seite oeffne(const std::string& pfad, uint8_t head) {
     Seite s;
-    const FsProfile* p = dateisysteme().find("udos_ds77");
-    if (!p) { s.error = "Dateisystem udos_ds77 unbekannt"; return s; }
+    const FsProfile* p = dateisysteme().find("udos_ds77_26x128");
+    if (!p) { s.error = "Dateisystem udos_ds77_26x128 unbekannt"; return s; }
     const DiskFormat* f = formate().find(p->format);
     if (!f) { s.error = "Format unbekannt"; return s; }
     s.disk = DiskImage::open(pfad, std::nullopt, false);

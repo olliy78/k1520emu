@@ -77,7 +77,7 @@ def test_tar_disk_reports_tar_and_unix_fields(tmp_path):
     p = tmp_path / "t.img"
     p.write_bytes(_tar())
     with DiskTool.open(p) as d:
-        assert d.filesystem == "tar720"
+        assert d.filesystem == "tar_ds80_9x512"
         assert d.filesystem_type == "tar"
         assert d.ist_tar and not d.ist_wega and not d.ist_udos and not d.ist_cpm
         assert d.read_only

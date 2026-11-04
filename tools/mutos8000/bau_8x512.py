@@ -76,7 +76,7 @@ def befehle_bauen(ziel, tmp, ausgabe=print):
     zyl0 = os.path.join(tmp, "cmd_zyl0.bin")
     disktool("get", CMD_TD0, "*", "--to", dateien)
     disktool("boot-get", CMD_TD0, zyl0)
-    disktool("create", bau, "--fs", "mutos8k_8x512_mfm", "--blocks", CMD_BLOECKE, "--inodes", CMD_INODES, "--boot", zyl0)
+    disktool("create", bau, "--fs", "mutos8k_ss77_8x512", "--blocks", CMD_BLOECKE, "--inodes", CMD_INODES, "--boot", zyl0)
     disktool("put", bau, dateien)
     pruefen(bau, ausgabe)
     shutil.copyfile(bau, ziel)

@@ -74,7 +74,7 @@ def test_emulator_bietet_kein_5_25_hd(qt_app):
 def _hd_hfe(tmp_path):
     from app.core_binding.k1520disk import DiskTool
     pfad = tmp_path / "hd.hfe"
-    with DiskTool.create(pfad, "dos1200", "HDPROBE") as d:
+    with DiskTool.create(pfad, "dos_ds80_15x512_hd", "HDPROBE") as d:
         d.flush()
     return pfad
 

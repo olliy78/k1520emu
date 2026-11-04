@@ -8,11 +8,11 @@ file a.bin:
   Erste Datei fuer die SIOS-Diskette.
 file b.bin:
   Zweite Datei.
-setup_run: create %neu.hfe% --fs sios_ss40 --label test01
+setup_run: create %neu.hfe% --fs sios_ss40_26x128 --label test01
 setup_run: put %neu.hfe% %a.bin% --as alpha
 setup_run: put %neu.hfe% %b.bin% --as BETA
 run:    ls -l %neu.hfe%
-expect: sios_ss40
+expect: sios_ss40_26x128
 expect: TEST01
 expect: ALPHA
 expect: BOE 01001 EOE 01026 EOD 01002

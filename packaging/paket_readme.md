@@ -51,7 +51,7 @@ Kassette, Erweiterungsmodul), die sich auch einzeln ändern lassen.
    auf B: schreiben). Die Schritt-für-Schritt-Anleitung steht im Handbuch
    (*Hilfe*, Abschnitt „Bootdiskette mit DISGEN erstellen"). Mit dem
    k1520DiskTool geht es ebenso von außen: `k1520disktool-cli create neu.hfe
-   --fs scpx8915 --boot boot.bin` (das Bootabbild `boot.bin` sichert man vorher mit `boot-get`
+   --fs scpx8915_ds80_5x1024_boot --boot boot.bin` (das Bootabbild `boot.bin` sichert man vorher mit `boot-get`
    aus einer vorhandenen Systemdiskette; Näheres: Handbuch des DiskTool).
 
 ## Installieren

@@ -1,6 +1,6 @@
-# UDOS 5.0 am A5120 (BIZ Schwerin 1997): NDOS-Dateisystem auf 16x256 (Profil udos50) bootet
+# UDOS 5.0 am A5120 (BIZ Schwerin 1997): NDOS-Dateisystem auf 16x256 (Profil udos50_ds80_16x256) bootet
 # vom rohen Sektorabbild bis zur Datumsabfrage (~25 Mio. Takte).  Das .img braucht die Geometrie
-# von aussen; die Vorgabe cpa780 laesst den Urlader ins Leere laufen.
+# von aussen; die Vorgabe cpa_ds80_5x1024_boot laesst den Urlader ins Leere laufen.
 tool:    boot_trace
 disk:    udos50_640k_a5120_system.img
 run:     --quiet --json -L /dev/null --format ds80_16x256 --until 'screen ~ "Neues Datum"' -c 100000000 %DISK%

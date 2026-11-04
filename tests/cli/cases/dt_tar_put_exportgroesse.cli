@@ -3,7 +3,7 @@
 tool:   k1520disktool
 tmpfile neu.dmk:
 tmpfile aus.tar:
-setup_run: create %neu.dmk% --fs tar720_leer
+setup_run: create %neu.dmk% --fs tar_ds80_9x512_leer
 setup_run: tar-put %neu.dmk% %CLI_DIR%/../fixtures/p8000/tar_v7_klein.tar
 run:    tar-export %neu.dmk% %aus.tar%
 expect: 3584 Byte (7 Bloecke)

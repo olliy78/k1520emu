@@ -224,7 +224,7 @@ K1520_API uint32_t k1520d_fs_unix_inodes(const char* fs_name);
 
 /* ─── Bootabbild (Systemspuren) ───────────────────────────────────────────── */
 
-/// @brief Ist das Profil die LEERE tar-Diskette (`tar720_leer`; nur Anlegen/Schreiben eines .tar)?
+/// @brief Ist das Profil die LEERE tar-Diskette (`tar_ds80_9x512_leer`; nur Anlegen/Schreiben eines .tar)?
 K1520_API bool k1520d_fs_leer(const char* name);
 
 /**

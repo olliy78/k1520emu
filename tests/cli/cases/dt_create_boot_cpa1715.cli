@@ -6,9 +6,9 @@ tmpfile kopf.bin:
 tmpfile neu.hfe:
 setup_run: boot-get %DISK% %kopf.bin%
 setup_run: get %DISK% @OS.COM --to q
-setup_run: create %neu.hfe% --fs cpa1715 --boot %kopf.bin%
+setup_run: create %neu.hfe% --fs cpa1715_ds80_5x1024_boot --boot %kopf.bin%
 setup_run: put %neu.hfe% q/@OS.COM
 run:    ls %neu.hfe%
-expect: cpa1715
+expect: cpa1715_ds80_5x1024_boot
 expect: @OS.COM
 exit:   0

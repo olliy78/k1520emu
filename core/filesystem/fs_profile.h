@@ -74,7 +74,7 @@ struct FsProfile {
     FsType      type = FsType::Cpm;
 
     /// @brief Erste Spur des Dateisystems.  Der Byte-Offset folgt daraus und wird
-    ///        NIE gepflegt — bei gemischter Geometrie (cpa780) waere er als Spurzahl
+    ///        NIE gepflegt — bei gemischter Geometrie (cpa_ds80_5x1024_boot) waere er als Spurzahl
     ///        gar nicht ausdrueckbar (doc/design/13_k1520disktool.md §6.2).
     uint8_t data_cyl  = 0;
     uint8_t data_head = 0;
@@ -91,7 +91,7 @@ struct FsProfile {
     ///        `mutos_io` fuer 8×512): das Rohgeraet ist die LINEARE Folge der 512-B-Sektoren ab @c data_cyl
     ///        (Block n = Zylinder data_cyl + n/8, Sektor-ID n mod 8 + 1, keine Verschraenkung, kein
     ///        Spurversatz) - YAML `unix_layout: mutos8k_512`.  Auch die Lage des Rohgeraets, nicht nur des
-    ///        tar-Stroms: dasselbe Blockgeraet traegt das UNIX-Dateisystem `mutos8k_8x512_mfm`.
+    ///        tar-Stroms: dasselbe Blockgeraet traegt das UNIX-Dateisystem `mutos8k_ss77_8x512`.
     bool mutos8k_linear = false;
 
     bool allow_img = true;     ///< als rohes Sektorabbild darstellbar (UDOS: nie)
@@ -104,12 +104,12 @@ struct FsProfile {
     int detect_rank = 0;       ///< kleiner = frueher bei mehrdeutiger Erkennung
     /// @brief false = **nur auf Anforderung** (`--fs NAME`, `create --fs NAME`), nie in
     ///        der Erkennung.  Fuer ein Dateisystem, das das Medium nicht von einem
-    ///        anderen unterscheidet — `scpx8915` (K8915, festes OFF 2) ist auf einer
-    ///        LEEREN Diskette dasselbe wie `cpa800` (CP/A, ab Zylinder 0).  Sobald der
+    ///        anderen unterscheidet — `scpx8915_ds80_5x1024_boot` (K8915, festes OFF 2) ist auf einer
+    ///        LEEREN Diskette dasselbe wie `cpa_ds80_5x1024_daten` (CP/A, ab Zylinder 0).  Sobald der
     ///        K8915 darauf geschrieben hat, findet es die CP/A-Regel ohnehin selbst.
     bool detect = true;
 
-    /// @brief Nur `type: tar`: die **leere** tar-Diskette (`tar720_leer`) — ein leeres Archiv, das
+    /// @brief Nur `type: tar`: die **leere** tar-Diskette (`tar_ds80_9x512_leer`) — ein leeres Archiv, das
     ///        wie jede tar-Diskette bearbeitet wird (ein Satz mit einem Abbild; eine `.tar` darauf
     ///        kann als Container gelten, @ref DiskVolume::tarDateiAblegen).  Erkannt wird sie nur an
     ///        einer Diskette, die ganz aus Nullen besteht (siehe disk_volume.cpp, Erkennung).
@@ -136,7 +136,7 @@ struct FsProfile {
     ///        vier die Laufwerks-Parametersaetze; beide gehoeren dem Urlader, nicht dem
     ///        Dateisystem — `list`/`check`/`erase` uebergehen sie, `write` vergibt sie nie,
     ///        und die Erkennung dieses Profils verlangt den Bootkopf ausdruecklich
-    ///        (sonst waere jede Datendiskette zugleich `cpa800` und `cpa1715`).
+    ///        (sonst waere jede Datendiskette zugleich `cpa_ds80_5x1024_daten` und `cpa1715_ds80_5x1024_boot`).
     bool dir_boot = false;
 
     /// @brief Nur CP/M: eine reine **Startdiskette** — der Bereich hinter den Systemspuren

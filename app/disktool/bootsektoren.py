@@ -8,7 +8,7 @@ und stehen in einem Katalog ``bootsektor.yaml``::
     version: 1
     bootsektoren:
       - description: "CP/A am A5120 (K5601)"   # erscheint im Auswahlfeld
-        filesystem:  cpa780                     # Dateisystem aus formats.yaml
+        filesystem:  cpa_ds80_5x1024_boot                     # Dateisystem aus formats.yaml
         file:        bootsektoren/a5120_cpa780.bin   # relativ zu DIESER Datei
 
 Gelesen werden zwei Dateien, in dieser Reihenfolge: der mitgelieferte Katalog
@@ -59,7 +59,7 @@ def _eintraege_aus(datei: Path, eigen: bool) -> Tuple[List[Bootabbild], List[str
             continue
         text = str(e.get("description") or "").strip()
         # `filesystem` darf eine LISTE sein: ein FAT-Bootsektor traegt den BPB der Diskette und
-        # passt deshalb zu jeder Groesse (dos160 … dos2880) - ein Eintrag je Abbild statt je Profil.
+        # passt deshalb zu jeder Groesse (dos_ss40_8x512 … dos_ds80_36x512_ed) - ein Eintrag je Abbild statt je Profil.
         roh_fs = e.get("filesystem")
         fss = [str(x).strip() for x in roh_fs] if isinstance(roh_fs, list) else [str(roh_fs or "").strip()]
         fss = [x for x in fss if x]

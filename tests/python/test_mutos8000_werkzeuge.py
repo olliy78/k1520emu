@@ -72,10 +72,10 @@ def test_bauangaben_werden_geprueft(tmp_path):
     sys.path.insert(0, str(TOOLS))
     import bau_aus_archiv
     f = tmp_path / "bauangaben.yaml"
-    f.write_text("fs: mutos8k_26x128_fm\ninodes: viele\nbloecke: 250\nzylinder0: z.bin\n")
+    f.write_text("fs: mutos8k_fm_ss77_26x128\ninodes: viele\nbloecke: 250\nzylinder0: z.bin\n")
     with pytest.raises(SystemExit, match="Zahl"):
         bau_aus_archiv.bauangaben_lesen(str(f))
-    f.write_text("fs: mutos8k_26x128_fm\n")
+    f.write_text("fs: mutos8k_fm_ss77_26x128\n")
     with pytest.raises(SystemExit, match="fehlt"):
         bau_aus_archiv.bauangaben_lesen(str(f))
 
@@ -151,7 +151,7 @@ def test_wurzel_fuer_mfm_laufwerke_hat_dieselbe_blockabbildung(tmp_path, monkeyp
     mfm = tmp_path / "mfm.hfe"
     bau_aus_archiv.bauen(str(ARCHIV), str(mfm), ausgabe=lambda *_: None, laufwerke="k5601")
     info = subprocess.run([str(DISKTOOL), "info", str(mfm)], capture_output=True, text=True).stdout
-    assert "Format:      ss77_26x128" in info and "Dateisystem: mutos8k_26x128_mfm" in info     # MFM, nicht fm_ss77_26x128
+    assert "Format:      ss77_26x128" in info and "Dateisystem: mutos8k_ss77_26x128" in info     # MFM, nicht fm_ss77_26x128
     # Blockabbildung gleich der FM-Fassung (nur die Anlagezeit ist fluechtig) ...
     assert _ohne_anlagezeit(_lesen(DISKTOOL, mfm, tmp_path, "mfm")) == \
         _ohne_anlagezeit(_lesen(DISKTOOL, WURZEL, tmp_path, "fm"))
@@ -382,7 +382,7 @@ def test_datendisketten_pwd_ist_die_aeltere_fassung():
 
 @braucht_disktool
 @pytest.mark.parametrize("rolle", sorted(ROLLEN))
-@pytest.mark.parametrize("laufwerke,suffix,profil", [("mf3200", "_fm", "mutos8k_26x128_fm"), ("k5601", "_mfm", "mutos8k_26x128_mfm")])
+@pytest.mark.parametrize("laufwerke,suffix,profil", [("mf3200", "_fm", "mutos8k_fm_ss77_26x128"), ("k5601", "_mfm", "mutos8k_ss77_26x128")])
 def test_datendiskette_aus_dem_archiv_ist_die_eingecheckte(tmp_path, monkeypatch, rolle, laufwerke, suffix, profil):
     monkeypatch.setenv("K1520_DISKTOOL", str(DISKTOOL))
     sys.path.insert(0, str(TOOLS))
@@ -573,7 +573,7 @@ def test_8x512_wurzel_und_befehle_sind_die_td0_originale_mit_der_alten_pwd(tmp_p
     assert _holen(ziele["cmd"], tmp_path / "n_cmd") == orig_cmd and len(orig_cmd) == 19
     for z in ziele.values():
         r = subprocess.run([str(DISKTOOL), "info", z], capture_output=True, text=True)
-        assert "mutos8k_8x512_mfm" in r.stdout
+        assert "mutos8k_ss77_8x512" in r.stdout or "mutos8k_ss80_8x512" in r.stdout  # frueher Teilstring von mutos8k_8x512_mfm[_80]
     # die eingecheckten Disketten sind dieselben Inhalte
     assert _holen(FERTIG / "a5120_mutos8000_root_8x512.hfe", tmp_path / "e_root") == neu_root
     assert _holen(FERTIG / "a5120_mutos8000_cmd_8x512.hfe", tmp_path / "e_cmd") == orig_cmd

@@ -8,7 +8,7 @@ file a:
   eins
 file b:
   zwei zwei zwei
-setup_run: create %w.img% --fs wega720
+setup_run: create %w.img% --fs wega_ds80_9x512
 setup_run: put %w.img% %a% --as bin/a
 setup_run: put %w.img% %b% --as usr/lib/x/b
 setup_run: rm %w.img% bin/a

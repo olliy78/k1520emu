@@ -96,7 +96,7 @@ bool zelleWieZgRam(Pc1715Machine& m, int col, int row) {
 }  // namespace
 
 /**
- * @test SCP 3.0 (cpa800, 5 × 1024): S550 → Lader (laedt SC619 nach 2000H, startet den 8275) →
+ * @test SCP 3.0 (cpa_ds80_5x1024_daten, 5 × 1024): S550 → Lader (laedt SC619 nach 2000H, startet den 8275) →
  *       SCP3.SYS → PROFILE.SUB → `A>`.  Das Bild kommt aus dem Bild-RAM, gerastert mit dem
  *       ZG-RAM (Banner Pixel fuer Pixel).
  */

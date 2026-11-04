@@ -40,7 +40,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-/// @brief Byte-Offset des CP/M-Verzeichnisses auf einer `cpa780`-Diskette.
+/// @brief Byte-Offset des CP/M-Verzeichnisses auf einer `cpa_ds80_5x1024_boot`-Diskette.
 ///        Nachgemessen (doc/design/13_k1520disktool.md §6.2): Anfang c2h0.
 constexpr uint64_t kCpa780Dir = 15104;
 constexpr size_t   kPlatz     = 32;
@@ -83,11 +83,11 @@ std::unique_ptr<DiskVolume> oeffne(const std::string& pfad) {
  * Verzeichnisplatz auf Plausibilitaet und weist eine Diskette mit zerstoertem
  * Verzeichnisanfang **ab** — die Pruefung kommt dann gar nicht erst zum Zug
  * (§20 „Eine Diskette, die nicht mountet, wird nicht geprueft").  Der Weg hinein
- * ist derselbe, den auch ein Anwender nimmt: `--fs cpa780`.
+ * ist derselbe, den auch ein Anwender nimmt: `--fs cpa_ds80_5x1024_boot`.
  */
 std::unique_ptr<DiskVolume> oeffneErzwungen(const std::string& pfad) {
     std::string err;
-    auto v = DiskVolume::open(pfad, "cpa780", formate(), dateisysteme(), err);
+    auto v = DiskVolume::open(pfad, "cpa_ds80_5x1024_boot", formate(), dateisysteme(), err);
     EXPECT_TRUE(v) << pfad << ": " << err;
     return v;
 }
@@ -398,7 +398,7 @@ TEST(FsCheckCpmSchaden, WilderBlockzeiger) {
     std::vector<std::pair<std::string, uint64_t>> vorher;
     { auto v = oeffneErzwungen(d); ASSERT_TRUE(v); vorher = bestand(*v); }
 
-    // cpa780 hat 390 Bloecke → 16-Bit-Zeiger; der erste steht bei Offset 16.
+    // cpa_ds80_5x1024_boot hat 390 Bloecke → 16-Bit-Zeiger; der erste steht bei Offset 16.
     schreib(d, platzOffset(slot) + 16, {0x0F, 0x27});          // 9999
 
     auto v = oeffneErzwungen(d);
@@ -441,7 +441,7 @@ TEST(FsCheckCpmSchaden, AngesagteGroesseOhneDeckung) {
 
     // Schreibend, weil dieser Test die Reparatur mitfaehrt.
     std::string err;
-    auto v = DiskVolume::open(d, "cpa780", formate(), dateisysteme(), err,
+    auto v = DiskVolume::open(d, "cpa_ds80_5x1024_boot", formate(), dateisysteme(), err,
                               /*read_only=*/false);
     ASSERT_TRUE(v) << err;
     const FsCheckReport& r = v->check(FsCheckLevel::Schnell, true);
@@ -731,7 +731,7 @@ struct UdosSeite {
 };
 
 UdosSeite udosOeffne(const std::string& pfad, uint8_t head, bool schreibbar,
-                     const char* fsname = "udos_ds77") {
+                     const char* fsname = "udos_ds77_26x128") {
     UdosSeite s;
     s.pfad = pfad;
     const FsProfile* p = dateisysteme().find(fsname);
@@ -887,7 +887,7 @@ const FsCatalog& dateisysteme_mehrdeutig() {
 ///       auffaellt — genau davor warnt die Gegenprobe.
 ///
 /// Der Fall in Zahlen: das Testprofil `scp1700_dir64` unterscheidet sich vom echten
-/// `scp1700` in einer einzigen Angabe — 64 statt 128 Verzeichniseintraege.  Beide
+/// `scp1700_ds80_16x256_boot` in einer einzigen Angabe — 64 statt 128 Verzeichniseintraege.  Beide
 /// mounten, beide melden dieselben zwei (echten) Systemspurbefunde.  Sichtbar sind
 /// aber **43 statt 46 Dateien**: drei Verzeichnisplaetze liegen jetzt in einem
 /// Bereich, den das Profil fuer Daten haelt.
@@ -915,9 +915,9 @@ TEST(FsCheckGegenprobe, EinZuKleinesVerzeichnisVerstecktDateien) {
     EXPECT_EQ(FsSeverity::Info, g[0].severity)
         << "die Diskette ist voellig in Ordnung — das ist keine Warnung";
     EXPECT_EQ(FsLayer::Erkennung, g[0].layer);
-    EXPECT_EQ("scp1700", g[0].object) << g[0].text;
+    EXPECT_EQ("scp1700_ds80_16x256_boot", g[0].object) << g[0].text;
     EXPECT_NE(std::string::npos, g[0].text.find("46 statt 43")) << g[0].text;
-    EXPECT_NE(std::string::npos, g[0].text.find("--fs scp1700")) << g[0].text;
+    EXPECT_NE(std::string::npos, g[0].text.find("--fs scp1700_ds80_16x256_boot")) << g[0].text;
 
     // Und die Kernzusage: die WAHL bleibt, wie sie war.  Eine Automatik daraus koennte
     // bei aehnlichen Profilen hin und her springen — der Anwender saehe bei jedem
@@ -932,7 +932,7 @@ TEST(FsCheckGegenprobe, EinZuKleinesVerzeichnisVerstecktDateien) {
 /// eine Meldung waere blosses Rauschen (E10).
 TEST(FsCheckGegenprobe, DasRichtigeProfilBekommtKeineMeldung) {
     std::string err;
-    auto v = DiskVolume::open(fixture("scp1700_640k_a7100_system.hfe"), "scp1700",
+    auto v = DiskVolume::open(fixture("scp1700_640k_a7100_system.hfe"), "scp1700_ds80_16x256_boot",
                               formate(), dateisysteme_mehrdeutig(), err,
                               /*read_only=*/true);
     ASSERT_TRUE(v) << err;
@@ -958,7 +958,7 @@ TEST(FsCheckGegenprobe, DerAusgelieferteKatalogIstEindeutig) {
         "scp1700_640k_a7100_system.hfe",
         "udos_boot_scp.hfe",            "udos1715_640k_pc1715_system.img",
         "udos50_640k_a5120_system.img",
-        // K8915 (AP-E5a): `scpx8915` steht mit `detect: false` im Katalog und darf
+        // K8915 (AP-E5a): `scpx8915_ds80_5x1024_boot` steht mit `detect: false` im Katalog und darf
         // die drei Systemdisketten nicht mehrdeutig machen.
         "k8915scpx_boot1.hfe",
         "k8915scpx_cpa800_k5601_bios55k-disk900.hfe",
@@ -970,12 +970,12 @@ TEST(FsCheckGegenprobe, DerAusgelieferteKatalogIstEindeutig) {
         EXPECT_TRUE(v->detection().unambiguous)
             << name << ": auch moeglich " << v->detection().alternatives.size();
     }
-    // OS/M (Entwurf 34): eine 640K-Systemdiskette passt auf `osm640` UND `scpx640` —
-    // deckungsgleich, also KEINE Mehrdeutigkeit; 800K liegt allein auf `osm800`.
+    // OS/M (Entwurf 34): eine 640K-Systemdiskette passt auf `osm_ds80_16x256_boot` UND `scpx_ds80_16x256_boot` —
+    // deckungsgleich, also KEINE Mehrdeutigkeit; 800K liegt allein auf `osm_ds80_5x1024_boot`.
     // Synthetisch (Urlader-Merkmale, tests/support/osm_urlader.h).
     for (const auto& [profil, fdconf, groesse] :
-         {std::tuple<const char*, uint8_t, size_t>{"osm640", 0x55, 16384},
-          std::tuple<const char*, uint8_t, size_t>{"osm800", 0x77, 20480}}) {
+         {std::tuple<const char*, uint8_t, size_t>{"osm_ds80_16x256_boot", 0x55, 16384},
+          std::tuple<const char*, uint8_t, size_t>{"osm_ds80_5x1024_boot", 0x77, 20480}}) {
         const std::string d = k1520test::tempPath((std::string("fscheck_eindeutig_") + profil + ".img").c_str());
         const std::string b = d + ".bin";
         k1520test::schreibeDatei(b, k1520test::osmBootabbild(fdconf, groesse));
@@ -1358,7 +1358,7 @@ struct NdosDiskette {
 
 NdosDiskette ndosOeffne(const std::string& pfad, bool schreibbar) {
     NdosDiskette s;
-    const FsProfile* p = dateisysteme().find("udos1715");
+    const FsProfile* p = dateisysteme().find("udos1715_ds80_16x256");
     const DiskFormat* f = p ? formate().find(p->format) : nullptr;
     if (!f) { s.err = "Katalog unvollstaendig"; return s; }
     // Ein `.img` traegt KEINE Geometrie — sie muss mitgegeben werden.  (Bei ZDOS
@@ -1894,10 +1894,10 @@ TEST(FsCheckReparatur, CpmWilderBlockzeigerWirdGestrichen) {
         ASSERT_TRUE(v0);
         vorher_inhalt = inhalte(*v0, "cpmwild_vor");
     }
-    // cpa780 hat 390 Bloecke → 16-Bit-Zeiger; der erste steht bei Offset 16.
+    // cpa_ds80_5x1024_boot hat 390 Bloecke → 16-Bit-Zeiger; der erste steht bei Offset 16.
     schreib(d, platzOffset(platz_nr) + 16, {0x0F, 0x27});      // Block 9999
 
-    auto v = oeffneSchreibbar(d, "cpa780");
+    auto v = oeffneSchreibbar(d, "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v);
     const FsCheckReport& r = v->check(FsCheckLevel::Schnell, true);
     const auto auswahl = waehle(r, "cpm.zeiger.streichen");
@@ -1933,7 +1933,7 @@ TEST(FsCheckReparatur, CpmSatzzahlWirdAngepasst) {
         schreib(d, platzOffset(platz_nr), p);
     }
 
-    auto v = oeffneSchreibbar(d, "cpa780");
+    auto v = oeffneSchreibbar(d, "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v);
     const FsCheckReport& r = v->check(FsCheckLevel::Schnell, true);
     const auto auswahl = waehle(r, "cpm.rc.anpassen");
@@ -2191,7 +2191,7 @@ TEST(FsCheck, EineUnerkannteDisketteNenntDieAblehnungsgruende) {
         EXPECT_EQ(FsLayer::Erkennung, f.layer) << f.id;
         EXPECT_EQ(FsSeverity::Info, f.severity) << f.id;   // ein Fund, kein Schaden
         EXPECT_TRUE(f.repairs.empty()) << f.id << ": Ebene 0 repariert nichts";
-        if (f.object == "cpa780") cpa780_dabei = true;
+        if (f.object == "cpa_ds80_5x1024_boot") cpa780_dabei = true;
     }
     EXPECT_TRUE(cpa780_dabei) << kennungen(r);
 
@@ -2232,15 +2232,15 @@ TEST(FsCheckKeineFalschmeldungen, EineErkannteDisketteHatKeineBefundeDerEbene0) 
 //
 // PC 1715, P8000 und A5120 (UDOS 5.0) legen ihre Disketten Feld fuer Feld gleich an;
 // verschieden ist nur die Fuellung hinter dem Belegungsplan (Spur 17H Sektor 0, Bytes
-// 158H…176H: 00 / 77H / FFH).  Daran haengen die drei Profile `udos1715`, `udos_p8000`,
-// `udos50` — jede Diskette muss genau EINES treffen, sonst waere die Anzeige geraten.
+// 158H…176H: 00 / 77H / FFH).  Daran haengen die drei Profile `udos1715_ds80_16x256`, `udos_p8000_ds80_16x256`,
+// `udos50_ds80_16x256` — jede Diskette muss genau EINES treffen, sonst waere die Anzeige geraten.
 
 /// @test Die drei echten Disketten werden als ihr Rechner erkannt, jeweils eindeutig.
 TEST(NdosSitte, DreiRechnerWerdenAnDerFuellungUnterschieden) {
     const std::pair<const char*, const char*> faelle[] = {
-        {"udos1715_640k_pc1715_system.img", "udos1715"},
-        {"udosP8000_640k_wega.hfe",         "udos_p8000"},
-        {"udos50_640k_a5120_system.img",    "udos50"},
+        {"udos1715_640k_pc1715_system.img", "udos1715_ds80_16x256"},
+        {"udosP8000_640k_wega.hfe",         "udos_p8000_ds80_16x256"},
+        {"udos50_640k_a5120_system.img",    "udos50_ds80_16x256"},
     };
     for (const auto& [datei, profil] : faelle) {
         auto v = oeffne(fixture(datei));
@@ -2254,7 +2254,7 @@ TEST(NdosSitte, DreiRechnerWerdenAnDerFuellungUnterschieden) {
 /// @test `create --fs <profil>` schreibt die Fuellung seines Rechners — die frische
 ///       Diskette wird beim Oeffnen wieder als DIESER Rechner erkannt.
 TEST(NdosSitte, AngelegteDisketteTraegtDieFuellungIhresRechners) {
-    for (const char* profil : {"udos1715", "udos_p8000", "udos50"}) {
+    for (const char* profil : {"udos1715_ds80_16x256", "udos_p8000_ds80_16x256", "udos50_ds80_16x256"}) {
         const std::string pfad = k1520test::tempPath(std::string("k1520_ndos_") + profil + ".img");
         struct Weg { std::string p; ~Weg() { std::error_code e; std::filesystem::remove(p, e); } }
             weg{pfad};

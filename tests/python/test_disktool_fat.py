@@ -45,7 +45,7 @@ def fat_disk(tmp_path):
     (quelle / "sub" / "tief" / "b.bin").write_bytes(b"\x00\x01\x02")
 
     pfad = tmp_path / "dos.img"
-    with DiskTool.create(pfad, "dos720", "PROBE") as d:
+    with DiskTool.create(pfad, "dos_ds80_9x512", "PROBE") as d:
         d.insert_all(quelle)
         d.flush()
     return pfad
@@ -60,7 +60,7 @@ def _eintrag(tool, name):
 def test_filesystem_family_is_fat(fat_disk):
     from app.core_binding.k1520disk import DiskTool
     with DiskTool.open(fat_disk) as d:
-        assert d.filesystem == "dos720"
+        assert d.filesystem == "dos_ds80_9x512"
         assert d.filesystem_type == "fat"
         assert d.ist_fat and d.hat_baum
         assert not (d.ist_udos or d.ist_wega or d.ist_cpm or d.ist_tar)
@@ -111,12 +111,12 @@ def test_lfn_switch(tmp_path):
     pfad = tmp_path / "x.img"
     src = tmp_path / "Lange Datei Name.txt"
     src.write_bytes(b"x")
-    with DiskTool.create(pfad, "dos720", "") as d:
+    with DiskTool.create(pfad, "dos_ds80_9x512", "") as d:
         d.set_fat_lfn(0)
         d.insert(src, "Lange Datei Name.txt")
         d.flush()
         assert [e.name for e in d.list()] == ["LANGED~1.TXT"]
-    with DiskTool.create(tmp_path / "y.img", "dos720", "") as d:
+    with DiskTool.create(tmp_path / "y.img", "dos_ds80_9x512", "") as d:
         d.set_fat_lfn(1)
         d.insert(src, "Lange Datei Name.txt")
         d.flush()
@@ -136,7 +136,7 @@ def _systemdiskette(tmp_path):
     bin_ = tmp_path / "boot.bin"
     bin_.write_bytes(bytes(bild))
     pfad = tmp_path / "sys.img"
-    with DiskTool.create(pfad, "dos720", "SYSQUELLE", boot_image=bin_) as d:
+    with DiskTool.create(pfad, "dos_ds80_9x512", "SYSQUELLE", boot_image=bin_) as d:
         d.set_fat_lfn(0)
         for name, n in (("IO.SYS", 3000), ("DCDOS.SYS", 7000), ("COMMAND.COM", 500)):
             tmp = tmp_path / name
@@ -152,7 +152,7 @@ def test_dos_sys_makes_a_boot_disk(tmp_path):
     from app.core_binding.k1520disk import DiskTool, K1520DiskError
     quelle_pfad, bild = _systemdiskette(tmp_path)
     ziel_pfad = tmp_path / "ziel.img"
-    with DiskTool.create(ziel_pfad, "dos360", "NEU") as ziel, DiskTool.open(quelle_pfad) as quelle:
+    with DiskTool.create(ziel_pfad, "dos_ds40_9x512", "NEU") as ziel, DiskTool.open(quelle_pfad) as quelle:
         bericht = ziel.dos_sys(quelle)
         assert "IO.SYS" in bericht and "DCDOS.SYS" in bericht and "WARNUNG" not in bericht
         ziel.flush()
@@ -169,7 +169,7 @@ def test_dos_sys_makes_a_boot_disk(tmp_path):
 
 def test_dos_sys_requires_system_files(tmp_path):
     from app.core_binding.k1520disk import DiskTool, K1520DiskError
-    with DiskTool.create(tmp_path / "a.img", "dos720", "") as a, DiskTool.create(tmp_path / "b.img", "dos720", "") as b:
+    with DiskTool.create(tmp_path / "a.img", "dos_ds80_9x512", "") as a, DiskTool.create(tmp_path / "b.img", "dos_ds80_9x512", "") as b:
         with pytest.raises(K1520DiskError, match="Systemdiskette"):
             a.dos_sys(b)
 
@@ -182,20 +182,20 @@ def test_boot_catalog_offers_the_dos_loaders_for_every_size():
     kap = {f.name: f.boot_capacity for f in filesystems()}
     nach_fs, warn = bootsektoren.brauchbare(kap)
     assert not [w for w in warn if "boot_dos" in w], warn
-    for fs in ("dos160", "dos180", "dos320", "dos360", "dos360ss80", "dos640", "dos720", "dos800",
-               "dos1200", "dos1440", "dos2880"):
+    for fs in ("dos_ss40_8x512", "dos_ss40_9x512", "dos_ds40_8x512", "dos_ds40_9x512", "dos_ss80_9x512", "dos_ds80_8x512", "dos_ds80_9x512", "dos_ds80_10x512",
+               "dos_ds80_15x512_hd", "dos_ds80_18x512_hd", "dos_ds80_36x512_ed"):
         texte = [e.description for e in nach_fs.get(fs, [])]
         assert any("DCP 3.3" in t for t in texte), (fs, texte)
         assert any("MDISK" in t for t in texte), (fs, texte)
     # jeder Eintrag ist ein ganzer Bootsektor
-    for e in nach_fs["dos720"]:
+    for e in nach_fs["dos_ds80_9x512"]:
         assert e.path.stat().st_size == 512
         d = e.path.read_bytes()
         assert d[510:512] == b"\x55\xAA" and d[0] in (0xEB, 0xE9)
 
 
 @pytest.mark.parametrize("bin_", sorted((PROJECT_ROOT / "data" / "bootsektoren").glob("boot_dos_*.bin")))
-@pytest.mark.parametrize("fs", ["dos720", "dos360", "dos1440"])
+@pytest.mark.parametrize("fs", ["dos_ds80_9x512", "dos_ds40_9x512", "dos_ds80_18x512_hd"])
 def test_create_with_every_hinterlegte_loader(tmp_path, bin_, fs):
     from app.core_binding.k1520disk import DiskTool
     pfad = tmp_path / "b.img"

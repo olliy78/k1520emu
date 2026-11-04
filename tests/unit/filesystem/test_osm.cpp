@@ -2,7 +2,7 @@
  * @file test_osm.cpp
  * @brief OS/M-Disketten des P8000 (doc/design/34_osm.md, AP 2 + AP 3).
  *
- * OS/M ist CP/M 2.2 auf den SCP-Formaten des PC 1715; eigene Profile `osm640`/`osm800`
+ * OS/M ist CP/M 2.2 auf den SCP-Formaten des PC 1715; eigene Profile `osm_ds80_16x256_boot`/`osm_ds80_5x1024_boot`
  * gibt es nur fuer den NAMEN, die Pruefung des Bootabbilds und die leere 800K-Diskette.
  * Erkannt wird NUR mit Urlader (`boot_header: osm`).  Die Abbilder hier sind synthetisch
  * (tests/support/osm_urlader.h: die drei Merkmale des Urladers, sonst 0xE5); die echten
@@ -105,16 +105,16 @@ std::vector<FsFinding> mitId(const FsCheckReport& r, const std::string& id) {
 
 // ─── Erkennung ───────────────────────────────────────────────────────────────
 
-/// @test Systemdiskette 640K (Urlader, FDCONF 55): `osm640`, EINDEUTIG — obwohl `scpx640`
+/// @test Systemdiskette 640K (Urlader, FDCONF 55): `osm_ds80_16x256_boot`, EINDEUTIG — obwohl `scpx_ds80_16x256_boot`
 ///       dieselbe Diskette ebenso liest (deckungsgleiche Profile sind keine Mehrdeutigkeit).
 TEST(OsmProfile, Systemdiskette640WirdOsm640Eindeutig) {
     Weg d("k1520_osm640_sys.img");
     std::string err;
-    ASSERT_TRUE(anlegen(d.p, "osm640", 0x55, 16384, err)) << err;
+    ASSERT_TRUE(anlegen(d.p, "osm_ds80_16x256_boot", 0x55, 16384, err)) << err;
     dateiDrauf(d.p, "", "A.TXT");
     auto v = oeffne(d.p);
     ASSERT_TRUE(v);
-    EXPECT_EQ(v->detection().filesystem, "osm640");
+    EXPECT_EQ(v->detection().filesystem, "osm_ds80_16x256_boot");
     EXPECT_TRUE(v->detection().unambiguous);
     EXPECT_TRUE(v->detection().alternatives.empty());
     EXPECT_EQ(v->profile().data_cyl, 2);
@@ -123,15 +123,15 @@ TEST(OsmProfile, Systemdiskette640WirdOsm640Eindeutig) {
     EXPECT_TRUE(v->check(FsCheckLevel::Voll, true).findings.empty());
 }
 
-/// @test Systemdiskette 800K (FDCONF 77): `osm800`, eindeutig, Verzeichnis ab c2h0.
+/// @test Systemdiskette 800K (FDCONF 77): `osm_ds80_5x1024_boot`, eindeutig, Verzeichnis ab c2h0.
 TEST(OsmProfile, Systemdiskette800WirdOsm800Eindeutig) {
     Weg d("k1520_osm800_sys.img");
     std::string err;
-    ASSERT_TRUE(anlegen(d.p, "osm800", 0x77, 20480, err)) << err;
+    ASSERT_TRUE(anlegen(d.p, "osm_ds80_5x1024_boot", 0x77, 20480, err)) << err;
     dateiDrauf(d.p, "", "B.TXT");
     auto v = oeffne(d.p);
     ASSERT_TRUE(v);
-    EXPECT_EQ(v->detection().filesystem, "osm800");
+    EXPECT_EQ(v->detection().filesystem, "osm_ds80_5x1024_boot");
     EXPECT_TRUE(v->detection().unambiguous);
     EXPECT_EQ(v->profile().data_cyl, 2);
     EXPECT_EQ(v->profile().dir_entries, 128);
@@ -145,12 +145,12 @@ TEST(OsmProfile, Systemdiskette800WirdOsm800Eindeutig) {
 TEST(OsmProfile, OhneUrladerBleibtEsBeiScpUndCpa) {
     Weg d640("k1520_osm640_daten.img");
     std::string err;
-    ASSERT_TRUE(anlegen(d640.p, "scpx640", -1, 0, err)) << err;
+    ASSERT_TRUE(anlegen(d640.p, "scpx_ds80_16x256_boot", -1, 0, err)) << err;
     dateiDrauf(d640.p, "", "C.TXT");
     {
         auto v = oeffne(d640.p);
         ASSERT_TRUE(v);
-        EXPECT_EQ(v->detection().filesystem, "scpx640");
+        EXPECT_EQ(v->detection().filesystem, "scpx_ds80_16x256_boot");
         EXPECT_TRUE(v->detection().unambiguous);
     }
     // Kennung allein (Code eines anderen Urladers davor): kein OS/M.
@@ -162,50 +162,50 @@ TEST(OsmProfile, OhneUrladerBleibtEsBeiScpUndCpa) {
         k1520test::schreibeDatei(d640.p, b);
         auto v = oeffne(d640.p);
         ASSERT_TRUE(v);
-        EXPECT_EQ(v->detection().filesystem, "scpx640");
+        EXPECT_EQ(v->detection().filesystem, "scpx_ds80_16x256_boot");
     }
 }
 
-/// @test Die LEERE 800K-Diskette bleibt `cpa800` (das Medium unterscheidet sie nicht),
-///       nennt aber den Ausweg `--fs osm800` — die Wahl aendert der Hinweis nie.
+/// @test Die LEERE 800K-Diskette bleibt `cpa_ds80_5x1024_daten` (das Medium unterscheidet sie nicht),
+///       nennt aber den Ausweg `--fs osm_ds80_5x1024_boot` — die Wahl aendert der Hinweis nie.
 TEST(OsmProfile, Leere800NenntOsm800AlsAusweg) {
     Weg d("k1520_osm800_leer.img");
     std::string err;
-    ASSERT_TRUE(anlegen(d.p, "cpa800", -1, 0, err)) << err;
+    ASSERT_TRUE(anlegen(d.p, "cpa_ds80_5x1024_daten", -1, 0, err)) << err;
     auto v = oeffne(d.p);
     ASSERT_TRUE(v);
-    EXPECT_EQ(v->detection().filesystem, "cpa800");
+    EXPECT_EQ(v->detection().filesystem, "cpa_ds80_5x1024_daten");
     EXPECT_TRUE(v->detection().unambiguous);
-    EXPECT_NE(v->detection().remarks.find("--fs osm800"), std::string::npos)
+    EXPECT_NE(v->detection().remarks.find("--fs osm_ds80_5x1024_boot"), std::string::npos)
         << v->detection().remarks;
     // Kein Befund daraus: die Diskette ist in Ordnung, nur ihr Zweck unbekannt.
     EXPECT_TRUE(v->check(FsCheckLevel::Schnell, true).findings.empty());
 
-    auto o = oeffne(d.p, "osm800");
+    auto o = oeffne(d.p, "osm_ds80_5x1024_boot");
     ASSERT_TRUE(o);
     EXPECT_EQ(o->profile().data_cyl, 2);
     EXPECT_EQ(o->profile().dir_entries, 128);
 }
 
-/// @test Auf 640K kein solcher Hinweis: `osm640` liegt deckungsgleich auf `scpx640`.
+/// @test Auf 640K kein solcher Hinweis: `osm_ds80_16x256_boot` liegt deckungsgleich auf `scpx_ds80_16x256_boot`.
 TEST(OsmProfile, Leere640OhneHinweisRauschen) {
     Weg d("k1520_osm640_leer.img");
     std::string err;
-    ASSERT_TRUE(anlegen(d.p, "scpx640", -1, 0, err)) << err;
+    ASSERT_TRUE(anlegen(d.p, "scpx_ds80_16x256_boot", -1, 0, err)) << err;
     auto v = oeffne(d.p);
     ASSERT_TRUE(v);
-    EXPECT_EQ(v->detection().filesystem, "scpx640");
-    EXPECT_EQ(v->detection().remarks.find("osm640"), std::string::npos)
+    EXPECT_EQ(v->detection().filesystem, "scpx_ds80_16x256_boot");
+    EXPECT_EQ(v->detection().remarks.find("osm_ds80_16x256_boot"), std::string::npos)
         << v->detection().remarks;
 }
 
-/// @test `create --fs osm800` ohne System: `put` schreibt NICHT in die Systemzylinder
+/// @test `create --fs osm_ds80_5x1024_boot` ohne System: `put` schreibt NICHT in die Systemzylinder
 ///       (Zylinder 0-1 bleiben 0xE5), und beim Wiederoeffnen liegt das Verzeichnis ab c2h0.
 TEST(OsmProfile, LeereOsm800SchuetztDieSystemzylinder) {
     Weg d("k1520_osm800_neu.img");
     std::string err;
-    ASSERT_TRUE(anlegen(d.p, "osm800", -1, 0, err)) << err;
-    dateiDrauf(d.p, "osm800", "D.TXT");
+    ASSERT_TRUE(anlegen(d.p, "osm_ds80_5x1024_boot", -1, 0, err)) << err;
+    dateiDrauf(d.p, "osm_ds80_5x1024_boot", "D.TXT");
 
     const std::vector<uint8_t> b = roh(d.p);
     ASSERT_EQ(b.size(), 819200u);
@@ -230,31 +230,31 @@ TEST(OsmProfile, BootabbildWirdGeprueft) {
     std::string err;
     {
         Weg d("k1520_osm_boot_typ.img");
-        EXPECT_FALSE(anlegen(d.p, "osm800", 0x55, 20480, err));
+        EXPECT_FALSE(anlegen(d.p, "osm_ds80_5x1024_boot", 0x55, 20480, err));
         EXPECT_NE(err.find("Laufwerkstyp 5"), std::string::npos) << err;
     }
     {
         Weg d("k1520_osm_boot_typ640.img");
-        EXPECT_FALSE(anlegen(d.p, "osm640", 0x77, 16384, err));
+        EXPECT_FALSE(anlegen(d.p, "osm_ds80_16x256_boot", 0x77, 16384, err));
         EXPECT_NE(err.find("Laufwerkstyp 7"), std::string::npos) << err;
     }
     {
         Weg d("k1520_osm_boot_kurz.img");
-        EXPECT_FALSE(anlegen(d.p, "osm640", 0x55, 4096, err));
+        EXPECT_FALSE(anlegen(d.p, "osm_ds80_16x256_boot", 0x55, 4096, err));
         EXPECT_NE(err.find("28H Saetze"), std::string::npos) << err;
     }
     {
         Weg d("k1520_osm_boot_fremd.img");
         Weg b("k1520_osm_boot_fremd.bin");
         k1520test::schreibeDatei(b.p, std::vector<uint8_t>(16384, 0x00));
-        EXPECT_FALSE(DiskVolume::create(d.p, "osm640", "", formate(), dateisysteme(), err, b.p));
+        EXPECT_FALSE(DiskVolume::create(d.p, "osm_ds80_16x256_boot", "", formate(), dateisysteme(), err, b.p));
         EXPECT_NE(err.find("keinen OS/M-Urlader"), std::string::npos) << err;
     }
     {
-        // boot-put auf eine erkannte OS/M-Diskette prueft ebenso (auch ueber --fs scpx640).
+        // boot-put auf eine erkannte OS/M-Diskette prueft ebenso (auch ueber --fs scpx_ds80_16x256_boot).
         Weg d("k1520_osm_bootput.img");
-        ASSERT_TRUE(anlegen(d.p, "osm640", 0x55, 16384, err)) << err;
-        auto v = oeffne(d.p, "scpx640");
+        ASSERT_TRUE(anlegen(d.p, "osm_ds80_16x256_boot", 0x55, 16384, err)) << err;
+        auto v = oeffne(d.p, "scpx_ds80_16x256_boot");
         ASSERT_TRUE(v);
         v->setReadOnly(false);
         EXPECT_FALSE(v->writeBootImage(std::vector<uint8_t>(16384, 0x00)));
@@ -269,7 +269,7 @@ TEST(OsmProfile, BootabbildWirdGeprueft) {
 TEST(FsCheckOsm, FdconfPasstNichtZurGeometrie) {
     Weg d("k1520_osm_fdconf.img");
     std::string err;
-    ASSERT_TRUE(anlegen(d.p, "osm640", 0x55, 16384, err)) << err;
+    ASSERT_TRUE(anlegen(d.p, "osm_ds80_16x256_boot", 0x55, 16384, err)) << err;
     {
         auto v = oeffne(d.p);
         ASSERT_TRUE(v);
@@ -280,7 +280,7 @@ TEST(FsCheckOsm, FdconfPasstNichtZurGeometrie) {
     k1520test::schreibeDatei(d.p, b);
     auto v = oeffne(d.p);
     ASSERT_TRUE(v);
-    EXPECT_EQ(v->detection().filesystem, "osm640");   // die Geometrie entscheidet
+    EXPECT_EQ(v->detection().filesystem, "osm_ds80_16x256_boot");   // die Geometrie entscheidet
     const auto f = mitId(v->check(FsCheckLevel::Schnell, true), "osm.fdconf");
     ASSERT_EQ(f.size(), 1u);
     EXPECT_EQ(f.front().severity, FsSeverity::Warnung);
@@ -294,7 +294,7 @@ TEST(FsCheckOsm, FdconfPasstNichtZurGeometrie) {
 TEST(FsCheckOsm, NurDasLaufwerkANibbleZaehlt) {
     Weg d("k1520_osm_fdconf8.img");
     std::string err;
-    ASSERT_TRUE(anlegen(d.p, "osm800", 0x77, 20480, err)) << err;
+    ASSERT_TRUE(anlegen(d.p, "osm_ds80_5x1024_boot", 0x77, 20480, err)) << err;
     std::vector<uint8_t> b = roh(d.p);
     b[0x7E] = 0x57;                       // A: Typ 7, B: Typ 5
     k1520test::schreibeDatei(d.p, b);
@@ -315,15 +315,15 @@ TEST(FsCheckOsm, NurDasLaufwerkANibbleZaehlt) {
 namespace {
 
 /// @brief Profil je Abbild, wie es die Erkennung NACH AP 2 liefert.  Alle Abbilder, die
-///        nicht tar720/wega720/udos1715 sind, stehen einzeln da; vor AP 2 waren die acht
-///        OS/M-Systemdisketten scpx640 bzw. cpa_auto, alle anderen genau so.
+///        nicht tar_ds80_9x512/wega_ds80_9x512/udos1715_ds80_16x256 sind, stehen einzeln da; vor AP 2 waren die acht
+///        OS/M-Systemdisketten scpx_ds80_16x256_boot bzw. cpa_auto, alle anderen genau so.
 const std::map<std::string, std::string>& erwartet() {
     static const std::map<std::string, std::string> m = {
-        {"osm30", "osm640"},    {"osmsys", "osm640"},   {"osm_org", "osm640"},
-        {"osmspiel", "osm800"}, {"osmut", "osm800"},    {"bsosm3", "osm800"},
-        {"osmdb", "osm800"},    {"osmredab", "osm800"},
-        {"c-beschr", "scpx640"}, {"ingdbd1", "scpx640"}, {"ingdbd23", "scpx640"},
-        {"p8000dok", "scpx640"}, {"rempc172", "scpx640"}, {"wegrem23", "scpx640"},
+        {"osm30", "osm_ds80_16x256_boot"},    {"osmsys", "osm_ds80_16x256_boot"},   {"osm_org", "osm_ds80_16x256_boot"},
+        {"osmspiel", "osm_ds80_5x1024_boot"}, {"osmut", "osm_ds80_5x1024_boot"},    {"bsosm3", "osm_ds80_5x1024_boot"},
+        {"osmdb", "osm_ds80_5x1024_boot"},    {"osmredab", "osm_ds80_5x1024_boot"},
+        {"c-beschr", "scpx_ds80_16x256_boot"}, {"ingdbd1", "scpx_ds80_16x256_boot"}, {"ingdbd23", "scpx_ds80_16x256_boot"},
+        {"p8000dok", "scpx_ds80_16x256_boot"}, {"rempc172", "scpx_ds80_16x256_boot"}, {"wegrem23", "scpx_ds80_16x256_boot"},
         {"rempc171", "cpa_auto"}, {"konsul2", "cpa_auto"},
         {"wdos_dcp", ""},        {"wegrem33", ""},       // FAT — kein Dateisystem
     };
@@ -353,7 +353,7 @@ std::vector<std::pair<std::string, std::string>> sammlung(const std::string& dir
 
 }  // namespace
 
-/// @test Die ganze pofo-Sammlung: genau die acht Systemdisketten werden osm640/osm800,
+/// @test Die ganze pofo-Sammlung: genau die acht Systemdisketten werden osm_ds80_16x256_boot/osm800,
 ///       alles andere behaelt sein Profil (Wachter gegen Erkennungsverschiebung).
 TEST(OsmEchtdaten, ErkennungUeberDieGanzeSammlung) {
     const char* e = std::getenv("K1520_CQM_DIR");
@@ -374,18 +374,18 @@ TEST(OsmEchtdaten, ErkennungUeberDieGanzeSammlung) {
         } else {
             // NDOS-Disketten der Sammlung: seit 2026-10-28 nach der Fuellung hinter dem
             // Plan getrennt (PC-1715-, P8000- oder UDOS-5.0-Sitte) - gezaehlt wird die Familie.
-            if (fs_name == "udos_p8000" || fs_name == "udos50") fs_name = "udos1715";
+            if (fs_name == "udos_p8000_ds80_16x256" || fs_name == "udos50_ds80_16x256") fs_name = "udos1715_ds80_16x256";
             ++zahl[fs_name];
-            EXPECT_TRUE(fs_name == "tar720" || fs_name == "wega720" || fs_name == "udos1715")
+            EXPECT_TRUE(fs_name == "tar_ds80_9x512" || fs_name == "wega_ds80_9x512" || fs_name == "udos1715_ds80_16x256")
                 << stamm << " → " << fs_name;
         }
     }
     // 151 Abbilder (Stand 2026-10-17); einzelne Abbilder koennen beim Nachladen der
     // Sammlung fehlen (rempc172) — die Zuordnung der vorhandenen zaehlt.
     EXPECT_GE(n, 150);
-    EXPECT_EQ(zahl["tar720"], 88);
-    EXPECT_EQ(zahl["wega720"], 32);
-    EXPECT_EQ(zahl["udos1715"], 13);
+    EXPECT_EQ(zahl["tar_ds80_9x512"], 88);
+    EXPECT_EQ(zahl["wega_ds80_9x512"], 32);
+    EXPECT_EQ(zahl["udos1715_ds80_16x256"], 13);
 }
 
 /// @test Die acht Systemdisketten: Dateizahl wie vorher, KEIN `osm.fdconf`, nur die

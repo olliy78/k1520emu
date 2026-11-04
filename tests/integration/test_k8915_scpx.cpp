@@ -10,7 +10,7 @@
  * Prompt.  Danach Kommandos ueber die Tastatur (K7672, Scancodes Satz 1).
  *
  * Die Bootdiskette ist `tests/fixtures/disks/k8915scpx_boot1.hfe` (Diskette 901 des
- * Anwenders, BIOS-Fassung „V24 (XON/XOFF)“, `cpa800`); AP-B2 fuegt die Disketten 900
+ * Anwenders, BIOS-Fassung „V24 (XON/XOFF)“, `cpa_ds80_5x1024_daten`); AP-B2 fuegt die Disketten 900
  * (Fassung „55 K“) und 904 (langer Autostart) hinzu — immer als TempDisk, der Emulator
  * schreibt zurueck.
  */
@@ -920,12 +920,12 @@ void rundreise(const char* bootdiskette, const char* format, const char* temp) {
  * @test K8915Scpx.DiskToolRundreiseFuenfMal1024OhneSystemspuren
  * @brief Diskette 900 (B: = 5 × 1024 wie A:), leere Diskette in B:.  Vor AP-E5a hielt
  *        das DiskTool sie nach dem `save` des K8915 fuer eine LEERE CP/A-Datendiskette
- *        (`cpa800`, Verzeichnis ab c0h0) — jetzt gilt die CP/A-Regel (OFF 2, 128 Plaetze),
+ *        (`cpa_ds80_5x1024_daten`, Verzeichnis ab c0h0) — jetzt gilt die CP/A-Regel (OFF 2, 128 Plaetze),
  *        und die Datei des DiskTools erscheint am K8915.
  */
 TEST(K8915Scpx, DiskToolRundreiseFuenfMal1024OhneSystemspuren)
 {
-    rundreise("k8915scpx_cpa800_k5601_bios55k-disk900.hfe", "cpa800", "k8915_dt_b1024.hfe");
+    rundreise("k8915scpx_cpa800_k5601_bios55k-disk900.hfe", "cpa_ds80_5x1024_daten", "k8915_dt_b1024.hfe");
 }
 
 /**
@@ -941,9 +941,9 @@ TEST(K8915Scpx, DiskToolRundreiseSechzehnMal256)
 /**
  * @test K8915Scpx.DiskToolFuelltLeereDisketteNurMitFsScpx8915
  * @brief Die eine Mehrdeutigkeit, die das Medium nicht aufloest: eine LEERE 5 × 1024-
- *        Diskette.  Ohne `--fs` wird sie, was CP/A daraus macht (`cpa800`, Verzeichnis ab
+ *        Diskette.  Ohne `--fs` wird sie, was CP/A daraus macht (`cpa_ds80_5x1024_daten`, Verzeichnis ab
  *        c0h0) — der K8915 sieht die Datei dann NICHT (sein Verzeichnis liegt ab c2h0).
- *        Mit `--fs scpx8915` liegt sie dort, wo das BIOS sucht.  Festgehalten, weil genau
+ *        Mit `--fs scpx8915_ds80_5x1024_boot` liegt sie dort, wo das BIOS sucht.  Festgehalten, weil genau
  *        dieser Unterschied der Grund fuer den Katalogeintrag ist.
  */
 TEST(K8915Scpx, DiskToolFuelltLeereDisketteNurMitFsScpx8915)
@@ -954,10 +954,10 @@ TEST(K8915Scpx, DiskToolFuelltLeereDisketteNurMitFsScpx8915)
         DtKataloge k;
         std::string err;
         for (const TempDisk* d : {&cpa, &k89})
-            ASSERT_TRUE(DiskVolume::create(d->path(), "cpa800", "", k.formate, k.fs, err)) << err;
+            ASSERT_TRUE(DiskVolume::create(d->path(), "cpa_ds80_5x1024_daten", "", k.formate, k.fs, err)) << err;
     }
     ASSERT_NO_FATAL_FAILURE(dtPut(cpa.path(), "", "CPA.TXT", "NUR FUER CP/A\n"));
-    ASSERT_NO_FATAL_FAILURE(dtPut(k89.path(), "scpx8915", "K89.TXT", "FUER DEN K8915\n"));
+    ASSERT_NO_FATAL_FAILURE(dtPut(k89.path(), "scpx8915_ds80_5x1024_boot", "K89.TXT", "FUER DEN K8915\n"));
 
     Aufbau x("k8915scpx_cpa800_k5601_bios55k-disk900.hfe");
     K8915Machine& m = x.m;
@@ -1110,7 +1110,7 @@ TEST(K8915Scpx, ImgRundreiseDerSystemdisketteBootet)
     TempDisk img = TempDisk::empty("k8915_rundreise900.img");
     {
         Aufbau x("k8915scpx_cpa800_k5601_bios55k-disk900.hfe");
-        ASSERT_TRUE(x.m.saveDiskAs(0, img.path(), "cpa800")) << x.m.lastError();
+        ASSERT_TRUE(x.m.saveDiskAs(0, img.path(), "cpa_ds80_5x1024_daten")) << x.m.lastError();
     }
     K8915Machine m;
     ASSERT_TRUE(m.mountDisk(0, img.path(), "cpa800", false)) << m.lastError();
@@ -1163,7 +1163,7 @@ void bootetBisPromptOhneRade(K8915Machine& m, const std::string& pfad) {
 }
 
 /**
- * Die ganze Kette: `boot-get` von @p quelle → `create --fs scpx8915 --boot` (Endung
+ * Die ganze Kette: `boot-get` von @p quelle → `create --fs scpx8915_ds80_5x1024_boot --boot` (Endung
  * @p ext) → Systemspuren byteweise gleich der Quelle → eine Datei per DiskTool → der
  * K8915 bootet davon bis `A>`, listet die Datei, gibt sie aus und schreibt selbst.
  */
@@ -1177,13 +1177,13 @@ void bautBootdiskette(const char* quelle, const char* ext, const char* banner) {
     DtKataloge k;
     std::string err;
     {
-        auto v = DiskVolume::create(neu.path(), "scpx8915", "", k.formate, k.fs, err, bin.path());
+        auto v = DiskVolume::create(neu.path(), "scpx8915_ds80_5x1024_boot", "", k.formate, k.fs, err, bin.path());
         ASSERT_TRUE(v) << err;
         EXPECT_EQ(v->bootAreaSize(), 20480u);
     }
     {
         // Massstab: Systemspuren byteweise gleich der Quelle; das Dateisystem ist leer und heil.
-        auto v = DiskVolume::open(neu.path(), "scpx8915", k.formate, k.fs, err);
+        auto v = DiskVolume::open(neu.path(), "scpx8915_ds80_5x1024_boot", k.formate, k.fs, err);
         ASSERT_TRUE(v) << err;
         std::vector<uint8_t> n;
         ASSERT_TRUE(v->readBootImage(n)) << v->lastError();
@@ -1191,7 +1191,7 @@ void bautBootdiskette(const char* quelle, const char* ext, const char* banner) {
         EXPECT_TRUE(v->list().empty());
         EXPECT_TRUE(v->check(FsCheckLevel::Voll, true).ohneBefund());
     }
-    ASSERT_NO_FATAL_FAILURE(dtPut(neu.path(), "scpx8915", "VOMDT.TXT", "AUF BOOTDISKETTE\n"));
+    ASSERT_NO_FATAL_FAILURE(dtPut(neu.path(), "scpx8915_ds80_5x1024_boot", "VOMDT.TXT", "AUF BOOTDISKETTE\n"));
     {
         // Mit Dateien darauf erkennt das DiskTool die Diskette ohne `--fs` als K8915.
         auto v = DiskVolume::open(neu.path(), "", k.formate, k.fs, err);
@@ -1214,7 +1214,7 @@ void bautBootdiskette(const char* quelle, const char* ext, const char* banner) {
 
 }  // namespace
 
-/// @test AP-E5c: `create --fs scpx8915 --boot` aus den Systemspuren der Diskette 900 (.hfe).
+/// @test AP-E5c: `create --fs scpx8915_ds80_5x1024_boot --boot` aus den Systemspuren der Diskette 900 (.hfe).
 TEST(K8915Scpx, DiskToolBautBootdisketteAus900Hfe) { bautBootdiskette(kSys900, "hfe", kBanner900); }
 /// @test Wie oben aus der Diskette 901 (BIOS-Fassung V24 XON/XOFF).
 TEST(K8915Scpx, DiskToolBautBootdisketteAus901Hfe) { bautBootdiskette(kSys901, "hfe", kBanner901); }
@@ -1225,7 +1225,7 @@ TEST(K8915Scpx, DiskToolBautBootdisketteAus901Img) { bautBootdiskette(kSys901, "
 /**
  * @test K8915Scpx.BootPutMachtEineLeereDisketteBootfaehig
  * @brief `boot-put` auf eine leere, formatierte Diskette (ohne Systemspuren, wie nach
- *        FORMAT.COM): ohne `--fs scpx8915` sind das fuer das DiskTool eine CP/A-Datendiskette
+ *        FORMAT.COM): ohne `--fs scpx8915_ds80_5x1024_boot` sind das fuer das DiskTool eine CP/A-Datendiskette
  *        ohne Systemspuren (Meldung „keine Systemspuren“), mit dem Profil geht es.
  */
 TEST(K8915Scpx, BootPutMachtEineLeereDisketteBootfaehig)
@@ -1234,21 +1234,21 @@ TEST(K8915Scpx, BootPutMachtEineLeereDisketteBootfaehig)
     TempDisk leer = TempDisk::empty("k8915_bootput.hfe");
     DtKataloge k;
     std::string err;
-    ASSERT_TRUE(DiskVolume::create(leer.path(), "cpa800", "", k.formate, k.fs, err)) << err;
+    ASSERT_TRUE(DiskVolume::create(leer.path(), "cpa_ds80_5x1024_daten", "", k.formate, k.fs, err)) << err;
     {
         auto v = DiskVolume::open(leer.path(), "", k.formate, k.fs, err, /*read_only=*/false);
         ASSERT_TRUE(v) << err;
-        EXPECT_FALSE(v->writeBootImage(sys)) << "cpa800 ab c0h0 hat keine Systemspuren";
+        EXPECT_FALSE(v->writeBootImage(sys)) << "cpa_ds80_5x1024_daten ab c0h0 hat keine Systemspuren";
         EXPECT_NE(v->lastError().find("keine Systemspuren"), std::string::npos);
     }
     {
-        auto v = DiskVolume::open(leer.path(), "scpx8915", k.formate, k.fs, err, false);
+        auto v = DiskVolume::open(leer.path(), "scpx8915_ds80_5x1024_boot", k.formate, k.fs, err, false);
         ASSERT_TRUE(v) << err;
         ASSERT_TRUE(v->writeBootImage(sys)) << v->lastError();
         ASSERT_TRUE(v->flush()) << v->lastError();
     }
     {
-        auto v = DiskVolume::open(leer.path(), "scpx8915", k.formate, k.fs, err);
+        auto v = DiskVolume::open(leer.path(), "scpx8915_ds80_5x1024_boot", k.formate, k.fs, err);
         ASSERT_TRUE(v) << err;
         std::vector<uint8_t> n;
         ASSERT_TRUE(v->readBootImage(n)) << v->lastError();
@@ -1265,7 +1265,7 @@ TEST(K8915Scpx, BootPutMachtEineLeereDisketteBootfaehig)
  *        und eines, das kuerzer ist als der Ladekopf verlangt, werden abgewiesen — beim
  *        Anlegen (dann bleibt keine Datei liegen) wie bei `boot-put` (Systemspuren
  *        unveraendert), auch wenn die Diskette nur an ihrem Ladekopf als K8915 kenntlich
- *        ist (Profil `cpa800`, ohne `--fs`).  Ein gueltiges Abbild geht danach durch.
+ *        ist (Profil `cpa_ds80_5x1024_daten`, ohne `--fs`).  Ein gueltiges Abbild geht danach durch.
  */
 TEST(K8915Scpx, FremdeSystemspurWirdFuerDenK8915Abgelehnt)
 {
@@ -1282,12 +1282,12 @@ TEST(K8915Scpx, FremdeSystemspurWirdFuerDenK8915Abgelehnt)
         schreibeBin(bin.path(), *schlecht);
         TempDisk neu = TempDisk::empty("k8915_fremd_neu.hfe");
         std::string err;
-        EXPECT_FALSE(DiskVolume::create(neu.path(), "scpx8915", "", k.formate, k.fs, err, bin.path()));
+        EXPECT_FALSE(DiskVolume::create(neu.path(), "scpx8915_ds80_5x1024_boot", "", k.formate, k.fs, err, bin.path()));
         EXPECT_FALSE(err.empty());
         EXPECT_FALSE(std::ifstream(neu.path()).good() && std::ifstream(neu.path()).peek() != EOF)
             << "es darf keine halbe Diskette liegen bleiben";
 
-        // boot-put auf einer vorhandenen K8915-Systemdiskette (erkannt als cpa800).
+        // boot-put auf einer vorhandenen K8915-Systemdiskette (erkannt als cpa_ds80_5x1024_daten).
         TempDisk sys(kSys900);
         auto v = DiskVolume::open(sys.path(), "", k.formate, k.fs, err, /*read_only=*/false);
         ASSERT_TRUE(v) << err;

@@ -254,7 +254,7 @@ bool comAufDiskette(const std::string& disk, const std::string& name, const std:
     std::string fe, err;
     static const FormatCatalog fk = FormatCatalog::loadDefault(&fe);
     static const FsCatalog     fs = FsCatalog::loadDefault(fk, &fe);
-    auto vol = DiskVolume::open(disk, "cpa780", fk, fs, err, /*read_only=*/false);
+    auto vol = DiskVolume::open(disk, "cpa_ds80_5x1024_boot", fk, fs, err, /*read_only=*/false);
     bool ok = false;
     if (vol) {
         FileRef ref;

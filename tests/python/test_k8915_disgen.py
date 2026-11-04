@@ -244,7 +244,7 @@ def test_disgen_builds_a_boot_disk_on_901_through_the_ui_keys(qapp, temp_disk, t
     try:
         emu = w.emulator
         t = _Tipper(emu, w.screen_widget)
-        # B: vorformatiert 5 × 1024 (= FORMAT.COM Verfahren 24/31, `cpa800`) — das
+        # B: vorformatiert 5 × 1024 (= FORMAT.COM Verfahren 24/31, `cpa_ds80_5x1024_daten`) — das
         # FORMAT-Menue selbst bewacht K8915Format.* (test-format).
         assert emu.create_disk(1, b, "cpa800"), emu.last_error()
         _kaltstart(t)

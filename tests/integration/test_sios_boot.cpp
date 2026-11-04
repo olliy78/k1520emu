@@ -306,7 +306,7 @@ TEST(SiosInit, InitialisiertDiskette) {
     auto vol = DiskVolume::open(ziel.path(), "", formate(), dateisysteme(), err);
     ASSERT_TRUE(vol) << err;
     ASSERT_TRUE(vol->hasFileSystem()) << "nicht als SIOS erkannt";
-    EXPECT_EQ(vol->profile().name, "sios_ss40");
+    EXPECT_EQ(vol->profile().name, "sios_ss40_26x128");
     EXPECT_EQ(vol->check(FsCheckLevel::Schnell, false).zaehlerAb(FsSeverity::Warnung), 0);
 }
 
@@ -626,7 +626,7 @@ TEST(SiosVorgabe, InitMitLeerdiskette80Zylinder) {
     const std::string z = leerdiskette("K5601", "sios_init_z80.hfe");
     InitErgebnis e = initLauf(z, "", "init80");
     EXPECT_TRUE(e.fertig) << e.schirm;
-    EXPECT_EQ(e.erkannt, "sios_ss40");
+    EXPECT_EQ(e.erkannt, "sios_ss40_26x128");
     EXPECT_EQ(e.warnungen, 0);
 }
 
@@ -640,7 +640,7 @@ TEST(SiosVorgabe, InitMitLeerdiskette40ZylinderScheitertImK5601) {
 }
 
 // --- Rundlauf DiskTool -> SIOS (D4) ------------------------------------------------------------------------
-// Datendiskette wie `k1520disktool create --fs sios_ss40` + `put`, in C: (Laufwerk 06) des K5601-Rechners;
+// Datendiskette wie `k1520disktool create --fs sios_ss40_26x128` + `put`, in C: (Laufwerk 06) des K5601-Rechners;
 // DIDI (programme1 in B:, ASN 0315 66) zeigt das Etikett HDR1 der Datei mit BOE/EOE/EOD.
 // Grenze (belegt): die Satzanzeige danach kehrt zum Monitor zurueck, auch an der Original-DP2 - nicht geklaert.
 TEST(SiosVorgabe, DidiZeigtDenKennsatzEinerMitDiskToolAngelegtenDatei) {
@@ -656,7 +656,7 @@ TEST(SiosVorgabe, DidiZeigtDenKennsatzEinerMitDiskToolAngelegtenDatei) {
     }
     std::string err;
     {
-        auto v = DiskVolume::create(pfad, "sios_ss40", "TEST01", formate(), dateisysteme(), err);
+        auto v = DiskVolume::create(pfad, "sios_ss40_26x128", "TEST01", formate(), dateisysteme(), err);
         ASSERT_TRUE(v) << err;
         TransferOptions to;
         ASSERT_TRUE(v->insertAll(quelle.string(), to)) << v->lastError();

@@ -137,7 +137,7 @@ def bauen(tool, ausgabe):
             with open(os.path.join(quelle, n), 'wb') as f:
                 f.write(d)
         os_com = os.path.join(quelle, '@OS.COM')
-        _lauf(tool, 'create', ziel, '--fs', 'cpa780', '--boot', BOOT)
+        _lauf(tool, 'create', ziel, '--fs', 'cpa_ds80_5x1024_boot', '--boot', BOOT)
         _lauf(tool, 'put', ziel, os_com, '--no-backup')          # ERSTE Datei
         os.remove(os_com)
         _lauf(tool, 'put', ziel, quelle, '--no-backup')

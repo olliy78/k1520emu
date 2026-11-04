@@ -77,7 +77,7 @@ std::unique_ptr<CpmFileSystem> CpmFileSystem::mount(SectorSpace& space,
 
     // Der Datenbereich muss einheitlich sein — CP/M rechnet mit EINER Sektorgroesse
     // je Diskette.  Die gemischte Geometrie einer Bootdiskette liegt vollstaendig
-    // VOR data_start (cpa780: drei 128-B-Seiten + eine 1024-B-Spur).
+    // VOR data_start (cpa_ds80_5x1024_boot: drei 128-B-Seiten + eine 1024-B-Spur).
     const SectorSpace::TrackRef erste = space.trackAt(static_cast<size_t>(start));
     fs->secs_per_track_ = erste.sectors;
     fs->sector_size_    = erste.sector_size;

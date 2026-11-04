@@ -365,7 +365,7 @@ TEST(WegaDiskVolume, AnlegenErkennenRundreise) {
 
     std::string err;
     {
-        auto dv = DiskVolume::create(img, "wega720", "probe", formate(), dateisysteme(), err);
+        auto dv = DiskVolume::create(img, "wega_ds80_9x512", "probe", formate(), dateisysteme(), err);
         ASSERT_TRUE(dv) << err;
         TransferOptions t;
         ASSERT_TRUE(dv->insertAll(quelle, t)) << dv->lastError();
@@ -374,7 +374,7 @@ TEST(WegaDiskVolume, AnlegenErkennenRundreise) {
     EXPECT_EQ(fs::file_size(img), 737280u);
     auto dv = DiskVolume::open(img, "", formate(), dateisysteme(), err);
     ASSERT_TRUE(dv) << err;
-    EXPECT_EQ(dv->detection().filesystem, "wega720");
+    EXPECT_EQ(dv->detection().filesystem, "wega_ds80_9x512");
     EXPECT_TRUE(dv->detection().unambiguous);
     EXPECT_TRUE(dv->istWega());
     std::map<std::string, FileEntry> l;
@@ -417,7 +417,7 @@ TEST(WegaLieferdisketten, AlleLesbarUndOhneBefund) {
         std::string err;
         auto dv = DiskVolume::open(e.path().string(), "", formate(), dateisysteme(), err);
         ASSERT_TRUE(dv) << name << ": " << err;
-        EXPECT_EQ(dv->detection().filesystem, "wega720") << name;
+        EXPECT_EQ(dv->detection().filesystem, "wega_ds80_9x512") << name;
         bool contents = false;
         for (const FileEntry& f : dv->list()) if (f.name == "CONTENTS") contents = true;
         // doc1 ist reine Dokumentation ohne Inhaltsliste (wega_datentraeger.md §3)
@@ -574,7 +574,7 @@ TEST(WegaDiskVolume, FileinfoTraegtUnixAngabenUndSpieltSieZurueck) {
     fs::create_directories(fs::path(quelle) / "usr" / "leer");
 
     std::string err;
-    auto dv = DiskVolume::create(img, "wega720", "probe", formate(), dateisysteme(), err);
+    auto dv = DiskVolume::create(img, "wega_ds80_9x512", "probe", formate(), dateisysteme(), err);
     ASSERT_TRUE(dv) << err;
     ASSERT_TRUE(dv->insertAll(quelle, TransferOptions{})) << dv->lastError();
 
@@ -616,7 +616,7 @@ TEST(WegaDiskVolume, FileinfoTraegtUnixAngabenUndSpieltSieZurueck) {
     EXPECT_EQ(bb.find("UDOS"), std::string::npos) << bb;
 
     // Rundreise: auf eine frische Diskette zurueck, Angaben muessen gleich sein
-    auto dv2 = DiskVolume::create(img2, "wega720", "zwei", formate(), dateisysteme(), err);
+    auto dv2 = DiskVolume::create(img2, "wega_ds80_9x512", "zwei", formate(), dateisysteme(), err);
     ASSERT_TRUE(dv2) << err;
     ASSERT_TRUE(dv2->insertAll(ziel, TransferOptions{})) << dv2->lastError();
     const auto l1 = eintraege(*dv), l2 = eintraege(*dv2);
@@ -648,7 +648,7 @@ TEST(WegaDiskVolume, FremdesFileinfoWirdUeberlesenNichtAlsUdosGedeutet) {
     schreibeText(fs::path(quelle) / "PROG.fileinfo",
                  "fs=udos\nname=PROG\ntyp=P\neig=W\nstart=4000\nsatz=1024\n");
     std::string err;
-    auto dv = DiskVolume::create(img, "wega720", "fremd", formate(), dateisysteme(), err);
+    auto dv = DiskVolume::create(img, "wega_ds80_9x512", "fremd", formate(), dateisysteme(), err);
     ASSERT_TRUE(dv) << err;
     TransferOptions t;
     EXPECT_TRUE(dv->insert((fs::path(quelle) / "PROG").string(), FileRef{0, "PROG"}, t))
@@ -664,7 +664,7 @@ TEST(WegaDiskVolume, UnixAngabenAufEinerNichtWegaDisketteWerdenAbgelehnt) {
     const std::string img = k1520test::tempPath("cpm_unix.img");
     fs::remove(img);
     std::string err;
-    auto dv = DiskVolume::create(img, "cpa780", "x", formate(), dateisysteme(), err);
+    auto dv = DiskVolume::create(img, "cpa_ds80_5x1024_boot", "x", formate(), dateisysteme(), err);
     ASSERT_TRUE(dv) << err;
     UnixAttrs a;
     a.set_mode = true; a.mode = 0755;

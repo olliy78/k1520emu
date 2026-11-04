@@ -9,7 +9,7 @@ Typische Benutzung::
     from core_binding.k1520disk import DiskTool, K1520DiskError
 
     with DiskTool.open("disks/udos_boot_scp.hfe") as d:
-        print(d.filesystem, d.volume_count)        # 'udos_ds77', 2
+        print(d.filesystem, d.volume_count)        # 'udos_ds77_26x128', 2
         for e in d.list():
             print(e.side_prefix + e.name, e.size)  # 'Side1/HELP.DAT.00', 9919
         d.extract_all("~/auszug")                  # legt Side0/ und Side1/ an

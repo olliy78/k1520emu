@@ -3,10 +3,10 @@
  * @brief DiskTool fuer BCU 880 am fruehen A5120 (doc/a5120_alt/bcu.md §11).
  *
  * Massstab ist wie bei `DisktoolPc1715.*`, ob die Maschine von der GEBAUTEN Diskette startet:
- *  - **Startdiskette „SYL auf Spur 1“** (`bcu880_syl`): wird am SYL-Lader erkannt, ist eine reine
+ *  - **Startdiskette „SYL auf Spur 1“** (`bcu880_ss40_26x128_syl`): wird am SYL-Lader erkannt, ist eine reine
  *    Startdiskette (`nur_boot`: kein `put`/`rm`), `boot-get` -> `create --boot` baut sie
  *    SEKTORGLEICH nach, ein fremdes Bootabbild wird VOR dem Anlegen abgewiesen.
- *  - **Arbeitsdiskette „ohne SYL“** (`bcu880`): System auf Zylinder 0-1 (Warmstart), Dateien ab
+ *  - **Arbeitsdiskette „ohne SYL“** (`bcu880_ss40_26x128_arbeit`): System auf Zylinder 0-1 (Warmstart), Dateien ab
  *    Zylinder 2 — mit dem Werkzeug gebaut, mit Dateien gefuellt, von BCU gelistet.
  *  - **SYSGEN.COM** der Diskette schreibt genau diese Systemspuren (Experiment im Emulator).
  *
@@ -171,7 +171,7 @@ TEST(DisktoolBcu, ErkenntDieStartdisketten) {
         TempDisk d(name);
         auto dv = oeffne(d.path());
         ASSERT_NE(dv, nullptr);
-        EXPECT_EQ(dv->detection().filesystem, "bcu880_syl") << name;
+        EXPECT_EQ(dv->detection().filesystem, "bcu880_ss40_26x128_syl") << name;
         EXPECT_TRUE(dv->list().empty()) << name;
         EXPECT_EQ(dv->volumeInfo(0).free_bytes, 0u) << name;   // kein Dateibereich fuer das Geraet
         EXPECT_EQ(dv->bootAreaSize(0), 5u * 26 * 128) << name;   // Zylinder 0-4
@@ -182,19 +182,19 @@ TEST(DisktoolBcu, DieArbeitsdisketteBleibtLesbar) {
     TempDisk d(kArbeit);
     auto dv = oeffne(d.path());
     ASSERT_NE(dv, nullptr);
-    EXPECT_NE(dv->detection().filesystem, "bcu880_syl");
+    EXPECT_NE(dv->detection().filesystem, "bcu880_ss40_26x128_syl");
     EXPECT_EQ(dv->list().size(), 19u);
 }
 
 TEST(DisktoolBcu, EineDatendisketteIstKeineStartdiskette) {
     // Gleiche Geometrie, aber kein SYL-Lader auf Zylinder 1: der Lader ist der Nachweis.
     TempPfad p("k1520_bcu_daten.img");
-    auto dv = baue(p.get(), "bcu880", "");
+    auto dv = baue(p.get(), "bcu880_ss40_26x128_arbeit", "");
     ASSERT_NE(dv, nullptr);
     ASSERT_TRUE(dv->flush());
     auto offen = oeffne(p.get());
     ASSERT_NE(offen, nullptr);
-    EXPECT_NE(offen->detection().filesystem, "bcu880_syl");
+    EXPECT_NE(offen->detection().filesystem, "bcu880_ss40_26x128_syl");
 }
 
 TEST(DisktoolBcu, EineStartdisketteNimmtKeineDateienAn) {
@@ -223,7 +223,7 @@ TEST(DisktoolBcu, BautDieStartdisketteSektorgleichNach) {
                          Fall{kSatz1, "boot_bcu12_syl_k7024.bin"}}) {
         TempPfad p("k1520_bcu_syl_neu.img");
         std::string fehler;
-        auto dv = baue(p.get(), "bcu880_syl", bootbin(f.bin), &fehler);
+        auto dv = baue(p.get(), "bcu880_ss40_26x128_syl", bootbin(f.bin), &fehler);
         ASSERT_NE(dv, nullptr) << f.bin << ": " << fehler;
         ASSERT_TRUE(dv->flush());
         // Der Beleg ist ein rohes .img: beide muessen Byte fuer Byte gleich sein.
@@ -245,13 +245,13 @@ TEST(DisktoolBcu, WeistFremdeBootabbilderVorDemAnlegenAb) {
     std::vector<uint8_t> abgeschnitten(syl.begin(), syl.begin() + 2 * 26 * 128 + 10 * 128);   // 10 statt 67 Sektoren System
     std::vector<uint8_t> cpa(syl.size(), 0xE5);              // sieht nach nichts aus
     const Fall faelle[] = {
-        {"bcu880_syl", ohne, "SYL"},                         // „ohne SYL“ auf einer Startdiskette
-        {"bcu880_syl", datei(bootbin("boot_cpa780.bin")), "SYL"},
-        {"bcu880_syl", kaputt, "Selbstpruefung"},
-        {"bcu880_syl", abgeschnitten, "bliebe mitten im System"},
-        {"bcu880_syl", cpa, "SYL"},
-        {"bcu880", datei(bootbin("boot_cpa780.bin")), "BCU-880-Kennung"},
-        {"bcu880", cpa, "BCU-880-Kennung"},
+        {"bcu880_ss40_26x128_syl", ohne, "SYL"},                         // „ohne SYL“ auf einer Startdiskette
+        {"bcu880_ss40_26x128_syl", datei(bootbin("boot_cpa780.bin")), "SYL"},
+        {"bcu880_ss40_26x128_syl", kaputt, "Selbstpruefung"},
+        {"bcu880_ss40_26x128_syl", abgeschnitten, "bliebe mitten im System"},
+        {"bcu880_ss40_26x128_syl", cpa, "SYL"},
+        {"bcu880_ss40_26x128_arbeit", datei(bootbin("boot_cpa780.bin")), "BCU-880-Kennung"},
+        {"bcu880_ss40_26x128_arbeit", cpa, "BCU-880-Kennung"},
     };
     for (const Fall& f : faelle) {
         TempPfad zu("k1520_bcu_fremd.img"), bin("k1520_bcu_fremd.bin");
@@ -287,7 +287,7 @@ void baueArbeitsdiskette(const std::string& ziel) {
     ASSERT_TRUE(quelle->extractAll(ordner.get(), TransferOptions{})) << quelle->lastError();
 
     std::string fehler;
-    auto dv = baue(ziel, "bcu880", bootbin("boot_bcu12_ohnesyl.bin"), &fehler);
+    auto dv = baue(ziel, "bcu880_ss40_26x128_arbeit", bootbin("boot_bcu12_ohnesyl.bin"), &fehler);
     ASSERT_NE(dv, nullptr) << fehler;
     ASSERT_TRUE(dv->insertAll(ordner.get(), TransferOptions{})) << dv->lastError();
     ASSERT_TRUE(dv->flush()) << dv->lastError();
@@ -306,7 +306,7 @@ TEST(DisktoolBcu, GebauteDisketteBootetUndListetDieDateien) {
              arbeit2("k1520_bcu_gebaut_a2.img");
     {
         std::string fehler;
-        auto dv = baue(start.get(), "bcu880_syl", bootbin("boot_bcu12_syl_k7023.bin"), &fehler);
+        auto dv = baue(start.get(), "bcu880_ss40_26x128_syl", bootbin("boot_bcu12_syl_k7023.bin"), &fehler);
         ASSERT_NE(dv, nullptr) << fehler;
         ASSERT_TRUE(dv->flush());
     }
@@ -338,7 +338,7 @@ TEST(DisktoolBcu, GebauteDisketteBootetUndListetDieDateien) {
 
 /**
  * @brief SYSGEN.COM der Diskette (Digital Research SYSGEN VER 2.0, ueber das BIOS: Spur 0-1 mit
- *        26 Sektoren) schreibt genau die Systemspuren, die `bcu880` als Bootabbild fuehrt.
+ *        26 Sektoren) schreibt genau die Systemspuren, die `bcu880_ss40_26x128_arbeit` als Bootabbild fuehrt.
  *
  * Quelle B: (Arbeitsdiskette), Ziel C: (leere, vom Werkzeug angelegte Diskette).  SYSGEN
  * erwartet die Zeilenenden als 0DH; die BCU-Fassung von „Kaltstart“ (Satz 1, K7024) uebersetzt
@@ -348,10 +348,10 @@ TEST(DisktoolBcu, SysgenSchreibtDieSystemspurenDerArbeitsdiskette) {
     TempPfad start("k1520_bcu_sg_a.img"), leer("k1520_bcu_sg_c.img");
     {
         std::string fehler;
-        auto dv = baue(start.get(), "bcu880_syl", bootbin("boot_bcu12_syl_k7024.bin"), &fehler);
+        auto dv = baue(start.get(), "bcu880_ss40_26x128_syl", bootbin("boot_bcu12_syl_k7024.bin"), &fehler);
         ASSERT_NE(dv, nullptr) << fehler;
         ASSERT_TRUE(dv->flush());
-        auto c = baue(leer.get(), "bcu880", "", &fehler);     // formatiert, Systemspuren leer
+        auto c = baue(leer.get(), "bcu880_ss40_26x128_arbeit", "", &fehler);     // formatiert, Systemspuren leer
         ASSERT_NE(c, nullptr) << fehler;
         ASSERT_TRUE(c->flush());
     }
@@ -389,7 +389,7 @@ TEST(DisktoolBcu, SysgenSchreibtDieSystemspurenDerArbeitsdiskette) {
     }
     ASSERT_TRUE(m.flushDisks()) << m.lastError();
 
-    auto dv = oeffne(leer.get(), "bcu880");
+    auto dv = oeffne(leer.get(), "bcu880_ss40_26x128_arbeit");
     ASSERT_NE(dv, nullptr);
     std::vector<uint8_t> system;
     ASSERT_TRUE(dv->readBootImage(system)) << dv->lastError();
@@ -402,7 +402,7 @@ TEST(DisktoolBcu, SysgenSchreibtDieSystemspurenDerArbeitsdiskette) {
 TEST(DisktoolBcu, KombidisketteWirdErkanntUndNimmtDateienAn) {
     TempPfad p("k1520_bcu_kombi.img");
     std::string fehler;
-    auto dv = baue(p.get(), "bcu880_kombi", bootbin("boot_bcu12_kombi_k7023.bin"), &fehler);
+    auto dv = baue(p.get(), "bcu880_ss40_26x128_kombi", bootbin("boot_bcu12_kombi_k7023.bin"), &fehler);
     ASSERT_NE(dv, nullptr) << fehler;
     TempPfad q("k1520_bcu_kombi_quelle.txt");
     schreibe(q.get(), {'h', 'a', 'l', 'l', 'o', '\r', '\n', 0x1A});
@@ -412,7 +412,7 @@ TEST(DisktoolBcu, KombidisketteWirdErkanntUndNimmtDateienAn) {
     ASSERT_TRUE(dv->flush());
     auto offen = oeffne(p.get());
     ASSERT_NE(offen, nullptr);
-    EXPECT_EQ(offen->detection().filesystem, "bcu880_kombi");
+    EXPECT_EQ(offen->detection().filesystem, "bcu880_ss40_26x128_kombi");
     EXPECT_EQ(offen->list().size(), 1u);
     EXPECT_GT(offen->volumeInfo(0).free_bytes, 100u * 1024);
 }
@@ -420,9 +420,9 @@ TEST(DisktoolBcu, KombidisketteWirdErkanntUndNimmtDateienAn) {
 TEST(DisktoolBcu, StartUndKombiAbbildSindNichtAustauschbar) {
     TempPfad zu("k1520_bcu_kombi_falsch.img");
     std::string fehler;
-    EXPECT_EQ(baue(zu.get(), "bcu880_syl", bootbin("boot_bcu12_kombi_k7023.bin"), &fehler), nullptr);
-    EXPECT_NE(fehler.find("bcu880_kombi"), std::string::npos) << fehler;
-    EXPECT_EQ(baue(zu.get(), "bcu880_kombi", bootbin("boot_bcu12_syl_k7023.bin"), &fehler), nullptr);
+    EXPECT_EQ(baue(zu.get(), "bcu880_ss40_26x128_syl", bootbin("boot_bcu12_kombi_k7023.bin"), &fehler), nullptr);
+    EXPECT_NE(fehler.find("bcu880_ss40_26x128_kombi"), std::string::npos) << fehler;
+    EXPECT_EQ(baue(zu.get(), "bcu880_ss40_26x128_kombi", bootbin("boot_bcu12_syl_k7023.bin"), &fehler), nullptr);
     EXPECT_NE(fehler.find("Kombi-Aenderungen"), std::string::npos) << fehler;
     EXPECT_FALSE(fs::exists(zu.get()));
 }
@@ -437,7 +437,7 @@ TEST(DisktoolBcu, KombidisketteBootetUndArbeitet) {
     TempPfad kombi("k1520_bcu_kombi_a.img");
     {
         std::string fehler;
-        auto dv = baue(kombi.get(), "bcu880_kombi", bootbin("boot_bcu12_kombi_k7023.bin"), &fehler);
+        auto dv = baue(kombi.get(), "bcu880_ss40_26x128_kombi", bootbin("boot_bcu12_kombi_k7023.bin"), &fehler);
         ASSERT_NE(dv, nullptr) << fehler;
         TempPfad q("k1520_bcu_kombi_hallo.txt");
         schreibe(q.get(), {'h', 'a', 'l', 'l', 'o', '\r', '\n', 0x1A});
@@ -476,7 +476,7 @@ TEST(DisktoolBcu, KombidisketteBootetUndArbeitet) {
     auto b = oeffne(arbeit.path());
     ASSERT_NE(a, nullptr);
     ASSERT_NE(b, nullptr);
-    EXPECT_EQ(a->detection().filesystem, "bcu880_kombi");
+    EXPECT_EQ(a->detection().filesystem, "bcu880_ss40_26x128_kombi");
     TempPfad x("k1520_bcu_kombi_kopie.bin"), y("k1520_bcu_kombi_stat.bin");
     FileRef ka, kb;
     ka.name = "KOPIE.COM";
@@ -498,7 +498,7 @@ TEST(DisktoolBcu, Kombidiskette80ArbeitetUeberZylinder40Hinaus) {
     for (size_t i = 0; i < gross.size(); ++i) gross[i] = static_cast<uint8_t>((i * 7 + (i >> 8)) & 0xFF);
     {
         std::string fehler;
-        auto dv = baue(kombi.get(), "bcu880_kombi80", bootbin("boot_bcu12_kombi80_k7023.bin"), &fehler);
+        auto dv = baue(kombi.get(), "bcu880_ss80_26x128_kombi", bootbin("boot_bcu12_kombi80_k7023.bin"), &fehler);
         ASSERT_NE(dv, nullptr) << fehler;
         TempPfad q("k1520_bcu_gross.com");
         schreibe(q.get(), gross);
@@ -508,7 +508,7 @@ TEST(DisktoolBcu, Kombidiskette80ArbeitetUeberZylinder40Hinaus) {
         ASSERT_TRUE(dv->flush());
 
         // Arbeitsdiskette: mit BCU-System in Zylinder 0-1 angelegt (daran wird sie erkannt), PIP.COM und STAT.COM von der Beleg-Diskette.
-        auto b = baue(arbeit.get(), "bcu880_80", bootbin("boot_bcu12_ohnesyl.bin"), &fehler);
+        auto b = baue(arbeit.get(), "bcu880_ss80_26x128_arbeit", bootbin("boot_bcu12_ohnesyl.bin"), &fehler);
         ASSERT_NE(b, nullptr) << fehler;
         TempDisk beleg(kArbeit);
         auto quelle = oeffne(beleg.path());
@@ -548,10 +548,10 @@ TEST(DisktoolBcu, Kombidiskette80ArbeitetUeberZylinder40Hinaus) {
 
     auto a = oeffne(kombi.get());
     ASSERT_NE(a, nullptr);
-    EXPECT_EQ(a->detection().filesystem, "bcu880_kombi80");
+    EXPECT_EQ(a->detection().filesystem, "bcu880_ss80_26x128_kombi");
     auto b = oeffne(arbeit.get());
     ASSERT_NE(b, nullptr);
-    EXPECT_EQ(b->detection().filesystem, "bcu880_80");   // nicht als CP/A-400K gelesen (2-KB-Bloecke!)
+    EXPECT_EQ(b->detection().filesystem, "bcu880_ss80_26x128_arbeit");   // nicht als CP/A-400K gelesen (2-KB-Bloecke!)
     for (const char* n : {"GROSS.COM", "KOPIE.COM"}) {
         TempPfad x("k1520_bcu_gross_aus.bin");
         FileRef r;
@@ -564,16 +564,16 @@ TEST(DisktoolBcu, Kombidiskette80ArbeitetUeberZylinder40Hinaus) {
 TEST(DisktoolBcu, Kombi40Und80AbbilderSindNichtAustauschbar) {
     TempPfad zu("k1520_bcu_kombi_spuren.img");
     std::string fehler;
-    EXPECT_EQ(baue(zu.get(), "bcu880_kombi", bootbin("boot_bcu12_kombi80_k7023.bin"), &fehler), nullptr);
+    EXPECT_EQ(baue(zu.get(), "bcu880_ss40_26x128_kombi", bootbin("boot_bcu12_kombi80_k7023.bin"), &fehler), nullptr);
     EXPECT_NE(fehler.find("Spurzahl"), std::string::npos) << fehler;
-    EXPECT_EQ(baue(zu.get(), "bcu880_kombi80", bootbin("boot_bcu12_kombi_k7023.bin"), &fehler), nullptr);
+    EXPECT_EQ(baue(zu.get(), "bcu880_ss80_26x128_kombi", bootbin("boot_bcu12_kombi_k7023.bin"), &fehler), nullptr);
     EXPECT_NE(fehler.find("Spurzahl"), std::string::npos) << fehler;
 }
 
 TEST(DisktoolBcu, Arbeitsdiskette80VerlangtEinBootabbild) {
     TempPfad p("k1520_bcu_80_ohne.img");
     std::string fehler;
-    EXPECT_EQ(baue(p.get(), "bcu880_80", "", &fehler), nullptr);
+    EXPECT_EQ(baue(p.get(), "bcu880_ss80_26x128_arbeit", "", &fehler), nullptr);
     EXPECT_NE(fehler.find("--boot"), std::string::npos) << fehler;
     EXPECT_FALSE(fs::exists(p.get()));
 }

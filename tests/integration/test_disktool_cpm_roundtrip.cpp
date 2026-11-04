@@ -110,7 +110,7 @@ TEST(DiskToolCpmRoundtrip, GeschriebeneDateiIstFuerCpaLesbar) {
     // ── DiskTool schreibt ────────────────────────────────────────────────────
     const std::string inhalt = "DISKTOOL HAT DIESE ZEILE GESCHRIEBEN";
     {
-        Volume v = oeffne(kopie.path(), "cpa780", /*wp=*/false);
+        Volume v = oeffne(kopie.path(), "cpa_ds80_5x1024_boot", /*wp=*/false);
         ASSERT_TRUE(v) << v.error;
 
         std::vector<uint8_t> daten(inhalt.begin(), inhalt.end());
@@ -148,7 +148,7 @@ TEST(DiskToolCpmRoundtrip, GeschriebeneDateiIstFuerCpaLesbar) {
 TEST(DiskToolCpmRoundtrip, CpaSiehtDieDateiImVerzeichnis) {
     TempDisk kopie("cpa_cpa780_k5601_noclock.img", "k1520_dt_dir.img");
     {
-        Volume v = oeffne(kopie.path(), "cpa780", false);
+        Volume v = oeffne(kopie.path(), "cpa_ds80_5x1024_boot", false);
         ASSERT_TRUE(v) << v.error;
         std::vector<uint8_t> daten(300, 'X');
         ASSERT_TRUE(v.fs->write("NEUDATEI.BIN", daten, WriteOptions{})) << v.fs->lastError();
@@ -172,7 +172,7 @@ TEST(DiskToolCpmRoundtrip, CpaSiehtDieDateiImVerzeichnis) {
 TEST(DiskToolCpmRoundtrip, GeloeschteDateiIstFuerCpaVerschwunden) {
     TempDisk kopie("cpa_cpa780_k5601_noclock.img", "k1520_dt_erase.img");
     {
-        Volume v = oeffne(kopie.path(), "cpa780", false);
+        Volume v = oeffne(kopie.path(), "cpa_ds80_5x1024_boot", false);
         ASSERT_TRUE(v) << v.error;
         ASSERT_TRUE(v.fs->erase("PIP.COM")) << v.fs->lastError();
         ASSERT_TRUE(v.disk->flush());

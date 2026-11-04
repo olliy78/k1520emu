@@ -3,7 +3,7 @@
 tool:   k1520disktool
 disk:   udos_boot_scp.hfe
 run:    info %DISK% --json
-expect: "filesystem":"udos_ds77"
+expect: "filesystem":"udos_ds77_26x128"
 expect: "read_only":true
 expect: "dir":"Side1"
 expect: "label":"UDOS.SYS.4.3"

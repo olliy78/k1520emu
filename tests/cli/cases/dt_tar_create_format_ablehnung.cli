@@ -1,6 +1,6 @@
 # --format beim Anlegen gilt nur fuer die leere tar-Diskette; ein unbekanntes Format wird abgelehnt.
 tool:   k1520disktool
 tmpfile k.img:
-run:    create %k.img% --fs cpa780 --format ss40_16x256
-expect: nur mit --fs tar720_leer
+run:    create %k.img% --fs cpa_ds80_5x1024_boot --format ss40_16x256
+expect: nur mit --fs tar_ds80_9x512_leer
 exit:   1

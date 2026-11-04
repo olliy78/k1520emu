@@ -5,7 +5,7 @@ build.py  -  die SCPX-Systemdisketten des PRG 710 und PRG 710-1 bauen
     disks/prg710_scpx15_system.hfe      PRG 710:    SCPX V 1.5 „B. Daehmlow“ (BIOS B151V24/B152V24/B152IFSS)
     disks/prg710-1_scpx17_system.hfe    PRG 710-1:  SCPX 1526 V 1.7 (52K)    (BIOS B17172xx/B17272xx, xx = V2/ZI/FS/SD)
 
-Format 16 x 256 (`scpx640`, wie die bisherigen PRG-Disketten).  Gemeinsam: `inhalt/` (Lader, CCP/BDOS, Dienst- und
+Format 16 x 256 (`scpx_ds80_16x256_boot`, wie die bisherigen PRG-Disketten).  Gemeinsam: `inhalt/` (Lader, CCP/BDOS, Dienst- und
 Entwicklungsprogramme, PROM-Programmierer PROG, CONV1 UDOS->SCP), `tools/scp_gemeinsam/` und die eigenen
 Pruefprogramme; je Geraet die BIOS-Module (`inhalt710/`, `inhalt710-1/`) und die Systemspuren (`bootabbild_*.bin`).  Die
 Anwenderdaten der frueheren 710-1-Diskette (KLINGEL.DAT, RITE.DAT, ROM*.DAT, LC80PRG.DAT, DIT.*, ALCP.*, …) sind
@@ -20,9 +20,9 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 import diskbau as db  # noqa: E402
 
-D710 = db.Diskette(__file__, 'prg710_scpx15_system.hfe', fs='scpx640', boot='boot_prg710_scpx15.bin',
+D710 = db.Diskette(__file__, 'prg710_scpx15_system.hfe', fs='scpx_ds80_16x256_boot', boot='boot_prg710_scpx15.bin',
                    create_args=['--prg', '710'])
-D7101 = db.Diskette(__file__, 'prg710-1_scpx17_system.hfe', fs='scpx640', boot='boot_prg710-1_scpx17.bin',
+D7101 = db.Diskette(__file__, 'prg710-1_scpx17_system.hfe', fs='scpx_ds80_16x256_boot', boot='boot_prg710-1_scpx17.bin',
                     create_args=['--prg', '710-1'])
 HIER = D710.hier
 

@@ -206,7 +206,7 @@ bool CpaDpbRule::derive(const DiskFormat& fmt, const SectorSpace& space,
         }
     }
 
-    // Sicherung gegen gemischte Geometrie: bei cpa780 loest eine fabrikfrische
+    // Sicherung gegen gemischte Geometrie: bei cpa_ds80_5x1024_boot loest eine fabrikfrische
     // (durchgehend 0xE5) Diskette auf „0 Systemspuren" auf — dort begaenne der
     // Datenbereich aber in den 128-B-Systemspuren, und CP/M rechnet mit EINER
     // Sektorlaenge je Diskette.  Das Original kommt damit ueber `dpbfsm` zurecht

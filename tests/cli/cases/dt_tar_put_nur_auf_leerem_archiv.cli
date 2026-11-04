@@ -3,7 +3,7 @@
 # (frueher: Einmalwurf, danach nur lesbar).
 tool:   k1520disktool
 tmpfile neu.img:
-setup_run: create %neu.img% --fs tar720_leer
+setup_run: create %neu.img% --fs tar_ds80_9x512_leer
 setup_run: tar-put %neu.img% %CLI_DIR%/../fixtures/p8000/tar_v7_klein.tar
 run:    tar-put %neu.img% %CLI_DIR%/../fixtures/p8000/tar_v7_klein.tar
 expect: nicht leer

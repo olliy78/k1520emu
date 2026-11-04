@@ -72,7 +72,7 @@ def alle_namen(view) -> set:
 def test_cpm_disk_is_shown_flat(window, fixture_disks):
     assert window.open_image(fixture_disks / "cpa_cpa780_k5601_clock.img")
 
-    assert window.tool.filesystem == "cpa780"
+    assert window.tool.filesystem == "cpa_ds80_5x1024_boot"
     assert window.tool.volume_count == 1
     # Ohne Seiten keine Gruppierung: die Dateien stehen direkt auf oberster Ebene.
     namen = alle_namen(window.disk_view)
@@ -130,7 +130,7 @@ def test_unrecognised_image_opens_raw_and_locks_the_file_actions(window,
 def test_forcing_a_filesystem_reopens_the_image(window, fixture_disks):
     """Die Erkennung ist uebersteuerbar — `cpa_auto` rechnet statt nachzuschlagen.
 
-    Das benannte Profil `scpx640` wurde von Hand nachgemessen; `cpa_auto` leitet
+    Das benannte Profil `scpx_ds80_16x256_boot` wurde von Hand nachgemessen; `cpa_auto` leitet
     dieselben Werte aus der Geometrie ab, wie es das CP/A-BIOS beim LOGIN tut
     (doc/design/13_k1520disktool.md §6.4).  Beide muessen deshalb **denselben**
     Inhalt zeigen — das ist die Gegenprobe der Regel von der Oberflaeche aus.
@@ -138,7 +138,7 @@ def test_forcing_a_filesystem_reopens_the_image(window, fixture_disks):
     bild = fixture_disks / "scpx17_cpa780_k5601.hfe"
 
     assert window.open_image(bild)
-    assert window.tool.filesystem == "scpx640"
+    assert window.tool.filesystem == "scpx_ds80_16x256_boot"
     assert window.tool.format == "ds80_16x256"
     erkannte_dateien = alle_namen(window.disk_view)
     assert "INIT.COM" in erkannte_dateien
@@ -240,7 +240,7 @@ def test_insert_all_refuses_when_it_does_not_fit(window, fixture_disks, tmp_path
 def test_round_trip_through_the_window(window, fixture_disks, tmp_path):
     """Neue Diskette anlegen, Ordner einfuegen, wieder extrahieren."""
     abbild = tmp_path / "neu.hfe"
-    assert window.create_disk(abbild, "udos_ds77", "GUI.TEST")
+    assert window.create_disk(abbild, "udos_ds77_26x128", "GUI.TEST")
     assert window.tool.volume_count == 2
 
     quelle = tmp_path / "quelle"
@@ -368,7 +368,7 @@ def test_archive_bundles_image_files_and_catalogue(window, fixture_disks, tmp_pa
         text = z.read("udos_boot_scp.txt").decode("utf-8")
 
     # Genau die Angaben, die beim Extrahieren sonst verlorengehen:
-    assert "udos_ds77" in text
+    assert "udos_ds77_26x128" in text
     assert "UDOS.SYS.4.3" in text
     assert "HELP.DAT.00" in text
     assert "P1" in text, "der UDOS-Dateityp gehört ins Verzeichnis"
@@ -549,7 +549,7 @@ def test_boot_image_button_follows_the_disk(window, fixture_disks, tmp_path):
 
     # Eine Datendiskette (Dateisystem ab Zylinder 0) hat nichts zu sichern.
     leer = tmp_path / "daten.hfe"
-    assert window.create_disk(leer, "cpa800")
+    assert window.create_disk(leer, "cpa_ds80_5x1024_daten")
     assert not window.act_bootabbild.isEnabled()
 
 
@@ -562,7 +562,7 @@ def test_saved_boot_image_makes_a_new_disk_bootable(window, fixture_disks, tmp_p
     assert window.tool.read_only, "Sichern ist eine reine Leseoperation"
 
     ziel = tmp_path / "bootfaehig.hfe"
-    assert window.create_disk(ziel, "cpa780", "", boot)
+    assert window.create_disk(ziel, "cpa_ds80_5x1024_boot", "", boot)
     kontrolle = tmp_path / "kontrolle.bin"
     window.tool.read_boot_image(kontrolle)
     assert kontrolle.read_bytes() == boot.read_bytes()
@@ -579,7 +579,7 @@ def test_boot_image_that_does_not_fit_is_reported(window, tmp_path, monkeypatch)
     zu_gross.write_bytes(b"\x5A" * 15105)
     ziel = tmp_path / "nicht_angelegt.hfe"
 
-    assert not window.create_disk(ziel, "cpa780", "", zu_gross)
+    assert not window.create_disk(ziel, "cpa_ds80_5x1024_boot", "", zu_gross)
     assert not ziel.exists()
     assert gemeldet and "15104" in gemeldet[0], gemeldet
 
@@ -792,7 +792,7 @@ def test_gemischte_diskette_oeffnet_roh_und_laesst_sich_zurechtschneiden(
     """Der ganze Weg an der gemischten Diskette — dem Fall, fuer den es gebaut ist.
 
     `mixed_udos_ss40_over_cpa800.hfe` entstand am echten Laufwerk: erst vollstaendig
-    als cpa800 formatiert, dann mit UDOS `ss40` im **Doppelschritt** ueberschrieben.
+    als cpa_ds80_5x1024_daten formatiert, dann mit UDOS `ss40` im **Doppelschritt** ueberschrieben.
     Kopf 0 traegt auf den geraden Zylindern 26×128 (UDOS) und auf den ungeraden noch
     5×1024, Kopf 1 durchgehend 5×1024.  Kein Katalogformat beschreibt das.
 
@@ -820,7 +820,7 @@ def test_gemischte_diskette_oeffnet_roh_und_laesst_sich_zurechtschneiden(
     assert t.medium_cylinders == 40 and t.medium_heads == 1
 
     assert t.redetect(), "nach den Schnitten immer noch nicht erkannt"
-    assert t.filesystem == "udos_ss40", f"erkannt als {t.filesystem}"
+    assert t.filesystem == "udos_ss40_26x128", f"erkannt als {t.filesystem}"
     assert len(t.list()) == 44
     # Und die eine schadhafte Spur wird als solche gemeldet, nicht verschwiegen.
     assert "fehlenden Sektoren" in t.remarks, t.remarks
@@ -838,7 +838,7 @@ def test_frisch_angelegte_udos_diskette_zeigt_ihre_anhaenge(window, tmp_path):
     ein UDOS-FORMAT hinterlaesst.
     """
     ziel = tmp_path / "neu.hfe"
-    assert window.create_disk(ziel, "udos_ss40", "TESTDISK")
+    assert window.create_disk(ziel, "udos_ss40_26x128", "TESTDISK")
     ed = window.open_disk_editor()
     ed.show()
 
@@ -1567,7 +1567,7 @@ def test_disk_editor_shows_an_empty_track_and_still_offers_a_new_sector(
     from app.core_binding.k1520disk import DiskTool
 
     abbild = tmp_path / "leer.hfe"
-    DiskTool.create(abbild, "cpa780").close()
+    DiskTool.create(abbild, "cpa_ds80_5x1024_boot").close()
     ed = _editor(window, abbild)
     window.set_read_only(False)
 
@@ -1592,7 +1592,7 @@ def test_disk_editor_leaves_the_back_of_a_single_sided_disk_empty(window, tmp_pa
     from app.core_binding.k1520disk import DiskTool
 
     abbild = tmp_path / "einseitig.hfe"
-    DiskTool.create(abbild, "udos_ss40").close()
+    DiskTool.create(abbild, "udos_ss40_26x128").close()
     ed = _editor(window, abbild)
 
     assert ed.surface.heads == 1
@@ -2028,7 +2028,7 @@ def test_header_carries_path_and_format(window, fixture_disks):
     """Der Kopfbereich traegt die DAUERHAFTEN Angaben — nicht die Statuszeile."""
     assert window.open_image(fixture_disks / "cpa_cpa780_k5601_clock.img")
     assert "cpa_cpa780_k5601_clock.img" in window.kopf.pfad.text()
-    assert "cpa780" in window.kopf.angaben.text()
+    assert "cpa_ds80_5x1024_boot" in window.kopf.angaben.text()
     assert "erkannt" in window.kopf.angaben.text()
 
 
@@ -2408,7 +2408,7 @@ def test_ein_gefahrbefund_verdraengt_alles_andere_im_streifen(window, fixture_di
     """
     abbild = _mit_kreuzbelegung(
         fixture_disks / "cpa_cpa780_k5601_noclock.img", tmp_path / "kreuz.img")
-    assert window.open_image(abbild, "cpa780")
+    assert window.open_image(abbild, "cpa_ds80_5x1024_boot")
 
     assert window.info_bar.stufe == "fehler"
     assert "Gefahr" in window.info_bar.text()
@@ -2422,7 +2422,7 @@ def test_jeder_befund_steht_mit_seiner_kennung_im_protokoll(window, fixture_disk
     """Das Protokoll ist der Ort zum Nachschlagen — dort steht ALLES, mit Kennung."""
     abbild = _mit_kreuzbelegung(
         fixture_disks / "cpa_cpa780_k5601_noclock.img", tmp_path / "kreuz2.img")
-    assert window.open_image(abbild, "cpa780")
+    assert window.open_image(abbild, "cpa_ds80_5x1024_boot")
 
     text = window.protokoll.toPlainText()
     assert "cpm.block.doppelt" in text
@@ -2436,7 +2436,7 @@ def test_die_diskettenangaben_tragen_den_ganzen_bericht(window, fixture_disks,
 
     abbild = _mit_kreuzbelegung(
         fixture_disks / "cpa_cpa780_k5601_noclock.img", tmp_path / "kreuz3.img")
-    assert window.open_image(abbild, "cpa780")
+    assert window.open_image(abbild, "cpa_ds80_5x1024_boot")
 
     text = angaben_text(window.tool)
     assert "PRÜFBERICHT" in text
@@ -2448,7 +2448,7 @@ def test_der_befund_verschwindet_mit_der_diskette(window, fixture_disks, tmp_pat
     """Ein stehengebliebener Befund gehoerte zur vorigen Diskette — irrefuehrend."""
     abbild = _mit_kreuzbelegung(
         fixture_disks / "cpa_cpa780_k5601_noclock.img", tmp_path / "kreuz4.img")
-    assert window.open_image(abbild, "cpa780")
+    assert window.open_image(abbild, "cpa_ds80_5x1024_boot")
     assert window.st_befund.text().endswith("1")
 
     window.close_disk()
@@ -2538,7 +2538,7 @@ def test_nichts_ist_vorausgewaehlt_was_daten_verwirft(window, fixture_disks, tmp
 
     abbild = _mit_kreuzbelegung(
         fixture_disks / "cpa_cpa780_k5601_noclock.img", tmp_path / "kreuz5.img")
-    assert window.open_image(abbild, "cpa780")
+    assert window.open_image(abbild, "cpa_ds80_5x1024_boot")
 
     dlg = FsckDialog(window.tool, window)
     eintraege = [dlg.baum.topLevelItem(i) for i in range(dlg.baum.topLevelItemCount())]
@@ -2803,10 +2803,10 @@ def test_eine_roh_geoeffnete_diskette_nennt_die_ablehnungsgruende(window, fixtur
     assert bericht.findings, "roh geöffnet heisst nicht „keine Auskunft“"
     assert all(f.layer == EBENE_ERKENNUNG for f in bericht.findings)
     assert all(not f.repairs for f in bericht.findings), "Ebene 0 repariert nichts"
-    assert any(f.object == "cpa780" for f in bericht.findings)
+    assert any(f.object == "cpa_ds80_5x1024_boot" for f in bericht.findings)
 
     text = window.protokoll.toPlainText()
-    assert "erkennung" in text.lower() or "geprüft: cpa780" in text
+    assert "erkennung" in text.lower() or "geprüft: cpa_ds80_5x1024_boot" in text
     assert "0xDC" in text and "nicht angelegt" in text
 
 

@@ -55,7 +55,7 @@ def wega_disk(tmp_path):
     (quelle / "usr" / "daten").write_bytes(bytes(range(256)) * 12)
 
     pfad = tmp_path / "wega.img"
-    with DiskTool.create(pfad, "wega720", "probe") as d:
+    with DiskTool.create(pfad, "wega_ds80_9x512", "probe") as d:
         d.insert_all(quelle)
         d.set_unix_attrs("bin/hallo", mode=0o4711, uid=5, gid=6, mtime=STAND)
         d.set_unix_attrs("etc/passwd", mode=0o600, uid=0, gid=3, mtime=STAND + 1)
@@ -102,7 +102,7 @@ def test_unix_attrs_are_validated_and_leave_the_disk_alone_on_error(wega_disk):
 
 def test_unix_attrs_refused_on_a_non_wega_disk(tmp_path):
     from app.core_binding.k1520disk import DiskTool, K1520DiskError
-    with DiskTool.create(tmp_path / "cpm.img", "cpa780", "x") as d:
+    with DiskTool.create(tmp_path / "cpm.img", "cpa_ds80_5x1024_boot", "x") as d:
         with pytest.raises(K1520DiskError, match="UNIX"):
             d.set_unix_attrs("X.COM", mode=0o755)
 
@@ -257,7 +257,7 @@ def test_archive_roundtrip_restores_unix_attributes(window, wega_disk, tmp_path)
         z.extractall(ausgepackt)
 
     neu = tmp_path / "neu.img"
-    with DiskTool.create(neu, "wega720", "neu") as d:
+    with DiskTool.create(neu, "wega_ds80_9x512", "neu") as d:
         d.insert_all(ausgepackt / "dateien")
         for name in ("bin/hallo", "etc/passwd", "usr"):
             alt = _eintrag(window.tool, name)

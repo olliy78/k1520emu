@@ -479,7 +479,7 @@ public:
     explicit SertestPrg(V v, const std::string& com = "")
         : v_(v), disk_(prg710test::scpxDiskette(v), std::string("sertest_prg_") + prg710test::name(v) + ".hfe"),
           m_(konfig(v)) {
-        fehler_ = aufspielen(disk_.path(), com, "scpx640");
+        fehler_ = aufspielen(disk_.path(), com, "scpx_ds80_16x256_boot");
         if (fehler_.empty() && !m_.mountDisk(0, disk_.path(), m_.defaultFormatName(0), false))
             fehler_ = "mountDisk: " + m_.lastError();
     }

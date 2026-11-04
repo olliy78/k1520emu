@@ -1,7 +1,7 @@
 """Die hinterlegten MicroDOS-Bootabbilder (data/bootsektoren/boot_microdos_*.bin) booten im Emulator.
 
 Waechter fuer doc/merkposten/microdos.md (Abschnitt "Bootabbilder des DiskTools"): eine mit
-`create --fs microdos800|microdos200|microdos1715 --boot <abbild>` gebaute Diskette -- danach mit `put`
+`create --fs microdos_ds80_5x1024_boot|microdos_ss40_5x1024_boot|microdos1715_ds80_5x1024_boot --boot <abbild>` gebaute Diskette -- danach mit `put`
 befuellt -- bootet bis `A>`, und zwar mit GENAU der Bestueckung, auf die das Abbild generiert ist:
 
   boot_microdos_1526.bin            800K  Tastatur K7637 (seriell), 4 x K5601
@@ -32,10 +32,10 @@ K5600 = ["K5600.10"] * 2 + [None, None]
 
 #: (Abbild, Profil, Tastatur, Laufwerke)
 FAELLE = [
-    ("boot_microdos_1526.bin", "microdos800", "k7637", None),
-    ("boot_microdos_1526_k7636.bin", "microdos800", "k7636", None),
-    ("boot_microdos_1526_200k.bin", "microdos200", "k7637", K5600),
-    ("boot_microdos_1526_200k_k7636.bin", "microdos200", "k7636", K5600),
+    ("boot_microdos_1526.bin", "microdos_ds80_5x1024_boot", "k7637", None),
+    ("boot_microdos_1526_k7636.bin", "microdos_ds80_5x1024_boot", "k7636", None),
+    ("boot_microdos_1526_200k.bin", "microdos_ss40_5x1024_boot", "k7637", K5600),
+    ("boot_microdos_1526_200k_k7636.bin", "microdos_ss40_5x1024_boot", "k7636", K5600),
 ]
 
 
@@ -66,7 +66,7 @@ def test_1526_bootabbild_bootet_mit_seiner_bestueckung(tmp_path, abbild, profil,
 def test_128_byte_bootabbild_bootet_mit_beiden_lade_roms(tmp_path, laderom):
     """Mit `create --boot` angelegte und per put befuellte 26x128-Diskette (msysgen Anhang B) bootet mit dem
     Lade-ROM V0.6 (SYL 0.6 von Zylinder 1) und V0.9_2 (Lader in den Verzeichnisplaetzen); Doku: Entwurf 13 §25.4."""
-    ziel = _baue(tmp_path, "microdos128", "boot_microdos_1526_128.bin")
+    ziel = _baue(tmp_path, "microdos_ss40_26x128_boot", "boot_microdos_1526_128.bin")
     s = ablauf.Sitzung("k7637", str(ziel), laufwerke=K5600, laderom=laderom)
     s.kaltstart_bis_prompt()
     assert "48K MicroDOS Vers 2.6" in s.bild()
@@ -77,7 +77,7 @@ def test_128_byte_bootabbild_bootet_mit_beiden_lade_roms(tmp_path, laderom):
 def test_1715_bootabbild_bootet_am_pc1715(tmp_path):
     from app.core_binding.k1520disk import DiskTool
     ziel = tmp_path / "boot1715.hfe"
-    with DiskTool.create(ziel, "microdos1715", "", str(BOOT / "boot_microdos_1715.bin")) as d:
+    with DiskTool.create(ziel, "microdos1715_ds80_5x1024_boot", "", str(BOOT / "boot_microdos_1715.bin")) as d:
         quelle = tmp_path / "q"
         quelle.mkdir()
         (quelle / "HALLO.COM").write_bytes(bytes(range(256)) * 4)

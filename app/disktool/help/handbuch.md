@@ -164,7 +164,7 @@ darum ab, statt stillschweigend eine unbrauchbare Datei zu schreiben.
 ## SCP1700 — das CP/M-86 des A7100
 
 Disketten des 16-Bit-Rechners **A7100** erkennt das Werkzeug von selbst und nennt
-sie `scp1700`. Für die Bedienung gibt es dort nichts Besonderes: das Dateisystem
+sie `scp1700_ds80_16x256_boot`. Für die Bedienung gibt es dort nichts Besonderes: das Dateisystem
 ist gewöhnliches CP/M, Attribute und Nutzerbereich verhalten sich wie bei einer
 CP/A-Diskette.
 
@@ -176,7 +176,7 @@ Diskeditor und in der Formatzeile.
 ## SIOS 1526 — die Etikettendisketten von A5120, A5130 und K8924
 
 Disketten des Betriebssystems **SIOS 1526** erkennt das Werkzeug von selbst und nennt
-sie `sios_ss40` (40 Spuren) bzw. `sios_ss80` (80 Spuren): einseitig, 26 Sektoren zu
+sie `sios_ss40_26x128` (40 Spuren) bzw. `sios_ss80_26x128` (80 Spuren): einseitig, 26 Sektoren zu
 128 Byte, MFM. Erkannt werden sie nur am **positiven Nachweis** — die Fehlspurkarte `ERMAP`
 in Spur 0 Sektor 5 *und* der Volumenetikett-Satz `VOL1` in Sektor 7. Das ist Absicht:
 auch fremde Systeme (BCU 880, MUTOS 8000) sind nach demselben IBM-Schema initialisiert und
@@ -204,8 +204,8 @@ Schreibschutz, `E` Austausch, `C` Fortsetzung auf der Folgediskette).
   an eine Bibliothek.
 * **Löschen** (`rm`): eine Datei wird zum gelöschten Etikett (`DDR1`) — die Daten
   bleiben. Ein Objekt verliert seinen Namen; sein Platz in der Bibliothek kehrt nicht zurück.
-* **Leere Datendiskette anlegen** (*Neue Diskette*, `create --fs sios_ss40` oder
-  `sios_ss80`, wahlweise `--label NAME`): so, wie SIOS-`INIT` sie anlegt, mit
+* **Leere Datendiskette anlegen** (*Neue Diskette*, `create --fs sios_ss40_26x128` oder
+  `sios_ss80_26x128`, wahlweise `--label NAME`): so, wie SIOS-`INIT` sie anlegt, mit
   Etikettenspur und gelöschten Datenmarken in den freien Etikettensektoren.
 * **Prüfen** (`fsck`, beim Öffnen die Schnellprüfung): Befunde `sios.hdr1.ungueltig`
   (Fehler), `sios.hdr1.ueberlappt` (Fehler: zwei Dateien teilen sich Sektoren) und
@@ -255,8 +255,8 @@ sie nicht aus, ob SIOS selbst darauf besteht, ist offen. Für den Emulator `.hfe
 
 **Eine Besonderheit:** die Systemdiskette `SYSARE09` (SIOS 0.9) ist eine
 40-Spur-Diskette, die im 80-Spur-Laufwerk zweiseitig ausgelesen wurde; sie passt zu keinem
-Katalogformat und wird nur erkannt, wenn Sie im Kopfbereich das Dateisystem `sios_ss40`
-wählen (Kommandozeile: `--fs sios_ss40`).
+Katalogformat und wird nur erkannt, wenn Sie im Kopfbereich das Dateisystem `sios_ss40_26x128`
+wählen (Kommandozeile: `--fs sios_ss40_26x128`).
 
 Das Format im Einzelnen: `doc/sios_diskettenformat.md`; Bedienung des Systems im Emulator:
 Handbuch des Emulators, Abschnitt „SIOS 1526".
@@ -270,18 +270,18 @@ das Verzeichnis ab Zylinder 2. Lesen, Schreiben, Löschen und Attribute verhalte
 wie bei jeder CP/A- oder SCP-Diskette.
 
 **Erkannt wird OS/M am Urlader.** Eine Systemdiskette trägt im ersten Sektor den
-OS/M-Urlader; dann heißt sie `osm640` bzw. `osm800`. Eine **Datendiskette** ohne System
-ist von einer SCP-Diskette nicht zu unterscheiden und erscheint deshalb als `scpx640`
+OS/M-Urlader; dann heißt sie `osm_ds80_16x256_boot` bzw. `osm_ds80_5x1024_boot`. Eine **Datendiskette** ohne System
+ist von einer SCP-Diskette nicht zu unterscheiden und erscheint deshalb als `scpx_ds80_16x256_boot`
 bzw. `cpa_auto` — gelesen wird sie genauso richtig, nur der Name sagt nicht „OS/M“.
 
 **Eine leere 800K-Diskette** — auch eine frisch unter OS/M formatierte — sieht aus wie
 eine leere CP/A-Datendiskette, deren Verzeichnis schon auf Zylinder 0 beginnt. Wer sie
-für OS/M füllen will, wählt im Dateisystem-Menü `osm800` (oder legt sie gleich als
-`osm800` an); sonst landen die ersten Dateien dort, wo OS/M sein System erwartet, und
-OS/M sieht sie nicht. Die Erkennung erinnert daran mit „ebenso gut osm800“ — in der
+für OS/M füllen will, wählt im Dateisystem-Menü `osm_ds80_5x1024_boot` (oder legt sie gleich als
+`osm_ds80_5x1024_boot` an); sonst landen die ersten Dateien dort, wo OS/M sein System erwartet, und
+OS/M sieht sie nicht. Die Erkennung erinnert daran mit „ebenso gut osm_ds80_5x1024_boot“ — in der
 Meldung über der Dateiliste und, im vollen Wortlaut, im Protokoll. Unter *Neue
-Diskette* heißen die Einträge „osm640 — OS/M (P8000) 640K, Format 5 …“ und
-„osm800 — OS/M (P8000) 800K, Format 7 …“. Eine
+Diskette* heißen die Einträge „osm_ds80_16x256_boot — OS/M (P8000) 640K, Format 5 …“ und
+„osm_ds80_5x1024_boot — OS/M (P8000) 800K, Format 7 …“. Eine
 Bootdiskette entsteht wie bei den anderen Systemen: Systemspuren einer OS/M-Diskette
 herausholen und beim Anlegen mitgeben. Das Werkzeug prüft dabei, dass es wirklich ein
 OS/M-Urlader für dasselbe Format ist.
@@ -298,7 +298,7 @@ Beim Herausholen wird daraus `GW_ZSID.DOC`.
 ## tar-Disketten — ein Archiv statt eines Dateisystems
 
 Viele P8000-Lieferdisketten tragen **kein Dateisystem**: jemand hat mit `tar` direkt auf
-die rohe Diskette geschrieben. Das Werkzeug erkennt das als `tar720` (immer als letzter
+die rohe Diskette geschrieben. Das Werkzeug erkennt das als `tar_ds80_9x512` (immer als letzter
 Versuch hinter allen echten Dateisystemen; bearbeitbar ist ein *abgeschlossenes* Archiv, siehe
 unten) und zeigt Modus, Besitzer und
 Zeit wie bei WEGA. Mehrere Disketten eines Satzes sind **ein** Strom: die letzte Datei
@@ -333,7 +333,7 @@ sich im Fenster wie eine große Diskette bearbeiten, sobald der Schreibschutz au
 - **Löschen, Ordner, Eigenschaften:** *Löschen*, **Bearbeiten ▸ Ordner im tar-Archiv anlegen…**
   und *Eigenschaften* (Modus, uid, gid, mtime) wie bei einer WEGA-Diskette.
 - **Eine einzelne `.tar`-Datei ablegen** (ziehen, `|←`, Strg+←): ist das Archiv **leer** — ein
-  neuer Satz, eine neue oder die leere Diskette `tar720_leer`, auch ein leer geräumtes Archiv —, fragt
+  neuer Satz, eine neue oder die leere Diskette `tar_ds80_9x512_leer`, auch ein leer geräumtes Archiv —, fragt
   ein Fenster: *Als Datei im Container ablegen* (sie wird ein Eintrag) oder *Ist ein fertiger
   tar-Container* (ihr Inhalt wird das Archiv; über eine Diskette hinaus entsteht ein Satz aus mehreren
   Abbildern). Auf einem Archiv mit Inhalt, bei mehreren abgelegten Dateien oder einem Ordner wird eine
@@ -380,8 +380,8 @@ Disketten:
        tar tvf w11data.tar                                      # bearbeiten: tar rf / tar --delete …
        split -b 737280 -d w11data.tar neu_                      # neu_00 … neu_06, je höchstens 720 KiB
 
-3. **Datei ▸ Neue Diskette…** mit dem Dateisystem `tar720_leer` (Kommandozeile
-   `create x.cqm --fs tar720_leer`) legt eine **leere tar-Diskette** an: 720 KiB (80 × 2 × 9 × 512), ganz Null, in jedem
+3. **Datei ▸ Neue Diskette…** mit dem Dateisystem `tar_ds80_9x512_leer` (Kommandozeile
+   `create x.cqm --fs tar_ds80_9x512_leer`) legt eine **leere tar-Diskette** an: 720 KiB (80 × 2 × 9 × 512), ganz Null, in jedem
    Container (`.img`, `.hfe`, `.dmk`, `.cqm`). Sie wird beim Öffnen als leeres tar-Archiv erkannt
    (nur wenn **alle** Bytes Null sind; eine mit Nullen gefüllte CP/A-Diskette erscheint ebenfalls so —
    *Diskette ▸ Dateisystem übersteuern* ▸ `cpa_auto` stellt es richtig). Wie jede tar-Diskette ist
@@ -400,7 +400,7 @@ Disketten:
    wird trotzdem): die P8000-/WEGA-Werkzeuge verstehen nur V7. `tar --format=v7` erzeugt ein solches
    Archiv (Namen bis 99 Zeichen).
 
-       k1520disktool create diskette00.cqm --fs tar720_leer
+       k1520disktool create diskette00.cqm --fs tar_ds80_9x512_leer
        k1520disktool tar-put diskette00.cqm archiv.tar          # passt auf eine Diskette
        k1520disktool tar-satz-neu --format k5601_9x512 neu.hfe --tar-container gross.tar   # neu1.hfe, neu2.hfe …
 
@@ -462,9 +462,9 @@ und zeigt es als eigenes Dateisystem:
 
 | Angezeigt als | Diskette | Blöcke je Diskette |
 |---|---|---|
-| `tar_mutos8k_26x128_mfm` | K5601 (5¼″, MFM), 26 × 128 | 494 (252 928 Byte) |
-| `tar_mutos8k_26x128_fm` | MF3200 (8″, FM), 26 × 128 | 494 |
-| `tar_mutos8k_8x512_mfm` | K5601, 8 × 512 (DISK-Satz) | 608 (311 296 Byte) |
+| `tar_ss77_26x128` | K5601 (5¼″, MFM), 26 × 128 | 494 (252 928 Byte) |
+| `tar_fm_ss77_26x128` | MF3200 (8″, FM), 26 × 128 | 494 |
+| `tar_ss77_8x512` | K5601, 8 × 512 (DISK-Satz) | 608 (311 296 Byte) |
 
 Mehrere Disketten eines Satzes (MUTOS kennt keine Folgedisketten, man teilt den Strom mit `dd` auf) öffnet man wie jeden
 tar-Satz: **Datei ▸ tar-Satz öffnen…**. Das Layout wird an der ersten Diskette erkannt. Lesen,
@@ -475,13 +475,13 @@ Diskette trägt im Datenbereich Nullblöcke, damit MUTOS sie als leeres Archiv l
 E5-Diskette endet bei `tar tvf` nicht sauber). Als Container gehen `.hfe`, `.dmk`, `.img` (immer MFM), `.td0`
 und `.imd`; `.cqm` nicht beim 8 × 512-Format (gemischte Geometrie). Auf der Kommandozeile:
 
-    k1520disktool create leer.hfe --fs tar_mutos8k_26x128_mfm_leer
-    k1520disktool tar-satz-neu --format tar_mutos8k_26x128_mfm satz.hfe --put datei1 --put ordner
+    k1520disktool create leer.hfe --fs tar_ss77_26x128_leer
+    k1520disktool tar-satz-neu --format tar_ss77_26x128 satz.hfe --put datei1 --put ordner
     k1520disktool tar-satz v1.hfe v2.hfe -l           # Satz lesen; --to ORDNER holt alles heraus
     k1520disktool tar-export v1.hfe teil.tar          # Strom als .tar
 
 Kein Dateisystem im üblichen Sinn: die Diskette ist ein Archiv. Das **UNIX-Dateisystem** derselben Disketten
-(`mkfs` unter MUTOS) heißt `mutos8k_26x128_mfm` bzw. `…_fm` und `mutos8k_8x512_mfm`; die früheren Namen
+(`mkfs` unter MUTOS) heißt `mutos8k_ss77_26x128` bzw. `…_fm` und `mutos8k_ss77_8x512`; die früheren Namen
 `mutos8k_mfm`, `mutos8k_fm`, `mutos77` gelten weiter als Alias. Anleitung für den Gast (Befehle, Fallstricke, Disketten
 wechseln): Handbuch des Emulators, Abschnitt *MUTOS 8000 (A5120.16)*.
 
@@ -590,13 +590,13 @@ Daraus folgt:
 ## UDOS1715 — dasselbe UDOS, anderes Dateisystem
 
 Disketten vom **PC 1715** tragen UDOS mit dem Treiber **NDOS** statt ZDOS. Das
-Werkzeug erkennt sie von selbst und nennt sie `udos1715`.
+Werkzeug erkennt sie von selbst und nennt sie `udos1715_ds80_16x256`.
 
 Dieselben Disketten schreiben auch der **EAW P8000** (dort UDOS 2.2, z. B. seine
 WEGA-Startdiskette) und der **A5120 unter UDOS 5.0**. Die Rechner haben nichts
 miteinander zu tun — sie legen ihre Disketten nur gleich an. Das Werkzeug zeigt
-trotzdem, von welchem Rechner eine Diskette stammt: **`udos1715`** (PC 1715),
-**`udos_p8000`** (P8000) oder **`udos50`** (A5120, UDOS 5.0). Erkannt wird das an
+trotzdem, von welchem Rechner eine Diskette stammt: **`udos1715_ds80_16x256`** (PC 1715),
+**`udos_p8000_ds80_16x256`** (P8000) oder **`udos50_ds80_16x256`** (A5120, UDOS 5.0). Erkannt wird das an
 einer einzigen Stelle, der Füllung hinter dem Belegungsplan (Spur 17H, Sektor 0,
 Bytes 158H–176H: `00`, `77` bzw. `FF`). Für die Bedienung macht es keinen Unterschied.
 
@@ -614,9 +614,9 @@ Drei Dinge sind dort anders als bei den A5120-Disketten:
 Dateityp, Eigenschaften und der ganze Rest des Kopfsektors sind dieselben wie bei
 UDOS/ZDOS; Eigenschaften-Dialog und Beiblatt gelten unverändert.
 
-Angelegt wird eine solche Diskette mit dem Dateisystem `udos1715`
-(80 Spuren beidseitig, 640 KB), `udos1715_ss80` (320 KB) oder `udos1715_ss40`
-(160 KB); `udos_p8000` und `udos50` legen dieselbe 640-KB-Diskette mit der Füllung
+Angelegt wird eine solche Diskette mit dem Dateisystem `udos1715_ds80_16x256`
+(80 Spuren beidseitig, 640 KB), `udos1715_ss80_16x256` (320 KB) oder `udos1715_ss40_16x256`
+(160 KB); `udos_p8000_ds80_16x256` und `udos50_ds80_16x256` legen dieselbe 640-KB-Diskette mit der Füllung
 des jeweiligen Rechners an. Für **UDOS 5.0** gibt es ein hinterlegtes Bootabbild: mit
 „Bootdiskette erstellen“ und danach den Dateien der Beispieldiskette
 `a5120_udos50/a5120_udos50_k5601_system.hfe` (mindestens `OS`, `DDOS`, `ZDOS`, `OS.INIT`)
@@ -689,8 +689,8 @@ führt und jede Datei für sich vollständig haben will, schaltet es ein.
 ## MS-DOS-Disketten (FAT12) — PC, A7150/DCP, PC 1834
 
 Das DiskTool liest und schreibt die Disketten, die ein PC-DOS, MS-DOS, **DCP** (A7150, PC 1834) oder Windows angelegt hat:
-160K bis 1,44M (und 2,88M).  Die Lage steht im Bootsektor (BPB); das Dateisystem heißt in der Titelzeile `dos720`,
-`dos360` … je nach Größe.
+160K bis 1,44M (und 2,88M).  Die Lage steht im Bootsektor (BPB); das Dateisystem heißt in der Titelzeile `dos_ds80_9x512`,
+`dos_ds40_9x512` … je nach Größe.
 
 * **Ordner** erscheinen als aufklappbare Zeilen.  Auf einen Ordner geklickte oder gezogene Dateien landen darin; *Neuer
   Ordner* legt ihn an (ohne angeklickten Ordner in der Wurzel).  *Alles holen/einfügen* nimmt den ganzen Baum mit, auch
@@ -704,7 +704,7 @@ Das DiskTool liest und schreibt die Disketten, die ein PC-DOS, MS-DOS, **DCP** (
   unverändert.  Die Prüfung (Strg+F) findet Kreuzverweise, verlorene Cluster und beschädigte FAT-Kopien.
 * **Hochdichte-Disketten** 1,2M und 1,44M lassen sich in allen Dateiformaten anlegen und speichern (`.img`, `.hfe`, `.dmk`, `.cqm`, `.td0`, `.imd`); 2,88M nur als `.img`.  Der Emulator nimmt sie nicht an (kein Laufwerk kann 500 kbit/s).
 
-**Bootfähige DOS-Diskette:** *Datei ▸ Neue Diskette*, Dateisystem `dos720`, Haken „Bootdiskette erstellen" und einen
+**Bootfähige DOS-Diskette:** *Datei ▸ Neue Diskette*, Dateisystem `dos_ds80_9x512`, Haken „Bootdiskette erstellen" und einen
 hinterlegten Lader wählen (DCP 3.3, DCP 3.20, DCP 3.2/PC 1834, MDISK).  Dann *Diskette ▸ Systemdateien übernehmen (DOS SYS)* und
 eine Systemdiskette wählen — der Bootsektor und `IO.SYS`/`DCDOS.SYS` (bzw. `BIO.COM`/`DOS.COM`) kommen mit Attributen
 und Zeit auf die **leere** Diskette; die Lader suchen sie an den ersten Verzeichnisplätzen.  Der Bootsektor trägt dabei den BPB
@@ -716,10 +716,10 @@ MicroDOS 1526 (A5120/A5130) und MicroDOS 1715 (PC 1715) sind CP/M-2.2-Abkömmlin
 **ARC**-Attribut wie gewohnt (*Eigenschaften*, `attr --arc`; das **Archivieren** packt sie samt Beiblatt `cpm-dateiangaben.txt`).
 Besonderheiten: Das Verzeichnis beginnt gleich auf der ersten Spur, **den Lader trägt der Anfang des Verzeichnisses** (er erscheint nicht als
 Datei und wird nie überschrieben), und die Systemdatei **`MicroDOS.SYS`** liegt an festen Sektoren (Spuren 1–4; bei 128-Byte-Sektoren Spuren 1–5) — sie ist deshalb Teil des
-*Bootabbilds* (Lader + System, 16 KB), nicht eine Datei zum Einfügen. Erkannt wird eine Diskette nur mit Lader (`microdos800`, `microdos200`,
-`microdos128`, `microdos1715`); eine Datendiskette gleicher Geometrie heißt `cpa800`. Eine neue Systemdiskette entsteht über *Neue Diskette ▸ Bootdiskette*
+*Bootabbilds* (Lader + System, 16 KB), nicht eine Datei zum Einfügen. Erkannt wird eine Diskette nur mit Lader (`microdos_ds80_5x1024_boot`, `microdos_ss40_5x1024_boot`,
+`microdos_ss40_26x128_boot`, `microdos1715_ds80_5x1024_boot`); eine Datendiskette gleicher Geometrie heißt `cpa_ds80_5x1024_daten`. Eine neue Systemdiskette entsteht über *Neue Diskette ▸ Bootdiskette*
 mit einem der mitgelieferten Abbilder. **Das System ist fest auf Tastatur und Laufwerke eingestellt** (Generierung MSYSG): die Auswahl nennt sie —
-800K: Tastatur K7637 (seriell) oder K7636 (parallel), vier Laufwerke K5601; 200K: dieselben Tastaturen, zwei Laufwerke **K5600.10** (nicht K5600.20); 100K mit 128-Byte-Sektoren (`microdos128`): K7637, zwei Laufwerke K5600.10, bootet mit Lade-ROM V0.6 und V0.9_2.
+800K: Tastatur K7637 (seriell) oder K7636 (parallel), vier Laufwerke K5601; 200K: dieselben Tastaturen, zwei Laufwerke **K5600.10** (nicht K5600.20); 100K mit 128-Byte-Sektoren (`microdos_ss40_26x128_boot`): K7637, zwei Laufwerke K5600.10, bootet mit Lade-ROM V0.6 und V0.9_2.
 Im Emulator muss die Bestückung dazu passen, sonst bleibt das Laden bei den Punkten stehen. Die Prüfung meldet, wenn
 `MicroDOS.SYS` nicht dort liegt, wo der Lader sie holt (die Diskette würde nicht starten).
 
@@ -743,12 +743,12 @@ Darunter steht der Haken **Bootdiskette erstellen** mit einem Auswahlfeld danebe
 Feld bietet die **hinterlegten Bootabbilder** des gewählten Dateisystems an — die
 Systemspuren aller mitgelieferten Systemdisketten (CP/A, SCPX, UDOS 4.3, BCU 880,
 SCPX 8915, PRG 710, SCP 1715, CP/Z, SCP 3.0, OS/M, UDOS 5.0). Der erste passende ist vorgewählt;
-mehrere gibt es, wo dasselbe Dateisystem auf verschiedenen Rechnern bootet (`scpx640`:
+mehrere gibt es, wo dasselbe Dateisystem auf verschiedenen Rechnern bootet (`scpx_ds80_16x256_boot`:
 A5120, PRG 710/710-1, PC 1715). Der letzte Eintrag, **Eigene .bin-Datei auswählen…**,
 fragt sofort nach einer Datei — etwa einem Abbild, das man mit *Diskette ▸ Bootabbild
 sichern* aus einer vorhandenen Bootdiskette geholt hat. Gibt es für das Dateisystem
-keinen hinterlegten Eintrag (Datendisketten wie `cpa800`, aber auch `udos1715` und
-`udos_p8000`, für die der Weg noch nicht geprüft ist), ist der Haken grau. Passt ein eigenes Abbild nicht in
+keinen hinterlegten Eintrag (Datendisketten wie `cpa_ds80_5x1024_daten`, aber auch `udos1715_ds80_16x256` und
+`udos_p8000_ds80_16x256`, für die der Weg noch nicht geprüft ist), ist der Haken grau. Passt ein eigenes Abbild nicht in
 die Systemspuren, wird gar nichts angelegt und die Meldung nennt beide Größen.
 
 Die Auswahl steht in der Datei `bootsektor.yaml` neben dem Formatkatalog, die Abbilder
@@ -759,19 +759,19 @@ den mitgelieferten hinzu und übersteht ein Update:
     version: 1
     bootsektoren:
       - description: "Mein CP/A mit Sondertreiber"
-        filesystem:  cpa780
+        filesystem:  cpa_ds80_5x1024_boot
         file:        meine_abbilder/cpa_sonder.bin
 
 `filesystem` ist ein Name aus der Dateisystemliste des Dialogs, `file` ein Pfad relativ
 zu dieser Datei. Ein Eintrag, der nicht taugt, erscheint nicht im Feld; den Grund nennt
 das Protokoll.
 
-Für den **K8915** (SCPX 8915) heißt das Dateisystem `scpx8915`; das Bootabbild muss den
+Für den **K8915** (SCPX 8915) heißt das Dateisystem `scpx8915_ds80_5x1024_boot`; das Bootabbild muss den
 Ladekopf einer K8915-Systemdiskette tragen — ein A5120-Abbild wird abgewiesen, bevor
 etwas angelegt wird.
 
-Für den **PC 1715** und den **1715W** (SCP 3.0) heißt es `scp1715`; **CP/A 1715** hat keine
-Systemspuren, sein Bootkopf steht in den ersten Verzeichnisplätzen (`cpa1715`, Bootabbild =
+Für den **PC 1715** und den **1715W** (SCP 3.0) heißt es `scp1715_ds80_5x1024_boot`; **CP/A 1715** hat keine
+Systemspuren, sein Bootkopf steht in den ersten Verzeichnisplätzen (`cpa1715_ds80_5x1024_boot`, Bootabbild =
 128 Byte) — dort muss `@OS.COM` die erste Datei sein. Ein Abbild ohne den 1715-Kopf
 (A5120-Lader) wird abgewiesen.
 
@@ -1391,7 +1391,7 @@ gut. Dann hilft ein Blick in die Dateiliste: das falsche Profil zeigt Unsinn.
 Über das Auswahlfeld im Kopf lässt sich das andere ausprobieren.
 
 Die Prüfung nimmt einem diese Arbeit weitgehend ab: sie probiert die übrigen Profile
-still durch und sagt es, wenn eines besser durchkommt — „mit `scp1700` kommt diese
+still durch und sagt es, wenn eines besser durchkommt — „mit `scp1700_ds80_16x256_boot` kommt diese
 Diskette besser durch: 46 statt 43 sichtbare Dateien". **Die Wahl ändert sie nie**,
 sie sagt sie nur an; entschieden wird im Auswahlfeld. Der zweite Teil dieser Auskunft
 ist der wichtigere: ein Profil mit einem zu kleinen Verzeichnisbereich mountet

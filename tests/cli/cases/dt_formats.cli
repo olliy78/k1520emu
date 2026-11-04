@@ -2,9 +2,9 @@
 tool:   k1520disktool
 disk_path: /dev/null
 run:    formats
-expect: cpa780
-expect: scpx798
-expect: udos_ds77
+expect: cpa_ds80_5x1024_boot
+expect: scpx_ds80_5x1024_boot
+expect: udos_ds77_26x128
 expect: udos
 expect: cpm
 exit:   0

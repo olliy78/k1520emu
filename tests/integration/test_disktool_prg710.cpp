@@ -144,12 +144,12 @@ class DisktoolPrg710 : public ::testing::TestWithParam<V> {};
 TEST(DisktoolPrg710, ErkenntSystemUndFassungAnDenGeraetedisketten) {
     struct Fall { const char* disk; const char* fs; System sys; PV soll; };
     const Fall faelle[] = {
-        {"prg710_udos43_k5601_mrs_boot.hfe",    "udos_ds77", System::Udos, PV::Prg710},
-        {"prg710_udos43_k5601_boot01.hfe",      "udos_ds77", System::Udos, PV::Prg710},
-        {"prg710-1_udos43_k5601_v43_189.hfe",   "udos_ds77", System::Udos, PV::Prg710_1},
-        {"prg710-1_udos_k5601_boot.hfe",        "udos_ds77", System::Udos, PV::Prg710_1},
-        {"prg710_scpx15_cpa640_sysprg.hfe",     "scpx640",   System::Scpx, PV::Prg710},
-        {"prg710-1_scpx17_cpa640_boot.hfe",     "scpx640",   System::Scpx, PV::Prg710_1},
+        {"prg710_udos43_k5601_mrs_boot.hfe",    "udos_ds77_26x128", System::Udos, PV::Prg710},
+        {"prg710_udos43_k5601_boot01.hfe",      "udos_ds77_26x128", System::Udos, PV::Prg710},
+        {"prg710-1_udos43_k5601_v43_189.hfe",   "udos_ds77_26x128", System::Udos, PV::Prg710_1},
+        {"prg710-1_udos_k5601_boot.hfe",        "udos_ds77_26x128", System::Udos, PV::Prg710_1},
+        {"prg710_scpx15_cpa640_sysprg.hfe",     "scpx_ds80_16x256_boot",   System::Scpx, PV::Prg710},
+        {"prg710-1_scpx17_cpa640_boot.hfe",     "scpx_ds80_16x256_boot",   System::Scpx, PV::Prg710_1},
     };
     for (const Fall& f : faelle) {
         k1520test::TempDisk d(f.disk);
@@ -160,11 +160,11 @@ TEST(DisktoolPrg710, ErkenntSystemUndFassungAnDenGeraetedisketten) {
     // A5120: UDOS-Lader und SCPX-Lader tragen den PRG-Ladesektor nicht.
     {
         k1520test::TempDisk d("udos_boot_scp.hfe");
-        EXPECT_FALSE(prg_boot::erkenne(band(d, "udos_ds77"), System::Udos).ist_prg);
+        EXPECT_FALSE(prg_boot::erkenne(band(d, "udos_ds77_26x128"), System::Udos).ist_prg);
     }
     {
         k1520test::TempDisk d("scpx17_cpa780_k5601.hfe");
-        EXPECT_FALSE(prg_boot::erkenne(band(d, "scpx640"), System::Scpx).ist_prg);
+        EXPECT_FALSE(prg_boot::erkenne(band(d, "scpx_ds80_16x256_boot"), System::Scpx).ist_prg);
     }
 }
 
@@ -178,16 +178,16 @@ TEST(DisktoolPrg710, ErkenntSystemUndFassungAnDenGeraetedisketten) {
 TEST(DisktoolPrg710, ScpxBandAusDenModulenGleichtDemGeraetband) {
     k1520test::TempDisk quelle("prg710-1_scpx17_cpa640_boot.hfe");
     std::string err;
-    auto dv = DiskVolume::open(quelle, "scpx640", formate(), dateisysteme(), err);
+    auto dv = DiskVolume::open(quelle, "scpx_ds80_16x256_boot", formate(), dateisysteme(), err);
     ASSERT_NE(dv, nullptr) << err;
     const auto syl = holeDatei(*dv, "SYL17.SYS");
     const auto ccp = holeDatei(*dv, "CCPBD17.SYS");
     ASSERT_EQ(syl.size(), 256u);
     ASSERT_EQ(ccp.size(), 5632u);
 
-    const std::vector<uint8_t> soll710_1 = band(quelle, "scpx640");
+    const std::vector<uint8_t> soll710_1 = band(quelle, "scpx_ds80_16x256_boot");
     k1520test::TempDisk d710("prg710_scpx15_cpa640_sysprg.hfe");
-    const std::vector<uint8_t> soll710 = band(d710, "scpx640");
+    const std::vector<uint8_t> soll710 = band(d710, "scpx_ds80_16x256_boot");
 
     struct Bios { const char* name; PV geraet; };
     const Bios bios[] = {
@@ -239,12 +239,12 @@ TEST_P(DisktoolPrg710, UdosBootdisketteBootetBisZumPrompt) {
     const V v = GetParam();
     k1520test::TempDisk quelle(udosDiskette(v));
     std::string err;
-    auto q = DiskVolume::open(quelle, "udos_ds77", formate(), dateisysteme(), err);
+    auto q = DiskVolume::open(quelle, "udos_ds77_26x128", formate(), dateisysteme(), err);
     ASSERT_NE(q, nullptr) << err;
     const std::string bootbin = k1520test::tempPath("k1520_prgboot_udos.bin");
     ASSERT_TRUE(q->readBootImageToFile(bootbin)) << q->lastError();
     TempPfad ziel("k1520_prgboot_udos.hfe");
-    auto neu = DiskVolume::create(ziel.get(), "udos_ds77", "UDOS.PRG", formate(),
+    auto neu = DiskVolume::create(ziel.get(), "udos_ds77_26x128", "UDOS.PRG", formate(),
                                   dateisysteme(), err, bootbin);
     std::error_code ec;
     fs::remove(bootbin, ec);
@@ -268,7 +268,7 @@ TEST_P(DisktoolPrg710, UdosBootdisketteBootetBisZumPrompt) {
 
 /**
  * @test DisktoolPrg710.ScpxBootdisketteAusModulenBootetBisA
- * @brief Systemspuren aus den Modulen (`boot-scpx`), `create --fs scpx640 --boot`, die
+ * @brief Systemspuren aus den Modulen (`boot-scpx`), `create --fs scpx_ds80_16x256_boot --boot`, die
  *        Programme der Geraetediskette dazu → Kaltstart bis `A>` mit dem Gruss des BIOS
  *        (710: V1.5, 710-1: V1.7), `DIR` listet, `STAT` wird von der Diskette geladen.
  */
@@ -276,7 +276,7 @@ TEST_P(DisktoolPrg710, ScpxBootdisketteAusModulenBootetBisA) {
     const V v = GetParam();
     k1520test::TempDisk quelle("prg710-1_scpx17_cpa640_boot.hfe");   // traegt alle Module
     std::string err;
-    auto q = DiskVolume::open(quelle, "scpx640", formate(), dateisysteme(), err);
+    auto q = DiskVolume::open(quelle, "scpx_ds80_16x256_boot", formate(), dateisysteme(), err);
     ASSERT_NE(q, nullptr) << err;
     const auto syl = holeDatei(*q, "SYL17.SYS");
     const auto ccp = holeDatei(*q, "CCPBD17.SYS");
@@ -293,7 +293,7 @@ TEST_P(DisktoolPrg710, ScpxBootdisketteAusModulenBootetBisA) {
                 static_cast<std::streamsize>(systemspuren.size()));
     }
     TempPfad ziel("k1520_prgboot_scpx.hfe");
-    auto neu = DiskVolume::create(ziel.get(), "scpx640", "", formate(), dateisysteme(), err,
+    auto neu = DiskVolume::create(ziel.get(), "scpx_ds80_16x256_boot", "", formate(), dateisysteme(), err,
                                   bootbin);
     std::error_code ec;
     fs::remove(bootbin, ec);
@@ -367,11 +367,11 @@ INSTANTIATE_TEST_SUITE_P(Varianten, DisktoolPrg710, ::testing::Values(V::Prg710,
 TEST(DisktoolPrg710, FremdeFassungWirdBeimEinspielenAbgewiesen) {
     struct Paar { const char* ziel; const char* fremd; const char* fs; const char* gleich; };
     const Paar paare[] = {
-        {"prg710-1_scpx17_cpa640_boot.hfe", "prg710_scpx15_cpa640_sysprg.hfe", "scpx640",
+        {"prg710-1_scpx17_cpa640_boot.hfe", "prg710_scpx15_cpa640_sysprg.hfe", "scpx_ds80_16x256_boot",
          "prg710-1_scpx17_cpa640_boot.hfe"},
-        {"prg710-1_udos43_k5601_v43_189.hfe", "prg710_udos43_k5601_mrs_boot.hfe", "udos_ds77",
+        {"prg710-1_udos43_k5601_v43_189.hfe", "prg710_udos43_k5601_mrs_boot.hfe", "udos_ds77_26x128",
          "prg710-1_udos_k5601_boot.hfe"},
-        {"prg710_udos43_k5601_mrs_boot.hfe", "prg710-1_udos43_k5601_v43_189.hfe", "udos_ds77",
+        {"prg710_udos43_k5601_mrs_boot.hfe", "prg710-1_udos43_k5601_v43_189.hfe", "udos_ds77_26x128",
          "prg710_udos43_k5601_boot01.hfe"},
     };
     for (const Paar& p : paare) {
@@ -402,8 +402,8 @@ TEST(DisktoolPrg710, FremdeFassungWirdBeimEinspielenAbgewiesen) {
 TEST(DisktoolPrg710, UnvollstaendigesPrgAbbildLegtKeineDisketteAn) {
     struct Fall { const char* disk; const char* fs; size_t laenge; };
     const Fall faelle[] = {
-        {"prg710_scpx15_cpa640_sysprg.hfe", "scpx640", 5000},
-        {"prg710_udos43_k5601_mrs_boot.hfe", "udos_ds77", 5000},
+        {"prg710_scpx15_cpa640_sysprg.hfe", "scpx_ds80_16x256_boot", 5000},
+        {"prg710_udos43_k5601_mrs_boot.hfe", "udos_ds77_26x128", 5000},
     };
     for (const Fall& f : faelle) {
         k1520test::TempDisk d(f.disk);
@@ -426,7 +426,7 @@ TEST(DisktoolPrg710, UnvollstaendigesPrgAbbildLegtKeineDisketteAn) {
     {
         // A5120-Abbild (SCPX-Systemspuren der A5120-Fixture): keine PRG-Pruefung.
         k1520test::TempDisk d("scpx17_cpa780_k5601.hfe");
-        const auto b = band(d, "scpx640");
+        const auto b = band(d, "scpx_ds80_16x256_boot");
         const std::string bootbin = k1520test::tempPath("k1520_prgboot_a5120.bin");
         {
             std::ofstream o(bootbin, std::ios::binary);
@@ -434,7 +434,7 @@ TEST(DisktoolPrg710, UnvollstaendigesPrgAbbildLegtKeineDisketteAn) {
         }
         TempPfad ziel("k1520_prgboot_a5120.hfe");
         std::string err;
-        auto neu = DiskVolume::create(ziel.get(), "scpx640", "", formate(), dateisysteme(),
+        auto neu = DiskVolume::create(ziel.get(), "scpx_ds80_16x256_boot", "", formate(), dateisysteme(),
                                       err, bootbin);
         std::error_code ec;
         fs::remove(bootbin, ec);

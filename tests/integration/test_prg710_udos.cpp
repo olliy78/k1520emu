@@ -178,7 +178,7 @@ std::vector<uint8_t> datei(const std::string& p) {
 /// Inhalt einer Datei auf Seite 0 einer UDOS-Diskette (ueber das DiskTool).
 std::vector<uint8_t> udosDatei(const std::string& abbild, const std::string& name) {
     std::string err;
-    auto dv = DiskVolume::open(abbild, "udos_ds77", formate(), dateisysteme(), err);
+    auto dv = DiskVolume::open(abbild, "udos_ds77_26x128", formate(), dateisysteme(), err);
     EXPECT_NE(dv, nullptr) << err;
     if (!dv) return {};
     TempPfad ziel("prg710_udos_datei.bin");
@@ -258,7 +258,7 @@ TEST_P(Prg710Udos, CatUndDate) {
 /**
  * @test Prg710Udos.KopiertAufLaufwerk1
  * @brief Laufwerk 1 traegt eine vom DiskTool frisch angelegte, leere UDOS-Diskette
- *        (`DiskVolume::create`, `udos_ds77`, Name „LEER“ — UDOS braucht Verzeichnis und
+ *        (`DiskVolume::create`, `udos_ds77_26x128`, Name „LEER“ — UDOS braucht Verzeichnis und
  *        Belegungsplan, die `createDisk` mit Format allein nicht schreibt).  `STATUS 1`
  *        liest sie, `COPY OS.INIT 1/KOPIE` schreibt im `/WAIT`-Betrieb, `CAT D=1 P=&`
  *        zeigt die Kopie, und das DiskTool findet sie danach bytegleich zum Original.
@@ -268,7 +268,7 @@ TEST_P(Prg710Udos, KopiertAufLaufwerk1) {
     TempPfad zweit("prg710_udos_lw1.hfe");
     {
         std::string err;
-        auto neu = DiskVolume::create(zweit.get(), "udos_ds77", "LEER", formate(),
+        auto neu = DiskVolume::create(zweit.get(), "udos_ds77_26x128", "LEER", formate(),
                                       dateisysteme(), err);
         ASSERT_NE(neu, nullptr) << err;
         ASSERT_TRUE(neu->flush()) << neu->lastError();

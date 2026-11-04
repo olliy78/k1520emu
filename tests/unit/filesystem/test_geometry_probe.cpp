@@ -70,7 +70,7 @@ TEST(GeometryProbe, ErkenntCpaBootdiskette) {
 
 TEST(GeometryProbe, ErkenntGemischteScpxDiskette) {
     // Zylinder 0 in 16×256, ab Zylinder 1 in 5×1024 — dafuer gibt es seit dem
-    // DiskTool den Katalogeintrag scpx798 (vorher passte KEIN Format).
+    // DiskTool den Katalogeintrag scpx_ds80_5x1024_boot (vorher passte KEIN Format).
     const auto m = vermessen("scpx17_5x1024_k5601_hardy_norm.hfe");
     ASSERT_FALSE(m.empty());
     EXPECT_EQ(bestesFormat(m), "ds80_2t16x256-5x1024");

@@ -166,7 +166,7 @@ Sektorraum, ein Byte an der richtigen Stelle ist der ganze Schaden:
 ```
 disk:   cpa_cpa780_k5601_noclock.img
 poke:   %DISK% 3b30 f00f      # Verzeichnisplatz 1, erster Blockzeiger → 0x0FF0
-run:    fsck %DISK% --fs cpa780 --repair=alle
+run:    fsck %DISK% --fs cpa_ds80_5x1024_boot --repair=alle
 ```
 
 Zwei Fallen dabei: die **Erkennung lehnt** eine Diskette mit unbrauchbarem

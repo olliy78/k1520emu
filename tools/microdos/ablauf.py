@@ -63,7 +63,7 @@ class Sitzung:
             self.emu = K1520Emulator(drive_types=laufwerke, konfig=dict({"tastatur": tastatur}, **konfig))
         else:
             self.emu = K1520Emulator(drive_types=laufwerke, tastatur=tastatur, laderom=laderom)
-        # "cpa800" ist nur der Katalogname fuer das Einlegen; HFE traegt die Geometrie selbst
+        # "cpa_ds80_5x1024_daten" ist nur der Katalogname fuer das Einlegen; HFE traegt die Geometrie selbst
         if not self.emu.mount_disk(0, a_pfad, 'cpa800', False):
             raise RuntimeError('A: einlegen: ' + str(self.emu.last_error()))
         if b_pfad:

@@ -102,7 +102,7 @@ def test_single_disk_is_a_set_with_one_image_and_grows_to_numbered_images(tmp_pa
     Inhalt darueber, wird beim Speichern nummeriert (frueher: erst `tar_zu_satz`)."""
     from app.core_binding.k1520disk import K1520DiskError
     einzel = tmp_path / "e.img"
-    _tool().create(einzel, "tar720_leer", "").close()
+    _tool().create(einzel, "tar_ds80_9x512_leer", "").close()
     with _tool().open(einzel, read_only=False) as t:
         assert t.tar_satz and t.tar_satz_einzel
         assert t.tar_satz_dateien == [str(einzel)]              # das einzige Abbild ist die Datei
@@ -120,7 +120,7 @@ def test_single_disk_is_a_set_with_one_image_and_grows_to_numbered_images(tmp_pa
 
 def test_single_disk_saves_into_its_own_image(tmp_path):
     einzel = tmp_path / "e.hfe"
-    _tool().create(einzel, "tar720_leer", "").close()
+    _tool().create(einzel, "tar_ds80_9x512_leer", "").close()
     with _tool().open(einzel, read_only=False) as t:
         t.insert(str(_quelle(tmp_path, "klein", _bytes(1000, 2))), "klein")
         assert t.dirty
@@ -133,7 +133,7 @@ def test_single_disk_saves_into_its_own_image(tmp_path):
 def test_new_set_rejects_unfit_formats_and_names(tmp_path):
     from app.core_binding.k1520disk import K1520DiskError
     with pytest.raises(K1520DiskError):
-        _tool().tar_satz_neu("cpa780", tmp_path / "x.hfe")           # gemischtes Format
+        _tool().tar_satz_neu("cpa_ds80_5x1024_boot", tmp_path / "x.hfe")           # gemischtes Format
     with pytest.raises(K1520DiskError):
         _tool().tar_disk_neu(tmp_path / "x.txt", "ds80_9x512")
     assert not (tmp_path / "x.txt").exists()
@@ -168,7 +168,7 @@ def test_container_beyond_one_disk_makes_a_set(tmp_path):
     paket = tmp_path / "gross.tar"
     subprocess.run(["tar", "--format=v7", "-cf", str(paket), "-C", str(tmp_path / "q"), "d0", "d1", "d2"], check=True)
     einzel = tmp_path / "e.img"
-    _tool().create(einzel, "tar720_leer", "").close()
+    _tool().create(einzel, "tar_ds80_9x512_leer", "").close()
     with _tool().open(einzel, read_only=False) as t:
         u = t.tar_datei_pruefen(paket)
         assert u["als_container"] and u["wird_satz"] and u["abbilder"] == 2

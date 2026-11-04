@@ -9,11 +9,11 @@ tmpfile v.img:
 tmpfile raus:
 file prog:
   echo hallo
-setup_run: create %w.img% --fs wega720 --label probe
+setup_run: create %w.img% --fs wega_ds80_9x512 --label probe
 setup_run: put %w.img% %prog% --as bin/prog
 setup_run: attr %w.img% bin/prog --mode 4711 --uid 5 --gid 6 --mtime 400000000
 setup_run: get %w.img% --to %raus%
-setup_run: create %v.img% --fs wega720 --label zwei
+setup_run: create %v.img% --fs wega_ds80_9x512 --label zwei
 setup_run: put %v.img% %raus%
 run:    attr %v.img% bin/prog
 expect: Modus 0104711

@@ -27,17 +27,17 @@ def _waehle(dlg, name):
 
 def test_haken_nur_bei_unix_dateisystemen(qt_app):
     dlg = _dialog(qt_app)
-    _waehle(dlg, "cpa800")
+    _waehle(dlg, "cpa_ds80_5x1024_daten")
     assert dlg.unix.isHidden() and dlg.inodes() == 0
-    _waehle(dlg, "mutos1700_720")
+    _waehle(dlg, "mutos1700_ds80_9x512")
     assert not dlg.unix.isHidden()
 
 
 def test_vorgabe_gesperrt_bis_der_haken_gesetzt_ist(qt_app):
     from app.core_binding.k1520disk import unix_standard_inodes
     dlg = _dialog(qt_app)
-    _waehle(dlg, "mutos1700_720")
-    assert unix_standard_inodes("mutos1700_720") == 448
+    _waehle(dlg, "mutos1700_ds80_9x512")
+    assert unix_standard_inodes("mutos1700_ds80_9x512") == 448
     assert dlg.zahl.value() == 448 and not dlg.zahl.isEnabled()
     assert dlg.inodes() == 0                      # Vorgabe: nichts uebersteuert
     dlg.haken.setChecked(True)
@@ -50,18 +50,18 @@ def test_vorgabe_gesperrt_bis_der_haken_gesetzt_ist(qt_app):
 
 def test_dateisystemwechsel_setzt_die_vorgabe_neu(qt_app):
     dlg = _dialog(qt_app)
-    _waehle(dlg, "mutos1700_720")
+    _waehle(dlg, "mutos1700_ds80_9x512")
     dlg.haken.setChecked(True)
     dlg.zahl.setValue(272)
-    _waehle(dlg, "mutos8k_8x512_mfm")
+    _waehle(dlg, "mutos8k_ss77_8x512")
     assert not dlg.haken.isChecked() and dlg.zahl.value() == 192 and dlg.inodes() == 0
 
 
 def test_angelegte_diskette_traegt_die_gewaehlte_inode_zahl(tmp_path):
     from app.core_binding.k1520disk import DiskTool
     # 272 Inodes = 17 Inode-Bloecke: drei Bloecke (3 KB) mehr Daten als bei der Vorgabe (28 Bloecke)
-    a = DiskTool.create(tmp_path / "a.dmk", "mutos1700_720", "A")
-    b = DiskTool.create(tmp_path / "b.dmk", "mutos1700_720", "B", None, 272)
+    a = DiskTool.create(tmp_path / "a.dmk", "mutos1700_ds80_9x512", "A")
+    b = DiskTool.create(tmp_path / "b.dmk", "mutos1700_ds80_9x512", "B", None, 272)
     frei_a, frei_b = a.volumes()[0].free, b.volumes()[0].free
     a.close(); b.close()
     assert frei_b - frei_a == (28 - 17) * 1024

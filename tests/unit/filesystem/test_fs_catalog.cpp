@@ -75,56 +75,56 @@ TEST(FsCatalog, ProfilnamenSindEinStabilerVertrag) {
     // (@ref CpaDpbRule), braucht ein Eintrag hier einen eigenen Grund — UDOS (andere
     // Familie) oder ein Name, den `create --fs` und die Oberflaeche brauchen.
     const std::vector<std::string> erwartet = {
-        "cpa780", "cpa800",
-        "scpx640", "scpx798",
-        "udos_ds77", "udos_ss77", "udos_ss40",
+        "cpa_ds80_5x1024_boot", "cpa_ds80_5x1024_daten",
+        "scpx_ds80_16x256_boot", "scpx_ds80_5x1024_boot",
+        "udos_ds77_26x128", "udos_ss77_26x128", "udos_ss40_26x128",
         // UDOS auf dem 8-Zoll-MF3200 (FM): `create` nimmt das Verfahren aus dem Format
         // (MUTOS-Ladediskette, Entwurf 39 9.13).
-        "udos_ss77_fm",
-        "udos1715", "udos1715_ss80", "udos1715_ss40",
+        "udos_fm_ss77_26x128",
+        "udos1715_ds80_16x256", "udos1715_ss80_16x256", "udos1715_ss40_16x256",
         // dieselbe NDOS-Diskette, unterschieden nur an der Fuellung hinter dem Plan
-        "udos_p8000", "udos50",
+        "udos_p8000_ds80_16x256", "udos50_ds80_16x256",
         // CP/M-86 des A7100: eigener Eintrag, weil die CP/A-Regel hier NICHT gilt
         // (sie bildet das CP/A-BIOS nach, nicht das SCP1700).
-        "scp1700",
+        "scp1700_ds80_16x256_boot",
         // SCPX 8915 (K8915): festes OFF 2 auch ohne Systemspuren.  Nur mit `--fs`
-        // (`detect: false`) — eine LEERE Diskette ist sonst von `cpa800` nicht zu
+        // (`detect: false`) — eine LEERE Diskette ist sonst von `cpa_ds80_5x1024_daten` nicht zu
         // unterscheiden (doc/design/16_k8915.md §8a AP-E5a).
-        "scpx8915",
+        "scpx8915_ds80_5x1024_boot",
         // PC 1715 (AP-D): CP/A 1715 mit Bootkopf IM Verzeichnis (erkannt nur mit Kopf) und
         // der Name fuer die SCP-1715-/SCP-3.0-Systemdiskette (`detect: false`).
-        "cpa1715", "scp1715",
+        "cpa1715_ds80_5x1024_boot", "scp1715_ds80_5x1024_boot",
         // WEGA (P8000, UNIX System III): andere Familie, beschreibt sich selbst
         // (doc/design/27_wega_dateisystem.md) — ein Eintrag fuer die 720-K-Diskette.
-        "wega720",
+        "wega_ds80_9x512",
         // MUTOS 8000 (A5120.16): dasselbe Dateisystem, Blockraum ab Zylinder 1.
-        "mutos8k_8x512_mfm", "mutos8k_8x512_mfm_80", "mutos1700_720", "mutos1700_a7100", "mutos8k_26x128_fm",
-        // … dieselbe 8k-Wurzel in MFM (K5601); Rang -10, damit sie vor udos_ss77 gewinnt.
-        "mutos8k_26x128_mfm",
+        "mutos8k_ss77_8x512", "mutos8k_ss80_8x512", "mutos1700_ds80_9x512", "mutos1700_ds80_16x256", "mutos8k_fm_ss77_26x128",
+        // … dieselbe 8k-Wurzel in MFM (K5601); Rang -10, damit sie vor udos_ss77_26x128 gewinnt.
+        "mutos8k_ss77_26x128",
         // tar-Disketten (P8000-Lieferungen ohne Dateisystem, nur lesbar): letzter
         // Erkennungsversuch hinter allen echten Dateisystemen (disk_volume.cpp).
-        "tar720",
+        "tar_ds80_9x512",
         // … und die LEERE tar-Diskette (ganz Null; nimmt genau ein .tar auf, `leer: true`).
-        "tar720_leer",
+        "tar_ds80_9x512_leer",
         // … und tar im MUTOS-8000-Layout (Rohgeraet /dev/rrkN, Entwurf 39): MFM (K5601) und FM (MF3200),
         // je mit der leeren Fassung.  Erkennung VOR den echten Dateisystemen (disk_volume.cpp).
-        "tar_mutos8k_26x128_mfm", "tar_mutos8k_26x128_mfm_leer", "tar_mutos8k_26x128_fm", "tar_mutos8k_26x128_fm_leer",
+        "tar_ss77_26x128", "tar_ss77_26x128_leer", "tar_fm_ss77_26x128", "tar_fm_ss77_26x128_leer",
         // … und im 8x512-Zuschnitt (DISK-Satz, lineares Rohgeraet ab Zylinder 1, 608 Bloecke; Entwurf 39 A5c).
-        "tar_mutos8k_8x512_mfm", "tar_mutos8k_8x512_mfm_leer",
+        "tar_ss77_8x512", "tar_ss77_8x512_leer",
         // BCU 880: Arbeitsdiskette „ohne SYL“ (Name, `detect: false`) und die Startdiskette
         // „SYL auf Spur 1“ (erkannt am Lader; `nur_boot`).
-        "bcu880", "bcu880_syl", "bcu880_kombi", "bcu880_kombi80", "bcu880_80",
+        "bcu880_ss40_26x128_arbeit", "bcu880_ss40_26x128_syl", "bcu880_ss40_26x128_kombi", "bcu880_ss80_26x128_kombi", "bcu880_ss80_26x128_arbeit",
         // OS/M (P8000, doc/design/34_osm.md): Name, Bootabbild-Pruefung (`boot_header: osm`)
-        // und — bei 800K — die leere Diskette, die sonst `cpa800` ab c0h0 waere.  Erkannt nur
-        // mit Urlader; `osm640` ist deckungsgleich mit `scpx640`.
-        "osm640", "osm800",
+        // und — bei 800K — die leere Diskette, die sonst `cpa_ds80_5x1024_daten` ab c0h0 waere.  Erkannt nur
+        // mit Urlader; `osm_ds80_16x256_boot` ist deckungsgleich mit `scpx_ds80_16x256_boot`.
+        "osm_ds80_16x256_boot", "osm_ds80_5x1024_boot",
         // SIOS 1526 (doc/sios_diskettenformat.md): Erkennung am Nachweis ERMAP + VOL1.
-        "sios_ss40", "sios_ss80",
+        "sios_ss40_26x128", "sios_ss80_26x128",
         // MicroDOS 1526/1715 (Rostock): Lader im Verzeichnis (Erkennung am Lader) und die
         // Datendisketten ohne Lader (`detect: false`), Entwurf 13 §25.
-        "microdos800", "microdos200", "microdos128", "microdos800_daten", "microdos200_daten", "microdos1715",
+        "microdos_ds80_5x1024_boot", "microdos_ss40_5x1024_boot", "microdos_ss40_26x128_boot", "microdos_ds80_5x1024_daten", "microdos_ss40_5x1024_daten", "microdos1715_ds80_5x1024_boot",
         // MS-DOS FAT12 (Entwurf 44): erkannt am BPB, `create --fs dosNNN` nimmt den Namen.
-        "dos160", "dos180", "dos320", "dos360", "dos360ss80", "dos640", "dos720", "dos800", "dos1200", "dos1440", "dos2880",
+        "dos_ss40_8x512", "dos_ss40_9x512", "dos_ds40_8x512", "dos_ds40_9x512", "dos_ss80_9x512", "dos_ds80_8x512", "dos_ds80_9x512", "dos_ds80_10x512", "dos_ds80_15x512_hd", "dos_ds80_18x512_hd", "dos_ds80_36x512_ed",
     };
     for (const auto& n : erwartet)
         EXPECT_NE(cat.find(n), nullptr) << "Dateisystem '" << n << "' fehlt";
@@ -140,10 +140,10 @@ TEST(FsCatalog, AlteProfilnamenLoesenAlsAliasAufDasNeueProfilAuf) {
     FsCatalog cat = FsCatalog::load({shippedCatalog()}, formate(), &fatal);
     ASSERT_TRUE(fatal.empty()) << fatal;
     const std::vector<std::pair<std::string, std::string>> paare = {
-        {"mutos77", "mutos8k_8x512_mfm"},          {"mutos80", "mutos8k_8x512_mfm_80"},
-        {"mutos8k_fm", "mutos8k_26x128_fm"},       {"mutos8k_mfm", "mutos8k_26x128_mfm"},
-        {"tar_mutos8k_fm", "tar_mutos8k_26x128_fm"}, {"tar_mutos8k_fm_leer", "tar_mutos8k_26x128_fm_leer"},
-        {"tar_mutos8k_mfm", "tar_mutos8k_26x128_mfm"}, {"tar_mutos8k_mfm_leer", "tar_mutos8k_26x128_mfm_leer"},
+        {"mutos77", "mutos8k_ss77_8x512"},          {"mutos80", "mutos8k_ss80_8x512"},
+        {"mutos8k_fm", "mutos8k_fm_ss77_26x128"},       {"mutos8k_mfm", "mutos8k_ss77_26x128"},
+        {"tar_mutos8k_fm", "tar_fm_ss77_26x128"}, {"tar_mutos8k_fm_leer", "tar_fm_ss77_26x128_leer"},
+        {"tar_mutos8k_mfm", "tar_ss77_26x128"}, {"tar_mutos8k_mfm_leer", "tar_ss77_26x128_leer"},
     };
     for (const auto& [alt, neu] : paare) {
         const FsProfile* a = cat.find(alt);
@@ -171,7 +171,7 @@ TEST(FsCatalog, JedesProfilVerweistAufEinVorhandenesFormat) {
 TEST(FsCatalog, Cpa780BeginntBeiZylinder2) {
     std::string fatal;
     FsCatalog cat = FsCatalog::load({shippedCatalog()}, formate(), &fatal);
-    const FsProfile* p = cat.find("cpa780");
+    const FsProfile* p = cat.find("cpa_ds80_5x1024_boot");
     ASSERT_NE(p, nullptr);
     EXPECT_EQ(p->type, FsType::Cpm);
     EXPECT_EQ(p->data_cyl, 2);
@@ -183,8 +183,8 @@ TEST(FsCatalog, Cpa780BeginntBeiZylinder2) {
 /**
  * @test Auf der 16×256-Geometrie liegt GENAU EIN Profil OHNE positiven Nachweis — und es
  *       beginnt bei c2h0.
- * @par Kriterium  `forFormat("ds80_16x256")` liefert `scpx640` (data_cyl 2) und sonst nur
- *                 `osm640`, das ausschliesslich mit OS/M-Urlader erkannt wird und
+ * @par Kriterium  `forFormat("ds80_16x256")` liefert `scpx_ds80_16x256_boot` (data_cyl 2) und sonst nur
+ *                 `osm_ds80_16x256_boot`, das ausschliesslich mit OS/M-Urlader erkannt wird und
  *                 deckungsgleich liegt (Entwurf 34 §6: keine Mehrdeutigkeit).
  * @par Warum      Bis 2026-08-11 stand daneben ein `ds80_16x256` mit `data_cyl == 0`,
  *                 gedacht als Beispiel fuer „mehrere Dateisysteme je Geometrie".  Das
@@ -212,7 +212,7 @@ TEST(FsCatalog, SechzehnMalZweihundertsechsundfuenfzigHatNurEinProfilAbZylinderZ
     }
     ASSERT_EQ(ohne_nachweis.size(), 1u) << "ein zweites Profil ohne Nachweis auf dieser "
                                            "Geometrie macht jede 16×256-Diskette wieder mehrdeutig";
-    EXPECT_EQ(ohne_nachweis.front()->name, "scpx640");
+    EXPECT_EQ(ohne_nachweis.front()->name, "scpx_ds80_16x256_boot");
     size_t cpm = 0;
     for (const FsProfile* p : auf640) cpm += p->type == FsType::Cpm;
     EXPECT_EQ(cpm, 2u);
@@ -267,7 +267,7 @@ TEST(FsCatalog, Udos1715ProfileSindImgFaehigUndEinseitigGezaehlt) {
     for (const auto& p : cat.profiles())
         if (p.type == FsType::Udos1715 && p.format == "ds80_16x256") fuellung[p.name] = p.ndos_fill;
     const std::map<std::string, std::string> soll = {
-        {"udos1715", "00"}, {"udos_p8000", "77"}, {"udos50", "ff"}};
+        {"udos1715_ds80_16x256", "00"}, {"udos_p8000_ds80_16x256", "77"}, {"udos50_ds80_16x256", "ff"}};
     EXPECT_EQ(fuellung, soll) << "jedes 640K-NDOS-Profil braucht eine EIGENE Fuellung, "
                                  "sonst ist die Erkennung mehrdeutig";
 }
@@ -289,7 +289,7 @@ TEST(FsCatalog, FehlendeSektionIstKeinFehler) {
 TEST(FsCatalog, UnbekanntesFormatWirdUebersprungenNichtAkzeptiert) {
     TempKatalog k("filesystems:\n"
                   "  - name: kaputt\n    format: gibtsnicht\n    type: cpm\n"
-                  "  - name: gut\n    format: cpa800\n    type: cpm\n");
+                  "  - name: gut\n    format: ds80_5x1024\n    type: cpm\n");
     std::string fatal;
     FsCatalog cat = FsCatalog::load({k.path()}, formate(), &fatal);
     EXPECT_TRUE(fatal.empty());
@@ -302,7 +302,7 @@ TEST(FsCatalog, UnbekanntesFormatWirdUebersprungenNichtAkzeptiert) {
 
 TEST(FsCatalog, DataStartAusserhalbDerGeometrieWirdAbgelehnt) {
     TempKatalog k("filesystems:\n"
-                  "  - name: zuweit\n    format: cpa800\n    type: cpm\n"
+                  "  - name: zuweit\n    format: ds80_5x1024\n    type: cpm\n"
                   "    data_start: { cyl: 200, head: 0 }\n");
     std::string fatal;
     FsCatalog cat = FsCatalog::load({k.path()}, formate(), &fatal);
@@ -313,9 +313,9 @@ TEST(FsCatalog, DataStartAusserhalbDerGeometrieWirdAbgelehnt) {
 
 TEST(FsCatalog, UngueltigeWerteWerdenBenannt) {
     TempKatalog k("filesystems:\n"
-                  "  - name: a\n    format: cpa800\n    type: raetsel\n"
-                  "  - name: b\n    format: cpa800\n    type: cpm\n    block_size: 3000\n"
-                  "  - name: c\n    format: cpa800\n    type: cpm\n    os: cpm4\n");
+                  "  - name: a\n    format: ds80_5x1024\n    type: raetsel\n"
+                  "  - name: b\n    format: ds80_5x1024\n    type: cpm\n    block_size: 3000\n"
+                  "  - name: c\n    format: ds80_5x1024\n    type: cpm\n    os: cpm4\n");
     std::string fatal;
     FsCatalog cat = FsCatalog::load({k.path()}, formate(), &fatal);
     EXPECT_TRUE(cat.profiles().empty());
@@ -327,7 +327,7 @@ TEST(FsCatalog, UngueltigeWerteWerdenBenannt) {
 
 TEST(FsCatalog, ImgFuerUdosWirdEntferntUndGemeldet) {
     TempKatalog k("filesystems:\n"
-                  "  - name: u\n    format: udos_ss77\n    type: udos\n"
+                  "  - name: u\n    format: ss77_26x128\n    type: udos\n"
                   "    containers: [img, hfe]\n");
     std::string fatal;
     FsCatalog cat = FsCatalog::load({k.path()}, formate(), &fatal);
@@ -340,9 +340,9 @@ TEST(FsCatalog, ImgFuerUdosWirdEntferntUndGemeldet) {
 }
 
 TEST(FsCatalog, SpaetereDateiUeberschreibtGleichenNamen) {
-    TempKatalog a("filesystems:\n  - name: x\n    format: cpa800\n    type: cpm\n"
+    TempKatalog a("filesystems:\n  - name: x\n    format: ds80_5x1024\n    type: cpm\n"
                   "    dir_entries: 64\n");
-    TempKatalog b("filesystems:\n  - name: x\n    format: cpa800\n    type: cpm\n"
+    TempKatalog b("filesystems:\n  - name: x\n    format: ds80_5x1024\n    type: cpm\n"
                   "    dir_entries: 256\n");
     std::string fatal;
     FsCatalog cat = FsCatalog::load({a.path(), b.path()}, formate(), &fatal);
@@ -358,9 +358,9 @@ TEST(FsCatalog, SpaetereDateiUeberschreibtGleichenNamen) {
  */
 TEST(FsCatalog, DetectUndBootHeaderWerdenGeprueft) {
     TempKatalog k("filesystems:\n"
-                  "  - name: a\n    format: cpa800\n    type: cpm\n    detect: vielleicht\n"
-                  "  - name: b\n    format: cpa800\n    type: cpm\n    boot_header: a5120\n"
-                  "  - name: c\n    format: cpa800\n    type: cpm\n    detect: false\n"
+                  "  - name: a\n    format: ds80_5x1024\n    type: cpm\n    detect: vielleicht\n"
+                  "  - name: b\n    format: ds80_5x1024\n    type: cpm\n    boot_header: a5120\n"
+                  "  - name: c\n    format: ds80_5x1024\n    type: cpm\n    detect: false\n"
                   "    boot_header: k8915\n");
     std::string fatal;
     FsCatalog cat = FsCatalog::load({k.path()}, formate(), &fatal);

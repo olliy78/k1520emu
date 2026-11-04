@@ -123,7 +123,7 @@ public:
 /// @brief Strom ueber der Sektorfolge einer Diskette.
 ///
 /// Ohne Profil (oder mit einem linearen) ist es die lineare Folge ab Sektor 0 (P8000-Lieferdisketten,
-/// `tar720`).  Mit einem Profil `unix_layout: mutos8k` ist es das **Rohgeraet des MUTOS-8000-Treibers**:
+/// `tar_ds80_9x512`).  Mit einem Profil `unix_layout: mutos8k` ist es das **Rohgeraet des MUTOS-8000-Treibers**:
 /// 512-B-Bloecke ab Zylinder @c data_cyl, Verschraenkung 2, Spurversatz 6 (@ref Mutos8kDev) - so legt
 /// das MUTOS-`tar cf /dev/rrk0` seinen Strom ab, und nur so liest es ihn wieder (Entwurf 39 §4.6.3).
 class TarSpaceQuelle : public TarQuelle {

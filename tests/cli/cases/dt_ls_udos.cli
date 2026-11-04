@@ -3,7 +3,7 @@
 tool:   k1520disktool
 disk:   udos_boot_scp.hfe
 run:    ls %DISK% -l
-expect: udos_ds77 (erkannt)
+expect: udos_ds77_26x128 (erkannt)
 expect: 2 Seiten
 expect: UDOS.SYS.4.3 / UDOS.SYS.4.3
 expect: Altbestand

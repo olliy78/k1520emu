@@ -1,6 +1,6 @@
 # Ein Format mit gemischten Spurformaten (CP/A-Bootdiskette) taugt nicht fuer einen Satz.
 tool:   k1520disktool
 tmpfile s.hfe:
-run:    tar-satz-neu --format cpa780 %s.hfe%
+run:    tar-satz-neu --format ds80_3t26x128-5x1024 %s.hfe%
 expect: nicht geeignet
 exit:   1

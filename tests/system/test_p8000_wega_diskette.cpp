@@ -304,7 +304,7 @@ TEST(P8000WegaDiskette, FormatMountTarUndDiskTool) {
     {
         auto v = oeffne(fsd);
         ASSERT_TRUE(v);
-        EXPECT_EQ(v->detection().filesystem, "wega720");
+        EXPECT_EQ(v->detection().filesystem, "wega_ds80_9x512");
         EXPECT_EQ(pruefe(*v), "");
         bool hallo = false, tar1 = false;
         for (const FileEntry& e : v->list()) {
@@ -319,7 +319,7 @@ TEST(P8000WegaDiskette, FormatMountTarUndDiskTool) {
     for (const std::string& p : {tara, tarb}) {   // jede Diskette ist voll und einzeln als tar-Diskette erkannt
         auto v = oeffne(p);
         ASSERT_TRUE(v);
-        EXPECT_EQ(v->detection().filesystem, "tar720");
+        EXPECT_EQ(v->detection().filesystem, "tar_ds80_9x512");
         uint64_t n = 0;
         ASSERT_TRUE(v->tarExport(dir + "/export.tar", &n)) << v->lastError();
         EXPECT_EQ(n, 737'280u);

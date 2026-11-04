@@ -226,6 +226,10 @@ k1520_add_test(katalog_alias SRC filesystem/test_katalog_alias.cpp
 k1520_add_test(format_schema SRC filesystem/test_format_schema.cpp
                              LIBS k1520_fs LABELS "${_lbl}"
                              DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
+# Namensschema der Dateisystemprofile (Entwurf 47, Waechter W4)
+k1520_add_test(fs_katalog_schema SRC filesystem/test_fs_katalog_schema.cpp
+                             LIBS k1520_fs LABELS "${_lbl}"
+                             DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
 k1520_add_test(geometry_probe SRC filesystem/test_geometry_probe.cpp
                               LIBS k1520_fs LABELS "${_lbl}"
                               DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
@@ -289,7 +293,7 @@ k1520_add_test(tar_mutos     SRC filesystem/test_tar_mutos.cpp
 k1520_add_test(disk_volume   SRC filesystem/test_disk_volume.cpp
                              LIBS k1520_fs LABELS "${_lbl}"
                              DEFS K1520_FORMATS_DEFAULT="${K1520_FORMATS_DEFAULT}")
-# OS/M des P8000 (doc/design/34_osm.md): Profile osm640/osm800, Urlader, osm.fdconf —
+# OS/M des P8000 (doc/design/34_osm.md): Profile osm_ds80_16x256_boot/osm_ds80_5x1024_boot, Urlader, osm.fdconf —
 # Echtdaten-Gegenprobe ueber die ganze pofo-Sammlung nur mit K1520_CQM_DIR.
 k1520_add_test(osm           SRC filesystem/test_osm.cpp
                              LIBS k1520_fs LABELS "${_lbl}"

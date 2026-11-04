@@ -376,7 +376,7 @@ def test_single_disk_overflow_is_announced_and_saved_as_numbered_images(window, 
     """Eine tar-Diskette ist ein Satz mit EINEM Abbild: kein Ablehnen, keine Rueckfrage beim Einfuegen;
     der Inhalt waechst im Speicher, das Protokoll sagt es, der Plan-Dialog zeigt die Abbilder."""
     einzel = tmp_path / "e.img"
-    _tool().create(einzel, "tar720_leer", "").close()
+    _tool().create(einzel, "tar_ds80_9x512_leer", "").close()
     vorher = einzel.read_bytes()
     p = tmp_path / "q"
     p.mkdir()
@@ -409,7 +409,7 @@ def _antworte_nie_ausser_speichern(window, monkeypatch):
 def test_save_of_an_opened_tar_disk_goes_into_its_image_without_a_question(window, tmp_path,
                                                                            monkeypatch):
     einzel = tmp_path / "e.hfe"
-    _tool().create(einzel, "tar720_leer", "").close()
+    _tool().create(einzel, "tar_ds80_9x512_leer", "").close()
     q = _quellen(tmp_path)
     assert window.open_image(str(einzel))
     window.set_read_only(False)
@@ -427,7 +427,7 @@ def test_tar_on_an_empty_single_disk_offers_both_ways(window, paket, tmp_path, m
     """Popup gilt fuer JEDE .tar auf einem LEEREN Archiv — auch auf der leeren Einzeldiskette."""
     for antwort, erwartet in (("datei", ["paket.tar"]), ("container", ["x.bin"])):
         einzel = tmp_path / f"{antwort}.img"
-        _tool().create(einzel, "tar720_leer", "").close()
+        _tool().create(einzel, "tar_ds80_9x512_leer", "").close()
         assert window.open_image(str(einzel))
         window.set_read_only(False)
         fragen = []
@@ -449,7 +449,7 @@ def test_container_beyond_one_disk_becomes_a_set_in_the_window(window, tmp_path,
     gross = tmp_path / "gross.tar"
     subprocess.run(["tar", "--format=v7", "-cf", str(gross), "-C", str(q), "d0", "d1", "d2"], check=True)
     einzel = tmp_path / "e.img"
-    _tool().create(einzel, "tar720_leer", "").close()
+    _tool().create(einzel, "tar_ds80_9x512_leer", "").close()
     assert window.open_image(str(einzel))
     window.set_read_only(False)
     gesehen = []
@@ -583,7 +583,7 @@ def test_download_writes_fileinfo_for_tar_and_insert_reads_it(window, satz_zwei,
 
 def test_empty_single_disk_takes_files_and_folders_like_any_archive(window, tmp_path):
     einzel = tmp_path / "e.img"
-    _tool().create(einzel, "tar720_leer", "").close()
+    _tool().create(einzel, "tar_ds80_9x512_leer", "").close()
     assert window.open_image(str(einzel))
     window.set_read_only(False)
     assert window.act_alles_rein.isEnabled()

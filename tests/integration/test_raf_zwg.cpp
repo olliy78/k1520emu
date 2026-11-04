@@ -58,7 +58,7 @@ const char*         kLauf       = "Test until Keyboard input.";
     std::string f, err;
     static const FormatCatalog fk = FormatCatalog::loadDefault(&f);
     static const FsCatalog     fs = FsCatalog::loadDefault(fk, &f);
-    auto vol = DiskVolume::open(pfad, "cpa780", fk, fs, err, /*read_only=*/false);
+    auto vol = DiskVolume::open(pfad, "cpa_ds80_5x1024_boot", fk, fs, err, /*read_only=*/false);
     if (!vol) return ::testing::AssertionFailure() << err;
     FileRef ref;
     ref.name = name;

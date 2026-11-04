@@ -90,7 +90,7 @@ struct Diskette {
 };
 
 Diskette oeffne(const std::string& pfad, bool nur_lesen = true,
-                const char* fsname = "udos1715") {
+                const char* fsname = "udos1715_ds80_16x256") {
     Diskette d;
     const FsProfile* p = dateisysteme().find(fsname);
     if (!p) { d.error = "Dateisystem unbekannt"; return d; }
@@ -109,7 +109,7 @@ Diskette referenz() { return oeffne(fixture(kFixture)); }
 /// @brief Die P8000-Diskette; als `.hfe` bringt sie ihre Geometrie selbst mit.
 Diskette p8000(bool nur_lesen = true, const std::string& pfad = "") {
     Diskette d;
-    const FsProfile* p = dateisysteme().find("udos_p8000");
+    const FsProfile* p = dateisysteme().find("udos_p8000_ds80_16x256");
     if (!p) { d.error = "Dateisystem unbekannt"; return d; }
     const DiskFormat* f = formate().find(p->format);
     if (!f) { d.error = "Format unbekannt"; return d; }
@@ -123,7 +123,7 @@ Diskette p8000(bool nur_lesen = true, const std::string& pfad = "") {
 
 /// @brief Frisch angelegte Diskette in einer Temp-Datei (raeumt sich weg).
 struct Leerdiskette {
-    explicit Leerdiskette(const char* fsname = "udos1715",
+    explicit Leerdiskette(const char* fsname = "udos1715_ds80_16x256",
                           const std::string& label = "TESTDISK") {
         pfad = k1520test::tempPath("k1520_test_u1715_" + std::to_string(++zaehler_) + ".img");
         const FsProfile* p = dateisysteme().find(fsname);
@@ -189,7 +189,7 @@ std::set<std::pair<int, int>> belegungAusDenDateien(Udos1715FileSystem& fs,
 // ─────────────────────────────────────────────────────────────────────────────
 
 TEST(Udos1715, ReferenzdisketteWirdErkannt) {
-    const FsProfile* p = dateisysteme().find("udos1715");
+    const FsProfile* p = dateisysteme().find("udos1715_ds80_16x256");
     ASSERT_NE(p, nullptr);
     const DiskFormat* f = formate().find(p->format);
     ASSERT_NE(f, nullptr);
@@ -206,7 +206,7 @@ TEST(Udos1715, EineZdosDisketteWirdNichtVerwechselt) {
     // Gegenprobe: die A5120-UDOS-Diskette (26×128, ZDOS) darf nicht als UDOS1715
     // durchgehen — schon die Sektorgroesse passt nicht, und ihre Karte traegt den
     // ZDOS-Nachlauf statt Nullen.
-    const FsProfile* p = dateisysteme().find("udos1715");
+    const FsProfile* p = dateisysteme().find("udos1715_ds80_16x256");
     ASSERT_NE(p, nullptr);
     const DiskFormat* f = formate().find(p->format);
     ASSERT_NE(f, nullptr);
@@ -338,7 +338,7 @@ TEST(Udos1715, MehrAls124RecordsBrauchenZweiZeigersektoren) {
 TEST(Udos1715Belegung, KarteUndDateienStimmenSektorgenau) {
     Diskette d = referenz();
     ASSERT_TRUE(d) << d.error;
-    const FsProfile* prof = dateisysteme().find("udos1715");
+    const FsProfile* prof = dateisysteme().find("udos1715_ds80_16x256");
     ASSERT_NE(prof, nullptr);
 
     std::set<std::pair<int, int>> aus_karte;
@@ -490,7 +490,7 @@ TEST(Udos1715Schreiben, FrischeDisketteHatDie13FestenSektoren) {
 TEST(Udos1715Schreiben, SchreibenLesenLoeschenGehtRundUndLaesstDieKarteHeil) {
     Leerdiskette l;
     ASSERT_TRUE(l) << l.fehler;
-    const FsProfile* prof = dateisysteme().find("udos1715");
+    const FsProfile* prof = dateisysteme().find("udos1715_ds80_16x256");
     ASSERT_NE(prof, nullptr);
 
     const int frei_vorher = l.fs().bitmap().countFree();
@@ -792,7 +792,7 @@ TEST(Udos1715Segmente, ZuVieleSegmenteWerdenAbgewiesen) {
 // liegen bei ZDOS vor Offset 344 und damit hier mitten im Belegungsplan.
 
 TEST(Udos1715P8000, WegaStartdisketteWirdErkannt) {
-    const FsProfile* p = dateisysteme().find("udos_p8000");
+    const FsProfile* p = dateisysteme().find("udos_p8000_ds80_16x256");
     ASSERT_NE(p, nullptr);
     const DiskFormat* f = formate().find(p->format);
     ASSERT_NE(f, nullptr);
@@ -848,7 +848,7 @@ TEST(Udos1715P8000, HinterDemBelegungsplanStehtDerZdosNachlauf) {
 TEST(Udos1715P8000, KarteUndDateienStimmenSektorgenau) {
     Diskette d = p8000();
     ASSERT_TRUE(d) << d.error;
-    const FsProfile* prof = dateisysteme().find("udos_p8000");
+    const FsProfile* prof = dateisysteme().find("udos_p8000_ds80_16x256");
     ASSERT_NE(prof, nullptr);
 
     std::set<std::pair<int, int>> aus_karte;
@@ -1065,7 +1065,7 @@ TEST(Udos1715P8000, DerSystembereichBleibtUnangetastet) {
 // Verzeichnis 16H, Plan 17H.  Abweichend ist allein die Fuellung hinter dem
 // Belegungsplan: durchgehend 0xFF (= Spuren 80…87 belegt).  Bis 2026-10-28 war die
 // Diskette deshalb „kein gueltiger UDOS1715-Diskettenbelegungsplan“ und wurde als
-// leere scpx640 erkannt.  Quelle: tools/udos50_a5120/original/ (sektorgleich mit der
+// leere scpx_ds80_16x256_boot erkannt.  Quelle: tools/udos50_a5120/original/ (sektorgleich mit der
 // mitgelieferten .dmk).
 
 namespace {
@@ -1075,7 +1075,7 @@ constexpr uint64_t kUdos50Verzeichniskopf = 0x16u * 32u * 256u;
 }  // namespace
 
 TEST(Udos1715A5120, Udos50DisketteWirdErkannt) {
-    const FsProfile* p = dateisysteme().find("udos50");
+    const FsProfile* p = dateisysteme().find("udos50_ds80_16x256");
     ASSERT_NE(p, nullptr);
     const DiskFormat* f = formate().find(p->format);
     ASSERT_NE(f, nullptr);
@@ -1088,7 +1088,7 @@ TEST(Udos1715A5120, Udos50DisketteWirdErkannt) {
 }
 
 TEST(Udos1715A5120, DatentraegerAngabenStimmen) {
-    Diskette d = oeffne(fixture(kFixtureUdos50), true, "udos50");
+    Diskette d = oeffne(fixture(kFixtureUdos50), true, "udos50_ds80_16x256");
     ASSERT_TRUE(d) << d.error;
 
     const FsInfo i = d.fs->info();
@@ -1109,7 +1109,7 @@ TEST(Udos1715A5120, DatentraegerAngabenStimmen) {
 }
 
 TEST(Udos1715A5120, HinterDemBelegungsplanStehtDurchgehendFF) {
-    Diskette d = oeffne(fixture(kFixtureUdos50), true, "udos50");
+    Diskette d = oeffne(fixture(kFixtureUdos50), true, "udos50_ds80_16x256");
     ASSERT_TRUE(d) << d.error;
     const std::vector<uint8_t>& roh = d.fs->bitmap().raw();
     ASSERT_EQ(roh.size(), kUdosBitmapBytes);
@@ -1125,7 +1125,7 @@ TEST(Udos1715A5120, HinterDemBelegungsplanStehtDurchgehendFF) {
 TEST(Udos1715A5120, EinzelnesFFZwischenNullenIstKeineSitte) {
     // Die FF-Sitte gilt nur DURCHGEHEND; ein einzelnes 0xFF ist weder PC 1715 (00)
     // noch P8000 (77) noch UDOS 5.0 — das bleibt ein Ablehnungsgrund.
-    Diskette d = oeffne(fixture(kFixtureUdos50), true, "udos50");
+    Diskette d = oeffne(fixture(kFixtureUdos50), true, "udos50_ds80_16x256");
     ASSERT_TRUE(d) << d.error;
     std::vector<uint8_t> roh = d.fs->bitmap().raw();
     std::string warum;
@@ -1149,7 +1149,7 @@ TEST(Udos1715A5120, SchreibenLoeschenLaesstPlanUndVerzeichniskopfStehen) {
     struct Weg { std::string p; ~Weg() { std::error_code e; std::filesystem::remove(p, e); } }
         weg{kopie};
 
-    Diskette d = oeffne(kopie, /*nur_lesen=*/false, "udos50");
+    Diskette d = oeffne(kopie, /*nur_lesen=*/false, "udos50_ds80_16x256");
     ASSERT_TRUE(d) << d.error;
 
     auto kopf = [&] {

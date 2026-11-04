@@ -106,16 +106,16 @@ def _wega(d, ordner: Path) -> None:
 def szenarien(abbilder: Path) -> list:
     """Die drei Szenarien.  *abbilder*: Ordner fuer umgewandelte Abbilder (.dmk -> .hfe)."""
     return [
-        Szenario("cpa", FIXTURES / "cpa_cpa780_k5601_clock.hfe", "cpa780", _cpa,
+        Szenario("cpa", FIXTURES / "cpa_cpa780_k5601_clock.hfe", "cpa_ds80_5x1024_boot", _cpa,
                  erwartet_da=["MITTEL.DAT", "GROSS.DAT"], erwartet_weg=["KLEIN.TXT"]),
         # Nicht udos_boot_scp.hfe: dem Mitschnitt fehlt Sektor 13 auf Spur 51/0, und genau
         # dorthin legt der Belegungsplan die erste neue Datei (das DiskTool verweigert dann
         # zu Recht die ganze Operation).
         Szenario("udos", PROJECT_ROOT / "disks/a5120_udos43/a5120_udos43_k5601_entwickler.hfe",
-                 "udos_ds77", _udos, erwartet_da=["HWKLEIN", "HWGROSS"]),
+                 "udos_ds77_26x128", _udos, erwartet_da=["HWKLEIN", "HWGROSS"]),
         Szenario("wega", als_hfe(PROJECT_ROOT / "disks/p8000_wega30/p8000_wega30_doc1.dmk",
                                  abbilder / "wega_doc1.hfe"),
-                 "wega720", _wega,
+                 "wega_ds80_9x512", _wega,
                  erwartet_da=["hwtest/klein", "hwtest/unter/gross"]),
     ]
 

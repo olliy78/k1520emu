@@ -148,7 +148,7 @@ void baueBootdiskette(const std::string& referenz, const std::string& fs_name,
 TEST(DiskToolBootdiskette, GebauteCpaDisketteBootetKalt) {
     TempPfad ziel("k1520_bootdisk_cpa.hfe");
     ASSERT_NO_FATAL_FAILURE(baueBootdiskette(diskPath("cpa_cpa780_k5601_clock.img"),
-                                             "cpa780", ziel.get(), 15104));
+                                             "cpa_ds80_5x1024_boot", ziel.get(), 15104));
 
     A5120Machine machine;
     machine.powerOn();
@@ -191,7 +191,7 @@ TEST(DiskToolBootdiskette, GebauteCpaDisketteBootetKalt) {
 TEST(DiskToolBootdiskette, GebauteScpxDisketteBootetKalt) {
     TempPfad ziel("k1520_bootdisk_scpx.hfe");
     ASSERT_NO_FATAL_FAILURE(baueBootdiskette(diskPath("scpx17_cpa780_k5601.hfe"),
-                                             "scpx640", ziel.get(), 16384));
+                                             "scpx_ds80_16x256_boot", ziel.get(), 16384));
 
     A5120Machine machine;
     ASSERT_TRUE(machine.mountDisk(0, ziel.get(), "ds80_16x256", /*wp=*/false))
@@ -227,7 +227,7 @@ TEST(DiskToolBootdiskette, GebauteScpxDisketteBootetKalt) {
 TEST(DiskToolBootdiskette, GebauteScpx798DisketteBootetKalt) {
     TempPfad ziel("k1520_bootdisk_scpx798.hfe");
     ASSERT_NO_FATAL_FAILURE(baueBootdiskette(diskPath("scpx17_5x1024_k5601_hardy_norm.hfe"),
-                                             "scpx798", ziel.get(), 18432));
+                                             "scpx_ds80_5x1024_boot", ziel.get(), 18432));
 
     A5120Machine machine;
     ASSERT_TRUE(machine.mountDisk(0, ziel.get(), "scpx798", /*wp=*/false))
@@ -262,7 +262,7 @@ TEST(DiskToolBootdiskette, GebauteScpx798DisketteBootetKalt) {
  */
 TEST(DiskToolBootdiskette, GebauteUdosDisketteBootetUndFuehrtBefehleAus) {
     std::string err;
-    auto quelle = DiskVolume::open(diskPath("udos_boot_scp.hfe"), "udos_ds77",
+    auto quelle = DiskVolume::open(diskPath("udos_boot_scp.hfe"), "udos_ds77_26x128",
                                    formate(), dateisysteme(), err);
     ASSERT_NE(quelle, nullptr) << err;
 
@@ -278,7 +278,7 @@ TEST(DiskToolBootdiskette, GebauteUdosDisketteBootetUndFuehrtBefehleAus) {
     ASSERT_TRUE(fs::exists(fs::path(dateien.path()) / "udos-dateiangaben.txt"));
 
     TempPfad ziel("k1520_bootdisk_udos.hfe");
-    auto neu = DiskVolume::create(ziel.get(), "udos_ds77", "UDOS.SYS.4.3",
+    auto neu = DiskVolume::create(ziel.get(), "udos_ds77_26x128", "UDOS.SYS.4.3",
                                   formate(), dateisysteme(), err, bootbin);
     std::error_code ec;
     fs::remove(bootbin, ec);
@@ -346,13 +346,13 @@ TEST(DiskToolBootdiskette, GebauteUdosDisketteBootetUndFuehrtBefehleAus) {
 TEST(DiskToolBootdiskette, UdosSystemspurenGehenMitUndZwarBeideSeiten) {
     TempPfad ziel("k1520_bootdisk_udos.hfe");
     ASSERT_NO_FATAL_FAILURE(baueBootdiskette(diskPath("udos_boot_scp.hfe"),
-                                             "udos_ds77", ziel.get(), 13728));
+                                             "udos_ds77_26x128", ziel.get(), 13728));
 
     std::string err;
-    auto quelle = DiskVolume::open(diskPath("udos_boot_scp.hfe"), "udos_ds77",
+    auto quelle = DiskVolume::open(diskPath("udos_boot_scp.hfe"), "udos_ds77_26x128",
                                    formate(), dateisysteme(), err);
     ASSERT_NE(quelle, nullptr) << err;
-    auto neu = DiskVolume::open(ziel.get(), "udos_ds77", formate(), dateisysteme(), err);
+    auto neu = DiskVolume::open(ziel.get(), "udos_ds77_26x128", formate(), dateisysteme(), err);
     ASSERT_NE(neu, nullptr) << err;
 
     std::vector<uint8_t> q0, n0, n1;
@@ -400,14 +400,14 @@ TEST(DiskToolBootdiskette, GeleerteUndZurueckgeschriebeneUdosDisketteBootet) {
     TempPfad ziel("k1520_udos_neu_beschrieben.hfe");
     {
         std::string err;
-        auto quelle = DiskVolume::open(diskPath("udos_boot_scp.hfe"), "udos_ds77",
+        auto quelle = DiskVolume::open(diskPath("udos_boot_scp.hfe"), "udos_ds77_26x128",
                                        formate(), dateisysteme(), err);
         ASSERT_NE(quelle, nullptr) << err;
         ASSERT_TRUE(quelle->saveAs(ziel.get())) << quelle->lastError();
     }
 
     std::string err;
-    auto dv = DiskVolume::open(ziel.get(), "udos_ds77", formate(), dateisysteme(), err);
+    auto dv = DiskVolume::open(ziel.get(), "udos_ds77_26x128", formate(), dateisysteme(), err);
     ASSERT_NE(dv, nullptr) << err;
     dv->setReadOnly(false);
     dv->setBackup(false);
@@ -452,7 +452,7 @@ TEST(DiskToolBootdiskette, GeleerteUndZurueckgeschriebeneUdosDisketteBootet) {
         if (e.type == "D") continue;
         int cyl = -1, head = -1, sektor = -1;
         if (!dv->firstSector(FileRef{e.volume, e.name}, cyl, head, sektor)) continue;
-        if (cyl == 22 || cyl == 23) ++auf_verwaltungsspur;   // udos_ds77: 16H/17H
+        if (cyl == 22 || cyl == 23) ++auf_verwaltungsspur;   // udos_ds77_26x128: 16H/17H
     }
     EXPECT_GT(auf_verwaltungsspur, 0)
         << "keine Datei liegt auf Spur 22/23 — der Fall prueft die gelockerte Regel nicht";

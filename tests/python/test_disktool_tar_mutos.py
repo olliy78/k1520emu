@@ -1,4 +1,4 @@
-"""tar im MUTOS-8000-Layout ueber die C-ABI (`tar_mutos8k_26x128_mfm`/`_fm`, `tar_mutos8k_8x512_mfm`, Entwurf 39, Merkposten tar_satz.md Nr. 17/18).
+"""tar im MUTOS-8000-Layout ueber die C-ABI (`tar_ss77_26x128`/`_fm`, `tar_ss77_8x512`, Entwurf 39, Merkposten tar_satz.md Nr. 17/18).
 
 Die Regeln (Blockabbildung, Auffuellung, Erkennung) pruefen die C++-Tests `TarMutos.*`; hier geht es
 um die Verdrahtung: die Formatliste nennt die Profile, ein Satz laesst sich damit anlegen/speichern/
@@ -32,14 +32,14 @@ def _quelle(tmp_path, name, daten):
 
 def test_format_list_names_the_mutos_profiles_with_the_raw_device_capacity():
     namen = {f["name"]: f for f in _tool().tar_formate()}
-    for profil in ("tar_mutos8k_26x128_mfm", "tar_mutos8k_26x128_fm"):
+    for profil in ("tar_ss77_26x128", "tar_fm_ss77_26x128"):
         assert namen[profil]["bytes"] == KAPAZITAET
         assert namen[profil]["hfe"]
 
 
 def test_a_set_in_the_mutos_layout_spreads_over_two_disks_and_reopens(tmp_path):
     a, b = _bytes(150000, 3), _bytes(160000, 5)
-    with _tool().tar_satz_neu("tar_mutos8k_26x128_mfm", tmp_path / "m.hfe") as t:
+    with _tool().tar_satz_neu("tar_ss77_26x128", tmp_path / "m.hfe") as t:
         t.insert(str(_quelle(tmp_path, "a.bin", a)), "a.bin")
         t.insert(str(_quelle(tmp_path, "b.bin", b)), "b.bin")
         plan = t.tar_satz_planen()
@@ -54,14 +54,14 @@ def test_a_set_in_the_mutos_layout_spreads_over_two_disks_and_reopens(tmp_path):
 
 def test_a_new_empty_disk_is_detected_as_the_empty_mutos_profile(tmp_path):
     pfad = tmp_path / "leer.hfe"
-    _tool().create(pfad, "tar_mutos8k_26x128_fm_leer").close()
+    _tool().create(pfad, "tar_fm_ss77_26x128_leer").close()
     with _tool().open(pfad) as t:
-        assert t.filesystem == "tar_mutos8k_26x128_fm_leer"
+        assert t.filesystem == "tar_fm_ss77_26x128_leer"
 
 
 def test_a_disk_written_by_mutos_itself_is_recognised_as_tar(temp_disk):
     with _tool().open(temp_disk("mutos8000_tar_crt0.dmk")) as t:
-        assert t.filesystem == "tar_mutos8k_26x128_mfm"
+        assert t.filesystem == "tar_ss77_26x128"
         assert [e.name for e in t.list()] == ["crt0.o"]
 
 
@@ -72,13 +72,13 @@ KAPAZITAET_8X512 = 608 * 512
 
 def test_format_list_names_the_8x512_profile_with_the_raw_device_capacity():
     namen = {f["name"]: f for f in _tool().tar_formate()}
-    assert namen["tar_mutos8k_8x512_mfm"]["bytes"] == KAPAZITAET_8X512
-    assert namen["tar_mutos8k_8x512_mfm"]["hfe"]
+    assert namen["tar_ss77_8x512"]["bytes"] == KAPAZITAET_8X512
+    assert namen["tar_ss77_8x512"]["hfe"]
 
 
 def test_an_8x512_set_spreads_over_two_disks_and_reopens(tmp_path):
     a, b = _bytes(150000, 3), _bytes(190000, 5)
-    with _tool().tar_satz_neu("tar_mutos8k_8x512_mfm", tmp_path / "m.hfe") as t:
+    with _tool().tar_satz_neu("tar_ss77_8x512", tmp_path / "m.hfe") as t:
         t.insert(str(_quelle(tmp_path, "a.bin", a)), "a.bin")
         t.insert(str(_quelle(tmp_path, "b.bin", b)), "b.bin")
         plan = t.tar_satz_planen()
@@ -92,12 +92,12 @@ def test_an_8x512_set_spreads_over_two_disks_and_reopens(tmp_path):
 
 def test_a_new_empty_8x512_disk_is_detected_as_the_empty_profile(tmp_path):
     pfad = tmp_path / "leer.hfe"
-    _tool().create(pfad, "tar_mutos8k_8x512_mfm_leer").close()
+    _tool().create(pfad, "tar_ss77_8x512_leer").close()
     with _tool().open(pfad) as t:
-        assert t.filesystem == "tar_mutos8k_8x512_mfm_leer"
+        assert t.filesystem == "tar_ss77_8x512_leer"
 
 
 def test_an_8x512_disk_written_by_mutos_itself_is_recognised_as_tar(temp_disk):
     with _tool().open(temp_disk("mutos8000_tar_8x512_einzel.dmk")) as t:
-        assert t.filesystem == "tar_mutos8k_8x512_mfm"
+        assert t.filesystem == "tar_ss77_8x512"
         assert [e.name for e in t.list()] == ["etc/group", "etc/ttys", "etc/passwd", "bin/sync"]

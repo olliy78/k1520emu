@@ -81,30 +81,30 @@ def test_ergaenzung_des_anwenders_kommt_hinzu(tmp_path, monkeypatch):
     (eigen_dir / "meins.bin").write_bytes(b"\x00" * 128)
     (eigen_dir / "bootsektor.yaml").write_text(
         "version: 1\nbootsektoren:\n"
-        "  - description: \"Mein CP/A\"\n    filesystem: cpa780\n    file: meins.bin\n"
+        "  - description: \"Mein CP/A\"\n    filesystem: cpa_ds80_5x1024_boot\n    file: meins.bin\n"
         "  - description: \"Kaputt\"\n    filesystem: gibtsnicht\n    file: meins.bin\n",
         encoding="utf-8")
     monkeypatch.setattr(paths, "bootsektor_user_file", lambda: eigen_dir / "bootsektor.yaml")
     monkeypatch.setattr(paths, "bootsektor_file", lambda: KATALOG)
 
     nach_fs, warn = bootsektoren.brauchbare(_kapazitaet())
-    texte = [e.description for e in nach_fs["cpa780"]]
+    texte = [e.description for e in nach_fs["cpa_ds80_5x1024_boot"]]
     assert texte[0].startswith("CP/A — A5120")          # mitgeliefert zuerst
     assert texte[-1] == "Mein CP/A"                      # dann die eigenen
-    assert nach_fs["cpa780"][-1].eigen
-    assert nach_fs["cpa780"][-1].path == eigen_dir / "meins.bin"
+    assert nach_fs["cpa_ds80_5x1024_boot"][-1].eigen
+    assert nach_fs["cpa_ds80_5x1024_boot"][-1].path == eigen_dir / "meins.bin"
     assert any("gibtsnicht" in w for w in warn)          # untauglich: gemeldet, nicht angeboten
 
 
 def test_zu_grosses_abbild_wird_uebergangen(tmp_path):
     from app.disktool import bootsektoren
     gross = tmp_path / "gross.bin"
-    gross.write_bytes(b"\x00" * (_kapazitaet()["cpa780"] + 1))
+    gross.write_bytes(b"\x00" * (_kapazitaet()["cpa_ds80_5x1024_boot"] + 1))
     kat = tmp_path / "bootsektor.yaml"
-    kat.write_text("bootsektoren:\n  - {description: X, filesystem: cpa780, file: gross.bin}\n",
+    kat.write_text("bootsektoren:\n  - {description: X, filesystem: cpa_ds80_5x1024_boot, file: gross.bin}\n",
                    encoding="utf-8")
     nach_fs, warn = bootsektoren.brauchbare(_kapazitaet(), [(kat, True)])
-    assert "cpa780" not in nach_fs
+    assert "cpa_ds80_5x1024_boot" not in nach_fs
     assert any("Systemspuren" in w for w in warn)
 
 
@@ -133,18 +133,18 @@ def _waehle(dlg, name):
 
 def test_ohne_eintrag_ist_der_haken_gesperrt(qt_app):
     dlg = _dialog(qt_app)
-    _waehle(dlg, "cpa800")                     # Datendiskette, keine Systemspuren
+    _waehle(dlg, "cpa_ds80_5x1024_daten")                     # Datendiskette, keine Systemspuren
     assert not dlg.boot_haken.isEnabled() and dlg.bootabbild() is None
-    _waehle(dlg, "udos_p8000")                 # NDOS P8000: (noch) kein geprueftes Abbild
+    _waehle(dlg, "udos_p8000_ds80_16x256")                 # NDOS P8000: (noch) kein geprueftes Abbild
     assert not dlg.boot_haken.isEnabled()
-    _waehle(dlg, "udos50")                     # UDOS 5.0 dagegen schon
+    _waehle(dlg, "udos50_ds80_16x256")                     # UDOS 5.0 dagegen schon
     assert dlg.boot_haken.isEnabled()
 
 
 def test_erster_treffer_vorgewaehlt_eigene_datei_als_letzter(qt_app):
     from app.disktool.ui.neu_dialog import EIGENE_DATEI, EIGENE_DATEI_TEXT
     dlg = _dialog(qt_app)
-    _waehle(dlg, "scpx640")
+    _waehle(dlg, "scpx_ds80_16x256_boot")
     assert dlg.boot_haken.isEnabled() and not dlg.boot_haken.isChecked()
     assert dlg.boot_wahl.currentIndex() == 0
     assert dlg.boot_wahl.currentText() == "SCPX 1526 V1.7 — A5120, 16×256"
@@ -162,7 +162,7 @@ def test_eigene_datei_wird_bei_der_wahl_erfragt(qt_app, tmp_path, monkeypatch):
     from PySide6.QtWidgets import QFileDialog
     from app.disktool.ui.neu_dialog import EIGENE_DATEI
     dlg = _dialog(qt_app)
-    _waehle(dlg, "cpa780")
+    _waehle(dlg, "cpa_ds80_5x1024_boot")
     dlg.boot_haken.setChecked(True)
     eigen = dlg.boot_wahl.findData(EIGENE_DATEI)
 
@@ -182,9 +182,9 @@ def test_eigene_datei_wird_bei_der_wahl_erfragt(qt_app, tmp_path, monkeypatch):
 
 def test_dateisystemwechsel_nimmt_den_haken_zurueck(qt_app):
     dlg = _dialog(qt_app)
-    _waehle(dlg, "cpa780")
+    _waehle(dlg, "cpa_ds80_5x1024_boot")
     dlg.boot_haken.setChecked(True)
-    _waehle(dlg, "scpx798")
+    _waehle(dlg, "scpx_ds80_5x1024_boot")
     assert not dlg.boot_haken.isChecked() and dlg.bootabbild() is None
     assert dlg.boot_wahl.currentText() == "SCPX 1526 V1.7 — A5120, 5×1024"
 
@@ -202,7 +202,7 @@ def test_dateidialog_kommt_erst_nach_diskette_anlegen(qt_app, tmp_path, monkeypa
 
     def exec_(dlg):
         ablauf.append("dialog")
-        _waehle(dlg, "cpa780")
+        _waehle(dlg, "cpa_ds80_5x1024_boot")
         dlg.boot_haken.setChecked(True)
         return QDialog.Accepted
 
@@ -232,7 +232,7 @@ def test_dateidialog_kommt_erst_nach_diskette_anlegen(qt_app, tmp_path, monkeypa
 
 @requires_core
 def test_udos50_bootdiskette_aus_dem_katalog_startet(tmp_path):
-    """Leere `udos50`-Diskette + Katalogabbild + Dateien der Originaldiskette → Kaltstart.
+    """Leere `udos50_ds80_16x256`-Diskette + Katalogabbild + Dateien der Originaldiskette → Kaltstart.
 
     Haelt die drei Dinge fest, an denen das hing (doc/udos1715_diskettenformat.md §3.0b):
     zweiter Bootteil in Spur 16H Sektor 07–09, Verzeichnis von vorn gefuellt, Byte 179H = 01.
@@ -250,7 +250,7 @@ def test_udos50_bootdiskette_aus_dem_katalog_startet(tmp_path):
         (auszug / n).unlink(missing_ok=True)
 
     ziel = tmp_path / "udos50_neu.hfe"
-    with DiskTool.create(ziel, "udos50", "SYSTEM", str(ORDNER / "boot_udos50.bin")) as d:
+    with DiskTool.create(ziel, "udos50_ds80_16x256", "SYSTEM", str(ORDNER / "boot_udos50.bin")) as d:
         d.insert_all(auszug)
         d.flush()
 

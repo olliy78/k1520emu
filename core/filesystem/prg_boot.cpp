@@ -25,7 +25,7 @@ namespace {
 constexpr size_t kBiosAb      = 6144;   ///< DE00H − C600H
 constexpr size_t kCcpAb       = 512;    ///< C800H − C600H
 constexpr size_t kCcpLaenge   = kBiosAb - kCcpAb;   ///< 5632 B = CCPBD17.SYS
-constexpr size_t kSpurBytes   = 16384;  ///< Systemspuren von `scpx640`
+constexpr size_t kSpurBytes   = 16384;  ///< Systemspuren von `scpx_ds80_16x256_boot`
 
 bool hatLader(const std::vector<uint8_t>& b) {
     return b.size() >= 5 && b[0] == 0x18 && b[1] == 0x03

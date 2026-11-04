@@ -4,7 +4,7 @@
 tool:   k1520disktool
 disk:   pc1715_cpa1715_boot_4lw.hfe
 run:    ls %DISK%
-expect: cpa1715
+expect: cpa1715_ds80_5x1024_boot
 expect: @OS.COM
 expect: BDOS.ERL
 forbid: ungueltig

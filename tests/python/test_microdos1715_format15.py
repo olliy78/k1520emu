@@ -24,7 +24,7 @@ ORIGINAL = PROJECT_ROOT / "disks" / "pc1715_microdos" / "pc1715_microdos_k5601_s
 DISKTOOL = PROJECT_ROOT / "build" / "k1520disktool"
 
 # (FORMAT15-Eintrag, SELDSK15-Format fuer die Rueckprobe im Gast oder None, DiskTool-Dateisystem oder None)
-FAELLE = [("3", "6", "scpx640"), ("5", "7", "cpa800"), ("1", None, None)]
+FAELLE = [("3", "6", "scpx_ds80_16x256_boot"), ("5", "7", "cpa_ds80_5x1024_daten"), ("1", None, None)]
 
 
 @pytest.mark.parametrize("eintrag,sfmt,erwartet", FAELLE, ids=["Eintrag" + f[0] for f in FAELLE])

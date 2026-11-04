@@ -97,7 +97,7 @@ uint64_t fnv1a(const std::vector<uint8_t>& d) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 TEST(CpmFileSystem, MountLeitetKapazitaetUndZeigerbreiteAb) {
-    Volume v = oeffne("cpa_cpa780_k5601_clock.img", "cpa780");
+    Volume v = oeffne("cpa_cpa780_k5601_clock.img", "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v) << v.error;
 
     // 813824 B gesamt − 15104 B Systembereich = 798720 B Daten → 390 Bloecke à 2048.
@@ -109,7 +109,7 @@ TEST(CpmFileSystem, MountLeitetKapazitaetUndZeigerbreiteAb) {
 }
 
 TEST(CpmFileSystem, ListetDasVerzeichnisDerEchtenBootdiskette) {
-    Volume v = oeffne("cpa_cpa780_k5601_clock.img", "cpa780");
+    Volume v = oeffne("cpa_cpa780_k5601_clock.img", "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v) << v.error;
 
     // Name → Groesse, identisch zu `cpmls`/`cpmcp -f A5120_160` (s. Dateikopf).
@@ -145,7 +145,7 @@ TEST(CpmFileSystem, LiestDateiinhalteByteweiseRichtig) {
     // Die Pruefsummen sind gegen `cpmcp` verifiziert (s. Dateikopf).  @OS.COM ist
     // ueber mehrere Extents verteilt (113 Saetze in Extent 0, Fortsetzung folgt),
     // TLC.PAR ist genau EIN Satz — beide Randfaelle stehen hier.
-    Volume v = oeffne("cpa_cpa780_k5601_clock.img", "cpa780");
+    Volume v = oeffne("cpa_cpa780_k5601_clock.img", "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v) << v.error;
 
     const struct { const char* name; size_t len; uint64_t hash; } soll[] = {
@@ -166,7 +166,7 @@ TEST(CpmFileSystem, MehrereExtentsWerdenInDerRichtigenReihenfolgeGelesen) {
     // FORMAT.COM belegt zwei Verzeichnisplaetze (Extent 0 mit RC=0x80 = voll, Extent 1
     // mit RC=0x08).  Wuerden sie vertauscht zusammengesetzt, waere die Datei genauso
     // lang, aber falsch — deshalb hier gegen die Extent-Struktur geprueft.
-    Volume v = oeffne("cpa_cpa780_k5601_clock.img", "cpa780");
+    Volume v = oeffne("cpa_cpa780_k5601_clock.img", "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v) << v.error;
 
     std::vector<CpmDirEntry> format_extents;
@@ -196,7 +196,7 @@ TEST(CpmFileSystem, MehrereExtentsWerdenInDerRichtigenReihenfolgeGelesen) {
 }
 
 TEST(CpmFileSystem, BelegungWirdAusDemVerzeichnisRekonstruiert) {
-    Volume v = oeffne("cpa_cpa780_k5601_clock.img", "cpa780");
+    Volume v = oeffne("cpa_cpa780_k5601_clock.img", "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v) << v.error;
 
     const std::vector<bool> karte = v.fs->allocationMap();
@@ -216,7 +216,7 @@ TEST(CpmFileSystem, BelegungWirdAusDemVerzeichnisRekonstruiert) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 TEST(CpmFileSystem, LiestScpx640) {
-    Volume v = oeffne("scpx17_cpa780_k5601.hfe", "scpx640");
+    Volume v = oeffne("scpx17_cpa780_k5601.hfe", "scpx_ds80_16x256_boot");
     ASSERT_TRUE(v) << v.error;
     EXPECT_EQ(v.fs->dataStart(), 16384u) << "c2h0 bei 16×256 = 4 Spuren à 4096 B";
 
@@ -231,7 +231,7 @@ TEST(CpmFileSystem, LiestScpx640) {
 }
 
 TEST(CpmFileSystem, LiestScpx798MitGemischterSystemspur) {
-    Volume v = oeffne("scpx17_5x1024_k5601_hardy_norm.hfe", "scpx798");
+    Volume v = oeffne("scpx17_5x1024_k5601_hardy_norm.hfe", "scpx_ds80_5x1024_boot");
     ASSERT_TRUE(v) << v.error;
     // Zylinder 0 ist 16×256 (2 × 4096 B), ab Zylinder 1 dann 5×1024 (2 × 5120 B):
     // 8192 + 10240 = 18432 — der Datenbereich beginnt hinter beidem.
@@ -248,7 +248,7 @@ TEST(CpmFileSystem, LiestScpx798MitGemischterSystemspur) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 TEST(CpmFileSystem, UnbekannteDateiWirdBenanntNichtErfunden) {
-    Volume v = oeffne("cpa_cpa780_k5601_clock.img", "cpa780");
+    Volume v = oeffne("cpa_cpa780_k5601_clock.img", "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v) << v.error;
 
     std::vector<uint8_t> d;
@@ -257,10 +257,10 @@ TEST(CpmFileSystem, UnbekannteDateiWirdBenanntNichtErfunden) {
 }
 
 TEST(CpmFileSystem, FalschesProfilFaelltAufStattUnsinnZuLiefern) {
-    // cpa800 liest dieselbe Diskette ab Zylinder 0 — dort steht der Bootbereich, kein
+    // cpa_ds80_5x1024_daten liest dieselbe Diskette ab Zylinder 0 — dort steht der Bootbereich, kein
     // Verzeichnis.  Erwartet wird: keine plausible Dateiliste, und wenn doch Eintraege
     // entstehen, dann Blockzeiger hinter dem Datenbereich → Warnung.
-    Volume v = oeffne("cpa_cpa780_k5601_clock.hfe", "cpa800");
+    Volume v = oeffne("cpa_cpa780_k5601_clock.hfe", "cpa_ds80_5x1024_daten");
     if (!v) return;                            // Geometrie passt nicht — auch in Ordnung
 
     const FsInfo i = v.fs->info();
@@ -270,7 +270,7 @@ TEST(CpmFileSystem, FalschesProfilFaelltAufStattUnsinnZuLiefern) {
 }
 
 TEST(CpmFileSystem, GrossKleinschreibungBeimLesenEgal) {
-    Volume v = oeffne("cpa_cpa780_k5601_clock.img", "cpa780");
+    Volume v = oeffne("cpa_cpa780_k5601_clock.img", "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v) << v.error;
     std::vector<uint8_t> a, b;
     ASSERT_TRUE(v.fs->read("pip.com", a)) << v.fs->lastError();
@@ -322,7 +322,7 @@ Volume oeffneSchreibbar(const std::string& pfad, const char* fsname) {
 
 TEST(CpmFileSystemWrite, RoundtripBinaerUndText) {
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_cpm_rt.img");
-    Volume v = oeffneSchreibbar(k.path(), "cpa780");
+    Volume v = oeffneSchreibbar(k.path(), "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v) << v.error;
 
     std::vector<uint8_t> binaer(3000);
@@ -352,7 +352,7 @@ TEST(CpmFileSystemWrite, RoundtripBinaerUndText) {
 
 TEST(CpmFileSystemWrite, GrosseDateiUeberMehrereExtents) {
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_cpm_gross.img");
-    Volume v = oeffneSchreibbar(k.path(), "cpa780");
+    Volume v = oeffneSchreibbar(k.path(), "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v) << v.error;
 
     // 40000 B → 313 Saetze → 20 Bloecke → 3 Verzeichnisplaetze (8 Zeiger je Platz).
@@ -380,7 +380,7 @@ TEST(CpmFileSystemWrite, GrosseDateiUeberMehrereExtents) {
 
 TEST(CpmFileSystemWrite, VorhandeneDateiNurMitErlaubnisUeberschreiben) {
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_cpm_ovr.img");
-    Volume v = oeffneSchreibbar(k.path(), "cpa780");
+    Volume v = oeffneSchreibbar(k.path(), "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v) << v.error;
 
     const std::vector<uint8_t> neu(500, 0x42);
@@ -402,7 +402,7 @@ TEST(CpmFileSystemWrite, VorhandeneDateiNurMitErlaubnisUeberschreiben) {
 
 TEST(CpmFileSystemWrite, LoeschenGibtDenPlatzZurueck) {
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_cpm_del.img");
-    Volume v = oeffneSchreibbar(k.path(), "cpa780");
+    Volume v = oeffneSchreibbar(k.path(), "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v) << v.error;
 
     const FsInfo vorher = v.fs->info();
@@ -419,7 +419,7 @@ TEST(CpmFileSystemWrite, LoeschenGibtDenPlatzZurueck) {
 
 TEST(CpmFileSystemWrite, PlatzpruefungRechnetVerwaltungMit) {
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_cpm_fit.img");
-    Volume v = oeffneSchreibbar(k.path(), "cpa780");
+    Volume v = oeffneSchreibbar(k.path(), "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v) << v.error;
 
     // 1 Byte belegt einen ganzen Block — genau das muss die Pruefung sagen.
@@ -445,7 +445,7 @@ TEST(CpmFileSystemWrite, PlatzpruefungRechnetVerwaltungMit) {
 
 TEST(CpmFileSystemWrite, DiskettenvollMeldungStattHalberDatei) {
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_cpm_voll.img");
-    Volume v = oeffneSchreibbar(k.path(), "cpa780");
+    Volume v = oeffneSchreibbar(k.path(), "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v) << v.error;
 
     const FsInfo vorher = v.fs->info();
@@ -461,7 +461,7 @@ TEST(CpmFileSystemWrite, DiskettenvollMeldungStattHalberDatei) {
 
 TEST(CpmFileSystemWrite, MkfsLeertNurDasVerzeichnis) {
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_cpm_mkfs.img");
-    Volume v = oeffneSchreibbar(k.path(), "cpa780");
+    Volume v = oeffneSchreibbar(k.path(), "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v) << v.error;
 
     ASSERT_TRUE(v.fs->mkfs()) << v.fs->lastError();
@@ -477,7 +477,7 @@ TEST(CpmFileSystemWrite, MkfsLeertNurDasVerzeichnis) {
 
 TEST(CpmFileSystemWrite, UnzulaessigeNamenWerdenAbgewiesen) {
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_cpm_name.img");
-    Volume v = oeffneSchreibbar(k.path(), "cpa780");
+    Volume v = oeffneSchreibbar(k.path(), "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v) << v.error;
 
     const std::vector<uint8_t> d(100, 1);
@@ -494,7 +494,7 @@ TEST(CpmFileSystemWrite, UnzulaessigeNamenWerdenAbgewiesen) {
 
 TEST(CpmFileSystemWrite, NutzerbereicheBleibenGetrennt) {
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_cpm_user.img");
-    Volume v = oeffneSchreibbar(k.path(), "cpa780");
+    Volume v = oeffneSchreibbar(k.path(), "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v) << v.error;
 
     ASSERT_TRUE(v.fs->write("3:GEHEIM.TXT", std::vector<uint8_t>(200, 'U'), WriteOptions{}))
@@ -519,7 +519,7 @@ TEST(CpmFileSystemWrite, NutzerbereicheBleibenGetrennt) {
 
 TEST(CpmFileSystemAttrs, SetztUndLoeschtDieDreiAttributbits) {
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_cpm_attr.img");
-    Volume v = oeffneSchreibbar(k.path(), "cpa780");
+    Volume v = oeffneSchreibbar(k.path(), "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v) << v.error;
 
     auto attribute = [&](const std::string& name) {
@@ -553,7 +553,7 @@ TEST(CpmFileSystemAttrs, AlleExtentsGehenMit) {
     // Eine Datei ueber mehrere Verzeichnisplaetze traegt die Bits in JEDEM Platz;
     // bliebe einer zurueck, widerspraechen sich die Extents derselben Datei.
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_cpm_attr_ext.img");
-    Volume v = oeffneSchreibbar(k.path(), "cpa780");
+    Volume v = oeffneSchreibbar(k.path(), "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v) << v.error;
 
     // 20 KB brauchen bei 2-KB-Bloecken und 16 Zeigern je Platz zwei Plaetze.
@@ -576,7 +576,7 @@ TEST(CpmFileSystemAttrs, AlleExtentsGehenMit) {
 
 TEST(CpmFileSystemAttrs, NutzerbereichWechselnVerschiebtDieDatei) {
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_cpm_attr_user.img");
-    Volume v = oeffneSchreibbar(k.path(), "cpa780");
+    Volume v = oeffneSchreibbar(k.path(), "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v) << v.error;
 
     CpmAttrs a;
@@ -590,7 +590,7 @@ TEST(CpmFileSystemAttrs, NutzerbereichWechselnVerschiebtDieDatei) {
 
 TEST(CpmFileSystemAttrs, UmzugInEinenBelegtenBereichWirdAbgelehnt) {
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_cpm_attr_kollision.img");
-    Volume v = oeffneSchreibbar(k.path(), "cpa780");
+    Volume v = oeffneSchreibbar(k.path(), "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v) << v.error;
 
     ASSERT_TRUE(v.fs->write("7:PIP.COM", std::vector<uint8_t>(300, 'Z'), WriteOptions{}))
@@ -611,7 +611,7 @@ TEST(CpmFileSystemAttrs, UmzugInEinenBelegtenBereichWirdAbgelehnt) {
 
 TEST(CpmFileSystemAttrs, UnbekannteDateiWirdBenannt) {
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_cpm_attr_unbekannt.img");
-    Volume v = oeffneSchreibbar(k.path(), "cpa780");
+    Volume v = oeffneSchreibbar(k.path(), "cpa_ds80_5x1024_boot");
     ASSERT_TRUE(v) << v.error;
 
     CpmAttrs a;

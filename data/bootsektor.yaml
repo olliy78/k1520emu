@@ -37,140 +37,140 @@ bootsektoren:
 
   # ── A5120 ──────────────────────────────────────────────────────────────────
   - description: "CP/A — A5120, K5601 (lädt @OS.COM)"
-    filesystem:  cpa780
+    filesystem:  cpa_ds80_5x1024_boot
     file:        bootsektoren/boot_cpa780.bin
 
   - description: "SCPX 1526 V1.7 — A5120, 5×1024"
-    filesystem:  scpx798
+    filesystem:  scpx_ds80_5x1024_boot
     file:        bootsektoren/boot_scpx798.bin
 
   - description: "SCPX 1526 V1.7 — A5120, 16×256"
-    filesystem:  scpx640
+    filesystem:  scpx_ds80_16x256_boot
     file:        bootsektoren/boot_scpx640.bin
 
   - description: "UDOS 4.3 — A5120 (UDOS BC.5120)"
-    filesystem:  udos_ds77
+    filesystem:  udos_ds77_26x128
     file:        bootsektoren/boot_udos43.bin
 
   # UDOS 5.0: Spur 0 Kopf 0 (Urlader + BFOS) UND der zweite Bootteil aus Spur 16H Sektor 07–09
   # (4096 + 768 Byte) — Udos1715FileSystem::zweiterBootteil.  Danach mindestens OS, DDOS,
   # ZDOS, OS.INIT einspielen (am einfachsten den ganzen Inhalt von disks/a5120_udos50/).
   - description: "UDOS 5.0 — A5120 (BIZ FmSZBw Schwerin 1997)"
-    filesystem:  udos50
+    filesystem:  udos50_ds80_16x256
     file:        bootsektoren/boot_udos50.bin
 
   # ── BCU 880 am frühen A5120 (Lade-ROM V0.6) ────────────────────────────────
   - description: "BCU 880 V1.2 Startdiskette „SYL auf Spur 1“ — Bildschirm K7023"
-    filesystem:  bcu880_syl
+    filesystem:  bcu880_ss40_26x128_syl
     file:        bootsektoren/boot_bcu12_syl_k7023.bin
 
   - description: "BCU 880 V1.2 Startdiskette „SYL auf Spur 1“ — Bildschirm K7024"
-    filesystem:  bcu880_syl
+    filesystem:  bcu880_ss40_26x128_syl
     file:        bootsektoren/boot_bcu12_syl_k7024.bin
 
   - description: "BCU 880 V1.2 Kombidiskette 40 Spuren — Bildschirm K7023"
-    filesystem:  bcu880_kombi
+    filesystem:  bcu880_ss40_26x128_kombi
     file:        bootsektoren/boot_bcu12_kombi_k7023.bin
 
   - description: "BCU 880 V1.2 Kombidiskette 40 Spuren — Bildschirm K7024"
-    filesystem:  bcu880_kombi
+    filesystem:  bcu880_ss40_26x128_kombi
     file:        bootsektoren/boot_bcu12_kombi_k7024.bin
 
   - description: "BCU 880 V1.2 Kombidiskette 80 Spuren — Bildschirm K7023"
-    filesystem:  bcu880_kombi80
+    filesystem:  bcu880_ss80_26x128_kombi
     file:        bootsektoren/boot_bcu12_kombi80_k7023.bin
 
   - description: "BCU 880 V1.2 Kombidiskette 80 Spuren — Bildschirm K7024"
-    filesystem:  bcu880_kombi80
+    filesystem:  bcu880_ss80_26x128_kombi
     file:        bootsektoren/boot_bcu12_kombi80_k7024.bin
 
   - description: "BCU 880 V1.2 Arbeitsdiskette (System für den Warmstart)"
-    filesystem:  bcu880
+    filesystem:  bcu880_ss40_26x128_arbeit
     file:        bootsektoren/boot_bcu12_ohnesyl.bin
 
   - description: "BCU 880 V1.2 Arbeitsdiskette 80 Spuren (System für den Warmstart)"
-    filesystem:  bcu880_80
+    filesystem:  bcu880_ss80_26x128_arbeit
     file:        bootsektoren/boot_bcu12_ohnesyl.bin
 
   # ── K8915 ──────────────────────────────────────────────────────────────────
   - description: "SCPX 8915 V5.3 „V24 (XON/XOFF)“ — K8915"
-    filesystem:  scpx8915
+    filesystem:  scpx8915_ds80_5x1024_boot
     file:        bootsektoren/boot_scpx8915_v24.bin
 
   - description: "SCPX 8915 V5.3 „55 K“ — K8915"
-    filesystem:  scpx8915
+    filesystem:  scpx8915_ds80_5x1024_boot
     file:        bootsektoren/boot_scpx8915_55k.bin
 
   # ── PRG 710 / 710-1 ────────────────────────────────────────────────────────
   - description: "UDOS 4.3 — PRG 710"
-    filesystem:  udos_ds77
+    filesystem:  udos_ds77_26x128
     file:        bootsektoren/boot_prg710_udos43.bin
 
   - description: "UDOS 4.3 — PRG 710-1"
-    filesystem:  udos_ds77
+    filesystem:  udos_ds77_26x128
     file:        bootsektoren/boot_prg710-1_udos43.bin
 
   - description: "SCPX V1.5 — PRG 710"
-    filesystem:  scpx640
+    filesystem:  scpx_ds80_16x256_boot
     file:        bootsektoren/boot_prg710_scpx15.bin
 
   - description: "SCPX 1526 V1.7 — PRG 710-1"
-    filesystem:  scpx640
+    filesystem:  scpx_ds80_16x256_boot
     file:        bootsektoren/boot_prg710-1_scpx17.bin
 
   # ── PC 1715 / 1715W ────────────────────────────────────────────────────────
   - description: "CP/A 1715 — PC 1715 (Bootkopf im Verzeichnis)"
-    filesystem:  cpa1715
+    filesystem:  cpa1715_ds80_5x1024_boot
     file:        bootsektoren/boot_pc1715_cpa1715.bin
 
   - description: "SCP 1715 V0006 — PC 1715, 5×1024"
-    filesystem:  scp1715
+    filesystem:  scp1715_ds80_5x1024_boot
     file:        bootsektoren/boot_pc1715_scp1715_v0006.bin
 
   - description: "SCP 1715 V0007 — PC 1715, 16×256"
-    filesystem:  scpx640
+    filesystem:  scpx_ds80_16x256_boot
     file:        bootsektoren/boot_pc1715_scp1715_v0007.bin
 
   - description: "CP/Z 2.2 — PC 1715, 16×256"
-    filesystem:  scpx640
+    filesystem:  scpx_ds80_16x256_boot
     file:        bootsektoren/boot_pc1715_cpz22.bin
 
   - description: "SCP 3.0 — PC 1715W, 5×1024"
-    filesystem:  scp1715
+    filesystem:  scp1715_ds80_5x1024_boot
     file:        bootsektoren/boot_pc1715w_scp30.bin
 
   - description: "MicroDOS 1715 — PC 1715 (Bootkopf im Verzeichnis + MICRODOS.SYS als erste Datei)"
-    filesystem:  microdos1715
+    filesystem:  microdos1715_ds80_5x1024_boot
     file:        bootsektoren/boot_microdos_1715.bin
 
   # ── MicroDOS 1526 (Rostock) — Lader im Verzeichnis + MicroDOS.SYS an festem Ort ─────────
   # Das System ist FEST auf Tastatur und Laufwerke generiert (MSYSG20, Tabellen in MicroDOS.SYS):
   # bootet nur mit der genannten Bestueckung (doc/merkposten/microdos.md).
   - description: "MicroDOS 1526 — A5120/A5130, 800K, Tastatur K7637 seriell, 4 x K5601 (SYL-Lader + MicroDOS.SYS)"
-    filesystem:  microdos800
+    filesystem:  microdos_ds80_5x1024_boot
     file:        bootsektoren/boot_microdos_1526.bin
 
   - description: "MicroDOS 1526 — A5120/A5130, 800K, Tastatur K7636 parallel, 4 x K5601 (SYL-Lader + MicroDOS.SYS)"
-    filesystem:  microdos800
+    filesystem:  microdos_ds80_5x1024_boot
     file:        bootsektoren/boot_microdos_1526_k7636.bin
 
   - description: "MicroDOS 1526 — A5120/A5130, 200K, Tastatur K7637 seriell, 2 x K5600.10 (SYL-Lader + MicroDOS.SYS)"
-    filesystem:  microdos200
+    filesystem:  microdos_ss40_5x1024_boot
     file:        bootsektoren/boot_microdos_1526_200k.bin
 
   - description: "MicroDOS 1526 — A5120/A5130, 200K, Tastatur K7636 parallel, 2 x K5600.10 (SYL-Lader + MicroDOS.SYS)"
-    filesystem:  microdos200
+    filesystem:  microdos_ss40_5x1024_boot
     file:        bootsektoren/boot_microdos_1526_200k_k7636.bin
 
   # 26 x 128 B (msysgen Anhang B): beide Lader (V0.9 in den Plaetzen 0-7, SYL 0.6 auf Zylinder 1) und das System
   # in Zylinder 1-5; bootet mit Lade-ROM V0.6 UND V0.9_2, aber nur mit K5600.10-Laufwerken (Format 1, 26 x 128).
   - description: "MicroDOS 1526 — A5120/A5130, 100K 26x128, Tastatur K7637 seriell, 2 x K5600.10, Lade-ROM V0.6 oder V0.9_2 (SYL + MicroDOS.SYS)"
-    filesystem:  microdos128
+    filesystem:  microdos_ss40_26x128_boot
     file:        bootsektoren/boot_microdos_1526_128.bin
 
   # ── P8000 ──────────────────────────────────────────────────────────────────
   - description: "OS/M 3.0 — P8000 (8-Bit-Teil), Format 5"
-    filesystem:  osm640
+    filesystem:  osm_ds80_16x256_boot
     file:        bootsektoren/boot_p8000_osm30.bin
 
   # ── MS-DOS / DCP (FAT12) ─────────────────────────────────────────────────────
@@ -181,21 +181,21 @@ bootsektoren:
   # eine frische Diskette; Beispiel: tools/diskbau.py).  Mit nichts davon ergibt der Sektor eine
   # Diskette, die „Keine Systemdiskette" meldet - so wie es sein soll.
   - description: "DCP 3.3 — A7150 (IO.SYS + DCDOS.SYS)"
-    filesystem:  [dos160, dos180, dos320, dos360, dos360ss80, dos640, dos720, dos800, dos1200, dos1440, dos2880]
+    filesystem:  [dos_ss40_8x512, dos_ss40_9x512, dos_ds40_8x512, dos_ds40_9x512, dos_ss80_9x512, dos_ds80_8x512, dos_ds80_9x512, dos_ds80_10x512, dos_ds80_15x512_hd, dos_ds80_18x512_hd, dos_ds80_36x512_ed]
     file:        bootsektoren/boot_dos_dcp33_a7150.bin
 
   - description: "DCP 3.20 — A7150 (IO.SYS + DCDOS.SYS)"
-    filesystem:  [dos160, dos180, dos320, dos360, dos360ss80, dos640, dos720, dos800, dos1200, dos1440, dos2880]
+    filesystem:  [dos_ss40_8x512, dos_ss40_9x512, dos_ds40_8x512, dos_ds40_9x512, dos_ss80_9x512, dos_ds80_8x512, dos_ds80_9x512, dos_ds80_10x512, dos_ds80_15x512_hd, dos_ds80_18x512_hd, dos_ds80_36x512_ed]
     file:        bootsektoren/boot_dos_dcp320_a7150.bin
 
   - description: "DCP 3.2/3.3 — PC 1834 und A7150 MASM (BIO.COM + DOS.COM)"
-    filesystem:  [dos160, dos180, dos320, dos360, dos360ss80, dos640, dos720, dos800, dos1200, dos1440, dos2880]
+    filesystem:  [dos_ss40_8x512, dos_ss40_9x512, dos_ds40_8x512, dos_ds40_9x512, dos_ss80_9x512, dos_ds80_8x512, dos_ds80_9x512, dos_ds80_10x512, dos_ds80_15x512_hd, dos_ds80_18x512_hd, dos_ds80_36x512_ed]
     file:        bootsektoren/boot_dos_dcp33_bio_pc1834.bin
 
   - description: "DCP 3.2 — A7150 (BIO.COM + DOS.COM, andere Meldungen)"
-    filesystem:  [dos160, dos180, dos320, dos360, dos360ss80, dos640, dos720, dos800, dos1200, dos1440, dos2880]
+    filesystem:  [dos_ss40_8x512, dos_ss40_9x512, dos_ds40_8x512, dos_ds40_9x512, dos_ss80_9x512, dos_ds80_8x512, dos_ds80_9x512, dos_ds80_10x512, dos_ds80_15x512_hd, dos_ds80_18x512_hd, dos_ds80_36x512_ed]
     file:        bootsektoren/boot_dos_dcp32_bio.bin
 
   - description: "MDISK — A7150 (BIO.COM + DOS.COM, MS-DOS-Meldungen)"
-    filesystem:  [dos160, dos180, dos320, dos360, dos360ss80, dos640, dos720, dos800, dos1200, dos1440, dos2880]
+    filesystem:  [dos_ss40_8x512, dos_ss40_9x512, dos_ds40_8x512, dos_ds40_9x512, dos_ss80_9x512, dos_ds80_8x512, dos_ds80_9x512, dos_ds80_10x512, dos_ds80_15x512_hd, dos_ds80_18x512_hd, dos_ds80_36x512_ed]
     file:        bootsektoren/boot_dos_mdisk_a7150.bin

@@ -3,8 +3,8 @@
 # Nur "schluessel: wert", ein Wert je Zeile.
 art: ladediskette
 # Profile je Aufzeichnungsverfahren: FM (8 Zoll, MF3200) und MFM (5,25 Zoll, K5601)
-fs_fm: udos_ss77_fm
-fs_mfm: udos_ss77
+fs_fm: udos_fm_ss77_26x128
+fs_mfm: udos_ss77_26x128
 # Systemspuren (Spur 0-2 mit dem SYL-Ladekopf plus Bootspur), Rohbytes aus `boot-get`
 systemspuren: systemspuren.bin
 # Laufwerkstyp-Konstante: `LD A,2AH / AND D / LD (0FCAH),A` (Zylinder 2, Sektor-ID 1, Offset 120/121).

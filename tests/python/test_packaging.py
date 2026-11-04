@@ -1751,7 +1751,7 @@ def test_disktool_kommandozeile_laeuft_aus_dem_paket(payload):
 
     formate = _sh(str(cli), "formats", cwd=stage / "payload")
     assert formate.returncode == 0, formate.stderr
-    for erwartet in ("cpa780", "udos_ds77"):
+    for erwartet in ("cpa_ds80_5x1024_boot", "udos_ds77_26x128"):
         assert erwartet in formate.stdout, \
             f"'{erwartet}' fehlt — der Formatkatalog des Pakets wurde nicht gefunden"
 

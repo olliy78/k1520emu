@@ -9,7 +9,7 @@
  *    Zeilen, die im Alltag vorkommen — und die 192→128-Kuerzung, die im Original eine
  *    eigene Sonderbehandlung ist (`selddr`).
  * 2. **Gegenprobe an den committeten Disketten.**  Die Regel muss genau das ausrechnen,
- *    was fuer `cpa780` / `scpx798` von Hand NACHGEMESSEN und in `data/formats.yaml`
+ *    was fuer `cpa_ds80_5x1024_boot` / `scpx_ds80_5x1024_boot` von Hand NACHGEMESSEN und in `data/formats.yaml`
  *    eingetragen wurde.  Weichen beide voneinander ab, ist eines von beiden falsch.
  *
  * @see core/filesystem/cpm/cpa_dpb.h, doc/cpa_format_detection.md
@@ -124,7 +124,7 @@ TEST(CpaDpb, TabellenzeilenEntsprechenDemBios) {
 // ─── 2. Gegenprobe an echten Disketten ───────────────────────────────────────
 
 /**
- * @test Die Regel reproduziert das von Hand nachgemessene Profil `cpa780`.
+ * @test Die Regel reproduziert das von Hand nachgemessene Profil `cpa_ds80_5x1024_boot`.
  * @par Kriterium  4 Systemspuren (= c2h0), 2-KB-Bloecke, **128** Plaetze — die 192 aus
  *                 der Tabelle werden gekuerzt, weil Systemspuren vorhanden sind.
  * @par Warum      Das ist der Beweis, dass die Regel nicht bloss plausibel rechnet,
@@ -144,7 +144,7 @@ TEST(CpaDpb, ReproduziertNachgemessenesProfilCpa780) {
     EXPECT_EQ(e.dpb.dir_entries, 128);
     EXPECT_EQ(e.dpb.skew, 0);
 
-    const FsProfile* p = dateisysteme().find("cpa780");
+    const FsProfile* p = dateisysteme().find("cpa_ds80_5x1024_boot");
     ASSERT_NE(p, nullptr);
     EXPECT_EQ(e.dpb.data_cyl,    p->data_cyl);
     EXPECT_EQ(e.dpb.data_head,   p->data_head);
@@ -153,7 +153,7 @@ TEST(CpaDpb, ReproduziertNachgemessenesProfilCpa780) {
 }
 
 /**
- * @test Dasselbe fuer die SCPX-Diskette `scpx798` (Systemzylinder in 16×256).
+ * @test Dasselbe fuer die SCPX-Diskette `scpx_ds80_5x1024_boot` (Systemzylinder in 16×256).
  * @par Kriterium  Die gemischte Geometrie aendert nichts: Sektorlaengencode kommt von der
  *                 DATENspur (logische Spur 3 = c1h1, 1024 B), also wieder 4/2048/128.
  */
@@ -161,7 +161,7 @@ TEST(CpaDpb, ReproduziertNachgemessenesProfilScpx798) {
     Erkannt e = erkenne(fixture("scpx17_5x1024_k5601_hardy_norm.hfe"));
     ASSERT_TRUE(e) << e.fehler;
 
-    const FsProfile* p = dateisysteme().find("scpx798");
+    const FsProfile* p = dateisysteme().find("scpx_ds80_5x1024_boot");
     ASSERT_NE(p, nullptr);
     EXPECT_EQ(e.format->name, p->format);
     EXPECT_EQ(e.dpb.data_cyl,    p->data_cyl);

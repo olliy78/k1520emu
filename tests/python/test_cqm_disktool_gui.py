@@ -98,7 +98,7 @@ def cqm_cpm(tmp_path):
     """Eine echte, beschreibbare .cqm mit CP/M-Dateisystem (im Kern angelegt)."""
     from app.core_binding.k1520disk import DiskTool
     p = tmp_path / "arbeit.cqm"
-    DiskTool.create(p, "cpa800", "TEST").close()
+    DiskTool.create(p, "cpa_ds80_5x1024_daten", "TEST").close()
     return p
 
 
@@ -138,7 +138,7 @@ def test_cqm_with_filesystem_can_be_changed_saved_and_reloaded(window, cqm_cpm, 
 def test_cqm_comment_survives_writing_back(window, tmp_path):
     from app.core_binding.k1520disk import DiskTool
     p = tmp_path / "k.cqm"
-    DiskTool.create(p, "cpa800", "K").close()
+    DiskTool.create(p, "cpa_ds80_5x1024_daten", "K").close()
     # Kommentar der Vorlage: Datei mit eigenem Kopf nachbauen ist Sache des Kerns
     # (CqmWrite.KopffelderBleibenErhalten); hier zaehlt, dass der Standardkommentar bleibt.
     assert window.open_image(str(p))
@@ -160,7 +160,7 @@ def test_save_as_cqm_works_for_a_uniform_disk(window, cqm_cpm, tmp_path):
 
 def test_save_as_cqm_of_mixed_geometry_gives_the_reason(window, tmp_path, monkeypatch,
                                                          fixture_disks):
-    """CP/A-Bootdiskette (cpa780: 128-B-Systemspuren): als .cqm nicht darstellbar -
+    """CP/A-Bootdiskette (cpa_ds80_5x1024_boot: 128-B-Systemspuren): als .cqm nicht darstellbar -
     verstaendliche Meldung, Datei unveraendert, die offene Diskette bleibt."""
     import shutil
     from PySide6.QtWidgets import QMessageBox
@@ -182,11 +182,11 @@ def test_udos_to_cqm_is_refused_before_the_core(window, tmp_path, monkeypatch):
     monkeypatch.setattr(QMessageBox, "critical",
                         staticmethod(lambda *a, **k: meldungen.append(a[2])))
     from app.disktool.ui.main_window import MainWindow
-    grund = MainWindow._container_grund(tmp_path / "x.cqm", "udos_ds77")
+    grund = MainWindow._container_grund(tmp_path / "x.cqm", "udos_ds77_26x128")
     assert "Sektorkontrollblöcke von UDOS" in grund
-    assert MainWindow._container_grund(tmp_path / "x.hfe", "udos_ds77") == ""
-    assert MainWindow._container_grund(tmp_path / "x.cqm", "udos1715") == ""
-    assert MainWindow._container_grund(tmp_path / "x.cqm", "cpa800") == ""
+    assert MainWindow._container_grund(tmp_path / "x.hfe", "udos_ds77_26x128") == ""
+    assert MainWindow._container_grund(tmp_path / "x.cqm", "udos1715_ds80_16x256") == ""
+    assert MainWindow._container_grund(tmp_path / "x.cqm", "cpa_ds80_5x1024_daten") == ""
 
 
 def test_create_cqm_with_udos_or_mixed_format_gives_a_reason(window, tmp_path, monkeypatch):
@@ -194,10 +194,10 @@ def test_create_cqm_with_udos_or_mixed_format_gives_a_reason(window, tmp_path, m
     meldungen = []
     monkeypatch.setattr(QMessageBox, "critical",
                         staticmethod(lambda *a, **k: meldungen.append(a[2])))
-    assert not window.create_disk(tmp_path / "m.cqm", "cpa780")
+    assert not window.create_disk(tmp_path / "m.cqm", "cpa_ds80_5x1024_boot")
     assert meldungen and "gemischten Formate" in meldungen[-1], meldungen
     assert not (tmp_path / "m.cqm").exists()
-    assert window.create_disk(tmp_path / "ok.cqm", "cpa800", "OK")
+    assert window.create_disk(tmp_path / "ok.cqm", "cpa_ds80_5x1024_daten", "OK")
     assert window.tool.ist_cqm and not window.tool.read_only
 
 
@@ -213,9 +213,9 @@ def test_tar_disk_shows_friendly_name_and_is_locked(window, tmp_path):
     img.write_bytes(_tar_roh())
     window.open_image(str(img))
     t = window.tool
-    assert t.ist_tar and t.filesystem == "tar720"
+    assert t.ist_tar and t.filesystem == "tar_ds80_9x512"
     assert "tar-Archiv (UNIX)" in window.kopf.angaben.text()
-    assert "tar720" not in window.kopf.angaben.text()
+    assert "tar_ds80_9x512" not in window.kopf.angaben.text()
     assert "tar-Archiv" in window.st_schutz.text()
     assert "Archivstrom" in window.act_loeschen.toolTip()
     from app.disktool.ui.disk_info_dialog import angaben_text

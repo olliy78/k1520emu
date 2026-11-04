@@ -1,5 +1,5 @@
 # MUTOS 8000 liest tar-Disketten, die das DiskTool geschrieben hat (Entwurf 39 Teil A, Merkposten tar_satz.md Nr. 17).
-# Vier K5601: A: und B: = die beiden Disketten eines tar-Satzes im MUTOS-Layout (tar_mutos8k_26x128_mfm), C: Wurzel,
+# Vier K5601: A: und B: = die beiden Disketten eines tar-Satzes im MUTOS-Layout (tar_ss77_26x128), C: Wurzel,
 # D: Datendiskette (Originale + tar/cmp/dd/pwd, eingehaengt als /usr).  Die Originale sind echte MUTOS-Dateien
 # (libc.a 72 KB, c1 36 KB, ld) von der usr-Diskette; der Satz traegt libc.a dreimal und c1 - c1 liegt zu
 # drei Bloecken hinter der Disketten-Grenze (494 Bloecke).
@@ -20,7 +20,7 @@ tmpfile data.hfe:
 setup_run: @k1520disktool get %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_usr_mfm.hfe lib/libc.a lib/c1 --to src
 setup_run: @k1520disktool get %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_cmd_mfm.hfe bin/cmp bin/dd bin/pwd bin/echo bin/rm --to src
 setup_run: @k1520disktool get %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_bin_mfm.hfe tar --to src
-setup_run: @k1520disktool create %data.hfe% --fs mutos8k_26x128_mfm --blocks 494
+setup_run: @k1520disktool create %data.hfe% --fs mutos8k_ss77_26x128 --blocks 494
 setup_run: @k1520disktool mkdir %data.hfe% bin
 setup_run: @k1520disktool mkdir %data.hfe% e
 setup_run: @k1520disktool put %data.hfe% src/lib/libc.a src/lib/c1
@@ -30,23 +30,23 @@ setup_run: @k1520disktool put %data.hfe% src/bin/echo --as bin/echo
 setup_run: @k1520disktool put %data.hfe% src/bin/rm --as bin/rm
 setup_run: @k1520disktool put %data.hfe% src/bin/pwd --as bin/pwd
 setup_run: @k1520disktool put %data.hfe% src/tar --as bin/tar
-setup_run: @k1520disktool tar-satz-neu --format tar_mutos8k_26x128_mfm %s.hfe% --put src/lib/libc.a=a.a --put src/lib/c1=c.o
-setup_run: @k1520disktool tar-satz-neu --format tar_mutos8k_26x128_mfm %t.hfe% --put src/lib/libc.a=a.a --put src/lib/libc.a=b.a --put src/lib/libc.a=c.a --put src/lib/c1=d.o
+setup_run: @k1520disktool tar-satz-neu --format tar_ss77_26x128 %s.hfe% --put src/lib/libc.a=a.a --put src/lib/c1=c.o
+setup_run: @k1520disktool tar-satz-neu --format tar_ss77_26x128 %t.hfe% --put src/lib/libc.a=a.a --put src/lib/libc.a=b.a --put src/lib/libc.a=c.a --put src/lib/c1=d.o
 run:       --em em256 --laufwerke K5601,K5601,K5601,K5601 %DISK%
 stdin:
   g 80000000
   keys BOOT\sMUTOS\r
   g 100000000
   eject A
-  mount C %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_root_mfm.hfe udos_ss77
+  mount C %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_root_mfm.hfe ss77_26x128
   keys r
   g 100000000
   keys root\r
   g 100000000
-  mount D %data.hfe% udos_ss77
+  mount D %data.hfe% ss77_26x128
   keys /etc/mount\s/dev/rk3\s/usr\r
   g 50000000
-  mount A %s1.hfe% udos_ss77
+  mount A %s1.hfe% ss77_26x128
   keys cd\s/usr/e\r
   g 50000000
   keys tar\stvf\s/dev/rrk0\r
@@ -59,8 +59,8 @@ stdin:
   screen
   keys rm\sa.a\r
   g 50000000
-  mount A %t1.hfe% udos_ss77
-  mount B %t2.hfe% udos_ss77
+  mount A %t1.hfe% ss77_26x128
+  mount B %t2.hfe% ss77_26x128
   keys (dd\sif=/dev/rrk0\sbs=512\scount=494;dd\sif=/dev/rrk1\sbs=512\scount=494)|tar\sxvf\s-\sd.o\r
   g 400000000
   keys cmp\sd.o\s/usr/c1;\secho\sCMP2=\$?\r

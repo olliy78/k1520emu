@@ -18,7 +18,7 @@ nur BESCHREIBT, was auf die Diskette gehoert (`soll()`), und alles Uebrige hier 
 Beschreibung einer Diskette:
 
     import diskbau as db
-    DISK = db.Diskette(__file__, 'a5120_scpx17_k5601_system.hfe', fs='scpx798',
+    DISK = db.Diskette(__file__, 'a5120_scpx17_k5601_system.hfe', fs='scpx_ds80_5x1024_boot',
                        boot='boot_scpx798.bin',          # Systemspuren aus data/bootsektoren/ (None = keine)
                        create_args=[],                   # z. B. ['--prg', '710']
                        erste=[])                         # Dateien, die zuerst eingespielt werden muessen

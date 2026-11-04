@@ -171,7 +171,7 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
     // Ein Verzeichnissektor mit falscher CRC erklaert jeden Muell, der danach im
     // Verzeichnis steht.  Deshalb kommt er VOR die Auswertung.
     // Sektoren eines BYTE-Bereichs des Dateisystems pruefen.  Byte, nicht Spur: das
-    // Verzeichnis endet mitten in einer Spur (bei cpa780 nach 4096 von 5120 Byte),
+    // Verzeichnis endet mitten in einer Spur (bei cpa_ds80_5x1024_boot nach 4096 von 5120 Byte),
     // und die Schnellpruefung darf nicht ueber sein Ende hinausschauen — sonst
     // meldete sie einen Schaden an Dateidaten, ohne die Datei benennen zu koennen.
     auto sektorenPruefen = [&](uint64_t von_byte, uint64_t bis_byte, bool mit_datei) {
@@ -617,7 +617,7 @@ FsCheckReport CpmFileSystem::check(FsCheckLevel level, bool nachladen) const {
     // naemlich die Bootfaehigkeit, und niemand sonst sieht ihn: die Erkennung meldet
     // „1 Sektor mit CRC-Fehler" ohne zu sagen, wo.  Eigene Rechnung, weil die
     // Systemspuren eine ANDERE Geometrie haben duerfen als der Datenbereich
-    // (cpa780: drei 128-B-Seiten, dann 1024 B).
+    // (cpa_ds80_5x1024_boot: drei 128-B-Seiten, dann 1024 B).
     if (level == FsCheckLevel::Voll && start > 0) {
         bericht.schritt("cpm.schritt.systemspuren",
                         "Systemspuren: Adressmarken und Pruefsummen (Bootfaehigkeit)");

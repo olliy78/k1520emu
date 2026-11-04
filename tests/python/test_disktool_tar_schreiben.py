@@ -1,4 +1,4 @@
-"""tar-Export, leere tar-Diskette (``tar720_leer``) und ``.tar`` ablegen:
+"""tar-Export, leere tar-Diskette (``tar_ds80_9x512_leer``) und ``.tar`` ablegen:
 C-ABI (``DiskTool.tar_*``) und Oberflaeche (PySide6, headless).
 
 Seit der Vereinheitlichung (Entwurf 37) ist eine tar-Diskette immer ein Satz mit N >= 1 Abbildern:
@@ -48,7 +48,7 @@ def _tar(ustar: bool = False) -> bytes:
 def leere(tmp_path):
     from app.core_binding.k1520disk import DiskTool
     p = tmp_path / "leer.cqm"
-    DiskTool.create(p, "tar720_leer", "").close()
+    DiskTool.create(p, "tar_ds80_9x512_leer", "").close()
     return p
 
 
@@ -57,8 +57,8 @@ def leere(tmp_path):
 def test_catalog_knows_the_empty_tar_profile():
     from app.core_binding.k1520disk import filesystems
     fs = {f.name: f for f in filesystems()}
-    assert fs["tar720_leer"].leer and fs["tar720_leer"].type == "tar"
-    assert not fs["tar720"].leer
+    assert fs["tar_ds80_9x512_leer"].leer and fs["tar_ds80_9x512_leer"].type == "tar"
+    assert not fs["tar_ds80_9x512"].leer
 
 
 def test_empty_tar_disk_roundtrip_through_the_abi(tmp_path, leere):
@@ -68,7 +68,7 @@ def test_empty_tar_disk_roundtrip_through_the_abi(tmp_path, leere):
     with DiskTool.open(leere, read_only=False) as d:
         # eine tar-Diskette ist ein Satz mit EINEM Abbild
         assert d.ist_tar and d.tar_satz and d.tar_satz_einzel and not d.read_only_forced
-        assert d.filesystem == "tar720_leer"
+        assert d.filesystem == "tar_ds80_9x512_leer"
         with pytest.raises(K1520DiskError, match="leer"):
             d.tar_export(tmp_path / "nichts.tar")
         u = d.tar_datei_pruefen(quelle)
@@ -77,7 +77,7 @@ def test_empty_tar_disk_roundtrip_through_the_abi(tmp_path, leere):
         d.flush()                                    # geht in dasselbe Abbild (.cqm bleibt .cqm)
         # nicht schreibgeschuetzt, ganz normal bearbeitbar; ein zweiter Container: nein
         assert not d.read_only and not d.read_only_forced and not d.dirty
-        assert d.filesystem == "tar720"
+        assert d.filesystem == "tar_ds80_9x512"
         assert [e.name for e in d.list()] == ["a.txt", "dir/b.bin"]
         with pytest.raises(K1520DiskError, match="nicht leer"):
             d.tar_datei_ablegen(quelle, als_container=True)
@@ -85,7 +85,7 @@ def test_empty_tar_disk_roundtrip_through_the_abi(tmp_path, leere):
         d.tar_export(aus)
         assert aus.read_bytes() == quelle.read_bytes()
     with DiskTool.open(leere) as d:                  # Wiederoeffnen
-        assert d.filesystem == "tar720" and d.container_info()["type"] == "cqm"
+        assert d.filesystem == "tar_ds80_9x512" and d.container_info()["type"] == "cqm"
         aus2 = tmp_path / "aus2.tar"
         d.tar_export(aus2)
         assert aus2.read_bytes() == quelle.read_bytes()
@@ -236,7 +236,7 @@ def test_export_is_offered_on_a_raw_opened_follow_up_part(window, tmp_path):
 def test_new_disk_dialog_offers_the_empty_tar_disk_only():
     from app.core_binding.k1520disk import filesystems
     angeboten = [f.name for f in filesystems() if f.type != "tar" or f.leer]
-    assert "tar720_leer" in angeboten and "tar720" not in angeboten
+    assert "tar_ds80_9x512_leer" in angeboten and "tar_ds80_9x512" not in angeboten
 
 
 # ─── |← / Strg+← und Ziehen und Ablegen auf der leeren tar-Diskette ──────────

@@ -115,7 +115,7 @@ TEST(DiskVolume, ErkenntCpaBootdisketteVonSelbst) {
     ASSERT_NE(dv, nullptr) << err;
 
     EXPECT_EQ(dv->detection().format, "ds80_3t26x128-5x1024");
-    EXPECT_EQ(dv->detection().filesystem, "cpa780");
+    EXPECT_EQ(dv->detection().filesystem, "cpa_ds80_5x1024_boot");
     EXPECT_TRUE(dv->detection().unambiguous);
     EXPECT_EQ(dv->volumeCount(), 1) << "eine CP/M-Diskette ist EIN Dateisystem";
     EXPECT_TRUE(dv->volumeDir(0).empty()) << "bei einem Volume ist der Ordner flach";
@@ -127,7 +127,7 @@ TEST(DiskVolume, ErkenntUdosUndOeffnetBeideSeitenAlsEinenDatentraeger) {
     auto dv = oeffne(fixture("udos_boot_scp.hfe"), "", err);
     ASSERT_NE(dv, nullptr) << err;
 
-    EXPECT_EQ(dv->detection().filesystem, "udos_ds77");
+    EXPECT_EQ(dv->detection().filesystem, "udos_ds77_26x128");
     EXPECT_EQ(dv->volumeCount(), 2) << "beide Seiten gehoeren zu EINER Diskette";
     EXPECT_EQ(dv->volumeDir(0), "Side0");
     EXPECT_EQ(dv->volumeDir(1), "Side1");
@@ -160,7 +160,7 @@ TEST(DiskVolume, LiestEineDisketteMitFremderSyncSitte) {
     auto dv = oeffne(fixture("udos_ds77_k5601_fremdsync.hfe"), "", err);
     ASSERT_NE(dv, nullptr) << err;
 
-    EXPECT_EQ(dv->detection().filesystem, "udos_ds77");
+    EXPECT_EQ(dv->detection().filesystem, "udos_ds77_26x128");
     EXPECT_EQ(dv->volumeCount(), 2);
 
     const std::vector<FileEntry> alle = dv->list();
@@ -219,14 +219,14 @@ TEST(DiskVolume, GeometrieOhneProfilWirdUeberDieCpaRegelGeoeffnet) {
 
 /**
  * @test Ein benanntes Profil geht dem abgeleiteten IMMER vor.
- * @par Kriterium  Die 780K-Bootdiskette meldet `cpa780`, nicht `cpa_auto` — obwohl die
+ * @par Kriterium  Die 780K-Bootdiskette meldet `cpa_ds80_5x1024_boot`, nicht `cpa_auto` — obwohl die
  *                 Regel dasselbe ausrechnen wuerde.
  */
 TEST(DiskVolume, BenanntesProfilGehtDemAbgeleitetenVor) {
     std::string err;
     auto dv = oeffne(fixture("cpa_cpa780_k5601_clock.hfe"), "", err);
     ASSERT_NE(dv, nullptr) << err;
-    EXPECT_EQ(dv->detection().filesystem, "cpa780");
+    EXPECT_EQ(dv->detection().filesystem, "cpa_ds80_5x1024_boot");
 }
 
 /**
@@ -238,7 +238,7 @@ TEST(DiskVolume, CpaAutoLaesstSichAusdruecklichAnfordern) {
     ASSERT_NE(dv, nullptr) << err;
     EXPECT_EQ(dv->detection().format, "ds80_3t26x128-5x1024");
     EXPECT_EQ(dv->detection().filesystem, "cpa_auto");
-    EXPECT_EQ(dv->list().size(), 24u) << "dieselben Dateien wie mit dem Profil cpa780";
+    EXPECT_EQ(dv->list().size(), 24u) << "dieselben Dateien wie mit dem Profil cpa_ds80_5x1024_boot";
 }
 
 /**
@@ -376,7 +376,7 @@ TEST(DiskVolume, JedesKatalogformatHatNormspurenMitEinerUmdrehung) {
 
 TEST(DiskVolume, UdosAlsImgWirdAbgelehnt) {
     std::string err;
-    auto dv = oeffne(fixture("cpa_cpa780_k5601_clock.img"), "udos_ds77", err);
+    auto dv = oeffne(fixture("cpa_cpa780_k5601_clock.img"), "udos_ds77_26x128", err);
     EXPECT_EQ(dv, nullptr);
     EXPECT_NE(err.find("img"), std::string::npos) << err;
 }
@@ -423,7 +423,7 @@ TEST(DiskVolume, ExtrahiertBeideSeitenInSideOrdner) {
 
 TEST(DiskVolume, ExtrahiertFlachWennDieDisketteEinDateisystemHat) {
     std::string err;
-    auto dv = oeffne(fixture("cpa_cpa780_k5601_clock.img"), "cpa780", err);
+    auto dv = oeffne(fixture("cpa_cpa780_k5601_clock.img"), "cpa_ds80_5x1024_boot", err);
     ASSERT_NE(dv, nullptr) << err;
 
     TempOrdner ziel("k1520_test_dv_flach");
@@ -474,7 +474,7 @@ TEST(DiskVolume, LoseDateienNebenDenSideOrdnernSindEinFehler) {
 TEST(DiskVolume, StapelPasstNichtUndSchreibtDeshalbGarNichts) {
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_dv_voll.img");
     std::string err;
-    auto dv = oeffneSchreibbar(k.path(), "cpa780", err);
+    auto dv = oeffneSchreibbar(k.path(), "cpa_ds80_5x1024_boot", err);
     ASSERT_NE(dv, nullptr) << err;
 
     const uint64_t frei_vorher = dv->volumeInfo(0).free_bytes;
@@ -496,7 +496,7 @@ TEST(DiskVolume, StapelPasstNichtUndSchreibtDeshalbGarNichts) {
 TEST(DiskVolume, StapelSchreibtUndDieAnsichtIstSofortAktuell) {
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_dv_ok.img");
     std::string err;
-    auto dv = oeffneSchreibbar(k.path(), "cpa780", err);
+    auto dv = oeffneSchreibbar(k.path(), "cpa_ds80_5x1024_boot", err);
     ASSERT_NE(dv, nullptr) << err;
 
     const size_t vorher = dv->list().size();
@@ -522,7 +522,7 @@ TEST(DiskVolume, StapelSchreibtUndDieAnsichtIstSofortAktuell) {
 TEST(DiskVolume, CheckFitUrteiltOhneZuSchreiben) {
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_dv_fit.img");
     std::string err;
-    auto dv = oeffne(k.path(), "cpa780", err);
+    auto dv = oeffne(k.path(), "cpa_ds80_5x1024_boot", err);
     ASSERT_NE(dv, nullptr) << err;
 
     TempOrdner klein("k1520_test_dv_fit_klein");
@@ -542,7 +542,7 @@ TEST(DiskVolume, CheckFitUrteiltOhneZuSchreiben) {
 TEST(DiskVolume, RoundtripUeberDieDateiEbene) {
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_dv_rt.img");
     std::string err;
-    auto dv = oeffneSchreibbar(k.path(), "cpa780", err);
+    auto dv = oeffneSchreibbar(k.path(), "cpa_ds80_5x1024_boot", err);
     ASSERT_NE(dv, nullptr) << err;
 
     TempOrdner quelle("k1520_test_dv_rt_q");
@@ -565,7 +565,7 @@ TEST(DiskVolume, RoundtripUeberDieDateiEbene) {
 TEST(DiskVolume, TextmodusSetztZeilenendenUm) {
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_dv_text.img");
     std::string err;
-    auto dv = oeffneSchreibbar(k.path(), "cpa780", err);
+    auto dv = oeffneSchreibbar(k.path(), "cpa_ds80_5x1024_boot", err);
     ASSERT_NE(dv, nullptr) << err;
 
     TempOrdner quelle("k1520_test_dv_text_q");
@@ -593,7 +593,7 @@ TEST(DiskVolume, TextmodusSetztZeilenendenUm) {
 TEST(DiskVolume, CpmBeiblattTraegtNutzerbereichUndAttributeDurchDenRundlauf) {
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_dv_cpm_beiblatt.img");
     std::string err;
-    auto dv = oeffneSchreibbar(k.path(), "cpa780", err);
+    auto dv = oeffneSchreibbar(k.path(), "cpa_ds80_5x1024_boot", err);
     ASSERT_NE(dv, nullptr) << err;
 
     // Eine Systemdatei im Nutzerbereich 3 — beides steht in keiner Linux-Datei.
@@ -616,7 +616,7 @@ TEST(DiskVolume, CpmBeiblattTraegtNutzerbereichUndAttributeDurchDenRundlauf) {
 
     // Und in eine frische Diskette zurueck.
     Kopie leer("cpa_cpa780_k5601_clock.img", "k1520_test_dv_cpm_bb_ziel.img");
-    auto ziel = oeffneSchreibbar(leer.path(), "cpa780", err);
+    auto ziel = oeffneSchreibbar(leer.path(), "cpa_ds80_5x1024_boot", err);
     ASSERT_NE(ziel, nullptr) << err;
     ASSERT_TRUE(ziel->insertAll(ordner.path(), TransferOptions{})) << ziel->lastError();
 
@@ -639,7 +639,7 @@ TEST(DiskVolume, CpmBeiblattEntstehtNurWennEsEtwasZuSagenGibt) {
     // ein leeres Beiblatt waere nur ein Ratsel im Ordner.
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_dv_cpm_bb_leer.img");
     std::string err;
-    auto dv = oeffne(k.path(), "cpa780", err);
+    auto dv = oeffne(k.path(), "cpa_ds80_5x1024_boot", err);
     ASSERT_NE(dv, nullptr) << err;
 
     TempOrdner ordner("k1520_test_dv_cpm_bb_leer_o");
@@ -831,7 +831,7 @@ TEST(DiskVolume, UdosGleicherNameAufBeidenSeitenBleibtGetrennt) {
 
 TEST(DiskVolume, WirdSchreibgeschuetztGeoeffnet) {
     std::string err;
-    auto dv = oeffne(fixture("cpa_cpa780_k5601_clock.img"), "cpa780", err);
+    auto dv = oeffne(fixture("cpa_cpa780_k5601_clock.img"), "cpa_ds80_5x1024_boot", err);
     ASSERT_NE(dv, nullptr) << err;
     EXPECT_TRUE(dv->readOnly()) << "Vorgabe beim Oeffnen ist Schreibschutz";
 
@@ -865,7 +865,7 @@ TEST(DiskVolume, SchreibgeschuetztesOeffnenLaesstDieDateiUnberuehrt) {
 
     {
         std::string err;
-        auto dv = oeffne(k.path(), "cpa780", err);
+        auto dv = oeffne(k.path(), "cpa_ds80_5x1024_boot", err);
         ASSERT_NE(dv, nullptr) << err;
         (void)dv->list();
         TempOrdner ziel("k1520_test_dv_ro_ziel");
@@ -888,7 +888,7 @@ TEST(DiskVolume, NeuAngelegteDisketteIstBeschreibbar) {
     const std::string pfad =
         k1520test::tempPath("k1520_test_dv_neu_rw.hfe");
     std::string err;
-    auto dv = DiskVolume::create(pfad, "udos_ds77", "FRISCH", formate(),
+    auto dv = DiskVolume::create(pfad, "udos_ds77_26x128", "FRISCH", formate(),
                                  dateisysteme(), err);
     ASSERT_NE(dv, nullptr) << err;
     EXPECT_FALSE(dv->readOnly());
@@ -923,7 +923,7 @@ TEST(DiskVolume, CopyQmAnlegenSchreibenUndNeuLaden) {
     schreibe(q / "HALLO.TXT", std::string(3000, 'x') + "ende");
     std::string err;
     {
-        auto dv = DiskVolume::create(pfad, "scpx640", "", formate(), dateisysteme(), err);
+        auto dv = DiskVolume::create(pfad, "scpx_ds80_16x256_boot", "", formate(), dateisysteme(), err);
         ASSERT_NE(dv, nullptr) << err;
         EXPECT_EQ(dv->containerName(), "cqm");
         EXPECT_FALSE(dv->readOnly());
@@ -964,7 +964,7 @@ TEST(DiskVolume, CopyQmAnlegenSchreibenUndNeuLaden) {
 ///       Info-Zugriff, kein erzwungener Schreibschutz; Kreuz td0 -> imd -> hfe -> td0 gleiche Dateiliste;
 ///       auch die gemischte Geometrie (CP/A: 128-B-Systemspuren) geht, anders als bei .cqm
 TEST(DiskVolume, Td0UndImdAnlegenSchreibenUndKreuzUmspeichern) {
-    for (const char* fs_name : {"scpx640", "cpa780"}) {
+    for (const char* fs_name : {"scpx_ds80_16x256_boot", "cpa_ds80_5x1024_boot"}) {
         for (const char* ext : {"td0", "imd"}) {
             SCOPED_TRACE(std::string(fs_name) + "." + ext);
             const std::string pfad = k1520test::tempPath((std::string("k1520_test_dv_k1.") + ext).c_str());
@@ -1036,7 +1036,7 @@ TEST(DiskVolume, Td0UndImdLehnenUdosAb) {
         const std::string pfad = k1520test::tempPath((std::string("k1520_test_dv_k1_udos.") + ext).c_str());
         fs::remove(pfad);
         std::string err;
-        auto dv = DiskVolume::create(pfad, "udos_ds77", "FRISCH", formate(), dateisysteme(), err);
+        auto dv = DiskVolume::create(pfad, "udos_ds77_26x128", "FRISCH", formate(), dateisysteme(), err);
         EXPECT_EQ(dv, nullptr);
         EXPECT_NE(err.find("UDOS"), std::string::npos) << err;
         EXPECT_FALSE(fs::exists(pfad));
@@ -1051,7 +1051,7 @@ TEST(DiskVolume, Td0UndImdLehnenUdosAb) {
 
 TEST(DiskVolume, ExportSchreibtEineKopieOhneUmzubinden) {
     std::string err;
-    auto dv = oeffne(fixture("cpa_cpa780_k5601_clock.hfe"), "cpa780", err);
+    auto dv = oeffne(fixture("cpa_cpa780_k5601_clock.hfe"), "cpa_ds80_5x1024_boot", err);
     ASSERT_NE(dv, nullptr) << err;
     const std::string quelle = dv->path();
 
@@ -1064,7 +1064,7 @@ TEST(DiskVolume, ExportSchreibtEineKopieOhneUmzubinden) {
 
     // Die Kopie traegt denselben Inhalt — im anderen Container.
     std::string err2;
-    auto kopie = oeffne(ziel, "cpa780", err2);
+    auto kopie = oeffne(ziel, "cpa_ds80_5x1024_boot", err2);
     ASSERT_NE(kopie, nullptr) << err2;
     EXPECT_EQ(kopie->list().size(), dv->list().size());
 
@@ -1094,7 +1094,7 @@ TEST(DiskVolume, UdosLaesstSichNichtAlsImgAblegen) {
 TEST(DiskVolume, SpeichernUnterBindetUmUndBleibtSchreibbar) {
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_dv_saveas_q.img");
     std::string err;
-    auto dv = oeffneSchreibbar(k.path(), "cpa780", err);
+    auto dv = oeffneSchreibbar(k.path(), "cpa_ds80_5x1024_boot", err);
     ASSERT_NE(dv, nullptr) << err;
 
     const std::string ziel =
@@ -1182,19 +1182,19 @@ TEST(DiskVolume, LochInDerMitteWirdNichtVermessen) {
  * @test Das Fassungsvermoegen der Systemspuren ist ein Vertrag.
  * @par Kriterium  Es ergibt sich aus Geometrie + Beginn des Dateisystems und darf
  *                 sich nicht unbemerkt verschieben — wer hier einen Wert aendert,
- *                 macht jedes vorhandene Bootabbild unbrauchbar.  cpa780 = 15104
+ *                 macht jedes vorhandene Bootabbild unbrauchbar.  cpa_ds80_5x1024_boot = 15104
  *                 ist zugleich das Offset, das cpmtools als `offset` fuehrt.
  */
 TEST(DiskVolume, SystemspurenFassenEineFesteZahlBytes) {
     struct Fall { const char* fs; uint64_t bytes; };
-    // cpa800 beginnt auf Zylinder 0 — eine Datendiskette kann nicht bootfaehig sein.
+    // cpa_ds80_5x1024_daten beginnt auf Zylinder 0 — eine Datendiskette kann nicht bootfaehig sein.
     const Fall faelle[] = {
-        {"cpa780",    15104},   // c0h0 + c0h1 + c1h0 (je 26×128) + c1h1 (5×1024)
-        {"scpx640",   16384},   // 4 × 16×256
-        {"scpx798",   18432},   // 2 × 16×256 + 2 × 5×1024
-        {"udos_ds77", 13728},   // Spuren 0–2 + Bootspur 21, je Sektor 128 + 4 Byte Kontrollblock
-        {"udos_ss40", 13728},
-        {"cpa800",        0},
+        {"cpa_ds80_5x1024_boot",    15104},   // c0h0 + c0h1 + c1h0 (je 26×128) + c1h1 (5×1024)
+        {"scpx_ds80_16x256_boot",   16384},   // 4 × 16×256
+        {"scpx_ds80_5x1024_boot",   18432},   // 2 × 16×256 + 2 × 5×1024
+        {"udos_ds77_26x128", 13728},   // Spuren 0–2 + Bootspur 21, je Sektor 128 + 4 Byte Kontrollblock
+        {"udos_ss40_26x128", 13728},
+        {"cpa_ds80_5x1024_daten",        0},
     };
     for (const Fall& f : faelle) {
         const FsProfile* p = dateisysteme().find(f.fs);
@@ -1262,7 +1262,7 @@ TEST(DiskVolume, KurzesBootabbildLaesstDenRestDerSystemspurenInRuhe) {
 
 TEST(DiskVolume, BootabbildGehtUnveraendertInDieSystemspuren) {
     std::string err;
-    auto quelle = oeffne(fixture("cpa_cpa780_k5601_clock.img"), "cpa780", err);
+    auto quelle = oeffne(fixture("cpa_cpa780_k5601_clock.img"), "cpa_ds80_5x1024_boot", err);
     ASSERT_NE(quelle, nullptr) << err;
 
     std::vector<uint8_t> boot;
@@ -1287,7 +1287,7 @@ TEST(DiskVolume, BootabbildGehtUnveraendertInDieSystemspuren) {
     const std::string pfad = k1520test::tempPath("k1520_dv_boot.hfe");
     std::error_code ec;
     fs::remove(pfad, ec);
-    auto neu = DiskVolume::create(pfad, "cpa780", "", formate(), dateisysteme(), err, bin);
+    auto neu = DiskVolume::create(pfad, "cpa_ds80_5x1024_boot", "", formate(), dateisysteme(), err, bin);
     ASSERT_NE(neu, nullptr) << err;
     EXPECT_EQ(neu->bootAreaSize(), 15104u);
 
@@ -1320,7 +1320,7 @@ TEST(DiskVolume, ZuGrossesBootabbildLegtKeineDisketteAn) {
     fs::remove(pfad, ec);
 
     std::string err;
-    auto dv = DiskVolume::create(pfad, "cpa780", "", formate(), dateisysteme(), err, bin);
+    auto dv = DiskVolume::create(pfad, "cpa_ds80_5x1024_boot", "", formate(), dateisysteme(), err, bin);
     EXPECT_EQ(dv, nullptr);
     EXPECT_NE(err.find("15105"), std::string::npos) << err;
     EXPECT_NE(err.find("15104"), std::string::npos) << err;
@@ -1330,7 +1330,7 @@ TEST(DiskVolume, ZuGrossesBootabbildLegtKeineDisketteAn) {
 
 /**
  * @test Ohne Systemspuren gibt es kein Bootabbild — mit Begruendung.
- * @par Kriterium  `cpa800` beginnt auf Zylinder 0; die Meldung sagt genau das,
+ * @par Kriterium  `cpa_ds80_5x1024_daten` beginnt auf Zylinder 0; die Meldung sagt genau das,
  *                 statt bloss „passt nicht".
  */
 TEST(DiskVolume, DateisystemOhneSystemspurenLehntBootabbildAb) {
@@ -1342,7 +1342,7 @@ TEST(DiskVolume, DateisystemOhneSystemspurenLehntBootabbildAb) {
     fs::remove(pfad, ec);
 
     std::string err;
-    auto dv = DiskVolume::create(pfad, "cpa800", "", formate(), dateisysteme(), err, bin);
+    auto dv = DiskVolume::create(pfad, "cpa_ds80_5x1024_daten", "", formate(), dateisysteme(), err, bin);
     EXPECT_EQ(dv, nullptr);
     EXPECT_NE(err.find("Systemspuren"), std::string::npos) << err;
     EXPECT_NE(err.find("Zylinder 0"), std::string::npos) << err;
@@ -1358,7 +1358,7 @@ TEST(DiskVolume, DateisystemOhneSystemspurenLehntBootabbildAb) {
 TEST(DiskVolume, SchreibgeschuetzteDisketteNimmtKeinBootabbild) {
     Kopie k("cpa_cpa780_k5601_clock.hfe", "k1520_dv_bootro.hfe");
     std::string err;
-    auto dv = oeffne(k.path(), "cpa780", err);
+    auto dv = oeffne(k.path(), "cpa_ds80_5x1024_boot", err);
     ASSERT_NE(dv, nullptr) << err;
 
     EXPECT_FALSE(dv->writeBootImage(std::vector<uint8_t>(128, 0x11)));
@@ -1376,7 +1376,7 @@ TEST(DiskVolume, SchreibgeschuetzteDisketteNimmtKeinBootabbild) {
  */
 TEST(DiskVolume, UdosKopfsektorangabenUeberlebenDenRundlauf) {
     std::string err;
-    auto quelle = oeffne(fixture("udos_boot_scp.hfe"), "udos_ds77", err);
+    auto quelle = oeffne(fixture("udos_boot_scp.hfe"), "udos_ds77_26x128", err);
     ASSERT_NE(quelle, nullptr) << err;
 
     TempOrdner ordner("k1520_dv_udosmeta");
@@ -1390,7 +1390,7 @@ TEST(DiskVolume, UdosKopfsektorangabenUeberlebenDenRundlauf) {
     const std::string pfad = k1520test::tempPath("k1520_dv_udosmeta.hfe");
     std::error_code ec;
     fs::remove(pfad, ec);
-    auto neu = DiskVolume::create(pfad, "udos_ds77", "UDOS.SYS.4.3",
+    auto neu = DiskVolume::create(pfad, "udos_ds77_26x128", "UDOS.SYS.4.3",
                                   formate(), dateisysteme(), err);
     ASSERT_NE(neu, nullptr) << err;
     ASSERT_TRUE(neu->insertAll(ordner.path(), TransferOptions{})) << neu->lastError();
@@ -1422,7 +1422,7 @@ TEST(DiskVolume, UdosKopfsektorangabenUeberlebenDenRundlauf) {
 TEST(DiskVolume, SektoransichtLiefertDieSpurenDesMediums) {
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_dv_sekt.img");
     std::string err;
-    auto dv = oeffne(k.path(), "cpa780", err);
+    auto dv = oeffne(k.path(), "cpa_ds80_5x1024_boot", err);
     ASSERT_NE(dv, nullptr) << err;
 
     EXPECT_GT(dv->mediumCylinders(), 0);
@@ -1452,7 +1452,7 @@ TEST(DiskVolume, SchreibgeschuetzteDisketteLehntJedeSektoraenderungAb) {
     // faellt beim blossen Ansehen einer fremden Diskette nicht auf.
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_dv_sekt_ro.img");
     std::string err;
-    auto dv = oeffne(k.path(), "cpa780", err);          // schreibgeschuetzt geoeffnet
+    auto dv = oeffne(k.path(), "cpa_ds80_5x1024_boot", err);          // schreibgeschuetzt geoeffnet
     ASSERT_NE(dv, nullptr) << err;
     ASSERT_TRUE(dv->readOnly());
 
@@ -1514,7 +1514,7 @@ TEST(DiskVolume, NachspannSchreibenLaesstDatenUndCrcInRuhe) {
 TEST(DiskVolume, SektorAnlegenUndLoeschenUeberDieFassade) {
     Kopie k("cpa_cpa780_k5601_clock.hfe", "k1520_test_dv_sekt_neu.hfe");
     std::string err;
-    auto dv = oeffneSchreibbar(k.path(), "cpa780", err);
+    auto dv = oeffneSchreibbar(k.path(), "cpa_ds80_5x1024_boot", err);
     ASSERT_NE(dv, nullptr) << err;
 
     const TrackView vorher = dv->trackView(0, 0);
@@ -1899,22 +1899,22 @@ TEST(DiskVolume, Scpx8915SystemdiskettenHabenDenBiosDpb) {
  * @test DiskVolume.Scpx8915LeereDisketteBleibtCpaDatendiskette
  * @brief Eine frisch formatierte, LEERE 5 × 1024-Diskette ist Sektor fuer Sektor dieselbe,
  *        ob FORMAT.COM des A5120 oder des K8915 sie geschrieben hat.  Sie bleibt, was CP/A
- *        daraus macht (`cpa800`, 192 Plaetze, am CP/A nachgewiesen), eindeutig — `scpx8915`
- *        (`detect: false`) steht nur als Hinweis mit dem Ausweg `--fs scpx8915` dabei.
+ *        daraus macht (`cpa_ds80_5x1024_daten`, 192 Plaetze, am CP/A nachgewiesen), eindeutig — `scpx8915_ds80_5x1024_boot`
+ *        (`detect: false`) steht nur als Hinweis mit dem Ausweg `--fs scpx8915_ds80_5x1024_boot` dabei.
  */
 TEST(DiskVolume, Scpx8915LeereDisketteBleibtCpaDatendiskette) {
-    Weg w{leereDiskette("cpa800", "k1520_dv_8915_leer.hfe")};
+    Weg w{leereDiskette("ds80_5x1024", "k1520_dv_8915_leer.hfe")};
     std::string err;
     auto dv = oeffne(w.p, "", err);
     ASSERT_NE(dv, nullptr) << err;
-    EXPECT_EQ(dv->detection().filesystem, "cpa800");
+    EXPECT_EQ(dv->detection().filesystem, "cpa_ds80_5x1024_daten");
     EXPECT_EQ(dv->profile().dir_entries, 192);
     EXPECT_TRUE(dv->detection().unambiguous);
     EXPECT_TRUE(dv->detection().alternatives.empty());
-    EXPECT_NE(dv->detection().remarks.find("--fs scpx8915"), std::string::npos)
+    EXPECT_NE(dv->detection().remarks.find("--fs scpx8915_ds80_5x1024_boot"), std::string::npos)
         << dv->detection().remarks;
 
-    auto k = oeffne(w.p, "scpx8915", err);
+    auto k = oeffne(w.p, "scpx8915_ds80_5x1024_boot", err);
     ASSERT_NE(k, nullptr) << err;
     EXPECT_EQ(k->profile().data_cyl, 2);
     EXPECT_EQ(k->profile().dir_entries, 128);
@@ -1925,18 +1925,18 @@ TEST(DiskVolume, Scpx8915LeereDisketteBleibtCpaDatendiskette) {
  * @test DiskVolume.Scpx8915BeschriebenOhneSystemspurenGiltDieCpaRegel
  * @brief Der gefaehrliche Fall: eine SCPX-8915-Diskette OHNE Systemspuren (FORMAT, kein
  *        DISGEN), auf die der K8915 geschrieben hat — Zylinder 0–1 durchgehend 0xE5, das
- *        Verzeichnis ab c2h0.  Vorher gewann `cpa800` (ab c0h0, leer gelesen): die
+ *        Verzeichnis ab c2h0.  Vorher gewann `cpa_ds80_5x1024_daten` (ab c0h0, leer gelesen): die
  *        Diskette erschien leer, und das naechste `put` legte seine Bloecke ueber das
  *        Verzeichnis des K8915.  Jetzt schlaegt das belegte Verzeichnis das leere — wie im
  *        CP/A-BIOS selbst (`selsy`: Spur 0 leer ⇒ an der ersten Datenspur nachsehen).
  */
 TEST(DiskVolume, Scpx8915BeschriebenOhneSystemspurenGiltDieCpaRegel) {
-    Weg w{leereDiskette("cpa800", "k1520_dv_8915_daten.hfe")};
+    Weg w{leereDiskette("ds80_5x1024", "k1520_dv_8915_daten.hfe")};
     Weg q{k1520test::tempPath("k1520_dv_8915_q.txt")};
     { std::ofstream(q.p, std::ios::binary) << "VOM K8915\r\n"; }
     std::string err;
     {
-        auto k = oeffneSchreibbar(w.p, "scpx8915", err);
+        auto k = oeffneSchreibbar(w.p, "scpx8915_ds80_5x1024_boot", err);
         ASSERT_NE(k, nullptr) << err;
         ASSERT_TRUE(k->insert(q.p, FileRef::parse("K8915.TXT"), TransferOptions{}))
             << k->lastError();
@@ -1958,7 +1958,7 @@ TEST(DiskVolume, Scpx8915BeschriebenOhneSystemspurenGiltDieCpaRegel) {
     ASSERT_TRUE(s->insert(q.p, FileRef::parse("ZWEI.TXT"), TransferOptions{}))
         << s->lastError();
     ASSERT_TRUE(s->flush());
-    auto k = oeffne(w.p, "scpx8915", err);
+    auto k = oeffne(w.p, "scpx8915_ds80_5x1024_boot", err);
     ASSERT_NE(k, nullptr) << err;
     EXPECT_EQ(k->list().size(), 2u);
 }
@@ -1970,12 +1970,12 @@ TEST(DiskVolume, Scpx8915BeschriebenOhneSystemspurenGiltDieCpaRegel) {
  *        ohne Befund, auch automatisch erkannt).
  */
 TEST(DiskVolume, Scpx8915HoechstensHundertachtundzwanzigPlaetze) {
-    Weg w{leereDiskette("cpa800", "k1520_dv_8915_voll.hfe")};
+    Weg w{leereDiskette("ds80_5x1024", "k1520_dv_8915_voll.hfe")};
     Weg q{k1520test::tempPath("k1520_dv_8915_klein.txt")};
     { std::ofstream(q.p, std::ios::binary) << "X"; }
     std::string err;
     {
-        auto k = oeffneSchreibbar(w.p, "scpx8915", err);
+        auto k = oeffneSchreibbar(w.p, "scpx8915_ds80_5x1024_boot", err);
         ASSERT_NE(k, nullptr) << err;
         for (int i = 0; i < 128; ++i)
             ASSERT_TRUE(k->insert(q.p, FileRef::parse("F" + std::to_string(i) + ".TXT"),
@@ -2023,7 +2023,7 @@ TEST(DiskVolume, Scpx8915SechzehnMal256HatDenBiosDpb) {
 TEST(DiskVolume, AuszugErsetztSchraegstricheUndBleibtImZielordner) {
     Kopie k("cpa_cpa780_k5601_clock.img", "k1520_test_dv_zielname.img");
     std::string err;
-    auto dv = oeffneSchreibbar(k.path(), "cpa780", err);
+    auto dv = oeffneSchreibbar(k.path(), "cpa_ds80_5x1024_boot", err);
     ASSERT_NE(dv, nullptr) << err;
 
     TempOrdner quelle("k1520_test_dv_zn_q");
@@ -2057,7 +2057,7 @@ TEST(DiskVolume, AuszugErsetztSchraegstricheUndBleibtImZielordner) {
         }
         std::ofstream(k.path(), std::ios::binary | std::ios::trunc) << abb;
     }
-    dv = oeffne(k.path(), "cpa780", err);
+    dv = oeffne(k.path(), "cpa_ds80_5x1024_boot", err);
     ASSERT_NE(dv, nullptr) << err;
 
     // Der Elternordner des Zielordners muss nach dem Auszug unveraendert sein.

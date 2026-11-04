@@ -23,7 +23,7 @@
  * k1520disktool tar-satz-save <abbild…> [-o basis] [--put/--rm/--mkdir/--attr …]   # Satz bearbeiten, auf N Abbilder speichern
  * k1520disktool tar-satz-neu --format <name> <basis> [--put/--rm/--mkdir/--attr/--tar-container …] # leeren Satz anlegen
  * k1520disktool tar-formate                              # Katalogformate fuer neue tar-Disketten/Saetze
- * k1520disktool create <abbild> --fs tar720_leer --format <name>   # leere tar-Diskette im GEWAEHLTEN Format
+ * k1520disktool create <abbild> --fs tar_ds80_9x512_leer --format <name>   # leere tar-Diskette im GEWAEHLTEN Format
  * k1520disktool formats
  * ```
  *
@@ -188,7 +188,7 @@ void gebrauch() {
         "                                           die Teile eines Satzes setzt `cat` zusammen\n"
         "  tar-put <abbild> <quelle.tar>            .tar (Vielfaches von 512, passt auf EIN Abbild) wird das\n"
         "                                           Archiv einer LEEREN tar-Diskette (`create x.img --fs\n"
-        "                                           tar720_leer`) - \"als Container\"; die Diskette bleibt danach\n"
+        "                                           tar_ds80_9x512_leer`) - \"als Container\"; die Diskette bleibt danach\n"
         "                                           bearbeitbar.  Auf einem Archiv mit Inhalt: Fehler (als Datei\n"
         "                                           kommt eine .tar per `put` hinein).  --dry-run: nur beurteilen.\n"
         "                                           Gewarnt wird vor Nicht-V7-tar (Schreiben geht trotzdem)\n"
@@ -205,7 +205,7 @@ void gebrauch() {
         "                                           `--tar-container X.tar` macht eine fertige .tar zum Archiv\n"
         "                                           (nur bei leerem Archiv; ueber Diskettengroesse: mehrere Abbilder)\n"
         "  tar-formate                              Katalogformate fuer neue tar-Disketten/Saetze (--format)\n"
-        "  create <abbild> --fs tar720_leer --format <katalogformat>\n"
+        "  create <abbild> --fs tar_ds80_9x512_leer --format <katalogformat>\n"
         "                                           leere tar-Diskette im GEWAEHLTEN Format (`tar-formate`);\n"
         "                                           tar-satz/-save: --format gibt die Geometrie eines .img vor\n"
         "  formats                                  bekannte Dateisysteme auflisten\n\n"
@@ -1519,8 +1519,8 @@ int cmd_create(const Optionen& o) {
         // `--format` nur fuer die leere tar-Diskette: GEWAEHLTES Katalogformat statt der 720K des Profils.
         const FsProfile* pr = dateisysteme().find(o.fs);
         if (!pr || pr->type != FsType::Tar || !pr->leer) {
-            std::cerr << "Fehler: --format gilt beim Anlegen nur mit --fs tar720_leer (leere tar-Diskette; "
-                         "ebenso tar_mutos8k_26x128_mfm_leer, tar_mutos8k_26x128_fm_leer, tar_mutos8k_8x512_mfm_leer)\n";
+            std::cerr << "Fehler: --format gilt beim Anlegen nur mit --fs tar_ds80_9x512_leer (leere tar-Diskette; "
+                         "ebenso tar_ss77_26x128_leer, tar_fm_ss77_26x128_leer, tar_ss77_8x512_leer)\n";
             return kFehler;
         }
         auto t = DiskVolume::tarDisketteNeu(o.rest[1], o.format, formate(), dateisysteme(), err);
@@ -1610,7 +1610,7 @@ int cmd_boot_put(const Optionen& o) {
 /**
  * @brief `boot-scpx` — die SCPX-Systemspuren des PRG aus den drei Modulen bauen.
  *
- * Ergebnis ist ein Bootabbild fuer `create --fs scpx640 --boot` bzw. `boot-put`
+ * Ergebnis ist ein Bootabbild fuer `create --fs scpx_ds80_16x256_boot --boot` bzw. `boot-put`
  * (AP-P6; Aufbau wie `SYSPRG`, prg_boot.h).  Das Geraet wird am BIOS abgelesen;
  * `--prg` haelt es fest, ein BIOS der anderen Fassung wird abgewiesen.
  */

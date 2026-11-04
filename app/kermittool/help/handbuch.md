@@ -673,7 +673,7 @@ startet den Server. Beendet der Client den Server mit *Finish*, führt Kermit di
 ### Die Kermit-Disketten
 
 Kermit kommt von der Diskette `kermit.cqm`. Sie liegt dem Emulator nicht bei. Die Diskette enthält
-kein Dateisystem, sondern ein `tar`-Archiv (Format `tar720`). Alles liegt im Ordner `kermit/`:
+kein Dateisystem, sondern ein `tar`-Archiv (Format `tar_ds80_9x512`). Alles liegt im Ordner `kermit/`:
 
 * `kermit/kermit` — das fertige Programm für den Z8000: C-Kermit 4.2(030), 78 560 Byte, vom
   Februar 1988. Es läuft unter WEGA 3.1 ohne Änderung.

@@ -77,7 +77,7 @@ std::unique_ptr<DiskVolume> neueLeere(const std::string& name) {
     std::string err;
     const std::string p = k1520test::tempPath(name);
     fs::remove(p);
-    auto v = DiskVolume::create(p, "tar720_leer", "", formate(), dateisysteme(), err);
+    auto v = DiskVolume::create(p, "tar_ds80_9x512_leer", "", formate(), dateisysteme(), err);
     EXPECT_TRUE(v) << err;
     return v;
 }
@@ -231,13 +231,13 @@ TEST(TarWrite, LeereDisketteRundlaufMitSystemTar) {
         ASSERT_TRUE(v->insert(q1, FileRef{0, "a.txt"}, TransferOptions{})) << v->lastError();
         ASSERT_TRUE(v->insert(q2, FileRef{0, "dir/b.bin"}, TransferOptions{})) << v->lastError();
         EXPECT_FALSE(tarLeer(*v));
-        EXPECT_EQ(v->detection().filesystem, "tar720_leer");     // Profil bleibt bis zum Wiederoeffnen
+        EXPECT_EQ(v->detection().filesystem, "tar_ds80_9x512_leer");     // Profil bleibt bis zum Wiederoeffnen
         ASSERT_TRUE(v->flush()) << v->lastError();
         fs::remove(q1); fs::remove(q2);
     }
     auto w = oeffne(pfad, false);
     ASSERT_TRUE(w);
-    EXPECT_EQ(w->detection().filesystem, "tar720");
+    EXPECT_EQ(w->detection().filesystem, "tar_ds80_9x512");
     EXPECT_FALSE(w->readOnlyForced());                           // abgeschlossen: schreibbar
     const auto l = w->list();
     ASSERT_EQ(l.size(), 3u);

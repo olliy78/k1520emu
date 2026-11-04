@@ -86,7 +86,7 @@ BERICHTIGUNGEN = {
                 "SCP-Format 5: 80x2x16x256); 'P8000/PC1715 remote' ist die PC-Seite von "
                 "WEGA-Remote.  Die Namen '/Z/...' sind UNIX-Pfade aus der WEGA-Uebertragung.",
     "rempc171": "Nicht OS/M, sondern eine SCP-1715-Diskette (Bootkopf 03 F0, "
-                "'CCP/BDOS-V0/4 ... Soemmerda', SCP-Format 7: 80x2x5x1024), Profil scp1715.  "
+                "'CCP/BDOS-V0/4 ... Soemmerda', SCP-Format 7: 80x2x5x1024), Profil scp1715_ds80_5x1024_boot.  "
                 "'P8000/PC1715 remote' ist die PC-Seite von WEGA-Remote.",
 }
 
@@ -191,7 +191,7 @@ def befunde_von(d: DiskTool) -> list:
 def osm_hinweise(d: DiskTool, name: str, pofo_format: str) -> list:
     """Angaben zu OS/M-Disketten, soweit sauber aus dem Medium ableitbar.
 
-    Systemdiskette (Profil osm640/osm800): Urlader-Typ (FDCONF), Systemkennung in den
+    Systemdiskette (Profil osm_ds80_16x256_boot/osm_ds80_5x1024_boot): Urlader-Typ (FDCONF), Systemkennung in den
     Systemspuren, Bildschirmtreiber, Anfang der README.  Datendiskette, die die Seite als
     OS/M fuehrt, aber ohne Urlader ist: nur der Vermerk, dass das Medium es nicht belegt.
     """
@@ -385,7 +385,7 @@ def archiviere_einzel(quelle: Path, name: str, ziel: Path, meta: Meta, satz_info
                     if i < n:
                         folge = f"; setzt sich auf {nachbarn[i]}.cqm fort"
                 hinweise.append(f"Datei '{e.name}' ist auf dieser Diskette abgeschnitten{folge}")
-        if name in satz_info and satz_info[name][1] > 1 and d.filesystem != "tar720":
+        if name in satz_info and satz_info[name][1] > 1 and d.filesystem != "tar_ds80_9x512":
             hinweise.append("Diskette beginnt mitten in einer Datei des Satzes (kein tar-Kopf "
                             f"am Anfang); die Erkennung '{d.filesystem or 'keine'}' ist hier "
                             "keine Aussage ueber den Inhalt")
@@ -623,7 +623,7 @@ def schreibe_uebersicht(ziel: Path, ergebnisse: list, saetze: list, meta: Meta,
           "- Profile: " + ", ".join(f"{k} {v}" for k, v in sorted(profile.items())),
           "- Befunde der Dateisystempruefung: "
           + (", ".join(f"{v} {k}" for k, v in sev.items()) or "keine"),
-          f"- OS/M-Systemdisketten (Profil osm640/osm800, am Urlader erkannt): {len(osm)}"
+          f"- OS/M-Systemdisketten (Profil osm_ds80_16x256_boot/osm_ds80_5x1024_boot, am Urlader erkannt): {len(osm)}"
           + (f" -- {', '.join(osm)}" if osm else ""),
           "- Berichtigt (pofo fuehrt sie als OS/M, es sind PC-1715-Disketten): "
           + (", ".join(n for n in sorted(BERICHTIGUNGEN) if any(r["name"] == n for r in ergebnisse))

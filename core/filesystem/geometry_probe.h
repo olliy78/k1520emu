@@ -203,7 +203,7 @@ std::string describe(const std::vector<MeasuredTrack>& tracks);
  *
  * Die Spurbereiche werden korrekt als RECHTECKE gebildet: erst Zylinder mit gleichem
  * Kopf-Muster zusammenfassen, dann darin die Koepfe — sonst bekaeme eine gemischte
- * Geometrie (cpa780: c0h0/c0h1/c1h0 sind 128 B, c1h1 schon 1024 B) einen Bereich, den
+ * Geometrie (cpa_ds80_5x1024_boot: c0h0/c0h1/c1h0 sind 128 B, c1h1 schon 1024 B) einen Bereich, den
  * es gar nicht gibt.  Ein erkanntes Luecken-Muster wird als `step: 2` ausgedrueckt.
  *
  * @param why  Grund, wenn nichts herauskommt

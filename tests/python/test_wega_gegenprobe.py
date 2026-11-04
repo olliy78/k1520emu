@@ -34,7 +34,7 @@ def test_die_vorstufe_liest_was_der_kern_schreibt(tmp_path):
     mittel = tmp_path / "mittel.bin"
     mittel.write_bytes(bytes((i * 31 + i // 512) & 0xFF for i in range(60000)))
 
-    disk = DiskTool.create(img, "wega720", "probe")
+    disk = DiskTool.create(img, "wega_ds80_9x512", "probe")
     disk.insert(klein, "etc/motd")
     disk.insert(mittel, "usr/lib/x/mittel.bin")
     disk.flush()

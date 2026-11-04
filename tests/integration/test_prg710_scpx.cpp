@@ -12,7 +12,7 @@
  * **Befunde aus AP-P5e:**
  * - Am 710-1 laeuft `PRG710-1_SCPX_Boot` ohne jede Kernaenderung bis `A>` („SCPX 1526 -
  *   V 1.7 (52K)“), ≈ 12 Mio. Takte nach ENTER; `DIR`, `STAT`, `PIP` nach B: laufen.
- * - Die Systemspuren (`scpx640`, 16384 B) sind genau `SYL17.SYS` (Bootsektor, 256 B,
+ * - Die Systemspuren (`scpx_ds80_16x256_boot`, 16384 B) sind genau `SYL17.SYS` (Bootsektor, 256 B,
  *   Rest des ersten 512-B-Blocks AAH) + `CCPBD17.SYS` (ab Byte 512) + BIOS (ab Byte 6144,
  *   hier `B17272V2.SYS`), danach AAH.  `SYSPRG` (Bildschirm 2, Tastatur 2, Drucker 3,
  *   Format 0, Laufwerk B) schreibt im Emulator **bytegleich dieselben** Systemspuren.
@@ -167,18 +167,18 @@ std::vector<uint8_t> datei(const std::string& p) {
     return {std::istreambuf_iterator<char>(f), {}};
 }
 
-/// Leere `scpx640`-Diskette (16 × 256, Verzeichnis leer, keine Systemspuren) vom DiskTool.
+/// Leere `scpx_ds80_16x256_boot`-Diskette (16 × 256, Verzeichnis leer, keine Systemspuren) vom DiskTool.
 void leereDiskette(const std::string& pfad) {
     std::string err;
-    auto neu = DiskVolume::create(pfad, "scpx640", "", formate(), dateisysteme(), err);
+    auto neu = DiskVolume::create(pfad, "scpx_ds80_16x256_boot", "", formate(), dateisysteme(), err);
     ASSERT_NE(neu, nullptr) << err;
     ASSERT_TRUE(neu->flush()) << neu->lastError();
 }
 
-/// Inhalt einer Datei einer `scpx640`-Diskette (ueber das DiskTool).
+/// Inhalt einer Datei einer `scpx_ds80_16x256_boot`-Diskette (ueber das DiskTool).
 std::vector<uint8_t> scpxDatei(const std::string& abbild, const std::string& name) {
     std::string err;
-    auto dv = DiskVolume::open(abbild, "scpx640", formate(), dateisysteme(), err);
+    auto dv = DiskVolume::open(abbild, "scpx_ds80_16x256_boot", formate(), dateisysteme(), err);
     EXPECT_NE(dv, nullptr) << err;
     if (!dv) return {};
     TempPfad ziel("prg710_scpx_datei.bin");
@@ -188,10 +188,10 @@ std::vector<uint8_t> scpxDatei(const std::string& abbild, const std::string& nam
     return datei(ziel.get());
 }
 
-/// Systemspuren einer `scpx640`-Diskette.
+/// Systemspuren einer `scpx_ds80_16x256_boot`-Diskette.
 std::vector<uint8_t> systemspuren(const std::string& abbild) {
     std::string err;
-    auto dv = DiskVolume::open(abbild, "scpx640", formate(), dateisysteme(), err);
+    auto dv = DiskVolume::open(abbild, "scpx_ds80_16x256_boot", formate(), dateisysteme(), err);
     EXPECT_NE(dv, nullptr) << err;
     std::vector<uint8_t> b;
     if (dv) EXPECT_TRUE(dv->readBootImage(b)) << dv->lastError();
@@ -257,7 +257,7 @@ TEST_F(Prg710Scpx, Prg710_1BootetBisZumPrompt) {
  * @test Prg710Scpx.Prg710_1DirStatUndKopieNachB
  * @brief `DIR` listet die Diskette (u. a. `SYSPRG.COM`, die BIOS-Module), `STAT` meldet
  *        146k frei; `PIP B:=STAT.COM` schreibt im `/WAIT`-Betrieb auf eine leere
- *        `scpx640`-Diskette in Laufwerk 1, `DIR B:` und `STAT B:*.*` sehen sie, und das
+ *        `scpx_ds80_16x256_boot`-Diskette in Laufwerk 1, `DIR B:` und `STAT B:*.*` sehen sie, und das
  *        DiskTool findet die Kopie bytegleich zum Original.
  */
 TEST_F(Prg710Scpx, Prg710_1DirStatUndKopieNachB) {

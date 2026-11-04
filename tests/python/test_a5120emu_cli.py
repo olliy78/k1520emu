@@ -11,7 +11,7 @@ Zwei Dinge werden geprueft, die leicht still kaputtgehen:
    soll eine Zeile im Terminal ergeben — auch auf einem Rechner ohne PySide6.
 2. **Bei einem rohen `.img` entscheidet die Dateigroesse ueber das Format.** Der
    Kern prueft sie beim Mounten NICHT: ein 780K-Abbild laesst sich klaglos als
-   `cpa800` einlegen und bootet dann nicht. Genau das ist beim Bau passiert.
+   `cpa_ds80_5x1024_daten` einlegen und bootet dann nicht. Genau das ist beim Bau passiert.
 """
 
 import os
@@ -116,8 +116,8 @@ def test_auswertung_braucht_kein_pyside6():
 def test_format_wird_ueber_die_dateigroesse_gewaehlt():
     """Ein rohes .img traegt seine Geometrie nur in der Groesse.
 
-    813824 Byte = cpa780. Waehlt die Vorauswahl stattdessen die Laufwerksvorgabe
-    cpa800 (819200), gelingt das Mounten trotzdem — und die Maschine bootet nicht.
+    813824 Byte = cpa_ds80_5x1024_boot. Waehlt die Vorauswahl stattdessen die Laufwerksvorgabe
+    cpa_ds80_5x1024_daten (819200), gelingt das Mounten trotzdem — und die Maschine bootet nicht.
     """
     sys.path.insert(0, str(PROJECT_ROOT))
     from app.ui.drive_widget import _abbildgroessen

@@ -7,7 +7,7 @@
  * (Sammlung, nicht im Repo) werden zusaetzlich geprueft, wenn `K1520_MICRODOS_DIR` auf ihren
  * Ordner zeigt (sonst uebersprungen).
  *
- *  - Erkennung: SYL-Lader (acht Plaetze) = positiver Nachweis; Datendiskette bleibt cpa800.
+ *  - Erkennung: SYL-Lader (acht Plaetze) = positiver Nachweis; Datendiskette bleibt cpa_ds80_5x1024_daten.
  *  - Der Lader gehoert dem Urlader: `list`/`put`/`rm`/`attr`/`fsck` fassen ihn nicht an.
  *  - `MicroDOS.SYS` liegt an FESTEN Sektoren (c1..c4 h0, Sektor 1-4) und ist gemischt geschrieben.
  *  - boot-get -> create --boot -> boot-get ist bitgleich; fremde Lader werden abgewiesen.
@@ -123,19 +123,19 @@ std::unique_ptr<DiskVolume> neu(const TempPfad& pfad, const char* profil, const 
 
 }  // namespace
 
-/// @test Leere MicroDOS-Systemdiskette: Lader + MicroDOS.SYS, wird als microdos800 erkannt,
-///       prueft ohne Befund; ohne Lader bleibt dieselbe Geometrie cpa800.
+/// @test Leere MicroDOS-Systemdiskette: Lader + MicroDOS.SYS, wird als microdos_ds80_5x1024_boot erkannt,
+///       prueft ohne Befund; ohne Lader bleibt dieselbe Geometrie cpa_ds80_5x1024_daten.
 TEST(DisktoolMicrodos, ErzeugteSystemdisketteWirdErkanntUndPrueftSauber) {
     TempPfad pfad("k1520_microdos_neu.hfe");
     {
-        auto dv = neu(pfad, "microdos800", "boot_microdos_1526.bin");
+        auto dv = neu(pfad, "microdos_ds80_5x1024_boot", "boot_microdos_1526.bin");
         ASSERT_NE(dv, nullptr);
         EXPECT_EQ(dv->bootAreaSize(), 256u + 16384u);
         ASSERT_TRUE(dv->flush()) << dv->lastError();
     }
     auto dv = oeffne(pfad.get());
     ASSERT_NE(dv, nullptr);
-    EXPECT_EQ(dv->detection().filesystem, "microdos800");
+    EXPECT_EQ(dv->detection().filesystem, "microdos_ds80_5x1024_boot");
     EXPECT_TRUE(dv->detection().unambiguous);
     const auto liste = dv->list();
     ASSERT_EQ(liste.size(), 1u);                       // nur MicroDOS.SYS, der Lader ist keine Datei
@@ -146,17 +146,17 @@ TEST(DisktoolMicrodos, ErzeugteSystemdisketteWirdErkanntUndPrueftSauber) {
         EXPECT_EQ(0, r.zaehlerAb(FsSeverity::Warnung)) << kennungen(r);
     }
 
-    // Dieselbe Geometrie ohne Lader ist eine Datendiskette: cpa800, nicht MicroDOS.
+    // Dieselbe Geometrie ohne Lader ist eine Datendiskette: cpa_ds80_5x1024_daten, nicht MicroDOS.
     TempPfad daten("k1520_microdos_daten.hfe");
     std::string err;
-    auto d = DiskVolume::create(daten.get(), "cpa800", "", formate(), dateisysteme(), err);
+    auto d = DiskVolume::create(daten.get(), "cpa_ds80_5x1024_daten", "", formate(), dateisysteme(), err);
     ASSERT_NE(d, nullptr) << err;
     ASSERT_TRUE(lege(*d, "T.TXT", std::vector<uint8_t>(300, 'x')));
     ASSERT_TRUE(d->flush());
     d.reset();
     auto dd = oeffne(daten.get());
     ASSERT_NE(dd, nullptr);
-    EXPECT_EQ(dd->detection().filesystem, "cpa800");
+    EXPECT_EQ(dd->detection().filesystem, "cpa_ds80_5x1024_daten");
 }
 
 /// @test boot-get -> create --boot -> boot-get ist bitgleich (Lader und Systemdatei),
@@ -165,7 +165,7 @@ TEST(DisktoolMicrodos, BootabbildRundlaufUndSchreibenLaesstLaderUnangetastet) {
     TempPfad pfad("k1520_microdos_rund.hfe");
     std::vector<uint8_t> vorher;
     {
-        auto dv = neu(pfad, "microdos800", "boot_microdos_1526.bin");
+        auto dv = neu(pfad, "microdos_ds80_5x1024_boot", "boot_microdos_1526.bin");
         ASSERT_NE(dv, nullptr);
         dv->setBackup(false);
         ASSERT_TRUE(dv->readBootImage(vorher));
@@ -186,7 +186,7 @@ TEST(DisktoolMicrodos, BootabbildRundlaufUndSchreibenLaesstLaderUnangetastet) {
     }
     auto dv = oeffne(pfad.get());
     ASSERT_NE(dv, nullptr);
-    EXPECT_EQ(dv->profile().name, "microdos800");
+    EXPECT_EQ(dv->profile().name, "microdos_ds80_5x1024_boot");
     std::vector<uint8_t> nachher;
     ASSERT_TRUE(dv->readBootImage(nachher));
     EXPECT_EQ(vorher, nachher);
@@ -206,7 +206,7 @@ TEST(DisktoolMicrodos, Systemdiskette128BootabbildRundlaufUndFremdeLader) {
     const std::vector<uint8_t> bild = datei(bootBin("boot_microdos_1526_128.bin"));
     ASSERT_EQ(bild.size(), 16640u);
     {
-        auto dv = neu(pfad, "microdos128", "boot_microdos_1526_128.bin");
+        auto dv = neu(pfad, "microdos_ss40_26x128_boot", "boot_microdos_1526_128.bin");
         ASSERT_NE(dv, nullptr);
         dv->setBackup(false);
         EXPECT_EQ(dv->bootAreaSize(), 256u + 16384u);
@@ -218,7 +218,7 @@ TEST(DisktoolMicrodos, Systemdiskette128BootabbildRundlaufUndFremdeLader) {
     }
     auto dv = oeffne(pfad.get());
     ASSERT_NE(dv, nullptr);
-    EXPECT_EQ(dv->detection().filesystem, "microdos128");
+    EXPECT_EQ(dv->detection().filesystem, "microdos_ss40_26x128_boot");
     for (FsCheckLevel stufe : {FsCheckLevel::Schnell, FsCheckLevel::Voll}) {
         const FsCheckReport& r = dv->check(stufe, true);
         EXPECT_EQ(0, r.zaehlerAb(FsSeverity::Warnung)) << kennungen(r);
@@ -231,9 +231,9 @@ TEST(DisktoolMicrodos, Systemdiskette128BootabbildRundlaufUndFremdeLader) {
 
     // Die Datei darf die Systembloecke nicht erreichen: A.TXT liegt ab Block 20.
     // Fremde Lader: 1024-B-Lader auf dem 128-Profil und umgekehrt, CP/A-Lader.
-    for (const auto& z : {std::make_pair("microdos128", "boot_microdos_1526.bin"),
-                          std::make_pair("microdos800", "boot_microdos_1526_128.bin"),
-                          std::make_pair("microdos200", "boot_microdos_1526_128.bin")}) {
+    for (const auto& z : {std::make_pair("microdos_ss40_26x128_boot", "boot_microdos_1526.bin"),
+                          std::make_pair("microdos_ds80_5x1024_boot", "boot_microdos_1526_128.bin"),
+                          std::make_pair("microdos_ss40_5x1024_boot", "boot_microdos_1526_128.bin")}) {
         TempPfad p2("k1520_microdos_fremd.hfe");
         std::string err;
         auto d = DiskVolume::create(p2.get(), z.first, "", formate(), dateisysteme(), err, bootBin(z.second));
@@ -247,14 +247,14 @@ TEST(DisktoolMicrodos, Profil200KUnd1715) {
     {
         TempPfad pfad("k1520_microdos_200k.hfe");
         {
-            auto dv = neu(pfad, "microdos200", "boot_microdos_1526_200k.bin");
+            auto dv = neu(pfad, "microdos_ss40_5x1024_boot", "boot_microdos_1526_200k.bin");
             ASSERT_NE(dv, nullptr);
             ASSERT_TRUE(lege(*dv, "X.TXT", std::vector<uint8_t>(2000, 'x'))) << dv->lastError();
             ASSERT_TRUE(dv->flush());
         }
         auto dv = oeffne(pfad.get());
         ASSERT_NE(dv, nullptr);
-        EXPECT_EQ(dv->detection().filesystem, "microdos200");
+        EXPECT_EQ(dv->detection().filesystem, "microdos_ss40_5x1024_boot");
         EXPECT_EQ(dv->list().size(), 2u);
         EXPECT_EQ(0, dv->check(FsCheckLevel::Voll, true).zaehlerAb(FsSeverity::Warnung));
     }
@@ -264,7 +264,7 @@ TEST(DisktoolMicrodos, Profil200KUnd1715) {
         TempPfad pfad("k1520_microdos_1715.hfe");
         std::vector<uint8_t> vorher;
         {
-            auto dv = neu(pfad, "microdos1715", "boot_microdos_1715.bin");
+            auto dv = neu(pfad, "microdos1715_ds80_5x1024_boot", "boot_microdos_1715.bin");
             ASSERT_NE(dv, nullptr);
             EXPECT_EQ(dv->bootAreaSize(), 128u + 16384u);
             ASSERT_TRUE(dv->readBootImage(vorher));
@@ -274,7 +274,7 @@ TEST(DisktoolMicrodos, Profil200KUnd1715) {
         }
         auto dv = oeffne(pfad.get());
         ASSERT_NE(dv, nullptr);
-        EXPECT_EQ(dv->detection().filesystem, "microdos1715");
+        EXPECT_EQ(dv->detection().filesystem, "microdos1715_ds80_5x1024_boot");
         EXPECT_EQ(dv->list().size(), 2u);
         std::vector<uint8_t> nachher;
         ASSERT_TRUE(dv->readBootImage(nachher));
@@ -285,7 +285,7 @@ TEST(DisktoolMicrodos, Profil200KUnd1715) {
     }
     {
         // Nur der Kopf (128 B): ohne MICRODOS.SYS noch keine MicroDOS-Diskette; die Datei danach
-        // als ERSTE Datei einfuegen genuegt (der Kopf allein ist cpa1715).
+        // als ERSTE Datei einfuegen genuegt (der Kopf allein ist cpa1715_ds80_5x1024_boot).
         TempPfad pfad("k1520_microdos_1715k.hfe");
         std::vector<uint8_t> kopf = datei(bootBin("boot_microdos_1715.bin"));
         kopf.resize(128);
@@ -296,7 +296,7 @@ TEST(DisktoolMicrodos, Profil200KUnd1715) {
         }
         std::string err;
         {
-            auto dv = DiskVolume::create(pfad.get(), "microdos1715", "", formate(), dateisysteme(), err,
+            auto dv = DiskVolume::create(pfad.get(), "microdos1715_ds80_5x1024_boot", "", formate(), dateisysteme(), err,
                                          kopfDatei.get());
             ASSERT_NE(dv, nullptr) << err;
             EXPECT_EQ(dv->bootAreaSize(), 128u + 16384u);
@@ -305,7 +305,7 @@ TEST(DisktoolMicrodos, Profil200KUnd1715) {
         }
         auto dv = oeffne(pfad.get());
         ASSERT_NE(dv, nullptr);
-        EXPECT_EQ(dv->detection().filesystem, "microdos1715");
+        EXPECT_EQ(dv->detection().filesystem, "microdos1715_ds80_5x1024_boot");
         EXPECT_EQ(0, dv->check(FsCheckLevel::Voll, true).zaehlerAb(FsSeverity::Warnung));
     }
 }
@@ -318,7 +318,7 @@ TEST(DisktoolMicrodos, FremdesBootabbildWirdAbgewiesen) {
     schreibe(fremd.get(), syl);
     TempPfad pfad("k1520_microdos_fremd.hfe");
     std::string err;
-    auto dv = DiskVolume::create(pfad.get(), "microdos800", "", formate(), dateisysteme(), err, fremd.get());
+    auto dv = DiskVolume::create(pfad.get(), "microdos_ds80_5x1024_boot", "", formate(), dateisysteme(), err, fremd.get());
     EXPECT_EQ(dv, nullptr);
     EXPECT_NE(err.find("MicroDOS-SYL-Lader"), std::string::npos) << err;
     EXPECT_FALSE(fs::exists(pfad.get()));
@@ -330,9 +330,9 @@ TEST(DisktoolMicrodos, OriginalabzuegeDerSammlung) {
     if (!dir) GTEST_SKIP() << "K1520_MICRODOS_DIR nicht gesetzt";
     struct Z { const char* datei; const char* fs; size_t dateien; };
     const Z soll[] = {
-        {"MicroDOS1526s.hfe", "microdos800", 57}, {"MicroDOS1526p.hfe", "microdos800", 57},
-        {"MicroDOS1526s_5600.hfe", "microdos200", 13}, {"MicroDOS1526p_5600.hfe", "microdos200", 13},
-        {"MicroDOS1715.hfe", "microdos1715", 12}, {"MicroDOS1715_LW_C.hfe", "microdos1715", 13},
+        {"MicroDOS1526s.hfe", "microdos_ds80_5x1024_boot", 57}, {"MicroDOS1526p.hfe", "microdos_ds80_5x1024_boot", 57},
+        {"MicroDOS1526s_5600.hfe", "microdos_ss40_5x1024_boot", 13}, {"MicroDOS1526p_5600.hfe", "microdos_ss40_5x1024_boot", 13},
+        {"MicroDOS1715.hfe", "microdos1715_ds80_5x1024_boot", 12}, {"MicroDOS1715_LW_C.hfe", "microdos1715_ds80_5x1024_boot", 13},
     };
     for (const Z& z : soll) {
         const fs::path q = fs::path(dir) / z.datei;
@@ -359,9 +359,9 @@ std::vector<uint8_t> muster(size_t n, uint8_t salz) {
 
 /// Bootabbild + Dateisystem je Profil; die Rettungsprobe laeuft fuer alle drei.
 struct Profil { const char* fs; const char* bin; };
-const Profil kProfile[] = {{"microdos800", "boot_microdos_1526.bin"},
-                           {"microdos200", "boot_microdos_1526_200k.bin"},
-                           {"microdos1715", "boot_microdos_1715.bin"}};
+const Profil kProfile[] = {{"microdos_ds80_5x1024_boot", "boot_microdos_1526.bin"},
+                           {"microdos_ss40_5x1024_boot", "boot_microdos_1526_200k.bin"},
+                           {"microdos1715_ds80_5x1024_boot", "boot_microdos_1715.bin"}};
 
 }  // namespace
 
@@ -434,7 +434,7 @@ TEST(DisktoolMicrodos, RettungFindetGeloeschteDateienUndLaesstSystemUnberuehrt) 
 TEST(DisktoolMicrodos, GeloeschtHinweisNurBeiWiederherstellbaremRest) {
     TempPfad pfad("k1520_microdos_leerrest.hfe");
     {
-        auto dv = neu(pfad, "microdos800", "boot_microdos_1526.bin");
+        auto dv = neu(pfad, "microdos_ds80_5x1024_boot", "boot_microdos_1526.bin");
         ASSERT_NE(dv, nullptr);
         dv->setBackup(false);
         // CP/M legt keine leere Datei an; der Rest entsteht also von Hand wie auf MicroDOS1526s
@@ -482,7 +482,7 @@ TEST(DisktoolMicrodos, PruefungMeldetSystemdateiAmFalschenOrt) {
         schreibe(kopf.get(), k);
         {
             std::string err;
-            auto dv = DiskVolume::create(pfad.get(), "microdos1715", "", formate(), dateisysteme(), err, kopf.get());
+            auto dv = DiskVolume::create(pfad.get(), "microdos1715_ds80_5x1024_boot", "", formate(), dateisysteme(), err, kopf.get());
             ASSERT_NE(dv, nullptr) << err;
             dv->setBackup(false);
             ASSERT_TRUE(lege(*dv, "X.COM", muster(3000, 4))) << dv->lastError();
@@ -490,7 +490,7 @@ TEST(DisktoolMicrodos, PruefungMeldetSystemdateiAmFalschenOrt) {
             ASSERT_TRUE(dv->flush());
         }
         auto dv = oeffne(pfad.get());
-        ASSERT_EQ(dv->detection().filesystem, "microdos1715");
+        ASSERT_EQ(dv->detection().filesystem, "microdos1715_ds80_5x1024_boot");
         const std::string k1 = kennungen(dv->check(FsCheckLevel::Voll, true));
         EXPECT_NE(k1.find("cpm.system.ort"), std::string::npos) << k1;
     }
@@ -498,7 +498,7 @@ TEST(DisktoolMicrodos, PruefungMeldetSystemdateiAmFalschenOrt) {
     for (int fall = 0; fall < 2; ++fall) {
         TempPfad pfad("k1520_microdos_ort1526.hfe");
         {
-            auto dv = neu(pfad, "microdos800", "boot_microdos_1526.bin");
+            auto dv = neu(pfad, "microdos_ds80_5x1024_boot", "boot_microdos_1526.bin");
             ASSERT_NE(dv, nullptr);
             dv->setBackup(false);
             std::vector<uint8_t> sek;
@@ -532,7 +532,7 @@ TEST(DisktoolMicrodos, PruefungMeldetSystemdateiAmFalschenOrt) {
     }
     TempPfad daten("k1520_microdos_ortdaten.hfe");
     std::string err;
-    auto dd = DiskVolume::create(daten.get(), "microdos800_daten", "", formate(), dateisysteme(), err);
+    auto dd = DiskVolume::create(daten.get(), "microdos_ds80_5x1024_daten", "", formate(), dateisysteme(), err);
     ASSERT_NE(dd, nullptr) << err;
     ASSERT_TRUE(lege(*dd, "T.TXT", muster(300, 8)));
     EXPECT_EQ(kennungen(dd->check(FsCheckLevel::Voll, true)).find("cpm.system"), std::string::npos);

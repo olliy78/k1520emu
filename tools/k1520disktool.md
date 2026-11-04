@@ -88,7 +88,7 @@ nimmt zusätzlich die Medienebene dazu.
 
 ```sh
 $ k1520disktool check scp1700.hfe --full
-scp1700.hfe  scp1700_640 / scp1700  Vollpruefung
+scp1700.hfe  scp1700_640 / scp1700_ds80_16x256_boot  Vollpruefung
 
   [x] Spuren bereitstellen — was gelesen ist, wird angesehen
   [x] Verzeichnissektoren: Adressmarken und Pruefsummen
@@ -165,9 +165,9 @@ zuletzt gelösten Fremdformaten die Diagnose gewesen:
 
 ```sh
 $ k1520disktool check fremde.img
-fremde.img  cpa780 / (kein Dateisystem erkannt)  Schnellprüfung
+fremde.img  cpa_ds80_5x1024_boot / (kein Dateisystem erkannt)  Schnellprüfung
 
-Hinweis Erkennung   cpa780    erkennung.abgelehnt   Geometrie cpa780: Verzeichnisplatz 0
+Hinweis Erkennung   cpa_ds80_5x1024_boot    erkennung.abgelehnt   Geometrie cpa_ds80_5x1024_boot: Verzeichnisplatz 0
                                                     trägt Nutzerbereich 0xDC — das
                                                     Verzeichnis ist nicht angelegt
 
@@ -192,8 +192,8 @@ sich nur ein Dateisystem, das es gibt.  Die Handhaben von hier aus sind `--fs NA
 `--repair` ändert es nichts** — es ist dann `check` mit einer anderen Ausgabe:
 
 ```sh
-$ k1520disktool fsck disk.img --fs cpa780
-disk.img  cpa780 / cpa780  Schnellpruefung
+$ k1520disktool fsck disk.img --fs cpa_ds80_5x1024_boot
+disk.img  cpa_ds80_5x1024_boot / cpa_ds80_5x1024_boot  Schnellpruefung
 
 Fehler  Verwaltung   Platz 1   cpm.block.ausserhalb   CPABCGEN.COM: Blockzeiger 4080
         liegt hinter dem Datenbereich (390 Bloecke) — meist das falsche Profil
@@ -219,7 +219,7 @@ Ausgeführt wird alles Gewählte in **einem** Zug und in fester Reihenfolge (Ver
 unverändert.  Danach wird sofort neu geprüft, und die Bilanz steht am Ende:
 
 ```sh
-$ k1520disktool fsck disk.img --fs cpa780 --repair=alle
+$ k1520disktool fsck disk.img --fs cpa_ds80_5x1024_boot --repair=alle
 …
 1 Reparatur(en) ausgefuehrt.
 
@@ -242,7 +242,7 @@ nicht mehr gefunden.
 
 ```sh
 $ k1520disktool recover disk.img
-disk.img  cpa780  Verzeichnissuche
+disk.img  cpa_ds80_5x1024_boot  Verzeichnissuche
 
   0  sicher         PIP.COM                   7424  Verzeichnisplatz 15
 
@@ -296,7 +296,7 @@ Rest im Verzeichnis:
 
 ```sh
 $ k1520disktool recover udos.hfe
-udos.hfe  udos_ds77  Verzeichnissuche
+udos.hfe  udos_ds77_26x128  Verzeichnissuche
 
   0  sicher         Vol1  GERETTET.001              2048  Kopfsektor Spur 21 Sektor 6
 
@@ -372,7 +372,7 @@ behandelt sie als **ein Byteband** in einer `.bin`.
 k1520disktool boot-get tests/fixtures/disks/cpa_cpa780_k5601_noclock.hfe boot_cpa780.bin
 
 # 2. neue Diskette damit anlegen …
-k1520disktool create neu.hfe --fs cpa780 --boot boot_cpa780.bin
+k1520disktool create neu.hfe --fs cpa_ds80_5x1024_boot --boot boot_cpa780.bin
 
 # 3. … und die Systemdateien hineinkopieren (@OS.COM und der Rest)
 k1520disktool get tests/fixtures/disks/cpa_cpa780_k5601_noclock.hfe --to auszug
@@ -386,31 +386,31 @@ Wie gross die Systemspuren sind, hängt am Dateisystem — `info` sagt es:
 
 | Dateisystem | Systemspuren | woraus |
 |-------------|--------------|--------|
-| `cpa780`  | 15104 B | c0h0 + c0h1 + c1h0 (je 26×128) + c1h1 (5×1024) |
-| `scpx640` | 16384 B | 4 × 16×256 |
-| `scpx798` | 18432 B | 2 × 16×256 + 2 × 5×1024 |
+| `cpa_ds80_5x1024_boot`  | 15104 B | c0h0 + c0h1 + c1h0 (je 26×128) + c1h1 (5×1024) |
+| `scpx_ds80_16x256_boot` | 16384 B | 4 × 16×256 |
+| `scpx_ds80_5x1024_boot` | 18432 B | 2 × 16×256 + 2 × 5×1024 |
 | `udos_*`  | 13312 B | Spuren 0–2 (Urlader + Nukleus) **+ Bootspur 21**, je Seite |
-| `cpa800`  | — | keine: das Dateisystem beginnt auf Zylinder 0 |
-| `scpx8915` | 20480 B | Zylinder 0–1 beidseitig (5×1024) — K8915 |
-| `scp1715` | 20480 B | Zylinder 0–1 beidseitig (5×1024) — SCP 1715 und SCP 3.0 (PC 1715W) |
-| `cpa1715` | 128 B | **keine Spuren**: die ersten vier Verzeichnisplätze (CP/A 1715) |
-| `bcu880_syl` | 16640 B | Zylinder 0–4 (26×128): 1 = SYL-Lader, 2–4 = System — **nur Start, keine Dateien** |
-| `bcu880_kombi` | 16640 B | wie `bcu880_syl`, aber **Eigenbau mit Dateisystem ab Zylinder 5** (nur als A:) |
-| `bcu880_kombi80` | 16640 B | wie `bcu880_kombi` für **80 Spuren** (K5600.20); Arbeitsdiskette dazu `bcu880_80` (`create` verlangt `--boot`) |
-| `bcu880` | 6656 B | Zylinder 0–1 (26×128) — BCU 880 „ohne SYL“ |
+| `cpa_ds80_5x1024_daten`  | — | keine: das Dateisystem beginnt auf Zylinder 0 |
+| `scpx8915_ds80_5x1024_boot` | 20480 B | Zylinder 0–1 beidseitig (5×1024) — K8915 |
+| `scp1715_ds80_5x1024_boot` | 20480 B | Zylinder 0–1 beidseitig (5×1024) — SCP 1715 und SCP 3.0 (PC 1715W) |
+| `cpa1715_ds80_5x1024_boot` | 128 B | **keine Spuren**: die ersten vier Verzeichnisplätze (CP/A 1715) |
+| `bcu880_ss40_26x128_syl` | 16640 B | Zylinder 0–4 (26×128): 1 = SYL-Lader, 2–4 = System — **nur Start, keine Dateien** |
+| `bcu880_ss40_26x128_kombi` | 16640 B | wie `bcu880_ss40_26x128_syl`, aber **Eigenbau mit Dateisystem ab Zylinder 5** (nur als A:) |
+| `bcu880_ss80_26x128_kombi` | 16640 B | wie `bcu880_ss40_26x128_kombi` für **80 Spuren** (K5600.20); Arbeitsdiskette dazu `bcu880_ss80_26x128_arbeit` (`create` verlangt `--boot`) |
+| `bcu880_ss40_26x128_arbeit` | 6656 B | Zylinder 0–1 (26×128) — BCU 880 „ohne SYL“ |
 
 ### BCU 880 (frühe A5120)
 
-Zwei Aufbauten (`doc/a5120_alt/bcu.md` §11).  Die **Startdiskette „SYL auf Spur 1“** (`bcu880_syl`) wird am
+Zwei Aufbauten (`doc/a5120_alt/bcu.md` §11).  Die **Startdiskette „SYL auf Spur 1“** (`bcu880_ss40_26x128_syl`) wird am
 SYL-Lader auf Zylinder 1 erkannt; sie ist eine reine Startdiskette — `put`/`rm`/`attr` werden verweigert
 (BCU sucht sein Verzeichnis ab Zylinder 2, dort liegt das System), `boot-get`/`boot-put`/`create --boot`
-gehen.  Die **Arbeitsdiskette „ohne SYL“** (`bcu880`, System auf Zylinder 0–1, Dateien ab Zylinder 2) ist
+gehen.  Die **Arbeitsdiskette „ohne SYL“** (`bcu880_ss40_26x128_arbeit`, System auf Zylinder 0–1, Dateien ab Zylinder 2) ist
 eine gewöhnliche Dateidiskette.  Das Bootabbild wird vor dem Schreiben geprüft (SYL-Lader samt
 Selbstprüfung bzw. Kennung „BCU 880“):
 
 ```sh
-k1520disktool create start.hfe  --fs bcu880_syl --boot data/bootsektoren/boot_bcu12_syl_k7023.bin   # K7024: …_k7024.bin
-k1520disktool create arbeit.hfe --fs bcu880     --boot data/bootsektoren/boot_bcu12_ohnesyl.bin
+k1520disktool create start.hfe  --fs bcu880_ss40_26x128_syl --boot data/bootsektoren/boot_bcu12_syl_k7023.bin   # K7024: …_k7024.bin
+k1520disktool create arbeit.hfe --fs bcu880_ss40_26x128_arbeit     --boot data/bootsektoren/boot_bcu12_ohnesyl.bin
 k1520disktool put arbeit.hfe PIP.COM STAT.COM
 ```
 
@@ -418,15 +418,15 @@ k1520disktool put arbeit.hfe PIP.COM STAT.COM
 
 Die Systemspuren des K8915 sind Zylinder 0–1 beidseitig (5×1024, 20480 B) mit dem
 **Ladekopf** in den ersten 16 Byte von Sektor 1 (CRC-CCITT, Ergebnis 0).  Der Name
-`scpx8915` ist nötig — ohne ihn hält das Werkzeug eine leere 5×1024-Diskette für eine
+`scpx8915_ds80_5x1024_boot` ist nötig — ohne ihn hält das Werkzeug eine leere 5×1024-Diskette für eine
 CP/A-Datendiskette ab Zylinder 0 (keine Systemspuren):
 
 ```sh
 k1520disktool boot-get disk900.hfe boot.bin                  # oder data/bootsektoren/boot_scpx8915_55k.bin
-k1520disktool create neu.hfe --fs scpx8915 --boot boot.bin   # .img geht ebenso
+k1520disktool create neu.hfe --fs scpx8915_ds80_5x1024_boot --boot boot.bin   # .img geht ebenso
 k1520disktool put neu.hfe auszug                             # Systemprogramme (DISGEN, FORMAT …)
 # eine mit FORMAT.COM formatierte Diskette nachträglich bootfähig machen:
-k1520disktool boot-put formatiert.hfe boot.bin --fs scpx8915
+k1520disktool boot-put formatiert.hfe boot.bin --fs scpx8915_ds80_5x1024_boot
 ```
 
 Ein Abbild ohne gültigen Ladekopf — etwa ein CP/A-Abbild des A5120 — oder kürzer als
@@ -438,8 +438,8 @@ Ein **kürzeres** Abbild ist erlaubt (der Rest bleibt formatierte Leerspur), ein
 **längeres** ist ein Fehler — und zwar bevor irgendetwas angelegt wird:
 
 ```
-$ k1520disktool create neu.hfe --fs cpa780 --boot zu_gross.bin
-Fehler: Das Bootabbild ist 20000 Byte gross, die Systemspuren von 'cpa780'
+$ k1520disktool create neu.hfe --fs cpa_ds80_5x1024_boot --boot zu_gross.bin
+Fehler: Das Bootabbild ist 20000 Byte gross, die Systemspuren von 'cpa_ds80_5x1024_boot'
         fassen aber nur 15104 Byte.
 ```
 
@@ -450,7 +450,7 @@ allein meldet er `OS NOT FOUND`. Eine vollständige, laufende Diskette entsteht 
 
 ```sh
 k1520disktool get    udos_boot_scp.hfe --to auszug     # Dateien + Angaben
-k1520disktool create neu.hfe --fs udos_ds77 --label UDOS.SYS.4.3 --boot boot_udos43.bin
+k1520disktool create neu.hfe --fs udos_ds77_26x128 --label UDOS.SYS.4.3 --boot boot_udos43.bin
 k1520disktool put    neu.hfe auszug
 ```
 
@@ -463,7 +463,7 @@ Die **Angaben aus `get` müssen dabei sein** (s. u.) — das `.fileinfo` neben j
 Datei und das Sammelbeiblatt: ohne die Kopfsektorangaben wird aus einer Systemdatei
 eine gewöhnliche Binärdatei, und die Diskette bootet nicht.
 
-### PC 1715 / PC 1715W (`scp1715`, `cpa1715`)
+### PC 1715 / PC 1715W (`scp1715_ds80_5x1024_boot`, `cpa1715_ds80_5x1024_boot`)
 
 `doc/design/21_pc1715.md` AP-D, Befund `doc/pc1715/disketten.md`.  Der Urlader S502 prüft von
 Spur 0 Sektor 1 **nur das Wort `F002H`/`F003H`** (Bytes `02|03 F0`); beide Profile haben
@@ -472,39 +472,39 @@ Spur 0 Sektor 1 **nur das Wort `F002H`/`F003H`** (Bytes `02|03 F0`); beide Profi
 einen 1715-Kopf trägt (auch unter dem abgeleiteten Profil `cpa_auto`).
 
 * **SCP 1715 / SCP 3.0** — vier Systemspuren (20480 B), wie bei den anderen CP/M-Systemen:
-  `boot-get` holt sie, `create neu.hfe --fs scp1715 --boot band.bin` legt die Diskette an,
+  `boot-get` holt sie, `create neu.hfe --fs scp1715_ds80_5x1024_boot --boot band.bin` legt die Diskette an,
   dann die Dateien hinein (`insertAll`/`put`).  SCP 3.0 des 1715W geht denselben Weg
-  (Wächter bootet beide Maschinen bis `A>`).  `scp1715` wird nie erkannt (`detect: false`);
+  (Wächter bootet beide Maschinen bis `A>`).  `scp1715_ds80_5x1024_boot` wird nie erkannt (`detect: false`);
   bestehende Disketten liest die CP/A-Regel als `cpa_auto`.  Zweites Format (SCP V0007,
-  16×256): `scpx640` — dort gibt es keinen `boot_header`, geprüft wird erst auf einer
+  16×256): `scpx_ds80_16x256_boot` — dort gibt es keinen `boot_header`, geprüft wird erst auf einer
   Diskette, die schon einen 1715-Kopf trägt.
 * **CP/A 1715 ohne Systemspuren** (`CPA_MAXI`, `BOOT_CPA_4LW`) — der Bootkopf steht im
   **Verzeichnis**: Platz 0 = Kopf, ein Platz mit Nutzerbyte `F0` (Platz 3) = Parametersätze
-  ab Byte 0x64.  `cpa1715` (`dir_boot: true`) erkennt die Diskette (nur mit dem Kopf; ohne
-  ihn bleibt es `cpa800`), `ls`/`get`/`check` übergehen beide Plätze, `put`/`rm`/`attr`
+  ab Byte 0x64.  `cpa1715_ds80_5x1024_boot` (`dir_boot: true`) erkennt die Diskette (nur mit dem Kopf; ohne
+  ihn bleibt es `cpa_ds80_5x1024_daten`), `ls`/`get`/`check` übergehen beide Plätze, `put`/`rm`/`attr`
   fassen sie nie an.  Bootabbild = **128 B** (`boot-get`): beim Einspielen werden nur Platz 0
   und die `F0`-Plätze übernommen; steht dort ein Dateieintrag, wird verweigert.  Bootfähige
-  Diskette: `boot-get` → `create --fs cpa1715 --boot kopf.bin` → **`@OS.COM` als erste
+  Diskette: `boot-get` → `create --fs cpa1715_ds80_5x1024_boot --boot kopf.bin` → **`@OS.COM` als erste
   Datei** (der Kopf lädt es ab Block 3) → weitere Dateien.
 * **CP/M-3-Sonderplätze** (SCP 3.0): Zeitstempel (21H, vierter Platz einer Vierergruppe),
   Etikett (20H), Kennwortsätze (16…31) sind keine Dateien, `put` vergibt sie nie, die
   Erkennung nimmt sie an; die Prüfung nennt sie als **Hinweis** (`cpm.dir.sonderplatz`,
   Schwere Info), nicht als Befund.
 
-Wächter: `DisktoolPc1715.*` (8), `cli_dt_*cpa1715*`, `cli_dt_boot_put_pc1715_a5120_abbild`.
+Wächter: `DisktoolPc1715.*` (8), `cli_dt_*cpa1715_ds80_5x1024_boot*`, `cli_dt_boot_put_pc1715_a5120_abbild`.
 
-### OS/M (P8000, `osm640`, `osm800`)
+### OS/M (P8000, `osm_ds80_16x256_boot`, `osm_ds80_5x1024_boot`)
 
 Entwurf `doc/design/34_osm.md`.  Beide Profile haben `boot_header: osm`: das Bootabbild muss
 den **OS/M-Urlader** tragen (Sektor 1: Code `FD 21 48 0C 31 00 40 3A 7E 0C`, Kennung
 `P8000SYS` bei 0x80), sein FDCONF-Typ (Byte 0x7E, Bits 0–3) muss zur Geometrie passen
 (640K = Typ 5, 800K = Typ 7) und es muss die 28H Sätze zu 256 B (10 KB) enthalten, die der
 Urlader lädt.  Ein UDOS-, SCP- oder CP/A-Abbild wird VOR dem Schreiben abgewiesen, ebenso bei
-`boot-put` auf eine Diskette, die den OS/M-Urlader schon trägt (auch unter `--fs scpx640`).
+`boot-put` auf eine Diskette, die den OS/M-Urlader schon trägt (auch unter `--fs scpx_ds80_16x256_boot`).
 
 ```
 $ k1520disktool boot-get osmspiel.cqm osm800.bin          # 20480 B Systemzylinder 0-1
-$ k1520disktool create neu.img --fs osm800 --boot osm800.bin
+$ k1520disktool create neu.img --fs osm_ds80_5x1024_boot --boot osm800.bin
 $ k1520disktool put neu.img datei.txt                      # landet ab Zylinder 2
 ```
 
@@ -513,7 +513,7 @@ Wächter: `OsmProfile.*`, `cli_dt_create_boot_osm800`, `cli_dt_create_boot_osm_f
 ### PRG 710 / PRG 710-1
 
 Systemdisketten des Robotron PRG 710 und 710-1 (`doc/design/20_prg710.md` §5, AP-P6):
-UDOS 4.3 (`udos_ds77`, 77 Spuren MFM beidseitig) und SCPX 1526 (`scpx640`, 16×256).
+UDOS 4.3 (`udos_ds77_26x128`, 77 Spuren MFM beidseitig) und SCPX 1526 (`scpx_ds80_16x256_boot`, 16×256).
 Das Werkzeug unterscheidet **beide Geräte**, denn Tastatur- und MKE-Treiber stehen im
 Bootabbild (710: 8279 an C8H/C9H, 710-1: K7672 an der K8025 5CH–5FH) — ein Abbild der
 falschen Fassung liest sich fehlerfrei und startet am Gerät nicht.  Erkannt wird am
@@ -523,7 +523,7 @@ Tastatur im BIOS (8279 → 710, sonst K7672 → 710-1).  `info` zeigt es an:
 `Systemspuren: 13 KB, beschrieben, UDOS fuer PRG 710-1`.
 
 **UDOS** geht wie oben: Bootabbild und Dateien aus einer PRG-Diskette holen (`boot-get`,
-`get`), `create --fs udos_ds77 --boot …`, `put`.  Beide Seiten werden angelegt (UDOS liest
+`get`), `create --fs udos_ds77_26x128 --boot …`, `put`.  Beide Seiten werden angelegt (UDOS liest
 beim ersten Zugriff auch Seite 1; eine unformatierte Seite hängt den Resident).  Mindestens
 nötig auf Seite 0: `OS`, `ZDOS`, `OS.INIT`, `DO`, `DATE`.
 
@@ -533,7 +533,7 @@ nötig auf Seite 0: `OS`, `ZDOS`, `OS.INIT`, `DO`, `DATE`.
 k1520disktool get prg710-1_scpx.hfe SYL17.SYS CCPBD17.SYS B152V24.SYS --to module
 # BIOS: B15x (V1.5) und B17x09 = PRG 710, B17x72 = PRG 710-1; das Gerät wird am BIOS erkannt
 k1520disktool boot-scpx module/SYL17.SYS module/CCPBD17.SYS module/B152V24.SYS band.bin --prg 710
-k1520disktool create neu.hfe --fs scpx640 --boot band.bin --prg 710
+k1520disktool create neu.hfe --fs scpx_ds80_16x256_boot --boot band.bin --prg 710
 k1520disktool put neu.hfe auszug                     # STAT.COM, PIP.COM, …
 ```
 
@@ -621,7 +621,7 @@ Findet sich nichts davon, bricht `put` bei UDOS **ab**, statt zu raten:
 ```
 $ k1520disktool put udos.hfe NEU.DAT
 Fehler: Zu 'NEU.DAT' gibt es keine Angaben (weder NEU.DAT.fileinfo noch
-        udos-dateiangaben.txt). udos_ds77 braucht Typ, Satzlaenge und — bei einem
+        udos-dateiangaben.txt). udos_ds77_26x128 braucht Typ, Satzlaenge und — bei einem
         Programm — Startadresse und Speicherangaben; ohne sie entstuende eine
         Datei, die nicht laeuft. …
 ```
@@ -742,41 +742,41 @@ Bei einem Dateisystem (jede CP/M-Diskette, auch beidseitige) ist der Ordner flac
 
 ## SCP1700 — das CP/M-86 des A7100
 
-Disketten des 16-Bit-Rechners **A7100** werden als `scp1700` erkannt.  Ihr
+Disketten des 16-Bit-Rechners **A7100** werden als `scp1700_ds80_16x256_boot` erkannt.  Ihr
 Dateisystem ist gewöhnliches CP/M — Verzeichnis, Extents, Attribute, Nutzerbereich
 verhalten sich wie bei einer CP/A-Diskette, und `.CMD`-Dateien sind einfach Dateien.
 
 Besonders ist die **Physik**: Spur 0 Kopf 0 ist in FM mit **halber Datenrate**
 aufgezeichnet (16 Sektoren à 128 B), alle übrigen 159 Spuren in MFM (16 × 256 B).
 Das Werkzeug führt diese Rate je Spur mit, auch beim Zurückschreiben — eine mit
-`create --fs scp1700` angelegte Diskette bekommt eine echte FM-Bootspur.
+`create --fs scp1700_ds80_16x256_boot` angelegte Diskette bekommt eine echte FM-Bootspur.
 
 ```
 $ k1520disktool ls     a7100.hfe
-$ k1520disktool create neu.hfe --fs scp1700
+$ k1520disktool create neu.hfe --fs scp1700_ds80_16x256_boot
 ```
 
 Hintergrund und Messwerte: `doc/scp1700_diskettenformat.md`.
 
-## OS/M — das CP/M des P8000 (`osm640`, `osm800`)
+## OS/M — das CP/M des P8000 (`osm_ds80_16x256_boot`, `osm_ds80_5x1024_boot`)
 
 OS/M 3.0 (8-Bit-Teil des P8000) ist **CP/M 2.2** auf den SCP-Formaten des PC 1715:
 Zylinder 0–1 System, Verzeichnis ab c2h0, 2-KB-Blöcke, 128 Plätze, kein Versatz —
 Format 5 (16×256, 640K) und Format 7 (5×1024, 800K).  Gelesen wurden solche Disketten
-schon immer richtig (als `scpx640` bzw. `cpa_auto`); die Profile bringen den Namen, die
+schon immer richtig (als `scpx_ds80_16x256_boot` bzw. `cpa_auto`); die Profile bringen den Namen, die
 Bootabbild-Prüfung und die leere 800K-Diskette.
 
 * **Erkannt wird nur mit Urlader** in c0h0 Sektor 1 (s. o.).  Eine Datendiskette ohne
-  Urlader bleibt `scpx640`/`cpa_auto`/`cpa800` — das Medium unterscheidet sie nicht von
+  Urlader bleibt `scpx_ds80_16x256_boot`/`cpa_auto`/`cpa_ds80_5x1024_daten` — das Medium unterscheidet sie nicht von
   einer SCP-Diskette, „OS/M" wäre geraten.  Der UDOS-Urlader des P8000 trägt dieselbe
   Kennung `P8000SYS`, aber anderen Code; er zählt nicht.
-* **Deckungsgleich ist nicht mehrdeutig**: eine 640K-Systemdiskette passt auf `osm640`
-  UND `scpx640` (gleiche Lage, Blöcke, Plätze).  Es gewinnt das Profil mit positivem
+* **Deckungsgleich ist nicht mehrdeutig**: eine 640K-Systemdiskette passt auf `osm_ds80_16x256_boot`
+  UND `scpx_ds80_16x256_boot` (gleiche Lage, Blöcke, Plätze).  Es gewinnt das Profil mit positivem
   Nachweis, eindeutig; die Gegenprobe läuft nicht.
 * **Die leere 800K-Diskette** (OS/M-`FORMAT` schreibt nur 0xE5) ist Sektor für Sektor eine
-  leere `cpa800` (Verzeichnis ab c0h0, 192 Plätze).  `info` nennt dann „ebenso gut osm800 …
-  dafür --fs osm800".  Wer sie für OS/M füllt, sagt `--fs osm800` bzw. legt sie mit
-  `create --fs osm800` an — sonst landet das erste `put` in den Systemzylindern.  Danach
+  leere `cpa_ds80_5x1024_daten` (Verzeichnis ab c0h0, 192 Plätze).  `info` nennt dann „ebenso gut osm_ds80_5x1024_boot …
+  dafür --fs osm_ds80_5x1024_boot".  Wer sie für OS/M füllt, sagt `--fs osm_ds80_5x1024_boot` bzw. legt sie mit
+  `create --fs osm_ds80_5x1024_boot` an — sonst landet das erste `put` in den Systemzylindern.  Danach
   (Dateien ab c2h0, Systemzylinder leer) liest die CP/A-Regel sie von selbst richtig
   (`cpa_auto`, Verzeichnis ab c2h0).
 * **Prüfung**: `osm.fdconf` (Warnung), wenn der FDCONF-Typ des Urladers (A:) nicht zur
@@ -793,13 +793,13 @@ von selbst (`cpa_auto`, 4 Systemspuren, 128 Plätze), sobald die Diskette System
 trägt oder der K8915 darauf geschrieben hat; B: in 16×256 ohnehin immer.
 
 Die Ausnahme ist eine **leere**, frisch formatierte 5×1024-Diskette: Sektor für Sektor
-dieselbe wie eine leere CP/A-Datendiskette.  Das Werkzeug nimmt dann `cpa800`
+dieselbe wie eine leere CP/A-Datendiskette.  Das Werkzeug nimmt dann `cpa_ds80_5x1024_daten`
 (Verzeichnis ab Zylinder 0, 192 Plätze) und sagt es:
 
 ```
 $ k1520disktool info leer.hfe
-Dateisystem: cpa800
-Medium:      Verzeichnis leer — ebenso gut scpx8915 (…); dafuer --fs scpx8915
+Dateisystem: cpa_ds80_5x1024_daten
+Medium:      Verzeichnis leer — ebenso gut scpx8915_ds80_5x1024_boot (…); dafuer --fs scpx8915_ds80_5x1024_boot
 ```
 
 Soll sie für den K8915 gefüllt werden, **muss** es beim ersten Schreiben gesagt werden —
@@ -807,18 +807,18 @@ sonst liegt das Verzeichnis dort, wo der K8915 seine Systemspuren erwartet, und 
 keine Datei:
 
 ```
-$ k1520disktool put leer.hfe BRIEF.TXT --fs scpx8915
-$ k1520disktool create neu.hfe --fs scpx8915
+$ k1520disktool put leer.hfe BRIEF.TXT --fs scpx8915_ds80_5x1024_boot
+$ k1520disktool create neu.hfe --fs scpx8915_ds80_5x1024_boot
 ```
 
-Danach erkennt das Werkzeug die Diskette ohne `--fs`.  `scpx8915` selbst wird nie
+Danach erkennt das Werkzeug die Diskette ohne `--fs`.  `scpx8915_ds80_5x1024_boot` selbst wird nie
 erkannt (`detect: false` im Katalog), eine CP/A-Diskette geht also nie als K8915-Diskette
 durch.
 
 ## UDOS1715 — dieselbe Familie, anderes Dateisystem
 
 Disketten des **PC 1715** tragen UDOS mit dem Treiber **NDOS**; erkannt werden sie
-als `udos1715`.  Der Grund für den Unterschied ist der µPD765-Controller des
+als `udos1715_ds80_16x256`.  Der Grund für den Unterschied ist der µPD765-Controller des
 PC 1715: er kann nichts hinter die Daten-CRC schreiben, also steht die Verkettung
 in eigenen *Zeigersektoren* innerhalb der Diskette.  Fürs Werkzeug heißt das:
 
@@ -832,17 +832,17 @@ in eigenen *Zeigersektoren* innerhalb der Diskette.  Fürs Werkzeug heißt das:
 
 ```
 $ k1520disktool ls     pc1715.img
-$ k1520disktool create neu.img --fs udos1715 --label SYSTEM
+$ k1520disktool create neu.img --fs udos1715_ds80_16x256 --label SYSTEM
 $ k1520disktool put    neu.img auszug/
 ```
 
 | Dateisystem | Format | Kapazität |
 |-------------|--------|-----------|
-| `udos1715` | 80 Spuren doppelseitig, 16×256 | 640 KB |
-| `udos1715_ss80` | 80 Spuren einseitig, 16×256 | 320 KB |
-| `udos1715_ss40` | 40 Spuren einseitig, 16×256 | 160 KB |
-| `udos_p8000` | wie `udos1715`, Füllung des **P8000** (UDOS 2.2) | 640 KB |
-| `udos50` | wie `udos1715`, Füllung des **A5120 unter UDOS 5.0** | 640 KB |
+| `udos1715_ds80_16x256` | 80 Spuren doppelseitig, 16×256 | 640 KB |
+| `udos1715_ss80_16x256` | 80 Spuren einseitig, 16×256 | 320 KB |
+| `udos1715_ss40_16x256` | 40 Spuren einseitig, 16×256 | 160 KB |
+| `udos_p8000_ds80_16x256` | wie `udos1715_ds80_16x256`, Füllung des **P8000** (UDOS 2.2) | 640 KB |
+| `udos50_ds80_16x256` | wie `udos1715_ds80_16x256`, Füllung des **A5120 unter UDOS 5.0** | 640 KB |
 
 Die drei 640-KB-Profile beschreiben dieselbe Diskette.  Unterschieden werden sie an
 **einer** Stelle: Spur 17H (23), Sektor 0 — dem ersten Sektor des Belegungsplans —,
@@ -953,7 +953,7 @@ Zwei Dinge, die dabei auffallen können:
   keine Diskette sein kann (**FAT16/FAT32**, BPB ohne Sinn).  Gewöhnliche DOS-Disketten (FAT12) liest und
   schreibt das Werkzeug, s. „MS-DOS / PC-DOS / DCP (FAT12)".
 
-## MS-DOS / PC-DOS / DCP (FAT12) — `dos160 … dos2880`
+## MS-DOS / PC-DOS / DCP (FAT12) — `dos_ss40_8x512 … dos_ds80_36x512_ed`
 
 Jede Diskette, die ein DOS (PC-DOS, MS-DOS, DCP des A7150/PC 1834, Windows) angelegt hat: 160K, 180K, 320K, 360K (40×2 und
 80×1), 640K, 720K, 800K, 1,2M, 1,44M, 2,88M.  Die Lage steht im **BPB** des Bootsektors, nicht im Katalog; BPB-lose Disketten
@@ -986,10 +986,10 @@ k1520disktool attr dos.img IO.SYS --ro --hid --sys       # --arc, --mtime SEKUND
 
 ```sh
 # wie DOS `SYS`: Bootsektor + Systemdateien einer Systemdiskette auf eine LEERE Diskette
-k1520disktool create neu.img --fs dos720 --label MEINE
+k1520disktool create neu.img --fs dos_ds80_9x512 --label MEINE
 k1520disktool sys    neu.img a7150_dcp33.hfe              # IO.SYS + DCDOS.SYS, Attribute und Zeit bleiben
 # oder von Hand: hinterlegter Lader, danach die Systemdateien in der Reihenfolge, die der Lader sucht
-k1520disktool create neu.img --fs dos720 --boot data/bootsektoren/boot_dos_dcp33_a7150.bin
+k1520disktool create neu.img --fs dos_ds80_9x512 --boot data/bootsektoren/boot_dos_dcp33_a7150.bin
 k1520disktool put neu.img IO.SYS DCDOS.SYS ; k1520disktool attr neu.img IO.SYS --ro --hid --sys
 k1520disktool boot-get a7150_dcp33.hfe lader.bin             # den Bootsektor einer vorhandenen Diskette sichern
 ```
@@ -1012,10 +1012,10 @@ Formate", "… Sektorkontrollbloecke von UDOS …", "… nur MFM …", "… unfo
 unveraendert.  Kommentar, Bezeichnung, Etikett, Interleave/Skew eines geladenen Abbilds
 bleiben erhalten (auch bei `save-as x.cqm y.cqm`); ueber `.hfe` und zurueck gehen sie
 verloren (neuer Standardkopf).  Nicht moeglich: UDOS (Gap-Verkettung), CP/A-Disketten mit
-128-B-Systemspuren (gemischte Geometrie, z. B. `create … --fs cpa780`), FM-Disketten.
+128-B-Systemspuren (gemischte Geometrie, z. B. `create … --fs cpa_ds80_5x1024_boot`), FM-Disketten.
 
 ```
-k1520disktool create neu.cqm --fs scpx640
+k1520disktool create neu.cqm --fs scpx_ds80_16x256_boot
 k1520disktool put neu.cqm PIP.COM
 k1520disktool save-as alt.hfe kopie.cqm      # und zurueck: save-as kopie.cqm neu.hfe
 ```
@@ -1036,14 +1036,14 @@ in einer Spur.  Eine leere (unformatierte) Diskette laesst sich in diesen Contai
 
 ```
 k1520disktool info scp07.td0
-k1520disktool create neu.imd --fs scpx640
+k1520disktool create neu.imd --fs scpx_ds80_16x256_boot
 k1520disktool save-as scp07.td0 scp07.hfe     # und zurueck: save-as scp07.hfe kopie.td0
 ```
 
 ## tar-Disketten und `tar-satz`
 
 84 der 142 P8000-Abbilder (`doc/design/35_cqm.md` §4a) tragen einen rohen `tar`-Strom ab
-Sektor 0 statt eines Dateisystems. Profil `tar720` (auch in einer `.cqm`). **Schreibbar ist ein abgeschlossenes Archiv** (Kopf bei
+Sektor 0 statt eines Dateisystems. Profil `tar_ds80_9x512` (auch in einer `.cqm`). **Schreibbar ist ein abgeschlossenes Archiv** (Kopf bei
 Sektor 0 UND Endmarke) und die leere tar-Diskette — eine tar-Diskette ist ein **Satz mit einem Abbild**
 (Entwurf 37, Vereinheitlichung): `put`/`rm`/`mkdir`/`attr` bauen den Strom aus dem
 Archivmodell (`TarArchiv`) jedes Mal NEU (V7-Köpfe, Namen ≤ 100, Verzeichnisse als Typ `5`, `.fileinfo`
@@ -1052,7 +1052,7 @@ Archiv ohne Endmarke bleiben nur lesbar (die Meldung nennt den Weg). Die Änderu
 geht mit dem Speichern (jedes Kommando, das schreibt, ruft `flush`) in **dasselbe Abbild** zurück
 (Container und Format bleiben, `<abbild>~` einmal je Sitzung); passt der neue Strom nicht mehr auf
 EINE Diskette, meldet das Speichern den Weg (`tar-satz-save … -o`, nummerierte Abbilder) und schreibt nichts. `create` eines belegten
-`tar720` bleibt unmöglich, Erkennung zuletzt, nach CP/A-Regel und allen echten
+`tar_ds80_9x512` bleibt unmöglich, Erkennung zuletzt, nach CP/A-Regel und allen echten
 Dateisystemen. `ls -l`, `get`, `info`, `check` wie bei WEGA (UNIX-Spalten, `.fileinfo`
 mit `fs=tar`). Befunde: `tar.abgeschnitten` (Warnung; Teilstück bleibt lesbar),
 `tar.fortsetzung`, `tar.pruefsumme` (Fehler), `tar.doppelt`, `tar.pfad` (Hinweis).
@@ -1076,7 +1076,7 @@ k1520disktool tar-satz-save satz1.hfe satz2.hfe -o neu.cqm --dry-run   # nur den
 Der Satz wird als Ganzes geoeffnet (ein Strom im Speicher); die Schritte `--put QUELLE[=ZIEL]` (Ordner =
 `insertAll`), `--rm NAME`, `--mkdir NAME`, `--attr NAME` (mit `--mode/--uid/--gid/--mtime`) laufen in der
 Reihenfolge der Kommandozeile, ohne Diskettengroessen-Grenze.  Gespeichert wird auf Abbilder GLEICHEN Formats
-(einheitliche Katalogformate: `tar-satz-neu` lehnt gemischte wie `cpa780` ab): die Nummer steht am Ende des
+(einheitliche Katalogformate: `tar-satz-neu` lehnt gemischte wie `cpa_ds80_5x1024_boot` ab): die Nummer steht am Ende des
 Basisnamens **vor** der Endung (`name1.hfe`, `name2.hfe`, …; Container je Endung `.img|.hfe|.dmk|.cqm`), das letzte
 Abbild ist mit Nullen aufgefuellt.  Ohne `-o` gelten die Namen des Satzes (Ziffern am Ende des ersten Abbilds
 entfallen: `ariane1.cqm` → `ariane.cqm`).  Gespeichert wird alles-oder-nichts (erst Hilfsdateien, dann
@@ -1087,39 +1087,39 @@ oeffnen, je Abbild schreiben.  Kern-API: `DiskVolume::tarSatzNeu/tarZuSatz/tarSa
 Ein `.img` mit kleiner, mehrdeutiger Geometrie wird beim Oeffnen geraten (Abbild hat keine Geometrie) — fuer
 Saetze `.hfe/.dmk/.cqm` bevorzugen.
 
-### tar im MUTOS-8000-Layout (`tar_mutos8k_26x128_mfm`, `tar_mutos8k_26x128_fm`)
+### tar im MUTOS-8000-Layout (`tar_ss77_26x128`, `tar_fm_ss77_26x128`)
 
 Die alten Namen (`mutos8k_fm`, `mutos8k_mfm`, `mutos77`, `mutos80`, `tar_mutos8k_{fm,mfm}[_leer]`) gelten als Alias (`aliases:` in `data/formats.yaml`, `FsCatalog::find`; Wächter `FsCatalog.AlteProfilnamenLoesenAlsAliasAufDasNeueProfilAuf`), stehen aber in keiner Liste und nie als Erkennungsergebnis.
 
 Das `tar` des MUTOS schreibt auf das Rohgeraet `/dev/rrkN` — in der Blockabbildung `Mutos8kDev` (ab Zylinder 1, verschraenkt), 494 Bloecke = 252 928 B je Diskette —, NICHT
-linear ab Zylinder 0 wie `tar720`.  Dafuer gibt es die Profile `tar_mutos8k_26x128_mfm` (K5601, Format `udos_ss77`) und `tar_mutos8k_26x128_fm` (8″, `mf3200_26x128`), je mit `…_leer`.  Gelesen und
+linear ab Zylinder 0 wie `tar_ds80_9x512`.  Dafuer gibt es die Profile `tar_ss77_26x128` (K5601, Format `udos_ss77_26x128`) und `tar_fm_ss77_26x128` (8″, `mf3200_26x128`), je mit `…_leer`.  Gelesen und
 geschrieben wie jede tar-Diskette; das Layout erkennt `tar-satz`/`info` am ersten Abbild von selbst (tar-Kopf bei Block 0):
 
 ```
 k1520disktool tar-formate                                     # nennt beide Profile (252928 B)
-k1520disktool create leer.hfe --fs tar_mutos8k_26x128_mfm_leer       # leere tar-Diskette (Datenbereich Null, Zyl. 0 bleibt E5); fm: tar_mutos8k_26x128_fm_leer
-k1520disktool tar-satz-neu --format tar_mutos8k_26x128_mfm satz.hfe --put a.bin --put b.bin    # -> satz1.hfe, satz2.hfe, …  (je 494 Bloecke)
+k1520disktool create leer.hfe --fs tar_ss77_26x128_leer       # leere tar-Diskette (Datenbereich Null, Zyl. 0 bleibt E5); fm: tar_fm_ss77_26x128_leer
+k1520disktool tar-satz-neu --format tar_ss77_26x128 satz.hfe --put a.bin --put b.bin    # -> satz1.hfe, satz2.hfe, …  (je 494 Bloecke)
 k1520disktool tar-satz mutos1.hfe mutos2.hfe -l               # von MUTOS (tar cf - | dd) geschriebener Satz
-k1520disktool tar-satz mutos1.hfe mutos2.hfe --format tar_mutos8k_26x128_mfm   # Layout vorgeben (z. B. .img, FM)
+k1520disktool tar-satz mutos1.hfe mutos2.hfe --format tar_ss77_26x128   # Layout vorgeben (z. B. .img, FM)
 ```
 Unter MUTOS: `tar tvf /dev/rrk0`, `tar xvf /dev/rrk0`; ein Satz ueber `(dd if=/dev/rrk0 bs=512 count=494; <Diskette tauschen>; dd …) | tar xvf -`.  Ein `.img` ist ohne Angabe MFM.
 Einzelheiten, Fallen (`tape read error` am Mediumende, `sync` vor dem Tausch): `doc/merkposten/tar_satz.md` Nr. 17, `doc/design/39_mutos8000.md` A5b.
 
-**8x512 (DISK-Satz 1987, Ladediskette `…_k5601_8x512`): `tar_mutos8k_8x512_mfm`** (Format `mutos_ss77`, 5¼″ MFM) mit `…_leer`.  Dort rechnet der Treiber LINEAR: Block n = Zylinder 1 + n/8,
+**8x512 (DISK-Satz 1987, Ladediskette `…_k5601_8x512`): `tar_ss77_8x512`** (Format `mutos_ss77`, 5¼″ MFM) mit `…_leer`.  Dort rechnet der Treiber LINEAR: Block n = Zylinder 1 + n/8,
 Sektor-ID n mod 8 + 1, 76 Zylinder = **608 Blöcke = 311 296 B** je Diskette (der Kernel lehnt Block ≥ 608 ab, auch auf einer 80-Zylinder-Diskette).  Aufrufe wie oben mit dem anderen Namen:
 ```
-k1520disktool create leer.hfe --fs tar_mutos8k_8x512_mfm_leer
-k1520disktool tar-satz-neu --format tar_mutos8k_8x512_mfm satz.hfe --put a.bin --put b.bin    # -> satz1.hfe, satz2.hfe, …  (je 608 Bloecke)
+k1520disktool create leer.hfe --fs tar_ss77_8x512_leer
+k1520disktool tar-satz-neu --format tar_ss77_8x512 satz.hfe --put a.bin --put b.bin    # -> satz1.hfe, satz2.hfe, …  (je 608 Bloecke)
 k1520disktool tar-satz mutos1.hfe mutos2.hfe -l               # Layout wird am ersten Abbild erkannt (auch .img/.td0/.imd, nicht .cqm: gemischte Geometrie)
 ```
 Unter MUTOS (8x512-Ladediskette): `tar tvf /dev/rrk0`, ein Satz `(dd if=/dev/rrk0 bs=512 count=608; <tauschen>; dd …) | tar xvf -`.  `tar` braucht dort die lauffähige `pwd` (die der DISK-ROOT-TD0 hängt:
-`bau_8x512.py` → `…_root_8x512.hfe`).  Das UNIX-Dateisystem derselben Geometrie ist `mutos8k_8x512_mfm` (`create` begrenzt es auf 608 Blöcke, auch auf `mutos8k_8x512_mfm_80`).  `doc/design/39_mutos8000.md` A5c.
+`bau_8x512.py` → `…_root_8x512.hfe`).  Das UNIX-Dateisystem derselben Geometrie ist `mutos8k_ss77_8x512` (`create` begrenzt es auf 608 Blöcke, auch auf `mutos8k_ss80_8x512`).  `doc/design/39_mutos8000.md` A5c.
 
-### `tar-export`, `tar-put` und die leere tar-Diskette `tar720_leer`
+### `tar-export`, `tar-put` und die leere tar-Diskette `tar_ds80_9x512_leer`
 
 ```
 k1520disktool tar-export <abbild> <ziel.tar>   # Rohinhalt der Diskette als .tar
-k1520disktool create x.cqm --fs tar720_leer    # leere 720K-tar-Diskette (img|hfe|dmk|cqm)
+k1520disktool create x.cqm --fs tar_ds80_9x512_leer    # leere 720K-tar-Diskette (img|hfe|dmk|cqm)
 k1520disktool tar-put x.cqm quelle.tar         # .tar wird das Archiv der LEEREN Diskette (Container), --dry-run nur beurteilen
 ```
 `tar-export`: die 512-Byte-Bloecke des Stroms 1:1. Beginnt die Diskette mit einem gueltigen
@@ -1130,7 +1130,7 @@ Nullbloecke enthalten koennen — der ganze Strom. Geht an tar-Disketten und an 
 an einem `tar-satz` aus mehreren Abbildern (eine tar-Diskette exportiert ihren Strom einschliesslich
 nicht gespeicherter Aenderungen).
 
-`tar720_leer` ist ganz Null und wird nur dann so erkannt (VOR der CP/A-Regel, die eine
+`tar_ds80_9x512_leer` ist ganz Null und wird nur dann so erkannt (VOR der CP/A-Regel, die eine
 Null-Diskette sonst als „CP/A, Fuellbyte 0x00“ liest; `--fs cpa_auto` uebersteuert); das Profil bleibt,
 weil sonst eine leere tar-Diskette beim Oeffnen nicht von einer CP/A-Diskette zu unterscheiden waere
 (Erkennung ganz Null, `create`, `info`).  **Es gibt keinen Sonderweg „genau EIN .tar“ mehr:** `tar-put`
@@ -1155,7 +1155,7 @@ mit Begründung im Handbuch (Abschnitt „Passende tar-Dateien unter Linux erzeu
 
 `data/formats.yaml` hat zwei Sektionen: `formats:` (Physik) und `filesystems:`
 (logische Ebene — `type`, `data_start`, `block_size`, `dir_entries`).  `data_start`
-ist eine **Spur**, kein Byte-Offset; bei gemischter Geometrie (cpa780) wäre er als
+ist eine **Spur**, kein Byte-Offset; bei gemischter Geometrie (cpa_ds80_5x1024_boot) wäre er als
 Spurzahl nicht ausdrückbar.  Schema: Kopf der Datei und
 `doc/design/13_k1520disktool.md` §6.3.  Ein Eintrag lohnt nur, wo die Regel oben
 nicht greift oder ein besserer Name gewünscht ist.
@@ -1247,11 +1247,11 @@ will, ändert sie und startet neu, ohne Code anzufassen.
 ## SIOS 1526
 
 IBM-Etikettendisketten des SIOS 1526 (A5120/A5130/K8924, 26×128 MFM einseitig, 40 oder 80 Spuren) werden an `ERMAP` + `VOL1` in Spur 0
-erkannt (Profile `sios_ss40`/`sios_ss80`).  Beschreibung des Formats: `doc/sios_diskettenformat.md`.
+erkannt (Profile `sios_ss40_26x128`/`sios_ss80_26x128`).  Beschreibung des Formats: `doc/sios_diskettenformat.md`.
 
 ```
 $ k1520disktool ls -l SIOS1526_DP1.hfe
-Dateisystem: sios_ss40 (erkannt) - 1 Seite - MWD051
+Dateisystem: sios_ss40_26x128 (erkannt) - 1 Seite - MWD051
 Name                 Typ   Satz  Groesse  Kz  Lage
 PHASELB              B      128   123136  E   BOE 01001 EOE 37026 EOD 38001
 PHASELB/CATM         O      128     4608      AADR 0013 ML 12
@@ -1264,7 +1264,7 @@ Typ `F` = physische Datei (Groesse = Sektoren `BOE..EOD-1`), `B` = Bibliothek (N
 Kennzeichen aus HDR1 (`P` Schreibschutz, `E` Austausch, `C` auf der Folgediskette fortgesetzt).  **Schreiben (D4):**
 
 ```
-$ k1520disktool create neu.hfe --fs sios_ss40 --label TEST01     # leere Datendiskette (INIT-gleich)
+$ k1520disktool create neu.hfe --fs sios_ss40_26x128 --label TEST01     # leere Datendiskette (INIT-gleich)
 $ k1520disktool put neu.hfe daten.bin --as ALPHA                 # physische Datei, Spurbereich ab Spur 1
 $ k1520disktool put dp2.hfe objekt.bin --as PHASELB/NEU          # Objekt ans Ende einer Bibliothek (ML = Sektoren/2, Annahme)
 $ k1520disktool rm neu.hfe ALPHA                                  # HDR1 -> DDR1, Daten bleiben
@@ -1285,20 +1285,20 @@ wieder ein, wenn kein lebendes Etikett den Bereich berührt; ein Objekt kommt **
 
 Namen: Datei 1–8, Objekt 1–5 Zeichen (Großbuchstaben/Ziffern/Satzzeichen des DKOI-Satzes), Satzlänge immer 128.  Abgelehnt (mit Meldung) wird: Bibliothek mit
 mehr als 14 Einträgen, Fehlspurkarte mit Einträgen, voll belegte Spuren 1–37, `create --boot`, `boot-put`.  Gelöschter Bibliotheksplatz kehrt nicht zurück.  Ein Abbild, dessen Geometrie zu keinem Katalogformat passt (`SIOS1526_SYLp.hfe`),
-braucht `--fs sios_ss40`.
+braucht `--fs sios_ss40_26x128`.
 
 ### MicroDOS 1526 / 1715
 
-Profile `microdos800` (80 Zyl. DS, 104 Plätze), `microdos200` (K5600.10, 64 Plätze), `microdos128` (K5600.10, 26 × 128 B, Lade-ROM V0.6/V0.9_2; System auf Spur 1–5), `microdos1715` (PC 1715). `fsck` prüft zusätzlich, ob `MicroDOS.SYS` am Ort des Laders liegt (`cpm.system.ort`, `cpm.system.fehlt`). Der SYL-Lader steht
+Profile `microdos_ds80_5x1024_boot` (80 Zyl. DS, 104 Plätze), `microdos_ss40_5x1024_boot` (K5600.10, 64 Plätze), `microdos_ss40_26x128_boot` (K5600.10, 26 × 128 B, Lade-ROM V0.6/V0.9_2; System auf Spur 1–5), `microdos1715_ds80_5x1024_boot` (PC 1715). `fsck` prüft zusätzlich, ob `MicroDOS.SYS` am Ort des Laders liegt (`cpm.system.ort`, `cpm.system.fehlt`). Der SYL-Lader steht
 in den ersten Verzeichnisplätzen, `MicroDOS.SYS` an festen Sektoren; `boot-get` liefert Lader + Systemdatei (16 640 B):
 
 ```
 k1520disktool boot-get MicroDOS1526s.hfe boot.bin
-k1520disktool create neu.hfe --fs microdos800 --boot boot.bin   # oder data/bootsektoren/boot_microdos_1526.bin
+k1520disktool create neu.hfe --fs microdos_ds80_5x1024_boot --boot boot.bin   # oder data/bootsektoren/boot_microdos_1526.bin
 # Hinterlegte Abbilder -- das System ist fest auf Tastatur und Laufwerke generiert (alle bootend geprueft):
 #   boot_microdos_1526.bin / _k7636.bin            800K, Tastatur K7637 bzw. K7636, 4 x K5601
 #   boot_microdos_1526_200k.bin / _200k_k7636.bin  200K, K7637 bzw. K7636, 2 x K5600.10 (NICHT K5600.20)
-#   boot_microdos_1526_128.bin                     100K 26x128 B (`microdos128`), K7637, 2 x K5600.10, Lade-ROM V0.6 oder V0.9_2
+#   boot_microdos_1526_128.bin                     100K 26x128 B (`microdos_ss40_26x128_boot`), K7637, 2 x K5600.10, Lade-ROM V0.6 oder V0.9_2
 #   boot_microdos_1715.bin                         PC 1715
 k1520disktool put neu.hfe PIP.COM ; k1520disktool attr neu.hfe PIP.COM --arc
 ```

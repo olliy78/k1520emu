@@ -178,13 +178,13 @@ bool tarLeer(const DiskVolume& v) {
 
 // ─── Erkennung und Lesen ─────────────────────────────────────────────────────
 
-/// @test Gueltiger Strom: erkannt als tar720, Dateien, Verzeichnis, Link, ustar-Praefix.
+/// @test Gueltiger Strom: erkannt als tar_ds80_9x512, Dateien, Verzeichnis, Link, ustar-Praefix.
 TEST(TarFs, ErkenntUndListetDenStrom) {
     const std::string p = imgMit("k1520_test_tar_a.img", aufDisk(beispiel()));
     auto v = oeffne(p);
     ASSERT_TRUE(v);
     ASSERT_TRUE(v->hasFileSystem());
-    EXPECT_EQ(v->detection().filesystem, "tar720");
+    EXPECT_EQ(v->detection().filesystem, "tar_ds80_9x512");
     EXPECT_TRUE(v->istTar());
     EXPECT_TRUE(v->istUnix());
     EXPECT_FALSE(v->istWega());
@@ -338,7 +338,7 @@ TEST(TarFs, FortsetzungWirdErkannt) {
     auto v = oeffne(p);
     ASSERT_TRUE(v);
     ASSERT_TRUE(v->hasFileSystem());
-    EXPECT_EQ(v->detection().filesystem, "tar720");
+    EXPECT_EQ(v->detection().filesystem, "tar_ds80_9x512");
     const auto l = v->list();
     const FileEntry* a = finde(l, "_fortsetzung_anfang.bin");
     ASSERT_TRUE(a);
@@ -395,7 +395,7 @@ TEST(TarFs, EchteDateisystemeGehenVor) {
     const std::string p = k1520test::tempPath("k1520_test_tar_h.img");
     std::string err;
     {
-        auto w = DiskVolume::create(p, "wega720", "test", formate(), dateisysteme(), err);
+        auto w = DiskVolume::create(p, "wega_ds80_9x512", "test", formate(), dateisysteme(), err);
         ASSERT_TRUE(w) << err;
         ASSERT_TRUE(w->flush());
     }
@@ -409,18 +409,18 @@ TEST(TarFs, EchteDateisystemeGehenVor) {
     }
     auto v = oeffne(p);
     ASSERT_TRUE(v);
-    EXPECT_EQ(v->detection().filesystem, "wega720");
+    EXPECT_EQ(v->detection().filesystem, "wega_ds80_9x512");
     EXPECT_FALSE(v->istTar());
     fs::remove(p);
 
     const std::string c = k1520test::tempPath("k1520_test_tar_i.img");
-    auto cpm = DiskVolume::create(c, "cpa800", "", formate(), dateisysteme(), err);
+    auto cpm = DiskVolume::create(c, "cpa_ds80_5x1024_daten", "", formate(), dateisysteme(), err);
     ASSERT_TRUE(cpm) << err;
     ASSERT_TRUE(cpm->flush());
     cpm.reset();
     auto v2 = oeffne(c);
     ASSERT_TRUE(v2);
-    EXPECT_EQ(v2->detection().filesystem, "cpa800");
+    EXPECT_EQ(v2->detection().filesystem, "cpa_ds80_5x1024_daten");
     fs::remove(c);
 }
 
@@ -442,7 +442,7 @@ TEST(TarFs, NurLesbar) {
     EXPECT_FALSE(v->erase(FileRef{0, "gross.bin"}));
     EXPECT_FALSE(v->makeDirectory(FileRef{0, "x"}));
     std::string err;
-    EXPECT_EQ(DiskVolume::create(k1520test::tempPath("k1520_test_tar_j2.img"), "tar720", "",
+    EXPECT_EQ(DiskVolume::create(k1520test::tempPath("k1520_test_tar_j2.img"), "tar_ds80_9x512", "",
                                  formate(), dateisysteme(), err), nullptr);
     fs::remove(p); fs::remove(q);
 }
@@ -542,7 +542,7 @@ TEST(CqmDiskVolume, SchreibschutzKommtVomTarProfilNichtVomContainer) {
     auto v = oeffne(p, /*schreibend=*/true);
     ASSERT_TRUE(v);
     ASSERT_TRUE(v->hasFileSystem());
-    EXPECT_EQ(v->detection().filesystem, "tar720");
+    EXPECT_EQ(v->detection().filesystem, "tar_ds80_9x512");
     EXPECT_TRUE(v->readOnlyForced());          // tar ohne Endmarke: unaufhebbar
     EXPECT_EQ(v->containerName(), "cqm");
     v->setReadOnly(false);
@@ -696,7 +696,7 @@ TEST(TarEchtdaten, SaetzeGleichGnuTarOhneBefund) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// tar-Export, leere tar-Diskette (tar720_leer) und `.tar` auf Diskette schreiben
+// tar-Export, leere tar-Diskette (tar_ds80_9x512_leer) und `.tar` auf Diskette schreiben
 // ═════════════════════════════════════════════════════════════════════════════
 
 namespace {
@@ -719,7 +719,7 @@ std::unique_ptr<DiskVolume> neueLeere(const std::string& name) {
     std::string err;
     const std::string p = k1520test::tempPath(name);
     fs::remove(p);
-    auto v = DiskVolume::create(p, "tar720_leer", "", formate(), dateisysteme(), err);
+    auto v = DiskVolume::create(p, "tar_ds80_9x512_leer", "", formate(), dateisysteme(), err);
     EXPECT_TRUE(v) << err;
     return v;
 }
@@ -818,7 +818,7 @@ TEST(TarExport, AblehnungenMitGrund) {
     std::string err;
     const std::string cpm = k1520test::tempPath("k1520_test_tarx_f.img");
     fs::remove(cpm);
-    auto c = DiskVolume::create(cpm, "cpa800", "", formate(), dateisysteme(), err);
+    auto c = DiskVolume::create(cpm, "cpa_ds80_5x1024_daten", "", formate(), dateisysteme(), err);
     ASSERT_TRUE(c) << err;
     const std::string z = k1520test::tempPath("k1520_test_tarx_f.tar");
     EXPECT_FALSE(c->tarExport(z));
@@ -950,7 +950,7 @@ TEST(TarLeer, AnlegenInAllenContainernUndWiederErkennen) {
         EXPECT_TRUE(v->tarSatzEinzel());                // eine tar-Diskette ist ein Satz mit EINEM Abbild
         EXPECT_FALSE(v->readOnly());
         EXPECT_FALSE(v->readOnlyForced());
-        EXPECT_EQ(v->detection().filesystem, "tar720_leer");
+        EXPECT_EQ(v->detection().filesystem, "tar_ds80_9x512_leer");
         EXPECT_TRUE(v->list().empty());
         const std::string p = v->path();
         v.reset();
@@ -958,7 +958,7 @@ TEST(TarLeer, AnlegenInAllenContainernUndWiederErkennen) {
         auto w = DiskVolume::open(p, "", formate(), dateisysteme(), err, true, true);
         ASSERT_TRUE(w) << err;
         EXPECT_TRUE(tarLeer(*w));
-        EXPECT_EQ(w->detection().filesystem, "tar720_leer");
+        EXPECT_EQ(w->detection().filesystem, "tar_ds80_9x512_leer");
         EXPECT_TRUE(w->readOnly());                   // Vorgabe beim Oeffnen
         EXPECT_FALSE(w->readOnlyForced());            // aber aufhebbar
         w->setReadOnly(false);
@@ -977,7 +977,7 @@ TEST(TarLeer, AnlegenInAllenContainernUndWiederErkennen) {
         auto x = DiskVolume::open(p, "", formate(), dateisysteme(), err, true, true);
         ASSERT_TRUE(x) << err;
         EXPECT_TRUE(finde(x->list(), "neu.txt"));
-        EXPECT_EQ(x->detection().filesystem, "tar720");
+        EXPECT_EQ(x->detection().filesystem, "tar_ds80_9x512");
         x.reset();
         fs::remove(q);
         fs::remove(p);
@@ -1012,7 +1012,7 @@ TEST(TarLeer, ErkennungNurBeiGanzNull) {
     std::string e2;
     const std::string cp = k1520test::tempPath("k1520_test_tarl_e.img");
     fs::remove(cp);
-    auto cpm = DiskVolume::create(cp, "cpa800", "", formate(), dateisysteme(), e2);
+    auto cpm = DiskVolume::create(cp, "cpa_ds80_5x1024_daten", "", formate(), dateisysteme(), e2);
     ASSERT_TRUE(cpm) << e2;
     cpm.reset();
     auto cpm2 = oeffne(cp);
@@ -1039,12 +1039,12 @@ TEST(TarLeer, ContainerRundlaufUndNurAufLeeremArchiv) {
         ASSERT_TRUE(v->tarDateiAblegen(src, TarDateiWeg::AlsContainer)) << v->lastError();
         ASSERT_TRUE(v->flush()) << v->lastError();
         EXPECT_TRUE(v->lastTarWarnung().empty());
-        // sofort danach: tar720, Archiv sichtbar, NICHT schreibgeschuetzt, nicht dirty
+        // sofort danach: tar_ds80_9x512, Archiv sichtbar, NICHT schreibgeschuetzt, nicht dirty
         EXPECT_FALSE(tarLeer(*v));
         EXPECT_FALSE(v->readOnly());
         EXPECT_FALSE(v->readOnlyForced());
         EXPECT_FALSE(v->dirty());
-        EXPECT_EQ(v->detection().filesystem, "tar720");
+        EXPECT_EQ(v->detection().filesystem, "tar_ds80_9x512");
         ASSERT_TRUE(finde(v->list(), "dir/b.bin"));
         // eine zweite .tar: nur noch als Datei
         u = v->tarDateiBeurteilen(src);
@@ -1064,7 +1064,7 @@ TEST(TarLeer, ContainerRundlaufUndNurAufLeeremArchiv) {
         EXPECT_TRUE(w->istTar());
         EXPECT_FALSE(tarLeer(*w));
         EXPECT_FALSE(w->readOnlyForced());         // Kopf + Endmarke: schreibbar
-        EXPECT_EQ(w->detection().filesystem, "tar720");
+        EXPECT_EQ(w->detection().filesystem, "tar_ds80_9x512");
         std::vector<uint8_t> aus;
         ASSERT_EQ(exportiere(*w, "k1520_test_tarl_f_aus.tar", aus), "");
         EXPECT_EQ(aus, x);                         // Kopf + Endmarke: exakt die Datei
@@ -1159,7 +1159,7 @@ TEST(TarLeer, WarnungSchreibtTrotzdemAblehnungLaesstDieDisketteUnveraendert) {
     fs::remove(p); fs::remove(src); fs::remove(gross); fs::remove(krumm);
 }
 
-/// @test Container nur in ein LEERES tar-Archiv: tar720 mit Inhalt, CP/A-Diskette (Dateisystem),
+/// @test Container nur in ein LEERES tar-Archiv: tar_ds80_9x512 mit Inhalt, CP/A-Diskette (Dateisystem),
 ///       Roh-Diskette und schreibgeschuetzt geoeffnete leere Diskette lehnen mit eigenem Grund ab.
 TEST(TarLeer, NurInEinLeeresTarArchiv) {
     const std::string src = k1520test::tempPath("k1520_test_tarl_i.tar");
@@ -1175,7 +1175,7 @@ TEST(TarLeer, NurInEinLeeresTarArchiv) {
 
     const std::string c = k1520test::tempPath("k1520_test_tarl_i2.img");
     fs::remove(c);
-    auto cv = DiskVolume::create(c, "cpa800", "", formate(), dateisysteme(), err);
+    auto cv = DiskVolume::create(c, "cpa_ds80_5x1024_daten", "", formate(), dateisysteme(), err);
     ASSERT_TRUE(cv) << err;
     EXPECT_FALSE(cv->tarDateiAblegen(src, TarDateiWeg::AlsContainer));
     EXPECT_NE(cv->lastError().find("tar-Diskette"), std::string::npos) << cv->lastError();

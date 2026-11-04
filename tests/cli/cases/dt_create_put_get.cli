@@ -6,7 +6,7 @@ tool:   k1520disktool
 disk:   udos_boot_scp.hfe
 tmpfile neu.hfe:
 setup_run: get %DISK% Side0/CAT Side1/CODE --to q
-setup_run: create %neu.hfe% --fs udos_ds77 --label TESTDISK
+setup_run: create %neu.hfe% --fs udos_ds77_26x128 --label TESTDISK
 setup_run: put %neu.hfe% q
 run:    ls %neu.hfe%
 expect: TESTDISK / TESTDISK

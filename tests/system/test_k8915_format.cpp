@@ -54,7 +54,7 @@ struct Kataloge {
  *  1. Eine echte Leerdiskette (unformatiert, `createDisk` mit leerem Formatnamen) in B:.
  *  2. FORMAT.COM, Verfahren 24 (5,25″ DS, 5 × 1024, mit Indexmarke), Spur 00–79:
  *     „FUNCTION COMPLETE“ ohne „ERROR“ — das eigene Pruef-Lesen ist also durch.
- *     `dir b:` meldet „NO FILE“; das k1520DiskTool erkennt `cpa800`, Pruefung ohne Befund.
+ *     `dir b:` meldet „NO FILE“; das k1520DiskTool erkennt `cpa_ds80_5x1024_daten`, Pruefung ohne Befund.
  *  3. DISGEN.COM: „Read system tracks“ von A:, „Write system tracks“ auf B:, „Exit“.
  *     Die Systemspuren der neuen Diskette gleichen danach denen der Quelle.
  *  4. Neue Maschine, die neue Diskette in A:, Kaltstart: das BIOS „55 K“ meldet sich,
@@ -152,7 +152,7 @@ TEST(K8915Format, LeerdisketteFormatDisgenKaltstart)
  * @test K8915Format.FormatDisketteGetBootPutBootetOhneDisgen
  * @brief AP-E5c: dieselbe Leerdiskette, aber statt DISGEN das DiskTool — FORMAT.COM
  *        (Verfahren 24) formatiert B:, `boot-get` holt die Systemspuren von A: (900),
- *        `boot-put` mit `--fs scpx8915` (ohne das Profil hat die frisch formatierte
+ *        `boot-put` mit `--fs scpx8915_ds80_5x1024_boot` (ohne das Profil hat die frisch formatierte
  *        Diskette fuer das DiskTool keine Systemspuren) bringt sie auf B:.  Danach sind sie
  *        byteweise gleich der Quelle, und ein neuer Kaltstart von B: laeuft bis `A>`.
  */
@@ -182,13 +182,13 @@ TEST(K8915Format, FormatDisketteGetBootPutBootetOhneDisgen)
         ASSERT_TRUE(v->readBootImage(quelle)) << v->lastError();
     }
     {
-        auto v = DiskVolume::open(b.path(), "scpx8915", k.formate, k.fs, err, /*read_only=*/false);
+        auto v = DiskVolume::open(b.path(), "scpx8915_ds80_5x1024_boot", k.formate, k.fs, err, /*read_only=*/false);
         ASSERT_TRUE(v) << err;
         ASSERT_TRUE(v->writeBootImage(quelle)) << v->lastError();
         ASSERT_TRUE(v->flush()) << v->lastError();
     }
     {
-        auto v = DiskVolume::open(b.path(), "scpx8915", k.formate, k.fs, err);
+        auto v = DiskVolume::open(b.path(), "scpx8915_ds80_5x1024_boot", k.formate, k.fs, err);
         ASSERT_TRUE(v) << err;
         std::vector<uint8_t> n;
         ASSERT_TRUE(v->readBootImage(n)) << v->lastError();
@@ -239,8 +239,8 @@ std::unique_ptr<DiskVolume> dtOeffne(const std::string& p, const std::string& fs
  * @brief Verfahren 24/31 (5 × 1024, mit/ohne Indexmarke) auf Diskette 900 (B: = A:),
  *        22/37 (16 × 256) auf Diskette 901 (B: per DISGEN 16 × 256), Zylinder 00–79.
  *  1. Frisch formatiert, leer: 16 × 256 ⇒ OFF 2 / 128 Plaetze (festes Offset der Regel);
- *     5 × 1024 ⇒ `cpa800` (192 ab c0h0 — vom Medium nicht von einer leeren CP/A-
- *     Datendiskette zu unterscheiden), mit dem Hinweis auf `--fs scpx8915`.
+ *     5 × 1024 ⇒ `cpa_ds80_5x1024_daten` (192 ab c0h0 — vom Medium nicht von einer leeren CP/A-
+ *     Datendiskette zu unterscheiden), mit dem Hinweis auf `--fs scpx8915_ds80_5x1024_boot`.
  *  2. Der K8915 schreibt (`save`): das DiskTool findet die Datei, OFF 2 / 128 Plaetze,
  *     Vollpruefung ohne Befund.
  *  3. Das DiskTool schreibt (ohne `--fs`): der K8915 listet beide Dateien und `type`
@@ -269,8 +269,8 @@ TEST_P(K8915FormatDiskTool, FrischFormatiertUndRundreise)
         EXPECT_TRUE(v->detection().unambiguous);
         EXPECT_TRUE(v->check(FsCheckLevel::Voll, true).ohneBefund());
         if (c.fuenf_mal_1024) {
-            EXPECT_EQ(v->detection().filesystem, "cpa800");
-            EXPECT_NE(v->detection().remarks.find("--fs scpx8915"), std::string::npos)
+            EXPECT_EQ(v->detection().filesystem, "cpa_ds80_5x1024_daten");
+            EXPECT_NE(v->detection().remarks.find("--fs scpx8915_ds80_5x1024_boot"), std::string::npos)
                 << v->detection().remarks;
         } else {
             EXPECT_EQ(v->profile().data_cyl, 2);

@@ -59,7 +59,7 @@ k1520test::TempDisk tmpPath(const std::string& name) {
  *
  * Ersetzt die frueher hartkodierte if-Kette `defaultFormatFor()`; die Zuordnung muss
  * unveraendert bleiben, sonst legt „Neue Diskette" ploetzlich eine andere Geometrie an.
- * @par Kriterium  K5601→cpa800, K5600.20→ss80_5x1024, K5600.10→ss40_5x1024,
+ * @par Kriterium  K5601→cpa_ds80_5x1024_daten, K5600.20→ss80_5x1024, K5600.10→ss40_5x1024,
  *                 MF3200→mf3200, MF6400→mf6400.
  */
 TEST(A5120DiskApi, DefaultFormat_KommtAusDefaultFor) {
@@ -236,7 +236,7 @@ TEST(A5120DiskApi, CreateDisk_LehntInkompatiblesFormatAb) {
     const std::string& path = path_disk.path();
 
     EXPECT_FALSE(m.createDisk(0, path, "cpa800", /*wp=*/false));
-    EXPECT_NE(m.lastError().find("cpa800"), std::string::npos)     << m.lastError();
+    EXPECT_NE(m.lastError().find("cpa_ds80_5x1024_daten"), std::string::npos)     << m.lastError();
     EXPECT_NE(m.lastError().find("K5600.20"), std::string::npos)  << m.lastError();
     EXPECT_FALSE(std::filesystem::exists(path));
 }
@@ -285,7 +285,7 @@ TEST(A5120DiskApi, CreateDisk_AchtZollFmLaufwerkErzeugtFmMedium) {
  * **Das ist Absicht, keine vergessene Pruefung** (§8.6.6, Abweichung 2):
  *  - bei self-describing `.hfe` ist der Formatname bedeutungslos, die Geometrie steht
  *    in der Datei — `tools/format_driver` mountet deshalb ALLE Slots nominell als
- *    "cpa780", auch die 8″-Laufwerke der Combo-Boot-Tests;
+ *    "cpa_ds80_5x1024_boot", auch die 8″-Laufwerke der Combo-Boot-Tests;
  *  - der Laufwerkstyp ist auf der A5120 reine BIOS-Software, Combo-Disketten betreiben
  *    an B:/C: bewusst Fremdtypen.
  *
@@ -303,7 +303,7 @@ TEST(A5120DiskApi, MountDisk_ErzwingtLaufwerksKompatibilitaetBewusstNicht) {
     ASSERT_TRUE(m.createDisk(0, path, m.defaultFormatName(0), /*wp=*/false)) << m.lastError();
     ASSERT_TRUE(m.unmountDisk(0));
 
-    // … und wie format_driver nominell als "cpa780" mounten (5,25″-Format, das fuer
+    // … und wie format_driver nominell als "cpa_ds80_5x1024_boot" mounten (5,25″-Format, das fuer
     // dieses Laufwerk NICHT gelistet ist).  Muss gelingen.
     EXPECT_TRUE(m.mountDisk(0, path, "cpa780", /*wp=*/false)) << m.lastError();
     EXPECT_TRUE(m.isDiskActive(0));
@@ -393,7 +393,7 @@ TEST(A5120DiskApi, NachStartabbruch_BleibtMaschineWeiterBaubar) {
  * @test A5120DiskApi/DetectedFormat_MisstDieEingelegteDiskette
  * @brief Ein selbstbeschreibender Container wird VERMESSEN — der Formatname beim
  *        Mounten ist dort nur ein Platzhalter und darf nicht durchschlagen.
- * @par Kriterium  Eine als "cpa800" eingelegte cpa780-Diskette wird als cpa780 erkannt.
+ * @par Kriterium  Eine als "cpa_ds80_5x1024_daten" eingelegte cpa780-Diskette wird als cpa_ds80_5x1024_boot erkannt.
  */
 TEST(A5120DiskApi, DetectedFormat_MisstDieEingelegteDiskette) {
     A5120Machine m;                                    // 4× K5601

@@ -34,7 +34,7 @@ def _emu(tmp_path):
 
 
 def _soll(cyls: int) -> dict:
-    """cpa780: 26 x 128 auf c0h0, c0h1, c1h0, sonst 5 x 1024."""
+    """cpa_ds80_5x1024_boot: 26 x 128 auf c0h0, c0h1, c1h0, sonst 5 x 1024."""
     return {(c, h): ((26, 26) if (c, h) in ((0, 0), (0, 1), (1, 0)) else (5, 5))
             for c in range(cyls) for h in (0, 1)}
 

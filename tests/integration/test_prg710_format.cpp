@@ -163,16 +163,16 @@ TEST_P(Prg710Format, UdosFormatiertLeerdiskette) {
     EXPECT_NE(bild(*m).find("KOPIE                1"), std::string::npos) << bild(*m);
 
     ASSERT_TRUE(m->flushDisks()) << m->lastError();
-    const auto original = holeDatei(disk, "udos_ds77", "OS.INIT");
+    const auto original = holeDatei(disk, "udos_ds77_26x128", "OS.INIT");
     ASSERT_FALSE(original.empty());
-    EXPECT_EQ(holeDatei(leer.get(), "udos_ds77", "KOPIE"), original);
+    EXPECT_EQ(holeDatei(leer.get(), "udos_ds77_26x128", "KOPIE"), original);
 }
 
 /**
  * @test Prg710Format.ScpxFormatMitSystemkopieBootet
  * @brief SCPX von der Geraetediskette (710-1: `PRG710-1_SCPX_Boot`, 710: die
  *        `SYSPRG`-Diskette aus AP-P5e), Leerdiskette in B:, `FORMAT` (Vorgabe 0 = DD-DS
- *        16 × 256) mit Systemkopie.  Das DiskTool erkennt `scpx640` mit leerem Verzeichnis
+ *        16 × 256) mit Systemkopie.  Das DiskTool erkennt `scpx_ds80_16x256_boot` mit leerem Verzeichnis
  *        und denselben Systemspuren wie die Quelle; die neue Diskette bootet an derselben
  *        Variante bis `A>`, `DIR` meldet ein leeres Verzeichnis.  Einziger Unterschied
  *        der Systemspuren: FORMAT.COM legt seinen Urheberstempel in die Kopie (s. u.).
@@ -197,15 +197,15 @@ TEST_P(Prg710Format, ScpxFormatMitSystemkopieBootet) {
         ASSERT_TRUE(m->flushDisks()) << m->lastError();
     }
     {
-        auto dv = oeffne(leer.get(), "scpx640");
+        auto dv = oeffne(leer.get(), "scpx_ds80_16x256_boot");
         ASSERT_NE(dv, nullptr);
         EXPECT_TRUE(dv->list().empty()) << "frisch formatiert: leeres Verzeichnis";
     }
-    const auto quelle = systemspuren(disk, "scpx640");
+    const auto quelle = systemspuren(disk, "scpx_ds80_16x256_boot");
     ASSERT_EQ(quelle.size(), 16384u);
     // FORMAT.COM legt in die Kopie seinen Urheberstempel (32 Byte ab Systemspur-Byte 2FE0H,
     // in FORMAT.COM ab Dateiversatz 065FH mit +C0H verschluesselt): Gastverhalten.
-    auto kopie = systemspuren(leer.get(), "scpx640");
+    auto kopie = systemspuren(leer.get(), "scpx_ds80_16x256_boot");
     ASSERT_EQ(kopie.size(), quelle.size());
     const std::string stempel(kopie.begin() + 0x2FE0, kopie.begin() + 0x2FE0 + 14);
     EXPECT_EQ(stempel, "IMPLEMENTET BY");

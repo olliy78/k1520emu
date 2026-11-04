@@ -100,10 +100,10 @@ const FileEntry* finde(const std::vector<FileEntry>& l, const std::string& name)
 TEST(SiosFs, ErkennungJedesAbbild) {
     struct Soll { const char* datei; const char* profil; const char* format; const char* label; };
     const Soll soll[] = {
-        {"sios1526_dp1.hfe",  "sios_ss40", "ss40_26x128", "MWD051"},
-        {"sios1526_dp2.hfe",  "sios_ss40", "ss40_26x128", "MWD051"},
-        {"sios1526_sg1.hfe",  "sios_ss40", "ss40_26x128", "MWD002"},
-        {"sios1526_syls.hfe", "sios_ss80", "ss80_26x128", "ROBINI"},
+        {"sios1526_dp1.hfe",  "sios_ss40_26x128", "ss40_26x128", "MWD051"},
+        {"sios1526_dp2.hfe",  "sios_ss40_26x128", "ss40_26x128", "MWD051"},
+        {"sios1526_sg1.hfe",  "sios_ss40_26x128", "ss40_26x128", "MWD002"},
+        {"sios1526_syls.hfe", "sios_ss80_26x128", "ss80_26x128", "ROBINI"},
     };
     for (const Soll& s : soll) {
         std::string err;
@@ -121,10 +121,10 @@ TEST(SiosFs, ErkennungJedesAbbild) {
 TEST(SiosFs, SylpIstNurMitFsErkennbar) {
     // SYLp ist ein 40-Spur-Abbild aus einem 80er-Laufwerk (Zylinder 40-68 unformatiert, ein
     // Streusektor c15h1): die Geometrie passt zu keinem Katalogformat, die Erkennung ohne
-    // Vorgabe liest es deshalb nicht.  Mit --fs sios_ss40 geht es (nur Seite 0, Spuren 0-39).
+    // Vorgabe liest es deshalb nicht.  Mit --fs sios_ss40_26x128 geht es (nur Seite 0, Spuren 0-39).
     std::string err;
     EXPECT_FALSE(oeffne("sios1526_sylp.hfe", err)) << "Befund geaendert? Dann Doku nachziehen";
-    auto v = oeffne("sios1526_sylp.hfe", err, "sios_ss40");
+    auto v = oeffne("sios1526_sylp.hfe", err, "sios_ss40_26x128");
     ASSERT_TRUE(v) << err;
     EXPECT_EQ(v->volumeInfo(0).label, "ROBINI");
     const auto l = v->list();
@@ -159,14 +159,14 @@ TEST(SiosFs, NurMitNachweisErkannt) {
     }
     // ... und erzwungen scheitert das Mounten ohne ERMAP/VOL1 mit einem Grund.
     std::string err;
-    EXPECT_FALSE(oeffne("bcu12_ss40-26x128_k5600-10_ohnesyl-sys1.img", err, "sios_ss40"));
+    EXPECT_FALSE(oeffne("bcu12_ss40-26x128_k5600-10_ohnesyl-sys1.img", err, "sios_ss40_26x128"));
     EXPECT_NE(err.find("SIOS"), std::string::npos) << err;
 }
 
 // ─── Etiketten ───────────────────────────────────────────────────────────────
 
 TEST(SiosFs, EtikettenSystemdiskette) {
-    auto d = direkt(fixture("sios1526_syls.hfe"), "sios_ss80");
+    auto d = direkt(fixture("sios1526_syls.hfe"), "sios_ss80_26x128");
     ASSERT_TRUE(d.fs) << d.error;
     EXPECT_EQ(d.fs->volumeName(), "ROBINI");
     EXPECT_EQ(d.fs->etikettenText(7).substr(0, 10), "VOL1ROBINI");
@@ -185,7 +185,7 @@ TEST(SiosFs, EtikettenSystemdiskette) {
 }
 
 TEST(SiosFs, EtikettenSg1) {
-    auto d = direkt(fixture("sios1526_sg1.hfe"), "sios_ss40");
+    auto d = direkt(fixture("sios1526_sg1.hfe"), "sios_ss40_26x128");
     ASSERT_TRUE(d.fs) << d.error;
     const auto et = d.fs->etiketten();     // 17 DDR1-Platzhalter (DATA10..26) sind NICHT aktiv
     ASSERT_EQ(et.size(), 2u);
@@ -222,7 +222,7 @@ TEST(SiosFs, DkoiTabelle) {
 // ─── Verzeichnis ─────────────────────────────────────────────────────────────
 
 TEST(SiosFs, Dp1PhaselbObjekte) {
-    auto d = direkt(fixture("sios1526_dp1.hfe"), "sios_ss40");
+    auto d = direkt(fixture("sios1526_dp1.hfe"), "sios_ss40_26x128");
     ASSERT_TRUE(d.fs) << d.error;
     const auto et = d.fs->etiketten();
     ASSERT_EQ(et.size(), 1u);
@@ -262,7 +262,7 @@ TEST(SiosFs, Dp1PhaselbObjekte) {
 
 TEST(SiosFs, Dp2UndSg1Bibliotheken) {
     {
-        auto d = direkt(fixture("sios1526_dp2.hfe"), "sios_ss40");
+        auto d = direkt(fixture("sios1526_dp2.hfe"), "sios_ss40_26x128");
         ASSERT_TRUE(d.fs) << d.error;
         const auto l = d.fs->list();
         EXPECT_EQ(l.size(), 14u);                   // PHASELB + 13 Objekte
@@ -271,7 +271,7 @@ TEST(SiosFs, Dp2UndSg1Bibliotheken) {
         EXPECT_NE(finde(l, "PHASELB/SYSD"), nullptr);
     }
     {
-        auto d = direkt(fixture("sios1526_sg1.hfe"), "sios_ss40");
+        auto d = direkt(fixture("sios1526_sg1.hfe"), "sios_ss40_26x128");
         ASSERT_TRUE(d.fs) << d.error;
         const auto l = d.fs->list();
         ASSERT_EQ(l.size(), 5u);                    // SYSORG09, PHASELB, SGEN, SOPH, SYSD
@@ -303,7 +303,7 @@ TEST(SiosFs, SystemdisketteListe) {
 // ─── Lesen ───────────────────────────────────────────────────────────────────
 
 TEST(SiosFs, ObjektBytesSindDerAusschnittDerBibliothek) {
-    auto d = direkt(fixture("sios1526_dp1.hfe"), "sios_ss40");
+    auto d = direkt(fixture("sios1526_dp1.hfe"), "sios_ss40_26x128");
     ASSERT_TRUE(d.fs) << d.error;
     std::vector<uint8_t> lib;
     ASSERT_TRUE(d.fs->read("PHASELB", lib));
@@ -323,7 +323,7 @@ TEST(SiosFs, ObjektBytesSindDerAusschnittDerBibliothek) {
 }
 
 TEST(SiosFs, SystemdateiBisEod) {
-    auto d = direkt(fixture("sios1526_syls.hfe"), "sios_ss80");
+    auto d = direkt(fixture("sios1526_syls.hfe"), "sios_ss80_26x128");
     ASSERT_TRUE(d.fs) << d.error;
     std::vector<uint8_t> sys;
     ASSERT_TRUE(d.fs->read("SYSARE11", sys));
@@ -335,7 +335,7 @@ TEST(SiosFs, SystemdateiBisEod) {
 }
 
 TEST(SiosFs, Sg1SatzlaengeAendertNichtsAmLesen) {
-    auto d = direkt(fixture("sios1526_sg1.hfe"), "sios_ss40");
+    auto d = direkt(fixture("sios1526_sg1.hfe"), "sios_ss40_26x128");
     ASSERT_TRUE(d.fs) << d.error;
     std::vector<uint8_t> org;
     ASSERT_TRUE(d.fs->read("SYSORG09", org));
@@ -346,7 +346,7 @@ TEST(SiosFs, Sg1SatzlaengeAendertNichtsAmLesen) {
 }
 
 TEST(SiosFs, UnbekannterNameUndFirstSector) {
-    auto d = direkt(fixture("sios1526_dp1.hfe"), "sios_ss40");
+    auto d = direkt(fixture("sios1526_dp1.hfe"), "sios_ss40_26x128");
     ASSERT_TRUE(d.fs) << d.error;
     std::vector<uint8_t> x;
     EXPECT_FALSE(d.fs->read("GIBTESNICHT", x));
@@ -417,12 +417,12 @@ TEST(SiosFsSchreiben, LeereDisketteHatDenInhaltVonParagraph10) {
     Kopie k(nullptr, "k1520_test_sios_leer.hfe");
     std::string err;
     {
-        auto v = neueDiskette(k.pfad, "sios_ss40", "test01", err);
+        auto v = neueDiskette(k.pfad, "sios_ss40_26x128", "test01", err);
         ASSERT_TRUE(v) << err;
         EXPECT_TRUE(v->list().empty());
         EXPECT_EQ(befunde(*v), 0) << v->checkReport().alsText();
     }
-    auto d = direkt(k.pfad, "sios_ss40");
+    auto d = direkt(k.pfad, "sios_ss40_26x128");
     ASSERT_TRUE(d.fs) << d.error;
     EXPECT_EQ(d.fs->volumeName(), "TEST01");
     EXPECT_EQ(d.fs->spuren(), 40);
@@ -468,26 +468,26 @@ TEST(SiosFsSchreiben, LeereDisketteHatDenInhaltVonParagraph10) {
 TEST(SiosFsSchreiben, AnlegenMitAchtzigSpurenUndNameRegeln) {
     Kopie k(nullptr, "k1520_test_sios_leer80.hfe");
     std::string err;
-    auto v = neueDiskette(k.pfad, "sios_ss80", "", err);
+    auto v = neueDiskette(k.pfad, "sios_ss80_26x128", "", err);
     ASSERT_TRUE(v) << err;
     EXPECT_EQ(befunde(*v), 0);
     Kopie k2(nullptr, "k1520_test_sios_leer_x.hfe");
-    EXPECT_FALSE(neueDiskette(k2.pfad, "sios_ss40", "ZUVIELE1", err));       // 7 Zeichen
+    EXPECT_FALSE(neueDiskette(k2.pfad, "sios_ss40_26x128", "ZUVIELE1", err));       // 7 Zeichen
     EXPECT_NE(err.find("SIOS"), std::string::npos) << err;
-    EXPECT_FALSE(neueDiskette(k2.pfad, "sios_ss40", "A\xC3\xA4" "B", err));
+    EXPECT_FALSE(neueDiskette(k2.pfad, "sios_ss40_26x128", "A\xC3\xA4" "B", err));
     // --boot ist (noch) nicht umgesetzt
-    EXPECT_FALSE(neueDiskette(k2.pfad, "sios_ss40", "X", err, "/dev/null"));
+    EXPECT_FALSE(neueDiskette(k2.pfad, "sios_ss40_26x128", "X", err, "/dev/null"));
     EXPECT_NE(err.find("SIOS"), std::string::npos) << err;
 }
 
 TEST(SiosFsSchreiben, RundlaufPhysischeDatei) {
     Kopie k(nullptr, "k1520_test_sios_rund.hfe");
     std::string err;
-    { auto v = neueDiskette(k.pfad, "sios_ss40", "RUND", err); ASSERT_TRUE(v) << err; }
+    { auto v = neueDiskette(k.pfad, "sios_ss40_26x128", "RUND", err); ASSERT_TRUE(v) << err; }
     const std::vector<uint8_t> a = muster(128 * 30), b = muster(128, 9), c = muster(128 * 26, 3);
     WriteOptions wo;
     {
-        auto d = direkt(k.pfad, "sios_ss40", false);
+        auto d = direkt(k.pfad, "sios_ss40_26x128", false);
         ASSERT_TRUE(d.fs) << d.error;
         ASSERT_TRUE(d.fs->write("alpha", a, wo)) << d.fs->lastError();
         ASSERT_TRUE(d.fs->write("BETA.1", b, wo));
@@ -530,7 +530,7 @@ TEST(SiosFsSchreiben, RundlaufPhysischeDatei) {
     }
     // Neu oeffnen (Container-Rueckschreiben) - alles bleibt
     {
-        auto d = direkt(k.pfad, "sios_ss40");
+        auto d = direkt(k.pfad, "sios_ss40_26x128");
         ASSERT_TRUE(d.fs) << d.error;
         EXPECT_EQ(d.fs->list().size(), 5u);
     }
@@ -539,8 +539,8 @@ TEST(SiosFsSchreiben, RundlaufPhysischeDatei) {
 TEST(SiosFsSchreiben, LoeschenUndWiederverwenden) {
     Kopie k(nullptr, "k1520_test_sios_rm.hfe");
     std::string err;
-    { auto v = neueDiskette(k.pfad, "sios_ss40", "RM", err); ASSERT_TRUE(v) << err; }
-    auto d = direkt(k.pfad, "sios_ss40", false);
+    { auto v = neueDiskette(k.pfad, "sios_ss40_26x128", "RM", err); ASSERT_TRUE(v) << err; }
+    auto d = direkt(k.pfad, "sios_ss40_26x128", false);
     ASSERT_TRUE(d.fs) << d.error;
     ASSERT_TRUE(d.fs->write("A", muster(128), WriteOptions{}));
     ASSERT_TRUE(d.fs->write("B", muster(128), WriteOptions{}));
@@ -570,8 +570,8 @@ TEST(SiosFsSchreiben, LoeschenUndWiederverwenden) {
 TEST(SiosFsSchreiben, UeberschreibenUndAblehnungen) {
     Kopie k(nullptr, "k1520_test_sios_abl.hfe");
     std::string err;
-    { auto v = neueDiskette(k.pfad, "sios_ss40", "ABL", err); ASSERT_TRUE(v) << err; }
-    auto d = direkt(k.pfad, "sios_ss40", false);
+    { auto v = neueDiskette(k.pfad, "sios_ss40_26x128", "ABL", err); ASSERT_TRUE(v) << err; }
+    auto d = direkt(k.pfad, "sios_ss40_26x128", false);
     ASSERT_TRUE(d.fs) << d.error;
     WriteOptions wo, ow;
     ow.overwrite = true;
@@ -607,8 +607,8 @@ TEST(SiosFsSchreiben, UeberschreibenUndAblehnungen) {
 TEST(SiosFsSchreiben, NeunzehnEtikettenDannVoll) {
     Kopie k(nullptr, "k1520_test_sios_19.hfe");
     std::string err;
-    { auto v = neueDiskette(k.pfad, "sios_ss40", "VOLL", err); ASSERT_TRUE(v) << err; }
-    auto d = direkt(k.pfad, "sios_ss40", false);
+    { auto v = neueDiskette(k.pfad, "sios_ss40_26x128", "VOLL", err); ASSERT_TRUE(v) << err; }
+    auto d = direkt(k.pfad, "sios_ss40_26x128", false);
     ASSERT_TRUE(d.fs) << d.error;
     for (int i = 0; i < 19; ++i)
         ASSERT_TRUE(d.fs->write("F" + std::to_string(i), muster(128), WriteOptions{})) << i;
@@ -619,8 +619,8 @@ TEST(SiosFsSchreiben, NeunzehnEtikettenDannVoll) {
 TEST(SiosFsSchreiben, PlatzpruefungOhneSchreiben) {
     Kopie k(nullptr, "k1520_test_sios_fit.hfe");
     std::string err;
-    { auto v = neueDiskette(k.pfad, "sios_ss40", "FIT", err); ASSERT_TRUE(v) << err; }
-    auto d = direkt(k.pfad, "sios_ss40");
+    { auto v = neueDiskette(k.pfad, "sios_ss40_26x128", "FIT", err); ASSERT_TRUE(v) << err; }
+    auto d = direkt(k.pfad, "sios_ss40_26x128");
     ASSERT_TRUE(d.fs) << d.error;
     FitReport r;
     PlannedFile gross; gross.name = "G"; gross.size = 128u * 26 * 40;
@@ -638,7 +638,7 @@ TEST(SiosFsSchreiben, PlatzpruefungOhneSchreiben) {
 
 TEST(SiosFsSchreiben, FehlspurkartenEintragSperrt) {
     Kopie k("sios1526_dp1.hfe", "k1520_test_sios_ermap.hfe");
-    auto d = direkt(k.pfad, "sios_ss40", false);
+    auto d = direkt(k.pfad, "sios_ss40_26x128", false);
     ASSERT_TRUE(d.fs) << d.error;
     SectorData s;
     ASSERT_TRUE(d.space->readSector(0, 0, 5, s));
@@ -653,7 +653,7 @@ TEST(SiosFsSchreiben, FehlspurkartenEintragSperrt) {
 
 TEST(SiosFsSchreiben, BibliothekObjektAnhaengenUndLoeschen) {
     Kopie k("sios1526_sg1.hfe", "k1520_test_sios_bib.hfe");     // PHASELB: 3 Objekte, ND 0087, Groesse 156
-    auto d = direkt(k.pfad, "sios_ss40", false);
+    auto d = direkt(k.pfad, "sios_ss40_26x128", false);
     ASSERT_TRUE(d.fs) << d.error;
     std::vector<uint8_t> vorher;
     ASSERT_TRUE(d.fs->read("PHASELB", vorher));
@@ -717,7 +717,7 @@ TEST(SiosFsSchreiben, BibliothekObjektAnhaengenUndLoeschen) {
 
 TEST(SiosFsSchreiben, BibliothekAblehnungen) {
     Kopie k("sios1526_dp1.hfe", "k1520_test_sios_bib2.hfe");     // 15 Eintraege, voll
-    auto d = direkt(k.pfad, "sios_ss40", false);
+    auto d = direkt(k.pfad, "sios_ss40_26x128", false);
     ASSERT_TRUE(d.fs) << d.error;
     WriteOptions wo;
     EXPECT_FALSE(d.fs->write("PHASELB/XYZ", muster(128), wo));
@@ -732,7 +732,7 @@ TEST(SiosFsSchreiben, BibliothekAblehnungen) {
     EXPECT_FALSE(finde(d.fs->list(), "PHASELB/CATM"));
 
     Kopie k2("sios1526_sg1.hfe", "k1520_test_sios_bib3.hfe");
-    auto d2 = direkt(k2.pfad, "sios_ss40", false);
+    auto d2 = direkt(k2.pfad, "sios_ss40_26x128", false);
     ASSERT_TRUE(d2.fs) << d2.error;
     EXPECT_FALSE(d2.fs->write("SYSORG09/ABC", muster(128), wo));      // keine Bibliothek
     // PHASELB: 156 - 0x87 + 1 = 22 Sektoren frei
@@ -789,7 +789,7 @@ TEST(SiosFsSchreiben, ContainerDmkUndImg) {
         schreibeDatei(quelle, muster(256));
         std::string err;
         {
-            auto v = neueDiskette(k.pfad, "sios_ss40", "CONT", err);
+            auto v = neueDiskette(k.pfad, "sios_ss40_26x128", "CONT", err);
             ASSERT_TRUE(v) << ext << ": " << err;
             TransferOptions to;
             ASSERT_TRUE(v->insert(quelle, FileRef{0, "DATEI"}, to)) << v->lastError();
@@ -797,7 +797,7 @@ TEST(SiosFsSchreiben, ContainerDmkUndImg) {
         }
         std::error_code ec;
         fs::remove(quelle, ec);
-        auto v = DiskVolume::open(k.pfad, "sios_ss40", formate(), dateisysteme(), err);
+        auto v = DiskVolume::open(k.pfad, "sios_ss40_26x128", formate(), dateisysteme(), err);
         ASSERT_TRUE(v) << ext << ": " << err;
         ASSERT_EQ(v->list().size(), 1u) << ext;
         EXPECT_EQ(v->list()[0].size, 256u);
@@ -817,7 +817,7 @@ TEST(SiosFsCheck, OriginaleSindOhneBefund) {
             << datei << "\n" << v->checkReport().alsText();
     }
     std::string err;
-    auto v = oeffne("sios1526_sylp.hfe", err, "sios_ss40");
+    auto v = oeffne("sios1526_sylp.hfe", err, "sios_ss40_26x128");
     ASSERT_TRUE(v) << err;
     EXPECT_EQ(v->checkReport().zaehlerAb(FsSeverity::Warnung), 0) << v->checkReport().alsText();
 }
@@ -829,7 +829,7 @@ TEST(SiosFsCheck, UeberlappendeBereicheWerdenGemeldet) {
     fs::copy_file(fixture("sios1526_sg1.hfe"), pfad, fs::copy_options::overwrite_existing, ec);
     ASSERT_FALSE(ec);
     {
-        auto d = direkt(pfad, "sios_ss40", /*nur_lesen=*/false);
+        auto d = direkt(pfad, "sios_ss40_26x128", /*nur_lesen=*/false);
         ASSERT_TRUE(d.fs) << d.error;
         SectorData s;
         ASSERT_TRUE(d.space->readSector(0, 0, 9, s));
@@ -849,7 +849,7 @@ TEST(SiosFsCheck, UeberlappendeBereicheWerdenGemeldet) {
 // Die Originalspur 0 traegt F8 auf S. 9-26; der treue Lesestrom des K5122 muss sie als F8 mit
 // gueltiger CRC liefern (sonst meldet der SIOS-Treiber Status 90H, doc/sios/befund_init.md).
 TEST(SiosFs, Dp1Spur0LesestromFuehrtF8) {
-    auto d = direkt(fixture("sios1526_dp1.hfe"), "sios_ss40");
+    auto d = direkt(fixture("sios1526_dp1.hfe"), "sios_ss40_26x128");
     ASSERT_TRUE(d.disk) << d.error;
     const auto sek = TrackCodec::parseTrack(d.disk->medium().track(0, 0));
     int geloescht = 0;
@@ -889,19 +889,19 @@ void aendere(Diskette& d, uint8_t cyl, uint8_t sek, F f) {
 TEST(SiosFsCheck, OriginaleHabenGarKeineBefundeAuchKeineHinweise) {
     for (const char* datei : {"sios1526_dp1.hfe", "sios1526_dp2.hfe", "sios1526_sg1.hfe",
                               "sios1526_syls.hfe"}) {
-        auto d = direkt(fixture(datei), std::string(datei) == "sios1526_syls.hfe" ? "sios_ss80" : "sios_ss40");
+        auto d = direkt(fixture(datei), std::string(datei) == "sios1526_syls.hfe" ? "sios_ss80_26x128" : "sios_ss40_26x128");
         ASSERT_TRUE(d.fs) << datei << d.error;
         const FsCheckReport r = d.fs->check(FsCheckLevel::Schnell, false);
         EXPECT_TRUE(r.findings.empty()) << datei << "\n" << r.alsText();
     }
-    auto p = direkt(fixture("sios1526_sylp.hfe"), "sios_ss40");
+    auto p = direkt(fixture("sios1526_sylp.hfe"), "sios_ss40_26x128");
     ASSERT_TRUE(p.fs) << p.error;
     EXPECT_TRUE(p.fs->check(FsCheckLevel::Schnell, false).findings.empty());
 }
 
 TEST(SiosFsCheck, KopfEtikettenFehlen) {
     Kopie k("sios1526_dp1.hfe", "k1520_test_sios_kopf.hfe");
-    auto d = direkt(k.pfad, "sios_ss40", false);
+    auto d = direkt(k.pfad, "sios_ss40_26x128", false);
     ASSERT_TRUE(d.fs) << d.error;
     aendere(d, 0, 5, [](std::vector<uint8_t>& b) { std::fill(b.begin(), b.begin() + 5, 0x40); });
     aendere(d, 0, 7, [](std::vector<uint8_t>& b) { std::fill(b.begin(), b.begin() + 4, 0x40); });
@@ -912,7 +912,7 @@ TEST(SiosFsCheck, KopfEtikettenFehlen) {
 
 TEST(SiosFsCheck, BibliotheksVerzeichnisGegenBelegung) {
     Kopie k("sios1526_dp1.hfe", "k1520_test_sios_bibcheck.hfe");   // PHASELB ab Spur 1; Verz. = Spur 1 Sektor 2
-    auto d = direkt(k.pfad, "sios_ss40", false);
+    auto d = direkt(k.pfad, "sios_ss40_26x128", false);
     ASSERT_TRUE(d.fs) << d.error;
     // Geloeschter Eintrag (Name blank) mit gleichem AADR wie der Nachbar zaehlt NICHT.
     aendere(d, 1, 2, [](std::vector<uint8_t>& b) {
@@ -939,7 +939,7 @@ TEST(SiosFsCheck, BibliotheksVerzeichnisGegenBelegung) {
 
 TEST(SiosFsCheck, DatenmarkenUndReparatur) {
     Kopie k("sios1526_sg1.hfe", "k1520_test_sios_marken.hfe");
-    auto d = direkt(k.pfad, "sios_ss40", false);
+    auto d = direkt(k.pfad, "sios_ss40_26x128", false);
     ASSERT_TRUE(d.fs) << d.error;
     SectorData s9, s12;
     ASSERT_TRUE(d.space->readSector(0, 0, 9, s9));      // PHASELB, aktiv
@@ -981,7 +981,7 @@ TEST(SiosRecover, OriginaleHabenNichtsZuRettenAuchDieDdr1PlatzhalterNicht) {
 
 TEST(SiosRecover, GeloeschteDateiRettenUndWiederherstellen) {
     Kopie k("sios1526_sg1.hfe", "k1520_test_sios_rec1.hfe");
-    auto d = direkt(k.pfad, "sios_ss40", false);
+    auto d = direkt(k.pfad, "sios_ss40_26x128", false);
     ASSERT_TRUE(d.fs) << d.error;
     std::vector<uint8_t> vorher;
     ASSERT_TRUE(d.fs->read("SYSORG09", vorher));
@@ -1013,7 +1013,7 @@ TEST(SiosRecover, GeloeschteDateiRettenUndWiederherstellen) {
 
 TEST(SiosRecover, BelegterBereichIstBruchstueckUndNichtWiederherstellbar) {
     Kopie k("sios1526_sg1.hfe", "k1520_test_sios_rec2.hfe");
-    auto d = direkt(k.pfad, "sios_ss40", false);
+    auto d = direkt(k.pfad, "sios_ss40_26x128", false);
     ASSERT_TRUE(d.fs) << d.error;
     // A (Sektor 10, Spur 35) und B (Sektor 11, Spur 36) anlegen und loeschen; ein neues, zwei
     // Spuren grosses NEU nimmt A's Etikettensatz UND die Spuren 35-36: B's DDR1 bleibt, B's Bereich ist weg.
@@ -1037,7 +1037,7 @@ TEST(SiosRecover, BelegterBereichIstBruchstueckUndNichtWiederherstellbar) {
 
 TEST(SiosRecover, NurFuellbytesIstNurInDerOberflaechensucheSichtbar) {
     Kopie k("sios1526_sg1.hfe", "k1520_test_sios_rec3.hfe");
-    auto d = direkt(k.pfad, "sios_ss40", false);
+    auto d = direkt(k.pfad, "sios_ss40_26x128", false);
     ASSERT_TRUE(d.fs) << d.error;
     ASSERT_TRUE(d.fs->write("LEER", std::vector<uint8_t>(128, 0xE5), WriteOptions{}));
     ASSERT_TRUE(d.fs->erase("LEER"));
@@ -1052,7 +1052,7 @@ TEST(SiosRecover, NurFuellbytesIstNurInDerOberflaechensucheSichtbar) {
 
 TEST(SiosRecover, GeloeschtesObjektBrauchtEinenNamen) {
     Kopie k("sios1526_sg1.hfe", "k1520_test_sios_rec4.hfe");
-    auto d = direkt(k.pfad, "sios_ss40", false);
+    auto d = direkt(k.pfad, "sios_ss40_26x128", false);
     ASSERT_TRUE(d.fs) << d.error;
     std::vector<uint8_t> vorher;
     ASSERT_TRUE(d.fs->read("PHASELB/SOPH", vorher));

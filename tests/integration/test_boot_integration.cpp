@@ -53,7 +53,7 @@ constexpr uint16_t kLoadAddr     = 0x0400;  // boot ROM load address (ZVE2 → R
 constexpr uint16_t kDoneFlagAddr = 0x03F8;  // ZVE1↔ZVE2 handshake flag
 constexpr uint8_t  kDoneValue    = 0x03;    // ZVE2 wrote "all sectors copied"
 constexpr int      kBootSectors  = 4;       // ROM [0x07F2]=4 → loads sectors 1..4
-constexpr int      kSectorBytes  = 128;     // cpa780 boot track: 128-byte sectors
+constexpr int      kSectorBytes  = 128;     // cpa_ds80_5x1024_boot boot track: 128-byte sectors
 constexpr int      kBootBytes    = kBootSectors * kSectorBytes;  // 512
 
 /// Laufen lassen, bis ZVE2 den DMA-Abschluss meldet ([0x03F8]==3).
@@ -257,7 +257,7 @@ TEST(BootIntegration, Stage3_FullyLoadsAndJumpsToOs) {
 
 // ─── cpa_cpa780_k5601_noclock — same disk in two encodings (.img raw + .hfe HxC) ────────────
 //
-// disks/cpa_cpa780_k5601_noclock.img (raw cpa780) and disks/cpa_cpa780_k5601_noclock.hfe (HxC HFE v1, produced
+// disks/cpa_cpa780_k5601_noclock.img (raw cpa_ds80_5x1024_boot) and disks/cpa_cpa780_k5601_noclock.hfe (HxC HFE v1, produced
 // by real HxC tooling — track_encoding=0xFF, treated as MFM) are two encodings of
 // the SAME disk: a CP/A system *without* a real-time clock.  These two tests prove
 // that the new K5122 controller boots BOTH formats through every stage into the
@@ -279,7 +279,7 @@ TEST(BootIntegration, Stage3_FullyLoadsAndJumpsToOs) {
 constexpr int kCpa02BudgetCycles = 90'000'000;
 
 // Mount cpa_cpa780_k5601_noclock by name.  Raw .img and self-describing .hfe both mount via the
-// same call; for HFE the "cpa780" format name is looked up (must exist) but ignored
+// same call; for HFE the "cpa_ds80_5x1024_boot" format name is looked up (must exist) but ignored
 // by the HFE backend, which reads geometry/encoding from the file header.
 void mountCpa02(A5120Machine& m, const char* name) {
     ASSERT_TRUE(m.mountDisk(0, diskPath(name), "cpa780", /*wp=*/false))
@@ -483,7 +483,7 @@ TEST(BootIntegrationDriveBC, ClockHfe_FromDriveC) {
 // ─── Voller CP/A-Boot bis zur Uhrzeit-Eingabe (per-Byte-/BUSRQ-Modell) ────────
 //
 // Kanonischer „bootet vollstaendig durch"-Test: cpa_cpa780_k5601_clock (Boot-Disk MIT
-// Echtzeituhr, Format = cpa780 mit aktiver autom. Formaterkennung im Config) wird
+// Echtzeituhr, Format = cpa_ds80_5x1024_boot mit aktiver autom. Formaterkennung im Config) wird
 // auf A: (Laufwerk 0) gemountet und durchlaeuft ALLE Loader-Stufen (Boot-ROM →
 // Sekundaerlader → 3. Stufe @OS.COM → CP/A-Kaltstart) bis zur Aufforderung
 // "Bitte Uhrzeit eingeben!".  Das ist der erwartete interaktive Endzustand des
@@ -598,7 +598,7 @@ TEST(BootIntegration, RestartFromInteractivePromptRebootsFromRom) {
 
         ASSERT_NO_FATAL_FAILURE(blankVram(machine));
         ASSERT_TRUE(machine.mountDisk(0, diskPath("cpa_cpa780_k5601_clock.img"),
-                                      "cpa780", /*wp=*/false)) << machine.lastError();
+                                      "cpa_ds80_5x1024_boot", /*wp=*/false)) << machine.lastError();
         if (power_cycle) machine.powerOn(); else machine.reset();
 
         EXPECT_TRUE(runUntilPC(machine, 0x1800, 40'000'000))
@@ -1098,7 +1098,7 @@ TEST(CreateDiskFormatted, K5601_DefaultIstCpa800) {
     ASSERT_TRUE(machine.createDisk(0, path, machine.defaultFormatName(0), /*wp=*/false))
         << machine.lastError();
     EXPECT_TRUE(machine.isDiskActive(0));
-    EXPECT_EQ(std::filesystem::file_size(path), 80u * 2 * 5 * 1024);  // cpa800 = 800K
+    EXPECT_EQ(std::filesystem::file_size(path), 80u * 2 * 5 * 1024);  // cpa_ds80_5x1024_daten = 800K
     machine.unmountDisk(0);
 }
 

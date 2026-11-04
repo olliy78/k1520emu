@@ -2,6 +2,6 @@
 # die Gegenprobe der tar-Profile auf derselben Geometrie ss77_1t26x128-8x512 verdraengt nichts.
 tool:   k1520disktool
 run:    info %CLI_DIR%/../../disks/a5120_mutos8000/a5120_mutos8000_cc1.td0
-expect: mutos8k_8x512_mfm
+expect: mutos8k_ss77_8x512
 forbid: tar_mutos8k
 exit:   0

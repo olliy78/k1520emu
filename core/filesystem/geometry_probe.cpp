@@ -130,7 +130,7 @@ std::vector<MeasuredTrack> measureSample(const DiskMedium& medium) {
     };
 
     // 1. Systemspuren.  Zylinder 3 ist die Sonde des CP/A-BIOS (`dlgint`) und trennt
-    //    die meisten Formate; 0–2 tragen bei gemischter Geometrie (cpa780) die
+    //    die meisten Formate; 0–2 tragen bei gemischter Geometrie (cpa_ds80_5x1024_boot) die
     //    128-B-Spuren, die sonst niemand sieht.
     for (uint8_t c = 0; c < 4 && c < ncyl; ++c) hole(c, 0);
     if (nhead > 1) hole(0, 1);
@@ -140,7 +140,7 @@ std::vector<MeasuredTrack> measureSample(const DiskMedium& medium) {
     //    Ohne sie urteilt die Stichprobe ueber eine Diskette, deren Ende sie nicht
     //    kennt: sondiert sie fest bei 77/78 und sind die unformatiert (Altbestand
     //    einer kuerzeren Formatierung), gilt die Diskette als 41 Zylinder lang, und
-    //    `udos_ss77` faellt mit „deklariert 77, beschrieben 41" durch — die
+    //    `udos_ss77_26x128` faellt mit „deklariert 77, beschrieben 41" durch — die
     //    Stichprobe nahm dann `k5601_ss40_26x128`.  Die Suche kostet ~log2(n) Spuren.
     //
     //    „Beschrieben" wird dabei ueber ZWEI benachbarte Zylinder geprueft: bei einer
@@ -377,7 +377,7 @@ GeometryMatch match(const std::vector<MeasuredTrack>& tracks, const DiskFormat& 
     for (const auto& t : tracks)
         if (t.formatted && fmt.logicalCylinder(t.cyl) >= 0) ++beschrieben;
     // ... aber NUR ueber eine Vollmessung.  Ein Verhaeltnis ueber acht angesehene
-    // Spuren ist keine Aussage ueber die Diskette: bei `udos_ss77` liegen 2 von 7
+    // Spuren ist keine Aussage ueber die Diskette: bei `udos_ss77_26x128` liegen 2 von 7
     // Sondenspuren ausserhalb (die Altbestandsspuren 77/78) — 28 %, also „anderes
     // Format", waehrend es ueber die ganze Diskette 3 von 80 sind (3,75 %).  So
     // verwarf die Stichprobe das richtige Format und nahm ein zu kleines.

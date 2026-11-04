@@ -47,7 +47,7 @@ def lage(request, freigabe, tmp_path_factory):
     if not sz.abbild.exists():
         pytest.skip(f"Abbild fehlt: {sz.abbild}")
     ordner = tmp_path_factory.mktemp(f"h9_{sz.name}")
-    # Erst loeschen: ein Abbild mit weniger Zylindern (udos_ds77: 77) liesse sonst den
+    # Erst loeschen: ein Abbild mit weniger Zylindern (udos_ds77_26x128: 77) liesse sonst den
     # alten Inhalt auf den uebrigen stehen — live gelesen waere != Datei.
     diskette_loeschen()
     schreibe_abbild(sz.abbild)

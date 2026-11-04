@@ -6,9 +6,9 @@
  * gebauten Diskette startet:
  *  - **CP/A 1715 ohne Systemspuren:** der Bootkopf (`F003H`) steht in Verzeichnisplatz 0, die
  *    Laufwerks-Parametersaetze in einem Platz mit Nutzerbyte `F0` — beides gehoert dem Urlader S502,
- *    nicht dem Dateisystem.  Erkennung (`cpa1715`), `ls`/`get`, Schreiben laesst beide unangetastet,
+ *    nicht dem Dateisystem.  Erkennung (`cpa1715_ds80_5x1024_boot`), `ls`/`get`, Schreiben laesst beide unangetastet,
  *    `fsck` meldet sie nicht.
- *  - **SCP 1715 / SCP 3.0 mit Systemspuren:** `boot-get` → `create --fs scp1715 --boot` + Dateien;
+ *  - **SCP 1715 / SCP 3.0 mit Systemspuren:** `boot-get` → `create --fs scp1715_ds80_5x1024_boot --boot` + Dateien;
  *    der Ladekopf wird VOR dem Schreiben geprueft (A5120-SYL-Kopf abgelehnt).
  *  - **Alle PC-1715-Abzuege** (`tests/fixtures/disks/pc1715*.hfe`) gegen die Tabelle in
  *    `doc/pc1715/disketten.md`: Format, Dateisystem, Dateizahl, keine Falschmeldung.
@@ -156,15 +156,15 @@ static const Abzug kAbzuege[] = {
     // dieselbe + PCTEST.COM (AP-4f, Werkstest unter SCP)
     {"pc1715_scp1715_v0006_pctest.hfe", "ds80_5x1024", "cpa_auto", 10},
     // SCP 1715 V0007 (16×256): zweites Format, Katalogprofil
-    {"pc1715_scp1715_v0007_cpa640_boot.hfe", "ds80_16x256", "scpx640", 4},
+    {"pc1715_scp1715_v0007_cpa640_boot.hfe", "ds80_16x256", "scpx_ds80_16x256_boot", 4},
     // CP/A 1715: KEINE Systemspuren, Bootkopf im Verzeichnis — vorher „nicht erkannt"
-    {"pc1715_cpa1715_boot_4lw.hfe", "ds80_5x1024", "cpa1715", 49},
+    {"pc1715_cpa1715_boot_4lw.hfe", "ds80_5x1024", "cpa1715_ds80_5x1024_boot", 49},
     // CP/A 1715 aus der CPA-Workbench gebaut (AP-3b, Bootkopf F003H, PCTEST.COM dabei)
-    {"pc1715_cpa1715_workbench.hfe", "ds80_5x1024", "cpa1715", 22},
+    {"pc1715_cpa1715_workbench.hfe", "ds80_5x1024", "cpa1715_ds80_5x1024_boot", 22},
     // UDOS 1715
-    {"pc1715_udos1715_system.hfe", "ds80_16x256", "udos1715", 67},
+    {"pc1715_udos1715_system.hfe", "ds80_16x256", "udos1715_ds80_16x256", 67},
     // CP/Z 2.2
-    {"pc1715_cpz22_boot.hfe", "ds80_16x256", "scpx640", 35},
+    {"pc1715_cpz22_boot.hfe", "ds80_16x256", "scpx_ds80_16x256_boot", 35},
     // SCP 3.0 (1715W)
     {"pc1715w_scp30_system.hfe", "ds80_5x1024", "cpa_auto", 42},
 };
@@ -200,12 +200,12 @@ TEST(DisktoolPc1715, ErkenntJedenAbzugMitDateizahlUndOhneFalschmeldung) {
     EXPECT_EQ(gefunden, static_cast<int>(std::size(kAbzuege)));
 }
 
-/// @test Nur der Bootkopf macht aus einer Datendiskette ohne Systemspuren eine `cpa1715`: dieselbe
-///       Geometrie ohne `F003H` bleibt `cpa800` (sonst waere jede 800K-Diskette „nicht eindeutig").
+/// @test Nur der Bootkopf macht aus einer Datendiskette ohne Systemspuren eine `cpa1715_ds80_5x1024_boot`: dieselbe
+///       Geometrie ohne `F003H` bleibt `cpa_ds80_5x1024_daten` (sonst waere jede 800K-Diskette „nicht eindeutig").
 TEST(DisktoolPc1715, DatendisketteOhneBootkopfBleibtCpa800) {
     TempPfad pfad("k1520_pc1715_daten.hfe");
     std::string err;
-    auto neu = DiskVolume::create(pfad.get(), "cpa800", "", formate(), dateisysteme(), err);
+    auto neu = DiskVolume::create(pfad.get(), "cpa_ds80_5x1024_daten", "", formate(), dateisysteme(), err);
     ASSERT_NE(neu, nullptr) << err;
     ASSERT_TRUE(lege(*neu, "TEST.TXT", std::vector<uint8_t>(300, 'x'))) << neu->lastError();
     ASSERT_TRUE(neu->flush());
@@ -213,7 +213,7 @@ TEST(DisktoolPc1715, DatendisketteOhneBootkopfBleibtCpa800) {
 
     auto dv = oeffne(pfad.get());
     ASSERT_NE(dv, nullptr);
-    EXPECT_EQ(dv->detection().filesystem, "cpa800");
+    EXPECT_EQ(dv->detection().filesystem, "cpa_ds80_5x1024_daten");
     EXPECT_TRUE(dv->detection().unambiguous);
 }
 
@@ -229,7 +229,7 @@ TEST(DisktoolPc1715, Cpa1715BootbereichBleibtBeimSchreibenUnangetastet) {
         auto dv = oeffne(d.path(), /*schreibend=*/true);
         ASSERT_NE(dv, nullptr);
         dv->setBackup(false);
-        ASSERT_EQ(dv->profile().name, "cpa1715");
+        ASSERT_EQ(dv->profile().name, "cpa1715_ds80_5x1024_boot");
         ASSERT_TRUE(dv->readBootImage(vorher));
         ASSERT_EQ(vorher.size(), 128u);
         ASSERT_EQ(vorher[0], 0x03);
@@ -253,7 +253,7 @@ TEST(DisktoolPc1715, Cpa1715BootbereichBleibtBeimSchreibenUnangetastet) {
 
     auto dv = oeffne(d.path());
     ASSERT_NE(dv, nullptr);
-    EXPECT_EQ(dv->profile().name, "cpa1715");
+    EXPECT_EQ(dv->profile().name, "cpa1715_ds80_5x1024_boot");
     std::vector<uint8_t> nachher;
     ASSERT_TRUE(dv->readBootImage(nachher));
     // Platz 0 (Bootkopf) und Platz 3 (Parametersaetze) bitgleich; Platz 1/2 sind Dateieintraege
@@ -279,7 +279,7 @@ TEST(DisktoolPc1715, Cpa1715BootbereichBleibtBeimSchreibenUnangetastet) {
 }
 
 /**
- * @test CP/A 1715 → `boot-get` → `create --fs cpa1715 --boot` → `@OS.COM` zuerst → bootet in
+ * @test CP/A 1715 → `boot-get` → `create --fs cpa1715_ds80_5x1024_boot --boot` → `@OS.COM` zuerst → bootet in
  *       `Pc1715Machine` bis `A>`.  `@OS.COM` muss auf Block 3 landen, weil der Bootkopf es dort
  *       sucht (Ladeliste ab Byte 0CH) — die erste Datei einer frischen Diskette tut es.
  */
@@ -295,7 +295,7 @@ TEST(DisktoolPc1715, GebauteCpa1715BootdisketteBootetBisPrompt) {
 
     TempPfad pfad("k1520_pc1715_cpa_neu.hfe");
     std::string err;
-    auto neu = DiskVolume::create(pfad.get(), "cpa1715", "", formate(), dateisysteme(), err,
+    auto neu = DiskVolume::create(pfad.get(), "cpa1715_ds80_5x1024_boot", "", formate(), dateisysteme(), err,
                                   kopfDatei.get());
     ASSERT_NE(neu, nullptr) << err;
     EXPECT_EQ(neu->bootAreaSize(), 128u);
@@ -308,7 +308,7 @@ TEST(DisktoolPc1715, GebauteCpa1715BootdisketteBootetBisPrompt) {
     {
         auto dv = oeffne(pfad.get());
         ASSERT_NE(dv, nullptr);
-        EXPECT_EQ(dv->detection().filesystem, "cpa1715");
+        EXPECT_EQ(dv->detection().filesystem, "cpa1715_ds80_5x1024_boot");
         EXPECT_EQ(dv->list().size(), 2u);
         std::vector<uint8_t> k2;
         ASSERT_TRUE(dv->readBootImage(k2));
@@ -334,7 +334,7 @@ TEST(DisktoolPc1715, FremdesBootabbildWirdAbgewiesen) {
     TempPfad sylDatei("k1520_pc1715_syl.bin");
     schreibe(sylDatei.get(), syl);
 
-    for (const char* profil : {"cpa1715", "scp1715"}) {
+    for (const char* profil : {"cpa1715_ds80_5x1024_boot", "scp1715_ds80_5x1024_boot"}) {
         TempPfad pfad("k1520_pc1715_syl.hfe");
         std::string err;
         auto neu = DiskVolume::create(pfad.get(), profil, "", formate(), dateisysteme(), err,
@@ -360,7 +360,7 @@ TEST(DisktoolPc1715, FremdesBootabbildWirdAbgewiesen) {
 }
 
 /**
- * @test SCP 1715: Systemspuren (20 KB) per `boot-get` herausholen, `create --fs scp1715 --boot`,
+ * @test SCP 1715: Systemspuren (20 KB) per `boot-get` herausholen, `create --fs scp1715_ds80_5x1024_boot --boot`,
  *       alle 9 Dateien zurueck — bootet bis `A>` mit dem Banner des Originals.
  */
 TEST(DisktoolPc1715, GebauteScp1715BootdisketteBootetBisPrompt) {
@@ -378,7 +378,7 @@ TEST(DisktoolPc1715, GebauteScp1715BootdisketteBootetBisPrompt) {
 
     TempPfad pfad("k1520_pc1715_scp_neu.hfe");
     std::string err;
-    auto neu = DiskVolume::create(pfad.get(), "scp1715", "", formate(), dateisysteme(), err,
+    auto neu = DiskVolume::create(pfad.get(), "scp1715_ds80_5x1024_boot", "", formate(), dateisysteme(), err,
                                   bandDatei.get());
     ASSERT_NE(neu, nullptr) << err;
     kopiereAlle(*q, *neu);
@@ -418,7 +418,7 @@ TEST(DisktoolPc1715, GebauteScp30BootdisketteBootetBisPrompt) {
 
     TempPfad pfad("k1520_pc1715_scp30_neu.hfe");
     std::string err;
-    auto neu = DiskVolume::create(pfad.get(), "scp1715", "", formate(), dateisysteme(), err,
+    auto neu = DiskVolume::create(pfad.get(), "scp1715_ds80_5x1024_boot", "", formate(), dateisysteme(), err,
                                   bandDatei.get());
     ASSERT_NE(neu, nullptr) << err;
     kopiereAlle(*q, *neu);

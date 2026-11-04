@@ -1,7 +1,7 @@
 # tools/scpx_a5120 — SCPX-Systemdiskette des A5120
 
 `python3 tools/scpx_a5120/build.py --tool build/k1520disktool` baut `disks/a5120_scpx17/a5120_scpx17_k5601_system.hfe`
-(`--check` = Wächter `cli_scpx_a5120`). Betriebssystem **SCPX 1526 V 1.7 (52K)**, Format **5 × 1024** (`scpx798`, K5601 — wie die
+(`--check` = Wächter `cli_scpx_a5120`). Betriebssystem **SCPX 1526 V 1.7 (52K)**, Format **5 × 1024** (`scpx_ds80_5x1024_boot`, K5601 — wie die
 anderen Systemdisketten des Pakets). Anwenderbeschreibung: `inhalt/LIESMICH.TXT`; Inventur und Entscheidungen: `doc/scp_inventur.md`.
 
 | Quelle | Inhalt |

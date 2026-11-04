@@ -1,7 +1,7 @@
 /**
  * @file test_tar_mutos.cpp
  * @brief GoogleTests fuer tar-Disketten und tar-Saetze im MUTOS-8000-Layout
- *        (Profile tar_mutos8k_26x128_mfm / tar_mutos8k_26x128_fm, Entwurf 39 Teil A, Merkposten tar_satz.md Nr. 17).
+ *        (Profile tar_ss77_26x128 / tar_fm_ss77_26x128, Entwurf 39 Teil A, Merkposten tar_satz.md Nr. 17).
  *
  * Das V7-`tar` des MUTOS schreibt seinen Strom auf das Rohgeraet /dev/rrkN: 512-B-Bloecke ab
  * Zylinder 1, Verschraenkung 2, Spurversatz 6, 494 Bloecke je Diskette.  Die Abbildung steht hier
@@ -169,7 +169,7 @@ TEST(TarMutos, LiestEineVonMutosGeschriebeneEinzeldiskette) {
     std::string err;
     auto v = DiskVolume::open(d.path(), "", formate(), dateisysteme(), err);
     ASSERT_TRUE(v) << err;
-    EXPECT_EQ(v->detection().filesystem, "tar_mutos8k_26x128_mfm");
+    EXPECT_EQ(v->detection().filesystem, "tar_ss77_26x128");
     EXPECT_EQ(v->detection().format, "ss77_26x128");
     ASSERT_EQ(namen(*v), std::vector<std::string>{"crt0.o"});
     EXPECT_EQ(inhalt(*v, "crt0.o").size(), 200u);
@@ -182,7 +182,7 @@ TEST(TarMutos, LiestDenMehrdisketten_SatzDenMutosMitDdGeschriebenHat) {
     auto v = DiskVolume::openTarSatz({a.path(), b.path()}, formate(), dateisysteme(), err);
     ASSERT_TRUE(v) << err;
     EXPECT_EQ(v->list().size(), 35u);
-    EXPECT_EQ(v->detection().filesystem, "tar_mutos8k_26x128_mfm");
+    EXPECT_EQ(v->detection().filesystem, "tar_ss77_26x128");
     EXPECT_EQ(v->tarSatzPlanen().kapazitaet, uint64_t(kStromBytes));
     const auto date = inhalt(*v, "bin/date");
     EXPECT_EQ(date.size(), 5774u);
@@ -190,8 +190,8 @@ TEST(TarMutos, LiestDenMehrdisketten_SatzDenMutosMitDdGeschriebenHat) {
     // Gegenprobe: Strom aus den Sektoren mit der EIGENEN Formel, System-tar liest ihn.
     if (!systemTarDa()) GTEST_SKIP() << "kein tar im System";
     Ordner o("tarmutos_lesen_satz");
-    auto s = rohgeraet(a.path(), "udos_ss77");
-    const auto s2 = rohgeraet(b.path(), "udos_ss77");
+    auto s = rohgeraet(a.path(), "ss77_26x128");
+    const auto s2 = rohgeraet(b.path(), "ss77_26x128");
     s.insert(s.end(), s2.begin(), s2.end());
     schreibeDatei(o / "alles.tar", s);
     fs::create_directories(o / "aus");
@@ -204,10 +204,10 @@ TEST(TarMutos, LiestDenMehrdisketten_SatzDenMutosMitDdGeschriebenHat) {
 TEST(TarMutos, SatzRundlaufInAllenContainernUndBeidenAufzeichnungen) {
     struct Fall { const char* profil; const char* format; const char* ext; };
     const Fall faelle[] = {
-        {"tar_mutos8k_26x128_mfm", "udos_ss77",     "hfe"},
-        {"tar_mutos8k_26x128_mfm", "udos_ss77",     "dmk"},
-        {"tar_mutos8k_26x128_mfm", "udos_ss77",     "img"},
-        {"tar_mutos8k_26x128_fm",  "fm_ss77_26x128", "hfe"},
+        {"tar_ss77_26x128", "ss77_26x128",     "hfe"},
+        {"tar_ss77_26x128", "ss77_26x128",     "dmk"},
+        {"tar_ss77_26x128", "ss77_26x128",     "img"},
+        {"tar_fm_ss77_26x128",  "fm_ss77_26x128", "hfe"},
     };
     for (const Fall& fa : faelle) {
         SCOPED_TRACE(std::string(fa.profil) + "." + fa.ext);
@@ -247,7 +247,7 @@ TEST(TarMutos, SatzRundlaufInAllenContainernUndBeidenAufzeichnungen) {
         EXPECT_EQ(inhalt(*r, "c.bin"), c);
         EXPECT_EQ(inhalt(*r, "d.bin"), d);
 
-        // ... auch mit vorgegebenem Profil (wie `--format tar_mutos8k_26x128_mfm`)
+        // ... auch mit vorgegebenem Profil (wie `--format tar_ss77_26x128`)
         auto r2 = DiskVolume::openTarSatz({n1, n2}, formate(), dateisysteme(), err, fa.profil);
         ASSERT_TRUE(r2) << err;
         EXPECT_EQ(inhalt(*r2, "d.bin"), d);
@@ -269,7 +269,7 @@ TEST(TarMutos, SatzBearbeitenDateiHinzufuegenUndEntfernen) {
     Ordner o("tarmutos_satz_bearbeiten");
     std::string err;
     {
-        auto v = DiskVolume::tarSatzNeu("tar_mutos8k_26x128_mfm", o / "s.hfe", formate(), dateisysteme(), err);
+        auto v = DiskVolume::tarSatzNeu("tar_ss77_26x128", o / "s.hfe", formate(), dateisysteme(), err);
         ASSERT_TRUE(v) << err;
         ASSERT_TRUE(einfuegen(*v, quelle(o, "g1.bin", muster(150000, 11)), "g1.bin"));
         ASSERT_TRUE(einfuegen(*v, quelle(o, "g2.bin", muster(150000, 12)), "g2.bin"));
@@ -289,7 +289,7 @@ TEST(TarMutos, SatzBearbeitenDateiHinzufuegenUndEntfernen) {
     // die zweite Nummer bleibt liegen (nie stillschweigend loeschen), s1 traegt alles
     auto r = DiskVolume::open(n1, "", formate(), dateisysteme(), err);
     ASSERT_TRUE(r) << err;
-    EXPECT_EQ(r->detection().filesystem, "tar_mutos8k_26x128_mfm");
+    EXPECT_EQ(r->detection().filesystem, "tar_ss77_26x128");
     EXPECT_EQ(inhalt(*r, "klein.bin"), neu);
     EXPECT_EQ(inhalt(*r, "g2.bin"), muster(150000, 12));
     for (const std::string& n : namen(*r)) EXPECT_NE(n, "g1.bin");
@@ -298,9 +298,9 @@ TEST(TarMutos, SatzBearbeitenDateiHinzufuegenUndEntfernen) {
 // ── Einzeldiskette: leer anlegen, beschreiben, Zylinder 0 bleibt ─────────────
 
 TEST(TarMutos, LeereDisketteHatNullenImDatenbereichUndLaesstZylinder0Liegen) {
-    for (const char* profil : {"tar_mutos8k_26x128_mfm", "tar_mutos8k_26x128_fm"}) {
+    for (const char* profil : {"tar_ss77_26x128", "tar_fm_ss77_26x128"}) {
         SCOPED_TRACE(profil);
-        const std::string fmt = std::string(profil) == "tar_mutos8k_26x128_fm" ? "fm_ss77_26x128" : "udos_ss77";
+        const std::string fmt = std::string(profil) == "tar_fm_ss77_26x128" ? "fm_ss77_26x128" : "ss77_26x128";
         Ordner o(std::string("tarmutos_leer_") + profil);
         std::string err;
         // Vergleichsstand: dieselbe Diskette frisch formatiert (E5), ohne tar
@@ -333,7 +333,7 @@ TEST(TarMutos, EinzeldisketteBeschreibenSpeichernUndWiederLesen) {
     std::string err;
     const auto a = muster(300, 21), b = muster(30000, 22);
     {
-        auto v = DiskVolume::tarDisketteNeu(o / "e.hfe", "tar_mutos8k_26x128_mfm", formate(), dateisysteme(), err);
+        auto v = DiskVolume::tarDisketteNeu(o / "e.hfe", "tar_ss77_26x128", formate(), dateisysteme(), err);
         ASSERT_TRUE(v) << err;
         ASSERT_TRUE(einfuegen(*v, quelle(o, "a.bin", a), "a.bin")) << v->lastError();
         ASSERT_TRUE(einfuegen(*v, quelle(o, "b.bin", b), "b.bin")) << v->lastError();
@@ -343,7 +343,7 @@ TEST(TarMutos, EinzeldisketteBeschreibenSpeichernUndWiederLesen) {
     {
         auto v = DiskVolume::open(o / "e.hfe", "", formate(), dateisysteme(), err, false);
         ASSERT_TRUE(v) << err;
-        EXPECT_EQ(v->detection().filesystem, "tar_mutos8k_26x128_mfm");
+        EXPECT_EQ(v->detection().filesystem, "tar_ss77_26x128");
         EXPECT_EQ(inhalt(*v, "a.bin"), a);
         EXPECT_EQ(inhalt(*v, "b.bin"), b);
         ASSERT_TRUE(v->erase(FileRef::parse("a.bin", 0))) << v->lastError();
@@ -351,19 +351,19 @@ TEST(TarMutos, EinzeldisketteBeschreibenSpeichernUndWiederLesen) {
         ASSERT_TRUE(v->flush()) << v->lastError();
     }
     // Alles entfernt: wieder ein leeres Archiv, der Datenbereich ganz Null (kein Rest alter Bloecke)
-    const auto strom = rohgeraet(o / "e.hfe", "udos_ss77");
+    const auto strom = rohgeraet(o / "e.hfe", "ss77_26x128");
     EXPECT_TRUE(tar::alleNull(strom.data(), strom.size()));
     auto r = DiskVolume::open(o / "e.hfe", "", formate(), dateisysteme(), err);
     ASSERT_TRUE(r) << err;
-    EXPECT_EQ(r->detection().filesystem, "tar_mutos8k_26x128_mfm_leer");
+    EXPECT_EQ(r->detection().filesystem, "tar_ss77_26x128_leer");
 }
 
 TEST(TarMutos, AnlegenMitCreateFuerAlleLeerenProfileUndContainer) {
-    for (const char* profil : {"tar_mutos8k_26x128_mfm_leer", "tar_mutos8k_26x128_fm_leer"}) {
+    for (const char* profil : {"tar_ss77_26x128_leer", "tar_fm_ss77_26x128_leer"}) {
         for (const char* ext : {"hfe", "dmk", "img"}) {
             // Ein .img traegt kein Aufzeichnungsverfahren: 77 x 26 x 128 ist ohne Angabe immer MFM
             // (K5601); die FM-Fassung als .img oeffnet man mit --fs / vorgegebenem Profil.
-            if (std::string(ext) == "img" && std::string(profil) == "tar_mutos8k_26x128_fm_leer") continue;
+            if (std::string(ext) == "img" && std::string(profil) == "tar_fm_ss77_26x128_leer") continue;
             SCOPED_TRACE(std::string(profil) + "." + ext);
             Ordner o(std::string("tarmutos_create_") + profil + "_" + ext);
             std::string err;
@@ -383,30 +383,30 @@ TEST(TarMutos, AndereDisketteGleicherGeometrieBleibenWasSieSind) {
     Ordner o("tarmutos_erkennung");
     std::string err;
     {   // leere UDOS-Diskette (E5 ueberall): bleibt UDOS, nicht "leeres tar"
-        auto v = DiskVolume::create(o / "u.hfe", "udos_ss77", "", formate(), dateisysteme(), err);
+        auto v = DiskVolume::create(o / "u.hfe", "udos_ss77_26x128", "", formate(), dateisysteme(), err);
         ASSERT_TRUE(v) << err;
     }
     {   // MUTOS-Dateisystem auf derselben Geometrie
-        auto v = DiskVolume::create(o / "m.hfe", "mutos8k_26x128_mfm", "", formate(), dateisysteme(), err);
+        auto v = DiskVolume::create(o / "m.hfe", "mutos8k_ss77_26x128", "", formate(), dateisysteme(), err);
         ASSERT_TRUE(v) << err;
     }
     auto u = DiskVolume::open(o / "u.hfe", "", formate(), dateisysteme(), err);
     ASSERT_TRUE(u) << err;
-    EXPECT_EQ(u->detection().filesystem, "udos_ss77");
+    EXPECT_EQ(u->detection().filesystem, "udos_ss77_26x128");
     auto m = DiskVolume::open(o / "m.hfe", "", formate(), dateisysteme(), err);
     ASSERT_TRUE(m) << err;
-    EXPECT_EQ(m->detection().filesystem, "mutos8k_26x128_mfm");
+    EXPECT_EQ(m->detection().filesystem, "mutos8k_ss77_26x128");
 }
 
 TEST(TarMutos, FormatlisteNenntDieMutosProfileMitDerKapazitaetDesRohgeraets) {
     bool mfm = false, fm = false;
     for (const TarFormatInfo& i : DiskVolume::tarFormate(formate(), dateisysteme())) {
-        if (i.name == "tar_mutos8k_26x128_mfm") { mfm = true; EXPECT_EQ(i.bytes, uint64_t(kStromBytes)); EXPECT_TRUE(i.hfe); }
-        if (i.name == "tar_mutos8k_26x128_fm")  { fm = true;  EXPECT_EQ(i.bytes, uint64_t(kStromBytes)); }
+        if (i.name == "tar_ss77_26x128") { mfm = true; EXPECT_EQ(i.bytes, uint64_t(kStromBytes)); EXPECT_TRUE(i.hfe); }
+        if (i.name == "tar_fm_ss77_26x128")  { fm = true;  EXPECT_EQ(i.bytes, uint64_t(kStromBytes)); }
     }
     EXPECT_TRUE(mfm && fm);
     for (const TarFormatInfo& i : DiskVolume::tarFormate(formate()))      // die alte Fassung kennt sie nicht
-        EXPECT_NE(i.name, "tar_mutos8k_26x128_mfm");
+        EXPECT_NE(i.name, "tar_ss77_26x128");
 }
 
 
@@ -468,7 +468,7 @@ TEST(TarMutos8x512, LiestEineVonMutosGeschriebeneEinzeldiskette) {
     std::string err;
     auto v = DiskVolume::open(d.path(), "", formate(), dateisysteme(), err);
     ASSERT_TRUE(v) << err;
-    EXPECT_EQ(v->detection().filesystem, "tar_mutos8k_8x512_mfm");
+    EXPECT_EQ(v->detection().filesystem, "tar_ss77_8x512");
     EXPECT_EQ(v->detection().format, "ss77_1t26x128-8x512");
     EXPECT_EQ(namen(*v), (std::vector<std::string>{"etc/group", "etc/ttys", "etc/passwd", "bin/sync"}));
     const auto ttys = inhalt(*v, "etc/ttys");
@@ -493,7 +493,7 @@ TEST(TarMutos8x512, LiestDenMehrdisketten_SatzDenMutosMitDdGeschriebenHat) {
     auto v = DiskVolume::openTarSatz({a.path(), b.path()}, formate(), dateisysteme(), err);
     ASSERT_TRUE(v) << err;
     EXPECT_EQ(v->list().size(), 54u);
-    EXPECT_EQ(v->detection().filesystem, "tar_mutos8k_8x512_mfm");
+    EXPECT_EQ(v->detection().filesystem, "tar_ss77_8x512");
     EXPECT_EQ(v->tarSatzPlanen().kapazitaet, uint64_t(kStromBytes512));
     const auto tar = inhalt(*v, "mnt/bin/tar");
     EXPECT_EQ(tar.size(), 17000u);
@@ -514,7 +514,7 @@ TEST(TarMutos8x512, SatzRundlaufInAllenContainern) {
         SCOPED_TRACE(ext);
         Ordner o(std::string("tarmutos8x512_satz_") + ext);
         std::string err;
-        auto v = DiskVolume::tarSatzNeu("tar_mutos8k_8x512_mfm", o / (std::string("m.") + ext), formate(), dateisysteme(), err);
+        auto v = DiskVolume::tarSatzNeu("tar_ss77_8x512", o / (std::string("m.") + ext), formate(), dateisysteme(), err);
         ASSERT_TRUE(v) << err;
         EXPECT_EQ(v->tarSatzPlanen().kapazitaet, uint64_t(kStromBytes512));
 
@@ -542,12 +542,12 @@ TEST(TarMutos8x512, SatzRundlaufInAllenContainern) {
         // Wiederoeffnen: das Layout wird am ERSTEN Abbild erkannt, auch mit vorgegebenem Profil
         auto r = DiskVolume::openTarSatz({n1, n2}, formate(), dateisysteme(), err);
         ASSERT_TRUE(r) << err;
-        EXPECT_EQ(r->detection().filesystem, "tar_mutos8k_8x512_mfm");
+        EXPECT_EQ(r->detection().filesystem, "tar_ss77_8x512");
         EXPECT_EQ(inhalt(*r, "a.bin"), a);
         EXPECT_EQ(inhalt(*r, "dir/b.bin"), b);
         EXPECT_EQ(inhalt(*r, "c.bin"), c);
         EXPECT_EQ(inhalt(*r, "d.bin"), d);
-        auto r2 = DiskVolume::openTarSatz({n1, n2}, formate(), dateisysteme(), err, "tar_mutos8k_8x512_mfm");
+        auto r2 = DiskVolume::openTarSatz({n1, n2}, formate(), dateisysteme(), err, "tar_ss77_8x512");
         ASSERT_TRUE(r2) << err;
         EXPECT_EQ(inhalt(*r2, "d.bin"), d);
 
@@ -572,7 +572,7 @@ TEST(TarMutos8x512, LeereDisketteHatNullenImDatenbereichUndLaesstZylinder0Liegen
                                      formate().find("ss77_1t26x128-8x512")->predominantEncoding(), &grund);
         ASSERT_TRUE(img) << grund;
     }
-    auto v = DiskVolume::tarDisketteNeu(o / "t.hfe", "tar_mutos8k_8x512_mfm", formate(), dateisysteme(), err);
+    auto v = DiskVolume::tarDisketteNeu(o / "t.hfe", "tar_ss77_8x512", formate(), dateisysteme(), err);
     ASSERT_TRUE(v) << err;
     EXPECT_TRUE(v->tarSatzEinzel());
     v.reset();
@@ -582,7 +582,7 @@ TEST(TarMutos8x512, LeereDisketteHatNullenImDatenbereichUndLaesstZylinder0Liegen
     EXPECT_EQ(zylinder0Mutos(o / "t.hfe"), zylinder0Mutos(o / "ref.hfe"));
     auto r = DiskVolume::open(o / "t.hfe", "", formate(), dateisysteme(), err);
     ASSERT_TRUE(r) << err;
-    EXPECT_EQ(r->detection().filesystem, "tar_mutos8k_8x512_mfm_leer");
+    EXPECT_EQ(r->detection().filesystem, "tar_ss77_8x512_leer");
 }
 
 TEST(TarMutos8x512, EinzeldisketteBeschreibenSpeichernUndWiederLesen) {
@@ -592,7 +592,7 @@ TEST(TarMutos8x512, EinzeldisketteBeschreibenSpeichernUndWiederLesen) {
         std::string err;
         const auto a = muster(300, 21), b = muster(30000, 22);
         {
-            auto v = DiskVolume::tarDisketteNeu(o / (std::string("e.") + ext), "tar_mutos8k_8x512_mfm", formate(), dateisysteme(), err);
+            auto v = DiskVolume::tarDisketteNeu(o / (std::string("e.") + ext), "tar_ss77_8x512", formate(), dateisysteme(), err);
             ASSERT_TRUE(v) << err;
             ASSERT_TRUE(einfuegen(*v, quelle(o, "a.bin", a), "a.bin")) << v->lastError();
             ASSERT_TRUE(einfuegen(*v, quelle(o, "b.bin", b), "b.bin")) << v->lastError();
@@ -601,7 +601,7 @@ TEST(TarMutos8x512, EinzeldisketteBeschreibenSpeichernUndWiederLesen) {
         {
             auto v = DiskVolume::open(o / (std::string("e.") + ext), "", formate(), dateisysteme(), err, false);
             ASSERT_TRUE(v) << err;
-            EXPECT_EQ(v->detection().filesystem, "tar_mutos8k_8x512_mfm");
+            EXPECT_EQ(v->detection().filesystem, "tar_ss77_8x512");
             EXPECT_EQ(inhalt(*v, "a.bin"), a);
             EXPECT_EQ(inhalt(*v, "b.bin"), b);
             ASSERT_TRUE(v->erase(FileRef::parse("a.bin", 0))) << v->lastError();
@@ -612,7 +612,7 @@ TEST(TarMutos8x512, EinzeldisketteBeschreibenSpeichernUndWiederLesen) {
         EXPECT_TRUE(tar::alleNull(strom.data(), strom.size()));
         auto r = DiskVolume::open(o / (std::string("e.") + ext), "", formate(), dateisysteme(), err);
         ASSERT_TRUE(r) << err;
-        EXPECT_EQ(r->detection().filesystem, "tar_mutos8k_8x512_mfm_leer");
+        EXPECT_EQ(r->detection().filesystem, "tar_ss77_8x512_leer");
     }
 }
 
@@ -620,15 +620,15 @@ TEST(TarMutos8x512, AnlegenMitCreateUndAndereDisketteBleibenWasSieSind) {
     Ordner o("tarmutos8x512_erkennung");
     std::string err;
     for (const char* ext : {"hfe", "dmk", "img", "td0", "imd"}) {
-        auto v = DiskVolume::create(o / (std::string("c.") + ext), "tar_mutos8k_8x512_mfm_leer", "", formate(), dateisysteme(), err);
+        auto v = DiskVolume::create(o / (std::string("c.") + ext), "tar_ss77_8x512_leer", "", formate(), dateisysteme(), err);
         ASSERT_TRUE(v) << ext << ": " << err;
         v.reset();
         auto r = DiskVolume::open(o / (std::string("c.") + ext), "", formate(), dateisysteme(), err);
         ASSERT_TRUE(r) << ext << ": " << err;
-        EXPECT_EQ(r->detection().filesystem, "tar_mutos8k_8x512_mfm_leer") << ext;
+        EXPECT_EQ(r->detection().filesystem, "tar_ss77_8x512_leer") << ext;
     }
     {   // das UNIX-Dateisystem auf derselben Geometrie und die leer formatierte Diskette bleiben, was sie sind
-        auto v = DiskVolume::create(o / "u.hfe", "mutos8k_8x512_mfm", "", formate(), dateisysteme(), err);
+        auto v = DiskVolume::create(o / "u.hfe", "mutos8k_ss77_8x512", "", formate(), dateisysteme(), err);
         ASSERT_TRUE(v) << err;
         std::string grund;
         auto img = DiskImage::create(o / "e5.hfe", *formate().find("ss77_1t26x128-8x512"), false,
@@ -637,7 +637,7 @@ TEST(TarMutos8x512, AnlegenMitCreateUndAndereDisketteBleibenWasSieSind) {
     }
     auto u = DiskVolume::open(o / "u.hfe", "", formate(), dateisysteme(), err);
     ASSERT_TRUE(u) << err;
-    EXPECT_EQ(u->detection().filesystem, "mutos8k_8x512_mfm");
+    EXPECT_EQ(u->detection().filesystem, "mutos8k_ss77_8x512");
     auto e = DiskVolume::open(o / "e5.hfe", "", formate(), dateisysteme(), err, true, /*roh_erlaubt=*/true);
     ASSERT_TRUE(e) << err;
     EXPECT_NE(e->detection().filesystem.rfind("tar", 0), 0u) << e->detection().filesystem;
@@ -646,6 +646,6 @@ TEST(TarMutos8x512, AnlegenMitCreateUndAndereDisketteBleibenWasSieSind) {
 TEST(TarMutos8x512, FormatlisteNenntDasProfilMitDerKapazitaetDesRohgeraets) {
     bool da = false;
     for (const TarFormatInfo& i : DiskVolume::tarFormate(formate(), dateisysteme()))
-        if (i.name == "tar_mutos8k_8x512_mfm") { da = true; EXPECT_EQ(i.bytes, uint64_t(kStromBytes512)); EXPECT_TRUE(i.hfe); EXPECT_TRUE(i.img); }
+        if (i.name == "tar_ss77_8x512") { da = true; EXPECT_EQ(i.bytes, uint64_t(kStromBytes512)); EXPECT_TRUE(i.hfe); EXPECT_TRUE(i.img); }
     EXPECT_TRUE(da);
 }

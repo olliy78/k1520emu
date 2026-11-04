@@ -3,7 +3,7 @@
 tool:   k1520disktool
 disk:   cpa_cpa780_k5601_noclock.img
 poke:   %DISK% 3b30 f00f
-run:    fsck %DISK% --fs cpa780 --json
+run:    fsck %DISK% --fs cpa_ds80_5x1024_boot --json
 expect: "ok":false
 expect: "findings":1
 expect: "repairable":1

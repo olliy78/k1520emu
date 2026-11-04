@@ -67,7 +67,7 @@ std::vector<uint8_t> holeDatei(DiskVolume& dv, const std::string& name) {
 /// SCPX-Systemdiskette des 710-1 mit dem BIOS @p bios (Systemspuren aus den Modulen).
 bool baueScpxDiskette(const std::string& ziel, const char* bios, std::string& err) {
     k1520test::TempDisk quelle("prg710-1_scpx17_cpa640_boot.hfe");
-    auto q = DiskVolume::open(quelle, "scpx640", formate(), dateisysteme(), err);
+    auto q = DiskVolume::open(quelle, "scpx_ds80_16x256_boot", formate(), dateisysteme(), err);
     if (!q) return false;
     std::vector<uint8_t> band;
     prg_boot::Variante erkannt = prg_boot::Variante::Unbekannt;
@@ -79,7 +79,7 @@ bool baueScpxDiskette(const std::string& ziel, const char* bios, std::string& er
         std::ofstream f(bootbin, std::ios::binary);
         f.write(reinterpret_cast<const char*>(band.data()), static_cast<std::streamsize>(band.size()));
     }
-    auto neu = DiskVolume::create(ziel, "scpx640", "", formate(), dateisysteme(), err, bootbin);
+    auto neu = DiskVolume::create(ziel, "scpx_ds80_16x256_boot", "", formate(), dateisysteme(), err, bootbin);
     std::error_code ec;
     fs::remove(bootbin, ec);
     if (!neu) return false;

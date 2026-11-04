@@ -188,7 +188,7 @@ def _datei_von(pfad, name, ordner):
     """Datei per DiskTool von der (geflushten) Diskette holen; ``None``, wenn sie fehlt."""
     ordner.mkdir(exist_ok=True)
     env = dict(os.environ, LD_LIBRARY_PATH=str(PROJECT_ROOT / "build"))
-    subprocess.run([str(DISKTOOL), "get", str(pfad), name, "--fs", "microdos800", "--to", str(ordner)], capture_output=True, env=env)
+    subprocess.run([str(DISKTOOL), "get", str(pfad), name, "--fs", "microdos_ds80_5x1024_boot", "--to", str(ordner)], capture_output=True, env=env)
     f = ordner / name
     return f.read_bytes() if f.exists() else None
 

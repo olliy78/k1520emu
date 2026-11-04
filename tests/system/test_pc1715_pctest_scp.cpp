@@ -60,7 +60,7 @@ struct Pctest {
     }
 
     /// SCP booten, PCTEST starten, Kopfdaten eingeben und bestaetigen.  @p laufwerke wie
-    /// eingetippt („a", „ab"); fuer B: liegt eine mit `cpa800` vorformatierte Diskette ein
+    /// eingetippt („a", „ab"); fuer B: liegt eine mit `cpa_ds80_5x1024_daten` vorformatierte Diskette ein
     /// (SCP fuehrt B: wie A: als 5 × 1024 × 80 DS).
     bool starte(const std::string& laufwerke, bool pruefstecker) {
         k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::ERROR);

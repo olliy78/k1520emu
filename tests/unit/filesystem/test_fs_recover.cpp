@@ -847,7 +847,7 @@ TEST(FsRecoverCpm, DerFundFuehrtSeineSektorenAuf) {
     EXPECT_EQ(f.cyl,          f.orte.front().cyl);
     EXPECT_EQ(f.head,         f.orte.front().head);
     EXPECT_EQ(f.sector_index, f.orte.front().sector);
-    // Die Liste deckt die Datei ab.  Die Sektorgroesse kennt der Test nicht (cpa780
+    // Die Liste deckt die Datei ab.  Die Sektorgroesse kennt der Test nicht (cpa_ds80_5x1024_boot
     // hat 1024er-Sektoren, andere Profile 128er) — gerechnet wird deshalb mit der
     // GROESSTEN im Katalog, dann gilt die Aussage fuer jedes Profil.
     EXPECT_GE(f.orte.size() * 1024u, f.size);

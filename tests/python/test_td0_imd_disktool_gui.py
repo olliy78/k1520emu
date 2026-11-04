@@ -53,7 +53,7 @@ def cpm_abbild(request, tmp_path):
     """Echtes, beschreibbares Abbild mit CP/M-Dateisystem (im Kern angelegt)."""
     from app.core_binding.k1520disk import DiskTool
     p = tmp_path / f"arbeit.{request.param}"
-    DiskTool.create(p, "cpa800", "TEST").close()
+    DiskTool.create(p, "cpa_ds80_5x1024_daten", "TEST").close()
     return p
 
 
@@ -135,17 +135,17 @@ def test_save_as_and_create(window, cpm_abbild, tmp_path, endung):
     assert window.save_as(ziel) and ziel.exists()
     assert window.tool.container_info()["type"] == endung
     neu = tmp_path / f"neu.{endung}"
-    assert window.create_disk(neu, "cpa800", "OK")
+    assert window.create_disk(neu, "cpa_ds80_5x1024_daten", "OK")
     assert window.tool.container_info()["type"] == endung and not window.tool.read_only
 
 
 def test_udos_is_refused_before_the_core(tmp_path):
     from app.disktool.ui.main_window import MainWindow
     for endung, name in (("td0", "TeleDisk"), ("imd", "ImageDisk")):
-        grund = MainWindow._container_grund(tmp_path / f"x.{endung}", "udos_ds77")
+        grund = MainWindow._container_grund(tmp_path / f"x.{endung}", "udos_ds77_26x128")
         assert f"{name} kann die Sektorkontrollblöcke von UDOS nicht speichern" in grund
-        assert MainWindow._container_grund(tmp_path / f"x.{endung}", "udos1715") == ""
-        assert MainWindow._container_grund(tmp_path / f"x.{endung}", "cpa800") == ""
+        assert MainWindow._container_grund(tmp_path / f"x.{endung}", "udos1715_ds80_16x256") == ""
+        assert MainWindow._container_grund(tmp_path / f"x.{endung}", "cpa_ds80_5x1024_daten") == ""
 
 
 def test_tar_formats_expose_td0_and_imd_keys():

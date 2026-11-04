@@ -3,7 +3,7 @@
  * @brief Kreuzprobe auf **frisch angelegten** Disketten: DiskTool schreibt, CP/A liest.
  *
  * `test_disktool_cpm_roundtrip.cpp` prueft den Schreibpfad auf der **Referenz**diskette
- * `cpa780` — einer Diskette, deren Dateisystemprofil von Hand nachgemessen wurde.  Die
+ * `cpa_ds80_5x1024_boot` — einer Diskette, deren Dateisystemprofil von Hand nachgemessen wurde.  Die
  * beiden Faelle hier pruefen genau das, was dort nicht drankommt: Disketten, deren
  * Dateisystem das Werkzeug **selbst ausrechnen** muss.
  *

@@ -91,7 +91,7 @@ def test_systemdiskette_mit_128_byte_sektoren_bootet_mit_dem_lade_rom_v06(tmp_pa
         t = ablauf.Sitzung("k7637", str(k), laufwerke=lw, laderom=laderom)
         t.kaltstart_bis_prompt()
         assert "MicroDOS.SYS" in t.kommando("D")
-    # DiskTool: Profil microdos128 (positiver Nachweis = SYL-Lader 0.6), lesen, schreiben, pruefen -- die Diskette bootet danach
+    # DiskTool: Profil microdos_ss40_26x128_boot (positiver Nachweis = SYL-Lader 0.6), lesen, schreiben, pruefen -- die Diskette bootet danach
     if not DISKTOOL.exists():
         return
     env = dict(os.environ, LD_LIBRARY_PATH=str(PROJECT_ROOT / "build"))
@@ -101,7 +101,7 @@ def test_systemdiskette_mit_128_byte_sektoren_bootet_mit_dem_lade_rom_v06(tmp_pa
         return r.returncode, r.stdout + r.stderr
 
     rc, aus = tool("info", b)
-    assert rc == 0 and "microdos128" in aus, aus
+    assert rc == 0 and "microdos_ss40_26x128_boot" in aus, aus
     rc, aus = tool("ls", "-l", b)
     assert "MicroDOS.SYS" in aus and "16384" in aus, aus
     rc, aus = tool("fsck", b, "--full")

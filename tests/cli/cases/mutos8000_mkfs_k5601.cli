@@ -12,15 +12,15 @@ stdin:
   keys BOOT\sMUTOS\r
   g 100000000
   eject A
-  mount C %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_root_mfm.hfe udos_ss77
+  mount C %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_root_mfm.hfe ss77_26x128
   keys r
   g 100000000
   keys root\r
   g 100000000
-  mount A %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_cmd_mfm.hfe udos_ss77
+  mount A %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_cmd_mfm.hfe ss77_26x128
   keys /etc/mount\s/dev/rk0\s/mnt\r
   g 50000000
-  mount B %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_bin_mfm.hfe udos_ss77
+  mount B %CLI_DIR%/../../disks/a5120_16_MUTOS/a5120_mutos8000_bin_mfm.hfe ss77_26x128
   keys /mnt/etc/mkfs\s/dev/rk1\s494\r
   g 300000000
   keys /etc/mount\s/dev/rk1\s/usr\r

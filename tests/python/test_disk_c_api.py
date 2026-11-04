@@ -78,11 +78,11 @@ def test_filesystem_catalogue_is_reachable():
     from app.core_binding.k1520disk import filesystems
 
     names = {f.name: f for f in filesystems()}
-    assert "cpa780" in names and "udos_ds77" in names
-    assert names["cpa780"].type == "cpm"
-    assert names["udos_ds77"].type == "udos"
-    assert names["scpx640"].format == "ds80_16x256", (
-        "scpx640 und ds80_16x256 teilen sich die Geometrie — genau dafür gibt es die "
+    assert "cpa_ds80_5x1024_boot" in names and "udos_ds77_26x128" in names
+    assert names["cpa_ds80_5x1024_boot"].type == "cpm"
+    assert names["udos_ds77_26x128"].type == "udos"
+    assert names["scpx_ds80_16x256_boot"].format == "ds80_16x256", (
+        "scpx_ds80_16x256_boot und ds80_16x256 teilen sich die Geometrie — genau dafür gibt es die "
         "eigene `filesystems:`-Sektion"
     )
     for f in filesystems():
@@ -101,7 +101,7 @@ def test_open_detects_cpa_boot_disk(fixture_disks):
     from app.core_binding.k1520disk import DiskTool
 
     with DiskTool.open(fixture_disks / "cpa_cpa780_k5601_clock.img") as d:
-        assert d.filesystem == "cpa780"
+        assert d.filesystem == "cpa_ds80_5x1024_boot"
         assert d.volume_count == 1
         assert d.volume_dir(0) == "", "eine CP/M-Diskette hat keine Seitenordner"
         names = {e.name for e in d.list()}
@@ -113,7 +113,7 @@ def test_open_treats_both_udos_sides_as_one_disk(fixture_disks):
     from app.core_binding.k1520disk import DiskTool
 
     with DiskTool.open(fixture_disks / "udos_boot_scp.hfe") as d:
-        assert d.filesystem == "udos_ds77"
+        assert d.filesystem == "udos_ds77_26x128"
         assert d.volume_count == 2
         assert [v.dir for v in d.volumes()] == ["Side0", "Side1"]
         # `STATUS` des laufenden UDOS: 850 bzw. 1310 freie Sektoren à 128 B.
@@ -144,7 +144,7 @@ def test_unknown_geometry_raises_with_the_measurement(fixture_disks):
 def test_detect_without_keeping_the_disk_open(fixture_disks):
     from app.core_binding.k1520disk import detect
 
-    assert detect(fixture_disks / "udos_boot_scp.hfe") == "udos_ds77"
+    assert detect(fixture_disks / "udos_boot_scp.hfe") == "udos_ds77_26x128"
     assert detect(fixture_disks / "cpa_mini.hfe") == ""
 
 
@@ -161,7 +161,7 @@ def test_create_write_read_roundtrip(tmp_path):
         "fs=udos\nname=quelle.bin\ntyp=B\nsatz=128\n")
 
     abbild = tmp_path / "neu.hfe"
-    with DiskTool.create(abbild, "udos_ds77", label="PYTEST") as d:
+    with DiskTool.create(abbild, "udos_ds77_26x128", label="PYTEST") as d:
         assert d.volume_count == 2
         assert [v.label for v in d.volumes()] == ["PYTEST", "PYTEST"]
 
@@ -255,14 +255,14 @@ def test_boot_capacity_is_known_without_a_disk():
     """Die Oberflaeche muss schon bei der Auswahl wissen, ob eine Bootdiskette geht."""
     from app.core_binding.k1520disk import boot_capacity, filesystems
 
-    assert boot_capacity("cpa780") == 15104
-    assert boot_capacity("cpa800") == 0, "eine Datendiskette beginnt auf Zylinder 0"
+    assert boot_capacity("cpa_ds80_5x1024_boot") == 15104
+    assert boot_capacity("cpa_ds80_5x1024_daten") == 0, "eine Datendiskette beginnt auf Zylinder 0"
     assert boot_capacity("gibtsnicht") == 0
 
     nach_name = {f.name: f for f in filesystems()}
-    assert nach_name["cpa780"].bootable
-    assert not nach_name["cpa800"].bootable
-    assert nach_name["cpa780"].boot_capacity == 15104
+    assert nach_name["cpa_ds80_5x1024_boot"].bootable
+    assert not nach_name["cpa_ds80_5x1024_daten"].bootable
+    assert nach_name["cpa_ds80_5x1024_boot"].boot_capacity == 15104
 
 
 def test_boot_image_roundtrip(tmp_path, fixture_disks):
@@ -278,7 +278,7 @@ def test_boot_image_roundtrip(tmp_path, fixture_disks):
     assert bin_.read_bytes()[:3] == b"SYL"
 
     abbild = tmp_path / "bootfaehig.hfe"
-    with DiskTool.create(abbild, "cpa780", boot_image=bin_) as d:
+    with DiskTool.create(abbild, "cpa_ds80_5x1024_boot", boot_image=bin_) as d:
         assert d.boot_area_size() == 15104
         zurueck = tmp_path / "zurueck.bin"
         d.read_boot_image(zurueck)
@@ -293,7 +293,7 @@ def test_boot_image_too_large_creates_nothing(tmp_path):
     abbild = tmp_path / "nicht_angelegt.hfe"
 
     with pytest.raises(K1520DiskError) as exc:
-        DiskTool.create(abbild, "cpa780", boot_image=zu_gross)
+        DiskTool.create(abbild, "cpa_ds80_5x1024_boot", boot_image=zu_gross)
     assert "15105" in str(exc.value) and "15104" in str(exc.value)
     assert not abbild.exists(), "trotz Fehler wurde eine Diskette angelegt"
 
@@ -428,7 +428,7 @@ def test_sector_write_replaces_only_that_sector(tmp_path, fixture_disks):
     shutil.copy(fixture_disks / "cpa_cpa780_k5601_clock.img", abbild)
     with DiskTool.open(abbild) as d:
         d.set_read_only(False)
-        # cpa780 hat gemischte Geometrie: ab Zylinder 2 sind es 1024-B-Sektoren.
+        # cpa_ds80_5x1024_boot hat gemischte Geometrie: ab Zylinder 2 sind es 1024-B-Sektoren.
         # Die Groesse kommt deshalb aus dem Sektor selbst, nicht aus einer Annahme.
         gross = next(s for s in d.track(2, 0).spans if s.is_sector).size
         nachbar = d.sector_data(2, 0, 1)
@@ -469,10 +469,10 @@ def test_unformatted_track_is_told_apart_from_a_gap(tmp_path):
     from app.core_binding.k1520disk import DiskTool, UNFORMATTED
 
     ziel = tmp_path / "leer.hfe"
-    DiskTool.create(ziel, "cpa780").close()
+    DiskTool.create(ziel, "cpa_ds80_5x1024_boot").close()
     with DiskTool.open(ziel) as d:
         t = d.track(60, 0)
-        assert t.formatted, "cpa780 legt eine formatierte Diskette an"
+        assert t.formatted, "cpa_ds80_5x1024_boot legt eine formatierte Diskette an"
 
     # Gegenprobe an einer Spur, die es in der Ausdehnung des Mediums nicht gibt.
     with DiskTool.open(ziel) as d:
@@ -633,15 +633,15 @@ def test_eine_kreuzbelegung_ist_gefahr_und_wird_benannt(fixture_disks, tmp_path)
     shutil.copy(fixture_disks / "cpa_cpa780_k5601_noclock.img", abbild)
 
     roh = bytearray(abbild.read_bytes())
-    dirbase = 15104                       # Verzeichnis von cpa780, nachgemessen
+    dirbase = 15104                       # Verzeichnis von cpa_ds80_5x1024_boot, nachgemessen
     belegt = [i for i in range(128) if roh[dirbase + i * 32] <= 15]
     a, b = belegt[0], belegt[1]
-    # Den ersten Blockzeiger von a auch in b eintragen (16 Bit, cpa780 hat 390 Bloecke).
+    # Den ersten Blockzeiger von a auch in b eintragen (16 Bit, cpa_ds80_5x1024_boot hat 390 Bloecke).
     roh[dirbase + b * 32 + 16: dirbase + b * 32 + 18] = \
         roh[dirbase + a * 32 + 16: dirbase + a * 32 + 18]
     abbild.write_bytes(bytes(roh))
 
-    with DiskTool.open(abbild, "cpa780") as d:
+    with DiskTool.open(abbild, "cpa_ds80_5x1024_boot") as d:
         bericht = d.findings()            # schon beim Oeffnen da
         treffer = [f for f in bericht.findings if f.id == "cpm.block.doppelt"]
         assert len(treffer) == 1, [f.text for f in bericht.findings]

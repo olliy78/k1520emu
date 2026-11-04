@@ -54,7 +54,7 @@ struct Gebootet {
 };
 }  // namespace
 
-/// SCP 1715 V0006 (cpa800, 5 × 1024): Urlader → Systemspuren → `A>`.  Zugleich die
+/// SCP 1715 V0006 (cpa_ds80_5x1024_daten, 5 × 1024): Urlader → Systemspuren → `A>`.  Zugleich die
 /// Bildpruefung: Banner in Zeile 1/2 im Zeichensatz S619, keine verschobenen Zeilen.
 TEST(Pc1715Boot, Scp1715BisPrompt) {
     Gebootet g("pc1715_scp1715_v0006_boot.hfe");
@@ -116,7 +116,7 @@ TEST(Pc1715Boot, Udos1715BisPrompt) {
     EXPECT_NE(zeile(g.m, 0).find("Betriebssystem UDOS1715"), std::string::npos) << bild(g.m);
 }
 
-/// CP/A 1715, gebaut von der CPA_Workbench (Variante `pc_1715`, M80/LINKMT, Diskette `cpa800`
+/// CP/A 1715, gebaut von der CPA_Workbench (Variante `pc_1715`, M80/LINKMT, Diskette `cpa_ds80_5x1024_daten`
 /// mit dem Bootkopf `F003H` aus `prebuilt/pc_1715`).  Waechter fuer AP-3b: die Workbench nahm fuer
 /// den Diskettenbau frueher immer den SYL-Kopf des A5120 — eine so gebaute Diskette bootet am
 /// 1715 nicht (der Urlader S502 prueft das Wort F003H).  Zugleich traegt die Diskette `PCTEST.COM`.
