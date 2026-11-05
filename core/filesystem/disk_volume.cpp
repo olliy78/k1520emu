@@ -16,6 +16,7 @@
 #include "core/filesystem/geometry_probe.h"
 #include "core/filesystem/prg_boot.h"
 #include "core/filesystem/sios/sios_fs.h"
+#include "core/filesystem/bs600/bs600_fs.h"
 #include "core/filesystem/fat/fat_fs.h"
 #include "core/filesystem/udos/udos1715_fs.h"
 #include "core/filesystem/udos/udos_fs.h"
@@ -319,6 +320,19 @@ std::vector<SectorSpace::TrackRef> systemspuren(const SectorSpace& raum, const F
                     out.push_back(t);
                 }
             }
+        }
+        return out;
+    }
+
+    if (p.type == FsType::Bs600) {
+        // Urlader = Sektor 1..3 der Spur 0; Sektor 4..6 (Rest der IBM-3740-Vorlage), Kennsatz,
+        // Verzeichnis und Belegungstabelle gehoeren dem Dateisystem und bleiben beim Einspielen stehen.
+        const int i = raum.trackIndexOf(0, 0);
+        if (i >= 0) {
+            SectorSpace::TrackRef t = raum.trackAt(static_cast<size_t>(i));
+            t.sectors = Bs600FileSystem::kBootSektoren;
+            t.bytes   = static_cast<uint64_t>(t.sectors) * t.sector_size;
+            out.push_back(t);
         }
         return out;
     }
@@ -1013,6 +1027,8 @@ std::string zielName(const std::string& quelle, FsType typ,
     // SIOS: der Linux-Name ist der Diskettenname (das Dateisystem macht Grossbuchstaben daraus
     // und prueft Laenge/Zeichen); ein Bibliotheksobjekt wird mit `--as LIB/NAME` ausdruecklich benannt.
     if (typ == FsType::Sios) return datei;
+    // BS600: der Name ohne Endung (6 Zeichen, Grossbuchstaben macht das Dateisystem).
+    if (typ == FsType::Bs600) return fs::path(datei).stem().string();
     // Das `.fileinfo` gehoert zu GENAU dieser Datei und geht dem Sammelbeiblatt
     // vor — es wandert mit ihr mit, das Beiblatt bleibt beim Umsortieren zurueck.
     FileAngaben ein;
@@ -1385,6 +1401,9 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
                 } else if (p->type == FsType::Udos1715) {
                     SectorSpace probe(dv->disk_->medium(), *f);
                     ja = Udos1715FileSystem::looksLikeUdos1715(probe, *p, &warum);
+                } else if (p->type == FsType::Bs600) {
+                    SectorSpace probe(dv->disk_->medium(), *f);
+                    ja = Bs600FileSystem::looksLikeBs600(probe, &warum);
                 } else if (p->type == FsType::WegaMutos) {
                     SectorSpace probe(dv->disk_->medium(), *f);
                     const auto geraet = unixGeraet(probe, *p);
@@ -1760,6 +1779,10 @@ std::unique_ptr<DiskVolume> DiskVolume::oeffnenMit(std::unique_ptr<DiskImage> vo
             auto w = WegaFileSystem::mount(unixGeraet(*v.space, *dv->profile_), warum);
             if (!w) { err = warum; return roh(warum); }
             v.fs = std::move(w);
+        } else if (dv->profile_->type == FsType::Bs600) {
+            auto x = Bs600FileSystem::mount(*v.space, *dv->profile_, warum);
+            if (!x) { err = warum; return roh(warum); }
+            v.fs = std::move(x);
         } else if (dv->profile_->type == FsType::Sios) {
             auto x = SiosFileSystem::mount(*v.space, *dv->profile_, warum);
             if (!x) { err = warum; return roh(warum); }
@@ -1841,6 +1864,11 @@ bool DiskVolume::readOnlyForced() const {
 const TarFileSystem* DiskVolume::tarFs() const {
     if (!profile_ || profile_->type != FsType::Tar || volumes_.empty()) return nullptr;
     return dynamic_cast<const TarFileSystem*>(volumes_[0].fs.get());
+}
+
+Bs600FileSystem* DiskVolume::bs600Fs() const {
+    if (!profile_ || profile_->type != FsType::Bs600 || volumes_.empty()) return nullptr;
+    return dynamic_cast<Bs600FileSystem*>(volumes_[0].fs.get());
 }
 
 const SiosFileSystem* DiskVolume::siosFs() const {
@@ -2723,6 +2751,8 @@ namespace {
  */
 int rang(const std::string& kind) {
     if (kind == "udos.karte.zaehler.neu")                    return 4;   // Zaehler
+    if (kind.rfind("bs600.tabelle.", 0) == 0)                return 3;   // Belegungstabelle (nach dem Verzeichnis)
+    if (kind == "bs600.reorganisieren")                      return 4;   // zuletzt: setzt ein heiles Verzeichnis voraus
     if (kind.find(".karte.") != std::string::npos)           return 3;   // Belegungsplan
     if (kind.rfind("udos.kette.", 0) == 0
         || kind.rfind("ndos.zeiger.", 0) == 0
@@ -3018,11 +3048,18 @@ bool DiskVolume::schreibeAngabenDatei(const FileEntry& e, const std::string& des
     a.udos = isUdosFamily(profile_->type);
     a.wega = istWega();
     a.tar  = profile_->type == FsType::Tar;
+    a.bs600 = profile_->type == FsType::Bs600;
     a.name = e.qualifiedName();
     if (a.tar && e.declared_size > e.size)
         a.teil = std::to_string(e.size) + "/" + std::to_string(e.declared_size);
     if (a.wega || a.tar) {
         a.x = unixAus(e);
+    } else if (a.bs600) {
+        a.u.typ = e.type;
+        a.u.start = e.entry_addr;
+        a.b.lade = e.low_addr;
+        for (char c : e.date) if (c != '.') a.b.datum += c;      // Anzeige TT.MM.JJ -> TTMMJJ
+        a.b.signum = e.created;
     } else if (a.udos) {
         a.u = angabeAus(e);
     } else {
@@ -3091,7 +3128,8 @@ bool DiskVolume::extractMit(const FileRef& ref, const std::string& dest_path,
     }
     // WEGA wie UDOS immer: Modus, Besitzer und Zeit stehen nirgends in der Linux-Datei,
     // und ein Systemverzeichnis (bin/, etc/) ohne seine Rechte ist unbrauchbar.
-    if (!isUdosFamily(profile_->type) && !istUnix() && !cpm_fileinfo_) return true;
+    // BS600 wie UDOS immer: Ladeadresse, Startadresse, Typ und Datum stehen nur im Verzeichnis.
+    if (!isUdosFamily(profile_->type) && !istUnix() && !istBs600() && !cpm_fileinfo_) return true;
     // SIOS: keine Angabendatei - die Etikettenfelder stehen im Verzeichnis (`ls -l`), und der
     // Schreibpfad (D4) legt jede Datei mit Satzlaenge 128 an; es gibt nichts, was eine
     // `.fileinfo` ueberliefern koennte, das nicht schon in den Bytes steckt.
@@ -3273,6 +3311,34 @@ bool DiskVolume::insert(const std::string& src_path, const FileRef& ref,
     wo.udos_created    = mit.udos_created;
     if (!mit.udos_modified.empty()) wo.date = mit.udos_modified;
 
+    // BS600: Typ, Datum, Signum und Adressen aus dem `.fileinfo` (fs=bs600) neben der Quelle; was der
+    // Aufrufer ausdruecklich nennt, geht vor.  Ohne beides gelten die Vorgaben des Dateisystems
+    // (Typ P, Ladeadresse 0, keine Startadresse, heutiges Datum).
+    if (istBs600()) {
+        FileAngaben ein;
+        const fs::path woher = opt.angaben_datei.empty()
+                             ? fileinfoPfad(src_path) : fs::path(opt.angaben_datei);
+        if (leseFileinfo(woher, ein)) {
+            if (ein.udos || ein.wega || ein.tar)
+                return fail("'" + fs::path(src_path).filename().string() + kFileinfoEndung
+                            + "' traegt " + (ein.wega ? "UNIX-Angaben (fs=wega)"
+                                                      : ein.tar ? "UNIX-Angaben (fs=tar)" : "UDOS-Angaben (fs=udos)")
+                            + ", die Diskette ist eine BS600-Diskette - die Angaben passen nicht zusammen.");
+            if (ein.bs600) {
+                wo.bs600_type = ein.u.typ;
+                wo.bs600_date = ein.b.datum;
+                wo.bs600_author = ein.b.signum;
+                wo.bs600_load = ein.b.lade;
+                wo.bs600_entry = ein.u.start;
+            }
+        }
+        if (!opt.bs600_type.empty())   wo.bs600_type = opt.bs600_type;
+        if (!opt.bs600_date.empty())   wo.bs600_date = opt.bs600_date;
+        if (!opt.bs600_author.empty()) wo.bs600_author = opt.bs600_author;
+        if (opt.bs600_load)            wo.bs600_load = opt.bs600_load;
+        if (opt.bs600_entry)           wo.bs600_entry = opt.bs600_entry;
+    }
+
     // Dasselbe fuer CP/M: die drei Attributbits aus dem Beiblatt neben der Quelle,
     // sofern der Aufrufer keine vorgibt.
     wo.cpm_read_only = opt.cpm_read_only;
@@ -3317,6 +3383,12 @@ bool DiskVolume::insert(const std::string& src_path, const FileRef& ref,
     // Bereich 0.  Nur wenn der Aufrufer nicht ausdruecklich umbenannt hat — ein
     // `put --as NEU.COM` gewinnt immer.
     std::string ziel_name = ref.name;
+    // BS600-Namen kennen keine Endung ('.' ist im Namen verboten): `prog.bin` aus der Oberflaeche (Ziehen, Einfuegen)
+    // wird `PROG`.  Wer ausdruecklich benennt (`put --as`), nennt ohnehin einen Namen ohne Punkt.
+    if (istBs600()) {
+        const size_t punkt = ziel_name.rfind('.');
+        if (punkt != std::string::npos && punkt > 0) ziel_name.resize(punkt);
+    }
     // NUR bei CP/M, und nur dort, wo der Aufrufer nicht ausdruecklich umbenannt hat:
     // dort traegt das `.fileinfo` den Nutzerbereich ("3:SYSTEM.COM"), fuer den im
     // Linux-Dateinamen ein Unterstrich steht — ohne diese Ruecksetzung landete die
@@ -3403,6 +3475,33 @@ bool DiskVolume::setAttributes(const FileRef& ref, const FatAttrs& attrs) {
                                         + " gibt es auf dieser Diskette nicht");
     if (!volumes_[static_cast<size_t>(ref.volume)].fs->setAttributes(ref.name, attrs))
         return fail(volumes_[static_cast<size_t>(ref.volume)].fs->lastError());
+    return true;
+}
+
+bool DiskVolume::setAttributes(const FileRef& ref, const Bs600Attrs& attrs) {
+    if (read_only_) return fail(schreibschutzText());
+    if (!valid(ref.volume)) return fail("Seite " + std::to_string(ref.volume)
+                                        + " gibt es auf dieser Diskette nicht");
+    if (!volumes_[static_cast<size_t>(ref.volume)].fs->setAttributes(ref.name, attrs))
+        return fail(volumes_[static_cast<size_t>(ref.volume)].fs->lastError());
+    return true;
+}
+
+bool DiskVolume::reorganize(int* bewegt) {
+    if (read_only_) return fail(schreibschutzText());
+    if (!istBs600() || volumes_.empty()) return fail("Reorganisieren gibt es nur bei BS600-Disketten");
+    auto* f = dynamic_cast<Bs600FileSystem*>(volumes_[0].fs.get());
+    if (!f) return fail("Kein BS600-Dateisystem");
+    if (!f->reorganize(bewegt)) return fail(f->lastError());
+    return true;
+}
+
+bool DiskVolume::rename(const FileRef& ref, const std::string& neuer_name) {
+    if (read_only_) return fail(schreibschutzText());
+    if (!istBs600() || !valid(ref.volume)) return fail("Umbenennen gibt es nur bei BS600-Disketten");
+    auto* f = dynamic_cast<Bs600FileSystem*>(volumes_[static_cast<size_t>(ref.volume)].fs.get());
+    if (!f) return fail("Kein BS600-Dateisystem");
+    if (!f->rename(ref.name, neuer_name)) return fail(f->lastError());
     return true;
 }
 
@@ -4414,6 +4513,10 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
         if (!err.empty()) return nullptr;
         err = prgBootabbildproblem(*profil, boot, nullptr);
         if (!err.empty()) return nullptr;
+        if (profil->type == FsType::Bs600) {
+            err = Bs600FileSystem::bootProblem(boot);
+            if (!err.empty()) return nullptr;
+        }
         if (boot.size() > platz) {
             err = "Das Bootabbild ist " + std::to_string(boot.size())
                 + " Byte gross, die Systemspuren von '" + profil->name + "' fassen aber nur "
@@ -4497,6 +4600,10 @@ std::unique_ptr<DiskVolume> DiskVolume::create(const std::string& path,
             auto u = Udos1715FileSystem::format(*v.space, *profil, label, err);
             if (!u) return nullptr;
             v.fs = std::move(u);
+        } else if (profil->type == FsType::Bs600) {
+            auto x = Bs600FileSystem::format(*v.space, *profil, label, err);
+            if (!x) return nullptr;
+            v.fs = std::move(x);
         } else if (profil->type == FsType::Sios) {
             auto x = SiosFileSystem::format(*v.space, *profil, label, err);
             if (!x) return nullptr;
@@ -4645,6 +4752,9 @@ bool DiskVolume::writeBootImage(const std::vector<uint8_t>& img, int volume) {
                     + "' fassen aber nur " + std::to_string(n) + " Byte.");
 
     SectorSpace& raum = *volumes_[static_cast<size_t>(volume)].space;
+    if (profile_->type == FsType::Bs600)
+        if (const std::string problem = Bs600FileSystem::bootProblem(img); !problem.empty())
+            return fail(problem);
     if (const std::string problem = k8915Bootabbildproblem(*profile_, raum, img); !problem.empty())
         return fail(problem);
     if (const std::string problem = pc1715Bootabbildproblem(*profile_, raum, img);

@@ -43,6 +43,14 @@ struct CpmAngabe {
     bool read_only = false, system = false, archived = false;
 };
 
+/// @brief BS600: was ein Verzeichniseintrag fuehrt und die Bytes der Datei nicht tragen.  Typ (`typ=`) und
+///        Startadresse (`start=`) stehen in @ref UdosAngabe (gleiche Schluessel, gleicher Leser).
+struct Bs600Angabe {
+    std::string datum;       ///< `TTMMJJ`
+    std::string signum;      ///< bis 3 Zeichen
+    uint16_t    lade = 0;    ///< Ladeadresse (Anfangsadresse)
+};
+
 struct UnixAngabe {
     std::string art = "-";      ///< "-" Datei · "d" Verzeichnis · "c"/"b" Geraet · "p" FIFO
     uint16_t    mode = 0;       ///< di_mode samt Dateiart
@@ -67,11 +75,13 @@ struct FileAngaben {
     bool        udos = false;   ///< `fs=udos` (ZDOS/NDOS) statt `fs=cpm`
     bool        wega = false;   ///< `fs=wega` (UNIX-Inode); schliesst @ref udos aus
     bool        tar  = false;   ///< `fs=tar` (UNIX-Angaben aus einem tar-Kopf); schliesst @ref udos aus
+    bool        bs600 = false;  ///< `fs=bs600` (BS600-Verzeichniseintrag); schliesst @ref udos aus
     std::string teil;           ///< tar: "ist/soll", wenn die Datei abgeschnitten ist
     std::string name;           ///< der ECHTE Name auf der Diskette ("3:SYSTEM.COM")
     UdosAngabe  u;
     CpmAngabe   c;
     UnixAngabe  x;
+    Bs600Angabe b;
 };
 
 std::string hex16(uint16_t v);

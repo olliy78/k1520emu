@@ -332,6 +332,23 @@ _lib.k1520d_set_cpm_attrs.argtypes = [
 ]
 _lib.k1520d_set_cpm_attrs.restype = ctypes.c_bool
 
+_lib.k1520d_entry_extent.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_entry_extent.restype = _CS
+_lib.k1520d_set_bs600_attrs.argtypes = [
+    _H, _CS, _CS,
+    ctypes.c_bool, _CS,
+    ctypes.c_bool, _CS,
+    ctypes.c_bool, ctypes.c_uint16,
+    ctypes.c_bool, ctypes.c_uint16,
+]
+_lib.k1520d_set_bs600_attrs.restype = ctypes.c_bool
+_lib.k1520d_bs600_reorganize.argtypes = [_H, ctypes.POINTER(ctypes.c_int)]
+_lib.k1520d_bs600_reorganize.restype = ctypes.c_bool
+_lib.k1520d_rename.argtypes = [_H, _CS, _CS]
+_lib.k1520d_rename.restype = ctypes.c_bool
+_lib.k1520d_bs600_urlader.argtypes = [_H]
+_lib.k1520d_bs600_urlader.restype = _CS
+
 _lib.k1520d_set_dos_attrs.argtypes = [
     _H, _CS,
     ctypes.c_bool, ctypes.c_bool,
@@ -849,6 +866,8 @@ class Entry:
     target_name: str = ""
     #: FAT: der 8.3-Kurzname (mit Pfad), wenn ``name`` ein langer Name ist.
     short_name: str = ""
+    #: BS600: die Lage der Datei, ``"06/15-13/13"`` (Spur/Sektor von … bis); sonst leer.
+    extent: str = ""
 
     # ── UDOS-Kopfsektorangaben (bei CP/M alle 0 bzw. leer) ──────────────────
     # Sie stehen NICHT in den Bytes der Datei, steuern aber, wie UDOS sie laedt
@@ -1601,6 +1620,12 @@ class DiskTool:
         return self.filesystem_type == "fat"
 
     @property
+    def ist_bs600(self) -> bool:
+        """BS600-Systemdiskette (PRG 700/710/710-1): Typ P/L, Lage, Lade-/End-/Startadresse, Datum, Signum.
+        ``Entry.type`` ist hier ``'P'``/``'L'`` — KEIN UDOS-Typ; ``Entry.created`` ist das Signum."""
+        return self.filesystem_type == "bs600"
+
+    @property
     def hat_baum(self) -> bool:
         """Namen sind Pfade mit ``/`` (WEGA, tar, FAT)."""
         return self.ist_wega or self.ist_tar or self.ist_fat
@@ -1713,6 +1738,7 @@ class DiskTool:
             side_dir=self.volume_dir(v),
             target_name=_s(_lib.k1520d_entry_target_name(self._h, i)),
             short_name=_s(_lib.k1520d_entry_short_name(self._h, i)),
+            extent=_s(_lib.k1520d_entry_extent(self._h, i)),
             entry=int(_lib.k1520d_entry_start(self._h, i)),
             record_len=int(_lib.k1520d_entry_record_len(self._h, i)),
             block_len=int(_lib.k1520d_entry_block_len(self._h, i)),
@@ -2115,6 +2141,39 @@ class DiskTool:
                 archive is not None, bool(archive),
                 mtime is not None, int(mtime or 0)):
             raise K1520DiskError(self._fail())
+
+    def set_bs600_attrs(self, name: str, *, type: Optional[str] = None, date: Optional[str] = None,
+                        author: Optional[str] = None, load: Optional[int] = None,
+                        entry: Optional[int] = None) -> None:
+        """BS600: Typ (``P``/``L``), Datum (``TTMMJJ``), Signum (bis 3 Zeichen), Lade- und Startadresse ändern.
+
+        Nicht angegebene Felder bleiben stehen; der Inhalt bleibt unangetastet.  Eine neue Ladeadresse verschiebt
+        die Endadresse mit (die Länge bleibt).  ``entry=0`` heißt „keine Startadresse“.
+        """
+        if not _lib.k1520d_set_bs600_attrs(
+                self._h, _b(name), _b(type or ""),
+                date is not None, _b(date or ""),
+                author is not None, _b(author or ""),
+                load is not None, int(load or 0),
+                entry is not None, int(entry or 0)):
+            raise K1520DiskError(self._fail())
+
+    def bs600_reorganize(self) -> int:
+        """BS600: Lücken schließen (alle Dateien lückenlos ab Spur 1 neu legen).  Liefert die Zahl verschobener Dateien."""
+        n = ctypes.c_int(0)
+        if not _lib.k1520d_bs600_reorganize(self._h, ctypes.byref(n)):
+            raise K1520DiskError(self._fail())
+        return int(n.value)
+
+    def rename(self, name: str, neuer_name: str) -> None:
+        """BS600: eine Datei umbenennen (Inhalt und Lage bleiben)."""
+        if not _lib.k1520d_rename(self._h, _b(name), _b(neuer_name)):
+            raise K1520DiskError(self._fail())
+
+    @property
+    def bs600_urlader(self) -> str:
+        """BS600: Bauart und Zielgerät des Urladers als Satz (``''`` = keiner / kein BS600)."""
+        return _s(_lib.k1520d_bs600_urlader(self._h))
 
     def dos_sys(self, quelle: "DiskTool") -> str:
         """FAT (DOS ``SYS``): Bootsektor und Systemdateien von ``quelle`` auf **diese** (leere) Diskette.

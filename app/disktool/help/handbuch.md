@@ -723,6 +723,30 @@ mit einem der mitgelieferten Abbilder. **Das System ist fest auf Tastatur und La
 Im Emulator muss die Bestückung dazu passen, sonst bleibt das Laden bei den Punkten stehen. Die Prüfung meldet, wenn
 `MicroDOS.SYS` nicht dort liegt, wo der Lader sie holt (die Diskette würde nicht starten).
 
+## BS600 — die Systemdisketten der Numerik-Programmiergeräte (PRG 700/710/710-1)
+
+BS600 (BS610, BS620) ist das menügeführte Betriebssystem der Programmiergeräte für SPS und CNC.  Die Diskette ist **einseitig,
+40 Zylinder**: Zylinder 0 hat 26 Sektoren zu 128 Byte (Urlader, Kennsatz, Verzeichnis, Belegungstabelle), die Zylinder 1 bis 39 haben
+15 Sektoren zu 256 Byte.  Das Verzeichnis fasst **54 Dateien**; **jede Datei liegt zusammenhängend** (keine Verkettung), nutzbar sind
+die Spuren 1 bis 37.  Erkannt wird sie am Inhalt (`BS600 Systemdiskette`), nicht am Namen.
+
+* **Die Liste** zeigt je Datei Typ (`P`), Größe, **Lage** (`Spur/Sektor-Spur/Sektor`), die drei Adressen (Laden, Ende, Start — hexadezimal;
+  `Start —` heißt „kein Programmstart“), Datum und Signum.  Ein Name hat höchstens 6 Zeichen und **keine Endung**: aus `prog.bin` wird `PROG`.
+* **Eigenschaften** (Doppelklick, Alt+Return) ändern Name, Typ, Datum, Signum, Lade- und Startadresse; die Endadresse folgt der
+  Ladeadresse, die Lage ändert nur *Reorganisieren*.  Beim **Holen** schreibt das Werkzeug die Angaben in ein `.fileinfo` neben die Datei;
+  beim **Einfügen** kommen sie von dort zurück.  Ohne `.fileinfo` gilt: Typ `P`, Ladeadresse `0000`, keine Startadresse, Datum heute, kein Signum
+  — für ein Programm also unbedingt Ladeadresse und Start nachtragen (Eigenschaften oder `put --load 6D00 --entry 6D5F`).
+* **Lücken:** BS600 vergibt nur zusammenhängende Läufe.  Nach dem Löschen können Lücken entstehen, in die eine große Datei nicht passt, obwohl
+  insgesamt Platz ist.  *Diskette ▸ BS600: Dateien reorganisieren…* legt alle Dateien lückenlos ab Spur 1 neu (Namen, Inhalt und Angaben bleiben).
+  Die Prüfung nennt Lücken als Hinweis.
+* **Urlader:** zwei Bauarten.  `SYL FOR BS620` (NKM-Lader) bootet am **PRG 710-1**; `BOOTSTRAP FOR BS600` gehört zum **PRG 700** (3-KB-ROM) und
+  startet am 710/710-1 nicht.  Der Hinweis steht im Prüfbericht, in `info` und nach dem Einspielen.  Eine neue Diskette entsteht über
+  *Neue Diskette ▸ BS600 Systemdiskette ▸ Bootdiskette* mit einem der mitgelieferten Urlader — die Dateien (`BS620`, `SYS…`) kommen danach per *Alles einfügen*.
+* **Prüfen und Retten:** die Prüfung vergleicht Verzeichnis und Belegungstabelle in beiden Richtungen, findet überlappende Dateien, unmögliche Lagen und Adressen,
+  doppelte Namen und einen fehlenden Kennsatz.  Reparieren kann sie die **Belegungstabelle** (neu rechnen) und einen Eintrag mit unmöglicher Lage
+  (löschen — nie vorausgewählt).  *Gelöschte Dateien suchen* findet nach dem Löschen nur den **Inhalt** (Rohbereich): ein BS600-Eintrag trägt Name, Typ, Adressen und
+  Dateigrenzen, und das Löschen überschreibt ihn ganz.  Zurückholen heißt: Inhalt retten und mit Ladeadresse neu einfügen.
+
 ## Neue Disketten und Bootdisketten
 
 *Datei ▸ Neue Diskette* (Strg+N) legt eine formatierte, leere Diskette an. Im
@@ -748,7 +772,7 @@ Kommandozeile heißt es `create --inodes N`.
 Darunter steht der Haken **Bootdiskette erstellen** mit einem Auswahlfeld daneben. Das
 Feld bietet die **hinterlegten Bootabbilder** des gewählten Dateisystems an — die
 Systemspuren aller mitgelieferten Systemdisketten (CP/A, SCPX, UDOS 4.3, BCU 880,
-SCPX 8915, PRG 710, SCP 1715, CP/Z, SCP 3.0, OS/M, UDOS 5.0). Der erste passende ist vorgewählt;
+SCPX 8915, PRG 710, BS600 (nur der Urlader), SCP 1715, CP/Z, SCP 3.0, OS/M, UDOS 5.0). Der erste passende ist vorgewählt;
 mehrere gibt es, wo dasselbe Dateisystem auf verschiedenen Rechnern bootet (`scpx_ds80_16x256_boot`:
 A5120, PRG 710/710-1, PC 1715). Der letzte Eintrag, **Eigene .bin-Datei auswählen…**,
 fragt sofort nach einer Datei — etwa einem Abbild, das man mit *Diskette ▸ Bootabbild

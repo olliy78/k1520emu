@@ -52,7 +52,10 @@ enum class FsType : uint8_t {
     /// @brief MS-DOS / PC-DOS / DCP (A7150) FAT12: BPB im Bootsektor, FAT, Wurzel- und
     ///        Unterverzeichnisse, lange Namen.  Die Lage steht auf der Diskette (BPB) - das Profil
     ///        benennt nur Geometrie und Namen.  @see core/filesystem/fat/fat_fs.h
-    Fat
+    Fat,
+    /// @brief BS600/BS610/BS620 (PRG 700/710/710-1): 26x128 Spur 0 (Urlader, VOL1, Verzeichnis, Belegungstabelle)
+    ///        + 15x256 Datenspuren, Dateien unfragmentiert.  @see doc/bs600_diskettenformat.md
+    Bs600
 };
 
 /// @brief Gehoert der Typ zur UDOS-Familie? (gemeinsame Kopfsektorfelder, Typ/Props)

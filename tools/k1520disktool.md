@@ -1,6 +1,6 @@
 # `k1520disktool` — Dateiaustausch mit K1520-Disketten
 
-Holt Dateien von CP/A-, SCPX-, **UDOS**-, **UDOS1715**-, **SCP1700**- und **SIOS-1526**-Disketten
+Holt Dateien von CP/A-, SCPX-, **UDOS**-, **UDOS1715**-, **SCP1700**-, **SIOS-1526**- und **BS600**-Disketten
 (CP/M-86 des A7100) und schreibt sie zurück —
 auf `.img`, `.hfe`, `.dmk`, `.cqm` (CopyQM), `.td0` (TeleDisk) und `.imd` (ImageDisk).  Dieselbe Bibliothek treibt die Oberfläche
 (`run_disktool.sh`); Feinentwurf: `doc/design/13_k1520disktool.md`.
@@ -17,7 +17,7 @@ k1520disktool get    <abbild> [muster…] --to <ordner>  Dateien herausholen
 k1520disktool put    <abbild> <datei|ordner…>          Dateien einfügen
 k1520disktool rm     <abbild> <muster…>                Dateien löschen
 k1520disktool create <abbild> --fs NAME [--label N]    leere Diskette anlegen
-       [--boot abbild.bin] [--prg 710|710-1]           … bootfähig (Systemspuren)
+       [--boot abbild.bin] [--prg 700|710|710-1]       … bootfähig (Systemspuren; 700 nur BS600)
        [--inodes N] [--blocks N]                       … WEGA/MUTOS: Mindestzahl Inodes / Dateisystem
                                                          nur N Blöcke groß (s_fsize; Rest bleibt frei,
                                                          z. B. für den Swap-Bereich des Kernels)
@@ -1302,3 +1302,32 @@ k1520disktool create neu.hfe --fs microdos_ds80_5x1024_boot --boot boot.bin   # 
 #   boot_microdos_1715.bin                         PC 1715
 k1520disktool put neu.hfe PIP.COM ; k1520disktool attr neu.hfe PIP.COM --arc
 ```
+
+## BS600 (PRG 700 / 710 / 710-1)
+
+Systemdisketten des Numerik-Betriebssystems BS600 (BS610, BS620): Spur 0 = 26 × 128 B (Urlader Sektor 1–3, Kennsatz `VOL1` Sektor 7, Verzeichnis 8–25,
+Belegungstabelle 26), Spur 1–39 = 15 × 256 B, einseitig, 54 Dateien, **jede Datei zusammenhängend** (nutzbar Spur 1–37).  Profil
+`bs600_ss40_15x256_boot` (Format `ss40_1t26x128-15x256`), erkannt am Inhalt (`VOL1` + `PRG` + plausibles Verzeichnis).  Aufbau: `doc/bs600_diskettenformat.md`,
+Entwurf `doc/design/48_bs600.md`, Festlegungen `doc/merkposten/bs600_disktool.md`.
+
+```
+$ k1520disktool ls -l BS620.hfe
+Name   Typ  Groesse  Lage         Laden Ende  Start Datum    Sig
+BS620  P       26624  06/15-13/13  6D00  D4FF  6D5F  20.12.88 KRU
+$ k1520disktool put neu.hfe prog.bin --load 6D00 --entry 6D5F --type P --date 051124 --author KRU   # Name PROG (ohne Endung)
+$ k1520disktool attr neu.hfe PROG --load 7000 --author OL        # Adressen hexadezimal; die Endadresse zieht mit
+$ k1520disktool mv neu.hfe PROG NEUNAM
+$ k1520disktool reorganize neu.hfe                               # Luecken schliessen (Dateien lueckenlos ab Spur 1)
+```
+
+* **Ohne Angaben** (`put` ohne `--type/--load/--entry/--date/--author` und ohne `.fileinfo`): Typ `P`, Ladeadresse `0000`, keine Startadresse, Datum heute, kein Signum.
+  `get` legt je Datei ein `.fileinfo` (`fs=bs600`) neben die Datei; `put` liest es zurück.
+* **Urlader und Zielgerät:** `SYL FOR BS620` (NKM-Lader) gehört zum **PRG 710-1**, `BOOTSTRAP FOR BS600` zum **PRG 700** (3-KB-ROM; bootet am 710/710-1 nicht).
+  `info` nennt es in der Zeile *Systemspuren*, `create --boot`/`boot-put` nach dem Einspielen, `check` als Hinweis `bs600.urlader.prg700`.
+  `--prg 700|710|710-1` weist einen Urlader der falschen Bauart vor dem Schreiben ab (710-1 nur mit `SYL FOR BS620`, 700 nur mit `BOOTSTRAP FOR BS600`;
+  `SYL FOR BS610` = 710 ist Annahme [?]).  Fertige Urlader: `data/bootsektoren/boot_bs620_prg710-1.bin`, `boot_bs600_prg700.bin`.
+* **Prüfung (`check`/`fsck`)** — Kennungen `bs600.*` sind ein Vertrag (Tabelle im Kopf von `core/filesystem/check/bs600_check.cpp`): Verzeichnis ↔ Belegungstabelle in beiden
+  Richtungen (`tabelle.fehlt` = Gefahr, `tabelle.ueberzaehlig`), Überlappung (Gefahr), Lage/Ende/Spur 38+, Adressen und Sektorzahl, doppelte Namen, Kennsatz, Datum (Hinweis), Lücken (Hinweis).
+  Reparaturen: Tabelle nachtragen (empfohlen), Tabelle freigeben (nicht vorausgewählt, gesperrt bei unbrauchbarem Eintrag), unbrauchbaren Eintrag löschen (nie vorausgewählt), Reorganisieren (nicht vorausgewählt).
+* **Rettung (`recover`)** findet nur den **Inhalt** (Rohbereich ohne Namen): Stufe Verzeichnis = von der Tabelle belegte Sektoren ohne Eintrag, `--full` zusätzlich freie Sektoren mit Inhalt (Guete *Bruchstück*).
+  Einen Eintrag wiederherstellen (`--restore`) geht nicht — Name, Typ, Adressen und Dateigrenzen stehen nur im Eintrag, und das Löschen überschreibt ihn mit Blanks.
