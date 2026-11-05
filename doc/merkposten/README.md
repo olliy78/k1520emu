@@ -28,6 +28,7 @@ sind nur nicht mehr in jeder einzelnen Anfrage geladen.
 | `sios.md` | SIOS 1526 (A5120/A5130/K8924): Q240/CTC/F8-Kernkorrekturen, Sicherheitsstecker, Tasten ET1/ET2/M, DiskTool-Dateisystem `sios`, Befunde CAN/INIT (Entwurf 43; direkt hier angelegt; `CLAUDE.md` traegt nur den Kurzabsatz „SIOS 1526“) |
 | `microdos.md` | MicroDOS 1526 (Rostock) am A5120: Abbild -> Tastatur/Laufwerk, FORMAT20, MSYSG20-Menuefolge, `tools/microdos/ablauf.py`, Waechter `py_microdos_ablauf` (direkt hier angelegt) |
 | `microdos1715.md` | MicroDOS 1715 (Rostock) am PC 1715: FORMAT15/MSYSG15A-Ablauf, Motorregister-Stolperstein nach FORMAT15 (RESET statt Strg+C), `create --boot` = Kopf + MICRODOS.SYS, `tools/microdos/ablauf1715.py` + `build1715.py`, Waechter `py_microdos1715_ablauf`/`cli_microdos1715`/`DisktoolMicrodos.*` (direkt hier angelegt) |
+| `drucker.md` | `core/peripherals/druckwerk/` + `core/cards/printer/` + `core/machines/printer/`, `k1520_printer_*`, Debugger-Befehl `blatt` — Druckeremulator `k1520printer` (SD 1157 druckt, Entwurf 49; Flugzeit, PIO-Ereignisse, /VK, Orakel; direkt hier angelegt) |
 
 ## Warum ausgelagert
 

@@ -1,6 +1,6 @@
 # Entwurf 49 — Druckeremulator `k1520printer` (Ticket #28)
 
-Stand 2026-11-05, **WP0a/WP0b erledigt, WP1 erledigt (siehe §5a)**, Rest Planung.  Zweig `feature/issue-28-k1520printer`.
+Stand 2026-11-05, **WP0a/WP0b, WP1, WP3 und WP2b erledigt (siehe §5a, §5b)**, Rest Planung.  Zweig `feature/issue-28-k1520printer`.
 Nummer 49, weil 48 für BS600 vorgemerkt ist (noch in keinem Zweig).
 
 ## 1  Auftrag (Ticket #28) und Festlegung des Anwenders
@@ -173,8 +173,8 @@ Je AP: Doku + Test + Commit, **nicht pushen**.  Reihenfolge: WP0a ‖ WP0b → W
 | **WP0a** | K6316-Hardware aus 19 Schaltplanblättern + Servicehandbuch: Chipliste, Adress-/E/A-Karte, PIO-Bits, Interruptkette, Sensoren/Aktoren, Bedienmatrix, DIL-Funktionen, Mechanikmaße → `doc/printer/k6316/hardware.md`; Abgleich mit den E/A-Befehlen im ROM (80H–8DH, A6H–A9H) | — | jede E/A-Adresse im ROM ist erklärt |
 | **WP0b** | SD-1157-Hardware aus `1157.mac` → `doc/printer/sd1157/hardware.md`; `1157.mac` übersetzen und mit `1157.rom` vergleichen; Zeichengenerator-Lage (3000H/3400H) klären; `.prn` für den Debugger | — | Vergleich dokumentiert, E/A vollständig |
 | **WP1** | Gerüst: `PrinterMachine`, Kennung 7, `k1520_create_printer`, `boot_trace`/`k1520dbg --machine sd1157|k6316`, leeres Druckwerk | WP0 | ROM läuft an, Debugger zeigt CPU/Speicher/E/A |
-| **WP3** | `Druckwerk`, `Nadeldruckwerk`, Blattmodell, Papierweg (Bahnen, Schnitt), C-ABI `k1520_printer_*` | WP1 | Unit-Tests `Druckwerk.*`: Phasen → Position, Punktlage vor/zurück, Blattgrenzen |
-| **WP2b** | `Sd1157Steuerung`: E/A nach WP0b, Bedienfeld, Sensoren | WP1, WP3 | Firmware erreicht Grundstellung (Wagen am Rand, Online-Lampe) |
+| **WP3** ✔ | `Druckwerk`, `Nadeldruckwerk`, Blattmodell, Papierweg (Bahnen, Schnitt), C-ABI `k1520_printer_*` | WP1 | Unit-Tests `Druckwerk.*`: Phasen → Position, Punktlage vor/zurück, Blattgrenzen (§5b: ohne `SchrittWagen`/Schnitt/zweite Bahn im Druck) |
+| **WP2b** ✔ | `Sd1157Steuerung`: E/A nach WP0b, Bedienfeld, Sensoren | WP1, WP3 | Firmware erreicht Grundstellung (Wagen am Rand, Online-Lampe) — **und druckt den Selbsttest** (§5b) |
 | **WP6b** | SD 1157 druckt: Selbsttest (TEST-Taste), Text über SIO (Testfall ohne Netz), Escape-Folgen, 2 Bahnen (267) | WP2b, WP4 | Selbsttestbild + Textprobe als Wächter (Punktmuster-Prüfsumme) |
 | **WP2a** | `K6316Steuerung` nach WP0a, Vorsteckmotor/Schneiden/Leitbleche, Betriebsartschalter, Haube/Kopfhebel | WP1, WP3 | Synchronisation läuft, H-LEDs wie Manual |
 | **WP6a** | K6316 druckt: Selbsttest (Foto als Abnahme), Lichtschrankentest, Text über IFSS und V.24, Schnitt | WP2a, WP4 | Wächter wie WP6b |
@@ -192,8 +192,35 @@ als Annahme), `boot_trace --machine sd1157`, `k1520dbg --machine sd1157`; `K6316
 Leerlaufschleife**: 13 CTC-1-Interrupts (~0,86 Mio. Takte), Wagenfahrt rueckwaerts bis /LR, 24 Anfangs-PV-Schritte (+ Rueckzug), Online-Lampe an,
 Fehlerlampe aus, DC1 an den IFSS (Kanal B; am V.24-Betrieb an Kanal A), danach Abfrage von PIO 3 B / SIO-Puffer ab ~5,6 Mio. Takten.
 Wächter: `Sd1157Karte.*`, `Sd1157Rom.*`, `K1520PrinterMaschine.*`, `py_c_api`.
-Offen: Startlagen im Randbereich (/VK oder /LR beim Einschalten schon 0) — der Platzhalter erzeugt dort keine /LR-Flanke (WP3);
-ein echtes `.prn` fuer den Debugger fehlt (`-l 1157.mac` stimmt nur bis ~00C0H, 132 Zeilen unbekannt, Adressen driften).
+Offen aus WP1, in WP3 gelöst (§5b): Startlagen im Randbereich (/VK, /LR), die 56 Papierschritte; ein echtes `.prn` für den Debugger fehlt weiter
+(`-l 1157.mac` stimmt nur bis ~00C0H, 132 Zeilen unbekannt, Adressen driften).
+
+### 5b  Stand WP3 / WP2b (2026-11-05)
+
+**Gebaut.**  `core/peripherals/druckwerk/` (Bibliothek `k1520_druckwerk`, ohne Qt/PDF, ohne Bezug auf ein Gerät): `Blattmodell` (Bit je Punkt, Blöcke zu 64 Zeilen,
+wächst nach unten, `version()`, `lies(y0, n, …)`, `blattAscii`), `Nadelkopf` (Muster + Position + Papierlage → Punkte, Flugzeit je Richtung, Kopf anliegend),
+`Papierweg` (Freigabe/Richtung/Hochlauf → Rückmeldeimpulse, Schritte je Richtung, Nettolage, Papierende), die Schnittstelle `Wagen` (`WagenEingang`: LFG/VW/VTAB **und**
+`phasen`; `WagenRueckmeldung`: LAUF/Takte **und** `g1`, Ränder) mit `GeregelterWagen` (SD 1157), `Nadeldruckwerk` (fügt zusammen) und `NadeldruckParameter`
+(Raster, Nadelteilung, Punktmaß, Flugzeit; `[?]` kommentiert).  `SchrittWagen` (K6316) ist **nicht** gebaut; die Schnittstelle trägt ihn ohne Umbau.
+`sd1157_mechanik_vorlaeufig.h` ist entfernt; `Sd1157Steuerung` besitzt ein `Nadeldruckwerk`, löst den Anschlag mit der **Flanke FGDI (2B.5) 0 → 1** aus
+und bietet Tasten/Schalter als API (`setOnline`, `setTastePV1/2`, `setTasteTest`, `setKopf`, `setLpi6`, `setPapierDa`; Lampen `lampeOnline`/`lampeFehler`).
+C-ABI additiv `k1520_printer_*` (Blatt lesen je Zeilenbereich, Größe, Version, Kopf, Raster, Tasten, Schalter, Lampen, Blatt leeren), ctypes-Deklaration,
+`py_c_api`; Debugger `blatt [info | x0 y0 [b h [sx sy]]]` (ASCII-Abzug), Diagnose der Druckertests.
+
+**Ergebnis der Abnahme.**  Der Selbsttest (TEST im Offline-Zustand, Original-ROM) druckt **Punkt für Punkt das, was ein Orakel aus `1157zg.rom` und dem Text ab 0300H
+berechnet**: Titelzeile (13 normale Zeichen, 15 breite, 20 schräge), Zeile mit 63 und Zeile mit 31 Zeichen, Zeilenabstand 24 Rasterzeilen (6 lpi) bzw. 18 (8 lpi),
+Formularvorschub am Ende = Formularlänge (192/288/576), kein Punkt außerhalb.  Die mittlere Zeile druckt die Firmware **rückwärts**, die beiden anderen vorwärts.
+
+**Befunde** (alle in `doc/merkposten/drucker.md` mit Wächter):
+1. **Flugzeit des Kopfes.**  Die Firmware löst rückwärts einen Takt später aus als vorwärts; beide Richtungen landen nur bei 0,5 Takt Flugzeit je Richtung auf denselben
+   Punkten (Raster x = 2 Pixel je Takt).  Das ist am Verhalten der Firmware gemessen, nicht an einem Handbuch.
+2. **PIO-Interrupts im Modus 3 sind Ereignisse** (`Z80PIO::setModus3Flanke`, U855 §6.4).  Im Pegelmodus löste jede Auffrischung der Eingangspegel bei /LR = 0 den
+   Randinterrupt neu aus und setzte die Spaltenzähler zurück: der Druck fuhr in die falsche Richtung.
+3. **/VK deckt den /LR-Bereich ab** (`vk_bis ≥ lr_bis`; WP0b hatte ≤ 10 angenommen).  Sonst bleiben Startlagen im Randbereich (auch „Wagen steht nach /RESET links“) am Anschlag hängen.
+4. **Die 56 Papierschritte sind Firmware**: 24 vor, Rückzug 24 + 4 zurück (`add a,4` bei m24dd), 4 vor; Nettolage 0.
+
+**Offen.**  Zweite Bahn im Druck (Punkte gehen immer auf Bahn 0, `Nadeldruckwerk::feuere`), `SchrittWagen`, Schnitt/Blattgrenzen, Textprobe über die SIO (WP4/WP6b), die offenen `[?]` aus
+hardware.md §14 (Takte je Zoll, Nadelteilung, Punktmaß, Flugzeit absolut).  Die Online-Lampe und das Flag `off` der Firmware folgen der Taste ONLINE nur beim Anlauf (Merkposten).
 
 ## 6  Tests und Wächter
 

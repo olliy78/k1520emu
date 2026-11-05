@@ -4,10 +4,12 @@
  *        drei PIO, SIO — rekonstruiert aus der Firmware.
  *
  * Quelle fuer alles: `doc/printer/sd1157/hardware.md` (WP0b, Entwurf 49; kein Schaltplan).
- * Hier nur Stand WP1: das Original-ROM laeuft an.  Noch KEIN Druckwerk (Nadeln BEH/BFH werden nur
- * gespeichert), KEIN Blatt, KEIN Anschluss der SIO nach aussen (ihr Sender wird in eine
- * Senke geleert), KEINE Bedienoberflaeche.  Wagen und Papier sind ein vorlaeufiger Platzhalter
- * (@ref Sd1157MechanikVorlaeufig), der in WP3 durch das Druckwerk ersetzt wird.
+ * Stand WP3/WP2b: das Original-ROM laeuft und druckt auf ein Blatt im Kern (@ref Nadeldruckwerk,
+ * core/peripherals/druckwerk/: geregelter Wagen, Papierweg, Nadelkopf, Blattmodell).  Der Nadelanschlag
+ * ist die **Flanke FGDI (2B.5) 0 -> 1** (hardware.md §15 Nr. 14): dann schlagen die Nadeln an, deren Bit im
+ * Latch BEH/BFH 0 ist.  Tasten und Schalter sind eine API (setOnline, setTastePV1/2/Test, setKopf, setLpi6,
+ * setPapierDa), Lampen lesbar (lampeOnline, lampeFehler).  KEIN Anschluss der SIO nach aussen (ihr Sender
+ * wird in eine Senke geleert, WP4), KEINE Bedienoberflaeche.
  *
  * **Speicher** (hardware.md §2): ROM 0000H–297FH (`1157.rom`, das Abbild, nicht die Quelle),
  * 2980H–2BFFH unbelegt (FFH [?] §14 Nr. 14), RAM 2C00H–2FFFH, ZG1 3000H–33FFH (`1157zg.rom`),
@@ -30,7 +32,8 @@
 
 #pragma once
 #include "core/bus/k1520_bus.h"
-#include "core/cards/printer/sd1157_mechanik_vorlaeufig.h"
+#include "core/peripherals/druckwerk/geregelter_wagen.h"
+#include "core/peripherals/druckwerk/nadeldruckwerk.h"
 #include "core/primitives/z80.h"
 #include "core/primitives/z80_ctc.h"
 #include "core/primitives/z80_pio.h"
@@ -73,7 +76,11 @@ public:
         bool    online = true;           ///< 3B.1 = 0 (Taste ONLINE: Pegel, 0 = online) [?] Vorgabe online
         bool    kopf_dauernd = false;    ///< 3B.4: 1 = Kopf dauernd angeschwenkt
         uint8_t ram_fill = 0x00;         ///< Vorbelegung der RAMs beim Einschalten [?]
-        int     wagen_start = Sd1157MechanikVorlaeufig::START_POS;   ///< Startlage des Wagens (Takte) [?] §15 Nr. 11
+        int     wagen_start = 300;       ///< Startlage des Wagens (Takte) [?] §15 Nr. 11
+        // Druckwerk: Mechanikparameter (Raster, Nadeln, Papier); Bahnzahl und Blattbreite folgen EBD/BDA.
+        NadeldruckParameter       druck;
+        GeregelterWagen::Parameter wagen;   ///< rr_ab folgt BDA (1420 schmal / 2200 breit)
+        Papierweg::Parameter      papier;
 
         /// SD 1157/264: 132 Spalten, eine Bahn (§13).
         static Config sd1157_264() { return Config{}; }
@@ -121,8 +128,16 @@ public:
     void setTastePV1(bool gedrueckt);     ///< 3B.2
     void setTastePV2(bool gedrueckt);     ///< 3B.3
     void setTasteTest(bool gedrueckt);    ///< 3B.6
-    void setPapierDa(bool da);            ///< BCH.0 /PE: true = Papier da
-    void setLpi6(bool lpi6);              ///< BCH.1
+    void setPapierDa(bool da);            ///< BCH.0 /PE: true = Papier da (false = Papier entnommen/leer)
+    void setLpi6(bool lpi6);              ///< BCH.1; die Firmware liest es NUR beim Anlauf (sy34), wirksam erst nach /RESET
+    void setKopf(bool dauernd);           ///< 3B.4: Taste Kopf: true = dauernd angeschwenkt
+    bool online() const { return online_; }
+    bool lpi6() const { return lpi6_; }
+    bool kopf() const { return kopf_dauernd_; }
+    bool tastePV1() const { return taste_pv1_; }
+    bool tastePV2() const { return taste_pv2_; }
+    bool tasteTest() const { return taste_test_; }
+    bool papierDa() const { return druck_.papier(0).papierDa(); }
 
     // ─── Ausgaben, soweit gespeichert (Beobachtung fuer Werkzeuge und Tests) ──
     /// Nadelmuster: Bit k = Nadel k+1 feuert (low-aktiv invertiert), Bit 8 = Nadel 9 (hardware.md §10.4).
@@ -138,7 +153,10 @@ public:
     /// Alles, was die SIO gesendet hat (Senke statt Anschluss, WP4): 0 = Kanal A (V.24), 1 = B (IFSS).
     const std::string& sioAusgabe(int kanal) const { return sio_aus_[kanal & 1]; }
 
-    const Sd1157MechanikVorlaeufig& mechanik() const { return mech_; }
+    /// Druckwerk (Wagen, Papier, Blatt) — Lesezugriff fuer Oberflaeche, Werkzeuge und Tests.
+    Nadeldruckwerk&       druck()       { return druck_; }
+    const Nadeldruckwerk& druck() const { return druck_; }
+    bool kopfAngeschwenkt() const { return kopf_dauernd_ || (p2b_aus_ & 0x04) != 0; }   ///< KAS (2B.2) oder Taste
 
 private:
     static uint8_t chipPort(uint8_t rel) {
@@ -148,7 +166,17 @@ private:
     uint8_t pio3a() const;
     uint8_t pio3b() const;
     void eingaengeSetzen();            ///< alle Pins an die PIOs anlegen
-    void pio1Setzen(const Sd1157MechanikVorlaeufig::Pegel& p);
+    /// Pegel der Eingangspins aus dem Druckwerk, wie die Firmware sie liest.
+    struct Pegel {
+        bool lauf = false, takt_vor = false, takt_rueck = false;   ///< aktiv high
+        bool vk = true, lr = true, rr = true;                     ///< 0 = aktiv
+        bool pv1 = true, pv2 = true;                              ///< PV-Schritt (0 = Impuls)
+        bool operator==(const Pegel& o) const {
+            return lauf == o.lauf && takt_vor == o.takt_vor && takt_rueck == o.takt_rueck && vk == o.vk &&
+                   lr == o.lr && rr == o.rr && pv1 == o.pv1 && pv2 == o.pv2;
+        }
+    };
+    Pegel pegelNeu() const;
     void mechanikAusgaenge();
     void mechanikPegel();
     void ketteNeu();                   ///< interne IEI/IEO-Kette (CTC -> PIO2 -> PIO1 -> SIO -> PIO3)
@@ -167,14 +195,14 @@ private:
 
     // Tasten/Schalter (Laufzeit)
     bool online_, taste_pv1_ = false, taste_pv2_ = false, taste_test_ = false;
-    bool papier_da_ = true, lpi6_;
+    bool lpi6_, kopf_dauernd_;
 
     // zuletzt geschriebene Ausgangsbytes; Startwerte nach hardware.md §5.1 (P2AD=10H, P2BD=18H, P1xD=08H)
     uint8_t p1a_aus_ = 0x08, p1b_aus_ = 0x08, p2a_aus_ = 0x10, p2b_aus_ = 0x18;
     uint8_t nad18_ = 0xFF, nad9_ = 0xFF;   ///< FFH = Nadeln aus (§10.4)
 
-    Sd1157MechanikVorlaeufig mech_;
-    Sd1157MechanikVorlaeufig::Pegel pegel_;   ///< zuletzt an die PIOs gelegt
+    Nadeldruckwerk druck_;
+    Pegel pegel_;   ///< zuletzt an die PIOs gelegt
 
     // Interruptkette
     bool iei_in_ = false;

@@ -1591,10 +1591,10 @@ int main(int argc, char** argv){
                 rcpfx(), rc(m.cpuCycles()), rel_armed?" (rel)":"");
             return;
         }
-        if (KS){   // Drucker: Speicher fest; Lampen und Wagen (Platzhalter) statt Banking
+        if (KS){   // Drucker: Speicher fest; Lampen und Wagen statt Banking
             Sd1157Steuerung& k=m.printer()->sd1157();
             fprintf(stderr,"  state: online=%s fehler=%s wagen=%d%s  %c-cyc=%lld%s\n", k.lampeOnline()?"an":"aus",
-                k.lampeFehler()?"an":"aus", k.mechanik().position(), k.mechanik().laeuft()?" (laeuft)":"",
+                k.lampeFehler()?"an":"aus", k.druck().wagen().position(), k.druck().wagen().laeuft()?" (laeuft)":"",
                 rcpfx(), rc(m.cpuCycles()), rel_armed?" (rel)":"");
             return;
         }
@@ -1912,16 +1912,16 @@ int main(int argc, char** argv){
             if (json){
                 fprintf(stderr,"\n{\"machine\":\"sd1157\",\"pc\":\"0x%04X\",\"online\":%s,\"fehler\":%s,"
                   "\"wagen\":%d,\"lauf\":%s,\"pv1\":%u,\"pv2\":%u,\"nadeln\":\"0x%03X\"}\n", pc,
-                  k.lampeOnline()?"true":"false", k.lampeFehler()?"true":"false", k.mechanik().position(),
-                  k.mechanik().laeuft()?"true":"false", (unsigned)k.mechanik().pvSchritte(0),
-                  (unsigned)k.mechanik().pvSchritte(1), (unsigned)k.nadeln());
+                  k.lampeOnline()?"true":"false", k.lampeFehler()?"true":"false", k.druck().wagen().position(),
+                  k.druck().wagen().laeuft()?"true":"false", (unsigned)k.druck().papier(0).schritte(),
+                  (unsigned)k.druck().papier(1).schritte(), (unsigned)k.nadeln());
                 return;
             }
             char l1[120]; disasmAt(pc,l1,sizeof l1); std::string p1=prnFor(pc);
             fprintf(stderr,"  CPU  %s%s%s\n",l1,p1.empty()?"":"  ; ",p1.c_str());
             fprintf(stderr,"  Lampen: ONLINE %s, FEHLER %s   Wagen: Position %d %s (Platzhalter, WP3)   PV-Schritte %u/%u\n",
-                    k.lampeOnline()?"an":"aus", k.lampeFehler()?"an":"aus", k.mechanik().position(),
-                    k.mechanik().laeuft()?"laeuft":"steht", (unsigned)k.mechanik().pvSchritte(0), (unsigned)k.mechanik().pvSchritte(1));
+                    k.lampeOnline()?"an":"aus", k.lampeFehler()?"an":"aus", k.druck().wagen().position(),
+                    k.druck().wagen().laeuft()?"laeuft":"steht", (unsigned)k.druck().papier(0).schritte(), (unsigned)k.druck().papier(1).schritte());
             fprintf(stderr,"  Ausgaenge 2A=%02X 2B=%02X 1A=%02X 1B=%02X  Nadeln BEH=%02X BFH=%02X   SIO gesendet A/B: %zu/%zu\n",
                     k.portAusgabe(2,0),k.portAusgabe(2,1),k.portAusgabe(1,0),k.portAusgabe(1,1),k.nad18(),k.nad9(),
                     k.sioAusgabe(0).size(),k.sioAusgabe(1).size());
@@ -2062,7 +2062,7 @@ int main(int argc, char** argv){
                          (unsigned long long)(runClock()-start), m.cpuPC(), m.pc1715()->zre().bwsRegister());
                  return; }
         if (KS){ fprintf(stderr,"  ... %llu cyc  PC=%04X  wagen=%d  [Ctrl-C bricht ab]\n",
-                         (unsigned long long)(runClock()-start), m.cpuPC(), m.printer()->sd1157().mechanik().position());
+                         (unsigned long long)(runClock()-start), m.cpuPC(), m.printer()->sd1157().druck().wagen().position());
                  return; }
         if (KM2){ fprintf(stderr,"  ... %llu cyc  PC=%04X  [Ctrl-C bricht ab]\n",
                          (unsigned long long)(runClock()-start), m.cpuPC());
@@ -3341,7 +3341,8 @@ int main(int argc, char** argv){
             fprintf(stderr,
               "  SD 1157 (--machine sd1157)  eine CPU (U880 2,4576 MHz), ROM 0000H-297FH, RAM 2C00H/3800H, ZG1 3000H (ZG2 3400H liest FFH)\n"
               "    map               Speicherkarte und E/A-Tore (doc/printer/sd1157/hardware.md §2/§4)\n"
-              "    d/u/x/e/wp        Speicher in CPU-Sicht;  where = Lampen, Wagen (Platzhalter), Papier, Nadeln\n"
+              "    d/u/x/e/wp        Speicher in CPU-Sicht;  where = Lampen, Wagen, Papier, Nadeln\n"
+              "    blatt [info | x0 y0 [b h [sx sy]]]  Blatt als ASCII-Abzug (Pixel; # = Punkt; sx/sy Pixel je Zeichen), Vorgabe: um die Papierlage\n"
               "    dev [ctc|pio|sio] CTC DCH, PIO 2/1/3 (F8H/F4H/ECH), SIO 7CH;  ivt = Kette CTC > PIO 2 > PIO 1 > SIO > PIO 3 [?]\n"
               "    Listings: -l doc/printer/sd1157/1157.mac  (kommentierte Quelle, vom Debugger-Assembler uebersetzt: 132 Zeilen\n"
               "                      unbekannt, die Adressen driften — nur der Anfang (Init, bis ~00C0H) stimmt, danach zeigt die\n"
@@ -3506,7 +3507,7 @@ int main(int argc, char** argv){
               "  PRG     map | help prg   (--machine prg710|prg710-1)\n"
               "  PC1715  map | help pc1715   (--machine pc1715)\n"
               "  MC80    map | dev | help mc80   (--machine mc80|mc80-30 [--spe 1|2])\n"
-              "  SD1157  map | dev | where | help sd1157   (--machine sd1157)\n"
+              "  SD1157  map | dev | where | blatt | help sd1157   (--machine sd1157)\n"
               "  P8000   map|adp | dma | kopp | mmu | xlat | ml | mp | segt | bsegt | term | help p8000   (--machine p8000|p8000-16)\n"
 
               "  A5120.16 cpu [zve1|zve2|u8000] ; dev em ; fcw ; psa ; bmode ; bvi ; bint16 ; emlog\n"
@@ -3830,7 +3831,7 @@ int main(int argc, char** argv){
                 "\"i\":\"0x%02X\",\"r\":\"0x%02X\",\"iff1\":%s,\"cyc\":%llu,\"rom\":true,"
                 "\"machine\":\"sd1157\",\"wagen\":%d,\"online\":%s}\n",
                 z.PC,z.SP,z.AF,z.BC,z.DE,z.HL,z.IX,z.IY,z.I,z.R, z.IFF1?"true":"false",
-                (unsigned long long)m.cpuCycles(), k.mechanik().position(), k.lampeOnline()?"true":"false"); }
+                (unsigned long long)m.cpuCycles(), k.druck().wagen().position(), k.lampeOnline()?"true":"false"); }
         else if (cmd=="rj" && KM){ const Z80& z=m.cpuDebug(); Mc80Machine& k=*m.mc80();
             fprintf(stderr,"\n{\"pc\":\"0x%04X\",\"sp\":\"0x%04X\",\"af\":\"0x%04X\",\"bc\":\"0x%04X\","
                 "\"de\":\"0x%04X\",\"hl\":\"0x%04X\",\"ix\":\"0x%04X\",\"iy\":\"0x%04X\","
@@ -4154,7 +4155,7 @@ int main(int argc, char** argv){
             else if (KS){   // Drucker: Lampen und Wagen statt Handschlag-RAM/CP/A-DPB
                 Sd1157Steuerung& k=m.printer()->sd1157();
                 fprintf(stderr,"  online=%s fehler=%s wagen=%d  SP=%04X  CTC-1-Vektor [2CE2]=%04X\n  (vars -f <datei> | vars add <name> <addr> [w] | vars clear)\n",
-                        k.lampeOnline()?"an":"aus", k.lampeFehler()?"an":"aus", k.mechanik().position(),
+                        k.lampeOnline()?"an":"aus", k.lampeFehler()?"an":"aus", k.druck().wagen().position(),
                         m.cpuSP(), wd(0x2CE2)); }
             else if (KM2){   // MC80.2x: nur das Bild statt Handschlag-RAM/CP/A-DPB
                 Mc80_2xMachine& k=*m.mc80_2x();
@@ -4644,6 +4645,27 @@ int main(int argc, char** argv){
             }
             else fprintf(stderr,"  Sicherheitsstecker: %d%s   (kbd stecker <0..6> [falsch]; 0 = ziehen)\n",
                          a5->sicherheitsstecker(), a5->sicherheitssteckerGeraetPasst()?"":" (Geraetekennung falsch)");
+        }
+        else if (cmd=="blatt" && KS){   // Drucker: Blatt als ASCII-Abzug eines Ausschnitts (Entwurf 49, WP3)
+            Sd1157Steuerung& k=m.printer()->sd1157();
+            const Nadeldruckwerk& d=k.druck();
+            const Blattmodell& b=d.blatt(0);
+            fprintf(stderr,"  Blatt %d x %d Pixel (%d x %d je Zoll), %llu Punkte, %llu ausserhalb verworfen, Version %llu; Kopf x=%d, Papier y=%d\n",
+                    b.breite(), b.hoehe(), d.parameter().takte_je_zoll*d.parameter().x_je_takt, d.parameter().y_je_zoll,
+                    (unsigned long long)b.punktzahl(), (unsigned long long)b.ausserhalb(), (unsigned long long)b.version(),
+                    d.kopfXPixel(), d.papierY(0));
+            if (!(t.size()>1 && t[1]=="info")){
+                // blatt [x0 y0 [breite hoehe [sx sy]]]: Pixel; Vorgabe = 200 x 40 Pixel um die Papierlage, ein Zeichen = 2 x 2 Pixel
+                int a[6]={-1,-1,200,40,2,2}; bool ok=true;
+                for (size_t i=1;i<t.size() && i<=6;++i){ try { a[i-1]=std::stoi(t[i]); } catch(...) { ok=false; } }
+                if (!ok || a[2]<1 || a[3]<1 || a[4]<1 || a[5]<1)
+                    fprintf(stderr,"  blatt [info | x0 y0 [breite hoehe [sx sy]]]  (Pixel; # = Punkt, . = leer; sx/sy = Pixel je Zeichen)\n");
+                else {
+                    if (a[0]<0) a[0]=160;
+                    if (a[1]<0) a[1]=std::max(0, d.papierY(0)-12);
+                    fprintf(stderr,"%s", blattAscii(b,a[0],a[1],a[2],a[3],a[4],a[5]).c_str());
+                }
+            }
         }
         else if (cmd=="tape"){   // Kassette K5020/K5200 (--tape): Status, Blockliste, Blockinhalt
             K5020* kk = m.base().k5020();

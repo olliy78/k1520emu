@@ -432,6 +432,109 @@ K1520Handle k1520_create_printer(int typ, const char* konfig) {
     }
 }
 
+// ─── Drucker: Blatt, Kopf, Bedienfeld (Entwurf 49, WP3) ──────────────────────
+
+static PrinterMachine* printerOf(K1520Handle h) {
+    return h ? dynamic_cast<PrinterMachine*>(toMachine(h)) : nullptr;
+}
+
+int k1520_printer_sheet_size(K1520Handle h, int bahn, int* breite, int* hoehe) {
+    auto* p = printerOf(h);
+    if (!p || bahn < 0 || bahn >= p->sd1157().druck().bahnen()) return 0;
+    const Blattmodell& b = p->sd1157().druck().blatt(bahn);
+    if (breite) *breite = b.breite();
+    if (hoehe) *hoehe = b.hoehe();
+    return 1;
+}
+
+uint64_t k1520_printer_sheet_version(K1520Handle h, int bahn) {
+    auto* p = printerOf(h);
+    if (!p || bahn < 0 || bahn >= p->sd1157().druck().bahnen()) return 0;
+    return p->sd1157().druck().blatt(bahn).version();
+}
+
+int k1520_printer_sheet_rows(K1520Handle h, int bahn, int y0, int n, uint8_t* buf, int cap) {
+    auto* p = printerOf(h);
+    if (!p || bahn < 0 || bahn >= p->sd1157().druck().bahnen() || !buf || cap <= 0) return 0;
+    return p->sd1157().druck().blatt(bahn).lies(y0, n, buf, static_cast<size_t>(cap));
+}
+
+int k1520_printer_sheet_clear(K1520Handle h) {
+    auto* p = printerOf(h);
+    if (!p) return 0;
+    p->sd1157().druck().blattLeeren();
+    return 1;
+}
+
+int k1520_printer_head(K1520Handle h, int* x_pixel, int* y_zeile, int* lauf) {
+    auto* p = printerOf(h);
+    if (!p) return 0;
+    const Nadeldruckwerk& d = p->sd1157().druck();
+    if (x_pixel) *x_pixel = d.kopfXPixel();
+    if (y_zeile) *y_zeile = d.papierY(0);
+    if (lauf) *lauf = d.wagen().laeuft() ? 1 : 0;
+    return 1;
+}
+
+int k1520_printer_geometry(K1520Handle h, int* x_je_zoll, int* y_je_zoll, int* bahnen) {
+    auto* p = printerOf(h);
+    if (!p) return 0;
+    const Nadeldruckwerk& d = p->sd1157().druck();
+    if (x_je_zoll) *x_je_zoll = d.parameter().takte_je_zoll * d.parameter().x_je_takt;
+    if (y_je_zoll) *y_je_zoll = d.parameter().y_je_zoll;
+    if (bahnen) *bahnen = d.bahnen();
+    return 1;
+}
+
+int k1520_printer_key(K1520Handle h, int taste, int gedrueckt) {
+    auto* p = printerOf(h);
+    if (!p) return 0;
+    Sd1157Steuerung& st = p->sd1157();
+    switch (taste) {
+        case K1520_PRINTER_KEY_PV1:  st.setTastePV1(gedrueckt != 0); return 1;
+        case K1520_PRINTER_KEY_PV2:  st.setTastePV2(gedrueckt != 0); return 1;
+        case K1520_PRINTER_KEY_TEST: st.setTasteTest(gedrueckt != 0); return 1;
+        default: return 0;
+    }
+}
+
+int k1520_printer_switch(K1520Handle h, int schalter, int wert) {
+    auto* p = printerOf(h);
+    if (!p) return 0;
+    Sd1157Steuerung& st = p->sd1157();
+    switch (schalter) {
+        case K1520_PRINTER_SW_ONLINE: st.setOnline(wert != 0); return 1;
+        case K1520_PRINTER_SW_KOPF:   st.setKopf(wert != 0); return 1;
+        case K1520_PRINTER_SW_LPI6:   st.setLpi6(wert != 0); return 1;
+        case K1520_PRINTER_SW_PAPIER: st.setPapierDa(wert != 0); return 1;
+        default: return 0;
+    }
+}
+
+int k1520_printer_switch_get(K1520Handle h, int schalter) {
+    auto* p = printerOf(h);
+    if (!p) return -1;
+    const Sd1157Steuerung& st = p->sd1157();
+    switch (schalter) {
+        case K1520_PRINTER_SW_ONLINE: return st.online() ? 1 : 0;
+        case K1520_PRINTER_SW_KOPF:   return st.kopf() ? 1 : 0;
+        case K1520_PRINTER_SW_LPI6:   return st.lpi6() ? 1 : 0;
+        case K1520_PRINTER_SW_PAPIER: return st.papierDa() ? 1 : 0;
+        default: return -1;
+    }
+}
+
+int k1520_printer_lamp(K1520Handle h, int lampe) {
+    auto* p = printerOf(h);
+    if (!p) return -1;
+    const Sd1157Steuerung& st = p->sd1157();
+    switch (lampe) {
+        case K1520_PRINTER_LAMP_ONLINE: return st.lampeOnline() ? 1 : 0;
+        case K1520_PRINTER_LAMP_FEHLER: return st.lampeFehler() ? 1 : 0;
+        default: return -1;
+    }
+}
+
 K1520Handle k1520_create_p8000(const char* konfig) {
     g_init_error.clear();
     P8000Machine::Config cfg;

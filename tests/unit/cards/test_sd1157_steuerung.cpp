@@ -3,7 +3,7 @@
  * @brief Steuerung des SD 1157 (Entwurf 49, WP1): Speicherkarte (ROM 0000H–297FH, RAM 2C00H/3800H,
  *        ZG1 3000H, ZG2 3400H liest FFH), ROM-Abbild gegen die MD5 aus doc/EPROMS/SD1157/README.md,
  *        E/A-Tore (6FH, BCH, BEH/BFH, CTC DCH, PIO F4H/F8H/ECH, SIO 7CH) mit den Ruhepegeln aus
- *        hardware.md §15, Wagen-Platzhalter (LAUF sofort, Raender), Interruptkette.
+ *        hardware.md §15, Wagen/Papier am Druckwerk (LAUF sofort, Raender), Nadelanschlag mit FGDI, Tasten/Lampen-API, Interruptkette.
  *        Quelle fuer alle Zahlen: doc/printer/sd1157/hardware.md (Paragraph je Fall).
  */
 
@@ -373,7 +373,7 @@ TEST(Sd1157Karte, CtcHatVorrangVorPio2)
     EXPECT_EQ(k.bus.interruptAcknowledge(), 0xE8);
 }
 
-// ─── Wagen-Platzhalter (vorlaeufig, WP3) ─────────────────────────────────────
+// ─── Wagen und Papier am Druckwerk (WP3) ─────────────────────────────────────
 
 TEST(Sd1157Karte, LaufIstSofortMitLfgUndRaenderFolgenDerPosition)
 {
@@ -390,15 +390,15 @@ TEST(Sd1157Karte, LaufIstSofortMitLfgUndRaenderFolgenDerPosition)
     int n = 0;
     while ((k.in(0xF4) & 0x20) && n++ < 400000) k.takte(50);
     EXPECT_LT(n, 400000);
-    EXPECT_LE(k.st.mechanik().position(), 76);
-    EXPECT_GT(k.st.mechanik().position(), 60);
+    EXPECT_LE(k.st.druck().wagen().position(), 76);
+    EXPECT_GT(k.st.druck().wagen().position(), 60);
 
     // LFG weg: Auslauf, LAUF bleibt kurz 1 und faellt dann (§15 Nr. 10)
     k.out(0xF8, 0x00);
     EXPECT_EQ(k.in(0xF8) & 0x20, 0x20);
     k.takte(100000);
     EXPECT_EQ(k.in(0xF8) & 0x20, 0x00);
-    EXPECT_FALSE(k.st.mechanik().laeuft());
+    EXPECT_FALSE(k.st.druck().wagen().laeuft());
     EXPECT_EQ(k.in(0xF4) & 0x20, 0x00);        // /LR bleibt 0, der Wagen steht links
 }
 
@@ -423,14 +423,93 @@ TEST(Sd1157Karte, PapierschritteKommenNurBeiXpfgUndImmerUnter7Ms)
     Karte k;
     k.out(0xF6, 0xCF); k.out(0xF6, 0x30);      // PIO 1 A: D4 = PV-Schritt 1
     k.takte(20000);
-    EXPECT_EQ(k.st.mechanik().pvSchritte(0), 0u);
+    EXPECT_EQ(k.st.druck().papier(0).schritte(), 0u);
     k.out(0xF4, 0x08 | 0x04);                  // XPFG1 = 1 (XPWV1 = 1)
     k.takte(7 * 2457);                         // 7 ms
-    EXPECT_GE(k.st.mechanik().pvSchritte(0), 1u);   // Anlauf FRH = 0: 4,5 ms < 7,08 ms (§10.2)
+    EXPECT_GE(k.st.druck().papier(0).schritte(), 1u);   // Anlauf FRH = 0: 4,5 ms < 7,08 ms (§10.2)
     k.out(0xF4, 0x08);
-    const uint32_t n = k.st.mechanik().pvSchritte(0);
+    const uint32_t n = k.st.druck().papier(0).schritte();
     k.takte(40000);
-    EXPECT_EQ(k.st.mechanik().pvSchritte(0), n);
+    EXPECT_EQ(k.st.druck().papier(0).schritte(), n);
+}
+
+// ─── Nadelanschlag mit FGDI (hardware.md §10.4, §15 Nr. 14) ─────────────────
+
+TEST(Sd1157Karte, DieFlankeFgdiSchlaegtDasNadelmusterAnNichtDasSchreibenInsLatch)
+{
+    Karte k;
+    const auto& b = k.st.druck().blatt(0);
+    const int y = k.st.druck().papierY(0);
+    k.out(0xBE, 0xFE);                          // Nadel 1 (low = feuern)
+    k.out(0xBF, 0x7F);                          // Nadel 9 (D7 = 0)
+    EXPECT_EQ(b.punktzahl(), 0u) << "das Schreiben ins Latch loest nichts aus (§15 Nr. 7)";
+    k.out(0xF9, 0x04 | 0x18);                   // 2B: KAS = 1, FGDI = 0
+    EXPECT_EQ(b.punktzahl(), 0u);
+    k.out(0xF9, 0x04 | 0x18 | 0x20);            // FGDI 0 -> 1: Anschlag bei der Wagenposition (Start 300)
+    EXPECT_EQ(b.punktzahl(), 4u) << "Nadel 1 und 9, je zwei Pixel";
+    EXPECT_TRUE(b.punkt(600, y));
+    EXPECT_TRUE(b.punkt(601, y));
+    EXPECT_TRUE(b.punkt(600, y + 16));
+    EXPECT_FALSE(b.punkt(600, y + 2));
+    k.out(0xF9, 0x04 | 0x18 | 0x20);            // FGDI bleibt 1: keine zweite Flanke
+    EXPECT_EQ(k.st.druck().kopf().anschlaege(), 1u);
+    k.out(0xF9, 0x04 | 0x18);
+    k.out(0xF9, 0x04 | 0x18 | 0x20);            // zweite Flanke, derselbe Ort: keine neuen Punkte
+    EXPECT_EQ(k.st.druck().kopf().anschlaege(), 2u);
+    EXPECT_EQ(b.punktzahl(), 4u);
+}
+
+TEST(Sd1157Karte, KopfNichtAngeschwenktBringtKeinenPunktAufsPapier)
+{
+    Karte k;
+    k.out(0xBE, 0xFE);
+    k.out(0xF9, 0x18 | 0x20);                   // KAS = 0
+    EXPECT_EQ(k.st.druck().blatt(0).punktzahl(), 0u);
+    EXPECT_EQ(k.st.druck().kopf().abgewiesen(), 1u);
+    // die Taste Kopf haelt ihn dauernd am Papier
+    k.st.setKopf(true);
+    k.out(0xF9, 0x18);
+    k.out(0xF9, 0x18 | 0x20);
+    EXPECT_EQ(k.st.druck().blatt(0).punktzahl(), 2u);
+}
+
+// ─── Tasten, Schalter, Lampen als API ────────────────────────────────────────
+
+TEST(Sd1157Karte, TastenUndSchalterErscheinenAlsPegelAmPortPio3BUndBch)
+{
+    Karte k;
+    k.out(0xEF, 0xCF); k.out(0xEF, 0xFF);       // PIO 3 B: Modus 3, alles Eingaenge
+    EXPECT_EQ(k.in(0xED) & 0x7E, 0x6C) << "online: Bit 1 = 0, Tasten PV1/PV2/TEST nicht gedrueckt = 1, ZFV = 1";
+    EXPECT_EQ(k.in(0xED) & 0x02, 0x00) << "ONLINE: 0 = online";
+    k.st.setOnline(false);
+    EXPECT_EQ(k.in(0xED) & 0x02, 0x02);
+    EXPECT_FALSE(k.st.online());
+    k.st.setTastePV1(true);  EXPECT_EQ(k.in(0xED) & 0x04, 0x00); EXPECT_TRUE(k.st.tastePV1());
+    k.st.setTastePV2(true);  EXPECT_EQ(k.in(0xED) & 0x08, 0x00); EXPECT_TRUE(k.st.tastePV2());
+    k.st.setTasteTest(true); EXPECT_EQ(k.in(0xED) & 0x40, 0x00); EXPECT_TRUE(k.st.tasteTest());
+    k.st.setTastePV1(false); k.st.setTastePV2(false); k.st.setTasteTest(false);
+    EXPECT_EQ(k.in(0xED) & 0x4C, 0x4C);
+    EXPECT_EQ(k.in(0xED) & 0x10, 0x00) << "Kopf nicht dauernd";
+    k.st.setKopf(true);
+    EXPECT_EQ(k.in(0xED) & 0x10, 0x10);
+    EXPECT_TRUE(k.st.kopf());
+    k.st.setLpi6(false);  EXPECT_EQ(k.in(0xBC) & 0x02, 0x00);
+    k.st.setLpi6(true);   EXPECT_EQ(k.in(0xBC) & 0x02, 0x02);
+    EXPECT_EQ(k.in(0xBC) & 0x01, 0x01) << "/PE = 1: Papier da";
+    k.st.setPapierDa(false);
+    EXPECT_EQ(k.in(0xBC) & 0x01, 0x00);
+    EXPECT_FALSE(k.st.papierDa());
+}
+
+TEST(Sd1157Karte, LampenSindLesbarOnlineHighAktivFehlerLowAktiv)
+{
+    Karte k;
+    EXPECT_FALSE(k.st.lampeOnline());           // Ausgang 2A.1 nach dem Einschalten 0
+    EXPECT_FALSE(k.st.lampeFehler());           // /TF = 1 (2B = 18H)
+    k.out(0xF8, 0x02);
+    EXPECT_TRUE(k.st.lampeOnline());
+    k.out(0xF9, 0x10);                          // 2B.3 = 0: /TF aktiv
+    EXPECT_TRUE(k.st.lampeFehler());
 }
 
 TEST(Sd1157Karte, ResetLoeschtRegisterAberNichtDenRam)

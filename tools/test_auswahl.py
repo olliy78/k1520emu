@@ -100,6 +100,7 @@ REGELN = [
     ("core/machines/mc80/**", (), "MC80 (keine langsamen Faelle)", True),
     ("core/machines/printer/**", ("fach_drucker",), "Drucker (PrinterMachine)", True),
     ("core/cards/printer/**", ("fach_drucker",), "Drucker-Karten (SD 1157)", True),
+    ("core/peripherals/druckwerk/**", ("fach_drucker",), "Druckwerk (Blatt, Wagen, Papier, Kopf)", True),
     ("core/cards/k8025/**", ("fach_a5120", "fach_serial"), "K8025", True),
     ("core/cards/k7028/**", ("fach_k8915", "fach_serial"), "K7028", True),
     ("core/cards/k2521/**", ("fach_k8915", "fach_prg710"), "K2521", True),

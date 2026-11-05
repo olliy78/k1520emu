@@ -5,8 +5,9 @@
  *        Papiervorschub, Online-Lampe, DC1 an den IFSS, danach die Leerlaufschleife.  Dazu die
  *        Maschine selbst (Kennung 7, K6316 wird abgewiesen).  Quelle fuer alle Zahlen:
  *        doc/printer/sd1157/hardware.md §7, §8, §11; Adressen aus dem ROM (Q = 1157.mac, F = ROM).
- *        Wagen und Papier sind der vorlaeufige Platzhalter (WP3) — geprueft wird, dass die Firmware
- *        mit ihm bis zur Leerlaufschleife kommt, nicht die Mechanik.
+ *        Wagen und Papier sind seit WP3 das Druckwerk (core/peripherals/druckwerk/): geprueft wird hier
+ *        das Anlaufverhalten der Firmware gegen den geregelten Wagen und den Papierweg, auch aus allen
+ *        Startlagen; das Druckbild steht in test_sd1157_druck.cpp.
  */
 
 #include <gtest/gtest.h>
@@ -133,11 +134,14 @@ TEST(Sd1157Rom, GrundstellungBisZurLeerlaufschleife)
     EXPECT_TRUE(l.besucht.test(0x0993)) << "Randsensor links / PV-Schritt";
 
     // Wagen am linken Rand (/LR = 0), steht (LAUF = 0)
-    EXPECT_LE(st.mechanik().position(), 76);
-    EXPECT_FALSE(st.mechanik().laeuft());
-    // Anfangs-PV 24 Schritte auf Bahn 1, nichts auf Bahn 2 (Einbahndrucker)
-    EXPECT_GE(st.mechanik().pvSchritte(0), 24u);
-    EXPECT_EQ(st.mechanik().pvSchritte(1), 0u);
+    EXPECT_LE(st.druck().wagen().position(), 76);
+    EXPECT_FALSE(st.druck().wagen().laeuft());
+    // Anfangs-PV, EXAKT: 24 vor, Rueckzug 24 + 4 (Spielausgleich, 24B1H-Sprung `add a,4`) zurueck, dann 4 vor
+    // = 56 Schritte, Nettolage 0.  Einbahndrucker: es gibt nur Bahn 1.
+    EXPECT_EQ(st.druck().bahnen(), 1);
+    EXPECT_EQ(st.druck().papier(0).schritteVor(), 28u);
+    EXPECT_EQ(st.druck().papier(0).schritteRueck(), 28u);
+    EXPECT_EQ(st.druck().papier(0).lage(), 0);
 
     // Online-Lampe an, keine Fehlerlampe, kein Fehler-Havarie-Pfad (NMI 0066H)
     EXPECT_TRUE(st.lampeOnline());
@@ -158,12 +162,12 @@ TEST(Sd1157Rom, DieLeerlaufschleifeBleibtStehenOhneAbsturz)
 {
     Lauf l;
     l.fahre(4'000'000);
-    const int pv = static_cast<int>(l.m->sd1157().mechanik().pvSchritte(0));
-    const int pos = l.m->sd1157().mechanik().position();
+    const int pv = static_cast<int>(l.m->sd1157().druck().papier(0).schritte());
+    const int pos = l.m->sd1157().druck().wagen().position();
     l.fahre(8'000'000);
     auto& st = l.m->sd1157();
-    EXPECT_EQ(static_cast<int>(st.mechanik().pvSchritte(0)), pv) << "kein Papiervorschub im Leerlauf";
-    EXPECT_EQ(st.mechanik().position(), pos) << "der Wagen bleibt links stehen";
+    EXPECT_EQ(static_cast<int>(st.druck().papier(0).schritte()), pv) << "kein Papiervorschub im Leerlauf";
+    EXPECT_EQ(st.druck().wagen().position(), pos) << "der Wagen bleibt links stehen";
     EXPECT_TRUE(st.lampeOnline());
     EXPECT_FALSE(st.lampeFehler());
     EXPECT_FALSE(l.besucht.test(0x0433)) << "NMI-Routine";
@@ -174,20 +178,23 @@ TEST(Sd1157Rom, DieLeerlaufschleifeBleibtStehenOhneAbsturz)
 
 TEST(Sd1157Rom, GrundstellungLaeuftAusAnderenStartlagenDurch)
 {
-    // hardware.md §14 Nr. 5 (Pruefkriterium fuer WP2b): aus beliebigem Startpunkt.  Hier die Lagen 100
-    // (knapp rechts vom linken Randsensor) und 1000 (Wagenmitte); beide fahren rueckwaerts bis /LR = 0.
-    // NICHT geprueft: Startlagen im Randbereich (/LR oder /VK schon 0) — dort entsteht im Platzhalter keine
-    // /LR-Flanke, und der Anlaufweg nach der LFG-Spitze ist unbekannt (WP3, hardware.md §10.1).
-    for (int start : {100, 1000}) {
+    // hardware.md §14 Nr. 5 (Pruefkriterium fuer WP2b): aus beliebigem Startpunkt, auch aus dem Randbereich
+    // (/LR und /VK schon 0, z. B. Wagen beim Ausschalten links) und von den Anschlaegen.  Die Randlagen sind der
+    // Fall, der mit /VK <= 10 haengenblieb: die LFG-Spitze des Einschaltens bewegt den Wagen um den Bremsweg
+    // (70 Takte bei VTAB = 1), der danach gelesene /VK muss dann noch im /LR-Bereich liegen
+    // (GeregelterWagen::Parameter::vk_bis >= lr_bis, merkposten/drucker.md).
+    for (int start : {-200, -150, -50, 0, 3, 10, 11, 50, 70, 76, 77, 100, 101, 150, 300, 1000, 1419, 1420, 2000, 2399}) {
         PrinterMachine::Config c;
         c.sd1157.wagen_start = start;
         Lauf l(c);
-        l.fahre(5'000'000);
+        l.fahre(10'000'000);
         auto& st = l.m->sd1157();
-        EXPECT_LE(st.mechanik().position(), 76) << "Start " << start;
-        EXPECT_GT(st.mechanik().position(), -200) << "Start " << start << ": Anschlag erreicht";
-        EXPECT_FALSE(st.mechanik().laeuft()) << "Start " << start;
-        EXPECT_GE(st.mechanik().pvSchritte(0), 24u) << "Start " << start;
+        EXPECT_LE(st.druck().wagen().position(), 76) << "Start " << start;
+        EXPECT_GT(st.druck().wagen().position(), -200) << "Start " << start << ": Anschlag erreicht";
+        EXPECT_FALSE(st.druck().wagen().laeuft()) << "Start " << start;
+        EXPECT_EQ(st.druck().papier(0).schritteVor(), 28u) << "Start " << start;
+        EXPECT_EQ(st.druck().papier(0).schritteRueck(), 28u) << "Start " << start;
+        EXPECT_EQ(st.druck().papier(0).lage(), 0) << "Start " << start;
         EXPECT_TRUE(st.lampeOnline()) << "Start " << start;
         EXPECT_FALSE(st.lampeFehler()) << "Start " << start;
         EXPECT_FALSE(l.besucht.test(0x0433)) << "NMI-Routine, Start " << start;
@@ -198,10 +205,11 @@ TEST(Sd1157Rom, ResetStartetNeuUndErreichtDieLeerlaufschleifeWieder)
 {
     Lauf l;
     l.fahre(4'000'000);
-    l.m->reset();
+    l.m->reset();   // /RESET versetzt den Wagen nicht: er steht links im Randbereich (der Fall aus WP1)
     EXPECT_EQ(l.m->cpuPC(), 0x0000);
+    EXPECT_LE(l.m->sd1157().druck().wagen().position(), 76);
     const uint64_t t0 = l.m->totalCycles();
-    l.fahre(t0 + 4'000'000);
+    l.fahre(t0 + 10'000'000);   // aus dem Randbereich: erst 30 Spalten vor, dann zurueck bis /LR (~8,6 Mio. Takte)
     EXPECT_TRUE(l.m->sd1157().lampeOnline());
     EXPECT_FALSE(l.m->sd1157().lampeFehler());
     EXPECT_FALSE(l.besucht.test(0x0433));

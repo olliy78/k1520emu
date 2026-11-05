@@ -133,6 +133,11 @@ k1520_add_test(raf   SRC cards/test_raf.cpp        LIBS k1520_raf k1520_z80 LABE
 
 # ── core/peripherals/ ────────────────────────────────────────────────────────
 # MC80.3x-Tastatur auf Zeichenebene (AP M3, doc/mc80/egos.md §3)
+# Druckwerk (Entwurf 49, WP3): Blattmodell, Nadelkopf, Papierweg, geregelter Wagen, Zusammenspiel
+foreach(_dw blattmodell nadelkopf papierweg geregelter_wagen nadeldruckwerk)
+    k1520_add_test(druckwerk_${_dw} SRC peripherals/druckwerk/test_${_dw}.cpp LIBS k1520_druckwerk
+                   LABELS "${_lbl};fach_drucker")
+endforeach()
 k1520_add_test(mc80_tastatur SRC peripherals/test_mc80_tastatur.cpp LIBS k1520_mc80_karten LABELS "${_lbl}")
 k1520_add_test(k7637          SRC peripherals/test_k7637.cpp
                               LIBS k1520_k7637 k1520_sio k1520_bus LABELS "${_lbl}")

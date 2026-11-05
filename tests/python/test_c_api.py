@@ -459,6 +459,99 @@ def test_printer_sd1157_can_be_created_and_runs_its_rom():
         del emu
 
 
+def test_printer_sheet_keys_lamps_and_switches_through_the_c_api():
+    """`k1520_printer_*` (Entwurf 49, WP3): der SD 1157 druckt seinen Selbsttest auf ein Blatt im Kern, das die
+    GUI zeilenweise liest; Tasten/Schalter/Lampen gehen ueber dieselbe Schnittstelle.  Andere Maschinen: 0 / -1."""
+    from app.core_binding.k1520 import _lib, K1520Handle
+
+    c = ctypes
+    SW_ONLINE, SW_KOPF, SW_LPI6, SW_PAPIER = 0, 1, 2, 3
+    KEY_PV1, KEY_TEST = 1, 3
+    LAMP_ONLINE, LAMP_FEHLER = 0, 1
+
+    handle = _lib.k1520_create_printer(0, None)
+    assert handle, _lib.k1520_last_init_error()
+    h = K1520Handle(handle)
+    try:
+        # Raster und Blattgroesse vor dem Druck
+        xz, yz, bahnen = c.c_int(), c.c_int(), c.c_int()
+        assert _lib.k1520_printer_geometry(h, c.byref(xz), c.byref(yz), c.byref(bahnen)) == 1
+        assert (xz.value, yz.value, bahnen.value) == (200, 144, 1)
+        breite, hoehe = c.c_int(), c.c_int()
+        assert _lib.k1520_printer_sheet_size(h, 0, c.byref(breite), c.byref(hoehe)) == 1
+        assert breite.value == 3000
+        assert _lib.k1520_printer_sheet_size(h, 1, c.byref(breite), c.byref(hoehe)) == 0     # Einbahndrucker
+        v0 = _lib.k1520_printer_sheet_version(h, 0)
+
+        # Schalter und Lampen
+        assert _lib.k1520_printer_switch_get(h, SW_ONLINE) == 1
+        assert _lib.k1520_printer_switch_get(h, SW_LPI6) == 1
+        assert _lib.k1520_printer_switch_get(h, SW_PAPIER) == 1
+        assert _lib.k1520_printer_switch_get(h, SW_KOPF) == 0
+        assert _lib.k1520_printer_switch_get(h, 99) == -1
+        assert _lib.k1520_printer_lamp(h, 99) == -1
+        assert _lib.k1520_printer_switch(h, 99, 1) == 0
+        assert _lib.k1520_printer_key(h, 99, 1) == 0
+
+        # offline einschalten, Grundstellung abwarten, TEST druecken
+        assert _lib.k1520_printer_switch(h, SW_ONLINE, 0) == 1
+        assert _lib.k1520_printer_switch_get(h, SW_ONLINE) == 0
+        for _ in range(250):
+            _lib.k1520_run(h, 20000)
+        assert _lib.k1520_printer_lamp(h, LAMP_ONLINE) == 0          # offline gestartet
+        assert _lib.k1520_printer_lamp(h, LAMP_FEHLER) == 0
+        assert _lib.k1520_printer_key(h, KEY_TEST, 1) == 1
+        for _ in range(500):
+            _lib.k1520_run(h, 20000)
+        x, y, lauf = c.c_int(), c.c_int(), c.c_int()
+        assert _lib.k1520_printer_head(h, c.byref(x), c.byref(y), c.byref(lauf)) == 1
+        assert y.value >= 36
+
+        assert _lib.k1520_printer_sheet_version(h, 0) > v0
+        assert _lib.k1520_printer_sheet_size(h, 0, c.byref(breite), c.byref(hoehe)) == 1
+        assert hoehe.value >= 60 + 17
+        zb = (breite.value + 7) // 8
+        # Zeile 62 (Nadel 2 der ersten Textzeile bei y0 = 36 + 8 * 3 = 60): das 'S' von SERIENDRUCKER beginnt bei Takt 80
+        # = Pixel 160 und hat in Spalte 0 die Nadeln 2, 3 und 6 (Glyphe 26H low-aktiv, hardware.md §3).
+        puffer = (c.c_uint8 * (zb * 18))()
+        n = _lib.k1520_printer_sheet_rows(h, 0, 60, 18, c.cast(puffer, c.c_void_p), zb * 18)
+        assert n == 18
+        def punkt(px, zeile):
+            return bool(puffer[(zeile - 60) * zb + px // 8] & (0x80 >> (px % 8)))
+        assert punkt(160, 62) and punkt(161, 62)                  # Nadel 2
+        assert punkt(160, 64) and punkt(160, 70)                  # Nadel 3, Nadel 6
+        assert not punkt(160, 60) and not punkt(160, 66)          # Nadel 1 und 4 nicht
+        assert not punkt(158, 62) and not punkt(0, 62)
+        # Puffer zu klein / Bereich hinter dem Blatt
+        assert _lib.k1520_printer_sheet_rows(h, 0, 60, 18, c.cast(puffer, c.c_void_p), zb * 2) == 2
+        assert _lib.k1520_printer_sheet_rows(h, 0, hoehe.value + 5, 3, c.cast(puffer, c.c_void_p), zb * 18) == 0
+
+        # Blatt leeren: Version steigt, Hoehe faellt auf den Papierstand zurueck
+        v1 = _lib.k1520_printer_sheet_version(h, 0)
+        assert _lib.k1520_printer_sheet_clear(h) == 1
+        assert _lib.k1520_printer_sheet_version(h, 0) > v1
+        assert _lib.k1520_printer_key(h, KEY_TEST, 0) == 1
+    finally:
+        _lib.k1520_destroy(h)
+
+    # kein Drucker: 0 bzw. -1, kein Absturz
+    m = _lib.k1520_create_mc80(0, None)
+    assert m, _lib.k1520_last_init_error()
+    hm = K1520Handle(m)
+    try:
+        assert _lib.k1520_printer_geometry(hm, None, None, None) == 0
+        assert _lib.k1520_printer_sheet_size(hm, 0, None, None) == 0
+        assert _lib.k1520_printer_sheet_version(hm, 0) == 0
+        assert _lib.k1520_printer_sheet_clear(hm) == 0
+        assert _lib.k1520_printer_head(hm, None, None, None) == 0
+        assert _lib.k1520_printer_key(hm, KEY_PV1, 1) == 0
+        assert _lib.k1520_printer_switch(hm, SW_ONLINE, 1) == 0
+        assert _lib.k1520_printer_switch_get(hm, SW_ONLINE) == -1
+        assert _lib.k1520_printer_lamp(hm, LAMP_ONLINE) == -1
+    finally:
+        _lib.k1520_destroy(hm)
+
+
 def test_mc80_2x_through_the_c_abi():
     """AP M11: MC80.21/.22 (`k1520_create_mc80(3|4)`) — Typ 6, Bild 528 × 256 aus der
     Displaylogik, `k1520_screen_char` = Zeichen der DPL (8 × 32), Menue des Betriebssystems;

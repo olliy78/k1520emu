@@ -473,3 +473,19 @@ Hardwareseitig bleibt alles andere gleich; der Gesamtvorrat 210 gilt für beide 
 **Bedienfeld/Anzeige** (`Sd1157Bedienfeld`): ONLINE (3B.1), PV1 (3B.2), PV2 (3B.3), TEST (3B.6), Kopf (3B.4), 6/8 lpi (BCH.1) als Eingabe; Lampen ONLINE (2A.1, 1=an), FEHLER (2B.3, 0=an).
 
 **Abnahme**: Einschalten bis Grundstellung (/LR-Fahrt, 24-Schritt-PV) ohne Fehlerlampe; TEST druckt Titelzeile + 63 + 31 Zeichen (ohne ZG2); `ESC [ 0 c` antwortet `ESC [ 4 c`; 9600 Bd IFSS: DC1 nach dem Einschalten, DC3 ab 3BF5H.
+
+## 16  Ergebnisse WP3/WP2b (2026-11-05) — Abweichungen von §10/§15
+
+Der SD 1157 druckt mit dem Original-ROM seinen Selbsttest auf ein Blatt im Kern (`doc/design/49_k1520printer.md` §5b, `doc/merkposten/drucker.md`).  Was sich gegenüber den
+Annahmen oben geändert hat:
+
+| § | Annahme | Befund |
+|---|---|---|
+| §10.1, §15 Nr. 11 | /VK = 0 nur ganz links (≤ 10) | **/VK deckt den /LR-Bereich ab** (`vk_bis ≥ 76`, Vorgabe 100): die LFG-Spitze beim Einschalten bewegt den Wagen um den Bremsweg, danach wird /VK erneut gelesen; mit ≤ 10 bleiben Startlagen im Randbereich am Anschlag hängen |
+| §10.1, §15 Nr. 10 | Bremsweg 8…70 Takte | **20 Takte bei Druckgeschwindigkeit, 70 bei VTAB = 1** (~ v², dieselben Zahlen, mit denen die Firmware vor dem Ziel bremst) |
+| §10.2 Nr. 6 | „einmal 24 Schritte je Bahn (Anfangs-PV, dann Rückzug)“ | **56 Schritte**: 24 vor, Rückzug 24 + 4 zurück (Spielausgleich, `add a,4`), 4 vor; netto 0 |
+| §5 Kopf | Eingänge der PIOs wirken als Pegel | im Modus 3 sind die Interrupts **Ereignisse** (`setModus3Flanke`); als Pegel fordert jede Pegelauffrischung den Randinterrupt neu an |
+| §10.4 | Impuls = Punkt an der Wagenposition | der Punkt landet eine **Flugzeit von 0,5 Takt** in Fahrtrichtung hinter der Ausloeseposition (vorwärts rechts, rückwärts links); sonst liegt der Rückwärtsdruck der Firmware 1 Takt rechts |
+| §5.4, §9 | 6/8 lpi, ONLINE als Pegel | die Firmware liest die Taste 6/8 lpi (BCH.1) und den Online-Zustand (Flag `off`, Lampe) nur **beim Anlauf**; PV/TEST-Pegel gelten zur Laufzeit |
+| §10.5 | 7 Punktspalten je Zelle | bestätigt: Zelle 10 Takte ab Takt 80, Spalte k bei +k; Breitdruck 20 Takte (Spalte k bei +2k, Spalte 6 wiederholt bei +14, UND mit der Vorspalte), Schrägdruck Nadel j um 8−j Takte versetzt |
+| §12 | Selbsttestbild | bestätigt Punkt für Punkt (Orakel aus `1157zg.rom`); die mittlere Zeile (63 Zeichen) druckt die Firmware rückwärts |

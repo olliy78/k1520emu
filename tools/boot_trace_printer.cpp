@@ -230,7 +230,7 @@ int bootTraceSd1157(const K8915TraceOpts& o, const prnlst::Listing& prn)
     if (itr) { fclose(itr); fprintf(stderr, "--itrace: %ld INT/NMI -> %s\n", itr_n, o.itrace_path.c_str()); }
 
     const uint64_t cycles = m.totalCycles();
-    const auto& mech = st.mechanik();
+    const auto& druck = st.druck();
     if (!o.quiet) {
         fprintf(stderr, "\n=== SD 1157 Boot Trace Complete: %llu cycles ===\n", (unsigned long long)cycles);
         if (o.until.kind != untilcond::UntilCond::NONE)
@@ -240,9 +240,9 @@ int bootTraceSd1157(const K8915TraceOpts& o, const prnlst::Listing& prn)
             fprintf(stderr, "Stillstand:  JA - %lld Takte ohne neues Paar (Tor, Wert) bei einem Schreibzugriff (PC=%04X)\n", o.stall, m.cpuPC());
         fprintf(stderr, "Lampen:      ONLINE %s, FEHLER %s\n", st.lampeOnline() ? "an" : "aus",
                 st.lampeFehler() ? "an" : "aus");
-        fprintf(stderr, "Wagen:       Position %d, %s (Platzhalter, WP3)  PV-Schritte Bahn 1/2: %u/%u\n",
-                mech.position(), mech.laeuft() ? "laeuft" : "steht",
-                (unsigned)mech.pvSchritte(0), (unsigned)mech.pvSchritte(1));
+        fprintf(stderr, "Wagen:       Position %d, %s  PV-Schritte Bahn 1/2: %u/%u\n",
+                druck.wagen().position(), druck.wagen().laeuft() ? "laeuft" : "steht",
+                (unsigned)druck.papier(0).schritte(), (unsigned)(druck.bahnen() > 1 ? druck.papier(1).schritte() : 0u));
         fprintf(stderr, "Ausgaenge:   2A=%02X 2B=%02X 1A=%02X 1B=%02X  Nadeln BEH=%02X BFH=%02X\n",
                 st.portAusgabe(2, 0), st.portAusgabe(2, 1), st.portAusgabe(1, 0), st.portAusgabe(1, 1),
                 st.nad18(), st.nad9());
@@ -305,7 +305,7 @@ int bootTraceSd1157(const K8915TraceOpts& o, const prnlst::Listing& prn)
             "\"instr\":%llu,\"events\":%ld,\"ints\":%ld,",
             stillstand ? "true" : "false", (unsigned long long)cycles, m.cpuPC(),
             st.lampeOnline() ? "true" : "false", st.lampeFehler() ? "true" : "false",
-            mech.position(), mech.laeuft() ? "true" : "false",
+            druck.wagen().position(), druck.wagen().laeuft() ? "true" : "false",
             (unsigned long long)instr, ev_total, ints);
         if (o.until.kind != untilcond::UntilCond::NONE)
             fprintf(stderr, "\"until\":{\"set\":true,\"met\":%s,\"cycle\":%llu,\"pc\":\"0x%04X\"}}\n",

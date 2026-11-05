@@ -266,11 +266,11 @@ K1520_API K1520Handle k1520_create_p8000_terminal(const char* konfig);
 K1520_API K1520Handle k1520_create_mc80(int variante, const char* konfig);
 
 /**
- * @brief Drucker (K1520_MACHINE_PRINTER), doc/design/49_k1520printer.md — Stand WP1: Geruest.
+ * @brief Drucker (K1520_MACHINE_PRINTER), doc/design/49_k1520printer.md — Stand WP3.
  *        Der Original-U880-Code des SD 1157 (ROM 0000H–297FH, RAM 2C00H/3800H, ZG1 3000H,
- *        CTC DCH, PIO F4H/F8H/ECH, SIO 7CH, Takt 2,4576 MHz) laeuft an.  Noch KEIN Druckwerk,
- *        kein Blatt, keine serielle Schnittstelle nach aussen, kein Bild: `k1520_fb_width/height`
- *        = 0, `k1520_screen_char` = 0, keine Laufwerke.  Zugriff auf Speicher/E/A ueber
+ *        CTC DCH, PIO F4H/F8H/ECH, SIO 7CH, Takt 2,4576 MHz) laeuft und druckt auf ein Blatt im
+ *        Kern (`k1520_printer_*` unten).  Noch keine serielle Schnittstelle nach aussen, kein
+ *        Bild: `k1520_fb_width/height` = 0, `k1520_screen_char` = 0, keine Laufwerke.  Zugriff auf Speicher/E/A ueber
  *        `k1520_mem_read`/`k1520_io_read` (CPU-Sicht des Druckers).
  *
  * @param typ     0 = SD 1157/264.  1 = K6316 (IFSS), 2 = K6316 (V.24): vorgesehen, aber noch nicht
@@ -281,6 +281,45 @@ K1520_API K1520Handle k1520_create_mc80(int variante, const char* konfig);
  * k1520_machine_type() = 7.  `k1520_create(K1520_MACHINE_PRINTER)` = SD 1157/264.
  */
 K1520_API K1520Handle k1520_create_printer(int typ, const char* konfig);
+
+/* ─── Drucker: Blatt, Kopf, Bedienfeld (Entwurf 49, WP3; additiv) ─────────────────────────────
+ * Nur an einer Maschine vom Typ K1520_MACHINE_PRINTER; sonst liefern die Funktionen 0 bzw. -1.
+ * Blatt: Punkte in Mechanikaufloesung, Bit 7 des ersten Bytes einer Zeile = linkester Punkt,
+ * 1 = Punkt, (breite+7)/8 Bytes je Zeile.  x zaehlt Blattpixel (k1520_printer_geometry: Pixel je
+ * Zoll), y Rasterzeilen; das Blatt waechst nach unten.  @p bahn 0 (SD 1157/264: nur eine Bahn). */
+
+/** Tasten (k1520_printer_key): gedrueckt = 1 / losgelassen = 0.  ONLINE ist ein Pegel: Schalter. */
+#define K1520_PRINTER_KEY_PV1   1   /* Papiervorschub Bahn 1 (nur offline wirksam) */
+#define K1520_PRINTER_KEY_PV2   2   /* Papiervorschub Bahn 2 */
+#define K1520_PRINTER_KEY_TEST  3   /* Selbsttest (nur offline) */
+/** Schalter (k1520_printer_switch / _get). */
+#define K1520_PRINTER_SW_ONLINE 0   /* 1 = online (Taste ONLINE: Pegel) */
+#define K1520_PRINTER_SW_KOPF   1   /* 1 = Kopf dauernd angeschwenkt */
+#define K1520_PRINTER_SW_LPI6   2   /* 1 = 6 lpi (8 Papierschritte je Zeile), 0 = 8 lpi (6) */
+#define K1520_PRINTER_SW_PAPIER 3   /* 1 = Papier da, 0 = Papierende */
+/** Lampen (k1520_printer_lamp): 1 = leuchtet. */
+#define K1520_PRINTER_LAMP_ONLINE 0
+#define K1520_PRINTER_LAMP_FEHLER 1
+
+/** Blattgroesse in Pixeln: *breite fest, *hoehe waechst.  1 = ok, 0 = kein Drucker/keine Bahn. */
+K1520_API int      k1520_printer_sheet_size(K1520Handle h, int bahn, int* breite, int* hoehe);
+/** Versionszaehler des Blatts: aendert sich bei jedem neuen Punkt, bei Wachstum und beim Leeren. */
+K1520_API uint64_t k1520_printer_sheet_version(K1520Handle h, int bahn);
+/** @p n Zeilen ab @p y0 nach @p buf (@p cap Bytes); Rueckgabe = gelieferte Zeilen (0 = keine/kein Drucker). */
+K1520_API int      k1520_printer_sheet_rows(K1520Handle h, int bahn, int y0, int n, uint8_t* buf, int cap);
+/** Blatt leeren (Bahn bleibt, Papierlage bleibt). */
+K1520_API int      k1520_printer_sheet_clear(K1520Handle h);
+/** Kopf: x in Blattpixeln (Wagenposition), y = Zeile der Nadel 1 bei der Papierlage von Bahn 0,
+ *  *lauf = 1 solange der Wagen laeuft.  Zeiger duerfen NULL sein. */
+K1520_API int      k1520_printer_head(K1520Handle h, int* x_pixel, int* y_zeile, int* lauf);
+/** Raster: Pixel je Zoll in x und y, Zahl der Bahnen.  Zeiger duerfen NULL sein. */
+K1520_API int      k1520_printer_geometry(K1520Handle h, int* x_je_zoll, int* y_je_zoll, int* bahnen);
+K1520_API int      k1520_printer_key(K1520Handle h, int taste, int gedrueckt);
+K1520_API int      k1520_printer_switch(K1520Handle h, int schalter, int wert);
+/** Schalterstand: 0/1, -1 = kein Drucker/unbekannt. */
+K1520_API int      k1520_printer_switch_get(K1520Handle h, int schalter);
+/** Lampenstand: 0/1, -1 = kein Drucker/unbekannt. */
+K1520_API int      k1520_printer_lamp(K1520Handle h, int lampe);
 
 /**
  * @brief Reason the last k1520_create*() returned NULL ("" if none).

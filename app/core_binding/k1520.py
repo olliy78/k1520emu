@@ -435,6 +435,33 @@ _lib.k1520_create_mc80.restype = K1520Handle
 _lib.k1520_create_printer.argtypes = [ctypes.c_int, ctypes.c_char_p]
 _lib.k1520_create_printer.restype = K1520Handle
 
+# Drucker: Blatt, Kopf, Bedienfeld (Entwurf 49, WP3).  Rueckgaben: 1/0 bzw. 0/1/-1 (kein Drucker).
+# Blattzeilen: (breite+7)/8 Bytes, Bit 7 des ersten Bytes = linkester Punkt.
+_lib.k1520_printer_sheet_size.argtypes = [K1520Handle, ctypes.c_int, ctypes.POINTER(ctypes.c_int),
+                                          ctypes.POINTER(ctypes.c_int)]
+_lib.k1520_printer_sheet_size.restype = ctypes.c_int
+_lib.k1520_printer_sheet_version.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_printer_sheet_version.restype = ctypes.c_uint64
+_lib.k1520_printer_sheet_rows.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                                          ctypes.c_void_p, ctypes.c_int]
+_lib.k1520_printer_sheet_rows.restype = ctypes.c_int
+_lib.k1520_printer_sheet_clear.argtypes = [K1520Handle]
+_lib.k1520_printer_sheet_clear.restype = ctypes.c_int
+_lib.k1520_printer_head.argtypes = [K1520Handle, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int),
+                                    ctypes.POINTER(ctypes.c_int)]
+_lib.k1520_printer_head.restype = ctypes.c_int
+_lib.k1520_printer_geometry.argtypes = [K1520Handle, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int),
+                                        ctypes.POINTER(ctypes.c_int)]
+_lib.k1520_printer_geometry.restype = ctypes.c_int
+_lib.k1520_printer_key.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_int]
+_lib.k1520_printer_key.restype = ctypes.c_int
+_lib.k1520_printer_switch.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_int]
+_lib.k1520_printer_switch.restype = ctypes.c_int
+_lib.k1520_printer_switch_get.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_printer_switch_get.restype = ctypes.c_int
+_lib.k1520_printer_lamp.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_printer_lamp.restype = ctypes.c_int
+
 # P8000-Terminals (k1520_term_*; andere Maschinen: 0 / -1 / False)
 _lib.k1520_term_count.argtypes = [K1520Handle]
 _lib.k1520_term_count.restype = ctypes.c_int

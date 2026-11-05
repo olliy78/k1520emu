@@ -437,3 +437,10 @@ k1520_add_test(mc80_spiele SRC test_mc80_spiele.cpp
 k1520_add_test(kermit_netz SRC test_kermit_netz.cpp
                            LIBS k1520kermit_core k1520_serial
                            LABELS "${_lbl}" TIMEOUT 180)
+
+# SD 1157 (Entwurf 49, WP3): druckt seinen Selbsttest auf das Blatt im Kern — Druckbild gegen ein unabhaengiges
+# Orakel aus 1157zg.rom, Vor-/Rueckwaertsdruck, Zeilenabstand, Formularvorschub, Anfangsvorschub, Tasten, Papierende.
+k1520_add_test(sd1157_druck SRC test_sd1157_druck.cpp
+                            LIBS k1520_printer k1520_logger
+                            LABELS "${_lbl};fach_drucker" DEFS LOG_LEVEL=2
+                            "SD1157_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/SD1157\"")

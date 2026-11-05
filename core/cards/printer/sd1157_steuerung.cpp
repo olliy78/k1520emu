@@ -26,9 +26,34 @@ constexpr std::size_t SIO_AUS_MAX = 1u << 16;   // Senke: hoechstens so viele Ze
 
 Sd1157Steuerung::Sd1157Steuerung(K1520Bus& bus) : Sd1157Steuerung(bus, Config{}) {}
 
-Sd1157Steuerung::Sd1157Steuerung(K1520Bus& bus, const Config& cfg)
-    : bus_(bus), cfg_(cfg), online_(cfg.online), lpi6_(cfg.lpi6)
+namespace {
+// Druckwerk nach Ausfuehrung: Bahnzahl (EBD) und Blattbreite (BDA) sind Schalter des Geraets.
+NadeldruckParameter druckParameter(const Sd1157Steuerung::Config& c)
 {
+    NadeldruckParameter p = c.druck;
+    p.bahnen = c.einbahn ? 1 : 2;
+    p.blatt_breite = c.breit ? 2300 : 1500;   // Papier ueber den Randsensor hinaus [?]
+    return p;
+}
+std::unique_ptr<Wagen> neuerWagen(const Sd1157Steuerung::Config& c)
+{
+    GeregelterWagen::Parameter w = c.wagen;
+    w.rr_ab = c.breit ? 2200 : 1420;          // /RR ab Spalte 220 bzw. 142, hardware.md §10.1
+    return std::make_unique<GeregelterWagen>(w);
+}
+}  // namespace
+
+Sd1157Steuerung::Sd1157Steuerung(K1520Bus& bus, const Config& cfg)
+    : bus_(bus), cfg_(cfg), online_(cfg.online), lpi6_(cfg.lpi6), kopf_dauernd_(cfg.kopf_dauernd),
+      druck_(druckParameter(cfg), neuerWagen(cfg), cfg.papier)
+{
+    // Modus-3-Interrupts der PIOs sind EREIGNISSE (U855 §6.4: Uebergang Nichterfuellung -> Erfuellung), kein Pegel.
+    // Ohne das loest jede Pegelauffrischung (eingaengeSetzen) bei /LR = 0 erneut den Randinterrupt aus; er setzt
+    // die Spaltenzaehler (kpz = 7, h' = 6) mitten im Auslauf und nach jedem Papiervorschub zurueck, und der
+    // Druck faehrt in die falsche Richtung (merkposten/drucker.md).
+    pio1_.setModus3Flanke(true);
+    pio2_.setModus3Flanke(true);
+    pio3_.setModus3Flanke(true);
     // Kette in der Reihenfolge der Prioritaet (Annahme [?], hardware.md §8)
     kette_ = {&ctc_, &pio2_, &pio1_, &sio_, &pio3_};
 
@@ -58,6 +83,7 @@ void Sd1157Steuerung::powerOn()
 {
     ram1_.fill(cfg_.ram_fill);
     ram2_.fill(cfg_.ram_fill);
+    druck_.netzEin(cfg_.wagen_start);   // Netz ein: Wagen auf der Startlage, Papierlage 0, leeres Blatt
     reset();
 }
 
@@ -79,8 +105,8 @@ void Sd1157Steuerung::reset()
     p2a_aus_ = 0x10;
     p2b_aus_ = 0x18;
     nad18_ = nad9_ = 0xFF;
-    mech_.reset(cfg_.wagen_start);
-    pegel_ = mech_.pegel(cfg_.breit);
+    druck_.halt();   // /RESET versetzt weder Wagen noch Papier: sie halten an, wo sie sind
+    pegel_ = pegelNeu();
     sio_aus_[0].clear();
     sio_aus_[1].clear();
     eingaengeSetzen();
@@ -92,7 +118,7 @@ void Sd1157Steuerung::reset()
 uint8_t Sd1157Steuerung::bch() const
 {
     // hardware.md §4.1
-    return static_cast<uint8_t>((papier_da_ ? 0x01 : 0) | (lpi6_ ? 0x02 : 0) | (cfg_.einbahn ? 0x04 : 0) |
+    return static_cast<uint8_t>((druck_.papier(0).papierDa() ? 0x01 : 0) | (lpi6_ ? 0x02 : 0) | (cfg_.einbahn ? 0x04 : 0) |
                                 (cfg_.breit ? 0x08 : 0) | ((cfg_.formular_bahn1 & 3) << 4) |
                                 ((cfg_.formular_bahn2 & 3) << 6));
 }
@@ -110,7 +136,7 @@ uint8_t Sd1157Steuerung::pio3b() const
     // hardware.md §5.4: 0 ser/par (0 = seriell); 1 ONLINE (0 = online); 2/3 PV1/PV2, 6 TEST (0 = gedrueckt);
     // 4 Kopf dauernd (1); 5 ZFV = 1 lassen; 7 nur im ZFV=0-Zweig gelesen -> 1 [?]
     return static_cast<uint8_t>((online_ ? 0 : 0x02) | (taste_pv1_ ? 0 : 0x04) | (taste_pv2_ ? 0 : 0x08) |
-                                (cfg_.kopf_dauernd ? 0x10 : 0) | 0x20 | (taste_test_ ? 0 : 0x40) | 0x80);
+                                (kopf_dauernd_ ? 0x10 : 0) | 0x20 | (taste_test_ ? 0 : 0x40) | 0x80);
 }
 
 void Sd1157Steuerung::eingaengeSetzen()
@@ -129,21 +155,36 @@ void Sd1157Steuerung::eingaengeSetzen()
 
 void Sd1157Steuerung::mechanikAusgaenge()
 {
-    Sd1157MechanikVorlaeufig::Ausgaenge a;
-    a.lfg   = (p2a_aus_ & 0x40) != 0;   // 2A.6 LFG
-    a.vw    = (p2a_aus_ & 0x10) != 0;   // 2A.4 VW
-    a.vtab  = (p2a_aus_ & 0x04) != 0;   // 2A.2 VTAB
-    a.xpfg1 = (p1a_aus_ & 0x04) != 0;   // 1A.2 XPFG1
-    a.frh1  = (p1a_aus_ & 0x02) != 0;   // 1A.1 FRH1
-    a.xpfg2 = (p1b_aus_ & 0x04) != 0;   // 1B.2 XPFG2
-    a.frh2  = (p1b_aus_ & 0x02) != 0;   // 1B.1 FRH2
-    mech_.ausgaenge(a);
+    WagenEingang w;
+    w.lfg       = (p2a_aus_ & 0x40) != 0;   // 2A.6 LFG
+    w.vorwaerts = (p2a_aus_ & 0x10) != 0;   // 2A.4 VW
+    w.schnell   = (p2a_aus_ & 0x04) != 0;   // 2A.2 VTAB
+    druck_.wagen().eingang(w);
+    // Papier: 1A.2 XPFG1, 1A.3 XPWV1, 1A.1 FRH1; Bahn 2 ebenso an PIO 1 B (nur beim Zweibahnendrucker)
+    druck_.papier(0).ausgaenge((p1a_aus_ & 0x04) != 0, (p1a_aus_ & 0x08) != 0, (p1a_aus_ & 0x02) != 0);
+    if (druck_.bahnen() > 1)
+        druck_.papier(1).ausgaenge((p1b_aus_ & 0x04) != 0, (p1b_aus_ & 0x08) != 0, (p1b_aus_ & 0x02) != 0);
     mechanikPegel();
+}
+
+Sd1157Steuerung::Pegel Sd1157Steuerung::pegelNeu() const
+{
+    const WagenRueckmeldung r = druck_.wagen().rueckmeldung();
+    Pegel p;
+    p.lauf = r.lauf;
+    p.takt_vor = r.takt_vor;
+    p.takt_rueck = r.takt_rueck;
+    p.vk = r.vk;
+    p.lr = r.lr;
+    p.rr = r.rr;
+    p.pv1 = !druck_.papier(0).impuls();   // aktiv low
+    p.pv2 = druck_.bahnen() > 1 ? !druck_.papier(1).impuls() : true;
+    return p;
 }
 
 void Sd1157Steuerung::mechanikPegel()
 {
-    const auto p = mech_.pegel(cfg_.breit);
+    const Pegel p = pegelNeu();
     if (p == pegel_) return;
     pegel_ = p;
     eingaengeSetzen();
@@ -155,8 +196,9 @@ void Sd1157Steuerung::setOnline(bool v)       { online_ = v;      eingaengeSetze
 void Sd1157Steuerung::setTastePV1(bool g)     { taste_pv1_ = g;   eingaengeSetzen(); }
 void Sd1157Steuerung::setTastePV2(bool g)     { taste_pv2_ = g;   eingaengeSetzen(); }
 void Sd1157Steuerung::setTasteTest(bool g)    { taste_test_ = g;  eingaengeSetzen(); }
-void Sd1157Steuerung::setPapierDa(bool da)    { papier_da_ = da; }
+void Sd1157Steuerung::setPapierDa(bool da)    { druck_.papier(0).setzePapierEnde(!da); }
 void Sd1157Steuerung::setLpi6(bool v)         { lpi6_ = v; }
+void Sd1157Steuerung::setKopf(bool dauernd)   { kopf_dauernd_ = dauernd; eingaengeSetzen(); }
 
 uint8_t Sd1157Steuerung::portAusgabe(int pio, int kanal) const
 {
@@ -220,7 +262,11 @@ void Sd1157Steuerung::ioWrite(uint8_t port, uint8_t data)
         pio2_.ioWrite(chipPort(rel), data);
         if (rel & 2) { eingaengeSetzen(); }
         else {
-            (rel & 1 ? p2b_aus_ : p2a_aus_) = data;
+            uint8_t& alt = (rel & 1 ? p2b_aus_ : p2a_aus_);
+            const uint8_t vorher = alt;
+            alt = data;
+            // FGDI (2B.5) 0 -> 1: Nadelanschlag mit dem Latch BEH/BFH (hardware.md §10.4, §15 Nr. 14)
+            if ((rel & 1) && (data & 0x20) && !(vorher & 0x20)) druck_.feuere(nadeln(), kopfAngeschwenkt());
             mechanikAusgaenge();
         }
     }
@@ -252,8 +298,8 @@ void Sd1157Steuerung::memWrite(uint16_t a, uint8_t d)
 bool Sd1157Steuerung::clockTick(int ticks)
 {
     bool dirty = ctc_.clockTick(ticks);
-    if (mech_.takt(ticks, cfg_.breit)) {
-        const auto p = mech_.pegel(cfg_.breit);
+    if (druck_.takt(ticks)) {
+        const Pegel p = pegelNeu();
         if (!(p == pegel_)) { pegel_ = p; eingaengeSetzen(); }
         dirty = true;
     }
