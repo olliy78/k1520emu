@@ -732,6 +732,18 @@ formats:
     tracks:
       - { cyls: 0-39, heads: 0, sectors: 16, size: 256 }
 
+  # BS600 (PRG 700/710/710-1, doc/bs600_diskettenformat.md): Spur 0 = 26x128 (Urlader, Kennsatz,
+  # Verzeichnis, Belegungstabelle), Spur 1..39 = 15x256, einseitig, alles MFM.
+  - name:        ss40_1t26x128-15x256
+    description: "BS600 — 40 Spuren einseitig, Spur 0 26×128 + 15×256"
+    title:       "40 Spuren einseitig, Systemspur 26×128 + 15×256"
+    capacity:    "150K"
+    drives:      [K5600.10, K5600.20, K5601]
+    encoding:    mfm
+    tracks:
+      - { cyls: 0,    heads: 0, sectors: 26, size: 128 }
+      - { cyls: 1-39, heads: 0, sectors: 15, size: 256 }
+
   - name:        ss40_15x256_dstep
     aliases:     [k5601_ss40_15x256_dstep]
     description: "K5601 §3.4 Format U 6 (BAP2001) — 40 Sp. einseitig 15×256, Doppelschritt"
@@ -1376,6 +1388,19 @@ filesystems:
     machines:    [A5120, A5130, K8924]
     format:      ss80_26x128
     type:        sios
+
+  # ══ BS600 / BS610 / BS620 (PRG 710, PRG 710-1) ═════════════════════════════
+  # Eigenes Dateisystem (Verzeichnis in Spur 0, Dateien unfragmentiert, doc/bs600_diskettenformat.md).
+  # Erkannt wird am INHALT (VOL1 + "PRG" in Sektor 7, plausibles Verzeichnis); die Geometrie
+  # (Spur 0 26x128, Spur 1..39 15x256) gehoert keinem anderen Profil.  Eine Diskette ohne
+  # Urlader (nur Datenverzeichnis) wird ebenso erkannt; boot-put spielt den Urlader (Sektor 1-3) ein.
+  - name:        bs600_ss40_15x256_boot
+    description: "BS600/BS610/BS620 — Numerik-Programmiergeraet, 40 Spuren einseitig, Systemspur 26×128 + 15×256"
+    title:       "BS600 Systemdiskette"
+    capacity:    "150K"
+    machines:    ["PRG 710", "PRG 710-1"]
+    format:      ss40_1t26x128-15x256
+    type:        bs600
 
   # ══ UDOS1715 / NDOS (PC 1715) ══════════════════════════════════════════════
   # Dieselbe Betriebssystemfamilie, ANDERES Dateisystem: der uPD765 des PC 1715

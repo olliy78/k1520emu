@@ -86,7 +86,9 @@ struct Optionen {
     bool        udos_block_gesetzt = false;
     std::string udos_zusatz;      ///< --extra (Kopfsektor 44-47, hex)
     std::string udos_erst;        ///< --created (Erstellungsvermerk, 6 Zeichen)
-    std::string udos_geaend;      ///< --date (Aenderungsdatum JJMMTT)
+    std::string udos_geaend;      ///< --date (Aenderungsdatum JJMMTT; BS600: TTMMJJ)
+    std::string bs600_signum;     ///< --author (BS600: Signum, hoechstens 3 Zeichen)
+    std::string load_text, entry_text;   ///< --load/--entry roh: BS600 liest sie HEXADEZIMAL ("6D00"), UDOS mit strtol
     // CP/M kennt nur drei Attributbits und den Nutzerbereich; jedes hat sein eigenes
     // „gesetzt"-Kennzeichen, damit `--no-ro` von „gar nicht genannt" unterscheidbar ist.
     bool cpm_ro_gesetzt  = false, cpm_ro  = false;   ///< --ro / --no-ro
@@ -132,6 +134,13 @@ struct Optionen {
     std::vector<std::string> rest;  ///< uebrige Argumente (Abbild, Muster, Dateien)
 };
 
+/// @brief Adresse als Hexzahl lesen ("6D00", "0x6D00", "6D00H").
+uint16_t hexAdresse(std::string t) {
+    if (!t.empty() && (t.back() == 'H' || t.back() == 'h')) t.pop_back();
+    if (t.size() > 2 && t[0] == '0' && (t[1] == 'x' || t[1] == 'X')) t = t.substr(2);
+    return static_cast<uint16_t>(std::strtoul(t.c_str(), nullptr, 16));
+}
+
 void gebrauch() {
     std::cout <<
         "k1520disktool - Dateien zwischen Linux und K1520-Disketten austauschen\n\n"
@@ -145,6 +154,7 @@ void gebrauch() {
         "         [--segment 2600+1591,4000+0200]   ... UDOS-Segmente ANFANG+LAENGE (hex)\n"
         "         [--mem E000:E3FF:0080]            ... LOW:HIGH:STACK (hex)\n"
         "         [--block-len 0] [--extra 0]       ... Kopfsektor 17 bzw. 44-47\n"
+        "         [--type P|L --load 6D00 --entry 6D5F --date TTMMJJ --author KRU]  ... BS600-Eintrag\n"
         "  rm     <abbild> <muster...>                Dateien loeschen (WEGA: auch leere\n"
         "                                             Verzeichnisse)\n"
         "  mkdir  <abbild> <pfad...>                  Verzeichnis anlegen (nur WEGA)\n"
@@ -159,6 +169,8 @@ void gebrauch() {
         "         [--arc|--no-arc] [--user 3]       ... und Nutzerbereich\n"
         "         [--hid|--no-hid]                  ... FAT: versteckt; --ro/--sys/--arc/--mtime gelten dort auch\n"
         "         [--prg 710|710-1]                 ... Bootabbild muss fuer dieses PRG-Geraet sein\n"
+        "  reorganize <abbild>                      BS600: Dateien lueckenlos ab Spur 1 neu legen\n"
+        "  mv     <abbild> <alt> <neu>              BS600: Datei umbenennen\n"
         "  boot-get <abbild> <datei.bin>            Systemspuren herausschreiben\n"
         "  sys    <ziel> <quelle>                   FAT/DOS: Bootsektor + Systemdateien einer Systemdiskette\n"
         "                                           auf eine LEERE FAT-Diskette uebertragen (wie DOS `SYS`)\n"
@@ -250,12 +262,15 @@ bool zerlege(int argc, char** argv, int ab, Optionen& o, std::string& err) {
         else if (a == "--prg")     { if (!wert("--prg"))    return false; o.prg    = argv[++i]; }
         else if (a == "--type")    { if (!wert("--type"))   return false; o.udos_typ = argv[++i]; }
         else if (a == "--props")   { if (!wert("--props"))  return false; o.udos_eig = argv[++i]; }
+        else if (a == "--date")    { if (!wert("--date"))   return false; o.udos_geaend = argv[++i]; }
         else if (a == "--entry")   { if (!wert("--entry"))  return false;
+                                     o.entry_text = argv[i + 1];
                                      o.udos_entry = static_cast<int>(
                                          std::strtol(argv[++i], nullptr, 0)); }
         else if (a == "--record-len") { if (!wert("--record-len")) return false;
                                      o.udos_satz = std::atoi(argv[++i]); }
         else if (a == "--load")    { if (!wert("--load"))   return false;
+                                     o.load_text = argv[i + 1];
                                      o.udos_segment = static_cast<int>(
                                          std::strtol(argv[++i], nullptr, 0)); }
         else if (a == "--image-len") { if (!wert("--image-len")) return false;
@@ -264,6 +279,7 @@ bool zerlege(int argc, char** argv, int ab, Optionen& o, std::string& err) {
         else if (a == "--segment") { if (!wert("--segment")) return false;
                                      o.udos_segmente = argv[++i]; }
         else if (a == "--mem")     { if (!wert("--mem"))    return false; o.udos_mem = argv[++i]; }
+        else if (a == "--author")  { if (!wert("--author")) return false; o.bs600_signum = argv[++i]; }
         else if (a == "--volume")  { if (!wert("--volume")) return false;
                                      o.volume = std::atoi(argv[++i]); }
         else if (a == "--ro")      { o.cpm_ro_gesetzt  = true; o.cpm_ro  = true; }
@@ -537,6 +553,14 @@ int cmd_ls(const Optionen& o) {
                         static_cast<unsigned long long>(e.size), e.date.c_str(), e.name.c_str(),
                         kurz.c_str(), e.damaged ? "  [DEFEKT]" : "");
         }
+    } else if (v->fsType() == FsType::Bs600) {
+        // BS600: Typ P/L, Lage Spur/Sektor, Lade-/End-/Startadresse (hex), Datum, Signum.
+        std::cout << "Name   Typ  Groesse  Lage         Laden Ende  Start Datum    Sig\n";
+        for (const FileEntry& e : liste)
+            std::printf("%-6s %-3s %8llu  %-11s  %04X  %04X  %04X  %-8s %s%s\n", e.name.c_str(), e.type.c_str(),
+                        static_cast<unsigned long long>(e.size), e.extent.c_str(),
+                        e.low_addr, e.high_addr, e.entry_addr, e.date.c_str(), e.created.c_str(),
+                        e.damaged ? "  [DEFEKT]" : "");
     } else if (v->fsType() == FsType::Sios) {
         // SIOS: Typ F = Datei, B = Bibliothek, O = Objekt einer Bibliothek (`PHASELB/INIT`);
         // Kz = Schutz/Austausch/Fortsetzung aus HDR1 (P/E/C); Lage = BOE/EOE/EOD bzw. AADR/ML.
@@ -1343,6 +1367,12 @@ int cmd_put(const Optionen& o) {
         t.udos_extra = static_cast<uint32_t>(std::strtoul(o.udos_zusatz.c_str(), nullptr, 16));
     t.udos_created  = o.udos_erst;
     t.udos_modified = o.udos_geaend;
+    // BS600 nimmt dieselben Schalter in seinen Bedeutungen: --type P|L, --load = Ladeadresse, --entry = Start
+    t.bs600_type   = o.udos_typ;
+    t.bs600_date   = o.udos_geaend;
+    t.bs600_author = o.bs600_signum;
+    t.bs600_load   = hexAdresse(o.load_text);
+    t.bs600_entry  = hexAdresse(o.entry_text);
     if (!o.udos_mem.empty()) {
         // LOW:HIGH[:STACK], alles hexadezimal
         unsigned von = 0, bis = 0, kz = 0x0080;
@@ -1395,6 +1425,8 @@ int cmd_put(const Optionen& o) {
             return kFehler;
         }
         std::string name = o.als.empty() ? fs::path(o.rest[i]).filename().string() : o.als;
+        // BS600-Namen kennen keine Endung: ohne --as gilt der Dateiname ohne sie.
+        if (o.als.empty() && v->istBs600()) name = fs::path(o.rest[i]).stem().string();
         FileRef ref = FileRef::parse(name, o.volume);
         if (!v->insert(o.rest[i], ref, t)) {
             std::cerr << "Fehler: " << v->lastError() << "\n";
@@ -1448,6 +1480,30 @@ int cmd_rm(const Optionen& o) {
     if (n == 0) { std::cerr << "Fehler: kein Eintrag passt auf das Muster\n"; return kFehler; }
     if (o.dry_run) return kOk;
     if (!v->flush()) { std::cerr << "Fehler: " << v->lastError() << "\n"; return kFehler; }
+    return kOk;
+}
+
+int cmd_reorganize(const Optionen& o) {
+    if (o.rest.size() < 2) { std::cerr << "Fehler: kein Abbild angegeben\n"; return kFehler; }
+    int rc = kOk;
+    auto v = oeffne(o, o.rest[1], rc, /*schreibend=*/true);
+    if (!v) return rc;
+    int bewegt = 0;
+    if (!v->reorganize(&bewegt) || !v->flush()) { std::cerr << "Fehler: " << v->lastError() << "\n"; return kFehler; }
+    std::cout << bewegt << " Dateien verschoben\n";
+    return kOk;
+}
+
+int cmd_mv(const Optionen& o) {
+    if (o.rest.size() < 4) { std::cerr << "Fehler: Abbild, alter und neuer Name angeben\n"; return kFehler; }
+    int rc = kOk;
+    auto v = oeffne(o, o.rest[1], rc, /*schreibend=*/true);
+    if (!v) return rc;
+    if (!v->rename(FileRef::parse(o.rest[2], o.volume), o.rest[3]) || !v->flush()) {
+        std::cerr << "Fehler: " << v->lastError() << "\n";
+        return kFehler;
+    }
+    std::cout << o.rest[2] << " -> " << o.rest[3] << "\n";
     return kOk;
 }
 
@@ -1659,7 +1715,8 @@ int cmd_attr(const Optionen& o) {
                       || o.udos_block_gesetzt || o.udos_segment || o.udos_ilen
                       || !o.udos_segmente.empty()
                       || !o.udos_mem.empty() || !o.udos_zusatz.empty()
-                      || !o.udos_erst.empty() || !o.udos_geaend.empty();
+                      || !o.udos_erst.empty() || !o.udos_geaend.empty() || !o.bs600_signum.empty()
+                      || !o.load_text.empty() || !o.entry_text.empty();
     bool aendern_cpm = o.cpm_ro_gesetzt || o.cpm_sys_gesetzt
                     || o.cpm_arc_gesetzt || o.cpm_user_gesetzt;
     bool aendern_unix = o.unix_mode_gesetzt || o.unix_uid_gesetzt
@@ -1744,7 +1801,18 @@ int cmd_attr(const Optionen& o) {
         }
     }
 
-    if (aendern_udos) {
+    if (aendern_udos && v->istBs600()) {
+        Bs600Attrs a;
+        a.type = o.udos_typ;
+        if (!o.udos_geaend.empty()) { a.set_date = true; a.date = o.udos_geaend; }
+        if (!o.bs600_signum.empty()) { a.set_author = true; a.author = o.bs600_signum; }
+        if (!o.load_text.empty())  { a.set_load = true;  a.load  = hexAdresse(o.load_text); }
+        if (!o.entry_text.empty()) { a.set_entry = true; a.entry = hexAdresse(o.entry_text); }
+        if (!v->setAttributes(ref, a) || !v->flush()) {
+            std::cerr << "Fehler: " << v->lastError() << "\n";
+            return kFehler;
+        }
+    } else if (aendern_udos) {
         UdosAttrs a;
         a.type       = o.udos_typ;
         a.properties = o.udos_eig;
@@ -1839,6 +1907,13 @@ int cmd_attr(const Optionen& o) {
             std::printf("  Geraet major,minor %u,%u\n", e->unix_rdev >> 8, e->unix_rdev & 0xFF);
         const std::string bl = v->blockList(ref);
         if (!bl.empty()) std::printf("  Bloecke %s\n", bl.c_str());
+        return kOk;
+    }
+    if (v->istBs600()) {
+        std::printf("%-6s Typ %s  %llu Byte  Lage %s\n", e->name.c_str(), e->type.c_str(),
+                    static_cast<unsigned long long>(e->size), e->extent.c_str());
+        std::printf("  Laden %04X  Ende %04X  Start %04X   Datum %s   Signum '%s'\n",
+                    e->low_addr, e->high_addr, e->entry_addr, e->date.c_str(), e->created.c_str());
         return kOk;
     }
     // CP/M fuehrt keine Kopfsektorangaben — dort waeren zehn Nullzeilen keine
@@ -2233,6 +2308,8 @@ int main(int argc, char** argv) {
     if (befehl == "put")     return cmd_put(o);
     if (befehl == "rm")      return cmd_rm(o);
     if (befehl == "mkdir")   return cmd_mkdir(o);
+    if (befehl == "reorganize") return cmd_reorganize(o);
+    if (befehl == "mv")      return cmd_mv(o);
     if (befehl == "create")  return cmd_create(o);
     if (befehl == "attr")    return cmd_attr(o);
     if (befehl == "boot-get") return cmd_boot_get(o);

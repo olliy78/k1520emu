@@ -135,6 +135,9 @@ bool schreibeFileinfo(const fs::path& ziel, const FileAngaben& a) {
              "# 0755, Besitzer 0/0, Zeit jetzt) - Inhalt und Name gehen nicht verloren.\n"
              "# Zurueckgespielt werden mode (untere 12 Bit), uid, gid und mtime; art,\n"
              "# nlink, inode, atime, ctime und rdev stehen nur zur Auskunft da.\n";
+    else if (a.bs600)
+        f << "# Ohne sie bekommt die Datei beim Einfuegen Typ P, Ladeadresse 0000, keine Startadresse und\n"
+             "# das heutige Datum - der Inhalt geht nicht verloren, aber ein Programm laeuft so nicht.\n";
     else if (a.udos)
         f << "# Ohne sie kann das Werkzeug nicht wissen, was fuer eine Datei das ist -\n"
              "# aus einem Programm wuerde eine Binaerdatei, die nicht laeuft.\n";
@@ -143,11 +146,17 @@ bool schreibeFileinfo(const fs::path& ziel, const FileAngaben& a) {
              "# bei CP/M der Normalfall und selten ein Verlust.\n";
     f << "# Loeschen schadet nur dieser einen Datei; die Zeilenform ist dieselbe wie in\n"
          "# udos-dateiangaben.txt bzw. cpm-dateiangaben.txt.\n";
-    f << "fs=" << (a.tar ? "tar" : a.wega ? "wega_mutos" : a.udos ? "udos" : "cpm") << '\n';
+    f << "fs=" << (a.tar ? "tar" : a.wega ? "wega_mutos" : a.bs600 ? "bs600" : a.udos ? "udos" : "cpm") << '\n';
     f << "name=" << a.name << '\n';
     if (a.wega || a.tar) {
         schreibeUnixFelder(f, a.x, '\n');
         if (!a.teil.empty()) f << "teilstueck=" << a.teil << '\n';
+    } else if (a.bs600) {
+        f << "typ=" << (a.u.typ.empty() ? "P" : a.u.typ) << '\n'
+          << "datum=" << a.b.datum << '\n'
+          << "signum=" << (a.b.signum.empty() ? "-" : a.b.signum) << '\n'
+          << "lade=" << hex16(a.b.lade) << '\n'
+          << "start=" << hex16(a.u.start) << '\n';
     } else if (a.udos) {
         f << "typ=" << (a.u.typ.empty() ? "-" : a.u.typ) << '\n'
           << "eig=" << (a.u.eigenschaften.empty() ? "-" : a.u.eigenschaften) << '\n'
@@ -190,13 +199,17 @@ bool leseFileinfo(const fs::path& datei, FileAngaben& out) {
         etwas = true;
         if      (k == "fs")   { a.wega = (v == "wega_mutos" || v == "wega");   // "wega": aeltere .fileinfo
                                 a.tar  = (v == "tar");
-                                a.udos = (v != "cpm" && !a.wega && !a.tar); }
+                                a.bs600 = (v == "bs600");
+                                a.udos = (v != "cpm" && !a.wega && !a.tar && !a.bs600); }
         else if (k == "name")   a.name = v;
         else if (leseUnixFeld(a.x, k, v)) {}
         else if (k == "attr") { if (v != "-") {
                                     a.c.read_only = v.find('R') != std::string::npos;
                                     a.c.system    = v.find('S') != std::string::npos;
                                     a.c.archived  = v.find('A') != std::string::npos; } }
+        else if (k == "datum")  a.b.datum = v;
+        else if (k == "signum") a.b.signum = (v == "-") ? "" : v;
+        else if (k == "lade")   a.b.lade = static_cast<uint16_t>(zahl(v, 16));
         else if (k == "typ")    a.u.typ = (v == "-") ? "" : v;
         else if (k == "eig")    a.u.eigenschaften = (v == "-") ? "" : v;
         else if (k == "start")  a.u.start = static_cast<uint16_t>(zahl(v, 16));
