@@ -35,7 +35,7 @@ tools/dev.sh test -R K2526           # Namensmuster (ctest-Argumente werden durc
 **Fachgebiets-Labels und `test-merge`.** Jeder Fall der langsamen Spuren (`format_integration`,
 `format_matrix`, `wega_install`) trägt zusätzlich mindestens ein `fach_*`-Label (`fach_floppy`,
 `fach_serial`, `fach_kermit`, `fach_p8000`, `fach_wega`, `fach_rtc`, `fach_a5120`, `fach_k8915`,
-`fach_pc1715`, `fach_prg710`), gesetzt in `LABELS` der `k1520_add_test()`-Zeile bzw. des `add_test`.
+`fach_pc1715`, `fach_prg710`, `fach_drucker`), gesetzt in `LABELS` der `k1520_add_test()`-Zeile bzw. des `add_test`.
 `tools/dev.sh test-merge [basis] [--alles] [--trocken]` liest den `git diff` gegen die Basis, bildet
 Pfade über die Tabelle in `tools/test_auswahl.py` auf Fachlabels ab und fährt `test`, die langsamen
 Spuren nur für die berührten Fachgebiete und `win` bei C++/CMake-Änderungen; reine Doku fährt nichts,

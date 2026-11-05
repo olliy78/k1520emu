@@ -430,6 +430,10 @@ _lib.k1520_create_p8000_terminal.restype = K1520Handle
 #   variante 0 = MC80.30 (alles andere ausser 3/4 → NULL), 3/4 = .21/.22 (konfig muss NULL sein); sonst "spe=1|2"
 _lib.k1520_create_mc80.argtypes = [ctypes.c_int, ctypes.c_char_p]
 _lib.k1520_create_mc80.restype = K1520Handle
+# k1520_create_printer(typ, konfig) -> K1520Handle   (Entwurf 49, WP1)
+#   typ 0 = SD 1157/264 (1/2 = K6316 IFSS/V.24: noch nicht gebaut → NULL); konfig "schnittstelle=ifss|v24" oder NULL
+_lib.k1520_create_printer.argtypes = [ctypes.c_int, ctypes.c_char_p]
+_lib.k1520_create_printer.restype = K1520Handle
 
 # P8000-Terminals (k1520_term_*; andere Maschinen: 0 / -1 / False)
 _lib.k1520_term_count.argtypes = [K1520Handle]
@@ -859,7 +863,7 @@ def _utf8(path) -> bytes:
 # Maschinentypen (K1520MachineType in core/api/k1520_api.h) — Name → Wert.
 MACHINE_TYPES = {"a5120": 0, "a5120-alt": 0, "a5120-kmbg": 0, "prg710": 1, "prg710-1": 1, "k8915": 2, "k8915-g2": 2, "pc1715": 3,
                  "pc1715-k7221": 3, "pc1715w": 3, "p8000": 4, "p8000-terminal": 5,
-                 "mc80": 6, "mc80-21": 6, "mc80-22": 6}
+                 "mc80": 6, "mc80-21": 6, "mc80-22": 6, "sd1157": 7}
 # (Variante, Bildschirm) fuer k1520_create_pc1715: Variante 0 = PC 1715, 1 = PC 1715W (AP-W3);
 # Bildschirm 0 = K7222 80×24, 1 = K7221 64×16 (am 1715W abgelehnt).
 # AP-6: waehlbare ROM-Fassungen → Parameter von k1520_create_pc1715_ex.
@@ -940,6 +944,8 @@ PRG_VARIANTEN = {"prg710": 0, "prg710-1": 1}
 MC80_VARIANTEN = {"mc80": 0, "mc80-21": 3, "mc80-22": 4}
 #: Die Varianten des MC80.2x (Bild 528 × 256, 32 × 8 Zeichen, Tastatur als Matrix, MBI).
 MC80_2X = ("mc80-21", "mc80-22")
+# Druckertyp fuer k1520_create_printer (Entwurf 49, WP1): nur der SD 1157/264 ist gebaut.
+DRUCKER_TYPEN = {"sd1157": 0}
 # Bauform fuer k1520_create_k8915 (doc/design/24_k8915_varianten.md R5); "k8915" bleibt V3.
 K8915_GENERATIONEN = {"k8915": 0, "k8915-g2": 1}
 
@@ -1211,7 +1217,8 @@ class K1520Emulator:
             machine: ``"a5120"`` (Vorgabe), ``"k8915"``, ``"k8915-g2"`` (K8915 Gen 2), ``"prg710"`` oder
                 ``"prg710-1"``, ``"pc1715"``, ``"pc1715-k7221"`` (PC 1715 mit dem
                 Bildschirm K7221, 64×16), ``"pc1715w"``, ``"mc80"`` (MC80.30) oder
-                ``"mc80-21"``/``"mc80-22"`` — siehe :data:`MACHINE_TYPES`.
+                ``"mc80-21"``/``"mc80-22"``, ``"sd1157"`` (Drucker SD 1157/264, Entwurf 49 — noch ohne
+                Druckwerk) — siehe :data:`MACHINE_TYPES`.
             zeichensatz: nur PC 1715 — Bestückung der ZG-EPROMs, ``"deutsch"``
                 (S619 + S602, Vorgabe), ``"polnisch"`` oder ``"kyrillisch"``; beim
                 ``"pc1715w"`` ohne Wirkung (der Satz kommt von Diskette).
@@ -1356,6 +1363,8 @@ class K1520Emulator:
             elif machine == "p8000-terminal":
                 teile = [f"{k}={v}" for k, v in (p8000 or {}).items()]
                 handle = _lib.k1520_create_p8000_terminal(",".join(teile).encode("utf-8"))
+            elif machine in DRUCKER_TYPEN:
+                handle = _lib.k1520_create_printer(DRUCKER_TYPEN[machine], None)
             elif machine in MC80_VARIANTEN:
                 # Der MC80.2x kennt keinen Konfigurationstext (k1520_create_mc80 lehnt ihn ab).
                 if machine in MC80_2X:

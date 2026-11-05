@@ -192,6 +192,12 @@ k1520_add_test(mc80_segmente SRC test_mc80_segmente.cpp
                           LIBS k1520_mc80 k1520_logger
                           LABELS "${_lbl}" DEFS LOG_LEVEL=2)
 
+# SD 1157 (Entwurf 49, WP1): das Original-ROM laeuft an — Stapel 2C28H, CTC, Vektortabelle 2CE0H, Wagenfahrt
+# bis zum linken Rand, Anfangs-PV, Online-Lampe, DC1, Leerlaufschleife; Maschinenkennung 7, K6316 abgewiesen.
+k1520_add_test(sd1157_rom SRC test_sd1157_rom.cpp
+                          LIBS k1520_printer k1520_logger
+                          LABELS "${_lbl};fach_drucker" DEFS LOG_LEVEL=2)
+
 # MC80.21/.22 (AP M11, doc/mc80/hardware_2x.md): BSYS meldet sich ueber die DPL, Tasten ueber die
 # Matrix, Programm ueber die MBI auf die Kassette und zurueck.
 k1520_add_test(mc80_2x SRC test_mc80_2x.cpp

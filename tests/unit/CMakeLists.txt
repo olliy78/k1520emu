@@ -70,6 +70,10 @@ k1520_add_test(mc80_asp SRC cards/test_mc80_asp.cpp LIBS k1520_mc80_karten LABEL
 # Magnetbandinterface MBI (EFH, Schreib-/Leseweg ueber das Schieberegister) samt E/A-Senke
 k1520_add_test(mc80_dpl SRC cards/test_mc80_dpl.cpp LIBS k1520_mc80_2x_karten LABELS "${_lbl}")
 k1520_add_test(mc80_mbi SRC cards/test_mc80_mbi.cpp LIBS k1520_mc80_2x_karten LABELS "${_lbl}")
+# SD 1157 (Entwurf 49, WP1): Steuerung des Seriendruckers — Speicherkarte, ROM-MD5, E/A-Tore, Wagen-Platzhalter, Kette
+k1520_add_test(sd1157_steuerung SRC cards/test_sd1157_steuerung.cpp LIBS k1520_printer_karten
+               LABELS "${_lbl};fach_drucker"
+               DEFS "SD1157_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/SD1157\"")
 # K3528 der K8915 Gen 2: Speicherbild je A8H-Wert, /MEMDI (doc/design/24_k8915_varianten.md R3, AP-V4)
 k1520_add_test(k3528 SRC cards/test_k3528.cpp      LIBS k1520_k3528 LABELS "${_lbl}")
 # PFS K3820 (16 × 2708), von keiner Maschine benutzt (doc/design/24_k8915_varianten.md AP-V11)

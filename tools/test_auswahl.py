@@ -25,7 +25,7 @@ ALLE = "*"  # Sonderwert: alle Fachgebiete (= alle langsamen Faelle)
 
 # Fachgebiete (muessen mit den Labels in tests/ uebereinstimmen; Waechter prueft es).
 FACHER = ("fach_floppy", "fach_serial", "fach_kermit", "fach_p8000", "fach_wega",
-          "fach_rtc", "fach_a5120", "fach_k8915", "fach_pc1715", "fach_prg710")
+          "fach_rtc", "fach_a5120", "fach_k8915", "fach_pc1715", "fach_prg710", "fach_drucker")
 LANGSAME_LABELS = ("format_integration", "format_matrix", "wega_install")
 
 _P8 = ("fach_p8000", "fach_wega")
@@ -98,6 +98,8 @@ REGELN = [
     ("core/machines/pc1715/**", ("fach_pc1715",), "PC 1715", True),
     ("core/machines/prg710/**", ("fach_prg710",), "PRG 710", True),
     ("core/machines/mc80/**", (), "MC80 (keine langsamen Faelle)", True),
+    ("core/machines/printer/**", ("fach_drucker",), "Drucker (PrinterMachine)", True),
+    ("core/cards/printer/**", ("fach_drucker",), "Drucker-Karten (SD 1157)", True),
     ("core/cards/k8025/**", ("fach_a5120", "fach_serial"), "K8025", True),
     ("core/cards/k7028/**", ("fach_k8915", "fach_serial"), "K7028", True),
     ("core/cards/k2521/**", ("fach_k8915", "fach_prg710"), "K2521", True),

@@ -19,6 +19,7 @@ typedef enum {
     K1520_MACHINE_P8000  = 4,
     K1520_MACHINE_P8000_TERMINAL = 5,   /* Originalterminal Typ 2 + K7673.09 ohne Rechner (P20d) */
     K1520_MACHINE_MC80   = 6,           /* MC80.3x (Entwurf 31, AP M2: Geruest ZVE + SPE 2) */
+    K1520_MACHINE_PRINTER = 7,          /* Drucker (Entwurf 49, WP1: SD 1157; K6316 folgt) */
 } K1520MachineType;
 
 typedef struct {
@@ -263,6 +264,23 @@ K1520_API K1520Handle k1520_create_p8000_terminal(const char* konfig);
  * k1520_machine_type() = 6.  Keine Laufwerke.  `k1520_create(K1520_MACHINE_MC80)` = MC80.30.
  */
 K1520_API K1520Handle k1520_create_mc80(int variante, const char* konfig);
+
+/**
+ * @brief Drucker (K1520_MACHINE_PRINTER), doc/design/49_k1520printer.md — Stand WP1: Geruest.
+ *        Der Original-U880-Code des SD 1157 (ROM 0000H–297FH, RAM 2C00H/3800H, ZG1 3000H,
+ *        CTC DCH, PIO F4H/F8H/ECH, SIO 7CH, Takt 2,4576 MHz) laeuft an.  Noch KEIN Druckwerk,
+ *        kein Blatt, keine serielle Schnittstelle nach aussen, kein Bild: `k1520_fb_width/height`
+ *        = 0, `k1520_screen_char` = 0, keine Laufwerke.  Zugriff auf Speicher/E/A ueber
+ *        `k1520_mem_read`/`k1520_io_read` (CPU-Sicht des Druckers).
+ *
+ * @param typ     0 = SD 1157/264.  1 = K6316 (IFSS), 2 = K6316 (V.24): vorgesehen, aber noch nicht
+ *                gebaut → NULL mit Grund.  Alles andere → NULL mit Grund.
+ * @param konfig  Schluessel=Wert-Liste, durch Komma getrennt (NULL/"" = Vorgabe); Schluessel
+ *                (nur SD 1157): `schnittstelle` (`ifss` | `v24`: Wahl am Schalterblock PIO 3 A.0).
+ *                Unbekannte Schluessel/Werte → NULL, Grund in k1520_last_init_error.
+ * k1520_machine_type() = 7.  `k1520_create(K1520_MACHINE_PRINTER)` = SD 1157/264.
+ */
+K1520_API K1520Handle k1520_create_printer(int typ, const char* konfig);
 
 /**
  * @brief Reason the last k1520_create*() returned NULL ("" if none).

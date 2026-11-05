@@ -591,6 +591,15 @@ if(BUILD_K1520)
     target_link_libraries(k1520_mc80 PUBLIC k1520_mc80_karten k1520_mc80_2x_karten k1520_k2521 k1520_k3820 k1520_k3525 k1520_raf k1520_k6022 k1520_k5020 k1520_floppy2 k1520_bus k1520_logger k1520_serial)
     target_include_directories(k1520_mc80 PUBLIC ${CMAKE_SOURCE_DIR})
 
+    # Drucker (doc/design/49_k1520printer.md, WP1): SD 1157 (U880, Original-ROM, CTC/PIO/SIO) als
+    # Karte, PrinterMachine darueber; Druckwerk/Blatt/Seriellanbindung folgen in WP3/WP4.
+    add_library(k1520_printer_karten STATIC core/cards/printer/sd1157_steuerung.cpp)
+    target_link_libraries(k1520_printer_karten PUBLIC k1520_z80 k1520_ctc k1520_pio k1520_sio k1520_bus k1520_logger)
+    target_include_directories(k1520_printer_karten PUBLIC ${CMAKE_SOURCE_DIR})
+    add_library(k1520_printer STATIC core/machines/printer/printer_machine.cpp)
+    target_link_libraries(k1520_printer PUBLIC k1520_printer_karten k1520_raf k1520_k6022 k1520_k5020 k1520_floppy2 k1520_bus k1520_logger k1520_serial)
+    target_include_directories(k1520_printer PUBLIC ${CMAKE_SOURCE_DIR})
+
     # P8000 (doc/design/25_p8000.md §10, AP P7a): 8-Bit-Seite (Karte8 + Floppy8 + Kern-Terminal)
     # + Originalterminal an tty1 (Config::terminal) und „P8000 Terminal" als eigene Maschine (P20c/P20d)
     add_library(k1520_p8000 STATIC core/machines/p8000/p8000.cpp core/machines/p8000/p8000_terminal_machine.cpp)
@@ -602,7 +611,7 @@ if(BUILD_K1520)
         core/api/k1520_api.cpp
         core/api/k1520_sync_api.cpp   # physische Diskette — steht in BEIDEN Bibliotheken
     )
-    target_link_libraries(k1520core PRIVATE k1520_a5120 k1520_k8915 k1520_prg710 k1520_pc1715 k1520_p8000 k1520_mc80 k1520_logger)
+    target_link_libraries(k1520core PRIVATE k1520_a5120 k1520_k8915 k1520_prg710 k1520_pc1715 k1520_p8000 k1520_mc80 k1520_printer k1520_logger)
     target_include_directories(k1520core PUBLIC ${CMAKE_SOURCE_DIR})
     # K1520_BUILD_SHARED schaltet K1520_API auf __declspec(dllexport).  OHNE das
     # exportiert eine MSVC-DLL GAR NICHTS und ctypes findet keine Funktion
@@ -649,8 +658,8 @@ if(BUILD_K1520)
     target_include_directories(z8kdis PRIVATE ${CMAKE_SOURCE_DIR})
 
     # boot_trace: standalone boot diagnostic tool (LOG_LEVEL=5 for full trace)
-    add_executable(boot_trace tools/boot_trace.cpp tools/boot_trace_k8915.cpp tools/boot_trace_prg710.cpp tools/boot_trace_pc1715.cpp tools/boot_trace_mc80.cpp tools/boot_trace_mc80_2x.cpp tools/boot_trace_p8000.cpp)
-    target_link_libraries(boot_trace PRIVATE k1520_a5120 k1520_k8915 k1520_prg710 k1520_pc1715 k1520_mc80 k1520_p8000 k1520_floppy k1520_logger)
+    add_executable(boot_trace tools/boot_trace.cpp tools/boot_trace_k8915.cpp tools/boot_trace_prg710.cpp tools/boot_trace_pc1715.cpp tools/boot_trace_mc80.cpp tools/boot_trace_mc80_2x.cpp tools/boot_trace_printer.cpp tools/boot_trace_p8000.cpp)
+    target_link_libraries(boot_trace PRIVATE k1520_a5120 k1520_k8915 k1520_prg710 k1520_pc1715 k1520_mc80 k1520_printer k1520_p8000 k1520_floppy k1520_logger)
     target_include_directories(boot_trace PRIVATE ${CMAKE_SOURCE_DIR})
     target_compile_definitions(boot_trace PRIVATE LOG_LEVEL=5)
 
@@ -690,7 +699,7 @@ if(BUILD_K1520)
     # k1520dbg: interactive gdb-style debugger (breakpoints, marker-relative cycles,
     # memory dump/disasm, watchpoints, keystroke injection, screen view)
     add_executable(k1520dbg tools/k1520dbg.cpp)
-    target_link_libraries(k1520dbg PRIVATE k1520_a5120 k1520_k8915 k1520_prg710 k1520_pc1715 k1520_mc80 k1520_p8000 k1520_p8000_terminal_hw k1520_z8 k1520_floppy k1520_logger)
+    target_link_libraries(k1520dbg PRIVATE k1520_a5120 k1520_k8915 k1520_prg710 k1520_pc1715 k1520_mc80 k1520_printer k1520_p8000 k1520_p8000_terminal_hw k1520_z8 k1520_floppy k1520_logger)
     target_include_directories(k1520dbg PRIVATE ${CMAKE_SOURCE_DIR})
     target_compile_definitions(k1520dbg PRIVATE LOG_LEVEL=5)
     # Zeilenbearbeitung der interaktiven Sitzung: Pfeiltasten, History,

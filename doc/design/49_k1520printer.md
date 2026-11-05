@@ -1,6 +1,6 @@
 # Entwurf 49 — Druckeremulator `k1520printer` (Ticket #28)
 
-Stand 2026-11-05, **Planung, nicht begonnen**.  Zweig `feature/issue-28-k1520printer`.
+Stand 2026-11-05, **WP0a/WP0b erledigt, WP1 erledigt (siehe §5a)**, Rest Planung.  Zweig `feature/issue-28-k1520printer`.
 Nummer 49, weil 48 für BS600 vorgemerkt ist (noch in keinem Zweig).
 
 ## 1  Auftrag (Ticket #28) und Festlegung des Anwenders
@@ -182,6 +182,18 @@ Je AP: Doku + Test + Commit, **nicht pushen**.  Reihenfolge: WP0a ‖ WP0b → W
 | **WP5** | `k1520printer`: Profil, `PrinterWindow`, `BlattWidget`, Bedienfelder, Typauswahl, PDF, System-Druck, Handbuch, Bindung | WP3 (Rest parallel) | `py_k1520printer_gui` offscreen; PDF enthält die Punkte |
 | **WP7** | Paket (Starter, `MASCHINEN`, Inno), Vorgabekonfiguration, `CLAUDE.md`-Abschnitt, Merkposten, `test-merge --alles` | alles | `py_packaging`, `py_programme`, Windows-Gegenprobe |
 | WP8 | (später) K6313 auf K6316-Basis, sobald der Abzug da ist; SD 1152/257 Typenrad als zweite `Druckwerk`-Implementierung | Abzug | — |
+
+### 5a  Stand WP1 (2026-11-05)
+
+Gebaut: `PrinterMachine` (`core/machines/printer/`, Kennung 7, `k1520_create_printer(typ, konfig)`, Python `machine="sd1157"`),
+`Sd1157Steuerung` (`core/cards/printer/`: ROM/RAM/ZG nach `sd1157/hardware.md` §2, CTC, 3 PIO, SIO, Kette CTC > PIO 2 > PIO 1 > SIO > PIO 3
+als Annahme), `boot_trace --machine sd1157`, `k1520dbg --machine sd1157`; `K6316_*` werden mit Meldung abgewiesen (WP2a).
+**Das Original-ROM erreicht mit dem vorlaeufigen Wagen-/Papier-Platzhalter (`sd1157_mechanik_vorlaeufig.h`, faellt mit WP3 weg) die
+Leerlaufschleife**: 13 CTC-1-Interrupts (~0,86 Mio. Takte), Wagenfahrt rueckwaerts bis /LR, 24 Anfangs-PV-Schritte (+ Rueckzug), Online-Lampe an,
+Fehlerlampe aus, DC1 an den IFSS (Kanal B; am V.24-Betrieb an Kanal A), danach Abfrage von PIO 3 B / SIO-Puffer ab ~5,6 Mio. Takten.
+Wächter: `Sd1157Karte.*`, `Sd1157Rom.*`, `K1520PrinterMaschine.*`, `py_c_api`.
+Offen: Startlagen im Randbereich (/VK oder /LR beim Einschalten schon 0) — der Platzhalter erzeugt dort keine /LR-Flanke (WP3);
+ein echtes `.prn` fuer den Debugger fehlt (`-l 1157.mac` stimmt nur bis ~00C0H, 132 Zeilen unbekannt, Adressen driften).
 
 ## 6  Tests und Wächter
 

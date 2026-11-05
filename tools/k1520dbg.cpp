@@ -221,7 +221,7 @@ int main(int argc, char** argv){
     // original writable (writes persist); `--read-only`/`--ro` mounts write-protected.
     enum { MOUNT_COW=0, MOUNT_RW=1, MOUNT_RO=2 } mount_mode = MOUNT_COW;
     bool start_console = false;   // --console: sofort in den Konsolenmodus (§9)
-    dbgm::Art art = dbgm::Art::A5120;   // --machine a5120|k8915|k8915-g2|prg710|prg710-1|pc1715|pc1715w|p8000|p8000-16|mc80[-30|-31|-21|-22] (Vorgabe a5120)
+    dbgm::Art art = dbgm::Art::A5120;   // --machine a5120|k8915|k8915-g2|prg710|prg710-1|pc1715|pc1715w|p8000|p8000-16|mc80[-30|-31|-21|-22]|sd1157 (Vorgabe a5120)
     int mc80_spe = 1;             // --spe 1|2: Zahl der SPE 2 am MC80 (AP M8)
     bool skip_selftest = false;   // --skip-selftest: K8915 ohne ROM-Selbsttest (wie ein Warmstart)
     const char* em_opt = nullptr; // --em none|em064|em256: A5120.16 mit Erweiterungsmodul
@@ -257,7 +257,7 @@ int main(int argc, char** argv){
     for (int i=1;i<argc;++i){
         if (!strcmp(argv[i],"--machine") && i+1<argc){
             if (!dbgm::parseMachine(argv[++i], art)){
-                fprintf(stderr,"unbekannte Maschine '%s' (a5120 | k8915 | k8915-g2 | prg710 | prg710-1 | pc1715 | pc1715w | p8000 | p8000-16 | mc80 | mc80-30 | mc80-21 | mc80-22)\n",argv[i]); return 2; } }
+                fprintf(stderr,"unbekannte Maschine '%s' (a5120 | k8915 | k8915-g2 | prg710 | prg710-1 | pc1715 | pc1715w | p8000 | p8000-16 | mc80 | mc80-30 | mc80-21 | mc80-22 | sd1157)\n",argv[i]); return 2; } }
         else if (!strcmp(argv[i],"--spe") && i+1<argc){ mc80_spe=atoi(argv[++i]);
             if (mc80_spe<1 || mc80_spe>2){ fprintf(stderr,"--spe: 1 oder 2\n"); return 2; } }
         else if (!strcmp(argv[i],"--skip-selftest")) skip_selftest=true;
@@ -447,6 +447,7 @@ int main(int argc, char** argv){
     EM* em = m.em();          // nullptr ohne --em (und immer am K8915)
     const bool KM = m.isMc80();    // MC80.3x (AP M8): eine CPU (ZVE), Segmentfenster 4000H–BFFFH, VIS-Bild als Text
     const bool KM2 = m.isMc80_2x();   // MC80.21/.22 (AP M12): K2521 + PFS/OPS, DPL-Bild 32 x 8, Matrixtastatur, MBI
+    const bool KS = m.isPrinter();   // Drucker SD 1157 (Entwurf 49, WP1): eine CPU, kein Bild, keine Tastatur, keine Laufwerke
     const bool KQ = m.isP8000();   // P8000 (AP P12): U880 + MON8, mit p8000-16 auch U8001/MMU/Kopplung
     // 16-Bit-Karte des P8000 (U8001-Kontext wie beim EM, aber MMU statt Segmentweiche); nullptr ohne `p8000-16`.
     P8000Karte16* p16 = KQ ? m.p8000()->karte16() : nullptr;
@@ -1590,6 +1591,13 @@ int main(int argc, char** argv){
                 rcpfx(), rc(m.cpuCycles()), rel_armed?" (rel)":"");
             return;
         }
+        if (KS){   // Drucker: Speicher fest; Lampen und Wagen (Platzhalter) statt Banking
+            Sd1157Steuerung& k=m.printer()->sd1157();
+            fprintf(stderr,"  state: online=%s fehler=%s wagen=%d%s  %c-cyc=%lld%s\n", k.lampeOnline()?"an":"aus",
+                k.lampeFehler()?"an":"aus", k.mechanik().position(), k.mechanik().laeuft()?" (laeuft)":"",
+                rcpfx(), rc(m.cpuCycles()), rel_armed?" (rel)":"");
+            return;
+        }
         if (KM2){   // MC80.2x: Speicher fest (ROM/PFS/OPS), kein Banking
             fprintf(stderr,"  state: %s  %c-cyc=%lld%s\n", m.name(), rcpfx(), rc(m.cpuCycles()), rel_armed?" (rel)":"");
             return;
@@ -1898,6 +1906,29 @@ int main(int argc, char** argv){
             rst38Hint();
             return;
         }
+        if (KS){   // Drucker: eine CPU, kein Bild; Lampen, Wagen (Platzhalter), Papier, Nadeln
+            Sd1157Steuerung& k=m.printer()->sd1157();
+            uint16_t pc=m.cpuPC();
+            if (json){
+                fprintf(stderr,"\n{\"machine\":\"sd1157\",\"pc\":\"0x%04X\",\"online\":%s,\"fehler\":%s,"
+                  "\"wagen\":%d,\"lauf\":%s,\"pv1\":%u,\"pv2\":%u,\"nadeln\":\"0x%03X\"}\n", pc,
+                  k.lampeOnline()?"true":"false", k.lampeFehler()?"true":"false", k.mechanik().position(),
+                  k.mechanik().laeuft()?"true":"false", (unsigned)k.mechanik().pvSchritte(0),
+                  (unsigned)k.mechanik().pvSchritte(1), (unsigned)k.nadeln());
+                return;
+            }
+            char l1[120]; disasmAt(pc,l1,sizeof l1); std::string p1=prnFor(pc);
+            fprintf(stderr,"  CPU  %s%s%s\n",l1,p1.empty()?"":"  ; ",p1.c_str());
+            fprintf(stderr,"  Lampen: ONLINE %s, FEHLER %s   Wagen: Position %d %s (Platzhalter, WP3)   PV-Schritte %u/%u\n",
+                    k.lampeOnline()?"an":"aus", k.lampeFehler()?"an":"aus", k.mechanik().position(),
+                    k.mechanik().laeuft()?"laeuft":"steht", (unsigned)k.mechanik().pvSchritte(0), (unsigned)k.mechanik().pvSchritte(1));
+            fprintf(stderr,"  Ausgaenge 2A=%02X 2B=%02X 1A=%02X 1B=%02X  Nadeln BEH=%02X BFH=%02X   SIO gesendet A/B: %zu/%zu\n",
+                    k.portAusgabe(2,0),k.portAusgabe(2,1),k.portAusgabe(1,0),k.portAusgabe(1,1),k.nad18(),k.nad9(),
+                    k.sioAusgabe(0).size(),k.sioAusgabe(1).size());
+            fprintf(stderr,"  Takte=%llu\n",(unsigned long long)m.machineCycles());
+            rst38Hint();
+            return;
+        }
         if (KM2){   // MC80.2x: Bild = 8 Zeilen DPL
             Mc80_2xMachine& k=*m.mc80_2x();
             uint16_t pc=m.cpuPC();
@@ -2029,6 +2060,9 @@ int main(int argc, char** argv){
                  return; }
         if (KC){ fprintf(stderr,"  ... %llu cyc  PC=%04X  BWS=%02X  [Ctrl-C bricht ab]\n",
                          (unsigned long long)(runClock()-start), m.cpuPC(), m.pc1715()->zre().bwsRegister());
+                 return; }
+        if (KS){ fprintf(stderr,"  ... %llu cyc  PC=%04X  wagen=%d  [Ctrl-C bricht ab]\n",
+                         (unsigned long long)(runClock()-start), m.cpuPC(), m.printer()->sd1157().mechanik().position());
                  return; }
         if (KM2){ fprintf(stderr,"  ... %llu cyc  PC=%04X  [Ctrl-C bricht ab]\n",
                          (unsigned long long)(runClock()-start), m.cpuPC());
@@ -2236,6 +2270,10 @@ int main(int argc, char** argv){
             ran+=goSilent(200000);
             fprintf(stderr,"   keys: %d Zeichen getippt, %llu cyc (PC=%04X)\n",n,
                     (unsigned long long)ran,m.cpuPC());
+            return;
+        }
+        if (KS){
+            fprintf(stderr,"  keys: der Drucker hat keine Tastatur (Tasten ONLINE/PV1/PV2/TEST folgen mit dem Bedienfeld, WP2b)\n");
             return;
         }
         if (KM){
@@ -3153,6 +3191,7 @@ int main(int argc, char** argv){
 
     signal(SIGINT, dbgSigInt);      // §7: Ctrl-C bricht einen laufenden `g` ab, nicht die Sitzung
     if (KQ) fprintf(stderr,"k1520dbg - Maschine P8000 (U880%s; 'help p8000').  Disassembler: built-in.\n",p16?" + U8001/MMU/Kopplung":"");
+    else if (KS) fprintf(stderr,"k1520dbg - Maschine %s (eine CPU; 'help sd1157').  Disassembler: built-in.\n",m.name());
     else if (KM2) fprintf(stderr,"k1520dbg - Maschine %s (eine CPU; 'help mc80-2x').  Disassembler: built-in.\n",m.name());
     else if (KM) fprintf(stderr,"k1520dbg - Maschine %s (eine CPU; 'help mc80').  Disassembler: built-in.\n",m.name());
     else if (KC) fprintf(stderr,"k1520dbg - Maschine PC 1715 (eine CPU; 'help pc1715').  Disassembler: built-in.\n");
@@ -3297,6 +3336,18 @@ int main(int argc, char** argv){
               "    rtc                 Echtzeituhr-Karte (--rtc u130x|rtc72421): Typ, Uhrzeit, Versatz, bei U130X Anzeige/Tasten/Zustand\n"
               "    wdc [r|u|d|log]     WDC (--wdc 4.2 / --hd abbild): Zustand, Register, Disassembler, Speicher, Kommando-Protokoll\n"
               "    Adressen der 16-Bit-Seite: <<seg>>off; `em:ADR` = physischer Hauptspeicher A0-A23 (roh)\n");
+        }
+        else if ((cmd=="help"||cmd=="h"||cmd=="?") && t.size()>1 && (t[1]=="sd1157"||t[1]=="SD1157"||t[1]=="printer"||t[1]=="drucker")){
+            fprintf(stderr,
+              "  SD 1157 (--machine sd1157)  eine CPU (U880 2,4576 MHz), ROM 0000H-297FH, RAM 2C00H/3800H, ZG1 3000H (ZG2 3400H liest FFH)\n"
+              "    map               Speicherkarte und E/A-Tore (doc/printer/sd1157/hardware.md §2/§4)\n"
+              "    d/u/x/e/wp        Speicher in CPU-Sicht;  where = Lampen, Wagen (Platzhalter), Papier, Nadeln\n"
+              "    dev [ctc|pio|sio] CTC DCH, PIO 2/1/3 (F8H/F4H/ECH), SIO 7CH;  ivt = Kette CTC > PIO 2 > PIO 1 > SIO > PIO 3 [?]\n"
+              "    Listings: -l doc/printer/sd1157/1157.mac  (kommentierte Quelle, vom Debugger-Assembler uebersetzt: 132 Zeilen\n"
+              "                      unbekannt, die Adressen driften — nur der Anfang (Init, bis ~00C0H) stimmt, danach zeigt die\n"
+              "                      Annotation teils die falsche Zeile; das ROM weicht ab 0D29H zusaetzlich um 38H ab, hardware.md §1.\n"
+              "                      Ein echtes .prn (M80-Listing) fehlt noch — Folgearbeit, kein neues Werkzeug in WP1)\n"
+              "    Nicht vorhanden: Tastatur, Bild, Laufwerke, ZVE2, bbusrq, snap/restore/rs/rc, savestate/loadstate, bank\n");
         }
         else if ((cmd=="help"||cmd=="h"||cmd=="?") && t.size()>1 && (t[1]=="mc80-2x"||t[1]=="mc8020"||t[1]=="MC80.2x")){
             fprintf(stderr,
@@ -3455,6 +3506,7 @@ int main(int argc, char** argv){
               "  PRG     map | help prg   (--machine prg710|prg710-1)\n"
               "  PC1715  map | help pc1715   (--machine pc1715)\n"
               "  MC80    map | dev | help mc80   (--machine mc80|mc80-30 [--spe 1|2])\n"
+              "  SD1157  map | dev | where | help sd1157   (--machine sd1157)\n"
               "  P8000   map|adp | dma | kopp | mmu | xlat | ml | mp | segt | bsegt | term | help p8000   (--machine p8000|p8000-16)\n"
 
               "  A5120.16 cpu [zve1|zve2|u8000] ; dev em ; fcw ; psa ; bmode ; bvi ; bint16 ; emlog\n"
@@ -3772,6 +3824,13 @@ int main(int argc, char** argv){
                 "\"i\":\"0x%02X\",\"r\":\"0x%02X\",\"iff1\":%s,\"cyc\":%llu,\"rom\":true,\"machine\":\"%s\"}\n",
                 z.PC,z.SP,z.AF,z.BC,z.DE,z.HL,z.IX,z.IY,z.I,z.R, z.IFF1?"true":"false",
                 (unsigned long long)m.cpuCycles(), m.name()); }
+        else if (cmd=="rj" && KS){ const Z80& z=m.cpuDebug(); Sd1157Steuerung& k=m.printer()->sd1157();
+            fprintf(stderr,"\n{\"pc\":\"0x%04X\",\"sp\":\"0x%04X\",\"af\":\"0x%04X\",\"bc\":\"0x%04X\","
+                "\"de\":\"0x%04X\",\"hl\":\"0x%04X\",\"ix\":\"0x%04X\",\"iy\":\"0x%04X\","
+                "\"i\":\"0x%02X\",\"r\":\"0x%02X\",\"iff1\":%s,\"cyc\":%llu,\"rom\":true,"
+                "\"machine\":\"sd1157\",\"wagen\":%d,\"online\":%s}\n",
+                z.PC,z.SP,z.AF,z.BC,z.DE,z.HL,z.IX,z.IY,z.I,z.R, z.IFF1?"true":"false",
+                (unsigned long long)m.cpuCycles(), k.mechanik().position(), k.lampeOnline()?"true":"false"); }
         else if (cmd=="rj" && KM){ const Z80& z=m.cpuDebug(); Mc80Machine& k=*m.mc80();
             fprintf(stderr,"\n{\"pc\":\"0x%04X\",\"sp\":\"0x%04X\",\"af\":\"0x%04X\",\"bc\":\"0x%04X\","
                 "\"de\":\"0x%04X\",\"hl\":\"0x%04X\",\"ix\":\"0x%04X\",\"iy\":\"0x%04X\","
@@ -4092,6 +4151,11 @@ int main(int argc, char** argv){
                 for(auto& v: var_watch){ uint16_t a=std::get<1>(v);
                     if(std::get<2>(v)) fprintf(stderr,"  %-14s [%04X] = %04X\n",std::get<0>(v).c_str(),a,wd(a));
                     else               fprintf(stderr,"  %-14s [%04X] = %02X\n",std::get<0>(v).c_str(),a,m.memReadDebug(a)); } }
+            else if (KS){   // Drucker: Lampen und Wagen statt Handschlag-RAM/CP/A-DPB
+                Sd1157Steuerung& k=m.printer()->sd1157();
+                fprintf(stderr,"  online=%s fehler=%s wagen=%d  SP=%04X  CTC-1-Vektor [2CE2]=%04X\n  (vars -f <datei> | vars add <name> <addr> [w] | vars clear)\n",
+                        k.lampeOnline()?"an":"aus", k.lampeFehler()?"an":"aus", k.mechanik().position(),
+                        m.cpuSP(), wd(0x2CE2)); }
             else if (KM2){   // MC80.2x: nur das Bild statt Handschlag-RAM/CP/A-DPB
                 Mc80_2xMachine& k=*m.mc80_2x();
                 fprintf(stderr,"  Zeile 0: |%s|  Zeile 1: |%s|\n  (vars -f <datei> | vars add <name> <addr> [w] | vars clear)\n",
@@ -4131,6 +4195,32 @@ int main(int argc, char** argv){
             else fprintf(stderr,"  [03F8]done=%02X  DPB: [D1B2]=%04X [D1B4]=%04X [D1B8]=%04X [D1BE]=%04X [D1CD]=%04X\n"
                                 "  (vars -f <datei> | vars add <name> <addr> [w] | vars clear)\n",
                     m.memReadDebug(0x03F8),wd(0xD1B2),wd(0xD1B4),wd(0xD1B8),wd(0xD1BE),wd(0xD1CD)); }
+        else if (cmd=="dev" && KS){   // SD 1157: CTC DCH, PIO 2 F8H, PIO 1 F4H, PIO 3 ECH, SIO 7CH
+            std::string w = t.size()>1? t[1] : "all";
+            Sd1157Steuerung& k=m.printer()->sd1157();
+            auto Y=[&](bool b){ return b?"1":"0"; };
+            auto showCtc=[&](const char* name, const Z80CTC::DebugState& c){
+                fprintf(stderr,"  CTC (%s)  vecBase=%02X  IEI=%s IEO=%s\n",name,c.vecBase,Y(c.iei),Y(c.ieo));
+                for(int i=0;i<4;++i){ auto& ch=c.ch[i];
+                    fprintf(stderr,"    ch%d ctl=%02X TC=%02X cnt=%-3d run=%s  INT(en=%s pend=%s ius=%s iei=%s)\n",
+                        i,ch.control,ch.timeConst,ch.counter,Y(ch.running),Y(ch.intEn),Y(ch.intPending),Y(ch.ius),Y(ch.iei)); } };
+            auto showPio=[&](const char* name, const Z80PIO::DebugState& p){
+                fprintf(stderr,"  %s  IEI=%s IEO=%s\n",name,Y(p.iei),Y(p.ieo));
+                for(int i=0;i<2;++i){ auto& pt=p.port[i];
+                    fprintf(stderr,"    %c mode=%u out=%02X in=%02X dir=%02X vec=%02X  INT(en=%s pend=%s ius=%s iei=%s)\n",
+                        i?'B':'A',pt.mode,pt.out,pt.in,pt.dir,pt.vector,Y(pt.ie),Y(pt.pending),Y(pt.ius),Y(pt.iei)); } };
+            bool any=false; const bool all=(w=="all");
+            if (all||w=="ctc"){ showCtc("DCH-DFH",k.ctc().debugState()); any=true; }
+            if (all||w=="pio"){ showPio("PIO 2 (F8H-FBH; A = Wagen/Lampen/Takt vor, B = Druck/Farbband/Takt rueck)",k.pio2().debugState());
+                                showPio("PIO 1 (F4H-F7H; Papiervorschub, Raender)",k.pio1().debugState());
+                                showPio("PIO 3 (ECH-EFH; Bedienfeld, Interface-Schalter)",k.pio3().debugState()); any=true; }
+            if (all||w=="sio"){ auto s2=k.sio().debugState();
+                fprintf(stderr,"  SIO (7CH-7FH)  IEI=%s IEO=%s\n",Y(s2.iei),Y(s2.ieo));
+                for(int i=0;i<2;++i){ auto& ch=s2.ch[i];
+                    fprintf(stderr,"    %c %s rr0=%02X rr1=%02X wr1=%02X vec=%02X  irq(rx=%s tx=%s ext=%s) ius=%s iei=%s  rxQ=%zu txBusy=%s  gesendet=%zu\n",
+                        i?'B':'A',i?"IFSS":"V.24",ch.rr0,ch.rr1,ch.wr1,ch.wr2,Y(ch.irqRx),Y(ch.irqTx),Y(ch.irqExt),Y(ch.ius),Y(ch.iei),ch.rxQueued,Y(ch.txBusy),k.sioAusgabe(i).size()); }
+                any=true; }
+            if (!any) fprintf(stderr,"  dev [all|ctc|pio|sio]   (SD 1157)\n"); }
         else if (cmd=="dev" && KM2){   // MC80.2x: DPL, MBI (je CTC + PIO) und ZRE (CTC 80H, PIO 84H)
             std::string w = t.size()>1? t[1] : "all";
             Mc80_2xMachine& k=*m.mc80_2x();
@@ -4405,6 +4495,16 @@ int main(int argc, char** argv){
                         default: snprintf(q,sizeof q,"leer"); }
                     fprintf(stderr,"    %X      %04X-%04X    %02X   %-8s  %X    %s\n",n,(n<<12),(n<<12)|0x0FFF,a,her,sp.seite(n),q);
                 }
+            }
+            else if (KS){   // Drucker: festes Speicherbild (hardware.md §2) und E/A-Tore (§4)
+                fprintf(stderr,"  0000-297F  ROM 1157.rom (10 624 B)\n"
+                               "  2980-2BFF  unbelegt (liest FFH) [?]\n"
+                               "  2C00-2FFF  RAM 1 KiB (SP=2C28H, Vektortabelle 2CE0H, Zeilenspeicher 2D09H..2FFFH)\n"
+                               "  3000-33FF  ZG1 (1157zg.rom)\n"
+                               "  3400-37FF  ZG2 nicht bestueckt (liest FFH)\n"
+                               "  3800-3BFF  RAM 1 KiB (SIO-Eingabepuffer)\n"
+                               "  E/A: 6FH(IN) Schalter, 7CH-7FH SIO, BCH(IN) 8212, BEH/BFH(OUT) Nadeln, DCH-DFH CTC,\n"
+                               "       ECH-EFH PIO 3, F4H-F7H PIO 1, F8H-FBH PIO 2\n");
             }
             else if (KM2){   // MC80.2x: festes Speicherbild
                 fprintf(stderr,"  0000-0FFF  BSYS-ROM (K2521, ver2) / RAM 0C00-0FFF (BWS, Systemzellen, Stapel)\n"

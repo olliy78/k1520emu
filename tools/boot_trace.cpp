@@ -78,6 +78,7 @@
 #include "tools/boot_trace_prg710.h"  // --machine prg710|prg710-1 (Entwurf 20 AP-P1d)
 #include "tools/boot_trace_p8000.h"   // --machine p8000 (Entwurf 25 AP P7c)
 #include "tools/boot_trace_mc80.h"      // --machine mc80 (AP M8)
+#include "tools/boot_trace_printer.h"   // --machine sd1157 (Entwurf 49, WP1)
 #include "tools/boot_trace_pc1715.h"  // --machine pc1715 (Entwurf 21 AP-2)
 #include "tools/em_trace.h"          // --em: EM-Transaktionen als Text
 #include "tools/dbg_u8000.h"         // --cpu u8000: Adressen <<seg>>off
@@ -340,6 +341,7 @@ int main(int argc, char** argv) {
     bool        machine_k8915 = false;
     int         machine_prg710 = 0;      // 1 = PRG 710, 2 = PRG 710-1 (gleiche Optionen wie K8915)
     bool        machine_pc1715 = false;  // PC 1715 (gleiche Optionen wie K8915)
+    bool        machine_sd1157 = false;  // Drucker SD 1157 (Entwurf 49, WP1)
     int         machine_mc80 = 0;        // 1 = MC80.30, 3/4 = MC80.21/.22 (AP M8/M12; gleiche Optionen wie K8915)
     bool        machine_pc1715w = false; // … in der Variante PC 1715W (AP-W3)
     bool        machine_p8000 = false;   // P8000, 8-Bit-Seite (AP P7c; gleiche Optionen wie K8915)
@@ -380,11 +382,12 @@ int main(int argc, char** argv) {
             else if (mn == "mc80" || mn == "mc80-30" || mn == "MC80") { machine_k8915 = true; machine_mc80 = 1; }
             else if (mn == "mc80-21" || mn == "MC80-21") { machine_k8915 = true; machine_mc80 = 3; }   // AP M12
             else if (mn == "mc80-22" || mn == "MC80-22") { machine_k8915 = true; machine_mc80 = 4; }
+            else if (mn == "sd1157" || mn == "SD1157") { machine_k8915 = true; machine_sd1157 = true; }
             else if (mn == "p8000" || mn == "P8000") { machine_k8915 = true; machine_p8000 = true; }
             else if (mn == "p8000-16" || mn == "P8000-16") { machine_k8915 = true; machine_p8000 = machine_p8000_16 = true; }
             else if (mn == "p8000-terminal" || mn == "P8000-TERMINAL") { machine_k8915 = true; machine_p8000_terminal = true; }
             else if (mn != "a5120" && mn != "A5120") {
-                fprintf(stderr, "unbekannte Maschine '%s' (a5120 | k8915 | k8915-g2 | prg710 | prg710-1 | pc1715 | pc1715w | mc80 | mc80-30 | mc80-21 | mc80-22 | p8000 | p8000-16 | p8000-terminal)\n", mn.c_str()); return 2; }
+                fprintf(stderr, "unbekannte Maschine '%s' (a5120 | k8915 | k8915-g2 | prg710 | prg710-1 | pc1715 | pc1715w | mc80 | mc80-30 | mc80-21 | mc80-22 | sd1157 | p8000 | p8000-16 | p8000-terminal)\n", mn.c_str()); return 2; }
         }
         else if (!strcmp(argv[i], "--raf") && i+1 < argc) { raf_opt = argv[++i]; k8o.raf = raf_opt; }
         else if (!strcmp(argv[i], "--wdc") && i+1 < argc) p8000_wdc = argv[++i];
@@ -590,6 +593,12 @@ int main(int argc, char** argv) {
             // .2x: das Menue steht nach < 2 Mio. Takten; die Marke blinkt mit 0,8 Mio. (zaehlt nicht als Aenderung).
             if (!stall_set) k8o.stall = machine_mc80 >= 3 ? 4'000'000 : 8'000'000;
         }
+        if (machine_sd1157) {
+            // SD 1157 (WP1): ROM startet, CTC 1 zaehlt 13 Interrupts (~345 ms = 0,85 Mio. Takte), danach Wagenfahrt
+            // und Anfangs-PV; 60 Mio. Takte = 24 s Maschinenzeit.  Stillstand = 4 Mio. Takte (1,6 s) ohne E/A-Schreiben.
+            if (!limit_set) k8o.limit = 60'000'000;
+            if (!stall_set) k8o.stall = 4'000'000;
+        }
         if (machine_p8000) {
             // P8000 (AP P7c): Hardwaretest ≈ 64 Mio. Takte (16 s), danach „Press RETURN"; mit
             // `--keys "<CR><CR>"` weiter ueber `>` in den BOOT (UDOS bis `%` ≈ 100 Mio. Takte).
@@ -626,6 +635,7 @@ int main(int argc, char** argv) {
         }
         if (p8000_original && !machine_p8000) { fprintf(stderr, "ERROR: --konsole nur mit --machine p8000[-16]\n"); return 2; }
         const int rc = machine_p8000 ? bootTraceP8000(k8o, prn, machine_p8000_16, p8000_wdc, p8000_hd, p8000_original, p8000_rtc, p8000_hd1, p8000_hd2)
+                     : machine_sd1157 ? bootTraceSd1157(k8o, prn)
                      : machine_mc80 >= 3 ? bootTraceMc80_2x(k8o, prn, machine_mc80 == 4)
                      : machine_mc80 ? bootTraceMc80(k8o, prn)
                      : machine_pc1715 ? bootTracePc1715(k8o, prn, machine_pc1715w)

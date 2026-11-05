@@ -9,6 +9,7 @@
 #include "core/machines/p8000/p8000_terminal_machine.h"
 #include "core/machines/mc80/mc80.h"
 #include "core/machines/mc80/mc80_2x.h"
+#include "core/machines/printer/printer_machine.h"
 #include "core/machines/machine.h"
 #include "core/peripherals/k7637/k7637.h"
 #include "core/logger.h"
@@ -97,11 +98,12 @@ K1520Handle k1520_create_configured(K1520MachineType type,
     }
     if (type == K1520_MACHINE_P8000_TERMINAL) return k1520_create_p8000_terminal(nullptr);
     if (type == K1520_MACHINE_MC80) return k1520_create_mc80(0, nullptr);
+    if (type == K1520_MACHINE_PRINTER) return k1520_create_printer(0, nullptr);
     g_init_error.clear();
     if (type != K1520_MACHINE_A5120 && type != K1520_MACHINE_K8915) {
         // Kein stilles NULL: die Oberflaeche soll sagen koennen, warum.
         g_init_error = "Maschinentyp " + std::to_string(static_cast<int>(type)) +
-                       " ist noch nicht implementiert (nur A5120, K8915, PRG710, PC1715, P8000, P8000-Terminal, MC80)";
+                       " ist noch nicht implementiert (nur A5120, K8915, PRG710, PC1715, P8000, P8000-Terminal, MC80, Drucker)";
         return nullptr;
     }
 
@@ -378,6 +380,51 @@ K1520Handle k1520_create_mc80(int variante, const char* konfig) {
     setup_logging();
     try {
         K1520Machine* m = new Mc80Machine(cfg);   // Handle = K1520Machine* (s. toMachine)
+        return m;
+    } catch (const std::exception& e) {
+        g_init_error = e.what();
+        return nullptr;
+    }
+}
+
+K1520Handle k1520_create_printer(int typ, const char* konfig) {
+    g_init_error.clear();
+    PrinterMachine::Config cfg;
+    switch (typ) {
+        case 0: cfg.typ = PrinterMachine::Config::Typ::Sd1157_264; break;
+        case 1: cfg.typ = PrinterMachine::Config::Typ::K6316_Ifss; break;   // PrinterMachine weist ab (WP2a)
+        case 2: cfg.typ = PrinterMachine::Config::Typ::K6316_V24; break;
+        default:
+            g_init_error = "Unbekannter Druckertyp " + std::to_string(typ) +
+                           " (0 = SD 1157/264, 1 = K6316 IFSS, 2 = K6316 V.24)";
+            return nullptr;
+    }
+    // Schluessel=Wert-Liste wie beim MC80; WP1 kennt nur `schnittstelle`.
+    const std::string text = konfig ? konfig : "";
+    size_t pos = 0;
+    while (pos < text.size()) {
+        size_t ende = text.find(',', pos);
+        if (ende == std::string::npos) ende = text.size();
+        const std::string teil = text.substr(pos, ende - pos);
+        pos = ende + 1;
+        if (teil.empty()) continue;
+        const size_t gl = teil.find('=');
+        const std::string key = teil.substr(0, gl);
+        const std::string val = gl == std::string::npos ? "" : teil.substr(gl + 1);
+        if (key == "schnittstelle" && (val == "ifss" || val == "v24")) {
+            cfg.sd1157.schnittstelle = val == "v24" ? Sd1157Steuerung::Config::Schnittstelle::V24
+                                                    : Sd1157Steuerung::Config::Schnittstelle::Ifss;
+        } else if (key == "schnittstelle") {
+            g_init_error = "Drucker: schnittstelle = " + val + " unbekannt (ifss | v24)";
+            return nullptr;
+        } else {
+            g_init_error = "Drucker: unbekannter Schluessel '" + key + "'";
+            return nullptr;
+        }
+    }
+    setup_logging();
+    try {
+        K1520Machine* m = new PrinterMachine(cfg);   // Handle = K1520Machine* (s. toMachine)
         return m;
     } catch (const std::exception& e) {
         g_init_error = e.what();

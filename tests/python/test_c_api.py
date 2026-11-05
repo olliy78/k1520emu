@@ -98,7 +98,7 @@ def test_unbuilt_machine_type_is_refused_with_a_reason():
     """
     from app.core_binding.k1520 import _lib, K1520Handle
 
-    for typ in (7,):
+    for typ in (8,):
         assert not _lib.k1520_create(typ), typ
         grund = _lib.k1520_last_init_error().decode()
         assert "nicht implementiert" in grund, grund
@@ -422,6 +422,41 @@ def test_mc80_can_be_created_and_reports_its_type():
                                     (3, b"spe=1", b"MC80.2x")):
         assert not _lib.k1520_create_mc80(variante, konfig)
         assert grund in _lib.k1520_last_init_error()
+
+
+def test_printer_sd1157_can_be_created_and_runs_its_rom():
+    """`k1520_create_printer` (Entwurf 49, WP1): der SD 1157 liefert eine Maschine vom Typ 7 ohne Bild,
+    das Original-ROM laeuft an; K6316 (noch nicht gebaut), unbekannte Typen und Schluessel → NULL mit Grund."""
+    from app.core_binding.k1520 import _lib, K1520Handle, K1520Emulator
+
+    for konfig in (None, b"schnittstelle=ifss", b"schnittstelle=v24"):
+        handle = _lib.k1520_create_printer(0, konfig)
+        assert handle, _lib.k1520_last_init_error()
+        h = K1520Handle(handle)
+        try:
+            assert _lib.k1520_machine_type(h) == 7
+            assert (_lib.k1520_fb_width(h), _lib.k1520_fb_height(h)) == (0, 0)
+            assert _lib.k1520_mem_read(h, 0x0000) == 0xED      # IM 2 (sy00)
+            assert _lib.k1520_mem_read(h, 0x3400) == 0xFF      # ZG2 nicht bestueckt
+            assert _lib.k1520_run(h, 200_000) > 0
+            assert _lib.k1520_mem_read(h, 0x2C28 - 2) in range(256)   # RAM erreichbar
+        finally:
+            _lib.k1520_destroy(h)
+
+    handle = _lib.k1520_create(7)                               # Vorgabe = SD 1157/264
+    assert handle, _lib.k1520_last_init_error()
+    _lib.k1520_destroy(K1520Handle(handle))
+
+    for typ, konfig, grund in ((1, None, b"K6316"), (2, None, b"K6316"), (9, None, b"Druckertyp"),
+                               (0, b"schnittstelle=x", b"schnittstelle"), (0, b"vis=1", b"vis")):
+        assert not _lib.k1520_create_printer(typ, konfig)
+        assert grund in _lib.k1520_last_init_error()
+
+    emu = K1520Emulator(machine="sd1157")
+    try:
+        assert emu.machine == "sd1157"
+    finally:
+        del emu
 
 
 def test_mc80_2x_through_the_c_abi():
