@@ -266,3 +266,51 @@ def test_lochband_auch_an_a5120_und_k8915(name):
     assert emu.ptape_punch_length() == 0
     assert not _lib.k1520_ptape_install(emu._handle)
     assert b"bereits" in _lib.k1520_last_init_error()
+
+
+def test_bs620_original_liest_ohne_umpolen_bis_list(tmp_path):
+    """AP-B2e: das ORIGINAL BS620 (PRG 710-1) liest ueber die C-ABI (`K1520Emulator(machine="prg710-1")`, so wie die
+    Oberflaeche prg710emu die Maschine baut) den Datentraeger bis `LIST` - ohne dass jemand das Marken-FF umpolt
+    (Leser-Modell 1 ist die Vorgabe des 710-1, doc/bs600/marken_ff.md)."""
+    import shutil
+    from pathlib import Path
+    from app.core_binding.k1520 import K1520Emulator, QK_TASTE_BASE
+
+    quelle = Path(__file__).resolve().parents[1] / "fixtures" / "bs600" / "bs620_prg710-1.hfe"
+    ziel = tmp_path / "bs620.hfe"
+    shutil.copyfile(quelle, ziel)
+
+    emu = K1520Emulator(machine="prg710-1")
+    assert emu.mount_disk(0, str(ziel), "cpa800", False), emu.last_error()
+    emu.power_on()
+    assert run_until_text(emu, "NKM-LOADER", 60_000_000)
+    emu.run(2_000_000)
+    _tippe(emu, QT_KEY_RETURN, 10)
+    assert run_until_text(emu, "DIENSTPROGRAMME", 400_000_000, chunk=1_000_000), "\n".join(_zeilen(emu))
+    emu.run(3_000_000)
+
+    def taste(code, warte):
+        emu.key_press(code)
+        emu.run(150_000)
+        emu.key_release(code)
+        emu.run(warte)
+
+    def warte_auf(text, frist):
+        assert run_until_text(emu, text, frist, chunk=2_000_000), text + "\n" + "\n".join(_zeilen(emu))
+        emu.run(8_000_000)
+
+    ab = QK_TASTE_BASE | 0x18          # Kursor ab (K7672-Matrix)
+    taste(ab, 3_000_000)
+    taste(QT_KEY_RETURN, 100_000_000)
+    taste(ord("J"), 2_000_000)
+    taste(QT_KEY_RETURN, 100_000_000)
+    warte_auf("DISK-NAME :", 3_000_000_000)           # Treiber hat den Kennsatz gelesen
+    taste(QT_KEY_RETURN, 100_000_000)                 # Menue LIST/COPY/...
+    warte_auf("LIST", 600_000_000)
+    for _ in range(3):
+        taste(QT_KEY_RETURN, 600_000_000)
+    taste(ord("J"), 2_000_000)
+    taste(QT_KEY_RETURN, 1_500_000_000)
+    taste(ab, 20_000_000)
+    taste(QT_KEY_RETURN, 3_000_000_000)
+    warte_auf("DISK ENTHAELT 28 VON 54", 1_500_000_000)

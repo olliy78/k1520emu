@@ -534,8 +534,14 @@ bool Bs600FileSystem::write(const std::string& rohname, const std::vector<uint8_
         break;
     }
     if (pl.platz < 0) {
-        for (int p = 0; p < kBs600Eintraege; ++p)
-            if (!b.platz_belegt[static_cast<size_t>(p)]) { pl.platz = p; break; }
+        // Reihenfolge des Originals (BS620 COPY, Befund AP-B2e): erst Platz 0 aller Verzeichnissektoren 8-25,
+        // dann Platz 1, dann Platz 2 - nicht sektorweise.  Beleg: COPY legte KOPIE1 auf Sektor 16/Platz 1,
+        // obwohl Platz 2 der Sektoren 8-15 frei war.
+        for (int slot = 0; slot < kEintraegeJeSektor && pl.platz < 0; ++slot)
+            for (int sek = 0; sek < kBs600Eintraege / kEintraegeJeSektor; ++sek) {
+                const int p = sek * kEintraegeJeSektor + slot;
+                if (!b.platz_belegt[static_cast<size_t>(p)]) { pl.platz = p; break; }
+            }
         if (pl.platz < 0) return fail("BS600: das Verzeichnis ist voll (" + std::to_string(kBs600Eintraege) + " Dateien)");
     }
     pl.sektoren = static_cast<int>((data.size() + kBs600Sektor - 1) / kBs600Sektor);

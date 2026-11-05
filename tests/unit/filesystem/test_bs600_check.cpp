@@ -103,11 +103,12 @@ void schreib0(DiskVolume& v, int sektor, const std::vector<uint8_t>& d) {
     ASSERT_TRUE(v.writeSectorAt(0, 0, sektor - 1, d, nullptr));
 }
 
-/// Einen 42-Byte-Eintrag auf Platz p in einem Verzeichnissektor aendern.
-void eintragAendern(DiskVolume& v, int platz, const std::function<void(uint8_t*)>& f) {
-    const int sek = 8 + platz / 3;
+/// Den n-ten abgelegten Eintrag aendern.  Das Original belegt zuerst Platz 0 aller Sektoren 8-25, dann Platz 1, dann 2
+/// (AP-B2e): n -> Sektor 8 + n % 18, Platz n / 18.
+void eintragAendern(DiskVolume& v, int n, const std::function<void(uint8_t*)>& f) {
+    const int sek = 8 + n % 18;
     auto d = lies0(v, sek);
-    f(d.data() + (platz % 3) * 42);
+    f(d.data() + (n / 18) * 42);
     schreib0(v, sek, d);
 }
 

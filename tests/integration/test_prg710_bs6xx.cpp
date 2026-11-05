@@ -15,10 +15,13 @@
 #include <string>
 #include <vector>
 
+#include "core/filesystem/bs600/bs600_fs.h"
 #include "core/filesystem/disk_volume.h"
+#include "core/filesystem/fs_catalog.h"
 #include "core/logger.h"
 #include "core/machines/prg710/prg710.h"
 #include "tests/support/fixtures.h"
+#include "tests/support/temp_path.h"
 
 namespace {
 using V = Prg710Machine::Config::Variante;
@@ -75,9 +78,9 @@ const char* stufeName(Stufe s) {
 struct Ergebnis { Stufe stufe; uint16_t pc; std::string bild; };
 
 /// Eine Diskette (Kopie) gegen das Modell: Boot, DIENSTPROGRAMME, LIST (Geraet BS).
-Ergebnis fahre(V v, const std::string& fixture, int modell, const char* listeText) {
+Ergebnis fahrePfad(V v, const std::string& pfad, int modell, const char* listeText) {
     k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::ERROR);
-    k1520test::TempDisk kopie(fixture, "bs6xx_tabelle.hfe");
+    struct { const std::string& p; const std::string& path() const { return p; } } kopie{pfad};
     Prg710Machine::Config c;
     c.variante = v;
     c.atp_zusatz = true;
@@ -109,6 +112,11 @@ Ergebnis fahre(V v, const std::string& fixture, int modell, const char* listeTex
     druecke(m, t.enter(), 3'000'000'000);
     if (!warteAuf(m, listeText, 1'500'000'000)) return ende(Stufe::DiskName);
     return ende(Stufe::Liste);
+}
+
+Ergebnis fahre(V v, const std::string& fixture, int modell, const char* listeText) {
+    k1520test::TempDisk kopie(fixture, "bs6xx_tabelle.hfe");
+    return fahrePfad(v, kopie.path(), modell, listeText);
 }
 
 struct Fall { const char* name; V v; const char* fixture; const char* liste; };
@@ -224,4 +232,72 @@ TEST(Prg710Bs6xxDisketten, UdosBootetJeLeserModell) {
         const bool ok = warteAuf(m, "Neues Datum", 150'000'000);
         EXPECT_EQ(ok, f.erwartet) << f.disk << " Modell " << f.modell << " PC=" << std::hex << m.cpuPC() << "\n" << bildText(m);
     }
+}
+
+namespace {
+const FormatCatalog& formate() {
+    static FormatCatalog c = [] { std::string f; return FormatCatalog::loadDefault(&f); }();
+    return c;
+}
+const FsCatalog& dateisysteme() {
+    static FsCatalog c = [] { std::string f; return FsCatalog::loadDefault(formate(), &f); }();
+    return c;
+}
+}  // namespace
+
+// Gegenprobe zum DiskTool (AP-B2e): das ORIGINAL (BS620 am 710-1) liest eine vom DiskTool beschriebene Diskette.
+// Dem Original-Abzug wird per `put` eine Datei hinzugefuegt (Verzeichnisplatz in der Reihenfolge des Originals, Belegung
+// Spur 26/Sektor 7 wie bei COPY); BS620 zeigt `LIST` mit 29 Dateien, das DiskTool prueft ohne Befund.
+TEST(Prg710Bs6xxDisketten, VomDiskToolErgaenzteDisketteLiestDasOriginal) {
+    k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::ERROR);
+    k1520test::TempDisk kopie("../bs600/bs620_prg710-1.hfe", "bs6xx_put.hfe");
+    {
+        std::string err;
+        auto v = DiskVolume::open(kopie.path(), "", formate(), dateisysteme(), err, /*read_only=*/false);
+        ASSERT_TRUE(v) << err;
+        ASSERT_EQ(v->fsType(), FsType::Bs600);
+        WriteOptions wo;
+        wo.bs600_type = "L"; wo.bs600_date = "051125"; wo.bs600_author = "TST"; wo.bs600_load = 0x2900;
+        std::vector<uint8_t> d(300, 0x41);
+        ASSERT_TRUE(v->bs600Fs()->write("DISKTL", d, wo)) << v->bs600Fs()->lastError();
+        ASSERT_TRUE(v->flush()) << v->lastError();
+        const FsCheckReport& r = v->check(FsCheckLevel::Schnell, true);
+        EXPECT_EQ(r.findings.size(), 0u);
+        EXPECT_EQ(v->list().size(), 29u);
+    }
+    const Ergebnis e = fahrePfad(V::Prg710_1, kopie.path(), -1, "DISK ENTHAELT 29 VON 54");
+    EXPECT_EQ(static_cast<int>(e.stufe), static_cast<int>(Stufe::Liste)) << e.bild;
+}
+
+// Eine VOLLSTAENDIG vom DiskTool gebaute Diskette (create --boot-Urlader + alle 28 Dateien des Originals mit ihren Angaben)
+// bootet am 710-1 bis zum Hauptmenue und zeigt LIST mit 28 Dateien.
+TEST(Prg710Bs6xxDisketten, VomDiskToolNeuGebauteDisketteBootet) {
+    k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::ERROR);
+    k1520test::TempDisk orig("../bs600/bs620_prg710-1.hfe", "bs6xx_orig.hfe");
+    const std::string ziel = k1520test::tempPath("bs6xx_neu.hfe");
+    std::filesystem::remove(ziel);
+    {
+        std::string err;
+        auto o = DiskVolume::open(orig.path(), "", formate(), dateisysteme(), err, true);
+        ASSERT_TRUE(o) << err;
+        std::vector<uint8_t> boot;
+        ASSERT_TRUE(o->readBootImage(boot));
+        auto n = DiskVolume::create(ziel, "bs600_ss40_15x256_boot", "BS600", formate(), dateisysteme(), err);
+        ASSERT_TRUE(n) << err;
+        ASSERT_TRUE(n->writeBootImage(boot)) << n->lastError();
+        for (const auto& e : o->bs600Fs()->eintraege()) {
+            std::vector<uint8_t> d;
+            ASSERT_TRUE(o->bs600Fs()->read(e.name, d)) << e.name;
+            WriteOptions wo;
+            wo.bs600_type = std::string(1, e.typ);
+            wo.bs600_date = e.datum; wo.bs600_author = e.signum;
+            wo.bs600_load = static_cast<uint16_t>(e.ladeadr); wo.bs600_entry = static_cast<uint16_t>(e.startadr);
+            ASSERT_TRUE(n->bs600Fs()->write(e.name, d, wo)) << e.name << ": " << n->bs600Fs()->lastError();
+        }
+        ASSERT_TRUE(n->flush()) << n->lastError();
+        EXPECT_EQ(n->list().size(), 28u);
+    }
+    const Ergebnis e = fahrePfad(V::Prg710_1, ziel, -1, "DISK ENTHAELT 28 VON 54");
+    EXPECT_EQ(static_cast<int>(e.stufe), static_cast<int>(Stufe::Liste)) << e.bild;
+    std::filesystem::remove(ziel);
 }

@@ -194,6 +194,25 @@ TEST(Bs600Fs, VierundfuenfzigEintraegeUndDiskVoll) {
     EXPECT_NE(bfs(*w).lastError().find("DISK VOLL"), std::string::npos);
 }
 
+// Reihenfolge der Verzeichnisplaetze wie im Original: Platz 0 aller 18 Sektoren, dann Platz 1, dann Platz 2 (Befund AP-B2e).
+TEST(Bs600Fs, VerzeichnisplatzReihenfolgeSlotWeise) {
+    auto v = neu("bs600_slots.hfe");
+    ASSERT_TRUE(v);
+    for (int i = 0; i < 40; ++i)
+        ASSERT_TRUE(ablegen(*v, "S" + std::to_string(i), muster(10, static_cast<uint8_t>(i)))) << bfs(*v).lastError();
+    std::map<std::string, int> platz;
+    for (const auto& e : bfs(*v).eintraege()) platz[e.name] = e.platz;
+    for (int i = 0; i < 18; ++i) EXPECT_EQ(platz["S" + std::to_string(i)], i * 3) << "Platz 0 von Sektor " << 8 + i;
+    for (int i = 18; i < 36; ++i) EXPECT_EQ(platz["S" + std::to_string(i)], (i - 18) * 3 + 1) << "Platz 1";
+    for (int i = 36; i < 40; ++i) EXPECT_EQ(platz["S" + std::to_string(i)], (i - 36) * 3 + 2) << "Platz 2";
+    // Eine geloeschte Datei hinterlaesst ein Loch, das als naechstes gefuellt wird (erster freier Platz in dieser Reihenfolge).
+    ASSERT_TRUE(bfs(*v).erase("S3"));
+    ASSERT_TRUE(ablegen(*v, "NEU", muster(10, 5)));
+    int pn = -1;
+    for (const auto& e : bfs(*v).eintraege()) if (e.name == "NEU") pn = e.platz;
+    EXPECT_EQ(pn, 3 * 3);
+}
+
 TEST(Bs600Fs, AttributeUmbenennenUndRestBleibt) {
     auto v = neu("bs600_attr.hfe");
     ASSERT_TRUE(v);
@@ -282,10 +301,17 @@ TEST(Bs600Fs, GegenprobeOriginalRundlauf) {
     }
     const auto neuE = bfs(*n).eintraege();
     ASSERT_EQ(alt.size(), neuE.size());
-    for (size_t i = 0; i < alt.size(); ++i) {
-        EXPECT_EQ(alt[i].ladeadr, neuE[i].ladeadr);
-        EXPECT_EQ(alt[i].startadr, neuE[i].startadr);
-        EXPECT_EQ(alt[i].datum, neuE[i].datum);
+    // Der Eintragsplatz folgt der Belegungsreihenfolge des Originals (Platz 0 aller Sektoren zuerst); verglichen wird nach Namen.
+    for (const auto& a : alt) {
+        bool da = false;
+        for (const auto& b : neuE) {
+            if (b.name != a.name) continue;
+            da = true;
+            EXPECT_EQ(a.ladeadr, b.ladeadr) << a.name;
+            EXPECT_EQ(a.startadr, b.startadr) << a.name;
+            EXPECT_EQ(a.datum, b.datum) << a.name;
+        }
+        EXPECT_TRUE(da) << a.name;
     }
     EXPECT_EQ(n->volumeInfo(0).free_bytes, o->volumeInfo(0).free_bytes);
     ASSERT_TRUE(n->flush());

@@ -172,3 +172,29 @@ Dann liefe der 710-1-Code (`JR Z` auf sich selbst) sofort durch, BS620 und das 7
 Echter PRG 710-1 mit K5601, Disketten per `gw write` mit `step=2` geschrieben: **`_ff_low` (Original) und `_ff_high` booten beide und zeigen beide die Dateiliste (`LIST`).** Der Selbsttest besteht am Geraet (kein `CTC ATP KANAL`, kein `SIO  KANAL`).  FORMAT und COPY sind nicht probiert, PRG 710 ist nicht getestet.
 
 Folge: Die Polaritaet ist fuer das Lesen am 710-1 unerheblich; das passt zu Modell 1 (Daten an 16H erst nach der Marke) und nicht zu Modell 0, unter dem das Original im Emulator haengt.  Beweis fuer den inneren Aufbau ist es nicht: es zeigt nur das Verhalten.  Dass auch der PRG 710 so arbeitet, folgt nur aus der Aussage des Anwenders, die Karten seien tauschbar.
+
+## 10. AP-B2e: Modell 1 als Vorgabe des 710-1; Suche nach EINEM Modell (Ergebnis: nicht gefunden)
+
+**Vorgabe:** Nach dem Geräte­befund (§9) ist `Prg710Machine::Config::leser_modell = -1` = „nach Variante“: PRG 710-1 → Modell 1, PRG 710 → Modell 0.  BS620 (Original) liest damit in `prg710emu`
+(Weg `K1520Emulator(machine="prg710-1")` → C-ABI, Test `py_prg710_api::test_bs620_original_liest_ohne_umpolen_bis_list`) ohne Umpolen bis `LIST` mit `DISK ENTHAELT 28 VON 54`.
+Nachgezogene Wächter: Ruhepegel 12H Bit 1 = 1 an beiden Geräten, `mkeLowAktiv` an beiden, `datenErstNachMarke` nur am 710-1.
+**Unformatierte Diskette am 710-1** (`UnformatierteDisketteMeldetFehlerUndBootetNachWechsel/Prg710_1`): das Ergebnis war zunächst „rot“, weil der Test nach dem Text `DISKERROR` sofort den Code suchte, der erst einige Takte später folgt —
+ein Rennen im Test, kein Fehlverhalten; mit etwas Nachlauf meldet auch Modell 1 `DISKERROR C5` (wie das 710), und zwar nach 0,4 s statt 11 s, weil das 710-1 vor der Taste nicht beide Laufwerke liest.
+
+**Warum bootet das 710-ROM mit Modell 1 nicht?**  Die Schleife `02DD` strobt alle 54 Takte (`B5H` = MR, `85H` = scharf) und fragt 12 Takte später ab.  Modell 1 setzt die Marke erst am Ende des ERSTEN GANZEN Sync-Bytes
+*nach* dem Scharfmachen (≥ 78 Takte danach): die Abfrage sieht sie nie — jeder Strobe verwirft die geplante Marke.  Das 710-1-ROM strobt einmal und ist davon nicht betroffen.
+
+**Versuche, dieselben K5122-Einstellungen an beiden Geräten zu bekommen** (alle am Modell, 710-ROM + UDOS/SCPX/FORMAT/EPROMmer/Lochband/Sertest und dasselbe am 710-1):
+
+| Versuch | Wirkung |
+|---|---|
+| Modell 1 (low, Daten nach Marke, keine Sofortmarke) | 710-1 alles grün; 710-ROM bootet nicht |
+| Modell 2 (wie 1 + Sofortmarke: das zuletzt FERTIGE Byte zählt) | 710 alles grün; 710-1 bootet UDOS nicht: das Byte davor ist oft ein Sync-Byte, die Marke steht beim Abfragen schon (Bit 1 = 0), das `JR Z` des 710-1-ROMs wartet **auf sich selbst** auf Bit 1 = 1 und kommt nie weiter (kein Strobe in der Schleife) |
+| Modell 3 „physikalisch“ (Marke am Ende JEDES A1-Bytes, das nach dem Scharfmachen endet, auch eines schon begonnenen) | 710-ROM liest Sektorköpfe, findet aber den gesuchten Sektor nie (`DISKERROR C4` nach 256 Versuchen): das starre Raster aus 54-Takt-Schleife und Byteende trifft immer nur jeden zweiten Sektorkopf (`09`, `0B`, …) |
+| Modell 3 + Schwankung des Byteendes ±p/4 (Schieberegister) | alles rot — auch das 710-1 (die Schwankung trifft das einmalige Strobe des 710-1 zufällig in das 12-Takte-Fenster, das `JR Z` hängt) |
+
+**Was widerspricht einem Modell für beide:** das 710-ROM braucht eine Marke, die in einem Fenster von **12 Takten** nach dem Strobe sichtbar wird, und das 710-1-ROM darf in diesem Fenster **keine** sehen (sonst hängt `JR Z` auf Bit 1 = 0).
+Beide Forderungen gleichzeitig erfüllt nur, wer die Marke an das **Strobe-Verhalten** des Codes bindet — das ist die Sofortmarke je Gerät, also eben nicht dieselbe Karte.  Die einzige physikalisch plausible Lösung wäre eine **echte Streuung**
+von Plattendrehung und CPU-Takt, die an einem 710-1 mit einmaligem Strobe nur mit verschwindend kleiner Wahrscheinlichkeit (≈ 0,4 % je Strobe) ein Hängen auslöst; ein deterministisches Modell kann das nicht ausdrücken, ohne dass sich einzelne Läufe
+aufhängen.  Eine Ursachenklärung (Hardware oder Zeitraster-Artefakt) ist **nur am Gerät** möglich: z. B. ob das 710-ROM an einem 710-1 (Karten sind laut Anwender tauschbar) bootet — genau diese Gegenprobe wäre belegend.
+**Folge:** das PRG 710 bleibt auf Modell 0, nichts verbogen.

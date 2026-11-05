@@ -286,6 +286,7 @@ tools/dev.sh trace --machine prg710 --events /tmp/ev.txt --events-cap 100000 DIS
 - `--coverage --csv --itrace --watch` (Speicher-Schreibzugriffe der CPU) wirken wie am K8915;
   `--skip-selftest --no-cr` gibt es nicht (Warnung).
   Mit Diskette wird über `defaultFormatName` gemountet (bei `.hfe` nur Platzhalter).
+- Das K5122-Leser-Modell folgt der Variante (`Config::leser_modell = -1`, AP-B2e): `--machine prg710-1` = Modell 1 (Marken-FF low-aktiv, Daten erst nach der Marke), `--machine prg710` = Modell 0; BS620 liest am 710-1 ohne Umpolen.
 
 Wächter: `cli_bt_prg710_tastatur`, `cli_bt_prg710-1_tastatur`, `cli_bt_prg710_udos_prompt`, `cli_bt_prg710-1_udos_prompt`.
 
