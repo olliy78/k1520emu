@@ -64,7 +64,7 @@ UDOS_EIGENSCHAFTEN = [
 ]
 
 
-#: BS600-Dateitypen (`doc/bs600_diskettenformat.md` §7): P an allen Abzügen; L akzeptiert der Monitor.
+#: BS600-Dateitypen (`doc/bs600_diskettenformat.md` §7): P an allen Abzuegen; L akzeptiert der Monitor.
 BS600_TYPEN = [
     ("P", "P — Programm"),
     ("L", "L — vom Monitor akzeptiert (Bedeutung offen)"),
@@ -211,8 +211,8 @@ class PropertiesDialog(QDialog):
     def _bs600_teil(self) -> QWidget:
         """BS600-Verzeichniseintrag: Name, Typ, Datum, Signum, Lade- und Startadresse.
 
-        Die **Lage** (Spur/Sektor) und die Endadresse sind Struktur und nur Anzeige: die Endadresse folgt aus der
-        Länge, die Lage aus der Ablage (Reorganisieren verschiebt Dateien).  Eine neue Ladeadresse verschiebt die
+        Die Lage (Spur/Sektor) und die Endadresse sind Struktur und nur Anzeige: die Endadresse folgt aus der
+        Laenge, die Lage aus der Ablage (Reorganisieren verschiebt Dateien).  Eine neue Ladeadresse verschiebt die
         Endadresse mit; der Dateiinhalt wird nie angefasst.
         """
         e = self.entry
