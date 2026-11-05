@@ -205,6 +205,51 @@ TEST(Sd1157Selbsttest, OhneFlugzeitLiegtDieRueckwaertsZeileEinenTaktRechts)
     }
 }
 
+TEST(Sd1157Selbsttest, FgdiFolgtDemTaktImpulsInBeidenRichtungenGleichSchnell)
+{
+    // Frage (Merkposten 4/17): kommt der 1-Takt-Versatz Rueckwaerts/Vorwaerts aus der Takt-/FGDI-Abfolge des EMULATORS?  Gemessen wird,
+    // wie viele Maschinentakte zwischen der letzten Positionsaenderung (= Takt-Impuls der Mechanik) und dem Anschlag (FGDI 2B.5) liegen
+    // und ob dabei eine weitere Position uebersprungen wird.  Ist die Latenz in beiden Richtungen gleich und klein gegen die Takt-
+    // Periode (1365 Maschinentakte), liegt der Punkt in beiden Richtungen auf der Position des Impulses: die Mechanik des Emulators ist
+    // richtungssymmetrisch, der Versatz stammt aus dem TRIGGER der Firmware (rueckwaerts eine Zaehlstelle spaeter) und wird nur durch die
+    // Flugzeit (oder eine gleichwertige Phasenlage des richtungsdekodierten Takts, [?]) ausgeglichen.
+    Drucker d(offline());
+    std::map<int, std::vector<uint64_t>> latenz;   // Richtung -> Takte seit der letzten Positionsaenderung
+    int pos = d.st().druck().wagen().position();
+    uint64_t seit = 0;
+    d.m->setBusTrace([&](bool io, bool rd, uint16_t a, uint8_t dd) {
+        if (io && !rd && (a & 0xFF) == 0xF9 && (dd & 0x20) && d.st().nadeln())
+            latenz[d.st().druck().wagen().richtung()].push_back(d.m->totalCycles() - seit);
+    });
+    d.fahre(5'000'000);
+    d.st().setTasteTest(true);
+    bool los = false;
+    d.m->setCpuTraceCallback([&](const Z80& c) {
+        const int p = d.st().druck().wagen().position();
+        if (p != pos) { pos = p; seit = d.m->totalCycles(); }
+        if (c.PC == HPT3 && !los) { los = true; d.st().setTasteTest(false); }
+    });
+    d.fahre(40'000'000);
+    d.m->setCpuTraceCallback(nullptr);
+    d.m->setBusTrace(nullptr);
+    ASSERT_TRUE(los);
+    ASSERT_GT(latenz[+1].size(), 100u);
+    ASSERT_GT(latenz[-1].size(), 100u);
+    double mittel[2] = {0, 0};
+    uint64_t maxi[2] = {0, 0};
+    int i = 0;
+    for (int r : {+1, -1}) {
+        for (uint64_t v : latenz[r]) { mittel[i] += static_cast<double>(v); maxi[i] = std::max(maxi[i], v); }
+        mittel[i] /= static_cast<double>(latenz[r].size());
+        ++i;
+    }
+    std::printf("FGDI-Latenz nach dem Takt-Impuls: vorwaerts mittel %.0f max %llu, rueckwaerts mittel %.0f max %llu (n = %zu / %zu)\n",
+                mittel[0], (unsigned long long)maxi[0], mittel[1], (unsigned long long)maxi[1], latenz[+1].size(), latenz[-1].size());
+    EXPECT_LT(maxi[0], 683u) << "vorwaerts: FGDI innerhalb der halben Takt-Periode";
+    EXPECT_LT(maxi[1], 683u) << "rueckwaerts: FGDI innerhalb der halben Takt-Periode";
+    EXPECT_LT(std::abs(mittel[0] - mittel[1]), 100.0) << "die Latenz ist richtungsunabhaengig";
+}
+
 TEST(Sd1157Selbsttest, ZeilenabstandFolgtDerTasteSechsAchtLpi)
 {
     const Zg zg = Zg::laden();

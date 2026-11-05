@@ -2,7 +2,7 @@
 
 Gilt für `core/peripherals/druckwerk/`, `core/cards/printer/`, `core/machines/printer/`, `k1520_printer_*` in der C-ABI und den Debugger-Befehl `blatt`.
 Entwurf und Stand: `doc/design/49_k1520printer.md` (§5a/§5b); Hardware des SD 1157 aus der Firmware: `doc/printer/sd1157/hardware.md`.
-Stand 2026-11-05 (WP3/WP2b, WP4 Anschluss).
+Stand 2026-11-05 (WP3/WP2b, WP4 Anschluss, Textdruck/Fluss/ROM-Reparatur).
 
 1. **Das Druckwerk kennt kein Gerät, kein PDF, kein Qt.**  `Blattmodell` und `Nadelkopf` wissen nichts vom SD 1157; die Steuerung gibt Pegel rein (`Wagen::eingang`,
    `Papierweg::ausgaenge`) und löst den Anschlag aus.  Alles in Maschinentakten.  Wächter `Blattmodell.*`, `Nadelkopf.*`, `Papierweg.*`, `GeregelterWagen.*`, `Nadeldruckwerk.*`
@@ -15,6 +15,10 @@ Stand 2026-11-05 (WP3/WP2b, WP4 Anschluss).
    rückwärts gedruckte Zeile 1 Takt rechts der vorwärts gedruckten.  Beide Richtungen decken sich nur mit **0,5 Takt Flugzeit je Richtung** (`versatz_vor = +1`, `versatz_rueck = -1` Pixel
    bei 2 Pixeln je Takt, Punktbreite 2).  Nicht in der Anzeige kaschieren, nicht auf 0 stellen.  Wächter `Sd1157Selbsttest.OhneFlugzeitLiegtDieRueckwaertsZeileEinenTaktRechts`,
    `Nadelkopf.VorUndRueckwaertsLandenMitFlugzeitAufDenselbenPunkten`, `Nadeldruckwerk.RueckwaertsfahrtGleichtDieFlugzeitAus`.
+   **Prüfung der Frage „Artefakt der Takt-/FGDI-Abfolge?" (2026-11-05): nein.**  Der Wagen setzt je Schritt die neue Position und gibt den Impuls in Fahrtrichtung; zwischen Impuls und
+   Anschlag (FGDI) liegen vorwärts im Mittel 139, rückwärts 136 Maschinentakte (max 211 bei 1365 je Takt-Periode), der Anschlag landet in beiden Richtungen auf der Position des
+   Impulses.  Der Versatz sitzt im Trigger der Firmware (rückwärts eine Zählstelle später) und wird durch Flugzeit 0,5 Takt je Richtung **oder** eine gleichwertige Phasenlage des
+   richtungsdekodierten Takts ausgeglichen; die Firmware kann beides nicht unterscheiden, nur Mechanikmessung [?].  Wächter `Sd1157Selbsttest.FgdiFolgtDemTaktImpulsInBeidenRichtungenGleichSchnell`.
 5. **PIO-Interrupts im Modus 3 sind am SD 1157 EREIGNISSE** (`Z80PIO::setModus3Flanke(true)` auf allen drei PIOs, U855 §6.4: Übergang Nichterfüllung → Erfüllung).  Im Pegelmodus
    (Vorgabe des Bausteins) fordert jede Auffrischung der Eingangspegel (`eingaengeSetzen`) bei /LR = 0 den Randinterrupt neu an, auch durch einen **fremden** Pinwechsel; die ISR setzt
    Spaltenzähler (kpz = 7, h' = 6) mitten im Auslauf zurück, die Firmware hält sich dann für 70 Takte zu weit rechts und druckt die erste Zeile rückwärts ins Leere.
@@ -59,8 +63,15 @@ Stand 2026-11-05 (WP3/WP2b, WP4 Anschluss).
     C-ABI `k1520_serial_*`, alter Unterbau DFU = V.24, PRINTER = IFSS).  Ohne Hub (Karte allein) leert eine Senke den Sender.  **Am V.24 gibt die Karte das DC1 nach dem Einschalten erst frei, wenn ein Transport
     anbindet** (CTS/DCD kommen vom Wandler, Auto Enables halten das Zeichen; wie K8025) — der Host sieht es dann.  **Baud:** CTC 0 ist Baudgenerator und wird im Takt-Interrupt (`m1a0d`, `17H,17H`, TC = 23) als
     Zeitbasis des Drucks neu gestartet; `Sd1157Steuerung::baudTakte()` lässt als Baud nur Perioden der Baudtabelle gelten (16 x 2^n, n = 0..7) und hält sonst die zuletzt programmierte — die Firmware
-    sieht die CTC unverändert (Wächter `Sd1157Seriell.DieBaudrateBleibtBeiDerDruckZeitbasisDerCtc0Stabil`, belegt, dass TC = 23 im Selbsttest tatsächlich auftritt).  **[?] Empfangspfad:** Zeichen kommen
-    verlustfrei im Puffer an (Wächter `Sd1157Empfang.*`), aber der Schiebepuffer des ROM (0D20H) zieht `ipzl` um 2 und `ipzf` um 1 ab, nachdem `ipzl` um 1 erhöht wurde: der Abstand `ipzf - ipzl` bleibt
-    konstant, der Puffer erscheint nie leer, die Firmware holt endlos NUL und kommt kaum zum Druck (3 Testzeilen „AAA", „BBB", „CCC" drucken nichts).  Ob das der ROM-Abzug ist oder eine Annahme der Karte
-    (die Quelle ohne Patch leert korrekt), ist **nicht geklärt**; DC3-Fluss (ab `ipzf` >= 3BF5H) und IFSS-Freigabe sind deshalb nicht prüfbar.  Nicht umgehen, erst klären.
-17. **Noch nicht untersucht (WP4-Rest):** Flugzeit-Erklärung über Takt-Interrupt/FGDI-Zeitpunkt (Nr. 4 bleibt Anpassung, nicht Beleg); Steuerfolgen/TAB/FF/Papierende im Auftrag; Loopback-Telnet-Rundlauf.
+    sieht die CTC unverändert (Wächter `Sd1157Seriell.DieBaudrateBleibtBeiDerDruckZeitbasisDerCtc0Stabil`, belegt, dass TC = 23 im Selbsttest tatsächlich auftritt).  **Empfangspfad: siehe Nr. 17/18.**
+17. **ROM-Abzug: Byte 0D34H (Hypothese, kein Beleg durch Prüfsumme).**  Der Schiebepuffer-Patch (0D20H) zieht `ipzl` um 2 (`2B 2B`) und `ipzf` um 1 ab, nachdem `ipzl` um 1 erhöht wurde: der Puffer
+    wird nie leer (Wächter `Sd1157Empfang.OriginalAbzugLeertDenPufferNie`).  Mit EINEM `DEC HL` ist die Logik schlüssig; die Erklärung ist ein Bitkipp 0 → 1 (Bit 5) eines ursprünglichen `0BH` (`DEC BC`,
+    wirkungslos).  Die Firmware hat keine ROM-Prüfsumme; Ein-Bit-Alternativen (`2AH`, `29H`, `23H`) zerstören den Zeiger.  **Der Abzug `1157.rom` bleibt unverändert**; `1157_repariert.rom` (nur 0D34H = 0BH,
+    MD5 in `doc/EPROMS/SD1157/README.md`) ist die **Vorgabe** der Karte, `Sd1157Steuerung::Config::rom_repariert = false` bzw. Konfigurationstext `rom=original` wählt den Abzug.  Wächter
+    `Sd1157Karte.DieVorgabeIstDerRepariertAbzugUnterscheidetSichNurInByte0D34H` (Abstand zum Abzug genau 1 Byte).  Status [?]: falls ein Original-EPROM-Auslesen 2BH bestätigt, ist die Reparatur reine Annahme.
+18. **Textdruck, Fluss, Antworten (gemessen, `Sd1157Text.*`/`Sd1157Fluss.*`/`Sd1157Telnet.*`, Orakel `sd1157_orakel.h`):** Zeile wird bei CR/LF gedruckt, davor kein LF (Zeile i bei Lage 8 i, 6 lpi); TAB modulo 8;
+    FF = Vorschub bis Formularlänge; > 132 Spalten: kein Umbruch, `fof`; **hinter Schräg bleibt eine Zelle leer** (m14a5).  IFSS: DC1 nach Einschalten, **DC3 bei Druckbeginn** und bei ≥ 3BF5H (1014 Zeichen),
+    **DC1 erst bei leerem Puffer und fertigem Druck**; Host ohne Flusssteuerung verliert hinter ~1 KiB (Gastverhalten).  V.24: zusätzlich DC1 je geholtem Zeichen.  Offline im Betrieb: Druck läuft
+    weiter, **DC1 erst wieder online**.  Papierende im Auftrag: alle Zeilen werden gedruckt, `ESC [ 5 n` → `ESC [ 2 n`.  `ESC [ 0 c` → `ESC [ 4 c`.  Test-Hosts mit Flusssteuerung brauchen eine
+    **dünne Leitung** (höchstens 2 Zeichen unterwegs): der Rückstaupuffer des Wandlers wäre sonst ein Puffer, den es an der Leitung nicht gibt.  Der Test wartet auf „Puffer leer", nicht auf „kein neuer
+    Punkt" (das ROM holt 1 Zeichen in ~21 000 Takten).  **Offen [?]:** Doppelbahn im Druck (WP6b), HPA/VPA-Spaltenzählung, Zeichen 80H–FFH.

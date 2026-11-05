@@ -222,11 +222,13 @@ Formularvorschub am Ende = Formularlänge (192/288/576), kein Punkt außerhalb. 
 **Offen.**  Zweite Bahn im Druck (Punkte gehen immer auf Bahn 0, `Nadeldruckwerk::feuere`), `SchrittWagen`, Schnitt/Blattgrenzen, Textprobe über die SIO (WP4/WP6b), die offenen `[?]` aus
 hardware.md §14 (Takte je Zoll, Nadelteilung, Punktmaß, Flugzeit absolut).  Die Online-Lampe und das Flag `off` der Firmware folgen der Taste ONLINE nur beim Anlauf (Merkposten).
 
-### 5c  Stand WP4 (2026-11-05, Teilstand)
+### 5c  Stand WP4 / WP6b Text (2026-11-05)
 
 Gebaut: `Sd1157Steuerung::Anschluss` je SIO-Kanal (IFSS = B, V.24 = A), `PrinterMachine` mit `SerialHub` (Index 0 IFSS, 1 V.24), alter Unterbau, Baudfilter für CTC 0 (Druck-Zeitbasis TC = 23 zählt nicht als Baud),
-gemeinsames Druckbild-Orakel `tests/support/sd1157_orakel.h`.  Wächter `Sd1157Seriell.*`, `Sd1157Online.*`, `Sd1157Empfang.*`.  Online/Offline zur Laufzeit gemessen (Merkposten Nr. 10).
-**Offen / [?]:** der Empfangspfad des ROM leert den Puffer nicht (Merkposten Nr. 16) — Text-Druck, DC3/DC1-Fluss, Loopback-Rundlauf, Flugzeit-Prüfung stehen aus.
+gemeinsames Druckbild-Orakel `tests/support/sd1157_orakel.h`.  **ROM:** der Abzug leert den Eingabepuffer nie (Byte 0D34H, Hypothese Bitkipp 0BH → 2BH); `doc/EPROMS/SD1157/1157_repariert.rom` ist Vorgabe
+(`Config::rom_repariert`, `rom=original|repariert`), der Abzug bleibt unverändert (Merkposten 17).  **Wächter:** `Sd1157Text.*` (Orakel: kurzer Text, mehrere Zeilen in beiden Richtungen, TAB, FF, > 132 Spalten,
+Breit/Schräg/Normal, 8 lpi, ungültige ESC, DA/DSR, Papierende, offline im Auftrag), `Sd1157Fluss.*` (DC1/DC3 am IFSS und V.24), `Sd1157Telnet.*` (Loopback, Port 0), `Sd1157Seriell.*`, `Sd1157Online.*`,
+`Sd1157Selbsttest.FgdiFolgt…` (Flugzeit: Emulator richtungssymmetrisch, Merkposten 4).  **Offen / [?]:** Doppelbahn im Druck (WP6b, `Nadeldruckwerk::feuere` nur Bahn 0), HPA/VPA-Spaltenzählung, Zeichen 80H–FFH, ROM-Bestätigung 0D34H am Original-EPROM.
 
 ## 6  Tests und Wächter
 

@@ -20,12 +20,19 @@ rekonstruieren (0 Restabweichungen).  Es gilt das ROM.
 
 | # | Ort im ROM | Quelle | ROM | Bedeutung |
 |---|---|---|---|---|
-| 1 | 0D20H–0D60H (65 B) | 0D20H–0D28H (9 B): `LD HL,(ipzl)` / `LD A,(HL)` / `POP HL` / `EI` / `JP if03` [Q:1641-1645] | `DI`, `PUSH BC/DE`, `LD A,(3800H)`, **`LDIR` 3801H→3800H, 3FFH Byte**, `ipzl`-2, `ipzf`-1, ist `ipzf`<3B00H: CTC0 mit TC aus `(IX-20)` neu starten, **SIO A WR5=0AAH, DC1 (11H) an V.24-Kanal A (7CH)**; dann `POP`…, `EI`, `JP 1023H` [F:0D1F] | Der Eingabepuffer 3800H–3BFFH ist im ROM ein **Schiebepuffer**: jedes geholte Zeichen schiebt den Rest um 1 Byte (LDIR 1023 Byte ≈ 21 000 T ≈ 8,5 ms bei 2,4576 MHz, mit DI) und sendet dabei DC1 (zeichenweise Freigabe, nur auf V.24-Kanal A; am IFSS wirkungslos) |
+| 1 | 0D20H–0D60H (65 B) | 0D20H–0D28H (9 B): `LD HL,(ipzl)` / `LD A,(HL)` / `POP HL` / `EI` / `JP if03` [Q:1641-1645] | `DI`, `PUSH BC/DE`, `LD A,(3800H)`, **`LDIR` 3801H→3800H, 3FFH Byte**, `ipzl`-2 (**Abzug-Befund, s. unten**), `ipzf`-1, ist `ipzf`<3B00H: CTC0 mit TC aus `(IX-20)` neu starten, **SIO A WR5=0AAH, DC1 (11H) an V.24-Kanal A (7CH)**; dann `POP`…, `EI`, `JP 1023H` [F:0D1F] | Der Eingabepuffer 3800H–3BFFH ist im ROM ein **Schiebepuffer**: jedes geholte Zeichen schiebt den Rest um 1 Byte (LDIR 1023 Byte ≈ 21 000 T ≈ 8,5 ms bei 2,4576 MHz, mit DI) und sendet dabei DC1 (zeichenweise Freigabe, nur auf V.24-Kanal A; am IFSS wirkungslos) |
 | 2 | ab 0D29H | Adressen n | n+38H | Folge von 1 (56 Byte mehr): alle Sprungziele, Vektoreinträge und die zwei `JR` bei 0D0BH/0D11H verschoben |
 | 3 | 2907H–297FH (121 B) | endet bei 28CEH | Kopie von 2887H–28FFH | Auffüllung hinter dem letzten `RET` (2906H), nie ausgeführt [F:2906] |
 
 Gleich geblieben: `ds 3,0FFH` (0008H, 0010H, 0020H → FFH) und `ds 30,0` (ROM 0DAEH–0DCBH → 00H).  Das ROM ist 0000H–297FH; der
 Raum 2980H–2BFFH ist im Abzug nicht belegt (FFH angenommen [?]).
+
+**Befund 0D34H (2026-11-05, Hypothese [?]):** `ipzl` wird vor dem Holen um 1 erhöht (Quelle m0d06) und im Patch um **2** (`2B 2B` bei 0D33H/0D34H), `ipzf` um 1
+verringert; der Abstand `ipzf - ipzl` bleibt dadurch 1, der Puffer wird nie leer, die Firmware holt endlos NUL.  Mit **einem** `DEC HL` ist die Logik schlüssig (beide Zeiger
+nach dem letzten Zeichen = 37FFH = leer).  Wahrscheinlichste Erklärung: **Bitkipp 0 → 1** (Ladungsverlust einer 2708-Zelle, Bit 5): ursprünglich `0BH` = `DEC BC` (wirkungslos, BC wird bei 0D5AH
+zurückgeholt), gelesen `2BH`.  Von den Ein-Bit-Nachbarn von `2BH` ist nur `0BH` sinnvoll (`2AH` = `LD HL,(nn)`, `29H` = `ADD HL,HL`, `23H` = `INC HL` zerstören den Zeiger).  **Kein Beleg durch
+Prüfsumme:** die Firmware hat keine ROM-Prüfsumme (Quelle durchsucht), die Quelle enthält den Patch nicht.  Reparierte Fassung als eigene Datei `doc/EPROMS/SD1157/1157_repariert.rom` (nur 0D34H = 0BH;
+`0D33H` statt `0D34H` wäre gleichwertig), Vorgabe der Karte (`Config::rom_repariert`, Konfigurationstext `rom=original|repariert`).  Wirkung am Lauf: Zeichen werden gedruckt, der Puffer leert sich.
 
 Folge fürs Verhalten: Lesen aus dem Eingabepuffer ist im ROM sehr langsam und läuft mit gesperrten Interrupts.  Es geschieht nur,
 wenn der Wagen steht (§10.1); der Emulator darf Takt-Impulse während eines solchen Fensters nicht „nachliefern“.
@@ -489,5 +496,9 @@ Annahmen oben geändert hat:
 | §5.4, §9 | 6/8 lpi, ONLINE als Pegel | die Firmware liest die Taste 6/8 lpi (BCH.1) und den Online-Zustand (Flag `off`, Lampe) nur **beim Anlauf**; PV/TEST-Pegel gelten zur Laufzeit |
 | §10.5 | 7 Punktspalten je Zelle | bestätigt: Zelle 10 Takte ab Takt 80, Spalte k bei +k; Breitdruck 20 Takte (Spalte k bei +2k, Spalte 6 wiederholt bei +14, UND mit der Vorspalte), Schrägdruck Nadel j um 8−j Takte versetzt |
 | §12 | Selbsttestbild | bestätigt Punkt für Punkt (Orakel aus `1157zg.rom`); die mittlere Zeile (63 Zeichen) druckt die Firmware rückwärts |
-| §7, §1 | Protokoll DC1/DC3, Schiebepuffer | **[?]** Der Puffer erscheint nie leer (ipzl -2 / ipzf -1 je Zeichen nach `INC ipzl`), Befund in `doc/merkposten/drucker.md` Nr. 16; DC1 am V.24 geht erst nach Anbinden des Transports hinaus (CTS/DCD) |
+| §7, §1 | Protokoll DC1/DC3, Schiebepuffer | Original-Abzug: der Puffer wird nie leer (Byte 0D34H, §1, Hypothese Bitkipp) → **reparierte Fassung ist Vorgabe**.  Gemessen (`Sd1157Fluss.*`, `Sd1157Text.*`): **IFSS** — DC1 nach dem Einschalten (~2,9 Mio. Takte), **DC3 bei Druckbeginn einer Zeile** (m0d70) und bei `ipzf` ≥ 3BF5H (nach 1014 Zeichen), **DC1 erst, wenn Puffer leer und Druck fertig** (m0c8c); ein Host, der DC3 nicht beachtet, verliert hinter ~1 KiB Daten (Puffer 3800H–3BFFH).  **V.24** — zusätzlich DC1 nach JEDEM aus dem Puffer geholten Zeichen (ROM-Patch).  Offline im Betrieb: Druck läuft weiter, **keine Freigabe (DC1) bis wieder online**; ein Zeichen im Leerlauf offline löst DC3 aus (seri8).  DC1 am V.24 geht erst nach Anbinden des Transports hinaus (CTS/DCD) |
+| §10.4, Nr. 4 | Flugzeit | Takt-/FGDI-Abfolge des Emulators ist richtungssymmetrisch (Latenz FGDI nach Takt-Impuls vorwärts 139 / rückwärts 136 Takte, max 211 von 1365 je Takt-Periode, Wächter `Sd1157Selbsttest.FgdiFolgtDemTaktImpulsInBeidenRichtungenGleichSchnell`): der 1-Takt-Versatz stammt aus dem **Trigger der Firmware** (rückwärts eine Zählstelle später) und wird nur durch Flugzeit 0,5 Takt je Richtung (oder eine gleichwertige Phasenlage des richtungsdekodierten Takts [?]) ausgeglichen — kein Emulatorartefakt |
+| §5.1 Text | Schrägdruck | Hinter einem Schräg-Lauf bleibt **eine Zelle leer** (m14a5: `inc dpz` beim Verlassen von `sdrf`); am Zeilenende ohne Folgen |
+| §7 | Zeile > 132 Spalten | nicht umgebrochen: ab dpz ≥ 84H wird `fof` (zmb Bit 3) gesetzt, weitere Zeichen entfallen (m13ab) |
+| §7 | Antworten | `ESC [ 0 c` → `ESC [ 4|5|6 c` (264 / breit / 2 Bahnen); `ESC [ 5 n` → `ESC [ 0 n` (nichts), `ESC [ 2 n` (Papierende, nur wenn /PE = 0) — am IFSS und V.24 (`ist13..ist20`) |
 | §9 | Online-Taste | zur Laufzeit wirken nur PV1/PV2; TEST und Lampe nur nach /RESET bei offline (`off` nur `sy40`/`m05b3`), Merkposten Nr. 10 |
