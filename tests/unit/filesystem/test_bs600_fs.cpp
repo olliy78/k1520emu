@@ -160,6 +160,7 @@ TEST(Bs600Fs, ReorganizeSchliesstLueckenOhneDatenverlust) {
     for (const auto& e : bfs(*v).eintraege())
         if (e.name == "C") {
             EXPECT_EQ(e.anf_spur * 100 + e.anf_sek, 104);        // A belegt 3 Sektoren (700 B)
+            EXPECT_EQ(e.sektoren(), 8);                          // 2000 B: das ENDE muss mitwandern (Fehler in AP-B5 gefunden)
             EXPECT_EQ(e.startadr, 0x4001);
         }
     const auto t = bfs(*v).belegungstabelle();

@@ -39,6 +39,7 @@
 #include "core/filesystem/cpm/cpa_dpb.h"
 #include "core/filesystem/disk_volume.h"
 #include "core/filesystem/fat/fat_fs.h"
+#include "core/filesystem/bs600/bs600_fs.h"
 #include "core/filesystem/prg_boot.h"
 #include "core/filesystem/geometry_probe.h"
 #include "core/filesystem/wega/platten_volume.h"
@@ -168,7 +169,7 @@ void gebrauch() {
         "         [--ro|--no-ro --sys|--no-sys]     ... CP/M-Attribute\n"
         "         [--arc|--no-arc] [--user 3]       ... und Nutzerbereich\n"
         "         [--hid|--no-hid]                  ... FAT: versteckt; --ro/--sys/--arc/--mtime gelten dort auch\n"
-        "         [--prg 710|710-1]                 ... Bootabbild muss fuer dieses PRG-Geraet sein\n"
+        "         [--prg 710|710-1]                 ... Bootabbild muss fuer dieses PRG-Geraet sein (BS600: auch 700)\n"
         "  reorganize <abbild>                      BS600: Dateien lueckenlos ab Spur 1 neu legen\n"
         "  mv     <abbild> <alt> <neu>              BS600: Datei umbenennen\n"
         "  boot-get <abbild> <datei.bin>            Systemspuren herausschreiben\n"
@@ -417,6 +418,12 @@ std::string bootZustand(const DiskVolume& v, int volume) {
     const bool leer = std::all_of(boot.begin(), boot.end(),
                                   [](uint8_t b) { return b == 0xE5 || b == 0x00 || b == 0x4E; });
     std::string z = menschlich(platz) + (leer ? ", leer" : ", beschrieben");
+    // BS600 (AP-B4): der Urlader nennt sein Geraet - 'BOOTSTRAP FOR BS600' ist die Bauart des PRG 700.
+    if (!leer && v.profile().type == FsType::Bs600) {
+        const Bs600Urlader u = Bs600FileSystem::urladerKennung(boot);
+        if (!u.text.empty()) z += ", " + u.text;
+        return z;
+    }
     // PRG 710/710-1 (AP-P6): der Ladesektor verraet System und Geraet.
     if (!leer) {
         prg_boot::System sys;
@@ -1539,6 +1546,14 @@ bool leseAlles(const std::string& pfad, std::vector<uint8_t>& out) {
  */
 bool pruefePrgWunsch(const Optionen& o, FsType typ, const std::string& bootpfad) {
     if (o.prg.empty()) return true;
+    if (typ == FsType::Bs600) {
+        // BS600: 700 | 710 | 710-1 - der Urlader ist je Geraet ein anderer ('SYL FOR BS620' / 'BOOTSTRAP FOR BS600').
+        std::vector<uint8_t> img;
+        if (!leseAlles(bootpfad, img)) return false;
+        const std::string p = Bs600FileSystem::urladerGegenWunsch(img, o.prg);
+        if (!p.empty()) { std::cerr << "Fehler: " << p << "\n"; return false; }
+        return true;
+    }
     const prg_boot::Variante wunsch = prg_boot::ausName(o.prg);
     if (wunsch == prg_boot::Variante::Unbekannt) {
         std::cerr << "Fehler: --prg erwartet 710 oder 710-1\n";
@@ -1547,13 +1562,24 @@ bool pruefePrgWunsch(const Optionen& o, FsType typ, const std::string& bootpfad)
     prg_boot::System sys;
     if (typ == FsType::Cpm)       sys = prg_boot::System::Scpx;
     else if (typ == FsType::Udos) sys = prg_boot::System::Udos;
-    else { std::cerr << "Fehler: --prg gilt nur fuer CP/M-artige (SCPX) und UDOS-Disketten\n";
+    else { std::cerr << "Fehler: --prg gilt nur fuer CP/M-artige (SCPX), UDOS- und BS600-Disketten\n";
            return false; }
     std::vector<uint8_t> img;
     if (!leseAlles(bootpfad, img)) return false;
     const std::string p = prg_boot::problem(img, sys, wunsch, prg_boot::Variante::Unbekannt);
     if (!p.empty()) { std::cerr << "Fehler: " << p << "\n"; return false; }
     return true;
+}
+
+/// @brief BS600: nach dem Einspielen eines Urladers sagen, fuer welches Geraet er gebaut ist (Entwurf 48, AP-B4).
+void urladerHinweis(FsType typ, const std::string& bootpfad) {
+    if (typ != FsType::Bs600) return;
+    std::vector<uint8_t> img;
+    std::ifstream f(bootpfad, std::ios::binary);
+    if (!f) return;
+    img.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+    const Bs600Urlader u = Bs600FileSystem::urladerKennung(img);
+    if (!u.text.empty()) std::cout << "Hinweis: " << u.text << "\n";
 }
 
 int cmd_create(const Optionen& o) {
@@ -1594,6 +1620,7 @@ int cmd_create(const Optionen& o) {
     if (!o.boot.empty())
         std::cout << "Bootabbild: " << o.boot << " -> Systemspuren ("
                   << menschlich(v->bootAreaSize()) << " Platz)\n";
+    if (!o.boot.empty()) urladerHinweis(v->profile().type, o.boot);
     return kOk;
 }
 
@@ -1660,6 +1687,7 @@ int cmd_boot_put(const Optionen& o) {
     }
     std::cout << o.rest[2] << " -> " << o.rest[1] << " (Systemspuren, "
               << menschlich(v->bootAreaSize(o.volume)) << " Platz)\n";
+    urladerHinweis(v->profile().type, o.rest[2]);
     return kOk;
 }
 

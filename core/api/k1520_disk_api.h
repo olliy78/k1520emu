@@ -579,6 +579,47 @@ K1520_API const char* k1520d_dos_sys_report(K1520Disk ziel);
 ///        0 = nie, 1 = immer, wo der Name kein 8.3-Name ist.
 K1520_API void k1520d_set_fat_lfn(K1520Disk h, int modus);
 
+/* ─── BS600 (PRG 700/710/710-1) ─────────────────────────────────────────────────
+ * Nur bei einer Diskette mit Dateisystemart "bs600" (@ref k1520d_fs_type).  Die Eintragsangaben liefern die
+ * allgemeinen Getter: Typ P/L = @ref k1520d_entry_type, Datum "TT.MM.JJ" = @ref k1520d_entry_date, Signum =
+ * @ref k1520d_entry_created, Ladeadresse = @ref k1520d_entry_low_addr, Endadresse = @ref k1520d_entry_high_addr,
+ * Startadresse = @ref k1520d_entry_start (0 = keine).                                                       */
+
+/// @brief BS600: die Lage der Datei als Text `"06/15-13/13"` (Anfangsspur/-sektor bis Endspur/-sektor); sonst "".
+K1520_API const char* k1520d_entry_extent(K1520Disk h, int i);
+
+/**
+ * @brief BS600: Typ, Datum, Signum und Adressen einer vorhandenen Datei aendern.
+ *
+ * Der Dateiinhalt bleibt unangetastet; **`set_* = false` und leere Zeichenketten lassen das Feld unveraendert**.
+ * Eine neue Ladeadresse verschiebt die Endadresse mit (die Laenge bleibt).
+ *
+ * @param type    "P" | "L"; NULL/"" = unveraendert
+ * @param date    `TTMMJJ` oder `TT.MM.JJ`
+ * @param author  Signum, hoechstens 3 Zeichen (leer setzen = ""); wirkt nur mit set_author
+ */
+K1520_API bool k1520d_set_bs600_attrs(K1520Disk h, const char* name, const char* type,
+                                      bool set_date, const char* date,
+                                      bool set_author, const char* author,
+                                      bool set_load, uint16_t load,
+                                      bool set_entry, uint16_t entry);
+
+/**
+ * @brief BS600: Luecken schliessen - alle Dateien lueckenlos ab Spur 1 neu legen.
+ * @param[out] bewegt  Zahl der verschobenen Dateien (darf NULL sein)
+ * @return false, wenn schreibgeschuetzt, kein BS600 oder ein Eintrag unbrauchbar/ueberlappend (Diskette dann unveraendert).
+ */
+K1520_API bool k1520d_bs600_reorganize(K1520Disk h, int* bewegt);
+
+/// @brief BS600: eine Datei umbenennen (Inhalt und Lage bleiben).  @p name wie @ref k1520d_entry_name.
+K1520_API bool k1520d_rename(K1520Disk h, const char* name, const char* new_name);
+
+/**
+ * @brief BS600: Bauart und Zielgeraet des Urladers (Sektor 1..3 der Spur 0) als Text, z. B.
+ *        `"Urlader 'SYL FOR BS620' (NKM-Lader) - startet am PRG 710-1"`; "" = kein Urlader / kein BS600.
+ */
+K1520_API const char* k1520d_bs600_urlader(K1520Disk h);
+
 /* ─── WEGA-(UNIX-)Dateiangaben ─────────────────────────────────────────────────
  * Nur bei einer Diskette mit Dateisystemart "wega_mutos" (@ref k1520d_fs_type); sonst
  * liefern die Getter 0 bzw. "" und @ref k1520d_set_unix_attrs scheitert.

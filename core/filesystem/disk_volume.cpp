@@ -2751,6 +2751,8 @@ namespace {
  */
 int rang(const std::string& kind) {
     if (kind == "udos.karte.zaehler.neu")                    return 4;   // Zaehler
+    if (kind.rfind("bs600.tabelle.", 0) == 0)                return 3;   // Belegungstabelle (nach dem Verzeichnis)
+    if (kind == "bs600.reorganisieren")                      return 4;   // zuletzt: setzt ein heiles Verzeichnis voraus
     if (kind.find(".karte.") != std::string::npos)           return 3;   // Belegungsplan
     if (kind.rfind("udos.kette.", 0) == 0
         || kind.rfind("ndos.zeiger.", 0) == 0
@@ -3381,6 +3383,12 @@ bool DiskVolume::insert(const std::string& src_path, const FileRef& ref,
     // Bereich 0.  Nur wenn der Aufrufer nicht ausdruecklich umbenannt hat — ein
     // `put --as NEU.COM` gewinnt immer.
     std::string ziel_name = ref.name;
+    // BS600-Namen kennen keine Endung ('.' ist im Namen verboten): `prog.bin` aus der Oberflaeche (Ziehen, Einfuegen)
+    // wird `PROG`.  Wer ausdruecklich benennt (`put --as`), nennt ohnehin einen Namen ohne Punkt.
+    if (istBs600()) {
+        const size_t punkt = ziel_name.rfind('.');
+        if (punkt != std::string::npos && punkt > 0) ziel_name.resize(punkt);
+    }
     // NUR bei CP/M, und nur dort, wo der Aufrufer nicht ausdruecklich umbenannt hat:
     // dort traegt das `.fileinfo` den Nutzerbereich ("3:SYSTEM.COM"), fuer den im
     // Linux-Dateinamen ein Unterstrich steht — ohne diese Ruecksetzung landete die

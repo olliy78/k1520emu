@@ -49,6 +49,19 @@ inline constexpr size_t kBs600EintragGroesse = 42;
 /// @brief Hoechste vergebene Spur (die Allokation des Originals meldet bei Spur 38 `DISK VOLL`).
 inline constexpr int kBs600LetzteNutzSpur = 37;
 
+/// @brief Geteilte Handgriffe des Dateisystems, der Pruefung und der Rettung.
+namespace bs600 {
+/// @brief 1..6 sichtbare ASCII-Zeichen ohne '.', '/', '\\'.
+bool nameGueltig(const std::string& n);
+/// @brief `TTMMJJ` oder `TT.MM.JJ` -> `TTMMJJ`; "" = nicht lesbar oder unmoeglicher Tag/Monat.
+std::string datumNormal(std::string d);
+/// @brief 42 Byte nur Blanks, nur 00 oder nur E5 = leerer Verzeichnisplatz.
+bool leerEintrag(const std::vector<uint8_t>& p);
+/// @brief Bit (Spur 1.., Sektor 1..15) der rohen Belegungstabelle (Sektor 26) setzen/loeschen/lesen.
+void tabBit(std::vector<uint8_t>& tab, int spur, int sek, bool belegt);
+bool tabBitGesetzt(const std::vector<uint8_t>& tab, int spur, int sek);
+}  // namespace bs600
+
 /**
  * @struct Bs600Eintrag
  * @brief Ein belegter Verzeichnisplatz, Felder wie in §5 des Formatdokuments.
@@ -69,6 +82,24 @@ struct Bs600Eintrag {
     int linAnfang() const { return (anf_spur - 1) * kBs600Sektoren + (anf_sek - 1); }
     int linEnde()   const { return (end_spur - 1) * kBs600Sektoren + (end_sek - 1); }
     int sektoren()  const { return gueltig ? linEnde() - linAnfang() + 1 : 0; }
+};
+
+/**
+ * @struct Bs600Urlader
+ * @brief Was der Urlader in Sektor 1..3 der Spur 0 ueber sein Zielgeraet verraet (Entwurf 48, AP-B4).
+ *
+ * Zwei Bauarten (`doc/bs600_diskettenformat.md` §3): `SYL FOR BS6x0` (NKM-Lader des 1-KB-ROM, PRG 710/710-1)
+ * und `BOOTSTRAP FOR BS600` (3-KB-ROM, PRG 700).  Die Zuordnung des Namens zum Geraet ist fuer `BS620` = PRG 710-1
+ * belegt (Abzug, Tastaturweg K7672); `BS610` = PRG 710 steht nur auf der Webseite [Web] - Annahme.
+ * Das Geraet steht NICHT im Rechnerwortschatz des Katalogs (Merkposten formatnamen Nr. 6), deshalb nur als Text.
+ */
+struct Bs600Urlader {
+    enum class Art { Keiner, Syl, Bootstrap, Unbekannt };
+    Art         art = Art::Keiner;
+    std::string name;       ///< "BS620" (Syl) bzw. "BS600" (Bootstrap); "" sonst
+    std::string schalter;   ///< "710-1" | "710" | "700" | "" (Fassung nicht bestimmbar) - Wert fuer `--prg`
+    std::string geraet;     ///< Anzeige: "PRG 710-1" ...
+    std::string text;       ///< ein Satz fuer `info`/Hinweis ("Urlader SYL FOR BS620 - startet am PRG 710-1")
 };
 
 /**
@@ -98,6 +129,15 @@ public:
     /// @brief Zahl der Sektoren des Bootabbilds (Sektor 1..3 der Spur 0).
     static constexpr int kBootSektoren = 3;
 
+    /// @brief Urlader eines Bootabbilds (Byteband Sektor 1..3) einordnen; `art == Keiner` = kein Urlader.
+    static Bs600Urlader urladerKennung(const std::vector<uint8_t>& img);
+
+    /// @brief Passt der Urlader zum verlangten Geraet (`--prg 700|710|710-1`)?  "" = ja, sonst die Begruendung.
+    static std::string urladerGegenWunsch(const std::vector<uint8_t>& img, const std::string& prg);
+
+    /// @brief Der Urlader dieser Diskette (liest Sektor 1..3 der Spur 0).
+    Bs600Urlader urlader() const;
+
     std::vector<FileEntry> list() const override;
     bool firstSector(const std::string& name, FsRecoverOrt& out) const override;
     bool read(const std::string& name, std::vector<uint8_t>& out) override;
@@ -108,6 +148,16 @@ public:
     bool mkfs() override;
     FsInfo info() const override;
     bool setAttributes(const std::string& name, const Bs600Attrs& attrs) override;
+
+    // ─── Pruefung und Rettung (Entwurf 48, AP-B5) ────────────────────────────
+    //
+    // Befundkennungen `bs600.*` sind ein VERTRAG (check/bs600_check.cpp, Tabelle im Kopf der Datei).
+    // Die Pruefung schreibt nie; Reparaturen laufen nur ueber @ref repair.
+    FsCheckReport check(FsCheckLevel level, bool nachladen) const override;
+    bool repair(const FsRepair& r) override;
+    FsRecoverReport recoverScan(FsRecoverLevel level, bool nachladen) const override;
+    bool recoverRead(const FsRecoverFind& f, std::vector<uint8_t>& out) const override;
+    bool recoverRestore(const FsRecoverFind& f, const std::string& name) override;
 
     /// @brief Eine Datei umbenennen (Inhalt und Lage bleiben).
     bool rename(const std::string& alt, const std::string& neu);

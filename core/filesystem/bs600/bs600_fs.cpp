@@ -53,6 +53,26 @@ std::string hexText(int v) {
     return b;
 }
 
+
+
+std::string heute() {
+    const std::time_t t = std::time(nullptr);
+    std::tm lt{};
+#ifdef _WIN32
+    localtime_s(&lt, &t);
+#else
+    localtime_r(&t, &lt);
+#endif
+    char b[8];
+    std::snprintf(b, sizeof b, "%02d%02d%02d", lt.tm_mday, lt.tm_mon + 1, lt.tm_year % 100);
+    return b;
+}
+
+}  // namespace
+
+// Geteilte Handgriffe (auch von check/bs600_check.cpp und check/bs600_recover.cpp gebraucht).
+namespace bs600 {
+
 /// @brief Der Anwendungsname einer Datei: 1..6 sichtbare ASCII-Zeichen ohne '.', '/', '\\'.
 bool nameGueltig(const std::string& n) {
     if (n.empty() || n.size() > 6) return false;
@@ -72,18 +92,34 @@ std::string datumNormal(std::string d) {
     return r;
 }
 
-std::string heute() {
-    const std::time_t t = std::time(nullptr);
-    std::tm lt{};
-#ifdef _WIN32
-    localtime_s(&lt, &t);
-#else
-    localtime_r(&t, &lt);
-#endif
-    char b[8];
-    std::snprintf(b, sizeof b, "%02d%02d%02d", lt.tm_mday, lt.tm_mon + 1, lt.tm_year % 100);
-    return b;
+bool leerEintrag(const std::vector<uint8_t>& p) {
+    for (uint8_t fuell : {uint8_t(0x20), uint8_t(0x00), uint8_t(0xE5)})
+        if (std::all_of(p.begin(), p.end(), [&](uint8_t b) { return b == fuell; })) return true;
+    return false;
 }
+
+/// @brief Bit (Spur, Sektor) in der rohen Belegungstabelle (Sektor 26) setzen/loeschen.
+void tabBit(std::vector<uint8_t>& tab, int spur, int sek, bool belegt) {
+    const size_t i = static_cast<size_t>(2 * (spur - 1) + (sek - 1) / 8);
+    const uint8_t m = static_cast<uint8_t>(0x80 >> ((sek - 1) % 8));
+    if (i >= tab.size()) return;
+    if (belegt) tab[i] = static_cast<uint8_t>(tab[i] | m); else tab[i] = static_cast<uint8_t>(tab[i] & ~m);
+}
+
+bool tabBitGesetzt(const std::vector<uint8_t>& tab, int spur, int sek) {
+    const size_t i = static_cast<size_t>(2 * (spur - 1) + (sek - 1) / 8);
+    return i < tab.size() && (tab[i] & (0x80 >> ((sek - 1) % 8)));
+}
+
+}  // namespace bs600
+
+using bs600::nameGueltig;
+using bs600::datumNormal;
+using bs600::leerEintrag;
+using bs600::tabBit;
+using bs600::tabBitGesetzt;
+
+namespace {
 
 std::string datumAnzeige(const std::string& d) {
     return datumNormal(d).empty() ? rtrim(d) : d.substr(0, 2) + "." + d.substr(2, 2) + "." + d.substr(4, 2);
@@ -91,11 +127,6 @@ std::string datumAnzeige(const std::string& d) {
 
 int linVon(int spur, int sek) { return (spur - 1) * kBs600Sektoren + (sek - 1); }
 
-bool leerEintrag(const std::vector<uint8_t>& p) {
-    for (uint8_t fuell : {uint8_t(0x20), uint8_t(0x00), uint8_t(0xE5)})
-        if (std::all_of(p.begin(), p.end(), [&](uint8_t b) { return b == fuell; })) return true;
-    return false;
-}
 
 /// @brief Hoechster Zylinder + 1 des Raums.
 int spurenVon(const SectorSpace& space) {
@@ -156,18 +187,7 @@ int freieNutzSektoren(const std::vector<uint8_t>& belegt) {
     return n;
 }
 
-/// @brief Bit (Spur, Sektor) in der rohen Belegungstabelle (Sektor 26) setzen/loeschen.
-void tabBit(std::vector<uint8_t>& tab, int spur, int sek, bool belegt) {
-    const size_t i = static_cast<size_t>(2 * (spur - 1) + (sek - 1) / 8);
-    const uint8_t m = static_cast<uint8_t>(0x80 >> ((sek - 1) % 8));
-    if (i >= tab.size()) return;
-    if (belegt) tab[i] = static_cast<uint8_t>(tab[i] | m); else tab[i] = static_cast<uint8_t>(tab[i] & ~m);
-}
 
-bool tabBitGesetzt(const std::vector<uint8_t>& tab, int spur, int sek) {
-    const size_t i = static_cast<size_t>(2 * (spur - 1) + (sek - 1) / 8);
-    return i < tab.size() && (tab[i] & (0x80 >> ((sek - 1) % 8)));
-}
 
 void lauf(std::vector<uint8_t>& tab, std::vector<uint8_t>* belegt, int lin_von, int n, bool setzen) {
     for (int l = lin_von; l < lin_von + n; ++l) {
@@ -244,6 +264,61 @@ std::string Bs600FileSystem::bootProblem(const std::vector<uint8_t>& img) {
         return "Das ist kein BS600-Urlader: der Kopf 'SYL FOR BS6x0' (PRG 710/710-1) bzw. 'BOOTSTRAP FOR BS600' "
                "(PRG 700) ab Byte 2 fehlt.";
     return {};
+}
+
+Bs600Urlader Bs600FileSystem::urladerKennung(const std::vector<uint8_t>& img) {
+    Bs600Urlader u;
+    const bool leer = std::all_of(img.begin(), img.end(),
+                                  [](uint8_t b) { return b == 0xE5 || b == 0x00 || b == 0x4E; });
+    if (img.empty() || leer) return u;                       // Art::Keiner
+    u.art = Bs600Urlader::Art::Unbekannt;
+    if (img.size() < 16 || img[0] != 0x18) { u.text = "kein BS600-Urlader (Kopf 18 xx fehlt)"; return u; }
+    if (text(img, 2, 10) == "SYL FOR ") {
+        u.art = Bs600Urlader::Art::Syl;
+        u.name = rtrim(text(img, 10, 16));
+        if (u.name == "BS620")      { u.schalter = "710-1"; u.geraet = "PRG 710-1"; }
+        else if (u.name == "BS610") { u.schalter = "710";   u.geraet = "PRG 710"; }     // [?] nur Webseite
+        else                        { u.geraet = "PRG 710 oder PRG 710-1 (Fassung nicht bestimmbar)"; }
+        u.text = "Urlader 'SYL FOR " + u.name + "' (NKM-Lader) - startet am " + u.geraet;
+    } else if (text(img, 2, 15) == "BOOTSTRAP FOR") {
+        u.art = Bs600Urlader::Art::Bootstrap;
+        u.name = rtrim(text(img, 15, 21));
+        u.schalter = "700";
+        u.geraet = "PRG 700";
+        u.text = "Urlader 'BOOTSTRAP FOR " + u.name + "' (3-KB-ROM) - startet am PRG 700, NICHT am PRG 710/710-1";
+    } else {
+        u.text = "kein BS600-Urlader (weder 'SYL FOR ' noch 'BOOTSTRAP FOR' ab Byte 2)";
+    }
+    return u;
+}
+
+std::string Bs600FileSystem::urladerGegenWunsch(const std::vector<uint8_t>& img, const std::string& prg) {
+    if (prg != "700" && prg != "710" && prg != "710-1")
+        return "--prg erwartet 700, 710 oder 710-1";
+    const Bs600Urlader u = urladerKennung(img);
+    if (u.art == Bs600Urlader::Art::Keiner || u.art == Bs600Urlader::Art::Unbekannt)
+        return "Das Bootabbild traegt keinen BS600-Urlader: " + (u.text.empty() ? std::string("es ist leer") : u.text);
+    if (u.art == Bs600Urlader::Art::Bootstrap) {
+        if (prg == "700") return {};
+        return "Der Urlader 'BOOTSTRAP FOR " + u.name + "' ist die Bauart des PRG 700 (3-KB-ROM); der NKM-Lader des PRG "
+               + prg + " bootet ihn nicht - dort gehoert ein 'SYL FOR BS6x0' hin.";
+    }
+    if (prg == "700")
+        return "Der Urlader 'SYL FOR " + u.name + "' ist fuer den NKM-Lader des PRG 710/710-1; das PRG 700 braucht "
+               "'BOOTSTRAP FOR BS600'.";
+    if (!u.schalter.empty() && u.schalter != prg)
+        return "Der Urlader 'SYL FOR " + u.name + "' ist fuer das " + u.geraet + " gebaut, verlangt ist PRG " + prg + ".";
+    return {};
+}
+
+Bs600Urlader Bs600FileSystem::urlader() const {
+    std::vector<uint8_t> img;
+    for (int i = 1; i <= kBootSektoren; ++i) {
+        std::vector<uint8_t> s;
+        if (!sektorLesen(0, i, s)) break;
+        img.insert(img.end(), s.begin(), s.end());
+    }
+    return urladerKennung(img);
 }
 
 // ─── Lesen ───────────────────────────────────────────────────────────────────
@@ -596,8 +671,11 @@ bool Bs600FileSystem::reorganize(int* bewegt) {
     for (size_t i = 0; i < dat.size(); ++i) {
         if (neu[i] == dat[i].linAnfang()) continue;
         Bs600Eintrag e = dat[i];
+        // Die Sektorzahl VOR dem Umsetzen des Anfangs lesen: sektoren() rechnet aus Anfang und Ende, und mit dem neuen
+        // Anfang und dem alten Ende kaeme ein falsches (zu grosses) Ende in den Eintrag.
+        const int n = e.sektoren();
         e.anf_spur = neu[i] / kBs600Sektoren + 1; e.anf_sek = neu[i] % kBs600Sektoren + 1;
-        const int ende = neu[i] + e.sektoren() - 1;
+        const int ende = neu[i] + n - 1;
         e.end_spur = ende / kBs600Sektoren + 1; e.end_sek = ende % kBs600Sektoren + 1;
         if (!eintragSchreiben(e.platz, eintragBytes(e))) return false;
     }
