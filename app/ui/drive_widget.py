@@ -695,6 +695,7 @@ class DriveWidget(QWidget):
     cqm_hinweise: tuple = ()
     td0_hinweise: tuple = ()
     imd_hinweise: tuple = ()
+    namens_hinweise: tuple = ()
 
     def _notice_help(self, zeile: str) -> str:
         if zeile.startswith(self.NICHT_SPEICHERBAR):
@@ -721,6 +722,8 @@ class DriveWidget(QWidget):
                     lines += list(self.td0_hinweise)
                 elif art == "imd":
                     lines += list(self.imd_hinweise)
+                name = os.path.basename(self._mounts[drive][0]).lower()
+                lines += [t for teil, t in self.namens_hinweise if teil in name]
         except Exception:
             pass
         label = panel._notice_label

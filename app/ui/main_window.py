@@ -441,6 +441,7 @@ class MainWindow(QMainWindow):
         self.drives_widget.cqm_hinweise = self.profil.cqm_hinweise
         self.drives_widget.td0_hinweise = self.profil.td0_hinweise
         self.drives_widget.imd_hinweise = self.profil.imd_hinweise
+        self.drives_widget.namens_hinweise = self.profil.namens_hinweise
         drives_scroll = QScrollArea()
         drives_scroll.setWidgetResizable(True)
         self.platten_widget = None

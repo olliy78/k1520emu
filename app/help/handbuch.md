@@ -1953,6 +1953,20 @@ K7024, Diskettensteuerung K5122 mit zwei K5601). Was anders ist:
 * Die **PC-Tastatur** geht wie beim A5120 an den Rechner. Am 710-1 wiederholt die
   K7672 eine gehaltene Taste selbst; am 710 gibt es keine Wiederholung.
 
+### BS600 (Numerik-Betriebssystem)
+
+Die Diskette **BS600** (Fassung **BS620**) enthält das menügeführte Betriebssystem für Numerik-Programmiergeräte
+(PC600, CNC600). BS620 läuft nur am **PRG 710-1**; am PRG 710 bootet sie nicht (die Fassung für das PRG 710 ist BS610).
+
+* Einlegen, **Enter** am NKM-LOADER — es folgt der Selbsttest (rund fünf Sekunden Maschinenzeit) und das Hauptmenü
+  `BS600  VERSION: 04` mit vier Einträgen.
+* Bedienung: **Pfeiltasten** (Bildschirmtastatur: die Kursorkappen) wählen, **Enter** ruft auf, **Esc** bricht ab und
+  quittiert Meldungen (am Gerät `CL` bzw. `ESC`). `Esc` allein gilt nur, wenn danach nicht binnen etwa 5 ms ein weiteres
+  Zeichen kommt — von Hand getippt ist das immer erfüllt.
+* `Dienstprogramme` und `PROG PMC600/CNC600` fragen zuerst `LAUFWERK 1  J`: **J** oder **N** eintippen, dann Enter.
+* Stand: Hauptmenü und das Unterbild von `PROG/TEST PC600` laufen; das Lesen der Diskette aus den Dienstprogrammen heraus
+  ist noch nicht geklärt (die Meldung `LAUFWERK 1` blinkt).
+
 ### Der EPROMmer
 
 Der PRG brennt U555 (1 KB, wie 2708) und U2716 (2 KB) in **einem** Sockel; das

@@ -52,9 +52,10 @@ public:
          *  (Plan §8.6). */
         bool eprommer = true;
         /** ATP-Zusatz (Entwurf 48, AP-B1): SIO C0H–C3H mit Kanalschleife, Anzeige F4H/F5H,
-         *  Takt an CLK/TRG0/1 der CTC CCH–CFH.  Vorgabe AUS — UDOS/SCPX unveraendert;
-         *  BS600/BS620 verlangt sie im Selbsttest. */
-        bool atp_zusatz = false;
+         *  Takt an CLK/TRG0/1 der CTC CCH–CFH.  Vorgabe AN (AP-B2): der Kern kennt
+         *  kein Betriebssystem, BS600/BS620 verlangt sie im Selbsttest, und UDOS/SCPX laufen mit ihr
+         *  unveraendert (Waechter prg710_*, cli_bt_prg710*: 152/152 gruen).  Tests ohne sie: false. */
+        bool atp_zusatz = true;
     };
 
     /// Takt der ZRE K2521 (2,4576 MHz).

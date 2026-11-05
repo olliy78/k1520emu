@@ -24,6 +24,8 @@
 #include "tools/z80dis_min.h"
 #include "core/machines/prg710/prg710.h"
 #include "core/peripherals/k7609/k7609.h"
+#include "core/peripherals/k7672/k7672.h"
+#include <cctype>
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -196,6 +198,7 @@ int bootTracePrg710(const K8915TraceOpts& o, bool v1, const prnlst::Listing& prn
     uint64_t instr = 0;
     uint64_t io_rd[256] = {0}, io_wr[256] = {0};
     uint64_t last_activity = 0;
+    uint64_t letzter_tastenzugriff = 0;   // letzter Lesezugriff auf den Tastaturport (5EH/5FH bzw. C8H/C9H)
     bool until_hit = false; uint64_t until_cyc = 0; uint16_t until_pc = 0;
     eventbp::Prev prev;
     long ints = 0;
@@ -281,6 +284,7 @@ int bootTracePrg710(const K8915TraceOpts& o, bool v1, const prnlst::Listing& prn
         }
         const uint8_t p = static_cast<uint8_t>(addr);
         (isRead ? io_rd : io_wr)[p]++;
+        if (isRead && (v1 ? (p == 0x5E || p == 0x5F) : (p == 0xC9 || p == 0xC8))) letzter_tastenzugriff = m.totalCycles();
         bool gewuenscht = beobachtet(p, v1);
         for (uint16_t w : o.watchio) if ((w & 0xFF) == p) gewuenscht = true;
         if (!gewuenscht) return;
@@ -310,13 +314,36 @@ int bootTracePrg710(const K8915TraceOpts& o, bool v1, const prnlst::Listing& prn
     // Getippt wird blockweise (ein Block endet mit `<ET>`) und immer erst, wenn die Maschine
     // steht (Stillstand: --stall Takte ohne Bildaenderung/Steuerzugriff) — also am Start-
     // taster-Warten des ROMs, an der Datumsabfrage von UDOS usw.
+    // Marken (gross/klein): <ET> ET1/Return · <ESC> und <CL> (Fehlermeldung weg; am 710-1 ist CL der
+    // K7672 stumm, dort gilt ESC allein = 83H, am 710 ist CL die Matrixtaste 28H = 83H, doc/bs600/
+    // selbsttest.md 3.8) · <UP> <DOWN> <LEFT> <RIGHT> Kursor (BS600-Menues; 710-1: Matrixtasten der
+    // K7672 wie auf der Bildschirmtastatur, 710: Kursortasten der K7609).  Ein Block endet mit <ET>.
     struct Taste { uint32_t code; bool et; };
+    struct Marke { const char* name; uint32_t v0; uint32_t v1; bool et; };
+    static const Marke marken[] = {
+        {"<ET>",    K7609::QK_TASTE_BASE | 0x37u, 0x01000004u, true},
+        {"<ESC>",   K7609::QK_TASTE_BASE | 0x28u, 0x01000000u, false},
+        {"<CL>",    K7609::QK_TASTE_BASE | 0x28u, 0x01000000u, false},
+        {"<UP>",    0x01000013u, K7672::QK_TASTE_BASE | 0x79u, false},
+        {"<DOWN>",  0x01000015u, K7672::QK_TASTE_BASE | 0x18u, false},
+        {"<LEFT>",  0x01000012u, K7672::QK_TASTE_BASE | 0x28u, false},
+        {"<RIGHT>", 0x01000014u, K7672::QK_TASTE_BASE | 0x08u, false},
+    };
     std::vector<Taste> tasten;
     for (size_t i = 0; i < o.keys.size(); ++i) {
-        if (o.keys.compare(i, 4, "<ET>") == 0 || o.keys.compare(i, 4, "<et>") == 0) {
-            tasten.push_back({v1 ? 0x01000004u : (K7609::QK_TASTE_BASE | 0x37u), true});
-            i += 3;
-        } else tasten.push_back({static_cast<uint8_t>(o.keys[i]), false});
+        bool gefunden = false;
+        if (o.keys[i] == '<') {
+            for (const Marke& mk : marken) {
+                const size_t n = strlen(mk.name);
+                if (o.keys.size() - i < n) continue;
+                bool gleich = true;
+                for (size_t k = 0; k < n && gleich; ++k) gleich = toupper(static_cast<unsigned char>(o.keys[i + k])) == mk.name[k];
+                if (!gleich) continue;
+                tasten.push_back({v1 ? mk.v1 : mk.v0, mk.et});
+                i += n - 1; gefunden = true; break;
+            }
+        }
+        if (!gefunden) tasten.push_back({static_cast<uint8_t>(o.keys[i]), false});
     }
     size_t tasten_pos = 0;
     // Naechster Block; false = Maschine waehrend des Tippens angehalten (--until).
@@ -368,7 +395,12 @@ int bootTracePrg710(const K8915TraceOpts& o, bool v1, const prnlst::Listing& prn
     const uint64_t cycles = m.totalCycles();
     const std::string prompt_zeile = letzteZeile(bild);
     const bool prompt = stillstand && prompt_zeile == "%";   // UDOS-Prompt, Bild steht
-    const bool taste = stillstand && inTastaturabfrage(m, v1, m.cpuPC());
+    // Im ROM-Lader (PC-Bereiche) ODER in einem Programm im RAM (BS600: Abfrage ueber RST 30 -> 0201H):
+    // wer im Stillstand noch kurz vorher den Tastaturport liest, wartet auf eine Taste.
+    const bool taste_rom = stillstand && inTastaturabfrage(m, v1, m.cpuPC());
+    const bool taste_ram = stillstand && !taste_rom && letzter_tastenzugriff != 0 &&
+                           cycles - letzter_tastenzugriff < 1'000'000;
+    const bool taste = taste_rom;
     if (!o.quiet) {
         fprintf(stderr, "\n=== %s Boot Trace Complete: %llu cycles ===\n", name_m, (unsigned long long)cycles);
         if (o.until.kind != untilcond::UntilCond::NONE)
@@ -382,7 +414,8 @@ int bootTracePrg710(const K8915TraceOpts& o, bool v1, const prnlst::Listing& prn
             fprintf(stderr, "Tasten:      %zu von %zu getippt\n", tasten_pos, tasten.size());
         fprintf(stderr, "Tastatur:    %s\n", taste ? (v1 ? "ROM wartet in der SIO-Abfrage (0163H, 5FH)"
                                                          : "ROM wartet in der 8279-Abfrage (0160H, C9H)")
-                                                    : "nein");
+                                                    : taste_ram ? "Programm (RAM) fragt die Tastatur ab (Port 5EH/5FH bzw. C8H/C9H)"
+                                                                : "nein");
         fprintf(stderr, "Speicher:    EBH=%02X map=%s  E8H[0]=%02X E8H[F]=%02X\n", m.speicher().freigabe(),
                 speicherbild(m).c_str(), m.speicher().attr(0), m.speicher().attr(15));
         fprintf(stderr, "Ereignisse:  %ld (%ld Zeilen), Interrupts: %ld, Befehle: %llu\n",

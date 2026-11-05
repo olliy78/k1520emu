@@ -248,6 +248,13 @@ void K7672::keyPress(uint32_t k, bool shift, bool ctrl)
 {
     if ((k & ~0xFFu) == QK_TASTE_BASE) { tasteMatrix(static_cast<uint8_t>(k & 0x7F), true, shift, ctrl); return; }
     if (modus_ == Modus::Dcp) { tasteDcp(k, true, shift, ctrl); return; }
+    if (modus_ == Modus::Scp && k >= 0x01000012 && k <= 0x01000015) {
+        // Host-Kursortasten (Qt: links/auf/rechts/ab) wie die Matrixtasten: `ESC [ D/A/C/B` (s. tasteMatrix).
+        static const char folge[] = {'D', 'A', 'C', 'B'};
+        sendeZeichen(ESC); sendeZeichen('['); sendeZeichen(static_cast<uint8_t>(folge[k - 0x01000012]));
+        wiederholungStopp();
+        return;
+    }
     uint8_t z = zeichenFuer(k, shift, ctrl);
     if (!z) return;
     // 0223H wie in tasteMatrix(): Feststellung (LED 21H Bit 7, auch per `ESC [ ? 1 1 h`
@@ -528,7 +535,18 @@ void K7672::tasteMatrix(uint8_t m, bool gedrueckt, bool shift, bool ctrl)
         const bool buchstabe = (kArt[m] & 0x3F) == 0x10;
         const bool um = shift || ((leds_ & LED_CAPS) && buchstabe);
         uint8_t z = scpZeichen(m, um);
-        if (z == 0xFF) return;                        // keine belegte Taste: nichts
+        if (z == 0xFF) {
+            // Kursortasten: die Firmwaretabellen (D3 0400H) haben fuer sie nichts; BS620 liest aber
+            // `ESC [ A/B/C/D` (Rueckgabecodes 8BH/8CH/89H/8AH in 0201H, doc/bs600/selbsttest.md 3.8).
+            // Die Folge ist DEC-Sitte und aus dem Leser abgeleitet, nicht an der Firmware belegt [?];
+            // UDOS/SCPX lesen diese Tasten nicht.
+            const char kursor = m == 0x79 ? 'A' : m == 0x18 ? 'B' : m == 0x08 ? 'C' : m == 0x28 ? 'D' : 0;
+            if (kursor) {
+                sendeZeichen(ESC); sendeZeichen('['); sendeZeichen(static_cast<uint8_t>(kursor));
+                wiederholungStopp();
+            }
+            return;                                   // keine belegte Taste: nichts
+        }
         if (ctrl && z >= 0x40 && z <= 0x7F) z &= 0x1F;
         sendeZeichen(z);
         if (wiederholbar(m)) wiederholungStart(QK_TASTE_BASE | m, std::string(1, static_cast<char>(z)));

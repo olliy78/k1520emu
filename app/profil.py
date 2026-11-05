@@ -147,6 +147,10 @@ class Programmprofil:
     #: Dasselbe fuer ``.td0`` (TeleDisk) und ``.imd`` (ImageDisk).
     td0_hinweise: Tuple[str, ...] = ()
     imd_hinweise: Tuple[str, ...] = ()
+    #: Hinweise nach Abbildname: ``(Teilstring in Kleinschrift, Text)``; der Text erscheint
+    #: unter dem Laufwerk, wenn der Dateiname den Teilstring enthaelt (BS600 am PRG, der Kern
+    #: erkennt es noch nicht am Inhalt).
+    namens_hinweise: Tuple[Tuple[str, str], ...] = ()
     #: Diskettenlaufwerke (K5122 o. ae.): ohne sie (MC80) fallen Kasten „Laufwerke“, die
     #: Diskettenmenues und die Laufwerksfelder der Statuszeile weg.
     laufwerke: bool = True
@@ -527,6 +531,10 @@ TD0_HINWEIS_INFO = ("Fehler- und Löschmarken bleiben erhalten. .td0 wird immer 
                     "Pseudosektoren bleiben nur beim Speichern in .td0 erhalten.")
 IMD_HINWEIS_INFO = "Fehler- und Löschmarken bleiben erhalten; Pseudosektoren des .td0 gehen beim Speichern als .imd verloren."
 
+#: BS600-Disketten (Numerik-Betriebssystem): die Fassung haengt am Geraet (doc/merkposten/bs600.md).
+BS600_HINWEIS = ("BS600: Die Fassung BS620 läuft nur am PRG 710-1 (Tastatur K7672), am PRG 710 bootet sie nicht; "
+                 "BS610 gehört zum PRG 710.")
+
 A5120 = Programmprofil(
     maschine="a5120",
     programm="a5120emu",
@@ -638,6 +646,7 @@ PRG710 = Programmprofil(
     cqm_hinweise=(CQM_HINWEIS_UDOS,),
     td0_hinweise=(TD0_HINWEIS_UDOS, TD0_HINWEIS_INFO),
     imd_hinweise=(IMD_HINWEIS_UDOS, IMD_HINWEIS_INFO),
+    namens_hinweise=(("bs6", BS600_HINWEIS),),
     beschreibung="Emulator der Programmiergeräte robotron PRG 710 und PRG 710-1 (K1520-Bus)",
     konfig_datei="prg710emu.yaml",
     vorgabe_datei="default_config_prg710.yaml",

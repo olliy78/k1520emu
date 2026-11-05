@@ -203,3 +203,103 @@ TEST(Prg710Bs620, SelbsttestOhneFehler) {
     }
     EXPECT_TRUE(menue) << "Hauptmenue nicht erreicht, PC=" << std::hex << m.cpuPC() << "\n" << bildText(m);
 }
+
+namespace {
+// Bis zum Hauptmenue von BS620 booten (Maschine mit Fixture-Kopie); liefert false bei Misserfolg.
+bool bootBs620(Prg710Machine& m, const std::string& pfad) {
+    m.powerOn();
+    if (!m.mountDisk(0, pfad, m.defaultFormatName(0), false)) return false;
+    long long done = 0;
+    while (done < 60'000'000 && bildText(m).find("NKM-LOADER") == std::string::npos) done += m.run(20'000);
+    m.run(2'000'000);
+    m.keyPress(0x01000004, false, false);
+    m.keyRelease(0x01000004);
+    for (done = 0; done < 200'000'000; done += m.run(100'000))
+        if (bildText(m).find("DIENSTPROGRAMME") != std::string::npos) { m.run(3'000'000); return true; }
+    return false;
+}
+
+// Taste tippen (K7672-Matrixtaste oder Host-Code), 60 ms halten, danach @p warte Takte laufen.
+void taste(Prg710Machine& m, uint32_t code, long long warte = 8'000'000) {
+    m.keyPress(code, false, false);
+    m.run(150'000);
+    m.keyRelease(code);
+    m.run(warte);
+}
+constexpr uint32_t T_UP = 0x03000000 | 0x79, T_DOWN = 0x03000000 | 0x18, T_LEFT = 0x03000000 | 0x28,
+                   T_RIGHT = 0x03000000 | 0x08, T_ENTER = 0x01000004, T_ESC = 0x01000000;
+}  // namespace
+
+// Zeile mit der Cursormarke '<' (Menues: "NAME  :  <").
+std::string markierte(Prg710Machine& m) {
+    const std::string t = bildText(m);
+    size_t k = t.find(" <");
+    if (k == std::string::npos) return "";
+    size_t a = t.rfind('\n', k) + 1;
+    std::string r = t.substr(a, t.find('\n', k) - a);
+    return r.substr(r.find_first_not_of(' '));
+}
+
+// Menuefuehrung von BS620 (doc/merkposten/bs600.md): Cursor = ESC [ A/B (K7672-Matrix 79H/18H),
+// ENTER = 0DH.  Hauptmenue: vier Eintraege, '<' markiert; der Cursor bleibt am Ende stehen.
+TEST(Prg710Bs620, MenueCursorUndUnterbild) {
+    k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::ERROR);
+    k1520test::TempDisk kopie("../bs600/BS600.hfe", "bs620_menue.hfe");
+    Prg710Machine m(cfg(true));
+    ASSERT_TRUE(bootBs620(m, kopie.path())) << bildText(m);
+    EXPECT_NE(bildText(m).find("BS600                           VERSION: 04"), std::string::npos) << bildText(m);
+    const char* eintraege[] = {"PROG/TEST PC600    : <", "DIENSTPROGRAMME    : <", "PROG PMC600/CNC600 : <",
+                               "PROG PMC600/CNC-H  : <", "PROG PMC600/CNC-H  : <"};
+    EXPECT_EQ(markierte(m), eintraege[0]);
+    for (int i = 1; i <= 4; ++i) {          // dreimal abwaerts, dann Anschlag
+        taste(m, T_DOWN, 3'000'000);
+        EXPECT_EQ(markierte(m), eintraege[i]) << "nach " << i << " x abwaerts";
+    }
+    taste(m, T_UP, 3'000'000);
+    EXPECT_EQ(markierte(m), eintraege[2]);
+    taste(m, 0x01000013, 3'000'000);        // Host-Kursor auf (Qt::Key_Up) wie die Matrixtaste
+    taste(m, T_UP, 3'000'000);
+    EXPECT_EQ(markierte(m), eintraege[0]);
+
+    // ENTER auf PROG/TEST PC600 -> Unterbild BETRIEBSARTEN mit acht Eintraegen
+    taste(m, T_ENTER, 80'000'000);
+    const std::string b = bildText(m);
+    EXPECT_NE(b.find("BETRIEBSARTEN"), std::string::npos) << b;
+    for (const char* e : {"ANZEIGE", "KORREKTUR", "LOGIKTRANSFER", "EIN-/AUSGABE", "ZWANGSSETZEN", "DOKUMENTATION",
+                          "MONITOR", "SYSTEMDISK"})
+        EXPECT_NE(b.find(e), std::string::npos) << e;
+    EXPECT_EQ(markierte(m), "ANZEIGE       : <");
+}
+
+// DIENSTPROGRAMME fragt "LAUFWERK 1  J" (J/N).  N + ENTER -> Laufwerk 2 ist leer -> blinkende
+// Meldung "LAUFWERK 2"; ESC quittiert und fuehrt ins Hauptmenue zurueck.
+TEST(Prg710Bs620, DienstprogrammeLaufwerkFrageUndEscZurueck) {
+    k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::ERROR);
+    k1520test::TempDisk kopie("../bs600/BS600.hfe", "bs620_menue2.hfe");
+    Prg710Machine m(cfg(true));
+    ASSERT_TRUE(bootBs620(m, kopie.path())) << bildText(m);
+    taste(m, T_DOWN, 3'000'000);
+    taste(m, T_ENTER, 100'000'000);
+    EXPECT_NE(bildText(m).find("LAUFWERK 1  J"), std::string::npos) << bildText(m);
+    taste(m, 'N', 2'000'000);
+    taste(m, T_ENTER, 150'000'000);
+    EXPECT_NE(bildText(m).find("LAUFWERK 2"), std::string::npos) << bildText(m);   // Meldung (blinkt)
+    taste(m, T_ESC, 50'000'000);
+    EXPECT_NE(bildText(m).find("VERSION: 04"), std::string::npos) << bildText(m);
+    EXPECT_NE(bildText(m).find("DIENSTPROGRAMME    :"), std::string::npos);
+}
+
+// OFFENER BEFUND (AP-B2): mit J (Laufwerk 1 = die BS620-Diskette) liest der Treiber von BS600 in 12E3H..1318H den
+// Sektorkopf; nach "4E 00 00 00" bleibt die Schleife `IN (12H) / AND 02H / JR NZ` (1312H) haengen, weil das
+// Marken-FF (12H Bit 1) nie faellt.  Die Meldung "LAUFWERK 1" blinkt dauernd.  Erwartet waere der Katalog.
+TEST(Prg710Bs620, DISABLED_DienstprogrammeLiestDenDatentraeger) {
+    k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::ERROR);
+    k1520test::TempDisk kopie("../bs600/BS600.hfe", "bs620_menue3.hfe");
+    Prg710Machine m(cfg(true));
+    ASSERT_TRUE(bootBs620(m, kopie.path())) << bildText(m);
+    taste(m, T_DOWN, 3'000'000);
+    taste(m, T_ENTER, 100'000'000);
+    taste(m, 'J', 2'000'000);
+    taste(m, T_ENTER, 300'000'000);
+    EXPECT_EQ(bildText(m).find("LAUFWERK"), std::string::npos) << bildText(m) << " PC=" << std::hex << m.cpuPC();
+}
