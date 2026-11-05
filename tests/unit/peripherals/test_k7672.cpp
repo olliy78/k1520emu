@@ -519,16 +519,19 @@ TEST(K7672, DcpSteuerzeichenOhneBuchstabe)
 /**
  * @test K7672.ScpTabRuecktasteUndUnbekannteTaste
  * @brief SCP-Modus (Boot-ROM, Monitor): Tab und Umschalt+Tab ⇒ 09H, Ruecktaste ⇒ 08H;
- *        eine Host-Taste ohne Zeichen (Umschalt allein, Kursor) sendet nichts.
+ *        eine Host-Taste ohne Zeichen (Umschalt allein) sendet nichts; Kursor links sendet seit AP-B2 `ESC [ D`.
  */
 TEST(K7672, ScpTabRuecktasteUndUnbekannteTaste)
 {
     Aufbau a;
-    for (uint32_t k : {QK_TAB, QK_BACKTAB, QK_BACKSPACE, QK_SHIFT, QK_LEFT}) {
+    for (uint32_t k : {QK_TAB, QK_BACKTAB, QK_BACKSPACE, QK_SHIFT}) {
         a.kbd.keyPress(k, false, false);
         a.kbd.keyRelease(k);
     }
     EXPECT_EQ(alles(a), (std::vector<int>{0x09, 0x09, 0x08}));
+    a.kbd.keyPress(QK_LEFT, false, false);
+    a.kbd.keyRelease(QK_LEFT);
+    EXPECT_EQ(alles(a), (std::vector<int>{0x1B, '[', 'D'}));
 }
 
 // ─── Tastenwiederholung (AP-E4g) ──────────────────────────────────────────────

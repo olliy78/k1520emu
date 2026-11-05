@@ -10,13 +10,30 @@
 
 #include <gtest/gtest.h>
 
+#include <filesystem>
 #include <string>
+#include <vector>
 
+#include "core/filesystem/disk_volume.h"
 #include "core/logger.h"
 #include "core/machines/prg710/prg710.h"
 #include "tests/support/fixtures.h"
 
 namespace {
+const FormatCatalog& formate() {
+    static FormatCatalog c = [] { std::string f; return FormatCatalog::loadDefault(&f); }();
+    return c;
+}
+const FsCatalog& dateisysteme() {
+    static FsCatalog c = [] { std::string f; return FsCatalog::loadDefault(formate(), &f); }();
+    return c;
+}
+/// Sektor @p s (1-basiert) der Spur @p t einer BS600-Diskette roh lesen (Spur 0: 26 x 128 B, sonst 15 x 256 B).
+std::vector<uint8_t> bsSektor(const DiskVolume& v, int t, int s) {
+    std::vector<uint8_t> b; uint16_t crc = 0;
+    EXPECT_TRUE(v.readSectorAt(static_cast<uint8_t>(t), 0, s - 1, b, crc)) << t << "/" << s;
+    return b;
+}
 using V = Prg710Machine::Config::Variante;
 
 Prg710Machine::Config cfg(bool atp) {
@@ -289,17 +306,142 @@ TEST(Prg710Bs620, DienstprogrammeLaufwerkFrageUndEscZurueck) {
     EXPECT_NE(bildText(m).find("DIENSTPROGRAMME    :"), std::string::npos);
 }
 
-// OFFENER BEFUND (AP-B2): mit J (Laufwerk 1 = die BS620-Diskette) liest der Treiber von BS600 in 12E3H..1318H den
-// Sektorkopf; nach "4E 00 00 00" bleibt die Schleife `IN (12H) / AND 02H / JR NZ` (1312H) haengen, weil das
-// Marken-FF (12H Bit 1) nie faellt.  Die Meldung "LAUFWERK 1" blinkt dauernd.  Erwartet waere der Katalog.
-TEST(Prg710Bs620, DISABLED_DienstprogrammeLiestDenDatentraeger) {
-    k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::ERROR);
-    k1520test::TempDisk kopie("../bs600/BS600.hfe", "bs620_menue3.hfe");
-    Prg710Machine m(cfg(true));
-    ASSERT_TRUE(bootBs620(m, kopie.path())) << bildText(m);
+
+// einlegen -> Laufwerk J -> Geraet.  Liefert die Maschine am Geraetemenue.
+void zumListenGeraet(Prg710Machine& m) {
     taste(m, T_DOWN, 3'000'000);
     taste(m, T_ENTER, 100'000'000);
     taste(m, 'J', 2'000'000);
-    taste(m, T_ENTER, 300'000'000);
-    EXPECT_EQ(bildText(m).find("LAUFWERK"), std::string::npos) << bildText(m) << " PC=" << std::hex << m.cpuPC();
+    for (int i = 0; i < 4; ++i) taste(m, T_ENTER, i < 2 ? 300'000'000 : 600'000'000);
+    taste(m, 'J', 2'000'000);
+    taste(m, T_ENTER, 1'500'000'000);
+}
+
+// AP-B2b: Der Plattentreiber von BS620 (12E3H-1318H) wartet nach dem Strobe auf Marken-FF = 0 (`IN (12H) / AND 02H /
+// JR NZ`), also low-aktiv wie am 710 - das ROM des 710-1 aber auf 1.  Mit der Polaritaet des 710-1 (high-aktiv) liest er
+// die Luecken vor der Marke (4E 00 00 00) und haengt.  Nach dem Boot wird deshalb umgeschaltet (merkposten bs600 Nr. 5).
+TEST(Prg710Bs620, DienstprogrammeLiestDenDatentraeger) {
+    k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::ERROR);
+    k1520test::TempDisk kopie("../bs600/BS600.hfe", "bs620_liste.hfe");
+    Prg710Machine m(cfg(true));
+    ASSERT_TRUE(bootBs620(m, kopie.path())) << bildText(m);
+    m.afs().setMkeLowAktiv(true);   // Treiber von BS620: Marken-FF low-aktiv - NACH dem ROM-Boot (merkposten bs600 Nr. 5)
+    zumListenGeraet(m);
+    taste(m, T_DOWN, 20'000'000);               // GERAET: Anzeige BS (der Cursor laeuft im Kreis)
+    taste(m, T_ENTER, 3'000'000'000);
+    const std::string kopf = bildText(m);
+    EXPECT_NE(kopf.find("DISK-NAME   : BS600-"), std::string::npos) << kopf;
+    EXPECT_NE(kopf.find("DISK ENTHAELT 28 VON 54 MOEGLICHEN DATEIEN"), std::string::npos) << kopf;
+    taste(m, T_DOWN, 1'500'000'000);
+    const std::string liste = bildText(m);
+    for (const char* e : {"SYSVSP  220983  HOF  P  01/01  01/01", "SYSNLD  081288  KRU  P  01/02  01/03",
+                          "SYSDMF  250285  HOF  P  01/04  01/04"})
+        EXPECT_NE(liste.find(e), std::string::npos) << e << "\n" << liste;
+}
+
+// Wartet bis @p text auf dem Bild steht (hoechstens @p max Takte), dann noch etwas Ruhe.
+bool warteAuf(Prg710Machine& m, const char* text, long long max = 6'000'000'000) {
+    for (long long g = 0; g < max; g += 2'000'000) {
+        if (bildText(m).find(text) != std::string::npos) { m.run(8'000'000); return true; }
+        m.run(2'000'000);
+    }
+    return false;
+}
+void tippe(Prg710Machine& m, const std::string& t) { for (char ch : t) taste(m, static_cast<uint32_t>(ch), 3'000'000); }
+
+// AP-B2b, Gegenprobe zu den DiskTool-Annahmen (doc/bs600_diskettenformat.md §5/§6): BS620 kopiert SYSVSP
+// (Quell- und Zieldisk sind hier dieselbe Diskette) als KOPIE1.  Danach muessen stimmen:
+//  - ein neuer Verzeichniseintrag (42 B) auf dem ERSTEN freien Platz (Sektor 16, Platz 1), Typ P, Anfang = Ende = Spur 26/
+//    Sektor 7 (Binaerbytes 1AH 07H), Rest wie das Original (Datum, Signum, Adressen);
+//  - das Belegungsbit von Spur 26, Sektor 7 gesetzt (Sektor 26, Byte 2*(26-1), Bit 1) - sonst unveraendert;
+//  - Allokation: erster freier Sektor ueber Spurgrenzen (Spur 26 Sektor 7 war der erste freie);
+//  - der Datensektor ist byteweise der von SYSVSP; alle anderen Sektoren unveraendert.
+TEST(Prg710Bs620, DateiKopierenAendertNurEintragBelegungUndDaten) {
+    k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::ERROR);
+    k1520test::TempDisk kopie("../bs600/BS600.hfe", "bs620_cp.hfe");
+    std::string err;
+    std::vector<std::vector<uint8_t>> vor;                       // alle 611 Sektoren vorher
+    {
+        auto v = DiskVolume::open(kopie.path(), "", formate(), dateisysteme(), err, true, true);
+        ASSERT_TRUE(v) << err;
+        for (int t = 0; t < 40; ++t)
+            for (int s = 1; s <= (t == 0 ? 26 : 15); ++s) vor.push_back(bsSektor(*v, t, s));
+    }
+    {
+        Prg710Machine m(cfg(true));
+        ASSERT_TRUE(bootBs620(m, kopie.path())) << bildText(m);
+        m.afs().setMkeLowAktiv(true);        // Treiber von BS620: low-aktiv - NACH dem ROM-Boot (merkposten bs600 Nr. 5)
+        taste(m, T_DOWN, 3'000'000);
+        taste(m, T_ENTER, 100'000'000);
+        taste(m, 'J', 2'000'000);
+        taste(m, T_ENTER, 100'000'000);
+        ASSERT_TRUE(warteAuf(m, "DISK-NAME :")) << bildText(m);
+        taste(m, T_ENTER, 100'000'000);
+        ASSERT_TRUE(warteAuf(m, "COPY   ")) << bildText(m);
+        taste(m, T_DOWN, 20'000'000);
+        taste(m, T_ENTER, 100'000'000);
+        ASSERT_TRUE(warteAuf(m, "STECKE QUELLDISK")) << bildText(m);
+        taste(m, T_ENTER, 100'000'000);
+        ASSERT_TRUE(warteAuf(m, "LAUFWERK 1  J")) << bildText(m);
+        taste(m, T_ENTER, 100'000'000);
+        ASSERT_TRUE(warteAuf(m, "DATEI-NAME")) << bildText(m);
+        tippe(m, "SYSVSP");
+        taste(m, T_ENTER, 100'000'000);
+        ASSERT_TRUE(warteAuf(m, "START-ADR")) << bildText(m);
+        taste(m, T_ENTER, 100'000'000);
+        ASSERT_TRUE(warteAuf(m, "STECKE ZIELDISK")) << bildText(m);
+        taste(m, T_ENTER, 100'000'000);
+        ASSERT_TRUE(warteAuf(m, "LAUFWERK 1  J")) << bildText(m);
+        taste(m, T_ENTER, 100'000'000);
+        ASSERT_TRUE(warteAuf(m, "DATEI-NAME", 12'000'000'000)) << bildText(m);
+        tippe(m, "KOPIE1");
+        taste(m, T_ENTER, 100'000'000);
+        // Einzellaufwerk: BS620 verlangt Quell- und Zieldisk abwechselnd (STECKE ...) - jeweils mit ENTER bestaetigen.
+        bool fertig = false;
+        for (int runde = 0; runde < 8 && !fertig; ++runde) {
+            for (long long g = 0; g < 6'000'000'000 && !fertig; g += 2'000'000) {
+                const std::string b = bildText(m);
+                fertig = b.find("SYSVSP KOPIERT") != std::string::npos;
+                if (fertig || b.find("STECKE") != std::string::npos) break;
+                m.run(2'000'000);
+            }
+            if (!fertig) { m.run(8'000'000); taste(m, T_ENTER, 100'000'000); }
+        }
+        ASSERT_TRUE(fertig) << bildText(m);
+        m.run(100'000'000);                   // Schreibpause des Mediums (autoFlush ~0.5 s Maschinenzeit)
+    }
+    auto v = DiskVolume::open(kopie.path(), "", formate(), dateisysteme(), err, true, true);
+    ASSERT_TRUE(v) << err;
+    std::vector<std::vector<uint8_t>> nach;
+    for (int t = 0; t < 40; ++t)
+        for (int s = 1; s <= (t == 0 ? 26 : 15); ++s) nach.push_back(bsSektor(*v, t, s));
+    ASSERT_EQ(vor.size(), nach.size());
+    auto idx = [](int t, int s) { return t == 0 ? s - 1 : 26 + (t - 1) * 15 + (s - 1); };
+
+    std::vector<int> geaendert;
+    for (size_t i = 0; i < vor.size(); ++i) if (vor[i] != nach[i]) geaendert.push_back(static_cast<int>(i));
+    EXPECT_EQ(geaendert, (std::vector<int>{idx(0, 16), idx(0, 26), idx(26, 7)}));
+
+    // Eintrag: Sektor 16 Platz 1 (Versatz 42) war leer (20H) und ist jetzt SYSVSP-Eintrag mit neuem Namen/Lage.
+    const auto& e = nach[idx(0, 16)];
+    const std::string eintrag(e.begin() + 42, e.begin() + 84);
+    EXPECT_EQ(eintrag, std::string("KOPIE1P\x1A\x07\x1A\x07" "220983HOF290029FF2900          "));
+    for (int i = 0; i < 42; ++i) EXPECT_EQ(e[i], vor[idx(0, 16)][i]) << "Platz 0 unveraendert, Byte " << i;
+    // Original-Eintrag SYSVSP (Sektor 8 Platz 0) als Vorlage: gleiche Felder hinter dem Namen.
+    const auto& o = nach[idx(0, 8)];
+    EXPECT_EQ(std::string(o.begin() + 6, o.begin() + 7), "P");
+    EXPECT_EQ(std::string(o.begin() + 11, o.begin() + 42), std::string(e.begin() + 42 + 11, e.begin() + 84));
+
+    // Belegungstabelle: nur Bit 1 (Sektor 7) im ersten Byte von Spur 26
+    const auto& b0 = vor[idx(0, 26)];
+    const auto& b1 = nach[idx(0, 26)];
+    for (size_t i = 0; i < b0.size(); ++i) {
+        if (i == 2 * (26 - 1)) EXPECT_EQ(b1[i], b0[i] | 0x02) << "Belegung Spur 26";
+        else                   EXPECT_EQ(b1[i], b0[i]) << "Belegungsbyte " << i;
+    }
+    EXPECT_EQ(b0[2 * (26 - 1)] & 0x02, 0) << "Sektor 7 war frei";
+    EXPECT_EQ(b0[2 * (26 - 1)] & 0xFC, 0xFC) << "Sektor 1-6 waren belegt: erster freier Sektor";
+
+    // Daten: byteweise die von SYSVSP (Spur 1, Sektor 1)
+    EXPECT_EQ(nach[idx(26, 7)], nach[idx(1, 1)]);
 }
