@@ -318,6 +318,7 @@ class MainWindow(QMainWindow):
         m.addSeparator()
         m.addAction(self.act_bootabbild)
         m.addAction(self.act_dos_sys)
+        m.addAction(self.act_reorganisieren)
         m.addAction(self.act_diskeditor)
         m.addSeparator()
         m.addAction(self.act_neu_beschreiben)
@@ -684,6 +685,9 @@ class MainWindow(QMainWindow):
         # DOS SYS: nur an einer beschreibbaren FAT-Diskette (leer ist Sache des Kerns - er sagt es klar)
         self.act_dos_sys.setEnabled(mit_fs and getattr(self.tool, "ist_fat", False)
                                     and not self.tool.read_only)
+        # BS600: Luecken schliessen - nur dort und nur an einer beschreibbaren Diskette.
+        bs600 = mit_fs and getattr(self.tool, "ist_bs600", False)
+        self.act_reorganisieren.setEnabled(bs600 and not self.tool.read_only)
         self.act_schreibschutz.setEnabled(offen)
         # Auch ohne offene Diskette waehlbar, wenn ein physisches Laufwerk im Spiel
         # ist: bei einer nicht erkannten Diskette ist das Uebersteuern der einzige Weg
@@ -2194,6 +2198,35 @@ class MainWindow(QMainWindow):
         self._reload()
         self.log(f"{len(refs)} Dateien gelöscht")
         return True
+
+    def reorganisieren(self) -> int:
+        """BS600: Lücken schließen (alle Dateien lückenlos ab Spur 1 neu legen) — ohne Rückfrage.
+
+        Returns:
+            Zahl der verschobenen Dateien; -1 bei Fehler (Meldung ist ausgegeben, die Diskette unverändert).
+        """
+        if self.tool is None or not getattr(self.tool, "ist_bs600", False):
+            return -1
+        try:
+            bewegt = self.tool.bs600_reorganize()
+        except K1520DiskError as e:
+            self._fehler("Reorganisieren", str(e))
+            self._reload()
+            return -1
+        self._reload()
+        self.log("Reorganisiert: " + (f"{bewegt} Datei(en) verschoben" if bewegt else "keine Lücken, nichts verschoben"))
+        return bewegt
+
+    def _reorganisieren(self) -> None:
+        """Handler der Aktion: erst fragen — es werden Dateien auf der Diskette verschoben."""
+        if self.tool is None or not getattr(self.tool, "ist_bs600", False):
+            return
+        antwort = QMessageBox.question(
+            self, "Reorganisieren",
+            "Alle Dateien werden lückenlos ab Spur 1 neu auf die Diskette gelegt.\n"
+            "Namen, Inhalt und Angaben bleiben; die Lage der Dateien ändert sich.\n\nFortfahren?")
+        if antwort == QMessageBox.Yes:
+            self.reorganisieren()
 
     def save_as(self, path) -> bool:
         """Unter neuem Namen/Container speichern und **dort weiterarbeiten**.

@@ -118,6 +118,18 @@ bootsektoren:
     filesystem:  scpx_ds80_16x256_boot
     file:        bootsektoren/boot_prg710-1_scpx17.bin
 
+  # BS600 (Entwurf 48): nur der URLADER (Sektor 1-3 der Spur 0, 384 B) aus den Originalabzuegen unter
+  # tests/fixtures/bs600/.  Er sucht die Datei BS620 bzw. BS600 im Verzeichnis - die Dateien kommen danach
+  # per „Alles einfügen“ dazu (Ladeadresse/Start stehen im .fileinfo).  Zwei Bauarten: SYL FOR BS620 gehoert zum
+  # PRG 710-1, BOOTSTRAP FOR BS600 zum PRG 700 und startet am 710/710-1 NICHT.
+  - description: "BS620 — Urlader „SYL FOR BS620“ für PRG 710-1"
+    filesystem:  bs600_ss40_15x256_boot
+    file:        bootsektoren/boot_bs620_prg710-1.bin
+
+  - description: "BS600 — Urlader „BOOTSTRAP FOR BS600“ für PRG 700 (nicht PRG 710/710-1)"
+    filesystem:  bs600_ss40_15x256_boot
+    file:        bootsektoren/boot_bs600_prg700.bin
+
   # ── PC 1715 / 1715W ────────────────────────────────────────────────────────
   - description: "CP/A 1715 — PC 1715 (Bootkopf im Verzeichnis)"
     filesystem:  cpa1715_ds80_5x1024_boot
