@@ -314,14 +314,17 @@ int bootTracePrg710(const K8915TraceOpts& o, bool v1, const prnlst::Listing& prn
     // Getippt wird blockweise (ein Block endet mit `<ET>`) und immer erst, wenn die Maschine
     // steht (Stillstand: --stall Takte ohne Bildaenderung/Steuerzugriff) — also am Start-
     // taster-Warten des ROMs, an der Datumsabfrage von UDOS usw.
-    // Marken (gross/klein): <ET> ET1/Return · <ESC> und <CL> (Fehlermeldung weg; am 710-1 ist CL der
+    // Marken (gross/klein): <ET> ROM-Starttaste (710: ET1 37H, 710-1: Return) · <ENTER> ENTER der BS6xx (710: Matrix 38H, 710-1: Return) · <ET> alt: ET1/Return · <ESC> und <CL> (Fehlermeldung weg; am 710-1 ist CL der
     // K7672 stumm, dort gilt ESC allein = 83H, am 710 ist CL die Matrixtaste 28H = 83H, doc/bs600/
     // selbsttest.md 3.8) · <UP> <DOWN> <LEFT> <RIGHT> Kursor (BS600-Menues; 710-1: Matrixtasten der
     // K7672 wie auf der Bildschirmtastatur, 710: Kursortasten der K7609).  Ein Block endet mit <ET>.
     struct Taste { uint32_t code; bool et; };
     struct Marke { const char* name; uint32_t v0; uint32_t v1; bool et; };
     static const Marke marken[] = {
-        {"<ET>",    K7609::QK_TASTE_BASE | 0x37u, 0x01000004u, true},
+        {"<ET>",    K7609::QK_TASTE_BASE | 0x37u, 0x01000004u, true},    // Start-Taste des ROMs (710: ET1, 710-1: ENTER)
+        // ENTER von BS600/BS610/BS620: 710 = Matrixtaste 38H (ET2; Tabelle bei 02B3H: 38H -> 84H; 37H -> 1EH),
+        // 710-1 = Return (0DH).  Eigene Marke, weil <ET> am 710 die ROM-Starttaste 37H ist.
+        {"<ENTER>", K7609::QK_TASTE_BASE | 0x38u, 0x01000004u, true},
         {"<ESC>",   K7609::QK_TASTE_BASE | 0x28u, 0x01000000u, false},
         {"<CL>",    K7609::QK_TASTE_BASE | 0x28u, 0x01000000u, false},
         {"<UP>",    0x01000013u, K7672::QK_TASTE_BASE | 0x79u, false},

@@ -438,7 +438,9 @@ int main(int argc, char** argv){
     }
     if (atp_opt){
         std::string err;
-        if (!m.prg() || !m.prg()->steckeAtpZusatz(&err)){
+        // Der Kern steckt den Zusatz seit AP-B2 ohnehin (Vorgabe AN): "steckt schon" ist kein Fehler.
+        if (m.prg() && m.prg()->atpZusatz()) {}
+        else if (!m.prg() || !m.prg()->steckeAtpZusatz(&err)){
             fprintf(stderr,"--atp-zusatz: %s\n", m.prg() ? err.c_str() : "nur am PRG 710/710-1"); return 2; }
     }
     { std::string err;   // ebenfalls vor dem ersten Lauf

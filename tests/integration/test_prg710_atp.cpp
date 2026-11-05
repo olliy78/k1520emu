@@ -5,7 +5,7 @@
  *
  * `Prg710Atp.*` treibt die Bausteine ueber den Systembus, waehrend das ROM der Maschine in
  * seiner Tastaturabfrage laeuft.  `Prg710Bs620.SelbsttestOhneFehler` startet die echte
- * Diskette `tests/fixtures/bs600/BS600.hfe` (Kopie ueber TempDisk).
+ * Diskette `tests/fixtures/bs600/bs620_prg710-1.hfe` (Kopie ueber TempDisk).
  */
 
 #include <gtest/gtest.h>
@@ -40,6 +40,7 @@ Prg710Machine::Config cfg(bool atp) {
     Prg710Machine::Config c;
     c.variante   = V::Prg710_1;
     c.atp_zusatz = atp;
+    c.leser_modell = 1;   // einheitlich: low-aktiv, Daten nach der Marke - BS620 liest ohne Umpolen (marken_ff.md §8)
     return c;
 }
 
@@ -191,9 +192,9 @@ std::string bildText(Prg710Machine& m) {
 
 TEST(Prg710Bs620, SelbsttestOhneFehler) {
     k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::ERROR);
-    // Fixture tests/fixtures/bs600/BS600.hfe (BS620, vom Anwender freigegeben); nur ueber TempDisk.
-    k1520test::TempDisk kopie("../bs600/BS600.hfe", "bs620_selbsttest.hfe");
-    ASSERT_FALSE(k1520test::readFileBytes(kopie.path()).empty()) << "Fixture BS600.hfe fehlt";
+    // Fixture tests/fixtures/bs600/bs620_prg710-1.hfe (BS620, vom Anwender freigegeben); nur ueber TempDisk.
+    k1520test::TempDisk kopie("../bs600/bs620_prg710-1.hfe", "bs620_selbsttest.hfe");
+    ASSERT_FALSE(k1520test::readFileBytes(kopie.path()).empty()) << "Fixture bs620_prg710-1.hfe fehlt";
 
     Prg710Machine m(cfg(true));
     m.powerOn();
@@ -261,7 +262,7 @@ std::string markierte(Prg710Machine& m) {
 // ENTER = 0DH.  Hauptmenue: vier Eintraege, '<' markiert; der Cursor bleibt am Ende stehen.
 TEST(Prg710Bs620, MenueCursorUndUnterbild) {
     k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::ERROR);
-    k1520test::TempDisk kopie("../bs600/BS600.hfe", "bs620_menue.hfe");
+    k1520test::TempDisk kopie("../bs600/bs620_prg710-1.hfe", "bs620_menue.hfe");
     Prg710Machine m(cfg(true));
     ASSERT_TRUE(bootBs620(m, kopie.path())) << bildText(m);
     EXPECT_NE(bildText(m).find("BS600                           VERSION: 04"), std::string::npos) << bildText(m);
@@ -292,7 +293,7 @@ TEST(Prg710Bs620, MenueCursorUndUnterbild) {
 // Meldung "LAUFWERK 2"; ESC quittiert und fuehrt ins Hauptmenue zurueck.
 TEST(Prg710Bs620, DienstprogrammeLaufwerkFrageUndEscZurueck) {
     k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::ERROR);
-    k1520test::TempDisk kopie("../bs600/BS600.hfe", "bs620_menue2.hfe");
+    k1520test::TempDisk kopie("../bs600/bs620_prg710-1.hfe", "bs620_menue2.hfe");
     Prg710Machine m(cfg(true));
     ASSERT_TRUE(bootBs620(m, kopie.path())) << bildText(m);
     taste(m, T_DOWN, 3'000'000);
@@ -322,10 +323,9 @@ void zumListenGeraet(Prg710Machine& m) {
 // die Luecken vor der Marke (4E 00 00 00) und haengt.  Nach dem Boot wird deshalb umgeschaltet (merkposten bs600 Nr. 5).
 TEST(Prg710Bs620, DienstprogrammeLiestDenDatentraeger) {
     k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::ERROR);
-    k1520test::TempDisk kopie("../bs600/BS600.hfe", "bs620_liste.hfe");
+    k1520test::TempDisk kopie("../bs600/bs620_prg710-1.hfe", "bs620_liste.hfe");
     Prg710Machine m(cfg(true));
     ASSERT_TRUE(bootBs620(m, kopie.path())) << bildText(m);
-    m.afs().setMkeLowAktiv(true);   // Treiber von BS620: Marken-FF low-aktiv - NACH dem ROM-Boot (merkposten bs600 Nr. 5)
     zumListenGeraet(m);
     taste(m, T_DOWN, 20'000'000);               // GERAET: Anzeige BS (der Cursor laeuft im Kreis)
     taste(m, T_ENTER, 3'000'000'000);
@@ -358,7 +358,7 @@ void tippe(Prg710Machine& m, const std::string& t) { for (char ch : t) taste(m, 
 //  - der Datensektor ist byteweise der von SYSVSP; alle anderen Sektoren unveraendert.
 TEST(Prg710Bs620, DateiKopierenAendertNurEintragBelegungUndDaten) {
     k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::ERROR);
-    k1520test::TempDisk kopie("../bs600/BS600.hfe", "bs620_cp.hfe");
+    k1520test::TempDisk kopie("../bs600/bs620_prg710-1.hfe", "bs620_cp.hfe");
     std::string err;
     std::vector<std::vector<uint8_t>> vor;                       // alle 611 Sektoren vorher
     {
@@ -370,7 +370,6 @@ TEST(Prg710Bs620, DateiKopierenAendertNurEintragBelegungUndDaten) {
     {
         Prg710Machine m(cfg(true));
         ASSERT_TRUE(bootBs620(m, kopie.path())) << bildText(m);
-        m.afs().setMkeLowAktiv(true);        // Treiber von BS620: low-aktiv - NACH dem ROM-Boot (merkposten bs600 Nr. 5)
         taste(m, T_DOWN, 3'000'000);
         taste(m, T_ENTER, 100'000'000);
         taste(m, 'J', 2'000'000);

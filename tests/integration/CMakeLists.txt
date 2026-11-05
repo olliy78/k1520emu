@@ -128,10 +128,15 @@ k1520_add_test(prg710_boot SRC test_prg710_boot.cpp
                           LABELS "${_lbl}" DEFS LOG_LEVEL=2)
 
 # PRG 710-1 (Entwurf 48, AP-B1): ATP-Zusatz (SIO C0H-C3H mit Schleife, CTC-Takt, Anzeige F4H/F5H)
-# und der BS620-Selbsttest (Fixture tests/fixtures/bs600/BS600.hfe).
+# und der BS620-Selbsttest (Fixture tests/fixtures/bs600/bs620_prg710-1.hfe).
 k1520_add_test(prg710_atp SRC test_prg710_atp.cpp
                           LIBS k1520_prg710 k1520_fs k1520_logger k1520_testsupport
                           LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 600)
+
+# BS600/BS620 am PRG 710 und 710-1 (AP-B2d): je Geraet zwei Disketten (low/high) gegen beide Leser-Modelle.
+k1520_add_test(prg710_bs6xx SRC test_prg710_bs6xx.cpp
+                          LIBS k1520_prg710 k1520_fs k1520_logger k1520_testsupport
+                          LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 900)
 
 # PRG 710 / 710-1 Etappe 3 (AP-P3): UDOS 4.3 bis zum Prompt.
 k1520_add_test(prg710_udos SRC test_prg710_udos.cpp

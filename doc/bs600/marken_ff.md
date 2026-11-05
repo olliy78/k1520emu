@@ -126,3 +126,43 @@ ein Umweg um eine Gerätefrage und sollte nicht ohne die Antworten unten gebaut 
 4. Zeigt am PRG 710-1 **UDOS/SCPX** Auffälligkeiten beim Lesen (Wiederholungen „DISKERROR C4“)?  Das wäre ein Hinweis auf eine unpassende Polarität.
 
 **Was sich ohne Gerät noch tun ließe (nicht getan):** Schaltplan der K5122 (062-8390) aus dem Fundus lesen (nicht im Projekt vorhanden); nach „MKE“/„Bit 1“ und Brücken suchen.
+
+## 8. AP-B2d: Hypothese „eine Hardware für alle Treiber“ am Modell geprüft
+
+Hypothese (Anwender): das Marken-FF ist an **beiden** Geräten low-aktiv, und `IN (16H)` liefert erst nach erkannter Marke Daten (die CPU bleibt im `/WAIT`).
+Dann liefe der 710-1-Code (`JR Z` auf sich selbst) sofort durch, BS620 und das 710-ROM warteten auf 0.  Dafür gibt es im K5122-`/WAIT`-Zweig die neue Einstellung
+`setDatenErstNachMarke(true)` (`IN (16H)` hält die CPU bis zum Ende des ersten Sync-Bytes der nächsten Gruppe und liefert dieses A1) und im PRG die Konfiguration
+`Prg710Machine::Config::leser_modell` (0 = bisher = **Vorgabe**, 1 = „einheitlich“, 2 = einheitlich mit Sofortmarke).  A5120 und K8915 sind unberührt (Vorgabe der Karte: aus).
+
+**Ergebnis [Lauf, Modell — nicht Gerät]:**
+
+| Leser-Modell | PRG 710-1 | PRG 710 |
+|---|---|---|
+| 0 bisher (710 low + Sofortmarke, 710-1 high) | alles grün; **BS620 hängt im Plattentreiber** | alles grün |
+| 1 einheitlich: low, Daten nach Marke, **keine** Sofortmarke | **alles grün** (ROM, UDOS, SCPX, FORMAT, EPROMmer, Lochband, Sertest, BS620 LIST/COPY **ohne Umpolen**) | 710-ROM **bootet nicht** |
+| 2 einheitlich + Sofortmarke (`setMkeJedesSyncByte`) | UDOS/SCPX/ROM-Tests rot, BS620 low bootet bis LIST | **alles grün** (UDOS, SCPX, FORMAT, EPROMmer, Lochband, Sertest) |
+
+* **Die Hypothese trägt zur Hälfte:** low-aktiv **und** Daten erst nach der Marke genügen am 710-1 für *alle* Software einschließlich des **unveränderten** BS620; die Polarität
+  je Variante entfällt dort.  Am 710 bleibt die Polarität low und `IN (16H)` nach der Marke verträgt sich mit allen Wächtern.
+* **Ein einziges Modell für beide Geräte ist es trotzdem nicht:** Modell 1 und 2 unterscheiden sich allein in der **Sofortmarke** — gilt das zuletzt fertige Byte als Marke, wenn es ein Sync-Byte ist.
+  Das 710-ROM strobt in einer 54-Takte-Schleife neu (Abfrage ≈ 12 Takte nach dem Strobe, kürzer als ein Byte) und findet ohne Sofortmarke nie eine; das 710-1-ROM strobt einmal und
+  liest bei einer Sofortmarke das Byte davor (die Falle von AP-P3).  Der Unterschied der Ablaufe der beiden ROMs (§3) ist damit **die** noch offene Eigenschaft; ob sie am Gerät eine
+  Hardwarefrage (FF setzt früher/später im Byte) oder ein Modellartefakt (starres Zeitraster) ist, bleibt offen [?].  Nicht verbogen: Vorgabe 0 bleibt; die Modelle 1/2 sind Prüfstände.
+* Eine Variante „Marke physikalisch“ (FF setzt am Ende eines gerade laufenden Sync-Bytes) wurde ausprobiert und verworfen: bootet weder 710 noch 710-1.
+* **Fehlerbilder der neuen Einstellung:** ohne jede Marke auf der Spur (unformatiert) liest `IN (16H)` wie bisher weiter (Rauschen mit Scheinmarken, AP-P3b); das Warten ist am Gerät unbekannt [?] —
+  `UnformatierteDisketteMeldetFehlerUndBootetNachWechsel` ist mit Modell 1 am 710-1 rot (Meldung/Dauer anders), mit Vorgabe grün.
+
+**Die vier Disketten am Modell** (`Prg710Bs6xxDisketten.Tabelle`, Stufe: Boot / Hauptmenü / Disk-Name / LIST):
+
+| Diskette | 0 bisher | 1 einheitlich | 2 einh.+Sofortmarke |
+|---|---|---|---|
+| 710-1 BS620 low (Original) | Hauptmenü | **LIST ok** | **LIST ok** |
+| 710-1 BS620 high (gepatcht) | **LIST ok** | **LIST ok** | Disk-Name |
+| 710 BS600 low (Eigenbau-Urlader) | Disk-Name | Boot fehlt | Disk-Name |
+| 710 BS600 high (gepatcht) | Hauptmenü | Boot fehlt | Disk-Name |
+
+* Die **BS600** (Version 02, Datei der PRG-700-Diskette) macht **Einfachschritt** und scheitert an einem 96-tpi-K5601 mit der 40-Spur-Diskette beim Nachladen von Spur ≥ 1 mit `FC 06` — „Disk-Name“ (Spur 0)
+  ist ihr Maximum am K5601 (Test `Prg710Bs600.LiestAmK5601NurSpur0FC06NachDemKennsatz`).  Das passt zu robotrontechnik.de (BS600 = K5600.10 am PRG 700).  Eine echte BS610 (Doppelschritt) liegt nicht vor;
+  die 710-Diskette ist damit **kein** Beleg für das Polaritätsproblem am PRG 710, nur für die Tastenbelegung (§ Tasten am 710 in `merkposten/bs600.md`).
+* **Patch `high`:** vier Bytes `20H → 28H` (JR NZ → JR Z) an `1316H`, `1354H`, `15A5H`/`161EH` (BS620: `1316H, 1354H, 15A8H, 1620H`) bzw. den entsprechenden Stellen der BS600; bei BS600 zusätzlich die Sollbytes der aktiven Prüfsumme
+  (`AEC4H`, `AEC5H`, `AEEBH`) — Sektorvergleich: BS620 genau 4 Bytes, BS600 genau 7 Bytes weichen ab, Prüfsumme nach dem Patch in allen 25 Blöcken gut (`bau_disketten.py --check`).

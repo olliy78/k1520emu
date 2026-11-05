@@ -282,7 +282,7 @@ tools/dev.sh trace --machine prg710 --events /tmp/ev.txt --events-cap 100000 DIS
   im Stillstand** → Exit 0, JSON-Feld `"prompt"` (hinter `"stall"`).
   Marken (AP-B2, gross/klein): `<ET>` (beendet den Block), `<ESC>`, `<CL>` (beides Abbruch/Meldung weg: am 710-1 ESC,
   am 710 Matrixtaste 28H), `<UP> <DOWN> <LEFT> <RIGHT>` (Kursor, BS600-Menues).  Fragt ein Programm im RAM (BS600) die
-  Tastatur ab, meldet der Schluss `Tastatur: Programm (RAM) fragt ...`.  `--atp-zusatz` ist seit AP-B2 ohnehin Vorgabe.
+  Tastatur ab, meldet der Schluss `Tastatur: Programm (RAM) fragt ...`.  `--atp-zusatz` ist seit AP-B2 ohnehin Vorgabe, `--ohne-atp-zusatz` schaltet den Zusatz ab; `<ENTER>` ist das ENTER der BS6xx (710: Matrixtaste 38H, `<ET>` = 37H ist nur die Starttaste des ROMs).
 - `--coverage --csv --itrace --watch` (Speicher-Schreibzugriffe der CPU) wirken wie am K8915;
   `--skip-selftest --no-cr` gibt es nicht (Warnung).
   Mit Diskette wird über `defaultFormatName` gemountet (bei `.hfe` nur Platzhalter).

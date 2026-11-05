@@ -72,10 +72,11 @@ Prg710Machine::Prg710Machine(const Config& cfg)
                          [this](uint16_t a, uint8_t d) { screen_.memWrite(a, d); });
     // K5122 auf /WAIT (keine ZVE2); Marken-FF: PRG 710 low-aktiv, 710-1 high-aktiv (§4a.1).
     afs_.setSynchronisation(K5122::Synchronisation::Wait);
-    afs_.setMkeLowAktiv(variante_ == Config::Variante::Prg710);
+    afs_.setMkeLowAktiv(cfg.leser_modell > 0 || variante_ == Config::Variante::Prg710);
+    afs_.setDatenErstNachMarke(cfg.leser_modell > 0);
     // Marken-FF an jedem Sync-Byte: das 710-ROM schlaegt das FF in einer engen Schleife
     // neu an (02DDH, AP-P1d); beide Varianten tragen dieselbe K5122.
-    afs_.setMkeJedesSyncByte(true);
+    afs_.setMkeJedesSyncByte(cfg.leser_modell != 1);
     // Unformatierte Spur/Seite = Rauschen mit Scheinmarken (AP-P3b): ROM und Resident
     // warten ohne Zeitablauf auf eine Marke; am Geraet beendet erst das Rauschen das Warten.
     afs_.setRauschenAufLeererSpur(true);
