@@ -1,0 +1,1 @@
+Um eine V24-Kasette des k6313 im k6316 nutzen zu können, müssen die 5 Eproms getauscht werden.
