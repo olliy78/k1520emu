@@ -36,6 +36,10 @@ PrinterMachine::PrinterMachine(const Config& cfg)
     steuerung_->attachToBus(bus_);
     // Kette mit der Steuerung als einziger Karte (CTC, PIO, SIO stehen in ihr, Annahme der Reihenfolge dort).
     bus_.setInterruptChain({steuerung_.get()});
+    // Schnittstellen nach aussen (Entwurf 19 §3, 49 §4.4): Reihenfolge = Hub-Index = C-ABI-Index: IFSS (B), V.24 (A).
+    steuerung_->setzeHubAktiv(true);
+    hub_.registriere(steuerung_->anschluss(Sd1157Steuerung::Config::Schnittstelle::Ifss));
+    hub_.registriere(steuerung_->anschluss(Sd1157Steuerung::Config::Schnittstelle::V24));
     powerOn();
 }
 
@@ -45,6 +49,17 @@ const FormatCatalog& PrinterMachine::formatCatalog() const
 {
     static const FormatCatalog leer;
     return leer;
+}
+
+std::vector<k1520::serial::SerialAnschluss*> PrinterMachine::serielleAnschluesse()
+{
+    return {&steuerung_->anschluss(Sd1157Steuerung::Config::Schnittstelle::Ifss),
+            &steuerung_->anschluss(Sd1157Steuerung::Config::Schnittstelle::V24)};
+}
+
+void PrinterMachine::altRueckruf(Sd1157Steuerung::Config::Schnittstelle s, SerialCb cb)
+{
+    steuerung_->setAbnehmer(s, std::move(cb));
 }
 
 void PrinterMachine::powerOn()
@@ -64,6 +79,8 @@ void PrinterMachine::reset()
 void PrinterMachine::resetHardware()
 {
     steuerung_->reset();
+    hub_.gastZurueckgesetzt();   // XOFF-/RTS-Halt des alten Gastes gilt nicht weiter
+    serial_naechst_ = 0;
     bus_.clearNMI();
     bus_.releaseINT();
     bus_.markIntDirty();
@@ -88,7 +105,13 @@ int PrinterMachine::run(int max_cycles)
         if (used == 0 && stop_.load(std::memory_order_relaxed)) break;   // Debugger-Halt
         remaining     -= used;
         total_cycles_ += static_cast<uint64_t>(used);
-        if (steuerung_->clockTick(used)) bus_.markIntDirty();
+        bool dirty = steuerung_->clockTick(used);
+        // Schnittstellen nach aussen (Entwurf 19 §6): der Wandler arbeitet nur alle 1/16 Zeichenzeit.
+        if (total_cycles_ >= serial_naechst_) {
+            serial_naechst_ = hub_.takt(total_cycles_);
+            dirty |= steuerung_->nimmSeriellGeaendert();
+        }
+        if (dirty) bus_.markIntDirty();
     }
     return max_cycles - remaining;
 }

@@ -592,7 +592,7 @@ if(BUILD_K1520)
     target_include_directories(k1520_mc80 PUBLIC ${CMAKE_SOURCE_DIR})
 
     # Drucker (doc/design/49_k1520printer.md, WP1): SD 1157 (U880, Original-ROM, CTC/PIO/SIO) als
-    # Karte, PrinterMachine darueber; Druckwerk/Blatt (WP3) in k1520_druckwerk, Seriellanbindung folgt in WP4.
+    # Karte, PrinterMachine darueber; Druckwerk/Blatt (WP3) in k1520_druckwerk, SIO ueber SerialAnschluss/SerialHub (WP4).
     # Druckwerk (WP3): Blattmodell, Nadelkopf, Papierweg, Wagen — ohne Bezug auf ein Geraet, ohne Qt/PDF
     add_library(k1520_druckwerk STATIC
         core/peripherals/druckwerk/blattmodell.cpp core/peripherals/druckwerk/nadelkopf.cpp
@@ -600,7 +600,7 @@ if(BUILD_K1520)
         core/peripherals/druckwerk/nadeldruckwerk.cpp)
     target_include_directories(k1520_druckwerk PUBLIC ${CMAKE_SOURCE_DIR})
     add_library(k1520_printer_karten STATIC core/cards/printer/sd1157_steuerung.cpp)
-    target_link_libraries(k1520_printer_karten PUBLIC k1520_druckwerk k1520_z80 k1520_ctc k1520_pio k1520_sio k1520_bus k1520_logger)
+    target_link_libraries(k1520_printer_karten PUBLIC k1520_druckwerk k1520_z80 k1520_ctc k1520_pio k1520_sio k1520_bus k1520_logger k1520_serial)
     target_include_directories(k1520_printer_karten PUBLIC ${CMAKE_SOURCE_DIR})
     add_library(k1520_printer STATIC core/machines/printer/printer_machine.cpp)
     target_link_libraries(k1520_printer PUBLIC k1520_printer_karten k1520_raf k1520_k6022 k1520_k5020 k1520_floppy2 k1520_bus k1520_logger k1520_serial)

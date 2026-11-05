@@ -444,3 +444,11 @@ k1520_add_test(sd1157_druck SRC test_sd1157_druck.cpp
                             LIBS k1520_printer k1520_logger
                             LABELS "${_lbl};fach_drucker" DEFS LOG_LEVEL=2
                             "SD1157_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/SD1157\"")
+
+# SD 1157 (Entwurf 49, WP4/WP6b): Text ueber die SIO (SerialAnschluss/SerialHub) wird mit dem Original-ROM gedruckt —
+# Orakel aus 1157zg.rom (tests/support/sd1157_orakel.h), Fluss DC1/DC3, Steuerfolgen, Geraetekennung, Papierende,
+# Online/Offline zur Laufzeit, Rundlauf ueber Loopback-Telnet (Port 0).
+k1520_add_test(sd1157_text SRC test_sd1157_text.cpp
+                           LIBS k1520_printer k1520_serial k1520_logger
+                           LABELS "${_lbl};fach_drucker" TIMEOUT 300 DEFS LOG_LEVEL=2
+                           "SD1157_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/SD1157\"")

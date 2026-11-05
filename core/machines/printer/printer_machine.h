@@ -2,9 +2,9 @@
  * @file printer_machine.h
  * @brief Drucker (Entwurf 49, Ticket #28) — siebte Maschine des Kerns (K1520_MACHINE_PRINTER = 7).
  *
- * Stand WP1: **Geruest.**  Der SD 1157 (`Sd1157Steuerung`: U880 2,4576 MHz, Original-ROM 0000H–297FH,
- * RAM 2C00H/3800H, ZG1 3000H, CTC DCH, PIO F4H/F8H/ECH, SIO 7CH) laeuft an; es gibt noch kein
- * Druckwerk, kein Blatt, keinen Anschluss der SIO nach aussen und keine Bedienoberflaeche.
+ * Stand WP4: Der SD 1157 (`Sd1157Steuerung`: U880 2,4576 MHz, Original-ROM 0000H–297FH,
+ * RAM 2C00H/3800H, ZG1 3000H, CTC DCH, PIO F4H/F8H/ECH, SIO 7CH) druckt auf ein Blatt im Kern, seine SIO haengt
+ * am `SerialHub` (IFSS, V.24; Telnet/RFC 2217/Datei).  Noch keine Bedienoberflaeche.
  * Die K6316-Typen sind als Werte vorgesehen und werden mit klarer Meldung abgewiesen (WP2a).
  *
  * Die Maschine kennt nur den Bus ihrer Steuerung (der Drucker hat keinen K1520-Steckplatz fuer
@@ -18,6 +18,7 @@
 #include "core/bus/k1520_bus.h"
 #include "core/cards/printer/sd1157_steuerung.h"
 #include "core/machines/machine.h"
+#include "core/serial/hub.h"
 #include <atomic>
 #include <functional>
 #include <memory>
@@ -90,9 +91,16 @@ public:
     bool isHeadLoaded() const override { return false; }
     void setDiskWriteProtect(int, bool) override {}
 
-    // ─── Serielle Schnittstellen: noch nicht angeschlossen (WP4) ─────────────
-    void setDFUECallback(SerialCb) override {}
-    void dfueSend(uint8_t) override {}
+    // ─── Serielle Schnittstellen nach aussen (WP4, Entwurf 19/49 §4.4) ───────
+    // Hub-Index 0 = IFSS (SIO-Kanal B), 1 = V.24 (SIO-Kanal A); beide gibt es immer, aktiv ist der, den
+    // `Config::sd1157.schnittstelle` (3A.0) waehlt.  Die Firmware macht das Protokoll (DC1/DC3, ESC [ 0 c) selbst.
+    k1520::serial::SerialHub* serialHub() override { return &hub_; }
+    std::vector<k1520::serial::SerialAnschluss*> serielleAnschluesse() override;
+    // Alter Unterbau (`k1520_serial_*`): DFU = V.24 (Kanal A), PRINTER = IFSS (Kanal B).
+    void setDFUECallback(SerialCb cb) override { altRueckruf(Sd1157Steuerung::Config::Schnittstelle::V24, std::move(cb)); }
+    void dfueSend(uint8_t b) override { steuerung_->einspeisen(Sd1157Steuerung::Config::Schnittstelle::V24, b); }
+    void setPrinterCallback(SerialCb cb) override { altRueckruf(Sd1157Steuerung::Config::Schnittstelle::Ifss, std::move(cb)); }
+    void printerSend(uint8_t b) override { steuerung_->einspeisen(Sd1157Steuerung::Config::Schnittstelle::Ifss, b); }
 
     // ─── Keine Zusatzkarten ──────────────────────────────────────────────────
     bool zusatzkartenSteckbar() const override { return false; }
@@ -119,10 +127,13 @@ protected:
 private:
     static Config pruefe(const Config& cfg);
     void resetHardware();
+    void altRueckruf(Sd1157Steuerung::Config::Schnittstelle s, SerialCb cb);
 
     const Config cfg_;
     K1520Bus bus_;
     std::unique_ptr<Sd1157Steuerung> steuerung_;
+    k1520::serial::SerialHub hub_{k1520::serial::PHI_NENN};   // nach steuerung_: stirbt zuerst (haelt Anschluss-Referenzen)
+    uint64_t serial_naechst_ = 0;   ///< naechster Blick der Wandler (Taktzahl)
 
     std::atomic<bool> stop_{false};
     std::atomic<bool> nmi_taster_{false};

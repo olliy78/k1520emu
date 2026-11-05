@@ -8,8 +8,9 @@
  * core/peripherals/druckwerk/: geregelter Wagen, Papierweg, Nadelkopf, Blattmodell).  Der Nadelanschlag
  * ist die **Flanke FGDI (2B.5) 0 -> 1** (hardware.md §15 Nr. 14): dann schlagen die Nadeln an, deren Bit im
  * Latch BEH/BFH 0 ist.  Tasten und Schalter sind eine API (setOnline, setTastePV1/2/Test, setKopf, setLpi6,
- * setPapierDa), Lampen lesbar (lampeOnline, lampeFehler).  KEIN Anschluss der SIO nach aussen (ihr Sender
- * wird in eine Senke geleert, WP4), KEINE Bedienoberflaeche.
+ * setPapierDa), Lampen lesbar (lampeOnline, lampeFehler).  **Die SIO geht ueber je einen `SerialAnschluss` nach
+ * aussen** (WP4, @ref anschluss: Kanal B = „IFSS", Kanal A = „V.24"; Anschluss an den `SerialHub` der
+ * `PrinterMachine`).  Ohne Hub (Karte allein, Unit-Tests) leert eine Senke den Sender.  KEINE Bedienoberflaeche.
  *
  * **Speicher** (hardware.md §2): ROM 0000H–297FH (`1157.rom`, das Abbild, nicht die Quelle),
  * 2980H–2BFFH unbelegt (FFH [?] §14 Nr. 14), RAM 2C00H–2FFFH, ZG1 3000H–33FFH (`1157zg.rom`),
@@ -38,8 +39,11 @@
 #include "core/primitives/z80_ctc.h"
 #include "core/primitives/z80_pio.h"
 #include "core/primitives/z80_sio.h"
+#include "core/serial/anschluss.h"
 #include <array>
 #include <cstdint>
+#include <functional>
+#include <memory>
 #include <string>
 
 class Sd1157Steuerung : public BusDevice, public MemDevice, public InterruptSlave {
@@ -88,6 +92,7 @@ public:
 
     explicit Sd1157Steuerung(K1520Bus& bus);
     Sd1157Steuerung(K1520Bus& bus, const Config& cfg);
+    ~Sd1157Steuerung();
 
     // ─── BusDevice ───────────────────────────────────────────────────────────
     uint8_t     ioRead(uint8_t port) override;
@@ -150,8 +155,23 @@ public:
     bool     lampeFehler() const { return (p2b_aus_ & 0x08) == 0; }   ///< 2B.3 /TF, 0 = an (§5.2)
     uint8_t  portAusgabe(int pio, int kanal) const;                    ///< zuletzt geschriebenes Datenbyte
 
-    /// Alles, was die SIO gesendet hat (Senke statt Anschluss, WP4): 0 = Kanal A (V.24), 1 = B (IFSS).
+    /// Mitschrift: alles, was die SIO gesendet hat (egal, ob Wandler oder Senke es abgenommen hat): 0 = Kanal A (V.24), 1 = B (IFSS).
     const std::string& sioAusgabe(int kanal) const { return sio_aus_[kanal & 1]; }
+
+    // ─── Serielle Schnittstellen nach aussen (WP4, Entwurf 19, 49 §4.4) ──────────
+    /// Anschluss je Kanal (lebt so lange wie die Karte); Hub-Reihenfolge der Maschine: IFSS (B), V.24 (A).
+    k1520::serial::SerialAnschluss& anschluss(Config::Schnittstelle s);
+    /// Ein `SerialHub` nimmt den Sender ab: die Senke (Karte allein) schweigt.
+    void setzeHubAktiv(bool aktiv) { senke_ = !aktiv; }
+    /// Ein Anschluss hat SIO-Zustand geaendert (Zeichen abgenommen/zugestellt, Leitungen) — Maschine: Interrupt neu bewerten.
+    bool nimmSeriellGeaendert() { const bool r = seriell_geaendert_; seriell_geaendert_ = false; return r; }
+    /// Alter Unterbau (`k1520_serial_set_rx_cb`/`_send`): Abnehmer der vom Gast gesendeten Bytes / Byte von aussen einspeisen.
+    using Abnehmer = std::function<void(uint8_t)>;
+    void setAbnehmer(Config::Schnittstelle s, Abnehmer cb);
+    void einspeisen(Config::Schnittstelle s, uint8_t byte);
+    /// Maschinentakte je ZC/TO-Impuls der CTC 0 als BAUDGENERATOR (hardware.md §7: Vorteiler 16 x TC aus der Baudtabelle);
+    /// die Druck-Zeitbasis (TC = 23, `m1a0d`) und der Stopp (13H) aendern sie nicht.  0 = noch nicht programmiert.
+    uint64_t baudTakte() const;
 
     /// Druckwerk (Wagen, Papier, Blatt) — Lesezugriff fuer Oberflaeche, Werkzeuge und Tests.
     Nadeldruckwerk&       druck()       { return druck_; }
@@ -181,6 +201,8 @@ private:
     void mechanikPegel();
     void ketteNeu();                   ///< interne IEI/IEO-Kette (CTC -> PIO2 -> PIO1 -> SIO -> PIO3)
     bool sioSenke();
+    class Anschluss;   // sd1157_steuerung.cpp
+    friend class Anschluss;
 
     K1520Bus& bus_;
     Config    cfg_;
@@ -212,4 +234,8 @@ private:
         "SD1157 CTC", "SD1157 PIO2", "SD1157 PIO1", "SD1157 SIO", "SD1157 PIO3"};
 
     std::array<std::string, 2> sio_aus_;
+    bool senke_ = true;                 ///< ohne Hub leert sioSenke() den Sender
+    bool seriell_geaendert_ = false;
+    mutable uint64_t baud_takte_ = 0;   ///< zuletzt programmierte Baud-Periode der CTC 0 (baudTakte)
+    std::array<std::unique_ptr<Anschluss>, 2> anschluesse_;   ///< [Config::Schnittstelle]
 };

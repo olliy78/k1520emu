@@ -2,7 +2,7 @@
 
 Gilt für `core/peripherals/druckwerk/`, `core/cards/printer/`, `core/machines/printer/`, `k1520_printer_*` in der C-ABI und den Debugger-Befehl `blatt`.
 Entwurf und Stand: `doc/design/49_k1520printer.md` (§5a/§5b); Hardware des SD 1157 aus der Firmware: `doc/printer/sd1157/hardware.md`.
-Stand 2026-11-05 (WP3/WP2b).
+Stand 2026-11-05 (WP3/WP2b, WP4 Anschluss).
 
 1. **Das Druckwerk kennt kein Gerät, kein PDF, kein Qt.**  `Blattmodell` und `Nadelkopf` wissen nichts vom SD 1157; die Steuerung gibt Pegel rein (`Wagen::eingang`,
    `Papierweg::ausgaenge`) und löst den Anschlag aus.  Alles in Maschinentakten.  Wächter `Blattmodell.*`, `Nadelkopf.*`, `Papierweg.*`, `GeregelterWagen.*`, `Nadeldruckwerk.*`
@@ -36,10 +36,14 @@ Stand 2026-11-05 (WP3/WP2b).
    Schräg: Nadel j um 8−j Takte nach rechts, Nadel 9 nicht (Ring der Quelle m1e1b..; der absolute Versatz ist am Lauf gewonnen, aber an allen 20 Zeichen bestätigt).  Passt das Bild nicht,
    ist das ein Befund — **das Orakel nicht dem Emulator anpassen**.  Teststart: Taste ONLINE offline **vom Anlauf an** (`Config::online = false`), TEST halten, loslassen bei PC `0FA6` (hpt3 =
    Ende des Teststroms; sonst wiederholt die Firmware den Zyklus), dann 40 Mio. Takte (Zeilen, FF, Neustart).  Wächter `Sd1157Selbsttest.*`.
-10. **Was die Firmware von den Bedienelementen nur beim Anlauf liest:** Taste 6/8 lpi (BCH.1, `sy34` → `za61`) und der Zustand `off`/Online-Lampe (`sy40`).  Zur Laufzeit wirken PV1/PV2/TEST-Pegel
-    (`m0646` ist die Tastenabfrage), aber `setOnline(false)` nach dem Anlauf schaltet die Online-Lampe nicht aus und setzt kein `off` (beobachtet, aus der Quelle nachvollzogen: `off` wird nur
-    in `m05b3` und `sy40` gesetzt) — Gastverhalten der angepassten Firmware, **kein Emulatorfehler**; Offline-Verhalten beim Test also immer vom Anlauf an prüfen.  PV1 kurz = ein LF
-    (8 bzw. 6 Schritte), PV1 ≥ ~0,85 s = Formularvorschub bis zur Formularlänge (BCH.5..4: 192/288/384/576).  Wächter `Sd1157Tasten.*`.
+10. **Was die Firmware von den Bedienelementen nur beim Anlauf liest:** Taste 6/8 lpi (BCH.1, `sy34` -> `za61`) und der Zustand `off`/Online-Lampe (`sy40`).  **Online/Offline zur Laufzeit
+    (am ROM gemessen, Wächter `Sd1157Online.*`; Quelle 760-910):** `off` (IX+5 Bit 7) setzen nur `sy40` (Anlauf offline) und `m05b3`; `m05b3` ist der EINZIGE Ort, der TEST auswertet, und nur über
+    `m05ee` (`off` = 1) erreichbar.  Wird ONLINE im Betrieb auf offline gelegt (`off` = 0), gilt: **PV1/PV2 wirken** (Zweig `m0646`/`ta00`, ein LF = 8 Schritte), **TEST nicht** (kein Selbsttest in
+    20 Mio. Takten), **die Online-Lampe (2A.1) bleibt an**; wieder online: PV1 wirkt nicht mehr.  Ein kurzer Offline-Impuls im Leerlauf (Taster) ändert nichts.  Erst ein **/RESET** bei offline
+    liest ONLINE neu (`sy40`): Lampe aus, TEST läuft.  Daten: im Empfang schaltet `seri8` offline sofort auf DC3 (Quelle; am Lauf nicht geprüft, s. Nr. 16).  **[?]** ob ONLINE am Gerät rastend
+    oder Taster ist: die Quelle unterscheidet das nicht (liest nur den Pegel); für die Oberfläche ist „rastend + Reset-Hinweis" die einzige Bedienung, bei der TEST erreichbar ist.  Zur Laufzeit
+    gewechselt ist das **Gastverhalten, kein Emulatorfehler**.  PV1 kurz = ein LF (8 bzw. 6 Schritte), PV1 ≥ ~0,85 s = Formularvorschub bis zur Formularlänge (BCH.5..4: 192/288/384/576).
+    Wächter `Sd1157Tasten.*`.
 11. **Papierende:** `/PE` fällt bei Papierlage ≥ `Papierweg::Parameter::laenge`; beim Vorschub setzt die Firmware das Statusbit `zmb pe` (IX+0AH Bit 2, RAM 2C5AH) mit dem ersten Schritt und
     `ape` (IX+7 Bit 5, 2C57H) 82 Schritte später (Lage 100 → 181); der Vorschub läuft aber bis zum Ende des Auftrags weiter.  Beim Anlauf ohne Papier steht `zmb pe` gleich im Register und
     löscht sich mit dem Papier.  Online-Lampe und Fehlerlampe ändert das nicht (`hpv2` setzt im seriellen Betrieb nur Ausgänge zurück).  Wächter `Sd1157Papierende.*`.
@@ -49,5 +53,14 @@ Stand 2026-11-05 (WP3/WP2b).
     (`test_printer_sheet_keys_lamps_and_switches_through_the_c_api`).
 14. **Debugger:** `k1520dbg --machine sd1157`, Befehl `blatt [info | x0 y0 [breite hoehe [sx sy]]]` zeigt einen Ausschnitt als ASCII (`#` = Punkt, Pixel; `sx`/`sy` Pixel je Zeichen) —
     dieselbe Hilfsfunktion `blattAscii` liefert den Abzug in der Fehlermeldung der Druckertests.
-15. **Offen:** zweite Bahn im Druck (`Nadeldruckwerk::feuere` schreibt nur auf Bahn 0; WP6b), `SchrittWagen`/Schnitt/Blattgrenzen (WP2a, K6316), Text über die SIO (WP4), absolute `[?]` (Takte je
+15. **Offen:** zweite Bahn im Druck (`Nadeldruckwerk::feuere` schreibt nur auf Bahn 0; WP6b), `SchrittWagen`/Schnitt/Blattgrenzen (WP2a, K6316), Text-Druck über die SIO (Nr. 16), absolute `[?]` (Takte je
     Zoll, Nadelteilung, Punktmaß, Flugzeit absolut), Papierende-Lampe (es gibt keinen Ausgang).
+16. **SIO-Anschluss (WP4):** `Sd1157Steuerung::anschluss()` liefert je Kanal einen `SerialAnschluss` (B = „IFSS", A = „V.24"; Hub-Index 0 = IFSS, 1 = V.24; `PrinterMachine::serialHub()`,
+    C-ABI `k1520_serial_*`, alter Unterbau DFU = V.24, PRINTER = IFSS).  Ohne Hub (Karte allein) leert eine Senke den Sender.  **Am V.24 gibt die Karte das DC1 nach dem Einschalten erst frei, wenn ein Transport
+    anbindet** (CTS/DCD kommen vom Wandler, Auto Enables halten das Zeichen; wie K8025) — der Host sieht es dann.  **Baud:** CTC 0 ist Baudgenerator und wird im Takt-Interrupt (`m1a0d`, `17H,17H`, TC = 23) als
+    Zeitbasis des Drucks neu gestartet; `Sd1157Steuerung::baudTakte()` lässt als Baud nur Perioden der Baudtabelle gelten (16 x 2^n, n = 0..7) und hält sonst die zuletzt programmierte — die Firmware
+    sieht die CTC unverändert (Wächter `Sd1157Seriell.DieBaudrateBleibtBeiDerDruckZeitbasisDerCtc0Stabil`, belegt, dass TC = 23 im Selbsttest tatsächlich auftritt).  **[?] Empfangspfad:** Zeichen kommen
+    verlustfrei im Puffer an (Wächter `Sd1157Empfang.*`), aber der Schiebepuffer des ROM (0D20H) zieht `ipzl` um 2 und `ipzf` um 1 ab, nachdem `ipzl` um 1 erhöht wurde: der Abstand `ipzf - ipzl` bleibt
+    konstant, der Puffer erscheint nie leer, die Firmware holt endlos NUL und kommt kaum zum Druck (3 Testzeilen „AAA", „BBB", „CCC" drucken nichts).  Ob das der ROM-Abzug ist oder eine Annahme der Karte
+    (die Quelle ohne Patch leert korrekt), ist **nicht geklärt**; DC3-Fluss (ab `ipzf` >= 3BF5H) und IFSS-Freigabe sind deshalb nicht prüfbar.  Nicht umgehen, erst klären.
+17. **Noch nicht untersucht (WP4-Rest):** Flugzeit-Erklärung über Takt-Interrupt/FGDI-Zeitpunkt (Nr. 4 bleibt Anpassung, nicht Beleg); Steuerfolgen/TAB/FF/Papierende im Auftrag; Loopback-Telnet-Rundlauf.

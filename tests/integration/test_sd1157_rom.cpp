@@ -118,6 +118,13 @@ TEST(Sd1157Rom, VektortabelleImV24Betrieb)
     // Auch im V.24-Betrieb (CTS/DCD fest aktiv) kommt die Firmware bis zur Leerlaufschleife; DC1 geht an Kanal A
     EXPECT_TRUE(st.lampeOnline());
     EXPECT_FALSE(st.lampeFehler());
+    // Ohne Gegenstelle ("Kabel ab") ist /CTS inaktiv: das DC1 bleibt wegen WR3-Auto-Enables im Sender stehen (WP4,
+    // wie an der K8025) und geht erst hinaus, wenn ein Transport anbindet — ein spaeter verbundener Host sieht es also.
+    EXPECT_EQ(st.sioAusgabe(0), "");
+    EXPECT_EQ(st.sioAusgabe(1), "");
+    EXPECT_TRUE(st.sio().channelA().tx_buf.has_value());
+    l.m->serialHub()->wandler(1).anbinden();
+    l.fahre(l.m->totalCycles() + 100'000);
     EXPECT_EQ(st.sioAusgabe(0), std::string("\x11"));
     EXPECT_EQ(st.sioAusgabe(1), "");
 }

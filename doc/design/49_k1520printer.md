@@ -222,6 +222,12 @@ Formularvorschub am Ende = Formularlänge (192/288/576), kein Punkt außerhalb. 
 **Offen.**  Zweite Bahn im Druck (Punkte gehen immer auf Bahn 0, `Nadeldruckwerk::feuere`), `SchrittWagen`, Schnitt/Blattgrenzen, Textprobe über die SIO (WP4/WP6b), die offenen `[?]` aus
 hardware.md §14 (Takte je Zoll, Nadelteilung, Punktmaß, Flugzeit absolut).  Die Online-Lampe und das Flag `off` der Firmware folgen der Taste ONLINE nur beim Anlauf (Merkposten).
 
+### 5c  Stand WP4 (2026-11-05, Teilstand)
+
+Gebaut: `Sd1157Steuerung::Anschluss` je SIO-Kanal (IFSS = B, V.24 = A), `PrinterMachine` mit `SerialHub` (Index 0 IFSS, 1 V.24), alter Unterbau, Baudfilter für CTC 0 (Druck-Zeitbasis TC = 23 zählt nicht als Baud),
+gemeinsames Druckbild-Orakel `tests/support/sd1157_orakel.h`.  Wächter `Sd1157Seriell.*`, `Sd1157Online.*`, `Sd1157Empfang.*`.  Online/Offline zur Laufzeit gemessen (Merkposten Nr. 10).
+**Offen / [?]:** der Empfangspfad des ROM leert den Puffer nicht (Merkposten Nr. 16) — Text-Druck, DC3/DC1-Fluss, Loopback-Rundlauf, Flugzeit-Prüfung stehen aus.
+
 ## 6  Tests und Wächter
 
 * Registrierung über `k1520_add_test()`; neues Fachlabel `fach_drucker` in `tools/test_auswahl.py` (Wächter `py_testauswahl`).

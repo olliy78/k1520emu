@@ -8,6 +8,7 @@
 #include "core/cards/printer/rom_sd1157.h"
 #include "core/cards/printer/rom_sd1157_zg.h"
 #include "core/logger.h"
+#include "core/serial/sio_format.h"
 
 namespace {
 // E/A-Adressen, hardware.md §4
@@ -25,6 +26,112 @@ constexpr std::size_t SIO_AUS_MAX = 1u << 16;   // Senke: hoechstens so viele Ze
 }  // namespace
 
 Sd1157Steuerung::Sd1157Steuerung(K1520Bus& bus) : Sd1157Steuerung(bus, Config{}) {}
+
+// ─── Anschluss je SIO-Kanal (WP4, Entwurf 19 §5.1, Entwurf 49 §4.4) ──────────
+//
+// Kanal B ist der IFSS (keine Steuerleitungen), Kanal A der V.24-Anschluss (hardware.md §7).  Beide haengen an
+// CTC 0 (Baudgenerator).  Die Karte kennt kein Netz: sie liefert Bytes, Format und Leitungen.
+
+class Sd1157Steuerung::Anschluss : public k1520::serial::SerialAnschluss {
+public:
+    Anschluss(Sd1157Steuerung& k, Config::Schnittstelle s) : k_(k), s_(s) {}
+
+    const char* name() const override { return s_ == Config::Schnittstelle::Ifss ? "IFSS" : "V.24"; }
+    const char* stecker() const override { return s_ == Config::Schnittstelle::Ifss ? "IFSS" : "V.24"; }
+    bool v24() const override { return s_ == Config::Schnittstelle::V24; }
+
+    k1520::serial::SerialFormat format() const override
+    {
+        return k1520::serial::serialFormatAusSio(kanal(), k_.baudTakte());
+    }
+    bool senderHatZeichen() const override { return kanal().senderHatZeichen(); }
+    uint8_t senderNimm() override
+    {
+        uint8_t b = kanal().txGet();
+        // Die Leitung traegt nur die programmierten Datenbits (V.24-Betrieb: 7 Bit, WR5 28H).
+        const uint8_t bits = kanal().format().tx_bits;
+        if (bits < 8) b &= static_cast<uint8_t>((1u << bits) - 1);
+        std::string& m = k_.sio_aus_[idx()];
+        if (m.size() < SIO_AUS_MAX) m.push_back(static_cast<char>(b));
+        k_.ketteNeu();                 // Tx leer -> Tx-Interrupt moeglich
+        k_.seriell_geaendert_ = true;
+        if (!belegt_ && abnehmer_) abnehmer_(b);
+        return b;
+    }
+    bool empfaengerFrei() const override { return kanal().empfaengerFrei(); }
+    void empfange(uint8_t b) override
+    {
+        kanal().rxByte(b);
+        k_.ketteNeu();
+        k_.seriell_geaendert_ = true;
+    }
+    bool rts() const override { return kanal().rts(); }
+    bool dtr() const override { return kanal().dtr(); }
+    void setzeEingaenge(bool cts, bool /*dsr*/, bool dcd) override
+    {
+        if (s_ != Config::Schnittstelle::V24) return;   // IFSS: keine Steuerleitungen
+        kanal().setzeCTS(cts);
+        kanal().setzeDCD(dcd);
+        k_.ketteNeu();
+        k_.seriell_geaendert_ = true;
+    }
+    bool breakGesendet() const override { return kanal().breakSenden(); }
+    void breakEmpfang(bool aktiv) override
+    {
+        kanal().setzeBreakEmpfang(aktiv);
+        k_.ketteNeu();
+        k_.seriell_geaendert_ = true;
+    }
+    void leitungBelegt(bool belegt) override { belegt_ = belegt; }
+
+    void setAbnehmer(Abnehmer cb) { abnehmer_ = std::move(cb); }
+    void einspeisen(uint8_t b)
+    {
+        if (belegt_) return;   // Transport/Loop am Stecker: ins Leere (Entwurf 19 §8)
+        empfange(b);
+    }
+
+private:
+    int idx() const { return s_ == Config::Schnittstelle::V24 ? 0 : 1; }   // wie sioAusgabe: 0 = A, 1 = B
+    Z80SIO::Channel& kanal() const { return s_ == Config::Schnittstelle::V24 ? k_.sio_.channelA() : k_.sio_.channelB(); }
+
+    Sd1157Steuerung&     k_;
+    Config::Schnittstelle s_;
+    bool                 belegt_ = false;
+    Abnehmer             abnehmer_;
+};
+
+Sd1157Steuerung::~Sd1157Steuerung() = default;
+
+k1520::serial::SerialAnschluss& Sd1157Steuerung::anschluss(Config::Schnittstelle s)
+{
+    return *anschluesse_[static_cast<size_t>(s)];
+}
+
+void Sd1157Steuerung::setAbnehmer(Config::Schnittstelle s, Abnehmer cb)
+{
+    anschluesse_[static_cast<size_t>(s)]->setAbnehmer(std::move(cb));
+}
+
+void Sd1157Steuerung::einspeisen(Config::Schnittstelle s, uint8_t byte)
+{
+    anschluesse_[static_cast<size_t>(s)]->einspeisen(byte);
+}
+
+uint64_t Sd1157Steuerung::baudTakte() const
+{
+    // CTC 0 ist Baudgenerator UND — im Takt-Interrupt `m1a0d` (17H, 17H) — Zeitbasis des Drucks (TC = 23, am Zeilenende 13H
+    // = Stopp, hardware.md §6).  Wuerde der Wandler die Zeitbasis als Baudrate lesen, sprang das Format bei jedem Zeichen
+    // zwischen 9600 und 417 Bd (und RFC 2217 meldete es der Gegenseite).  Als Baud gilt darum nur eine Periode aus der
+    // Baudtabelle (§7: Vorteiler 16 x TC, TC = 1, 2, 4 ... 128); alles andere laesst die zuletzt programmierte stehen.
+    // Das Gastverhalten bleibt unberuehrt: die Firmware sieht die CTC unveraendert.
+    const uint64_t p = ctc_.teilerTakte(0);
+    if (p >= 16 && p <= 16u * 128u && p % 16 == 0) {
+        const uint64_t tc = p / 16;
+        if ((tc & (tc - 1)) == 0) baud_takte_ = p;
+    }
+    return baud_takte_;
+}
 
 namespace {
 // Druckwerk nach Ausfuehrung: Bahnzahl (EBD) und Blattbreite (BDA) sind Schalter des Geraets.
@@ -54,6 +161,8 @@ Sd1157Steuerung::Sd1157Steuerung(K1520Bus& bus, const Config& cfg)
     pio1_.setModus3Flanke(true);
     pio2_.setModus3Flanke(true);
     pio3_.setModus3Flanke(true);
+    for (int i = 0; i < 2; ++i)
+        anschluesse_[static_cast<size_t>(i)] = std::make_unique<Anschluss>(*this, static_cast<Config::Schnittstelle>(i));
     // Kette in der Reihenfolge der Prioritaet (Annahme [?], hardware.md §8)
     kette_ = {&ctc_, &pio2_, &pio1_, &sio_, &pio3_};
 
@@ -109,6 +218,7 @@ void Sd1157Steuerung::reset()
     pegel_ = pegelNeu();
     sio_aus_[0].clear();
     sio_aus_[1].clear();
+    baud_takte_ = 0;
     eingaengeSetzen();
     ketteNeu();
 }
@@ -303,14 +413,14 @@ bool Sd1157Steuerung::clockTick(int ticks)
         if (!(p == pegel_)) { pegel_ = p; eingaengeSetzen(); }
         dirty = true;
     }
-    dirty |= sioSenke();
+    if (senke_) dirty |= sioSenke();
     if (dirty) ketteNeu();
     return dirty;
 }
 
 bool Sd1157Steuerung::sioSenke()
 {
-    // Kein Anschluss nach aussen (WP4): was der Sender abgibt, wird sofort abgenommen und gemerkt.
+    // Karte ohne Hub (Unit-Tests): was der Sender abgibt, wird sofort abgenommen und gemerkt.
     // Ohne das bliebe das erste DC1 im Sendepuffer und die Firmware wartete auf den Sender.
     bool any = false;
     Z80SIO::Channel* k[2] = {&sio_.channelA(), &sio_.channelB()};

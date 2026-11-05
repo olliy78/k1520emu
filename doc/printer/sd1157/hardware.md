@@ -489,3 +489,5 @@ Annahmen oben geändert hat:
 | §5.4, §9 | 6/8 lpi, ONLINE als Pegel | die Firmware liest die Taste 6/8 lpi (BCH.1) und den Online-Zustand (Flag `off`, Lampe) nur **beim Anlauf**; PV/TEST-Pegel gelten zur Laufzeit |
 | §10.5 | 7 Punktspalten je Zelle | bestätigt: Zelle 10 Takte ab Takt 80, Spalte k bei +k; Breitdruck 20 Takte (Spalte k bei +2k, Spalte 6 wiederholt bei +14, UND mit der Vorspalte), Schrägdruck Nadel j um 8−j Takte versetzt |
 | §12 | Selbsttestbild | bestätigt Punkt für Punkt (Orakel aus `1157zg.rom`); die mittlere Zeile (63 Zeichen) druckt die Firmware rückwärts |
+| §7, §1 | Protokoll DC1/DC3, Schiebepuffer | **[?]** Der Puffer erscheint nie leer (ipzl -2 / ipzf -1 je Zeichen nach `INC ipzl`), Befund in `doc/merkposten/drucker.md` Nr. 16; DC1 am V.24 geht erst nach Anbinden des Transports hinaus (CTS/DCD) |
+| §9 | Online-Taste | zur Laufzeit wirken nur PV1/PV2; TEST und Lampe nur nach /RESET bei offline (`off` nur `sy40`/`m05b3`), Merkposten Nr. 10 |
