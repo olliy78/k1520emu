@@ -6,6 +6,10 @@
 #   PRG 710   : disks/prg710_bs600/prg710_bs600_ff_low.hfe       = BS600 VERSION 02 (PRG-700-Diskette) mit
 #                                                                    Urladerkopf 'SYL FOR BS600 ' (EIGENBAU, siehe unten)
 #               disks/prg710_bs600/prg710_bs600_ff_high.hfe      = dasselbe mit gepatchtem Plattentreiber
+#   PRG 710   : disks/prg710_bs610_rekonstruktion/prg710_bs610_rek.hfe = 'BS610-Rekonstruktion' (AP-B8, EIGENBAU, kein Original):
+#               die BS620-Diskette, in der Datei BS620 der Tastaturteil durch den von BS600 V02 ersetzt (K7609 am 8279 statt
+#               K7672 an der K8025-SIO), Bytes aus BS600 V02 an REK_BEREICHE (doc/bs600/tastatur.md §4).  Urlader, Dateiname,
+#               Plattentreiber (Doppelschritt) und alle anderen Dateien bleiben die von BS620.
 #
 # Patch "high": die vier Wartestellen auf das Marken-FF (K5122 Tor B Bit 1) im Plattentreiber, JR NZ (20H) -> JR Z (28H):
 #   IN A,(12H) / AND 02H / JR NZ,<selbst>              (Sektorkopf, zwei Stellen)
@@ -28,7 +32,17 @@ AUS = {
     'prg710-1_bs620_ff_high': 'disks/prg710-1_bs620/prg710-1_bs620_ff_high.hfe',
     'prg710_bs600_ff_low': 'disks/prg710_bs600/prg710_bs600_ff_low.hfe',
     'prg710_bs600_ff_high': 'disks/prg710_bs600/prg710_bs600_ff_high.hfe',
+    'prg710_bs610_rek': 'disks/prg710_bs610_rekonstruktion/prg710_bs610_rek.hfe',
 }
+# Tastaturteil (Laufadressen, beide Grenzen einschliesslich) und sein Dateioffset (Monitor ab 4300H, Hauptprogramm ab 6D00H).
+REK_BEREICHE = [
+    (0x000E, 0x000E, 0x4300),   # RST 08: JP 004D statt JP 0048
+    (0x0030, 0x0037, 0x4300),   # RST 30: 8279-Status statt CALL 0201
+    (0x0048, 0x005C, 0x4300),   # CALL 0115 / RST-08-Init statt K8025-CTC/SIO-B-Init
+    (0x0115, 0x0131, 0x4300),   # Warten + Umsetzen ueber 02B3, Holen IN (C9H)/(C8H)
+    (0x0B98, 0x0B99, 0x4300),   # Sprungleiste 0B97: JP 012A statt JP 0201
+    (0x74A8, 0x74AD, -0x6D00),  # Hauptprogramm: 8279-Init (C9H := 02H, C1H) statt RST 08
+]
 PAT_KOPF = bytes([0xDB, 0x12, 0xE6, 0x02, 0x20, 0xFA])             # JR NZ steht an Position 4
 PAT_DATEN = bytes([0xDB, 0x12, 0xE6, 0x02, 0xDB, 0x16, 0x20, 0xF8])  # JR NZ steht an Position 6
 SEG_EXT = 0x4F00      # Dateioffset der Quellkopie von 1000H..28FFH (Ladeplan, doc/bs600/selbsttest.md §1)
@@ -195,6 +209,37 @@ def urlader_eigenbau(disk600, disk620):
         disk600.schreibe(0, i, s)
 
 
+def rek_patchen(disk, quelle):
+    """Datei BS620 in @p disk: REK_BEREICHE aus der Datei BS600 von @p quelle uebernehmen (sektorweise).  Liefert die Aenderungen."""
+    d = bytearray(datei_lesen(disk, 'BS620')); alt = bytes(d)
+    q = datei_lesen(quelle, 'BS600')
+    if len(q) != len(d): sys.exit('BS600/BS620 verschieden lang')
+    if alt[SEG_EXT + 0x1400] != 0xC9: sys.exit('BS620: Pruefsumme nicht stillgelegt (2400H <> RET)')
+    for a, e, basis in REK_BEREICHE:
+        o = a + basis
+        d[o:o + e - a + 1] = q[o:o + e - a + 1]
+    lage = datei_lage(disk, 'BS620')
+    aend = [(o, alt[o], d[o]) for o in range(len(d)) if alt[o] != d[o]]
+    for o, a_, n_ in aend:
+        t, i, bo = sektor_von(o, lage)
+        sek = bytearray(disk.lies(t, i))
+        assert sek[bo] == a_
+        sek[bo] = n_
+        disk.schreibe(t, i, sek)
+    return aend
+
+
+def rek_erwartet(lib):
+    """Die erwartete Abweichungsliste (Dateioffset, BS620, BS600) aus den Fixtures."""
+    a = lib.oeffne(BS620); b = lib.oeffne(BS600)
+    x, y = datei_lesen(a, 'BS620'), datei_lesen(b, 'BS600')
+    a.schliesse(); b.schliesse()
+    r = []
+    for s_, e, basis in REK_BEREICHE:
+        r += [(o, x[o], y[o]) for o in range(s_ + basis, e + basis + 1) if x[o] != y[o]]
+    return r
+
+
 def bauen(lib, wurzel):
     stand = {}
     # PRG 710-1 / BS620
@@ -217,6 +262,11 @@ def bauen(lib, wurzel):
             aend, _ = hoch_patchen(d, 'BS600')
             stand[ziel] = aend
         d.speichere(ziel); d.schliesse()
+    # PRG 710 / BS610-Rekonstruktion (Eigenbau)
+    ziel = os.path.join(wurzel, AUS['prg710_bs610_rek'])
+    d = lib.oeffne(BS620, True); q = lib.oeffne(BS600)
+    stand[ziel] = rek_patchen(d, q); q.schliesse()
+    d.speichere(ziel); d.schliesse()
     return stand
 
 
@@ -243,6 +293,23 @@ def pruefen(lib, wurzel):
     ok &= a.lies(0, 0)[:10] == q.lies(0, 0)[:10] and a.lies(0, 0)[10:16] == b'BS600 ' and a.lies(0, 0)[16:] == q.lies(0, 0)[16:]
     ok &= a.lies(0, 1) == q.lies(0, 1) and a.lies(0, 2) == q.lies(0, 2)
     a.schliesse(); q.schliesse()
+    # BS610-Rekonstruktion: Sektorvergleich gegen das BS620-Original, genau die Bytes der REK_BEREICHE weichen ab
+    a = lib.oeffne(BS620); b = lib.oeffne(os.path.join(wurzel, AUS['prg710_bs610_rek']))
+    lage = datei_lage(a, 'BS620')
+    erw = {sektor_von(o, lage): (o, x, y) for o, x, y in rek_erwartet(lib)}
+    ist = {}
+    for c in range(40):
+        for i in range(Disk.anzahl(c)):
+            s_, t = a.lies(c, i), b.lies(c, i)
+            for k in range(len(s_)):
+                if s_[k] != t[k]: ist[(c, i, k)] = (s_[k], t[k])
+    print('prg710_bs610_rek: %d Bytes weichen vom BS620-Original ab (erwartet %d)' % (len(ist), len(erw)))
+    for (c, i, k), (x, y) in sorted(ist.items()):
+        o = erw.get((c, i, k))
+        lauf = '' if o is None else (' = %04XH' % (o[0] - 0x4300 if 0x4300 <= o[0] < 0x4F00 else o[0] + 0x6D00))
+        print('   Spur %d Sektor %d Byte %3d (Dateioffset %s%s): %02X -> %02X' % (c, i + 1, k, '%04X' % o[0] if o else '????', lauf, x, y))
+    ok &= set(ist) == set(erw) and all(ist[k] == erw[k][1:] for k in ist)
+    a.schliesse(); b.schliesse()
     # BS620 low = Original, Byte fuer Byte
     ok &= open(os.path.join(wurzel, AUS['prg710-1_bs620_ff_low']), 'rb').read() == open(BS620, 'rb').read()
     print('OK' if ok else 'FEHLER')

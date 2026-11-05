@@ -138,6 +138,11 @@ k1520_add_test(prg710_bs6xx SRC test_prg710_bs6xx.cpp
                           LIBS k1520_prg710 k1520_fs k1520_logger k1520_testsupport
                           LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 900)
 
+# BS610-Rekonstruktion (AP-B8): BS620 mit dem K7609-Tastaturteil von BS600 V02 am PRG 710 (Eigenbau-Diskette).
+k1520_add_test(prg710_bs610_rek SRC test_prg710_bs610_rek.cpp
+                          LIBS k1520_prg710 k1520_fs k1520_logger k1520_testsupport
+                          LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 900)
+
 # PRG 710 / 710-1 Etappe 3 (AP-P3): UDOS 4.3 bis zum Prompt.
 k1520_add_test(prg710_udos SRC test_prg710_udos.cpp
                           LIBS k1520_prg710 k1520_fs k1520_logger k1520_testsupport

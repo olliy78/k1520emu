@@ -76,3 +76,22 @@ Das ist ein **eigener Befund** (Fehlertext genau notieren) und sagt nichts über
 | **keine** läuft | Boot-/Selbsttestfehler zuerst klären (Fehlertext); sonst Laufwerk/Spurlage prüfen (96 tpi, `step=2`, Laufwerk 0 = links), Diskette gegenlesen. |
 
 Bitte die ausgefüllten Bögen und, wenn möglich, ein Foto des Bildschirms an den Entwickler zurückgeben.
+
+## 5. BS610-Rekonstruktion am echten PRG 710 (AP-B8) — Eigenbau, kein Original
+
+Datei: `disks/prg710_bs610_rekonstruktion/prg710_bs610_rek.hfe` (`python3 -I tools/bs600/bau_disketten.py`, Prüfung `--check`).  Es gibt keinen
+Abzug einer echten BS610.  Diese Diskette ist die **BS620-Diskette des PRG 710-1**, in deren Datei `BS620` der Tastaturteil (67 Bytes) durch
+den von **BS600 Version 02** ersetzt ist: K7609 am 8279 statt K7672.  Alles andere ist BS620: Urlader `SYL FOR BS620`, Plattentreiber mit
+**Doppelschritt** (passt zum K5601), Dateien, Version 04 im Kopf.  Einzelheiten: `doc/bs600/tastatur.md`.
+
+Im Emulator (`prg710`, 2 × K5601) laufen Boot, Selbsttest, Hauptmenü, Kursortasten, ENTER, CL, `LIST` (28 Dateien) und `COPY`.  Am Gerät
+ist das alles unbelegt.
+
+* Schreiben wie §1 (`step=2`, 40 Zylinder, Kopf 0).
+* Am PRG 710: Diskette links, Einschalten, **ET1** (`↵`) startet das Laden.  Erwartet: `GRUNDDIAGNOSE`, dann das Hauptmenü `BS600  VERSION: 04`.
+* Bedienung: **Kursor ab/auf**; **ENTER = Taste ET2** (`ST`), **CL** quittiert Fehlermeldungen.  Probe: `DIENSTPROGRAMME`, `N`, ET2 → blinkende Meldung
+  `LAUFWERK 2` (wenn rechts keine Diskette liegt), **CL** → zurück ins Hauptmenü.  Dann `DIENSTPROGRAMME`, `J`, ET2, ET2, `LIST` wie §2.6 →
+  `DISK ENTHAELT 28 VON 54`.
+* Bitte notieren: Selbsttestfehler (Text), ob jede Taste wirkt (Kursor, ET2, CL, `J`/`N`), Auffälligkeiten beim Lesen.  `COPY` nur auf einer **Kopie**.
+* Bekannte Unsicherheit: von BS600 V02 übernommen gibt `RST 08` einige Bytes an die Ports **71H/72H** aus (in BS600 V02 genauso, vermutlich ein
+  alter Tabellenverweis).  Ist dort am Gerät etwas angeschlossen, kann sich das zeigen.
