@@ -213,6 +213,64 @@ TEST(Bs600Fs, VerzeichnisplatzReihenfolgeSlotWeise) {
     EXPECT_EQ(pn, 3 * 3);
 }
 
+// `create` gleicht dem FORMAT-Abzug vom echten PRG 710-1 (FORMAT unter BS620, Fixture bs620_prg710-1_format_leer.hfe: 80 Zylinder
+// gelesen, auf 40 Zylinder einseitig reduziert): Sektoren 1-6 (Urlader + EBCDIC), Verzeichnis, Belegungstabelle und alle Datensektoren
+// (C4H + 255 x 5EH) byteweise gleich; nur Name/Datum/Besitzer des Kennsatzes (Sektor 7) unterscheiden sich.
+TEST(Bs600Fs, CreateGleichtDemFormatAbzug) {
+    const std::string kopie = k1520test::tempPath("bs600_format.hfe");
+    fs::copy_file(fixture("bs620_prg710-1_format_leer.hfe"), kopie, fs::copy_options::overwrite_existing);
+    std::string err;
+    auto o = DiskVolume::open(kopie, "", formate(), dateisysteme(), err, true);
+    ASSERT_TRUE(o) << err;
+    EXPECT_EQ(o->fsType(), FsType::Bs600);
+    EXPECT_EQ(o->list().size(), 0u);
+    auto n = neu("bs600_create_gleich.hfe");
+    ASSERT_TRUE(n);
+    std::string e2;
+    ASSERT_TRUE(bfs(*n).kennsatzSetzen("051126", "OLLIY", e2)) << e2;
+    // Name im Abzug 'LEER' - das Katalog-Anlegen nennt ihn "TEST"
+    for (int t = 0; t < 40; ++t)
+        for (int sek = 1; sek <= (t == 0 ? 26 : 15); ++sek) {
+            struct { std::vector<uint8_t> data; } x, y;
+            uint16_t crc = 0;
+            ASSERT_TRUE(o->readSectorAt(static_cast<uint8_t>(t), 0, sek - 1, x.data, crc)) << t << "/" << sek;
+            ASSERT_TRUE(n->readSectorAt(static_cast<uint8_t>(t), 0, sek - 1, y.data, crc)) << t << "/" << sek;
+            if (t == 0 && sek == 7) {
+                ASSERT_EQ(x.data.size(), y.data.size());
+                for (size_t i = 0; i < x.data.size(); ++i)
+                    if (i < 4 || i >= 10) EXPECT_EQ(x.data[i], y.data[i]) << "Kennsatz Byte " << i;
+                continue;
+            }
+            EXPECT_EQ(x.data, y.data) << "Spur " << t << " Sektor " << sek;
+        }
+}
+
+// DISKCOPY am echten Geraet (Fixture bs620_prg710-1_diskcopy_high.hfe): erkannt als BS600, 28 Dateien, und bis auf den Kennsatz (Sektor 7:
+// Name `BS620H`, Datum, Besitzer) byteweise die Quelle `disks/prg710-1_bs620/prg710-1_bs620_ff_high.hfe`.
+TEST(Bs600Fs, DiskcopyAbzugGleichtDerQuelleAusserDemKennsatz) {
+    const std::string kopie = k1520test::tempPath("bs600_dcopy.hfe");
+    fs::copy_file(fixture("bs620_prg710-1_diskcopy_high.hfe"), kopie, fs::copy_options::overwrite_existing);
+    const std::string quelle = k1520test::tempPath("bs600_dcopy_quelle.hfe");
+    fs::copy_file((fs::path(FIXTURE_DIR) / ".." / ".." / ".." / "disks" / "prg710-1_bs620" / "prg710-1_bs620_ff_high.hfe").string(), quelle,
+                  fs::copy_options::overwrite_existing);
+    std::string err;
+    auto a = DiskVolume::open(kopie, "", formate(), dateisysteme(), err, true);
+    ASSERT_TRUE(a) << err;
+    auto b = DiskVolume::open(quelle, "", formate(), dateisysteme(), err, true);
+    ASSERT_TRUE(b) << err;
+    EXPECT_EQ(a->fsType(), FsType::Bs600);
+    EXPECT_EQ(a->list().size(), 28u);
+    for (int t = 0; t < 40; ++t)
+        for (int sek = 1; sek <= (t == 0 ? 26 : 15); ++sek) {
+            if (t == 0 && sek == 7) continue;
+            std::vector<uint8_t> x, y;
+            uint16_t crc = 0;
+            ASSERT_TRUE(a->readSectorAt(static_cast<uint8_t>(t), 0, sek - 1, x, crc));
+            ASSERT_TRUE(b->readSectorAt(static_cast<uint8_t>(t), 0, sek - 1, y, crc));
+            EXPECT_EQ(x, y) << "Spur " << t << " Sektor " << sek;
+        }
+}
+
 TEST(Bs600Fs, AttributeUmbenennenUndRestBleibt) {
     auto v = neu("bs600_attr.hfe");
     ASSERT_TRUE(v);

@@ -1614,6 +1614,14 @@ int cmd_create(const Optionen& o) {
                                  static_cast<uint32_t>(std::max(0, o.inodes)),
                                  static_cast<uint32_t>(std::max(0, o.blocks)));
     if (!v) { std::cerr << "Fehler: " << err << "\n"; return kFehler; }
+    if (v->bs600Fs() && (!o.udos_geaend.empty() || !o.bs600_signum.empty())) {
+        // BS600: Datum (TTMMJJ, Vorgabe heute) und Besitzer des Kennsatzes wie bei FORMAT unter BS620
+        std::string e2;
+        if (!v->bs600Fs()->kennsatzSetzen(o.udos_geaend, o.bs600_signum, e2) || !v->flush()) {
+            std::cerr << "Fehler: " << (e2.empty() ? v->lastError() : e2) << "\n";
+            return kFehler;
+        }
+    }
 
     std::cout << "angelegt: " << o.rest[1] << " (" << o.fs << ", "
               << v->volumeCount() << (v->volumeCount() == 1 ? " Seite" : " Seiten") << ")\n";

@@ -128,6 +128,10 @@ public:
 
     /// @brief Zahl der Sektoren des Bootabbilds (Sektor 1..3 der Spur 0).
     static constexpr int kBootSektoren = 3;
+    /// Fuellung eines Datensektors wie von FORMAT unter BS620: C4H, dann 255 x 5EH.
+    static std::vector<uint8_t> datenFuellung();
+    /// Datum (TTMMJJ) und Besitzer (hoechstens 5 Zeichen, Byte 37..41) des Kennsatzes setzen; leer = unveraendert.
+    bool kennsatzSetzen(const std::string& datum, const std::string& besitzer, std::string& err);
 
     /// @brief Urlader eines Bootabbilds (Byteband Sektor 1..3) einordnen; `art == Keiner` = kein Urlader.
     static Bs600Urlader urladerKennung(const std::vector<uint8_t>& img);

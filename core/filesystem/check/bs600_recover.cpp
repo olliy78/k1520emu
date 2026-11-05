@@ -128,7 +128,7 @@ FsRecoverReport Bs600FileSystem::recoverScan(FsRecoverLevel level, bool nachlade
             if (tab[idx(l)] || soll[idx(l)]) { abschliessen(); continue; }
             if (!spurDa(l / kBs600Sektoren + 1)) { abschliessen(); continue; }
             std::vector<uint8_t> s;
-            if (!sektorLesen(l / kBs600Sektoren + 1, l % kBs600Sektoren + 1, s) || fsRecoverFuellmuster(s)) {
+            if (!sektorLesen(l / kBs600Sektoren + 1, l % kBs600Sektoren + 1, s) || fsRecoverFuellmuster(s) || s == Bs600FileSystem::datenFuellung()) {
                 abschliessen();
                 continue;
             }
