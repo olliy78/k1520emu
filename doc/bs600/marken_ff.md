@@ -164,6 +164,7 @@ Dann liefe der 710-1-Code (`JR Z` auf sich selbst) sofort durch, BS620 und das 7
 * Die **BS600** (Version 02, Datei der PRG-700-Diskette) macht **Einfachschritt** und scheitert an einem 96-tpi-K5601 mit der 40-Spur-Diskette beim Nachladen von Spur ≥ 1 mit `FC 06` — „Disk-Name“ (Spur 0)
   ist ihr Maximum am K5601 (Test `Prg710Bs600.LiestAmK5601NurSpur0FC06NachDemKennsatz`).  Das passt zu robotrontechnik.de (BS600 = K5600.10 am PRG 700).  Eine echte BS610 (Doppelschritt) liegt nicht vor;
   die 710-Diskette ist damit **kein** Beleg für das Polaritätsproblem am PRG 710, nur für die Tastenbelegung (§ Tasten am 710 in `merkposten/bs600.md`).
+  **Gegenprobe (AP-B8):** mit einem K5600.10 als Laufwerk 1 (48 tpi) liest dieselbe BS600 V02 dort alle Spuren, `LIST` zeigt 25 Dateien (`Prg710Bs600.ZweitesLaufwerkK5600_10ListetAlleDateien`).
 * **Patch `high`:** vier Bytes `20H → 28H` (JR NZ → JR Z) an `1316H`, `1354H`, `15A5H`/`161EH` (BS620: `1316H, 1354H, 15A8H, 1620H`) bzw. den entsprechenden Stellen der BS600; bei BS600 zusätzlich die Sollbytes der aktiven Prüfsumme
   (`AEC4H`, `AEC5H`, `AEEBH`) — Sektorvergleich: BS620 genau 4 Bytes, BS600 genau 7 Bytes weichen ab, Prüfsumme nach dem Patch in allen 25 Blöcken gut (`bau_disketten.py --check`).
 

@@ -208,6 +208,40 @@ TEST(Prg710Bs600, LiestAmK5601NurSpur0FC06NachDemKennsatz) {
     EXPECT_LE(innen, 3) << "wenige Schritte nach innen (Einfachschritt): " << innen << " von " << schritte;
 }
 
+// AP-B8 Schritt 1 (Gegenprobe zur Einfachschritt-Erklaerung, BEFUND: bestaetigt): Laufwerk 0 = K5601 (das 710-ROM bootet die
+// Diskette mit Doppelschritt), Laufwerk 1 = K5600.10 (40 Spuren, 48 tpi: Spur n = Zylinder n, kein TrackPitch) mit einer Kopie
+// derselben Diskette.  Unter DIENSTPROGRAMME waehlt 'N' Laufwerk 2 (= K5122-Laufwerk 1): Menue-Ueberlagerungen und LIST kommen
+// von dort, BS600 V02 liest mit Einfachschritt alle Spuren und zeigt 25 Dateien (am K5601 dagegen FC 06, Test oben).
+// Leser-Modell = Kernvorgabe des 710 (0).
+TEST(Prg710Bs600, ZweitesLaufwerkK5600_10ListetAlleDateien) {
+    k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::ERROR);
+    k1520test::TempDisk sys("../../../disks/prg710_bs600/prg710_bs600_ff_low.hfe", "bs6xx_lw0.hfe");
+    k1520test::TempDisk dat("../../../disks/prg710_bs600/prg710_bs600_ff_low.hfe", "bs6xx_lw1.hfe");
+    Prg710Machine::Config c; c.variante = V::Prg710; c.atp_zusatz = true;
+    c.laufwerke = {"K5601", "K5600.10", "none", "none"};
+    Prg710Machine m(c);
+    ASSERT_TRUE(m.mountDisk(1, dat.path(), m.defaultFormatName(1), false)) << m.lastError();
+    ASSERT_TRUE(bootBs600(m, sys.path())) << bildText(m);
+    const uint32_t enter = 0x03000000u | 0x38u;
+    druecke(m, 0x01000015u, 3'000'000);                  // Kursor ab: DIENSTPROGRAMME
+    druecke(m, enter, 100'000'000);
+    druecke(m, 'N', 2'000'000);                          // LAUFWERK 1  J -> N = Laufwerk 2
+    druecke(m, enter, 100'000'000);
+    ASSERT_TRUE(warteAuf(m, "DISK-NAME :", 3'000'000'000)) << bildText(m);
+    EXPECT_NE(bildText(m).find("LAUFWERK 2"), std::string::npos) << bildText(m);
+    druecke(m, enter, 300'000'000);                      // Menue der Dienstprogramme (Ueberlagerung von Spur >= 1)
+    ASSERT_TRUE(warteAuf(m, "COPYDISK", 600'000'000)) << bildText(m);
+    EXPECT_EQ(bildText(m).find("FC 06"), std::string::npos) << bildText(m);
+    druecke(m, enter, 300'000'000);                      // LIST
+    druecke(m, enter, 600'000'000);                      // DRUCKROUTINE
+    druecke(m, enter, 600'000'000);                      // DISK EINLEGEN
+    druecke(m, 'N', 2'000'000);                          // LAUFWERK 1  J -> N
+    druecke(m, enter, 1'500'000'000);
+    druecke(m, 0x01000015u, 20'000'000);                 // GERAET: BS
+    druecke(m, enter, 3'000'000'000);
+    EXPECT_TRUE(warteAuf(m, "DISK ENTHAELT 25 VON 54", 1'500'000'000)) << "PC=" << std::hex << m.cpuPC() << "\n" << bildText(m);
+}
+
 // Gegenprobe: dieselben Leser-Modelle mit den GERAETEdisketten (UDOS) - das 710-1 bootet UDOS nur mit Modell 0 und 1, das 710 nur
 // mit 0 und 2.  Ein einziges Modell fuer beide Geraete gibt es damit NICHT (marken_ff.md, Abschnitt 8).
 TEST(Prg710Bs6xxDisketten, UdosBootetJeLeserModell) {
