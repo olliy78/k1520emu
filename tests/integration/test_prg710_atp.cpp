@@ -40,7 +40,6 @@ Prg710Machine::Config cfg(bool atp) {
     Prg710Machine::Config c;
     c.variante   = V::Prg710_1;
     c.atp_zusatz = atp;
-    c.leser_modell = 1;   // einheitlich: low-aktiv, Daten nach der Marke - BS620 liest ohne Umpolen (marken_ff.md §8)
     return c;
 }
 

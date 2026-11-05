@@ -166,3 +166,9 @@ Dann liefe der 710-1-Code (`JR Z` auf sich selbst) sofort durch, BS620 und das 7
   die 710-Diskette ist damit **kein** Beleg für das Polaritätsproblem am PRG 710, nur für die Tastenbelegung (§ Tasten am 710 in `merkposten/bs600.md`).
 * **Patch `high`:** vier Bytes `20H → 28H` (JR NZ → JR Z) an `1316H`, `1354H`, `15A5H`/`161EH` (BS620: `1316H, 1354H, 15A8H, 1620H`) bzw. den entsprechenden Stellen der BS600; bei BS600 zusätzlich die Sollbytes der aktiven Prüfsumme
   (`AEC4H`, `AEC5H`, `AEEBH`) — Sektorvergleich: BS620 genau 4 Bytes, BS600 genau 7 Bytes weichen ab, Prüfsumme nach dem Patch in allen 25 Blöcken gut (`bau_disketten.py --check`).
+
+## 9. Geraetetest (Anwender, 2026-11-05)
+
+Echter PRG 710-1 mit K5601, Disketten per `gw write` mit `step=2` geschrieben: **`_ff_low` (Original) und `_ff_high` booten beide und zeigen beide die Dateiliste (`LIST`).** Der Selbsttest besteht am Geraet (kein `CTC ATP KANAL`, kein `SIO  KANAL`).  FORMAT und COPY sind nicht probiert, PRG 710 ist nicht getestet.
+
+Folge: Die Polaritaet ist fuer das Lesen am 710-1 unerheblich; das passt zu Modell 1 (Daten an 16H erst nach der Marke) und nicht zu Modell 0, unter dem das Original im Emulator haengt.  Beweis fuer den inneren Aufbau ist es nicht: es zeigt nur das Verhalten.  Dass auch der PRG 710 so arbeitet, folgt nur aus der Aussage des Anwenders, die Karten seien tauschbar.

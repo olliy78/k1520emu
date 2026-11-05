@@ -242,15 +242,16 @@ TEST_P(Prg710Boot, SpeicherverwaltungFolgtDemArbeitsmodell) {
 
 /**
  * @test Prg710Boot.MarkenFFRuhepegelAmTorB
- * @brief K5122 Tor B Bit 1 (12H) in Ruhe, vom ROM programmiert: am 710 1 (low-aktiv),
- *        am 710-1 0 (high-aktiv) — passend zu `JR NZ` bzw. `JR Z` der Lese-Routine
- *        (§4a.1).  Der „Bit 1 = 1 vor der PIO-Programmierung“ aus AP-P1c war die
+ * @brief K5122 Tor B Bit 1 (12H) in Ruhe, vom ROM programmiert: an BEIDEN Geraeten 1 (low-aktiv:
+ *        scharf = 1, Marke = 0).  Seit AP-B2e (Geraetebefund 2026-11-05: BS620 liest am echten 710-1
+ *        Original und gepatcht) gilt am 710-1 Leser-Modell 1 (Daten erst nach der Marke), an dem
+ *        das `JR Z` des 710-1-ROMs sofort durchlaeuft und `IN (16H)` auf die Marke wartet (marken_ff.md §8/§9).  Der „Bit 1 = 1 vor der PIO-Programmierung“ aus AP-P1c war die
  *        fehlende Anmeldung der K5122 am Bus (FFH von einem leeren Port).
  */
 TEST_P(Prg710Boot, MarkenFFRuhepegelAmTorB) {
     Prg710Machine m(cfgFuer(GetParam()));
     m.powerOn();
-    const uint8_t erwartet = GetParam() == V::Prg710 ? 0x02 : 0x00;
+    const uint8_t erwartet = 0x02;   // beide Geraete: Ruhepegel 1
     EXPECT_EQ(m.ioReadDebug(0x12) & 0x02, erwartet) << "nach Netz-Ein (PIO im Grundzustand)";
     EXPECT_NE(m.ioReadDebug(0x12), 0xFF) << "K5122 antwortet an 12H";
     ASSERT_GT(bisTastaturabfrage(m), 0);
