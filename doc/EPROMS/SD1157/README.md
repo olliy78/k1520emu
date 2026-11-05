@@ -6,12 +6,12 @@ Neuerervorschlag und Beschreibung liegen unter `doc/printer/sd1157/`.
 | Datei | Größe | MD5 | Inhalt |
 |---|---|---|---|
 | `1157.rom` | 10 624 B (0000H–297FH) | 09c70714ae52729e1352b2645ef4a90e | Mikroprogramm |
-| `1157zg.rom` | 1 024 B | 44bbe490f3acbbb0ddcc11e50fad8d95 | Zeichengenerator (laut Quelle `azg1` = 3000H bzw. `azg2` = 3400H; welcher der beiden — prüfen) |
+| `1157zg.rom` | 1 024 B | 44bbe490f3acbbb0ddcc11e50fad8d95 | Zeichengenerator ZG1, liegt auf 3000H (`azg1`); ZG2 auf 3400H fehlt und muss FFH lesen |
 
 **Wichtig:** Das ist die von JDE angepasste Fassung (Version 1.00 vom 10.09.1984, letzte Änderung 24.04.1986: modulo-8-Tabs,
 Übergehen von Fehlerzuständen, DC4 → DC1; Anschluss an SKR/A5120 über IFSS und V.24), **nicht** das Werksoriginal.  Gilt für die
-Typen 264/267, nicht für 269 (Grafik).  Ob `1157.rom` genau das Übersetzungsergebnis von `1157.mac` ist, ist **noch nicht geprüft**
-(Entwurf 49 WP0: mit M80-kompatiblem Assembler übersetzen und vergleichen).
+Typen 264/267, nicht für 269 (Grafik).  **`1157.rom` ist nicht genau die Übersetzung von `1157.mac`** (WP0b, mit M80 geprüft): Abweichungen
+und Hardwarebefund in `doc/printer/sd1157/hardware.md` §1.  Maßgeblich ist das ROM.
 
 Hardware aus dem Kopf von `1157.mac` (kein Schaltplan vorhanden):
 

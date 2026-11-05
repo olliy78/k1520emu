@@ -29,7 +29,7 @@ Bestand und Herkunft aller Unterlagen: **`doc/printer/README.md`**.  EPROMs: `do
 | | **K6316** Schalterdrucker | **SD 1157** Seriendrucker | K6313/K6314 (später) | SD 1152/257 (später) |
 |---|---|---|---|---|
 | Druckwerk | 9 Nadeln, 80 Spalten, 100 Z/s, vor-/rückwärts | 9 Nadeln, 132 (264) bzw. 210 Spalten/2 Bahnen (267), 180 Z/s | 9 Nadeln, 80/136 Spalten | Typenrad |
-| Rechner | U880, PIO U855, SIO U856, CTC U857, 5 × U2716, RAM ab ~3800H | U880 in Sloteinheit (11 LP), SIO, CTC, 3 PIO, RAM 2C00H | U880, CTC, PIO | Master-/Subprozessor |
+| Rechner | U880, 3 PIO, 2 CTC, SIO am Modul, 5 × U2716, 1 KiB RAM 3800H (`k6316/hardware.md`) | U880 in Sloteinheit (11 LP), SIO, CTC, 3 PIO, RAM 2C00H + 3800H (`sd1157/hardware.md`) | U880, CTC, PIO | Master-/Subprozessor |
 | Firmware | **ja**, IFSS- und V.24-Satz | **ja** + **kommentierte Quelle** (JDE, angepasste Fassung) | **nein** | nein |
 | Schaltplan | **ja**, 19 Blätter + Servicehandbuch 74 S. | **nein** (Hardware aus Quelle) | ja (5 Blätter) | Servicehandbuch |
 | Schnittstelle | IFSS-Modul (praktisch nur dieses), V.24 | IFSS + V.24 an einer SIO (A = V.24, B = IFSS) | Module | V.24/IFSS/Centronics |
@@ -66,7 +66,11 @@ Druckwerk, Taktierung, Bedienmatrix-Prinzip, Interfacemodul.
   Damit lässt sich die Hardware **aus dem, was die Firmware erwartet**, rekonstruieren — Kennzeichnung `[Q]` (aus Quelle) statt
   `[S]` (aus Schaltplan) im Hardwaredokument.
 * IFSS-Beschreibung (BÜWK 1983): 9600 Bd, Puffer 1 KiB, Zeichensätze nach RöW 3565-76, Freigabe/Sperre über DC1/DC3, Statusmeldungen.
-* **Offen**: ist `1157.rom` = Übersetzung von `1157.mac`?  (WP0b; wenn nicht, gilt das ROM, die Quelle dient als Kommentar.)
+* **WP0b erledigt: `doc/printer/sd1157/hardware.md`.**  `1157.rom` ≠ Übersetzung von `1157.mac`: Quelle + drei Abweichungen ergeben das ROM
+  byteweise (0D20H Schiebepuffer im Eingabepfad, Folgeverschiebung +38H, Auffüllung 2907H–297FH).  **Es gilt das ROM**, die Quelle ist der Kommentar.
+  `1157zg.rom` = ZG1 auf 3000H; ZG2 (3400H) fehlt und muss FFH lesen.
+* **Der SD 1157 hat keine Motorphasen.**  Die Firmware gibt nur LFG/VW/VTAB aus (Rampen macht die Hardware) und liest LAUF, /VK, Takte (richtungsgetrennt
+  2A.0/2B.0) und Ränder; Papier: XPFG/XPWV, Schrittimpulse zurück (1/48″).  Bleiben Rückmeldungen aus: NMI bzw. Havarie.
 
 ### 2.4  K6313 — kein Abzug
 
@@ -128,11 +132,11 @@ core/peripherals/druckwerk   Druckwerk (Schnittstelle) · Nadeldruckwerk (+ Para
 
 ### 4.3  Druckwerk und Blattmodell (WP3)
 
-* **Eingänge**: Wagenmotor-Phasen, Nadelimpulse (9 Bit), Vorschubmotor-Phasen (je Bahn), Hilfsmotoren/Magnete (Vorsteck, Schneiden,
-  Farbband) — Letztere nur als Zustand.  **Ausgänge**: Taktscheibe/Lichtschranke, Randsensoren (links/rechts), Papierende je Bahn.
-* **Nadeldruckwerk**: Phasenfolge → Wagenposition (vorerst ideal, keine Trägheit, bis die Firmware Gegenteiliges zeigt);
-  Taktscheibe aus Position; Punkt = Nadelimpuls an (Position + Nadelversatz je Richtung).  Parametersatz je Gerät
-  (K6316: 80 Spalten, 6°-Motor, 30 Impulse/Umdr.; SD 1157: 132/210 Spalten, Werte aus Quelle).
+* **Die Antriebe sind verschieden, das Blatt nicht.**  K6316: Firmware schaltet Phasen selbst, liest Taktscheibe /G1.  SD 1157: Firmware
+  gibt Lauf/Richtung/Tempo vor, die Hardware regelt und meldet LAUF und Takte.  Deshalb **zwei Antriebsklassen** hinter einer gemeinsamen
+  Schnittstelle zum Kopf: `Wagen` liefert `position()` und Takt-/Sensorrückmeldungen, `Papierweg` den Vorschub; `SchrittWagen` (K6316)
+  und `GeregelterWagen` (SD 1157).  `Nadelkopf` + `Blattmodell` sind gemeinsam: Nadelimpuls + Position + Papierlage → Punkt.
+* Ideal bis zum Gegenbeweis: keine Trägheit, außer die Firmware verlangt sie (SD 1157: LAUF binnen µs, Auslauf 8…70 Takte, Impulse < 7 ms).
 * **Blattmodell**: Bitmap in Mechanik-Auflösung, wächst nach unten; **Schnitt** (K6316) bzw. Form Feed/Seitenlänge erzeugen eine
   **Blattgrenze** → natürliche PDF-Seiten.  **Zwei Bahnen** (SD 1157/267) = zwei Blätter nebeneinander mit eigenem Vorschub.
   Lesen zeilenpaketweise mit Versionszähler (`k1520_printer_rows`), nie das ganze Blatt je Bild.
@@ -210,6 +214,7 @@ Parallel gefahrlos: WP0a ‖ WP0b (nur Lesen/Doku).  Bauende Agenten nacheinande
 * **SD-1157-Hardware ohne Schaltplan**: Taktfrequenz, Interruptprioritäten, Sensorpegel sind erschlossen.  Läuft die Firmware nicht
   an, ist zuerst die Rekonstruktion verdächtig, nicht die Firmware.
 * **SD-1157-Firmware ist eine Anpassung** (JDE), kein Werksoriginal — für die Emulation unerheblich, im Handbuch kenntlich machen.
+  Das ROM blockiert je Zeichen ≈ 8,5 ms mit DI (Schiebepuffer) und sendet DC1 nur auf V.24: **gastseitiges Verhalten, nicht „reparieren"**.
 * **K6316-Spezialmechanik** (Vorsteck, Schneiden, Leitbleche) verlangt Sensorrückmeldungen, die die Firmware vielleicht prüft;
   fehlende Rückmeldung = Fehlerzustand → als Erstes im Selbsttest sichtbar.
 * **Mechanikgenauigkeit** (Nadelversatz, Punktgröße) aus Handbuchwerten; Versatz zwischen Vor-/Rückwärtsdruck wird an der Firmware
@@ -219,10 +224,11 @@ Parallel gefahrlos: WP0a ‖ WP0b (nur Lesen/Doku).  Bauende Agenten nacheinande
 
 ## 9  Offene Fragen an den Anwender
 
-* **F1**  Reihenfolge: **SD 1157 zuerst** lauffähig (Quelle vorhanden), K6316 danach — einverstanden?
-* **F2**  K6316: beide Firmwaresätze (IFSS und V.24) als Typen anbieten, oder nur IFSS (Auslieferungszustand)?  Empfehlung: beide.
-* **F3**  SD 1157/267 mit zwei Bahnen von Anfang an, oder zuerst nur 264?  Empfehlung: 264 zuerst, 267 in WP6b.
+Entschieden 2026-11-05: **SD 1157 zuerst** lauffähig, K6316 danach; K6316 mit **beiden Firmwaresätzen** (IFSS und V.24) als Typen;
+**SD 1157/264 zuerst**, 267 mit zwei Bahnen in WP6b.
+
 * **F4**  Summer/Geräusche: nur Anzeige oder Ton?  Empfehlung: abschaltbar, Standard aus.
+* **F6**  SD 1157: Kennung 4/5/6 aus EBD/BDA; 4 = 264 und 6 = 267 plausibel, 5 ungeklärt.  Offene Punkte mit Prüfkriterium: `sd1157/hardware.md` §14.
 * **F5**  K6313-Kassette: wird ausgelesen oder angefragt?  (Bestimmt, wann WP8 beginnt.)
 
 ## 10  Nicht im Umfang
