@@ -62,6 +62,9 @@ public:
     /// DIP-Schalter, Steckbruecken, Tasten-Ruhelage: Aufbau des Geraets zur Bauzeit (§4.1, §5.4).
     struct Config {
         enum class Schnittstelle { Ifss, V24 };
+        /// ROM-Abzug: der Original-Abzug (`1157.rom`) leert den SIO-Eingabepuffer nie (Byte 0D34H = 2BH statt 0BH, [?] Bitkipp,
+        /// doc/EPROMS/SD1157/README.md); `true` = `1157_repariert.rom` (nur 0D34H = 0BH), Vorgabe.
+        bool rom_repariert = true;
         Schnittstelle schnittstelle = Schnittstelle::Ifss;   ///< 3A.0: 0 = IFSS (SIO B), 1 = V.24 (SIO A) §5.4
         // PIO 3 A, Schalter des V.24-Betriebs (§5.4); Vorgaben [?]
         uint8_t stopbits_code = 1;       ///< Bit 2/1 = 01 -> 1 Stoppbit

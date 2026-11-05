@@ -6,6 +6,7 @@
 
 #include "core/cards/printer/sd1157_steuerung.h"
 #include "core/cards/printer/rom_sd1157.h"
+#include "core/cards/printer/rom_sd1157_repariert.h"
 #include "core/cards/printer/rom_sd1157_zg.h"
 #include "core/logger.h"
 #include "core/serial/sio_format.h"
@@ -387,7 +388,7 @@ void Sd1157Steuerung::ioWrite(uint8_t port, uint8_t data)
 
 uint8_t Sd1157Steuerung::memRead(uint16_t a)
 {
-    if (a < ROM_ENDE) return SD1157_ROM[a];
+    if (a < ROM_ENDE) return cfg_.rom_repariert ? SD1157_ROM_REPARIERT[a] : SD1157_ROM[a];
     if (a < RAM1_BASIS) return 0xFF;                       // 2980H–2BFFH unbelegt [?] §14 Nr. 14
     if (a < ZG1_BASIS) return ram1_[a - RAM1_BASIS];
     if (a < ZG2_BASIS) return SD1157_ZG1[a - ZG1_BASIS];

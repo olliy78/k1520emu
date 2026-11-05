@@ -139,6 +139,26 @@ TEST(Sd1157Karte, EingebettetesAbbildIstDieDateiUnveraendert)
     EXPECT_TRUE(std::equal(zg.begin(), zg.end(), SD1157_ZG1));
 }
 
+TEST(Sd1157Karte, DieVorgabeIstDerRepariertAbzugUnterscheidetSichNurInByte0D34H)
+{
+    const auto orig = dateiBytes("1157.rom");
+    const auto rep = dateiBytes("1157_repariert.rom");
+    ASSERT_EQ(orig.size(), rep.size());
+    ASSERT_FALSE(md5AusReadme("1157_repariert.rom").empty());
+    EXPECT_EQ(md5Hex(rep.data(), rep.size()), md5AusReadme("1157_repariert.rom"));
+    int diff = 0;
+    for (size_t i = 0; i < orig.size(); ++i)
+        if (orig[i] != rep[i]) { ++diff; EXPECT_EQ(i, 0x0D34u); EXPECT_EQ(orig[i], 0x2B); EXPECT_EQ(rep[i], 0x0B); }
+    EXPECT_EQ(diff, 1);
+    Karte vorgabe;
+    Sd1157Steuerung::Config co; co.rom_repariert = false;
+    Karte original(co);
+    for (size_t i = 0; i < rep.size(); ++i) {
+        ASSERT_EQ(vorgabe.rd(static_cast<uint16_t>(i)), rep[i]) << i;
+        ASSERT_EQ(original.rd(static_cast<uint16_t>(i)), orig[i]) << i;
+    }
+}
+
 // ─── Speicherkarte (hardware.md §2) ──────────────────────────────────────────
 
 TEST(Sd1157Karte, RomLiegtAuf0000BisFFFFH297FUndIstNichtBeschreibbar)

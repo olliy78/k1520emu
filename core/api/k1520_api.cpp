@@ -414,6 +414,11 @@ K1520Handle k1520_create_printer(int typ, const char* konfig) {
         if (key == "schnittstelle" && (val == "ifss" || val == "v24")) {
             cfg.sd1157.schnittstelle = val == "v24" ? Sd1157Steuerung::Config::Schnittstelle::V24
                                                     : Sd1157Steuerung::Config::Schnittstelle::Ifss;
+        } else if (key == "rom" && (val == "original" || val == "repariert")) {
+            cfg.sd1157.rom_repariert = val == "repariert";
+        } else if (key == "rom") {
+            g_init_error = "Drucker: rom = " + val + " unbekannt (original | repariert)";
+            return nullptr;
         } else if (key == "schnittstelle") {
             g_init_error = "Drucker: schnittstelle = " + val + " unbekannt (ifss | v24)";
             return nullptr;
