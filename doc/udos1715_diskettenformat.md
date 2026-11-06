@@ -214,8 +214,12 @@ bootet, frisch angelegte Diskette nicht → sektorweise gemischt):
    bei 4002H `"BO"` steht (`BOOT FOR UDOS V 5.0!`); sonst `ERROR: 45`.  Die Sektoren
    07–09 gehören deshalb zum Bootabbild (hinter Spur 0 Kopf 0, zusammen 4864 Byte), die
    Verzeichnissätze liegen unter UDOS 5.0 auf **05, 0A, 01, 06, 0B** (nicht auf der
-   Handbuchlage 05, 0A, 0F, 04, 09 …), und `mkfs` führt Spur 16H und 17H ganz als belegt
-   — wie die Originaldiskette (`Udos1715FileSystem::zweiterBootteil`).
+   Handbuchlage 05, 0A, 0F, 04, 09 …).  `mkfs` sperrt auf einer **Systemdiskette** Spur 0 Kopf 0 (16 Sektoren)
+   und Spur 16H Sektor 07–09 (`Udos1715FileSystem::sperreBootbereich`, `zweiterBootteil`) — zusammen mit den
+   9 festen Sektoren **28 belegt**, genau wie FORMAT V 5.0 `S=Y`; eine **Datendiskette** belegt nur die 9
+   (2551 frei).  *Ticket #29 (2026-11-06):* früher stand hier „Spur 16H und 17H ganz belegt“ (80 bzw. 96
+   Sektoren) — das war der Zustand der gebrauchten Originaldiskette, nicht Bedingung des Kaltstarts
+   (am Emulator gegengeprüft: UDOS bootet von der 28-Sektoren-Diskette und kopiert/liest Dateien).
 2. **Verzeichnis von vorn füllen** (§4 „in den nächsten Record").  Der Urlader BFOS liest
    die Sätze der Reihe nach und hört am ersten leeren auf; ein Eintrag hinter einer Lücke
    ist für ihn nicht da (`CAT` dagegen liest alle).  Das DiskTool hängte bis dahin jeden
@@ -233,6 +237,19 @@ startet).  Wächter: `py_disktool_bootsektoren` (baut und bootet), `Udos1715A512
 > (DIRECTORY) und 23 (Belegungsplan) — beim PC 1715 nur die 13 tatsächlich benutzten
 > Sektoren der Spuren 22/23. Kopf 1 derselben Spuren trägt gewöhnliche Dateidaten.
 > Maßgeblich ist auch hier die Karte, nicht die Regel.
+
+**FORMAT V 5.0 vs. DiskTool (Ticket #29, am Emulator gemessen).**  Leerdiskette in B: mit `FORMAT D=1 … S=N/S=Y`
+ergibt dieselbe Belegung wie `create --fs udos50 [--boot …]` (9 bzw. 28 Sektoren, Belegungsplan sektorgleich);
+verschieden nur Füllbytes: das 24-Byte-Namensfeld hinter dem `0D` ist bei FORMAT **FFH** (DiskTool `0D` — beides wird
+erkannt), der Descriptor trägt dort die Zusatzangaben ab `28H`, und freie Plansektoren sind 00 statt E5.  Kopierte Dateien
+(`COPY datei 1/datei`) belegt UDOS ab Spur 21 aufwärts, das DiskTool ab Spur 0 — beide Karten sind gültig,
+`fsck --full` meldet nichts, und jede Seite liest die Dateien der anderen byteidentisch.
+
+**Spur 0 vergibt das DiskTool bei `udos50` nie** (`allocSectors`/`allocRecords`), obwohl die Karte (wie bei FORMAT) Spur 0
+Kopf 1 frei führt: eine Systemdiskette mit allen 65 Dateien der Originaldiskette, deren erste Dateien auf Spur 0 Kopf 1 lagen,
+brach beim Kaltstart mit `ERROR C4` (= *SECTOR ADDRESS ERROR*) ab, mit anderer Reihenfolge der Dateien nicht.  Ursache nicht
+bis zum Befehl verfolgt (UDOS selbst beginnt erst bei Spur 21); die Regel ist die gemessene sichere Seite.
+Wächter: `py_disktool_bootsektoren` (volle Dateimenge, alphabetische Reihenfolge).
 
 ### 3.1 Anders als bei ZDOS: **die Zähler stimmen**
 

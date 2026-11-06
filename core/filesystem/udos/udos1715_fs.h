@@ -162,6 +162,10 @@ public:
      */
     static bool zweiterBootteil(const FsProfile& prof, uint8_t& erster, uint8_t& anzahl);
 
+    /// @brief Bootbereich im Belegungsplan sperren (UDOS 5.0: Spur 0 Kopf 0 + Spur 16H
+    ///        Sektor 07-09; sonst ganze Spur 0).  `speichern` schreibt die Karte sofort (nachtraegliches Einspielen eines Bootabbilds).
+    bool sperreBootbereich(bool speichern = false);
+
     /// @brief Gueltiger Name?  Bis 32 Zeichen, **muss mit einem Buchstaben beginnen**
     ///        (Handbuch §3.1).
     static bool validName(const std::string& name, std::string* why);

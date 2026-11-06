@@ -1108,6 +1108,60 @@ TEST(Udos1715A5120, DatentraegerAngabenStimmen) {
     EXPECT_NE(text.find("UDOS_5.0"), std::string::npos);
 }
 
+// Ticket #29: eine frisch angelegte UDOS-5.0-Datendiskette belegt genau die 9 Sektoren, die
+// FORMAT V 5.0 am echten A5120 belegt (Karte 1700/1701, Descriptor 1600, Zeigersektor 1602,
+// Verzeichnissaetze 1605/160A/1601/1606/160B) - nicht ganze Spuren.
+TEST(Udos1715A5120, FrischeDatendisketteBelegtNeunSektoren) {
+    Leerdiskette l("udos50_ds80_16x256", "DATEN");
+    ASSERT_TRUE(l) << l.fehler;
+    const UdosBitmap& b = l.fs().bitmap();
+    EXPECT_EQ(b.countUsed(), 9);
+    EXPECT_EQ(b.countFree(), 2551);
+    for (uint8_t s : {0, 1, 2, 5, 6, 10, 11}) EXPECT_TRUE(b.used(22, s + 1)) << "Spur 22 Sektor " << int(s);
+    for (uint8_t s : {0, 1}) EXPECT_TRUE(b.used(23, s + 1)) << "Spur 23 Sektor " << int(s);
+    EXPECT_FALSE(b.used(0, 1)) << "Spur 0 gehoert einer Datendiskette nicht";
+}
+
+// Systemdiskette (FORMAT S=Y): + 16 Sektoren Spur 0 Kopf 0 + 3 Sektoren (07-09) zweiter Bootteil = 28.
+TEST(Udos1715A5120, FrischeSystemdisketteBelegtAchtundzwanzigSektoren) {
+    const FsProfile* basis = dateisysteme().find("udos50_ds80_16x256");
+    ASSERT_NE(basis, nullptr);
+    FsProfile sys = *basis;
+    sys.system_track0 = true;      // so leitet DiskVolume::create es bei einem Bootabbild ab
+    const DiskFormat* f = formate().find(sys.format);
+    ASSERT_NE(f, nullptr);
+    const std::string pfad = k1520test::tempPath("k1520_test_udos50_sys.img");
+    {
+        auto leer = DiskImage::create(pfad, *f, false, f->predominantEncoding());
+        ASSERT_TRUE(leer && leer->flush());
+    }
+    auto disk = DiskImage::open(pfad, *f, false);
+    ASSERT_TRUE(disk);
+    SectorSpace raum(disk->medium(), *f);
+    std::string err;
+    auto fs = Udos1715FileSystem::format(raum, sys, "SYS", err);
+    ASSERT_TRUE(fs) << err;
+    const UdosBitmap& b = fs->bitmap();
+    EXPECT_EQ(b.countUsed(), 28);
+    EXPECT_EQ(b.countFree(), 2532);
+    for (uint8_t s = 0; s < 16; ++s) EXPECT_TRUE(b.used(0, s + 1)) << "Spur 0 Sektor " << int(s);
+    EXPECT_FALSE(b.used(0, 17)) << "Spur 0 Kopf 1 bleibt frei";
+    for (uint8_t s : {7, 8, 9}) EXPECT_TRUE(b.used(22, s + 1)) << "Spur 22 Sektor " << int(s);
+    std::error_code ec; std::filesystem::remove(pfad, ec);
+}
+
+// FORMAT V 5.0 fuellt das 24-Byte-Namensfeld hinter dem 0D-Abschluss mit FFH (am Emulator
+// gemessen, Ticket #29); eine so formatierte Diskette muss erkannt werden.
+TEST(Udos1715A5120, NamensfeldMitFFFuellungIstKeineBeschaedigung) {
+    UdosBitmap b = UdosBitmap::makeEmpty(32, 80, "DATEN", UdosMapSitte::Ndos1715, NdosFuellung::FF);
+    for (size_t i = 6; i < 24; ++i) b.raw()[i] = 0xFF;      // "DATEN", 0D, dann FFH
+    std::string warum;
+    EXPECT_TRUE(b.looksValid(32, 80, &warum)) << warum;
+    EXPECT_EQ(b.label(), "DATEN");
+    b.raw()[3] = 0x01;                                      // Steuerzeichen im Namen bleibt Schaden
+    EXPECT_FALSE(b.looksValid(32, 80, &warum));
+}
+
 TEST(Udos1715A5120, HinterDemBelegungsplanStehtDurchgehendFF) {
     Diskette d = oeffne(fixture(kFixtureUdos50), true, "udos50_ds80_16x256");
     ASSERT_TRUE(d) << d.error;

@@ -1053,6 +1053,10 @@ public:
     void noteError(const std::string& why) const { last_error_ = why; }
 
 private:
+    /// @brief UDOS 5.0: nach dem Einspielen eines Bootabbilds dessen Sektoren im
+    ///        Belegungsplan sperren (sonst ueberschriebe ein spaeteres `put` den Urlader).
+    bool bootKarteNachtragen(int volume);
+
     int fat_lfn_ = -1;     ///< siehe @ref setFatLfn
     std::vector<std::string> ziel_hinweise_;   ///< @ref lastTargetNotices
     DiskVolume() = default;

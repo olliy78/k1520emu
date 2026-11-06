@@ -4730,6 +4730,14 @@ bool DiskVolume::readBootImageToFile(const std::string& path, int volume) const 
     return true;
 }
 
+bool DiskVolume::bootKarteNachtragen(int volume) {
+    if (!profile_ || profile_->type != FsType::Udos1715 || profile_->ndos_fill != "ff") return true;
+    auto* f = dynamic_cast<Udos1715FileSystem*>(volumes_[static_cast<size_t>(volume)].fs.get());
+    if (!f) return true;
+    if (!f->sperreBootbereich(true)) return fail(f->lastError());
+    return true;
+}
+
 bool DiskVolume::writeBootImage(const std::vector<uint8_t>& img, int volume) {
     if (!valid(volume) || !profile_)
         return fail("Seite " + std::to_string(volume) + " gibt es nicht");
@@ -4791,7 +4799,7 @@ bool DiskVolume::writeBootImage(const std::vector<uint8_t>& img, int volume) {
     for (const SectorSpace::TrackRef& t : systemspuren(raum, *profile_)) {
         const size_t satz = t.sector_size + nach;
         for (uint8_t k = 0; k < t.sectors; ++k) {
-            if (her >= img.size()) return true;   // kuerzeres Abbild: Rest bleibt Leerspur
+            if (her >= img.size()) return bootKarteNachtragen(volume);   // kuerzeres Abbild: Rest bleibt Leerspur
             // Ein angebrochener Satz am Ende wird mit dem Fuellbyte der Leerdiskette
             // aufgefuellt — ein halber Sektor laesst sich nicht schreiben.
             std::vector<uint8_t> satzbytes(satz, 0xE5);

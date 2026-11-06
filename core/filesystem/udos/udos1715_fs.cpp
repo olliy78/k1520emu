@@ -509,6 +509,7 @@ FsInfo Udos1715FileSystem::info() const {
 bool Udos1715FileSystem::allocSectors(uint32_t n, std::vector<UdosPointer>& out) {
     out.clear();
     for (uint8_t t = 0; t < tracks_ && out.size() < n; ++t) {
+        if (t == 0 && istUdos50(prof_)) continue;   // s. Kommentar bei `allocRecords`
         for (uint8_t s = 0; s < secs_per_track_ && out.size() < n; ++s) {
             if (bitmap_.used(t, static_cast<uint8_t>(s + 1))) continue;
             out.push_back(UdosPointer{s, t});
@@ -534,6 +535,11 @@ bool Udos1715FileSystem::allocRecords(uint32_t records, uint32_t sec_je_record,
 
     uint32_t gefunden = 0;
     for (uint8_t t = 0; t < tracks_ && gefunden < records; ++t) {
+        // UDOS 5.0 vergibt auf Spur 0 nie etwas (FORMAT meldet Kopf 1 zwar frei, UDOS selbst
+        // beginnt aber erst bei der Verzeichnisspur).  Dateien auf Spur 0 Kopf 1 fuehrten bei
+        // einer vollen Systemdiskette zu `ERROR C4` (SECTOR ADDRESS ERROR) beim Kaltstart
+        // (Ticket #29; Waechter py_disktool_bootsektoren) - die Karte bleibt trotzdem so wie bei FORMAT.
+        if (t == 0 && istUdos50(prof_)) continue;
         // Ein Record ueberschreitet nie die Spurgrenze (§5.3) — die KOPFgrenze
         // innerhalb des Zylinders dagegen sehr wohl, denn die Spur ist der Zylinder.
         for (uint16_t s = 0; s + sec_je_record <= secs_per_track_ && gefunden < records; ) {
@@ -976,6 +982,19 @@ bool Udos1715FileSystem::setAttributes(const std::string& name, const UdosAttrs&
 
 // ─── Anlegen ─────────────────────────────────────────────────────────────────
 
+bool Udos1715FileSystem::sperreBootbereich(bool speichern) {
+    if (istUdos50(prof_)) {
+        for (uint8_t s = 0; s < 16 && s < secs_per_track_; ++s) bitmap_.setUsed(0, s + 1, true);
+        uint8_t erster = 0, anzahl = 0;
+        if (zweiterBootteil(prof_, erster, anzahl))
+            for (uint8_t s = erster; s < erster + anzahl && s < secs_per_track_; ++s)
+                bitmap_.setUsed(prof_.directory_track, s + 1, true);
+    } else {
+        for (uint8_t s = 0; s < secs_per_track_; ++s) bitmap_.setUsed(0, s + 1, true);
+    }
+    return speichern ? saveBitmap() : true;
+}
+
 bool Udos1715FileSystem::mkfs() {
     const NdosFuellung fuell = prof_.ndos_fill == "77" ? NdosFuellung::Nachlauf77
                              : prof_.ndos_fill == "ff" ? NdosFuellung::FF : NdosFuellung::Null;
@@ -994,18 +1013,11 @@ bool Udos1715FileSystem::mkfs() {
     for (uint8_t s : saetze) bitmap_.setUsed(prof_.directory_track, s + 1, true);
     bitmap_.setUsed(prof_.bitmap_track, 0 + 1, true);
     bitmap_.setUsed(prof_.bitmap_track, 1 + 1, true);
-    if (prof_.system_track0)
-        for (uint8_t s = 0; s < secs_per_track_; ++s) bitmap_.setUsed(0, s + 1, true);
-    // UDOS 5.0 fuehrt Verzeichnis- und Planspur GANZ als belegt (so die Originaldiskette):
-    // dort liegt der zweite Bootteil (Sektor 07–09), und das Verzeichnis waechst dort.
-    // Spur 0 Kopf 0 (Urlader + BFOS) ebenso — ohne sie gibt es keinen Kaltstart.
-    if (u50) {
-        for (uint8_t s = 0; s < secs_per_track_; ++s) {
-            bitmap_.setUsed(prof_.directory_track, s + 1, true);
-            bitmap_.setUsed(prof_.bitmap_track, s + 1, true);
-        }
-        for (uint8_t s = 0; s < 16 && s < secs_per_track_; ++s) bitmap_.setUsed(0, s + 1, true);
-    }
+    // Systemdiskette: UDOS 5.0 sperrt nur den tatsaechlichen Bootbereich (Spur 0 Kopf 0 und
+    // Spur 16H Sektor 07-09, wie FORMAT S=Y -> 28 Sektoren belegt), die uebrigen
+    // NDOS-Profile die ganze Spur 0.  Eine Datendiskette bleibt bei den 9 festen Sektoren
+    // (Ticket #29) - Verzeichnis und Planspur sind ansonsten gewoehnliche Spuren.
+    if (prof_.system_track0) sperreBootbereich();
 
     const UdosPointer descriptor = directoryDescriptor();
     const UdosPointer zeiger{kDirPointerBlock, prof_.directory_track};
