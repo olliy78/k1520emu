@@ -9,7 +9,7 @@
  * (Lesen FFH).  **E/A:** Decoder D8 (DS8205): PIO D12 80H, CTC D5 84H, CTC D10 88H, PIO D14 8CH, Modul A0H–A3H
  * (frei) und SIO A4H–A7H, PIO D11 A8H.  PIO/SIO zaehlen A-Daten/B-Daten/A-Steuer/B-Steuer.
  *
- * **Schnittstellenmodul** = Firmwaresatz: IFSS (Stromschleife, SIO Kanal B) oder V.24 (SIO Kanal A) — die Sätze
+ * **Schnittstellenmodul** = Firmwaresatz: IFSS (Stromschleife, SIO Kanal B) oder V.24 (SIO Kanal A) — die Saetze
  * gehoeren zum Modul (@ref Config::Schnittstelle).  Beide Anschluesse gibt es fuer den `SerialHub` immer; aktiv ist der
  * des gewaehlten Moduls.
  *
@@ -74,9 +74,10 @@ public:
         /// bis dorthin, am Lauf: 1621 Halbschritte); links setzt der Wagen es zurueck.
         int schnitt_pos = 1600;           ///< ab dieser Wagenlage (Halbschritte) schneidet das Messer
         int schnitt_ruecksetz = 120;      ///< bis zu dieser Lage zurueck ist das Messer wieder gespannt
-        /// Abstand der Schneidkante unter der Zeile der Nadel 7 am Druckkopf (Raster-Einheiten) [?]: nicht belegt; die Firmware
-        /// schiebt vor dem Schnitt so weit vor, dass die letzte Zeile 3,5 mm (Handbuch 2.6) ueber der Kante steht.
-        int schnitt_abstand_y = 0;
+        /// Abstand der Schneidkante unter der Zeile der Nadel 7 am Druckkopf (Raster-Einheiten).  Die Firmware schneidet am
+        /// Lauf SOFORT nach der letzten Zeile (ohne vorher vorzuschieben) und schiebt den Beleg danach aus (225 Schritte); der
+        /// kleinste Fussabstand ist laut Handbuch 2.6 Nr. 4 3,5 mm (n = 0) = 30 Einheiten bei 216 je Zoll [H, abgeleitet].
+        int schnitt_abstand_y = 30;
 
         /// Raster des K6316 (Servicehandbuch 1.1.3.1, Handbuch 2.1): ein Motorschritt des Wagens = 1/75 Zoll, die Position zaehlt
         /// Halbschritte (1/150 Zoll, 2 Pixel je Einheit = 300 dpi); Papierschritt 1/108 Zoll [H] (Service 1.2.5), Nadelteilung

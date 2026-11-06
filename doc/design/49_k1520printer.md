@@ -1,6 +1,6 @@
 # Entwurf 49 — Druckeremulator `k1520printer` (Ticket #28)
 
-Stand 2026-11-05, **WP0a/WP0b, WP1, WP3 und WP2b erledigt (siehe §5a, §5b)**, Rest Planung.  Zweig `feature/issue-28-k1520printer`.
+Stand 2026-11-06, **WP0a/WP0b, WP1, WP3, WP2b, WP4/WP6b-Text, WP5, WP2a und WP6a erledigt (siehe §5a–§5e)**, Rest Planung.  Zweig `feature/issue-28-k1520printer`.
 Nummer 49, weil 48 für BS600 vorgemerkt ist (noch in keinem Zweig).
 
 ## 1  Auftrag (Ticket #28) und Festlegung des Anwenders
@@ -258,9 +258,26 @@ Vorgabe `data/default_config_printer.yaml` (IFSS lauscht als Telnet-Server auf 5
   oben, Lampen/Netz aus/ein, TEST-Hinweis, Typsperre, Neuanlage nach Rückfrage (ROM-Byte 0D34H geprüft), Konfigurationsrundlauf, **PDF zurück in ein Bild gerechnet
   (jeder Punkt an seiner Stelle, sonst weiß)**, Seitenumbruch, Druckdialog mit Ersatz, Telnet-Rechner druckt Text mit DC1/DC3, Kürzelvertrag, Handbuch, `--help/--paths`.
 
-**Nicht über die C-ABI erreichbar (kein Kernumbau gemacht):** Formularlängen und Schalterblock-Einzelschalter (BCH.2–7, PIO 3 A) — nur `schnittstelle`/`rom` gehen
+**[Überholt durch §5e/Merkposten Nr. 27 — Formularlänge und Schalterblöcke sind seither über die ABI erreichbar.]  Nicht über die C-ABI erreichbar (damals):** Formularlängen und Schalterblock-Einzelschalter (BCH.2–7, PIO 3 A) — nur `schnittstelle`/`rom` gehen
 beim Anlegen als Konfigurationstext; die Baudrate bestimmt der Gast (CTC 0).  Die Seitenlänge für PDF/Druck ist deshalb eine Oberflächeneinstellung; der Formularvorschub
 der Firmware fährt 12 Zoll (Vorgabe des Kerns).  Zweite Bahn, K6316, Doppelbahn im Druck: weiter WP2a/WP6b.
+
+### 5e  Stand WP2a / WP6a — K6316 (2026-11-06)
+
+**Gebaut.**  `PhasenMotor` (4-Phasen-Schrittmotor, Feld → Halbschritte), `SchrittWagen` (Phasen /SW1–4 rein, /G1 raus, harte Anschläge, Kopflage zwischen den Schritten), `Papierweg::phasen`
+(Papier-/Vorsteckmotor), `K6316Steuerung` (`core/cards/printer/`: ROM je Modul, RAM 3800H, 2 CTC, 3 PIO, SIO, Kette CTC D5 → D10 → PIO D12 → SIO, Diodenmatrix mit 16 DIL-Schaltern, Tasten S1–S5,
+Drehschalter, MHA/PE/FSO/FSU, Messer), die gemeinsame Schnittstelle `DruckerSteuerung` (`PrinterMachine` kennt beide Geräte), Blattgrenzen (`Blattmodell::schnitt`), C-ABI (Merkposten Nr. 27),
+Debugger `--machine k6316[-v24]`, Oberfläche (Typen K6316 IFSS/V.24 mit Bedienfeld aus `typen.py`: Tasten, Lampen H1–H5, Drehschalter, DIL-Gruppe, Schnittkante), Wächter `K6316*` (19 Fälle), `py_k1520printer_gui` (+3).
+
+**Ergebnis der Abnahme.**  Das Original-ROM beider Module läuft bis in die Grundstellung (~8 s), meldet DC1 (V.24 mit S17 und Gegenstelle), druckt den Selbsttest (S5) und Text über die SIO.  Das Druckbild
+stimmt **Punkt für Punkt mit dem Zeichengenerator im ROM** überein (Orakel `tests/support/k6316_orakel.h`; Kennungszeile und je 26 Zeichen der Testzeilen, vor- und rückwärts).  Die offenen Punkte
+aus `hardware.md` §8 sind beantwortet (§9 dort), einschließlich zweier **Berichtigungen** (D12 A.0/.2 = Lichtschranken FSO/FSU; H4 hängt an /SPAUS, nicht an AM4).
+
+**Annahmen `[?]`.**  Position der Einheit des Messers (3,5 mm unter Nadel 7) und `schnitt_pos` (1600; die Firmware fährt bis 1621), mechanischer Nullpunkt links (Textbeginn bei ~1,4″), rechter Anschlag
+(1800), Punktmaß (3 × 2), Flugzeit/Nacheilung ±2 Pixel, Herkunft /MPV, Reihenschaltung Haube/Kopf auf MHA, Funktion S11/S12/S15/S16/S18–S23.
+
+**Offen.**  Breit-/Schrägschrift und Unterlängen im Orakel (Merkposten Nr. 22), Hex-/Lichtschranken-/Vorstecktest nur als Eingabe vorhanden (nicht geprüft), Vorsteckbeleg als eigenes Blatt (der Vorsteckmotor
+ist ein Zähler ohne Blatt), K6313 (kein Abzug).
 
 ## 6  Tests und Wächter
 

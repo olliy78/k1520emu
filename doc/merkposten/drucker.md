@@ -2,12 +2,12 @@
 
 Gilt für `core/peripherals/druckwerk/`, `core/cards/printer/`, `core/machines/printer/`, `k1520_printer_*` in der C-ABI und den Debugger-Befehl `blatt`.
 Entwurf und Stand: `doc/design/49_k1520printer.md` (§5a/§5b); Hardware des SD 1157 aus der Firmware: `doc/printer/sd1157/hardware.md`.
-Stand 2026-11-05 (WP3/WP2b, WP4 Anschluss, Textdruck/Fluss/ROM-Reparatur).
+Stand 2026-11-06 (WP3/WP2b, WP4 Anschluss, Textdruck/Fluss/ROM-Reparatur, WP2a/WP6a K6316 ab Nr. 20).
 
 1. **Das Druckwerk kennt kein Gerät, kein PDF, kein Qt.**  `Blattmodell` und `Nadelkopf` wissen nichts vom SD 1157; die Steuerung gibt Pegel rein (`Wagen::eingang`,
    `Papierweg::ausgaenge`) und löst den Anschlag aus.  Alles in Maschinentakten.  Wächter `Blattmodell.*`, `Nadelkopf.*`, `Papierweg.*`, `GeregelterWagen.*`, `Nadeldruckwerk.*`
    (`tests/unit/peripherals/druckwerk`), Label `fach_drucker`.
-2. **Der Wagen-Schnittstelle fehlt nichts für den K6316**: `WagenEingang::phasen` rein, `WagenRueckmeldung::g1` raus.  `SchrittWagen` ist trotzdem NICHT gebaut (WP2a).
+2. **Der Wagen-Schnittstelle fehlt nichts für den K6316**: `WagenEingang::phasen` rein, `WagenRueckmeldung::g1` raus.  `SchrittWagen` ist seit WP2a gebaut (Nr. 20).
 3. **Raster des Blatts:** x = 2 Pixel je Takt der Taktscheibe (1/200″), y = 1/144″ (Papierschritt 1/48″ = 3, Nadelteilung 1/72″ = 2, 6/8 lpi = 18/24 Zeilen).  Takte je Zoll (100),
    Nadelteilung, Punktmaß sind `[?]`-Annahmen im `NadeldruckParameter`; die Firmware sieht sie nie.  Das Blatt wächst mit der Papierlage (Rand oben `rand_oben_y` = 36,
    damit Rückzüge über Lage 0 hinaus nicht ins Leere gehen).
@@ -81,7 +81,32 @@ Stand 2026-11-05 (WP3/WP2b, WP4 Anschluss, Textdruck/Fluss/ROM-Reparatur).
     bytegleich mit dem Kern.  **(b) Das Blatt geht beim Typ-/ROM-/Schnittstellenwechsel verloren** (Neuanlage, keine ABI zum Einspielen) — die Rückfrage sagt es.  **(c) Das TEST-Verhalten
     (Nr. 10) steht sichtbar in der Oberfläche** (Dauerhinweis + Warnzeile mit „Neustart jetzt“), nicht wegerklärt; ONLINE ist rastend.  **(d) Netz aus** hält den Takt an, die Maschine
     bleibt bestehen, Netz ein ist ein `/RESET` (Blatt bleibt).  **(e) Punkte im PDF/Druck:** Pixelfolgen werden in Punkte zu 2 Pixeln zerlegt, Kreisdurchmesser 1,25 × Breite — Darstellung
-    (`ausgabe.PUNKT_*`), kein Mechanikmaß `[?]`; der Wächter rechnet das PDF zurück in ein Bild und prüft jeden Punkt.  **(f)** Seitenlänge (4/6/8/12") ist Oberflächeneinstellung; die
-    Formularlänge der Firmware (BCH.5..4) ist über die ABI nicht erreichbar (Vorgabe 12").  **(g)** Gesperrte Typen: `typen.GESPERRT` (/267, K6316 IFSS/V.24, K6313, SD 1152/257); wer
+    (`ausgabe.PUNKT_*`), kein Mechanikmaß `[?]`; der Wächter rechnet das PDF zurück in ein Bild und prüft jeden Punkt.  **(f)** [überholt durch Nr. 27: die Formularlänge geht jetzt über `SW_FORMULAR1` an den Kern] Seitenlänge (4/6/8/12") ist Oberflächeneinstellung; die
+    Formularlänge der Firmware (BCH.5..4) ist über die ABI nicht erreichbar (Vorgabe 12").  **(g)** Gesperrte Typen: `typen.GESPERRT` (/267, K6313, SD 1152/257; K6316 seit WP2a freigeschaltet); wer
     einen Typ freischaltet, verschiebt ihn nach `typen.TYPEN` mit eigener `Typbeschreibung`.  **(h)** Der Test fährt den Kern selbst (`autostart=False`, `lauf`), die Auslieferungsvorgabe
     startet einen Server auf Port 5000 — Tests übergeben `konfig_daten={}`.
+
+20. **K6316 (WP2a, `K6316Steuerung`, `SchrittWagen`, `PhasenMotor`; Befund `doc/printer/k6316/hardware.md` §9).**  Zwei Firmwaresätze = zwei Module (Typ `K6316_Ifss`/`K6316_V24` wählt ROM und SIO-Kanal; B = IFSS, A = V.24),
+    Kennung im ROM (`540`/`19461306`, `501`/`15263105`) als Wächter.  **Ablauf Netz-Ein bis DC1 ≈ 8 s Gerätezeit (20 Mio. Takte)**: Wagen-Synchronisation gegen den linken Anschlag, dann der Vorsteckmotor
+    (`sub_2231` wartet auf den Zeitgeber-Interrupt).  Bleibt der Test vor 80 Mio. Takten stumm, ist zuerst `MHA` (Haube/Kopf), dann S17 (V.24) verdächtig.  Wächter `K6316Rom.*`, `K6316Modul.*`.
+21. **Wagen: Position in HALBSCHRITTEN (1/150″), steigende Phasennummer = nach links (`SchrittWagen::Parameter::umgekehrt = true`).**  Mit anderer Richtung läuft die Synchronisation in den rechten Anschlag
+    und „findet“ dort den linken (Position 1800 statt 9) — Druck und Schnitt gerieten durcheinander.  Die **Kopflage zwischen den Schritten** (`positionPixel`) ist nötig: die Firmware feuert 4 Drucktakte je 3 Schritte;
+    ohne die Zwischenlage lägen alle Punkte auf Schrittpositionen (4 Pixel statt 3).  **Nadelspalten:** gerade Nadeln 12 Pixel links der ungeraden (`NadeldruckParameter::nadel_x`), sonst steht das Zeichen schief.
+    Vor-/Rückwärtszeilen decken sich mit `versatz_vor/rueck = −2/+2` (ohne Versatz liegen Rückwärtszeilen 4 Pixel links; Flugzeit und Rotornacheilung sind nicht trennbar, wie Nr. 4).  Wächter
+    `K6316Modul.SelbsttestDruckStimmtMitDemZeichengeneratorImRomUeberein` (Zeilen 0–3, vor- und rückwärts, gleicher Ursprung).
+22. **Orakel des K6316 (`tests/support/k6316_orakel.h`):** Zeichengenerator im ROM bei 2400H + 8·Code (aus `sub_1303` abgelesen), Bit 7−k = Nadel k+1 (invertiert); nur der Ursprung des Texts wird gefittet.  Spalte 0 von
+    `, ; @ _ g j p q y` ist Steuerdaten und wird nicht gedruckt; Zeile 9 (Nadel 9) gehört Unterlänge/Unterstrich und bleibt außen vor.  **Geprüft: Normaldruck (Kennungszeile + je 26 Zeichen der Zeilen 1–3).  NICHT geprüft:
+    Breitschrift und Schräg des Selbsttests** (Breit: Spaltenabstand 6, jede Spalte doppelt — am Lauf passend, aber ohne unabhängige Regel; Schräg ungeprüft) und die Unterlängen-Zeichen.
+23. **V.24: CTS/DCD kommen vom Host (Wandler).**  Ohne Gegenstelle (`reset()` setzt Kanal A auf CTS/DCD = 0) wartet das V.24-ROM (`1995H`) mit dem ersten DC1; mit `serialHub()->wandler(1).anbinden()` geht es los (wie SD 1157).
+    **Ohne S17 (Auslieferungszustand, alle DIL Aus) läuft das DTR-Protokoll, es wird kein DC1 gesendet.**  Text in die SIO am V.24 muss über `Wandler::fernGib`, nicht über `dfueSend` (`einspeisen` ignoriert belegte Leitungen).
+    **Offen:** das V.24-ROM sendet auch ohne Papier DC1 (statt DC4) — Gastverhalten oder Eigenheit des Protokolls [?].
+24. **Schnitt ist mechanisch** (kein Signal): `K6316Steuerung::Config::schnitt_pos` (1600 Halbschritte) löst einmal aus, `schnitt_ruecksetz` (120) spannt wieder; `Blattmodell::schnitt(y)` führt die Blattgrenzen
+    (`k1520_printer_sheet_cuts`, in der Oberfläche eine rote Kante).  Die Firmware schneidet nur in der Stellung Schneiden (39H) und offline mit S5+S4 und **schiebt erst NACH dem Schnitt 225 Schritte aus**;
+    Abstand Messer–Zeile (`schnitt_abstand_y` = 30 Einheiten = 3,5 mm) ist abgeleitet [H], nicht gemessen.  Wächter `K6316Betriebsart.SchneidenSchneidetNurInDerStellungSchneiden`.
+25. **Tasten:** Spalten-Tasten lesen **gedrückt = 1** (33 kΩ nach 0 V), S1 (`/ITON`) **gedrückt = 0** und braucht den PIO-Interrupt: `K6316Steuerung::clockTick` meldet `eingang_neu_` an den Bus, sonst wird ein
+    Tastendruck im ruhenden Drucker nie angenommen (ohne laufende Zeitgeber-Interrupts gab es keinen Anlass, die Interruptkette neu zu bewerten).  Die Diodenmatrix wirkt nur auf **getriebener** Zeile (`K6316Matrix.*`).
+26. **H4 BEREIT ist keine CPU-Ausgabe** (invertiertes /SPAUS), `K6316Steuerung::lampe(4)` liefert immer `true`.  H3 = PE (1 = Ende).  H1/H2/H5 = Bit 5/6/4 von D14 A, 1 = an.
+27. **C-ABI (additiv):** Tasten `K1520_PRINTER_KEY_K6316_S1..S5` (11–15), Schalter `SW_HAUBE` 4, `SW_BETRIEBSART` 5 (0 Aufwickeln, 1 Schneiden, 2 Endlos), `SW_BELEG_OBEN/UNTEN` 6/7, `SW_DIL_BASIS` 16 (S11–S26 = 16–31), Lampen
+    `TEST` 2, `PAPIER` 3, `H4` 4, Konfigurationsschlüssel `betriebsart=`, `dil=`; `k1520_printer_sheet_cuts`.  **SD 1157 (Merkposten Nr. 19 geschlossen):** `SW_FORMULAR1/2` (8/9, Code 0–3 = 4/6/8/12″), `SW_BLOCK_6F` (10), `SW_BLOCK_3A` (11);
+    die Firmware liest sie bei Bedarf, die Oberfläche setzt die Formularlänge bei jeder Änderung.  Wächter `py_c_api`, `py_k1520printer_gui`.
+28. **Debugger:** `k1520dbg`/`boot_trace --machine k6316|k6316-v24` (`blatt`, `dev`, `map`, `state`, `summary`).  Standard-Grenzen für `boot_trace`: 90 Mio. Takte, Stillstand 20 Mio. (die Motorphasen wiederholen sich).
