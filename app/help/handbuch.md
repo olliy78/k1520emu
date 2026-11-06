@@ -1958,14 +1958,18 @@ K7024, Diskettensteuerung K5122 mit zwei K5601). Was anders ist:
 Die Diskette **BS600** (Fassung **BS620**) enthält das menügeführte Betriebssystem für Numerik-Programmiergeräte
 (PC600, CNC600). BS620 läuft nur am **PRG 710-1**; am PRG 710 bootet sie nicht (die Fassung für das PRG 710 ist BS610).
 
+* **Beispieldisketten:** `prg710-1_bs620_system.hfe` (Original BS620, am echten PRG 710-1 getestet; Modell *PRG 710-1*) und
+  `prg710_bs610_rek.hfe` — eine **Rekonstruktion für das PRG 710** (Eigenbau: BS620 mit dem Tastaturteil von BS600 V02; im Emulator geprüft:
+  Selbsttest, Menü, `LIST`, `COPY`; am echten PRG 710 ungetestet). Beide liegen im Ordner *Beispieldisketten*.
+
 * Einlegen, **Enter** am NKM-LOADER — es folgt der Selbsttest (rund fünf Sekunden Maschinenzeit) und das Hauptmenü
   `BS600  VERSION: 04` mit vier Einträgen.
 * Bedienung: **Pfeiltasten** (Bildschirmtastatur: die Kursorkappen) wählen, **Enter** ruft auf, **Esc** bricht ab und
   quittiert Meldungen (am Gerät `CL` bzw. `ESC`). `Esc` allein gilt nur, wenn danach nicht binnen etwa 5 ms ein weiteres
   Zeichen kommt — von Hand getippt ist das immer erfüllt.
 * `Dienstprogramme` und `PROG PMC600/CNC600` fragen zuerst `LAUFWERK 1  J`: **J** oder **N** eintippen, dann Enter.
-* Stand: Hauptmenü und das Unterbild von `PROG/TEST PC600` laufen; das Lesen der Diskette aus den Dienstprogrammen heraus
-  ist noch nicht geklärt (die Meldung `LAUFWERK 1` blinkt).
+* Stand: Hauptmenü, die Unterbilder und die Dienstprogramme laufen; `LIST` zeigt die 28 Dateien der Diskette, `COPY` kopiert (auf einem
+  Laufwerk abwechselnd `STECKE QUELLDISK` / `STECKE ZIELDISK`). Mit dem DiskTool lassen sich BS600-Disketten ansehen und ergänzen.
 
 ### Der EPROMmer
 

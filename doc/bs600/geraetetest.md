@@ -9,14 +9,17 @@ Der Plattentreiber von BS620 (und BS600/BS610) wartet am Marken-Flipflop der Dis
 PRG 710-1 von der Diskette liest, weiß niemand sicher.  Deshalb gibt es je Gerät **zwei** Disketten, die sich nur in diesen
 vier Wartestellen unterscheiden:
 
-| Gerät | Datei (im Ordner `disks/`) | Inhalt |
+| Gerät | Datei (Ordner siehe unten) | Inhalt |
 |---|---|---|
-| PRG 710-1 | `prg710-1_bs620/prg710-1_bs620_ff_low.hfe`  | **Original** BS620 (Dez. 1988), kein Byte geändert |
-| PRG 710-1 | `prg710-1_bs620/prg710-1_bs620_ff_high.hfe` | BS620, vier Sprungbefehle geändert (`JR NZ` → `JR Z`) |
-| PRG 710   | `prg710_bs600/prg710_bs600_ff_low.hfe`      | BS600 Version 02 (PRG-700/710-Fassung), Urlader-Kopf **Eigenbau** (s. u.) |
-| PRG 710   | `prg710_bs600/prg710_bs600_ff_high.hfe`     | dasselbe, vier Sprungbefehle und die Prüfsumme angepasst |
+| PRG 710-1 | `prg710-1_bs620_ff_low.hfe`  | **Original** BS620 (Dez. 1988), kein Byte geändert |
+| PRG 710-1 | `prg710-1_bs620_ff_high.hfe` | BS620, vier Sprungbefehle geändert (`JR NZ` → `JR Z`) |
+| PRG 710   | `prg710_bs600_ff_low.hfe`      | BS600 Version 02 (PRG-700/710-Fassung), Urlader-Kopf **Eigenbau** (s. u.) |
+| PRG 710   | `prg710_bs600_ff_high.hfe`     | dasselbe, vier Sprungbefehle und die Prüfsumme angepasst |
 
-Die Disketten entstehen reproduzierbar mit `python3 tools/bs600/bau_disketten.py` aus den eingecheckten Abzügen.
+Die Disketten liegen **nicht mehr in `disks/`** (AP-B6; dort nur die Systemdiskette `prg710-1_bs620/prg710-1_bs620_system.hfe` = `_ff_low`, Original, und
+die BS610-Rekonstruktion).  Sie entstehen reproduzierbar mit `python3 -I tools/bs600/bau_disketten.py --geraetetest <Ordner>` aus den eingecheckten Abzügen
+(`tests/fixtures/bs600/`); dieselben Abbilder liegen dort als Testeingabe (`--check` vergleicht sie byteweise).  Ergebnis des Gerätetests am 710-1:
+`low` und `high` liefen beide, deshalb ist `low` (Original) die ausgelieferte Diskette.
 
 **Wichtig:** Die 710-Diskette ist keine Originaldiskette.  Sie trägt die Dateien der PRG-700-Diskette (BS600, Version 02), aber den Urlader
 von BS620 mit dem Namen `BS600 ` im Kopf, damit das 1-KB-ROM des PRG 710 („NKM-LOADER“) sie startet.  Ob das ROM des echten PRG 710 sie so

@@ -1,15 +1,21 @@
-# BS600/BS620 - je Geraet ZWEI Disketten bauen (Entwurf 48, AP-B2d): "low" und "high" (Polaritaet des Marken-FF,
-# doc/bs600/marken_ff.md).  Reproduzierbar aus den eingecheckten Fixtures; nur Stdlib + libk1520disk.
+# BS600/BS620 am PRG 710/710-1 (Entwurf 48, AP-B2d/B6).  Reproduzierbar aus den eingecheckten Fixtures; nur Stdlib + libk1520disk.
 #
-#   PRG 710-1 : disks/prg710-1_bs620/prg710-1_bs620_ff_low.hfe   = Original (BS620, Dez. 1988), Bytes unveraendert
-#               disks/prg710-1_bs620/prg710-1_bs620_ff_high.hfe  = BS620 mit gepatchtem Plattentreiber
-#   PRG 710   : disks/prg710_bs600/prg710_bs600_ff_low.hfe       = BS600 VERSION 02 (PRG-700-Diskette) mit
-#                                                                    Urladerkopf 'SYL FOR BS600 ' (EIGENBAU, siehe unten)
-#               disks/prg710_bs600/prg710_bs600_ff_high.hfe      = dasselbe mit gepatchtem Plattentreiber
-#   PRG 710   : disks/prg710_bs610_rekonstruktion/prg710_bs610_rek.hfe = 'BS610-Rekonstruktion' (AP-B8, EIGENBAU, kein Original):
-#               die BS620-Diskette, in der Datei BS620 der Tastaturteil durch den von BS600 V02 ersetzt (K7609 am 8279 statt
-#               K7672 an der K8025-SIO), Bytes aus BS600 V02 an REK_BEREICHE (doc/bs600/tastatur.md §4).  Urlader, Dateiname,
-#               Plattentreiber (Doppelschritt) und alle anderen Dateien bleiben die von BS620.
+# In disks/ liegen (AP-B6, Auslieferungsentscheidung):
+#   PRG 710-1 : disks/prg710-1_bs620/prg710-1_bs620_system.hfe = Original BS620 (Dez. 1988), Bytes unveraendert (im Paket;
+#               am echten 710-1 laufen "low" und "high" - doc/bs600/marken_ff.md §9/§10)
+#   PRG 710   : disks/prg710_bs610_rekonstruktion/prg710_bs610_rek.hfe = 'BS610-Rekonstruktion' (AP-B8, EIGENBAU, kein Original,
+#               am echten PRG 710 UNGETESTET, EXPERIMENTELL; im Emulator geprueft, im Paket): die BS620-Diskette, in der Datei BS620 der
+#               Tastaturteil durch den von BS600 V02 ersetzt (K7609 am 8279 statt K7672 an der K8025-SIO), Bytes aus BS600 V02 an
+#               REK_BEREICHE (doc/bs600/tastatur.md §4).  Urlader, Dateiname, Plattentreiber (Doppelschritt) und alle anderen
+#               Dateien bleiben die von BS620.
+#
+# Mit --geraetetest <Ordner> entstehen AUSSERHALB von disks/ die vier Disketten des Geraetetests (doc/bs600/geraetetest.md):
+#   prg710-1_bs620_ff_low.hfe   = Original BS620 (= die Systemdiskette)
+#   prg710-1_bs620_ff_high.hfe  = BS620 mit gepatchtem Plattentreiber
+#   prg710_bs600_ff_low.hfe     = BS600 VERSION 02 (PRG-700-Diskette) mit Urladerkopf 'SYL FOR BS600 ' (EIGENBAU, siehe unten)
+#   prg710_bs600_ff_high.hfe    = dasselbe mit gepatchtem Plattentreiber
+# Die drei abgeleiteten (high, bs600 low/high) liegen als Testeingabe in tests/fixtures/bs600/; --check vergleicht sie byteweise
+# mit einem frischen Bau.
 #
 # Patch "high": die vier Wartestellen auf das Marken-FF (K5122 Tor B Bit 1) im Plattentreiber, JR NZ (20H) -> JR Z (28H):
 #   IN A,(12H) / AND 02H / JR NZ,<selbst>              (Sektorkopf, zwei Stellen)
@@ -21,19 +27,22 @@
 # 1-KB-ROM des PRG 710 verlangt 'SY' bei Byte 2/3 (NKM-Lader).  Die Sektoren 1-3 sind deshalb die des BS620-Urladers mit
 # dem Namen 'BS600 ' (Byte 10-15) - eine EIGENBAU-Abwandlung, KEIN Original.
 #
-# Aufruf (aus dem Repo-Wurzelverzeichnis):  python3 -I tools/bs600/bau_disketten.py [--check] [--lib build/libk1520disk.so]
-import argparse, ctypes, os, shutil, sys
+# Aufruf (aus dem Repo-Wurzelverzeichnis):
+#   python3 -I tools/bs600/bau_disketten.py [--check] [--geraetetest ORDNER] [--lib build/libk1520disk.so]
+import argparse, ctypes, os, shutil, sys, tempfile
 
 FIXT = 'tests/fixtures/bs600/'
 BS620 = FIXT + 'bs620_prg710-1.hfe'
 BS600 = FIXT + 'bs600_prg700.hfe'
 AUS = {
-    'prg710-1_bs620_ff_low': 'disks/prg710-1_bs620/prg710-1_bs620_ff_low.hfe',
-    'prg710-1_bs620_ff_high': 'disks/prg710-1_bs620/prg710-1_bs620_ff_high.hfe',
-    'prg710_bs600_ff_low': 'disks/prg710_bs600/prg710_bs600_ff_low.hfe',
-    'prg710_bs600_ff_high': 'disks/prg710_bs600/prg710_bs600_ff_high.hfe',
+    'prg710-1_bs620_system': 'disks/prg710-1_bs620/prg710-1_bs620_system.hfe',
     'prg710_bs610_rek': 'disks/prg710_bs610_rekonstruktion/prg710_bs610_rek.hfe',
 }
+PAARE = ('prg710-1_bs620_ff_low', 'prg710-1_bs620_ff_high', 'prg710_bs600_ff_low', 'prg710_bs600_ff_high')
+FIXTURE_ABGELEITET = ('prg710-1_bs620_ff_high', 'prg710_bs600_ff_low', 'prg710_bs600_ff_high')   # in tests/fixtures/bs600/
+
+
+def paar(ordner, name): return os.path.join(ordner, name + '.hfe')
 # Tastaturteil (Laufadressen, beide Grenzen einschliesslich) und sein Dateioffset (Monitor ab 4300H, Hauptprogramm ab 6D00H).
 REK_BEREICHE = [
     (0x000E, 0x000E, 0x4300),   # RST 08: JP 004D statt JP 0048
@@ -240,13 +249,14 @@ def rek_erwartet(lib):
     return r
 
 
-def bauen(lib, wurzel):
+def bauen_paare(lib, ordner):
+    """Die vier Geraetetest-Disketten nach @p ordner (ausserhalb von disks/)."""
     stand = {}
+    os.makedirs(ordner, exist_ok=True)
     # PRG 710-1 / BS620
     for ff in ('low', 'high'):
-        ziel = os.path.join(wurzel, AUS['prg710-1_bs620_ff_' + ff])
+        ziel = paar(ordner, 'prg710-1_bs620_ff_' + ff)
         if ff == 'low':
-            os.makedirs(os.path.dirname(ziel), exist_ok=True)
             shutil.copyfile(BS620, ziel)                                  # Original, Byte fuer Byte
         else:
             d = lib.oeffne(BS620, True)
@@ -255,13 +265,21 @@ def bauen(lib, wurzel):
             stand[ziel] = aend
     # PRG 710 / BS600
     for ff in ('low', 'high'):
-        ziel = os.path.join(wurzel, AUS['prg710_bs600_ff_' + ff])
+        ziel = paar(ordner, 'prg710_bs600_ff_' + ff)
         d = lib.oeffne(BS600, True); q = lib.oeffne(BS620)
         urlader_eigenbau(d, q); q.schliesse()
         if ff == 'high':
             aend, _ = hoch_patchen(d, 'BS600')
             stand[ziel] = aend
         d.speichere(ziel); d.schliesse()
+    return stand
+
+
+def bauen(lib, wurzel):
+    stand = {}
+    ziel = os.path.join(wurzel, AUS['prg710-1_bs620_system'])
+    os.makedirs(os.path.dirname(ziel), exist_ok=True)
+    shutil.copyfile(BS620, ziel)                                          # Original, Byte fuer Byte
     # PRG 710 / BS610-Rekonstruktion (Eigenbau)
     ziel = os.path.join(wurzel, AUS['prg710_bs610_rek'])
     d = lib.oeffne(BS620, True); q = lib.oeffne(BS600)
@@ -270,11 +288,11 @@ def bauen(lib, wurzel):
     return stand
 
 
-def pruefen(lib, wurzel):
-    """Sektorvergleich: genau die erwarteten Bytes weichen ab."""
+def pruefen(lib, wurzel, ordner):
+    """Sektorvergleich: genau die erwarteten Bytes weichen ab.  @p ordner = Geraetetest-Paare (frisch gebaut)."""
     ok = True
     for name, basis, bs in (('prg710-1_bs620', BS620, 'BS620'), ('prg710_bs600', BS600, 'BS600')):
-        a = lib.oeffne(os.path.join(wurzel, AUS[name + '_ff_low'])); b = lib.oeffne(os.path.join(wurzel, AUS[name + '_ff_high']))
+        a = lib.oeffne(paar(ordner, name + '_ff_low')); b = lib.oeffne(paar(ordner, name + '_ff_high'))
         x, y = a.alle(), b.alle()
         lage = datei_lage(a, bs); d = datei_lesen(a, bs)
         diff = []
@@ -289,7 +307,7 @@ def pruefen(lib, wurzel):
         ok &= n_diff == erwartet
         a.schliesse(); b.schliesse()
     # Eigenbau-Urlader: nur Sektor 1 Byte 10-15 weicht vom BS620 ab
-    a = lib.oeffne(os.path.join(wurzel, AUS['prg710_bs600_ff_low'])); q = lib.oeffne(BS620)
+    a = lib.oeffne(paar(ordner, 'prg710_bs600_ff_low')); q = lib.oeffne(BS620)
     ok &= a.lies(0, 0)[:10] == q.lies(0, 0)[:10] and a.lies(0, 0)[10:16] == b'BS600 ' and a.lies(0, 0)[16:] == q.lies(0, 0)[16:]
     ok &= a.lies(0, 1) == q.lies(0, 1) and a.lies(0, 2) == q.lies(0, 2)
     a.schliesse(); q.schliesse()
@@ -311,7 +329,14 @@ def pruefen(lib, wurzel):
     ok &= set(ist) == set(erw) and all(ist[k] == erw[k][1:] for k in ist)
     a.schliesse(); b.schliesse()
     # BS620 low = Original, Byte fuer Byte
-    ok &= open(os.path.join(wurzel, AUS['prg710-1_bs620_ff_low']), 'rb').read() == open(BS620, 'rb').read()
+    ok &= open(os.path.join(wurzel, AUS['prg710-1_bs620_system']), 'rb').read() == open(BS620, 'rb').read()
+    ok &= open(paar(ordner, 'prg710-1_bs620_ff_low'), 'rb').read() == open(BS620, 'rb').read()
+    # abgeleitete Testeingaben in tests/fixtures/bs600/ == frischer Bau
+    for n in FIXTURE_ABGELEITET:
+        f = FIXT + n + '.hfe'
+        gleich = os.path.exists(f) and open(f, 'rb').read() == open(paar(ordner, n), 'rb').read()
+        print('Fixture %s: %s' % (f, 'gleich' if gleich else 'ABWEICHEND/FEHLT'))
+        ok &= gleich
     print('OK' if ok else 'FEHLER')
     return ok
 
@@ -320,11 +345,19 @@ if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument('--lib', default='build/libk1520disk.so')
     ap.add_argument('--wurzel', default='.')
-    ap.add_argument('--check', action='store_true', help='nur pruefen, nichts bauen')
+    ap.add_argument('--check', action='store_true', help='nur pruefen, nichts in disks/ bauen')
+    ap.add_argument('--geraetetest', metavar='ORDNER', help='die vier Geraetetest-Disketten (low/high) hierhin bauen (nicht disks/)')
     a = ap.parse_args()
     lib = Lib(a.lib)
     if not a.check:
         for z, aend in bauen(lib, a.wurzel).items():
             print(z)
             for o, alt, neu in aend: print('   Dateioffset %04X: %02X -> %02X' % (o, alt, neu))
-    sys.exit(0 if pruefen(lib, a.wurzel) else 1)
+    with tempfile.TemporaryDirectory() as tmp:
+        ordner = a.geraetetest or tmp
+        for z, aend in bauen_paare(lib, ordner).items():
+            if a.geraetetest:
+                print(z)
+                for o, alt, neu in aend: print('   Dateioffset %04X: %02X -> %02X' % (o, alt, neu))
+        ok = pruefen(lib, a.wurzel, ordner)
+    sys.exit(0 if ok else 1)

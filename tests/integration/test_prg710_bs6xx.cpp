@@ -121,10 +121,10 @@ Ergebnis fahre(V v, const std::string& fixture, int modell, const char* listeTex
 
 struct Fall { const char* name; V v; const char* fixture; const char* liste; };
 const Fall kFaelle[] = {
-    {"710-1 BS620 low  (Original)", V::Prg710_1, "../../../disks/prg710-1_bs620/prg710-1_bs620_ff_low.hfe",  "DISK ENTHAELT 28 VON 54"},
-    {"710-1 BS620 high (gepatcht)", V::Prg710_1, "../../../disks/prg710-1_bs620/prg710-1_bs620_ff_high.hfe", "DISK ENTHAELT 28 VON 54"},
-    {"710   BS600 low  (Eigenbau-Urlader)", V::Prg710, "../../../disks/prg710_bs600/prg710_bs600_ff_low.hfe",  "DISK ENTHAELT 25 VON 54"},
-    {"710   BS600 high (gepatcht)", V::Prg710, "../../../disks/prg710_bs600/prg710_bs600_ff_high.hfe", "DISK ENTHAELT 25 VON 54"},
+    {"710-1 BS620 low  (Original)", V::Prg710_1, "../bs600/bs620_prg710-1.hfe",  "DISK ENTHAELT 28 VON 54"},
+    {"710-1 BS620 high (gepatcht)", V::Prg710_1, "../bs600/prg710-1_bs620_ff_high.hfe", "DISK ENTHAELT 28 VON 54"},
+    {"710   BS600 low  (Eigenbau-Urlader)", V::Prg710, "../bs600/prg710_bs600_ff_low.hfe",  "DISK ENTHAELT 25 VON 54"},
+    {"710   BS600 high (gepatcht)", V::Prg710, "../bs600/prg710_bs600_ff_high.hfe", "DISK ENTHAELT 25 VON 54"},
 };
 }  // namespace
 
@@ -169,7 +169,7 @@ bool bootBs600(Prg710Machine& m, const std::string& pfad) {
 // fuer 37H (ET1, ROM-Starttaste) 1EH (kein ENTER), fuer 38H (ET2) 84H = ENTER.  Am Lauf bestaetigt; 39H-3BH sind Kursor.
 TEST(Prg710Bs600, EnterIstMatrixtaste38) {
     k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::ERROR);
-    k1520test::TempDisk kopie("../../../disks/prg710_bs600/prg710_bs600_ff_low.hfe", "bs6xx_t1.hfe");
+    k1520test::TempDisk kopie("../bs600/prg710_bs600_ff_low.hfe", "bs6xx_t1.hfe");
     Prg710Machine::Config c; c.variante = V::Prg710; c.atp_zusatz = true; c.leser_modell = 2;
     Prg710Machine m(c);
     ASSERT_TRUE(bootBs600(m, kopie.path())) << bildText(m);
@@ -188,7 +188,7 @@ TEST(Prg710Bs600, EnterIstMatrixtaste38) {
 // K5601; auf einem 40-Spur-Laufwerk (K5600.x) wuerde dagegen der Doppelschritt des 710-ROMs (Boot) scheitern.
 TEST(Prg710Bs600, LiestAmK5601NurSpur0FC06NachDemKennsatz) {
     k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::ERROR);
-    k1520test::TempDisk kopie("../../../disks/prg710_bs600/prg710_bs600_ff_low.hfe", "bs6xx_t2.hfe");
+    k1520test::TempDisk kopie("../bs600/prg710_bs600_ff_low.hfe", "bs6xx_t2.hfe");
     Prg710Machine::Config c; c.variante = V::Prg710; c.atp_zusatz = true; c.leser_modell = 2;
     Prg710Machine m(c);
     ASSERT_TRUE(bootBs600(m, kopie.path())) << bildText(m);
@@ -215,8 +215,8 @@ TEST(Prg710Bs600, LiestAmK5601NurSpur0FC06NachDemKennsatz) {
 // Leser-Modell = Kernvorgabe des 710 (0).
 TEST(Prg710Bs600, ZweitesLaufwerkK5600_10ListetAlleDateien) {
     k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::ERROR);
-    k1520test::TempDisk sys("../../../disks/prg710_bs600/prg710_bs600_ff_low.hfe", "bs6xx_lw0.hfe");
-    k1520test::TempDisk dat("../../../disks/prg710_bs600/prg710_bs600_ff_low.hfe", "bs6xx_lw1.hfe");
+    k1520test::TempDisk sys("../bs600/prg710_bs600_ff_low.hfe", "bs6xx_lw0.hfe");
+    k1520test::TempDisk dat("../bs600/prg710_bs600_ff_low.hfe", "bs6xx_lw1.hfe");
     Prg710Machine::Config c; c.variante = V::Prg710; c.atp_zusatz = true;
     c.laufwerke = {"K5601", "K5600.10", "none", "none"};
     Prg710Machine m(c);

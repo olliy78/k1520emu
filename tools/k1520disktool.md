@@ -1308,7 +1308,7 @@ k1520disktool put neu.hfe PIP.COM ; k1520disktool attr neu.hfe PIP.COM --arc
 Systemdisketten des Numerik-Betriebssystems BS600 (BS610, BS620): Spur 0 = 26 × 128 B (Urlader Sektor 1–3, Kennsatz `VOL1` Sektor 7, Verzeichnis 8–25,
 Belegungstabelle 26), Spur 1–39 = 15 × 256 B, einseitig, 54 Dateien, **jede Datei zusammenhängend** (nutzbar Spur 1–37).  Profil
 `bs600_ss40_15x256_boot` (Format `ss40_1t26x128-15x256`), erkannt am Inhalt (`VOL1` + `PRG` + plausibles Verzeichnis).  Aufbau: `doc/bs600_diskettenformat.md`,
-Entwurf `doc/design/48_bs600.md`, Festlegungen `doc/merkposten/bs600_disktool.md`.
+Entwurf `doc/design/48_bs600.md`, Festlegungen `doc/merkposten/bs600.md` (Abschnitt DiskTool-Seite D1-D11).  Beispieldiskette: `disks/prg710-1_bs620/prg710-1_bs620_system.hfe`.
 
 ```
 $ k1520disktool ls -l BS620.hfe
@@ -1329,5 +1329,6 @@ $ k1520disktool reorganize neu.hfe                               # Luecken schli
 * **Prüfung (`check`/`fsck`)** — Kennungen `bs600.*` sind ein Vertrag (Tabelle im Kopf von `core/filesystem/check/bs600_check.cpp`): Verzeichnis ↔ Belegungstabelle in beiden
   Richtungen (`tabelle.fehlt` = Gefahr, `tabelle.ueberzaehlig`), Überlappung (Gefahr), Lage/Ende/Spur 38+, Adressen und Sektorzahl, doppelte Namen, Kennsatz, Datum (Hinweis), Lücken (Hinweis).
   Reparaturen: Tabelle nachtragen (empfohlen), Tabelle freigeben (nicht vorausgewählt, gesperrt bei unbrauchbarem Eintrag), unbrauchbaren Eintrag löschen (nie vorausgewählt), Reorganisieren (nicht vorausgewählt).
+* **Anlegen:** `create --fs bs600 …` legt eine Leerdiskette wie FORMAT unter BS620 an; mit `--boot` kommt ein Urlader dazu (Dateien per `put`/*Alles einfügen*); `reorganize` schliesst Lücken (`mv`/`attr` benennen und ändern Adressen).
 * **Rettung (`recover`)** findet nur den **Inhalt** (Rohbereich ohne Namen): Stufe Verzeichnis = von der Tabelle belegte Sektoren ohne Eintrag, `--full` zusätzlich freie Sektoren mit Inhalt (Guete *Bruchstück*).
   Einen Eintrag wiederherstellen (`--restore`) geht nicht — Name, Typ, Adressen und Dateigrenzen stehen nur im Eintrag, und das Löschen überschreibt ihn mit Blanks.

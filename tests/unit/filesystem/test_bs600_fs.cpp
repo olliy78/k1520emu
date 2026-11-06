@@ -246,12 +246,12 @@ TEST(Bs600Fs, CreateGleichtDemFormatAbzug) {
 }
 
 // DISKCOPY am echten Geraet (Fixture bs620_prg710-1_diskcopy_high.hfe): erkannt als BS600, 28 Dateien, und bis auf den Kennsatz (Sektor 7:
-// Name `BS620H`, Datum, Besitzer) byteweise die Quelle `disks/prg710-1_bs620/prg710-1_bs620_ff_high.hfe`.
+// Name `BS620H`, Datum, Besitzer) byteweise die Quelle `tests/fixtures/bs600/prg710-1_bs620_ff_high.hfe`.
 TEST(Bs600Fs, DiskcopyAbzugGleichtDerQuelleAusserDemKennsatz) {
     const std::string kopie = k1520test::tempPath("bs600_dcopy.hfe");
     fs::copy_file(fixture("bs620_prg710-1_diskcopy_high.hfe"), kopie, fs::copy_options::overwrite_existing);
     const std::string quelle = k1520test::tempPath("bs600_dcopy_quelle.hfe");
-    fs::copy_file((fs::path(FIXTURE_DIR) / ".." / ".." / ".." / "disks" / "prg710-1_bs620" / "prg710-1_bs620_ff_high.hfe").string(), quelle,
+    fs::copy_file(fixture("prg710-1_bs620_ff_high.hfe"), quelle,
                   fs::copy_options::overwrite_existing);
     std::string err;
     auto a = DiskVolume::open(kopie, "", formate(), dateisysteme(), err, true);
