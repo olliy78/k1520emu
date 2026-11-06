@@ -13,3 +13,18 @@ printer:
 window:
   width: 1280
   height: 760
+# Auslieferung: die IFSS lauscht als Telnet-Server auf Port 5000 (Loopback); ein Rechner-Emulator verbindet
+# sich als Client.  V.24 steht auf Port 5001 bereit, aber aus.
+schnittstellen:
+  IFSS:
+    betriebsart: telnet
+    rolle: server
+    host: 127.0.0.1
+    port: 5000
+    aktiv: true
+  V.24:
+    betriebsart: telnet
+    rolle: server
+    host: 127.0.0.1
+    port: 5001
+    aktiv: false

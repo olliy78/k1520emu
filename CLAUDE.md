@@ -724,6 +724,13 @@ PC-Gegenstelle (`app/pcmc.py`, Kasten `app/ui/pcmc_widget.py`, Aktion *Maschine 
 nur an der ASP-CTC, EPROM-Segmente, Kassettentakt-Annahmen, MC80.2x-Zeitmodell und RETI-Verteilung, offene Fragen).
 Plan: `doc/design/31_mc80.md`.
 
+## Druckeremulator `k1520printer` (Zweig `feature/issue-28-k1520printer`, Stand 2026-11-06)
+
+Hardware-Emulator der Nadeldrucker (SD 1157/264 mit Original-Firmware; K6316/K6313/Typenrad folgen): Kern `core/machines/printer/` + `core/peripherals/druckwerk/`
+(C-ABI `k1520_printer_*`), Oberfläche **`app/printertool/`** (`bash run_k1520printer.sh`, eigenes Fenster statt `main_window.py`, `k1520printer.yaml`, Handbuch `app/printertool/help/`).
+Blatt-Widget, Bedienfeld aus `typen.py`, PDF/System-Druck, Telnet/RFC 2217 über den vorhandenen Schnittstellen-Reiter.  **Vor Arbeiten daran: `doc/merkposten/drucker.md` lesen**
+(Nr. 10 TEST nur nach Offline-Neustart, Nr. 17 repariertes ROM, Nr. 19 Oberfläche); Entwurf `doc/design/49_k1520printer.md`.  Wächter `py_k1520printer_gui`, Fach `fach_drucker`.
+
 ## SIOS 1526 (Zweig `SIOS1526`, Stand 2026-10-30)
 
 > **/IEO sperrt bei IUS (2026-10-30):** `getIEO()` von CTC/PIO/SIO ist low, solange ein Kanal anfordert ODER in Bedienung ist; RETI geht nur an den ersten Baustein in Bedienung (`InterruptSlave::inService()`). Nicht aufweichen (Wächter `RetiChain.*`, `SiosMonitor.ZweitesCalNachProgrammende`); zweites CAL und SGEN laufen seither.

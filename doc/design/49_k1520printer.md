@@ -157,9 +157,10 @@ Rückstau, Maschinenzeit-Baud.  Die Firmware macht das Protokoll (DC1/DC3, Statu
   Interfaceschalter (Baudrate).  Schalterbelegung mit Funktionstext aus dem Manual.
 * **Auswahlfeld „Druckertyp"** (Einstellungen ▸ Allgemein, `general.model`): `K6316 (IFSS)`, `K6316 (V.24)`, `SD 1157/264`,
   `SD 1157/267`; **gesperrt** „K6313 (EPROM fehlt)", „SD 1152/257 Typenrad (in Vorbereitung)".  Wechsel = Neuanlage der Maschine,
-  Blatt bleibt (Rückfrage).
-* **Fenster**: eigenständiges `app/ui/printer_window.py`, importiert nur Bausteine (Aktionen, Statuszeile, Schnittstellen-Reiter,
-  Handbuch, Mehrinstanz) — **`main_window.py` wird nicht zerlegt** (berührt sonst alle sechs Programme).
+  Blatt bleibt (Rückfrage) — **Abweichung WP5:** das Blatt liegt im Kern und lässt sich nicht in eine neue Maschine einspielen,
+  der Wechsel leert es (die Rückfrage sagt es; §5d).
+* **Fenster**: eigenständiges Paket **`app/printertool/`** (Entscheidung WP5, §5d), importiert nur Bausteine (Emulationstakt,
+  Statuszeilen-Lampe, Schnittstellen-Reiter, Handbuch, Mehrinstanz) — **`main_window.py` wird nicht zerlegt** (berührt sonst alle sechs Programme).
 * Programm `k1520printer` (`app/main.py --machine printer` oder eigener Einstieg), `k1520printer.yaml`,
   `data/default_config_printer.yaml`, Handbuch `app/help/` (Kürzeltabelle = Vertrag, nur `Strg+Umschalt`).
 
@@ -229,6 +230,37 @@ gemeinsames Druckbild-Orakel `tests/support/sd1157_orakel.h`.  **ROM:** der Abzu
 (`Config::rom_repariert`, `rom=original|repariert`), der Abzug bleibt unverändert (Merkposten 17).  **Wächter:** `Sd1157Text.*` (Orakel: kurzer Text, mehrere Zeilen in beiden Richtungen, TAB, FF, > 132 Spalten,
 Breit/Schräg/Normal, 8 lpi, ungültige ESC, DA/DSR, Papierende, offline im Auftrag), `Sd1157Fluss.*` (DC1/DC3 am IFSS und V.24), `Sd1157Telnet.*` (Loopback, Port 0), `Sd1157Seriell.*`, `Sd1157Online.*`,
 `Sd1157Selbsttest.FgdiFolgt…` (Flugzeit: Emulator richtungssymmetrisch, Merkposten 4).  **Offen / [?]:** Doppelbahn im Druck (WP6b, `Nadeldruckwerk::feuere` nur Bahn 0), HPA/VPA-Spaltenzählung, Zeichen 80H–FFH, ROM-Bestätigung 0D34H am Original-EPROM.
+
+### 5d  Stand WP5 — Oberfläche `k1520printer` (2026-11-06)
+
+**Entscheidung Fensteraufbau.**  Eigenes Paket `app/printertool/` (Muster `app/kermittool/`), kein Profil in `main_window.py`: dessen Fenster ist um
+Bildschirm, Laufwerke und Tastatur gebaut (3 200 Zeilen, `Programmprofil` mit über 40 Feldern); ein Drucker hätte dort fast alles abschalten müssen und
+jede Änderung berührte die sechs Rechnerprogramme.  Das Druckerfenster importiert nur Bausteine: `Emulationstakt` (Faden + Kernsperre), `SerialWidget` (der
+vorhandene Schnittstellen-Reiter, nicht nachgebaut), `PanelLamp` (Statuszeile), `HelpWindow`, `config_io`/`paths`/`instanz`.  Eigene Dateien: `main.py` (Einstieg,
+`--instance/--config/--paths/--help` vor den Qt-Importen), `fenster.py` (`PrinterWindow`, `BlattAnsicht`, `DruckerEinstellungen`), `blatt_widget.py`,
+`bedienfeld.py`, `typen.py` (Typbeschreibung als DATEN), `ausgabe.py`, `aktionen.py`, `konfig.py`, `help/handbuch.md`; Starter `run_k1520printer.sh`,
+Vorgabe `data/default_config_printer.yaml` (IFSS lauscht als Telnet-Server auf 5000), Konfiguration `k1520printer.yaml`.
+
+**Gebaut.**
+* `BlattWidget` (QWidget, kein OpenGL): weißes Blatt, Punkte aus `printer_sheet_rows` in `QImage.Format_Mono`; hält eine eigene Kopie und liest nur ab
+  `min(Kopfzeile vorher, jetzt) − 48` nach (der Kern kennt nur einen Versionszähler); Blatt folgen (Kopfzeile bei 80 % der Höhe, das Blatt schiebt nach oben),
+  Zoll/Einpassen/Strg+Mausrad, Rollbalken, Perforation an der Seitenlänge, Kopfband über den neun Nadeln + Dreieck auf der Schiene (x aus `printer_head`).
+  Raster und Blattbreite kommen aus `printer_geometry`/`printer_sheet_size`, nichts davon ist in Python festgelegt.
+* Bedienfeld aus `Typbeschreibung` (Tasten, Lampen; ein K6316 braucht nur eine neue Beschreibung): ONLINE/Kopf/6-8 lpi/Papier rastend, PV1/PV2/TEST als Taster,
+  Lampen Netz/ONLINE/FEHLER, Netzschalter (Aus: Takt steht, Lampen dunkel, Blatt bleibt; Ein: `/RESET`).  **TEST-Hinweis** (Merkposten Nr. 10): dauernde Zeile
+  unter dem Bedienfeld und eine Warnzeile mit Knopf „Neustart jetzt“, sobald ONLINE-Schalter und -Lampe auseinanderlaufen.
+* Einstellungen: Druckertyp (SD 1157/264 wählbar; /267, K6316 IFSS/V.24, K6313, SD 1152/257 ausgegraut mit Begründung), ROM-Fassung repariert/Original-Abzug mit
+  Erklärung (Nr. 17), Schnittstelle IFSS/V.24, Tempo, Seitenlänge; Reiter *Schnittstellen* = `SerialWidget`.  Statuszeile: Typ, online/offline/Netz aus/FEHLER,
+  Schnittstelle, Server/Verbindungen, Kopfposition (Zoll, Spalte bei 10 cpi).
+* Ausgabe: `blatt_zeichnen` für **PDF** (`QPdfWriter`, 600 dpi, Seite 15 Zoll × Seitenlänge) und **System-Druck** (`QPrinter`/`QPrintDialog`, auf die Papierbreite
+  eingepasst, nie vergrößert).  Punkte = gefüllte Kreise; Folgen gesetzter Pixel werden in Punkte zu je 2 Pixeln zerlegt (Darstellung, kein Mechanikmaß `[?]`).
+* Wächter `py_k1520printer_gui` (18 Fälle, Label `fach_drucker`): Selbsttest über die Tasten = Blatt im Kern bytegleich, Kopf fährt, Blatt wächst und schiebt nach
+  oben, Lampen/Netz aus/ein, TEST-Hinweis, Typsperre, Neuanlage nach Rückfrage (ROM-Byte 0D34H geprüft), Konfigurationsrundlauf, **PDF zurück in ein Bild gerechnet
+  (jeder Punkt an seiner Stelle, sonst weiß)**, Seitenumbruch, Druckdialog mit Ersatz, Telnet-Rechner druckt Text mit DC1/DC3, Kürzelvertrag, Handbuch, `--help/--paths`.
+
+**Nicht über die C-ABI erreichbar (kein Kernumbau gemacht):** Formularlängen und Schalterblock-Einzelschalter (BCH.2–7, PIO 3 A) — nur `schnittstelle`/`rom` gehen
+beim Anlegen als Konfigurationstext; die Baudrate bestimmt der Gast (CTC 0).  Die Seitenlänge für PDF/Druck ist deshalb eine Oberflächeneinstellung; der Formularvorschub
+der Firmware fährt 12 Zoll (Vorgabe des Kerns).  Zweite Bahn, K6316, Doppelbahn im Druck: weiter WP2a/WP6b.
 
 ## 6  Tests und Wächter
 

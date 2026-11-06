@@ -75,3 +75,13 @@ Stand 2026-11-05 (WP3/WP2b, WP4 Anschluss, Textdruck/Fluss/ROM-Reparatur).
     weiter, **DC1 erst wieder online**.  Papierende im Auftrag: alle Zeilen werden gedruckt, `ESC [ 5 n` → `ESC [ 2 n`.  `ESC [ 0 c` → `ESC [ 4 c`.  Test-Hosts mit Flusssteuerung brauchen eine
     **dünne Leitung** (höchstens 2 Zeichen unterwegs): der Rückstaupuffer des Wandlers wäre sonst ein Puffer, den es an der Leitung nicht gibt.  Der Test wartet auf „Puffer leer", nicht auf „kein neuer
     Punkt" (das ROM holt 1 Zeichen in ~21 000 Takten).  **Offen [?]:** Doppelbahn im Druck (WP6b), HPA/VPA-Spaltenzählung, Zeichen 80H–FFH.
+19. **Oberfläche `k1520printer` (WP5, `app/printertool/`, Entwurf 49 §5d, Wächter `py_k1520printer_gui`).**  Eigenes Paket, nicht `main_window.py` (Entscheidung §5d); Bausteine ja,
+    Zerlegen nein.  **(a) Das Blatt-Widget holt nicht das ganze Blatt**, sondern ab `min(Kopfzeile vorher, jetzt) − 48` (`ZEILEN_VORLAUF`): der Kern liefert nur einen Versionszähler, Punkte
+    entstehen nur bei den Nadeln.  Wer die Papierbewegung ändert (Rückzug größer als 48 Zeilen zwischen zwei Abfragen), muss den Vorlauf mitziehen; der Wächter vergleicht die Kopie
+    bytegleich mit dem Kern.  **(b) Das Blatt geht beim Typ-/ROM-/Schnittstellenwechsel verloren** (Neuanlage, keine ABI zum Einspielen) — die Rückfrage sagt es.  **(c) Das TEST-Verhalten
+    (Nr. 10) steht sichtbar in der Oberfläche** (Dauerhinweis + Warnzeile mit „Neustart jetzt“), nicht wegerklärt; ONLINE ist rastend.  **(d) Netz aus** hält den Takt an, die Maschine
+    bleibt bestehen, Netz ein ist ein `/RESET` (Blatt bleibt).  **(e) Punkte im PDF/Druck:** Pixelfolgen werden in Punkte zu 2 Pixeln zerlegt, Kreisdurchmesser 1,25 × Breite — Darstellung
+    (`ausgabe.PUNKT_*`), kein Mechanikmaß `[?]`; der Wächter rechnet das PDF zurück in ein Bild und prüft jeden Punkt.  **(f)** Seitenlänge (4/6/8/12") ist Oberflächeneinstellung; die
+    Formularlänge der Firmware (BCH.5..4) ist über die ABI nicht erreichbar (Vorgabe 12").  **(g)** Gesperrte Typen: `typen.GESPERRT` (/267, K6316 IFSS/V.24, K6313, SD 1152/257); wer
+    einen Typ freischaltet, verschiebt ihn nach `typen.TYPEN` mit eigener `Typbeschreibung`.  **(h)** Der Test fährt den Kern selbst (`autostart=False`, `lauf`), die Auslieferungsvorgabe
+    startet einen Server auf Port 5000 — Tests übergeben `konfig_daten={}`.
