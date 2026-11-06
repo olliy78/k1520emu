@@ -15,7 +15,7 @@ from typing import Dict, Optional
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QFrame, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget,
+    QComboBox, QFrame, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget,
 )
 
 from app.printertool.typen import Typbeschreibung
@@ -24,7 +24,7 @@ from app.ui.status_bar import PanelLamp
 
 class Bedienfeld(QWidget):
     taste = Signal(int, bool)          # (kern_id, gedrueckt) - Taster
-    schalter = Signal(int, bool)       # (kern_id, an)        - rastende Schalter
+    schalter = Signal(int, int)        # (kern_id, an/Stellung) - rastende Schalter, Drehschalter
     netz = Signal(bool)                # Netzschalter
     neustart = Signal()                # Knopf "Neustart jetzt" im Hinweis
 
@@ -82,6 +82,34 @@ class Bedienfeld(QWidget):
             self._tasten[t.name] = knopf
             gl.addWidget(knopf, i // 2, i % 2)
         lay.addWidget(tg)
+
+        # Drehschalter Betriebsart und DIL-Schalter (K6316)
+        self.betriebsart: Optional[QComboBox] = None
+        if b.betriebsarten:
+            bg = QGroupBox("Betriebsart")
+            bl = QHBoxLayout(bg)
+            self.betriebsart = QComboBox()
+            for wert, text in b.betriebsarten:
+                self.betriebsart.addItem(text, wert)
+            self.betriebsart.setToolTip("Drehschalter im Drucker.  Die Firmware liest ihn beim Netz-Ein (und bei der "
+                                        "Geraetekennung): Aenderung wirkt nach dem Neustart.  Nur in der Stellung "
+                                        "Schneiden schneidet der Drucker (S5+S4); Aufwickeln sperrt Papier rueckwaerts.")
+            self.betriebsart.currentIndexChanged.connect(
+                lambda _i: None if self._laden else self.schalter.emit(b.betriebsart_id, int(self.betriebsart.currentData())))
+            bl.addWidget(self.betriebsart)
+            lay.addWidget(bg)
+        if b.dil:
+            dg = QGroupBox("DIL-Schalter S11 - S26 (Ein = geschlossen)")
+            dl = QGridLayout(dg)
+            for i, t in enumerate(b.dil):
+                knopf = QPushButton(t.text)
+                knopf.setCheckable(True)
+                knopf.setToolTip(t.tipp)
+                knopf.setFocusPolicy(Qt.NoFocus)
+                knopf.toggled.connect(lambda an, k=t.kern_id: None if self._laden else self.schalter.emit(k, an))
+                self._tasten[t.name] = knopf
+                dl.addWidget(knopf, i // 4, i % 4)
+            lay.addWidget(dg)
 
         # Hinweise (Gastverhalten, nicht wegerklaert)
         self.hinweise = QLabel()
@@ -155,6 +183,20 @@ class Bedienfeld(QWidget):
                         k.blockSignals(True)
                         k.setChecked(bool(w))
                         k.blockSignals(False)
+            for t in b.dil:
+                w = emu.printer_switch_get(t.kern_id)
+                k = self._tasten[t.name]
+                if w >= 0 and k.isChecked() != bool(w):
+                    k.blockSignals(True)
+                    k.setChecked(bool(w))
+                    k.blockSignals(False)
+            if self.betriebsart is not None:
+                w = emu.printer_switch_get(b.betriebsart_id)
+                i = self.betriebsart.findData(w)
+                if i >= 0 and self.betriebsart.currentIndex() != i:
+                    self.betriebsart.blockSignals(True)
+                    self.betriebsart.setCurrentIndex(i)
+                    self.betriebsart.blockSignals(False)
         finally:
             self._laden = False
         if self._netz_an:

@@ -2712,6 +2712,10 @@ class K1520Emulator:
     def printer_switch(self, schalter: int, wert: bool) -> bool:
         return bool(_lib.k1520_printer_switch(self._handle, schalter, 1 if wert else 0))
 
+    def printer_switch_value(self, schalter: int, wert: int) -> bool:
+        """Schalter mit Zahlenwert (Formularlaenge 0..3, Betriebsart 0..2, Schalterbloecke als Byte)."""
+        return bool(_lib.k1520_printer_switch(self._handle, schalter, int(wert)))
+
     def printer_switch_get(self, schalter: int) -> int:
         """0/1, -1 = unbekannt/kein Drucker."""
         return int(_lib.k1520_printer_switch_get(self._handle, schalter))

@@ -218,8 +218,8 @@ def test_blatt_leeren_und_papier_taste(fenster):
 def test_typauswahl_sperrt_alle_unfertigen_typen(fenster, monkeypatch):
     e = fenster.einst_drucker
     items = {e.typ.itemData(i): e.typ.model().item(i) for i in range(e.typ.count())}
-    assert items["sd1157"].isEnabled()
-    gesperrt = {"sd1157-267", "k6316-ifss", "k6316-v24", "k6313", "sd1152-257"}
+    assert items["sd1157"].isEnabled() and items["k6316-ifss"].isEnabled() and items["k6316-v24"].isEnabled()
+    gesperrt = {"sd1157-267", "k6313", "sd1152-257"}
     assert gesperrt <= set(items)
     for s in gesperrt:
         assert not items[s].isEnabled() and items[s].toolTip()
@@ -488,3 +488,62 @@ def test_programm_zeigt_hilfe_und_pfade_ohne_qt():
                            capture_output=True, text=True, timeout=60, cwd=PROJECT_ROOT)
         assert r.returncode == 0, r.stderr
         assert erwartet in r.stdout
+
+
+# ─── K6316 (WP2a) ────────────────────────────────────────────────────────────
+
+def test_k6316_typwahl_baut_bedienfeld_dil_und_betriebsart(fenster, monkeypatch):
+    e = fenster.einst_drucker
+    monkeypatch.setattr(QMessageBox, "question", staticmethod(lambda *a, **k: QMessageBox.Yes))
+    emu0 = fenster.emu
+    e.typ.setCurrentIndex(e.typ.findData("k6316-ifss"))
+    fenster.takt.stop()
+    assert fenster.emu is not emu0 and fenster.beschreibung.schluessel == "k6316-ifss"
+    assert fenster.emu.machine == "k6316-ifss" and "IFSS" in fenster.st_schnittstelle.text()
+    b = fenster.bedienfeld
+    assert b.beschreibung is fenster.beschreibung
+    # Tasten, Schalter, Lampen H1-H5 und alle 16 DIL-Schalter stehen im Bedienfeld
+    for n in ("s1", "s2", "s3", "s4", "s5", "kopf", "haube", "papier", "beleg_o", "beleg_u") + tuple(f"s{n}" for n in range(11, 27)):
+        assert b.knopf(n) is not None
+    for l in ("TEST", "FEHLER", "PAPIER", "BEREIT", "ONLINE"):
+        assert b.lampe(l) is not None
+    assert not e.rom.isEnabled() and not e.schnittstelle.isEnabled()     # das Modul folgt dem Typ
+    assert not fenster.act_online.isEnabled()
+    # DIL-Schalter und Drehschalter erreichen den Kern; Kern ist Quelle der Wahrheit
+    b.knopf("s14").click()
+    assert fenster.emu.printer_switch_get(K.DRUCKER_SW_DIL_BASIS + 3) == 1 and fenster._dil == 1 << 3
+    assert fenster.konfig_lesen()["printer"]["dil"] == 1 << 3
+    b.betriebsart.setCurrentIndex(b.betriebsart.findData(1))
+    assert fenster.emu.printer_switch_get(K.DRUCKER_SW_BETRIEBSART) == 1
+    assert fenster.konfig_lesen()["printer"]["betriebsart"] == "schneiden"
+    b.knopf("kopf").click()
+    assert fenster.emu.printer_switch_get(K.DRUCKER_SW_KOPF) == 0
+    b.knopf("kopf").click()
+    assert fenster.emu.printer_switch_get(K.DRUCKER_SW_KOPF) == 1
+    # Grundstellung abwarten: DC1 erreicht die Anzeige als H5 (ONLINE)
+    lauf(fenster, 3000, schritt=20000, aktualisieren_jeden=100)
+    assert fenster.emu.printer_lamp(K.DRUCKER_LAMPE_ONLINE) == 1 and fenster.emu.printer_lamp(K.DRUCKER_LAMPE_H4) == 1
+    assert fenster.emu.printer_lamp(K.DRUCKER_LAMPE_FEHLER) == 0
+
+
+def test_k6316_selbsttest_druckt_ueber_die_taste_s5(fenster, monkeypatch):
+    e = fenster.einst_drucker
+    monkeypatch.setattr(QMessageBox, "question", staticmethod(lambda *a, **k: QMessageBox.Yes))
+    e.typ.setCurrentIndex(e.typ.findData("k6316-ifss"))
+    fenster.takt.stop()
+    fenster.bedienfeld.knopf("s5").pressed.emit()             # beim Netz-Ein halten
+    fenster.act_reset.trigger()
+    fenster.takt.stop()
+    lauf(fenster, 3000, schritt=20000, aktualisieren_jeden=200)
+    fenster.bedienfeld.knopf("s5").released.emit()
+    lauf(fenster, 800, schritt=20000, aktualisieren_jeden=20)
+    assert fenster.blatt.punkte_zaehlen() > 1000
+    assert fenster.emu.printer_lamp(K.DRUCKER_LAMPE_TEST) == 1
+    assert fenster.emu.printer_geometry() == (300, 216, 1)
+
+
+def test_sd1157_formularlaenge_geht_an_den_kern_schalter(fenster):
+    fenster.einst_drucker.seite.setCurrentIndex(fenster.einst_drucker.seite.findData(6))
+    assert fenster.emu.printer_switch_get(K.DRUCKER_SW_FORMULAR1) == 1          # 6" = Code 1 (BCH.5..4)
+    fenster.einst_drucker.seite.setCurrentIndex(fenster.einst_drucker.seite.findData(12))
+    assert fenster.emu.printer_switch_get(K.DRUCKER_SW_FORMULAR1) == 3

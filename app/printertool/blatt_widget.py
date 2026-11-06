@@ -68,6 +68,7 @@ class BlattWidget(QWidget):
         self._ox = 0.0                   # Blattkoordinaten der linken oberen Ecke der Ansicht
         self._oy = 0.0
         self._formular_zeilen = 0        # 0 = keine Perforation zeichnen
+        self._schnitte = []              # Zeilen der Schnitte (K6316)
         self._kopf_sichtbar = True
         self._farbe_punkt = QColor(0, 0, 0)
 
@@ -173,6 +174,7 @@ class BlattWidget(QWidget):
         self._daten = bytearray()
         self._version = -1
         self._kopf_y_vorher = 0
+        self._schnitte = []
         self._oy = 0.0
         self.ansicht_geaendert.emit()
         self.update()
@@ -193,6 +195,7 @@ class BlattWidget(QWidget):
             groesse = emu.printer_sheet_size()
             if groesse is not None:
                 self._blatt_lesen(emu, groesse, kopf[1] if kopf else 0)
+                self._schnitte = emu.printer_sheet_cuts()      # K6316: Schneideinrichtung (sonst leer)
                 self._version = ver
                 geaendert = True
         if kopf is not None:
@@ -308,6 +311,13 @@ class BlattWidget(QWidget):
                     y = oben + k * z
                     p.drawLine(QPointF(max(0.0, links), y), QPointF(min(self.width(), links + self._breite * z), y))
                 k += self._formular_zeilen
+        # Schnittkanten (K6316): durchgezogen rot, das Papier ist dort getrennt
+        if self._schnitte:
+            p.setPen(QPen(QColor(200, 40, 40), 1, Qt.SolidLine))
+            for k in self._schnitte:
+                y = oben + k * z
+                if 0 <= y <= self.height():
+                    p.drawLine(QPointF(max(0.0, links), y), QPointF(min(self.width(), links + self._breite * z), y))
         # Kopfband ueber den Nadeln
         if self._kopf_sichtbar:
             kx, ky, lauf = self._kopf

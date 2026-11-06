@@ -192,6 +192,11 @@ class PrinterWindow(QMainWindow):
         self.beschreibung = typen.typ(str(allg.get("model", "")))
         self._rom = dr.get("rom") if dr.get("rom") in ("repariert", "original") else "repariert"
         self._schnittstelle = dr.get("schnittstelle") if dr.get("schnittstelle") in ("ifss", "v24") else "ifss"
+        self._betriebsart = dr.get("betriebsart") if dr.get("betriebsart") in ("aufwickeln", "schneiden", "endlos") else "endlos"
+        try:
+            self._dil = int(dr.get("dil", 0)) & 0xFFFF
+        except (TypeError, ValueError):
+            self._dil = 0
         self._tempo = konfig.tempo_waehlbar(allg.get("speed", 1.0))
         self._formular_zoll = konfig.zoll_waehlbar(dr.get("formular_zoll", 12))
         self._netz = True
@@ -200,6 +205,7 @@ class PrinterWindow(QMainWindow):
         self._druckdialog = QPrintDialog          # Tests setzen einen Ersatz
         self.emu = self._emulator_anlegen()
         self.emu.printer_switch(K.DRUCKER_SW_ONLINE, bool(dr.get("online", True)))
+        self._formular_an_kern()
 
         aktionen.erzeuge_aktionen(self)
         self.act_power.blockSignals(True)           # das Netz ist an: Haken setzen, ohne Neustart auszuloesen
@@ -336,13 +342,24 @@ class PrinterWindow(QMainWindow):
         e.tempo.currentIndexChanged.connect(self._tempo_gewaehlt)
         e.seite.currentIndexChanged.connect(self._seite_gewaehlt)
         self.st_typ.setText(self.beschreibung.titel)
-        self.st_schnittstelle.setText(f"Schnittstelle: {dict(typen.SCHNITTSTELLEN)[self._schnittstelle]}")
+        self.st_schnittstelle.setText(f"Schnittstelle: {dict(typen.SCHNITTSTELLEN)[self._schnittstelle_aktiv()]}")
+        self._bedienfeld_neu()
 
     # ── Maschine ─────────────────────────────────────────────────────────────
 
     def _emulator_anlegen(self) -> K.K1520Emulator:
         return K.K1520Emulator(machine=self.beschreibung.kern_maschine,
-                               drucker=typen.konfig_text(self._schnittstelle, self._rom))
+                               drucker=typen.konfig_text(self._schnittstelle, self._rom, self.beschreibung,
+                                                         self._betriebsart, self._dil))
+
+    def _schnittstelle_aktiv(self) -> str:
+        """Die Schnittstelle des Geraets: beim K6316 legt der Typ das Modul fest, am SD 1157 der Schalter."""
+        return self.beschreibung.schnittstelle_fest or self._schnittstelle
+
+    def _formular_an_kern(self) -> None:
+        """Formularlaenge an den Schalter des SD 1157 (BCH.5..4): die Firmware liest ihn beim Formularvorschub."""
+        code = {4: 0, 6: 1, 8: 2, 12: 3}.get(self._formular_zoll, 3)
+        self.emu.printer_switch_value(K.DRUCKER_SW_FORMULAR1, code)
 
     def _neu_anlegen(self, beschreibung=None, rom=None, schnittstelle=None) -> None:
         """Drucker mit anderen Anlageparametern neu bauen; Takt, Schnittstellen und Blatt ziehen mit."""
@@ -360,10 +377,31 @@ class PrinterWindow(QMainWindow):
         self.seriell.set_emulator(self.emu)
         self.seriell.zustand_anwenden(zustand)
         self.st_typ.setText(self.beschreibung.titel)
-        self.st_schnittstelle.setText(f"Schnittstelle: {dict(typen.SCHNITTSTELLEN)[self._schnittstelle]}")
+        self.st_schnittstelle.setText(f"Schnittstelle: {dict(typen.SCHNITTSTELLEN)[self._schnittstelle_aktiv()]}")
+        self._formular_an_kern()
+        self._bedienfeld_neu()
         self._netz_setzen(True, neu_starten=False)
         self.aktualisieren()
         self.takt.start()
+
+    def _bedienfeld_neu(self) -> None:
+        """Bedienfeld und Einstellungen zum (neuen) Typ: ein K6316 hat Drehschalter und DIL-Schalter, keine ROM-Wahl."""
+        if self.bedienfeld.beschreibung is not self.beschreibung:
+            alt = self.bedienfeld
+            self.bedienfeld = Bedienfeld(self.beschreibung)
+            self.bedienfeld.taste.connect(self._taste)
+            self.bedienfeld.schalter.connect(self._schalter)
+            self.bedienfeld.netz.connect(self._netz_aus_bedienfeld)
+            self.bedienfeld.neustart.connect(self._neustart)
+            self.dock_bedienfeld.setWidget(self.bedienfeld)
+            alt.deleteLater()
+        e = self.einst_drucker
+        for w in (e.rom, e.rom_text, e.schnittstelle, e.schnittstelle_text):
+            w.setEnabled(self.beschreibung.hat_rom_wahl)
+        for n in ("online", "pv1", "pv2", "test"):
+            a = getattr(self, f"act_{n}", None)
+            if a is not None:
+                a.setEnabled(self.beschreibung.hat_online_schalter)
 
     def _frage(self, titel: str, text: str) -> bool:
         return QMessageBox.question(self, titel, text, QMessageBox.Yes | QMessageBox.No,
@@ -419,6 +457,7 @@ class PrinterWindow(QMainWindow):
     def _seite_gewaehlt(self, _=None) -> None:
         self._formular_zoll = int(self.einst_drucker.seite.currentData())
         self.blatt.set_formular_zeilen(self._formular_zeilen())
+        self._formular_an_kern()
 
     def _formular_zeilen(self) -> int:
         ydpi = (self.emu.printer_geometry() or (200, 144, 1))[1]
@@ -457,10 +496,18 @@ class PrinterWindow(QMainWindow):
         if self._netz:
             self.emu.printer_key(kern_id, gedrueckt)
 
-    def _schalter(self, kern_id: int, an: bool) -> None:
+    def _schalter(self, kern_id: int, an) -> None:
         if not self._netz:
             return
+        if kern_id == K.DRUCKER_SW_BETRIEBSART:
+            self.emu.printer_switch_value(kern_id, int(an))
+            self._betriebsart = ("aufwickeln", "schneiden", "endlos")[int(an)]
+            return
+        an = bool(an)
         self.emu.printer_switch(kern_id, an)
+        if K.DRUCKER_SW_DIL_BASIS <= kern_id < K.DRUCKER_SW_DIL_BASIS + 16:
+            bit = 1 << (kern_id - K.DRUCKER_SW_DIL_BASIS)
+            self._dil = (self._dil | bit) if an else (self._dil & ~bit)
         if kern_id == K.DRUCKER_SW_ONLINE:
             self._online_spiegeln(an)
 
@@ -531,7 +578,7 @@ class PrinterWindow(QMainWindow):
         self.blatt.aktualisieren(self.emu)
         self.bedienfeld.aktualisieren(self.emu)
         self._online_spiegeln(self.emu.printer_switch_get(K.DRUCKER_SW_ONLINE) == 1)
-        self.act_online.setEnabled(self._netz)
+        self.act_online.setEnabled(self._netz and self.beschreibung.hat_online_schalter)
         if not self._netz:
             zustand = "Netz aus"
         else:
@@ -609,6 +656,7 @@ class PrinterWindow(QMainWindow):
         return {
             "general": {"model": self.beschreibung.schluessel, "speed": self._tempo},
             "printer": {"rom": self._rom, "schnittstelle": self._schnittstelle,
+                        "betriebsart": self._betriebsart, "dil": self._dil,
                         "online": self.emu.printer_switch_get(K.DRUCKER_SW_ONLINE) == 1,
                         "formular_zoll": self._formular_zoll, "zoom": round(self.blatt.zoom(), 4),
                         "einpassen": self.blatt.einpassen(), "folgen": self.blatt.folgen()},
