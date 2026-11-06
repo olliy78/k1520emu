@@ -452,3 +452,10 @@ k1520_add_test(sd1157_text SRC test_sd1157_text.cpp
                            LIBS k1520_printer k1520_serial k1520_logger
                            LABELS "${_lbl};fach_drucker" TIMEOUT 300 DEFS LOG_LEVEL=2
                            "SD1157_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/SD1157\"")
+
+# K6316 (Entwurf 49, WP2a/WP6a): Original-ROM beider Module bis in die Grundstellung, Selbsttest und Text ueber die SIO gegen ein
+# Orakel aus dem Zeichengenerator im ROM (tests/support/k6316_orakel.h), Betriebsarten/Schnitt, Papierende, Diodenmatrix.
+k1520_add_test(k6316 SRC test_k6316.cpp
+                     LIBS k1520_printer k1520_logger
+                     LABELS "${_lbl};fach_drucker" TIMEOUT 600 DEFS LOG_LEVEL=2
+                     "K6316_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/K6316\"")

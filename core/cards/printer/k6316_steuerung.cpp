@@ -191,9 +191,11 @@ void K6316Steuerung::reset()
     pio14_.reset();
     sio_.reset();
     cpu_.reset();
-    // /CTS und /DCD liegen fest aktiv (V.24-Modul braucht beide wegen WR3 D5, IFSS hat keine)
-    sio_.channelA().setzeDCD(true);
-    sio_.channelA().setzeCTS(true);
+    // IFSS (Kanal B) hat keine Steuerleitungen: /CTS und /DCD liegen fest aktiv.  Am V.24 (Kanal A) kommen sie vom Host (Wandler/
+    // Gegenstelle): ohne Gegenstelle sind sie inaktiv, und die V.24-Firmware wartet mit dem ersten DC1 auf ihre Statusaenderung
+    // (Interrupt, ROM 1995H) — wie am SD 1157.
+    sio_.channelA().setzeDCD(false);
+    sio_.channelA().setzeCTS(false);
     sio_.channelB().setzeDCD(true);
     sio_.channelB().setzeCTS(true);
     druck_.halt();
