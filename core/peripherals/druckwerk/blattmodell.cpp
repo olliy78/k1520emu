@@ -67,6 +67,7 @@ void Blattmodell::streckeBis(int zeilen)
 void Blattmodell::leeren()
 {
     bloecke_.clear();
+    schnitte_.clear();
     hoehe_ = 0;
     punkte_ = 0;
     ++version_;
@@ -101,4 +102,13 @@ std::string blattAscii(const Blattmodell& b, int x0, int y0, int breite, int hoe
         s.push_back('\n');
     }
     return s;
+}
+
+void Blattmodell::schnitt(int y)
+{
+    if (y < 0) return;
+    if (!schnitte_.empty() && schnitte_.back() == y) return;
+    schnitte_.push_back(y);
+    streckeBis(y + 1);
+    ++version_;
 }

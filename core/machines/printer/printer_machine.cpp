@@ -17,29 +17,38 @@ const char* PrinterMachine::typName(Config::Typ t)
     return "Drucker ?";
 }
 
-PrinterMachine::Config PrinterMachine::pruefe(const Config& cfg)
+namespace {
+static_assert(Sd1157Steuerung::CPU_HZ == K6316Steuerung::CPU_HZ, "beide Drucker laufen mit 2,4576 MHz");
+
+std::unique_ptr<DruckerSteuerung> neueSteuerung(const PrinterMachine::Config& cfg, K1520Bus& bus)
 {
     switch (cfg.typ) {
-        case Config::Typ::Sd1157_264:
-            break;
-        case Config::Typ::K6316_Ifss:
-        case Config::Typ::K6316_V24:
-            throw std::invalid_argument(std::string(typName(cfg.typ)) +
-                                        " ist noch nicht gebaut (K6316Steuerung folgt in WP2a, Entwurf 49)");
+        case PrinterMachine::Config::Typ::Sd1157_264:
+            return std::make_unique<Sd1157Steuerung>(bus, cfg.sd1157);
+        case PrinterMachine::Config::Typ::K6316_Ifss:
+        case PrinterMachine::Config::Typ::K6316_V24: {
+            K6316Steuerung::Config c = cfg.k6316;
+            c.schnittstelle = cfg.typ == PrinterMachine::Config::Typ::K6316_V24 ? K6316Steuerung::Config::Schnittstelle::V24
+                                                                               : K6316Steuerung::Config::Schnittstelle::Ifss;
+            return std::make_unique<K6316Steuerung>(bus, c);
+        }
     }
-    return cfg;
+    throw std::invalid_argument("unbekannter Druckertyp");
 }
+}  // namespace
 
 PrinterMachine::PrinterMachine(const Config& cfg)
-    : cfg_(pruefe(cfg)), steuerung_(std::make_unique<Sd1157Steuerung>(bus_, cfg_.sd1157))
+    : cfg_(cfg), steuerung_(neueSteuerung(cfg_, bus_))
 {
+    sd1157_ = dynamic_cast<Sd1157Steuerung*>(steuerung_.get());
+    k6316_  = dynamic_cast<K6316Steuerung*>(steuerung_.get());
     steuerung_->attachToBus(bus_);
-    // Kette mit der Steuerung als einziger Karte (CTC, PIO, SIO stehen in ihr, Annahme der Reihenfolge dort).
-    bus_.setInterruptChain({steuerung_.get()});
+    // Kette mit der Steuerung als einziger Karte (CTC, PIO, SIO stehen in ihr, Reihenfolge dort).
+    bus_.setInterruptChain({&steuerung_->unterbrechung()});
     // Schnittstellen nach aussen (Entwurf 19 §3, 49 §4.4): Reihenfolge = Hub-Index = C-ABI-Index: IFSS (B), V.24 (A).
     steuerung_->setzeHubAktiv(true);
-    hub_.registriere(steuerung_->anschluss(Sd1157Steuerung::Config::Schnittstelle::Ifss));
-    hub_.registriere(steuerung_->anschluss(Sd1157Steuerung::Config::Schnittstelle::V24));
+    hub_.registriere(steuerung_->serialAnschluss(false));
+    hub_.registriere(steuerung_->serialAnschluss(true));
     powerOn();
 }
 
@@ -53,13 +62,7 @@ const FormatCatalog& PrinterMachine::formatCatalog() const
 
 std::vector<k1520::serial::SerialAnschluss*> PrinterMachine::serielleAnschluesse()
 {
-    return {&steuerung_->anschluss(Sd1157Steuerung::Config::Schnittstelle::Ifss),
-            &steuerung_->anschluss(Sd1157Steuerung::Config::Schnittstelle::V24)};
-}
-
-void PrinterMachine::altRueckruf(Sd1157Steuerung::Config::Schnittstelle s, SerialCb cb)
-{
-    steuerung_->setAbnehmer(s, std::move(cb));
+    return {&steuerung_->serialAnschluss(false), &steuerung_->serialAnschluss(true)};
 }
 
 void PrinterMachine::powerOn()

@@ -445,6 +445,8 @@ _lib.k1520_printer_sheet_version.restype = ctypes.c_uint64
 _lib.k1520_printer_sheet_rows.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_int, ctypes.c_int,
                                           ctypes.c_void_p, ctypes.c_int]
 _lib.k1520_printer_sheet_rows.restype = ctypes.c_int
+_lib.k1520_printer_sheet_cuts.argtypes = [K1520Handle, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.c_int]
+_lib.k1520_printer_sheet_cuts.restype = ctypes.c_int
 _lib.k1520_printer_sheet_clear.argtypes = [K1520Handle]
 _lib.k1520_printer_sheet_clear.restype = ctypes.c_int
 _lib.k1520_printer_head.argtypes = [K1520Handle, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int),
@@ -890,7 +892,7 @@ def _utf8(path) -> bytes:
 # Maschinentypen (K1520MachineType in core/api/k1520_api.h) — Name → Wert.
 MACHINE_TYPES = {"a5120": 0, "a5120-alt": 0, "a5120-kmbg": 0, "prg710": 1, "prg710-1": 1, "k8915": 2, "k8915-g2": 2, "pc1715": 3,
                  "pc1715-k7221": 3, "pc1715w": 3, "p8000": 4, "p8000-terminal": 5,
-                 "mc80": 6, "mc80-21": 6, "mc80-22": 6, "sd1157": 7}
+                 "mc80": 6, "mc80-21": 6, "mc80-22": 6, "sd1157": 7, "k6316-ifss": 7, "k6316-v24": 7}
 # (Variante, Bildschirm) fuer k1520_create_pc1715: Variante 0 = PC 1715, 1 = PC 1715W (AP-W3);
 # Bildschirm 0 = K7222 80×24, 1 = K7221 64×16 (am 1715W abgelehnt).
 # AP-6: waehlbare ROM-Fassungen → Parameter von k1520_create_pc1715_ex.
@@ -971,12 +973,18 @@ PRG_VARIANTEN = {"prg710": 0, "prg710-1": 1}
 MC80_VARIANTEN = {"mc80": 0, "mc80-21": 3, "mc80-22": 4}
 #: Die Varianten des MC80.2x (Bild 528 × 256, 32 × 8 Zeichen, Tastatur als Matrix, MBI).
 MC80_2X = ("mc80-21", "mc80-22")
-# Druckertyp fuer k1520_create_printer (Entwurf 49, WP1): nur der SD 1157/264 ist gebaut.
-DRUCKER_TYPEN = {"sd1157": 0}
+# Druckertyp fuer k1520_create_printer (Entwurf 49): SD 1157/264 und K6316 (Modul IFSS bzw. V.24).
+DRUCKER_TYPEN = {"sd1157": 0, "k6316-ifss": 1, "k6316-v24": 2}
 # Tasten, Schalter und Lampen des Druckers (k1520_printer_key/_switch/_lamp, Werte wie in k1520_api.h).
 DRUCKER_TASTE_PV1, DRUCKER_TASTE_PV2, DRUCKER_TASTE_TEST = 1, 2, 3
 DRUCKER_SW_ONLINE, DRUCKER_SW_KOPF, DRUCKER_SW_LPI6, DRUCKER_SW_PAPIER = 0, 1, 2, 3
 DRUCKER_LAMPE_ONLINE, DRUCKER_LAMPE_FEHLER = 0, 1
+# K6316 (nur dort): Tasten S1..S5, weitere Schalter, Lampen (H5 = ONLINE, H2 = FEHLER, dazu TEST = H1, PAPIER = H3, H4 BEREIT)
+DRUCKER_TASTE_S1, DRUCKER_TASTE_S2, DRUCKER_TASTE_S3, DRUCKER_TASTE_S4, DRUCKER_TASTE_S5 = 11, 12, 13, 14, 15
+DRUCKER_SW_HAUBE, DRUCKER_SW_BETRIEBSART, DRUCKER_SW_BELEG_OBEN, DRUCKER_SW_BELEG_UNTEN = 4, 5, 6, 7
+DRUCKER_SW_DIL_BASIS = 16                  # S11..S26 = 16..31
+DRUCKER_SW_FORMULAR1, DRUCKER_SW_FORMULAR2, DRUCKER_SW_BLOCK_6F, DRUCKER_SW_BLOCK_3A = 8, 9, 10, 11   # SD 1157
+DRUCKER_LAMPE_TEST, DRUCKER_LAMPE_PAPIER, DRUCKER_LAMPE_H4 = 2, 3, 4
 # Bauform fuer k1520_create_k8915 (doc/design/24_k8915_varianten.md R5); "k8915" bleibt V3.
 K8915_GENERATIONEN = {"k8915": 0, "k8915-g2": 1}
 
@@ -2678,6 +2686,15 @@ class K1520Emulator:
         got = int(_lib.k1520_printer_sheet_rows(self._handle, bahn, y0, n,
                                                 ctypes.cast(puffer, ctypes.c_void_p), zb * n))
         return bytes(puffer[:got * zb]) if got > 0 else b""
+
+    def printer_sheet_cuts(self, bahn: int = 0) -> list:
+        """Zeilen der Schnitte (K6316, Schneideinrichtung) auf dem Blatt."""
+        n = int(_lib.k1520_printer_sheet_cuts(self._handle, bahn, None, 0))
+        if n <= 0:
+            return []
+        puffer = (ctypes.c_int * n)()
+        _lib.k1520_printer_sheet_cuts(self._handle, bahn, puffer, n)
+        return list(puffer)
 
     def printer_sheet_clear(self) -> bool:
         return bool(_lib.k1520_printer_sheet_clear(self._handle))

@@ -33,6 +33,7 @@
 
 #pragma once
 #include "core/bus/k1520_bus.h"
+#include "core/cards/printer/drucker_steuerung.h"
 #include "core/peripherals/druckwerk/geregelter_wagen.h"
 #include "core/peripherals/druckwerk/nadeldruckwerk.h"
 #include "core/primitives/z80.h"
@@ -46,7 +47,7 @@
 #include <memory>
 #include <string>
 
-class Sd1157Steuerung : public BusDevice, public MemDevice, public InterruptSlave {
+class Sd1157Steuerung : public BusDevice, public MemDevice, public InterruptSlave, public DruckerSteuerung {
 public:
     /// Taktfrequenz: aus der Baudprogrammierung abgeleitet [F, ?] hardware.md §6/§14 Nr. 1.
     static constexpr uint32_t CPU_HZ = 2'457'600;
@@ -116,13 +117,13 @@ public:
     const char* intDeviceName() const override;
 
     // ─── Lebenslauf ──────────────────────────────────────────────────────────
-    void attachToBus(K1520Bus& bus);
-    void reset();                       ///< /RESET: CPU, CTC, PIO, SIO, Mechanik; RAM bleibt
-    void powerOn();                     ///< RAM vorbelegen, dann reset()
+    void attachToBus(K1520Bus& bus) override;
+    void reset() override;              ///< /RESET: CPU, CTC, PIO, SIO, Mechanik; RAM bleibt
+    void powerOn() override;            ///< RAM vorbelegen, dann reset()
     /// Takte fortschreiben; true = Interruptzustand kann sich geaendert haben.
-    bool clockTick(int ticks);
+    bool clockTick(int ticks) override;
 
-    Z80&       cpu()       { return cpu_; }
+    Z80&       cpu() override { return cpu_; }
     const Z80& cpu() const { return cpu_; }
     Z80CTC&    ctc()       { return ctc_; }
     Z80PIO&    pio1()      { return pio1_; }   ///< F4H–F7H: Papiervorschub, Raender
@@ -139,6 +140,19 @@ public:
     void setPapierDa(bool da);            ///< BCH.0 /PE: true = Papier da (false = Papier entnommen/leer)
     void setLpi6(bool lpi6);              ///< BCH.1; die Firmware liest es NUR beim Anlauf (sy34), wirksam erst nach /RESET
     void setKopf(bool dauernd);           ///< 3B.4: Taste Kopf: true = dauernd angeschwenkt
+    /// Schalter am Geraet, die die Firmware liest (merkposten/drucker.md Nr. 19): Formularlaenge je Bahn (BCH.5..4 / .7..6:
+    /// 0 = 4", 1 = 6", 2 = 8", 3 = 12"), Schalterblock 6FH, PIO 3 A (Bit 1..7: Stoppbits, Paritaet, Baud; Bit 0 folgt der
+    /// Schnittstelle).  Die Firmware liest sie bei Bedarf; wer sicher gehen will, setzt sie vor dem Netz-Ein.
+    void setFormular(int bahn, uint8_t code) { (bahn == 2 ? cfg_.formular_bahn2 : cfg_.formular_bahn1) = code & 3; }
+    void setSchalter6f(uint8_t b) { cfg_.schalter_6f = b; }
+    void setSchalter3a(uint8_t b) {
+        cfg_.stopbits_code = (b >> 1) & 3;
+        cfg_.paritaet_gerade = (b & 0x08) != 0;
+        cfg_.paritaet_ein = (b & 0x10) != 0;
+        cfg_.baud_code = (b >> 5) & 7;
+        eingaengeSetzen();
+    }
+    uint8_t schalter3a() const { return pio3a(); }
     bool online() const { return online_; }
     bool lpi6() const { return lpi6_; }
     bool kopf() const { return kopf_dauernd_; }
@@ -165,9 +179,9 @@ public:
     /// Anschluss je Kanal (lebt so lange wie die Karte); Hub-Reihenfolge der Maschine: IFSS (B), V.24 (A).
     k1520::serial::SerialAnschluss& anschluss(Config::Schnittstelle s);
     /// Ein `SerialHub` nimmt den Sender ab: die Senke (Karte allein) schweigt.
-    void setzeHubAktiv(bool aktiv) { senke_ = !aktiv; }
+    void setzeHubAktiv(bool aktiv) override { senke_ = !aktiv; }
     /// Ein Anschluss hat SIO-Zustand geaendert (Zeichen abgenommen/zugestellt, Leitungen) — Maschine: Interrupt neu bewerten.
-    bool nimmSeriellGeaendert() { const bool r = seriell_geaendert_; seriell_geaendert_ = false; return r; }
+    bool nimmSeriellGeaendert() override { const bool r = seriell_geaendert_; seriell_geaendert_ = false; return r; }
     /// Alter Unterbau (`k1520_serial_set_rx_cb`/`_send`): Abnehmer der vom Gast gesendeten Bytes / Byte von aussen einspeisen.
     using Abnehmer = std::function<void(uint8_t)>;
     void setAbnehmer(Config::Schnittstelle s, Abnehmer cb);
@@ -177,8 +191,18 @@ public:
     uint64_t baudTakte() const;
 
     /// Druckwerk (Wagen, Papier, Blatt) — Lesezugriff fuer Oberflaeche, Werkzeuge und Tests.
-    Nadeldruckwerk&       druck()       { return druck_; }
-    const Nadeldruckwerk& druck() const { return druck_; }
+    Nadeldruckwerk&       druck() override       { return druck_; }
+    const Nadeldruckwerk& druck() const override { return druck_; }
+    InterruptSlave& unterbrechung() override { return *this; }
+    k1520::serial::SerialAnschluss& serialAnschluss(bool v24) override {
+        return anschluss(v24 ? Config::Schnittstelle::V24 : Config::Schnittstelle::Ifss);
+    }
+    void serialAbnehmer(bool v24, std::function<void(uint8_t)> cb) override {
+        setAbnehmer(v24 ? Config::Schnittstelle::V24 : Config::Schnittstelle::Ifss, std::move(cb));
+    }
+    void serialEinspeisen(bool v24, uint8_t byte) override {
+        einspeisen(v24 ? Config::Schnittstelle::V24 : Config::Schnittstelle::Ifss, byte);
+    }
     bool kopfAngeschwenkt() const { return kopf_dauernd_ || (p2b_aus_ & 0x04) != 0; }   ///< KAS (2B.2) oder Taste
 
 private:

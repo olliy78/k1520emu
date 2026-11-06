@@ -35,7 +35,7 @@ struct Lauf {
     uint16_t wort(uint16_t a) { return static_cast<uint16_t>(m->memReadDebug(a) | (m->memReadDebug(a + 1) << 8)); }
 };
 
-TEST(K1520PrinterMaschine, KennungUndK6316WirdAbgewiesen)
+TEST(K1520PrinterMaschine, KennungUndK6316TypenWerdenAngelegt)
 {
     PrinterMachine m;
     EXPECT_EQ(m.machineType(), 7);
@@ -43,17 +43,15 @@ TEST(K1520PrinterMaschine, KennungUndK6316WirdAbgewiesen)
     EXPECT_EQ(m.memReadDebug(0x0000), 0xED);   // IM 2
     EXPECT_FALSE(m.zusatzkartenSteckbar());
     EXPECT_FALSE(m.installRaf(RAF::Typ::RAF512));
+    EXPECT_FALSE(m.istK6316());
 
     for (auto t : {PrinterMachine::Config::Typ::K6316_Ifss, PrinterMachine::Config::Typ::K6316_V24}) {
         PrinterMachine::Config c;
         c.typ = t;
-        try {
-            PrinterMachine x(c);
-            FAIL() << "K6316 haette abgewiesen werden muessen";
-        } catch (const std::invalid_argument& e) {
-            EXPECT_NE(std::string(e.what()).find("K6316"), std::string::npos) << e.what();
-            EXPECT_NE(std::string(e.what()).find("WP2a"), std::string::npos) << e.what();
-        }
+        PrinterMachine x(c);
+        EXPECT_TRUE(x.istK6316());
+        EXPECT_EQ(x.machineType(), 7);
+        EXPECT_EQ(x.memReadDebug(0x0000), 0xDD);   // LD IX,3824H
     }
 }
 

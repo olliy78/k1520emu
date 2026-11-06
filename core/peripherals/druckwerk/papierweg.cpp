@@ -13,6 +13,7 @@ void Papierweg::netzEin()
     schnell_ = false;
     akku_ = puls_ = lage_ = 0;
     n_vor_ = n_rueck_ = 0;
+    motor_.netzEin();
 }
 
 void Papierweg::halt()
@@ -45,4 +46,16 @@ bool Papierweg::takt(int ticks)
         }
     }
     return (puls_ > 0) != vorher;
+}
+
+void Papierweg::phasen(uint8_t aktiv)
+{
+    const int vorher = lage_;
+    const int d = motor_.phasen(aktiv);
+    if (!d) return;
+    // Die Rotorlage zaehlt Halbschritte; die Papierlage Vollschritte (die Firmware schaltet Vollschritte).
+    const int h = p_.phasen_umgekehrt ? -motor_.lage() : motor_.lage();
+    lage_ = h >> 1;
+    if (lage_ > vorher) n_vor_ += static_cast<uint32_t>(lage_ - vorher);
+    else if (lage_ < vorher) n_rueck_ += static_cast<uint32_t>(vorher - lage_);
 }

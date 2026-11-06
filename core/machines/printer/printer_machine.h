@@ -2,10 +2,11 @@
  * @file printer_machine.h
  * @brief Drucker (Entwurf 49, Ticket #28) — siebte Maschine des Kerns (K1520_MACHINE_PRINTER = 7).
  *
+ * Stand WP2a: zwei Geraete, je eine Steuerungsklasse hinter @ref DruckerSteuerung: der SD 1157 und der K6316
+ * (`K6316Steuerung`: Original-ROM je Schnittstellenmodul IFSS/V.24, Schrittmotor-Wagen).
  * Stand WP4: Der SD 1157 (`Sd1157Steuerung`: U880 2,4576 MHz, Original-ROM 0000H–297FH,
  * RAM 2C00H/3800H, ZG1 3000H, CTC DCH, PIO F4H/F8H/ECH, SIO 7CH) druckt auf ein Blatt im Kern, seine SIO haengt
  * am `SerialHub` (IFSS, V.24; Telnet/RFC 2217/Datei).  Noch keine Bedienoberflaeche.
- * Die K6316-Typen sind als Werte vorgesehen und werden mit klarer Meldung abgewiesen (WP2a).
  *
  * Die Maschine kennt nur den Bus ihrer Steuerung (der Drucker hat keinen K1520-Steckplatz fuer
  * Zusatzkarten, @ref zusatzkartenSteckbar = false), keine Laufwerke, keine Tastatur, kein Bild.
@@ -16,6 +17,8 @@
 
 #pragma once
 #include "core/bus/k1520_bus.h"
+#include "core/cards/printer/drucker_steuerung.h"
+#include "core/cards/printer/k6316_steuerung.h"
 #include "core/cards/printer/sd1157_steuerung.h"
 #include "core/machines/machine.h"
 #include "core/serial/hub.h"
@@ -29,14 +32,16 @@
 class PrinterMachine : public K1520Machine {
 public:
     struct Config {
-        /// Druckertyp; `K6316_*` sind vorgesehen, aber erst in WP2a lauffaehig (Anlegen wirft).
+        /// Druckertyp; bei `K6316_*` bestimmt der Typ das Schnittstellenmodul (und damit den Firmwaresatz).
         enum class Typ { Sd1157_264, K6316_Ifss, K6316_V24 };
         Typ typ = Typ::Sd1157_264;
         /// Aufbau des SD 1157 (DIP-Schalter, Interface-Wahl, Ruhelage der Tasten).
         Sd1157Steuerung::Config sd1157;
+        /// Aufbau des K6316 (DIL-Schalter, Betriebsart, Mechanik); `schnittstelle` folgt dem Typ.
+        K6316Steuerung::Config k6316;
     };
 
-    static constexpr uint32_t CPU_HZ = Sd1157Steuerung::CPU_HZ;
+    static constexpr uint32_t CPU_HZ = Sd1157Steuerung::CPU_HZ;   // gleicher Takt am K6316 (static_assert in der .cpp)
 
     PrinterMachine() : PrinterMachine(Config{}) {}
     explicit PrinterMachine(const Config& cfg);
@@ -93,14 +98,15 @@ public:
 
     // ─── Serielle Schnittstellen nach aussen (WP4, Entwurf 19/49 §4.4) ───────
     // Hub-Index 0 = IFSS (SIO-Kanal B), 1 = V.24 (SIO-Kanal A); beide gibt es immer, aktiv ist der, den
-    // `Config::sd1157.schnittstelle` (3A.0) waehlt.  Die Firmware macht das Protokoll (DC1/DC3, ESC [ 0 c) selbst.
+    // `Config::sd1157.schnittstelle` (3A.0) bzw. das Modul des K6316 waehlt.  Die Firmware macht das Protokoll
+    // (DC1/DC3, ESC [ 0 c) selbst.
     k1520::serial::SerialHub* serialHub() override { return &hub_; }
     std::vector<k1520::serial::SerialAnschluss*> serielleAnschluesse() override;
     // Alter Unterbau (`k1520_serial_*`): DFU = V.24 (Kanal A), PRINTER = IFSS (Kanal B).
-    void setDFUECallback(SerialCb cb) override { altRueckruf(Sd1157Steuerung::Config::Schnittstelle::V24, std::move(cb)); }
-    void dfueSend(uint8_t b) override { steuerung_->einspeisen(Sd1157Steuerung::Config::Schnittstelle::V24, b); }
-    void setPrinterCallback(SerialCb cb) override { altRueckruf(Sd1157Steuerung::Config::Schnittstelle::Ifss, std::move(cb)); }
-    void printerSend(uint8_t b) override { steuerung_->einspeisen(Sd1157Steuerung::Config::Schnittstelle::Ifss, b); }
+    void setDFUECallback(SerialCb cb) override { steuerung_->serialAbnehmer(true, std::move(cb)); }
+    void dfueSend(uint8_t b) override { steuerung_->serialEinspeisen(true, b); }
+    void setPrinterCallback(SerialCb cb) override { steuerung_->serialAbnehmer(false, std::move(cb)); }
+    void printerSend(uint8_t b) override { steuerung_->serialEinspeisen(false, b); }
 
     // ─── Keine Zusatzkarten ──────────────────────────────────────────────────
     bool zusatzkartenSteckbar() const override { return false; }
@@ -111,7 +117,13 @@ public:
     uint8_t ioReadDebug(uint8_t port) override { return bus_.ioRead(port); }
     std::string lastError() const override { return ""; }
 
-    Sd1157Steuerung& sd1157() { return *steuerung_; }
+    bool istK6316() const { return k6316_ != nullptr; }
+    /// Die Steuerung des gewaehlten Geraets (@ref istK6316); die jeweils andere Zugriffsfunktion darf nicht gerufen werden.
+    Sd1157Steuerung& sd1157() { return *sd1157_; }
+    K6316Steuerung&  k6316() { return *k6316_; }
+    DruckerSteuerung& steuerung() { return *steuerung_; }
+    Nadeldruckwerk& druck() { return steuerung_->druck(); }
+    Z80& cpu() { return steuerung_->cpu(); }
     K1520Bus& bus() { return bus_; }
     uint64_t  totalCycles() const { return total_cycles_; }
     void      clearStop() { stop_.store(false); }
@@ -125,13 +137,13 @@ protected:
     uint32_t  k6022TaktHz() const override { return CPU_HZ; }
 
 private:
-    static Config pruefe(const Config& cfg);
     void resetHardware();
-    void altRueckruf(Sd1157Steuerung::Config::Schnittstelle s, SerialCb cb);
 
     const Config cfg_;
     K1520Bus bus_;
-    std::unique_ptr<Sd1157Steuerung> steuerung_;
+    std::unique_ptr<DruckerSteuerung> steuerung_;   // Besitzer: eine der beiden Karten, ueber sd1157_/k6316_ typisiert
+    Sd1157Steuerung* sd1157_ = nullptr;
+    K6316Steuerung*  k6316_ = nullptr;
     k1520::serial::SerialHub hub_{k1520::serial::PHI_NENN};   // nach steuerung_: stirbt zuerst (haelt Anschluss-Referenzen)
     uint64_t serial_naechst_ = 0;   ///< naechster Blick der Wandler (Taktzahl)
 

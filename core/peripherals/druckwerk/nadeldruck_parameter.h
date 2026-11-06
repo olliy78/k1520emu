@@ -25,6 +25,9 @@ struct NadeldruckParameter {
     int nadel1_y = 0;          ///< [?] Lage der Nadel 1 (obere Zeile) zur Papierlage, Einheiten
     int punkt_breite = 2;      ///< [?] Punktmass in Pixeln (2 = ein Takt = 1/100")
     int punkt_hoehe = 1;       ///< [?] Punktmass in Einheiten
+    /// Lage der Nadel k+1 in x relativ zur Wagenposition, in Blattpixeln (Nadeln in zwei versetzten Spalten, K6316:
+    /// ungerade und gerade Nadeln; ausserhalb davon 0).  Fester Ortsversatz, unabhaengig von der Fahrtrichtung.
+    int nadel_x[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
     /// Flugzeit der Nadel: der Punkt landet `versatz_vor` Pixel rechts (Vorwaertsdruck) bzw. `versatz_rueck` links
     /// (Rueckwaertsdruck, negativ) von der Wagenposition der Ausloesung.  **[F] an der Firmware gemessen:** deren
     /// Rueckwaertsdruck loest einen Takt spaeter aus als ein symmetrischer; beide Richtungen landen nur dann auf

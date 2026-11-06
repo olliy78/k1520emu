@@ -597,9 +597,9 @@ if(BUILD_K1520)
     add_library(k1520_druckwerk STATIC
         core/peripherals/druckwerk/blattmodell.cpp core/peripherals/druckwerk/nadelkopf.cpp
         core/peripherals/druckwerk/papierweg.cpp core/peripherals/druckwerk/geregelter_wagen.cpp
-        core/peripherals/druckwerk/nadeldruckwerk.cpp)
+        core/peripherals/druckwerk/nadeldruckwerk.cpp core/peripherals/druckwerk/schrittwagen.cpp)
     target_include_directories(k1520_druckwerk PUBLIC ${CMAKE_SOURCE_DIR})
-    add_library(k1520_printer_karten STATIC core/cards/printer/sd1157_steuerung.cpp)
+    add_library(k1520_printer_karten STATIC core/cards/printer/sd1157_steuerung.cpp core/cards/printer/k6316_steuerung.cpp)
     target_link_libraries(k1520_printer_karten PUBLIC k1520_druckwerk k1520_z80 k1520_ctc k1520_pio k1520_sio k1520_bus k1520_logger k1520_serial)
     target_include_directories(k1520_printer_karten PUBLIC ${CMAKE_SOURCE_DIR})
     add_library(k1520_printer STATIC core/machines/printer/printer_machine.cpp)

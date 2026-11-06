@@ -38,6 +38,11 @@ public:
     void streckeBis(int zeilen);
     void leeren();
 
+    /// Blattgrenze: das Papier wurde in Zeile @p y durchgeschnitten (K6316, Schneideinrichtung).  Die Punkte darunter gehoeren
+    /// zum naechsten Beleg; die Oberflaeche zeichnet die Kante, das PDF kann dort umbrechen.  `leeren()` loescht sie.
+    void schnitt(int y);
+    const std::vector<int>& schnitte() const { return schnitte_; }
+
     /// Beschriebene Punkte (je Position nur einmal gezaehlt) und verworfene (ausserhalb).
     uint64_t punktzahl() const { return punkte_; }
     uint64_t ausserhalb() const { return ausserhalb_; }
@@ -54,6 +59,7 @@ private:
     int hoehe_ = 0;
     uint64_t version_ = 0, punkte_ = 0, ausserhalb_ = 0;
     std::vector<std::unique_ptr<uint8_t[]>> bloecke_;
+    std::vector<int> schnitte_;
 };
 
 /**

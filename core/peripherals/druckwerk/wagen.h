@@ -51,6 +51,10 @@ public:
     virtual WagenRueckmeldung rueckmeldung() const = 0;
     /// Position in Takten der Taktscheibe (ganzzahlig, wie die Firmware sie mitzaehlt).
     virtual int  position() const = 0;
+    /// Position in Blattpixeln (@p x_je_takt Pixel je Takt), fuer den Nadelanschlag.  Vorgabe: die ganzzahlige Position.
+    /// Ein Schrittmotor-Wagen (`SchrittWagen`) liefert hier die Lage ZWISCHEN den Schritten (der Kopf feuert zwischen zwei
+    /// Motorschritten, Drucktakt = 3/4 Schritt).
+    virtual int  positionPixel(int x_je_takt) const { return position() * x_je_takt; }
     /// +1 = vorwaerts (nach rechts), -1 = rueckwaerts: Richtung der letzten Bewegung.
     virtual int  richtung() const = 0;
     virtual bool laeuft() const = 0;

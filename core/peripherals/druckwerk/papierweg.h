@@ -12,6 +12,7 @@
  */
 
 #pragma once
+#include "core/peripherals/druckwerk/phasenmotor.h"
 #include <cstdint>
 
 class Papierweg {
@@ -25,6 +26,8 @@ public:
         int impuls = 50;
         /// Papierlaenge in Schritten ab Lage 0; < 0 = unbegrenzt.  Bei Lage >= Laenge ist das Papier zu Ende.
         int laenge = -1;
+        /// K6316: Papiermotor als Phasenmotor (@ref Papierweg::phasen); true = steigende Phasennummer ist Rueckwaerts
+        bool phasen_umgekehrt = false;
     };
 
     Papierweg() : Papierweg(Parameter{}) {}
@@ -39,6 +42,9 @@ public:
     void ausgaenge(bool freigabe, bool vorwaerts, bool schnell);
     /// @p ticks Takte; true = der Impulspegel hat gewechselt.
     bool takt(int ticks);
+    /// K6316: Papier-/Vorsteckmotor wird von der Firmware per Phasenmuster geschaltet (Bit k = Phase k+1 bestromt);
+    /// die Lage zaehlt Vollschritte.  Die Impulsgeber-Wege (@ref ausgaenge) bleiben davon unberuehrt.
+    void phasen(uint8_t aktiv);
 
     bool impuls() const { return puls_ > 0; }          ///< 1 waehrend eines Rueckmeldeimpulses
     int  lage() const { return lage_; }                ///< Schritte netto, vorwaerts = +
@@ -57,4 +63,5 @@ private:
     bool frei_ = false, vor_ = true, schnell_ = false, ende_erzwungen_ = false;
     int  akku_ = 0, puls_ = 0, lage_ = 0;
     uint32_t n_vor_ = 0, n_rueck_ = 0;
+    PhasenMotor motor_;
 };

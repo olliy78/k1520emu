@@ -266,17 +266,20 @@ K1520_API K1520Handle k1520_create_p8000_terminal(const char* konfig);
 K1520_API K1520Handle k1520_create_mc80(int variante, const char* konfig);
 
 /**
- * @brief Drucker (K1520_MACHINE_PRINTER), doc/design/49_k1520printer.md — Stand WP3.
+ * @brief Drucker (K1520_MACHINE_PRINTER), doc/design/49_k1520printer.md — Stand WP2a.
  *        Der Original-U880-Code des SD 1157 (ROM 0000H–297FH, RAM 2C00H/3800H, ZG1 3000H,
- *        CTC DCH, PIO F4H/F8H/ECH, SIO 7CH, Takt 2,4576 MHz) laeuft und druckt auf ein Blatt im
+ *        CTC DCH, PIO F4H/F8H/ECH, SIO 7CH, Takt 2,4576 MHz) bzw. des K6316 (ROM 0000H–27FFH je Modul,
+ *        RAM 3800H, 2 CTC, 3 PIO, SIO am Modul) laeuft und druckt auf ein Blatt im
  *        Kern (`k1520_printer_*` unten).  Noch keine serielle Schnittstelle nach aussen, kein
  *        Bild: `k1520_fb_width/height` = 0, `k1520_screen_char` = 0, keine Laufwerke.  Zugriff auf Speicher/E/A ueber
  *        `k1520_mem_read`/`k1520_io_read` (CPU-Sicht des Druckers).
  *
- * @param typ     0 = SD 1157/264.  1 = K6316 (IFSS), 2 = K6316 (V.24): vorgesehen, aber noch nicht
- *                gebaut → NULL mit Grund.  Alles andere → NULL mit Grund.
+ * @param typ     0 = SD 1157/264.  1 = K6316 (IFSS), 2 = K6316 (V.24): der Typ waehlt Schnittstellenmodul und
+ *                Firmwaresatz.  Alles andere → NULL mit Grund.
  * @param konfig  Schluessel=Wert-Liste, durch Komma getrennt (NULL/"" = Vorgabe); Schluessel
- *                (nur SD 1157): `schnittstelle` (`ifss` | `v24`: Wahl am Schalterblock PIO 3 A.0).
+ *                SD 1157: `schnittstelle` (`ifss` | `v24`: Wahl am Schalterblock PIO 3 A.0), `rom` (`repariert` | `original`).
+ *                K6316: `betriebsart` (`aufwickeln` | `schneiden` | `endlos`), `dil` (Maske der geschlossenen
+ *                DIL-Schalter, Bit 0 = S11 ... Bit 15 = S26).
  *                Unbekannte Schluessel/Werte → NULL, Grund in k1520_last_init_error.
  * k1520_machine_type() = 7.  `k1520_create(K1520_MACHINE_PRINTER)` = SD 1157/264.
  */
@@ -292,14 +295,37 @@ K1520_API K1520Handle k1520_create_printer(int typ, const char* konfig);
 #define K1520_PRINTER_KEY_PV1   1   /* Papiervorschub Bahn 1 (nur offline wirksam) */
 #define K1520_PRINTER_KEY_PV2   2   /* Papiervorschub Bahn 2 */
 #define K1520_PRINTER_KEY_TEST  3   /* Selbsttest (nur offline) */
+/* K6316 (nur dort): S1 ON/OFF-LINE (Taster), S2 LINE FEED vor, S3 LINE FEED rueck, S4 Belegauswurf, S5 Schneiden;
+ * beim Netz-Ein gehalten starten sie die Testfunktionen (Handbuch 5.6: S5 Selbsttest Druck, S5+S4 ohne Druck,
+ * S1 Lichtschrankentest, S2 Hexadezimaldarstellung, S3 Test der Vorsteckeinrichtung). */
+#define K1520_PRINTER_KEY_K6316_S1 11
+#define K1520_PRINTER_KEY_K6316_S2 12
+#define K1520_PRINTER_KEY_K6316_S3 13
+#define K1520_PRINTER_KEY_K6316_S4 14
+#define K1520_PRINTER_KEY_K6316_S5 15
 /** Schalter (k1520_printer_switch / _get). */
 #define K1520_PRINTER_SW_ONLINE 0   /* 1 = online (Taste ONLINE: Pegel) */
 #define K1520_PRINTER_SW_KOPF   1   /* 1 = Kopf dauernd angeschwenkt */
 #define K1520_PRINTER_SW_LPI6   2   /* 1 = 6 lpi (8 Papierschritte je Zeile), 0 = 8 lpi (6) */
 #define K1520_PRINTER_SW_PAPIER 3   /* 1 = Papier da, 0 = Papierende */
+/* nur K6316 (SW_KOPF = Einstellhebel: 1 = Kopf angeschwenkt; SW_PAPIER wie oben): */
+#define K1520_PRINTER_SW_HAUBE        4   /* 1 = vordere Abdeckhaube geschlossen */
+#define K1520_PRINTER_SW_BETRIEBSART  5   /* Drehschalter: 0 Aufwickeln, 1 Schneiden, 2 Endlos (wird beim Netz-Ein gelesen) */
+#define K1520_PRINTER_SW_BELEG_OBEN   6   /* 1 = Papier vor der oberen Lichtschranke des Vorsteckschachts (FSO) */
+#define K1520_PRINTER_SW_BELEG_UNTEN  7   /* 1 = Papier vor der unteren Lichtschranke (FSU) */
+#define K1520_PRINTER_SW_DIL_BASIS    16  /* K6316: DIL-Schalter S11..S26 = 16..31, 1 = Ein (geschlossen) */
+/* nur SD 1157 (Schalter am Geraet, die die Firmware liest): */
+#define K1520_PRINTER_SW_FORMULAR1    8   /* Formularlaenge Bahn 1 (BCH.5..4): 0 = 4", 1 = 6", 2 = 8", 3 = 12" */
+#define K1520_PRINTER_SW_FORMULAR2    9   /* Formularlaenge Bahn 2 (BCH.7..6) */
+#define K1520_PRINTER_SW_BLOCK_6F     10  /* Schalterblock 6FH (Byte; D1 OPR, D3 HDUPL, D4 EXT/ETX, D5 8-Bit) */
+#define K1520_PRINTER_SW_BLOCK_3A     11  /* PIO 3 A (Byte, Bit 1..7: Stoppbits, Paritaet, Baud; Bit 0 folgt der Schnittstelle) */
 /** Lampen (k1520_printer_lamp): 1 = leuchtet. */
 #define K1520_PRINTER_LAMP_ONLINE 0
 #define K1520_PRINTER_LAMP_FEHLER 1
+/* K6316: ONLINE = H5, FEHLER = H2, dazu TEST = H1, PAPIER = H3 (Papierende), H4 */
+#define K1520_PRINTER_LAMP_TEST   2
+#define K1520_PRINTER_LAMP_PAPIER 3
+#define K1520_PRINTER_LAMP_H4     4
 
 /** Blattgroesse in Pixeln: *breite fest, *hoehe waechst.  1 = ok, 0 = kein Drucker/keine Bahn. */
 K1520_API int      k1520_printer_sheet_size(K1520Handle h, int bahn, int* breite, int* hoehe);
@@ -307,6 +333,9 @@ K1520_API int      k1520_printer_sheet_size(K1520Handle h, int bahn, int* breite
 K1520_API uint64_t k1520_printer_sheet_version(K1520Handle h, int bahn);
 /** @p n Zeilen ab @p y0 nach @p buf (@p cap Bytes); Rueckgabe = gelieferte Zeilen (0 = keine/kein Drucker). */
 K1520_API int      k1520_printer_sheet_rows(K1520Handle h, int bahn, int y0, int n, uint8_t* buf, int cap);
+/** Schnitte (K6316: Schneideinrichtung): Zeilen, in denen das Papier durchgeschnitten wurde, aufsteigend, bis @p cap
+ *  Eintraege nach @p y; Rueckgabe = Zahl aller Schnitte (0 = keine/kein Drucker). */
+K1520_API int      k1520_printer_sheet_cuts(K1520Handle h, int bahn, int* y, int cap);
 /** Blatt leeren (Bahn bleibt, Papierlage bleibt). */
 K1520_API int      k1520_printer_sheet_clear(K1520Handle h);
 /** Kopf: x in Blattpixeln (Wagenposition), y = Zeile der Nadel 1 bei der Papierlage von Bahn 0,

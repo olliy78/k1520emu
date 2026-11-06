@@ -28,7 +28,12 @@ public:
      * @param anliegend false = Kopf nicht angeschwenkt: nichts erreicht das Papier (die Punkte werden gezaehlt)
      * @return gesetzte Punkte (ausserhalb des Blatts Verworfene zaehlen nicht)
      */
-    int feuere(uint16_t muster, int x, int y_papier, int richtung, bool anliegend, Blattmodell& blatt);
+    int feuere(uint16_t muster, int x, int y_papier, int richtung, bool anliegend, Blattmodell& blatt)
+    {
+        return feuerePixel(muster, x * p_.x_je_takt, y_papier, richtung, anliegend, blatt);
+    }
+    /// Wie @ref feuere, die Wagenposition schon in Blattpixeln (Schrittmotor-Wagen: Lage zwischen den Schritten).
+    int feuerePixel(uint16_t muster, int x_pixel, int y_papier, int richtung, bool anliegend, Blattmodell& blatt);
 
     uint64_t anschlaege() const { return anschlaege_; }       ///< Aufrufe mit mindestens einer Nadel
     uint64_t punkteGesetzt() const { return gesetzt_; }

@@ -53,7 +53,7 @@ bool Nadeldruckwerk::takt(int ticks)
 
 int Nadeldruckwerk::feuere(uint16_t muster, bool kopf_anliegend)
 {
-    return kopf_.feuere(muster, wagen_->position(), papierY(0), wagen_->richtung(), kopf_anliegend, *blatt_[0]);
+    return kopf_.feuerePixel(muster, wagen_->positionPixel(p_.x_je_takt), papierY(0), wagen_->richtung(), kopf_anliegend, *blatt_[0]);
 }
 
 void Nadeldruckwerk::blattLeeren()

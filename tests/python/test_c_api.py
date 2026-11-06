@@ -447,7 +447,21 @@ def test_printer_sd1157_can_be_created_and_runs_its_rom():
     assert handle, _lib.k1520_last_init_error()
     _lib.k1520_destroy(K1520Handle(handle))
 
-    for typ, konfig, grund in ((1, None, b"K6316"), (2, None, b"K6316"), (9, None, b"Druckertyp"),
+    for typ in (1, 2):                                          # K6316: IFSS / V.24 (WP2a)
+        h6 = _lib.k1520_create_printer(typ, b"betriebsart=schneiden,dil=0x8")
+        assert h6, _lib.k1520_last_init_error()
+        try:
+            h6 = K1520Handle(h6)
+            assert _lib.k1520_machine_type(h6) == 7
+            assert _lib.k1520_printer_switch_get(h6, 5) == 1    # SW_BETRIEBSART: Schneiden
+            assert _lib.k1520_printer_switch_get(h6, 16 + 3) == 1   # SW_DIL_BASIS + (S14 - S11)
+            assert _lib.k1520_printer_switch_get(h6, 16) == 0
+            assert _lib.k1520_printer_lamp(h6, 4) == 1          # H4 BEREIT
+            assert _lib.k1520_run(h6, 200_000) > 0
+        finally:
+            _lib.k1520_destroy(h6)
+
+    for typ, konfig, grund in ((1, b"rom=original", b"Schluessel"), (9, None, b"Druckertyp"),
                                (0, b"schnittstelle=x", b"schnittstelle"), (0, b"vis=1", b"vis")):
         assert not _lib.k1520_create_printer(typ, konfig)
         assert grund in _lib.k1520_last_init_error()
