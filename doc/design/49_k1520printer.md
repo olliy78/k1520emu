@@ -1,6 +1,6 @@
 # Entwurf 49 — Druckeremulator `k1520printer` (Ticket #28)
 
-Stand 2026-11-06, **WP0a/WP0b, WP1, WP3, WP2b, WP4/WP6b-Text, WP5, WP2a und WP6a erledigt (siehe §5a–§5e)**, Rest Planung.  Zweig `feature/issue-28-k1520printer`.
+Stand 2026-11-06, **WP0a/WP0b, WP1, WP3, WP2b, WP4/WP6b-Text, WP5, WP2a, WP6a und WP7 erledigt (siehe §5a–§5f)**; die zweite Bahn (267) entfällt (§10).  Zweig `feature/issue-28-k1520printer`.
 Nummer 49, weil 48 für BS600 vorgemerkt ist (noch in keinem Zweig).
 
 ## 1  Auftrag (Ticket #28) und Festlegung des Anwenders
@@ -176,12 +176,12 @@ Je AP: Doku + Test + Commit, **nicht pushen**.  Reihenfolge: WP0a ‖ WP0b → W
 | **WP1** | Gerüst: `PrinterMachine`, Kennung 7, `k1520_create_printer`, `boot_trace`/`k1520dbg --machine sd1157|k6316`, leeres Druckwerk | WP0 | ROM läuft an, Debugger zeigt CPU/Speicher/E/A |
 | **WP3** ✔ | `Druckwerk`, `Nadeldruckwerk`, Blattmodell, Papierweg (Bahnen, Schnitt), C-ABI `k1520_printer_*` | WP1 | Unit-Tests `Druckwerk.*`: Phasen → Position, Punktlage vor/zurück, Blattgrenzen (§5b: ohne `SchrittWagen`/Schnitt/zweite Bahn im Druck) |
 | **WP2b** ✔ | `Sd1157Steuerung`: E/A nach WP0b, Bedienfeld, Sensoren | WP1, WP3 | Firmware erreicht Grundstellung (Wagen am Rand, Online-Lampe) — **und druckt den Selbsttest** (§5b) |
-| **WP6b** | SD 1157 druckt: Selbsttest (TEST-Taste), Text über SIO (Testfall ohne Netz), Escape-Folgen, 2 Bahnen (267) | WP2b, WP4 | Selbsttestbild + Textprobe als Wächter (Punktmuster-Prüfsumme) |
+| **WP6b** ✔ | SD 1157 druckt: Selbsttest (TEST-Taste), Text über SIO (Testfall ohne Netz), Escape-Folgen; ~~2 Bahnen (267)~~ entfällt, §10 | WP2b, WP4 | Selbsttestbild + Textprobe als Wächter (Punktmuster-Prüfsumme) |
 | **WP2a** | `K6316Steuerung` nach WP0a, Vorsteckmotor/Schneiden/Leitbleche, Betriebsartschalter, Haube/Kopfhebel | WP1, WP3 | Synchronisation läuft, H-LEDs wie Manual |
 | **WP6a** | K6316 druckt: Selbsttest (Foto als Abnahme), Lichtschrankentest, Text über IFSS und V.24, Schnitt | WP2a, WP4 | Wächter wie WP6b |
 | **WP4** | SIO beider Geräte an `SerialHub` (IFSS/V.24), Loopback-Test (Port 0) | WP2a oder b | Telnet → Firmware → Punkte (Integrationstest) |
 | **WP5** | `k1520printer`: Profil, `PrinterWindow`, `BlattWidget`, Bedienfelder, Typauswahl, PDF, System-Druck, Handbuch, Bindung | WP3 (Rest parallel) | `py_k1520printer_gui` offscreen; PDF enthält die Punkte |
-| **WP7** | Paket (Starter, `MASCHINEN`, Inno), Vorgabekonfiguration, `CLAUDE.md`-Abschnitt, Merkposten, `test-merge --alles` | alles | `py_packaging`, `py_programme`, Windows-Gegenprobe |
+| **WP7** ✔ | Paket (Starter, `MASCHINEN`, Inno), Vorgabekonfiguration, `CLAUDE.md`-Abschnitt, Merkposten, `test-merge --alles` | alles | `py_packaging`, `py_programme`, Windows-Gegenprobe |
 | WP8 | (später) K6313 auf K6316-Basis, sobald der Abzug da ist; SD 1152/257 Typenrad als zweite `Druckwerk`-Implementierung | Abzug | — |
 
 ### 5a  Stand WP1 (2026-11-05)
@@ -220,7 +220,7 @@ Formularvorschub am Ende = Formularlänge (192/288/576), kein Punkt außerhalb. 
 3. **/VK deckt den /LR-Bereich ab** (`vk_bis ≥ lr_bis`; WP0b hatte ≤ 10 angenommen).  Sonst bleiben Startlagen im Randbereich (auch „Wagen steht nach /RESET links“) am Anschlag hängen.
 4. **Die 56 Papierschritte sind Firmware**: 24 vor, Rückzug 24 + 4 zurück (`add a,4` bei m24dd), 4 vor; Nettolage 0.
 
-**Offen.**  Zweite Bahn im Druck (Punkte gehen immer auf Bahn 0, `Nadeldruckwerk::feuere`), `SchrittWagen`, Schnitt/Blattgrenzen, Textprobe über die SIO (WP4/WP6b), die offenen `[?]` aus
+**Offen.**  [Zweite Bahn entfällt, §10.]  `SchrittWagen`, Schnitt/Blattgrenzen, Textprobe über die SIO (WP4/WP6b), die offenen `[?]` aus
 hardware.md §14 (Takte je Zoll, Nadelteilung, Punktmaß, Flugzeit absolut).  Die Online-Lampe und das Flag `off` der Firmware folgen der Taste ONLINE nur beim Anlauf (Merkposten).
 
 ### 5c  Stand WP4 / WP6b Text (2026-11-05)
@@ -229,7 +229,7 @@ Gebaut: `Sd1157Steuerung::Anschluss` je SIO-Kanal (IFSS = B, V.24 = A), `Printer
 gemeinsames Druckbild-Orakel `tests/support/sd1157_orakel.h`.  **ROM:** der Abzug leert den Eingabepuffer nie (Byte 0D34H, Hypothese Bitkipp 0BH → 2BH); `doc/EPROMS/SD1157/1157_repariert.rom` ist Vorgabe
 (`Config::rom_repariert`, `rom=original|repariert`), der Abzug bleibt unverändert (Merkposten 17).  **Wächter:** `Sd1157Text.*` (Orakel: kurzer Text, mehrere Zeilen in beiden Richtungen, TAB, FF, > 132 Spalten,
 Breit/Schräg/Normal, 8 lpi, ungültige ESC, DA/DSR, Papierende, offline im Auftrag), `Sd1157Fluss.*` (DC1/DC3 am IFSS und V.24), `Sd1157Telnet.*` (Loopback, Port 0), `Sd1157Seriell.*`, `Sd1157Online.*`,
-`Sd1157Selbsttest.FgdiFolgt…` (Flugzeit: Emulator richtungssymmetrisch, Merkposten 4).  **Offen / [?]:** Doppelbahn im Druck (WP6b, `Nadeldruckwerk::feuere` nur Bahn 0), HPA/VPA-Spaltenzählung, Zeichen 80H–FFH, ROM-Bestätigung 0D34H am Original-EPROM.
+`Sd1157Selbsttest.FgdiFolgt…` (Flugzeit: Emulator richtungssymmetrisch, Merkposten 4).  **Offen / [?]:** [Doppelbahn entfällt, §10;] HPA/VPA-Spaltenzählung, Zeichen 80H–FFH, ROM-Bestätigung 0D34H am Original-EPROM.
 
 ### 5d  Stand WP5 — Oberfläche `k1520printer` (2026-11-06)
 
@@ -260,7 +260,7 @@ Vorgabe `data/default_config_printer.yaml` (IFSS lauscht als Telnet-Server auf 5
 
 **[Überholt durch §5e/Merkposten Nr. 27 — Formularlänge und Schalterblöcke sind seither über die ABI erreichbar.]  Nicht über die C-ABI erreichbar (damals):** Formularlängen und Schalterblock-Einzelschalter (BCH.2–7, PIO 3 A) — nur `schnittstelle`/`rom` gehen
 beim Anlegen als Konfigurationstext; die Baudrate bestimmt der Gast (CTC 0).  Die Seitenlänge für PDF/Druck ist deshalb eine Oberflächeneinstellung; der Formularvorschub
-der Firmware fährt 12 Zoll (Vorgabe des Kerns).  Zweite Bahn, K6316, Doppelbahn im Druck: weiter WP2a/WP6b.
+der Firmware fährt 12 Zoll (Vorgabe des Kerns).  Zweite Bahn und Doppelbahn im Druck: entfallen (§10); K6316: WP2a (§5e).
 
 ### 5e  Stand WP2a / WP6a — K6316 (2026-11-06)
 
@@ -278,6 +278,16 @@ aus `hardware.md` §8 sind beantwortet (§9 dort), einschließlich zweier **Beri
 
 **Offen.**  Breit-/Schrägschrift und Unterlängen im Orakel (Merkposten Nr. 22), Hex-/Lichtschranken-/Vorstecktest nur als Eingabe vorhanden (nicht geprüft), Vorsteckbeleg als eigenes Blatt (der Vorsteckmotor
 ist ein Zähler ohne Blatt), K6313 (kein Abzug).
+
+### 5f  Stand WP7 — Paket und Werkzeugmenü (2026-11-06)
+
+**Paket.**  `k1520printer` ist wie Kermit/DiskTool ein eigener Starter in derselben Installation, aber ohne eigene Bibliothek (er nutzt `libk1520core`, `K1520_MACHINE_PRINTER = 7`) und ohne
+Kommandozeile: Vorlagen `printer_launcher.sh/.cmd` (nicht `launcher.*`: das wählt ein Maschinenprofil), `k1520printer.desktop.in`, Eintrag in `WERKZEUGE` (`install.sh`), Startmenü-Eintrag im `.iss`,
+`default_config_printer.yaml` nach `share/k1520emu/`, `app/printertool/` samt Handbuch.  `slim.py` behält nun auch das Qt-Plugin-Verzeichnis **`printsupport/`** (CUPS bzw. Windows-Druckdienst) —
+ohne das hätte `QPrintDialog` im Paket keinen Drucker.  Rauchtests (install.sh, .iss, beide `release.yml`-Jobs): `k1520_create(7)`; install.sh/.iss bauen zusätzlich das `PrinterWindow`
+(Konfiguration im Wegwerfordner).  **Werkzeugmenü:** Emulatoren und DiskTool haben *K1520 Printer starten* (ohne Kürzel, `programme.PRINTER`); K1520 Kermit und K1520 Printer selbst haben
+kein Werkzeugmenü (das Muster sieht es dort nicht vor).  Handbücher: Emulator („Einen Drucker anschließen“: Schnittstelle als Telnet-Client auf `127.0.0.1:5000`), DiskTool.
+Wächter: `test_der_drucker_ist_in_allen_paketwegen` u. a. in `py_packaging`/`py_programme`.
 
 ## 6  Tests und Wächter
 
@@ -321,7 +331,7 @@ Parallel gefahrlos: WP0a ‖ WP0b (nur Lesen/Doku).  Bauende Agenten nacheinande
 ## 9  Offene Fragen an den Anwender
 
 Entschieden 2026-11-05: **SD 1157 zuerst** lauffähig, K6316 danach; K6316 mit **beiden Firmwaresätzen** (IFSS und V.24) als Typen;
-**SD 1157/264 zuerst**, 267 mit zwei Bahnen in WP6b.
+**SD 1157/264 zuerst**, 267 mit zwei Bahnen in WP6b — **überholt 2026-11-06: 267 entfällt (§10).**
 
 * **F4**  Summer/Geräusche: nur Anzeige oder Ton?  Empfehlung: abschaltbar, Standard aus.
 * **F6**  SD 1157: Kennung 4/5/6 aus EBD/BDA; 4 = 264 und 6 = 267 plausibel, 5 ungeklärt.  Offene Punkte mit Prüfkriterium: `sd1157/hardware.md` §14.
@@ -330,3 +340,7 @@ Entschieden 2026-11-05: **SD 1157 zuerst** lauffähig, K6316 danach; K6316 mit *
 ## 10  Nicht im Umfang
 
 Centronics/IFSP-Module, Farbdruck, SD 1157/269 (Grafik), Netzwerkdruckprotokolle (LPD/IPP), virtueller CUPS-Drucker des Wirtssystems.
+
+**SD 1157/267 mit zweiter Papierbahn (Festlegung des Anwenders, 2026-11-06):** wird nicht umgesetzt — sehr selten verwendetes Merkmal.  Der Typ bleibt in der Oberfläche sichtbar gesperrt
+(`typen.GESPERRT`, „nicht vorgesehen"), PV2 ohne Wirkung.  Was der Kern dafür schon trägt (Papierweg mit Bahnindex, Formularlänge 2, `SW_FORMULAR2`) bleibt, wird aber nicht weiterverfolgt
+und nicht ausgebaut; insbesondere schreibt `Nadeldruckwerk::feuere` weiter nur auf Bahn 0.

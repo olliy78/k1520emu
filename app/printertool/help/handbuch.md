@@ -18,7 +18,7 @@ Das Blatt lässt sich mit dem Mausrad rollen (das beendet *Blatt folgen*) und mi
 | **Netz** | Netzschalter.  *Aus*: der Drucker steht, alle Lampen sind dunkel, das Blatt bleibt.  *Ein*: Neustart (/RESET). |
 | **ONLINE** | Online/Offline (rastend).  Offline druckt der Drucker nicht und nimmt PV1, PV2 und TEST an. |
 | **PV1** | Papiervorschub: kurz = eine Zeile, gehalten (ab etwa 0,85 s) = Formularvorschub.  Nur offline. |
-| **PV2** | Papiervorschub der zweiten Bahn.  Der SD 1157/264 hat nur eine Bahn. |
+| **PV2** | Papiervorschub der zweiten Bahn.  Ohne Wirkung: der SD 1157/264 hat nur eine Bahn, und die zweite Bahn des Typs /267 wird nicht nachgebildet. |
 | **TEST** | Selbsttest: Titelzeile und zwei Zeilen Zeichensatz.  Siehe unten: wirkt nur nach einem Offline-Einschalten. |
 | **Kopf an** | Druckkopf dauernd angeschwenkt (sonst nur während des Drucks). |
 | **6 lpi** | Zeilenabstand 6 oder 8 Zeilen je Zoll; wirkt nach dem nächsten Neustart. |
@@ -32,7 +32,7 @@ Das ist das Verhalten der Original-Firmware, kein Fehler des Emulators.  Die Fir
 
 ## Einstellungen
 
-* **Druckertyp.**  Wählbar ist der SD 1157/264.  Grau und nicht wählbar sind die Typen, die noch fehlen: SD 1157/267 (die zweite Bahn folgt), K6316 (IFSS und V.24, in Arbeit), K6313 (kein EPROM-Abzug vorhanden), SD 1152/257 Typenrad (in Vorbereitung).  Ein Wechsel legt den Drucker neu an (Rückfrage); das Blatt wird dabei geleert.
+* **Druckertyp.**  Wählbar sind SD 1157/264 sowie K6316 (IFSS und V.24).  Grau und nicht wählbar sind: SD 1157/267 (nicht vorgesehen, die zweite Papierbahn wird nicht nachgebildet), K6313 (kein EPROM-Abzug vorhanden), SD 1152/257 Typenrad (in Vorbereitung).  Ein Wechsel legt den Drucker neu an (Rückfrage); das Blatt wird dabei geleert.
 * **ROM-Fassung.**  *repariert* ist die Vorgabe.  Im Original-Abzug des SD-1157-EPROMs ist vermutlich ein Bit gekippt (Byte 0D34H): der Eingabepuffer leert sich nie, und über die Schnittstelle bleibt der Drucker nach dem ersten Zeichen stehen.  Die reparierte Fassung ändert nur dieses eine Byte.  *Original-Abzug* ist der unveränderte Abzug (der Selbsttest läuft damit).
 * **Schnittstelle.**  Der Schalterblock des Druckers wählt, ob die Firmware die Schnittstelle *IFSS* oder *V.24* benutzt.  Ein Wechsel startet den Drucker neu.
 * **Tempo.**  Rechengeschwindigkeit gegenüber dem echten Drucker.

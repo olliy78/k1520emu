@@ -159,6 +159,10 @@ Neben Emulator und DiskTool liefert das Paket den **Debugger `k1520dbg`** aus, d
   `test_kermit_findet_seine_bibliothek_im_installationslayout`,
   `test_die_wega_platte_mit_kermit_benutzer_liegt_im_paket`.
 
+**K1520 Printer (WP7 des Druckers, 2026-11-06):** wie Kermit, aber **ohne eigene Bibliothek und ohne `-cli`** — `bin/k1520printer` ist nur der Starter (`printer_launcher.*`, `WERKZEUGE`,
+`k1520printer.desktop.in`), `default_config_printer.yaml` steht in der Vorgabenliste von `build_payload.sh`, und **`slim.py` behält das Qt-Plugin `printsupport/`** (sonst kein Systemdruck).
+Rauchtests erzeugen `k1520_create(7)` und (install.sh/.iss) das `PrinterWindow`.  Wächter `test_der_drucker_ist_in_allen_paketwegen`.
+
 Tests: `py_paths` + `py_packaging` (schnell, ohne Netz, in der Standardregression). Der
 vollständige Installationslauf (lädt ~120 MB) liegt hinter
 `K1520_PACKAGING_FULL=1 venv/bin/python3 -m pytest tests/python/test_packaging.py`.

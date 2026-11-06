@@ -235,6 +235,7 @@ Source: "{#Paket}\requirements.lock";      Flags: dontcopy
 Source: "{#Paket}\launcher.cmd";           Flags: dontcopy
 Source: "{#Paket}\disktool_launcher.cmd";  Flags: dontcopy
 Source: "{#Paket}\kermit_launcher.cmd";    Flags: dontcopy
+Source: "{#Paket}\printer_launcher.cmd";   Flags: dontcopy
 ; Die Eingabeaufforderung fuer die Konsolenwerkzeuge (Debugger,
 ; k1520disktool-cli).  Wie die uebrigen Starter eine VORLAGE — der
 ; Installationsordner wird beim Einrichten eingetragen.
@@ -280,6 +281,9 @@ Name: "{group}\k1520DiskTool"; Filename: "{app}\venv\Scripts\pythonw.exe"; \
   IconFilename: "{app}\share\icons\a5120emu.ico"
 Name: "{group}\K1520 Kermit"; Filename: "{app}\venv\Scripts\pythonw.exe"; \
   Parameters: """{app}\app\kermittool\main.py"""; WorkingDir: "{app}"; Comment: "Dateiaustausch mit der WEGA (P8000) ueber Kermit"; \
+  IconFilename: "{app}\share\icons\a5120emu.ico"
+Name: "{group}\K1520 Printer"; Filename: "{app}\venv\Scripts\pythonw.exe"; \
+  Parameters: """{app}\app\printertool\main.py"""; WorkingDir: "{app}"; Comment: "Nadeldrucker SD 1157 und K6316 nachbilden"; \
   IconFilename: "{app}\share\icons\a5120emu.ico"
 ; Die Werkzeug-Eingabeaufforderung — NICHT der Debugger.  Der Unterschied ist
 ; der Grund, warum dieser Eintrag den Zuschnitt aus §10a.2 nicht bricht: ein
@@ -694,6 +698,7 @@ begin
   ExtractTemporaryFile('launcher.cmd');
   ExtractTemporaryFile('disktool_launcher.cmd');
   ExtractTemporaryFile('kermit_launcher.cmd');
+  ExtractTemporaryFile('printer_launcher.cmd');
   CreateDir(ExpandConstant('{app}\bin'));
   VorlageSchreiben(ExpandConstant('{tmp}\launcher.cmd'),
                    ExpandConstant('{app}\bin\a5120emu.cmd'));
@@ -718,6 +723,9 @@ begin
     bin\k1520kermit-cli.exe in der Payload). }
   VorlageSchreiben(ExpandConstant('{tmp}\kermit_launcher.cmd'),
                    ExpandConstant('{app}\bin\k1520kermit.cmd'));
+  { K1520 Printer: eigene Vorlage, nutzt k1520core.dll (keine Kommandozeile). }
+  VorlageSchreiben(ExpandConstant('{tmp}\printer_launcher.cmd'),
+                   ExpandConstant('{app}\bin\k1520printer.cmd'));
 
   { Der Debugger bekommt KEIN Symbol und keinen Doppelklick-Starter: er ist
     kein Programm, das man oeffnet und wieder schliesst, sondern eines, das
@@ -759,7 +767,7 @@ begin
   Daten := AbweichenderDatenOrdner;
   StringChangeEx(Daten, '\', '\\', True);
 
-  SetArrayLength(Zeilen, 47);
+  SetArrayLength(Zeilen, 51);
   Zeilen[0]  := 'import ctypes, os, sys';
   Zeilen[1]  := 'os.environ["QT_QPA_PLATFORM"] = "offscreen"';
   Zeilen[2]  := 'sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))';
@@ -795,11 +803,11 @@ begin
   Zeilen[24] := 'lib.k1520_create.argtypes = [ctypes.c_int]';
   Zeilen[25] := 'lib.k1520_create.restype = ctypes.c_void_p';
   Zeilen[26] := 'lib.k1520_destroy.argtypes = [ctypes.c_void_p]';
-  Zeilen[27] := 'for nr, name in ((0, "A5120"), (1, "PRG710"), (2, "K8915"), (3, "PC1715"), (4, "P8000"), (5, "P8000-Terminal"), (6, "MC80")):';
+  Zeilen[27] := 'for nr, name in ((0, "A5120"), (1, "PRG710"), (2, "K8915"), (3, "PC1715"), (4, "P8000"), (5, "P8000-Terminal"), (6, "MC80"), (7, "Drucker")):';
   Zeilen[28] := '    h = lib.k1520_create(nr)';
   Zeilen[29] := '    if not h: sys.exit(name + ": k1520_create schlug fehl")';
   Zeilen[30] := '    lib.k1520_destroy(h)';
-  Zeilen[31] := 'print("Maschinen:  A5120, PRG710, K8915, PC1715, P8000, P8000-Terminal, MC80")';
+  Zeilen[31] := 'print("Maschinen:  A5120, PRG710, K8915, PC1715, P8000, P8000-Terminal, MC80, Drucker")';
   Zeilen[32] := 'from app import profil';
   Zeilen[33] := 'MainWindow(profil=profil.profil("k8915")).close()';
   Zeilen[34] := 'print("Oberflaeche K8915: baut auf")';
@@ -815,7 +823,12 @@ begin
   Zeilen[43] := 'klib = ctypes.CDLL(str(paths.kermit_library()))';
   Zeilen[44] := 'klib.k1520k_version.restype = ctypes.c_char_p';
   Zeilen[45] := 'print("Kermit:     ", klib.k1520k_version().decode())';
-  Zeilen[46] := 'sys.stdout.flush()';
+  { K1520 Printer: Fenster samt Qt-Druckunterstuetzung, Konfiguration in einem Wegwerfordner. }
+  Zeilen[46] := 'import os, tempfile';
+  Zeilen[47] := 'from app.printertool.fenster import PrinterWindow';
+  Zeilen[48] := 'PrinterWindow(konfig_daten={}, konfig_pfad=os.path.join(tempfile.mkdtemp(), "p.yaml"), autostart=False).close()';
+  Zeilen[49] := 'print("Oberflaeche Printer: baut auf")';
+  Zeilen[50] := 'sys.stdout.flush()';
 
   Datei := ExpandConstant('{app}\.rauchtest.py');
   if not SaveStringsToFile(Datei, Zeilen, False) then

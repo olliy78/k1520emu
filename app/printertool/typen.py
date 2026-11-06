@@ -74,7 +74,7 @@ SD1157_264 = Typbeschreibung(
         Taste("pv1", "PV1", "Papiervorschub: kurz = eine Zeile, lange gehalten (ab etwa 0,85 s) = "
                             "Formularvorschub.  Nur offline wirksam.", "taster", 1),
         Taste("pv2", "PV2", "Papiervorschub Bahn 2.  Der SD 1157/264 hat nur eine Bahn; die Taste "
-                            "gehört zum Zweibahntyp /267.", "taster", 2),
+                            "ohne Wirkung (die zweite Bahn des Typs /267 wird nicht nachgebildet).", "taster", 2),
         Taste("test", "TEST", "Selbsttest.  Wirkt nur im Offline-Zustand, der beim Einschalten bestand "
                               "(ONLINE aus, dann Neustart) - Gastverhalten der Firmware, kein Emulatorfehler.",
               "taster", 3),
@@ -160,7 +160,7 @@ TYPEN = (SD1157_264, K6316_IFSS, K6316_V24)
 
 #: Typen, die der Entwurf kennt, der Kern aber noch nicht faehrt: (Schluessel, Anzeige, Begruendung).
 GESPERRT = (
-    ("sd1157-267", "SD 1157/267", "Die zweite Bahn (Zweibahndrucker) folgt."),
+    ("sd1157-267", "SD 1157/267", "Nicht vorgesehen (zweite Papierbahn wird nicht nachgebildet)."),
     ("k6313", "K6313", "Für den K6313 liegt kein EPROM-Abzug vor."),
     ("sd1152-257", "SD 1152/257 (Typenrad)", "In Vorbereitung."),
 )

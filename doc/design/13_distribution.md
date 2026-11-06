@@ -1004,3 +1004,10 @@ mit eigenem Starter und Startmenü-Eintrag.  Verdrahtet:
   nachinstalliert oder nur warnt.
 - **Proxy-Umgebungen**: `uv` respektiert `HTTPS_PROXY`; ob der Installer danach fragt, wenn
   der Download scheitert.
+
+## 10d. K1520 Printer im Paket (WP7 des Druckers, 2026-11-06)
+
+Der Drucker-Emulator (`doc/design/49_k1520printer.md` §5f) kommt als Starter `bin/k1520printer` (Windows `bin\k1520printer.cmd`) in dieselbe Installation.  Anders als Kermit hat er **keine eigene
+Bibliothek und keine Kommandozeile** (Kern `libk1520core`, Maschinenart 7).  Bausteine: `printer_launcher.sh/.cmd`, `k1520printer.desktop.in`, Eintrag in `WERKZEUGE`, `{group}\K1520 Printer` im
+`.iss`, `data/default_config_printer.yaml` → `share/k1520emu/`, `printsupport/` in `slim.py::PLUGINS_KEEP`.  Rauchtests: `k1520_create(7)`, `PrinterWindow` (Wegwerf-Konfiguration).
+

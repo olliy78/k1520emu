@@ -227,7 +227,7 @@ def test_typauswahl_sperrt_alle_unfertigen_typen(fenster, monkeypatch):
     emu = fenster.emu
     e.typ.setCurrentIndex(e.typ.findData("k6313"))
     assert fenster.emu is emu and e.typ.currentData() == "sd1157"
-    assert "EPROM" in e.sperrgrund("k6313") and "zweite Bahn" in e.sperrgrund("sd1157-267")
+    assert "EPROM" in e.sperrgrund("k6313") and "Nicht vorgesehen" in e.sperrgrund("sd1157-267")
 
 
 def test_rom_und_schnittstellenwechsel_legen_neu_an_nach_rueckfrage(fenster, monkeypatch):

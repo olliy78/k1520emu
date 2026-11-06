@@ -57,7 +57,7 @@ Stand 2026-11-06 (WP3/WP2b, WP4 Anschluss, Textdruck/Fluss/ROM-Reparatur, WP2a/W
     (`test_printer_sheet_keys_lamps_and_switches_through_the_c_api`).
 14. **Debugger:** `k1520dbg --machine sd1157`, Befehl `blatt [info | x0 y0 [breite hoehe [sx sy]]]` zeigt einen Ausschnitt als ASCII (`#` = Punkt, Pixel; `sx`/`sy` Pixel je Zeichen) —
     dieselbe Hilfsfunktion `blattAscii` liefert den Abzug in der Fehlermeldung der Druckertests.
-15. **Offen:** zweite Bahn im Druck (`Nadeldruckwerk::feuere` schreibt nur auf Bahn 0; WP6b), `SchrittWagen`/Schnitt/Blattgrenzen (WP2a, K6316), Text-Druck über die SIO (Nr. 16), absolute `[?]` (Takte je
+15. **Offen:** [zweite Bahn entfällt, Entwurf 49 §10; `Nadeldruckwerk::feuere` schreibt bewusst nur auf Bahn 0], `SchrittWagen`/Schnitt/Blattgrenzen (WP2a, K6316), Text-Druck über die SIO (Nr. 16), absolute `[?]` (Takte je
     Zoll, Nadelteilung, Punktmaß, Flugzeit absolut), Papierende-Lampe (es gibt keinen Ausgang).
 16. **SIO-Anschluss (WP4):** `Sd1157Steuerung::anschluss()` liefert je Kanal einen `SerialAnschluss` (B = „IFSS", A = „V.24"; Hub-Index 0 = IFSS, 1 = V.24; `PrinterMachine::serialHub()`,
     C-ABI `k1520_serial_*`, alter Unterbau DFU = V.24, PRINTER = IFSS).  Ohne Hub (Karte allein) leert eine Senke den Sender.  **Am V.24 gibt die Karte das DC1 nach dem Einschalten erst frei, wenn ein Transport
@@ -74,7 +74,7 @@ Stand 2026-11-06 (WP3/WP2b, WP4 Anschluss, Textdruck/Fluss/ROM-Reparatur, WP2a/W
     **DC1 erst bei leerem Puffer und fertigem Druck**; Host ohne Flusssteuerung verliert hinter ~1 KiB (Gastverhalten).  V.24: zusätzlich DC1 je geholtem Zeichen.  Offline im Betrieb: Druck läuft
     weiter, **DC1 erst wieder online**.  Papierende im Auftrag: alle Zeilen werden gedruckt, `ESC [ 5 n` → `ESC [ 2 n`.  `ESC [ 0 c` → `ESC [ 4 c`.  Test-Hosts mit Flusssteuerung brauchen eine
     **dünne Leitung** (höchstens 2 Zeichen unterwegs): der Rückstaupuffer des Wandlers wäre sonst ein Puffer, den es an der Leitung nicht gibt.  Der Test wartet auf „Puffer leer", nicht auf „kein neuer
-    Punkt" (das ROM holt 1 Zeichen in ~21 000 Takten).  **Offen [?]:** Doppelbahn im Druck (WP6b), HPA/VPA-Spaltenzählung, Zeichen 80H–FFH.
+    Punkt" (das ROM holt 1 Zeichen in ~21 000 Takten).  **Offen [?]:** [Doppelbahn entfällt, Entwurf 49 §10] HPA/VPA-Spaltenzählung, Zeichen 80H–FFH.
 19. **Oberfläche `k1520printer` (WP5, `app/printertool/`, Entwurf 49 §5d, Wächter `py_k1520printer_gui`).**  Eigenes Paket, nicht `main_window.py` (Entscheidung §5d); Bausteine ja,
     Zerlegen nein.  **(a) Das Blatt-Widget holt nicht das ganze Blatt**, sondern ab `min(Kopfzeile vorher, jetzt) − 48` (`ZEILEN_VORLAUF`): der Kern liefert nur einen Versionszähler, Punkte
     entstehen nur bei den Nadeln.  Wer die Papierbewegung ändert (Rückzug größer als 48 Zeilen zwischen zwei Abfragen), muss den Vorlauf mitziehen; der Wächter vergleicht die Kopie
@@ -82,7 +82,7 @@ Stand 2026-11-06 (WP3/WP2b, WP4 Anschluss, Textdruck/Fluss/ROM-Reparatur, WP2a/W
     (Nr. 10) steht sichtbar in der Oberfläche** (Dauerhinweis + Warnzeile mit „Neustart jetzt“), nicht wegerklärt; ONLINE ist rastend.  **(d) Netz aus** hält den Takt an, die Maschine
     bleibt bestehen, Netz ein ist ein `/RESET` (Blatt bleibt).  **(e) Punkte im PDF/Druck:** Pixelfolgen werden in Punkte zu 2 Pixeln zerlegt, Kreisdurchmesser 1,25 × Breite — Darstellung
     (`ausgabe.PUNKT_*`), kein Mechanikmaß `[?]`; der Wächter rechnet das PDF zurück in ein Bild und prüft jeden Punkt.  **(f)** [überholt durch Nr. 27: die Formularlänge geht jetzt über `SW_FORMULAR1` an den Kern] Seitenlänge (4/6/8/12") ist Oberflächeneinstellung; die
-    Formularlänge der Firmware (BCH.5..4) ist über die ABI nicht erreichbar (Vorgabe 12").  **(g)** Gesperrte Typen: `typen.GESPERRT` (/267, K6313, SD 1152/257; K6316 seit WP2a freigeschaltet); wer
+    Formularlänge der Firmware (BCH.5..4) ist über die ABI nicht erreichbar (Vorgabe 12").  **(g)** Gesperrte Typen: `typen.GESPERRT` (/267 — nicht vorgesehen, Entwurf 49 §10 —, K6313, SD 1152/257; K6316 seit WP2a freigeschaltet); wer
     einen Typ freischaltet, verschiebt ihn nach `typen.TYPEN` mit eigener `Typbeschreibung`.  **(h)** Der Test fährt den Kern selbst (`autostart=False`, `lauf`), die Auslieferungsvorgabe
     startet einen Server auf Port 5000 — Tests übergeben `konfig_daten={}`.
 
@@ -110,3 +110,8 @@ Stand 2026-11-06 (WP3/WP2b, WP4 Anschluss, Textdruck/Fluss/ROM-Reparatur, WP2a/W
     `TEST` 2, `PAPIER` 3, `H4` 4, Konfigurationsschlüssel `betriebsart=`, `dil=`; `k1520_printer_sheet_cuts`.  **SD 1157 (Merkposten Nr. 19 geschlossen):** `SW_FORMULAR1/2` (8/9, Code 0–3 = 4/6/8/12″), `SW_BLOCK_6F` (10), `SW_BLOCK_3A` (11);
     die Firmware liest sie bei Bedarf, die Oberfläche setzt die Formularlänge bei jeder Änderung.  Wächter `py_c_api`, `py_k1520printer_gui`.
 28. **Debugger:** `k1520dbg`/`boot_trace --machine k6316|k6316-v24` (`blatt`, `dev`, `map`, `state`, `summary`).  Standard-Grenzen für `boot_trace`: 90 Mio. Takte, Stillstand 20 Mio. (die Motorphasen wiederholen sich).
+29. **Paket und Werkzeugmenü (WP7, Entwurf 49 §5f).**  `k1520printer` = eigener Starter (`printer_launcher.*`, `WERKZEUGE` in `install.sh`, `k1520printer.desktop.in`, `.iss`-Eintrag), **keine eigene Bibliothek und
+    keine Kommandozeile** (Kern = `libk1520core`).  `slim.py` muss `printsupport/` in `PLUGINS_KEEP` behalten, sonst zeigt `QPrintDialog` im Paket keine Drucker.  Die Vorgabedatei
+    `default_config_printer.yaml` gehört in die Liste von `build_payload.sh`.  *K1520 Printer starten* steht im Werkzeugmenü von Emulatoren und DiskTool, **ohne Kürzel** (Kürzeltabelle = Vertrag).
+    **SD 1157/267 (zweite Bahn) ist gestrichen** (Anwender 2026-11-06, Entwurf 49 §10): sichtbar gesperrt, nicht nachziehen.  Wächter `py_packaging`, `py_programme`, `py_k1520printer_gui`.
+

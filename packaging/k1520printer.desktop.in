@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=K1520 Printer
+GenericName=Nadeldrucker-Emulator
+Comment=Nadeldrucker SD 1157 und K6316 nachbilden: Original-Firmware, Blatt als PDF oder System-Druck (Telnet, RFC 2217)
+Comment[en]=Emulate the SD 1157 and K6316 dot-matrix printers: original firmware, sheet as PDF or system print (Telnet, RFC 2217)
+Exec="@ROOT@/bin/k1520printer"
+Icon=a5120emu
+Terminal=false
+Categories=System;Utility;
+Keywords=K1520;SD1157;K6316;Drucker;robotron;Nadeldrucker;Telnet;
+StartupNotify=true
+StartupWMClass=main.py

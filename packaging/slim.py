@@ -42,7 +42,7 @@ from pathlib import Path
 #: PySide6-Bindungen, die `app/` importiert (siehe `rg "PySide6\.[A-Za-z]+" app/`).
 BINDINGS_KEEP = {
     "QtCore", "QtGui", "QtWidgets", "QtOpenGL", "QtOpenGLWidgets",
-    # k1520printer (Entwurf 49 WP5): System-Druck.  Das Plugin-Verzeichnis printsupport/ prueft WP7 (Paketierung).
+    # k1520printer (Entwurf 49 WP5): System-Druck.  Das Plugin-Verzeichnis printsupport/ steht in PLUGINS_KEEP.
     "QtPrintSupport",
     # QtDBus/QtNetwork werden nicht importiert, aber von Plugins nachgeladen —
     # darueber entscheidet die ldd-Huelle, nicht diese Liste.
@@ -59,6 +59,8 @@ PLUGINS_KEEP = {
     # Windows: Qt fragt darueber, ob eine Netzverbindung besteht.  Winzig, und
     # ohne die Gruppe meldet Qt beim Start eine Warnung.
     "networkinformation",
+    # k1520printer: ohne dieses Plugin (CUPS bzw. Windows-Druckdienst) zeigt QPrintDialog keinen Drucker.
+    "printsupport",
 }
 
 #: Einzelne Plugins, die trotz passender Gruppe rausfliegen.  Die
