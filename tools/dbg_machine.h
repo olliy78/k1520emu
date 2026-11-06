@@ -46,7 +46,7 @@ namespace dbgm {
 using IntSource = A5120Machine::IntSource;
 
 /** @brief Maschinenwahl aus `--machine`; false bei unbekanntem Namen. */
-enum class Art { A5120, K8915, K8915G2, Prg710, Prg710_1, Pc1715, Pc1715W, P8000, P8000_16, Mc80_30, Mc80_21, Mc80_22, Sd1157 };
+enum class Art { A5120, K8915, K8915G2, Prg710, Prg710_1, Pc1715, Pc1715W, P8000, P8000_16, Mc80_30, Mc80_21, Mc80_22, Sd1157, K6316, K6316V24 };
 inline bool parseMachine(const std::string& s, Art& art) {
     if (s == "a5120" || s == "A5120")       { art = Art::A5120;    return true; }
     if (s == "k8915" || s == "K8915")       { art = Art::K8915;    return true; }
@@ -59,6 +59,8 @@ inline bool parseMachine(const std::string& s, Art& art) {
     if (s == "mc80-21" || s == "MC80.21")   { art = Art::Mc80_21;  return true; }   // AP M12
     if (s == "mc80-22" || s == "MC80.22")   { art = Art::Mc80_22;  return true; }
     if (s == "sd1157" || s == "SD1157")     { art = Art::Sd1157;   return true; }   // Drucker, Entwurf 49 WP1
+    if (s == "k6316" || s == "k6316-ifss" || s == "K6316") { art = Art::K6316; return true; }   // Drucker K6316, Modul IFSS
+    if (s == "k6316-v24")                   { art = Art::K6316V24; return true; }                 // Modul V.24
     if (s == "p8000" || s == "P8000")       { art = Art::P8000;    return true; }   // AP P12a: nur 8-Bit-Seite
     if (s == "p8000-16" || s == "P8000-16") { art = Art::P8000_16; return true; }   // mit 16-Bit-Karte + Kopplung
     return false;
@@ -311,6 +313,11 @@ public:
             m2_ = std::make_unique<Mc80_2xMachine>(c);
         }
         else if (art == Art::Sd1157) pr_ = std::make_unique<PrinterMachine>();   // WP1: SD 1157/264
+        else if (art == Art::K6316 || art == Art::K6316V24) {                      // WP2a: K6316
+            PrinterMachine::Config c;
+            c.typ = art == Art::K6316 ? PrinterMachine::Config::Typ::K6316_Ifss : PrinterMachine::Config::Typ::K6316_V24;
+            pr_ = std::make_unique<PrinterMachine>(c);
+        }
         else if (art == Art::Pc1715) pc_ = std::make_unique<Pc1715Machine>();
         else if (art == Art::Pc1715W) {   // dieselbe Klasse, Variante 1715W (AP-W3)
             Pc1715Machine::Config c;
@@ -421,7 +428,7 @@ public:
         if (p8_) return p8_->karte8().cpu();
         if (mc_) return mc_->zve().cpu();
         if (m2_) return m2_->zre().cpu();
-        if (pr_) return pr_->sd1157().cpu();
+        if (pr_) return pr_->cpu();
         return a5_->cpuDebug();
     }
     uint16_t cpuPC() { return cpuDebug().PC; }
@@ -618,6 +625,39 @@ public:
             }
             addCtc(mc_->asp().ctc(), "ASP CTC");
             addPio(mc_->asp().pio().debugState(), "ASP PIO");
+            return out;
+        }
+        if (pr_ && pr_->istK6316()) {   // K6316: CTC D5 → CTC D10 → PIO D12 → SIO (Schaltplan Blatt 03)
+            K6316Steuerung& k6 = pr_->k6316();
+            for (int i = 0; i < 2; ++i) {
+                auto cs = (i ? k6.ctc10() : k6.ctc5()).debugState();
+                for (int c = 0; c < 4; ++c) {
+                    IntSource s;
+                    s.device = std::string(i ? "CTC D10 ch" : "CTC D5 ch") + char('0' + c);
+                    s.vector = (uint8_t)(cs.vecBase | (c << 1));
+                    s.ie = cs.ch[c].intEn; s.pending = cs.ch[c].intPending;
+                    s.ius = cs.ch[c].ius; s.iei = cs.ch[c].iei; s.chain = pos++;
+                    out.push_back(std::move(s));
+                }
+            }
+            auto ps = k6.pio12().debugState();
+            for (int p = 0; p < 2; ++p) {
+                IntSource s;
+                s.device = std::string("PIO D12 ") + (p ? "B" : "A");
+                s.vector = ps.port[p].vector; s.ie = ps.port[p].ie; s.pending = ps.port[p].pending;
+                s.ius = ps.port[p].ius; s.iei = ps.port[p].iei; s.chain = pos++;
+                out.push_back(std::move(s));
+            }
+            auto ss = k6.sio().debugState();
+            for (int c = 0; c < 2; ++c) {
+                IntSource s;
+                s.device = std::string("SIO ") + (c ? "B (IFSS)" : "A (V.24)");
+                s.vector = ss.ch[1].wr2; s.exact = false;
+                s.ie = (ss.ch[c].wr1 & 0x1F) != 0;
+                s.pending = ss.ch[c].irqRx || ss.ch[c].irqTx || ss.ch[c].irqExt;
+                s.ius = ss.ch[c].ius; s.iei = ss.ch[c].iei; s.chain = pos++;
+                out.push_back(std::move(s));
+            }
             return out;
         }
         if (pr_) {   // SD 1157: CTC → PIO 2 → PIO 1 → SIO → PIO 3 [? Reihenfolge nicht belegt, hardware.md §8]

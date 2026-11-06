@@ -221,7 +221,7 @@ int main(int argc, char** argv){
     // original writable (writes persist); `--read-only`/`--ro` mounts write-protected.
     enum { MOUNT_COW=0, MOUNT_RW=1, MOUNT_RO=2 } mount_mode = MOUNT_COW;
     bool start_console = false;   // --console: sofort in den Konsolenmodus (§9)
-    dbgm::Art art = dbgm::Art::A5120;   // --machine a5120|k8915|k8915-g2|prg710|prg710-1|pc1715|pc1715w|p8000|p8000-16|mc80[-30|-31|-21|-22]|sd1157 (Vorgabe a5120)
+    dbgm::Art art = dbgm::Art::A5120;   // --machine a5120|k8915|k8915-g2|prg710|prg710-1|pc1715|pc1715w|p8000|p8000-16|mc80[-30|-31|-21|-22]|sd1157|k6316|k6316-v24 (Vorgabe a5120)
     int mc80_spe = 1;             // --spe 1|2: Zahl der SPE 2 am MC80 (AP M8)
     bool skip_selftest = false;   // --skip-selftest: K8915 ohne ROM-Selbsttest (wie ein Warmstart)
     const char* em_opt = nullptr; // --em none|em064|em256: A5120.16 mit Erweiterungsmodul
@@ -257,7 +257,7 @@ int main(int argc, char** argv){
     for (int i=1;i<argc;++i){
         if (!strcmp(argv[i],"--machine") && i+1<argc){
             if (!dbgm::parseMachine(argv[++i], art)){
-                fprintf(stderr,"unbekannte Maschine '%s' (a5120 | k8915 | k8915-g2 | prg710 | prg710-1 | pc1715 | pc1715w | p8000 | p8000-16 | mc80 | mc80-30 | mc80-21 | mc80-22 | sd1157)\n",argv[i]); return 2; } }
+                fprintf(stderr,"unbekannte Maschine '%s' (a5120 | k8915 | k8915-g2 | prg710 | prg710-1 | pc1715 | pc1715w | p8000 | p8000-16 | mc80 | mc80-30 | mc80-21 | mc80-22 | sd1157 | k6316 | k6316-v24)\n",argv[i]); return 2; } }
         else if (!strcmp(argv[i],"--spe") && i+1<argc){ mc80_spe=atoi(argv[++i]);
             if (mc80_spe<1 || mc80_spe>2){ fprintf(stderr,"--spe: 1 oder 2\n"); return 2; } }
         else if (!strcmp(argv[i],"--skip-selftest")) skip_selftest=true;
@@ -1591,6 +1591,12 @@ int main(int argc, char** argv){
                 rcpfx(), rc(m.cpuCycles()), rel_armed?" (rel)":"");
             return;
         }
+        if (KS && m.printer()->istK6316()){   // K6316: Lampen H1..H5, Wagen, Papier
+            K6316Steuerung& k=m.printer()->k6316();
+            fprintf(stderr,"  state: H1..H5=%d%d%d%d%d wagen=%d papier=%d schnitte=%d  %c-cyc=%lld%s\n", k.lampe(1),k.lampe(2),k.lampe(3),k.lampe(4),k.lampe(5),
+                k.druck().wagen().position(), k.druck().papier(0).lage(), k.schnitte(), rcpfx(), rc(m.cpuCycles()), rel_armed?" (rel)":"");
+            return;
+        }
         if (KS){   // Drucker: Speicher fest; Lampen und Wagen statt Banking
             Sd1157Steuerung& k=m.printer()->sd1157();
             fprintf(stderr,"  state: online=%s fehler=%s wagen=%d%s  %c-cyc=%lld%s\n", k.lampeOnline()?"an":"aus",
@@ -1906,6 +1912,20 @@ int main(int argc, char** argv){
             rst38Hint();
             return;
         }
+        if (KS && m.printer()->istK6316()){   // K6316: Lampen H1..H5, Wagen, Papier, Nadeln, Schnitte
+            K6316Steuerung& k=m.printer()->k6316();
+            uint16_t pc=m.cpuPC();
+            if (json){
+                fprintf(stderr,"\n{\"machine\":\"k6316\",\"pc\":\"0x%04X\",\"h\":[%d,%d,%d,%d,%d],\"wagen\":%d,\"papier\":%d,"
+                  "\"nadeln\":\"0x%03X\",\"schnitte\":%d}\n", pc, k.lampe(1),k.lampe(2),k.lampe(3),k.lampe(4),k.lampe(5),
+                  k.druck().wagen().position(), k.druck().papier(0).lage(), (unsigned)k.nadeln(), k.schnitte());
+                return;
+            }
+            fprintf(stderr,"  PC=%04X  H1 TEST=%d H2 FEHLER=%d H3 PAPIER=%d H4 BEREIT=%d H5 ONLINE=%d  wagen=%d papier=%d  Schnitte=%d\n  SIO gesendet: A (V.24) %zu, B (IFSS) %zu Zeichen\n",
+                pc,k.lampe(1),k.lampe(2),k.lampe(3),k.lampe(4),k.lampe(5),k.druck().wagen().position(),k.druck().papier(0).lage(),k.schnitte(),
+                k.sioAusgabe(0).size(),k.sioAusgabe(1).size());
+            return;
+        }
         if (KS){   // Drucker: eine CPU, kein Bild; Lampen, Wagen (Platzhalter), Papier, Nadeln
             Sd1157Steuerung& k=m.printer()->sd1157();
             uint16_t pc=m.cpuPC();
@@ -2062,7 +2082,7 @@ int main(int argc, char** argv){
                          (unsigned long long)(runClock()-start), m.cpuPC(), m.pc1715()->zre().bwsRegister());
                  return; }
         if (KS){ fprintf(stderr,"  ... %llu cyc  PC=%04X  wagen=%d  [Ctrl-C bricht ab]\n",
-                         (unsigned long long)(runClock()-start), m.cpuPC(), m.printer()->sd1157().druck().wagen().position());
+                         (unsigned long long)(runClock()-start), m.cpuPC(), m.printer()->druck().wagen().position());
                  return; }
         if (KM2){ fprintf(stderr,"  ... %llu cyc  PC=%04X  [Ctrl-C bricht ab]\n",
                          (unsigned long long)(runClock()-start), m.cpuPC());
@@ -2273,7 +2293,7 @@ int main(int argc, char** argv){
             return;
         }
         if (KS){
-            fprintf(stderr,"  keys: der Drucker hat keine Tastatur (Tasten ONLINE/PV1/PV2/TEST folgen mit dem Bedienfeld, WP2b)\n");
+            fprintf(stderr,"  keys: der Drucker hat keine Tastatur (Bedienfeld: Oberflaeche bzw. C-ABI k1520_printer_key)\n");
             return;
         }
         if (KM){
@@ -3825,6 +3845,13 @@ int main(int argc, char** argv){
                 "\"i\":\"0x%02X\",\"r\":\"0x%02X\",\"iff1\":%s,\"cyc\":%llu,\"rom\":true,\"machine\":\"%s\"}\n",
                 z.PC,z.SP,z.AF,z.BC,z.DE,z.HL,z.IX,z.IY,z.I,z.R, z.IFF1?"true":"false",
                 (unsigned long long)m.cpuCycles(), m.name()); }
+        else if (cmd=="rj" && KS && m.printer()->istK6316()){ const Z80& z=m.cpuDebug(); K6316Steuerung& k=m.printer()->k6316();
+            fprintf(stderr,"\n{\"pc\":\"0x%04X\",\"sp\":\"0x%04X\",\"af\":\"0x%04X\",\"bc\":\"0x%04X\","
+                "\"de\":\"0x%04X\",\"hl\":\"0x%04X\",\"ix\":\"0x%04X\",\"iy\":\"0x%04X\","
+                "\"i\":\"0x%02X\",\"r\":\"0x%02X\",\"iff1\":%s,\"cyc\":%llu,\"rom\":true,"
+                "\"machine\":\"k6316\",\"wagen\":%d,\"online\":%s}\n",
+                z.PC,z.SP,z.AF,z.BC,z.DE,z.HL,z.IX,z.IY,z.I,z.R, z.IFF1?"true":"false",
+                (unsigned long long)m.cpuCycles(), k.druck().wagen().position(), k.lampe(5)?"true":"false"); }
         else if (cmd=="rj" && KS){ const Z80& z=m.cpuDebug(); Sd1157Steuerung& k=m.printer()->sd1157();
             fprintf(stderr,"\n{\"pc\":\"0x%04X\",\"sp\":\"0x%04X\",\"af\":\"0x%04X\",\"bc\":\"0x%04X\","
                 "\"de\":\"0x%04X\",\"hl\":\"0x%04X\",\"ix\":\"0x%04X\",\"iy\":\"0x%04X\","
@@ -4152,6 +4179,11 @@ int main(int argc, char** argv){
                 for(auto& v: var_watch){ uint16_t a=std::get<1>(v);
                     if(std::get<2>(v)) fprintf(stderr,"  %-14s [%04X] = %04X\n",std::get<0>(v).c_str(),a,wd(a));
                     else               fprintf(stderr,"  %-14s [%04X] = %02X\n",std::get<0>(v).c_str(),a,m.memReadDebug(a)); } }
+            else if (KS && m.printer()->istK6316()){   // K6316: Lampen, Wagen, IX-Flags (RAM 3824H..)
+                K6316Steuerung& k=m.printer()->k6316();
+                fprintf(stderr,"  H1..H5=%d%d%d%d%d wagen=%d  SP=%04X  Betriebsart (IX+102)=%02X Flags IX+98=%02X IX+78=%02X IX+79=%02X\n  (vars -f <datei> | vars add <name> <addr> [w] | vars clear)\n",
+                        k.lampe(1),k.lampe(2),k.lampe(3),k.lampe(4),k.lampe(5), k.druck().wagen().position(), m.cpuSP(),
+                        m.memReadDebug(0x388A), m.memReadDebug(0x3824+98), m.memReadDebug(0x3824+78), m.memReadDebug(0x3824+79)); }
             else if (KS){   // Drucker: Lampen und Wagen statt Handschlag-RAM/CP/A-DPB
                 Sd1157Steuerung& k=m.printer()->sd1157();
                 fprintf(stderr,"  online=%s fehler=%s wagen=%d  SP=%04X  CTC-1-Vektor [2CE2]=%04X\n  (vars -f <datei> | vars add <name> <addr> [w] | vars clear)\n",
@@ -4196,6 +4228,24 @@ int main(int argc, char** argv){
             else fprintf(stderr,"  [03F8]done=%02X  DPB: [D1B2]=%04X [D1B4]=%04X [D1B8]=%04X [D1BE]=%04X [D1CD]=%04X\n"
                                 "  (vars -f <datei> | vars add <name> <addr> [w] | vars clear)\n",
                     m.memReadDebug(0x03F8),wd(0xD1B2),wd(0xD1B4),wd(0xD1B8),wd(0xD1BE),wd(0xD1CD)); }
+        else if (cmd=="dev" && KS && m.printer()->istK6316()){   // K6316: CTC D5/D10, PIO D12/D14/D11
+            K6316Steuerung& k=m.printer()->k6316();
+            auto Y=[&](bool b){ return b?"1":"0"; };
+            auto showCtc=[&](const char* name, const Z80CTC::DebugState& c){
+                fprintf(stderr,"  CTC (%s)  vecBase=%02X  IEI=%s IEO=%s\n",name,c.vecBase,Y(c.iei),Y(c.ieo));
+                for(int i=0;i<4;++i){ auto& ch=c.ch[i];
+                    fprintf(stderr,"    ch%d ctl=%02X TC=%02X cnt=%-3d run=%s  INT(en=%s pend=%s ius=%s iei=%s)\n",
+                        i,ch.control,ch.timeConst,ch.counter,Y(ch.running),Y(ch.intEn),Y(ch.intPending),Y(ch.ius),Y(ch.iei)); } };
+            auto showPio=[&](const char* name, const Z80PIO::DebugState& p){
+                fprintf(stderr,"  %s  IEI=%s IEO=%s\n",name,Y(p.iei),Y(p.ieo));
+                for(int i=0;i<2;++i){ auto& pt=p.port[i];
+                    fprintf(stderr,"    %c mode=%u out=%02X in=%02X dir=%02X vec=%02X  INT(en=%s pend=%s ius=%s iei=%s)\n",
+                        i?'B':'A',pt.mode,pt.out,pt.in,pt.dir,pt.vector,Y(pt.ie),Y(pt.pending),Y(pt.ius),Y(pt.iei)); } };
+            showCtc("D5, 84H-87H",k.ctc5().debugState()); showCtc("D10, 88H-8BH",k.ctc10().debugState());
+            showPio("PIO D12, 80H-83H",k.pio12().debugState()); showPio("PIO D14, 8CH-8FH",k.pio14().debugState());
+            showPio("PIO D11, A8H-ABH",k.pio11().debugState());
+            fprintf(stderr,"  Pinpegel D11 A/B=%02X/%02X D12 A/B=%02X/%02X D14 A/B=%02X/%02X\n",
+                k.portAusgabe(11,0),k.portAusgabe(11,1),k.portAusgabe(12,0),k.portAusgabe(12,1),k.portAusgabe(14,0),k.portAusgabe(14,1)); }
         else if (cmd=="dev" && KS){   // SD 1157: CTC DCH, PIO 2 F8H, PIO 1 F4H, PIO 3 ECH, SIO 7CH
             std::string w = t.size()>1? t[1] : "all";
             Sd1157Steuerung& k=m.printer()->sd1157();
@@ -4497,6 +4547,13 @@ int main(int argc, char** argv){
                     fprintf(stderr,"    %X      %04X-%04X    %02X   %-8s  %X    %s\n",n,(n<<12),(n<<12)|0x0FFF,a,her,sp.seite(n),q);
                 }
             }
+            else if (KS && m.printer()->istK6316()){   // K6316: festes Speicherbild (doc/printer/k6316/hardware.md §2)
+                fprintf(stderr,"  0000-27FF  ROM, 5 x 2716 (I1..I5 bzw. V1..V5)\n"
+                               "  2800-37FF  unbelegt (liest FFH)\n"
+                               "  3800-3BFF  RAM 1 KiB (2 x 2114), IX=3824H, SP=3C00H\n"
+                               "  E/A: 80H-83H PIO D12, 84H-87H CTC D5, 88H-8BH CTC D10, 8CH-8FH PIO D14, A0H-A3H Modul (frei),\n"
+                               "       A4H-A7H SIO (A = V.24, B = IFSS), A8H-ABH PIO D11\n");
+            }
             else if (KS){   // Drucker: festes Speicherbild (hardware.md §2) und E/A-Tore (§4)
                 fprintf(stderr,"  0000-297F  ROM 1157.rom (10 624 B)\n"
                                "  2980-2BFF  unbelegt (liest FFH) [?]\n"
@@ -4647,8 +4704,7 @@ int main(int argc, char** argv){
                          a5->sicherheitsstecker(), a5->sicherheitssteckerGeraetPasst()?"":" (Geraetekennung falsch)");
         }
         else if (cmd=="blatt" && KS){   // Drucker: Blatt als ASCII-Abzug eines Ausschnitts (Entwurf 49, WP3)
-            Sd1157Steuerung& k=m.printer()->sd1157();
-            const Nadeldruckwerk& d=k.druck();
+            const Nadeldruckwerk& d=m.printer()->druck();
             const Blattmodell& b=d.blatt(0);
             fprintf(stderr,"  Blatt %d x %d Pixel (%d x %d je Zoll), %llu Punkte, %llu ausserhalb verworfen, Version %llu; Kopf x=%d, Papier y=%d\n",
                     b.breite(), b.hoehe(), d.parameter().takte_je_zoll*d.parameter().x_je_takt, d.parameter().y_je_zoll,
