@@ -43,6 +43,12 @@ constexpr uint8_t kDirPointerBlock = 0x02;
 /// @brief UDOS 5.0 am A5120 — erkannt an der FFH-Fuellung hinter dem Belegungsplan.
 bool istUdos50(const FsProfile& p) { return p.ndos_fill == "ff"; }
 
+/// @brief Die Lage der UDOS-2.2/5.0-Disketten: fuenf Verzeichnissaetze (05, 0A, 01, 06, 0B) und
+///        der zweite Bootteil auf Spur 16H Sektor 07-09 - A5120 (UDOS 5.0, FFH) UND P8000
+///        (UDOS 2.2, 77H).  Am Emulator mit dem FORMAT der echten P8000-UDOS-Diskette gemessen
+///        (Datendiskette 9 Sektoren, Saetze auf 05/0A/01/06/0B; Ticket #29).
+bool udos2xLage(const FsProfile& p) { return p.ndos_fill == "ff" || p.ndos_fill == "77"; }
+
 uint16_t le16(const uint8_t* p) { return static_cast<uint16_t>(p[0] | (p[1] << 8)); }
 void     put16(uint8_t* p, uint16_t v) {
     p[0] = static_cast<uint8_t>(v & 0xFF);
@@ -192,7 +198,7 @@ bool Udos1715FileSystem::looksLikeUdos1715(const SectorSpace& space, const FsPro
 
 bool Udos1715FileSystem::zweiterBootteil(const FsProfile& prof, uint8_t& erster,
                                          uint8_t& anzahl) {
-    if (!istUdos50(prof)) return false;
+    if (!udos2xLage(prof)) return false;
     erster = 0x07;
     anzahl = 3;
     return true;
@@ -983,12 +989,16 @@ bool Udos1715FileSystem::setAttributes(const std::string& name, const UdosAttrs&
 // ─── Anlegen ─────────────────────────────────────────────────────────────────
 
 bool Udos1715FileSystem::sperreBootbereich(bool speichern) {
-    if (istUdos50(prof_)) {
+    if (udos2xLage(prof_)) {
         for (uint8_t s = 0; s < 16 && s < secs_per_track_; ++s) bitmap_.setUsed(0, s + 1, true);
         uint8_t erster = 0, anzahl = 0;
         if (zweiterBootteil(prof_, erster, anzahl))
             for (uint8_t s = erster; s < erster + anzahl && s < secs_per_track_; ++s)
                 bitmap_.setUsed(prof_.directory_track, s + 1, true);
+    } else if (prof_.ndos_fill == "00") {
+        // PC 1715: FORMAT (Systemdisk = J) sperrt nur Spur 0 Kopf 0 - am Emulator gemessen
+        // (13 + 16 = 29 Sektoren belegt, Ticket #29).
+        for (uint8_t s = 0; s < 16 && s < secs_per_track_; ++s) bitmap_.setUsed(0, s + 1, true);
     } else {
         for (uint8_t s = 0; s < secs_per_track_; ++s) bitmap_.setUsed(0, s + 1, true);
     }
@@ -1002,7 +1012,7 @@ bool Udos1715FileSystem::mkfs() {
                                     fuell);
 
     // Satzlage der DIRECTORY: Handbuch §1.2.1, unter UDOS 5.0 die der Originaldiskette.
-    const bool u50 = istUdos50(prof_);
+    const bool u50 = udos2xLage(prof_);
     const std::vector<uint8_t> saetze = u50
         ? std::vector<uint8_t>(std::begin(kDirRecords50), std::end(kDirRecords50))
         : std::vector<uint8_t>(std::begin(kDirRecords), std::end(kDirRecords));

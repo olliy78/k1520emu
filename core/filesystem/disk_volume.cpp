@@ -4731,7 +4731,9 @@ bool DiskVolume::readBootImageToFile(const std::string& path, int volume) const 
 }
 
 bool DiskVolume::bootKarteNachtragen(int volume) {
-    if (!profile_ || profile_->type != FsType::Udos1715 || profile_->ndos_fill != "ff") return true;
+    uint8_t erster = 0, anzahl = 0;
+    if (!profile_ || profile_->type != FsType::Udos1715
+        || !Udos1715FileSystem::zweiterBootteil(*profile_, erster, anzahl)) return true;
     auto* f = dynamic_cast<Udos1715FileSystem*>(volumes_[static_cast<size_t>(volume)].fs.get());
     if (!f) return true;
     if (!f->sperreBootbereich(true)) return fail(f->lastError());

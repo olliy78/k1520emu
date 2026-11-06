@@ -245,6 +245,22 @@ erkannt), der Descriptor trägt dort die Zusatzangaben ab `28H`, und freie Plans
 (`COPY datei 1/datei`) belegt UDOS ab Spur 21 aufwärts, das DiskTool ab Spur 0 — beide Karten sind gültig,
 `fsck --full` meldet nichts, und jede Seite liest die Dateien der anderen byteidentisch.
 
+**UDOS 1715 (PC 1715), gleiche Messung (2026-11-06).**  `FORMAT` am Emulator (`format` → Drive 1 → 80 Spuren J → doppelseitig J → ID):
+Datendiskette **13** Sektoren belegt (= DiskTool), Systemdisk = J **29** (13 + Spur 0 Kopf 0; Plan Spur 0 = `FFFF0000`).  Das DiskTool
+sperrte bei einer Systemdiskette die ganze Spur 0 (45); jetzt nur Kopf 0 wie FORMAT.  Dateien auf Spur 0 Kopf 1 liest UDOS 1715
+fehlerfrei (anders als UDOS 5.0), dort wird Spur 0 deshalb **nicht** von der Vergabe ausgenommen.
+
+**P8000 (UDOS 2.2), gleiche Messung** mit den echten Disketten `~/projects/robotron/P8000/discs/udossys.cqm` / `udos_org.cqm` (FORMAT mit den
+Dateiangaben der echten Datei: `LOW 4000 HIGH A4C1`; die `FORMAT.400` des Fundus allein brach mit falschen Angaben mit `BREAK 0003` ab).
+`FORMAT D=1 ID='X'` + `Y` (Großbuchstaben tippen; kein Systemdisk-Parameter) belegt **9** Sektoren, die Sätze der DIRECTORY liegen auf
+05/0A/01/06/0B — also die **Lage von UDOS 5.0**, nicht die 13 Sektoren des PC 1715, die das DiskTool bis dahin anlegte.  Auch beide
+echten Systemdisketten haben diese Satzlage, und der Urlader lädt `OSLOAD` aus Spur 16H Sektor 07–09 (`doc/merkposten/p8000.md`):
+eine mit `create --fs udos_p8000 --boot` gebaute Diskette **startete nicht** (nur Spur 0 im Bootabbild, Monitor blieb am `>`).
+Jetzt teilen sich `udos50` und `udos_p8000` die Lage (`udos2xLage`: fünf Sätze, zweiter Bootteil, Bootbereich 16 + 3 Sektoren);
+`boot-get` liefert für die P8000 4864 statt 4096 Byte.  Gegenprobe: DiskTool-Systemdiskette mit allen 74 Dateien bootet am P8000,
+`COPY` auf eine FORMAT-Diskette und Rücklesen byteidentisch.  **Offen:** eine frisch von UDOS angelegte P8000-*Systemdiskette* gibt es
+nicht zum Vergleichen (FORMAT kennt nur Datendisketten) — die 28 Sektoren der Systemdiskette sind aus dem A5120 übernommen.
+
 **Spur 0 vergibt das DiskTool bei `udos50` nie** (`allocSectors`/`allocRecords`), obwohl die Karte (wie bei FORMAT) Spur 0
 Kopf 1 frei führt: eine Systemdiskette mit allen 65 Dateien der Originaldiskette, deren erste Dateien auf Spur 0 Kopf 1 lagen,
 brach beim Kaltstart mit `ERROR C4` (= *SECTOR ADDRESS ERROR*) ab, mit anderer Reihenfolge der Dateien nicht.  Ursache nicht

@@ -1150,6 +1150,54 @@ TEST(Udos1715A5120, FrischeSystemdisketteBelegtAchtundzwanzigSektoren) {
     std::error_code ec; std::filesystem::remove(pfad, ec);
 }
 
+// UDOS 1715 (PC 1715): FORMAT mit Systemdisk = J belegt 13 + Spur 0 Kopf 0 = 29 Sektoren
+// (am Emulator gemessen, Ticket #29) - nicht die ganze Spur 0.
+TEST(Udos1715Profil, FrischeSystemdisketteBelegtNurKopfNullVonSpurNull) {
+    const FsProfile* basis = dateisysteme().find("udos1715_ds80_16x256");
+    ASSERT_NE(basis, nullptr);
+    FsProfile sys = *basis;
+    sys.system_track0 = true;
+    const DiskFormat* f = formate().find(sys.format);
+    ASSERT_NE(f, nullptr);
+    const std::string pfad = k1520test::tempPath("k1520_test_u1715_sys.img");
+    {
+        auto leer = DiskImage::create(pfad, *f, false, f->predominantEncoding());
+        ASSERT_TRUE(leer && leer->flush());
+    }
+    auto disk = DiskImage::open(pfad, *f, false);
+    ASSERT_TRUE(disk);
+    SectorSpace raum(disk->medium(), *f);
+    std::string err;
+    auto fs = Udos1715FileSystem::format(raum, sys, "SYS", err);
+    ASSERT_TRUE(fs) << err;
+    EXPECT_EQ(fs->bitmap().countUsed(), 29);
+    for (uint8_t s = 0; s < 16; ++s) EXPECT_TRUE(fs->bitmap().used(0, s + 1));
+    EXPECT_FALSE(fs->bitmap().used(0, 17)) << "Kopf 1 von Spur 0 bleibt frei";
+    std::error_code ec; std::filesystem::remove(pfad, ec);
+}
+
+// UDOS 2.2 (P8000): FORMAT der echten P8000-UDOS-Diskette belegt auf einer Datendiskette 9 Sektoren
+// (Saetze 05/0A/01/06/0B wie UDOS 5.0), das DiskTool legte vorher die 13 des PC 1715 an und
+// die Systemdiskette ohne den zweiten Bootteil (Spur 16H Sektor 07-09) - sie startete nicht.
+TEST(Udos1715P8000, FrischeDatendisketteBelegtNeunSektoren) {
+    Leerdiskette l("udos_p8000_ds80_16x256", "DATEN");
+    ASSERT_TRUE(l) << l.fehler;
+    EXPECT_EQ(l.fs().bitmap().countUsed(), 9);
+    for (uint8_t s : {0, 1, 2, 5, 6, 10, 11}) EXPECT_TRUE(l.fs().bitmap().used(22, s + 1)) << int(s);
+}
+
+TEST(Udos1715P8000, ZweiterBootteilGehoertZumBootabbild) {
+    const FsProfile* p = dateisysteme().find("udos_p8000_ds80_16x256");
+    ASSERT_NE(p, nullptr);
+    uint8_t erster = 0, anzahl = 0;
+    ASSERT_TRUE(Udos1715FileSystem::zweiterBootteil(*p, erster, anzahl));
+    EXPECT_EQ(erster, 7);
+    EXPECT_EQ(anzahl, 3);
+    const FsProfile* pc = dateisysteme().find("udos1715_ds80_16x256");
+    ASSERT_NE(pc, nullptr);
+    EXPECT_FALSE(Udos1715FileSystem::zweiterBootteil(*pc, erster, anzahl)) << "PC 1715 hat keinen";
+}
+
 // FORMAT V 5.0 fuellt das 24-Byte-Namensfeld hinter dem 0D-Abschluss mit FFH (am Emulator
 // gemessen, Ticket #29); eine so formatierte Diskette muss erkannt werden.
 TEST(Udos1715A5120, NamensfeldMitFFFuellungIstKeineBeschaedigung) {
