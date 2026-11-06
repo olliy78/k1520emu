@@ -48,6 +48,14 @@ if [ "$only_deletions" -eq 1 ]; then
 fi
 
 c_ylw ">> pre-push: tools/dev.sh test (Regression, ohne format_integration)"
+# Git setzt fuer den Hook Umgebungsvariablen wie GIT_DIR (in einem Worktree immer).
+# Erben die Tests sie, landen die git-Befehle ihrer Wegwerf-Repos (py_version:
+# `git init`, `git commit`) im ECHTEN Repository: so entstanden am 2026-11-05 ein
+# Testcommit "start" im gepushten Zweig und core.bare=true in .git/config.
+# Die Tests brauchen keine dieser Variablen - also alle weg.
+while IFS='=' read -r _name _; do
+    case "$_name" in GIT_*) unset "$_name" ;; esac
+done < <(env)
 # stdin kommt hier als ERSCHOEPFTE Pipe an (die Ref-Schleife oben hat sie
 # leergelesen).  Ein Lesezugriff darauf blockiert, statt EOF zu liefern —
 # `py_dbg_konsole` faellt dadurch reproduzierbar um, obwohl derselbe Baum
