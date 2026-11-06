@@ -799,13 +799,27 @@ K1520_API int      k1520_k8915_generation(K1520Handle h);
 /**
  * @brief Speicherverwaltung des PRG (Ports E8H/EAH), Diagnose fuer Debugger/Oberflaeche.
  * @param n      Seite 0…15 (A12–A15).
- * @param attr   E8H dieser Seite (unteres Halbbyte 0 = OPS-RAM, sonst Systemkarte); darf NULL sein.
+ * @param attr   E8H dieser Seite (unteres Halbbyte 0 oder 4 = OPS-RAM, sonst Systemkarte); darf NULL sein.
  * @param seite  EAH dieser Seite (physische OPS-Seite, 4 Bit); darf NULL sein.
  * @return false bei anderer Maschine oder n ausserhalb 0…15 (Ausgaben unberuehrt).
  */
 K1520_API bool     k1520_prg710_page(K1520Handle h, int n, uint8_t* attr, uint8_t* seite);
 /** @brief Freigabe-Register EBH (0 = Abbildung aus); -1 bei anderer Maschine. */
 K1520_API int      k1520_prg710_freigabe(K1520Handle h);
+/**
+ * @brief ATP-Zusatz des PRG stecken (Entwurf 48, AP-B1): SIO C0H–C3H mit Kanalschleife,
+ *        Anzeige F4H/F5H, Takt an CLK/TRG0/1 der CTC CCH–CFH.  Nur vor dem ersten
+ *        Lauf/Reset; Vorgabe ungesteckt (UDOS/SCPX unveraendert, BS600 verlangt ihn).
+ * @return false bei anderer Maschine, schon gesteckt oder nach dem ersten Lauf.
+ */
+K1520_API bool     k1520_prg710_atp_install(K1520Handle h);
+/** @brief Steckt der ATP-Zusatz?  false auch bei anderer Maschine. */
+K1520_API bool     k1520_prg710_atp_installed(K1520Handle h);
+/**
+ * @brief Zuletzt auf die Anzeige F4H/F5H geschriebene Werte und Zahl der Zugriffe.
+ *        Ausgaben duerfen NULL sein.  false ohne ATP-Zusatz oder bei anderer Maschine.
+ */
+K1520_API bool     k1520_prg710_atp_display(K1520Handle h, uint8_t* f4, uint8_t* f5, uint32_t* anzahl);
 
 /* ─── EPROMmer des PRG (ATP 590068, virtueller Sockel; doc/prg710/eprommer.md, AP-P7b) ───
  * Typ: 1 = U555 (1 KB, 2708-artig), 2 = U2716 (2 KB); 0 beim Einlegen = aus der Dateigroesse.

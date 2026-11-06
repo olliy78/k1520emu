@@ -51,6 +51,22 @@ public:
          *  Varianten gesteckt: `PROG`/`PROG.COM` liegen auch auf den 710-1-Disketten [?]
          *  (Plan §8.6). */
         bool eprommer = true;
+        /** ATP-Zusatz (Entwurf 48, AP-B1): SIO C0H–C3H mit Kanalschleife, Anzeige F4H/F5H,
+         *  Takt an CLK/TRG0/1 der CTC CCH–CFH.  Vorgabe AN (AP-B2): der Kern kennt
+         *  kein Betriebssystem, BS600/BS620 verlangt sie im Selbsttest, und UDOS/SCPX laufen mit ihr
+         *  unveraendert (Waechter prg710_*, cli_bt_prg710*: 152/152 gruen).  Tests ohne sie: false. */
+        bool atp_zusatz = true;
+        /** Leser-Modell der K5122 (AP-B2d, Hypothese "eine Hardware fuer alle Treiber"), Vorgabe -1.
+         * -1 = nach Variante: PRG 710-1 -> 1 (Geraetebefund 2026-11-05: BS620 liest dort Original UND gepatcht bis LIST), PRG 710 -> 0.
+         *  0 = bisher: 710 Marken-FF low-aktiv mit Sofortmarke (`setMkeJedesSyncByte`), 710-1 high-aktiv; Daten auch
+         *  vor der Marke.
+         *  1 = einheitlich: beide Geraete low-aktiv, `IN (16H)` liefert erst nach der Marke (`setDatenErstNachMarke`),
+         *      KEINE Sofortmarke.  Am 710-1 laufen damit ROM, UDOS, SCPX, FORMAT, EPROMmer, Lochband, Sertest und BS620
+         *      (Original) ohne Umpolen; das 710-ROM bootet damit nicht.
+         *  2 = wie 1, aber mit Sofortmarke: am 710 laufen damit alle bisherigen Waechter; das 710-1 bootet nicht.
+         *  Gemessen in doc/bs600/marken_ff.md; ein einziges Modell fuer beide Geraete haben wir NICHT: es unterscheidet sich
+         *  allein in der Sofortmarke (Strobe in der 54-Takte-Schleife des 710-ROMs gegen einmaliger Strobe des 710-1-ROMs). */
+        int leser_modell = -1;
     };
 
     /// Takt der ZRE K2521 (2,4576 MHz).
@@ -159,6 +175,12 @@ public:
     K7609&           k7609()    { return k7609_; }
     K7672&           k7672()    { return k7672_; }   ///< nur am 710-1 an A32-B
     Ass590069&       ass590069() { return fs_; }     ///< Fernschreiber C4H–C7H (AP-P8c)
+    /// ATP-Zusatz stecken (vor dem ersten Lauf/Reset; false + Grund sonst).  Wie Config::atp_zusatz.
+    bool steckeAtpZusatz(std::string* fehler = nullptr);
+    bool atpZusatz() const { return atp_.zusatz(); }
+    /// Letzte Schreibzugriffe auf die Anzeige F4H/F5H der ATP (nur mit ATP-Zusatz).
+    const Atp590068::Anzeige& atpAnzeige() const { return atp_.anzeige(); }
+    Z80SIO&          atpSio()   { return atp_.diagSio(); }   ///< SIO C0H–C3H (nur mit ATP-Zusatz)
     K1520Bus&        bus()      { return bus_; }
     uint64_t         totalCycles() const { return total_cycles_; }
 

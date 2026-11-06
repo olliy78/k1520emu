@@ -183,6 +183,18 @@ struct WriteOptions {
     ///        leer = wie @ref date.
     std::string udos_created;
 
+    // ── nur BS600 (PRG 700/710/710-1): was im Verzeichniseintrag steht und Linux nicht mitliefert ──
+    /// @brief "P" (Programm, Vorgabe bei leer) | "L".
+    std::string bs600_type;
+    /// @brief Datum `TTMMJJ` (auch `TT.MM.JJ`); leer = heute.
+    std::string bs600_date;
+    /// @brief Signum (Kuerzel des Bearbeiters), hoechstens 3 Zeichen; leer = Blanks.
+    std::string bs600_author;
+    /// @brief Ladeadresse (Anfangsadresse); die Endadresse folgt aus der Laenge.
+    uint16_t bs600_load = 0;
+    /// @brief Startadresse; 0 = keine (Dateien ohne Programmstart).
+    uint16_t bs600_entry = 0;
+
     // ── nur CP/M: die Attributbits in den Hochbits des Dateityps ─────────────
     bool cpm_read_only = false;   ///< R/O
     bool cpm_system    = false;   ///< SYS (im `DIR` unsichtbar)
@@ -295,6 +307,21 @@ struct FatAttrs {
     bool set_system    = false;  bool system    = false;
     bool set_archive   = false;  bool archive   = false;
     bool set_mtime     = false;  int64_t mtime  = 0;    ///< Ortszeit-Sekunden seit 1970
+};
+
+/**
+ * @struct Bs600Attrs
+ * @brief Die aenderbaren Angaben einer BS600-Datei (Typ, Datum, Signum, Lade- und Startadresse).
+ *
+ * Nicht gesetzte Felder (leere Zeichenkette bzw. `set_*` = false) bleiben unveraendert.  Eine neue
+ * Ladeadresse verschiebt die Endadresse mit (die Laenge der Datei bleibt).
+ */
+struct Bs600Attrs {
+    std::string type;                              ///< "P" | "L"; leer = unveraendert
+    bool        set_date   = false; std::string date;     ///< `TTMMJJ` (auch `TT.MM.JJ`)
+    bool        set_author = false; std::string author;   ///< bis 3 Zeichen
+    bool        set_load   = false; uint16_t load  = 0;   ///< Ladeadresse
+    bool        set_entry  = false; uint16_t entry = 0;   ///< Startadresse (0 = keine)
 };
 
 /**
@@ -445,6 +472,12 @@ public:
     /// @brief Attribute und Zeitstempel einer vorhandenen Datei aendern (nur FAT).
     virtual bool setAttributes(const std::string& name, const FatAttrs&) {
         last_error_ = "Dieses Dateisystem fuehrt keine DOS-Attribute";
+        return false;
+    }
+
+    /// @brief Typ, Datum, Signum und Adressen einer vorhandenen Datei aendern (nur BS600).
+    virtual bool setAttributes(const std::string& name, const Bs600Attrs&) {
+        last_error_ = "Dieses Dateisystem fuehrt keine BS600-Dateiangaben";
         return false;
     }
 

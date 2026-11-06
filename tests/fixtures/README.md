@@ -276,3 +276,21 @@ Band, Lücken nach `k1520tape`).  Das Programm (`tools/kassette/bandtest/`, Quel
 `KassetteBoot.*` (`tests/integration/test_kassette_boot.cpp`); die Tests lesen die Datei nur und
 binden sie nicht (kein Zurückschreiben).  Wächter, dass Band und Programm zusammenpassen:
 `cli_bandtest_bootband`; dass das Programm zur Quelle passt: `cli_bandtest_bin_passt_zur_quelle`.
+
+## `bs600/`: BS600-Systemdisketten (PRG 700/710/710-1, Entwurf 48, AP-B3)
+
+Beide aus der Diskettensammlung RT (freigegeben zur Ablage als Testfixture), 40 Zylinder einseitig, Spur 0 = 26×128, Spur 1..39 = 15×256
+(`doc/bs600_diskettenformat.md`).  Benutzer: `Bs600Fs.*` — **nie direkt mounten**, die Tests kopieren in den Temp-Ordner.
+
+| Datei | Inhalt |
+|---|---|
+| `bs620_prg710-1.hfe` | **BS620** (PRG 710-1), Urlader `SYL FOR BS620`, 28 Dateien (`BS620` 6D00..D4FF, Start 6D5F, 20.12.88), 381 Sektoren belegt; Original `Disketten_Images_RT/BS600.hfe` |
+| `bs600_prg700.hfe` | **BS600** (PRG 700, 3-KB-ROM), Urlader `BOOTSTRAP FOR BS600`, 25 Dateien (u. a. `TEST`), 248 Sektoren belegt; aus `PC1715/discs/real_discs/BS600_80Tracks.scp` (`gw convert --format=ibm.scan --tracks="c=0-39:h=0:step=2"`), vollstaendig statt der abgeschnittenen `.img` |
+
+### BS600/BS620 vom echten Geraet (AP-B2f, 2026-11-05)
+
+`bs600/bs620_prg710-1_format_leer.hfe` und `bs600/bs620_prg710-1_diskcopy_high.hfe`: am echten PRG 710-1 (K5601) erzeugt und mit dem Greaseweazle
+gelesen — `…_format_leer`: FORMAT unter BS620 auf einer Leerdiskette (Name `LEER`, Datum 05.11.26, Besitzer `OLLIY`); `…_diskcopy_high`: DISKCOPY der
+`prg710-1_bs620_ff_high.hfe` (Name `BS620H`).  Die Originallesungen hatten 80 Zylinder / 2 Koepfe (Doppelschritt, ungerade Zylinder leer, Rauschen auf Kopf 1);
+hier **reduziert** auf 40 Zylinder einseitig (gerade Zylinder, Kopf 0 -> Zylinder 0-39) mit `tools/bs600/reduziere_abzug.py`; die Sektordaten sind
+unveraendert, CRCs und Luecken normiert.  Die Originallesungen liegen nur beim Anwender (`~/bs620_abzuege/`).

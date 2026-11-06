@@ -80,12 +80,14 @@ TEST_P(Prg710Maschine, SpeicherverwaltungIstDerSpeicherweg) {
 
 /**
  * @test Prg710Maschine.MarkenFFPolaritaetJeVariante
- * @brief Die K5122 traegt die Polaritaet des Marken-FF: 710 low-aktiv, 710-1 high-aktiv.
+ * @brief Die K5122 traegt die Polaritaet des Marken-FF: an beiden Geraeten low-aktiv (710-1 seit AP-B2e, Leser-Modell 1:
+ *        Daten erst nach der Marke).
  */
 TEST_P(Prg710Maschine, MarkenFFPolaritaetJeVariante) {
     Prg710Machine m(cfgFuer(GetParam()));
     m.powerOn();
-    EXPECT_EQ(m.afs().mkeLowAktiv(), GetParam() == V::Prg710);
+    EXPECT_TRUE(m.afs().mkeLowAktiv());
+    EXPECT_EQ(m.afs().datenErstNachMarke(), GetParam() == V::Prg710_1);
     EXPECT_FALSE(m.afs().markeErkannt());
     // Der Pegel an Tor B selbst: Waechter in test_k5122_wait.cpp (MkeLowAktiv_…).
 }

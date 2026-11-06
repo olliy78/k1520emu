@@ -515,6 +515,8 @@ Markenerkennung, `Z80PIO`/`Z80SIO`-Korrekturen, K7672 SCP/DCP, vorläufige Prüf
 
 ## Dritte Maschine: PRG 710 / PRG 710-1
 
+(BS600/BS620 darauf: Abschnitt weiter unten, `doc/merkposten/bs600.md`.)
+
 Numerik-Programmiergeräte (K2521-ZRE, 1 CPU, `/WAIT`-K5122, UDOS 4.3 und SCPX 1526), eine
 Klasse `Prg710Machine` unter `core/machines/prg710/` (Variante 710 | 710-1 wählt ROM,
 Tastaturweg — 8279/K7609 bzw. K7672 an K8025 A32-B —, K8025-Belegung und Marken-FF-Polarität);
@@ -532,6 +534,14 @@ den Seitenregistern), eigenes Programm **prg710emu** (AP-P5d), dritter Starter i
 samt Berichtigung, `keyRelease` Pflicht am 710-1, K8025-Belegung mit `taktquelle = 1`, ISO-646-
 Zeichensatz, Fixtures/beschädigte Abzüge, Bedienung von UDOS/SCPX/FORMAT im Test). Plan:
 `doc/design/20_prg710.md`.
+
+**BS600/BS620 (Numerik-Betriebssystem, Entwurf 48, Stand 2026-11-06):** BS620 (Dez. 1988) bootet am `prg710-1` bis Hauptmenue, Unterbilder, Selbsttest ohne Fehler,
+`LIST`/`COPY`/FORMAT/DISKCOPY (am echten 710-1 gegengeprueft: Original UND gepatchte Fassung laufen).  Kernaenderungen: **ATP-Zusatz** (SIO C0H-C3H/CTC CCH-CFH,
+`Config::atp_zusatz`, Vorgabe an), **K5122-Leser-Modell** (`Config::leser_modell`, 710-1 = 1: Marken-FF low-aktiv, Daten erst nach der Marke), **E8H-Seitenregister**
+(`04H` = RAM sichtbar), K7672-Kursor `ESC [ A-D`.  DiskTool-Dateisystem `bs600` (create/put/reorganize/fsck/recover).  Disketten: `disks/prg710-1_bs620/prg710-1_bs620_system.hfe`
+(Original) und `disks/prg710_bs610_rekonstruktion/prg710_bs610_rek.hfe` (**Eigenbau**, BS620 + K7609-Tastaturteil von BS600 V02, im Emulator geprueft, am echten PRG 710 ungetestet);
+beide im Paket; Geraetetest-Paare nur ueber `tools/bs600/bau_disketten.py --geraetetest <Ordner>` (Fixtures `tests/fixtures/bs600/`).
+**Vor Arbeiten daran: `doc/merkposten/bs600.md` lesen**; Entwurf `doc/design/48_bs600.md`.
 
 ## Vierte Maschine: PC 1715 / PC 1715W
 

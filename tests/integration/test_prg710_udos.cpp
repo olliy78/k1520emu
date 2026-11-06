@@ -356,6 +356,7 @@ TEST_P(Prg710Udos, UnformatierteDisketteMeldetFehlerUndBootetNachWechsel) {
     taste(m, QK_RETURN);
     ASSERT_TRUE(bisText(m, "DISKERROR", 400'000'000))
         << "PC=" << std::hex << m.cpuPC() << "\n" << bild(m);
+    m.run(5'000'000);                                // der Statuscode folgt dem Text einige Takte spaeter
     EXPECT_NE(bild(m).find("DISKERROR C5"), std::string::npos) << bild(m);
 
     // Diskette wechseln (gleich nach der Meldung — der 710 liest nach „NO SYSTEM“ vor der

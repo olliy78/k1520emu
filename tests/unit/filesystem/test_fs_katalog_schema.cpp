@@ -56,7 +56,7 @@ const std::set<std::string>& osListe() {
     static const std::set<std::string> s = {
         "cpa", "scpx", "scpx8915", "cpa1715", "scp1715", "microdos", "microdos1715", "osm", "bcu880",
         "scp1700", "udos", "udos1715", "udos_p8000", "udos50", "sios", "wega", "mutos1700", "mutos8k",
-        "tar", "dos"};
+        "tar", "dos", "bs600"};
     return s;
 }
 
@@ -151,7 +151,7 @@ TEST(FsKatalogSchema, UmbenennungstabelleStimmtMitDemKatalogUeberein) {
     EXPECT_EQ(n, 58);
     // Der Katalog hat kein Profil, das die Tabelle nicht kennt - ausser den nach Schema 47 neu
     // angelegten, die nie einen Altnamen hatten (Z2: CPA1715_5600).
-    const std::set<std::string> ohneAltnamen = {"cpa1715_ss40_5x1024_boot"};
+    const std::set<std::string> ohneAltnamen = {"cpa1715_ss40_5x1024_boot", "bs600_ss40_15x256_boot"};
     for (const FsProfile& p : kataloge().dateisysteme.profiles())
         if (ohneAltnamen.count(p.name))
             EXPECT_EQ(neue.count(p.name), 0u) << p.name << " hat keinen Altnamen, steht aber in der Tabelle";

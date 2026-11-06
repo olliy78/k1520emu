@@ -325,6 +325,19 @@ def test_microdos1526_disketten_sind_in_der_vorgabeauswahl():
     for name in soll:
         assert ausgelieferte_diskette(name).is_file(), name
 
+def test_bs6xx_disketten_sind_im_paket():
+    """BS620 (PRG 710-1, Original, am echten Geraet getestet) und die BS610-Rekonstruktion (PRG 710, Eigenbau,
+    nur im Emulator geprueft) liegen im Paket (doc/merkposten/bs600.md Nr. 14); die Frankenstein-Diskette BS600 nicht."""
+    text = (PACKAGING / "build_payload.sh").read_text(encoding="utf-8")
+    block = text[text.index('DISKS_DEFAULT="'):]
+    block = block[len('DISKS_DEFAULT="'):].split('"', 1)[0].split()
+    soll = {"prg710-1_bs620_system.hfe", "prg710_bs610_rek.hfe"}
+    assert soll <= set(block)
+    assert not any("bs600" in n for n in block)
+    for name in soll:
+        assert ausgelieferte_diskette(name).is_file(), name
+
+
 def test_iss_hat_den_k8915_emulator_im_startmenue():
     iss = (PACKAGING / "k1520emu.iss").read_text(encoding="utf-8")
     assert '#define Programm  "A5120 Emulator"' in iss

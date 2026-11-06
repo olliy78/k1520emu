@@ -118,6 +118,17 @@ public:
     void setMkeJedesSyncByte(bool an) { mke_jedes_sync_ = an; w_strom_gilt_ = false; }
     bool mkeJedesSyncByte() const { return mke_jedes_sync_; }
     /**
+     * @brief Daten erst nach der Marke (nur Wait-Betrieb, AP-B2d).  Vorgabe false.  Mit `an` haelt `IN (16H)`
+     *        die CPU im /WAIT, solange das Marken-FF scharf, aber noch nicht gesetzt ist: der Leser ist erst
+     *        mit der naechsten Sync-Gruppe synchron, vorher liefert er nichts (kein Luecken-Byte 4EH).  Das
+     *        erste gelieferte Byte ist das erste Sync-Byte (A1) der Gruppe.  Ein Treiber, der das FF nicht
+     *        abfragt oder nur auf `bis gesetzt/nicht gesetzt` wartet (710-1-ROM `JR Z`), laeuft dann ohne
+     *        Zufall richtig.  Kommt am Strom nie eine Marke (w_mke_time_ unbestimmt), liest `IN (16H)` wie
+     *        bisher weiter (am Geraet unbekannt [?]).
+     */
+    void setDatenErstNachMarke(bool an) { daten_erst_nach_marke_ = an; }
+    bool datenErstNachMarke() const { return daten_erst_nach_marke_; }
+    /**
      * @brief Rauschen auf einer UNFORMATIERTEN Spur (nur Wait-Betrieb).  Vorgabe false:
      *        eine Spur ohne Aufzeichnung liefert Luecke (4EH) und nie ein MKE
      *        (A5120/K8915 unveraendert).  true: unter dem Kopf liegt, was ein echtes
@@ -416,6 +427,7 @@ private:
     uint8_t  w_latch_       = 0xFF;     ///< zuletzt uebergebenes Byte (Daten-PIO)
     bool     w_scharf_      = false;    ///< /STR = 0 und MR = 0: Marken-FF sucht
     bool     mke_low_aktiv_ = false;     ///< Tor B Bit1 invertiert (PRG 710)
+    bool     daten_erst_nach_marke_ = false;   ///< IN (16H) wartet auf die Marke (PRG)
     bool     mke_jedes_sync_ = false;    ///< MKE an jedem Sync-Byte, Teilfenster (PRG 710)
     bool     rauschen_       = false;    ///< unformatierte Spur = Rauschen (PRG 710)
     uint64_t w_fenster_umdr_ = 0;        ///< Umdrehung des zuletzt von waitFenster belegten Fensters

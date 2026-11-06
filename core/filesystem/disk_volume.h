@@ -46,6 +46,7 @@
 
 class TarFileSystem;
 class SiosFileSystem;
+class Bs600FileSystem;
 struct TarSatzSpeicher;
 
 /**
@@ -181,6 +182,15 @@ struct TransferOptions {
     bool cpm_read_only = false;
     bool cpm_system    = false;
     bool cpm_archived  = false;
+
+    // ── nur BS600: Angaben des Verzeichniseintrags, die eine Linux-Datei nicht mitbringt ─
+    //
+    // Nicht leer bzw. ungleich 0 gewinnt gegen ein `.fileinfo` neben der Quelle (fs=bs600).
+    std::string bs600_type;      ///< "P" | "L"
+    std::string bs600_date;      ///< `TTMMJJ`; leer = heute
+    std::string bs600_author;    ///< Signum, hoechstens 3 Zeichen
+    uint16_t    bs600_load  = 0; ///< Ladeadresse
+    uint16_t    bs600_entry = 0; ///< Startadresse (0 = keine)
 
     /// @brief Eine ZUBEHOERdatei (`.fileinfo`, Sammelbeiblatt) trotzdem als Nutzdatei
     ///        auf die Diskette schreiben.
@@ -617,6 +627,8 @@ public:
     const TarFileSystem* tarFs() const;
     /// @brief Das SIOS-Dateisystem (nur bei Profil `sios`), sonst nullptr.
     const SiosFileSystem* siosFs() const;
+    /// @brief Das BS600-Dateisystem (nur bei Profil `bs600`), sonst nullptr.
+    Bs600FileSystem* bs600Fs() const;
 
     /**
      * @brief Den tar-Strom der Diskette als `.tar` herausschreiben (`tar-export`).
@@ -831,6 +843,14 @@ public:
     bool setAttributes(const FileRef& ref, const UnixAttrs& attrs);
     /// @brief DOS-Attribute und Zeitstempel einer FAT-Datei aendern.
     bool setAttributes(const FileRef& ref, const FatAttrs& attrs);
+    /// @brief Typ, Datum, Signum und Adressen einer BS600-Datei aendern.
+    bool setAttributes(const FileRef& ref, const Bs600Attrs& attrs);
+    /// @brief BS600: Dateien lueckenlos neu legen (Luecken schliessen); @p bewegt = Zahl der verschobenen Dateien.
+    bool reorganize(int* bewegt = nullptr);
+    /// @brief BS600: eine Datei umbenennen.
+    bool rename(const FileRef& ref, const std::string& neuer_name);
+    /// @brief BS600-Systemdiskette (PRG 700/710/710-1)?
+    bool istBs600() const { return profile_ && profile_->type == FsType::Bs600; }
 
     /// @brief Belegte Bloecke als Text (nur WEGA, sonst leer) — fuer den Eigenschaften-Dialog.
     std::string blockList(const FileRef& ref) const;

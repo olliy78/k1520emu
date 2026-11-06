@@ -279,6 +279,16 @@ uint8_t K5122::waitRead()
 
     const uint64_t t = waitJetzt();
     size_t slot = 0;
+    if (daten_erst_nach_marke_ && w_scharf_ && !w_mke_ && w_mke_time_ != UINT64_MAX && w_mke_time_ > t) {
+        // Der Leser ist noch nicht synchron: /WAIT bis zum Ende des ersten Sync-Bytes der Gruppe, dann
+        // gilt die Marke, und genau dieses Byte (A1) wird geliefert.
+        bus_.addWaitCycles(static_cast<int>(w_mke_time_ - t));
+        waitFenster(w_mke_time_, slot);
+        w_mke_ = true;
+        updateStatusPortB();
+        w_latch_ = waitByte(slot);
+        return w_latch_;
+    }
     const uint64_t ende = waitFenster(t, slot);
     if (ende > t) bus_.addWaitCycles(static_cast<int>(ende - t));
     w_latch_ = waitByte(slot);

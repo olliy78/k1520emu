@@ -17,6 +17,7 @@
 #include "core/peripherals/floppy_drive/format_catalog.h"
 #include "core/peripherals/k7636/k7636.h"
 #include "core/peripherals/k7637/k7637.h"
+#include "core/util/os_compat.h"
 #include "tests/support/fixtures.h"
 #include "tests/support/keyboard.h"
 #include "tests/support/machine_run.h"
@@ -46,7 +47,10 @@ const FsCatalog& dateisysteme() {
 struct Kopie {
     std::string path;
     Kopie(const std::string& rel, const std::string& name) {
-        path = (fs::temp_directory_path() / ("k1520_sios_rest_" + name)).string();
+        // Prozessnummer im Namen: ctest faehrt die Faelle parallel, jeder in eigenem Prozess; mit
+        // festem Namen raeumte der Destruktor des einen Falls die Kopie des anderen weg.
+        path = (fs::temp_directory_path() /
+                ("k1520_sios_rest_" + std::to_string(k1520::os::processId()) + "_" + name)).string();
         fs::copy_file(fs::path(A5120_LIEFERDISKETTEN) / rel, path, fs::copy_options::overwrite_existing);
     }
     ~Kopie() { std::error_code ec; fs::remove(path, ec); }

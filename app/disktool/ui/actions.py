@@ -132,6 +132,12 @@ _SPEC: List[Tuple] = [
     ("dos_sys", "&Systemdateien übernehmen… (DOS SYS)", None, None,
      "Bei einer leeren MS-DOS-Diskette: Bootsektor und Systemdateien (IO.SYS, DCDOS.SYS …) von einer "
      "Systemdiskette übernehmen — das macht sie bootfähig", "_dos_sys_dialog", False),
+    # BS600 (PRG 700/710/710-1): Dateien liegen unfragmentiert; nach dem Loeschen entstehen Luecken, in die
+    # eine grosse Datei nicht mehr passt.  Bewusst OHNE Tastenkuerzel (die Kuerzeltabelle des Handbuchs ist
+    # ein Vertrag).  Nur bei einer BS600-Diskette sichtbar bedienbar.
+    ("reorganisieren", "BS600: Dateien &reorganisieren…", None, None,
+     "Bei einer BS600-Diskette die Lücken zwischen den Dateien schließen (alle Dateien lückenlos ab Spur 1 "
+     "neu legen; Namen und Inhalt bleiben)", "_reorganisieren", False),
     ("diskeditor", "&Diskeditor…", "disk-editor", "Ctrl+E",
      "Die Diskette Spur für Spur und Sektor für Sektor ansehen und bearbeiten",
      "open_disk_editor", False),
@@ -225,6 +231,7 @@ KURZ = {'oeffnen': 'Öffnen',
     'gerade_spuren': 'Ungerade weg',
     'seite1_weg': 'Seite 1 weg',
     'bootabbild': 'Bootabbild',
+    'reorganisieren': 'Reorganisieren',
     'dos_sys': 'DOS SYS',
     'diskeditor': 'Diskeditor',
     'angaben': 'Diskette',

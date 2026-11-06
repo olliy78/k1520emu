@@ -45,6 +45,8 @@ DIR_ROLE = Qt.UserRole + 3
 
 #: Spaltenkoepfe der Diskettenansicht und der Plattenansicht (UNIX-Angaben).
 DISK_SPALTEN = ["Name", "Typ", "Größe", "Eigensch.", "Datum"]
+#: BS600 (PRG 700/710/710-1): Typ P/L, Lage Spur/Sektor, Lade-/End-/Startadresse (hex), Datum, Signum.
+BS600_SPALTEN = ["Name", "Typ", "Größe", "Lage", "Laden", "Ende", "Start", "Datum", "Signum"]
 PLATTE_SPALTEN = ["Name", "Art", "Größe", "Rechte", "uid", "gid", "Geändert"]
 
 
@@ -256,6 +258,9 @@ class DiskView(QWidget):
         if getattr(tool, "ist_fat", False):
             self._set_fat(tool, entries)
             return
+        if getattr(tool, "ist_bs600", False):
+            self._set_bs600(tool, entries)
+            return
         self._spalten_setzen(DISK_SPALTEN)
         self.titel.setText(f"Diskette — {tool.filesystem}")
         # Leer formatiert oder mit unpassendem Format geoeffnet: beides sieht hier
@@ -284,6 +289,27 @@ class DiskView(QWidget):
             # Zeile ueber die LAUFENDE NUMMER merken: genau darueber spricht die
             # Bibliothek beim Nachtragen (`load_entry_details(i)`), und Namen sind
             # bei UDOS ueber beide Seiten hinweg nicht eindeutig.
+            self._zeilen[nr] = item
+
+    def _set_bs600(self, tool, entries) -> None:
+        """BS600: flache Liste mit den Eintragsfeldern des Verzeichnisses (kein Dateiendungs-Begriff).
+
+        Lage ist ``Spur/Sektor-Spur/Sektor`` (Spur = Zylinder); Adressen hexadezimal.  Die Startadresse
+        ``0000`` heißt „keine“ (Dateien ohne Programmstart) und steht als Strich.
+        """
+        self._spalten_setzen(BS600_SPALTEN)
+        self.titel.setText(f"Diskette — {tool.filesystem}")
+        self.tree.leer_text = "" if entries else "Keine Dateien auf der Diskette"
+        self._zeilen = {}
+        for nr, e in enumerate(entries):
+            start = f"{e.entry:04X}" if e.entry else "—"
+            item = QTreeWidgetItem(self.tree, [e.name, e.type, f"{e.size}", e.extent,
+                                               f"{e.low_addr:04X}", f"{e.high_addr:04X}", start,
+                                               e.date, e.created])
+            item.setData(0, REF_ROLE, e.ref)
+            item.setData(0, VOLUME_ROLE, e.volume)
+            if e.damaged:
+                item.setText(1, "DEFEKT")
             self._zeilen[nr] = item
 
     def _set_fat(self, tool, entries) -> None:

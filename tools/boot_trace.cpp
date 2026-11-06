@@ -23,6 +23,9 @@
  *                    eine Zeile "EM …" (Vorgabe em256)
  *     --raf <typ>    RAM-Floppy stecken (raf128|raf512|raf2m|none), vor dem ersten Lauf;
  *                    gilt fuer alle Maschinen (A5120, --em, --machine k8915|prg710[-1])
+ *     --ohne-atp-zusatz   PRG 710/710-1: ATP-Zusatz abschalten (Vorgabe seit AP-B2 AN; `--atp-zusatz` bleibt als Kurzform)
+ *     (frueher --atp-zusatz   PRG 710/710-1: ATP-Zusatz (SIO C0H-C3H mit Schleife, Anzeige F4H/F5H, Takt
+ *                    an der CTC CCH-CFH); BS600/BS620 verlangt ihn im Selbsttest)
  *     --ptape        Lochstreifen-Karte K6022 (SIF1000, E0H–E7H) stecken, alle Maschinen
  *     --tape <k52>   Kassettenkarte K5020 stecken (A5120 30H, K8915 D0H, PRG 30H) und die
  *                    Kassettendatei <k52> an Geraet 1 binden (fehlt sie: leere Kassette);
@@ -397,6 +400,8 @@ int main(int argc, char** argv) {
             if (k == "original") p8000_original = true;
             else if (k != "kern") { fprintf(stderr, "--konsole %s unbekannt (kern | original)\n", k.c_str()); return 2; }
         }
+        else if (!strcmp(argv[i], "--atp-zusatz")) { k8o.atp_zusatz = true; }          // Vorgabe seit AP-B2; bleibt als Kurzform
+        else if (!strcmp(argv[i], "--ohne-atp-zusatz")) { k8o.atp_zusatz = false; }
         else if (!strcmp(argv[i], "--ptape")) { ptape_opt = true; k8o.ptape = true; }
         else if (!strcmp(argv[i], "--tape-card")) { tape_opt = true; k8o.tape = true; }
         else if (!strcmp(argv[i], "--tape") && i+1 < argc) { tape_opt = true; k8o.tape = true; tape1_opt = k8o.tape1 = argv[++i]; }

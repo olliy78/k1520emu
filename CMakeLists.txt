@@ -248,6 +248,7 @@ if(BUILD_K1520)
         core/filesystem/udos/udos_fs.cpp
         core/filesystem/udos/udos1715_fs.cpp
         core/filesystem/sios/sios_fs.cpp
+        core/filesystem/bs600/bs600_fs.cpp
         core/filesystem/fat/fat_fs.cpp
         core/filesystem/wega/wega_fs.cpp
         core/filesystem/tar/tar_fs.cpp
@@ -267,6 +268,8 @@ if(BUILD_K1520)
         core/filesystem/check/udos1715_recover.cpp
         core/filesystem/check/sios_check.cpp
         core/filesystem/check/sios_recover.cpp
+        core/filesystem/check/bs600_check.cpp
+        core/filesystem/check/bs600_recover.cpp
     )
     target_link_libraries(k1520_fs PUBLIC k1520_geometry k1520_floppy2 k1520_util k1520_gzip)
     target_include_directories(k1520_fs PUBLIC ${CMAKE_SOURCE_DIR})

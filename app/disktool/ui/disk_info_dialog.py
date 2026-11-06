@@ -42,6 +42,9 @@ def angaben_text(tool) -> str:
     boot = tool.boot_area_size(0)
     zeilen.append(f"Systemspuren:     {boot} Byte" if boot > 0
                   else "Systemspuren:     keine (Datendiskette)")
+    # BS600: der Urlader nennt sein Zielgeraet (PRG 710-1 oder PRG 700) - das steht nirgends sonst auf der Diskette.
+    if getattr(tool, "ist_bs600", False) and tool.bs600_urlader:
+        zeilen.append(f"Urlader:          {tool.bs600_urlader}")
 
     zeilen.append("")
     zeilen.append("BELEGUNG")

@@ -27,6 +27,11 @@ Die Zuordnung Datei → Ordner steht für die Bauskripte in `tools/disketten_bei
 `<system>_<diskformat>_<laufwerkskonfiguration>_<merkmale>.<ext>` — identisch zu den Fixtures,
 Erklärung der Segmente in `tests/fixtures/README.md`.
 
+## BS620 (`prg710-1_bs620/`) und BS610-Rekonstruktion
+
+`prg710-1_bs620/prg710-1_bs620_system.hfe` = Original BS620 (PRG 710-1, am echten Gerät getestet; im Paket). `prg710_bs610_rekonstruktion/` ist ein
+Eigenbau für das PRG 710, **experimentell** (im Emulator geprüft, am echten Gerät ungetestet; im Paket). Die Gerätetest-Paare (low/high) baut `tools/bs600/bau_disketten.py --geraetetest <Ordner>`.
+
 ## SIOS 1526 (`a5120_sios1526/`)
 
 Gebaut mit `tools/sios_a5120/build.py` aus den Originalen in `tools/sios_a5120/original/` (Wächter `cli_sios_a5120`, Bedienung

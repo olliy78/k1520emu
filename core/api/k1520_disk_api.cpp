@@ -17,6 +17,7 @@
 #include "core/api/k1520_sync_internal.h"
 #include "core/version.h"
 
+#include "core/filesystem/bs600/bs600_fs.h"
 #include "core/filesystem/fat/fat_fs.h"
 #include "core/filesystem/disk_volume.h"
 #include "core/filesystem/geometry_probe.h"
@@ -69,7 +70,7 @@ struct Handle {
     TrackView                   spur;        ///< Stand des letzten k1520d_track_scan
     // Puffer je Getter — die Rueckgabe gilt bis zum naechsten Aufruf DERSELBEN Funktion.
     std::string s_error, s_name, s_type, s_attrs, s_date, s_kurz, s_sys, s_dir, s_label, s_created,
-                s_segments, s_blocks, s_ziel;
+                s_segments, s_blocks, s_ziel, s_extent, s_urlader;
     std::string s_fmt, s_fs, s_alt, s_remarks, s_fit, s_check, s_container, s_tarwarn;
     std::string s_satzbasis, s_pnamen, s_pueber, s_palt, s_hinweise, s_geschr, s_tgrund, s_physgrund;
     TarSatzPlan satzplan;                         ///< Stand des letzten k1520d_tar_satz_plan
@@ -843,6 +844,42 @@ extern "C" const char* k1520d_entry_segments(K1520Disk h, int i) {
 extern "C" const char* k1520d_entry_created(K1520Disk h, int i) {
     const FileEntry* e = eintrag(h, i);
     return e ? halte(H(h)->s_created, e->created) : "";
+}
+
+extern "C" const char* k1520d_entry_extent(K1520Disk h, int i) {
+    const FileEntry* e = eintrag(h, i);
+    return e ? halte(H(h)->s_extent, e->extent) : "";
+}
+
+extern "C" bool k1520d_set_bs600_attrs(K1520Disk h, const char* name, const char* type,
+                                       bool set_date, const char* date,
+                                       bool set_author, const char* author,
+                                       bool set_load, uint16_t load,
+                                       bool set_entry, uint16_t entry) {
+    if (!h || !name) return false;
+    Bs600Attrs a;
+    if (type) a.type = type;
+    a.set_date   = set_date;   if (date)   a.date   = date;
+    a.set_author = set_author; if (author) a.author = author;
+    a.set_load   = set_load;   a.load  = load;
+    a.set_entry  = set_entry;  a.entry = entry;
+    return H(h)->vol->setAttributes(FileRef::parse(name), a);
+}
+
+extern "C" bool k1520d_bs600_reorganize(K1520Disk h, int* bewegt) {
+    if (!h) return false;
+    return H(h)->vol->reorganize(bewegt);
+}
+
+extern "C" bool k1520d_rename(K1520Disk h, const char* name, const char* new_name) {
+    if (!h || !name || !new_name) return false;
+    return H(h)->vol->rename(FileRef::parse(name), new_name);
+}
+
+extern "C" const char* k1520d_bs600_urlader(K1520Disk h) {
+    if (!h) return "";
+    const Bs600FileSystem* f = H(h)->vol->bs600Fs();
+    return halte(H(h)->s_urlader, f ? f->urlader().text : std::string());
 }
 
 extern "C" bool k1520d_set_udos_attrs(K1520Disk h, const char* name,

@@ -1213,6 +1213,26 @@ int k1520_prg710_freigabe(K1520Handle h) {
     return p ? p->speicher().freigabe() : -1;
 }
 
+bool k1520_prg710_atp_install(K1520Handle h) {
+    auto* p = prgOf(h);
+    return p && p->steckeAtpZusatz();
+}
+
+bool k1520_prg710_atp_installed(K1520Handle h) {
+    auto* p = prgOf(h);
+    return p && p->atpZusatz();
+}
+
+bool k1520_prg710_atp_display(K1520Handle h, uint8_t* f4, uint8_t* f5, uint32_t* anzahl) {
+    auto* p = prgOf(h);
+    if (!p || !p->atpZusatz()) return false;
+    const auto& a = p->atpAnzeige();
+    if (f4) *f4 = a.f4;
+    if (f5) *f5 = a.f5;
+    if (anzahl) *anzahl = a.anzahl;
+    return true;
+}
+
 // ─── EPROMmer (AP-P7b) ───────────────────────────────────────────────────────
 namespace {
 thread_local std::string eprom_fehler;
