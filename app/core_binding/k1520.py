@@ -973,6 +973,10 @@ MC80_VARIANTEN = {"mc80": 0, "mc80-21": 3, "mc80-22": 4}
 MC80_2X = ("mc80-21", "mc80-22")
 # Druckertyp fuer k1520_create_printer (Entwurf 49, WP1): nur der SD 1157/264 ist gebaut.
 DRUCKER_TYPEN = {"sd1157": 0}
+# Tasten, Schalter und Lampen des Druckers (k1520_printer_key/_switch/_lamp, Werte wie in k1520_api.h).
+DRUCKER_TASTE_PV1, DRUCKER_TASTE_PV2, DRUCKER_TASTE_TEST = 1, 2, 3
+DRUCKER_SW_ONLINE, DRUCKER_SW_KOPF, DRUCKER_SW_LPI6, DRUCKER_SW_PAPIER = 0, 1, 2, 3
+DRUCKER_LAMPE_ONLINE, DRUCKER_LAMPE_FEHLER = 0, 1
 # Bauform fuer k1520_create_k8915 (doc/design/24_k8915_varianten.md R5); "k8915" bleibt V3.
 K8915_GENERATIONEN = {"k8915": 0, "k8915-g2": 1}
 
@@ -1232,7 +1236,7 @@ class K1520Emulator:
                  tastatur: Optional[str] = None, p8000: Optional[dict] = None,
                  ausfuehrung: Optional[str] = None, spe=1, pcmc=False, laderom: Optional[str] = None,
                  konfig: Optional[dict] = None, aup: bool = False,
-                 aup_sonder: bool = False):
+                 aup_sonder: bool = False, drucker: Optional[str] = None):
         """Initialize emulator instance.
 
         Args:
@@ -1391,7 +1395,9 @@ class K1520Emulator:
                 teile = [f"{k}={v}" for k, v in (p8000 or {}).items()]
                 handle = _lib.k1520_create_p8000_terminal(",".join(teile).encode("utf-8"))
             elif machine in DRUCKER_TYPEN:
-                handle = _lib.k1520_create_printer(DRUCKER_TYPEN[machine], None)
+                # drucker = Konfigurationstext des Kerns ("schnittstelle=ifss|v24,rom=original|repariert")
+                handle = _lib.k1520_create_printer(DRUCKER_TYPEN[machine],
+                                                   drucker.encode("ascii") if drucker else None)
             elif machine in MC80_VARIANTEN:
                 # Der MC80.2x kennt keinen Konfigurationstext (k1520_create_mc80 lehnt ihn ab).
                 if machine in MC80_2X:
@@ -2640,6 +2646,62 @@ class K1520Emulator:
                  for i in range(VRAM_COLS * VRAM_ROWS)]
         return "\n".join("".join(chars[r * VRAM_COLS:(r + 1) * VRAM_COLS])
                           for r in range(VRAM_ROWS))
+
+    # ─── Drucker (Entwurf 49, WP3/WP5): Blatt, Kopf, Bedienfeld ───────────────
+
+    def printer_geometry(self) -> Optional[tuple]:
+        """(Pixel je Zoll in x, Pixel je Zoll in y, Bahnen); ``None`` ohne Drucker."""
+        x, y, b = ctypes.c_int(), ctypes.c_int(), ctypes.c_int()
+        if not _lib.k1520_printer_geometry(self._handle, ctypes.byref(x), ctypes.byref(y), ctypes.byref(b)):
+            return None
+        return (x.value, y.value, b.value)
+
+    def printer_sheet_size(self, bahn: int = 0) -> Optional[tuple]:
+        """(Breite, Hoehe) des Blatts in Pixeln; die Hoehe waechst.  ``None`` ohne Bahn."""
+        w, h = ctypes.c_int(), ctypes.c_int()
+        if not _lib.k1520_printer_sheet_size(self._handle, bahn, ctypes.byref(w), ctypes.byref(h)):
+            return None
+        return (w.value, h.value)
+
+    def printer_sheet_version(self, bahn: int = 0) -> int:
+        """Versionszaehler des Blatts (aendert sich bei jedem Punkt, Wachstum und Leeren)."""
+        return int(_lib.k1520_printer_sheet_version(self._handle, bahn))
+
+    def printer_sheet_rows(self, y0: int, n: int, bahn: int = 0) -> bytes:
+        """Bis zu ``n`` Zeilen ab ``y0``, je ``(Breite+7)//8`` Byte, Bit 7 = linkester Punkt.
+        Leer, wenn es die Zeilen nicht gibt."""
+        groesse = self.printer_sheet_size(bahn)
+        if groesse is None or n <= 0:
+            return b""
+        zb = (groesse[0] + 7) // 8
+        puffer = (ctypes.c_uint8 * (zb * n))()
+        got = int(_lib.k1520_printer_sheet_rows(self._handle, bahn, y0, n,
+                                                ctypes.cast(puffer, ctypes.c_void_p), zb * n))
+        return bytes(puffer[:got * zb]) if got > 0 else b""
+
+    def printer_sheet_clear(self) -> bool:
+        return bool(_lib.k1520_printer_sheet_clear(self._handle))
+
+    def printer_head(self) -> Optional[tuple]:
+        """(x in Blattpixeln, y-Zeile der Nadel 1, laeuft 0/1); ``None`` ohne Drucker."""
+        x, y, lauf = ctypes.c_int(), ctypes.c_int(), ctypes.c_int()
+        if not _lib.k1520_printer_head(self._handle, ctypes.byref(x), ctypes.byref(y), ctypes.byref(lauf)):
+            return None
+        return (x.value, y.value, lauf.value)
+
+    def printer_key(self, taste: int, gedrueckt: bool) -> bool:
+        return bool(_lib.k1520_printer_key(self._handle, taste, 1 if gedrueckt else 0))
+
+    def printer_switch(self, schalter: int, wert: bool) -> bool:
+        return bool(_lib.k1520_printer_switch(self._handle, schalter, 1 if wert else 0))
+
+    def printer_switch_get(self, schalter: int) -> int:
+        """0/1, -1 = unbekannt/kein Drucker."""
+        return int(_lib.k1520_printer_switch_get(self._handle, schalter))
+
+    def printer_lamp(self, lampe: int) -> int:
+        """0/1, -1 = unbekannt/kein Drucker."""
+        return int(_lib.k1520_printer_lamp(self._handle, lampe))
 
     # ─── Serielle Schnittstellen nach aussen (Entwurf 19 §8) ──────────────────
 

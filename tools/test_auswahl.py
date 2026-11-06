@@ -71,6 +71,9 @@ REGELN = [
     ("tools/kermit80/**", ("fach_kermit",), "Kermit-80", False),
     ("tools/k1520kermit*", ("fach_kermit",), "Kermit-CLI", True),
     ("app/kermittool/**", (), "Kermit-Oberflaeche", False),
+    ("app/printertool/**", ("fach_drucker",), "Drucker-Oberflaeche", False),
+    ("data/default_config_printer.yaml", ("fach_drucker",), "Drucker-Vorgabe", False),
+    ("run_k1520printer.sh", ("fach_drucker",), "Drucker-Starter", False),
     ("tools/sertest/**", ("fach_serial",), "SERTEST", False),
     # ── Diskette ────────────────────────────────────────────────────────
     ("core/peripherals/floppy_drive/**", _FLOPPY_WEIT, "Diskettenlaufwerk/-medium", True),

@@ -1,0 +1,15 @@
+# Auslieferungszustand von K1520 Printer (gleicher Aufbau wie k1520printer.yaml des Anwenders).
+# Kein window.geometry (Bildschirmposition des Baurechners); width/height reichen.
+general:
+  model: sd1157
+  speed: 1.0
+printer:
+  rom: repariert
+  schnittstelle: ifss
+  online: true
+  formular_zoll: 12
+  einpassen: true
+  folgen: true
+window:
+  width: 1280
+  height: 760
