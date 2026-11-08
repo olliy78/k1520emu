@@ -155,7 +155,9 @@ REGELN = [
     ("tools/*.h", (), "Werkzeug (schnelle Spur)", True),
     ("tools/**", (), "Werkzeug (schnelle Spur)", False),
     ("data/**", (), "Daten (schnelle Spur)", False),
-    ("*", (), "unbekannter Pfad ausserhalb core/ (nur `test`)", False),
+    (".github/**", (), "CI-Ablauf (faehrt dieselben dev.sh-Befehle)", False),
+    # `**` statt `*`: `*` deckt nur EINEN Namensteil, ein verschachtelter Pfad fiel sonst durch.
+    ("**", (), "unbekannter Pfad ausserhalb core/ (nur `test`)", False),
 ]
 
 _cache = {}
@@ -185,7 +187,7 @@ def regel_fuer(pfad):
             if win is None:
                 win = False
             return muster, facher, grund, win
-    raise AssertionError(pfad)  # "*" faengt alles
+    raise AssertionError(pfad)  # "**" faengt alles
 
 
 def plan(dateien, alles=False):
