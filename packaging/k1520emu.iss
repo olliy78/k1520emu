@@ -176,9 +176,10 @@ VersionInfoVersion={#VersionInfo}
 ;
 ; Ein VC-Redist entfaellt in beiden Faellen: die Kernbibliothek bringt ihre
 ; C-Laufzeit selbst mit (/MT, §5.1).
-; Mindestens Windows 10 Version 1809: Python 3.14 laeuft erst ab Windows 10, und
-; Qt 6 verlangt seit 6.5 mindestens 1809 (Annahme — fuer Qt 6.11 nicht
-; nachgeschlagen).  Besser jetzt eine klare Absage als ein Fehlschlag mitten im Bootstrap.
+; Mindestens Windows 10 Version 1809 (10.0.17763): so steht es in der Plattformliste
+; von Qt 6.11 (doc.qt.io/qt-6.11/windows.html, geprueft 2026-11-08; Windows 10 nur
+; x86_64), und Python 3.14 laeuft erst ab Windows 10.  Besser jetzt eine klare
+; Absage als ein Fehlschlag mitten im Bootstrap.
 MinVersion=10.0.17763
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
@@ -363,8 +364,13 @@ const
 
   { Vorabpruefung (ZielPruefen) }
   MaxPfadLaenge    = 100;   { PySide6 geht unter dem Ziel noch gut 120 Zeichen tief; MAX_PATH ist 260 }
-  PlatzZielMB      = 900;   { grobe Schaetzung: Python ~150, Qt-Umgebung ~450, Reserve }
-  PlatzTempMB      = 400;   { entpacktes tar + Zwischenstaende }
+  { Gemessen (doc/design/13_distribution.md §8, bootstrap.log): fertige Installation
+    116 MB, davon schneidet slim.py vorher 170 MB wieder ab -> Spitze ~290 MB, mit
+    Reserve 320.  Bei einem Update liegt die alte Fassung (~120 MB) als *.alt daneben.
+    Temp: python.tar.gz 21 MB + entpacktes tar ~70 MB. }
+  PlatzZielMB      = 320;
+  PlatzAltMB       = 120;
+  PlatzTempMB      = 150;
 
 var
   HinweisSeite:      TOutputMsgWizardPage;
@@ -595,10 +601,13 @@ end;
 function ZielPruefen: String;
 var
   Ziel, Temp: String;
-  PlatzZiel, PlatzTemp: Integer;
+  PlatzZiel, PlatzTemp, BrauchtZiel: Integer;
 begin
   Result := '';
   Ziel := ExpandConstant('{app}');
+  BrauchtZiel := PlatzZielMB;
+  if DirExists(Ziel + '\venv') or DirExists(Ziel + '\venv.alt') then
+    BrauchtZiel := BrauchtZiel + PlatzAltMB;   { Update: die alte Fassung liegt daneben }
   Temp := ExpandConstant('{tmp}');
 
   if Length(Ziel) > MaxPfadLaenge then begin
@@ -614,17 +623,17 @@ begin
   if (PlatzZiel >= 0) and (PlatzTemp >= 0)
      and (CompareText(ExtractFileDrive(Ziel), ExtractFileDrive(Temp)) = 0) then begin
     { Beides auf demselben Laufwerk: die Summen zaehlen. }
-    if PlatzZiel < PlatzZielMB + PlatzTempMB then begin
+    if PlatzZiel < BrauchtZiel + PlatzTempMB then begin
       Result := 'Auf dem Laufwerk ' + ExtractFileDrive(Ziel) + ' sind nur ' + IntToStr(PlatzZiel)
-              + ' MB frei; die Installation braucht (grob geschaetzt) ca. '
-              + IntToStr(PlatzZielMB + PlatzTempMB) + ' MB.';
+              + ' MB frei; die Installation braucht ca. '
+              + IntToStr(BrauchtZiel + PlatzTempMB) + ' MB.';
       Exit;
     end;
   end else begin
-    if (PlatzZiel >= 0) and (PlatzZiel < PlatzZielMB) then begin
+    if (PlatzZiel >= 0) and (PlatzZiel < BrauchtZiel) then begin
       Result := 'Auf dem Laufwerk ' + ExtractFileDrive(Ziel) + ' sind nur ' + IntToStr(PlatzZiel)
-              + ' MB frei; die Installation braucht (grob geschaetzt) ca. '
-              + IntToStr(PlatzZielMB) + ' MB.';
+              + ' MB frei; die Installation braucht ca. '
+              + IntToStr(BrauchtZiel) + ' MB.';
       Exit;
     end;
     if (PlatzTemp >= 0) and (PlatzTemp < PlatzTempMB) then begin
