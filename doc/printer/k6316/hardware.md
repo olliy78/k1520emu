@@ -290,8 +290,10 @@ Segmentanfänge in Takten ab Zeilenanfang: Normal 0, Breit 270, Schräg 540.  Na
 ### 10.8  Hexdump (S2 beim Einschalten) `[E]` (`0303H…0368H`; V.24: `03A9H…03F2H`, Code gleich)
 Gesetzt in `00C9H…00D3H` (Eingang `8CH` Bit 2 beim Einschalten, nach Handbuch S2 = TPVV; Zuordnung `[?]`).  Jedes empfangene Byte B wird als **drei Zeichen** gedruckt:
 `'0'+hi` — **ohne Korrektur: hi ≥ A druckt `:` `;` `<` `=` `>` `?` (30H|hi)** —, dann `lo`: `'0'…'9'` bzw. `'A'…'F'` (`RLD`-Folge, Vergleich `90H` gegen `lo<<4`), dann Leerzeichen.  **32 Bytes je Zeile**
-(`(IX+103)`: LF+CR vor dem ersten Byte und nach je 32 Bytes, Zähler 20H), Zeilenlänge 96 Zeichen.  Alles läuft über die normale Zeichenausgabe `1A14H` (Normalschrift, Pitch wie eingestellt).  Ob das Hi-Nibble-Verhalten
-Absicht oder Abzug-Fehler ist, bleibt `[?]` (die Glyphen 3AH…3FH sind gewöhnliche Satzzeichen, keine Hexziffern).
+(`(IX+103)`: LF+CR vor dem ersten Byte und nach je 32 Bytes, Zähler 20H), Zeilenlänge 96 Zeichen.  Alles läuft über die normale Zeichenausgabe `1A14H` (Normalschrift, Pitch wie eingestellt).  Das Hi-Nibble-Verhalten ist
+**praktisch folgenlos**: die SIO läuft mit 7 Datenbits (`WR3 = 61H`, §2), Bit 7 kommt nie an, Hi ≥ 8 also nicht vor.  **Am Emulator bestätigt 2026-11-08** (beide Module, Wächter
+`K6316Modul.HexdumpMitS2BeimEinschalten…`): S2 beim Netz-Ein schaltet den Hexdump ein (Zuordnung `8CH` Bit 2 = S2 damit belegt), gedruckt wird mit **12,5 Z/Z** (96 Zeichen je Zeile).  Ein
+angebotenes 98H druckt als `18`.
 
 ### 10.9  Orakel-Pseudocode für `k6316_orakel.h`
 ```
@@ -309,5 +311,5 @@ Gleiche Regeln: Zeichengenerator ebenfalls `2400H + 8·Code` (Zweittabelle `2100
 Glyphen der Codes **24H, 26H, 40H** (IFSS: andere Formen, `@` mit eigenem `g[0]=BBH`; V.24: `@` mit `g[0]=FF`) und in der Zweittabelle.
 
 ### 10.11  Offen `[?]`
-Zeilennummern des Pitch-/SO-Wechsels im Selbsttest (aus Zählerstand, nicht gemessen); Zuordnung der Einschalt-Tasten zu `8CH`-Bits (Hexdump); ~~SGR-Parameter~~ am Emulator bestätigt 2026-11-08 (`ESC[1m`/`[3m`/`[4m`/`[0m` über die SIO, Wächter `K6316Modul.SchriftartenUeberEscFolgen…`); Selbsttestzeilen 1–3 (Segmente 0/270/540) ebenso;
+Zeilennummern des Pitch-/SO-Wechsels im Selbsttest (aus Zählerstand, nicht gemessen); ~~Zuordnung S2 ↔ `8CH` Bit 2 (Hexdump)~~ am Emulator bestätigt (§10.8); ~~SGR-Parameter~~ am Emulator bestätigt 2026-11-08 (`ESC[1m`/`[3m`/`[4m`/`[0m` über die SIO, Wächter `K6316Modul.SchriftartenUeberEscFolgen…`); Selbsttestzeilen 1–3 (Segmente 0/270/540) ebenso;
 Verhalten der Zweitzeichensatz-Glyphen im Orakel (nicht getestet); Anfang einer Schrägzeile (erste Zelle ohne `FF`-Vorbelegung nur beim allerersten Zeichen nach Zeilenwechsel, dort `sub_1FDCH` — nicht geprüft).

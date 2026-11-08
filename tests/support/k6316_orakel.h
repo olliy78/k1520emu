@@ -18,6 +18,7 @@
  */
 #pragma once
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <fstream>
 #include <iterator>
@@ -209,10 +210,50 @@ inline std::string vergleiche(const Blattmodell& b, const std::vector<uint8_t>& 
     return msg;
 }
 
+/// Liest ein Band im Normaldruck (10 Z/Z) zurueck in Text: je 30-Pixel-Zelle der Code 20H..7EH, dessen Treffer GENAU passen,
+/// sonst '?'.  Der Ursprung wird gesucht (bester von 30 Kandidaten).  Nur Diagnose, kein Pruefmassstab.
+inline std::string lesen(const Blattmodell& b, const std::vector<uint8_t>& rom, int ya, int yb, double takt_px = DRUCKTAKT)
+{
+    // Ist-Lage auf Takte zu 3 Pixeln umrechnen (die Glyphen unten sind in 3-Pixel-Takten)
+    Punkte alle;
+    {
+        const Punkte roh = gedruckt(b, ya, yb);
+        if (roh.empty()) return "";
+        int rx = 1 << 30;
+        for (auto& q : roh) rx = std::min(rx, q.first);
+        for (auto& q : roh) alle.insert({rx + static_cast<int>(std::lround((q.first - rx) / takt_px)) * DRUCKTAKT, q.second});
+    }
+    if (alle.empty()) return "";
+    int ax = 1 << 30, ay = 1 << 30, bx = 0;
+    for (auto& q : alle) { ax = std::min(ax, q.first); ay = std::min(ay, q.second); bx = std::max(bx, q.first); }
+    std::vector<Punkte> glyphen(0x7F);
+    for (int c = 0x20; c < 0x7F; ++c)
+        for (auto& q : treffer(rom, c, Schrift::Normal)) glyphen[static_cast<size_t>(c)].insert({q.first * DRUCKTAKT, (q.second - 1) * NADEL});
+    std::string best;
+    int best_ok = -1;
+    for (int ox = ax - ZEICHEN + 1; ox <= ax; ++ox)
+        for (int oy = ay - 7 * NADEL; oy <= ay; oy += 1) {
+            std::string s;
+            int ok = 0;
+            for (int x0 = ox; x0 <= bx; x0 += ZEICHEN) {
+                Punkte z;
+                for (auto& q : alle) if (q.first >= x0 && q.first < x0 + ZEICHEN) z.insert({q.first - x0, q.second - oy});
+                char ch = '?';
+                for (int c = 0x20; c < 0x7F && ch == '?'; ++c) if (glyphen[static_cast<size_t>(c)] == z) ch = static_cast<char>(c);
+                if (ch != '?') ++ok;
+                s += ch;
+            }
+            if (ok > best_ok) { best_ok = ok; best = s; }
+        }
+    return best;
+}
+
 /// Vergleicht eine GANZE Zeile (alle Abschnitte, alle neun Nadeln) mit dem Band [ya, yb).  Ursprung (@p ox, @p oy: Takt 0 /
 /// Nadel 1 in Pixeln) vorgegeben oder (Vorgabe) aus dem ersten Punkt gewonnen — der einzige freie Wert.
+/// @p takt_px: Pixel je Drucktakt (10 Z/Z = 3, 12,5 Z/Z = 2,4, 15 Z/Z = 2; §10.1 Nr. 4).  Verglichen wird in Takten: die Ist-Lage
+/// wird auf den naechsten Takt gerundet (die Pixellage zwischen den Halbschritten ist Sache des Kopfmodells, nicht der Firmware).
 inline std::string vergleicheZeile(const Blattmodell& b, const std::vector<uint8_t>& rom, const std::vector<Abschnitt>& teile,
-                                   int ya, int yb, int ox = INT32_MIN, int oy = 0)
+                                   int ya, int yb, int ox = INT32_MIN, int oy = 0, double takt_px = DRUCKTAKT)
 {
     const Punkte exp = erwartetZeile(rom, teile);
     if (ox == INT32_MIN) {   // Ursprung aus dem ersten Punkt (Zeile beginnt links oben mit einem Treffer in beiden Mengen)
@@ -221,10 +262,11 @@ inline std::string vergleicheZeile(const Blattmodell& b, const std::vector<uint8
         int ex = 1 << 30, ey = 1 << 30, ax = 1 << 30, ay = 1 << 30;
         for (auto& q : exp) { ex = std::min(ex, q.first); ey = std::min(ey, q.second); }
         for (auto& q : alle) { ax = std::min(ax, q.first); ay = std::min(ay, q.second); }
-        ox = ax - ex; oy = ay - ey;
+        ox = ax - static_cast<int>(std::lround(ex / DRUCKTAKT * takt_px)); oy = ay - ey;
     }
     Punkte act;
-    for (auto& q : gedruckt(b, ya, yb)) act.insert({q.first - ox, q.second - oy});
+    for (auto& q : gedruckt(b, ya, yb))
+        act.insert({static_cast<int>(std::lround((q.first - ox) / takt_px)) * DRUCKTAKT, q.second - oy});
     std::string msg;
     int n = 0, nf = 0, nz = 0;
     for (auto& q : exp) if (!act.count(q)) { ++nf; if (n++ < 6) msg += " fehlt(" + std::to_string(q.first) + "," + std::to_string(q.second) + ")"; }

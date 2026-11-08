@@ -99,6 +99,8 @@ Stand 2026-11-06 (WP3/WP2b, WP4 Anschluss, Textdruck/Fluss/ROM-Reparatur, WP2a/W
     **Nadel-9-Maske** (Bit k = Takt k), Datenspalte `g[c]` im Takt c−1; Breit = Spalte m im Takt 2m aus `g[m] & g[m+1]` (roh), 20 Takte; Schräg = Nadel j um 9−j Takte verzögert;
     Unterstrich = Nadel 9 auf 0,2,4,6,8 je Zelle ohne eigenes Nadel-9-Bild.  Wächter: ganze Selbsttestzeilen 1–3 (Normal ab Takt 0, Breit+Unterstrich ab 270, Schräg ab 540, alle neun Nadeln)
     und `ESC[1m`/`[3m`/`[4m`/`[0m` über die SIO (`K6316Modul.SelbsttestZeilenMit…`, `…SchriftartenUeberEscFolgen…`).  Gegenprobe: ein um einen Takt verschobener Schrägabschnitt fällt mit ~300 Punkten durch.
+    Andere Teilung: `vergleicheZeile(..., takt_px)` vergleicht in Takten (12,5 Z/Z = 2,4 Pixel; der Hexdump druckt so).  `lesen()` liest ein Band zurück in Text — nur zur Diagnose im Fehlertext.
+    **Hexdump:** die SIO hat 7 Datenbits (`WR3 = 61H`) — Bytes ab 80H kommen ohne Bit 7 an (Gastverhalten, nicht „reparieren“).
 23. **V.24: CTS/DCD kommen vom Host (Wandler).**  Ohne Gegenstelle (`reset()` setzt Kanal A auf CTS/DCD = 0) wartet das V.24-ROM (`1995H`) mit dem ersten DC1; mit `serialHub()->wandler(1).anbinden()` geht es los (wie SD 1157).
     **Ohne S17 (Auslieferungszustand, alle DIL Aus) läuft das DTR-Protokoll, es wird kein DC1 gesendet.**  Text in die SIO am V.24 muss über `Wandler::fernGib`, nicht über `dfueSend` (`einspeisen` ignoriert belegte Leitungen).
     **Offen:** das V.24-ROM sendet auch ohne Papier DC1 (statt DC4) — Gastverhalten oder Eigenheit des Protokolls [?].

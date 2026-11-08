@@ -284,6 +284,34 @@ TEST_P(K6316Modul, SchriftartenUeberEscFolgenUndUnterlaengenMitNadel9)
     EXPECT_EQ(vergleicheZeile(l.blatt(), r, {{z4, Schrift::Normal, true, 0}}, b[3].first, b[3].second), "") << "ESC[4m Unterstrich";
 }
 
+TEST_P(K6316Modul, HexdumpMitS2BeimEinschaltenDrucktJedesByteAlsDreiZeichen)
+{
+    // hardware.md §10.8: S2 beim Netz-Ein (8CH Bit 2) -> jedes empfangene Byte als '0'+hi, lo als 0-9/A-F, Leerzeichen; 32 Bytes = 96 Zeichen je Zeile, gedruckt mit 12,5 Z/Z (Takt 1/125 Zoll = 2,4 Pixel; am Lauf gemessen).
+    const auto r = rom(abzugDir(), l_v24(GetParam()));
+    Lauf l(GetParam());
+    l.st().setTaste(2, true);
+    ASSERT_TRUE(l.erstesZeichen(80'000'000));
+    l.st().setTaste(2, false);
+    l.fahre(2'000'000);
+    std::string daten, text;
+    for (int i = 0; i < 32; ++i) {
+        // Die Firmware programmiert die SIO auf 7 Datenbits (WR3 = 61H, hardware.md §2): Bit 7 kommt nie an, ein Hi-Nibble >= 8 also
+        // auch nicht — der Pfad "hi >= A druckt : ; < = > ?" (§10.8) ist ueber die Schnittstelle nicht erreichbar.
+        const int bb = (i * 0x1D + 0x07) & 0x7F;   // alle Lo-Nibble, Hi 0..7
+        daten += static_cast<char>(bb);
+        text += static_cast<char>(0x30 | (bb >> 4));
+        text += "0123456789ABCDEF"[bb & 15];
+        text += ' ';
+    }
+    l.sende(daten);
+    l.fahre(12'000'000);
+    const auto b = baender(l.blatt());
+    ASSERT_EQ(b.size(), 1u) << "eine Zeile mit 32 Bytes";
+    constexpr double TAKT_125 = 2.4;
+    EXPECT_EQ(vergleicheZeile(l.blatt(), r, {{text, Schrift::Normal, false, 0}}, b[0].first, b[0].second, INT32_MIN, 0, TAKT_125), "")
+        << "gelesen: \"" << lesen(l.blatt(), r, b[0].first, b[0].second, TAKT_125) << "\"\nerwartet: \"" << text << "\"";
+}
+
 INSTANTIATE_TEST_SUITE_P(Module, K6316Modul, ::testing::Values(Typ::K6316_Ifss, Typ::K6316_V24));
 
 // ─── Betriebsarten und Schnitt ───────────────────────────────────────────────
