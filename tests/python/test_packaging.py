@@ -944,7 +944,7 @@ def test_iss_raeumt_auf_wenn_das_nachladen_scheitert():
     vorbereiten = code[code.index("function PrepareToInstall"):]
     vorbereiten = vorbereiten[:vorbereiten.index("procedure VorlageSchreiben")]
     for weg in ("{app}\\venv", "{app}\\python"):
-        assert f"DelTree(ExpandConstant('{weg}')" in vorbereiten, (
+        assert f"OrdnerRestlosLoeschen(ExpandConstant('{weg}')" in vorbereiten, (
             f"{weg} wird nach einem Fehlschlag nicht weggeräumt")
 
 
@@ -2286,3 +2286,29 @@ def test_mutos8000_nur_der_k5601_satz_im_paket():
     for name in block:
         assert ausgelieferte_diskette(name).is_file(), name
     assert "*/a5120_mutos8000/*) continue" in text          # --disks all laesst die Quellen aus
+
+
+def test_iss_sichert_die_alte_fassung_und_stellt_sie_wieder_her():
+    """Ein fehlgeschlagenes Update darf die laufende Installation nicht zerstoeren.
+
+    Die alte Fassung wird beiseite gelegt (das ist zugleich die Probe auf laufende
+    Programme), bei Fehlschlag zurueckgestellt und erst nach dem Rauchtest geloescht.
+    """
+    code = _iss_code()
+    for name in ("function AltesSichern", "procedure AltesZurueck",
+                 "procedure SicherungLoeschen", "procedure DeinitializeSetup",
+                 "function ZielPruefen", "procedure ProtokollKopf"):
+        assert name in code, f"{name} fehlt"
+    vorbereiten = code[code.index("function PrepareToInstall"):]
+    vorbereiten = vorbereiten[:vorbereiten.index("procedure DeinitializeSetup")]
+    assert vorbereiten.index("AltesSichern") < vorbereiten.index("PythonAuspacken")
+    nachlauf = code[code.index("procedure CurStepChanged"):]
+    nachlauf = nachlauf[:nachlauf.index("procedure InitializeWizard")]
+    # Die Sicherung faellt erst NACH dem Rauchtest weg.
+    assert nachlauf.index("Rauchtest <> 0") < nachlauf.index("SicherungLoeschen")
+    assert nachlauf.index("SicherungLoeschen") < nachlauf.index("Erfolg := True")
+    assert "-m compileall" in nachlauf
+    iss = _iss()
+    assert "MinVersion=10.0.17763" in iss
+    for n in ("python", "venv", "app", "share", "bin"):
+        assert f'Name: "{{app}}\\{n}.alt"' in iss, f"{n}.alt fehlt im Deinstallationsabschnitt"
