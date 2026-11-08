@@ -43,9 +43,9 @@ constexpr uint8_t kDirPointerBlock = 0x02;
 /// @brief UDOS 5.0 am A5120 — erkannt an der FFH-Fuellung hinter dem Belegungsplan.
 bool istUdos50(const FsProfile& p) { return p.ndos_fill == "ff"; }
 
-/// @brief Die Lage der UDOS-2.2/5.0-Disketten: fuenf Verzeichnissaetze (05, 0A, 01, 06, 0B) und
+/// @brief Die Lage der UDOS-3.x/5.0-Disketten: fuenf Verzeichnissaetze (05, 0A, 01, 06, 0B) und
 ///        der zweite Bootteil auf Spur 16H Sektor 07-09 - A5120 (UDOS 5.0, FFH) UND P8000
-///        (UDOS 2.2, 77H).  Am Emulator mit dem FORMAT der echten P8000-UDOS-Diskette gemessen
+///        (UDOS 3.x, 77H).  Am Emulator mit dem FORMAT der echten P8000-UDOS-Diskette gemessen
 ///        (Datendiskette 9 Sektoren, Saetze auf 05/0A/01/06/0B; Ticket #29).
 bool udos2xLage(const FsProfile& p) { return p.ndos_fill == "ff" || p.ndos_fill == "77"; }
 
@@ -541,10 +541,14 @@ bool Udos1715FileSystem::allocRecords(uint32_t records, uint32_t sec_je_record,
 
     uint32_t gefunden = 0;
     for (uint8_t t = 0; t < tracks_ && gefunden < records; ++t) {
-        // UDOS 5.0 vergibt auf Spur 0 nie etwas (FORMAT meldet Kopf 1 zwar frei, UDOS selbst
-        // beginnt aber erst bei der Verzeichnisspur).  Dateien auf Spur 0 Kopf 1 fuehrten bei
-        // einer vollen Systemdiskette zu `ERROR C4` (SECTOR ADDRESS ERROR) beim Kaltstart
-        // (Ticket #29; Waechter py_disktool_bootsektoren) - die Karte bleibt trotzdem so wie bei FORMAT.
+        // UDOS 5.0 (A5120, Treiber DDOS) vergibt auf Spur 0 nie etwas, und es liest dort auch nichts:
+        // eine Datei mit Zeigern auf Spur 0 laedt als Programm nicht (am Emulator gemessen
+        // 2026-11-08: der K5122 sieht keinen einzigen Zugriff auf Zylinder 0 Kopf 1, das
+        // Programm bleibt aus FFH, Start endet mit `ERROR C4` bzw. `BREAK 4313`).  Die Karte fuehrt
+        // Spur 0 Kopf 1 trotzdem frei, wie bei FORMAT.  ANDERS der NDOS des P8000 (UDOS 3.x) und
+        // der PC 1715: auf der echten udossys.cqm liegen Programmdateien (U8000ASM2) auf Spur 0 -
+        // dort wird Spur 0 deshalb NICHT ausgenommen.  Ob der DDOS am echten A5120 ebenso
+        // versagt, ist offen (Ticket #29, Test von Hubert).
         if (t == 0 && istUdos50(prof_)) continue;
         // Ein Record ueberschreitet nie die Spurgrenze (§5.3) — die KOPFgrenze
         // innerhalb des Zylinders dagegen sehr wohl, denn die Spur ist der Zylinder.

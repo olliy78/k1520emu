@@ -592,7 +592,7 @@ Daraus folgt:
 Disketten vom **PC 1715** tragen UDOS mit dem Treiber **NDOS** statt ZDOS. Das
 Werkzeug erkennt sie von selbst und nennt sie `udos1715_ds80_16x256`.
 
-Dieselben Disketten schreiben auch der **EAW P8000** (dort UDOS 2.2, z. B. seine
+Dieselben Disketten schreiben auch der **EAW P8000** (dort UDOS 3.x, z. B. seine
 WEGA-Startdiskette) und der **A5120 unter UDOS 5.0**. Die Rechner haben nichts
 miteinander zu tun — sie legen ihre Disketten nur gleich an. Das Werkzeug zeigt
 trotzdem, von welchem Rechner eine Diskette stammt: **`udos1715_ds80_16x256`** (PC 1715),

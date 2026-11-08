@@ -43,7 +43,7 @@ der Strom beginnt exakt nach 53 Byte, die „0" gehört nicht mehr zum Kommentar
 
 | Datei | Zweck / Inhalt (laut `/CONTENTS` bzw. UDOS-Dateien) | Geometrie | Dateisystem | SHA-256 des `.img` |
 |---|---|---|---|---|
-| w30start | UDOS-Startdiskette: Urlader-Sektor, `boot`, `wega` (Kernel 3.2 vom 12.02.88), `sa.*`, README/INHALT | 16×256 | UDOS 2.2 (Dateien als zusammenhängende Läufe wiedergefunden) | 3f4d7452db5d0186…3fa7 |
+| w30start | UDOS-Startdiskette: Urlader-Sektor, `boot`, `wega` (Kernel 3.2 vom 12.02.88), `sa.*`, README/INHALT | 16×256 | UDOS 3.x (Dateien als zusammenhängende Läufe wiedergefunden) | 3f4d7452db5d0186…3fa7 |
 | w30strt2 | dasselbe, zweiter Stand (andere README/INHALT, Firmware-3.2-Hinweis; 16 Läufe, 26 660 B Unterschied zu start) | 16×256 | UDOS | 7fccdaa032824682…90ff |
 | w30root1 | `/`: Boot-Block-Abzug `pb.image`, `boot`, `sa.*`, `/dev`-Liste, `/bin` a–c… | 9×512 | UNIX (System III) | 68eb30974d18a8a5…ee90 |
 | w30root2 | `/bin` cc…echo… | 9×512 | UNIX | f24a01a4acf35063…9755 |

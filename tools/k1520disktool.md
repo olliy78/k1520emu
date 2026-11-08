@@ -841,7 +841,7 @@ $ k1520disktool put    neu.img auszug/
 | `udos1715_ds80_16x256` | 80 Spuren doppelseitig, 16×256 | 640 KB |
 | `udos1715_ss80_16x256` | 80 Spuren einseitig, 16×256 | 320 KB |
 | `udos1715_ss40_16x256` | 40 Spuren einseitig, 16×256 | 160 KB |
-| `udos_p8000_ds80_16x256` | wie `udos1715_ds80_16x256`, Füllung des **P8000** (UDOS 2.2) | 640 KB |
+| `udos_p8000_ds80_16x256` | wie `udos1715_ds80_16x256`, Füllung des **P8000** (UDOS 3.x) | 640 KB |
 | `udos50_ds80_16x256` | wie `udos1715_ds80_16x256`, Füllung des **A5120 unter UDOS 5.0** | 640 KB |
 
 Die drei 640-KB-Profile beschreiben dieselbe Diskette.  Unterschieden werden sie an

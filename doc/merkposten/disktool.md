@@ -140,7 +140,7 @@ Was beim Weiterarbeiten zu wissen ist:
   Füllung hinter dem Plan (`ndos_fill` = `00`/`77`/`ff`, `NdosFuellung`; Wächter
   `NdosSitte.*`, `FsCatalog.Udos1715ProfileSindImgFaehigUndEinseitigGezaehlt`).  Gemischtes
   00/77 zählt als P8000, damit jede bisher lesbare Diskette genau einem Profil zufällt.  Eine WEGA-Startdiskette des **P8000**
-  (UDOS 2.2, 80×32×256, 250 kbit/s MFM) galt als unlesbar.  Sie ist Feld für Feld eine
+  (UDOS 3.x, 80×32×256, 250 kbit/s MFM) galt als unlesbar.  Sie ist Feld für Feld eine
   NDOS-Diskette; nur ihr Formatierer lässt zwischen Belegungsplan und Zählern den
   **`77H`-Nachlauf der ZDOS-Sitte** stehen (`179H` = `01`), und darauf bestand
   `UdosBitmap::looksValid` als Unterscheidungsmerkmal.  **Das Füllmuster trennt die

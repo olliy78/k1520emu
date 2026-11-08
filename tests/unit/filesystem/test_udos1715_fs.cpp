@@ -43,7 +43,7 @@ namespace {
 
 constexpr const char* kFixture = "udos1715_640k_pc1715_system.img";
 /// @brief Dieselbe Diskettensitte auf einem **anderen Rechner**: die
-///        WEGA-Startdiskette des **EAW P8000** (UDOS 2.2).
+///        WEGA-Startdiskette des **EAW P8000** (UDOS 3.x).
 ///
 /// Der P8000 ist keine Spielart des PC 1715 — andere Maschine, anderer Zweck der
 /// Diskette (sie startet WEGA).  Geteilt wird nur, wie eine Diskette angelegt ist;
@@ -783,7 +783,7 @@ TEST(Udos1715Segmente, ZuVieleSegmenteWerdenAbgewiesen) {
 // deren Diskette hier das Hauptsystem WEGA startet.  Gemeinsam ist allein, wie eine
 // Diskette angelegt wird — und genau das pruefen diese Faelle.
 //
-// Die WEGA-Startdiskette des P8000 (UDOS 2.2) traegt Descriptoren, Zeigersektoren
+// Die WEGA-Startdiskette des P8000 (UDOS 3.x) traegt Descriptoren, Zeigersektoren
 // und Verzeichnis genau dort, wo das PC-1715-Handbuch sie beschreibt.  Sie war
 // trotzdem unlesbar, weil ihr Formatierer den Platz zwischen Belegungsplan und
 // Zaehlern nicht mit `00` fuellt, sondern mit dem **0x77-Rest der ZDOS-Sitte**.
@@ -1176,7 +1176,7 @@ TEST(Udos1715Profil, FrischeSystemdisketteBelegtNurKopfNullVonSpurNull) {
     std::error_code ec; std::filesystem::remove(pfad, ec);
 }
 
-// UDOS 2.2 (P8000): FORMAT der echten P8000-UDOS-Diskette belegt auf einer Datendiskette 9 Sektoren
+// UDOS 3.x (P8000): FORMAT der echten P8000-UDOS-Diskette belegt auf einer Datendiskette 9 Sektoren
 // (Saetze 05/0A/01/06/0B wie UDOS 5.0), das DiskTool legte vorher die 13 des PC 1715 an und
 // die Systemdiskette ohne den zweiten Bootteil (Spur 16H Sektor 07-09) - sie startete nicht.
 TEST(Udos1715P8000, FrischeDatendisketteBelegtNeunSektoren) {

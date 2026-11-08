@@ -2,7 +2,7 @@
 
 Stand 2026-10-06. Nur Befunde; was nicht gefunden wurde, steht als „nicht gefunden".
 Gerät: EAW P8000 = 8-Bit-Teil (U880, Monitor MON8, WDC, Terminal) + 16-Bit-Teil
-(U8001, 3× U8010-MMU, Monitor MON16), Betriebssystem WEGA (UNIX System III-Derivat) bzw. UDOS 2.2/3.x.
+(U8001, 3× U8010-MMU, Monitor MON16), Betriebssystem WEGA (UNIX System III-Derivat) bzw. UDOS 3.x.
 
 ## 0. Wichtigste Befunde
 
@@ -13,7 +13,7 @@ Gerät: EAW P8000 = 8-Bit-Teil (U880, Monitor MON8, WDC, Terminal) + 16-Bit-Teil
 2. **Quelltexte der Firmware** (MON8, MON16, WDC 4.2, Terminal 4.2/5.0, sa.diags = Hardwaretest) und
    des **WEGA-Kernels** (teils Original, teils rückübersetzt) liegen auf GitHub `OlliL/P8000`
    (keine Lizenzdatei). Enthält auch den Boot-Pfad (`boot0.*.s`) und die Kernel-Treiber (`uts/dev/*`).
-3. Lokal gibt es **keinen** ROM-Abzug, aber echte Start-Datenträger: WEGA-Startdiskette (UDOS 2.2,
+3. Lokal gibt es **keinen** ROM-Abzug, aber echte Start-Datenträger: WEGA-Startdiskette (UDOS 3.x,
    Urlader `boot0.*`, `boot`, `wega`-Kernel, `sa.*`) und die komplette WEGA-3.0-Sammlung.
 4. MAME hat `p8000`/`p8000_16` nur als **Skeleton, MACHINE_NOT_WORKING** (2009, Fabio Priuli). Kein
    Referenzemulator mit MMU/WDC/WEGA-Boot. Z8001-Kern im Repo ist vorhanden.
@@ -56,9 +56,9 @@ Die Abbilder wurden nicht geöffnet (nur Kopfdaten gelesen).
 
 | Pfad | Inhalt | Eignung |
 |---|---|---|
-| `P8000/` (vom DiskTool extrahiert, 42 Dateien + `.fileinfo`) | **Ja, extrahierte WEGA-Startdisketteninhalte.** `boot` (6790 B) = Z8001-Zwischenlader („boot", Text: `md(0,16000)wega`, `BOOTING FROM …`); `boot0.fd/.rm/.ud` (466/532/508 B) = Urlader-Sektor 0 für Floppy/Remote/UDOS-Floppy; `wega`, `wega.n26`, `wega.n52` (je 96 400 B) = WEGA-Kernel (3.2, 12.02.88; Plattenaufteilung /usr 0/13000, swap 13000/3000, / 16000/7000, /tmp 23000/4000, /z 27000/60732 Blöcke; Kernel-Speicher 139 520 B); `sa.diags` (25 598 B, „P8000 Hardwaretest U8001 V1.0", enthält U8000-Softwaremonitor-Meldungen), `sa.format`, `sa.install`, `sa.mkfs`, `sa.verify`, `sa.shipdisk`, `sa.cat` = Standalone-Programme (Z8001); `FORMAT/STATUS/SET…` = UDOS-2.2-Z80-Dienstprogramme; `README` (27 K), `INHALT` (190 K), `udos-dateiangaben.txt` | **Sehr gut.** `boot0.*` + `boot` + `wega` + `sa.*` = vollständiger Bootweg ohne Festplatte |
+| `P8000/` (vom DiskTool extrahiert, 42 Dateien + `.fileinfo`) | **Ja, extrahierte WEGA-Startdisketteninhalte.** `boot` (6790 B) = Z8001-Zwischenlader („boot", Text: `md(0,16000)wega`, `BOOTING FROM …`); `boot0.fd/.rm/.ud` (466/532/508 B) = Urlader-Sektor 0 für Floppy/Remote/UDOS-Floppy; `wega`, `wega.n26`, `wega.n52` (je 96 400 B) = WEGA-Kernel (3.2, 12.02.88; Plattenaufteilung /usr 0/13000, swap 13000/3000, / 16000/7000, /tmp 23000/4000, /z 27000/60732 Blöcke; Kernel-Speicher 139 520 B); `sa.diags` (25 598 B, „P8000 Hardwaretest U8001 V1.0", enthält U8000-Softwaremonitor-Meldungen), `sa.format`, `sa.install`, `sa.mkfs`, `sa.verify`, `sa.shipdisk`, `sa.cat` = Standalone-Programme (Z8001); `FORMAT/STATUS/SET…` = UDOS 3.x-Z80-Dienstprogramme; `README` (27 K), `INHALT` (190 K), `udos-dateiangaben.txt` | **Sehr gut.** `boot0.*` + `boot` + `wega` + `sa.*` = vollständiger Bootweg ohne Festplatte |
 | `*.fileinfo` | DiskTool-Sidecar (`fs=udos name= typ= eig= start= satz= block= rest= segment=0000:6790 mem=… erst= geaend=`); Angaben, die UDOS im Verzeichnis führt, damit `put` sie wiederherstellt | Rein Werkzeug; `segment`/`mem` zeigen Ladeadresse |
-| `P8000_WEGA-STARTDISKETTE.zip` (648 K) | `.hfe` (2 008 064 B, k5601_16x256, UDOS 2.2) + `.txt` (Verzeichnis, 42 Dateien, 633 KB belegt) + `diskarchive.yaml` + `dateien/` (dieselben Dateien) | Sicherung der echten Diskette (Greaseweazle) |
+| `P8000_WEGA-STARTDISKETTE.zip` (648 K) | `.hfe` (2 008 064 B, k5601_16x256, UDOS 3.x) + `.txt` (Verzeichnis, 42 Dateien, 633 KB belegt) + `diskarchive.yaml` + `dateien/` (dieselben Dateien) | Sicherung der echten Diskette (Greaseweazle) |
 | `udos_P8000.hfe`, `udos_P8000_neu.hfe` | 2 008 064 B, DiskTool-Arbeitsstände der Startdiskette | Arbeitskopie |
 | `001/`, `003/`, `005/`, `PRG/` | andere Maschinen | nicht P8000 |
 
@@ -71,7 +71,7 @@ Header der Z8001-Dateien (`boot`, `sa.*`, `wega`): UDOS-Ladeformat mit Segment-H
 |---|---|---|
 | `~/projects/prg710/disks/P8000_UDOSwegaBOOT01.scp` (38 M) | Flux der Startdiskette (UDOS „wega"-Boot) | Rohflux, redundant zu .hfe |
 | `~/Documents/obsidian/notes/P8000.md` (8 K) | Eigenes Protokoll des echten Geräts (9600 8N1 an tty1; K5504.50): **Hardwaretest U880 V3.0 / U8001 V3.0**, Monitor-Dialoge, Fehler 52/53 (RAM-Test AAAA/5555), `sa.format`/`sa.verify`-Läufe mit WDC_V.3.4.05, Plattenfehler 81 / Blinkcode, Bad-Track-Tabellen; Links pofo.de, ycdt | **Gut**: Referenzausgaben des echten Geräts (Monitorprompts, Texte) |
-| `~/projects/UDOS/UDOS/P8000/` | UDOS-2.2-Originale vom P8000: `FORMAT.000/.400/.MAC` (Formatierer, TPA 4000H; Fehlertexte „UNKNOWN FORMAT, PLEASE USE SETFD"), `STATUS(80).000/.400/.COM/.MAC` | Z80-Teil; Formatierlogik des 8-Bit-Teils/UDOS |
+| `~/projects/UDOS/UDOS/P8000/` | UDOS-Originale (Fassung nicht belegt) vom P8000: `FORMAT.000/.400/.MAC` (Formatierer, TPA 4000H; Fehlertexte „UNKNOWN FORMAT, PLEASE USE SETFD"), `STATUS(80).000/.400/.COM/.MAC` | Z80-Teil; Formatierlogik des 8-Bit-Teils/UDOS |
 | `~/projects/UDOS/README.md` (37 K) | UDOS-Quellenfundus; P8000 in §5.6 | Verweisquelle |
 | `~/projects/robotron/A7100/Doku/A7100_SCP1700_und_UDOS_P8000_Hand_Buecher/` | `UDOS-Software Mikroprozessorsoftware.pdf`, `UDOS-Software Programmiersprachen.pdf`, `Begleitzettel.pdf` (+ SCP1700-Handbücher) | UDOS-Handbücher (Assembler U880, U8000-Cross) |
 | `~/projects/robotron/A7100/` (JPG 43 Stk.) | Fotos A7100 | irrelevant für P8000 |
@@ -87,7 +87,7 @@ Header der Z8001-Dateien (`boot`, `sa.*`, `wega`): UDOS-Ladeformat mit Segment-H
 
 | Pfad | Inhalt |
 |---|---|
-| `tests/fixtures/disks/udosP8000_640k_wega.hfe` (2 008 064 B) | WEGA-Startdiskette (UDOS 2.2) als Fixture; Wächter `Udos1715P8000.*` |
+| `tests/fixtures/disks/udosP8000_640k_wega.hfe` (2 008 064 B) | WEGA-Startdiskette (UDOS 3.x) als Fixture; Wächter `Udos1715P8000.*` |
 | `doc/udos1715_diskettenformat.md` | §3.0a, §8: P8000-Diskette = NDOS-Dialekt wie PC 1715, Füllbyte `77H`, `179H=01`, Systembereich = ganzer Kopf 0 der Spuren 0/21/22/23; 2560/2560 Sektoren am echten Laufwerk verifiziert |
 | `core/primitives/z8000.{h,cpp}` + `z8000/` | Z8001/2-Kern (Buszyklus mit Status ST0..3, N/S, SN0..6, Befehlstabelle, MAME-Oracle-Test `tests/oracle/`). Schnittstelle: `read`/`write`-Rückrufe je Buszyklus — MMU als Karte außen davor möglich (so am A5120.16 gelöst). MMU-Modell (U8010) fehlt |
 | `core/cards/em/`, `doc/design/17_a5120_16.md` | EM256-Karte (U8001 am K1520) — Vorbild für Segmentweiche/RAM |

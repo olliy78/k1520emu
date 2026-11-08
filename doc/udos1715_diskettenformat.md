@@ -2,7 +2,7 @@
 
 **Stand:** 2026-08-18 · Referenzdatenträger: eine am Greaseweazle eingelesene
 Systemdiskette („SYSTEM", 67 Dateien, 80×32×256, 0 CRC-Fehler); als zweiter Beleg die
-**WEGA-Startdiskette des EAW P8000** (UDOS 2.2, 42 Dateien, dieselbe Geometrie)
+**WEGA-Startdiskette des EAW P8000** (UDOS 3.x, 42 Dateien, dieselbe Geometrie)
 
 Dieses Dokument beschreibt ein **Dateisystem**, keine Maschine. Es heißt hier
 UDOS1715, weil es am **PC 1715** aufgenommen und entschlüsselt wurde; angetroffen wurde
@@ -11,7 +11,7 @@ es inzwischen auf zwei **völlig verschiedenen Rechnern**:
 | | **PC 1715** | **EAW P8000** |
 |---|---|---|
 | Bauart | Bürocomputer, U880 (Z80) | Mehrprozessorsystem; UDOS läuft auf dem Z80-Vorrechner |
-| UDOS-Fassung | UDOS1715 | UDOS 2.2 |
+| UDOS-Fassung | UDOS1715 | UDOS 3.x |
 | Betriebsart der Diskette | Systemdiskette | **WEGA**-Startdiskette (lädt das Hauptsystem) |
 | Beleg hier | `SYSTEM`, 67 Dateien | `WEGA-STARTDISKETTE`, 42 Dateien |
 
@@ -166,7 +166,7 @@ Spur 4FH:  FF FF FF FF   voll
 
 ### 3.0a Zwei Rechner, dieselbe Sitte — aber nicht dasselbe Füllmuster
 
-Die Diskette des **EAW P8000** (UDOS 2.2, WEGA-Startdiskette) ist Feld für Feld
+Die Diskette des **EAW P8000** (UDOS 3.x, WEGA-Startdiskette) ist Feld für Feld
 dieselbe Karte — nur füllt ihr Formatierer den Platz zwischen Belegungsplan und
 Zählern nicht mit `00`, sondern mit dem **`77H`-Rest der ZDOS-Sitte**:
 
@@ -250,7 +250,7 @@ Datendiskette **13** Sektoren belegt (= DiskTool), Systemdisk = J **29** (13 + S
 sperrte bei einer Systemdiskette die ganze Spur 0 (45); jetzt nur Kopf 0 wie FORMAT.  Dateien auf Spur 0 Kopf 1 liest UDOS 1715
 fehlerfrei (anders als UDOS 5.0), dort wird Spur 0 deshalb **nicht** von der Vergabe ausgenommen.
 
-**P8000 (UDOS 2.2), gleiche Messung** mit den echten Disketten `~/projects/robotron/P8000/discs/udossys.cqm` / `udos_org.cqm` (FORMAT mit den
+**P8000 (UDOS 3.x), gleiche Messung** mit den echten Disketten `~/projects/robotron/P8000/discs/udossys.cqm` / `udos_org.cqm` (FORMAT mit den
 Dateiangaben der echten Datei: `LOW 4000 HIGH A4C1`; die `FORMAT.400` des Fundus allein brach mit falschen Angaben mit `BREAK 0003` ab).
 `FORMAT D=1 ID='X'` + `Y` (Großbuchstaben tippen; kein Systemdisk-Parameter) belegt **9** Sektoren, die Sätze der DIRECTORY liegen auf
 05/0A/01/06/0B — also die **Lage von UDOS 5.0**, nicht die 13 Sektoren des PC 1715, die das DiskTool bis dahin anlegte.  Auch beide
@@ -258,13 +258,34 @@ echten Systemdisketten haben diese Satzlage, und der Urlader lädt `OSLOAD` aus 
 eine mit `create --fs udos_p8000 --boot` gebaute Diskette **startete nicht** (nur Spur 0 im Bootabbild, Monitor blieb am `>`).
 Jetzt teilen sich `udos50` und `udos_p8000` die Lage (`udos2xLage`: fünf Sätze, zweiter Bootteil, Bootbereich 16 + 3 Sektoren);
 `boot-get` liefert für die P8000 4864 statt 4096 Byte.  Gegenprobe: DiskTool-Systemdiskette mit allen 74 Dateien bootet am P8000,
-`COPY` auf eine FORMAT-Diskette und Rücklesen byteidentisch.  **Offen:** eine frisch von UDOS angelegte P8000-*Systemdiskette* gibt es
-nicht zum Vergleichen (FORMAT kennt nur Datendisketten) — die 28 Sektoren der Systemdiskette sind aus dem A5120 übernommen.
+`COPY` auf eine FORMAT-Diskette und Rücklesen byteidentisch.  **Versionsbezeichnung (Ticket #30, 2026-11-08).**  Die P8000-Disketten heissen **UDOS 3.0** (`uspr_org`/`udos_org`) und **UDOS 3.1**
+(`udosprog`/`udossys`), nicht 2.2: die README der Systemdiskette nennt „Version 3.1 / 29.05.1989" und sagt nur, die *Schnittstelle*
+sei „kompatibel zur UDOS-Version 2.2" - daher die falsche Zahl.  `OS`, `NDOS`, `STATUS`, `SET` sind auf `udos_org`, `udossys` und der
+WEGA-Startdiskette **bytegleich** (MD5), `FORMAT` unterscheidet sich zwischen 3.0 und 3.1 geringfuegig.  Bei UDOS 5.0 (A5120) heisst der
+Plattentreiber **`DDOS`** (`LADT` zeigt ihn bei 2600H), nicht `NDOS`; die Plattenstruktur ist kompatibel, der Code im Treiber nicht ganz
+(Laufwerke 4/5).  Im Quelltext bleibt der Name `Ndos*` fuer die ganze Familie.
+
+**Die echten UDOS-3.x-Disketten sind von Spur 0 an voll** (DAM von `udossys`: Spuren 0-57 ganz, 58/59 teilweise = 1887 Sektoren; `udos_org`:
+Spuren 0-60, 2072 Sektoren).  Auch Programmdateien (`U8000ASM2`, Typ P) tragen Zeiger auf Spur 0 beider Koepfe.  Der NDOS vergibt von der
+Verzeichnisspur (16H/17H) nach aussen und innen, die Reihenfolge ist fuer die Kapazitaet gleichgueltig.  Gegenprobe: die vollstaendigen
+Dateisaetze von `udossys` (74 Dateien) und `udos_org` (89) passen auf eine `create --fs udos_p8000 --boot`-Diskette, `fsck --full` ohne Befund.
+Groesste einzelne Datei auf einer leeren Datendiskette: P8000 2529 von 2551 freien Sektoren (Rest = Descriptor + Zeigersektoren), PC 1715 2525
+von 2547, UDOS 5.0 2498 (Spur 0 gesperrt, s. u.).
+
+**P8000-Systemdiskette: `FORMAT D=1 ID='..' S` belegt 47 Sektoren (Hubert, Ticket #30), nicht 28.**  Belegungstabelle: Spur 0 nur Sektor 0
+(Urlader), Spur 21 Kopf 0 ganz (16), Spur 22 (DIRECTORY) `E7FF` = Sektoren 0-2, 5-15, Spur 23 Kopf 0 ganz (16).  Die Mehrbelegung gegenueber der
+Datendiskette (9) ist die vom FORMAT mitgeschriebene Erweiterung des U880-Monitors (GET/SAVE-Paket) samt Auslagerungsbereichen.  **Das DiskTool
+legt die P8000-Systemdiskette noch mit der A5120-Lage (28: Spur 0 Kopf 0, Spur 22 Sektor 7-9) an - offen**, ebenso der Inhalt der Sektoren auf
+Spur 21/22/23, der aus der Systemdiskette kopiert wird.
 
 **Spur 0 vergibt das DiskTool bei `udos50` nie** (`allocSectors`/`allocRecords`), obwohl die Karte (wie bei FORMAT) Spur 0
-Kopf 1 frei führt: eine Systemdiskette mit allen 65 Dateien der Originaldiskette, deren erste Dateien auf Spur 0 Kopf 1 lagen,
-brach beim Kaltstart mit `ERROR C4` (= *SECTOR ADDRESS ERROR*) ab, mit anderer Reihenfolge der Dateien nicht.  Ursache nicht
-bis zum Befehl verfolgt (UDOS selbst beginnt erst bei Spur 21); die Regel ist die gemessene sichere Seite.
+Kopf 1 frei fuehrt.  Befund 2026-11-08: eine Systemdiskette mit allen 65 Dateien der Originaldiskette, deren erste Dateien auf Spur 0 Kopf 1
+lagen, brach beim Kaltstart mit `ERROR C4` ab.  Einzelversuch (je EINE Datei auf Spur 0 Kopf 1, Rest wie bei der Beispieldiskette):
+Textdatei `OS.INIT` und die vom Urlader geladenen `OS`/`DDOS`/`ZDOS` laufen, **Programme** (`ACTIVATE`, `DATE`, `KEY`) bleiben aus `FFH`
+(`BREAK 4313`), `ASSDRIVER` haengt den Start; im `dbg` sieht der K5122 dabei **keinen einzigen Zugriff** auf Zylinder 0 - der DDOS laedt
+Zeiger mit Spur 0 gar nicht erst (also kein Emulator-, sondern Treiberverhalten, `C4` ist ein Wiederholungsfehler wie im
+PC-1715-Treiber `PCUDDEB.MAC`).  Folge: auf einer UDOS-5.0-Datendiskette bleiben 32 Sektoren (8 KB) fuer das DiskTool unbenutzbar,
+FORMAT meldet sie frei.  **Offen:** am echten A5120 gegenpruefen (Ticket #29).  P8000 und PC 1715 sind nicht betroffen.
 Wächter: `py_disktool_bootsektoren` (volle Dateimenge, alphabetische Reihenfolge).
 
 ### 3.1 Anders als bei ZDOS: **die Zähler stimmen**
@@ -504,7 +525,7 @@ Python-Prüfskript gegengerechnet:
 | Zähler `177H` + `17CH` = 80 · 32 | 1673 + 887 = 2560 ✔ |
 
 Am **zweiten** Datenträger — der WEGA-Startdiskette des EAW P8000 (42 Dateien,
-UDOS 2.2) — dasselbe Bild:
+UDOS 3.x) — dasselbe Bild:
 
 | Probe | Ergebnis |
 |---|---|

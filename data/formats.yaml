@@ -1419,7 +1419,7 @@ filesystems:
   # (344…374) — zwischen den 80 Spureintraegen (18H…157H) und dem „belegt"-Zaehler
   # (177H).  Jeder Formatierer fuellt sie anders (`ndos_fill`):
   #     "00"  PC 1715  (UDOS1715)   158H…176H = 31 × 00
-  #     "77"  P8000    (UDOS 2.2)   158H…15BH = 00, 15CH…176H = 27 × 77H (ZDOS-Rest)
+  #     "77"  P8000    (UDOS 3.x)   158H…15BH = 00, 15CH…176H = 27 × 77H (ZDOS-Rest)
   #     "ff"  A5120    (UDOS 5.0)   158H…176H = 31 × FFH (Spuren 80…87 als belegt)
   # Erkannt wird die Diskette ueber dieses Feld, angelegt wird sie damit ebenso
   # (doc/udos1715_diskettenformat.md §3.0a, core/filesystem/udos/udos_bitmap.h).
@@ -1437,8 +1437,8 @@ filesystems:
 
   - name:        udos_p8000_ds80_16x256
     aliases:     [udos_p8000]
-    description: "UDOS 2.2/NDOS (P8000) — 80 Spuren doppelseitig, 16×256 (640K)"
-    title:       "UDOS 2.2 (NDOS)"
+    description: "UDOS 3.x/NDOS (P8000) — 80 Spuren doppelseitig, 16×256 (640K)"
+    title:       "UDOS 3.x (NDOS)"
     capacity:    "640K"
     machines:    [P8000]
     format:      ds80_16x256
@@ -1448,8 +1448,8 @@ filesystems:
 
   - name:        udos50_ds80_16x256
     aliases:     [udos50]
-    description: "UDOS 5.0/NDOS (A5120) — 80 Spuren doppelseitig, 16×256 (640K)"
-    title:       "UDOS 5.0 (NDOS)"
+    description: "UDOS 5.0/DDOS (A5120) — 80 Spuren doppelseitig, 16×256 (640K)"
+    title:       "UDOS 5.0 (DDOS)"
     capacity:    "640K"
     machines:    [A5120]
     format:      ds80_16x256

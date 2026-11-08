@@ -2699,7 +2699,7 @@ Wichtige UDOS-Kommandos (Namen aus der Einführung in die Software; die Syntax i
 Namen von Dateien in anderen Laufwerken: `ud(0,0)name` ist die Datei `name` auf UDOS-Laufwerk 0 (A:).
 **Eine leere Diskette formatieren:** *Leere Diskette* im Laufwerkskasten legt ein unformatiertes Medium
 ein, das UDOS mit `FORMAT` formatieren muss. `FORMAT` steht nicht auf der WEGA-Startdiskette; ob und wie
-es sich am P8000 mit der UDOS-2.2-Diskette bedienen lässt, ist *nicht geprüft*.
+es sich am P8000 mit der UDOS-3.x-Diskette bedienen lässt, ist *nicht geprüft*.
 
 ### WEGA: die Platte vorbereiten und installieren
 

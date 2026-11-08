@@ -22,7 +22,7 @@ Kurzbezeichnung der Diskettenfamilien (in der Spalte „Vorkommen“ der Tabelle
 | **B** | A5120/USAR „1526 par“ | `UDOS_1526_par` (106 Dateien, Datenträger `NEA/AS.VOL_003`) | `UDOS BC.5120`, 31.10.91 |
 | **U** | USAR (Unterzentrale Suhl) | `USAR_UDOS` (15 Dateien) | `UDOS BC.5120`, 27.06.89 |
 | **PC** | PC 1715, **UDOS1715/NDOS** | `UDOS1715_patched`, `udos1715_640k_pc1715_system` u. a. | eigenes System (`NDOS`, nicht ZDOS) |
-| **W** | P8000, UDOS 2.2 + WEGA-Starter | `udos_P8000`, `udosP8000_640k_wega` | `NDOS`, 22.01.88 |
+| **W** | P8000, UDOS 3.x + WEGA-Starter | `udos_P8000`, `udosP8000_640k_wega` | `NDOS`, 22.01.88 |
 
 Die letzten beiden sind ein **anderes Dateisystem** (NDOS, Zeigersektoren) und ein anderes UDOS; ihre
 Programme sind für die PRG **nicht ohne Test** übernehmbar (§5).
@@ -152,7 +152,7 @@ anderen System; bei Gleichheit des Dateisystems (ZDOS) ist ein Test sinnvoll, be
 | `REORG` | Diskettenbelegung reorganisieren (V4.3) | B | ○ nützlich auf Arbeitsdisketten |
 | `CPCOPY` | Kopieren zwischen UDOS- und SCP-Dateien | PC | ✘ NDOS, nur mit SCP-Diskette |
 | `TRANSFER` | CP/M-Hexdatei auf UDOS-Diskette übertragen (Burkhardt/Schütz 1986) | B | ○ |
-| `UDOSCNVT`, `SETFD`, `SETLP`, `GETDAY`, `SAVEDAY`, `DAY`, `KINIT`, `LP`, `WEGA`, `boot*`, `sa.*`, `wega*`, `INHALT`, `README` | P8000-Starter für **WEGA** (UNIX) und UDOS-2.2-Werkzeuge | W | ✘ |
+| `UDOSCNVT`, `SETFD`, `SETLP`, `GETDAY`, `SAVEDAY`, `DAY`, `KINIT`, `LP`, `WEGA`, `boot*`, `sa.*`, `wega*`, `INHALT`, `README` | P8000-Starter für **WEGA** (UNIX) und UDOS 3.x-Werkzeuge | W | ✘ |
 
 ### 3.7 MRS-700-Programmierumgebung (VEB Numerik Karl-Marx-Stadt)
 
