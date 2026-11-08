@@ -192,3 +192,122 @@ gemessen (Wächter in `tests/integration/test_k6316.cpp`, Merkposten Nr. 20 ff.)
 9. **Widersprüche Schaltplan/Firmware:** (a) hardware.md Fassung 1 nannte D12 A.0/.2 „Spannungsüberwachung“ — die Firmware (`0524H`) und das Handbuch
    (Lichtschrankentest) sagen FSO/FSU; (b) H4 an AM4 war eine Fehllesung; (c) die Namen /MELO und /MAUF in Fassung 1 („Melder“) sind die zwei Kontakte des
    Drehschalters.  Nicht auflösbar: Herkunft von /MPV, Reihenschaltung Haube/Kopf auf MHA, Funktion S11/S12/S15/S16/S18–S23 `[?]`.
+
+## 10  Druckregeln aus dem ROM (Orakel) — Stand 2026-11-08
+
+Zweck: Formeln, aus denen `tests/support/k6316_orakel.h` die erwarteten Punkte **ohne** Blick auf den Emulator berechnet.  Alles aus den
+ROM-Abzügen `doc/EPROMS/K6316/{ifss,v24}` (je fünf Chips lückenlos ab 0000H) abgeleitet.  Marken: `[E]` = aus dem ROM erschlossen (statische Lesung
+**und** Gegenprobe: die Zellenbau-Routinen wurden in einem Wegwerf-Z80-Interpreter ausgeführt und bitgleich mit den Formeln unten verglichen —
+95 Codes × 6 Modi × beide Firmwaresätze = 1140 Fälle, 0 Abweichungen; die Füllroutine der Druck-ISR zusätzlich an 8 Texten/Modi), `[?]` = unsicher.
+Die Skripte sind nicht eingecheckt (Scratchpad).  Adressen **IFSS**; V.24-Entsprechung in Klammern (gleicher Code, anders verschoben).
+
+### 10.1  Datenweg Zeichen → Nadel `[E]`
+
+1. **Zeichenzelle.**  `sub_1303` (V.24: `13ADH`) baut je Zeichencode eine **12-Byte-Zelle** im Ringpuffer `3A1FH…3BABH` (Zeiger `(385EH)`, Weiterschalten
+   `sub_12CC` / V.24 `1376H`, Spiegelzelle `3BABH` wird nach `3A1FH` kopiert).  Modus `(3836H)`: Bits 0–2 = Schriftart (0 Normal, 1 Breit, 2 Schräg; +3 = mit
+   Unterstrich), Bit 3 = Zweitzeichensatz (SO, Basis `2100H` statt `2400H`).  Glyphe `g[0..7]` = ROM `[2400H + 8·(Code & 7FH)]`.  Dispatch `1312H…1335H`:
+   Modus 0/3 → `1418H`, 1/4 → `13EDH` (`sub_0865`), 2/5 → `133DH` (Scherung).
+2. **Zelle → Takte.**  Die Füllroutine der Druck-ISR (`17C2H…186DH`, V.24 Entsprechung ab `187CH`) erzeugt aus einer Zelle `N[0..11]` zehn „Wörter“, eines je
+   Drucktakt `k = 0…9`: Wort = (Byte 0: Nadeln 1…8, Byte 1 Bit 0: Nadel 9).
+   ```
+   Daten(k)  = N[2+k]                      (k = 0..9, N[10], N[11] sind FF)
+   Nadel9(k) = (N[0] >> k) & 1             (k = 0..7)   -- Rotation `RRC (HL)` je Takt, 17D9H
+             = N[1] & 1                    (k = 8)      -- 17F3H
+             = (N[1] >> 1) & 1             (k = 9)      -- 1800H/17FFH (RRA)
+   ```
+   Alle Bytes sind **roh = invertiert**: Bit 0 = Nadel schlägt an.  Nadel j (1…8) = Bit (8−j) des Datenbytes; Nadel 9 = Bit 0 des zweiten Wortbytes `[1737H]`.
+3. **Ausgabe.**  ISR `1715H…174DH` (V.24 gleich): Port `8DH` = `(Strom A | 55H) & (Strom B | AAH)` → Strom A liefert Nadeln 1,3,5,7 (Bits 7,5,3,1) **und Nadel 9**
+   (Bit 0 des Folgebytes → Port `8CH` Bit 0, `1737H…1747H`), Strom B Nadeln 2,4,6,8.  Die Leseabstände im 7-Wörter-Ring `3874H…3880H` sind 4/5/6 Wörter (`sub_153B`,
+   `1542H/1552H/155FH`, je nach Zeichenabstand `(3828H)` = 0/1/2): **gerade Nadeln drucken dieselbe Spalte 4/5/6 Takte später** — das ist die feste Nadelversetzung 0,04″
+   (3 Motorschritte, §9 Nr. 7).  Für das Orakel entfällt sie: im Blatt (Kern: `nadel_x`) stehen alle Nadeln einer Spalte übereinander.
+4. **Takt = 1/(10·Zeichen/Zoll)″.**  Jedes Zeichen belegt **10 Takte** je Zelle: 10 Z/Z → Takt 1/100″ (3 Pixel), 12,5 Z/Z → 1/125″ (2,4 Pixel), 15 Z/Z → 1/150″ (2 Pixel);
+   Umschaltung `(3868H)` über `sub_1BB6/1B99/1BD8` (ESC-Folgen, im Selbsttest s. 10.7).  Die Formeln unten gelten in **Takten**; der Orakel-Test fährt 10 Z/Z (Takt = 3 Pixel).
+
+### 10.2  Normalschrift, Spalte 0, Nadel 9, „Unterlänge“ `[E]` (Modus 0; `1418H…1432H`)
+
+Zelle: `N[0]=g[0]`, `N[1]=FF`, `N[2..8]=g[1..7]`, `N[9..11]=FF`.  Folge:
+
+* **Spalte 0 ist keine Druckspalte, sondern die Nadel-9-Bitmaske:** Bit k von `g[0]` (0 = Treffer) = Nadel 9 schlägt im Takt k an (k = 0…6 ↔ Datenspalte `g[k+1]`;
+  Bit 7 ↔ Takt 7, dort ohne Spaltendaten).  Nur `, ; @ _ g j p q y` haben `g[0] ≠ FF` (V.24: ohne `@`).
+* **Es gibt kein Verschieben der Matrix nach unten.**  Die Unterlänge steckt in den Glyphen selbst: Kleinbuchstaben nutzen Nadel 3…7, `g j p q y` zusätzlich 8 und über
+  `g[0]` die Nadel 9 (`p`: Schaft Nadeln 3…9 in Spalte 2; `g`: Haken Nadel 8 + Nadel 9 in den Spalten 2/4/6; `_`: nur Nadel 9, `g[0]=AAH` → Takte 0,2,4,6 = punktierte Linie).  Großbuchstaben: Nadeln 1…7.
+* **Spaltenlage:** Datenspalte `g[c]` (c = 1…7) im Takt `c − 1`; Takte 7…9 bleiben leer (Zeichenabstand 10).  (`k6316_orakel.h` führt `g[c]` bei Takt `c` und `g[0]` als Spalte 0:
+  das ist um eine Spalte verschoben, bleibt aber wegen des gefitteten Ursprungs richtig, weil `g[0] = FF` für alle ausser den neun Sonderzeichen.)
+
+```
+treffer_normal(code):                          # Punkte (takt, nadel) relativ zum Zeichenanfang
+  g = ROM[2400H + 8*code .. +8]
+  for c in 1..7: for j in 1..8: if bit(g[c], 8-j) == 0: (c-1, j)
+  for k in 0..7:               if bit(g[0], k)   == 0: (k, 9)
+```
+
+### 10.3  Breitschrift `[E]` (Modus 1; `sub_0865`, `0865H…08F2H`)
+
+Auslösung: `ESC [ 1 m` (SGR 1; `1C7FH → 1D49H → 1D83H`), im Selbsttest (Zeile 2, 13 Zeichen, mit Unterstrich = Modus 4).  **Zwei Zellen je Zeichen = 20 Takte (1/5″)**, Spaltenabstand **2 Takte**:
+
+* die acht Spalten stehen im Takt 0, 2, 4 … 14; Spalte m (m = 0…7) = **ROH-UND zweier Nachbarspalten** `g[m] & g[m+1]` mit `g[0] = g[8] = FF` (roh-UND = **Vereinigung der Treffer**:
+  jede Quellspalte kommt in zwei aufeinanderfolgenden Breitspalten vor = „doppelt gesetzt“, Beleg `08BFH…08DCH`);
+* Nadel 9: Bit j (j = 0…6) von `g[0]` = Treffer ⇒ Nadel 9 in den Takten `2j` **und** `2j+2` (`AND FAH/EBH/AFH/BFH` in `0873H…08B6H` je 2 Takte, Rest in `N[1]` bzw. der 2. Zelle);
+* Takte 15…19: leer.
+
+```
+treffer_breit(code):
+  gg = [FF] + g[1..7] + [FF]
+  for m in 0..7: w = gg[m] & gg[m+1]; for j in 1..8: if bit(w, 8-j)==0: (2*m, j)
+  for j in 0..6: if bit(g[0], j)==0: (2*j, 9) und (2*j+2, 9)
+  Zeichenbreite = 20 Takte
+```
+
+### 10.4  Schrägschrift `[E]` (Modus 2; `133DH…13E9H`, Schleife `1390H…13CAH`)
+
+Auslösung: `ESC [ 3 m` (`1D7FH`; Modus wird 2), im Selbsttest Zeile 3 (25 Zeichen).  **Scherung nach rechts: Nadel j wird um `9 − j` Takte verzögert** (Nadel 9 gar nicht, Nadel 8 um 1, Nadel 1 um 8
+Takte; Steigung 1 Takt je Nadelabstand).  Die Schleife legt Spaltenbit b (Bit b = Nadel 8−b) der Datenspalte c in Zellbyte `c + 2 + b` (jenseits Byte 11 um 2 weiter — die zwei
+Kopfbytes der Folgezelle werden übersprungen), also in den Takt `c + b`; die Spalte `g[0]` wird **ungeschert** nach `N[0]` kopiert (`1386H…1388H`).  Teile über Takt 9 hinaus
+fallen in die **Folgezelle** (roh-UND, `FF`-Vorbelegung der Folgezelle `1436H`) und vereinigen sich dort mit dem nächsten Zeichen.  Zeichenbreite weiter 10 Takte.
+
+```
+treffer_schraeg(code):
+  for c in 1..7: for b in 0..7: if bit(g[c], b)==0: (c + b, 8 - b)       # = (c-1) + (9-j), j = 8-b
+  for k in 0..7:               if bit(g[0], k)==0: (k, 9)
+  # Zeichen n: alle Takte + 10*n; Ergebnis aller Zeichen vereinigen (Überlauf bis Takt 14)
+```
+
+### 10.5  Unterstrich (Modus ≥ 3) `[E]`
+
+`ESC [ 4 m` addiert 3 zum Modus (`1D5D`H; nur wenn Modus < 3), `ESC [ 0/1/3 m` löscht ihn.  `sub_1441` (`1441H…1459H`) setzt in jeder Zelle, deren `N[0]` **und** `N[1]` beide `FF` sind (kein eigenes
+Nadel-9-Bild), `N[0]=AAH`, `N[1]=FEH` ⇒ **Nadel 9 in den Takten 0,2,4,6,8 der Zelle**.  Bei Breit (Modus 4) wird jede der zwei Zellen einzeln geprüft (`13F9H…13FFH`); bei Schräg (5) und Normal (3) die eine.
+Zeichen mit eigenem Nadel-9-Bild (`g j p q y , ; @ _`) bekommen **keinen** zusätzlichen Strich.  Leerzeichen laufen im Modus ≥ 3 über `1DE7H` (Strich), sonst nur Vorschub (`1B21H…1B4EH`).
+
+### 10.6  Zweitzeichensatz `[E]`
+`SO` (0EH, `1E8BH`) / `SI` (0FH, `1E96H`) setzen/löschen Bit 3 von `(IX+18)` und damit des Modus: Glyphen aus `2100H + 8·Code`, sonst identische Regeln.  Die Tabellen der Sätze unterscheiden sich (`'A'` liegt im IFSS-Satz bei
+Code 61H, im V.24-Satz bei 41H) — für das Orakel Normaltabelle `2400H` nehmen, sonst die Tabelle des jeweiligen ROM lesen.
+
+### 10.7  Selbsttest-Zeile (Druckverlauf `00FBH…0196H`) `[E]`
+Ablauf je Zeile (`C` = Zeilenzähler 20H…; Zeichen laufen zyklisch 21H…7EH, 20H, 21H …):
+`26 Zeichen Normal` → Leerzeichen (Modus 0, 10 Takte) → `ESC[1m ESC[4m` (= Modus 4) → `13 Zeichen Breit+Unterstrich` (13·20 = 260 Takte) → `ESC[3m` (Modus 2, löscht Unterstrich) → Leerzeichen (Modus 2) → `25 Zeichen Schräg` (64 Zeichen je Zeile, dann LF+CR).
+Segmentanfänge in Takten ab Zeilenanfang: Normal 0, Breit 270, Schräg 540.  Nach Zeile `k` (C = 20H+k): `C=35H` (k=21) → Zeichenabstand 12,5 Z/Z (`1BB6H`), `3FH` (k=31) → SO, `4AH` (k=42) → 15 Z/Z (`1B99H`), `5FH` (k=63) → SI, 10 Z/Z, Neubeginn (`0188H`).  Die Zeilennummern sind aus dem Zählerstand gelesen, nicht am laufenden Gerät gemessen `[?]`.
+
+### 10.8  Hexdump (S2 beim Einschalten) `[E]` (`0303H…0368H`; V.24: `03A9H…03F2H`, Code gleich)
+Gesetzt in `00C9H…00D3H` (Eingang `8CH` Bit 2 beim Einschalten, nach Handbuch S2 = TPVV; Zuordnung `[?]`).  Jedes empfangene Byte B wird als **drei Zeichen** gedruckt:
+`'0'+hi` — **ohne Korrektur: hi ≥ A druckt `:` `;` `<` `=` `>` `?` (30H|hi)** —, dann `lo`: `'0'…'9'` bzw. `'A'…'F'` (`RLD`-Folge, Vergleich `90H` gegen `lo<<4`), dann Leerzeichen.  **32 Bytes je Zeile**
+(`(IX+103)`: LF+CR vor dem ersten Byte und nach je 32 Bytes, Zähler 20H), Zeilenlänge 96 Zeichen.  Alles läuft über die normale Zeichenausgabe `1A14H` (Normalschrift, Pitch wie eingestellt).  Ob das Hi-Nibble-Verhalten
+Absicht oder Abzug-Fehler ist, bleibt `[?]` (die Glyphen 3AH…3FH sind gewöhnliche Satzzeichen, keine Hexziffern).
+
+### 10.9  Orakel-Pseudocode für `k6316_orakel.h`
+```
+BREITE  = {0,3: 10, 1,4: 20, 2,5: 10}[modus]        # Takte je Zeichen
+x_px    = ursprung_x + (taktsumme_vorheriger_Zeichen + takt) * DRUCKTAKT     # 3 px bei 10 Z/Z
+y_px    = ursprung_y + (nadel - 1) * NADEL                                   # nadel 1..9, 9 = y 24
+punkte(text, modus) = Vereinigung ueber Zeichen n von treffer_<modus>(code) verschoben um taktsumme(n)
+Unterstrich (modus >= 3): zusaetzlich (0,9),(2,9),(4,9),(6,9),(8,9) je Zelle ohne eigenes Nadel-9-Bild (10.5)
+```
+Hinweise: (a) Nadel 9 gehört jetzt dazu (`vergleiche` schneidet bisher `y ≥ 8·NADEL` ab); (b) die Sonderzeichenliste `hatSteuerSpalte0` besser aus `g[0] != FF` ableiten (V.24 kennt `@` nicht als Sonderzeichen);
+(c) Schräg-Überläufe (Takte 10…14) gehören dem Folgezeichen/Zeilenende — am Zeilenende das Fenster um 4 Takte nach rechts erweitern; (d) Rückwärtszeilen: die Füllroutine liest die Zellen rückwärts (`1825H…186DH`); dass dasselbe Bild entsteht, ist hier nicht nachgerechnet `[?]` (der Emulator-Wächter in Nr. 21 deckt es ab).
+
+### 10.10  V.24-Satz `[E]`
+Gleiche Regeln: Zeichengenerator ebenfalls `2400H + 8·Code` (Zweittabelle `2100H`), Zellenbau `13ADH` statt `1303H`, Weiterschalten `1376H`, Füllroutine ab `187CH`, Hexdump `03A9H` — für alle Codes 20H…7EH und Modi 0…5 **zellengleich** zum IFSS-Satz.  Unterschiede nur in den
+Glyphen der Codes **24H, 26H, 40H** (IFSS: andere Formen, `@` mit eigenem `g[0]=BBH`; V.24: `@` mit `g[0]=FF`) und in der Zweittabelle.
+
+### 10.11  Offen `[?]`
+Zeilennummern des Pitch-/SO-Wechsels im Selbsttest (aus Zählerstand, nicht gemessen); Zuordnung der Einschalt-Tasten zu `8CH`-Bits (Hexdump); ~~SGR-Parameter~~ am Emulator bestätigt 2026-11-08 (`ESC[1m`/`[3m`/`[4m`/`[0m` über die SIO, Wächter `K6316Modul.SchriftartenUeberEscFolgen…`); Selbsttestzeilen 1–3 (Segmente 0/270/540) ebenso;
+Verhalten der Zweitzeichensatz-Glyphen im Orakel (nicht getestet); Anfang einer Schrägzeile (erste Zelle ohne `FF`-Vorbelegung nur beim allerersten Zeichen nach Zeilenwechsel, dort `sub_1FDCH` — nicht geprüft).

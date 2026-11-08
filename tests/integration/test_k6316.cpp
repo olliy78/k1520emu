@@ -224,6 +224,30 @@ TEST_P(K6316Modul, SelbsttestDruckStimmtMitDemZeichengeneratorImRomUeberein)
     EXPECT_TRUE(l.st().lampe(1)) << "H1 TEST";
 }
 
+TEST_P(K6316Modul, SelbsttestZeilenMitBreitUnterstrichSchraegUndNadel9StimmenMitDemRomUeberein)
+{
+    // Merkposten Nr. 22 / hardware.md §10.7: je Zeile 64 Zeichen aus dem Umlauf 21H…7EH, 20H — 26 Normal, Leerzeichen, 13 Breit mit
+    // Unterstrich (ab Takt 270), Leerzeichen, 25 Schraeg (ab Takt 540).  Geprueft wird die GANZE Zeile mit allen neun Nadeln.
+    const auto r = rom(abzugDir(), l_v24(GetParam()));
+    Lauf l(GetParam());
+    l.st().setTaste(5, true);
+    ASSERT_TRUE(l.bis([&] { return l.m->druck().kopf().anschlaege() > 0; }, 80'000'000));
+    l.st().setTaste(5, false);
+    l.fahre(14'000'000);
+    const auto b = baender(l.blatt());
+    ASSERT_GE(b.size(), 4u);
+    auto umlauf = [](int k) { const int c = 0x21 + k % 95; return static_cast<char>(c == 0x7F ? 0x20 : c); };
+    for (int i = 0; i < 3; ++i) {
+        std::string n, w, s;
+        for (int k = 0; k < 26; ++k) n += umlauf(i + k);
+        for (int k = 26; k < 39; ++k) w += umlauf(i + k);
+        for (int k = 39; k < 64; ++k) s += umlauf(i + k);
+        const std::vector<Abschnitt> teile = {{n, Schrift::Normal, false, 0}, {w, Schrift::Breit, true, 270}, {s, Schrift::Schraeg, false, 540}};
+        EXPECT_EQ(vergleicheZeile(l.blatt(), r, teile, b[static_cast<size_t>(i + 1)].first, b[static_cast<size_t>(i + 1)].second), "")
+            << "Zeile " << i + 1 << (i == 1 ? " (rueckwaerts)" : " (vorwaerts)");
+    }
+}
+
 TEST_P(K6316Modul, TextUeberDieSioWirdGedrucktUndBeideRichtungenDecken)
 {
     const auto r = rom(abzugDir(), l_v24(GetParam()));
@@ -239,6 +263,25 @@ TEST_P(K6316Modul, TextUeberDieSioWirdGedrucktUndBeideRichtungenDecken)
     EXPECT_EQ(vergleiche(l.blatt(), r, t1, b[0].first, b[0].second, &xa), "");
     EXPECT_EQ(vergleiche(l.blatt(), r, t2, b[1].first, b[1].second, &xb), "");
     EXPECT_EQ(xa, xb) << "Vor-/Rueckwaertsdruck decken sich";
+}
+
+TEST_P(K6316Modul, SchriftartenUeberEscFolgenUndUnterlaengenMitNadel9)
+{
+    // hardware.md §10.2–10.5: SGR 1 = Breit, 3 = Schraeg, 4 = Unterstrich, 0 = zurueck; Unterlaengen ueber Nadel 9 (Spalte 0 der Glyphe).
+    const auto r = rom(abzugDir(), l_v24(GetParam()));
+    Lauf l(GetParam());
+    ASSERT_TRUE(l.erstesZeichen(80'000'000));
+    l.fahre(2'000'000);
+    const std::string esc = "\x1b[";
+    const std::string z1 = "gjpqy_,;@ Agj", z2 = "BREIT gj", z3 = "SCHRAEG gj", z4 = "UNTER STRICH";
+    l.sende(z1 + "\r\n" + esc + "1m" + z2 + esc + "0m\r\n" + esc + "3m" + z3 + esc + "0m\r\n" + esc + "4m" + z4 + esc + "0m\r\n");
+    l.fahre(12'000'000);
+    const auto b = baender(l.blatt());
+    ASSERT_EQ(b.size(), 4u);
+    EXPECT_EQ(vergleicheZeile(l.blatt(), r, {{z1, Schrift::Normal, false, 0}}, b[0].first, b[0].second), "") << "Normal + Nadel 9";
+    EXPECT_EQ(vergleicheZeile(l.blatt(), r, {{z2, Schrift::Breit, false, 0}}, b[1].first, b[1].second), "") << "ESC[1m Breit";
+    EXPECT_EQ(vergleicheZeile(l.blatt(), r, {{z3, Schrift::Schraeg, false, 0}}, b[2].first, b[2].second), "") << "ESC[3m Schraeg";
+    EXPECT_EQ(vergleicheZeile(l.blatt(), r, {{z4, Schrift::Normal, true, 0}}, b[3].first, b[3].second), "") << "ESC[4m Unterstrich";
 }
 
 INSTANTIATE_TEST_SUITE_P(Module, K6316Modul, ::testing::Values(Typ::K6316_Ifss, Typ::K6316_V24));

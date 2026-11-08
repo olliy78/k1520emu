@@ -276,7 +276,9 @@ aus `hardware.md` §8 sind beantwortet (§9 dort), einschließlich zweier **Beri
 **Annahmen `[?]`.**  Position der Einheit des Messers (3,5 mm unter Nadel 7) und `schnitt_pos` (1600; die Firmware fährt bis 1621), mechanischer Nullpunkt links (Textbeginn bei ~1,4″), rechter Anschlag
 (1800), Punktmaß (3 × 2), Flugzeit/Nacheilung ±2 Pixel, Herkunft /MPV, Reihenschaltung Haube/Kopf auf MHA, Funktion S11/S12/S15/S16/S18–S23.
 
-**Offen.**  Breit-/Schrägschrift und Unterlängen im Orakel (Merkposten Nr. 22), Hex-/Lichtschranken-/Vorstecktest nur als Eingabe vorhanden (nicht geprüft), Vorsteckbeleg als eigenes Blatt (der Vorsteckmotor
+**Nachtrag 2026-11-08:** Breit-/Schrägschrift, Unterstrich und Unterlängen (Nadel 9) sind aus dem ROM abgeleitet (`hardware.md` §10) und im Orakel geprüft (Merkposten Nr. 22).
+
+**Offen.**  Hex-/Lichtschranken-/Vorstecktest nur als Eingabe vorhanden (nicht geprüft), Vorsteckbeleg als eigenes Blatt (der Vorsteckmotor
 ist ein Zähler ohne Blatt), K6313 (kein Abzug).
 
 ### 5f  Stand WP7 — Paket und Werkzeugmenü (2026-11-06)
