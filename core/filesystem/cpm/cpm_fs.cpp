@@ -245,9 +245,14 @@ bool CpmFileSystem::bootKopf(const uint8_t* p, size_t n) {
 }
 
 bool CpmFileSystem::osmUrlader(const uint8_t* p, size_t n) {
-    static const uint8_t kAnfang[10] = {0xFD, 0x21, 0x48, 0x0C, 0x31, 0x00, 0x40, 0x3A, 0x7E, 0x0C};
+    // Zwei Fassungen desselben Urladers: 3.0 setzt den Stapel (LD SP,4000H), 2.0 (15.04.1987) hat dort
+    // drei Nullbytes und liegt einen Vektor tiefer (LD IY,0C42H).  Gemeinsam: LD A,(FDCONF) dahinter
+    // und die Kennung bei 0x80.
+    static const uint8_t kAnfang30[10] = {0xFD, 0x21, 0x48, 0x0C, 0x31, 0x00, 0x40, 0x3A, 0x7E, 0x0C};
+    static const uint8_t kAnfang20[10] = {0xFD, 0x21, 0x42, 0x0C, 0x00, 0x00, 0x00, 0x3A, 0x7E, 0x0C};
     static const char    kKennung[8] = {'P', '8', '0', '0', '0', 'S', 'Y', 'S'};
-    return n >= 0x88 && std::equal(kAnfang, kAnfang + 10, p)
+    return n >= 0x88
+        && (std::equal(kAnfang30, kAnfang30 + 10, p) || std::equal(kAnfang20, kAnfang20 + 10, p))
         && std::equal(kKennung, kKennung + 8, p + 0x80);
 }
 

@@ -1117,7 +1117,7 @@ Was beim Weiterarbeiten zu wissen ist:
   OS/M ist CP/M 2.2 auf den **SCP-Formaten des PC 1715** — kein eigenes Dateisystem, kein
   `FsType::Osm`.  Fünf Festlegungen:
   **(1) `osm640`/`osm800` erkennt nur der Urlader** (`boot_header: osm`, `CpmFileSystem::osmUrlader`):
-  c0h0 Sektor 1 mit Code `FD 21 48 0C 31 00 40 3A 7E 0C` UND `P8000SYS` bei 0x80 — die Kennung allein
+  c0h0 Sektor 1 mit Code `FD 21 48 0C 31 00 40 3A 7E 0C` (OS/M 3.0) bzw. `FD 21 42 0C 00 00 00 3A 7E 0C` (OS/M 2.0, 2026-11-08, ohne Stapelsetzen) UND `P8000SYS` bei 0x80 — die Kennung allein
   trägt auch der UDOS-Urlader des P8000 (`udos_org`, `w30start` …).  Datendisketten ohne Urlader bleiben
   `scpx640`/`cpa_auto`/`cpa800`; „OS/M" nach Herkunft wäre geraten.  Der FDCONF-Typ entscheidet die
   Erkennung NICHT (die Geometrie wählt das Profil), er ist Gegenstand von (4).

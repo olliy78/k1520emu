@@ -137,6 +137,7 @@ ORDNER = {
     'pc1715_scp1715_v0007_system.hfe': 'pc1715_scp1715_v0007',
     'pc1715w_scp30_system.hfe': 'pc1715w_scp30',
     'p8000_osm30_system.hfe': 'p8000_osm30',
+    'p8000_osm20_system.hfe': 'p8000_osm20',
     'udos1715_640k_pc1715_system.hfe': 'pc1715_udos1715',
     'prg710_scpx15_system.hfe': 'prg710_scpx15',
     'prg710-1_scpx17_system.hfe': 'prg710-1_scpx17',

@@ -191,8 +191,8 @@ public:
     /// @name OS/M-Urlader (P8000, `boot_header: osm`, doc/design/34_osm.md §3.2)
     /// @{
     /// @brief Traegt @p p den OS/M-Urlader (`OSM.URLADER.S`, ORG 0C00H)?  Merkmale: die
-    ///        ersten zehn Bytes `FD 21 48 0C 31 00 40 3A 7E 0C` (LD IY,VEKTOR / LD SP,4000H /
-    ///        LD A,(FDCONF)) und die Kennung `P8000SYS` bei 0x80.  Die Kennung allein reicht
+    ///        ersten zehn Bytes `FD 21 48 0C 31 00 40 3A 7E 0C` (OS/M 3.0: LD IY,VEKTOR / LD SP,4000H /
+    ///        LD A,(FDCONF)) bzw. `FD 21 42 0C 00 00 00 3A 7E 0C` (OS/M 2.0, ohne Stapelsetzen) und die Kennung `P8000SYS` bei 0x80.  Die Kennung allein reicht
     ///        nicht — der UDOS-Urlader des P8000 traegt sie auch.
     static bool osmUrlader(const uint8_t* p, size_t n);
     /// @brief Byte 0x7E des Urladers: FDCONF (Laufwerkstyp; Bits 0-3 = A:).

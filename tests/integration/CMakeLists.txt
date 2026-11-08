@@ -376,6 +376,13 @@ k1520_add_test(p8000_ohne_terminal SRC test_p8000_ohne_terminal.cpp
                           LIBS k1520_p8000 k1520_logger k1520_testsupport k1520_serial k1520core
                           LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 300)
 
+# OS/M 2.0/3.0 (8-Bit-Teil) booten bis `A:` am Kern- und am Originalterminal; der 2.0-Urlader prueft /DCD der Konsole.
+k1520_add_test(p8000_osm SRC test_p8000_osm.cpp
+                          LIBS k1520_p8000 k1520_logger k1520_testsupport
+                          LABELS "${_lbl}" DEFS LOG_LEVEL=2
+                          "K1520_OSM20_DISK=\"${CMAKE_SOURCE_DIR}/disks/p8000_osm20/p8000_osm20_system.hfe\""
+                          "K1520_OSM30_DISK=\"${CMAKE_SOURCE_DIR}/disks/p8000_osm30/p8000_osm30_system.hfe\"" TIMEOUT 600)
+
 # P8000 Meilenstein M1 (doc/design/25_p8000.md §10.11 AP P7d): UDOS von der WEGA-Startdiskette.
 k1520_add_test(p8000_boot SRC test_p8000_boot.cpp
                           LIBS k1520_p8000 k1520_logger k1520_testsupport

@@ -185,6 +185,11 @@ bootsektoren:
     filesystem:  osm_ds80_16x256_boot
     file:        bootsektoren/boot_p8000_osm30.bin
 
+  # OS/M 2.0 (15.04.1987): anderer Urlader (ohne Stapelsetzen), prueft vor dem Start /DCD an der Konsole (tty1).
+  - description: "OS/M 2.0 — P8000 (8-Bit-Teil), Format 5"
+    filesystem:  osm_ds80_16x256_boot
+    file:        bootsektoren/boot_p8000_osm20.bin
+
   # ── MS-DOS / DCP (FAT12) ─────────────────────────────────────────────────────
   # EIN Bootsektor (512 Byte) in Sektor 0.  Sein BPB wird beim Schreiben durch den der Diskette
   # ersetzt (FatFileSystem::bootsektorMitBpb) - derselbe Lader taugt fuer jede Groesse.  Der

@@ -1,0 +1,138 @@
+README 'P8000 OS/M - Systemdiskette'
+
+
+	P8000 Betriebssystem OS/M - Systemdiskette
+	  Hinweise zur Installation und Anwendung
+		 Version 2.0 / 15.04.1987
+	------------------------------------------
+
+
+(1)	Inhalt
+
+Die vorliegende OS/M-Systemdiskette enthaelt das Betriebs-
+system OS/M des P8000 mit folgenden Kommandos, Dienstpro-
+grammen und Applikationsprogrammen.
+Die internen Kommandos sind die im OS/M-Betriebssystem
+direkt enthaltenen residenten Kommandos. Sie sind Bestand-
+teil des von der Systemdiskette in den Speicher geladenen
+Betriebssystems. Auf sie kann sofort zugegriffen werden.
+Die externen Kommandos, Dienstprogramme und Applikations-
+programme, sind auf der Diskette als Datei mit dem Dateityp
+".COM" verfuegbar. Sie werden in den Anwenderspeicher durch
+Eingabe ihres Dateinamen geladen.
+
+
+README		-  Datei mit vorliegenden Nutzerhinweisen
+ASM.COM		-  Dienstprogramm ASM; K5801K80-Assembler
+COPYDISK.COM	-  Dienstprogramm COPYDISK; Kopieren von
+		   Disketteninhalten
+DDT.COM		-  Dienstprogramm DDT; Debugger-Programm
+DUMP.COM	-  Dienstprogramm DUMP; hexadezimaler Da-
+		   teiausdruck auf dem Bildschirm
+ED.COM		-  Dienstprogramm ED; Editierprogramm
+ERRORS.COM	-  Dienstprogramm ERRORS; Ausgabe von Dis-
+		   kettenzugriffsfehlern
+FORMAT.COM	-  Dienstprogramm FORMAT; Formatierungs-
+		   programm
+GENHEX.COM	-  Dienstprogramm GENHEX; Transformations-
+		   programm
+LOAD.COM	-  Dienstprogramm LOAD; Transformations-
+		   gramm
+PIP.COM		-  Dienstprogramm PIP; Universelles Ko-
+		   pierprogramm
+POWER.COM	-  Dienstprogramm POWER; Manipulations-
+		   programm fuer Diskettenarbeit
+SETFD.COM	-  Dienstprogramm SETFD; Ausgabe und Aen-
+		   derung der Floppy-Disk-Konfiguration
+SETLP.COM	-  Dienstprogramm SETLP; Anzeige und Aen-
+		   derung der Druckparameter
+SUBMIT.COM	-  Dienstprogramm SUBMIT; Ausfuehren einer
+		   Befehlsfolge
+STAT.COM	-  Dienstprogramm STAT; Anzeige von Sta-
+		   tusinformationen
+SYSGEN.COM	-  Dienstprogramm SYSGEN; Generierung einer
+		   OS/M-Kopie
+XSUB.COM	-  Dienstprogramm XSUB; erweiterte SUBMIT-
+		   Funktion
+
+TP.COM		-  Applikationsprogramm TP; Textprogramm
+TPDRUCK.OVR	-  Ueberlagerungsdatei TP
+TPHT.OVR	-  Ueberlagerungsdatei TP
+TPOVLY0.OVR	-  Ueberlagerungsdatei TP
+REDABAS.COM	-  Applikationsprogramm REDABAS; Relationa-
+		   les Datenbankbetriebssystem
+RDBASOVR.COM	-  Ueberlagerungsdatei REDABAS
+RDBASMSG.TXT	-  Ueberlagerungsdatei REDABAS
+
+TP.DOC		-  Dokumentationsdatei "Anwenderbeschrei-
+		   bung TP"
+REDABAS.DOC	-  Dokumentationsdatei "Anwenderbeschrei-
+		   bung REDABAS"
+POWER.DOC	-  Dokumentationsdatei "Anwenderbeschrei-
+		   bung POWER"
+	
+
+(2)	Dokumentation
+
+Das P8000 OS/M-Systemhandbuch enthaelt die Beschreibung des
+Betriebssystems OS/M, der Kommandos und der Dienstprogramme.
+Des weiteren werden Literaturhinweise gegeben, die eine wei-
+terfuehrende Beschreibung der im OS/M enthaltenen Kommandos,
+Dienstprogramme und Applikationsprogramme beinhalten.
+Die Dokumentationsdateien TP.DOC, REDABAS.DOC und POWER.DOC
+enthalten Anwenderbeschreibungen (TP-Dateien) zu den Appli-
+katinsprogrammen TP und REDABAS sowie zu dem Dienstprogramm
+POWER.
+
+
+(3)	Installation
+
+Es ist grundsaetzlich keine Installation erforderlich. Ver-
+aenderungen anderer Standardinstallationen sind jedoch bei
+Bedarf moeglich. So kann mit dem Dienstprogramm "SETFD" die
+Floppy-Disk-Konfiguration geaendert werden und das Dienst-
+programm "SETLP" gestattet eine Aenderung der Druckparame-
+ter.
+
+
+(4)	Nutzerhinweise 
+
+Die Schnittstelle vom OS/M auf dem P8000 zu den unter sei-
+ner Steuerung laufenden Programmen ist voll kompatibel mit
+der Schnittstelle des Betriebssystems CP/M Version 2.2.
+Ausserdem ist die Kompatibilitaet mit dem in der DDR ver-
+fuegbaren Betriebssystem SCPX 1526 fuer die Buerocomputer
+A5120/30 und dem Personalcomputer PC1715 gegeben.
+Bei der Uebernahme von Anwendersoftwarepaketen ist moegli-
+cherweise eine Drucker- bzw. Terminalinstallation notwen-
+dig. Entsprechende Angaben ueber die Steuersequenzen sind
+den Terminal- bzw. Druckerdokumentationen zu entnehmen.
+Treten bei der Uebernahme von Disketten anderer Systeme
+eventuelle Probleme auf, so ist eine auf dem P8000 for-
+matierte Diskette zu verwenden.  
+In Vorbereitung befindet sich das tar-Kommando. Mit die-
+sem Kommando koennen WEGA-Blockdisketten im tar-Format un-
+ter OS/M gelesen und geschrieben werden. Damit ist ein Da-
+tenaustausch (ASCII) zwischen WEGA und OS/M moeglich. 
+Gleichzeitig ist damit eine Konvertierungsmoeglichkeit
+zwischen UDOS und OS/M  gegeben, da analoge tar-Kommandos
+unter dem Betriebssystem UDOS zur Verfuegung stehen wer-
+den.
+Das Applikationsprogramm REDABAS ist nicht vollstaendig 
+ausgetestet.
+
+
+(5)	Versionshinweise
+
+Gegenueber der Version 1.0 wurden folgende Aenderungen
+vorgenommen:
+
+- Neuinstallation REDABAS
+- Neuinstallation TP
+
+
+
+(6)	Probleme
+
+---
+ 	
