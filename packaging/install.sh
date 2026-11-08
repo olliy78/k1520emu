@@ -38,11 +38,8 @@ PREFIX="$HOME/K1520emu"
 # Starter eingetragen (K1520_DATA).
 DATEN=
 DATEN_SET=no
-BINDIR="$HOME/.local/bin"
-APPDIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
-ICONDIR="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/scalable/apps"
-DATADIR=$(benutzerdaten_dir)
-CONFDIR="${XDG_CONFIG_HOME:-$HOME/.config}/k1520emu"
+# BINDIR/APPDIR/ICONDIR/DATADIR/CONFDIR und INVENTAR stehen in lib/common.sh —
+# Installieren und Deinstallieren (uninstall.sh) brauchen dieselben Orte.
 
 # Maschinen dieser Familie, fuer die Starter und Startmenue-Eintraege entstehen.
 # Das Projekt heisst nach dem Bus, nicht nach einem Rechner: der A5120 ist die
@@ -67,17 +64,14 @@ WERKZEUGE="k1520disktool k1520kermit"
 # `k1520kermit-cli` ist die Kommandozeile von K1520 Kermit, gleich geschnitten.
 KONSOLENWERKZEUGE="k1520dbg k1520disktool-cli k1520kermit-cli"
 
-# Alles, was einen Starter/Eintrag bekommt — nur fuer das Aufraeumen gedacht.
-STARTER="$MASCHINEN $WERKZEUGE"
-
-# Was der Installer im Zielverzeichnis anlegt — und ausschliesslich das entfernt
-# das Deinstallieren wieder.  Die Liste wandert beim Installieren in den Ausweis
-# (siehe unten), sodass eine aeltere Installation nach ihrer EIGENEN Liste
-# abgeraeumt wird und nicht nach der einer neueren Fassung.
-INVENTAR="bin app share venv python tools .cache-uv VERSION requirements.lock LICENSE LIZENZ.txt"
+# Das Deinstallieren (uninstall.sh) arbeitet NACH INHALT — es entfernt jeden Verweis
+# und jede .desktop-Datei, die in die Installation zeigt — und braucht deshalb
+# keine Namensliste mehr.  Eine neue Maschine gehoert trotzdem in $MASCHINEN (das
+# Update findet seine Installation darueber) und braucht eine <name>.desktop.in.
 
 MODE=install
 SHORTCUTS=yes
+SHORTCUTS_SET=no
 KEEP_CACHE=no
 PURGE=no
 SLIM=yes
@@ -95,11 +89,15 @@ K1520-Emulator — Installation
                    gefragt, Vorschlag: <Dokumente>/K1520emu)
   -y, --yes        nicht fragen, Vorschlaege verwenden
   --python X.Y     Python-Fassung der Laufzeitumgebung (Vorgabe: $PY_VERSION)
-  --no-shortcut    keinen Startmenue-Eintrag und keinen Starter in ~/.local/bin
+  --shortcut       Startmenue-Eintraege (.desktop-Dateien) und Starter in ~/.local/bin
+                   anlegen, ohne zu fragen
+  --no-shortcut    keine Startmenue-Eintraege und keine Starter in ~/.local/bin
+                   (ohne beide Angaben wird gefragt)
   --no-slim        Python und Qt vollstaendig lassen (~400 statt ~146 MB)
   --keep-cache     uv und seinen Download-Cache behalten (schnellere
                    Neuinstallation, belegt einige hundert MB mehr)
-  --uninstall      Installation entfernen
+  --uninstall      Installation entfernen (ruft uninstall.sh; das liegt auch in der
+                   Installation und im Startmenue als "K1520emu deinstallieren")
   --purge          zusaetzlich Disketten und Konfiguration loeschen
   -h, --help       diese Hilfe
 
@@ -117,7 +115,8 @@ while [ $# -gt 0 ]; do
         -y|--yes)     ASSUME_YES=yes; shift ;;
         --python)     PY_VERSION=$2; shift 2 ;;
         --python=*)   PY_VERSION=${1#*=}; shift ;;
-        --no-shortcut) SHORTCUTS=no; shift ;;
+        --shortcut)   SHORTCUTS=yes; SHORTCUTS_SET=yes; shift ;;
+        --no-shortcut) SHORTCUTS=no; SHORTCUTS_SET=yes; shift ;;
         --no-slim)    SLIM=no; shift ;;
         --keep-cache) KEEP_CACHE=yes; shift ;;
         --uninstall)  MODE=uninstall; shift ;;
@@ -126,6 +125,17 @@ while [ $# -gt 0 ]; do
         *) die "unbekannte Option: $1  (--help zeigt die Liste)" ;;
     esac
 done
+
+# Deinstallieren macht uninstall.sh (dasselbe Skript, das auch in der Installation
+# liegt) — hier wird nur weitergereicht.  Ohne --prefix findet es die Installation
+# ueber die Verweise in ~/.local/bin selbst.
+if [ "$MODE" = uninstall ]; then
+    set --
+    if [ "$PREFIX_SET" = yes ]; then set -- --prefix "$PREFIX"; fi
+    if [ "$ASSUME_YES" = yes ]; then set -- "$@" -y; fi
+    if [ "$PURGE" = yes ]; then set -- "$@" --purge; fi
+    exec sh "$SELF_DIR/uninstall.sh" "$@"
+fi
 
 # vorhandene_installation — Wurzel einer bereits eingerichteten Installation.
 #
@@ -210,6 +220,22 @@ if [ -n "$DATEN" ]; then
     [ "$DATEN" = "$_daten_vorgabe" ] && DATEN=
 fi
 
+# ─── Startmenue-Eintraege erfragen ───────────────────────────────────────────
+#
+# Die Programme sollen wie unter Windows im Anwendungsmenue auftauchen: je Programm
+# eine .desktop-Datei in ~/.local/share/applications und ein Starter in
+# ~/.local/bin.  Beides liegt AUSSERHALB der Installation, deshalb wird gefragt —
+# und deshalb gibt es uninstall.sh, das genau diese Dateien wieder entfernt.
+# Ohne Terminal (Skript, CI) und mit -y gilt "ja".
+if [ "$MODE" = install ] && [ "$SHORTCUTS_SET" = no ] && [ "$ASSUME_YES" = no ] \
+   && [ -r /dev/tty ] && [ -t 1 ]; then
+    printf "Sollen Startmenue-Eintraege (.desktop-Dateien) angelegt werden?\n"
+    printf "  (die Programme erscheinen im Anwendungsmenue; Ablage in %s und\n" "$APPDIR"
+    printf "   Starter in %s; bereits vorhandene Eintraege werden ersetzt)\n" "$BINDIR"
+    if frage_jn "Eintraege anlegen?" j; then SHORTCUTS=yes; else SHORTCUTS=no; fi
+    printf "\n"
+fi
+
 # ─── Ziel pruefen ─────────────────────────────────────────────────────────────
 #
 # Das Deinstallieren loescht sein Ziel mit `rm -rf`.  Solange das Ziel fest
@@ -226,73 +252,6 @@ if [ "$MODE" = install ] && ! ist_leer "$PREFIX" && ! ist_installation "$PREFIX"
     die "$PREFIX ist nicht leer und enthaelt keine Installation des Emulators.
      Bitte einen eigenen Ordner angeben — beim Deinstallieren wuerde dieser
      hier samt Inhalt geloescht."
-fi
-
-# ─── Deinstallieren ──────────────────────────────────────────────────────────
-
-# entferne_installation <wurzel> — nur das wegraeumen, was der Installer anlegte.
-#
-# Ein `rm -rf` auf die Wurzel waere einfacher, naehme dem Anwender aber alles mit,
-# was er DANEBEN abgelegt hat — eigene Disketten, Notizen, ein Skript.  Geloescht
-# wird deshalb nach dem Inventar aus dem Ausweis (eine aeltere Installation nach
-# ihrer eigenen Liste, nicht nach der dieser Fassung); bleibt danach etwas
-# uebrig, bleibt auch das Verzeichnis stehen und der Anwender erfaehrt es.
-entferne_installation() {
-    _wurzel=$1
-    _liste=$(sed -n 's/^eintrag //p' "$_wurzel/$INSTALL_MARKER" 2>/dev/null || true)
-    [ -n "$_liste" ] || _liste=$INVENTAR
-
-    for _e in $_liste; do
-        # Ein Eintrag ist ein NAME, kein Pfad — sonst zeigte ein verfaelschter
-        # Ausweis („../..") aus der Installation heraus.
-        case "$_e" in
-            */*|..|.|"") warn "uebergangen: fragwuerdiger Eintrag im Ausweis ($_e)"; continue ;;
-        esac
-        rm -rf "$_wurzel/$_e"
-    done
-    # Protokolle des Emulators — sie entstehen im ARBEITSVERZEICHNIS (seit
-    # e6db12c in dessen Unterverzeichnis `logs/`, siehe k1520_api.cpp), also
-    # hier, sobald jemand aus der Installation heraus startet.  Die aeltere
-    # Schreibweise direkt im Verzeichnis bleibt beruecksichtigt, damit auch eine
-    # damit angelegte Installation sauber verschwindet.
-    rm -rf "$_wurzel/logs"
-    rm -f "$_wurzel"/k1520_*.log
-    rm -f "$_wurzel/$INSTALL_MARKER"
-
-    if rmdir "$_wurzel" 2>/dev/null; then
-        ok "Verzeichnis geloescht"
-    else
-        ok "Programmdateien entfernt"
-        printf "     %s bleibt stehen — darin liegt, was nicht vom Installer stammt:\n" "$_wurzel"
-        ls -A "$_wurzel" 2>/dev/null | sed 's/^/       /'
-    fi
-}
-
-if [ "$MODE" = uninstall ]; then
-    info "Installation entfernen: $PREFIX"
-    if [ ! -d "$PREFIX" ]; then
-        warn "nichts zu loeschen — $PREFIX gibt es nicht"
-    elif ist_installation "$PREFIX"; then
-        entferne_installation "$PREFIX"
-    else
-        warn "$PREFIX sieht nicht nach einer Installation aus — es bleibt unangetastet"
-    fi
-    for _m in $STARTER; do
-        rm -f "$BINDIR/$_m" "$APPDIR/$_m.desktop" "$ICONDIR/$_m.svg"
-    done
-    # Nur der Verweis — Startmenue-Eintrag und Symbol gibt es dafuer nicht.
-    for _m in $KONSOLENWERKZEUGE; do
-        rm -f "$BINDIR/$_m"
-    done
-    ok "Starter und Startmenue-Eintraege entfernt"
-    if [ "$PURGE" = yes ]; then
-        rm -rf "$DATADIR" "$CONFDIR"
-        ok "Disketten und Konfiguration geloescht"
-    else
-        printf "     Behalten: %s (Disketten), %s (Konfiguration)\n" "$DATADIR" "$CONFDIR"
-        printf "     Mit --purge loeschen.\n"
-    fi
-    exit 0
 fi
 
 # ─── Vorpruefungen ────────────────────────────────────────────────────────────
@@ -318,17 +277,92 @@ fi
 
 # ─── 1. Payload kopieren ─────────────────────────────────────────────────────
 
+# ── Die alte Fassung beiseite legen — und bei einem Fehlschlag zurueckstellen ──
+#
+# Eine aeltere Installation wird nicht ueberschrieben, sondern umbenannt (*.alt);
+# erst wenn die neue steht UND der Rauchtest bestanden hat, wird sie geloescht.
+# Scheitert irgendetwas dazwischen (Netz weg, Rauchtest rot, Strg+C), stellt der
+# EXIT-Handler die alte Fassung wieder her — der Anwender hat danach, was er vorher
+# hatte, nicht eine halbe Installation.  Beiseite kommen nur die Teile, die der
+# Installer ohnehin neu schreibt; `python/` (der geladene Interpreter), `tools/`
+# (uv) und die Datenordner bleiben stehen — ein neu zu ladender Python waere eine
+# unnoetige Netzlast, und uv ersetzt eine andere Fassung ohnehin nur NEBEN der alten.
+SICHERUNG_LISTE="bin app share venv VERSION requirements.lock LICENSE LIZENZ.txt uninstall.sh lib $INSTALL_MARKER"
+SICHERUNG=no       # die alte Fassung liegt als *.alt beiseite
+ERFOLG=no          # die neue Fassung ist vollstaendig und geprueft
+WAR_NEU=no         # es gab vorher keine Installation
+
+alt_vorhanden() {
+    for _e in $SICHERUNG_LISTE; do
+        [ -e "$PREFIX/$_e.alt" ] && return 0
+    done
+    return 1
+}
+
+# stelle_alte_fassung_wieder_her — nimmt weg, was neu entstand, und holt *.alt zurueck.
+stelle_alte_fassung_wieder_her() {
+    [ -n "$PREFIX" ] && [ "$PREFIX" != / ] || return 0
+    for _e in $SICHERUNG_LISTE; do
+        if [ -e "$PREFIX/$_e.alt" ]; then
+            rm -rf "${PREFIX:?}/${_e:?}"
+            mv "$PREFIX/$_e.alt" "$PREFIX/$_e" || warn "nicht zurueckgestellt: $PREFIX/$_e.alt"
+        fi
+    done
+}
+
+# Wird bei JEDEM Ende des Skripts gerufen (auch nach `die` und nach Strg+C).
+beim_ende() {
+    _status=$?
+    trap - EXIT
+    if [ "$SICHERUNG" = yes ] && [ "$ERFOLG" = no ]; then
+        cd / 2>/dev/null || true
+        if [ "$WAR_NEU" = yes ]; then
+            warn "Installation nicht abgeschlossen — das Angelegte wird entfernt"
+            for _e in $INVENTAR; do
+                case "$_e" in */*|..|.|"") continue ;; esac
+                rm -rf "${PREFIX:?}/${_e:?}"
+            done
+            rm -f "${PREFIX:?}/$INSTALL_MARKER"
+            rmdir "$PREFIX" 2>/dev/null || true
+        else
+            warn "Installation nicht abgeschlossen — die vorherige Fassung wird wiederhergestellt"
+            stelle_alte_fassung_wieder_her
+        fi
+    fi
+    exit "$_status"
+}
+trap beim_ende EXIT
+trap 'exit 130' INT TERM HUP
+
 info "Programmdateien kopieren"
-# Eine aeltere Installation wird ersetzt; python/ (der geladene Interpreter)
-# bleibt stehen, die Laufzeitumgebung wird weiter unten neu aufgebaut.
+if alt_vorhanden; then
+    # Rest eines abgebrochenen Laufs (z. B. kill -9): DAS ist die alte Fassung,
+    # was jetzt in $PREFIX steht, ist unvollstaendig.  Erst zurueckstellen.
+    warn "Rest eines abgebrochenen Laufs gefunden — die vorherige Fassung wird zuerst wiederhergestellt"
+    stelle_alte_fassung_wieder_her
+fi
+if ist_installation "$PREFIX"; then WAR_NEU=no; else WAR_NEU=yes; fi
+SICHERUNG=yes
+for _e in $SICHERUNG_LISTE; do
+    if [ -e "$PREFIX/$_e" ]; then mv "$PREFIX/$_e" "$PREFIX/$_e.alt"; fi
+done
+if [ "$WAR_NEU" = no ]; then
+    printf "     (die vorherige Fassung bleibt bis zum erfolgreichen Rauchtest als *.alt erhalten)\n"
+fi
+
 for d in bin app share; do
-    rm -rf "$PREFIX/$d"
     cp -R "$SELF_DIR/payload/$d" "$PREFIX/$d"
 done
 cp "$SELF_DIR/VERSION" "$SELF_DIR/requirements.lock" "$PREFIX/"
 for _l in LICENSE LIZENZ.txt; do
     if [ -f "$SELF_DIR/$_l" ]; then cp "$SELF_DIR/$_l" "$PREFIX/"; fi
 done
+# Das Deinstallationsskript samt seinem Hilfsmodul — es liegt in der Installation,
+# damit der Anwender sie auch ohne das Paket wieder entfernen kann.
+mkdir -p "$PREFIX/lib"
+cp "$SELF_DIR/uninstall.sh" "$PREFIX/uninstall.sh"
+cp "$SELF_DIR/lib/common.sh" "$PREFIX/lib/common.sh"
+chmod +x "$PREFIX/uninstall.sh"
 
 # Ausweis fuer das Deinstallieren.  Er beantwortet zwei Fragen: ob dieses
 # Verzeichnis ueberhaupt uns gehoert (sonst wird nichts geloescht) und WAS darin
@@ -370,7 +404,9 @@ info "Laufzeitumgebung anlegen"
 VENV_CLEAR=
 if [ -d "$PREFIX/venv" ]; then
     VENV_CLEAR=--clear
-    printf "     (bestehende Laufzeitumgebung wird erneuert)\n"
+fi
+if [ "$WAR_NEU" = no ]; then
+    printf "     (bestehende Laufzeitumgebung wird erneuert; die alte liegt als venv.alt daneben)\n"
 fi
 # shellcheck disable=SC2086  # VENV_CLEAR ist leer oder genau ein Wort
 "$UV" venv $VENV_CLEAR --python "$PY_VERSION" --python-preference only-managed \
@@ -478,7 +514,22 @@ ersetze_platzhalter "$SELF_DIR/kermit_launcher.sh" "$PREFIX" "$DATEN" > "$PREFIX
 chmod +x "$PREFIX/bin/k1520kermit"
 [ -f "$PREFIX/bin/k1520kermit-cli" ] && chmod +x "$PREFIX/bin/k1520kermit-cli"
 
-if [ "$SHORTCUTS" = yes ]; then
+# ── Startmenue-Eintraege und Starter in ~/.local/bin ─────────────────────────
+#
+# Wird ERST NACH dem bestandenen Rauchtest gerufen (siehe unten): ein Eintrag fuer
+# eine unbrauchbare Installation waere schlimmer als gar keiner, und bei einem
+# Fehlschlag soll die vorherige Fassung samt ihren Eintraegen unveraendert bleiben.
+# Bekannte Eintraege einer frueheren Fassung werden dabei ERSETZT: erst werden alle
+# entfernt, die in diese Installation zeigen (auch solche, die es heute nicht mehr
+# gibt), dann neu geschrieben.
+lege_menue_eintraege_an() {
+    _alt=$(entferne_menue_eintraege "$PREFIX")
+    if [ "$SHORTCUTS" != yes ]; then
+        if [ "${_alt:-0}" -gt 0 ]; then
+            ok "keine neuen Eintraege angelegt; $_alt vorhandene entfernt"
+        fi
+        return 0
+    fi
     mkdir -p "$BINDIR" "$APPDIR" "$ICONDIR"
     ln -sf "$PREFIX/bin/a5120emu" "$BINDIR/a5120emu"
     cp "$PREFIX/share/icons/a5120emu.svg" "$ICONDIR/a5120emu.svg" 2>/dev/null || true
@@ -523,7 +574,14 @@ if [ "$SHORTCUTS" = yes ]; then
         *":$BINDIR:"*) ;;
         *) warn "$BINDIR liegt nicht im PATH — der Emulator startet trotzdem ueber das Startmenue" ;;
     esac
-fi
+    # Deinstallieren aus dem Startmenue: uninstall.sh (laeuft im Terminal, fragt nach).
+    ersetze_platzhalter "$SELF_DIR/k1520emu-uninstall.desktop.in" "$PREFIX" \
+        > "$APPDIR/k1520emu-uninstall.desktop"
+    ln -sf "$PREFIX/uninstall.sh" "$BINDIR/k1520emu-uninstall"
+    if have update-desktop-database; then
+        update-desktop-database "$APPDIR" >/dev/null 2>&1 || true
+    fi
+}
 
 # ─── 5. Rauchtest ────────────────────────────────────────────────────────────
 #
@@ -631,6 +689,14 @@ if [ -x "$PREFIX/bin/k1520dbg" ]; then
 fi
 ok "laeuft"
 
+# Erst jetzt, wo die neue Fassung bewiesen hat, dass sie startet: Menue-Eintraege
+# schreiben, die Sicherung der alten Fassung wegwerfen, den Erfolg festhalten.
+lege_menue_eintraege_an
+for _e in $SICHERUNG_LISTE; do
+    if [ -e "$PREFIX/$_e.alt" ]; then rm -rf "${PREFIX:?}/${_e:?}.alt"; fi
+done
+ERFOLG=yes
+
 printf "\n"
 info "Fertig."
 printf "     Installiert:  %s (%s)\n" "$PREFIX" \
@@ -668,4 +734,9 @@ printf "     Die Greaseweazle-Anbindung ist eingespielt: mit einem\n"
 printf "     Greaseweazle-Adapter lesen und beschreiben beide Programme echte\n"
 printf "     5,25\"- und 8\"-Disketten (Emulator: „Physisch…\" am Laufwerkskasten,\n"
 printf "     Diskettenwerkzeug: Datei ▸ Physisches Laufwerk…).\n"
-printf "     Entfernen:    %s --uninstall\n" "$0"
+printf "     Entfernen:    %s  (fragt, ob der Programmordner geloescht wird;\n" "$PREFIX/uninstall.sh"
+if [ "$SHORTCUTS" = yes ]; then
+    printf "                   auch im Startmenue: \"K1520emu deinstallieren\")\n"
+else
+    printf "                   entfernt Verweise und Menue-Eintraege, falls vorhanden)\n"
+fi

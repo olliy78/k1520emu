@@ -69,9 +69,13 @@ venv/bin/python3 -m pytest tests/python/test_packaging.py -v
 Installer findet die vorhandene Installation über den Starter in `~/.local/bin`
 und schlägt sie vor, die Laufzeitumgebung wird dabei neu aufgebaut (§3.2 des
 Entwurfs).  Das Ziel ist gegen Unfälle gesichert: `$HOME`, `/` und jedes nicht
-leere fremde Verzeichnis werden abgelehnt; `--uninstall` fasst nur an, was sich
+leere fremde Verzeichnis werden abgelehnt; `--uninstall` (= `uninstall.sh`, das auch in der
+Installation liegt und im Startmenü steht) fasst nur an, was sich
 als Installation ausweist, und entfernt daraus **nur das Inventar aus dem
-Ausweis** — fremde Dateien im Ordner überleben.
+Ausweis** — fremde Dateien im Ordner überleben.  Verweise und `.desktop`-Dateien werden
+**nach Inhalt** gefunden (zeigen sie in die Installation?), nicht nach einer Namensliste.
+Ein Update legt die alte Fassung als `*.alt` beiseite und stellt sie bei einem Fehlschlag
+wieder her (Linux wie Windows); Startmenü-Einträge entstehen erst nach dem Rauchtest.
 
 ## Windows: Setup bauen und ausprobieren
 
@@ -114,7 +118,8 @@ Datei im Zielordner überlebt.
 | `launcher.cmd`, `disktool_launcher.cmd`, `kermit_launcher.cmd` | Windows-Starter; die Startmenü-Verknüpfung zeigt dagegen direkt auf `pythonw.exe`, sonst öffnet sich ein Konsolenfenster |
 | `launcher.sh` | Startskript-Vorlage; `@ROOT@` wird beim Installieren ersetzt. EINE Vorlage für alle sechs Emulatoren (`bin/a5120emu`, `bin/k8915emu`, `bin/prg710emu`, `bin/pc1715emu`, `bin/p8000emu`, `bin/mc80emu`): der Name, unter dem der Starter aufgerufen wird, wählt das Programmprofil (`k8915emu*` ⇒ `--machine k8915`, `prg710emu*` ⇒ `--machine prg710`, `pc1715emu*` ⇒ `--machine pc1715`, `p8000emu*` ⇒ `--machine p8000`, `mc80emu*` ⇒ `--machine mc80`); `launcher.cmd` ebenso über `%~n0` |
 | `slim.py` | wirft nach dem Installieren heraus, was nie geladen wird (~400 → ~146 MB) |
-| `lib/common.sh` | gemeinsame Bausteine: Meldungen, Plattform, Download, `ensure_uv` |
+| `lib/common.sh` | gemeinsame Bausteine: Meldungen, Plattform, Download, `ensure_uv`, Inventar, `entferne_menue_eintraege` |
+| `uninstall.sh`, `k1520emu-uninstall.desktop.in` | Deinstallation (Linux): Einträge entfernen, nach dem Programmordner fragen; liegt auch in der Installation |
 | `uv_pins.txt` | gepinnte uv-Fassung + Prüfsummen für die **Unix**-Installer (`build_payload.sh --refresh-uv`) |
 | `a5120emu.desktop.in` | Startmenü-Eintrag „A5120 Emulator" |
 | `k8915emu.desktop.in` | Startmenü-Eintrag „K8915 Emulator" (gleiches Symbol) |

@@ -43,6 +43,13 @@ Sieben Dinge, die man dabei nicht kaputtmachen darf:
   `test_installer_verweigert_*`, `test_deinstallieren_loescht_nur_eine_installation`,
   `test_deinstallieren_laesst_eigene_dateien_stehen`,
   `test_deinstallieren_folgt_keinem_pfad_im_ausweis`.
+- **Linux-Update mit Rückfall, Startmenü-Frage, `uninstall.sh`** (2026-11-08): `install.sh` legt `bin app share venv` + Dateien als `*.alt`
+  beiseite, ein EXIT-Handler (`beim_ende`) stellt sie bei Fehlschlag/Abbruch zurück (Erstinstallation: räumt das Angelegte weg);
+  `*.alt` fällt erst NACH dem Rauchtest, ebenso entstehen Menü-Einträge erst dort (`lege_menue_eintraege_an`). `python/`, `tools/`
+  werden nicht gesichert (kein erneutes Laden). `uninstall.sh` (in der Installation, mit `lib/common.sh`; Inventar `uninstall.sh lib`)
+  findet Verweise/`.desktop`-Dateien **nach Inhalt** (Exec/Linkziel in der Wurzel), nicht per Namensliste. Gelesen wird von
+  `/dev/tty`, ohne Terminal gilt die Vorgabe. Guards: `test_update_stellt_bei_fehlschlag_*`, `test_erstinstallation_hinterlaesst_*`,
+  `test_uninstall_*`, `test_frage_jn_*`. Nicht getestet: der Dialog am echten Terminal und ein vollständiger Lauf mit Netz.
 - **Ein Update findet seine Installation selbst** (`vorhandene_installation()` über den
   Starter-Symlink) und schlägt sie als Ziel vor. Ohne das legte ein `install.sh` ohne
   `--prefix` eine ZWEITE Installation am Standardort an und ließe die alte verwaisen.
