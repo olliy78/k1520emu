@@ -141,7 +141,7 @@ NadeldruckParameter druckParameter(const K6316Steuerung::Config& c)
 K6316Steuerung::K6316Steuerung(K1520Bus& bus, const Config& cfg)
     : bus_(bus), cfg_(cfg), betriebsart_(cfg.betriebsart), kopf_(cfg.kopf_angeschwenkt), haube_(cfg.haube_zu),
       pe_(!cfg.papier_da), dil_(cfg.dil),
-      druck_(druckParameter(cfg), std::make_unique<SchrittWagen>(cfg.wagen), cfg.papier), vorsteck_(cfg.papier)
+      druck_(druckParameter(cfg), std::make_unique<SchrittWagen>(cfg.wagen), cfg.papier), vorsteck_(cfg.papier), beleg_(cfg.beleg)
 {
     // Modus-3-Interrupts der PIOs sind Ereignisse (wie am SD 1157, merkposten/drucker.md Nr. 5)
     pio11_.setModus3Flanke(true);
@@ -177,6 +177,7 @@ void K6316Steuerung::powerOn()
     ram_.fill(cfg_.ram_fill);
     druck_.netzEin(cfg_.wagen_start);
     vorsteck_.netzEin();
+    beleg_lage_ = 0;   // der Beleg (falls einer liegt) bleibt, wo er ist; nur der Zaehler des Motors beginnt neu
     messer_bereit_ = true;
     schnitte_ = 0;
     reset();
@@ -267,6 +268,7 @@ void K6316Steuerung::ausgaengeAuswerten()
     }
     druck_.papier(0).phasen(pp);
     vorsteck_.phasen(vp);
+    belegAbgleichen();
     // Nadeln: /DNx = 0 bei freigegebenem Treiber (/DTFG = 0); Nadel 1..8 = D14 B Bit 7..0, Nadel 9 = D14 A Bit 0
     uint16_t aktiv = 0;
     if (!(a14 & 0x02)) {
@@ -276,7 +278,16 @@ void K6316Steuerung::ausgaengeAuswerten()
     }
     const uint16_t neu = static_cast<uint16_t>(aktiv & ~nadeln_aktiv_);
     nadeln_aktiv_ = aktiv;
-    if (neu) druck_.feuere(neu, kopf_ && haube_);
+    if (neu) {
+        // Liegt ein Beleg unter der Druckzeile und der Wagen ueber ihm, treffen die Nadeln ihn (er liegt zwischen Kopf und
+        // Endlospapier, hardware.md §11.1/§11.4 [?]); sonst das Endlospapier.
+        const int xpix = druck_.wagen().positionPixel(druck_.parameter().x_je_takt);
+        if (beleg_.unterDruckzeile() && beleg_.trifftX(xpix))
+            druck_.kopf().feuerePixel(neu, xpix - beleg_.xLinks(), beleg_.druckzeileY(), druck_.wagen().richtung(), kopf_ && haube_,
+                                      beleg_.blatt());
+        else
+            druck_.feuere(neu, kopf_ && haube_);
+    }
     // Schneideinrichtung: mechanisch ueber die Wagenlage
     const int pos = druck_.wagen().position();
     if (messer_bereit_ && pos >= cfg_.schnitt_pos) {
@@ -289,6 +300,44 @@ void K6316Steuerung::ausgaengeAuswerten()
     // Taktscheibe folgt der Wagenlage
     const bool g1 = druck_.wagen().rueckmeldung().g1;
     if (g1 != g1_) g1_ = g1;
+}
+
+// ─── Vorsteckbeleg (hardware.md §11) ─────────────────────────────────────────
+
+namespace {
+/// Einzug (Beleg in den Drucker) = Lage des Vorsteckmotors steigt (+1) oder faellt (-1): am Lauf der IFSS-Firmware gemessen
+/// (BEZ: die Lage laeuft in diese Richtung), hardware.md §11.8.
+constexpr int EINZUG_VORZEICHEN = -1;
+constexpr double PIXEL_JE_MM = 300.0 / 25.4;    // 300 dpi in x
+constexpr double SCHRITTE_JE_MM = 108.0 / 25.4; // 1 Vorsteckschritt = 1/108 Zoll
+}  // namespace
+
+void K6316Steuerung::belegAbgleichen()
+{
+    const int l = vorsteck_.lage();
+    if (l == beleg_lage_) return;
+    const int d = (l - beleg_lage_) * EINZUG_VORZEICHEN;
+    beleg_lage_ = l;
+    if (!beleg_.eingelegt()) return;
+    beleg_.bewege(d);
+    if (beleg_.fso() != fso_ || beleg_.fsu() != fsu_) setBeleg(beleg_.fso(), beleg_.fsu());
+}
+
+bool K6316Steuerung::belegEinlegen(double laenge_mm, double breite_mm)
+{
+    if (laenge_mm <= 0 || breite_mm <= 0) return false;
+    if (!beleg_.einlegen(static_cast<int>(laenge_mm * SCHRITTE_JE_MM + 0.5), static_cast<int>(breite_mm * PIXEL_JE_MM + 0.5)))
+        return false;
+    beleg_lage_ = vorsteck_.lage();
+    setBeleg(beleg_.fso(), beleg_.fsu());
+    return true;
+}
+
+void K6316Steuerung::belegEntnehmen()
+{
+    if (!beleg_.eingelegt()) return;
+    beleg_.entnehmen();
+    setBeleg(false, false);
 }
 
 // ─── Bedienfeld ──────────────────────────────────────────────────────────────

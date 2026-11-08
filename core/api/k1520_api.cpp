@@ -462,31 +462,39 @@ static PrinterMachine* printerOf(K1520Handle h) {
     return h ? dynamic_cast<PrinterMachine*>(toMachine(h)) : nullptr;
 }
 
+// Blatt einer "Bahn": 0 = Endlospapier; K6316 zusaetzlich 1 = der Beleg im Vorsteckschacht (nach dem ersten Einlegen vorhanden).
+static const Blattmodell* printerBlatt(PrinterMachine* p, int bahn) {
+    if (!p || bahn < 0) return nullptr;
+    if (bahn < p->druck().bahnen()) return &p->druck().blatt(bahn);
+    if (bahn == 1 && p->istK6316() && p->k6316().beleg_modell().hatBlatt()) return &p->k6316().belegBlatt();
+    return nullptr;
+}
+
 int k1520_printer_sheet_size(K1520Handle h, int bahn, int* breite, int* hoehe) {
-    auto* p = printerOf(h);
-    if (!p || bahn < 0 || bahn >= p->druck().bahnen()) return 0;
-    const Blattmodell& b = p->druck().blatt(bahn);
-    if (breite) *breite = b.breite();
-    if (hoehe) *hoehe = b.hoehe();
+    const Blattmodell* b = printerBlatt(printerOf(h), bahn);
+    if (!b) return 0;
+    if (breite) *breite = b->breite();
+    if (hoehe) *hoehe = b->hoehe();
     return 1;
 }
 
 uint64_t k1520_printer_sheet_version(K1520Handle h, int bahn) {
     auto* p = printerOf(h);
-    if (!p || bahn < 0 || bahn >= p->druck().bahnen()) return 0;
-    return p->druck().blatt(bahn).version();
+    if (p && bahn == 1 && p->istK6316() && p->k6316().beleg_modell().hatBlatt()) return p->k6316().beleg_modell().version();
+    const Blattmodell* b = printerBlatt(p, bahn);
+    return b ? b->version() : 0;
 }
 
 int k1520_printer_sheet_rows(K1520Handle h, int bahn, int y0, int n, uint8_t* buf, int cap) {
-    auto* p = printerOf(h);
-    if (!p || bahn < 0 || bahn >= p->druck().bahnen() || !buf || cap <= 0) return 0;
-    return p->druck().blatt(bahn).lies(y0, n, buf, static_cast<size_t>(cap));
+    const Blattmodell* b = printerBlatt(printerOf(h), bahn);
+    if (!b || !buf || cap <= 0) return 0;
+    return b->lies(y0, n, buf, static_cast<size_t>(cap));
 }
 
 int k1520_printer_sheet_cuts(K1520Handle h, int bahn, int* y, int cap) {
-    auto* p = printerOf(h);
-    if (!p || bahn < 0 || bahn >= p->druck().bahnen()) return 0;
-    const std::vector<int>& s = p->druck().blatt(bahn).schnitte();
+    const Blattmodell* b = printerBlatt(printerOf(h), bahn);
+    if (!b) return 0;
+    const std::vector<int>& s = b->schnitte();
     for (int i = 0; y && i < cap && i < static_cast<int>(s.size()); ++i) y[i] = s[static_cast<size_t>(i)];
     return static_cast<int>(s.size());
 }
@@ -626,6 +634,32 @@ int k1520_printer_lamp(K1520Handle h, int lampe) {
         case K1520_PRINTER_LAMP_FEHLER: return st.lampeFehler() ? 1 : 0;
         default: return -1;
     }
+}
+
+int k1520_printer_beleg_insert(K1520Handle h, int laenge_mm, int breite_mm) {
+    auto* p = printerOf(h);
+    if (!p || !p->istK6316()) return 0;
+    return p->k6316().belegEinlegen(laenge_mm, breite_mm) ? 1 : 0;
+}
+
+int k1520_printer_beleg_remove(K1520Handle h) {
+    auto* p = printerOf(h);
+    if (!p || !p->istK6316()) return 0;
+    p->k6316().belegEntnehmen();
+    return 1;
+}
+
+int k1520_printer_beleg_state(K1520Handle h, int* eingelegt, int* u, int* laenge, int* breite_px, int* x_links, int* druck_y) {
+    auto* p = printerOf(h);
+    if (!p || !p->istK6316()) return 0;
+    const Vorsteckbeleg& b = p->k6316().beleg_modell();
+    if (eingelegt) *eingelegt = b.eingelegt() ? 1 : 0;
+    if (u) *u = b.u();
+    if (laenge) *laenge = b.laenge();
+    if (breite_px) *breite_px = b.breitePixel();
+    if (x_links) *x_links = b.xLinks();
+    if (druck_y) *druck_y = b.unterDruckzeile() ? b.druckzeileY() : -1;
+    return 1;
 }
 
 K1520Handle k1520_create_p8000(const char* konfig) {

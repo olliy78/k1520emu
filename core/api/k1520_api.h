@@ -327,7 +327,9 @@ K1520_API K1520Handle k1520_create_printer(int typ, const char* konfig);
 #define K1520_PRINTER_LAMP_PAPIER 3
 #define K1520_PRINTER_LAMP_H4     4
 
-/** Blattgroesse in Pixeln: *breite fest, *hoehe waechst.  1 = ok, 0 = kein Drucker/keine Bahn. */
+/** Blattgroesse in Pixeln: *breite fest, *hoehe waechst.  1 = ok, 0 = kein Drucker/keine Bahn.
+ *  Bahn 0 = Endlospapier; K6316: Bahn 1 = der Vorsteckbeleg (erst nach dem ersten k1520_printer_beleg_insert, bleibt nach dem
+ *  Entnehmen zum Ansehen stehen; sheet_clear fasst ihn nicht an; sheet_version waechst auch ueber ein neues Einlegen hinweg). */
 K1520_API int      k1520_printer_sheet_size(K1520Handle h, int bahn, int* breite, int* hoehe);
 /** Versionszaehler des Blatts: aendert sich bei jedem neuen Punkt, bei Wachstum und beim Leeren. */
 K1520_API uint64_t k1520_printer_sheet_version(K1520Handle h, int bahn);
@@ -349,6 +351,17 @@ K1520_API int      k1520_printer_switch(K1520Handle h, int schalter, int wert);
 K1520_API int      k1520_printer_switch_get(K1520Handle h, int schalter);
 /** Lampenstand: 0/1, -1 = kein Drucker/unbekannt. */
 K1520_API int      k1520_printer_lamp(K1520Handle h, int lampe);
+
+/** K6316, Vorsteckbeleg (hardware.md §11): Beleg von Hand in den Schacht stecken (Spitze hinter der oberen Lichtschranke).
+ *  Masse in mm; 1 = ok, 0 = kein K6316 / es liegt schon einer im Schacht / unsinniges Mass.  Danach folgen FSO/FSU der Lage
+ *  des Vorsteckmotors (BEZ/BAU/ZBV/ZBR der Firmware), Nadelanschlaege unter der Druckzeile gehen auf das Blatt der Bahn 1. */
+K1520_API int      k1520_printer_beleg_insert(K1520Handle h, int laenge_mm, int breite_mm);
+/** Beleg aus dem Schacht nehmen (FSO/FSU frei, das Blatt bleibt).  1 = K6316, 0 = sonst. */
+K1520_API int      k1520_printer_beleg_remove(K1520Handle h);
+/** Zustand des Belegs: eingelegt 0/1, u = Weg der Spitze hinter FSO in Vorsteckschritten (1/108 Zoll), laenge in Schritten,
+ *  Breite in Blattpixeln (300 dpi), x_links = Linkskante in Pixeln des Endlospapier-Blatts, druck_y = Blattzeile der Nadel 1 auf dem
+ *  Beleg-Blatt, solange der Beleg unter der Druckzeile liegt, sonst -1.  Zeiger duerfen NULL sein.  1 = K6316, 0 = sonst. */
+K1520_API int      k1520_printer_beleg_state(K1520Handle h, int* eingelegt, int* u, int* laenge, int* breite_px, int* x_links, int* druck_y);
 
 /**
  * @brief Reason the last k1520_create*() returned NULL ("" if none).

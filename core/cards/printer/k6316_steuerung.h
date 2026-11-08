@@ -31,6 +31,7 @@
 #include "core/cards/printer/drucker_steuerung.h"
 #include "core/peripherals/druckwerk/nadeldruckwerk.h"
 #include "core/peripherals/druckwerk/schrittwagen.h"
+#include "core/peripherals/druckwerk/vorsteckbeleg.h"
 #include "core/primitives/z80.h"
 #include "core/primitives/z80_ctc.h"
 #include "core/primitives/z80_pio.h"
@@ -78,6 +79,8 @@ public:
         /// Lauf SOFORT nach der letzten Zeile (ohne vorher vorzuschieben) und schiebt den Beleg danach aus (225 Schritte); der
         /// kleinste Fussabstand ist laut Handbuch 2.6 Nr. 4 3,5 mm (n = 0) = 30 Einheiten bei 216 je Zoll [H, abgeleitet].
         int schnitt_abstand_y = 30;
+        /// Vorsteckbeleg (hardware.md §11): Abstand FSO-FSU, Druckzeile, x-Lage; Annahmen [?] dort.
+        Vorsteckbeleg::Parameter beleg;
 
         /// Raster des K6316 (Servicehandbuch 1.1.3.1, Handbuch 2.1): ein Motorschritt des Wagens = 1/75 Zoll, die Position zaehlt
         /// Halbschritte (1/150 Zoll, 2 Pixel je Einheit = 300 dpi); Papierschritt 1/108 Zoll [H] (Service 1.2.5), Nadelteilung
@@ -180,6 +183,16 @@ public:
     uint8_t  portAusgabe(int pio, int kanal) const;   ///< Pin-Pegel: pio = 11/12/14, kanal 0 = A, 1 = B
     Papierweg& vorsteck() { return vorsteck_; }
     int schnitte() const { return schnitte_; }   ///< bisher ausgeloeste Schnitte
+
+    // ─── Vorsteckbeleg als eigenes Blatt (hardware.md §11) ───────────────────
+    /// Beleg von Hand einlegen (Spitze hinter FSO, vor FSU); FSO/FSU folgen ab jetzt seiner Lage, die der Vorsteckmotor
+    /// bewegt.  false = es liegt schon einer im Schacht oder das Mass ist unsinnig.
+    bool belegEinlegen(double laenge_mm, double breite_mm);
+    void belegEntnehmen();                         ///< FSO/FSU frei; das Belegblatt bleibt zum Ansehen
+    const Vorsteckbeleg& beleg_modell() const { return beleg_; }
+    Vorsteckbeleg& beleg_modell() { return beleg_; }
+    /// Das Blatt des Belegs (nur nach dem ersten Einlegen vorhanden: @ref Vorsteckbeleg::hatBlatt).
+    const Blattmodell& belegBlatt() const { return beleg_.blatt(); }
     bool magnetUnten() const { return !(pio11_.pinsB(0) & 0x01); }   ///< /YABU
     bool magnetOben() const  { return !(pio11_.pinsB(0) & 0x08); }   ///< /YABO
 
@@ -198,6 +211,7 @@ private:
     void eingaengeSetzen();                ///< alle Pins an die PIOs anlegen
     uint8_t spalten() const;               ///< Pegel der fuenf Spalten (Bit 0 TSCH, 1 TBAW, 2 DIL, 3 TPVV, 4 TPVR)
     void ausgaengeAuswerten();             ///< Motorphasen, Nadeln
+    void belegAbgleichen();                ///< Vorsteckmotor hat sich bewegt: Beleg nachfuehren, FSO/FSU setzen
     void ketteNeu();
     bool sioSenke();
 
@@ -221,6 +235,8 @@ private:
 
     Nadeldruckwerk druck_;
     Papierweg vorsteck_;
+    Vorsteckbeleg beleg_;
+    int beleg_lage_ = 0;          ///< Lage des Vorsteckmotors beim letzten Abgleich mit dem Beleg
     uint16_t nadeln_aktiv_ = 0;   ///< zuletzt aktive Nadeln (fuer die Flankenerkennung)
     bool g1_ = false;             ///< zuletzt an D12 B Bit 0 gelegter Pegel
     bool messer_bereit_ = true;   ///< Messer gespannt (rechter Anschlag loest aus, linker spannt)

@@ -463,6 +463,13 @@ _lib.k1520_printer_switch_get.argtypes = [K1520Handle, ctypes.c_int]
 _lib.k1520_printer_switch_get.restype = ctypes.c_int
 _lib.k1520_printer_lamp.argtypes = [K1520Handle, ctypes.c_int]
 _lib.k1520_printer_lamp.restype = ctypes.c_int
+# K6316: Vorsteckbeleg als eigenes Blatt (Bahn 1 der k1520_printer_sheet_*; hardware.md §11)
+_lib.k1520_printer_beleg_insert.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_int]
+_lib.k1520_printer_beleg_insert.restype = ctypes.c_int
+_lib.k1520_printer_beleg_remove.argtypes = [K1520Handle]
+_lib.k1520_printer_beleg_remove.restype = ctypes.c_int
+_lib.k1520_printer_beleg_state.argtypes = [K1520Handle] + [ctypes.POINTER(ctypes.c_int)] * 6
+_lib.k1520_printer_beleg_state.restype = ctypes.c_int
 
 # P8000-Terminals (k1520_term_*; andere Maschinen: 0 / -1 / False)
 _lib.k1520_term_count.argtypes = [K1520Handle]

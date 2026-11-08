@@ -458,6 +458,27 @@ def test_printer_sd1157_can_be_created_and_runs_its_rom():
             assert _lib.k1520_printer_switch_get(h6, 16) == 0
             assert _lib.k1520_printer_lamp(h6, 4) == 1          # H4 BEREIT
             assert _lib.k1520_run(h6, 200_000) > 0
+            # Vorsteckbeleg (hardware.md §11): Bahn 1 des Blatts gibt es erst nach dem ersten Einlegen
+            c = ctypes
+            w, hh = c.c_int(), c.c_int()
+            assert _lib.k1520_printer_sheet_size(h6, 1, c.byref(w), c.byref(hh)) == 0
+            assert _lib.k1520_printer_sheet_version(h6, 1) == 0
+            assert _lib.k1520_printer_beleg_insert(h6, 0, 148) == 0          # unsinniges Mass
+            assert _lib.k1520_printer_beleg_insert(h6, 210, 148) == 1
+            assert _lib.k1520_printer_beleg_insert(h6, 210, 148) == 0        # es liegt schon einer im Schacht
+            ein, u, lg, bp, xl, dy = (c.c_int() for _ in range(6))
+            assert _lib.k1520_printer_beleg_state(h6, *(c.byref(v) for v in (ein, u, lg, bp, xl, dy))) == 1
+            assert (ein.value, lg.value, bp.value) == (1, 893, 1748) and 0 < u.value < 36 and dy.value == -1
+            assert _lib.k1520_printer_switch_get(h6, 6) == 1 and _lib.k1520_printer_switch_get(h6, 7) == 0   # FSO an, FSU aus
+            assert _lib.k1520_printer_sheet_size(h6, 1, c.byref(w), c.byref(hh)) == 1
+            assert (w.value, hh.value) == (1748, 2 * 893)
+            v1 = _lib.k1520_printer_sheet_version(h6, 1)
+            assert _lib.k1520_printer_beleg_remove(h6) == 1
+            assert _lib.k1520_printer_switch_get(h6, 6) == 0
+            assert _lib.k1520_printer_beleg_state(h6, c.byref(ein), None, None, None, None, None) == 1 and ein.value == 0
+            assert _lib.k1520_printer_sheet_size(h6, 1, c.byref(w), c.byref(hh)) == 1   # das Blatt bleibt
+            assert _lib.k1520_printer_beleg_insert(h6, 100, 100) == 1
+            assert _lib.k1520_printer_sheet_version(h6, 1) > v1                          # waechst ueber den Wechsel hinweg
         finally:
             _lib.k1520_destroy(h6)
 
@@ -495,6 +516,9 @@ def test_printer_sheet_keys_lamps_and_switches_through_the_c_api():
         assert _lib.k1520_printer_sheet_size(h, 0, c.byref(breite), c.byref(hoehe)) == 1
         assert breite.value == 3000
         assert _lib.k1520_printer_sheet_size(h, 1, c.byref(breite), c.byref(hoehe)) == 0     # Einbahndrucker
+        assert _lib.k1520_printer_beleg_insert(h, 210, 148) == 0                              # Vorsteckbeleg gibt es nur am K6316
+        assert _lib.k1520_printer_beleg_remove(h) == 0
+        assert _lib.k1520_printer_beleg_state(h, None, None, None, None, None, None) == 0
         v0 = _lib.k1520_printer_sheet_version(h, 0)
 
         # Schalter und Lampen
@@ -557,6 +581,7 @@ def test_printer_sheet_keys_lamps_and_switches_through_the_c_api():
         assert _lib.k1520_printer_sheet_size(hm, 0, None, None) == 0
         assert _lib.k1520_printer_sheet_version(hm, 0) == 0
         assert _lib.k1520_printer_sheet_clear(hm) == 0
+        assert _lib.k1520_printer_beleg_insert(hm, 210, 148) == 0
         assert _lib.k1520_printer_head(hm, None, None, None) == 0
         assert _lib.k1520_printer_key(hm, KEY_PV1, 1) == 0
         assert _lib.k1520_printer_switch(hm, SW_ONLINE, 1) == 0

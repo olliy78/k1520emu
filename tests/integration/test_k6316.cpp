@@ -418,3 +418,241 @@ TEST(K6316Matrix, DilSchalterWirkenNurAufGetriebenerZeileTastenImmer)
     EXPECT_EQ(zeile(AM1 | AM3 | AM4), 0x03) << "nur die Tasten";
     EXPECT_EQ(k.dilMaske(), 0);
 }
+
+// ─── Vorsteckbeleg als eigenes Blatt (hardware.md §11) ───────────────────────
+//
+// Die Firmware ist massgeblich: die Erwartungen unten sind am Lauf des IFSS-ROMs gemessen (hardware.md §11.8) und fuer die
+// Zeitpunkte nur als Schrittzahlen des Vorsteckmotors (`Papierweg::schritte()`) formuliert, nicht als Taktzahlen.
+
+namespace {
+/// Einzug-Messung: alles in Vorsteckschritten seit dem Senden von BEZ.
+struct Einzug {
+    int  fsu_schritt = -1;     ///< Schritt der ersten FSU-Flanke (steigend)
+    int  fso_fall = -1;        ///< Schritt, in dem FSO faellt (Ende des Belegs hat FSO passiert)
+    int  u_start = 0, u_max = 0, u_ende = 0;
+    int  lage_start = 0, lage_max_u = 0;   ///< Motorlage beim Start und im Umkehrpunkt
+    int  schritte = 0;
+};
+
+/// Die ersten BEZ nach dem Netz-Ein scheitert in Endlos (hardware.md §11.8 Nr. 1); fuer alle weiteren Messungen vorher ausraeumen.
+void belegAufwaermen(Lauf& l)
+{
+    ASSERT_TRUE(l.st().belegEinlegen(210, 148));
+    l.sende("\x1b[0t");
+    l.fahre(20'000'000);
+    l.st().belegEntnehmen();
+    l.fahre(1'000'000);
+}
+
+/// Beleg einlegen, BEZ @p n senden und @p takte lang beobachten.
+Einzug bez(Lauf& l, double mm, double breite_mm, int n, uint64_t takte = 30'000'000)
+{
+    Einzug e;
+    K6316Steuerung& s = l.st();
+    EXPECT_TRUE(s.belegEinlegen(mm, breite_mm));
+    l.sende("\x1b[" + std::to_string(n) + "t");
+    const uint32_t n0 = s.vorsteck().schritte();
+    e.u_start = e.u_max = e.u_ende = s.beleg_modell().u();
+    e.lage_start = s.vorsteck().lage();
+    bool fsu = s.fsu(), fso = s.fso();
+    const uint64_t z = l.m->totalCycles() + takte;
+    while (l.m->totalCycles() < z) {
+        l.m->run(500);
+        const int sch = static_cast<int>(s.vorsteck().schritte() - n0);
+        if (s.fsu() && !fsu && e.fsu_schritt < 0) e.fsu_schritt = sch;
+        if (!s.fso() && fso && e.fso_fall < 0) e.fso_fall = sch;
+        fsu = s.fsu();
+        fso = s.fso();
+        if (s.beleg_modell().u() > e.u_max) { e.u_max = s.beleg_modell().u(); e.lage_max_u = s.vorsteck().lage(); }
+        e.schritte = sch;
+    }
+    e.u_ende = s.beleg_modell().u();
+    return e;
+}
+
+std::string statusAntwort(Lauf& l)
+{
+    const size_t n = l.sio().size();
+    l.sende("\x1b[5n");
+    l.fahre(1'500'000);
+    return l.sio().substr(n);
+}
+}  // namespace
+
+TEST(K6316Beleg, ErstesBezNachNetzEinScheitertWeilDerFirmwareZaehlerFFIst)
+{
+    // hardware.md §11.8 Nr. 1: Netz-Ein laesst (IX+22) = 3824H+22 = FFH; BEZ erlaubt in Endlos nur so viele Schritte OHNE FSU, wie
+    // dieser Zaehler bis zum Ueberlauf hergibt — also keinen.  Der Fehler wirft den Beleg wieder hinaus (Status 5 = Belegfehler),
+    // und BEZ setzt den Zaehler auf 0: erst das zweite BEZ arbeitet.
+    Lauf l(Typ::K6316_Ifss);
+    ASSERT_TRUE(l.erstesZeichen(80'000'000));
+    l.fahre(2'000'000);
+    EXPECT_EQ(l.m->memReadDebug(0x383A), 0xFF);
+    ASSERT_TRUE(l.st().belegEinlegen(210, 148));
+    l.sende("\x1b[0t");
+    l.fahre(20'000'000);
+    EXPECT_EQ(l.m->memReadDebug(0x383A), 0x00);
+    EXPECT_FALSE(l.st().fso());
+    EXPECT_FALSE(l.st().fsu());
+    EXPECT_TRUE(l.st().beleg_modell().eingelegt()) << "der Beleg steckt noch im Schacht, nur nicht mehr unter den Lichtschranken";
+    EXPECT_EQ(statusAntwort(l), "\x13\x1b[5n\x14") << "DC3, ESC [ 5 n (Belegfehler), DC4";
+}
+
+TEST(K6316Beleg, EinzugFolgtDerMessungAnDerFirmwareUndDerBelegHatEinEigenesBlatt)
+{
+    // hardware.md §11.7 Nr. 1 und 3: BEZ0 mit einem A5-Beleg.  Einzug = die Lage des Vorsteckmotors FAELLT (Auswurf = steigend).
+    Lauf l(Typ::K6316_Ifss);
+    ASSERT_TRUE(l.erstesZeichen(80'000'000));
+    l.fahre(2'000'000);
+    belegAufwaermen(l);
+    const auto& cfg = l.st().config().beleg;
+    const Einzug e = bez(l, 210, 148, 0);
+    const int L = l.st().beleg_modell().laenge();
+    EXPECT_EQ(L, 893) << "210 mm zu 108 Schritten je Zoll";
+    ASSERT_GE(e.fsu_schritt, 1);
+    EXPECT_LE(e.fsu_schritt, 255) << "die Firmware gibt ohne FSU hoechstens 255 Schritte";
+    EXPECT_EQ(e.fsu_schritt, cfg.abstand_fso_fsu - cfg.einlege_lage) << "FSU steigt bei u = D";
+    EXPECT_LT(e.lage_max_u, e.lage_start) << "Einzug = Lage faellt";
+    // FSO faellt, wenn das Ende des Belegs (u - L) an FSO vorbei ist
+    ASSERT_GT(e.fso_fall, 0);
+    EXPECT_EQ(e.fso_fall, L + 1 - cfg.einlege_lage);
+    EXPECT_GE(e.fso_fall - e.fsu_schritt, 279) << "mehr als 31 Gruppen zu 9 Schritten, sonst 'Beleg zu kurz'";
+    // Ende: 12 Gruppen nach dem Verlassen von FSU, dann 22 Schritte Auslauf, dann 18 zurueck
+    const int ende_fsu = L + cfg.abstand_fso_fsu + 1;
+    EXPECT_NEAR(e.u_max - ende_fsu, 12 * 9 + 22, 9) << "Gruppenraster der Firmware";
+    EXPECT_EQ(e.u_max - e.u_ende, 18) << "dann 18 Schritte (zwei Gruppen) in Auswurfrichtung zurueck";
+    // Kopfzeilenabstand 8,46 mm = 36 Schritte: das Ende des Belegs steht 28...36 Schritte vor der Bezugslinie
+    EXPECT_NEAR(cfg.druckzeile - (e.u_ende - L), 36, 9);
+    EXPECT_TRUE(l.st().beleg_modell().unterDruckzeile());
+    EXPECT_FALSE(l.st().fso());
+    EXPECT_FALSE(l.st().fsu());
+    // Das Blatt des Belegs: 148 mm = 1748 Pixel breit, 2 Zeilen je Schritt hoch, eigenstaendig
+    ASSERT_TRUE(l.st().beleg_modell().hatBlatt());
+    EXPECT_EQ(l.st().belegBlatt().breite(), 1748);
+    EXPECT_EQ(l.st().belegBlatt().hoehe(), 2 * L);
+    EXPECT_EQ(l.st().belegBlatt().punktzahl(), 0u);
+}
+
+TEST(K6316Beleg, EinzugMitParameterLaeuftNeunSchrittJeEinheitAbFsu)
+{
+    // hardware.md §11.2 (d): BEZ n zaehlt (n + 16) Gruppen ab der ersten FSU-Erkennung, dann 22 Schritte Auslauf, dann 18 zurueck —
+    // die Spitze steht danach bei u = D + 148 + 9 n.  (Fussabstand 4,23 mm = 18 Schritte unter der Bezugslinie bei n = 1.)
+    for (int n : {1, 5}) {
+        Lauf l(Typ::K6316_Ifss);
+        ASSERT_TRUE(l.erstesZeichen(80'000'000));
+        l.fahre(2'000'000);
+        belegAufwaermen(l);
+        const auto& cfg = l.st().config().beleg;
+        const Einzug e = bez(l, 210, 148, n);
+        EXPECT_EQ(e.u_ende, cfg.abstand_fso_fsu + 148 + 9 * n) << "n=" << n;
+        EXPECT_EQ(e.u_max - e.u_ende, 18) << n;
+        EXPECT_EQ(e.u_ende - cfg.druckzeile, 18 + 9 * (n - 1)) << "Spitze n Zeilen unter der Bezugslinie, n=" << n;
+        EXPECT_TRUE(l.st().fso() && l.st().fsu()) << "die Spitze steht weit hinter FSU, das Ende noch davor";
+    }
+}
+
+TEST(K6316Beleg, AuswurfMitS4LaeuftBisFsuFreiPlusNachlauf)
+{
+    // hardware.md §11.2: S4 offline -> Auswurf; die Firmware faehrt, bis FSU frei ist, dann 36 Schritte (4 Gruppen) Nachlauf —
+    // die Spitze ragt danach ueber FSO hinaus, der Beleg liegt zur Entnahme im Schacht (FSO/FSU frei).
+    Lauf l(Typ::K6316_Ifss);
+    ASSERT_TRUE(l.erstesZeichen(80'000'000));
+    l.fahre(2'000'000);
+    belegAufwaermen(l);
+    const auto& cfg = l.st().config().beleg;
+    (void)bez(l, 210, 148, 0);
+    K6316Steuerung& s = l.st();
+    s.setTaste(1, true); l.fahre(2'000'000); s.setTaste(1, false); l.fahre(3'000'000);   // S1: OFF-LINE
+    ASSERT_FALSE(s.lampe(5));
+    const uint32_t n0 = s.vorsteck().schritte();
+    int fsu_frei = -1, ende = 0;
+    bool fsu_war = false;
+    s.setTaste(4, true);
+    const uint64_t z = l.m->totalCycles() + 15'000'000;
+    while (l.m->totalCycles() < z) {
+        l.m->run(500);
+        const int sch = static_cast<int>(s.vorsteck().schritte() - n0);
+        if (s.fsu()) fsu_war = true;
+        else if (fsu_war && fsu_frei < 0) fsu_frei = sch;
+        ende = sch;
+        if (sch > 100) s.setTaste(4, false);
+    }
+    ASSERT_GT(fsu_frei, 0) << "das Ende kam unter FSU durch";
+    EXPECT_EQ(s.beleg_modell().u(), cfg.abstand_fso_fsu - 1 - (ende - fsu_frei)) << "Spitze: FSU frei bei u = D - 1, dann Nachlauf";
+    EXPECT_NEAR(ende - fsu_frei, 36, 9) << "4 Gruppen Nachlauf";
+    EXPECT_FALSE(s.fso());
+    EXPECT_FALSE(s.fsu());
+    EXPECT_TRUE(s.beleg_modell().eingelegt()) << "bleibt im Schacht, bis der Anwender ihn entnimmt";
+    EXPECT_GT(s.beleg_modell().u(), s.beleg_modell().parameter().u_hinaus);
+}
+
+TEST(K6316Beleg, TextLandetAufDemBelegblattUndNichtAufDemEndlospapier)
+{
+    const auto r = rom(abzugDir(), false);
+    Lauf l(Typ::K6316_Ifss);
+    ASSERT_TRUE(l.erstesZeichen(80'000'000));
+    l.fahre(2'000'000);
+    belegAufwaermen(l);
+    (void)bez(l, 210, 148, 0);
+    K6316Steuerung& s = l.st();
+    ASSERT_TRUE(s.beleg_modell().unterDruckzeile());
+    const uint64_t haupt = l.blatt().punktzahl();
+    const std::string t = "HELLO 123 ROBOTRON K6316";
+    l.sende(t + "\r\n");
+    l.fahre(8'000'000);
+    EXPECT_EQ(l.blatt().punktzahl(), haupt) << "kein Punkt auf dem Endlospapier";
+    const auto b = baender(s.belegBlatt());
+    ASSERT_EQ(b.size(), 1u);
+    EXPECT_EQ(vergleicheZeile(s.belegBlatt(), r, {{t, Schrift::Normal, false, 0}}, b[0].first, b[0].second), "");
+    // Lage: Oberkante des Textes liegt Kopfzeilenabstand (36 Schritte, +-Gruppenraster) minus Zeichenhoehe unter dem Ende des Belegs
+    EXPECT_GE(b[0].first, 2 * 28 - 21 - 4);
+    EXPECT_LE(b[0].first, 2 * 36 - 21 + 4);
+    // x: 30 Pixel vom Linksrand (der erste Textpunkt der Maschine liegt bei 425, die Belegkante bei 395)
+    int xmin = 1 << 30;
+    for (int y = b[0].first; y < b[0].second; ++y)
+        for (int x = 0; x < s.belegBlatt().breite(); ++x) if (s.belegBlatt().punkt(x, y)) xmin = std::min(xmin, x);
+    EXPECT_EQ(xmin, 425 - s.config().beleg.x_links);
+}
+
+TEST(K6316Beleg, TextHinterDemBelegrandTrifftDasEndlospapier)
+{
+    // Beleg 74 mm breit (874 Pixel, Kante bei 395 -> 1269): ein Zeichen in Spalte 45 (Pixel ~1775) liegt daneben.
+    Lauf l(Typ::K6316_Ifss);
+    ASSERT_TRUE(l.erstesZeichen(80'000'000));
+    l.fahre(2'000'000);
+    belegAufwaermen(l);
+    (void)bez(l, 210, 74, 0);
+    K6316Steuerung& s = l.st();
+    ASSERT_TRUE(s.beleg_modell().unterDruckzeile());
+    const uint64_t haupt = l.blatt().punktzahl(), beleg = s.belegBlatt().punktzahl();
+    l.sende(std::string(45, ' ') + "X\r\n");
+    l.fahre(8'000'000);
+    EXPECT_GT(l.blatt().punktzahl(), haupt) << "das X steht rechts neben dem Beleg: Endlospapier";
+    EXPECT_EQ(s.belegBlatt().punktzahl(), beleg);
+}
+
+TEST(K6316Beleg, ZuKurzerBelegGibtBelegfehlerUndWirdWiederHinausgefahren)
+{
+    // hardware.md §11.2 (c): Schwelle am Lauf L >= D + 270 Schritte (D = 36: 306 = Mindestlaenge 72 mm, Handbuch 2.5).  68 mm = 289 Schritte
+    // fehlen; 72 mm geht.  Fehler = Status 5 (Belegfehler, `ESC [ 5 n`) und DC4; der Beleg kommt zurueck bis ueber FSO.
+    {
+        Lauf l(Typ::K6316_Ifss);
+        ASSERT_TRUE(l.erstesZeichen(80'000'000));
+        l.fahre(2'000'000);
+        belegAufwaermen(l);
+        (void)bez(l, 68, 148, 0, 20'000'000);
+        EXPECT_FALSE(l.st().fso());
+        EXPECT_FALSE(l.st().fsu());
+        EXPECT_LT(l.st().beleg_modell().u(), 0) << "zurueck ueber FSO hinaus";
+        EXPECT_EQ(statusAntwort(l), "\x13\x1b[5n\x14");
+    }
+    {
+        Lauf l(Typ::K6316_Ifss);
+        ASSERT_TRUE(l.erstesZeichen(80'000'000));
+        l.fahre(2'000'000);
+        belegAufwaermen(l);
+        (void)bez(l, 72, 148, 0, 20'000'000);
+        EXPECT_TRUE(l.st().beleg_modell().unterDruckzeile());
+        EXPECT_EQ(statusAntwort(l), "\x13\x1b[0n\x11");
+    }
+}

@@ -314,3 +314,132 @@ Glyphen der Codes **24H, 26H, 40H** (IFSS: andere Formen, `@` mit eigenem `g[0]=
 ### 10.11  Offen `[?]`
 Zeilennummern des Pitch-/SO-Wechsels im Selbsttest (aus Zählerstand, nicht gemessen); ~~Zuordnung S2 ↔ `8CH` Bit 2 (Hexdump)~~ am Emulator bestätigt (§10.8); ~~SGR-Parameter~~ am Emulator bestätigt 2026-11-08 (`ESC[1m`/`[3m`/`[4m`/`[0m` über die SIO, Wächter `K6316Modul.SchriftartenUeberEscFolgen…`); Selbsttestzeilen 1–3 (Segmente 0/270/540) ebenso;
 Verhalten der Zweitzeichensatz-Glyphen im Orakel (nicht getestet); Anfang einer Schrägzeile (erste Zelle ohne `FF`-Vorbelegung nur beim allerersten Zeichen nach Zeilenwechsel, dort `sub_1FDCH` — nicht geprüft).
+
+## 11  Vorsteckbeleg (Entwurfsgrundlage für ein Belegmodell) — Stand 2026-11-08
+
+Zweck: aus Handbuch, Servicehandbuch und ROM herausarbeiten, was ein **Beleg im Vorsteckschacht** physikalisch tut, damit FSO/FSU aus einer Belegposition
+berechnet werden und der Vorsteckmotor (heute nur `Papierweg::lage()` als Schrittzähler) einen Beleg bewegt.  Marken wie §9; neu: `[F:adr]` = IFSS-ROM (V.24 siehe 11.6),
+`[H]` = aus Zahlen abgeleitet (Rechnung dabei), `[?]` = offen.  Die Handbuch-Seitenangaben sind die des PDF (Scan, per OCR gelesen; Zahlen mit `[M:n]` gegen das Bild prüfen).
+**Alle ROM-Aussagen sind statisch gelesen, nicht am laufenden Gerät gemessen** — ein Wegwerf-Interpreter oder ein Beleg-Prototyp im Emulator muss sie bestätigen (11.7).
+
+### 11.1  Mechanik
+
+* **Bahn.**  Beleg (Einzelformular, Karte, Satz) und Endlospapier laufen durch **dieselbe Belegbahn** zwischen Kopf und Walze; „das Endlospapier blockiert den Vorsteckschacht“ (`DEL`/`BEZ`,
+  Handbuch 9.3.2.2), vor dem Vorstecktest muss in der Betriebsart Schneiden das Endlospapier aus der Belegbahn `[M:17, 5.6.3]`.  Zwei Transportsysteme (**oben/unten**, je Walze mit
+  Andruckrollen, Service 4.1.6/4.2.6) halten den Beleg; zwei Leitklappen (**obere/untere**, je ein Magnet **ULA = /YABU**, **OLA = /YABO**) geben ihm den Weg frei
+  (Öffnung je ≈ 3,5 mm, `[V:4.2.9]`).  **Der Beleg liegt zwischen Kopf und Endlospapier [?]** — Annahme für das Modell: die Nadeln treffen den Beleg.
+* **Vorstecken von Hand** „rechtsbündig mit Spiel zum Anschlag in den Zuführungsschacht“, rechter Anschlag (Abb. 9 Pos. 16) vorher nach links geschoben, Anschlag links Pos. 9 `[M:25, 7.1]`.
+  Ob von **oben** oder **vorn** gesteckt wird, steht im Text nicht; Richtungsangaben der Befehle sind eindeutig: **Einzug = Beleg nach unten/in den Drucker, Auswurf = Beleg nach oben/hinaus**
+  (`ZBR` „in Einzugsrichtung“ → oberste Zeile, `ZBV` „in Auswurfrichtung“ → unterste Zeile, Beispiel 12 Handbuch 9.3.2.7).  „Oben/unten“ in FSO/FSU = Lage im Schacht `[?]` (H2 = obere, H5 = untere LS `[M:18]`).
+* **Formate** `[M:5, 2.5]`: Höhe 74…297 mm, Breite 74…210 mm (Verhältnis Höhe/Breite ≤ 1,5), Einzelformulare 40…120 g/m², Mehrlagen geheftet 40…60 g/m² (Kohle 23), Karten 120…170 g/m², **Mindestlänge für Einzug 72 mm** `[M:44, BEZ]`.
+  **Kopfzeilenabstand** (Oberkante → Unterkante erste Zeile) 8,46 mm + n·25,4/12, **Fußzeilenabstand** 4,23 mm + n·25,4/12 (2,12 mm = 1/12″ = Grundschritt).
+* **Schritt** des Vorsteckmotors: 1 Vollschritt = **1/108″** (0,235 mm; 4,25 Schritte/mm) `[V:14]`; 1/12″ = **9 Schritte** (Vorschubgrundschritt, „Gruppe“ unten); 1 Halbzeile = 4,5 Schritte `[H]`.
+  Schrittzahlen: 8,46 mm = **36** Schritte, 4,23 mm = **18**, 72 mm = **306**, 297 mm = **1262**, 74 mm = 315.
+* **Bedienung.**  S4 „BA“ = Belegauswurf (TBAW, A8H Bit 1) `[M:15, 5.4.4]` — nur wirksam, wenn ein Beleg erkannt wird (Lichtschranke) bzw. eingezogen ist; Taste im Vorstecktest ebenso `[M:17]`.
+  Wird der Beleg nach `BEZ` entnommen → **Bedienfehler, H2 blinkt**; Wiedereinführen löscht ihn `[M:15, 5.5.2]`.  **Papiereinzugshilfe** (Abb. 9 Pos. 13, über der Walze) löst Papiertransport wie LINE FEED aus `[M:15, 5.4.6]`.
+* **/MPV ist die Papiereinzugshilfe, kein Belegkontakt** (Berichtigung zu §3/§9 Nr. 3): `029DH…02B2H` — /MPV = 0 (entprellt) setzt `(IX+3).7` und ruft den LF-Lauf `0373H` mit `E = FFH`, der **läuft, solange /MPV = 0** (`03B2H`),
+  im Einklang mit `[M:15, 5.4.6]`.  Für das Belegmodell ohne Belang (Ruhelage 1).
+
+### 11.2  Firmware (IFSS-Adressen)
+
+Zustand: `(IX+3).4` = **Beleg eingezogen** (Flag), `(IX+98).5` = Richtung (1 = **Auswurf**, 0 = Einzug; steuert `0E3EH` ±1 am Phasenindex `(3887H)` und `0ECDH`: Auswurf → /YABO, Einzug → /YABU),
+`(IX+98).0` = Belegfehler (→ Status 35), `(IX+100)=(3888H)` Parameter/Zähler, `(IX+103)=388BH`, `(IX+104)=388CH` Gruppenzähler, `(IX+13)` Taktzähler je Gruppe, `(IX+22)` Vorlaufzähler.
+`FSO = 0EABH` (80H Bit 0, Z bei frei), `FSU = 0EA6H` (80H Bit 2, Z bei frei), Vorsteckphase `0E6AH` (Tabelle `0909H`, 8 Halbschritt-Muster `60 E0 C0 D0 90 B0 30 70`, zwei Indexschritte `0E3EH ×2` = **1 Vollschritt je Zeitgeberinterrupt**).
+`0955H` = Magnete aus (A9H |= 09H) + nach 3 Takten Haltestrom (SVH/SFH, `0E8CH`); `2231H` wartet bis der Lauf fertig ist (`(3833H) = 0`).
+
+* **Schrittakt.**  CTC D5 Kanal 3 (`87H`, Steuerwort `B7H`, Teiler 256, φ = 2,4576 MHz): Zeitkonstanten aus der Rampe `0849H…084BH` = `31H, 2CH, 1BH` (`0EB6H`) ⇒ **5,1 ms, 4,6 ms, dann 2,8 ms je Schritt** `[F]`.
+  Eine **Gruppe** = 9 Schritte (`(IX+13)` 9, in den Aus-/Nachlaufphasen 12H/16H).
+* **Einzug `BEZ`** (ESC `[` n `t`, `2189H`; Zeichen dahinter werden bei fehlendem Beleg verworfen/DC4): `FSO = 0` → Fehler (`21E3H`, `(IX+98).0`).  Sonst `0AB1H`: zweites `BEZ` bei gesetztem Flag → Fehler (Status 35); Flag setzen;
+  `FSO = 0` → H2 blinkt (`0B1DH`/`0B48H`, Zähler 20, ≈ Bedienfehler, wartet auf Wiedereinlegen); sonst Magnete aus (`0955H`), Richtung Einzug, **/YABU an**, Lauf mit ISR `0B69H`:
+  **je Schritt** `FSU` lesen.  (a) Solange `FSU = 0` und `(IX+104) = 0`: `(IX+22)++`, bei **256 Schritten ohne FSU = Fehler** (`0BDBH→0BB8H`).  (b) Sobald `FSU = 1`: je 9 Schritte `(IX+104)++`
+  (Wrap = Fehler), und **`FSO = 1` → weiter**.  (c) `Parameter = 0` („oberste Zeile“, `(IX+3).5 = 1`): Ende, wenn **`FSO = 0`** wird (Beleg-Oberkante hat FSO passiert) — aber **nur mit `(IX+104) ≥ 1FH`**
+  (31 Gruppen = **279 Schritte** nach der ersten FSU-Erkennung, `0B9AH`); davor ist `FSO = 0` in den Betriebsarten Endlos/Aufwickeln ein **Fehler („Beleg zu kurz“, `0BF9H→0BB8H`)**.
+  (d) `Parameter ≠ 0`: `(IX+100) = Parameter + 10H` wird je Gruppe nach der FSU-Erkennung heruntergezählt (`0B8DH`); bei 0 Ende (Weg = **(P + 16)·9 Schritte** ab FSU, `0BE3H`), auch dort mit FSO/Längenprüfung.
+  Nach dem Ende **fährt der Beleg 18 Schritte (2 Gruppen) zurück in Auswurfrichtung** (`0A58H…0A9CH`, `(IX+100) = 2`, ISR `0A8DH`) — **18 Schritte = Fußzeilenabstand 4,23 mm `[H]`**.  Fehlerausgang: `210FH` setzt `(IX+98).0`, nach 18 weiteren Schritten (`0A3AH`) Magnete aus, und
+  `21DAH` ruft **`0911H` (Auswurf)** auf.
+* **Auswurf** (`S4`, `ESC 4` = `BAU`, `1C56H`, jeweils `0911H`): Voraussetzung `FSO = 1` oder `FSU = 1` oder Flag eingezogen (sonst nichts: `0968H…0977H`; bei `BAU` ohne Beleg Fehler `2229H`).  Richtung Auswurf, **/YABO an**, ISR `097BH`:
+  alle 9 Schritte `FSU` lesen — Lauf geht weiter, solange **`FSU = 1` oder das Flag steht** (das Flag fällt, wenn in einer Gruppe `FSO = 1`, `09B7H…09C0H`; 256 Gruppen als Notgrenze `09B2H`).  Danach **Nachlauf 4 Gruppen = 36 Schritte** (`098EH`, ISR `09F0H`,
+  `0A04H…0A19H`), dann Magnete aus.  Am Ende steht die **Beleg-Unterkante 36 Schritte hinter FSU** (der Beleg ragt zur Entnahme aus dem Schacht, FSO/FSU zeigen frei [H]).  **36 Schritte = Kopfzeilenabstand 8,46 mm** — Zufall oder Auslegung [?].
+  **Netz-Ein:** `05DCH` setzt das Flag und ruft `0911H` — ohne Beleg und ohne FSO läuft die Auswurf-Schleife bis `(IX+100)` überläuft (bis ≈ 256 Gruppen = **2304 Schritte ≈ 6,5 s**) — das ist der Hauptteil der ≈ 8 s bis zum ersten DC1 (§9 Nr. 5, Merkposten 20) [?: Anfangswert `(IX+100)`].
+  Liegt ein Beleg an (FSU = 1), wird er hier hinausgefahren.
+* **`ZBV`/`ZBR`** (`21FAH`/`2212H`, `09C7H`/`0A49H`): nur mit Flag (sonst Fehler `2229H`); Parameter in Halbzeilen, bewegt den Vorsteckmotor in Auswurf- bzw. Einzugsrichtung, **Grenzen** `388CH = 11H` / `388BH = 0CH` (Zähler der bereits
+  gefahrenen Halbzeilen vor/zurück `[?]`) → Fehler `210FH` + Positionierung auf letzte/oberste Zeile.  Im **Vorstecktest** (S3 beim Einschalten, nach der Synchronisation gelesen, `0257H→03F4H`): S2/TPVV = `09C7H` (Auswurfrichtung), S3/TPVR =
+  `0A49H` (Einzugsrichtung), **je Tastendruck 2 Gruppen = 18 Schritte** (`(IX+100) = 2`) `[F, ?]`; S4 = `0911H`; S1 beendet.
+* **Flanken FSO/FSU im Ruhebetrieb.**  PIO D12 A (`82H`) überwacht FSO/`/ITON` (`97H`, Maske `FCH` bzw. `FEH`, ISR `043EH`/`0446H`/`0466H`): fällt `FSO` bei gesetztem Beleg-Flag, entsteht der Bedienfehler (H2 blinkt, `0AC2H`-Schleife wartet auf FSO = 1);
+  ohne Flag **startet ein neuer Beleg am Schacht nichts** — der Host muss `BEZ` senden (IFSS: `DSR` → Status **36 „neuer Beleg im Schacht“**, 35 = Belegfehler; `[M:48, 9.3.3.2]`).  V.24/IFSP: **H1 TEST leuchtet, wenn ein Beleg gefordert wird** `[M:15, 5.5.1]`.
+* **Hinweis zu LF mit Beleg.**  Endlos/Aufwickeln: LF fährt nur den Papiermotor (`20D9H`: Flag blockiert nur in **Schneiden**: `210AH` = Fehler, kein Papiertransport `[M:9.3.2.2]`); in Schneiden fährt die Firmware den Vorsteckmotor bei Rückwärts-LF mit
+  (`0CF5H…0D05H`, nur wenn `FSU = 1`, 1 Vollschritt je Papier-Vollschritt).  **Schnitt** (`0D9DH`): nur ohne Beleg-Flag; danach muss `FSU = 1` sein (Stück erkannt, sonst Fehler `0E2AH`), dann `0911H` (Auswurf).
+  **Der Auswurf des abgetrennten Stücks (225 Schritte, §9 Nr. 4) = Lauf bis FSU frei + 36 Nachlauf ⇒ FSU liegt ≈ 189 Schritte (44 mm) hinter dem Schnitt [H, nicht gemessen]**; Servicehandbuch 4.2.20 stellt „Lichtschranke zur Schneidkante“ ein.
+
+### 11.3  Aus der Firmware folgende Geometrie `[H]`
+
+* **Abstand FSO ↔ FSU ≈ 27 Schritte (6,4 mm).**  Die Fehlerschwelle „Beleg zu kurz“ ist (31 Gruppen = 279 Schritte) + Abstand FSU–FSO; Handbuch nennt Mindestlänge 72 mm = 306 Schritte ⇒ **D ≈ 306 − 279 = 27**.
+  (Läge D = 0, wäre die Schwelle ohne Handbuchzahl 279 Schritte = 65,6 mm; die 72 mm passen nur mit D ≈ 6 mm.  Toleranz ±9 Schritte, Gruppenraster.)  Die LS sitzen also **dicht beieinander** (FSU in Einzugsrichtung hinter FSO).
+* **Der Einzug ohne Parameter endet mit der Beleg-Oberkante kurz hinter FSO**; nach dem Rückstoß von 18 Schritten steht sie **36 Schritte (Kopfzeilenabstand) über der Druckzeile** `[H]` ⇒ FSO liegt ≈ **18…26 Schritte (4…6 mm) über der Druckzeile**
+  (`h_FSO = 36 − 18 + δ`, δ = 0…8 Rastergröße der Gruppenprüfung).  Das ist die Kalibriergröße des Modells, nicht gemessen `[?]`.
+* **Fenster für die erste FSU-Erkennung: höchstens 255 Schritte** ab Einzugsbeginn — jeder von Hand gesteckte Beleg, dessen Spitze weniger als ≈ 255 − D hinter FSO steckt, wird erkannt.
+
+### 11.4  Modellvorschlag
+
+**Belegmodell** (neu, z. B. `core/peripherals/druckwerk/vorsteckbeleg.{h,cpp}`; die Maschine hält `Vorsteckbeleg` und `Blattmodell beleg_blatt_`):
+
+* **Zustand:** `L` (Länge in Vorsteckschritten, 315…1262 `[M:5]`), `B` (Breite, 74…210 mm → Pixel zu 300 dpi; rechtsbündig `x_R` `[?]`), und **`u`** = Weg der Beleg-**Spitze** (Einzugsrichtung vorn) hinter **FSO**, in Schritten (`u > 0` = Spitze hinter FSO).  Eigener `Blattmodell` der Größe `B × (2·L)` Rasterzeilen (216/108 = 2 je Schritt).
+* **Bewegung:** `u += (lage_alt − lage_neu)` je Änderung von `Papierweg::lage()` des Vorsteckmotors (**Vorzeichen: Lage + = Auswurf**, gleiche Phasentabelle und gleicher Index-Takt wie der Papiermotor `[F:0E3EH]`, im Code zu prüfen `[?]`) — jeder Vollschritt 1/108″.
+  Ohne Beleg ändert sich nichts (die Netz-Ein-Schleife fährt ins Leere).
+* **Lichtschranken:** `FSO = (u ≥ 0) && (u − L ≤ 0)`, `FSU = (u ≥ D) && (u − L ≤ D)` mit **`D = 27`** [H]; `setBeleg(fso, fsu)` wird bei jeder Änderung gerufen (dieselben Pegel wie heute, damit der PIO-Interrupt `D12 A` ausgelöst wird).
+* **Einlegen** (Anwenderaktion, Oberfläche/Test): setzt `u = u_ein` mit `0 < u_ein < D` (Spitze hinter FSO, vor FSU: `FSO = 1`, `FSU = 0` = Bedingung von `BEZ`) und `L`, `B`; Vorgabe `u_ein = 10` `[?]`.  **Entnehmen** setzt `u = −∞` (FSO = FSU = 0).
+  Ein ausgeworfener Beleg (Unterkante hinter FSU + 36) bleibt **im Schacht**, bis der Anwender entnimmt; ein neuer lässt sich erst danach einlegen (Status 36 setzt „vorheriger entnommen“ voraus `[M:48]`).
+* **Druckposition:** die Druckzeile liegt bei `u = P` mit **`P = h_FSO` ≈ 22 Schritten** (11.3, Kalibriergröße).  Die Nadeln treffen den Beleg, wenn `u − L ≤ P ≤ u` und der Wagen innerhalb `x_R − B … x_R` ist; sonst gehen die Punkte auf das Endlospapier (heutiger Weg) bzw. ins Leere.
+  Beleg-Blattzeile `y_b = 2·(P + L − u) + Nadelversatz` (Oberkante = Zeile 0, Raster 1/216″), x relativ zur Beleg-Linkskante.  **Der Wagenvorlauf (`Papierweg`-Linie des Endlospapiers) bleibt unberührt**, der Beleg hat eigene Koordinaten.
+* **Ende des Weges:** `u` wird auf `[−L_aus, L + U_max]` begrenzt `[?]`: **Einzug über das untere Transportsystem hinaus** („Beleg fällt nach unten“, `[M:17]`) klemmt `u = U_max`, die Motorschritte laufen leer, FSO/FSU bleiben stehen (die Firmware reagiert mit Fehler nach 256 Schritten bzw. Gruppen).
+  **Auswurf**: oberhalb `u − L > A_max` ist der Beleg ganz hinaus (Spezialfall von Entnehmen).
+* **Leitklappen**: nur lesbar (`magnetUnten/Oben`); Wächterbedingung für Tests: beim Einzug ist /YABU = 0 (an), beim Auswurf /YABO = 0 (`0ECDH`), beide aus nach dem Lauf (`0955H`).
+* **Mehrfachbeleg/Endlos:** Endlospapier und Beleg gleichzeitig modellieren **nur über „Beleg zwischen Kopf und Endlospapier“** (11.1); keine Wechselwirkung beim Rückwärts-LF in Schneiden (11.2) — dort `(IX+3).4 = 1` sperrt den Papiertransport ohnehin.
+
+Zahlen für die Oberfläche (Beleg anlegen): A6 quer 148 mm = 629 Schritte (B = 105), A5 hoch 210 × 148, A4 297 × 210 (Längengrenzen aus 11.1).
+
+### 11.5  Antworten an den Host `[M:47–48, 52]`
+IFSS: `DSR` (`ESC [ 5 n`) → `ESC [ … n` mit **30** normal, **35** Belegfehler (zweites BEZ, BAU/ZBV/ZBR ohne Beleg, ZB über Format, Beleg zu kurz, Beleg nach BEZ entfernt + BAU), **36** neuer Beleg im Schacht (nur wenn der vorherige entnommen), **34** Operationsfehler
+(`SNE` bei eingezogenem Beleg, `BEZ` in Schneiden nach Endlos-Vorschub).  Löschen von 35/36 durch `BEZ`/`DEL`.  `BEZ` ohne Beleg: IFSS verwirft alle nachfolgenden Zeichen (und sendet `DC4`), IFSP/V.24 melden den Wunsch (H1) und warten.
+Die Fehlerbits sitzen im Statuswort bei `(IX+1)`/`(IX+0)` (`1D0AH`: `(IX+1).5` = Beleg erkannt, ohne Flag und ohne laufendes `BEZ`) `[?]` — nicht weiter aufgelöst.
+
+### 11.6  V.24-Satz
+Gleicher Code, verschoben: `FSO` bei **0F55H** (IFSS 0EABH, +AAH), `FSU` **0F50H**, Vorsteckphase-Ausgabe **0F1EH**, Phasentabelle **09BEH** (IFSS 0909H, +B5H); die Verschiebungen sind im Bereich 0E00H…0FFFH nicht einheitlich.  Die Ablaufpunkte aus 11.2 sind für V.24 **nicht einzeln nachgelesen** `[?]`.
+
+### 11.7  Offen / Prüfschritte vor dem Bau
+1. **Einzug-Ende bestätigen** (`0B69H…0BF9H`, 11.2 (c)/(d)): am Emulator mit einem Wegwerf-Belegmodell (nur `setBeleg` aus `u`) `BEZ0`, `BEZ1`, `BEZ5` über die SIO schicken und die Schrittzahlen `Papierweg(vorsteck).schritte()` zwischen den Flanken messen; erwartet: FSU-Flanke ≤ 255 Schritte nach Start, danach ≥ 279 Schritte bis FSO fällt (sonst „zu kurz“), dann 18 zurück.
+2. **D und h_FSO** (11.3) sind aus Handbuchzahlen + Fehlerschwelle **abgeleitet, nicht gemessen**; wenn der Schaltplan Blatt 11 (`schaltplan_scans`) oder ein Foto Lichtschrankenabstände liefert, dort nachziehen.  Servicehandbuch 4.2.20 (LS zur Schneidkante) gibt keine Maße.
+3. **Vorzeichen** `Papierweg::lage()` des Vorsteckmotors (K6316 setzt `phasen_umgekehrt` nicht, Vorgabe false) gegen „Auswurf = +“ prüfen: Wächter = beim Netz-Ein läuft die Auswurf-Schleife (Lage steigt um bis zu 2304) bzw. S4 mit `setBeleg(true, false)` fährt hinaus.
+4. **Netz-Ein-Schleife** (2304 Schritte, `(IX+100)` Anfangswert): mit gesetztem FSO/FSU beim Einschalten ändert sich die Dauer — Wächter `K6316Modul.*` anpassen, falls der Beleg-Standard „kein Beleg“ bleibt, ändert sich nichts.
+5. **Lage des Belegs zum Endlospapier** (davor/dahinter) und **x-Lage** (rechter Anschlag) `[?]`: Handbuch 7.1 sagt nur „rechtsbündig mit Spiel“; Vorgabe im Modell konfigurierbar, nicht fest verdrahten.
+6. Gegenprobe **V.24-Firmware** (11.6) und **Vorstecktest** (18 Schritte je Tastendruck, S4) mit Wächter nach dem Bau.
+
+### 11.8  Ergebnisse am laufenden Emulator `[E]` — 2026-11-08 (Belegmodell gebaut, `Vorsteckbeleg`)
+
+Gemessen am IFSS-ROM mit dem Belegmodell (`core/peripherals/druckwerk/vorsteckbeleg.*`, `K6316Steuerung::belegEinlegen`), Wächter `K6316Beleg.*` (`tests/integration/test_k6316.cpp`).  Zeiten sind Schritte des Vorsteckmotors
+(`Papierweg::schritte()`).  **Wo 11.1–11.7 anders sagt, gilt dieser Abschnitt.**
+
+1. **Vorzeichen (11.7 Nr. 3):** Einzug = `Papierweg::lage()` des Vorsteckmotors **fällt**, Auswurf = steigt (Phasenindex `(3887H)`: Einzug zählt ab, Muster-Folge in `0909H` läuft bei steigendem Index 1→2→3→4;
+   `phasen_umgekehrt = false` ⇒ steigende Phase = steigende Lage).  Bestätigt: die Auswurf-Schleife des Netz-Ein und S4 steigen, BEZ fällt.  Im Modell `EINZUG_VORZEICHEN = -1` (`k6316_steuerung.cpp`).
+2. **Das erste BEZ nach dem Netz-Ein scheitert in Endlos** (neu, nicht in 11.2): `(IX+22)` = `383AH` steht nach dem Einschalten auf `FFH` (`0C95H`-Folge der Vorsteck-Grundstellung), BEZ erlaubt aber nur so
+   viele Schritte **ohne** FSU, wie dieser Zähler bis zum Überlauf hergibt (`0BDBH`: `INC (IX+22)` → `JR Z`) — hier einen.  Fehler, Beleg wird 18 Schritte zurück- und dann in den Auswurf gefahren, Status **5** (`ESC [ 5 n`, in 11.5 als „35“
+   geführt), `21D6H` setzt den Zähler auf 0; **erst das zweite BEZ arbeitet**.  Wäre der Beleg schon tiefer gesteckt (FSU = 1 beim Start), gäbe es das Problem nicht.  `[?]` am Gerät kann der Zähler durch Eingaben beim Einschalten
+   (Beleg liegt) anders stehen.  Wächter `…ErstesBezNachNetzEinScheitert…`.
+3. **Einzug-Ende (11.7 Nr. 1, Berichtigung zu 11.2 (c)/(d)):**
+   * Erste FSU-Flanke nach `D − u_ein` Schritten (≤ 255 ✓).
+   * **BEZ n ≥ 1:** `(n + 16)·9` Schritte ab der ersten FSU-Erkennung ✓ (wie 11.2 (d)), **dazu 22 Schritte Auslauf** (`0BF2H`: `(IX+13) = 16H`, Lauf in Einzugsrichtung — fehlt in 11.2), dann **18 zurück** ✓.  Spitze danach bei `u = D + 148 + 9n`.
+   * **BEZ 0 (oberste Zeile):** (c) in 11.2 stimmt **nicht**.  Der Lauf endet **nicht**, wenn FSO fällt: `0BA1H…` prüft danach FSU, und erst **12 Gruppen (108 Schritte) nach dem ersten Gruppenschlag mit FSU frei** (`388BH = 0CH`) endet er (+22 Auslauf, 18 zurück).
+     Das Ende des Belegs liegt dann ≈ 110 Schritte **hinter FSU** (gemessen 137 hinter FSO bei D = 27).  FSO fällt früh genug nur wenn der Beleg lang genug ist: die Schwelle „zu kurz“ (`0BF9H`) stimmt dem Wert nach (31 Gruppen ab FSU), aber das Gruppenraster beginnt mit dem
+     ersten FSU-Schritt: Beleg-Länge `L ≥ D + 270` Schritte.  **Gemessen: 68 mm (289) Fehler, 70 mm (298) geht** bei D = 27.
+4. **D und Bezugslinie `P`:** `D` bleibt aus der Handbuchzahl abgeleitet — mit **D = 36** wird die Schwelle `D + 270 = 306 = 72 mm` genau die Mindestlänge des Handbuchs (statt 27 in 11.3: D = 27 ergäbe 69,9 mm).  Gemessen ist nur die Summe, nicht D.
+   `P` (Abstand der Druckzeile hinter FSO) ist **nicht 22**: das Beleg-Ende steht nach BEZ 0 ≈ 146 hinter FSO (D = 36), die Spitze nach BEZ 1 bei 193; mit Kopfzeilenabstand 36 (Ende → Bezugslinie, ±8 Raster) und Fußzeilenabstand 18
+   (Bezugslinie → Spitze bei BEZ 1) folgt **P = 175** (Config `Vorsteckbeleg::Parameter::druckzeile`).  Das heißt: FSO/FSU sitzen **weit oberhalb** der Druckzeile (FSU ≈ 139 Schritte = 33 mm darüber), nicht dicht daneben — der
+   Beleg läuft nach dem Erkennen noch durch das obere Transportsystem zur Druckzeile.  Bezugslinie = Unterkante der ersten Zeile (Nadel 8; Nadel 1 liegt 21 Rasterzeilen höher) `[H]`.
+5. **Auswurf mit S4 (11.2):** bestätigt.  Lauf bis FSU frei (`u = D − 1`), danach **36 Schritte Nachlauf** (gemessen 36…44 wegen des Gruppenrasters); die Spitze steht dann bei `u ≈ D − 37…−44`, **über FSO hinaus** (FSO und FSU frei), der Beleg bleibt im
+   Schacht (Modell: eingelegt, bis `entnehmen` oder `u < u_hinaus`).  Voraussetzung: OFF-LINE (S1), sonst reagiert S4 nicht (wie S5).
+6. **Fehler „zu kurz“ (d):** Status **5** (Belegfehler) und DC4 auf `ESC [ 5 n`; der Beleg fährt zurück bis über FSO (Spitze bei ≈ −18…−43), Lampen H1/H2 waren zum Messzeitpunkt (20 Mio. Takte danach) **aus** — ein Blinken des Bedienfehlers „Beleg nach BEZ entnommen“ (11.1) ist
+   hier nicht aufgetreten, über die Zeit aber nicht geprüft `[?]`.
+7. **Druck auf den Beleg:** Nadelanschläge gehen auf das Belegblatt, wenn `P ≤ u` und `u − L ≤ P` und der Wagen innerhalb `x_links … x_links + B` steht (ganzer Anschlag, nicht Punkt für Punkt: Randpunkte gehen verloren).  Sonst auf das Endlospapier.  Wächter:
+   Text auf dem Belegblatt gegen das ROM-Orakel (`vergleicheZeile`), keine Punkte auf dem Hauptblatt; Text rechts neben dem Beleg trifft das Endlospapier.  x-Lage `x_links = 395` `[?]` (30 Pixel vor dem ersten Textpunkt bei 425).
+8. **Offen `[?]`:** V.24-Satz nicht nachgemessen (11.6); `u_ein`, `u_max`, `u_hinaus` Annahmen; ZBV/ZBR/Vorstecktest (18 Schritte je Tastendruck) nicht neu gemessen; D/P hängen aneinander (nur ihre Summen sind belegt); Netz-Ein mit liegendem Beleg
+   (11.7 Nr. 4) nicht geprüft.

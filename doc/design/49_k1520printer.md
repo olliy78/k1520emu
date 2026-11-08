@@ -282,8 +282,9 @@ Hexdump (S2 beim Einschalten, 12,5 Z/Z, 7-Bit-SIO) geprüft.
 
 Lichtschranken- und Vorstecktest (S1/S3 beim Einschalten) geprüft.
 
-**Offen.**  Vorsteckbeleg als eigenes Blatt (der Vorsteckmotor
-ist ein Zähler ohne Blatt), K6313 (kein Abzug).
+**Vorsteckbeleg (2026-11-08):** `Vorsteckbeleg` (Kern) + Blatt-Bahn 1 der C-ABI (`k1520_printer_beleg_*`); Firmware-Messungen in `hardware.md` §11.8, Merkposten Nr. 30.
+
+**Offen.**  Bedienung des Belegs in der Oberfläche (Einlegen/Entnehmen, Belegblatt anzeigen), V.24-Satz am Beleg nachmessen, D/P einzeln (Foto/Maße des Schachts), K6313 (kein Abzug).
 
 ### 5f  Stand WP7 — Paket und Werkzeugmenü (2026-11-06)
 
