@@ -2491,3 +2491,18 @@ def test_installer_fragt_nach_startmenue_eintraegen_und_rollt_zurueck():
     assert "uninstall.sh" in bp and "k1520emu-uninstall.desktop.in" in bp
     desk = (PACKAGING / "k1520emu-uninstall.desktop.in").read_text(encoding="utf-8")
     assert "Terminal=true" in desk and "uninstall.sh" in desk
+
+
+def test_sios_disketten_sind_in_der_auslieferung():
+    """Alle SIOS-1526-Disketten aus disks/a5120_sios1526/ gehoeren ins Paket (freigegeben 2026-11-08).
+
+    Sonst steht eine gebaute Lieferdiskette im Repository und fehlt beim Anwender —
+    so war es bis zu diesem Tag unbemerkt geblieben.
+    """
+    text = (PACKAGING / "build_payload.sh").read_text(encoding="utf-8")
+    block = text[text.index('DISKS_DEFAULT="'):]
+    block = block[len('DISKS_DEFAULT="'):].split('"', 1)[0].split()
+    vorhanden = sorted(p.name for p in (PROJECT_ROOT / "disks" / "a5120_sios1526").glob("*.hfe"))
+    assert vorhanden, "disks/a5120_sios1526/ ist leer"
+    fehlen = [n for n in vorhanden if n not in block]
+    assert not fehlen, f"SIOS-Disketten fehlen in DISKS_DEFAULT: {fehlen}"

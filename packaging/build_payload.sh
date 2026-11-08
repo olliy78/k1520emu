@@ -46,6 +46,8 @@ GW=yes
 # Seit 2026-11-06: BS620 (PRG 710-1; Original, am echten Geraet getestet) und die BS610-Rekonstruktion (PRG 710; EIGENBAU, im Emulator geprueft,
 # am echten Geraet ungetestet - merkposten/bs600.md Nr. 13/14).
 # Seit 2026-11-03: MicroDOS 1526 (tools/microdos/build.py, vier Bootdisketten; Auslieferung vom Anwender freigegeben).
+# Seit 2026-11-08: die sieben SIOS-1526-Disketten (disks/a5120_sios1526/, tools/sios_a5120/build.py;
+# vom Anwender zur Auslieferung freigegeben).
 # Alles aus disks/: --disks all.
 DISKS_DEFAULT="a5120_cpa_k5601_system.hfe
 a5120_scpx17_k5601_system.hfe
@@ -72,7 +74,14 @@ pc1715w_scp30_system.hfe
 a5120_bcu12_k5600-10_start-syl.hfe
 a5120_bcu12_k5600-10_arbeit-sys1.hfe
 bcu_kassette_formatiert.k52
-bandtest_boot.k52"
+bandtest_boot.k52
+a5120_sios11_3xk5601_seriell.hfe
+a5120_sios11_3xk5601_seriell_sl1.hfe
+a5120_sios09_3xk5601_parallel.hfe
+a5120_sios09_3xk5600_10_parallel.hfe
+a5120_sios_programme1.hfe
+a5120_sios_programme2.hfe
+a5120_sios_generierung.hfe"
 
 # MUTOS 8000 (A5120.16, 2026-10-25): NUR der K5601-Satz — Ladediskette mit "nur_a" (Wurzel und
 # Datendisketten duerfen schon beim Einschalten in B:/C: liegen) und die dazu passenden MFM-Disketten.
