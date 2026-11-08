@@ -2731,6 +2731,23 @@ class K1520Emulator:
         """0/1, -1 = unbekannt/kein Drucker."""
         return int(_lib.k1520_printer_lamp(self._handle, lampe))
 
+    def printer_beleg_insert(self, laenge_mm: int, breite_mm: int) -> bool:
+        """K6316: Beleg in den Vorsteckschacht stecken (Blatt = Bahn 1).  False = kein K6316, schon belegt, unsinniges Mass."""
+        return bool(_lib.k1520_printer_beleg_insert(self._handle, int(laenge_mm), int(breite_mm)))
+
+    def printer_beleg_remove(self) -> bool:
+        """K6316: Beleg aus dem Schacht nehmen (das Blatt der Bahn 1 bleibt)."""
+        return bool(_lib.k1520_printer_beleg_remove(self._handle))
+
+    def printer_beleg_state(self) -> Optional[dict]:
+        """K6316: ``eingelegt``, ``u`` (Vorsteckschritte hinter FSO), ``laenge`` (Schritte), ``breite_px``, ``x_links``,
+        ``druck_y`` (-1 = nicht unter der Druckzeile); ``None`` ohne K6316."""
+        werte = [ctypes.c_int() for _ in range(6)]
+        if not _lib.k1520_printer_beleg_state(self._handle, *[ctypes.byref(w) for w in werte]):
+            return None
+        namen = ("eingelegt", "u", "laenge", "breite_px", "x_links", "druck_y")
+        return {n: w.value for n, w in zip(namen, werte)}
+
     # ─── Serielle Schnittstellen nach aussen (Entwurf 19 §8) ──────────────────
 
     def serial_count(self) -> int:

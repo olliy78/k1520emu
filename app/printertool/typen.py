@@ -60,6 +60,8 @@ class Typbeschreibung:
     schnittstelle_fest: Optional[str] = None
     #: Kern-Schalter fuer "ONLINE" (SD 1157: rastender Schalter); ``None`` = nur ueber die Taste (K6316 S1).
     hat_online_schalter: bool = True
+    #: Vorsteckschacht mit Beleg als eigenem Blatt (K6316, Bahn 1 des Kerns; hardware.md §11).
+    hat_vorsteck: bool = False
 
 
 SD1157_264 = Typbeschreibung(
@@ -149,7 +151,7 @@ def _k6316(schluessel: str, titel: str, kern: str, schnittstelle: str, namen: Tu
     return Typbeschreibung(
         schluessel=schluessel, titel=titel, kern_maschine=kern, tasten=_K6316_TASTEN, lampen=_K6316_LAMPEN,
         schnittstellen=namen, betriebsart_id=5, betriebsarten=_K6316_BETRIEBSARTEN, dil=_DIL_TASTEN,
-        hat_rom_wahl=False, schnittstelle_fest=schnittstelle, hat_online_schalter=False)
+        hat_rom_wahl=False, schnittstelle_fest=schnittstelle, hat_online_schalter=False, hat_vorsteck=True)
 
 
 K6316_IFSS = _k6316("k6316-ifss", "K6316 (IFSS)", "k6316-ifss", "ifss", ("IFSS", "V.24"))

@@ -48,9 +48,12 @@ class BlattWidget(QWidget):
     #: Kopf bewegt: (x_pixel, y_zeile, lauf) - fuer die Statuszeile.
     kopf_geaendert = Signal(int, int, int)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, bahn: int = 0):
         super().__init__(parent)
-        self.setMinimumSize(320, 240)
+        #: Bahn des Kerns: 0 = Endlospapier, 1 = Vorsteckbeleg (K6316).  Auf dem Beleg steht der Kopf nur, solange
+        #: der Beleg unter der Druckzeile liegt; seine x-Lage ist die des Kopfes minus der Linkskante des Belegs.
+        self._bahn = int(bahn)
+        self.setMinimumSize(320, 240 if bahn == 0 else 120)
         self.setFocusPolicy(Qt.NoFocus)
         self.setAutoFillBackground(False)
         self._breite = 0                 # Blattpixel
@@ -186,16 +189,22 @@ class BlattWidget(QWidget):
         if geom is not None:
             self._xdpi, self._ydpi = geom[0], geom[1]
         kopf = emu.printer_head()
+        if self._bahn == 1 and kopf is not None:
+            st = emu.printer_beleg_state()
+            ueber = bool(st and st["eingelegt"] and st["druck_y"] >= 0)
+            if ueber != self._kopf_sichtbar:
+                self.set_kopf_sichtbar(ueber)
+            kopf = (kopf[0] - st["x_links"], st["druck_y"], kopf[2]) if ueber else self._kopf
         if kopf is not None and kopf != self._kopf:
             self._kopf = kopf
             self.kopf_geaendert.emit(*kopf)
             geaendert = True
-        ver = emu.printer_sheet_version()
+        ver = emu.printer_sheet_version(self._bahn)
         if ver != self._version:
-            groesse = emu.printer_sheet_size()
+            groesse = emu.printer_sheet_size(self._bahn)
             if groesse is not None:
                 self._blatt_lesen(emu, groesse, kopf[1] if kopf else 0)
-                self._schnitte = emu.printer_sheet_cuts()      # K6316: Schneideinrichtung (sonst leer)
+                self._schnitte = emu.printer_sheet_cuts(self._bahn)   # K6316: Schneideinrichtung (sonst leer)
                 self._version = ver
                 geaendert = True
         if kopf is not None:
@@ -214,7 +223,7 @@ class BlattWidget(QWidget):
             self._stride = (self._zb + 3) & ~3
             self._daten = bytearray()
         ab = min(self._hoehe, max(0, min(self._kopf_y_vorher, kopf_y) - ZEILEN_VORLAUF))
-        zeilen = emu.printer_sheet_rows(ab, hoehe - ab)
+        zeilen = emu.printer_sheet_rows(ab, hoehe - ab, self._bahn)
         n = len(zeilen) // self._zb if self._zb else 0
         if hoehe > self._hoehe:
             self._daten.extend(bytes((hoehe - self._hoehe) * self._stride))

@@ -30,6 +30,16 @@ Das Blatt lässt sich mit dem Mausrad rollen (das beendet *Blatt folgen*) und mi
 
 Das ist das Verhalten der Original-Firmware, kein Fehler des Emulators.  Die Firmware wertet TEST nur aus, wenn sie **offline eingeschaltet** wurde: also **ONLINE ausschalten, dann *Neustart***, danach TEST drücken.  Schaltet man ONLINE nur im Betrieb aus, bleibt die ONLINE-Lampe an, PV1/PV2 wirken, TEST nicht.  Unter dem Bedienfeld erscheint dann ein Hinweis mit dem Knopf *Neustart jetzt*.  Ebenso liest die Firmware die Tasten *6 lpi* und *ONLINE* für die Lampe nur beim Einschalten.
 
+### K6316: Einschalttests und Vorsteckbeleg
+
+Beim K6316 wertet die Firmware die Tasten beim Einschalten erst **nach der Synchronisation** aus (etwa 8 Sekunden).  Die Taste also so lange halten:
+**S5** = Selbsttest mit Druck, **S5+S4** = Selbsttest ohne Druck, **S1** = Lichtschrankentest (FEHLER leuchtet bei freier oberer, ONLINE bei freier unterer Lichtschranke; S1 erneut beendet ihn),
+**S2** = Hexdump (jedes empfangene Byte als zwei Hexziffern, 32 je Zeile; die Schnittstelle überträgt nur 7 Bit), **S3** = Test der Vorsteckeinrichtung.
+
+Der Kasten **Vorsteckbeleg** (nur K6316) steckt einen Beleg der gewählten Größe vor die Lichtschranke bzw. nimmt ihn wieder heraus.  Einziehen, Positionieren und Auswerfen
+macht die Firmware: auf Befehl des Rechners oder offline mit **S4** (Auswurf).  Was gedruckt wird, solange der Beleg unter der Druckzeile liegt, erscheint auf dem Belegblatt im Kasten, nicht auf dem Endlospapier.
+Die Lage der Lichtschranken zur Druckzeile ist aus der Firmware erschlossen, nicht am Gerät gemessen.
+
 ## Einstellungen
 
 * **Druckertyp.**  Wählbar sind SD 1157/264 sowie K6316 (IFSS und V.24).  Grau und nicht wählbar sind: SD 1157/267 (nicht vorgesehen, die zweite Papierbahn wird nicht nachgebildet), K6313 (kein EPROM-Abzug vorhanden), SD 1152/257 Typenrad (in Vorbereitung).  Ein Wechsel legt den Drucker neu an (Rückfrage); das Blatt wird dabei geleert.

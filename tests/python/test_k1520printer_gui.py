@@ -547,3 +547,27 @@ def test_sd1157_formularlaenge_geht_an_den_kern_schalter(fenster):
     assert fenster.emu.printer_switch_get(K.DRUCKER_SW_FORMULAR1) == 1          # 6" = Code 1 (BCH.5..4)
     fenster.einst_drucker.seite.setCurrentIndex(fenster.einst_drucker.seite.findData(12))
     assert fenster.emu.printer_switch_get(K.DRUCKER_SW_FORMULAR1) == 3
+
+
+def test_k6316_vorsteckbeleg_kasten_einlegen_entnehmen(fenster, monkeypatch):
+    # SD 1157: kein Vorsteckschacht, der Kasten ist verborgen
+    assert fenster.dock_beleg.isHidden()
+    e = fenster.einst_drucker
+    monkeypatch.setattr(QMessageBox, "question", staticmethod(lambda *a, **k: QMessageBox.Yes))
+    e.typ.setCurrentIndex(e.typ.findData("k6316-ifss"))
+    fenster.takt.stop()
+    assert not fenster.dock_beleg.isHidden()
+    k = fenster.beleg
+    fenster.aktualisieren()
+    assert k.einlegen.isEnabled() and not k.entnehmen.isEnabled() and "leer" in k.zustand.text()
+    k.laenge.setValue(120)
+    k.breite.setValue(90)
+    k.einlegen.click()
+    st = fenster.emu.printer_beleg_state()
+    assert st["eingelegt"] == 1 and st["breite_px"] > 0
+    assert not k.einlegen.isEnabled() and k.entnehmen.isEnabled()
+    assert "Lichtschranke" in k.zustand.text() or "Schacht" in k.zustand.text()
+    assert not k.ansicht.blatt._kopf_sichtbar           # Beleg liegt nicht unter der Druckzeile
+    k.entnehmen.click()
+    assert fenster.emu.printer_beleg_state()["eingelegt"] == 0
+    assert k.einlegen.isEnabled() and "leer" in k.zustand.text()

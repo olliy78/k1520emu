@@ -30,8 +30,8 @@ from PySide6.QtCore import QByteArray, QSize, Qt, QTimer
 from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
-    QComboBox, QDockWidget, QFileDialog, QFormLayout, QFrame, QGridLayout, QLabel, QMainWindow, QMessageBox,
-    QScrollArea, QScrollBar, QSizePolicy, QTabWidget, QToolBar, QVBoxLayout, QWidget,
+    QComboBox, QDockWidget, QFileDialog, QFormLayout, QFrame, QGridLayout, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
+    QPushButton, QScrollArea, QScrollBar, QSizePolicy, QSpinBox, QTabWidget, QToolBar, QVBoxLayout, QWidget,
 )
 
 from app import version as _version
@@ -54,9 +54,9 @@ TIPP_MS = {K.DRUCKER_TASTE_PV1: 120, K.DRUCKER_TASTE_PV2: 120, K.DRUCKER_TASTE_T
 class BlattAnsicht(QWidget):
     """Blatt mit Rollbalken (senkrecht und - bei Zoom ueber der Fensterbreite - waagerecht)."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, bahn: int = 0):
         super().__init__(parent)
-        self.blatt = BlattWidget()
+        self.blatt = BlattWidget(bahn=bahn)
         self.vbar = QScrollBar(Qt.Vertical)
         self.hbar = QScrollBar(Qt.Horizontal)
         lay = QGridLayout(self)
@@ -92,6 +92,78 @@ class BlattAnsicht(QWidget):
         self.hbar.setValue(int(ox))
         self.hbar.setVisible(b.blatt_breite() - sb > 1)
         self._sync = False
+
+
+class BelegKasten(QWidget):
+    """K6316: Vorsteckschacht.  Masse waehlen, Beleg einlegen/entnehmen, das Belegblatt (Bahn 1) mit Kopf.
+
+    Einziehen, Positionieren und Auswerfen macht die FIRMWARE (BEZ/BAU vom Rechner, S4 offline) - der Kasten
+    steckt den Beleg nur vor die Lichtschranke FSO bzw. nimmt ihn heraus (hardware.md §11)."""
+
+    def __init__(self, fenster: "PrinterWindow"):
+        super().__init__()
+        self._fenster = fenster
+        self._abgelehnt = False
+        lay = QVBoxLayout(self)
+        form = QFormLayout()
+        self.laenge = QSpinBox()
+        self.laenge.setRange(74, 297)              # Handbuch: 74...297 x 74...210 mm, Mindestlaenge 72 mm
+        self.laenge.setValue(148)
+        self.laenge.setSuffix(" mm")
+        self.breite = QSpinBox()
+        self.breite.setRange(74, 210)
+        self.breite.setValue(105)
+        self.breite.setSuffix(" mm")
+        form.addRow("Länge:", self.laenge)
+        form.addRow("Breite:", self.breite)
+        lay.addLayout(form)
+        knoepfe = QHBoxLayout()
+        self.einlegen = QPushButton("Beleg einlegen")
+        self.entnehmen = QPushButton("Beleg entnehmen")
+        for k in (self.einlegen, self.entnehmen):
+            k.setFocusPolicy(Qt.NoFocus)
+            knoepfe.addWidget(k)
+        lay.addLayout(knoepfe)
+        self.zustand = QLabel()
+        self.zustand.setWordWrap(True)
+        lay.addWidget(self.zustand)
+        self.ansicht = BlattAnsicht(bahn=1)
+        self.ansicht.setMinimumHeight(180)
+        lay.addWidget(self.ansicht, 1)
+        self.einlegen.clicked.connect(self._einlegen)
+        self.entnehmen.clicked.connect(self._entnehmen)
+
+    def _einlegen(self) -> None:
+        emu = self._fenster.emu
+        self._abgelehnt = emu is not None and not emu.printer_beleg_insert(self.laenge.value(), self.breite.value())
+        self._fenster.aktualisieren()
+
+    def _entnehmen(self) -> None:
+        emu = self._fenster.emu
+        if emu is not None:
+            emu.printer_beleg_remove()
+        self._abgelehnt = False
+        self._fenster.aktualisieren()
+
+    def aktualisieren(self, emu) -> None:
+        st = emu.printer_beleg_state()
+        if st is None:
+            return
+        if not st["eingelegt"]:
+            text = "Schacht leer."
+        elif st["druck_y"] >= 0:
+            text = "Beleg eingezogen, liegt unter der Druckzeile."
+        elif st["u"] <= 0:
+            text = "Beleg steckt vor der Lichtschranke."
+        else:
+            text = "Beleg im Schacht."
+        if self._abgelehnt:
+            text = "Einlegen nicht möglich: es liegt schon ein Beleg im Schacht."
+        if text != self.zustand.text():
+            self.zustand.setText(text)
+        self.einlegen.setEnabled(not st["eingelegt"])
+        self.entnehmen.setEnabled(bool(st["eingelegt"]))
+        self.ansicht.blatt.aktualisieren(emu)
 
 
 class DruckerEinstellungen(QWidget):
@@ -242,6 +314,9 @@ class PrinterWindow(QMainWindow):
         self.reiter.addTab(self.seriell, "Schnittstellen")
         self.dock_einstellungen = self._dock("Einstellungen", self.reiter, "dock_einstellungen")
         self.splitDockWidget(self.dock_bedienfeld, self.dock_einstellungen, Qt.Vertical)
+        self.beleg = BelegKasten(self)
+        self.dock_beleg = self._dock("Vorsteckbeleg", self.beleg, "dock_beleg")
+        self.splitDockWidget(self.dock_bedienfeld, self.dock_beleg, Qt.Vertical)
 
         # ── Statuszeile ─────────────────────────────────────────────────────
         sb = self.statusBar()
@@ -271,6 +346,7 @@ class PrinterWindow(QMainWindow):
                 pass
         self.act_einpassen.setChecked(bool(dr.get("einpassen", True)))
         self.act_folgen.setChecked(bool(dr.get("folgen", True)))
+        self.dock_beleg.setVisible(self.beschreibung.hat_vorsteck)   # restoreState kennt den Typ nicht
         if not dr.get("einpassen", True) and dr.get("zoom"):
             self.blatt.set_zoom(float(dr["zoom"]))
         self.seriell.zustand_anwenden(daten.get("schnittstellen", {}) or {})
@@ -374,6 +450,7 @@ class PrinterWindow(QMainWindow):
         del alt
         self.emu.printer_switch(K.DRUCKER_SW_ONLINE, online)
         self.blatt.leeren()
+        self.beleg.ansicht.blatt.leeren()
         self.seriell.set_emulator(self.emu)
         self.seriell.zustand_anwenden(zustand)
         self.st_typ.setText(self.beschreibung.titel)
@@ -398,6 +475,8 @@ class PrinterWindow(QMainWindow):
         e = self.einst_drucker
         for w in (e.rom, e.rom_text, e.schnittstelle, e.schnittstelle_text):
             w.setEnabled(self.beschreibung.hat_rom_wahl)
+        if hasattr(self, "dock_beleg"):
+            self.dock_beleg.setVisible(self.beschreibung.hat_vorsteck)
         for n in ("online", "pv1", "pv2", "test"):
             a = getattr(self, f"act_{n}", None)
             if a is not None:
@@ -577,6 +656,8 @@ class PrinterWindow(QMainWindow):
             return
         self.blatt.aktualisieren(self.emu)
         self.bedienfeld.aktualisieren(self.emu)
+        if self.beschreibung.hat_vorsteck:
+            self.beleg.aktualisieren(self.emu)
         self._online_spiegeln(self.emu.printer_switch_get(K.DRUCKER_SW_ONLINE) == 1)
         self.act_online.setEnabled(self._netz and self.beschreibung.hat_online_schalter)
         if not self._netz:
