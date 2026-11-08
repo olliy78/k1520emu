@@ -294,6 +294,18 @@ Name: "{group}\K1520-Werkzeuge (Eingabeaufforderung)"; Filename: "{app}\bin\k152
   IconFilename: "{app}\share\icons\a5120emu.ico"
 Name: "{group}\{cm:UninstallProgram,{#Produkt}}"; Filename: "{uninstallexe}"
 
+[InstallDelete]
+; Update ueber eine bestehende Installation: Inno kopiert nur UEBER den Bestand
+; und loescht nichts.  Was die neue Fassung nicht mehr mitbringt (entfallene oder
+; umbenannte Module, alte __pycache__, Kataloge), bliebe sonst neben dem Neuen
+; liegen und koennte weiter importiert werden.  Hier steht NUR, was der
+; Installer selbst vollstaendig neu schreibt; Konfiguration (%APPDATA%) und
+; Arbeitsdisketten bleiben unberuehrt, python\ und venv\ erneuert der Bootstrap.
+; Laeuft nach PrepareToInstall und vor dem Kopieren.
+Type: filesandordirs; Name: "{app}\app"
+Type: filesandordirs; Name: "{app}\share"
+Type: filesandordirs; Name: "{app}\bin"
+
 [UninstallDelete]
 ; Was INNO angelegt hat, raeumt Inno von selbst weg — hier steht nur, was erst
 ; waehrend der Installation entsteht und in keiner Dateiliste steht:
@@ -498,6 +510,50 @@ end;
   zurueck und sonst den Grund im Klartext — den zeigt der Assistent dann an,
   ohne irgendetwas installiert zu haben. }
 
+{ Windows-API: SetEnvironmentVariable gibt es in Pascal Script nicht.  Ein LEERER
+  Wert genuegt — Python behandelt ein leeres PYTHONHOME/PYTHONPATH wie ein
+  fehlendes. }
+function SetEnvironmentVariableW(Name, Wert: String): Boolean;
+  external 'SetEnvironmentVariableW@kernel32.dll stdcall';
+
+{ Python-Umgebungsvariablen des Anwenders wuerden unser Python (und das venv)
+  umlenken: PYTHONHOME/PYTHONPATH zeigen auf eine fremde Installation, und der
+  Fehler erscheint erst im Kindprozess `ensurepip`, ohne Text im Protokoll
+  (Forum, Beitrag 70).  Der Installer-Prozess und seine Kinder sehen sie nicht
+  mehr; der Wert wird vorher ins Protokoll geschrieben, damit man die Ursache
+  sieht. }
+procedure PythonUmgebungNeutralisieren;
+var
+  Namen: array of String;
+  I: Integer;
+  Wert: String;
+begin
+  Namen := ['PYTHONHOME', 'PYTHONPATH', 'PYTHONSTARTUP', 'PYTHONUSERBASE',
+            'PYTHONSAFEPATH', 'PYTHONPLATLIBDIR', 'PYTHONEXECUTABLE'];
+  for I := 0 to GetArrayLength(Namen) - 1 do begin
+    Wert := GetEnv(Namen[I]);
+    if Wert <> '' then begin
+      Notiere('    Umgebungsvariable ' + Namen[I] + ' = ' + Wert
+            + '  (fuer die Installation ausgeblendet)');
+      SetEnvironmentVariableW(Namen[I], '');
+    end;
+  end;
+end;
+
+{ Loescht einen Ordner und PRUEFT es.  Ein stehengebliebener Rest einer aelteren
+  Installation (gesperrte Datei: laufender Emulator, Virenscanner) ist sonst
+  unsichtbar und das neue venv entsteht mitten darin. }
+function OrdnerRestlosLoeschen(const Pfad: String): Boolean;
+begin
+  Result := True;
+  if not DirExists(Pfad) then Exit;
+  DelTree(Pfad, True, True, True);
+  if DirExists(Pfad) then begin
+    Notiere('!!! ' + Pfad + ' liess sich nicht vollstaendig loeschen');
+    Result := False;
+  end;
+end;
+
 function PythonAuspacken: String;
 var
   Archiv, Tar, PyExe: String;
@@ -527,7 +583,11 @@ begin
 
   { Ein Update packt NICHT ueber die alte Fassung: sonst blieben Dateien einer
     aelteren Fehlerstandes daneben liegen, die dort nichts mehr zu suchen haben. }
-  DelTree(ExpandConstant('{app}\python'), True, True, True);
+  if not OrdnerRestlosLoeschen(ExpandConstant('{app}\python')) then begin
+    Result := 'Die fruehere Python-Fassung (' + ExpandConstant('{app}\python')
+            + ') liess sich nicht entfernen. Bitte alle K1520emu-Programme beenden.';
+    Exit;
+  end;
   try
     ExtractArchive(Tar, ExpandConstant('{app}'), '', True, @Auspackfortschritt);
   except
@@ -557,10 +617,33 @@ begin
   { Eine vorhandene Laufzeitumgebung wird ERNEUERT, nicht weiterbenutzt: nach
     einem Update zeigen ihre Verweise auf die alte Python-Fassung. }
   Melde('Laufzeitumgebung anlegen', MarkeVenv);
-  DelTree(ExpandConstant('{app}\venv'), True, True, True);
-  if Laufe(PyExe, '-m venv "' + ExpandConstant('{app}\venv') + '"',
+  PythonUmgebungNeutralisieren;
+  if not OrdnerRestlosLoeschen(ExpandConstant('{app}\venv')) then begin
+    Result := 'Eine fruehere Laufzeitumgebung (' + ExpandConstant('{app}\venv')
+            + ') liess sich nicht entfernen.' + #13#10
+            + 'Laeuft noch ein K1520emu-Programm? Bitte alle beenden (oder die '
+            + 'alte Fassung ueber die Programmliste deinstallieren) und '
+            + 'die Installation wiederholen.';
+    Exit;
+  end;
+
+  { Erst OHNE pip anlegen, dann ensurepip fuer sich: `venv` verschluckt die
+    Ausgabe von ensurepip und meldet nur "exit status 1".  Als eigener Aufruf
+    steht der wirkliche Grund im Protokoll. }
+  if Laufe(PyExe, '-m venv --without-pip "' + ExpandConstant('{app}\venv') + '"',
            ExpandConstant('{app}')) <> 0 then begin
     Result := 'Die Laufzeitumgebung liess sich nicht anlegen.';
+    Exit;
+  end;
+  if not FileExists(VenvPy) then begin
+    Result := 'Nach dem Anlegen fehlt ' + VenvPy;
+    Exit;
+  end;
+  if Laufe(VenvPy, '-m ensurepip --upgrade --default-pip',
+           ExpandConstant('{app}')) <> 0 then begin
+    Result := 'pip liess sich in der Laufzeitumgebung nicht einrichten.' + #13#10
+            + 'Der Grund steht im Protokoll. Haeufig: ein Virenscanner, der '
+            + 'neu angelegte Programme in AppData blockiert.';
     Exit;
   end;
   if not FileExists(VenvPy) then begin

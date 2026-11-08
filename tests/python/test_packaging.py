@@ -837,7 +837,7 @@ def test_iss_hat_keine_versehentlichen_abschnittskoepfe():
     hier kostet nichts.
     """
     erlaubt = {"[Setup]", "[Languages]", "[Files]", "[Icons]", "[Run]",
-               "[UninstallRun]", "[UninstallDelete]", "[Code]", "[Tasks]",
+               "[UninstallRun]", "[InstallDelete]", "[UninstallDelete]", "[Code]", "[Tasks]",
                "[Dirs]", "[Registry]", "[INI]", "[Messages]", "[CustomMessages]"}
     text = (PACKAGING / "k1520emu.iss").read_text(encoding="utf-8")
     for nr, zeile in enumerate(text.splitlines(), 1):
@@ -946,6 +946,31 @@ def test_iss_raeumt_auf_wenn_das_nachladen_scheitert():
     for weg in ("{app}\\venv", "{app}\\python"):
         assert f"DelTree(ExpandConstant('{weg}')" in vorbereiten, (
             f"{weg} wird nach einem Fehlschlag nicht weggeräumt")
+
+
+def test_iss_raeumt_beim_update_die_alten_programmdateien_weg():
+    """Drueberinstallieren darf kein Gemisch aus alter und neuer Fassung ergeben.
+
+    Inno loescht beim Kopieren nichts; ohne [InstallDelete] blieben entfallene
+    Module in app\\ liegen.  Konfiguration und Disketten gehoeren NICHT hierher.
+    """
+    code = _iss()
+    assert "[InstallDelete]" in code
+    abschnitt = code[code.index("[InstallDelete]"):code.index("[UninstallDelete]")]
+    for weg in ("{app}\\app", "{app}\\share", "{app}\\bin"):
+        assert f'Name: "{weg}"' in abschnitt, f"{weg} wird beim Update nicht geraeumt"
+    regeln = "\n".join(z for z in abschnitt.splitlines() if z.startswith("Type:"))
+    for tabu in ("APPDATA", "Documents", "Disketten", "{userdocs}"):
+        assert tabu not in regeln, f"{tabu} darf ein Update nie anfassen"
+
+
+def test_iss_bootstrap_prueft_loeschen_und_trennt_ensurepip():
+    """Forum Beitrag 70: ensurepip scheiterte im venv ohne Text im Protokoll."""
+    code = _iss_code()
+    assert "function OrdnerRestlosLoeschen" in code
+    assert "-m venv --without-pip" in code
+    assert "-m ensurepip" in code
+    assert "procedure PythonUmgebungNeutralisieren" in code
 
 
 def test_iss_entfernt_verknuepfungen_wenn_der_rauchtest_scheitert():
