@@ -41,9 +41,12 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 
 # Statisch binden: sonst braucht jede .exe libstdc++-6.dll/libgcc_s_seh-1.dll/
-# libwinpthread-1.dll neben sich, und wine findet sie nicht.
+# libwinpthread-1.dll neben sich, und wine findet sie nicht.  Das gilt auch fuer die DLLs:
+# ohne `-static` zieht libk1520core.dll libwinpthread-1.dll nach, und ein Test, der gegen die DLL
+# linkt (k1520_test_p8000_ohne_terminal), scheitert schon beim Auflisten (wine Rueckgabe 53) - das
+# bricht den ganzen ctest-Lauf ab.  Wirkt nur auf einen FRISCHEN Cache (tools/dev.sh clean win).
 set(CMAKE_EXE_LINKER_FLAGS_INIT    "-static -static-libgcc -static-libstdc++")
-set(CMAKE_SHARED_LINKER_FLAGS_INIT "-static-libgcc -static-libstdc++")
+set(CMAKE_SHARED_LINKER_FLAGS_INIT "-static -static-libgcc -static-libstdc++")
 
 # ctest (und gtest_discover_tests beim Bauen) starten die .exe hierueber.
 find_program(_wine NAMES wine64 wine)
