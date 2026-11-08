@@ -312,6 +312,42 @@ TEST_P(K6316Modul, HexdumpMitS2BeimEinschaltenDrucktJedesByteAlsDreiZeichen)
         << "gelesen: \"" << lesen(l.blatt(), r, b[0].first, b[0].second, TAKT_125) << "\"\nerwartet: \"" << text << "\"";
 }
 
+TEST_P(K6316Modul, LichtschrankentestMitS1ZeigtFsoUndFsuAufH2UndH5)
+{
+    // hardware.md §8 Nr. 1, Handbuch [M:6/7]: S1 beim Netz-Ein = Lichtschrankentest (Firmware 00E5H -> 0524H).  Die Tasten werden erst
+    // NACH der Synchronisation (~8 s, ~20 Mio. Takte) gelesen, also lange halten.  0524H: H2 an, wenn FSO = 0 (kein Papier), H5 an, wenn
+    // FSU = 0 — die Lampe zeigt die FREIE Lichtschranke ("ohne Papier", Handbuch).  S1 erneut beendet den Test.
+    Lauf l(GetParam());
+    l.st().setTaste(1, true);
+    l.fahre(40'000'000);
+    l.st().setTaste(1, false);
+    struct F { bool o, u; };
+    for (F f : {F{false, false}, F{true, false}, F{false, true}, F{true, true}, F{false, false}}) {
+        l.st().setBeleg(f.o, f.u);
+        l.fahre(3'000'000);
+        EXPECT_EQ(l.st().lampe(2), !f.o) << "H2 = FSO frei, oben=" << f.o << " unten=" << f.u;
+        EXPECT_EQ(l.st().lampe(5), !f.u) << "H5 = FSU frei, oben=" << f.o << " unten=" << f.u;
+    }
+}
+
+TEST_P(K6316Modul, VorstecktestMitS3BewegtDenVorsteckmotor)
+{
+    // Handbuch [M:6/7]: S3 beim Netz-Ein = Test der Vorsteckeinrichtung.  Ohne S3 ruht der Vorsteckmotor nach der Grundstellung.
+    Lauf ohne(GetParam());
+    ASSERT_TRUE(ohne.erstesZeichen(80'000'000));
+    const uint32_t ruhe = ohne.st().vorsteck().schritte();
+    ohne.fahre(20'000'000);
+    EXPECT_EQ(ohne.st().vorsteck().schritte(), ruhe) << "ohne Test bleibt der Vorsteckmotor stehen";
+
+    Lauf l(GetParam());
+    l.st().setTaste(3, true);   // 8CH Bit 3 (00DAH -> 0257H), wie S1 erst nach der Synchronisation gelesen
+    l.fahre(40'000'000);
+    l.st().setTaste(3, false);
+    const uint32_t a = l.st().vorsteck().schritte();
+    l.fahre(20'000'000);
+    EXPECT_GT(l.st().vorsteck().schritte(), a) << "der Vorstecktest faehrt den Motor";
+}
+
 INSTANTIATE_TEST_SUITE_P(Module, K6316Modul, ::testing::Values(Typ::K6316_Ifss, Typ::K6316_V24));
 
 // ─── Betriebsarten und Schnitt ───────────────────────────────────────────────

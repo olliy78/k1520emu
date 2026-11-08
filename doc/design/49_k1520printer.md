@@ -280,7 +280,9 @@ aus `hardware.md` §8 sind beantwortet (§9 dort), einschließlich zweier **Beri
 
 Hexdump (S2 beim Einschalten, 12,5 Z/Z, 7-Bit-SIO) geprüft.
 
-**Offen.**  Lichtschranken-/Vorstecktest nur als Eingabe vorhanden (nicht geprüft), Vorsteckbeleg als eigenes Blatt (der Vorsteckmotor
+Lichtschranken- und Vorstecktest (S1/S3 beim Einschalten) geprüft.
+
+**Offen.**  Vorsteckbeleg als eigenes Blatt (der Vorsteckmotor
 ist ein Zähler ohne Blatt), K6313 (kein Abzug).
 
 ### 5f  Stand WP7 — Paket und Werkzeugmenü (2026-11-06)

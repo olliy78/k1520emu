@@ -147,7 +147,8 @@ gemessen (Wächter in `tests/integration/test_k6316.cpp`, Merkposten Nr. 20 ff.)
    Inverter: Ausgangsbit 1 = Lampe an.  **Berichtigung:** H4 hängt **nicht** an AM4, sondern an /SPAUS der Spannungsüberwachung (`ISPAUS` am Stecker X528, Blatt 03
    unten, invertiert über den fünften D13-Inverter): sie leuchtet, solange die Betriebsspannungen stimmen, ohne CPU-Zutun.  Beim Einschalten gelten
    (`[M:6/7, 9–10]`, Firmware `00C9H`): S5 gehalten bis der Ausdruck beginnt = Selbsttest mit Druck; S5+S4 = Selbsttest ohne Druck (Wagenmotor, Papier); S1 =
-   Lichtschrankentest (H2/H5 = FSO/FSU ohne Papier, Firmware `0524H`); S2 = Hexadezimaldarstellung; S3 = Test der Vorsteckeinrichtung.  Lampen je Zustand
+   Lichtschrankentest (H2/H5 = FSO/FSU ohne Papier, Firmware `0524H`); S2 = Hexadezimaldarstellung; S3 = Test der Vorsteckeinrichtung.  **[E] 2026-11-08:** gelesen wird erst **nach der Synchronisation** (`00C9H…00F0H`: `8CH` Bit 2 = S2 Hexdump, Bit 3 = S3 Vorstecktest `0257H`, `80H` Bit 1 = S1 Lichtschrankentest `0524H`,
+   `A8H` Bit 0 = S5 Selbsttest); die Taste muss also ~8 s gehalten werden.  Im Lichtschrankentest leuchtet H2 bei **freier** FSO, H5 bei freier FSU; S1 erneut beendet ihn.  Wächter `K6316Modul.Lichtschrankentest…`, `…Vorstecktest…`.  Lampen je Zustand
    `[M:7]`: ON-LINE H4+H5; Selbsttest H1+H4.  **Der Emulator zeigt H1 im Selbsttest, H5 aus** — passt zur Tabelle (ON-LINE-Lampe erlischt, weil der Test
    OFF-LINE läuft [E]).
 2. **Drehschalter** `[F:04F7H, 0EB0H]`, `[M:7, 24]`: zwei Kontakte.  /MELO = 0: Stellung **Endlos** (Code 37H); /MELO = 1 und /MAUF = 0: **Aufwickeln** (38H); beide 1:
@@ -184,8 +185,8 @@ gemessen (Wächter in `tests/integration/test_k6316.cpp`, Merkposten Nr. 20 ff.)
    72 Punkte/Zoll, Zeichenbreite 1,9 mm, -höhe 2,5 mm (7 Punkte), Nadeln 1…9 untereinander im Abstand 1/72″ **in zwei Spalten** (ungerade/gerade Nadeln,
    Verteilung Blatt 08): die geraden Nadeln sitzen **3 Motorschritte = 4 Drucktakte** vor den ungeraden (die Firmware löst sie entsprechend später aus, am
    Selbsttest gemessen [E]), Drucknadelfrequenz 500 Hz, höchstens jeder 2. Rasterpunkt.  **Zeichengenerator im ROM `[F:1303H]`:** 2400H + 8 × Code, 8 Spaltenbytes, Bit 7 − k
-   = Nadel k+1, 0 = Nadel schlägt an (das Byte geht unverändert auf 8DH); Spalte 0 von `, ; @ _ g j p q y` trägt Steuerdaten (Unterlängen).  Die Zeilen 0…7
-   ( = Nadel 1…8) sind das Zeichen; Nadel 9 ist Unterlänge/Unterstrich.  Breitschrift: jede Spalte 6 statt 3 Pixel Abstand und doppelt gesetzt [E].
+   = Nadel k+1, 0 = Nadel schlägt an (das Byte geht unverändert auf 8DH); Spalte 0 ist die **Nadel-9-Maske** (nur bei `, ; @ _ g j p q y` ≠ FFH), die Datenspalten 1…7
+   tragen Nadel 1…8.  Breit-, Schrägschrift, Unterstrich: **§10** (die frühere Angabe „jede Spalte 6 Pixel und doppelt“ ist dort genauer: Spalte m im Takt 2m = Vereinigung zweier Quellspalten).
 8. **Nadelanschlag `[S:08]`, `[V:11–13]`**: Je Nadel ein Timer (B555), getriggert vom Pegel /DNx, zurückgesetzt von /DTFG = 1; der Stromfluss beginnt, sobald
    /DNx = 0 **und** /DTFG = 0, den Rest regelt die Endstufe.  Modell: Anschlag = Flanke „aktiv“ (DN = 0 bei DTFG = 0) je Nadel.  Zwischen zwei Anschlägen
    steht /DTFG wieder auf 1 (Firmware `1877H`).
