@@ -246,6 +246,41 @@ angelegt statt als Entwurf. Für das Tag braucht der Job die Historie, deshalb
 checkt er sie ganz aus (`fetch-depth: 0`, dabei `filter: blob:none`,
 weil die ~500 MB Diskettenabbilder in der Historie hier niemand braucht).
 
+### 4.3a Signierter Installer (SignPath Foundation)
+
+`release.yml` kann das Windows-Setup bei einem Tag über **SignPath** signieren lassen. Der Dienst ist für Open-Source-Projekte
+kostenlos; das Zertifikat läuft auf die *SignPath Foundation* als Herausgeberin, der Schlüssel verlässt SignPath nie.
+**Solange die Repository-Variable `SIGNPATH_ORGANIZATION_ID` fehlt, ändert sich nichts** — die Schritte werden übersprungen
+und das Setup bleibt unsigniert. Signiert wird nur das **äußere Setup**; der eingebettete Deinstallierer und die
+nachgeladenen Dateien (Python, Qt) bleiben unsigniert. Die Signatur hilft also gegen die SmartScreen-Warnung beim Start des
+Setups, nicht gegen jeden Virenscanner-Alarm später.
+
+Einmalig zu tun (Stand der Bedingungen: vor der Bewerbung auf der SignPath-Seite nachlesen, ich kenne sie aus Dritt-Quellen):
+1. **Bewerben** bei <https://signpath.org> (Open-Source-Programm). Verlangt werden nach meinem Kenntnisstand: OSI-Lizenz
+   (MIT passt), öffentliches GitHub-Repository mit automatisiertem Build, mindestens ein früheres Release, Zwei-Faktor-Anmeldung
+   für alle Beteiligten bei GitHub **und** SignPath, eine veröffentlichte *Code-Signing-Policy* (Entwurf:
+   `doc/code_signing_policy.md`; in die README verlinken) und der Hinweis „Free code signing provided by SignPath.io,
+   certificate by SignPath Foundation".
+2. In SignPath ein **Projekt** `k1520emu` anlegen, eine **Signing Policy** `release-signing` (Herkunftsprüfung: GitHub,
+   Repository `olliy78/a5120emu`, Build auf GitHub-gehosteten Läufern) und unter *Artifact Configurations* den Inhalt von
+   `packaging/signpath/artifact-configuration.xml` eintragen. Freigabe der Signieranträge: manuell durch dich (empfohlen)
+   oder automatisch.
+3. In SignPath einen **API-Token** für einen Benutzer „CI" erzeugen (Berechtigung: Signieranträge für diese Policy einreichen).
+4. In GitHub → *Settings → Secrets and variables → Actions*:
+   - **Secret** `SIGNPATH_API_TOKEN` = der Token aus 3.
+   - **Variable** `SIGNPATH_ORGANIZATION_ID` = die Organisations-ID (steht in SignPath in der Adresszeile bzw. unter
+     *Organization*). Erst diese Variable **schaltet** das Signieren ein.
+   - Optional **Variablen** `SIGNPATH_PROJECT_SLUG` (Vorgabe `k1520emu`) und `SIGNPATH_POLICY_SLUG` (Vorgabe `release-signing`),
+     falls du die Kennungen anders vergeben hast.
+5. In SignPath die **GitHub-App/Trusted Build System** für das Repository verbinden (*Trusted Build Systems → GitHub.com*) —
+   ohne sie verweigert SignPath die Herkunft des Artefakts.
+
+Ablauf bei einem Tag: Setup bauen → als Artefakt `…-unsigniert` hochladen → SignPath signiert (der Lauf wartet) → das
+signierte Setup ersetzt die unsignierte Datei in `dist/` → `Get-AuthenticodeSignature` muss `Valid` melden, sonst bricht der
+Lauf ab → Artefakt und Release-Asset sind das signierte Setup. Auf Läufen ohne Tag wird nicht signiert.
+**Ungeprüft:** der Workflow ist nicht gegen echtes SignPath gelaufen; der Aktionsname (`signpath/github-action-submit-signing-request@v1`)
+und seine Eingaben sind nach der Dokumentation eingetragen — beim ersten Lauf auf einem Test-Tag prüfen.
+
 ### 4.4 Windows — Bauen und Regression (`windows-ci.yml`)
 
 Die Gegenprobe zu [§4.1](#41-bauen-und-regression-ciyml) auf der anderen Plattform:
