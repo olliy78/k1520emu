@@ -288,6 +288,9 @@ def _build_layout_pc1715(zeichen: Optional[Dict[int, Tuple[str, str]]] = None) -
 _HOST_POS = {
     int(Qt.Key_Up): pos(5, 7), int(Qt.Key_Down): pos(3, 7),
     int(Qt.Key_Left): pos(12, 3), int(Qt.Key_Right): pos(6, 3),
+    # Der PC1715 hat keine Ruecktaste; CP/A und SCP lesen den Code der Cursor-links-Taste
+    # (88H) als ^H = Backspace.  Die Ruecktaste des PC sendet deshalb genau diese Taste.
+    int(Qt.Key_Backspace): pos(12, 3),
     int(Qt.Key_Delete): pos(6, 6), int(Qt.Key_Insert): pos(5, 6),
     # Cursorblock unten (Ticket #27): Pos1 |<-, Ende ->|, Bild hoch, Bild runter.
     int(Qt.Key_Home): pos(12, 7), int(Qt.Key_End): pos(6, 7),
@@ -298,7 +301,7 @@ _HOST_POS.update({int(Qt.Key_F1) + n - 1: FTASTEN[n] for n in range(1, 13)})
 _HOST_HERVOR = {
     int(Qt.Key_Return): ET, int(Qt.Key_Enter): ET, int(Qt.Key_Escape): pos(8, 2),
     int(Qt.Key_Tab): pos(12, 6), int(Qt.Key_Backtab): pos(12, 6),
-    int(Qt.Key_Backspace): pos(6, 6), int(Qt.Key_Space): pos(12, 1),
+    int(Qt.Key_Space): pos(12, 1),
 }
 
 
