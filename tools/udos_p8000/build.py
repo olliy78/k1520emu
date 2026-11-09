@@ -35,9 +35,11 @@ OHNE = ('DIRECTORY', 'DIRECTORY.fileinfo')
 
 
 def _tool():
-    """Der Pfad des DiskTools steht schon auf der Kommandozeile, bevor `main` ihn auswertet (soll() braucht ihn zum Auspacken)."""
+    """Aufruf des DiskTools als Liste (mit dem `--emulator`-Vorsatz, z. B. wine): steht schon auf der Kommandozeile,
+    bevor `main` ihn auswertet, soll() braucht ihn aber zum Auspacken."""
     a = sys.argv
-    return os.path.abspath(a[a.index('--tool') + 1])
+    vor = [a[i + 1] for i, x in enumerate(a[:-1]) if x == '--emulator']
+    return [*vor, os.path.abspath(a[a.index('--tool') + 1])]
 
 
 def _inhalt(cqm):
@@ -45,7 +47,7 @@ def _inhalt(cqm):
     with tempfile.TemporaryDirectory() as tmp:
         ziel = os.path.join(tmp, 'o')
         os.makedirs(ziel)
-        r = subprocess.run([_tool(), 'get', os.path.join(db.HIER_ORIGINAL, cqm), '*', '--to', ziel],
+        r = subprocess.run([*_tool(), 'get', os.path.join(db.HIER_ORIGINAL, cqm), '*', '--to', ziel],
                            capture_output=True, text=True)
         if r.returncode != 0:
             sys.exit(f'{cqm}: Auspacken fehlgeschlagen\n{r.stdout}{r.stderr}')
