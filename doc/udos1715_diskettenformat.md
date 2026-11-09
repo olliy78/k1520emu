@@ -212,7 +212,7 @@ bootet, frisch angelegte Diskette nicht → sektorweise gemischt):
 1. **Zweiter Bootteil in der Verzeichnisspur.**  Der Monitor von UDOS 5.0 lädt beim
    Kaltstart 300H Byte ab **Spur 16H Sektor 07** nach 4000H und springt nur hinein, wenn
    bei 4002H `"BO"` steht (`BOOT FOR UDOS V 5.0!`); sonst `ERROR: 45`.  Die Sektoren
-   07–09 gehören deshalb zum Bootabbild (hinter Spur 0 Kopf 0, zusammen 4864 Byte), die
+   07–09 gehören deshalb zum Bootabbild (hinter Spur 0 Kopf 0, zusammen 4864 Byte; beim P8000 ist das Bootabbild ANDERS aufgebaut, s. u.), die
    Verzeichnissätze liegen unter UDOS 5.0 auf **05, 0A, 01, 06, 0B** (nicht auf der
    Handbuchlage 05, 0A, 0F, 04, 09 …).  `mkfs` sperrt auf einer **Systemdiskette** Spur 0 Kopf 0 (16 Sektoren)
    und Spur 16H Sektor 07–09 (`Udos1715FileSystem::sperreBootbereich`, `zweiterBootteil`) — zusammen mit den
@@ -272,11 +272,29 @@ Dateisaetze von `udossys` (74 Dateien) und `udos_org` (89) passen auf eine `crea
 Groesste einzelne Datei auf einer leeren Datendiskette: P8000 2529 von 2551 freien Sektoren (Rest = Descriptor + Zeigersektoren), PC 1715 2525
 von 2547, UDOS 5.0 2498 (Spur 0 gesperrt, s. u.).
 
-**P8000-Systemdiskette: `FORMAT D=1 ID='..' S` belegt 47 Sektoren (Hubert, Ticket #30), nicht 28.**  Belegungstabelle: Spur 0 nur Sektor 0
-(Urlader), Spur 21 Kopf 0 ganz (16), Spur 22 (DIRECTORY) `E7FF` = Sektoren 0-2, 5-15, Spur 23 Kopf 0 ganz (16).  Die Mehrbelegung gegenueber der
-Datendiskette (9) ist die vom FORMAT mitgeschriebene Erweiterung des U880-Monitors (GET/SAVE-Paket) samt Auslagerungsbereichen.  **Das DiskTool
-legt die P8000-Systemdiskette noch mit der A5120-Lage (28: Spur 0 Kopf 0, Spur 22 Sektor 7-9) an - offen**, ebenso der Inhalt der Sektoren auf
-Spur 21/22/23, der aus der Systemdiskette kopiert wird.
+**P8000-Systemdiskette: `FORMAT D=1 ID='..' S` belegt 47 Sektoren (Hubert, Ticket #30; am Emulator nachgemessen 2026-11-09).**
+Belegungstabelle: Spur 0 nur Sektor 0, Spur 15H (21) Kopf 0 ganz, Spur 16H (22) `E7FF` = Sektoren 0-2, 5-15, Spur 17H (23) Kopf 0 ganz.
+FORMAT kopiert dabei von der Systemdiskette in Laufwerk 0 (Abfrage `SYSTEM DISK IN DRIVE:0`) **22 Sektoren = 5632 Byte**, sektorgleich
+zu `udossys`/`udos_org` (alle anderen Sektoren der Diskette bleiben `E5`):
+
+| Ort | Sektoren | Inhalt |
+|---|---|---|
+| Spur 0 Sektor 0 | 1 | Urlader (`P8000SYS` bei 80H) |
+| Spur 16H Sektor 07-09 | 3 | `OSLOAD` („`*** UDOS *: OSLOAD ***`“): sucht `OS` und `NDOS` im Verzeichnis (`NOT FOUND`, `BAD POINTER IN`, `EOF IN`) |
+| Spur 16H Sektor 12-15 + Spur 17H Sektor 02-15 | 18 | 4,5 KB Dateizugriffscode (`TOO MANY SEGMENTS`, `MEMORY PROTECTION`, `FILE ERR`, `DISK FULL`) - das ist das „GET/SAVE-Paket“ des U880-Monitors: damit liest und schreibt der Monitor UDOS-Dateien, bevor UDOS läuft |
+| Spur 15H Kopf 0 | 16 | nur im Belegungsplan gesperrt, nie beschrieben (`E5`): Auslagerungsbereich |
+
+UDOS 3.0 und 3.1 unterscheiden sich in diesen 22 Sektoren nur in einem (Spur 16H Sektor 14). Das DiskTool bildet das ab
+(`Udos1715FileSystem::bootbereiche`): Bootabbild **5632 Byte** (UDOS 5.0 am A5120 bleibt bei 4864); `data/bootsektoren/boot_p8000_udos31.bin`
+und `…udos30.bin` sind das `boot-get` der Systemdisketten, eine `create --fs udos_p8000 --boot`-Diskette hat denselben Belegungsplan
+(Byte für Byte) wie die von FORMAT S, und `FORMAT … S` mit der DiskTool-Diskette als Quelle ergibt wieder die Originalsektoren
+(Wächter `Udos1715P8000.*`, `cli_dt_boot_p8000_udos31`, `cli_bt_p8000_udos31_prompt`).  *Vorher* legte das DiskTool die A5120-Lage an
+(Spur 0 Kopf 0 + Spur 16H 7-9 = 28): sie bootete, ließ aber GET/SAVE im Monitor ohne Code und sperrte 15 Sektoren auf Spur 0 grundlos.
+
+**Die Disketten gibt es fertig:** `tools/udos_p8000/build.py` baut aus den vier Abzügen (`tools/udos_p8000/original/`) `disks/p8000_udos30/` und
+`disks/p8000_udos31/` (je Systemdiskette + Programmiersprachen: PLZ, BASIC, FORTRAN, PASCAL), Wächter `cli_udos_p8000`.  Der EPROM-Programmierer
+(`UPROG`, für den P8000-Programmer Typ 1 und den des P8000 Compact Typ 2, Erkennung automatisch) und die EPROM-Inhalte (`MON8_*`, `MON16_*`,
+`P8T*`, `WDC_*`) liegen auf den **Systemdisketten**.
 
 **Spur 0 vergibt das DiskTool bei `udos50` nie** (`allocSectors`/`allocRecords`), obwohl die Karte (wie bei FORMAT) Spur 0
 Kopf 1 frei fuehrt.  Befund 2026-11-08: eine Systemdiskette mit allen 65 Dateien der Originaldiskette, deren erste Dateien auf Spur 0 Kopf 1

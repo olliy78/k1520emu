@@ -91,6 +91,7 @@ REGELN = [
     ("core/peripherals/p8000_terminal/**", _P8, "P8000-Terminal", True),
     ("tools/p8000/**", _P8 + ("fach_kermit",), "P8000-Werkzeuge", False),
     ("tools/osm_p8000/**", ("fach_kermit",), "OS/M", False),
+    ("tools/udos_p8000/**", _P8, "UDOS 3.x P8000", False),
     ("tests/fixtures/p8000/**", _P8, "P8000-Fixtures", False),
     # ── Maschinen (Formatier-Faelle der Maschine) ───────────────────────
     ("core/machines/a5120/**", ("fach_a5120",), "A5120", True),

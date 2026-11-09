@@ -47,6 +47,9 @@ bool istUdos50(const FsProfile& p) { return p.ndos_fill == "ff"; }
 ///        der zweite Bootteil auf Spur 16H Sektor 07-09 - A5120 (UDOS 5.0, FFH) UND P8000
 ///        (UDOS 3.x, 77H).  Am Emulator mit dem FORMAT der echten P8000-UDOS-Diskette gemessen
 ///        (Datendiskette 9 Sektoren, Saetze auf 05/0A/01/06/0B; Ticket #29).
+/// @brief P8000: Spur 15H Kopf 0 - von `FORMAT S` im Belegungsplan gesperrt, nie beschrieben.
+constexpr uint8_t kAuslagerungsSpur = 0x15;
+
 bool udos2xLage(const FsProfile& p) { return p.ndos_fill == "ff" || p.ndos_fill == "77"; }
 
 uint16_t le16(const uint8_t* p) { return static_cast<uint16_t>(p[0] | (p[1] << 8)); }
@@ -202,6 +205,15 @@ bool Udos1715FileSystem::zweiterBootteil(const FsProfile& prof, uint8_t& erster,
     erster = 0x07;
     anzahl = 3;
     return true;
+}
+
+std::vector<Udos1715FileSystem::Bootbereich> Udos1715FileSystem::bootbereiche(const FsProfile& prof) {
+    if (prof.ndos_fill == "ff")
+        return {{0, 0, 16}, {prof.directory_track, 0x07, 3}};
+    if (prof.ndos_fill == "77")
+        return {{0, 0, 1}, {prof.directory_track, 0x07, 3}, {prof.directory_track, 0x0C, 4},
+                {prof.bitmap_track, 0x02, 14}};
+    return {};
 }
 
 // ─── Sektoren ────────────────────────────────────────────────────────────────
@@ -994,11 +1006,12 @@ bool Udos1715FileSystem::setAttributes(const std::string& name, const UdosAttrs&
 
 bool Udos1715FileSystem::sperreBootbereich(bool speichern) {
     if (udos2xLage(prof_)) {
-        for (uint8_t s = 0; s < 16 && s < secs_per_track_; ++s) bitmap_.setUsed(0, s + 1, true);
-        uint8_t erster = 0, anzahl = 0;
-        if (zweiterBootteil(prof_, erster, anzahl))
-            for (uint8_t s = erster; s < erster + anzahl && s < secs_per_track_; ++s)
-                bitmap_.setUsed(prof_.directory_track, s + 1, true);
+        for (const Bootbereich& b : bootbereiche(prof_))
+            for (uint8_t s = b.erster; s < b.erster + b.anzahl && s < secs_per_track_; ++s)
+                bitmap_.setUsed(b.spur, s + 1, true);
+        // P8000: Spur 15H Kopf 0 ist der Auslagerungsbereich des Monitors - belegt, aber ohne Inhalt.
+        if (prof_.ndos_fill == "77")
+            for (uint8_t s = 0; s < 16 && s < secs_per_track_; ++s) bitmap_.setUsed(kAuslagerungsSpur, s + 1, true);
     } else if (prof_.ndos_fill == "00") {
         // PC 1715: FORMAT (Systemdisk = J) sperrt nur Spur 0 Kopf 0 - am Emulator gemessen
         // (13 + 16 = 29 Sektoren belegt, Ticket #29).

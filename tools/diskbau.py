@@ -93,9 +93,11 @@ def wm_hlp():
 
 
 class Diskette:
-    def __init__(self, skript, name, fs, boot=None, create_args=(), erste=()):
+    def __init__(self, skript, name, fs, boot=None, create_args=(), erste=(), ignoriere=()):
         self.hier = os.path.dirname(os.path.abspath(skript))
         self.name, self.fs, self.create_args, self.erste = name, fs, list(create_args), list(erste)
+        #: Dateien, die das DiskTool selbst anlegt und die deshalb nicht in `soll()` stehen (UDOS: DIRECTORY)
+        self.ignoriere = ('cpm-dateiangaben.txt', *ignoriere)
         self.boot = os.path.join(BOOTSEKTOREN, boot) if boot else None
 
     # -- Werkzeug ---------------------------------------------------------------------------------------------
@@ -144,7 +146,7 @@ class Diskette:
             ist_ordner = os.path.join(tmp, 'ist')
             os.makedirs(ist_ordner)
             self._lauf(tool, 'get', diskette, '*', '--to', ist_ordner)
-            ist = {n: lies(ist_ordner, n) for n in os.listdir(ist_ordner) if n != 'cpm-dateiangaben.txt'}
+            ist = {n: lies(ist_ordner, n) for n in os.listdir(ist_ordner) if n not in self.ignoriere}
             boot_ok = True
             if self.boot:
                 bf = os.path.join(tmp, 'boot.bin')

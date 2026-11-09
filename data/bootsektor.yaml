@@ -27,9 +27,10 @@
 # (etwa `@OS.COM`, `OS`) kommen danach mit „Dateien einfügen" dazu.
 # Wächter dieser Datei: tests/python/test_disktool_bootsektoren.py.
 #
-# NICHT aufgenommen (2026-10-28): UDOS1715 (PC 1715) und UDOS 3.x (P8000) — dort ist der
-# Weg „leere Diskette + Systemspuren + Dateien" nicht am Emulator geprüft.  UDOS 5.0 ist
-# geprüft (tests/python/test_disktool_bootsektoren.py bootet eine so gebaute Diskette).
+# NICHT aufgenommen: UDOS1715 (PC 1715) — dort ist der Weg „leere Diskette + Systemspuren + Dateien"
+# nicht am Emulator geprüft.  UDOS 5.0 ist geprüft (tests/python/test_disktool_bootsektoren.py
+# bootet eine so gebaute Diskette), UDOS 3.0/3.1 (P8000) seit 2026-11-09 ebenfalls
+# (tools/udos_p8000/build.py, Wächter cli_udos_p8000, bt_p8000_udos31).
 
 version: 1
 
@@ -58,6 +59,18 @@ bootsektoren:
   - description: "UDOS 5.0 — A5120 (BIZ FmSZBw Schwerin 1997)"
     filesystem:  udos50_ds80_16x256
     file:        bootsektoren/boot_udos50.bin
+
+  # UDOS 3.0/3.1 am P8000: 22 Sektoren (5632 Byte) = das, was FORMAT ... S von der Systemdiskette kopiert -
+  # Urlader (Spur 0 Sektor 0), OSLOAD (Spur 16H Sektor 07-09) und der Dateizugriffscode des Monitors
+  # (Spur 16H Sektor 12-15, Spur 17H Sektor 02-15).  Danach OS, NDOS, OS.INIT u. a. einspielen
+  # (am einfachsten den ganzen Inhalt von disks/p8000_udos31/).
+  - description: "UDOS 3.1 — P8000 (8-Bit-Teil, Systemdiskette 29.05.1989)"
+    filesystem:  udos_p8000_ds80_16x256
+    file:        bootsektoren/boot_p8000_udos31.bin
+
+  - description: "UDOS 3.0 — P8000 (8-Bit-Teil)"
+    filesystem:  udos_p8000_ds80_16x256
+    file:        bootsektoren/boot_p8000_udos30.bin
 
   # ── BCU 880 am frühen A5120 (Lade-ROM V0.6) ────────────────────────────────
   - description: "BCU 880 V1.2 Startdiskette „SYL auf Spur 1“ — Bildschirm K7023"

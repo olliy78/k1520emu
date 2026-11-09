@@ -1,0 +1,9 @@
+# Die vom DiskTool gebaute UDOS-3.1-Systemdiskette (tools/udos_p8000/build.py, Ticket #30) bootet am P8000 (8-Bit-Teil):
+# MON8 -> Return -> Return = BOOT -> UDOS bis zum Prompt '%'.  Haengt an den Systemspuren der Diskette
+# (Urlader, OSLOAD Spur 16H Sektor 07-09) - ohne sie bleibt der Monitor am '>'.
+tool:    boot_trace
+disk:    udosP8000_640k_udos31_system.hfe
+run:     --machine p8000 --quiet --json --keys '<CR><CR>' --until 'screen ~ "%"' -c 300000000 %DISK%
+timeout: 180
+exit:    0
+expect:  "met":true

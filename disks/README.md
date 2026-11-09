@@ -32,6 +32,21 @@ Erklärung der Segmente in `tests/fixtures/README.md`.
 `prg710-1_bs620/prg710-1_bs620_system.hfe` = Original BS620 (PRG 710-1, am echten Gerät getestet; im Paket). `prg710_bs610_rekonstruktion/` ist ein
 Eigenbau für das PRG 710, **experimentell** (im Emulator geprüft, am echten Gerät ungetestet; im Paket). Die Gerätetest-Paare (low/high) baut `tools/bs600/bau_disketten.py --geraetetest <Ordner>`.
 
+## UDOS 3.0 / 3.1 am P8000 (`p8000_udos30/`, `p8000_udos31/`)
+
+Gebaut mit `tools/udos_p8000/build.py` aus den vier Abzügen der pofo.de-Sammlung (`tools/udos_p8000/original/`; Wächter `cli_udos_p8000`).
+Datei für Datei gleich dem Abzug, mit den Systemspuren, die `FORMAT … S` schreibt (Bootabbild `data/bootsektoren/boot_p8000_udos3{0,1}.bin`).
+Im Paket.  **8-Bit-Teil des P8000** (U880); Start: Return, Return (= BOOT).
+
+| Datei | Inhalt |
+|-------|--------|
+| `p8000_udos31_system.hfe` | UDOS 3.1 (29.05.1989) Systemdiskette: Systemkommandos, EDIT, Assembler/Binder (U880, U881/U882, U8000), `FORMAT`, `UPROG` (**EPROM-Programmierer** des P8000), EPROM-Inhalte `MON8_*`, `P8T*`, `EIGENTEST` |
+| `p8000_udos31_sprachen.hfe` | UDOS 3.1 Programmiersprachen: PLZ, BASIC, FORTRAN, PASCAL |
+| `p8000_udos30_system.hfe` | UDOS 3.0 Systemdiskette (zusätzlich `MON16_*` und `WDC_*` EPROM-Inhalte, `GETDAY`/`SAVEDAY`) |
+| `p8000_udos30_sprachen.hfe` | UDOS 3.0 Programmiersprachen |
+
+Die Versionsnummer ist **3.0/3.1**, nicht 2.2 (die README nennt 2.2 nur als Schnittstellenkompatibilität).  Zum Arbeiten eine Kopie benutzen (der Emulator öffnet r/w).
+
 ## SIOS 1526 (`a5120_sios1526/`)
 
 Gebaut mit `tools/sios_a5120/build.py` aus den Originalen in `tools/sios_a5120/original/` (Wächter `cli_sios_a5120`, Bedienung

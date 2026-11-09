@@ -1198,6 +1198,51 @@ TEST(Udos1715P8000, ZweiterBootteilGehoertZumBootabbild) {
     EXPECT_FALSE(Udos1715FileSystem::zweiterBootteil(*pc, erster, anzahl)) << "PC 1715 hat keinen";
 }
 
+// P8000-Systemdiskette: `FORMAT D=1 ID='..' S` am Emulator belegt 47 Sektoren (Ticket #30):
+// Spur 0 nur Sektor 0, Spur 15H Kopf 0 ganz, Spur 16H 0-2/5-15 (E7FF), Spur 17H Kopf 0 ganz.
+TEST(Udos1715P8000, FrischeSystemdisketteBelegtSiebenundvierzigSektoren) {
+    const FsProfile* basis = dateisysteme().find("udos_p8000_ds80_16x256");
+    ASSERT_NE(basis, nullptr);
+    FsProfile sys = *basis;
+    sys.system_track0 = true;
+    const DiskFormat* f = formate().find(sys.format);
+    ASSERT_NE(f, nullptr);
+    const std::string pfad = k1520test::tempPath("k1520_test_p8000_sys.img");
+    {
+        auto leer = DiskImage::create(pfad, *f, false, f->predominantEncoding());
+        ASSERT_TRUE(leer && leer->flush());
+    }
+    auto disk = DiskImage::open(pfad, *f, false);
+    ASSERT_TRUE(disk);
+    SectorSpace raum(disk->medium(), *f);
+    std::string err;
+    auto fs = Udos1715FileSystem::format(raum, sys, "SYS", err);
+    ASSERT_TRUE(fs) << err;
+    const UdosBitmap& b = fs->bitmap();
+    EXPECT_EQ(b.countUsed(), 47);
+    EXPECT_EQ(b.countFree(), 2513);
+    EXPECT_TRUE(b.used(0, 1));
+    for (uint8_t s = 1; s < 32; ++s) EXPECT_FALSE(b.used(0, s + 1)) << "Spur 0 Sektor " << int(s);
+    for (uint8_t s = 0; s < 16; ++s) {
+        EXPECT_TRUE(b.used(21, s + 1)) << "Spur 21 Sektor " << int(s);
+        EXPECT_TRUE(b.used(23, s + 1)) << "Spur 23 Sektor " << int(s);
+        EXPECT_EQ(b.used(22, s + 1), s != 3 && s != 4) << "Spur 22 Sektor " << int(s);
+    }
+    for (uint8_t s = 16; s < 32; ++s) EXPECT_FALSE(b.used(21, s + 1));
+    std::error_code ec; std::filesystem::remove(pfad, ec);
+}
+
+TEST(Udos1715P8000, BootbereichEntsprichtDemFormatS) {
+    const FsProfile* p = dateisysteme().find("udos_p8000_ds80_16x256");
+    ASSERT_NE(p, nullptr);
+    const auto b = Udos1715FileSystem::bootbereiche(*p);
+    ASSERT_EQ(b.size(), 4u);
+    int summe = 0;
+    for (const auto& x : b) summe += x.anzahl;
+    EXPECT_EQ(summe, 22) << "22 Sektoren = 5632 Byte Bootabbild";
+    EXPECT_TRUE(Udos1715FileSystem::bootbereiche(*dateisysteme().find("udos1715_ds80_16x256")).empty());
+}
+
 // FORMAT V 5.0 fuellt das 24-Byte-Namensfeld hinter dem 0D-Abschluss mit FFH (am Emulator
 // gemessen, Ticket #29); eine so formatierte Diskette muss erkannt werden.
 TEST(Udos1715A5120, NamensfeldMitFFFuellungIstKeineBeschaedigung) {

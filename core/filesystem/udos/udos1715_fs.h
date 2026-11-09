@@ -162,6 +162,21 @@ public:
      */
     static bool zweiterBootteil(const FsProfile& prof, uint8_t& erster, uint8_t& anzahl);
 
+    /// @brief Ein Stueck der Systemspuren: `anzahl` Sektoren ab Sektorindex `erster` (Kopf 0) der Spur `spur`.
+    struct Bootbereich { uint8_t spur; uint8_t erster; uint8_t anzahl; };
+
+    /**
+     * @brief Die Stuecke, aus denen das Bootabbild einer UDOS-Systemdiskette besteht, in Abbildreihenfolge.
+     *
+     * - **UDOS 5.0 (A5120):** Spur 0 Kopf 0 (Urlader + BFOS, 16 Sektoren) + Spur 16H Sektor 07-09 (zweiter Bootteil).
+     * - **UDOS 3.x (P8000):** am Emulator mit `FORMAT D=1 ID='..' S` gemessen (Ticket #30) - FORMAT kopiert von der
+     *   Systemdiskette Spur 0 Sektor 0 (Urlader, `P8000SYS`), Spur 16H Sektor 07-09 (`OSLOAD`), Spur 16H Sektor 12-15
+     *   und Spur 17H Sektor 02-15 (zusammen 4,5 KB Dateizugriffscode des Monitors fuer `GET`/`SAVE`).  Spur 15H Kopf 0
+     *   bleibt unbeschrieben und wird nur im Belegungsplan gesperrt (Auslagerungsbereich).  Zusammen 47 belegte Sektoren.
+     * - **PC 1715 und alle anderen:** leer (dort gilt der Weg ueber ganze Spuren).
+     */
+    static std::vector<Bootbereich> bootbereiche(const FsProfile& prof);
+
     /// @brief Bootbereich im Belegungsplan sperren (UDOS 5.0: Spur 0 Kopf 0 + Spur 16H
     ///        Sektor 07-09; sonst ganze Spur 0).  `speichern` schreibt die Karte sofort (nachtraegliches Einspielen eines Bootabbilds).
     bool sperreBootbereich(bool speichern = false);

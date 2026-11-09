@@ -252,6 +252,14 @@ add_test(NAME cli_osm_p8000
 set_tests_properties(cli_osm_p8000 PROPERTIES
     TIMEOUT 180 LABELS "cli;fast")
 
+# Waechter „die UDOS-3.0/3.1-Disketten des P8000 in disks/ sind der Inhalt von tools/udos_p8000/“ (Ticket #30).
+# Neu bauen: python3 tools/udos_p8000/build.py --tool build/k1520disktool
+add_test(NAME cli_udos_p8000
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/udos_p8000/build.py"
+            --check --tool "$<TARGET_FILE:k1520disktool>" ${_beigaben_emulator})
+set_tests_properties(cli_udos_p8000 PROPERTIES
+    TIMEOUT 180 LABELS "cli;fast")
+
 # Waechter „die kommentierten Boot-ROM-Listings des PRG 710/710-1 sind die Ausgabe des
 # Generators" (AP-P0d, doc/design/20_prg710.md): tools/gen_prg710_zre_prn.py --check
 # erzeugt beide Listings im Speicher, prueft MD5 der ROM-Abzuege, dass JEDES der 1024 Byte
