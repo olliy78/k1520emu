@@ -648,7 +648,7 @@ case "$DISKS" in
         done
         # P8000 (2026-10-11, Entscheid des Anwenders): die WEGA-Saetze GANZ — fertig installierte
         # Platten (*.img.gz, bleiben beim Anwender gepackt, der Emulator schliesst sie so an),
-        # Startdisketten und der Installationssatz (*.dmk), dazu die OS/M-Systemdiskette (*.hfe, p8000_osm30).
+        # Startdisketten und der Installationssatz (*.dmk), dazu die OS/M- und UDOS-Disketten (*.hfe, p8000_osm30, p8000_udos30/31).
         for d in $(find "$REPO/disks" -mindepth 2 -maxdepth 2 -type f -path '*/p8000_*' \
                         \( -name '*.dmk' -o -name '*.img.gz' -o -name '*.hfe' \) | sort); do
             lege_diskette_ab "$d"

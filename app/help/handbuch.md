@@ -2698,8 +2698,20 @@ Wichtige UDOS-Kommandos (Namen aus der Einführung in die Software; die Syntax i
 
 Namen von Dateien in anderen Laufwerken: `ud(0,0)name` ist die Datei `name` auf UDOS-Laufwerk 0 (A:).
 **Eine leere Diskette formatieren:** *Leere Diskette* im Laufwerkskasten legt ein unformatiertes Medium
-ein, das UDOS mit `FORMAT` formatieren muss. `FORMAT` steht nicht auf der WEGA-Startdiskette; ob und wie
-es sich am P8000 mit der UDOS-3.x-Diskette bedienen lässt, ist *nicht geprüft*.
+ein, das UDOS mit `FORMAT` formatieren muss. `FORMAT` steht nicht auf der WEGA-Startdiskette, wohl aber auf den
+UDOS-Systemdisketten (nächster Abschnitt).
+
+#### Die vollständigen UDOS-Disketten 3.0 und 3.1
+
+Im Paket liegen (Ordner `p8000_udos30/`, `p8000_udos31/`) die UDOS-Systemdisketten mit allen Dienstprogrammen und die
+Programmiersprachen-Disketten (PLZ, BASIC, FORTRAN, PASCAL). Die **Systemdiskette** in A: einlegen und wie oben starten.
+Auf ihr stehen unter anderem `FORMAT`, `EDIT`, die Assembler und Binder (U880, U881/U882, U8000), `FILE.DEBUG`, `UPROG`
+(Programm für den **EPROM-Programmierer** des P8000, Typ 1 und Typ 2) und die EPROM-Inhalte (`MON8_*`, `P8T*`; in 3.0 auch `MON16_*`, `WDC_*`).
+
+**Eine Diskette formatieren** (zweite Diskette in B:, Laufwerk 1): `FORMAT D=1 ID='NAME' Q=N` für eine Datendiskette,
+mit `S` zusätzlich als **Systemdiskette** (`FORMAT D=1 ID='NAME' S Q=N`; auf die Frage `SYSTEM DISK IN DRIVE:` die Nummer des
+Laufwerks mit der Systemdiskette, also `0`). Großbuchstaben tippen. Eine Datendiskette belegt danach 9 Sektoren, eine
+Systemdiskette 47 (Urlader, zweiter Bootteil und der Dateizugriffscode des Monitors für `GET`/`SAVE`).
 
 ### WEGA: die Platte vorbereiten und installieren
 
