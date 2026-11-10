@@ -132,6 +132,8 @@ k1520_add_test(gide  SRC cards/test_gide.cpp       LIBS k1520_gide k1520_z80 LAB
 k1520_add_test(gide_rtc SRC cards/test_gide_rtc.cpp LIBS k1520_gide k1520_z80 LABELS "${_lbl}")
 # GUN-USB (Z80-PIO + VDIP1) mit echtem Z80 (Entwurf 50 AP U2)
 k1520_add_test(gun_usb SRC cards/test_gun_usb.cpp LIBS k1520_gun_usb k1520_z80 LABELS "${_lbl}")
+# KCNet-Netzkarte (Z80-PIO + ATmega-Modell + W5100) mit echtem Z80 (Entwurf 50 AP N2, Protokoll 50a)
+k1520_add_test(gun_net SRC cards/test_gun_net.cpp LIBS k1520_gun_net k1520_z80 LABELS "${_lbl}")
 
 # ── core/peripherals/ ────────────────────────────────────────────────────────
 # MC80.3x-Tastatur auf Zeichenebene (AP M3, doc/mc80/egos.md §3)

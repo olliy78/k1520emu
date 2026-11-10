@@ -97,6 +97,7 @@ void Mc80_2xMachine::powerOn()
     rafPowerOn();
     gidePowerOn();
     gunUsbPowerOn();
+    gunNetPowerOn();
     total_cycles_ = 0;
     {
         std::lock_guard<std::mutex> l(tasten_mtx_);
@@ -123,6 +124,7 @@ void Mc80_2xMachine::resetHardware()
     k5020Reset();
     gideReset();             // GIDE (gesteckt?): LH, Platte; Medium bleibt
     gunUsbReset();           // GUN-USB (gesteckt?): PIO, VDIP1; Stick bleibt
+    gunNetReset();           // KCNet (gesteckt?): PIO, Automat, W5100
     rafReset();
     bus_.clearNMI();
     bus_.releaseINT();
@@ -155,6 +157,7 @@ int Mc80_2xMachine::run(int max_cycles)
         dirty |= k6022Takt(used);
         dirty |= k5020Takt(used);
         gideTakt(total_cycles_);   // GIDE (gesteckt?): Platte und RTC in Maschinenzeit
+        gunNetTakt(total_cycles_);   // KCNet (gesteckt?): Kommando 03 in Maschinenzeit
         if (dirty) bus_.markIntDirty();
     }
     mbi_.autoFlush();

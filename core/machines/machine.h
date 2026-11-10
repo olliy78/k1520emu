@@ -17,6 +17,7 @@
 #include "core/bus/k1520_bus.h"
 #include "core/cards/gide/gide.h"
 #include "core/cards/gun_usb/gun_usb.h"
+#include "core/cards/gun_net/gun_net.h"
 #include "core/cards/k5020/k5020.h"
 #include "core/cards/k6022/k6022.h"
 #include "core/cards/raf/raf.h"
@@ -429,6 +430,53 @@ public:
     /** @brief Grund des letzten gescheiterten @ref installGunUsb ("" = keiner). */
     const std::string& gunUsbFehler() const { return gun_usb_fehler_; }
 
+    // ─── KCNet (GUN-Netz): Z80-PIO + ATmega-Modell + W5100 (doc/design/50_gun_gide.md AP N2, Protokoll 50a) ─────
+    // Wie GunUsb: nach dem Anlegen, VOR dem ersten run()/reset(); vier Tore ab cfg.basis (GUN 88H, Netzkarte C0H/28H;
+    // frei in 4er-Schritten).  Kommando 03 zaehlt in Maschinenzeit (@ref gunNetTakt).  Nicht im Save-State.
+    /**
+     * @brief Steckt die KCNet-Karte.  cfg.takt_hz == 0: der Takt der Maschine (@ref k6022TaktHz).
+     * @return false (Grund in @ref gunNetFehler) nach dem ersten run()/reset(), bei doppeltem Stecken,
+     *         ungueltiger Basis oder belegtem Tor (RAF 88H/89H, ZRE-Tore usw.).
+     */
+    bool installGunNet(const k1520::GunNet::Config& cfg) {
+        gun_net_fehler_.clear();
+        if (!zusatzkartenSteckbar()) {
+            gun_net_fehler_ = "Diese Maschine hat keinen K1520-Steckplatz fuer eine KCNet-Karte";
+            return false;
+        }
+        if (!bestueckbar_) {
+            gun_net_fehler_ = "KCNet nur vor dem ersten Lauf/Reset steckbar";
+            return false;
+        }
+        if (gun_net_) {
+            gun_net_fehler_ = "Es steckt bereits eine KCNet-Karte";
+            return false;
+        }
+        std::unique_ptr<k1520::GunNet> karte;
+        try {
+            karte = std::make_unique<k1520::GunNet>(cfg);   // wirft bei ungueltiger Basis
+        } catch (const std::exception& e) {
+            gun_net_fehler_ = e.what();
+            return false;
+        }
+        K1520Bus& bus = systemBus();
+        if (const std::string g = karte->belegtGrund(bus); !g.empty()) {   // erst pruefen, dann anmelden
+            gun_net_fehler_ = g;
+            return false;
+        }
+        karte->setzeTaktHz(cfg.takt_hz ? cfg.takt_hz : k6022TaktHz());
+        karte->attachToBus(bus);
+        karte->powerOn();
+        gun_net_ = std::move(karte);
+        gunNetEinketten(*gun_net_);
+        return true;
+    }
+    /** @brief Die gesteckte KCNet-Karte (nullptr = keine). */
+    k1520::GunNet*       gunNet()       { return gun_net_.get(); }
+    const k1520::GunNet* gunNet() const { return gun_net_.get(); }
+    /** @brief Grund des letzten gescheiterten @ref installGunNet ("" = keiner). */
+    const std::string& gunNetFehler() const { return gun_net_fehler_; }
+
 protected:
     /** @brief Der Systembus, auf dem Zusatzkarten (RAF) ihre E/A-Tore anmelden. */
     virtual K1520Bus& systemBus() = 0;
@@ -491,6 +539,15 @@ protected:
     /** @brief Netz-Ein: Zaehler leer. */
     void gunUsbPowerOn() { if (gun_usb_) gun_usb_->powerOn(); }
 
+    /** @brief Die PIO der frisch gesteckten KCNet-Karte hinten an die Interruptkette (PRG 710 baut neu). */
+    virtual void gunNetEinketten(k1520::GunNet& k) { systemBus().appendInterruptChain(&k.pio()); }
+    /** @brief Systemweiter /RESET: PIO und Automat zurueck, W5100 zurueckgesetzt. */
+    void gunNetReset() { if (gun_net_) gun_net_->reset(); }
+    /** @brief Netz-Ein: Zaehler leer. */
+    void gunNetPowerOn() { if (gun_net_) gun_net_->powerOn(); }
+    /** @brief Laufweg, je Befehl: absolute Maschinentakte (Kommando 03 in Maschinenzeit). */
+    void gunNetTakt(uint64_t takte) { if (gun_net_) gun_net_->takt(takte); }
+
     /// Erst NACH Bus und Karten der abgeleiteten Klasse zerstoert — unschaedlich, die
     /// RAF fasst den Bus in ihrem Destruktor nicht an.
     std::unique_ptr<RAF> raf_;
@@ -503,6 +560,8 @@ protected:
     std::unique_ptr<k1520::Gide> gide_;
     /// Wie gide_ (die GUN-USB fasst den Bus im Destruktor nicht an).
     std::unique_ptr<k1520::GunUsb> gun_usb_;
+    /// Wie gun_usb_ (zuletzt zerstoert: der Destruktor stoppt den Arbeitsfaden des W5100).
+    std::unique_ptr<k1520::GunNet> gun_net_;
 
 private:
     bool        bestueckbar_ = true;
@@ -511,4 +570,5 @@ private:
     std::string k5020_fehler_;
     std::string gide_fehler_;
     std::string gun_usb_fehler_;
+    std::string gun_net_fehler_;
 };

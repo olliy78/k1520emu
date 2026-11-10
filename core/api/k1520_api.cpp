@@ -1825,6 +1825,70 @@ bool k1520_usb_status(K1520Handle h, int* basis, int* stick_vorhanden, uint64_t*
     return true;
 }
 
+// ─── KCNet-Netzkarte (doc/design/50_gun_gide.md, AP N2) ────────────────────────
+namespace {
+using k1520::GunNet;
+std::string net_fehler;
+bool netErgebnis(bool ok, const std::string& grund) {
+    net_fehler = ok ? std::string() : grund;
+    return ok;
+}
+GunNet* netOf(K1520Handle h) { return h ? toMachine(h)->gunNet() : nullptr; }
+GunNet* netOderFehler(K1520Handle h) {
+    GunNet* g = netOf(h);
+    if (!g) net_fehler = "keine KCNet-Karte gesteckt";
+    return g;
+}
+}  // namespace
+
+bool k1520_net_install(K1520Handle h, int basis, bool nur_loopback, bool link_online, const char* dns) {
+    if (!h) return netErgebnis(false, "kein Handle");
+    if (basis < 0 || basis > 0xFF) return netErgebnis(false, "KCNet: Basis ausserhalb 00H..FFH");
+    GunNet::Config c;
+    c.basis = static_cast<uint8_t>(basis);
+    c.richtlinie.aussenErlaubt = !nur_loopback;
+    c.link_online = link_online;
+    if (dns && *dns) {
+        unsigned a, b, cc, d;
+        char rest;
+        if (std::sscanf(dns, "%u.%u.%u.%u%c", &a, &b, &cc, &d, &rest) != 4 || a > 255 || b > 255 || cc > 255 || d > 255)
+            return netErgebnis(false, "KCNet: DNS-Adresse ungueltig (a.b.c.d)");
+        c.dns_server[0] = uint8_t(a); c.dns_server[1] = uint8_t(b); c.dns_server[2] = uint8_t(cc); c.dns_server[3] = uint8_t(d);
+    }
+    K1520Machine* m = toMachine(h);
+    if (!m->installGunNet(c)) return netErgebnis(false, m->gunNetFehler());
+    return netErgebnis(true, {});
+}
+
+bool k1520_net_installed(K1520Handle h) { return netOf(h) != nullptr; }
+
+const char* k1520_net_error(K1520Handle) { return net_fehler.c_str(); }
+
+bool k1520_net_set_link(K1520Handle h, bool online) {
+    GunNet* g = netOderFehler(h);
+    if (!g) return false;
+    g->setzeLink(online);
+    return netErgebnis(true, {});
+}
+
+bool k1520_net_status(K1520Handle h, int* basis, uint64_t* zaehler) {
+    const GunNet* g = netOderFehler(h);
+    if (!g) return false;
+    if (basis) *basis = g->config().basis;
+    if (zaehler) {
+        const GunNet::Zaehler& z = g->zaehler();
+        zaehler[0] = z.kommandos; zaehler[1] = z.fehlerkommandos;
+        zaehler[2] = z.bytes_zur_karte; zaehler[3] = z.bytes_zum_gast;
+    }
+    return true;
+}
+
+int k1520_net_w5100_read(K1520Handle h, int adr) {
+    GunNet* g = netOf(h);
+    if (!g || adr < 0) return -1;
+    return g->w5100().lese(static_cast<uint16_t>(adr & 0x7FFF));
+}
+
 // ─── RAM-Floppy RAF (doc/design/22_raf512.md §6) ───────────────────────────────
 bool k1520_raf_install(K1520Handle h, const char* typ) {
     if (!h) return false;

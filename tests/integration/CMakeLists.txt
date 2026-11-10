@@ -478,3 +478,14 @@ k1520_add_test(mc80_spiele SRC test_mc80_spiele.cpp
 k1520_add_test(kermit_netz SRC test_kermit_netz.cpp
                            LIBS k1520kermit_core k1520_serial
                            LABELS "${_lbl}" TIMEOUT 180)
+
+# KCNet (Entwurf 50 AP N2): stecken je Maschine, doppelt, zu spaet, Tore belegt (RAF 88H/89H, ZRE-Tore)
+k1520_add_test(gun_net_maschinen SRC test_gun_net_maschinen.cpp
+                                 LIBS k1520_a5120 k1520_k8915 k1520_prg710 k1520_pc1715 k1520_mc80 k1520_gun_net k1520_logger k1520_testsupport
+                                 LABELS "${_lbl}" DEFS LOG_LEVEL=2)
+
+# KCNet, AP N2: die ECHTEN Gastprogramme TFTP1287/CPMN1587 (Basis C0H) gegen die Karte; die Software liegt nur lokal
+# (~/Documents/K1520emu/GIDE_Software/kcnet/sw, K1520_GIDE_SW), fehlt sie, werden die Faelle uebersprungen.
+k1520_add_test(gun_net_system SRC test_gun_net_system.cpp
+                              LIBS k1520_a5120 k1520_gun_net k1520_floppy k1520_fs k1520_logger k1520_testsupport
+                              LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 180)

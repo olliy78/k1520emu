@@ -127,3 +127,17 @@ Beleg der Registerbelegung (W5100-Datenblatt):
 - Fehlt nur: (a) die elektrische Handshake-Hülle (PB0/PB7 als direkt synchrone Folge von PIO-Betriebsart 2; im Emulator als Zustandsbits des Kartenmodells gleichwertig, Anforderung: PB0 = 1 sofort nach `OUT`, PB7 sofort nach `IN` = 0), (b) Werte der Identitätsdaten (Version >= 1.2, Hardware-Version, Link = online, DNS-Server), (c) ein plausibles Verhalten für Zeitgeber/Ephemeralport.
 - Modell: W5100-Registermodell aus N1 (`core/…/w5100`) hinter einem Byte-Zustandsautomaten für die Kommandos 00–0D; Bit 15 der Adresse maskieren; Tx/Rx-Puffer 2 KB × 4 Sockets wie der Gast sie benutzt.
 - Nicht zu klären ohne Hardware: Feinheiten aus Abschnitt 7, Nr. 1–5; für die Gastprogramme folgenlos, solange PB0/PB7-Semantik und Kommandoumfang stimmen.
+
+## 9. Bestaetigung und Korrekturen durch das Verhaltensmodell (AP N2, 2026-11-10)
+
+`core/cards/gun_net/` bedient `TFTP1287.COM` und `CPMN1587.COM` **unveraendert** (Basis C0H; Tests `GunNetSystem.*`).  Gegen den Befund oben:
+- **Bestaetigt:** Handshake wie Abschnitt 3 (PB0 nach `OUT` = 1 bis zur naechsten Abfrage, PB7 nach `IN` = 0), Erkennung ueber PB7 = 0 nach dem Dummy-Lesen, 14 Kommandos
+  mit den Parameterlaengen der Tabelle, Antworten **Lo, Hi** (auch 08 und 0D), Bit 15 maskiert (Tx `C000H` -> `4000H`, Rx `E000H` -> `6000H`), 2-KB-Puffer je Socket (RMSR = TMSR = 55H) mit
+  Zeigerverwaltung im Gast.  Der Zeiger aus Kommando 02 zaehlt im Block weiter; ob ueber Kommandos hinweg, braucht der Gast nicht (Modell: ja).
+- **Bildschirm CPMNET `I`:** `Software 1.2      Hardware 1.0   online` (Kommandos 09/0A/0B), `0` -> `COMMAND ERRORS = 0`.  TFTP ohne IP: `network not configured !`;
+  Kabel ab (0B = 0) **und** IP gesetzt: `network-cable not connected !` (die IP-Pruefung kommt zuerst).
+- **Neu:** Der Gast zeigt `MAC-Address` aus SHAR — die Firmware muss die MAC nach dem Einschalten setzen (Modell: `02:4B:43:4E:45:54`, `Config::mac`), sonst `00:00:..`.
+  "Network: configured" erscheint erst mit IP **und** Netzmaske (nur IP gesetzt, Maske 0: `not configured`).  TFTP sendet den Modus **`OCTET`** (Grossbuchstaben), antwortet DATA-Bloecke aus fremder TID (UDP-Socket nimmt
+  jeden Absender an) und laedt damit eine Datei bitgleich.  CPMNET `S` (TCP-Server) benutzt Socket 3 und schliesst bei lokalem Port 0 sofort (`TCP SOCKET CLOSED`).
+- **Modellentscheidung (nicht belegt):** Betriebsartwort an Steuer A wirft Rest-Kommandos/Antworten weg (Abschnitt 7 Nr. 5); /RESET setzt den W5100 per MR-Reset zurueck.
+- **Weiter offen:** Nr. 1 (genaue Zeitlage PB0/PB7), 4 (06/0C), 6 (Zeitbasis 03/08 ausser Maschinenzeit), 7, 8, 9.

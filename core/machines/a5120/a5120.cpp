@@ -374,6 +374,7 @@ void A5120Machine::resetHardware() {
     k5020Reset();             // K5020 (gesteckt?): PIOs zurueck, Baender bleiben liegen
     gideReset();             // GIDE (gesteckt?): LH, Platte; Medium bleibt
     gunUsbReset();           // GUN-USB (gesteckt?): PIO, VDIP1; Stick bleibt
+    gunNetReset();           // KCNet (gesteckt?): PIO, Automat, W5100
     bus_.clearNMI();
     bus_.releaseINT();
     bus_.releaseWAIT();
@@ -406,6 +407,7 @@ void A5120Machine::powerOn() {
     rafPowerOn();       // RAF ohne Stand-by-Pufferung: Inhalt weg (Entwurf 22 §3.4)
     gidePowerOn();
     gunUsbPowerOn();
+    gunNetPowerOn();
     resetHardware();
     LOG_INFO("A5120", "Power on: ZVE1 Reset, Lade-ROM aktiv");
 
@@ -1030,6 +1032,7 @@ int A5120Machine::run(int max_cycles) {
         ctc_fired      = k6022Takt(used) || ctc_fired;   // Lochstreifen (gesteckt?)
         ctc_fired      = k5020Takt(used) || ctc_fired;   // Kassette (gesteckt?)
         gideTakt(total_cycles_);   // GIDE (gesteckt?): Platte und RTC in Maschinenzeit
+        gunNetTakt(total_cycles_);   // KCNet (gesteckt?): Kommando 03 in Maschinenzeit
         if (ctc_fired) bus_.markIntDirty();
 
         // Service the keyboard: advance the 9600-baud serial-transmit timing

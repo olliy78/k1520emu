@@ -30,6 +30,8 @@ struct K8915TraceOpts {
     bool        usb = false;     ///< --usb[=basis]: GUN-USB stecken
     int         usb_basis = -1;  ///< -1 = Vorgabe 84H
     std::string usb_dir;         ///< --usb-dir: Wirtsverzeichnis des Sticks
+    bool        net = false;     ///< --net[=basis]: KCNet-Netzkarte stecken
+    int         net_basis = -1;  ///< -1 = Vorgabe 88H
     std::string disk;            ///< Diskettenpfad (leer = keine)
     std::string mount_path;      ///< tatsaechlich zu mountender Pfad (COW-Kopie o. ae.)
     bool        write_protect = false;

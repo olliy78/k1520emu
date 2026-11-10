@@ -199,6 +199,7 @@ protected:
     void      k6022Einketten(K6022&) override { interruptKetteSetzen(); }
     void      k5020Einketten(K5020&) override { interruptKetteSetzen(); }
     void      gunUsbEinketten(k1520::GunUsb&) override { interruptKetteSetzen(); }
+    void      gunNetEinketten(k1520::GunNet&) override { interruptKetteSetzen(); }
 
 private:
     void resetHardware();

@@ -1,0 +1,8 @@
+# Ohne --net: der Befehl `net` meldet das, statt zu stuerzen.
+tool:    k1520dbg
+disk:    cpa_cpa780_k5601_clock.img
+run:     %DISK%
+stdin:
+  net
+  q
+expect:  keine KCNet-Karte gesteckt

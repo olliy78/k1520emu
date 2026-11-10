@@ -109,6 +109,7 @@ void K8915Machine::resetHardware()
     k5020Reset();             // K5020 (gesteckt?): PIOs zurueck, Baender bleiben liegen
     gideReset();             // GIDE (gesteckt?): LH, Platte; Medium bleibt
     gunUsbReset();           // GUN-USB (gesteckt?): PIO, VDIP1; Stick bleibt
+    gunNetReset();           // KCNet (gesteckt?): PIO, Automat, W5100
     hub_.gastZurueckgesetzt();   // XOFF-/RTS-Halt des alten Gastes gilt nicht weiter
     serial_naechst_ = 0;
     bus_.clearNMI();
@@ -132,6 +133,7 @@ void K8915Machine::powerOn()
     rafPowerOn();            // RAF ohne Stand-by-Pufferung: Inhalt weg (Entwurf 22 §3.4)
     gidePowerOn();
     gunUsbPowerOn();
+    gunNetPowerOn();
     resetHardware();
     anzeigenSpiegeln();
     LOG_INFO("K8915", "Netz ein (%s): A8H=00H, Boot-ROM bei 0000H",
@@ -227,6 +229,7 @@ int K8915Machine::run(int max_cycles)
         dirty |= k6022Takt(used);   // Lochstreifen (gesteckt?)
         dirty |= k5020Takt(used);   // Kassette (gesteckt?)
         gideTakt(total_cycles_);   // GIDE (gesteckt?): Platte und RTC in Maschinenzeit
+        gunNetTakt(total_cycles_);   // KCNet (gesteckt?): Kommando 03 in Maschinenzeit
         // Schnittstellen nach aussen (Entwurf 19 §6): der Wandler arbeitet nur alle
         // 1/16 Zeichenzeit — dazwischen kostet es nur diesen Vergleich.
         if (total_cycles_ >= serial_naechst_) {

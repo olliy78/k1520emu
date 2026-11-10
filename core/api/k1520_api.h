@@ -1166,6 +1166,26 @@ K1520_API bool        k1520_usb_stick_remove(K1520Handle h);
  *  Jeder Zeiger darf NULL sein.  false ohne Karte. */
 K1520_API bool        k1520_usb_status(K1520Handle h, int* basis, int* stick_vorhanden, uint64_t* zaehler);
 
+/* ─── KCNet-Netzkarte: Z80-PIO + ATmega-Modell + W5100 (doc/design/50_gun_gide.md AP N2, Protokoll 50a) ───
+ * Bestueckung nach dem Anlegen, VOR dem ersten k1520_run/k1520_reset; alle Maschinen mit K1520-Bus
+ * (nicht P8000).  Vier Tore ab basis (GUN: 88H, K1520-Netzkarte C0H oder 28H; 88H/89H gehoeren der RAF).
+ * Die Karte benutzt das Netz des WIRTS; ein Filter ist nur mit nur_loopback gesetzt.  Ohne Karte: false / -1. */
+
+/** @brief Steckt die Netzkarte.  @p basis = erstes Tor (Vielfaches von 4), @p nur_loopback = ausgehende Ziele nur
+ *  127.x.x.x (sonst frei), @p link_online = Kommando 0B meldet "Kabel steckt", @p dns = Text "a.b.c.d" des DNS-Servers
+ *  (NULL oder "" = 0.0.0.0).  Fehler (zu spaet, doppelt, Tor belegt, ungueltig): false, Grund in k1520_net_error. */
+K1520_API bool        k1520_net_install(K1520Handle h, int basis, bool nur_loopback, bool link_online, const char* dns);
+K1520_API bool        k1520_net_installed(K1520Handle h);
+/** @brief Grund des letzten gescheiterten k1520_net_*-Aufrufs. */
+K1520_API const char* k1520_net_error(K1520Handle h);
+/** @brief Kabelzustand (Kommando 0B) zur Laufzeit; false ohne Karte. */
+K1520_API bool        k1520_net_set_link(K1520Handle h, bool online);
+/** @brief Zustand ohne Nebenwirkung.  @p zaehler = 4 Werte: Kommandos, ungueltige Kommandos, Bytes Gast -> Karte,
+ *  Bytes Karte -> Gast.  Jeder Zeiger darf NULL sein.  false ohne Karte. */
+K1520_API bool        k1520_net_status(K1520Handle h, int* basis, uint64_t* zaehler);
+/** @brief Register/Speicher des W5100 (15-Bit-Adresse, ohne Nebenwirkung auf Sockets); -1 ohne Karte. */
+K1520_API int         k1520_net_w5100_read(K1520Handle h, int adr);
+
 #ifdef __cplusplus
 }
 #endif

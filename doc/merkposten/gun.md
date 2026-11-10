@@ -107,3 +107,22 @@ den UTools-Quellen und dem Verhalten der Binaerdateien abgeleitet, **nicht** aus
   (`tests/unit/peripherals/test_vdip_geraet.cpp`), `GunUsbMaschine.*` (`tests/integration/test_gun_usb_maschinen.cpp`), `GunUsbSystem.*`
   (`test_gun_usb_system.cpp`, lokal), `py_usb_api`, `cli_bt_usb`, `cli_bt_usb_k8915`, `cli_dbg_usb`, `cli_dbg_usb_keine`, `cli_dbg_usb_konflikt`.
   Alle schnell.
+
+## KCNet-Netzkarte (AP N2, Stand 2026-11-10)
+
+`core/cards/gun_net/` (`k1520::GunNet`: Z80-PIO + Verhaltensmodell der ATmega-Firmware vor `k1520::w5100::W5100`), gesteckt ueber `K1520Machine::installGunNet`
+**nach dem Anlegen, vor dem ersten `run()`/`reset()`** (C-ABI `k1520_net_*`, Python `K1520Emulator(net=…)`, `--net[=basis]` in `boot_trace`/`k1520dbg`, Befehl `net`).
+Protokoll: `doc/design/50a_kcnet_protokoll.md` (aus den Gast-Binaerdateien rekonstruiert).  Festlegungen mit Waechtern:
+
+| Nr. | Festlegung | Waechter |
+|---|---|---|
+| N1 | **Handshake:** nach `OUT` (Daten A) steht PB0 = 1 bis zur naechsten Statusabfrage (Lesen von Daten B), PB7 = 1 nur bei einem Antwortbyte, nach `IN (Daten A)` sofort 0; das naechste Antwortbyte kommt erst bei der naechsten Statusabfrage.  Ohne Antwort ist PB7 = 0 (das IST die Erkennung "Karte da"). | `GunNet.HandshakePb0NachOutEinsPb7NachInNull`, `GunNet.ErkennungKarteDaUndVersion` |
+| N2 | **Neuinitialisierung der PIO (Betriebsartwort an Steuer A) wirft angefangene Kommandos und unabgeholte Antworten weg** — Modellentscheidung, der echte ATmega sieht das nicht; sonst scheitert die Erkennung nach einem abgebrochenen Programm. | `GunNet.NeuinitialisierungWirftOffeneAntwortenWeg` |
+| N3 | **Bit 15 der Gast-Adresse wird maskiert** (`W5100` rechnet mit 15 Bit): Gast `8000H|adr` -> `adr`, Tx `C000H..` -> `4000H..`, Rx `E000H..` -> `6000H..`.  Der Zeiger (Kommando 02) zaehlt im Block weiter und ueber Kommandos hinweg. | `GunNet.BlockSchreibenUndLesenUeberTxPufferUndRegister`, `GunNet.EinzelbyteZugriffMitBit15AufW5100` |
+| N4 | **Kommando 03 zaehlt in MASCHINENZEIT** (`takt(total_cycles_)` je Befehl, Takt = `k6022TaktHz()` der Maschine), Umlauf 60000; 08 zaehlt ab 49152; 0D zaehlt ungueltige Kommandobytes (16 Bit). | `GunNet.TimerLaeuftInMaschinenzeitMitUmlauf60000`, `GunNet.DynamischerPortZaehltAb49152`, `GunNet.UngueltigesKommandoWirdGezaehltUndVerworfen` |
+| N5 | **/RESET der Maschine setzt den W5100 zurueck** (Sockets zu, Register leer, MAC `02:4B:43:4E:45:54` = Vorgabe `Config::mac`); die Richtlinie bleibt.  Netz: Wirtsnetz, Vorgabe **frei** (Entscheidung des Anwenders); die TESTS bleiben auf Loopback/Port 0. | `GunNet.ResetSetztW5100ZurueckRichtlinieBleibt` |
+| N6 | **Portlage:** Vorgabe 88H (GUN); 88H/89H gehoeren der RAF; PRG 710/-1: ATP-Zusatz belegt C0H..C3H, ZRE 80H..87H; MC80.3x: VIS 2a C0H..CFH, ASP 88H..93H (28H frei); MC80.2x, K8915 (V3/Gen 2), A5120, PC 1715: 88H und C0H frei.  Konflikt -> `installGunNet` meldet den Grund, kein Absturz. | `GunNetMaschine.*`, `cli_dbg_net_konflikt`, `py_net_api` |
+| N7 | **Echte Gastprogramme** (nur lokal in `~/Documents/K1520emu/GIDE_Software/kcnet/sw/cpmnet87/`, `K1520_GIDE_SW`): TFTP1287/CPMN1587 erkennen die Karte (Basis C0H), Firmware 1.2, Hardware 1.0, online; CPMNET-TCP-Server mit Echo gegen einen Loopback-Client; `TFTP GET` gegen einen Loopback-Server auf UDP **69** (privilegiert: ohne Recht uebersprungen — lokal pruefbar mit `unshare -rn sh -c 'ip link set lo up && tools/dev.sh test -R GunNetSystem'`). | `GunNetSystem.*` |
+
+Nicht nachgebildet/offen: Kommando 0C (ID-String) und 06 mit Index != 0 haben keinen Gast-Beleg; DHCP/DNS/Ping-Gegenstellen (Broadcast/ICMP gibt es im W5100-Modell nicht — `H`/`D`/`P` in CPMNET sind ohne Wirkung);
+kein Save-State; GUI (N3) offen; PRG 710 mit ATP-Zusatz nur mit freier Basis.

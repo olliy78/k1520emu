@@ -644,6 +644,19 @@ _lib.k1520_usb_stick_remove.restype = ctypes.c_bool
 _lib.k1520_usb_status.argtypes = [K1520Handle, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int),
                                   ctypes.POINTER(ctypes.c_uint64)]
 _lib.k1520_usb_status.restype = ctypes.c_bool
+# KCNet-Netzkarte (doc/design/50_gun_gide.md, AP N2)
+_lib.k1520_net_install.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_bool, ctypes.c_bool, ctypes.c_char_p]
+_lib.k1520_net_install.restype = ctypes.c_bool
+_lib.k1520_net_installed.argtypes = [K1520Handle]
+_lib.k1520_net_installed.restype = ctypes.c_bool
+_lib.k1520_net_error.argtypes = [K1520Handle]
+_lib.k1520_net_error.restype = ctypes.c_char_p
+_lib.k1520_net_set_link.argtypes = [K1520Handle, ctypes.c_bool]
+_lib.k1520_net_set_link.restype = ctypes.c_bool
+_lib.k1520_net_status.argtypes = [K1520Handle, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_uint64)]
+_lib.k1520_net_status.restype = ctypes.c_bool
+_lib.k1520_net_w5100_read.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_net_w5100_read.restype = ctypes.c_int
 
 # RAM-Floppy RAF (doc/design/22_raf512.md §6)
 _lib.k1520_raf_install.argtypes = [K1520Handle, ctypes.c_char_p]
@@ -1243,7 +1256,7 @@ class K1520Emulator:
                  tastatur: Optional[str] = None, p8000: Optional[dict] = None,
                  ausfuehrung: Optional[str] = None, spe=1, pcmc=False, laderom: Optional[str] = None,
                  konfig: Optional[dict] = None, aup: bool = False,
-                 aup_sonder: bool = False, gide=None, usb=None):
+                 aup_sonder: bool = False, gide=None, usb=None, net=None):
         """Initialize emulator instance.
 
         Args:
@@ -1289,6 +1302,10 @@ class K1520Emulator:
                 = ohne, ``True`` = Vorgaben (Basis 0x84, kein Stick), sonst ein dict mit ``basis``,
                 ``ordner`` (Stick-Wirtsverzeichnis) und ``schreibgeschuetzt`` (bool).
                 Direkt nach dem Anlegen gesteckt; Fehler → ValueError.
+            net: KCNet-Netzkarte (Z80-PIO + ATmega-Modell + W5100, Netz des Wirts) stecken (an jeder Maschine
+                ausser P8000) — ``None``/``False`` = ohne, ``True`` = Vorgaben (Basis 0x88, Ziele frei,
+                Kabel steckt), sonst ein dict mit ``basis``, ``nur_loopback`` (bool), ``link`` (bool),
+                ``dns`` ("a.b.c.d").  88H/89H gehören der RAF.  Fehler → ValueError.
             ptape: Lochstreifen-Karte K6022 (SIF1000, E0H–E7H) stecken; an jeder
                 Maschine, wie ``raf`` direkt nach dem Anlegen.  Fehler → ValueError.
             aup: nur A5120 — AUP 062-8531 (Tastaturteil K7633 + Kundentastatur, E/A 40H–43H)
@@ -1464,6 +1481,16 @@ class K1520Emulator:
                 _lib.k1520_destroy(handle)
                 self._handle = None
                 raise ValueError(reason or "GUN-USB nicht steckbar")
+        if net:
+            n = {} if net is True else dict(net)
+            dns = n.get("dns")
+            if not _lib.k1520_net_install(handle, int(n.get("basis", 0x88)), bool(n.get("nur_loopback", False)),
+                                          bool(n.get("link", True)), dns.encode("ascii") if dns else None):
+                reason = _lib.k1520_net_error(handle)
+                reason = reason.decode("utf-8", "replace") if reason else ""
+                _lib.k1520_destroy(handle)
+                self._handle = None
+                raise ValueError(reason or "KCNet nicht steckbar")
         if ptape and not _lib.k1520_ptape_install(handle):
             reason = _lib.k1520_last_init_error()
             reason = reason.decode("utf-8", "replace") if reason else ""
@@ -2542,6 +2569,32 @@ class K1520Emulator:
             return None
         return {"basis": basis.value, "stick_vorhanden": bool(stick.value),
                 "gelesen": z[0], "geschrieben": z[1], "resets": z[2]}
+
+    # ─── KCNet-Netzkarte ───────────────────────────────────────────────────
+    def net_installed(self) -> bool:
+        """True, wenn die KCNet-Karte gesteckt ist (``K1520Emulator(net=...)``)."""
+        return bool(_lib.k1520_net_installed(self._handle))
+
+    def net_error(self) -> str:
+        v = _lib.k1520_net_error(self._handle)
+        return v.decode("utf-8", "replace") if v else ""
+
+    def net_set_link(self, online: bool) -> bool:
+        """Kabelzustand (Kommando 0B) zur Laufzeit."""
+        return bool(_lib.k1520_net_set_link(self._handle, bool(online)))
+
+    def net_status(self) -> Optional[dict]:
+        """Zustand ohne Nebenwirkung (``None`` ohne Karte)."""
+        basis = ctypes.c_int()
+        z = (ctypes.c_uint64 * 4)()
+        if not _lib.k1520_net_status(self._handle, ctypes.byref(basis), z):
+            return None
+        return {"basis": basis.value, "kommandos": z[0], "fehlerkommandos": z[1],
+                "bytes_zur_karte": z[2], "bytes_zum_gast": z[3]}
+
+    def net_w5100_read(self, adr: int) -> int:
+        """Register/Speicher des W5100 (15-Bit-Adresse); -1 ohne Karte."""
+        return int(_lib.k1520_net_w5100_read(self._handle, int(adr)))
 
     # ─── RAM-Floppy RAF ────────────────────────────────────────────────────
     @property
