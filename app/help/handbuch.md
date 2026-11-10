@@ -62,7 +62,7 @@ Speichern unter und für die echte Diskette.
 **Kassette** — die beiden Kassettenlaufwerke, nur solange die Kassetten-Karte steckt
 (siehe *Kassette* unten).
 
-**Einstellungen** — vier Reiter: *Allgemein* (Modell, Takt, RAM-Disk, Lochstreifen, Kassette), *Laufwerke*
+**Einstellungen** — vier Reiter: *Allgemein* (Modell, Takt, RAM-Disk, Lochstreifen, Kassette, IDE-Platte), *Laufwerke*
 (welcher Laufwerkstyp in welchem Steckplatz steckt), *Schnittstellen* (die seriellen
 Anschlüsse des Rechners nach außen, ein Block je Schnittstelle — siehe *Serielle
 Schnittstellen* unten) und *CRT* (das Aussehen der Bildröhre).
@@ -1397,6 +1397,62 @@ geschrieben; eine vorhandene bleibt liegen.
 **A5120.16 und RAF** gehen zusammen: das Erweiterungsmodul belegt M: (CP/A mit
 EM256-BIOS), `RAF512.COM` legt die RAF daneben als P: an.
 
+## IDE-Platte (GIDE) und Uhr
+
+*Einstellungen ▸ Allgemein ▸ IDE-Platte (GIDE)* steckt eine IDE-Karte nach
+Tilmann Reh mit einer ATA-Platte und der Uhr RTC 72421 — im A5120 Emulator, im K8915 Emulator, im PRG710
+Emulator und im PC1715 Emulator (nicht im P8000 und nicht im MC80). Ab Werk ist sie **aus**.
+
+* **GIDE-Karte stecken** — das Kästchen. Ein Wechsel schaltet die Maschine aus und baut sie neu auf, wie
+  bei der RAM-Disk — eine Karte steckt man nicht im Betrieb.
+* **E/A-Basis** — die Karte belegt die Adressen *Basis+4* bis *Basis+0FH*; das Auswahlfeld bietet
+  **00H bis F0H** in 10H-Schritten an. Wie die Brücken der echten Karten stehen, ist nicht bekannt; ab
+  Werk ist **90H** vorgewählt — auf allen Rechnern frei und ohne Streit mit den anderen Karten. In der
+  Praxis üblich ist D0H (Treiber `GIDEHPD0`, `gidn@D0h`); wo sie frei ist, kann man sie wählen. Was schon
+  belegt ist, steht im Auswahlfeld dabei und lässt sich nicht wählen, etwa „D0H (belegt: K5020 Daten-PIO)“
+  (die Kassette bei D0H am K8915 und am PC 1715) oder „D0H (belegt: …)“ am PRG 710 durch den EPROMmer.
+  Die Auskunft kommt vom Rechner selbst. Fordert eine geladene Konfiguration trotzdem eine belegte Basis
+  (oder belegt eine andere Karte die Adressen), bleibt die GIDE **aus**, und der Grund steht in roter
+  Schrift unter der Gruppe.
+* **Plattenabbild** — nur bei gesteckter Karte bedienbar. *Wählen …* legt ein vorhandenes Abbild
+  ein, *Auswerfen* nimmt es heraus und schreibt es sofort zurück, *Neue Platte …* fragt nach Name und
+  Größe (**8, 16, 32, 64, 128 oder 256 MB**, Vorgabe 256 MB) und legt ein leeres Rohabbild sparsam an
+  (es belegt nur, was beschrieben wird); mit der Endung `.gz` wird es gepackt. Eine **vorhandene Datei
+  wird nie überschrieben** — gibt es den Namen schon, fragt das Programm nur, ob diese Platte
+  stattdessen eingelegt werden soll. Neue Platten liegen vorgabegemäß im Dokumentenordner unter
+  `K1520emu/GIDE_Platten`.
+* **RTC 72421 auf der Karte** — die Uhr (Vorgabe an). Sie zeigt dem Gast die Zeit des Wirtsrechners
+  in **UTC**, läuft in Maschinenzeit und springt beim Start nie zurück; ihr Stand liegt in der
+  Batteriedatei `gide_rtc_<programm>.dat` im Konfigurationsordner. Die Gruppe zeigt die Uhrzeit der Karte.
+
+In der Statuszeile steht bei gesteckter Karte die Leuchte **IDE**. Sie folgt dem **Zugriff** des
+Gastsystems auf die Karte, nicht dem Inhalt: gefüllt = Abbild eingelegt, rot = die Karte wurde
+eben angesprochen, Ring = kein Abbild. Der Tooltip nennt Basis und Abbildname.
+
+**Treiber** brauchen die Gastsysteme selbst; sie liegen dem Emulator nicht bei. Bekannt sind die von
+Poppe (`GIDEHPxx.COM`) und von Kingstener (`gidn@D0h.com`). Die beiden **formatieren die Platte
+untereinander unverträglich** — eine mit dem einen Treiber angelegte Platte liest der andere nicht;
+ein Abbild gehört also zu seinem Treiber. Der Treiber von Poppe braucht mindestens 504000 Sektoren
+(rund 258 MB, also die 256-MB-Vorgabe oder mehr), der von Kingstener kommt mit 32 MB aus.
+
+Gemerkt werden Karte, Basis, Abbild und Uhr in der Konfiguration (`general.gide`).
+
+**Vorauswahl der E/A-Basen der Steckkarten.** Die Basen von IDE-Karte, USB-Karte (GUN-USB) und
+Netzkarte (KCNet) sind so vorbelegt, dass sie untereinander und mit RAM-Floppy (88H/89H), Kassette,
+Lochstreifen und den festen Karten des jeweiligen Rechners nichts gemeinsam belegen:
+
+| Rechner | IDE (GIDE) | USB | Netz |
+|---------|------------|-----|------|
+| A5120 (auch .16, A5130, K8924) | 90H | 84H | C0H |
+| K8915 V3 | 90H | 84H | C0H |
+| K8915 V2 | 90H | 8CH | C0H |
+| PRG 710 / 710-1 | 90H | 8CH | 28H |
+| PC 1715 / 1715W | 90H | 84H | C0H |
+
+(84H ist die Lage der GUN; C0H und 28H sind die beiden Jumperstellungen der K1520-Netzkarte; am PRG 710
+ist C0H der ATP-Zusatz, am K8915 V2 und am PRG 710 80H–87H belegt.) Die USB- und die Netzkarte
+bekommen ihre Gruppen mit derselben Basiswahl.
+
 ## Lochstreifen
 
 *Einstellungen ▸ Allgemein ▸ Lochstreifen (SIF1000, K6022)* steckt die
@@ -1727,7 +1783,7 @@ Alles, was man einstellt, landet fortlaufend in
 kann also den A5120 mit drei Laufwerken und sichtbarer Tastatur und den K8915 mit
 zwei Laufwerken ohne Tastatur nebeneinander führen. Gemerkt werden Bildröhre,
 Takt, Modell, RAM-Disk (samt Stand-by), Lochstreifen-Karte samt Leser- und
-Stanzerdatei, Kassetten-Karte samt den Dateien beider Laufwerke, Laufwerksbestückung, eingelegte Disketten, die seriellen Schnittstellen
+Stanzerdatei, Kassetten-Karte samt den Dateien beider Laufwerke, IDE-Karte GIDE samt Abbild, Laufwerksbestückung, eingelegte Disketten, die seriellen Schnittstellen
 (samt dem, was lief), Größe und Lage des Fensters
 (auch „maximiert"), die Lage und Breite der Kästen samt der Trennlinien
 dazwischen, und der Inhalt der Symbolleiste.

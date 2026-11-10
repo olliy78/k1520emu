@@ -50,6 +50,14 @@ crt:
 # Zehnfach: der Selbsttest des Boot-ROMs dauert sonst ≈ 12 s.
 general:
   speed: 10.0
+  # IDE-Platte GIDE + Uhr RTC 72421 (app/gide.py, doc/design/50_gun_gide.md G6): enabled = Karte
+  # gesteckt, basis = E/A-Basis (Hex, Vielfaches von 10; Vorauswahl 90H), image = Plattenabbild
+  # ('' = keins; Pfade sind rechnerspezifisch, hier leer), rtc = Uhr bestueckt.
+  gide:
+    enabled: false
+    basis: '90'
+    image: ''
+    rtc: true
   # Lochstreifen (ADA K6022, SIF1000) gesteckt? doc/design/23_lochstreifen.md §7.
   ptape: false
   # Kassette (AKB K5020, 2 × K5200) gesteckt? doc/design/29_kassette.md.

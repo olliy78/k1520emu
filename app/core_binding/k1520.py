@@ -630,6 +630,8 @@ _lib.k1520_gide_status.argtypes = [K1520Handle, ctypes.POINTER(ctypes.c_int), ct
 _lib.k1520_gide_status.restype = ctypes.c_bool
 _lib.k1520_gide_rtc_zeit.argtypes = [K1520Handle, ctypes.POINTER(ctypes.c_int64)]
 _lib.k1520_gide_rtc_zeit.restype = ctypes.c_bool
+_lib.k1520_io_owner.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_io_owner.restype = ctypes.c_char_p
 # GUN-USB (doc/design/50_gun_gide.md, AP U2)
 _lib.k1520_usb_install.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_char_p, ctypes.c_bool]
 _lib.k1520_usb_install.restype = ctypes.c_bool
@@ -2544,6 +2546,11 @@ class K1520Emulator:
         """Uhr der RTC (Unix-Sekunden der Kalenderzeit), ``None`` ohne Karte/RTC."""
         t = ctypes.c_int64()
         return t.value if _lib.k1520_gide_rtc_zeit(self._handle, ctypes.byref(t)) else None
+
+    def io_owner(self, port: int) -> str:
+        """Name des Geraets, das den E/A-Port belegt (``""`` = frei) -- die Wahrheit des Busses."""
+        v = _lib.k1520_io_owner(self._handle, int(port))
+        return v.decode("utf-8", "replace") if v else ""
 
     # ─── GUN-USB ───────────────────────────────────────────────────────────
     def usb_installed(self) -> bool:

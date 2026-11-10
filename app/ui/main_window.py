@@ -64,6 +64,8 @@ from app import profil as profile
 from app import takt
 from app.emulationstakt import Emulationstakt
 from app import raf
+from app import gide
+from app import kartenwahl
 from app import rtc
 from app import k3521
 
@@ -134,6 +136,12 @@ class MainWindow(QMainWindow):
         # Kassette K5020 (doc/design/29_kassette.md): dasselbe Muster.
         self._tape = False
         self._tape_zustand = {}
+        # IDE-Karte GIDE (`app/gide.py`, doc/design/50_gun_gide.md G6): ebenfalls ein
+        # Konstruktorparameter, Vorgabe aus.  ``_gide_fehler`` = Grund, warum der Kern die Karte
+        # (oder das Abbild) nicht angenommen hat -- steht unter der Gruppe, kein Meldungsfenster.
+        self._gide = gide.vorgabe(self.profil.gide_basis_vorgabe)
+        self._gide_fehler = ""
+        self._gide_zaehler = None       # Summe der Zugriffszaehler beim letzten Abtasten (Leuchte)
         # AUP 062-8531 (Entwurf 33 N10e): Option, Vorgabe aus; Sonderschnittstelle und die
         # Annahme zur Alpha-Tabelle (led|ohne|mit) gehoeren dazu.
         self._aup = False
@@ -250,6 +258,8 @@ class MainWindow(QMainWindow):
         self.settings_widget.modelChanged.connect(self._on_model_selected)
         self.settings_widget.hardwareChanged.connect(self._on_hardware_selected)
         self.settings_widget.bildschirmSchalterChanged.connect(self._on_bildschirm_schalter)
+        self.settings_widget.gideChanged.connect(self._on_gide_changed)
+        self.settings_widget.gidePlatteNeu.connect(self._on_gide_platte_neu)
         self.settings_widget.rafChanged.connect(self._on_raf_selected)
         self.settings_widget.rtcStellenGewuenscht.connect(self._on_rtc_stellen)
         self.settings_widget.rafStandbyChanged.connect(self._on_raf_standby_changed)
@@ -1363,6 +1373,8 @@ class MainWindow(QMainWindow):
             general["bildschirm_schalter"] = self._schalter
         general["ptape"] = bool(self._ptape)
         general["tape"] = bool(self._tape)
+        if self.profil.erweiterungskarten:
+            general[gide.SCHLUESSEL] = gide.fuer_konfig(self._gide)
         if self.profil.aup_wahl:
             general["aup"] = bool(self._aup)
             general["aup_sonder"] = bool(self._aup and self._aup_sonder)
@@ -1657,6 +1669,13 @@ class MainWindow(QMainWindow):
             # Kassette K5020: dasselbe (fehlend = aus).
             self._tape = general.get("tape") is True and self.profil.tape_wahl
             self.settings_widget.set_tape_value(self._tape)
+            # GIDE: ein FEHLENDER Abschnitt laesst alles, wie es ist (aeltere Dateien); ein vorhandener
+            # gilt ganz, unbekannte Einzelwerte fallen auf die Vorgabe.  Gesteckt wird im Neuaufbau unten.
+            if self.profil.erweiterungskarten and gide.SCHLUESSEL in general:
+                self._gide = gide.normalize(general.get(gide.SCHLUESSEL),
+                                            self.profil.gide_basis_vorgabe)
+                self._gide_fehler = ""
+            self.settings_widget.set_gide_value(self._gide)
             # AUP: dasselbe (fehlend = aus; Sonderschnittstelle/Alpha nur mit gesteckter AUP).
             self._aup = general.get("aup") is True and self.profil.aup_wahl
             self._aup_sonder = self._aup and general.get("aup_sonder") is True
@@ -1815,6 +1834,7 @@ class MainWindow(QMainWindow):
         raf_vorher = self._raf
         ptape_vorher = self._ptape
         tape_vorher = self._tape
+        gide_vorher = self._gide_kern_zustand()
         aup_vorher = (self._aup, self._aup_sonder, self._aup_alpha)
         k3521_vorher = self._k3521
         self._apply_config(vorgabe)
@@ -1828,6 +1848,7 @@ class MainWindow(QMainWindow):
                 or self._hardware != hardware_vorher
                 or self._raf != raf_vorher or self._ptape != ptape_vorher
                 or self._tape != tape_vorher
+                or self._gide_kern_zustand() != gide_vorher
                 or self._k3521 != k3521_vorher
                 or (self._aup, self._aup_sonder, self._aup_alpha) != aup_vorher):
             self._cold_restart()
@@ -2040,6 +2061,7 @@ class MainWindow(QMainWindow):
         self._update_em_status()
         self._update_verbindung()
         self._update_rtc()
+        self._update_gide_uhr()
         # Stand von Leser/Stanzer im selben Takt (kein eigener Zeitgeber).
         if self.lochstreifen_dock.isVisible():
             self.lochstreifen_widget.aktualisieren()
@@ -2101,6 +2123,7 @@ class MainWindow(QMainWindow):
         Sektorzugriff ist in wenigen Zehntelsekunden vorbei.
         """
         self._update_frontplatte()
+        self._update_gide()
         for feld in self.status_widget.felder():
             drive = feld.drive
             lampe = self.status_widget.lampe(drive)
@@ -2436,10 +2459,13 @@ class MainWindow(QMainWindow):
         else:
             einzel = {"em": self.profil.modell_em(self._model, self._hardware),
                       "tape": bool(self._tape)}
-        emu = K1520Emulator(types, machine=self.profil.modell_maschine(self._model),
-                            raf=raf.core_param(self._raf) if self.profil.raf_wahl else None,
-                            ptape=bool(self._ptape),
-                            **einzel, **kern)
+        def bauen(gide_param):
+            return K1520Emulator(types, machine=self.profil.modell_maschine(self._model),
+                                 raf=raf.core_param(self._raf) if self.profil.raf_wahl else None,
+                                 ptape=bool(self._ptape), gide=gide_param,
+                                 **einzel, **kern)
+
+        emu = self._gide_bauen(bauen)
         # Die Tastatur hat ihren eigenen Quarz — bei 10 × Rechnertakt darf sie
         # nicht zehnmal so frueh wiederholen (core/peripherals/tasten_uhr.h).
         emu.set_key_repeat_realtime(True)
@@ -2449,6 +2475,160 @@ class MainWindow(QMainWindow):
         self._raf_laden(emu)
         self._k3521_binden(emu)
         return emu
+
+    def _gide_kern_zustand(self):
+        """Was am Kern haengt (Neuaufbau noetig bei Aenderung): Karte, Basis, RTC -- nicht das Abbild."""
+        if not self.profil.erweiterungskarten or not self._gide["enabled"]:
+            return None
+        return (self._gide["basis"], self._gide["rtc"])
+
+    def _gide_bauen(self, bauen):
+        """Maschine mit gesteckter GIDE bauen -- ein Fehler des Kerns stuerzt NICHT ab.
+
+        Reihenfolge der Rueckfaelle: (1) mit Abbild, (2) ohne Abbild (Karte bleibt, Fehlertext),
+        (3) ohne Karte (Basis belegt u. a.; die Karte bleibt AUS und der Haken faellt).  Scheitert
+        auch der Bau ohne Karte, war es nicht die GIDE: der Fehler geht unveraendert weiter.
+        """
+        self._gide_fehler = ""
+        param = (gide.kern_param(self._gide, self.profil.programm)
+                 if self.profil.erweiterungskarten else None)
+        if not param:
+            return bauen(None)
+        try:
+            return bauen(param)
+        except ValueError as e:
+            grund = str(e)
+        if param["abbild"]:
+            try:
+                emu = bauen({**param, "abbild": ""})
+            except ValueError as e:
+                grund = str(e)
+            else:
+                self._gide_fehler = f"Plattenabbild nicht eingelegt: {grund}"
+                self.statusBar().showMessage(self._gide_fehler, 10000)
+                return emu
+        emu = bauen(None)                      # scheitert er, war es nicht die GIDE
+        self._gide = {**self._gide, "enabled": False}
+        self._gide_fehler = f"GIDE nicht gesteckt: {grund}"
+        self.statusBar().showMessage(self._gide_fehler, 10000)
+        print(f"[gide] {self._gide_fehler}")
+        return emu
+
+    def _gide_abbild_freigeben(self) -> str:
+        """Plattenabbild der laufenden Maschine auswerfen (Kern schreibt sofort zurueck, Sperre frei).
+
+        Returns:
+            Den Pfad, der eingelegt war (``""`` = keiner oder keine Karte).
+        """
+        if not self._gide_gesteckt():
+            return ""
+        pfad = self.emulator.gide_image_path()
+        if pfad:
+            self.emulator.gide_image_eject()
+        return pfad
+
+    def _gide_gesteckt(self) -> bool:
+        return bool(self.profil.erweiterungskarten and self.emulator.gide_installed())
+
+    def _gide_anzeigen(self) -> None:
+        """Gruppe und Statuszeile an die laufende Maschine angleichen (nach jedem Neuaufbau)."""
+        if not self.profil.erweiterungskarten:
+            return
+        gesteckt = self._gide_gesteckt()
+        self.settings_widget.set_gide_value(self._gide, self._gide_fehler, gesteckt)
+        self._gide_basen_beschriften()
+        self._gide_zaehler = None
+        self._update_gide()
+
+    def _gide_basen_beschriften(self) -> None:
+        """Auswahlfeld der Basis: Besitzer aus dem KERN (``io_owner``), Kollisionen mit den anderen im
+        Dialog gewaehlten Karten aus :mod:`app.kartenwahl` (USB/Netz: U3/N3 tragen ihre Basis hier ein)."""
+        andere = {}                     # {"usb": basis, "net": basis} sobald es die Gruppen gibt
+        self.settings_widget.gide_gruppe.set_basen(
+            kartenwahl.eintraege(kartenwahl.GIDE, self.emulator.io_owner, andere))
+
+    def _on_gide_changed(self, neu: dict):
+        """Eingaben der GIDE-Gruppe: Karte/Basis/RTC bauen die Maschine neu, das Abbild wirkt sofort."""
+        neu = dict(neu)                 # kommt gueltig aus der Gruppe (Basis als Zahl)
+        alt = self._gide
+        if neu == alt:
+            return
+        kern_alt = (alt["enabled"], alt["basis"], alt["rtc"])
+        kern_neu = (neu["enabled"], neu["basis"], neu["rtc"])
+        if kern_neu != kern_alt and (neu["enabled"] or alt["enabled"]):
+            if not self._eprom_rueckfrage("Wechsel der GIDE-Karte"):
+                self.settings_widget.set_gide_value(alt, self._gide_fehler, self._gide_gesteckt())
+                return
+            self._gide = neu
+            self._apply_drive_types(self._drive_types, cold_restart=True)
+            self._schedule_autosave()
+            return
+        self._gide = neu
+        if neu["image"] != alt["image"] and self._gide_gesteckt():
+            self._gide_abbild_wirken()
+        self._schedule_autosave()
+
+    def _gide_abbild_wirken(self) -> bool:
+        """Das gewaehlte Abbild in die gesteckte Karte legen bzw. auswerfen (sofort, Kern schreibt zurueck)."""
+        pfad = self._gide["image"]
+        if pfad:
+            ok = bool(self.emulator.gide_image_mount(pfad))
+        else:
+            ok = bool(self.emulator.gide_image_eject())
+        self._gide_fehler = "" if ok else f"Plattenabbild: {self.emulator.gide_error()}"
+        if not ok:
+            # Im Kern liegt weiter das alte; die Gruppe zeigt, was wirklich liegt.
+            self._gide = {**self._gide, "image": self.emulator.gide_image_path()}
+        self.settings_widget.set_gide_value(self._gide, self._gide_fehler, True)
+        self._update_gide()
+        return ok
+
+    def _on_gide_platte_neu(self, pfad: str, mbyte: int) -> bool:
+        """„Neue Platte": Abbild anlegen (nie ueber eine vorhandene Datei) und einlegen."""
+        if not self._gide_gesteckt():
+            return False
+        try:
+            os.makedirs(os.path.dirname(pfad) or ".", exist_ok=True)
+        except OSError as e:
+            self._gide_fehler = f"Plattenabbild nicht angelegt: {e}"
+            self.settings_widget.set_gide_value(self._gide, self._gide_fehler, True)
+            return False
+        if not self.emulator.gide_image_create(pfad, mbyte):
+            self._gide_fehler = f"Plattenabbild nicht angelegt: {self.emulator.gide_error()}"
+            self.settings_widget.set_gide_value(self._gide, self._gide_fehler, True)
+            return False
+        self._gide = {**self._gide, "image": pfad}
+        self._gide_abbild_wirken()
+        self._schedule_autosave()
+        return not self._gide_fehler
+
+    def _update_gide(self) -> None:
+        """Leuchte „IDE" (folgt dem ZUGRIFF, 120-ms-Takt) und Uhranzeige."""
+        sb = self.status_widget
+        if not self._gide_gesteckt():
+            sb.ide.zeige(False, status_bar.LEER)
+            return
+        st = self.emulator.gide_status()
+        if st is None:
+            sb.ide.zeige(False, status_bar.LEER)
+            return
+        summe = st["daten_lesen"] + st["daten_schreiben"] + st["taskfile"] + st["befehle"]
+        aktiv = self._gide_zaehler is not None and summe != self._gide_zaehler
+        self._gide_zaehler = summe
+        belegt = bool(st["abbild_vorhanden"])
+        tipp = [f"IDE-Platte (GIDE), E/A-Basis {gide.basis_text(st['basis'])}"]
+        tipp.append(f"Abbild: {os.path.basename(self.emulator.gide_image_path())}" if belegt
+                    else "kein Plattenabbild eingelegt")
+        sb.ide.zeige(True, status_bar.ZUGRIFF if aktiv else status_bar.BELEGT if belegt
+                     else status_bar.LEER, "\n".join(tipp))
+
+    def _update_gide_uhr(self) -> None:
+        """Uhr der Karte in der Gruppe (Sekundentakt)."""
+        if not self._gide_gesteckt():
+            self.settings_widget.gide_gruppe.set_rtc_anzeige("")
+            return
+        t = self.emulator.gide_rtc_zeit()
+        self.settings_widget.gide_gruppe.set_rtc_anzeige(rtc.anzeige(t) if t is not None else "")
 
     def _k3521_binden(self, emu) -> None:
         """Ablagedatei je K3521-Karte binden (Inhalt dauerhaft, Entwurf 33 N10h).  Ein Fehler
@@ -2782,16 +2962,25 @@ class MainWindow(QMainWindow):
         # fortgeschriebene Datei ohnehin nicht, R3b.)
         self._rtc_netz_aus()
 
+        # Die alte Maschine gibt ihr Plattenabbild FREI (zurueckschreiben + Sperrdatei), bevor die neue
+        # es oeffnet -- sonst meldet der Kern „schon in Benutzung".
+        gide_abbild = self._gide_abbild_freigeben()
+
         # Recreate the machine with the new drive bay / model.
         try:
             new_emu = self._maschine_erzeugen(types)
         except Exception as e:
+            if gide_abbild:
+                self.emulator.gide_image_mount(gide_abbild)       # die alte Maschine laeuft weiter
             QMessageBox.critical(self, "Laufwerke",
                                  f"Konnte Maschine nicht neu erzeugen:\n{e}")
             # Keep the settings dropdowns consistent with the machine still in use.
             self.settings_widget.set_drive_types(self._drive_types)
             self.settings_widget.set_model_value(self._model)
             self.settings_widget.set_raf_value(self._raf)
+            if self.profil.erweiterungskarten:
+                self._gide = {**self._gide, "enabled": self._gide_gesteckt()}   # was wirklich steckt
+            self._gide_anzeigen()
             self._ptape = bool(self.emulator.ptape_installed())
             self.settings_widget.set_ptape_value(self._ptape)
             self._tape = bool(self.emulator.tape_installed())
@@ -2863,6 +3052,7 @@ class MainWindow(QMainWindow):
         self.settings_widget.set_nenntakt(nenntakt)
         self.status_widget.set_nenntakt(nenntakt)
         self.settings_widget.set_raf_value(self._raf)       # dito
+        self._gide_anzeigen()
         self.settings_widget.set_ptape_value(self._ptape)   # dito
         self._lochstreifen_kasten()
         self.settings_widget.set_tape_value(self._tape)
@@ -3213,6 +3403,9 @@ class MainWindow(QMainWindow):
         self._autosave_timer.stop()
         self._autosave_now()
         self.pcmc_widget.ausschalten()
+        # GIDE: das Abbild jetzt zurueckschreiben und freigeben (gepackte Abbilder schreibt der Kern
+        # sonst erst verzoegert; die Konfiguration ist oben schon mit dem Abbildnamen gesichert).
+        self._gide_abbild_freigeben()
         # Stand-by: RAF-Inhalt in die Ablage (doc/design/22_raf512.md §7.1).
         self._raf_sichern()
         # Lochstreifen: was gestanzt ist, gehoert jetzt in die gebundene Datei.

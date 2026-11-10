@@ -378,6 +378,13 @@ public:
     /** @brief Die gesteckte GIDE (nullptr = keine). */
     k1520::Gide*       gide()       { return gide_.get(); }
     const k1520::Gide* gide() const { return gide_.get(); }
+
+    /// Name des Geraets, das den E/A-Port @p port belegt ("" = frei).  Die Wahrheit des Busses --
+    /// die Oberflaeche fragt damit, ob eine gewuenschte Kartenbasis frei ist (AP G6).
+    std::string ioBesitzer(uint8_t port) {
+        const BusDevice* d = systemBus().ioOwner(port);
+        return d ? std::string(d->deviceName()) : std::string();
+    }
     /** @brief Grund des letzten gescheiterten @ref installGide ("" = keiner). */
     const std::string& gideFehler() const { return gide_fehler_; }
 

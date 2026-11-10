@@ -1765,6 +1765,13 @@ bool k1520_gide_rtc_zeit(K1520Handle h, int64_t* out) {
     return true;
 }
 
+const char* k1520_io_owner(K1520Handle h, int port) {
+    static thread_local std::string puffer;
+    puffer.clear();
+    if (h && port >= 0 && port <= 0xFF) puffer = toMachine(h)->ioBesitzer(static_cast<uint8_t>(port));
+    return puffer.c_str();
+}
+
 // ─── GUN-USB (doc/design/50_gun_gide.md, AP U2) ────────────────────────────────
 namespace {
 using k1520::GunUsb;

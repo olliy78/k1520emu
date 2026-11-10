@@ -1145,6 +1145,9 @@ K1520_API bool        k1520_gide_status(K1520Handle h, int* basis, int* lh, int*
                                         int* abbild_vorhanden, uint64_t* sektoren, uint64_t* zaehler);
 /** @brief Uhr der RTC wie der Gast sie sieht (Kalenderzeit als Unix-Sekunden); false ohne Karte/RTC. */
 K1520_API bool        k1520_gide_rtc_zeit(K1520Handle h, int64_t* out);
+/** @brief Besitzer des E/A-Ports @p port (deviceName() des am Bus angemeldeten Geraets), "" = frei
+ *  oder Port ausserhalb 0..255.  Die Wahrheit des Busses -- Grundlage der Basiswahl der Steckkarten. */
+K1520_API const char* k1520_io_owner(K1520Handle h, int port);
 
 /* ─── GUN-USB: Z80-PIO + VDIP1 mit Wirtsverzeichnis als "USB-Stick" (doc/design/50_gun_gide.md, AP U2) ───
  * Bestueckung nach dem Anlegen, VOR dem ersten k1520_run/k1520_reset; alle Maschinen mit K1520-Bus

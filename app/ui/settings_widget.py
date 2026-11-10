@@ -30,6 +30,7 @@ from PySide6.QtGui import QColor
 
 from app.ui.screen_widget import CRTParams
 from app.ui.bildschirm_schalter import BildschirmSchalter
+from app.ui.gide_gruppe import GideGruppe
 from app import drive_types as dt
 from app import profil as profile
 from app import takt
@@ -83,6 +84,11 @@ class SettingsWidget(QWidget):
     mitschriftChanged = Signal(str)
     # Schaltflaeche „Uhr nach Wirtszeit stellen“ der Gruppe RTC (nur P8000).
     rtcStellenGewuenscht = Signal()
+    # Gruppe „IDE-Platte (GIDE)“: Eingaben als Zustand (`app/gide.py`); Stecken/Basis/RTC bauen die
+    # Maschine neu, das Abbild wirkt sofort.  Spaeter U3/N3: je Karte ein eigenes Signal.
+    gideChanged = Signal(dict)
+    # „Neue Platte“ bestaetigt: (Pfad, MB) — das Hauptfenster legt an.
+    gidePlatteNeu = Signal(str, int)
 
     #: (Beschriftung, Faktor).  Die Stufen
     #: stehen in :mod:`app.takt`, damit Auswahlfeld und Statuszeile dasselbe
@@ -494,6 +500,21 @@ class SettingsWidget(QWidget):
             for w in self._k3521_widgets:
                 w.setVisible(False)
 
+        # Erweiterungskarten: EIN Behaelter, in den jede Karte ihre Gruppe legt.  Heute die IDE-Karte
+        # GIDE (G6); USB (U3) und Netzwerk (N3) haengen sich mit eigener Gruppe daneben
+        # (`karten_layout.addWidget(...)`), ohne diese Stelle anzufassen.
+        self.karten_box = QWidget(inner)
+        self.karten_layout = QVBoxLayout(self.karten_box)
+        self.karten_layout.setContentsMargins(0, 0, 0, 0)
+        self.gide_gruppe = GideGruppe(self.profil.gide_basis_vorgabe, self.karten_box)
+        self.gide_gruppe.gideChanged.connect(self.gideChanged)
+        self.gide_gruppe.neuePlatteGewuenscht.connect(self.gidePlatteNeu)
+        self.karten_layout.addWidget(self.gide_gruppe)
+        if self.profil.erweiterungskarten:
+            form.addRow(self.karten_box)
+        else:
+            self.karten_box.setVisible(False)      # P8000/MC80: keine Karte, keine Gruppe
+
         # Mitschrift des Terminals (nur Profil mit Terminal): Dateiname + Ordnerknopf.
         self.mitschrift_edit = QLineEdit(inner)
         self.mitschrift_edit.setPlaceholderText("leer = keine Mitschrift")
@@ -695,6 +716,16 @@ class SettingsWidget(QWidget):
         self._ptape_guard = True
         self.ptape_box.setChecked(bool(an))
         self._ptape_guard = False
+
+    # ── IDE-Platte (GIDE) ────────────────────────────────────────────────────
+
+    def gide_value(self) -> dict:
+        """Die Eingaben der GIDE-Gruppe (`app/gide.py`)."""
+        return self.gide_gruppe.zustand()
+
+    def set_gide_value(self, zustand: dict, fehler: str = "", gesteckt=None) -> None:
+        """Gruppe setzen (ohne Signal); *fehler* = Kernfehler unter der Gruppe."""
+        self.gide_gruppe.set_zustand(zustand, fehler, gesteckt)
 
     # ── RAM-Disk (RAF) ───────────────────────────────────────────────────────
 

@@ -50,6 +50,14 @@ crt:
 # Zehnfach: der Kaltstart (Urlader, Laufwerkssuche, Laden des Betriebssystems) dauert sonst mehrere Sekunden.
 general:
   speed: 10.0
+  # IDE-Platte GIDE + Uhr RTC 72421 (app/gide.py, doc/design/50_gun_gide.md G6): enabled = Karte
+  # gesteckt, basis = E/A-Basis (Hex, Vielfaches von 10; Vorauswahl 90H), image = Plattenabbild
+  # ('' = keins; Pfade sind rechnerspezifisch, hier leer), rtc = Uhr bestueckt.
+  gide:
+    enabled: false
+    basis: '90'
+    image: ''
+    rtc: true
   # Modell: pc1715 (Bildschirm K7222, 80 x 24) oder pc1715-k7221 (K7221, 64 x 16).
   model: pc1715
   # ROM-Varianten (AP-6, Kaltstart nötig; ein fehlender Schluessel = Vorgabe):
