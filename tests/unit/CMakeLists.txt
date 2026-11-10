@@ -175,6 +175,10 @@ k1520_add_test(ata_geraet     SRC peripherals/test_ata_geraet.cpp
 k1520_add_test(vdip_geraet    SRC peripherals/test_vdip_geraet.cpp
                               LIBS k1520_vdip LABELS "${_lbl}")
 
+# WIZnet W5100 gegen Loopback (Entwurf 50 AP N1)
+k1520_add_test(w5100          SRC peripherals/test_w5100.cpp
+                              LIBS k1520_w5100 LABELS "${_lbl}")
+
 # Lochstreifen-Bandformate Roh / Intel HEX / ASCII-Art (doc/design/23_lochstreifen.md §4, AP-L2)
 k1520_add_test(band_format    SRC peripherals/test_band_format.cpp
                               LIBS k1520_lochstreifen LABELS "${_lbl}")

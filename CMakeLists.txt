@@ -481,6 +481,11 @@ if(BUILD_K1520)
     add_library(k1520_vdip STATIC core/peripherals/vdip/vdip_geraet.cpp)
     target_include_directories(k1520_vdip PUBLIC ${CMAKE_SOURCE_DIR})
 
+    # WIZnet W5100 (Registermodell, Netz ueber die Socket-Schicht; GUN, Entwurf 50 AP N1)
+    add_library(k1520_w5100 STATIC core/peripherals/w5100/w5100.cpp)
+    target_link_libraries(k1520_w5100 PUBLIC k1520_serial_net Threads::Threads)
+    target_include_directories(k1520_w5100 PUBLIC ${CMAKE_SOURCE_DIR})
+
     # P8000, Winchesterlaufwerk am WDC: LBA-Abbild, Spursynthese/-zerlegung, Mechanik (AP P13b)
     add_library(k1520_winchester STATIC core/peripherals/winchester/platte.cpp)
     target_link_libraries(k1520_winchester PUBLIC k1520_logger k1520_gzip Threads::Threads)

@@ -125,6 +125,7 @@ REGELN = [
     ("core/cards/gun_usb/**", (), "GUN-USB (keine langsamen Faelle)", True),
     ("core/peripherals/ata/**", (), "ATA-Platte (keine langsamen Faelle)", True),
     ("core/peripherals/vdip/**", (), "VDIP-USB-Stick (keine langsamen Faelle)", True),
+    ("core/peripherals/w5100/**", (), "W5100-Netzbaustein (keine langsamen Faelle)", True),
     ("core/cards/k6022/**", ("fach_a5120",), "Lochstreifen", True),
     ("core/peripherals/kassette/**", ("fach_a5120",), "Kassette", True),
     ("core/peripherals/k7672*/**", ("fach_k8915", "fach_prg710"), "Tastatur K7672", True),
