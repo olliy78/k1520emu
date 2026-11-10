@@ -372,6 +372,7 @@ void A5120Machine::resetHardware() {
     rafReset();             // RAF (gesteckt?): nur das Latch sperrt, der Inhalt bleibt
     k6022Reset();           // K6022 (gesteckt?): PIOs zurueck, Band und Stanzband bleiben
     k5020Reset();             // K5020 (gesteckt?): PIOs zurueck, Baender bleiben liegen
+    gideReset();             // GIDE (gesteckt?): LH, Platte; Medium bleibt
     bus_.clearNMI();
     bus_.releaseINT();
     bus_.releaseWAIT();
@@ -402,6 +403,7 @@ void A5120Machine::powerOn() {
     if (em_) em_->powerOn();
     // K3521 (Akkupufferung): Inhalt bleibt auch ueber Netz-Aus/Ein; /SUE faellt im resetHardware().
     rafPowerOn();       // RAF ohne Stand-by-Pufferung: Inhalt weg (Entwurf 22 §3.4)
+    gidePowerOn();
     resetHardware();
     LOG_INFO("A5120", "Power on: ZVE1 Reset, Lade-ROM aktiv");
 
@@ -1025,6 +1027,7 @@ int A5120Machine::run(int max_cycles) {
         if (aup_sonder_) ctc_fired = aup_->clockTick(used) || ctc_fired;   // AUP-Sonderschnittstelle
         ctc_fired      = k6022Takt(used) || ctc_fired;   // Lochstreifen (gesteckt?)
         ctc_fired      = k5020Takt(used) || ctc_fired;   // Kassette (gesteckt?)
+        gideTakt(total_cycles_);   // GIDE (gesteckt?): Platte und RTC in Maschinenzeit
         if (ctc_fired) bus_.markIntDirty();
 
         // Service the keyboard: advance the 9600-baud serial-transmit timing

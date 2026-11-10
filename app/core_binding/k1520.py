@@ -609,6 +609,28 @@ _lib.k1520_aup_code.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int]
 _lib.k1520_aup_code.restype = ctypes.c_int
 _lib.k1520_aup_tastenname.argtypes = [ctypes.c_int, ctypes.c_int]
 _lib.k1520_aup_tastenname.restype = ctypes.c_char_p
+# GIDE (doc/design/50_gun_gide.md, AP G4)
+_lib.k1520_gide_install.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_bool, ctypes.c_char_p, ctypes.c_char_p]
+_lib.k1520_gide_install.restype = ctypes.c_bool
+_lib.k1520_gide_installed.argtypes = [K1520Handle]
+_lib.k1520_gide_installed.restype = ctypes.c_bool
+_lib.k1520_gide_error.argtypes = [K1520Handle]
+_lib.k1520_gide_error.restype = ctypes.c_char_p
+_lib.k1520_gide_image_mount.argtypes = [K1520Handle, ctypes.c_char_p]
+_lib.k1520_gide_image_mount.restype = ctypes.c_bool
+_lib.k1520_gide_image_eject.argtypes = [K1520Handle]
+_lib.k1520_gide_image_eject.restype = ctypes.c_bool
+_lib.k1520_gide_image_create.argtypes = [K1520Handle, ctypes.c_char_p, ctypes.c_uint32]
+_lib.k1520_gide_image_create.restype = ctypes.c_bool
+_lib.k1520_gide_image_path.argtypes = [K1520Handle]
+_lib.k1520_gide_image_path.restype = ctypes.c_char_p
+_lib.k1520_gide_status.argtypes = [K1520Handle, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int),
+                                   ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int),
+                                   ctypes.POINTER(ctypes.c_uint64), ctypes.POINTER(ctypes.c_uint64)]
+_lib.k1520_gide_status.restype = ctypes.c_bool
+_lib.k1520_gide_rtc_zeit.argtypes = [K1520Handle, ctypes.POINTER(ctypes.c_int64)]
+_lib.k1520_gide_rtc_zeit.restype = ctypes.c_bool
+
 # RAM-Floppy RAF (doc/design/22_raf512.md §6)
 _lib.k1520_raf_install.argtypes = [K1520Handle, ctypes.c_char_p]
 _lib.k1520_raf_install.restype = ctypes.c_bool
@@ -1207,7 +1229,7 @@ class K1520Emulator:
                  tastatur: Optional[str] = None, p8000: Optional[dict] = None,
                  ausfuehrung: Optional[str] = None, spe=1, pcmc=False, laderom: Optional[str] = None,
                  konfig: Optional[dict] = None, aup: bool = False,
-                 aup_sonder: bool = False):
+                 aup_sonder: bool = False, gide=None):
         """Initialize emulator instance.
 
         Args:
@@ -1244,6 +1266,10 @@ class K1520Emulator:
             raf: RAM-Floppy — ``None``/``"none"`` = ohne, ``"raf128"``, ``"raf512"``
                 oder ``"raf2m"``; an jeder Maschine.  Wird direkt nach dem Anlegen
                 gesteckt (vor dem ersten Lauf); Fehler → ValueError.
+            gide: IDE-Karte GIDE stecken (an jeder Maschine ausser P8000) — ``None``/``False`` = ohne,
+                ``True`` = Vorgaben (Basis 0x90, RTC bestückt), sonst ein dict mit den Schlüsseln
+                ``basis``, ``rtc`` (bool), ``abbild`` (Plattenabbild), ``rtc_zustand`` (Batteriedatei).
+                Direkt nach dem Anlegen gesteckt; Fehler → ValueError.
             ptape: Lochstreifen-Karte K6022 (SIF1000, E0H–E7H) stecken; an jeder
                 Maschine, wie ``raf`` direkt nach dem Anlegen.  Fehler → ValueError.
             aup: nur A5120 — AUP 062-8531 (Tastaturteil K7633 + Kundentastatur, E/A 40H–43H)
@@ -1400,6 +1426,16 @@ class K1520Emulator:
                 _lib.k1520_destroy(handle)
                 self._handle = None
                 raise ValueError(reason or f"RAF {raf!r} nicht steckbar")
+        if gide:
+            g = {} if gide is True else dict(gide)
+            if not _lib.k1520_gide_install(handle, int(g.get("basis", 0x90)), bool(g.get("rtc", True)),
+                                           os.fsencode(g.get("abbild") or ""),
+                                           os.fsencode(g.get("rtc_zustand") or "")):
+                reason = _lib.k1520_gide_error(handle)
+                reason = reason.decode("utf-8", "replace") if reason else ""
+                _lib.k1520_destroy(handle)
+                self._handle = None
+                raise ValueError(reason or "GIDE nicht steckbar")
         if ptape and not _lib.k1520_ptape_install(handle):
             reason = _lib.k1520_last_init_error()
             reason = reason.decode("utf-8", "replace") if reason else ""
@@ -2413,6 +2449,46 @@ class K1520Emulator:
         return _lib.k1520_head_loaded(self._handle)
 
     # ─── Speicher-/Portzugriff (Diagnose, Tests) ─────────────────────────────
+
+    # ─── GIDE ──────────────────────────────────────────────────────────────
+    def gide_installed(self) -> bool:
+        """True, wenn die GIDE gesteckt ist (``K1520Emulator(gide=...)``)."""
+        return bool(_lib.k1520_gide_installed(self._handle))
+
+    def gide_error(self) -> str:
+        v = _lib.k1520_gide_error(self._handle)
+        return v.decode("utf-8", "replace") if v else ""
+
+    def gide_image_mount(self, pfad) -> bool:
+        return bool(_lib.k1520_gide_image_mount(self._handle, os.fsencode(pfad)))
+
+    def gide_image_eject(self) -> bool:
+        return bool(_lib.k1520_gide_image_eject(self._handle))
+
+    def gide_image_create(self, pfad, mbyte: int) -> bool:
+        """Leeres Abbild von ``mbyte`` MB anlegen (vorhandene Datei bleibt unberührt → False)."""
+        return bool(_lib.k1520_gide_image_create(self._handle, os.fsencode(pfad), int(mbyte)))
+
+    def gide_image_path(self) -> str:
+        v = _lib.k1520_gide_image_path(self._handle)
+        return os.fsdecode(v) if v else ""
+
+    def gide_status(self) -> Optional[dict]:
+        """Zustand ohne Nebenwirkung (``None`` ohne Karte)."""
+        basis, lh, cmd, img = (ctypes.c_int() for _ in range(4))
+        sek = ctypes.c_uint64()
+        z = (ctypes.c_uint64 * 4)()
+        if not _lib.k1520_gide_status(self._handle, ctypes.byref(basis), ctypes.byref(lh), ctypes.byref(cmd),
+                                      ctypes.byref(img), ctypes.byref(sek), z):
+            return None
+        return {"basis": basis.value, "lh": lh.value, "letzter_befehl": cmd.value,
+                "abbild_vorhanden": bool(img.value), "sektoren": sek.value,
+                "daten_lesen": z[0], "daten_schreiben": z[1], "taskfile": z[2], "befehle": z[3]}
+
+    def gide_rtc_zeit(self) -> Optional[int]:
+        """Uhr der RTC (Unix-Sekunden der Kalenderzeit), ``None`` ohne Karte/RTC."""
+        t = ctypes.c_int64()
+        return t.value if _lib.k1520_gide_rtc_zeit(self._handle, ctypes.byref(t)) else None
 
     # ─── RAM-Floppy RAF ────────────────────────────────────────────────────
     @property

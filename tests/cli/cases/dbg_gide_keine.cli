@@ -1,0 +1,8 @@
+# Ohne --gide: der Befehl `gide` meldet das, statt zu stuerzen.
+tool:    k1520dbg
+disk:    cpa_cpa780_k5601_clock.img
+run:     %DISK%
+stdin:
+  gide
+  q
+expect:  keine GIDE gesteckt

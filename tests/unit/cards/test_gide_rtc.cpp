@@ -85,9 +85,7 @@ struct Rig {
     /// BCD-Zeit [Jahr, Monat, Tag, Std, Min, Sek] in den Speicher legen und mit RTCset (STOP drumherum) stellen.
     void stelle(std::array<uint8_t, 6> t) {
         std::copy(t.begin(), t.end(), ram.begin() + 0x3000);
-        chip(0x0F, 0x06);                 // STOP (RTCset von Reh setzt nur HOLD, s. Bericht [R3])
-        ASSERT_TRUE(rufe(0x280));
-        chip(0x0F, 0x04);                 // Stop loesen: Zeit gilt
+        ASSERT_TRUE(rufe(0x280));         // Rehs RTCset unveraendert: nur HOLD, nie STOP
     }
     std::array<uint8_t, 6> lies() {
         std::fill(ram.begin() + 0x3000, ram.begin() + 0x3006, 0xEE);

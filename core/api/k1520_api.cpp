@@ -1676,6 +1676,95 @@ int k1520_ptape_punch_enabled(K1520Handle h) {
     return k ? (k->stanzerEin() ? 1 : 0) : -1;
 }
 
+// ─── GIDE (doc/design/50_gun_gide.md, AP G4) ───────────────────────────────────
+namespace {
+using k1520::Gide;
+using k1520::AtaGeraet;
+std::string gide_fehler;
+bool gideErgebnis(bool ok, const std::string& grund) {
+    gide_fehler = ok ? std::string() : grund;
+    return ok;
+}
+Gide* gideOf(K1520Handle h) { return h ? toMachine(h)->gide() : nullptr; }
+Gide* gideOderFehler(K1520Handle h) {
+    Gide* g = gideOf(h);
+    if (!g) gide_fehler = "keine GIDE gesteckt";
+    return g;
+}
+}  // namespace
+
+bool k1520_gide_install(K1520Handle h, int basis, bool rtc_vorhanden, const char* abbild, const char* rtc_zustand) {
+    if (!h) return gideErgebnis(false, "kein Handle");
+    if (basis < 0 || basis > 0xFF) return gideErgebnis(false, "GIDE: Basis ausserhalb 00H..FFH");
+    Gide::Config c;
+    c.basis = static_cast<uint8_t>(basis);
+    c.rtc_vorhanden = rtc_vorhanden;
+    Gide::RtcConfig rc;
+    if (rtc_zustand) rc.zustand = rtc_zustand;
+    K1520Machine* m = toMachine(h);
+    if (!m->installGide(c, &rc, abbild ? abbild : "")) return gideErgebnis(false, m->gideFehler());
+    return gideErgebnis(true, {});
+}
+
+bool k1520_gide_installed(K1520Handle h) { return gideOf(h) != nullptr; }
+
+const char* k1520_gide_error(K1520Handle) { return gide_fehler.c_str(); }
+
+bool k1520_gide_image_mount(K1520Handle h, const char* pfad) {
+    Gide* g = gideOderFehler(h);
+    if (!g) return false;
+    if (!pfad || !*pfad) return gideErgebnis(false, "kein Abbildpfad");
+    std::string f;
+    g->platte().auswerfen();
+    if (!g->platte().abbildOeffnen(pfad, AtaGeraet::Geometrie(), &f)) return gideErgebnis(false, f);
+    return gideErgebnis(true, {});
+}
+
+bool k1520_gide_image_eject(K1520Handle h) {
+    Gide* g = gideOderFehler(h);
+    if (!g) return false;
+    g->platte().auswerfen();
+    return gideErgebnis(true, {});
+}
+
+bool k1520_gide_image_create(K1520Handle, const char* pfad, uint32_t mbyte) {
+    if (!pfad || !*pfad) return gideErgebnis(false, "kein Abbildpfad");
+    if (mbyte == 0) return gideErgebnis(false, "Groesse 0 MB");
+    std::string f;
+    if (!AtaGeraet::abbildAnlegen(pfad, uint64_t(mbyte) * 2048, &f)) return gideErgebnis(false, f);
+    return gideErgebnis(true, {});
+}
+
+const char* k1520_gide_image_path(K1520Handle h) {
+    static thread_local std::string buf;
+    const Gide* g = gideOf(h);
+    buf = (g && g->platte().mediumVorhanden()) ? g->platte().pfad() : std::string();
+    return buf.c_str();
+}
+
+bool k1520_gide_status(K1520Handle h, int* basis, int* lh, int* letzter_befehl,
+                       int* abbild_vorhanden, uint64_t* sektoren, uint64_t* zaehler) {
+    const Gide* g = gideOderFehler(h);
+    if (!g) return false;
+    if (basis) *basis = g->config().basis;
+    if (lh) *lh = g->lh() ? 1 : 0;
+    if (letzter_befehl) *letzter_befehl = g->letzterBefehl();
+    if (abbild_vorhanden) *abbild_vorhanden = g->platte().mediumVorhanden() ? 1 : 0;
+    if (sektoren) *sektoren = g->platte().sektorenGesamt();
+    if (zaehler) {
+        const Gide::Zaehler& z = g->zaehler();
+        zaehler[0] = z.daten_lesen; zaehler[1] = z.daten_schreiben; zaehler[2] = z.taskfile; zaehler[3] = z.befehle;
+    }
+    return true;
+}
+
+bool k1520_gide_rtc_zeit(K1520Handle h, int64_t* out) {
+    Gide* g = gideOderFehler(h);
+    if (!g || !g->rtc()) return gideErgebnis(false, "keine RTC bestueckt");
+    if (out) *out = g->rtc()->gastZeit();
+    return true;
+}
+
 // ─── RAM-Floppy RAF (doc/design/22_raf512.md §6) ───────────────────────────────
 bool k1520_raf_install(K1520Handle h, const char* typ) {
     if (!h) return false;

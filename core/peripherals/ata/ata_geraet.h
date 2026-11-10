@@ -114,6 +114,9 @@ public:
     bool drq() const { return drq_; }
     bool bsy() const { return busy_ || srst_; }
     bool slaveGewaehlt() const { return (sdh_ & 0x10) != 0; }
+    /// Task-File ohne Nebenwirkung (Debugger): kein BSY-Zaehler, kein Datenwort.
+    struct TaskFile { uint8_t error, features, sektoranzahl, sektornummer, zyl_low, zyl_high, sdh, status, befehl; };
+    TaskFile taskFile() const { return {err_, features_, sc_, sn_, cl_, ch_, sdh_, status(), cmd_}; }
 
 private:
     enum class Modus { Keiner, Lesen, Schreiben, Identify };

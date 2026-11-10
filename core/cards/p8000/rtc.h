@@ -86,6 +86,13 @@ struct P8000RtcConfig {
     std::function<int64_t()> zeitquelle;  ///< Unix-Sekunden UTC; leer = std::time
     uint32_t takt_hz = 4'000'000;         ///< Takt, in dem `takte()` zaehlt (Maschinenzeit)
     std::string kopf = "K1520-P8000-RTC"; ///< Kopfkennung der Batteriedatei (ohne " 2"); GIDE nutzt eine eigene
+    /// false (P8000, Annahme [R3]): Zeitregister nehmen Schreibzugriffe nur bei STOP/RESET an.
+    /// true (GIDE, Rehs RTCset: HOLD setzen, Ziffern schreiben, HOLD loeschen, nie STOP): Schreiben auch unter HOLD.
+    /// Modell: unter HOLD stehen die Register (Momentaufnahme); geschriebene Ziffern aendern sie, und beim
+    /// Loeschen von HOLD gilt der Registerstand als neue Uhrzeit (Uhr laeuft von dort weiter, Resttakte der
+    /// Sekunde auf 0).  Die waehrend HOLD aufgelaufene Zeit wird dabei verworfen, nicht zusaetzlich gezaehlt;
+    /// wurde nichts geschrieben, bleibt die laufende Uhr unberuehrt (kein Verlust eines Sekundenuebertrags).
+    bool schreiben_unter_hold = false;
 };
 
 class P8000Rtc {

@@ -164,6 +164,7 @@ void Prg710Machine::resetHardware()
     atp_.reset();            // 8279: FIFO leer
     k6022Reset();            // K6022 (gesteckt?): PIOs; Band im Leser und Stanzband bleiben
     k5020Reset();             // K5020 (gesteckt?): PIOs zurueck, Baender bleiben liegen
+    gideReset();             // GIDE (gesteckt?): LH, Platte; Medium bleibt
     fs_.reset();
     rafReset();              // RAF (gesteckt?): nur das Latch sperrt, der Inhalt bleibt
     hub_.gastZurueckgesetzt();
@@ -183,6 +184,7 @@ void Prg710Machine::powerOn()
     k7609_.powerOn();        // die Tastatur hat ihr eigenes Netz-Ein, ein /RESET trifft sie nicht
     k7672_.powerOn();        // Selbsttest, KEIN DC1 (wie K8915)
     rafPowerOn();            // RAF ohne Stand-by-Pufferung: Inhalt weg (Entwurf 22 §3.4)
+    gidePowerOn();
     resetHardware();
     LOG_INFO("PRG710", "Netz ein: Abbildung aus, ROM bei 0000H");
 }
@@ -267,6 +269,7 @@ int Prg710Machine::run(int max_cycles)
         dirty |= ass_.clockTick(used);
         dirty |= k6022Takt(used);   // Lochstreifen (gesteckt?)
         dirty |= k5020Takt(used);   // Kassette (gesteckt?)
+        gideTakt(total_cycles_);   // GIDE (gesteckt?): Platte und RTC in Maschinenzeit
         dirty |= fs_.clockTick(used);
         dirty |= atp_.clockTick(used);   // ATP-Zusatz (gesteckt?): Kanalschleife der SIO C0H–C3H
         if (total_cycles_ >= serial_naechst_) {

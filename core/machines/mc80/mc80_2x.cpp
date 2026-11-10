@@ -95,6 +95,7 @@ void Mc80_2xMachine::powerOn()
     ops_.fill(0xFF);          // dRAM beim Einschalten: wie die K3525 (A2) FFH
     dpl_.powerOn();
     rafPowerOn();
+    gidePowerOn();
     total_cycles_ = 0;
     {
         std::lock_guard<std::mutex> l(tasten_mtx_);
@@ -119,6 +120,7 @@ void Mc80_2xMachine::resetHardware()
     mbi_.reset();
     k6022Reset();
     k5020Reset();
+    gideReset();             // GIDE (gesteckt?): LH, Platte; Medium bleibt
     rafReset();
     bus_.clearNMI();
     bus_.releaseINT();
@@ -150,6 +152,7 @@ int Mc80_2xMachine::run(int max_cycles)
         tastenTakt(used);
         dirty |= k6022Takt(used);
         dirty |= k5020Takt(used);
+        gideTakt(total_cycles_);   // GIDE (gesteckt?): Platte und RTC in Maschinenzeit
         if (dirty) bus_.markIntDirty();
     }
     mbi_.autoFlush();

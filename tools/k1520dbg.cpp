@@ -242,6 +242,7 @@ int main(int argc, char** argv){
     bool aup_opt = false;                  // --aup: AUP-Tastaturteil auf 40H-43H (N10c)
     const char* aup_alpha_opt = nullptr;   // --aup-alpha led|ohne|mit
     bool aup_sonder_opt = false;           // --aup-sonder: Sonderschnittstelle (N10d)
+    bool gide_opt = false; int gide_basis = -1; std::string gide_image;   // --gide[=basis] / --gide-image
     const char* raf_opt = nullptr; // --raf none|raf128|raf512|raf2m: RAM-Floppy auf 88H/89H
     const char* mon8_opt = nullptr; const char* mon16_opt = nullptr; // --mon8/--mon16: ROM-Fassung der Monitore (P8000)
     const char* plattepar_opt = nullptr; // --plattepar aus|ergaenzen: Parametersatz einer Platte ohne PAR ergaenzen (Kern-Vorgabe) oder nicht (p8000emu-Vorgabe)
@@ -299,6 +300,8 @@ int main(int argc, char** argv){
         else if (!strcmp(argv[i],"--rtc") && i+1<argc) rtc_opt=argv[++i];
         else if (!strcmp(argv[i],"--atp-zusatz")) atp_opt=true;
         else if (!strcmp(argv[i],"--ptape")) ptape_opt=true;
+        else if (dbgm::parseGideOpt(argv[i],gide_basis)) gide_opt=true;
+        else if (!strcmp(argv[i],"--gide-image") && i+1<argc) { gide_opt=true; gide_image=argv[++i]; }
         else if (!strcmp(argv[i],"--tape-card")) tape_opt=true;
         else if (!strcmp(argv[i],"--tape") && i+1<argc) { tape_opt=true; tape1_opt=argv[++i]; }
         else if (!strcmp(argv[i],"--tape2") && i+1<argc) { tape_opt=true; tape2_opt=argv[++i]; }
@@ -446,6 +449,7 @@ int main(int argc, char** argv){
     { std::string err;   // ebenfalls vor dem ersten Lauf
       if (!dbgm::steckeK6022(m.base(), ptape_opt, err)){ fprintf(stderr,"--ptape: %s\n",err.c_str()); return 2; }
       if (!dbgm::steckeK5020(m.base(), tape_opt, tape1_opt, tape2_opt, err)){ fprintf(stderr,"--tape: %s\n",err.c_str()); return 2; }
+      if (!dbgm::steckeGide(m.base(), gide_opt, gide_basis, gide_image, err)){ fprintf(stderr,"--gide: %s\n",err.c_str()); return 2; }
       if (m.base().k6022()) {
           if (!ptape_in.empty() && !m.base().k6022()->bandEinlegenDatei(ptape_in, err)){ fprintf(stderr,"--ptape-in: %s\n",err.c_str()); return 2; }
           if (!ptape_out.empty() && !m.base().k6022()->stanzerBinden(ptape_out, K6022::Format::Roh, err)){ fprintf(stderr,"--ptape-out: %s\n",err.c_str()); return 2; } } }
@@ -3405,6 +3409,7 @@ int main(int argc, char** argv){
               "  AUP      aup      (mit --aup) Kommando, Lampen, Hupe, Schluessel;  aup taste <0|1> <pos>  aup schluessel <1|2> <an|aus>\n"
               "  KASSETTE tape     (mit --tape) K5020: Karte, je Geraet Kassette/Seite/Kopf/Bloecke/Bindung\n"
               "          tape <1|2> [A|B]       Blockliste einer Seite;  tape <1|2> <A|B> <i>  Rohbytes von Block i\n"
+              "  GIDE    gide      (mit --gide) Basis, LH, letzter Befehl, Zaehler, Platte, Task-File (ohne Nebenwirkung), RTC\n"
               "  RAF     raf       (mit --raf) Typ, Kapazitaet, Latch, gesperrt, Sektor aus dem Latch\n"
               "          raf <S>   Hexdump des 128-B-Sektors S in TREIBER-Lesart: Byte 0 zuerst, also\n"
               "                    rueckwaerts aus der Karte gelesen (INIR/OTIR ohne Autoinkrement)\n"
@@ -4555,6 +4560,11 @@ int main(int argc, char** argv){
             }
             else fprintf(stderr,"  Sicherheitsstecker: %d%s   (kbd stecker <0..6> [falsch]; 0 = ziehen)\n",
                          a5->sicherheitsstecker(), a5->sicherheitssteckerGeraetPasst()?"":" (Geraetekennung falsch)");
+        }
+        else if (cmd=="gide"){   // GIDE (--gide): Basis, LH, letzter Befehl, Zaehler, Platte, Task-File, RTC (ohne Nebenwirkung)
+            const k1520::Gide* g = m.base().gide();
+            if (!g) fprintf(stderr,"  keine GIDE gesteckt (--gide[=basis] [--gide-image <datei>])\n");
+            else fputs(dbgm::gideText(*g).c_str(), stderr);
         }
         else if (cmd=="tape"){   // Kassette K5020/K5200 (--tape): Status, Blockliste, Blockinhalt
             K5020* kk = m.base().k5020();

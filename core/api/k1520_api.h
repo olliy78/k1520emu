@@ -1117,6 +1117,35 @@ K1520_API const char* k1520_hd_rom_typ(const char* firmware);
  *  Plattenabbilder heissen `<name>.<kuerzel>.img` (P24). */
 K1520_API const char* k1520_hd_typ_kuerzel(const char* typ);
 
+/* ─── GIDE: IDE-Karte mit ATA-Platte und RTC 72421 (doc/design/50_gun_gide.md, AP G4) ───────
+ * Bestueckung nach dem Anlegen, VOR dem ersten k1520_run/k1520_reset; alle Maschinen mit K1520-Bus
+ * (nicht P8000).  Die Karte belegt basis+4 .. basis+F.  Ohne Karte: false / 0 / "". */
+
+/** @brief Steckt eine GIDE.  @p basis = Hochnibble-Jumper (Vielfaches von 0x10, Vorgabe 0x90),
+ *  @p rtc_vorhanden = RTC bestueckt, @p abbild = Plattenabbild ("" oder NULL = keins),
+ *  @p rtc_zustand = Batteriedatei der RTC ("" oder NULL = nur im Speicher).
+ *  Fehler (zu spaet, doppelt, Tor belegt, Abbild): false, Grund in k1520_gide_error. */
+K1520_API bool        k1520_gide_install(K1520Handle h, int basis, bool rtc_vorhanden,
+                                         const char* abbild, const char* rtc_zustand);
+K1520_API bool        k1520_gide_installed(K1520Handle h);
+/** @brief Grund des letzten gescheiterten k1520_gide_*-Aufrufs. */
+K1520_API const char* k1520_gide_error(K1520Handle h);
+/** @brief Abbild in die gesteckte Karte legen (Geometrie aus der Groesse). */
+K1520_API bool        k1520_gide_image_mount(K1520Handle h, const char* pfad);
+/** @brief Abbild auswerfen (ausstehendes Schreiben sofort); false ohne Karte. */
+K1520_API bool        k1520_gide_image_eject(K1520Handle h);
+/** @brief Leeres Abbild von @p mbyte MB anlegen (Endung .gz = gepackt); eine vorhandene Datei
+ *  wird NICHT ueberschrieben.  Braucht keine Karte (@p h darf NULL sein; dann kein Fehlertext). */
+K1520_API bool        k1520_gide_image_create(K1520Handle h, const char* pfad, uint32_t mbyte);
+/** @brief Pfad des eingelegten Abbilds ("" = keins). */
+K1520_API const char* k1520_gide_image_path(K1520Handle h);
+/** @brief Zustand ohne Nebenwirkung.  @p zaehler = 4 Werte: Datenworte lesen, schreiben (+8),
+ *  Task-File-Zugriffe (+9..+F), Befehle.  Jeder Zeiger darf NULL sein.  false ohne Karte. */
+K1520_API bool        k1520_gide_status(K1520Handle h, int* basis, int* lh, int* letzter_befehl,
+                                        int* abbild_vorhanden, uint64_t* sektoren, uint64_t* zaehler);
+/** @brief Uhr der RTC wie der Gast sie sieht (Kalenderzeit als Unix-Sekunden); false ohne Karte/RTC. */
+K1520_API bool        k1520_gide_rtc_zeit(K1520Handle h, int64_t* out);
+
 #ifdef __cplusplus
 }
 #endif

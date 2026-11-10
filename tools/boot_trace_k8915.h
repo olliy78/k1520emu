@@ -24,6 +24,9 @@ struct K8915TraceOpts {
     bool        ptape = false;   ///< --ptape: Lochstreifen-Karte K6022 stecken (E0H–E7H)
     bool        tape = false;    ///< --tape/--tape-card: Kassettenkarte K5020 stecken
     std::string tape1, tape2;    ///< --tape/--tape2: .k52 an Geraet 1/2 binden
+    bool        gide = false;    ///< --gide[=basis]: GIDE stecken
+    int         gide_basis = -1; ///< -1 = Vorgabe 90H
+    std::string gide_image;      ///< --gide-image: ATA-Plattenabbild
     std::string disk;            ///< Diskettenpfad (leer = keine)
     std::string mount_path;      ///< tatsaechlich zu mountender Pfad (COW-Kopie o. ae.)
     bool        write_protect = false;

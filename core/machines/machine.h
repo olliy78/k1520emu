@@ -15,6 +15,7 @@
 
 #pragma once
 #include "core/bus/k1520_bus.h"
+#include "core/cards/gide/gide.h"
 #include "core/cards/k5020/k5020.h"
 #include "core/cards/k6022/k6022.h"
 #include "core/cards/raf/raf.h"
@@ -313,6 +314,71 @@ public:
         return &k5020_->laufwerk(drive);
     }
 
+    // ─── GIDE: IDE-Karte mit ATA-Platte und RTC 72421 (doc/design/50_gun_gide.md, AP G4) ──────
+    // Wie K5020/K6022: nach dem Anlegen, VOR dem ersten run()/reset() gesteckt.  Die Basis (Jumper
+    // ja4..ja7) und das Vorhandensein der RTC stellt der Aufrufer ein (@p cfg); die Karte belegt
+    // basis+4 .. basis+F.  Kein Interrupt, kein /WAIT, kein Save-State.  Die Maschine meldet ihr in
+    // der Laufschleife die absolute Taktzahl (@ref gideTakt), setzt sie beim /RESET zurueck
+    // (@ref gideReset; das Plattenabbild und die RTC bleiben) und beim Netz-Ein (@ref gidePowerOn).
+    /**
+     * @brief Steckt eine GIDE.
+     * @param cfg    Bestueckung/Jumper (Basis, RTC bestueckt)
+     * @param rtc    Zeitpolitik der RTC (nur mit cfg.rtc_vorhanden); nullptr = Vorgaben.  Der Takt
+     *               (`takt_hz`) wird IMMER auf den Maschinentakt gesetzt — den kennt nur die Maschine.
+     * @param abbild Plattenabbild ("" = ohne Medium); Fehler beim Oeffnen = false, Karte bleibt ungesteckt
+     * @return false (Grund in @ref gideFehler) nach dem ersten run()/reset(), bei doppeltem Stecken,
+     *         ungueltiger Basis, belegtem Tor oder nicht oeffenbarem Abbild.
+     */
+    bool installGide(const k1520::Gide::Config& cfg, const k1520::Gide::RtcConfig* rtc = nullptr,
+                     const std::string& abbild = "") {
+        gide_fehler_.clear();
+        if (!zusatzkartenSteckbar()) {
+            gide_fehler_ = "Diese Maschine hat keinen K1520-Steckplatz fuer eine GIDE";
+            return false;
+        }
+        if (!bestueckbar_) {
+            gide_fehler_ = "GIDE nur vor dem ersten Lauf/Reset steckbar";
+            return false;
+        }
+        if (gide_) {
+            gide_fehler_ = "Es steckt bereits eine GIDE";
+            return false;
+        }
+        std::unique_ptr<k1520::Gide> karte;
+        try {
+            karte = std::make_unique<k1520::Gide>(cfg);   // wirft bei Basis mit gesetztem Tiefnibble
+        } catch (const std::exception& e) {
+            gide_fehler_ = e.what();
+            return false;
+        }
+        K1520Bus& bus = systemBus();
+        if (const std::string g = karte->belegtGrund(bus); !g.empty()) {   // erst pruefen, dann anmelden
+            gide_fehler_ = g;
+            return false;
+        }
+        if (!abbild.empty()) {
+            std::string f;
+            if (!karte->platte().abbildOeffnen(abbild, k1520::AtaGeraet::Geometrie(), &f)) {
+                gide_fehler_ = f.empty() ? "Abbild nicht oeffenbar: " + abbild : f;
+                return false;
+            }
+        }
+        if (cfg.rtc_vorhanden) {
+            k1520::Gide::RtcConfig rc = rtc ? *rtc : k1520::Gide::RtcConfig();
+            rc.takt_hz = k6022TaktHz();   // Maschinentakt (Name historisch: die virtuelle Funktion gilt je Maschine)
+            karte->rtcAnlegen(rc);
+        }
+        karte->attachToBus(bus);
+        karte->powerOn();
+        gide_ = std::move(karte);
+        return true;
+    }
+    /** @brief Die gesteckte GIDE (nullptr = keine). */
+    k1520::Gide*       gide()       { return gide_.get(); }
+    const k1520::Gide* gide() const { return gide_.get(); }
+    /** @brief Grund des letzten gescheiterten @ref installGide ("" = keiner). */
+    const std::string& gideFehler() const { return gide_fehler_; }
+
 protected:
     /** @brief Der Systembus, auf dem Zusatzkarten (RAF) ihre E/A-Tore anmelden. */
     virtual K1520Bus& systemBus() = 0;
@@ -361,6 +427,13 @@ protected:
     /** @brief Ende jeder run()-Scheibe: gebundene Baender nach der Schreibpause zurueckschreiben. */
     void k5020AutoFlush() { if (k5020_) k5020_->autoFlush(); }
 
+    /** @brief Laufweg, je Befehl: absolute Maschinentakte an die GIDE (Platte, RTC). */
+    void gideTakt(uint64_t takte) { if (gide_) gide_->takt(takte); }
+    /** @brief Systemweiter /RESET: LH und Platte zurueck; Medium und RTC bleiben. */
+    void gideReset() { if (gide_) gide_->reset(); }
+    /** @brief Netz-Ein: Zaehler leer (die RTC hat Batterie, das Medium bleibt). */
+    void gidePowerOn() { if (gide_) gide_->powerOn(); }
+
     /// Erst NACH Bus und Karten der abgeleiteten Klasse zerstoert — unschaedlich, die
     /// RAF fasst den Bus in ihrem Destruktor nicht an.
     std::unique_ptr<RAF> raf_;
@@ -369,10 +442,13 @@ protected:
     std::unique_ptr<K6022> k6022_;
     /// Wie k6022_ (K5020 fasst den Bus im Destruktor nicht an).
     std::unique_ptr<K5020> k5020_;
+    /// Wie k5020_ (die GIDE fasst den Bus im Destruktor nicht an; der Destruktor der Platte schreibt zurueck).
+    std::unique_ptr<k1520::Gide> gide_;
 
 private:
     bool        bestueckbar_ = true;
     std::string raf_fehler_;
     std::string k6022_fehler_;
     std::string k5020_fehler_;
+    std::string gide_fehler_;
 };

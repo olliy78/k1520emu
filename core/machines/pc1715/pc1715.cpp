@@ -264,6 +264,7 @@ void Pc1715Machine::resetHardware()
     }
     k6022Reset();            // K6022 (gesteckt?): PIOs; Band und Stanzband bleiben
     k5020Reset();             // K5020 (gesteckt?): PIOs zurueck, Baender bleiben liegen
+    gideReset();             // GIDE (gesteckt?): LH, Platte; Medium bleibt
     rafReset();              // RAF (gesteckt?): nur das Latch sperrt, der Inhalt bleibt
     hub_.gastZurueckgesetzt();   // XOFF-/RTS-Halt des alten Gastes gilt nicht weiter
     serial_naechst_ = 0;
@@ -280,6 +281,7 @@ void Pc1715Machine::powerOn()
     zre_.powerOn(0x00);
     if (w_) w_->spk.powerOn(0x00);
     rafPowerOn();            // RAF ohne Stand-by-Pufferung: Inhalt weg (Entwurf 22 §3.4)
+    gidePowerOn();
     resetHardware();
     LOG_INFO("PC1715", w_ ? "Netz ein (1715W): BR = 00H, S550 bei 0000H"
                           : "Netz ein: ROM-Overlay S502 bei 0000H");
@@ -443,6 +445,7 @@ int Pc1715Machine::run(int max_cycles)
         bool dirty = zre_.clockTick(used);
         dirty |= k6022Takt(used);   // Lochstreifen (gesteckt?)
         dirty |= k5020Takt(used);   // Kassette (gesteckt?)
+        gideTakt(total_cycles_);   // GIDE (gesteckt?): Platte und RTC in Maschinenzeit
         // Schnittstellen nach aussen: der Wandler arbeitet nur alle 1/16 Zeichenzeit.
         if (total_cycles_ >= serial_naechst_) {
             serial_naechst_ = hub_.takt(total_cycles_);
@@ -510,6 +513,7 @@ int Pc1715Machine::runW(int max_cycles)
         dirty |= w.ctc2.clockTick(used);
         dirty |= k6022Takt(used);   // Lochstreifen (gesteckt?)
         dirty |= k5020Takt(used);   // Kassette (gesteckt?)
+        gideTakt(total_cycles_);   // GIDE (gesteckt?): Platte und RTC in Maschinenzeit
         if (total_cycles_ >= serial_naechst_) {
             serial_naechst_ = hub_.takt(total_cycles_);
             dirty |= zre_.nimmSeriellGeaendert();

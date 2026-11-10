@@ -56,6 +56,7 @@ void Gide::rtcAnlegen(const RtcConfig& rc) {
     c.zeitquelle = rc.zeitquelle;
     c.takt_hz = rc.takt_hz;
     c.kopf = "K1520-GIDE-RTC";
+    c.schreiben_unter_hold = true;   // Rehs RTCset stellt nur unter HOLD (nie STOP)
     rtc_ = std::make_unique<P8000Rtc72421>(c);
     rtc_takt_init_ = false;
     P8000Rtc72421* r = rtc_.get();

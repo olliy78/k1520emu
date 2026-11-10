@@ -307,11 +307,17 @@ void P8000Rtc72421::registerSchreiben(uint8_t n, uint8_t d) {
     n &= 0x0F;
     const uint8_t v = d & 0x0F;
     if (n <= 12) {
-        if (angehalten()) { zeit_[n] = v; stell_geaendert_ = true; }   // [R3]
+        if (angehalten() || (cfg_.schreiben_unter_hold && hold_)) { zeit_[n] = v; stell_geaendert_ = true; }   // [R3]
     } else if (n == 13) {
         const bool neu = v & 1;
-        if (neu && !hold_ && !angehalten()) ladeNibbel(uhrWand(), zeit_);  // [R2]
+        if (neu && !hold_ && !angehalten()) { ladeNibbel(uhrWand(), zeit_); stell_geaendert_ = false; }  // [R2]
+        const bool hold_fiel = hold_ && !neu;
         hold_ = neu;
+        // Stellen unter HOLD (nur mit schreiben_unter_hold): beim Loeschen gilt der Registerstand als Uhrzeit.
+        if (hold_fiel && cfg_.schreiben_unter_hold && !angehalten() && stell_geaendert_) {
+            festschreiben();
+            stell_geaendert_ = false;
+        }
         d_ = uint8_t(v & 0x04);
         if (v & 0x08) minuteRunden();                                   // [R6]
     } else if (n == 14) {

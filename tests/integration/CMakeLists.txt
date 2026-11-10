@@ -274,6 +274,12 @@ k1520_add_test(k5020_maschinen SRC test_k5020_maschinen.cpp
                                LIBS k1520_a5120 k1520_k8915 k1520_prg710 k1520_pc1715 k1520_logger k1520_testsupport
                                LABELS "${_lbl}" DEFS LOG_LEVEL=2)
 
+# GIDE (IDE + RTC 72421, Entwurf 50 AP G4) als Option: stecken (Basis 90H/A0H), zu spaet, doppelt, Tor belegt,
+# ungueltige Basis; Z80-Gastcode schreibt/liest/vergleicht einen Sektor und liest die RTC (A5120/.16, K8915, PRG 710-1, PC 1715).
+k1520_add_test(gide_maschinen SRC test_gide_maschinen.cpp
+                              LIBS k1520_a5120 k1520_k8915 k1520_prg710 k1520_pc1715 k1520_gide k1520_logger k1520_testsupport
+                              LABELS "${_lbl}" DEFS LOG_LEVEL=2)
+
 # A5120 bootet vom Band (doc/design/29_kassette.md AP K7): keine Diskette, K5020 gesteckt, das
 # Lade-ROM faellt auf die Kassette (LW1, bzw. LW1 leer → LW2) und startet tools/kassette/bandtest.
 k1520_add_test(kassette_boot SRC test_kassette_boot.cpp

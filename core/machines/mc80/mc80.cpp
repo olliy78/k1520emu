@@ -96,6 +96,7 @@ void Mc80Machine::powerOn()
     vis_.powerOn();
     zve_.powerOn(cfg_.ram_fill);   // zuletzt: meldet Segmentregister 00H an die SPE
     rafPowerOn();
+    gidePowerOn();
     total_cycles_ = 0;
     // NICHT reset(): das schloesse die Bestueckung ab, und powerOn() laeuft schon im Konstruktor —
     // installK5020() danach schluege immer fehl (Fund M7, Waechter Mc80Kassette.KarteSteckbar…).
@@ -117,6 +118,7 @@ void Mc80Machine::resetHardware()
     tast_.reset();    // VIS 2a: /RESET laesst das Bild stehen
     k6022Reset();
     k5020Reset();
+    gideReset();             // GIDE (gesteckt?): LH, Platte; Medium bleibt
     rafReset();
     hub_.gastZurueckgesetzt();   // XOFF-/RTS-Halt des alten Gastes gilt nicht weiter
     serial_naechst_ = 0;
@@ -154,6 +156,7 @@ int Mc80Machine::run(int max_cycles)
         }
         dirty |= k6022Takt(used);
         dirty |= k5020Takt(used);
+        gideTakt(total_cycles_);   // GIDE (gesteckt?): Platte und RTC in Maschinenzeit
         if (total_cycles_ >= serial_naechst_) {
             serial_naechst_ = hub_.takt(total_cycles_);
             dirty |= asp_.nimmSeriellGeaendert();

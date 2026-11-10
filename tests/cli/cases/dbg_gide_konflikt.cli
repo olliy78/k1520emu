@@ -1,0 +1,6 @@
+# --gide=0xA0 am K8915: Tor A8H gehoert der ZRE -> Fehlermeldung mit Grund, Exit 2, kein Absturz.
+tool:    k1520dbg
+disk:    k8915scpx_boot1.hfe
+run:     --machine k8915 --gide=0xA0 %DISK%
+exit:    2
+expect:  --gide: E/A-Tor A8H belegt

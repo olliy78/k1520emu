@@ -82,6 +82,54 @@ inline bool steckeRaf(K1520Machine& m, const std::string& name, std::string& err
     return true;
 }
 
+/**
+ * @brief Steckt die GIDE (`--gide[=basis]`, `--gide-image`, Entwurf 50 AP G4) in @p m, wenn @p an.
+ *        @p basis < 0 = Vorgabe 90H.  Die RTC ist bestueckt (Wirtszeit, nur im Speicher).
+ */
+inline bool steckeGide(K1520Machine& m, bool an, int basis, const std::string& abbild, std::string& err) {
+    if (!an) return true;
+    k1520::Gide::Config c;
+    if (basis >= 0) c.basis = static_cast<uint8_t>(basis);
+    if (!m.installGide(c, nullptr, abbild)) { err = m.gideFehler(); return false; }
+    return true;
+}
+
+/// `--gide` bzw. `--gide=<basis>` (Zahl, 0x.. erlaubt): true, wenn @p arg die Option ist; @p basis = -1 ohne Wert.
+inline bool parseGideOpt(const char* arg, int& basis) {
+    if (!strcmp(arg, "--gide")) { basis = -1; return true; }
+    if (!strncmp(arg, "--gide=", 7)) { basis = static_cast<int>(strtol(arg + 7, nullptr, 0)); return true; }
+    return false;
+}
+
+/** @brief Zustand der GIDE als Text (Debugbefehl `gide`), ohne Nebenwirkung. */
+inline std::string gideText(const k1520::Gide& g) {
+    char b[200];
+    std::string s;
+    const auto& z = g.zaehler();
+    snprintf(b, sizeof b, "  GIDE  Basis %02XH (Tore %02XH-%02XH)  LH=%d  letzter Befehl %02XH\n", g.config().basis,
+             g.config().basis + 4, g.config().basis + 0xF, g.lh() ? 1 : 0, g.letzterBefehl());
+    s += b;
+    snprintf(b, sizeof b, "  Zugriffe: Daten lesen %llu, schreiben %llu, Task-File %llu, Befehle %llu\n",
+             (unsigned long long)z.daten_lesen, (unsigned long long)z.daten_schreiben,
+             (unsigned long long)z.taskfile, (unsigned long long)z.befehle);
+    s += b;
+    const auto& p = g.platte();
+    if (p.mediumVorhanden()) {
+        const auto geo = p.geometrie();
+        snprintf(b, sizeof b, "  Platte: %llu Sektoren (%u/%u/%u), %s%s\n", (unsigned long long)p.sektorenGesamt(),
+                 geo.zylinder, geo.koepfe, geo.sektoren, p.schmutzig() ? "ungesichert, " : "", p.pfad().c_str());
+    } else snprintf(b, sizeof b, "  Platte: kein Abbild\n");
+    s += b;
+    const auto t = p.taskFile();
+    snprintf(b, sizeof b, "  Task-File: Error %02X  Features %02X  SC %02X  SN %02X  CL %02X  CH %02X  SDH %02X  Status %02X%s%s%s  Cmd %02X\n",
+             t.error, t.features, t.sektoranzahl, t.sektornummer, t.zyl_low, t.zyl_high, t.sdh, t.status,
+             (t.status & 0x80) ? " BSY" : "", (t.status & 0x08) ? " DRQ" : "", (t.status & 0x01) ? " ERR" : "", t.befehl);
+    s += b;
+    if (g.config().rtc_vorhanden && const_cast<k1520::Gide&>(g).rtc()) s += "  RTC: " + const_cast<k1520::Gide&>(g).rtc()->text() + "\n";
+    else s += "  RTC: nicht bestueckt\n";
+    return s;
+}
+
 /** @brief Steckt die K6022 (`--ptape`, Entwurf 23 AP-L1) in @p m, wenn @p an; false + @p err bei Fehler. */
 inline bool steckeK6022(K1520Machine& m, bool an, std::string& err) {
     if (!an) return true;
