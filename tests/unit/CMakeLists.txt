@@ -161,6 +161,10 @@ k1520_add_test(tastatur_k7673 SRC peripherals/test_tastatur_k7673.cpp
 k1520_add_test(platte         SRC peripherals/test_platte.cpp
                               LIBS k1520_winchester LABELS "${_lbl}")
 
+# ATA-/IDE-Festplatte (Entwurf 50 AP G1)
+k1520_add_test(ata_geraet     SRC peripherals/test_ata_geraet.cpp
+                              LIBS k1520_ata LABELS "${_lbl}")
+
 # Lochstreifen-Bandformate Roh / Intel HEX / ASCII-Art (doc/design/23_lochstreifen.md §4, AP-L2)
 k1520_add_test(band_format    SRC peripherals/test_band_format.cpp
                               LIBS k1520_lochstreifen LABELS "${_lbl}")

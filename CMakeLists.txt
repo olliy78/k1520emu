@@ -457,6 +457,11 @@ if(BUILD_K1520)
     target_link_libraries(k1520_p8000_karte16 PUBLIC k1520_p8000_mmu_logik16 k1520_p8000_dram16 k1520_z8000 k1520_ctc k1520_sio k1520_pio k1520_bus k1520_logger k1520_serial)
     target_include_directories(k1520_p8000_karte16 PUBLIC ${CMAKE_SOURCE_DIR})
 
+    # ATA-/IDE-Festplatte (GIDE, Entwurf 50 AP G1): Task-File, Befehle, Rohabbild/.img.gz
+    add_library(k1520_ata STATIC core/peripherals/ata/ata_geraet.cpp)
+    target_link_libraries(k1520_ata PUBLIC k1520_gzip Threads::Threads)
+    target_include_directories(k1520_ata PUBLIC ${CMAKE_SOURCE_DIR})
+
     # P8000, Winchesterlaufwerk am WDC: LBA-Abbild, Spursynthese/-zerlegung, Mechanik (AP P13b)
     add_library(k1520_winchester STATIC core/peripherals/winchester/platte.cpp)
     target_link_libraries(k1520_winchester PUBLIC k1520_logger k1520_gzip Threads::Threads)
