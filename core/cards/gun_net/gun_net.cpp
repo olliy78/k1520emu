@@ -60,6 +60,25 @@ void GunNet::verwerfen() {
     pb0_ = false;
 }
 
+// "Blockierende Zustaende bei PIO-Ausgabe bzw. -Eingabe werden nach 524 ms abgebrochen und die komplette Befehlsverarbeitung
+// zurueckgesetzt" (KCNET Protokoll V1.2).  Hier: ein angefangenes Kommando oder eine nicht abgeholte Antwort verfaellt, wenn
+// 524 ms MASCHINENZEIT lang kein Byte geflossen ist.  Der Zeiger (Kommando 02) und die Zaehler bleiben.
+void GunNet::fristPruefen() {
+    if (phase_ == Phase::Bereit && antwort_.empty() && !vorgelegt_) return;
+    const uint64_t hz = cfg_.takt_hz ? cfg_.takt_hz : 2'457'600;
+    if (takte_ >= aktiv_seit_ && takte_ - aktiv_seit_ > hz * FRIST_MS / 1000) {
+        verwerfen();
+        pegelAnlegen();
+        ++zaehler_.fristabbrueche;
+    }
+}
+
+void GunNet::schreibeGast(uint16_t a, uint8_t b) {
+    if (a < 0x8000) return;                  // PIO schreibt nur im TCP/IP-Stack (8000H..FFFFH)
+    if (a >= 0x8009 && a <= 0x800E) return;  // Ethernet-MAC (SHAR) ist fuer die PIO nicht beschreibbar
+    w5100_->schreibe(uint16_t(a & 0x7FFF), b);
+}
+
 void GunNet::reset() {
     pio_.reset();
     verwerfen();
@@ -69,9 +88,19 @@ void GunNet::reset() {
     verdrahten();
 }
 
+// Port-B-Beschaltung der Karte (Hardware 1.2, Artikel "KCNET 1.2" von R. Kaestner): ARDY der PIO geht direkt auf PB0,
+// BRDY INVERTIERT auf PB7, PB1..PB6 liegen an Masse (bei Eingabe immer 0).  Daraus folgen die beiden Warteschleifen des Gastes:
+//  - Senden:    ARDY ist 1, solange das Ausgaberegister von Port A gefuellt ist und die Gegenseite (/ASTB) es noch nicht
+//               abgeholt hat -> "warte bis PB0 = 0" heisst "Byte uebernommen".
+//  - Empfangen: BRDY ist 1, solange das Eingaberegister LEER ist (die Gegenseite darf /BSTB geben); nach /BSTB faellt es auf 0,
+//               nach dem Lesen von Daten A steigt es wieder.  Invertiert auf PB7 heisst das: PB7 = 1 <=> Byte da,
+//               "warte bis PB7 = 1" und nach dem Lesen sofort wieder 0.
+// Das Modell fuehrt beides als Zustandsbits (pb0_/vorgelegt_); der echte ATmega ist schnell genug, dass PB0 nach dem OUT
+// mindestens eine Abfrage lang 1 ist (50a Abschnitt 3).  Dass die K1520-Platine B1/B5/B6 fuer die EEPROM-Segmentwahl
+// (eepload.COM) benutzt, betrifft eine andere Bestueckung; die Netzseite braucht nur B0 und B7.
 void GunNet::pegelAnlegen() {
     const uint8_t v = uint8_t((pb0_ ? PB_UEBERNOMMEN : 0) | (vorgelegt_ ? PB_DATEN : 0));
-    pio_.setExternB(v, uint8_t(PB_UEBERNOMMEN | PB_DATEN));
+    pio_.setExternB(v, 0xFF);   // PB1..PB6 = 0
 }
 
 void GunNet::vorlegen() {
@@ -88,6 +117,7 @@ void GunNet::vorlegen() {
 
 void GunNet::byteVomGast(uint8_t b) {
     ++zaehler_.bytes_zur_karte;
+    aktiv_seit_ = takte_;
     switch (phase_) {
         case Phase::Bereit: {
             const int n = parameterZahl(b);
@@ -106,7 +136,7 @@ void GunNet::byteVomGast(uint8_t b) {
             if (par_n_ >= erwartet_) { phase_ = Phase::Bereit; ausfuehren(); }
             return;
         case Phase::DatenSchreiben:
-            w5100_->schreibe(adr(), b);
+            schreibeGast(zeiger_, b);
             ++zeiger_;
             if (--rest_ == 0) phase_ = Phase::Bereit;
             return;
@@ -129,24 +159,26 @@ void GunNet::ausfuehren() {
             antwort16(uint16_t((takte_ * 1000ull / hz) % 60000ull));
             break;
         }
-        case 0x04: w5100_->schreibe(uint16_t(p16 & 0x7FFF), par_[2]); break;
+        case 0x04: schreibeGast(p16, par_[2]); break;
         case 0x05: antwort_.push_back(w5100_->lese(uint16_t(p16 & 0x7FFF))); break;
-        case 0x06:
-            for (int i = 0; i < 4; ++i) server_ip_[par_[0] & 7][i] = par_[1 + i];
+        case 0x06:   // IP-Nummer 0..7; groessere Nummer = Kommandofehler (Annahme [?], die Beschreibung sagt es nicht)
+            if (par_[0] > 7) { ++zaehler_.fehlerkommandos; ++fehler_zaehl_; break; }
+            for (int i = 0; i < 4; ++i) server_ip_[par_[0]][i] = par_[1 + i];
             break;
-        case 0x07:
-            for (int i = 0; i < 4; ++i) antwort_.push_back(server_ip_[par_[0] & 7][i]);
+        case 0x07:   // Antwort: Net-Order (hoechstwertiges Byte zuerst), so wie gespeichert
+            if (par_[0] > 7) { ++zaehler_.fehlerkommandos; ++fehler_zaehl_; break; }
+            for (int i = 0; i < 4; ++i) antwort_.push_back(server_ip_[par_[0]][i]);
             break;
-        case 0x08:
-            antwort16(dyn_port_);
+        case 0x08:   // dynamische Portnummer: Net-Order (b2, b1) = hoeherwertiges Byte ZUERST
+            antwort_.push_back(uint8_t(dyn_port_ >> 8)); antwort_.push_back(uint8_t(dyn_port_ & 0xFF));
             dyn_port_ = dyn_port_ == 0xFFFF ? uint16_t(49152) : uint16_t(dyn_port_ + 1);
             break;
         case 0x09: antwort_.push_back(cfg_.firmware_neben); antwort_.push_back(cfg_.firmware_haupt); break;
         case 0x0A: antwort_.push_back(cfg_.hardware_neben); antwort_.push_back(cfg_.hardware_haupt); break;
         case 0x0B: antwort_.push_back(cfg_.link_online ? 1 : 0); break;
         case 0x0C:
-            for (char c : cfg_.id_string) antwort_.push_back(uint8_t(c));
-            antwort_.push_back(0);
+            for (std::size_t i = 0; i < cfg_.id_string.size() && i < 127; ++i) antwort_.push_back(uint8_t(cfg_.id_string[i]));
+            antwort_.push_back(0);   // Zeichenkette + 0, hoechstens 128 Byte
             break;
         case 0x0D: antwort16(fehler_zaehl_); break;
         default: break;
@@ -156,6 +188,8 @@ void GunNet::ausfuehren() {
 uint8_t GunNet::ioRead(uint8_t port) {
     static const uint8_t abb[4] = {0, 2, 1, 3};   // A0 = Port, A1 = Daten/Steuer -> PIO-Zaehlung
     const unsigned i = (port - cfg_.basis) & 3;
+    fristPruefen();
+    if (i == 0) aktiv_seit_ = takte_;   // Abholen einer Antwort = Aktivitaet
     if (i == 1) {            // Statusabfrage: die Karte hat inzwischen geantwortet
         vorlegen();
         pegelAnlegen();
@@ -169,6 +203,7 @@ uint8_t GunNet::ioRead(uint8_t port) {
 void GunNet::ioWrite(uint8_t port, uint8_t d) {
     static const uint8_t abb[4] = {0, 2, 1, 3};
     const unsigned i = (port - cfg_.basis) & 3;
+    fristPruefen();
     out_neu_ = false;
     pio_.ioWrite(abb[i], d);
     if (i == 2 && (d & 0x0F) == 0x0F) { verwerfen(); pegelAnlegen(); }   // Betriebsartwort: Neuinitialisierung

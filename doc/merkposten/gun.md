@@ -112,7 +112,8 @@ den UTools-Quellen und dem Verhalten der Binaerdateien abgeleitet, **nicht** aus
 
 `core/cards/gun_net/` (`k1520::GunNet`: Z80-PIO + Verhaltensmodell der ATmega-Firmware vor `k1520::w5100::W5100`), gesteckt ueber `K1520Machine::installGunNet`
 **nach dem Anlegen, vor dem ersten `run()`/`reset()`** (C-ABI `k1520_net_*`, Python `K1520Emulator(net=…)`, `--net[=basis]` in `boot_trace`/`k1520dbg`, Befehl `net`).
-Protokoll: `doc/design/50a_kcnet_protokoll.md` (aus den Gast-Binaerdateien rekonstruiert).  Festlegungen mit Waechtern:
+Protokoll: `doc/design/50a_kcnet_protokoll.md` (aus den Gast-Binaerdateien rekonstruiert, seit 2026-11-10 abgeglichen mit der OFFIZIELLEN Beschreibung "KCNET Protokoll Version 1.2" von R. Kaestner, kc85.info; dort §10 massgeblich).
+Die ATmega-Firmware ist Closed Source (nur auf persoenliche Anfrage) -> das Verhaltensmodell ist der gewollte Weg.  Festlegungen mit Waechtern:
 
 | Nr. | Festlegung | Waechter |
 |---|---|---|
@@ -124,5 +125,10 @@ Protokoll: `doc/design/50a_kcnet_protokoll.md` (aus den Gast-Binaerdateien rekon
 | N6 | **Portlage:** Vorgabe 88H (GUN); 88H/89H gehoeren der RAF; PRG 710/-1: ATP-Zusatz belegt C0H..C3H, ZRE 80H..87H; MC80.3x: VIS 2a C0H..CFH, ASP 88H..93H (28H frei); MC80.2x, K8915 (V3/Gen 2), A5120, PC 1715: 88H und C0H frei.  Konflikt -> `installGunNet` meldet den Grund, kein Absturz. | `GunNetMaschine.*`, `cli_dbg_net_konflikt`, `py_net_api` |
 | N7 | **Echte Gastprogramme** (nur lokal in `~/Documents/K1520emu/GIDE_Software/kcnet/sw/cpmnet87/`, `K1520_GIDE_SW`): TFTP1287/CPMN1587 erkennen die Karte (Basis C0H), Firmware 1.2, Hardware 1.0, online; CPMNET-TCP-Server mit Echo gegen einen Loopback-Client; `TFTP GET` gegen einen Loopback-Server auf UDP **69** (privilegiert: ohne Recht uebersprungen — lokal pruefbar mit `unshare -rn sh -c 'ip link set lo up && tools/dev.sh test -R GunNetSystem'`). | `GunNetSystem.*` |
 
-Nicht nachgebildet/offen: Kommando 0C (ID-String) und 06 mit Index != 0 haben keinen Gast-Beleg; DHCP/DNS/Ping-Gegenstellen (Broadcast/ICMP gibt es im W5100-Modell nicht — `H`/`D`/`P` in CPMNET sind ohne Wirkung);
+| N8 | **Byte-Reihenfolgen nach der offiziellen Beschreibung:** Zaehler/Adresse/Timer/Fehlerzaehler niederwertig zuerst; IP-Adressen und die dynamische Portnummer (Kdo 8) in **Net-Order = hoeherwertiges Byte zuerst** (CPMNET/TFTP schreiben das erste Byte nach Sn_PORT 8404H; mit Lo zuerst scheiterte die Bindung des Gast-UDP-Sockets (Port 192), jetzt laeuft dessen DNS-Rueckfrage ins Leere — der Test wartet seither `kLangBudget`); Versionen Unter-, dann Hauptversion; Kennung hoechstens 128 Byte inkl. 0. | `GunNet.DynamischerPortZaehltAb49152InNetOrder`, `GunNet.KennungHoechstens128ByteMitNull`, `GunNetSystem.CpmnetTcpServerEchoMitLoopbackClient` |
+| N9 | **Schreibzugriffe nur 8000H..FFFFH und nie in die MAC (8009H..800EH)** (Kdo 0 und 4; der Zeiger zaehlt trotzdem weiter); die MAC liest der Gast nur (`Config::mac`). | `GunNet.SchreibenNurAb8000HUndNichtInDieMac` |
+| N10 | **524-ms-Regel (Maschinenzeit):** angefangenes Kommando oder nicht abgeholte Antwort ohne Byteverkehr werden nach 524 ms verworfen (Zeiger und Fehlerzaehler bleiben); im Ruhezustand keine Frist. | `GunNet.Frist524ms*`, `GunNet.FristLaeuftNichtWennKeinKommandoOffenIst` |
+| N11 | **IP-Nummern 0..7** alle schreib-/lesbar; Nummer > 7 = Kommandofehler (Annahme [?]).  **Port B:** PB0 = ARDY, PB7 = invertiertes BRDY, PB1..PB6 = 0 (an Masse). | `GunNet.IpNummern0Bis7SindAlleSchreibUndLesbar`, `GunNet.PortBPb1BisPb6SindMasse` |
+
+Nicht nachgebildet/offen: Kommando 0C (ID-String) hat keinen Gast-Beleg; DHCP/DNS/Ping-Gegenstellen (Broadcast/ICMP gibt es im W5100-Modell nicht — `H`/`D`/`P` in CPMNET sind ohne Wirkung);
 kein Save-State; GUI (N3) offen; PRG 710 mit ATP-Zusatz nur mit freier Basis.

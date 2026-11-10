@@ -7,15 +7,18 @@
  * @code
  *   +0  Daten A    Betriebsart 2 (bidirektional): Kommando-/Datenbytes zur Karte, Antwortbytes zum Gast
  *   +1  Daten B    Bitbetrieb, nur Eingaenge:  PB0 = "letztes Byte noch nicht uebernommen" (1 = ja),
- *                                              PB7 = "Antwortbyte da"
+ *                                              PB7 = "Antwortbyte da", PB1..PB6 = 0 (an Masse)
  *   +2  Steuer A
  *   +3  Steuer B
  * @endcode
  * (A0 waehlt Port A/B, A1 Daten/Steuer — die Z80-PIO selbst zaehlt 0=DA 1=SA 2=DB 3=SB; die Karte vertauscht.)
  *
- * Byteprotokoll (50a Abschnitt 4): Kommandobyte + feste Parameter (16 Bit Low zuerst), Antwort sofort danach.
+ * Byteprotokoll (50a Abschnitt 4 und 10, offizielle Beschreibung "KCNET Protokoll Version 1.2"): Kommandobyte + feste Parameter
+ * (Zaehler/Adresse/Timer/Fehlerzaehler 16 Bit NIEDERWERTIG zuerst; IP-Adresse und dynamischer Port in Net-Order = hoechstwertiges
+ * Byte zuerst; Versionen Unter-, dann Hauptversion), Antwort sofort danach.  Schreiben nur in 8000H..FFFFH, MAC (8009H..800EH)
+ * nicht beschreibbar; ein Stillstand von 524 ms Maschinenzeit mitten im Kommando/in der Antwort setzt die Verarbeitung zurueck.
  *   00 Block Gast -> W5100 ab Zeiger (nach 02)   01 Block W5100 -> Gast   02 Zeiger setzen   03 Timer (ms, 0..59999)
- *   04 Byte schreiben   05 Byte lesen   06/07 Server-IP setzen/lesen (Index 0 = DNS)   08 dynamischer Port
+ *   04 Byte schreiben   05 Byte lesen   06/07 IP setzen/lesen (Nummer 0..7, 0 = DNS)   08 dynamischer Port
  *   09 Firmware-Version   0A Hardware-Version   0B Link   0C Kennung   0D Zaehler ungueltiger Kommandos
  * W5100-Adressen: das Gast-Bit 15 wird vom W5100-Modell maskiert (8000H|adr -> adr; Tx C000H.. -> 4000H.., Rx E000H.. -> 6000H..).
  *
@@ -79,7 +82,10 @@ public:
     void reset();
     void powerOn() { reset(); zaehler_ = Zaehler(); dyn_port_ = 49152; }
     /// Fortschreibung: absolute Maschinentakte (fuer Kommando 03).
-    void takt(uint64_t maschinentakte) { takte_ = maschinentakte; }
+    void takt(uint64_t maschinentakte) {
+        takte_ = maschinentakte;
+        if (phase_ != Phase::Bereit || vorgelegt_ || !antwort_.empty()) fristPruefen();   // 524-ms-Regel
+    }
 
     // ---- Eigenschaften / Debug ----
     const Config& config() const { return cfg_; }
@@ -94,6 +100,7 @@ public:
         uint64_t fehlerkommandos = 0;   ///< unbekannte Kommandobytes (Kommando 0D)
         uint64_t bytes_zur_karte = 0;   ///< Gast -> Karte
         uint64_t bytes_zum_gast = 0;    ///< Karte -> Gast
+        uint64_t fristabbrueche = 0;    ///< Kommandoverarbeitung nach 524 ms Stillstand zurueckgesetzt
     };
     const Zaehler& zaehler() const { return zaehler_; }
     uint8_t letztesKommando() const { return letztes_; }
@@ -104,6 +111,8 @@ private:
     enum class Phase { Bereit, Parameter, DatenSchreiben };
     void verdrahten();
     void pegelAnlegen();
+    void fristPruefen();
+    void schreibeGast(uint16_t a, uint8_t b);   ///< nur 8000H..FFFFH ohne MAC (8009H..800EH)
     void verwerfen();                 ///< Automat und Antworten zurueck
     void byteVomGast(uint8_t b);
     void ausfuehren();
@@ -115,6 +124,8 @@ private:
     Z80PIO pio_;
     std::unique_ptr<w5100::W5100> w5100_;
     uint64_t takte_ = 0;
+    uint64_t aktiv_seit_ = 0;         ///< Maschinentakt des letzten Bytes (zur Karte oder zum Gast)
+    static constexpr uint64_t FRIST_MS = 524;
     Phase phase_ = Phase::Bereit;
     uint8_t befehl_ = 0, erwartet_ = 0, par_[5] = {0, 0, 0, 0, 0}, par_n_ = 0;
     uint32_t rest_ = 0;               ///< noch zu schreibende Datenbytes (Kommando 00)

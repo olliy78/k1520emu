@@ -281,7 +281,10 @@ TEST_F(GunNetSystem, CpmnetTcpServerEchoMitLoopbackClient) {
     ASSERT_TRUE(runSmallUntil(m, "IP: 127.0.0.1", 20'000'000)) << vramText(m);
 
     net::senden(cl.fd(), "HALLO VOM HOST\r\n", 16);
-    ASSERT_TRUE(runSmallUntil(m, "RECEIVED: HALLO VOM HOST", 20'000'000)) << vramText(m);
+    // Seit Kommando 8 die Portnummer in Net-Order liefert (offizielle Beschreibung V1.2), oeffnet der Gast fuer die DNS-
+    // Rueckfrage zur Client-Adresse wirklich ein UDP-Socket (frueher byteverdreht = Port 192 = Bindung scheiterte sofort);
+    // die drei Anfragen an 127.0.0.1:53 laufen ins Leere und kosten Maschinenzeit, bevor der Gast die Daten zeigt.
+    ASSERT_TRUE(runSmallUntil(m, "RECEIVED: HALLO VOM HOST", kLangBudget)) << vramText(m);
     zeige("empfangen", m);
 
     r.taste("E");   // Echo-Modus: was der Client schickt, geht zurueck

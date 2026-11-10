@@ -50,7 +50,8 @@ struct Rig {
     std::array<uint8_t, 65536> ram{};
     uint8_t b;   // Basis
 
-    explicit Rig(uint8_t basis = 0xC0) : net(cfgLoopback(basis)), b(basis) {
+    explicit Rig(uint8_t basis = 0xC0) : Rig(cfgLoopback(basis)) {}
+    explicit Rig(const GunNet::Config& c) : net(c), b(c.basis) {
         net.attachToBus(bus);
         cpu.readByte  = [this](uint16_t a) { return ram[a]; };
         cpu.writeByte = [this](uint16_t a, uint8_t d) { ram[a] = d; };
@@ -247,13 +248,131 @@ TEST(GunNet, TimerLaeuftInMaschinenzeitMitUmlauf60000) {
     EXPECT_LT(r.recv16(), 60000);
 }
 
-TEST(GunNet, DynamischerPortZaehltAb49152) {
+TEST(GunNet, DynamischerPortZaehltAb49152InNetOrder) {
+    // KCNET Protokoll V1.2: Kommando 8 liefert "2 Byte Portnummer Net-Order (b2, b1)" = hoeherwertiges Byte ZUERST
+    // (frueher fehlerhaft Low zuerst: 49152 = C000H kam als 00H C0H)
     Rig r;
     ASSERT_TRUE(r.init());
     r.send(8);
-    EXPECT_EQ(r.recv16(), 49152);
+    EXPECT_EQ(r.recv(), 0xC0);
+    EXPECT_EQ(r.recv(), 0x00);
     r.send(8);
-    EXPECT_EQ(r.recv16(), 49153);
+    EXPECT_EQ(r.recv(), 0xC0);
+    EXPECT_EQ(r.recv(), 0x01);
+}
+
+TEST(GunNet, PortBPb1BisPb6SindMasse) {
+    Rig r;
+    ASSERT_TRUE(r.init());
+    EXPECT_EQ(r.status() & 0x7E, 0) << "PB1..PB6 liegen an Masse";
+    r.run({0xD3, r.b, 0x76}, 9);        // Antwort anstossen: PB0 und PB7 aktiv, der Rest bleibt 0
+    EXPECT_EQ(r.status() & 0x7E, 0);
+}
+
+TEST(GunNet, IpNummern0Bis7SindAlleSchreibUndLesbar) {
+    Rig r;
+    ASSERT_TRUE(r.init());
+    for (uint8_t n = 0; n < 8; ++n) {   // Net-Order b4,b3,b2,b1 = Adresse a.b.c.d in dieser Reihenfolge
+        r.send(6); r.send(n); r.send(192); r.send(168); r.send(n); r.send(uint8_t(10 + n));
+    }
+    for (uint8_t n = 0; n < 8; ++n) {
+        r.send(7); r.send(n);
+        EXPECT_EQ(r.recv(), 192); EXPECT_EQ(r.recv(), 168); EXPECT_EQ(r.recv(), n); EXPECT_EQ(r.recv(), 10 + n);
+    }
+    // Nummer > 7: Kommandofehler (Annahme [?]), nichts gespeichert, keine Antwort
+    r.send(6); r.send(8); r.send(1); r.send(2); r.send(3); r.send(4);
+    r.send(7); r.send(9);
+    EXPECT_EQ(r.net.antwortenOffen(), 0u);
+    r.send(0x0D);
+    EXPECT_EQ(r.recv16(), 2);
+    r.send(7); r.send(0);               // Nummer 0 ist unberuehrt
+    EXPECT_EQ(r.recv(), 192);
+}
+
+TEST(GunNet, KennungHoechstens128ByteMitNull) {
+    GunNet::Config c = cfgLoopback(0xC0);
+    c.id_string = std::string(300, 'x');
+    Rig q(c);
+    ASSERT_TRUE(q.init());
+    q.send(0x0C);
+    size_t len = 0;
+    for (uint8_t b; len < 400 && (b = q.recv()) != 0;) ++len;
+    EXPECT_EQ(len, 127u) << "Zeichenkette + 0 ergibt hoechstens 128 Byte";
+    EXPECT_EQ(q.net.antwortenOffen(), 0u);
+}
+
+TEST(GunNet, SchreibenNurAb8000HUndNichtInDieMac) {
+    Rig r;
+    r.net.reset();                      // die Firmware setzt die MAC nach /RESET
+    ASSERT_TRUE(r.init());
+    const uint8_t mac0 = r.net.w5100().lese(reg::SHAR);
+    ASSERT_EQ(mac0, 0x02) << "MAC aus Config::mac";
+    // Kommando 4 in die MAC (8009H..800EH) wirkungslos, Nachbarn (8008H = Kennung davor, 800FH = SIPR) wirken
+    for (uint16_t a = 0x8009; a <= 0x800E; ++a) r.wr(a, 0xEE);
+    for (int i = 0; i < 6; ++i) EXPECT_EQ(r.net.w5100().lese(uint16_t(reg::SHAR + i)), r.net.config().mac[i]) << i;
+    r.wr(0x800F, 0x7B);
+    EXPECT_EQ(r.net.w5100().lese(reg::SIPR), 0x7B);
+    // Blockschreiben quer ueber die MAC: nur die Bytes ausserhalb wirken, der Zeiger zaehlt trotzdem weiter
+    r.blockWrite(0x8008, std::string("\x11\xEE\xEE\xEE\xEE\xEE\xEE\x22", 8));
+    EXPECT_EQ(r.net.w5100().lese(uint16_t(reg::SHAR - 1)), 0x11);
+    for (int i = 0; i < 6; ++i) EXPECT_EQ(r.net.w5100().lese(uint16_t(reg::SHAR + i)), r.net.config().mac[i]) << i;
+    EXPECT_EQ(r.net.w5100().lese(reg::SIPR), 0x22);
+    EXPECT_EQ(r.net.zeiger(), 0x8010);
+    // Schreibzugriffe unterhalb 8000H (Kommando 4 und Block) bleiben ohne Wirkung; Kommando 4 auf 0001H waere sonst GAR
+    r.wr(0x0001, 0x99);
+    EXPECT_EQ(r.net.w5100().lese(reg::GAR), 0);
+    r.blockWrite(0x0001, std::string("\x99\x98", 2));
+    EXPECT_EQ(r.net.w5100().lese(reg::GAR), 0);
+    EXPECT_EQ(r.net.w5100().lese(reg::GAR + 1), 0);
+    r.wr(0x8001, 0x42);                 // oberhalb weiter beschreibbar
+    EXPECT_EQ(r.net.w5100().lese(reg::GAR), 0x42);
+}
+
+TEST(GunNet, Frist524msSetztAngefangenesKommandoZurueck) {
+    Rig r;
+    r.net.setzeTaktHz(1'000'000);       // 524 ms = 524 000 Takte
+    ASSERT_TRUE(r.init());
+    r.net.takt(1'000'000);
+    r.run({0xD3, r.b, 0x76}, 4);        // Kommando 4 (Schreibe Byte): drei Parameter fehlen noch
+    r.net.takt(1'000'000 + 523'000);    // knapp unter der Frist: unveraendert
+    r.send(0x01); r.send(0x80); r.send(0x5A);   // 4 8001H 5A: vollstaendig
+    EXPECT_EQ(r.net.w5100().lese(reg::GAR), 0x5A);
+    EXPECT_EQ(r.net.zaehler().fristabbrueche, 0u);
+    // jetzt wieder angefangen und liegen gelassen
+    r.net.takt(2'000'000);
+    r.run({0xD3, r.b, 0x76}, 4);
+    r.net.takt(2'000'000 + 525'000);
+    r.send(0x01); r.send(0x80); r.send(0x77);    // diese drei Bytes sind ein NEUES Kommando 01?  -> 01 = Block lesen (80H 77H = Anzahl), keine Schreibwirkung
+    EXPECT_EQ(r.net.zaehler().fristabbrueche, 1u);
+    EXPECT_EQ(r.net.w5100().lese(reg::GAR), 0x5A) << "das verfallene Kommando 4 darf nichts mehr schreiben";
+}
+
+TEST(GunNet, Frist524msVerwirftNichtAbgeholteAntwort) {
+    Rig r;
+    r.net.setzeTaktHz(1'000'000);
+    ASSERT_TRUE(r.init());
+    r.net.takt(1'000'000);
+    r.run({0xD3, r.b, 0x76}, 9);        // Version angefordert, nicht abgeholt
+    EXPECT_EQ(r.net.antwortenOffen(), 2u);
+    r.net.takt(1'000'000 + 523'000);
+    EXPECT_EQ(r.net.antwortenOffen(), 2u) << "unter 524 ms bleibt die Antwort stehen";
+    r.net.takt(1'000'000 + 525'000);
+    EXPECT_EQ(r.net.antwortenOffen(), 0u);
+    EXPECT_EQ(r.net.zaehler().fristabbrueche, 1u);
+    EXPECT_EQ(r.status() & 0x80, 0) << "danach wieder 'Karte da'";
+    r.send(0x0B);                       // Verarbeitung laeuft normal weiter
+    EXPECT_EQ(r.recv(), 1);
+}
+
+TEST(GunNet, FristLaeuftNichtWennKeinKommandoOffenIst) {
+    Rig r;
+    r.net.setzeTaktHz(1'000'000);
+    ASSERT_TRUE(r.init());
+    r.net.takt(10'000'000);
+    r.send(0x0B);
+    EXPECT_EQ(r.recv(), 1);
+    r.net.takt(900'000'000);            // lange Ruhe ohne offenes Kommando: kein Abbruch
+    EXPECT_EQ(r.net.zaehler().fristabbrueche, 0u);
 }
 
 TEST(GunNet, NeuinitialisierungWirftOffeneAntwortenWeg) {

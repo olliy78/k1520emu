@@ -65,7 +65,7 @@ Die Tabelle `015C` und die Menütexte (CPMN `4773`) ergeben:
 | 05 | `0199` | L H | 1 B | RDBYTE ADR | ein Byte lesen |
 | 06 | `021B` | Idx, 4 Bytes | — | SERVER IP-ADDRESSES (Setzen) | vom Gast nirgends benutzt |
 | 07 | `0233` | Idx | 4 B | SERVER IP-ADDRESSES (Lesen) | **Idx 0 = DNS-Server** (TFTP `0BB2`: 4 Bytes, danach hängt der Gast Port `00 35` = 53 an) |
-| 08 | `0285` | — | 2 B | DYNAMIC PORT | nächster freier lokaler Port (TFTP `0603`: wird nach Sn_PORT `8404/05` geschrieben, hi,lo) |
+| 08 | `0285` | — | 2 B (**Net-Order, hoeherwertiges Byte zuerst**, s. §10) | DYNAMIC PORT | nächster freier lokaler Port (TFTP `0603`: wird nach Sn_PORT `8404/05` geschrieben, hi,lo) |
 | 09 | `025F` | — | 2 B (Lo, Hi) | — | **Firmware-Version** H.L (`sub_0D43`; Prüfung `H>=1 und L>=2`, sonst Abbruch „requires at least Firmware-Version 1.2") |
 | 0A | `0264` | — | 2 B | — | Hardware-Version H.L (CPMN-Statusseite „Hardware") |
 | 0B | `0269` | — | 1 B | — | Link/online (E≠0: online; E=0: „network-cable not connected !", TFTP `1A1D`) |
@@ -132,7 +132,7 @@ Beleg der Registerbelegung (W5100-Datenblatt):
 
 `core/cards/gun_net/` bedient `TFTP1287.COM` und `CPMN1587.COM` **unveraendert** (Basis C0H; Tests `GunNetSystem.*`).  Gegen den Befund oben:
 - **Bestaetigt:** Handshake wie Abschnitt 3 (PB0 nach `OUT` = 1 bis zur naechsten Abfrage, PB7 nach `IN` = 0), Erkennung ueber PB7 = 0 nach dem Dummy-Lesen, 14 Kommandos
-  mit den Parameterlaengen der Tabelle, Antworten **Lo, Hi** (auch 08 und 0D), Bit 15 maskiert (Tx `C000H` -> `4000H`, Rx `E000H` -> `6000H`), 2-KB-Puffer je Socket (RMSR = TMSR = 55H) mit
+  mit den Parameterlaengen der Tabelle, Antworten **Lo, Hi** (03, 0D; Kommando 08 dagegen **Hi, Lo** — berichtigt in §10), Bit 15 maskiert (Tx `C000H` -> `4000H`, Rx `E000H` -> `6000H`), 2-KB-Puffer je Socket (RMSR = TMSR = 55H) mit
   Zeigerverwaltung im Gast.  Der Zeiger aus Kommando 02 zaehlt im Block weiter; ob ueber Kommandos hinweg, braucht der Gast nicht (Modell: ja).
 - **Bildschirm CPMNET `I`:** `Software 1.2      Hardware 1.0   online` (Kommandos 09/0A/0B), `0` -> `COMMAND ERRORS = 0`.  TFTP ohne IP: `network not configured !`;
   Kabel ab (0B = 0) **und** IP gesetzt: `network-cable not connected !` (die IP-Pruefung kommt zuerst).
@@ -141,3 +141,61 @@ Beleg der Registerbelegung (W5100-Datenblatt):
   jeden Absender an) und laedt damit eine Datei bitgleich.  CPMNET `S` (TCP-Server) benutzt Socket 3 und schliesst bei lokalem Port 0 sofort (`TCP SOCKET CLOSED`).
 - **Modellentscheidung (nicht belegt):** Betriebsartwort an Steuer A wirft Rest-Kommandos/Antworten weg (Abschnitt 7 Nr. 5); /RESET setzt den W5100 per MR-Reset zurueck.
 - **Weiter offen:** Nr. 1 (genaue Zeitlage PB0/PB7), 4 (06/0C), 6 (Zeitbasis 03/08 ausser Maschinenzeit), 7, 8, 9.
+
+## 10. Abgleich mit der offiziellen Beschreibung (2026-11-10)
+
+Quelle: Ralf Kaestner, **"KCNET Protokoll Version 1.2"** (kcnet_v1.2_prg_de.pdf, kc85.info, 1 Seite, 2008-12-14) und der Artikel "KCNET 1.2" (kc85.info, 2008-07-15);
+lokal in `~/Documents/K1520emu/GIDE_Software/kcnet/doku/` (nicht im Repo).  Die Beschreibung ist **massgeblich** vor den Deutungen der Abschnitte 1-9.
+Die Firmware selbst ist Closed Source (nur auf persoenliche Anfrage); das Verhaltensmodell `core/cards/gun_net/` ist deshalb der gewollte Weg.
+
+| Kdo | Name | Parameter (Reihenfolge) | Antwort (Reihenfolge) |
+|---|---|---|---|
+| 0 | Schreibe Bytes nach Zeiger+ (8000H+) | Zaehler NWB, HWB, dann Zaehler Bytes | — |
+| 1 | Lese Bytes von Zeiger+ | Zaehler NWB, HWB | Zaehler Bytes |
+| 2 | Schreibe Adress-Zeiger fuer Kdo 0/1 | Adresse NWB, HWB | — |
+| 3 | Lese Timer (0..59999 ms) | — | Timer NWB, HWB |
+| 4 | Schreibe Byte nach Adresse (8000H+) | Adresse NWB, HWB, Byte | — |
+| 5 | Lese Byte von Adresse | Adresse NWB, HWB | Byte |
+| 6 | Schreibe IP-Adresse | Nummer 0..7, 4 Byte **Net-Order** (b4,b3,b2,b1 = a.b.c.d) | — |
+| 7 | Lese IP-Adresse | Nummer 0..7 | 4 Byte Net-Order |
+| 8 | Lese dynamische Portnummer | — | 2 Byte **Net-Order (b2,b1)**, hoeherwertiges Byte zuerst |
+| 9 | Lese Software-Version | — | Unterversion, Hauptversion (1.2 -> 2, 1) |
+| 10 | Lese Hardware-Version | — | Unterversion, Hauptversion (1.0 -> 0, 1) |
+| 11 | Lese Link-Status | — | 1 Byte |
+| 12 | Lese Kennung | — | Zeichenkette + 0, **hoechstens 128 Byte** |
+| 13 | Lese Anzahl Kommando-Fehler | — | Anzahl NWB, HWB |
+
+NWB/HWB = nieder-/hoeherwertiges Byte.  Die Gast-Befunde der Abschnitte 4/9 (Zeigerfuehrung, 1:1-Fenster mit Bit 15) bleiben gueltig.
+
+**Abweichungen des Modells vor dem Abgleich und ihre Korrektur** (Wächter in `tests/unit/cards/test_gun_net.cpp`):
+
+| # | Abweichung | Beleg | Korrektur / Test |
+|---|---|---|---|
+| 1 | Kdo 8 lieferte Lo,Hi (49152 = `00 C0`) | PDF "Net-Order (b2, b1)"; Gast `TFTP 0603`: erstes Byte -> Sn_PORT 8404H (= Hi) | Hi,Lo; `DynamischerPortZaehltAb49152InNetOrder` |
+| 2 | PB1..PB6 lasen 1 (Pull-ups) | Artikel: "PIOB1 bis PIOB6 gehen an Masse ... bei Eingaben immer 0" | PB1..PB6 = 0; `PortBPb1BisPb6SindMasse` |
+| 3 | Schreiben unterhalb 8000H wirkte (Bit 15 maskiert) | PDF "nur auf Adressen des TCP/IP-Stack Schreibzugriff (8000H...FFFFH)" | wirkungslos (Kdo 0 und 4; der Zeiger zaehlt trotzdem); `SchreibenNurAb8000HUndNichtInDieMac` |
+| 4 | MAC 8009H..800EH war ueber die Karte beschreibbar | PDF "kann die Ethernet-MAC-Adresse ... nicht beschreiben" | wirkungslos (Kdo 0 und 4); gleicher Test.  Die MAC kommt aus `Config::mac` (Firmware laedt sie nach /RESET) |
+| 5 | Kein Fristabbruch | PDF "blockierende Zustaende ... nach 524 ms abgebrochen und die komplette Befehlsverarbeitung zurueckgesetzt" | s. unten; `Frist524msSetztAngefangenesKommandoZurueck`, `Frist524msVerwirftNichtAbgeholteAntwort`, `FristLaeuftNichtWennKeinKommandoOffenIst` |
+| 6 | Kdo 6/7 nahmen Nummer `& 7` | PDF "Nummer (0...7)" | alle 8 Plaetze; Nummer > 7 = Kommandofehler (Zaehler 0D, keine Antwort, nichts gespeichert) **[?]** (Beschreibung sagt nichts); `IpNummern0Bis7SindAlleSchreibUndLesbar` |
+| 7 | Kdo 12 ohne Laengengrenze | PDF "Zeichenkette + 0 (max. 128 Byte)" | hoechstens 127 Zeichen + 0; `KennungHoechstens128ByteMitNull` |
+
+Bestaetigt ohne Aenderung: Zaehler/Adresse/Timer/Fehlerzaehler niederwertig zuerst, IP Net-Order, Versionen (Unter-, Hauptversion), Timer 0..59999 ms (Maschinenzeit), dyn. Port ab 49152 aufsteigend
+(Artikel: bis 65535, "16383 Aufrufe"; das Modell laeuft nach 65535 auf 49152 um), Link 1 Byte, Fehlerzaehler 16 Bit.
+
+**524-ms-Regel.**  Die Firmware wartet bei der PIO-Ausgabe (Antwortbyte nicht abgeholt) und der PIO-Eingabe (Kommando/Daten unvollstaendig) hoechstens 524 ms, dann wird die gesamte Befehlsverarbeitung
+zurueckgesetzt.  Modell: 524 ms **Maschinenzeit** (`GunNet::takt`, `Config::takt_hz`) ohne ein Byte in eine der beiden Richtungen, waehrend ein Kommando angefangen oder eine Antwort offen ist, werfen Kommando,
+Parameter, Restdaten und Antworten weg (`Zaehler::fristabbrueche`); Zeiger (Kdo 2) und Fehlerzaehler bleiben **[?]** (die Beschreibung nennt nur die Befehlsverarbeitung).  Geprueft wird bei jedem
+E/A-Zugriff und in `takt()`.  Im Ruhezustand (nichts offen) laeuft keine Frist.  Ersetzt die bisherige "Modellentscheidung" nicht, ergaenzt sie: das Betriebsartwort verwirft weiter sofort (Modell, der ATmega sieht es nicht).
+Der Gast (CPMNET/TFTP) bleibt davon unberuehrt; die Treiber warten ohne eigene Frist (Abschnitt 3).
+
+**Schreibschutz.**  Die PIO beschreibt nur den TCP/IP-Stack (8000H-FFFFH), nicht die MAC (8009H-800EH).  Lesen ist nicht eingeschraenkt; Lesen unterhalb 8000H ist unbelegt (Modell: Bit 15 maskiert, wie bisher) **[?]**.
+
+**Handshake / Port B (Aufloesung von Abschnitt 3 und 7 Nr. 1, 7).**  Hardware 1.2: **ARDY der PIO geht direkt auf PB0, BRDY invertiert auf PB7, PB1..PB6 liegen an Masse**.  ARDY = 1, solange das
+Ausgaberegister von Port A gefuellt ist und die Gegenseite es nicht abgeholt hat -> "Senden: warte bis PB0 = 0".  BRDY = 1, solange das Eingaberegister leer ist; invertiert: PB7 = 1 <=> Antwortbyte da ->
+"Empfangen: warte bis PB7 = 1", nach dem Lesen von Daten A sofort wieder 0.  Das stimmt mit dem Gastcode (Abschnitt 3) und dem Modell (PB0/PB7 als Zustandsbits) ueberein.  Der "Widerspruch zum Schaltplan"
+(B0 = BTB, B1/B5/B6 als Ausgaenge fuer die EEPROM-Segmentwahl in `eepload.COM`) betrifft die **K1520-Platine** mit zusaetzlicher EEPROM-/Boot-Logik (`K15ETU11.EQN`), nicht die Netzseite: ohne EEPROM-Bestueckung
+liegen B1..B6 an Masse; fuer die Netzfunktion zaehlen nur B0 und B7.  Ob die K1520-Platine B1/B5/B6 zusaetzlich ausgibt, bleibt **[?]** (Plan, nicht Netzmodell).  Damit sind Abschnitt 7 Nr. 1 (Polaritaet), 4 (Kdo 6/12 definiert), 6 (Zeitbasis Kdo 3/8
+= 1-ms-Zaehler 0..59999 bzw. aufsteigend ab 49152) und 7 geklaert; offen bleiben Nr. 2 (Lesen < 8000H), 3 (Zeiger ueber Blockende), 5 (Synchronisation nach Abbruch: nun durch die 524-ms-Regel beschrieben), 8, 9.
+
+**RS232-Kommandos** (zweite Tabelle der PDF: Terminalmenue `k c s h l w r p x y i o` ueber MAX232 am ATmega, ASCII) sind eine Debug-Schnittstelle der Firmware, nicht der Z80-Seite; nicht nachgebildet (Entscheidung: nicht relevant,
+hoechstens spaeter als Debugger-Befehl `net`).  `m052net.dok` beschreibt dagegen die KC85-Modul-Software (CAOS-EEPROM-Segmente, NCFG-Menue), kein RS232-Menue.
