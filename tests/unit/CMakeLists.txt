@@ -127,6 +127,9 @@ k1520_add_test(em16  SRC cards/test_em16.cpp       LIBS k1520_em k1520_k3526 LAB
 # RAM-Floppy RAF 128/512/2M mit echtem Z80 (doc/design/22_raf512.md AP-R1)
 k1520_add_test(raf   SRC cards/test_raf.cpp        LIBS k1520_raf k1520_z80 LABELS "${_lbl}")
 
+# GIDE-IDE-Karte mit echtem Z80 (Entwurf 50 AP G2)
+k1520_add_test(gide  SRC cards/test_gide.cpp       LIBS k1520_gide k1520_z80 LABELS "${_lbl}")
+
 # ── core/peripherals/ ────────────────────────────────────────────────────────
 # MC80.3x-Tastatur auf Zeichenebene (AP M3, doc/mc80/egos.md §3)
 k1520_add_test(mc80_tastatur SRC peripherals/test_mc80_tastatur.cpp LIBS k1520_mc80_karten LABELS "${_lbl}")

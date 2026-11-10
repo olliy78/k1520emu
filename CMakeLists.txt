@@ -381,6 +381,11 @@ if(BUILD_K1520)
     target_link_libraries(k1520_raf PUBLIC k1520_bus k1520_logger)
     target_include_directories(k1520_raf PUBLIC ${CMAKE_SOURCE_DIR})
 
+    # GIDE: IDE-Karte mit ATA-Platte (Entwurf 50)
+    add_library(k1520_gide STATIC core/cards/gide/gide.cpp)
+    target_link_libraries(k1520_gide PUBLIC k1520_bus k1520_logger k1520_ata)
+    target_include_directories(k1520_gide PUBLIC ${CMAKE_SOURCE_DIR})
+
     # K3521.30 – akkugepuffertes 4-KB-RAM (Entwurf 33 N10b)
     add_library(k1520_k3521 STATIC core/cards/k3521/k3521.cpp)
     target_link_libraries(k1520_k3521 PUBLIC k1520_bus)
