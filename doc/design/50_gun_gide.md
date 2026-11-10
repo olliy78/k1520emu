@@ -87,6 +87,18 @@ eigenem Quelltext.  Gleiches für die Forums-Doku.
 6. Fremdsoftware liegt **nur lokal** in `~/Documents/K1520emu/GIDE_Software/` (Lizenz ungeklärt, nie ins Repo); Tests suchen dort
    (`K1520_GIDE_SW` überschreibt) und werden **übersprungen**, wenn sie fehlt.
 
+**Ergebnis G5c (2026-11-10, Systemtest mit den echten Treibern, `GideSystem.*`, ohne Modelländerung grün):**
+- **A5120/CP/A + Poppe `GIDEHPD0.COM`:** Treiber meldet `GIDE-Modul auf Adresse D0H`, erkennt die Platte (Identify), `ERADIR D:`,
+  `PIP D:=A:...`, `DIR D:`, Rückkopie **bitgleich**.  Am CP/A-Fixture belegt das BIOS A: und C:, der Treiber vergibt **D:…K:**.
+- **K8915/SCPX + Kingstener `gidn /f`** (Laufwerk **N:**): Formatieren, Kopieren, Rückkopie bitgleich.
+- **Anforderungen an das Plattenmodell (aus den Treiberquellen):** Poppe sendet **nie 91h**, adressiert **CHS ohne LBA-Bit** mit
+  Kopf = Laufwerk (SDH = A0H+n, 8 Laufwerke), 500 Zylinder, 16 Köpfe, 63 Sektoren → die Platte braucht mindestens
+  **504 000 Sektoren (≈ 258 MB, als Rohabbild sparse anlegen)**; DPB SPT 128, BSH 6, BLM 63, EXM 3, DSM 3E7H, DRM 3FFH.
+  Kingstener sendet 91h (SC=40h, SDH=A0H|3 → 4 Köpfe × 64 Sektoren) und braucht ≥ 256 Zylinder; DPB SPT 64, BSH 5, DSM 7FDH.
+  Folge für G6: Vorgabegröße „Neue Platte" **256 MB (sparse)**; kleinere Abbilder gehen nur mit dem Kingstener-Treiber.
+- Treiberbefund: nach `ERADIR D:` findet der erste Befehl auf A: nichts, bis `DIR D:` und `DIR A:` aufgerufen wurden (Treiber-/BDOS-
+  Verhalten: `hdisk` bleibt gesetzt; Diskette unversehrt).  Nicht abgedeckt: PRG 710, PC 1715 (kein passendes Treiber-/Boot-Paar geprüft).
+
 ## 3. GIDE — Befund (aus `gide1.pds`/`gide2.pds`, Stand 26.09.1995)
 
 ### 3.1 Adressdekodierung (GAL2, 20V8)
