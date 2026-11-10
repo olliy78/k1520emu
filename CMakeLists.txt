@@ -472,6 +472,10 @@ if(BUILD_K1520)
     target_link_libraries(k1520_ata PUBLIC k1520_gzip Threads::Threads)
     target_include_directories(k1520_ata PUBLIC ${CMAKE_SOURCE_DIR})
 
+    # VDIP1 (VDAP-Firmware) ueber einem Wirtsverzeichnis als USB-Stick (GUN, Entwurf 50 AP U1)
+    add_library(k1520_vdip STATIC core/peripherals/vdip/vdip_geraet.cpp)
+    target_include_directories(k1520_vdip PUBLIC ${CMAKE_SOURCE_DIR})
+
     # P8000, Winchesterlaufwerk am WDC: LBA-Abbild, Spursynthese/-zerlegung, Mechanik (AP P13b)
     add_library(k1520_winchester STATIC core/peripherals/winchester/platte.cpp)
     target_link_libraries(k1520_winchester PUBLIC k1520_logger k1520_gzip Threads::Threads)

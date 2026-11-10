@@ -194,6 +194,43 @@ Gatter nachgebaut**, sondern als Verhalten (RXF/TXE-Pegel → BRDY/ARDY).  Zu kl
 `Z80PIO` Mode 2 samt externem `/ASTB`/`/BSTB` über seine Schnittstelle an (Kommentar in `z80_pio.cpp`
 sagt: Mode 2 ist implementiert; ob die Strobes von außen gesetzt werden können, ist zu prüfen).
 
+## 5a. Protokoll nach UTools-Quellen (AP U1, 2026-11-10)
+
+Quelle: UTools V1.4 (Leubner/Haensel; lokal `~/Documents/K1520emu/GIDE_Software/utools14/`, nicht im Repo), Zeilen
+beziehen sich auf `USBINC.Z80` (I), `UDIR.Z80` (D), `UGET.Z80` (G), `UPUT.Z80` (P), `USB.Z80` (U).  Das Handbuch war
+nicht beschaffbar: **Was nur aus dem Gedaechtnis stammt, ist `[?]`.**  Zwei Befunde gegen die Vermutung aus §5:
+(1) **SCS = Kurzbefehlssatz (Einzelbyte-Opcodes, Prompt `>` CR, Fehler als 2 Buchstaben), ECS = erweiterter Satz
+(Textbefehle, Prompt `D:\>` CR, Fehler im Klartext)**; die Opcodes werden auch im ECS-Modus erkannt (UDIR schickt `10h`
+im Vorgabemodus, I:279 ff.).  (2) **Der Prompt IST der Status**: Erfolg = Prompt + CR, Fehler = Fehlertext + CR
+*ohne* folgenden Prompt (G:487-490, P:305-340: nach `CF`/`FI` laeuft das naechste EXEC sofort weiter und erwartet `>`).
+Ohne Stick lautet der Status `No Disk` (ECS) bzw. `ND` [?] (SCS) (D:256).  `E`/`e` antworten ohne Prompt (I:279-303).
+
+| Befehl | Syntax (Bytes) | erwartete Antwort | Quelle |
+|--------|----------------|-------------------|--------|
+| Sync | `CR` · `E CR` · `e CR` | beliebige Zeile bis CR · `E CR` · `e CR`; vorher alles Anstehende wird abgeholt | I:272-303 |
+| Start | (Reset) | `Ver03.68VDAPF On-Line:` CR `Device Detected P2` CR `No Upgrade` CR `D:\>` CR (wortwoertlich, Wiki hc-ddr); ohne Stick `No Disk` statt Detected/Prompt [?] | Wiki |
+| leere Zeile | `CR` | Status (`>` CR / `D:\>` CR / Fehler) — dient als „Stick vorhanden?“ | D:120, G:130 |
+| SCS | `10h CR` | `>` CR, ab dann Kurzsatz | D:110-113 |
+| ECS | `11h CR` | `D:\>` CR (UTools ueberlesen alles bis `>`) | U:94-105 |
+| IPH / IPA | `91h CR` / `90h`[?] | Status; IPH = Zahlen binaer (MSB zuerst als Parameter), IPA = ASCII-dezimal [?] | D:115 |
+| DIR | `01h CR` bzw. `DIR CR` | CR, je Eintrag `NAME.EXT` CR / `NAME DIR` CR (Datei ohne Typ ohne Punkt; in Unterverzeichnissen `.`/`..` als `. DIR`), dann Status | D:127-160, G:738-762 |
+| DIR name | `01h SP NAME.EXT CR` | CR, `NAME.EXT SP` + 4 Byte Groesse **LSB zuerst** + CR, Status; fehlt: CR, `CF` CR | G:212-245, D:529-562 |
+| DIRT name | `2Fh SP NAME.EXT CR` | CR, `NAME.EXT SP` + 10 Byte + CR, Status; 10 Byte = erstellt (Zeit-Wort, Datum-Wort, LE) · Zugriffsdatum (Wort) · geaendert (Zeit, Datum, LE); je 4 Byte = MS-DOS-Dword LE (aus `m2utim`-Aufrufen bei +0/+2/+6 abgeleitet) | G:269-302, D:596-629 |
+| OPR | `0Eh SP name CR` | Status; fehlt: `CF` (3.66+) bzw. `FI` (3.64) CR; schon offen: `FO` | G:487, P:305-340 |
+| OPW | `09h SP name [SP d3 d2 d1 d0] CR` | Status; Datei wird angelegt, sonst angehaengt [?]; Stempel = DOS-Dword **MSB zuerst** (Datum vor Zeit), rohe Bytes in jedem Modus | P:517-535 |
+| RDF | `0Bh SP 0 0 0 n CR` | genau n Rohbytes (nichts davor), dann Status | G:535-557 |
+| WRF | `08h SP 0 0 0 n CR` + n Rohbytes | Status nach den Daten | P:578-600 |
+| CLF | `0Ah SP name CR` | Status (Name der offenen Datei) | G:588, P:342, 625 |
+| DLF | `07h SP name CR` | Status; schreibgeschuetzt `RO`; fehlt `CF` | P:460-495 |
+| CD / DLD / MKD / REN / RD / FS / IDD / FWV | Textform `CD name` usw. (U:53-69, UTools14.TXT); `CD /` Wurzel, `CD ..` hoch; `MKD name [SP d3..d0]` (mit Datum auf DOS/ZSDOS-Systemen) | Status; Daten von RD (Rohbytes), FS/IDD/FWV (Textzeilen, Format [?]) | U:92-141 |
+| Namen | CP/M-Name wird zu `NAME.EXT` ohne Leerzeichen; `\ / " | +` werden zu `_`; **leere Endung ergibt `NAME.`** (Punkt wird gesendet) | I:439-461 |
+| Fehlertexte (ECS) | `Bad Command` `Command Failed` `Disk Full` `Invalid` `Read Only` `File Open` `Dir Not Empty` `Filename Invalid` `No Disk` | SCS-Kuerzel gesichert nur `CF` `FI` `RO` `FO`; `BC` `DF` `NE` `FN` `ND` [?] | U:245-258 |
+| Port-Pegel | PIO-B Bit0 = RXF# (1 = nichts abzuholen), Bit1 = TXE# (1 = nicht schreibbar); Ausgaenge: B2 = RD# (low = Lesen, `C0h`), B3 = WR (high = Schreiben, `CCh`), Ruhe `C4h`; B6 = RES# und B7 = PRG# im Ruhezustand 1; Eingangsmaske `33h` | I:209-225, 369-426 |
+
+`[?]`-Punkte im Modell: Opcodes ausser den in den Quellen benutzten (`CD 02h`, `RD 04h`, `DLD 05h`, `MKD 06h`, `REN 0Ch`,
+`IDD 0Fh`, `FS 12h`, `FWV 13h`, `SEK 28h`, `IPA 90h`), IPA-Zahlenform, Textformat von FS/IDD/FWV, OPW „anhaengen“, Kurzcodes
+`BC DF NE FN ND`, Verhalten von `RDF` ueber das Dateiende (Modell liefert nur den Rest).
+
 ## 6. Netzwerk (88H–8BH, KC-Net-Bauart)
 
 Aus dem Schaltplan: **zweite Z80-PIO** (IC2, `IO88H`: **88H Daten A · 89H Daten B · 8AH Steuer A · 8BH
@@ -314,7 +351,7 @@ Kommentare deutsch; neue langsame Tests brauchen ein `fach_*`-Label — **keine 
 | **G6** [zurueckgestellt (Basisfrage)] | **Oberfläche**: *Einstellungen ▸ Allgemein* Gruppe „IDE/GUN": Kästchen GIDE, Basis (Auswahl 80H…F0H mit Konfliktanzeige), Abbildwahl + „Neue Platte…" (Größe), RTC-Kästchen + Zeitquelle; Statuszeilen-Leuchte „IDE" (folgt dem **Zugriff**, wie die Laufwerksleuchte), Abbilddatei-Name; Konfigschlüssel `general.gide.*` in den vier `default_config_*.yaml` (Vorgabe **aus**), `Programmprofil`-Feld (alle vier Profile erlauben es), Handbuch-Abschnitt (`app/help/handbuch.md`, **Kürzeltabelle bleibt unberührt, kein Tastenkürzel**), Hilfe-Wächter `py_help`. | G4 | Python-Tests (offscreen) `tests/python/test_gide_gui.py`: Stecken per Konfiguration, Konfliktsperre RAF↔Netz, Zurücksetzen, Konfig-Rundlauf |
 | **G7** [erledigt (2026-11-10; kein `fach_gide`: alle Gide-Tests schnell, Pfade ohne Fachlabel)] | **Paketierung/Merkposten**: `doc/merkposten/gun.md` (+ Eintrag in `doc/merkposten/README.md`), Kurzabsatz in `CLAUDE.md`, `tools/test_auswahl.py` (Pfade `core/cards/gide`, `peripherals/ata` → Fachlabel `fach_gide`), `doc/ci_pipeline.md` falls nötig, Paketlisten (Beigaben). | G6 | `tools/dev.sh test-merge --trocken` zeigt die richtige Auswahl; `py_testauswahl`, `py_packaging` grün |
 | **U0** [offen] | **USB-Recherche** (nur Lesen/Schreiben von Notizen): *Vinculum Firmware User Manual* (VDAP-Monitor, Kurz-/Erweiterter Befehlssatz, Antwortformate, Statuszeichen, Sync `E`/`e`, Dateihandle-Modell) + *VDIP1 Datenblatt* (Pins, Parallel-FIFO-Zeitverhalten RXF#/TXE#/RD#/WR#) beschaffen; `pio3_usb_sch.pdf`/`diskveru.pdf` (AC1) per `pdftotext`; **AC-Zuordnung und Glue aus §5 bestätigen**. Ergebnis als §5-Nachtrag. | — | Aktualisierter §5 ohne `[?]` oder mit benannten Restlücken |
-| **U1** [offen] | `core/peripherals/vdip/vdip_geraet.{h,cpp}`: Firmware-Zustandsmaschine (Befehlszeile, `E`/`e`, `DIR`, `CD`, `OPR/OPW/CLF`, `RDF/WRF/SEK`, `DLF`, `MKD`, `FS`, `IDD`, Fehlertexte `Command Failed`/`Bad Command`), über einer **Wirtsverzeichnis-Abstraktion** (Pfad-Sandbox: nie aus dem Ordner herausführen, `..` abweisen, 8.3-Namen); Ein-/Ausgabe als Bytefolge mit FIFO-Pegeln. | U0 | Unit-Tests: Befehlsablauf, Pfadflucht-Tests (`..`, absolute Pfade, Symlinks), Datei anlegen/lesen/anhängen/löschen, große Datei |
+| **U1** [erledigt 2026-11-10; Protokoll §5a, Tests `VdipGeraet.*`/`VdipStick.*`/`VdipPfadflucht.*`] | `core/peripherals/vdip/vdip_geraet.{h,cpp}`: Firmware-Zustandsmaschine (Befehlszeile, `E`/`e`, `DIR`, `CD`, `OPR/OPW/CLF`, `RDF/WRF/SEK`, `DLF`, `MKD`, `FS`, `IDD`, Fehlertexte `Command Failed`/`Bad Command`), über einer **Wirtsverzeichnis-Abstraktion** (Pfad-Sandbox: nie aus dem Ordner herausführen, `..` abweisen, 8.3-Namen); Ein-/Ausgabe als Bytefolge mit FIFO-Pegeln. | U0 | Unit-Tests: Befehlsablauf, Pfadflucht-Tests (`..`, absolute Pfade, Symlinks), Datei anlegen/lesen/anhängen/löschen, große Datei |
 | **U2** [offen] | **Karte** `core/cards/gun_usb/`: Z80PIO (Mode 2) auf 84H–87H, Verhaltensglue VDIP↔PIO (B-Bits nach §5), Reset/PRG-Leitung, `installGunUsb(Config{ordner})` + C-ABI/Python/`--usb` wie G4. | G0, U1 | Gastprogramm-Test (Z80-Code im Test): Sync, `DIR`, Datei schreiben/lesen; Rundlauf mit Wirtsdatei |
 | **U3** [offen] | GUI (Kasten „USB": Ordnerwahl, „Stick einlegen/entfernen"), Statuslampe, `GIDETST`/`USBTST.COM`, Handbuch, Konfig. | U2, G6 | wie G6 |
 | **N0** [offen (Anwender)] | **Quellenbeschaffung KC-Net** (Anwender-Aufgabe, siehe F2).  Ohne Ergebnis: N1 darf nur das Modell **ohne** Karte liefern. | Anwender | Dokument/Quelltext/Hex im Ordner `doc/gun/` (**Lizenzstatus klären** vor Einchecken) |

@@ -123,6 +123,7 @@ REGELN = [
     # GIDE/ATA: Blattkarte ohne langsame Faelle (alle Gide-Tests sind schnell, kein fach_gide noetig)
     ("core/cards/gide/**", (), "GIDE (keine langsamen Faelle)", True),
     ("core/peripherals/ata/**", (), "ATA-Platte (keine langsamen Faelle)", True),
+    ("core/peripherals/vdip/**", (), "VDIP-USB-Stick (keine langsamen Faelle)", True),
     ("core/cards/k6022/**", ("fach_a5120",), "Lochstreifen", True),
     ("core/peripherals/kassette/**", ("fach_a5120",), "Kassette", True),
     ("core/peripherals/k7672*/**", ("fach_k8915", "fach_prg710"), "Tastatur K7672", True),
