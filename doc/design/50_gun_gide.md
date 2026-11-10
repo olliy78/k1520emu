@@ -248,6 +248,7 @@ Konsequenz für die Planung: **§6 ist in zwei Stufen geschnitten**:
 - **N1:** Modell des **W5100** (Register `MR/GAR/SUBR/SHAR/SIPR`, Sockets 0–3, TX/RX-Puffer 8+8 KB
   Vorgabe, Sn_MR/CR/SR, **TCP-Client/Server und UDP** über die vorhandene Socket-Schicht
   `core/serial/net/` auf den Wirtsrechner) — protokollunabhängig, testbar ohne Gast.
+- **Netzzugang (Entscheidung des Anwenders):** das W5100-Modell benutzt die Netzanbindung des Wirts ("richtig im Netz"): ausgehende Ziele frei (Vorgabe), Listen-/UDP-Sockets auf allen Schnittstellen, Gast-IP/Gateway/Subnet nur Register.  Optionaler Filter `Richtlinie::frage`; Tests bleiben auf Loopback/Port 0.
 - **N2:** ATmega-Brücke als **Verhaltensmodell** (nicht den AVR emulieren, solange das Protokoll bekannt ist;
   *Alternative bei fehlender Dokumentation:* die Original-Firmware im AVR-Emulator laufen lassen — großer
   Zusatzaufwand, nur mit Hex-Datei möglich, nicht empfohlen).
@@ -362,7 +363,7 @@ Kommentare deutsch; neue langsame Tests brauchen ein `fach_*`-Label — **keine 
 | **N0** [offen (Anwender)] | **Quellenbeschaffung KC-Net** (Anwender-Aufgabe, siehe F2).  Ohne Ergebnis: N1 darf nur das Modell **ohne** Karte liefern. | Anwender | Dokument/Quelltext/Hex im Ordner `doc/gun/` (**Lizenzstatus klären** vor Einchecken) |
 | **N1** [offen] | `core/peripherals/w5100/`: W5100-Registermodell (Gemeinsam: Mode, IP/Gateway/Subnet/MAC, Socket-Register, Puffer 8+8 KB, TCP-Client/-Server, UDP) über `core/serial/net/socket.*`; **kein Netz im Emulationsfaden** (Regel aus `serielle_schnittstellen.md`: Hub/Wandler-Faden, Rückstau, Loopback-Tests auf Port 0). | — (nur Netzschicht) | Unit-Tests gegen Loopback: TCP-Echo, UDP, Verbindungsabbau, Puffervoll |
 | **N2** [offen] | `core/cards/gun_net/`: PIO (88H–8BH) + ATmega-**Verhaltensmodell** gemäß N0-Protokoll, `installGunNet`, C-ABI/Python/`--net`, Konflikt zu RAF. | N0, N1, G0 | Gast-Z80-Test: Socket öffnen, Daten senden/empfangen gegen Test-Server auf Loopback |
-| **N3** [offen] | GUI (Kasten „Netzwerk": Wirtsschnittstelle/Weiterleitung, Statuslampe), Handbuch, Konfig; Sicherheitshinweis: der Gast öffnet Verbindungen **nach außen** — Standard „nur Loopback/NAT-Ziel nach Rückfrage", **keine Rückfrage-Umgehung**. | N2, G6 | wie G6 |
+| **N3** [offen] | GUI (Kasten „Netzwerk": Wirtsschnittstelle/Weiterleitung, Statuslampe), Handbuch, Konfig; Sicherheitshinweis: der Gast öffnet Verbindungen **nach außen** — Entscheidung des Anwenders: das Modell arbeitet „richtig im Netz“ (Ziele frei, Listen/UDP auf allen Schnittstellen); die GUI kann über den Filter `Richtlinie::frage` (Allow/Deny) fragen. | N2, G6 | wie G6 |
 
 Reihenfolge: **G0 → G1 → G2 → G3 → G4 → G5a → G6 → G7** (Paket 1+2), danach **U0 → U1 → U2 → U3**,
 parallel/danach **N1** (unabhängig), **N2/N3** erst nach **N0**.

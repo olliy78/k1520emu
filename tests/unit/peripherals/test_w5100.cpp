@@ -252,19 +252,18 @@ TEST(W5100, ConnectOhneServerMeldetTimeout) {
     EXPECT_TRUE(w.interrupt());
 }
 
-TEST(W5100, ZielAusserhalbLoopbackWirdAbgewiesenOhneSocket) {
-    W5100 w;
-    oeffne(w, 0, reg::PROTO_TCP);
-    const uint8_t aussen[4] = {192, 0, 2, 1};   // TEST-NET-1, wuerde nie antworten
-    ziel(w, 0, aussen, 80);
-    cmd(w, 0, reg::CMD_CONNECT);
-    ASSERT_TRUE(warteAuf([&] { return ir(w, 0) & reg::IR_TIMEOUT; }));
-    EXPECT_EQ(sr(w, 0), reg::SR_CLOSED);
-    EXPECT_EQ(w.verbindungsversuche(), 0u);   // kein Socket je geoeffnet
-    EXPECT_EQ(w.abgewieseneZiele(), 1u);
+TEST(W5100, VorgabeWeistKeinZielAb) {
+    W5100 w;   // nur die Entscheidungsfunktion: es wird kein Aussenziel kontaktiert
+    EXPECT_TRUE(w.zielErlaubt(0xC0000201u, 80));   // 192.0.2.1
+    EXPECT_TRUE(w.zielErlaubt(0x7F000001u, 80));
+    W5100::Richtlinie nur;
+    nur.aussenErlaubt = false;
+    w.setzeRichtlinie(nur);
+    EXPECT_FALSE(w.zielErlaubt(0xC0000201u, 80));   // abschaltbar
+    EXPECT_TRUE(w.zielErlaubt(0x7F000001u, 80));
 }
 
-TEST(W5100, RueckrufKannAussenzielErlauben) {
+TEST(W5100, RueckrufKannEinZielVerweigern) {
     W5100::Richtlinie r;
     int gefragt = 0;
     r.frage = [&](uint32_t ip, uint16_t) { ++gefragt; return ip != 0xC0000201u ? true : false; };

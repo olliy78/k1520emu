@@ -19,10 +19,12 @@
  * (Gast-IP wird nicht verwendet); Ziel ist die in Sn_DIPR/Sn_DPORT stehende Adresse.
  * Es gibt keine ARP-/ICMP-/Routing-Nachbildung.
  *
- * Richtlinie: ausgehend NUR Loopback (127.0.0.0/8), ausser `aussenErlaubt` oder der Rueckruf
- * `frage` erlaubt das Ziel.  Eingehende Listen-Sockets sind immer auf 127.0.0.1 gebunden.
- * Ein abgewiesenes Ziel oeffnet gar keinen Socket (`verbindungsversuche()` zaehlt nur
- * wirkliche Versuche) und meldet wie der Chip bei nicht erreichbarem Ziel `TIMEOUT`.
+ * Netzanbindung: das Modell benutzt die Netzanbindung des WIRTS ("richtig im Netz", Entscheidung
+ * des Anwenders).  Listen- und UDP-Sockets binden auf alle Schnittstellen (Gast-Port Sn_PORT; bei
+ * Port 0 traegt das Modell den vom System gewaehlten ein).  Ausgehende Ziele sind in der Vorgabe
+ * frei; `Richtlinie::frage` ist ein OPTIONALER Filter (Allow/Deny, z. B. die Rueckfrage der GUI).
+ * Ein vom Filter abgewiesenes Ziel oeffnet gar keinen Socket und meldet TIMEOUT.  Tests bleiben
+ * trotzdem auf Loopback/Port 0.
  *
  * Mit [?] gekennzeichnete Stellen sind aus dem Gedaechtnis des Datenblatts gesetzt, nicht
  * an einem Chip gemessen.
@@ -73,10 +75,11 @@ constexpr uint8_t SR_CLOSED = 0x00, SR_INIT = 0x13, SR_LISTEN = 0x14, SR_SYNSENT
 
 class W5100 {
 public:
-    /// Ausgehende Ziele.  `frage` wird im ARBEITSFADEN ohne Sperre gerufen (darf also die
+    /// Ausgehende Ziele.  Ist `frage` gesetzt, entscheidet es allein (Allow/Deny); sonst gilt
+    /// `aussenErlaubt` (Vorgabe: alles erlaubt).  `frage` wird im ARBEITSFADEN ohne Sperre gerufen (darf also die
     /// Oberflaeche fragen; muss dann selbst threadsicher sein).
     struct Richtlinie {
-        bool aussenErlaubt = false;
+        bool aussenErlaubt = true;   ///< false: nur Loopback (127.0.0.0/8), sofern `frage` nicht entscheidet
         std::function<bool(uint32_t ip, uint16_t port)> frage;   ///< ip: a<<24|b<<16|c<<8|d
     };
 
@@ -99,6 +102,8 @@ public:
 
     // ── Wirts-Seite / Test ──────────────────────────────────────────────────
     void setzeRichtlinie(const Richtlinie& r);
+    /// Entscheidung der Richtlinie fuer ein Ziel (ip: a<<24|b<<16|c<<8|d).
+    bool zielErlaubt(uint32_t ip, uint16_t port);
     /// Obergrenze der Wirts-Verbindungsfrist in ms (Vorgabe 3000; Chip: RTR*(RCR+1)*100 us).
     void setzeVerbindenFristMax(int ms) { fristMax_ = ms; }
     /// Tatsaechlicher Wirtsport des Sockets `n` (Listen/UDP), 0 solange nicht gebunden.

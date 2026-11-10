@@ -158,6 +158,13 @@ bool W5100::interrupt() {
     return (v & reg_[reg::IMR]) != 0;
 }
 
+bool W5100::zielErlaubt(uint32_t ip, uint16_t port) {
+    Richtlinie rl;
+    { std::lock_guard<std::mutex> l(m_); rl = richtlinie_; }
+    if (rl.frage) return rl.frage(ip, port);
+    return rl.aussenErlaubt || istLoopback(ip);
+}
+
 void W5100::setzeRichtlinie(const Richtlinie& rl) {
     std::lock_guard<std::mutex> l(m_);
     richtlinie_ = rl;
@@ -271,7 +278,8 @@ void W5100::schritt(std::unique_lock<std::mutex>& sp) {
         const Richtlinie rl = richtlinie_;
         sp.unlock();
         auto erlaubt = [&](uint32_t ip, uint16_t port) {
-            return istLoopback(ip) || rl.aussenErlaubt || (rl.frage && rl.frage(ip, port));
+            if (rl.frage) return rl.frage(ip, port);
+            return rl.aussenErlaubt || istLoopback(ip);
         };
         struct VErg { Verb v; bool erlaubt; net::Socket sock; };
         std::vector<VErg> verg;
@@ -346,11 +354,10 @@ void W5100::sockSchritt(int n) {
         const int port = r16(n, reg::Sn_PORT);
         net::Fehler f;
         if (sr == reg::SR_LISTEN) {
-            net::Lauscher l = net::lauschenLoopback(port);   // eingehend immer nur Loopback
+            net::Lauscher l = net::lauschen(port);   // alle Schnittstellen
             if (l.sock) { s.lausch = std::move(l.sock); s.wirtsPort = l.port; }
         } else if (sr == reg::SR_UDP) {
-            const bool nurLoop = !richtlinie_.aussenErlaubt && !richtlinie_.frage;
-            net::Socket u = net::udpOeffnen(port, nurLoop, &f);
+            net::Socket u = net::udpOeffnen(port, false, &f);
             if (u) { s.wirtsPort = net::lokalerPort(u.fd()); s.fd = std::move(u); }
         }
         if (s.wirtsPort == 0) {
