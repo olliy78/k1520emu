@@ -630,7 +630,7 @@ Sektor bzw. Bytezeiger, Sperrbits und Spiegelung sind **so** nachgebildet, RESET
 Inhalt.  **Vor Arbeiten daran: `doc/merkposten/raf.md` lesen**; Entwurf
 `doc/design/22_raf512.md`, Originale `doc/raf512/`.
 
-## GIDE / GUN (IDE-Platte + RTC)
+## GIDE / GUN (IDE-Platte + RTC + USB)
 
 IDE-Platte nach dem Vorbild der GIDE (Tilmann Reh; GUN = PC-1715-Platine mit GIDE + USB + Netz) mit **RTC 72421** als
 steckbare Option in A5120 (auch .16), K8915, PRG 710/-1 und PC 1715 (P8000 nicht), Vorgabe überall aus.  Karte `core/cards/gide/`,
@@ -640,7 +640,13 @@ P8000-Uhr; gesteckt über `K1520Machine::installGide` **nach dem Anlegen, vor de
 **LH-Wechsel-Flipflop** (Task-File-Zugriff setzt es zurück), RTC über A8–A11, `schreiben_unter_hold` nur an der GIDE, Batteriekopf
 `K1520-GIDE-RTC`.  **Basis im Kern frei** (Jumperstellung der echten Karten unbekannt; übliche Basis D0H kollidiert mit K5020/EPROMmer),
 Maschinenvorgabe offen.  Fremdtreiber (Poppe/Kingstener) liegen **nur lokal**, `GideSystem.*` überspringt sich ohne sie.  **Nicht gemacht:**
-Oberfläche (G6), USB, Netz, Save-State.  **Vor Arbeiten daran: `doc/merkposten/gun.md` lesen**; Entwurf `doc/design/50_gun_gide.md`.
+Oberfläche (G6), Netz, Save-State.
+**USB (U1/U2, Zweig `gide`):** `GunUsb` (Z80-PIO + VDIP1/VDAP 3.68, `core/cards/gun_usb/`, Firmware-Modell `core/peripherals/vdip/`), vier Tore ab Basis
+(**frei**, Vielfaches von 4; GUN 84H, Variante DCh; am K8915 Gen 2 und PRG 710/-1 ist 84H belegt), gesteckt über `installGunUsb` vor dem ersten `run()`
+(C-ABI `k1520_usb_*`, Python `K1520Emulator(usb=…)`, `--usb[=basis]`/`--usb-dir` in `boot_trace`/`k1520dbg`).  Der „Stick" ist ein Wirtsverzeichnis mit
+**Pfad-Sandbox** (nur 8.3, nie ausserhalb, Symlinks unsichtbar; Wächter `VdipPfadflucht.*`) — **nie aufweichen**.  UTools (Fremdsoftware, Lizenz
+ungeklärt) nur lokal, `GunUsbSystem.*` überspringt sich ohne sie.  GUI (U3) zurückgestellt.  **Netz** (W5100/KC-Net): in Planung (N1 läuft, KC-Net-Protokoll
+fehlt), keine Zusagen.  **Vor Arbeiten daran: `doc/merkposten/gun.md` lesen**; Entwurf `doc/design/50_gun_gide.md`.
 
 ## Lochstreifen K6022/SIF1000 (alle Maschinen; PC 1715 nur mechanisch)
 

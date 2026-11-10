@@ -1,7 +1,7 @@
 <!-- Angelegt 2026-11-10 (AP G7, Entwurf 50).  Gilt WIE CLAUDE.md, sobald an der GIDE (IDE-Platte + RTC 72421)
      gearbeitet wird.  Begruendung: doc/merkposten/README.md -->
 
-# GIDE / GUN (IDE-Platte + RTC) — Merkposten
+# GIDE / GUN (IDE-Platte + RTC + USB) — Merkposten
 
 **GIDE** (Tilmann Reh, nie von Robotron gefertigt) als **steckbare Option** in allen K1520-nahen Maschinen
 (A5120 auch .16, K8915 V3/Gen2, PRG 710/-1, PC 1715/1715W; MC80 mechanisch), Vorgabe überall **aus**.
@@ -61,10 +61,49 @@ doppelt, Tor belegt, Z80-Gastcode Sektor + RTC), `GideSystem.*` (`test_gide_syst
 
 - **G6 Oberfläche** (Einstellungen, Statuslampe „IDE“, Konfigschlüssel `general.gide.*`, Handbuch) — zurückgestellt, bis die Basisfrage
   (Festlegung 4) entschieden ist.  Es gibt keinen Programmprofil-/Konfigurationsweg; `gide=` gilt nur in Python/CLI/Werkzeugen.
-- **USB (VDIP1, 84H–87H) und Netz (W5100/KC-Net, 88H–8BH)** — Entwurf 50 §5/§6, APs U*/N*; Netz kollidiert mit der RAF, am K8915/PRG 710
-  nicht steckbar (CTC/PIO der ZRE).  Das Netzprotokoll ist unbekannt (N0, Anwenderaufgabe).
+- **Netz (W5100/KC-Net, 88H–8BH)** — Entwurf 50 §6, APs N*; kollidiert mit der RAF, am K8915/PRG 710 nicht steckbar (CTC/PIO der ZRE).
+  In Planung (N1 laeuft), das KC-Net-Protokoll fehlt noch; keine Zusagen.  USB siehe unten (U1/U2 fertig, GUI U3 zurueckgestellt).
 - **G5b Gasttreiber `GIDEDRV.COM`** — entfällt: die vorhandenen Poppe-/Kingstener-Treiber genügen (Anwenderantwort F3).
   Auch kein eigenes Prüfprogramm `GIDETST.COM` (G5a ist durch die echten Treiber, G5c, überholt).
 - **Save-State**, **P8000** (kein K1520-Bus), **DiskTool-Dateisystem für IDE-Abbilder**.
 - **PRG 710 und PC 1715 am Gastsystem:** dort nur Z80-Prüfcode (`GideMaschine.*_Z80…`), kein passendes Treiber-/Boot-Paar
   geprüft; MC80 nicht geprüft.
+
+## USB (GunUsb + VdipGeraet) — AP U1/U2
+
+USB-Karte der GUN: **Z80-PIO + VDIP1** (Vinculum, Firmware VDAP 3.68) als steckbare Option, Vorgabe aus.  Karte `core/cards/gun_usb/`
+(`GunUsb`), Firmware als Byte-Zustandsmaschine `core/peripherals/vdip/` (`VdipGeraet`, `VdipStick`).  Bestueckung
+`K1520Machine::installGunUsb(GunUsb::Config)` **nach dem Anlegen, vor dem ersten `run()`/`reset()`**; C-ABI `k1520_usb_*`
+(`install`/`installed`/`error`/`stick_insert`/`stick_remove`/`status`), Python `K1520Emulator(usb=…)`, `--usb[=basis]`/`--usb-dir <ordner>`
+in `boot_trace`/`k1520dbg`.  Entwurf: `doc/design/50_gun_gide.md` §5 (Karte), §5a (Protokoll), §7.1a (Portlage).
+
+| # | Festlegung | Waechter |
+|---|------------|----------|
+| U1 | **Vier Tore ab Basis:** +0 Daten A (AD0..7, Mode 2), +1 Daten B, +2 Steuer A, +3 Steuer B (die Karte vertauscht gegenueber der PIO-Zaehlung 0=DA 1=SA 2=DB 3=SB: A0 waehlt Port A/B, A1 Daten/Steuer).  **Basis = Vielfaches von 4** (GUN fest **84H**; UTools-CP/M-Fassung/Z9001-Variante **DCh..DFh**), sonst `std::invalid_argument`.  **Kein INT genutzt** (die PIO haengt nur in der Interruptkette, die UTools brauchen ihn nicht). | `GunUsb.BusAnmeldungUndKonflikt`, `GunUsb/GunUsbBasis.InitSyncDirUndDateienRundlauf` (parametrisiert ueber Basen), `GunUsbMaschine.A5120_BasisDC` |
+| U2 | **Port-B-Belegung:** B0 RXF# (E), B1 TXE# (E), B2 RD# (A, aktiv low), B3 WR (A, Impuls aktiv high), B4/B5 Eingaenge ohne Funktion, B6 RES# (A), B7 PRG# (A).  **PRG# wird nicht ausgewertet** (Programmiermodus des Chips nicht nachgebildet).  RXF#/TXE# werden bei jedem Zugriff aus dem `VdipGeraet` auf B0/B1 gelegt; TXE# ist immer bereit (**kein Zeitmodell**). | `GunUsb.PegelRxfTxe`, `GunUsb.LesenOhneDatumAendertNichts`, `GunUsb.SyncWieUsbinc` |
+| U3 | **Verhaltensmodell statt Gatter [?]:** die 74LS00-Gatter des Schaltplans werden nicht einzeln nachgebaut.  **Fallende RD#-Flanke mit RXF# = 0 → naechstes Byte sofort ins Eingaberegister von Port A** (der Gast `USBINC.Z80` liest Port A VOR dem Deaktivieren von RD#; die echte PIO luede erst bei der steigenden BSTB-Flanke).  **Fallende WR-Flanke (B3) → Byte an das VDIP1** (TXE# = 0 vorausgesetzt), ASTB = NAND(B2,B3).  **Abgesichert nur durch das Verhalten der echten UTools-Binaerdateien**, nicht durch den Schaltplan — nicht „der Schaltung zuliebe" umbauen, ohne `GunUsbSystem.UToolsA5120` gruen zu sehen. | `GunUsb.*`, `GunUsbSystem.UToolsA5120` |
+| U4 | **RES#-Impuls (B6 low → high) startet die Firmware neu** (`VdipGeraet::reset`, Startmeldung in der Ausgabe); `/RESET` der Karte setzt PIO und VDIP1 zurueck, **der Stick bleibt gesteckt**; Stick-Wechsel zeigt sich ohne Zwischenzugriff (`Device Detected/Removed P2`); schreibgeschuetzter Stick lehnt Schreiben ab. | `GunUsb.ResImpulsStartetFirmwareNeu`, `GunUsb.ResetDerKarteLaesstStickGesteckt`, `GunUsb.StickWechselZeigtSichOhneZwischenzugriff`, `GunUsb.SchreibgeschuetzterStickLehntSchreibenAb`, `VdipGeraet.ResetSchliesstDateiUndLiefertBanner` |
+| U5 | **SCS/ECS (Vertauschung nicht „berichtigen"):** **ECS** = Vorgabe nach Reset, Textbefehle (`DIR`, `OPW` …), Prompt `D:\>` CR, Klartext-Fehler; **SCS** (per `10h`) = Kurzsatz mit Opcodes, Prompt `>` CR, Kurzfehler.  Opcodes und Mnemonics werden in beiden Modi erkannt.  **Der Prompt ist zugleich der Status:** Erfolg = Prompt CR, Fehler = Fehlertext CR **ohne** Prompt.  `E`/`e` (Echo) ohne Prompt. | `VdipGeraet.SyncWieUtools`, `VdipGeraet.EchoMitHalbfertigerZeileUndUnbekannt`, `VdipGeraet.StartmeldungMitStick`, `VdipGeraet.StartmeldungOhneStick` |
+| U6 | **Stick = Wirtsverzeichnis mit PFAD-SANDBOX — nie aufweichen:** nur strikte **8.3-Namen** (eingeschraenkter Zeichensatz, keine Geraetenamen, GROSS normalisiert), **nie ausserhalb der Wurzel** (kein `..`/Pfadtrenner/absoluter Pfad ausser dem Befehl `CD ..`/`CD /`), **Symlinks und alles ausser regulaeren Dateien/Verzeichnissen sind unsichtbar**; jede Pfadkomponente wird bei jedem Zugriff erneut geprueft (auch nach `CD`, auch die Wurzel selbst als Symlink).  Fehler kommen als VDIP-Fehlertext, nie als Ausnahme.  Ein Gast mit freier Textzeile darf den Wirt nie lesen oder beschreiben koennen. | `VdipPfadflucht.KeinZugriffAusserhalbDesSticks`, `VdipPfadflucht.CdPunktPunktUndWurzel`, `VdipPfadflucht.SymlinksNachAussen`, `VdipPfadflucht.VerzeichnisWirdNachCdDurchSymlinkErsetzt`, `VdipPfadflucht.WurzelSelbstAlsSymlinkWirdAufgeloest`, `VdipPfadflucht.TestKannRotWerden`, `VdipStick.Namen83` |
+| U7 | **Portlage je Maschine** (Entwurf 50 §7.1a, Befund U2): **84H..87H frei** am A5120 (auch .16), **PC 1715** und **K8915 V3** (die ZRE-CTC belegt nur 80H..83H).  **Belegt** am **K8915 Gen 2** (K2521: CTC/PIO auf 80H..87H) und am **PRG 710/-1** → dort **freie Basis wie DCh**; Konflikt → `installGunUsb` meldet den Grund (`k1520_usb_error`, Text `--usb: E/A-Tor 84H belegt`), **kein Absturz**, Pruefung der Tore **vor** dem Anmelden (`belegtGrund`). | `GunUsbMaschine.Bestueckung_A5120`/`_A5120_16`/`_K8915`/`_K8915_Gen2`/`_Prg710`/`_Prg710_1`/`_Pc1715`, `cli_dbg_usb_konflikt`, `py_usb_api` (`test_zre_belegt_84h_aber_freie_basis_geht`) |
+| U8 | **Gast-Rundlauf mit echtem Z80** an allen Maschinen: Startmeldung holen; ausserdem Sync, `DIR`, Schreiben/Lesen (`WRF`/`RDF`, `OPW` mit Anhaengen/Stempel), `SEK`, `MKD`/`CD`/`DLD`, `DLF`, `REN`, `FS`/`IDD`, Fehlerfaelle (Datei fehlt, schon offen, ohne Stick, schreibgeschuetzt) mit Gegenpruefung gegen die Wirtsdatei. | `GunUsbMaschine.*_Z80HoltStartmeldung`, `VdipGeraet.SchreibenWieUput_UndPruefungGegenWirtsdatei`, `VdipGeraet.LesenWieUget_UndPruefungGegenWirtsdatei`, `VdipGeraet.DirtDatumUndZeit`, `VdipGeraet.ZeitUmrechnung`, `VdipGeraet.OpwHaengtAnVorhandeneDateiAn`, `VdipGeraet.SchonOffen`, `VdipGeraet.OhneStick`, `VdipGeraet.SchreibgeschuetzterStick` |
+
+### Fremdsoftware (UTools): nur lokal, Tests ueberspringen
+
+Quellen und Binaerdateien der **UTools** (`USB.COM`, `UDIR.COM`, `UPUT.COM`, `UGET.COM`, `USBINC.Z80` …) liegen nur lokal in
+`~/Documents/K1520emu/GIDE_Software/utools14/` (`K1520_GIDE_SW` ueberschreibt den Ort), **Lizenz ungeklaert, nie ins Repo**.
+`GunUsbSystem.UToolsA5120` (CP/A am A5120, Karte auf DCh: `USB FWV`, `UDIR`, `UPUT`, `UGET`) **ueberspringt sich ohne sie** — ein Skip ist
+kein Rot, aber auch kein Beleg; auf dem Entwicklungsrechner muss er einmal gruen gelaufen sein.  Das Protokoll (Entwurf 50 §5a) ist aus
+den UTools-Quellen und dem Verhalten der Binaerdateien abgeleitet, **nicht** aus einem Firmware-Handbuch.
+
+### Nicht nachgebildet / offen
+
+- **PRG#-Programmiermodus** (B7), **Zeitmodell** (TXE#/RXF# immer sofort), **Interrupt** der PIO in der Praxis.
+- Textformat von **`FS`/`IDD`/`FWV`** [?] (nur so weit, wie die UTools es auswerten), **Opcodes ausser den von UTools benutzten** [?] (aus der
+  Erinnerung), **IPA-Zahlenform** [?], **Reihenfolge der `DIR`-Ausgabe** (Wirtsverzeichnisreihenfolge, am echten Stick FAT-Reihenfolge).
+- **GUI-Kasten** (U3) zurueckgestellt: kein Programmprofil-/Konfigurationsweg; `usb=` gilt nur in Python/CLI/Werkzeugen.
+- Nicht im Save-State, P8000 nicht steckbar (kein K1520-Bus).
+- Wachter-Uebersicht: `GunUsb.*` (`tests/unit/cards/test_gun_usb.cpp`), `VdipGeraet.*`/`VdipStick.*`/`VdipPfadflucht.*`
+  (`tests/unit/peripherals/test_vdip_geraet.cpp`), `GunUsbMaschine.*` (`tests/integration/test_gun_usb_maschinen.cpp`), `GunUsbSystem.*`
+  (`test_gun_usb_system.cpp`, lokal), `py_usb_api`, `cli_bt_usb`, `cli_bt_usb_k8915`, `cli_dbg_usb`, `cli_dbg_usb_keine`, `cli_dbg_usb_konflikt`.
+  Alle schnell.
