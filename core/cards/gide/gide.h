@@ -21,9 +21,11 @@
 #pragma once
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
 
 #include "core/bus/k1520_bus.h"
+#include "core/cards/p8000/rtc.h"
 #include "core/peripherals/ata/ata_geraet.h"
 
 namespace k1520 {
@@ -55,7 +57,20 @@ public:
     void reset();      ///< systemweiter /RESET: LH=0, Platte reset(); Medium bleibt
     void powerOn() { reset(); letzter_befehl_ = 0; zaehler_ = Zaehler(); }
     /// Maschinenzeit (absolute Takte) an die Platte weiterreichen.
-    void takt(uint64_t maschinentakte) { platte_.takt(maschinentakte); }
+    /// Die RTC zaehlt dieselben Maschinentakte (Zeit laeuft in Maschinenzeit, Entwurf 50 Abschnitt 4).
+    void takt(uint64_t maschinentakte);
+
+    // ---- RTC 72421 (AP G3): Chipmodell = P8000Rtc72421 (Registerschnittstelle), Zeitpolitik wie P8000-Uhr ----
+    struct RtcConfig {
+        std::string zustand;                   ///< Batteriedatei (Kopf `K1520-GIDE-RTC 2`), "" = nur im Speicher
+        uint32_t takt_hz = 4'000'000;          ///< Maschinentakt, in dem takt() zaehlt
+        std::function<int64_t()> zeitquelle;   ///< Unix-Sekunden UTC; leer = std::time
+        bool utc = true;                       ///< Wirtszeit als UTC (Oberflaeche speist UTC)
+        int jahresversatz = 0;
+    };
+    /// Chipmodell anlegen und rtcLese/rtcSchreibe darauf verdrahten (nur sinnvoll mit rtc_vorhanden).
+    void rtcAnlegen(const RtcConfig& rc);
+    P8000Rtc72421* rtc() { return rtc_.get(); }
 
     // ---- RTC-Hook (AP G3): Registernummer = A8..A11 des Zyklus ----
     std::function<uint8_t(uint8_t reg)> rtcLese;
@@ -78,6 +93,9 @@ private:
     Config cfg_;
     AtaGeraet platte_;
     K1520Bus* bus_ = nullptr;
+    std::unique_ptr<P8000Rtc72421> rtc_;
+    uint64_t rtc_takt_ = 0;
+    bool rtc_takt_init_ = false;
     bool lh_ = false;
     uint8_t merker_ = 0;          ///< 646-Register: High-Byte (Lesen) bzw. Low-Byte (Schreiben)
     uint8_t letzter_befehl_ = 0;

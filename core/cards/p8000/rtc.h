@@ -85,6 +85,7 @@ struct P8000RtcConfig {
     std::string zustand;                  ///< Batteriedatei, "" = nur im Speicher
     std::function<int64_t()> zeitquelle;  ///< Unix-Sekunden UTC; leer = std::time
     uint32_t takt_hz = 4'000'000;         ///< Takt, in dem `takte()` zaehlt (Maschinenzeit)
+    std::string kopf = "K1520-P8000-RTC"; ///< Kopfkennung der Batteriedatei (ohne " 2"); GIDE nutzt eine eigene
 };
 
 class P8000Rtc {
@@ -159,6 +160,10 @@ public:
     explicit P8000Rtc72421(const P8000RtcConfig& cfg);
     bool lesen(uint16_t port, uint8_t& d) override;
     bool schreiben(uint16_t port, uint8_t d) override;
+    /// Reine Registerschnittstelle (n = 0..15, ohne P8000-Kennung): liefert den Nibble in D0..D3, obere Bits 0.
+    /// Die P8000-Portsicht `lesen`/`schreiben` setzt darauf auf (KENNUNG 0x30 ODER Nibble).
+    uint8_t registerLesen(uint8_t n);
+    void registerSchreiben(uint8_t n, uint8_t d);
     void takte(int n) override;
     P8000RtcTyp typ() const override { return P8000RtcTyp::Rtc72421; }
     std::string text() const override;

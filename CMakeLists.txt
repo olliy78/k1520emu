@@ -383,7 +383,7 @@ if(BUILD_K1520)
 
     # GIDE: IDE-Karte mit ATA-Platte (Entwurf 50)
     add_library(k1520_gide STATIC core/cards/gide/gide.cpp)
-    target_link_libraries(k1520_gide PUBLIC k1520_bus k1520_logger k1520_ata)
+    target_link_libraries(k1520_gide PUBLIC k1520_bus k1520_logger k1520_ata k1520_p8000_rtc)
     target_include_directories(k1520_gide PUBLIC ${CMAKE_SOURCE_DIR})
 
     # K3521.30 – akkugepuffertes 4-KB-RAM (Entwurf 33 N10b)
@@ -457,9 +457,14 @@ if(BUILD_K1520)
     add_library(k1520_p8000_dram16 STATIC core/cards/p8000/dram16.cpp)
     target_include_directories(k1520_p8000_dram16 PUBLIC ${CMAKE_SOURCE_DIR})
 
+    # RTC-Chipmodelle (72421, U130X): eigene Bibliothek, von P8000-Karte16 und GIDE benutzt
+    add_library(k1520_p8000_rtc STATIC core/cards/p8000/rtc.cpp)
+    target_link_libraries(k1520_p8000_rtc PUBLIC k1520_logger)
+    target_include_directories(k1520_p8000_rtc PUBLIC ${CMAKE_SOURCE_DIR})
+
     # P8000, 16-Bit-Rechnerkarte: U8001, On-Board-Speicher, CTC/SIO/PIO, E/A, NMI/Reset (AP P10b)
-    add_library(k1520_p8000_karte16 STATIC core/cards/p8000/karte16.cpp core/cards/p8000/rtc.cpp)
-    target_link_libraries(k1520_p8000_karte16 PUBLIC k1520_p8000_mmu_logik16 k1520_p8000_dram16 k1520_z8000 k1520_ctc k1520_sio k1520_pio k1520_bus k1520_logger k1520_serial)
+    add_library(k1520_p8000_karte16 STATIC core/cards/p8000/karte16.cpp)
+    target_link_libraries(k1520_p8000_karte16 PUBLIC k1520_p8000_rtc k1520_p8000_mmu_logik16 k1520_p8000_dram16 k1520_z8000 k1520_ctc k1520_sio k1520_pio k1520_bus k1520_logger k1520_serial)
     target_include_directories(k1520_p8000_karte16 PUBLIC ${CMAKE_SOURCE_DIR})
 
     # ATA-/IDE-Festplatte (GIDE, Entwurf 50 AP G1): Task-File, Befehle, Rohabbild/.img.gz

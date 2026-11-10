@@ -129,6 +129,7 @@ k1520_add_test(raf   SRC cards/test_raf.cpp        LIBS k1520_raf k1520_z80 LABE
 
 # GIDE-IDE-Karte mit echtem Z80 (Entwurf 50 AP G2)
 k1520_add_test(gide  SRC cards/test_gide.cpp       LIBS k1520_gide k1520_z80 LABELS "${_lbl}")
+k1520_add_test(gide_rtc SRC cards/test_gide_rtc.cpp LIBS k1520_gide k1520_z80 LABELS "${_lbl}")
 
 # ── core/peripherals/ ────────────────────────────────────────────────────────
 # MC80.3x-Tastatur auf Zeichenebene (AP M3, doc/mc80/egos.md §3)

@@ -30,6 +30,39 @@ void Gide::attachToBus(K1520Bus& bus) {
     bus.registerIO(this, uint8_t(cfg_.basis + 4), ANZAHL_TORE);
 }
 
+void Gide::takt(uint64_t maschinentakte) {
+    platte_.takt(maschinentakte);
+    if (!rtc_) return;
+    if (!rtc_takt_init_ || maschinentakte < rtc_takt_) {   // erster Aufruf bzw. Maschinenzeit zurueckgesetzt: neu aufsetzen
+        rtc_takt_ = maschinentakte;
+        rtc_takt_init_ = true;
+        return;
+    }
+    uint64_t d = maschinentakte - rtc_takt_;
+    rtc_takt_ = maschinentakte;
+    while (d) {
+        const int n = int(d > 0x40000000u ? 0x40000000u : d);
+        rtc_->takte(n);
+        d -= uint64_t(n);
+    }
+}
+
+void Gide::rtcAnlegen(const RtcConfig& rc) {
+    P8000RtcConfig c;
+    c.typ = P8000RtcTyp::Rtc72421;
+    c.jahresversatz = rc.jahresversatz;
+    c.utc = rc.utc;
+    c.zustand = rc.zustand;
+    c.zeitquelle = rc.zeitquelle;
+    c.takt_hz = rc.takt_hz;
+    c.kopf = "K1520-GIDE-RTC";
+    rtc_ = std::make_unique<P8000Rtc72421>(c);
+    rtc_takt_init_ = false;
+    P8000Rtc72421* r = rtc_.get();
+    rtcLese = [r](uint8_t reg) { return r->registerLesen(reg); };
+    rtcSchreibe = [r](uint8_t reg, uint8_t d) { r->registerSchreiben(reg, d); };
+}
+
 void Gide::reset() {
     lh_ = false;
     merker_ = 0;

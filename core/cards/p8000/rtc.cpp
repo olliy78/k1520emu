@@ -87,14 +87,14 @@ struct Batterie {
     int64_t stand = 0, wirt = 0, versatz = 0;
 };
 
-Batterie leseBatterie(const std::string& pfad) {
+Batterie leseBatterie(const std::string& pfad, const std::string& praefix = "K1520-P8000-RTC") {
     Batterie b;
     if (pfad.empty()) return b;
     std::ifstream f(pfad);
     if (!f) return b;   // noch keine Batteriedatei
     std::string kopf, zeile;
     std::getline(f, kopf);
-    const int fassung = kopf == "K1520-P8000-RTC 2" ? 2 : kopf == "K1520-P8000-RTC 1" ? 1 : 0;
+    const int fassung = kopf == praefix + " 2" ? 2 : kopf == praefix + " 1" ? 1 : 0;
     if (!fassung) { LOG_WARN("P8000", "RTC: Batteriedatei '%s' unbekannt", pfad.c_str()); return b; }
     bool stand = false, wirt = false;
     auto zahl = [](const std::string& z, size_t n, int64_t& v) {
@@ -110,10 +110,10 @@ Batterie leseBatterie(const std::string& pfad) {
     return b;
 }
 
-bool schreibeBatterie(const std::string& pfad, int64_t stand, int64_t wirt) {
+bool schreibeBatterie(const std::string& pfad, int64_t stand, int64_t wirt, const std::string& praefix = "K1520-P8000-RTC") {
     std::ofstream f(pfad, std::ios::trunc);
     if (!f) { LOG_WARN("P8000", "RTC: Batteriedatei '%s' nicht schreibbar", pfad.c_str()); return false; }
-    f << "K1520-P8000-RTC 2\nstand=" << stand << "\nwirt=" << wirt << "\n";
+    f << praefix << " 2\nstand=" << stand << "\nwirt=" << wirt << "\n";
     return bool(f);
 }
 
@@ -129,9 +129,10 @@ int64_t startRegel(const Batterie& b, bool utc, int64_t jetzt) {
     return host;
 }
 
-int64_t startWand(const std::string& pfad, bool utc, const std::function<int64_t()>& zq) {
+int64_t startWand(const std::string& pfad, bool utc, const std::function<int64_t()>& zq,
+                  const std::string& praefix = "K1520-P8000-RTC") {
     const int64_t jetzt = unixJetzt(zq);
-    return startRegel(leseBatterie(pfad), utc, jetzt);
+    return startRegel(leseBatterie(pfad, praefix), utc, jetzt);
 }
 
 }  // namespace
@@ -157,7 +158,7 @@ std::unique_ptr<P8000Rtc> P8000Rtc::anlegen(const P8000RtcConfig& cfg, std::stri
 
 P8000RtcBasis::P8000RtcBasis(const P8000RtcConfig& cfg) : cfg_(cfg) {
     if (cfg_.takt_hz == 0) cfg_.takt_hz = 4'000'000;
-    sek_ = startWand(cfg_.zustand, cfg_.utc, cfg_.zeitquelle);
+    sek_ = startWand(cfg_.zustand, cfg_.utc, cfg_.zeitquelle, cfg_.kopf);
     gesehen_ = dateiStand();
 }
 
@@ -187,7 +188,7 @@ void P8000RtcBasis::netzEin() {
     Batterie b;
     b.fassung = 2; b.stand = aus_stand_; b.wirt = aus_wirt_;
     if (!cfg_.zustand.empty()) {
-        const Batterie d = leseBatterie(cfg_.zustand);
+        const Batterie d = leseBatterie(cfg_.zustand, cfg_.kopf);
         if (d.fassung == 2) b = d;   // massgeblich ist die Datei (z. B. von aussen gestellt)
     }
     sek_ = startRegel(b, cfg_.utc, unixJetzt(cfg_.zeitquelle));
@@ -278,9 +279,8 @@ void P8000Rtc72421::minuteRunden() {
     setzeUhr(sek_ + (s >= 30 ? 60 - s : -s), true);
 }
 
-bool P8000Rtc72421::lesen(uint16_t port, uint8_t& d) {
-    if (!(port & 1) || (port & 0xFFE0) != 0xFDE0) return false;   // [R7]
-    const int n = (port >> 1) & 0x0F;
+uint8_t P8000Rtc72421::registerLesen(uint8_t n) {
+    n &= 0x0F;
     uint8_t v = 0;
     if (n <= 12) {
         if (hold_ || angehalten()) v = zeit_[n];
@@ -294,13 +294,17 @@ bool P8000Rtc72421::lesen(uint16_t port, uint8_t& d) {
         v = uint8_t((hold_ ? 1 : 0) | (busy ? 2 : 0) | (d_ & 0x04));
     } else if (n == 14) v = e_;
     else v = f_;
-    d = uint8_t(KENNUNG | (v & 0x0F));
+    return uint8_t(v & 0x0F);
+}
+
+bool P8000Rtc72421::lesen(uint16_t port, uint8_t& d) {
+    if (!(port & 1) || (port & 0xFFE0) != 0xFDE0) return false;   // [R7]
+    d = uint8_t(KENNUNG | registerLesen(uint8_t((port >> 1) & 0x0F)));
     return true;
 }
 
-bool P8000Rtc72421::schreiben(uint16_t port, uint8_t d) {
-    if (!(port & 1) || (port & 0xFFE0) != 0xFDE0) return false;
-    const int n = (port >> 1) & 0x0F;
+void P8000Rtc72421::registerSchreiben(uint8_t n, uint8_t d) {
+    n &= 0x0F;
     const uint8_t v = d & 0x0F;
     if (n <= 12) {
         if (angehalten()) { zeit_[n] = v; stell_geaendert_ = true; }   // [R3]
@@ -318,6 +322,11 @@ bool P8000Rtc72421::schreiben(uint16_t port, uint8_t d) {
         if (!war && angehalten()) { ladeNibbel(uhrWand(), zeit_); stell_geaendert_ = false; }
         else if (war && !angehalten() && stell_geaendert_) { festschreiben(); stell_geaendert_ = false; }
     }
+}
+
+bool P8000Rtc72421::schreiben(uint16_t port, uint8_t d) {
+    if (!(port & 1) || (port & 0xFFE0) != 0xFDE0) return false;
+    registerSchreiben(uint8_t((port >> 1) & 0x0F), d);
     return true;
 }
 
@@ -370,7 +379,7 @@ void P8000RtcBasis::sichern(bool erzwingen) const {
         LOG_WARN("P8000", "RTC: Batteriedatei '%s' von anderer Hand geaendert - nicht ueberschrieben", cfg_.zustand.c_str());
         return;
     }
-    if (schreibeBatterie(cfg_.zustand, sek_, unixJetzt(cfg_.zeitquelle))) gesehen_ = dateiStand();
+    if (schreibeBatterie(cfg_.zustand, sek_, unixJetzt(cfg_.zeitquelle), cfg_.kopf)) gesehen_ = dateiStand();
 }
 
 // ─── Save-State ──────────────────────────────────────────────────────────────
