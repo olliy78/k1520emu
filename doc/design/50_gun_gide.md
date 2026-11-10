@@ -53,6 +53,40 @@ Platine: gleiches Registermodell, in jeder Maschine steckbar.
 einchecken**; der Emulator wird aus der *Verhaltensbeschreibung* (§3) neu geschrieben, Gasttests mit
 eigenem Quelltext.  Gleiches für die Forums-Doku.
 
+## 2a. Vorhandene Gastsoftware (Recherche 2026-11-10, zweite Runde)
+
+**Es gibt reichlich Software; sie läuft auf K1520-Rechnern.**  Quellen: Forum 16206 („GIDE – CP/A für A5120/K8924", Klaus, 2018/19),
+11026 („GIDE für 5120/8924", 2014), 21872 (RTC/NTIME), 10769 (GUN am PC 1715), hc-ddr.hucki.net (Wiki *z9001/cpm/gide*).
+
+| Software | Autor | Was | Stand |
+|----------|-------|-----|-------|
+| `GIDEHPxx.COM` (xx = Basisadresse, 16 Stück, `gide-all_02.zip`), `eradir.com` | Heiko Poppe | **nachladbarer** CP/M-2.2-Treiber V0.2 für CP/A-Systeme (A5120, K8924, PC 1715, KC87); bis **8 Laufwerke à 8 MB** (C:…J:), 1024 Verzeichniseinträge | **lokal vorhanden** |
+| `gidn@50h/D0h/F0h.com` V0.4 (`gidedrv_v04.zip`), Quelltext `gidn5004.mac` | Kingstener (DL) | nachladbarer Treiber, Laufwerk N: (früher O:), Schnellformat `gidn /F`; läuft laut Forum auch am **K8915 (SCPX)** | **lokal vorhanden** |
+| `guk1520.pdf` (Treiber 0.6 mit Quelltext) | Kingstener | für GU-K1520 | lokal vorhanden |
+| in **CP/A-BIOS eingebaut** (`ANZGIDE`; `@OS.COM`, Urlader `K2526UL4.BIN`, bootet vom ersten GIDE-Laufwerk) | Klaus (A5120/K8924), Heiko Poppe (PC 1715) | **nur per E-Mail**, nicht abrufbar | — |
+| `HDFORMAT.COM`, `SYSWRCPA.COM` | Heiko Poppe | Formatieren / Systemspuren schreiben | nicht abrufbar |
+| `TIME.COM` (RTC stellen), `SNTIME11.COM`/`NTIME11.COM` (NTP → RTC), `CLK.COM`; CP/A zeigt die RTC-Zeit in der Statuszeile | susowa, Klaus, Heiko | **RTC-Software**; SNTIME schreibt über Rehs Routinen (Basis+5) | nur per E-Mail / Quelle unerreichbar |
+| `GIDEIDE.MAC`/`GIDERTC.MAC`/`GIDE09` | Tilmann Reh | Beispielcode | lokal vorhanden (Quelle `autometer.de`) |
+
+**Folgerungen für den Entwurf:**
+1. **Übliche GIDE-Basis ist D0H** (A5120/K8924, PC 1715 mit GUN, K8915-Gerippe „GIDE 0D0h, RTC 0D5h", Netz-PIO 088H);
+   MPC4 B0H, BIC E0H, KC87 50H/F0H.  → Vorgabe der **Maschinen-Verdrahtung** D0H (nicht 90H); der Kern lässt die Basis frei
+   (Config).  Folge: **D0H kollidiert mit der Kassette K5020** (K8915, PC 1715; am A5120 liegt sie bei 30H) und am PRG 710
+   mit dem EPROMmer D0–D4 — dort bleibt eine abweichende Basis nötig.  (§7.1 entsprechend gelesen.)
+2. Der Poppe-Treiber benutzt genau das Registermodell dieses Entwurfs (Basis+6…+F, 91h Init, ECh Identify, 20h/30h, `inir`/`otir`
+   über +8, Status-Polling) — **die echten Treiber sind der beste Systemtest** (AP G5c): CP/A-Diskette booten, `gidehpd0`,
+   `eradir c:`, Dateien kopieren, `dir`, zurücklesen.
+3. **Plattenformate sind untereinander unverträglich** (Poppe ≠ DL ≠ im CP/A-BIOS eingebaut): falscher Treiber = Datenverlust.
+   Der Emulator ist davon nicht betroffen (Abbild ist nur ein Plattenabbild); ein späteres DiskTool-Dateisystem muss die
+   Variante kennen.  Das Layout des Poppe-Treibers (8 MB je Laufwerk, 500 Spuren × 128 Rec/Spur, 2 Systemspuren, Verzeichnis 1024
+   Einträge) ist aus der Treiberausgabe belegt; DPB/Blockgröße ist aus dem Treiberquelltext zu entnehmen (G5c).
+4. **SCPX/SCP:** der nachladbare DL-Treiber läuft am K8915; SCP 3.0 (CP/M 3, PC 1715W) wird von den bekannten GIDE-Tools **nicht**
+   unterstützt; SCP verträgt laut Forum nur 128-Byte-Sektoren (Blocken im Treiber).
+5. **RTC-Software** ist für den Emulator nur in Rehs Routinen (lokal) greifbar; `SNTIME`/`TIME.COM` sind nicht beschaffbar.
+   Hinweis aus dem Forum: stellte man „GUN-RTC Stundenzehner falsch" fest (Hardwarefehler, nicht Chipmodell).
+6. Fremdsoftware liegt **nur lokal** in `~/Documents/K1520emu/GIDE_Software/` (Lizenz ungeklärt, nie ins Repo); Tests suchen dort
+   (`K1520_GIDE_SW` überschreibt) und werden **übersprungen**, wenn sie fehlt.
+
 ## 3. GIDE — Befund (aus `gide1.pds`/`gide2.pds`, Stand 26.09.1995)
 
 ### 3.1 Adressdekodierung (GAL2, 20V8)
@@ -262,6 +296,7 @@ Kommentare deutsch; neue langsame Tests brauchen ein `fach_*`-Label — **keine 
 | **G3** | **RTC 72421**: Chipmodell aus `core/cards/p8000/rtc.*` herauslösen (gemeinsamer Baustein `core/primitives/rtc72421.{h,cpp}`, P8000-Karte nutzt ihn weiter — **P8000-Wächter `Rtc*` müssen grün bleiben**), Zugriff über A8–A11, Zeitpolitik nach §4 (Maschinenzeit, Batteriedatei `gide_rtc.dat` in der Benutzerkonfiguration, UTC-Eingabe), Einhängen in `Gide` an Basis+5. Datenblatt (Epson RTC-72421 Application Manual) beschaffen und Registerbitbelegung **gegen** §4 prüfen, Abweichungen in diesem Dokument nachtragen. | G2 | Tests: Rehs `gidertc.mac` als Z80-Programm (Init, Hold/Busy, Lesen, Setzen), Zeit läuft in Maschinenzeit, kein Zurückspringen nach Neustart, 24h-/12h-Modus, P8000-Wächter grün |
 | **G4** | **Maschinenintegration** (Muster `installRaf`): `installGide(Config{basis, abbild, rtc})` in `machine.h`, Rückgabe + `gideFehler()`, `/RESET`-Verdrahtung, in **allen vier** Maschinen lauffähig (`zusatzkartenSteckbar()`); C-ABI `k1520_gide_*` (anlegen/Abbild einlegen/auswerfen/Status/Zugriffsprotokoll/`k1520_gide_create_image`), Python-Bindung (`app/core_binding/k1520.py`), `test_c_api.py` erweitern, `boot_trace`/`k1520dbg --gide`, Debugbefehl `gide`. | G2, G3 | `tests/integration/test_gide_maschinen.cpp`: je Maschine Karte stecken, vom Gast-Z80-Code Sektor schreiben/lesen; Doppelstecken/Portkonflikt/zu spät gesteckt → Fehlertext; `py_c_api`, `py_binding` grün |
 | **G5a** | **Prüfprogramm `GIDETST.COM`** (`tools/gide/`, Z80-Quelle + eingechecktes `.com`, Bau `tools/gide/build.py` über `tools/cpm_bau.py`): Portbasis als Parameter, Identify anzeigen, Schreib-/Lese-/Vergleichslauf, RTC-Anzeige/Stellen; auf die Bootdisketten (`tools/disketten_beigaben.py`, Wächter `cli_beigaben_auf_den_disketten` nachziehen). | G4 | Integrationstests je Maschine: CP/A (A5120), SCPX (K8915, PRG 710-1), SCP/CP/A 1715 starten, `GIDETST` läuft, Meldung „OK" über `vramText()`/`laufeBisText`; Tastatur-Batchgrößen beachten (5 000 Zyklen) |
+| **G5c** | **Systemtest mit echten Treibern** (Fremdsoftware aus `~/Documents/K1520emu/GIDE_Software/`, übersprungen wenn sie fehlt): A5120 mit CP/A-Bootdiskette, `GIDEHPD0.COM` (Basis D0H), `ERADIR C:`, Datei auf C: kopieren/lesen/vergleichen; K8915 mit SCPX und `gidn@D0h.com`; Abbild vorab leer. Ablauf über die Testhilfen (`TempDisk`, `typeString`, `runSmallUntil`). Befunde (Treiberverhalten, das das Modell verletzt) in den Entwurf. | G4 | Tests `GideSystem.*` (Label wie die anderen langsamen Systemtests nur nach Absprache — sonst `fast` halten) |
 | **G5b** | **Gasttreiber `GIDEDRV.COM`** (nachladbar wie `RAFCPM.COM`; Laufwerk z. B. `H:`) — **Entwurf zuerst** (DPB je OS, Partitionstabelle, CP/M-Grenzen) — **erst nach Anwenderentscheidung F3**. | G5a | Entwurfsabschnitt + Folgeplan |
 | **G6** | **Oberfläche**: *Einstellungen ▸ Allgemein* Gruppe „IDE/GUN": Kästchen GIDE, Basis (Auswahl 80H…F0H mit Konfliktanzeige), Abbildwahl + „Neue Platte…" (Größe), RTC-Kästchen + Zeitquelle; Statuszeilen-Leuchte „IDE" (folgt dem **Zugriff**, wie die Laufwerksleuchte), Abbilddatei-Name; Konfigschlüssel `general.gide.*` in den vier `default_config_*.yaml` (Vorgabe **aus**), `Programmprofil`-Feld (alle vier Profile erlauben es), Handbuch-Abschnitt (`app/help/handbuch.md`, **Kürzeltabelle bleibt unberührt, kein Tastenkürzel**), Hilfe-Wächter `py_help`. | G4 | Python-Tests (offscreen) `tests/python/test_gide_gui.py`: Stecken per Konfiguration, Konfliktsperre RAF↔Netz, Zurücksetzen, Konfig-Rundlauf |
 | **G7** | **Paketierung/Merkposten**: `doc/merkposten/gun.md` (+ Eintrag in `doc/merkposten/README.md`), Kurzabsatz in `CLAUDE.md`, `tools/test_auswahl.py` (Pfade `core/cards/gide`, `peripherals/ata` → Fachlabel `fach_gide`), `doc/ci_pipeline.md` falls nötig, Paketlisten (Beigaben). | G6 | `tools/dev.sh test-merge --trocken` zeigt die richtige Auswahl; `py_testauswahl`, `py_packaging` grün |
