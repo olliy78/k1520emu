@@ -630,6 +630,18 @@ Sektor bzw. Bytezeiger, Sperrbits und Spiegelung sind **so** nachgebildet, RESET
 Inhalt.  **Vor Arbeiten daran: `doc/merkposten/raf.md` lesen**; Entwurf
 `doc/design/22_raf512.md`, Originale `doc/raf512/`.
 
+## GIDE / GUN (IDE-Platte + RTC)
+
+IDE-Platte nach dem Vorbild der GIDE (Tilmann Reh; GUN = PC-1715-Platine mit GIDE + USB + Netz) mit **RTC 72421** als
+steckbare Option in A5120 (auch .16), K8915, PRG 710/-1 und PC 1715 (P8000 nicht), Vorgabe überall aus.  Karte `core/cards/gide/`,
+Platte `core/peripherals/ata/` (`AtaGeraet`, Rohabbild oder `.img.gz`, Sperrdatei, verzögertes Zurückschreiben), RTC = Chipmodell der
+P8000-Uhr; gesteckt über `K1520Machine::installGide` **nach dem Anlegen, vor dem ersten `run()`/`reset()`** (C-ABI `k1520_gide_*`, Python
+`K1520Emulator(gide=…)`, `--gide` in `boot_trace`/`k1520dbg`, Befehl `gide`).  Festgelegt: Ports **Basis+4…+F**, 16-Bit-Datenregister über das
+**LH-Wechsel-Flipflop** (Task-File-Zugriff setzt es zurück), RTC über A8–A11, `schreiben_unter_hold` nur an der GIDE, Batteriekopf
+`K1520-GIDE-RTC`.  **Basis im Kern frei** (Jumperstellung der echten Karten unbekannt; übliche Basis D0H kollidiert mit K5020/EPROMmer),
+Maschinenvorgabe offen.  Fremdtreiber (Poppe/Kingstener) liegen **nur lokal**, `GideSystem.*` überspringt sich ohne sie.  **Nicht gemacht:**
+Oberfläche (G6), USB, Netz, Save-State.  **Vor Arbeiten daran: `doc/merkposten/gun.md` lesen**; Entwurf `doc/design/50_gun_gide.md`.
+
 ## Lochstreifen K6022/SIF1000 (alle Maschinen; PC 1715 nur mechanisch)
 
 ADA K6022 (Leser daro 1210, Stanzer daro 1215) als steckbare Option auf **E/A E0H–E7H**
