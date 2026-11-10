@@ -62,7 +62,7 @@ Speichern unter und für die echte Diskette.
 **Kassette** — die beiden Kassettenlaufwerke, nur solange die Kassetten-Karte steckt
 (siehe *Kassette* unten).
 
-**Einstellungen** — vier Reiter: *Allgemein* (Modell, Takt, RAM-Disk, Lochstreifen, Kassette, IDE-Platte), *Laufwerke*
+**Einstellungen** — vier Reiter: *Allgemein* (Modell, Takt, RAM-Disk, Lochstreifen, Kassette, IDE-Platte, USB-Stick, Netzwerk), *Laufwerke*
 (welcher Laufwerkstyp in welchem Steckplatz steckt), *Schnittstellen* (die seriellen
 Anschlüsse des Rechners nach außen, ein Block je Schnittstelle — siehe *Serielle
 Schnittstellen* unten) und *CRT* (das Aussehen der Bildröhre).
@@ -1450,8 +1450,52 @@ Lochstreifen und den festen Karten des jeweiligen Rechners nichts gemeinsam bele
 | PC 1715 / 1715W | 90H | 84H | C0H |
 
 (84H ist die Lage der GUN; C0H und 28H sind die beiden Jumperstellungen der K1520-Netzkarte; am PRG 710
-ist C0H der ATP-Zusatz, am K8915 V2 und am PRG 710 80H–87H belegt.) Die USB- und die Netzkarte
-bekommen ihre Gruppen mit derselben Basiswahl.
+ist C0H der ATP-Zusatz, am K8915 V2 und am PRG 710 80H–87H belegt.) Die Gruppen für USB und Netz
+haben dieselbe Basiswahl (Vielfache von 4); belegte Basen sind markiert und nicht wählbar, auch die
+der jeweils anderen angehakten Karten.
+
+## USB-Stick (GUN/VDIP1)
+
+*Einstellungen ▸ Allgemein ▸ USB-Stick (GUN/VDIP1)* steckt die USB-Karte der GUN (Z80-PIO mit dem
+Speicherstick-Baustein VDIP1) — in denselben vier Programmen wie die IDE-Karte. Ab Werk ist sie **aus**.
+
+* **USB-Karte stecken** und **E/A-Basis** — wie bei der IDE-Karte: ein Wechsel schaltet die Maschine aus
+  und baut sie neu auf. Vorgewählt ist 84H (die Lage der GUN), am K8915 V2 und am PRG 710 8CH (siehe die
+  Tabelle oben).
+* **Stick-Ordner** — ein Ordner des Rechners, der im Gast als Stick erscheint (ab Werk
+  `K1520emu/USB-Stick` im Dokumentenordner; wird bei Bedarf angelegt). **Der Gast sieht nur diesen
+  Ordner**: nur Dateinamen im 8.3-Format, nichts außerhalb, Verknüpfungen bleiben unsichtbar. Ein
+  anderer Ordner wirkt sofort, ohne Neustart — wie ein anderer Stick.
+* **Stick schreibgeschützt** — wirkt sofort (der Stick wird dabei neu gesteckt).
+* **Stick entfernen / Stick stecken** — zieht den Stick bzw. steckt ihn wieder ein, sofort und ohne
+  Neustart. Nach einem Neuaufbau der Maschine steckt der Stick wieder.
+
+Die Leuchte **USB** in der Statuszeile steht nur bei gesteckter Karte und folgt dem Zugriff: gefüllt =
+Stick steckt, rot = eben angesprochen, Ring = kein Stick. Der Tooltip nennt Basis und Ordner.
+
+Der Gast bedient den Stick mit eigenen Programmen (nicht im Lieferumfang), etwa `UGET`, `UPUT`,
+`UDIR` und `USB`. Gemerkt wird alles in der Konfiguration (`general.usb`).
+
+## Netzwerk (KCNet/W5100)
+
+*Einstellungen ▸ Allgemein ▸ Netzwerk (KCNet/W5100)* steckt die Netzwerkkarte KCNet (Z80-PIO mit dem
+Netzwerkbaustein W5100) — ab Werk **aus**.
+
+* **Netzwerkkarte stecken** und **E/A-Basis** — ein Wechsel baut die Maschine neu auf. Üblich sind C0H
+  oder 28H (die beiden Jumperstellungen der K1520-Netzkarte; vorgewählt ist die Lage der Tabelle oben)
+  und 88H bei der GUN. **88H/89H gehören der RAM-Floppy**, solange diese steckt.
+* **nur lokal (Loopback)** — ab Werk **aus**. Ohne Haken kann der emulierte Rechner Verbindungen ins
+  **echte Netz** aufbauen und annehmen; das ist gewollt, aber was im Gast läuft, ist dann im Netz
+  sichtbar. Mit Haken erreicht er nur den Rechner selbst. Ein Wechsel baut die Maschine neu auf.
+* **Netzwerkkabel verbunden** — wirkt sofort; ohne Kabel meldet die Karte „offline“.
+* Die Anzeige **Verkehr** zählt Kommandos und Bytes.
+
+Die Leuchte **NET** in der Statuszeile folgt dem Verkehr: gefüllt = Kabel verbunden, rot = eben
+angesprochen, Ring = Kabel abgezogen.
+
+Im Gast laufen Programme wie `TFTP` und `CPMNET` (nicht im Lieferumfang). **Die Basis der Gastsoftware
+muss zur Einstellung passen** — die Programme suchen die Karte an einer festen Adresse (meist C0H).
+Gemerkt wird alles in der Konfiguration (`general.net`).
 
 ## Lochstreifen
 
@@ -1783,7 +1827,7 @@ Alles, was man einstellt, landet fortlaufend in
 kann also den A5120 mit drei Laufwerken und sichtbarer Tastatur und den K8915 mit
 zwei Laufwerken ohne Tastatur nebeneinander führen. Gemerkt werden Bildröhre,
 Takt, Modell, RAM-Disk (samt Stand-by), Lochstreifen-Karte samt Leser- und
-Stanzerdatei, Kassetten-Karte samt den Dateien beider Laufwerke, IDE-Karte GIDE samt Abbild, Laufwerksbestückung, eingelegte Disketten, die seriellen Schnittstellen
+Stanzerdatei, Kassetten-Karte samt den Dateien beider Laufwerke, IDE-Karte GIDE samt Abbild, USB- und Netzwerkkarte, Laufwerksbestückung, eingelegte Disketten, die seriellen Schnittstellen
 (samt dem, was lief), Größe und Lage des Fensters
 (auch „maximiert"), die Lage und Breite der Kästen samt der Trennlinien
 dazwischen, und der Inhalt der Symbolleiste.

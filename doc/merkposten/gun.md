@@ -101,7 +101,7 @@ den UTools-Quellen und dem Verhalten der Binaerdateien abgeleitet, **nicht** aus
 - **PRG#-Programmiermodus** (B7), **Zeitmodell** (TXE#/RXF# immer sofort), **Interrupt** der PIO in der Praxis.
 - Textformat von **`FS`/`IDD`/`FWV`** [?] (nur so weit, wie die UTools es auswerten), **Opcodes ausser den von UTools benutzten** [?] (aus der
   Erinnerung), **IPA-Zahlenform** [?], **Reihenfolge der `DIR`-Ausgabe** (Wirtsverzeichnisreihenfolge, am echten Stick FAT-Reihenfolge).
-- **GUI-Kasten** (U3) zurueckgestellt: kein Programmprofil-/Konfigurationsweg; `usb=` gilt nur in Python/CLI/Werkzeugen.
+- **GUI** (U3/N3, 2026-11-11): Gruppen `USB-Stick (GUN/VDIP1)` und `Netzwerk (KCNet/W5100)` (`app/usb.py`, `app/netz.py`, `app/ui/karten_gruppe.py`), `general.usb`/`general.net`; jede Karte faellt im Neuaufbau fuer sich zurueck (`MainWindow._karten_bauen`); Stick stecken/entfernen, Stick-Ordner, Schreibschutz und Netzkabel wirken ohne Neuaufbau, Loopback nur beim Stecken; Netz-Vorgabe `nur_loopback` AUS (Anwenderentscheid). Waechter `py_usb_netz_gui`.
 - Nicht im Save-State, P8000 nicht steckbar (kein K1520-Bus).
 - Wachter-Uebersicht: `GunUsb.*` (`tests/unit/cards/test_gun_usb.cpp`), `VdipGeraet.*`/`VdipStick.*`/`VdipPfadflucht.*`
   (`tests/unit/peripherals/test_vdip_geraet.cpp`), `GunUsbMaschine.*` (`tests/integration/test_gun_usb_maschinen.cpp`), `GunUsbSystem.*`

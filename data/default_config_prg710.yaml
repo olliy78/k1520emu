@@ -58,6 +58,18 @@ general:
     basis: '90'
     image: ''
     rtc: true
+  # USB-Karte der GUN (app/usb.py, Entwurf 50 U3): ordner '' = <Dokumente>/K1520emu/USB-Stick.
+  usb:
+    enabled: false
+    basis: '8C'
+    ordner: ''
+    schreibgeschuetzt: false
+  # Netzwerkkarte KCNet/W5100 (app/netz.py, Entwurf 50 N3): nur_loopback aus = Zugang zum echten Netz.
+  net:
+    enabled: false
+    basis: '28'
+    nur_loopback: false
+    link: true
   # Modell: prg710 (K7609) oder prg710-1 (K7672).
   model: prg710
   # Lochstreifen (ADA K6022, SIF1000) gesteckt? doc/design/23_lochstreifen.md §7.

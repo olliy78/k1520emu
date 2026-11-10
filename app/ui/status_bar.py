@@ -381,14 +381,15 @@ class IdeFeld(QWidget):
     wurde seit der letzten Abfrage angesprochen, ``BELEGT`` = Abbild eingelegt, ``LEER`` = keins.
     """
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, text: str = "IDE"):
+        # Dieselbe Leuchte tragen USB und Netz (Beschriftung "USB"/"NET", AP U3/N3).
         super().__init__(parent)
         self.setFocusPolicy(Qt.NoFocus)
         lay = QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(4)
         lay.addWidget(_trennstrich())
-        self.beschriftung = QLabel("IDE")
+        self.beschriftung = QLabel(text)
         self.beschriftung.setMargin(2)
         self.lampe = DriveLamp()
         lay.addWidget(self.beschriftung)
@@ -448,6 +449,10 @@ class MachineStatus(QWidget):
         # Leuchte „IDE" der GIDE-Karte (nur mit gesteckter Karte).
         self.ide = IdeFeld()
         self._lay.addWidget(self.ide)
+        self.usb = IdeFeld(text="USB")
+        self._lay.addWidget(self.usb)
+        self.net = IdeFeld(text="NET")
+        self._lay.addWidget(self.net)
         self._fest = self._lay.count()
 
         # A5120.16-Leuchten (V1/V2) + Modus — feste Stelle zwischen Takt und

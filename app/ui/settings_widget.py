@@ -31,6 +31,7 @@ from PySide6.QtGui import QColor
 from app.ui.screen_widget import CRTParams
 from app.ui.bildschirm_schalter import BildschirmSchalter
 from app.ui.gide_gruppe import GideGruppe
+from app.ui.karten_gruppe import NetzGruppe, UsbGruppe
 from app import drive_types as dt
 from app import profil as profile
 from app import takt
@@ -89,6 +90,11 @@ class SettingsWidget(QWidget):
     gideChanged = Signal(dict)
     # „Neue Platte“ bestaetigt: (Pfad, MB) — das Hauptfenster legt an.
     gidePlatteNeu = Signal(str, int)
+    # Gruppen „USB-Stick“ und „Netzwerk“ (U3/N3): Zustand (`app/usb.py`, `app/netz.py`); Stick
+    # stecken/entfernen als eigenes Signal (wirkt sofort, ohne Neuaufbau).
+    usbChanged = Signal(dict)
+    usbStickGewuenscht = Signal(bool)
+    netChanged = Signal(dict)
 
     #: (Beschriftung, Faktor).  Die Stufen
     #: stehen in :mod:`app.takt`, damit Auswahlfeld und Statuszeile dasselbe
@@ -510,6 +516,13 @@ class SettingsWidget(QWidget):
         self.gide_gruppe.gideChanged.connect(self.gideChanged)
         self.gide_gruppe.neuePlatteGewuenscht.connect(self.gidePlatteNeu)
         self.karten_layout.addWidget(self.gide_gruppe)
+        self.usb_gruppe = UsbGruppe(self.profil.karten_vorauswahl("usb"), self.karten_box)
+        self.usb_gruppe.usbChanged.connect(self.usbChanged)
+        self.usb_gruppe.stickGewuenscht.connect(self.usbStickGewuenscht)
+        self.karten_layout.addWidget(self.usb_gruppe)
+        self.netz_gruppe = NetzGruppe(self.profil.karten_vorauswahl("net"), self.karten_box)
+        self.netz_gruppe.netChanged.connect(self.netChanged)
+        self.karten_layout.addWidget(self.netz_gruppe)
         if self.profil.erweiterungskarten:
             form.addRow(self.karten_box)
         else:
@@ -726,6 +739,12 @@ class SettingsWidget(QWidget):
     def set_gide_value(self, zustand: dict, fehler: str = "", gesteckt=None) -> None:
         """Gruppe setzen (ohne Signal); *fehler* = Kernfehler unter der Gruppe."""
         self.gide_gruppe.set_zustand(zustand, fehler, gesteckt)
+
+    def set_usb_value(self, zustand: dict, fehler: str = "", gesteckt=None, stick=None) -> None:
+        self.usb_gruppe.set_zustand(zustand, fehler, gesteckt, stick)
+
+    def set_net_value(self, zustand: dict, fehler: str = "", gesteckt=None) -> None:
+        self.netz_gruppe.set_zustand(zustand, fehler, gesteckt)
 
     # ── RAM-Disk (RAF) ───────────────────────────────────────────────────────
 

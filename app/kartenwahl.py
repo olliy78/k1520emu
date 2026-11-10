@@ -28,6 +28,20 @@ def basis_text(basis: int) -> str:
     return f"{int(basis) & 0xFF:02X}H"
 
 
+def basis_lesen(art: "KartenArt", wert, vorgabe: int) -> int:
+    """Basis aus der Konfiguration (``"84"``/``"84H"``/``"0x84"``, auch die Zahl 84 = Hexziffern 84).
+
+    Ungueltig (nicht lesbar, kein Vielfaches von ``art.schritt``) -> *vorgabe*.
+    """
+    try:
+        if isinstance(wert, bool):
+            raise ValueError
+        n = int(str(wert).strip().lower().removeprefix("0x").removesuffix("h"), 16)
+    except (ValueError, TypeError):
+        return vorgabe
+    return n if n in art.basen() else vorgabe
+
+
 @dataclass(frozen=True)
 class KartenArt:
     """Eine Steckkarte mit E/A-Basis."""

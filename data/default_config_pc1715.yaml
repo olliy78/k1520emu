@@ -58,6 +58,18 @@ general:
     basis: '90'
     image: ''
     rtc: true
+  # USB-Karte der GUN (app/usb.py, Entwurf 50 U3): ordner '' = <Dokumente>/K1520emu/USB-Stick.
+  usb:
+    enabled: false
+    basis: '84'
+    ordner: ''
+    schreibgeschuetzt: false
+  # Netzwerkkarte KCNet/W5100 (app/netz.py, Entwurf 50 N3): nur_loopback aus = Zugang zum echten Netz.
+  net:
+    enabled: false
+    basis: 'C0'
+    nur_loopback: false
+    link: true
   # Modell: pc1715 (Bildschirm K7222, 80 x 24) oder pc1715-k7221 (K7221, 64 x 16).
   model: pc1715
   # ROM-Varianten (AP-6, Kaltstart nötig; ein fehlender Schluessel = Vorgabe):
