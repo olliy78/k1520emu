@@ -96,6 +96,7 @@ void Mc80_2xMachine::powerOn()
     dpl_.powerOn();
     rafPowerOn();
     gidePowerOn();
+    gunUsbPowerOn();
     total_cycles_ = 0;
     {
         std::lock_guard<std::mutex> l(tasten_mtx_);
@@ -121,6 +122,7 @@ void Mc80_2xMachine::resetHardware()
     k6022Reset();
     k5020Reset();
     gideReset();             // GIDE (gesteckt?): LH, Platte; Medium bleibt
+    gunUsbReset();           // GUN-USB (gesteckt?): PIO, VDIP1; Stick bleibt
     rafReset();
     bus_.clearNMI();
     bus_.releaseINT();

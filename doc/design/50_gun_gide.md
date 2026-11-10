@@ -303,6 +303,11 @@ beschaltet — **in G0/N3 klären**, Rangfolge in den vier Maschinen beachten).
 Einstellungsdialog durchgereicht wird oder die Maschinen eine feste Verdrahtung vorgeben, wird **später** entschieden
 (G6 zurückgestellt).  Umfang jetzt: GIDE + RTC (G1–G5a).
 
+**Berichtigung AP U2 (2026-11-10):** am **K8915 V3** belegt die ZRE nur 80H..83H, 84H..87H sind **frei** — die GUN-USB
+(Basis 84H) ist dort steckbar; nicht steckbar bleibt sie am K8915 Gen 2 und am PRG 710/-1 (K2521: 80H..87H).  Die Karte
+(`core/cards/gun_usb/`) hat eine einstellbare Basis (4er-Schritte); die UTools-CP/M-Fassung (DCh..DFh) laeuft ohne Patch
+gegen `basis = 0xDC` (Systemtest `GunUsbSystem.UToolsA5120`: USB FWV, UDIR, UPUT, UGET bitgleich).
+
 ### 7.2 Gemeinsames Muster (wie RAF/K6022/K5020)
 `K1520Machine::installGide(Config)` / `installGunUsb()` / `installGunNet()` im Basisklassen-Kopf
 (`core/machines/machine.h`), Steckung vor dem ersten `run()`/`reset()`, C-ABI `k1520_gide_*`,
@@ -352,7 +357,7 @@ Kommentare deutsch; neue langsame Tests brauchen ein `fach_*`-Label — **keine 
 | **G7** [erledigt (2026-11-10; kein `fach_gide`: alle Gide-Tests schnell, Pfade ohne Fachlabel)] | **Paketierung/Merkposten**: `doc/merkposten/gun.md` (+ Eintrag in `doc/merkposten/README.md`), Kurzabsatz in `CLAUDE.md`, `tools/test_auswahl.py` (Pfade `core/cards/gide`, `peripherals/ata` → Fachlabel `fach_gide`), `doc/ci_pipeline.md` falls nötig, Paketlisten (Beigaben). | G6 | `tools/dev.sh test-merge --trocken` zeigt die richtige Auswahl; `py_testauswahl`, `py_packaging` grün |
 | **U0** [offen] | **USB-Recherche** (nur Lesen/Schreiben von Notizen): *Vinculum Firmware User Manual* (VDAP-Monitor, Kurz-/Erweiterter Befehlssatz, Antwortformate, Statuszeichen, Sync `E`/`e`, Dateihandle-Modell) + *VDIP1 Datenblatt* (Pins, Parallel-FIFO-Zeitverhalten RXF#/TXE#/RD#/WR#) beschaffen; `pio3_usb_sch.pdf`/`diskveru.pdf` (AC1) per `pdftotext`; **AC-Zuordnung und Glue aus §5 bestätigen**. Ergebnis als §5-Nachtrag. | — | Aktualisierter §5 ohne `[?]` oder mit benannten Restlücken |
 | **U1** [erledigt 2026-11-10; Protokoll §5a, Tests `VdipGeraet.*`/`VdipStick.*`/`VdipPfadflucht.*`] | `core/peripherals/vdip/vdip_geraet.{h,cpp}`: Firmware-Zustandsmaschine (Befehlszeile, `E`/`e`, `DIR`, `CD`, `OPR/OPW/CLF`, `RDF/WRF/SEK`, `DLF`, `MKD`, `FS`, `IDD`, Fehlertexte `Command Failed`/`Bad Command`), über einer **Wirtsverzeichnis-Abstraktion** (Pfad-Sandbox: nie aus dem Ordner herausführen, `..` abweisen, 8.3-Namen); Ein-/Ausgabe als Bytefolge mit FIFO-Pegeln. | U0 | Unit-Tests: Befehlsablauf, Pfadflucht-Tests (`..`, absolute Pfade, Symlinks), Datei anlegen/lesen/anhängen/löschen, große Datei |
-| **U2** [offen] | **Karte** `core/cards/gun_usb/`: Z80PIO (Mode 2) auf 84H–87H, Verhaltensglue VDIP↔PIO (B-Bits nach §5), Reset/PRG-Leitung, `installGunUsb(Config{ordner})` + C-ABI/Python/`--usb` wie G4. | G0, U1 | Gastprogramm-Test (Z80-Code im Test): Sync, `DIR`, Datei schreiben/lesen; Rundlauf mit Wirtsdatei |
+| **U2** [erledigt 2026-11-10] | **Karte** `core/cards/gun_usb/`: Z80PIO (Mode 2) auf 84H–87H, Verhaltensglue VDIP↔PIO (B-Bits nach §5), Reset/PRG-Leitung, `installGunUsb(Config{ordner})` + C-ABI/Python/`--usb` wie G4. | G0, U1 | Gastprogramm-Test (Z80-Code im Test): Sync, `DIR`, Datei schreiben/lesen; Rundlauf mit Wirtsdatei |
 | **U3** [offen] | GUI (Kasten „USB": Ordnerwahl, „Stick einlegen/entfernen"), Statuslampe, `GIDETST`/`USBTST.COM`, Handbuch, Konfig. | U2, G6 | wie G6 |
 | **N0** [offen (Anwender)] | **Quellenbeschaffung KC-Net** (Anwender-Aufgabe, siehe F2).  Ohne Ergebnis: N1 darf nur das Modell **ohne** Karte liefern. | Anwender | Dokument/Quelltext/Hex im Ordner `doc/gun/` (**Lizenzstatus klären** vor Einchecken) |
 | **N1** [offen] | `core/peripherals/w5100/`: W5100-Registermodell (Gemeinsam: Mode, IP/Gateway/Subnet/MAC, Socket-Register, Puffer 8+8 KB, TCP-Client/-Server, UDP) über `core/serial/net/socket.*`; **kein Netz im Emulationsfaden** (Regel aus `serielle_schnittstellen.md`: Hub/Wandler-Faden, Rückstau, Loopback-Tests auf Port 0). | — (nur Netzschicht) | Unit-Tests gegen Loopback: TCP-Echo, UDP, Verbindungsabbau, Puffervoll |

@@ -122,6 +122,7 @@ REGELN = [
     ("core/cards/raf/**", ("fach_a5120",), "RAM-Floppy", True),
     # GIDE/ATA: Blattkarte ohne langsame Faelle (alle Gide-Tests sind schnell, kein fach_gide noetig)
     ("core/cards/gide/**", (), "GIDE (keine langsamen Faelle)", True),
+    ("core/cards/gun_usb/**", (), "GUN-USB (keine langsamen Faelle)", True),
     ("core/peripherals/ata/**", (), "ATA-Platte (keine langsamen Faelle)", True),
     ("core/peripherals/vdip/**", (), "VDIP-USB-Stick (keine langsamen Faelle)", True),
     ("core/cards/k6022/**", ("fach_a5120",), "Lochstreifen", True),

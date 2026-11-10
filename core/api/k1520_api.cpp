@@ -1765,6 +1765,66 @@ bool k1520_gide_rtc_zeit(K1520Handle h, int64_t* out) {
     return true;
 }
 
+// ─── GUN-USB (doc/design/50_gun_gide.md, AP U2) ────────────────────────────────
+namespace {
+using k1520::GunUsb;
+std::string usb_fehler;
+bool usbErgebnis(bool ok, const std::string& grund) {
+    usb_fehler = ok ? std::string() : grund;
+    return ok;
+}
+GunUsb* usbOf(K1520Handle h) { return h ? toMachine(h)->gunUsb() : nullptr; }
+GunUsb* usbOderFehler(K1520Handle h) {
+    GunUsb* g = usbOf(h);
+    if (!g) usb_fehler = "keine GUN-USB gesteckt";
+    return g;
+}
+}  // namespace
+
+bool k1520_usb_install(K1520Handle h, int basis, const char* ordner, bool schreibgeschuetzt) {
+    if (!h) return usbErgebnis(false, "kein Handle");
+    if (basis < 0 || basis > 0xFF) return usbErgebnis(false, "GUN-USB: Basis ausserhalb 00H..FFH");
+    GunUsb::Config c;
+    c.basis = static_cast<uint8_t>(basis);
+    if (ordner && *ordner) c.ordner = std::filesystem::u8path(ordner);
+    c.schreibgeschuetzt = schreibgeschuetzt;
+    K1520Machine* m = toMachine(h);
+    if (!m->installGunUsb(c)) return usbErgebnis(false, m->gunUsbFehler());
+    return usbErgebnis(true, {});
+}
+
+bool k1520_usb_installed(K1520Handle h) { return usbOf(h) != nullptr; }
+
+const char* k1520_usb_error(K1520Handle) { return usb_fehler.c_str(); }
+
+bool k1520_usb_stick_insert(K1520Handle h, const char* pfad, bool schreibgeschuetzt) {
+    GunUsb* g = usbOderFehler(h);
+    if (!g) return false;
+    if (!pfad || !*pfad) return usbErgebnis(false, "kein Ordner");
+    std::string f;
+    if (!g->stickEinstecken(std::filesystem::u8path(pfad), schreibgeschuetzt, &f)) return usbErgebnis(false, f);
+    return usbErgebnis(true, {});
+}
+
+bool k1520_usb_stick_remove(K1520Handle h) {
+    GunUsb* g = usbOderFehler(h);
+    if (!g) return false;
+    g->stickZiehen();
+    return usbErgebnis(true, {});
+}
+
+bool k1520_usb_status(K1520Handle h, int* basis, int* stick_vorhanden, uint64_t* zaehler) {
+    const GunUsb* g = usbOderFehler(h);
+    if (!g) return false;
+    if (basis) *basis = g->config().basis;
+    if (stick_vorhanden) *stick_vorhanden = g->vdip().stickVorhanden() ? 1 : 0;
+    if (zaehler) {
+        const GunUsb::Zaehler& z = g->zaehler();
+        zaehler[0] = z.gelesen; zaehler[1] = z.geschrieben; zaehler[2] = z.resets;
+    }
+    return true;
+}
+
 // ─── RAM-Floppy RAF (doc/design/22_raf512.md §6) ───────────────────────────────
 bool k1520_raf_install(K1520Handle h, const char* typ) {
     if (!h) return false;

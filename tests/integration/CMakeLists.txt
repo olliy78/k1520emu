@@ -286,6 +286,18 @@ k1520_add_test(gide_system SRC test_gide_system.cpp
                            LIBS k1520_a5120 k1520_k8915 k1520_gide k1520_floppy k1520_fs k1520_logger k1520_testsupport
                            LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 180)
 
+# GUN-USB (Z80-PIO + VDIP1, Entwurf 50 AP U2) als Option: stecken je Maschine, doppelt, zu spaet, Tore belegt
+# (K8915/PRG 710: 84H..87H gehoeren der ZRE); Z80-Gastcode in der Maschine fragt den VDIP1 per Sync ab.
+k1520_add_test(gun_usb_maschinen SRC test_gun_usb_maschinen.cpp
+                                 LIBS k1520_a5120 k1520_k8915 k1520_prg710 k1520_pc1715 k1520_gun_usb k1520_logger k1520_testsupport
+                                 LABELS "${_lbl}" DEFS LOG_LEVEL=2)
+
+# GUN-USB, AP U2: die ECHTEN UTools 1.4 (USB/UDIR/UPUT/UGET, PIO DCh..DFh) gegen die Karte; die Software liegt nur lokal
+# (~/Documents/K1520emu/GIDE_Software/utools14, K1520_GIDE_SW), fehlt sie, werden die Faelle uebersprungen.
+k1520_add_test(gun_usb_system SRC test_gun_usb_system.cpp
+                              LIBS k1520_a5120 k1520_gun_usb k1520_floppy k1520_fs k1520_logger k1520_testsupport
+                              LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 180)
+
 # A5120 bootet vom Band (doc/design/29_kassette.md AP K7): keine Diskette, K5020 gesteckt, das
 # Lade-ROM faellt auf die Kassette (LW1, bzw. LW1 leer → LW2) und startet tools/kassette/bandtest.
 k1520_add_test(kassette_boot SRC test_kassette_boot.cpp

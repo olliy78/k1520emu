@@ -27,6 +27,9 @@ struct K8915TraceOpts {
     bool        gide = false;    ///< --gide[=basis]: GIDE stecken
     int         gide_basis = -1; ///< -1 = Vorgabe 90H
     std::string gide_image;      ///< --gide-image: ATA-Plattenabbild
+    bool        usb = false;     ///< --usb[=basis]: GUN-USB stecken
+    int         usb_basis = -1;  ///< -1 = Vorgabe 84H
+    std::string usb_dir;         ///< --usb-dir: Wirtsverzeichnis des Sticks
     std::string disk;            ///< Diskettenpfad (leer = keine)
     std::string mount_path;      ///< tatsaechlich zu mountender Pfad (COW-Kopie o. ae.)
     bool        write_protect = false;

@@ -141,6 +141,7 @@ void Prg710Machine::interruptKetteSetzen()
         bus_.appendInterruptChain(&k5020_->pioDaten());
         bus_.appendInterruptChain(&k5020_->pioSteuer());
     }
+    if (gun_usb_) bus_.appendInterruptChain(&gun_usb_->pio());   // GUN-USB (AP U2): hinten, am Geraet unbelegt [?]
 }
 
 std::vector<k1520::serial::SerialAnschluss*> Prg710Machine::serielleAnschluesse()
@@ -165,6 +166,7 @@ void Prg710Machine::resetHardware()
     k6022Reset();            // K6022 (gesteckt?): PIOs; Band im Leser und Stanzband bleiben
     k5020Reset();             // K5020 (gesteckt?): PIOs zurueck, Baender bleiben liegen
     gideReset();             // GIDE (gesteckt?): LH, Platte; Medium bleibt
+    gunUsbReset();           // GUN-USB (gesteckt?): PIO, VDIP1; Stick bleibt
     fs_.reset();
     rafReset();              // RAF (gesteckt?): nur das Latch sperrt, der Inhalt bleibt
     hub_.gastZurueckgesetzt();
@@ -185,6 +187,7 @@ void Prg710Machine::powerOn()
     k7672_.powerOn();        // Selbsttest, KEIN DC1 (wie K8915)
     rafPowerOn();            // RAF ohne Stand-by-Pufferung: Inhalt weg (Entwurf 22 §3.4)
     gidePowerOn();
+    gunUsbPowerOn();
     resetHardware();
     LOG_INFO("PRG710", "Netz ein: Abbildung aus, ROM bei 0000H");
 }

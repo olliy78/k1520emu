@@ -16,6 +16,7 @@
 #pragma once
 #include "core/bus/k1520_bus.h"
 #include "core/cards/gide/gide.h"
+#include "core/cards/gun_usb/gun_usb.h"
 #include "core/cards/k5020/k5020.h"
 #include "core/cards/k6022/k6022.h"
 #include "core/cards/raf/raf.h"
@@ -379,6 +380,55 @@ public:
     /** @brief Grund des letzten gescheiterten @ref installGide ("" = keiner). */
     const std::string& gideFehler() const { return gide_fehler_; }
 
+    // ─── GUN-USB: Z80-PIO + VDIP1 mit Wirtsverzeichnis als Stick (doc/design/50_gun_gide.md, AP U2) ──────
+    // Wie GIDE/K5020: nach dem Anlegen, VOR dem ersten run()/reset() gesteckt.  Vier Tore ab cfg.basis
+    // (GUN fest 84H; frei einstellbar in 4er-Schritten).  Die PIO haengt hinten in der Interruptkette
+    // (@ref gunUsbEinketten).  Zeitlos (kein Takt), nicht im Save-State; /RESET setzt PIO und VDIP1 zurueck,
+    // der Stick bleibt gesteckt.
+    /**
+     * @brief Steckt die GUN-USB.
+     * @return false (Grund in @ref gunUsbFehler) nach dem ersten run()/reset(), bei doppeltem Stecken,
+     *         ungueltiger Basis, belegtem Tor (K8915/PRG 710: 84H..87H gehoeren der ZRE) oder nicht
+     *         oeffenbarem Stickordner.
+     */
+    bool installGunUsb(const k1520::GunUsb::Config& cfg) {
+        gun_usb_fehler_.clear();
+        if (!zusatzkartenSteckbar()) {
+            gun_usb_fehler_ = "Diese Maschine hat keinen K1520-Steckplatz fuer eine GUN-USB";
+            return false;
+        }
+        if (!bestueckbar_) {
+            gun_usb_fehler_ = "GUN-USB nur vor dem ersten Lauf/Reset steckbar";
+            return false;
+        }
+        if (gun_usb_) {
+            gun_usb_fehler_ = "Es steckt bereits eine GUN-USB";
+            return false;
+        }
+        std::unique_ptr<k1520::GunUsb> karte;
+        try {
+            karte = std::make_unique<k1520::GunUsb>(cfg);   // wirft bei ungueltiger Basis / nicht oeffenbarem Ordner
+        } catch (const std::exception& e) {
+            gun_usb_fehler_ = e.what();
+            return false;
+        }
+        K1520Bus& bus = systemBus();
+        if (const std::string g = karte->belegtGrund(bus); !g.empty()) {   // erst pruefen, dann anmelden
+            gun_usb_fehler_ = g;
+            return false;
+        }
+        karte->attachToBus(bus);
+        karte->powerOn();
+        gun_usb_ = std::move(karte);
+        gunUsbEinketten(*gun_usb_);
+        return true;
+    }
+    /** @brief Die gesteckte GUN-USB (nullptr = keine). */
+    k1520::GunUsb*       gunUsb()       { return gun_usb_.get(); }
+    const k1520::GunUsb* gunUsb() const { return gun_usb_.get(); }
+    /** @brief Grund des letzten gescheiterten @ref installGunUsb ("" = keiner). */
+    const std::string& gunUsbFehler() const { return gun_usb_fehler_; }
+
 protected:
     /** @brief Der Systembus, auf dem Zusatzkarten (RAF) ihre E/A-Tore anmelden. */
     virtual K1520Bus& systemBus() = 0;
@@ -434,6 +484,13 @@ protected:
     /** @brief Netz-Ein: Zaehler leer (die RTC hat Batterie, das Medium bleibt). */
     void gidePowerOn() { if (gide_) gide_->powerOn(); }
 
+    /** @brief Die PIO der frisch gesteckten GUN-USB hinten an die Interruptkette (PRG 710 baut neu). */
+    virtual void gunUsbEinketten(k1520::GunUsb& k) { systemBus().appendInterruptChain(&k.pio()); }
+    /** @brief Systemweiter /RESET: PIO und VDIP1 zurueck; der Stick bleibt. */
+    void gunUsbReset() { if (gun_usb_) gun_usb_->reset(); }
+    /** @brief Netz-Ein: Zaehler leer. */
+    void gunUsbPowerOn() { if (gun_usb_) gun_usb_->powerOn(); }
+
     /// Erst NACH Bus und Karten der abgeleiteten Klasse zerstoert — unschaedlich, die
     /// RAF fasst den Bus in ihrem Destruktor nicht an.
     std::unique_ptr<RAF> raf_;
@@ -444,6 +501,8 @@ protected:
     std::unique_ptr<K5020> k5020_;
     /// Wie k5020_ (die GIDE fasst den Bus im Destruktor nicht an; der Destruktor der Platte schreibt zurueck).
     std::unique_ptr<k1520::Gide> gide_;
+    /// Wie gide_ (die GUN-USB fasst den Bus im Destruktor nicht an).
+    std::unique_ptr<k1520::GunUsb> gun_usb_;
 
 private:
     bool        bestueckbar_ = true;
@@ -451,4 +510,5 @@ private:
     std::string k6022_fehler_;
     std::string k5020_fehler_;
     std::string gide_fehler_;
+    std::string gun_usb_fehler_;
 };

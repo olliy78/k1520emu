@@ -171,7 +171,7 @@ void pruefeBestueckung(Neu neu, int konflikt = -1) {
 template <class M>
 void gastLaeuft(M& m, Z80& cpu, uint8_t basis, uint32_t cpu_hz, std::function<void()> nachEin = {}) {
     const std::string img = k1520test::tempPath("gide_maschine.img");
-    std::filesystem::remove(img);
+    { std::error_code ec0; std::filesystem::remove(img, ec0); }
     ASSERT_TRUE(AtaGeraet::abbildAnlegen(img, 2048));
     Gide::Config c;
     c.basis = basis;
@@ -209,6 +209,7 @@ void gastLaeuft(M& m, Z80& cpu, uint8_t basis, uint32_t cpu_hz, std::function<vo
     f.seekg(kSektor * 512);
     Bytes datei(512);
     f.read(reinterpret_cast<char*>(datei.data()), 512);
+    f.close();   // Windows: eine offene Datei laesst sich nicht loeschen
     EXPECT_EQ(datei, quelle) << "Abbilddatei traegt den Sektor nicht";
 
     // RTC in Maschinenzeit mit DEM Takt der Maschine: vier Maschinensekunden = vier Uhrsekunden
@@ -218,7 +219,8 @@ void gastLaeuft(M& m, Z80& cpu, uint8_t basis, uint32_t cpu_hz, std::function<vo
     EXPECT_GE(d, 4);
     EXPECT_LE(d, 4) << "RTC-Takt passt nicht zum Maschinentakt";   // zu hoher/niedriger takt_hz gaebe 2/3 bzw. 5/6
     m.gide()->platte().auswerfen();
-    std::filesystem::remove(img);
+    std::error_code ec;
+    std::filesystem::remove(img, ec);
 }
 
 A5120Machine::Config em256() {

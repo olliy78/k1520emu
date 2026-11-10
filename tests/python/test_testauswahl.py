@@ -83,7 +83,7 @@ def test_reine_oberflaeche_nur_test_ohne_langsame_spur_und_win():
     assert p["test"] and not p["facher"] and not p["win"], p
 
 
-@pytest.mark.parametrize("pfad", ["core/cards/gide/gide.cpp", "core/peripherals/ata/ata_geraet.cpp", "core/peripherals/vdip/vdip_geraet.cpp"])
+@pytest.mark.parametrize("pfad", ["core/cards/gide/gide.cpp", "core/cards/gun_usb/gun_usb.cpp", "core/peripherals/ata/ata_geraet.cpp", "core/peripherals/vdip/vdip_geraet.cpp"])
 def test_gide_und_ata_haben_keine_langsamen_faelle_fallen_aber_nicht_auf_alles_zurueck(pfad):
     p = plan(pfad)
     assert p["test"] and p["win"] and not p["facher"], p

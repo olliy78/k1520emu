@@ -97,6 +97,7 @@ void Mc80Machine::powerOn()
     zve_.powerOn(cfg_.ram_fill);   // zuletzt: meldet Segmentregister 00H an die SPE
     rafPowerOn();
     gidePowerOn();
+    gunUsbPowerOn();
     total_cycles_ = 0;
     // NICHT reset(): das schloesse die Bestueckung ab, und powerOn() laeuft schon im Konstruktor —
     // installK5020() danach schluege immer fehl (Fund M7, Waechter Mc80Kassette.KarteSteckbar…).
@@ -119,6 +120,7 @@ void Mc80Machine::resetHardware()
     k6022Reset();
     k5020Reset();
     gideReset();             // GIDE (gesteckt?): LH, Platte; Medium bleibt
+    gunUsbReset();           // GUN-USB (gesteckt?): PIO, VDIP1; Stick bleibt
     rafReset();
     hub_.gastZurueckgesetzt();   // XOFF-/RTS-Halt des alten Gastes gilt nicht weiter
     serial_naechst_ = 0;

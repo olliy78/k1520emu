@@ -630,6 +630,20 @@ _lib.k1520_gide_status.argtypes = [K1520Handle, ctypes.POINTER(ctypes.c_int), ct
 _lib.k1520_gide_status.restype = ctypes.c_bool
 _lib.k1520_gide_rtc_zeit.argtypes = [K1520Handle, ctypes.POINTER(ctypes.c_int64)]
 _lib.k1520_gide_rtc_zeit.restype = ctypes.c_bool
+# GUN-USB (doc/design/50_gun_gide.md, AP U2)
+_lib.k1520_usb_install.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_char_p, ctypes.c_bool]
+_lib.k1520_usb_install.restype = ctypes.c_bool
+_lib.k1520_usb_installed.argtypes = [K1520Handle]
+_lib.k1520_usb_installed.restype = ctypes.c_bool
+_lib.k1520_usb_error.argtypes = [K1520Handle]
+_lib.k1520_usb_error.restype = ctypes.c_char_p
+_lib.k1520_usb_stick_insert.argtypes = [K1520Handle, ctypes.c_char_p, ctypes.c_bool]
+_lib.k1520_usb_stick_insert.restype = ctypes.c_bool
+_lib.k1520_usb_stick_remove.argtypes = [K1520Handle]
+_lib.k1520_usb_stick_remove.restype = ctypes.c_bool
+_lib.k1520_usb_status.argtypes = [K1520Handle, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int),
+                                  ctypes.POINTER(ctypes.c_uint64)]
+_lib.k1520_usb_status.restype = ctypes.c_bool
 
 # RAM-Floppy RAF (doc/design/22_raf512.md §6)
 _lib.k1520_raf_install.argtypes = [K1520Handle, ctypes.c_char_p]
@@ -1229,7 +1243,7 @@ class K1520Emulator:
                  tastatur: Optional[str] = None, p8000: Optional[dict] = None,
                  ausfuehrung: Optional[str] = None, spe=1, pcmc=False, laderom: Optional[str] = None,
                  konfig: Optional[dict] = None, aup: bool = False,
-                 aup_sonder: bool = False, gide=None):
+                 aup_sonder: bool = False, gide=None, usb=None):
         """Initialize emulator instance.
 
         Args:
@@ -1269,6 +1283,11 @@ class K1520Emulator:
             gide: IDE-Karte GIDE stecken (an jeder Maschine ausser P8000) — ``None``/``False`` = ohne,
                 ``True`` = Vorgaben (Basis 0x90, RTC bestückt), sonst ein dict mit den Schlüsseln
                 ``basis``, ``rtc`` (bool), ``abbild`` (Plattenabbild), ``rtc_zustand`` (Batteriedatei).
+                Direkt nach dem Anlegen gesteckt; Fehler → ValueError.
+            usb: GUN-USB (Z80-PIO + VDIP1, Wirtsverzeichnis als Stick) stecken (an jeder Maschine ausser
+                P8000; am K8915/PRG 710 ist die Vorgabe-Basis 0x84 von der ZRE belegt) — ``None``/``False``
+                = ohne, ``True`` = Vorgaben (Basis 0x84, kein Stick), sonst ein dict mit ``basis``,
+                ``ordner`` (Stick-Wirtsverzeichnis) und ``schreibgeschuetzt`` (bool).
                 Direkt nach dem Anlegen gesteckt; Fehler → ValueError.
             ptape: Lochstreifen-Karte K6022 (SIF1000, E0H–E7H) stecken; an jeder
                 Maschine, wie ``raf`` direkt nach dem Anlegen.  Fehler → ValueError.
@@ -1436,6 +1455,15 @@ class K1520Emulator:
                 _lib.k1520_destroy(handle)
                 self._handle = None
                 raise ValueError(reason or "GIDE nicht steckbar")
+        if usb:
+            u = {} if usb is True else dict(usb)
+            if not _lib.k1520_usb_install(handle, int(u.get("basis", 0x84)), os.fsencode(u.get("ordner") or ""),
+                                          bool(u.get("schreibgeschuetzt", False))):
+                reason = _lib.k1520_usb_error(handle)
+                reason = reason.decode("utf-8", "replace") if reason else ""
+                _lib.k1520_destroy(handle)
+                self._handle = None
+                raise ValueError(reason or "GUN-USB nicht steckbar")
         if ptape and not _lib.k1520_ptape_install(handle):
             reason = _lib.k1520_last_init_error()
             reason = reason.decode("utf-8", "replace") if reason else ""
@@ -2489,6 +2517,31 @@ class K1520Emulator:
         """Uhr der RTC (Unix-Sekunden der Kalenderzeit), ``None`` ohne Karte/RTC."""
         t = ctypes.c_int64()
         return t.value if _lib.k1520_gide_rtc_zeit(self._handle, ctypes.byref(t)) else None
+
+    # ─── GUN-USB ───────────────────────────────────────────────────────────
+    def usb_installed(self) -> bool:
+        """True, wenn die GUN-USB gesteckt ist (``K1520Emulator(usb=...)``)."""
+        return bool(_lib.k1520_usb_installed(self._handle))
+
+    def usb_error(self) -> str:
+        v = _lib.k1520_usb_error(self._handle)
+        return v.decode("utf-8", "replace") if v else ""
+
+    def usb_stick_insert(self, pfad, schreibgeschuetzt: bool = False) -> bool:
+        """Wirtsverzeichnis als Stick einstecken (ein vorhandener wird vorher gezogen)."""
+        return bool(_lib.k1520_usb_stick_insert(self._handle, os.fsencode(pfad), bool(schreibgeschuetzt)))
+
+    def usb_stick_remove(self) -> bool:
+        return bool(_lib.k1520_usb_stick_remove(self._handle))
+
+    def usb_status(self) -> Optional[dict]:
+        """Zustand ohne Nebenwirkung (``None`` ohne Karte)."""
+        basis, stick = ctypes.c_int(), ctypes.c_int()
+        z = (ctypes.c_uint64 * 3)()
+        if not _lib.k1520_usb_status(self._handle, ctypes.byref(basis), ctypes.byref(stick), z):
+            return None
+        return {"basis": basis.value, "stick_vorhanden": bool(stick.value),
+                "gelesen": z[0], "geschrieben": z[1], "resets": z[2]}
 
     # ─── RAM-Floppy RAF ────────────────────────────────────────────────────
     @property

@@ -13,6 +13,14 @@
 #include <fstream>
 
 #include "core/util/os_compat.h"
+#if defined(_WIN32)
+#  include <fcntl.h>
+#  include <io.h>
+#  include <sys/stat.h>
+#else
+#  include <fcntl.h>
+#  include <unistd.h>
+#endif
 
 #if !defined(_WIN32)
 #  include <sys/types.h>
@@ -30,6 +38,27 @@ void setzeString(uint16_t* w, size_t wort0, size_t nwoerter, const char* text) {
     s.resize(nwoerter * 2, ' ');
     for (size_t i = 0; i < nwoerter; ++i)
         w[wort0 + i] = static_cast<uint16_t>((static_cast<uint8_t>(s[2 * i]) << 8) | static_cast<uint8_t>(s[2 * i + 1]));
+}
+
+// Sperrdatei EXKLUSIV anlegen (existiert sie schon: false).  fopen("wx") reicht nicht: die
+// alte MSVCRT/MinGW-Laufzeit ignoriert das 'x', die Sperre waere dort nie exklusiv.
+bool sperrdateiExklusivAnlegen(const std::string& pfad, long pid) {
+#if defined(_WIN32)
+    const int fd = ::_open(pfad.c_str(), _O_CREAT | _O_EXCL | _O_WRONLY | _O_BINARY, _S_IREAD | _S_IWRITE);
+#else
+    const int fd = ::open(pfad.c_str(), O_CREAT | O_EXCL | O_WRONLY, 0644);
+#endif
+    if (fd < 0) return false;
+    char b[32];
+    const int n = std::snprintf(b, sizeof b, "%ld\n", pid);
+#if defined(_WIN32)
+    (void)::_write(fd, b, static_cast<unsigned>(n));
+    ::_close(fd);
+#else
+    (void)::write(fd, b, static_cast<size_t>(n));
+    ::close(fd);
+#endif
+    return true;
 }
 
 bool prozessLebt(long pid) {
@@ -66,11 +95,7 @@ AtaGeraet::Geometrie AtaGeraet::geometrieAbleiten(uint64_t sektoren) {
 bool AtaGeraet::sperreAnlegen(std::string* fehler) {
     sperre_ = pfad_ + ".lock";
     for (int versuch = 0; versuch < 2; ++versuch) {
-        if (FILE* f = std::fopen(sperre_.c_str(), "wx")) {
-            std::fprintf(f, "%ld\n", os::processId());
-            std::fclose(f);
-            return true;
-        }
+        if (sperrdateiExklusivAnlegen(sperre_, os::processId())) return true;
         // Bestehende Sperre: nur uebernehmen, wenn ihr Prozess nicht mehr lebt.
         long pid = -1;
         if (FILE* f = std::fopen(sperre_.c_str(), "r")) {

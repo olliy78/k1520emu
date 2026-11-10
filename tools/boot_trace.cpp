@@ -30,6 +30,8 @@
  *     --tape <k52>   Kassettenkarte K5020 stecken (A5120 30H, K8915 D0H, PRG 30H) und die
  *                    Kassettendatei <k52> an Geraet 1 binden (fehlt sie: leere Kassette);
  *                    --tape2 <k52> = Geraet 2; --tape-card = nur die Karte
+ *     --usb[=basis]  GUN-USB (Z80-PIO + VDIP1, 4 Tore ab basis, Vorgabe 84H) stecken, alle K1520-Maschinen ausser P8000;
+ *                    --usb-dir <ordner> legt das Wirtsverzeichnis des "Sticks" ein (impliziert --usb)
  *     --gide[=basis] GIDE (IDE-Karte + RTC 72421, Tore basis+4..basis+F, Vorgabe 90H) stecken, alle K1520-Maschinen;
  *                    --gide-image <datei> legt ein ATA-Plattenabbild ein (impliziert --gide)
  *     --cpu u8000    jeden Befehl des U8001 als Zeile "U8 …" (Deckel -W); impliziert --em
@@ -357,6 +359,7 @@ int main(int argc, char** argv) {
     bool        limit_set     = false;   // -c angegeben? (Vorgabe je Maschine verschieden)
     K8915TraceOpts k8o;
     bool gide_opt = false; int gide_basis = -1; std::string gide_image;   // --gide[=basis] / --gide-image: IDE-Karte GIDE
+    bool usb_opt = false; int usb_basis = -1; std::string usb_dir;   // --usb[=basis] / --usb-dir: GUN-USB
     std::string raf_opt;                 // --raf none|raf128|raf512|raf2m: RAM-Floppy vor dem ersten Lauf stecken
     bool        ptape_opt = false;       // --ptape: Lochstreifen-Karte K6022 vor dem ersten Lauf stecken
     bool        tape_opt = false;        // --tape/--tape2/--tape-card: Kassettenkarte K5020
@@ -408,6 +411,8 @@ int main(int argc, char** argv) {
         else if (!strcmp(argv[i], "--ptape")) { ptape_opt = true; k8o.ptape = true; }
         else if (dbgm::parseGideOpt(argv[i], gide_basis)) { gide_opt = true; k8o.gide = true; k8o.gide_basis = gide_basis; }
         else if (!strcmp(argv[i], "--gide-image") && i+1 < argc) { gide_opt = true; k8o.gide = true; gide_image = k8o.gide_image = argv[++i]; }
+        else if (dbgm::parseUsbOpt(argv[i], usb_basis)) { usb_opt = true; k8o.usb = true; k8o.usb_basis = usb_basis; }
+        else if (!strcmp(argv[i], "--usb-dir") && i+1 < argc) { usb_opt = true; k8o.usb = true; usb_dir = k8o.usb_dir = argv[++i]; }
         else if (!strcmp(argv[i], "--tape-card")) { tape_opt = true; k8o.tape = true; }
         else if (!strcmp(argv[i], "--tape") && i+1 < argc) { tape_opt = true; k8o.tape = true; tape1_opt = k8o.tape1 = argv[++i]; }
         else if (!strcmp(argv[i], "--tape2") && i+1 < argc) { tape_opt = true; k8o.tape = true; tape2_opt = k8o.tape2 = argv[++i]; }
@@ -692,7 +697,8 @@ int main(int argc, char** argv) {
       if (!dbgm::steckeRaf(machine, raf_opt, err)) { fprintf(stderr, "--raf: %s\n", err.c_str()); return 2; }
       if (!dbgm::steckeK6022(machine, ptape_opt, err)) { fprintf(stderr, "--ptape: %s\n", err.c_str()); return 2; }
       if (!dbgm::steckeK5020(machine, tape_opt, tape1_opt, tape2_opt, err)) { fprintf(stderr, "--tape: %s\n", err.c_str()); return 2; }
-      if (!dbgm::steckeGide(machine, gide_opt, gide_basis, gide_image, err)) { fprintf(stderr, "--gide: %s\n", err.c_str()); return 2; } }
+      if (!dbgm::steckeGide(machine, gide_opt, gide_basis, gide_image, err)) { fprintf(stderr, "--gide: %s\n", err.c_str()); return 2; }
+      if (!dbgm::steckeUsb(machine, usb_opt, usb_basis, usb_dir, err)) { fprintf(stderr, "--usb: %s\n", err.c_str()); return 2; } }
     if (bedien_opt && !machine.setSicherheitsstecker(bedien_opt)) { fprintf(stderr, "--sicherheitsstecker: 0..6, nur mit K7637\n"); return 2; }
     machine.powerOn();
 

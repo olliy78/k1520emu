@@ -373,6 +373,7 @@ void A5120Machine::resetHardware() {
     k6022Reset();           // K6022 (gesteckt?): PIOs zurueck, Band und Stanzband bleiben
     k5020Reset();             // K5020 (gesteckt?): PIOs zurueck, Baender bleiben liegen
     gideReset();             // GIDE (gesteckt?): LH, Platte; Medium bleibt
+    gunUsbReset();           // GUN-USB (gesteckt?): PIO, VDIP1; Stick bleibt
     bus_.clearNMI();
     bus_.releaseINT();
     bus_.releaseWAIT();
@@ -404,6 +405,7 @@ void A5120Machine::powerOn() {
     // K3521 (Akkupufferung): Inhalt bleibt auch ueber Netz-Aus/Ein; /SUE faellt im resetHardware().
     rafPowerOn();       // RAF ohne Stand-by-Pufferung: Inhalt weg (Entwurf 22 §3.4)
     gidePowerOn();
+    gunUsbPowerOn();
     resetHardware();
     LOG_INFO("A5120", "Power on: ZVE1 Reset, Lade-ROM aktiv");
 

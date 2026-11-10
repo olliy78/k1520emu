@@ -130,6 +130,46 @@ inline std::string gideText(const k1520::Gide& g) {
     return s;
 }
 
+/**
+ * @brief Steckt die GUN-USB (`--usb[=basis]`, `--usb-dir`, Entwurf 50 AP U2) in @p m, wenn @p an.
+ *        @p basis < 0 = Vorgabe 84H; @p ordner = Wirtsverzeichnis des Sticks ("" = Fach leer).
+ */
+inline bool steckeUsb(K1520Machine& m, bool an, int basis, const std::string& ordner, std::string& err) {
+    if (!an) return true;
+    k1520::GunUsb::Config c;
+    if (basis >= 0) c.basis = static_cast<uint8_t>(basis);
+    c.ordner = ordner;
+    if (!m.installGunUsb(c)) { err = m.gunUsbFehler(); return false; }
+    return true;
+}
+
+/// `--usb` bzw. `--usb=<basis>` (Zahl, 0x.. erlaubt): true, wenn @p arg die Option ist; @p basis = -1 ohne Wert.
+inline bool parseUsbOpt(const char* arg, int& basis) {
+    if (!strcmp(arg, "--usb")) { basis = -1; return true; }
+    if (!strncmp(arg, "--usb=", 6)) { basis = static_cast<int>(strtol(arg + 6, nullptr, 0)); return true; }
+    return false;
+}
+
+/** @brief Zustand der GUN-USB als Text (Debugbefehl `usb`), ohne Nebenwirkung. */
+inline std::string usbText(const k1520::GunUsb& g) {
+    char b[240];
+    std::string s;
+    const auto& z = g.zaehler();
+    snprintf(b, sizeof b, "  GUN-USB  Basis %02XH (Tore %02XH-%02XH)  Stick: %s\n", g.config().basis, g.config().basis,
+             g.config().basis + 3, g.vdip().stickVorhanden() ? "gesteckt" : "keiner");
+    s += b;
+    snprintf(b, sizeof b, "  Bytes VDIP1->Gast %llu, Gast->VDIP1 %llu, RES#-Impulse %llu  Ausgabe-FIFO %zu  Befehlssatz %s\n",
+             (unsigned long long)z.gelesen, (unsigned long long)z.geschrieben, (unsigned long long)z.resets,
+             g.vdip().datenAnzahl(), g.vdip().kurzSatz() ? "SCS" : "ECS");
+    s += b;
+    const auto d = g.pio().debugState();
+    snprintf(b, sizeof b, "  PIO A: Modus %u out %02X in %02X  B: Modus %u out %02X in %02X dir %02X  ARDY=%d BRDY=%d  Pins B %02X\n",
+             d.port[0].mode, d.port[0].out, d.port[0].in, d.port[1].mode, d.port[1].out, d.port[1].in, d.port[1].dir,
+             g.pio().ardy() ? 1 : 0, g.pio().brdy() ? 1 : 0, g.pio().pinsB());
+    s += b;
+    return s;
+}
+
 /** @brief Steckt die K6022 (`--ptape`, Entwurf 23 AP-L1) in @p m, wenn @p an; false + @p err bei Fehler. */
 inline bool steckeK6022(K1520Machine& m, bool an, std::string& err) {
     if (!an) return true;

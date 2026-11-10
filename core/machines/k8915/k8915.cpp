@@ -108,6 +108,7 @@ void K8915Machine::resetHardware()
     k6022Reset();            // K6022 (gesteckt?): PIOs zurueck, Band und Stanzband bleiben
     k5020Reset();             // K5020 (gesteckt?): PIOs zurueck, Baender bleiben liegen
     gideReset();             // GIDE (gesteckt?): LH, Platte; Medium bleibt
+    gunUsbReset();           // GUN-USB (gesteckt?): PIO, VDIP1; Stick bleibt
     hub_.gastZurueckgesetzt();   // XOFF-/RTS-Halt des alten Gastes gilt nicht weiter
     serial_naechst_ = 0;
     bus_.clearNMI();
@@ -130,6 +131,7 @@ void K8915Machine::powerOn()
     kbd_.powerOn();          // Selbsttest der Tastatur, KEIN DC1 (Firmware 000CH)
     rafPowerOn();            // RAF ohne Stand-by-Pufferung: Inhalt weg (Entwurf 22 §3.4)
     gidePowerOn();
+    gunUsbPowerOn();
     resetHardware();
     anzeigenSpiegeln();
     LOG_INFO("K8915", "Netz ein (%s): A8H=00H, Boot-ROM bei 0000H",

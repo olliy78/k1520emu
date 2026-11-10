@@ -136,6 +136,7 @@ clock machine
 raf
 raf 0
 gide
+usb
 tape
 tape 1
 tape 1 A 0

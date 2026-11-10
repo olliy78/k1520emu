@@ -1146,6 +1146,26 @@ K1520_API bool        k1520_gide_status(K1520Handle h, int* basis, int* lh, int*
 /** @brief Uhr der RTC wie der Gast sie sieht (Kalenderzeit als Unix-Sekunden); false ohne Karte/RTC. */
 K1520_API bool        k1520_gide_rtc_zeit(K1520Handle h, int64_t* out);
 
+/* ─── GUN-USB: Z80-PIO + VDIP1 mit Wirtsverzeichnis als "USB-Stick" (doc/design/50_gun_gide.md, AP U2) ───
+ * Bestueckung nach dem Anlegen, VOR dem ersten k1520_run/k1520_reset; alle Maschinen mit K1520-Bus
+ * (nicht P8000).  Die Karte belegt vier Tore ab basis (GUN: 84H, am K8915/PRG 710 von der ZRE belegt).
+ * Ohne Karte: false / "". */
+
+/** @brief Steckt die GUN-USB.  @p basis = erstes Tor (Vielfaches von 4; GUN 0x84, UTools-CP/M-Fassung 0xDC),
+ *  @p ordner = Wirtsverzeichnis des Sticks ("" oder NULL = Stick-Fach leer), @p schreibgeschuetzt = Stick
+ *  nur lesbar.  Fehler (zu spaet, doppelt, Tor belegt, Ordner nicht oeffenbar): false, Grund in k1520_usb_error. */
+K1520_API bool        k1520_usb_install(K1520Handle h, int basis, const char* ordner, bool schreibgeschuetzt);
+K1520_API bool        k1520_usb_installed(K1520Handle h);
+/** @brief Grund des letzten gescheiterten k1520_usb_*-Aufrufs. */
+K1520_API const char* k1520_usb_error(K1520Handle h);
+/** @brief Stick einstecken (Wirtsverzeichnis; ein steckender Stick wird vorher gezogen). */
+K1520_API bool        k1520_usb_stick_insert(K1520Handle h, const char* pfad, bool schreibgeschuetzt);
+/** @brief Stick ziehen; false ohne Karte. */
+K1520_API bool        k1520_usb_stick_remove(K1520Handle h);
+/** @brief Zustand ohne Nebenwirkung.  @p zaehler = 3 Werte: Bytes VDIP1 -> Gast, Gast -> VDIP1, RES#-Impulse.
+ *  Jeder Zeiger darf NULL sein.  false ohne Karte. */
+K1520_API bool        k1520_usb_status(K1520Handle h, int* basis, int* stick_vorhanden, uint64_t* zaehler);
+
 #ifdef __cplusplus
 }
 #endif
