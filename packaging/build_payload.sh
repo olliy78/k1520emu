@@ -562,6 +562,19 @@ cp "$REPO/third_party/miniz/LICENSE" \
 cp "$REPO/tools/kermit80/COPYRIGHT.txt" \
    "$STAGE/payload/share/doc/lizenzen/kermit80-COPYRIGHT.txt"
 
+# Gast-Software der Hardwareoptionen (GIDE/USB/Netz, Anwenderentscheidung 2026-11-11, tools/gide/README.md): die Fremdtreiber
+# fuer ALLE Basisadressen (Poppe gidehp00..f0), die Ausgangsstuecke zum Umschreiben (basis_anpassen.py) und die Herkunftstabelle.
+# Die Systemdisketten tragen die Programme fuer die Vorauswahl-Basis bereits (tools/gide/karten.py).
+mkdir -p "$STAGE/payload/share/k1520emu/karten_software"
+cp -R "$REPO/tools/gide/fremd" "$STAGE/payload/share/k1520emu/karten_software/fremd" \
+    || die "tools/gide/fremd fehlt"
+cp "$REPO/tools/gide/basis_anpassen.py" "$STAGE/payload/share/k1520emu/karten_software/basis_anpassen.py" \
+    || die "tools/gide/basis_anpassen.py fehlt"
+cp "$REPO/tools/gide/uhr/uhr.com" "$STAGE/payload/share/k1520emu/karten_software/UHR.COM" \
+    || die "tools/gide/uhr/uhr.com fehlt"
+cp "$REPO/tools/gide/README.md" "$STAGE/payload/share/k1520emu/karten_software/HERKUNFT.md"
+cp "$REPO/tools/gide/README.md" "$STAGE/payload/share/doc/lizenzen/karten_software-HERKUNFT.md"
+
 # GUI ohne Bytecode-Reste des Entwicklungsrechners (--exclude MUSS vor dem
 # Pfad stehen, sonst wirkt es bei GNU tar nicht)
 ( cd "$REPO" && tar cf - --exclude='__pycache__' --exclude='*.pyc' app ) \

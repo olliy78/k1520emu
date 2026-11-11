@@ -42,6 +42,8 @@ BOOTSEKTOREN = os.path.join(REPO, 'data', 'bootsektoren')
 
 sys.path.insert(0, TOOLS)
 import disketten_beigaben as _beigaben  # noqa: E402
+sys.path.insert(0, os.path.join(TOOLS, 'gide'))
+import karten as _karten  # noqa: E402
 
 # Hilfsfunktionen (CP/M-Text, deutsche WM.HLP) liegen im A5120-CP/A-Bau
 _spec = importlib.util.spec_from_file_location('cpa_a5120_build', os.path.join(TOOLS, 'cpa_a5120', 'build.py'))
@@ -72,6 +74,11 @@ def beigaben(*namen):
 def kermit80(rechner):
     """Kermit-80 mit der Ueberlagerung des Rechners (disketten_beigaben.KERMIT80), auf der Diskette KERMIT.COM."""
     return {'KERMIT.COM': lies(_beigaben.KERMIT80[rechner])}
+
+
+def karten(schluessel):
+    """Gast-Software der Hardwareoptionen GIDE/RTC/USB/Netz fuer die Systemdiskette @p schluessel (tools/gide/karten.py)."""
+    return _karten.dateien(schluessel)
 
 
 def aus_fixture(pfad, *namen):

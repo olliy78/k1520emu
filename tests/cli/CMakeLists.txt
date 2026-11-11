@@ -126,6 +126,21 @@ add_test(NAME cli_beigaben_auf_den_disketten
 set_tests_properties(cli_beigaben_auf_den_disketten PROPERTIES
     TIMEOUT 180 LABELS "cli;fast")
 
+# Waechter „die Systemdisketten tragen die Gast-Software der Hardwareoptionen (GIDE/Uhr/USB/Netz)“ (tools/gide/README.md):
+# jede ausgelieferte Systemdiskette traegt genau die Dateien von tools/gide/karten.py, bytegleich.
+# Nachziehen: die Bauskripte der Disketten (python3 tools/cpa_a5120/build.py --tool build/k1520disktool usw.)
+add_test(NAME cli_karten_beigaben
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/gide/karten.py"
+            --check --tool "$<TARGET_FILE:k1520disktool>" ${_beigaben_emulator})
+set_tests_properties(cli_karten_beigaben PROPERTIES
+    TIMEOUT 180 LABELS "cli;fast")
+
+# Waechter „UHR.COM ist aus tools/gide/uhr/src gebaut“ (nur mit CP/M-Werkzeugkette, sonst uebersprungen, Rueckgabe 77).
+# Neu bauen: python3 tools/gide/uhr/build.py
+add_test(NAME cli_uhr_com
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/gide/uhr/build.py" --check)
+set_tests_properties(cli_uhr_com PROPERTIES TIMEOUT 120 SKIP_RETURN_CODE 77 LABELS "cli;fast")
+
 # Waechter „die beiden PRG-UDOS-Lieferdisketten in disks/ sind der Inhalt von
 # tools/prg_disketten/“ (doc/udos_programme.md): Dateiliste, Seite, Inhalt und Systemspuren
 # beider Disketten gegen den gemeinsamen Ordner.  Neu bauen:

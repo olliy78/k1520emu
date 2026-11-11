@@ -1441,11 +1441,39 @@ In der Statuszeile steht bei gesteckter Karte die Leuchte **IDE**. Sie folgt dem
 Gastsystems auf die Karte, nicht dem Inhalt: gefüllt = Abbild eingelegt, rot = die Karte wurde
 eben angesprochen, Ring = kein Abbild. Der Tooltip nennt Basis und Abbildname.
 
-**Treiber** brauchen die Gastsysteme selbst; sie liegen dem Emulator nicht bei. Bekannt sind die von
-Poppe (`GIDEHPxx.COM`) und von Kingstener (`gidn@D0h.com`). Die beiden **formatieren die Platte
-untereinander unverträglich** — eine mit dem einen Treiber angelegte Platte liest der andere nicht;
-ein Abbild gehört also zu seinem Treiber. Der Treiber von Poppe braucht mindestens 504000 Sektoren
-(rund 258 MB, also die 256-MB-Vorgabe oder mehr), der von Kingstener kommt mit 32 MB aus.
+**Treiber und Programme** brauchen die Gastsysteme selbst. Sie liegen **auf den mitgelieferten
+Systemdisketten** (Beispieldisketten) und passen zur oben genannten Vorauswahl der Basen — GIDE auf
+**90H**; die Tabelle weiter unten sagt, welche Diskette welche Programme trägt. Jede dieser Disketten hat
+die Texte `GIDE.TXT`, `USB.TXT` und `NETZ.TXT` mit der Bedienung.
+
+* **Platte:** unter CP/A (A5120, PC 1715) und unter SCPX 1.5 (PRG 710) der Treiber von Poppe
+  (`GIDEHP90`, danach `ERADIR D:` für das Verzeichnis des ersten neuen Laufwerks), unter SCPX 1.7,
+  SCPX 8915 und SCP 1715 der von Kingstener (`GIDN90 /F` beim ersten Mal, Laufwerk N:). Für SCP 3.0 (PC 1715W) ist
+  kein Treiber bekannt. Die beiden **formatieren die Platte untereinander unverträglich** — eine mit dem
+  einen Treiber angelegte Platte liest der andere nicht; ein Abbild gehört also zu seinem Treiber. Der Treiber
+  von Poppe braucht mindestens 504000 Sektoren (rund 258 MB, also die 256-MB-Vorgabe oder mehr), der von
+  Kingstener kommt mit 32 MB aus.
+* **Uhr:** `UHR` zeigt Datum und Zeit (`TT.MM.JJJJ HH:MM:SS`), `UHR S 24.12.26 18:30:00` stellt sie,
+  `UHR A0` (Hexzahl) fragt eine Karte mit anderer Basis. Die Uhr gibt es auf **jeder** der Disketten, auch am PC 1715W.
+* **Wer eine andere Basis einstellt**, braucht passende Dateien: bei Poppe liegen im Installationsordner
+  `share/k1520emu/karten_software/fremd/poppe/` die Treiber `GIDEHP00` bis `GIDEHPF0` für jede Basis; für
+  Kingstener, USB und Netz schreibt `python3 karten_software/basis_anpassen.py gidn|usb|net <Basis> --out <Ordner>`
+  die Operanden um. Die Herkunft der Programme (und was über ihre Weitergabe bekannt ist) steht in
+  `share/k1520emu/karten_software/HERKUNFT.md`.
+
+| Systemdiskette | Platte | Uhr | USB (Basis) | Netz (Basis) |
+|----------------|--------|-----|-------------|--------------|
+| A5120 CP/A | Poppe | UHR | 84H | C0H |
+| A5120 SCPX 1.7 | Kingstener | UHR | 84H | C0H |
+| K8915 SCPX 8915 | Kingstener | UHR | 84H (`USB`…) und 8CH (`USB8C`…) | C0H |
+| PRG 710 SCPX 1.5 | Poppe | UHR | 8CH | 28H |
+| PRG 710-1 SCPX 1.7 | Kingstener | UHR | 8CH | 28H |
+| PC 1715 CP/A 1715 | Poppe | UHR | 84H | C0H |
+| PC 1715 SCP 1715 (V0006, V0007) | Kingstener (ohne PIP: `SAVE`) | UHR | 84H | C0H |
+| PC 1715W SCP 3.0 | — | UHR | 84H | — (zu groß für die Diskette) |
+
+Andere Systemdisketten (UDOS, MicroDOS, SIOS, BCU, CP/Z …) tragen diese Programme nicht; ob die
+CP/M-Treiber dort laufen, ist nicht geprüft.
 
 Gemerkt werden Karte, Basis, Abbild, Uhr und Zeitversatz in der Konfiguration (`general.gide`, Schlüssel
 `enabled`, `basis`, `image`, `rtc`, `rtc_versatz`).
@@ -1487,8 +1515,11 @@ Speicherstick-Baustein VDIP1) — in denselben vier Programmen wie die IDE-Karte
 Die Leuchte **USB** in der Statuszeile steht nur bei gesteckter Karte und folgt dem Zugriff: gefüllt =
 Stick steckt, rot = eben angesprochen, Ring = kein Stick. Der Tooltip nennt Basis und Ordner.
 
-Der Gast bedient den Stick mit eigenen Programmen (nicht im Lieferumfang), etwa `UGET`, `UPUT`,
-`UDIR` und `USB`. Gemerkt wird alles in der Konfiguration (`general.usb`).
+Der Gast bedient den Stick mit den **UTools** (M. Leubner), die auf den Systemdisketten liegen und zur
+Vorauswahl der Basis passen (Tabelle im Abschnitt *IDE-Platte (GIDE) und Uhr*): `USB FWV` (Firmware-Version =
+Verbindungsprobe), `UDIR` (Verzeichnis des Sticks), `UGET Datei` (vom Stick auf die Diskette), `UPUT Datei` (auf den Stick).
+Am K8915 tragen die Programme für **8CH** (K8915 V2) das Suffix `8C` (`UDIR8C` …). Gemerkt wird alles in der
+Konfiguration (`general.usb`).
 
 ## Netzwerk (KCNet/W5100)
 
@@ -1507,8 +1538,12 @@ Netzwerkbaustein W5100) — ab Werk **aus**.
 Die Leuchte **NET** in der Statuszeile folgt dem Verkehr: gefüllt = Kabel verbunden, rot = eben
 angesprochen, Ring = Kabel abgezogen.
 
-Im Gast laufen Programme wie `TFTP` und `CPMNET` (nicht im Lieferumfang). **Die Basis der Gastsoftware
-muss zur Einstellung passen** — die Programme suchen die Karte an einer festen Adresse (meist C0H).
+Im Gast laufen `TFTP` und `CPMNET` (Ralf Kaestner), die auf den Systemdisketten liegen (Tabelle im Abschnitt
+*IDE-Platte (GIDE) und Uhr*; `NETZ.TXT` erklärt die Einrichtung). **Die Basis der Gastsoftware muss zur Einstellung
+passen** — die Programme suchen die Karte an einer festen Adresse: die Disketten tragen die Fassung für die Vorauswahl
+(C0H, am PRG 710 28H); für eine andere Basis schreibt `basis_anpassen.py net <Basis>` sie um. Im Menü *T* von
+`CPMNET` trägt man IP-Adresse, Netzmaske und Gateway **von Hand** ein; DHCP, DNS und Ping gibt es im Modell nicht (die im
+Gast eingetragene Adresse wertet der Emulator nicht aus, er benutzt die Netzverbindung des Rechners).
 Gemerkt wird alles in der Konfiguration (`general.net`).
 
 ## Lochstreifen

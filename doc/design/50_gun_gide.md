@@ -56,6 +56,16 @@ eigenem Quelltext.  Gleiches für die Forums-Doku.
 
 ## 2a. Vorhandene Gastsoftware (Recherche 2026-11-10, zweite Runde)
 
+> **Stand 2026-11-11 — Grundsatz „nur lokal, nie ins Repo" AUFGEHOBEN (Anwenderentscheidung).** Auf ausdrückliche Anweisung
+> („Wir müssen die notwendige Software auch auf die Disketten bringen, die wir mit dem Installer ausliefern, damit die
+> Hardwareoptionen (GIDE, RTC, USB, Netz) auch verwendet werden können") liegen Poppe `GIDEHPxx`/`ERADIR`, Kingstener `gidn`
+> (Ausgangsstück @50h), UTools `USB/UDIR/UGET/UPUT` und KCNet `CPMNET`/`TFTP` seit diesem Tag im Repository
+> (`tools/gide/fremd/`) und auf den Systemdisketten. Die **Lizenz-/Weitergabelage bleibt UNGEKLÄRT** (Urheber nicht gefragt,
+> Tabelle mit Herkunft und Kenntnisstand: `tools/gide/README.md`). Nicht ins Repo gekommen: Rehs Quelltexte, die Quelltexte der
+> Fremdprogramme, `guk1520.pdf`. Die Beigaben je Rechner/Diskette: `tools/gide/karten.py`; Tests `KartenBeigaben.*`
+> (`tests/integration/test_karten_beigaben.cpp`, ohne Überspringen). Die Stellen weiter unten, die „nur lokal vorhanden" sagen,
+> beschreiben die ältere Lage (die Systemtests `GideSystem`/`GunUsbSystem`/`GunNetSystem` benutzen weiter die lokale Kopie).
+
 **Es gibt reichlich Software; sie läuft auf K1520-Rechnern.**  Quellen: Forum 16206 („GIDE – CP/A für A5120/K8924", Klaus, 2018/19),
 11026 („GIDE für 5120/8924", 2014), 21872 (RTC/NTIME), 10769 (GUN am PC 1715), hc-ddr.hucki.net (Wiki *z9001/cpm/gide*).
 

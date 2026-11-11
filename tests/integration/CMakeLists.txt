@@ -298,6 +298,15 @@ k1520_add_test(gun_usb_system SRC test_gun_usb_system.cpp
                               LIBS k1520_a5120 k1520_gun_usb k1520_floppy k1520_fs k1520_logger k1520_testsupport
                               LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 180)
 
+# Hardwareoptionen auf den AUSGELIEFERTEN Systemdisketten (tools/gide/, doc/merkposten/gun.md): je Rechner die Lieferdiskette
+# booten, GIDE (90H), USB (84H/8CH) und Netz (C0H/28H) auf der Vorauswahl-Basis stecken und die mitgelieferten Programme
+# laufen lassen.  Alle Dateien kommen aus dem Repository - kein Ueberspringen.
+k1520_add_test(karten_beigaben SRC test_karten_beigaben.cpp
+                               LIBS k1520_a5120 k1520_k8915 k1520_prg710 k1520_pc1715 k1520_gide k1520_gun_usb k1520_gun_net
+                                    k1520_floppy k1520_fs k1520_logger k1520_testsupport
+                               LABELS "${_lbl}" DEFS LOG_LEVEL=2
+                               "A5120_LIEFERDISKETTEN=\"${CMAKE_SOURCE_DIR}/disks\"" TIMEOUT 300)
+
 # A5120 bootet vom Band (doc/design/29_kassette.md AP K7): keine Diskette, K5020 gesteckt, das
 # Lade-ROM faellt auf die Kassette (LW1, bzw. LW1 leer → LW2) und startet tools/kassette/bandtest.
 k1520_add_test(kassette_boot SRC test_kassette_boot.cpp

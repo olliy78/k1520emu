@@ -28,6 +28,7 @@ def soll():
     d.update(db.gemeinsam('WM.COM', 'BASIC.COM', 'PASCAL.COM', 'PASCAL.TXT', 'PASCAL.RES'))
     d.update(db.beigaben('SERTEST.COM'))
     d.update(db.kermit80('pc1715w'))
+    d.update(db.karten('pc1715w_scp3'))
     return d
 
 

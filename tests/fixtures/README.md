@@ -295,3 +295,8 @@ gelesen — `…_format_leer`: FORMAT unter BS620 auf einer Leerdiskette (Name `
 `prg710-1_bs620_ff_high.hfe` (Name `BS620H`).  Die Originallesungen hatten 80 Zylinder / 2 Koepfe (Doppelschritt, ungerade Zylinder leer, Rauschen auf Kopf 1);
 hier **reduziert** auf 40 Zylinder einseitig (gerade Zylinder, Kopf 0 -> Zylinder 0-39) mit `tools/bs600/reduziere_abzug.py`; die Sektordaten sind
 unveraendert, CRCs und Luecken normiert.  Die Originallesungen liegen nur beim Anwender (`~/bs620_abzuege/`).
+
+### Ausgelieferte Systemdisketten als Pruefling (2026-11-11)
+
+`KartenBeigaben.*` (`tests/integration/test_karten_beigaben.cpp`) bootet die **AUSGELIEFERTEN** Disketten aus `disks/` (als Kopie in `/tmp`, nie das Original
+mounten) und laesst die Gast-Software der Hardwareoptionen laufen (`tools/gide/`); es liegt dafuer nichts unter `tests/fixtures/disks/`.

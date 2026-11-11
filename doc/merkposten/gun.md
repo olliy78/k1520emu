@@ -29,7 +29,38 @@ Die **GUN** (PC-1715-Platine mit GIDE + USB + Netz) ist Vorbild; abgebildet werd
 | 11 | **Zugriff nur über 8 Bit** (LH-Folge, Festlegung 2); die Kartenklasse bietet **keinen** 16-Bit-Weg am Bus.  Eine Maschine, die E/A-Adressen auf 8 Bit abschnitte, wäre wie bei der RAF zu berichtigen (`ioAddress()` stimmt in allen vier, Entwurf 50 §7.1a). | `GideMaschine.*_Z80SchreibtLiestUndLiestRtc` |
 | 12 | **Oberfläche der GIDE (2026-11-11):** Einstellungen = nur FLACHE Zeilen im Reiter Allgemein (Haken+Basis, Uhr: Haken+Zeitversatz, Uhrzeit Gast/PC, „Nach PC-Uhr stellen”); **keine Gruppenrahmen, keine eigenen Kästen** (Anwenderentscheid).  Das **Plattenabbild** steht im Reiter *Laufwerke* (`app/ui/gide_platte_widget.py`, sichtbar nur bei gesteckter Karte, wie der P8000-Plattenkasten) und ist **nur gepackt** (`.img.gz`, Endung erzwungen; ein rohes `.img` wird mit Hinweistext abgelehnt; der Kern liest Roh weiter).  `AtaGeraet::abbildAnlegen(.gz)` schreibt als Strom (`gzip::nullenSpeichern`, 256 MB ≈ 260 KB, kein Rohpuffer).  Uhr: `general.gide.rtc_versatz` (`'0'`/`'-28'`/`'-40'`, Vorgabe `-40` wie P8000) → `k1520_gide_install_ex`; Netz-Aus/Ein wirkt auch an der GIDE-Uhr (`Gide::powerOn` → `netzEin`, `k1520_gide_rtc_netz_aus` beim Ausschalten/Beenden der GUI).  Die Einstellungsseiten sind senkrecht rollbar (Mindesthöhe unabhängig von der Zeilenzahl). | `py_gide_gui`, `py_gide_api`, `GideRtc.*`, `GzipDatei.NullenSpeichern*` |
 
-## Fremdsoftware: nur lokal, Tests überspringen
+## Fremdsoftware: seit 2026-11-11 IM Repo und auf den Systemdisketten (Anwenderentscheidung)
+
+**Der frühere Grundsatz „nur lokal, nie im Repo" ist für die Dateien in `tools/gide/fremd/` aufgehoben** — auf ausdrückliche
+Anweisung des Anwenders, damit die Optionen mit den ausgelieferten Disketten benutzbar sind.  **Lizenz- und Weitergabestatus
+bleibt UNGEKLÄRT** (nicht geprüft; Autoren, Fundorte, Kenntnisstand: `tools/gide/README.md`, reist im Paket als
+`share/k1520emu/karten_software/HERKUNFT.md` mit).  Grund der Aufnahme: Anwenderentscheidung, kein Rechtsbefund.
+Festlegungen (Wächter in Klammern):
+
+1. **Die Software passt zur Vorauswahl der Oberfläche** (`app/profil.py`: GIDE 90H; USB 84H bzw. 8CH am K8915 Gen 2 und PRG 710/-1;
+   Netz C0H bzw. 28H am PRG 710/-1).  Zusammenstellung je Rechner nur in `tools/gide/karten.py` (`RECHNER`); Ändert man die
+   Vorauswahl, ändert man `karten.py` und baut die Disketten neu (`py_karten_software`, `KartenBeigaben.*`).
+2. **Bauweise:** Poppe und `UHR.COM` unverändert/eigen; `GIDN90`, UTools (84H/8CH) und CPMNET/TFTP (28H) sind **umgeschriebene
+   Fremdbinaries** (`tools/gide/basis_anpassen.py`, nur die belegten Port-Operanden, andere Dateien werden abgelehnt; Wächter
+   `py_karten_software`).  Neuaufbau der UTools aus dem Quelltext geht NICHT (SLRNK braucht `DSLIBS.REL`/`SYSLIBS.REL`, nicht verfügbar).
+   Die Fassungen @D0h/@F0h des Kingstener-Treibers werden bytegleich nachgebildet (SHA-256 im Test) — damit ist die @90h-Fassung belegt.
+3. **Kingstener `GIDN` läuft nicht unter SCPX 1.5** (PRG 710): dort Poppe (`GIDEHP90`, erstes neues Laufwerk E:).  Unter SCP 1715 gibt es kein
+   brauchbares PIP (V0006 „REQUIRES SCP3", V0007 fehlt) → der Test schreibt mit `SAVE`.  PC 1715W: nur Uhr und USB (12 KB frei, kein
+   Treiber für SCP 3.0).
+4. **Wer eine Beigabe ändert, zieht die Disketten nach** (Bauskripte `tools/cpa_a5120`, `scpx_a5120`, `scpx_k8915`, `scpx_prg`, `cpa_pc1715`,
+   `scp_pc1715` [danach `git checkout disks/pc1715_cpz22/…`: die CP/Z-Diskette baut das Skript mit und sie ist nicht bytegleich
+   reproduzierbar], `scp_pc1715w`) — Wächter `cli_karten_beigaben` (+ die Wächter der einzelnen Bauskripte).
+5. **`UHR.COM` ist eigenes Werk** (`tools/gide/uhr`, M80, MIT): HOLD → BUSY=0 → 12 Ziffern → HOLD aus; Stellen: CF=4 (24 h), HOLD, Ziffern
+   schreiben, HOLD aus (Rehs `RTCset`-Folge, `schreiben_unter_hold`); ohne Karte meldet es „Keine Uhr gefunden“ statt zu hängen (Wächter `cli_uhr_com`,
+   alle `KartenBeigaben.*`).
+
+**Frühere Lage (bis 2026-11-10):** die Gast-Treiber trugen ungeklärte Lizenz und lagen nur lokal in `~/Documents/K1520emu/GIDE_Software/`
+(`K1520_GIDE_SW` überschreibt den Ort); `GideSystem.*`, `GunUsbSystem.*`, `GunNetSystem.*` benutzen weiter diese lokale Kopie und
+**überspringen** sich ohne sie — ein Skip ist kein Rot, aber auch kein Beleg; die **Pflicht-Belege liefert `KartenBeigaben.*`**.
+Rehs `GIDEIDE/GIDERTC.MAC` liegen weiterhin nur lokal.
+Die Forumsdoku
+`GIDE_K1520_Doku.pdf` wurde wegen Urheberrecht entfernt — nicht verwenden.  Der Emulator ist aus der
+*Verhaltensbeschreibung* (GAL-Gleichungen) neu geschrieben.
 
 Die Gast-Treiber (Poppe `GIDEHPxx.COM`, Kingstener `gidn@D0h.com`, `ERADIR.COM`, Rehs `GIDEIDE/GIDERTC.MAC`) tragen
 **ungeklärte Lizenz** und liegen **nie im Repo**, nur lokal in `~/Documents/K1520emu/GIDE_Software/`
@@ -54,7 +85,7 @@ aber auch kein Beleg; auf dem Entwicklungsrechner muss er einmal grün gelaufen 
 
 `AtaGeraet.*` (`tests/unit/peripherals/test_ata_geraet.cpp`), `Gide.*` (`tests/unit/cards/test_gide.cpp`),
 `GideRtc.*` (`test_gide_rtc.cpp`), `GideMaschine.*` (`tests/integration/test_gide_maschinen.cpp`: Stecken je Maschine, zu spät,
-doppelt, Tor belegt, Z80-Gastcode Sektor + RTC), `GideSystem.*` (`test_gide_system.cpp`: **echte Treiber**, lokal), `py_gide_api`
+doppelt, Tor belegt, Z80-Gastcode Sektor + RTC), `GideSystem.*` (`test_gide_system.cpp`: **echte Treiber**, lokale Kopie), `KartenBeigaben.*` (`test_karten_beigaben.cpp`: ausgelieferte Disketten, Software aus dem Repo, kein Skip), `py_karten_software`, `cli_karten_beigaben`, `cli_uhr_com`, `py_gide_api`
 (C-ABI/Bindung; `py_c_api` vergleicht Header/Bibliothek/ctypes mechanisch), `cli_bt_gide`, `cli_bt_gide_k8915`, `cli_dbg_gide`,
 `cli_dbg_gide_keine`, `cli_dbg_gide_konflikt`.  Alle sind **schnell**; es gibt kein Fachlabel `fach_gide` (siehe Entwurf 50 §8, G7).
 
@@ -89,7 +120,7 @@ in `boot_trace`/`k1520dbg`.  Entwurf: `doc/design/50_gun_gide.md` §5 (Karte), �
 | U7 | **Portlage je Maschine** (Entwurf 50 §7.1a, Befund U2): **84H..87H frei** am A5120 (auch .16), **PC 1715** und **K8915 V3** (die ZRE-CTC belegt nur 80H..83H).  **Belegt** am **K8915 Gen 2** (K2521: CTC/PIO auf 80H..87H) und am **PRG 710/-1** → dort **freie Basis wie DCh**; Konflikt → `installGunUsb` meldet den Grund (`k1520_usb_error`, Text `--usb: E/A-Tor 84H belegt`), **kein Absturz**, Pruefung der Tore **vor** dem Anmelden (`belegtGrund`). | `GunUsbMaschine.Bestueckung_A5120`/`_A5120_16`/`_K8915`/`_K8915_Gen2`/`_Prg710`/`_Prg710_1`/`_Pc1715`, `cli_dbg_usb_konflikt`, `py_usb_api` (`test_zre_belegt_84h_aber_freie_basis_geht`) |
 | U8 | **Gast-Rundlauf mit echtem Z80** an allen Maschinen: Startmeldung holen; ausserdem Sync, `DIR`, Schreiben/Lesen (`WRF`/`RDF`, `OPW` mit Anhaengen/Stempel), `SEK`, `MKD`/`CD`/`DLD`, `DLF`, `REN`, `FS`/`IDD`, Fehlerfaelle (Datei fehlt, schon offen, ohne Stick, schreibgeschuetzt) mit Gegenpruefung gegen die Wirtsdatei. | `GunUsbMaschine.*_Z80HoltStartmeldung`, `VdipGeraet.SchreibenWieUput_UndPruefungGegenWirtsdatei`, `VdipGeraet.LesenWieUget_UndPruefungGegenWirtsdatei`, `VdipGeraet.DirtDatumUndZeit`, `VdipGeraet.ZeitUmrechnung`, `VdipGeraet.OpwHaengtAnVorhandeneDateiAn`, `VdipGeraet.SchonOffen`, `VdipGeraet.OhneStick`, `VdipGeraet.SchreibgeschuetzterStick` |
 
-### Fremdsoftware (UTools): nur lokal, Tests ueberspringen
+### Fremdsoftware (UTools): seit 2026-11-11 im Repo (`tools/gide/fremd/utools`, siehe oben); die folgende Beschreibung gilt fuer die aeltere lokale Kopie
 
 Quellen und Binaerdateien der **UTools** (`USB.COM`, `UDIR.COM`, `UPUT.COM`, `UGET.COM`, `USBINC.Z80` …) liegen nur lokal in
 `~/Documents/K1520emu/GIDE_Software/utools14/` (`K1520_GIDE_SW` ueberschreibt den Ort), **Lizenz ungeklaert, nie ins Repo**.
