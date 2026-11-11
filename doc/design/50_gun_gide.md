@@ -3,6 +3,9 @@
 Stand: 2026-11-10, **GIDE + RTC umgesetzt** (Zweig `gide`): G0–G5c und G7 erledigt (Karte, ATA-Platte, RTC-Hook, `installGide` in allen
 K1520-Maschinen, C-ABI/Python, `--gide`, Systemtests mit echten Fremdtreibern).  **Offen/zurückgestellt:** G6 (Oberfläche, wartet auf die
 Basisentscheidung), USB (U0–U3), Netz (N0–N3).  Merkposten: `doc/merkposten/gun.md`.
+**DiskTool-Treiber (2026-11-11):** `GidePlatte` (`core/filesystem/gide/`) liest und schreibt die Plattenabbilder der Treiber **Poppe** und **Kingstener** als CP/M-Laufwerke (Layout erkannt, nie geraten; C-ABI
+`k1520d_gide_*`, CLI `--gide-layout`, Oberfläche, Austauschtests mit den echten Treibern, Golden-Fixture) — Festlegungen und Treiberbefunde (u. a. Kingstener: nur das letzte Viertel des Hostsektors zählt) in
+`doc/merkposten/disktool.md`, Abschnitt „GIDE-Platten".
 
 ## 1. Ziel
 

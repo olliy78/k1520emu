@@ -36,6 +36,9 @@ typedef void* K1520Disk;
 /// @brief Opakes Handle eines geoeffneten P8000-Plattenabbilds (@ref k1520d_platte_open).
 typedef void* K1520Platte;
 
+/// @brief Opakes Handle einer geoeffneten GIDE-Platte (@ref k1520d_gide_open).
+typedef void* K1520Gide;
+
 /// @brief Uebertragungsmodus fuer @ref k1520d_extract / @ref k1520d_insert.
 typedef enum {
     K1520D_BINARY = 0,   ///< Bytes unveraendert
@@ -1210,6 +1213,83 @@ K1520_API bool k1520d_platte_extract(K1520Platte h, const char* path, const char
 /// @brief Linux-Datei oder -Ordner (rekursiv) einfuegen; @p dest = voller Zielpfad.
 K1520_API bool k1520d_platte_insert(K1520Platte h, const char* src, const char* dest,
                                     bool overwrite);
+
+/* ─── GIDE-Platte (IDE-Abbild der GIDE-Karte, CP/M-Laufwerke) ────────────────
+ * Eigener Handle: eine Platte hat bis zu 8 Laufwerke (Poppe) bzw. eines (Kingstener) statt Seiten.
+ * Pfade lauten `lw0/NAME.EXT` (Nutzerbereich `lw0/3:NAME.EXT`).  Layout (Aufteilung durch den
+ * Gast-Treiber): 0 = auto (nur bei EINDEUTIGEM Befund), 1 = poppe, 2 = kingstener.  Die beiden
+ * Layouts sind unvertraeglich; erkannt wird nur lesend, geschrieben nur an erkannte/ausdruecklich
+ * gewaehlte Layouts mit plausiblem Verzeichnis.  Schreibschutz ist die Vorgabe; eine fremde Sperre
+ * `<abbild>.lock` (laufender Emulator) verbietet Schreiben.  Fehlertexte des Oeffnens:
+ * @ref k1520d_last_open_error.  @ref k1520d_gide_close schreibt NICHT selbsttaetig.
+ * (Doku: doc/merkposten/disktool.md, Abschnitt GIDE-Platten.)
+ */
+
+/// @brief Kann die Datei (Groesse, Endung) eine GIDE-Platte sein?  Billig; sagt nichts ueber das Layout.
+K1520_API bool k1520d_gide_kandidat(const char* path);
+
+/// @brief Leeres Abbild anlegen (`.gz` gepackt); @p sektoren 0 = Mindestgroesse.  Ueberschreibt nie.
+///        Fehlertext: @ref k1520d_last_open_error.
+K1520_API bool k1520d_gide_create(const char* path, int layout, uint64_t sektoren);
+
+/// @brief Platte oeffnen; NULL + @ref k1520d_last_open_error (bei Auto und unklarem Befund steht dort die Begruendung).
+K1520_API K1520Gide   k1520d_gide_open(const char* path, bool read_only, int layout);
+K1520_API void        k1520d_gide_close(K1520Gide h);
+K1520_API const char* k1520d_gide_last_error(K1520Gide h);
+K1520_API const char* k1520d_gide_path(K1520Gide h);
+
+/// @brief Benutztes Layout: 1 = poppe, 2 = kingstener.
+K1520_API int         k1520d_gide_layout(K1520Gide h);
+/// @brief Befund der Erkennung: Layout vorgegeben / eindeutig / beide Layouts passen.
+K1520_API bool        k1520d_gide_ausdruecklich(K1520Gide h);
+K1520_API bool        k1520d_gide_sicher(K1520Gide h);
+K1520_API bool        k1520d_gide_mehrdeutig(K1520Gide h);
+/// @brief Begruendung/Warnung der Erkennung in Klartext ("" = nichts zu sagen).
+K1520_API const char* k1520d_gide_erkennung_text(K1520Gide h);
+/// @brief Fremde Sperre (laufender Emulator) vorhanden?
+K1520_API bool        k1520d_gide_fremd_gesperrt(K1520Gide h);
+
+K1520_API bool k1520d_gide_read_only(K1520Gide h);
+/// @brief Schreibschutz aendern; Aufheben kann scheitern (gesperrt / Layout unsicher) - dann false + last_error.
+K1520_API bool k1520d_gide_set_read_only(K1520Gide h, bool ro);
+K1520_API void k1520d_gide_set_backup(K1520Gide h, bool on);
+K1520_API bool k1520d_gide_dirty(K1520Gide h);
+K1520_API bool k1520d_gide_flush(K1520Gide h);
+
+/// @brief Laufwerke, die in das Abbild passen (Poppe bis 8; Kingstener 1) - auch unformatierte.
+K1520_API int         k1520d_gide_laufwerk_count(K1520Gide h);
+K1520_API const char* k1520d_gide_laufwerk_name(K1520Gide h, int lw);
+K1520_API bool        k1520d_gide_laufwerk_formatiert(K1520Gide h, int lw);
+K1520_API uint64_t    k1520d_gide_laufwerk_total(K1520Gide h, int lw);
+K1520_API uint64_t    k1520d_gide_laufwerk_free(K1520Gide h, int lw);
+K1520_API uint64_t    k1520d_gide_laufwerk_used(K1520Gide h, int lw);
+K1520_API int         k1520d_gide_laufwerk_files(K1520Gide h, int lw);
+/// @brief Verzeichnis leeren (ERADIR/quickformat).  Nur bei ausdruecklichem Layout; wo Daten stehen nur mit @p erzwingen.
+K1520_API bool        k1520d_gide_format(K1520Gide h, int lw, bool erzwingen);
+
+/// @brief Alle Dateien der formatierten Laufwerke (frisch gelesen); Anzahl.
+K1520_API int         k1520d_gide_list(K1520Gide h);
+K1520_API int         k1520d_gide_entry_volume(K1520Gide h, int i);
+K1520_API const char* k1520d_gide_entry_name(K1520Gide h, int i);
+K1520_API uint64_t    k1520d_gide_entry_size(K1520Gide h, int i);
+K1520_API int         k1520d_gide_entry_user(K1520Gide h, int i);
+K1520_API const char* k1520d_gide_entry_attrs(K1520Gide h, int i);
+K1520_API bool        k1520d_gide_entry_damaged(K1520Gide h, int i);
+
+/// @brief Datei lesen: Teil 1 laedt und liefert die Groesse (-1 = Fehler), Teil 2 holt den Inhalt ab.
+K1520_API int64_t k1520d_gide_read_size(K1520Gide h, const char* path);
+K1520_API int64_t k1520d_gide_read_data(K1520Gide h, uint8_t* buf, uint64_t cap);
+K1520_API bool    k1520d_gide_write(K1520Gide h, const char* path, const uint8_t* buf, uint64_t len, bool overwrite);
+K1520_API bool    k1520d_gide_erase(K1520Gide h, const char* path);
+/// @brief Datei(en) nach @p dest_dir/lwN/NAME holen; @p path leer = alle.
+K1520_API bool    k1520d_gide_extract(K1520Gide h, const char* path, const char* dest_dir, bool overwrite);
+/// @brief Linux-Datei als @p dest (`lw0/NAME.EXT`) einfuegen.
+K1520_API bool    k1520d_gide_insert(K1520Gide h, const char* src, const char* dest, bool overwrite);
+
+/// @brief Pruefung; liefert die hoechste Schwere (0 Info, 1 Warnung, 2 Fehler, 3 Gefahr), -1 = ohne Befund.
+///        Der Bericht in Klartext: @ref k1520d_gide_check_text.
+K1520_API int         k1520d_gide_check(K1520Gide h, bool voll);
+K1520_API const char* k1520d_gide_check_text(K1520Gide h);
 
 #ifdef __cplusplus
 }

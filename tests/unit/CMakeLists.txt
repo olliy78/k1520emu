@@ -301,6 +301,10 @@ k1520_add_test(wega_platte   SRC filesystem/test_wega_platte.cpp
                              LIBS k1520_fs LABELS "${_lbl}")
 k1520_add_test(platten_volume SRC filesystem/test_platten_volume.cpp
                              LIBS k1520_fs LABELS "${_lbl}")
+# GIDE-Platten (Poppe/Kingstener) im DiskTool - doc/merkposten/disktool.md (GIDE-Platten)
+k1520_add_test(gide_platte    SRC filesystem/test_gide_platte.cpp
+                             LIBS k1520_fs LABELS "${_lbl}"
+                             DEFS K1520_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
 # Tar-Disketten (rohe tar-Stroeme ohne Dateisystem, nur lesbar) — Echtdaten mit K1520_CQM_DIR
 k1520_add_test(tar_fs        SRC filesystem/test_tar_fs.cpp
                              LIBS k1520_fs LABELS "${_lbl}"

@@ -23,9 +23,11 @@
 #include "core/filesystem/geometry_probe.h"
 #include "core/filesystem/sios/sios_fs.h"
 #include "core/filesystem/wega/platten_volume.h"
+#include "core/filesystem/gide/gide_platte.h"
 
 #include <algorithm>
 #include <cctype>
+#include <cstring>
 #include <cstdio>
 #include <memory>
 #include <string>
@@ -1883,3 +1885,158 @@ extern "C" bool k1520d_platte_insert(K1520Platte h, const char* src, const char*
     if (!h || !src || !dest) return false;
     return P(h)->vol->insert(src, dest, overwrite);
 }
+
+// ─── GIDE-Platte (GidePlatte) ────────────────────────────────────────────────
+
+namespace {
+
+struct GideHandle {
+    std::unique_ptr<GidePlatte> vol;
+    std::vector<FileEntry>      eintraege;   ///< Stand des letzten k1520d_gide_list
+    std::vector<uint8_t>        gelesen;     ///< Inhalt des letzten k1520d_gide_read_size
+    bool                        gelesen_da = false;
+    std::string                 check_text;
+    std::string s_error, s_path, s_name, s_attrs, s_erk, s_lw;
+};
+
+GideHandle* G(K1520Gide h) { return static_cast<GideHandle*>(h); }
+
+const FileEntry* geintrag(K1520Gide h, int i) {
+    if (!h) return nullptr;
+    GideHandle* p = G(h);
+    if (i < 0 || i >= static_cast<int>(p->eintraege.size())) return nullptr;
+    return &p->eintraege[static_cast<size_t>(i)];
+}
+
+bool glw_ok(K1520Gide h, int lw) { return h && lw >= 0 && lw < G(h)->vol->laufwerkAnzahl(); }
+
+GideLayout glayout(int l) { return l == 1 ? GideLayout::Poppe : l == 2 ? GideLayout::Kingstener : GideLayout::Auto; }
+
+}  // namespace
+
+extern "C" bool k1520d_gide_kandidat(const char* path) {
+    return path && *path && GidePlatte::kandidat(path);
+}
+
+extern "C" bool k1520d_gide_create(const char* path, int layout, uint64_t sektoren) {
+    g_open_error.clear();
+    if (!path || !*path) { g_open_error = "kein Pfad angegeben"; return false; }
+    std::string err;
+    if (!GidePlatte::anlegen(path, glayout(layout), sektoren, err)) { g_open_error = err; return false; }
+    return true;
+}
+
+extern "C" K1520Gide k1520d_gide_open(const char* path, bool read_only, int layout) {
+    g_open_error.clear();
+    if (!path || !*path) { g_open_error = "kein Pfad angegeben"; return nullptr; }
+    auto h = std::make_unique<GideHandle>();
+    std::string err;
+    h->vol = GidePlatte::open(path, err, read_only, glayout(layout));
+    if (!h->vol) { g_open_error = err; return nullptr; }
+    return h.release();
+}
+
+extern "C" void k1520d_gide_close(K1520Gide h) { delete G(h); }
+
+extern "C" const char* k1520d_gide_last_error(K1520Gide h) {
+    if (!h) return g_open_error.c_str();
+    return halte(G(h)->s_error, G(h)->vol->lastError());
+}
+
+extern "C" const char* k1520d_gide_path(K1520Gide h) {
+    return h ? halte(G(h)->s_path, G(h)->vol->path()) : "";
+}
+
+extern "C" int k1520d_gide_layout(K1520Gide h) {
+    if (!h) return 0;
+    return G(h)->vol->layout() == GideLayout::Poppe ? 1 : G(h)->vol->layout() == GideLayout::Kingstener ? 2 : 0;
+}
+extern "C" bool k1520d_gide_ausdruecklich(K1520Gide h) { return h && G(h)->vol->erkennung().ausdruecklich; }
+extern "C" bool k1520d_gide_sicher(K1520Gide h) { return h && G(h)->vol->erkennung().sicher; }
+extern "C" bool k1520d_gide_mehrdeutig(K1520Gide h) { return h && G(h)->vol->erkennung().mehrdeutig; }
+extern "C" const char* k1520d_gide_erkennung_text(K1520Gide h) {
+    return h ? halte(G(h)->s_erk, G(h)->vol->erkennung().text) : "";
+}
+extern "C" bool k1520d_gide_fremd_gesperrt(K1520Gide h) { return h && G(h)->vol->fremdGesperrt(); }
+
+extern "C" bool k1520d_gide_read_only(K1520Gide h) { return h && G(h)->vol->readOnly(); }
+extern "C" bool k1520d_gide_set_read_only(K1520Gide h, bool ro) { return h && G(h)->vol->setReadOnly(ro); }
+extern "C" void k1520d_gide_set_backup(K1520Gide h, bool on) { if (h) G(h)->vol->setBackup(on); }
+extern "C" bool k1520d_gide_dirty(K1520Gide h) { return h && G(h)->vol->dirty(); }
+extern "C" bool k1520d_gide_flush(K1520Gide h) { return h && G(h)->vol->flush(); }
+
+extern "C" int k1520d_gide_laufwerk_count(K1520Gide h) { return h ? G(h)->vol->laufwerkAnzahl() : 0; }
+extern "C" const char* k1520d_gide_laufwerk_name(K1520Gide h, int lw) {
+    return glw_ok(h, lw) ? halte(G(h)->s_lw, G(h)->vol->laufwerkInfo(lw).name) : "";
+}
+extern "C" bool k1520d_gide_laufwerk_formatiert(K1520Gide h, int lw) {
+    return glw_ok(h, lw) && G(h)->vol->laufwerkInfo(lw).formatiert;
+}
+extern "C" uint64_t k1520d_gide_laufwerk_total(K1520Gide h, int lw) { return glw_ok(h, lw) ? G(h)->vol->laufwerkInfo(lw).total : 0; }
+extern "C" uint64_t k1520d_gide_laufwerk_free(K1520Gide h, int lw) { return glw_ok(h, lw) ? G(h)->vol->laufwerkInfo(lw).free : 0; }
+extern "C" uint64_t k1520d_gide_laufwerk_used(K1520Gide h, int lw) { return glw_ok(h, lw) ? G(h)->vol->laufwerkInfo(lw).used : 0; }
+extern "C" int k1520d_gide_laufwerk_files(K1520Gide h, int lw) { return glw_ok(h, lw) ? G(h)->vol->laufwerkInfo(lw).dateien : 0; }
+extern "C" bool k1520d_gide_format(K1520Gide h, int lw, bool erzwingen) {
+    return glw_ok(h, lw) && G(h)->vol->formatLaufwerk(lw, erzwingen);
+}
+
+extern "C" int k1520d_gide_list(K1520Gide h) {
+    if (!h) return 0;
+    G(h)->eintraege = G(h)->vol->list();
+    return static_cast<int>(G(h)->eintraege.size());
+}
+extern "C" int k1520d_gide_entry_volume(K1520Gide h, int i) { const FileEntry* e = geintrag(h, i); return e ? e->volume : -1; }
+extern "C" const char* k1520d_gide_entry_name(K1520Gide h, int i) {
+    const FileEntry* e = geintrag(h, i);
+    return e ? halte(G(h)->s_name, e->name) : "";
+}
+extern "C" uint64_t k1520d_gide_entry_size(K1520Gide h, int i) { const FileEntry* e = geintrag(h, i); return e ? e->size : 0; }
+extern "C" int k1520d_gide_entry_user(K1520Gide h, int i) { const FileEntry* e = geintrag(h, i); return e ? e->user : 0; }
+extern "C" const char* k1520d_gide_entry_attrs(K1520Gide h, int i) {
+    const FileEntry* e = geintrag(h, i);
+    return e ? halte(G(h)->s_attrs, e->attributes) : "";
+}
+extern "C" bool k1520d_gide_entry_damaged(K1520Gide h, int i) { const FileEntry* e = geintrag(h, i); return e && e->damaged; }
+
+extern "C" int64_t k1520d_gide_read_size(K1520Gide h, const char* path) {
+    if (!h || !path) return -1;
+    G(h)->gelesen.clear();
+    G(h)->gelesen_da = false;
+    if (!G(h)->vol->read(path, G(h)->gelesen)) return -1;
+    G(h)->gelesen_da = true;
+    return static_cast<int64_t>(G(h)->gelesen.size());
+}
+
+extern "C" int64_t k1520d_gide_read_data(K1520Gide h, uint8_t* buf, uint64_t cap) {
+    if (!h || !G(h)->gelesen_da || (cap && !buf)) return -1;
+    const uint64_t n = std::min<uint64_t>(cap, G(h)->gelesen.size());
+    if (n) std::memcpy(buf, G(h)->gelesen.data(), static_cast<size_t>(n));
+    return static_cast<int64_t>(n);
+}
+
+extern "C" bool k1520d_gide_write(K1520Gide h, const char* path, const uint8_t* buf, uint64_t len, bool overwrite) {
+    if (!h || !path || (len && !buf)) return false;
+    WriteOptions w;
+    w.overwrite = overwrite;
+    const std::vector<uint8_t> d(buf, buf + len);
+    return G(h)->vol->write(path, d, w);
+}
+
+extern "C" bool k1520d_gide_erase(K1520Gide h, const char* path) { return h && path && G(h)->vol->erase(path); }
+
+extern "C" bool k1520d_gide_extract(K1520Gide h, const char* path, const char* dest_dir, bool overwrite) {
+    return h && dest_dir && G(h)->vol->extract(path ? path : "", dest_dir, overwrite);
+}
+
+extern "C" bool k1520d_gide_insert(K1520Gide h, const char* src, const char* dest, bool overwrite) {
+    return h && src && dest && G(h)->vol->insert(src, dest, overwrite);
+}
+
+extern "C" int k1520d_gide_check(K1520Gide h, bool voll) {
+    if (!h) return -1;
+    const FsCheckReport r = G(h)->vol->check(voll ? FsCheckLevel::Voll : FsCheckLevel::Schnell);
+    G(h)->check_text = r.alsText(true);
+    return r.findings.empty() ? -1 : static_cast<int>(r.hoechste());
+}
+
+extern "C" const char* k1520d_gide_check_text(K1520Gide h) { return h ? G(h)->check_text.c_str() : ""; }

@@ -43,6 +43,7 @@
 #include "core/filesystem/prg_boot.h"
 #include "core/filesystem/geometry_probe.h"
 #include "core/filesystem/wega/platten_volume.h"
+#include "core/filesystem/gide/gide_platte.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -104,6 +105,9 @@ struct Optionen {
     bool unix_gid_gesetzt  = false;  int unix_gid  = 0;             ///< --gid
     bool unix_mtime_gesetzt = false; unsigned long unix_mtime = 0;  ///< --mtime (Sekunden seit 1970)
     int         volume  = 0; ///< --volume
+    std::string gide_layout;     ///< --gide-layout auto|poppe|kingstener (GIDE-Platte; "" = nicht verlangt)
+    int         laufwerk = -1;   ///< --laufwerk N (GIDE-Platte: Standardlaufwerk fuer Namen ohne lwN/; -1 = keins)
+    unsigned long long sektoren = 0; ///< --sectors N (create einer GIDE-Platte; 0 = Mindestgroesse)
     bool        text    = false;
     bool        binaer  = false;
     bool        force   = false;
@@ -225,6 +229,14 @@ void gebrauch() {
         "P8000-Plattenabbild (WEGA, PAR in Zylinder 0): ls/info/check/get/put/rm/mkdir/attr;\n"
         "  Namen mit Partition vorn (md0 = /usr, md2 = /, md3 = /tmp, md4 = /z):\n"
         "  get platte.img 'md2/etc/*' --to x -  put platte.img datei --as md2/etc/datei\n\n"
+        "GIDE-Platte (IDE-Abbild der GIDE-Karte, CP/M; .img oder .img.gz, > 33 MB): ls/info/check/fsck/get/put/rm/format/create;\n"
+        "  Namen mit Laufwerk vorn: lw0/NAME.EXT (Nutzerbereich lw0/3:NAME.EXT).  Das Layout des Gast-Treibers wird aus den\n"
+        "  Verzeichnissen erkannt und NIE geraten (--gide-layout auto|poppe|kingstener uebersteuert; bei Unklarheit scheitert auto):\n"
+        "  poppe = bis 8 Laufwerke je 8 MB (GIDEHP, auch im CP/A-BIOS), kingstener = 1 Laufwerk (gidn).  Die Layouts sind unvertraeglich.\n"
+        "  create x.img.gz --gide-layout poppe [--sectors N] [--laufwerk N]   leeres Abbild, Verzeichnisse formatiert\n"
+        "  format x.img.gz --gide-layout poppe --laufwerk 2 [--force]          Verzeichnis leeren (--force: auch wo Daten stehen)\n"
+        "  put x.img.gz DATEI... --as lw1[/NAME] | --laufwerk 1    get x.img.gz 'lw0/*' --to dir    rm x.img.gz 'lw1/*.COM'\n"
+        "  Geschrieben wird nur bei erkanntem oder vorgegebenem Layout, nie in ein Abbild mit fremder Sperre <abbild>.lock.\n\n"
         "Gemeinsam: --fs NAME (Erkennung uebersteuern), --volume N (Seite),\n"
         "           --text|--binary, --force, --dry-run, --no-backup\n"
         "  Neben jeder herausgeholten Datei liegt ein <datei>.fileinfo mit dem, was\n"
@@ -256,6 +268,9 @@ bool zerlege(int argc, char** argv, int ab, Optionen& o, std::string& err) {
         else if (a == "--restore") { if (!wert("--restore")) return false;
                                      o.restore_wahl = argv[++i]; }
         else if (a == "--as")      { if (!wert("--as"))     return false; o.als    = argv[++i]; }
+        else if (a == "--gide-layout") { if (!wert("--gide-layout")) return false; o.gide_layout = argv[++i]; }
+        else if (a == "--laufwerk" || a == "--lw") { if (!wert("--laufwerk")) return false; o.laufwerk = std::atoi(argv[++i]); }
+        else if (a == "--sectors") { if (!wert("--sectors")) return false; o.sektoren = std::strtoull(argv[++i], nullptr, 10); }
         else if (a == "--blocks")  { if (!wert("--blocks")) return false; o.blocks = std::atoi(argv[++i]); }
         else if (a == "--inodes")  { if (!wert("--inodes")) return false; o.inodes = std::atoi(argv[++i]); }
         else if (a == "--label")   { if (!wert("--label"))  return false; o.label  = argv[++i]; }
@@ -2314,6 +2329,207 @@ int platte(const std::string& befehl, const Optionen& o) {
     return kOk;
 }
 
+
+// ─── GIDE-Platte (Poppe / Kingstener, doc/merkposten/disktool.md) ────────────
+//
+// Wie die P8000-Platte ein Abbild mit mehreren Laufwerken statt einer Diskette; das Layout (Aufteilung durch den
+// Gast-Treiber) steht nirgends auf der Platte und wird aus den Verzeichnissen ERKANNT - nie geraten.  Namen tragen
+// das Laufwerk vorn: `lw0/NAME.EXT` (Nutzerbereich `lw0/3:NAME.EXT`).
+
+GideLayout gideWahl(const Optionen& o, bool& ok) {
+    GideLayout l = GideLayout::Auto;
+    ok = o.gide_layout.empty() || gideLayoutVon(o.gide_layout, l);
+    if (!ok) std::cerr << "Fehler: --gide-layout muss auto, poppe oder kingstener sein\n";
+    return l;
+}
+
+int cmd_gide_create(const Optionen& o) {
+    bool ok = true;
+    const GideLayout l = gideWahl(o, ok);
+    if (!ok) return kFehler;
+    if (o.rest.size() < 2) { std::cerr << "Fehler: kein Abbild angegeben\n"; return kFehler; }
+    if (l == GideLayout::Auto) { std::cerr << "Fehler: --gide-layout poppe|kingstener ist zum Anlegen Pflicht\n"; return kFehler; }
+    std::string err;
+    if (!GidePlatte::anlegen(o.rest[1], l, o.sektoren, err)) { std::cerr << "Fehler: " << err << "\n"; return kFehler; }
+    // Verzeichnisse anlegen: --laufwerk N = nur dieses, sonst Poppe alle 8 / Kingstener das eine
+    auto p = GidePlatte::open(o.rest[1], err, /*read_only=*/false, l);
+    if (!p) { std::cerr << "Fehler: " << err << "\n"; return kFehler; }
+    p->setBackup(false);
+    int n = 0;
+    for (int lw = 0; lw < p->laufwerkAnzahl(); ++lw) {
+        if (o.laufwerk >= 0 && lw != o.laufwerk) continue;
+        if (!p->formatLaufwerk(lw)) { std::cerr << "Fehler: " << p->lastError() << "\n"; return kFehler; }
+        ++n;
+    }
+    if (!p->flush()) { std::cerr << "Fehler: " << p->lastError() << "\n"; return kFehler; }
+    std::cout << "angelegt: " << o.rest[1] << " (" << gideLayoutName(l) << ", " << n << " Laufwerk(e) formatiert)\n";
+    return kOk;
+}
+
+int gide(const std::string& befehl, const Optionen& o) {
+    bool ok = true;
+    const GideLayout wahl = gideWahl(o, ok);
+    if (!ok) return kFehler;
+    if (befehl == "fsck" && o.reparieren) {
+        std::cerr << "Fehler: fuer GIDE-Platten gibt es noch keine Reparaturen (nur pruefen)\n";
+        return kFehler;
+    }
+    const bool schreibend = befehl == "put" || befehl == "rm" || befehl == "format";
+    if (!schreibend && befehl != "ls" && befehl != "info" && befehl != "check" && befehl != "fsck" && befehl != "get") {
+        std::cerr << "Fehler: '" << befehl << "' gibt es fuer GIDE-Platten nicht (ls, info, check, fsck, get, put, rm, format)\n";
+        return kFehler;
+    }
+    std::string err;
+    auto p = GidePlatte::open(o.rest[1], err, /*read_only=*/!schreibend || o.dry_run, wahl);
+    if (!p) { std::cerr << "Fehler: " << err << "\n"; return kNichtErkannt; }
+    if (o.nobackup) p->setBackup(false);
+    if (o.laufwerk >= 0) p->setStandardLaufwerk(o.laufwerk);
+
+    auto kopf = [&](std::ostream& aus) {
+        const GideErkennung& e = p->erkennung();
+        aus << "GIDE-Platte: Layout " << gideLayoutName(p->layout())
+            << (e.ausdruecklich ? " (vorgegeben" : " (erkannt") << (e.sicher ? ", eindeutig" : ", NICHT eindeutig") << "), "
+            << p->sektorenGesamt() << " Sektoren, " << p->laufwerkAnzahl() << " Laufwerk(e)\n";
+        if (!e.text.empty()) aus << "  " << e.text << "\n";
+        if (p->fremdGesperrt()) aus << "  Abbild gesperrt (laufender Emulator?) - nur lesbar\n";
+    };
+
+    if (befehl == "ls") {
+        std::ostream& info_aus = o.lang ? std::cout : std::cerr;
+        kopf(info_aus);
+        for (int lw = 0; lw < p->laufwerkAnzahl(); ++lw) {
+            const GideLaufwerkInfo i = p->laufwerkInfo(lw);
+            info_aus << i.name << (i.formatiert ? ": " : ": unformatiert");
+            if (i.formatiert) info_aus << i.dateien << " Dateien, " << menschlich(i.free) << " frei";
+            info_aus << "\n";
+        }
+        for (const FileEntry& e : p->list()) {
+            if (!o.lang) { std::cout << e.name << "\n"; continue; }
+            std::printf("%-10s %9llu  %s\n", e.attributes.c_str(), static_cast<unsigned long long>(e.size), e.name.c_str());
+        }
+        return kOk;
+    }
+    if (befehl == "info") {
+        kopf(std::cout);
+        for (int lw = 0; lw < p->laufwerkAnzahl(); ++lw) {
+            const GideLaufwerkInfo i = p->laufwerkInfo(lw);
+            std::cout << i.name << ": ";
+            if (!i.formatiert) { std::cout << "unformatiert (kein Verzeichnis im Layout " << gideLayoutName(p->layout()) << ")\n"; continue; }
+            std::cout << i.dateien << " Dateien, " << menschlich(i.used) << " belegt, " << menschlich(i.free) << " frei von "
+                      << menschlich(i.total) << (i.systemspuren ? ", " + std::to_string(i.systemspuren) + " Systemspuren" : "") << "\n";
+        }
+        return kOk;
+    }
+    if (befehl == "check" || befehl == "fsck") {
+        const FsCheckLevel stufe = o.voll ? FsCheckLevel::Voll : FsCheckLevel::Schnell;
+        const FsCheckReport gesamt = p->check(stufe);
+        if (o.json) {
+            std::cout << "{\"findings\":[";
+            for (size_t i = 0; i < gesamt.findings.size(); ++i) {
+                const FsFinding& f = gesamt.findings[i];
+                std::cout << (i ? "," : "") << "{\"id\":" << jsonText(f.id) << ",\"severity\":" << jsonText(fsSeverityName(f.severity))
+                          << ",\"object\":" << jsonText(f.object) << ",\"text\":" << jsonText(f.text) << "}";
+            }
+            std::cout << "]}\n";
+        } else {
+            kopf(std::cout);
+            std::cout << (stufe == FsCheckLevel::Voll ? "Vollpruefung" : "Schnellpruefung") << "\n";
+            if (gesamt.ohneBefund()) std::cout << "ohne Befund\n";
+            else std::cout << gesamt.alsText();
+        }
+        return gesamt.ohneBefund() ? kOk : kFehler;
+    }
+    // Muster darf das Laufwerk weglassen: dann gilt es fuer den Dateinamen allein
+    auto trifft = [](const std::string& m, const std::string& voll) {
+        const std::string rest = voll.substr(voll.find('/') + 1);
+        return passt(m, voll) || (m.find('/') == std::string::npos && passt(m, rest));
+    };
+    if (befehl == "get") {
+        if (o.ziel.empty()) { std::cerr << "Fehler: --to <verzeichnis> fehlt\n"; return kFehler; }
+        std::vector<std::string> muster(o.rest.begin() + 2, o.rest.end());
+        if (muster.empty()) muster.push_back("*");
+        int n = 0;
+        for (const FileEntry& e : p->list()) {
+            bool treffer = false;
+            for (const std::string& m : muster) treffer = treffer || trifft(m, e.name);
+            if (!treffer) continue;
+            if (o.dry_run) { std::cout << "wuerde holen: " << e.name << "\n"; ++n; continue; }
+            if (!p->extract(e.name, o.ziel, o.force)) { std::cerr << "Fehler: " << p->lastError() << "\n"; return kFehler; }
+            ++n;
+        }
+        if (n == 0) { std::cerr << "Fehler: keine Datei passt auf das Muster\n"; return kFehler; }
+        std::cout << n << " Dateien nach " << o.ziel << "\n";
+        return kOk;
+    }
+    if (befehl == "rm") {
+        int n = 0;
+        for (size_t i = 2; i < o.rest.size(); ++i)
+            for (const FileEntry& e : p->list()) {
+                if (!trifft(o.rest[i], e.name)) continue;
+                if (o.laufwerk >= 0 && e.volume != o.laufwerk && o.rest[i].find('/') == std::string::npos) continue;
+                if (o.dry_run) { std::cout << "wuerde loeschen: " << e.name << "\n"; ++n; continue; }
+                if (!p->erase(e.name)) { std::cerr << "Fehler: " << p->lastError() << "\n"; return kFehler; }
+                std::cout << "geloescht: " << e.name << "\n";
+                ++n;
+            }
+        if (n == 0) { std::cerr << "Fehler: keine Datei passt auf das Muster\n"; return kFehler; }
+    } else if (befehl == "put") {
+        if (o.rest.size() < 3) { std::cerr << "Fehler: Abbild und Datei angeben\n"; return kFehler; }
+        // Ziel: --as lwN[/NAME] oder --laufwerk N (Kingstener: das eine Laufwerk)
+        std::string lwpraefix, alsname;
+        if (!o.als.empty()) {
+            const size_t s = o.als.find('/');
+            lwpraefix = o.als.substr(0, s);
+            if (s != std::string::npos) alsname = o.als.substr(s + 1);
+        } else if (o.laufwerk >= 0) {
+            lwpraefix = "lw" + std::to_string(o.laufwerk);
+        } else if (p->layout() == GideLayout::Kingstener) {
+            lwpraefix = "lw0";
+        } else {
+            std::cerr << "Fehler: das Ziellaufwerk mit --as lw<N>[/NAME] oder --laufwerk N angeben (Poppe hat bis 8 Laufwerke)\n";
+            return kFehler;
+        }
+        if (lwpraefix.size() < 3 || lwpraefix.compare(0, 2, "lw") != 0) {
+            std::cerr << "Fehler: Laufwerk als lw<N> angeben, nicht '" << lwpraefix << "'\n";
+            return kFehler;
+        }
+        std::error_code ec;
+        std::vector<std::string> quellen;
+        for (size_t i = 2; i < o.rest.size(); ++i) {
+            if (fs::is_directory(o.rest[i], ec)) {
+                for (const auto& d : fs::directory_iterator(o.rest[i], ec))
+                    if (d.is_regular_file(ec) && d.path().extension() != ".fileinfo") quellen.push_back(d.path().string());
+            } else {
+                quellen.push_back(o.rest[i]);
+            }
+        }
+        std::sort(quellen.begin(), quellen.end());
+        if (!alsname.empty() && quellen.size() != 1) { std::cerr << "Fehler: --as lw<N>/NAME gilt nur fuer eine Datei\n"; return kFehler; }
+        for (const std::string& q : quellen) {
+            const std::string name = alsname.empty() ? CpmFileSystem::toCpmName(fs::path(q).filename().string()) : alsname;
+            const std::string ziel = lwpraefix + "/" + name;
+            if (o.dry_run) { std::cout << q << " -> " << ziel << " (Probelauf)\n"; continue; }
+            if (!p->insert(q, ziel, o.force)) { std::cerr << "Fehler: " << p->lastError() << "\n"; return kFehler; }
+            std::cout << q << " -> " << ziel << "\n";
+        }
+    } else if (befehl == "format") {
+        if (o.gide_layout.empty() || wahl == GideLayout::Auto) {
+            std::cerr << "Fehler: format nur mit ausdruecklich gewaehltem Layout (--gide-layout poppe|kingstener)\n";
+            return kFehler;
+        }
+        if (o.laufwerk < 0 && p->layout() != GideLayout::Kingstener) {
+            std::cerr << "Fehler: format braucht --laufwerk N (0-7)\n";
+            return kFehler;
+        }
+        const int lw = o.laufwerk < 0 ? 0 : o.laufwerk;
+        if (!o.dry_run && !p->formatLaufwerk(lw, o.force)) { std::cerr << "Fehler: " << p->lastError() << "\n"; return kFehler; }
+        std::cout << (o.dry_run ? "wuerde formatieren: lw" : "formatiert: lw") << lw << "\n";
+    }
+    if (o.dry_run) return kOk;
+    if (!p->flush()) { std::cerr << "Fehler: " << p->lastError() << "\n"; return kFehler; }
+    return kOk;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -2333,6 +2549,12 @@ int main(int argc, char** argv) {
         std::cerr << "Fehler: --text und --binary schliessen sich aus\n";
         return kFehler;
     }
+
+    // GIDE-Platte (Poppe/Kingstener): --gide-layout verlangt sie, sonst entscheidet die Groesse (>= 65472 Sektoren, nie eine Diskette)
+    if (befehl == "create" && !o.gide_layout.empty()) return cmd_gide_create(o);
+    if (o.rest.size() >= 2 && befehl != "create" && befehl != "formats" && befehl.rfind("tar-", 0) != 0 && o.fs.empty() &&
+        !WegaPlatte::istPlatte(o.rest[1]) && (!o.gide_layout.empty() || GidePlatte::kandidat(o.rest[1])))
+        return gide(befehl, o);
 
     // P8000-Plattenabbild (PAR in Z0/K0/S1): eigener Weg, mehrere WEGA-Partitionen
     if (o.rest.size() >= 2 && befehl != "create" && befehl != "formats" && befehl != "tar-satz"
