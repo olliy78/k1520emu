@@ -295,3 +295,11 @@ gelesen — `…_format_leer`: FORMAT unter BS620 auf einer Leerdiskette (Name `
 `prg710-1_bs620_ff_high.hfe` (Name `BS620H`).  Die Originallesungen hatten 80 Zylinder / 2 Koepfe (Doppelschritt, ungerade Zylinder leer, Rauschen auf Kopf 1);
 hier **reduziert** auf 40 Zylinder einseitig (gerade Zylinder, Kopf 0 -> Zylinder 0-39) mit `tools/bs600/reduziere_abzug.py`; die Sektordaten sind
 unveraendert, CRCs und Luecken normiert.  Die Originallesungen liegen nur beim Anwender (`~/bs620_abzuege/`).
+
+## `gide/`: GIDE-Platte nach Poppe (DiskTool, Golden-Fixture)
+
+`gide/poppe_cpa.img.gz` (≈ 250 KB; entpackt 504 000 Sektoren = 258 MB, fast nur Nullen): vom **echten Poppe-Treiber** (`GIDEHPD0`, CP/A am A5120, Basis D0H)
+im Emulator beschrieben — `ERADIR D:` und `E:`, dann `PIP D:=A:NUTZ.BIN` und `PIP E:=A:HALLO.TXT`.  Layout `poppe`: **Laufwerk 0** (`D:`, 2 Systemspuren)
+mit `NUTZ.BIN` (20000 Byte Muster `i*7 + (i>>8)`), **Laufwerk 1** (`E:`) mit `HALLO.TXT` (`Hallo von Poppe, geschrieben im Emulator.` + CRLF); Laufwerke 2–7
+unformatiert.  Benutzer: `GidePlatteGolden.*` (`tests/unit/filesystem/test_gide_platte.cpp`) — **nie direkt öffnen** (das Werkzeug legt `.lock` an; der Test kopiert).
+Neu erzeugen: `K1520_GIDE_GOLDEN_OUT=<pfad.img.gz> tools/dev.sh test -R GideAustausch.Poppe` (braucht die lokale Fremdsoftware, `K1520_GIDE_SW`).

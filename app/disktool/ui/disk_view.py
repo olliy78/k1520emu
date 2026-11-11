@@ -48,6 +48,8 @@ DISK_SPALTEN = ["Name", "Typ", "Größe", "Eigensch.", "Datum"]
 #: BS600 (PRG 700/710/710-1): Typ P/L, Lage Spur/Sektor, Lade-/End-/Startadresse (hex), Datum, Signum.
 BS600_SPALTEN = ["Name", "Typ", "Größe", "Lage", "Laden", "Ende", "Start", "Datum", "Signum"]
 PLATTE_SPALTEN = ["Name", "Art", "Größe", "Rechte", "uid", "gid", "Geändert"]
+#: GIDE-Platte (CP/M-Laufwerke): kein UNIX, dafuer der Nutzerbereich.
+GIDE_SPALTEN = ["Name", "Nutzer", "Größe", "Attribute"]
 
 
 class _Tree(QTreeWidget):
@@ -234,6 +236,7 @@ class DiskView(QWidget):
     def _spalten_setzen(self, koepfe) -> None:
         if [self.tree.headerItem().text(i)
                 for i in range(self.tree.columnCount())] != list(koepfe):
+            self.tree.setColumnCount(len(koepfe))        # setHeaderLabels verkleinert nie
             self.tree.setHeaderLabels(list(koepfe))
             self._spaltenbreiten()
 
@@ -405,8 +408,9 @@ class DiskView(QWidget):
         ihnen gebaut.  Die Wurzelzeile einer Partition traegt Rolle, Datentraegername
         und freien Platz — wie die Gruppenzeile einer zweiseitigen Diskette.
         """
-        self._spalten_setzen(PLATTE_SPALTEN)
-        self.titel.setText("Platte — WEGA (P8000)")
+        gide = bool(getattr(tool, "ist_gide", False))
+        self._spalten_setzen(GIDE_SPALTEN if gide else PLATTE_SPALTEN)
+        self.titel.setText(f"GIDE-Platte — {tool.layout}" if gide else "Platte — WEGA (P8000)")
         self.tree.leer_text = "" if entries else "Keine Dateien gefunden"
         volumes = {v.dir: v for v in tool.volumes()}
         self._zeilen = {}
@@ -434,6 +438,10 @@ class DiskView(QWidget):
     @staticmethod
     def _platte_spalten(e, kurz: str, volume, tool) -> List[str]:
         """Name, Art, Groesse, Rechte, uid, gid, Zeit — wie ``ls -l``."""
+        if getattr(tool, "ist_gide", False):
+            if volume is not None:
+                return [f"{kurz}   {volume.free // 1024} KB frei", "", "", ""]
+            return [kurz, str(e.user) if e.user else "", f"{e.size}", e.attrs]
         if volume is not None:
             rolle = tool.volume_role(volume.index)
             kopf = f"{kurz}   {rolle} {volume.label}".rstrip()

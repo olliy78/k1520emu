@@ -75,6 +75,9 @@ REGELN = [
     # ── Diskette ────────────────────────────────────────────────────────
     ("core/peripherals/floppy_drive/**", _FLOPPY_WEIT, "Diskettenlaufwerk/-medium", True),
     ("core/cards/k5122/**", ("fach_floppy", "fach_kermit"), "K5122", True),
+    # GIDE-Platte im DiskTool (Poppe/Kingstener): alle Faelle schnell, kein Fachlabel noetig (SectorSpace/CpmFileSystem-Aenderungen laufen ueber core/filesystem/**)
+    ("core/filesystem/gide/**", (), "GIDE-Platte im DiskTool (keine langsamen Faelle)", True),
+    ("tests/fixtures/gide/**", (), "GIDE-Golden-Fixture (keine langsamen Faelle)", False),
     ("core/filesystem/wega/**", ("fach_floppy",) + _P8, "WEGA-Dateisystem", True),
     ("core/filesystem/**", ("fach_floppy",), "Dateisysteme", True),
     ("data/formats.yaml", _FLOPPY_WEIT, "Formatkatalog", False),

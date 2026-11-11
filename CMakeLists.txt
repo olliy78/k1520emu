@@ -255,6 +255,7 @@ if(BUILD_K1520)
         core/filesystem/tar/tar_archiv.cpp
         core/filesystem/wega/wega_platte.cpp
         core/filesystem/wega/platten_volume.cpp
+        core/filesystem/gide/gide_platte.cpp
         core/filesystem/fileinfo.cpp
         core/filesystem/disk_volume.cpp
         core/filesystem/prg_boot.cpp

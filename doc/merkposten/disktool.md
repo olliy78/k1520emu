@@ -1325,3 +1325,47 @@ Festlegungen:
    brauchbarem Blockzeiger (ein geloeschter LEERER Eintrag wie `WSNEW.COM` auf MicroDOS1526s ist kein Fund für `recover`).
 7. Rettung und Archiv (ZIP + `cpm-dateiangaben.txt`, Rückweg per `insert_all`) sind für alle drei Profile abgesichert (`DisktoolMicrodos.Rettung*`,
    `py_disktool_microdos`). Das Beiblatt führt nur Dateien mit Angaben.
+
+
+## GIDE-Platten (Poppe / Kingstener) im DiskTool (2026-11-11, Entwurf 50)
+
+`GidePlatte` (`core/filesystem/gide/`) öffnet die IDE-Plattenabbilder der GIDE-Karte (`.img`/`.img.gz`, Art folgt den Magic Bytes) als **CP/M-Laufwerke** und
+benutzt dafür das vorhandene `CpmFileSystem` (nichts neu geschrieben): jedes Laufwerk wird als **linearer Sektorstrom** herausgelöst (`SectorSpace` im
+flachen Betrieb, `SectorSpace(std::vector<uint8_t>&, DiskFormat)`), geändert wird nur, was sich gegenüber dem Laden unterscheidet. C-ABI `k1520d_gide_*`
+(additiv), Python `GideTool` (Duck-Typing zu `PlatteTool`, `ist_plattenabbild = True`, `ist_gide = True`), CLI `k1520disktool … --gide-layout/--laufwerk`,
+Oberfläche (Baum `lw0`…, Aktionen *Neue GIDE-Platte…*, *GIDE-Laufwerk formatieren…*, *GIDE-Platte prüfen…*, alle ohne Kürzel). **Quellen nur lokal**
+(`~/Documents/K1520emu/GIDE_Software/`, Lizenz ungeklärt): `poppe_src/GIDEHP.ASM`, `dl_src/gidn5004.mac`.
+
+1. **Die beiden Layouts sind untereinander unverträglich; Belege stehen in den Treiberquellen** (Wächter `GideLayoutAbbildung.*`, `GidePlatteGolden.*`, `GideAustausch.*`):
+   - **Poppe** (`GIDEHP.ASM`: `rwoper`, `tfsetup`, `DPBHD0`/`DPBHD`): **kein 91h**, also die Vorgabegeometrie 16 Köpfe × 63 Sektoren; Kopf = Laufwerk (SDH = A0H+n, 0…7),
+     Zylinder = CP/M-Spur (CL/CH), Sektor = Hostsektor+1 (1…32); **LBA = (Spur·16 + Laufwerk)·63 + Hostsektor**; 4 Sätze à 128 B je 512-B-Hostsektor (Hostsektor = Satz>>2).
+     DPB SPT 128, BSH 6 (8-KB-Blöcke), BLM 63, EXM 3, **DSM 3E7H** (3E3H am ersten Laufwerk wegen **OFF = 2** Systemspuren), DRM 3FFH (1024 Einträge = nur 4 Blöcke),
+     **AL0/AL1 = FFH/00H → 8 Blöcke reserviert** (`FsProfile::reserved_blocks = 8`: die 4 Blöcke hinter dem Verzeichnis vergibt das Gerät nie, das Werkzeug also auch nicht).
+     Das **erste** Laufwerk der Treibertabelle (`hdtab`, `A0H`) ist `lw0` und hat die zwei Systemspuren; die Buchstaben (`D:`…`K:`) vergibt der Treiber im Gast aus den freien
+     Plätzen und gehören nicht zur Platte.
+   - **Kingstener** (`gidn5004.mac`: `HDInit`, `HdPrep`, `RdIDE`, `WrIDE`, `rafdpb`, `format`): **sendet 91h** (SC = 40h, SDH = A3H → 4 Köpfe × 64 Sektoren); Kopf = Spur und 3,
+     Zylinder = Spur/4, Sektor = Satz+1 (`p_rsectran`); **LBA = Spur·64 + Satz** (= die lineare Satznummer). **Nur 128 der 512 Byte eines Hostsektors tragen Nutzdaten:**
+     `RdIDE` liest 4 × `inir` mit `HL = (dbdma)` **in denselben 128-B-Puffer** — das LETZTE Viertel (Byte 384…511) bleibt stehen; `WrIDE` schreibt 4 × `otir` **aus demselben Puffer**,
+     also denselben Satz **vierfach**. Das Werkzeug liest Byte 384…511 und schreibt alle vier Viertel. DPB SPT 64, BSH 5 (4-KB-Blöcke), BLM 1FH, EXM 1, **DSM 7FDH** (→ `max_blocks = 2046`),
+     DRM 3FFH, AL0 FFH (= genau das Verzeichnis), OFF 0; `GIDN /F` (Quickformat) schreibt 256 Sätze `E5 + 31×00`.
+   - Mindestgröße: Poppe 504 000 Sektoren (258 MB, 8 Laufwerke bis Spur 499), Kingstener 65 472 Sektoren (`create` legt 65 536 an).
+   - **Der im CP/A-BIOS eingebaute Treiber** (Klaus) formatiert laut Anwender wie Poppe; **nicht an einer Quelle geprüft** (Quelle liegt nicht vor) — die Annahme ist nicht belegt.
+2. **Erkennung nur lesend, nie geraten** (`GidePlatte::erkennen`): ein Poppe-Laufwerk gilt als *formatiert*, wenn sein Verzeichnis (1024 Einträge ab Spur 0 bzw. 2) AUSSCHLIESSLICH plausible Einträge
+   trägt (`verzeichnisPlausibel`: Nutzer 0…15 oder E5, Namenszeichen 7-bit druckbar, EX ≤ 31, S1 = 0, RC ≤ 80H, Blockzeiger < DSM); Kingstener: die ersten 256 Sätze plausibel UND in jedem
+   Hostsektor die vier Viertel gleich. Genau eines passt → sicher; beide oder keines → `auto` scheitert mit Begründung (Exit 2), ausdrücklich gewähltes Layout öffnet mit Warnung
+   (`GideErkennung::mehrdeutig/sicher/text`). Nullen sind nie ein Verzeichnis. (Wächter `GideErkennung.*`)
+3. **Schreiben nur mit sicher erkanntem oder ausdrücklich gewähltem Layout UND an ein Laufwerk mit plausiblem Verzeichnis** (`schreibErlaubt`). **Formatieren** (`formatLaufwerk`; ERADIR/quickformat = Verzeichnis
+   0xE5) verweigert, wo etwas anderes steht (Dateien, fremde Daten, **oder wenn die Platte nach dem ANDEREN Layout formatiert ist** — auch wenn der Bereich gerade Nullen trägt: Poppe-`lw0` hat dort
+   Systemspuren), außer mit `erzwingen`; die **CLI verlangt dafür `--gide-layout`**. Systemspuren werden nie beschrieben. (Wächter `GideErkennung.Poppe_Platte_Als_Kingstener_…`, `…FormatierenVerweigert…`,
+   `test_format_verweigert_ueber_daten_ohne_force`)
+4. **Sperre `<abbild>.lock`** wie an der Karte (Prozessnummer, verwaiste Sperre wird übernommen): schreibbares Öffnen legt sie an, eine fremde, lebende Sperre (laufender Emulator) macht das Abbild
+   **nur lesbar** („Abbild gesperrt"), auch `setReadOnly(false)` scheitert; die Sperre verschwindet mit dem Schließen. (Wächter `GidePlatteSperre.*`, `test_fremde_sperre_verbietet_schreiben`)
+5. **Zurückschreiben:** `.img.gz` ganz und atomar (`gzip::speichern`, vorher einmalig `<abbild>~` — für rohe `.img` standardmäßig keine Sicherung, 258 MB); rohe `.img` nur die geänderten Sektoren an Ort und Stelle
+   (sparse bleibt sparse). `close` schreibt nie von selbst. Anlegen (`anlegen`): `.gz` als Strom (`nullenSpeichern`, ≈ 250 KB), roh sparse; eine vorhandene Datei wird nie überschrieben.
+6. **Pfade `lw0/NAME.EXT`** (Nutzerbereich `lw0/3:NAME.EXT`, beim Holen `lw0/u3/NAME.EXT`); Kingstener darf das Präfix weglassen. Keine Ordner, keine Attribute-Änderung, keine Reparatur (nur Prüfung; die Befunde
+   `gide.layout.mehrdeutig`, `gide.kingstener.viertel` und die der CP/M-Prüfung tragen `lwN/` im Objekt) — **die Kennungen sind ein Vertrag** (Wächter `GideErkennung.MehrdeutigSchreibt…`, `GidePlatteRundlauf.KingstenerErkennt…`).
+7. **Golden-Fixture** `tests/fixtures/gide/poppe_cpa.img.gz` (≈ 250 KB, vom Poppe-Treiber im Emulator geschrieben; Neuerzeugung `K1520_GIDE_GOLDEN_OUT`, siehe `tests/fixtures/README.md`) hält die Poppe-Richtung
+   Gast → DiskTool auch ohne Fremdsoftware fest (`GidePlatteGolden.*`, `py_disktool_gide*`). Der Austausch in beide Richtungen mit den echten Treibern (A5120/CP/A Poppe, K8915/SCPX Kingstener) ist
+   `GideAustausch.*` (überspringt sich ohne die lokale Software).
+8. **Offen:** Reparatur, Dateiattribute (R/O/SYS/ARC) und Nutzerbereichswechsel in der Oberfläche, Platte kleiner als 504 000 Sektoren im Poppe-Layout (ein abgeschnittenes Abbild öffnet nicht), Treiber mit anderen
+   Köpfen/Sektoren (Rehs `GIDEIDE`-Beispiel mit eigenen Parametern), Hostsektoren des Kingstener-Layouts mit ungleichen Vierteln (nur Warnung, gelesen wird das letzte Viertel).

@@ -639,7 +639,7 @@ P8000-Uhr; gesteckt über `K1520Machine::installGide` **nach dem Anlegen, vor de
 `K1520Emulator(gide=…)`, `--gide` in `boot_trace`/`k1520dbg`, Befehl `gide`).  Festgelegt: Ports **Basis+4…+F**, 16-Bit-Datenregister über das
 **LH-Wechsel-Flipflop** (Task-File-Zugriff setzt es zurück), RTC über A8–A11, `schreiben_unter_hold` nur an der GIDE, Batteriekopf
 `K1520-GIDE-RTC`.  **Basis im Kern frei** (Jumperstellung der echten Karten unbekannt; übliche Basis D0H kollidiert mit K5020/EPROMmer),
-Maschinenvorgabe offen.  Fremdtreiber (Poppe/Kingstener) liegen **nur lokal**, `GideSystem.*` überspringt sich ohne sie.  **Nicht gemacht:**
+Maschinenvorgabe offen.  **DiskTool (2026-11-11):** `GidePlatte` (`core/filesystem/gide/`, C-ABI `k1520d_gide_*`, `k1520disktool --gide-layout`, Oberfläche) liest/schreibt die Plattenabbilder von Poppe (bis 8 Laufwerke, LBA `(Spur*16+Lw)*63+Hostsektor`) und Kingstener (1 Laufwerk, nur das LETZTE Viertel des Hostsektors zählt) als CP/M-Laufwerke — Layout aus den Verzeichnissen erkannt, **nie geraten**, Schreiben nur mit sicherem/gewähltem Layout und ohne fremde `.lock`; vor Arbeiten daran `doc/merkposten/disktool.md` (GIDE-Platten) lesen.  Fremdtreiber (Poppe/Kingstener) liegen **nur lokal**, `GideSystem.*` überspringt sich ohne sie.  **Nicht gemacht:**
 Oberfläche (G6), Netz, Save-State.
 **USB (U1/U2, Zweig `gide`):** `GunUsb` (Z80-PIO + VDIP1/VDAP 3.68, `core/cards/gun_usb/`, Firmware-Modell `core/peripherals/vdip/`), vier Tore ab Basis
 (**frei**, Vielfaches von 4; GUN 84H, Variante DCh; am K8915 Gen 2 und PRG 710/-1 ist 84H belegt), gesteckt über `installGunUsb` vor dem ersten `run()`

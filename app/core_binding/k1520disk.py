@@ -744,6 +744,88 @@ _lib.k1520d_platte_extract.restype = ctypes.c_bool
 _lib.k1520d_platte_insert.argtypes = [_H, _CS, _CS, ctypes.c_bool]
 _lib.k1520d_platte_insert.restype = ctypes.c_bool
 
+# ── GIDE-Platte (Poppe/Kingstener) ───────────────────────────────────────────
+_lib.k1520d_gide_kandidat.argtypes = [_CS]
+_lib.k1520d_gide_kandidat.restype = ctypes.c_bool
+_lib.k1520d_gide_create.argtypes = [_CS, ctypes.c_int, _U64]
+_lib.k1520d_gide_create.restype = ctypes.c_bool
+_lib.k1520d_gide_open.argtypes = [_CS, ctypes.c_bool, ctypes.c_int]
+_lib.k1520d_gide_open.restype = _H
+_lib.k1520d_gide_close.argtypes = [_H]
+_lib.k1520d_gide_close.restype = None
+_lib.k1520d_gide_last_error.argtypes = [_H]
+_lib.k1520d_gide_last_error.restype = _CS
+_lib.k1520d_gide_path.argtypes = [_H]
+_lib.k1520d_gide_path.restype = _CS
+_lib.k1520d_gide_layout.argtypes = [_H]
+_lib.k1520d_gide_layout.restype = ctypes.c_int
+_lib.k1520d_gide_ausdruecklich.argtypes = [_H]
+_lib.k1520d_gide_ausdruecklich.restype = ctypes.c_bool
+_lib.k1520d_gide_sicher.argtypes = [_H]
+_lib.k1520d_gide_sicher.restype = ctypes.c_bool
+_lib.k1520d_gide_mehrdeutig.argtypes = [_H]
+_lib.k1520d_gide_mehrdeutig.restype = ctypes.c_bool
+_lib.k1520d_gide_erkennung_text.argtypes = [_H]
+_lib.k1520d_gide_erkennung_text.restype = _CS
+_lib.k1520d_gide_fremd_gesperrt.argtypes = [_H]
+_lib.k1520d_gide_fremd_gesperrt.restype = ctypes.c_bool
+_lib.k1520d_gide_read_only.argtypes = [_H]
+_lib.k1520d_gide_read_only.restype = ctypes.c_bool
+_lib.k1520d_gide_set_read_only.argtypes = [_H, ctypes.c_bool]
+_lib.k1520d_gide_set_read_only.restype = ctypes.c_bool
+_lib.k1520d_gide_set_backup.argtypes = [_H, ctypes.c_bool]
+_lib.k1520d_gide_set_backup.restype = None
+_lib.k1520d_gide_dirty.argtypes = [_H]
+_lib.k1520d_gide_dirty.restype = ctypes.c_bool
+_lib.k1520d_gide_flush.argtypes = [_H]
+_lib.k1520d_gide_flush.restype = ctypes.c_bool
+_lib.k1520d_gide_laufwerk_count.argtypes = [_H]
+_lib.k1520d_gide_laufwerk_count.restype = ctypes.c_int
+_lib.k1520d_gide_laufwerk_name.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_gide_laufwerk_name.restype = _CS
+_lib.k1520d_gide_laufwerk_formatiert.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_gide_laufwerk_formatiert.restype = ctypes.c_bool
+_lib.k1520d_gide_laufwerk_total.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_gide_laufwerk_total.restype = _U64
+_lib.k1520d_gide_laufwerk_free.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_gide_laufwerk_free.restype = _U64
+_lib.k1520d_gide_laufwerk_used.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_gide_laufwerk_used.restype = _U64
+_lib.k1520d_gide_laufwerk_files.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_gide_laufwerk_files.restype = ctypes.c_int
+_lib.k1520d_gide_format.argtypes = [_H, ctypes.c_int, ctypes.c_bool]
+_lib.k1520d_gide_format.restype = ctypes.c_bool
+_lib.k1520d_gide_list.argtypes = [_H]
+_lib.k1520d_gide_list.restype = ctypes.c_int
+_lib.k1520d_gide_entry_volume.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_gide_entry_volume.restype = ctypes.c_int
+_lib.k1520d_gide_entry_name.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_gide_entry_name.restype = _CS
+_lib.k1520d_gide_entry_size.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_gide_entry_size.restype = _U64
+_lib.k1520d_gide_entry_user.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_gide_entry_user.restype = ctypes.c_int
+_lib.k1520d_gide_entry_attrs.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_gide_entry_attrs.restype = _CS
+_lib.k1520d_gide_entry_damaged.argtypes = [_H, ctypes.c_int]
+_lib.k1520d_gide_entry_damaged.restype = ctypes.c_bool
+_lib.k1520d_gide_read_size.argtypes = [_H, _CS]
+_lib.k1520d_gide_read_size.restype = _I64
+_lib.k1520d_gide_read_data.argtypes = [_H, _U8P, _U64]
+_lib.k1520d_gide_read_data.restype = _I64
+_lib.k1520d_gide_write.argtypes = [_H, _CS, _U8P, _U64, ctypes.c_bool]
+_lib.k1520d_gide_write.restype = ctypes.c_bool
+_lib.k1520d_gide_erase.argtypes = [_H, _CS]
+_lib.k1520d_gide_erase.restype = ctypes.c_bool
+_lib.k1520d_gide_extract.argtypes = [_H, _CS, _CS, ctypes.c_bool]
+_lib.k1520d_gide_extract.restype = ctypes.c_bool
+_lib.k1520d_gide_insert.argtypes = [_H, _CS, _CS, ctypes.c_bool]
+_lib.k1520d_gide_insert.restype = ctypes.c_bool
+_lib.k1520d_gide_check.argtypes = [_H, ctypes.c_bool]
+_lib.k1520d_gide_check.restype = ctypes.c_int
+_lib.k1520d_gide_check_text.argtypes = [_H]
+_lib.k1520d_gide_check_text.restype = _CS
+
 
 def _s(raw) -> str:
     """C-Zeichenkette → str (leer bei NULL)."""
@@ -2819,3 +2901,273 @@ class PlatteTool:
 
     def set_read_only(self, ro: bool) -> None:
         _lib.k1520d_platte_set_read_only(self._h, ro)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# GIDE-Platte (Poppe / Kingstener) - CP/M-Laufwerke auf einem IDE-Abbild
+# ════════════════════════════════════════════════════════════════════════════
+
+#: Layouts der Gast-Treiber (Vertrag mit der C-ABI: 0 auto, 1 poppe, 2 kingstener).
+GIDE_AUTO, GIDE_POPPE, GIDE_KINGSTENER = 0, 1, 2
+GIDE_LAYOUTS = {"auto": GIDE_AUTO, "poppe": GIDE_POPPE, "kingstener": GIDE_KINGSTENER}
+GIDE_LAYOUT_NAME = {GIDE_POPPE: "poppe", GIDE_KINGSTENER: "kingstener"}
+
+
+def gide_layout_nummer(name) -> int:
+    """``"poppe"``/``"kingstener"``/``"auto"`` (oder schon die Zahl) → Layoutnummer."""
+    if isinstance(name, int):
+        return name
+    try:
+        return GIDE_LAYOUTS[str(name or "auto").strip().lower()]
+    except KeyError:
+        raise K1520DiskError(f"Unbekanntes GIDE-Layout '{name}' (auto|poppe|kingstener)") from None
+
+
+def ist_gide_kandidat(path) -> bool:
+    """Kann die Datei nach Groesse (>= 65472 Sektoren) und Endung eine GIDE-Platte sein?  Billig."""
+    return bool(_lib.k1520d_gide_kandidat(_b(os.fspath(path))))
+
+
+def gide_anlegen(path, layout, sektoren: int = 0) -> None:
+    """Leeres (unformatiertes) Abbild im Layout anlegen; ``.gz`` gepackt.  Ueberschreibt nie."""
+    if not _lib.k1520d_gide_create(_b(os.fspath(path)), gide_layout_nummer(layout), int(sektoren)):
+        raise K1520DiskError(_s(_lib.k1520d_last_open_error()))
+
+
+class GideTool:
+    """Eine geoeffnete GIDE-Platte - dieselbe Oberflaeche wie :class:`PlatteTool`, soweit die GUI sie braucht
+    (Duck-Typing).  Die Laufwerke erscheinen als oberste Ordner (``lw0/NAME.EXT``).
+
+    Schreibschutz ist die Vorgabe.  ``close()`` schreibt **nicht** von selbst - vorher :meth:`flush`.
+    """
+
+    ist_unix = False
+
+    def __init__(self, handle: int, path: str):
+        self._h = handle
+        self._path = path
+
+    @classmethod
+    def open(cls, path, read_only: bool = True, layout="auto") -> "GideTool":
+        """Platte oeffnen (``.img`` oder ``.img.gz``).
+
+        Raises:
+            K1520DiskError: kein erkennbares Layout (bei ``auto`` mit Begruendung), gesperrt, unlesbar.
+        """
+        p = os.fspath(path)
+        h = _lib.k1520d_gide_open(_b(p), read_only, gide_layout_nummer(layout))
+        if not h:
+            raise K1520DiskError(_s(_lib.k1520d_last_open_error()))
+        return cls(h, p)
+
+    @staticmethod
+    def ist_kandidat(path) -> bool:
+        return ist_gide_kandidat(path)
+
+    def __enter__(self) -> "GideTool":
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self.close()
+
+    def close(self) -> None:
+        if getattr(self, "_h", None):
+            _lib.k1520d_gide_close(self._h)
+            self._h = None
+
+    def __del__(self):
+        self.close()
+
+    def _fail(self) -> str:
+        return _s(_lib.k1520d_gide_last_error(self._h)) or "unbekannter Fehler"
+
+    # ── Auskunft ─────────────────────────────────────────────────────────────
+
+    @property
+    def path(self) -> str:
+        return self._path
+
+    @property
+    def layout(self) -> str:
+        return GIDE_LAYOUT_NAME.get(int(_lib.k1520d_gide_layout(self._h)), "auto")
+
+    @property
+    def layout_ausdruecklich(self) -> bool:
+        return bool(_lib.k1520d_gide_ausdruecklich(self._h))
+
+    @property
+    def layout_sicher(self) -> bool:
+        return bool(_lib.k1520d_gide_sicher(self._h))
+
+    @property
+    def layout_mehrdeutig(self) -> bool:
+        return bool(_lib.k1520d_gide_mehrdeutig(self._h))
+
+    @property
+    def erkennung_text(self) -> str:
+        return _s(_lib.k1520d_gide_erkennung_text(self._h))
+
+    @property
+    def fremd_gesperrt(self) -> bool:
+        """Ein laufender Emulator (oder anderes Werkzeug) hat das Abbild gesperrt - nur lesbar."""
+        return bool(_lib.k1520d_gide_fremd_gesperrt(self._h))
+
+    @property
+    def filesystem(self) -> str:
+        return "gide_" + self.layout
+
+    @property
+    def filesystem_type(self) -> str:
+        return "cpm"
+
+    @property
+    def format(self) -> str:
+        return self.filesystem
+
+    @property
+    def has_filesystem(self) -> bool:
+        return True
+
+    ist_gide = True
+    ist_wega = False
+    ist_tar = False
+    ist_udos = False
+    ist_sios = False
+    ist_cpm = True
+    ist_cqm = False
+    ist_td0 = False
+    ist_imd = False
+    read_only_forced = False
+    #: Kennung fuer die Oberflaeche: wie eine Platte behandeln (``ist_platte`` in schreibsperre.py).
+    ist_plattenabbild = True
+
+    unambiguous = True
+    alternatives: List[str] = []
+    remarks = ""
+    tar_satz = False
+    tar_satz_einzel = False
+    tar_satz_basis = ""
+    physisch_schreiben_grund = ""
+    medium_cylinders = 0
+    medium_heads = 0
+    examined_tracks = 0
+
+    def container_info(self) -> dict:
+        return {}
+
+    def unix_blocks(self, name: str) -> str:
+        return ""
+
+    @property
+    def volume_count(self) -> int:
+        """Zahl der Laufwerke, die in das Abbild passen (auch unformatierte)."""
+        return int(_lib.k1520d_gide_laufwerk_count(self._h))
+
+    def volume_dir(self, v: int) -> str:
+        return _s(_lib.k1520d_gide_laufwerk_name(self._h, v))
+
+    def laufwerk_formatiert(self, v: int) -> bool:
+        return bool(_lib.k1520d_gide_laufwerk_formatiert(self._h, v))
+
+    def volumes(self) -> List[VolumeInfo]:
+        """Die FORMATIERTEN Laufwerke (``dir`` = ``lw0``)."""
+        h = self._h
+        return [
+            VolumeInfo(index=v, dir=self.volume_dir(v), label="",
+                       total=int(_lib.k1520d_gide_laufwerk_total(h, v)),
+                       used=int(_lib.k1520d_gide_laufwerk_used(h, v)),
+                       free=int(_lib.k1520d_gide_laufwerk_free(h, v)))
+            for v in range(self.volume_count) if self.laufwerk_formatiert(v)
+        ]
+
+    def volume_role(self, v: int) -> str:
+        return ""
+
+    def format_laufwerk(self, v: int, erzwingen: bool = False) -> None:
+        """Verzeichnis eines Laufwerks leeren (nur bei ausdruecklichem Layout; vorhandene Daten nur mit ``erzwingen``)."""
+        if not _lib.k1520d_gide_format(self._h, v, erzwingen):
+            raise K1520DiskError(self._fail())
+
+    # ── Verzeichnis ──────────────────────────────────────────────────────────
+
+    def list(self) -> List[Entry]:
+        """Die Laufwerke (Typ ``d``, ``lw0``) und alle Dateien der formatierten Laufwerke - immer frisch gelesen;
+        ``name`` = ``lw0/NAME.EXT``."""
+        h = self._h
+        aus = [Entry(volume=v.index, name=v.dir, size=0, type="d") for v in self.volumes()]   # Laufwerkszeilen (Baum)
+        for i in range(_lib.k1520d_gide_list(h)):
+            aus.append(Entry(
+                volume=int(_lib.k1520d_gide_entry_volume(h, i)),
+                name=_s(_lib.k1520d_gide_entry_name(h, i)),
+                size=int(_lib.k1520d_gide_entry_size(h, i)),
+                attrs=_s(_lib.k1520d_gide_entry_attrs(h, i)),
+                user=int(_lib.k1520d_gide_entry_user(h, i)),
+                damaged=bool(_lib.k1520d_gide_entry_damaged(h, i)),
+            ))
+        return aus
+
+    # ── Lesen / Schreiben ────────────────────────────────────────────────────
+
+    def read(self, name: str) -> bytes:
+        n = int(_lib.k1520d_gide_read_size(self._h, _b(name)))
+        if n < 0:
+            raise K1520DiskError(self._fail())
+        buf = (ctypes.c_uint8 * max(n, 1))()
+        if _lib.k1520d_gide_read_data(self._h, buf, n) != n:
+            raise K1520DiskError(self._fail())
+        return bytes(buf[:n])
+
+    def write(self, name: str, data: bytes, *, overwrite: bool = False, **_ignored) -> None:
+        data = bytes(data)
+        buf = (ctypes.c_uint8 * max(len(data), 1)).from_buffer_copy(data or b"\0")
+        if not _lib.k1520d_gide_write(self._h, _b(name), buf, len(data), overwrite):
+            raise K1520DiskError(self._fail())
+
+    def erase(self, name: str) -> None:
+        if not _lib.k1520d_gide_erase(self._h, _b(name)):
+            raise K1520DiskError(self._fail())
+
+    def mkdir(self, name: str) -> None:
+        raise K1520DiskError("CP/M kennt keine Ordner")
+
+    def set_unix_attrs(self, *a, **k) -> None:
+        raise K1520DiskError("CP/M kennt keine UNIX-Attribute")
+
+    # ── Uebertragung ──────────────────────────────────────────────────────────
+
+    def extract(self, name: str, dest_dir, overwrite: bool = False) -> None:
+        """Datei (``lw0/NAME.EXT``), ein Laufwerk (``lw0``) oder alles (``""``) nach ``dest_dir/lwN/…`` holen."""
+        if not _lib.k1520d_gide_extract(self._h, _b(name or ""), _b(os.fspath(dest_dir)), overwrite):
+            raise K1520DiskError(self._fail())
+
+    def insert(self, src, name: str, overwrite: bool = False) -> None:
+        """Linux-Datei als ``name`` (``lw0/NAME.EXT``) einfuegen."""
+        if not _lib.k1520d_gide_insert(self._h, _b(os.fspath(src)), _b(name), overwrite):
+            raise K1520DiskError(self._fail())
+
+    def check(self, voll: bool = False) -> tuple:
+        """Pruefung: (hoechste Schwere oder -1 = ohne Befund, Bericht als Text)."""
+        sev = int(_lib.k1520d_gide_check(self._h, voll))
+        return sev, _s(_lib.k1520d_gide_check_text(self._h))
+
+    # ── Dateibindung ─────────────────────────────────────────────────────────
+
+    @property
+    def dirty(self) -> bool:
+        return bool(_lib.k1520d_gide_dirty(self._h))
+
+    def set_backup(self, on: bool) -> None:
+        _lib.k1520d_gide_set_backup(self._h, on)
+
+    def flush(self) -> None:
+        if not _lib.k1520d_gide_flush(self._h):
+            raise K1520DiskError(self._fail())
+
+    @property
+    def read_only(self) -> bool:
+        return bool(_lib.k1520d_gide_read_only(self._h))
+
+    def set_read_only(self, ro: bool) -> None:
+        """Schreibschutz aendern; Aufheben scheitert bei gesperrtem Abbild (``K1520DiskError``)."""
+        if not _lib.k1520d_gide_set_read_only(self._h, ro):
+            raise K1520DiskError(self._fail())

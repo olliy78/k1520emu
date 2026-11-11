@@ -489,3 +489,9 @@ k1520_add_test(gun_net_maschinen SRC test_gun_net_maschinen.cpp
 k1520_add_test(gun_net_system SRC test_gun_net_system.cpp
                               LIBS k1520_a5120 k1520_gun_net k1520_floppy k1520_fs k1520_logger k1520_testsupport
                               LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 180)
+
+# GIDE-Platten im DiskTool (GidePlatte): AUSTAUSCH mit dem Emulator-Gast - Poppe (A5120/CP/A) und Kingstener (K8915/SCPX),
+# Gast schreibt -> DiskTool liest bitgleich und umgekehrt.  Echte Treiber nur lokal (K1520_GIDE_SW), sonst uebersprungen.
+k1520_add_test(gide_austausch SRC test_gide_austausch.cpp
+                              LIBS k1520_a5120 k1520_k8915 k1520_gide k1520_floppy k1520_fs k1520_logger k1520_testsupport
+                              LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 240)

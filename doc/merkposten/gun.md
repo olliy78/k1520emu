@@ -46,7 +46,7 @@ aber auch kein Beleg; auf dem Entwicklungsrechner muss er einmal grün gelaufen 
   bis `DIR D:`/`DIR A:` gelaufen sind (Treiber-/BDOS-Verhalten, Diskette unversehrt).
 - **Kingstener `gidn`** (SCPX, K8915, Laufwerk N:): sendet **91h** (SC=40h, SDH=A0H|3 → 4 Köpfe × 64 Sektoren), braucht **≥ 256 Zylinder**.
 - **Plattenformate sind untereinander unverträglich** (Poppe ≠ DL/Kingstener ≠ im CP/A-BIOS eingebaut): falscher Treiber = Datenverlust.
-  Der Emulator ist davon nicht betroffen (nur Plattenabbild); ein späteres DiskTool-Dateisystem müsste die Variante kennen.
+  Der Emulator ist davon nicht betroffen (nur Plattenabbild); das DiskTool (`GidePlatte`) erkennt die Variante aus den Verzeichnissen und schreibt nie ohne sicheres/gewähltes Layout.
 - Vorgabegröße für „Neue Platte“ in der Oberfläche (G6): **256 MB sparse**; kleinere Abbilder gehen nur mit dem Kingstener-Treiber.
 - SCP 3.0 (PC 1715W) wird von den bekannten Treibern nicht unterstützt.
 
@@ -66,7 +66,7 @@ doppelt, Tor belegt, Z80-Gastcode Sektor + RTC), `GideSystem.*` (`test_gide_syst
   In Planung (N1 laeuft), das KC-Net-Protokoll fehlt noch; keine Zusagen.  USB siehe unten (U1/U2 fertig, GUI U3 zurueckgestellt).
 - **G5b Gasttreiber `GIDEDRV.COM`** — entfällt: die vorhandenen Poppe-/Kingstener-Treiber genügen (Anwenderantwort F3).
   Auch kein eigenes Prüfprogramm `GIDETST.COM` (G5a ist durch die echten Treiber, G5c, überholt).
-- **Save-State**, **P8000** (kein K1520-Bus), **DiskTool-Dateisystem für IDE-Abbilder**.
+- **Save-State**, **P8000** (kein K1520-Bus).  (Das DiskTool-Dateisystem für IDE-Abbilder gibt es seit 2026-11-11: `doc/merkposten/disktool.md`, Abschnitt „GIDE-Platten".)
 - **PRG 710 und PC 1715 am Gastsystem:** dort nur Z80-Prüfcode (`GideMaschine.*_Z80…`), kein passendes Treiber-/Boot-Paar
   geprüft; MC80 nicht geprüft.
 

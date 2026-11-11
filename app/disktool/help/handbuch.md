@@ -11,7 +11,7 @@ Dazu kommen die UNIX-Disketten des P8000: **WEGA** (mit Modus, Besitzer und Zeit
 Datei), **tar-Disketten** ohne Dateisystem und **Plattenabbilder** (`.img.gz`) mit ihren
 Partitionen — alle ohne UDOS-Angaben. Alles
 Wesentliche zu den neueren Funktionen steht in den Abschnitten *tar-Disketten*,
-*P8000-Platten (WEGA)*,
+*P8000-Platten (WEGA)*, *GIDE-Platten (Poppe / Kingstener)*,
 *CopyQM-Abbilder*, *Containerformate im Vergleich*, *Was eine Datei außer ihren Bytes hat* und *Archivieren*
 (einschließlich *Archive auf der Kommandozeile*).
 
@@ -515,6 +515,49 @@ Formatdialog**: Format und Dateisystem (WEGA) stehen fest.
   Spuren, Seiten oder Systemspuren), Greaseweazle, Diskettenangaben, Dateisystemprüfung,
   Wiederherstellen, Archivieren, *Speichern unter* (für eine Arbeitskopie die Datei im
   Dateimanager kopieren) und *Alles einfügen* (dafür Ziehen oder *Auf die Platte schreiben*).
+
+## GIDE-Platten (Poppe / Kingstener)
+
+Das **Plattenabbild der GIDE-Karte** (IDE-Platte am K1520-Bus, im Emulator als `.img.gz`) öffnet man wie
+eine Diskette: *Datei ▸ Abbild öffnen…* oder die Datei auf die linke Hälfte ziehen. Es erscheint **kein
+Formatdialog**; die Platte trägt **CP/M-Laufwerke**, und *wie* sie aufgeteilt sind, bestimmt der
+**Gast-Treiber**, nicht die Platte. Zwei Treiber sind bekannt, und ihre Layouts sind **unverträglich** —
+ein falscher Treiber vernichtet Daten:
+
+| Layout | Treiber | Laufwerke |
+|---|---|---|
+| `poppe` | `GIDEHP…` von H. Poppe, auch der im CP/A-BIOS eingebaute | bis 8 Laufwerke (`lw0` … `lw7`) je 8 MB; `lw0` mit 2 Systemspuren |
+| `kingstener` | `gidn` (Kingstener/DL) | 1 Laufwerk (`lw0`), 8 MB |
+
+* **Erkennung.** Das Layout steht nirgends auf der Platte; das Werkzeug erkennt es **nur lesend** aus den
+  Verzeichnissen. Passt genau eines, ist es sicher (Kopfzeile: *Layout: poppe (erkannt)*). Passen beide oder
+  keines (unformatierte Platte), wird **nichts geraten**: das Fenster fragt nach dem Layout, und das Abbild
+  bleibt schreibgeschützt, bis Sie den Schutz aufheben. Bei mehrdeutigem Befund steht eine Warnung im Streifen.
+* **Ansicht.** Die Laufwerke `lw0` … stehen als oberste Ordner (mit freiem Platz), darunter ihre Dateien;
+  Spalten: Name, Nutzerbereich, Größe, Attribute (R/O, SYS, ARC). Die Zuordnung zu Laufwerksbuchstaben
+  (`D:` …) vergibt der Treiber im Gast; hier zählen die Laufwerke von 0.
+* **Holen** legt die Dateien nach `lwN/NAME.EXT` im Ordner; **Hinzufügen** (*Auf die Platte schreiben*, `Strg+←`,
+  oder Ziehen) legt in das angeklickte Laufwerk. Dateinamen müssen CP/M-Namen sein (8.3, Großschrift). *Löschen*
+  entfernt Dateien, nie ein Laufwerk. Es gibt keine Ordner (CP/M); *Eigenschaften* sind für GIDE-Platten gesperrt.
+* **Neue GIDE-Platte…** (*Datei*) legt ein leeres `.img.gz` im gewählten Layout an und formatiert alle Laufwerke
+  (Poppe: 258 MB, Kingstener: 34 MB — gepackt wenige hundert KB). *GIDE-Laufwerk formatieren…* (*Bearbeiten*,
+  nur an einer GIDE-Platte und beschreibbar) leert das Verzeichnis eines Laufwerks wie `ERADIR` bzw. `GIDN /F`;
+  liegen dort Dateien oder fremde Daten, wird nachgefragt. *GIDE-Platte prüfen…* zeigt Layout und Befunde
+  (nur lesend).
+* **Schreibschutz und Sperre.** Wie bei jedem Datenträger ist er beim Öffnen gesetzt (*Diskette ▸ Schreibschutz*,
+  `Strg+R`). Hat ein laufender Emulator das Abbild geladen (Sperrdatei `<abbild>.lock`), ist es **nur lesbar** —
+  der Schutz lässt sich nicht aufheben, bis der Emulator es freigegeben hat. Geschrieben wird erst beim
+  Speichern (`Strg+S`), bei `.img.gz` ganz und atomar; vor dem ersten Zurückschreiben entsteht einmalig eine
+  Sicherung `<abbild>~`.
+* **Austausch mit dem Gast.** Was der Gast mit dem echten Treiber (PIP, ERADIR, GIDN) auf die Platte schreibt,
+  liest das Werkzeug bitgleich — und umgekehrt (Wächter `GideAustausch.*`, nur mit dem lokal liegenden
+  Fremdtreiber). Beim Kingstener-Layout schreibt der Treiber jeden 128-Byte-Satz **vierfach** in den
+  512-Byte-Hostsektor und liest das **letzte Viertel**; das Werkzeug tut dasselbe.
+* **Gesperrt** sind Diskeditor, Bootabbild, Dateisystemwahl, Spurschnitte, Diskettenangaben, Reparieren,
+  Wiederherstellen, Archivieren, *Speichern unter* und *Alles einfügen* — mit Begründung im Tooltip.
+
+Auf der Kommandozeile: `k1520disktool ls|info|check|fsck|get|put|rm|format|create` mit
+`--gide-layout auto|poppe|kingstener` und `--laufwerk N` (siehe `tools/k1520disktool.md`).
 
 ## CopyQM-Abbilder
 
