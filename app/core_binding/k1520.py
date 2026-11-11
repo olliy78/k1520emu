@@ -612,6 +612,9 @@ _lib.k1520_aup_tastenname.restype = ctypes.c_char_p
 # GIDE (doc/design/50_gun_gide.md, AP G4)
 _lib.k1520_gide_install.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_bool, ctypes.c_char_p, ctypes.c_char_p]
 _lib.k1520_gide_install.restype = ctypes.c_bool
+_lib.k1520_gide_install_ex.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_bool, ctypes.c_char_p, ctypes.c_char_p,
+                                       ctypes.c_int]
+_lib.k1520_gide_install_ex.restype = ctypes.c_bool
 _lib.k1520_gide_installed.argtypes = [K1520Handle]
 _lib.k1520_gide_installed.restype = ctypes.c_bool
 _lib.k1520_gide_error.argtypes = [K1520Handle]
@@ -630,6 +633,12 @@ _lib.k1520_gide_status.argtypes = [K1520Handle, ctypes.POINTER(ctypes.c_int), ct
 _lib.k1520_gide_status.restype = ctypes.c_bool
 _lib.k1520_gide_rtc_zeit.argtypes = [K1520Handle, ctypes.POINTER(ctypes.c_int64)]
 _lib.k1520_gide_rtc_zeit.restype = ctypes.c_bool
+_lib.k1520_gide_rtc_stellen.argtypes = [K1520Handle, ctypes.c_int64]
+_lib.k1520_gide_rtc_stellen.restype = ctypes.c_bool
+_lib.k1520_gide_rtc_netz_aus.argtypes = [K1520Handle]
+_lib.k1520_gide_rtc_netz_aus.restype = ctypes.c_bool
+_lib.k1520_gide_rtc_startzeit.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_int]
+_lib.k1520_gide_rtc_startzeit.restype = ctypes.c_int64
 _lib.k1520_io_owner.argtypes = [K1520Handle, ctypes.c_int]
 _lib.k1520_io_owner.restype = ctypes.c_char_p
 # GUN-USB (doc/design/50_gun_gide.md, AP U2)
@@ -1297,7 +1306,8 @@ class K1520Emulator:
                 gesteckt (vor dem ersten Lauf); Fehler → ValueError.
             gide: IDE-Karte GIDE stecken (an jeder Maschine ausser P8000) — ``None``/``False`` = ohne,
                 ``True`` = Vorgaben (Basis 0x90, RTC bestückt), sonst ein dict mit den Schlüsseln
-                ``basis``, ``rtc`` (bool), ``abbild`` (Plattenabbild), ``rtc_zustand`` (Batteriedatei).
+                ``basis``, ``rtc`` (bool), ``abbild`` (Plattenabbild), ``rtc_zustand`` (Batteriedatei),
+                ``rtc_versatz`` (Jahre, 0/-28/-40, nur Anzeige gegenueber dem Gast).
                 Direkt nach dem Anlegen gesteckt; Fehler → ValueError.
             usb: GUN-USB (Z80-PIO + VDIP1, Wirtsverzeichnis als Stick) stecken (an jeder Maschine ausser
                 P8000; am K8915/PRG 710 ist die Vorgabe-Basis 0x84 von der ZRE belegt) — ``None``/``False``
@@ -1466,9 +1476,10 @@ class K1520Emulator:
                 raise ValueError(reason or f"RAF {raf!r} nicht steckbar")
         if gide:
             g = {} if gide is True else dict(gide)
-            if not _lib.k1520_gide_install(handle, int(g.get("basis", 0x90)), bool(g.get("rtc", True)),
-                                           os.fsencode(g.get("abbild") or ""),
-                                           os.fsencode(g.get("rtc_zustand") or "")):
+            if not _lib.k1520_gide_install_ex(handle, int(g.get("basis", 0x90)), bool(g.get("rtc", True)),
+                                              os.fsencode(g.get("abbild") or ""),
+                                              os.fsencode(g.get("rtc_zustand") or ""),
+                                              int(g.get("rtc_versatz", 0))):
                 reason = _lib.k1520_gide_error(handle)
                 reason = reason.decode("utf-8", "replace") if reason else ""
                 _lib.k1520_destroy(handle)
@@ -2546,6 +2557,21 @@ class K1520Emulator:
         """Uhr der RTC (Unix-Sekunden der Kalenderzeit), ``None`` ohne Karte/RTC."""
         t = ctypes.c_int64()
         return t.value if _lib.k1520_gide_rtc_zeit(self._handle, ctypes.byref(t)) else None
+
+    def gide_rtc_stellen(self, unix_wirt: int) -> bool:
+        """Uhr der GIDE auf ``unix_wirt`` stellen (Jahr des Wirts, UTC, ohne Jahresversatz); Batteriedatei
+        wird geschrieben.  ``False`` ohne Karte/RTC."""
+        return bool(_lib.k1520_gide_rtc_stellen(self._handle, int(unix_wirt)))
+
+    def gide_rtc_netz_aus(self) -> bool:
+        """Netz-Aus an die GIDE-Uhr melden (Stand + Wirtszeit in die Batteriedatei).  ``False`` ohne Karte/RTC."""
+        return bool(_lib.k1520_gide_rtc_netz_aus(self._handle))
+
+    @staticmethod
+    def gide_rtc_startzeit(zustandsdatei: str, jahresversatz: int = 0, utc: bool = True) -> int:
+        """Ohne Maschine: Zeit, mit der eine GIDE-Uhr mit dieser Batteriedatei JETZT starten würde (gastsichtig)."""
+        return int(_lib.k1520_gide_rtc_startzeit((zustandsdatei or "").encode("utf-8"), int(jahresversatz),
+                                                 int(bool(utc))))
 
     def io_owner(self, port: int) -> str:
         """Name des Geraets, das den E/A-Port belegt (``""`` = frei) -- die Wahrheit des Busses."""

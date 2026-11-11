@@ -120,8 +120,10 @@ public:
     virtual void netzEin() = 0;
 
     /// Zeit, mit der eine Karte mit dieser Batteriedatei JETZT starten wuerde (Startregel), gastsichtig; ohne Karte.
+    /// @p kopf = Kopfkennung der Batteriedatei (P8000-Vorgabe; die GIDE-Karte schreibt "K1520-GIDE-RTC").
     static int64_t startzeit(const std::string& zustand, int jahresversatz, bool utc,
-                             const std::function<int64_t()>& zeitquelle = {});
+                             const std::function<int64_t()>& zeitquelle = {},
+                             const std::string& kopf = "K1520-P8000-RTC");
     /// Batteriedatei auf @p wand (Kalenderzeit im Jahr des Wirts) stellen; false = nicht schreibbar.
     static bool stellenDatei(const std::string& zustand, int64_t wand,
                              const std::function<int64_t()>& zeitquelle = {});

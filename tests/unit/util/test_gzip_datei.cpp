@@ -67,6 +67,25 @@ TEST(GzipDatei, RundreiseUndKleinerAlsRoh)
     }
 }
 
+TEST(GzipDatei, NullenSpeichernSchreibtDenStromWieDerGesamtpuffer)
+{
+    // Streckenlaenge ueber mehrere 1-MB-Stuecke, nicht auf eine Stuecklaenge gerundet; 0 = leerer Inhalt.
+    for (uint64_t n : {uint64_t(0), uint64_t(512), uint64_t(3'000'000), uint64_t(2u << 20)}) {
+        const std::string p = k1520test::tempPath("k1520_gzip_nullen.img.gz");
+        std::filesystem::remove(p);
+        std::string f;
+        ASSERT_TRUE(gzip::nullenSpeichern(p, n, 1, &f)) << f;
+        EXPECT_FALSE(std::filesystem::exists(p + ".tmp"));
+        std::vector<uint8_t> r{1};
+        gzip::Art art = gzip::Art::Roh;
+        ASSERT_TRUE(gzip::laden(p, r, &art, &f)) << f;     // prueft CRC-32 und ISIZE mit
+        EXPECT_EQ(art, gzip::Art::Gzip);
+        EXPECT_EQ(r, std::vector<uint8_t>(n, 0)) << n;
+        if (n >= 3'000'000) EXPECT_LT(std::filesystem::file_size(p), 20'000u);
+        std::filesystem::remove(p);
+    }
+}
+
 TEST(GzipDatei, LeererInhalt)
 {
     std::vector<uint8_t> z, r{1, 2, 3};

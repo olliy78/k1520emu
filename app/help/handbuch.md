@@ -1399,7 +1399,8 @@ EM256-BIOS), `RAF512.COM` legt die RAF daneben als P: an.
 
 ## IDE-Platte (GIDE) und Uhr
 
-*Einstellungen ▸ Allgemein ▸ IDE-Platte (GIDE)* steckt eine IDE-Karte nach
+*Einstellungen ▸ Allgemein* (Zeilen **IDE-Platte (GIDE)** und **GIDE-Uhr**, flach untereinander wie die übrigen
+Einstellungen; die Seite lässt sich senkrecht rollen) steckt eine IDE-Karte nach
 Tilmann Reh mit einer ATA-Platte und der Uhr RTC 72421 — im A5120 Emulator, im K8915 Emulator, im PRG710
 Emulator und im PC1715 Emulator (nicht im P8000 und nicht im MC80). Ab Werk ist sie **aus**.
 
@@ -1414,16 +1415,27 @@ Emulator und im PC1715 Emulator (nicht im P8000 und nicht im MC80). Ab Werk ist 
   Die Auskunft kommt vom Rechner selbst. Fordert eine geladene Konfiguration trotzdem eine belegte Basis
   (oder belegt eine andere Karte die Adressen), bleibt die GIDE **aus**, und der Grund steht in roter
   Schrift unter der Gruppe.
-* **Plattenabbild** — nur bei gesteckter Karte bedienbar. *Wählen …* legt ein vorhandenes Abbild
-  ein, *Auswerfen* nimmt es heraus und schreibt es sofort zurück, *Neue Platte …* fragt nach Name und
-  Größe (**8, 16, 32, 64, 128 oder 256 MB**, Vorgabe 256 MB) und legt ein leeres Rohabbild sparsam an
-  (es belegt nur, was beschrieben wird); mit der Endung `.gz` wird es gepackt. Eine **vorhandene Datei
-  wird nie überschrieben** — gibt es den Namen schon, fragt das Programm nur, ob diese Platte
-  stattdessen eingelegt werden soll. Neue Platten liegen vorgabegemäß im Dokumentenordner unter
-  `K1520emu/GIDE_Platten`.
-* **RTC 72421 auf der Karte** — die Uhr (Vorgabe an). Sie zeigt dem Gast die Zeit des Wirtsrechners
-  in **UTC**, läuft in Maschinenzeit und springt beim Start nie zurück; ihr Stand liegt in der
-  Batteriedatei `gide_rtc_<programm>.dat` im Konfigurationsordner. Die Gruppe zeigt die Uhrzeit der Karte.
+* **Plattenabbild** — steht nicht bei den Einstellungen, sondern als Kasten **IDE-Platte (GIDE)** im
+  Reiter *Laufwerke*, unter den Disketten (wie die Winchesterplatte des P8000); der Kasten erscheint,
+  sobald die Karte gesteckt ist. *Einlegen …* legt ein vorhandenes Abbild ein, *Auswerfen* nimmt es heraus
+  und schreibt es sofort zurück, *Neue Platte …* fragt nach Name und Größe (**8, 16, 32, 64, 128 oder
+  256 MB**, Vorgabe 256 MB). **Plattenabbilder sind immer gepackt (`.img.gz`)**, wie die Platten des
+  P8000: eine leere 256-MB-Platte belegt rund 250 KB; die Endung `.img.gz` wird beim Anlegen erzwungen.
+  Ein rohes `.img` wird beim Einlegen abgelehnt (mit Hinweis); `gzip -k abbild.img` packt es, das Original
+  bleibt. Eine **vorhandene Datei wird nie überschrieben** — gibt es den Namen schon, fragt das Programm nur,
+  ob diese Platte stattdessen eingelegt werden soll. Neue Platten liegen vorgabegemäß im Dokumentenordner
+  unter `K1520emu/GIDE_Platten`.
+* **RTC 72421** — die Uhr (Vorgabe an), gestaltet wie die Zeilen *RTC* des P8000. Sie zeigt dem Gast
+  die Zeit des Wirtsrechners in **UTC**, läuft in **Maschinenzeit** (bei erhöhter Geschwindigkeit also
+  schneller) und springt beim Neustart nie zurück (Stand und Wirtszeit stehen in der Batteriedatei
+  `gide_rtc_<programm>.dat` im Konfigurationsordner und werden beim Ausschalten, Beenden und etwa je Minute
+  Maschinenzeit gesichert; beim Start gilt das Größere aus „Stand + Abwesenheit“ und PC-Uhr). Beim
+  allerersten Start stellt sie sich nach der **PC-Uhr**. **Zeitversatz:** *Kein Zeitversatz*,
+  *−28 Jahre* (gleicher Wochentag) oder *−40 Jahre* (Vorgabe, wie beim P8000) — der Gast sieht die Zeit
+  um so viele Jahre zurück; ein Wechsel baut die Maschine neu auf. Die Zeile *Uhrzeit* zeigt die Zeit des
+  Gastsystems und daneben die PC-Zeit (beide UTC); *Nach PC-Uhr stellen* setzt die Uhr auf die PC-Zeit
+  (liegt sie dann vor der bisherigen, wird vorher gefragt). In der Statuszeile steht dieselbe Zeit als
+  Feld **RTC:**.
 
 In der Statuszeile steht bei gesteckter Karte die Leuchte **IDE**. Sie folgt dem **Zugriff** des
 Gastsystems auf die Karte, nicht dem Inhalt: gefüllt = Abbild eingelegt, rot = die Karte wurde
@@ -1435,7 +1447,8 @@ untereinander unverträglich** — eine mit dem einen Treiber angelegte Platte l
 ein Abbild gehört also zu seinem Treiber. Der Treiber von Poppe braucht mindestens 504000 Sektoren
 (rund 258 MB, also die 256-MB-Vorgabe oder mehr), der von Kingstener kommt mit 32 MB aus.
 
-Gemerkt werden Karte, Basis, Abbild und Uhr in der Konfiguration (`general.gide`).
+Gemerkt werden Karte, Basis, Abbild, Uhr und Zeitversatz in der Konfiguration (`general.gide`, Schlüssel
+`enabled`, `basis`, `image`, `rtc`, `rtc_versatz`).
 
 **Vorauswahl der E/A-Basen der Steckkarten.** Die Basen von IDE-Karte, USB-Karte (GUN-USB) und
 Netzkarte (KCNet) sind so vorbelegt, dass sie untereinander und mit RAM-Floppy (88H/89H), Kassette,
@@ -1450,13 +1463,14 @@ Lochstreifen und den festen Karten des jeweiligen Rechners nichts gemeinsam bele
 | PC 1715 / 1715W | 90H | 84H | C0H |
 
 (84H ist die Lage der GUN; C0H und 28H sind die beiden Jumperstellungen der K1520-Netzkarte; am PRG 710
-ist C0H der ATP-Zusatz, am K8915 V2 und am PRG 710 80H–87H belegt.) Die Gruppen für USB und Netz
+ist C0H der ATP-Zusatz, am K8915 V2 und am PRG 710 80H–87H belegt.) Die Zeilen für USB und Netz
 haben dieselbe Basiswahl (Vielfache von 4); belegte Basen sind markiert und nicht wählbar, auch die
 der jeweils anderen angehakten Karten.
 
 ## USB-Stick (GUN/VDIP1)
 
-*Einstellungen ▸ Allgemein ▸ USB-Stick (GUN/VDIP1)* steckt die USB-Karte der GUN (Z80-PIO mit dem
+*Einstellungen ▸ Allgemein ▸ USB-Stick (GUN)* (eine Zeile mit Haken und Basis, darunter Stick-Ordner, Schreibschutz und
+Stick-Knopf) steckt die USB-Karte der GUN (Z80-PIO mit dem
 Speicherstick-Baustein VDIP1) — in denselben vier Programmen wie die IDE-Karte. Ab Werk ist sie **aus**.
 
 * **USB-Karte stecken** und **E/A-Basis** — wie bei der IDE-Karte: ein Wechsel schaltet die Maschine aus
@@ -1478,7 +1492,7 @@ Der Gast bedient den Stick mit eigenen Programmen (nicht im Lieferumfang), etwa 
 
 ## Netzwerk (KCNet/W5100)
 
-*Einstellungen ▸ Allgemein ▸ Netzwerk (KCNet/W5100)* steckt die Netzwerkkarte KCNet (Z80-PIO mit dem
+*Einstellungen ▸ Allgemein ▸ Netzwerk (KCNet)* (flache Zeilen: Haken und Basis, nur lokal, Kabel) steckt die Netzwerkkarte KCNet (Z80-PIO mit dem
 Netzwerkbaustein W5100) — ab Werk **aus**.
 
 * **Netzwerkkarte stecken** und **E/A-Basis** — ein Wechsel baut die Maschine neu auf. Üblich sind C0H

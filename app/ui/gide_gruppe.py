@@ -1,109 +1,60 @@
 """
-K1520 Emulator - Gruppe „IDE-Platte (GIDE)" unter *Einstellungen ▸ Allgemein*
-=============================================================================
+K1520 Emulator - Zeilen „IDE-Platte (GIDE)“ und „GIDE-Uhr“ unter *Einstellungen ▸ Allgemein*
+=============================================================================================
 
-Eine Gruppe der Reihe „Erweiterungskarten" (doc/design/50_gun_gide.md, AP G6).  Sie
-sammelt NUR die Eingaben und meldet sie als Zustand (:mod:`app.gide`); das Hauptfenster
-steckt die Karte (Neuaufbau der Maschine wie bei RAF/Kassette), legt Abbilder ein und
-zeigt Kernfehler an.  Die Gruppe selbst kennt den Kern nicht.
+Zeilen im Reiter *Allgemein* (flach, ohne Rahmen, untereinander wie die uebrigen Einstellungen;
+doc/design/50_gun_gide.md, AP G6):
 
-Plattenabbild-Bedienung (Wählen / Neue Platte / Auswerfen) ist nur bei GESTECKTER Karte
-frei (Muster Kassette): Einlegen und Auswerfen wirken sofort am Kern.  Dialoge laufen über
-die kleinen Methoden ``_datei_waehlen``/``_neue_platte_abfragen``/``_frage`` — Tests ersetzen
-sie, ein ``exec()`` stuende headless bis zum Zeitueberlauf.
+* :class:`GideGruppe` -- Kästchen „GIDE-Karte stecken", E/A-Basis (Auswahlfeld mit Belegt-Markierung),
+  Fehlertext des Kerns.
+* :class:`GideRtcGruppe` -- die Uhr RTC 72421 im Stil der P8000-Gruppe *RTC*: Kästchen, Zeitversatz
+  (0 / −28 / −40 Jahre), Uhrzeit des Gastsystems, Wirtszeit (PC-Uhr), „Uhr nach Wirtszeit stellen".
+
+Das PLATTENABBILD (Wählen / Neue Platte / Auswerfen) steht NICHT hier, sondern als Kasten im Reiter
+*Laufwerke* (:mod:`app.ui.gide_platte_widget`), wie die Winchesterplatte des P8000.
+
+Beide Gruppen sammeln nur Eingaben und melden sie als TEIL-Zustand im Sinne von :mod:`app.gide`;
+das Hauptfenster setzt ihn mit dem Rest zusammen, steckt die Karte (Neuaufbau der Maschine wie bei
+RAF/Kassette) und zeigt Kernfehler an.  Die Gruppen kennen den Kern nicht.
 """
 
 from __future__ import annotations
 
-import os
-from typing import Optional, Tuple
+from typing import Optional
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGroupBox,
-    QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QVBoxLayout, QWidget,
+    QCheckBox, QComboBox, QFormLayout, QHBoxLayout, QLabel, QPushButton, QWidget,
 )
 
 from app import gide
 
 
-class NeuePlatteDialog(QDialog):
-    """Name und Groesse einer neuen Platte (Abbild als Rohdatei, sparsam angelegt)."""
+class GideGruppe(QWidget):
+    """Zeile „IDE-Karte (GIDE)“: Kästchen und Basis (+ Fehlertext) -- flach, ohne Rahmen."""
 
-    def __init__(self, ordner: str, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Neue Platte")
-        lay = QVBoxLayout(self)
-        form = QFormLayout()
-        self.name_edit = QLineEdit(os.path.join(ordner, "gide.img"), self)
-        form.addRow("Datei:", self.name_edit)
-        self.groesse_combo = QComboBox(self)
-        for mb in gide.GROESSEN_MB:
-            self.groesse_combo.addItem(f"{mb} MB", mb)
-        self.groesse_combo.setCurrentIndex(self.groesse_combo.findData(gide.GROESSE_VORGABE_MB))
-        form.addRow("Größe:", self.groesse_combo)
-        self.gz_box = QCheckBox("gepackt (.img.gz)", self)
-        self.gz_box.setToolTip("Hängt .gz an; die Datei wird erst beim Auswerfen oder Beenden geschrieben.")
-        form.addRow("", self.gz_box)
-        lay.addLayout(form)
-        hinweis = QLabel(gide.HINWEIS_GROESSE, self)
-        hinweis.setWordWrap(True)
-        lay.addWidget(hinweis)
-        tasten = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        tasten.accepted.connect(self.accept)
-        tasten.rejected.connect(self.reject)
-        lay.addWidget(tasten)
-
-    def ergebnis(self) -> Tuple[str, int]:
-        pfad = self.name_edit.text().strip()
-        if pfad and self.gz_box.isChecked() and not pfad.lower().endswith(".gz"):
-            pfad += ".gz"
-        return pfad, int(self.groesse_combo.currentData())
-
-
-class GideGruppe(QGroupBox):
-    """Kästchen, Basis, Plattenabbild und RTC der GIDE."""
-
-    #: Zustand (:func:`app.gide.normalize`) nach einer Eingabe des Anwenders.
+    #: Teil-Zustand ``{enabled, basis}`` nach einer Eingabe des Anwenders.
     gideChanged = Signal(dict)
-    #: „Neue Platte" bestaetigt: (Pfad, MB); das Hauptfenster legt an und legt ein.
-    neuePlatteGewuenscht = Signal(str, int)
 
     def __init__(self, basis_vorgabe: int, parent=None):
-        super().__init__("IDE-Platte (GIDE)", parent)
+        super().__init__(parent)
         self._guard = False
         self._basis_vorgabe = int(basis_vorgabe)
         self._gesteckt = False
         form = QFormLayout(self)
+        form.setContentsMargins(0, 0, 0, 0)
 
         self.karte_box = QCheckBox("GIDE-Karte stecken", self)
         self.karte_box.setToolTip(gide.TIPP_KARTE)
-        form.addRow(self.karte_box)
-
         self.basis_combo = QComboBox(self)
         for b in gide.BASEN:
             self.basis_combo.addItem(gide.basis_text(b), b)
         self.basis_combo.setToolTip(gide.TIPP_BASIS)
-        form.addRow("E/A-Basis:", self.basis_combo)
-
-        self.abbild_edit = QLineEdit(self)
-        self.abbild_edit.setPlaceholderText("kein Plattenabbild")
-        self.abbild_edit.setToolTip(gide.TIPP_ABBILD)
-        self.waehlen_knopf = QPushButton("Wählen …", self)
-        self.neu_knopf = QPushButton("Neue Platte …", self)
-        self.auswerfen_knopf = QPushButton("Auswerfen", self)
-        zeile = QWidget(self)
-        zl = QHBoxLayout(zeile)
-        zl.setContentsMargins(0, 0, 0, 0)
-        for w in (self.abbild_edit, self.waehlen_knopf, self.neu_knopf, self.auswerfen_knopf):
-            zl.addWidget(w, 1 if w is self.abbild_edit else 0)
-        form.addRow("Plattenabbild:", zeile)
-
-        self.rtc_box = QCheckBox("RTC 72421 auf der Karte", self)
-        self.rtc_box.setToolTip(gide.TIPP_RTC)
-        form.addRow(self.rtc_box)
-        self.rtc_zeit_label = QLabel("", self)
-        form.addRow("Uhr der Karte (UTC):", self.rtc_zeit_label)
+        zeile = QHBoxLayout()
+        zeile.addWidget(self.karte_box)
+        zeile.addWidget(QLabel("E/A-Basis:", self))
+        zeile.addWidget(self.basis_combo, 1)
+        form.addRow("IDE-Platte (GIDE):", zeile)
 
         self.fehler_label = QLabel("", self)
         self.fehler_label.setStyleSheet("color: #c00;")
@@ -113,21 +64,13 @@ class GideGruppe(QGroupBox):
 
         self.karte_box.toggled.connect(self._aenderung)
         self.basis_combo.currentIndexChanged.connect(self._aenderung)
-        self.rtc_box.toggled.connect(self._aenderung)
-        self.abbild_edit.editingFinished.connect(self._aenderung)
-        self.waehlen_knopf.clicked.connect(lambda _c=False: self._on_waehlen())
-        self.neu_knopf.clicked.connect(lambda _c=False: self._on_neu())
-        self.auswerfen_knopf.clicked.connect(lambda _c=False: self._on_auswerfen())
         self.set_zustand(gide.vorgabe(self._basis_vorgabe))
 
     # ── Zustand ──────────────────────────────────────────────────────────────
 
     def zustand(self) -> dict:
-        """Die Eingaben als Zustand im Sinne von :mod:`app.gide`."""
-        return {"enabled": self.karte_box.isChecked(),
-                "basis": int(self.basis_combo.currentData()),
-                "image": self.abbild_edit.text().strip(),
-                "rtc": self.rtc_box.isChecked()}
+        """Teil-Zustand (``enabled``, ``basis``) im Sinne von :mod:`app.gide`."""
+        return {"enabled": self.karte_box.isChecked(), "basis": int(self.basis_combo.currentData())}
 
     def set_zustand(self, z: dict, fehler: str = "", gesteckt: Optional[bool] = None) -> None:
         """Eingaben setzen (ohne Signal).  *gesteckt*: die Karte steckt WIRKLICH (sonst bleibt der Stand)."""
@@ -135,13 +78,10 @@ class GideGruppe(QGroupBox):
         self.karte_box.setChecked(bool(z.get("enabled")))
         idx = self.basis_combo.findData(int(z.get("basis", self._basis_vorgabe)))
         self.basis_combo.setCurrentIndex(idx if idx >= 0 else self.basis_combo.findData(self._basis_vorgabe))
-        self.abbild_edit.setText(str(z.get("image") or ""))
-        self.rtc_box.setChecked(z.get("rtc") is not False)
         self._guard = False
         if gesteckt is not None:
             self._gesteckt = bool(gesteckt)
         self.set_fehler(fehler)
-        self._knoepfe()
 
     def set_basen(self, zeilen) -> None:
         """Auswahlfeld der Basis beschriften (:func:`app.kartenwahl.eintraege`): belegte Eintraege
@@ -161,73 +101,90 @@ class GideGruppe(QGroupBox):
         self.fehler_label.setText(text or "")
         self.fehler_label.setVisible(bool(text))
 
-    def set_rtc_anzeige(self, text: str) -> None:
-        self.rtc_zeit_label.setText(text or "—")
-
     def gesteckt(self) -> bool:
         return self._gesteckt
 
-    def _knoepfe(self) -> None:
-        """Plattenbedienung nur mit gesteckter Karte; Auswerfen nur mit Abbild."""
-        g = self._gesteckt
-        self.abbild_edit.setEnabled(g)
-        self.waehlen_knopf.setEnabled(g)
-        self.neu_knopf.setEnabled(g)
-        self.auswerfen_knopf.setEnabled(g and bool(self.abbild_edit.text().strip()))
-        self.rtc_zeit_label.setEnabled(g)
-
-    # ── Bedienung ────────────────────────────────────────────────────────────
-
     def _aenderung(self, *_args) -> None:
-        self._knoepfe()
         if not self._guard:
             self.gideChanged.emit(self.zustand())
 
-    def _datei_waehlen(self) -> str:
-        pfad, _ = QFileDialog.getOpenFileName(
-            self, "Plattenabbild einlegen", gide.platten_ordner(),
-            "Plattenabbilder (*.img *.img.gz *.hdf *.bin);;Alle Dateien (*)")
-        return pfad
 
-    def _neue_platte_abfragen(self) -> Optional[Tuple[str, int]]:
-        ordner = gide.platten_ordner()
-        dlg = NeuePlatteDialog(ordner, self)
-        if dlg.exec() != QDialog.Accepted:
-            return None
-        return dlg.ergebnis()
+class GideRtcGruppe(QWidget):
+    """Die Uhr der GIDE im Stil der P8000-Zeilen *RTC*: Haken, Zeitversatz, Uhrzeit, Stellen."""
 
-    def _frage(self, titel: str, text: str) -> bool:
-        return QMessageBox.question(self, titel, text, QMessageBox.Yes | QMessageBox.No,
-                                    QMessageBox.No) == QMessageBox.Yes
+    #: Teil-Zustand ``{rtc, rtc_versatz}`` nach einer Eingabe des Anwenders.
+    rtcChanged = Signal(dict)
+    #: „Uhr nach Wirtszeit stellen" gedrueckt.
+    rtcStellenGewuenscht = Signal()
 
-    def _on_waehlen(self) -> None:
-        pfad = self._datei_waehlen()
-        if pfad:
-            self.abbild_edit.setText(pfad)
-            self._aenderung()
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._guard = False
+        form = QFormLayout(self)
+        form.setContentsMargins(0, 0, 0, 0)
 
-    def _on_auswerfen(self) -> None:
-        self.abbild_edit.setText("")
-        self._aenderung()
+        self.rtc_box = QCheckBox("RTC 72421", self)
+        self.rtc_box.setToolTip(gide.TIPP_RTC)
+        self.versatz_combo = QComboBox(self)
+        for wert, text in gide.VERSAETZE:
+            self.versatz_combo.addItem(text, wert)
+        self.versatz_combo.setToolTip(gide.TIPP_VERSATZ)
+        zeile = QHBoxLayout()
+        zeile.addWidget(self.rtc_box)
+        zeile.addWidget(self.versatz_combo, 1)
+        form.addRow("GIDE-Uhr:", zeile)
 
-    def _on_neu(self) -> None:
-        wahl = self._neue_platte_abfragen()
-        if not wahl or not wahl[0]:
-            return
-        self.neue_platte(*wahl)
+        # Zeitquelle ist immer die PC-Uhr (UTC); angezeigt werden Gast- und Wirtszeit in EINER Zeile,
+        # daneben der Knopf zum Stellen.
+        self.rtc_zeit_label = QLabel("—", self)
+        self.rtc_zeit_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.wirt_label = QLabel("—", self)
+        self.wirt_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.stellen_knopf = QPushButton("Nach PC-Uhr stellen", self)
+        self.stellen_knopf.setToolTip(
+            "Stellt die Uhr der Karte auf die jetzige Zeit des PCs (UTC; der gewählte Zeitversatz wirkt wie "
+            "beim Lesen).  Liegt die neue Zeit vor der bisherigen, wird vorher gefragt.  Von selbst stellt "
+            "sich die Uhr nur beim allerersten Start; danach läuft sie auf ihrer Batterie weiter.")
+        self.stellen_knopf.clicked.connect(lambda _c=False: self.rtcStellenGewuenscht.emit())
+        z2 = QHBoxLayout()
+        z2.addWidget(QLabel("Gast:", self))
+        z2.addWidget(self.rtc_zeit_label)
+        z2.addWidget(QLabel("PC:", self))
+        z2.addWidget(self.wirt_label)
+        z2.addStretch(1)
+        z2.addWidget(self.stellen_knopf)
+        form.addRow("Uhrzeit (UTC):", z2)
 
-    def neue_platte(self, pfad: str, mbyte: int) -> None:
-        """Eine neue Platte anlegen lassen — eine VORHANDENE Datei wird nie überschrieben.
+        self.rtc_box.toggled.connect(self._aenderung)
+        self.versatz_combo.currentIndexChanged.connect(self._aenderung)
+        self.set_zustand(gide.vorgabe(0))
 
-        Ist der Name vergeben, gibt es nur die Rückfrage, ob stattdessen diese Platte
-        eingelegt werden soll (die Datei bleibt unberührt).
-        """
-        pfad = os.path.abspath(os.path.expanduser(pfad))
-        if os.path.exists(pfad):
-            if self._frage("Neue Platte",
-                           f"Die Datei {pfad} gibt es schon.  Sie wird NICHT überschrieben.\n\n"
-                           "Stattdessen diese Platte einlegen?"):
-                self.abbild_edit.setText(pfad)
-                self._aenderung()
-            return
-        self.neuePlatteGewuenscht.emit(pfad, int(mbyte))
+    def zustand(self) -> dict:
+        return {"rtc": self.rtc_box.isChecked(), "rtc_versatz": str(self.versatz_combo.currentData())}
+
+    def set_zustand(self, z: dict, aktiv: Optional[bool] = None) -> None:
+        """Eingaben setzen (ohne Signal).  *aktiv*: Karte gewuenscht -- ohne sie ist die Gruppe grau."""
+        self._guard = True
+        self.rtc_box.setChecked(z.get("rtc") is not False)
+        i = self.versatz_combo.findData(str(z.get("rtc_versatz", gide.VERSATZ_VORGABE)))
+        self.versatz_combo.setCurrentIndex(i if i >= 0 else self.versatz_combo.findData(gide.VERSATZ_VORGABE))
+        self._guard = False
+        if aktiv is None:
+            aktiv = bool(z.get("enabled"))
+        self.set_aktiv(aktiv)
+
+    def set_aktiv(self, an: bool) -> None:
+        """Ohne gewuenschte Karte gibt es nichts zu stellen."""
+        self.rtc_box.setEnabled(an)
+        self.versatz_combo.setEnabled(an and self.rtc_box.isChecked())
+        self.stellen_knopf.setEnabled(an and self.rtc_box.isChecked())
+
+    def set_anzeige(self, gast: str, wirt: str = "") -> None:
+        self.rtc_zeit_label.setText(gast or "—")
+        self.wirt_label.setText(wirt or "—")
+
+    def _aenderung(self, *_args) -> None:
+        self.versatz_combo.setEnabled(self.rtc_box.isEnabled() and self.rtc_box.isChecked())
+        self.stellen_knopf.setEnabled(self.rtc_box.isEnabled() and self.rtc_box.isChecked())
+        if not self._guard:
+            self.rtcChanged.emit(self.zustand())

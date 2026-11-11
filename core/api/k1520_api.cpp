@@ -1694,6 +1694,11 @@ Gide* gideOderFehler(K1520Handle h) {
 }  // namespace
 
 bool k1520_gide_install(K1520Handle h, int basis, bool rtc_vorhanden, const char* abbild, const char* rtc_zustand) {
+    return k1520_gide_install_ex(h, basis, rtc_vorhanden, abbild, rtc_zustand, 0);
+}
+
+bool k1520_gide_install_ex(K1520Handle h, int basis, bool rtc_vorhanden, const char* abbild, const char* rtc_zustand,
+                           int rtc_jahresversatz) {
     if (!h) return gideErgebnis(false, "kein Handle");
     if (basis < 0 || basis > 0xFF) return gideErgebnis(false, "GIDE: Basis ausserhalb 00H..FFH");
     Gide::Config c;
@@ -1701,6 +1706,7 @@ bool k1520_gide_install(K1520Handle h, int basis, bool rtc_vorhanden, const char
     c.rtc_vorhanden = rtc_vorhanden;
     Gide::RtcConfig rc;
     if (rtc_zustand) rc.zustand = rtc_zustand;
+    rc.jahresversatz = rtc_jahresversatz;
     K1520Machine* m = toMachine(h);
     if (!m->installGide(c, &rc, abbild ? abbild : "")) return gideErgebnis(false, m->gideFehler());
     return gideErgebnis(true, {});
@@ -1763,6 +1769,24 @@ bool k1520_gide_rtc_zeit(K1520Handle h, int64_t* out) {
     if (!g || !g->rtc()) return gideErgebnis(false, "keine RTC bestueckt");
     if (out) *out = g->rtc()->gastZeit();
     return true;
+}
+
+bool k1520_gide_rtc_stellen(K1520Handle h, int64_t unix_wirt) {
+    Gide* g = gideOderFehler(h);
+    if (!g || !g->rtc()) return gideErgebnis(false, "keine RTC bestueckt");
+    g->rtc()->stellen(unix_wirt);
+    return true;
+}
+
+bool k1520_gide_rtc_netz_aus(K1520Handle h) {
+    Gide* g = gideOf(h);
+    if (!g || !g->rtc()) return false;
+    g->rtc()->netzAus();
+    return true;
+}
+
+int64_t k1520_gide_rtc_startzeit(const char* zustandsdatei, int jahresversatz, int utc) {
+    return P8000Rtc::startzeit(zustandsdatei ? zustandsdatei : "", jahresversatz, utc != 0, {}, Gide::RTC_KOPF);
 }
 
 const char* k1520_io_owner(K1520Handle h, int port) {

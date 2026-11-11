@@ -85,3 +85,24 @@ def test_zu_spaet_gesteckt_scheitert():
 def test_p8000_hat_keinen_steckplatz():
     with pytest.raises(ValueError, match="Steckplatz"):
         _emu(machine="p8000", gide=True)
+
+
+def test_rtc_versatz_stellen_und_netz_aus(tmp_path):
+    import time
+    from app.core_binding.k1520 import K1520Emulator
+    batt = tmp_path / "gide_rtc.dat"
+    jahr = time.gmtime().tm_year
+    for versatz in (0, -28, -40):
+        emu = _emu(machine="a5120", gide={"rtc_versatz": versatz})
+        assert time.gmtime(emu.gide_rtc_zeit()).tm_year in (jahr + versatz, jahr + versatz + 1)
+    emu = _emu(machine="a5120", gide={"rtc_versatz": -28, "rtc_zustand": str(batt)})
+    assert emu.gide_rtc_stellen(1_800_000_000)               # Jahr des Wirts 2027
+    assert time.gmtime(emu.gide_rtc_zeit()).tm_year == 1999
+    assert emu.gide_rtc_netz_aus()
+    # Startzeit ohne Maschine: Stand + Abwesenheit (nie hinter die Wirtszeit), gastsichtig
+    t = K1520Emulator.gide_rtc_startzeit(str(batt), -28, True)
+    assert time.gmtime(t).tm_year == 1999 and t >= 916_387_200     # Stand 1999-xx (gestellt) + Abwesenheit
+    emu2 = _emu(machine="a5120")                              # ohne Karte
+    assert emu2.gide_rtc_stellen(1) is False and emu2.gide_rtc_netz_aus() is False
+    emu3 = _emu(machine="a5120", gide={"rtc": False})
+    assert emu3.gide_rtc_stellen(1) is False and emu3.gide_rtc_netz_aus() is False

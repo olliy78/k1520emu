@@ -15,6 +15,7 @@ Merkposten ``doc/merkposten/gun.md``.
         basis: D0           # E/A-Basis, Hochnibble-Jumper, Hex (00..F0)
         image: ''           # Plattenabbild ('' = keins)
         rtc: true           # RTC 72421 bestueckt
+        rtc_versatz: '-40'  # Zeitversatz der Uhr gegenueber dem Gast in Jahren: '0' | '-28' | '-40'
 
 Ein fehlender Abschnitt heisst „nicht anfassen" (Auslieferungsvorgabe aelterer Dateien);
 ein unbekannter/kaputter Einzelwert faellt auf die Vorgabe zurueck.
@@ -33,7 +34,7 @@ from __future__ import annotations
 import os
 from typing import Optional
 
-from app import instanz, kartenwahl, paths
+from app import instanz, kartenwahl, paths, rtc as _rtc
 
 #: Schluessel in ``general`` der Konfiguration.
 SCHLUESSEL = "gide"
@@ -55,17 +56,67 @@ TIPP_BASIS = (
     "GIDEHPD0, gidn@D0h).  Belegte Einträge (Kassette K5020, EPROMmer, andere Karten) sind markiert und "
     "nicht wählbar.  Ein Wechsel schaltet die Maschine aus und neu ein.")
 TIPP_ABBILD = (
-    "Plattenabbild (Rohabbild; die Endung .gz packt es).  Auswerfen schreibt sofort zurück.  "
+    "Plattenabbild, immer gepackt (.img.gz) wie die Platten des P8000: eine leere 256-MB-Platte belegt "
+    "rund 250 KB.  Auswerfen schreibt sofort zurück.  "
     "Der Poppe-Treiber braucht mindestens 504000 Sektoren (rund 258 MB), der Kingstener-Treiber "
     "kommt mit 32 MB aus.")
 TIPP_RTC = (
     "Uhr RTC 72421 auf der Karte (Basis+5).  Sie zeigt UTC wie die Uhr des P8000 und läuft in "
-    "Maschinenzeit; der Stand liegt in einer Batteriedatei im Konfigurationsordner.")
+    "Maschinenzeit (bei erhöhter Geschwindigkeit also schneller); der Stand liegt in einer Batteriedatei "
+    "im Konfigurationsordner, die Uhr springt beim Neustart nie zurück.  Beim ersten Start stellt sie "
+    "sich nach der PC-Uhr.")
+TIPP_VERSATZ = (
+    "Die Uhr zeigt dem Gast die Wirtszeit um diese Jahre zurück (nur was der Gast liest und schreibt "
+    "wird gerechnet).  −28 Jahre erhält Wochentag und Schaltjahrmuster, −40 nur das Schaltjahrmuster.  "
+    "Ein Wechsel schaltet die Maschine aus und neu ein.")
+
+#: Zeitversatz der Uhr: dieselben Stufen und Beschriftungen wie bei der P8000-Uhr (:mod:`app.rtc`).
+VERSAETZE = _rtc.VERSAETZE
+VERSATZ_VORGABE = _rtc.VORGABE_VERSATZ     # "-40", wie bei der P8000
 
 #: Hinweis im „Neue Platte"-Dialog.
 HINWEIS_GROESSE = (
     "Der Treiber von Poppe braucht mindestens 504000 Sektoren (256 MB); der von Kingstener kommt mit "
-    "32 MB aus.  Die Datei wird sparsam angelegt (belegt nur, was beschrieben wird).")
+    "32 MB aus.  Die Platte wird gepackt gespeichert (.img.gz); eine leere belegt kaum Platz.")
+
+#: Endung der Plattenabbilder der Oberflaeche (nur gepackt; der Kern liest auch Rohabbilder).
+ENDUNG = ".img.gz"
+HINWEIS_NUR_GEPACKT = (
+    "Plattenabbilder werden nur gepackt (.img.gz) benutzt.  Ein rohes Abbild lässt sich mit "
+    "„gzip -k abbild.img“ packen (das Original bleibt); mit „Neue Platte …“ entsteht gleich ein "
+    "gepacktes.")
+
+
+def gz_pfad(pfad: str) -> str:
+    """*pfad* mit der Endung ``.img.gz`` (``x`` / ``x.img`` / ``x.gz`` -> ``x.img.gz``)."""
+    pfad = str(pfad).strip()
+    if pfad.lower().endswith(ENDUNG):
+        return pfad
+    for alt in (".gz", ".img"):
+        if pfad.lower().endswith(alt):
+            pfad = pfad[:-len(alt)]
+    if pfad.lower().endswith(".img"):
+        pfad = pfad[:-4]
+    return pfad + ENDUNG
+
+
+def ist_gepackt(pfad: str) -> bool:
+    """Beginnt die Datei mit der gzip-Kennung ``1F 8B``?  (Der Kern erkennt gzip ebenso an den Magic
+    Bytes, nicht an der Endung.)"""
+    try:
+        with open(pfad, "rb") as f:
+            return f.read(2) == b"\x1f\x8b"
+    except OSError:
+        return False
+
+
+def abbild_pruefen(pfad: str) -> str:
+    """Taugt *pfad* als Plattenabbild der Oberflaeche?  ``""`` = ja, sonst der Hinweistext.
+
+    Nur gepackte Abbilder; eine nicht vorhandene Datei prueft der Kern beim Einlegen."""
+    if os.path.isfile(pfad) and not ist_gepackt(pfad):
+        return f"„{os.path.basename(pfad)}“ ist kein gepacktes Abbild.  " + HINWEIS_NUR_GEPACKT
+    return ""
 
 
 basis_text = kartenwahl.basis_text
@@ -90,7 +141,8 @@ def basis_lesen(wert, vorgabe: int) -> int:
 
 def vorgabe(basis_vorgabe: int) -> dict:
     """Der Zustand ohne Karte: aus, Basis der Maschine, kein Abbild, RTC bestueckt."""
-    return {"enabled": False, "basis": int(basis_vorgabe), "image": "", "rtc": True}
+    return {"enabled": False, "basis": int(basis_vorgabe), "image": "", "rtc": True,
+            "rtc_versatz": VERSATZ_VORGABE}
 
 
 def normalize(wert, basis_vorgabe: int, alt: Optional[dict] = None) -> dict:
@@ -107,6 +159,8 @@ def normalize(wert, basis_vorgabe: int, alt: Optional[dict] = None) -> dict:
     img = wert.get("image", "")
     z["image"] = str(img).strip() if isinstance(img, (str, os.PathLike)) else ""
     z["rtc"] = wert.get("rtc") is not False        # nur ein echtes false nimmt die RTC weg
+    v = str(wert.get("rtc_versatz", z.get("rtc_versatz", VERSATZ_VORGABE))).strip()
+    z["rtc_versatz"] = v if v in dict(VERSAETZE) else VERSATZ_VORGABE
     return z
 
 
@@ -115,7 +169,8 @@ def fuer_konfig(zustand: dict) -> dict:
     return {"enabled": bool(zustand["enabled"]),
             "basis": f"{int(zustand['basis']) & 0xFF:02X}",
             "image": str(zustand.get("image") or ""),
-            "rtc": bool(zustand["rtc"])}
+            "rtc": bool(zustand["rtc"]),
+            "rtc_versatz": str(zustand.get("rtc_versatz", VERSATZ_VORGABE))}
 
 
 def batterie_pfad(programm: str) -> str:
@@ -140,4 +195,5 @@ def kern_param(zustand: dict, programm: str) -> Optional[dict]:
         return None
     return {"basis": int(zustand["basis"]), "rtc": bool(zustand["rtc"]),
             "abbild": str(zustand.get("image") or ""),
-            "rtc_zustand": batterie_pfad(programm) if zustand["rtc"] else ""}
+            "rtc_zustand": batterie_pfad(programm) if zustand["rtc"] else "",
+            "rtc_versatz": _rtc.versatz_jahre(zustand.get("rtc_versatz", VERSATZ_VORGABE))}

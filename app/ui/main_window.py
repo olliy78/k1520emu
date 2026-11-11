@@ -45,6 +45,7 @@ from app.ui.eprom_widget import EpromWidget
 from app.ui.keyboard import KeyboardWidget
 from app.ui.focus import release_focus, ScreenFocusGuard
 from app.ui.help_window import HelpWindow
+from app.ui.gide_platte_widget import GidePlatteWidget
 from app.ui.kassette_widget import KassetteWidget
 from app.ui.pcmc_widget import PcmcWidget
 from app.ui.keyboard_k7633 import AupWidget
@@ -269,7 +270,8 @@ class MainWindow(QMainWindow):
         self.settings_widget.hardwareChanged.connect(self._on_hardware_selected)
         self.settings_widget.bildschirmSchalterChanged.connect(self._on_bildschirm_schalter)
         self.settings_widget.gideChanged.connect(self._on_gide_changed)
-        self.settings_widget.gidePlatteNeu.connect(self._on_gide_platte_neu)
+        self.settings_widget.gideRtcChanged.connect(self._on_gide_changed)
+        self.settings_widget.gideRtcStellenGewuenscht.connect(self._on_gide_rtc_stellen)
         self.settings_widget.usbChanged.connect(self._on_usb_changed)
         self.settings_widget.usbStickGewuenscht.connect(self._on_usb_stick)
         self.settings_widget.netChanged.connect(self._on_net_changed)
@@ -469,12 +471,25 @@ class MainWindow(QMainWindow):
         drives_scroll.setWidgetResizable(True)
         self.platten_widget = None
         self.platten_gruppe = None
-        if self.profil.platte:
+        # IDE-Platte der GIDE (a5120/k8915/prg710/pc1715): wie die Winchesterplatte des P8000 unter den
+        # Disketten, sichtbar nur bei gesteckter Karte (:meth:`_gide_zeigen`).
+        self.gide_platte = None
+        if self.profil.erweiterungskarten:
+            self.gide_platte = GidePlatteWidget()
+            self.gide_platte.setVisible(False)
+            self.gide_platte.abbildGewaehlt.connect(self._on_gide_abbild_gewaehlt)
+            self.gide_platte.neuePlatteGewuenscht.connect(self._on_gide_platte_neu)
+            self.gide_platte.meldung.connect(lambda text: self.statusBar().showMessage(text, 8000))
+        if self.profil.platte or self.gide_platte is not None:
             # P8000: unter den Disketten der Kasten fuer die Winchesterplatte.
             kasten = QWidget()
             kl = QVBoxLayout(kasten)
             kl.setContentsMargins(0, 0, 0, 0)
             kl.addWidget(self.drives_widget)
+            if self.gide_platte is not None:
+                kl.addWidget(self.gide_platte)
+                kl.addStretch(1)
+        if self.profil.platte:
             self.platten_gruppe = PlattenGruppe(self.emulator)
             self.platten_gruppe.set_firmware(self._hardware.get("wdc", "4.2"))
             self.platten_gruppe.set_verfuegbar(self.profil.modell_hat_wdc(self._model))
@@ -483,6 +498,8 @@ class MainWindow(QMainWindow):
                 lambda text: self.statusBar().showMessage(text, 8000))
             kl.addWidget(self.platten_gruppe)
             self.platten_widget = self.platten_gruppe.kaesten[0]      # Laufwerk 0
+            drives_scroll.setWidget(kasten)
+        elif self.gide_platte is not None:
             drives_scroll.setWidget(kasten)
         else:
             drives_scroll.setWidget(self.drives_widget)
@@ -1690,7 +1707,7 @@ class MainWindow(QMainWindow):
                 self._gide = gide.normalize(general.get(gide.SCHLUESSEL),
                                             self.profil.gide_basis_vorgabe)
                 self._gide_fehler = ""
-            self.settings_widget.set_gide_value(self._gide)
+            self._gide_zeigen(self._gide)
             # USB und Netz: dasselbe (fehlender Abschnitt = nicht anfassen).
             if self.profil.erweiterungskarten and usb.SCHLUESSEL in general:
                 self._usb = usb.normalize(general.get(usb.SCHLUESSEL),
@@ -2087,7 +2104,6 @@ class MainWindow(QMainWindow):
         self._update_em_status()
         self._update_verbindung()
         self._update_rtc()
-        self._update_gide_uhr()
         # Stand von Leser/Stanzer im selben Takt (kein eigener Zeitgeber).
         if self.lochstreifen_dock.isVisible():
             self.lochstreifen_widget.aktualisieren()
@@ -2199,6 +2215,8 @@ class MainWindow(QMainWindow):
         try:
             with kern_sperre():
                 self.emulator.rtc_netz_aus()
+                if self.profil.erweiterungskarten and self._gide_rtc_aktiv():
+                    self.emulator.gide_rtc_netz_aus()      # GIDE-Uhr: Stand + Wirtszeit in die Batteriedatei
         except Exception:
             pass
 
@@ -2229,6 +2247,9 @@ class MainWindow(QMainWindow):
         wechselt also einmal je Minute Maschinenzeit.
         """
         if getattr(self, "status_widget", None) is None or getattr(self, "settings_widget", None) is None:
+            return
+        if self.profil.erweiterungskarten:       # keine P8000-Uhr: hier zeigt das Feld die GIDE-Uhr
+            self._update_gide_uhr()
             return
         t = self._rtc_zeit()
         text = rtc.anzeige(rtc.ortszeit(t, self._rtc_versatz()))
@@ -2512,7 +2533,7 @@ class MainWindow(QMainWindow):
         """Was am Kern haengt (Neuaufbau noetig bei Aenderung): Karte, Basis, RTC -- nicht das Abbild."""
         if not self.profil.erweiterungskarten or not self._gide["enabled"]:
             return None
-        return (self._gide["basis"], self._gide["rtc"])
+        return (self._gide["basis"], self._gide["rtc"], self._gide["rtc_versatz"])
 
     def _karten_kern_zustand(self):
         """Was an den Steckkarten am Kern haengt (Neuaufbau noetig bei Aenderung) -- GIDE, USB, Netz."""
@@ -2623,7 +2644,7 @@ class MainWindow(QMainWindow):
         if not self.profil.erweiterungskarten:
             return
         gesteckt = self._gide_gesteckt()
-        self.settings_widget.set_gide_value(self._gide, self._gide_fehler, gesteckt)
+        self._gide_zeigen(self._gide, self._gide_fehler, gesteckt)
         self._gide_zaehler = None
         self._update_gide()
 
@@ -2658,17 +2679,31 @@ class MainWindow(QMainWindow):
             if z["basis"] == self.profil.karten_vorauswahl(schl, modell_alt):
                 z["basis"] = self.profil.karten_vorauswahl(schl, self._model)
 
-    def _on_gide_changed(self, neu: dict):
-        """Eingaben der GIDE-Gruppe: Karte/Basis/RTC bauen die Maschine neu, das Abbild wirkt sofort."""
-        neu = dict(neu)                 # kommt gueltig aus der Gruppe (Basis als Zahl)
+    def _gide_zeigen(self, zustand: dict, fehler: str = "", gesteckt=None) -> None:
+        """Kasten „IDE-Platte & Uhr“ (Karte, Basis, Uhr) und den Plattenkasten im Reiter Laufwerke setzen.
+
+        Der Plattenkasten ist nur bei WIRKLICH gesteckter Karte sichtbar; Fehlertexte des Kerns stehen im
+        Kartenkasten, bei gesteckter Karte (dann betreffen sie das Abbild) auch beim Plattenkasten."""
+        self.settings_widget.set_gide_value(zustand, fehler, gesteckt)
+        if getattr(self, "gide_platte", None) is None:
+            return
+        g = self._gide_gesteckt() if gesteckt is None else bool(gesteckt)
+        self.gide_platte.set_zustand(zustand.get("image", ""), g, fehler if g else "")
+        self.gide_platte.setVisible(g)
+
+    def _on_gide_changed(self, teil: dict):
+        """Eingaben der GIDE-Kasten (Teil-Zustand): Karte/Basis/RTC/Versatz bauen die Maschine neu.
+
+        Das Plattenabbild kommt NICHT hierher, sondern aus dem Plattenkasten (:meth:`_on_gide_abbild_gewaehlt`)."""
         alt = self._gide
+        neu = {**alt, **dict(teil)}
         if neu == alt:
             return
-        kern_alt = (alt["enabled"], alt["basis"], alt["rtc"])
-        kern_neu = (neu["enabled"], neu["basis"], neu["rtc"])
+        kern_alt = (alt["enabled"], alt["basis"], alt["rtc"], alt["rtc_versatz"])
+        kern_neu = (neu["enabled"], neu["basis"], neu["rtc"], neu["rtc_versatz"])
         if kern_neu != kern_alt and (neu["enabled"] or alt["enabled"]):
             if not self._eprom_rueckfrage("Wechsel der GIDE-Karte"):
-                self.settings_widget.set_gide_value(alt, self._gide_fehler, self._gide_gesteckt())
+                self._gide_zeigen(alt, self._gide_fehler, self._gide_gesteckt())
                 return
             self._gide = neu
             self._apply_drive_types(self._drive_types, cold_restart=True)
@@ -2676,7 +2711,14 @@ class MainWindow(QMainWindow):
             return
         self._gide = neu
         self._karten_basen_beschriften()
-        if neu["image"] != alt["image"] and self._gide_gesteckt():
+        self._schedule_autosave()
+
+    def _on_gide_abbild_gewaehlt(self, pfad: str):
+        """Plattenkasten: Abbild einlegen (``pfad``) bzw. auswerfen (``""``) -- wirkt sofort am Kern."""
+        if pfad == self._gide["image"]:
+            return
+        self._gide = {**self._gide, "image": pfad}
+        if self._gide_gesteckt():
             self._gide_abbild_wirken()
         self._schedule_autosave()
 
@@ -2769,7 +2811,7 @@ class MainWindow(QMainWindow):
         if not ok:
             # Im Kern liegt weiter das alte; die Gruppe zeigt, was wirklich liegt.
             self._gide = {**self._gide, "image": self.emulator.gide_image_path()}
-        self.settings_widget.set_gide_value(self._gide, self._gide_fehler, True)
+        self._gide_zeigen(self._gide, self._gide_fehler, True)
         self._update_gide()
         return ok
 
@@ -2781,11 +2823,11 @@ class MainWindow(QMainWindow):
             os.makedirs(os.path.dirname(pfad) or ".", exist_ok=True)
         except OSError as e:
             self._gide_fehler = f"Plattenabbild nicht angelegt: {e}"
-            self.settings_widget.set_gide_value(self._gide, self._gide_fehler, True)
+            self._gide_zeigen(self._gide, self._gide_fehler, True)
             return False
         if not self.emulator.gide_image_create(pfad, mbyte):
             self._gide_fehler = f"Plattenabbild nicht angelegt: {self.emulator.gide_error()}"
-            self.settings_widget.set_gide_value(self._gide, self._gide_fehler, True)
+            self._gide_zeigen(self._gide, self._gide_fehler, True)
             return False
         self._gide = {**self._gide, "image": pfad}
         self._gide_abbild_wirken()
@@ -2849,13 +2891,70 @@ class MainWindow(QMainWindow):
             f"{st['kommandos']} Kommandos ({st['fehlerkommandos']} Fehler), "
             f"{st['bytes_zur_karte']} Byte zur Karte, {st['bytes_zum_gast']} Byte zum Rechner")
 
+    def _gide_rtc_aktiv(self) -> bool:
+        """Steckt eine GIDE MIT Uhr in der laufenden Maschine?"""
+        return bool(self._gide_gesteckt() and self._gide.get("rtc"))
+
+    def _gide_rtc_versatz(self) -> int:
+        return rtc.versatz_jahre(self._gide.get("rtc_versatz"))
+
+    def _gide_rtc_zeit(self) -> int:
+        """Uhr der GIDE-Karte, gastsichtig (UTC, mit Versatz); -1 = keine Uhr.
+
+        Eingeschaltet: der Stand der laufenden Karte.  Ausgeschaltet: die Zeit, mit der sie jetzt starten
+        wuerde (Startregel des Kerns aus der Batteriedatei) -- wie bei der P8000-Uhr."""
+        if not self._gide_rtc_aktiv():
+            return -1
+        try:
+            if self._emu_started and self.act_power.isChecked():
+                with kern_sperre():
+                    t = self.emulator.gide_rtc_zeit()
+                return -1 if t is None else int(t)
+            return int(K1520Emulator.gide_rtc_startzeit(
+                gide.batterie_pfad(self.profil.programm), self._gide_rtc_versatz(), rtc.UTC))
+        except Exception:
+            return -1
+
     def _update_gide_uhr(self) -> None:
-        """Uhr der Karte in der Gruppe (Sekundentakt)."""
-        if not self._gide_gesteckt():
-            self.settings_widget.gide_gruppe.set_rtc_anzeige("")
+        """Uhr der GIDE: Anzeige im Kasten (Gastzeit und Wirtszeit) und Feld „RTC:“ der Statuszeile."""
+        if getattr(self, "status_widget", None) is None or getattr(self, "settings_widget", None) is None:
             return
-        t = self.emulator.gide_rtc_zeit()
-        self.settings_widget.gide_gruppe.set_rtc_anzeige(rtc.anzeige(t) if t is not None else "")
+        t = self._gide_rtc_zeit()
+        text = rtc.anzeige(t) if t >= 0 else ""
+        self.settings_widget.gide_rtc_gruppe.set_anzeige(
+            text, rtc.anzeige(rtc.wirtszeit_kodiert()) if t >= 0 else "")
+        tipp = ("Die Zeit, die das Gastsystem von der Uhr der GIDE liest (UTC, mit Zeitversatz).  "
+                "Die Uhr läuft in Maschinenzeit." if t >= 0 else "")
+        if t >= 0 and not (self._emu_started and self.act_power.isChecked()):
+            tipp = "Maschine aus: die Zeit, mit der sie jetzt starten würde."
+        self.status_widget.set_rtc(f"RTC: {text}" if t >= 0 else "", tipp)
+
+    def _on_gide_rtc_stellen(self):
+        """„Uhr nach Wirtszeit stellen“ am Kasten der GIDE: UTC der PC-Uhr, der Versatz wirkt wie beim Lesen.
+
+        Springt die Gastzeit zurueck, vorher fragen (Zeitstempel aus der Zukunft, wie bei der P8000)."""
+        if not self._gide_rtc_aktiv():
+            return
+        jetzt = rtc.wirtszeit_kodiert()
+        alt = self._gide_rtc_zeit()
+        neu = rtc.um_jahre(jetzt, self._gide_rtc_versatz())
+        if alt >= 0 and neu < alt - 60:
+            antwort = QMessageBox.question(
+                self, "Uhr stellen",
+                f"Die Uhr der GIDE geht von {rtc.anzeige(alt)} auf {rtc.anzeige(neu)} zurück.\n\n"
+                "Dateien, die das Gastsystem schon mit der späteren Zeit angelegt hat, tragen dann "
+                "einen Zeitstempel aus der Zukunft.\n\nTrotzdem zurückstellen?",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if antwort != QMessageBox.Yes:
+                return
+        try:
+            with kern_sperre():
+                ok = bool(self.emulator.gide_rtc_stellen(jetzt))
+        except Exception:
+            ok = False
+        self.statusBar().showMessage(
+            "Uhr nach Wirtszeit gestellt." if ok else "Die Uhr konnte nicht gestellt werden.", 4000)
+        self._update_gide_uhr()
 
     def _k3521_binden(self, emu) -> None:
         """Ablagedatei je K3521-Karte binden (Inhalt dauerhaft, Entwurf 33 N10h).  Ein Fehler
@@ -3635,6 +3734,9 @@ class MainWindow(QMainWindow):
         # GIDE: das Abbild jetzt zurueckschreiben und freigeben (gepackte Abbilder schreibt der Kern
         # sonst erst verzoegert; die Konfiguration ist oben schon mit dem Abbildnamen gesichert).
         self._gide_abbild_freigeben()
+        # Uhren mit Batterie (P8000, GIDE): Stand + Wirtszeit JETZT sichern, nicht erst beim (nicht
+        # garantierten) Abbau des Kernobjekts -- sonst bliebe nur der Stand des letzten 60-s-Schreibens.
+        self._rtc_netz_aus()
         # Stand-by: RAF-Inhalt in die Ablage (doc/design/22_raf512.md §7.1).
         self._raf_sichern()
         # Lochstreifen: was gestanzt ist, gehoert jetzt in die gebundene Datei.

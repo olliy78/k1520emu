@@ -55,7 +55,9 @@ public:
 
     // ---- Lebenslauf ----
     void reset();      ///< systemweiter /RESET: LH=0, Platte reset(); Medium bleibt
-    void powerOn() { reset(); letzter_befehl_ = 0; zaehler_ = Zaehler(); }
+    /// Netz-Ein: wie reset(), dazu die Startregel der RTC (Batterie: nach einem Netz-Aus laeuft die Uhr
+    /// um die Aus-Dauer weiter, nie hinter die Wirtszeit zurueck; ohne vorheriges Netz-Aus folgenlos).
+    void powerOn() { reset(); letzter_befehl_ = 0; zaehler_ = Zaehler(); if (rtc_) rtc_->netzEin(); }
     /// Maschinenzeit (absolute Takte) an die Platte weiterreichen.
     /// Die RTC zaehlt dieselben Maschinentakte (Zeit laeuft in Maschinenzeit, Entwurf 50 Abschnitt 4).
     void takt(uint64_t maschinentakte);
@@ -71,6 +73,8 @@ public:
     /// Chipmodell anlegen und rtcLese/rtcSchreibe darauf verdrahten (nur sinnvoll mit rtc_vorhanden).
     void rtcAnlegen(const RtcConfig& rc);
     P8000Rtc72421* rtc() { return rtc_.get(); }
+    /// Kopfkennung der Batteriedatei der GIDE-Uhr (ohne " 2").
+    static constexpr const char* RTC_KOPF = "K1520-GIDE-RTC";
 
     // ---- RTC-Hook (AP G3): Registernummer = A8..A11 des Zyklus ----
     std::function<uint8_t(uint8_t reg)> rtcLese;

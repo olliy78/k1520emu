@@ -175,8 +175,7 @@ bool AtaGeraet::abbildAnlegen(const std::string& pfad, uint64_t sektoren, std::s
     }
     const uint64_t bytes = sektoren * SEKTORBYTES;
     if (gzip::artNachEndung(pfad) == gzip::Art::Gzip) {
-        std::vector<uint8_t> nullen(bytes, 0);
-        return gzip::speichern(pfad, nullen.data(), nullen.size(), gzip::Art::Gzip, gzip::STUFE_VORGABE, fehler);
+        return gzip::nullenSpeichern(pfad, bytes, gzip::STUFE_VORGABE, fehler);   // Strom, kein Rohpuffer
     }
     std::ofstream o(pfad, std::ios::binary);
     if (!o) {

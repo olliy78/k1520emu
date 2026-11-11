@@ -1,6 +1,6 @@
 """
-K1520 Emulator - Gruppen „USB-Stick" und „Netzwerk" unter *Einstellungen ▸ Allgemein*
-=====================================================================================
+K1520 Emulator - Zeilen „USB-Stick" und „Netzwerk" unter *Einstellungen ▸ Allgemein*
+====================================================================================
 
 Zwei weitere Gruppen der Reihe „Erweiterungskarten" (doc/design/50_gun_gide.md, AP U3/N3) nach dem
 Muster der :class:`app.ui.gide_gruppe.GideGruppe`: sie sammeln NUR die Eingaben und melden sie als
@@ -12,27 +12,27 @@ from __future__ import annotations
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+    QCheckBox, QComboBox, QFileDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QWidget,
 )
 
 from app import kartenwahl, netz, usb
 
 
-class KartenGruppe(QGroupBox):
-    """Gemeinsamer Teil: Kaestchen, Basis-Auswahl, roter Fehlertext."""
+class KartenGruppe(QWidget):
+    """Gemeinsamer Teil: Zeile mit Kaestchen und Basis-Auswahl, roter Fehlertext -- flach, ohne Rahmen."""
 
     def __init__(self, titel: str, karte_text: str, art: kartenwahl.KartenArt, basis_vorgabe: int,
                  tipp_karte: str, tipp_basis: str, parent=None):
-        super().__init__(titel, parent)
+        super().__init__(parent)
         self._guard = False
         self._basis_vorgabe = int(basis_vorgabe)
         self._gesteckt = False
         self.form = QFormLayout(self)
+        self.form.setContentsMargins(0, 0, 0, 0)
 
         self.karte_box = QCheckBox(karte_text, self)
         self.karte_box.setToolTip(tipp_karte)
-        self.form.addRow(self.karte_box)
 
         self.basis_combo = QComboBox(self)
         for b in art.basen():
@@ -41,7 +41,11 @@ class KartenGruppe(QGroupBox):
                 text += f" ({art.hervorgehoben[b]})"
             self.basis_combo.addItem(text, b)
         self.basis_combo.setToolTip(tipp_basis)
-        self.form.addRow("E/A-Basis:", self.basis_combo)
+        zeile = QHBoxLayout()
+        zeile.addWidget(self.karte_box)
+        zeile.addWidget(QLabel("E/A-Basis:", self))
+        zeile.addWidget(self.basis_combo, 1)
+        self.form.addRow(titel + ":", zeile)
 
         self.fehler_label = QLabel("", self)
         self.fehler_label.setStyleSheet("color: #c00;")
@@ -86,7 +90,7 @@ class UsbGruppe(KartenGruppe):
     stickGewuenscht = Signal(bool)
 
     def __init__(self, basis_vorgabe: int, parent=None):
-        super().__init__("USB-Stick (GUN/VDIP1)", "USB-Karte stecken", kartenwahl.USB, basis_vorgabe,
+        super().__init__("USB-Stick (GUN)", "USB-Karte stecken", kartenwahl.USB, basis_vorgabe,
                          usb.TIPP_KARTE, usb.TIPP_BASIS, parent)
         self._stick = False
 
@@ -103,11 +107,13 @@ class UsbGruppe(KartenGruppe):
 
         self.schutz_box = QCheckBox("Stick schreibgeschützt", self)
         self.schutz_box.setToolTip(usb.TIPP_SCHUTZ)
-        self.form.addRow(self.schutz_box)
-
         self.stick_knopf = QPushButton("Stick entfernen", self)
         self.stick_knopf.setToolTip(usb.TIPP_STICK)
-        self.form.addRow(self.stick_knopf)
+        z2 = QHBoxLayout()
+        z2.addWidget(self.schutz_box)
+        z2.addStretch(1)
+        z2.addWidget(self.stick_knopf)
+        self.form.addRow("", z2)
         self._fehlerzeile()
 
         self.karte_box.toggled.connect(self._aenderung)
@@ -166,15 +172,18 @@ class NetzGruppe(KartenGruppe):
     netChanged = Signal(dict)
 
     def __init__(self, basis_vorgabe: int, parent=None):
-        super().__init__("Netzwerk (KCNet/W5100)", "Netzwerkkarte stecken", kartenwahl.NETZ, basis_vorgabe,
+        super().__init__("Netzwerk (KCNet)", "Netzwerkkarte stecken", kartenwahl.NETZ, basis_vorgabe,
                          netz.TIPP_KARTE, netz.TIPP_BASIS, parent)
 
         self.loopback_box = QCheckBox("nur lokal (Loopback)", self)
         self.loopback_box.setToolTip(netz.TIPP_LOOPBACK)
-        self.form.addRow(self.loopback_box)
         self.link_box = QCheckBox("Netzwerkkabel verbunden", self)
         self.link_box.setToolTip(netz.TIPP_LINK)
-        self.form.addRow(self.link_box)
+        z2 = QHBoxLayout()
+        z2.addWidget(self.loopback_box)
+        z2.addWidget(self.link_box)
+        z2.addStretch(1)
+        self.form.addRow("", z2)
         self.zaehler_label = QLabel("", self)
         self.form.addRow("Verkehr:", self.zaehler_label)
         self._fehlerzeile()

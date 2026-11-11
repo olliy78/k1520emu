@@ -52,12 +52,13 @@ general:
   speed: 10.0
   # IDE-Platte GIDE + Uhr RTC 72421 (app/gide.py, doc/design/50_gun_gide.md G6): enabled = Karte
   # gesteckt, basis = E/A-Basis (Hex, Vielfaches von 10; Vorauswahl 90H), image = Plattenabbild
-  # ('' = keins; Pfade sind rechnerspezifisch, hier leer), rtc = Uhr bestueckt.
+  # ('' = keins; Pfade sind rechnerspezifisch, hier leer), rtc = Uhr bestueckt, rtc_versatz = Zeitversatz der Uhr in Jahren ('0' | '-28' | '-40').
   gide:
     enabled: false
     basis: '90'
     image: ''
     rtc: true
+    rtc_versatz: '-40'
   # USB-Karte der GUN (app/usb.py, Entwurf 50 U3): ordner '' = <Dokumente>/K1520emu/USB-Stick.
   usb:
     enabled: false

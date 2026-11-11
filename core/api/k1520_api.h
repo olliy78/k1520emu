@@ -1127,6 +1127,11 @@ K1520_API const char* k1520_hd_typ_kuerzel(const char* typ);
  *  Fehler (zu spaet, doppelt, Tor belegt, Abbild): false, Grund in k1520_gide_error. */
 K1520_API bool        k1520_gide_install(K1520Handle h, int basis, bool rtc_vorhanden,
                                          const char* abbild, const char* rtc_zustand);
+/** @brief Wie k1520_gide_install, dazu @p rtc_jahresversatz = Jahre, um die die Uhr dem Gast die Wirtszeit
+ *  verschoben zeigt (0, -28, -40; negativ = zurueck; wie `P8000RtcConfig::jahresversatz`).  Die Uhr zaehlt
+ *  in UTC und in Maschinenzeit; die Batteriedatei traegt den Stand OHNE Versatz. */
+K1520_API bool        k1520_gide_install_ex(K1520Handle h, int basis, bool rtc_vorhanden,
+                                            const char* abbild, const char* rtc_zustand, int rtc_jahresversatz);
 K1520_API bool        k1520_gide_installed(K1520Handle h);
 /** @brief Grund des letzten gescheiterten k1520_gide_*-Aufrufs. */
 K1520_API const char* k1520_gide_error(K1520Handle h);
@@ -1145,6 +1150,15 @@ K1520_API bool        k1520_gide_status(K1520Handle h, int* basis, int* lh, int*
                                         int* abbild_vorhanden, uint64_t* sektoren, uint64_t* zaehler);
 /** @brief Uhr der RTC wie der Gast sie sieht (Kalenderzeit als Unix-Sekunden); false ohne Karte/RTC. */
 K1520_API bool        k1520_gide_rtc_zeit(K1520Handle h, int64_t* out);
+/** @brief Uhr auf @p unix_wirt stellen (Kalenderzeit im Jahr des Wirts, UTC, OHNE Jahresversatz) und die
+ *  Batteriedatei schreiben; false ohne Karte/RTC. */
+K1520_API bool        k1520_gide_rtc_stellen(K1520Handle h, int64_t unix_wirt);
+/** @brief Netz-Aus an die Uhr melden: Stand + Wirtszeit in die Batteriedatei; beim naechsten Netz-Ein
+ *  (power_on) laeuft die Uhr um die Aus-Dauer weiter, nie hinter die Wirtszeit zurueck.  false ohne Karte/RTC. */
+K1520_API bool        k1520_gide_rtc_netz_aus(K1520Handle h);
+/** @brief Ohne Maschine: Zeit (gastsichtig, mit @p jahresversatz), mit der eine GIDE-Uhr mit dieser
+ *  Batteriedatei JETZT starten wuerde (Startregel); fehlende Datei = Wirtszeit.  @p utc != 0: UTC. */
+K1520_API int64_t     k1520_gide_rtc_startzeit(const char* zustandsdatei, int jahresversatz, int utc);
 /** @brief Besitzer des E/A-Ports @p port (deviceName() des am Bus angemeldeten Geraets), "" = frei
  *  oder Port ausserhalb 0..255.  Die Wahrheit des Busses -- Grundlage der Basiswahl der Steckkarten. */
 K1520_API const char* k1520_io_owner(K1520Handle h, int port);

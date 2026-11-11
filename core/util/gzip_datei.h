@@ -47,6 +47,9 @@ bool ladenAnfang(const std::string& pfad, size_t n, std::vector<uint8_t>& daten,
 /// Inhaltsgroesse: roh = Dateigroesse, gzip = entpackte Groesse (entpackt dafuer die ganze Datei).
 std::optional<uint64_t> inhaltsGroesse(const std::string& pfad);
 
+/// Gepackte Datei aus @p n Nullbyte schreiben, als Strom (Speicher ~ gepackte Groesse, nicht @p n); atomar wie speichern().
+bool nullenSpeichern(const std::string& pfad, uint64_t n, int stufe = STUFE_VORGABE, std::string* fehler = nullptr);
+
 /// Ganze Datei schreiben, atomar ueber `<pfad>.tmp` + `rename`.
 bool speichern(const std::string& pfad, const uint8_t* d, size_t n, Art art,
                int stufe = STUFE_VORGABE, std::string* fehler = nullptr);

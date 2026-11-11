@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from PySide6.QtWidgets import QGroupBox
 
 from conftest import requires_core
 
@@ -69,7 +70,7 @@ def test_gruppen_nur_in_den_vier_programmen(qapp, konfig_ordner, maschine):
         if maschine in MIT_KARTE:
             assert not sw.karten_box.isHidden()
             u, n = sw.usb_gruppe, sw.netz_gruppe
-            assert u.title() == "USB-Stick (GUN/VDIP1)" and n.title() == "Netzwerk (KCNet/W5100)"
+            assert not isinstance(u, QGroupBox) and not isinstance(n, QGroupBox)   # flache Zeilen, keine Rahmen
             assert not u.karte_box.isChecked() and not w.emulator.usb_installed()
             assert not n.karte_box.isChecked() and not w.emulator.net_installed()
             assert u.basis_combo.currentData() == USB_BASIS[maschine]

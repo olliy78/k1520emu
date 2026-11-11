@@ -138,8 +138,8 @@ int64_t startWand(const std::string& pfad, bool utc, const std::function<int64_t
 }  // namespace
 
 int64_t P8000Rtc::startzeit(const std::string& zustand, int jahresversatz, bool utc,
-                            const std::function<int64_t()>& zeitquelle) {
-    return mitJahresversatz(startWand(zustand, utc, zeitquelle), jahresversatz);
+                            const std::function<int64_t()>& zeitquelle, const std::string& kopf) {
+    return mitJahresversatz(startWand(zustand, utc, zeitquelle, kopf), jahresversatz);
 }
 
 bool P8000Rtc::stellenDatei(const std::string& zustand, int64_t wand, const std::function<int64_t()>& zeitquelle) {
