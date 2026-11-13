@@ -519,9 +519,9 @@ K1520Handle k1520_create_a5120_konfig(int ausfuehrung, int laderom, int tastatur
                        " (0 neu, 1 alt, 2 KMBG, 3 8 Zoll)";
         return nullptr;
     }
-    if (laderom < 0 || laderom > 2) {
+    if (laderom < 0 || laderom > 3) {
         g_init_error = "Unbekanntes Lade-ROM " + std::to_string(laderom) +
-                       " (0 V0.9_2, 1 V0.9_1, 2 V0.6)";
+                       " (0 V0.9_2, 1 V0.9_1, 2 V0.6, 3 UL4/GIDE)";
         return nullptr;
     }
     if (tastatur < 0 || tastatur > 2) {

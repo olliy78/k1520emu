@@ -15,6 +15,7 @@ sie; sie dient der EPROM-Prüfung.
 | Kurzname | Datei | MD5 | CRC-Feld | CRC gerechnet | Bemerkung |
 |---|---|---|---|---|---|
 | **V0.6** | `doc/EPROMS/K2526/laderom_v06.bin` | 07245123… | 07F1 | 07F1 ✓ | Anwender-Abzug; `laderom_v06.mac` ist nur ein Kopf (Zeile „V0.6, 02.11.2019“), keine Analyse |
+| **UL4 (GIDE)** | `doc/EPROMS/K2526/laderom_ul4_gide.bin` (+ `.mac`) | = `k2526ul4.bin` der Workbench | — | — | Wilfling 2018/2020: Diskette wie V0.9_2, danach GIDE D0H (Systemspuren, Kennung `BOOT`), sonst `BOOT > X`; ohne Kassettenboot, mit Farb-BWS-Init (Port F2H, vom Emulator ignoriert). Eigenbau-Quelle bitgleich nachgebaut. `doc/merkposten/gide_cpa.md` |
 | **V0.9_1** | `doc/EPROMS/K2526/laderom_v09_1.bin` | 0195729d… | 3FAE | 3FAE ✓ | lt. Plan = MAME `a5120_v2` (nicht nachgeprüft) |
 | **V0.9_2** | `doc/EPROMS/zre.rom` | 99280684… | F76B | F76B ✓ | lt. Plan = MAME `a5120_v1`; **die im Emulator eingebettete Fassung**; `laderom_orirom.mac` (Anwender 2005, „LOAD.V09“) ist ihr kommentiertes Listing (Bytes stimmen: `ld b,l` 0109, `ld (hl),10h` 0197) |
 | **V0.9a (K8924)** | `doc/EPROMS/K2526/k8924_laderom_v0.9a.bin` | 7309c039… | F76B | **2900** ✗ | = V0.9_2 mit gepatchter Suchschleife, **CRC-Feld nicht nachgeführt** (trägt die CRC von V0.9_2) → von Hand geändert |

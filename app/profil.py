@@ -614,8 +614,8 @@ A5120 = Programmprofil(
           ("3", "03 (Stopfen 1+2)"), ("4", "04 (Stopfen 3)"), ("5", "05 (Stopfen 1+3)"),
           ("6", "06 5. Bedienebene")), ()),
         ("laderom", "Lade-ROM:",
-         "Lade-ROM der K2526.  V0.6 liest die BCU-Disketten „SYL auf Spur 1“.",
-         (("v09_2", "V0.9_2"), ("v09_1", "V0.9_1"), ("v06", "V0.6")), ()),
+         "Lade-ROM der K2526.  V0.6 liest die BCU-Disketten „SYL auf Spur 1“; UL4 (Wilfling) bootet nach der Diskette von der GIDE-Platte (Basis D0H, Karte unter Erweiterungskarten stecken).",
+         (("v09_2", "V0.9_2"), ("v09_1", "V0.9_1"), ("v06", "V0.6"), ("ul4", "UL4 (GIDE-Boot)")), ()),
         ("erweiterungsmodul", "Erweiterungsmodul:",
          "EM064/EM256 mit dem U8001 (A5120.16): nur am A5120 und nur mit der K3526 (64 KB) als RAM.  "
          "EM1024 (1 MB) ist eine Neuentwicklung ohne historisches Vorbild.",

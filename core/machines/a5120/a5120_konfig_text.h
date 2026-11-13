@@ -15,7 +15,7 @@
  *   bildschirm  = k7024 | k7023 | beide
  *   schalter    = k7024 | k7023      Anfangsstellung des Umschalters, nur mit bildschirm=beide
  *   tastatur    = k7637 | k7636
- *   laderom     = v09_2 | v09_1 | v06
+ *   laderom     = v09_2 | v09_1 | v06 | ul4
  *   kassette    = 0 | 1
  *   em          = none | em064 | em256
  *   k3521       = aus | <Hex-Adresse im 4-KB-Raster, 0 .. f000>[+<Hex>...]   akkugepuffertes RAM K3521.30
@@ -81,7 +81,8 @@ inline bool wert(A5120Machine::Config& cfg, const std::string& schluessel_in,
         if      (v == "v09_2") cfg.laderom = K2526::Laderom::V09_2;
         else if (v == "v09_1") cfg.laderom = K2526::Laderom::V09_1;
         else if (v == "v06")   cfg.laderom = K2526::Laderom::V06;
-        else { err = "laderom: unbekannt '" + v + "' (v09_2|v09_1|v06)"; return false; }
+        else if (v == "ul4")   cfg.laderom = K2526::Laderom::UL4;
+        else { err = "laderom: unbekannt '" + v + "' (v09_2|v09_1|v06|ul4)"; return false; }
     } else if (k == "kassette") {
         if      (v == "1" || v == "ja")   cfg.kassette = true;
         else if (v == "0" || v == "nein") cfg.kassette = false;

@@ -88,6 +88,7 @@
 #include "core/cards/k2526/rom_data.h"
 #include "core/cards/k2526/laderom_v06_data.h"
 #include "core/cards/k2526/laderom_v09_1_data.h"
+#include "core/cards/k2526/laderom_ul4_data.h"
 #include <array>
 #include <cstdint>
 #include <functional>
@@ -229,14 +230,18 @@ public:
      * - `V06`   — `doc/EPROMS/K2526/laderom_v06.bin`: anderes Programm — liest
      *             **Zylinder 1**, 6×128 B, Einsprung 042EH; startet die BCU-880-Disketten
      *             „SYL auf Spur 1“ (AP A7).
+     * - `UL4`   — `doc/EPROMS/K2526/laderom_ul4_gide.bin` (K2526UL4, Klaus Wilfling 2018): Diskette
+     *             wie V0.9_2, danach **GIDE** (Basis D0H, Systemspuren des ersten Laufwerks), sonst `BOOT > X`;
+     *             Kassettenboot entfernt, Initialisierung der Farb-BWS (Heiko Poppe).
      */
-    enum class Laderom { V09_2 = 0, V09_1 = 1, V06 = 2 };
+    enum class Laderom { V09_2 = 0, V09_1 = 1, V06 = 2, UL4 = 3 };
 
     /// ROM-Inhalt einer Fassung (eingebettete Abzuege, `tools/eprom_to_h.py`).
     static const uint8_t (&laderomDaten(Laderom l))[1024] {
         switch (l) {
             case Laderom::V09_1: return ZRE_LADEROM_V09_1;
             case Laderom::V06:   return ZRE_LADEROM_V06;
+            case Laderom::UL4:   return ZRE_LADEROM_UL4;
             case Laderom::V09_2: break;
         }
         return ZRE_BOOT_ROM;

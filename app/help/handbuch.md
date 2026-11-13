@@ -762,6 +762,12 @@ Einschalten die Diskette lädt:
 * **V0.9_1** — die ältere Fassung desselben Programms.
 * **V0.6** — ein anderes Programm: es liest Zylinder 1 und startet die BCU-880-
   Disketten „SYL auf Spur 1“ (Abschnitt *BCU 880*).
+* **UL4 (GIDE-Boot)** — der Urlader von Klaus Wilfling (K2526UL4): versucht zuerst
+  die Diskette wie V0.9_2, danach das **erste GIDE-Laufwerk** (Basis **D0H**; unter
+  *Erweiterungskarten* die GIDE-Karte mit Basis D0H und einer bootfähigen Platte
+  stecken). Findet er nichts, meldet er `BOOT > X`. Das Booten von Kassette ist
+  in diesem ROM entfernt. Passend dazu gibt es das GIDE-CP/A mit dem Treiber im
+  BIOS: Diskette und Platte unter `a5120_cpa_gide` (Beispieldisketten).
 
 Das Lade-ROM des K8924 (V0.9a) ist ein handgepatchter Abzug und fehlt in der
 Auswahl.
