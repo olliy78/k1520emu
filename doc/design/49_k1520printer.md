@@ -72,7 +72,9 @@ Druckwerk, Taktierung, Bedienmatrix-Prinzip, Interfacemodul.
 * **Der SD 1157 hat keine Motorphasen.**  Die Firmware gibt nur LFG/VW/VTAB aus (Rampen macht die Hardware) und liest LAUF, /VK, Takte (richtungsgetrennt
   2A.0/2B.0) und Ränder; Papier: XPFG/XPWV, Schrittimpulse zurück (1/48″).  Bleiben Rückmeldungen aus: NMI bzw. Havarie.
 
-### 2.4  K6313 — kein Abzug
+### 2.4  K6313 — Abzüge seit 2026-11-13 (bis dahin: keiner öffentlich)
+
+**Überholt durch §11:** 19 Abzüge K6311/K6313 von robotron.webhop.net liegen in `doc/EPROMS/K6311/`, `doc/EPROMS/K6313/`.  Der Rest dieses Abschnitts ist der Stand vom 2026-11-05.
 
 Netz- und Vollsuche (Robotrontechnik-Forum, tiffe.de komplett 12 422 Dateien inkl. Archive, CPC-Wiki, oldcomputer.info, GitHub,
 archive.org): **kein K6313/K6314-Abzug öffentlich**.  Mikroprogramm + Zeichensatz liegen auf einer ziehbaren EPROM/RAM-Kassette
@@ -182,7 +184,7 @@ Je AP: Doku + Test + Commit, **nicht pushen**.  Reihenfolge: WP0a ‖ WP0b → W
 | **WP4** | SIO beider Geräte an `SerialHub` (IFSS/V.24), Loopback-Test (Port 0) | WP2a oder b | Telnet → Firmware → Punkte (Integrationstest) |
 | **WP5** | `k1520printer`: Profil, `PrinterWindow`, `BlattWidget`, Bedienfelder, Typauswahl, PDF, System-Druck, Handbuch, Bindung | WP3 (Rest parallel) | `py_k1520printer_gui` offscreen; PDF enthält die Punkte |
 | **WP7** ✔ | Paket (Starter, `MASCHINEN`, Inno), Vorgabekonfiguration, `CLAUDE.md`-Abschnitt, Merkposten, `test-merge --alles` | alles | `py_packaging`, `py_programme`, Windows-Gegenprobe |
-| WP8 | (später) K6313 auf K6316-Basis, sobald der Abzug da ist; SD 1152/257 Typenrad als zweite `Druckwerk`-Implementierung | Abzug | — |
+| WP8 | K6311/K6313 auf K6316-Basis — **aufgeteilt in WP8a–e, siehe §11**; SD 1152/257 Typenrad als zweite `Druckwerk`-Implementierung bleibt später | Abzüge (da) | — |
 
 ### 5a  Stand WP1 (2026-11-05)
 
@@ -342,7 +344,7 @@ Entschieden 2026-11-05: **SD 1157 zuerst** lauffähig, K6316 danach; K6316 mit *
 
 * **F4**  Summer/Geräusche: nur Anzeige oder Ton?  Empfehlung: abschaltbar, Standard aus.
 * **F6**  SD 1157: Kennung 4/5/6 aus EBD/BDA; 4 = 264 und 6 = 267 plausibel, 5 ungeklärt.  Offene Punkte mit Prüfkriterium: `sd1157/hardware.md` §14.
-* **F5**  K6313-Kassette: wird ausgelesen oder angefragt?  (Bestimmt, wann WP8 beginnt.)
+* **F5**  ~~K6313-Kassette: wird ausgelesen oder angefragt?~~  Erledigt 2026-11-13: Abzüge liegen vor (§11).
 
 ## 10  Nicht im Umfang
 
@@ -351,3 +353,50 @@ Centronics/IFSP-Module, Farbdruck, SD 1157/269 (Grafik), Netzwerkdruckprotokolle
 **SD 1157/267 mit zweiter Papierbahn (Festlegung des Anwenders, 2026-11-06):** wird nicht umgesetzt — sehr selten verwendetes Merkmal.  Der Typ bleibt in der Oberfläche sichtbar gesperrt
 (`typen.GESPERRT`, „nicht vorgesehen"), PV2 ohne Wirkung.  Was der Kern dafür schon trägt (Papierweg mit Bahnindex, Formularlänge 2, `SW_FORMULAR2`) bleibt, wird aber nicht weiterverfolgt
 und nicht ausgebaut; insbesondere schreibt `Nadeldruckwerk::feuere` weiter nur auf Bahn 0.
+
+## 11  K6311/K6313 und ROM-Wahl (Festlegung des Anwenders 2026-11-13, WP8)
+
+### 11.1  Befund
+
+* **Quelle der Abzüge:** `https://robotron.webhop.net/docs/drucker/` (Excel-Export, Liste in `index-Dateien/sheet001.html`, Dateien unter `mikroprogramme/`),
+  52 `.bin` insgesamt.  Geholt 2026-11-13: **K6311 (5)** und **K6313 (14)** nach `doc/EPROMS/K6311/`, `doc/EPROMS/K6313/` (MD5 in den README, WP8a).
+  Nicht geholt (nicht im Auftrag): K6314 (21), K6316 (5, andere PGM-Nummern als unsere tiffe-Sätze), K6319, Präsident 6313C/6320.
+* **Größen:** 10 KiB (5 × 2 KiB, alte Platine), 16 KiB, 32 KiB (neue Platine/IBM; im K6313 nur `5c53a001`), K6311 8 oder 10 KiB.
+* **Gleiche Familie wie K6316:** jeder Abzug beginnt mit `DD 21 24 38 31 …` (`LD IX,3824H`, `LD SP,…`), also dieselbe Firmware-Wurzel.  Stack: K6311 alt/K6316 `3C00H`, K6313-ISO (`30835007`) `F000H` →
+  **die 16-KiB-Fassungen laufen auf anderem Speicherplan** (Hypothese [?], WP8a klärt).
+* **Zwei Quellen für das Verständnis der Kassette** (Forum robotrontechnik.de, Thread 6421, 24 Beiträge): Die Interfacekassette trägt EPROM **und** RAM (HY6116); das Interface führt nur A0–A14 (32 KiB);
+  eine LS00-Logik schaltet oberhalb der ROM-Endadresse auf das RAM um (Signal B8, **Quelle widersprüchlich [?]**).  Kassette und Hauptplatine müssen zusammenpassen (alt/neu).
+  Etikett `x.nn-3-ZS/PS`: x = 3/5 K6313 alt/neu, 4/6 K6314, `/PS` = Programmstand; Kürzel der Zeichensätze/Schnittstellen (EPS, IBM, SCH, ISO, KYR, HCD, CL, INT.) sind im Thread nicht erklärt —
+  maßgeblich ist `Drucker_K6313_K6314_Dipschalter_usw.pdf` (WP8a).
+* **Etiketten ≠ Inhalt:** der Thread nennt einen umgebauten Modul mit Etikett 3.08-3-52/07 und Inhalt 3.65-3-92/11; die Liste führt `33538511` mit defektem 2. ROM, `30835207` nur 10k beschrieben.
+  → **Der Katalog trägt eine Güte** (`ok` / `unvollstaendig` / `defekt` / `unbekannt`), sichtbar im Dialog.
+* **K6311:** zu ihm liegt **keine Unterlage** im Projekt (kein Schaltplan, kein Handbuch).  Er teilt die Firmware-Wurzel; seine Hardware wird aus dem ROM (E/A-Adressen) und dem Vergleich mit K6316/K6313
+  erschlossen — **Annahmen als [?] kennzeichnen, nie als Befund**.  Der Anwender fragt dort ausdrücklich nach Abzügen (Thread 022), also ist Prüfen am Original später möglich.
+
+### 11.2  ROM-Wahl (Entwurf)
+
+* **Ein Katalog `data/drucker_roms.yaml`** (Installation: `share/k1520emu/`, aufgelöst in `app/paths.py`, **keine** Repo-Pfade in der Oberfläche): je Eintrag `schluessel`, `typ` (`sd1157|k6311|k6313|k6316-ifss|k6316-v24`),
+  `titel`, `pgm` (Etikett), `datei` (relativ zu `doc/EPROMS`/`share/…/eproms`), `groesse`, `md5`, `schnittstellen`, `zeichensatz`, `guete`, `hinweis`, `vorgabe: true` (genau einer je Typ), `aliases`.
+  SD 1157 (`repariert`/`original`) und K6316 (I/V-Sätze) ziehen in den Katalog um; die bisherigen Schlüssel leben als Aliase weiter (Konfigurationen, `rom=repariert`).
+* **Kern:** neuer Konfigurationsschlüssel `romdatei=<Pfad>` (Satz aus einer Datei, Länge/Aufteilung je Typ geprüft; Fehler = klare Meldung), der bestehende `rom=` bleibt als Kurzform.  Der Kern kennt den Katalog **nicht** (wie bei Greaseweazle: Auflösung gehört in `app/`).
+* **Oberfläche:** Auswahlfeld „EPROM" im Bedienfeld/Typdialog, nur bei Typen mit mehr als einem Eintrag; Vorgabe markiert; Güte-/Hinweiszeile; Wahl wird je Typ in `k1520printer.yaml` gemerkt (`printer.rom.<typ>`).  Ein Wechsel startet den Drucker neu (wie Typwechsel heute).
+* **Paket:** die Abzüge gehören ins Paket (`build_payload.sh`, `.iss`), Wächter `py_packaging`; Katalog-Wächter prüft Schema, MD5 gegen die Dateien, genau eine Vorgabe je Typ, Aliase (Muster `FormatKatalogSchema.*`).
+
+### 11.3  Arbeitspakete
+
+| AP | Inhalt | Agent | Erledigt, wenn |
+|---|---|---|---|
+| **WP8a** | Befund: (1) Katalogdaten aus der webhop-Tabelle + `Drucker_K6313_K6314_Dipschalter_usw.pdf` in `doc/EPROMS/K6311|K6313/README.md` (MD5, Güte, Etikettenschlüssel); (2) K6313-Hardware aus `K6313_14_Serviceschaltplaene.pdf`/`ServiceHB` nach `doc/printer/k6313/hardware.md` (Unterschiede zu K6316: Speicherplan, Dekoder, Kassette ROM/RAM-Umschaltung, E/A, Bedienmatrix, Sensoren, Motoren, DIL); (3) E/A-Diff K6311↔K6313↔K6316 per `tools/z80_disasm2.py` | `boot-disasm-analyst` (Sonnet) | jede E/A-Adresse beider Familien erklärt oder als [?] benannt; Entscheidung, welche Abzüge der Kern fährt |
+| **WP8b** | ROM-Wahl-Infrastruktur: Katalog + Schema-Wächter, `romdatei=` im Kern (SD 1157/K6316 zuerst, ohne Verhaltensänderung), `app/paths.py`, Auswahlfeld, Konfiguration, Paket | `cpp-coder` (Kern/Wächter), `general-purpose` Sonnet (GUI) | bisherige Tests grün; Vorgabe-Wahl = bisheriges Verhalten; neuer Wächter `DruckerRomKatalog.*`, `py_k1520printer_gui` |
+| **WP8c** | `K6313Steuerung` auf K6316-Basis nach WP8a (`core/cards/printer/…`), Typ `k6313` in `typen.py` (aus `GESPERRT` heraus), `boot_trace`/`k1520dbg --machine k6313`, C-ABI additiv | `cpp-coder` | Grundstellung erreicht, H-LEDs/Selbsttest-Muster |
+| **WP8d** | K6313 druckt: Selbsttest, Text über V.24/IFSS/Centronics-frei, Orakel gegen Zeichengenerator im ROM, je ein Wächter je Fassungsfamilie (10 KiB, 16 KiB) | `boot-disasm-analyst` + `cpp-coder` | Wächter wie WP6a |
+| **WP8e** | K6311 nach den Annahmen aus WP8a, kenntlich als „Hardware erschlossen" im Handbuch | `cpp-coder` | läuft an; Befund in Merkposten, offene [?] gelistet |
+
+Reihenfolge: **WP8a ‖ WP8b** (a nur lesend/Doku, b baut) → WP8c → WP8d → WP8e.  Je AP Doku + Test + Commit, **nicht pushen**; Bau-Agenten nacheinander (gemeinsames `build/`).
+Gesperrt bleibt: SD 1152/257, K6314 (Abzüge liegen vor, aber nicht im Auftrag), 32-KiB-Fassungen, solange WP8a keinen Speicherplan dafür belegt.
+
+### 11.4  Risiken
+
+* K6311 ohne Schaltplan: Hypothesen statt Befunde; Falschmeldungen schlimmer als Lücken.
+* 16-KiB-/32-KiB-Fassungen brauchen evtl. eine zweite Platinenvariante (neue Elektronik) — dann zwei Speicherpläne im Kern, nicht einen aufgeweichten.
+* Defekte/unvollständige Abzüge (`33538511`, `30835207`) dürfen nicht Vorgabe werden und laufen u. U. nicht an — kein Emulatorfehler suchen, bevor die Güte geprüft ist.
