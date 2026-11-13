@@ -1676,6 +1676,250 @@ int k1520_ptape_punch_enabled(K1520Handle h) {
     return k ? (k->stanzerEin() ? 1 : 0) : -1;
 }
 
+// ─── GIDE (doc/design/50_gun_gide.md, AP G4) ───────────────────────────────────
+namespace {
+using k1520::Gide;
+using k1520::AtaGeraet;
+std::string gide_fehler;
+bool gideErgebnis(bool ok, const std::string& grund) {
+    gide_fehler = ok ? std::string() : grund;
+    return ok;
+}
+Gide* gideOf(K1520Handle h) { return h ? toMachine(h)->gide() : nullptr; }
+Gide* gideOderFehler(K1520Handle h) {
+    Gide* g = gideOf(h);
+    if (!g) gide_fehler = "keine GIDE gesteckt";
+    return g;
+}
+}  // namespace
+
+bool k1520_gide_install(K1520Handle h, int basis, bool rtc_vorhanden, const char* abbild, const char* rtc_zustand) {
+    return k1520_gide_install_ex(h, basis, rtc_vorhanden, abbild, rtc_zustand, 0);
+}
+
+bool k1520_gide_install_ex(K1520Handle h, int basis, bool rtc_vorhanden, const char* abbild, const char* rtc_zustand,
+                           int rtc_jahresversatz) {
+    if (!h) return gideErgebnis(false, "kein Handle");
+    if (basis < 0 || basis > 0xFF) return gideErgebnis(false, "GIDE: Basis ausserhalb 00H..FFH");
+    Gide::Config c;
+    c.basis = static_cast<uint8_t>(basis);
+    c.rtc_vorhanden = rtc_vorhanden;
+    Gide::RtcConfig rc;
+    if (rtc_zustand) rc.zustand = rtc_zustand;
+    rc.jahresversatz = rtc_jahresversatz;
+    K1520Machine* m = toMachine(h);
+    if (!m->installGide(c, &rc, abbild ? abbild : "")) return gideErgebnis(false, m->gideFehler());
+    return gideErgebnis(true, {});
+}
+
+bool k1520_gide_installed(K1520Handle h) { return gideOf(h) != nullptr; }
+
+const char* k1520_gide_error(K1520Handle) { return gide_fehler.c_str(); }
+
+bool k1520_gide_image_mount(K1520Handle h, const char* pfad) {
+    Gide* g = gideOderFehler(h);
+    if (!g) return false;
+    if (!pfad || !*pfad) return gideErgebnis(false, "kein Abbildpfad");
+    std::string f;
+    g->platte().auswerfen();
+    if (!g->platte().abbildOeffnen(pfad, AtaGeraet::Geometrie(), &f)) return gideErgebnis(false, f);
+    return gideErgebnis(true, {});
+}
+
+bool k1520_gide_image_eject(K1520Handle h) {
+    Gide* g = gideOderFehler(h);
+    if (!g) return false;
+    g->platte().auswerfen();
+    return gideErgebnis(true, {});
+}
+
+bool k1520_gide_image_create(K1520Handle, const char* pfad, uint32_t mbyte) {
+    if (!pfad || !*pfad) return gideErgebnis(false, "kein Abbildpfad");
+    if (mbyte == 0) return gideErgebnis(false, "Groesse 0 MB");
+    std::string f;
+    if (!AtaGeraet::abbildAnlegen(pfad, uint64_t(mbyte) * 2048, &f)) return gideErgebnis(false, f);
+    return gideErgebnis(true, {});
+}
+
+const char* k1520_gide_image_path(K1520Handle h) {
+    static thread_local std::string buf;
+    const Gide* g = gideOf(h);
+    buf = (g && g->platte().mediumVorhanden()) ? g->platte().pfad() : std::string();
+    return buf.c_str();
+}
+
+bool k1520_gide_status(K1520Handle h, int* basis, int* lh, int* letzter_befehl,
+                       int* abbild_vorhanden, uint64_t* sektoren, uint64_t* zaehler) {
+    const Gide* g = gideOderFehler(h);
+    if (!g) return false;
+    if (basis) *basis = g->config().basis;
+    if (lh) *lh = g->lh() ? 1 : 0;
+    if (letzter_befehl) *letzter_befehl = g->letzterBefehl();
+    if (abbild_vorhanden) *abbild_vorhanden = g->platte().mediumVorhanden() ? 1 : 0;
+    if (sektoren) *sektoren = g->platte().sektorenGesamt();
+    if (zaehler) {
+        const Gide::Zaehler& z = g->zaehler();
+        zaehler[0] = z.daten_lesen; zaehler[1] = z.daten_schreiben; zaehler[2] = z.taskfile; zaehler[3] = z.befehle;
+    }
+    return true;
+}
+
+bool k1520_gide_rtc_zeit(K1520Handle h, int64_t* out) {
+    Gide* g = gideOderFehler(h);
+    if (!g || !g->rtc()) return gideErgebnis(false, "keine RTC bestueckt");
+    if (out) *out = g->rtc()->gastZeit();
+    return true;
+}
+
+bool k1520_gide_rtc_stellen(K1520Handle h, int64_t unix_wirt) {
+    Gide* g = gideOderFehler(h);
+    if (!g || !g->rtc()) return gideErgebnis(false, "keine RTC bestueckt");
+    g->rtc()->stellen(unix_wirt);
+    return true;
+}
+
+bool k1520_gide_rtc_netz_aus(K1520Handle h) {
+    Gide* g = gideOf(h);
+    if (!g || !g->rtc()) return false;
+    g->rtc()->netzAus();
+    return true;
+}
+
+int64_t k1520_gide_rtc_startzeit(const char* zustandsdatei, int jahresversatz, int utc) {
+    return P8000Rtc::startzeit(zustandsdatei ? zustandsdatei : "", jahresversatz, utc != 0, {}, Gide::RTC_KOPF);
+}
+
+const char* k1520_io_owner(K1520Handle h, int port) {
+    static thread_local std::string puffer;
+    puffer.clear();
+    if (h && port >= 0 && port <= 0xFF) puffer = toMachine(h)->ioBesitzer(static_cast<uint8_t>(port));
+    return puffer.c_str();
+}
+
+// ─── GUN-USB (doc/design/50_gun_gide.md, AP U2) ────────────────────────────────
+namespace {
+using k1520::GunUsb;
+std::string usb_fehler;
+bool usbErgebnis(bool ok, const std::string& grund) {
+    usb_fehler = ok ? std::string() : grund;
+    return ok;
+}
+GunUsb* usbOf(K1520Handle h) { return h ? toMachine(h)->gunUsb() : nullptr; }
+GunUsb* usbOderFehler(K1520Handle h) {
+    GunUsb* g = usbOf(h);
+    if (!g) usb_fehler = "keine GUN-USB gesteckt";
+    return g;
+}
+}  // namespace
+
+bool k1520_usb_install(K1520Handle h, int basis, const char* ordner, bool schreibgeschuetzt) {
+    if (!h) return usbErgebnis(false, "kein Handle");
+    if (basis < 0 || basis > 0xFF) return usbErgebnis(false, "GUN-USB: Basis ausserhalb 00H..FFH");
+    GunUsb::Config c;
+    c.basis = static_cast<uint8_t>(basis);
+    if (ordner && *ordner) c.ordner = std::filesystem::u8path(ordner);
+    c.schreibgeschuetzt = schreibgeschuetzt;
+    K1520Machine* m = toMachine(h);
+    if (!m->installGunUsb(c)) return usbErgebnis(false, m->gunUsbFehler());
+    return usbErgebnis(true, {});
+}
+
+bool k1520_usb_installed(K1520Handle h) { return usbOf(h) != nullptr; }
+
+const char* k1520_usb_error(K1520Handle) { return usb_fehler.c_str(); }
+
+bool k1520_usb_stick_insert(K1520Handle h, const char* pfad, bool schreibgeschuetzt) {
+    GunUsb* g = usbOderFehler(h);
+    if (!g) return false;
+    if (!pfad || !*pfad) return usbErgebnis(false, "kein Ordner");
+    std::string f;
+    if (!g->stickEinstecken(std::filesystem::u8path(pfad), schreibgeschuetzt, &f)) return usbErgebnis(false, f);
+    return usbErgebnis(true, {});
+}
+
+bool k1520_usb_stick_remove(K1520Handle h) {
+    GunUsb* g = usbOderFehler(h);
+    if (!g) return false;
+    g->stickZiehen();
+    return usbErgebnis(true, {});
+}
+
+bool k1520_usb_status(K1520Handle h, int* basis, int* stick_vorhanden, uint64_t* zaehler) {
+    const GunUsb* g = usbOderFehler(h);
+    if (!g) return false;
+    if (basis) *basis = g->config().basis;
+    if (stick_vorhanden) *stick_vorhanden = g->vdip().stickVorhanden() ? 1 : 0;
+    if (zaehler) {
+        const GunUsb::Zaehler& z = g->zaehler();
+        zaehler[0] = z.gelesen; zaehler[1] = z.geschrieben; zaehler[2] = z.resets;
+    }
+    return true;
+}
+
+// ─── KCNet-Netzkarte (doc/design/50_gun_gide.md, AP N2) ────────────────────────
+namespace {
+using k1520::GunNet;
+std::string net_fehler;
+bool netErgebnis(bool ok, const std::string& grund) {
+    net_fehler = ok ? std::string() : grund;
+    return ok;
+}
+GunNet* netOf(K1520Handle h) { return h ? toMachine(h)->gunNet() : nullptr; }
+GunNet* netOderFehler(K1520Handle h) {
+    GunNet* g = netOf(h);
+    if (!g) net_fehler = "keine KCNet-Karte gesteckt";
+    return g;
+}
+}  // namespace
+
+bool k1520_net_install(K1520Handle h, int basis, bool nur_loopback, bool link_online, const char* dns) {
+    if (!h) return netErgebnis(false, "kein Handle");
+    if (basis < 0 || basis > 0xFF) return netErgebnis(false, "KCNet: Basis ausserhalb 00H..FFH");
+    GunNet::Config c;
+    c.basis = static_cast<uint8_t>(basis);
+    c.richtlinie.aussenErlaubt = !nur_loopback;
+    c.link_online = link_online;
+    if (dns && *dns) {
+        unsigned a, b, cc, d;
+        char rest;
+        if (std::sscanf(dns, "%u.%u.%u.%u%c", &a, &b, &cc, &d, &rest) != 4 || a > 255 || b > 255 || cc > 255 || d > 255)
+            return netErgebnis(false, "KCNet: DNS-Adresse ungueltig (a.b.c.d)");
+        c.dns_server[0] = uint8_t(a); c.dns_server[1] = uint8_t(b); c.dns_server[2] = uint8_t(cc); c.dns_server[3] = uint8_t(d);
+    }
+    K1520Machine* m = toMachine(h);
+    if (!m->installGunNet(c)) return netErgebnis(false, m->gunNetFehler());
+    return netErgebnis(true, {});
+}
+
+bool k1520_net_installed(K1520Handle h) { return netOf(h) != nullptr; }
+
+const char* k1520_net_error(K1520Handle) { return net_fehler.c_str(); }
+
+bool k1520_net_set_link(K1520Handle h, bool online) {
+    GunNet* g = netOderFehler(h);
+    if (!g) return false;
+    g->setzeLink(online);
+    return netErgebnis(true, {});
+}
+
+bool k1520_net_status(K1520Handle h, int* basis, uint64_t* zaehler) {
+    const GunNet* g = netOderFehler(h);
+    if (!g) return false;
+    if (basis) *basis = g->config().basis;
+    if (zaehler) {
+        const GunNet::Zaehler& z = g->zaehler();
+        zaehler[0] = z.kommandos; zaehler[1] = z.fehlerkommandos;
+        zaehler[2] = z.bytes_zur_karte; zaehler[3] = z.bytes_zum_gast;
+    }
+    return true;
+}
+
+int k1520_net_w5100_read(K1520Handle h, int adr) {
+    GunNet* g = netOf(h);
+    if (!g || adr < 0) return -1;
+    return g->w5100().lese(static_cast<uint16_t>(adr & 0x7FFF));
+}
+
 // ─── RAM-Floppy RAF (doc/design/22_raf512.md §6) ───────────────────────────────
 bool k1520_raf_install(K1520Handle h, const char* typ) {
     if (!h) return false;

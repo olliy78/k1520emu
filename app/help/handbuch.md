@@ -62,7 +62,7 @@ Speichern unter und für die echte Diskette.
 **Kassette** — die beiden Kassettenlaufwerke, nur solange die Kassetten-Karte steckt
 (siehe *Kassette* unten).
 
-**Einstellungen** — vier Reiter: *Allgemein* (Modell, Takt, RAM-Disk, Lochstreifen, Kassette), *Laufwerke*
+**Einstellungen** — vier Reiter: *Allgemein* (Modell, Takt, RAM-Disk, Lochstreifen, Kassette, IDE-Platte, USB-Stick, Netzwerk), *Laufwerke*
 (welcher Laufwerkstyp in welchem Steckplatz steckt), *Schnittstellen* (die seriellen
 Anschlüsse des Rechners nach außen, ein Block je Schnittstelle — siehe *Serielle
 Schnittstellen* unten) und *CRT* (das Aussehen der Bildröhre).
@@ -1397,6 +1397,155 @@ geschrieben; eine vorhandene bleibt liegen.
 **A5120.16 und RAF** gehen zusammen: das Erweiterungsmodul belegt M: (CP/A mit
 EM256-BIOS), `RAF512.COM` legt die RAF daneben als P: an.
 
+## IDE-Platte (GIDE) und Uhr
+
+*Einstellungen ▸ Allgemein* (Zeilen **IDE-Platte (GIDE)** und **GIDE-Uhr**, flach untereinander wie die übrigen
+Einstellungen; die Seite lässt sich senkrecht rollen) steckt eine IDE-Karte nach
+Tilmann Reh mit einer ATA-Platte und der Uhr RTC 72421 — im A5120 Emulator, im K8915 Emulator, im PRG710
+Emulator und im PC1715 Emulator (nicht im P8000 und nicht im MC80). Ab Werk ist sie **aus**.
+
+* **GIDE-Karte stecken** — das Kästchen. Ein Wechsel schaltet die Maschine aus und baut sie neu auf, wie
+  bei der RAM-Disk — eine Karte steckt man nicht im Betrieb.
+* **E/A-Basis** — die Karte belegt die Adressen *Basis+4* bis *Basis+0FH*; das Auswahlfeld bietet
+  **00H bis F0H** in 10H-Schritten an. Wie die Brücken der echten Karten stehen, ist nicht bekannt; ab
+  Werk ist **90H** vorgewählt — auf allen Rechnern frei und ohne Streit mit den anderen Karten. In der
+  Praxis üblich ist D0H (Treiber `GIDEHPD0`, `gidn@D0h`); wo sie frei ist, kann man sie wählen. Was schon
+  belegt ist, steht im Auswahlfeld dabei und lässt sich nicht wählen, etwa „D0H (belegt: K5020 Daten-PIO)“
+  (die Kassette bei D0H am K8915 und am PC 1715) oder „D0H (belegt: …)“ am PRG 710 durch den EPROMmer.
+  Die Auskunft kommt vom Rechner selbst. Fordert eine geladene Konfiguration trotzdem eine belegte Basis
+  (oder belegt eine andere Karte die Adressen), bleibt die GIDE **aus**, und der Grund steht in roter
+  Schrift unter der Gruppe.
+* **Plattenabbild** — steht nicht bei den Einstellungen, sondern als Kasten **IDE-Platte (GIDE)** im
+  Reiter *Laufwerke*, unter den Disketten (wie die Winchesterplatte des P8000); der Kasten erscheint,
+  sobald die Karte gesteckt ist. *Einlegen …* legt ein vorhandenes Abbild ein, *Auswerfen* nimmt es heraus
+  und schreibt es sofort zurück, *Neue Platte …* fragt nach Name und Größe (**8, 16, 32, 64, 128 oder
+  256 MB**, Vorgabe 256 MB). **Plattenabbilder sind immer gepackt (`.img.gz`)**, wie die Platten des
+  P8000: eine leere 256-MB-Platte belegt rund 250 KB; die Endung `.img.gz` wird beim Anlegen erzwungen.
+  Ein rohes `.img` wird beim Einlegen abgelehnt (mit Hinweis); `gzip -k abbild.img` packt es, das Original
+  bleibt. Eine **vorhandene Datei wird nie überschrieben** — gibt es den Namen schon, fragt das Programm nur,
+  ob diese Platte stattdessen eingelegt werden soll. Neue Platten liegen vorgabegemäß im Dokumentenordner
+  unter `K1520emu/GIDE_Platten`.
+* **RTC 72421** — die Uhr (Vorgabe an), gestaltet wie die Zeilen *RTC* des P8000. Sie zeigt dem Gast
+  die Zeit des Wirtsrechners in **UTC**, läuft in **Maschinenzeit** (bei erhöhter Geschwindigkeit also
+  schneller) und springt beim Neustart nie zurück (Stand und Wirtszeit stehen in der Batteriedatei
+  `gide_rtc_<programm>.dat` im Konfigurationsordner und werden beim Ausschalten, Beenden und etwa je Minute
+  Maschinenzeit gesichert; beim Start gilt das Größere aus „Stand + Abwesenheit“ und PC-Uhr). Beim
+  allerersten Start stellt sie sich nach der **PC-Uhr**. **Zeitversatz:** *Kein Zeitversatz*,
+  *−28 Jahre* (gleicher Wochentag) oder *−40 Jahre* (Vorgabe, wie beim P8000) — der Gast sieht die Zeit
+  um so viele Jahre zurück; ein Wechsel baut die Maschine neu auf. Die Zeile *Uhrzeit* zeigt die Zeit des
+  Gastsystems und daneben die PC-Zeit (beide UTC); *Nach PC-Uhr stellen* setzt die Uhr auf die PC-Zeit
+  (liegt sie dann vor der bisherigen, wird vorher gefragt). In der Statuszeile steht dieselbe Zeit als
+  Feld **RTC:**.
+
+In der Statuszeile steht bei gesteckter Karte die Leuchte **IDE**. Sie folgt dem **Zugriff** des
+Gastsystems auf die Karte, nicht dem Inhalt: gefüllt = Abbild eingelegt, rot = die Karte wurde
+eben angesprochen, Ring = kein Abbild. Der Tooltip nennt Basis und Abbildname.
+
+**Treiber und Programme** brauchen die Gastsysteme selbst. Sie liegen **auf den mitgelieferten
+Systemdisketten** (Beispieldisketten) und passen zur oben genannten Vorauswahl der Basen — GIDE auf
+**90H**; die Tabelle weiter unten sagt, welche Diskette welche Programme trägt. Jede dieser Disketten hat
+die Texte `GIDE.TXT`, `USB.TXT` und `NETZ.TXT` mit der Bedienung.
+
+* **Platte:** unter CP/A (A5120, PC 1715) und unter SCPX 1.5 (PRG 710) der Treiber von Poppe
+  (`GIDEHP90`, danach `ERADIR D:` für das Verzeichnis des ersten neuen Laufwerks), unter SCPX 1.7,
+  SCPX 8915 und SCP 1715 der von Kingstener (`GIDN90 /F` beim ersten Mal, Laufwerk N:). Für SCP 3.0 (PC 1715W) ist
+  kein Treiber bekannt. Die beiden **formatieren die Platte untereinander unverträglich** — eine mit dem
+  einen Treiber angelegte Platte liest der andere nicht; ein Abbild gehört also zu seinem Treiber. Der Treiber
+  von Poppe braucht mindestens 504000 Sektoren (rund 258 MB, also die 256-MB-Vorgabe oder mehr), der von
+  Kingstener kommt mit 32 MB aus.
+* **Uhr:** `UHR` zeigt Datum und Zeit (`TT.MM.JJJJ HH:MM:SS`), `UHR S 24.12.26 18:30:00` stellt sie,
+  `UHR A0` (Hexzahl) fragt eine Karte mit anderer Basis. Die Uhr gibt es auf **jeder** der Disketten, auch am PC 1715W.
+* **Wer eine andere Basis einstellt**, braucht passende Dateien: bei Poppe liegen im Installationsordner
+  `share/k1520emu/karten_software/fremd/poppe/` die Treiber `GIDEHP00` bis `GIDEHPF0` für jede Basis; für
+  Kingstener, USB und Netz schreibt `python3 karten_software/basis_anpassen.py gidn|usb|net <Basis> --out <Ordner>`
+  die Operanden um. Die Herkunft der Programme (und was über ihre Weitergabe bekannt ist) steht in
+  `share/k1520emu/karten_software/HERKUNFT.md`.
+
+| Systemdiskette | Platte | Uhr | USB (Basis) | Netz (Basis) |
+|----------------|--------|-----|-------------|--------------|
+| A5120 CP/A | Poppe | UHR | 84H | C0H |
+| A5120 SCPX 1.7 | Kingstener | UHR | 84H | C0H |
+| K8915 SCPX 8915 | Kingstener | UHR | 84H (`USB`…) und 8CH (`USB8C`…) | C0H |
+| PRG 710 SCPX 1.5 | Poppe | UHR | 8CH | 28H |
+| PRG 710-1 SCPX 1.7 | Kingstener | UHR | 8CH | 28H |
+| PC 1715 CP/A 1715 | Poppe | UHR | 84H | C0H |
+| PC 1715 SCP 1715 (V0006, V0007) | Kingstener (ohne PIP: `SAVE`) | UHR | 84H | C0H |
+| PC 1715W SCP 3.0 | — | UHR | 84H | — (zu groß für die Diskette) |
+
+Andere Systemdisketten (UDOS, MicroDOS, SIOS, BCU, CP/Z …) tragen diese Programme nicht; ob die
+CP/M-Treiber dort laufen, ist nicht geprüft.
+
+Gemerkt werden Karte, Basis, Abbild, Uhr und Zeitversatz in der Konfiguration (`general.gide`, Schlüssel
+`enabled`, `basis`, `image`, `rtc`, `rtc_versatz`).
+
+**Vorauswahl der E/A-Basen der Steckkarten.** Die Basen von IDE-Karte, USB-Karte (GUN-USB) und
+Netzkarte (KCNet) sind so vorbelegt, dass sie untereinander und mit RAM-Floppy (88H/89H), Kassette,
+Lochstreifen und den festen Karten des jeweiligen Rechners nichts gemeinsam belegen:
+
+| Rechner | IDE (GIDE) | USB | Netz |
+|---------|------------|-----|------|
+| A5120 (auch .16, A5130, K8924) | 90H | 84H | C0H |
+| K8915 V3 | 90H | 84H | C0H |
+| K8915 V2 | 90H | 8CH | C0H |
+| PRG 710 / 710-1 | 90H | 8CH | 28H |
+| PC 1715 / 1715W | 90H | 84H | C0H |
+
+(84H ist die Lage der GUN; C0H und 28H sind die beiden Jumperstellungen der K1520-Netzkarte; am PRG 710
+ist C0H der ATP-Zusatz, am K8915 V2 und am PRG 710 80H–87H belegt.) Die Zeilen für USB und Netz
+haben dieselbe Basiswahl (Vielfache von 4); belegte Basen sind markiert und nicht wählbar, auch die
+der jeweils anderen angehakten Karten.
+
+## USB-Stick (GUN/VDIP1)
+
+*Einstellungen ▸ Allgemein ▸ USB-Stick (GUN)* (eine Zeile mit Haken und Basis, darunter Stick-Ordner, Schreibschutz und
+Stick-Knopf) steckt die USB-Karte der GUN (Z80-PIO mit dem
+Speicherstick-Baustein VDIP1) — in denselben vier Programmen wie die IDE-Karte. Ab Werk ist sie **aus**.
+
+* **USB-Karte stecken** und **E/A-Basis** — wie bei der IDE-Karte: ein Wechsel schaltet die Maschine aus
+  und baut sie neu auf. Vorgewählt ist 84H (die Lage der GUN), am K8915 V2 und am PRG 710 8CH (siehe die
+  Tabelle oben).
+* **Stick-Ordner** — ein Ordner des Rechners, der im Gast als Stick erscheint (ab Werk
+  `K1520emu/USB-Stick` im Dokumentenordner; wird bei Bedarf angelegt). **Der Gast sieht nur diesen
+  Ordner**: nur Dateinamen im 8.3-Format, nichts außerhalb, Verknüpfungen bleiben unsichtbar. Ein
+  anderer Ordner wirkt sofort, ohne Neustart — wie ein anderer Stick.
+* **Stick schreibgeschützt** — wirkt sofort (der Stick wird dabei neu gesteckt).
+* **Stick entfernen / Stick stecken** — zieht den Stick bzw. steckt ihn wieder ein, sofort und ohne
+  Neustart. Nach einem Neuaufbau der Maschine steckt der Stick wieder.
+
+Die Leuchte **USB** in der Statuszeile steht nur bei gesteckter Karte und folgt dem Zugriff: gefüllt =
+Stick steckt, rot = eben angesprochen, Ring = kein Stick. Der Tooltip nennt Basis und Ordner.
+
+Der Gast bedient den Stick mit den **UTools** (M. Leubner), die auf den Systemdisketten liegen und zur
+Vorauswahl der Basis passen (Tabelle im Abschnitt *IDE-Platte (GIDE) und Uhr*): `USB FWV` (Firmware-Version =
+Verbindungsprobe), `UDIR` (Verzeichnis des Sticks), `UGET Datei` (vom Stick auf die Diskette), `UPUT Datei` (auf den Stick).
+Am K8915 tragen die Programme für **8CH** (K8915 V2) das Suffix `8C` (`UDIR8C` …). Gemerkt wird alles in der
+Konfiguration (`general.usb`).
+
+## Netzwerk (KCNet/W5100)
+
+*Einstellungen ▸ Allgemein ▸ Netzwerk (KCNet)* (flache Zeilen: Haken und Basis, nur lokal, Kabel) steckt die Netzwerkkarte KCNet (Z80-PIO mit dem
+Netzwerkbaustein W5100) — ab Werk **aus**.
+
+* **Netzwerkkarte stecken** und **E/A-Basis** — ein Wechsel baut die Maschine neu auf. Üblich sind C0H
+  oder 28H (die beiden Jumperstellungen der K1520-Netzkarte; vorgewählt ist die Lage der Tabelle oben)
+  und 88H bei der GUN. **88H/89H gehören der RAM-Floppy**, solange diese steckt.
+* **nur lokal (Loopback)** — ab Werk **aus**. Ohne Haken kann der emulierte Rechner Verbindungen ins
+  **echte Netz** aufbauen und annehmen; das ist gewollt, aber was im Gast läuft, ist dann im Netz
+  sichtbar. Mit Haken erreicht er nur den Rechner selbst. Ein Wechsel baut die Maschine neu auf.
+* **Netzwerkkabel verbunden** — wirkt sofort; ohne Kabel meldet die Karte „offline“.
+* Die Anzeige **Verkehr** zählt Kommandos und Bytes.
+
+Die Leuchte **NET** in der Statuszeile folgt dem Verkehr: gefüllt = Kabel verbunden, rot = eben
+angesprochen, Ring = Kabel abgezogen.
+
+Im Gast laufen `TFTP` und `CPMNET` (Ralf Kaestner), die auf den Systemdisketten liegen (Tabelle im Abschnitt
+*IDE-Platte (GIDE) und Uhr*; `NETZ.TXT` erklärt die Einrichtung). **Die Basis der Gastsoftware muss zur Einstellung
+passen** — die Programme suchen die Karte an einer festen Adresse: die Disketten tragen die Fassung für die Vorauswahl
+(C0H, am PRG 710 28H); für eine andere Basis schreibt `basis_anpassen.py net <Basis>` sie um. Im Menü *T* von
+`CPMNET` trägt man IP-Adresse, Netzmaske und Gateway **von Hand** ein; DHCP, DNS und Ping gibt es im Modell nicht (die im
+Gast eingetragene Adresse wertet der Emulator nicht aus, er benutzt die Netzverbindung des Rechners).
+Gemerkt wird alles in der Konfiguration (`general.net`).
+
 ## Lochstreifen
 
 *Einstellungen ▸ Allgemein ▸ Lochstreifen (SIF1000, K6022)* steckt die
@@ -1727,7 +1876,7 @@ Alles, was man einstellt, landet fortlaufend in
 kann also den A5120 mit drei Laufwerken und sichtbarer Tastatur und den K8915 mit
 zwei Laufwerken ohne Tastatur nebeneinander führen. Gemerkt werden Bildröhre,
 Takt, Modell, RAM-Disk (samt Stand-by), Lochstreifen-Karte samt Leser- und
-Stanzerdatei, Kassetten-Karte samt den Dateien beider Laufwerke, Laufwerksbestückung, eingelegte Disketten, die seriellen Schnittstellen
+Stanzerdatei, Kassetten-Karte samt den Dateien beider Laufwerke, IDE-Karte GIDE samt Abbild, USB- und Netzwerkkarte, Laufwerksbestückung, eingelegte Disketten, die seriellen Schnittstellen
 (samt dem, was lief), Größe und Lage des Fensters
 (auch „maximiert"), die Lage und Breite der Kästen samt der Trennlinien
 dazwischen, und der Inhalt der Symbolleiste.

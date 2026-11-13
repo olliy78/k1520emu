@@ -112,6 +112,7 @@ std::unique_ptr<CpmFileSystem> CpmFileSystem::mount(SectorSpace& space,
 
     const uint32_t dir_bytes = static_cast<uint32_t>(prof.dir_entries) * 32;
     fs->dir_blocks_ = (dir_bytes + prof.block_size - 1) / prof.block_size;
+    if (prof.reserved_blocks > fs->dir_blocks_) fs->dir_blocks_ = prof.reserved_blocks;   // AL0/AL1 > Verzeichnis
     if (fs->dir_blocks_ >= fs->total_blocks_) {
         err = "Verzeichnis (" + std::to_string(prof.dir_entries)
             + " Eintraege) passt nicht in den Datenbereich";

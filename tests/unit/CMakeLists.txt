@@ -127,6 +127,14 @@ k1520_add_test(em16  SRC cards/test_em16.cpp       LIBS k1520_em k1520_k3526 LAB
 # RAM-Floppy RAF 128/512/2M mit echtem Z80 (doc/design/22_raf512.md AP-R1)
 k1520_add_test(raf   SRC cards/test_raf.cpp        LIBS k1520_raf k1520_z80 LABELS "${_lbl}")
 
+# GIDE-IDE-Karte mit echtem Z80 (Entwurf 50 AP G2)
+k1520_add_test(gide  SRC cards/test_gide.cpp       LIBS k1520_gide k1520_z80 LABELS "${_lbl}")
+k1520_add_test(gide_rtc SRC cards/test_gide_rtc.cpp LIBS k1520_gide k1520_z80 LABELS "${_lbl}")
+# GUN-USB (Z80-PIO + VDIP1) mit echtem Z80 (Entwurf 50 AP U2)
+k1520_add_test(gun_usb SRC cards/test_gun_usb.cpp LIBS k1520_gun_usb k1520_z80 LABELS "${_lbl}")
+# KCNet-Netzkarte (Z80-PIO + ATmega-Modell + W5100) mit echtem Z80 (Entwurf 50 AP N2, Protokoll 50a)
+k1520_add_test(gun_net SRC cards/test_gun_net.cpp LIBS k1520_gun_net k1520_z80 LABELS "${_lbl}")
+
 # ── core/peripherals/ ────────────────────────────────────────────────────────
 # MC80.3x-Tastatur auf Zeichenebene (AP M3, doc/mc80/egos.md §3)
 k1520_add_test(mc80_tastatur SRC peripherals/test_mc80_tastatur.cpp LIBS k1520_mc80_karten LABELS "${_lbl}")
@@ -160,6 +168,18 @@ k1520_add_test(tastatur_k7673 SRC peripherals/test_tastatur_k7673.cpp
 # P8000-Winchesterplatte: Geometrie, PAR, Spursynthese/-zerlegung, Mechanik (Entwurf 25 AP P13b)
 k1520_add_test(platte         SRC peripherals/test_platte.cpp
                               LIBS k1520_winchester LABELS "${_lbl}")
+
+# ATA-/IDE-Festplatte (Entwurf 50 AP G1)
+k1520_add_test(ata_geraet     SRC peripherals/test_ata_geraet.cpp
+                              LIBS k1520_ata LABELS "${_lbl}")
+
+# VDIP1/VDAP-Firmware ueber Wirtsverzeichnis (Entwurf 50 AP U1)
+k1520_add_test(vdip_geraet    SRC peripherals/test_vdip_geraet.cpp
+                              LIBS k1520_vdip LABELS "${_lbl}")
+
+# WIZnet W5100 gegen Loopback (Entwurf 50 AP N1)
+k1520_add_test(w5100          SRC peripherals/test_w5100.cpp
+                              LIBS k1520_w5100 LABELS "${_lbl}")
 
 # Lochstreifen-Bandformate Roh / Intel HEX / ASCII-Art (doc/design/23_lochstreifen.md §4, AP-L2)
 k1520_add_test(band_format    SRC peripherals/test_band_format.cpp
@@ -281,6 +301,10 @@ k1520_add_test(wega_platte   SRC filesystem/test_wega_platte.cpp
                              LIBS k1520_fs LABELS "${_lbl}")
 k1520_add_test(platten_volume SRC filesystem/test_platten_volume.cpp
                              LIBS k1520_fs LABELS "${_lbl}")
+# GIDE-Platten (Poppe/Kingstener) im DiskTool - doc/merkposten/disktool.md (GIDE-Platten)
+k1520_add_test(gide_platte    SRC filesystem/test_gide_platte.cpp
+                             LIBS k1520_fs LABELS "${_lbl}"
+                             DEFS K1520_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
 # Tar-Disketten (rohe tar-Stroeme ohne Dateisystem, nur lesbar) — Echtdaten mit K1520_CQM_DIR
 k1520_add_test(tar_fs        SRC filesystem/test_tar_fs.cpp
                              LIBS k1520_fs LABELS "${_lbl}"

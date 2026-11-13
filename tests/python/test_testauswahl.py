@@ -83,6 +83,29 @@ def test_reine_oberflaeche_nur_test_ohne_langsame_spur_und_win():
     assert p["test"] and not p["facher"] and not p["win"], p
 
 
+@pytest.mark.parametrize("pfad", ["core/cards/gide/gide.cpp", "core/cards/gun_usb/gun_usb.cpp", "core/cards/gun_net/gun_net.cpp", "core/peripherals/ata/ata_geraet.cpp", "core/peripherals/vdip/vdip_geraet.cpp", "core/peripherals/w5100/w5100.cpp"])
+def test_gide_und_ata_haben_keine_langsamen_faelle_fallen_aber_nicht_auf_alles_zurueck(pfad):
+    p = plan(pfad)
+    assert p["test"] and p["win"] and not p["facher"], p
+
+
+@pytest.mark.parametrize("pfad", ["core/filesystem/gide/gide_platte.cpp", "core/filesystem/gide/gide_platte.h"])
+def test_gide_platte_im_disktool_hat_keine_langsamen_faelle_win_aber_ja(pfad):
+    p = plan(pfad)
+    assert p["test"] and p["win"] and not p["facher"], p
+
+
+def test_gide_golden_fixture_loest_nur_die_schnelle_runde_aus():
+    p = plan("tests/fixtures/gide/poppe_cpa.img.gz")
+    assert p["test"] and not p["win"] and not p["facher"], p
+
+
+def test_sector_space_und_cpm_bleiben_im_fachgebiet_floppy():
+    # die flache SectorSpace-Betriebsart der GIDE-Platte darf die Diskettenregeln nicht umgehen
+    assert "fach_floppy" in plan("core/filesystem/sector_space.cpp")["facher"]
+    assert "fach_floppy" in plan("core/filesystem/cpm/cpm_fs.cpp")["facher"]
+
+
 def test_cpp_aenderung_loest_windows_aus_python_nicht():
     assert plan("core/machines/mc80/mc80.cpp")["win"]
     assert not plan("tools/test_auswahl.py")["win"]

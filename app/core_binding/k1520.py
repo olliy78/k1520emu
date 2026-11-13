@@ -609,6 +609,66 @@ _lib.k1520_aup_code.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int]
 _lib.k1520_aup_code.restype = ctypes.c_int
 _lib.k1520_aup_tastenname.argtypes = [ctypes.c_int, ctypes.c_int]
 _lib.k1520_aup_tastenname.restype = ctypes.c_char_p
+# GIDE (doc/design/50_gun_gide.md, AP G4)
+_lib.k1520_gide_install.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_bool, ctypes.c_char_p, ctypes.c_char_p]
+_lib.k1520_gide_install.restype = ctypes.c_bool
+_lib.k1520_gide_install_ex.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_bool, ctypes.c_char_p, ctypes.c_char_p,
+                                       ctypes.c_int]
+_lib.k1520_gide_install_ex.restype = ctypes.c_bool
+_lib.k1520_gide_installed.argtypes = [K1520Handle]
+_lib.k1520_gide_installed.restype = ctypes.c_bool
+_lib.k1520_gide_error.argtypes = [K1520Handle]
+_lib.k1520_gide_error.restype = ctypes.c_char_p
+_lib.k1520_gide_image_mount.argtypes = [K1520Handle, ctypes.c_char_p]
+_lib.k1520_gide_image_mount.restype = ctypes.c_bool
+_lib.k1520_gide_image_eject.argtypes = [K1520Handle]
+_lib.k1520_gide_image_eject.restype = ctypes.c_bool
+_lib.k1520_gide_image_create.argtypes = [K1520Handle, ctypes.c_char_p, ctypes.c_uint32]
+_lib.k1520_gide_image_create.restype = ctypes.c_bool
+_lib.k1520_gide_image_path.argtypes = [K1520Handle]
+_lib.k1520_gide_image_path.restype = ctypes.c_char_p
+_lib.k1520_gide_status.argtypes = [K1520Handle, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int),
+                                   ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int),
+                                   ctypes.POINTER(ctypes.c_uint64), ctypes.POINTER(ctypes.c_uint64)]
+_lib.k1520_gide_status.restype = ctypes.c_bool
+_lib.k1520_gide_rtc_zeit.argtypes = [K1520Handle, ctypes.POINTER(ctypes.c_int64)]
+_lib.k1520_gide_rtc_zeit.restype = ctypes.c_bool
+_lib.k1520_gide_rtc_stellen.argtypes = [K1520Handle, ctypes.c_int64]
+_lib.k1520_gide_rtc_stellen.restype = ctypes.c_bool
+_lib.k1520_gide_rtc_netz_aus.argtypes = [K1520Handle]
+_lib.k1520_gide_rtc_netz_aus.restype = ctypes.c_bool
+_lib.k1520_gide_rtc_startzeit.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_int]
+_lib.k1520_gide_rtc_startzeit.restype = ctypes.c_int64
+_lib.k1520_io_owner.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_io_owner.restype = ctypes.c_char_p
+# GUN-USB (doc/design/50_gun_gide.md, AP U2)
+_lib.k1520_usb_install.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_char_p, ctypes.c_bool]
+_lib.k1520_usb_install.restype = ctypes.c_bool
+_lib.k1520_usb_installed.argtypes = [K1520Handle]
+_lib.k1520_usb_installed.restype = ctypes.c_bool
+_lib.k1520_usb_error.argtypes = [K1520Handle]
+_lib.k1520_usb_error.restype = ctypes.c_char_p
+_lib.k1520_usb_stick_insert.argtypes = [K1520Handle, ctypes.c_char_p, ctypes.c_bool]
+_lib.k1520_usb_stick_insert.restype = ctypes.c_bool
+_lib.k1520_usb_stick_remove.argtypes = [K1520Handle]
+_lib.k1520_usb_stick_remove.restype = ctypes.c_bool
+_lib.k1520_usb_status.argtypes = [K1520Handle, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int),
+                                  ctypes.POINTER(ctypes.c_uint64)]
+_lib.k1520_usb_status.restype = ctypes.c_bool
+# KCNet-Netzkarte (doc/design/50_gun_gide.md, AP N2)
+_lib.k1520_net_install.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_bool, ctypes.c_bool, ctypes.c_char_p]
+_lib.k1520_net_install.restype = ctypes.c_bool
+_lib.k1520_net_installed.argtypes = [K1520Handle]
+_lib.k1520_net_installed.restype = ctypes.c_bool
+_lib.k1520_net_error.argtypes = [K1520Handle]
+_lib.k1520_net_error.restype = ctypes.c_char_p
+_lib.k1520_net_set_link.argtypes = [K1520Handle, ctypes.c_bool]
+_lib.k1520_net_set_link.restype = ctypes.c_bool
+_lib.k1520_net_status.argtypes = [K1520Handle, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_uint64)]
+_lib.k1520_net_status.restype = ctypes.c_bool
+_lib.k1520_net_w5100_read.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_net_w5100_read.restype = ctypes.c_int
+
 # RAM-Floppy RAF (doc/design/22_raf512.md §6)
 _lib.k1520_raf_install.argtypes = [K1520Handle, ctypes.c_char_p]
 _lib.k1520_raf_install.restype = ctypes.c_bool
@@ -1207,7 +1267,7 @@ class K1520Emulator:
                  tastatur: Optional[str] = None, p8000: Optional[dict] = None,
                  ausfuehrung: Optional[str] = None, spe=1, pcmc=False, laderom: Optional[str] = None,
                  konfig: Optional[dict] = None, aup: bool = False,
-                 aup_sonder: bool = False):
+                 aup_sonder: bool = False, gide=None, usb=None, net=None):
         """Initialize emulator instance.
 
         Args:
@@ -1244,6 +1304,20 @@ class K1520Emulator:
             raf: RAM-Floppy — ``None``/``"none"`` = ohne, ``"raf128"``, ``"raf512"``
                 oder ``"raf2m"``; an jeder Maschine.  Wird direkt nach dem Anlegen
                 gesteckt (vor dem ersten Lauf); Fehler → ValueError.
+            gide: IDE-Karte GIDE stecken (an jeder Maschine ausser P8000) — ``None``/``False`` = ohne,
+                ``True`` = Vorgaben (Basis 0x90, RTC bestückt), sonst ein dict mit den Schlüsseln
+                ``basis``, ``rtc`` (bool), ``abbild`` (Plattenabbild), ``rtc_zustand`` (Batteriedatei),
+                ``rtc_versatz`` (Jahre, 0/-28/-40, nur Anzeige gegenueber dem Gast).
+                Direkt nach dem Anlegen gesteckt; Fehler → ValueError.
+            usb: GUN-USB (Z80-PIO + VDIP1, Wirtsverzeichnis als Stick) stecken (an jeder Maschine ausser
+                P8000; am K8915/PRG 710 ist die Vorgabe-Basis 0x84 von der ZRE belegt) — ``None``/``False``
+                = ohne, ``True`` = Vorgaben (Basis 0x84, kein Stick), sonst ein dict mit ``basis``,
+                ``ordner`` (Stick-Wirtsverzeichnis) und ``schreibgeschuetzt`` (bool).
+                Direkt nach dem Anlegen gesteckt; Fehler → ValueError.
+            net: KCNet-Netzkarte (Z80-PIO + ATmega-Modell + W5100, Netz des Wirts) stecken (an jeder Maschine
+                ausser P8000) — ``None``/``False`` = ohne, ``True`` = Vorgaben (Basis 0x88, Ziele frei,
+                Kabel steckt), sonst ein dict mit ``basis``, ``nur_loopback`` (bool), ``link`` (bool),
+                ``dns`` ("a.b.c.d").  88H/89H gehören der RAF.  Fehler → ValueError.
             ptape: Lochstreifen-Karte K6022 (SIF1000, E0H–E7H) stecken; an jeder
                 Maschine, wie ``raf`` direkt nach dem Anlegen.  Fehler → ValueError.
             aup: nur A5120 — AUP 062-8531 (Tastaturteil K7633 + Kundentastatur, E/A 40H–43H)
@@ -1400,6 +1474,36 @@ class K1520Emulator:
                 _lib.k1520_destroy(handle)
                 self._handle = None
                 raise ValueError(reason or f"RAF {raf!r} nicht steckbar")
+        if gide:
+            g = {} if gide is True else dict(gide)
+            if not _lib.k1520_gide_install_ex(handle, int(g.get("basis", 0x90)), bool(g.get("rtc", True)),
+                                              os.fsencode(g.get("abbild") or ""),
+                                              os.fsencode(g.get("rtc_zustand") or ""),
+                                              int(g.get("rtc_versatz", 0))):
+                reason = _lib.k1520_gide_error(handle)
+                reason = reason.decode("utf-8", "replace") if reason else ""
+                _lib.k1520_destroy(handle)
+                self._handle = None
+                raise ValueError(reason or "GIDE nicht steckbar")
+        if usb:
+            u = {} if usb is True else dict(usb)
+            if not _lib.k1520_usb_install(handle, int(u.get("basis", 0x84)), os.fsencode(u.get("ordner") or ""),
+                                          bool(u.get("schreibgeschuetzt", False))):
+                reason = _lib.k1520_usb_error(handle)
+                reason = reason.decode("utf-8", "replace") if reason else ""
+                _lib.k1520_destroy(handle)
+                self._handle = None
+                raise ValueError(reason or "GUN-USB nicht steckbar")
+        if net:
+            n = {} if net is True else dict(net)
+            dns = n.get("dns")
+            if not _lib.k1520_net_install(handle, int(n.get("basis", 0x88)), bool(n.get("nur_loopback", False)),
+                                          bool(n.get("link", True)), dns.encode("ascii") if dns else None):
+                reason = _lib.k1520_net_error(handle)
+                reason = reason.decode("utf-8", "replace") if reason else ""
+                _lib.k1520_destroy(handle)
+                self._handle = None
+                raise ValueError(reason or "KCNet nicht steckbar")
         if ptape and not _lib.k1520_ptape_install(handle):
             reason = _lib.k1520_last_init_error()
             reason = reason.decode("utf-8", "replace") if reason else ""
@@ -2413,6 +2517,117 @@ class K1520Emulator:
         return _lib.k1520_head_loaded(self._handle)
 
     # ─── Speicher-/Portzugriff (Diagnose, Tests) ─────────────────────────────
+
+    # ─── GIDE ──────────────────────────────────────────────────────────────
+    def gide_installed(self) -> bool:
+        """True, wenn die GIDE gesteckt ist (``K1520Emulator(gide=...)``)."""
+        return bool(_lib.k1520_gide_installed(self._handle))
+
+    def gide_error(self) -> str:
+        v = _lib.k1520_gide_error(self._handle)
+        return v.decode("utf-8", "replace") if v else ""
+
+    def gide_image_mount(self, pfad) -> bool:
+        return bool(_lib.k1520_gide_image_mount(self._handle, os.fsencode(pfad)))
+
+    def gide_image_eject(self) -> bool:
+        return bool(_lib.k1520_gide_image_eject(self._handle))
+
+    def gide_image_create(self, pfad, mbyte: int) -> bool:
+        """Leeres Abbild von ``mbyte`` MB anlegen (vorhandene Datei bleibt unberührt → False)."""
+        return bool(_lib.k1520_gide_image_create(self._handle, os.fsencode(pfad), int(mbyte)))
+
+    def gide_image_path(self) -> str:
+        v = _lib.k1520_gide_image_path(self._handle)
+        return os.fsdecode(v) if v else ""
+
+    def gide_status(self) -> Optional[dict]:
+        """Zustand ohne Nebenwirkung (``None`` ohne Karte)."""
+        basis, lh, cmd, img = (ctypes.c_int() for _ in range(4))
+        sek = ctypes.c_uint64()
+        z = (ctypes.c_uint64 * 4)()
+        if not _lib.k1520_gide_status(self._handle, ctypes.byref(basis), ctypes.byref(lh), ctypes.byref(cmd),
+                                      ctypes.byref(img), ctypes.byref(sek), z):
+            return None
+        return {"basis": basis.value, "lh": lh.value, "letzter_befehl": cmd.value,
+                "abbild_vorhanden": bool(img.value), "sektoren": sek.value,
+                "daten_lesen": z[0], "daten_schreiben": z[1], "taskfile": z[2], "befehle": z[3]}
+
+    def gide_rtc_zeit(self) -> Optional[int]:
+        """Uhr der RTC (Unix-Sekunden der Kalenderzeit), ``None`` ohne Karte/RTC."""
+        t = ctypes.c_int64()
+        return t.value if _lib.k1520_gide_rtc_zeit(self._handle, ctypes.byref(t)) else None
+
+    def gide_rtc_stellen(self, unix_wirt: int) -> bool:
+        """Uhr der GIDE auf ``unix_wirt`` stellen (Jahr des Wirts, UTC, ohne Jahresversatz); Batteriedatei
+        wird geschrieben.  ``False`` ohne Karte/RTC."""
+        return bool(_lib.k1520_gide_rtc_stellen(self._handle, int(unix_wirt)))
+
+    def gide_rtc_netz_aus(self) -> bool:
+        """Netz-Aus an die GIDE-Uhr melden (Stand + Wirtszeit in die Batteriedatei).  ``False`` ohne Karte/RTC."""
+        return bool(_lib.k1520_gide_rtc_netz_aus(self._handle))
+
+    @staticmethod
+    def gide_rtc_startzeit(zustandsdatei: str, jahresversatz: int = 0, utc: bool = True) -> int:
+        """Ohne Maschine: Zeit, mit der eine GIDE-Uhr mit dieser Batteriedatei JETZT starten würde (gastsichtig)."""
+        return int(_lib.k1520_gide_rtc_startzeit((zustandsdatei or "").encode("utf-8"), int(jahresversatz),
+                                                 int(bool(utc))))
+
+    def io_owner(self, port: int) -> str:
+        """Name des Geraets, das den E/A-Port belegt (``""`` = frei) -- die Wahrheit des Busses."""
+        v = _lib.k1520_io_owner(self._handle, int(port))
+        return v.decode("utf-8", "replace") if v else ""
+
+    # ─── GUN-USB ───────────────────────────────────────────────────────────
+    def usb_installed(self) -> bool:
+        """True, wenn die GUN-USB gesteckt ist (``K1520Emulator(usb=...)``)."""
+        return bool(_lib.k1520_usb_installed(self._handle))
+
+    def usb_error(self) -> str:
+        v = _lib.k1520_usb_error(self._handle)
+        return v.decode("utf-8", "replace") if v else ""
+
+    def usb_stick_insert(self, pfad, schreibgeschuetzt: bool = False) -> bool:
+        """Wirtsverzeichnis als Stick einstecken (ein vorhandener wird vorher gezogen)."""
+        return bool(_lib.k1520_usb_stick_insert(self._handle, os.fsencode(pfad), bool(schreibgeschuetzt)))
+
+    def usb_stick_remove(self) -> bool:
+        return bool(_lib.k1520_usb_stick_remove(self._handle))
+
+    def usb_status(self) -> Optional[dict]:
+        """Zustand ohne Nebenwirkung (``None`` ohne Karte)."""
+        basis, stick = ctypes.c_int(), ctypes.c_int()
+        z = (ctypes.c_uint64 * 3)()
+        if not _lib.k1520_usb_status(self._handle, ctypes.byref(basis), ctypes.byref(stick), z):
+            return None
+        return {"basis": basis.value, "stick_vorhanden": bool(stick.value),
+                "gelesen": z[0], "geschrieben": z[1], "resets": z[2]}
+
+    # ─── KCNet-Netzkarte ───────────────────────────────────────────────────
+    def net_installed(self) -> bool:
+        """True, wenn die KCNet-Karte gesteckt ist (``K1520Emulator(net=...)``)."""
+        return bool(_lib.k1520_net_installed(self._handle))
+
+    def net_error(self) -> str:
+        v = _lib.k1520_net_error(self._handle)
+        return v.decode("utf-8", "replace") if v else ""
+
+    def net_set_link(self, online: bool) -> bool:
+        """Kabelzustand (Kommando 0B) zur Laufzeit."""
+        return bool(_lib.k1520_net_set_link(self._handle, bool(online)))
+
+    def net_status(self) -> Optional[dict]:
+        """Zustand ohne Nebenwirkung (``None`` ohne Karte)."""
+        basis = ctypes.c_int()
+        z = (ctypes.c_uint64 * 4)()
+        if not _lib.k1520_net_status(self._handle, ctypes.byref(basis), z):
+            return None
+        return {"basis": basis.value, "kommandos": z[0], "fehlerkommandos": z[1],
+                "bytes_zur_karte": z[2], "bytes_zum_gast": z[3]}
+
+    def net_w5100_read(self, adr: int) -> int:
+        """Register/Speicher des W5100 (15-Bit-Adresse); -1 ohne Karte."""
+        return int(_lib.k1520_net_w5100_read(self._handle, int(adr)))
 
     # ─── RAM-Floppy RAF ────────────────────────────────────────────────────
     @property

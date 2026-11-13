@@ -141,6 +141,8 @@ void Prg710Machine::interruptKetteSetzen()
         bus_.appendInterruptChain(&k5020_->pioDaten());
         bus_.appendInterruptChain(&k5020_->pioSteuer());
     }
+    if (gun_usb_) bus_.appendInterruptChain(&gun_usb_->pio());   // GUN-USB (AP U2): hinten, am Geraet unbelegt [?]
+    if (gun_net_) bus_.appendInterruptChain(&gun_net_->pio());   // KCNet (AP N2): hinten, am Geraet unbelegt [?]
 }
 
 std::vector<k1520::serial::SerialAnschluss*> Prg710Machine::serielleAnschluesse()
@@ -164,6 +166,9 @@ void Prg710Machine::resetHardware()
     atp_.reset();            // 8279: FIFO leer
     k6022Reset();            // K6022 (gesteckt?): PIOs; Band im Leser und Stanzband bleiben
     k5020Reset();             // K5020 (gesteckt?): PIOs zurueck, Baender bleiben liegen
+    gideReset();             // GIDE (gesteckt?): LH, Platte; Medium bleibt
+    gunUsbReset();           // GUN-USB (gesteckt?): PIO, VDIP1; Stick bleibt
+    gunNetReset();           // KCNet (gesteckt?): PIO, Automat, W5100
     fs_.reset();
     rafReset();              // RAF (gesteckt?): nur das Latch sperrt, der Inhalt bleibt
     hub_.gastZurueckgesetzt();
@@ -183,6 +188,9 @@ void Prg710Machine::powerOn()
     k7609_.powerOn();        // die Tastatur hat ihr eigenes Netz-Ein, ein /RESET trifft sie nicht
     k7672_.powerOn();        // Selbsttest, KEIN DC1 (wie K8915)
     rafPowerOn();            // RAF ohne Stand-by-Pufferung: Inhalt weg (Entwurf 22 §3.4)
+    gidePowerOn();
+    gunUsbPowerOn();
+    gunNetPowerOn();
     resetHardware();
     LOG_INFO("PRG710", "Netz ein: Abbildung aus, ROM bei 0000H");
 }
@@ -267,6 +275,8 @@ int Prg710Machine::run(int max_cycles)
         dirty |= ass_.clockTick(used);
         dirty |= k6022Takt(used);   // Lochstreifen (gesteckt?)
         dirty |= k5020Takt(used);   // Kassette (gesteckt?)
+        gideTakt(total_cycles_);   // GIDE (gesteckt?): Platte und RTC in Maschinenzeit
+        gunNetTakt(total_cycles_);   // KCNet (gesteckt?): Kommando 03 in Maschinenzeit
         dirty |= fs_.clockTick(used);
         dirty |= atp_.clockTick(used);   // ATP-Zusatz (gesteckt?): Kanalschleife der SIO C0H–C3H
         if (total_cycles_ >= serial_naechst_) {

@@ -162,6 +162,10 @@ struct FsProfile {
     ///        80-Spur-Diskette hat 253) — Bloecke, die das Geraet nie vergibt, vergibt das Werkzeug auch nicht.
     uint16_t max_blocks  = 0;
     std::string os       = "cpm2.2";
+    /// @brief 0 = nur das Verzeichnis ist reserviert.  Sonst so viele Bloecke ab Blockzaehler 0 (AL0/AL1 des
+    ///        DPB): die GIDE-Platte nach Poppe reserviert 8 Bloecke (AL0 = FFH), das Verzeichnis (1024 x 32 B)
+    ///        belegt aber nur 4 - die uebrigen vier vergibt das Geraet nie, das Werkzeug also auch nicht.
+    uint16_t reserved_blocks = 0;
 
     // ── nur die UDOS-Familie ─────────────────────────────────────────────────
     bool    sides_separate  = true;  ///< je Seite ein eigenes Dateisystem → SideN/

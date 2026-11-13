@@ -37,6 +37,8 @@ HIER = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HIER))
 sys.path.insert(0, os.path.join(REPO, 'tools'))
 import disketten_beigaben as _db  # noqa: E402  (Ordner je Diskette)
+sys.path.insert(0, os.path.join(REPO, 'tools', 'gide'))
+import karten as _karten  # noqa: E402  (Hardwareoptionen GIDE/RTC/USB/Netz)
 
 # Hilfsfunktionen (CP/M-Text, WM.HLP) und der Quellpfad der Hilfe kommen aus dem A5120-Bau.
 _spec = importlib.util.spec_from_file_location('cpa_a5120_build', os.path.join(REPO, 'tools', 'cpa_a5120', 'build.py'))
@@ -70,6 +72,7 @@ def soll():
     # SERTEST V0.2 kennt den PC 1715 (unter CP/A 1715 geprueft: Sertest.Pc1715_*)
     inhalt['SERTEST.COM'] = _lies(a5120.beigaben.PROGRAMME['SERTEST.COM'])
     inhalt['KERMIT.COM'] = _lies(_db.KERMIT80['pc1715'])
+    inhalt.update(_karten.dateien('pc1715_cpa'))   # GIDE, UHR, USB, Netz (tools/gide)
     inhalt['WM.HLP'] = a5120._wm_hlp()
     return inhalt
 

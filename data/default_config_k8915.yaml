@@ -50,6 +50,27 @@ crt:
 # Zehnfach: der Selbsttest des Boot-ROMs dauert sonst ≈ 12 s.
 general:
   speed: 10.0
+  # IDE-Platte GIDE + Uhr RTC 72421 (app/gide.py, doc/design/50_gun_gide.md G6): enabled = Karte
+  # gesteckt, basis = E/A-Basis (Hex, Vielfaches von 10; Vorauswahl 90H), image = Plattenabbild
+  # ('' = keins; Pfade sind rechnerspezifisch, hier leer), rtc = Uhr bestueckt, rtc_versatz = Zeitversatz der Uhr in Jahren ('0' | '-28' | '-40').
+  gide:
+    enabled: false
+    basis: '90'
+    image: ''
+    rtc: true
+    rtc_versatz: '-40'
+  # USB-Karte der GUN (app/usb.py, Entwurf 50 U3): ordner '' = <Dokumente>/K1520emu/USB-Stick.
+  usb:
+    enabled: false
+    basis: '84'
+    ordner: ''
+    schreibgeschuetzt: false
+  # Netzwerkkarte KCNet/W5100 (app/netz.py, Entwurf 50 N3): nur_loopback aus = Zugang zum echten Netz.
+  net:
+    enabled: false
+    basis: 'C0'
+    nur_loopback: false
+    link: true
   # Lochstreifen (ADA K6022, SIF1000) gesteckt? doc/design/23_lochstreifen.md §7.
   ptape: false
   # Kassette (AKB K5020, 2 × K5200) gesteckt? doc/design/29_kassette.md.

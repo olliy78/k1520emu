@@ -79,13 +79,43 @@ PLATTE_GESPERRT = {
     "neu_beschreiben": "Das ist keine physische Diskette.",
 }
 
+def ist_gide(tool) -> bool:
+    """Ist das geoeffnete Ding eine GIDE-Platte (``GideTool``, Poppe/Kingstener)?"""
+    return bool(getattr(tool, "ist_gide", False))
+
+
+#: Dasselbe fuer die GIDE-Platte (CP/M-Laufwerke auf einem IDE-Abbild): die WEGA-Begruendungen passen dort nicht,
+#: und ``eigenschaften`` kommt dazu (der CP/M-Dialog fuer RO/SYS/ARC arbeitet nur an Disketten).
+PLATTE_GESPERRT_GIDE = dict(PLATTE_GESPERRT)
+PLATTE_GESPERRT_GIDE.update({
+    "diskeditor": "Eine GIDE-Platte hat keine Spuren und Sektoren im Sinn des Diskeditors — die Laufwerke "
+                  "werden vom Gast-Treiber in Hostsektoren aufgeteilt.",
+    "datei_im_editor": "Der Diskeditor arbeitet nur an Disketten (Spuren und Sektoren).",
+    "angaben": "Geometrie, Medium und Erkennung gibt es nur für Disketten; die GIDE-Platte ist durch ihr "
+               "Layout (Poppe oder Kingstener) festgelegt.",
+    "speichern_unter": "GIDE-Plattenabbilder werden an Ort und Stelle zurückgeschrieben (gepackt: vorher "
+                       "entsteht eine Sicherung „<abbild>~“).  Für eine Arbeitskopie die Datei im "
+                       "Dateimanager kopieren.",
+    "reparieren": "Die Reparatur arbeitet an Disketten.  Die GIDE-Platte prüft „Bearbeiten ▸ GIDE-Platte "
+                  "prüfen…“ (nur lesend).",
+    "wiederherstellen": "Die Suche nach gelöschten Dateien arbeitet an Disketten.",
+    "eigenschaften": "Dateiattribute (R/O, SYS, ARC) lassen sich an GIDE-Platten noch nicht ändern.",
+})
+
 #: Begruendung fuer das Dateisystem-Menue und das Auswahlfeld im Kopf.
 PLATTE_FORMAT_FEST = ("Das Format ist durch die Platte festgelegt: P8000-Platte mit WEGA-"
                       "Dateisystem, Partitionen md0…md4 nach der Standardtabelle des Kerns.")
 
 
+#: Dasselbe fuer die GIDE-Platte.
+GIDE_FORMAT_FEST = ("Das Format ist durch die Platte festgelegt: CP/M-Laufwerke im Layout des Gast-Treibers "
+                    "(Poppe oder Kingstener), erkannt aus den Verzeichnissen.")
+
+
 def dateisystem_anzeige(tool) -> str:
     """Name des Dateisystems in der Form, die man dem Anwender zeigt."""
+    if ist_gide(tool):
+        return f"CP/M (GIDE-Platte, Layout {tool.layout})"
     if ist_platte(tool):
         return "WEGA (P8000-Platte)"
     if tool.ist_tar:

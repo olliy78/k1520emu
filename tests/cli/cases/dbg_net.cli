@@ -1,0 +1,19 @@
+# k1520dbg --net=0xC0: ein Z80-Schnipsel initialisiert die PIO wie der Treiber von TFTP1287 und holt per Kommando 09 die
+# Firmware-Version (1.2); `net` zeigt Basis, Version, Zaehler, W5100-Sockets und PIO ohne Nebenwirkung.
+tool:    k1520dbg
+disk:    cpa_cpa780_k5601_clock.img
+run:     --net=0xC0 %DISK%
+stdin:
+  net
+  e 0x6000 F3 3E 8F D3 C2 3E 07 D3 C2 3E CF D3 C3 3E FF D3 C3 DB C0 3E 09 D3 C0 DB C1 0F 38 FB DB C1 07 30 FB DB C0 DB C1 07 30 FB DB C0 18 FE
+  set pc 0x6000
+  g 5000
+  net
+  q
+expect:  KCNet  Basis C0H (Tore C0H-C3H)
+expect:  Firmware 1.2  Link online
+expect:  Kommandos 1, ungueltige 0, Bytes Gast->Karte 1, Karte->Gast 2
+expect:  Socket 3: MR 00 SR 00
+expect:  B: Modus 3
+forbid:  keine KCNet-Karte gesteckt
+forbid:  --net:

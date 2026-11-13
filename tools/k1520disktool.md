@@ -1151,6 +1151,27 @@ GNU tar bricht damit ab („GNU features wanted on incompatible archive format�
 GNU-Format schreibt `-M` Fortsetzungsköpfe (Typ `M`), die kein V7 sind.  Die Rezepte stehen
 mit Begründung im Handbuch (Abschnitt „Passende tar-Dateien unter Linux erzeugen und entpacken“).
 
+## GIDE-Platten (Poppe / Kingstener) — `--gide-layout`, `--laufwerk`
+
+Ein IDE-Plattenabbild der GIDE-Karte (`.img` oder `.img.gz`, mindestens 65 472 Sektoren ≈ 33 MB — nie eine Diskette) trägt **CP/M-Laufwerke**; wie sie aufgeteilt sind, bestimmt der
+Gast-Treiber, und die beiden bekannten Layouts sind **unverträglich** (ein falscher Treiber vernichtet Daten): **`poppe`** (`GIDEHP…`, auch der im CP/A-BIOS eingebaute; bis 8 Laufwerke `lw0`…`lw7` je 8 MB,
+`lw0` mit 2 Systemspuren) und **`kingstener`** (`gidn`; 1 Laufwerk `lw0`, jeder 128-B-Satz vierfach im 512-B-Hostsektor).  Das Werkzeug erkennt das Layout **nur lesend** aus den Verzeichnissen und rät nie
+(`--gide-layout auto`, Vorgabe); bei Mehrdeutigkeit oder Unformatiertem scheitert `auto` mit Begründung (Exit 2), nichts wird geschrieben.  Namen: `lw0/NAME.EXT` (Nutzerbereich `lw0/3:NAME.EXT`).
+
+```sh
+k1520disktool create x.img.gz --gide-layout poppe [--sectors N] [--laufwerk N]   # leeres Abbild; Verzeichnisse aller (bzw. des einen) Laufwerke formatiert
+k1520disktool ls|info|check|fsck x.img.gz [-l] [--full] [--json]               # Layout, Laufwerke, Dateien, Pruefung (fsck nur pruefend)
+k1520disktool get  x.img.gz 'lw0/*' --to dir [--force]                         # Dateien nach dir/lwN/NAME (Nutzerbereich N: dir/lwN/uN/NAME)
+k1520disktool put  x.img.gz DATEI... --as lw1[/NAME] | --laufwerk 1            # Kingstener: ohne --as
+k1520disktool rm   x.img.gz 'lw1/*.COM' | NAME --laufwerk 1
+k1520disktool format x.img.gz --gide-layout poppe --laufwerk 2 [--force]       # Verzeichnis leeren (ERADIR/GIDN /F); --force: auch wo Daten stehen
+```
+
+Nur bei erkanntem oder vorgegebenem Layout wird geschrieben, nur an Laufwerke mit plausiblem Verzeichnis; `format` verlangt `--gide-layout` und verweigert über Dateien, über fremden Daten und auf einer
+Platte, die nach dem anderen Layout formatiert ist (ohne `--force`).  Eine fremde Sperre `<abbild>.lock` (laufender Emulator) macht das Abbild nur lesbar (`Abbild gesperrt`).  `.img.gz` wird ganz und atomar
+zurückgeschrieben (vorher einmalig `<abbild>~`, `--no-backup` lässt es weg); rohe `.img` nur die geänderten Sektoren.  Nicht vorhanden für GIDE-Platten: `mkdir`, `attr`, Reparatur, Bootabbilder.
+Hintergründe und Wächter: `doc/merkposten/disktool.md` (GIDE-Platten).
+
 ## Dateisysteme ergänzen
 
 `data/formats.yaml` hat zwei Sektionen: `formats:` (Physik) und `filesystems:`

@@ -255,6 +255,7 @@ if(BUILD_K1520)
         core/filesystem/tar/tar_archiv.cpp
         core/filesystem/wega/wega_platte.cpp
         core/filesystem/wega/platten_volume.cpp
+        core/filesystem/gide/gide_platte.cpp
         core/filesystem/fileinfo.cpp
         core/filesystem/disk_volume.cpp
         core/filesystem/prg_boot.cpp
@@ -381,6 +382,21 @@ if(BUILD_K1520)
     target_link_libraries(k1520_raf PUBLIC k1520_bus k1520_logger)
     target_include_directories(k1520_raf PUBLIC ${CMAKE_SOURCE_DIR})
 
+    # GIDE: IDE-Karte mit ATA-Platte (Entwurf 50)
+    add_library(k1520_gide STATIC core/cards/gide/gide.cpp)
+    target_link_libraries(k1520_gide PUBLIC k1520_bus k1520_logger k1520_ata k1520_p8000_rtc)
+    target_include_directories(k1520_gide PUBLIC ${CMAKE_SOURCE_DIR})
+
+    # GUN-USB: Z80-PIO + VDIP1 (Entwurf 50 AP U2)
+    add_library(k1520_gun_usb STATIC core/cards/gun_usb/gun_usb.cpp)
+    target_link_libraries(k1520_gun_usb PUBLIC k1520_bus k1520_logger k1520_pio k1520_vdip)
+    target_include_directories(k1520_gun_usb PUBLIC ${CMAKE_SOURCE_DIR})
+
+    # KCNet-Netzkarte: Z80-PIO + ATmega-Verhaltensmodell + W5100 (Entwurf 50 AP N2, Protokoll 50a)
+    add_library(k1520_gun_net STATIC core/cards/gun_net/gun_net.cpp)
+    target_link_libraries(k1520_gun_net PUBLIC k1520_bus k1520_logger k1520_pio k1520_w5100)
+    target_include_directories(k1520_gun_net PUBLIC ${CMAKE_SOURCE_DIR})
+
     # K3521.30 – akkugepuffertes 4-KB-RAM (Entwurf 33 N10b)
     add_library(k1520_k3521 STATIC core/cards/k3521/k3521.cpp)
     target_link_libraries(k1520_k3521 PUBLIC k1520_bus)
@@ -397,7 +413,7 @@ if(BUILD_K1520)
     )
     target_link_libraries(k1520_a5120 PUBLIC
         k1520_z80
-        k1520_k2526 k1520_k3526 k1520_k7024 k1520_k8025 k1520_k5122 k1520_laufwerke k1520_em k1520_raf k1520_k6022 k1520_k5020
+        k1520_k2526 k1520_k3526 k1520_k7024 k1520_k8025 k1520_k5122 k1520_laufwerke k1520_em k1520_raf k1520_gide k1520_gun_usb k1520_gun_net k1520_k6022 k1520_k5020
         k1520_k3525 k1520_k3521 k1520_aup k1520_k7023 k1520_k7636
         k1520_k7637 k1520_floppy k1520_floppy2 k1520_geometry k1520_bus k1520_logger k1520_serial
     )
@@ -452,10 +468,29 @@ if(BUILD_K1520)
     add_library(k1520_p8000_dram16 STATIC core/cards/p8000/dram16.cpp)
     target_include_directories(k1520_p8000_dram16 PUBLIC ${CMAKE_SOURCE_DIR})
 
+    # RTC-Chipmodelle (72421, U130X): eigene Bibliothek, von P8000-Karte16 und GIDE benutzt
+    add_library(k1520_p8000_rtc STATIC core/cards/p8000/rtc.cpp)
+    target_link_libraries(k1520_p8000_rtc PUBLIC k1520_logger)
+    target_include_directories(k1520_p8000_rtc PUBLIC ${CMAKE_SOURCE_DIR})
+
     # P8000, 16-Bit-Rechnerkarte: U8001, On-Board-Speicher, CTC/SIO/PIO, E/A, NMI/Reset (AP P10b)
-    add_library(k1520_p8000_karte16 STATIC core/cards/p8000/karte16.cpp core/cards/p8000/rtc.cpp)
-    target_link_libraries(k1520_p8000_karte16 PUBLIC k1520_p8000_mmu_logik16 k1520_p8000_dram16 k1520_z8000 k1520_ctc k1520_sio k1520_pio k1520_bus k1520_logger k1520_serial)
+    add_library(k1520_p8000_karte16 STATIC core/cards/p8000/karte16.cpp)
+    target_link_libraries(k1520_p8000_karte16 PUBLIC k1520_p8000_rtc k1520_p8000_mmu_logik16 k1520_p8000_dram16 k1520_z8000 k1520_ctc k1520_sio k1520_pio k1520_bus k1520_logger k1520_serial)
     target_include_directories(k1520_p8000_karte16 PUBLIC ${CMAKE_SOURCE_DIR})
+
+    # ATA-/IDE-Festplatte (GIDE, Entwurf 50 AP G1): Task-File, Befehle, Rohabbild/.img.gz
+    add_library(k1520_ata STATIC core/peripherals/ata/ata_geraet.cpp)
+    target_link_libraries(k1520_ata PUBLIC k1520_gzip Threads::Threads)
+    target_include_directories(k1520_ata PUBLIC ${CMAKE_SOURCE_DIR})
+
+    # VDIP1 (VDAP-Firmware) ueber einem Wirtsverzeichnis als USB-Stick (GUN, Entwurf 50 AP U1)
+    add_library(k1520_vdip STATIC core/peripherals/vdip/vdip_geraet.cpp)
+    target_include_directories(k1520_vdip PUBLIC ${CMAKE_SOURCE_DIR})
+
+    # WIZnet W5100 (Registermodell, Netz ueber die Socket-Schicht; GUN, Entwurf 50 AP N1)
+    add_library(k1520_w5100 STATIC core/peripherals/w5100/w5100.cpp)
+    target_link_libraries(k1520_w5100 PUBLIC k1520_serial_net Threads::Threads)
+    target_include_directories(k1520_w5100 PUBLIC ${CMAKE_SOURCE_DIR})
 
     # P8000, Winchesterlaufwerk am WDC: LBA-Abbild, Spursynthese/-zerlegung, Mechanik (AP P13b)
     add_library(k1520_winchester STATIC core/peripherals/winchester/platte.cpp)
@@ -533,7 +568,7 @@ if(BUILD_K1520)
     # AP-V6a): K2521 + K3528 statt der ZRE 045-8762, Config::generation.
     add_library(k1520_k8915 STATIC core/machines/k8915/k8915.cpp)
     target_link_libraries(k1520_k8915 PUBLIC
-        k1520_zre8762 k1520_k2521 k1520_k3528 k1520_k7028 k1520_k7672 k1520_k7024 k1520_k5122 k1520_laufwerke k1520_raf k1520_k6022 k1520_k5020
+        k1520_zre8762 k1520_k2521 k1520_k3528 k1520_k7028 k1520_k7672 k1520_k7024 k1520_k5122 k1520_laufwerke k1520_raf k1520_gide k1520_gun_usb k1520_gun_net k1520_k6022 k1520_k5020
         k1520_floppy2 k1520_bus k1520_logger k1520_serial)
     target_include_directories(k1520_k8915 PUBLIC ${CMAKE_SOURCE_DIR})
 
@@ -542,7 +577,7 @@ if(BUILD_K1520)
     add_library(k1520_prg710 STATIC core/machines/prg710/prg710.cpp)
     target_link_libraries(k1520_prg710 PUBLIC
         k1520_k2521 k1520_prg710_speicher k1520_k8025 k1520_k7024 k1520_k5122 k1520_laufwerke
-        k1520_atp590068 k1520_k7609 k1520_k7672 k1520_k6022 k1520_k5020 k1520_ass590069 k1520_raf
+        k1520_atp590068 k1520_k7609 k1520_k7672 k1520_k6022 k1520_k5020 k1520_ass590069 k1520_raf k1520_gide k1520_gun_usb k1520_gun_net
         k1520_floppy2 k1520_bus k1520_logger k1520_serial)
     target_include_directories(k1520_prg710 PUBLIC ${CMAKE_SOURCE_DIR})
 
@@ -576,7 +611,7 @@ if(BUILD_K1520)
     target_link_libraries(k1520_pc1715w_speicher PUBLIC k1520_i8275 k1520_bus k1520_logger)
     target_include_directories(k1520_pc1715w_speicher PUBLIC ${CMAKE_SOURCE_DIR})
     add_library(k1520_pc1715 STATIC core/machines/pc1715/pc1715.cpp)
-    target_link_libraries(k1520_pc1715 PUBLIC k1520_pc1715_zre k1520_pc1715w_speicher k1520_z80dma k1520_upd765 k1520_tastatur1715 k1520_k5122 k1520_laufwerke k1520_floppy2 k1520_bus k1520_logger k1520_serial)
+    target_link_libraries(k1520_pc1715 PUBLIC k1520_pc1715_zre k1520_pc1715w_speicher k1520_z80dma k1520_upd765 k1520_tastatur1715 k1520_k5122 k1520_laufwerke k1520_floppy2 k1520_gide k1520_gun_usb k1520_gun_net k1520_bus k1520_logger k1520_serial)
     target_include_directories(k1520_pc1715 PUBLIC ${CMAKE_SOURCE_DIR})
 
     # MC80.3x (doc/design/31_mc80.md, AP M2): ZVE (U880, EGOS-ROM, CTC/PIO, Segmentregister 85H)
@@ -591,13 +626,13 @@ if(BUILD_K1520)
     target_link_libraries(k1520_mc80_2x_karten PUBLIC k1520_ctc k1520_pio k1520_bus k1520_logger k1520_kassette)
     target_include_directories(k1520_mc80_2x_karten PUBLIC ${CMAKE_SOURCE_DIR})
     add_library(k1520_mc80 STATIC core/machines/mc80/mc80.cpp core/machines/mc80/mc80_2x.cpp)
-    target_link_libraries(k1520_mc80 PUBLIC k1520_mc80_karten k1520_mc80_2x_karten k1520_k2521 k1520_k3820 k1520_k3525 k1520_raf k1520_k6022 k1520_k5020 k1520_floppy2 k1520_bus k1520_logger k1520_serial)
+    target_link_libraries(k1520_mc80 PUBLIC k1520_mc80_karten k1520_mc80_2x_karten k1520_k2521 k1520_k3820 k1520_k3525 k1520_raf k1520_gide k1520_gun_usb k1520_gun_net k1520_k6022 k1520_k5020 k1520_floppy2 k1520_bus k1520_logger k1520_serial)
     target_include_directories(k1520_mc80 PUBLIC ${CMAKE_SOURCE_DIR})
 
     # P8000 (doc/design/25_p8000.md §10, AP P7a): 8-Bit-Seite (Karte8 + Floppy8 + Kern-Terminal)
     # + Originalterminal an tty1 (Config::terminal) und „P8000 Terminal" als eigene Maschine (P20c/P20d)
     add_library(k1520_p8000 STATIC core/machines/p8000/p8000.cpp core/machines/p8000/p8000_terminal_machine.cpp)
-    target_link_libraries(k1520_p8000 PUBLIC k1520_p8000_floppy8 k1520_p8000_karte8 k1520_p8000_karte16 k1520_p8000_kopplung k1520_p8000_wdc_anschluss k1520_p8000_terminal k1520_p8000_terminal_hw k1520_laufwerke k1520_bus k1520_logger k1520_serial)
+    target_link_libraries(k1520_p8000 PUBLIC k1520_p8000_floppy8 k1520_p8000_karte8 k1520_p8000_karte16 k1520_p8000_kopplung k1520_p8000_wdc_anschluss k1520_p8000_terminal k1520_p8000_terminal_hw k1520_laufwerke k1520_gide k1520_gun_usb k1520_gun_net k1520_bus k1520_logger k1520_serial)
     target_include_directories(k1520_p8000 PUBLIC ${CMAKE_SOURCE_DIR})
 
     # libk1520core.so — stable C-API shared library

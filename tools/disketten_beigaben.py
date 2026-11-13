@@ -23,6 +23,8 @@ Emulator wie am Geraet ohne eigenen Kopierschritt bereitstehen:
   AUPTEST.COM   tools/auptest/   A5120/K8924 — AUP 062-8531 Tastaturteil (E/A 40H-43H, N10c)
   AUPTSIO.COM   tools/auptest/   dieselbe Karte, Sonderschnittstelle CTC/SIO B0H-B7H (N10d)
   K3521TST.COM  tools/k3521tst/  A5120/K8924 — Pruefprogramm K3521.30: Speichertest und Editor (N10i)
+  GIDE/UHR/USB/Netz  tools/gide/  Gast-Software der Hardwareoptionen (GIDEHP90/GIDN90, UHR, UTools, CPMNET/TFTP) je Rechner;
+                Zusammenstellung in tools/gide/karten.py (Waechter ``cli_karten_beigaben``), Herkunft in tools/gide/README.md
   KERMIT.COM    tools/kermit80/  Kermit-80 4.11, je Rechner eine Ueberlagerung (KERMIT80): A5120 (CP/A, SCPX),
                 K8915, PC 1715 (SCP 1715, CP/A 1715), PC 1715W (SCP 3.0), PRG 710/710-1 (SCPX) und P8000 (OS/M) — Beigabe
                 zum Ausprobieren der V.24-Schnittstelle

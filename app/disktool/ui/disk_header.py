@@ -22,7 +22,7 @@ from app import katalog_anzeige as ka
 from app.core_binding.k1520disk import filesystems
 from app.katalog_anzeige import profil_zeile
 from app.disktool.ui.schreibsperre import (
-    PLATTE_FORMAT_FEST, dateisystem_anzeige, ist_platte,
+    GIDE_FORMAT_FEST, PLATTE_FORMAT_FEST, dateisystem_anzeige, ist_gide, ist_platte,
 )
 from app.disktool.ui.icons import icon
 
@@ -115,11 +115,11 @@ class DiskHeader(QFrame):
                              "Diskette an.")
         self._fs_frei(True)
 
-    def _fs_frei(self, frei: bool) -> None:
+    def _fs_frei(self, frei: bool, grund: str = "") -> None:
         """Das Auswahlfeld sperren (Platte: das Format steht fest) oder freigeben."""
         self.fs_wahl.setEnabled(frei)
         self.fs_wahl.setToolTip("Die Erkennung übersteuern und neu öffnen" if frei
-                                else "Gesperrt: " + PLATTE_FORMAT_FEST)
+                                else "Gesperrt: " + (grund or PLATTE_FORMAT_FEST))
 
     def setze(self, tool, name: str = "") -> None:
         """Kopf aus einer geöffneten Diskette füllen.
@@ -129,6 +129,14 @@ class DiskHeader(QFrame):
         muss.
         """
         self.pfad.setText(name or tool.path)
+        if ist_gide(tool):
+            self.pfad.setToolTip("")
+            self._fs_frei(False, GIDE_FORMAT_FEST)
+            self.angaben.setText("   ·   ".join([
+                "Format: GIDE-Plattenabbild",
+                f"Layout: {tool.layout}" + (" (vorgegeben)" if tool.layout_ausdruecklich else " (erkannt)"),
+                "Laufwerke: " + (", ".join(v.dir for v in tool.volumes()) or "keines formatiert")]))
+            return
         if ist_platte(tool):
             # Eine Platte hat Partitionen statt Seiten und kein waehlbares Format.
             self.pfad.setToolTip("")

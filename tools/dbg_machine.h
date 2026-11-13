@@ -82,6 +82,147 @@ inline bool steckeRaf(K1520Machine& m, const std::string& name, std::string& err
     return true;
 }
 
+/**
+ * @brief Steckt die GIDE (`--gide[=basis]`, `--gide-image`, Entwurf 50 AP G4) in @p m, wenn @p an.
+ *        @p basis < 0 = Vorgabe 90H.  Die RTC ist bestueckt (Wirtszeit, nur im Speicher).
+ */
+inline bool steckeGide(K1520Machine& m, bool an, int basis, const std::string& abbild, std::string& err) {
+    if (!an) return true;
+    k1520::Gide::Config c;
+    if (basis >= 0) c.basis = static_cast<uint8_t>(basis);
+    if (!m.installGide(c, nullptr, abbild)) { err = m.gideFehler(); return false; }
+    return true;
+}
+
+/// `--gide` bzw. `--gide=<basis>` (Zahl, 0x.. erlaubt): true, wenn @p arg die Option ist; @p basis = -1 ohne Wert.
+inline bool parseGideOpt(const char* arg, int& basis) {
+    if (!strcmp(arg, "--gide")) { basis = -1; return true; }
+    if (!strncmp(arg, "--gide=", 7)) { basis = static_cast<int>(strtol(arg + 7, nullptr, 0)); return true; }
+    return false;
+}
+
+/** @brief Zustand der GIDE als Text (Debugbefehl `gide`), ohne Nebenwirkung. */
+inline std::string gideText(const k1520::Gide& g) {
+    char b[200];
+    std::string s;
+    const auto& z = g.zaehler();
+    snprintf(b, sizeof b, "  GIDE  Basis %02XH (Tore %02XH-%02XH)  LH=%d  letzter Befehl %02XH\n", g.config().basis,
+             g.config().basis + 4, g.config().basis + 0xF, g.lh() ? 1 : 0, g.letzterBefehl());
+    s += b;
+    snprintf(b, sizeof b, "  Zugriffe: Daten lesen %llu, schreiben %llu, Task-File %llu, Befehle %llu\n",
+             (unsigned long long)z.daten_lesen, (unsigned long long)z.daten_schreiben,
+             (unsigned long long)z.taskfile, (unsigned long long)z.befehle);
+    s += b;
+    const auto& p = g.platte();
+    if (p.mediumVorhanden()) {
+        const auto geo = p.geometrie();
+        snprintf(b, sizeof b, "  Platte: %llu Sektoren (%u/%u/%u), %s%s\n", (unsigned long long)p.sektorenGesamt(),
+                 geo.zylinder, geo.koepfe, geo.sektoren, p.schmutzig() ? "ungesichert, " : "", p.pfad().c_str());
+    } else snprintf(b, sizeof b, "  Platte: kein Abbild\n");
+    s += b;
+    const auto t = p.taskFile();
+    snprintf(b, sizeof b, "  Task-File: Error %02X  Features %02X  SC %02X  SN %02X  CL %02X  CH %02X  SDH %02X  Status %02X%s%s%s  Cmd %02X\n",
+             t.error, t.features, t.sektoranzahl, t.sektornummer, t.zyl_low, t.zyl_high, t.sdh, t.status,
+             (t.status & 0x80) ? " BSY" : "", (t.status & 0x08) ? " DRQ" : "", (t.status & 0x01) ? " ERR" : "", t.befehl);
+    s += b;
+    if (g.config().rtc_vorhanden && const_cast<k1520::Gide&>(g).rtc()) s += "  RTC: " + const_cast<k1520::Gide&>(g).rtc()->text() + "\n";
+    else s += "  RTC: nicht bestueckt\n";
+    return s;
+}
+
+/**
+ * @brief Steckt die GUN-USB (`--usb[=basis]`, `--usb-dir`, Entwurf 50 AP U2) in @p m, wenn @p an.
+ *        @p basis < 0 = Vorgabe 84H; @p ordner = Wirtsverzeichnis des Sticks ("" = Fach leer).
+ */
+inline bool steckeUsb(K1520Machine& m, bool an, int basis, const std::string& ordner, std::string& err) {
+    if (!an) return true;
+    k1520::GunUsb::Config c;
+    if (basis >= 0) c.basis = static_cast<uint8_t>(basis);
+    c.ordner = ordner;
+    if (!m.installGunUsb(c)) { err = m.gunUsbFehler(); return false; }
+    return true;
+}
+
+/// `--usb` bzw. `--usb=<basis>` (Zahl, 0x.. erlaubt): true, wenn @p arg die Option ist; @p basis = -1 ohne Wert.
+inline bool parseUsbOpt(const char* arg, int& basis) {
+    if (!strcmp(arg, "--usb")) { basis = -1; return true; }
+    if (!strncmp(arg, "--usb=", 6)) { basis = static_cast<int>(strtol(arg + 6, nullptr, 0)); return true; }
+    return false;
+}
+
+/** @brief Zustand der GUN-USB als Text (Debugbefehl `usb`), ohne Nebenwirkung. */
+inline std::string usbText(const k1520::GunUsb& g) {
+    char b[240];
+    std::string s;
+    const auto& z = g.zaehler();
+    snprintf(b, sizeof b, "  GUN-USB  Basis %02XH (Tore %02XH-%02XH)  Stick: %s\n", g.config().basis, g.config().basis,
+             g.config().basis + 3, g.vdip().stickVorhanden() ? "gesteckt" : "keiner");
+    s += b;
+    snprintf(b, sizeof b, "  Bytes VDIP1->Gast %llu, Gast->VDIP1 %llu, RES#-Impulse %llu  Ausgabe-FIFO %zu  Befehlssatz %s\n",
+             (unsigned long long)z.gelesen, (unsigned long long)z.geschrieben, (unsigned long long)z.resets,
+             g.vdip().datenAnzahl(), g.vdip().kurzSatz() ? "SCS" : "ECS");
+    s += b;
+    const auto d = g.pio().debugState();
+    snprintf(b, sizeof b, "  PIO A: Modus %u out %02X in %02X  B: Modus %u out %02X in %02X dir %02X  ARDY=%d BRDY=%d  Pins B %02X\n",
+             d.port[0].mode, d.port[0].out, d.port[0].in, d.port[1].mode, d.port[1].out, d.port[1].in, d.port[1].dir,
+             g.pio().ardy() ? 1 : 0, g.pio().brdy() ? 1 : 0, g.pio().pinsB());
+    s += b;
+    return s;
+}
+
+/**
+ * @brief Steckt die KCNet-Netzkarte (`--net[=basis]`, Entwurf 50 AP N2) in @p m, wenn @p an.
+ *        @p basis < 0 = Vorgabe 88H.  Das Netz ist das des Wirts (Ziele frei).
+ */
+inline bool steckeNet(K1520Machine& m, bool an, int basis, std::string& err) {
+    if (!an) return true;
+    k1520::GunNet::Config c;
+    if (basis >= 0) c.basis = static_cast<uint8_t>(basis);
+    if (!m.installGunNet(c)) { err = m.gunNetFehler(); return false; }
+    return true;
+}
+
+/// `--net` bzw. `--net=<basis>` (Zahl, 0x.. erlaubt): true, wenn @p arg die Option ist; @p basis = -1 ohne Wert.
+inline bool parseNetOpt(const char* arg, int& basis) {
+    if (!strcmp(arg, "--net")) { basis = -1; return true; }
+    if (!strncmp(arg, "--net=", 6)) { basis = static_cast<int>(strtol(arg + 6, nullptr, 0)); return true; }
+    return false;
+}
+
+/** @brief Zustand der KCNet-Karte als Text (Debugbefehl `net`), ohne Nebenwirkung (auch die W5100-Register nur gelesen). */
+inline std::string netText(k1520::GunNet& g) {
+    char b[300];
+    std::string s;
+    const auto& z = g.zaehler();
+    snprintf(b, sizeof b, "  KCNet  Basis %02XH (Tore %02XH-%02XH)  Firmware %u.%u  Link %s  letztes Kommando %02XH  Zeiger %04XH\n",
+             g.config().basis, g.config().basis, g.config().basis + 3, g.config().firmware_haupt, g.config().firmware_neben,
+             g.config().link_online ? "online" : "offline", g.letztesKommando(), g.zeiger());
+    s += b;
+    snprintf(b, sizeof b, "  Kommandos %llu, ungueltige %llu, Bytes Gast->Karte %llu, Karte->Gast %llu, Antworten offen %zu\n",
+             (unsigned long long)z.kommandos, (unsigned long long)z.fehlerkommandos, (unsigned long long)z.bytes_zur_karte,
+             (unsigned long long)z.bytes_zum_gast, g.antwortenOffen());
+    s += b;
+    auto& w = g.w5100();
+    namespace R = k1520::w5100::reg;
+    snprintf(b, sizeof b, "  W5100: MR %02X  SIPR %u.%u.%u.%u  Verbindungsversuche %u, abgewiesen %u\n", w.lese(R::MR),
+             w.lese(R::SIPR), w.lese(R::SIPR + 1), w.lese(R::SIPR + 2), w.lese(R::SIPR + 3), w.verbindungsversuche(), w.abgewieseneZiele());
+    s += b;
+    for (int n = 0; n < 4; ++n) {
+        snprintf(b, sizeof b, "  Socket %d: MR %02X SR %02X IR %02X  Port %u  Ziel %u.%u.%u.%u:%u  TX_WR %04X RX_RSR %04X  Wirtsport %d\n", n,
+                 w.lese(R::sock(n, R::Sn_MR)), w.lese(R::sock(n, R::Sn_SR)), w.lese(R::sock(n, R::Sn_IR)), w.lese16(R::sock(n, R::Sn_PORT)),
+                 w.lese(R::sock(n, R::Sn_DIPR)), w.lese(R::sock(n, R::Sn_DIPR + 1)), w.lese(R::sock(n, R::Sn_DIPR + 2)),
+                 w.lese(R::sock(n, R::Sn_DIPR + 3)), w.lese16(R::sock(n, R::Sn_DPORT)), w.lese16(R::sock(n, R::Sn_TX_WR)),
+                 w.lese16(R::sock(n, R::Sn_RX_RSR)), w.wirtsPort(n));
+        s += b;
+    }
+    const auto d = g.pio().debugState();
+    snprintf(b, sizeof b, "  PIO A: Modus %u out %02X in %02X  B: Modus %u dir %02X  ARDY=%d BRDY=%d  Pins B %02X\n",
+             d.port[0].mode, d.port[0].out, d.port[0].in, d.port[1].mode, d.port[1].dir,
+             g.pio().ardy() ? 1 : 0, g.pio().brdy() ? 1 : 0, g.pio().pinsB());
+    s += b;
+    return s;
+}
+
 /** @brief Steckt die K6022 (`--ptape`, Entwurf 23 AP-L1) in @p m, wenn @p an; false + @p err bei Fehler. */
 inline bool steckeK6022(K1520Machine& m, bool an, std::string& err) {
     if (!an) return true;

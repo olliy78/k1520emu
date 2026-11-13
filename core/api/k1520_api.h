@@ -1117,6 +1117,92 @@ K1520_API const char* k1520_hd_rom_typ(const char* firmware);
  *  Plattenabbilder heissen `<name>.<kuerzel>.img` (P24). */
 K1520_API const char* k1520_hd_typ_kuerzel(const char* typ);
 
+/* ─── GIDE: IDE-Karte mit ATA-Platte und RTC 72421 (doc/design/50_gun_gide.md, AP G4) ───────
+ * Bestueckung nach dem Anlegen, VOR dem ersten k1520_run/k1520_reset; alle Maschinen mit K1520-Bus
+ * (nicht P8000).  Die Karte belegt basis+4 .. basis+F.  Ohne Karte: false / 0 / "". */
+
+/** @brief Steckt eine GIDE.  @p basis = Hochnibble-Jumper (Vielfaches von 0x10, Vorgabe 0x90),
+ *  @p rtc_vorhanden = RTC bestueckt, @p abbild = Plattenabbild ("" oder NULL = keins),
+ *  @p rtc_zustand = Batteriedatei der RTC ("" oder NULL = nur im Speicher).
+ *  Fehler (zu spaet, doppelt, Tor belegt, Abbild): false, Grund in k1520_gide_error. */
+K1520_API bool        k1520_gide_install(K1520Handle h, int basis, bool rtc_vorhanden,
+                                         const char* abbild, const char* rtc_zustand);
+/** @brief Wie k1520_gide_install, dazu @p rtc_jahresversatz = Jahre, um die die Uhr dem Gast die Wirtszeit
+ *  verschoben zeigt (0, -28, -40; negativ = zurueck; wie `P8000RtcConfig::jahresversatz`).  Die Uhr zaehlt
+ *  in UTC und in Maschinenzeit; die Batteriedatei traegt den Stand OHNE Versatz. */
+K1520_API bool        k1520_gide_install_ex(K1520Handle h, int basis, bool rtc_vorhanden,
+                                            const char* abbild, const char* rtc_zustand, int rtc_jahresversatz);
+K1520_API bool        k1520_gide_installed(K1520Handle h);
+/** @brief Grund des letzten gescheiterten k1520_gide_*-Aufrufs. */
+K1520_API const char* k1520_gide_error(K1520Handle h);
+/** @brief Abbild in die gesteckte Karte legen (Geometrie aus der Groesse). */
+K1520_API bool        k1520_gide_image_mount(K1520Handle h, const char* pfad);
+/** @brief Abbild auswerfen (ausstehendes Schreiben sofort); false ohne Karte. */
+K1520_API bool        k1520_gide_image_eject(K1520Handle h);
+/** @brief Leeres Abbild von @p mbyte MB anlegen (Endung .gz = gepackt); eine vorhandene Datei
+ *  wird NICHT ueberschrieben.  Braucht keine Karte (@p h darf NULL sein; dann kein Fehlertext). */
+K1520_API bool        k1520_gide_image_create(K1520Handle h, const char* pfad, uint32_t mbyte);
+/** @brief Pfad des eingelegten Abbilds ("" = keins). */
+K1520_API const char* k1520_gide_image_path(K1520Handle h);
+/** @brief Zustand ohne Nebenwirkung.  @p zaehler = 4 Werte: Datenworte lesen, schreiben (+8),
+ *  Task-File-Zugriffe (+9..+F), Befehle.  Jeder Zeiger darf NULL sein.  false ohne Karte. */
+K1520_API bool        k1520_gide_status(K1520Handle h, int* basis, int* lh, int* letzter_befehl,
+                                        int* abbild_vorhanden, uint64_t* sektoren, uint64_t* zaehler);
+/** @brief Uhr der RTC wie der Gast sie sieht (Kalenderzeit als Unix-Sekunden); false ohne Karte/RTC. */
+K1520_API bool        k1520_gide_rtc_zeit(K1520Handle h, int64_t* out);
+/** @brief Uhr auf @p unix_wirt stellen (Kalenderzeit im Jahr des Wirts, UTC, OHNE Jahresversatz) und die
+ *  Batteriedatei schreiben; false ohne Karte/RTC. */
+K1520_API bool        k1520_gide_rtc_stellen(K1520Handle h, int64_t unix_wirt);
+/** @brief Netz-Aus an die Uhr melden: Stand + Wirtszeit in die Batteriedatei; beim naechsten Netz-Ein
+ *  (power_on) laeuft die Uhr um die Aus-Dauer weiter, nie hinter die Wirtszeit zurueck.  false ohne Karte/RTC. */
+K1520_API bool        k1520_gide_rtc_netz_aus(K1520Handle h);
+/** @brief Ohne Maschine: Zeit (gastsichtig, mit @p jahresversatz), mit der eine GIDE-Uhr mit dieser
+ *  Batteriedatei JETZT starten wuerde (Startregel); fehlende Datei = Wirtszeit.  @p utc != 0: UTC. */
+K1520_API int64_t     k1520_gide_rtc_startzeit(const char* zustandsdatei, int jahresversatz, int utc);
+/** @brief Besitzer des E/A-Ports @p port (deviceName() des am Bus angemeldeten Geraets), "" = frei
+ *  oder Port ausserhalb 0..255.  Die Wahrheit des Busses -- Grundlage der Basiswahl der Steckkarten. */
+K1520_API const char* k1520_io_owner(K1520Handle h, int port);
+
+/* ─── GUN-USB: Z80-PIO + VDIP1 mit Wirtsverzeichnis als "USB-Stick" (doc/design/50_gun_gide.md, AP U2) ───
+ * Bestueckung nach dem Anlegen, VOR dem ersten k1520_run/k1520_reset; alle Maschinen mit K1520-Bus
+ * (nicht P8000).  Die Karte belegt vier Tore ab basis (GUN: 84H, am K8915/PRG 710 von der ZRE belegt).
+ * Ohne Karte: false / "". */
+
+/** @brief Steckt die GUN-USB.  @p basis = erstes Tor (Vielfaches von 4; GUN 0x84, UTools-CP/M-Fassung 0xDC),
+ *  @p ordner = Wirtsverzeichnis des Sticks ("" oder NULL = Stick-Fach leer), @p schreibgeschuetzt = Stick
+ *  nur lesbar.  Fehler (zu spaet, doppelt, Tor belegt, Ordner nicht oeffenbar): false, Grund in k1520_usb_error. */
+K1520_API bool        k1520_usb_install(K1520Handle h, int basis, const char* ordner, bool schreibgeschuetzt);
+K1520_API bool        k1520_usb_installed(K1520Handle h);
+/** @brief Grund des letzten gescheiterten k1520_usb_*-Aufrufs. */
+K1520_API const char* k1520_usb_error(K1520Handle h);
+/** @brief Stick einstecken (Wirtsverzeichnis; ein steckender Stick wird vorher gezogen). */
+K1520_API bool        k1520_usb_stick_insert(K1520Handle h, const char* pfad, bool schreibgeschuetzt);
+/** @brief Stick ziehen; false ohne Karte. */
+K1520_API bool        k1520_usb_stick_remove(K1520Handle h);
+/** @brief Zustand ohne Nebenwirkung.  @p zaehler = 3 Werte: Bytes VDIP1 -> Gast, Gast -> VDIP1, RES#-Impulse.
+ *  Jeder Zeiger darf NULL sein.  false ohne Karte. */
+K1520_API bool        k1520_usb_status(K1520Handle h, int* basis, int* stick_vorhanden, uint64_t* zaehler);
+
+/* ─── KCNet-Netzkarte: Z80-PIO + ATmega-Modell + W5100 (doc/design/50_gun_gide.md AP N2, Protokoll 50a) ───
+ * Bestueckung nach dem Anlegen, VOR dem ersten k1520_run/k1520_reset; alle Maschinen mit K1520-Bus
+ * (nicht P8000).  Vier Tore ab basis (GUN: 88H, K1520-Netzkarte C0H oder 28H; 88H/89H gehoeren der RAF).
+ * Die Karte benutzt das Netz des WIRTS; ein Filter ist nur mit nur_loopback gesetzt.  Ohne Karte: false / -1. */
+
+/** @brief Steckt die Netzkarte.  @p basis = erstes Tor (Vielfaches von 4), @p nur_loopback = ausgehende Ziele nur
+ *  127.x.x.x (sonst frei), @p link_online = Kommando 0B meldet "Kabel steckt", @p dns = Text "a.b.c.d" des DNS-Servers
+ *  (NULL oder "" = 0.0.0.0).  Fehler (zu spaet, doppelt, Tor belegt, ungueltig): false, Grund in k1520_net_error. */
+K1520_API bool        k1520_net_install(K1520Handle h, int basis, bool nur_loopback, bool link_online, const char* dns);
+K1520_API bool        k1520_net_installed(K1520Handle h);
+/** @brief Grund des letzten gescheiterten k1520_net_*-Aufrufs. */
+K1520_API const char* k1520_net_error(K1520Handle h);
+/** @brief Kabelzustand (Kommando 0B) zur Laufzeit; false ohne Karte. */
+K1520_API bool        k1520_net_set_link(K1520Handle h, bool online);
+/** @brief Zustand ohne Nebenwirkung.  @p zaehler = 4 Werte: Kommandos, ungueltige Kommandos, Bytes Gast -> Karte,
+ *  Bytes Karte -> Gast.  Jeder Zeiger darf NULL sein.  false ohne Karte. */
+K1520_API bool        k1520_net_status(K1520Handle h, int* basis, uint64_t* zaehler);
+/** @brief Register/Speicher des W5100 (15-Bit-Adresse, ohne Nebenwirkung auf Sockets); -1 ohne Karte. */
+K1520_API int         k1520_net_w5100_read(K1520Handle h, int adr);
+
 #ifdef __cplusplus
 }
 #endif

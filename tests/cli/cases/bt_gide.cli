@@ -1,0 +1,5 @@
+# boot_trace --gide: Karte vor dem ersten Lauf stecken; kurzer Lauf, keine Fehlermeldung zur Karte.
+tool:    boot_trace
+disk:    cpa_cpa780_k5601_clock.img
+run:     -L /dev/null --gide -c 2000000 --quiet --json %DISK%
+forbid:  --gide:

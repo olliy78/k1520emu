@@ -169,3 +169,11 @@ Neben Emulator und DiskTool liefert das Paket den **Debugger `k1520dbg`** aus, d
 Tests: `py_paths` + `py_packaging` (schnell, ohne Netz, in der Standardregression). Der
 vollständige Installationslauf (lädt ~120 MB) liegt hinter
 `K1520_PACKAGING_FULL=1 venv/bin/python3 -m pytest tests/python/test_packaging.py`.
+
+## Gast-Software der Hardwareoptionen im Paket (2026-11-11)
+
+`share/k1520emu/karten_software/` (`fremd/` mit allen 16 Poppe-Treibern und den Ausgangsstücken, `basis_anpassen.py`, `UHR.COM`, `HERKUNFT.md`) und
+`share/doc/lizenzen/karten_software-HERKUNFT.md`; die Systemdisketten tragen die Programme für die Vorauswahl-Basis schon.
+**Weitergabe-Lage der Fremddateien ungeklärt** (Anwenderentscheidung vom 2026-11-11, `tools/gide/README.md`) — soll das Paket ohne sie
+gehen, entfällt der Block in `build_payload.sh` UND die Beigaben in `tools/gide/karten.py`.  Wächter: `py_karten_software`
+(`test_paket_liefert_alle_poppe_fassungen_und_das_umschreibwerkzeug`).

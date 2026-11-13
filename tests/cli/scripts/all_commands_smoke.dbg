@@ -135,6 +135,9 @@ clock zve1
 clock machine
 raf
 raf 0
+gide
+usb
+net
 tape
 tape 1
 tape 1 A 0

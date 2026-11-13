@@ -1,0 +1,18 @@
+# k1520dbg --gide=0xA0: ein Z80-Schnipsel schreibt SDH (Basis+E = AEH); `gide` zeigt Basis,
+# Task-File-Zugriff und SDH ohne Nebenwirkung.  Ohne Abbild: "kein Abbild".
+tool:    k1520dbg
+disk:    cpa_cpa780_k5601_clock.img
+run:     --gide=0xA0 %DISK%
+stdin:
+  gide
+  e 0x6000 F3 3E E0 D3 AE 18 FE
+  set pc 0x6000
+  g 5000
+  gide
+  q
+expect:  Basis A0H (Tore A4H-AFH)
+expect:  Platte: kein Abbild
+expect:  Task-File 1,
+expect:  SDH E0
+forbid:  keine GIDE gesteckt
+forbid:  --gide:
