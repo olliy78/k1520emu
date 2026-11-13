@@ -19,7 +19,7 @@ Die **GUN** (PC-1715-Platine mit GIDE + USB + Netz) ist Vorbild; abgebildet werd
 | 1 | **Portdekodierung:** Basis = Hochnibble (Jumper A4–A7), die Karte belegt **Basis+4 … Basis+F** (12 Tore), alles andere antwortet nicht.  +4 (EXP) ohne Wirkung, +5 = RTC, +6/+7 = IDE /CS1 (Alternate Status/Device Control, Drive Address), +8 = 16-Bit-Daten, +9…+F = Task-File.  Basis mit gesetztem Tiefnibble → `std::invalid_argument`.  /IORQ allein, A8–A15 werden **nur für die RTC** ausgewertet. | `Gide.NurBasisPlus4BisFAntworten`, `Gide.ExpPortOhneWirkung`, `Gide.BasisA0`, `Gide.PortkonfliktWirftUndBasisIstVielfachesVon16` |
 | 2 | **LH-Wechsel-Flipflop** (aus GAL1, `gide1.pds`): kippt bei JEDEM Zugriff auf +8 und +9…+F, wird aber bei Task-File-Zugriff (+9…+F) auf **0** gesetzt; +6/+7 ändern ihn nicht.  Lesen +8: 1. Zugriff holt das Wort von der Platte (`IORD`) und liefert das **Low-Byte**, 2. Zugriff das gemerkte High-Byte ohne `IORD`.  Schreiben: 1. Zugriff merkt Low, 2. schreibt (`IOWR`).  **Low-Byte zuerst.**  `INIR`/`OTIR` je 2 × 256 B = 1 Sektor; ein Task-File-Zugriff mitten im Sektor setzt die Folge zurück — so nachbilden, nicht „entschärfen“. | `Gide.LowByteZuerst`, `Gide.TaskFileZugriffMittenImSektorSetztFolgeZurueck`, `Gide.ZugriffAufCs1AendertLhNicht`, `Gide.UngeradeZugriffszahlLiestUndSchreibtNichtVorzeitig`, `Gide.ResetSetztLhZurueckMediumBleibt` |
 | 3 | **Gast-Rundlauf nach Rehs Routinen** (`HDInit`: DOR 06h/02h, 91h; Lesen 20h + DRQ + 2×`inir`; Schreiben 30h + 2×`otir`) mit echtem Z80 im Test.  Kein Interrupt, kein /WAIT, kein IORDY — der Gast fragt BSY/DRQ ab; BSY ist **mindestens eine Statusabfrage lang sichtbar**. | `Gide.RundlaufHdInitSchreibenLesenByteweiseGleich`, `AtaGeraet.BsyIstMindestensEineAbfrageSichtbarDannDrq`, `AtaGeraet.BsyEndetAuchOhneAbfrageNachTakten` |
-| 4 | **Basis = Jumper.**  Die Jumperstellungen der echten Karten sind unbekannt (Anwenderentscheid 2026-11-10): im **Kern ist die Basis frei** (`Gide::Config::basis`, Vielfaches von 10H); die **Maschinenvorgabe** (feste Verdrahtung oder Wahl in der Oberfläche) ist **offen, später** (G6).  Die Tests stecken ausdrücklich Basis (A0H/90H/B0H/D0H) — nicht auf eine Vorgabe verlassen. | `GideMaschine.A5120_AbweichendeBasisB0`, `py_gide_api` (`test_abweichende_basis_und_ohne_rtc`) |
+| 4 | **Basis = Jumper.**  Die Jumperstellungen der echten Karten sind unbekannt (Anwenderentscheid 2026-11-10): im **Kern ist die Basis frei** (`Gide::Config::basis`, Vielfaches von 10H); die **Maschinenvorgabe** (feste Verdrahtung oder Wahl in der Oberfläche) ist seit 2026-11-13 die Vorauswahl der Oberfläche (`KartenVorgaben.*`).  Die Tests stecken ausdrücklich Basis (A0H/90H/B0H/D0H) — nicht auf eine Vorgabe verlassen. | `GideMaschine.A5120_AbweichendeBasisB0`, `py_gide_api` (`test_abweichende_basis_und_ohne_rtc`) |
 | 5 | **Übliche Basis in der Praxis ist D0H** (Poppe-Treiber `GIDEHPD0`, Kingstener `gidn@D0h`, GUN am PC 1715, K8915-Gerippe).  **D0H kollidiert** mit der Kassette K5020 (K8915, PC 1715; am A5120 30H) und mit dem EPROMmer des PRG 710 (D0–D4).  Frei auf allen Maschinen: 90H–9FH, A0H–A7H, F0H–FFH (außer PRG-ATP F4/F5).  Kollision → `installGide` meldet den Grund (`gideFehler()`), **kein Absturz**; die Tore werden **vor** dem Anmelden geprüft (`belegtGrund`, Vorbild `installK5020`, nicht der Wurf von `registerIO`). | `GideMaschine.Bestueckung_*` (Konfliktfälle), `cli_dbg_gide_konflikt` |
 | 6 | **Gesteckt wird nach dem Anlegen, vor dem ersten `run()`/`reset()`**; danach, doppelt oder bei belegtem Tor `false` + `gideFehler()` (C-ABI `k1520_gide_error`, Python `ValueError` mit Grund).  P8000: nicht steckbar (kein K1520-Bus).  Der Maschinentakt kommt über `gideTakt(absolute Takte)` aus der Laufschleife — **`takt()` muss laufen**, sonst weder verzögertes Zurückschreiben noch BSY-Ende noch RTC. | `GideMaschine.Bestueckung_*`, `py_gide_api` (`test_zu_spaet_gesteckt_scheitert`, `test_p8000_hat_keinen_steckplatz`) |
 | 7 | **`/RESET` setzt LH und die Platte zurück, Abbild und RTC bleiben; Netz-Ein (`powerOn`) löscht Befehlsspur und Zähler.**  Nicht im Save-State (wie RAF/K6022/K5020; neue Teile bräuchten eine neue Fassungsnummer). | `Gide.ResetSetztLhZurueckMediumBleibt` |
@@ -32,8 +32,7 @@ Die **GUN** (PC-1715-Platine mit GIDE + USB + Netz) ist Vorbild; abgebildet werd
 ## Fremdsoftware: seit 2026-11-11 IM Repo und auf den Systemdisketten (Anwenderentscheidung)
 
 **Der frühere Grundsatz „nur lokal, nie im Repo" ist für die Dateien in `tools/gide/fremd/` aufgehoben** — auf ausdrückliche
-Anweisung des Anwenders, damit die Optionen mit den ausgelieferten Disketten benutzbar sind.  **Lizenz- und Weitergabestatus
-bleibt UNGEKLÄRT** (nicht geprüft; Autoren, Fundorte, Kenntnisstand: `tools/gide/README.md`, reist im Paket als
+Anweisung des Anwenders, damit die Optionen mit den ausgelieferten Disketten benutzbar sind.  **Weitergabe mit dem Paket vom Anwender am 2026-11-13 ausdrücklich freigegeben** (Anwenderentscheidung, kein Rechtsbefund; Urheber nicht gefragt; Autoren, Fundorte, Kenntnisstand: `tools/gide/README.md`, reist im Paket als
 `share/k1520emu/karten_software/HERKUNFT.md` mit).  Grund der Aufnahme: Anwenderentscheidung, kein Rechtsbefund.
 Festlegungen (Wächter in Klammern):
 
@@ -91,10 +90,8 @@ doppelt, Tor belegt, Z80-Gastcode Sektor + RTC), `GideSystem.*` (`test_gide_syst
 
 ## Ausdrücklich NICHT gemacht
 
-- **G6 Oberfläche** (Einstellungen, Statuslampe „IDE“, Konfigschlüssel `general.gide.*`, Handbuch) — zurückgestellt, bis die Basisfrage
-  (Festlegung 4) entschieden ist.  Es gibt keinen Programmprofil-/Konfigurationsweg; `gide=` gilt nur in Python/CLI/Werkzeugen.
-- **Netz (W5100/KC-Net, 88H–8BH)** — Entwurf 50 §6, APs N*; kollidiert mit der RAF, am K8915/PRG 710 nicht steckbar (CTC/PIO der ZRE).
-  In Planung (N1 laeuft), das KC-Net-Protokoll fehlt noch; keine Zusagen.  USB siehe unten (U1/U2 fertig, GUI U3 zurueckgestellt).
+- **Maschinenvorgabe der Basen** — seit 2026-11-13 entschieden: die Vorauswahl der Oberfläche (GIDE 90H, USB 84H/8CH, Netz C0H/28H, `app/profil.py`) ist die Vorgabe; Wächter `KartenVorgaben.*` (alle drei Karten + RAF/K5020/K6022 zugleich, je Karte ein Z80-Gastprogramm, an A5120, A5120.16, K8915 V3/Gen 2, PRG 710/-1, PC 1715/1715W) und `test_vorauswahl_kollidiert_nirgends`.  Die Jumper bleiben in der Oberfläche wählbar.
+- **Netz (W5100/KC-Net, 88H–8BH)** ist umgesetzt (N1–N3, siehe unten); es kollidiert mit der RAF und ist am K8915/PRG 710 nicht steckbar (CTC/PIO der ZRE).
 - **G5b Gasttreiber `GIDEDRV.COM`** — entfällt: die vorhandenen Poppe-/Kingstener-Treiber genügen (Anwenderantwort F3).
   Auch kein eigenes Prüfprogramm `GIDETST.COM` (G5a ist durch die echten Treiber, G5c, überholt).
 - **Save-State**, **P8000** (kein K1520-Bus).  (Das DiskTool-Dateisystem für IDE-Abbilder gibt es seit 2026-11-11: `doc/merkposten/disktool.md`, Abschnitt „GIDE-Platten".)
@@ -163,4 +160,4 @@ Die ATmega-Firmware ist Closed Source (nur auf persoenliche Anfrage) -> das Verh
 | N11 | **IP-Nummern 0..7** alle schreib-/lesbar; Nummer > 7 = Kommandofehler (Annahme [?]).  **Port B:** PB0 = ARDY, PB7 = invertiertes BRDY, PB1..PB6 = 0 (an Masse). | `GunNet.IpNummern0Bis7SindAlleSchreibUndLesbar`, `GunNet.PortBPb1BisPb6SindMasse` |
 
 Nicht nachgebildet/offen: Kommando 0C (ID-String) hat keinen Gast-Beleg; DHCP/DNS/Ping-Gegenstellen (Broadcast/ICMP gibt es im W5100-Modell nicht — `H`/`D`/`P` in CPMNET sind ohne Wirkung);
-kein Save-State; GUI (N3) offen; PRG 710 mit ATP-Zusatz nur mit freier Basis.
+kein Save-State; PRG 710 mit ATP-Zusatz nur mit freier Basis.

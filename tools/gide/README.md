@@ -7,9 +7,8 @@ benutzbar.  Diese Software liegt seit **2026-11-11** im Repository und auf den a
 > **Anwenderentscheidung, kein Rechtsbefund.**  Der frühere Grundsatz „Fremdsoftware nur lokal, nie ins Repo"
 > (`doc/merkposten/gun.md`, Entwurf 50 §2a) ist für genau die Dateien in `fremd/` **aufgehoben** — auf ausdrückliche
 > Anweisung des Anwenders („Wir müssen die notwendige Software auch auf die Disketten bringen, die wir mit dem Installer
-> ausliefern"). Die **Weitergabe-Erlaubnis der Urheber ist NICHT geprüft**; die Tabelle unten gibt den
-> Kenntnisstand wieder. Wer das Paket weitergibt, tut es auf eigene Verantwortung; im Zweifel `fremd/` aus dem Paket
-> nehmen (`packaging/build_payload.sh`, Abschnitt „Gast-Software der Hardwareoptionen").
+> ausliefern"). Der Anwender hat die **Weitergabe mit dem Paket am 2026-11-13 ausdrücklich freigegeben**; eine Rückfrage bei den Urhebern gab es nicht. Die Tabelle unten gibt den
+> Kenntnisstand wieder. Soll `fremd/` doch aus dem Paket, geht das über (`packaging/build_payload.sh`, Abschnitt „Gast-Software der Hardwareoptionen").
 
 ## Herkunft und Status
 
