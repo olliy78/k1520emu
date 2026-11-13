@@ -292,6 +292,11 @@ k1520_add_test(gun_usb_maschinen SRC test_gun_usb_maschinen.cpp
                                  LIBS k1520_a5120 k1520_k8915 k1520_prg710 k1520_pc1715 k1520_gun_usb k1520_logger k1520_testsupport
                                  LABELS "${_lbl}" DEFS LOG_LEVEL=2)
 
+# Vorauswahl der Karten-Basen je Maschinenvariante: GIDE + USB + Netz (+ RAF, K5020, K6022) zugleich, je Karte ein Z80-Gastprogramm.
+k1520_add_test(karten_vorgaben SRC test_karten_vorgaben.cpp
+                               LIBS k1520_a5120 k1520_k8915 k1520_prg710 k1520_pc1715 k1520_gide k1520_gun_usb k1520_gun_net k1520_logger k1520_testsupport
+                               LABELS "${_lbl}" DEFS LOG_LEVEL=2)
+
 # GUN-USB, AP U2: die ECHTEN UTools 1.4 (USB/UDIR/UPUT/UGET, PIO DCh..DFh) gegen die Karte; die Software liegt nur lokal
 # (~/Documents/K1520emu/GIDE_Software/utools14, K1520_GIDE_SW), fehlt sie, werden die Faelle uebersprungen.
 k1520_add_test(gun_usb_system SRC test_gun_usb_system.cpp
