@@ -178,27 +178,22 @@ def typ(schluessel: str) -> Typbeschreibung:
     return VORGABE
 
 
-#: ROM-Wahl des SD 1157: (Schluessel, Anzeige, Erklaerung).  Merkposten Nr. 17.
-ROM_WAHL = (
-    ("repariert", "repariert (Vorgabe)",
-     "Der Original-Abzug leert den Eingabepuffer nie (Byte 0D34H); die reparierte Fassung ist nur dort "
-     "um ein Byte geändert.  Mit ihr arbeitet der Drucker an der Schnittstelle zuverlässig."),
-    ("original", "Original-Abzug",
-     "Der unveränderte EPROM-Abzug.  Der Selbsttest läuft; über die Schnittstelle bleibt der "
-     "Eingabepuffer nach dem ersten Zeichen voll (vermutlich ein Lesefehler des Abzugs)."),
-)
+#: Die ROM-Wahl steht im Katalog data/drucker_roms.yaml (app/printertool/rom_katalog.py), nicht mehr hier (Entwurf 49 §11.2).
 
 SCHNITTSTELLEN = (("ifss", "IFSS"), ("v24", "V.24"))
 
 
 def konfig_text(schnittstelle: str = "ifss", rom: str = "repariert", beschreibung: Optional[Typbeschreibung] = None,
-                betriebsart: str = "endlos", dil: int = 0) -> str:
+                betriebsart: str = "endlos", dil: int = 0, romdatei: Optional[str] = None) -> str:
     """Konfigurationstext fuer ``k1520_create_printer`` (Unbekanntes -> Vorgabe).
 
-    Beim K6316 folgt das Schnittstellenmodul dem Typ; der Kern kennt dort ``betriebsart`` und ``dil``."""
+    Beim K6316 folgt das Schnittstellenmodul dem Typ; der Kern kennt dort ``betriebsart`` und ``dil``.
+    ``romdatei`` (Pfad aus dem ROM-Katalog) hat Vorrang vor dem eingebetteten Abbild; ohne Katalog bleibt
+    am SD 1157 ``rom=`` (Alias) als Rueckfall.  Ein Komma im Pfad trennt die Liste und ist nicht darstellbar."""
+    zusatz = f",romdatei={romdatei}" if romdatei and "," not in romdatei else ""
     if beschreibung is not None and beschreibung.betriebsart_id is not None:
         betriebsart = betriebsart if betriebsart in ("aufwickeln", "schneiden", "endlos") else "endlos"
-        return f"betriebsart={betriebsart},dil={int(dil) & 0xFFFF}"
+        return f"betriebsart={betriebsart},dil={int(dil) & 0xFFFF}{zusatz}"
     schnittstelle = schnittstelle if schnittstelle in ("ifss", "v24") else "ifss"
     rom = rom if rom in ("repariert", "original") else "repariert"
-    return f"schnittstelle={schnittstelle},rom={rom}"
+    return f"schnittstelle={schnittstelle},rom={rom}{zusatz}"

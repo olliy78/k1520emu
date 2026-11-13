@@ -4,7 +4,8 @@ general:
   model: sd1157
   speed: 1.0
 printer:
-  rom: repariert
+  rom:
+    sd1157: repariert
   schnittstelle: ifss
   online: true
   formular_zoll: 12

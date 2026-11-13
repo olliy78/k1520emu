@@ -7,7 +7,7 @@ nicht ueberschrieben.  Mehrinstanz (``--instance``/``--config``) wie die Emulato
 Abschnitte::
 
     general:   {model, speed}                   Drucker und Tempo
-    printer:   {rom, schnittstelle, online, formular_zoll, zoom, folgen, einpassen}
+    printer:   {rom (je Typ: {sd1157: <Katalogschluessel>}; alt ein Text = SD 1157), schnittstelle, online, formular_zoll, zoom, folgen, einpassen}
     schnittstellen: {...}                      Zustand der SerialWidget-Bloecke
     window:    {width, height, dock_state}
 """

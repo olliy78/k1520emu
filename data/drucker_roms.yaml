@@ -1,0 +1,67 @@
+# Katalog der EPROM-Saetze der Nadeldrucker (Entwurf 49 §11.2, Merkposten drucker.md Nr. 31).
+# Aufgeloest in app/paths.py (Umgebung K1520_PRINTER_ROMS -> share/k1520emu -> data/), gelesen von app/printertool/rom_katalog.py.
+# `datei` ist relativ zum ROM-Ordner (Installation: share/k1520emu/eproms/, Quellbaum: doc/EPROMS/).
+# Der Kern kennt diesen Katalog nicht: er bekommt nur den Pfad (`romdatei=`).  Keine Umlaute in den Schluesseln.
+#
+# schluessel      eindeutig im ganzen Katalog (technischer Name)
+# typ             sd1157 | k6316-ifss | k6316-v24 (= Typschluessel der Oberflaeche)
+# pgm             Etikett/Programmstand
+# groesse         Bytes der Datei (SD 1157: 10624 = 0000H-297FH; K6316: 10240 = fuenf Chips zu 2 KiB lueckenlos)
+# md5             MD5 der Datei (Waechter DruckerRomKatalog.* prueft sie)
+# guete           ok | unvollstaendig | defekt | unbekannt
+# vorgabe         genau ein Eintrag je typ ist die Vorgabe
+# aliases         alte Schluessel (Konfigurationen, rom=repariert); nie entfernen
+version: 1
+eintraege:
+  - schluessel: sd1157-repariert
+    typ: sd1157
+    titel: "repariert"
+    pgm: "JDE 1.00 / 24.04.1986, Byte 0D34H = 0BH"
+    datei: SD1157/1157_repariert.rom
+    groesse: 10624
+    md5: 164f693230dc07b5eb68603d56c75e0f
+    schnittstellen: [ifss, v24]
+    zeichensatz: ZG1 (eingebettet, 1157zg.rom)
+    guete: ok
+    hinweis: "Der Original-Abzug leert den Eingabepuffer nie (Byte 0D34H); diese Fassung ist nur dort um ein Byte geändert.  Mit ihr arbeitet der Drucker an der Schnittstelle zuverlässig."
+    vorgabe: true
+    aliases: [repariert]
+  - schluessel: sd1157-original
+    typ: sd1157
+    titel: "Original-Abzug"
+    pgm: "JDE 1.00 / 24.04.1986"
+    datei: SD1157/1157.rom
+    groesse: 10624
+    md5: 09c70714ae52729e1352b2645ef4a90e
+    schnittstellen: [ifss, v24]
+    zeichensatz: ZG1 (eingebettet, 1157zg.rom)
+    guete: ok
+    hinweis: "Der unveränderte EPROM-Abzug.  Der Selbsttest läuft; über die Schnittstelle bleibt der Eingabepuffer nach dem ersten Zeichen voll (vermutlich ein Lesefehler des Abzugs)."
+    vorgabe: false
+    aliases: [original]
+  - schluessel: k6316-ifss
+    typ: k6316-ifss
+    titel: "K6316 IFSS-Satz (I1-I5)"
+    pgm: "tiffe.de, Satz I1-I5"
+    datei: K6316/k6316_ifss.rom
+    groesse: 10240
+    md5: 90307f3dd64f237e25c9baafeb867d34
+    schnittstellen: [ifss]
+    zeichensatz: im ROM
+    guete: ok
+    hinweis: "Fünf EPROMs zu 2 KiB (ifss/I1.BIN bis I5.BIN) lückenlos hintereinander, 0000H-27FFH."
+    vorgabe: true
+    aliases: []
+  - schluessel: k6316-v24
+    typ: k6316-v24
+    titel: "K6316 V.24-Satz (V1-V5)"
+    pgm: "tiffe.de, Satz V1-V5"
+    datei: K6316/k6316_v24.rom
+    groesse: 10240
+    md5: 61114a06ccb249a6a0e6cd34fa6dc135
+    schnittstellen: [v24]
+    zeichensatz: im ROM
+    guete: ok
+    hinweis: "Fünf EPROMs zu 2 KiB (v24/V1.BIN bis V5.BIN) lückenlos hintereinander, 0000H-27FFH."
+    vorgabe: true
+    aliases: []

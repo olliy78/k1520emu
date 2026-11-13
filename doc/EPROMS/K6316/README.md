@@ -26,3 +26,6 @@ Erster Befund (noch ohne Schaltplanabgleich, [?]):
   Serviceschaltplänen (`doc/printer/k6316/original/`), Entwurf 49 WP0.
 * Bestückung laut Servicehandbuch: U 880 D, U 855 D (PIO), U 856 D (SIO), U 857 D (CTC), U 2716 / K573RF2.
 * Die Reihenfolge V1…V5 = Steckplatz/Adressbereich ist **Annahme** — beim Abgleich mit dem Bestückungsplan prüfen.
+
+**Zusammengesetzte Sätze (WP8b, Katalog `data/drucker_roms.yaml`):** `k6316_ifss.rom` = `cat ifss/I1.BIN … I5.BIN` (MD5 90307f3dd64f237e25c9baafeb867d34),
+`k6316_v24.rom` = `cat v24/V1.BIN … V5.BIN` (MD5 61114a06ccb249a6a0e6cd34fa6dc135); je 10 240 B, die Datei, die der Kern über `romdatei=` nimmt.

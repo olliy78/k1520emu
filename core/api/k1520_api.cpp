@@ -421,6 +421,25 @@ K1520Handle k1520_create_printer(int typ, const char* konfig) {
         } else if (!k6316 && key == "rom") {
             g_init_error = "Drucker: rom = " + val + " unbekannt (original | repariert)";
             return nullptr;
+        } else if (key == "romdatei") {
+            // ROM-Satz aus einer Datei (Entwurf 49 §11.2; der Katalog gehoert in die Oberflaeche, der Kern kennt nur den Pfad).
+            // Genau die Laenge des Speicherplans; der Pfad darf kein Komma enthalten (Trenner der Liste).
+            const size_t soll = k6316 ? static_cast<size_t>(K6316Steuerung::ROM_ENDE)
+                                      : static_cast<size_t>(Sd1157Steuerung::ROM_ENDE);
+            std::ifstream f(std::filesystem::u8path(val), std::ios::binary);
+            std::vector<uint8_t> daten((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+            if (!f && !f.eof()) daten.clear();
+            if (daten.empty()) {
+                g_init_error = "Drucker: romdatei '" + val + "' nicht lesbar oder leer";
+                return nullptr;
+            }
+            if (daten.size() != soll) {
+                g_init_error = "Drucker: romdatei '" + val + "' hat " + std::to_string(daten.size()) + " Bytes, erwartet " +
+                               std::to_string(soll) + (k6316 ? " (fuenf Chips zu 2 KiB lueckenlos, 0000H-27FFH)"
+                                                              : " (0000H-297FH)");
+                return nullptr;
+            }
+            (k6316 ? cfg.k6316.rom_extern : cfg.sd1157.rom_extern) = std::move(daten);
         } else if (!k6316 && key == "schnittstelle") {
             g_init_error = "Drucker: schnittstelle = " + val + " unbekannt (ifss | v24)";
             return nullptr;
@@ -442,7 +461,7 @@ K1520Handle k1520_create_printer(int typ, const char* konfig) {
             }
         } else {
             g_init_error = "Drucker: unbekannter Schluessel '" + key + "'" +
-                           (k6316 ? " fuer den K6316 (betriebsart | dil)" : " fuer den SD 1157 (schnittstelle | rom)");
+                           (k6316 ? " fuer den K6316 (betriebsart | dil | romdatei)" : " fuer den SD 1157 (schnittstelle | rom | romdatei)");
             return nullptr;
         }
     }

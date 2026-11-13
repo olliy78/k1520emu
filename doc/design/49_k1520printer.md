@@ -392,6 +392,8 @@ und nicht ausgebaut; insbesondere schreibt `Nadeldruckwerk::feuere` weiter nur a
 | **WP8d** | K6313 druckt: Selbsttest, Text über V.24/IFSS/Centronics-frei, Orakel gegen Zeichengenerator im ROM, je ein Wächter je Fassungsfamilie (10 KiB, 16 KiB) | `boot-disasm-analyst` + `cpp-coder` | Wächter wie WP6a |
 | **WP8e** | K6311 nach den Annahmen aus WP8a, kenntlich als „Hardware erschlossen" im Handbuch | `cpp-coder` | läuft an; Befund in Merkposten, offene [?] gelistet |
 
+**Stand WP8b (2026-11-14): fertig** — `data/drucker_roms.yaml` (SD 1157 repariert/original, K6316 IFSS/V.24), `romdatei=` im Kern, `app/paths.py`/`app/printertool/rom_katalog.py`, Feld „EPROM“ (nur bei > 1 Eintrag), `printer.rom.<typ>`, Paket, Wächter `DruckerRomKatalog.*`; Vorgaben unverändert, K6311/K6313 noch nicht im Katalog; Merkposten Nr. 31.
+
 Reihenfolge: **WP8a ‖ WP8b** (a nur lesend/Doku, b baut) → WP8c → WP8d → WP8e.  Je AP Doku + Test + Commit, **nicht pushen**; Bau-Agenten nacheinander (gemeinsames `build/`).
 Gesperrt bleibt: SD 1152/257, K6314 (Abzüge liegen vor, aber nicht im Auftrag), 32-KiB-Fassungen, solange WP8a keinen Speicherplan dafür belegt.
 

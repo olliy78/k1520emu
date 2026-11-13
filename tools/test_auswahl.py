@@ -35,6 +35,9 @@ _FLOPPY_WEIT = ("fach_floppy", "fach_kermit", "fach_p8000", "fach_wega")
 # (Muster, Fachgebiete oder ALLE, Begruendung, win?)  `**` = beliebig tief, `*` = ein Namensteil.
 # win=None: aus dem Pfad ableiten (C++/CMake -> ja).
 REGELN = [
+    # ── EPROM-Abzuege der Drucker liegen unter doc/, gehen aber in den Katalog (vor der Doku-Regel) ──
+    ("doc/EPROMS/SD1157/**", ("fach_drucker",), "SD 1157 EPROM-Abzuege", False),
+    ("doc/EPROMS/K6316/**", ("fach_drucker",), "K6316 EPROM-Abzuege", False),
     # ── nur Doku: nichts ────────────────────────────────────────────────
     ("**/*.md", (), "Doku", False),
     ("doc/**", (), "Doku", False),
@@ -73,6 +76,7 @@ REGELN = [
     ("app/kermittool/**", (), "Kermit-Oberflaeche", False),
     ("app/printertool/**", ("fach_drucker",), "Drucker-Oberflaeche", False),
     ("data/default_config_printer.yaml", ("fach_drucker",), "Drucker-Vorgabe", False),
+    ("data/drucker_roms.yaml", ("fach_drucker",), "Drucker-EPROM-Katalog", False),
     ("run_k1520printer.sh", ("fach_drucker",), "Drucker-Starter", False),
     ("tools/sertest/**", ("fach_serial",), "SERTEST", False),
     # ── Diskette ────────────────────────────────────────────────────────

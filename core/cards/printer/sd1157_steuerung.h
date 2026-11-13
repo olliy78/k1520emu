@@ -32,6 +32,8 @@
  */
 
 #pragma once
+#include <cstdint>
+#include <vector>
 #include "core/bus/k1520_bus.h"
 #include "core/cards/printer/drucker_steuerung.h"
 #include "core/peripherals/druckwerk/geregelter_wagen.h"
@@ -66,6 +68,9 @@ public:
         /// ROM-Abzug: der Original-Abzug (`1157.rom`) leert den SIO-Eingabepuffer nie (Byte 0D34H = 2BH statt 0BH, [?] Bitkipp,
         /// doc/EPROMS/SD1157/README.md); `true` = `1157_repariert.rom` (nur 0D34H = 0BH), Vorgabe.
         bool rom_repariert = true;
+        /// ROM-Satz aus einer Datei (Konfigurationsschluessel `romdatei=`, Entwurf 49 §11.2): genau `ROM_ENDE` Bytes ab 0000H.
+        /// Leer = das eingebettete Abbild (`rom_repariert`); nicht leer hat Vorrang.  Die Laenge prueft der Aufrufer (C-ABI).
+        std::vector<uint8_t> rom_extern;
         Schnittstelle schnittstelle = Schnittstelle::Ifss;   ///< 3A.0: 0 = IFSS (SIO B), 1 = V.24 (SIO A) §5.4
         // PIO 3 A, Schalter des V.24-Betriebs (§5.4); Vorgaben [?]
         uint8_t stopbits_code = 1;       ///< Bit 2/1 = 01 -> 1 Stoppbit

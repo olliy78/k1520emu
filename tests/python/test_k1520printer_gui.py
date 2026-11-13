@@ -241,11 +241,11 @@ def test_rom_und_schnittstellenwechsel_legen_neu_an_nach_rueckfrage(fenster, mon
     antworten = []
     monkeypatch.setattr(QMessageBox, "question",
                         staticmethod(lambda *a, **k: antworten.append(a[1]) or QMessageBox.No))
-    e.rom.setCurrentIndex(e.rom.findData("original"))
-    assert fenster.emu is emu0 and e.rom.currentData() == "repariert" and len(antworten) == 1
+    e.rom.setCurrentIndex(e.rom.findData("sd1157-original"))
+    assert fenster.emu is emu0 and e.rom.currentData() == "sd1157-repariert" and len(antworten) == 1
     monkeypatch.setattr(QMessageBox, "question", staticmethod(lambda *a, **k: QMessageBox.Yes))
-    e.rom.setCurrentIndex(e.rom.findData("original"))
-    assert fenster.emu is not emu0 and rom(fenster.emu) == 0x2B and fenster._rom == "original"
+    e.rom.setCurrentIndex(e.rom.findData("sd1157-original"))
+    assert fenster.emu is not emu0 and rom(fenster.emu) == 0x2B and fenster._rom == "sd1157-original"
     assert fenster.takt.isActive()
     fenster.takt.stop()
     # Schnittstelle: v24 am Schalterblock -> Neuanlage; der Kern meldet den Aufbau, die Anzeige folgt
@@ -253,7 +253,7 @@ def test_rom_und_schnittstellenwechsel_legen_neu_an_nach_rueckfrage(fenster, mon
     assert fenster._schnittstelle == "v24" and "V.24" in fenster.st_schnittstelle.text()
     assert fenster.emu.serial_count() == 2 and fenster.seriell.emulator is fenster.emu
     fenster.takt.stop()
-    assert fenster.konfig_lesen()["printer"]["rom"] == "original"
+    assert fenster.konfig_lesen()["printer"]["rom"]["sd1157"] == "sd1157-original"
 
 
 def test_konfiguration_rundlauf(fenster, tmp_path):
@@ -507,7 +507,7 @@ def test_k6316_typwahl_baut_bedienfeld_dil_und_betriebsart(fenster, monkeypatch)
         assert b.knopf(n) is not None
     for l in ("TEST", "FEHLER", "PAPIER", "BEREIT", "ONLINE"):
         assert b.lampe(l) is not None
-    assert not e.rom.isEnabled() and not e.schnittstelle.isEnabled()     # das Modul folgt dem Typ
+    assert e.rom.isHidden() and not e.schnittstelle.isEnabled()     # das Modul folgt dem Typ; ein Satz je Typ = keine EPROM-Wahl
     assert not fenster.act_online.isEnabled()
     # DIL-Schalter und Drehschalter erreichen den Kern; Kern ist Quelle der Wahrheit
     b.knopf("s14").click()
@@ -571,3 +571,51 @@ def test_k6316_vorsteckbeleg_kasten_einlegen_entnehmen(fenster, monkeypatch):
     k.entnehmen.click()
     assert fenster.emu.printer_beleg_state()["eingelegt"] == 0
     assert k.einlegen.isEnabled() and "leer" in k.zustand.text()
+
+
+# ─── EPROM-Katalog in der Oberflaeche (WP8b, Entwurf 49 §11.2) ───────────────
+
+def test_eprom_feld_nur_bei_mehreren_eintraegen_vorgabe_markiert_und_hinweis(fenster):
+    e = fenster.einst_drucker
+    assert not e.rom.isHidden() and e.rom.count() == 2                  # SD 1157: repariert + original
+    assert e.rom.currentData() == "sd1157-repariert" and "(Vorgabe)" in e.rom.currentText()
+    assert "Güte: ok" in e.rom_text.text() and "Byte 0D34H" in e.rom_text.text()
+    # K6316: ein Satz je Typ -> kein Auswahlfeld
+    fenster._neu_anlegen(beschreibung=typen.typ("k6316-v24"))
+    assert e.rom.isHidden() and e.rom.count() == 1
+    fenster.takt.stop()
+    fenster._neu_anlegen(beschreibung=typen.typ("sd1157"))
+    assert not e.rom.isHidden()
+    fenster.takt.stop()
+
+
+def test_alte_konfiguration_rom_text_und_aliase_laufen_weiter(qapp, tmp_path):
+    from app.printertool.fenster import PrinterWindow
+    for wahl in ("original", {"sd1157": "original"}, {"sd1157": "sd1157-original"}):
+        f = PrinterWindow(konfig_daten={"printer": {"rom": wahl}}, konfig_pfad=str(tmp_path / "c.yaml"), autostart=False)
+        try:
+            assert f._rom == "sd1157-original"
+            assert K._lib.k1520_mem_read(f.emu._handle, 0x0D34) == 0x2B
+            assert f.konfig_lesen()["printer"]["rom"] == {"sd1157": "sd1157-original"}
+        finally:
+            f.takt.beenden()
+            f.close()
+    f = PrinterWindow(konfig_daten={"printer": {"rom": "gibtsnicht"}}, konfig_pfad=str(tmp_path / "c.yaml"), autostart=False)
+    try:
+        assert f._rom == "sd1157-repariert"                              # Unbekanntes -> Vorgabe
+    finally:
+        f.takt.beenden()
+        f.close()
+
+
+def test_ohne_katalog_laeuft_der_drucker_mit_dem_eingebetteten_abbild(qapp, tmp_path, monkeypatch):
+    from app.printertool.fenster import PrinterWindow
+    monkeypatch.setenv("K1520_PRINTER_ROMS", str(tmp_path / "gibtsnicht.yaml"))
+    monkeypatch.setattr("app.paths.printer_roms_candidates", lambda: [tmp_path / "gibtsnicht.yaml"])
+    f = PrinterWindow(konfig_daten={}, konfig_pfad=str(tmp_path / "c.yaml"), autostart=False)
+    try:
+        assert f.einst_drucker.rom.isHidden()
+        assert K._lib.k1520_mem_read(f.emu._handle, 0x0D34) == 0x0B     # Vorgabe wie bisher
+    finally:
+        f.takt.beenden()
+        f.close()

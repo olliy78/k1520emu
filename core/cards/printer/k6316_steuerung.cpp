@@ -427,7 +427,10 @@ void K6316Steuerung::ioWrite(uint8_t port, uint8_t data)
 
 uint8_t K6316Steuerung::memRead(uint16_t a)
 {
-    if (a < ROM_ENDE) return cfg_.schnittstelle == Config::Schnittstelle::V24 ? K6316_ROM_V24[a] : K6316_ROM_IFSS[a];
+    if (a < ROM_ENDE) {
+        if (!cfg_.rom_extern.empty()) return cfg_.rom_extern[a];
+        return cfg_.schnittstelle == Config::Schnittstelle::V24 ? K6316_ROM_V24[a] : K6316_ROM_IFSS[a];
+    }
     if (a >= RAM_BASIS && a < RAM_BASIS + RAM_GROESSE) return ram_[a - RAM_BASIS];
     return 0xFF;
 }

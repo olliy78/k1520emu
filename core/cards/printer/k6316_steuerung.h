@@ -27,6 +27,8 @@
  */
 
 #pragma once
+#include <cstdint>
+#include <vector>
 #include "core/bus/k1520_bus.h"
 #include "core/cards/printer/drucker_steuerung.h"
 #include "core/peripherals/druckwerk/nadeldruckwerk.h"
@@ -58,6 +60,9 @@ public:
     struct Config {
         enum class Schnittstelle { Ifss, V24 };
         Schnittstelle schnittstelle = Schnittstelle::Ifss;   ///< Modul = Firmwaresatz = SIO-Kanal
+        /// ROM-Satz aus einer Datei (`romdatei=`, Entwurf 49 §11.2): die fuenf Chips lueckenlos, genau `ROM_ENDE` Bytes.
+        /// Leer = eingebetteter Satz je `schnittstelle`; nicht leer hat Vorrang.
+        std::vector<uint8_t> rom_extern;
         /// DIL-Schalter S11–S26: Bit i = S(11+i) geschlossen (Ein).  Auslieferungszustand: alle Aus (Handbuch 5.8.2:
         /// „Aus entspricht Nichtbestueckung des Schalterblocks“).
         uint16_t dil = 0;

@@ -47,6 +47,8 @@ ENV_FORMATS = "K1520_FORMATS"  # Formatkatalog (Datei oder Verzeichnis)
 ENV_DATA = "K1520_DATA"        # Datenordner des Anwenders (enthaelt Disketten/)
 ENV_DISKS = "K1520_DISKS"      # Verzeichnis der Arbeitsdisketten
 ENV_DEFAULT_CONFIG = "K1520_DEFAULT_CONFIG"   # Auslieferungskonfiguration (Datei oder Verzeichnis)
+ENV_PRINTER_ROMS = "K1520_PRINTER_ROMS"       # Katalog der Drucker-EPROMs (Datei oder Verzeichnis)
+ENV_PRINTER_EPROMS = "K1520_PRINTER_EPROMS"   # Ordner der Drucker-EPROM-Dateien
 # ENV_DISKS ist die SPEZIELLERE Angabe und schlaegt deshalb ENV_DATA: wer nur die
 # Disketten woanders haben will, soll dafuer nicht den ganzen Datenordner
 # verschieben muessen (dort liegen auch Zustaende und `logs/`).
@@ -276,6 +278,55 @@ def formats_file() -> Optional[Path]:
     """Erster existierender Formatkatalog — oder ``None``."""
     for p in formats_candidates():
         if p.is_file():
+            return p.resolve()
+    return None
+
+
+# ─── EPROM-Katalog der Drucker (Entwurf 49 §11.2) ───────────────────────────
+
+#: Name des Katalogs der Drucker-EPROMs.
+PRINTER_ROMS_FILE = "drucker_roms.yaml"
+
+
+def _env_pfade(name: str) -> List[Path]:
+    env = os.environ.get(name)
+    if not env:
+        return []
+    sep = ";" if _is_windows() else ":"
+    return [Path(i).expanduser() for i in env.split(sep) if i]
+
+
+def printer_roms_candidates() -> List[Path]:
+    """Kandidaten für ``drucker_roms.yaml``: Umgebung, Installation, Quellbaum (kein Benutzerordner:
+    wie bei der Auslieferungskonfiguration soll ein Anwender nichts „überschreiben“, was geliefert wird)."""
+    out = [p / PRINTER_ROMS_FILE if p.is_dir() else p for p in _env_pfade(ENV_PRINTER_ROMS)]
+    base = base_dir()
+    out.append(base / "share" / "k1520emu" / PRINTER_ROMS_FILE)   # Installation
+    out.append(base / "data" / PRINTER_ROMS_FILE)                 # Quellbaum
+    return out
+
+
+def printer_roms_file() -> Optional[Path]:
+    """Erster existierende Katalog der Drucker-EPROMs — oder ``None``."""
+    for p in printer_roms_candidates():
+        if p.is_file():
+            return p.resolve()
+    return None
+
+
+def printer_eproms_candidates() -> List[Path]:
+    """Kandidaten für den Ordner der EPROM-Dateien (``datei`` im Katalog ist relativ dazu)."""
+    out = list(_env_pfade(ENV_PRINTER_EPROMS))
+    base = base_dir()
+    out.append(base / "share" / "k1520emu" / "eproms")   # Installation
+    out.append(base / "doc" / "EPROMS")                  # Quellbaum
+    return out
+
+
+def printer_eproms_dir() -> Optional[Path]:
+    """Erster existierende Ordner der Drucker-EPROM-Dateien — oder ``None``."""
+    for p in printer_eproms_candidates():
+        if p.is_dir():
             return p.resolve()
     return None
 
@@ -794,6 +845,8 @@ def describe() -> str:
     vorgabe_pc1715 = default_config_file("default_config_pc1715.yaml")
     vorgabe_p8000 = default_config_file("default_config_p8000.yaml")
     vorgabe_mc80 = default_config_file("default_config_mc80.yaml")
+    drucker_kat = printer_roms_file()
+    drucker_roms = printer_eproms_dir()
     bundled = bundled_disks_dir()
     dbg = debugger()
     cli = disktool_cli()
@@ -807,6 +860,8 @@ def describe() -> str:
         f"Formatkatalog:     {fmt if fmt else 'NICHT GEFUNDEN (der Kern sucht weiter selbst)'}",
         f"Bootabbilder:      {boot_kat if boot_kat else 'NICHT GEFUNDEN'}"
         f" (+ {bootsektor_user_file()}, falls vorhanden)",
+        f"Drucker-EPROMs:   {drucker_kat if drucker_kat else 'NICHT GEFUNDEN'}"
+        f" (Dateien: {drucker_roms if drucker_roms else 'NICHT GEFUNDEN'})",
         f"Disketten (Paket): {bundled if bundled else '—'}",
         f"Disketten (Nutzer):{user_disks_dir()}",
         f"Dateien (DiskTool):{user_files_dir()}",

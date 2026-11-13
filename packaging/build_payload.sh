@@ -574,6 +574,17 @@ cp "$REPO/data/bootsektor.yaml" "$STAGE/payload/share/k1520emu/bootsektor.yaml" 
 mkdir -p "$STAGE/payload/share/k1520emu/bootsektoren"
 cp "$REPO"/data/bootsektoren/*.bin "$STAGE/payload/share/k1520emu/bootsektoren/" \
     || die "data/bootsektoren/*.bin fehlen"
+# EPROM-Katalog der Drucker (Entwurf 49 §11.2): Katalog + die im Katalog genannten Dateien unter
+# eproms/ (app/paths.py::printer_roms_file / printer_eproms_dir suchen share/k1520emu/ vor data/ bzw. doc/EPROMS/).
+# Die Dateinamen stehen im Katalog (`datei:`, relativ); hier wird genau das kopiert, was er nennt.
+cp "$REPO/data/drucker_roms.yaml" "$STAGE/payload/share/k1520emu/drucker_roms.yaml" \
+    || die "data/drucker_roms.yaml fehlt"
+mkdir -p "$STAGE/payload/share/k1520emu/eproms"
+for _rom in $(sed -n 's/^ *datei: *//p' "$REPO/data/drucker_roms.yaml"); do
+    mkdir -p "$STAGE/payload/share/k1520emu/eproms/$(dirname "$_rom")"
+    cp "$REPO/doc/EPROMS/$_rom" "$STAGE/payload/share/k1520emu/eproms/$_rom" \
+        || die "EPROM-Datei fehlt: doc/EPROMS/$_rom (Katalog data/drucker_roms.yaml)"
+done
 # Auslieferungskonfiguration: der Zustand nach der Erstinstallation und das Ziel
 # von *Ansicht > Standard zuruecksetzen* (app/config_io.py::standard_konfiguration)
 # — je Programm eine (A5120, K8915, PRG710, PC1715, P8000 und MC80 Emulator; app/profil.py) plus K1520 Printer (kein Profil, app/printertool/konfig.py).

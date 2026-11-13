@@ -1437,6 +1437,12 @@ def test_payload_enthaelt_alles_zum_starten(payload):
         "payload/share/k1520emu/default_config_pc1715.yaml",
         "payload/share/k1520emu/default_config_p8000.yaml",
         "payload/share/k1520emu/default_config_mc80.yaml",
+        # EPROM-Katalog der Drucker samt den Dateien, die er nennt (Entwurf 49 §11.2).
+        "payload/share/k1520emu/drucker_roms.yaml",
+        "payload/share/k1520emu/eproms/SD1157/1157_repariert.rom",
+        "payload/share/k1520emu/eproms/SD1157/1157.rom",
+        "payload/share/k1520emu/eproms/K6316/k6316_ifss.rom",
+        "payload/share/k1520emu/eproms/K6316/k6316_v24.rom",
         "payload/share/icons/a5120emu.svg",
         # k1520DiskTool: Bibliothek, Kommandozeile, Oberflaeche, Starter.
         # Ohne diese Zeilen laege app/disktool/ zwar im Paket (die ganze app/-
@@ -1865,6 +1871,12 @@ def test_der_drucker_ist_in_allen_paketwegen():
     assert "QtPrintSupport" in _slim().BINDINGS_KEEP
     # Die Vorgabedatei, die der Drucker beim Start sucht, gibt es im Quellbaum.
     assert (PROJECT_ROOT / "data" / "default_config_printer.yaml").is_file()
+    # EPROM-Katalog (WP8b): Katalog + jede genannte Datei kommen ins Paket (share/k1520emu/eproms/).
+    assert "drucker_roms.yaml" in bp and "share/k1520emu/eproms" in bp
+    import yaml
+    katalog = yaml.safe_load((PROJECT_ROOT / "data" / "drucker_roms.yaml").read_text(encoding="utf-8"))
+    for e in katalog["eintraege"]:
+        assert (PROJECT_ROOT / "doc" / "EPROMS" / e["datei"]).is_file(), e["datei"]
 
 
 def test_kermit_cli_name_im_installationslayout(tmp_path):
