@@ -447,3 +447,35 @@ Reihenfolge WP8f → WP8g → WP8h (gemeinsames `build/`), je AP Doku + Test + C
 
 **Stand WP8h (2026-11-14): K6313/K6311 vollstaendiger.**  (a) Schriftarten Fett/Breit/Elite/komprimiert/Unterstreichen, Zeilenabstaende, FF/Formularlaenge, ISO VPRV/VPA am K6313 (EPSON 33538013, ISO 30835007) und Breit/Unterstreichen am K6311 mit Orakeln (Huellenvergleich +-1 Pixel); nicht belegt: Schraegschrift, Hoch-/Tiefschrift, Doppeldruck, ESC C/N, VPRR.  (b) Selbsttest ueber IFSS (K6313, K6311 13325212), Hexdump K6313 (FF + LF vor beim Netz-Ein, Elite-Teilung); K6311-Hexdump ohne Orakel.  (c) **16-KiB-Fassung** (Speicherplan *lang*) mit 30835007/30835207.  (d) 53538500: Fremdpunkte der ersten Zeile = nicht modellierte Nadelfreigabe /PC (Polaritaet je Platine verschieden).  (e) Summer nur beobachtet.  (f) Bedienfeld/Handbuch/Katalog.  Merkposten Nr. 37.  **Offen:** Schraeg/Hoch/Tief/Doppeldruck, /PC-Freigabe, Summeranzeige (ABI), K6311-Hexdump-Orakel, 36539211/5c53a001, Pruefprogramme ab 2800H, IFSP.
 
+
+## 12  Umbau: ROM-Katalog als EINE YAML-Datei mit Intel-HEX, gelesen vom Kern (WP9, Festlegung des Anwenders 2026-11-15)
+
+### 12.1  Anlass
+
+Ein ROM existiert heute bis zu viermal (`doc/EPROMS/*.bin`, Paketkopie `share/k1520emu/eproms/`, eingebettetes `rom_*.h`, MD5 im Katalog) plus zusammengesetzte `k6316_*.rom`;
+dazu Pfadauflösung, `romdatei=` und ein Wächter, der alles gegeneinander prüft — fehleranfällig.  **Neu: eine Datei, gelesen vom Kern.**
+
+### 12.2  Festlegungen
+
+* **`data/drucker_roms.yaml` trägt die Daten selbst** als Intel-HEX (`daten:` als Blockwert, 16 Byte je Zeile, Adresse ab 0000H, Endsatz `:00000001FF`).  Der Anwender kann sie mit einem Texteditor ändern.
+  Schätzung 0,4–0,5 MB; IFSS-/Mehrfacheinträge **verweisen** auf dieselben Daten (`daten_von: <schluessel>`), sie duplizieren sie nicht.
+* **Keine MD5 im Katalog** (Anwender): die **Zeilenprüfsumme des Intel-HEX** ist die Integritätsprüfung; eine Änderung muss nur die Zeile ändern.  Ein Eintrag hat zusätzlich `groesse` (Bytes), die der Leser gegen die Daten prüft.
+* **Der Kern liest den Katalog** (Umkehr der Festlegung aus §11.2): neue Klasse im Kern (Muster `format_catalog.h`: Suchpfad Umgebung `K1520_PRINTER_ROMS` → Installation `share/k1520emu/` → Quellbaum `data/`, `K1520_PRINTER_ROMS_DEFAULT` aus CMake wie `K1520_FORMATS_DEFAULT`;
+  Release-Bauten ohne Baurechnerpfad — Wächter `py_packaging`), Parser `core/util/yaml_lite` (Eignung für Blockwerte dieser Größe prüfen und messen; sonst gezielt erweitern, nicht ersetzen).
+* **Konfiguration:** `rom=<Schlüssel>` (Schlüssel oder Alias) ersetzt `romdatei=`.  `romdatei=` entfällt **samt** der zusammengesetzten `k6316_*.rom` und der eingebetteten `rom_*.h` (kein Rückfall: Katalog fehlt = klare Fehlermeldung `k1520_last_init_error`).
+  Die Längen-/Aufteilungsprüfung je Typ bleibt.  Bisherige Schlüssel (`rom=repariert|original`) laufen als Aliase weiter.
+* **C-ABI (additiv):** Katalog abfragen: Anzahl, je Eintrag Schlüssel, Typ, Titel, PGM, Schnittstellen, Zeichensatz, Güte, Hinweis, Vorgabe-Flag; Fehlertext.  Die GUI liest **nichts** mehr selbst: `app/printertool/rom_katalog.py`, die ROM-Pfade in `app/paths.py`
+  (`K1520_PRINTER_EPROMS`) und die Paketkopie der `.bin` entfallen; das Auswahlfeld wird aus der C-ABI gespeist.
+* **Die `.bin` bleiben als Herkunftsbeleg** unter `doc/EPROMS/` (Quelle: webhop/tiffe), sind aber **keine Laufzeitquelle** mehr.  Ein Wächter vergleicht jeden Katalogeintrag **byteweise mit seiner `.bin`**
+  (Herkunft belegt, ersetzt die MD5; für die K6316-Sätze mit den fünf Einzelchips, für `1157_repariert` mit dem Abzug).  Er läuft nur im Quellbaum.
+* **Wächter im Kern/Python:** Schema (Pflichtfelder, `typ`, genau eine Vorgabe je Typ, Aliase), HEX-Zeilenprüfsummen/Adresslücken/Länge = `groesse`, ASCII-Kennung bei 27F8H/3FF8H gegen den Namen, `daten_von`-Verweise lösen auf.
+  Ein Fehler in der Datei meldet **Zeile und Eintrag**.
+* **Paket:** nur noch die eine YAML (`share/k1520emu/`); `build_payload.sh`-Kopie der ROM-Dateien entfällt.
+
+### 12.3  Arbeitspaket
+
+| AP | Inhalt | Agent |
+|---|---|---|
+| **WP9** | Erzeugung `data/drucker_roms.yaml` aus den bisherigen Einträgen + `.bin` (Skript `tools/drucker_roms_bauen.py`, einmalig/nachvollziehbar, NICHT Laufzeit), Kernleser samt Suchpfad, `rom=<Schlüssel>`, C-ABI-Abfrage + `py_c_api`/ctypes, Umbau Steuerungen/`PrinterMachine` auf Katalog-Bytes, Entfernen von `romdatei=`, `rom_*.h`, `k6316_*.rom`, `rom_katalog.py`, ROM-Pfaden in `paths.py` und Paketkopie, GUI-Auswahl über die C-ABI, Wächter wie oben, `tools/test_auswahl.py`, Merkposten, Handbuch/Entwurf | `cpp-coder` (Sonnet) |
+
+Reihenfolge: nach dem laufenden `test-merge` (gemeinsames `build/`); danach erneut `test-merge`.  Vor Beginn gelesen werden: Merkposten Nr. 31–37.  **Verhalten unverändert:** Druckbild-Wächter (Orakel, alle K6316/K6313/K6311/SD-1157-Fälle) müssen unverändert grün bleiben — sie sind die Gegenprobe, dass die Bytes aus der YAML dieselben sind wie die aus den `.bin`.
