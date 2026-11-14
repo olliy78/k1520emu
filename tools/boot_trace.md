@@ -280,9 +280,14 @@ tools/dev.sh trace --machine prg710 --events /tmp/ev.txt --events-cap 100000 DIS
   `<ET>`), jeweils sobald die Maschine steht (Stillstand): z. B. `--keys "<ET>021086<ET>"` =
   Starttaste, Datum + ET. `-c` ist mit `--keys` 250 Mio.; Abbruch: **`%` als letzte Bildzeile
   im Stillstand** → Exit 0, JSON-Feld `"prompt"` (hinter `"stall"`).
+  Marken (AP-B2, gross/klein): `<ET>` (beendet den Block), `<ESC>`, `<CL>` (beides Abbruch/Meldung weg: am 710-1 ESC,
+  am 710 Matrixtaste 28H), `<UP> <DOWN> <LEFT> <RIGHT>` (Kursor, BS600-Menues).  Fragt ein Programm im RAM (BS600) die
+  Tastatur ab, meldet der Schluss `Tastatur: Programm (RAM) fragt ...`.  `--atp-zusatz` ist seit AP-B2 ohnehin Vorgabe, `--ohne-atp-zusatz` schaltet den Zusatz ab; `<ENTER>` ist das ENTER der BS6xx (710: Matrixtaste 38H, `<ET>` = 37H ist nur die Starttaste des ROMs).
 - `--coverage --csv --itrace --watch` (Speicher-Schreibzugriffe der CPU) wirken wie am K8915;
   `--skip-selftest --no-cr` gibt es nicht (Warnung).
   Mit Diskette wird über `defaultFormatName` gemountet (bei `.hfe` nur Platzhalter).
+- BS600/BS620 (Beispieldiskette `disks/prg710-1_bs620/prg710-1_bs620_system.hfe`): `--machine prg710-1 --keys "<ET><DOWN><ENTER>..."`; `<ENTER>` ist die ENTER-Taste der BS6xx, `<ESC>`/`<CL>` quittieren Meldungen; der ATP-Zusatz ist Vorgabe, `--ohne-atp-zusatz` (alt `--atp-zusatz`) schaltet ihn ab.
+- Das K5122-Leser-Modell folgt der Variante (`Config::leser_modell = -1`, AP-B2e): `--machine prg710-1` = Modell 1 (Marken-FF low-aktiv, Daten erst nach der Marke), `--machine prg710` = Modell 0; BS620 liest am 710-1 ohne Umpolen.
 
 Wächter: `cli_bt_prg710_tastatur`, `cli_bt_prg710-1_tastatur`, `cli_bt_prg710_udos_prompt`, `cli_bt_prg710-1_udos_prompt`.
 

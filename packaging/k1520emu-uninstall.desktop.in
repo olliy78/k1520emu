@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=K1520emu deinstallieren
+GenericName=Deinstallation
+Comment=Entfernt die Startmenü-Einträge und auf Wunsch den Programmordner von K1520emu
+Comment[en]=Removes the K1520emu menu entries and, if you wish, the program folder
+Exec=env K1520_UNINSTALL_WARTEN=1 sh "@ROOT@/uninstall.sh"
+Icon=a5120emu
+Terminal=true
+Categories=System;Utility;
+Keywords=K1520;robotron;deinstallieren;uninstall;
+StartupNotify=false

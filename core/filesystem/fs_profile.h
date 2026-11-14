@@ -52,7 +52,10 @@ enum class FsType : uint8_t {
     /// @brief MS-DOS / PC-DOS / DCP (A7150) FAT12: BPB im Bootsektor, FAT, Wurzel- und
     ///        Unterverzeichnisse, lange Namen.  Die Lage steht auf der Diskette (BPB) - das Profil
     ///        benennt nur Geometrie und Namen.  @see core/filesystem/fat/fat_fs.h
-    Fat
+    Fat,
+    /// @brief BS600/BS610/BS620 (PRG 700/710/710-1): 26x128 Spur 0 (Urlader, VOL1, Verzeichnis, Belegungstabelle)
+    ///        + 15x256 Datenspuren, Dateien unfragmentiert.  @see doc/bs600_diskettenformat.md
+    Bs600
 };
 
 /// @brief Gehoert der Typ zur UDOS-Familie? (gemeinsame Kopfsektorfelder, Typ/Props)
@@ -159,6 +162,10 @@ struct FsProfile {
     ///        80-Spur-Diskette hat 253) — Bloecke, die das Geraet nie vergibt, vergibt das Werkzeug auch nicht.
     uint16_t max_blocks  = 0;
     std::string os       = "cpm2.2";
+    /// @brief 0 = nur das Verzeichnis ist reserviert.  Sonst so viele Bloecke ab Blockzaehler 0 (AL0/AL1 des
+    ///        DPB): die GIDE-Platte nach Poppe reserviert 8 Bloecke (AL0 = FFH), das Verzeichnis (1024 x 32 B)
+    ///        belegt aber nur 4 - die uebrigen vier vergibt das Geraet nie, das Werkzeug also auch nicht.
+    uint16_t reserved_blocks = 0;
 
     // ── nur die UDOS-Familie ─────────────────────────────────────────────────
     bool    sides_separate  = true;  ///< je Seite ein eigenes Dateisystem → SideN/

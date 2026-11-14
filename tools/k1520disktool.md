@@ -1,6 +1,6 @@
 # `k1520disktool` — Dateiaustausch mit K1520-Disketten
 
-Holt Dateien von CP/A-, SCPX-, **UDOS**-, **UDOS1715**-, **SCP1700**- und **SIOS-1526**-Disketten
+Holt Dateien von CP/A-, SCPX-, **UDOS**-, **UDOS1715**-, **SCP1700**-, **SIOS-1526**- und **BS600**-Disketten
 (CP/M-86 des A7100) und schreibt sie zurück —
 auf `.img`, `.hfe`, `.dmk`, `.cqm` (CopyQM), `.td0` (TeleDisk) und `.imd` (ImageDisk).  Dieselbe Bibliothek treibt die Oberfläche
 (`run_disktool.sh`); Feinentwurf: `doc/design/13_k1520disktool.md`.
@@ -17,7 +17,7 @@ k1520disktool get    <abbild> [muster…] --to <ordner>  Dateien herausholen
 k1520disktool put    <abbild> <datei|ordner…>          Dateien einfügen
 k1520disktool rm     <abbild> <muster…>                Dateien löschen
 k1520disktool create <abbild> --fs NAME [--label N]    leere Diskette anlegen
-       [--boot abbild.bin] [--prg 710|710-1]           … bootfähig (Systemspuren)
+       [--boot abbild.bin] [--prg 700|710|710-1]       … bootfähig (Systemspuren; 700 nur BS600)
        [--inodes N] [--blocks N]                       … WEGA/MUTOS: Mindestzahl Inodes / Dateisystem
                                                          nur N Blöcke groß (s_fsize; Rest bleibt frei,
                                                          z. B. für den Swap-Bereich des Kernels)
@@ -841,7 +841,7 @@ $ k1520disktool put    neu.img auszug/
 | `udos1715_ds80_16x256` | 80 Spuren doppelseitig, 16×256 | 640 KB |
 | `udos1715_ss80_16x256` | 80 Spuren einseitig, 16×256 | 320 KB |
 | `udos1715_ss40_16x256` | 40 Spuren einseitig, 16×256 | 160 KB |
-| `udos_p8000_ds80_16x256` | wie `udos1715_ds80_16x256`, Füllung des **P8000** (UDOS 2.2) | 640 KB |
+| `udos_p8000_ds80_16x256` | wie `udos1715_ds80_16x256`, Füllung des **P8000** (UDOS 3.x) | 640 KB |
 | `udos50_ds80_16x256` | wie `udos1715_ds80_16x256`, Füllung des **A5120 unter UDOS 5.0** | 640 KB |
 
 Die drei 640-KB-Profile beschreiben dieselbe Diskette.  Unterschieden werden sie an
@@ -1151,6 +1151,27 @@ GNU tar bricht damit ab („GNU features wanted on incompatible archive format�
 GNU-Format schreibt `-M` Fortsetzungsköpfe (Typ `M`), die kein V7 sind.  Die Rezepte stehen
 mit Begründung im Handbuch (Abschnitt „Passende tar-Dateien unter Linux erzeugen und entpacken“).
 
+## GIDE-Platten (Poppe / Kingstener) — `--gide-layout`, `--laufwerk`
+
+Ein IDE-Plattenabbild der GIDE-Karte (`.img` oder `.img.gz`, mindestens 65 472 Sektoren ≈ 33 MB — nie eine Diskette) trägt **CP/M-Laufwerke**; wie sie aufgeteilt sind, bestimmt der
+Gast-Treiber, und die beiden bekannten Layouts sind **unverträglich** (ein falscher Treiber vernichtet Daten): **`poppe`** (`GIDEHP…`, auch der im CP/A-BIOS eingebaute; bis 8 Laufwerke `lw0`…`lw7` je 8 MB,
+`lw0` mit 2 Systemspuren) und **`kingstener`** (`gidn`; 1 Laufwerk `lw0`, jeder 128-B-Satz vierfach im 512-B-Hostsektor).  Das Werkzeug erkennt das Layout **nur lesend** aus den Verzeichnissen und rät nie
+(`--gide-layout auto`, Vorgabe); bei Mehrdeutigkeit oder Unformatiertem scheitert `auto` mit Begründung (Exit 2), nichts wird geschrieben.  Namen: `lw0/NAME.EXT` (Nutzerbereich `lw0/3:NAME.EXT`).
+
+```sh
+k1520disktool create x.img.gz --gide-layout poppe [--sectors N] [--laufwerk N]   # leeres Abbild; Verzeichnisse aller (bzw. des einen) Laufwerke formatiert
+k1520disktool ls|info|check|fsck x.img.gz [-l] [--full] [--json]               # Layout, Laufwerke, Dateien, Pruefung (fsck nur pruefend)
+k1520disktool get  x.img.gz 'lw0/*' --to dir [--force]                         # Dateien nach dir/lwN/NAME (Nutzerbereich N: dir/lwN/uN/NAME)
+k1520disktool put  x.img.gz DATEI... --as lw1[/NAME] | --laufwerk 1            # Kingstener: ohne --as
+k1520disktool rm   x.img.gz 'lw1/*.COM' | NAME --laufwerk 1
+k1520disktool format x.img.gz --gide-layout poppe --laufwerk 2 [--force]       # Verzeichnis leeren (ERADIR/GIDN /F); --force: auch wo Daten stehen
+```
+
+Nur bei erkanntem oder vorgegebenem Layout wird geschrieben, nur an Laufwerke mit plausiblem Verzeichnis; `format` verlangt `--gide-layout` und verweigert über Dateien, über fremden Daten und auf einer
+Platte, die nach dem anderen Layout formatiert ist (ohne `--force`).  Eine fremde Sperre `<abbild>.lock` (laufender Emulator) macht das Abbild nur lesbar (`Abbild gesperrt`).  `.img.gz` wird ganz und atomar
+zurückgeschrieben (vorher einmalig `<abbild>~`, `--no-backup` lässt es weg); rohe `.img` nur die geänderten Sektoren.  Nicht vorhanden für GIDE-Platten: `mkdir`, `attr`, Reparatur, Bootabbilder.
+Hintergründe und Wächter: `doc/merkposten/disktool.md` (GIDE-Platten).
+
 ## Dateisysteme ergänzen
 
 `data/formats.yaml` hat zwei Sektionen: `formats:` (Physik) und `filesystems:`
@@ -1302,3 +1323,33 @@ k1520disktool create neu.hfe --fs microdos_ds80_5x1024_boot --boot boot.bin   # 
 #   boot_microdos_1715.bin                         PC 1715
 k1520disktool put neu.hfe PIP.COM ; k1520disktool attr neu.hfe PIP.COM --arc
 ```
+
+## BS600 (PRG 700 / 710 / 710-1)
+
+Systemdisketten des Numerik-Betriebssystems BS600 (BS610, BS620): Spur 0 = 26 × 128 B (Urlader Sektor 1–3, Kennsatz `VOL1` Sektor 7, Verzeichnis 8–25,
+Belegungstabelle 26), Spur 1–39 = 15 × 256 B, einseitig, 54 Dateien, **jede Datei zusammenhängend** (nutzbar Spur 1–37).  Profil
+`bs600_ss40_15x256_boot` (Format `ss40_1t26x128-15x256`), erkannt am Inhalt (`VOL1` + `PRG` + plausibles Verzeichnis).  Aufbau: `doc/bs600_diskettenformat.md`,
+Entwurf `doc/design/48_bs600.md`, Festlegungen `doc/merkposten/bs600.md` (Abschnitt DiskTool-Seite D1-D11).  Beispieldiskette: `disks/prg710-1_bs620/prg710-1_bs620_system.hfe`.
+
+```
+$ k1520disktool ls -l BS620.hfe
+Name   Typ  Groesse  Lage         Laden Ende  Start Datum    Sig
+BS620  P       26624  06/15-13/13  6D00  D4FF  6D5F  20.12.88 KRU
+$ k1520disktool put neu.hfe prog.bin --load 6D00 --entry 6D5F --type P --date 051124 --author KRU   # Name PROG (ohne Endung)
+$ k1520disktool attr neu.hfe PROG --load 7000 --author OL        # Adressen hexadezimal; die Endadresse zieht mit
+$ k1520disktool mv neu.hfe PROG NEUNAM
+$ k1520disktool reorganize neu.hfe                               # Luecken schliessen (Dateien lueckenlos ab Spur 1)
+```
+
+* **Ohne Angaben** (`put` ohne `--type/--load/--entry/--date/--author` und ohne `.fileinfo`): Typ `P`, Ladeadresse `0000`, keine Startadresse, Datum heute, kein Signum.
+  `get` legt je Datei ein `.fileinfo` (`fs=bs600`) neben die Datei; `put` liest es zurück.
+* **Urlader und Zielgerät:** `SYL FOR BS620` (NKM-Lader) gehört zum **PRG 710-1**, `BOOTSTRAP FOR BS600` zum **PRG 700** (3-KB-ROM; bootet am 710/710-1 nicht).
+  `info` nennt es in der Zeile *Systemspuren*, `create --boot`/`boot-put` nach dem Einspielen, `check` als Hinweis `bs600.urlader.prg700`.
+  `--prg 700|710|710-1` weist einen Urlader der falschen Bauart vor dem Schreiben ab (710-1 nur mit `SYL FOR BS620`, 700 nur mit `BOOTSTRAP FOR BS600`;
+  `SYL FOR BS610` = 710 ist Annahme [?]).  Fertige Urlader: `data/bootsektoren/boot_bs620_prg710-1.bin`, `boot_bs600_prg700.bin`.
+* **Prüfung (`check`/`fsck`)** — Kennungen `bs600.*` sind ein Vertrag (Tabelle im Kopf von `core/filesystem/check/bs600_check.cpp`): Verzeichnis ↔ Belegungstabelle in beiden
+  Richtungen (`tabelle.fehlt` = Gefahr, `tabelle.ueberzaehlig`), Überlappung (Gefahr), Lage/Ende/Spur 38+, Adressen und Sektorzahl, doppelte Namen, Kennsatz, Datum (Hinweis), Lücken (Hinweis).
+  Reparaturen: Tabelle nachtragen (empfohlen), Tabelle freigeben (nicht vorausgewählt, gesperrt bei unbrauchbarem Eintrag), unbrauchbaren Eintrag löschen (nie vorausgewählt), Reorganisieren (nicht vorausgewählt).
+* **Anlegen:** `create --fs bs600 …` legt eine Leerdiskette wie FORMAT unter BS620 an; mit `--boot` kommt ein Urlader dazu (Dateien per `put`/*Alles einfügen*); `reorganize` schliesst Lücken (`mv`/`attr` benennen und ändern Adressen).
+* **Rettung (`recover`)** findet nur den **Inhalt** (Rohbereich ohne Namen): Stufe Verzeichnis = von der Tabelle belegte Sektoren ohne Eintrag, `--full` zusätzlich freie Sektoren mit Inhalt (Guete *Bruchstück*).
+  Einen Eintrag wiederherstellen (`--restore`) geht nicht — Name, Typ, Adressen und Dateigrenzen stehen nur im Eintrag, und das Löschen überschreibt ihn mit Blanks.

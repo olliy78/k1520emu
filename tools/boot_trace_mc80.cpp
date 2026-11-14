@@ -76,7 +76,10 @@ int bootTraceMc80(const K8915TraceOpts& o, const prnlst::Listing& prn)
     const int cols = Mc80Machine::TEXT_SPALTEN, rows = 25;
     { std::string err;   // vor dem ersten Lauf stecken
       if (!dbgm::steckeK6022(m, o.ptape, err)) { fprintf(stderr, "--ptape: %s\n", err.c_str()); return 2; }
-      if (!dbgm::steckeK5020(m, o.tape, o.tape1, o.tape2, err)) { fprintf(stderr, "--tape: %s\n", err.c_str()); return 2; } }
+      if (!dbgm::steckeK5020(m, o.tape, o.tape1, o.tape2, err)) { fprintf(stderr, "--tape: %s\n", err.c_str()); return 2; }
+      if (!dbgm::steckeGide(m, o.gide, o.gide_basis, o.gide_image, err)) { fprintf(stderr, "--gide: %s\n", err.c_str()); return 2; }
+      if (!dbgm::steckeUsb(m, o.usb, o.usb_basis, o.usb_dir, err)) { fprintf(stderr, "--usb: %s\n", err.c_str()); return 2; }
+      if (!dbgm::steckeNet(m, o.net, o.net_basis, err)) { fprintf(stderr, "--net: %s\n", err.c_str()); return 2; } }
     auto rd = [&](uint16_t a) { return m.memReadDebug(a); };
     auto prnTail = [&](uint16_t a) -> std::string {
         const std::string* s = prn.find(a);

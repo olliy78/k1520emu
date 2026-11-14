@@ -10,3 +10,8 @@ Basis: die bisherigen Bootdisketten (`bootabbild_*.bin`, `inhalt_v0006/`, `inhal
 TP, WM-Hilfe, SERTEST; TLC meldet „PC 1715 - V.24“). Nicht aufgenommen: Spiele und Anwendungen der Softwaredisketten (Anwenderdaten),
 der BASIC-Compiler (`BASCOM`/`L80`/`BCLOAD` übersetzt, das gelinkte Programm bricht ab — wie am A5120), `SID` (Fremdprogramm von 1990),
 PCTEST auf V0007 (Speicherfehler, Gastverhalten), RAF/Lochband (am 1715 nur mechanisch).
+
+**Tastencode-Tabelle V0006 (2026-11-09):** `data/bootsektoren/boot_pc1715_scp1715_v0006.bin` ist nicht mehr das Original, sondern ein mit
+INSTSCP (6 Treiber ▸ 0 Tastatur ▸ Change Code-Table ▸ Save System ▸ Boot System to Disk) geaendertes System: Taste `88` (Cursor links)
+liefert `08H` statt `13H` (^S), damit Programme mit Pfeiltasten-Steuerung (z. B. CPMTRISP.COM Option 2) laufen und die Ruecktaste des PC
+(sendet Taste `88`) am Prompt wie Backspace wirkt.  Wird die Diskette neu gebaut, bleibt das so; das Originalabbild liegt in der Git-Historie.

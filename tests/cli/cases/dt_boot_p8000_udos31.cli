@@ -1,0 +1,8 @@
+# Das hinterlegte Bootabbild der P8000-UDOS-3.1-Systemdiskette hat 22 Sektoren (5632 Byte): Urlader,
+# OSLOAD und der Dateizugriffscode des Monitors - so viel kopiert FORMAT ... S (Ticket #30).
+tool:   k1520disktool
+disk:   udosP8000_640k_udos31_system.hfe
+tmpfile boot.bin:
+run:    boot-get %DISK% %boot.bin%
+expect: 5632 Byte Systemspuren
+exit:   0

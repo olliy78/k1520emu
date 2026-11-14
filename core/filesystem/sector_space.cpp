@@ -15,7 +15,16 @@
 // ─── Aufbau ──────────────────────────────────────────────────────────────────
 
 SectorSpace::SectorSpace(DiskMedium& medium, const DiskFormat& fmt, uint8_t head_filter)
-    : medium_(medium), fmt_(fmt), head_filter_(head_filter) {
+    : medium_(&medium), fmt_(fmt), head_filter_(head_filter) {
+    aufbauen();
+}
+
+SectorSpace::SectorSpace(std::vector<uint8_t>& flat, const DiskFormat& fmt)
+    : flat_(&flat), fmt_(fmt), head_filter_(kAllHeads) {
+    aufbauen();
+}
+
+void SectorSpace::aufbauen() {
 
     // Layout-Reihenfolge des .img-Codecs: Zylinder aussen, Kopf innen.  Nur Spuren, die
     // das Format kennt UND die zum Kopf-Filter passen, gehoeren zum Raum.
@@ -42,7 +51,7 @@ SectorSpace::SectorSpace(DiskMedium& medium, const DiskFormat& fmt, uint8_t head
 
     cache_.resize(slots_.size());
     cache_gueltig_.assign(slots_.size(), 0);
-    cache_revision_ = medium_.revision();
+    cache_revision_ = medium_ ? medium_->revision() : flat_revision_;
 }
 
 // ─── Spur-Nachschlag ─────────────────────────────────────────────────────────
@@ -67,14 +76,36 @@ int SectorSpace::slotAt(uint64_t offset) const {
 const std::vector<LogicalSector>& SectorSpace::sectors(int slot) const {
     // Jede Aenderung am Medium (auch durch Dritte) erhoeht die Revision — dann ist der
     // gesamte Zwischenspeicher wertlos.  Lieber grob verwerfen als falsch antworten.
-    if (medium_.revision() != cache_revision_) {
+    const uint64_t rev = medium_ ? medium_->revision() : flat_revision_;
+    if (rev != cache_revision_) {
         std::fill(cache_gueltig_.begin(), cache_gueltig_.end(), 0);
-        cache_revision_ = medium_.revision();
+        cache_revision_ = rev;
     }
     if (!cache_gueltig_[static_cast<size_t>(slot)]) {
         const Slot& s = slots_[static_cast<size_t>(slot)];
-        cache_[static_cast<size_t>(slot)] =
-            TrackCodec::parseTrack(medium_.track(s.phys, s.head));
+        if (flat_) {
+            // Flacher Raum: die Sektoren der Spur aus dem linearen Strom herausschneiden.
+            std::vector<LogicalSector>& tr = cache_[static_cast<size_t>(slot)];
+            tr.clear();
+            const uint16_t bs = s.tf->bytes_per_sec;
+            for (uint8_t i = 0; i < s.tf->secs_per_track; ++i) {
+                LogicalSector ls;
+                ls.cyl  = s.cyl;
+                ls.head = s.head;
+                ls.id   = static_cast<uint8_t>(s.tf->first_sector_id + i);
+                ls.size = bs;
+                const uint64_t ab = s.start + static_cast<uint64_t>(i) * bs;
+                if (ab + bs <= flat_->size())
+                    ls.data.assign(flat_->begin() + static_cast<long>(ab),
+                                   flat_->begin() + static_cast<long>(ab + bs));
+                else
+                    ls.data.assign(bs, 0);
+                tr.push_back(std::move(ls));
+            }
+        } else {
+            cache_[static_cast<size_t>(slot)] =
+                TrackCodec::parseTrack(medium_->track(s.phys, s.head));
+        }
         cache_gueltig_[static_cast<size_t>(slot)] = 1;
     }
     return cache_[static_cast<size_t>(slot)];
@@ -129,7 +160,8 @@ bool SectorSpace::trackKnown(uint8_t cyl, uint8_t head) const {
     // Bewusst NICHT ueber sectors()/track(): beides holt die Spur.  Gefragt ist der
     // Zustand, nicht der Inhalt.
     if (slotOf(cyl, head) < 0) return false;
-    return medium_.state(cyl, head) != TrackState::Unknown;
+    if (flat_) return true;
+    return medium_->state(cyl, head) != TrackState::Unknown;
 }
 
 // ─── physisch ────────────────────────────────────────────────────────────────
@@ -164,10 +196,12 @@ bool SectorSpace::writeSector(uint8_t cyl, uint8_t head, uint8_t id,
         return false;
     }
 
+    if (flat_) return flachSchreiben(slot, id, data);
+
     // mutableTrack() markiert die Spur sofort als geaendert — auch wenn writeSector
     // gleich scheitert.  Das ist bewusst konservativ: eine ueberfluessig als schmutzig
     // markierte Spur kostet einen Rueckschreibvorgang, eine verpasste kostet Daten.
-    TrackImage& t = medium_.mutableTrack(slots_[static_cast<size_t>(slot)].phys, head);
+    TrackImage& t = medium_->mutableTrack(slots_[static_cast<size_t>(slot)].phys, head);
     if (!TrackCodec::writeSector(t, id, data, tail)) {
         last_error_ = "Sektor " + std::to_string(id) + " auf Spur " + std::to_string(cyl)
                     + "/" + std::to_string(head) + " nicht beschreibbar (fehlt, falsche "
@@ -185,13 +219,29 @@ bool SectorSpace::writeSectorDam(uint8_t cyl, uint8_t head, uint8_t id,
                     + " gehoert nicht zu diesem Datentraeger";
         return false;
     }
-    TrackImage& t = medium_.mutableTrack(slots_[static_cast<size_t>(slot)].phys, head);
+    if (flat_) return flachSchreiben(slot, id, data);   // geloeschte Datenmarke gibt es im flachen Raum nicht
+    TrackImage& t = medium_->mutableTrack(slots_[static_cast<size_t>(slot)].phys, head);
     if (!TrackCodec::writeSectorDam(t, id, data, deleted)) {
         last_error_ = "Sektor " + std::to_string(id) + " auf Spur " + std::to_string(cyl)
                     + "/" + std::to_string(head) + " nicht beschreibbar (fehlt, falsche "
                       "Laenge oder unformatiert)";
         return false;
     }
+    return true;
+}
+
+bool SectorSpace::flachSchreiben(int slot, uint8_t id, const std::vector<uint8_t>& data) {
+    const Slot& sl = slots_[static_cast<size_t>(slot)];
+    const int first = sl.tf->first_sector_id;
+    if (id < first || id >= first + sl.tf->secs_per_track || data.size() != sl.tf->bytes_per_sec) {
+        last_error_ = "Sektor " + std::to_string(id) + " auf Spur " + std::to_string(sl.cyl) + "/"
+                    + std::to_string(sl.head) + " nicht beschreibbar (fehlt oder falsche Laenge)";
+        return false;
+    }
+    const uint64_t ab = sl.start + static_cast<uint64_t>(id - first) * sl.tf->bytes_per_sec;
+    if (ab + data.size() > flat_->size()) { last_error_ = "Schreiben ueber das Ende des Datentraegers hinaus"; return false; }
+    std::copy(data.begin(), data.end(), flat_->begin() + static_cast<long>(ab));
+    ++flat_revision_;
     return true;
 }
 

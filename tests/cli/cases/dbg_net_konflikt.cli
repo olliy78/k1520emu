@@ -1,0 +1,6 @@
+# --net (Basis 88H) mit --raf: 88H/89H gehoeren der RAF -> Fehlermeldung mit Grund, Exit 2, kein Absturz.
+tool:    k1520dbg
+disk:    cpa_cpa780_k5601_clock.img
+run:     --raf raf512 --net %DISK%
+exit:    2
+expect:  --net: E/A-Tor 88H belegt

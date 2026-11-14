@@ -63,7 +63,8 @@ Disketten, deren `@OS.COM` sie beschreiben; für Anwender sind sie nicht gedacht
 | `udos1715_640k_pc1715_system.img` | **UDOS1715/NDOS** (PC 1715), Systemdiskette „SYSTEM": 80×32×256, 67 Dateien, darunter das Systemhandbuch `UDOS.TEXT` | `Udos1715.*`, `Udos1715Belegung.*`, `Udos1715Schreiben.*` |
 | `sios1526_dp1.hfe` / `sios1526_dp2.hfe` | **SIOS 1526** Programmdisketten (IBM-Etiketten), 40 Zyl. einseitig 26×128: VOL1 `MWD051`, HDR1 `PHASELB` (Spur 1–37) mit 15 bzw. 13 Bibliotheksobjekten. Unveränderte Kopien von `tools/sios_a5120/original/SIOS1526_DP1.hfe` / `_DP2.hfe` (Herkunft dort im README, Format `doc/sios_diskettenformat.md`) | `SiosFs.*`, `SiosFsCheck.*`, `cli_dt_ls_sios_dp1`, `cli_dt_get_sios_objekt` |
 | `sios1526_sg1.hfe` | **SIOS 1526** SGEN-Diskette: VOL1 `MWD002`, HDR1 `SYSORG09` (Satzlänge 1024, `EC`) + `PHASELB` (SGEN/SOPH/SYSD), 17 `DDR1`-Platzhalter. Kopie von `…/original/SIOS1526_SG1.hfe` | `SiosFs.*`, `cli_dt_ls_sios_sg1` |
-| `udosP8000_640k_wega.hfe` | **UDOS1715/NDOS** vom **EAW P8000** (UDOS 2.2), „WEGA-STARTDISKETTE": 80×32×256, 42 Dateien (UDOS-Dienstprogramme + die WEGA-Urlader und `sa.*`-Werkzeuge). **Anderer Rechner als der PC 1715**, gleiche Diskettensitte — nur mit `77H` statt `00` hinter dem Belegungsplan | `Udos1715P8000.*`, `NdosSitte.*` (Profil `udos_p8000_ds80_16x256`) |
+| `udosP8000_640k_wega.hfe` | **UDOS1715/NDOS** vom **EAW P8000** (UDOS 3.x), „WEGA-STARTDISKETTE": 80×32×256, 42 Dateien (UDOS-Dienstprogramme + die WEGA-Urlader und `sa.*`-Werkzeuge). **Anderer Rechner als der PC 1715**, gleiche Diskettensitte — nur mit `77H` statt `00` hinter dem Belegungsplan | `Udos1715P8000.*`, `NdosSitte.*` (Profil `udos_p8000_ds80_16x256`) |
+| `udosP8000_640k_udos31_system.hfe` | **UDOS 3.1** (P8000, 8-Bit-Teil), vom DiskTool gebaute Systemdiskette (`tools/udos_p8000/build.py`, Kopie von `disks/p8000_udos31/`): 74 Dateien, Systemspuren wie `FORMAT … S` (Urlader, OSLOAD, Dateizugriffscode des Monitors) | `bt_p8000_udos31_prompt`, `dt_boot_p8000_udos31` |
 | `udos50_640k_a5120_system.img` | **UDOS 5.0 am A5120** (BIZ FmSZBw Schwerin, 1997), bootfähig: dasselbe NDOS-Dateisystem, 80×32×256, 67 Dateien — dritte Füllsitte: durchgehend `FFH` hinter dem Belegungsplan; der DIRECTORY-Descriptor trägt ab `28H` Angaben, ohne die UDOS 5.0 nicht startet. Sektorgleich mit `tools/udos50_a5120/original/a5120-udos5.img` | `Udos1715A5120.*`, `FsCheck*`, `bt_a5120_udos50_datum` |
 | `mutos8000_ss80_root.td0`, `mutos8000_ss77_cc2.td0` | **MUTOS 8000** (A5120.16) als TeleDisk: UNIX-System-III-Dateisystem wie WEGA, Blockraum ab Zylinder 1 (Zyl. 0 = 26×128 ohne Dateisystem), einseitig 8×512; Wurzel (80 Zyl.) bzw. Compilerdiskette 2 (77 Zyl.) | `MutosFs.*` |
 | `mutos8000_m8k_cmd.td0`, `mutos8000_m8k_usr.td0` | **MUTOS 8000, M8K-Satz** (8″ FM 26×128, TeleDisk 2011): `unix_layout: mutos8k` — 512-B-Block = 4 logische Sektoren, Verschränkung 2, 6 Sektoren Spurversatz je Spur (`Mutos8kDev`). Mit **Quelldefekten** (fehlende/CRC-Sektoren: CMD `bin/pr`, USR `bin/ed`, `lib/c0`, `lib/c1`) | `MutosFs.M8k_*` |
@@ -276,3 +277,34 @@ Band, Lücken nach `k1520tape`).  Das Programm (`tools/kassette/bandtest/`, Quel
 `KassetteBoot.*` (`tests/integration/test_kassette_boot.cpp`); die Tests lesen die Datei nur und
 binden sie nicht (kein Zurückschreiben).  Wächter, dass Band und Programm zusammenpassen:
 `cli_bandtest_bootband`; dass das Programm zur Quelle passt: `cli_bandtest_bin_passt_zur_quelle`.
+
+## `bs600/`: BS600-Systemdisketten (PRG 700/710/710-1, Entwurf 48, AP-B3)
+
+Beide aus der Diskettensammlung RT (freigegeben zur Ablage als Testfixture), 40 Zylinder einseitig, Spur 0 = 26×128, Spur 1..39 = 15×256
+(`doc/bs600_diskettenformat.md`).  Benutzer: `Bs600Fs.*` — **nie direkt mounten**, die Tests kopieren in den Temp-Ordner.
+
+| Datei | Inhalt |
+|---|---|
+| `bs620_prg710-1.hfe` | **BS620** (PRG 710-1), Urlader `SYL FOR BS620`, 28 Dateien (`BS620` 6D00..D4FF, Start 6D5F, 20.12.88), 381 Sektoren belegt; Original `Disketten_Images_RT/BS600.hfe` |
+| `bs600_prg700.hfe` | **BS600** (PRG 700, 3-KB-ROM), Urlader `BOOTSTRAP FOR BS600`, 25 Dateien (u. a. `TEST`), 248 Sektoren belegt; aus `PC1715/discs/real_discs/BS600_80Tracks.scp` (`gw convert --format=ibm.scan --tracks="c=0-39:h=0:step=2"`), vollstaendig statt der abgeschnittenen `.img` |
+
+### BS600/BS620 vom echten Geraet (AP-B2f, 2026-11-05)
+
+`bs600/bs620_prg710-1_format_leer.hfe` und `bs600/bs620_prg710-1_diskcopy_high.hfe`: am echten PRG 710-1 (K5601) erzeugt und mit dem Greaseweazle
+gelesen — `…_format_leer`: FORMAT unter BS620 auf einer Leerdiskette (Name `LEER`, Datum 05.11.26, Besitzer `OLLIY`); `…_diskcopy_high`: DISKCOPY der
+`prg710-1_bs620_ff_high.hfe` (Name `BS620H`).  Die Originallesungen hatten 80 Zylinder / 2 Koepfe (Doppelschritt, ungerade Zylinder leer, Rauschen auf Kopf 1);
+hier **reduziert** auf 40 Zylinder einseitig (gerade Zylinder, Kopf 0 -> Zylinder 0-39) mit `tools/bs600/reduziere_abzug.py`; die Sektordaten sind
+unveraendert, CRCs und Luecken normiert.  Die Originallesungen liegen nur beim Anwender (`~/bs620_abzuege/`).
+
+### Ausgelieferte Systemdisketten als Pruefling (2026-11-11)
+
+`KartenBeigaben.*` (`tests/integration/test_karten_beigaben.cpp`) bootet die **AUSGELIEFERTEN** Disketten aus `disks/` (als Kopie in `/tmp`, nie das Original
+mounten) und laesst die Gast-Software der Hardwareoptionen laufen (`tools/gide/`); es liegt dafuer nichts unter `tests/fixtures/disks/`.
+
+## `gide/`: GIDE-Platte nach Poppe (DiskTool, Golden-Fixture)
+
+`gide/poppe_cpa.img.gz` (≈ 250 KB; entpackt 504 000 Sektoren = 258 MB, fast nur Nullen): vom **echten Poppe-Treiber** (`GIDEHPD0`, CP/A am A5120, Basis D0H)
+im Emulator beschrieben — `ERADIR D:` und `E:`, dann `PIP D:=A:NUTZ.BIN` und `PIP E:=A:HALLO.TXT`.  Layout `poppe`: **Laufwerk 0** (`D:`, 2 Systemspuren)
+mit `NUTZ.BIN` (20000 Byte Muster `i*7 + (i>>8)`), **Laufwerk 1** (`E:`) mit `HALLO.TXT` (`Hallo von Poppe, geschrieben im Emulator.` + CRLF); Laufwerke 2–7
+unformatiert.  Benutzer: `GidePlatteGolden.*` (`tests/unit/filesystem/test_gide_platte.cpp`) — **nie direkt öffnen** (das Werkzeug legt `.lock` an; der Test kopiert).
+Neu erzeugen: `K1520_GIDE_GOLDEN_OUT=<pfad.img.gz> tools/dev.sh test -R GideAustausch.Poppe` (braucht die lokale Fremdsoftware, `K1520_GIDE_SW`).

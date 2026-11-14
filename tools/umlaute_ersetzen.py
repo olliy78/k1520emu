@@ -43,6 +43,7 @@ AUSGENOMMEN_DATEI = {
     "LIZENZ.txt",
     "packaging/release_notes.md.in",
     "packaging/a5120emu.desktop.in",
+    "packaging/k1520emu-uninstall.desktop.in",
 }
 # Python: in app/ nur Kommentare; in tests/python/ Kommentare und Docstrings
 # (Zeichenketten dort koennen gegen Oberflaechentexte pruefen); sonst auch Strings.

@@ -38,6 +38,14 @@ sys.path.insert(0, str(PROJECT_ROOT))
 # Headless-Qt + eigenes Konfigurationsverzeichnis: Tests duerfen die echte
 # ~/.config/k1520emu/config.yaml des Nutzers weder lesen noch ueberschreiben.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+# Git-Umgebung (GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE, ...) entfernen: laufen die Tests
+# aus einem Git-Hook (pre-push in einem Worktree), erbten sonst die Wegwerf-Repos der
+# Tests (test_version.py: `git init`, `git commit`) das ECHTE Repository - am 2026-11-05
+# entstand so ein Testcommit im gepushten Zweig und core.bare=true.  Zweiter Riegel
+# neben .githooks/pre-push; Waechter test_version.py::test_git_umgebung_ist_leer.
+for _name in [n for n in os.environ if n.startswith("GIT_")]:
+    del os.environ[_name]
 #
 # **Je PROZESS ein eigenes Verzeichnis, nicht ein gemeinsames.** Ein ctest-Fall
 # der Python-Ebene ist ein eigener `pytest`-Prozess je Testmodul (siehe

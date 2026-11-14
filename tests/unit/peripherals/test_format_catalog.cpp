@@ -102,7 +102,7 @@ TEST(FormatCatalog, Formatnamen_SindEinStabilerVertrag) {
         "ds80_26x128", "ds80_9x512", "ds80_10x512", "ss80_26x128", "ss80_9x512", "ss40_5x1024",
         "ss40_26x128", "ss40_16x256", "ss40_15x256", "ds40_5x1024", "ds40_26x128",
         "ds40_16x256", "ds40_17x256", "ss40_5x1024_dstep", "ss40_26x128_dstep",
-        "ss40_16x256_dstep", "ss40_15x256_dstep", "ds40_5x1024_dstep", "ds40_26x128_dstep",
+        "ss40_16x256_dstep", "ss40_15x256_dstep", "ss40_1t26x128-15x256", "ds40_5x1024_dstep", "ds40_26x128_dstep",
         "ds40_16x256_dstep", "ds40_17x256_dstep", "ds40_8x512", "ds40_9x512", "ds80_8x512",
         "ds80_15x512_hd", "ds80_18x512_hd", "ds80_36x512_ed",
     };

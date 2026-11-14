@@ -515,6 +515,8 @@ Markenerkennung, `Z80PIO`/`Z80SIO`-Korrekturen, K7672 SCP/DCP, vorläufige Prüf
 
 ## Dritte Maschine: PRG 710 / PRG 710-1
 
+(BS600/BS620 darauf: Abschnitt weiter unten, `doc/merkposten/bs600.md`.)
+
 Numerik-Programmiergeräte (K2521-ZRE, 1 CPU, `/WAIT`-K5122, UDOS 4.3 und SCPX 1526), eine
 Klasse `Prg710Machine` unter `core/machines/prg710/` (Variante 710 | 710-1 wählt ROM,
 Tastaturweg — 8279/K7609 bzw. K7672 an K8025 A32-B —, K8025-Belegung und Marken-FF-Polarität);
@@ -532,6 +534,14 @@ den Seitenregistern), eigenes Programm **prg710emu** (AP-P5d), dritter Starter i
 samt Berichtigung, `keyRelease` Pflicht am 710-1, K8025-Belegung mit `taktquelle = 1`, ISO-646-
 Zeichensatz, Fixtures/beschädigte Abzüge, Bedienung von UDOS/SCPX/FORMAT im Test). Plan:
 `doc/design/20_prg710.md`.
+
+**BS600/BS620 (Numerik-Betriebssystem, Entwurf 48, Stand 2026-11-06):** BS620 (Dez. 1988) bootet am `prg710-1` bis Hauptmenue, Unterbilder, Selbsttest ohne Fehler,
+`LIST`/`COPY`/FORMAT/DISKCOPY (am echten 710-1 gegengeprueft: Original UND gepatchte Fassung laufen).  Kernaenderungen: **ATP-Zusatz** (SIO C0H-C3H/CTC CCH-CFH,
+`Config::atp_zusatz`, Vorgabe an), **K5122-Leser-Modell** (`Config::leser_modell`, 710-1 = 1: Marken-FF low-aktiv, Daten erst nach der Marke), **E8H-Seitenregister**
+(`04H` = RAM sichtbar), K7672-Kursor `ESC [ A-D`.  DiskTool-Dateisystem `bs600` (create/put/reorganize/fsck/recover).  Disketten: `disks/prg710-1_bs620/prg710-1_bs620_system.hfe`
+(Original) und `disks/prg710_bs610_rekonstruktion/prg710_bs610_rek.hfe` (**Eigenbau**, BS620 + K7609-Tastaturteil von BS600 V02, im Emulator geprueft, am echten PRG 710 ungetestet);
+beide im Paket; Geraetetest-Paare nur ueber `tools/bs600/bau_disketten.py --geraetetest <Ordner>` (Fixtures `tests/fixtures/bs600/`).
+**Vor Arbeiten daran: `doc/merkposten/bs600.md` lesen**; Entwurf `doc/design/48_bs600.md`.
 
 ## Vierte Maschine: PC 1715 / PC 1715W
 
@@ -619,6 +629,21 @@ SCPX 8915 und SCPX 1.7, dazu die CP/A-Diskette mit eingebautem Treiber
 Sektor bzw. Bytezeiger, Sperrbits und Spiegelung sind **so** nachgebildet, RESET erhält den
 Inhalt.  **Vor Arbeiten daran: `doc/merkposten/raf.md` lesen**; Entwurf
 `doc/design/22_raf512.md`, Originale `doc/raf512/`.
+
+## GIDE / GUN (IDE-Platte + RTC + USB)
+
+IDE-Platte nach dem Vorbild der GIDE (Tilmann Reh; GUN = PC-1715-Platine mit GIDE + USB + Netz) mit **RTC 72421** als
+steckbare Option in A5120 (auch .16), K8915, PRG 710/-1 und PC 1715 (P8000 nicht), Vorgabe überall aus.  Karte `core/cards/gide/`,
+Platte `core/peripherals/ata/` (`AtaGeraet`, Rohabbild oder `.img.gz`, Sperrdatei, verzögertes Zurückschreiben), RTC = Chipmodell der
+P8000-Uhr; gesteckt über `K1520Machine::installGide` **nach dem Anlegen, vor dem ersten `run()`/`reset()`** (C-ABI `k1520_gide_*`, Python
+`K1520Emulator(gide=…)`, `--gide` in `boot_trace`/`k1520dbg`, Befehl `gide`).  Festgelegt: Ports **Basis+4…+F**, 16-Bit-Datenregister über das
+**LH-Wechsel-Flipflop** (Task-File-Zugriff setzt es zurück), RTC über A8–A11, `schreiben_unter_hold` nur an der GIDE, Batteriekopf
+`K1520-GIDE-RTC`.  **Basis im Kern frei** (Jumperstellung der echten Karten unbekannt; übliche Basis D0H kollidiert mit K5020/EPROMmer),
+Maschinenvorgabe = Vorauswahl der Oberfläche (`app/profil.py`: GIDE 90H, USB 84H bzw. 8CH am K8915 Gen 2/PRG 710, Netz C0H bzw. 28H am PRG 710), je Variante mit Gastcode getestet (`KartenVorgaben.*`, alle Karten zugleich); die Jumper bleiben in der GUI wählbar.  Fremdtreiber (Poppe/Kingstener) liegen seit 2026-11-11 **im Repo** (`tools/gide/fremd`, Anwenderentscheidung; Weitergabe mit dem Paket vom Anwender am 2026-11-13 ausdrücklich freigegeben) und auf den Systemdisketten (s. u.); `GideSystem.*` benutzt weiter die lokale Kopie und überspringt sich ohne sie.  **DiskTool (2026-11-11):** `GidePlatte` (`core/filesystem/gide/`, C-ABI `k1520d_gide_*`, `k1520disktool --gide-layout`, Oberfläche) liest/schreibt die Plattenabbilder von Poppe (bis 8 Laufwerke, LBA `(Spur*16+Lw)*63+Hostsektor`) und Kingstener (1 Laufwerk, nur das LETZTE Viertel des Hostsektors zählt) als CP/M-Laufwerke — Layout aus den Verzeichnissen erkannt, **nie geraten**, Schreiben nur mit sicherem/gewähltem Layout und ohne fremde `.lock`; vor Arbeiten daran `doc/merkposten/disktool.md` (GIDE-Platten) lesen.  Fremdtreiber (Poppe/Kingstener) liegen **nur lokal**, `GideSystem.*` überspringt sich ohne sie.  **Nicht gemacht:** Save-State; Reparatur (`fsck --repair`) von GIDE-Platten im DiskTool.
+**USB (U1/U2, Zweig `gide`):** `GunUsb` (Z80-PIO + VDIP1/VDAP 3.68, `core/cards/gun_usb/`, Firmware-Modell `core/peripherals/vdip/`), vier Tore ab Basis
+(**frei**, Vielfaches von 4; GUN 84H, Variante DCh; am K8915 Gen 2 und PRG 710/-1 ist 84H belegt), gesteckt über `installGunUsb` vor dem ersten `run()`
+(C-ABI `k1520_usb_*`, Python `K1520Emulator(usb=…)`, `--usb[=basis]`/`--usb-dir` in `boot_trace`/`k1520dbg`).  Der „Stick" ist ein Wirtsverzeichnis mit
+**Pfad-Sandbox** (nur 8.3, nie ausserhalb, Symlinks unsichtbar; Wächter `VdipPfadflucht.*`) — **nie aufweichen**.  UTools (Fremdsoftware, Weitergabe freigegeben) seit 2026-11-11 im Repo (`tools/gide/fremd/utools`), `GunUsbSystem.*` überspringt sich ohne die lokale Kopie.  **Netz** (KCNet = Z80-PIO + ATmega-Verhaltensmodell + W5100: `core/cards/gun_net/`, `core/peripherals/w5100/`; Rechnerprotokoll aus den Gastprogrammen rekonstruiert, `doc/design/50a_kcnet_protokoll.md`): `installGunNet`, C-ABI `k1520_net_*`, `--net[=basis]`; Basis frei (GUN 88H, K1520-Netzkarte C0H/28H).  Das Modell benutzt die Netzanbindung des Wirts, **ohne Loopback-Beschränkung** (Entscheidung des Anwenders, Filter `Richtlinie::frage` optional); Tests nur Loopback/Port 0.  `TFTP1287.COM`/`CPMN1587.COM` laufen unverändert (seit 2026-11-11 im Repo, `GunNetSystem.*` benutzt weiter die lokale Kopie).  GUI (G6/U3/N3) steht.  **Gast-Software auf den Systemdisketten (2026-11-11, Anwenderentscheidung, Lizenz/Weitergabe UNGEKLÄRT):** `tools/gide/` (`README.md` = Herkunftstabelle, `karten.py` = was auf welche Diskette gehört, `basis_anpassen.py` = Port-Operanden umschreiben, `uhr/` = eigenes `UHR.COM`); neun Systemdisketten (A5120 CP/A+SCPX, K8915, PRG 710/-1, PC 1715 ×3, PC 1715W) tragen sie passend zur Oberflächen-Vorauswahl; Wächter `KartenBeigaben.*` (ohne Skip), `py_karten_software`, `cli_karten_beigaben`, `cli_uhr_com`.  **Vor Arbeiten daran: `doc/merkposten/gun.md` lesen**; Entwurf `doc/design/50_gun_gide.md`.
 
 ## Lochstreifen K6022/SIF1000 (alle Maschinen; PC 1715 nur mechanisch)
 

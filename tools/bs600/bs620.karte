@@ -1,0 +1,155 @@
+seg 6D00 0 4300
+seg 0000 4300 C00
+seg 1000 4F00 1900
+code 0 8 10 30 38 48 66 AE0 B90 B93 B96 B99 B9C B9F BA2 BA5 BA8 BAB BAE BB1 BB4 BB7 BBA BBD BC0 BC3 BC6 BC9 BCC BCF BD2 BD5 BD8 BDB BDE BE1 BE4 BE7 BEA BED BF0 BF3 BF6 BF9 BFA BFC BFF 104E 1056 1DE2 1DE5 1DE8 1DEB 1DEE 1DF1 1DF4 1DF7 1DFA 1DFD 20FA 2463 2490 2561 2C26 6D5F 6DA9 6DF7 6E6C 6E82 6EF4 6F18 6F38 6F4A 6FA2 7000 708C 749C 74A8 7500 75B8 76AF 7714 7744 77CE 7800 7A58 7B38 7B52 7BCA 7C00 7C05 7D18 7D7E 7D84 7E52 7E65 7E66 7F2F 7FAA 8000 86C4 8770 8D00 8D36 914A 93C1 9400 9569 979C 98EC 99A7 A58C AB2F AF64 AF67 AF6A AF6D AF70 AF73 AF76 AF79 AF7C AF7F AF82 AF85 AF88 AF8B AF8E AF91 AF94 AF97 AF9A AF9D AFA0 AFA3 AFA6 AFA9 AFAC AFAF AFB2 AFB5 AFB8 AFBB AFBE AFC1 AFC4 AFC7 AFCA AFCD AFD0 AFD3 AFD6 AFD9 AFDC AFDF AFE2 AFE5 AFE8 AFEB AFEE AFF1 AFF4 AFF7 AFFA
+db 7A50 7A53
+db 7B4C 7B51
+db 7B90 7B93
+db 7BC2 7BC9
+db 80AF 80B2
+db 82BC 82BF
+db 8383 8387
+db 83F6 83FF
+db 8767 876F
+db 87F5 87FF
+db 8FF3 8FFF
+db 93F5 93FF
+db 9776 977B
+db 9BB9 9BCE
+db 9BFA 9BFF
+db 3 7
+db 1C 1F
+db 5D 65
+db 127 131
+db 15C 160
+db 28D 2B2
+db 332 3FD
+db 544 550
+db 672 677
+db 7BD 7CB
+db ABA ABF
+db AD9 ADF
+db B7E B8D
+db 1DD7 1DE1
+db 1EAA 1EAD
+db 23B2 23B7
+db 26E9 26EF
+db 2894 289A
+db 6FB8 6FFE
+db D494 D4FF
+db 6D00 6D21
+txt 6D22 6D5E
+db 6FB8 6FFF
+db D494 D4FF
+txt 7105 712C
+txt 712E 718B
+txt 718E 73FC
+txt 74F2 74FF
+txt 81F0 8212
+txt 8410 842B
+txt 87B6 87C1
+txt 8FC5 8FD9
+txt 9754 9761
+txt 2B3 2BA
+txt 2CD 2DA
+txt 2DC 2E9
+txt 2F0 2FA
+txt 30E 31A
+txt 31C 329
+txt B13 B31
+txt B35 B4F
+txt 170D 17D0
+txt 1D71 1D77
+txt 1EC4 1ECE
+txt 1ED7 1EE2
+txt 2201 220B
+txt 241F 2428
+txt 246F 2508
+txt 251F 2548
+txt AB4F AB6E
+db 2509 251E
+db 2549 2560
+db 02B3 0329
+eq ZTD400 D400
+eq ZTD40C D40C
+eq ZTD41F D41F
+eq ZTD431 D431
+eq ZTD436 D436
+eq ZTD442 D442
+eq ZTD44B D44B
+eq ZTD452 D452
+eq ZTD458 D458
+eq ZTD45E D45E
+eq ZTD464 D464
+eq ZTD46D D46D
+eq ZTD484 D484
+eq ZTD488 D488
+eq ZTD48A D48A
+# ---- Namen ----
+name 6D5F START
+name 6DA9 RAM_A_FEHLER
+name 6DF7 RAM_A_FERTIG_KOPIE
+name 6DBD HEXZIFFER
+name 6E6C PIO_PRUEFUNG
+name 6E82 RAM_B_TEST
+name 6EF4 CTC_ZE_TEST
+name 6F18 CTC_ZE_KANAL_SCHLEIFE
+name 6F38 CTC_ZE_ISR
+name 6F4A CTC_ATP_TEST
+name 6F7A SIO_TEST
+name 6FA2 SIO_WARTE_UND_VERGLEICH
+name 2561 HAUPTPROGRAMM
+name 2463 HAUPTMENUE_ZEICHNEN
+name 74A8 PERIPHERIE_INIT
+name 749C OTIR_PAAR
+name 0BA0 TEXT_AUS
+name 0BA3 TEXT_INLINE
+name 0BA6 BILD_LOESCHEN
+name 0BA9 ZEILE_LOESCHEN
+name 0BAC HEX16_NACH_ASCII
+name 0BAF HEX8_NACH_ASCII
+name 0BC4 MELDUNG_BIS_ESC_ODER_CL
+name 0BCD HEXPAAR_NACH_BYTE
+name 0A68 TEXT_AUS_ROUTINE
+name 0A8A TEXT_INLINE_ROUTINE
+name 097F MELDUNG_WARTEN_ROUTINE
+name 0201 TASTE_HOLEN
+name 0285 SIO_B_STATUS_UND_DATEN
+name 1A1D VERZ_SUCHE_NAME
+name 1BD0 BITMAP_BIT_SETZEN_LOESCHEN
+name 1AD4 SPEICHER_REGION_SUCHEN
+name 1D29 DATEI_ZEIGER_UEBERNEHMEN
+name 1D83 DATEI_LADEN
+name 19DB LAENGE_AUS_EINTRAG
+name 1C5B K5122_INIT
+name 1C93 DISK_PRUEFEN_KENNSATZ
+name 1C32 ANZEIGE_F4F5_SCHLEIFE
+kom 6D5F ===== Stufe 0: Speicherverwaltung und RAM-Test A (vor jeder Bildausgabe, Fehler fatal) =====
+kom 6D5F E8H[0] := 00 (Seite 0 = RAM), E8H[F] := FF (VRAM sichtbar).  [Disk]
+kom 6D6D RAM-Test A: Muster AAH dann 55H; fuellen 0000-0BFF und 1000-28FF, dann 10 Lesedurchlaeufe (CPI).
+kom 6DA9 Fehler: E8H[0] := FF (ZRE-ROM sichtbar), E8H[F] := 00; HL-1 = fehlerhafte Zelle als 4 Hexziffern in den Text 'RAM-ZELLE xxxx ' (6D2C), Ausgabe ueber CALL 04BC, dann (0FDA):=11H und RST 38.  04BC/0038 gehoeren zum 3-KB-ROM des PRG700 (Debugger 'mit Ruecksprung'); im 1-KB-ROM des 710/710-1 liegt dort nichts Passendes (0400-0BFF unbestueckt = FFH) [?].  Kein F4H/F5H-Code.
+kom 6DF7 ===== Stufe 1: Resident nach unten kopieren, Seiten umschalten, Bild loeschen =====
+kom 6DF7 B000-BBFF nach 0000-0BFF, BC00-D4FF nach 1000-28FF.  Danach laeuft der Monitor aus dem unteren RAM; D400-D4FF bleibt zusaetzlich am Ladeort (Stufe-1-Fehlerroutinen, ZTD4xx).
+kom 6E0A E8H[1,7,8,9,A] := 04.  Bedeutung des Wertes 04 unbekannt [?] (vermutlich Schreibschutz der Seite); der Emulator behandelt ein unteres Halbbyte <> 0 als 'Systemkarte' = leer -> BS620 wuerde hier die Seiten 1 und 7-A verlieren (Befund AP-B0).
+kom 6E22 Bild loeschen: F800-FFFF := 20H (VRAM); (03FE) = Endadresse/Kennung F7FC bzw. FCF7 je nach Rueckleseprobe (F7FF=20H?) [?]
+kom 6E42 SP := 2900; Fehlermerker (0E50) := 0; Titel 'GRUNDDIAGNOSE' (14 Zeichen bei 74F2, Ausgabe 13 Zeichen, Position 1DH) ueber 0BA3.
+kom 6E4E Test 2: PIO ZE (Ports 84H-87H).  Tor A/B in Betrieb 3, alle Ausgaenge (CFH, 00H an 86H und 87H), dann je Tor 10 x (AAH, 55H) schreiben und zuruecklesen.
+kom 6E82 ===== Test 3: RAM B (0C00-0D8F, 2900-5FFF, B000-D3FF, D500-EFFF), Muster AAH/55H, je 2 Lesedurchlaeufe; Fehler -> 'RAM-ZELLE xxxx' + Warten auf CL/ESC, dann Abbruch dieses Tests =====
+kom 6EF4 ===== Test 4: CTC ZE (Ports 80H-83H): Zeitgeber 27H x 256 = 9984 Takte, Interruptbetrieb IM 2, I = 6DH (Vektoren 6D00-6D06 -> 6F38) =====
+kom 6F18 je Kanal: Zeitkonstante (6D0AH = 27H) ausgeben, EI, Wartezeit ~10300 Takte; kommt der Interrupt (ISR 6F38 setzt Kanal zurueck, naechster Kanal) -> gut, sonst Fehler 'CTC ZE KANAL' F5H = 34H-D (30H..33H), F4H = 3EH.
+kom 6F4A ===== Test 5: CTC ATP (Ports CCH, CDH): Zaehlerbetrieb, Steuerwort 57H, Zeitkonstante 1FH; sofortiges Zuruecklesen muss <> 1FH sein (CLK/TRG-Takt noetig) =====
+kom 6F68 Danach beide Kanaele auf 55H, 01H (Zaehler, Teiler 1) -- Durchreichen des CLK/TRG-Taktes an ZC/TO (Baudratentakt fuer die SIO?) [?]
+kom 6F7A ===== Test 6: SIO (C0H Daten A, C1H Daten B, C2H Steuer A, C3H Steuer B): Init 10 Bytes (6D10), AAH senden, Empfang abwarten (~255 Abfragen), Vergleich; erst Kanal A, dann B =====
+kom 6F9F -> HAUPTPROGRAMM (2561) ueber die Sprungleiste AFDF
+kom 2561 ===== Hauptprogramm: SP := 0FFF, Peripherie-Init (K6022-PIOs E2/E3/E6/E7 und ZRE-PIO 86H/87H), Bild loeschen, Hauptmenue =====
+kom 6F5F (Fortsetzung Test 5: Kanal 0 (CCH) wird gleich behandelt; Fehlercode F5H = 30H fuer Kanal 0, 31H fuer Kanal 1)
+kom 2400 BS620: RET (Pruefsummenpruefung stillgelegt); BS610: LD HL,0000 -- Pruefsumme je 1-KB-Block, Soll-Tabelle bei AEC0 (Index = Blockadresse/400H), Summe + Sollwert muss 0 ergeben
+kom 2429 Block pruefen: Summe ueber 0400H Bytes ab HL, Sollwert (AEC0 + H/4) addieren, Z = gut; sonst 'PRUEFSUMME xxxxH' (Blockadresse), Warten auf CL/ESC
+kom 0201 TASTE_HOLEN (nur PRG710-1, K7672 an K8025 SIO B: Daten 5EH, Status 5FH Bit 0): 1BH allein (kein Folgezeichen in ~256 Abfragen) -> 83H; ESC [/O/? u,v,w,s,t -> 80H,81H,82H,87H,88H; ESC C,D,A,B -> 89H,8AH,8BH,8CH; ESC Z -> 1EH; 0DH -> 84H; Kleinbuchstaben -> gross
+kom 097F Meldung blinkend (Text ein, Wartezeit, Text aus) bis Taste 82H oder 83H (RST 30 liefert den Tastencode in (0E4A)); kehrt dann zurueck
+kom 0A8A TEXT_INLINE: Rueckkehradresse zeigt auf vier Bytes: Laenge/Attribut, Position, Zeiger lo, Zeiger hi
+kom 1BD0 Zuordnungstabelle (Sektor 26 der Spur 0, im Speicher bei 2800): 2 Byte je Spur 1..39, Bit 7 des ersten Bytes = Sektor 1, ...; E=0 loeschen, sonst setzen
+kom 1AD4 Freiraum suchen: erster zusammenhaengender Lauf von D freien Sektoren (ueber Spurgrenzen hinweg), Spuren 1..37 (Spur 38 = 'DISK VOLL')
+kom 1A1D Verzeichnis durchsuchen: Sektoren 8..25 (18), je 3 Eintraege zu 42 Byte (Versatz 0, 2AH, 54H), Namensvergleich ueber 6 Zeichen (Treiberbefehl 40H)
+kom 1CD3 Kennsatz (Sektor 7 der Spur 0) muss ab Versatz 11 'PRG' enthalten, sonst 'KEINE PRG-DISK'
+kom 18E6 Dateityp: 'P' (Programm) oder 'L' (Ladedatei? [?]); sonst Fehler 'TYP'

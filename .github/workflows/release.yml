@@ -261,6 +261,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write
+      actions: read      # SignPath holt das hochgeladene Artefakt ueber die GitHub-API
 
     steps:
       - uses: actions/checkout@v4
@@ -468,6 +469,48 @@ jobs:
                  -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $wheel) { throw 'kein plattformunabhaengiges Greaseweazle-wheel im Paket' }
           Write-Host "     $($wheel.Name)"
+
+      # ── Signieren (SignPath Foundation, kostenlos fuer Open Source) ───────────
+      # Nur bei einem Tag UND wenn die Repository-Variable SIGNPATH_ORGANIZATION_ID
+      # gesetzt ist — ohne sie laeuft alles wie bisher, nur unsigniert.  Der
+      # Schluessel liegt bei SignPath, nicht hier; hier steht nur das Zugriffsband
+      # (Secret SIGNPATH_API_TOKEN).  Signiert wird NUR das aeussere Setup; der
+      # eingebettete Deinstallierer und die nachgeladenen Python-/Qt-Dateien bleiben
+      # unsigniert.  Einrichtung: doc/ci_pipeline.md "Signierter Installer".
+      - name: Unsigniertes Setup hochladen (fuer SignPath)
+        id: unsigniert
+        if: startsWith(github.ref, 'refs/tags/v') && vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: k1520emu-windows-x64-unsigniert
+          path: dist/*setup.exe
+          retention-days: 7
+
+      - name: Signieren (SignPath)
+        if: startsWith(github.ref, 'refs/tags/v') && vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'k1520emu' }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG || 'release-signing' }}
+          github-artifact-id: ${{ steps.unsigniert.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: dist/signiert
+
+      - name: Signiertes Setup uebernehmen und pruefen
+        if: startsWith(github.ref, 'refs/tags/v') && vars.SIGNPATH_ORGANIZATION_ID != ''
+        shell: pwsh
+        run: |
+          $signiert = Get-ChildItem dist\signiert\*setup.exe | Select-Object -First 1
+          if (-not $signiert) { throw 'SignPath lieferte kein Setup zurueck' }
+          Copy-Item -LiteralPath $signiert.FullName -Destination dist\ -Force
+          foreach ($f in Get-ChildItem dist\*setup.exe) {
+            $sig = Get-AuthenticodeSignature -LiteralPath $f.FullName
+            Write-Host "$($f.Name): $($sig.Status) — $($sig.SignerCertificate.Subject)"
+            if ($sig.Status -ne 'Valid') { throw "$($f.Name) ist nicht gueltig signiert: $($sig.Status)" }
+          }
+          Remove-Item -Recurse -Force dist\signiert
 
       - name: Paket als Artefakt
         uses: actions/upload-artifact@v4

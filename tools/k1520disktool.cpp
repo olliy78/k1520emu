@@ -39,9 +39,11 @@
 #include "core/filesystem/cpm/cpa_dpb.h"
 #include "core/filesystem/disk_volume.h"
 #include "core/filesystem/fat/fat_fs.h"
+#include "core/filesystem/bs600/bs600_fs.h"
 #include "core/filesystem/prg_boot.h"
 #include "core/filesystem/geometry_probe.h"
 #include "core/filesystem/wega/platten_volume.h"
+#include "core/filesystem/gide/gide_platte.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -86,7 +88,9 @@ struct Optionen {
     bool        udos_block_gesetzt = false;
     std::string udos_zusatz;      ///< --extra (Kopfsektor 44-47, hex)
     std::string udos_erst;        ///< --created (Erstellungsvermerk, 6 Zeichen)
-    std::string udos_geaend;      ///< --date (Aenderungsdatum JJMMTT)
+    std::string udos_geaend;      ///< --date (Aenderungsdatum JJMMTT; BS600: TTMMJJ)
+    std::string bs600_signum;     ///< --author (BS600: Signum, hoechstens 3 Zeichen)
+    std::string load_text, entry_text;   ///< --load/--entry roh: BS600 liest sie HEXADEZIMAL ("6D00"), UDOS mit strtol
     // CP/M kennt nur drei Attributbits und den Nutzerbereich; jedes hat sein eigenes
     // „gesetzt"-Kennzeichen, damit `--no-ro` von „gar nicht genannt" unterscheidbar ist.
     bool cpm_ro_gesetzt  = false, cpm_ro  = false;   ///< --ro / --no-ro
@@ -101,6 +105,9 @@ struct Optionen {
     bool unix_gid_gesetzt  = false;  int unix_gid  = 0;             ///< --gid
     bool unix_mtime_gesetzt = false; unsigned long unix_mtime = 0;  ///< --mtime (Sekunden seit 1970)
     int         volume  = 0; ///< --volume
+    std::string gide_layout;     ///< --gide-layout auto|poppe|kingstener (GIDE-Platte; "" = nicht verlangt)
+    int         laufwerk = -1;   ///< --laufwerk N (GIDE-Platte: Standardlaufwerk fuer Namen ohne lwN/; -1 = keins)
+    unsigned long long sektoren = 0; ///< --sectors N (create einer GIDE-Platte; 0 = Mindestgroesse)
     bool        text    = false;
     bool        binaer  = false;
     bool        force   = false;
@@ -132,6 +139,13 @@ struct Optionen {
     std::vector<std::string> rest;  ///< uebrige Argumente (Abbild, Muster, Dateien)
 };
 
+/// @brief Adresse als Hexzahl lesen ("6D00", "0x6D00", "6D00H").
+uint16_t hexAdresse(std::string t) {
+    if (!t.empty() && (t.back() == 'H' || t.back() == 'h')) t.pop_back();
+    if (t.size() > 2 && t[0] == '0' && (t[1] == 'x' || t[1] == 'X')) t = t.substr(2);
+    return static_cast<uint16_t>(std::strtoul(t.c_str(), nullptr, 16));
+}
+
 void gebrauch() {
     std::cout <<
         "k1520disktool - Dateien zwischen Linux und K1520-Disketten austauschen\n\n"
@@ -145,6 +159,7 @@ void gebrauch() {
         "         [--segment 2600+1591,4000+0200]   ... UDOS-Segmente ANFANG+LAENGE (hex)\n"
         "         [--mem E000:E3FF:0080]            ... LOW:HIGH:STACK (hex)\n"
         "         [--block-len 0] [--extra 0]       ... Kopfsektor 17 bzw. 44-47\n"
+        "         [--type P|L --load 6D00 --entry 6D5F --date TTMMJJ --author KRU]  ... BS600-Eintrag\n"
         "  rm     <abbild> <muster...>                Dateien loeschen (WEGA: auch leere\n"
         "                                             Verzeichnisse)\n"
         "  mkdir  <abbild> <pfad...>                  Verzeichnis anlegen (nur WEGA)\n"
@@ -158,7 +173,9 @@ void gebrauch() {
         "         [--ro|--no-ro --sys|--no-sys]     ... CP/M-Attribute\n"
         "         [--arc|--no-arc] [--user 3]       ... und Nutzerbereich\n"
         "         [--hid|--no-hid]                  ... FAT: versteckt; --ro/--sys/--arc/--mtime gelten dort auch\n"
-        "         [--prg 710|710-1]                 ... Bootabbild muss fuer dieses PRG-Geraet sein\n"
+        "         [--prg 710|710-1]                 ... Bootabbild muss fuer dieses PRG-Geraet sein (BS600: auch 700)\n"
+        "  reorganize <abbild>                      BS600: Dateien lueckenlos ab Spur 1 neu legen\n"
+        "  mv     <abbild> <alt> <neu>              BS600: Datei umbenennen\n"
         "  boot-get <abbild> <datei.bin>            Systemspuren herausschreiben\n"
         "  sys    <ziel> <quelle>                   FAT/DOS: Bootsektor + Systemdateien einer Systemdiskette\n"
         "                                           auf eine LEERE FAT-Diskette uebertragen (wie DOS `SYS`)\n"
@@ -212,6 +229,14 @@ void gebrauch() {
         "P8000-Plattenabbild (WEGA, PAR in Zylinder 0): ls/info/check/get/put/rm/mkdir/attr;\n"
         "  Namen mit Partition vorn (md0 = /usr, md2 = /, md3 = /tmp, md4 = /z):\n"
         "  get platte.img 'md2/etc/*' --to x -  put platte.img datei --as md2/etc/datei\n\n"
+        "GIDE-Platte (IDE-Abbild der GIDE-Karte, CP/M; .img oder .img.gz, > 33 MB): ls/info/check/fsck/get/put/rm/format/create;\n"
+        "  Namen mit Laufwerk vorn: lw0/NAME.EXT (Nutzerbereich lw0/3:NAME.EXT).  Das Layout des Gast-Treibers wird aus den\n"
+        "  Verzeichnissen erkannt und NIE geraten (--gide-layout auto|poppe|kingstener uebersteuert; bei Unklarheit scheitert auto):\n"
+        "  poppe = bis 8 Laufwerke je 8 MB (GIDEHP, auch im CP/A-BIOS), kingstener = 1 Laufwerk (gidn).  Die Layouts sind unvertraeglich.\n"
+        "  create x.img.gz --gide-layout poppe [--sectors N] [--laufwerk N]   leeres Abbild, Verzeichnisse formatiert\n"
+        "  format x.img.gz --gide-layout poppe --laufwerk 2 [--force]          Verzeichnis leeren (--force: auch wo Daten stehen)\n"
+        "  put x.img.gz DATEI... --as lw1[/NAME] | --laufwerk 1    get x.img.gz 'lw0/*' --to dir    rm x.img.gz 'lw1/*.COM'\n"
+        "  Geschrieben wird nur bei erkanntem oder vorgegebenem Layout, nie in ein Abbild mit fremder Sperre <abbild>.lock.\n\n"
         "Gemeinsam: --fs NAME (Erkennung uebersteuern), --volume N (Seite),\n"
         "           --text|--binary, --force, --dry-run, --no-backup\n"
         "  Neben jeder herausgeholten Datei liegt ein <datei>.fileinfo mit dem, was\n"
@@ -243,6 +268,9 @@ bool zerlege(int argc, char** argv, int ab, Optionen& o, std::string& err) {
         else if (a == "--restore") { if (!wert("--restore")) return false;
                                      o.restore_wahl = argv[++i]; }
         else if (a == "--as")      { if (!wert("--as"))     return false; o.als    = argv[++i]; }
+        else if (a == "--gide-layout") { if (!wert("--gide-layout")) return false; o.gide_layout = argv[++i]; }
+        else if (a == "--laufwerk" || a == "--lw") { if (!wert("--laufwerk")) return false; o.laufwerk = std::atoi(argv[++i]); }
+        else if (a == "--sectors") { if (!wert("--sectors")) return false; o.sektoren = std::strtoull(argv[++i], nullptr, 10); }
         else if (a == "--blocks")  { if (!wert("--blocks")) return false; o.blocks = std::atoi(argv[++i]); }
         else if (a == "--inodes")  { if (!wert("--inodes")) return false; o.inodes = std::atoi(argv[++i]); }
         else if (a == "--label")   { if (!wert("--label"))  return false; o.label  = argv[++i]; }
@@ -250,12 +278,15 @@ bool zerlege(int argc, char** argv, int ab, Optionen& o, std::string& err) {
         else if (a == "--prg")     { if (!wert("--prg"))    return false; o.prg    = argv[++i]; }
         else if (a == "--type")    { if (!wert("--type"))   return false; o.udos_typ = argv[++i]; }
         else if (a == "--props")   { if (!wert("--props"))  return false; o.udos_eig = argv[++i]; }
+        else if (a == "--date")    { if (!wert("--date"))   return false; o.udos_geaend = argv[++i]; }
         else if (a == "--entry")   { if (!wert("--entry"))  return false;
+                                     o.entry_text = argv[i + 1];
                                      o.udos_entry = static_cast<int>(
                                          std::strtol(argv[++i], nullptr, 0)); }
         else if (a == "--record-len") { if (!wert("--record-len")) return false;
                                      o.udos_satz = std::atoi(argv[++i]); }
         else if (a == "--load")    { if (!wert("--load"))   return false;
+                                     o.load_text = argv[i + 1];
                                      o.udos_segment = static_cast<int>(
                                          std::strtol(argv[++i], nullptr, 0)); }
         else if (a == "--image-len") { if (!wert("--image-len")) return false;
@@ -264,6 +295,7 @@ bool zerlege(int argc, char** argv, int ab, Optionen& o, std::string& err) {
         else if (a == "--segment") { if (!wert("--segment")) return false;
                                      o.udos_segmente = argv[++i]; }
         else if (a == "--mem")     { if (!wert("--mem"))    return false; o.udos_mem = argv[++i]; }
+        else if (a == "--author")  { if (!wert("--author")) return false; o.bs600_signum = argv[++i]; }
         else if (a == "--volume")  { if (!wert("--volume")) return false;
                                      o.volume = std::atoi(argv[++i]); }
         else if (a == "--ro")      { o.cpm_ro_gesetzt  = true; o.cpm_ro  = true; }
@@ -401,6 +433,12 @@ std::string bootZustand(const DiskVolume& v, int volume) {
     const bool leer = std::all_of(boot.begin(), boot.end(),
                                   [](uint8_t b) { return b == 0xE5 || b == 0x00 || b == 0x4E; });
     std::string z = menschlich(platz) + (leer ? ", leer" : ", beschrieben");
+    // BS600 (AP-B4): der Urlader nennt sein Geraet - 'BOOTSTRAP FOR BS600' ist die Bauart des PRG 700.
+    if (!leer && v.profile().type == FsType::Bs600) {
+        const Bs600Urlader u = Bs600FileSystem::urladerKennung(boot);
+        if (!u.text.empty()) z += ", " + u.text;
+        return z;
+    }
     // PRG 710/710-1 (AP-P6): der Ladesektor verraet System und Geraet.
     if (!leer) {
         prg_boot::System sys;
@@ -537,6 +575,14 @@ int cmd_ls(const Optionen& o) {
                         static_cast<unsigned long long>(e.size), e.date.c_str(), e.name.c_str(),
                         kurz.c_str(), e.damaged ? "  [DEFEKT]" : "");
         }
+    } else if (v->fsType() == FsType::Bs600) {
+        // BS600: Typ P/L, Lage Spur/Sektor, Lade-/End-/Startadresse (hex), Datum, Signum.
+        std::cout << "Name   Typ  Groesse  Lage         Laden Ende  Start Datum    Sig\n";
+        for (const FileEntry& e : liste)
+            std::printf("%-6s %-3s %8llu  %-11s  %04X  %04X  %04X  %-8s %s%s\n", e.name.c_str(), e.type.c_str(),
+                        static_cast<unsigned long long>(e.size), e.extent.c_str(),
+                        e.low_addr, e.high_addr, e.entry_addr, e.date.c_str(), e.created.c_str(),
+                        e.damaged ? "  [DEFEKT]" : "");
     } else if (v->fsType() == FsType::Sios) {
         // SIOS: Typ F = Datei, B = Bibliothek, O = Objekt einer Bibliothek (`PHASELB/INIT`);
         // Kz = Schutz/Austausch/Fortsetzung aus HDR1 (P/E/C); Lage = BOE/EOE/EOD bzw. AADR/ML.
@@ -1343,6 +1389,12 @@ int cmd_put(const Optionen& o) {
         t.udos_extra = static_cast<uint32_t>(std::strtoul(o.udos_zusatz.c_str(), nullptr, 16));
     t.udos_created  = o.udos_erst;
     t.udos_modified = o.udos_geaend;
+    // BS600 nimmt dieselben Schalter in seinen Bedeutungen: --type P|L, --load = Ladeadresse, --entry = Start
+    t.bs600_type   = o.udos_typ;
+    t.bs600_date   = o.udos_geaend;
+    t.bs600_author = o.bs600_signum;
+    t.bs600_load   = hexAdresse(o.load_text);
+    t.bs600_entry  = hexAdresse(o.entry_text);
     if (!o.udos_mem.empty()) {
         // LOW:HIGH[:STACK], alles hexadezimal
         unsigned von = 0, bis = 0, kz = 0x0080;
@@ -1395,6 +1447,8 @@ int cmd_put(const Optionen& o) {
             return kFehler;
         }
         std::string name = o.als.empty() ? fs::path(o.rest[i]).filename().string() : o.als;
+        // BS600-Namen kennen keine Endung: ohne --as gilt der Dateiname ohne sie.
+        if (o.als.empty() && v->istBs600()) name = fs::path(o.rest[i]).stem().string();
         FileRef ref = FileRef::parse(name, o.volume);
         if (!v->insert(o.rest[i], ref, t)) {
             std::cerr << "Fehler: " << v->lastError() << "\n";
@@ -1451,6 +1505,30 @@ int cmd_rm(const Optionen& o) {
     return kOk;
 }
 
+int cmd_reorganize(const Optionen& o) {
+    if (o.rest.size() < 2) { std::cerr << "Fehler: kein Abbild angegeben\n"; return kFehler; }
+    int rc = kOk;
+    auto v = oeffne(o, o.rest[1], rc, /*schreibend=*/true);
+    if (!v) return rc;
+    int bewegt = 0;
+    if (!v->reorganize(&bewegt) || !v->flush()) { std::cerr << "Fehler: " << v->lastError() << "\n"; return kFehler; }
+    std::cout << bewegt << " Dateien verschoben\n";
+    return kOk;
+}
+
+int cmd_mv(const Optionen& o) {
+    if (o.rest.size() < 4) { std::cerr << "Fehler: Abbild, alter und neuer Name angeben\n"; return kFehler; }
+    int rc = kOk;
+    auto v = oeffne(o, o.rest[1], rc, /*schreibend=*/true);
+    if (!v) return rc;
+    if (!v->rename(FileRef::parse(o.rest[2], o.volume), o.rest[3]) || !v->flush()) {
+        std::cerr << "Fehler: " << v->lastError() << "\n";
+        return kFehler;
+    }
+    std::cout << o.rest[2] << " -> " << o.rest[3] << "\n";
+    return kOk;
+}
+
 int cmd_mkdir(const Optionen& o) {
     if (o.rest.size() < 3) { std::cerr << "Fehler: Abbild und Pfad angeben\n"; return kFehler; }
     int rc = kOk;
@@ -1483,6 +1561,14 @@ bool leseAlles(const std::string& pfad, std::vector<uint8_t>& out) {
  */
 bool pruefePrgWunsch(const Optionen& o, FsType typ, const std::string& bootpfad) {
     if (o.prg.empty()) return true;
+    if (typ == FsType::Bs600) {
+        // BS600: 700 | 710 | 710-1 - der Urlader ist je Geraet ein anderer ('SYL FOR BS620' / 'BOOTSTRAP FOR BS600').
+        std::vector<uint8_t> img;
+        if (!leseAlles(bootpfad, img)) return false;
+        const std::string p = Bs600FileSystem::urladerGegenWunsch(img, o.prg);
+        if (!p.empty()) { std::cerr << "Fehler: " << p << "\n"; return false; }
+        return true;
+    }
     const prg_boot::Variante wunsch = prg_boot::ausName(o.prg);
     if (wunsch == prg_boot::Variante::Unbekannt) {
         std::cerr << "Fehler: --prg erwartet 710 oder 710-1\n";
@@ -1491,13 +1577,24 @@ bool pruefePrgWunsch(const Optionen& o, FsType typ, const std::string& bootpfad)
     prg_boot::System sys;
     if (typ == FsType::Cpm)       sys = prg_boot::System::Scpx;
     else if (typ == FsType::Udos) sys = prg_boot::System::Udos;
-    else { std::cerr << "Fehler: --prg gilt nur fuer CP/M-artige (SCPX) und UDOS-Disketten\n";
+    else { std::cerr << "Fehler: --prg gilt nur fuer CP/M-artige (SCPX), UDOS- und BS600-Disketten\n";
            return false; }
     std::vector<uint8_t> img;
     if (!leseAlles(bootpfad, img)) return false;
     const std::string p = prg_boot::problem(img, sys, wunsch, prg_boot::Variante::Unbekannt);
     if (!p.empty()) { std::cerr << "Fehler: " << p << "\n"; return false; }
     return true;
+}
+
+/// @brief BS600: nach dem Einspielen eines Urladers sagen, fuer welches Geraet er gebaut ist (Entwurf 48, AP-B4).
+void urladerHinweis(FsType typ, const std::string& bootpfad) {
+    if (typ != FsType::Bs600) return;
+    std::vector<uint8_t> img;
+    std::ifstream f(bootpfad, std::ios::binary);
+    if (!f) return;
+    img.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+    const Bs600Urlader u = Bs600FileSystem::urladerKennung(img);
+    if (!u.text.empty()) std::cout << "Hinweis: " << u.text << "\n";
 }
 
 int cmd_create(const Optionen& o) {
@@ -1532,12 +1629,21 @@ int cmd_create(const Optionen& o) {
                                  static_cast<uint32_t>(std::max(0, o.inodes)),
                                  static_cast<uint32_t>(std::max(0, o.blocks)));
     if (!v) { std::cerr << "Fehler: " << err << "\n"; return kFehler; }
+    if (v->bs600Fs() && (!o.udos_geaend.empty() || !o.bs600_signum.empty())) {
+        // BS600: Datum (TTMMJJ, Vorgabe heute) und Besitzer des Kennsatzes wie bei FORMAT unter BS620
+        std::string e2;
+        if (!v->bs600Fs()->kennsatzSetzen(o.udos_geaend, o.bs600_signum, e2) || !v->flush()) {
+            std::cerr << "Fehler: " << (e2.empty() ? v->lastError() : e2) << "\n";
+            return kFehler;
+        }
+    }
 
     std::cout << "angelegt: " << o.rest[1] << " (" << o.fs << ", "
               << v->volumeCount() << (v->volumeCount() == 1 ? " Seite" : " Seiten") << ")\n";
     if (!o.boot.empty())
         std::cout << "Bootabbild: " << o.boot << " -> Systemspuren ("
                   << menschlich(v->bootAreaSize()) << " Platz)\n";
+    if (!o.boot.empty()) urladerHinweis(v->profile().type, o.boot);
     return kOk;
 }
 
@@ -1604,6 +1710,7 @@ int cmd_boot_put(const Optionen& o) {
     }
     std::cout << o.rest[2] << " -> " << o.rest[1] << " (Systemspuren, "
               << menschlich(v->bootAreaSize(o.volume)) << " Platz)\n";
+    urladerHinweis(v->profile().type, o.rest[2]);
     return kOk;
 }
 
@@ -1659,7 +1766,8 @@ int cmd_attr(const Optionen& o) {
                       || o.udos_block_gesetzt || o.udos_segment || o.udos_ilen
                       || !o.udos_segmente.empty()
                       || !o.udos_mem.empty() || !o.udos_zusatz.empty()
-                      || !o.udos_erst.empty() || !o.udos_geaend.empty();
+                      || !o.udos_erst.empty() || !o.udos_geaend.empty() || !o.bs600_signum.empty()
+                      || !o.load_text.empty() || !o.entry_text.empty();
     bool aendern_cpm = o.cpm_ro_gesetzt || o.cpm_sys_gesetzt
                     || o.cpm_arc_gesetzt || o.cpm_user_gesetzt;
     bool aendern_unix = o.unix_mode_gesetzt || o.unix_uid_gesetzt
@@ -1744,7 +1852,18 @@ int cmd_attr(const Optionen& o) {
         }
     }
 
-    if (aendern_udos) {
+    if (aendern_udos && v->istBs600()) {
+        Bs600Attrs a;
+        a.type = o.udos_typ;
+        if (!o.udos_geaend.empty()) { a.set_date = true; a.date = o.udos_geaend; }
+        if (!o.bs600_signum.empty()) { a.set_author = true; a.author = o.bs600_signum; }
+        if (!o.load_text.empty())  { a.set_load = true;  a.load  = hexAdresse(o.load_text); }
+        if (!o.entry_text.empty()) { a.set_entry = true; a.entry = hexAdresse(o.entry_text); }
+        if (!v->setAttributes(ref, a) || !v->flush()) {
+            std::cerr << "Fehler: " << v->lastError() << "\n";
+            return kFehler;
+        }
+    } else if (aendern_udos) {
         UdosAttrs a;
         a.type       = o.udos_typ;
         a.properties = o.udos_eig;
@@ -1839,6 +1958,13 @@ int cmd_attr(const Optionen& o) {
             std::printf("  Geraet major,minor %u,%u\n", e->unix_rdev >> 8, e->unix_rdev & 0xFF);
         const std::string bl = v->blockList(ref);
         if (!bl.empty()) std::printf("  Bloecke %s\n", bl.c_str());
+        return kOk;
+    }
+    if (v->istBs600()) {
+        std::printf("%-6s Typ %s  %llu Byte  Lage %s\n", e->name.c_str(), e->type.c_str(),
+                    static_cast<unsigned long long>(e->size), e->extent.c_str());
+        std::printf("  Laden %04X  Ende %04X  Start %04X   Datum %s   Signum '%s'\n",
+                    e->low_addr, e->high_addr, e->entry_addr, e->date.c_str(), e->created.c_str());
         return kOk;
     }
     // CP/M fuehrt keine Kopfsektorangaben — dort waeren zehn Nullzeilen keine
@@ -2203,6 +2329,207 @@ int platte(const std::string& befehl, const Optionen& o) {
     return kOk;
 }
 
+
+// ─── GIDE-Platte (Poppe / Kingstener, doc/merkposten/disktool.md) ────────────
+//
+// Wie die P8000-Platte ein Abbild mit mehreren Laufwerken statt einer Diskette; das Layout (Aufteilung durch den
+// Gast-Treiber) steht nirgends auf der Platte und wird aus den Verzeichnissen ERKANNT - nie geraten.  Namen tragen
+// das Laufwerk vorn: `lw0/NAME.EXT` (Nutzerbereich `lw0/3:NAME.EXT`).
+
+GideLayout gideWahl(const Optionen& o, bool& ok) {
+    GideLayout l = GideLayout::Auto;
+    ok = o.gide_layout.empty() || gideLayoutVon(o.gide_layout, l);
+    if (!ok) std::cerr << "Fehler: --gide-layout muss auto, poppe oder kingstener sein\n";
+    return l;
+}
+
+int cmd_gide_create(const Optionen& o) {
+    bool ok = true;
+    const GideLayout l = gideWahl(o, ok);
+    if (!ok) return kFehler;
+    if (o.rest.size() < 2) { std::cerr << "Fehler: kein Abbild angegeben\n"; return kFehler; }
+    if (l == GideLayout::Auto) { std::cerr << "Fehler: --gide-layout poppe|kingstener ist zum Anlegen Pflicht\n"; return kFehler; }
+    std::string err;
+    if (!GidePlatte::anlegen(o.rest[1], l, o.sektoren, err)) { std::cerr << "Fehler: " << err << "\n"; return kFehler; }
+    // Verzeichnisse anlegen: --laufwerk N = nur dieses, sonst Poppe alle 8 / Kingstener das eine
+    auto p = GidePlatte::open(o.rest[1], err, /*read_only=*/false, l);
+    if (!p) { std::cerr << "Fehler: " << err << "\n"; return kFehler; }
+    p->setBackup(false);
+    int n = 0;
+    for (int lw = 0; lw < p->laufwerkAnzahl(); ++lw) {
+        if (o.laufwerk >= 0 && lw != o.laufwerk) continue;
+        if (!p->formatLaufwerk(lw)) { std::cerr << "Fehler: " << p->lastError() << "\n"; return kFehler; }
+        ++n;
+    }
+    if (!p->flush()) { std::cerr << "Fehler: " << p->lastError() << "\n"; return kFehler; }
+    std::cout << "angelegt: " << o.rest[1] << " (" << gideLayoutName(l) << ", " << n << " Laufwerk(e) formatiert)\n";
+    return kOk;
+}
+
+int gide(const std::string& befehl, const Optionen& o) {
+    bool ok = true;
+    const GideLayout wahl = gideWahl(o, ok);
+    if (!ok) return kFehler;
+    if (befehl == "fsck" && o.reparieren) {
+        std::cerr << "Fehler: fuer GIDE-Platten gibt es noch keine Reparaturen (nur pruefen)\n";
+        return kFehler;
+    }
+    const bool schreibend = befehl == "put" || befehl == "rm" || befehl == "format";
+    if (!schreibend && befehl != "ls" && befehl != "info" && befehl != "check" && befehl != "fsck" && befehl != "get") {
+        std::cerr << "Fehler: '" << befehl << "' gibt es fuer GIDE-Platten nicht (ls, info, check, fsck, get, put, rm, format)\n";
+        return kFehler;
+    }
+    std::string err;
+    auto p = GidePlatte::open(o.rest[1], err, /*read_only=*/!schreibend || o.dry_run, wahl);
+    if (!p) { std::cerr << "Fehler: " << err << "\n"; return kNichtErkannt; }
+    if (o.nobackup) p->setBackup(false);
+    if (o.laufwerk >= 0) p->setStandardLaufwerk(o.laufwerk);
+
+    auto kopf = [&](std::ostream& aus) {
+        const GideErkennung& e = p->erkennung();
+        aus << "GIDE-Platte: Layout " << gideLayoutName(p->layout())
+            << (e.ausdruecklich ? " (vorgegeben" : " (erkannt") << (e.sicher ? ", eindeutig" : ", NICHT eindeutig") << "), "
+            << p->sektorenGesamt() << " Sektoren, " << p->laufwerkAnzahl() << " Laufwerk(e)\n";
+        if (!e.text.empty()) aus << "  " << e.text << "\n";
+        if (p->fremdGesperrt()) aus << "  Abbild gesperrt (laufender Emulator?) - nur lesbar\n";
+    };
+
+    if (befehl == "ls") {
+        std::ostream& info_aus = o.lang ? std::cout : std::cerr;
+        kopf(info_aus);
+        for (int lw = 0; lw < p->laufwerkAnzahl(); ++lw) {
+            const GideLaufwerkInfo i = p->laufwerkInfo(lw);
+            info_aus << i.name << (i.formatiert ? ": " : ": unformatiert");
+            if (i.formatiert) info_aus << i.dateien << " Dateien, " << menschlich(i.free) << " frei";
+            info_aus << "\n";
+        }
+        for (const FileEntry& e : p->list()) {
+            if (!o.lang) { std::cout << e.name << "\n"; continue; }
+            std::printf("%-10s %9llu  %s\n", e.attributes.c_str(), static_cast<unsigned long long>(e.size), e.name.c_str());
+        }
+        return kOk;
+    }
+    if (befehl == "info") {
+        kopf(std::cout);
+        for (int lw = 0; lw < p->laufwerkAnzahl(); ++lw) {
+            const GideLaufwerkInfo i = p->laufwerkInfo(lw);
+            std::cout << i.name << ": ";
+            if (!i.formatiert) { std::cout << "unformatiert (kein Verzeichnis im Layout " << gideLayoutName(p->layout()) << ")\n"; continue; }
+            std::cout << i.dateien << " Dateien, " << menschlich(i.used) << " belegt, " << menschlich(i.free) << " frei von "
+                      << menschlich(i.total) << (i.systemspuren ? ", " + std::to_string(i.systemspuren) + " Systemspuren" : "") << "\n";
+        }
+        return kOk;
+    }
+    if (befehl == "check" || befehl == "fsck") {
+        const FsCheckLevel stufe = o.voll ? FsCheckLevel::Voll : FsCheckLevel::Schnell;
+        const FsCheckReport gesamt = p->check(stufe);
+        if (o.json) {
+            std::cout << "{\"findings\":[";
+            for (size_t i = 0; i < gesamt.findings.size(); ++i) {
+                const FsFinding& f = gesamt.findings[i];
+                std::cout << (i ? "," : "") << "{\"id\":" << jsonText(f.id) << ",\"severity\":" << jsonText(fsSeverityName(f.severity))
+                          << ",\"object\":" << jsonText(f.object) << ",\"text\":" << jsonText(f.text) << "}";
+            }
+            std::cout << "]}\n";
+        } else {
+            kopf(std::cout);
+            std::cout << (stufe == FsCheckLevel::Voll ? "Vollpruefung" : "Schnellpruefung") << "\n";
+            if (gesamt.ohneBefund()) std::cout << "ohne Befund\n";
+            else std::cout << gesamt.alsText();
+        }
+        return gesamt.ohneBefund() ? kOk : kFehler;
+    }
+    // Muster darf das Laufwerk weglassen: dann gilt es fuer den Dateinamen allein
+    auto trifft = [](const std::string& m, const std::string& voll) {
+        const std::string rest = voll.substr(voll.find('/') + 1);
+        return passt(m, voll) || (m.find('/') == std::string::npos && passt(m, rest));
+    };
+    if (befehl == "get") {
+        if (o.ziel.empty()) { std::cerr << "Fehler: --to <verzeichnis> fehlt\n"; return kFehler; }
+        std::vector<std::string> muster(o.rest.begin() + 2, o.rest.end());
+        if (muster.empty()) muster.push_back("*");
+        int n = 0;
+        for (const FileEntry& e : p->list()) {
+            bool treffer = false;
+            for (const std::string& m : muster) treffer = treffer || trifft(m, e.name);
+            if (!treffer) continue;
+            if (o.dry_run) { std::cout << "wuerde holen: " << e.name << "\n"; ++n; continue; }
+            if (!p->extract(e.name, o.ziel, o.force)) { std::cerr << "Fehler: " << p->lastError() << "\n"; return kFehler; }
+            ++n;
+        }
+        if (n == 0) { std::cerr << "Fehler: keine Datei passt auf das Muster\n"; return kFehler; }
+        std::cout << n << " Dateien nach " << o.ziel << "\n";
+        return kOk;
+    }
+    if (befehl == "rm") {
+        int n = 0;
+        for (size_t i = 2; i < o.rest.size(); ++i)
+            for (const FileEntry& e : p->list()) {
+                if (!trifft(o.rest[i], e.name)) continue;
+                if (o.laufwerk >= 0 && e.volume != o.laufwerk && o.rest[i].find('/') == std::string::npos) continue;
+                if (o.dry_run) { std::cout << "wuerde loeschen: " << e.name << "\n"; ++n; continue; }
+                if (!p->erase(e.name)) { std::cerr << "Fehler: " << p->lastError() << "\n"; return kFehler; }
+                std::cout << "geloescht: " << e.name << "\n";
+                ++n;
+            }
+        if (n == 0) { std::cerr << "Fehler: keine Datei passt auf das Muster\n"; return kFehler; }
+    } else if (befehl == "put") {
+        if (o.rest.size() < 3) { std::cerr << "Fehler: Abbild und Datei angeben\n"; return kFehler; }
+        // Ziel: --as lwN[/NAME] oder --laufwerk N (Kingstener: das eine Laufwerk)
+        std::string lwpraefix, alsname;
+        if (!o.als.empty()) {
+            const size_t s = o.als.find('/');
+            lwpraefix = o.als.substr(0, s);
+            if (s != std::string::npos) alsname = o.als.substr(s + 1);
+        } else if (o.laufwerk >= 0) {
+            lwpraefix = "lw" + std::to_string(o.laufwerk);
+        } else if (p->layout() == GideLayout::Kingstener) {
+            lwpraefix = "lw0";
+        } else {
+            std::cerr << "Fehler: das Ziellaufwerk mit --as lw<N>[/NAME] oder --laufwerk N angeben (Poppe hat bis 8 Laufwerke)\n";
+            return kFehler;
+        }
+        if (lwpraefix.size() < 3 || lwpraefix.compare(0, 2, "lw") != 0) {
+            std::cerr << "Fehler: Laufwerk als lw<N> angeben, nicht '" << lwpraefix << "'\n";
+            return kFehler;
+        }
+        std::error_code ec;
+        std::vector<std::string> quellen;
+        for (size_t i = 2; i < o.rest.size(); ++i) {
+            if (fs::is_directory(o.rest[i], ec)) {
+                for (const auto& d : fs::directory_iterator(o.rest[i], ec))
+                    if (d.is_regular_file(ec) && d.path().extension() != ".fileinfo") quellen.push_back(d.path().string());
+            } else {
+                quellen.push_back(o.rest[i]);
+            }
+        }
+        std::sort(quellen.begin(), quellen.end());
+        if (!alsname.empty() && quellen.size() != 1) { std::cerr << "Fehler: --as lw<N>/NAME gilt nur fuer eine Datei\n"; return kFehler; }
+        for (const std::string& q : quellen) {
+            const std::string name = alsname.empty() ? CpmFileSystem::toCpmName(fs::path(q).filename().string()) : alsname;
+            const std::string ziel = lwpraefix + "/" + name;
+            if (o.dry_run) { std::cout << q << " -> " << ziel << " (Probelauf)\n"; continue; }
+            if (!p->insert(q, ziel, o.force)) { std::cerr << "Fehler: " << p->lastError() << "\n"; return kFehler; }
+            std::cout << q << " -> " << ziel << "\n";
+        }
+    } else if (befehl == "format") {
+        if (o.gide_layout.empty() || wahl == GideLayout::Auto) {
+            std::cerr << "Fehler: format nur mit ausdruecklich gewaehltem Layout (--gide-layout poppe|kingstener)\n";
+            return kFehler;
+        }
+        if (o.laufwerk < 0 && p->layout() != GideLayout::Kingstener) {
+            std::cerr << "Fehler: format braucht --laufwerk N (0-7)\n";
+            return kFehler;
+        }
+        const int lw = o.laufwerk < 0 ? 0 : o.laufwerk;
+        if (!o.dry_run && !p->formatLaufwerk(lw, o.force)) { std::cerr << "Fehler: " << p->lastError() << "\n"; return kFehler; }
+        std::cout << (o.dry_run ? "wuerde formatieren: lw" : "formatiert: lw") << lw << "\n";
+    }
+    if (o.dry_run) return kOk;
+    if (!p->flush()) { std::cerr << "Fehler: " << p->lastError() << "\n"; return kFehler; }
+    return kOk;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -2223,6 +2550,12 @@ int main(int argc, char** argv) {
         return kFehler;
     }
 
+    // GIDE-Platte (Poppe/Kingstener): --gide-layout verlangt sie, sonst entscheidet die Groesse (>= 65472 Sektoren, nie eine Diskette)
+    if (befehl == "create" && !o.gide_layout.empty()) return cmd_gide_create(o);
+    if (o.rest.size() >= 2 && befehl != "create" && befehl != "formats" && befehl.rfind("tar-", 0) != 0 && o.fs.empty() &&
+        !WegaPlatte::istPlatte(o.rest[1]) && (!o.gide_layout.empty() || GidePlatte::kandidat(o.rest[1])))
+        return gide(befehl, o);
+
     // P8000-Plattenabbild (PAR in Z0/K0/S1): eigener Weg, mehrere WEGA-Partitionen
     if (o.rest.size() >= 2 && befehl != "create" && befehl != "formats" && befehl != "tar-satz"
         && befehl != "tar-satz-save" && befehl != "tar-satz-neu" && befehl != "tar-formate" && WegaPlatte::istPlatte(o.rest[1]))
@@ -2233,6 +2566,8 @@ int main(int argc, char** argv) {
     if (befehl == "put")     return cmd_put(o);
     if (befehl == "rm")      return cmd_rm(o);
     if (befehl == "mkdir")   return cmd_mkdir(o);
+    if (befehl == "reorganize") return cmd_reorganize(o);
+    if (befehl == "mv")      return cmd_mv(o);
     if (befehl == "create")  return cmd_create(o);
     if (befehl == "attr")    return cmd_attr(o);
     if (befehl == "boot-get") return cmd_boot_get(o);

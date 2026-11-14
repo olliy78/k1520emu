@@ -119,6 +119,8 @@ bool UdosBitmap::store(SectorSpace& space, uint8_t head, uint8_t bitmap_track,
 
 std::string UdosBitmap::label() const {
     std::string s(raw_.begin(), raw_.begin() + 24);
+    // Hinter dem 0x0D-Abschluss steht Fuellung (0x0D oder, bei FORMAT V 5.0, 0xFF).
+    if (const size_t cr = s.find('\r'); cr != std::string::npos) s.resize(cr);
     // UDOS fuellt mit 0x0D auf; Leerzeichen am Rand sind ebenfalls Fuellung.
     while (!s.empty() && (s.back() == '\r' || s.back() == ' ' || s.back() == '\0'))
         s.pop_back();
@@ -237,10 +239,16 @@ bool UdosBitmap::looksValid(const std::vector<uint8_t>& raw, uint8_t expect_secs
         for (size_t i = 348; i < 375; ++i) if (raw[i] != 0x77) return sag("Nachlauf 0x77 fehlt");
     }
 
-    // Datentraegername: druckbar oder 0x0D-Fuellung.
+    // Datentraegername: druckbar, mit 0x0D beendet.  Hinter dem Abschluss steht 0x0D (DiskTool,
+    // PC 1715) oder 0xFF (FORMAT V 5.0 des A5120 fuellt den Rest des 24-Byte-Felds mit FFH,
+    // Ticket #29) - beides ist keine Beschaedigung.
+    bool ende = false;
     for (size_t i = 0; i < 24; ++i) {
         const uint8_t c = raw[i];
-        if (c == 0x0D || (c >= 0x20 && c < 0x7F)) continue;
+        if (ende) {
+            if (c == 0x0D || c == 0xFF) continue;
+        } else if (c == 0x0D) { ende = true; continue; }
+        else if (c >= 0x20 && c < 0x7F) continue;
         return sag("Datentraegername enthaelt ein Sonderzeichen");
     }
     return true;

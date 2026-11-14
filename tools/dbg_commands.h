@@ -39,6 +39,12 @@ inline const std::vector<std::string>& names() {
         "raf",
         // Kassette (--tape)
         "tape",
+        // GIDE (--gide)
+        "gide",
+        // GUN-USB (--usb)
+        "usb",
+        // KCNet-Netzkarte (--net)
+        "net",
         // A5120.16 (U8001-Kontext)
         "cpu","a","fcw","psa","bmode","bvi","bint16","emlog","emmsg",
         // P8000 (--machine p8000|p8000-16): ADP, UA858, Kopplung, MMU, Terminal

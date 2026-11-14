@@ -72,13 +72,16 @@ Prg710Machine::Prg710Machine(const Config& cfg)
                          [this](uint16_t a, uint8_t d) { screen_.memWrite(a, d); });
     // K5122 auf /WAIT (keine ZVE2); Marken-FF: PRG 710 low-aktiv, 710-1 high-aktiv (§4a.1).
     afs_.setSynchronisation(K5122::Synchronisation::Wait);
-    afs_.setMkeLowAktiv(variante_ == Config::Variante::Prg710);
+    const int modell = cfg.leser_modell >= 0 ? cfg.leser_modell : (variante_ == Config::Variante::Prg710_1 ? 1 : 0);
+    afs_.setMkeLowAktiv(modell > 0 || variante_ == Config::Variante::Prg710);
+    afs_.setDatenErstNachMarke(modell > 0);
     // Marken-FF an jedem Sync-Byte: das 710-ROM schlaegt das FF in einer engen Schleife
     // neu an (02DDH, AP-P1d); beide Varianten tragen dieselbe K5122.
-    afs_.setMkeJedesSyncByte(true);
+    afs_.setMkeJedesSyncByte(modell != 1);
     // Unformatierte Spur/Seite = Rauschen mit Scheinmarken (AP-P3b): ROM und Resident
     // warten ohne Zeitablauf auf eine Marke; am Geraet beendet erst das Rauschen das Warten.
     afs_.setRauschenAufLeererSpur(true);
+    if (cfg.atp_zusatz) steckeAtpZusatz();
     interruptKetteSetzen();
     zre_.cpu().abortBeforeExecute = [this] { return stop_.load(std::memory_order_relaxed); };
 
@@ -104,6 +107,22 @@ Prg710Machine::Prg710Machine(const Config& cfg)
     hub_.konfigurieren(0, k);
 }
 
+bool Prg710Machine::steckeAtpZusatz(std::string* fehler)
+{
+    auto nein = [&](const char* g) { if (fehler) *fehler = g; return false; };
+    if (atp_.zusatz()) return nein("ATP-Zusatz steckt schon");
+    if (!bestueckbar()) return nein("ATP-Zusatz nur vor dem ersten Lauf/Reset steckbar");
+    for (int p : {0xC0, 0xC1, 0xC2, 0xC3, 0xF4, 0xF5})
+        if (bus_.ioOwner(static_cast<uint8_t>(p))) return nein("E/A-Tor des ATP-Zusatzes belegt");
+    atp_.attachZusatz(bus_);
+    // CLK/TRG0 und TRG1 der ATP-CTC (CCH–CFH, von der Ass590069 getragen): fester Takt phi/4
+    // = 614,4 kHz [?] (der Selbsttest verlangt >= ca. 200 kHz, Entwurf 48 §2.4).  Zeitgeber-
+    // betrieb (Fernschreibertreiber, CDH) ignoriert CLK/TRG und bleibt bitgleich.
+    for (int k = 0; k < 2; ++k)
+        fs_.ctc().setzeEingangsTakt(k, CPU_HZ / static_cast<uint32_t>(atp_.config().bittakt_teiler), CPU_HZ);
+    return true;
+}
+
 void Prg710Machine::interruptKetteSetzen()
 {
     // Interruptkette (vorlaeufig [?], §3.1/AP-P1c): K5122 → K2521 (CTC, PIO) → K8025.
@@ -122,6 +141,8 @@ void Prg710Machine::interruptKetteSetzen()
         bus_.appendInterruptChain(&k5020_->pioDaten());
         bus_.appendInterruptChain(&k5020_->pioSteuer());
     }
+    if (gun_usb_) bus_.appendInterruptChain(&gun_usb_->pio());   // GUN-USB (AP U2): hinten, am Geraet unbelegt [?]
+    if (gun_net_) bus_.appendInterruptChain(&gun_net_->pio());   // KCNet (AP N2): hinten, am Geraet unbelegt [?]
 }
 
 std::vector<k1520::serial::SerialAnschluss*> Prg710Machine::serielleAnschluesse()
@@ -145,6 +166,9 @@ void Prg710Machine::resetHardware()
     atp_.reset();            // 8279: FIFO leer
     k6022Reset();            // K6022 (gesteckt?): PIOs; Band im Leser und Stanzband bleiben
     k5020Reset();             // K5020 (gesteckt?): PIOs zurueck, Baender bleiben liegen
+    gideReset();             // GIDE (gesteckt?): LH, Platte; Medium bleibt
+    gunUsbReset();           // GUN-USB (gesteckt?): PIO, VDIP1; Stick bleibt
+    gunNetReset();           // KCNet (gesteckt?): PIO, Automat, W5100
     fs_.reset();
     rafReset();              // RAF (gesteckt?): nur das Latch sperrt, der Inhalt bleibt
     hub_.gastZurueckgesetzt();
@@ -164,6 +188,9 @@ void Prg710Machine::powerOn()
     k7609_.powerOn();        // die Tastatur hat ihr eigenes Netz-Ein, ein /RESET trifft sie nicht
     k7672_.powerOn();        // Selbsttest, KEIN DC1 (wie K8915)
     rafPowerOn();            // RAF ohne Stand-by-Pufferung: Inhalt weg (Entwurf 22 §3.4)
+    gidePowerOn();
+    gunUsbPowerOn();
+    gunNetPowerOn();
     resetHardware();
     LOG_INFO("PRG710", "Netz ein: Abbildung aus, ROM bei 0000H");
 }
@@ -248,7 +275,10 @@ int Prg710Machine::run(int max_cycles)
         dirty |= ass_.clockTick(used);
         dirty |= k6022Takt(used);   // Lochstreifen (gesteckt?)
         dirty |= k5020Takt(used);   // Kassette (gesteckt?)
+        gideTakt(total_cycles_);   // GIDE (gesteckt?): Platte und RTC in Maschinenzeit
+        gunNetTakt(total_cycles_);   // KCNet (gesteckt?): Kommando 03 in Maschinenzeit
         dirty |= fs_.clockTick(used);
+        dirty |= atp_.clockTick(used);   // ATP-Zusatz (gesteckt?): Kanalschleife der SIO C0H–C3H
         if (total_cycles_ >= serial_naechst_) {
             serial_naechst_ = hub_.takt(total_cycles_);
             dirty |= ass_.nimmSeriellGeaendert();

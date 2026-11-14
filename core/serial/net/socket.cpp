@@ -396,6 +396,105 @@ Socket verbindenAlle(const std::vector<Ziel>& ziele, int fristMs, Fehler* f) {
     return Socket();
 }
 
+// ── Erweiterung fuer den W5100: Loopback-Lauscher und UDP ─────────────────────────
+
+Lauscher lauschenLoopback(int port) {
+    Lauscher r;
+    if (port < 0 || port > 65535) { r.fehler = macheFehler(kFehlerUngueltig); return r; }
+    if (!netzStarten(&r.fehler)) return r;
+    Socket s(neuerSocket(AF_INET));
+    if (!s) { r.fehler = macheFehler(letzterFehler()); return r; }
+#if defined(_WIN32)
+    setzeOption(s.fd(), SOL_SOCKET, SO_EXCLUSIVEADDRUSE, 1);
+#else
+    setzeOption(s.fd(), SOL_SOCKET, SO_REUSEADDR, 1);
+#endif
+    sockaddr_in a{};
+    a.sin_family      = AF_INET;
+    a.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    a.sin_port        = htons(static_cast<unsigned short>(port));
+    if (::bind(roh(s.fd()), reinterpret_cast<sockaddr*>(&a), sizeof a) != 0 ||
+        ::listen(roh(s.fd()), 8) != 0 || !nichtBlockierend(s.fd())) {
+        r.fehler = macheFehler(letzterFehler());
+        return r;
+    }
+    r.port   = eigenerPort(s.fd());
+    r.sock   = std::move(s);
+    return r;
+}
+
+int lokalerPort(SockFd fd) { return eigenerPort(fd); }
+
+Socket udpOeffnen(int port, bool nurLoopback, Fehler* f) {
+    if (port < 0 || port > 65535) { meldeFehler(f, kFehlerUngueltig); return Socket(); }
+    if (!netzStarten(f)) return Socket();
+    const auto raw = ::socket(AF_INET, SOCK_DGRAM, 0);
+#if defined(_WIN32)
+    if (raw == INVALID_SOCKET) { meldeFehler(f, letzterFehler()); return Socket(); }
+#else
+    if (raw < 0) { meldeFehler(f, letzterFehler()); return Socket(); }
+#endif
+    Socket s(static_cast<SockFd>(raw));
+    sockaddr_in a{};
+    a.sin_family      = AF_INET;
+    a.sin_addr.s_addr = htonl(nurLoopback ? INADDR_LOOPBACK : INADDR_ANY);
+    a.sin_port        = htons(static_cast<unsigned short>(port));
+    if (::bind(roh(s.fd()), reinterpret_cast<sockaddr*>(&a), sizeof a) != 0 ||
+        !nichtBlockierend(s.fd())) {
+        meldeFehler(f, letzterFehler());
+        return Socket();
+    }
+    return s;
+}
+
+IoErgebnis udpSenden(SockFd fd, const unsigned char ip[4], int port, const void* daten, std::size_t n) {
+    IoErgebnis r;
+    sockaddr_in a{};
+    a.sin_family = AF_INET;
+    std::memcpy(&a.sin_addr.s_addr, ip, 4);
+    a.sin_port = htons(static_cast<unsigned short>(port));
+    const auto rc = ::sendto(roh(fd), static_cast<const char*>(daten),
+#if defined(_WIN32)
+                             static_cast<int>(n),
+#else
+                             n,
+#endif
+                             0, reinterpret_cast<sockaddr*>(&a), sizeof a);
+    if (rc < 0) {
+        const int e = letzterFehler();
+        r.status = istWarten(e) ? IoStatus::Warten : IoStatus::Fehler;
+        if (r.status == IoStatus::Fehler) r.fehler = macheFehler(e);
+        return r;
+    }
+    r.n = static_cast<std::size_t>(rc);
+    return r;
+}
+
+IoErgebnis udpEmpfangen(SockFd fd, void* puffer, std::size_t max, unsigned char ip[4], int* port) {
+    IoErgebnis r;
+    sockaddr_in a{};
+    SockLen len = sizeof a;
+    const auto rc = ::recvfrom(roh(fd), static_cast<char*>(puffer),
+#if defined(_WIN32)
+                               static_cast<int>(max),
+#else
+                               max,
+#endif
+                               0, reinterpret_cast<sockaddr*>(&a), &len);
+    if (rc < 0) {
+        const int e = letzterFehler();
+        // ECONNRESET/WSAECONNRESET: ICMP „Port nicht erreichbar" eines frueheren Sendens
+        // (Windows meldet es am ungebundenen Empfang) — kein Fehler des Sockets, nichts da.
+        r.status = (istWarten(e) || istAbbruch(e)) ? IoStatus::Warten : IoStatus::Fehler;
+        if (r.status == IoStatus::Fehler) r.fehler = macheFehler(e);
+        return r;
+    }
+    r.n = static_cast<std::size_t>(rc);
+    if (ip)   std::memcpy(ip, &a.sin_addr.s_addr, 4);
+    if (port) *port = ntohs(a.sin_port);
+    return r;
+}
+
 // ── Ein-/Ausgabe ────────────────────────────────────────────────────────────
 
 IoErgebnis senden(SockFd fd, const void* daten, std::size_t n) {

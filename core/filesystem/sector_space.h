@@ -67,6 +67,16 @@ public:
      */
     SectorSpace(DiskMedium& medium, const DiskFormat& fmt, uint8_t head_filter = kAllHeads);
 
+    /**
+     * @brief **Flacher** Sektorraum: das lineare Abbild liegt in @p flat (Layout-Reihenfolge wie `.img`,
+     *        Laenge = @c fmt.totalBytes()), ohne Spurbilder und Aufzeichnungsverfahren.
+     *
+     * Fuer Festplattenabbilder (GIDE, `core/filesystem/gide/`): ein Laufwerk wird als Strom von
+     * Sektoren beschrieben, die das CP/M-Dateisystem wie eine Diskette liest.  Alle Sektoren gelten als
+     * bekannt und fehlerfrei; ein Nachspann (UDOS) gibt es nicht.  @p flat muss den SectorSpace ueberleben.
+     */
+    SectorSpace(std::vector<uint8_t>& flat, const DiskFormat& fmt);
+
     const DiskFormat& format()     const { return fmt_; }
     uint8_t           headFilter() const { return head_filter_; }
 
@@ -163,6 +173,9 @@ public:
 
     const std::string& lastError() const { return last_error_; }
 
+    /// @brief Nur flacher Raum: +1 je Schreibzugriff (0 = nie beschrieben); an einem Diskettenmedium immer 0.
+    uint64_t flatRevision() const { return flat_revision_; }
+
 private:
     /// @brief Eine Spur des linearen Raums.
     struct Slot {
@@ -175,6 +188,8 @@ private:
     };
 
     /// @brief Slot-Index einer Spur; -1 = nicht im Raum.
+    void aufbauen();
+    bool flachSchreiben(int slot, uint8_t id, const std::vector<uint8_t>& data);
     int slotOf(uint8_t cyl, uint8_t head) const;
     /// @brief Slot-Index zu einem linearen Offset; -1 = ausserhalb.
     int slotAt(uint64_t offset) const;
@@ -182,7 +197,9 @@ private:
     /// @brief Geparste Spur aus dem Zwischenspeicher (parst bei Bedarf).
     const std::vector<LogicalSector>& sectors(int slot) const;
 
-    DiskMedium&       medium_;
+    DiskMedium*       medium_ = nullptr;   ///< nullptr = flacher Raum (@ref flat_)
+    std::vector<uint8_t>* flat_ = nullptr;
+    uint64_t          flat_revision_ = 0;  ///< +1 je Schreibzugriff im flachen Raum (Zwischenspeicher)
     const DiskFormat& fmt_;
     uint8_t           head_filter_;
 

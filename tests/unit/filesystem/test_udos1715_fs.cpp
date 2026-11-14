@@ -43,7 +43,7 @@ namespace {
 
 constexpr const char* kFixture = "udos1715_640k_pc1715_system.img";
 /// @brief Dieselbe Diskettensitte auf einem **anderen Rechner**: die
-///        WEGA-Startdiskette des **EAW P8000** (UDOS 2.2).
+///        WEGA-Startdiskette des **EAW P8000** (UDOS 3.x).
 ///
 /// Der P8000 ist keine Spielart des PC 1715 — andere Maschine, anderer Zweck der
 /// Diskette (sie startet WEGA).  Geteilt wird nur, wie eine Diskette angelegt ist;
@@ -783,7 +783,7 @@ TEST(Udos1715Segmente, ZuVieleSegmenteWerdenAbgewiesen) {
 // deren Diskette hier das Hauptsystem WEGA startet.  Gemeinsam ist allein, wie eine
 // Diskette angelegt wird — und genau das pruefen diese Faelle.
 //
-// Die WEGA-Startdiskette des P8000 (UDOS 2.2) traegt Descriptoren, Zeigersektoren
+// Die WEGA-Startdiskette des P8000 (UDOS 3.x) traegt Descriptoren, Zeigersektoren
 // und Verzeichnis genau dort, wo das PC-1715-Handbuch sie beschreibt.  Sie war
 // trotzdem unlesbar, weil ihr Formatierer den Platz zwischen Belegungsplan und
 // Zaehlern nicht mit `00` fuellt, sondern mit dem **0x77-Rest der ZDOS-Sitte**.
@@ -1106,6 +1106,153 @@ TEST(Udos1715A5120, DatentraegerAngabenStimmen) {
     ASSERT_TRUE(d.fs->read("OS.INIT", init)) << d.fs->lastError();
     const std::string text(init.begin(), init.end());
     EXPECT_NE(text.find("UDOS_5.0"), std::string::npos);
+}
+
+// Ticket #29: eine frisch angelegte UDOS-5.0-Datendiskette belegt genau die 9 Sektoren, die
+// FORMAT V 5.0 am echten A5120 belegt (Karte 1700/1701, Descriptor 1600, Zeigersektor 1602,
+// Verzeichnissaetze 1605/160A/1601/1606/160B) - nicht ganze Spuren.
+TEST(Udos1715A5120, FrischeDatendisketteBelegtNeunSektoren) {
+    Leerdiskette l("udos50_ds80_16x256", "DATEN");
+    ASSERT_TRUE(l) << l.fehler;
+    const UdosBitmap& b = l.fs().bitmap();
+    EXPECT_EQ(b.countUsed(), 9);
+    EXPECT_EQ(b.countFree(), 2551);
+    for (uint8_t s : {0, 1, 2, 5, 6, 10, 11}) EXPECT_TRUE(b.used(22, s + 1)) << "Spur 22 Sektor " << int(s);
+    for (uint8_t s : {0, 1}) EXPECT_TRUE(b.used(23, s + 1)) << "Spur 23 Sektor " << int(s);
+    EXPECT_FALSE(b.used(0, 1)) << "Spur 0 gehoert einer Datendiskette nicht";
+}
+
+// Systemdiskette (FORMAT S=Y): + 16 Sektoren Spur 0 Kopf 0 + 3 Sektoren (07-09) zweiter Bootteil = 28.
+TEST(Udos1715A5120, FrischeSystemdisketteBelegtAchtundzwanzigSektoren) {
+    const FsProfile* basis = dateisysteme().find("udos50_ds80_16x256");
+    ASSERT_NE(basis, nullptr);
+    FsProfile sys = *basis;
+    sys.system_track0 = true;      // so leitet DiskVolume::create es bei einem Bootabbild ab
+    const DiskFormat* f = formate().find(sys.format);
+    ASSERT_NE(f, nullptr);
+    const std::string pfad = k1520test::tempPath("k1520_test_udos50_sys.img");
+    {
+        auto leer = DiskImage::create(pfad, *f, false, f->predominantEncoding());
+        ASSERT_TRUE(leer && leer->flush());
+    }
+    auto disk = DiskImage::open(pfad, *f, false);
+    ASSERT_TRUE(disk);
+    SectorSpace raum(disk->medium(), *f);
+    std::string err;
+    auto fs = Udos1715FileSystem::format(raum, sys, "SYS", err);
+    ASSERT_TRUE(fs) << err;
+    const UdosBitmap& b = fs->bitmap();
+    EXPECT_EQ(b.countUsed(), 28);
+    EXPECT_EQ(b.countFree(), 2532);
+    for (uint8_t s = 0; s < 16; ++s) EXPECT_TRUE(b.used(0, s + 1)) << "Spur 0 Sektor " << int(s);
+    EXPECT_FALSE(b.used(0, 17)) << "Spur 0 Kopf 1 bleibt frei";
+    for (uint8_t s : {7, 8, 9}) EXPECT_TRUE(b.used(22, s + 1)) << "Spur 22 Sektor " << int(s);
+    std::error_code ec; std::filesystem::remove(pfad, ec);
+}
+
+// UDOS 1715 (PC 1715): FORMAT mit Systemdisk = J belegt 13 + Spur 0 Kopf 0 = 29 Sektoren
+// (am Emulator gemessen, Ticket #29) - nicht die ganze Spur 0.
+TEST(Udos1715Profil, FrischeSystemdisketteBelegtNurKopfNullVonSpurNull) {
+    const FsProfile* basis = dateisysteme().find("udos1715_ds80_16x256");
+    ASSERT_NE(basis, nullptr);
+    FsProfile sys = *basis;
+    sys.system_track0 = true;
+    const DiskFormat* f = formate().find(sys.format);
+    ASSERT_NE(f, nullptr);
+    const std::string pfad = k1520test::tempPath("k1520_test_u1715_sys.img");
+    {
+        auto leer = DiskImage::create(pfad, *f, false, f->predominantEncoding());
+        ASSERT_TRUE(leer && leer->flush());
+    }
+    auto disk = DiskImage::open(pfad, *f, false);
+    ASSERT_TRUE(disk);
+    SectorSpace raum(disk->medium(), *f);
+    std::string err;
+    auto fs = Udos1715FileSystem::format(raum, sys, "SYS", err);
+    ASSERT_TRUE(fs) << err;
+    EXPECT_EQ(fs->bitmap().countUsed(), 29);
+    for (uint8_t s = 0; s < 16; ++s) EXPECT_TRUE(fs->bitmap().used(0, s + 1));
+    EXPECT_FALSE(fs->bitmap().used(0, 17)) << "Kopf 1 von Spur 0 bleibt frei";
+    std::error_code ec; std::filesystem::remove(pfad, ec);
+}
+
+// UDOS 3.x (P8000): FORMAT der echten P8000-UDOS-Diskette belegt auf einer Datendiskette 9 Sektoren
+// (Saetze 05/0A/01/06/0B wie UDOS 5.0), das DiskTool legte vorher die 13 des PC 1715 an und
+// die Systemdiskette ohne den zweiten Bootteil (Spur 16H Sektor 07-09) - sie startete nicht.
+TEST(Udos1715P8000, FrischeDatendisketteBelegtNeunSektoren) {
+    Leerdiskette l("udos_p8000_ds80_16x256", "DATEN");
+    ASSERT_TRUE(l) << l.fehler;
+    EXPECT_EQ(l.fs().bitmap().countUsed(), 9);
+    for (uint8_t s : {0, 1, 2, 5, 6, 10, 11}) EXPECT_TRUE(l.fs().bitmap().used(22, s + 1)) << int(s);
+}
+
+TEST(Udos1715P8000, ZweiterBootteilGehoertZumBootabbild) {
+    const FsProfile* p = dateisysteme().find("udos_p8000_ds80_16x256");
+    ASSERT_NE(p, nullptr);
+    uint8_t erster = 0, anzahl = 0;
+    ASSERT_TRUE(Udos1715FileSystem::zweiterBootteil(*p, erster, anzahl));
+    EXPECT_EQ(erster, 7);
+    EXPECT_EQ(anzahl, 3);
+    const FsProfile* pc = dateisysteme().find("udos1715_ds80_16x256");
+    ASSERT_NE(pc, nullptr);
+    EXPECT_FALSE(Udos1715FileSystem::zweiterBootteil(*pc, erster, anzahl)) << "PC 1715 hat keinen";
+}
+
+// P8000-Systemdiskette: `FORMAT D=1 ID='..' S` am Emulator belegt 47 Sektoren (Ticket #30):
+// Spur 0 nur Sektor 0, Spur 15H Kopf 0 ganz, Spur 16H 0-2/5-15 (E7FF), Spur 17H Kopf 0 ganz.
+TEST(Udos1715P8000, FrischeSystemdisketteBelegtSiebenundvierzigSektoren) {
+    const FsProfile* basis = dateisysteme().find("udos_p8000_ds80_16x256");
+    ASSERT_NE(basis, nullptr);
+    FsProfile sys = *basis;
+    sys.system_track0 = true;
+    const DiskFormat* f = formate().find(sys.format);
+    ASSERT_NE(f, nullptr);
+    const std::string pfad = k1520test::tempPath("k1520_test_p8000_sys.img");
+    {
+        auto leer = DiskImage::create(pfad, *f, false, f->predominantEncoding());
+        ASSERT_TRUE(leer && leer->flush());
+    }
+    auto disk = DiskImage::open(pfad, *f, false);
+    ASSERT_TRUE(disk);
+    SectorSpace raum(disk->medium(), *f);
+    std::string err;
+    auto fs = Udos1715FileSystem::format(raum, sys, "SYS", err);
+    ASSERT_TRUE(fs) << err;
+    const UdosBitmap& b = fs->bitmap();
+    EXPECT_EQ(b.countUsed(), 47);
+    EXPECT_EQ(b.countFree(), 2513);
+    EXPECT_TRUE(b.used(0, 1));
+    for (uint8_t s = 1; s < 32; ++s) EXPECT_FALSE(b.used(0, s + 1)) << "Spur 0 Sektor " << int(s);
+    for (uint8_t s = 0; s < 16; ++s) {
+        EXPECT_TRUE(b.used(21, s + 1)) << "Spur 21 Sektor " << int(s);
+        EXPECT_TRUE(b.used(23, s + 1)) << "Spur 23 Sektor " << int(s);
+        EXPECT_EQ(b.used(22, s + 1), s != 3 && s != 4) << "Spur 22 Sektor " << int(s);
+    }
+    for (uint8_t s = 16; s < 32; ++s) EXPECT_FALSE(b.used(21, s + 1));
+    std::error_code ec; std::filesystem::remove(pfad, ec);
+}
+
+TEST(Udos1715P8000, BootbereichEntsprichtDemFormatS) {
+    const FsProfile* p = dateisysteme().find("udos_p8000_ds80_16x256");
+    ASSERT_NE(p, nullptr);
+    const auto b = Udos1715FileSystem::bootbereiche(*p);
+    ASSERT_EQ(b.size(), 4u);
+    int summe = 0;
+    for (const auto& x : b) summe += x.anzahl;
+    EXPECT_EQ(summe, 22) << "22 Sektoren = 5632 Byte Bootabbild";
+    EXPECT_TRUE(Udos1715FileSystem::bootbereiche(*dateisysteme().find("udos1715_ds80_16x256")).empty());
+}
+
+// FORMAT V 5.0 fuellt das 24-Byte-Namensfeld hinter dem 0D-Abschluss mit FFH (am Emulator
+// gemessen, Ticket #29); eine so formatierte Diskette muss erkannt werden.
+TEST(Udos1715A5120, NamensfeldMitFFFuellungIstKeineBeschaedigung) {
+    UdosBitmap b = UdosBitmap::makeEmpty(32, 80, "DATEN", UdosMapSitte::Ndos1715, NdosFuellung::FF);
+    for (size_t i = 6; i < 24; ++i) b.raw()[i] = 0xFF;      // "DATEN", 0D, dann FFH
+    std::string warum;
+    EXPECT_TRUE(b.looksValid(32, 80, &warum)) << warum;
+    EXPECT_EQ(b.label(), "DATEN");
+    b.raw()[3] = 0x01;                                      // Steuerzeichen im Namen bleibt Schaden
+    EXPECT_FALSE(b.looksValid(32, 80, &warum));
 }
 
 TEST(Udos1715A5120, HinterDemBelegungsplanStehtDurchgehendFF) {

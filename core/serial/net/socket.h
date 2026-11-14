@@ -167,6 +167,25 @@ struct PollEintrag {
 /// Rueckgabe: Zahl der Eintraege mit Ereignis, -1 bei Fehler.  EINTR wird als 0 gemeldet.
 int warten(std::vector<PollEintrag>& eintraege, int timeoutMs);
 
+// ── Erweiterung fuer den W5100 (Entwurf 50 AP N1): Loopback-Lauscher und UDP (nur IPv4) ──
+
+/// Wie `lauschen`, aber NUR auf 127.0.0.1 (IPv4-Loopback): eingehende Verbindungen kommen
+/// ausschliesslich vom eigenen Rechner.  Port 0 = beliebig (`Lauscher::port` nennt ihn).
+Lauscher lauschenLoopback(int port);
+
+/// Tatsaechlicher lokaler Port eines Sockets (0 bei Fehler).
+int lokalerPort(SockFd fd);
+
+/// UDP-Socket (IPv4, nicht blockierend) an `port` (0 = beliebig) binden: `nurLoopback` →
+/// 127.0.0.1, sonst alle Schnittstellen.  Ungueltig + `f` bei Fehler.
+Socket udpOeffnen(int port, bool nurLoopback, Fehler* f = nullptr);
+
+/// Ein Datagramm an IPv4-Adresse `ip` (Netzreihenfolge, 4 Bytes) senden.
+IoErgebnis udpSenden(SockFd fd, const unsigned char ip[4], int port, const void* daten, std::size_t n);
+
+/// Ein Datagramm empfangen (`Warten`, wenn keines da ist); Absender in `ip`/`port`.
+IoErgebnis udpEmpfangen(SockFd fd, void* puffer, std::size_t max, unsigned char ip[4], int* port);
+
 // ── Weck-Socketpaar ─────────────────────────────────────────────────────────
 
 /// Weckt den wartenden I/O-Faden aus `warten()`: der Faden nimmt `lesefd()` in seine

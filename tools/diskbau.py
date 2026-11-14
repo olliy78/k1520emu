@@ -42,6 +42,8 @@ BOOTSEKTOREN = os.path.join(REPO, 'data', 'bootsektoren')
 
 sys.path.insert(0, TOOLS)
 import disketten_beigaben as _beigaben  # noqa: E402
+sys.path.insert(0, os.path.join(TOOLS, 'gide'))
+import karten as _karten  # noqa: E402
 
 # Hilfsfunktionen (CP/M-Text, deutsche WM.HLP) liegen im A5120-CP/A-Bau
 _spec = importlib.util.spec_from_file_location('cpa_a5120_build', os.path.join(TOOLS, 'cpa_a5120', 'build.py'))
@@ -74,6 +76,11 @@ def kermit80(rechner):
     return {'KERMIT.COM': lies(_beigaben.KERMIT80[rechner])}
 
 
+def karten(schluessel):
+    """Gast-Software der Hardwareoptionen GIDE/RTC/USB/Netz fuer die Systemdiskette @p schluessel (tools/gide/karten.py)."""
+    return _karten.dateien(schluessel)
+
+
 def aus_fixture(pfad, *namen):
     """Dateien aus einer eingecheckten Datei (z. B. tests/fixtures/raf/RAFTEST.COM) unter dem Diskettennamen."""
     return {n: lies(REPO, pfad, n) for n in namen}
@@ -93,9 +100,11 @@ def wm_hlp():
 
 
 class Diskette:
-    def __init__(self, skript, name, fs, boot=None, create_args=(), erste=()):
+    def __init__(self, skript, name, fs, boot=None, create_args=(), erste=(), ignoriere=()):
         self.hier = os.path.dirname(os.path.abspath(skript))
         self.name, self.fs, self.create_args, self.erste = name, fs, list(create_args), list(erste)
+        #: Dateien, die das DiskTool selbst anlegt und die deshalb nicht in `soll()` stehen (UDOS: DIRECTORY)
+        self.ignoriere = ('cpm-dateiangaben.txt', *ignoriere)
         self.boot = os.path.join(BOOTSEKTOREN, boot) if boot else None
 
     # -- Werkzeug ---------------------------------------------------------------------------------------------
@@ -144,7 +153,7 @@ class Diskette:
             ist_ordner = os.path.join(tmp, 'ist')
             os.makedirs(ist_ordner)
             self._lauf(tool, 'get', diskette, '*', '--to', ist_ordner)
-            ist = {n: lies(ist_ordner, n) for n in os.listdir(ist_ordner) if n != 'cpm-dateiangaben.txt'}
+            ist = {n: lies(ist_ordner, n) for n in os.listdir(ist_ordner) if n not in self.ignoriere}
             boot_ok = True
             if self.boot:
                 bf = os.path.join(tmp, 'boot.bin')

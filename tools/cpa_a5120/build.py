@@ -50,6 +50,8 @@ HIER = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HIER))
 sys.path.insert(0, os.path.join(REPO, 'tools'))
 import disketten_beigaben as beigaben  # noqa: E402  (Programmliste + Quellpfade, EINE Wahrheit)
+sys.path.insert(0, os.path.join(REPO, 'tools', 'gide'))
+import karten as _karten  # noqa: E402  (Hardwareoptionen GIDE/RTC/USB/Netz)
 
 NAME = 'a5120_cpa_k5601_system.hfe'
 BOOT = os.path.join(REPO, 'data', 'bootsektoren', 'boot_cpa780.bin')
@@ -113,6 +115,7 @@ def soll():
     for n in BEIGABEN:
         inhalt[n] = _lies(beigaben.PROGRAMME[n])
     inhalt['KERMIT.COM'] = _lies(beigaben.KERMIT80['a5120'])
+    inhalt.update(_karten.dateien('a5120_cpa'))   # GIDE, UHR, USB, Netz (tools/gide)
     inhalt['RAFTEST.COM'] = _raftest()
     inhalt['RAFQUICK.COM'] = _lies(RAF_FIXTURES, 'RAFQUICK.COM')
     return inhalt

@@ -780,7 +780,11 @@ TEST(KermitSitzung, PfadfallenUeberDasProtokoll) {
 TEST(KermitSitzung, HolenEmpfaengtBoeseNamenNicht) {
     // Ein boesartiger Server schickt "../x": der Client weist ihn ab
     SpeicherLeitungPaar l;
-    TempOrdner ziel;
+    // Ziel in einem EIGENEN Elternordner: "../x" darf nur dort pruefbar fehlen.  Mit
+    // dem Elternordner TMPDIR schlug der Test fehl, sobald dort zufaellig ein "x" lag.
+    TempOrdner eltern;
+    const fs::path ziel = eltern.p / "ziel";
+    fs::create_directories(ziel);
     std::thread t([&] {
         Roh r{l.ende(1)};
         Paket p;
@@ -794,9 +798,9 @@ TEST(KermitSitzung, HolenEmpfaengtBoeseNamenNicht) {
         EXPECT_EQ(p.typ, 'E');
     });
     Sitzung c(l.ende(0), client());
-    EXPECT_EQ(c.holen("x", ziel.s()).art, Fehlerart::PfadAbgewiesen);
+    EXPECT_EQ(c.holen("x", ziel.string()).art, Fehlerart::PfadAbgewiesen);
     t.join();
-    EXPECT_FALSE(fs::exists(ziel.p.parent_path() / "x"));
+    EXPECT_FALSE(fs::exists(eltern.p / "x"));
 }
 
 TEST(KermitSitzung, ServerAbbruchVonAussen) {

@@ -43,7 +43,11 @@ GW=yes
 # (cpa_a5120, cpa_pc1715, scpx_a5120, scpx_k8915, scpx_prg, scp_pc1715, scp_pc1715w; Inventur: doc/scp_inventur.md).
 # Seit 2026-10-16: BCU 880 am fruehen A5120 (tools/bcu_a5120/build.py: Start- und Arbeitsdiskette aus
 # den Belegen doc/a5120_alt/bcu/, formatierte BCU-Kassette) und das Demo-Bootband (Eigenbau, .k52).
+# Seit 2026-11-06: BS620 (PRG 710-1; Original, am echten Geraet getestet) und die BS610-Rekonstruktion (PRG 710; EIGENBAU, im Emulator geprueft,
+# am echten Geraet ungetestet - merkposten/bs600.md Nr. 13/14).
 # Seit 2026-11-03: MicroDOS 1526 (tools/microdos/build.py, vier Bootdisketten; Auslieferung vom Anwender freigegeben).
+# Seit 2026-11-08: die sieben SIOS-1526-Disketten (disks/a5120_sios1526/, tools/sios_a5120/build.py;
+# vom Anwender zur Auslieferung freigegeben).
 # Alles aus disks/: --disks all.
 DISKS_DEFAULT="a5120_cpa_k5601_system.hfe
 a5120_scpx17_k5601_system.hfe
@@ -58,6 +62,8 @@ prg710_udos43_k5601_system.hfe
 prg710-1_udos43_k5601_v43_189.hfe
 prg710_scpx15_system.hfe
 prg710-1_scpx17_system.hfe
+prg710-1_bs620_system.hfe
+prg710_bs610_rek.hfe
 pc1715_cpa1715_system.hfe
 pc1715_microdos_k5601_system.hfe
 pc1715_scp1715_v0006_system.hfe
@@ -68,7 +74,14 @@ pc1715w_scp30_system.hfe
 a5120_bcu12_k5600-10_start-syl.hfe
 a5120_bcu12_k5600-10_arbeit-sys1.hfe
 bcu_kassette_formatiert.k52
-bandtest_boot.k52"
+bandtest_boot.k52
+a5120_sios11_3xk5601_seriell.hfe
+a5120_sios11_3xk5601_seriell_sl1.hfe
+a5120_sios09_3xk5601_parallel.hfe
+a5120_sios09_3xk5600_10_parallel.hfe
+a5120_sios_programme1.hfe
+a5120_sios_programme2.hfe
+a5120_sios_generierung.hfe"
 
 # MUTOS 8000 (A5120.16, 2026-10-25): NUR der K5601-Satz — Ladediskette mit "nur_a" (Wurzel und
 # Datendisketten duerfen schon beim Einschalten in B:/C: liegen) und die dazu passenden MFM-Disketten.
@@ -550,6 +563,19 @@ cp "$REPO/third_party/miniz/LICENSE" \
 cp "$REPO/tools/kermit80/COPYRIGHT.txt" \
    "$STAGE/payload/share/doc/lizenzen/kermit80-COPYRIGHT.txt"
 
+# Gast-Software der Hardwareoptionen (GIDE/USB/Netz, Anwenderentscheidung 2026-11-11, tools/gide/README.md): die Fremdtreiber
+# fuer ALLE Basisadressen (Poppe gidehp00..f0), die Ausgangsstuecke zum Umschreiben (basis_anpassen.py) und die Herkunftstabelle.
+# Die Systemdisketten tragen die Programme fuer die Vorauswahl-Basis bereits (tools/gide/karten.py).
+mkdir -p "$STAGE/payload/share/k1520emu/karten_software"
+cp -R "$REPO/tools/gide/fremd" "$STAGE/payload/share/k1520emu/karten_software/fremd" \
+    || die "tools/gide/fremd fehlt"
+cp "$REPO/tools/gide/basis_anpassen.py" "$STAGE/payload/share/k1520emu/karten_software/basis_anpassen.py" \
+    || die "tools/gide/basis_anpassen.py fehlt"
+cp "$REPO/tools/gide/uhr/uhr.com" "$STAGE/payload/share/k1520emu/karten_software/UHR.COM" \
+    || die "tools/gide/uhr/uhr.com fehlt"
+cp "$REPO/tools/gide/README.md" "$STAGE/payload/share/k1520emu/karten_software/HERKUNFT.md"
+cp "$REPO/tools/gide/README.md" "$STAGE/payload/share/doc/lizenzen/karten_software-HERKUNFT.md"
+
 # GUI ohne Bytecode-Reste des Entwicklungsrechners (--exclude MUSS vor dem
 # Pfad stehen, sonst wirkt es bei GNU tar nicht)
 ( cd "$REPO" && tar cf - --exclude='__pycache__' --exclude='*.pyc' app ) \
@@ -644,7 +670,7 @@ case "$DISKS" in
         done
         # P8000 (2026-10-11, Entscheid des Anwenders): die WEGA-Saetze GANZ — fertig installierte
         # Platten (*.img.gz, bleiben beim Anwender gepackt, der Emulator schliesst sie so an),
-        # Startdisketten und der Installationssatz (*.dmk), dazu die OS/M-Systemdiskette (*.hfe, p8000_osm30).
+        # Startdisketten und der Installationssatz (*.dmk), dazu die OS/M- und UDOS-Disketten (*.hfe, p8000_osm30, p8000_udos30/31).
         for d in $(find "$REPO/disks" -mindepth 2 -maxdepth 2 -type f -path '*/p8000_*' \
                         \( -name '*.dmk' -o -name '*.img.gz' -o -name '*.hfe' \) | sort); do
             lege_diskette_ab "$d"
@@ -682,6 +708,8 @@ if ist_windows; then
 else
     cp "$SELF_DIR/uv_pins.txt"              "$STAGE/uv_pins.txt"
     cp "$SELF_DIR/install.sh"               "$STAGE/install.sh"
+    cp "$SELF_DIR/uninstall.sh"             "$STAGE/uninstall.sh"
+    cp "$SELF_DIR/k1520emu-uninstall.desktop.in" "$STAGE/k1520emu-uninstall.desktop.in"
     cp "$SELF_DIR/launcher.sh"              "$STAGE/launcher.sh"
     cp "$SELF_DIR/disktool_launcher.sh"     "$STAGE/disktool_launcher.sh"
     cp "$SELF_DIR/k1520disktool.desktop.in" "$STAGE/k1520disktool.desktop.in"
@@ -696,7 +724,7 @@ else
     cp "$SELF_DIR/p8000emu.desktop.in"      "$STAGE/p8000emu.desktop.in"
     cp "$SELF_DIR/mc80emu.desktop.in"       "$STAGE/mc80emu.desktop.in"
     cp "$SELF_DIR/lib/common.sh"            "$STAGE/lib/common.sh"
-    chmod +x "$STAGE/install.sh"
+    chmod +x "$STAGE/install.sh" "$STAGE/uninstall.sh"
 fi
 # LICENSE = der reine englische MIT-Text (GitHubs Lizenzerkennung verlangt ihn
 # unveraendert), LIZENZ.txt = deutsche Uebersetzung + englischer Text + Hinweis

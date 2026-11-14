@@ -1,0 +1,5 @@
+# boot_trace --machine k8915 --usb=0xDC: der Pfad ueber boot_trace_k8915 steckt die Karte ebenfalls.
+tool:    boot_trace
+disk:    k8915scpx_boot1.hfe
+run:     -L /dev/null --machine k8915 --usb=0xDC -c 2000000 --quiet --json %DISK%
+forbid:  --usb:

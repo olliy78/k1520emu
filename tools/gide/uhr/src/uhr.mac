@@ -1,0 +1,517 @@
+	TITLE	'UHR - Uhr der GIDE-Karte (RTC 72421) anzeigen und stellen'
+	.Z80
+;
+; uhr.mac - Eigenes Programm (MIT), Teil der Beigaben fuer die Hardwareoptionen
+;           (tools/gide/README.md).  Kein Fremdcode.
+;
+;   UHR                   Uhrzeit anzeigen   TT.MM.JJJJ HH:MM:SS
+;   UHR 90                dasselbe, Kartenbasis 90H (Hex, Vorgabe 90H)
+;   UHR S TT.MM.JJ HH:MM:SS [BB]   Uhr stellen (Jahr auch vierstellig, Sekunden weglassbar)
+;
+; Die GIDE-Karte traegt den Epson RTC 72421 auf E/A Basis+5.  Die Registernummer (0..F)
+; steht im Register B beim Zugriff (Adressbits A8..A11): LD B,reg / IN A,(C).  Die Karte
+; liefert/nimmt nur den Tiefnibble.
+;
+; Register: 0 S1  1 S10  2 MI1  3 MI10  4 H1  5 H10  6 D1  7 D10  8 MO1  9 MO10
+;           A Y1  B Y10  C Wochentag  D (Bit0 HOLD, Bit1 BUSY)  E  F (Bit2 = 24 h)
+;
+; Lesen:   HOLD setzen (Momentaufnahme), warten bis BUSY = 0, Ziffern lesen, HOLD loeschen.
+; Stellen: 24-h-Betrieb sicherstellen (CF = 4), HOLD setzen, Ziffern schreiben, HOLD
+;          loeschen - dann zaehlt die Uhr ab dem geschriebenen Stand (Rehs RTCset arbeitet so).
+;
+; Ohne Karte (oder bei falscher Basis) liefert der Bus FFH: BUSY bleibt 1, das Programm
+; meldet "Keine Uhr" statt zu haengen.
+;
+BDOS	EQU	0005H
+CMDBUF	EQU	0081H		; Kommandozeile (80H = Laenge)
+
+R_D	EQU	0DH
+R_F	EQU	0FH
+
+	ORG	100H
+START:	LD	SP,STACK
+	LD	A,90H
+	LD	(BASIS),A
+	XOR	A
+	LD	(STELLEN),A
+	LD	HL,CMDBUF
+	LD	A,(CMDBUF-1)
+	LD	E,A
+	LD	D,0
+	ADD	HL,DE
+	LD	(HL),0		; Zeile mit 0 abschliessen
+	LD	HL,CMDBUF
+; ---- Argumente
+ARG:	CALL	SKIPSP
+	LD	A,(HL)
+	OR	A
+	JR	Z,FERTIG
+	CP	'?'
+	JP	Z,HILFE
+	CP	'/'
+	JP	Z,HILFE
+	AND	5FH		; Gross
+	CP	'S'
+	JR	NZ,ARGHEX
+	INC	HL
+	LD	A,(HL)
+	CP	' '
+	JR	Z,ARGSET
+	OR	A
+	JR	Z,ARGSET
+	DEC	HL		; "S" gehoert zu einer Hexzahl? (kein Hex-Zeichen -> Fehler)
+	JP	FALSCH
+ARGSET:	LD	A,1
+	LD	(STELLEN),A
+	CALL	SKIPSP
+	CALL	PARSEDATUM
+	JP	C,FALSCH
+	CALL	SKIPSP
+	CALL	PARSEZEIT
+	JP	C,FALSCH
+	JR	ARG
+ARGHEX:	CALL	HEXBYTE
+	JP	C,FALSCH
+	LD	(BASIS),A
+	JR	ARG
+FERTIG:	LD	A,(BASIS)
+	ADD	A,5
+	LD	(PORT),A
+	LD	A,(STELLEN)
+	OR	A
+	JR	Z,ANZEIGE
+; ---- Stellen
+	LD	HL,DIG		; Plausibilitaet
+	CALL	PRUEFE
+	JP	C,FALSCH
+	LD	A,04H		; CF: 24-h-Betrieb, nicht STOP/RESET
+	LD	B,R_F
+	CALL	WREG
+	LD	A,01H		; HOLD
+	LD	B,R_D
+	CALL	WREG
+	LD	B,0
+SCHR:	LD	HL,DIG
+	LD	E,B
+	LD	D,0
+	ADD	HL,DE
+	LD	A,(HL)
+	CALL	WREG
+	INC	B
+	LD	A,B
+	CP	12
+	JR	C,SCHR
+	XOR	A		; HOLD loeschen: die Uhr laeuft ab dem geschriebenen Stand
+	LD	B,R_D
+	CALL	WREG
+; ---- Anzeigen
+ANZEIGE:
+	CALL	LESEN
+	JP	C,KEINEUHR
+	CALL	AUSGABE
+	JP	0
+
+; =============================================================================
+; Uhr lesen -> DIG[0..11] ; Carry = Fehler (keine Uhr / ungueltige Ziffer)
+; =============================================================================
+LESEN:	LD	A,01H		; HOLD
+	LD	B,R_D
+	CALL	WREG
+	LD	DE,0		; Frist: 65536 Durchlaeufe
+WBUSY:	LD	B,R_D
+	CALL	RREG
+	AND	02H		; BUSY?
+	JR	Z,BEREIT
+	DEC	DE
+	LD	A,D
+	OR	E
+	JR	NZ,WBUSY
+	XOR	A		; HOLD loeschen, Fehler
+	LD	B,R_D
+	CALL	WREG
+	SCF
+	RET
+BEREIT:	LD	B,0
+LES1:	CALL	RREG
+	LD	HL,DIG
+	LD	E,B
+	LD	D,0
+	ADD	HL,DE
+	LD	(HL),A
+	INC	B
+	LD	A,B
+	CP	12
+	JR	C,LES1
+	XOR	A
+	LD	B,R_D
+	CALL	WREG
+	; Ziffern pruefen (<= 9 ; Zehnerstellen mit eigener Maske)
+	LD	HL,DIG
+	LD	B,12
+LES2:	LD	A,(HL)
+	CP	10
+	JR	NC,LESBAD
+	INC	HL
+	DJNZ	LES2
+	; Zehnerstellen maskieren (Stunde Bit 2 = PM im 12-h-Betrieb, Tag max. 3, Monat max. 1)
+	LD	A,(DIG+5)
+	AND	3
+	LD	(DIG+5),A
+	OR	A
+	RET
+LESBAD:	SCF
+	RET
+
+; Register B lesen -> A (Tiefnibble); Port = (PORT), Registernummer in B bleibt
+RREG:	PUSH	BC
+	LD	A,(PORT)
+	LD	C,A
+	IN	A,(C)
+	AND	0FH
+	POP	BC
+	RET
+; Register B mit A beschreiben
+WREG:	PUSH	BC
+	PUSH	AF
+	LD	A,(PORT)
+	LD	C,A
+	POP	AF
+	OUT	(C),A
+	POP	BC
+	RET
+
+; =============================================================================
+; Ausgabe  TT.MM.JJJJ HH:MM:SS
+; =============================================================================
+AUSGABE:
+	LD	A,7
+	CALL	PRD
+	LD	A,6
+	CALL	PRD
+	LD	E,'.'
+	CALL	PRC
+	LD	A,9
+	CALL	PRD
+	LD	A,8
+	CALL	PRD
+	LD	E,'.'
+	CALL	PRC
+	LD	A,(DIG+11)	; Jahrhundert: ab 70 -> 19xx, sonst 20xx
+	CP	7
+	LD	DE,JH20
+	JR	C,AUS1
+	LD	DE,JH19
+AUS1:	LD	C,9
+	CALL	BDOS
+	LD	A,11
+	CALL	PRD
+	LD	A,10
+	CALL	PRD
+	LD	E,' '
+	CALL	PRC
+	LD	A,5
+	CALL	PRD
+	LD	A,4
+	CALL	PRD
+	LD	E,':'
+	CALL	PRC
+	LD	A,3
+	CALL	PRD
+	LD	A,2
+	CALL	PRD
+	LD	E,':'
+	CALL	PRC
+	LD	A,1
+	CALL	PRD
+	XOR	A
+	CALL	PRD
+	LD	DE,CRLF
+	LD	C,9
+	JP	BDOS
+; Ziffer DIG[A] ausgeben
+PRD:	LD	HL,DIG
+	LD	E,A
+	LD	D,0
+	ADD	HL,DE
+	LD	A,(HL)
+	ADD	A,'0'
+	LD	E,A
+PRC:	LD	C,2
+	JP	BDOS
+
+; =============================================================================
+; Eingabe
+; =============================================================================
+SKIPSP:	LD	A,(HL)
+	CP	' '
+	RET	NZ
+	INC	HL
+	JR	SKIPSP
+
+; Hexzahl (1..2 Stellen) ab (HL) -> A ; Carry = Fehler.  Muss vor Leerzeichen/Ende enden.
+HEXBYTE:
+	LD	B,0		; Stellenzahl
+	LD	C,0		; Wert
+HEXLP:	LD	A,(HL)
+	CP	' '
+	JR	Z,HEXEND
+	OR	A
+	JR	Z,HEXEND
+	CALL	HEXDIG
+	RET	C
+	LD	D,A
+	LD	A,B
+	CP	2
+	JR	NC,HEXFEHL	; dritte Stelle
+	LD	A,C
+	ADD	A,A
+	ADD	A,A
+	ADD	A,A
+	ADD	A,A
+	OR	D
+	LD	C,A
+	INC	B
+	INC	HL
+	JR	HEXLP
+HEXEND:	LD	A,B
+	OR	A
+	JR	Z,HEXFEHL
+	LD	A,C
+	OR	A
+	RET
+HEXFEHL:
+	SCF
+	RET
+; A = Zeichen -> A = 0..15 ; Carry = kein Hexzeichen
+HEXDIG:	AND	7FH
+	CP	'a'
+	JR	C,HD1
+	SUB	20H
+HD1:	SUB	'0'
+	RET	C
+	CP	10
+	JR	C,HDOK
+	SUB	7
+	CP	10
+	RET	C
+	CP	16
+	JR	C,HDOK
+	SCF
+	RET
+HDOK:	OR	A
+	RET
+
+; Ziffer ab (HL) -> A (0..9), HL+1 ; Carry gesetzt = FEHLER
+GETD:	LD	A,(HL)
+	SUB	'0'
+	CP	10
+	CCF
+	RET	C
+	INC	HL
+	OR	A
+	RET
+; Zeichen E erwarten ; Carry = Fehler
+ERWART:	LD	A,(HL)
+	CP	E
+	JR	Z,ERW1
+	SCF
+	RET
+ERW1:	INC	HL
+	OR	A
+	RET
+
+; TT.MM.JJ[JJ]
+PARSEDATUM:
+	CALL	GETD
+	RET	C
+	LD	(DIG+7),A
+	CALL	GETD
+	RET	C
+	LD	(DIG+6),A
+	LD	E,'.'
+	CALL	ERWART
+	RET	C
+	CALL	GETD
+	RET	C
+	LD	(DIG+9),A
+	CALL	GETD
+	RET	C
+	LD	(DIG+8),A
+	LD	E,'.'
+	CALL	ERWART
+	RET	C
+	CALL	GETD
+	RET	C
+	LD	(DIG+11),A
+	CALL	GETD
+	RET	C
+	LD	(DIG+10),A
+	LD	A,(HL)		; vierstellig? dann waren die ersten beiden das Jahrhundert
+	SUB	'0'
+	CP	10
+	RET	NC		; (Carry aus, kein Fehler)
+	LD	A,(DIG+11)
+	LD	(DIG+13),A
+	LD	A,(DIG+10)
+	LD	(DIG+12),A
+	CALL	GETD
+	RET	C
+	LD	(DIG+11),A
+	CALL	GETD
+	RET	C
+	LD	(DIG+10),A
+	OR	A
+	RET
+
+; HH:MM[:SS]
+PARSEZEIT:
+	XOR	A
+	LD	(DIG+0),A
+	LD	(DIG+1),A
+	CALL	GETD
+	RET	C
+	LD	(DIG+5),A
+	CALL	GETD
+	RET	C
+	LD	(DIG+4),A
+	LD	E,':'
+	CALL	ERWART
+	RET	C
+	CALL	GETD
+	RET	C
+	LD	(DIG+3),A
+	CALL	GETD
+	RET	C
+	LD	(DIG+2),A
+	LD	A,(HL)
+	CP	':'
+	JR	NZ,PZ1
+	INC	HL
+	CALL	GETD
+	RET	C
+	LD	(DIG+1),A
+	CALL	GETD
+	RET	C
+	LD	(DIG+0),A
+PZ1:	OR	A
+	RET
+
+; Zehner/Einer (Zehner in A, Einer in B) -> A = Wert
+ZWERT:	LD	C,A
+	ADD	A,A
+	LD	D,A
+	ADD	A,A
+	ADD	A,A
+	ADD	A,D
+	ADD	A,B
+	RET
+
+; Eingabewerte pruefen ; Carry = ungueltig
+PRUEFE:	LD	A,(DIG+7)
+	LD	B,A
+	LD	A,(DIG+6)
+	LD	C,A
+	LD	A,B
+	LD	B,C
+	CALL	ZWERT
+	OR	A
+	JR	Z,PBAD
+	CP	32
+	JR	NC,PBAD
+	LD	A,(DIG+9)
+	LD	B,A
+	LD	A,(DIG+8)
+	LD	C,A
+	LD	A,B
+	LD	B,C
+	CALL	ZWERT
+	OR	A
+	JR	Z,PBAD
+	CP	13
+	JR	NC,PBAD
+	LD	A,(DIG+5)
+	LD	B,A
+	LD	A,(DIG+4)
+	LD	C,A
+	LD	A,B
+	LD	B,C
+	CALL	ZWERT
+	CP	24
+	JR	NC,PBAD
+	LD	A,(DIG+3)
+	LD	B,A
+	LD	A,(DIG+2)
+	LD	C,A
+	LD	A,B
+	LD	B,C
+	CALL	ZWERT
+	CP	60
+	JR	NC,PBAD
+	LD	A,(DIG+1)
+	LD	B,A
+	LD	A,(DIG+0)
+	LD	C,A
+	LD	A,B
+	LD	B,C
+	CALL	ZWERT
+	CP	60
+	JR	NC,PBAD
+	OR	A
+	RET
+PBAD:	SCF
+	RET
+
+; =============================================================================
+; Meldungen
+; =============================================================================
+FALSCH:	LD	DE,M_FALSCH
+	JR	MELDUNG
+KEINEUHR:
+	LD	DE,M_KEINE
+MELDUNG:
+	LD	C,9
+	CALL	BDOS
+	LD	A,(BASIS)
+	CALL	PRHEX
+	LD	DE,M_ENDE
+	LD	C,9
+	CALL	BDOS
+	JP	0
+HILFE:	LD	DE,M_HILFE
+	LD	C,9
+	CALL	BDOS
+	JP	0
+PRHEX:	PUSH	AF
+	RRCA
+	RRCA
+	RRCA
+	RRCA
+	CALL	PRNIB
+	POP	AF
+PRNIB:	AND	0FH
+	ADD	A,'0'
+	CP	'9'+1
+	JR	C,PRN1
+	ADD	A,7
+PRN1:	LD	E,A
+	LD	C,2
+	JP	BDOS
+
+M_FALSCH: DB	'Ungueltige Eingabe. UHR ? zeigt die Bedienung. (Basis $'
+M_KEINE: DB	'Keine Uhr gefunden (RTC der GIDE, Basis $'
+M_ENDE:	DB	'H)',0DH,0AH,'$'
+M_HILFE: DB	'UHR - Uhr der GIDE-Karte (RTC 72421)',0DH,0AH
+	DB	'  UHR [BB]                   anzeigen, BB = Kartenbasis in Hex (Vorgabe 90)',0DH,0AH
+	DB	'  UHR S TT.MM.JJ HH:MM:SS [BB]   stellen (Jahr auch JJJJ, Sekunden weglassbar)',0DH,0AH,'$'
+JH19:	DB	'19$'
+JH20:	DB	'20$'
+CRLF:	DB	0DH,0AH,'$'
+
+BASIS:	DS	1
+PORT:	DS	1
+STELLEN: DS	1
+DIG:	DS	14
+	DS	64
+STACK	EQU	$
+
+	END	START

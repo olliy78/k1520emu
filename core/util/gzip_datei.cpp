@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <memory>
 #include <thread>
 
 namespace k1520::gzip {
@@ -187,6 +188,41 @@ std::optional<uint64_t> inhaltsGroesse(const std::string& pfad)
     std::vector<uint8_t> d;
     if (!laden(pfad, d)) return std::nullopt;
     return d.size();
+}
+
+bool nullenSpeichern(const std::string& pfad, uint64_t n, int stufe, std::string* fehler)
+{
+    // Strom statt Gesamtpuffer: 1-MB-Stuecke Nullen durch den Deflater; der Hauptspeicher bleibt bei
+    // der gepackten Groesse (256 MB Nullen = rund 260 KB), nicht bei den 256 MB.
+    std::vector<uint8_t> gepackt;
+    gepackt.reserve(n / 512 + 1024);
+    gepackt.insert(gepackt.end(), {ID1, ID2, CM_DEFLATE, 0, 0, 0, 0, 0, static_cast<uint8_t>(stufe <= 1 ? 4 : 0), 0xFF});
+    const int flags = static_cast<int>(
+        tdefl_create_comp_flags_from_zip_params(std::clamp(stufe, 1, 9), -MZ_DEFAULT_WINDOW_BITS, MZ_DEFAULT_STRATEGY));
+    auto comp = std::make_unique<tdefl_compressor>();
+    if (tdefl_init(comp.get(), deflatePut, &gepackt, flags) != TDEFL_STATUS_OKAY) {
+        setze(fehler, "Packen gescheitert: " + pfad);
+        return false;
+    }
+    constexpr size_t STUECK = 1u << 20;
+    const std::vector<uint8_t> nullen(STUECK, 0);
+    uint32_t crc = static_cast<uint32_t>(MZ_CRC32_INIT);
+    for (uint64_t rest = n; rest;) {
+        const size_t k = static_cast<size_t>(std::min<uint64_t>(rest, STUECK));
+        crc = static_cast<uint32_t>(mz_crc32(crc, nullen.data(), k));
+        rest -= k;
+        if (tdefl_compress_buffer(comp.get(), nullen.data(), k, rest ? TDEFL_NO_FLUSH : TDEFL_FINISH) < 0) {
+            setze(fehler, "Packen gescheitert: " + pfad);
+            return false;
+        }
+    }
+    if (n == 0 && tdefl_compress_buffer(comp.get(), nullen.data(), 0, TDEFL_FINISH) < 0) {
+        setze(fehler, "Packen gescheitert: " + pfad);
+        return false;
+    }
+    le32(gepackt, crc);
+    le32(gepackt, static_cast<uint32_t>(n));
+    return speichern(pfad, gepackt.data(), gepackt.size(), Art::Roh, stufe, fehler);
 }
 
 bool speichern(const std::string& pfad, const uint8_t* d, size_t n, Art art, int stufe, std::string* fehler)

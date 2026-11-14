@@ -67,7 +67,7 @@ enum class UdosMapSitte : uint8_t {
     Zdos,      ///< UDOS 1526 / 4.x auf dem A5120
     /// UDOS1715/NDOS.  Angetroffen auf zwei **unverwandten** Rechnern, die nur
     /// dieselbe Diskettensitte teilen: dem **PC 1715** (UDOS1715, Namensgeber) und
-    /// dem **EAW P8000** (UDOS 2.2).  Der Name sagt, wo es entschluesselt
+    /// dem **EAW P8000** (UDOS 3.x).  Der Name sagt, wo es entschluesselt
     /// wurde — nicht, dass die Maschinen etwas miteinander zu tun haetten.
     Ndos1715
 };
@@ -80,7 +80,7 @@ enum class UdosMapSitte : uint8_t {
  * einzige Merkmal, an dem sich die Disketten der drei bekannten NDOS-Rechner unterscheiden
  * (doc/udos1715_diskettenformat.md §3.0a):
  *   - `Null`   PC 1715 (UDOS1715):    durchgehend 00
- *   - `Nachlauf77` P8000 (UDOS 2.2):  00 00 00 00, dann 27 × 77H (der ZDOS-Nachlauf)
+ *   - `Nachlauf77` P8000 (UDOS 3.x):  00 00 00 00, dann 27 × 77H (der ZDOS-Nachlauf)
  *   - `FF`     A5120 (UDOS 5.0):      durchgehend FFH (Spuren 80…87 als belegt)
  *   - `Fremd`  keines davon — keine NDOS-Karte.
  */

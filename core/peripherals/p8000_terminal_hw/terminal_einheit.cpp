@@ -330,6 +330,8 @@ TerminalHwKopplung::TerminalHwKopplung(serial::SerialAnschluss& karte, P8000Term
                                        uint64_t phiNenn)
     : karte_(karte), term_(term), phi_(phiNenn ? phiNenn : 4'000'000), ziel_(term.hw_.takte()) {
     term_.nz_ = this;
+    // Terminal (DEE) am Kanal: DTR/RTS aktiv => /DCD, /DSR, /CTS an der Karte (siehe TerminalAnschluss).
+    karte_.setzeEingaenge(true, true, true);
 }
 
 TerminalHwKopplung::~TerminalHwKopplung() {
@@ -497,6 +499,7 @@ bool TerminalHwKopplung::deserialize(const uint8_t*& p, const uint8_t* end) {
     if (!a.ok) return false;
     rest_ = r; ziel_ = z; rxRest_ = rx; breakBis_ = bb; breakAktiv_ = ba;
     offen_ = 0; ringN_ = 0; aufgeschoben_ = false; aktiv = false; ruheFolge_ = 0; naechsteProbe_ = 0;
+    karte_.setzeEingaenge(true, true, true);
     p = a.p;
     return true;
 }

@@ -28,8 +28,8 @@ void Prg710Speicher::ioWrite(uint8_t port, uint8_t data) {
     switch (port & 3) {
     case 0:   // E8H
         attr_[n] = data;
-        // belegt: 0FH, 10H, F0H, FFH; alles andere [?] unbekannt, nur gespeichert
-        if (data != 0x0F && data != 0x10 && data != 0xF0 && data != 0xFF)
+        // belegt: 0FH, 10H, F0H, FFH (und 04H, BS620); alles andere [?] unbekannt, nur gespeichert
+        if (data != 0x0F && data != 0x10 && data != 0xF0 && data != 0xFF && (data & 0x0F) != 0x04)
             LOG_DEBUG("PRG710MEM", "[?] E8H[%X] := %02X unbelegter Wert", n, data);
         break;
     case 1:   // E9H
@@ -53,7 +53,10 @@ Prg710Speicher::Ort Prg710Speicher::ortVon(uint16_t addr) const {
         if (addr >= VRAM_ANFANG)  return {Quelle::Vram, addr};
         return {Quelle::Ops, addr};
     }
-    if ((attr_[n] & 0x0F) != 0) {   // Systemkarte dieser Seite
+    // Unteres Halbbyte 4 = OPS-RAM sichtbar (BS620: Programmseiten 1, 7-A; Deutung
+    // Schreibschutz [?], Entwurf 48 §2.4) — wie 0, nicht "Systemkarte".
+    const uint8_t sk = attr_[n] & 0x0F;
+    if (sk != 0 && sk != ATTR_RAM_GESCHUETZT) {   // Systemkarte dieser Seite
         if (n == 0)                         return {Quelle::Zre, addr};
         if (n == 0x0F && addr >= VRAM_ANFANG) return {Quelle::Vram, addr};
         if (n == 0x0F)                      return {Quelle::Ops, uint16_t((seite_[n] << 12) | (addr & 0x0FFF))};

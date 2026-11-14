@@ -1,0 +1,18 @@
+# k1520dbg --usb=0xDC: ein Z80-Schnipsel initialisiert Port B wie USBINC.Z80 (Bitbetrieb, Maske 33h, 0C4h);
+# der RES#-Impuls startet den VDIP1 (Startmeldung steht an); `usb` zeigt Basis, Zaehler und PIO ohne Nebenwirkung.
+tool:    k1520dbg
+disk:    cpa_cpa780_k5601_clock.img
+run:     --usb=0xDC %DISK%
+stdin:
+  usb
+  e 0x6000 F3 3E CF D3 DF 3E 33 D3 DF 3E 07 D3 DF 3E C4 D3 DD 18 FE
+  set pc 0x6000
+  g 5000
+  usb
+  q
+expect:  Basis DCH (Tore DCH-DFH)
+expect:  Stick: keiner
+expect:  RES#-Impulse 1
+expect:  B: Modus 3
+forbid:  keine GUN-USB gesteckt
+forbid:  --usb:

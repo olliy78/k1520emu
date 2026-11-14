@@ -119,7 +119,7 @@ TEST(FsCatalog, ProfilnamenSindEinStabilerVertrag) {
         // mit Urlader; `osm_ds80_16x256_boot` ist deckungsgleich mit `scpx_ds80_16x256_boot`.
         "osm_ds80_16x256_boot", "osm_ds80_5x1024_boot",
         // SIOS 1526 (doc/sios_diskettenformat.md): Erkennung am Nachweis ERMAP + VOL1.
-        "sios_ss40_26x128", "sios_ss80_26x128",
+        "sios_ss40_26x128", "sios_ss80_26x128", "bs600_ss40_15x256_boot",
         // MicroDOS 1526/1715 (Rostock): Lader im Verzeichnis (Erkennung am Lader) und die
         // Datendisketten ohne Lader (`detect: false`), Entwurf 13 §25.
         "microdos_ds80_5x1024_boot", "microdos_ss40_5x1024_boot", "microdos_ss40_26x128_boot", "microdos_ds80_5x1024_daten", "microdos_ss40_5x1024_daten", "microdos1715_ds80_5x1024_boot",

@@ -1,0 +1,1603 @@
+.uj off
+.lh 8
+.cw 12
+.mt 6
+.op
+
+
+
+
+
+
+
+
+
+
+                       R E D A B A S
+                                    
+           Relationales Datenbankbetriebssystem
+.paŠ.pn 1
+.op
+.he OS/M-Applikationsprogramm  - # -                    REDABAS
+
+
+Inhaltsverzeichnis
+
+1.     Allgemeines .....................................  2 
+  
+2.     REDABAS - Datenbankverwaltung ...................  2
+2.1.   Start / Verlassen von REDABAS ...................  2
+2.2.   Erstellen einer Datei ...........................  3
+2.3.   Aktualisieren einer bestehenden Datei ...........  4
+2.3.1. Anfuegen weiterer Datensaetze 
+       (an das Dateiende) ..............................  4
+2.3.2. Aendern / Loeschen von Saetzen ..................  5
+2.3.3. Einfuegen von Datensaetzen ......................  7
+2.4.   Auswertung von Dateien ..........................  7
+2.4.1. Bedingungen fuer Satzauswahl ....................  7
+2.4.2. Anzeige / Druck ohne Aufbereitung ...............  8
+2.4.3. Auswertung von Dateien ..........................  9
+2.4.4. Der integrierte Listengenerator .................  9
+2.5.   Loeschen / Umbenennen von Dateien ............... 12
+2.6.   Aendern von Dateistrukturen ..................... 12
+2.7.   Sortieren und Indizieren ........................ 13
+2.8.   Dateikomprimierung .............................. 14
+2.9.   Verknuepfen mehrerer Dateien .................... 15
+
+3.     Programmieren mit REDABAS ....................... 16
+3.1.   Einfache Befehlsketten .......................... 18
+3.2.   Programmschleifen /-verzweigungen ............... 19 
+3.3.   Online - Programme .............................. 20
+
+4.     Beispiele ....................................... 23
+4.1.   Programmschleifen ............................... 23
+4.2.   Etiketten - Druckprogramm ....................... 24
+4.3.   Vom Programm erzwungene Sicherheitskopien ....... 24
+4.4.   Zugriffskontrolle mit Passwort .................. 26
+4.5.   Schnelles zweistufiges Suchen ................... 27         
+4.6.   Schnelles Suchen und Umblaettern ................ 27
+4.7.   Dialoggesteuerte Erzeugung von Dateien .......... 28
+.PAŠ1.     Allgemeines
+
+Dieså Anwenderbeschreibunç enthaelô einå Kurzcharakteristië 
+voî  REDABAÓ  sowiå einå Kurzbeschreibunç deò Funktioî  deò 
+Datenbankverwaltunç unä deò Programmiermoeglichkeiten.
+Fueò einå ausfuehrlichå Beschreibunç deò REDABAS-Funktioneî 
+unä -Befehlå wirä auæ folgendå  Systemunterlagen-Dokumenta
+tioî verwiesen:
+          . Anwenderbeschreibung
+          . Programmtechnische Beschreibung
+
+            REDABAS
+            Relationales Datenbankbetriebssystem
+
+            VEB Robotron-Projekt Dresden
+
+Ohnå  aufwendigå  Einarbeitungszeiô isô  deò  Anwendeò  voî 
+REDABAÓ  iî deò Lage¬  einfachå Datenverwaltungeî zõ reali
+sieren®  Schoî miô relatiö wenigeî Anweisungeî kanî eò  Da
+teieî erstellen¬ aktualisiereî unä auswerten.
+
+Zuò  Programmierunç  iî  REDABAÓ isô eó danî nuò  nocè  eiî 
+kleineò Schritt¬  denî allå Befehle¬ diå deò Anwendeò lernô 
+unä ií direkteî Dialoç miô REDABAÓ einsetzt¬  koenneî  aucè 
+ií  Rahmeî voî Programmeî verwendeô werden®  Diå restlicheî 
+Kommandos¬  diå fueò diå Bildunç voî Programmschleifeî  unä 
+Verzweigungeî benoetigô werden¬  sinä rascè dazugelernt® Sï 
+eigneô sicè deò Anwendeò ií Umganç miô REDABAÓ gleichzeitiç 
+einå Programmiersprachå voî hoheí Niveaõ an.
+
+
+
+2.     REDABAS - Datenbankverwaltung
+
+2.1.   Start / Verlassen von REDABAS
+
+REDABAÓ musó sicè ií geradå aktuelleî Laufwerë befindeî unä 
+wirä miô "REDABAS¢ geladeî unä gestartet.
+REDABAS meldet sich mit
+
+     P8000 - REDABAS
+
+     **********************
+     *       REDABAS      *
+     **********************
+     Version 1.0 - 23.August 1985
+
+und gibt die Moeglichkeit, das aktuelle Datum in Form
+
+     TT.MM.JJ  oder TT/MM/JJ
+
+einzugeben (wahlweise).
+Nacè  Betaetigeî voî RETURÎ (miô odeò ohnå vorherigeò   Da
+tumeingabe©  erscheint
+
+   :_  (Kursor)
+
+Dieseò Doppelpunkô bedeuteô stets¬ dasó REDABAÓ bereiô ist¬ Šeineî Befehì zõ empfangen® Dieseò Befehì kanî einå   Anwei
+sung¬  einå  Fragå  odeò aucè deò Aufruæ  eineó  kompletteî 
+Programmó sein.
+
+                  +------+
+Mit dem Kommando  | QUIT |  wird REDABAS verlassen.
+                  +------+
+
+Hinweise:  Jedå  Eingabå  isô miô  deò  RETURN-Tastå  abzu
+           schliessen.
+
+           Deò  Unterschieä zwischeî Klein- unä  Grossbuch
+           stabeî  spielô nuò beií Inhalô voî  alphanumeri
+           scheî Felderî einå Rolle.
+
+           REDABAÓ  kanî  aucè miô  "REDABAÓ  kommandofile¢ 
+           geladeî  werden®  Nacè deí Ladeî wirä soforô daó 
+           angegebenå  Kommandofilå abgearbeiteô  (Datuí  º 
+           00/00/0° !)
+           Miô deí Befehì "QUIÔ TÏ kommandoliste¢ wirä nacè 
+           Verlasseî  voî REDABAÓ diå hinteò TÏ  angegebenå 
+           Listå voî Kommandoó abgearbeitet® z.B® º QUIÔ TÏ 
+           'DIÒ B:','PIĞ PRN:=ALTERNAT.TXT'
+
+
+
+2.2.   Erstellen einer Datei
+ 
+Zunaechsô erfolgô diå Definitioî deò Dateistruktuò mit
+
++-------------------+
+| CREATE  dateiname |        dateiname: max. 8 Zeichen
++-------------------+
+
+Solltå  unteò deí angegebeneî Dateinameî schoî  einå  Dateé 
+auæ Diskettå existieren¬ meldeô sicè  REDABAS  mit
+
+   DESTROY EXISTING FILE?  (Y/N)
+
+Solì diå Dateé geloeschô werden¬  isô miô "Y¢ zõ antworten¬ 
+ansonsteî miô "N".
+Existiertå  diå Dateé nichô odeò wurdå diå letztå Fragå miô 
+"Y¢ beantwortet¬ meldeô sicè REDABAS mit
+
+   ENTER RECORD STRUCTURE AS FOLLOWS:
+   FIELD  NAME, TYPE, WIDTH, DECIMAL PLACES
+   001  _  (Kursor)
+
+Fueò jedeó Felä (Datenelement© isô einå Zeilå  vorgeschrie
+beî (max® 32)
+
+NAME          : Bezeichnunç  deó Datenfeldeó (max®  1° Zei
+                chen,miô Buchstabeî beginnend,ans.nuò  Zif
+                ferî  unä Doppelpunkô  zugelassen¬  Doppel
+                punkô aí Endå nichô erlaubt)
+TYPE          : Ã   alphanumerischeó  Felä  Î   numerischeó 
+                Felä  (miô deí spaeteò arithmetischå Opera
+                tioneî durchgefuehrô werdeî sollen© Ì   loŠ                gischeó Feld
+WIDTH         : Feldlaengå  (beé  numerischeî  Felderî  miô 
+                Dezimalstelleî  isô deò Dezimalpunkô miô zõ 
+                beruecksichtigen© 
+DECIMAL PLACES: Anzahì deò Dezimalstellen
+
+Nacè  jedeò  Angabå  isô eiî Kommá zõ setzeî  unä  aí  Endå 
+RETURÎ zõ betaetigen.
+
+Deò  Abschlusó  deò Definitioî  deò  Dateistruktuò  erfolgô 
+durcè RETURN¬ ohnå vorheò eiî Feldelemenô zõ definieren.
+Es erscheint die REDABAS-Meldung
+
+   INPUT DATA NOW?
+
+Solì  diå neõ geschaffenå Datenbanë jetzô miô Informationeî 
+gefuellô  werden¬  sï  isô miô "Y"¬  ansonsteî miô  "N¢  zõ 
+antworten®  
+Wurdå "Y¢ eingegeben¬ sï wirä einå Maskå zuò Datenerfassunç 
+angezeigt¬  diå diå Struktuò deó ebeî definierteî Datensat
+zeó widerspiegelt.
+
+Innerhalâ  deó  Datensatzeó isô  diå  Kursor-Positionierunç 
+nebeî deî gebraeuchlicheî Kursortasteî moeglicè mit
+
+   CTRL-E   Kursor Zeile nach oben
+   CTRL-X   Kursor Zeile nach unten
+   CTRL-S   Kursor Zeichen nach links
+   CTRL-D   Kursor Zeichen nach rechts
+
+Diå Eingabå deó Datensatzeó wirä beendet¬  wenî voí letzteî 
+Felä  auó RETURÎ betaetigô wirä odeò wenî daó  letztå  Felä 
+bió zuí Endå gefuellô wird.
+
+Diå  Erfassunç  wirä  beendet¬  wenî statô Eingabå  deó  1® 
+Feldeó  soforô RETURÎ betaetigô wird®  Diå erfassteî  Dateî 
+sinä unteò deí Nameî  dateinamå  auæ Diskettå gespeichert.
+
+
+
+2.3.   Aktualisieren einer bestehenden Datei
+
+Solì miô eineò Dateé gearbeiteô werden¬  sï isô siå  vorheò           
+     +---------------+
+mit  | USE dateiname |  zu eroeffnen.
+     +---------------+
+
+
+
+2.3.1. Anfuegen weiterer Datensaetze (an das Dateiende)
+
+Fueò  daó  Fortschreibeî eineò Dateé (aucè fueò  deî  Fall¬ 
+dasó siå auó ° Saetzeî besteht© dienô deò Befehl
++--------+
+| APPEND |
++--------+
+Desweitereî  isô sï zõ verfahren¬  aló oâ diå Fragå  "INPUÔ 
+DATÁ NOW?¢ miô "Y¢ beantworteô wurdå (siehå 2.2.).ŠSEÔ  CARRÙ  OÎ ermoeglicht¬  Dateî auó deí zuvoò  erfassteî 
+Satú iî deî augenblicklicè aufgerufeneî zõ uebernehmen.
+
+
+
+2.3.2. Aendern / Loeschen von Saetzen
+
+Uí einzelnå Saetzå zõ aenderî odeò zõ loescheî stehô deò 
+       +------+
+Befehl | EDIT |  zur Verfuegung.
+       +------+
+REDABAS meldet sich darauf mit
+
+    ENTER RECORD # : _(Kursor)
+
+Eó  isô  diå  Satznummeò deó zõ  aenderndeî  ¯  loeschendeî 
+Satzeó  einzugeben¬  worauæ  deò betreffendå Satú  auæ  deí 
+Bildschirí angezeigô wird.
+
+In Verbindung mit CTRL gibt es folgende Funktionen:
+
+   CTRL-W  schliesst Funktion EDIT ab
+   CTRL-C  schreibô geaenderteî Satú auæ Diskettå unä  rufô 
+           deî naechsteî Satú zuò Bearbeitunç auf
+   CTRL-R  schreibô  geaenderteî Satú auæ Diskettå unä rufô 
+           vorhergehendeî Satú zuò Bearbeitunç auf
+   CTRL-Q  annullierô  diå  Aenderungeî  ií  augenblicklicè 
+           aufgerufeneî  Satú unä verlaessô diå  EDIT-Funk
+           tion
+   CTRL-G  loeschô daó Zeichen¬ uebeò deí deò Kursoò steht
+   CTRL-V  schalteô uí zwischeî Ueberschreibeî unä  Einfue
+           geî  voî Zeichen®  Wenî Einfuegeî gewaehlô  ist¬ 
+           wirä  dieó aí obereî Ranä deó Bildschirmeó ange
+           zeigô (INSERÔ ON)
+   CTRL-U  markierô deî aufgerufeneî Datensatú zuò  spaete
+           reî  Loeschung®  Eó erscheinô aí obereî Ranä deò 
+           Satzmaskå "DELETED"®  Durcè nochmaligeó Drueckeî 
+           voî  CTRL-Õ kanî diå Loeschunç rueckgaengiç  ge
+           machô  werden®  (markiertå Saetzå erhalteî  beií 
+           Auflisteî aí Satzanfanç eineî "*")
+
+Daó  Markiereî voî Saetzeî zweckó spaetereò  Loeschunç  isô 
+aucè durcè folgendå Anweisunç moeglich
+
++---------------------------------+
+| DELETE  bereich  FOR  bedingung |
++---------------------------------+
+
+Beispiele   DELETE RECORD n             : n-teò Satz
+            DELETE NEXT n               : diå  naechsteî  î 
+                                          Saetze
+            DELETE ALL                  : allå Saetzå 
+            DELETE ALL FOR  bedingung   : allå Saetze¬ fueò 
+                                          diå  diå  angege
+                                          benå    Bedingunç 
+                                          erfuellô      isô          
+.paŠ+---------------------------------+
+| RECALL  bereich  FOR  bedingung |
++---------------------------------+
+machô  diå  Loeschmarkierunç rueckgaengiç (Gegenstuecë  zuí 
+Befehì DELETE)
+
+Daó physischå Loescheî voî markierteî Saetzeî erfolgô mit
++------+
+| PACK |        oder mit
++------+
++-------------------+
+| COPY TO zieldatei |
++-------------------+
+Ií  ersteî  Falì  isô diå geradå eroeffnetå  Dateé  uí  diå 
+markierteî Saetzå reduziert¬ ií zweiteî isô diå Dateé ziel
+dateé identiscè miô deò geradå eroeffneteî Datei¬  nuò dasó 
+diå markierteî Saetzå fehlen.
+
+Ein weiterer Befehl zum Aendern von Saetzen ist
++--------+
+| BROWSE |
++--------+
+Eó  werdeî  1¹ aufeinanderfolgendå  Saetzå  angezeigt¬  diå 
+bearbeiteô  werdeî koennen®  Iî deò linkeî obereî Eckå  isô 
+deò Satú angegeben¬  auæ deí sicè augenblicklicè deò Kursoò 
+befindet.
+
+Funktionen in Verbindung mit CTRL:
+
+   CTRL-W    Bearbeitunç  wirä  abgeschlosseî  unä   BROWSÅ 
+             verlassen
+   CTRL-C    Bewegunç  deó  Kursoró  senkrechô  nacè  unteî 
+             durcè allå gleicheî Felder
+   CTRL-R    Bewegunç deó Kursoró senkrechô nacè obeî durcè 
+             allå  gleicheî Felder
+   CTRL-G, CTRL-U, CTRL-V  : wie bei EDIT
+
++-------------------------------+
+ü REPLACÅ  felä  WITÈ  ausdrucë ü  ersetzô deî Inhalô  deó 
++-------------------------------«  Datenfelä deó ií Zugrifæ 
+befindlicheî Satzeó durcè deî Inhalô odeò daó Ergebnió  voî 
+ausdrucë (andereò Feldname¬ Text¬ Zahl¬ Formel© REPLACÅ ALÌ 
+felä  WITÈ  ausdrucë  º  iî saemtlicheî Saetzeî  wirä  felä 
+ersetzt.
+z.B.º REPLACÅ ALÌ datuí WITÈ DATE(© º daó Feldelemenô datuí      
+wirä durcè daó aktuellå Maschinendatuí ersetzt.
+
++------------------------------+
+| CHANGE  bereich  FIELD  feld |
++------------------------------+
+Miô   CHANGÅ  werdeî gezielô einzelnå Datenfeldeò  aufgeru
+fen¬  dereî Inhalô danî manuelì geaenderô werdeî kann® Solì 
+deò Werô veraenderô werden¬  isô hinteò "TO:¢ deò neuå Werô 
+einzugeben¬ ansonsteî isô nuò RETURÎ zõ betaetigen.
+.paŠ2.3.3. Einfuegen von Datensaetzen
+
+Daó Einfuegeî eineó einzelneî Datensatzeó erfolgô durch
++--------+  
+| INSERT | 
++--------+
+ 
+Deò  Satú wirä unmittelbaò nacè deí  Satú  eingefuegt¬  auæ  
+deî deò Datensatzzeigeò augenblicklicè weist.
+  
+INSERT  BEFORE : Fuegô  deî  neueî  Satú  voò  dieseî  Satú 
+                 ein
+INSERT BLANK  :  Fuegô eineî leereî Datensatú ein
+  
+Das Positionieren des Datensatzzeigers erfolgt mit
++-------------------------+
+ü  LOCATÅ  FOÒ bedingunç  ü   º  Wirä  auæ deî ersteî  Satú 
++-------------------------«      gestellt¬   deò diå Bedin
+                                 gunç erfuellt
+
++--------------+ TOP            :auf # 00001 gestellt
+| GO oder GOTO | n oder RECORD nºauf den n-ten Satz gestellt
++--------------+ BOTTOM         :auf letzten  Satz  gestellt
+                 speichername   :indirekte  Adressierung ei-
+                                 neó Satzes,dereî Nummeò iî 
+                                 deí bezeichneteî  Speicheò 
+                                 steht.
+ 
+
+2.4.   Auswertung von Dateien
+  
+Diå auszuwertendå Dateé musó eroeffneô sein®  Daó Einschal
+teî bzw® Ausschalteî deó Druckeró erfolgô miô CTRL-P.
+  
+
+
+2.4.1. Bedingungen fuer die Satzauswahl
+  
+Vergleichsoperatoren    : =¬ <¬ >¬ <¾ (ungleich)¬ <=¬ >=
+Logische Grundfunktionen: .NOT.¬ .AND.¬ .OR.
+Logische Konstanten     : T,t,Y,ù  fueò  wahò  unä  F,f,N,î 
+                          fueò falsch
+  
+Diå   allgemeinå   Forí  fueò  diå  Angabå eineò  Bedingunç 
+ist
+   
++---------------+
+| FOR bedingung |
++---------------+
+  
+Beispiele:
+- - - -  -
+ 
+FOR feld=ausdruck : Isô  felä  alphanumerischeî  Typs¬  isô 
+                    ausdrucë  iî (einfachå  odeò  doppelte© 
+                    Anfuehrungszeicheî zõ setzen®  Deò Ver
+                    gleicè  beé alphanumerischeî Dateî  er
+                    folgô linksbuendig.ŠFOR ausdruck$feld : Ií  durcè  felä  angegebeneî  Datenfelä 
+                    wirä  nacè deò durcè  ausdrucë  festge
+                    legteî Zeichenkombinatioî gesucht.
+  
+FOR $(feld, position, laenge)=ausdruck
+                    Wenî  ausdrucë  identiscè isô  miô  deò 
+                    Zeichenfolge¬  diå iî felä aâ  Positioî 
+                    positioî deò Laengå laengå steht
+   
+FOR bedingung1 .OR. bedingung2
+                    wenî  einå  deò beideî Bedingungeî  er
+                    fuellô ist
+  
+FOR .NOT.bedingung1 .AND. bedingung2
+                    wenî  bedingung± nichô  unä  bedingung² 
+                    erfuellô ist
+  
+FOR bedingung1 .AND. (bedingung2 .OR. bedingung3)
+                    wenî   bedingung±  unä  einå  deò  bei
+                    deî andereî Bedingungeî erfuellô ist® 
+   
+
+
+2.4.2. Anzeige/Druck ohne Aufbereitung
+  
++------+
+| LIST |            : Auflistung aller Datensaetze
++------+
+  
+LIST STRUCTURE      : Anzeige der Datenstruktur
+LIST feld1,feld2,.. : Auflistunç einzelneò Feldeò (Diå aus
+                      gewaehlteî  Feldelementå sinä wiå  iî 
+                      deò   Dateistruktuò   festgelegô   zõ 
+                      schreiben)
+LIST FOR bedingung  : Bedingteó Auflisteî voî Saetzen
+  
+Hinweis: Beé   LISÔ   werdeî  allå   Datensaetzå  "rollend¢ 
+         angezeigô (ohnå Halt).
+  
++----------------------+  Bedingteó Sucheî einzelneò  Saet
+I LOCATE FOR bedingung I  ze,keiî  Anzeigå (Satznummeò  deó 
++----------------------+  ersteî  Satzes,deò diå  Bedingunç 
+                          erfuellt¬ wirä angezeigt.)
+  
++---------+               Sichtbarmachunç  deó  ií  Zugrifæ 
+I DISPLAY I               befindlicheî   (z.B.durcè  LOCATÅ 
++---------+               gefundenen© Satzes.
+  
++----------+              Sucheî deó naechsteî Datensatzes¬ 
+I CONTINUE I              deò  diå  Bedingunç  deò  letzteî 
++----------+              LOCATE-Anweisunç erfuellt.
+  
+DISPLAY ALL               Analoç  LIST,wobeé  abeò nacè  1µ 
+                          Saetzeî angehalteî wird
+DISPLAY FOR bedingung     Analoç  LIST
+DISPLAY RECORD n          Anzeigå deó Satzeó miô deò  Satz
+                          nummeò n
+DISPLAY feld1,feld2,...   Analoç  LISTŠDISPLAY ... OFF           ohnå Datensatznummer
+  
+?                         Isô   deò  gewuenschtå  Datensatú 
+                          bereitó  ií Zugriff,koenneî  ein
+                          zelnå  Datenfeldeò  sehò  schnelì 
+                          durcè  Angabå eineó Fragezeichenó 
+                          miô nachfolgendeí Feldnameî abge
+                          fragô werden
+                          z.B®  ¿ feld1,feld2
+                          Mitteló deó Fragezeichenó  lasseî 
+                          sicè   aucè  kleinerå  Rechnungeî 
+                          aehnlicè   eineí   Taschenrechneò 
+                          durchfuehren.
+  
+
+
+2.4.3. Auswertungen von Dateien
+
++-----+
+| SUM |  feld1,feld2,.... FOR bedingung    Summenbildung
++-----+
+         Eó isô moeglich¬ daó Rechenergebnió iî eineí sepa
+         rateî Speicheò abzulegen®  REDABAÓ besitzô 6´ sol
+         cheò Speicher,diå entwedeò Zahlenwertå odeò alpha
+         numerischeî Texô voî max®  25´ Zeicheî Laengå auf
+         nehmeî koennen®  Siå werdeî einzelî durcè Benenneî 
+         miô eineí Nameî definierô unä adressiert.
+
+SUM  feld  TO  speichername
+
+Speicherinhaltå   werdeî  miô  Verlasseî  voî  REDABAÓ  ge
+loescht.
+
++-------+
+| COUNT |  Zaehlen von Datensaetzen
++-------+
+  
+COUNT FOR  bedingung
+COUNT TO   speicher
+  
++--------------------------------+                        
+| STORE ausdruck TO speichername |  Belegen von Speichern
++--------------------------------+
+   
++----------------+  Anzeige aller definierten Speicherna-
+| DISPLAY MEMORY |  men nebst Inhalt
++----------------+
+   
+
+
+2.4.4. Integrierter Listengenerator
+ 
+Deò integriertå  Listengeneratoò isô eiî Unterprogramm¬ daó 
+durcè  einå Reihå gezielteò Frageî voí Anwendeò Informatio
+neî erhaelt¬ diå zuò Definitioî deò Drucktabellå  benoetigô 
+werden®  Iî deò Praxió lasseî sicè diå meisteî  Drucklisteî 
+uebeò  dieseî Reportgeneratoò  erstellen®  Nuò  iî  relatiö  
+wenigeî Faelleî werdeî  speziellå Druckprogrammå zõ schreiŠ.pn 10
+.op
+.he OS/M-Applikationsprogramm  - # -                   REDABAS
+beî sein.
+Bevoò deò Reportgeneratoò aufgerufeî wird¬  musó stetó die
+jenigå  Dateé eroeffneô sein¬  auæ  diå daó Auswertungspro
+gramí  zugreifeî  soll®  Isô dieó  nichô deò  Fall¬  meldeô 
+sicè REDABAS mit
+
+        NO DATA BASE FILE IN USE, ENTER FILENAME: ,
+
+worauæ  durcè Angabå deó Dateinamenó dieså nocè  nachtraeg
+licè eroeffneô werdeî kann.
+
+Der Aufruf des Reportgenerators erfolgt mit
+
++-------------------+
+| REPORT FORM liste | .
++-------------------+
+
+Diå  Dateé  listå  wirä auæ Diskettå  gespeicherô  unä  haô 
+den Tyğ ".DEF"
+
+Fragen:
+
+ENTEÒ OPTIONS¬  M=LEFÔ MARGIN¬  L=LINES/PAGE¬  W=PAGÅ WIDTÍ 
+_(Kursor)
+      Standardannahmen: M=8, L=57, W=80
+      M : linker Rand bis zur ersten Druckposition
+      L : Zeilen pro Seite
+      W : Anzahl der Zeichen pro Zeile
+
+PAGÅ HEADING¿ (Y/N©           Ueberschrifô erwuenschô ?
+      Wirä  dieså Fragå miô "Y¢ beantwortet¬  kanî  iî  deò 
+      Folgezeilå einå Ueberschrifô eingegebeî werden.
+  
+DOUBLE SPACE REPORT? (Y/N)    Doppelter Zeilenabstand ?
+
+ARE TOTALS REQUIRED? (Y/N)    Summen erwuenscht ?    
+      Diå  Beantwortunç  miô "Y¢ haô zuò  Folge¬  dasó  deò 
+      Inhalô  alleò  numerischeî Feldeò summierô unä  dieså 
+      Summeî aló letztå Zeilå deò Listå ausgewieseî werden.
+
+SUBTOTALS IN REPORT? (Y/N)    Zwischensummen erwuenscht ?
+      Auæ diå Antworô  "Y¢  folgô diå Mitteilung
+            ENTEÒ SUBTOTALÓ FIELDº ,
+      worauæ daó Felä anzugebeî ist¬  fueò daó Zwischensum
+      meî  gedruckô werdeî  sollen¬  wenî sicè  deò  Inhalô 
+      dieseó Feldeó aendert.
+ 
+SUMMARÙ REPORÔ ONLY¿ (Y/N©     Nuò Drucë voî Summeî ¿          
+
+EJECT PAGE AFTER SUBTOTALS? (Y/N)  Solì  nacè  deí  Druckeî 
+                                   eineò      Zwischensummå 
+                                   Blattvorschuâ erfolgen?
+     
+ENTER SUBTOTALS HEADING:           Aî  dieseò  Stellå  kanî 
+                                   einå  Ueberschrifô  fueò 
+                                   einzelnå Gruppeî angege
+                                   beî werden,diå miô eineò 
+                                   Zwischensummå enden.ŠSinä allå Frageî beantwortet¬ meldeô sicè  REDABAS mit
+
+    COL   WIDTH, CONTENTS
+    001   - (Kursor)
+  
+    COL       : Drucklistenspalte
+    WIDTH     : Spaltenbreite
+    CONTENTS  : Spalteninhalô  (waó  solì iî dieseò  Spaltå 
+                gedruckô werden)º  Namå eineó  Datenfeldes¬ 
+                Namå eineó Speicheró odeò eiî Ausdruck
+
+Sinä  diå beideî  Angabeî (WIDTH¬ CONTENTS© gemachô unä miô 
+RETURÎ quittiert¬  erscheinô  iî  deò  Folgezeilå  auæ  deí 
+Bildschirm
+  
+    HEADING:
+
+Eó isô  diå  Spaltenueberschrifô  einzugeben®  Ueberschrif
+teî  werdeî auæ Spaltenmittå  ausgerichtet®  Einå   rechts
+buendigå  Ausrichtunç  erfolgt¬  wenî  voò deí   Texô   deò  
+Spaltenueberschrifô  daó  Zeicheî  ">¢   stehô  (numerischå 
+Wertå   werdeî iî deò Spaltå rechtsbuendiç gedruckt)®  Solì 
+diå  Ueberschrifô nacè linkó ausgerichteô werden¬  isô  deò 
+Texô  zuò  Spaltenueberschrifô miô  "<¢  zõ beginnen.
+
+Diå   Definitioî   deó Druckformularó  wirä  abgeschlossen¬ 
+wenî  zõ  Beginî deò  naechsteî   Spaltendefinitioî  soforô 
+RETURÎ betaetigô wird.
+
+Eó isô moeglich¬ iî diå  erstå Zeilå deò Listå einå weiterå 
+Ueberschrifô  zõ  setzen®  Hierzõ isô voò  deí  Aufruæ  deó 
+Reportgeneratoró daó Kommando
+
++----------------------+
+| SET HEADING TO  text | einzufuegen.
++----------------------+
+Diå  Verarbeitunç  deò Dateé unä daó Generiereî  deò  Listå 
+erfolgô durcè  USÅ  dateiname
+
+         +------------------------------+
+         | REPORT FORM  liste  TO PRINT |
+         +------------------------------+
+
+Zõ  Beginî  deó Reportó erscheineî einå Seitennummeò  (PAGÅ 
+NO.00001© unä daó aktuellå Datum®  
+
+Wenî  diå  REPORT-Dateé bereitó  existiert¬  entfaellô  deò 
+Definitionsteil¬ unä diå Listå wirä soforô erstellt.
+ 
+Ueberschrifteî  koenneî mehrerå Zeileî einnehmeî unä werdeî 
+voî REDABAÓ automatiscè auæ einzelnå Zeileî verteilt®  Wilì 
+deò Anwendeò jedocè selbsô festlegen¬  welchå Textteilå  iî 
+welcheò  Zeilå  zõ steheî haben,sï kanî eò dieså durcè  eiî 
+Semikoloî  getrennô angeben®  Auæ dieså Arô unä Weiså  sinä 
+aucè Unterstreichungeî voî Ueberschrifteî moeglich.
+
+Diå  Beschreibunç  deó Listenformularó  enthaelô nuò  Nameî 
+voî Datenfeldern¬  abeò nichô Nameî deò Dateé  selbst®  Daó Šbedeutet¬  dasó  diå Erstellunç deó Reportó nichô  aî  einå 
+bestimmtå  Dateé gebundeî ist¬  sonderî  dasó allå Dateien¬ 
+diå diå benoetigteî Feldeò enthalten¬ aló Basió fueò  dieså 
+Listå dieneî koennen®  Iî deò Praxió sinä dieó insbesonderå 
+diå Indexdateien¬  diå já bió auæ  diå individuellå Sortie
+runç  miô deò Stammdateé identiscè sind®  Sï  koenneî   miô 
+eineò REPORT-Dateé unä verschiedeneî Indexdateieî verschie
+deî sortiertå Listeî  erstellô werden.
+
+Einå   FOR-Klauseì isô  nichô Bestandteiì deò  Listenstruk
+tur®  Siå  kanî  ersô  beé Abruæ  deó  REPORTÓ   angehaengô  
+werdeî  unä ermoeglichô einå ganzå Reihå verschiedeneò  Be
+richte.
+  
+REPORT FORM  liste  FOR  bedingung  TO PRINT
+REPORT  bereich  FORM  liste  TO PRINT
+
+Deò  Zusatú  PLAIÎ bewirkt¬  dasó diå Kopfzeileî auæ  jedeò 
+Seitå  deó Reportó erscheineî (REPORÔ FORÍ dateé  TÏ  PRINÔ 
+PLAIN).
+
+
+
+2.5.   Loeschen / Umbenennen von Dateien
+
++-------------------------+
+| DELETE  FILE  dateiname |          Loeschen
++-------------------------+
+
++------------------------------+
+| RENAME  namealt  TO  nameneu |     Umbenennen
++------------------------------+
+
+Iî  deò  Regeì  isô fueò beidå Kommandoó deò  Dateityğ  miô 
+anzugeben®  Wirä dieó unterlassen¬ danî nimmô REDABAÓ stetó 
+deî Tyğ ".DBD¢ an.
+Dateien¬  diå  momentaî geoeffneô sind¬  koenneî nichô  ge
+loeschô werden.
+
+Hinweis : Nichô  jedeò  Dateityğ kanî unteò deò  Regiå  voî 
+          REDABAS geloeschô bzw®  umbenannô werden®  Eó seé 
+          aî  dieseò Stellå aî diå OS/M-Kommandoó ERÁ  bzw® 
+          REÎ  erinnerô (ERÁ  dateiname¬  REÎ  dateineu=da
+          teialt).
+
+
+
+2.6.   Aendern von Dateistrukturen
+
+REDABAÓ gestatteô auæ unvergleichlicè einfachå  Weise¬  Da
+teistruktureî zõ aendern¬  ohnå diå vorhandeneî Anwendungs
+programmå zõ tangieren.
+
+Die Aenderung einer Dateistruktur erfolgt in 3 Schritten:
+    1.  Diå  Dateî deò betreffendeî Dateé werdeî  "ausgela
+        gert",d.h® iî einå temporaerå Dateé kopiert.
+    2.  Diå Dateistruktuò wirä geaendert
+    3.  Zurueckschreibeî deò Dateî deò temporaereî Dateé iî Š        diå  veraendertå Dateé unteò Beruecksichtigunç  deò 
+        neueî Struktur.
+
+1. USE datei1
+   COPY TO datei2
+        nnnnî  RECORDÓ  COPIEÄ signalisierô  daó  Endå  deó 
+        Kopierens.
+
+2. +-------------------+
+   | MODIFY  STRUCTURE |
+   +-------------------+
+   REDABAS meldet sich mit
+     MODIFY ERASES ALL DATA RECORDS ... PROCEED (Y/N)
+   Eingabå  voî  "Y¢ haô zuò Folge¬  dasó allå  Saetzå  ge
+   loeschô     werdeî     unä  diå Dateistruktuò  iî  eineò 
+   Editiermaskå erscheint®  Zusaetzlichå  Editierfunktioneî 
+   (ans® wiå beé EDIT):
+   CTRL-T  Loescheî Zeile¬  iî  deò deò Kursoò steht¬  allå 
+           nachfolgendeî Feldeò  schliesseî nacè obeî auf
+   CTRL-Y  wiå CTRL-T¬ nuò dasó diå Folgefeldeò nichô nach
+           ruecken®  Diå  geleertå  Zeilå kanî  soforô  neõ 
+           beschriebeî werden.
+   CTRL-N  Schiebô  allå  Zeileî (Felder© aâ deò Zeilå  deó 
+           Kursoró nacè unteî unä ermoeglichô daó Einfuegeî 
+           eineó neueî Feldes.
+   CTRL-W  Schliessô diå Strukturmodifizierunç ab
+
+3. +----------------------+
+   | APPEND  FROM  datei2 |
+   +----------------------+
+
+   nnnnî RECORDÓ ADDEÄ signalisierô daó Endå deó Kopiervor
+   ganges¬ datei² bleibô erhalten® Eó werdeî nuò diå Daten
+   feldeò    uebernommen¬  diå  aucè iî deò neueî  Struktuò 
+   beruecksichtigô sinä   (gleichå Bezeichnungen©        
+
+
+
+2.7.   Sortieren und Indizieren
+
++-----------------------------------------+
+| SORT  ON feld TO zieldatei (DESCENDING) |
++-----------------------------------------+
+
+Deò  Zusatú "DESCENDING¢ isô nuò beé absteigendeò  Sortier
+folgå anzugeben® 
+
+Diå Sortierunç nacè mehrereî Sortiermerkmaleî (Feldern© isô 
+durcè  mehrmaligeî SORÔ zõ realisieren¬  beginnenä miô  deî 
+untergeordneteî Kriterien® 
+
+Mitteló  Indexdateieî lasseî sicè mehrerå  Sortierordnungeî 
+gleichzeitiç verwalten®  Einå Indexdateé isô einå Teilkopiå 
+ihreò Stammdatei¬ diå prï Satú nuò nocè eiî einzigeó Daten
+felä  enthaelô unä diå nacè dieseí  Feld¬  deí  sogenannteî 
+Schluesseì sortierô ist.
+.paŠUSE stammdatei
++---------------------------------+
+| INDEX  ON  feld  TO  indexdatei |
++---------------------------------+
+
+Aló  Namå deò Indexdateé kanî aucè deò deò Stammdateé ange
+gebeî werdeî (Dateityp:".IDX")
+    nnnnî  RECORDÓ INDEXEÄ signalisierô daó Endå deó  Indi
+    zierens
+
++------------------------------------+
+| USE  stammdatei  INDEX  indexdatei | dient dem Eroeffnen 
++------------------------------------+ einer Indexdatei
+
+Fuer Indexdateien gibt es einen schnellen Suchbefehl
+
++------------------+   Deò Suchbegrifæ isô einå Zeichenket
+I FIND suchbegriff I   tå (Tyğ C)¬  diå nichô unbedingô  iî 
++------------------+   einfachå  odeò  doppeltå  Hochkommaó 
+                       gesetzô werdeî muss.
+
+Miô Erscheineî deó Punkteó isô deò Satú ií Zugrifæ unä kanî 
+verarbeiteô werden®  Wirä keiî Satú gefunden¬ deò deî Such
+begrifæ  enthaelt¬  erscheinô diå Ausschrifô "NÏ FIND¢  unä 
+deò Datensatzzeigeò erhaelô deî Werô 0.
+
+Miô  Hilfå deò sogenannteî Makrofunktioî "&¢ kanî maî  nacè 
+Datensaetzeî suchen¬ dereî Schluesselwerô iî eineí Speicheò 
+stehtº 
+FIND &speichername
+Dieså Variantå wirä haeufiç iî Programmeî eingesetzt¬  wenî 
+derselbå Suchbefehì mehrfacè auæ verschiedenå Objektå ange
+wandô werdeî soll.
+
+
+
+2.8.   Dateikomprimierung
+
++-------------------------------+
+| TOTAL  ON feldname TO kompdat |
++-------------------------------+
+
+Miô dieseí Befehì werdeî allå Saetze¬  diå iî deí  spezifi
+zierteî  Felä deî gleicheî Schluesselwerô besitzen¬  zusam
+mengefasst¬ diå numerischeî Feldeò alleò Saetzå addierô unä 
+diå  zusammengefassteî  Saetzå iî diå  neuå  Dateé  kompdaô 
+uebernommen®  Diå  Struktuò deò Zieldateé kann¬  musó  abeò 
+nichô  vorheò festgelegô werden®  Diå Ursprungsdateé bleibô 
+erhalten.
+
+Diå  Uebernahmå nichô erwuenschteò Informationeî  kanî  da
+durcè  unterdrueckô  werden¬  indeí maî fueò diå  Zieldateé 
+einå geeignetå Satzstruktuò waehlt.
+
+Uí deî Befehì TOTAÌ korrekô anzuwenden¬ musó diå Dateé nacè 
+deí fueò diå Zusammenfassunç gewuenschteî Felä  vorsortierô 
+odeò indizierô sein.
+.paŠ2.9.   Das Verknuepfen mehrerer Dateien
+
+Aktualisierung einer Datei mittels Bewegungsdatei  
+-------------------------------------------------
+USE stamm   (zu aktualisierende Datei)
++-------------------------------+
+| COPY  STRUCTURE  TO  bewegung |
++-------------------------------+
+            (fuellen der Datei bewegung)
+USE stamm
++----------------------------------------+
+| APPEND  FROM  bewegung  FOR  bedingung |
++----------------------------------------+
+            (bedingung beinhaltet Neuzugange)
++-----------------------------------------------------+
+| UPDATE FROM bewegung ON feldname ADD/REPLACE felder |
++-----------------------------------------------------+
+
+Deò  korrektå Einsatú voî UPDATÅ setzô voraus¬  dasó  beidå 
+Dateieî nacè deí unteò "ON¢ genannteî Felä sortierô sind.
+
+Gleichzeitigeó  Aktualisiereî  voî zweé Dateieî miô  unter
+schiedlicher Dateistruktur
+-----------------------------------------------------------
+
+REDABAÓ  isô  iî  deò Lage¬  zweé Dateieî  gleichzeitiç  ií 
+Zugrifæ zõ halten:
+
+USE datei1             Eroeffnen der 1. Datei (PRIMARY)
+SELECT SECONDARY
+USE datei2 INDEX feld
+
+Maî  haô jetzô gleichzeitiç diå Dateé datei± unä  diå  nacè 
+felä indiziertå Dateé datei² ií Zugriff.
+
+Miô USÅ wirä einå Dateé voî Diskettå geleseî unä ihò Daten
+satzzeigeò  auæ deî 1®  Satú gerichtet®  Miô eineí erneuteî 
+USÅ wirä einå  anderå Dateé unä dereî 1®  Satú  aufgerufen®  
+Diå  1®  Dateé wirä geschlosseî unä isô fueò Befehlå  nichô 
+mehò ansprechbar.
+     
+Miô  SELECÔ  SECONDARÙ  unä nachfolgendeí USÅ wirä  diå  2® 
+Dateé eroeffnet¬  abeò diå 1®  nichô geschlossen®  Maî kanî 
+abwechselnä  jedå Dateé fueò sicè bearbeiten,indeí maî  zuò 
+1® Dateé miô 
++-----------------+
+| SELECT  PRIMARY |
++-----------------+
+und zur zweiten mit dem Befehl
++------------------+
+| SELECT SECONDARY |
++------------------+
+wechselt¬  wobeé maî stetó wiedeò zõ deí zuletzô bearbeite
+teî Datensatú zurueckkehrô unä nichô aî deî Dateianfang.
+.paŠIsô beispielsweiså eiî Satú deò Sekundaerdateé ií  Zugriff¬ 
+sï kanî eò wiå folgô veraenderô werden:
+REPLACE  feld  WITH  P.feld
+      (P.felä  bedeutetº   felä  auó  Primaerdatei¬          
+       S.feld: Sekundaerdatei)
+    
++--------+
+| EDIT # | :   eó wirä derjenigå Satú editiert¬  deò augen
++--------+     blicklicè im Zugriff ist 
+          
+STORE   #  TO  speicher  :    Abspeicherî  deò Nummeò eineó 
+                              Datensatzes
+
+Erzeugen einer neuen Datei aus 2 bestehenden
+-------------------------------------------- 
+
++-----------------------------------------------------+
+| JOIN  TO  dateiname  FOR  bedingung  FIELDS  felder |
++-----------------------------------------------------+
+ 
+Deò Befehì JOIÎ gestattet¬ zweé Dateieî odeò Teilå davoî zõ 
+eineò  neueî Dateé zõ vereinigen®  Diå beideî  Ursprungsda
+teieî werdeî miô SELECÔ PRIMARÙ bzw®  SELECÔ SECONDARÙ  er
+oeffnet®  Diå neueî Datensaetzå werdeî unteò deò festgeleg
+teî  Bedingunç gebildeô unä setzeî sicè auó beliebigeî Fel
+derî deò Ursprungsdateieî zusammen®         
+
+Rechnerinterî laeufô diå Ausfuehrunç deó Befehleó JOIÎ etwá 
+folgendermasseî ab:
+Deò  Datensatzzeigeò weisô iî beideî Dateieî zunaechsô  auæ 
+deî 1®  Satz®  Danî wirä deò 1® Satú deò Primaerdateé nach
+einandeò  miô jedeí Satú deò Sekundaerdateé verglicheî  unä 
+auæ diå FOÒ - Bedingunç  hiî abgefragt®  Isô diå  Bedingunç 
+erfuellt¬  wirä eiî neueò Datensatú gebildet¬  deò sicè auó 
+deî angegebeneî Datenfelderî beideò Ursprungsdateieî zusam
+mensetzt®  Isô diå Bedingunç nichô erfuellt¬ wirä keiî Satú 
+gebildet.
+Isô  deò  1®  Satú deò Primaerdateé miô alleî  Saetzeî  deò 
+Sekundaerdateé verglicheî worden¬  danî wiederholô sicè deò 
+gesammtå Vorganç fueò deî 2® Satú deò Primaerdateé usw® bió 
+schliesslicè  jedeò Satú deò eineî miô jedeí Satú deò ande
+reî Dateé verglicheî ist.
+     
+USE datei1
+SELECT  SECONDARY
+USE datei2
+SELECT PRIMARY
+JOIN TO datei3 FOR feld=S.feld FIELDS feld1,feld2,;
+S.feld3,feld4
+     (Befehl ueber 2 Zeilen: nach ";":RETURN)
+
+
+
+3.     Programmieren mit REDABAS
+
+REDABAÓ bieteô diå Moeglichkeit¬  Befehlsfolgeî iî  Dateieî 
+abzuspeicherî  unä  beé Bedaræ miô eineí einzigeî  Kommandï 
+wiedeò aufzurufeî unä erneuô ablaufeî zõ lassen.ŠJedeò  bisheò besprochenå Befehì kanî unveraenderô  iî  eiî 
+Programí uebernommeî werden®  Unterschiedlicè isô lediglicè 
+diå  Arô deò Befehlseingabe®  Uí diå Befehlå  speicherî  zõ 
+koennen¬  muesseî  siå iî einå Befehlsdateé (COMMANÄ  FILE© 
+geschriebeî werden.
+  
++-------------------------+
+| MODIFY COMMAND progname | : Eroeffnen einer Kommandodatei
++-------------------------+          
+                              (progname : max. 8 Zeichen)
+
+Deò  Bildschirí wirä geloeschô unä deò Kursoò iî diå  linkå 
+oberå Eckå plaziert® Maî befindeô sicè jetzô ií sogenannteî 
+Programmeditor®          
+
+Daó  Erstelleî  voî  Kommando-Fileó kanî maî  aucè  miô  TĞ 
+realisieren® Aló Dateityğ isô ".PRG¢ anzugeben.
+
++-------+
+| ERASE |         Loeschen des Bildschirmes
++-------+
++---------+
+|  RETURN |       Beendeô daó Programí unä ermoeglichô einå 
++---------+       Rueckkehrin die vorherige Kommandoebene
++-------------+
+| DO progname |   Diå  ií Kommando-Filå prognamå  abgespei
++-------------+   chertå Befehlsfolge wird abgearbeitet
+
+
+
++-------------------------+
+| MODIFY COMMAND progname |
++-------------------------+
+Existierô daó Kommando-Filå progname¬  wirä eó iî deî  Edi
+toò    geladeî unä kanî geaenderô werden®  Nacè deò  Aende
+runç  wirä eó auæ deò Diskettå aî Stellå deó alteî  gespei
+chert®  Diå  altå  Programmversioî isô nocè aló  sogenanntå 
+Backup-Dateé verfuegbaò (Datei-Typº  ".BAK")®  Siå isô fueò 
+REDABAÓ  nichô mehò ií unmittelbareî Zugriff¬  koenntå abeò 
+ií   Bedarfsfalì iî einå ".PRG"-Dateé umbenannô  unä  damiô 
+aktivierô werdeî (durcè OS/M-Befehì º  REN)® Backup-Dateieî 
+werdeî nuò angelegt¬  wenî auæ deò Diskettå genuegenä Platú 
+vorhandeî ist.
+
+Einigå  Funktioneî  iî Verbindunç miô  CTRÌ  innerhalâ  deó 
+Programmeditoró
+       CTRL-T  Loescheî deò Zeile¬ iî deò deò Kursoò steht
+       CTRL-N  Einfuegeî eineò Zeilå voò diå Zeile¬  iî deò 
+               deò Kursor steht
+       CTRL-W  Verlassen des Programmeditors
+
+Falló  maî sicè uebeò daó angefertigtå Programí eiî  PROTO
+KOLÌ anfertigeî moechte¬ isô wiå folgô zõ verfahreî :
+- Verlassen von REDABAS
+- CTRL-P (Einschalten des Druckers)
+- TYPE progname.PRG
+.paŠ3.1.   Einfache Befehlsketten
+
++---+   Dient der Ausgabe von Daten in die Folgezeile. 
+| ? |   Ein einzelnes Fragezeichen erzeugt eine Leerzeile.
++---+   z.B. ? feld1+feld2+'  Text'
+             ?        Leerzeile
+             ? 'Zusatztext'+feld3
+
++-------------------+
+| @ Zeile, position | Bildschirm : 0<= Zeile <=23
++-------------------+              0<= position <=79
+                      Drucker    : 0<= Zeile,position <=254
+
+Dieseò Befehì dienô deò Positionierunç voò deò Ausgabå  auæ 
+(Zeile+1).-tå Zeile¬ (position+1).-tå Spalte
+
++--------------------------------+
+ü @ Zeile¬ positioî SAÙ ausdrucë ü Zuò  Ausgabe von Texten 
++--------------------------------+ oder Daten           
+
+À  Zeile,positioî  saù ausdrucë using'literal§  ermoeglichô 
+einå formatiertå Ausgabe
+           Zeichen im Literal  |  Bedeutung
+           --------------------|---------------------------
+                #,9            |  Ziffer
+                X,A            |  Zeichen
+                $,ª            ü  vorangestellte Leer- 
+                               ü  zeicheî werdeî  durcè  ¤ 
+                               |  oder * ersetzt
+
+Maî  kanî  mitteló  "@¢ gezielô nuò  diå  Informationeî  iî  
+denjenigeî Zeileî ausdruckeî lassen¬  diå miô "@¢ beginnen¬ 
+unä allå andereî Nachrichteî voí Drucë ausschliessen®  Dazõ  
+wirä  zõ  Beginî eineó  entsprechendeî  Programmteileó  deò 
+Befehl
++---------------------+
+| SET FORMAT TO PRINT |
++---------------------+
+gegeben und am Ende mit
++----------------------+
+| SET FORMAT TO SCREEN |
++----------------------+
+diå  Ausgabå  deò Informationeî wiedeò auæ  deî  Bildschirí  
+gelegt.
+
++---------------------------------------+
+| ACCEPT 'erlaeuterung' TO speichername |
++---------------------------------------+
+Alphanumerische Dateneingabe
+
++---+
+| * |  Stern am Beginn einer Zeile : Kommentarzeile
++---+
+
++-----------------+
+ü TRIÍ (feldname© ü  Abschneideî deò nachgestellteî 
++-----------------+  Leerzeichen    
+Datenfeldeò  alphanumerischeî Typó lasseî sicè mitteló  "+¢ Šaneinanderketten.
+z.B. @ 0,0 say feld1+feld2+'xyz'
+
+Saemtlichå  Befehlå  iî REDABAÓ behalteî ihrå Wirkunç  aucè 
+uebeò daó Endå eineó Programmó hinauó solangå bei¬  bió siå 
+durcè  anderslautendå  Befehlå aufgehobeî werdeî  odeò  bió 
+REDABAÓ  beendeô wird.
+
+
+
+3.2.   Programmschleifen / -verzweigungen
+
++--------------------+
+| DO WHILE bedingung |  Durchlaufeî  deò  zwischeî  DÏ  unä 
++--------------------+  ENDDÏ  steheî  deî  Befehle,solangå 
+                        bedingunç erfuellô ist.
+   ...
++-------+ 
+| ENDDO |
++-------+
+
++------------------+
+| WAIT TO speicher |   Nimmô  nuò einå einzelnå  Tastå  aló 
++------------------+   Eingabå  aî  unä brauchô  nichô  miô 
+                       RETURÎ abgeschlosseî werden.
+
+WAIÔ  (ohnå Zusatú voî TÏ ...© º  Daó Programí haelô aî unä 
+wirä auæ eineî beliebigeî Tastendrucë fortgesetzt.
+ 
++----------+
+| ! (text) |           Grossbuchstabenfunktion
++----------+
+
++----------------------------------------------------+
+| STR (numerischer Ausdruck, Laenge, Dezimalstellen) |
++----------------------------------------------------+
+Umwandlunç eineó numerischeî Ausdruckeó iî einå  alphanume
+rischå Zeichenkette®  Diå Laengå deó umzuwandelndeî Ausdru
+ckeó (iî Anzahì Zeichen© muss¬  diå Anzahì deò Dezimalstel
+leî kanî angegebeî werden.
+
+Miô  deí Befehì DÏ koenneî Programmå aucè voî andereî  Pro
+grammeî auó abgerufeî werden.
+Besonderó  nuetzlicè isô diå Arbeiô miô Unterprogrammeî  iî 
+deò  sogenannteî  Menuetechnik¬  beé deò allå  wesentlicheî 
+Funktionsbloeckå  auæ deí Bildschirí angezeigô  werdeî  unä 
+deò  Benutzeò  durcè  Auswahì uebeò diå  Tastatuò  daó  ge
+wuenschtå  Programí aufruft®  Nacè Abschlusó deó  Programmó 
+kehrô  daó  Systeí  zuí Menuå zuruecë unä  ermoeglichô  diå 
+erneutå Auswahì eineò Funktion.
+.paŠWAIT TO ant
++---------+
+| DO CASE |      Programmverzweigung in Abhaengigkeit des
++---------+      eingegebenen Zeichens
+   CASE ant='1'  (Nach der ersten erfuellten CASE-Bedingung
+      DO prog1   werden alle weiteren uebersprungen)
+   CASE ant='2'
+      DO prog2
+   CASE ant='0'
+      RETURN
+   OTHERWISE
+      DO prog3   (ant ungleich 1,2 und 0)
++---------+
+| ENDCASE |
++---------+
+
++--------------+
+| IF bedingung |
++--------------+
+     ( Befehle fuer erfuellte bedingung)
++------+
+| ELSE |
++------+
+     (Befehle fuer nicht erfuellte bedingung)
++-------+
+| ENDIF |
++-------+
+Diå Anweisunç ELSÅ miô deî entsprechendeî Programmschritteî 
+kanî entfallen.
+
+
+
+3.3  Online-Programme
+
+Eó  herrschô deò Trenä vor,Programmå sï  zõ  schreiben,dasó 
+diå  Dateî direkô erfassô unä soforô verarbeiteô  werden,uí 
+permanenô diå aktuellsteî Informationeî verfuegbaò zõ habeî 
+(Online-Verarbeitung).
++--------------+
+| GET feldname |    mit dem Folgebefehl READ
++--------------+
+Zusammeî  miô  entsprechendeî Formatierbefehleî  kanî  einå 
+individuellå  Editiermaskå erstellô werden,diå sowohì nume
+rischå  aló  aucè alphanumerischå Dateî  aufnimmt.Aucè  diå 
+Faehigkeit,deî  Kursoò innerhalâ deò Maskå voî eineò  Posi
+tioî zuò andereî wiå iî eineí normaleî Editoò beliebiç  voò 
+unä  zuruecë  zõ bewegen,isô volì gegeben®  Ersô  wenî  daó 
+letztå  GET-Felä  miô RETURÎ abgeschlosseî ist,werdeî  allå 
+Dateî deò Erfassungsmaskå gemeinsaí eingelesen®  Auæ  dieså 
+Weiså  koenneî  bió zõ 6´ Feldeò gleichzeitiç editierô  unä 
+miô eineí Lesebefehì erfassô werden.
+
++--------------+
+| SET TALK OFF |     Ausblenden der Systemnachrichten
++--------------+
++--------------+
+| SET TALK ON  |     Einschalten des Dialogs
++--------------+ŠBeispiel
+--------
+
+Struktur der Datei rechnung
+   001  rnr,c,5
+   002  datum,c,8
+   003  kunummer,c,3
+   004  betrag,n,10,2
+   005  bezahlt,n,10,2
+   006  bdatum,c,8
+
+Struktur der Datei kunden
+   001  kunummer,c,3
+   002  ort,c,4
+   003  lrech,c,5
+   004  datum,c,8
+   005  umsatz,n,10,2
+   006  bezahlt,n,10,2
+   007  offen,n,10,2
+
+Zuò  Demonstratioî  deó Befehló GEÔ solì eiî  Programí  ge
+schriebeî  werden,dasó sowohì neõ erstelltå Rechnungeî  aló 
+aucè  Zahlungseingaengå voî Kundeî iî eineò  Rechnungsdateé 
+erfasst®  Gleichzeitiç solleî diå erfassteî Dateî aucè  zuí 
+Fortschreibeî deò Kundendateé dienen:
+SET TALK OFF
+ERASE
+@ 2,12 SAY 'Rechnungs-Bearbeitung'
+SELECT PRIMARY
+USE rechnung INDEX nummer
+* nummer ist die nach kunummer indizierte Datei rechnung
+SELECT SECONDARY
+USE kunden INDEX kundnum
+DO WHILE T
+* T ist ein logischer Direktwert (TRUE)
+   ERASE
+   @ 5,1
+   ACCEPT 'Rechnungs-Nr.' TO Mnr
+   SELECT PRIMARY
+   FIND &Mnr
+   DO CASE
+      CASE #=0
+         ERASE
+         @ 2,14 SAY 'neue Rechnung'
+         APPEND BLANK
+         @ 5,10 SAY 'Rechnungs-Nr'+Mnr
+         @ 8,1° SAÙ 'Kunden-Nr.:§ GEÔ  kunummeò PICTURE'999'
+         @ 10,10 SAY 'Betrag: M'   GET  betrag
+         READ
+         REPLACE rnr WITH Mnr
+         REPLACE datum WITH date()
+         STORE kunummer TO Mkunde
+         SELECT SECONDARY
+         FIND &Mkunde
+         REPLACE lrech WITH Mnr
+         REPLACE datum WITH date()
+         REPLACE umsatz WITH umsatz + P.betrag
+         REPLACE offen WITH umsatz-bezahltŠ      CASE #>0
+         ERASE
+         STORE 0 TO Mbezahlt
+         @ 2,15 SAY 'Zahlungseingang'
+         @ 5,10 SAY 'Rechnungs-Nr.'+rnr
+         @ 8,4  SAY 'Betrag  Teilzahlung  offen'
+         ? betrag,bezahlt,betrag-bezahlt
+         @ 11,4  SAY 'neue Zahlung: M' GET Mbezahlt
+         READ
+         REPLACE bezahlt WITH bezahlt + Mbezahlt    
+         REPLACE bdatum  WITH date()
+         STORE kunummer TO Mkunde
+         SELECT SECONDARY
+         FIND &Mkunde
+         REPLACE bezahlt WITH bezahlt + Mbezahlt
+         REPLACE offen WITH umsatz-bezahlt
+   ENDCASE
+   @ 18,4 SAY 'Fuer weitere Eingaben RETURN,sonst N druecken'
+   WAIT TO antwort
+   IF ! (antwort)='N'
+      SET TALK ON
+      RETURN
+   ENDIF
+ENDDO
+
+Erlaeuterungen
+--------------
+
+Findeô REDABAÓ keineî Satú eineò bestimmteî Nummeò (nuò beé 
+Anwendunç  voî  FIND)¬  weisô deò Satzzeigeò auæ  diå  lfd® 
+Satznummeò 0.
+
+APPENÄ  BLANË haengô aî diå eroeffnetå Dateé eineî "leeren¢ 
+Datensatú an¬  ohnå dieseî zõ editieren® Diå Datenerfassunç 
+erfolgô  danî nichô uebeò diå APPEND-Maske¬  sonderî  uebeò 
+diå individuelì gestaltetå Maskå mitteló GET-Anweisungen.
+
+Zusammeî miô deí Befehì GEÔ kanî maî diå  Formatierfunktioî 
+PICTURÅ  'format§  verwenden®  Miô ihreò Hilfå laessô  sicè 
+sicherstellen¬  dasó  diå erfassteî Dateî stetó  ií  selbeî 
+Formaô  gespeicherô  werden®  Unkorrekô  formatiertå  Dateî 
+werdeî richtiggestellô odeò zurueckgewiesen.
+
+           Zeichen  |  Bedeutung
+           ---------|------------------------------------
+             #,9    |  Ziffer oder ".","+","-"," "(space)
+             X      |  Zeichen
+             A      |  Buchstabe
+             $,*    |  wird mit ausgegeben
+             !      |  konvertiert Klein- in Grossbuchstaben
+
+Miô REAÄ werdeî diå uebeò GEÔ erfassteî Dateî iî deî leereî 
+neueî Datensatú geschrieben.
+
+
+.paŠ4.   Beispiele  
+
+Eó  solleî  einigå  Beispielå  fueò  Programmroutineî   ge
+zeigô werden¬  diå aló Bausteinå mehò odeò wenigeò  univer
+selì  einsetzbaò sind.
+
+
+
+4.1. Programmschleifen
+
+DO WHILE .NOT.EOF
+Dieså  Bedingunç  wirä  beé deò  sequentielleî  Bearbeitunç 
+eineò Dateé benutzt¬  wobeé iî jedeí Schleifendurchlauæ eiî 
+Datensatú  verarbeiteô wird¬   bió daó  Dateiendå  erreichô 
+ist®   Diå Pruefunç deó Dateiendeó erfolgô miô deò Funktioî  
+"EOF"¬  diå  voî ihreí logischeî Werô  "F¢  (FALSE©  iî deî 
+logischeî Werô "T¢ (TRUE©  uebergeht¬ sobalä deò Datensatz
+anzeigeò auæ daó Dateiendå weist.
+
++------+
+| SKIP | :  Aufruæ deó jeweiló folgendeî Datensatzes® Durcè 
++------+    Zufuegeî  eineò positiveî  odeò negativeî  Zahì 
+            kanî  deò Datensatzzeigeò auæ  eineî   entspre
+            chenä  weiteò  entfernteî  Datensatú  gerichteô 
+            werden.
+
+DO WHILE #=0
+            Befehlsfolgå fueò deî Fall,dasó iî eineò INDEX-
+            Dateé eiî Satú nichô gefundeî wurdå  (miô FIND)
+ENDDO
+
+Diå  Betaetigunç deò RETURN-Tastå (ohnå vorherigå  Eingabe© 
+erzeugô eiî Leerzeichen.
+
+STORE T TO m
+DO WHILE m
+
+
+STORE 1 TO z
+DO WHILE z=1
+
+STORE 'x' TO y
+DO WHILE y<>' '  Schleife,diå  beé  Betaetigunç voî  RETURÎ 
+                 odeò deò Leertastå verlasseî wird.
+
+WAIT TO a
+DO WHILE a$'1234567890' 
+                 Allå Zifferntasteî bewirkeî eiî Verweilen
+                 innerhalâ deò Schleife.
+
+
+.paŠ4.2. Etiketten-Druckprogramm
+
+ERASE 
+@ 5,25 SAY 'Etiketten-Druckprogramm'
+@ 10,0
+ACCEPT 'zusaetzlicher Text' TO text
+USE adressen INDEX alphabet
+STORE 'E' TO Meinzel
+DO WHILE .NOT.EOF
+   SET Print ON
+   ? text
+   ?
+   ? TRIM (vorname)+' '+name
+   ? strasse
+   ? ort
+   ?
+   ?
+   SET PRINT OFF
+   SKIP
+   IF ! (Meinzel)='E'
+      ERASE
+      @ 10,5 SAY '(E) Einzeldruck fuer Justage fortsetzen'
+      @ 12,5 SAY '(A) Alle Etiketten von Anfang an drucken'
+      @ 14,5 SAY '(0) ENDE'
+      @ 17,5 SAY 'Bitte waehlen Sie eine Funktion'
+      WAIT TO Meinzel
+      IF ! (Meinzel)='A'
+         GO TOP
+      ENDIF
+      IF ! (Meinzel)='0'
+         RETURN
+      ENDIF
+   ENDIF
+ENDDO
+
+
+
+4.3.   Vom Programm erzwungene Sicherheitskopien
+
+Diå  Sicherheitskopiå fueò einå Dateé wirä uebeò eiî  sepa
+rateó  Programí  erstellt®  Beé dieseò Gelegenheiô wirä  iî  
+eineí   separateî Speicheò (z.B®  Msiko© eiî  diesbezuegli
+cheò  Hinweió (z.B®  "frei"©  gesetzô unä auæ Diskettå  ge
+speichert®  Werdeî Veraenderungeî aî deò Dateé vorgenommen¬ 
+danî wirä deò  Hinweió "frei¢ geloescht.
+Bevoò  nuî  einå Auswertunç deò Dateé erfolgeî  kann¬  wirä  
+zunaechsô  deò Hinweisspeicheò auæ seineî Statuó hiî  abge
+fragt®  Wirä  deò Inhalô "frei¢ gelesen¬  kanî daó  Auswer
+tungsprogramí durchgefuehrô werden®  Anderfalló wirä dieseó 
+gesperrô unä deò Benutzeò statô desseî aufgefordert¬ zuersô 
+diå Sicherheitskopiå zõ erstellen®            
+
+STORE 'frei' TO Msiko
++------------------+
+| SAVE TO speicher |
++------------------+  
+Miô  SAVÅ werdeî allå augenblicklicè  definierteî  Speicheò 
+miô  ihreî Inhalteî iî eineò Dateé voí Tyğ ".VAR¢  auæ  deò  ŠDiskettå gespeichert®   
+
+Daó  Programí laessô sicè bezueglicè deò zõ sicherndeî  Da
+teieî verallgemeinern¬ wenî iî deò Maskå zunaechsô nacè deò 
+Dateé  gefragô  wirä unä dieså  danî  indirekô   aufgerufeî  
+wird:
+@ 5,5
+ACCEPT  'Name der zu sichernden Datei'  TO datei    
+  ...
+USE &datei
+COPY TO B:&datei
+  ...
+STORE  'frei'  TO &datei
+SAVE TO speicher
+
++-----------------------+
+| RESTORE FROM speicher |
++-----------------------+
+Miô  RESTORÅ  werdeî allå iî deò Speicherdateé  vorhandeneî 
+Dateî iî diå frueheò definierteî Speicheò  zurueckgeschrie
+ben®  Gleichzeitiç  werdeî  diå bió dahiî aktiveî  Speicheò 
+freigeben.
+
+Beispiel:  Programí miô integrierteí Zwanç zuò Sicherheits
+           kopiå fueò diå Adressdatei
+
+RESTORE FROM speicher
+DO WHILE T
+   ERASE
+   @ 1,30 SAY 'Programm-Auswahl'
+   @   5,15 SAY '(1) Information ueber einzelne Kunden'
+   @   7,15 SAY '(2) Kundenadressen auflisten'
+   @   9,15 SAY '(3) neue Kunden aufnehmen'
+   @  11,15 SAY '(4) Rechnungs-Bearbeitung'
+   @  13,15 SAY '(5) Sicherheitskopie'
+   @  15,15 SAY '(0) ENDE'
+   @  19,15 SAY 'Bitte waehlen Sie eine Funktion'
+   WAIT TO ant
+   DO CASE
+      CASE ant='1'
+        DO info
+      CASE ant='2'
+        ERASE
+        IF Msiko='frei'
+           USE adressen INDEX alphabet
+           @  1,1 SAY 'Kunde   Strasse  Wohnort Kunden-Nr.'
+           DISPLAY OFF ALL $(vorname,1,1),name,strasse,;
+           ort,kunummer
+           WAIT
+        ELSE
+           @ 10,5 SAY 'Machen Sie erst eine Sicherheitskop.'
+           @ 15,5 SAY 'Druecken Sie irgendeine Taste'
+           WAIT
+        ENDIF
+     CASE ant='3'
+        USE adressen INDEX alphabet
+        APPEND
+        STORE ' '  TO MsikoŠ        SAVE TO speicher
+     CASE ant='4'
+        DO rechnung
+     CASE ant='5'
+        DO siko
+     CASE ant='0'
+        RETURN
+   ENDCASE
+ENDDO
+
+Beispiel:  Erstellen der Sicherheitskopie (siko)
+
+DO WHILE T
+   ERASE
+   @ 10,5 SAY 'Bitte Diskette fuer Sicherheitskopie'
+   @ 11,5 SAY ' in Laufwerk B einlegen und dann:'
+   @ 14,5 SAY '(S) Start Sicherheitskopie'
+   @ 16,5 SAY '(0) zurueck zum Hauptmenue'
+   WAIT TO ant
+   IF !(ant)='S'
+      ERASE
+      @ 10,5 SAY 'Sicherheitskopie wird erstellt'
+      USE adressen
+      COPY TO B:adressen      
+      STORE 'frei' TO Msiko
+      SAVE TO speicher 
+   ENDIF
+   IF ant='0'
+      RETURN 
+   ENDIF
+ENDDO
+
+
+
+4.4.   Zugriffskontrolle mit Passwort
+
+Zuò  Verwaltunç deò Dateî uebeò berechtigtå  Personeî  wirä 
+einå  Dateé  (z.B®  password© miô z.B®  folgendeò  Struktuò 
+angelegô unä gefuellt:
+
+      001  name ,c,15
+      002  passw,c,10
+      003  schl ,c,1
+
+Soforô  nacè  Starô  deó Programmeó wirä  diå  Eingabå  deó 
+Namenó unä deó Passworteó verlangt®  Solltå deò Namå  nichô 
+iî  deò  Dateé enthalteî seiî odeò stimmô  beé  vorhandeneí 
+Nameî  daó  Passworô nicht¬  wirä daó Programí  automatiscè 
+beendet.
+Sinä Namå unä Passworô iî Ordnung¬  entscheideô deò  Inhalô 
+voî  schì uebeò diå Zugriffsberechtigunç zõ einzelneî Funk
+tionsbloecken.
+
+z.B.   1  -  uneingeschraenktå Berechtigung
+       2  -  Berechtigung¬  allå Informationeî  abzufragen¬ 
+             abeò nichô zõ aendern
+       3  -  Berechtigung¬  nuò  bestimmtå Informationeî zõ 
+             lesenŠ4.5.   Schnelles zweistufiges Suchen
+
+Daó erstå Auftreteî deó Schluesselworteó wirä iî deò ersteî 
+Stufå miô FINÄ festgestellt®  Danacè kanî iî eineò  zweiteî 
+Stufå auó deí relatiö kleineî Blocë alleò Saetzå miô dieseí 
+Schluesselworô  mitteló   LOCATÅ  eiî ganú bestimmteò  Satú 
+ermittelô werden.
+Beispiel:   FIND &Mname
+            IF Mvor<>' '
+               LOCATE FOR (Mname$ name .AND. Mvor$ vorname)
+            ENDIF
+            IF (EOF.OR.#=0)
+               ? 'Namen nicht gefunden'
+               WAIT
+            ENDIF
+
+
+
+4.6.   Schnelles Suchen und Umblaettern
+
+ERASE 
+USE adr INDEX alpha
+ACCEPT  'Name des Kunden'  TO Mname
+FIND  &Mname
+STORE  'x'  TO ant
+DO WHILE ant <>' '
+   DO WHILE #=0
+      ERASE
+      @  5,5 SAY 'Name nicht gefunden'
+      @  7,5 SAY 'Bitte Eingabe wiederholen'
+      @  8,5 SAY '      oder mit RETURN abbrechen'
+      @ 10,0
+      ACCEPT  'Name des Kunden'  TO Mname
+      IF Mname=' '
+         RETURN
+      ENDIF
+      FIND &Mname
+   ENDDO
+   ERASE
+   @  3,10 SAY TRIM(vorname)+' '+name
+   @  5,10 SAY strasse
+   @  6,10 SAY ort
+   @ 15,5  SAY 'Ist das der gesuchte Kunde?'
+   @ 17,5  SAY 'Wenn ja,  RETURN  druecken'
+   @ 19,5  SAY '(N) Nein, weiter zum naechsten Namen'
+   @ 20,5  SAY '(Z) Nein, zurueck zum vorhergehenden'
+   @ 21,5  SAY '(A) Nein, Suche abbrechen'
+   WAIT TO ant
+   DO CASE
+      CASE !(ant)='N'
+         SKIP
+      CASE !(ant)='Z' 
+         SKIP -1
+      CASE !(ant)='A'
+         RETURN
+   ENDCASE
+ENDDO
+*  Der gesuchte Satz ist im ZugriffŠ4.7.   Dialogesteuerte Erzeugung von Dateien
+
++------------------------------------------+
+| COPY TO strukturdatei STRUCTURE EXTENDED |
++------------------------------------------+ 
+
+Miô dieseí Befehì wirä diå Strukturbeschreibunç eineò Dateé 
+aló Dateiinhalô iî diå Dateé strukturdateé uebernommen.
+ . USE adressen  
+ . COPY TO struktur STRUCTURE EXTENDED
+ . USE struktur
+ . LIST
+
+00001  KUNUMMER   C   3  0          +-------------------+
+00002  NAME       C  10  0          | Datensaetze einer |
+00003  VORNAME    C  10  0          | Strukturdatei     |
+00004  STRASSE    C  15  0          +-------------------+
+00005  ORT        C  16  0
+
+
+ . USE  struktur
+ . LIST STRUCTURE
+
+STRUCTURE FOR FILE:  STRUKTUR.DBD   +-----------------+
+NUMBER OF RECORDS:   00005          | Struktur aller  |
+DATE OF LAST UPDATE: 00/00/00       | Strukturdateien |
+PRIMARY USE DATABASE                +-----------------+
+FLD    NAME       TYPE  WIDTH  DEC
+001  FIELD:NAME    C    010
+002  FIELD::TYPE   C    001
+003  FIELD:LEN     N    003
+004  FIELD:DEC     N    003
+**  TOTAL  **         00018
+
+
+Daó folgendå Beispieì ermoeglichô daó Erstelleî voî Dateieî 
+ií Dialog®  Zunaechsô generierô maî einå leerå  Strukturda
+teiº 
+USE  struktur
+DELETE ALL
+PACK
+
+Beispiel:
+ERASE
+ACCEPT  'Name der zu erstellenden Datei'  TO Mdatei
+USE struktur
+COPY TO strukt1
+USE strukt1
+STORE 'x' TO ant
+DO WHILE !(ant)<>'N'
+   ERASE
+   APPEND BLANK
+   @ 2,5 SAY 'Festlegung des '+STR(#,5)+'. Datenfeldes'
+   @ 5,5 SAY 'Feldname (max. 10 Zeichen)' GET field:name
+   @ 7,5 SAY 'Feldtyp (C oder N oder L)' GET field:type
+   @ 9,5 SAY 'Feldlaenge (Anzahl Zeichen)' GET field:len
+   READ
+   IF ! (field:type)='N'Š      @  11,5 SAY Anzahl der Dezimalstellen GET field:dec
+      READ
+   ENDIF
+   @  15,5 SAY ' weitere Felder definieren?'
+   @  17,5 SAY ' (J) Ja'
+   @  18,5 SAY ' (N) Nein'
+   WAIT TO ant
+
+ENDDO
+ERASE
+@ 10,5 SAY ' Bitte warten, Datei wird generiert'
+CREATE  &Mdatei  FROM  strukt1
+USE  &Mdatei
+@ 15,5 SAY ' Wollen Sie sofort Daten eingeben? (J/N)'
+WAIT TO ant
+IF  !(ant)='J'
+   APPEND
+ENDIF
+
+Erlaeuterung:
+           +---------------------------------+
+Der Befehl | CREATE datei FROM strukturdatei |
+           +---------------------------------+
+           dienô  deò  Generierunç  eineò Dateé  auó  eineò 
+           definierteî Struktur.
+

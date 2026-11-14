@@ -64,6 +64,13 @@ UDOS_EIGENSCHAFTEN = [
 ]
 
 
+#: BS600-Dateitypen (`doc/bs600_diskettenformat.md` §7): P an allen Abzuegen; L akzeptiert der Monitor.
+BS600_TYPEN = [
+    ("P", "P — Programm"),
+    ("L", "L — vom Monitor akzeptiert (Bedeutung offen)"),
+]
+
+
 #: Dateiarten einer WEGA-Inode mit Klartext (Spalte `type` der Dateiliste).
 UNIX_ARTEN = {
     "-": "gewöhnliche Datei", "d": "Verzeichnis", "c": "Zeichen-Gerät",
@@ -133,7 +140,9 @@ class PropertiesDialog(QDialog):
         # dieselben Kopfsektorangaben — nur CP/M nicht.
         # Die Art kommt aus dem Dateisystem, nicht aus dem Typfeld des Eintrags: bei
         # WEGA steht dort eine Dateiart (-/d/c), die man leicht fuer einen UDOS-Typ haelt.
-        if getattr(tool, "ist_sios", False):
+        if getattr(tool, "ist_bs600", False):
+            self.art = "bs600"         # Typ P/L, Datum, Signum, Lade-/Startadresse (KEIN UDOS-Typ)
+        elif getattr(tool, "ist_sios", False):
             self.art = "sios"          # nur Anzeige: VOL1 und HDR1 bzw. AADR/ML
         elif getattr(tool, "ist_fat", False):
             self.art = "fat"           # DOS: vier Attributbits und Zeitstempel
@@ -150,7 +159,7 @@ class PropertiesDialog(QDialog):
         lay.addWidget(self._kopf())
         lay.addWidget({"wega": self._wega_teil, "udos": self._udos_teil,
                        "cpm": self._cpm_teil, "sios": self._sios_teil,
-                       "fat": self._fat_teil}[self.art](), 1)
+                       "fat": self._fat_teil, "bs600": self._bs600_teil}[self.art](), 1)
 
         self.hinweis = QLabel("")
         self.hinweis.setWordWrap(True)
@@ -197,6 +206,60 @@ class PropertiesDialog(QDialog):
             defekt = QLabel("nicht vollständig lesbar (CRC-Fehler oder Kettenbruch)")
             defekt.setStyleSheet("color: #b00000;")
             form.addRow("Zustand", defekt)
+        return kasten
+
+    def _bs600_teil(self) -> QWidget:
+        """BS600-Verzeichniseintrag: Name, Typ, Datum, Signum, Lade- und Startadresse.
+
+        Die Lage (Spur/Sektor) und die Endadresse sind Struktur und nur Anzeige: die Endadresse folgt aus der
+        Laenge, die Lage aus der Ablage (Reorganisieren verschiebt Dateien).  Eine neue Ladeadresse verschiebt die
+        Endadresse mit; der Dateiinhalt wird nie angefasst.
+        """
+        e = self.entry
+        kasten = QGroupBox("BS600-Eintrag (PRG 700/710/710-1)")
+        form = QFormLayout(kasten)
+
+        self.f_name = QLineEdit(e.name)
+        self.f_name.setMaxLength(6)
+        self.f_name.setMaximumWidth(120)
+        self.f_name.setToolTip("Dateiname: 1 bis 6 Zeichen ohne Punkt (BS600 kennt keine Endungen); "
+                               "Großbuchstaben, Ziffern.  Geändert wird nur der Verzeichniseintrag.")
+        form.addRow("Name", self.f_name)
+
+        self.f_typ6 = QComboBox()
+        for kuerzel, text in BS600_TYPEN:
+            self.f_typ6.addItem(text, kuerzel)
+        i = self.f_typ6.findData(e.type)
+        if i < 0:                                # ein fremder Buchstabe bleibt sichtbar und unveraendert
+            self.f_typ6.addItem(f"{e.type or '?'} — unbekannt", e.type)
+            i = self.f_typ6.count() - 1
+        self.f_typ6.setCurrentIndex(i)
+        form.addRow("Typ", self.f_typ6)
+
+        self.f_datum6 = QLineEdit(e.date)
+        self.f_datum6.setPlaceholderText("TT.MM.JJ")
+        self.f_datum6.setMaximumWidth(100)
+        self.f_datum6.setToolTip("Datum der Datei, TT.MM.JJ (oder TTMMJJ), wie im Verzeichnis.")
+        form.addRow("Datum", self.f_datum6)
+
+        self.f_signum6 = QLineEdit(e.created)
+        self.f_signum6.setMaxLength(3)
+        self.f_signum6.setMaximumWidth(60)
+        self.f_signum6.setToolTip("Signum: Kürzel des Bearbeiters, bis zu 3 Zeichen.")
+        form.addRow("Signum", self.f_signum6)
+
+        self.f_lade6 = QLineEdit(_hex16(e.low_addr))
+        self.f_lade6.setMaximumWidth(80)
+        self.f_lade6.setToolTip("Ladeadresse (hex): dorthin lädt BS600 die Datei.  Die Endadresse zieht mit.")
+        form.addRow("Ladeadresse", self.f_lade6)
+        form.addRow("Endadresse", self._nur_anzeige(
+            _hex16(e.high_addr), "Letztes Byte der Datei; folgt aus Ladeadresse und Länge."))
+        self.f_start6 = QLineEdit(_hex16(e.entry))
+        self.f_start6.setMaximumWidth(80)
+        self.f_start6.setToolTip("Startadresse (hex), 0000 = Datei ohne Programmstart.")
+        form.addRow("Startadresse", self.f_start6)
+        form.addRow("Lage", self._nur_anzeige(
+            e.extent or "—", "Spur/Sektor von … bis (Spur = Zylinder); eine Datei liegt stets zusammenhängend."))
         return kasten
 
     def _wega_teil(self) -> QWidget:
@@ -608,6 +671,23 @@ class PropertiesDialog(QDialog):
         aend: dict = {}
         if self.art == "sios":
             return aend
+        if self.art == "bs600":
+            neu = self.f_name.text().strip().upper()
+            if neu != e.name:
+                aend["name"] = neu
+            if self.f_typ6.currentData() != e.type:
+                aend["type"] = self.f_typ6.currentData()
+            if self.f_datum6.text().strip().replace(".", "") != e.date.replace(".", ""):
+                aend["date"] = self.f_datum6.text().strip()
+            if self.f_signum6.text() != e.created:
+                aend["author"] = self.f_signum6.text()
+            lade = _parse_hex(self.f_lade6.text(), "Ladeadresse")
+            if lade != e.low_addr:
+                aend["load"] = lade
+            start = _parse_hex(self.f_start6.text(), "Startadresse")
+            if start != e.entry:
+                aend["entry"] = start
+            return aend
         if self.wega:
             text = self.f_oktal.text().strip() or "0"
             try:
@@ -705,6 +785,13 @@ class PropertiesDialog(QDialog):
                 self.tool.set_unix_attrs(self.entry.ref, **aend)
             elif self.art == "fat":
                 self.tool.set_dos_attrs(self.entry.ref, **aend)
+            elif self.art == "bs600":
+                # Erst die Angaben unter dem ALTEN Namen, dann umbenennen.
+                neu = aend.pop("name", None)
+                if aend:
+                    self.tool.set_bs600_attrs(self.entry.ref, **aend)
+                if neu is not None:
+                    self.tool.rename(self.entry.ref, neu)
             elif self.udos:
                 self.tool.set_udos_attrs(self.entry.ref, **aend)
             else:

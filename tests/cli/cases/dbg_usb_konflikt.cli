@@ -1,0 +1,6 @@
+# --usb (Basis 84H) am PRG 710: 84H..87H gehoeren der K2521 (CTC/PIO) -> Fehlermeldung mit Grund, Exit 2, kein Absturz.
+tool:    k1520dbg
+disk:    cpa_cpa780_k5601_clock.img
+run:     --machine prg710 --usb %DISK%
+exit:    2
+expect:  --usb: E/A-Tor 84H belegt

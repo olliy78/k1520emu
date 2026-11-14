@@ -190,6 +190,8 @@ TEST(FsCheckKeineFalschmeldungen, JedeUnversehrteFixturePrueftOhneBefund) {
         "udos_boot_scp.hfe",            "udos_ds77_k5601_fremdsync.hfe",
         "udos1715_640k_pc1715_system.img", "udosP8000_640k_wega.hfe",
         "udos50_640k_a5120_system.img",
+        // BS600 (Entwurf 48, AP-B5): beide Originale pruefen ohne Warnung (die Info zum PRG-700-Urlader ist keine).
+        "../bs600/bs620_prg710-1.hfe",  "../bs600/bs600_prg700.hfe",
     };
 
     for (const char* name : disketten) {
@@ -963,6 +965,9 @@ TEST(FsCheckGegenprobe, DerAusgelieferteKatalogIstEindeutig) {
         "k8915scpx_boot1.hfe",
         "k8915scpx_cpa800_k5601_bios55k-disk900.hfe",
         "k8915scpx_cpa800_k5601_v24xonxoff-autodbase-disk904.hfe",
+        // BS600 (Entwurf 48, AP-B4): eigene Geometrie (Spur 0 26x128 + 15x256), darf weder UDOS noch SCPX noch CPA
+        // mehrdeutig machen - und umgekehrt.
+        "../bs600/bs620_prg710-1.hfe",  "../bs600/bs600_prg700.hfe",
     };
     for (const char* name : disketten) {
         auto v = oeffne(fixture(name));

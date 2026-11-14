@@ -86,9 +86,24 @@ Weitere Möglichkeiten:
 ```sh
 ./install.sh --prefix ~/programme/K1520emu   # ohne Rückfrage dorthin
 ./install.sh -y                              # ohne Rückfrage in den Vorschlag
-./install.sh --no-shortcut                   # ohne Startmenü-Eintrag
+./install.sh --shortcut                      # Startmenü-Einträge ohne Rückfrage anlegen
+./install.sh --no-shortcut                   # ohne Startmenü-Einträge
 ./install.sh --help                          # alle Optionen
 ```
+
+**Startmenü-Einträge.** Der Installer fragt, ob zusätzlich zu den Programmen `.desktop`-Dateien
+(in `~/.local/share/applications`) und Starter in `~/.local/bin` angelegt werden, damit die Programme
+wie unter Windows im Anwendungsmenü auftauchen.  Bereits vorhandene Einträge einer früheren Fassung
+werden ersetzt.  Ohne Terminal und mit `-y` gilt „ja".
+
+**Update.** Derselbe Aufruf über eine vorhandene Installation: die alte Fassung wird beiseite gelegt
+(`*.alt`) und erst nach dem bestandenen Rauchtest gelöscht.  Scheitert die Installation oder brechen Sie
+ab, wird die vorherige Fassung wiederhergestellt; Startmenü-Einträge entstehen erst nach dem Rauchtest.
+
+**Entfernen.** `<Ziel>/uninstall.sh` (auch im Startmenü als „K1520emu deinstallieren") löscht die
+Startmenü-Einträge und Starter dieser Installation und fragt, ob der Programmordner gelöscht werden soll.
+`-y` fragt nicht, `--keep-folder` behält den Ordner, `--purge` löscht zusätzlich Disketten und Konfiguration.
+`./install.sh --uninstall` ruft dasselbe Skript.
 
 ## Starten
 

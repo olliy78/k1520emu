@@ -37,6 +37,10 @@ _SPEC: List[Tuple] = [
      "Eine leere tar-Diskette oder einen leeren tar-Satz in einem wählbaren Format anlegen — "
      "Dateien und Ordner hineinziehen, dann speichern (wächst der Inhalt über eine Diskette, "
      "entstehen nummerierte Abbilder)", "_tar_neu_dialog", False),
+    # GIDE-Platten (Poppe/Kingstener).  Bewusst OHNE Tastenkuerzel (die Kuerzeltabelle des Handbuchs ist ein Vertrag).
+    ("gide_neu", "Neue &GIDE-Platte…", None, None,
+     "Ein leeres GIDE-Plattenabbild (.img.gz) im Layout Poppe oder Kingstener anlegen und formatieren",
+     "_gide_neu_dialog", False),
     ("speichern", "&Speichern", "save", "Ctrl+S",
      "Die Änderungen in die Abbilddatei schreiben (bei einem tar-Satz: erst die Rückfrage mit "
      "Namen und Umfang)", "save", False),
@@ -66,6 +70,12 @@ _SPEC: List[Tuple] = [
     ("platte_ordner", "Ordner auf der &Platte anlegen…", None, None,
      "Auf der Platte im angeklickten Ordner (oder der Partition) einen neuen Ordner "
      "anlegen", "_platte_ordner_anlegen", False),
+    # Nur an einer GIDE-Platte sichtbar; OHNE Tastenkuerzel.
+    ("gide_format", "GIDE-&Laufwerk formatieren…", None, None,
+     "Das Verzeichnis eines Laufwerks der GIDE-Platte leeren (wie ERADIR bzw. GIDN /F)",
+     "_gide_format_dialog", False),
+    ("gide_pruefen", "GIDE-Platte &prüfen…", None, None,
+     "Layout und Verzeichnisse der GIDE-Platte prüfen (nur lesend)", "_gide_pruefen_dialog", False),
     # Nur an einem tar-Archiv sichtbar (Entwurf 37 T4); OHNE Tastenkuerzel.
     ("tar_ordner", "Ordner im &tar-Archiv anlegen…", None, None,
      "Im tar-Archiv einen neuen Ordner anlegen (Zwischenordner entstehen mit)",
@@ -132,6 +142,12 @@ _SPEC: List[Tuple] = [
     ("dos_sys", "&Systemdateien übernehmen… (DOS SYS)", None, None,
      "Bei einer leeren MS-DOS-Diskette: Bootsektor und Systemdateien (IO.SYS, DCDOS.SYS …) von einer "
      "Systemdiskette übernehmen — das macht sie bootfähig", "_dos_sys_dialog", False),
+    # BS600 (PRG 700/710/710-1): Dateien liegen unfragmentiert; nach dem Loeschen entstehen Luecken, in die
+    # eine grosse Datei nicht mehr passt.  Bewusst OHNE Tastenkuerzel (die Kuerzeltabelle des Handbuchs ist
+    # ein Vertrag).  Nur bei einer BS600-Diskette sichtbar bedienbar.
+    ("reorganisieren", "BS600: Dateien &reorganisieren…", None, None,
+     "Bei einer BS600-Diskette die Lücken zwischen den Dateien schließen (alle Dateien lückenlos ab Spur 1 "
+     "neu legen; Namen und Inhalt bleiben)", "_reorganisieren", False),
     ("diskeditor", "&Diskeditor…", "disk-editor", "Ctrl+E",
      "Die Diskette Spur für Spur und Sektor für Sektor ansehen und bearbeiten",
      "open_disk_editor", False),
@@ -228,6 +244,7 @@ KURZ = {'oeffnen': 'Öffnen',
     'gerade_spuren': 'Ungerade weg',
     'seite1_weg': 'Seite 1 weg',
     'bootabbild': 'Bootabbild',
+    'reorganisieren': 'Reorganisieren',
     'dos_sys': 'DOS SYS',
     'diskeditor': 'Diskeditor',
     'angaben': 'Diskette',

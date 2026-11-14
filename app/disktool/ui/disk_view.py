@@ -45,7 +45,11 @@ DIR_ROLE = Qt.UserRole + 3
 
 #: Spaltenkoepfe der Diskettenansicht und der Plattenansicht (UNIX-Angaben).
 DISK_SPALTEN = ["Name", "Typ", "Größe", "Eigensch.", "Datum"]
+#: BS600 (PRG 700/710/710-1): Typ P/L, Lage Spur/Sektor, Lade-/End-/Startadresse (hex), Datum, Signum.
+BS600_SPALTEN = ["Name", "Typ", "Größe", "Lage", "Laden", "Ende", "Start", "Datum", "Signum"]
 PLATTE_SPALTEN = ["Name", "Art", "Größe", "Rechte", "uid", "gid", "Geändert"]
+#: GIDE-Platte (CP/M-Laufwerke): kein UNIX, dafuer der Nutzerbereich.
+GIDE_SPALTEN = ["Name", "Nutzer", "Größe", "Attribute"]
 
 
 class _Tree(QTreeWidget):
@@ -232,6 +236,7 @@ class DiskView(QWidget):
     def _spalten_setzen(self, koepfe) -> None:
         if [self.tree.headerItem().text(i)
                 for i in range(self.tree.columnCount())] != list(koepfe):
+            self.tree.setColumnCount(len(koepfe))        # setHeaderLabels verkleinert nie
             self.tree.setHeaderLabels(list(koepfe))
             self._spaltenbreiten()
 
@@ -255,6 +260,9 @@ class DiskView(QWidget):
             return
         if getattr(tool, "ist_fat", False):
             self._set_fat(tool, entries)
+            return
+        if getattr(tool, "ist_bs600", False):
+            self._set_bs600(tool, entries)
             return
         self._spalten_setzen(DISK_SPALTEN)
         self.titel.setText(f"Diskette — {tool.filesystem}")
@@ -284,6 +292,27 @@ class DiskView(QWidget):
             # Zeile ueber die LAUFENDE NUMMER merken: genau darueber spricht die
             # Bibliothek beim Nachtragen (`load_entry_details(i)`), und Namen sind
             # bei UDOS ueber beide Seiten hinweg nicht eindeutig.
+            self._zeilen[nr] = item
+
+    def _set_bs600(self, tool, entries) -> None:
+        """BS600: flache Liste mit den Eintragsfeldern des Verzeichnisses (kein Dateiendungs-Begriff).
+
+        Lage ist ``Spur/Sektor-Spur/Sektor`` (Spur = Zylinder); Adressen hexadezimal.  Die Startadresse
+        ``0000`` heißt „keine“ (Dateien ohne Programmstart) und steht als Strich.
+        """
+        self._spalten_setzen(BS600_SPALTEN)
+        self.titel.setText(f"Diskette — {tool.filesystem}")
+        self.tree.leer_text = "" if entries else "Keine Dateien auf der Diskette"
+        self._zeilen = {}
+        for nr, e in enumerate(entries):
+            start = f"{e.entry:04X}" if e.entry else "—"
+            item = QTreeWidgetItem(self.tree, [e.name, e.type, f"{e.size}", e.extent,
+                                               f"{e.low_addr:04X}", f"{e.high_addr:04X}", start,
+                                               e.date, e.created])
+            item.setData(0, REF_ROLE, e.ref)
+            item.setData(0, VOLUME_ROLE, e.volume)
+            if e.damaged:
+                item.setText(1, "DEFEKT")
             self._zeilen[nr] = item
 
     def _set_fat(self, tool, entries) -> None:
@@ -379,8 +408,9 @@ class DiskView(QWidget):
         ihnen gebaut.  Die Wurzelzeile einer Partition traegt Rolle, Datentraegername
         und freien Platz — wie die Gruppenzeile einer zweiseitigen Diskette.
         """
-        self._spalten_setzen(PLATTE_SPALTEN)
-        self.titel.setText("Platte — WEGA (P8000)")
+        gide = bool(getattr(tool, "ist_gide", False))
+        self._spalten_setzen(GIDE_SPALTEN if gide else PLATTE_SPALTEN)
+        self.titel.setText(f"GIDE-Platte — {tool.layout}" if gide else "Platte — WEGA (P8000)")
         self.tree.leer_text = "" if entries else "Keine Dateien gefunden"
         volumes = {v.dir: v for v in tool.volumes()}
         self._zeilen = {}
@@ -408,6 +438,10 @@ class DiskView(QWidget):
     @staticmethod
     def _platte_spalten(e, kurz: str, volume, tool) -> List[str]:
         """Name, Art, Groesse, Rechte, uid, gid, Zeit — wie ``ls -l``."""
+        if getattr(tool, "ist_gide", False):
+            if volume is not None:
+                return [f"{kurz}   {volume.free // 1024} KB frei", "", "", ""]
+            return [kurz, str(e.user) if e.user else "", f"{e.size}", e.attrs]
         if volume is not None:
             rolle = tool.volume_role(volume.index)
             kopf = f"{kurz}   {rolle} {volume.label}".rstrip()

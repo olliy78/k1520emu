@@ -1,0 +1,8 @@
+# Ohne --usb: der Befehl `usb` meldet das, statt zu stuerzen.
+tool:    k1520dbg
+disk:    cpa_cpa780_k5601_clock.img
+run:     %DISK%
+stdin:
+  usb
+  q
+expect:  keine GUN-USB gesteckt

@@ -59,6 +59,7 @@ bool TerminalAnschluss::deserialize(const uint8_t*& p, const uint8_t* end)
     a.num(rx); a.num(tx); a.num(br); a.flag(ba);
     if (!a.ok) return false;
     rxRest_ = rx; txRest_ = tx; breakRest_ = br; breakAktiv_ = ba;
+    leitungenSetzen();
     p = a.p;
     return true;
 }

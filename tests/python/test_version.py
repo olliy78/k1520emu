@@ -47,6 +47,13 @@ def cli(*args: str, wurzel: Path = None):
     return subprocess.run(cmd, capture_output=True, text=True)
 
 
+def test_git_umgebung_ist_leer():
+    """Kein GIT_* in der Testumgebung (conftest.py raeumt sie): sonst schreiben die
+    Wegwerf-Repos unten bei einem Lauf aus einem Git-Hook ins echte Repository."""
+    import os
+    assert not [n for n in os.environ if n.startswith("GIT_")]
+
+
 # ─── Die Datei VERSION ───────────────────────────────────────────────────────
 
 def test_version_datei_hat_eine_zeile_und_gueltige_grammatik():

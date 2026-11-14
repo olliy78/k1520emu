@@ -75,6 +75,7 @@ def _scp_soll(schluessel):
         d.update(db.gemeinsam(*GEMEINSAM_SCP))
         d.update(db.beigaben('SERTEST.COM'))
         d.update(db.kermit80('pc1715'))
+        d.update(db.karten('pc1715_scp6' if schluessel == 'v0006' else 'pc1715_scp7'))
         return d
     return soll
 

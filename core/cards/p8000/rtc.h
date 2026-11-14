@@ -85,6 +85,14 @@ struct P8000RtcConfig {
     std::string zustand;                  ///< Batteriedatei, "" = nur im Speicher
     std::function<int64_t()> zeitquelle;  ///< Unix-Sekunden UTC; leer = std::time
     uint32_t takt_hz = 4'000'000;         ///< Takt, in dem `takte()` zaehlt (Maschinenzeit)
+    std::string kopf = "K1520-P8000-RTC"; ///< Kopfkennung der Batteriedatei (ohne " 2"); GIDE nutzt eine eigene
+    /// false (P8000, Annahme [R3]): Zeitregister nehmen Schreibzugriffe nur bei STOP/RESET an.
+    /// true (GIDE, Rehs RTCset: HOLD setzen, Ziffern schreiben, HOLD loeschen, nie STOP): Schreiben auch unter HOLD.
+    /// Modell: unter HOLD stehen die Register (Momentaufnahme); geschriebene Ziffern aendern sie, und beim
+    /// Loeschen von HOLD gilt der Registerstand als neue Uhrzeit (Uhr laeuft von dort weiter, Resttakte der
+    /// Sekunde auf 0).  Die waehrend HOLD aufgelaufene Zeit wird dabei verworfen, nicht zusaetzlich gezaehlt;
+    /// wurde nichts geschrieben, bleibt die laufende Uhr unberuehrt (kein Verlust eines Sekundenuebertrags).
+    bool schreiben_unter_hold = false;
 };
 
 class P8000Rtc {
@@ -112,8 +120,10 @@ public:
     virtual void netzEin() = 0;
 
     /// Zeit, mit der eine Karte mit dieser Batteriedatei JETZT starten wuerde (Startregel), gastsichtig; ohne Karte.
+    /// @p kopf = Kopfkennung der Batteriedatei (P8000-Vorgabe; die GIDE-Karte schreibt "K1520-GIDE-RTC").
     static int64_t startzeit(const std::string& zustand, int jahresversatz, bool utc,
-                             const std::function<int64_t()>& zeitquelle = {});
+                             const std::function<int64_t()>& zeitquelle = {},
+                             const std::string& kopf = "K1520-P8000-RTC");
     /// Batteriedatei auf @p wand (Kalenderzeit im Jahr des Wirts) stellen; false = nicht schreibbar.
     static bool stellenDatei(const std::string& zustand, int64_t wand,
                              const std::function<int64_t()>& zeitquelle = {});
@@ -159,6 +169,10 @@ public:
     explicit P8000Rtc72421(const P8000RtcConfig& cfg);
     bool lesen(uint16_t port, uint8_t& d) override;
     bool schreiben(uint16_t port, uint8_t d) override;
+    /// Reine Registerschnittstelle (n = 0..15, ohne P8000-Kennung): liefert den Nibble in D0..D3, obere Bits 0.
+    /// Die P8000-Portsicht `lesen`/`schreiben` setzt darauf auf (KENNUNG 0x30 ODER Nibble).
+    uint8_t registerLesen(uint8_t n);
+    void registerSchreiben(uint8_t n, uint8_t d);
     void takte(int n) override;
     P8000RtcTyp typ() const override { return P8000RtcTyp::Rtc72421; }
     std::string text() const override;

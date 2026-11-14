@@ -135,8 +135,10 @@ def test_ohne_eintrag_ist_der_haken_gesperrt(qt_app):
     dlg = _dialog(qt_app)
     _waehle(dlg, "cpa_ds80_5x1024_daten")                     # Datendiskette, keine Systemspuren
     assert not dlg.boot_haken.isEnabled() and dlg.bootabbild() is None
-    _waehle(dlg, "udos_p8000_ds80_16x256")                 # NDOS P8000: (noch) kein geprueftes Abbild
+    _waehle(dlg, "udos1715_ds80_16x256")                   # NDOS PC 1715: (noch) kein geprueftes Abbild
     assert not dlg.boot_haken.isEnabled()
+    _waehle(dlg, "udos_p8000_ds80_16x256")                 # UDOS 3.0/3.1 am P8000: seit Ticket #30 geprueft
+    assert dlg.boot_haken.isEnabled()
     _waehle(dlg, "udos50_ds80_16x256")                     # UDOS 5.0 dagegen schon
     assert dlg.boot_haken.isEnabled()
 

@@ -141,12 +141,32 @@ class Programmprofil:
     #: unter *Einstellungen ▸ Allgemein* (doc/design/22_raf512.md §7).  Alle drei
     #: Programme bieten sie an; ohne sie laeuft die Maschine stets ohne RAF.
     raf_wahl: bool = True
+    #: Gruppe „Erweiterungskarten" unter *Einstellungen ▸ Allgemein* mit der IDE-Karte GIDE samt
+    #: Uhr (`app/gide.py`, doc/design/50_gun_gide.md G6).  Spaeter haengen sich USB (U3) und
+    #: Netzwerk (N3) in dieselbe Gruppe.  Nicht am P8000 (kein K1520-Bus) und nicht am MC80.
+    erweiterungskarten: bool = True
+    #: Vorauswahl der E/A-Basis der Steckkarten (`app/kartenwahl.py`): so gewaehlt, dass die Vorauswahlen
+    #: aller drei Karten UNTEREINANDER und mit RAF, Kassette K5020, Lochstreifen K6022 und den festen Karten
+    #: der Maschine disjunkt sind (Waechter `test_vorauswahl_kollidiert_nirgends`).
+    #: GIDE 90H auf allen Maschinen (94H..9FH frei).
+    gide_basis_vorgabe: int = 0x90
+    #: USB: 84H (GUN-Festlage), ausser wo 80H..87H belegt ist: ``usb_basis_modell`` = ``((Modell, Basis), …)``
+    #: ueberstimmt (K8915 Gen2, PRG 710/-1: 8CH).
+    usb_basis_vorgabe: int = 0x84
+    usb_basis_modell: Tuple[Tuple[str, int], ...] = ()
+    #: Netz: C0H (Standardlage der K1520-Netzkarte); PRG 710/-1: 28H (C0H..C3H = ATP-Zusatz).
+    net_basis_vorgabe: int = 0xC0
+    net_basis_modell: Tuple[Tuple[str, int], ...] = ()
     #: Hinweise, die der Laufwerkskasten beim Einlegen eines ``.cqm`` zeigt (Hinweiszeile,
     #: kein Meldungsfenster): was CopyQM an DIESEM Rechner unbrauchbar macht.  Leer = keine.
     cqm_hinweise: Tuple[str, ...] = ()
     #: Dasselbe fuer ``.td0`` (TeleDisk) und ``.imd`` (ImageDisk).
     td0_hinweise: Tuple[str, ...] = ()
     imd_hinweise: Tuple[str, ...] = ()
+    #: Hinweise nach Abbildname: ``(Teilstring in Kleinschrift, Text)``; der Text erscheint
+    #: unter dem Laufwerk, wenn der Dateiname den Teilstring enthaelt (BS600 am PRG, der Kern
+    #: erkennt es noch nicht am Inhalt).
+    namens_hinweise: Tuple[Tuple[str, str], ...] = ()
     #: Diskettenlaufwerke (K5122 o. ae.): ohne sie (MC80) fallen Kasten „Laufwerke“, die
     #: Diskettenmenues und die Laufwerksfelder der Statuszeile weg.
     laufwerke: bool = True
@@ -173,6 +193,19 @@ class Programmprofil:
         """Schlüssel des Modells ab Werk (das erste; ohne Modellwahl ``a5120``,
         der Schlüssel „kein Erweiterungsmodul“ aus `app/modell.py`)."""
         return self.modelle[0][0] if self.modelle else _modell.DEFAULT_MODEL
+
+    def karten_vorauswahl(self, karte: str, modell: str = "") -> int:
+        """Vorauswahl der E/A-Basis von *karte* (``"gide"``/``"usb"``/``"net"``) fuer *modell* (leer = Standardmodell)."""
+        if karte == "gide":
+            return self.gide_basis_vorgabe
+        tabelle = self.usb_basis_modell if karte == "usb" else self.net_basis_modell if karte == "net" else None
+        if tabelle is None:
+            raise ValueError(f"unbekannte Karte {karte!r}")
+        modell = modell or self.standard_modell()
+        for m, b in tabelle:
+            if m == modell:
+                return b
+        return self.usb_basis_vorgabe if karte == "usb" else self.net_basis_vorgabe
 
     def modell_normalisieren(self, modell) -> str:
         """Ein bekannter Modellschlüssel — Unbekanntes/Fehlendes wird die Vorgabe."""
@@ -527,6 +560,10 @@ TD0_HINWEIS_INFO = ("Fehler- und Löschmarken bleiben erhalten. .td0 wird immer 
                     "Pseudosektoren bleiben nur beim Speichern in .td0 erhalten.")
 IMD_HINWEIS_INFO = "Fehler- und Löschmarken bleiben erhalten; Pseudosektoren des .td0 gehen beim Speichern als .imd verloren."
 
+#: BS600-Disketten (Numerik-Betriebssystem): die Fassung haengt am Geraet (doc/merkposten/bs600.md).
+BS600_HINWEIS = ("BS600: Die Fassung BS620 läuft nur am PRG 710-1 (Tastatur K7672), am PRG 710 bootet sie nicht; "
+                 "BS610 gehört zum PRG 710.")
+
 A5120 = Programmprofil(
     maschine="a5120",
     programm="a5120emu",
@@ -613,6 +650,7 @@ K8915 = Programmprofil(
     # nur die Anzeigetexte tragen die Geraetenamen V3/V2 (F1, 2026-10-05: „Gen 2“ = V2).  Fehlt ``general.model`` (Vorgabe-
     # datei, aeltere Konfigurationen), ist es der V3.  Ein EM gibt es hier nicht
     # (``em`` = None in jeder Zeile) — ``a5120.16`` ist am K8915 unbekannt → V3.
+    usb_basis_modell=(("k8915-g2", 0x8C),),      # Gen2: 84H belegt (K2521/K3528)
     modelle=(("k8915", "k8915", None, "K8915 V3 (ZRE 045-8762, 128 KB)", "k7672"),
              ("k8915-g2", "k8915-g2", None, "K8915 V2 (ZRE K2521, 64 KB)", "k7672")),
     # V1 (Tastatur K7634) faehrt der Kern nicht: kein Urlader-Baustein fuer 0400H
@@ -638,9 +676,12 @@ PRG710 = Programmprofil(
     cqm_hinweise=(CQM_HINWEIS_UDOS,),
     td0_hinweise=(TD0_HINWEIS_UDOS, TD0_HINWEIS_INFO),
     imd_hinweise=(IMD_HINWEIS_UDOS, IMD_HINWEIS_INFO),
+    namens_hinweise=(("bs6", BS600_HINWEIS),),
     beschreibung="Emulator der Programmiergeräte robotron PRG 710 und PRG 710-1 (K1520-Bus)",
     konfig_datei="prg710emu.yaml",
     vorgabe_datei="default_config_prg710.yaml",
+    usb_basis_vorgabe=0x8C,         # 80H..87H belegt (ZRE)
+    net_basis_vorgabe=0x28,         # C0H..C3H = ATP-Zusatz
     # 2,4576 MHz (Prg710Machine::CPU_HZ, wie der K8915).
     nenntakt_hz=2_457_600,
     nenntakt_text="2,4576 MHz",
@@ -754,6 +795,7 @@ P8000 = Programmprofil(
     ptape_wahl=False,
     tape_wahl=False,
     raf_wahl=False,                 # die RAF ist eine K1520-Karte; der P8000 hat keinen K1520-Bus
+    erweiterungskarten=False,       # dito GIDE/USB/Netz
     rtc_wahl=True,
     hardware_vorgaben=(("rtc", _rtc.VORGABE_TYP), ("rtc_versatz", _rtc.VORGABE_VERSATZ)),
     modellwahl=True,
@@ -896,6 +938,7 @@ MC80 = Programmprofil(
     ptape_wahl=False,
     tape_wahl=False,
     raf_wahl=False,
+    erweiterungskarten=False,       # MC80: keine GIDE (ausdruecklich, Entwurf 50)
     ueber_rechner="der Mikrorechner <b>MC80.30/21/22</b> des VEB Elektronik Gera",
     andere="a5120",
     weitere=("k8915", "prg710", "pc1715", "p8000"),

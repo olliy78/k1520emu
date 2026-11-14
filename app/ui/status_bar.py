@@ -374,6 +374,39 @@ class SeriellFeld(QWidget):
         self.setVisible(bool(text))
 
 
+class IdeFeld(QWidget):
+    """Leuchte „IDE" der GIDE-Karte: Trennstrich + Beschriftung + Lampe, nur mit gesteckter Karte.
+
+    Die Lampe folgt dem ZUGRIFF (Zaehler des Kerns), nicht dem Inhalt: ``ZUGRIFF`` = die Karte
+    wurde seit der letzten Abfrage angesprochen, ``BELEGT`` = Abbild eingelegt, ``LEER`` = keins.
+    """
+
+    def __init__(self, parent=None, text: str = "IDE"):
+        # Dieselbe Leuchte tragen USB und Netz (Beschriftung "USB"/"NET", AP U3/N3).
+        super().__init__(parent)
+        self.setFocusPolicy(Qt.NoFocus)
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(4)
+        lay.addWidget(_trennstrich())
+        self.beschriftung = QLabel(text)
+        self.beschriftung.setMargin(2)
+        self.lampe = DriveLamp()
+        lay.addWidget(self.beschriftung)
+        lay.addWidget(self.lampe)
+        self.setVisible(False)
+
+    def zeige(self, sichtbar: bool, zustand: str, tipp: str = "") -> None:
+        """Sichtbarkeit, Lampe und Tooltip nachfuehren (laeuft im 120-ms-Takt: nur Aenderungen)."""
+        self.setVisible(bool(sichtbar))
+        self.lampe.set_zustand(zustand)
+        # DriveLamp setzt einen Diskettentext; fuer die Platte gilt der eigene.
+        if self.lampe.toolTip() != tipp:
+            self.lampe.setToolTip(tipp)
+        if self.beschriftung.toolTip() != tipp:
+            self.beschriftung.setToolTip(tipp)
+
+
 class MachineStatus(QWidget):
     """Der dauerhafte Teil der Statuszeile (Takt + Laufwerke, K8915: Frontplatte)."""
 
@@ -413,6 +446,13 @@ class MachineStatus(QWidget):
         # Uhr der P8000-Uhrenkarte (Entwurf 38 R3): nur mit gesteckter Karte und Rechnerbetrieb.
         self.rtc = SeriellFeld()
         self._lay.addWidget(self.rtc)
+        # Leuchte „IDE" der GIDE-Karte (nur mit gesteckter Karte).
+        self.ide = IdeFeld()
+        self._lay.addWidget(self.ide)
+        self.usb = IdeFeld(text="USB")
+        self._lay.addWidget(self.usb)
+        self.net = IdeFeld(text="NET")
+        self._lay.addWidget(self.net)
         self._fest = self._lay.count()
 
         # A5120.16-Leuchten (V1/V2) + Modus — feste Stelle zwischen Takt und

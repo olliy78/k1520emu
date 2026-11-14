@@ -29,6 +29,7 @@ sind nur nicht mehr in jeder einzelnen Anfrage geladen.
 | `microdos.md` | MicroDOS 1526 (Rostock) am A5120: Abbild -> Tastatur/Laufwerk, FORMAT20, MSYSG20-Menuefolge, `tools/microdos/ablauf.py`, Waechter `py_microdos_ablauf` (direkt hier angelegt) |
 | `microdos1715.md` | MicroDOS 1715 (Rostock) am PC 1715: FORMAT15/MSYSG15A-Ablauf, Motorregister-Stolperstein nach FORMAT15 (RESET statt Strg+C), `create --boot` = Kopf + MICRODOS.SYS, `tools/microdos/ablauf1715.py` + `build1715.py`, Waechter `py_microdos1715_ablauf`/`cli_microdos1715`/`DisktoolMicrodos.*` (direkt hier angelegt) |
 | `drucker.md` | `core/peripherals/druckwerk/` + `core/cards/printer/` + `core/machines/printer/`, `k1520_printer_*`, Debugger-Befehl `blatt` — Druckeremulator `k1520printer` (SD 1157 druckt, Entwurf 49; Flugzeit, PIO-Ereignisse, /VK, Orakel; direkt hier angelegt) |
+| `gun.md` | `core/cards/gide/` + `core/peripherals/ata/` + `installGide` in allen Maschinen, `k1520_gide_*`, `--gide`, RTC 72421 am Port Basis+5 — GIDE (IDE-Platte + RTC) **und USB** (`core/cards/gun_usb/` + `core/peripherals/vdip/`, `installGunUsb`, `k1520_usb_*`, Stick-Pfad-Sandbox; Entwurf 50, direkt hier angelegt; `CLAUDE.md` traegt nur den Kurzabsatz „GIDE / GUN“; Netz: `core/cards/gun_net/` + `installGunNet`, `k1520_net_*`, KCNet nach 50a, Abschnitt "KCNet-Netzkarte"; GUI offen) |
 
 ## Warum ausgelagert
 

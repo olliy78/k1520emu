@@ -1,0 +1,5 @@
+# boot_trace --gide am K8915 (eigener Zweig): Karte steckt, kein Fehler.
+tool:    boot_trace
+disk:    k8915scpx_boot1.hfe
+run:     -L /dev/null --machine k8915 --gide=0xB0 -c 2000000 --quiet --json %DISK%
+forbid:  --gide:

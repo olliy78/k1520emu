@@ -85,6 +85,9 @@ REGELN = [
     # ── Diskette ────────────────────────────────────────────────────────
     ("core/peripherals/floppy_drive/**", _FLOPPY_WEIT, "Diskettenlaufwerk/-medium", True),
     ("core/cards/k5122/**", ("fach_floppy", "fach_kermit"), "K5122", True),
+    # GIDE-Platte im DiskTool (Poppe/Kingstener): alle Faelle schnell, kein Fachlabel noetig (SectorSpace/CpmFileSystem-Aenderungen laufen ueber core/filesystem/**)
+    ("core/filesystem/gide/**", (), "GIDE-Platte im DiskTool (keine langsamen Faelle)", True),
+    ("tests/fixtures/gide/**", (), "GIDE-Golden-Fixture (keine langsamen Faelle)", False),
     ("core/filesystem/wega/**", ("fach_floppy",) + _P8, "WEGA-Dateisystem", True),
     ("core/filesystem/**", ("fach_floppy",), "Dateisysteme", True),
     ("data/formats.yaml", _FLOPPY_WEIT, "Formatkatalog", False),
@@ -101,6 +104,7 @@ REGELN = [
     ("core/peripherals/p8000_terminal/**", _P8, "P8000-Terminal", True),
     ("tools/p8000/**", _P8 + ("fach_kermit",), "P8000-Werkzeuge", False),
     ("tools/osm_p8000/**", ("fach_kermit",), "OS/M", False),
+    ("tools/udos_p8000/**", _P8, "UDOS 3.x P8000", False),
     ("tests/fixtures/p8000/**", _P8, "P8000-Fixtures", False),
     # ── Maschinen (Formatier-Faelle der Maschine) ───────────────────────
     ("core/machines/a5120/**", ("fach_a5120",), "A5120", True),
@@ -132,6 +136,13 @@ REGELN = [
     ("core/cards/em/**", ("fach_a5120",), "Erweiterungsmodul", True),
     ("core/cards/k5020/**", ("fach_a5120",), "Kassettenkarte", True),
     ("core/cards/raf/**", ("fach_a5120",), "RAM-Floppy", True),
+    # GIDE/ATA: Blattkarte ohne langsame Faelle (alle Gide-Tests sind schnell, kein fach_gide noetig)
+    ("core/cards/gide/**", (), "GIDE (keine langsamen Faelle)", True),
+    ("core/cards/gun_usb/**", (), "GUN-USB (keine langsamen Faelle)", True),
+    ("core/cards/gun_net/**", (), "KCNet-Netzkarte (keine langsamen Faelle)", True),
+    ("core/peripherals/ata/**", (), "ATA-Platte (keine langsamen Faelle)", True),
+    ("core/peripherals/vdip/**", (), "VDIP-USB-Stick (keine langsamen Faelle)", True),
+    ("core/peripherals/w5100/**", (), "W5100-Netzbaustein (keine langsamen Faelle)", True),
     ("core/cards/k6022/**", ("fach_a5120",), "Lochstreifen", True),
     ("core/peripherals/kassette/**", ("fach_a5120",), "Kassette", True),
     ("core/peripherals/k7672*/**", ("fach_k8915", "fach_prg710"), "Tastatur K7672", True),

@@ -43,6 +43,15 @@ constexpr uint8_t kDirPointerBlock = 0x02;
 /// @brief UDOS 5.0 am A5120 — erkannt an der FFH-Fuellung hinter dem Belegungsplan.
 bool istUdos50(const FsProfile& p) { return p.ndos_fill == "ff"; }
 
+/// @brief Die Lage der UDOS-3.x/5.0-Disketten: fuenf Verzeichnissaetze (05, 0A, 01, 06, 0B) und
+///        der zweite Bootteil auf Spur 16H Sektor 07-09 - A5120 (UDOS 5.0, FFH) UND P8000
+///        (UDOS 3.x, 77H).  Am Emulator mit dem FORMAT der echten P8000-UDOS-Diskette gemessen
+///        (Datendiskette 9 Sektoren, Saetze auf 05/0A/01/06/0B; Ticket #29).
+/// @brief P8000: Spur 15H Kopf 0 - von `FORMAT S` im Belegungsplan gesperrt, nie beschrieben.
+constexpr uint8_t kAuslagerungsSpur = 0x15;
+
+bool udos2xLage(const FsProfile& p) { return p.ndos_fill == "ff" || p.ndos_fill == "77"; }
+
 uint16_t le16(const uint8_t* p) { return static_cast<uint16_t>(p[0] | (p[1] << 8)); }
 void     put16(uint8_t* p, uint16_t v) {
     p[0] = static_cast<uint8_t>(v & 0xFF);
@@ -192,10 +201,19 @@ bool Udos1715FileSystem::looksLikeUdos1715(const SectorSpace& space, const FsPro
 
 bool Udos1715FileSystem::zweiterBootteil(const FsProfile& prof, uint8_t& erster,
                                          uint8_t& anzahl) {
-    if (!istUdos50(prof)) return false;
+    if (!udos2xLage(prof)) return false;
     erster = 0x07;
     anzahl = 3;
     return true;
+}
+
+std::vector<Udos1715FileSystem::Bootbereich> Udos1715FileSystem::bootbereiche(const FsProfile& prof) {
+    if (prof.ndos_fill == "ff")
+        return {{0, 0, 16}, {prof.directory_track, 0x07, 3}};
+    if (prof.ndos_fill == "77")
+        return {{0, 0, 1}, {prof.directory_track, 0x07, 3}, {prof.directory_track, 0x0C, 4},
+                {prof.bitmap_track, 0x02, 14}};
+    return {};
 }
 
 // ─── Sektoren ────────────────────────────────────────────────────────────────
@@ -509,6 +527,7 @@ FsInfo Udos1715FileSystem::info() const {
 bool Udos1715FileSystem::allocSectors(uint32_t n, std::vector<UdosPointer>& out) {
     out.clear();
     for (uint8_t t = 0; t < tracks_ && out.size() < n; ++t) {
+        if (t == 0 && istUdos50(prof_)) continue;   // s. Kommentar bei `allocRecords`
         for (uint8_t s = 0; s < secs_per_track_ && out.size() < n; ++s) {
             if (bitmap_.used(t, static_cast<uint8_t>(s + 1))) continue;
             out.push_back(UdosPointer{s, t});
@@ -534,6 +553,15 @@ bool Udos1715FileSystem::allocRecords(uint32_t records, uint32_t sec_je_record,
 
     uint32_t gefunden = 0;
     for (uint8_t t = 0; t < tracks_ && gefunden < records; ++t) {
+        // UDOS 5.0 (A5120, Treiber DDOS) vergibt auf Spur 0 nie etwas, und es liest dort auch nichts:
+        // eine Datei mit Zeigern auf Spur 0 laedt als Programm nicht (am Emulator gemessen
+        // 2026-11-08: der K5122 sieht keinen einzigen Zugriff auf Zylinder 0 Kopf 1, das
+        // Programm bleibt aus FFH, Start endet mit `ERROR C4` bzw. `BREAK 4313`).  Die Karte fuehrt
+        // Spur 0 Kopf 1 trotzdem frei, wie bei FORMAT.  ANDERS der NDOS des P8000 (UDOS 3.x) und
+        // der PC 1715: auf der echten udossys.cqm liegen Programmdateien (U8000ASM2) auf Spur 0 -
+        // dort wird Spur 0 deshalb NICHT ausgenommen.  Ob der DDOS am echten A5120 ebenso
+        // versagt, ist offen (Ticket #29, Test von Hubert).
+        if (t == 0 && istUdos50(prof_)) continue;
         // Ein Record ueberschreitet nie die Spurgrenze (§5.3) — die KOPFgrenze
         // innerhalb des Zylinders dagegen sehr wohl, denn die Spur ist der Zylinder.
         for (uint16_t s = 0; s + sec_je_record <= secs_per_track_ && gefunden < records; ) {
@@ -976,6 +1004,24 @@ bool Udos1715FileSystem::setAttributes(const std::string& name, const UdosAttrs&
 
 // ─── Anlegen ─────────────────────────────────────────────────────────────────
 
+bool Udos1715FileSystem::sperreBootbereich(bool speichern) {
+    if (udos2xLage(prof_)) {
+        for (const Bootbereich& b : bootbereiche(prof_))
+            for (uint8_t s = b.erster; s < b.erster + b.anzahl && s < secs_per_track_; ++s)
+                bitmap_.setUsed(b.spur, s + 1, true);
+        // P8000: Spur 15H Kopf 0 ist der Auslagerungsbereich des Monitors - belegt, aber ohne Inhalt.
+        if (prof_.ndos_fill == "77")
+            for (uint8_t s = 0; s < 16 && s < secs_per_track_; ++s) bitmap_.setUsed(kAuslagerungsSpur, s + 1, true);
+    } else if (prof_.ndos_fill == "00") {
+        // PC 1715: FORMAT (Systemdisk = J) sperrt nur Spur 0 Kopf 0 - am Emulator gemessen
+        // (13 + 16 = 29 Sektoren belegt, Ticket #29).
+        for (uint8_t s = 0; s < 16 && s < secs_per_track_; ++s) bitmap_.setUsed(0, s + 1, true);
+    } else {
+        for (uint8_t s = 0; s < secs_per_track_; ++s) bitmap_.setUsed(0, s + 1, true);
+    }
+    return speichern ? saveBitmap() : true;
+}
+
 bool Udos1715FileSystem::mkfs() {
     const NdosFuellung fuell = prof_.ndos_fill == "77" ? NdosFuellung::Nachlauf77
                              : prof_.ndos_fill == "ff" ? NdosFuellung::FF : NdosFuellung::Null;
@@ -983,7 +1029,7 @@ bool Udos1715FileSystem::mkfs() {
                                     fuell);
 
     // Satzlage der DIRECTORY: Handbuch §1.2.1, unter UDOS 5.0 die der Originaldiskette.
-    const bool u50 = istUdos50(prof_);
+    const bool u50 = udos2xLage(prof_);
     const std::vector<uint8_t> saetze = u50
         ? std::vector<uint8_t>(std::begin(kDirRecords50), std::end(kDirRecords50))
         : std::vector<uint8_t>(std::begin(kDirRecords), std::end(kDirRecords));
@@ -994,18 +1040,11 @@ bool Udos1715FileSystem::mkfs() {
     for (uint8_t s : saetze) bitmap_.setUsed(prof_.directory_track, s + 1, true);
     bitmap_.setUsed(prof_.bitmap_track, 0 + 1, true);
     bitmap_.setUsed(prof_.bitmap_track, 1 + 1, true);
-    if (prof_.system_track0)
-        for (uint8_t s = 0; s < secs_per_track_; ++s) bitmap_.setUsed(0, s + 1, true);
-    // UDOS 5.0 fuehrt Verzeichnis- und Planspur GANZ als belegt (so die Originaldiskette):
-    // dort liegt der zweite Bootteil (Sektor 07–09), und das Verzeichnis waechst dort.
-    // Spur 0 Kopf 0 (Urlader + BFOS) ebenso — ohne sie gibt es keinen Kaltstart.
-    if (u50) {
-        for (uint8_t s = 0; s < secs_per_track_; ++s) {
-            bitmap_.setUsed(prof_.directory_track, s + 1, true);
-            bitmap_.setUsed(prof_.bitmap_track, s + 1, true);
-        }
-        for (uint8_t s = 0; s < 16 && s < secs_per_track_; ++s) bitmap_.setUsed(0, s + 1, true);
-    }
+    // Systemdiskette: UDOS 5.0 sperrt nur den tatsaechlichen Bootbereich (Spur 0 Kopf 0 und
+    // Spur 16H Sektor 07-09, wie FORMAT S=Y -> 28 Sektoren belegt), die uebrigen
+    // NDOS-Profile die ganze Spur 0.  Eine Datendiskette bleibt bei den 9 festen Sektoren
+    // (Ticket #29) - Verzeichnis und Planspur sind ansonsten gewoehnliche Spuren.
+    if (prof_.system_track0) sperreBootbereich();
 
     const UdosPointer descriptor = directoryDescriptor();
     const UdosPointer zeiger{kDirPointerBlock, prof_.directory_track};

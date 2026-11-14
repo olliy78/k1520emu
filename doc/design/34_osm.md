@@ -5,6 +5,10 @@ Stand 2026-10-17, Zweig `cqm`.  Analyse und Plan; **AP 1, AP 2, AP 3 und AP 6 si
 Original-Auslieferung 3.0; `osmsys`/`osm_org` tragen dieselben Systemspuren, aber zusätzlich `PW.COM` bzw. `SC`/`REMOTE`; die Reinfassung ist die Wahl), 32 Dateien + `LIESMICH.TXT` +
 `KERMIT.COM`, Systemspuren unverändert; gebaut aus `tools/osm_p8000/` mit `create --fs osm640 --boot` (Wächter `cli_osm_p8000`), HFE wie die
 übrigen 5¼″-Disketten.
+**OS/M 2.0 (2026-11-08):** `disks/p8000_osm20/p8000_osm20_system.hfe` (aus `osm20.cqm` des Anwenders, 28 Dateien + `LIESMICH.TXT`, kein
+`KERMIT.COM`), Urlader `data/bootsektoren/boot_p8000_osm20.bin` — anderer Code als 3.0 (kein `LD SP`, Vektor 0C42H), gleiche Kennung
+und FDCONF bei 0x7E; `osmUrlader` erkennt beide.  Dieser Urlader prüft `/DCD` an tty1 (Merkposten p8000 Nr. 67).  Bauen:
+`python3 tools/osm_p8000/build.py --tool build/k1520disktool` (beide Disketten), Wächter `cli_osm_p8000`, `P8000Osm.*`.
 Bezug: `doc/design/35_cqm.md` (Container), `doc/merkposten/disktool.md`, `doc/merkposten/cqm.md`,
 Sammlung `~/projects/robotron/P8000/discs/` (pofo.de), Übersicht
 `~/projects/robotron/P8000/archive/UEBERSICHT.md`.

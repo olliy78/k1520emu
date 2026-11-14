@@ -23,7 +23,13 @@ class TerminalAnschluss {
 public:
     TerminalAnschluss(serial::SerialAnschluss& karte, Terminal& term,
                       uint64_t phiNenn = 4'000'000)
-        : karte_(karte), term_(term), phi_(phiNenn) {}
+        : karte_(karte), term_(term), phi_(phiNenn) { leitungenSetzen(); }
+
+    /// Das Terminal ist ein angeschlossenes, eingeschaltetes DEE: es legt DTR (am Rechner = /DCD, /DSR)
+    /// und RTS (= /CTS) fest auf aktiv.  Ohne das bliebe /DCD an der Karte inaktiv wie bei "Kabel ab",
+    /// und Gastsoftware, die die Leitungen vor dem Start pruefen (OS/M 2.0), meldet "Terminal nicht
+    /// angeschlossen".  Telnet/RFC 2217 liefern diese Pegel ueber den Wandler (`fernLeitungen`).
+    void leitungenSetzen() { karte_.setzeEingaenge(true, true, true); }
 
     /// `takte` Maschinentakte sind vergangen.
     void takt(uint64_t takte);

@@ -176,6 +176,11 @@ VersionInfoVersion={#VersionInfo}
 ;
 ; Ein VC-Redist entfaellt in beiden Faellen: die Kernbibliothek bringt ihre
 ; C-Laufzeit selbst mit (/MT, §5.1).
+; Mindestens Windows 10 Version 1809 (10.0.17763): so steht es in der Plattformliste
+; von Qt 6.11 (doc.qt.io/qt-6.11/windows.html, geprueft 2026-11-08; Windows 10 nur
+; x86_64), und Python 3.14 laeuft erst ab Windows 10.  Besser jetzt eine klare
+; Absage als ein Fehlschlag mitten im Bootstrap.
+MinVersion=10.0.17763
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 DefaultDirName={autopf}\{#Produkt}
@@ -298,6 +303,18 @@ Name: "{group}\K1520-Werkzeuge (Eingabeaufforderung)"; Filename: "{app}\bin\k152
   IconFilename: "{app}\share\icons\a5120emu.ico"
 Name: "{group}\{cm:UninstallProgram,{#Produkt}}"; Filename: "{uninstallexe}"
 
+[InstallDelete]
+; Update ueber eine bestehende Installation: Inno kopiert nur UEBER den Bestand
+; und loescht nichts.  Was die neue Fassung nicht mehr mitbringt (entfallene oder
+; umbenannte Module, alte __pycache__, Kataloge), bliebe sonst neben dem Neuen
+; liegen und koennte weiter importiert werden.  Hier steht NUR, was der
+; Installer selbst vollstaendig neu schreibt; Konfiguration (%APPDATA%) und
+; Arbeitsdisketten bleiben unberuehrt, python\ und venv\ erneuert der Bootstrap.
+; Laeuft nach PrepareToInstall und vor dem Kopieren.
+Type: filesandordirs; Name: "{app}\app"
+Type: filesandordirs; Name: "{app}\share"
+Type: filesandordirs; Name: "{app}\bin"
+
 [UninstallDelete]
 ; Was INNO angelegt hat, raeumt Inno von selbst weg — hier steht nur, was erst
 ; waehrend der Installation entsteht und in keiner Dateiliste steht:
@@ -310,6 +327,11 @@ Name: "{group}\{cm:UninstallProgram,{#Produkt}}"; Filename: "{uninstallexe}"
 ; auf, wenn nach alldem nichts uebrig ist.
 Type: filesandordirs; Name: "{app}\python"
 Type: filesandordirs; Name: "{app}\venv"
+Type: filesandordirs; Name: "{app}\python.alt"
+Type: filesandordirs; Name: "{app}\venv.alt"
+Type: filesandordirs; Name: "{app}\app.alt"
+Type: filesandordirs; Name: "{app}\share.alt"
+Type: filesandordirs; Name: "{app}\bin.alt"
 Type: filesandordirs; Name: "{app}\bin"
 Type: filesandordirs; Name: "{app}\app"
 Type: filesandordirs; Name: "{app}\share"
@@ -344,6 +366,16 @@ const
   MarkeSchlank     = 960;
   MarkeFertig      = 1000;
 
+  { Vorabpruefung (ZielPruefen) }
+  MaxPfadLaenge    = 100;   { PySide6 geht unter dem Ziel noch gut 120 Zeichen tief; MAX_PATH ist 260 }
+  { Gemessen (doc/design/13_distribution.md §8, bootstrap.log): fertige Installation
+    116 MB, davon schneidet slim.py vorher 170 MB wieder ab -> Spitze ~290 MB, mit
+    Reserve 320.  Bei einem Update liegt die alte Fassung (~120 MB) als *.alt daneben.
+    Temp: python.tar.gz 21 MB + entpacktes tar ~70 MB. }
+  PlatzZielMB      = 320;
+  PlatzAltMB       = 120;
+  PlatzTempMB      = 150;
+
 var
   HinweisSeite:      TOutputMsgWizardPage;
   AbschlussSeite:    TOutputMsgWizardPage;
@@ -355,6 +387,8 @@ var
   BalkenVon:         Integer;  { Strecke, auf die eine Rueckmeldung abgebildet wird }
   BalkenBis:         Integer;
   BalkenJetzt:       Integer;
+  Gesichert:         Boolean;  { die alte Fassung liegt als *.alt beiseite }
+  Erfolg:            Boolean;  { die Installation ist vollstaendig durchgelaufen }
 
 { ── Rueckmeldung: Statuszeile, Balken, Protokoll ────────────────────────────
 
@@ -502,6 +536,244 @@ end;
   zurueck und sonst den Grund im Klartext — den zeigt der Assistent dann an,
   ohne irgendetwas installiert zu haben. }
 
+{ Windows-API: SetEnvironmentVariable gibt es in Pascal Script nicht.  Ein LEERER
+  Wert genuegt — Python behandelt ein leeres PYTHONHOME/PYTHONPATH wie ein
+  fehlendes. }
+function SetEnvironmentVariableW(Name, Wert: String): Boolean;
+  external 'SetEnvironmentVariableW@kernel32.dll stdcall';
+
+{ Python-Umgebungsvariablen des Anwenders wuerden unser Python (und das venv)
+  umlenken: PYTHONHOME/PYTHONPATH zeigen auf eine fremde Installation, und der
+  Fehler erscheint erst im Kindprozess `ensurepip`, ohne Text im Protokoll
+  (Forum, Beitrag 70).  Der Installer-Prozess und seine Kinder sehen sie nicht
+  mehr; der Wert wird vorher ins Protokoll geschrieben, damit man die Ursache
+  sieht. }
+procedure PythonUmgebungNeutralisieren;
+var
+  Namen: array of String;
+  I: Integer;
+  Wert: String;
+begin
+  SetArrayLength(Namen, 7);
+  Namen[0] := 'PYTHONHOME';      Namen[1] := 'PYTHONPATH';
+  Namen[2] := 'PYTHONSTARTUP';   Namen[3] := 'PYTHONUSERBASE';
+  Namen[4] := 'PYTHONSAFEPATH';  Namen[5] := 'PYTHONPLATLIBDIR';
+  Namen[6] := 'PYTHONEXECUTABLE';
+  for I := 0 to GetArrayLength(Namen) - 1 do begin
+    Wert := GetEnv(Namen[I]);
+    if Wert <> '' then begin
+      Notiere('    Umgebungsvariable ' + Namen[I] + ' = ' + Wert
+            + '  (fuer die Installation ausgeblendet)');
+      SetEnvironmentVariableW(Namen[I], '');
+    end;
+  end;
+end;
+
+{ Loescht einen Ordner und PRUEFT es.  Ein stehengebliebener Rest einer aelteren
+  Installation (gesperrte Datei: laufender Emulator, Virenscanner) ist sonst
+  unsichtbar und das neue venv entsteht mitten darin. }
+function OrdnerRestlosLoeschen(const Pfad: String): Boolean;
+begin
+  Result := True;
+  if not DirExists(Pfad) then Exit;
+  DelTree(Pfad, True, True, True);
+  if DirExists(Pfad) then begin
+    Notiere('!!! ' + Pfad + ' liess sich nicht vollstaendig loeschen');
+    Result := False;
+  end;
+end;
+
+{ ── Vorabpruefung, Protokollkopf, Sicherung der alten Fassung ───────────────
+
+  Die Sicherung ist zugleich die Probe auf gesperrte Dateien: ein Ordner, in dem
+  ein Programm laeuft (oder eine Eingabeaufforderung steht), laesst sich unter
+  Windows nicht umbenennen.  Genau das sagt der Assistent dann — statt dass
+  spaeter ein halb geloeschtes venv ein Raetsel aufgibt (Forum, Beitrag 70).
+  Scheitert irgendein Schritt, kommt die alte Fassung unveraendert zurueck;
+  gelingt alles, wird sie erst ganz am Ende entfernt. }
+
+function PlatzMB(const Pfad: String): Integer;
+var
+  Frei, Gesamt: Int64;
+begin
+  { -1 = nicht feststellbar (dann nicht abweisen) }
+  Result := -1;
+  if GetSpaceOnDisk64(ExtractFileDrive(Pfad) + '\', Frei, Gesamt) then
+    Result := Frei div 1048576;
+end;
+
+function ZielPruefen: String;
+var
+  Ziel, Temp: String;
+  PlatzZiel, PlatzTemp, BrauchtZiel: Integer;
+begin
+  Result := '';
+  Ziel := ExpandConstant('{app}');
+  BrauchtZiel := PlatzZielMB;
+  if DirExists(Ziel + '\venv') or DirExists(Ziel + '\venv.alt') then
+    BrauchtZiel := BrauchtZiel + PlatzAltMB;   { Update: die alte Fassung liegt daneben }
+  Temp := ExpandConstant('{tmp}');
+
+  if Length(Ziel) > MaxPfadLaenge then begin
+    Result := 'Der Installationsordner ist zu tief verschachtelt (' + IntToStr(Length(Ziel))
+            + ' Zeichen, hoechstens ' + IntToStr(MaxPfadLaenge) + '):' + #13#10 + Ziel
+            + #13#10 + #13#10 + 'Qt bringt sehr lange Dateipfade mit; Windows lehnt sie ab. '
+            + 'Bitte einen kuerzeren Ordner waehlen, zum Beispiel C:\K1520emu.';
+    Exit;
+  end;
+
+  PlatzZiel := PlatzMB(Ziel);
+  PlatzTemp := PlatzMB(Temp);
+  if (PlatzZiel >= 0) and (PlatzTemp >= 0)
+     and (CompareText(ExtractFileDrive(Ziel), ExtractFileDrive(Temp)) = 0) then begin
+    { Beides auf demselben Laufwerk: die Summen zaehlen. }
+    if PlatzZiel < BrauchtZiel + PlatzTempMB then begin
+      Result := 'Auf dem Laufwerk ' + ExtractFileDrive(Ziel) + ' sind nur ' + IntToStr(PlatzZiel)
+              + ' MB frei; die Installation braucht ca. '
+              + IntToStr(BrauchtZiel + PlatzTempMB) + ' MB.';
+      Exit;
+    end;
+  end else begin
+    if (PlatzZiel >= 0) and (PlatzZiel < BrauchtZiel) then begin
+      Result := 'Auf dem Laufwerk ' + ExtractFileDrive(Ziel) + ' sind nur ' + IntToStr(PlatzZiel)
+              + ' MB frei; die Installation braucht ca. '
+              + IntToStr(BrauchtZiel) + ' MB.';
+      Exit;
+    end;
+    if (PlatzTemp >= 0) and (PlatzTemp < PlatzTempMB) then begin
+      Result := 'Im temporaeren Ordner (' + Temp + ') sind nur ' + IntToStr(PlatzTemp)
+              + ' MB frei; die Installation braucht dort ca. ' + IntToStr(PlatzTempMB) + ' MB.';
+      Exit;
+    end;
+  end;
+end;
+
+procedure ProtokollKopf;
+var
+  Namen: array of String;
+  I, Z: Integer;
+  Wert: String;
+  Zahl: Cardinal;
+begin
+  { Was man bei einem Fehlschlag sonst erst erfragen muss. }
+  Notiere('    Windows:   ' + GetWindowsVersionString);
+  if IsAdminInstallMode then
+    Notiere('    Rechte:    Installation fuer alle Benutzer (Administrator)')
+  else
+    Notiere('    Rechte:    Installation nur fuer den Benutzer');
+  Notiere('    Frei:      Ziel ' + IntToStr(PlatzMB(ExpandConstant('{app}')))
+        + ' MB, Temp ' + IntToStr(PlatzMB(ExpandConstant('{tmp}'))) + ' MB');
+  Notiere('    Pfadlaenge: ' + IntToStr(Length(ExpandConstant('{app}'))) + ' Zeichen');
+  if Pos('\OneDrive', ExpandConstant('{app}')) > 0 then
+    Notiere('    Hinweis:   Ziel liegt unter OneDrive');
+  if RegQueryDWordValue(HKLM, 'SYSTEM\CurrentControlSet\Control\CI\Policy',
+                        'VerifiedAndReputablePolicyState', Zahl) then
+    Notiere('    Smart App Control: ' + IntToStr(Zahl) + ' (0 aus, 1 an, 2 Evaluierung)');
+  if RegQueryDWordValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Internet Settings',
+                        'ProxyEnable', Zahl) then
+    Notiere('    Proxy (Windows): ProxyEnable=' + IntToStr(Zahl));
+  SetArrayLength(Namen, 4);
+  Namen[0] := 'ProxyServer'; Namen[1] := 'AutoConfigURL';
+  Namen[2] := 'ProxyOverride'; Namen[3] := '';
+  for I := 0 to 2 do
+    if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Internet Settings',
+                           Namen[I], Wert) and (Wert <> '') then begin
+      if Pos('@', Wert) > 0 then
+        Notiere('    Proxy (Windows): ' + Namen[I] + ' gesetzt (mit Zugangsdaten, nicht protokolliert)')
+      else
+        Notiere('    Proxy (Windows): ' + Namen[I] + ' = ' + Wert);
+    end;
+  SetArrayLength(Namen, 7);
+  Namen[0] := 'HTTP_PROXY';  Namen[1] := 'HTTPS_PROXY'; Namen[2] := 'ALL_PROXY';
+  Namen[3] := 'NO_PROXY';    Namen[4] := 'PIP_INDEX_URL'; Namen[5] := 'PIP_CONFIG_FILE';
+  Namen[6] := 'PIP_REQUIRE_VIRTUALENV';
+  for Z := 0 to 6 do begin
+    Wert := GetEnv(Namen[Z]);
+    if Wert <> '' then begin
+      if Pos('@', Wert) > 0 then
+        Notiere('    Umgebung:  ' + Namen[Z] + ' gesetzt (mit Zugangsdaten, nicht protokolliert)')
+      else
+        Notiere('    Umgebung:  ' + Namen[Z] + ' = ' + Wert);
+    end;
+  end;
+end;
+
+function SicherungsNamen: TArrayOfString;
+begin
+  { Die ersten beiden MUESSEN sich verschieben lassen (Probe auf laufende
+    Programme), die uebrigen versuchen wir nur — sie sind nicht gesperrt, wenn
+    kein Programm laeuft, und [InstallDelete] raeumt, was bleibt. }
+  SetArrayLength(Result, 5);
+  Result[0] := 'venv';  Result[1] := 'python';
+  Result[2] := 'app';   Result[3] := 'share';  Result[4] := 'bin';
+end;
+
+procedure AltesZurueck;
+var
+  Namen: TArrayOfString;
+  I: Integer;
+  Ordner, Alt: String;
+begin
+  Namen := SicherungsNamen;
+  for I := 0 to GetArrayLength(Namen) - 1 do begin
+    Ordner := ExpandConstant('{app}\') + Namen[I];
+    Alt := Ordner + '.alt';
+    if DirExists(Alt) then begin
+      OrdnerRestlosLoeschen(Ordner);
+      if RenameFile(Alt, Ordner) then
+        Notiere('    zurueckgestellt: ' + Ordner)
+      else
+        Notiere('!!! liess sich nicht zurueckstellen: ' + Alt);
+    end;
+  end;
+end;
+
+procedure SicherungLoeschen;
+var
+  Namen: TArrayOfString;
+  I: Integer;
+begin
+  Namen := SicherungsNamen;
+  for I := 0 to GetArrayLength(Namen) - 1 do
+    OrdnerRestlosLoeschen(ExpandConstant('{app}\') + Namen[I] + '.alt');
+end;
+
+function AltesSichern: String;
+var
+  Namen: TArrayOfString;
+  I: Integer;
+  Ordner, Alt: String;
+begin
+  Result := '';
+  Namen := SicherungsNamen;
+  for I := 0 to GetArrayLength(Namen) - 1 do begin
+    Ordner := ExpandConstant('{app}\') + Namen[I];
+    Alt := Ordner + '.alt';
+    { Rest eines frueheren, abgebrochenen Laufs. }
+    if not OrdnerRestlosLoeschen(Alt) then begin
+      Result := 'Ein Rest einer frueheren Installation (' + Alt + ') liess sich nicht entfernen.'
+              + #13#10 + 'Bitte alle K1520emu-Programme und Eingabeaufforderungen in diesem Ordner schliessen.';
+      AltesZurueck;
+      Exit;
+    end;
+    if DirExists(Ordner) then begin
+      if RenameFile(Ordner, Alt) then
+        Notiere('    beiseite gelegt: ' + Ordner + ' -> ' + Alt)
+      else if I < 2 then begin
+        Notiere('!!! ' + Ordner + ' liess sich nicht umbenennen (in Benutzung?)');
+        Result := 'Die vorhandene Installation ist in Benutzung (' + Ordner + ').'
+                + #13#10 + 'Bitte alle K1520emu-Programme beenden, auch das Fenster der '
+                + 'Werkzeugkonsole oder eine Eingabeaufforderung in diesem Ordner, '
+                + 'und die Installation wiederholen. Die vorhandene Installation bleibt unveraendert.';
+        AltesZurueck;
+        Exit;
+      end else
+        Notiere('    nicht verschiebbar (wird beim Kopieren bereinigt): ' + Ordner);
+    end;
+  end;
+  Gesichert := True;
+end;
+
 function PythonAuspacken: String;
 var
   Archiv, Tar, PyExe: String;
@@ -531,7 +803,11 @@ begin
 
   { Ein Update packt NICHT ueber die alte Fassung: sonst blieben Dateien einer
     aelteren Fehlerstandes daneben liegen, die dort nichts mehr zu suchen haben. }
-  DelTree(ExpandConstant('{app}\python'), True, True, True);
+  if not OrdnerRestlosLoeschen(ExpandConstant('{app}\python')) then begin
+    Result := 'Die fruehere Python-Fassung (' + ExpandConstant('{app}\python')
+            + ') liess sich nicht entfernen. Bitte alle K1520emu-Programme beenden.';
+    Exit;
+  end;
   try
     ExtractArchive(Tar, ExpandConstant('{app}'), '', True, @Auspackfortschritt);
   except
@@ -561,10 +837,33 @@ begin
   { Eine vorhandene Laufzeitumgebung wird ERNEUERT, nicht weiterbenutzt: nach
     einem Update zeigen ihre Verweise auf die alte Python-Fassung. }
   Melde('Laufzeitumgebung anlegen', MarkeVenv);
-  DelTree(ExpandConstant('{app}\venv'), True, True, True);
-  if Laufe(PyExe, '-m venv "' + ExpandConstant('{app}\venv') + '"',
+  PythonUmgebungNeutralisieren;
+  if not OrdnerRestlosLoeschen(ExpandConstant('{app}\venv')) then begin
+    Result := 'Eine fruehere Laufzeitumgebung (' + ExpandConstant('{app}\venv')
+            + ') liess sich nicht entfernen.' + #13#10
+            + 'Laeuft noch ein K1520emu-Programm? Bitte alle beenden (oder die '
+            + 'alte Fassung ueber die Programmliste deinstallieren) und '
+            + 'die Installation wiederholen.';
+    Exit;
+  end;
+
+  { Erst OHNE pip anlegen, dann ensurepip fuer sich: `venv` verschluckt die
+    Ausgabe von ensurepip und meldet nur "exit status 1".  Als eigener Aufruf
+    steht der wirkliche Grund im Protokoll. }
+  if Laufe(PyExe, '-m venv --without-pip "' + ExpandConstant('{app}\venv') + '"',
            ExpandConstant('{app}')) <> 0 then begin
     Result := 'Die Laufzeitumgebung liess sich nicht anlegen.';
+    Exit;
+  end;
+  if not FileExists(VenvPy) then begin
+    Result := 'Nach dem Anlegen fehlt ' + VenvPy;
+    Exit;
+  end;
+  if Laufe(VenvPy, '-m ensurepip --upgrade --default-pip',
+           ExpandConstant('{app}')) <> 0 then begin
+    Result := 'pip liess sich in der Laufzeitumgebung nicht einrichten.' + #13#10
+            + 'Der Grund steht im Protokoll. Haeufig: ein Virenscanner, der '
+            + 'neu angelegte Programme in AppData blockiert.';
     Exit;
   end;
   if not FileExists(VenvPy) then begin
@@ -627,6 +926,8 @@ begin
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  FehlerCode: Integer;
 begin
   { Alles Nachladbare passiert HIER — vor der ersten kopierten Datei.  Was
     dieser Rueckgabewert enthaelt, zeigt der Assistent an; die Installation
@@ -634,14 +935,21 @@ begin
   ForceDirectories(ExpandConstant('{app}'));
   Protokoll := ExpandConstant('{app}\bootstrap.log');
   DeleteFile(Protokoll);
+  Gesichert := False;
+  Erfolg := False;
   Notiere('K1520emu {#Version} — Installation');
   Notiere('    Ziel:      ' + ExpandConstant('{app}'));
   Notiere('    Disketten: ' + DatenOrdner);
   Notiere('    Python:    {#PyVersion} (eigene Laufzeitumgebung, kein Systempython)');
+  ProtokollKopf;
 
   Fortschrittsseite.Show;
   try
-    Result := PythonAuspacken;
+    Result := ZielPruefen;
+    if Result = '' then
+      Result := AltesSichern;
+    if Result = '' then
+      Result := PythonAuspacken;
     if Result = '' then
       Result := LaufzeitumgebungEinrichten;
   finally
@@ -649,13 +957,38 @@ begin
   end;
 
   if Result <> '' then begin
-    { Zurueckgeraeumt wird, was bis hierher entstand — der Anwender soll nach
-      einem Fehlschlag keine 150 MB Bruchstueck behalten.  Das Protokoll bleibt
-      stehen, es ist ja der Grund. }
+    { Zurueckgeraeumt wird, was bis hierher NEU entstand — und die alte Fassung
+      kommt zurueck.  Das Protokoll bleibt stehen, es ist ja der Grund.
+      Nur wenn die Sicherung stand, gehoeren venv\ und python\ uns; sonst
+      sind es noch die alten (AltesSichern hat dann selbst zurueckgestellt). }
     Notiere('!!! ' + Result);
-    DelTree(ExpandConstant('{app}\venv'), True, True, True);
-    DelTree(ExpandConstant('{app}\python'), True, True, True);
+    if Gesichert then begin
+      OrdnerRestlosLoeschen(ExpandConstant('{app}\venv'));
+      OrdnerRestlosLoeschen(ExpandConstant('{app}\python'));
+      AltesZurueck;
+      Gesichert := False;
+    end;
     Result := Result + #13#10 + #13#10 + 'Einzelheiten stehen in:' + #13#10 + Protokoll;
+    if not WizardSilent then
+      if MsgBox('Die Installation ist fehlgeschlagen. Protokoll jetzt oeffnen?',
+                mbError, MB_YESNO) = IDYES then
+        Exec('notepad.exe', '"' + Protokoll + '"', '', SW_SHOW, ewNoWait, FehlerCode);
+  end;
+end;
+
+procedure DeinitializeSetup;
+begin
+  { Wird am Ende JEDES Laufs gerufen — auch nach Abbruch oder Fehler beim
+    Kopieren.  Nur wenn die alte Fassung beiseite liegt und die neue nicht
+    vollstaendig fertig wurde, kommt die alte zurueck. }
+  if Gesichert and (not Erfolg) then begin
+    Notiere('==> Installation nicht abgeschlossen — die vorherige Fassung wird wiederhergestellt');
+    OrdnerRestlosLoeschen(ExpandConstant('{app}\venv'));
+    OrdnerRestlosLoeschen(ExpandConstant('{app}\python'));
+    OrdnerRestlosLoeschen(ExpandConstant('{app}\app'));
+    OrdnerRestlosLoeschen(ExpandConstant('{app}\share'));
+    OrdnerRestlosLoeschen(ExpandConstant('{app}\bin'));
+    AltesZurueck;
   end;
 end;
 
@@ -888,6 +1221,16 @@ begin
   StarterSchreiben;
   AusweisSchreiben;
 
+  { Vorkompilieren: der erste Start ist schneller, und bei einer Installation
+    fuer alle Benutzer (Programme) duerfte ein normaler Benutzer die
+    Zwischencodedateien gar nicht selbst anlegen.  Scheitert es, ist das nur
+    langsamer — kein Grund, die Installation hinzuwerfen. }
+  MeldeImNachlauf('Programmdateien vorkompilieren…');
+  if Laufe(ExpandConstant('{app}\venv\Scripts\python.exe'),
+           '-m compileall -q "' + ExpandConstant('{app}\app') + '"',
+           ExpandConstant('{app}')) <> 0 then
+    Notiere('Warnung: Vorkompilieren fehlgeschlagen — die Programme laufen trotzdem');
+
   if Rauchtest <> 0 then begin
     VerknuepfungenEntfernen;
     Aufraeumen;
@@ -895,6 +1238,10 @@ begin
       + #13#10 + #13#10 + 'Einzelheiten stehen in:' + #13#10 + Protokoll);
   end;
   Aufraeumen;
+  { Erst jetzt, wo alles steht, darf die alte Fassung endgueltig weg. }
+  MeldeImNachlauf('Alte Fassung wird entfernt…');
+  SicherungLoeschen;
+  Erfolg := True;
   Notiere('==> Fertig.');
 end;
 
@@ -1019,8 +1366,19 @@ begin
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
+var
+  Fehler: String;
 begin
   Result := True;
+  if CurPageID = wpSelectDir then begin
+    { Pfadlaenge und Platz gleich beim Waehlen — nicht erst nach dem Laden. }
+    Fehler := ZielPruefen;
+    if Fehler <> '' then begin
+      MsgBox(Fehler, mbError, MB_OK);
+      Result := False;
+    end;
+    Exit;
+  end;
   if CurPageID <> wpReady then
     Exit;
 

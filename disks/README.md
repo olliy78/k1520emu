@@ -27,6 +27,26 @@ Die Zuordnung Datei → Ordner steht für die Bauskripte in `tools/disketten_bei
 `<system>_<diskformat>_<laufwerkskonfiguration>_<merkmale>.<ext>` — identisch zu den Fixtures,
 Erklärung der Segmente in `tests/fixtures/README.md`.
 
+## BS620 (`prg710-1_bs620/`) und BS610-Rekonstruktion
+
+`prg710-1_bs620/prg710-1_bs620_system.hfe` = Original BS620 (PRG 710-1, am echten Gerät getestet; im Paket). `prg710_bs610_rekonstruktion/` ist ein
+Eigenbau für das PRG 710, **experimentell** (im Emulator geprüft, am echten Gerät ungetestet; im Paket). Die Gerätetest-Paare (low/high) baut `tools/bs600/bau_disketten.py --geraetetest <Ordner>`.
+
+## UDOS 3.0 / 3.1 am P8000 (`p8000_udos30/`, `p8000_udos31/`)
+
+Gebaut mit `tools/udos_p8000/build.py` aus den vier Abzügen der pofo.de-Sammlung (`tools/udos_p8000/original/`; Wächter `cli_udos_p8000`).
+Datei für Datei gleich dem Abzug, mit den Systemspuren, die `FORMAT … S` schreibt (Bootabbild `data/bootsektoren/boot_p8000_udos3{0,1}.bin`).
+Im Paket.  **8-Bit-Teil des P8000** (U880); Start: Return, Return (= BOOT).
+
+| Datei | Inhalt |
+|-------|--------|
+| `p8000_udos31_system.hfe` | UDOS 3.1 (29.05.1989) Systemdiskette: Systemkommandos, EDIT, Assembler/Binder (U880, U881/U882, U8000), `FORMAT`, `UPROG` (**EPROM-Programmierer** des P8000), EPROM-Inhalte `MON8_*`, `P8T*`, `EIGENTEST` |
+| `p8000_udos31_sprachen.hfe` | UDOS 3.1 Programmiersprachen: PLZ, BASIC, FORTRAN, PASCAL |
+| `p8000_udos30_system.hfe` | UDOS 3.0 Systemdiskette (zusätzlich `MON16_*` und `WDC_*` EPROM-Inhalte, `GETDAY`/`SAVEDAY`) |
+| `p8000_udos30_sprachen.hfe` | UDOS 3.0 Programmiersprachen |
+
+Die Versionsnummer ist **3.0/3.1**, nicht 2.2 (die README nennt 2.2 nur als Schnittstellenkompatibilität).  Zum Arbeiten eine Kopie benutzen (der Emulator öffnet r/w).
+
 ## SIOS 1526 (`a5120_sios1526/`)
 
 Gebaut mit `tools/sios_a5120/build.py` aus den Originalen in `tools/sios_a5120/original/` (Wächter `cli_sios_a5120`, Bedienung
@@ -69,7 +89,7 @@ Falsche Tastatur oder falsches Laufwerk: Ladeschirm bleibt bei den Punkten stehe
 
 | Datei | System | Laufwerke A: / B: / C: |
 |-------|--------|------------------------|
-| **`a5120_cpa/a5120_cpa_k5601_system.hfe`** | **DIE CP/A-Diskette der Auslieferung.** Bootet mit `@OS.COM` = mit Uhr, 3 × K5601; daneben die übrigen BIOS-Fassungen unter eigenem Namen, vom `A>` aus zu starten (voller BIOS-Neustart, ^C behält die Wahl): `OSNOCLK` (ohne Uhr), `OSCOMB5` (B: K5600.10, C: K5600.20), `OSCOMB8` (B: MF3200, C: MF6400), `OSRAF` (RAF als M:), `OSEM256` (A5120.16). Dazu Systemprogramme (FORMAT, CPABCGEN, PIP, STAT, POWER, DIENST …), Textverarbeitung (WordMaster mit deutscher Hilfe, TP 3.0 samt TPDRUCK und Installer TPINSCPA), Entwicklung (BASIC, Turbo Pascal, M80/LINKMT, Z1, ZSID), alle eigenen Prüfprogramme (SERTEST, ROMREAD, EM256*, RAF*, LBREAD/LBPUNCH) und `LIESMICH.TXT`; 52 Dateien, 194 KB frei. Gebaut aus `tools/cpa_a5120/` (`build.py`, Wächter `cli_cpa_a5120`); `CPABCGEN B: OSCOMB5.COM` erzeugt eine Systemdiskette auf Basis einer Variante | A: K5601 · B:/C: je nach gestarteter Variante |
+| **`a5120_cpa/a5120_cpa_k5601_system.hfe`** | **DIE CP/A-Diskette der Auslieferung.** Bootet mit `@OS.COM` = mit Uhr, 3 × K5601; daneben die übrigen BIOS-Fassungen unter eigenem Namen, vom `A>` aus zu starten (voller BIOS-Neustart, ^C behält die Wahl): `OSNOCLK` (ohne Uhr), `OSCOMB5` (B: K5600.10, C: K5600.20), `OSCOMB8` (B: MF3200, C: MF6400), `OSRAF` (RAF als M:), `OSEM256` (A5120.16). Dazu Systemprogramme (FORMAT, CPABCGEN, PIP, STAT, POWER, DIENST …), Textverarbeitung (WordMaster mit deutscher Hilfe, TP 3.0 samt TPDRUCK und Installer TPINSCPA), Entwicklung (BASIC, Turbo Pascal, M80/LINKMT, Z1, ZSID), alle eigenen Prüfprogramme (SERTEST, ROMREAD, EM256*, RAF*, LBREAD/LBPUNCH) und `LIESMICH.TXT`; 68 Dateien, 82 KB frei (inkl. Hardwareoptions-Beigaben). Gebaut aus `tools/cpa_a5120/` (`build.py`, Wächter `cli_cpa_a5120`); `CPABCGEN B: OSCOMB5.COM` erzeugt eine Systemdiskette auf Basis einer Variante | A: K5601 · B:/C: je nach gestarteter Variante |
 | `pc1715_udos1715/udos1715_640k_pc1715_system.hfe` | **UDOS1715/NDOS** (PC 1715), Systemdiskette „SYSTEM", 80×32×256 — dieselbe Diskette liegt als `.img` unter `tests/fixtures/disks/` | MFS 1.6 |
 | `prg710_udos43/prg710_udos43_k5601_system.hfe` | **UDOS 4.3 für den PRG 710**, beidseitig: Seite 0 Kommandos, Treiber, Assembler, Editor `SCREEN`, `PROG`; Seite 1 MRS-700-Umgebung (`MRS`, `MPSS`, `EDI`, `PROM`, E/A-Treiber) und Dokumente. Gebaut aus `tools/prg_disketten/`, `check --full` ohne Befund | PRG 710 (K5601) |
 | `a5120_udos43/a5120_udos43_k5601_entwickler.hfe` | **UDOS 4.3 für den A5120** (UDOS BC.5120, 08/90), startfähig, **mit allen Entwicklerwerkzeugen** der Entwicklerdiskette (ASM/LINK, EDIT/EDI/SEDIT, SYD, BASIC, PL/Z, TRANSFER, REORG, LW, SG samt `POS_*`-Kernen). Bestand der Altdiskette `udos_boot_scp` ohne `UPRO`/`ESPRO`. Gebaut aus `tools/udos_a5120/`, `check --full` ohne Befund | A5120 (K5601) |
@@ -86,6 +106,7 @@ Falsche Tastatur oder falsches Laufwerk: Ladeschirm bleibt bei den Punkten stehe
 | **`pc1715_microdos/pc1715_microdos_k5601_system.hfe`** | **MicroDOS 2.6 (01.05.86, Rostock) für den PC 1715**, CP/M-2.2-kompatibel, 5×1024 (K5601). `FORMAT15` (Leerdiskette formatieren), `MSYSG15A` (Systemgenerierung für MFS 1.6), `POWER`, `SELDSK15`, `SELPRT`, `LIESMICH.TXT`. Vom `tools/microdos/build1715.py` gebaut; Bedienung: `LIESMICH.TXT`, `doc/merkposten/microdos1715.md` | PC 1715 (K5601) |
 | **`pc1715_cpz22/pc1715_cpz22_system.hfe`** | **CP/Z 2.2** („52K CP/Z 2.2 ZOAZ MRL“ 06.12.88), 16×256, mit `CPZINIT`/`CPZGEN`/`CPZDUP`, Turbo Pascal, WordStar; dazu WM, BASIC, `TLC`, SERTEST | PC 1715 (K5601) |
 | **`pc1715w_scp30/pc1715w_scp30_system.hfe`** | **SCP 3.0 (CP/M 3) V0003 28.03.89, Lader PC 1715W**, 5×1024; Zeichensätze `SC6xx.ZGF`, Textprogramm V1/3B + `TPINSTD`, WM, BASIC, Pascal, SERTEST V0.3. Aus `tools/scp_pc1715w/` (`cli_scp_pc1715w`) | PC 1715W (U8272) |
+| **`p8000_osm20/p8000_osm20_system.hfe`** | **OS/M 2.0 (ZFT/KEAW, 15.04.1987) für den P8000, 8-Bit-Teil** (CP/M 2.2), Format 5 (80×2×16×256, 640K, Profil `osm_ds80_16x256_boot`) mit dem 2.0-Urlader, der vor dem Start die Leitungen der Konsole (tty1, `/DCD`) prüft; Systemdiskette `osm20` mit ihren 28 Dateien (SYSGEN, SETFD, FORMAT, COPYDISK, ASM, DDT, ED, TP, POWER, REDABAS …) plus `LIESMICH.TXT`; 29 Dateien, 212 KB frei. Startet im `p8000emu` wie die 3.0 (Kaltstart, am Monitor zweimal RETURN). Aus `tools/osm_p8000/` (`cli_osm_p8000`, `P8000Osm.*`) | P8000 (8-Bit-Teil) |
 | **`p8000_osm30/p8000_osm30_system.hfe`** | **OS/M 3.0 (ZFT/KEAW, 15.01.1988) für den P8000, 8-Bit-Teil** (CP/M 2.2), Format 5 (80×2×16×256, 640K, Profil `osm640`) mit OS/M-Urlader; Systemdiskette der pofo-Sammlung (`osm30`) mit ihren 32 Dateien (SYSGEN, SETFD, FORMAT, COPYDISK, ASM, DDT, ED, TP, POWER, REDABAS, `BIOS.L` …) plus `LIESMICH.TXT` und `KERMIT.COM`; 34 Dateien, 104 KB frei. Startet im `p8000emu` (Diskette in A:, Kaltstart, am Monitor zweimal RETURN). Aus `tools/osm_p8000/` (`cli_osm_p8000`) | P8000 (8-Bit-Teil) |
 | **`a5120_bcu/a5120_bcu12_k5600-10_start-syl.hfe`** | **BCU 880 V1.2** (FZW/BL), Startdiskette „SYL auf Spur 1“ (Satz 2, Bild 64×16) — startet im Modell **„A5120 BCU 880 (Lade-ROM V0.6)“**, Laufwerke **K5600.10**. Keine Dateidiskette. Mit dem DiskTool **gebaut** (`create --fs bcu880_syl --boot data/bootsektoren/boot_bcu12_syl_k7023.bin`), sektorgleich zum Beleg `doc/a5120_alt/bcu/satz2_SYL_auf_Spur1/disk.img` | A: K5600.10 |
 | **`a5120_bcu/a5120_bcu12_k5600-10_arbeit-sys1.hfe`** | BCU 880 V1.2 „ohne SYL“ („SYS1“): Arbeitsdiskette mit PIP, STAT, INIT, `KMBG.REL`, MBASIC, DDT, EPROM u. a. (19 Dateien); in B:, nach dem Start auch in A: (Warmstart). Wandlung von `satz2_OhneSYL.1/disk.img` | B: K5600.10 |
@@ -116,6 +137,7 @@ spielen sie über `tools/disketten_beigaben.py` und `tools/diskbau.py` ein):
 | `EM256ADR.COM`, `EM16ABL.COM`, `EM256FUL.COM`, `EM256TST.COM` — Prüfprogramme der A5120.16 (EM064/EM256, U8001) | `tools/em256/` | A5120 (CP/A, SCPX) |
 | `RAFCPM.COM` (M:), `RAF512.COM` (P:), `RAFTEST.COM`, `RAFQUICK.COM` — RAM-Floppy RAF (ZWG der AdW, Fremdsoftware, freigegeben; Entwurf 22) | `doc/raf512/`, `tests/fixtures/raf/` | A5120, K8915, PRG 710/710-1 |
 | `LBREAD.COM`, `LBPUNCH.COM` — Lochband lesen/stanzen (K6022/SIF1000) | `tools/lochband/` | A5120 (CP/A, SCPX), K8915, PRG 710/710-1 |
+| Hardwareoptionen **GIDE / Uhr / USB / Netz** (2026-11-11, Anwenderentscheidung, **Weitergabe-Lage der Fremdsoftware ungeklärt**): `GIDEHP90.COM`+`ERADIR.COM` (Poppe) oder `GIDN90.COM` (Kingstener), `UHR.COM` (eigen), `USB/UDIR/UGET/UPUT.COM` (UTools, 84H; K8915 zusätzlich `…8C.COM` für 8CH, PRG 8CH), `CPMNET.COM`+`TFTP.COM` (KCNet, C0H; PRG 28H), `GIDE.TXT`/`USB.TXT`/`NETZ.TXT` — passend zur Oberflächen-Vorauswahl | `tools/gide/` (`README.md` = Herkunft, `karten.py` = Zusammenstellung) | A5120 (CP/A, SCPX), K8915, PRG 710/710-1 (SCPX), PC 1715 (CP/A 1715, SCP 1715 V0006/V0007), PC 1715W (nur Uhr + USB) |
 | `KMBGTEST.COM` — Kassette K5020 über die Robotron-Bibliothek; `KMBG.REL` — die Bibliothek selbst (zum Binden) | `tools/kassette/kmbgtest/`, `doc/kassette/fex/` | A5120 (SCPX) — CP/A und SCPX haben keinen Kassettentreiber im BIOS |
 
 Nach einem Neubau einer dieser Dateien alle Systemdisketten nachbauen (`python3 tools/<ordner>/build.py --tool build/k1520disktool`;

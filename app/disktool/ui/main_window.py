@@ -54,15 +54,16 @@ from app.katalog_anzeige import profil_zeile
 from app.disktool.archive import NAMENLOS, create_archive, dateiname
 
 from app.core_binding.k1520disk import (
-    EBENE_ERKENNUNG, FEHLER, GEFAHR, WARNUNG, DiskTool, K1520DiskError, PlatteTool,
-    filesystems, fs_resolve, ist_platte as ist_plattendatei,
+    EBENE_ERKENNUNG, FEHLER, GEFAHR, WARNUNG, DiskTool, GideTool, K1520DiskError, PlatteTool,
+    filesystems, fs_resolve, gide_anlegen, ist_gide_kandidat, ist_platte as ist_plattendatei,
 )
 from app.disktool.ui.actions import erzeuge_aktionen
 from app.disktool.ui.disk_editor import DiskEditorWindow
 from app.disktool.ui.disk_header import DiskHeader, auswahlliste
 from app.disktool.ui.disk_info_dialog import DiskInfoDialog
 from app.disktool.ui.schreibsperre import (
-    PLATTE_FORMAT_FEST, PLATTE_GESPERRT, dateisystem_anzeige, ist_platte, physisch_grund,
+    GIDE_FORMAT_FEST, PLATTE_FORMAT_FEST, PLATTE_GESPERRT, PLATTE_GESPERRT_GIDE, dateisystem_anzeige, ist_gide,
+    ist_platte, physisch_grund,
     schutz_text, sperrgrund,
 )
 from app.disktool.ui.tar_neu_dialog import EINZEL, SATZ, TarNeuDialog
@@ -275,6 +276,7 @@ class MainWindow(QMainWindow):
         m.addAction(self.act_neu)
         m.addAction(self.act_tar_satz)
         m.addAction(self.act_tar_neu)
+        m.addAction(self.act_gide_neu)
         m.addSeparator()
         m.addAction(self.act_speichern)
         m.addAction(self.act_speichern_unter)
@@ -291,6 +293,8 @@ class MainWindow(QMainWindow):
         m.addAction(self.act_loeschen)
         m.addAction(self.act_platte_ordner)
         m.addAction(self.act_tar_ordner)
+        m.addAction(self.act_gide_format)
+        m.addAction(self.act_gide_pruefen)
         m.addSeparator()
         m.addAction(self.act_datei_im_editor)
         m.addAction(self.act_eigenschaften)
@@ -318,6 +322,7 @@ class MainWindow(QMainWindow):
         m.addSeparator()
         m.addAction(self.act_bootabbild)
         m.addAction(self.act_dos_sys)
+        m.addAction(self.act_reorganisieren)
         m.addAction(self.act_diskeditor)
         m.addSeparator()
         m.addAction(self.act_neu_beschreiben)
@@ -685,6 +690,9 @@ class MainWindow(QMainWindow):
         # DOS SYS: nur an einer beschreibbaren FAT-Diskette (leer ist Sache des Kerns - er sagt es klar)
         self.act_dos_sys.setEnabled(mit_fs and getattr(self.tool, "ist_fat", False)
                                     and not self.tool.read_only)
+        # BS600: Luecken schliessen - nur dort und nur an einer beschreibbaren Diskette.
+        bs600 = mit_fs and getattr(self.tool, "ist_bs600", False)
+        self.act_reorganisieren.setEnabled(bs600 and not self.tool.read_only)
         self.act_schreibschutz.setEnabled(offen)
         # Auch ohne offene Diskette waehlbar, wenn ein physisches Laufwerk im Spiel
         # ist: bei einer nicht erkannten Diskette ist das Uebersteuern der einzige Weg
@@ -757,11 +765,14 @@ class MainWindow(QMainWindow):
         Freigabe selbst bleibt der Logik von :meth:`_aktionen_pruefen`.
         """
         platte = self.tool is not None and ist_platte(self.tool)
+        gide = platte and ist_gide(self.tool)
+        tabelle = PLATTE_GESPERRT_GIDE if gide else PLATTE_GESPERRT
         tipps = self.__dict__.setdefault("_tipps_platte", {})
         veraendert = self.__dict__.setdefault("_platte_getippt", set())
-        for name, grund in PLATTE_GESPERRT.items():
+        for name in PLATTE_GESPERRT_GIDE:           # Obermenge der Schluessel
+            grund = tabelle.get(name)
             a = getattr(self, f"act_{name}")
-            if platte:
+            if platte and grund:
                 if a not in veraendert:
                     tipps[a] = a.toolTip()
                     veraendert.add(a)
@@ -774,13 +785,15 @@ class MainWindow(QMainWindow):
                 veraendert.discard(a)
 
         # Menue und Radiogruppen, die keine Aktion aus der Tabelle sind.
-        for obj, grund in ((self.menue_fs.menuAction(), PLATTE_FORMAT_FEST),
+        for obj, grund in ((self.menue_fs.menuAction(), GIDE_FORMAT_FEST if gide else PLATTE_FORMAT_FEST),
                            (self.menue_schnitt.menuAction(),
                             "Eine Platte hat keine Spuren oder Seiten, die sich "
                             "entfernen liessen."),
                            (self.act_text, "Platten werden Byte für Byte übertragen; "
                                            "es gibt keinen Textmodus."),
-                           (self.act_cpm_fileinfo, "Gilt nur für CP/M-Disketten; die "
+                           (self.act_cpm_fileinfo, "Gilt nur für CP/M-Disketten; die GIDE-Platte schreibt "
+                                                   "kein .fileinfo." if gide else
+                                                   "Gilt nur für CP/M-Disketten; die "
                                                    "Platte schreibt immer ein .fileinfo "
                                                    "mit den UNIX-Angaben.")):
             if platte:
@@ -803,6 +816,7 @@ class MainWindow(QMainWindow):
         # Die eine Aktion, die es NUR an der Platte gibt.
         a = self.act_platte_ordner
         fat = self.tool is not None and getattr(self.tool, "ist_fat", False)
+        platte = platte and not gide                 # CP/M kennt keine Ordner: die Aktion gibt es dort nicht
         a.setVisible(platte or fat)
         schreibbar = (platte or fat) and not self.tool.read_only
         # An einer FAT-Diskette gilt ohne angeklickten Ordner die Wurzel; an der Platte wird nie geraten.
@@ -816,6 +830,15 @@ class MainWindow(QMainWindow):
                          "anklicken, in dem er entstehen soll.")
         else:
             a.setToolTip(tipps[a])
+
+        # Die beiden Aktionen, die es NUR an der GIDE-Platte gibt.
+        for g in (self.act_gide_format, self.act_gide_pruefen):
+            g.setVisible(gide)
+        self.act_gide_pruefen.setEnabled(gide)
+        self.act_gide_format.setEnabled(gide and not self.tool.read_only)
+        self.act_gide_format.setToolTip(
+            self.act_gide_format.statusTip() if not gide or not self.tool.read_only else
+            f"{self.act_gide_format.statusTip()}\n\nGesperrt: erst den Schreibschutz aufheben.")
 
     def _schutz_anzeigen(self) -> None:
         """Der Schutzknopf ZEIGT den Zustand, statt ihn nur zu schalten.
@@ -1122,6 +1145,9 @@ class MainWindow(QMainWindow):
     def _platte_hinweis(self) -> None:
         """Meldungsstreifen einer Platte: Schreibschutz-Vorgabe bzw. Sicherungskopie."""
         self.st_befund.hide()                   # keine Dateisystempruefung fuer Platten
+        if ist_gide(self.tool):
+            self._gide_hinweis()
+            return
         if self.tool.read_only:
             self.info_bar.zeige(
                 "Plattenabbild schreibgeschützt geöffnet.  Zum Ändern den Schreibschutz "
@@ -1131,6 +1157,24 @@ class MainWindow(QMainWindow):
             self.info_bar.zeige(
                 "Plattenabbild beschreibbar.  Geändert wird erst beim Speichern (Strg+S); "
                 f"vorher entsteht einmalig „{Path(self.tool.path).name}~“.", "warnung")
+
+    def _gide_hinweis(self) -> None:
+        """Meldungsstreifen einer GIDE-Platte: Layout, Unklarheit, Sperre, Schreibschutz."""
+        t = self.tool
+        if t.fremd_gesperrt:
+            self.info_bar.zeige("GIDE-Platte gesperrt (<abbild>.lock): ein laufender Emulator oder ein anderes Werkzeug "
+                                "benutzt sie — nur lesbar.", "warnung")
+        elif t.layout_mehrdeutig or not t.layout_sicher:
+            self.info_bar.zeige(f"Layout {t.layout}: " + (t.erkennung_text or "nicht eindeutig erkannt")
+                                + "  Die Layouts von Poppe und Kingstener sind unverträglich — ein falscher "
+                                  "Treiber vernichtet Daten.", "warnung")
+        elif t.read_only:
+            self.info_bar.zeige(f"GIDE-Platte (Layout {t.layout}, erkannt) schreibgeschützt geöffnet.  Zum Ändern "
+                                f"den Schreibschutz aufheben (Strg+R).  Der Gast-Treiber muss zum Layout {t.layout} "
+                                "passen — Poppe und Kingstener sind unverträglich.", "hinweis")
+        else:
+            self.info_bar.zeige(f"GIDE-Platte (Layout {t.layout}) beschreibbar.  Geändert wird erst beim Speichern "
+                                "(Strg+S).", "warnung")
 
     def _befund_streifen(self, befund) -> None:
         """Den schwersten Befund in den Streifen setzen — mit Weg zum Ganzen."""
@@ -1181,7 +1225,7 @@ class MainWindow(QMainWindow):
     # Diskette oeffnen / anlegen / schliessen
     # ════════════════════════════════════════════════════════════════════════
 
-    def open_image(self, path, filesystem: str = "", *, satz=None) -> bool:
+    def open_image(self, path, filesystem: str = "", *, satz=None, gide_layout: str = "auto") -> bool:
         """Abbild öffnen — **roh, wenn nichts erkannt wird** (§12.6).
 
         Eine gemischte oder unbekannte Geometrie ist kein Grund, das Abbild gar
@@ -1202,6 +1246,9 @@ class MainWindow(QMainWindow):
                 # Eine Platte ist kein Diskettenformat: kein Formatdialog, kein
                 # Katalogname.  Schreibschutz ist die Vorgabe (Entwurf 37, Nr. 12).
                 self.tool = PlatteTool.open(path, read_only=True)
+            elif not filesystem and self._ist_gide_datei(path):
+                # GIDE-Platte (IDE-Abbild der GIDE-Karte): Layout erkennen, nie raten.
+                self.tool = self._gide_oeffnen(path, gide_layout)
             else:
                 self.tool = DiskTool.open_raw(path, filesystem or None)
         except (K1520DiskError, FileNotFoundError) as e:
@@ -1239,6 +1286,36 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(
             f"Geöffnet: {Path(path).name} — {anzeige}", STATUS_DAUER)
         return True
+
+    @staticmethod
+    def _ist_gide_datei(path) -> bool:
+        """Kann die Datei nach Groesse (>= 33 MB) eine GIDE-Platte sein?  Billig, ohne das Abbild zu laden."""
+        try:
+            return bool(ist_gide_kandidat(path))
+        except Exception:                                   # noqa: BLE001
+            return False
+
+    #: Auswahl des Layouts, wenn die Erkennung nichts Eindeutiges liefert: Rueckgabe ``"poppe"``/``"kingstener"``
+    #: oder ``""`` (abgebrochen).  Eigene Methode, damit Tests sie ersetzen koennen (kein modales Fenster).
+    def _gide_layout_fragen(self, grund: str) -> str:
+        wahl, ok = QInputDialog.getItem(
+            self, "GIDE-Platte: Layout wählen",
+            f"{grund}\n\nDie Layouts von Poppe (bis 8 Laufwerke je 8 MB, GIDEHP, auch im CP/A-BIOS) und von "
+            "Kingstener (1 Laufwerk, gidn) sind unverträglich.  Das Abbild bleibt schreibgeschützt, bis Sie den "
+            "Schutz aufheben.\n\nLayout:", ["poppe", "kingstener"], 0, False)
+        return wahl if ok else ""
+
+    def _gide_oeffnen(self, path, layout: str = "auto"):
+        """GIDE-Platte schreibgeschuetzt oeffnen; bei unklarem Befund nach dem Layout fragen."""
+        try:
+            return GideTool.open(path, read_only=True, layout=layout)
+        except K1520DiskError as e:
+            if layout != "auto" or "gide-layout" not in str(e) and "nicht eindeutig" not in str(e):
+                raise
+            wahl = self._gide_layout_fragen(str(e))
+            if not wahl:
+                raise
+            return GideTool.open(path, read_only=True, layout=wahl)
 
     @staticmethod
     def _ist_platte_datei(path) -> bool:
@@ -2023,6 +2100,80 @@ class MainWindow(QMainWindow):
         self.log(f"Ordner angelegt: {name}")
         return True
 
+    # ── GIDE-Platte ─────────────────────────────────────────────────────────
+
+    def _gide_neu_dialog(self) -> None:
+        """Leeres GIDE-Plattenabbild (.img.gz) anlegen, formatieren und oeffnen."""
+        pfad, _ = QFileDialog.getSaveFileName(
+            self, "Neue GIDE-Platte", self._disketten_ordner(), "GIDE-Plattenabbild (*.img.gz)")
+        if not pfad:
+            return
+        if not pfad.lower().endswith(".gz"):
+            pfad += ".gz" if pfad.lower().endswith(".img") else ".img.gz"
+        wahl, ok = QInputDialog.getItem(
+            self, "Neue GIDE-Platte: Layout",
+            "Layout des Gast-Treibers:\n  poppe — bis 8 Laufwerke je 8 MB (GIDEHP, auch im CP/A-BIOS), 258 MB\n"
+            "  kingstener — 1 Laufwerk (gidn), 34 MB\n\nDie beiden Layouts sind unverträglich: das Abbild gehört "
+            "zu EINEM Treiber.", ["poppe", "kingstener"], 0, False)
+        if not ok:
+            return
+        self.neue_gide_platte(pfad, wahl)
+
+    def neue_gide_platte(self, pfad, layout: str) -> bool:
+        """Anlegen (wie der Dialog, ohne Fenster): Abbild, Verzeichnisse aller Laufwerke, dann geoeffnet."""
+        try:
+            gide_anlegen(pfad, layout)
+            with GideTool.open(pfad, read_only=False, layout=layout) as t:
+                t.set_backup(False)
+                for v in range(t.volume_count):
+                    t.format_laufwerk(v)
+                t.flush()
+        except K1520DiskError as e:
+            self._fehler("Neue GIDE-Platte", str(e))
+            return False
+        self.log(f"GIDE-Platte angelegt: {pfad} (Layout {layout})")
+        return self.open_image(pfad, gide_layout=layout)
+
+    def _gide_format_dialog(self) -> None:
+        t = self.tool
+        if t is None or not ist_gide(t) or t.read_only:
+            return
+        n = t.volume_count
+        v, ok = QInputDialog.getInt(self, "GIDE-Laufwerk formatieren",
+                                    f"Laufwerk (0 … {n - 1}); sein Verzeichnis wird geleert:", 0, 0, max(n - 1, 0))
+        if ok:
+            self.gide_laufwerk_formatieren(v)
+
+    def gide_laufwerk_formatieren(self, v: int, erzwingen: bool = False) -> bool:
+        """Verzeichnis von Laufwerk ``v`` leeren; liegen dort Daten, fragt es nach (``erzwingen`` ueberspringt das)."""
+        t = self.tool
+        try:
+            t.format_laufwerk(v, erzwingen)
+        except K1520DiskError as e:
+            if "erzwingen" in str(e) and not erzwingen:
+                antwort = QMessageBox.warning(
+                    self, "GIDE-Laufwerk formatieren",
+                    f"{e}\n\nTrotzdem formatieren?  Die Daten des Laufwerks gehen verloren.",
+                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                if antwort == QMessageBox.Yes:
+                    return self.gide_laufwerk_formatieren(v, True)
+                return False
+            self._fehler("GIDE-Laufwerk formatieren", str(e))
+            return False
+        self._reload()
+        self.log(f"Laufwerk lw{v} formatiert (noch nicht gespeichert)")
+        return True
+
+    def _gide_pruefen_dialog(self) -> None:
+        t = self.tool
+        if t is None or not ist_gide(t):
+            return
+        stufe, text = t.check(voll=True)
+        text = (text or "").strip()
+        self.log("GIDE-Platte geprüft: " + ("ohne Befund" if stufe < 0 else text.splitlines()[0] if text else ""))
+        QMessageBox.information(self, "GIDE-Platte prüfen",
+                                f"Layout {t.layout}\n\n" + ("Ohne Befund." if stufe < 0 else text))
+
     def _platte_ordner_anlegen(self) -> None:
         ziel = self.disk_view.platte_ziel()
         fat = getattr(self.tool, "ist_fat", False)
@@ -2182,8 +2333,9 @@ class MainWindow(QMainWindow):
         if self.tool is None or not refs:
             return False
         if ist_platte(self.tool) and any("/" not in r for r in refs):
-            self._fehler("Löschen", "Eine Partition (md0, md2 …) lässt sich nicht löschen — "
-                                    "nur Dateien und Ordner darin.")
+            self._fehler("Löschen", "Ein Laufwerk (lw0 …) lässt sich nicht löschen — nur die Dateien darin."
+                         if ist_gide(self.tool) else
+                         "Eine Partition (md0, md2 …) lässt sich nicht löschen — nur Dateien und Ordner darin.")
             return False
         try:
             for ref in refs:
@@ -2195,6 +2347,35 @@ class MainWindow(QMainWindow):
         self._reload()
         self.log(f"{len(refs)} Dateien gelöscht")
         return True
+
+    def reorganisieren(self) -> int:
+        """BS600: Lücken schließen (alle Dateien lückenlos ab Spur 1 neu legen) — ohne Rückfrage.
+
+        Returns:
+            Zahl der verschobenen Dateien; -1 bei Fehler (Meldung ist ausgegeben, die Diskette unverändert).
+        """
+        if self.tool is None or not getattr(self.tool, "ist_bs600", False):
+            return -1
+        try:
+            bewegt = self.tool.bs600_reorganize()
+        except K1520DiskError as e:
+            self._fehler("Reorganisieren", str(e))
+            self._reload()
+            return -1
+        self._reload()
+        self.log("Reorganisiert: " + (f"{bewegt} Datei(en) verschoben" if bewegt else "keine Lücken, nichts verschoben"))
+        return bewegt
+
+    def _reorganisieren(self) -> None:
+        """Handler der Aktion: erst fragen — es werden Dateien auf der Diskette verschoben."""
+        if self.tool is None or not getattr(self.tool, "ist_bs600", False):
+            return
+        antwort = QMessageBox.question(
+            self, "Reorganisieren",
+            "Alle Dateien werden lückenlos ab Spur 1 neu auf die Diskette gelegt.\n"
+            "Namen, Inhalt und Angaben bleiben; die Lage der Dateien ändert sich.\n\nFortfahren?")
+        if antwort == QMessageBox.Yes:
+            self.reorganisieren()
 
     def save_as(self, path) -> bool:
         """Unter neuem Namen/Container speichern und **dort weiterarbeiten**.
@@ -2335,7 +2516,14 @@ class MainWindow(QMainWindow):
         """Schreibschutz setzen — ohne Rueckfrage (die sitzt im Klick-Behandler)."""
         if self.tool is None:
             return
-        self.tool.set_read_only(ro)
+        try:
+            self.tool.set_read_only(ro)
+        except K1520DiskError as e:              # GIDE-Platte: gesperrt / Layout unsicher
+            self.act_schreibschutz.blockSignals(True)
+            self.act_schreibschutz.setChecked(True)
+            self.act_schreibschutz.blockSignals(False)
+            self._fehler("Schreibschutz", str(e))
+            return
         self.act_schreibschutz.blockSignals(True)
         self.act_schreibschutz.setChecked(ro)
         self.act_schreibschutz.blockSignals(False)

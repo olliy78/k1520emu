@@ -305,3 +305,137 @@ gw_pin() {
 gw_quelle_url() {
     echo "https://github.com/keirf/greaseweazle/releases/download/v$1/greaseweazle-$1.zip"
 }
+
+# ─── Ablageorte und Inventar (Installieren UND Deinstallieren) ───────────────
+
+BINDIR="$HOME/.local/bin"
+APPDIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+ICONDIR="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/scalable/apps"
+DATADIR=$(benutzerdaten_dir)
+CONFDIR="${XDG_CONFIG_HOME:-$HOME/.config}/k1520emu"
+
+# Was der Installer im Zielverzeichnis anlegt — und ausschliesslich das entfernt
+# das Deinstallieren wieder.  Die Liste wandert beim Installieren in den Ausweis,
+# sodass eine aeltere Installation nach ihrer EIGENEN Liste abgeraeumt wird und
+# nicht nach der einer neueren Fassung.  `uninstall.sh` und `lib` sind das
+# Deinstallationsskript samt seinem Hilfsmodul.
+INVENTAR="bin app share venv python tools .cache-uv VERSION requirements.lock LICENSE LIZENZ.txt uninstall.sh lib"
+
+# frage_jn <frage> <vorgabe j|n> — Ja/Nein am Terminal; ohne Terminal gilt die Vorgabe.
+#
+# Gelesen wird von /dev/tty, nicht von der Standardeingabe: der Installer kann
+# aus einer Pipe laufen.  Rueckgabe 0 = ja, 1 = nein.
+frage_jn() {
+    _frage=$1; _vorgabe=$2
+    if [ -r /dev/tty ] && [ -t 1 ]; then
+        if [ "$_vorgabe" = j ]; then _hinweis="[J/n]"; else _hinweis="[j/N]"; fi
+        printf "%s %s: " "$_frage" "$_hinweis"
+        _antwort=
+        IFS= read -r _antwort < /dev/tty || true
+        case "$_antwort" in
+            j|J|ja|Ja|JA|y|Y|yes|Yes) return 0 ;;
+            n|N|nein|Nein|NEIN|no|No) return 1 ;;
+        esac
+    fi
+    [ "$_vorgabe" = j ]
+}
+
+# entferne_menue_eintraege <wurzel> — Verweise und Startmenue-Eintraege einer Installation.
+#
+# Entfernt wird NACH INHALT, nicht nach einer Namensliste: ein Verweis in
+# ~/.local/bin, der in <wurzel>/ zeigt, und eine .desktop-Datei, deren Exec-Zeile
+# in <wurzel>/ liegt.  Damit verschwinden auch Eintraege, die eine AELTERE
+# Fassung angelegt hat und die in der heutigen Liste nicht mehr stehen — und eine
+# zweite Installation an anderem Ort bleibt unangetastet.  Gibt die Zahl der
+# entfernten Dateien aus.
+entferne_menue_eintraege() {
+    _w=$1; _n=0; _a5120=no
+    [ -n "$_w" ] && [ "$_w" != / ] || { echo 0; return 0; }
+    if [ -d "$BINDIR" ]; then
+        for _l in "$BINDIR"/*; do
+            [ -L "$_l" ] || continue
+            case "$(readlink "$_l" 2>/dev/null || true)" in
+                "$_w"/*) rm -f "$_l"; _n=$((_n + 1)) ;;
+            esac
+        done
+    fi
+    if [ -d "$APPDIR" ]; then
+        for _d in "$APPDIR"/*.desktop; do
+            [ -f "$_d" ] || continue
+            if grep '^Exec=' "$_d" 2>/dev/null | grep -qF "$_w/"; then
+                [ "$(basename "$_d")" = a5120emu.desktop ] && _a5120=yes
+                rm -f "$_d"; _n=$((_n + 1))
+            fi
+        done
+    fi
+    # Das gemeinsame Symbol aller Eintraege (Icon=a5120emu) — erst weg, wenn der
+    # Eintrag, der es mitbrachte, weg ist.
+    if [ "$_a5120" = yes ]; then rm -f "$ICONDIR/a5120emu.svg"; fi
+    if have update-desktop-database && [ -d "$APPDIR" ]; then
+        update-desktop-database "$APPDIR" >/dev/null 2>&1 || true
+    fi
+    echo "$_n"
+}
+
+# installation_ueber_verweise — Wurzel einer Installation, auf die ein Verweis in
+# ~/.local/bin zeigt (irgendeiner, nicht nur die der bekannten Maschinen).
+installation_ueber_verweise() {
+    [ -d "$BINDIR" ] || return 1
+    for _l in "$BINDIR"/*; do
+        [ -L "$_l" ] || continue
+        _ziel=$(readlink -f "$_l" 2>/dev/null || true)
+        case "$_ziel" in
+            */bin/*) _wurzel=${_ziel%/bin/*} ;;
+            *) continue ;;
+        esac
+        if [ -n "$_wurzel" ] && [ -d "$_wurzel" ] && ist_installation "$_wurzel"; then
+            echo "$_wurzel"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# entferne_installation <wurzel> — nur das wegraeumen, was der Installer anlegte.
+#
+# Ein rekursives Loeschen der Wurzel waere einfacher, naehme dem Anwender aber
+# alles mit, was er DANEBEN abgelegt hat — eigene Disketten, Notizen, ein Skript.
+# Geloescht wird deshalb nach dem Inventar aus dem Ausweis (eine aeltere
+# Installation nach ihrer eigenen Liste, nicht nach der dieser Fassung); bleibt
+# danach etwas uebrig, bleibt auch das Verzeichnis stehen und der Anwender
+# erfaehrt es.
+entferne_installation() {
+    _wurzel=$1
+    # Nie mit leerer oder Wurzel-Angabe weiterlaufen.
+    if [ -z "$_wurzel" ] || [ "$_wurzel" = / ]; then
+        warn "keine Installationswurzel angegeben — nichts geloescht"
+        return 1
+    fi
+    _liste=$(sed -n 's/^eintrag //p' "$_wurzel/$INSTALL_MARKER" 2>/dev/null || true)
+    [ -n "$_liste" ] || _liste=$INVENTAR
+
+    for _e in $_liste; do
+        # Ein Eintrag ist ein NAME, kein Pfad — sonst zeigte ein verfaelschter
+        # Ausweis („../..") aus der Installation heraus.
+        case "$_e" in
+            */*|..|.|"") warn "uebergangen: fragwuerdiger Eintrag im Ausweis ($_e)"; continue ;;
+        esac
+        rm -rf "${_wurzel:?}/${_e:?}"
+    done
+    # Protokolle des Emulators — sie entstehen im ARBEITSVERZEICHNIS (seit
+    # e6db12c in dessen Unterverzeichnis `logs/`, siehe k1520_api.cpp), also
+    # hier, sobald jemand aus der Installation heraus startet.  Die aeltere
+    # Schreibweise direkt im Verzeichnis bleibt beruecksichtigt, damit auch eine
+    # damit angelegte Installation sauber verschwindet.
+    rm -rf "${_wurzel:?}/logs"
+    rm -f "$_wurzel"/k1520_*.log
+    rm -f "${_wurzel:?}/$INSTALL_MARKER"
+
+    if rmdir "$_wurzel" 2>/dev/null; then
+        ok "Verzeichnis geloescht"
+    else
+        ok "Programmdateien entfernt"
+        printf "     %s bleibt stehen — darin liegt, was nicht vom Installer stammt:\n" "$_wurzel"
+        ls -A "$_wurzel" 2>/dev/null | sed 's/^/       /'
+    fi
+}

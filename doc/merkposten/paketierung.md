@@ -43,6 +43,13 @@ Sieben Dinge, die man dabei nicht kaputtmachen darf:
   `test_installer_verweigert_*`, `test_deinstallieren_loescht_nur_eine_installation`,
   `test_deinstallieren_laesst_eigene_dateien_stehen`,
   `test_deinstallieren_folgt_keinem_pfad_im_ausweis`.
+- **Linux-Update mit Rückfall, Startmenü-Frage, `uninstall.sh`** (2026-11-08): `install.sh` legt `bin app share venv` + Dateien als `*.alt`
+  beiseite, ein EXIT-Handler (`beim_ende`) stellt sie bei Fehlschlag/Abbruch zurück (Erstinstallation: räumt das Angelegte weg);
+  `*.alt` fällt erst NACH dem Rauchtest, ebenso entstehen Menü-Einträge erst dort (`lege_menue_eintraege_an`). `python/`, `tools/`
+  werden nicht gesichert (kein erneutes Laden). `uninstall.sh` (in der Installation, mit `lib/common.sh`; Inventar `uninstall.sh lib`)
+  findet Verweise/`.desktop`-Dateien **nach Inhalt** (Exec/Linkziel in der Wurzel), nicht per Namensliste. Gelesen wird von
+  `/dev/tty`, ohne Terminal gilt die Vorgabe. Guards: `test_update_stellt_bei_fehlschlag_*`, `test_erstinstallation_hinterlaesst_*`,
+  `test_uninstall_*`, `test_frage_jn_*`. Nicht getestet: der Dialog am echten Terminal und ein vollständiger Lauf mit Netz.
 - **Ein Update findet seine Installation selbst** (`vorhandene_installation()` über den
   Starter-Symlink) und schlägt sie als Ziel vor. Ohne das legte ein `install.sh` ohne
   `--prefix` eine ZWEITE Installation am Standardort an und ließe die alte verwaisen.
@@ -166,3 +173,11 @@ Rauchtests erzeugen `k1520_create(7)` und (install.sh/.iss) das `PrinterWindow`.
 Tests: `py_paths` + `py_packaging` (schnell, ohne Netz, in der Standardregression). Der
 vollständige Installationslauf (lädt ~120 MB) liegt hinter
 `K1520_PACKAGING_FULL=1 venv/bin/python3 -m pytest tests/python/test_packaging.py`.
+
+## Gast-Software der Hardwareoptionen im Paket (2026-11-11)
+
+`share/k1520emu/karten_software/` (`fremd/` mit allen 16 Poppe-Treibern und den Ausgangsstücken, `basis_anpassen.py`, `UHR.COM`, `HERKUNFT.md`) und
+`share/doc/lizenzen/karten_software-HERKUNFT.md`; die Systemdisketten tragen die Programme für die Vorauswahl-Basis schon.
+**Weitergabe-Lage der Fremddateien ungeklärt** (Anwenderentscheidung vom 2026-11-11, `tools/gide/README.md`) — soll das Paket ohne sie
+gehen, entfällt der Block in `build_payload.sh` UND die Beigaben in `tools/gide/karten.py`.  Wächter: `py_karten_software`
+(`test_paket_liefert_alle_poppe_fassungen_und_das_umschreibwerkzeug`).

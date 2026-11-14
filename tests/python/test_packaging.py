@@ -29,7 +29,7 @@ import pytest
 from conftest import PROJECT_ROOT, ausgelieferte_diskette, requires_core
 
 PACKAGING = PROJECT_ROOT / "packaging"
-SCRIPTS = ["install.sh", "build_payload.sh", "launcher.sh",
+SCRIPTS = ["install.sh", "uninstall.sh", "build_payload.sh", "launcher.sh",
            "disktool_launcher.sh", "kermit_launcher.sh", "printer_launcher.sh", "lib/common.sh"]
 # Frisch geschlankt sind es ~146 MB OHNE Disketten (§8 des Entwurfs).  Mit der Vorgabeauswahl
 # kamen die P8000-WEGA-Saetze dazu (~13 MB, seit 2026-10-11) und K1520 Kermit (~2,4 MB,
@@ -326,6 +326,19 @@ def test_microdos1526_disketten_sind_in_der_vorgabeauswahl():
     assert soll <= set(block)
     for name in soll:
         assert ausgelieferte_diskette(name).is_file(), name
+
+def test_bs6xx_disketten_sind_im_paket():
+    """BS620 (PRG 710-1, Original, am echten Geraet getestet) und die BS610-Rekonstruktion (PRG 710, Eigenbau,
+    nur im Emulator geprueft) liegen im Paket (doc/merkposten/bs600.md Nr. 14); die Frankenstein-Diskette BS600 nicht."""
+    text = (PACKAGING / "build_payload.sh").read_text(encoding="utf-8")
+    block = text[text.index('DISKS_DEFAULT="'):]
+    block = block[len('DISKS_DEFAULT="'):].split('"', 1)[0].split()
+    soll = {"prg710-1_bs620_system.hfe", "prg710_bs610_rek.hfe"}
+    assert soll <= set(block)
+    assert not any("bs600" in n for n in block)
+    for name in soll:
+        assert ausgelieferte_diskette(name).is_file(), name
+
 
 def test_iss_hat_den_k8915_emulator_im_startmenue():
     iss = (PACKAGING / "k1520emu.iss").read_text(encoding="utf-8")
@@ -827,7 +840,7 @@ def test_iss_hat_keine_versehentlichen_abschnittskoepfe():
     hier kostet nichts.
     """
     erlaubt = {"[Setup]", "[Languages]", "[Files]", "[Icons]", "[Run]",
-               "[UninstallRun]", "[UninstallDelete]", "[Code]", "[Tasks]",
+               "[UninstallRun]", "[InstallDelete]", "[UninstallDelete]", "[Code]", "[Tasks]",
                "[Dirs]", "[Registry]", "[INI]", "[Messages]", "[CustomMessages]"}
     text = (PACKAGING / "k1520emu.iss").read_text(encoding="utf-8")
     for nr, zeile in enumerate(text.splitlines(), 1):
@@ -934,8 +947,33 @@ def test_iss_raeumt_auf_wenn_das_nachladen_scheitert():
     vorbereiten = code[code.index("function PrepareToInstall"):]
     vorbereiten = vorbereiten[:vorbereiten.index("procedure VorlageSchreiben")]
     for weg in ("{app}\\venv", "{app}\\python"):
-        assert f"DelTree(ExpandConstant('{weg}')" in vorbereiten, (
+        assert f"OrdnerRestlosLoeschen(ExpandConstant('{weg}')" in vorbereiten, (
             f"{weg} wird nach einem Fehlschlag nicht weggeräumt")
+
+
+def test_iss_raeumt_beim_update_die_alten_programmdateien_weg():
+    """Drueberinstallieren darf kein Gemisch aus alter und neuer Fassung ergeben.
+
+    Inno loescht beim Kopieren nichts; ohne [InstallDelete] blieben entfallene
+    Module in app\\ liegen.  Konfiguration und Disketten gehoeren NICHT hierher.
+    """
+    code = _iss()
+    assert "[InstallDelete]" in code
+    abschnitt = code[code.index("[InstallDelete]"):code.index("[UninstallDelete]")]
+    for weg in ("{app}\\app", "{app}\\share", "{app}\\bin"):
+        assert f'Name: "{weg}"' in abschnitt, f"{weg} wird beim Update nicht geraeumt"
+    regeln = "\n".join(z for z in abschnitt.splitlines() if z.startswith("Type:"))
+    for tabu in ("APPDATA", "Documents", "Disketten", "{userdocs}"):
+        assert tabu not in regeln, f"{tabu} darf ein Update nie anfassen"
+
+
+def test_iss_bootstrap_prueft_loeschen_und_trennt_ensurepip():
+    """Forum Beitrag 70: ensurepip scheiterte im venv ohne Text im Protokoll."""
+    code = _iss_code()
+    assert "function OrdnerRestlosLoeschen" in code
+    assert "-m venv --without-pip" in code
+    assert "-m ensurepip" in code
+    assert "procedure PythonUmgebungNeutralisieren" in code
 
 
 def test_iss_entfernt_verknuepfungen_wenn_der_rauchtest_scheitert():
@@ -1416,7 +1454,7 @@ def test_payload_enthaelt_alles_zum_starten(payload):
     """
     stage = _stage(payload)
     for pflicht in [
-        "install.sh", "launcher.sh", "slim.py", "a5120emu.desktop.in",
+        "install.sh", "uninstall.sh", "k1520emu-uninstall.desktop.in", "launcher.sh", "slim.py", "a5120emu.desktop.in",
         "k8915emu.desktop.in", "prg710emu.desktop.in", "pc1715emu.desktop.in", "p8000emu.desktop.in",
         "mc80emu.desktop.in", "uv_pins.txt",
         "lib/common.sh", "requirements.lock", "VERSION", "README.md",
@@ -1782,18 +1820,21 @@ def test_installer_legt_beide_starter_an():
     assert 'k1520disktool.desktop.in' in text
 
 
-def test_deinstallieren_raeumt_auch_das_werkzeug_weg():
-    """Die Aufraeumliste muss beide Namen kennen.
+def test_deinstallieren_raeumt_nach_inhalt_nicht_nach_namensliste():
+    """`uninstall.sh` entfernt jeden Verweis und jede .desktop-Datei, die IN die Installation zeigt.
 
-    `--uninstall` entfernt genau die Namen aus einer Liste. Stuende dort nur die
-    Maschine, bliebe der Starter des Werkzeugs samt Startmenue-Eintrag als Leiche
-    zurueck und zeigte auf ein geloeschtes Verzeichnis.
+    Eine Namensliste vergisst den naechsten Rechner (und die Eintraege einer aelteren
+    Fassung, die es heute nicht mehr gibt).  Nach Inhalt zu suchen heisst: ein neues
+    Programm braucht hier nichts, nur seine <name>.desktop.in beim Installieren.
     """
-    text = (PACKAGING / "install.sh").read_text(encoding="utf-8")
-    assert 'WERKZEUGE="k1520disktool k1520kermit k1520printer"' in text
-    assert 'STARTER="$MASCHINEN $WERKZEUGE"' in text
-    assert 'for _m in $STARTER; do' in text, \
-        "die Aufräumschleife läuft noch über $MASCHINEN und übersieht das Werkzeug"
+    common = (PACKAGING / "lib" / "common.sh").read_text(encoding="utf-8")
+    assert "entferne_menue_eintraege()" in common
+    assert 'grep \'^Exec=\' "$_d"' in common and 'readlink "$_l"' in common
+    un = (PACKAGING / "uninstall.sh").read_text(encoding="utf-8")
+    assert "entferne_menue_eintraege" in un and "entferne_installation" in un
+    inst = (PACKAGING / "install.sh").read_text(encoding="utf-8")
+    assert 'WERKZEUGE="k1520disktool k1520kermit k1520printer"' in inst
+    assert 'exec sh "$SELF_DIR/uninstall.sh"' in inst, "--uninstall ruft uninstall.sh nicht mehr"
 
 
 # ─── K1520 Kermit im Paket (Entwurf 36, AP K9) ───────────────────────────────
@@ -2061,9 +2102,8 @@ def test_installer_verweist_den_debugger_und_raeumt_ihn_wieder_weg():
         "die Kommandozeile des DiskTool blieb beim Deinstallieren als toter Verweis liegen"
     # Angelegt …
     assert 'ln -sf "$PREFIX/bin/$_w" "$BINDIR/$_w"' in text
-    # … und wieder entfernt.
-    assert re.search(r"for _m in \$KONSOLENWERKZEUGE; do\s*\n\s*rm -f \"\$BINDIR/\$_m\"", text), \
-        "die Konsolenwerkzeuge werden beim Deinstallieren nicht entfernt"
+    # … und wieder entfernt: uninstall.sh sucht jeden Verweis, der in die Installation zeigt.
+    assert "entferne_menue_eintraege" in (PACKAGING / "uninstall.sh").read_text(encoding="utf-8")
 
 
 @nur_unix_installer
@@ -2299,3 +2339,221 @@ def test_mutos8000_nur_der_k5601_satz_im_paket():
     for name in block:
         assert ausgelieferte_diskette(name).is_file(), name
     assert "*/a5120_mutos8000/*) continue" in text          # --disks all laesst die Quellen aus
+
+
+def test_iss_sichert_die_alte_fassung_und_stellt_sie_wieder_her():
+    """Ein fehlgeschlagenes Update darf die laufende Installation nicht zerstoeren.
+
+    Die alte Fassung wird beiseite gelegt (das ist zugleich die Probe auf laufende
+    Programme), bei Fehlschlag zurueckgestellt und erst nach dem Rauchtest geloescht.
+    """
+    code = _iss_code()
+    for name in ("function AltesSichern", "procedure AltesZurueck",
+                 "procedure SicherungLoeschen", "procedure DeinitializeSetup",
+                 "function ZielPruefen", "procedure ProtokollKopf"):
+        assert name in code, f"{name} fehlt"
+    vorbereiten = code[code.index("function PrepareToInstall"):]
+    vorbereiten = vorbereiten[:vorbereiten.index("procedure DeinitializeSetup")]
+    assert vorbereiten.index("AltesSichern") < vorbereiten.index("PythonAuspacken")
+    nachlauf = code[code.index("procedure CurStepChanged"):]
+    nachlauf = nachlauf[:nachlauf.index("procedure InitializeWizard")]
+    # Die Sicherung faellt erst NACH dem Rauchtest weg.
+    assert nachlauf.index("Rauchtest <> 0") < nachlauf.index("SicherungLoeschen")
+    assert nachlauf.index("SicherungLoeschen") < nachlauf.index("Erfolg := True")
+    assert "-m compileall" in nachlauf
+    iss = _iss()
+    assert "MinVersion=10.0.17763" in iss
+    for n in ("python", "venv", "app", "share", "bin"):
+        assert f'Name: "{{app}}\\{n}.alt"' in iss, f"{n}.alt fehlt im Deinstallationsabschnitt"
+
+
+# ─── Startmenue-Eintraege, Deinstallationsskript, Rueckfall beim Update (Linux) ──
+#
+# Alles ohne Netz: ein Update, dem das Laden (absichtlich) fehlschlaegt, ist der
+# Fall, der die Rueckstellung beweist.
+
+def _paket_attrappe(ziel: Path) -> Path:
+    """Ein winziges Paket: die echten Skripte, eine leere Payload — mehr braucht der Fehlerfall nicht."""
+    ziel.mkdir(parents=True)
+    for datei in ("install.sh", "uninstall.sh", "launcher.sh", "disktool_launcher.sh",
+                  "kermit_launcher.sh", "uv_pins.txt"):
+        shutil.copy(PACKAGING / datei, ziel / datei)
+    for vorlage in PACKAGING.glob("*.desktop.in"):
+        shutil.copy(vorlage, ziel / vorlage.name)
+    (ziel / "lib").mkdir()
+    shutil.copy(PACKAGING / "lib" / "common.sh", ziel / "lib" / "common.sh")
+    for d in ("bin", "app", "share"):
+        (ziel / "payload" / d).mkdir(parents=True)
+        (ziel / "payload" / d / "neu").write_text("neue fassung")
+    (ziel / "VERSION").write_text("neu\n")
+    (ziel / "requirements.lock").write_text("")
+    return ziel
+
+
+def _ohne_netz(tmp_path: Path, heim: Path) -> dict:
+    """Umgebung, in der jedes Laden scheitert (curl endet mit 1) — und kein Netz noetig ist."""
+    falsch = tmp_path / "falsch"
+    falsch.mkdir(exist_ok=True)
+    for name in ("curl", "wget"):
+        (falsch / name).write_text("#!/bin/sh\nexit 1\n")
+        (falsch / name).chmod(0o755)
+    umgebung = {k: v for k, v in os.environ.items()
+                if k not in ("XDG_DATA_HOME", "XDG_CONFIG_HOME")}
+    umgebung["HOME"] = str(heim)
+    umgebung["PATH"] = f"{falsch}:{umgebung['PATH']}"
+    return umgebung
+
+
+@nur_unix_installer
+def test_update_stellt_bei_fehlschlag_die_alte_fassung_wieder_her(tmp_path):
+    """Scheitert ein Update, hat der Anwender danach wieder, was er vorher hatte."""
+    heim = tmp_path / "heim"
+    heim.mkdir()
+    wurzel = _fake_installation(tmp_path / "K1520emu")
+    paket = _paket_attrappe(tmp_path / "paket")
+    out = subprocess.run(["sh", str(paket / "install.sh"), "--prefix", str(wurzel), "-y"],
+                         capture_output=True, text=True, env=_ohne_netz(tmp_path, heim),
+                         timeout=120)
+    assert out.returncode != 0, "der Ladeversuch haette scheitern muessen"
+    text = out.stdout + out.stderr
+    assert "vorherige Fassung wird wiederhergestellt" in text, text
+    for d in ("bin", "app", "share", "venv"):
+        assert (wurzel / d / "inhalt").read_text(encoding="utf-8") == "vom installer", \
+            f"{d} wurde nicht zurueckgestellt"
+        assert not (wurzel / d / "neu").exists(), f"{d} enthaelt noch Teile der neuen Fassung"
+    assert (wurzel / "VERSION").read_text(encoding="utf-8") == "test\n"
+    assert (wurzel / ".k1520emu-installation").is_file(), "der Ausweis fehlt nach der Rueckstellung"
+    assert not list(wurzel.glob("*.alt")), "Sicherungsreste blieben liegen"
+
+
+@nur_unix_installer
+def test_erstinstallation_hinterlaesst_bei_fehlschlag_nichts(tmp_path):
+    heim = tmp_path / "heim"
+    heim.mkdir()
+    paket = _paket_attrappe(tmp_path / "paket")
+    ziel = tmp_path / "K1520emu"
+    out = subprocess.run(["sh", str(paket / "install.sh"), "--prefix", str(ziel), "-y"],
+                         capture_output=True, text=True, env=_ohne_netz(tmp_path, heim),
+                         timeout=120)
+    assert out.returncode != 0
+    assert not ziel.exists() or not any(ziel.iterdir()), \
+        f"eine halbe Erstinstallation blieb liegen: {sorted(p.name for p in ziel.iterdir())}"
+    assert not (heim / ".local" / "share" / "applications").exists() or \
+        not list((heim / ".local" / "share" / "applications").glob("*.desktop")), \
+        "ein Startmenue-Eintrag zeigt auf eine gescheiterte Installation"
+
+
+def _eintraege_anlegen(heim: Path, wurzel: Path, namen=("a5120emu", "k8915emu", "alt_gewesen")):
+    """Verweise und .desktop-Dateien, wie sie eine (auch aeltere) Fassung angelegt hat."""
+    bindir = heim / ".local" / "bin"
+    appdir = heim / ".local" / "share" / "applications"
+    bindir.mkdir(parents=True, exist_ok=True)
+    appdir.mkdir(parents=True, exist_ok=True)
+    for n in namen:
+        (wurzel / "bin").mkdir(parents=True, exist_ok=True)
+        (wurzel / "bin" / n).write_text("#!/bin/sh\n")
+        (bindir / n).symlink_to(wurzel / "bin" / n)
+        (appdir / f"{n}.desktop").write_text(
+            f'[Desktop Entry]\nName={n}\nExec="{wurzel}/bin/{n}"\n', encoding="utf-8")
+    return bindir, appdir
+
+
+@nur_unix_installer
+def test_uninstall_entfernt_eintraege_auch_aelterer_fassungen_und_nur_eigene(tmp_path):
+    heim = tmp_path / "heim"
+    heim.mkdir()
+    wurzel = _fake_installation(tmp_path / "K1520emu")
+    bindir, appdir = _eintraege_anlegen(heim, wurzel)
+    # Eine ZWEITE Installation und ein fremdes Programm duerfen nicht angefasst werden.
+    andere = _fake_installation(tmp_path / "andere")
+    (andere / "bin").mkdir(exist_ok=True)
+    (andere / "bin" / "p8000emu").write_text("#!/bin/sh\n")
+    (bindir / "p8000emu").symlink_to(andere / "bin" / "p8000emu")
+    (appdir / "p8000emu.desktop").write_text(f'[Desktop Entry]\nExec="{andere}/bin/p8000emu"\n')
+    (appdir / "firefox.desktop").write_text("[Desktop Entry]\nExec=firefox\n")
+
+    out = _install_sh(wurzel, heim, "--uninstall")
+    assert out.returncode == 0, out.stderr
+    for n in ("a5120emu", "k8915emu", "alt_gewesen"):
+        assert not (bindir / n).is_symlink(), f"Verweis {n} blieb"
+        assert not (appdir / f"{n}.desktop").exists(), f"Eintrag {n} blieb"
+    assert (bindir / "p8000emu").is_symlink(), "die zweite Installation wurde angefasst"
+    assert (appdir / "p8000emu.desktop").exists()
+    assert (appdir / "firefox.desktop").exists(), "ein fremder Eintrag wurde geloescht"
+    assert not wurzel.exists(), "ohne Terminal wird der Programmordner geloescht"
+
+
+@nur_unix_installer
+def test_uninstall_keep_folder_laesst_den_ordner_stehen(tmp_path):
+    heim = tmp_path / "heim"
+    heim.mkdir()
+    wurzel = _fake_installation(tmp_path / "K1520emu")
+    bindir, appdir = _eintraege_anlegen(heim, wurzel, ("a5120emu",))
+    out = subprocess.run(["sh", str(PACKAGING / "uninstall.sh"), "--prefix", str(wurzel),
+                          "--keep-folder"], capture_output=True, text=True, timeout=60,
+                         env={**os.environ, "HOME": str(heim),
+                              "XDG_DATA_HOME": "", "XDG_CONFIG_HOME": ""})
+    assert out.returncode == 0, out.stderr
+    assert not (appdir / "a5120emu.desktop").exists()
+    assert (wurzel / "bin").is_dir(), "der Programmordner haette bleiben muessen"
+    assert "bleibt" in out.stdout
+
+
+@nur_unix_installer
+def test_uninstall_aus_der_installation_findet_sich_selbst(tmp_path):
+    """Das Skript liegt in der Installation und braucht weder Paket noch --prefix."""
+    heim = tmp_path / "heim"
+    heim.mkdir()
+    wurzel = _fake_installation(tmp_path / "K1520emu")
+    (wurzel / "lib").mkdir()
+    shutil.copy(PACKAGING / "lib" / "common.sh", wurzel / "lib" / "common.sh")
+    shutil.copy(PACKAGING / "uninstall.sh", wurzel / "uninstall.sh")
+    marke = wurzel / ".k1520emu-installation"
+    marke.write_text(marke.read_text(encoding="utf-8") + "eintrag uninstall.sh\neintrag lib\n")
+    bindir, appdir = _eintraege_anlegen(heim, wurzel, ("a5120emu",))
+    out = subprocess.run(["sh", str(wurzel / "uninstall.sh")], capture_output=True, text=True,
+                         timeout=60, cwd=tmp_path,
+                         env={**os.environ, "HOME": str(heim), "XDG_DATA_HOME": "",
+                              "XDG_CONFIG_HOME": ""})
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert not wurzel.exists(), "das Skript hat sich nicht selbst mit entfernt"
+    assert not (appdir / "a5120emu.desktop").exists()
+
+
+def test_frage_jn_ohne_terminal_gilt_die_vorgabe():
+    """Im Skript/CI (kein Terminal) wird nicht gefragt."""
+    common = PACKAGING / "lib" / "common.sh"
+    for vorgabe, erwartet in (("j", 0), ("n", 1)):
+        out = _sh("sh", "-c", f'. "{common}"; frage_jn "Frage?" {vorgabe}')
+        assert out.returncode == erwartet, out.stdout + out.stderr
+
+
+def test_installer_fragt_nach_startmenue_eintraegen_und_rollt_zurueck():
+    """Die Bausteine der neuen Linux-Installation stehen im Skript."""
+    inst = (PACKAGING / "install.sh").read_text(encoding="utf-8")
+    assert "--shortcut" in inst and "--no-shortcut" in inst
+    assert 'frage_jn "Eintraege anlegen?" j' in inst
+    assert "trap beim_ende EXIT" in inst and "stelle_alte_fassung_wieder_her" in inst
+    # Eintraege entstehen ERST nach dem bestandenen Rauchtest.
+    assert inst.index("Rauchtest fehlgeschlagen") < inst.index("\nlege_menue_eintraege_an\n")
+    assert inst.index("\nlege_menue_eintraege_an\n") < inst.index("ERFOLG=yes")
+    assert 'cp "$SELF_DIR/uninstall.sh" "$PREFIX/uninstall.sh"' in inst
+    bp = (PACKAGING / "build_payload.sh").read_text(encoding="utf-8")
+    assert "uninstall.sh" in bp and "k1520emu-uninstall.desktop.in" in bp
+    desk = (PACKAGING / "k1520emu-uninstall.desktop.in").read_text(encoding="utf-8")
+    assert "Terminal=true" in desk and "uninstall.sh" in desk
+
+
+def test_sios_disketten_sind_in_der_auslieferung():
+    """Alle SIOS-1526-Disketten aus disks/a5120_sios1526/ gehoeren ins Paket (freigegeben 2026-11-08).
+
+    Sonst steht eine gebaute Lieferdiskette im Repository und fehlt beim Anwender —
+    so war es bis zu diesem Tag unbemerkt geblieben.
+    """
+    text = (PACKAGING / "build_payload.sh").read_text(encoding="utf-8")
+    block = text[text.index('DISKS_DEFAULT="'):]
+    block = block[len('DISKS_DEFAULT="'):].split('"', 1)[0].split()
+    vorhanden = sorted(p.name for p in (PROJECT_ROOT / "disks" / "a5120_sios1526").glob("*.hfe"))
+    assert vorhanden, "disks/a5120_sios1526/ ist leer"
+    fehlen = [n for n in vorhanden if n not in block]
+    assert not fehlen, f"SIOS-Disketten fehlen in DISKS_DEFAULT: {fehlen}"

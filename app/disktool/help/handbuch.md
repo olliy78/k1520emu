@@ -11,7 +11,7 @@ Dazu kommen die UNIX-Disketten des P8000: **WEGA** (mit Modus, Besitzer und Zeit
 Datei), **tar-Disketten** ohne Dateisystem und **Plattenabbilder** (`.img.gz`) mit ihren
 Partitionen — alle ohne UDOS-Angaben. Alles
 Wesentliche zu den neueren Funktionen steht in den Abschnitten *tar-Disketten*,
-*P8000-Platten (WEGA)*,
+*P8000-Platten (WEGA)*, *GIDE-Platten (Poppe / Kingstener)*,
 *CopyQM-Abbilder*, *Containerformate im Vergleich*, *Was eine Datei außer ihren Bytes hat* und *Archivieren*
 (einschließlich *Archive auf der Kommandozeile*).
 
@@ -516,6 +516,49 @@ Formatdialog**: Format und Dateisystem (WEGA) stehen fest.
   Wiederherstellen, Archivieren, *Speichern unter* (für eine Arbeitskopie die Datei im
   Dateimanager kopieren) und *Alles einfügen* (dafür Ziehen oder *Auf die Platte schreiben*).
 
+## GIDE-Platten (Poppe / Kingstener)
+
+Das **Plattenabbild der GIDE-Karte** (IDE-Platte am K1520-Bus, im Emulator als `.img.gz`) öffnet man wie
+eine Diskette: *Datei ▸ Abbild öffnen…* oder die Datei auf die linke Hälfte ziehen. Es erscheint **kein
+Formatdialog**; die Platte trägt **CP/M-Laufwerke**, und *wie* sie aufgeteilt sind, bestimmt der
+**Gast-Treiber**, nicht die Platte. Zwei Treiber sind bekannt, und ihre Layouts sind **unverträglich** —
+ein falscher Treiber vernichtet Daten:
+
+| Layout | Treiber | Laufwerke |
+|---|---|---|
+| `poppe` | `GIDEHP…` von H. Poppe, auch der im CP/A-BIOS eingebaute | bis 8 Laufwerke (`lw0` … `lw7`) je 8 MB; `lw0` mit 2 Systemspuren |
+| `kingstener` | `gidn` (Kingstener/DL) | 1 Laufwerk (`lw0`), 8 MB |
+
+* **Erkennung.** Das Layout steht nirgends auf der Platte; das Werkzeug erkennt es **nur lesend** aus den
+  Verzeichnissen. Passt genau eines, ist es sicher (Kopfzeile: *Layout: poppe (erkannt)*). Passen beide oder
+  keines (unformatierte Platte), wird **nichts geraten**: das Fenster fragt nach dem Layout, und das Abbild
+  bleibt schreibgeschützt, bis Sie den Schutz aufheben. Bei mehrdeutigem Befund steht eine Warnung im Streifen.
+* **Ansicht.** Die Laufwerke `lw0` … stehen als oberste Ordner (mit freiem Platz), darunter ihre Dateien;
+  Spalten: Name, Nutzerbereich, Größe, Attribute (R/O, SYS, ARC). Die Zuordnung zu Laufwerksbuchstaben
+  (`D:` …) vergibt der Treiber im Gast; hier zählen die Laufwerke von 0.
+* **Holen** legt die Dateien nach `lwN/NAME.EXT` im Ordner; **Hinzufügen** (*Auf die Platte schreiben*, `Strg+←`,
+  oder Ziehen) legt in das angeklickte Laufwerk. Dateinamen müssen CP/M-Namen sein (8.3, Großschrift). *Löschen*
+  entfernt Dateien, nie ein Laufwerk. Es gibt keine Ordner (CP/M); *Eigenschaften* sind für GIDE-Platten gesperrt.
+* **Neue GIDE-Platte…** (*Datei*) legt ein leeres `.img.gz` im gewählten Layout an und formatiert alle Laufwerke
+  (Poppe: 258 MB, Kingstener: 34 MB — gepackt wenige hundert KB). *GIDE-Laufwerk formatieren…* (*Bearbeiten*,
+  nur an einer GIDE-Platte und beschreibbar) leert das Verzeichnis eines Laufwerks wie `ERADIR` bzw. `GIDN /F`;
+  liegen dort Dateien oder fremde Daten, wird nachgefragt. *GIDE-Platte prüfen…* zeigt Layout und Befunde
+  (nur lesend).
+* **Schreibschutz und Sperre.** Wie bei jedem Datenträger ist er beim Öffnen gesetzt (*Diskette ▸ Schreibschutz*,
+  `Strg+R`). Hat ein laufender Emulator das Abbild geladen (Sperrdatei `<abbild>.lock`), ist es **nur lesbar** —
+  der Schutz lässt sich nicht aufheben, bis der Emulator es freigegeben hat. Geschrieben wird erst beim
+  Speichern (`Strg+S`), bei `.img.gz` ganz und atomar; vor dem ersten Zurückschreiben entsteht einmalig eine
+  Sicherung `<abbild>~`.
+* **Austausch mit dem Gast.** Was der Gast mit dem echten Treiber (PIP, ERADIR, GIDN) auf die Platte schreibt,
+  liest das Werkzeug bitgleich — und umgekehrt (Wächter `GideAustausch.*`, nur mit dem lokal liegenden
+  Fremdtreiber). Beim Kingstener-Layout schreibt der Treiber jeden 128-Byte-Satz **vierfach** in den
+  512-Byte-Hostsektor und liest das **letzte Viertel**; das Werkzeug tut dasselbe.
+* **Gesperrt** sind Diskeditor, Bootabbild, Dateisystemwahl, Spurschnitte, Diskettenangaben, Reparieren,
+  Wiederherstellen, Archivieren, *Speichern unter* und *Alles einfügen* — mit Begründung im Tooltip.
+
+Auf der Kommandozeile: `k1520disktool ls|info|check|fsck|get|put|rm|format|create` mit
+`--gide-layout auto|poppe|kingstener` und `--laufwerk N` (siehe `tools/k1520disktool.md`).
+
 ## CopyQM-Abbilder
 
 Viele Abbilder alter Rechner liegen als `.cqm` (Programm CopyQM). Das Werkzeug **liest und
@@ -592,7 +635,7 @@ Daraus folgt:
 Disketten vom **PC 1715** tragen UDOS mit dem Treiber **NDOS** statt ZDOS. Das
 Werkzeug erkennt sie von selbst und nennt sie `udos1715_ds80_16x256`.
 
-Dieselben Disketten schreiben auch der **EAW P8000** (dort UDOS 2.2, z. B. seine
+Dieselben Disketten schreiben auch der **EAW P8000** (dort UDOS 3.x, z. B. seine
 WEGA-Startdiskette) und der **A5120 unter UDOS 5.0**. Die Rechner haben nichts
 miteinander zu tun — sie legen ihre Disketten nur gleich an. Das Werkzeug zeigt
 trotzdem, von welchem Rechner eine Diskette stammt: **`udos1715_ds80_16x256`** (PC 1715),
@@ -723,6 +766,30 @@ mit einem der mitgelieferten Abbilder. **Das System ist fest auf Tastatur und La
 Im Emulator muss die Bestückung dazu passen, sonst bleibt das Laden bei den Punkten stehen. Die Prüfung meldet, wenn
 `MicroDOS.SYS` nicht dort liegt, wo der Lader sie holt (die Diskette würde nicht starten).
 
+## BS600 — die Systemdisketten der Numerik-Programmiergeräte (PRG 700/710/710-1)
+
+BS600 (BS610, BS620) ist das menügeführte Betriebssystem der Programmiergeräte für SPS und CNC.  Die Diskette ist **einseitig,
+40 Zylinder**: Zylinder 0 hat 26 Sektoren zu 128 Byte (Urlader, Kennsatz, Verzeichnis, Belegungstabelle), die Zylinder 1 bis 39 haben
+15 Sektoren zu 256 Byte.  Das Verzeichnis fasst **54 Dateien**; **jede Datei liegt zusammenhängend** (keine Verkettung), nutzbar sind
+die Spuren 1 bis 37.  Erkannt wird sie am Inhalt (`BS600 Systemdiskette`), nicht am Namen.
+
+* **Die Liste** zeigt je Datei Typ (`P`), Größe, **Lage** (`Spur/Sektor-Spur/Sektor`), die drei Adressen (Laden, Ende, Start — hexadezimal;
+  `Start —` heißt „kein Programmstart“), Datum und Signum.  Ein Name hat höchstens 6 Zeichen und **keine Endung**: aus `prog.bin` wird `PROG`.
+* **Eigenschaften** (Doppelklick, Alt+Return) ändern Name, Typ, Datum, Signum, Lade- und Startadresse; die Endadresse folgt der
+  Ladeadresse, die Lage ändert nur *Reorganisieren*.  Beim **Holen** schreibt das Werkzeug die Angaben in ein `.fileinfo` neben die Datei;
+  beim **Einfügen** kommen sie von dort zurück.  Ohne `.fileinfo` gilt: Typ `P`, Ladeadresse `0000`, keine Startadresse, Datum heute, kein Signum
+  — für ein Programm also unbedingt Ladeadresse und Start nachtragen (Eigenschaften oder `put --load 6D00 --entry 6D5F`).
+* **Lücken:** BS600 vergibt nur zusammenhängende Läufe.  Nach dem Löschen können Lücken entstehen, in die eine große Datei nicht passt, obwohl
+  insgesamt Platz ist.  *Diskette ▸ BS600: Dateien reorganisieren…* legt alle Dateien lückenlos ab Spur 1 neu (Namen, Inhalt und Angaben bleiben).
+  Die Prüfung nennt Lücken als Hinweis.
+* **Urlader:** zwei Bauarten.  `SYL FOR BS620` (NKM-Lader) bootet am **PRG 710-1**; `BOOTSTRAP FOR BS600` gehört zum **PRG 700** (3-KB-ROM) und
+  startet am 710/710-1 nicht.  Der Hinweis steht im Prüfbericht, in `info` und nach dem Einspielen.  Eine neue Diskette entsteht über
+  *Neue Diskette ▸ BS600 Systemdiskette ▸ Bootdiskette* mit einem der mitgelieferten Urlader — die Dateien (`BS620`, `SYS…`) kommen danach per *Alles einfügen*.
+* **Prüfen und Retten:** die Prüfung vergleicht Verzeichnis und Belegungstabelle in beiden Richtungen, findet überlappende Dateien, unmögliche Lagen und Adressen,
+  doppelte Namen und einen fehlenden Kennsatz.  Reparieren kann sie die **Belegungstabelle** (neu rechnen) und einen Eintrag mit unmöglicher Lage
+  (löschen — nie vorausgewählt).  *Gelöschte Dateien suchen* findet nach dem Löschen nur den **Inhalt** (Rohbereich): ein BS600-Eintrag trägt Name, Typ, Adressen und
+  Dateigrenzen, und das Löschen überschreibt ihn ganz.  Zurückholen heißt: Inhalt retten und mit Ladeadresse neu einfügen.
+
 ## Neue Disketten und Bootdisketten
 
 *Datei ▸ Neue Diskette* (Strg+N) legt eine formatierte, leere Diskette an. Im
@@ -748,7 +815,7 @@ Kommandozeile heißt es `create --inodes N`.
 Darunter steht der Haken **Bootdiskette erstellen** mit einem Auswahlfeld daneben. Das
 Feld bietet die **hinterlegten Bootabbilder** des gewählten Dateisystems an — die
 Systemspuren aller mitgelieferten Systemdisketten (CP/A, SCPX, UDOS 4.3, BCU 880,
-SCPX 8915, PRG 710, SCP 1715, CP/Z, SCP 3.0, OS/M, UDOS 5.0). Der erste passende ist vorgewählt;
+SCPX 8915, PRG 710, BS600 (nur der Urlader), SCP 1715, CP/Z, SCP 3.0, OS/M, UDOS 5.0). Der erste passende ist vorgewählt;
 mehrere gibt es, wo dasselbe Dateisystem auf verschiedenen Rechnern bootet (`scpx_ds80_16x256_boot`:
 A5120, PRG 710/710-1, PC 1715). Der letzte Eintrag, **Eigene .bin-Datei auswählen…**,
 fragt sofort nach einer Datei — etwa einem Abbild, das man mit *Diskette ▸ Bootabbild
