@@ -484,3 +484,9 @@ k1520_add_test(k6311 SRC test_k6311.cpp
                      LIBS k1520_printer k1520_serial k1520_logger
                      LABELS "${_lbl};fach_drucker" TIMEOUT 600 DEFS LOG_LEVEL=2
                      "K6311_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/K6311\"")
+
+# K6311 Schriftarten (WP8h-a): Breit und Unterstreichen am ROM 12128062 gegen das Orakel k6311_orakel_esc.h
+k1520_add_test(k6311_esc SRC test_k6311_esc.cpp
+                     LIBS k1520_printer k1520_serial k1520_logger
+                     LABELS "${_lbl};fach_drucker" TIMEOUT 600 DEFS LOG_LEVEL=2
+                     "K6311_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/K6311\"")

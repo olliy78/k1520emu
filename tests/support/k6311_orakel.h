@@ -110,10 +110,17 @@ struct Ergebnis {
 /// FEST 3 Pixel.  Danach muss jeder erwartete Punkt (Spaltenindex, Nadel) im Blatt gesetzt sein (Mittelpixel), und **kein** gesetztes Pixel darf ausserhalb
 /// der erwarteten Punktzellen liegen (Zelle 3 x 2 Pixel, in x +-1 Pixel Rundung).  Benachbarte Punkte verschmelzen im Blatt; deshalb wird hier
 /// geprueft statt Punkte aus dem Blatt zu "zaehlen".  Rueckgabe: Fehlerbeschreibung ("" = gleich).
+inline Ergebnis vergleichePunkte(const Blattmodell& b, const Punkte& exp, int ya, int yb);
+
 inline Ergebnis vergleiche(const Blattmodell& b, const std::vector<uint8_t>& rom, const std::string& text, int ya, int yb)
 {
+    return vergleichePunkte(b, erwartet(rom, text), ya, yb);
+}
+
+/// Wie @ref vergleiche mit fertig berechneten Punkten (Spaltenindex zu 3 Pixeln, Nadel), z. B. der Schriftarten aus `k6311_orakel_esc.h`.
+inline Ergebnis vergleichePunkte(const Blattmodell& b, const Punkte& exp, int ya, int yb)
+{
     Ergebnis e;
-    const Punkte exp = erwartet(rom, text);
     if (exp.empty()) { e.fehler = "kein erwarteter Punkt"; return e; }
     int ax = 1 << 30, ay = 1 << 30, ek = 1 << 30, nmin = 99;
     for (int y = std::max(ya, 0); y < yb && y < b.hoehe(); ++y)
