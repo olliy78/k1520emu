@@ -15,6 +15,8 @@ k1520_add_test(z8    SRC primitives/test_z8.cpp primitives/test_z8_peripherie.cp
                      DEFS "K1520_EPROM_DIR=\"${CMAKE_SOURCE_DIR}/doc/p8000/eproms\"")
 k1520_add_test(pio   SRC primitives/test_pio.cpp   LIBS k1520_pio LABELS "${_lbl}")
 k1520_add_test(ctc   SRC primitives/test_ctc.cpp   LIBS k1520_ctc LABELS "${_lbl}")
+# AY-3-8910/8912 (Entwurf 51, S1)
+k1520_add_test(ay38910 SRC primitives/test_ay38910.cpp LIBS k1520_ay38910 LABELS "${_lbl}")
 # P8000 P5c/P5d: Handshake-/Pinpegel-Erweiterung PIO, Bruchtakt-Zaehleingang CTC
 k1520_add_test(pio_handshake  SRC primitives/test_pio_handshake.cpp  LIBS k1520_pio LABELS "${_lbl}")
 k1520_add_test(ctc_bruchtakt  SRC primitives/test_ctc_bruchtakt.cpp  LIBS k1520_ctc k1520_sio k1520_serial LABELS "${_lbl}")

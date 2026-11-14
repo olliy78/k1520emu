@@ -287,6 +287,10 @@ if(BUILD_K1520)
     )
     target_include_directories(k1520_ctc PUBLIC ${CMAKE_SOURCE_DIR})
 
+    # AY-3-8910/8912 Tongenerator (Entwurf 51, S1)
+    add_library(k1520_ay38910 STATIC core/primitives/ay38910.cpp)
+    target_include_directories(k1520_ay38910 PUBLIC ${CMAKE_SOURCE_DIR})
+
     # Z80-DMA (UA858, PC 1715W, doc/design/21_pc1715.md AP-W2a)
     add_library(k1520_z80dma STATIC core/primitives/z80_dma.cpp)
     target_link_libraries(k1520_z80dma PUBLIC k1520_bus)
