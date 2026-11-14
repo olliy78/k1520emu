@@ -90,7 +90,7 @@ doppelt, Tor belegt, Z80-Gastcode Sektor + RTC), `GideSystem.*` (`test_gide_syst
 
 ## Ausdrücklich NICHT gemacht
 
-- **Maschinenvorgabe der Basen** — seit 2026-11-13 entschieden: die Vorauswahl der Oberfläche (GIDE 90H, USB 84H/8CH, Netz C0H/28H, `app/profil.py`) ist die Vorgabe; Wächter `KartenVorgaben.*` (alle drei Karten + RAF/K5020/K6022 zugleich, je Karte ein Z80-Gastprogramm, an A5120, A5120.16, K8915 V3/Gen 2, PRG 710/-1, PC 1715/1715W) und `test_vorauswahl_kollidiert_nirgends`.  Die Jumper bleiben in der Oberfläche wählbar.
+- **Maschinenvorgabe der Basen** — seit 2026-11-13 entschieden: die Vorauswahl der Oberfläche (GIDE D0H — PRG 710/-1 90H wegen EPROMmer —, USB 84H/8CH, Netz C0H/28H, `app/profil.py`; seit 2026-11-14 D0H statt 90H, die Systemdisketten tragen die D0H-Treiber; GIDE D0H + K5020 am K8915/PC 1715 = gemeldeter Konflikt, Test `py_karten_vorauswahl`) ist die Vorgabe; Wächter `KartenVorgaben.*` (alle drei Karten + RAF/K5020/K6022 zugleich, je Karte ein Z80-Gastprogramm, an A5120, A5120.16, K8915 V3/Gen 2, PRG 710/-1, PC 1715/1715W) und `test_vorauswahl_kollidiert_nirgends`.  Die Jumper bleiben in der Oberfläche wählbar.
 - **Netz (W5100/KC-Net, 88H–8BH)** ist umgesetzt (N1–N3, siehe unten); es kollidiert mit der RAF und ist am K8915/PRG 710 nicht steckbar (CTC/PIO der ZRE).
 - **G5b Gasttreiber `GIDEDRV.COM`** — entfällt: die vorhandenen Poppe-/Kingstener-Treiber genügen (Anwenderantwort F3).
   Auch kein eigenes Prüfprogramm `GIDETST.COM` (G5a ist durch die echten Treiber, G5c, überholt).

@@ -5,7 +5,7 @@
  *
  * Alle Dateien kommen aus dem Repository (tools/gide/fremd, tools/gide/uhr), nichts wird uebersprungen.
  * Je Rechner/Betriebssystem: die Lieferdiskette (TempDisk-artige Kopie) booten, die Karten auf der
- * Vorauswahl-Basis stecken (app/profil.py: GIDE 90H; USB 84H bzw. 8CH; Netz C0H bzw. 28H am PRG 710) und
+ * Vorauswahl-Basis stecken (app/profil.py: GIDE D0H (PRG 90H); USB 84H bzw. 8CH; Netz C0H bzw. 28H am PRG 710) und
  *  - GIDE: Treiber starten, Platte benutzen (Datei hin und zurueck, bitgleich), UHR zeigt und stellt die Zeit,
  *  - USB:  USB FWV, UDIR zeigt den Stick, UGET holt eine Stickdatei bitgleich,
  *  - Netz: TFTP/CPMNET melden die Karte (Version, "online").
@@ -326,10 +326,15 @@ void zeige(const char* was, Gast& g) {
 // ---------------------------------------------------------------------------------------------
 enum class Treiber { Poppe, Kingstener, Keiner };   // Keiner: nur die Uhr der Karte (SCP 3.0)
 
-k1520::Gide::Config gideCfg() {
+k1520::Gide::Config gideCfg(uint8_t basis) {
     k1520::Gide::Config c;
-    c.basis = 0x90;          // Vorauswahl der Oberflaeche auf allen Rechnern
+    c.basis = basis;         // Vorauswahl der Oberflaeche: D0H, am PRG 710/-1 90H (EPROMmer auf D0H)
     return c;
+}
+std::string hex2(uint8_t b) {
+    char t[3];
+    snprintf(t, sizeof t, "%02X", b);
+    return t;
 }
 k1520::Gide::RtcConfig rtcCfg() {
     k1520::Gide::RtcConfig r;
@@ -337,16 +342,16 @@ k1520::Gide::RtcConfig rtcCfg() {
     return r;
 }
 
-/// Gesteckt (vor dem Start): GIDE mit leerem Plattenabbild auf 90H.
+/// Gesteckt (vor dem Start): GIDE mit leerem Plattenabbild auf der Basis @p basis.
 template <class M>
-std::string gideStecken(M& m, Treiber t) {
+std::string gideStecken(M& m, Treiber t, uint8_t basis) {
     const std::string abbild = k1520test::tempPath(t == Treiber::Poppe ? "k1520_karten_poppe.img" : "k1520_karten_gidn.img");
     std::error_code ec;
     fs::remove(abbild, ec);
     // Poppe rechnet mit 500 x 16 x 63 Sektoren, Kingstener mit 256 x 4 x 64
     if (!k1520::AtaGeraet::abbildAnlegen(abbild, t == Treiber::Poppe ? 504'100 : 65'600)) return "";
     const auto rc = rtcCfg();
-    if (!m.installGide(gideCfg(), &rc, abbild)) {
+    if (!m.installGide(gideCfg(basis), &rc, abbild)) {
         ADD_FAILURE() << "GIDE: " << m.gideFehler();
         return "";
     }
@@ -354,13 +359,14 @@ std::string gideStecken(M& m, Treiber t) {
 }
 
 /// GIDE-Abschnitt: Treiber, Datei GIDE.TXT hin und zurueck (bitgleich), Uhr anzeigen und stellen.
-void gidePruefen(Gast& g, Treiber t, bool pip, const std::string& diskette, const std::string& abbild) {
+void gidePruefen(Gast& g, Treiber t, bool pip, const std::string& diskette, const std::string& abbild, uint8_t basis) {
+    const std::string bh = hex2(basis);
     if (t == Treiber::Keiner) {
         // kein Treiber: nur die Uhr der Karte
     } else if (t == Treiber::Poppe) {
-        ASSERT_TRUE(g.befehl("GIDEHP90")) << g.bild();
-        zeige("GIDEHP90", g);
-        EXPECT_NE(g.bild().find("GIDE-Modul auf Adresse 90H"), std::string::npos) << g.bild();
+        ASSERT_TRUE(g.befehl("GIDEHP" + bh)) << g.bild();
+        zeige(("GIDEHP" + bh).c_str(), g);
+        EXPECT_NE(g.bild().find("GIDE-Modul auf Adresse " + bh + "H"), std::string::npos) << g.bild();
         EXPECT_NE(g.bild().find("GIDE-Treiber installiert"), std::string::npos) << g.bild();
         // Erstes neu installiertes Laufwerk aus der Meldung ("Neu installierte GIDE-Laufwerke:\nD: E: ...")
         const std::string b = g.bild();
@@ -379,8 +385,8 @@ void gidePruefen(Gast& g, Treiber t, bool pip, const std::string& diskette, cons
         EXPECT_NE(g.bild().find(lw + ": GIDE     TXT"), std::string::npos) << g.bild();
         ASSERT_TRUE(g.befehl("PIP A:KOPIE.TXT=" + lw + ":GIDE.TXT")) << g.bild();
     } else {
-        ASSERT_TRUE(g.befehl("GIDN90 /F", 400'000'000, "formatieren J/N?", "J")) << g.bild();
-        zeige("GIDN90 /F", g);
+        ASSERT_TRUE(g.befehl("GIDN" + bh + " /F", 400'000'000, "formatieren J/N?", "J")) << g.bild();
+        zeige(("GIDN" + bh + " /F").c_str(), g);
         EXPECT_NE(g.bild().find("GIDE als Laufwerk N: installiert"), std::string::npos) << g.bild();
         if (pip) {
             ASSERT_TRUE(g.befehl("PIP N:=A:GIDE.TXT")) << g.bild();
@@ -500,6 +506,7 @@ struct Satz {
     uint8_t usb, net;           ///< net 0 = keine Netzprogramme auf der Diskette
     const char* usbSuffix = "";
     bool pip = true;            ///< false: kein PIP auf der Diskette (SCP 1715)
+    uint8_t gide = 0xD0;        ///< GIDE-Basis der Vorauswahl (PRG 710/-1: 90H)
 };
 
 /// Gemeinsamer Ablauf; @p g ist der (noch nicht gestartete) Gast, @p m seine Maschine.
@@ -508,7 +515,7 @@ void alles(G& g, M& m, const Satz& s, const char* name) {
     Lieferkopie kopie(s.rel, name);
     ASSERT_TRUE(kopie.ok()) << "Lieferdiskette fehlt: " << s.rel;
     Stick stick;
-    const std::string abbild = gideStecken(m, s.treiber);
+    const std::string abbild = gideStecken(m, s.treiber, s.gide);
     ASSERT_FALSE(abbild.empty());
     ASSERT_NO_FATAL_FAILURE(usbStecken(m, s.usb, stick));
     if (s.net) ASSERT_NO_FATAL_FAILURE(netzStecken(m, s.net));
@@ -516,7 +523,7 @@ void alles(G& g, M& m, const Satz& s, const char* name) {
     g.kaltstart();
     ASSERT_EQ(g.letzte(), "A>") << g.bild();
 
-    ASSERT_NO_FATAL_FAILURE(gidePruefen(g, s.treiber, s.pip, kopie.path(), abbild));
+    ASSERT_NO_FATAL_FAILURE(gidePruefen(g, s.treiber, s.pip, kopie.path(), abbild, s.gide));
     ASSERT_NO_FATAL_FAILURE(usbPruefen(g, s.usbSuffix));
     if (s.net) ASSERT_NO_FATAL_FAILURE(netzPruefen(g));
     ASSERT_TRUE(m.flushDisks());
@@ -531,32 +538,32 @@ void alles(G& g, M& m, const Satz& s, const char* name) {
 
 }  // namespace
 
-/// A5120 mit CP/A: Poppe-Treiber (GIDEHP90, ERADIR), UHR, USB 84H, Netz C0H.
+/// A5120 mit CP/A: Poppe-Treiber (GIDEHPD0, ERADIR), UHR, USB 84H, Netz C0H.
 TEST_F(KartenBeigaben, A5120_CPA) {
     GastA5120 g;
     alles(g, g.m, {"a5120_cpa/a5120_cpa_k5601_system.hfe", Treiber::Poppe, 0x84, 0xC0}, "k1520_karten_a5120_cpa.hfe");
 }
 
-/// A5120 mit SCPX 1.7: Kingstener-Treiber (GIDN90), UHR, USB 84H, Netz C0H.
+/// A5120 mit SCPX 1.7: Kingstener-Treiber (GIDND0), UHR, USB 84H, Netz C0H.
 TEST_F(KartenBeigaben, A5120_SCPX17) {
     GastA5120 g;
     alles(g, g.m, {"a5120_scpx17/a5120_scpx17_k5601_system.hfe", Treiber::Kingstener, 0x84, 0xC0},
           "k1520_karten_a5120_scpx.hfe");
 }
 
-/// K8915 V3 mit SCPX 8915: GIDN90, USB 84H, Netz C0H.
+/// K8915 V3 mit SCPX 8915: GIDND0, USB 84H, Netz C0H.
 TEST_F(KartenBeigaben, K8915_V3_SCPX) {
     GastK8915 g;
     alles(g, g.m, {"k8915_scpx8915/k8915_scpx8915_v24_system.hfe", Treiber::Kingstener, 0x84, 0xC0},
           "k1520_karten_k8915.hfe");
 }
 
-/// PRG 710-1 mit SCPX 1.7: GIDN90, USB 8CH (84H gehoert der ZRE), Netz 28H (C0H gehoert dem ATP-Zusatz).
+/// PRG 710-1 mit SCPX 1.7: GIDN90 (Basis 90H), USB 8CH (84H gehoert der ZRE), Netz 28H (C0H gehoert dem ATP-Zusatz).
 TEST_F(KartenBeigaben, PRG710_1_SCPX) {
     Prg710Machine::Config c;
     c.variante = Prg710Machine::Config::Variante::Prg710_1;
     GastPrg g(c);
-    alles(g, g.m, {"prg710-1_scpx17/prg710-1_scpx17_system.hfe", Treiber::Kingstener, 0x8C, 0x28}, "k1520_karten_prg710_1.hfe");
+    alles(g, g.m, {"prg710-1_scpx17/prg710-1_scpx17_system.hfe", Treiber::Kingstener, 0x8C, 0x28, "", true, 0x90}, "k1520_karten_prg710_1.hfe");
 }
 
 /// PRG 710 mit SCPX 1.5: wie der 710-1.
@@ -564,7 +571,7 @@ TEST_F(KartenBeigaben, PRG710_SCPX15) {
     Prg710Machine::Config c;
     c.variante = Prg710Machine::Config::Variante::Prg710;
     GastPrg g(c);
-    alles(g, g.m, {"prg710_scpx15/prg710_scpx15_system.hfe", Treiber::Poppe, 0x8C, 0x28}, "k1520_karten_prg710.hfe");
+    alles(g, g.m, {"prg710_scpx15/prg710_scpx15_system.hfe", Treiber::Poppe, 0x8C, 0x28, "", true, 0x90}, "k1520_karten_prg710.hfe");
 }
 
 /// PC 1715 mit CP/A 1715: Poppe-Treiber, USB 84H, Netz C0H.
@@ -595,7 +602,7 @@ TEST_F(KartenBeigaben, PC1715W_SCP30) {
     alles(g, g.m, {"pc1715w_scp30/pc1715w_scp30_system.hfe", Treiber::Keiner, 0x84, 0}, "k1520_karten_pc1715w.hfe");
 }
 
-/// K8915 Gen 2 (V2-Geraet, K2521 + 64 KB): USB 8CH (84H gehoert der K2521), GIDE 90H, Netz C0H; USB-Programme mit Suffix 8C.
+/// K8915 Gen 2 (V2-Geraet, K2521 + 64 KB): USB 8CH (84H gehoert der K2521), GIDE D0H, Netz C0H; USB-Programme mit Suffix 8C.
 TEST_F(KartenBeigaben, K8915_Gen2_SCPX) {
     K8915Machine::Config c;
     c.generation = K8915Machine::Generation::Gen2;

@@ -2,7 +2,8 @@
  * @file test_karten_vorgaben.cpp
  * @brief Die VORAUSWAHL der Steckkarten-Basen (Entwurf 50, Anwenderauftrag 2026-11-13) laeuft an jeder
  *        Maschinenvariante: GIDE + RTC, GUN-USB und KCNet-Netz stecken ZUGLEICH an den Basen des Profils
- *        (`app/profil.py`: GIDE 90H, USB 84H bzw. 8CH, Netz C0H bzw. 28H) — zusammen mit RAF, K5020 und
+ *        (`app/profil.py`: GIDE D0H bzw. 90H am PRG, USB 84H bzw. 8CH, Netz C0H bzw. 28H) — zusammen mit RAF, K5020
+ *        (nur wo sie nicht auf D0H liegt: am K8915 und PC 1715 meldet der Kern den Konflikt, eigener Test) und
  *        K6022 — und je ein ECHTES Z80-Gastprogramm benutzt jede Karte (Sektor schreiben/lesen + RTC,
  *        VDIP-Startmeldung, KCNet-Firmware-Version).
  *
@@ -128,7 +129,7 @@ Bytes programm(uint8_t b) {
 }  // namespace netp
 
 /// Basen einer Variante (Vorauswahl des Profils).
-struct Basen { uint8_t gide, usb, net; };
+struct Basen { uint8_t gide, usb, net; bool kassette; };
 
 struct Leise : ::testing::Test {
     void SetUp() override { k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::WARN); }
@@ -166,7 +167,11 @@ void alleKarten(M& m, Z80& cpu, Basen b, std::function<void()> nachEin = {}) {
     ASSERT_TRUE(m.installGunNet(nc)) << m.gunNetFehler();
     // die uebrigen Optionen derselben Maschine muessen daneben stecken (Vorauswahlen sind disjunkt)
     ASSERT_TRUE(m.installRaf(RAF::Typ::RAF512)) << m.rafFehler();
-    ASSERT_TRUE(m.installK5020()) << m.k5020Fehler();
+    if (b.kassette) ASSERT_TRUE(m.installK5020()) << m.k5020Fehler();
+    else {   // K5020 auf D0H..D7H: GIDE D0H (D4H..DFH) ueberlappt, der Kern meldet es mit Grund
+        EXPECT_FALSE(m.installK5020());
+        EXPECT_NE(m.k5020Fehler().find("belegt"), std::string::npos) << m.k5020Fehler();
+    }
     ASSERT_TRUE(m.installK6022()) << m.k6022Fehler();
     m.powerOn();
     if (nachEin) nachEin();
@@ -203,9 +208,10 @@ void alleKarten(M& m, Z80& cpu, Basen b, std::function<void()> nachEin = {}) {
     std::filesystem::remove(img, ec);
 }
 
-constexpr Basen kStandard{0x90, 0x84, 0xC0};   // A5120 (alle Modelle, auch .16), K8915 V3, PC 1715/1715W
-constexpr Basen kGen2{0x90, 0x8C, 0xC0};       // K8915 Gen 2: 80H..87H gehoeren der K2521
-constexpr Basen kPrg{0x90, 0x8C, 0x28};        // PRG 710/-1: 80H..87H K2521, C0H..C3H ATP-Zusatz
+constexpr Basen kA5120{0xD0, 0x84, 0xC0, true};     // A5120 (alle Modelle, auch .16): K5020 liegt auf 30H
+constexpr Basen kD0{0xD0, 0x84, 0xC0, false};       // K8915 V3, PC 1715/1715W: K5020 auf D0H..D7H
+constexpr Basen kGen2{0xD0, 0x8C, 0xC0, false};     // K8915 Gen 2: 80H..87H gehoeren der K2521
+constexpr Basen kPrg{0x90, 0x8C, 0x28, true};       // PRG 710/-1: 80H..87H K2521, C0H..C3H ATP-Zusatz, EPROMmer D0H..D4H
 
 Prg710Machine::Config prg(Prg710Machine::Config::Variante v) {
     Prg710Machine::Config c;
@@ -217,17 +223,17 @@ Prg710Machine::Config prg(Prg710Machine::Config::Variante v) {
 
 TEST_F(KartenVorgaben, A5120) {
     A5120Machine m;
-    alleKarten(m, m.cpuDebug(), kStandard);
+    alleKarten(m, m.cpuDebug(), kA5120);
 }
 TEST_F(KartenVorgaben, A5120_16_EM256) {
     A5120Machine::Config c;
     c.em = A5120Machine::Config::Em::em256;
     A5120Machine m(c);
-    alleKarten(m, m.cpuDebug(), kStandard);
+    alleKarten(m, m.cpuDebug(), kA5120);
 }
 TEST_F(KartenVorgaben, K8915_V3) {
     K8915Machine m;
-    alleKarten(m, m.zre().cpu(), kStandard, [&] { m.zre().setReg(0x87); });   // alles RAM
+    alleKarten(m, m.zre().cpu(), kD0, [&] { m.zre().setReg(0x87); });   // alles RAM
 }
 TEST_F(KartenVorgaben, K8915_Gen2) {
     K8915Machine::Config c;
@@ -245,11 +251,11 @@ TEST_F(KartenVorgaben, Prg710_1) {
 }
 TEST_F(KartenVorgaben, Pc1715) {
     Pc1715Machine m;
-    alleKarten(m, m.zre().cpu(), kStandard);
+    alleKarten(m, m.zre().cpu(), kD0);
 }
 TEST_F(KartenVorgaben, Pc1715W) {
     Pc1715Machine::Config c;
     c.variante = Pc1715Machine::Config::Variante::Pc1715W;
     Pc1715Machine m(c);
-    alleKarten(m, m.zre().cpu(), kStandard);
+    alleKarten(m, m.zre().cpu(), kD0);
 }

@@ -138,7 +138,10 @@ def test_k8915_traegt_beide_usb_basen():
 def test_jeder_rechner_hat_uhr_und_texte_in_cpm_form():
     for schluessel in karten.RECHNER:
         d = karten.dateien(schluessel)
-        assert d['UHR.COM'] == lies('uhr', 'uhr.com')
+        uhr = bytearray(lies('uhr', 'uhr.com'))
+        uhr[0x104] = karten.RECHNER[schluessel].gide_basis      # Vorgabe der .com D0H, PRG 710/-1: 90H
+        assert d['UHR.COM'] == bytes(uhr)
+        assert d['UHR.COM'][0x103] == 0x3E                       # LD A,n am Programmanfang
         for n in ('GIDE.TXT', 'USB.TXT') + (('NETZ.TXT',) if karten.RECHNER[schluessel].net is not None else ()):
             t = d[n]
             assert len(t) % 128 == 0 and t.endswith(b'\x1a')

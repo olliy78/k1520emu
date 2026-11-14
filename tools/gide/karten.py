@@ -8,7 +8,7 @@ Was auf welche Systemdiskette gehoert, steht HIER (eine Wahrheit); die Bauskript
 (tools/cpa_a5120/build.py usw.) rufen :func:`dateien` und legen das Ergebnis in ihr ``soll()``.
 Die Software passt zur VORAUSWAHL der Oberflaeche (``app/profil.py``, Handbuch „Zusatzkarten"):
 
-  GIDE  Basis 90H auf allen Rechnern
+  GIDE  Basis D0H (A5120, K8915, PC 1715/1715W), 90H (PRG 710/710-1: der EPROMmer belegt D0H..D4H)
   USB   84H (A5120 alle Modelle, K8915 V3, PC 1715/1715W) bzw. 8CH (K8915 Gen 2, PRG 710/710-1)
   Netz  C0H (A5120, K8915, PC 1715/1715W) bzw. 28H (PRG 710/710-1)
 
@@ -31,7 +31,7 @@ UHR_COM = os.path.join(HIER, 'uhr', 'uhr.com')
 
 
 class Rechner:
-    def __init__(self, titel, gide, usb, net, gide_basis=0x90, pip=True):
+    def __init__(self, titel, gide, usb, net, gide_basis=0xD0, pip=True):
         self.titel = titel
         self.gide = gide                # 'poppe' | 'gidn' | None (kein Treiber; die Uhr der Karte gibt es trotzdem)
         self.usb = usb                  # Liste der Basen; die erste traegt die Namen USB.COM ..., weitere Suffix
@@ -45,8 +45,8 @@ RECHNER = {
     'a5120_cpa':    Rechner('A5120 mit CP/A', 'poppe', [0x84], 0xC0),
     'a5120_scpx':   Rechner('A5120 mit SCPX 1.7', 'gidn', [0x84], 0xC0),
     'k8915_scpx':   Rechner('K8915 mit SCPX 8915', 'gidn', [0x84, 0x8C], 0xC0),
-    'prg710_scpx':  Rechner('PRG 710 mit SCPX', 'poppe', [0x8C], 0x28),
-    'prg710_1_scpx': Rechner('PRG 710-1 mit SCPX 1.7', 'gidn', [0x8C], 0x28),
+    'prg710_scpx':  Rechner('PRG 710 mit SCPX', 'poppe', [0x8C], 0x28, gide_basis=0x90),
+    'prg710_1_scpx': Rechner('PRG 710-1 mit SCPX 1.7', 'gidn', [0x8C], 0x28, gide_basis=0x90),
     'pc1715_cpa':   Rechner('PC 1715 mit CP/A 1715', 'poppe', [0x84], 0xC0),
     'pc1715_scp6':  Rechner('PC 1715 mit SCP 1715 V0006', 'gidn', [0x84], 0xC0, pip=False),
     'pc1715_scp7':  Rechner('PC 1715 mit SCP 1715 V0007', 'gidn', [0x84], 0xC0, pip=False),
@@ -123,7 +123,7 @@ def _gide_text(r):
            f'----------------------------------\n'
            f'  UHR                           zeigt TT.MM.JJJJ HH:MM:SS\n'
            f'  UHR S 24.12.26 18:30:00       stellt die Uhr (Jahr auch vierstellig)\n'
-           f'  UHR BB ...                    andere Kartenbasis, BB in Hex (Vorgabe 90)\n'
+           f'  UHR BB ...                    andere Kartenbasis, BB in Hex (Vorgabe {r.gide_basis:02X})\n'
            f'Die Uhr laeuft in Maschinenzeit und wird vom Emulator mit der PC-Uhr (UTC)\n'
            f'versorgt (Einstellungen - Allgemein - GIDE).\n')
     return kopf + platte + uhr
@@ -181,7 +181,9 @@ def dateien(schluessel):
         d['ERADIR.COM'] = _lies(FREMD, 'poppe', 'eradir.com')
     elif r.gide == 'gidn':
         d[f'GIDN{r.gide_basis:02X}.COM'] = ba.gidn_datei(r.gide_basis)
-    d['UHR.COM'] = _lies(UHR_COM)
+    uhr = bytearray(_lies(UHR_COM))
+    uhr[0x104] = r.gide_basis        # LD A,<Basis> am Programmanfang (Vorgabe der .com: D0H)
+    d['UHR.COM'] = bytes(uhr)
     d['GIDE.TXT'] = cpm_text(_gide_text(r))
     for i, basis in enumerate(r.usb):
         suffix = '' if i == 0 else f'{basis:02X}'

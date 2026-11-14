@@ -21,7 +21,7 @@ pytestmark = requires_core
 
 MIT_KARTE = ["a5120", "k8915", "prg710", "pc1715"]
 OHNE_KARTE = ["p8000", "mc80"]
-BASIS = {m: 0x90 for m in MIT_KARTE}      # Vorauswahl: ueberall 90H
+BASIS = {m: (0x90 if m == "prg710" else 0xD0) for m in MIT_KARTE}   # Vorauswahl D0H, PRG 710/-1: 90H (EPROMmer)
 
 
 @pytest.fixture
@@ -338,7 +338,7 @@ def test_fehlender_abschnitt_laesst_alles_wie_es_ist(qapp, konfig_ordner):
         assert w._gide["enabled"] is True
         daten["general"]["gide"] = {"enabled": True, "basis": "kaputt", "rtc": "egal"}
         w._apply_config(daten)
-        assert w._gide["basis"] == 0x90 and w._gide["rtc"] is True     # Vorgabewerte
+        assert w._gide["basis"] == 0xD0 and w._gide["rtc"] is True     # Vorgabewerte (A5120)
         assert w._gide["rtc_versatz"] == "-40"
     finally:
         _zu(w, qapp)
@@ -356,7 +356,7 @@ def test_auslieferung_hat_die_karte_aus(qapp, konfig_ordner, maschine):
     from app import config_io, profil
     g = config_io.standard_konfiguration(profil.profil(maschine))["general"]["gide"]
     assert g["enabled"] is False and g["image"] == "" and g["rtc"] is True and g["rtc_versatz"] == "-40"
-    assert int(g["basis"], 16) == BASIS[maschine] == 0x90
+    assert int(g["basis"], 16) == BASIS[maschine]
 
 
 @pytest.mark.parametrize("maschine", OHNE_KARTE)
@@ -400,9 +400,9 @@ def test_leuchte_folgt_dem_zugriff(qapp, konfig_ordner, tmp_path):
         w.gide_platte.neue_platte(str(tmp_path / "l.img.gz"), 8)
         w._update_gide()
         assert ide.lampe.zustand() == status_bar.BELEGT
-        assert "l.img.gz" in ide.lampe.toolTip() and "90H" in ide.lampe.toolTip()
+        assert "l.img.gz" in ide.lampe.toolTip() and "D0H" in ide.lampe.toolTip()
         before = w.emulator.gide_status()["taskfile"] + w.emulator.gide_status()["befehle"]
-        w.emulator.io_read(0x90 + 0x0F)                    # Gast liest das Statusregister
+        w.emulator.io_read(0xD0 + 0x0F)                    # Gast liest das Statusregister
         st = w.emulator.gide_status()
         assert st["taskfile"] + st["befehle"] > before
         w._update_gide()

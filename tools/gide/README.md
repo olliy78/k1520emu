@@ -27,7 +27,7 @@ Repository; sie standen nur für das Verständnis zur Verfügung (Entwurf 50 §2
 ## Welche Diskette trägt was
 
 Die Software passt zur **Vorauswahl der Oberfläche** (`app/profil.py` `karten_vorauswahl`, Handbuch „Zusatzkarten"):
-GIDE **90H** überall; USB **84H** (A5120 alle Modelle, K8915 V3, PC 1715/1715W) bzw. **8CH** (K8915 Gen 2, PRG 710/710-1);
+GIDE **D0H** (A5120, K8915, PC 1715/1715W) bzw. **90H** (PRG 710/710-1, der EPROMmer belegt D0H); USB **84H** (A5120 alle Modelle, K8915 V3, PC 1715/1715W) bzw. **8CH** (K8915 Gen 2, PRG 710/710-1);
 Netz **C0H** (A5120, K8915, PC 1715) bzw. **28H** (PRG 710/710-1).  Aufstellung: `karten.py` (`RECHNER`); der Waechter
 `cli_karten_beigaben` vergleicht jede Diskette bytegleich damit.
 
@@ -76,7 +76,7 @@ Disketten **neu bauen** (Reihenfolge egal; jede Diskette hat ihr Bauskript, `too
 ## Tests
 
 - `KartenBeigaben.*` (`tests/integration/test_karten_beigaben.cpp`, **ohne Überspringen**): je Rechner die AUSGELIEFERTE Diskette (Kopie)
-  booten, GIDE auf 90H, USB, Netz auf der Vorauswahl-Basis stecken und die Programme laufen lassen — Treiber starten, Datei über die
+  booten, GIDE auf der Vorauswahl-Basis, USB, Netz auf der Vorauswahl-Basis stecken und die Programme laufen lassen — Treiber starten, Datei über die
   Platte hin und zurück (bitgleich), `UHR` zeigt/stellt die Zeit, `USB FWV`/`UDIR`/`UGET` gegen einen Temp-Ordner als Stick,
   `TFTP`/`CPMNET` melden Version und „online".  Nur Loopback, kein UDP-Port 69.
 - `py_karten_software` (Umschreiben, Zusammenstellung, Vorauswahl = Basis der Software), `cli_karten_beigaben`, `cli_uhr_com`.
