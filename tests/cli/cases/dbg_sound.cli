@@ -1,0 +1,22 @@
+# k1520dbg --sound: ohne Lauf stehen alle Register auf 0; ein Z80-Schnipsel stellt Kanal A auf TP 100 (R0 = 64H),
+# Ton an (R7 = 3EH) und Pegel 15 (R8 = 0FH); `ay` zeigt Register, Tonperiode und Pegel.
+tool:    k1520dbg
+disk:    cpa_cpa780_k5601_clock.img
+run:     --sound %DISK%
+stdin:
+  ay
+  e 0x6000 F3 3E 00 D3 38 3E 64 D3 39 3E 07 D3 38 3E 3E D3 39 3E 08 D3 38 3E 0F D3 39 18 FE
+  set pc 0x6000
+  g 5000
+  ay
+  help ay
+  q
+expect:  SOUND-K1520  Basis 38H
+expect:  R0-R15:
+expect:  Kanal A: Tonperiode  100
+expect:  Ton an
+expect:  Pegel 15
+expect:  Huellkurve: Periode
+expect:  CTC (Karte, 3CH-3FH)
+forbid:  keine SOUND-Karte gesteckt
+forbid:  --sound:

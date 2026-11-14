@@ -17,6 +17,7 @@
  */
 #include "tools/boot_trace_pc1715.h"
 #include "tools/coverage_diff.h"
+#include "tools/dbg_machine.h"
 #include "tools/event_bp.h"
 #include "tools/z80dis_min.h"
 #include "core/machines/pc1715/pc1715.h"
@@ -113,6 +114,9 @@ int bootTracePc1715(const K8915TraceOpts& o, const prnlst::Listing& prn, bool w)
     Pc1715Machine::Config cfg;
     if (w) cfg.variante = Pc1715Machine::Config::Variante::Pc1715W;
     Pc1715Machine m(cfg);
+    { std::string err;
+      if (!dbgm::steckeSound(m, o.sound, true, err)) { fprintf(stderr, "--sound: %s\n", err.c_str()); return 2; } }
+    dbgm::WavWaechter wav_waechter(m, o.sound);
     const int cols = m.zre().textCols(), rows = m.zre().maxZeilen();   // + CP/A-Statuszeile
     auto rd = [&](uint16_t a) { return m.memReadDebug(a); };
     auto prnTail = [&](uint16_t a) -> std::string {

@@ -572,6 +572,8 @@ public:
         soundSenkeNachfuehren();
         return ok;
     }
+    /** @brief Frames der laufenden/letzten WAV-Mitschrift (0 ohne Karte). */
+    uint64_t audioWavFrames() const { return ton_ ? ton_->wavFrames() : 0; }
     void audioWavStop() {
         if (!ton_) return;
         ton_->wavStop();

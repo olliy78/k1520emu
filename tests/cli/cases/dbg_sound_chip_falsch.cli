@@ -1,0 +1,9 @@
+# Ungueltiger Wert einer Soundoption: klare Meldung, Exit 2.
+tool:    k1520dbg
+disk:    cpa_cpa780_k5601_clock.img
+run:     --sound-chip=9999 %DISK%
+stdin:
+  q
+expect:  --sound-chip
+expect:  unbekannt
+exit:    2

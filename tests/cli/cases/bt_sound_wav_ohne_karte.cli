@@ -1,0 +1,7 @@
+# --wav ohne --sound: klare Fehlermeldung, Abbruch mit Exit 2.
+tool:    boot_trace
+disk:    cpa_cpa780_k5601_clock.img
+tmpfile wav:
+run:     -L /dev/null --wav=%wav% -c 1000 --quiet --json %DISK%
+expect:  --wav braucht --sound
+exit:    2

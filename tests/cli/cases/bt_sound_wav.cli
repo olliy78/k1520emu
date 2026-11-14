@@ -1,0 +1,12 @@
+# boot_trace --sound --wav: die Karte steckt, die WAV-Mitschrift entsteht (RIFF/WAVE, 48000 Hz, 2 Kanaele, >0 Frames).
+# Die Frames meldet das Werkzeug beim Programmende; der Kopf wird ueber capture_file gesehen.
+tool:    boot_trace
+disk:    cpa_cpa780_k5601_clock.img
+tmpfile wav:
+run:     -L /dev/null --sound --wav=%wav% -c 2000000 --quiet --json %DISK%
+capture_file: wav
+expect:  RIFF
+expect:  WAVE
+expect_re: --wav: [1-9][0-9]* Frames \(48000 Hz, 2 Kanaele\)
+forbid:  --sound:
+forbid:  --wav: 0 Frames

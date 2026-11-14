@@ -26,6 +26,7 @@
  * @license MIT
  */
 #pragma once
+#include "tools/sound_opts.h"
 #include "core/machines/a5120/a5120.h"
 #include "core/machines/a5120/a5120_konfig_text.h"
 #include "core/machines/k8915/k8915.h"
@@ -167,6 +168,99 @@ inline std::string usbText(const k1520::GunUsb& g) {
              d.port[0].mode, d.port[0].out, d.port[0].in, d.port[1].mode, d.port[1].out, d.port[1].in, d.port[1].dir,
              g.pio().ardy() ? 1 : 0, g.pio().brdy() ? 1 : 0, g.pio().pinsB());
     s += b;
+    return s;
+}
+
+/**
+ * @brief Steckt die SOUND-Karte (`--sound...`, Entwurf 51 AP S6) in @p m, wenn @p o.an, und startet die WAV-Mitschrift.
+ *        Basis ohne Wert: 38H, am PC 1715/1715W (@p pc) E0H.  Die Tonausgabe an den Wirt wird NICHT gestartet.
+ */
+inline bool steckeSound(K1520Machine& m, const SoundOpts& o, bool pc, std::string& err) {
+    if (!o.fehler.empty()) { err = o.fehler; return false; }
+    if (!o.an) {
+        if (!o.wav.empty()) { err = "--wav braucht --sound"; return false; }
+        return true;
+    }
+    k1520::SoundK1520::Config c;
+    c.basis = o.basis >= 0 ? static_cast<uint8_t>(o.basis) : (pc ? 0xE0 : 0x38);
+    c.takt = o.takt == "quarz" ? k1520::SoundK1520::Takt::Quarz
+           : o.takt == "system" ? k1520::SoundK1520::Takt::System : k1520::SoundK1520::Takt::QuarzHalbe;
+    c.kanal = o.kanal == "acb" ? k1520::SoundK1520::Kanal::ACB
+            : o.kanal == "mono" ? k1520::SoundK1520::Kanal::Mono : k1520::SoundK1520::Kanal::ABC;
+    c.chip = o.chip == "8912" ? Ay38910::Variante::AY8912 : Ay38910::Variante::AY8910;
+    if (o.basis >= 0 && (o.basis & 7)) { err = "Basis muss ein Vielfaches von 8 sein"; return false; }
+    if (!m.installSound(c)) { err = m.soundFehler(); return false; }
+    if (!o.wav.empty() && !m.audioWavStart(o.wav)) { err = "WAV: " + m.audioFehler(); return false; }
+    return true;
+}
+
+/// Beendet die WAV-Mitschrift beim Programmende (jeder Rueckkehrweg) und meldet die Frames.
+struct WavWaechter {
+    K1520Machine& m;
+    bool an;
+    WavWaechter(K1520Machine& mm, const SoundOpts& o) : m(mm), an(!o.wav.empty() && o.an) {}
+    ~WavWaechter() {
+        if (!an) return;
+        const unsigned long long f = m.audioWavFrames();
+        m.audioWavStop();
+        fprintf(stderr, "--wav: %llu Frames (48000 Hz, 2 Kanaele) geschrieben\n", f);
+    }
+};
+
+/** @brief Zustand der SOUND-Karte (AY + CTC) als Text (Debugbefehl `ay`), ohne Nebenwirkung. */
+inline std::string soundText(const k1520::SoundK1520& k) {
+    char b[300];
+    std::string s;
+    const Ay38910& ay = k.ay();
+    const double f = ay.chipTakt();
+    const auto& cfg = k.config();
+    snprintf(b, sizeof b, "  SOUND-K1520  Basis %02XH (Tore %02XH,%02XH,%02XH-%02XH)  %s  Chiptakt %.0f Hz  Mischer %s\n",
+             cfg.basis, cfg.basis, cfg.basis + 1, cfg.basis + 4, cfg.basis + 7,
+             ay.variante() == Ay38910::Variante::AY8912 ? "AY-3-8912" : "AY-3-8910", f,
+             cfg.kanal == k1520::SoundK1520::Kanal::ABC ? "ABC" : cfg.kanal == k1520::SoundK1520::Kanal::ACB ? "ACB" : "Mono");
+    s += b;
+    s += "  R0-R15:";
+    for (int i = 0; i < 16; ++i) { snprintf(b, sizeof b, " %02X", ay.reg(i)); s += b; }
+    snprintf(b, sizeof b, "\n  Latch %02XH\n", ay.latch());
+    s += b;
+    const uint8_t r7 = ay.reg(7);
+    for (int c = 0; c < 3; ++c) {
+        int tp = ay.reg(2 * c) | ((ay.reg(2 * c + 1) & 0x0F) << 8);
+        if (tp == 0) tp = 1;
+        const uint8_t amp = ay.reg(8 + c);
+        char pegel[24];
+        if (amp & 0x10) snprintf(pegel, sizeof pegel, "Huellkurve"); else snprintf(pegel, sizeof pegel, "Pegel %u", amp & 0x0F);
+        snprintf(b, sizeof b, "  Kanal %c: Tonperiode %4d (%8.1f Hz)  Ton %-3s  Rauschen %-3s  %s\n", 'A' + c, tp, f / (16.0 * tp),
+                 (r7 >> c) & 1 ? "aus" : "an", (r7 >> (c + 3)) & 1 ? "aus" : "an", pegel);
+        s += b;
+    }
+    int np = ay.reg(6) & 0x1F;
+    if (np == 0) np = 1;
+    int ep = ay.reg(11) | (ay.reg(12) << 8);
+    const int ep_eff = ep ? ep : 1;
+    snprintf(b, sizeof b, "  Rauschen: Periode %d (%.1f Hz)\n", np, f / (16.0 * np));
+    s += b;
+    // Form R13 (C Att Alt Hold): ASCII-Verlauf
+    const int r13 = ay.reg(13) & 0x0F;
+    const char* name;
+    switch (r13) {
+        case 0: case 1: case 2: case 3: case 9: name = "\\___  (einmal ab, dann 0)"; break;
+        case 4: case 5: case 6: case 7: case 15: name = "/___  (einmal auf, dann 0)"; break;
+        case 8: name = "\\\\\\\\  (Saege abwaerts, wiederholt)"; break;
+        case 10: name = "\\/\\/  (Dreieck, ab beginnend)"; break;
+        case 11: name = "\\\"\"\"  (einmal ab, dann Pegel 15)"; break;
+        case 12: name = "////  (Saege aufwaerts, wiederholt)"; break;
+        case 13: name = "/\"\"\"  (einmal auf, dann Pegel 15)"; break;
+        default: name = "/\\/\\  (Dreieck, auf beginnend)"; break;
+    }
+    snprintf(b, sizeof b, "  Huellkurve: Periode EP=%d (Durchlauf %.1f ms)  Form R13=%X %s  aktuelle Stufe %d\n", ep,
+             256.0 * ep_eff * 1000.0 / f, r13, name, ay.huellkurvePegel());
+    s += b;
+    for (int p = 0; p < 2; ++p) {
+        const bool aus = (ay.reg(7) >> (6 + p)) & 1;
+        snprintf(b, sizeof b, "  Port %c: %s  Register %02X  Pins %02X\n", 'A' + p, aus ? "Ausgang" : "Eingang", ay.reg(14 + p), ay.portPins(p));
+        s += b;
+    }
     return s;
 }
 

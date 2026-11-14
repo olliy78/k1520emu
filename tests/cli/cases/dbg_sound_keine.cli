@@ -1,0 +1,8 @@
+# Ohne --sound: der Befehl `ay` meldet das, statt zu stuerzen.
+tool:    k1520dbg
+disk:    cpa_cpa780_k5601_clock.img
+run:     %DISK%
+stdin:
+  ay
+  q
+expect:  keine SOUND-Karte gesteckt
