@@ -1,0 +1,112 @@
+;###########################################
+
+Interruptsäule / Interrupttabellen CP/A ,SCPX K2526:
+
+;###########################################
+
+CPA für BC A5120, K8924
+;-------------------------------------
+Das Interruptregister I ist auf F7h eingestellt. Darf nicht geändert werden!!!
+IV-Tabelle liegt 100h vor Beginn des BWS... also bei F700h-F7FFh
+
+F700h
+...
+
+F7D0h
+F7D2h
+F7D4h
+F7D6h
+
+
+Interrupts von K1520-SOUND Karte
+IV = D8h in Kanal 0 der CTC schreiben
+
+F7D8h - CTC-SOUND Kanal 0 (20ms Interrupt für SONG-Wiedergabe)
+F7DAh - CTC-SOUND Kanal 1 (frei)
+F7DCh - CTC-SOUND Kanal 2 (frei)
+F7DEh - CTC-SOUND Kanal 3 (frei)
+
+
+Ab F7E0h von CPA genutzt
+
+F7E0h - Paritätsfehler EM256-RAM
+F7E2h - Status Interrupt PIO-Drucker
+F7E4h - frei
+F7E6h - Speicherschutz bei A5120/30
+
+F7E8h - Disk Index-Interrupt 
+F7EAh - Disk Marken-/Fault-Interrupt
+F7ECh - frei
+F7EEh - frei
+
+F7F0h - LS Stanzer
+F7F2h - LS Leser
+F7F4h 
+F7F6h - LS Stanzer 
+
+F7F8h - CTC-ZRE Kanal 0 (frei)
+F7FAh - CTC-ZRE Kanal 1
+F7FCh - CTC-ZRE Kanal 2 (Timer 5ms)
+F7FEh - CTC-ZRE Kanal 3 (Timer 1s)
+
+Ab F800h beginnt der Bildspeicher
+
+;--------------------------------------------------------------------
+
+
+SCPX (K2526) für BC A5120, K8924
+;---------------------------------------------------
+
+Jede Interruptroutine hat einen eigenen Stack einzurichten.
+Der ehemalige Stackpointer ist zu retten, der eigene Stackpointer ist einzustellen und dann sollte erst der CPU-Befehl EI (Interruptfreigabe) folgen.
+Das Rückschreiben des alten Stackpionter vor RETI ist mit DI und EI einzuschließen.
+Dabei sind für Unterbrechungen durch Interrupts höherer Priorität 4 Byte in der Größenbemessung des Stacks zu berücksichtigen!
+
+Das Interruptregister I ist auf F7h eingestellt und darf nicht geändert werden!!!
+
+Belegung der Interruptsäule durch durch SCPX selbst:
+
+F740h - ???? 
+F741h - ????
+
+Freier Bereich für weiter Treiber (von hinten F7DF beginnen!)
+F742h
+....
+F7D6h
+
+Interrupts von K1520-SOUND Karte
+IV = D8h in Kanal 0 der CTC schreiben
+
+F7D8h - CTC SOUND Kanal 0 (20ms Interrupt für SONG-Wiedergabe)
+F7DAh - CTC SOUND Kanal 1
+F7DCh - CTC SOUND Kanal 2
+F7DEh - CTC SOUND Kanal 3
+
+Belgung durch SCPX
+
+(F7E0h - Paritätsfehler EM256-RAM)
+(F7E2h - Status Interrupt PIO-Drucker)
+(F7E4h - frei)
+(F7E6h - Speicherschutz bei A5120/30)
+(F7E8h - Disk Index-Interrupt) 
+(F7EAh - Disk Marken-/Fault-Interrupt)
+
+Auf F7EBh steht der L-Adressteil des adresshöchsten freien Bytes
+Zeiger auf Beginn des freien Interruptsäulenbereiches. Dieser ist entsprechend anzupassen.
+Er wird bei jedem Kaltstart zurückgesetzt.
+
+(F7ECh - frei)
+(F7EEh - frei)
+
+(F7F0h - LS Stanzer)
+(F7F2h - LS Leser)
+(F7F4h 
+(F7F6h - LS Stanzer 
+
+
+F7F8h - CTC-ZRE Kanal 0
+F7FAh - CTC-ZRE Kanal 1
+F7FCh - CTC-ZRE Kanal 2 (Timer 10ms)
+F7FEh - CTC-ZRE Kanal 3 
+
+Ab F800h beginnt der Bildspeicher
