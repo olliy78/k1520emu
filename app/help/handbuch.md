@@ -1403,12 +1403,27 @@ geschrieben; eine vorhandene bleibt liegen.
 **A5120.16 und RAF** gehen zusammen: das Erweiterungsmodul belegt M: (CP/A mit
 EM256-BIOS), `RAF512.COM` legt die RAF daneben als P: an.
 
+## Die Steckkarten GIDE, USB und Netz im Überblick
+
+Vier Bestandteile der GUN-Platine (und ihrer Verwandten) lassen sich in A5120, K8915, PRG 710/-1 und PC 1715
+stecken — im P8000, im MC80 und im PC 1715W nicht. Alle sind ab Werk **aus**, wirken erst nach einem
+Neuaufbau der Maschine (ein Wechsel schaltet sie aus und wieder ein) und stehen unter *Einstellungen ▸ Allgemein*:
+
+* **IDE-Platte (GIDE)** — eine ATA-Platte als Abbild (`.img.gz`), bis 256 MB; Kasten *IDE-Platte* im Reiter *Laufwerke*.
+* **GIDE-Uhr (RTC 72421)** — die Echtzeituhr der GIDE-Karte, zeigt die Wirtszeit in UTC.
+* **USB-Stick (GUN)** — ein Wirtsordner als Stick (Z80-PIO + VDIP1), bedient mit den UTools.
+* **Netzwerk (KCNet)** — TCP/UDP nach außen über den Netzbaustein W5100.
+
+Die Gastsoftware (Treiber, `UHR`, UTools, `TFTP`, `CPMNET`) liegt auf den mitgelieferten Systemdisketten. Jede Karte hat
+eine **E/A-Basis**; die Vorgabe passt zu dieser Software, belegte Basen sind im Auswahlfeld markiert. Je Karte ein
+Abschnitt weiter unten, die Basis-Tabelle am Ende des ersten.
+
 ## IDE-Platte (GIDE) und Uhr
 
 *Einstellungen ▸ Allgemein* (Zeilen **IDE-Platte (GIDE)** und **GIDE-Uhr**, flach untereinander wie die übrigen
 Einstellungen; die Seite lässt sich senkrecht rollen) steckt eine IDE-Karte nach
 Tilmann Reh mit einer ATA-Platte und der Uhr RTC 72421 — im A5120 Emulator, im K8915 Emulator, im PRG710
-Emulator und im PC1715 Emulator (nicht im P8000 und nicht im MC80). Ab Werk ist sie **aus**.
+Emulator und im PC1715 Emulator (dort nur der PC 1715, nicht der PC 1715W; nicht im P8000 und nicht im MC80). Ab Werk ist sie **aus**.
 
 * **GIDE-Karte stecken** — das Kästchen. Ein Wechsel schaltet die Maschine aus und baut sie neu auf, wie
   bei der RAM-Disk — eine Karte steckt man nicht im Betrieb.
@@ -1455,13 +1470,12 @@ die Texte `GIDE.TXT`, `USB.TXT` und `NETZ.TXT` mit der Bedienung.
 
 * **Platte:** unter CP/A (A5120, PC 1715) und unter SCPX 1.5 (PRG 710) der Treiber von Poppe
   (`GIDEHP90`, danach `ERADIR D:` für das Verzeichnis des ersten neuen Laufwerks), unter SCPX 1.7,
-  SCPX 8915 und SCP 1715 der von Kingstener (`GIDND0 /F` beim ersten Mal, Laufwerk N:). Für SCP 3.0 (PC 1715W) ist
-  kein Treiber bekannt. Die beiden **formatieren die Platte untereinander unverträglich** — eine mit dem
+  SCPX 8915 und SCP 1715 der von Kingstener (`GIDND0 /F` beim ersten Mal, Laufwerk N:). Die beiden **formatieren die Platte untereinander unverträglich** — eine mit dem
   einen Treiber angelegte Platte liest der andere nicht; ein Abbild gehört also zu seinem Treiber. Der Treiber
   von Poppe braucht mindestens 504000 Sektoren (rund 258 MB, also die 256-MB-Vorgabe oder mehr), der von
   Kingstener kommt mit 32 MB aus.
 * **Uhr:** `UHR` zeigt Datum und Zeit (`TT.MM.JJJJ HH:MM:SS`), `UHR S 24.12.26 18:30:00` stellt sie,
-  `UHR A0` (Hexzahl) fragt eine Karte mit anderer Basis. Die Uhr gibt es auf **jeder** der Disketten, auch am PC 1715W.
+  `UHR A0` (Hexzahl) fragt eine Karte mit anderer Basis. Die Uhr gibt es auf **jeder** dieser Disketten.
 * **Wer eine andere Basis einstellt**, braucht passende Dateien: bei Poppe liegen im Installationsordner
   `share/k1520emu/karten_software/fremd/poppe/` die Treiber `GIDEHP00` bis `GIDEHPF0` für jede Basis; für
   Kingstener, USB und Netz schreibt `python3 karten_software/basis_anpassen.py gidn|usb|net <Basis> --out <Ordner>`
@@ -1477,7 +1491,6 @@ die Texte `GIDE.TXT`, `USB.TXT` und `NETZ.TXT` mit der Bedienung.
 | PRG 710-1 SCPX 1.7 | Kingstener | UHR | 8CH | 28H |
 | PC 1715 CP/A 1715 | Poppe | UHR | 84H | C0H |
 | PC 1715 SCP 1715 (V0006, V0007) | Kingstener (ohne PIP: `SAVE`) | UHR | 84H | C0H |
-| PC 1715W SCP 3.0 | — | UHR | 84H | — (zu groß für die Diskette) |
 
 Andere Systemdisketten (UDOS, MicroDOS, SIOS, BCU, CP/Z …) tragen diese Programme nicht; ob die
 CP/M-Treiber dort laufen, ist nicht geprüft.
@@ -1496,7 +1509,7 @@ am PC 1715 die Adressen D4H–D7H mit der Kassette K5020 (D0H–D7H):
 | K8915 V3 | D0H | 84H | C0H |
 | K8915 V2 | D0H | 8CH | C0H |
 | PRG 710 / 710-1 | 90H | 8CH | 28H |
-| PC 1715 / 1715W | D0H | 84H | C0H |
+| PC 1715 | D0H | 84H | C0H |
 
 (84H ist die Lage der GUN; C0H und 28H sind die beiden Jumperstellungen der K1520-Netzkarte; am PRG 710
 ist C0H der ATP-Zusatz, am K8915 V2 und am PRG 710 80H–87H belegt.) Die Zeilen für USB und Netz
@@ -1523,9 +1536,9 @@ Speicherstick-Baustein VDIP1) — in denselben vier Programmen wie die IDE-Karte
 Die Leuchte **USB** in der Statuszeile steht nur bei gesteckter Karte und folgt dem Zugriff: gefüllt =
 Stick steckt, rot = eben angesprochen, Ring = kein Stick. Der Tooltip nennt Basis und Ordner.
 
-Der Gast bedient den Stick mit den **UTools** (M. Leubner), die auf den Systemdisketten liegen und zur
+Der Gast bedient den Stick mit den **UTools 1.8** (M. Leubner, 2022), die auf den Systemdisketten liegen und zur
 Vorauswahl der Basis passen (Tabelle im Abschnitt *IDE-Platte (GIDE) und Uhr*): `USB FWV` (Firmware-Version =
-Verbindungsprobe), `UDIR` (Verzeichnis des Sticks), `UGET Datei` (vom Stick auf die Diskette), `UPUT Datei` (auf den Stick), dazu `URUN Programm` (COM-Datei vom Stick starten) sowie `UBACKUP`/`URESTORE` (Sicherung auf den Stick; am PC 1715W nicht auf der Diskette).
+Verbindungsprobe), `UDIR` (Verzeichnis des Sticks), `UGET Datei` (vom Stick auf die Diskette), `UPUT Datei` (auf den Stick), dazu `URUN Programm` (COM-Datei vom Stick starten) sowie `UBACKUP`/`URESTORE`. Die Basis steht in den Programmen als ein einziges Byte; geliefert sind sie für die Vorauswahl, für eine andere Basis schreibt `basis_anpassen.py usb <Basis>` sie um.
 Am K8915 tragen die Programme für **8CH** (K8915 V2) das Suffix `8C` (`UDIR8C` …, `UBACK8C`, `UREST8C`). Gemerkt wird alles in der
 Konfiguration (`general.usb`).
 
