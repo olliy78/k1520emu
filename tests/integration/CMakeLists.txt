@@ -297,11 +297,11 @@ k1520_add_test(karten_vorgaben SRC test_karten_vorgaben.cpp
                                LIBS k1520_a5120 k1520_k8915 k1520_prg710 k1520_pc1715 k1520_gide k1520_gun_usb k1520_gun_net k1520_logger k1520_testsupport
                                LABELS "${_lbl}" DEFS LOG_LEVEL=2)
 
-# GUN-USB, AP U2: die ECHTEN UTools 1.4 (USB/UDIR/UPUT/UGET, PIO DCh..DFh) gegen die Karte; die Software liegt nur lokal
-# (~/Documents/K1520emu/GIDE_Software/utools14, K1520_GIDE_SW), fehlt sie, werden die Faelle uebersprungen.
+# GUN-USB, AP U2: die ECHTEN UTools 1.8 (USB/UDIR/UPUT/UGET, PIO D0H wie geliefert) gegen die Karte; die Software liegt
+# im Repo (tools/gide/fremd/utools).
 k1520_add_test(gun_usb_system SRC test_gun_usb_system.cpp
                               LIBS k1520_a5120 k1520_gun_usb k1520_floppy k1520_fs k1520_logger k1520_testsupport
-                              LABELS "${_lbl}" DEFS LOG_LEVEL=2 TIMEOUT 180)
+                              LABELS "${_lbl}" DEFS LOG_LEVEL=2 "K1520_UTOOLS_DIR=\"${CMAKE_SOURCE_DIR}/tools/gide/fremd/utools\"" TIMEOUT 180)
 
 # Hardwareoptionen auf den AUSGELIEFERTEN Systemdisketten (tools/gide/, doc/merkposten/gun.md): je Rechner die Lieferdiskette
 # booten, GIDE (90H), USB (84H/8CH) und Netz (C0H/28H) auf der Vorauswahl-Basis stecken und die mitgelieferten Programme

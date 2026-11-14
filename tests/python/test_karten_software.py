@@ -49,15 +49,24 @@ def test_gidn_90_aendert_nur_die_16_operanden():
 
 # ---- UTools und KCNet -----------------------------------------------------------------------------------------
 
-def test_usb_originalbasis_ist_unveraendert_und_andere_basen_aendern_nur_die_stellen():
+def test_usb_originalbasis_ist_unveraendert_und_andere_basen_aendern_nur_ein_byte():
+    """UTools 1.8: die Basis ist EIN Byte im Konfigurationsblock (Versatz 0x88, umgeben von 50h und 01h)."""
+    assert len(ba.USB_DATEIEN) == 7
     for name in ba.USB_DATEIEN:
         o = lies('fremd', 'utools', name)
-        assert ba.usb(o, 0xDC) == o
+        assert ba.usb(o, 0xD0) == o
         for basis in (0x84, 0x8C):
             n = ba.usb(o, basis)
-            assert unterschiede(o, n) == set(ba.USB_STELLEN)
-            for off, abstand in ba.USB_STELLEN.items():
-                assert n[off] == basis + abstand
+            assert unterschiede(o, n) == {ba.USB_BASIS_VERSATZ}
+            assert n[ba.USB_BASIS_VERSATZ] == basis
+
+
+def test_usb14_fuer_den_pc1715w_aendert_16_operanden():
+    for name in ba.USB14_DATEIEN:
+        o = lies('fremd', 'utools14', name)
+        assert ba.usb14(o, 0xDC) == o
+        n = ba.usb14(o, 0x84)
+        assert unterschiede(o, n) == set(ba.USB14_STELLEN)
 
 
 def test_net_originalbasis_ist_unveraendert_und_28_aendert_nur_die_stellen():
@@ -129,7 +138,8 @@ def test_vorauswahl_der_oberflaeche_ist_die_basis_der_software():
 
 def test_k8915_traegt_beide_usb_basen():
     d = karten.dateien('k8915_scpx')
-    for n in ('USB.COM', 'UDIR.COM', 'UGET.COM', 'UPUT.COM', 'USB8C.COM', 'UDIR8C.COM', 'UGET8C.COM', 'UPUT8C.COM'):
+    for n in ('USB.COM', 'UDIR.COM', 'UGET.COM', 'UPUT.COM', 'URUN.COM', 'UBACKUP.COM', 'URESTORE.COM',
+              'USB8C.COM', 'UDIR8C.COM', 'UGET8C.COM', 'UPUT8C.COM', 'URUN8C.COM', 'UBACK8C.COM', 'UREST8C.COM'):
         assert n in d
     assert d['USB.COM'] == ba.usb(lies('fremd', 'utools', 'usb.com'), 0x84)
     assert d['USB8C.COM'] == ba.usb(lies('fremd', 'utools', 'usb.com'), 0x8C)

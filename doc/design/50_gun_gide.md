@@ -208,7 +208,7 @@ sagt: Mode 2 ist implementiert; ob die Strobes von außen gesetzt werden können
 
 ## 5a. Protokoll nach UTools-Quellen (AP U1, 2026-11-10)
 
-Quelle: UTools V1.4 (Leubner/Haensel; lokal `~/Documents/K1520emu/GIDE_Software/utools14/`, nicht im Repo), Zeilen
+Quelle: UTools V1.4 (Leubner/Haensel; Hucki-Wiki; seit 2026-11-14 ersetzt durch die UTools 1.8 aus rowikla, `tools/gide/fremd/utools`; das Protokoll ist unveraendert), Zeilen
 beziehen sich auf `USBINC.Z80` (I), `UDIR.Z80` (D), `UGET.Z80` (G), `UPUT.Z80` (P), `USB.Z80` (U).  Das Handbuch war
 nicht beschaffbar: **Was nur aus dem Gedaechtnis stammt, ist `[?]`.**  Zwei Befunde gegen die Vermutung aus §5:
 (1) **SCS = Kurzbefehlssatz (Einzelbyte-Opcodes, Prompt `>` CR, Fehler als 2 Buchstaben), ECS = erweiterter Satz

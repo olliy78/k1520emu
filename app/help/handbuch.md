@@ -1525,8 +1525,8 @@ Stick steckt, rot = eben angesprochen, Ring = kein Stick. Der Tooltip nennt Basi
 
 Der Gast bedient den Stick mit den **UTools** (M. Leubner), die auf den Systemdisketten liegen und zur
 Vorauswahl der Basis passen (Tabelle im Abschnitt *IDE-Platte (GIDE) und Uhr*): `USB FWV` (Firmware-Version =
-Verbindungsprobe), `UDIR` (Verzeichnis des Sticks), `UGET Datei` (vom Stick auf die Diskette), `UPUT Datei` (auf den Stick).
-Am K8915 tragen die Programme für **8CH** (K8915 V2) das Suffix `8C` (`UDIR8C` …). Gemerkt wird alles in der
+Verbindungsprobe), `UDIR` (Verzeichnis des Sticks), `UGET Datei` (vom Stick auf die Diskette), `UPUT Datei` (auf den Stick), dazu `URUN Programm` (COM-Datei vom Stick starten) sowie `UBACKUP`/`URESTORE` (Sicherung auf den Stick; am PC 1715W nicht auf der Diskette).
+Am K8915 tragen die Programme für **8CH** (K8915 V2) das Suffix `8C` (`UDIR8C` …, `UBACK8C`, `UREST8C`). Gemerkt wird alles in der
 Konfiguration (`general.usb`).
 
 ## Netzwerk (KCNet/W5100)

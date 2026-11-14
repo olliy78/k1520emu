@@ -436,7 +436,7 @@ void gideNachpruefen(bool pip, const std::string& diskette, const std::string& a
 }
 
 /// USB-Abschnitt (Programme USB/UDIR/UGET mit dem Suffix der Basis).
-void usbPruefen(Gast& g, const std::string& suffix) {
+void usbPruefen(Gast& g, const std::string& suffix, bool voll = true) {
     ASSERT_TRUE(g.befehl("USB" + suffix + " FWV", 600'000'000)) << g.bild();
     zeige("USB FWV", g);
     EXPECT_EQ(g.bild().find("Error"), std::string::npos) << g.bild();
@@ -446,6 +446,14 @@ void usbPruefen(Gast& g, const std::string& suffix) {
     EXPECT_NE(g.bild().find("STICK"), std::string::npos) << g.bild();
     ASSERT_TRUE(g.befehl("UGET" + suffix + " STICK.BIN", 600'000'000)) << g.bild();
     zeige("UGET", g);
+    if (!voll) return;   // PC 1715W: UTools 1.4 (nur USB/UDIR/UGET/UPUT)
+    // URUN/UBACKUP/URESTORE ohne Argument: Hilfeseite = das Programm laeuft und kommt zurueck.  (Namen mit Suffix: UBACK/UREST.)
+    ASSERT_TRUE(g.befehl("URUN" + suffix, 600'000'000)) << g.bild();
+    EXPECT_NE(g.bild().find("URUN.COM"), std::string::npos) << g.bild();
+    ASSERT_TRUE(g.befehl((suffix.empty() ? "UBACKUP" : "UBACK" + suffix), 600'000'000)) << g.bild();
+    zeige("UBACKUP", g);
+    ASSERT_TRUE(g.befehl((suffix.empty() ? "URESTORE" : "UREST" + suffix), 600'000'000)) << g.bild();
+    zeige("URESTORE", g);
 }
 
 /// Netz-Abschnitt: TFTP und CPMNET erkennen die Karte.
@@ -507,6 +515,7 @@ struct Satz {
     const char* usbSuffix = "";
     bool pip = true;            ///< false: kein PIP auf der Diskette (SCP 1715)
     uint8_t gide = 0xD0;        ///< GIDE-Basis der Vorauswahl (PRG 710/-1: 90H)
+    bool usbVoll = true;        ///< false: UTools 1.4 (PC 1715W; die 1.8 bleiben dort stumm)
 };
 
 /// Gemeinsamer Ablauf; @p g ist der (noch nicht gestartete) Gast, @p m seine Maschine.
@@ -524,7 +533,7 @@ void alles(G& g, M& m, const Satz& s, const char* name) {
     ASSERT_EQ(g.letzte(), "A>") << g.bild();
 
     ASSERT_NO_FATAL_FAILURE(gidePruefen(g, s.treiber, s.pip, kopie.path(), abbild, s.gide));
-    ASSERT_NO_FATAL_FAILURE(usbPruefen(g, s.usbSuffix));
+    ASSERT_NO_FATAL_FAILURE(usbPruefen(g, s.usbSuffix, s.usbVoll));
     if (s.net) ASSERT_NO_FATAL_FAILURE(netzPruefen(g));
     ASSERT_TRUE(m.flushDisks());
     ASSERT_TRUE(m.gide()->platte().flush());
@@ -599,7 +608,7 @@ TEST_F(KartenBeigaben, PC1715W_SCP30) {
     Pc1715Machine::Config c;
     c.variante = Pc1715Machine::Config::Variante::Pc1715W;
     GastPc g(c);
-    alles(g, g.m, {"pc1715w_scp30/pc1715w_scp30_system.hfe", Treiber::Keiner, 0x84, 0}, "k1520_karten_pc1715w.hfe");
+    alles(g, g.m, {"pc1715w_scp30/pc1715w_scp30_system.hfe", Treiber::Keiner, 0x84, 0, "", true, 0xD0, false}, "k1520_karten_pc1715w.hfe");
 }
 
 /// K8915 Gen 2 (V2-Geraet, K2521 + 64 KB): USB 8CH (84H gehoert der K2521), GIDE D0H, Netz C0H; USB-Programme mit Suffix 8C.

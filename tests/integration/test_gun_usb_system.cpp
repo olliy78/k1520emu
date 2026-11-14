@@ -1,12 +1,10 @@
 /**
  * @file test_gun_usb_system.cpp
- * @brief GUN-USB (Entwurf 50, AP U2): die ECHTEN UTools 1.4 (USB, UDIR, UPUT, UGET) gegen die Karte.
+ * @brief GUN-USB (Entwurf 50, AP U2): die ECHTEN UTools 1.8 (USB, UDIR, UPUT, UGET; M. Leubner) gegen die Karte.
  *
- * Die Programme (Leubner/Haensel, CP/M-Fassung fuer PIO DCh..DFh) liegen NUR lokal in
- * `~/Documents/K1520emu/GIDE_Software/utools14/` (Lizenz ungeklaert, nie im Repo; `K1520_GIDE_SW`
- * ueberschreibt den Ort der GIDE_Software).  Fehlen sie, werden die Faelle uebersprungen.  Sie kommen
- * auf eine TEMP-KOPIE der CP/A-Bootdiskette; die Karte steckt auf Basis DCh (frei einstellbar, kein
- * Patchen noetig) mit einem Temp-Verzeichnis als Stick.
+ * Die Programme liegen im Repo (`tools/gide/fremd/utools`, Pfad aus K1520_UTOOLS_DIR) und kommen UNVERAENDERT
+ * (Basis D0H wie geliefert) auf eine TEMP-KOPIE der CP/A-Bootdiskette; die Karte steckt auf D0H mit einem
+ * Temp-Verzeichnis als Stick.  Die umgeschriebenen Basen (84H/8CH) pruefen die KartenBeigaben.*.
  *
  * Gepruft: USB (Sync, FWV), UDIR zeigt die Stickdatei, UPUT legt eine CP/A-Datei bitgleich im Wirtsverzeichnis
  * ab, UGET holt eine Wirtsdatei bitgleich auf die CP/A-Diskette.
@@ -48,11 +46,6 @@ constexpr int kInputBudget = 40'000'000;
 constexpr int kLangBudget  = 200'000'000;
 constexpr const char* kFs = "cpa_ds80_5x1024_boot";
 
-std::string swVerzeichnis() {
-    if (const char* e = std::getenv("K1520_GIDE_SW")) return e;
-    if (const char* h = std::getenv("HOME")) return std::string(h) + "/Documents/K1520emu/GIDE_Software";
-    return "";
-}
 std::vector<uint8_t> dateiLesen(const fs::path& pfad) {
     std::ifstream f(pfad, std::ios::binary);
     return std::vector<uint8_t>(std::istreambuf_iterator<char>(f), {});
@@ -129,20 +122,19 @@ using GunUsbSystem = Leise;
  * @brief CP/A am A5120, Karte auf DCh..DFh: USB FWV, UDIR, UPUT, UGET mit den echten UTools-Binaerdateien.
  */
 TEST_F(GunUsbSystem, UToolsA5120) {
-    const fs::path sw = fs::path(swVerzeichnis()) / "utools14";
+    const fs::path sw = K1520_UTOOLS_DIR;
     const auto usb = dateiLesen(sw / "usb.com"), udir = dateiLesen(sw / "udir.com"),
                uput = dateiLesen(sw / "uput.com"), uget = dateiLesen(sw / "uget.com");
-    if (usb.empty() || udir.empty() || uput.empty() || uget.empty())
-        GTEST_SKIP() << "UTools nicht vorhanden (" << sw.string() << ")";
+    ASSERT_FALSE(usb.empty() || udir.empty() || uput.empty() || uget.empty()) << sw.string();
 
-    TempDisk a("cpa_cpa780_k5601_noclock.img", "k1520_gunusb_a.img");
+    TempDisk a("cpa_cpa780_k5601_noclock.img", "k1520_gunusb18_a.img");
     std::vector<uint8_t> nutz(5000), stickDatei(3000);
     for (size_t i = 0; i < nutz.size(); ++i) nutz[i] = uint8_t((i * 7 + (i >> 8)) & 0xFF);
     for (size_t i = 0; i < stickDatei.size(); ++i) stickDatei[i] = uint8_t((i * 13 + 5 + (i >> 7)) & 0xFF);
     ASSERT_TRUE(diskettePut(a.path(), {{"USB.COM", usb}, {"UDIR.COM", udir}, {"UPUT.COM", uput},
                                        {"UGET.COM", uget}, {"NUTZ.BIN", nutz}}));
 
-    const fs::path stick = k1520test::tempPath("k1520_gunusb_stick");
+    const fs::path stick = k1520test::tempPath("k1520_gunusb18_stick");
     std::error_code ec;
     fs::remove_all(stick, ec);
     fs::create_directories(stick);
@@ -151,7 +143,7 @@ TEST_F(GunUsbSystem, UToolsA5120) {
     {
         A5120Machine m;
         k1520::GunUsb::Config gc;
-        gc.basis = 0xDC;   // die UTools-CP/M-Fassung ist fuer DCh..DFh gebaut
+        gc.basis = 0xD0;
         gc.ordner = stick;
         ASSERT_TRUE(m.installGunUsb(gc)) << m.gunUsbFehler();
         ASSERT_TRUE(m.mountDisk(0, a.path(), "cpa780", false)) << m.lastError();
