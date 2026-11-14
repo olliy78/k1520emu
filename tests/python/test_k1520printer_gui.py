@@ -576,7 +576,7 @@ def test_k6313_typwahl_baut_bedienfeld_und_dil_matrix(fenster, monkeypatch):
     assert fenster.emu.printer_lamp(K.DRUCKER_LAMPE_POW) == 1
 
 
-@pytest.mark.parametrize("schluessel, abzuege", [("k6313-ifss", 3), ("k6311-ifss", 1)])
+@pytest.mark.parametrize("schluessel, abzuege", [("k6313-ifss", 5), ("k6311-ifss", 1)])
 def test_ifss_typen_laufen_an_und_haben_ihre_abzuege(fenster, monkeypatch, schluessel, abzuege):
     # WP8g: IFSS-Fassungen von K6313/K6311 (Kern-Typ 5/6); die Kassette steckt fest, die Schnittstelle folgt dem Typ
     e = fenster.einst_drucker

@@ -165,6 +165,8 @@ K6313Ccb::K6313Ccb(K1520Bus& bus, const Config& cfg)
     : bus_(bus), cfg_(cfg), pe_(!cfg.papier_da), dil_(cfg.dil),
       druck_(druckParameter(cfg), std::make_unique<SchrittWagen>(cfg.wagen), cfg.papier)
 {
+    if (!cfg_.k6311 && cfg_.rom_extern.size() == ROM_ENDE_LANG) cfg_.lang = true;   // 16-KiB-Abzug: Speicherplan "lang"
+    if (cfg_.lang && cfg_.rom_extern.size() != ROM_ENDE_LANG) cfg_.rom_extern.assign(ROM_ENDE_LANG, 0xFF);   // ohne Abzug nichts zu fahren (Aufrufer pruefen)
     if (cfg_.k6311 && cfg_.rom_extern.size() == ROM_ENDE_8K) cfg_.rom_extern.resize(ROM_ENDE, 0xFF);   // vier Chips: der fuenfte Sockel liest FFH [?]
     pio104_.setModus3Flanke(true);
     pio105_.setModus3Flanke(true);
@@ -197,6 +199,11 @@ void K6313Ccb::attachToBus(K1520Bus& bus)
     bus.registerIO(this, P_CTC102, 4);
     bus.registerIO(this, P_CTC101, 4);
     bus.registerIO(this, P_PIO104, 4);
+    if (cfg_.lang) {
+        bus.registerMem(this, 0x0000, ROM_ENDE_LANG);
+        bus.registerMem(this, RAM_LANG_BASIS, RAM_LANG_GROESSE);
+        return;
+    }
     bus.registerMem(this, 0x0000, RAM_BASIS + RAM_GROESSE);   // ROM, 3000H-Fenster, Luecke und 3800H-Fenster in einem Bereich; memRead/-Write entscheiden
 }
 
@@ -407,6 +414,11 @@ void K6313Ccb::ioWrite(uint8_t port, uint8_t data)
 
 uint8_t K6313Ccb::memRead(uint16_t a)
 {
+    if (cfg_.lang) {   // Speicherplan "lang": 27128 ab 0000H, 2 KiB RAM bei F000H (A15 fehlt am Modul, sonst Leerlauf FFH)
+        if (a < ROM_ENDE_LANG) return cfg_.rom_extern[a];
+        if (a >= RAM_LANG_BASIS && a < RAM_LANG_BASIS + RAM_LANG_GROESSE) return ram_[a - RAM_LANG_BASIS];
+        return 0xFF;
+    }
     if (a < ROM_ENDE) return !cfg_.rom_extern.empty() ? cfg_.rom_extern[a] : cfg_.k6311 ? K6311_ROM_12128062[a] : K6313_ROM_33538013[a];
     if (a >= RAM_BASIS && a < RAM_BASIS + RAM_GROESSE) return ram_[a - RAM_BASIS];
     if (a >= RAM2_BASIS && a < RAM2_BASIS + RAM_GROESSE) return ram_[RAM_GROESSE + (a - RAM2_BASIS)];
@@ -415,6 +427,10 @@ uint8_t K6313Ccb::memRead(uint16_t a)
 
 void K6313Ccb::memWrite(uint16_t a, uint8_t d)
 {
+    if (cfg_.lang) {
+        if (a >= RAM_LANG_BASIS && a < RAM_LANG_BASIS + RAM_LANG_GROESSE) ram_[a - RAM_LANG_BASIS] = d;
+        return;
+    }
     if (a >= RAM_BASIS && a < RAM_BASIS + RAM_GROESSE) ram_[a - RAM_BASIS] = d;
     else if (a >= RAM2_BASIS && a < RAM2_BASIS + RAM_GROESSE) ram_[RAM_GROESSE + (a - RAM2_BASIS)] = d;
 }

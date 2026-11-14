@@ -37,22 +37,39 @@ constexpr int NADEL    = 3;                 ///< Einheiten zwischen zwei Nadeln
 constexpr int PUNKT_B  = 4;                 ///< Punktbreite in Pixeln
 constexpr int GLYPHE0  = 0x2300;            ///< Zelle von 20H
 
-/// Lage der Zelle von 20H im Abzug (WP8g): 2300H bei 33538013 und seinen Verwandten; 33830803 (ISO/US ASCII) traegt dieselben Zellen bei 2134H.  Gesucht wird die
-/// Zelle von 'A' (21H + 20H = 41H) des Referenzabzugs; nicht gefunden = Vorgabe 2300H (dann schlaegt der Vergleich fehl, statt etwas Falsches zu belegen).
-inline int glyphe0(const std::vector<uint8_t>& rom)
+/// Lage der Zellen im Abzug: Basis = Zelle von 20H, Schritt = Bytes je Zelle.
+struct Zellen { int basis; int schritt; };
+
+/// Gesucht wird die Zelle von 'A' (41H) des Referenzabzugs; daraus folgt die Basis bei Schritt 10 (33538013 und Verwandte: 2300H; 33830803: 2134H, WP8g)
+/// oder Schritt 12 (16-KiB-Abzug 30835007, WP8h: Zelle = Maske + 9 Spalten + 2 Fuellbytes, Basis 2E10H = 2C90H + 12 * 20H, am ROM 13CBH-13E4H gelesen).
+/// Gilt der Schritt 10, wenn die Zelle von 20H (Leerzeichen) lauter FF ist, sonst 12.  Nicht gefunden = Vorgabe 2300H/10 (der Vergleich schlaegt dann fehl,
+/// statt etwas Falsches zu belegen).
+inline Zellen zellen(const std::vector<uint8_t>& rom)
 {
     static const uint8_t A[10] = {0xFF, 0xE1, 0xDF, 0xB7, 0x7F, 0xF7, 0x7F, 0xB7, 0xDF, 0xE1};
     static thread_local const uint8_t* zp = nullptr;   // letzter Fund (Zeiger + Lage), billig nachgeprueft
-    static thread_local int zb = GLYPHE0;
-    const auto passt = [&](int base) {
-        const size_t i = static_cast<size_t>(base) + 10u * 0x21u;
-        return i + 10 <= rom.size() && std::equal(A, A + 10, rom.begin() + static_cast<std::ptrdiff_t>(i));
+    static thread_local Zellen z{GLYPHE0, 10};
+    const auto leer = [&](int base, int n) {
+        for (int i = 0; i < n; ++i) if (static_cast<size_t>(base + i) >= rom.size() || rom[static_cast<size_t>(base + i)] != 0xFF) return false;
+        return true;
     };
-    if (zp == rom.data() && passt(zb)) return zb;
-    for (size_t i = 10u * 0x21u; i + 10 <= rom.size(); ++i)
-        if (std::equal(A, A + 10, rom.begin() + static_cast<std::ptrdiff_t>(i))) { zp = rom.data(); zb = static_cast<int>(i - 10u * 0x21u); return zb; }
-    return GLYPHE0;
+    if (zp == rom.data() && zp) {   // Treffer nur gueltig, solange die Zelle von 'A' noch dort liegt (ein anderer Abzug kann dieselbe Adresse bekommen)
+        const size_t i = static_cast<size_t>(z.basis + z.schritt * 0x21);
+        if (i + 10 <= rom.size() && std::equal(A, A + 10, rom.begin() + static_cast<std::ptrdiff_t>(i)) && leer(z.basis, z.schritt)) return z;
+    }
+    for (size_t i = 12u * 0x21u; i + 10 <= rom.size(); ++i) {
+        if (!std::equal(A, A + 10, rom.begin() + static_cast<std::ptrdiff_t>(i))) continue;
+        const int b10 = static_cast<int>(i) - 10 * 0x21;
+        const int b12 = static_cast<int>(i) - 12 * 0x21;
+        if (b10 >= 0 && leer(b10, 10)) z = {b10, 10};
+        else if (b12 >= 0 && leer(b12, 12)) z = {b12, 12};
+        else continue;
+        zp = rom.data();
+        return z;
+    }
+    return {GLYPHE0, 10};
 }
+inline int glyphe0(const std::vector<uint8_t>& rom) { return zellen(rom).basis; }
 
 /// ROM-Abzug (10 KiB, 0000H-27FFH) aus `<dir>/33538013.bin`.
 inline std::vector<uint8_t> rom(const std::string& dir, const std::string& name = "33538013")
@@ -67,7 +84,8 @@ using Treffer = std::set<std::pair<int, int>>;   ///< (Spalte 0...8, Nadel 1...9
 inline Treffer treffer(const std::vector<uint8_t>& rom, int code)
 {
     Treffer t;
-    const size_t a = static_cast<size_t>(glyphe0(rom) + 10 * (code - 0x20));
+    const Zellen zl = zellen(rom);
+    const size_t a = static_cast<size_t>(zl.basis + zl.schritt * (code - 0x20));
     for (int j = 0; j < 9; ++j)
         for (int n = 1; n <= 8; ++n)
             if (!((rom[a + 1 + static_cast<size_t>(j)] >> (8 - n)) & 1)) t.insert({j, n});

@@ -61,6 +61,9 @@ public:
     static constexpr uint32_t CPU_HZ = 2'457'600;
 
     static constexpr uint16_t ROM_ENDE    = 0x2800;   ///< ROM 0000H-27FFH (Fassung "kurz")
+    static constexpr uint16_t ROM_ENDE_LANG = 0x4000;   ///< Fassung "lang" (WP8h, 16 KiB, ein 27128): ROM 0000H-3FFFH, RAM F000H-F7FFH
+    static constexpr uint16_t RAM_LANG_BASIS = 0xF000;  ///< Fassung "lang": ein zusammenhaengendes 2-KiB-RAM (Stapel von F800H)
+    static constexpr uint16_t RAM_LANG_GROESSE = 0x0800;
     static constexpr uint16_t ROM_ENDE_8K = 0x2000;   ///< K6311 mit vier 2-KiB-Chips (13120012, 13325212): 0000H-1FFFH
     /// RAM (WP8d): zwei Fenster zu je 1 KiB, 3000H-33FFH und 3800H-3BFFH.  Die Firmware nutzt 3000H-3011H (Nadelspalten-Ring), 3124H-3323H
     /// (Punktdaten, +100H = zweiter Satz) UND 3800H-3BFFH (Variablen, Stapel) [F]; dazwischen (3400H-37FFH) nichts angefasst - ob dort RAM
@@ -82,6 +85,9 @@ public:
         /// Anwenders `K6313_DIPswitches.png`.  Rest OFF (Pica, US ASCII, 12 Zoll, 9600 Bd) — kein Auslieferungszustand, nur Vorgabe.
         uint32_t dil = (1u << dilIndex(5, 2)) | (1u << dilIndex(13, 2));
         bool papier_da = true;
+        /// Speicherplan "lang" (WP8h, Merkposten drucker.md Nr. 37): ROM 0000H-3FFFH (16 KiB), RAM F000H-F7FFH (2 KiB), Stapel F800H, I = F0H [F: alle
+        /// 16-KiB-Abzuege]; der kurze Plan (10 KiB, RAM 3000H/3800H) bleibt unveraendert.  Wird auch gesetzt, wenn `rom_extern` genau 16 KiB lang ist.
+        bool lang = false;
         /// IFSS-Kassette statt V.24 (WP8g, Merkposten drucker.md Nr. 36): der IFSS-Anschluss ist wirksam, V.24 ohne Funktion; ohne Steuerleitungen
         /// (/CTS, /DCD fest aktiv).  K6313: Daten wie am V.24 ueber SIO-Kanal A (die ROM-Abzuege kennen keinen anderen Weg [F]); K6311: Kanal B
         /// (Abzug 13325212).  Das ROM wird NICHT umgeschaltet - die Wahl des Abzugs gehoert dem Aufrufer (Katalog).

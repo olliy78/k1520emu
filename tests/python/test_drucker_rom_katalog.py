@@ -51,8 +51,10 @@ def test_DruckerRomKatalog_K6313_Kennung_im_ROM_stimmt_mit_dem_Dateinamen(eintra
     for e in liste:
         n = Path(e.datei).stem
         roh = (PROJECT_ROOT / "doc" / "EPROMS" / e.datei).read_bytes()
-        assert roh[0x27F8:0x2800].decode("ascii") == n[3] + n[4:6] + n[0] + n[1:3] + n[6:8], e.schluessel
-        assert e.guete == "ok" and len(roh) == 10240
+        # WP8h: 16-KiB-Abzuege (Plan "lang") tragen die Kennung am Ende des Chips (3FF8H)
+        assert len(roh) in (10240, 16384)
+        assert roh[len(roh) - 8:].decode("ascii") == n[3] + n[4:6] + n[0] + n[1:3] + n[6:8], e.schluessel
+        assert e.guete == "ok" and e.groesse == len(roh)
 
 
 def test_DruckerRomKatalog_K6311_Kennung_im_ROM_stimmt_mit_dem_Dateinamen(eintraege):
@@ -75,8 +77,8 @@ def test_DruckerRomKatalog_IfssTypen_Kennung_Groesse_und_Schnittstelle(eintraege
     for e in k13:
         n = Path(e.datei).stem
         roh = (PROJECT_ROOT / "doc" / "EPROMS" / e.datei).read_bytes()
-        assert roh[0x27F8:0x2800].decode("ascii") == n[3] + n[4:6] + n[0] + n[1:3] + n[6:8], e.schluessel
-        assert e.guete == "ok" and len(roh) == 10240 and e.schnittstellen == ("ifss",)
+        assert roh[len(roh) - 8:].decode("ascii") == n[3] + n[4:6] + n[0] + n[1:3] + n[6:8], e.schluessel
+        assert e.guete == "ok" and len(roh) in (10240, 16384) and e.schnittstellen == ("ifss",)
         assert v24.get(e.datei) == e.md5, "dieselbe Datei wie am V.24"
     k11 = rk.fuer_typ("k6311-ifss", eintraege)
     assert [e.schluessel for e in k11] == ["k6311-ifss-13325212"]
@@ -222,6 +224,17 @@ def test_DruckerRomKatalog_romdatei_liefert_dieselben_Bytes_wie_das_eingebettete
         assert _byte(lib, h, adr) == roh[adr]
     assert all(_byte(lib, h, adr) == 0xFF for adr in (0x2000, 0x2400, 0x27FF)), "fuenfter Sockel: FFH"
     lib.k1520_destroy(h)
+    # WP8h: 16-KiB-Abzug (Plan "lang"): ROM bis 3FFFH, RAM-Fenster F000H statt 3800H, Typ 3 und 5
+    e = next(x for x in eintraege if x.schluessel == "k6313-30835007")
+    roh = (ordner / e.datei).read_bytes()
+    assert len(roh) == 16384
+    for typ in (3, 5):
+        lib, h = _drucker(typ, f"romdatei={ordner / e.datei}")
+        assert h
+        for adr in (0x0000, 0x0801, 0x2C90, 0x3FF8, 0x3FFF):
+            assert _byte(lib, h, adr) == roh[adr], hex(adr)
+        assert _byte(lib, h, 0x4000) == 0xFF
+        lib.k1520_destroy(h)
     # K6316: Satz aus Datei == eingebettet
     for typ, schluessel in ((1, "k6316-ifss"), (2, "k6316-v24")):
         e = next(x for x in eintraege if x.schluessel == schluessel)

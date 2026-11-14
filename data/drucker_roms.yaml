@@ -132,6 +132,34 @@ eintraege:
     hinweis: "Neue Platine, 10-KiB-Zuschnitt.  Achtung: das Druckbild stimmt (auch am V.24) nicht Punkt fuer Punkt mit dem Orakel des K6313 ueberein (Zeile 1 um eine Spalte versetzt), Ursache offen [?]."
     vorgabe: false
     aliases: []
+  # 16-KiB-Fassung "lang" (WP8h, Merkposten Nr. 37): ROM 0000H-3FFFH, RAM F000H-F7FFH, Stapel F800H; die Karte erkennt sie an der Dateilaenge (16384).
+  # Nur Abzuege mit SIO-Weg (V.24/IFSS) und gepruefter Druckbild; reine Centronics-Abzuege (37239503) und 36539211/5c53a001 (anderes Programmgeschlecht, siehe README) fehlen.
+  - schluessel: k6313-30835007
+    typ: k6313
+    titel: "3.08-3-50/07 V24/CL/IFSP ISO LAT/KYR (16 KiB, mit Pruefprogrammen)"
+    pgm: "3.08-3-50/07, Kennung 35030807 (gedruckt als 30835007)"
+    datei: K6313/30835007.bin
+    groesse: 16384
+    md5: 2a1b75629c6852e9482d1d0afcbc014e
+    schnittstellen: [v24]
+    zeichensatz: "im ROM (ISO, Latein/Kyrillisch; Zellen 12 Byte ab 2C90H + 12 * Code)"
+    guete: ok
+    hinweis: "ISO-Befehlssatz (ESC [ ... m), Speicherplan lang (ein 27128, RAM F000H).  Selbsttest und Text ueber V.24 stimmen Punkt fuer Punkt mit dem Zeichengenerator im ROM ueberein; die Pruefprogramme ab 2800H sind nicht gefahren.  Der Parallelweg (IFSP) fehlt im Kern."
+    vorgabe: false
+    aliases: []
+  - schluessel: k6313-30835207
+    typ: k6313
+    titel: "3.08-3-52/07 V24/CL/IFSP ISO GERMAN DE/US ASCII (16 KiB)"
+    pgm: "3.08-3-52/07, Kennung 35230807 (gedruckt als 30835207)"
+    datei: K6313/30835207.bin
+    groesse: 16384
+    md5: 6de9fe5b5353e19f514406e9cbe7dd02
+    schnittstellen: [v24]
+    zeichensatz: "im ROM (ISO, deutsch + US ASCII)"
+    guete: ok
+    hinweis: "Die Liste nennt \"nur 10k beschrieben\"; die Messung widerspricht (Daten bis 3FFFH, Kennung stimmt), und der Abzug druckt Selbsttest und Text ueber V.24 Punkt fuer Punkt wie 30835007.  Speicherplan lang."
+    vorgabe: false
+    aliases: []
   # IFSS-Kassette (WP8g, Merkposten Nr. 36): dieselben Abzuege wie am V.24 (Stromschleife-Etikett "CL"), Daten ueber SIO-Kanal A ohne Steuerleitungen.
   # Es gibt keinen Plan der Kassette; nur Abzuege, deren Druckbild ueber IFSS gegen das ROM geprueft ist.
   - schluessel: k6313-ifss-33538013
@@ -171,6 +199,32 @@ eintraege:
     zeichensatz: im ROM (US ASCII/Kyrillisch)
     guete: ok
     hinweis: "IFSP-Fassung: der Parallelweg (IFSP) fehlt im Kern.  Zeichentabelle bei 2134H; Text ueber IFSS gegen das ROM geprueft."
+    vorgabe: false
+    aliases: []
+  - schluessel: k6313-ifss-30835007
+    typ: k6313-ifss
+    titel: "3.08-3-50/07 V24/CL/IFSP ISO LAT/KYR (16 KiB, mit Pruefprogrammen)"
+    pgm: "3.08-3-50/07, Kennung 35030807 (gedruckt als 30835007)"
+    datei: K6313/30835007.bin
+    groesse: 16384
+    md5: 2a1b75629c6852e9482d1d0afcbc014e
+    schnittstellen: [ifss]
+    zeichensatz: "im ROM (ISO, Latein/Kyrillisch; Zellen 12 Byte ab 2C90H + 12 * Code)"
+    guete: ok
+    hinweis: "ISO-Befehlssatz (ESC [ ... m), Speicherplan lang (ein 27128, RAM F000H).  Text ueber IFSS (SIO-Kanal A, ohne Steuerleitungen) stimmen Punkt fuer Punkt mit dem Zeichengenerator im ROM ueberein; die Pruefprogramme ab 2800H sind nicht gefahren.  Der Parallelweg (IFSP) fehlt im Kern."
+    vorgabe: false
+    aliases: []
+  - schluessel: k6313-ifss-30835207
+    typ: k6313-ifss
+    titel: "3.08-3-52/07 V24/CL/IFSP ISO GERMAN DE/US ASCII (16 KiB)"
+    pgm: "3.08-3-52/07, Kennung 35230807 (gedruckt als 30835207)"
+    datei: K6313/30835207.bin
+    groesse: 16384
+    md5: 6de9fe5b5353e19f514406e9cbe7dd02
+    schnittstellen: [ifss]
+    zeichensatz: "im ROM (ISO, deutsch + US ASCII)"
+    guete: ok
+    hinweis: "Die Liste nennt \"nur 10k beschrieben\"; die Messung widerspricht (Daten bis 3FFFH, Kennung stimmt), und der Abzug druckt Text ueber IFSS (SIO-Kanal A, ohne Steuerleitungen) Punkt fuer Punkt wie 30835007.  Speicherplan lang."
     vorgabe: false
     aliases: []
   # K6311 (Entwurf 49 §11, WP8e): KEIN Schaltplan, die Hardware ist nur aus dem ROM erschlossen [?].  Fassung "kurz" (10 KiB) auf der Karte des K6313.

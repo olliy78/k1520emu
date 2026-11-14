@@ -441,11 +441,13 @@ K1520Handle k1520_create_printer(int typ, const char* konfig) {
                 g_init_error = "Drucker: romdatei '" + val + "' nicht lesbar oder leer";
                 return nullptr;
             }
-            if (k6311 && daten.size() == static_cast<size_t>(K6313Ccb::ROM_ENDE_8K)) {
+            if (k6313 && !k6311 && daten.size() == static_cast<size_t>(K6313Ccb::ROM_ENDE_LANG)) {
+                // 16 KiB (ein 27128, WP8h): Speicherplan "lang" (ROM 0000H-3FFFH, RAM F000H), die Karte erkennt ihn an der Laenge
+            } else if (k6311 && daten.size() == static_cast<size_t>(K6313Ccb::ROM_ENDE_8K)) {
                 // vier Chips zu 2 KiB (13120012, 13325212): die Karte fuellt den fuenften Sockel mit FFH auf (WP8g)
             } else if (daten.size() != soll) {
                 g_init_error = "Drucker: romdatei '" + val + "' hat " + std::to_string(daten.size()) + " Bytes, erwartet " +
-                               std::to_string(soll) + ((k6316 || k6313) ? (k6311 ? " (fuenf Chips zu 2 KiB lueckenlos, 0000H-27FFH; K6311 auch 8192 = vier Chips)" : " (fuenf Chips zu 2 KiB lueckenlos, 0000H-27FFH)")
+                               std::to_string(soll) + ((k6316 || k6313) ? (k6311 ? " (fuenf Chips zu 2 KiB lueckenlos, 0000H-27FFH; K6311 auch 8192 = vier Chips)" : " (fuenf Chips zu 2 KiB lueckenlos, 0000H-27FFH; K6313 auch 16384 = ein 27128)")
                                                               : " (0000H-297FH)");
                 return nullptr;
             }
