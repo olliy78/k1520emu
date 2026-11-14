@@ -167,6 +167,11 @@ K6313Ccb::K6313Ccb(K1520Bus& bus, const Config& cfg)
     anschluesse_[0] = std::make_unique<Anschluss>(*this, false);
     anschluesse_[1] = std::make_unique<Anschluss>(*this, true);
     kette_ = {&ctc101_, &ctc102_, &pio104_, &pio105_, &sio_};
+    // HCP (D102 ZC/TO0, Draht 57) speist C/TRG1 und C/TRG2 von D101 [S:4]: die Firmware zaehlt damit Chopper-Takte (Spalten- und Schrittzeitbasis,
+    // 1BF0H-1C0AH, ISR 1F10H/1C17H).  C7H = Zaehlbetrieb auf der fallenden Flanke; der Rueckruf reicht beide Pegel durch, clkTrg waehlt.
+    ctc102_.setZCTOCallback([this](int ch, bool lvl) {
+        if (ch == 0) { ctc101_.clkTrg(1, lvl); ctc101_.clkTrg(2, lvl); eingang_neu_ = true; }   // eingang_neu_: Interruptkette neu bewerten
+    }, 0x01);
 
     cpu_.readByte     = [this](uint16_t a)            { return bus_.memRead(a); };
     cpu_.writeByte    = [this](uint16_t a, uint8_t d) { bus_.memWrite(a, d); };
@@ -183,7 +188,7 @@ void K6313Ccb::attachToBus(K1520Bus& bus)
     bus.registerIO(this, P_CTC102, 4);
     bus.registerIO(this, P_CTC101, 4);
     bus.registerIO(this, P_PIO104, 4);
-    bus.registerMem(this, 0x0000, RAM_BASIS + RAM_GROESSE);
+    bus.registerMem(this, 0x0000, RAM_BASIS + RAM_GROESSE);   // ROM, 3000H-Fenster, Luecke und 3800H-Fenster in einem Bereich; memRead/-Write entscheiden
 }
 
 void K6313Ccb::powerOn()
@@ -207,6 +212,8 @@ void K6313Ccb::reset()
     sio_.channelB().setzeDCD(true);
     sio_.channelB().setzeCTS(true);
     druck_.halt();
+    cmt_beobachtet_ = false;
+    cmtBeobachten();   // Kanal 2 steht nach dem Reset im Ruhezustand: D115 transparent
     nadeln_aktiv_ = 0;
     g1_ = druck_.wagen().rueckmeldung().g1;
     sio_aus_[0].clear();
@@ -236,7 +243,8 @@ void K6313Ccb::eingaengeSetzen()
     eingang_neu_ = true;
     // D105 A: Bit 0...3 = Zeilen KB01...KB04 (Eingaenge, Maske 0FH, 0041H)
     pio105_.setExternA(zeilen(), 0x0F);
-    // D104 A: Bit 0 = Eingang, unbenannt (Maske 05H) -> Taktscheibe [?: nur Annahme]; Bit 2 = PE (1 = Papierende)
+    // D104 A: Bit 0 = Eingang, unbenannt (Maske 05H) -> Taktscheibe [?: die Firmware wertet nur die Flanken "A0 high" aus (1ACFH, ISR 1B30H/1B3CH:
+    // Zeitgeber D101 K3 bei jeder Flanke neu starten = "Wagen steht"); Zeichnung: Pin 15 mit unklarem Anschluss neben /CM1]; Bit 2 = PE (1 = Papierende)
     pio104_.setExternA(static_cast<uint8_t>((g1_ ? 0x01 : 0) | (pe_ ? 0x04 : 0)), 0x05);
     // D104 B: Bit 4 = PE1 (Kassettenkennung, V.24 = 0), Bit 6 = TDS (Taktscheibe)
     pio104_.setExternB(static_cast<uint8_t>(g1_ ? 0x40 : 0), 0x50);
@@ -246,25 +254,47 @@ void K6313Ccb::ausgaengeAuswerten()
 {
     const uint8_t a104 = pio104_.pinsA(0), b104 = pio104_.pinsB(0), b105 = pio105_.pinsB(0);
     // Wagenmotor /CM1...4 = D104 A1,3,5,7, Hochpegel = Phase bestromt (die Firmware rotiert das Muster in 3824H um 2 Bit, 1B7BH)
-    WagenEingang w;
+    cm_wunsch_ = 0;
     for (int k = 0; k < 4; ++k)
-        if ((a104 >> (1 + 2 * k)) & 1) w.phasen |= static_cast<uint8_t>(1 << k);
-    druck_.wagen().eingang(w);
+        if ((a104 >> (1 + 2 * k)) & 1) cm_wunsch_ |= static_cast<uint8_t>(1 << k);
+    if (!cmtZaehlt()) phasenAnlegen();   // sonst uebernimmt D115 sie erst mit der naechsten CMT-Flanke (cmtBeobachten)
     // Formularmotor PFA1...4 = D104 B1,3,5,7 [?]
     uint8_t pp = 0;
     for (int k = 0; k < 4; ++k)
         if ((b104 >> (1 + 2 * k)) & 1) pp |= static_cast<uint8_t>(1 << k);
     druck_.papier(0).phasen(pp);
     // Nadeln: PP1...8 = D105 B7...B0, PP9 = D104 B0; Tiefpegel = Nadel [?: /IPC-Freigabe (D104 B2) nicht modelliert]
+    // Vor der Einrichtung der Tore (Modus 3, Ausgang) sind die Pins hochohmig, die Endstufen sehen H: keine Nadel (sonst schluege das
+    // Rueckgesetzte Register 0 beim Netz-Ein einen Punkt)
     uint16_t aktiv = 0;
-    for (int n = 1; n <= 8; ++n)
-        if (!((b105 >> (8 - n)) & 1)) aktiv |= static_cast<uint16_t>(1u << (n - 1));
-    if (!(b104 & 0x01)) aktiv |= 0x100;
+    const auto s105 = pio105_.debugState(), s104 = pio104_.debugState();
+    if (s105.port[1].mode == 3 && s105.port[1].dir == 0x00)
+        for (int n = 1; n <= 8; ++n)
+            if (!((b105 >> (8 - n)) & 1)) aktiv |= static_cast<uint16_t>(1u << (n - 1));
+    if (s104.port[1].mode == 3 && !(s104.port[1].dir & 0x01) && !(b104 & 0x01)) aktiv |= 0x100;
     const uint16_t neu = static_cast<uint16_t>(aktiv & ~nadeln_aktiv_);
     nadeln_aktiv_ = aktiv;
     if (neu) druck_.feuere(neu, true);
     const bool g1 = druck_.wagen().rueckmeldung().g1;
     if (g1 != g1_) g1_ = g1;
+}
+
+// Phasenregister D115 (DL175): /CM1...4 -> /CMA1...4 mit der steigenden Flanke von CMT = D101 ZC/TO2 [S:4].  Laeuft Kanal 2 als Zeitgeber
+// (Synchronisation: 17H, TC 1 = alle 16 Takte), ist das Register fuer die Mechanik transparent und wird nicht Takt fuer Takt nachgebildet;
+// im Zaehlbetrieb (C7H, 9 HCP-Impulse je Schritt) schaltet der Wagen genau mit der CMT-Flanke statt mit dem Schreibzugriff der Firmware -
+// das haelt die Spalten des Druckbilds auf dem Raster der HCP-Impulse (Interruptlatenz geht nicht mehr in die Wagenlage ein) [?].
+bool K6313Ccb::cmtZaehlt() const { return (ctc101_.debugState().ch[2].control & 0x40) != 0; }
+
+void K6313Ccb::phasenAnlegen()
+{
+    WagenEingang w;
+    w.phasen = cm_wunsch_;
+    druck_.wagen().eingang(w);
+}
+
+void K6313Ccb::cmtBeobachten()
+{
+    ctc101_.setZCTOCallback([this](int ch, bool lvl) { if (ch == 2 && lvl) { phasenAnlegen(); eingang_neu_ = true; } }, cmtZaehlt() ? 0x04 : 0x00);
 }
 
 // ─── Bedienfeld ──────────────────────────────────────────────────────────────
@@ -330,6 +360,11 @@ void K6313Ccb::ioWrite(uint8_t port, uint8_t data)
         ctc102_.ioWrite(port - P_CTC102, data);
     } else if (imBereich(port, P_CTC101)) {
         ctc101_.ioWrite(port - P_CTC101, data);
+        if (port == P_CTC101 + 2) {   // Kanal 2 (CMT): Betriebsart kann sich geaendert haben
+            const bool z = cmtZaehlt();
+            if (z != cmt_beobachtet_) { cmt_beobachtet_ = z; cmtBeobachten(); }
+            if (!z) { phasenAnlegen(); }   // Rueckfall in den Zeitgeberbetrieb: Register transparent
+        }
     } else if (imBereich(port, P_PIO104)) {
         pio104_.ioWrite(chipPort(port - P_PIO104), data);
         pio_daten = !((port - P_PIO104) & 2);
@@ -345,12 +380,14 @@ uint8_t K6313Ccb::memRead(uint16_t a)
 {
     if (a < ROM_ENDE) return cfg_.rom_extern.empty() ? K6313_ROM_33538013[a] : cfg_.rom_extern[a];
     if (a >= RAM_BASIS && a < RAM_BASIS + RAM_GROESSE) return ram_[a - RAM_BASIS];
+    if (a >= RAM2_BASIS && a < RAM2_BASIS + RAM_GROESSE) return ram_[RAM_GROESSE + (a - RAM2_BASIS)];
     return 0xFF;
 }
 
 void K6313Ccb::memWrite(uint16_t a, uint8_t d)
 {
     if (a >= RAM_BASIS && a < RAM_BASIS + RAM_GROESSE) ram_[a - RAM_BASIS] = d;
+    else if (a >= RAM2_BASIS && a < RAM2_BASIS + RAM_GROESSE) ram_[RAM_GROESSE + (a - RAM2_BASIS)] = d;
 }
 
 // ─── Takt ────────────────────────────────────────────────────────────────────

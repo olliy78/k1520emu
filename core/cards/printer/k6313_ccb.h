@@ -7,8 +7,7 @@
  * Marken wie dort: `[S]` Schaltplan, `[F]` aus der Firmware, `[?]` Annahme.  Diese Karte ist **nicht** die K6316-Karte
  * (`K6316Steuerung`): die CCB hat keinen E/A-Dekoder, jeder Baustein haengt mit /CE an einer Adressleitung A2...A7.
  *
- * **Speicher (Fassung "kurz", 10 KiB):** ROM 0000H-27FFH (5 x 2716), RAM 3800H-3BFFH (1 KiB genutzt; das Modul traegt
- * 4 x 0,5 KiB, ihre Lage ist nicht belegt [?]); sonst Lesen FFH.  Die 16-KiB-Fassung (RAM F000H) gibt es noch nicht.
+ * **Speicher (Fassung "kurz", 10 KiB):** ROM 0000H-27FFH (5 x 2716), RAM 3000H-33FFH und 3800H-3BFFH (siehe RAM_BASIS); sonst Lesen FFH.  Die 16-KiB-Fassung (RAM F000H) gibt es noch nicht.
  *
  * **E/A (jeder Baustein an einer Leitung tief, hardware.md §2.2):** SIO 7CH-7FH (Kassette, Kanal A = Daten), PIO D1 der
  * Centronics-Kassette BCH-BFH (auf der V.24-Kassette nicht vorhanden: Lesen FFH), PIO D105 DCH-DFH (Tastenmatrix, Nadeln
@@ -21,14 +20,14 @@
  * 042AH-0494H), nicht aus einem Plan: sie ist in `DIL_MATRIX` mit den Befunden je Zelle dokumentiert; die Zellen mit [?] sind
  * Annahmen aus dem Muster "je Spalte zwei Paare, zuerst -2 dann -1".
  *
- * **Druckwerk:** Wagenmotor /CM1...4 (D104 A1,3,5,7, Hochpegel = Phase bestromt [F: Phasenmuster 3824H rotiert um 2]),
- * Formularmotor PFA1...4 (D104 B1,3,5,7), Nadeln PP1...8 (D105 B7...0, Tiefpegel = Nadel), PP9 (D104 B0).  Das Phasenregister
- * D115 (DL175, getaktet vom CTC-Ausgang CMT) ist transparent nachgebildet: die Phasen wirken sofort [?].  Das Druckbild ist
- * in WP8c **nicht** gegen ein Orakel geprueft (WP8d).
- *
- * **Bekannte Luecke (WP8c):** CTC D101 Kanal 1/2 stehen beim Wagenlauf im Zaehlbetrieb (C7H, 1BF2H-1C0AH); woher ihre CLK/TRG-Impulse
- * kommen, belegt kein Plan.  Ein Versuch (D102 ZC/TO0 -> D101 CLK/TRG1/2) aenderte nichts und wurde nicht uebernommen.  Folge: die
- * Einschalt-Testfunktionen (Tasten beim Netz-Ein) bleiben in 1794H/185FH stehen, es wird nichts gedruckt.
+ * **Druckwerk:** Wagenmotor /CM1...4 (D104 A1,3,5,7, Hochpegel = Phase bestromt [F: Phasenmuster 3824H rotiert um 2]), Formularmotor PFA1...4
+ * (D104 B1,3,5,7), Nadeln PP1...8 (D105 B7...0, Tiefpegel = Nadel), PP9 (D104 B0), erst nach der Einrichtung der Tore.  Das Phasenregister
+ * D115 (DL175, Takt = CMT = D101 ZC/TO2) ist im Zaehlbetrieb von Kanal 2 getaktet nachgebildet (der Wagen schaltet mit der CMT-Flanke), sonst
+ * transparent.  **Zeitbasis (WP8d, [S:4]):** CTC D102 ZC/TO0 = HCP speist C/TRG1 und C/TRG2 von D101 (Draht 57); die Firmware zaehlt damit
+ * Schrittimpulse (Kanal 2: 9 HCP je Wagenschritt) und Spaltenimpulse (Kanal 1: ISR 1F10H, 3 HCP je Spalte).  C/TRG0 und C/TRG3 sind im
+ * Plan nur Pruefpunkte (169, 170), Kanal 3 und 0 laufen als reine Zeitgeber.  D104 A0 (Pin 15, Zeichnung unklar neben /CM1) liest die
+ * Firmware nur als Flanke "A0 high" (Wagen steht -> 26-ms-Zeitgeber, 1ACFH/1B30H); es folgt der Taktscheibe [?].  Das Druckbild wird in
+ * `tests/support/k6313_orakel.h` Punkt fuer Punkt gegen den Zeichengenerator im ROM geprueft (Merkposten Nr. 33).
  *
  * **Schnittstelle:** zuerst V.24 an der SIO (Kassettenkennung PE1 = D104 B4 liest 0, Centronics-Kassette 1 [F:0096H]).  IFSS und
  * Centronics fehlen noch; fuer den `SerialHub` gibt es trotzdem beide Anschluesse (wie K6316): IFSS (Kanal B) ohne Funktion.
@@ -57,8 +56,12 @@ public:
     static constexpr uint32_t CPU_HZ = 2'457'600;
 
     static constexpr uint16_t ROM_ENDE    = 0x2800;   ///< ROM 0000H-27FFH (Fassung "kurz")
+    /// RAM (WP8d): zwei Fenster zu je 1 KiB, 3000H-33FFH und 3800H-3BFFH.  Die Firmware nutzt 3000H-3011H (Nadelspalten-Ring), 3124H-3323H
+    /// (Punktdaten, +100H = zweiter Satz) UND 3800H-3BFFH (Variablen, Stapel) [F]; dazwischen (3400H-37FFH) nichts angefasst - ob dort RAM
+    /// sitzt, ist nicht belegt [?] (Lage der Chips im Speichermodul unbekannt), der Emulator laesst es leer (Lesen FFH).
     static constexpr uint16_t RAM_BASIS   = 0x3800;
     static constexpr uint16_t RAM_GROESSE = 0x0400;
+    static constexpr uint16_t RAM2_BASIS  = 0x3000;   ///< zweites Fenster (Punktdaten)
 
     /// DIL-Schalter: Bit i = Schalter `(5 + i/2)-(1 + i%2)` (5-1 = 0, 5-2 = 1, 6-1 = 2 ... 18-2 = 27), 1 = ON.
     static constexpr int DIL_ANZAHL = 28;
@@ -78,17 +81,30 @@ public:
         SchrittWagen::Parameter wagen;
         Papierweg::Parameter papier;
         Config() {
-            // Raster wie K6316 (ein Motorschritt = 1/75 Zoll, 300 dpi in x) [?]; Nadeln in einer Spalte, 9 Nadeln [?]
-            druck.takte_je_zoll = 150;
-            druck.x_je_takt = 2;
+            // Raster [F]: die Firmware feuert 3 Spalten je 4 Positionseinheiten (Halbschritte) und druckt Pica mit 12 Spalten je Zeichen
+            // (80 Zeichen = 960 Spalten = 1284 Einheiten gemessen) -> 160 Einheiten je Zoll, Spaltenabstand 1/120 Zoll.  Blattraster 480 dpi:
+            // 3 Pixel je Einheit, 4 Pixel je Spalte.  Senkrecht 72 Punkte je Zoll [Handbuch 1.2], Papierschritt 1/216 Zoll [Firmware: 1/6 Zoll = 36].
+            druck.takte_je_zoll = 160;
+            druck.x_je_takt = 3;
             druck.y_je_zoll = 216;
-            druck.pv_schritt_y = 2;
+            druck.pv_schritt_y = 1;
             druck.nadel_teilung_y = 3;
-            druck.punkt_breite = 3;
+            druck.punkt_breite = 4;
             druck.punkt_hoehe = 2;
             druck.bahnen = 1;
-            druck.blatt_breite = 1700;
+            druck.blatt_breite = 2240;   // 14 Zoll
+            // Zwei Nadelspalten: die Firmware verzoegert die geraden Nadeln (2, 4, 6, 8) um 4 Spalten gegen die ungeraden (1, 3, 5, 7, 9) -
+            // Ringpuffer 3000H, Versatz 4 Eintraege [F: ISR 1F10H, Aufbau 16CCH]; damit die Punkte in einer Spalte landen, stehen die geraden
+            // Nadeln 4 Spalten = 16 Pixel links der ungeraden (wie beim K6316) [F: Selbsttest-Druckbild, Orakel k6313_orakel.h]
+            for (int k = 1; k < 8; k += 2) druck.nadel_x[k] = -16;
+            // Flugzeit/Rotornacheilung: so abgeglichen, dass vor- und rueckwaerts gedruckte Zeilen denselben Ursprung haben (die Firmware druckt die
+            // Rueckwaertszeile ohne eigenen Ausgleich; wie beim K6316 sind Flugzeit und Rotornacheilung nicht zu trennen) [?]
+            druck.versatz_vor = 1;
+            druck.versatz_rueck = 4;
             druck.rand_oben_y = 36;
+            // Formularmotor: die Phasenfolge, die der Selbsttest beim Vorwaerts-Zeilenvorschub ausgibt, laeuft auf steigender Phasennummer
+            // [?: Richtung nur aus dem Verhalten (Test druckt Zeile um Zeile nach unten), kein Plan] -> umgekehrt = Papier vorwaerts
+            papier.phasen_umgekehrt = true;
         }
     };
 
@@ -168,6 +184,9 @@ private:
     void eingaengeSetzen();
     uint8_t zeilen() const;        ///< Pegel der Zeilen KB01...KB04 bei der gewaehlten Spalte
     void ausgaengeAuswerten();
+    bool cmtZaehlt() const;      ///< D101 Kanal 2 im Zaehlbetrieb (Phasenregister D115 getaktet)
+    void phasenAnlegen();
+    void cmtBeobachten();
     void ketteNeu();
     bool sioSenke();
 
@@ -179,7 +198,7 @@ private:
     Z80PIO    pio104_{"K6313-PIO-D104"};
     Z80PIO    pio105_{"K6313-PIO-D105"};
     Z80SIO    sio_{"K6313-SIO"};
-    std::array<uint8_t, RAM_GROESSE> ram_{};
+    std::array<uint8_t, 2 * RAM_GROESSE> ram_{};   ///< [0, 1K) = 3800H-Fenster, [1K, 2K) = 3000H-Fenster
 
     std::array<bool, 4> taste_{};
     bool pe_;
@@ -187,6 +206,8 @@ private:
 
     Nadeldruckwerk druck_;
     uint16_t nadeln_aktiv_ = 0;
+    uint8_t cm_wunsch_ = 0;          ///< /CM1...4 der Firmware (Bit k = Phase k+1), Eingang von D115
+    bool cmt_beobachtet_ = false;
     bool g1_ = false;
     bool eingang_neu_ = false;
 

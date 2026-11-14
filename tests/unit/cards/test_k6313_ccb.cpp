@@ -1,6 +1,6 @@
 /**
  * @file test_k6313_ccb.cpp
- * @brief K6313-CCB (Entwurf 49 WP8c): Speicherkarte (ROM 0000H-27FFH, RAM 3800H-3BFFH), ROM gegen die MD5 aus
+ * @brief K6313-CCB (Entwurf 49 WP8c): Speicherkarte (ROM 0000H-27FFH, RAM 3000H-33FFH und 3800H-3BFFH), ROM gegen die MD5 aus
  *        doc/EPROMS/K6313/README.md, E/A-Adressen "eine Leitung tief" (7CH SIO, DCH PIO D105, ECH CTC D102, F4H CTC D101,
  *        F8H PIO D104, BCH nicht bestueckt), Tastenmatrix (Waehlcode x Zeile) und Sensoren.
  *        Quelle fuer alle Zahlen: doc/printer/k6313/hardware.md (§2.2 E/A, §3 PIO-Belegung, §5 Matrix) und die Firmware.
@@ -61,7 +61,7 @@ TEST(K6313Ccb, EingebettetesRomIstDerAbzug33538013)
     EXPECT_EQ(std::string(r.begin() + 0x27F8, r.begin() + 0x2800), "38033513");
 }
 
-TEST(K6313Ccb, SpeicherplanKurzRom0000Ram3800)
+TEST(K6313Ccb, SpeicherplanKurzRom0000Ram3000Und3800)
 {
     Karte k;
     for (int a = 0; a < 0x2800; a += 0x1F) EXPECT_EQ(k.bus.memRead(static_cast<uint16_t>(a)), K6313_ROM_33538013[a]) << a;
@@ -72,6 +72,15 @@ TEST(K6313Ccb, SpeicherplanKurzRom0000Ram3800)
     EXPECT_EQ(k.bus.memRead(0x3800), 0xA5);
     EXPECT_EQ(k.bus.memRead(0x3BFF), 0x5A);
     EXPECT_EQ(k.bus.memRead(0x3C00), 0xFF);
+    // zweites RAM-Fenster 3000H-33FFH (Punktdaten der Firmware, ISR 1F10H / sub_1934), dazwischen nichts (WP8d)
+    k.bus.memWrite(0x3000, 0x11);
+    k.bus.memWrite(0x33FF, 0x22);
+    EXPECT_EQ(k.bus.memRead(0x3000), 0x11);
+    EXPECT_EQ(k.bus.memRead(0x33FF), 0x22);
+    EXPECT_EQ(k.bus.memRead(0x3800), 0xA5) << "die Fenster sind getrennt";
+    k.bus.memWrite(0x3400, 0x33);
+    EXPECT_EQ(k.bus.memRead(0x3400), 0xFF);
+    EXPECT_EQ(k.bus.memRead(0x2FFF), 0xFF);
     k.bus.memWrite(0x0100, 0x00);
     EXPECT_EQ(k.bus.memRead(0x0100), K6313_ROM_33538013[0x100]) << "ROM ist nicht beschreibbar";
 }
@@ -216,4 +225,22 @@ TEST(K6313Ccb, InterruptketteCtcD101VorCtcD102)
     for (int i = 0; i < 200 && !k.ccb.hasInterrupt(); ++i) k.ccb.clockTick(16);
     ASSERT_TRUE(k.ccb.hasInterrupt());
     EXPECT_EQ(k.ccb.getVector(), 0x00) << "D101 hat Vorrang vor D102";
+}
+
+TEST(K6313Ccb, HcpVonD102Kanal0TaktetDieZaehlerkanaeleVonD101)
+{
+    // Schaltplan CCB: D102 ZC/TO0 (HCP, Draht 57) -> D101 C/TRG1 und C/TRG2.  Die Firmware zaehlt damit Spalten- und Schrittimpulse (WP8d).
+    Karte k;
+    k.out(0xEC, 0x17);   // D102 Kanal 0: Zeitgeber, Teiler 16, Zeitkonstante folgt
+    k.out(0xEC, 4);      // 16 * 4 = 64 Takte je HCP-Periode
+    k.out(0xF5, 0x47);   // D101 Kanal 1: Zaehler, fallende Flanke, Zeitkonstante folgt
+    k.out(0xF5, 5);
+    k.out(0xF6, 0x47);   // Kanal 2
+    k.out(0xF6, 9);
+    k.ccb.clockTick(64 * 3 + 10);
+    EXPECT_EQ(k.ccb.ctc101().debugState().ch[1].counter, 5 - 3);
+    EXPECT_EQ(k.ccb.ctc101().debugState().ch[2].counter, 9 - 3);
+    k.ccb.clockTick(64 * 3);   // Kanal 1 laeuft ueber 0 und laedt nach
+    EXPECT_EQ(k.ccb.ctc101().debugState().ch[1].counter, 5 - 6 + 5);
+    EXPECT_EQ(k.ccb.ctc101().debugState().ch[2].counter, 9 - 6);
 }

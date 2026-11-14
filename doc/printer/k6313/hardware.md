@@ -32,7 +32,7 @@ Die Bausteine auf der CCB tragen **keinen** Speicher.  Speicher sitzt nur im Spe
 
 | Fassung | ROM | RAM | Stapel | Beleg |
 |---|---|---|---|---|
-| **10 KiB** (5 × 2716, Platine 05-260-6111-0 / BIMAR 6312) | 0000–27FFH | **3800–3BFFH** (1 KiB genutzt), Stapel von 3C00H | `LD SP,3C00H`, `LD IX,3824H`, `I` = 38H | `[F:0000]` aller 10-KiB-Abzüge, wie K6316.  Das Speichermodul-Schaltbild fehlt `[?]` (Dekodierung des 10-KiB-Moduls unbekannt) |
+| **10 KiB** (5 × 2716, Platine 05-260-6111-0 / BIMAR 6312) | 0000–27FFH | **3000–33FFH** (Punktdaten, WP8d) und **3800–3BFFH** (Variablen), Stapel von 3C00H | `LD SP,3C00H`, `LD IX,3824H`, `I` = 38H | `[F:0000]` aller 10-KiB-Abzüge, wie K6316.  Das Speichermodul-Schaltbild fehlt `[?]` (Dekodierung des 10-KiB-Moduls unbekannt) |
 | **16 KiB** (1 × 27128, Modul 10-260-6316-x / SDM 80-5) | 0000–3FFFH | **F000–F7FFH** (2 KiB) | `LD SP,F800H`, `LD IX,F024H`, `I` = F0H | `[F:0000]` der 16-KiB-Abzüge; Dekodierung `[S:3]` unten |
 
 **Dekodierung des 16-KiB-Moduls `[S:3]`** (Sheet „201.1 Stromlaufplan", Drahtlesung): Dekoder **DS8205 (D8)**, `A0` ← A13, `A1` ← A14, `A2` ← 0 (Masse);
@@ -114,6 +114,7 @@ Beim Anlauf (`[F:0036–003D]`) werden `DFH←00H` (Nadeln inaktiv), `DDH←FFH`
 
 ## 4  Zeitgeber
 
+* **WP8d [S:4]:** D102 `ZC/TO0` (HCP, Draht 57) → D101 **C/TRG1 und C/TRG2** (Spalten- bzw. Schrittzähler); C/TRG0/C/TRG3 nur Prüfpunkte 169/170.  Maße und Zeichengenerator: Merkposten Nr. 33.
 * **CTC D101** (F4–F7): `ZC/TO0` → Monoflop **D116/DL123** (R119 20,5 kΩ, C109 68 nF; zweites Monoflop R120 10 kΩ, C110 1 nF) → Nadelimpulsbreite `[S:4]`;
   `ZC/TO2` = **CMT** → Takt des Flip-Flops D115 (Übernahme der Wagenmotor-Phasen /CM1…/CM4 → /CMA1…/CMA4) `[S:4]`; `ZC/TO1` unbeschaltet.
 * **CTC D102** (EC–EF): `ZC/TO0` = **HCP** (Chopper-Takt `[?]`), `ZC/TO2` = **RTC** → Sende-/Empfangstakt der SIO (Baudrate).  Firmware: `OUT (EEH),n` mit Teiler

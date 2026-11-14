@@ -460,7 +460,9 @@ k1520_add_test(k6316 SRC test_k6316.cpp
                      LABELS "${_lbl};fach_drucker" TIMEOUT 600 DEFS LOG_LEVEL=2
                      "K6316_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/K6316\"")
 
-# K6313 (Entwurf 49, WP8c): Original-ROM 33538013 bis in die Grundstellung (Wagen, Lampen, DTR ueber Kanal B); kein Druckbild-Orakel (WP8d)
+# K6313 (Entwurf 49, WP8c/WP8d): Original-ROM 33538013 bis in die Grundstellung (Wagen, Lampen, DTR ueber Kanal B), Selbsttest und Text
+# ueber V.24 gegen ein Orakel aus dem Zeichengenerator im ROM (tests/support/k6313_orakel.h)
 k1520_add_test(k6313 SRC test_k6313.cpp
-                     LIBS k1520_printer k1520_logger
-                     LABELS "${_lbl};fach_drucker" TIMEOUT 600 DEFS LOG_LEVEL=2)
+                     LIBS k1520_printer k1520_serial k1520_logger
+                     LABELS "${_lbl};fach_drucker" TIMEOUT 600 DEFS LOG_LEVEL=2
+                     "K6313_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/K6313\"")
