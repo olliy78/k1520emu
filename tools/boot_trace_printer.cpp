@@ -67,7 +67,9 @@ const char* portName(uint8_t p, int fam = 0) {   // fam: 0 SD 1157, 1 K6316, 2 K
 int bootTraceSd1157(const K8915TraceOpts& o, const prnlst::Listing& prn, int k6316)
 {
     PrinterMachine::Config cfg;
-    if (k6316 == 3) cfg.typ = PrinterMachine::Config::Typ::K6313_V24;   // 3 = K6313 (WP8c)
+    const bool k13 = k6316 == 3 || k6316 == 4;   // gleiche Karte K6313Ccb: 3 = K6313 (WP8c), 4 = K6311 (WP8e, Hardware erschlossen [?])
+    if (k6316 == 4) cfg.typ = PrinterMachine::Config::Typ::K6311_V24;
+    else if (k6316 == 3) cfg.typ = PrinterMachine::Config::Typ::K6313_V24;
     else if (k6316) cfg.typ = k6316 == 2 ? PrinterMachine::Config::Typ::K6316_V24 : PrinterMachine::Config::Typ::K6316_Ifss;
     if (!o.rom_path.empty()) {   // --rom <Datei>: ROM-Satz statt des eingebetteten (K6313/K6316)
         std::vector<uint8_t> d;
@@ -76,14 +78,14 @@ int bootTraceSd1157(const K8915TraceOpts& o, const prnlst::Listing& prn, int k63
             fclose(f);
         }
         if (d.empty()) { fprintf(stderr, "FEHLER: --rom '%s' nicht lesbar\n", o.rom_path.c_str()); return 2; }
-        (k6316 == 3 ? cfg.k6313.rom_extern : k6316 ? cfg.k6316.rom_extern : cfg.sd1157.rom_extern) = std::move(d);
+        (k13 ? cfg.k6313.rom_extern : k6316 ? cfg.k6316.rom_extern : cfg.sd1157.rom_extern) = std::move(d);
     }
     if (k6316 == 3 && o.dil >= 0) cfg.k6313.dil = static_cast<uint32_t>(o.dil);
     PrinterMachine m(cfg);
     // Je Geraet eine Steuerung: `sd` (SD 1157), `k6` (K6316) bzw. `k3` (K6313); gemeinsam sind CPU, Druckwerk und SIO-Mitschrift.
     Sd1157Steuerung* sd = k6316 ? nullptr : &m.sd1157();
     K6316Steuerung*  k6 = (k6316 == 1 || k6316 == 2) ? &m.k6316() : nullptr;
-    K6313Ccb*        k3 = k6316 == 3 ? &m.k6313() : nullptr;
+    K6313Ccb*        k3 = k13 ? &m.k6313() : nullptr;
     auto sioAus = [&](int kanal) -> const std::string& { return sd ? sd->sioAusgabe(kanal) : k3 ? k3->sioAusgabe(kanal) : k6->sioAusgabe(kanal); };
     auto lampeOn = [&]() { return sd ? sd->lampeOnline() : k3 ? k3->lampe(1) : k6->lampe(5); };
     auto lampeErr = [&]() { return sd ? sd->lampeFehler() : k3 ? k3->lampe(3) : k6->lampe(2); };
@@ -246,7 +248,7 @@ int bootTraceSd1157(const K8915TraceOpts& o, const prnlst::Listing& prn, int k63
         for (uint16_t w : o.watchio) if ((w & 0xFF) == p) gewuenscht = true;
         if (!gewuenscht) return;
         char t[200], k[24];
-        snprintf(t, sizeof t, "%s (%02XH)=%02X  %s", isRead ? "IN " : "OUT", p, data, portName(p, k6316 == 3 ? 2 : k6316 ? 1 : 0));
+        snprintf(t, sizeof t, "%s (%02XH)=%02X  %s", isRead ? "IN " : "OUT", p, data, portName(p, k13 ? 2 : k6316 ? 1 : 0));
         snprintf(k, sizeof k, "P%c%02X%02X%04X", isRead ? 'r' : 'w', p, data, pc);
         event(k, t, pc);
     });
@@ -313,7 +315,7 @@ int bootTraceSd1157(const K8915TraceOpts& o, const prnlst::Listing& prn, int k63
         for (int p = 0; p < 256; ++p)
             if (io_rd[p] || io_wr[p])
                 fprintf(stderr, "  port 0x%02X : rd=%-9llu wr=%-9llu %s\n", p,
-                        (unsigned long long)io_rd[p], (unsigned long long)io_wr[p], portName(static_cast<uint8_t>(p), k6316 == 3 ? 2 : k6316 ? 1 : 0));
+                        (unsigned long long)io_rd[p], (unsigned long long)io_wr[p], portName(static_cast<uint8_t>(p), k13 ? 2 : k6316 ? 1 : 0));
 
         std::vector<std::pair<uint32_t, uint16_t>> hs;
         for (auto& kv : hist) hs.push_back({kv.second, kv.first});
@@ -358,7 +360,7 @@ int bootTraceSd1157(const K8915TraceOpts& o, const prnlst::Listing& prn, int k63
             "{\"machine\":\"%s\",\"stall\":%s,\"cycles\":%llu,\"final_pc\":\"0x%04X\","
             "\"online_lampe\":%s,\"fehler_lampe\":%s,\"wagen\":%d,\"lauf\":%s,"
             "\"instr\":%llu,\"events\":%ld,\"ints\":%ld,",
-            k6316 == 3 ? "k6313" : k6316 ? (k6316 == 2 ? "k6316-v24" : "k6316") : "sd1157", stillstand ? "true" : "false", (unsigned long long)cycles, m.cpuPC(),
+            k6316 == 4 ? "k6311" : k6316 == 3 ? "k6313" : k6316 ? (k6316 == 2 ? "k6316-v24" : "k6316") : "sd1157", stillstand ? "true" : "false", (unsigned long long)cycles, m.cpuPC(),
             lampeOn() ? "true" : "false", lampeErr() ? "true" : "false",
             druck.wagen().position(), druck.wagen().laeuft() ? "true" : "false",
             (unsigned long long)instr, ev_total, ints);

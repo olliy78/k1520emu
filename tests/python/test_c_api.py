@@ -461,6 +461,22 @@ def test_printer_sd1157_can_be_created_and_runs_its_rom():
         _lib.k1520_destroy(h3)
     assert not _lib.k1520_create_printer(3, b"betriebsart=endlos")   # K6316-Schluessel gilt nicht am K6313
 
+    h11 = _lib.k1520_create_printer(4, b"schalter_baud=0xBF,schalter_format=0x3F")   # K6311 (WP8e): Hardware nur aus dem ROM erschlossen [?]
+    assert h11, _lib.k1520_last_init_error()
+    try:
+        h11 = K1520Handle(h11)
+        assert _lib.k1520_machine_type(h11) == 7
+        assert _lib.k1520_printer_lamp(h11, 5) == 1                                   # POW
+        assert _lib.k1520_printer_lamp(h11, 0) == -1 and _lib.k1520_printer_lamp(h11, 1) == -1   # ON LINE/ERR unbekannt
+        assert _lib.k1520_printer_key(h11, 21, 1) == 0                               # keine Tastenbelegung bekannt
+        assert _lib.k1520_printer_switch_get(h11, 32) == -1 and _lib.k1520_printer_switch(h11, 32, 1) == 0
+        assert _lib.k1520_run(h11, 200_000) > 0
+    finally:
+        _lib.k1520_destroy(h11)
+    assert not _lib.k1520_create_printer(4, b"dil=0x3")                # K6313-Schluessel gilt nicht am K6311
+    assert not _lib.k1520_create_printer(4, b"schalter_baud=300")      # > 255
+    assert not _lib.k1520_create_printer(3, b"schalter_baud=1")        # nur am K6311
+
     for typ in (1, 2):                                          # K6316: IFSS / V.24 (WP2a)
         h6 = _lib.k1520_create_printer(typ, b"betriebsart=schneiden,dil=0x8")
         assert h6, _lib.k1520_last_init_error()

@@ -75,6 +75,15 @@ public:
         /// Anwenders `K6313_DIPswitches.png`.  Rest OFF (Pica, US ASCII, 12 Zoll, 9600 Bd) — kein Auslieferungszustand, nur Vorgabe.
         uint32_t dil = (1u << dilIndex(5, 2)) | (1u << dilIndex(13, 2));
         bool papier_da = true;
+        /// K6311 (WP8e): dieselbe Karte, aber die Hardware ist **nur aus dem ROM 12128062 erschlossen [?]** (kein Plan).  Wirkt: BCH/BDH liefern
+        /// `schalter_baud`/`schalter_format` (Eingangs-PIO der V.24-Platte, Quelle der Bits unbekannt [?]), Lampen ON LINE/ERR/PE sind nicht belegt (nur POW).
+        /// Bedienmatrix, Motorbelegung und Nadelports des K6311 sind NICHT nachgebildet (die K6313-Belegung gilt dort nachweislich nicht).
+        bool k6311 = false;
+        /// BCH (nur K6311): Bit 5/6 waehlen den Teiler, Bit 7 = 0 verdoppelt ihn; FFH = 9600 Bd [E: ROM 00AFH-00CCH, Quelle der Bits [?]].
+        uint8_t schalter_baud = 0xFF;
+        /// BDH (nur K6311): Bit 7 = 1: 7, 0: 8 Datenbits; Bit 6 = 1: Paritaet; Bit 5 = 1: ungerade; Bit 3 = 1: 1 Stopbit [E: ROM 00FAH-0161H].
+        /// Vorgabe 3FH = 8 Bit, keine Paritaet, 1 Stopbit (Annahme des Emulators [?], kein Auslieferungszustand).
+        uint8_t schalter_format = 0x3F;
         uint8_t ram_fill = 0x00;
         int  wagen_start = 400;                    ///< Startlage des Wagens (Halbschritte)
         NadeldruckParameter druck;                 ///< Raster/Nadeln: Platzhalter der K6316-Werte [?], WP8d
@@ -115,7 +124,7 @@ public:
     // BusDevice / MemDevice
     uint8_t     ioRead(uint8_t port) override;
     void        ioWrite(uint8_t port, uint8_t data) override;
-    const char* deviceName() const override { return "K6313 CCB"; }
+    const char* deviceName() const override { return cfg_.k6311 ? "K6311 CCB [?]" : "K6313 CCB"; }
     uint8_t     memRead(uint16_t a) override;
     void        memWrite(uint16_t a, uint8_t d) override;
 

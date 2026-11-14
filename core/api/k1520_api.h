@@ -276,6 +276,8 @@ K1520_API K1520Handle k1520_create_mc80(int variante, const char* konfig);
  *
  * @param typ     0 = SD 1157/264.  1 = K6316 (IFSS), 2 = K6316 (V.24): der Typ waehlt Schnittstellenmodul und
  *                Firmwaresatz.  3 = K6313 (V.24-Kassette, Speicherplan "kurz" ROM 0000H-27FFH, RAM 3800H, E/A 7CH-FBH; WP8c).
+ *                4 = K6311 (V.24, WP8e): dieselbe Karte mit ROM 12128062; **Hardware nur aus dem ROM erschlossen [?]**, keine Tasten/DIL/Lampen
+ *                ON LINE und ERR (`k1520_printer_lamp` = -1), BCH/BDH = Schaltereingaenge.
  *                Alles andere → NULL mit Grund.
  * @param konfig  Schluessel=Wert-Liste, durch Komma getrennt (NULL/"" = Vorgabe); Schluessel
  *                SD 1157: `schnittstelle` (`ifss` | `v24`: Wahl am Schalterblock PIO 3 A.0), `rom` (`repariert` | `original`).
@@ -284,6 +286,7 @@ K1520_API K1520Handle k1520_create_mc80(int variante, const char* konfig);
  *                K6316: `betriebsart` (`aufwickeln` | `schneiden` | `endlos`), `dil` (Maske der geschlossenen
  *                DIL-Schalter, Bit 0 = S11 ... Bit 15 = S26).
  *                K6313: `dil` (Maske, Bit 0 = 5-1, Bit 1 = 5-2, ... Bit 27 = 18-2), `romdatei` (10 240 B wie K6316).
+ *                K6311: `schalter_baud`, `schalter_format` (Bytes an BCH/BDH, 0..255), `romdatei` (10 240 B).
  *                Unbekannte Schluessel/Werte → NULL, Grund in k1520_last_init_error.
  * k1520_machine_type() = 7.  `k1520_create(K1520_MACHINE_PRINTER)` = SD 1157/264.
  */

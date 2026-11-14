@@ -221,7 +221,7 @@ int main(int argc, char** argv){
     // original writable (writes persist); `--read-only`/`--ro` mounts write-protected.
     enum { MOUNT_COW=0, MOUNT_RW=1, MOUNT_RO=2 } mount_mode = MOUNT_COW;
     bool start_console = false;   // --console: sofort in den Konsolenmodus (§9)
-    dbgm::Art art = dbgm::Art::A5120;   // --machine a5120|k8915|k8915-g2|prg710|prg710-1|pc1715|pc1715w|p8000|p8000-16|mc80[-30|-31|-21|-22]|sd1157|k6316|k6316-v24|k6313 (Vorgabe a5120)
+    dbgm::Art art = dbgm::Art::A5120;   // --machine a5120|k8915|k8915-g2|prg710|prg710-1|pc1715|pc1715w|p8000|p8000-16|mc80[-30|-31|-21|-22]|sd1157|k6316|k6316-v24|k6313|k6311 (Vorgabe a5120)
     int mc80_spe = 1;             // --spe 1|2: Zahl der SPE 2 am MC80 (AP M8)
     bool skip_selftest = false;   // --skip-selftest: K8915 ohne ROM-Selbsttest (wie ein Warmstart)
     const char* em_opt = nullptr; // --em none|em064|em256: A5120.16 mit Erweiterungsmodul
@@ -257,7 +257,7 @@ int main(int argc, char** argv){
     for (int i=1;i<argc;++i){
         if (!strcmp(argv[i],"--machine") && i+1<argc){
             if (!dbgm::parseMachine(argv[++i], art)){
-                fprintf(stderr,"unbekannte Maschine '%s' (a5120 | k8915 | k8915-g2 | prg710 | prg710-1 | pc1715 | pc1715w | p8000 | p8000-16 | mc80 | mc80-30 | mc80-21 | mc80-22 | sd1157 | k6316 | k6316-v24 | k6313)\n",argv[i]); return 2; } }
+                fprintf(stderr,"unbekannte Maschine '%s' (a5120 | k8915 | k8915-g2 | prg710 | prg710-1 | pc1715 | pc1715w | p8000 | p8000-16 | mc80 | mc80-30 | mc80-21 | mc80-22 | sd1157 | k6316 | k6316-v24 | k6313 | k6311)\n",argv[i]); return 2; } }
         else if (!strcmp(argv[i],"--spe") && i+1<argc){ mc80_spe=atoi(argv[++i]);
             if (mc80_spe<1 || mc80_spe>2){ fprintf(stderr,"--spe: 1 oder 2\n"); return 2; } }
         else if (!strcmp(argv[i],"--skip-selftest")) skip_selftest=true;

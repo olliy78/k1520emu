@@ -55,6 +55,18 @@ def test_DruckerRomKatalog_K6313_Kennung_im_ROM_stimmt_mit_dem_Dateinamen(eintra
         assert e.guete == "ok" and len(roh) == 10240
 
 
+def test_DruckerRomKatalog_K6311_Kennung_im_ROM_stimmt_mit_dem_Dateinamen(eintraege):
+    # wie K6313: Dateiname x nn F ZS PS (ohne Anhang _1), Kennung F ZS x nn PS bei 27F8H; die Hardware ist nur erschlossen [?], die Abzuege sind ok
+    liste = rk.fuer_typ("k6311", eintraege)
+    assert len(liste) == 2 and rk.vorgabe("k6311", eintraege).schluessel == "k6311-12128062"
+    for e in liste:
+        n = Path(e.datei).stem.split("_")[0]
+        roh = (PROJECT_ROOT / "doc" / "EPROMS" / e.datei).read_bytes()
+        assert roh[0x27F8:0x2800].decode("ascii") == n[3] + n[4:6] + n[0] + n[1:3] + n[6:8], e.schluessel
+        assert e.guete == "ok" and len(roh) == 10240
+        assert "erschlossen" in e.hinweis or "nicht nachgebildet" in e.hinweis
+
+
 def test_DruckerRomKatalog_genau_eine_Vorgabe_je_Typ(eintraege):
     for t in rk.TYPEN:
         assert len([e for e in rk.fuer_typ(t, eintraege) if e.vorgabe]) == 1, t
@@ -157,6 +169,16 @@ def test_DruckerRomKatalog_romdatei_liefert_dieselben_Bytes_wie_das_eingebettete
     assert h_alt and h_neu
     roh = (ordner / e.datei).read_bytes()
     for adr in (0x0000, 0x0801, 0x1234, 0x27F8, 0x27FF):
+        assert _byte(lib, h_neu, adr) == _byte(lib, h_alt, adr) == roh[adr]
+    lib.k1520_destroy(h_alt)
+    lib.k1520_destroy(h_neu)
+    # K6311: Vorgabe-Abzug aus Datei == eingebettet (Typ 4)
+    e = rk.vorgabe("k6311", eintraege)
+    lib, h_alt = _drucker(4, "")
+    _, h_neu = _drucker(4, f"romdatei={ordner / e.datei}")
+    assert h_alt and h_neu
+    roh = (ordner / e.datei).read_bytes()
+    for adr in (0x0000, 0x0801, 0x1234, 0x27F7, 0x27FF):
         assert _byte(lib, h_neu, adr) == _byte(lib, h_alt, adr) == roh[adr]
     lib.k1520_destroy(h_alt)
     lib.k1520_destroy(h_neu)

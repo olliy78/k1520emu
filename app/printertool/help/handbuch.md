@@ -30,9 +30,13 @@ Das Blatt lässt sich mit dem Mausrad rollen (das beendet *Blatt folgen*) und mi
 
 Das ist das Verhalten der Original-Firmware, kein Fehler des Emulators.  Die Firmware wertet TEST nur aus, wenn sie **offline eingeschaltet** wurde: also **ONLINE ausschalten, dann *Neustart***, danach TEST drücken.  Schaltet man ONLINE nur im Betrieb aus, bleibt die ONLINE-Lampe an, PV1/PV2 wirken, TEST nicht.  Unter dem Bedienfeld erscheint dann ein Hinweis mit dem Knopf *Neustart jetzt*.  Ebenso liest die Firmware die Tasten *6 lpi* und *ONLINE* für die Lampe nur beim Einschalten.
 
+### K6311: Hardware erschlossen [?]
+
+Zum K6311 (Vorläufer des K6313) gibt es **keinen Schaltplan und kein Handbuch**.  Alles, was der Emulator von ihm weiß, ist aus dem Programm im ROM (Abzug 12128062, V.24) **erschlossen** und mit [?] zu lesen.  Die Firmware läuft an, richtet die serielle Schnittstelle ein (Baudrate und Datenformat liest sie an den Ports BCH/BDH, die der Emulator mit Vorgaben belegt: 9600 Bd, 8 Bit, keine Parität, ein Stoppbit) und nimmt Text über V.24 an.  **Gedruckt wird nichts**: die Belegung von Wagenmotor, Formularmotor, Nadeln, Tasten und der Lampen ON LINE/ERR ist am K6311 anders als am K6313 und nicht bekannt; deshalb zeigt das Bedienfeld nur die Netzlampe, und das Blatt bleibt leer.  Das ist eine Lücke der Nachbildung, kein Fehler der Firmware.
+
 ### K6313: Stand der Nachbildung
 
-Der K6313 läuft mit seiner Original-Firmware (Fassung kurz, V.24-Kassette) bis in die Grundstellung: Wagen synchronisiert, ON LINE leuchtet.  **Die Hardware ist aus der Firmware erschlossen**, nicht aus einem vollständigen Plan; Angaben mit [?] in den Hinweistexten der Tasten und DIL-Schalter sind Annahmen.  Die Einschalt-Testfunktionen (Taste beim Netz-Ein gehalten) laufen noch nicht an, ein Druckbild gibt es noch nicht; IFSS und Centronics fehlen.  Die DIL-Schalter 5-1…18-2 liegen in einer Matrix; 5-2 muss EIN bleiben, sonst startet die Firmware nicht im Normalpfad.
+Der K6313 läuft mit seiner Original-Firmware (Fassung kurz, V.24-Kassette) bis in die Grundstellung: Wagen synchronisiert, ON LINE leuchtet.  **Die Hardware ist aus der Firmware erschlossen**, nicht aus einem vollständigen Plan; Angaben mit [?] in den Hinweistexten der Tasten und DIL-Schalter sind Annahmen.  Der Selbsttest (LF vor bzw. LF zurück beim Netz-Ein gehalten) und Text über V.24 drucken; das Druckbild stimmt Punkt für Punkt mit dem Zeichengenerator im ROM überein.  IFSS, Centronics und die 16-KiB-Fassung fehlen.  Die DIL-Schalter 5-1…18-2 liegen in einer Matrix; 5-2 muss EIN bleiben, sonst startet die Firmware nicht im Normalpfad.
 
 ### K6316: Einschalttests und Vorsteckbeleg
 
@@ -46,7 +50,7 @@ Die Lage der Lichtschranken zur Druckzeile ist aus der Firmware erschlossen, nic
 
 ## Einstellungen
 
-* **Druckertyp.**  Wählbar sind SD 1157/264, K6316 (IFSS und V.24) sowie K6313 (V.24).  Grau und nicht wählbar sind: SD 1157/267 (nicht vorgesehen, die zweite Papierbahn wird nicht nachgebildet), SD 1152/257 Typenrad (in Vorbereitung).  Ein Wechsel legt den Drucker neu an (Rückfrage); das Blatt wird dabei geleert.
+* **Druckertyp.**  Wählbar sind SD 1157/264, K6316 (IFSS und V.24) K6313 (V.24) sowie K6311 (V.24, Hardware erschlossen, druckt nicht).  Grau und nicht wählbar sind: SD 1157/267 (nicht vorgesehen, die zweite Papierbahn wird nicht nachgebildet), SD 1152/257 Typenrad (in Vorbereitung).  Ein Wechsel legt den Drucker neu an (Rückfrage); das Blatt wird dabei geleert.
 * **ROM-Fassung.**  *repariert* ist die Vorgabe.  Im Original-Abzug des SD-1157-EPROMs ist vermutlich ein Bit gekippt (Byte 0D34H): der Eingabepuffer leert sich nie, und über die Schnittstelle bleibt der Drucker nach dem ersten Zeichen stehen.  Die reparierte Fassung ändert nur dieses eine Byte.  *Original-Abzug* ist der unveränderte Abzug (der Selbsttest läuft damit).
 * **Schnittstelle.**  Der Schalterblock des Druckers wählt, ob die Firmware die Schnittstelle *IFSS* oder *V.24* benutzt.  Ein Wechsel startet den Drucker neu.
 * **Tempo.**  Rechengeschwindigkeit gegenüber dem echten Drucker.

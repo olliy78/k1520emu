@@ -34,13 +34,14 @@ class PrinterMachine : public K1520Machine {
 public:
     struct Config {
         /// Druckertyp; bei `K6316_*` bestimmt der Typ das Schnittstellenmodul (und damit den Firmwaresatz).
-        enum class Typ { Sd1157_264, K6316_Ifss, K6316_V24, K6313_V24 };
+        enum class Typ { Sd1157_264, K6316_Ifss, K6316_V24, K6313_V24, K6311_V24 };
         Typ typ = Typ::Sd1157_264;
         /// Aufbau des SD 1157 (DIP-Schalter, Interface-Wahl, Ruhelage der Tasten).
         Sd1157Steuerung::Config sd1157;
         /// Aufbau des K6316 (DIL-Schalter, Betriebsart, Mechanik); `schnittstelle` folgt dem Typ.
         K6316Steuerung::Config k6316;
-        /// Aufbau des K6313 (WP8c; Fassung "kurz", Kassette V.24): DIL-Schalter, ROM, Mechanik.
+        /// Aufbau des K6313 (WP8c; Fassung "kurz", Kassette V.24): DIL-Schalter, ROM, Mechanik.  Auch fuer `K6311_V24` (WP8e; `k6311` wird
+        /// vom Typ gesetzt, Hardware nur aus dem ROM erschlossen [?]).
         K6313Ccb::Config k6313;
     };
 
@@ -121,7 +122,8 @@ public:
     std::string lastError() const override { return ""; }
 
     bool istK6316() const { return k6316_ != nullptr; }
-    bool istK6313() const { return k6313_ != nullptr; }
+    bool istK6313() const { return k6313_ != nullptr; }   ///< auch der K6311 (gleiche Karte, @ref istK6311)
+    bool istK6311() const { return k6313_ != nullptr && k6313_->config().k6311; }
     /// Die Steuerung des gewaehlten Geraets (@ref istK6316/@ref istK6313); die jeweils andere Zugriffsfunktion darf nicht gerufen werden.
     Sd1157Steuerung& sd1157() { return *sd1157_; }
     K6316Steuerung&  k6316() { return *k6316_; }

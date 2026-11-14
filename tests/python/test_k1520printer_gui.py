@@ -219,7 +219,7 @@ def test_typauswahl_sperrt_alle_unfertigen_typen(fenster, monkeypatch):
     e = fenster.einst_drucker
     items = {e.typ.itemData(i): e.typ.model().item(i) for i in range(e.typ.count())}
     assert items["sd1157"].isEnabled() and items["k6316-ifss"].isEnabled() and items["k6316-v24"].isEnabled()
-    assert items["k6313"].isEnabled()
+    assert items["k6313"].isEnabled() and items["k6311"].isEnabled()
     gesperrt = {"sd1157-267", "sd1152-257"}
     assert gesperrt <= set(items)
     for s in gesperrt:
@@ -278,6 +278,7 @@ def test_konfiguration_rundlauf(fenster, tmp_path):
     assert konfig.zoll_waehlbar(7) == 12 and konfig.tempo_waehlbar("x") == 1.0
     assert typen.typ("sd1152-257").schluessel == "sd1157"     # gesperrt/unbekannt -> Vorgabe
     assert typen.typ("k6313").schluessel == "k6313"
+    assert typen.typ("k6311").schluessel == "k6311"
 
 
 # ─── Ausgabe: PDF und Druck ──────────────────────────────────────────────────
@@ -526,6 +527,24 @@ def test_k6316_typwahl_baut_bedienfeld_dil_und_betriebsart(fenster, monkeypatch)
     lauf(fenster, 3000, schritt=20000, aktualisieren_jeden=100)
     assert fenster.emu.printer_lamp(K.DRUCKER_LAMPE_ONLINE) == 1 and fenster.emu.printer_lamp(K.DRUCKER_LAMPE_H4) == 1
     assert fenster.emu.printer_lamp(K.DRUCKER_LAMPE_FEHLER) == 0
+
+
+def test_k6311_typwahl_zeigt_nur_die_netzlampe_und_den_hinweis_erschlossen(fenster, monkeypatch):
+    e = fenster.einst_drucker
+    monkeypatch.setattr(QMessageBox, "question", staticmethod(lambda *a, **k: QMessageBox.Yes))
+    e.typ.setCurrentIndex(e.typ.findData("k6311"))
+    fenster.takt.stop()
+    assert fenster.beschreibung.schluessel == "k6311" and fenster.emu.machine == "k6311"
+    b = fenster.bedienfeld
+    assert b.lampe("POW") is not None
+    for l in ("ON LINE", "ERR", "PE"):
+        assert l not in b._lampen          # Belegung unbekannt: nicht angezeigt statt geraten
+    assert not fenster.beschreibung.tasten and not fenster.beschreibung.dil
+    assert "erschlossen" in b.hinweise.text() and "nichts gedruckt" in b.hinweise.text()
+    lauf(fenster, 300, schritt=20000, aktualisieren_jeden=100)
+    assert fenster.emu.printer_lamp(K.DRUCKER_LAMPE_POW) == 1
+    # ROM-Wahl: die zwei K6311-Abzuege stehen im Auswahlfeld, die Vorgabe ist 12128062
+    assert fenster.einst_drucker.rom.count() == 2
 
 
 def test_k6313_typwahl_baut_bedienfeld_und_dil_matrix(fenster, monkeypatch):

@@ -395,14 +395,16 @@ K1520Handle k1520_create_printer(int typ, const char* konfig) {
         case 1: cfg.typ = PrinterMachine::Config::Typ::K6316_Ifss; break;
         case 2: cfg.typ = PrinterMachine::Config::Typ::K6316_V24; break;
         case 3: cfg.typ = PrinterMachine::Config::Typ::K6313_V24; break;
+        case 4: cfg.typ = PrinterMachine::Config::Typ::K6311_V24; break;
         default:
             g_init_error = "Unbekannter Druckertyp " + std::to_string(typ) +
-                           " (0 = SD 1157/264, 1 = K6316 IFSS, 2 = K6316 V.24, 3 = K6313 V.24)";
+                           " (0 = SD 1157/264, 1 = K6316 IFSS, 2 = K6316 V.24, 3 = K6313 V.24, 4 = K6311 V.24)";
             return nullptr;
     }
     // Schluessel=Wert-Liste wie beim MC80.  SD 1157: `schnittstelle`, `rom`.  K6316: `betriebsart`, `dil`
     // (das Schnittstellenmodul folgt dem Typ, es gibt kein ROM zu waehlen).
-    const bool k6313 = typ == 3;           // K6313 (WP8c): Schluessel `dil` (28 Schalter), `romdatei`
+    const bool k6311 = typ == 4;           // K6311 (WP8e, Hardware nur aus dem ROM erschlossen [?]): `schalter_baud`, `schalter_format`, `romdatei`
+    const bool k6313 = typ == 3 || k6311;  // K6313 (WP8c): Schluessel `dil` (28 Schalter), `romdatei`; der K6311 nutzt dieselbe Karte
     const bool k6316 = typ == 1 || typ == 2;
     const std::string text = konfig ? konfig : "";
     size_t pos = 0;
@@ -455,7 +457,17 @@ K1520Handle k1520_create_printer(int typ, const char* konfig) {
                 g_init_error = "Drucker: betriebsart = " + val + " unbekannt (aufwickeln | schneiden | endlos)";
                 return nullptr;
             }
-        } else if (k6313 && key == "dil") {
+        } else if (k6311 && (key == "schalter_baud" || key == "schalter_format")) {
+            // BCH/BDH des K6311 (Bitbedeutung: K6313Ccb::Config)
+            try {
+                const unsigned long v = std::stoul(val, nullptr, 0);
+                if (v > 0xFF) throw std::out_of_range("0..255");
+                (key == "schalter_baud" ? cfg.k6313.schalter_baud : cfg.k6313.schalter_format) = static_cast<uint8_t>(v);
+            } catch (const std::exception&) {
+                g_init_error = "Drucker: " + key + " = " + val + " ist keine Zahl 0..255";
+                return nullptr;
+            }
+        } else if (k6313 && !k6311 && key == "dil") {
             // Maske der geschlossenen DIL-Schalter, Bit 0 = 5-1, Bit 1 = 5-2, ... Bit 27 = 18-2 (K6313Ccb::dilIndex)
             try {
                 cfg.k6313.dil = static_cast<uint32_t>(std::stoul(val, nullptr, 0)) & ((1u << K6313Ccb::DIL_ANZAHL) - 1);
@@ -473,7 +485,8 @@ K1520Handle k1520_create_printer(int typ, const char* konfig) {
             }
         } else {
             g_init_error = "Drucker: unbekannter Schluessel '" + key + "'" +
-                           (k6313 ? " fuer den K6313 (dil | romdatei)"
+                           (k6311 ? " fuer den K6311 (schalter_baud | schalter_format | romdatei)"
+                            : k6313 ? " fuer den K6313 (dil | romdatei)"
                             : k6316 ? " fuer den K6316 (betriebsart | dil | romdatei)" : " fuer den SD 1157 (schnittstelle | rom | romdatei)");
             return nullptr;
         }
@@ -561,6 +574,7 @@ int k1520_printer_geometry(K1520Handle h, int* x_je_zoll, int* y_je_zoll, int* b
 int k1520_printer_key(K1520Handle h, int taste, int gedrueckt) {
     auto* p = printerOf(h);
     if (!p) return 0;
+    if (p->istK6311()) return 0;   // Tastenbelegung des K6311 unbekannt [?]: keine Tasten (WP8e)
     if (p->istK6313()) {
         if (taste < K1520_PRINTER_KEY_K6313_T1 || taste > K1520_PRINTER_KEY_K6313_T4) return 0;
         p->k6313().setTaste(taste - K1520_PRINTER_KEY_K6313_T1 + 1, gedrueckt != 0);
@@ -585,12 +599,12 @@ int k1520_printer_switch(K1520Handle h, int schalter, int wert) {
     if (!p) return 0;
     if (p->istK6313()) {
         K6313Ccb& st = p->k6313();
-        if (schalter >= K1520_PRINTER_SW_K6313_DIL_BASIS && schalter < K1520_PRINTER_SW_K6313_DIL_BASIS + K6313Ccb::DIL_ANZAHL) {
+        if (!p->istK6311() && schalter >= K1520_PRINTER_SW_K6313_DIL_BASIS && schalter < K1520_PRINTER_SW_K6313_DIL_BASIS + K6313Ccb::DIL_ANZAHL) {
             const int i = schalter - K1520_PRINTER_SW_K6313_DIL_BASIS;
             st.setDil(5 + i / 2, 1 + i % 2, wert != 0);
             return 1;
         }
-        if (schalter == K1520_PRINTER_SW_PAPIER) { st.setPapierDa(wert != 0); return 1; }
+        if (!p->istK6311() && schalter == K1520_PRINTER_SW_PAPIER) { st.setPapierDa(wert != 0); return 1; }
         return 0;
     }
     if (p->istK6316()) {
@@ -633,11 +647,11 @@ int k1520_printer_switch_get(K1520Handle h, int schalter) {
     if (!p) return -1;
     if (p->istK6313()) {
         const K6313Ccb& st = p->k6313();
-        if (schalter >= K1520_PRINTER_SW_K6313_DIL_BASIS && schalter < K1520_PRINTER_SW_K6313_DIL_BASIS + K6313Ccb::DIL_ANZAHL) {
+        if (!p->istK6311() && schalter >= K1520_PRINTER_SW_K6313_DIL_BASIS && schalter < K1520_PRINTER_SW_K6313_DIL_BASIS + K6313Ccb::DIL_ANZAHL) {
             const int i = schalter - K1520_PRINTER_SW_K6313_DIL_BASIS;
             return st.dil(5 + i / 2, 1 + i % 2) ? 1 : 0;
         }
-        return schalter == K1520_PRINTER_SW_PAPIER ? (st.papierDa() ? 1 : 0) : -1;
+        return !p->istK6311() && schalter == K1520_PRINTER_SW_PAPIER ? (st.papierDa() ? 1 : 0) : -1;
     }
     if (p->istK6316()) {
         const K6316Steuerung& st = p->k6316();
@@ -675,9 +689,9 @@ int k1520_printer_lamp(K1520Handle h, int lampe) {
     if (p->istK6313()) {
         const K6313Ccb& st = p->k6313();
         switch (lampe) {
-            case K1520_PRINTER_LAMP_ONLINE: return st.lampe(1) ? 1 : 0;
-            case K1520_PRINTER_LAMP_FEHLER: return st.lampe(3) ? 1 : 0;
-            case K1520_PRINTER_LAMP_PAPIER: return st.lampe(4) ? 1 : 0;
+            case K1520_PRINTER_LAMP_ONLINE: return p->istK6311() ? -1 : st.lampe(1) ? 1 : 0;   // K6311: LON/ERR unbekannt [?]
+            case K1520_PRINTER_LAMP_FEHLER: return p->istK6311() ? -1 : st.lampe(3) ? 1 : 0;
+            case K1520_PRINTER_LAMP_PAPIER: return p->istK6311() ? -1 : st.lampe(4) ? 1 : 0;
             case K1520_PRINTER_LAMP_POW:    return st.lampe(2) ? 1 : 0;
             default: return -1;
         }

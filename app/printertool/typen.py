@@ -225,8 +225,25 @@ K6313 = Typbeschreibung(
                   "Orakel geprueft.",
 )
 
+# ── K6311 (WP8e, Entwurf 49 §11): KEIN Schaltplan - Hardware nur aus dem ROM 12128062 erschlossen [?] ──────────────────────────────────
+# Die Karte ist die des K6313 (E/A 7CH-FBH), aber Tastenmatrix, Lampen, Motor- und Nadelbelegung des K6311 sind unbekannt und nicht
+# nachgebildet: das Bedienfeld hat deshalb weder Tasten noch DIL-Schalter, nur die Netzlampe.  Es wird nichts gedruckt.
+K6311 = Typbeschreibung(
+    schluessel="k6311",
+    titel="K6311 (V.24) - Hardware erschlossen [?]",
+    kern_maschine="k6311",
+    tasten=(),
+    lampen=(Lampe("POW", "#37d34a", "POW: der Drucker ist eingeschaltet.", None),),
+    schnittstellen=("IFSS", "V.24"),
+    hat_rom_wahl=False, schnittstelle_fest="v24", hat_online_schalter=False,
+    dil_basis=0, dil_anzahl=0,
+    stand_hinweis="<b>Hardware erschlossen [?]:</b> zum K6311 gibt es keinen Schaltplan; alles ist aus dem ROM abgelesen.  Die Firmware laeuft an "
+                  "und nimmt Text ueber V.24 an, aber Wagen, Nadeln, Tasten und Lampen ON LINE/ERR sind nicht nachgebildet - "
+                  "<b>es wird nichts gedruckt</b>.",
+)
+
 #: Die waehlbaren Typen (in der Reihenfolge des Auswahlfelds).
-TYPEN = (SD1157_264, K6316_IFSS, K6316_V24, K6313)
+TYPEN = (SD1157_264, K6316_IFSS, K6316_V24, K6313, K6311)
 
 #: Typen, die der Entwurf kennt, der Kern aber noch nicht faehrt: (Schluessel, Anzeige, Begruendung).
 GESPERRT = (
@@ -258,6 +275,8 @@ def konfig_text(schnittstelle: str = "ifss", rom: str = "repariert", beschreibun
     ``romdatei`` (Pfad aus dem ROM-Katalog) hat Vorrang vor dem eingebetteten Abbild; ohne Katalog bleibt
     am SD 1157 ``rom=`` (Alias) als Rueckfall.  Ein Komma im Pfad trennt die Liste und ist nicht darstellbar."""
     zusatz = f",romdatei={romdatei}" if romdatei and "," not in romdatei else ""
+    if beschreibung is not None and beschreibung.schluessel == "k6311":
+        return zusatz[1:]   # nur romdatei=; BCH/BDH (schalter_baud/schalter_format) haben Vorgaben im Kern
     if beschreibung is not None and beschreibung.schluessel == "k6313":
         return f"dil={int(dil) & ((1 << beschreibung.dil_anzahl) - 1)}{zusatz}"
     if beschreibung is not None and beschreibung.betriebsart_id is not None:

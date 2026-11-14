@@ -5,6 +5,7 @@
  */
 
 #include "core/cards/printer/k6313_ccb.h"
+#include "core/cards/printer/rom_k6311_12128062.h"
 #include "core/cards/printer/rom_k6313_33538013.h"
 #include "core/logger.h"
 #include "core/serial/sio_format.h"
@@ -316,6 +317,8 @@ void K6313Ccb::setDil(int paar, int n, bool ein)
 
 bool K6313Ccb::lampe(int nr) const
 {
+    // K6311: Belegung von LON/ERR/Papierende unbekannt [?] -> nur Netz wird gemeldet
+    if (cfg_.k6311 && nr != 2) return false;
     switch (nr) {
         case 1: return (pio104_.pinsA(0) & 0x40) != 0;   // ON LINE: LON (D104 A6)
         case 2: return true;                              // POW: Netz
@@ -343,7 +346,10 @@ uint8_t K6313Ccb::ioRead(uint8_t port)
     else if (imBereich(port, P_CTC102)) r = ctc102_.ioRead(port - P_CTC102);
     else if (imBereich(port, P_CTC101)) r = ctc101_.ioRead(port - P_CTC101);
     else if (imBereich(port, P_PIO104)) r = pio104_.ioRead(chipPort(port - P_PIO104));
-    // BCH-BFH: Centronics-PIO nicht bestueckt -> FFH (offener Bus)
+    // BCH-BFH: Centronics-PIO nicht bestueckt -> FFH (offener Bus).  K6311 (WP8e): BCH/BDH sind Schaltereingaenge [E: ROM 00AFH, 00FAH]; die
+    // Firmware schreibt vorher Modus 3 / Maske FFH (alle Eingang) nach BEH/BFH [E: 009BH-00A1H], die Ausgabe ist damit ohne Wirkung.
+    else if (cfg_.k6311 && port == P_CENTRO)     r = cfg_.schalter_baud;
+    else if (cfg_.k6311 && port == P_CENTRO + 1) r = cfg_.schalter_format;
     ketteNeu();
     return r;
 }
@@ -378,7 +384,7 @@ void K6313Ccb::ioWrite(uint8_t port, uint8_t data)
 
 uint8_t K6313Ccb::memRead(uint16_t a)
 {
-    if (a < ROM_ENDE) return cfg_.rom_extern.empty() ? K6313_ROM_33538013[a] : cfg_.rom_extern[a];
+    if (a < ROM_ENDE) return !cfg_.rom_extern.empty() ? cfg_.rom_extern[a] : cfg_.k6311 ? K6311_ROM_12128062[a] : K6313_ROM_33538013[a];
     if (a >= RAM_BASIS && a < RAM_BASIS + RAM_GROESSE) return ram_[a - RAM_BASIS];
     if (a >= RAM2_BASIS && a < RAM2_BASIS + RAM_GROESSE) return ram_[RAM_GROESSE + (a - RAM2_BASIS)];
     return 0xFF;

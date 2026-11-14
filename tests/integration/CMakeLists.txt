@@ -466,3 +466,9 @@ k1520_add_test(k6313 SRC test_k6313.cpp
                      LIBS k1520_printer k1520_serial k1520_logger
                      LABELS "${_lbl};fach_drucker" TIMEOUT 600 DEFS LOG_LEVEL=2
                      "K6313_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/K6313\"")
+
+# K6311 (Entwurf 49, WP8e): Hardware nur aus dem ROM 12128062 erschlossen [?] (kein Plan); Grundlauf, BCH/BDH, Grenzen (Merkposten Nr. 34)
+k1520_add_test(k6311 SRC test_k6311.cpp
+                     LIBS k1520_printer k1520_serial k1520_logger
+                     LABELS "${_lbl};fach_drucker" TIMEOUT 600 DEFS LOG_LEVEL=2
+                     "K6311_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/K6311\"")

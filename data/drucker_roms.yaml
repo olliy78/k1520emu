@@ -132,3 +132,31 @@ eintraege:
     hinweis: "Neue Platine, 10-KiB-Zuschnitt.  Nicht einzeln geprueft."
     vorgabe: false
     aliases: []
+  # K6311 (Entwurf 49 §11, WP8e): KEIN Schaltplan, die Hardware ist nur aus dem ROM erschlossen [?].  Fassung "kurz" (10 KiB) auf der Karte des K6313.
+  # Nicht aufgenommen: 12228062 (Centronics: Datenpfad ueber BCH-BFH nicht nachgebildet), 13120012/13325212 (nur 8 KiB, der Kern verlangt 10 240 B).
+  - schluessel: k6311-12128062
+    typ: k6311
+    titel: "1.21-2-80/62 HCD 80 F ISO-G V24 (GERMAN)"
+    pgm: "1.21-2-80/62, Kennung 28012162"
+    datei: K6311/12128062.bin
+    groesse: 10240
+    md5: 8674d87842c7409864a420141be86cc0
+    schnittstellen: [v24]
+    zeichensatz: Deutsch [?] (aus der Etikettenliste und Byte 27F7H geschlossen)
+    guete: ok
+    hinweis: "Vorgabe.  Hardware des K6311 nur aus dem ROM erschlossen [?]: Das ROM laeuft an und nimmt Text an, Wagen und Nadeln sind NICHT nachgebildet - es wird nichts gedruckt."
+    vorgabe: true
+    aliases: []
+  - schluessel: k6311-12128062_1
+    typ: k6311
+    titel: "1.21-2-80/62 HCD 80 F ISO-G V24 (UK ASCII)"
+    pgm: "1.21-2-80/62, Etikett ...803, Kennung 28012162"
+    datei: K6311/12128062_1.bin
+    groesse: 10240
+    md5: dacf64d41476fb71bd66f6c0dff325de
+    schnittstellen: [v24]
+    zeichensatz: UK ASCII [?] (aus der Etikettenliste und Byte 27F7H geschlossen)
+    guete: ok
+    hinweis: "Ein Byte Unterschied zum Abzug 12128062 (27F7H: 20H gegen 30H).  Hardware nur erschlossen [?]: nur Anlauf und Texteingang, Wagen und Nadeln nicht nachgebildet."
+    vorgabe: false
+    aliases: []
