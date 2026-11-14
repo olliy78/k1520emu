@@ -2,14 +2,15 @@
 
 Bestand für den Druckeremulator `k1520printer` (Ticket #28, `doc/design/49_k1520printer.md`).  Alle Originale sind Scans
 und stammen von [tiffe.de/Robotron](https://www.tiffe.de/Robotron/) (Holm Tiffe) bzw. aus der lokalen Sammlung
-`~/projects/robotron/Drucker/`; eingesammelt am 2026-11-04/05.  EPROM-Abzüge liegen getrennt unter `doc/EPROMS/K6316/` und
-`doc/EPROMS/SD1157/` (je mit README).
+`~/projects/robotron/Drucker/`; eingesammelt am 2026-11-04/05.  EPROM-Abzüge liegen getrennt unter `doc/EPROMS/K6316/`, `doc/EPROMS/SD1157/`, `doc/EPROMS/K6313/` (14 Abzüge) und `doc/EPROMS/K6311/` (5 Abzüge), je mit README;
+zur Laufzeit wird nur der Katalog `data/drucker_roms.yaml` gelesen (Intel-HEX, `doc/design/49_k1520printer.md` §12, `doc/merkposten/drucker.md` Nr. 38).  Bedienung: Kurzhandbuch `app/printertool/help/handbuch.md`.
 
 | Ordner | Gerät | Firmware | Schaltplan | Stand |
 |---|---|---|---|---|
 | `k6316/` | **K6316** Schalterdrucker (Bank), 9 Nadeln, 80 Spalten, 100 Z/s, Rollen/Leporello, Schneideinrichtung | **ja**: V.24- und IFSS-Satz, je 5 × 2716 | **ja** (19 Blätter, PDF + Scans Stadtarchiv Sömmerda) + Servicehandbuch 74 S. + Manual 36 S. | vollständig |
 | `sd1157/` | **SD 1157** Seriendrucker, 9 Nadeln, 132/210 Spalten, 180 Z/s, U880 in Sloteinheit (11 LP) | **ja**: `1157.rom` + Zeichengenerator, **kommentierte Quelle `1157.mac`** (JDE 1984–86, angepasste Fassung) | **nein** — Hardware aus der Quelle rekonstruierbar (E/A-Belegung im Kopf von `1157.mac`) | Firmware vollständig, Hardware [?] |
-| `k6313/` | **K6313/K6314** Hard-Copy-Drucker, 9 Nadeln | **nein** (EPROM-Kassette nicht öffentlich, s. Entwurf 49 §2.2) | ja (5 Blätter) + Servicehandbuch + Manual 1–3 | wartet auf Abzug |
+| `k6313/` | **K6313/K6314** Hard-Copy-Drucker, 9 Nadeln | **ja seit 2026-11-13**: 14 Abzüge in `doc/EPROMS/K6313/` (davon 7 V.24-, 5 IFSS-Einträge im Katalog; Centronics-Abzüge nicht) | ja (5 Blätter) + Servicehandbuch + Manual 1–3 | umgesetzt (K6313 V.24/IFSS, Entwurf 49 §11); Hardware aus Firmware + Plan erschlossen |
+| *(kein Ordner)* | **K6311** (Vorläufer des K6313) | **ja**: 5 Abzüge in `doc/EPROMS/K6311/` (V.24 2, IFSS 1 im Katalog) | **nein**, kein Handbuch | umgesetzt (V.24/IFSS), Hardware nur aus dem ROM erschlossen [?], Merkposten Nr. 34/35 |
 | `sd1152_257/` | **SD 1152/257** Typenraddrucker | nein | Servicehandbuch 1987, Manual, Ersatzteilkatalog | Kandidat Typenrad, später |
 
 ## Herkunft im Einzelnen

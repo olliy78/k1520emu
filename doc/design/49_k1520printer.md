@@ -1,6 +1,6 @@
 # Entwurf 49 — Druckeremulator `k1520printer` (Ticket #28)
 
-Stand 2026-11-06, **WP0a/WP0b, WP1, WP3, WP2b, WP4/WP6b-Text, WP5, WP2a, WP6a und WP7 erledigt (siehe §5a–§5f)**; die zweite Bahn (267) entfällt (§10).  Zweig `feature/issue-28-k1520printer`.
+Stand 2026-11-14, **WP0–WP7 erledigt (§5a–§5f), WP8a–h (K6311/K6313, §11) und WP9 (ROM-Katalog als eine YAML, §12) erledigt**; Kurzhandbuch `app/printertool/help/handbuch.md`; die zweite Bahn (267) entfällt (§10).  Zweig `feature/issue-28-k1520printer`.
 Nummer 49, weil 48 für BS600 vorgemerkt ist (noch in keinem Zweig).
 
 ## 1  Auftrag (Ticket #28) und Festlegung des Anwenders
@@ -26,11 +26,11 @@ Bestand und Herkunft aller Unterlagen: **`doc/printer/README.md`**.  EPROMs: `do
 
 ### 2.1  Die Geräte im Überblick
 
-| | **K6316** Schalterdrucker | **SD 1157** Seriendrucker | K6313/K6314 (später) | SD 1152/257 (später) |
+| | **K6316** Schalterdrucker | **SD 1157** Seriendrucker | K6313/K6314 (K6313 seit WP8, §11) | SD 1152/257 (später) |
 |---|---|---|---|---|
 | Druckwerk | 9 Nadeln, 80 Spalten, 100 Z/s, vor-/rückwärts | 9 Nadeln, 132 (264) bzw. 210 Spalten/2 Bahnen (267), 180 Z/s | 9 Nadeln, 80/136 Spalten | Typenrad |
 | Rechner | U880, 3 PIO, 2 CTC, SIO am Modul, 5 × U2716, 1 KiB RAM 3800H (`k6316/hardware.md`) | U880 in Sloteinheit (11 LP), SIO, CTC, 3 PIO, RAM 2C00H + 3800H (`sd1157/hardware.md`) | U880, CTC, PIO | Master-/Subprozessor |
-| Firmware | **ja**, IFSS- und V.24-Satz | **ja** + **kommentierte Quelle** (JDE, angepasste Fassung) | **nein** | nein |
+| Firmware | **ja**, IFSS- und V.24-Satz | **ja** + **kommentierte Quelle** (JDE, angepasste Fassung) | **ja** seit 2026-11-13 (14 Abzüge, §11; K6311: 5 Abzüge) | nein |
 | Schaltplan | **ja**, 19 Blätter + Servicehandbuch 74 S. | **nein** (Hardware aus Quelle) | ja (5 Blätter) | Servicehandbuch |
 | Schnittstelle | IFSS-Modul (praktisch nur dieses), V.24 | IFSS + V.24 an einer SIO (A = V.24, B = IFSS) | Module | V.24/IFSS/Centronics |
 
@@ -73,7 +73,7 @@ mit 6°-Schrittmotor und Taktscheibe, Interfacemodul-Kassetten).  **Was am K6316
 
 ### 2.4  K6313 — Abzüge seit 2026-11-13 (bis dahin: keiner öffentlich)
 
-**Überholt durch §11:** 19 Abzüge K6311/K6313 von robotron.webhop.net liegen in `doc/EPROMS/K6311/`, `doc/EPROMS/K6313/`.  Der Rest dieses Abschnitts ist der Stand vom 2026-11-05.
+**Überholt durch §11/§12:** der K6313 ist umgesetzt (WP8c–h, Typen V.24 und IFSS, auch 16 KiB), der K6311 ebenfalls (WP8e–h); die Sätze stehen im Katalog `data/drucker_roms.yaml`.  19 Abzüge K6311/K6313 von robotron.webhop.net liegen in `doc/EPROMS/K6311/`, `doc/EPROMS/K6313/`.  Der Rest dieses Abschnitts ist der Stand vom 2026-11-05.
 
 Netz- und Vollsuche (Robotrontechnik-Forum, tiffe.de komplett 12 422 Dateien inkl. Archive, CPC-Wiki, oldcomputer.info, GitHub,
 archive.org): **kein K6313/K6314-Abzug öffentlich**.  Mikroprogramm + Zeichensatz liegen auf einer ziehbaren EPROM/RAM-Kassette
@@ -157,7 +157,7 @@ Rückstau, Maschinenzeit-Baud.  Die Firmware macht das Protokoll (DC1/DC3, Statu
   Betriebsart-Drehschalter, DIL-Schalter, Kopfhebel/Haube; SD 1157 Tasten ONLINE/PV1/PV2/TEST/6-8 lpi, Online-/Fehler-/Netzlampe,
   Interfaceschalter (Baudrate).  Schalterbelegung mit Funktionstext aus dem Manual.
 * **Auswahlfeld „Druckertyp"** (Einstellungen ▸ Allgemein, `general.model`): `K6316 (IFSS)`, `K6316 (V.24)`, `SD 1157/264`,
-  `SD 1157/267`; **gesperrt** „K6313 (EPROM fehlt)", „SD 1152/257 Typenrad (in Vorbereitung)".  Wechsel = Neuanlage der Maschine,
+  `SD 1157/267`; **gesperrt** „SD 1152/257 Typenrad (in Vorbereitung)" (Stand WP5: auch „K6313 (EPROM fehlt)" — seit WP8 wählbar: K6313/K6311 je V.24/IFSS, §11).  Wechsel = Neuanlage der Maschine,
   Blatt bleibt (Rückfrage) — **Abweichung WP5:** das Blatt liegt im Kern und lässt sich nicht in eine neue Maschine einspielen,
   der Wechsel leert es (die Rückfrage sagt es; §5d).
 * **Fenster**: eigenständiges Paket **`app/printertool/`** (Entscheidung WP5, §5d), importiert nur Bausteine (Emulationstakt,

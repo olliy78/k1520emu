@@ -44,6 +44,11 @@ Ausführungen des A5120, neue Optionen — und das DiskTool versteht viele weite
   Kermit) über Telnet/RFC 2217, als Client und als Server, mit Oberfläche und Kommandozeile.
   **Kermit-80** liegt als Beigabe auf den Disketten der CP/M-Rechner; die mitgelieferte
   WEGA-3.1-Platte hat den Benutzer `kermit` schon eingerichtet.
+- **K1520 Printer** — Druckeremulator mit Original-Firmware (SD 1157, K6316, K6313, K6311; das Blatt
+  entsteht Punkt für Punkt, Ausgabe als PDF oder Systemdruck). Der Rechner-Emulator verbindet
+  seine Druckerschnittstelle über Telnet oder RFC 2217; die EPROM-Sätze stehen in einer Katalogdatei
+  (`drucker_roms.yaml`) und lassen sich je Typ wählen. Die Hardware des K6311 ist nur aus dem ROM
+  erschlossen.
 
 **DiskTool und Diskettenformate**
 
