@@ -5,7 +5,10 @@
  *        ROM).  Merkposten drucker.md Nr. 32 und 33.
  */
 #include <gtest/gtest.h>
+#include <fstream>
+#include <iterator>
 #include <string>
+#include <vector>
 
 #include <algorithm>
 #include "core/machines/printer/printer_machine.h"
@@ -21,9 +24,9 @@ using Typ = PrinterMachine::Config::Typ;
 namespace {
 struct Lauf {
     std::unique_ptr<PrinterMachine> m;
-    explicit Lauf(PrinterMachine::Config c = {})
+    explicit Lauf(PrinterMachine::Config c = {}, Typ t = Typ::K6313_V24)
     {
-        c.typ = Typ::K6313_V24;
+        c.typ = t;
         m = std::make_unique<PrinterMachine>(c);
     }
     K6313Ccb& st() { return m->k6313(); }
@@ -193,4 +196,81 @@ TEST(K6313Modul, TextUeberV24WirdGedrucktUndBeideRichtungenDecken)
     EXPECT_EQ(vergleiche(bl, r, t2, b[1].first, b[1].second, &x2), "") << "Zeile 2";
     EXPECT_NEAR(x1, x2, 2) << "beide Zeilen beginnen am linken Rand";
     EXPECT_EQ(b[1].first - b[0].first, 36) << "Zeilenabstand 1/6 Zoll (DIL 11-2 OFF)";
+}
+
+// ─── IFSS (WP8g, Merkposten drucker.md Nr. 36) ───────────────────────────────
+
+namespace {
+std::vector<uint8_t> abzugDatei(const char* name)
+{
+    std::ifstream f(std::string(K6313_ABZUG_DIR) + "/" + name, std::ios::binary);
+    return std::vector<uint8_t>((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+}
+
+/// Text ueber den Wandler `idx` (0 = IFSS, 1 = V.24) in die SIO; Rueckgabe: gedruckte Baender gegen das Orakel.
+void sendeUeber(Lauf& l, int idx, const std::string& t)
+{
+    auto& w = l.m->serialHub()->wandler(idx);
+    for (char ch : t) {
+        const uint8_t b = static_cast<uint8_t>(ch);
+        int g = 0;
+        while (w.fernFrei() == 0 && g++ < 1000) l.fahre(3000);
+        w.fernGib(&b, 1);
+        l.fahre(3000);
+        uint8_t rest[64];
+        while (w.fernNimm(rest, sizeof rest) > 0) {}
+    }
+}
+}  // namespace
+
+TEST(K6313Modul, IfssLaeuftAnUndNurDerIfssAnschlussIstWirksam)
+{
+    Lauf l({}, Typ::K6313_Ifss);
+    l.fahre(30'000'000);
+    EXPECT_TRUE(l.st().lampe(1)) << "ON LINE";
+    EXPECT_STREQ(l.m->serielleAnschluesse()[0]->name(), "IFSS");
+    // Kanal A ist der Datenkanal (wie am V.24), /CTS und /DCD fest aktiv: kein Host noetig
+    EXPECT_TRUE(l.st().sio().channelA().cts());
+    EXPECT_TRUE(l.st().sio().channelA().dcd());
+    EXPECT_TRUE(l.m->serielleAnschluesse()[0]->format().gueltig);
+    EXPECT_FALSE(l.m->serielleAnschluesse()[1]->empfaengerFrei()) << "V.24 ist bei gesteckter IFSS-Kassette ohne Funktion";
+    EXPECT_FALSE(l.m->serielleAnschluesse()[1]->senderHatZeichen());
+}
+
+namespace {
+/// Zwei Zeilen ueber den IFSS-Wandler drucken und Punkt fuer Punkt gegen das Orakel pruefen; @p datei leer = eingebettetes 33538013.
+void druckeUeberIfss(const std::string& datei)
+{
+    PrinterMachine::Config c;
+    if (!datei.empty()) c.k6313.rom_extern = abzugDatei(datei.c_str());
+    Lauf l(c, Typ::K6313_Ifss);
+    const std::vector<uint8_t> r = rom(K6313_ABZUG_DIR, datei.empty() ? "33538013" : datei.substr(0, datei.size() - 4));
+    l.fahre(30'000'000);
+    ASSERT_TRUE(l.st().lampe(1)) << "ON LINE " << datei;
+    l.m->serialHub()->wandler(0).anbinden();
+    l.fahre(1'000'000);
+    const std::string t1 = "HELLO 123 ROBOTRON K6313", t2 = "ZEILE ZWEI IFSS 0987654321";
+    sendeUeber(l, 0, t1 + "\r\n" + t2 + "\r\n");
+    l.fahre(80'000'000);
+    const Blattmodell& bl = l.m->druck().blatt(0);
+    const auto b = baender(bl);
+    ASSERT_GE(b.size(), 2u) << datei;
+    int x1 = 0, x2 = 0;
+    EXPECT_EQ(vergleiche(bl, r, t1, b[0].first, b[0].second, &x1), "") << datei << " Zeile 1";
+    EXPECT_EQ(vergleiche(bl, r, t2, b[1].first, b[1].second, &x2), "") << datei << " Zeile 2";
+    EXPECT_NEAR(x1, x2, 2) << datei;
+}
+}  // namespace
+
+TEST(K6313Modul, TextUeberIfssWirdGedrucktUndBeideRichtungenDecken)
+{
+    druckeUeberIfss("");
+}
+
+TEST(K6313Modul, TextUeberIfssMitDenAbzuegenMitStromschleifenEtikett)
+{
+    // Etikett "V24/CL/..." (CL = Stromschleife): 33538513 und 33830803 (IFSP); gleicher Firmwareweg (Kanal A), keine Steuerleitungen noetig.
+    // 53538500 (neue Platine, ebenfalls CL) druckt auch am V.24 nicht Punkt fuer Punkt wie das Orakel (Zeile 1 fehlt/zuviel um eine Spalte, am V.24
+    // gegengeprueft) - das hat mit der Schnittstelle nichts zu tun und ist hier nicht abgedeckt.
+    for (const char* n : {"33538513.bin", "33830803.bin"}) druckeUeberIfss(n);
 }

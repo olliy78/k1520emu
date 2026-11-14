@@ -34,8 +34,8 @@
  * Papierende D104 A6, Lampen D105 A2 (ON LINE)/A3 (ERR); Zeichengenerator 2280H + 8 * (Code - 20H).  Ablauf: `eingaengeSetzen6311`, `ausgaengeAuswerten6311`,
  * `nadelnAuswerten6311`.
  *
- * **Schnittstelle:** zuerst V.24 an der SIO (Kassettenkennung PE1 = D104 B4 liest 0, Centronics-Kassette 1 [F:0096H]).  IFSS und
- * Centronics fehlen noch; fuer den `SerialHub` gibt es trotzdem beide Anschluesse (wie K6316): IFSS (Kanal B) ohne Funktion.
+ * **Schnittstelle:** V.24 (Vorgabe) oder IFSS (`Config::ifss`, WP8g) an der SIO (Kassettenkennung PE1 = D104 B4 liest 0, Centronics-Kassette 1 [F:0096H]);
+ * Centronics fehlt (nicht im Umfang).  Fuer den `SerialHub` gibt es immer beide Anschluesse, wirksam ist der der gesteckten Kassette.
  */
 
 #pragma once
@@ -61,6 +61,7 @@ public:
     static constexpr uint32_t CPU_HZ = 2'457'600;
 
     static constexpr uint16_t ROM_ENDE    = 0x2800;   ///< ROM 0000H-27FFH (Fassung "kurz")
+    static constexpr uint16_t ROM_ENDE_8K = 0x2000;   ///< K6311 mit vier 2-KiB-Chips (13120012, 13325212): 0000H-1FFFH
     /// RAM (WP8d): zwei Fenster zu je 1 KiB, 3000H-33FFH und 3800H-3BFFH.  Die Firmware nutzt 3000H-3011H (Nadelspalten-Ring), 3124H-3323H
     /// (Punktdaten, +100H = zweiter Satz) UND 3800H-3BFFH (Variablen, Stapel) [F]; dazwischen (3400H-37FFH) nichts angefasst - ob dort RAM
     /// sitzt, ist nicht belegt [?] (Lage der Chips im Speichermodul unbekannt), der Emulator laesst es leer (Lesen FFH).
@@ -73,13 +74,18 @@ public:
     static constexpr int dilIndex(int paar, int n) { return (paar - 5) * 2 + (n - 1); }
 
     struct Config {
-        /// ROM-Satz aus einer Datei (`romdatei=`): genau `ROM_ENDE` Bytes.  Leer = eingebettetes 33538013.
+        /// ROM-Satz aus einer Datei (`romdatei=`): genau `ROM_ENDE` Bytes (K6311: auch `ROM_ENDE_8K`, der Rest liest FFH - leere fuenfte Fassung,
+        /// der IFSS-Abzug 13325212 greift nie darauf zu).  Leer = eingebettetes 33538013.
         std::vector<uint8_t> rom_extern;
         /// DIL-Schalter (siehe @ref dilIndex).  Vorgabe: 5-2 ON und 13-2 ON — ohne 5-2 verlaesst die Firmware beim Einschalten den
         /// Normalpfad (Lesen 018CH: Spalte 3, Zeilen 2/3 muessen 1/0 sein, [F]); 13-2 ON = EPSON-Steuercodes (`ESC`), Beispiel des
         /// Anwenders `K6313_DIPswitches.png`.  Rest OFF (Pica, US ASCII, 12 Zoll, 9600 Bd) — kein Auslieferungszustand, nur Vorgabe.
         uint32_t dil = (1u << dilIndex(5, 2)) | (1u << dilIndex(13, 2));
         bool papier_da = true;
+        /// IFSS-Kassette statt V.24 (WP8g, Merkposten drucker.md Nr. 36): der IFSS-Anschluss ist wirksam, V.24 ohne Funktion; ohne Steuerleitungen
+        /// (/CTS, /DCD fest aktiv).  K6313: Daten wie am V.24 ueber SIO-Kanal A (die ROM-Abzuege kennen keinen anderen Weg [F]); K6311: Kanal B
+        /// (Abzug 13325212).  Das ROM wird NICHT umgeschaltet - die Wahl des Abzugs gehoert dem Aufrufer (Katalog).
+        bool ifss = false;
         /// K6311 (WP8e/WP8f): dieselbe Karte, aber die Hardware ist **nur aus dem ROM 12128062 erschlossen [?]** (kein Plan).  Wirkt: BCH/BDH liefern
         /// `schalter_baud`/`schalter_format` (Eingangs-PIO der V.24-Platte, Quelle der Bits unbekannt [?]); Wagen, Papiermotor, Nadeln, Tasten, Papierende und
         /// Lampen ON LINE/ERR sind nach Nr. 35 des Merkpostens belegt (die K6313-Belegung gilt dort nachweislich nicht); Bedienfeld siehe `setTaste`/`lampe`.

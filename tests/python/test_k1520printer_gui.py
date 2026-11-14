@@ -220,6 +220,7 @@ def test_typauswahl_sperrt_alle_unfertigen_typen(fenster, monkeypatch):
     items = {e.typ.itemData(i): e.typ.model().item(i) for i in range(e.typ.count())}
     assert items["sd1157"].isEnabled() and items["k6316-ifss"].isEnabled() and items["k6316-v24"].isEnabled()
     assert items["k6313"].isEnabled() and items["k6311"].isEnabled()
+    assert items["k6313-ifss"].isEnabled() and items["k6311-ifss"].isEnabled()
     gesperrt = {"sd1157-267", "sd1152-257"}
     assert gesperrt <= set(items)
     for s in gesperrt:
@@ -279,6 +280,8 @@ def test_konfiguration_rundlauf(fenster, tmp_path):
     assert typen.typ("sd1152-257").schluessel == "sd1157"     # gesperrt/unbekannt -> Vorgabe
     assert typen.typ("k6313").schluessel == "k6313"
     assert typen.typ("k6311").schluessel == "k6311"
+    assert typen.typ("k6313-ifss").schnittstelle_fest == "ifss" and typen.typ("k6311-ifss").schnittstelle_fest == "ifss"
+    assert typen.typ("k6313").schnittstelle_fest == "v24" and typen.typ("k6311").schnittstelle_fest == "v24"
 
 
 # ─── Ausgabe: PDF und Druck ──────────────────────────────────────────────────
@@ -571,6 +574,21 @@ def test_k6313_typwahl_baut_bedienfeld_und_dil_matrix(fenster, monkeypatch):
     lauf(fenster, 3000, schritt=20000, aktualisieren_jeden=100)
     assert fenster.emu.printer_lamp(K.DRUCKER_LAMPE_ONLINE) == 1 and fenster.emu.printer_lamp(K.DRUCKER_LAMPE_FEHLER) == 0
     assert fenster.emu.printer_lamp(K.DRUCKER_LAMPE_POW) == 1
+
+
+@pytest.mark.parametrize("schluessel, abzuege", [("k6313-ifss", 3), ("k6311-ifss", 1)])
+def test_ifss_typen_laufen_an_und_haben_ihre_abzuege(fenster, monkeypatch, schluessel, abzuege):
+    # WP8g: IFSS-Fassungen von K6313/K6311 (Kern-Typ 5/6); die Kassette steckt fest, die Schnittstelle folgt dem Typ
+    e = fenster.einst_drucker
+    monkeypatch.setattr(QMessageBox, "question", staticmethod(lambda *a, **k: QMessageBox.Yes))
+    e.typ.setCurrentIndex(e.typ.findData(schluessel))
+    fenster.takt.stop()
+    assert fenster.beschreibung.schluessel == schluessel and fenster.emu.machine == schluessel
+    assert fenster._schnittstelle_aktiv() == "ifss"
+    assert e.rom.count() == abzuege
+    lauf(fenster, 3000, schritt=20000, aktualisieren_jeden=100)
+    assert fenster.emu.printer_lamp(K.DRUCKER_LAMPE_POW) == 1
+    assert fenster.emu.printer_lamp(K.DRUCKER_LAMPE_ONLINE) == 1 and fenster.emu.printer_lamp(K.DRUCKER_LAMPE_FEHLER) == 0
 
 
 def test_k6316_selbsttest_druckt_ueber_die_taste_s5(fenster, monkeypatch):

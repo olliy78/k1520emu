@@ -33,7 +33,11 @@ constexpr int SPALTE   = 3;                 ///< Pixel je Spalte (1/120 Zoll), N
 constexpr int ZEICHEN  = 10;                ///< Spalten je Zeichen (7 Zellspalten + 3 leer)
 constexpr int NADEL    = 2;                 ///< Einheiten zwischen zwei Nadeln
 constexpr int PUNKT_B  = 3;                 ///< Punktbreite in Pixeln
-constexpr int GLYPHE0  = 0x2280;            ///< Zelle von 20H
+constexpr int GLYPHE0  = 0x2280;            ///< Zelle von 20H (Abzuege mit 10 KiB)
+constexpr int GLYPHE0_8K = 0x1D00;          ///< dito in den 8-KiB-Abzuegen 13120012/13325212 (WP8g: Zelle 'A' bei 1E08H, ASCII-Zellen gleich, am ROM gemessen)
+
+/// Lage der Zeichenzelle 20H: 8-KiB-Abzug (vier Chips) bei 1D00H, sonst 2280H.
+inline int glyphe0(const std::vector<uint8_t>& rom) { return rom.size() <= 0x2000 ? GLYPHE0_8K : GLYPHE0; }
 
 inline std::vector<uint8_t> rom(const std::string& dir, const std::string& name = "12128062")
 {
@@ -46,7 +50,7 @@ using Treffer = std::set<std::pair<int, int>>;   ///< (Spalte 1...7, Nadel 1...9
 inline Treffer treffer(const std::vector<uint8_t>& rom, int code)
 {
     Treffer t;
-    const size_t a = static_cast<size_t>(GLYPHE0 + 8 * (code - 0x20));
+    const size_t a = static_cast<size_t>(glyphe0(rom) + 8 * (code - 0x20));
     for (int j = 1; j < 8; ++j)
         for (int n = 1; n <= 8; ++n)
             if (!((rom[a + static_cast<size_t>(j)] >> (8 - n)) & 1)) t.insert({j, n});
@@ -62,6 +66,7 @@ using Punkte = std::set<std::pair<int, int>>;   ///< (Spaltenindex, Nadel)
 /// bleiben.  Das Byte 27F7H kommt aus dem ROM selbst (0074H: Kopie nach 383BH, 1855H: OR C).
 inline int zelleVon(const std::vector<uint8_t>& rom, int code)
 {
+    if (rom.size() <= 0x2000) return code;   // 8-KiB-Abzug: die Ersatztabelle liegt woanders [?], nationale Zeichen werden hier nicht geprueft
     static const char NAT[] = "#$@[\\]^`{|}~()<>";
     for (int i = 0; i < 16; ++i)
         if (code == NAT[i]) return rom[static_cast<size_t>(0x2200 + rom[0x27F7] + i)];

@@ -37,6 +37,23 @@ constexpr int NADEL    = 3;                 ///< Einheiten zwischen zwei Nadeln
 constexpr int PUNKT_B  = 4;                 ///< Punktbreite in Pixeln
 constexpr int GLYPHE0  = 0x2300;            ///< Zelle von 20H
 
+/// Lage der Zelle von 20H im Abzug (WP8g): 2300H bei 33538013 und seinen Verwandten; 33830803 (ISO/US ASCII) traegt dieselben Zellen bei 2134H.  Gesucht wird die
+/// Zelle von 'A' (21H + 20H = 41H) des Referenzabzugs; nicht gefunden = Vorgabe 2300H (dann schlaegt der Vergleich fehl, statt etwas Falsches zu belegen).
+inline int glyphe0(const std::vector<uint8_t>& rom)
+{
+    static const uint8_t A[10] = {0xFF, 0xE1, 0xDF, 0xB7, 0x7F, 0xF7, 0x7F, 0xB7, 0xDF, 0xE1};
+    static thread_local const uint8_t* zp = nullptr;   // letzter Fund (Zeiger + Lage), billig nachgeprueft
+    static thread_local int zb = GLYPHE0;
+    const auto passt = [&](int base) {
+        const size_t i = static_cast<size_t>(base) + 10u * 0x21u;
+        return i + 10 <= rom.size() && std::equal(A, A + 10, rom.begin() + static_cast<std::ptrdiff_t>(i));
+    };
+    if (zp == rom.data() && passt(zb)) return zb;
+    for (size_t i = 10u * 0x21u; i + 10 <= rom.size(); ++i)
+        if (std::equal(A, A + 10, rom.begin() + static_cast<std::ptrdiff_t>(i))) { zp = rom.data(); zb = static_cast<int>(i - 10u * 0x21u); return zb; }
+    return GLYPHE0;
+}
+
 /// ROM-Abzug (10 KiB, 0000H-27FFH) aus `<dir>/33538013.bin`.
 inline std::vector<uint8_t> rom(const std::string& dir, const std::string& name = "33538013")
 {
@@ -50,7 +67,7 @@ using Treffer = std::set<std::pair<int, int>>;   ///< (Spalte 0...8, Nadel 1...9
 inline Treffer treffer(const std::vector<uint8_t>& rom, int code)
 {
     Treffer t;
-    const size_t a = static_cast<size_t>(GLYPHE0 + 10 * (code - 0x20));
+    const size_t a = static_cast<size_t>(glyphe0(rom) + 10 * (code - 0x20));
     for (int j = 0; j < 9; ++j)
         for (int n = 1; n <= 8; ++n)
             if (!((rom[a + 1 + static_cast<size_t>(j)] >> (8 - n)) & 1)) t.insert({j, n});

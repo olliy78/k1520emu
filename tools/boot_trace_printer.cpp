@@ -67,8 +67,10 @@ const char* portName(uint8_t p, int fam = 0) {   // fam: 0 SD 1157, 1 K6316, 2 K
 int bootTraceSd1157(const K8915TraceOpts& o, const prnlst::Listing& prn, int k6316)
 {
     PrinterMachine::Config cfg;
-    const bool k13 = k6316 == 3 || k6316 == 4;   // gleiche Karte K6313Ccb: 3 = K6313 (WP8c), 4 = K6311 (WP8e, Hardware erschlossen [?])
-    if (k6316 == 4) cfg.typ = PrinterMachine::Config::Typ::K6311_V24;
+    const bool k13 = k6316 >= 3;   // gleiche Karte K6313Ccb: 3 = K6313 (WP8c), 4 = K6311 (WP8e, Hardware erschlossen [?]), 5/6 = IFSS-Fassungen (WP8g)
+    if (k6316 == 5) cfg.typ = PrinterMachine::Config::Typ::K6313_Ifss;
+    else if (k6316 == 6) cfg.typ = PrinterMachine::Config::Typ::K6311_Ifss;
+    else if (k6316 == 4) cfg.typ = PrinterMachine::Config::Typ::K6311_V24;
     else if (k6316 == 3) cfg.typ = PrinterMachine::Config::Typ::K6313_V24;
     else if (k6316) cfg.typ = k6316 == 2 ? PrinterMachine::Config::Typ::K6316_V24 : PrinterMachine::Config::Typ::K6316_Ifss;
     if (!o.rom_path.empty()) {   // --rom <Datei>: ROM-Satz statt des eingebetteten (K6313/K6316)
@@ -80,7 +82,7 @@ int bootTraceSd1157(const K8915TraceOpts& o, const prnlst::Listing& prn, int k63
         if (d.empty()) { fprintf(stderr, "FEHLER: --rom '%s' nicht lesbar\n", o.rom_path.c_str()); return 2; }
         (k13 ? cfg.k6313.rom_extern : k6316 ? cfg.k6316.rom_extern : cfg.sd1157.rom_extern) = std::move(d);
     }
-    if (k6316 == 3 && o.dil >= 0) cfg.k6313.dil = static_cast<uint32_t>(o.dil);
+    if ((k6316 == 3 || k6316 == 5) && o.dil >= 0) cfg.k6313.dil = static_cast<uint32_t>(o.dil);
     PrinterMachine m(cfg);
     // Je Geraet eine Steuerung: `sd` (SD 1157), `k6` (K6316) bzw. `k3` (K6313); gemeinsam sind CPU, Druckwerk und SIO-Mitschrift.
     Sd1157Steuerung* sd = k6316 ? nullptr : &m.sd1157();
@@ -360,7 +362,7 @@ int bootTraceSd1157(const K8915TraceOpts& o, const prnlst::Listing& prn, int k63
             "{\"machine\":\"%s\",\"stall\":%s,\"cycles\":%llu,\"final_pc\":\"0x%04X\","
             "\"online_lampe\":%s,\"fehler_lampe\":%s,\"wagen\":%d,\"lauf\":%s,"
             "\"instr\":%llu,\"events\":%ld,\"ints\":%ld,",
-            k6316 == 4 ? "k6311" : k6316 == 3 ? "k6313" : k6316 ? (k6316 == 2 ? "k6316-v24" : "k6316") : "sd1157", stillstand ? "true" : "false", (unsigned long long)cycles, m.cpuPC(),
+            k6316 == 6 ? "k6311-ifss" : k6316 == 5 ? "k6313-ifss" : k6316 == 4 ? "k6311" : k6316 == 3 ? "k6313" : k6316 ? (k6316 == 2 ? "k6316-v24" : "k6316") : "sd1157", stillstand ? "true" : "false", (unsigned long long)cycles, m.cpuPC(),
             lampeOn() ? "true" : "false", lampeErr() ? "true" : "false",
             druck.wagen().position(), druck.wagen().laeuft() ? "true" : "false",
             (unsigned long long)instr, ev_total, ints);

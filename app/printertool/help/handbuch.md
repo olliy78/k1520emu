@@ -48,11 +48,15 @@ Zum K6311 (Vorläufer des K6313) gibt es **keinen Schaltplan und kein Handbuch**
 
 **Zeichensatz.**  Das Byte 27F7H im ROM wählt die Ersatztabelle für `# $ @ [ \ ] ^ ` { | } ~`: **12128062** druckt US-ASCII, **12128062_1** den deutschen Satz mit Pfundzeichen (`#` = £, `@` = §, `[ \ ]` = Ä Ö Ü, `{ | } ~` = ä ö ü ß).  Die Etikettenliste nennt die beiden Abzüge GERMAN bzw. UK ASCII; das Druckbild widerspricht ihr.  **Abmessung (Annahme [?]):** 10 Spalten je Zeichen (7 Zellspalten + 3 leer) zu 1/100 Zoll, ein Schritt des Wagenmotors 1/75 Zoll (Pica, 10 Zeichen/Zoll angenommen), Papierschritt 1/48 Zoll.
 
-Nicht nachgebildet bzw. nicht gegen ein Orakel geprüft: IFSS, Centronics, Summer sowie die ESC-Folgen (Fettdruck, Unterstreichen, Schriftarten): sie lösen in der Firmware etwas aus, das Druckbild ist aber nicht belegt.
+Nicht nachgebildet bzw. nicht gegen ein Orakel geprüft: Centronics, Summer sowie die ESC-Folgen (Fettdruck, Unterstreichen, Schriftarten): sie lösen in der Firmware etwas aus, das Druckbild ist aber nicht belegt.
+
+**K6311 (IFSS):** der einzige IFSS-Abzug ist 13325212 (nur 8 KiB; der Emulator füllt den leeren fünften ROM-Sockel mit FFH auf, der Abzug liest dort nie).  Er benutzt den SIO-Kanal B mit festem Format (9600 Bd, 7 Bit, Parität ungerade, ein Stoppbit) und keine Steuerleitungen.  Text über IFSS druckt Punkt für Punkt wie der Zeichengenerator im ROM; nationale Zeichen (Ersatztabelle) und der Selbsttest sind für diesen Abzug nicht geprüft.
 
 ### K6313: Stand der Nachbildung
 
-Der K6313 läuft mit seiner Original-Firmware (Fassung kurz, V.24-Kassette) bis in die Grundstellung: Wagen synchronisiert, ON LINE leuchtet.  **Die Hardware ist aus der Firmware erschlossen**, nicht aus einem vollständigen Plan; Angaben mit [?] in den Hinweistexten der Tasten und DIL-Schalter sind Annahmen.  Der Selbsttest (LF vor bzw. LF zurück beim Netz-Ein gehalten) und Text über V.24 drucken; das Druckbild stimmt Punkt für Punkt mit dem Zeichengenerator im ROM überein.  IFSS, Centronics und die 16-KiB-Fassung fehlen.  Die DIL-Schalter 5-1…18-2 liegen in einer Matrix; 5-2 muss EIN bleiben, sonst startet die Firmware nicht im Normalpfad.
+Der K6313 läuft mit seiner Original-Firmware (Fassung kurz, V.24-Kassette) bis in die Grundstellung: Wagen synchronisiert, ON LINE leuchtet.  **Die Hardware ist aus der Firmware erschlossen**, nicht aus einem vollständigen Plan; Angaben mit [?] in den Hinweistexten der Tasten und DIL-Schalter sind Annahmen.  Der Selbsttest (LF vor bzw. LF zurück beim Netz-Ein gehalten) und Text über V.24 drucken; das Druckbild stimmt Punkt für Punkt mit dem Zeichengenerator im ROM überein.  Centronics und die 16-KiB-Fassung fehlen.
+
+**K6313 (IFSS):** die Abzüge mit dem Etikett „CL“ (Stromschleife: 33538013, 33538513, 33830803) tragen keinen eigenen IFSS-Zweig; die IFSS-Kassette schickt die Daten wie die V.24-Kassette über den SIO-Kanal A, hat aber keine Steuerleitungen (/CTS, /DCD fest aktiv).  Es gibt keinen Plan der Kassette: ihre Wirkungsweise ist erschlossen [?].  Text über IFSS druckt Punkt für Punkt wie der Zeichengenerator im ROM.  Der IFSP-Parallelweg des Abzugs 33830803 fehlt.  Die DIL-Schalter 5-1…18-2 liegen in einer Matrix; 5-2 muss EIN bleiben, sonst startet die Firmware nicht im Normalpfad.
 
 ### K6316: Einschalttests und Vorsteckbeleg
 
@@ -66,7 +70,7 @@ Die Lage der Lichtschranken zur Druckzeile ist aus der Firmware erschlossen, nic
 
 ## Einstellungen
 
-* **Druckertyp.**  Wählbar sind SD 1157/264, K6316 (IFSS und V.24) K6313 (V.24) sowie K6311 (V.24, Hardware aus dem ROM erschlossen).  Grau und nicht wählbar sind: SD 1157/267 (nicht vorgesehen, die zweite Papierbahn wird nicht nachgebildet), SD 1152/257 Typenrad (in Vorbereitung).  Ein Wechsel legt den Drucker neu an (Rückfrage); das Blatt wird dabei geleert.
+* **Druckertyp.**  Wählbar sind SD 1157/264, K6316 (IFSS und V.24) K6313 (V.24 oder IFSS) sowie K6311 (V.24 oder IFSS, Hardware aus dem ROM erschlossen).  Grau und nicht wählbar sind: SD 1157/267 (nicht vorgesehen, die zweite Papierbahn wird nicht nachgebildet), SD 1152/257 Typenrad (in Vorbereitung).  Ein Wechsel legt den Drucker neu an (Rückfrage); das Blatt wird dabei geleert.
 * **ROM-Fassung.**  *repariert* ist die Vorgabe.  Im Original-Abzug des SD-1157-EPROMs ist vermutlich ein Bit gekippt (Byte 0D34H): der Eingabepuffer leert sich nie, und über die Schnittstelle bleibt der Drucker nach dem ersten Zeichen stehen.  Die reparierte Fassung ändert nur dieses eine Byte.  *Original-Abzug* ist der unveränderte Abzug (der Selbsttest läuft damit).
 * **Schnittstelle.**  Der Schalterblock des Druckers wählt, ob die Firmware die Schnittstelle *IFSS* oder *V.24* benutzt.  Ein Wechsel startet den Drucker neu.
 * **Tempo.**  Rechengeschwindigkeit gegenüber dem echten Drucker.

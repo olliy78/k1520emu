@@ -195,10 +195,7 @@ _K6313_DIL = tuple(Taste(f"d{p}_{n}", f"{p}-{n}", _K6313_DIL_TEXT[(p, n)], "rast
 #: Vorgabe: 5-2 ON (Normalstellung beim Einschalten [?]) und 13-2 ON (EPSON), Rest OFF.
 _K6313_DIL_VORGABE = (1 << 1) | (1 << ((13 - 5) * 2 + 1))
 
-K6313 = Typbeschreibung(
-    schluessel="k6313",
-    titel="K6313 (V.24)",
-    kern_maschine="k6313",
+_K6313_BASIS = dict(
     tasten=(
         Taste("t1", "ON/OFF LINE", "Taste ON/OFF LINE: schaltet zwischen ON LINE und OFF LINE um (LED ON LINE).  Zeile 4 der Tastenspalte [?]; "
               "ON/OFF LINE loescht LON (ROM 02B6H) [F].", "taster", 21),
@@ -217,22 +214,26 @@ K6313 = Typbeschreibung(
         Lampe("PE", "#e6c229", "PE: Papierende.", 3),
     ),
     schnittstellen=("IFSS", "V.24"),
-    hat_rom_wahl=False, schnittstelle_fest="v24", hat_online_schalter=False,
+    hat_rom_wahl=False, hat_online_schalter=False,
     dil=_K6313_DIL, dil_basis=32, dil_anzahl=28, dil_vorgabe=_K6313_DIL_VORGABE,
     dil_titel="DIL-Schalter 5-1 bis 18-2 (ON = geschlossen)",
     stand_hinweis="Hardware aus der Firmware erschlossen (Fassung kurz, V.24-Kassette): die Belegung der Tasten- und DIL-Matrix ist am ROM "
-                  "abgelesen, nicht an einem Plan; mit [?] gekennzeichnete Angaben sind Annahmen.  Das Druckbild ist noch nicht gegen ein "
-                  "Orakel geprueft.",
+                  "abgelesen, nicht an einem Plan; mit [?] gekennzeichnete Angaben sind Annahmen.  Das Druckbild (Text ueber die Schnittstelle, "
+                  "Selbsttest) stimmt Punkt fuer Punkt mit dem Zeichengenerator im ROM ueberein.",
 )
+K6313 = Typbeschreibung(schluessel="k6313", titel="K6313 (V.24)", kern_maschine="k6313", schnittstelle_fest="v24", **_K6313_BASIS)
+#: IFSS-Kassette (WP8g, Merkposten Nr. 36): dieselbe Karte und dieselben Abzuege (Stromschleife-Etikett "CL"), die Daten laufen ueber SIO-Kanal A wie am
+#: V.24, aber ohne Steuerleitungen.  Es gibt keinen Plan der Kassette: Wirkungsweise der Stromschleife [?].
+K6313_IFSS = Typbeschreibung(schluessel="k6313-ifss", titel="K6313 (IFSS)", kern_maschine="k6313-ifss", schnittstelle_fest="ifss",
+                             **{**_K6313_BASIS, "stand_hinweis": _K6313_BASIS["stand_hinweis"].replace(
+                                 "V.24-Kassette", "IFSS-Kassette (Stromschleife, ohne Plan [?])")})
+
 
 # ── K6311 (WP8e/WP8f, Entwurf 49 §11): KEIN Schaltplan - Hardware nur aus dem ROM 12128062 erschlossen [?] ───────────────────────────
 # Die Karte ist die des K6313 (E/A 7CH-FBH), die Belegung der Bits aber eine andere (Merkposten drucker.md Nr. 34/35): vier Tasten (ON LINE an D104 A2,
 # drei weitere an D105 A4-A6), Lampen ON LINE (D105 A2) und ERR (D105 A3), Papierende-Sensor D104 A6; KEINE DIL-Schalter (Baud/Format kommen ueber BCH/BDH).
 # Das Druckbild stimmt Punkt fuer Punkt mit dem Zeichengenerator im ROM ueberein; die Zuordnung der Bits ist erschlossen.
-K6311 = Typbeschreibung(
-    schluessel="k6311",
-    titel="K6311 (V.24) - Hardware erschlossen [?]",
-    kern_maschine="k6311",
+_K6311_BASIS = dict(
     tasten=(
         Taste("t1", "ON/OFF LINE", "Taste ON/OFF LINE (D104 A2, aktiv low): schaltet zwischen ON LINE und OFF LINE um (Lampe ON LINE).  "
               "Zuordnung aus dem ROM [?].", "taster", 21),
@@ -251,15 +252,21 @@ K6311 = Typbeschreibung(
         Lampe("ERR", "#e53935", "ERR (D105 A3): Wachhund des Wagens (Stillstand) oder Haltepunkt der Firmware.  Lampenrolle erschlossen [?].", 1),
     ),
     schnittstellen=("IFSS", "V.24"),
-    hat_rom_wahl=False, schnittstelle_fest="v24", hat_online_schalter=False,
+    hat_rom_wahl=False, hat_online_schalter=False,
     dil_basis=0, dil_anzahl=0,
     stand_hinweis="<b>Hardware erschlossen [?]:</b> zum K6311 gibt es keinen Schaltplan; die Belegung von Wagen, Papiermotor, Nadeln, Tasten und "
                   "Lampen ist aus dem ROM abgelesen.  Das Druckbild (Text ueber V.24, Selbsttest) stimmt Punkt fuer Punkt mit dem Zeichengenerator im ROM "
-                  "ueberein.  Nicht nachgebildet: IFSS, Centronics, Summer, Fettdruck/Unterstreichen sind nicht gegen ein Orakel geprueft.",
+                  "ueberein.  Nicht nachgebildet: Centronics, Summer; Fettdruck/Unterstreichen sind nicht gegen ein Orakel geprueft.",
 )
+K6311 = Typbeschreibung(schluessel="k6311", titel="K6311 (V.24) - Hardware erschlossen [?]", kern_maschine="k6311", schnittstelle_fest="v24",
+                        **_K6311_BASIS)
+#: IFSS (WP8g): nur der Abzug 13325212 (8 KiB, Daten ueber SIO-Kanal B); Selbsttest/Text stimmen mit dem Zeichengenerator im ROM ueberein.
+K6311_IFSS = Typbeschreibung(schluessel="k6311-ifss", titel="K6311 (IFSS) - Hardware erschlossen [?]", kern_maschine="k6311-ifss",
+                             schnittstelle_fest="ifss", **_K6311_BASIS)
+
 
 #: Die waehlbaren Typen (in der Reihenfolge des Auswahlfelds).
-TYPEN = (SD1157_264, K6316_IFSS, K6316_V24, K6313, K6311)
+TYPEN = (SD1157_264, K6316_IFSS, K6316_V24, K6313, K6313_IFSS, K6311, K6311_IFSS)
 
 #: Typen, die der Entwurf kennt, der Kern aber noch nicht faehrt: (Schluessel, Anzeige, Begruendung).
 GESPERRT = (
@@ -291,9 +298,9 @@ def konfig_text(schnittstelle: str = "ifss", rom: str = "repariert", beschreibun
     ``romdatei`` (Pfad aus dem ROM-Katalog) hat Vorrang vor dem eingebetteten Abbild; ohne Katalog bleibt
     am SD 1157 ``rom=`` (Alias) als Rueckfall.  Ein Komma im Pfad trennt die Liste und ist nicht darstellbar."""
     zusatz = f",romdatei={romdatei}" if romdatei and "," not in romdatei else ""
-    if beschreibung is not None and beschreibung.schluessel == "k6311":
+    if beschreibung is not None and beschreibung.schluessel in ("k6311", "k6311-ifss"):
         return zusatz[1:]   # nur romdatei=; BCH/BDH (schalter_baud/schalter_format) haben Vorgaben im Kern
-    if beschreibung is not None and beschreibung.schluessel == "k6313":
+    if beschreibung is not None and beschreibung.schluessel in ("k6313", "k6313-ifss"):
         return f"dil={int(dil) & ((1 << beschreibung.dil_anzahl) - 1)}{zusatz}"
     if beschreibung is not None and beschreibung.betriebsart_id is not None:
         betriebsart = betriebsart if betriebsart in ("aufwickeln", "schneiden", "endlos") else "endlos"

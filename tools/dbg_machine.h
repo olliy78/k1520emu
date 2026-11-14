@@ -46,7 +46,7 @@ namespace dbgm {
 using IntSource = A5120Machine::IntSource;
 
 /** @brief Maschinenwahl aus `--machine`; false bei unbekanntem Namen. */
-enum class Art { A5120, K8915, K8915G2, Prg710, Prg710_1, Pc1715, Pc1715W, P8000, P8000_16, Mc80_30, Mc80_21, Mc80_22, Sd1157, K6316, K6316V24, K6313, K6311 };
+enum class Art { A5120, K8915, K8915G2, Prg710, Prg710_1, Pc1715, Pc1715W, P8000, P8000_16, Mc80_30, Mc80_21, Mc80_22, Sd1157, K6316, K6316V24, K6313, K6311, K6313Ifss, K6311Ifss };
 inline bool parseMachine(const std::string& s, Art& art) {
     if (s == "a5120" || s == "A5120")       { art = Art::A5120;    return true; }
     if (s == "k8915" || s == "K8915")       { art = Art::K8915;    return true; }
@@ -63,6 +63,8 @@ inline bool parseMachine(const std::string& s, Art& art) {
     if (s == "k6316-v24")                   { art = Art::K6316V24; return true; }                 // Modul V.24
     if (s == "k6313" || s == "k6313-v24" || s == "K6313") { art = Art::K6313; return true; }   // WP8c: K6313, Kassette V.24
     if (s == "k6311" || s == "k6311-v24" || s == "K6311") { art = Art::K6311; return true; }   // WP8e: K6311, Hardware aus dem ROM erschlossen [?]
+    if (s == "k6313-ifss")                  { art = Art::K6313Ifss; return true; }   // WP8g: IFSS-Kassette
+    if (s == "k6311-ifss")                  { art = Art::K6311Ifss; return true; }
     if (s == "p8000" || s == "P8000")       { art = Art::P8000;    return true; }   // AP P12a: nur 8-Bit-Seite
     if (s == "p8000-16" || s == "P8000-16") { art = Art::P8000_16; return true; }   // mit 16-Bit-Karte + Kopplung
     return false;
@@ -320,9 +322,10 @@ public:
             c.typ = art == Art::K6316 ? PrinterMachine::Config::Typ::K6316_Ifss : PrinterMachine::Config::Typ::K6316_V24;
             pr_ = std::make_unique<PrinterMachine>(c);
         }
-        else if (art == Art::K6313 || art == Art::K6311) {                         // WP8c: K6313, WP8e: K6311
+        else if (art == Art::K6313 || art == Art::K6311 || art == Art::K6313Ifss || art == Art::K6311Ifss) {   // WP8c: K6313, WP8e: K6311, WP8g: IFSS
             PrinterMachine::Config c;
-            c.typ = art == Art::K6311 ? PrinterMachine::Config::Typ::K6311_V24 : PrinterMachine::Config::Typ::K6313_V24;
+            c.typ = art == Art::K6311 ? PrinterMachine::Config::Typ::K6311_V24 : art == Art::K6313Ifss ? PrinterMachine::Config::Typ::K6313_Ifss
+                  : art == Art::K6311Ifss ? PrinterMachine::Config::Typ::K6311_Ifss : PrinterMachine::Config::Typ::K6313_V24;
             pr_ = std::make_unique<PrinterMachine>(c);
         }
         else if (art == Art::Pc1715) pc_ = std::make_unique<Pc1715Machine>();

@@ -278,6 +278,8 @@ K1520_API K1520Handle k1520_create_mc80(int variante, const char* konfig);
  *                Firmwaresatz.  3 = K6313 (V.24-Kassette, Speicherplan "kurz" ROM 0000H-27FFH, RAM 3800H, E/A 7CH-FBH; WP8c).
  *                4 = K6311 (V.24, WP8e/WP8f): dieselbe Karte mit ROM 12128062; **Hardware nur aus dem ROM erschlossen [?]**; druckt seit WP8f.
  *                Tasten 21..24 (ON LINE, D105 A4, A5, A6), Papier-Schalter, Lampen ON LINE/ERR/POW (PE = -1, keine DIL-Schalter), BCH/BDH = Schaltereingaenge.
+ *                5 = K6313 (IFSS-Kassette, WP8g), 6 = K6311 (IFSS, WP8g): wie 3/4, aber der IFSS-Anschluss der SIO ist wirksam (ohne Steuerleitungen), V.24 ohne
+ *                Funktion; das ROM waehlt der Aufrufer (`romdatei`; K6311-IFSS: 13325212, 8192 Bytes = vier Chips, die Karte fuellt mit FFH auf).
  *                Alles andere → NULL mit Grund.
  * @param konfig  Schluessel=Wert-Liste, durch Komma getrennt (NULL/"" = Vorgabe); Schluessel
  *                SD 1157: `schnittstelle` (`ifss` | `v24`: Wahl am Schalterblock PIO 3 A.0), `rom` (`repariert` | `original`).
@@ -286,7 +288,7 @@ K1520_API K1520Handle k1520_create_mc80(int variante, const char* konfig);
  *                K6316: `betriebsart` (`aufwickeln` | `schneiden` | `endlos`), `dil` (Maske der geschlossenen
  *                DIL-Schalter, Bit 0 = S11 ... Bit 15 = S26).
  *                K6313: `dil` (Maske, Bit 0 = 5-1, Bit 1 = 5-2, ... Bit 27 = 18-2), `romdatei` (10 240 B wie K6316).
- *                K6311: `schalter_baud`, `schalter_format` (Bytes an BCH/BDH, 0..255), `romdatei` (10 240 B).
+ *                K6311: `schalter_baud`, `schalter_format` (Bytes an BCH/BDH, 0..255), `romdatei` (10 240 B, oder 8192 B = vier Chips).
  *                Unbekannte Schluessel/Werte → NULL, Grund in k1520_last_init_error.
  * k1520_machine_type() = 7.  `k1520_create(K1520_MACHINE_PRINTER)` = SD 1157/264.
  */

@@ -15,6 +15,8 @@ const char* PrinterMachine::typName(Config::Typ t)
         case Config::Typ::K6316_V24:  return "K6316 (V.24)";
         case Config::Typ::K6313_V24:  return "K6313 (V.24)";
         case Config::Typ::K6311_V24:  return "K6311 (V.24)";
+        case Config::Typ::K6313_Ifss: return "K6313 (IFSS)";
+        case Config::Typ::K6311_Ifss: return "K6311 (IFSS)";
     }
     return "Drucker ?";
 }
@@ -37,9 +39,16 @@ std::unique_ptr<DruckerSteuerung> neueSteuerung(const PrinterMachine::Config& cf
         }
         case PrinterMachine::Config::Typ::K6313_V24:
             return std::make_unique<K6313Ccb>(bus, cfg.k6313);
-        case PrinterMachine::Config::Typ::K6311_V24: {
+        case PrinterMachine::Config::Typ::K6313_Ifss: {
+            K6313Ccb::Config c = cfg.k6313;
+            c.ifss = true;   // IFSS-Kassette (WP8g); das ROM waehlt der Aufrufer
+            return std::make_unique<K6313Ccb>(bus, c);
+        }
+        case PrinterMachine::Config::Typ::K6311_V24:
+        case PrinterMachine::Config::Typ::K6311_Ifss: {
             K6313Ccb::Config c = cfg.k6313;
             c.alsK6311();   // dieselbe Karte, Hardware aus dem ROM erschlossen [?]
+            c.ifss = cfg.typ == PrinterMachine::Config::Typ::K6311_Ifss;
             return std::make_unique<K6313Ccb>(bus, c);
         }
     }

@@ -34,7 +34,7 @@ class PrinterMachine : public K1520Machine {
 public:
     struct Config {
         /// Druckertyp; bei `K6316_*` bestimmt der Typ das Schnittstellenmodul (und damit den Firmwaresatz).
-        enum class Typ { Sd1157_264, K6316_Ifss, K6316_V24, K6313_V24, K6311_V24 };
+        enum class Typ { Sd1157_264, K6316_Ifss, K6316_V24, K6313_V24, K6311_V24, K6313_Ifss, K6311_Ifss };
         Typ typ = Typ::Sd1157_264;
         /// Aufbau des SD 1157 (DIP-Schalter, Interface-Wahl, Ruhelage der Tasten).
         Sd1157Steuerung::Config sd1157;

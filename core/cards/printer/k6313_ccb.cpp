@@ -59,9 +59,12 @@ int K6313Ccb::matrixZelle(int spalte, int zeile)
 }
 
 // ─── Anschluss je SIO-Kanal ──────────────────────────────────────────────────
-// V.24: Daten, CTS und DCD an Kanal A (die Firmware richtet A als Datenkanal ein, WR3 = 61H mit Auto Enables); DTR/RTS (Flusssteuerung,
+// V.24-Kassette: Daten, CTS und DCD an Kanal A (die Firmware richtet A als Datenkanal ein, WR3 = 61H mit Auto Enables); DTR/RTS (Flusssteuerung,
 // WR5 = 88H/08H bzw. +02H) schreibt sie an Kanal B (0641H-0663H, 1EEEH-1EFDH) [F]: die V.24-Leitungen DTR/RTS kommen also vom Kanal B.
-// IFSS (Kanal B) gibt es in dieser Fassung nicht (Kassette V.24): der Anschluss ist ohne Funktion.
+// IFSS-Kassette (WP8g, `Config::ifss`, Merkposten drucker.md Nr. 36): es ist immer genau EIN Anschluss wirksam, der andere ohne Funktion.
+//   K6313: alle K6313-Abzuege fahren die Daten ueber Kanal A (7CH/7EH; Kanal-B-Daten 7DH nutzt keiner [F]) - die "CL"-Abzuege (Stromschleife) haben
+//   keinen eigenen Firmwarezweig, die Stromschleife ist eine andere Kassette hinter demselben SIO-Kanal [?, Kassettenplan fehlt]; ohne Steuerleitungen.
+//   K6311: der IFSS-Abzug 13325212 faehrt die Daten ueber Kanal B (7DH/7FH, WR5 = AAH), Kanal A ruht [F]; ebenfalls ohne Steuerleitungen.
 
 class K6313Ccb::Anschluss : public k1520::serial::SerialAnschluss {
 public:
@@ -73,46 +76,46 @@ public:
 
     k1520::serial::SerialFormat format() const override
     {
-        return k1520::serial::serialFormatAusSio(k_.sio_.channelA(), k_.baudTakte());
+        return k1520::serial::serialFormatAusSio(kanal(), k_.baudTakte());
     }
-    bool senderHatZeichen() const override { return v24_ && k_.sio_.channelA().senderHatZeichen(); }
+    bool senderHatZeichen() const override { return aktiv() && kanal().senderHatZeichen(); }
     uint8_t senderNimm() override
     {
-        if (!v24_) return 0;
-        Z80SIO::Channel& a = k_.sio_.channelA();
+        if (!aktiv()) return 0;
+        Z80SIO::Channel& a = kanal();
         uint8_t b = a.txGet();
         const uint8_t bits = a.format().tx_bits;
         if (bits < 8) b &= static_cast<uint8_t>((1u << bits) - 1);
-        std::string& m = k_.sio_aus_[0];
+        std::string& m = k_.sio_aus_[kanalNr()];
         if (m.size() < SIO_AUS_MAX) m.push_back(static_cast<char>(b));
         k_.ketteNeu();
         k_.seriell_geaendert_ = true;
         if (!belegt_ && abnehmer_) abnehmer_(b);
         return b;
     }
-    bool empfaengerFrei() const override { return v24_ && k_.sio_.channelA().empfaengerFrei(); }
+    bool empfaengerFrei() const override { return aktiv() && kanal().empfaengerFrei(); }
     void empfange(uint8_t b) override
     {
-        if (!v24_) return;
-        k_.sio_.channelA().rxByte(b);
+        if (!aktiv()) return;
+        kanal().rxByte(b);
         k_.ketteNeu();
         k_.seriell_geaendert_ = true;
     }
-    bool rts() const override { return v24_ && k_.sio_.channelB().rts(); }
-    bool dtr() const override { return v24_ && k_.sio_.channelB().dtr(); }
+    bool rts() const override { return v24_ && aktiv() && k_.sio_.channelB().rts(); }
+    bool dtr() const override { return v24_ && aktiv() && k_.sio_.channelB().dtr(); }
     void setzeEingaenge(bool cts, bool /*dsr*/, bool dcd) override
     {
-        if (!v24_) return;
+        if (!v24_ || !aktiv()) return;   // IFSS: keine Steuerleitungen, /CTS und /DCD liegen fest aktiv (reset())
         k_.sio_.channelA().setzeCTS(cts);
         k_.sio_.channelA().setzeDCD(dcd);
         k_.ketteNeu();
         k_.seriell_geaendert_ = true;
     }
-    bool breakGesendet() const override { return v24_ && k_.sio_.channelA().breakSenden(); }
-    void breakEmpfang(bool aktiv) override
+    bool breakGesendet() const override { return aktiv() && kanal().breakSenden(); }
+    void breakEmpfang(bool an) override
     {
-        if (!v24_) return;
-        k_.sio_.channelA().setzeBreakEmpfang(aktiv);
+        if (!aktiv()) return;
+        kanal().setzeBreakEmpfang(an);
         k_.ketteNeu();
         k_.seriell_geaendert_ = true;
     }
@@ -126,6 +129,10 @@ public:
     }
 
 private:
+    bool aktiv() const { return v24_ != k_.cfg_.ifss; }   ///< gesteckt ist genau eine Kassette
+    int  kanalNr() const { return (!v24_ && k_.cfg_.k6311) ? 1 : 0; }   ///< SIO-Datenkanal: 0 = A, 1 = B (nur K6311-IFSS)
+    Z80SIO::Channel& kanal() const { return kanalNr() ? k_.sio_.channelB() : k_.sio_.channelA(); }
+
     K6313Ccb& k_;
     bool      v24_;
     bool      belegt_ = false;
@@ -158,6 +165,7 @@ K6313Ccb::K6313Ccb(K1520Bus& bus, const Config& cfg)
     : bus_(bus), cfg_(cfg), pe_(!cfg.papier_da), dil_(cfg.dil),
       druck_(druckParameter(cfg), std::make_unique<SchrittWagen>(cfg.wagen), cfg.papier)
 {
+    if (cfg_.k6311 && cfg_.rom_extern.size() == ROM_ENDE_8K) cfg_.rom_extern.resize(ROM_ENDE, 0xFF);   // vier Chips: der fuenfte Sockel liest FFH [?]
     pio104_.setModus3Flanke(true);
     pio105_.setModus3Flanke(true);
     // offene Eingangsbits lesen 0 (Zeilen der Tastenmatrix: Taste/Schalter legen die gewaehlte Spalte darauf, Firmware 02D0H: gedrueckt = 1)
@@ -208,8 +216,9 @@ void K6313Ccb::reset()
     sio_.reset();
     cpu_.reset();
     // V.24: /CTS und /DCD kommen vom Host (Wandler/Gegenstelle), ohne Gegenstelle inaktiv (wie K6316 V.24).
-    sio_.channelA().setzeDCD(false);
-    sio_.channelA().setzeCTS(false);
+    // IFSS (WP8g): keine Steuerleitungen, /CTS und /DCD fest aktiv (auch am Kanal A des K6313: dort liegen die Daten).
+    sio_.channelA().setzeDCD(cfg_.ifss);
+    sio_.channelA().setzeCTS(cfg_.ifss);
     sio_.channelB().setzeDCD(true);
     sio_.channelB().setzeCTS(true);
     druck_.halt();

@@ -396,15 +396,17 @@ K1520Handle k1520_create_printer(int typ, const char* konfig) {
         case 2: cfg.typ = PrinterMachine::Config::Typ::K6316_V24; break;
         case 3: cfg.typ = PrinterMachine::Config::Typ::K6313_V24; break;
         case 4: cfg.typ = PrinterMachine::Config::Typ::K6311_V24; break;
+        case 5: cfg.typ = PrinterMachine::Config::Typ::K6313_Ifss; break;
+        case 6: cfg.typ = PrinterMachine::Config::Typ::K6311_Ifss; break;
         default:
             g_init_error = "Unbekannter Druckertyp " + std::to_string(typ) +
-                           " (0 = SD 1157/264, 1 = K6316 IFSS, 2 = K6316 V.24, 3 = K6313 V.24, 4 = K6311 V.24)";
+                           " (0 = SD 1157/264, 1 = K6316 IFSS, 2 = K6316 V.24, 3 = K6313 V.24, 4 = K6311 V.24, 5 = K6313 IFSS, 6 = K6311 IFSS)";
             return nullptr;
     }
     // Schluessel=Wert-Liste wie beim MC80.  SD 1157: `schnittstelle`, `rom`.  K6316: `betriebsart`, `dil`
     // (das Schnittstellenmodul folgt dem Typ, es gibt kein ROM zu waehlen).
-    const bool k6311 = typ == 4;           // K6311 (WP8e, Hardware nur aus dem ROM erschlossen [?]): `schalter_baud`, `schalter_format`, `romdatei`
-    const bool k6313 = typ == 3 || k6311;  // K6313 (WP8c): Schluessel `dil` (28 Schalter), `romdatei`; der K6311 nutzt dieselbe Karte
+    const bool k6311 = typ == 4 || typ == 6;          // K6311 (WP8e, Hardware nur aus dem ROM erschlossen [?]): `schalter_baud`, `schalter_format`, `romdatei`
+    const bool k6313 = typ == 3 || typ == 5 || k6311;  // K6313 (WP8c): Schluessel `dil` (28 Schalter), `romdatei`; der K6311 nutzt dieselbe Karte
     const bool k6316 = typ == 1 || typ == 2;
     const std::string text = konfig ? konfig : "";
     size_t pos = 0;
@@ -439,9 +441,11 @@ K1520Handle k1520_create_printer(int typ, const char* konfig) {
                 g_init_error = "Drucker: romdatei '" + val + "' nicht lesbar oder leer";
                 return nullptr;
             }
-            if (daten.size() != soll) {
+            if (k6311 && daten.size() == static_cast<size_t>(K6313Ccb::ROM_ENDE_8K)) {
+                // vier Chips zu 2 KiB (13120012, 13325212): die Karte fuellt den fuenften Sockel mit FFH auf (WP8g)
+            } else if (daten.size() != soll) {
                 g_init_error = "Drucker: romdatei '" + val + "' hat " + std::to_string(daten.size()) + " Bytes, erwartet " +
-                               std::to_string(soll) + ((k6316 || k6313) ? " (fuenf Chips zu 2 KiB lueckenlos, 0000H-27FFH)"
+                               std::to_string(soll) + ((k6316 || k6313) ? (k6311 ? " (fuenf Chips zu 2 KiB lueckenlos, 0000H-27FFH; K6311 auch 8192 = vier Chips)" : " (fuenf Chips zu 2 KiB lueckenlos, 0000H-27FFH)")
                                                               : " (0000H-297FH)");
                 return nullptr;
             }

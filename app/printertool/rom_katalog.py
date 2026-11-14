@@ -17,7 +17,7 @@ import yaml
 
 from app import paths
 
-TYPEN = ("sd1157", "k6316-ifss", "k6316-v24", "k6313", "k6311")
+TYPEN = ("sd1157", "k6316-ifss", "k6316-v24", "k6313", "k6313-ifss", "k6311", "k6311-ifss")
 GUETEN = ("ok", "unvollstaendig", "defekt", "unbekannt")
 SCHNITTSTELLEN = ("ifss", "v24")
 FORMAT_VERSION = 1

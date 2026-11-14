@@ -67,6 +67,27 @@ def test_DruckerRomKatalog_K6311_Kennung_im_ROM_stimmt_mit_dem_Dateinamen(eintra
         assert "erschlossen" in e.hinweis or "nicht nachgebildet" in e.hinweis
 
 
+def test_DruckerRomKatalog_IfssTypen_Kennung_Groesse_und_Schnittstelle(eintraege):
+    # WP8g: K6313 IFSS = dieselben Abzuege wie am V.24 (Kennung bei 27F8H); K6311 IFSS = 13325212 (8 KiB, Kennung bei 1FF8H)
+    k13 = rk.fuer_typ("k6313-ifss", eintraege)
+    assert [e.schluessel for e in k13][0] == "k6313-ifss-33538013" and rk.vorgabe("k6313-ifss", eintraege).schluessel == "k6313-ifss-33538013"
+    v24 = {e.datei: e.md5 for e in rk.fuer_typ("k6313", eintraege)}
+    for e in k13:
+        n = Path(e.datei).stem
+        roh = (PROJECT_ROOT / "doc" / "EPROMS" / e.datei).read_bytes()
+        assert roh[0x27F8:0x2800].decode("ascii") == n[3] + n[4:6] + n[0] + n[1:3] + n[6:8], e.schluessel
+        assert e.guete == "ok" and len(roh) == 10240 and e.schnittstellen == ("ifss",)
+        assert v24.get(e.datei) == e.md5, "dieselbe Datei wie am V.24"
+    k11 = rk.fuer_typ("k6311-ifss", eintraege)
+    assert [e.schluessel for e in k11] == ["k6311-ifss-13325212"]
+    e = k11[0]
+    roh = (PROJECT_ROOT / "doc" / "EPROMS" / e.datei).read_bytes()
+    n = Path(e.datei).stem
+    assert len(roh) == 8192 == e.groesse and e.schnittstellen == ("ifss",)
+    assert roh[0x1FF8:0x2000].decode("ascii") == n[3] + n[4:6] + n[0] + n[1:3] + n[6:8]
+    assert "erschlossen" in e.hinweis
+
+
 def test_DruckerRomKatalog_genau_eine_Vorgabe_je_Typ(eintraege):
     for t in rk.TYPEN:
         assert len([e for e in rk.fuer_typ(t, eintraege) if e.vorgabe]) == 1, t
@@ -182,6 +203,25 @@ def test_DruckerRomKatalog_romdatei_liefert_dieselben_Bytes_wie_das_eingebettete
         assert _byte(lib, h_neu, adr) == _byte(lib, h_alt, adr) == roh[adr]
     lib.k1520_destroy(h_alt)
     lib.k1520_destroy(h_neu)
+    # IFSS (WP8g, Typ 5/6): K6313-Vorgabe aus Datei == eingebettet; K6311: 8-KiB-Abzug wird mit FFH aufgefuellt
+    e = rk.vorgabe("k6313-ifss", eintraege)
+    lib, h_alt = _drucker(5, "")
+    _, h_neu = _drucker(5, f"romdatei={ordner / e.datei}")
+    assert h_alt and h_neu
+    roh = (ordner / e.datei).read_bytes()
+    for adr in (0x0000, 0x0801, 0x1234, 0x27F8, 0x27FF):
+        assert _byte(lib, h_neu, adr) == _byte(lib, h_alt, adr) == roh[adr]
+    lib.k1520_destroy(h_alt)
+    lib.k1520_destroy(h_neu)
+    e = rk.vorgabe("k6311-ifss", eintraege)
+    lib, h = _drucker(6, f"romdatei={ordner / e.datei}")
+    assert h
+    roh = (ordner / e.datei).read_bytes()
+    assert len(roh) == 8192
+    for adr in (0x0000, 0x0801, 0x1D08, 0x1FF8, 0x1FFF):
+        assert _byte(lib, h, adr) == roh[adr]
+    assert all(_byte(lib, h, adr) == 0xFF for adr in (0x2000, 0x2400, 0x27FF)), "fuenfter Sockel: FFH"
+    lib.k1520_destroy(h)
     # K6316: Satz aus Datei == eingebettet
     for typ, schluessel in ((1, "k6316-ifss"), (2, "k6316-v24")):
         e = next(x for x in eintraege if x.schluessel == schluessel)
@@ -209,7 +249,9 @@ def test_DruckerRomKatalog_romdatei_hat_Vorrang_und_laeuft_wirklich_aus_der_Date
 @pytest.mark.parametrize("typ, groesse, fragment", [(0, 100, "100 Bytes, erwartet 10624"),
                                                     (1, 10624, "10624 Bytes, erwartet 10240"),
                                                     (2, 0, "nicht lesbar oder leer"),
-                                                    (3, 100, "100 Bytes, erwartet 10240")])
+                                                    (3, 100, "100 Bytes, erwartet 10240"),
+                                                    (5, 8192, "8192 Bytes, erwartet 10240"),    # K6313: nur der K6311 darf 8 KiB
+                                                    (6, 100, "100 Bytes, erwartet 10240")])
 def test_DruckerRomKatalog_romdatei_falsche_Laenge_klare_Meldung(tmp_path, typ, groesse, fragment):
     from app.core_binding import k1520 as K
     p = tmp_path / "falsch.rom"

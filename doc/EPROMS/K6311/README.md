@@ -36,3 +36,4 @@ Kein Block leer, keine Nullflächen ≥ 48 Byte, kein Block ganz FF → **kein H
 
 * Schnittstellenmodul-Zuordnung (V.24 / IFSS / Centronics) der 10-KiB-Platinen ist nur aus dem Firmwareverhalten erschlossen.
 * Die Liste führt kein 16-KiB-K6311; die Abzüge `13xxxxx` (8 KiB) haben kein zweites Gegenstück.
+* **IFSS (WP8g):** `13325212` läuft auf der Karte `K6313Ccb` als K6311 IFSS (SIO-Kanal B, 9600 Bd, 7O1, ohne Steuerleitungen); Zeichenzellen bei 1D00H, Kennung bei 1FF8H; der leere fünfte Sockel liest FFH `[?]`, der Abzug greift nie darauf zu (Merkposten drucker.md Nr. 36).

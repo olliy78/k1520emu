@@ -63,3 +63,4 @@ Alle 14 Abzüge beginnen mit `DD 21 24 38 31 …` (10 KiB, `LD IX,3824H`, `LD SP
 
 * `43530809` (Liste: nicht hier) und die K6314-/K6316-/K6319-/Präsident-Abzüge sind nicht geholt.
 * Bedeutung der Kürzel EPS, IBM, SCH, ISO, KYR, HCD, CL, INT. ist nur aus Liste/Handbuch erschlossen (EPS = EPSON-Steuercodes, CL = Current Loop `[?]`).
+* **IFSS (WP8g):** alle K6313-Abzüge fahren die Daten über SIO-Kanal A; „CL“ im Etikett = Stromschleife hinter derselben Firmware (kein eigener Zweig, keine eigene Kennung).  Über IFSS gegen den Zeichengenerator geprüft: `33538013`, `33538513`, `33830803`.  `53538500` druckt auch am V.24 nicht wie das Orakel (Merkposten drucker.md Nr. 36).

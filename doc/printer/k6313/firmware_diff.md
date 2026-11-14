@@ -127,3 +127,5 @@ SIO/PIO-Kassette bei 10–1E, PIO D104 bei 20/22) ist in K6311 und K6313 gleich.
 * Tastenmatrix-Belegung (welche Taste/welcher DIL-Schalter an welchem Kreuzungspunkt) ist nirgends belegt.
 * Bedeutung von `PE1`-Kennung (V.24 = 0 / Centronics = 1) bei IFSS/IFSP; ob `BC–BF` im V.24-K6311 wirklich ein PIO oder ein Eingangsregister ist.
 * Zahlen aus dem Servicehandbuch (nur gescannt) stammen aus OCR; vor der Modellierung am Bild gegenprüfen.
+
+**Berichtigung WP8g (2026-11-14):** die offene Frage „Bedeutung der PE1-Kennung bei IFSS/IFSP“ ist für die K6313-Abzüge beantwortet, soweit das ROM sie trägt: kein Abzug nutzt Kanal-B-Daten (7DH), die „CL/IFSP“-Abzüge laufen über Kanal A wie V.24, PE1 liest an der IFSS-Kassette 0.  Nur `13325212` (K6311) fährt IFSS über Kanal B (7DH/7FH).  Volltext: Merkposten drucker.md Nr. 36.
