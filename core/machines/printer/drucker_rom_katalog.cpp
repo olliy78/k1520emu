@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
 #include <map>
 #include <mutex>
 #include <set>
@@ -180,12 +181,11 @@ std::vector<std::string> DruckerRomKatalog::searchPaths()
 
 std::shared_ptr<const DruckerRomKatalog> DruckerRomKatalog::gemeinsam()
 {
+    // Der Katalog (~0,5 MB) wird je Prozess einmal geparst; neu gelesen wird, wenn sich Fundort ODER Dateiinhalt aendern
+    // (Tests setzen die Umgebung um, ein Anwender bearbeitet die Datei).  Den Inhalt zu lesen kostet ~0,1 ms, das Parsen ~3 ms.
     static std::mutex m;
     static std::shared_ptr<const DruckerRomKatalog> cache;
-    static std::string cachePfad;
-    static std::filesystem::file_time_type cacheZeit;
-    static std::uintmax_t cacheGroesse = 0;
-    static std::string cacheSuche;
+    static std::string cachePfad, cacheText, cacheSuche;
     std::lock_guard<std::mutex> lock(m);
 
     const std::vector<std::string> kand = searchPaths();
@@ -196,14 +196,14 @@ std::shared_ptr<const DruckerRomKatalog> DruckerRomKatalog::gemeinsam()
         std::error_code ec;
         if (std::filesystem::is_regular_file(k, ec)) { gefunden = k; break; }
     }
-    std::error_code ec;
-    std::filesystem::file_time_type zeit{};
-    std::uintmax_t groesse = 0;
+    std::string text;
     if (!gefunden.empty()) {
-        zeit = std::filesystem::last_write_time(gefunden, ec);
-        groesse = std::filesystem::file_size(gefunden, ec);
+        std::ifstream f(std::filesystem::u8path(gefunden), std::ios::binary);
+        std::ostringstream os;
+        os << f.rdbuf();
+        text = os.str();
     }
-    if (cache && such == cacheSuche && gefunden == cachePfad && zeit == cacheZeit && groesse == cacheGroesse) return cache;
+    if (cache && such == cacheSuche && gefunden == cachePfad && text == cacheText) return cache;
 
     DruckerRomKatalog k;
     if (gefunden.empty()) {
@@ -211,10 +211,10 @@ std::shared_ptr<const DruckerRomKatalog> DruckerRomKatalog::gemeinsam()
         for (const auto& c : kand) k.fehler_ += "\n  " + c;
         k.fehler_ += "\nAbhilfe: data/drucker_roms.yaml bereitstellen oder K1520_PRINTER_ROMS=<datei> setzen.";
     } else {
-        k = laden(gefunden);
+        k = ausText(text, gefunden);
     }
     cache = std::make_shared<const DruckerRomKatalog>(std::move(k));
-    cacheSuche = such; cachePfad = gefunden; cacheZeit = zeit; cacheGroesse = groesse;
+    cacheSuche = such; cachePfad = gefunden; cacheText = std::move(text);
     return cache;
 }
 

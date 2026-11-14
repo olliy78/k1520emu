@@ -279,16 +279,18 @@ K1520_API K1520Handle k1520_create_mc80(int variante, const char* konfig);
  *                4 = K6311 (V.24, WP8e/WP8f): dieselbe Karte mit ROM 12128062; **Hardware nur aus dem ROM erschlossen [?]**; druckt seit WP8f.
  *                Tasten 21..24 (ON LINE, D105 A4, A5, A6), Papier-Schalter, Lampen ON LINE/ERR/POW (PE = -1, keine DIL-Schalter), BCH/BDH = Schaltereingaenge.
  *                5 = K6313 (IFSS-Kassette, WP8g), 6 = K6311 (IFSS, WP8g): wie 3/4, aber der IFSS-Anschluss der SIO ist wirksam (ohne Steuerleitungen), V.24 ohne
- *                Funktion; das ROM waehlt der Aufrufer (`romdatei`; K6311-IFSS: 13325212, 8192 Bytes = vier Chips, die Karte fuellt mit FFH auf).
+ *                Funktion; das ROM waehlt `rom` (K6311-IFSS: 13325212, 8192 Bytes = vier Chips, die Karte fuellt mit FFH auf).
  *                Alles andere → NULL mit Grund.
  * @param konfig  Schluessel=Wert-Liste, durch Komma getrennt (NULL/"" = Vorgabe); Schluessel
- *                SD 1157: `schnittstelle` (`ifss` | `v24`: Wahl am Schalterblock PIO 3 A.0), `rom` (`repariert` | `original`).
- *                Beide Typen: `romdatei` (Pfad eines ROM-Satzes: SD 1157 10 624 B = 0000H-297FH, K6316 10 240 B = fuenf
- *                Chips lueckenlos; hat Vorrang vor dem eingebetteten Abbild und vor `rom`; Pfad ohne Komma; Entwurf 49 §11.2).
+ *                Alle Typen: `rom` = Schluessel oder Alias eines Eintrags des ROM-Katalogs `data/drucker_roms.yaml` fuer genau diesen Typ
+ *                (SD 1157: `sd1157-repariert` = Alias `repariert`, Vorgabe; `sd1157-original` = `original`); ohne `rom` gilt die Vorgabe des Typs.
+ *                Das ROM kommt NUR aus dem Katalog (kein eingebettetes Abbild, kein `romdatei`); fehlt er oder ist er fehlerhaft → NULL mit
+ *                der Meldung des Lesers (Datei, Zeile, Eintrag).  Katalog abfragen: `k1520_printer_rom_*`.
+ *                SD 1157: `schnittstelle` (`ifss` | `v24`: Wahl am Schalterblock PIO 3 A.0).
  *                K6316: `betriebsart` (`aufwickeln` | `schneiden` | `endlos`), `dil` (Maske der geschlossenen
  *                DIL-Schalter, Bit 0 = S11 ... Bit 15 = S26).
- *                K6313: `dil` (Maske, Bit 0 = 5-1, Bit 1 = 5-2, ... Bit 27 = 18-2), `romdatei` (10 240 B wie K6316).
- *                K6311: `schalter_baud`, `schalter_format` (Bytes an BCH/BDH, 0..255), `romdatei` (10 240 B, oder 8192 B = vier Chips).
+ *                K6313: `dil` (Maske, Bit 0 = 5-1, Bit 1 = 5-2, ... Bit 27 = 18-2).
+ *                K6311: `schalter_baud`, `schalter_format` (Bytes an BCH/BDH, 0..255).
  *                Unbekannte Schluessel/Werte → NULL, Grund in k1520_last_init_error.
  * k1520_machine_type() = 7.  `k1520_create(K1520_MACHINE_PRINTER)` = SD 1157/264.
  */
@@ -390,6 +392,35 @@ K1520_API int      k1520_printer_beleg_state(K1520Handle h, int* eingelegt, int*
  * pointer stays valid until the next k1520_create*() call.
  */
 K1520_API const char* k1520_last_init_error(void);
+
+/**
+ * @name ROM-Katalog der Drucker (WP9, Entwurf 49 §12; additiv)
+ * Der Kern liest `data/drucker_roms.yaml` (Suchpfad: Umgebung K1520_PRINTER_ROMS -> share/k1520emu -> data/); die Oberflaeche liest
+ * nichts selbst.  Reihenfolge = Reihenfolge der Datei.
+ * @{
+ */
+/** Anzahl der Katalogeintraege; **-1**, wenn der Katalog fehlt oder fehlerhaft ist (Text: k1520_printer_rom_error). */
+K1520_API int k1520_printer_rom_count(void);
+/** Fehlertext des Katalogs (mit Datei, Zeile, Eintrag); "" wenn in Ordnung.  Zeiger gilt bis zum naechsten Aufruf dieser Funktion im selben Faden. */
+K1520_API const char* k1520_printer_rom_error(void);
+/** Felder fuer k1520_printer_rom_info. */
+enum {
+    K1520_PROM_SCHLUESSEL = 0,    /**< technischer Name, eindeutig */
+    K1520_PROM_TYP = 1,           /**< sd1157 | k6316-ifss | k6316-v24 | k6313 | k6311 | k6313-ifss | k6311-ifss */
+    K1520_PROM_TITEL = 2,
+    K1520_PROM_PGM = 3,           /**< Etikett/Programmstand */
+    K1520_PROM_SCHNITTSTELLEN = 4,/**< "ifss,v24" (kommagetrennt) */
+    K1520_PROM_ZEICHENSATZ = 5,
+    K1520_PROM_GUETE = 6,         /**< ok | unvollstaendig | defekt | unbekannt */
+    K1520_PROM_HINWEIS = 7,
+    K1520_PROM_VORGABE = 8,       /**< "1" = Vorgabe des Typs, sonst "0" */
+    K1520_PROM_ALIASES = 9,       /**< kommagetrennt */
+    K1520_PROM_HERKUNFT = 10,     /**< Beleg (Abzug unter doc/EPROMS), nur Anzeige */
+    K1520_PROM_GROESSE = 11       /**< Bytes der Daten als Dezimaltext */
+};
+/** Feld @p feld des Eintrags @p index als Text; "" bei ungueltigem Index/Feld.  Zeiger gilt bis zum naechsten Aufruf im selben Faden. */
+K1520_API const char* k1520_printer_rom_info(int index, int feld);
+/** @} */
 
 K1520_API void        k1520_destroy(K1520Handle h);
 K1520_API void        k1520_reset(K1520Handle h);

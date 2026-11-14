@@ -287,26 +287,40 @@ def typ(schluessel: str) -> Typbeschreibung:
     return VORGABE
 
 
-#: Die ROM-Wahl steht im Katalog data/drucker_roms.yaml (app/printertool/rom_katalog.py), nicht mehr hier (Entwurf 49 §11.2).
+#: Die ROM-Wahl steht im Katalog data/drucker_roms.yaml, den der KERN liest (k1520_printer_rom_*, WP9, Entwurf 49 §12); hier nur
+#: das Aufloesen eines gemerkten Schluessels/Alias gegen die vom Kern gelieferte Liste.
+
+
+def roms_fuer_typ(roms, typ: str) -> list:
+    """Die Katalogeintraege eines Typs in Katalogreihenfolge (``roms`` = ``K.drucker_roms()``)."""
+    return [r for r in roms if r.typ == typ]
+
+
+def rom_aufloesen(roms, wahl, typ: str):
+    """Schluessel oder Alias -> Eintrag dieses Typs; Unbekanntes -> Vorgabe des Typs (``None`` ohne Katalog)."""
+    liste = roms_fuer_typ(roms, typ)
+    for r in liste:
+        if wahl == r.schluessel or wahl in r.aliases:
+            return r
+    return next((r for r in liste if r.vorgabe), None)
 
 SCHNITTSTELLEN = (("ifss", "IFSS"), ("v24", "V.24"))
 
 
-def konfig_text(schnittstelle: str = "ifss", rom: str = "repariert", beschreibung: Optional[Typbeschreibung] = None,
-                betriebsart: str = "endlos", dil: int = 0, romdatei: Optional[str] = None) -> str:
+def konfig_text(schnittstelle: str = "ifss", rom: str = "", beschreibung: Optional[Typbeschreibung] = None,
+                betriebsart: str = "endlos", dil: int = 0) -> str:
     """Konfigurationstext fuer ``k1520_create_printer`` (Unbekanntes -> Vorgabe).
 
     Beim K6316 folgt das Schnittstellenmodul dem Typ; der Kern kennt dort ``betriebsart`` und ``dil``.
-    ``romdatei`` (Pfad aus dem ROM-Katalog) hat Vorrang vor dem eingebetteten Abbild; ohne Katalog bleibt
-    am SD 1157 ``rom=`` (Alias) als Rueckfall.  Ein Komma im Pfad trennt die Liste und ist nicht darstellbar."""
-    zusatz = f",romdatei={romdatei}" if romdatei and "," not in romdatei else ""
+    ``rom`` ist Schluessel oder Alias eines Katalogeintrags des Typs (Kern: ``rom=``); leer = Vorgabe des Typs.
+    Ein Komma im Wert trennt die Liste und ist nicht darstellbar (wird weggelassen)."""
+    zusatz = f",rom={rom}" if rom and "," not in rom else ""
     if beschreibung is not None and beschreibung.schluessel in ("k6311", "k6311-ifss"):
-        return zusatz[1:]   # nur romdatei=; BCH/BDH (schalter_baud/schalter_format) haben Vorgaben im Kern
+        return zusatz[1:]   # nur rom=; BCH/BDH (schalter_baud/schalter_format) haben Vorgaben im Kern
     if beschreibung is not None and beschreibung.schluessel in ("k6313", "k6313-ifss"):
         return f"dil={int(dil) & ((1 << beschreibung.dil_anzahl) - 1)}{zusatz}"
     if beschreibung is not None and beschreibung.betriebsart_id is not None:
         betriebsart = betriebsart if betriebsart in ("aufwickeln", "schneiden", "endlos") else "endlos"
         return f"betriebsart={betriebsart},dil={int(dil) & 0xFFFF}{zusatz}"
     schnittstelle = schnittstelle if schnittstelle in ("ifss", "v24") else "ifss"
-    rom = rom if rom in ("repariert", "original") else "repariert"
-    return f"schnittstelle={schnittstelle},rom={rom}{zusatz}"
+    return f"schnittstelle={schnittstelle}{zusatz}"

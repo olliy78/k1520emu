@@ -471,6 +471,57 @@ _lib.k1520_printer_beleg_remove.restype = ctypes.c_int
 _lib.k1520_printer_beleg_state.argtypes = [K1520Handle] + [ctypes.POINTER(ctypes.c_int)] * 6
 _lib.k1520_printer_beleg_state.restype = ctypes.c_int
 
+# ROM-Katalog der Drucker (WP9): vom Kern gelesen, die Oberflaeche liest nichts selbst
+_lib.k1520_printer_rom_count.argtypes = []
+_lib.k1520_printer_rom_count.restype = ctypes.c_int
+_lib.k1520_printer_rom_error.argtypes = []
+_lib.k1520_printer_rom_error.restype = ctypes.c_char_p
+_lib.k1520_printer_rom_info.argtypes = [ctypes.c_int, ctypes.c_int]
+_lib.k1520_printer_rom_info.restype = ctypes.c_char_p
+
+
+@dataclass(frozen=True)
+class DruckerRom:
+    """Ein Eintrag des ROM-Katalogs der Drucker (``data/drucker_roms.yaml``), vom Kern gelesen (WP9)."""
+    schluessel: str
+    typ: str
+    titel: str
+    pgm: str
+    schnittstellen: tuple
+    zeichensatz: str
+    guete: str
+    hinweis: str
+    vorgabe: bool
+    aliases: tuple
+    herkunft: str
+    groesse: int
+
+
+def drucker_roms_fehler() -> str:
+    """Fehlertext des Katalogs ("" = in Ordnung)."""
+    t = _lib.k1520_printer_rom_error()
+    return t.decode("utf-8", "replace") if t else ""
+
+
+def drucker_roms() -> list:
+    """Alle Eintraege des ROM-Katalogs in Dateireihenfolge; leer, wenn der Kern den Katalog nicht lesen kann
+    (Grund: :func:`drucker_roms_fehler`).  Die Oberflaeche liest die Datei NICHT selbst."""
+    n = _lib.k1520_printer_rom_count()
+    if n <= 0:
+        return []
+
+    def feld(i: int, f: int) -> str:
+        t = _lib.k1520_printer_rom_info(i, f)
+        return t.decode("utf-8", "replace") if t else ""
+
+    def liste(t: str) -> tuple:
+        return tuple(x for x in t.split(",") if x)
+
+    return [DruckerRom(schluessel=feld(i, 0), typ=feld(i, 1), titel=feld(i, 2), pgm=feld(i, 3),
+                       schnittstellen=liste(feld(i, 4)), zeichensatz=feld(i, 5), guete=feld(i, 6),
+                       hinweis=feld(i, 7), vorgabe=feld(i, 8) == "1", aliases=liste(feld(i, 9)),
+                       herkunft=feld(i, 10), groesse=int(feld(i, 11) or 0)) for i in range(n)]
+
 # P8000-Terminals (k1520_term_*; andere Maschinen: 0 / -1 / False)
 _lib.k1520_term_count.argtypes = [K1520Handle]
 _lib.k1520_term_count.restype = ctypes.c_int

@@ -37,7 +37,7 @@ from PySide6.QtWidgets import (
 from app import version as _version
 from app.core_binding import k1520 as K
 from app.emulationstakt import Emulationstakt
-from app.printertool import aktionen, ausgabe, konfig, rom_katalog, typen
+from app.printertool import aktionen, ausgabe, konfig, typen
 from app.printertool.bedienfeld import Bedienfeld
 from app.printertool.blatt_widget import BlattWidget
 from app.ui.serial_widget import SerialWidget
@@ -285,7 +285,7 @@ class PrinterWindow(QMainWindow):
 
         self.beschreibung = typen.typ(str(allg.get("model", "")))
         # EPROM-Wahl je Typ (printer.rom.<typ>, Schluessel oder Alias des Katalogs).  Alt: `rom: repariert` (ein Text) = SD 1157.
-        self._roms = rom_katalog.laden()
+        self._roms = K.drucker_roms()          # vom Kern gelesen (k1520_printer_rom_*), nicht von der Oberflaeche
         wahl = dr.get("rom")
         self._rom_je_typ = {str(k): str(v) for k, v in wahl.items()} if isinstance(wahl, dict) else (
             {"sd1157": str(wahl)} if isinstance(wahl, str) else {})
@@ -431,25 +431,15 @@ class PrinterWindow(QMainWindow):
 
     @property
     def _rom(self) -> str:
-        """Schluessel des gewaehlten Katalogeintrags zum aktuellen Typ (ohne Katalog: der gemerkte Text oder die alte Vorgabe)."""
+        """Schluessel des gewaehlten Katalogeintrags zum aktuellen Typ (Unbekanntes -> Vorgabe; ohne Katalog leer:
+        der Kern verweigert dann das Anlegen mit einer klaren Meldung, es gibt keinen Rueckfall)."""
         typ = self.beschreibung.schluessel
-        wahl = self._rom_je_typ.get(typ)
-        eintrag = rom_katalog.aufloesen(wahl, typ, self._roms)
-        if eintrag is not None:
-            return eintrag.schluessel
-        return wahl if wahl in ("repariert", "original") else "repariert"
-
-    def _rom_eintrag(self):
-        return rom_katalog.aufloesen(self._rom_je_typ.get(self.beschreibung.schluessel), self.beschreibung.schluessel, self._roms)
-
-    def _rom_datei(self) -> Optional[str]:
-        e = self._rom_eintrag()
-        p = e.pfad() if e is not None else None
-        return str(p) if p is not None else None
+        eintrag = typen.rom_aufloesen(self._roms, self._rom_je_typ.get(typ), typ)
+        return eintrag.schluessel if eintrag is not None else ""
 
     def _einstellungen_anzeigen(self) -> None:
         e = self.einst_drucker
-        e.rom_anbieten(rom_katalog.fuer_typ(self.beschreibung.schluessel, self._roms), self._rom)
+        e.rom_anbieten(typen.roms_fuer_typ(self._roms, self.beschreibung.schluessel), self._rom)
         for combo, wert in ((e.typ, self.beschreibung.schluessel),
                             (e.schnittstelle, self._schnittstelle), (e.tempo, self._tempo),
                             (e.seite, self._formular_zoll)):
@@ -471,7 +461,7 @@ class PrinterWindow(QMainWindow):
     def _emulator_anlegen(self) -> K.K1520Emulator:
         return K.K1520Emulator(machine=self.beschreibung.kern_maschine,
                                drucker=typen.konfig_text(self._schnittstelle, self._rom, self.beschreibung,
-                                                         self._betriebsart, self._dil, self._rom_datei()))
+                                                         self._betriebsart, self._dil))
 
     def _schnittstelle_aktiv(self) -> str:
         """Die Schnittstelle des Geraets: beim K6316 legt der Typ das Modul fest, am SD 1157 der Schalter."""
@@ -521,7 +511,7 @@ class PrinterWindow(QMainWindow):
             self.dock_bedienfeld.setWidget(self.bedienfeld)
             alt.deleteLater()
         e = self.einst_drucker
-        e.rom_anbieten(rom_katalog.fuer_typ(self.beschreibung.schluessel, self._roms), self._rom)
+        e.rom_anbieten(typen.roms_fuer_typ(self._roms, self.beschreibung.schluessel), self._rom)
         for w in (e.schnittstelle, e.schnittstelle_text):
             w.setEnabled(self.beschreibung.hat_rom_wahl)
         if hasattr(self, "dock_beleg"):

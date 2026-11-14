@@ -673,14 +673,9 @@ def test_alte_konfiguration_rom_text_und_aliase_laufen_weiter(qapp, tmp_path):
         f.close()
 
 
-def test_ohne_katalog_laeuft_der_drucker_mit_dem_eingebetteten_abbild(qapp, tmp_path, monkeypatch):
+def test_ohne_katalog_startet_der_drucker_nicht_mit_klarer_meldung(qapp, tmp_path, monkeypatch):
+    """WP9: kein Rueckfall auf ein eingebettetes Abbild - der Kern meldet den fehlenden Katalog (main.py gibt die Meldung aus)."""
     from app.printertool.fenster import PrinterWindow
     monkeypatch.setenv("K1520_PRINTER_ROMS", str(tmp_path / "gibtsnicht.yaml"))
-    monkeypatch.setattr("app.paths.printer_roms_candidates", lambda: [tmp_path / "gibtsnicht.yaml"])
-    f = PrinterWindow(konfig_daten={}, konfig_pfad=str(tmp_path / "c.yaml"), autostart=False)
-    try:
-        assert f.einst_drucker.rom.isHidden()
-        assert K._lib.k1520_mem_read(f.emu._handle, 0x0D34) == 0x0B     # Vorgabe wie bisher
-    finally:
-        f.takt.beenden()
-        f.close()
+    with pytest.raises(RuntimeError, match="drucker_roms.yaml nicht gefunden"):
+        PrinterWindow(konfig_daten={}, konfig_pfad=str(tmp_path / "c.yaml"), autostart=False)

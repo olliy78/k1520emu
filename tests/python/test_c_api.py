@@ -519,7 +519,7 @@ def test_printer_sd1157_can_be_created_and_runs_its_rom():
         finally:
             _lib.k1520_destroy(h6)
 
-    for typ, konfig, grund in ((1, b"rom=original", b"Schluessel"), (9, None, b"Druckertyp"),
+    for typ, konfig, grund in ((1, b"rom=original", b"unbekannt"), (9, None, b"Druckertyp"),
                                (0, b"schnittstelle=x", b"schnittstelle"), (0, b"vis=1", b"vis")):
         assert not _lib.k1520_create_printer(typ, konfig)
         assert grund in _lib.k1520_last_init_error()

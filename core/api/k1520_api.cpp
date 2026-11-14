@@ -499,6 +499,48 @@ K1520Handle k1520_create_printer(int typ, const char* konfig) {
     }
 }
 
+// ─── Drucker: ROM-Katalog (WP9, Entwurf 49 §12) ───────────────────────────────
+
+int k1520_printer_rom_count(void) {
+    const auto kat = DruckerRomKatalog::gemeinsam();
+    return kat->ok() ? static_cast<int>(kat->eintraege().size()) : -1;
+}
+
+const char* k1520_printer_rom_error(void) {
+    static thread_local std::string puffer;
+    puffer = DruckerRomKatalog::gemeinsam()->fehler();
+    return puffer.c_str();
+}
+
+const char* k1520_printer_rom_info(int index, int feld) {
+    static thread_local std::string puffer;
+    puffer.clear();
+    const auto kat = DruckerRomKatalog::gemeinsam();
+    if (!kat->ok() || index < 0 || static_cast<size_t>(index) >= kat->eintraege().size()) return puffer.c_str();
+    const DruckerRomEintrag& e = kat->eintraege()[static_cast<size_t>(index)];
+    auto komma = [](const std::vector<std::string>& v) {
+        std::string s;
+        for (const auto& x : v) s += (s.empty() ? "" : ",") + x;
+        return s;
+    };
+    switch (feld) {
+        case K1520_PROM_SCHLUESSEL: puffer = e.schluessel; break;
+        case K1520_PROM_TYP: puffer = e.typ; break;
+        case K1520_PROM_TITEL: puffer = e.titel; break;
+        case K1520_PROM_PGM: puffer = e.pgm; break;
+        case K1520_PROM_SCHNITTSTELLEN: puffer = komma(e.schnittstellen); break;
+        case K1520_PROM_ZEICHENSATZ: puffer = e.zeichensatz; break;
+        case K1520_PROM_GUETE: puffer = e.guete; break;
+        case K1520_PROM_HINWEIS: puffer = e.hinweis; break;
+        case K1520_PROM_VORGABE: puffer = e.vorgabe ? "1" : "0"; break;
+        case K1520_PROM_ALIASES: puffer = komma(e.aliases); break;
+        case K1520_PROM_HERKUNFT: puffer = e.herkunft; break;
+        case K1520_PROM_GROESSE: puffer = std::to_string(e.daten ? e.daten->size() : 0); break;
+        default: break;
+    }
+    return puffer.c_str();
+}
+
 // ─── Drucker: Blatt, Kopf, Bedienfeld (Entwurf 49, WP3) ──────────────────────
 
 static PrinterMachine* printerOf(K1520Handle h) {
