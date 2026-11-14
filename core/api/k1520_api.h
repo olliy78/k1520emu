@@ -1203,6 +1203,56 @@ K1520_API bool        k1520_net_status(K1520Handle h, int* basis, uint64_t* zaeh
 /** @brief Register/Speicher des W5100 (15-Bit-Adresse, ohne Nebenwirkung auf Sockets); -1 ohne Karte. */
 K1520_API int         k1520_net_w5100_read(K1520Handle h, int adr);
 
+/* ─── SOUND-Karte K1520: AY-3-8910/8912 + eigene CTC, Tonausgabe (doc/design/51_soundkarte_k1520.md, AP S5) ───
+ * Bestueckung nach dem Anlegen, VOR dem ersten k1520_run/k1520_reset; alle Maschinen mit K1520-Bus (nicht P8000).
+ * Die Tonausgabe (Wirtsgeraet, WAV) gehoert der Maschine; ohne Karte sind die Audio-Aufrufe wirkungslos
+ * (Status Aus bzw. 0/false, Fehlertext "Keine SOUND-Karte gesteckt"), nie ein Absturz. */
+
+/** Werte von k1520_audio_status. */
+enum {
+    K1520_AUDIO_AUS        = 0,   /**< nicht gestartet */
+    K1520_AUDIO_STUMM      = 1,   /**< laeuft, aber nichts zu hoeren */
+    K1520_AUDIO_HOERBAR    = 2,   /**< gibt an das Wirtsgeraet aus */
+    K1520_AUDIO_KEIN_GERAET = 3   /**< kein Wirtsgeraet oeffenbar */
+};
+
+/** @brief Steckt die SOUND-Karte.  @p basis = erstes Tor (Vielfaches von 8, Vorauswahl 0x38), @p chip 0 = AY-3-8910,
+ *  1 = AY-3-8912, @p takt 0 = Quarz, 1 = Quarz/2, 2 = Systemtakt, @p quarz_hz bestueckter Quarz (3579545),
+ *  @p kanal 0 = ABC, 1 = ACB, 2 = Mono, @p tiefpass != 0 = C16/C17 bestueckt, @p kaskade Bit0 TO0->TR1, Bit1 TO1->TR2,
+ *  Bit2 TO2->TR3.  @return 1 = gesteckt, 0 = Fehler (zu spaet, doppelt, Tor belegt, Basis ungueltig, P8000),
+ *  Grund in k1520_sound_fehler. */
+K1520_API int         k1520_sound_install(K1520Handle h, int basis, int chip, int takt, uint32_t quarz_hz, int kanal,
+                                          int tiefpass, int kaskade);
+/** @brief Grund des letzten gescheiterten k1520_sound_install ("" = keiner). */
+K1520_API const char* k1520_sound_fehler(K1520Handle h);
+/** @brief 1, wenn eine SOUND-Karte steckt. */
+K1520_API int         k1520_sound_present(K1520Handle h);
+/** @brief Die 16 AY-Register (Rohwerte) nach @p out; 1 = ok, 0 = keine Karte (out unberuehrt). */
+K1520_API int         k1520_sound_regs(K1520Handle h, uint8_t out[16]);
+/** @brief Zuletzt gewaehlte AY-Registeradresse (Latch); -1 ohne Karte. */
+K1520_API int         k1520_sound_latch(K1520Handle h);
+/** @brief Test-/Debughaken: schreibt @p wert in AY-Register @p reg (0..15) ueber die Tore basis/basis+1 der Karte,
+ *  wie ein OUT des Gastes.  1 = ok, 0 = keine Karte oder reg ausserhalb. */
+K1520_API int         k1520_sound_reg_write(K1520Handle h, int reg, uint8_t wert);
+/** @brief Nenntakt der Maschine in Hz (CTC-/Tonzeit). */
+K1520_API uint32_t    k1520_nenntakt_hz(K1520Handle h);
+
+/** @brief Wirtsausgabe starten.  1 = ok, 0 = Fehler (k1520_audio_fehler); ohne Karte 0. */
+K1520_API int         k1520_audio_start(K1520Handle h);
+K1520_API void        k1520_audio_stop(K1520Handle h);
+/** @brief Lautstaerke 0.0 .. 1.0 der Wirtsausgabe. */
+K1520_API void        k1520_audio_lautstaerke(K1520Handle h, float v);
+K1520_API void        k1520_audio_stumm(K1520Handle h, int stumm);
+/** @brief Echtzeit-Betrieb der Ausgabe (0 = Maschine laeuft schneller/langsamer, Wirtsausgabe stumm). */
+K1520_API void        k1520_audio_echtzeit(K1520Handle h, int an);
+/** @brief K1520_AUDIO_*; ohne Karte K1520_AUDIO_AUS. */
+K1520_API int         k1520_audio_status(K1520Handle h);
+/** @brief Grund des letzten Audio-Fehlers ("" = keiner). */
+K1520_API const char* k1520_audio_fehler(K1520Handle h);
+/** @brief WAV-Mitschrift (48 kHz Stereo, Maschinenzeit) in @p pfad starten.  1 = ok, 0 = Fehler (k1520_audio_fehler). */
+K1520_API int         k1520_audio_wav_start(K1520Handle h, const char* pfad);
+K1520_API void        k1520_audio_wav_stop(K1520Handle h);
+
 #ifdef __cplusplus
 }
 #endif

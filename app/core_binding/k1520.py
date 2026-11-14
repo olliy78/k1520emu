@@ -669,6 +669,47 @@ _lib.k1520_net_status.restype = ctypes.c_bool
 _lib.k1520_net_w5100_read.argtypes = [K1520Handle, ctypes.c_int]
 _lib.k1520_net_w5100_read.restype = ctypes.c_int
 
+# SOUND-Karte K1520 + Tonausgabe (doc/design/51_soundkarte_k1520.md, AP S5)
+_lib.k1520_sound_install.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint32,
+                                     ctypes.c_int, ctypes.c_int, ctypes.c_int]
+_lib.k1520_sound_install.restype = ctypes.c_int
+_lib.k1520_sound_fehler.argtypes = [K1520Handle]
+_lib.k1520_sound_fehler.restype = ctypes.c_char_p
+_lib.k1520_sound_present.argtypes = [K1520Handle]
+_lib.k1520_sound_present.restype = ctypes.c_int
+_lib.k1520_sound_regs.argtypes = [K1520Handle, ctypes.POINTER(ctypes.c_uint8)]
+_lib.k1520_sound_regs.restype = ctypes.c_int
+_lib.k1520_sound_latch.argtypes = [K1520Handle]
+_lib.k1520_sound_latch.restype = ctypes.c_int
+_lib.k1520_sound_reg_write.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_uint8]
+_lib.k1520_sound_reg_write.restype = ctypes.c_int
+_lib.k1520_nenntakt_hz.argtypes = [K1520Handle]
+_lib.k1520_nenntakt_hz.restype = ctypes.c_uint32
+_lib.k1520_audio_start.argtypes = [K1520Handle]
+_lib.k1520_audio_start.restype = ctypes.c_int
+_lib.k1520_audio_stop.argtypes = [K1520Handle]
+_lib.k1520_audio_stop.restype = None
+_lib.k1520_audio_lautstaerke.argtypes = [K1520Handle, ctypes.c_float]
+_lib.k1520_audio_lautstaerke.restype = None
+_lib.k1520_audio_stumm.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_audio_stumm.restype = None
+_lib.k1520_audio_echtzeit.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_audio_echtzeit.restype = None
+_lib.k1520_audio_status.argtypes = [K1520Handle]
+_lib.k1520_audio_status.restype = ctypes.c_int
+_lib.k1520_audio_fehler.argtypes = [K1520Handle]
+_lib.k1520_audio_fehler.restype = ctypes.c_char_p
+_lib.k1520_audio_wav_start.argtypes = [K1520Handle, ctypes.c_char_p]
+_lib.k1520_audio_wav_start.restype = ctypes.c_int
+_lib.k1520_audio_wav_stop.argtypes = [K1520Handle]
+_lib.k1520_audio_wav_stop.restype = None
+
+# Namen der SOUND-Optionen -> C-ABI-Werte
+_SOUND_CHIP = {"ay8910": 0, "ay8912": 1}
+_SOUND_TAKT = {"quarz": 0, "quarz_halbe": 1, "system": 2}
+_SOUND_KANAL = {"abc": 0, "acb": 1, "mono": 2}
+_AUDIO_STATUS = {0: "aus", 1: "stumm", 2: "hoerbar", 3: "kein_geraet"}
+
 # RAM-Floppy RAF (doc/design/22_raf512.md §6)
 _lib.k1520_raf_install.argtypes = [K1520Handle, ctypes.c_char_p]
 _lib.k1520_raf_install.restype = ctypes.c_bool
@@ -1267,7 +1308,7 @@ class K1520Emulator:
                  tastatur: Optional[str] = None, p8000: Optional[dict] = None,
                  ausfuehrung: Optional[str] = None, spe=1, pcmc=False, laderom: Optional[str] = None,
                  konfig: Optional[dict] = None, aup: bool = False,
-                 aup_sonder: bool = False, gide=None, usb=None, net=None):
+                 aup_sonder: bool = False, gide=None, usb=None, net=None, sound=None):
         """Initialize emulator instance.
 
         Args:
@@ -1308,6 +1349,11 @@ class K1520Emulator:
                 ``True`` = Vorgaben (Basis 0x90, RTC bestückt), sonst ein dict mit den Schlüsseln
                 ``basis``, ``rtc`` (bool), ``abbild`` (Plattenabbild), ``rtc_zustand`` (Batteriedatei),
                 ``rtc_versatz`` (Jahre, 0/-28/-40, nur Anzeige gegenueber dem Gast).
+                Direkt nach dem Anlegen gesteckt; Fehler → ValueError.
+            sound: SOUND-Karte K1520 (AY-3-8910/8912 + CTC) stecken (an jeder Maschine ausser P8000) —
+                ``None``/``False`` = ohne, ``True``/``{}`` = Vorgaben, sonst ein dict mit ``basis`` (0x38),
+                ``chip`` ("ay8910"|"ay8912"), ``takt`` ("quarz"|"quarz_halbe"|"system"), ``quarz_hz`` (3579545),
+                ``kanal`` ("abc"|"acb"|"mono"), ``tiefpass`` (bool) und ``kaskade`` (Bits 0..2).
                 Direkt nach dem Anlegen gesteckt; Fehler → ValueError.
             usb: GUN-USB (Z80-PIO + VDIP1, Wirtsverzeichnis als Stick) stecken (an jeder Maschine ausser
                 P8000; am K8915/PRG 710 ist die Vorgabe-Basis 0x84 von der ZRE belegt) — ``None``/``False``
@@ -1504,6 +1550,24 @@ class K1520Emulator:
                 _lib.k1520_destroy(handle)
                 self._handle = None
                 raise ValueError(reason or "KCNet nicht steckbar")
+        if sound is not None and sound is not False:
+            sd = {} if sound is True else dict(sound)
+            try:
+                werte = (_SOUND_CHIP[str(sd.get("chip", "ay8910")).lower()],
+                         _SOUND_TAKT[str(sd.get("takt", "quarz_halbe")).lower()],
+                         _SOUND_KANAL[str(sd.get("kanal", "abc")).lower()])
+            except KeyError as e:
+                _lib.k1520_destroy(handle)
+                self._handle = None
+                raise ValueError(f"SOUND: unbekannte Option {e}") from None
+            if not _lib.k1520_sound_install(handle, int(sd.get("basis", 0x38)), werte[0], werte[1],
+                                            int(sd.get("quarz_hz", 3579545)), werte[2],
+                                            1 if sd.get("tiefpass", False) else 0, int(sd.get("kaskade", 0))):
+                reason = _lib.k1520_sound_fehler(handle)
+                reason = reason.decode("utf-8", "replace") if reason else ""
+                _lib.k1520_destroy(handle)
+                self._handle = None
+                raise ValueError(reason or "SOUND-Karte nicht steckbar")
         if ptape and not _lib.k1520_ptape_install(handle):
             reason = _lib.k1520_last_init_error()
             reason = reason.decode("utf-8", "replace") if reason else ""
@@ -2602,6 +2666,61 @@ class K1520Emulator:
             return None
         return {"basis": basis.value, "stick_vorhanden": bool(stick.value),
                 "gelesen": z[0], "geschrieben": z[1], "resets": z[2]}
+
+    # ─── SOUND-Karte K1520 + Tonausgabe ────────────────────────────────────
+    def sound_present(self) -> bool:
+        """True, wenn die SOUND-Karte gesteckt ist (``K1520Emulator(sound=...)``)."""
+        return bool(_lib.k1520_sound_present(self._handle))
+
+    def sound_regs(self) -> Optional[list]:
+        """Die 16 AY-Register (Rohwerte) oder ``None`` ohne Karte."""
+        puffer = (ctypes.c_uint8 * 16)()
+        if not _lib.k1520_sound_regs(self._handle, puffer):
+            return None
+        return list(puffer)
+
+    def sound_latch(self) -> Optional[int]:
+        """Zuletzt gewaehlte AY-Registeradresse (``None`` ohne Karte)."""
+        v = _lib.k1520_sound_latch(self._handle)
+        return None if v < 0 else v
+
+    def sound_reg_write(self, reg: int, wert: int) -> bool:
+        """Debughaken: AY-Register ``reg`` wie ein Gast-OUT schreiben."""
+        return bool(_lib.k1520_sound_reg_write(self._handle, int(reg), int(wert) & 0xFF))
+
+    def nenntakt_hz(self) -> int:
+        return int(_lib.k1520_nenntakt_hz(self._handle))
+
+    def audio_start(self) -> bool:
+        """Wirtsausgabe starten; Fehler → ``False``, Grund in ``audio_fehler()``."""
+        return bool(_lib.k1520_audio_start(self._handle))
+
+    def audio_stop(self) -> None:
+        _lib.k1520_audio_stop(self._handle)
+
+    def audio_lautstaerke(self, v: float) -> None:
+        _lib.k1520_audio_lautstaerke(self._handle, float(v))
+
+    def audio_stumm(self, stumm: bool) -> None:
+        _lib.k1520_audio_stumm(self._handle, 1 if stumm else 0)
+
+    def audio_echtzeit(self, an: bool) -> None:
+        _lib.k1520_audio_echtzeit(self._handle, 1 if an else 0)
+
+    def audio_status(self) -> str:
+        """``"aus"`` | ``"stumm"`` | ``"hoerbar"`` | ``"kein_geraet"``."""
+        return _AUDIO_STATUS.get(int(_lib.k1520_audio_status(self._handle)), "aus")
+
+    def audio_fehler(self) -> str:
+        v = _lib.k1520_audio_fehler(self._handle)
+        return v.decode("utf-8", "replace") if v else ""
+
+    def audio_wav_start(self, pfad) -> bool:
+        """WAV-Mitschrift (48 kHz Stereo, Maschinenzeit) starten."""
+        return bool(_lib.k1520_audio_wav_start(self._handle, os.fsencode(str(pfad))))
+
+    def audio_wav_stop(self) -> None:
+        _lib.k1520_audio_wav_stop(self._handle)
 
     # ─── KCNet-Netzkarte ───────────────────────────────────────────────────
     def net_installed(self) -> bool:
