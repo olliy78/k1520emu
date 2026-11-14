@@ -272,7 +272,8 @@ inline bool parseAusfuehrung(const char* ausf, const char* lw, A5120Machine::Con
         if      (s == "v06")   lr = K2526::Laderom::V06;
         else if (s == "v09_1") lr = K2526::Laderom::V09_1;
         else if (s == "v09_2") lr = K2526::Laderom::V09_2;
-        else { err = "--laderom: unbekannt '" + s + "' (v06|v09_1|v09_2)"; return false; }
+        else if (s == "ul4")   lr = K2526::Laderom::UL4;
+        else { err = "--laderom: unbekannt '" + s + "' (v06|v09_1|v09_2|ul4)"; return false; }
     }
     // `--tastatur k7636|k7637` (AP A7): Tastatur abweichend von der Ausfuehrung (BCU 880 V1.2:
     // `neu` + K7636).

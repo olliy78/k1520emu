@@ -14,11 +14,11 @@ pytestmark = requires_core
 
 PROGRAMME = ["a5120", "k8915", "prg710", "pc1715"]
 VORAUSWAHL = {            # (gide, usb, net) je Programm/Modell laut Anwenderentscheid
-    ("a5120", None): (0x90, 0x84, 0xC0),
-    ("k8915", "k8915"): (0x90, 0x84, 0xC0),
-    ("k8915", "k8915-g2"): (0x90, 0x8C, 0xC0),
-    ("prg710", None): (0x90, 0x8C, 0x28),
-    ("pc1715", None): (0x90, 0x84, 0xC0),
+    ("a5120", None): (0xD0, 0x84, 0xC0),
+    ("k8915", "k8915"): (0xD0, 0x84, 0xC0),
+    ("k8915", "k8915-g2"): (0xD0, 0x8C, 0xC0),
+    ("prg710", None): (0x90, 0x8C, 0x28),      # EPROMmer D0H..D4H
+    ("pc1715", None): (0xD0, 0x84, 0xC0),
 }
 
 
@@ -45,23 +45,36 @@ def test_vorauswahl_laut_tabelle(fall):
 @pytest.mark.parametrize("fall", list(_faelle()), ids=_id)
 @pytest.mark.parametrize("em", [None, "em064", "em256", "em1024"])
 def test_vorauswahl_kollidiert_nirgends(fall, em):
-    """Alle drei Karten + RAF + Kassette + Lochstreifen zugleich, ohne gemeldeten Konflikt."""
+    """Alle drei Karten + RAF + Lochstreifen (+ Kassette, wo sie nicht auf D0H liegt) zugleich, ohne gemeldeten Konflikt.
+
+    K8915 und PC 1715: GIDE D0H und K5020 (D0H..D7H) teilen sich D4H..D7H -- die Kassette fehlt dort mit Absicht
+    (Anwenderentscheid 2026-11-14), der Konflikt selbst steht in ``test_gide_d0_und_kassette_melden_konflikt``.
+    """
     from app.core_binding.k1520 import K1520Emulator
     p, m = fall
     if em and p.maschine != "a5120":
         pytest.skip("Erweiterungsmodul gibt es nur am A5120")
     kern = dict(p.kern_parameter(m, p.hardware_standard(m), "k7024"))
     extra = {}
+    kassette = p.maschine in ("a5120", "prg710")        # K8915/PC 1715: K5020 auf D0H..D7H, GIDE D0H
     if "konfig" in kern:
-        kern["konfig"] = {**kern["konfig"], "kassette": True, **({"em": em} if em else {})}
-    else:
+        kern["konfig"] = {**kern["konfig"], "kassette": kassette, **({"em": em} if em else {})}
+    elif kassette:
         extra["tape"] = True
     emu = K1520Emulator(machine=p.modell_maschine(m), raf="raf2m", ptape=True,
                         gide={"basis": p.karten_vorauswahl("gide", m)},
                         usb={"basis": p.karten_vorauswahl("usb", m)},
                         net={"basis": p.karten_vorauswahl("net", m)}, **extra, **kern)
     assert emu.gide_installed() and emu.usb_installed() and emu.net_installed()
-    assert emu.tape_installed() and emu.ptape_installed() and emu.raf_variant
+    assert emu.tape_installed() == kassette and emu.ptape_installed() and emu.raf_variant
+
+
+@pytest.mark.parametrize("maschine", ["k8915", "pc1715"])
+def test_gide_d0_und_kassette_melden_konflikt(maschine):
+    """GIDE auf der Vorauswahl D0H und die K5020 (D0H..D7H) zugleich: der Kern meldet den Konflikt mit Grund."""
+    from app.core_binding.k1520 import K1520Emulator
+    with pytest.raises(ValueError, match="belegt"):
+        K1520Emulator(machine=maschine, tape=True, gide={"basis": 0xD0})
 
 
 def test_besitzerabfrage_und_kandidatenliste():

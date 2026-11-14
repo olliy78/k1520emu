@@ -16,7 +16,7 @@ benutzbar.  Diese Software liegt seit **2026-11-11** im Repository und auf den a
 |-----------|-----|-----------------|--------------------------------|------------|
 | `fremd/poppe/gidehp00..f0.com`, `eradir.com` | GIDE-Treiber für CP/A (nachladbar, Laufwerke ab dem ersten freien Buchstaben) und Verzeichnis-Anlegen | Heiko Poppe, V0.2 | hc-ddr.hucki.net, Wiki *z9001/cpm/gide* | **ungeklärt**; für den Quelltext der Treiberfamilie nennt die Fundstelle „private Nachnutzung gestattet, nicht kommerziell" |
 | `fremd/kingstener/gidn_50h.com` (Ausgangsstück für `GIDN90.COM`) | nachladbarer GIDE-Treiber für SCPX/SCP, Laufwerk N: | Kingstener (DL), V0.4, 2014; „basiert auf RAF2008-Treiber und gideide.mac (C) 1995 Tilmann Reh"; Reassemblierung V. Pohlers | hc-ddr.hucki.net, Wiki *z9001/cpm/gide* | **ungeklärt**; laut Wiki „mit freundlicher Genehmigung" des Autors dort eingestellt — keine Erlaubnis für uns |
-| `fremd/utools/{usb,udir,uget,uput}.com` | UTools 1.4: USB-Stick am VDIP1 (PIO DCh..DFh) | © 2008–2011 M. Leubner; CP/M-Fassung (AC1) von Ralph Hänsel | hc-ddr.hucki.net, Wiki *z9001/module_sonstige/guk_v8* | **ungeklärt** |
+| `fremd/utools/{usb,udir,uget,uput,urun,ubackup,urestore}.com` | UTools **1.8**: USB-Stick am VDIP1 (PIO-Basis als ein Byte im Konfigurationsblock, geliefert D0H) | © 2008–2022 M. Leubner; Fassung „Adr D0h“ aus den rowikla-Unterlagen (`H_OLAF/TOOLs`, Dateien von 2023); löst die UTools 1.4 (Hucki-Wiki, PIO DCh) ab | rowikla-Sammlung | Weitergabe vom Anwender am 2026-11-13 freigegeben; Quellen nicht dabei |
 | `fremd/kcnet/CPMN1587.COM`, `TFTP1287.COM` | CPMNET 1.5 (2008) und TFTP 1.2 (2009) für die KCNet-Karte | `>susowa<` = Ralf Kaestner | kc85.info (Software-Seite der KCNet) | **ungeklärt**; die Nutzungsbedingungen der Seite waren aus der Entwicklungsumgebung nicht abrufbar (kein Netz) — **nachzuholen** |
 | `uhr/` (`UHR.COM`, `src/uhr.mac`) | Uhr der GIDE-Karte anzeigen/stellen | **eigenes Werk**, MIT; Registerbelegung aus dem Verständnis von Rehs `gidertc.mac`, kein Quelltext übernommen | — | frei (MIT) |
 | `basis_anpassen.py`, `karten.py` | Umschreiben der Basis, Zusammenstellung je Rechner | eigen, MIT | — | frei |
@@ -27,7 +27,7 @@ Repository; sie standen nur für das Verständnis zur Verfügung (Entwurf 50 §2
 ## Welche Diskette trägt was
 
 Die Software passt zur **Vorauswahl der Oberfläche** (`app/profil.py` `karten_vorauswahl`, Handbuch „Zusatzkarten"):
-GIDE **90H** überall; USB **84H** (A5120 alle Modelle, K8915 V3, PC 1715/1715W) bzw. **8CH** (K8915 Gen 2, PRG 710/710-1);
+GIDE **D0H** (A5120, K8915, PC 1715/1715W) bzw. **90H** (PRG 710/710-1, der EPROMmer belegt D0H); USB **84H** (A5120 alle Modelle, K8915 V3, PC 1715/1715W) bzw. **8CH** (K8915 Gen 2, PRG 710/710-1);
 Netz **C0H** (A5120, K8915, PC 1715) bzw. **28H** (PRG 710/710-1).  Aufstellung: `karten.py` (`RECHNER`); der Waechter
 `cli_karten_beigaben` vergleicht jede Diskette bytegleich damit.
 
@@ -54,7 +54,7 @@ Treiber laufen (nicht geprüft), oder es gibt kein CP/M.  Wer eine andere **Basi
 |----------|----------|----------|
 | `GIDEHP90.COM`, `ERADIR.COM` | **unverändert** aus der Quelle des Autors (für jede Basis gibt es eine Fassung) | Systemtests `KartenBeigaben.A5120_CPA`, `PC1715_CPA1715`, `PRG710_SCPX15` |
 | `GIDN90.COM` | **umgeschrieben** aus `gidn@50h.com`: 16 Operanden (Hochnibble 5 → 9); `gidn(0xD0)`/`gidn(0xF0)` erzeugen **bytegleich** die Fassungen `@D0h`/`@F0h` des Autors (SHA-256 im Wächter) | `test_karten_software.py::test_gidn_*`, Systemtests K8915/A5120 SCPX/PRG 710-1/SCP 1715 |
-| `USB/UDIR/UGET/UPUT` für 84H/8CH | **umgeschrieben**: 16 Port-Operanden im gemeinsamen Teil (`USBINC.Z80`), in allen vier Programmen an denselben Stellen; DCh ergibt das Original. **Neuaufbau aus dem Quelltext war nicht möglich**: der Linker (SLRNK) braucht `DSLIBS.REL`/`SYSLIBS.REL` des Autors (`$MEMRY`, `CONDIN`, `COUT`, `EPRINT`, `PA2HC`, `U2MTIM`), die nicht zum Paket gehören | Disassemblierung der Stellen, Systemtests auf 6 Rechnern |
+| `USB/UDIR/UGET/UPUT/URUN/UBACKUP/URESTORE` für 84H/8CH | **umgeschrieben**: UTools 1.8 tragen die Basis als EIN Byte (Versatz 0x88, umgeben von `50h`/`01h`); D0H ergibt das Original. Quellen liegen nicht vor (nur die `.com`). Bei der zweiten K8915-Basis (8CH) heißen UBACKUP/URESTORE `UBACK8C`/`UREST8C` (8-Zeichen-Grenze); **PC 1715W: UTools 1.4** (`fremd/utools14`, 16 Operanden, nur USB/UDIR/UGET/UPUT) — die 1.8 bleiben dort mit SCP 3.0 stumm (`USB FWV` ohne Ausgabe, `UDIR` kehrt nicht zurück; Ursache nicht geklärt, abgeschaltete KC85-Erkennung half nicht) | Systemtests `KartenBeigaben.*` (84H, 8CH), `GunUsbSystem.UToolsA5120` (D0H unverändert) |
 | `CPMNET.COM`, `TFTP.COM` | C0H **unverändert**; für 28H **umgeschrieben**: 10 Operanden des Treiberblocks 0109..028E (`LD C,n`, `IN/OUT (n)`), in beiden Programmen identisch; sonst kommt C0H..C3H im ganzen Programm nicht vor (disassembliert) | Systemtest `KartenBeigaben.PRG710_*` (28H) |
 | `UHR.COM` | **eigen**, `tools/gide/uhr/build.py` (M80 + LINKMT über die CPA_Workbench, wie SERTEST); `.com` eingecheckt, Wächter `cli_uhr_com` | alle Systemtests |
 
@@ -76,7 +76,7 @@ Disketten **neu bauen** (Reihenfolge egal; jede Diskette hat ihr Bauskript, `too
 ## Tests
 
 - `KartenBeigaben.*` (`tests/integration/test_karten_beigaben.cpp`, **ohne Überspringen**): je Rechner die AUSGELIEFERTE Diskette (Kopie)
-  booten, GIDE auf 90H, USB, Netz auf der Vorauswahl-Basis stecken und die Programme laufen lassen — Treiber starten, Datei über die
+  booten, GIDE auf der Vorauswahl-Basis, USB, Netz auf der Vorauswahl-Basis stecken und die Programme laufen lassen — Treiber starten, Datei über die
   Platte hin und zurück (bitgleich), `UHR` zeigt/stellt die Zeit, `USB FWV`/`UDIR`/`UGET` gegen einen Temp-Ordner als Stick,
   `TFTP`/`CPMNET` melden Version und „online".  Nur Loopback, kein UDP-Port 69.
 - `py_karten_software` (Umschreiben, Zusammenstellung, Vorauswahl = Basis der Software), `cli_karten_beigaben`, `cli_uhr_com`.

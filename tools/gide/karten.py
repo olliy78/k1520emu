@@ -8,7 +8,7 @@ Was auf welche Systemdiskette gehoert, steht HIER (eine Wahrheit); die Bauskript
 (tools/cpa_a5120/build.py usw.) rufen :func:`dateien` und legen das Ergebnis in ihr ``soll()``.
 Die Software passt zur VORAUSWAHL der Oberflaeche (``app/profil.py``, Handbuch „Zusatzkarten"):
 
-  GIDE  Basis 90H auf allen Rechnern
+  GIDE  Basis D0H (A5120, K8915, PC 1715/1715W), 90H (PRG 710/710-1: der EPROMmer belegt D0H..D4H)
   USB   84H (A5120 alle Modelle, K8915 V3, PC 1715/1715W) bzw. 8CH (K8915 Gen 2, PRG 710/710-1)
   Netz  C0H (A5120, K8915, PC 1715/1715W) bzw. 28H (PRG 710/710-1)
 
@@ -31,12 +31,13 @@ UHR_COM = os.path.join(HIER, 'uhr', 'uhr.com')
 
 
 class Rechner:
-    def __init__(self, titel, gide, usb, net, gide_basis=0x90, pip=True):
+    def __init__(self, titel, gide, usb, net, gide_basis=0xD0, pip=True, usb14=False):
         self.titel = titel
         self.gide = gide                # 'poppe' | 'gidn' | None (kein Treiber; die Uhr der Karte gibt es trotzdem)
         self.usb = usb                  # Liste der Basen; die erste traegt die Namen USB.COM ..., weitere Suffix
         self.net = net                  # None = nicht auf der Diskette (Platz)
         self.gide_basis = gide_basis
+        self.usb14 = usb14              # PC 1715W: UTools 1.4 (die 1.8 bleiben dort stumm, Ursache offen)
         self.pip = pip                  # False: SCP 1715 hat kein brauchbares PIP (nur Hinweis im Text)
 
 
@@ -45,14 +46,18 @@ RECHNER = {
     'a5120_cpa':    Rechner('A5120 mit CP/A', 'poppe', [0x84], 0xC0),
     'a5120_scpx':   Rechner('A5120 mit SCPX 1.7', 'gidn', [0x84], 0xC0),
     'k8915_scpx':   Rechner('K8915 mit SCPX 8915', 'gidn', [0x84, 0x8C], 0xC0),
-    'prg710_scpx':  Rechner('PRG 710 mit SCPX', 'poppe', [0x8C], 0x28),
-    'prg710_1_scpx': Rechner('PRG 710-1 mit SCPX 1.7', 'gidn', [0x8C], 0x28),
+    'prg710_scpx':  Rechner('PRG 710 mit SCPX', 'poppe', [0x8C], 0x28, gide_basis=0x90),
+    'prg710_1_scpx': Rechner('PRG 710-1 mit SCPX 1.7', 'gidn', [0x8C], 0x28, gide_basis=0x90),
     'pc1715_cpa':   Rechner('PC 1715 mit CP/A 1715', 'poppe', [0x84], 0xC0),
     'pc1715_scp6':  Rechner('PC 1715 mit SCP 1715 V0006', 'gidn', [0x84], 0xC0, pip=False),
     'pc1715_scp7':  Rechner('PC 1715 mit SCP 1715 V0007', 'gidn', [0x84], 0xC0, pip=False),
     # PC 1715W mit SCP 3.0: kein IDE-Treiber bekannt, die Systemdiskette hat nur 38 KB frei -> Uhr und USB (Netz: zu gross)
-    'pc1715w_scp3': Rechner('PC 1715W mit SCP 3.0', None, [0x84], None),
+    'pc1715w_scp3': Rechner('PC 1715W mit SCP 3.0', None, [0x84], None, usb14=True),
 }
+
+
+#: Kurznamen der UTools mit Basis-Suffix (8 Zeichen: Stamm + 2 Hex-Ziffern)
+USB_KURZ = {'UBACKUP': 'UBACK', 'URESTORE': 'UREST'}
 
 
 def _lies(*teile):
@@ -123,7 +128,7 @@ def _gide_text(r):
            f'----------------------------------\n'
            f'  UHR                           zeigt TT.MM.JJJJ HH:MM:SS\n'
            f'  UHR S 24.12.26 18:30:00       stellt die Uhr (Jahr auch vierstellig)\n'
-           f'  UHR BB ...                    andere Kartenbasis, BB in Hex (Vorgabe 90)\n'
+           f'  UHR BB ...                    andere Kartenbasis, BB in Hex (Vorgabe {r.gide_basis:02X})\n'
            f'Die Uhr laeuft in Maschinenzeit und wird vom Emulator mit der PC-Uhr (UTC)\n'
            f'versorgt (Einstellungen - Allgemein - GIDE).\n')
     return kopf + platte + uhr
@@ -132,21 +137,24 @@ def _gide_text(r):
 def _usb_text(r):
     erste = r.usb[0]
     s = (f'USB-Stick (GUN/VDIP1) - {r.titel}\n{"=" * 60}\n\n'
-         f'Programme der UTools 1.4 (M. Leubner), umgeschrieben auf die Vorauswahl-Basis\n'
+         f'Programme der UTools {"1.4" if r.usb14 else "1.8"} (M. Leubner), umgeschrieben auf die Vorauswahl-Basis\n'
          f'{_hex(erste)} des Emulators (Einstellungen - Allgemein - USB-Stick):\n\n'
          f'  USB FWV              Firmware-Version der Karte (Pruefung der Verbindung)\n'
          f'  UDIR                 Verzeichnis des Sticks\n'
          f'  UGET DATEI.EXT       Datei vom Stick auf die Diskette holen\n'
          f'  UPUT DATEI.EXT       Datei von der Diskette auf den Stick schreiben\n'
-         f'  USB CD name / MKD name / DLF name / FS   Verzeichnis, Anlegen, Loeschen, Platz\n\n'
+         f'  USB CD name / MKD name / DLF name / FS   Verzeichnis, Anlegen, Loeschen, Platz\n'
+         + ('' if r.usb14 else f'  URUN PROG.COM        COM-Datei direkt vom Stick starten\n'
+                              f'  UBACKUP / URESTORE   Diskette auf den Stick sichern bzw. zurueckspielen\n') + '\n'
          f'Der "Stick" ist ein Ordner auf dem Rechner (im Emulator waehlen); Namen nur 8.3.\n')
     if len(r.usb) > 1:
         s += (f'\nDieser Rechner hat je nach Modell zwei Vorauswahlen: {_hex(r.usb[0])} (K8915 V3) und '
               f'{_hex(r.usb[1])} (K8915 Gen 2).\n'
               f'Die Programme mit dem Suffix {r.usb[1]:02X} (USB{r.usb[1]:02X}.COM, UDIR{r.usb[1]:02X}.COM, '
-              f'UGET{r.usb[1]:02X}.COM, UPUT{r.usb[1]:02X}.COM) gehoeren zur Basis {_hex(r.usb[1])}.\n')
+              f'UGET{r.usb[1]:02X}.COM, UPUT{r.usb[1]:02X}.COM, URUN{r.usb[1]:02X}.COM, UBACK{r.usb[1]:02X}.COM,\n'
+              f'UREST{r.usb[1]:02X}.COM) gehoeren zur Basis {_hex(r.usb[1])}.\n')
     s += (f'\nAndere Basis: python3 karten_software/basis_anpassen.py usb <BB> --out <Ordner>\n'
-          f'(BB = Hexzahl, Vielfaches von 4); die vier Programme dann auf die Diskette kopieren.\n')
+          f'(BB = Hexzahl, Vielfaches von 4); die Programme dann auf die Diskette kopieren.\n')
     return s
 
 
@@ -181,13 +189,19 @@ def dateien(schluessel):
         d['ERADIR.COM'] = _lies(FREMD, 'poppe', 'eradir.com')
     elif r.gide == 'gidn':
         d[f'GIDN{r.gide_basis:02X}.COM'] = ba.gidn_datei(r.gide_basis)
-    d['UHR.COM'] = _lies(UHR_COM)
+    uhr = bytearray(_lies(UHR_COM))
+    uhr[0x104] = r.gide_basis        # LD A,<Basis> am Programmanfang (Vorgabe der .com: D0H)
+    d['UHR.COM'] = bytes(uhr)
     d['GIDE.TXT'] = cpm_text(_gide_text(r))
     for i, basis in enumerate(r.usb):
-        suffix = '' if i == 0 else f'{basis:02X}'
-        for name, daten in ba.usb_satz(basis).items():
+        for name, daten in (ba.usb14_satz(basis) if r.usb14 else ba.usb_satz(basis)).items():
             stamm, endung = name.split('.')
-            d[f'{stamm}{suffix}.{endung}'] = daten
+            if i == 0:
+                d[name] = daten
+            else:
+                # Zweite Basis: Suffix an den Namen; UBACKUP/URESTORE waeren dann laenger als 8 Zeichen -> gekuerzt
+                stamm = USB_KURZ.get(stamm, stamm)
+                d[f'{stamm}{basis:02X}.{endung}'] = daten
     d['USB.TXT'] = cpm_text(_usb_text(r))
     if r.net is not None:
         n = ba.net_satz(r.net)

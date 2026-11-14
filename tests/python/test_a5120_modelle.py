@@ -122,7 +122,7 @@ def test_laderom_und_tastatur_falsch():
 def test_c_abi_lehnt_unbekannte_werte_mit_grund_ab():
     from app.core_binding import k1520
     lib = k1520._lib
-    for args in ((1, 3, 0), (1, 0, 3), (4, 0, 0)):
+    for args in ((1, 4, 0), (1, 0, 3), (4, 0, 0)):
         h = lib.k1520_create_a5120_konfig(*args, None, None, None, None)
         assert not h, args
         assert lib.k1520_last_init_error()
@@ -195,7 +195,7 @@ def test_optionsfelder_und_beschriftungen():
         ["1x K3525 16KB", "2x K3525 32KB", "4x K3525 64KB", "K3526 64KB"]
     assert [w for w, _a in felder["tastatur"][3]] == ["k7636", "k7637"]
     # Das Lade-ROM „K8924 V0.9a“ fehlt, solange der Kern es nicht kennt.
-    assert [w for w, _a in felder["laderom"][3]] == ["v09_2", "v09_1", "v06"]
+    assert [w for w, _a in felder["laderom"][3]] == ["v09_2", "v09_1", "v06", "ul4"]
     assert felder["erweiterungsmodul"][4] == ("a5120",)
     assert p.tape_wahl
 

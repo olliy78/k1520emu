@@ -22,9 +22,9 @@ ein unbekannter/kaputter Einzelwert faellt auf die Vorgabe zurueck.
 
 **Warum die Basis eine Wahl ist:** die Jumperstellung der echten Karten ist unbekannt
 (Anwenderentscheid 2026-11-10).  Das Auswahlfeld bildet 00H..F0H ab (:mod:`app.kartenwahl`, belegte
-Eintraege sind markiert und nicht waehlbar); die Vorauswahl ist ueberall 90H (94H..9FH ist auf allen
-Maschinen frei und kollidiert weder mit K5020 noch EPROMmer D0H..D4H noch RAF).  Die uebliche Basis der
-Community, D0H (Poppe-Treiber GIDEHPD0, Kingstener gidn@D0h), ist waehlbar, wo sie frei ist.  Ein Konflikt
+Eintraege sind markiert und nicht waehlbar); die Vorauswahl ist D0H (die Basis der Poppe-Treiber GIDEHPD0, des
+Urladers K2526UL4, Kingstener gidn@D0h; Anwenderentscheid 2026-11-14), am PRG 710/-1 90H (der EPROMmer belegt
+D0H..D4H).  An K8915 und PC 1715 teilt sich D0H mit der K5020: beide zugleich meldet der Kern als Konflikt.  Ein Konflikt
 mit einer Karte, die der Auswahl entgeht, wird vom KERN beim Stecken gemeldet -- die Oberflaeche zeigt den
 Fehlertext.
 """
@@ -52,8 +52,8 @@ TIPP_KARTE = (
     "und neu ein.")
 TIPP_BASIS = (
     "Hochnibble der E/A-Adresse (Jumper A4–A7 der Karte).  Die Jumperstellung der echten Karten ist "
-    "nicht bekannt; vorbelegt ist 90H (frei auf allen Rechnern), üblich in der Praxis D0H (Treiber "
-    "GIDEHPD0, gidn@D0h).  Belegte Einträge (Kassette K5020, EPROMmer, andere Karten) sind markiert und "
+    "nicht bekannt; vorbelegt ist D0H, die Basis der Gemeinschafts-Software (Treiber "
+    "GIDEHPD0, gidn@D0h, Urlader UL4), am PRG 710/-1 90H (EPROMmer).  Belegte Einträge (Kassette K5020, EPROMmer, andere Karten) sind markiert und "
     "nicht wählbar.  Ein Wechsel schaltet die Maschine aus und neu ein.")
 TIPP_ABBILD = (
     "Plattenabbild, immer gepackt (.img.gz) wie die Platten des P8000: eine leere 256-MB-Platte belegt "

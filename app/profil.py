@@ -148,8 +148,11 @@ class Programmprofil:
     #: Vorauswahl der E/A-Basis der Steckkarten (`app/kartenwahl.py`): so gewaehlt, dass die Vorauswahlen
     #: aller drei Karten UNTEREINANDER und mit RAF, Kassette K5020, Lochstreifen K6022 und den festen Karten
     #: der Maschine disjunkt sind (Waechter `test_vorauswahl_kollidiert_nirgends`).
-    #: GIDE 90H auf allen Maschinen (94H..9FH frei).
-    gide_basis_vorgabe: int = 0x90
+    #: GIDE D0H (die Basis der Urlader/Treiber/Werkzeuge der Gemeinschaft, Anwenderentscheid 2026-11-14);
+    #: am PRG 710/-1 90H, weil der EPROMmer D0H..D4H belegt.  An K8915 und PC 1715 teilt sich D4H..D7H mit der
+    #: K5020 (D0H..D7H): beide zugleich meldet der Kern als Konflikt (Fehlertext in der Oberflaeche), die Basis
+    #: laesst sich von Hand aendern.
+    gide_basis_vorgabe: int = 0xD0
     #: USB: 84H (GUN-Festlage), ausser wo 80H..87H belegt ist: ``usb_basis_modell`` = ``((Modell, Basis), …)``
     #: ueberstimmt (K8915 Gen2, PRG 710/-1: 8CH).
     usb_basis_vorgabe: int = 0x84
@@ -614,8 +617,8 @@ A5120 = Programmprofil(
           ("3", "03 (Stopfen 1+2)"), ("4", "04 (Stopfen 3)"), ("5", "05 (Stopfen 1+3)"),
           ("6", "06 5. Bedienebene")), ()),
         ("laderom", "Lade-ROM:",
-         "Lade-ROM der K2526.  V0.6 liest die BCU-Disketten „SYL auf Spur 1“.",
-         (("v09_2", "V0.9_2"), ("v09_1", "V0.9_1"), ("v06", "V0.6")), ()),
+         "Lade-ROM der K2526.  V0.6 liest die BCU-Disketten „SYL auf Spur 1“; UL4 (Wilfling) bootet nach der Diskette von der GIDE-Platte (Basis D0H, Karte unter Erweiterungskarten stecken).",
+         (("v09_2", "V0.9_2"), ("v09_1", "V0.9_1"), ("v06", "V0.6"), ("ul4", "UL4 (GIDE-Boot)")), ()),
         ("erweiterungsmodul", "Erweiterungsmodul:",
          "EM064/EM256 mit dem U8001 (A5120.16): nur am A5120 und nur mit der K3526 (64 KB) als RAM.  "
          "EM1024 (1 MB) ist eine Neuentwicklung ohne historisches Vorbild.",
@@ -680,6 +683,7 @@ PRG710 = Programmprofil(
     beschreibung="Emulator der Programmiergeräte robotron PRG 710 und PRG 710-1 (K1520-Bus)",
     konfig_datei="prg710emu.yaml",
     vorgabe_datei="default_config_prg710.yaml",
+    gide_basis_vorgabe=0x90,        # EPROMmer D0H..D4H belegt
     usb_basis_vorgabe=0x8C,         # 80H..87H belegt (ZRE)
     net_basis_vorgabe=0x28,         # C0H..C3H = ATP-Zusatz
     # 2,4576 MHz (Prg710Machine::CPU_HZ, wie der K8915).

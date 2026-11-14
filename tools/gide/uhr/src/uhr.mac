@@ -5,7 +5,7 @@
 ;           (tools/gide/README.md).  Kein Fremdcode.
 ;
 ;   UHR                   Uhrzeit anzeigen   TT.MM.JJJJ HH:MM:SS
-;   UHR 90                dasselbe, Kartenbasis 90H (Hex, Vorgabe 90H)
+;   UHR 90                dasselbe, Kartenbasis 90H (Hex, Vorgabe D0H)
 ;   UHR S TT.MM.JJ HH:MM:SS [BB]   Uhr stellen (Jahr auch vierstellig, Sekunden weglassbar)
 ;
 ; Die GIDE-Karte traegt den Epson RTC 72421 auf E/A Basis+5.  Die Registernummer (0..F)
@@ -30,7 +30,7 @@ R_F	EQU	0FH
 
 	ORG	100H
 START:	LD	SP,STACK
-	LD	A,90H
+	LD	A,0D0H
 	LD	(BASIS),A
 	XOR	A
 	LD	(STELLEN),A
