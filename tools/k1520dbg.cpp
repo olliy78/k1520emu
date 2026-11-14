@@ -4803,6 +4803,7 @@ int main(int argc, char** argv){
                     fprintf(stderr,"%s", blattAscii(b,a[0],a[1],a[2],a[3],a[4],a[5]).c_str());
                 }
             }
+        }
         else if (cmd=="usb"){   // GUN-USB (--usb): Basis, Stick, Zaehler, PIO (ohne Nebenwirkung)
             const k1520::GunUsb* g = m.base().gunUsb();
             if (!g) fprintf(stderr,"  keine GUN-USB gesteckt (--usb[=basis] [--usb-dir <ordner>])\n");
