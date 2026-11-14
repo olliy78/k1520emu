@@ -375,6 +375,7 @@ void A5120Machine::resetHardware() {
     gideReset();             // GIDE (gesteckt?): LH, Platte; Medium bleibt
     gunUsbReset();           // GUN-USB (gesteckt?): PIO, VDIP1; Stick bleibt
     gunNetReset();           // KCNet (gesteckt?): PIO, Automat, W5100
+    soundReset();             // SOUND-Karte (gesteckt?): AY und CTC
     bus_.clearNMI();
     bus_.releaseINT();
     bus_.releaseWAIT();
@@ -408,6 +409,7 @@ void A5120Machine::powerOn() {
     gidePowerOn();
     gunUsbPowerOn();
     gunNetPowerOn();
+    soundPowerOn();
     resetHardware();
     LOG_INFO("A5120", "Power on: ZVE1 Reset, Lade-ROM aktiv");
 
@@ -1033,6 +1035,7 @@ int A5120Machine::run(int max_cycles) {
         ctc_fired      = k5020Takt(used) || ctc_fired;   // Kassette (gesteckt?)
         gideTakt(total_cycles_);   // GIDE (gesteckt?): Platte und RTC in Maschinenzeit
         gunNetTakt(total_cycles_);   // KCNet (gesteckt?): Kommando 03 in Maschinenzeit
+        ctc_fired = soundTakt(used, total_cycles_) || ctc_fired;   // SOUND-Karte (gesteckt?): CTC-Takt + AY-Zeit
         if (ctc_fired) bus_.markIntDirty();
 
         // Service the keyboard: advance the 9600-baud serial-transmit timing

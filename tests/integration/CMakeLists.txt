@@ -294,7 +294,7 @@ k1520_add_test(gun_usb_maschinen SRC test_gun_usb_maschinen.cpp
 
 # Vorauswahl der Karten-Basen je Maschinenvariante: GIDE + USB + Netz (+ RAF, K5020, K6022) zugleich, je Karte ein Z80-Gastprogramm.
 k1520_add_test(karten_vorgaben SRC test_karten_vorgaben.cpp
-                               LIBS k1520_a5120 k1520_k8915 k1520_prg710 k1520_pc1715 k1520_gide k1520_gun_usb k1520_gun_net k1520_logger k1520_testsupport
+                               LIBS k1520_a5120 k1520_k8915 k1520_prg710 k1520_pc1715 k1520_gide k1520_gun_usb k1520_gun_net k1520_sound_k1520 k1520_logger k1520_testsupport
                                LABELS "${_lbl}" DEFS LOG_LEVEL=2)
 
 # GUN-USB, AP U2: die ECHTEN UTools 1.8 (USB/UDIR/UPUT/UGET, PIO D0H wie geliefert) gegen die Karte; die Software liegt
@@ -492,6 +492,11 @@ k1520_add_test(mc80_spiele SRC test_mc80_spiele.cpp
 k1520_add_test(kermit_netz SRC test_kermit_netz.cpp
                            LIBS k1520kermit_core k1520_serial
                            LABELS "${_lbl}" TIMEOUT 180)
+
+# SOUND-Karte K1520 (Entwurf 51 AP S4): stecken/Fehlerfaelle je Maschine, P8000 lehnt ab, CTC 50 Hz + AY-Ton in der WAV am A5120/K8915
+k1520_add_test(sound_maschinen SRC test_sound_maschinen.cpp
+                               LIBS k1520_a5120 k1520_k8915 k1520_prg710 k1520_pc1715 k1520_mc80 k1520_p8000 k1520_sound_k1520 k1520_logger k1520_testsupport
+                               LABELS "${_lbl}" DEFS LOG_LEVEL=2)
 
 # KCNet (Entwurf 50 AP N2): stecken je Maschine, doppelt, zu spaet, Tore belegt (RAF 88H/89H, ZRE-Tore)
 k1520_add_test(gun_net_maschinen SRC test_gun_net_maschinen.cpp

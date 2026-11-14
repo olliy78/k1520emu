@@ -267,6 +267,7 @@ void Pc1715Machine::resetHardware()
     gideReset();             // GIDE (gesteckt?): LH, Platte; Medium bleibt
     gunUsbReset();           // GUN-USB (gesteckt?): PIO, VDIP1; Stick bleibt
     gunNetReset();           // KCNet (gesteckt?): PIO, Automat, W5100
+    soundReset();             // SOUND-Karte (gesteckt?): AY und CTC
     rafReset();              // RAF (gesteckt?): nur das Latch sperrt, der Inhalt bleibt
     hub_.gastZurueckgesetzt();   // XOFF-/RTS-Halt des alten Gastes gilt nicht weiter
     serial_naechst_ = 0;
@@ -286,6 +287,7 @@ void Pc1715Machine::powerOn()
     gidePowerOn();
     gunUsbPowerOn();
     gunNetPowerOn();
+    soundPowerOn();
     resetHardware();
     LOG_INFO("PC1715", w_ ? "Netz ein (1715W): BR = 00H, S550 bei 0000H"
                           : "Netz ein: ROM-Overlay S502 bei 0000H");
@@ -451,6 +453,7 @@ int Pc1715Machine::run(int max_cycles)
         dirty |= k5020Takt(used);   // Kassette (gesteckt?)
         gideTakt(total_cycles_);   // GIDE (gesteckt?): Platte und RTC in Maschinenzeit
         gunNetTakt(total_cycles_);   // KCNet (gesteckt?): Kommando 03 in Maschinenzeit
+        dirty = soundTakt(used, total_cycles_) || dirty;   // SOUND-Karte (gesteckt?): CTC-Takt + AY-Zeit
         // Schnittstellen nach aussen: der Wandler arbeitet nur alle 1/16 Zeichenzeit.
         if (total_cycles_ >= serial_naechst_) {
             serial_naechst_ = hub_.takt(total_cycles_);
@@ -520,6 +523,7 @@ int Pc1715Machine::runW(int max_cycles)
         dirty |= k5020Takt(used);   // Kassette (gesteckt?)
         gideTakt(total_cycles_);   // GIDE (gesteckt?): Platte und RTC in Maschinenzeit
         gunNetTakt(total_cycles_);   // KCNet (gesteckt?): Kommando 03 in Maschinenzeit
+        dirty = soundTakt(used, total_cycles_) || dirty;   // SOUND-Karte (gesteckt?): CTC-Takt + AY-Zeit
         if (total_cycles_ >= serial_naechst_) {
             serial_naechst_ = hub_.takt(total_cycles_);
             dirty |= zre_.nimmSeriellGeaendert();

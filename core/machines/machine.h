@@ -21,6 +21,8 @@
 #include "core/cards/k5020/k5020.h"
 #include "core/cards/k6022/k6022.h"
 #include "core/cards/raf/raf.h"
+#include "core/cards/sound_k1520/sound_k1520.h"
+#include "core/audio/ausgabe.h"
 #include "core/peripherals/floppy_drive/disk_image.h"
 #include "core/peripherals/floppy_drive/format_catalog.h"
 #include "core/serial/hub.h"
@@ -484,6 +486,98 @@ public:
     /** @brief Grund des letzten gescheiterten @ref installGunNet ("" = keiner). */
     const std::string& gunNetFehler() const { return gun_net_fehler_; }
 
+    // ─── SOUND-Karte K1520: AY-3-8910/8912 + eigene CTC (doc/design/51_soundkarte_k1520.md, AP S4) ──────
+    // Wie GIDE/K5020: nach dem Anlegen, VOR dem ersten run()/reset() gesteckt.  Acht Tore im 8er-Raster ab cfg.basis
+    // (Vorauswahl 38H, PC 1715/1715W E0H).  Die CTC haengt hinten in der Interruptkette (@ref soundEinketten).
+    // Die Tonausgabe (Ringpuffer, Ausgabefaden, WAV) gehoert der MASCHINE, nicht der Karte (@ref audioStart).
+    /**
+     * @brief Steckt die SOUND-Karte.  cfg.systemtakt_hz wird IMMER aus dem Maschinentakt gesetzt.
+     * @return false (Grund in @ref soundFehler) nach dem ersten run()/reset(), bei doppeltem Stecken,
+     *         ungueltiger Basis (kein Vielfaches von 8) oder belegtem Tor.
+     */
+    bool installSound(const k1520::SoundK1520::Config& cfg) {
+        sound_fehler_.clear();
+        if (!zusatzkartenSteckbar()) {
+            sound_fehler_ = "Diese Maschine hat keinen K1520-Steckplatz fuer eine SOUND-Karte";
+            return false;
+        }
+        if (!bestueckbar_) {
+            sound_fehler_ = "SOUND-Karte nur vor dem ersten Lauf/Reset steckbar";
+            return false;
+        }
+        if (sound_) {
+            sound_fehler_ = "Es steckt bereits eine SOUND-Karte";
+            return false;
+        }
+        k1520::SoundK1520::Config c = cfg;
+        c.systemtakt_hz = nenntaktHz();
+        std::unique_ptr<k1520::SoundK1520> karte;
+        try {
+            karte = std::make_unique<k1520::SoundK1520>(c);   // wirft bei Basis kein Vielfaches von 8
+        } catch (const std::exception& e) {
+            sound_fehler_ = e.what();
+            return false;
+        }
+        K1520Bus& bus = systemBus();
+        if (const std::string g = karte->belegtGrund(bus); !g.empty()) {   // erst pruefen, dann anmelden
+            sound_fehler_ = g;
+            return false;
+        }
+        karte->attachToBus(bus);
+        karte->powerOn();
+        ton_ = std::make_unique<k1520::audio::TonAusgabe>();
+        sound_ = std::move(karte);
+        soundEinketten(*sound_);
+        soundSenkeNachfuehren();
+        return true;
+    }
+    /** @brief Die gesteckte SOUND-Karte (nullptr = keine). */
+    k1520::SoundK1520*       soundK1520()       { return sound_.get(); }
+    const k1520::SoundK1520* soundK1520() const { return sound_.get(); }
+    /** @brief Grund des letzten gescheiterten @ref installSound ("" = keiner). */
+    const std::string& soundFehler() const { return sound_fehler_; }
+
+    /** @brief Nenntakt der Maschine in Hz (CTC-/Tonzeit); oeffentlicher Zugang zu @ref k6022TaktHz. */
+    uint32_t nenntaktHz() const { return k6022TaktHz(); }
+
+    // Tonausgabe der Maschine.  Ohne Karte: false bzw. Status Aus und ein Fehlertext, nie ein Absturz.
+    // Die Karte erzeugt nur dann Abtastwerte, wenn jemand sie braucht (Wirtsausgabe hoerbar oder WAV laeuft).
+    /** @brief Wirtsausgabe starten (Geraet oeffnen, Ausgabefaden).  false + @ref audioFehler bei Misserfolg. */
+    bool audioStart() {
+        if (!ton_) { audio_fehler_ = "Keine SOUND-Karte gesteckt"; return false; }
+        const bool ok = ton_->start();
+        audio_an_ = ok;
+        soundSenkeNachfuehren();
+        return ok;
+    }
+    void audioStop() {
+        if (!ton_) return;
+        ton_->stop();
+        audio_an_ = false;
+        soundSenkeNachfuehren();
+    }
+    void audioLautstaerke(float v) { if (ton_) ton_->lautstaerke(v); }
+    void audioStumm(bool s) { if (ton_) { ton_->stumm(s); soundSenkeNachfuehren(); } }
+    void audioEchtzeit(bool e) { if (ton_) { ton_->echtzeit(e); soundSenkeNachfuehren(); } }
+    k1520::audio::TonAusgabe::Status audioStatus() const {
+        return ton_ ? ton_->status() : k1520::audio::TonAusgabe::Status::Aus;
+    }
+    std::string audioFehler() const { return ton_ ? ton_->fehler() : audio_fehler_; }
+    /** @brief WAV-Mitschrift (48 kHz Stereo, Maschinenzeit, jedes Tempo).  false + @ref audioFehler bei Misserfolg. */
+    bool audioWavStart(const std::string& pfad) {
+        if (!ton_) { audio_fehler_ = "Keine SOUND-Karte gesteckt"; return false; }
+        std::string f;
+        const bool ok = ton_->wavStart(pfad, &f);
+        if (!ok) audio_fehler_ = f;
+        soundSenkeNachfuehren();
+        return ok;
+    }
+    void audioWavStop() {
+        if (!ton_) return;
+        ton_->wavStop();
+        soundSenkeNachfuehren();
+    }
+
 protected:
     /** @brief Der Systembus, auf dem Zusatzkarten (RAF) ihre E/A-Tore anmelden. */
     virtual K1520Bus& systemBus() = 0;
@@ -555,6 +649,22 @@ protected:
     /** @brief Laufweg, je Befehl: absolute Maschinentakte (Kommando 03 in Maschinenzeit). */
     void gunNetTakt(uint64_t takte) { if (gun_net_) gun_net_->takt(takte); }
 
+    /** @brief Die CTC der frisch gesteckten SOUND-Karte hinten an die Interruptkette (PRG 710 baut neu). */
+    virtual void soundEinketten(k1520::SoundK1520& k) { systemBus().appendInterruptChain(&k.ctc()); }
+    /** @brief Laufweg, je Befehl: verbrauchte Takte + absolute Maschinentakte; true = Interruptzustand evtl. geaendert. */
+    bool soundTakt(int used, uint64_t total) { return sound_ && sound_->takt(used, total); }
+    /** @brief Systemweiter /RESET: AY und CTC zurueck. */
+    void soundReset() { if (sound_) sound_->reset(); }
+    /** @brief Netz-Ein. */
+    void soundPowerOn() { if (sound_) sound_->powerOn(); }
+    /** @brief Senke der Karte nur setzen, solange Abtastwerte gebraucht werden (spart die Mischerrechnung). */
+    void soundSenkeNachfuehren() {
+        if (!sound_ || !ton_) return;
+        using S = k1520::audio::TonAusgabe::Status;
+        const bool hoerbar = audio_an_ && ton_->echtzeit() && !ton_->stumm() && ton_->status() == S::Hoerbar;
+        sound_->setzeSenke((hoerbar || ton_->wavLaeuft()) ? static_cast<k1520::audio::TonSenke*>(ton_.get()) : nullptr);
+    }
+
     /// Erst NACH Bus und Karten der abgeleiteten Klasse zerstoert — unschaedlich, die
     /// RAF fasst den Bus in ihrem Destruktor nicht an.
     std::unique_ptr<RAF> raf_;
@@ -569,6 +679,11 @@ protected:
     std::unique_ptr<k1520::GunUsb> gun_usb_;
     /// Wie gun_usb_ (zuletzt zerstoert: der Destruktor stoppt den Arbeitsfaden des W5100).
     std::unique_ptr<k1520::GunNet> gun_net_;
+    /// Die SOUND-Karte haelt nur einen ZEIGER auf die Ausgabe (@ref ton_) und fasst Bus und Ausgabe im Destruktor nicht an.
+    std::unique_ptr<k1520::SoundK1520> sound_;
+    /// Tonausgabe mit eigenem Ausgabefaden: ZULETZT deklariert, damit sie als ERSTES zerstoert wird (Destruktor
+    /// beendet den Faden synchron, bevor Karte/Bus fort sind; wie beim W5100-Faden von gun_net_).
+    std::unique_ptr<k1520::audio::TonAusgabe> ton_;
 
 private:
     bool        bestueckbar_ = true;
@@ -578,4 +693,7 @@ private:
     std::string gide_fehler_;
     std::string gun_usb_fehler_;
     std::string gun_net_fehler_;
+    std::string sound_fehler_;
+    std::string audio_fehler_;
+    bool        audio_an_ = false;   ///< audioStart() gelang und kein audioStop() seither
 };

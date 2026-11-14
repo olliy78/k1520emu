@@ -99,6 +99,7 @@ void Mc80Machine::powerOn()
     gidePowerOn();
     gunUsbPowerOn();
     gunNetPowerOn();
+    soundPowerOn();
     total_cycles_ = 0;
     // NICHT reset(): das schloesse die Bestueckung ab, und powerOn() laeuft schon im Konstruktor —
     // installK5020() danach schluege immer fehl (Fund M7, Waechter Mc80Kassette.KarteSteckbar…).
@@ -123,6 +124,7 @@ void Mc80Machine::resetHardware()
     gideReset();             // GIDE (gesteckt?): LH, Platte; Medium bleibt
     gunUsbReset();           // GUN-USB (gesteckt?): PIO, VDIP1; Stick bleibt
     gunNetReset();           // KCNet (gesteckt?): PIO, Automat, W5100
+    soundReset();             // SOUND-Karte (gesteckt?): AY und CTC
     rafReset();
     hub_.gastZurueckgesetzt();   // XOFF-/RTS-Halt des alten Gastes gilt nicht weiter
     serial_naechst_ = 0;
@@ -162,6 +164,7 @@ int Mc80Machine::run(int max_cycles)
         dirty |= k5020Takt(used);
         gideTakt(total_cycles_);   // GIDE (gesteckt?): Platte und RTC in Maschinenzeit
         gunNetTakt(total_cycles_);   // KCNet (gesteckt?): Kommando 03 in Maschinenzeit
+        dirty = soundTakt(used, total_cycles_) || dirty;   // SOUND-Karte (gesteckt?): CTC-Takt + AY-Zeit
         if (total_cycles_ >= serial_naechst_) {
             serial_naechst_ = hub_.takt(total_cycles_);
             dirty |= asp_.nimmSeriellGeaendert();
