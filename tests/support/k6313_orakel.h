@@ -144,10 +144,17 @@ inline std::vector<std::pair<int, int>> baender(const Blattmodell& b)
 /// Punkte werden auf Spalten zu 4 Pixeln gerundet — die Lage zwischen den Motorschritten ist auf einen Pixel genau (Kopfmodell
 /// interpoliert, 3 Pixel je Halbschritt), nicht auf eine Spalte.  Danach muss die Punktmenge **gleich** sein.
 /// Rueckgabe "" = gleich, sonst Beschreibung; @p ursprung_x liefert den besten Ursprung in x (Pixel).
+inline std::string vergleichePunkte(const Blattmodell& b, const Punkte& exp, int ya, int yb, int* ursprung_x = nullptr);
+
 inline std::string vergleiche(const Blattmodell& b, const std::vector<uint8_t>& rom, const std::string& text, int ya, int yb,
                               int* ursprung_x = nullptr)
 {
-    const Punkte exp = erwartet(rom, text);
+    return vergleichePunkte(b, erwartet(rom, text), ya, yb, ursprung_x);
+}
+
+/// Wie @ref vergleiche, aber mit fertig berechneten erwarteten Punkten (Schriftarten, Orakel `k6313_orakel_esc.h`).
+inline std::string vergleichePunkte(const Blattmodell& b, const Punkte& exp, int ya, int yb, int* ursprung_x)
+{
     const Punkte alle = gedruckt(b, ya, yb);
     if (exp.empty() || alle.empty()) return "leer";
     int ex = 1 << 30, ey = 1 << 30, ax = 1 << 30, ay = 1 << 30;

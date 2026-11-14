@@ -4,7 +4,7 @@
  */
 #include <gtest/gtest.h>
 #include <fstream>
-#include <map>
+#include <iterator>
 #include <iostream>
 #include <iterator>
 #include <string>
@@ -39,8 +39,6 @@ struct Lauf {
 
 
 namespace {
-const char* SP = "/tmp/claude-1000/-home-olliy-projects-a5120emu-ui/1e46907c-29e5-461f-b727-21307e865705/scratchpad/";
-
 void senden(Lauf& l, int idx, const std::string& t)
 {
     auto& w = l.m->serialHub()->wandler(idx);
@@ -55,20 +53,6 @@ void senden(Lauf& l, int idx, const std::string& t)
     }
 }
 
-void dump(std::ostream& o, const Blattmodell& bl, int maxspalten = 400)
-{
-    (void)maxspalten;
-    for (auto& band : baender(bl)) {
-        o << "--- Band y=" << band.first << ".." << band.second << "\n";
-        const Punkte p = gedruckt(bl, band.first, band.second);
-        int ay = 1 << 30, ax = 1 << 30;
-        for (auto& q : p) { ay = std::min(ay, q.second); ax = std::min(ax, q.first); }
-        std::map<int, int> sp;
-        for (auto& q : p) sp[(q.first - ax) / 4] |= 1 << ((q.second - ay) / 3);
-        for (auto& e : sp) { char b[16]; std::snprintf(b, sizeof b, "%d:%03X ", e.first, e.second); o << b; }
-        o << "\n";
-    }
-}
 }  // namespace
 
 namespace {
@@ -211,28 +195,4 @@ TEST(K6313Lang, TextMit30835207UeberV24UndIfss)
 {
     druckeText(Typ::K6313_V24, 1, "30835207");
     druckeText(Typ::K6313_Ifss, 0, "30835207");
-}
-
-TEST(K6313Lang, Erkundung)
-{
-    std::ofstream o(std::string(SP) + "erk.txt");
-    for (const char* name : {"30835207", "36539211", "5c53a001", "3b834000", "13325212"}) {
-        const auto r = rom(K6313_ABZUG_DIR, name);
-        if (r.size() != 16384) continue;
-        PrinterMachine::Config c;
-        c.k6313.rom_extern = r;
-        Lauf l(c);
-        l.fahre(30'000'000);
-        o << name << ": zellen " << std::hex << zellen(r).basis << "/" << std::dec << zellen(r).schritt << " online=" << l.st().lampe(1) << " err=" << l.st().lampe(3) << " PC=" << std::hex << l.m->cpuPC() << std::dec << "\n";
-        l.m->serialHub()->wandler(1).anbinden();
-        l.fahre(1'000'000);
-        const std::string t1 = "HELLO 123 ROBOTRON K6313";
-        senden(l, 1, t1 + "\r\n");
-        l.fahre(80'000'000);
-        const Blattmodell& bl = l.m->druck().blatt(0);
-        const auto b = baender(bl);
-        o << "  baender " << b.size();
-        if (!b.empty()) { int ox = 0; o << " text: " << vergleiche(bl, r, t1, b[0].first, b[0].second, &ox) << " ox=" << ox; }
-        o << "\n";
-    }
 }

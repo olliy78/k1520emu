@@ -473,6 +473,12 @@ k1520_add_test(k6313_lang SRC test_k6313_lang.cpp
                      LABELS "${_lbl};fach_drucker" TIMEOUT 600 DEFS LOG_LEVEL=2
                      "K6313_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/K6313\"")
 
+# K6313 Schriftarten und Steuerfolgen (WP8h-a): EPSON (33538013) und ISO (30835007) gegen das Orakel k6313_orakel_esc.h, Zeilenabstand, FF, Formularlaenge
+k1520_add_test(k6313_esc SRC test_k6313_esc.cpp
+                     LIBS k1520_printer k1520_serial k1520_logger
+                     LABELS "${_lbl};fach_drucker" TIMEOUT 600 DEFS LOG_LEVEL=2
+                     "K6313_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/K6313\"")
+
 # K6311 (Entwurf 49, WP8e): Hardware nur aus dem ROM 12128062 erschlossen [?] (kein Plan); Grundlauf, BCH/BDH, Grenzen (Merkposten Nr. 34)
 k1520_add_test(k6311 SRC test_k6311.cpp
                      LIBS k1520_printer k1520_serial k1520_logger
