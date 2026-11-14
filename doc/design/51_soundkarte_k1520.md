@@ -162,7 +162,8 @@ core/cards/sound_k1520/             Karte: Dekodierung, AY + CTC, Mischer ABC/AC
 - C-ABI (additiv): `k1520_sound_install(h, basis, chip, takt, quarz_hz, kanal, tiefpass, kaskade)`,
   `k1520_sound_fehler`, `k1520_sound_regs(h, uint8_t[16])`;
   `k1520_audio_start(h)/_stop`, `k1520_audio_lautstaerke(h, float)`, `k1520_audio_stumm(h, int)`,
-  `k1520_audio_fehler`, `k1520_audio_wav_start(h, pfad)/_stop`.
+  `k1520_audio_fehler`, `k1520_audio_echtzeit(h, int)` (setzt die Oberfläche aus dem Faktor des Emulationstakts, §4.1 Nr. 4),
+  `k1520_audio_wav_start(h, pfad)/_stop`.  Dazu öffentlich `K1520Machine::nenntaktHz()` (heute nur protected `k6022TaktHz()`, Befund S0).
 - Python: `K1520Emulator(sound={…})`, `emu.audio_*`; `test_c_api.py` gleicht die Deklarationen ab.
 - Werkzeuge: `boot_trace`/`k1520dbg` `--sound[=basis]`, `--wav datei`; Befehl `ay` im Debugger
   (Register, Perioden → Hz, Mischer entschlüsselt, Hüllkurvenform, Portrichtung).
@@ -172,9 +173,115 @@ core/cards/sound_k1520/             Karte: Dekodierung, AY + CTC, Mischer ABC/AC
 Alle mit `zusatzkartenSteckbar()` (A5120 inkl. .16, A5130, K8924, K8915 V3/V2, PRG 710/-1, PC 1715
 mechanisch wie GIDE, MC80 prüfen); P8000 nicht.  Belegung je Maschine in S0 am Bus prüfen
 (`ioBesitzer`); bekannt frei am A5120/K8924 (Unterlagen).  Interruptsäule ist Gastsache (CP/A: F7D8H).
-**Vorauswahl der Oberfläche:** 38H, am **PC 1715 E0H** (so die PC-1715-Gastsoftware) — dort kollidiert
+**Vorauswahl der Oberfläche:** 38H, am **PC 1715 und PC 1715W E0H** (PC 1715: so die Gastsoftware; 1715W: 38H–3FH belegt, Befund S0), MC80.2x 38H (E0H dort belegt) — dort kollidiert
 sie mit der Lochstreifenkarte K6022 (E0H–E7H fest); beide zugleich meldet der Kern als Konflikt, wie
 GIDE/K5020 (gewollt, Basis von Hand ändern).
+
+### 5a. Befund S0 (2026-11-14)
+
+Methode: reine Code-Lektüre (nichts gebaut, nichts gelaufen).  Die Tabelle 1 ist aus den `registerIO`-Aufrufen
+abgeleitet, nicht am laufenden Bus gemessen — **S4 prüft sie mit `ioBesitzer(38H..3FH)` je Maschine nach**
+(Erweiterung von `KartenVorgaben.*`, `tests/integration/test_karten_vorgaben.cpp`; dort fehlen heute MC80).
+
+**1. Tore.**  `zusatzkartenSteckbar()` ist `true` (`machine.h:162`) und wird nur vom P8000 (`p8000.h:199`) und vom
+P8000-Terminal (`p8000_terminal_machine.h:87`) überschrieben → **alle MC80-Varianten sind steckbar**, P8000 lehnt ab.
+
+| Maschine | belegt im Bereich 38H–3FH | belegt im Bereich E0H–E7H | Vorauswahl | Konflikt |
+|----------|---------------------------|---------------------------|-----------|----------|
+| A5120 (.16), A5130, K8924 | — (K2526 00–0F `k2526.cpp:140`, K5122 10–18 `a5120.cpp:209`, K8025 50–5F `a5120.cpp:206`, AUP 40–43/B0–B7, EM A8–B0, RAF 88/89, K5020 30–37 daneben) | nur Option K6022 | **38H** | keiner |
+| K8915 V3 / Gen 2 | — (K5122 10–18, K7028 40–5F + 60–67 `k7028.cpp:157`, ZRE 80–83/A8–AB `zre8762.cpp:30`; Gen 2: K2521 80–87, K3528 A8–AB) | nur Option K6022 (K5020 liegt auf D0–D7, `k8915.h:243`) | **38H** | keiner |
+| PRG 710 / 710-1 | — (K5122 10–18, K8025 50–5F, K2521 80–87, ASS 590069 C4–C7/CC–CF, ATP C0–C9, EPROMmer D0–D4, F4/F5; K5020 30–37) | nur Option K6022; **E8–EB = Seitenregister** (`prg710_speicher.h:42`, grenzt an) | **38H** | keiner |
+| PC 1715 (K7222/K7221) | — (K5122 00–07 + 20–23, CTC 08–0B, SIO 0C–0F, CRT 18–1B, 24–33, BWS 34–37 `pc1715_zre.cpp:21–28,209–218`; K5020 D0–D7) | nur Option K6022 | **E0H** (38H wäre ebenfalls frei) | nur mit K6022 (gewollt) |
+| PC 1715W | **38–3F belegt** durch `PC1715W-E/A` (Senke für /SR 38–3B, /RST 3C–3F, `pc1715.cpp:75`, Kommentar `:55–57`) | nur Option K6022 | **E0H** (38H geht nicht) | 38H → `belegtGrund` „PC1715W-E/A" |
+| MC80.30 / .31 | — (ZVE 80–87/8C/8D `zve3x.cpp:34–36`, SPE B0–B3 `spe.cpp:58`, VIS C0–CF, ASP D0–DB; K5020 fest 30–37 `mc80.h:163`) | nur Option K6022 | **38H** | keiner |
+| MC80.21 / .22 | — (Senke 00–0F `mc80_2x.h:191`, K2521 80–87, DPL F0–F7, MBI EF/F8–FF) | **E0–E8 = PPE-Senke** (`mc80_2x.h:192`) → auch K6022 nicht steckbar | **38H** | E0H wäre belegt, nicht wählen |
+| P8000 (alle) | — | — | — | `installSound` lehnt ab (Grund wie bei GIDE) |
+
+Folgen: (a) Die Vorauswahl der Oberfläche ist 38H, **am PC 1715 nur beim Modell PC 1715 E0H, am 1715W ebenfalls E0H**
+(Profil `app/profil.py` Zeile ~716 hat zwei Modelle in einem Profil; für Sound ist E0H auf beiden richtig).  Gastsoftware gibt es nur für die
+CP/A-Fassung des PC 1715, nicht für SCP 1715 und nicht für den 1715W.  (b) Der Kern meldet 38H am 1715W korrekt als belegt, weil die Senke
+sich als echtes `BusDevice` anmeldet.  (c) Alle 8 Tore der Karte anmelden (8er-Raster, die Komparatorlogik
+besetzt den ganzen Block; Basis+2/+3 lesen FFH), nicht nur 0/1/4–7 — `registerIO` kennt nur zusammenhängende Bereiche.
+
+**Registrierung.**  `K1520Bus::registerIO(dev, basis, n)` (`k1520_bus.cpp:6`) wirft `std::runtime_error` bei Überlappung; `ioOwner(port)`
+(`k1520_bus.h:298`) → `K1520Machine::ioBesitzer` (`machine.h:384`) → C-ABI `k1520_io_owner` (`k1520_api.h:1164`).  Üblich ist
+`Karte::belegtGrund(bus)` vor dem Anmelden (Text „E/A-Tor %02XH belegt (%s)", Muster `gun_net.cpp:40`).  **Abweichung vom Header-Kommentar:**
+der Bus reicht den **absoluten** Port an `ioRead/ioWrite` durch (`k1520_bus.cpp:160,177`), nicht den relativen — die Karte rechnet `port - basis`
+selbst.  Eine Karte mit zwei Funktionsblöcken nimmt je Block ein eigenes `BusDevice` (Muster K5020: `tor_d_`/`tor_s_`, `k5020.cpp:26–27`).
+Die Oberfläche hat keine Tortabelle: `app/kartenwahl.py::KartenArt` (Felder `schritt`, `tore_ab`, `tore_zahl`, `eigener_name`) und
+`Programmprofil.karten_vorauswahl` — für Sound `schritt=8`, `tore_zahl=8`, `eigener_name` = `deviceName()` der Karte; die Vorauswahl braucht
+die Modellabbildung (`*_basis_modell`) nur für den PC 1715 (alle Modelle E0H → eine Vorgabe je Profil genügt).
+
+**2. Einbau-Muster und Laufschleifen.**  Vorbilder: GIDE/GunNet (`machine.h:334,448`: `installX` → Steckbarkeit, `bestueckbar_`, Doppelt-Prüfung, `belegtGrund`,
+`attachToBus`, `powerOn`, ggf. `…Einketten`) plus K5020 für die CTC (`k5020Takt(int)` liefert `bool dirty`, `machine.h:529`).  Der C-ABI-Fehler
+läuft über einen statischen String je Karte (`k1520_gide_install_ex`, `k1520_api.cpp:1700`; Handle = `K1520Machine*`, `toMachine`).
+Zu ergänzen in `machine.h` (analog): `installSound(cfg)`, `soundK1520()`, `soundFehler()`, geschützt `virtual soundEinketten(…)` (Vorgabe
+`appendInterruptChain(&k.ctc())`), `bool soundTakt(int used, uint64_t total)` (CTC `clockTick(used)` + absolute Takte für den AY → `true` = Interrupt
+evtl. geändert), `soundReset()`, `soundPowerOn()`, Member `std::unique_ptr<…> sound_` **hinter** den anderen Karten (Zerstörungsreihenfolge) und `sound_fehler_`.
+Aufrufstellen (Zeilen vor dem Eintrag der Karte; alle Maschinen außer P8000):
+
+| Maschine | `…Takt` in `run()` | `…Reset` in `resetHardware()` | `…PowerOn` | Kette |
+|----------|--------------------|-------------------------------|------------|-------|
+| A5120 | `a5120.cpp:1032–1036` (Hauptpfad; **der ZVE2-DMA-Pfad `:933` tickt keine Karte**, ZRE-CTC auch nicht → kein neues Problem) | `:372–377` | `:408–410` | Basisvorgabe |
+| K8915 | `k8915.cpp:229–232` | `:107–112` | `:134–136` | Basisvorgabe |
+| PRG 710 | `prg710.cpp:276–279` | `:169–173` | `:191–193` | **`interruptKetteSetzen()` (`prg710.cpp:126–146`) um `sound_`-CTC ergänzen + `soundEinketten`-Override `prg710.h:199–202`** (die Kette wird dort bei jedem Stecken neu gebaut) |
+| PC 1715 / 1715W | **zwei** Schleifen: `pc1715.cpp:450–453` (PC 1715) und `:519–522` (1715W) | `:267–270` | `:286–288` | Basisvorgabe (Kette `{afs, zre}` bzw. `{dma, ctc2, zre}`, Karte hinten) |
+| MC80.3x | `mc80.cpp:161–164` | `:123–126` | `:99–101` | Basisvorgabe |
+| MC80.2x | `mc80_2x.cpp:157–160` | `:125–128` | `:98–100` | Basisvorgabe |
+
+Zeitstand: `gideTakt(total_cycles_)` wird **nach** dem Befehl gerufen, ein `OUT` sieht also den Stand des Vorgängerbefehls (Versatz ≤ ~23 Takte ≈ 9 µs,
+für das „lazy catch-up" des AY unhörbar).  Ein Zeiger auf `total_cycles_` in der Config (wie `AUP::Config::uhr`, `aup.h:108`) bringt dieselbe Genauigkeit —
+es bleibt beim GIDE-Muster (`soundTakt(used, total_cycles_)`).  Keine `AutoFlush`-Stelle nötig.
+
+**3. Z80CTC (`core/primitives/z80_ctc.{h,cpp}`).**  Ein Objekt = 4 Kanäle an 4 aufeinanderfolgenden Toren, **relativer** Port 0–3 in `ioRead/ioWrite`
+(die Karte reicht `port - basis - 4` durch).  Takt: `clockTick(int takte)` mit den verbrauchten Systemtakten (aufgeschoben/gebatcht, `z80_ctc.h:119`,
+Rückgabe `true` = ZC/TO-Flanke möglich → `bus.markIntDirty()`); jeder `ioRead/ioWrite/clkTrg` rechnet vorher ab.  ZC/TO-Ausgänge: Rückruf
+`setZCTOCallback(cb(kanal, pegel), kanalmaske)`; er kommt mit `false` bei der Flanke (`fireZCTO`, `z80_ctc.cpp:487`) und mit `true` im Folgetakt.  **Kaskade
+TO0→TR1** wie am A5120 (`a5120.cpp:257–265`): im Rückruf `ctc.clkTrg(kanal+1, pegel)`; Zähler brauchen Steuerwort-Bit D6 = 1 und die gewünschte
+Flanke (D4).  **Die Kanalmaske nur auf die verdrahteten Jumper setzen** (Bit n = TOn hat Abnehmer; ohne Jumper gar keinen Rückruf) — jeder maskierte
+Kanal verlässt den schnellen arithmetischen Pfad (`zcto_beobachtet`, `z80_ctc.h`).  TR-Eingänge der Stiftleiste S7 (von außen) sind unbelegt
+(kein Abnehmer; Kaskadenjumper reichen).  Interruptkette: `Z80CTC` ist selbst `InterruptSlave` (`setIEI/getIEO/hasInterrupt/getVector/onRETI/inService`) →
+`bus.appendInterruptChain(&ctc)`; die Vektorbasis kommt vom Gast (Steuerwort D0 = 0 an Kanal 0, Gast: D8H).  Besonderheiten: `getIEO` = IEI ∧ ¬Anforderung ∧ ¬IUS
+(`z80_ctc.cpp:586`, Fund SIOS 2026-10-30), RETI löscht IUS nur beim ersten Baustein in Bedienung (Bus `signalRETI`); `setIntAusVerwirftAnforderung`
+bleibt **aus** (nur ASP des MC80 braucht es; ein Sound-Gast `AYPBC.INC` schaltet INT nicht im Betrieb ab); `reset()` bei `/RESET` (verwirft Verdrahtung nicht),
+`setResetLaedtZeitkonstante` nur P8000.  Taktquelle ist **immer der Systemtakt** (kein eigener Quarz an der Karten-CTC, §3.3) — also kein `setzeEingangsTakt`.
+
+**4. Takt, Nenntakt, Ausgabe.**  Der Kern kennt den Nenntakt nur geschützt und unter dem historischen Namen `k6022TaktHz()` (`machine.h:500`, Vorgabe 2 457 600;
+PC 1715 `cpuHz()` = 2 458 000, 1715W 3 993 600; K8915/PRG/MC80 `CPU_HZ` = 2 457 600).  Für die Tonquelle **eine öffentliche Funktion `nenntaktHz()`**
+(oder `soundTaktHz`) auf Basis dieses Werts anlegen — `installGide/GunNet` benutzen ihn schon.  Die absolute Taktzahl ist je Maschine ein
+privates `total_cycles_`; die Karte bekommt sie aus `soundTakt`.  **Der Echtzeit-Faktor kennt nur Python**: `app/emulationstakt.py` (`set_tempo(hz, faktor)`,
+`_lauf`, Scheiben von 2 ms Wanduhr ≈ 4900 Takte bei 1×, Schlaf bis 20 ms) ruft `k1520_run`; der Kern sieht nur `run(max_cycles)`.  Für §4.1 Nr. 4 braucht
+es deshalb einen **neuen C-Aufruf** `k1520_audio_echtzeit(h, int)` (setzt die Oberfläche bei jedem `set_tempo`) — in §4.2 fehlt er.  Fäden im Kern gibt es als
+Vorbild: `SerialHub::sicherstellenFaden` (`hub.cpp:362–368`, `join` im Destruktor `:99–106`), Schreibfaden der ATA-Platte (`ata_geraet.cpp:255`), Winchester
+(`platte.cpp:134`), W5100 (`w5100.cpp:24`; deshalb `gun_net_` als **letztes** Member zerstört, `machine.h:570`).  `dlopen` kommt im Kern noch nicht vor
+(nur `dladdr`, `${CMAKE_DL_LIBS}` ist an `k1520_floppy2` gebunden, `CMakeLists.txt:215`; `Threads::Threads` an `k1520_serial/ata/w5100/winchester`).
+Natürlicher Ort der Tonquelle: ein Member in `K1520Machine` neben den Karten (`machine.h`, Handle = `K1520Machine*`, also auch die C-ABI ohne Zusatzobjekt),
+**Ringpuffer und Ausgabefaden gehören nicht der Karte**, sondern einem eigenen Objekt, das vor der Karte stirbt (Faden zuerst anhalten).
+
+**5. Beigaben (Vorlage `tools/gide/karten.py`).**  `RECHNER` (Schlüssel = Systemdiskette → `Rechner(titel, …)`), `dateien(schlüssel)` → `{Diskettenname: Bytes}`,
+`cpm_text()` (LF→CRLF, ^Z, 128-B-Auffüllung), Textbausteine je Rechner, **`DISKETTEN`** (Schlüssel → Dateiname der Lieferdiskette) und `pruefen/main --check`
+(liest jede Diskette mit `k1520disktool get <abbild> * --to <tmp>` und vergleicht bytegleich; Ausgabe `aktuell|FEHLT|OHNE|ALT`).  Bauskripte rufen
+`karten.dateien(...)`: `tools/cpa_a5120/build.py:118`, `tools/cpa_pc1715/build.py:75`, `tools/scpx_a5120/build.py:40` (über `tools/diskbau.py::karten`, `:79`);
+Pfade `tools/disketten_beigaben.py::diskpfad` + `ORDNER`.  Wächter: ctest `cli_karten_beigaben` (`tests/cli/CMakeLists.txt:132`, Labels `cli;fast`),
+`KartenBeigaben.*` (`tests/integration/test_karten_beigaben.cpp`, bootet die Lieferdisketten mit den Karten), `py_karten_software` (`tests/python/test_karten_software.py`),
+`py_karten_vorauswahl` (Tabelle gegen Profil); `tools/test_auswahl.py` hat für `core/cards/gide/**` einen Blatteintrag ohne `fach_`-Label.  Heutige `DISKETTEN`:
+`a5120_cpa` = `a5120_cpa_k5601_system.hfe`, `a5120_scpx` = `a5120_scpx17_k5601_system.hfe`, `k8915_scpx`, `prg710_scpx`, `prg710_1_scpx`,
+**`pc1715_cpa` = `disks/pc1715_cpa1715/pc1715_cpa1715_system.hfe` (die PC-1715-CP/A-Diskette)**, `pc1715_scp6/7`, `pc1715w_scp3`.  Für Sound gehören
+rein: `a5120_cpa`, `a5120_scpx` (38H), `pc1715_cpa` (E0H, PC-1715-Fassungen); K8915/PRG nur über den USB-Player (S10).  Gesamtgröße je Satz ≈ 12 KB
+(SKTEST4 5250 + STCTEST1 2270 + PLAYSTC 1678 + SONG.STC 1007 + TGCPM 2034 B); **freier Platz auf `pc1715_cpa1715_system.hfe` ist nicht geprüft** (der 1715W hat
+nur 38 KB frei) — in S9a mit `k1520disktool` messen, bevor man die PC-1715-Fassungen einplant.
+
+**Abweichungen/Lücken gegenüber dem Entwurf (Stand S0).**
+1. §5: „MC80 prüfen" → **steckbar** (Vorgabe `true`); MC80.2x belegt E0–E8 durch die PPE-Senke, 38H ist frei.
+2. §5: PC 1715**W** belegt 38–3F → dort **E0H**, nicht 38H (der Entwurf nennt nur „PC 1715 E0H"; 1715W ohne Gastsoftware, nur Basis wählbar).
+3. §4.2 fehlt `k1520_audio_echtzeit` (nötig für §4.1 Nr. 4); der Nenntakt ist kein öffentlicher Kernwert (`nenntaktHz()` nachrüsten, A5120 `k6022TaktHz()` = 2 457 600,
+   aber GUI-Profil `nenntakt_hz` = 2 450 000, `app/profil.py:581`, `app/takt.py:23` — 0,3 % Abweichung zwischen Erzeugung (Maschinenzeit) und Verbrauch
+   (Wanduhr): von der Füllstandregelung (§4.1 Nr. 5) abgefangen, Tonhöhe ≈ 5 Cent daneben; besser `nenntakt_hz` des A5120-Profils auf 2 457 600 setzen oder die
+   Regelung nach `nenntaktHz()` des Kerns richten).
+4. §6 S6: das Debugger-Dispatch-Skript heißt `tests/cli/scripts/all_commands_smoke.dbg` (+ je Maschine `tests/cli/cases/dbg_*_all_commands_smoke.cli`), nicht `tests/dbg/…`.
+5. Der Bus reicht absolute Ports durch (Header-Kommentar falsch), siehe oben — S3 muss `port - basis` rechnen.
+6. PRG 710: die Interruptkette wird in `interruptKetteSetzen()` neu aufgebaut — ein bloßes `appendInterruptChain` im Basis-`soundEinketten` genügt dort **nicht**.
+7. `KartenVorgaben.*` deckt nur A5120/K8915/PC 1715/PRG 710 ab (kein MC80, kein 1715W-Sonderfall) — S4 muss die Soundkarte dort und je einen Test für MC80.3x/.2x und 1715W (38H belegt) ergänzen.
 
 ## 6. Arbeitspakete (für Sonnet-5.5-Agenten)
 
@@ -191,9 +298,9 @@ die Zeile „Stand:" oben in diesem Entwurf nachführen + Commit in den Zweig `s
 | **S3** | **Karte `SoundK1520`** (`core/cards/sound_k1520/`): Dekodierung §3.1, AY + `Z80CTC` (Kaskaden-Jumper, CTC-Takt = Systemtakt), Mischer ABC/ACB/Mono mit Gewichten §3.4, Tiefpass, `takt()`, `reset()`, `belegtGrund`. | S1, S2 | `test_sound_k1520.cpp`: Tore +0…+7, +1 lesen = FFH, +2/+3 nicht belegt; Basis ≠ 8er → Ablehnung; R7-Rücklesen wie `AYPBC.INC`; CTC-Kanal 0 mit A7H/C0H gibt 50 Hz Interrupts (Takt 2,4576 MHz); Kaskade TO0→TR1 zählt; ABC vs. ACB vs. Mono: Ton nur auf A → nur links / beide |
 | **S4** | **Einbau in die Maschinen**: `installSound` in `K1520Machine` (Muster GIDE: nur vor erstem Lauf, doppelt/Konflikt/Basis → Grund), `soundEinketten`, `soundTakt`/`soundReset` in allen Laufschleifen, Tonquelle an die Ausgabe der Maschine. | S3, S0 | `KartenVorgaben.*` um die Soundkarte erweitern (alle Karten zugleich, Konflikte je Maschine); Install-Fehlerfälle; P8000 lehnt ab |
 | **S5** | **C-ABI + Python** (§4.2), `app/core_binding/k1520.py`, `K1520Emulator(sound=…)`. | S4 | `py_c_api` (mechanischer Abgleich), `py_binding`: Register schreiben/lesen über `io_write`, WAV-Mitschrift einer Sekunde 1-kHz-Ton → Frequenz per `wave` + Nulldurchgängen |
-| **S6** | **Werkzeuge**: `--sound[=basis]`, `--wav` in `boot_trace` und `k1520dbg`, Befehl `ay`, `help`-Text, `tools/k1520dbg.md`/`tools/boot_trace.md`. | S4 | Dispatch-Smoke `tests/dbg/all_commands_smoke.dbg` um `ay`; `cli_*`-Test: `boot_trace --sound --wav` erzeugt gültige WAV |
+| **S6** | **Werkzeuge**: `--sound[=basis]`, `--wav` in `boot_trace` und `k1520dbg`, Befehl `ay`, `help`-Text, `tools/k1520dbg.md`/`tools/boot_trace.md`. | S4 | Dispatch-Smoke `tests/cli/scripts/all_commands_smoke.dbg` (+ `tests/cli/cases/dbg_*_all_commands_smoke.cli`) um `ay`; `cli_*`-Test: `boot_trace --sound --wav` erzeugt gültige WAV |
 | **S7** | **Systemtest mit Gastsoftware** (Originale aus `tools/sound/fremd/original/`, entpackt in `TempDisk`-Kopien): A5120 + CP/A, `SKTEST4` Eingaben `B` (1,79 MHz), `1`, `A` → WAV ≈ 1 kHz nur links; Menü `4` (CTC-Interrupt) → 2 s nicht still, Interrupts ≈ 50/s; `STCTEST1` → Lied läuft, danach `DIR` am Prompt bedienbar; `PLAYSTC SONG.STC`; dasselbe unter SCPX; PC 1715 + CP/A mit den PC-1715-Fassungen an E0H. Label `fach_sound`, langsamer Lauf. | S5 | `SoundSystem.*` (ohne Skip — die Originale liegen im Repo) |
-| **S8** | **Oberfläche**: *Einstellungen ▸ Allgemein ▸ Soundkarte* (aus / AY-3-8910 / AY-3-8912, Basis mit Konfliktanzeige wie GIDE, AY-Takt, Quarz, Kanal ABC/ACB/Mono, Tiefpass, Kaskade), Vorauswahl je Programmprofil (`app/profil.py`), *Maschine ▸ Ton* (an/stumm) + Lautstärke ohne Kürzel, Statuszeile „Ton: aus/stumm/hörbar/kein Gerät", `general.sound` in Konfiguration + Vorgabedateien (aus), Handbuch-Abschnitt. | S5 | `py_sound_gui` (offscreen, Ausgabe `stumm`); Kürzel-Wächter bleiben grün; `py_keine_umlaute` |
+| **S8** | **Oberfläche**: *Einstellungen ▸ Allgemein ▸ Soundkarte* (aus / AY-3-8910 / AY-3-8912, Basis mit Konfliktanzeige wie GIDE, AY-Takt, Quarz, Kanal ABC/ACB/Mono, Tiefpass, Kaskade), Vorauswahl je Programmprofil (`app/profil.py`), *Maschine ▸ Ton* (an/stumm) + Lautstärke ohne Kürzel, Statuszeile „Ton: aus/stumm/hörbar/kein Gerät", `general.sound` in Konfiguration + Vorgabedateien (aus), Handbuch-Abschnitt; `k1520_audio_echtzeit` aus dem Faktor des Emulationstakts; **A5120-Nenntakt im Profil (`app/profil.py`, `app/takt.py`: 2 450 000) auf den Kernwert 2 457 600 angleichen** (sonst Tonhöhe ≈ 5 Cent daneben, Befund S0). | S5 | `py_sound_gui` (offscreen, Ausgabe `stumm`); Kürzel-Wächter bleiben grün; `py_keine_umlaute` |
 | **S9a** | **Beigaben auf die Systemdisketten** nach dem Muster `tools/gide/karten.py` (eigenes `tools/sound/karten.py`, Wächter wie `KartenBeigaben.*`/`cli_karten_beigaben`): A5120/K8924 CP/A und SCPX bekommen `SKTEST4.COM` (neuerer Bau aus `rowikla_SKTEST4_BC/`), `STCTEST1.COM`, `PLAYSTC.COM`, `SONG.STC`, `TGCPM.COM` (CP/A-/SCPX-Fassung, 38H); PC-1715-CP/A-Diskette die PC-1715-Fassungen (E0H); Diskettenbau neu, `tools/sound/fremd/README.md` nachführen. | S7 | Wächter prüft je Diskette die Dateien bytegleich zu den Originalen |
 | **S10** | **USB-Player** `CPMSTCPL`/`CPMPT3PL` 1.0.5 + `SNDINIT2` mit passender `SOUND.INI` je Rechner (A5120 `38 C0 D8F7 <USB-Basis>`, K8915 `38 C0 B0FF …`, PC 1715 `E0 C0 F0F7 …`; USB-Basis = Vorauswahl der GUN-USB im Profil) auf die Disketten; Systemtest: Stickordner mit `SONG.STC`, Player spielt ihn ab. Optional, wenn S0–S9a stehen. | S9a | `SoundUsbPlayer.*` |
 | **S9** | **Abschluss**: Merkposten `doc/merkposten/sound.md` (Festlegungen §4.1 mit Wächtern), CLAUDE.md-Absatz, `tools/test_auswahl.py` Label `fach_sound` für die neuen Pfade, Paket prüfen (keine neue Python-Abhängigkeit; ALSA-Ausfall im Paket dokumentieren), `tools/dev.sh test-merge`, `tools/dev.sh win`. | alle | grüner `test-merge` + `win` |
