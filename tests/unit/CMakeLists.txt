@@ -359,3 +359,7 @@ k1520_add_test(kermit_serverlogin SRC kermit/test_kermit_serverlogin.cpp LIBS k1
 
 # Zeitgrenzen der add_test()-Faelle × K1520_TEST_ZEIT_FAKTOR (tests/cmake/K1520AddTest.cmake)
 k1520_test_zeiten_skalieren()
+
+# ── core/audio/ (Entwurf 51, S2: Tonstrecke) ─────────────────────────────────
+# Setzen nie ein Audiogeraet voraus (CI hat keins): Backend "stumm" bzw. falscher Bibliotheksname.
+k1520_add_test(audio SRC audio/test_audio.cpp LIBS k1520_audio LABELS "${_lbl}")

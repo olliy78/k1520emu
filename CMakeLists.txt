@@ -291,6 +291,23 @@ if(BUILD_K1520)
     add_library(k1520_ay38910 STATIC core/primitives/ay38910.cpp)
     target_include_directories(k1520_ay38910 PUBLIC ${CMAKE_SOURCE_DIR})
 
+    # Tonstrecke (Entwurf 51, S2): Ringpuffer, WAV, Ausgabefaden; ALSA per dlopen, Windows winmm
+    set(K1520_AUDIO_SRC
+        core/audio/wav_schreiber.cpp
+        core/audio/ausgabe.cpp
+        core/audio/ausgabe_stumm.cpp)
+    if(WIN32)
+        list(APPEND K1520_AUDIO_SRC core/audio/ausgabe_waveout.cpp)
+    else()
+        list(APPEND K1520_AUDIO_SRC core/audio/ausgabe_alsa.cpp)
+    endif()
+    add_library(k1520_audio STATIC ${K1520_AUDIO_SRC})
+    target_include_directories(k1520_audio PUBLIC ${CMAKE_SOURCE_DIR})
+    target_link_libraries(k1520_audio PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
+    if(WIN32)
+        target_link_libraries(k1520_audio PUBLIC winmm)
+    endif()
+
     # Z80-DMA (UA858, PC 1715W, doc/design/21_pc1715.md AP-W2a)
     add_library(k1520_z80dma STATIC core/primitives/z80_dma.cpp)
     target_link_libraries(k1520_z80dma PUBLIC k1520_bus)
