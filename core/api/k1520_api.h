@@ -276,8 +276,8 @@ K1520_API K1520Handle k1520_create_mc80(int variante, const char* konfig);
  *
  * @param typ     0 = SD 1157/264.  1 = K6316 (IFSS), 2 = K6316 (V.24): der Typ waehlt Schnittstellenmodul und
  *                Firmwaresatz.  3 = K6313 (V.24-Kassette, Speicherplan "kurz" ROM 0000H-27FFH, RAM 3800H, E/A 7CH-FBH; WP8c).
- *                4 = K6311 (V.24, WP8e): dieselbe Karte mit ROM 12128062; **Hardware nur aus dem ROM erschlossen [?]**, keine Tasten/DIL/Lampen
- *                ON LINE und ERR (`k1520_printer_lamp` = -1), BCH/BDH = Schaltereingaenge.
+ *                4 = K6311 (V.24, WP8e/WP8f): dieselbe Karte mit ROM 12128062; **Hardware nur aus dem ROM erschlossen [?]**; druckt seit WP8f.
+ *                Tasten 21..24 (ON LINE, D105 A4, A5, A6), Papier-Schalter, Lampen ON LINE/ERR/POW (PE = -1, keine DIL-Schalter), BCH/BDH = Schaltereingaenge.
  *                Alles andere → NULL mit Grund.
  * @param konfig  Schluessel=Wert-Liste, durch Komma getrennt (NULL/"" = Vorgabe); Schluessel
  *                SD 1157: `schnittstelle` (`ifss` | `v24`: Wahl am Schalterblock PIO 3 A.0), `rom` (`repariert` | `original`).

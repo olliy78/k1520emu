@@ -107,6 +107,8 @@ SIO/PIO-Kassette bei 10–1E, PIO D104 bei 20/22) ist in K6311 und K6313 gleich.
   (Deutsch / UK)" ist durch die Listenangaben (GERMAN / UK ASCII) gestützt, nicht belegt `[?]`.
 * Bedienmatrix, Sensoren, Motoren, LED-/Tastenbelegung des K6311: **nicht aus dem ROM erkundet**; solange kein Plan vorliegt, gelten die K6313-Annahmen mit dem Etikett „Hardware erschlossen" (Entwurf 49 §11.3, WP8e).
 
+**Berichtigung WP8f (2026-11-14):** die Annahme „Bedienmatrix, Sensoren, Motoren, LED-/Tastenbelegung des K6311: nicht aus dem ROM erkundet, es gelten die K6313-Annahmen“ galt nicht: der K6311 hat eine **andere Bit-Belegung** (Wagen F9H, Papier F8H, Nadeln DDH/DCH.0, Tasten D104 A2 + D105 A4–A6, Papierende D104 A6) und einen 8-Byte-Zeichengenerator bei 2280H.  Volltext: Merkposten drucker.md Nr. 35.  Die Zuordnung `27F7H = 20H/30H` ist ebenfalls berichtigt (US-ASCII bzw. deutscher Satz mit Pfund, nicht Deutsch/UK).
+
 ## 7  Empfehlung
 
 1. **Zuerst fahren: `33538013`** (3.35-3-80/13, 10 KiB, V.24/CL/CEN EPS INT.): häufigstes Etikett, 10-KiB-Speicherplan = K6316-Plan, Schaltplan (CCB) vorhanden.

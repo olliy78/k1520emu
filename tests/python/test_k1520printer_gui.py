@@ -529,20 +529,23 @@ def test_k6316_typwahl_baut_bedienfeld_dil_und_betriebsart(fenster, monkeypatch)
     assert fenster.emu.printer_lamp(K.DRUCKER_LAMPE_FEHLER) == 0
 
 
-def test_k6311_typwahl_zeigt_nur_die_netzlampe_und_den_hinweis_erschlossen(fenster, monkeypatch):
+def test_k6311_typwahl_zeigt_tasten_und_lampen_und_den_hinweis_erschlossen(fenster, monkeypatch):
     e = fenster.einst_drucker
     monkeypatch.setattr(QMessageBox, "question", staticmethod(lambda *a, **k: QMessageBox.Yes))
     e.typ.setCurrentIndex(e.typ.findData("k6311"))
     fenster.takt.stop()
     assert fenster.beschreibung.schluessel == "k6311" and fenster.emu.machine == "k6311"
     b = fenster.bedienfeld
-    assert b.lampe("POW") is not None
-    for l in ("ON LINE", "ERR", "PE"):
-        assert l not in b._lampen          # Belegung unbekannt: nicht angezeigt statt geraten
-    assert not fenster.beschreibung.tasten and not fenster.beschreibung.dil
-    assert "erschlossen" in b.hinweise.text() and "nichts gedruckt" in b.hinweise.text()
-    lauf(fenster, 300, schritt=20000, aktualisieren_jeden=100)
+    for l in ("POW", "ON LINE", "ERR"):
+        assert b.lampe(l) is not None
+    assert "PE" not in b._lampen            # das ROM schreibt keine PE-Lampe: nicht angezeigt statt geraten
+    for n in ("t1", "t2", "t3", "t4", "papier"):
+        assert b.knopf(n) is not None
+    assert not fenster.beschreibung.dil     # keine DIL-Schalter (Baud/Format ueber BCH/BDH)
+    assert "erschlossen" in b.hinweise.text() and "Punkt fuer Punkt" in b.hinweise.text()
+    lauf(fenster, 3000, schritt=20000, aktualisieren_jeden=100)
     assert fenster.emu.printer_lamp(K.DRUCKER_LAMPE_POW) == 1
+    assert fenster.emu.printer_lamp(K.DRUCKER_LAMPE_ONLINE) == 1 and fenster.emu.printer_lamp(K.DRUCKER_LAMPE_FEHLER) == 0
     # ROM-Wahl: die zwei K6311-Abzuege stehen im Auswahlfeld, die Vorgabe ist 12128062
     assert fenster.einst_drucker.rom.count() == 2
 

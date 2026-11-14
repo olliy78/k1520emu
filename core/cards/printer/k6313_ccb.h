@@ -29,6 +29,11 @@
  * Firmware nur als Flanke "A0 high" (Wagen steht -> 26-ms-Zeitgeber, 1ACFH/1B30H); es folgt der Taktscheibe [?].  Das Druckbild wird in
  * `tests/support/k6313_orakel.h` Punkt fuer Punkt gegen den Zeichengenerator im ROM geprueft (Merkposten Nr. 33).
  *
+ * **K6311 (`Config::k6311`, WP8e/WP8f):** dieselbe Karte, aber ANDERE Bitbelegung, nur aus dem ROM 12128062 erschlossen [?] (Merkposten drucker.md Nr. 35):
+ * Wagen F9H B1/B3/B5/B7 (B0 = Taktscheibe), Papiermotor F8H A4/A5 (Zwei-Bit-Code), Nadeln DDH + DCH.0, Freigabe DCH.1, Tasten D104 A2 + D105 A4-A6,
+ * Papierende D104 A6, Lampen D105 A2 (ON LINE)/A3 (ERR); Zeichengenerator 2280H + 8 * (Code - 20H).  Ablauf: `eingaengeSetzen6311`, `ausgaengeAuswerten6311`,
+ * `nadelnAuswerten6311`.
+ *
  * **Schnittstelle:** zuerst V.24 an der SIO (Kassettenkennung PE1 = D104 B4 liest 0, Centronics-Kassette 1 [F:0096H]).  IFSS und
  * Centronics fehlen noch; fuer den `SerialHub` gibt es trotzdem beide Anschluesse (wie K6316): IFSS (Kanal B) ohne Funktion.
  */
@@ -75,9 +80,9 @@ public:
         /// Anwenders `K6313_DIPswitches.png`.  Rest OFF (Pica, US ASCII, 12 Zoll, 9600 Bd) — kein Auslieferungszustand, nur Vorgabe.
         uint32_t dil = (1u << dilIndex(5, 2)) | (1u << dilIndex(13, 2));
         bool papier_da = true;
-        /// K6311 (WP8e): dieselbe Karte, aber die Hardware ist **nur aus dem ROM 12128062 erschlossen [?]** (kein Plan).  Wirkt: BCH/BDH liefern
-        /// `schalter_baud`/`schalter_format` (Eingangs-PIO der V.24-Platte, Quelle der Bits unbekannt [?]), Lampen ON LINE/ERR/PE sind nicht belegt (nur POW).
-        /// Bedienmatrix, Motorbelegung und Nadelports des K6311 sind NICHT nachgebildet (die K6313-Belegung gilt dort nachweislich nicht).
+        /// K6311 (WP8e/WP8f): dieselbe Karte, aber die Hardware ist **nur aus dem ROM 12128062 erschlossen [?]** (kein Plan).  Wirkt: BCH/BDH liefern
+        /// `schalter_baud`/`schalter_format` (Eingangs-PIO der V.24-Platte, Quelle der Bits unbekannt [?]); Wagen, Papiermotor, Nadeln, Tasten, Papierende und
+        /// Lampen ON LINE/ERR sind nach Nr. 35 des Merkpostens belegt (die K6313-Belegung gilt dort nachweislich nicht); Bedienfeld siehe `setTaste`/`lampe`.
         bool k6311 = false;
         /// BCH (nur K6311): Bit 5/6 waehlen den Teiler, Bit 7 = 0 verdoppelt ihn; FFH = 9600 Bd [E: ROM 00AFH-00CCH, Quelle der Bits [?]].
         uint8_t schalter_baud = 0xFF;
@@ -114,6 +119,28 @@ public:
             // Formularmotor: die Phasenfolge, die der Selbsttest beim Vorwaerts-Zeilenvorschub ausgibt, laeuft auf steigender Phasennummer
             // [?: Richtung nur aus dem Verhalten (Test druckt Zeile um Zeile nach unten), kein Plan] -> umgekehrt = Papier vorwaerts
             papier.phasen_umgekehrt = true;
+        }
+        /// K6311 (WP8f): Mechanik-Parameter des K6311.  Die Firmware taktet Wagenschritte (F5H-Zeitgeber, 3640 Takte je Schritt bei Lauf) und
+        /// Druckspalten (EC-Zeitgeber, 2742 Takte je Spalte bei Pica) getrennt; 12 Spalten = ein Pica-Zeichen (1/10 Zoll) ergeben 9,04 Schritte [F: Trace],
+        /// also **90 Schritte je Zoll** [?] (kein Plan; Pica = 10 Zeichen/Zoll angenommen).  Raster x: 360 dpi (Halbschritt 2 Pixel, Spalte 3 Pixel),
+        /// y: 144/Zoll (Papierschritt 1/48 Zoll = 3 Einheiten, Nadelteilung 1/72 Zoll = 2) - 8 Papierschritte je Zeile bei 6 Zeilen/Zoll [F: Trace].
+        void alsK6311()
+        {
+            k6311 = true;
+            druck.takte_je_zoll = 180;
+            druck.x_je_takt = 2;
+            druck.y_je_zoll = 144;
+            druck.pv_schritt_y = 3;
+            druck.nadel_teilung_y = 2;
+            druck.punkt_breite = 3;
+            druck.punkt_hoehe = 2;
+            druck.blatt_breite = 2520;   // 14 Zoll in Halbschritten
+            for (int k = 0; k < 9; ++k) druck.nadel_x[k] = 0;
+            for (int k = 1; k < 8; k += 2) druck.nadel_x[k] = -12;
+            druck.versatz_vor = -2;      // Abgleich: Vor- und Rueckwaertszeilen haben denselben Ursprung (Messung: 6 Pixel Unterschied bei +-1) [?]
+            druck.versatz_rueck = 2;
+            druck.rand_oben_y = 36;
+            papier.phasen_umgekehrt = false;
         }
     };
 
@@ -172,6 +199,7 @@ public:
     uint32_t dilMaske() const { return dil_; }
 
     // ─── Ausgaben (Beobachtung) ──────────────────────────────────────────────
+    /// K6311: Tasten 1 = ON/OFF LINE (D104 A2), 2/3/4 = D105 A4/A5/A6; Papierende = D104 A6.
     /// Lampen: 1 ON LINE, 2 POW, 3 ERR, 4 PE (1 = leuchtet).  ON LINE = D104 A6 high, ERR = D105 A4 high [?] (Polaritaet
     /// nicht aus dem Plan lesbar; wie K6316 positiv angenommen), POW = Netz, PE = Papierende (/LPE = NAND(PE, PEX)).
     bool lampe(int nr) const;
@@ -193,6 +221,9 @@ private:
     void eingaengeSetzen();
     uint8_t zeilen() const;        ///< Pegel der Zeilen KB01...KB04 bei der gewaehlten Spalte
     void ausgaengeAuswerten();
+    void eingaengeSetzen6311();      ///< K6311 (WP8f)
+    void ausgaengeAuswerten6311();
+    void nadelnAuswerten6311();
     bool cmtZaehlt() const;      ///< D101 Kanal 2 im Zaehlbetrieb (Phasenregister D115 getaktet)
     void phasenAnlegen();
     void cmtBeobachten();
@@ -218,6 +249,8 @@ private:
     uint8_t cm_wunsch_ = 0;          ///< /CM1...4 der Firmware (Bit k = Phase k+1), Eingang von D115
     bool cmt_beobachtet_ = false;
     bool g1_ = false;
+    bool home_ = false;              ///< K6311: Heimatsensor des Wagens (D104 B0)
+    bool tor_offen_ = false;         ///< K6311: Nadelfreigabe (D105 A1 low)
     bool eingang_neu_ = false;
 
     bool iei_in_ = false;

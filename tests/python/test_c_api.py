@@ -467,10 +467,17 @@ def test_printer_sd1157_can_be_created_and_runs_its_rom():
         h11 = K1520Handle(h11)
         assert _lib.k1520_machine_type(h11) == 7
         assert _lib.k1520_printer_lamp(h11, 5) == 1                                   # POW
-        assert _lib.k1520_printer_lamp(h11, 0) == -1 and _lib.k1520_printer_lamp(h11, 1) == -1   # ON LINE/ERR unbekannt
-        assert _lib.k1520_printer_key(h11, 21, 1) == 0                               # keine Tastenbelegung bekannt
-        assert _lib.k1520_printer_switch_get(h11, 32) == -1 and _lib.k1520_printer_switch(h11, 32, 1) == 0
+        assert _lib.k1520_printer_lamp(h11, 3) == -1                                  # PE-Lampe: das ROM schreibt keine
+        assert _lib.k1520_printer_key(h11, 21, 1) == 1 and _lib.k1520_printer_key(h11, 24, 1) == 1   # WP8f: Tasten ON LINE ... D105 A6
+        assert _lib.k1520_printer_key(h11, 21, 0) == 1 and _lib.k1520_printer_key(h11, 25, 1) == 0
+        assert _lib.k1520_printer_switch_get(h11, 32) == -1 and _lib.k1520_printer_switch(h11, 32, 1) == 0   # keine DIL-Schalter
+        assert _lib.k1520_printer_switch_get(h11, 3) == 1                             # Papier da (D104 A6 = 0)
         assert _lib.k1520_run(h11, 200_000) > 0
+        for _ in range(100):                                                          # bis ON LINE (D105 A2): ~20 Mio. Takte
+            _lib.k1520_run(h11, 300_000)
+            if _lib.k1520_printer_lamp(h11, 0) == 1:
+                break
+        assert _lib.k1520_printer_lamp(h11, 0) == 1 and _lib.k1520_printer_lamp(h11, 1) == 0   # ON LINE an, ERR aus
     finally:
         _lib.k1520_destroy(h11)
     assert not _lib.k1520_create_printer(4, b"dil=0x3")                # K6313-Schluessel gilt nicht am K6311

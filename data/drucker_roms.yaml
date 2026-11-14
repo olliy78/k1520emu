@@ -136,27 +136,27 @@ eintraege:
   # Nicht aufgenommen: 12228062 (Centronics: Datenpfad ueber BCH-BFH nicht nachgebildet), 13120012/13325212 (nur 8 KiB, der Kern verlangt 10 240 B).
   - schluessel: k6311-12128062
     typ: k6311
-    titel: "1.21-2-80/62 HCD 80 F ISO-G V24 (GERMAN)"
+    titel: "1.21-2-80/62 HCD 80 F ISO-G V24 (Etikett GERMAN, druckt ASCII)"
     pgm: "1.21-2-80/62, Kennung 28012162"
     datei: K6311/12128062.bin
     groesse: 10240
     md5: 8674d87842c7409864a420141be86cc0
     schnittstellen: [v24]
-    zeichensatz: Deutsch [?] (aus der Etikettenliste und Byte 27F7H geschlossen)
+    zeichensatz: "US ASCII (Byte 27F7H = 20H waehlt die Tabelle 2220H; die Etikettenliste nennt GERMAN - das Druckbild widerspricht)"
     guete: ok
-    hinweis: "Vorgabe.  Hardware des K6311 nur aus dem ROM erschlossen [?]: Das ROM laeuft an und nimmt Text an, Wagen und Nadeln sind NICHT nachgebildet - es wird nichts gedruckt."
+    hinweis: "Vorgabe.  Hardware des K6311 nur aus dem ROM erschlossen [?]: Selbsttest und Text ueber V.24 drucken und stimmen Punkt fuer Punkt mit dem Zeichengenerator im ROM ueberein."
     vorgabe: true
     aliases: []
   - schluessel: k6311-12128062_1
     typ: k6311
-    titel: "1.21-2-80/62 HCD 80 F ISO-G V24 (UK ASCII)"
+    titel: "1.21-2-80/62 HCD 80 F ISO-G V24 (Etikett UK ASCII, druckt deutschen Satz mit Pfund)"
     pgm: "1.21-2-80/62, Etikett ...803, Kennung 28012162"
     datei: K6311/12128062_1.bin
     groesse: 10240
     md5: dacf64d41476fb71bd66f6c0dff325de
     schnittstellen: [v24]
-    zeichensatz: UK ASCII [?] (aus der Etikettenliste und Byte 27F7H geschlossen)
+    zeichensatz: "Byte 27F7H = 30H waehlt die Tabelle 2230H: # = Pfund, @ = Paragraph, [ \\ ] = Ae Oe Ue, { | } ~ = ae oe ue ss (die Etikettenliste nennt UK ASCII)"
     guete: ok
-    hinweis: "Ein Byte Unterschied zum Abzug 12128062 (27F7H: 20H gegen 30H).  Hardware nur erschlossen [?]: nur Anlauf und Texteingang, Wagen und Nadeln nicht nachgebildet."
+    hinweis: "Ein Byte Unterschied zum Abzug 12128062 (27F7H: 20H gegen 30H).  Hardware nur erschlossen [?]; das Druckbild mit dem Zeichensatz dieser Tabelle ist gegen das ROM geprueft."
     vorgabe: false
     aliases: []

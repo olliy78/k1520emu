@@ -1,18 +1,21 @@
 /**
  * @file test_k6311.cpp
- * @brief K6311 (Entwurf 49 WP8e): ROM 12128062 auf der Karte `K6313Ccb` (Variante `k6311`).  **Es gibt keinen Schaltplan des K6311**: die
- *        Hardware ist nur aus dem ROM erschlossen [?] (doc/printer/k6313/firmware_diff.md §6, Merkposten drucker.md Nr. 34).  Diese Tests
- *        pruefen deshalb nur, was das ROM selbst belegt (Anlauf bis zur Leerlaufschleife, Auswertung von BCH/BDH, Annahme von Text,
- *        ROM-Byte 27F7H) und halten die **Grenze** fest: es wird nichts gedruckt, weil die Motor-/Nadelbelegung des K6311 nicht bekannt ist.
+ * @brief K6311 (Entwurf 49 WP8e/WP8f): ROM 12128062 auf der Karte `K6313Ccb` (Variante `k6311`).  **Es gibt keinen Schaltplan des K6311**: die
+ *        Hardware ist nur aus dem ROM erschlossen [?] (doc/printer/k6313/firmware_diff.md §6, Merkposten drucker.md Nr. 34/35).  Diese Tests
+ *        pruefen den Anlauf, die serielle Einrichtung und (WP8f) das **Druckbild Punkt fuer Punkt gegen den Zeichengenerator im ROM**
+ *        (`tests/support/k6311_orakel.h`): Text ueber V.24 in beiden Druckrichtungen, alle 94 Zeichen, Selbsttest, Zeichensatzbyte 27F7H,
+ *        Zeilenvorschub/Formularvorschub, Tasten und Papierende.  Die Zuordnung der E/A-Bits ist erschlossen [?], das Druckbild nicht.
  */
 #include <gtest/gtest.h>
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <iterator>
 #include <string>
 #include <vector>
 
 #include "core/machines/printer/printer_machine.h"
+#include "tests/support/k6311_orakel.h"
 
 using Typ = PrinterMachine::Config::Typ;
 
@@ -143,24 +146,183 @@ TEST(K6311Modul, TextUeberV24WirdAngenommenUndAusDemEingangspufferGelesen)
     EXPECT_EQ(l.wort(0x384E), l.wort(0x384C));
 }
 
-TEST(K6311Modul, GrenzeDieBelegungVonWagenUndNadelnIstUnbekanntEsWirdNichtGedruckt)
+
+namespace {
+std::string zeilen(const std::vector<std::string>& z)
 {
-    // **Dokumentierte Luecke, kein Sollverhalten.**  Das ROM schreibt Wagen-Phasen als Zwei-Bit-Code in D104 A4/A5 (Werte 00H/20H/30H/10H an F8H)
-    // statt in A1/A3/A5/A7 wie am K6313, die Formularmotor-Muster an F9H (93H/1EH/38H/F0H) passen nicht zur K6313-Belegung, und DDH
-    // (Nadeln am K6313) wird nur beim Einrichten beschrieben.  Folge im Emulator: der Wagen steht, der Papiervorschub laeuft, es faellt
-    // kein Nadelanschlag.  Wird die Belegung irgendwann erschlossen und nachgebildet, muss dieser Test durch ein Orakel ersetzt werden.
-    Lauf l;
-    l.fahre(3'000'000);
-    const int wagen = l.m->druck().wagen().position();
-    l.sende("HELLO 123\r\nZWEI\r\n");
-    l.fahre(40'000'000);
-    EXPECT_EQ(l.m->druck().kopf().anschlaege(), 0u);
-    EXPECT_EQ(l.m->druck().wagen().position(), wagen);
-    EXPECT_FALSE(l.st().lampe(1));
-    EXPECT_FALSE(l.st().lampe(3));
-    EXPECT_TRUE(l.st().lampe(2));
+    std::string t;
+    for (auto& e : z) t += e + "\r\n";
+    return t;
 }
 
+/// Prueft alle Baender des Blatts gegen die Zeilen; Rueckgabe "" = gleich.  Ursprung aller Zeilen: +-2 Pixel gleich (Abgleich Vor-/Rueckwaertsdruck).
+std::string pruefe(Lauf& l, const std::vector<uint8_t>& rom, const std::vector<std::string>& soll, int* ursprung0 = nullptr)
+{
+    const Blattmodell& bl = l.m->druck().blatt(0);
+    const auto b = k6311test::baender(bl);
+    if (b.size() != soll.size()) return "Baender: " + std::to_string(b.size()) + " statt " + std::to_string(soll.size());
+    double ox0 = -1;
+    for (size_t i = 0; i < b.size(); ++i) {
+        const auto e = k6311test::vergleiche(bl, rom, soll[i], b[i].first, b[i].second);
+        if (!e.fehler.empty()) return "Zeile " + std::to_string(i) + " '" + soll[i].substr(0, 20) + "': " + e.fehler;
+        if (ox0 < 0) ox0 = e.ursprung;
+        if (std::abs(e.ursprung - ox0) > 2) return "Zeile " + std::to_string(i) + ": Ursprung " + std::to_string(e.ursprung) + " statt " + std::to_string(ox0);
+    }
+    if (ursprung0) *ursprung0 = static_cast<int>(ox0);
+    return "";
+}
+}  // namespace
+
+TEST(K6311Modul, TextUeberV24DrucktUndDeckeSichPunktFuerPunktMitDemZeichengenerator)
+{
+    // Zeile 1 vorwaerts, Zeile 2 rueckwaerts (die Firmware druckt bidirektional): beide stimmen mit den Zellen im ROM (2280H + 8 * (Code - 20H)) ueberein.
+    const auto r = k6311test::rom(K6311_ABZUG_DIR);
+    Lauf l;
+    l.fahre(20'000'000);
+    ASSERT_TRUE(l.st().lampe(1)) << "ON LINE";
+    l.sende(zeilen({"HELLO 123", "ZWEI", "ROBOTRON K6311 0987654321"}));
+    l.fahre(80'000'000);
+    EXPECT_EQ(pruefe(l, r, {"HELLO 123", "ZWEI", "ROBOTRON K6311 0987654321"}), "");
+    const auto b = k6311test::baender(l.m->druck().blatt(0));
+    ASSERT_EQ(b.size(), 3u);
+    EXPECT_EQ(b[1].first - b[0].first, 24) << "Zeilenabstand 1/6 Zoll = 8 Papierschritte zu 1/48 Zoll";
+    EXPECT_EQ(b[2].first - b[1].first, 24);
+}
+
+TEST(K6311Modul, AlleDruckbarenZeichenInklusiveUnterlaengenDeckenSichMitDemZeichengenerator)
+{
+    // Unterlaengen (g j p q y , ;) tragen in Byte 0 der Zelle die Nadel-9-Maske (Bit k = Spalte k+1, 0 = Nadel 9 schlaegt an).
+    const auto r = k6311test::rom(K6311_ABZUG_DIR);
+    Lauf l;
+    l.fahre(20'000'000);
+    const std::string z1 = "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ", z2 = "[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+    l.sende(zeilen({z1, z2}));
+    l.fahre(120'000'000);
+    EXPECT_EQ(pruefe(l, r, {z1, z2}), "");
+}
+
+TEST(K6311Modul, ZeichensatzByte27F7WaehltDieNationaleTabelleUndDasDruckbildFolgt)
+{
+    // 12128062: 27F7H = 20H -> Tabelle 2220H = ASCII; 12128062_1: 27F7H = 30H -> Tabelle 2230H: # = 7FH (Pfund), @ = 82H (Paragraph), [ \ ] = Ae Oe Ue,
+    // { | } ~ = ae oe ue ss.  Die Etikettenliste nennt ...802 "GERMAN" und ...803 "UK ASCII" - das Druckbild widerspricht ihr (Merkposten Nr. 35).
+    for (const char* name : {"12128062", "12128062_1"}) {
+        const auto r = k6311test::rom(K6311_ABZUG_DIR, name);
+        ASSERT_EQ(r.size(), 10240u) << name;
+        PrinterMachine::Config c;
+        c.k6313.rom_extern = r;
+        Lauf l(c);
+        l.fahre(20'000'000);
+        l.sende(zeilen({"#$@[\\]^`{|}~()<>"}));
+        l.fahre(40'000'000);
+        EXPECT_EQ(pruefe(l, r, {"#$@[\\]^`{|}~()<>"}), "") << name;
+        const int zelle_hash = k6311test::zelleVon(r, '#');
+        EXPECT_EQ(zelle_hash, r[0x27F7] == 0x30 ? 0x7F : 0x23) << name;
+    }
+}
+
+TEST(K6311Modul, SelbsttestDruckKennungUndZeichenumlaufStimmenMitDemProgrammImRomUeberein)
+{
+    // ON LINE aus (Taste 1: D104 A2), dann Taste 2 (D105 A4) im Offline-Zustand: Selbsttest ab 0264H [F]: Kennungszeile aus den ROM-Bytes 27F8H-27FFH
+    // (0F48H-0F5CH), danach je Zeile die Zeichen B+1...7EH, 20H... rund, 80 je Zeile, B = 20H, 21H, ...
+    const auto r = k6311test::rom(K6311_ABZUG_DIR);
+    Lauf l;
+    l.fahre(20'000'000);
+    l.st().setTaste(1, true);
+    l.fahre(3'000'000);
+    l.st().setTaste(1, false);
+    l.fahre(6'000'000);
+    ASSERT_FALSE(l.st().lampe(1)) << "OFF LINE";
+    l.st().setTaste(2, true);
+    l.fahre(60'000'000);
+    l.st().setTaste(2, false);
+    const Blattmodell& bl = l.m->druck().blatt(0);
+    const auto b = k6311test::baender(bl);
+    ASSERT_GE(b.size(), 8u);
+    // Kennung: 27FBH-27FDH, 27F8H-27FAH, '0' + oberes Nibble von 27F7H (RLD), 27FEH-27FFH
+    std::string kennung;
+    for (int a : {0x27FB, 0x27FC, 0x27FD, 0x27F8, 0x27F9, 0x27FA}) kennung += static_cast<char>(r[static_cast<size_t>(a)]);
+    kennung += static_cast<char>(0x30 | (r[0x27F7] >> 4));
+    kennung += static_cast<char>(r[0x27FE]);
+    kennung += static_cast<char>(r[0x27FF]);
+    EXPECT_EQ(kennung, "121280262");
+    EXPECT_EQ(k6311test::vergleiche(bl, r, kennung, b[0].first, b[0].second).fehler, "") << "Kennungszeile";
+    for (int i = 1; i < 8; ++i) {
+        std::string z;
+        int a = 0x20 + i - 1;
+        for (int n = 0; n < 80; ++n) { ++a; if (a == 0x7F) a = 0x20; z += static_cast<char>(a); }
+        EXPECT_EQ(k6311test::vergleiche(bl, r, z, b[static_cast<size_t>(i)].first, b[static_cast<size_t>(i)].second).fehler, "") << "Selbsttest-Zeile " << i;
+    }
+}
+
+TEST(K6311Modul, TasteOnLineSchaltetOfflineUndWiederOnline)
+{
+    // D104 A2 (aktiv low) ist die Taste ON LINE: die Firmware geht beim Druck offline (0226H loescht D105 A2 = Lampe), beim naechsten Druck wieder online (0180H).
+    Lauf l;
+    l.fahre(20'000'000);
+    ASSERT_TRUE(l.st().lampe(1));
+    ASSERT_FALSE(l.st().lampe(3));
+    l.st().setTaste(1, true); l.fahre(3'000'000); l.st().setTaste(1, false); l.fahre(6'000'000);
+    EXPECT_FALSE(l.st().lampe(1)) << "OFF LINE";
+    l.st().setTaste(1, true); l.fahre(3'000'000); l.st().setTaste(1, false); l.fahre(6'000'000);
+    EXPECT_TRUE(l.st().lampe(1)) << "wieder ON LINE";
+    EXPECT_FALSE(l.st().lampe(3));
+}
+
+TEST(K6311Modul, TastenZeilenvorschubWirkenAufDasPapierSolangeSieGehaltenWerden)
+{
+    // Offline: Taste 3 (D105 A5) schiebt das Papier rueckwaerts (Dauer, Viererschritte, ROM 1126H), Taste 4 (D105 A6) vorwaerts (Dauer, 8 Schritte = 1/6 Zoll,
+    // der Wagen faehrt vorher nach rechts); Zuordnung der Tasten zu Beschriftungen [?].
+    for (int taste : {3, 4}) {
+        Lauf l;
+        l.fahre(20'000'000);
+        l.st().setTaste(1, true); l.fahre(3'000'000); l.st().setTaste(1, false); l.fahre(6'000'000);
+        ASSERT_FALSE(l.st().lampe(1));
+        const int p0 = l.m->druck().papier(0).lage();
+        l.st().setTaste(taste, true);
+        l.fahre(8'000'000);
+        const int p1 = l.m->druck().papier(0).lage();
+        l.st().setTaste(taste, false);
+        l.fahre(3'000'000);
+        const int p2 = l.m->druck().papier(0).lage();
+        if (taste == 3) EXPECT_LT(p1, p0 - 20) << "Papier rueckwaerts";
+        else            EXPECT_GT(p1, p0 + 20) << "Papier vorwaerts";
+        EXPECT_LE(std::abs(p2 - p1), 12) << "nach dem Loslassen laeuft es nicht weiter";
+    }
+}
+
+TEST(K6311Modul, PapierendeSensorD104A6SchaltetDieFirmwareBeimNaechstenVorschubOfflineUndEsGehtMitPapierWeiter)
+{
+    // D104 A6 = 1 (Papierende [?]) tastet die Firmware je vier Papierschritte ab (1178H): sie geht offline (D105 A2 aus).  Mit Papier und ON LINE druckt sie weiter.
+    const auto r = k6311test::rom(K6311_ABZUG_DIR);
+    Lauf l;
+    l.fahre(20'000'000);
+    l.st().setPapierDa(false);
+    l.sende(zeilen({"AB", "CD"}));
+    l.fahre(30'000'000);
+    EXPECT_FALSE(l.st().lampe(1)) << "offline nach Papierende";
+    l.st().setPapierDa(true);
+    l.st().setTaste(1, true); l.fahre(3'000'000); l.st().setTaste(1, false); l.fahre(20'000'000);
+    EXPECT_TRUE(l.st().lampe(1)) << "wieder ON LINE";
+    const uint64_t vorher = l.m->druck().kopf().anschlaege();
+    l.sende(zeilen({"EF"}));
+    l.fahre(30'000'000);
+    EXPECT_GT(l.m->druck().kopf().anschlaege(), vorher);
+    EXPECT_EQ(k6311test::vergleiche(l.m->druck().blatt(0), r, "EF", k6311test::baender(l.m->druck().blatt(0)).back().first, k6311test::baender(l.m->druck().blatt(0)).back().second).fehler, "");
+}
+
+TEST(K6311Modul, FormfeedSchiebtDasPapierUmDieFormatlaengeVonZwoelfZoll)
+{
+    // 0CH: 576 Papierschritte zu 1/48 Zoll = 12 Zoll (Vorgabe der Firmware) -> 1728 Rasterzeilen (1/144 Zoll)
+    const auto r = k6311test::rom(K6311_ABZUG_DIR);
+    Lauf l;
+    l.fahre(20'000'000);
+    l.sende("A\fB\r\n");
+    l.fahre(60'000'000);
+    const auto b = k6311test::baender(l.m->druck().blatt(0));
+    ASSERT_GE(b.size(), 2u);
+    EXPECT_EQ(b[1].first - b[0].first, 1728);
+    EXPECT_EQ(k6311test::vergleiche(l.m->druck().blatt(0), r, "A", b[0].first, b[0].second).fehler, "");
+}
 TEST(K6311Modul, DerK6313BleibtUnberuehrt)
 {
     // BCH/BDH lesen am K6313 weiter FFH (Centronics-PIO nicht bestueckt), die Lampen bleiben belegt
@@ -172,3 +334,4 @@ TEST(K6311Modul, DerK6313BleibtUnberuehrt)
     EXPECT_EQ(m.ioReadDebug(0xBD), 0xFF);
     EXPECT_STREQ(m.k6313().deviceName(), "K6313 CCB");
 }
+

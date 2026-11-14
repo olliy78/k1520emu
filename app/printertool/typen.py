@@ -225,21 +225,37 @@ K6313 = Typbeschreibung(
                   "Orakel geprueft.",
 )
 
-# ── K6311 (WP8e, Entwurf 49 §11): KEIN Schaltplan - Hardware nur aus dem ROM 12128062 erschlossen [?] ──────────────────────────────────
-# Die Karte ist die des K6313 (E/A 7CH-FBH), aber Tastenmatrix, Lampen, Motor- und Nadelbelegung des K6311 sind unbekannt und nicht
-# nachgebildet: das Bedienfeld hat deshalb weder Tasten noch DIL-Schalter, nur die Netzlampe.  Es wird nichts gedruckt.
+# ── K6311 (WP8e/WP8f, Entwurf 49 §11): KEIN Schaltplan - Hardware nur aus dem ROM 12128062 erschlossen [?] ───────────────────────────
+# Die Karte ist die des K6313 (E/A 7CH-FBH), die Belegung der Bits aber eine andere (Merkposten drucker.md Nr. 34/35): vier Tasten (ON LINE an D104 A2,
+# drei weitere an D105 A4-A6), Lampen ON LINE (D105 A2) und ERR (D105 A3), Papierende-Sensor D104 A6; KEINE DIL-Schalter (Baud/Format kommen ueber BCH/BDH).
+# Das Druckbild stimmt Punkt fuer Punkt mit dem Zeichengenerator im ROM ueberein; die Zuordnung der Bits ist erschlossen.
 K6311 = Typbeschreibung(
     schluessel="k6311",
     titel="K6311 (V.24) - Hardware erschlossen [?]",
     kern_maschine="k6311",
-    tasten=(),
-    lampen=(Lampe("POW", "#37d34a", "POW: der Drucker ist eingeschaltet.", None),),
+    tasten=(
+        Taste("t1", "ON/OFF LINE", "Taste ON/OFF LINE (D104 A2, aktiv low): schaltet zwischen ON LINE und OFF LINE um (Lampe ON LINE).  "
+              "Zuordnung aus dem ROM [?].", "taster", 21),
+        Taste("t2", "TEST", "Taste D105 A4: im OFF-LINE-Zustand gedrueckt startet sie den Selbsttest (Kennungszeile und Zeichenumlauf, ROM 0264H); "
+              "beim Netz-Ein zusammen mit der Taste PAPIER VOR gehalten: Hexdump-Modus (ROM 00D1H-00DCH).  Beschriftung [?].", "taster", 22),
+        Taste("t3", "PAPIER \u25B2", "Taste D105 A5: schiebt das Papier im OFF-LINE-Zustand rueckwaerts, solange sie gehalten wird (ROM 1126H).  Beschriftung [?].",
+              "taster", 23),
+        Taste("t4", "PAPIER \u25BC", "Taste D105 A6: faehrt den Wagen nach rechts und schiebt das Papier im OFF-LINE-Zustand vorwaerts "
+              "(Zeilen zu 1/6 Zoll), solange sie gehalten wird (ROM 120DH).  Beschriftung [?].", "taster", 24),
+        Taste("papier", "Papier da", "Endlospapier eingelegt.  Aus = Papierende (D104 A6 = 1): die Firmware tastet den Sensor je vier Papierschritte ab "
+              "und geht offline.  Rolle des Sensors erschlossen [?].", "rastend", 3),
+    ),
+    lampen=(
+        Lampe("POW", "#37d34a", "POW: der Drucker ist eingeschaltet.", None),
+        Lampe("ON LINE", "#e6c229", "ON LINE (D105 A2): der Drucker ist bereit und nimmt Daten an.  Lampenrolle erschlossen [?].", 0),
+        Lampe("ERR", "#e53935", "ERR (D105 A3): Wachhund des Wagens (Stillstand) oder Haltepunkt der Firmware.  Lampenrolle erschlossen [?].", 1),
+    ),
     schnittstellen=("IFSS", "V.24"),
     hat_rom_wahl=False, schnittstelle_fest="v24", hat_online_schalter=False,
     dil_basis=0, dil_anzahl=0,
-    stand_hinweis="<b>Hardware erschlossen [?]:</b> zum K6311 gibt es keinen Schaltplan; alles ist aus dem ROM abgelesen.  Die Firmware laeuft an "
-                  "und nimmt Text ueber V.24 an, aber Wagen, Nadeln, Tasten und Lampen ON LINE/ERR sind nicht nachgebildet - "
-                  "<b>es wird nichts gedruckt</b>.",
+    stand_hinweis="<b>Hardware erschlossen [?]:</b> zum K6311 gibt es keinen Schaltplan; die Belegung von Wagen, Papiermotor, Nadeln, Tasten und "
+                  "Lampen ist aus dem ROM abgelesen.  Das Druckbild (Text ueber V.24, Selbsttest) stimmt Punkt fuer Punkt mit dem Zeichengenerator im ROM "
+                  "ueberein.  Nicht nachgebildet: IFSS, Centronics, Summer, Fettdruck/Unterstreichen sind nicht gegen ein Orakel geprueft.",
 )
 
 #: Die waehlbaren Typen (in der Reihenfolge des Auswahlfelds).

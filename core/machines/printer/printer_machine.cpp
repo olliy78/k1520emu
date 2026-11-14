@@ -39,7 +39,7 @@ std::unique_ptr<DruckerSteuerung> neueSteuerung(const PrinterMachine::Config& cf
             return std::make_unique<K6313Ccb>(bus, cfg.k6313);
         case PrinterMachine::Config::Typ::K6311_V24: {
             K6313Ccb::Config c = cfg.k6313;
-            c.k6311 = true;   // dieselbe Karte, Hardware aus dem ROM erschlossen [?]
+            c.alsK6311();   // dieselbe Karte, Hardware aus dem ROM erschlossen [?]
             return std::make_unique<K6313Ccb>(bus, c);
         }
     }

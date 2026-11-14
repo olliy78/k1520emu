@@ -213,6 +213,8 @@ void K6313Ccb::reset()
     sio_.channelB().setzeDCD(true);
     sio_.channelB().setzeCTS(true);
     druck_.halt();
+    home_ = cfg_.k6311 && druck_.wagen().rueckmeldung().g1;
+    tor_offen_ = false;
     cmt_beobachtet_ = false;
     cmtBeobachten();   // Kanal 2 steht nach dem Reset im Ruhezustand: D115 transparent
     nadeln_aktiv_ = 0;
@@ -242,6 +244,7 @@ uint8_t K6313Ccb::zeilen() const
 void K6313Ccb::eingaengeSetzen()
 {
     eingang_neu_ = true;
+    if (cfg_.k6311) { eingaengeSetzen6311(); return; }
     // D105 A: Bit 0...3 = Zeilen KB01...KB04 (Eingaenge, Maske 0FH, 0041H)
     pio105_.setExternA(zeilen(), 0x0F);
     // D104 A: Bit 0 = Eingang, unbenannt (Maske 05H) -> Taktscheibe [?: die Firmware wertet nur die Flanken "A0 high" aus (1ACFH, ISR 1B30H/1B3CH:
@@ -253,6 +256,7 @@ void K6313Ccb::eingaengeSetzen()
 
 void K6313Ccb::ausgaengeAuswerten()
 {
+    if (cfg_.k6311) { ausgaengeAuswerten6311(); return; }
     const uint8_t a104 = pio104_.pinsA(0), b104 = pio104_.pinsB(0), b105 = pio105_.pinsB(0);
     // Wagenmotor /CM1...4 = D104 A1,3,5,7, Hochpegel = Phase bestromt (die Firmware rotiert das Muster in 3824H um 2 Bit, 1B7BH)
     cm_wunsch_ = 0;
@@ -318,7 +322,16 @@ void K6313Ccb::setDil(int paar, int n, bool ein)
 bool K6313Ccb::lampe(int nr) const
 {
     // K6311: Belegung von LON/ERR/Papierende unbekannt [?] -> nur Netz wird gemeldet
-    if (cfg_.k6311 && nr != 2) return false;
+    if (cfg_.k6311) {
+        // DC.2 = ON LINE (gesetzt beim Eintritt in die Leerlaufschleife 0180H, geloescht beim Offline-Gehen 0226H), DC.3 = Fehler (gesetzt bei Wachhund-
+        // Ablauf 1375H und Haltepunkt 04ABH, nie geloescht) [F: Ablauf; die Lampenrolle ist erschlossen, nicht belegt [?]]; PE-Lampe: das ROM schreibt keine.
+        switch (nr) {
+            case 1: return (pio105_.pinsA(0) & 0x04) != 0;
+            case 2: return true;
+            case 3: return (pio105_.pinsA(0) & 0x08) != 0;
+        }
+        return false;
+    }
     switch (nr) {
         case 1: return (pio104_.pinsA(0) & 0x40) != 0;   // ON LINE: LON (D104 A6)
         case 2: return true;                              // POW: Netz
@@ -376,6 +389,7 @@ void K6313Ccb::ioWrite(uint8_t port, uint8_t data)
         pio_daten = !((port - P_PIO104) & 2);
     }
     if (pio_daten) ausgaengeAuswerten();
+    if (cfg_.k6311 && imBereich(port, P_PIO105) && !((port - P_PIO105) & 2) && (port & 1) == 0) nadelnAuswerten6311();
     if (imBereich(port, P_PIO105) || imBereich(port, P_PIO104)) eingaengeSetzen();
     ketteNeu();
 }
@@ -484,4 +498,67 @@ void K6313Ccb::onRETI()
             break;
         }
     ketteNeu();
+}
+
+// ─── K6311 (WP8f): Belegung nur aus dem ROM 12128062 erschlossen [?] ─────────────────────────────────────────────────
+// Die Belegung folgt NICHT der des K6313; jede Zeile steht unter [?], soweit kein Trace-Beleg genannt ist.
+
+void K6313Ccb::eingaengeSetzen6311()
+{
+    // D104 A (F8H), Maske 45H = A0, A2, A6 Eingang [F: 0F72H-0F7AH].
+    //  A2 = Taste ON LINE (aktiv low): das ROM richtet den Interrupt "A2 low" ein (D7H/FBH an FAH, 018AH-0190H); bei 0 meldet es (IX+2).1 und geht in die
+    //       Offline-Folge 01DBH-0350H, die A2 = 1 (Taste losgelassen) abwartet, im Offline-Zustand A2 = 0 als "wieder online" auswertet (0339H-034AH) [F]; Ruhe = 1.
+    //  A6 = Papierende (1 = kein Papier) [?]: das ROM tastet ihn je 4 Papierschritte ab (1178H) und beim Anlauf (0192H), setzt dann (IX+78).1/(IX+79).5 und geht
+    //       offline (01B0H), im Offline-Zustand sperrt A6 = 1 die Tastenabfrage (0236H-023AH) - die Rolle eines Papierende-Sensors ist erschlossen, nicht belegt.
+    pio104_.setExternA(static_cast<uint8_t>((taste_[0] ? 0x00 : 0x04) | (pe_ ? 0x40 : 0x00)), 0x45);
+    // D104 B (F9H), Maske 45H = B0, B2, B6 Eingang.  B0: das ROM richtet den Interrupt auf B0 ein (F7H bzw. D7H/FEH an FBH, 1284H/128DH) und setzt in ISR 138FH
+    // den Wachhund F6H neu: B0 = Taktscheibe des Wagens, ein Wechsel je Vollschritt (wie /G1 des K6316/K6313) [?; ohne Impulse meldet der Wachhund nach
+    // 26 ms Wagenstillstand (ISR 1356H: Motoren aus, DC.3 = Fehler)].  B2 wertet das ROM nur bei CR aus (0761H, "CALL NZ,0BF2": Zeile ausgeben); Bedeutung
+    // unbekannt [?], Ruhepegel 0.  B6 liest das ROM nie.
+    pio104_.setExternB(static_cast<uint8_t>(home_ ? 0x01 : 0x00), 0x45);
+    // D105 A (DCH), Maske 70H = A4...A6 Eingang: Tasten, aktiv low (041CH: OR E / CP FFH, E = BFH bzw. DFH; 023FH BIT 4) [F]; Ruhe = 1.
+    // Taste 2 = DC.4, 3 = DC.5, 4 = DC.6.
+    uint8_t t = 0x70;
+    for (int i = 1; i < 4; ++i) if (taste_[i]) t = static_cast<uint8_t>(t & ~(0x10 << (i - 1)));
+    pio105_.setExternA(t, 0x70);
+}
+
+void K6313Ccb::ausgaengeAuswerten6311()
+{
+    const uint8_t a104 = pio104_.pinsA(0), b104 = pio104_.pinsB(0);
+    // Wagenmotor = F9H B1, B3, B5, B7 (Phasen 1...4, hoch = bestromt), B4 = Leistung (Halten ohne B4 [F: AND AAH, 1109H]) [?].  Phasenfolge laut ROM:
+    // Synchronisation (ISR 1061H, RLC) 93H-1EH-38H-F0H = Phasenpaare {4,1},{1,2},{2,3},{3,4}, aufsteigende Phasennummer; Heimatfahrt -> Wagen nach links.
+    uint8_t cm = 0;
+    for (int k = 0; k < 4; ++k)
+        if ((b104 >> (1 + 2 * k)) & 1) cm |= static_cast<uint8_t>(1 << k);
+    WagenEingang w;
+    w.phasen = cm;
+    druck_.wagen().eingang(w);
+    const bool home = druck_.wagen().rueckmeldung().g1;
+    if (home != home_) { home_ = home; eingaengeSetzen6311(); }
+    // Papiermotor = F8H A4/A5 als Zwei-Bit-Code (00H-20H-30H-10H), A3 = Haltestrom/Freigabe [?]: wie eine Vollschrittfolge zweier Wicklungen
+    // gedeutet; die Zuordnung Code -> Phasenpaar ist eine Annahme, die Richtung folgt aus dem Zeilenvorschub (Bild nach unten).
+    static const uint8_t PAAR[4] = {0x03, 0x06, 0x0C, 0x09};   // Code (A5,A4) 00, 01, 11, 10
+    const uint8_t code = static_cast<uint8_t>((a104 >> 4) & 3);
+    static const int FOLGE[4] = {0, 1, 3, 2};                    // Bitmuster -> Rang in der Gray-Folge 00, 01, 11, 10
+    druck_.papier(0).phasen(PAAR[FOLGE[code]]);
+}
+
+void K6313Ccb::nadelnAuswerten6311()
+{
+    // D105 B (DDH) = Nadeln 1...8 (Bit 7 = Nadel 1), D105 A (DCH) Bit 0 = Nadel 9, Bit 1 = Freigabe; 0 = aktiv [?].  Das ROM setzt zuerst DDH, dann
+    // DCH (1D7EH-1D92H), arbeitet danach die Impulszeit mit CTC D101 Kanal 0 (F4H: 97H/37H = 880 Takte) ab und schaltet im Interrupt (1EDFH) die
+    // Freigabe wieder aus.  Gefeuert wird mit der fallenden Flanke der Freigabe mit den dann anliegenden Daten.
+    const uint8_t dc = pio105_.pinsA(0), dd = pio105_.pinsB(0);
+    const bool offen = !(dc & 0x02);
+    if (offen && !tor_offen_) {
+        uint16_t aktiv = 0;
+        for (int n = 1; n <= 8; ++n)
+            if (!((dd >> (8 - n)) & 1)) aktiv |= static_cast<uint16_t>(1u << (n - 1));
+        if (!(dc & 0x01)) aktiv |= 0x100;
+        nadeln_aktiv_ = aktiv;
+        if (aktiv) druck_.feuere(aktiv, true);
+    }
+    if (!offen) nadeln_aktiv_ = 0;
+    tor_offen_ = offen;
 }

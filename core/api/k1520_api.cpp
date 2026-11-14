@@ -574,7 +574,7 @@ int k1520_printer_geometry(K1520Handle h, int* x_je_zoll, int* y_je_zoll, int* b
 int k1520_printer_key(K1520Handle h, int taste, int gedrueckt) {
     auto* p = printerOf(h);
     if (!p) return 0;
-    if (p->istK6311()) return 0;   // Tastenbelegung des K6311 unbekannt [?]: keine Tasten (WP8e)
+    // K6311 (WP8f): Tasten 21..24 = ON LINE (D104 A2), D105 A4, A5, A6 - aus dem ROM erschlossen [?], Zuordnung in K6313Ccb::eingaengeSetzen6311
     if (p->istK6313()) {
         if (taste < K1520_PRINTER_KEY_K6313_T1 || taste > K1520_PRINTER_KEY_K6313_T4) return 0;
         p->k6313().setTaste(taste - K1520_PRINTER_KEY_K6313_T1 + 1, gedrueckt != 0);
@@ -604,7 +604,7 @@ int k1520_printer_switch(K1520Handle h, int schalter, int wert) {
             st.setDil(5 + i / 2, 1 + i % 2, wert != 0);
             return 1;
         }
-        if (!p->istK6311() && schalter == K1520_PRINTER_SW_PAPIER) { st.setPapierDa(wert != 0); return 1; }
+        if (schalter == K1520_PRINTER_SW_PAPIER) { st.setPapierDa(wert != 0); return 1; }   // K6311: D104 A6 [?]
         return 0;
     }
     if (p->istK6316()) {
@@ -651,7 +651,7 @@ int k1520_printer_switch_get(K1520Handle h, int schalter) {
             const int i = schalter - K1520_PRINTER_SW_K6313_DIL_BASIS;
             return st.dil(5 + i / 2, 1 + i % 2) ? 1 : 0;
         }
-        return !p->istK6311() && schalter == K1520_PRINTER_SW_PAPIER ? (st.papierDa() ? 1 : 0) : -1;
+        return schalter == K1520_PRINTER_SW_PAPIER ? (st.papierDa() ? 1 : 0) : -1;
     }
     if (p->istK6316()) {
         const K6316Steuerung& st = p->k6316();
@@ -689,9 +689,9 @@ int k1520_printer_lamp(K1520Handle h, int lampe) {
     if (p->istK6313()) {
         const K6313Ccb& st = p->k6313();
         switch (lampe) {
-            case K1520_PRINTER_LAMP_ONLINE: return p->istK6311() ? -1 : st.lampe(1) ? 1 : 0;   // K6311: LON/ERR unbekannt [?]
-            case K1520_PRINTER_LAMP_FEHLER: return p->istK6311() ? -1 : st.lampe(3) ? 1 : 0;
-            case K1520_PRINTER_LAMP_PAPIER: return p->istK6311() ? -1 : st.lampe(4) ? 1 : 0;
+            case K1520_PRINTER_LAMP_ONLINE: return st.lampe(1) ? 1 : 0;   // K6311: D105 A2 [?]
+            case K1520_PRINTER_LAMP_FEHLER: return st.lampe(3) ? 1 : 0;   // K6311: D105 A3 [?]
+            case K1520_PRINTER_LAMP_PAPIER: return p->istK6311() ? -1 : st.lampe(4) ? 1 : 0;   // K6311: das ROM schreibt keine PE-Lampe
             case K1520_PRINTER_LAMP_POW:    return st.lampe(2) ? 1 : 0;
             default: return -1;
         }

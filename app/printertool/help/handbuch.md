@@ -32,7 +32,23 @@ Das ist das Verhalten der Original-Firmware, kein Fehler des Emulators.  Die Fir
 
 ### K6311: Hardware erschlossen [?]
 
-Zum K6311 (Vorläufer des K6313) gibt es **keinen Schaltplan und kein Handbuch**.  Alles, was der Emulator von ihm weiß, ist aus dem Programm im ROM (Abzug 12128062, V.24) **erschlossen** und mit [?] zu lesen.  Die Firmware läuft an, richtet die serielle Schnittstelle ein (Baudrate und Datenformat liest sie an den Ports BCH/BDH, die der Emulator mit Vorgaben belegt: 9600 Bd, 8 Bit, keine Parität, ein Stoppbit) und nimmt Text über V.24 an.  **Gedruckt wird nichts**: die Belegung von Wagenmotor, Formularmotor, Nadeln, Tasten und der Lampen ON LINE/ERR ist am K6311 anders als am K6313 und nicht bekannt; deshalb zeigt das Bedienfeld nur die Netzlampe, und das Blatt bleibt leer.  Das ist eine Lücke der Nachbildung, kein Fehler der Firmware.
+Zum K6311 (Vorläufer des K6313) gibt es **keinen Schaltplan und kein Handbuch**.  Alles, was der Emulator von ihm weiß, ist aus dem Programm im ROM (Abzug 12128062, V.24) **erschlossen** und mit [?] zu lesen.  Der Drucker **druckt**: Selbsttest und Text über V.24 (beide Druckrichtungen, alle 94 Zeichen mit Unterlängen) stimmen **Punkt für Punkt** mit dem Zeichengenerator im ROM überein.  Die Firmware richtet die serielle Schnittstelle ein (Baudrate und Datenformat liest sie an den Ports BCH/BDH, die der Emulator mit Vorgaben belegt: 9600 Bd, 8 Bit, keine Parität, ein Stoppbit); DIL-Schalter gibt es am K6311 nicht.
+
+**Bedienfeld** (Zuordnung aus dem ROM, Beschriftung der Tasten [?]):
+
+| Bedienung | Wirkung |
+|---|---|
+| **ON/OFF LINE** | schaltet zwischen ON LINE und OFF LINE um (Lampe *ON LINE*). |
+| **TEST** | im OFF-LINE-Zustand gedrückt: **Selbsttest** (Kennungszeile aus dem ROM, danach der Zeichenumlauf zu 80 Zeichen je Zeile).  Beim Netz-Ein zusammen mit *PAPIER ▼* gehalten: Hexdump-Modus. |
+| **PAPIER ▲** | im OFF-LINE-Zustand: Papier rückwärts, solange sie gehalten wird. |
+| **PAPIER ▼** | im OFF-LINE-Zustand: Wagen nach rechts, Papier vorwärts (Zeilen zu 1/6 Zoll), solange sie gehalten wird. |
+| **Papier da** | aus = Papierende: die Firmware tastet den Sensor beim Papiervorschub ab und geht OFF LINE; mit Papier und *ON/OFF LINE* druckt sie weiter. |
+
+**Lampen:** *POW*, *ON LINE*, *ERR* (Wachhund des Wagens oder Haltepunkt der Firmware).  Eine PE-Lampe schreibt das ROM nicht; sie wird deshalb nicht gezeigt.
+
+**Zeichensatz.**  Das Byte 27F7H im ROM wählt die Ersatztabelle für `# $ @ [ \ ] ^ ` { | } ~`: **12128062** druckt US-ASCII, **12128062_1** den deutschen Satz mit Pfundzeichen (`#` = £, `@` = §, `[ \ ]` = Ä Ö Ü, `{ | } ~` = ä ö ü ß).  Die Etikettenliste nennt die beiden Abzüge GERMAN bzw. UK ASCII; das Druckbild widerspricht ihr.  **Abmessung (Annahme [?]):** 10 Spalten je Zeichen (7 Zellspalten + 3 leer) zu 1/100 Zoll, ein Schritt des Wagenmotors 1/75 Zoll (Pica, 10 Zeichen/Zoll angenommen), Papierschritt 1/48 Zoll.
+
+Nicht nachgebildet bzw. nicht gegen ein Orakel geprüft: IFSS, Centronics, Summer sowie die ESC-Folgen (Fettdruck, Unterstreichen, Schriftarten): sie lösen in der Firmware etwas aus, das Druckbild ist aber nicht belegt.
 
 ### K6313: Stand der Nachbildung
 
@@ -50,7 +66,7 @@ Die Lage der Lichtschranken zur Druckzeile ist aus der Firmware erschlossen, nic
 
 ## Einstellungen
 
-* **Druckertyp.**  Wählbar sind SD 1157/264, K6316 (IFSS und V.24) K6313 (V.24) sowie K6311 (V.24, Hardware erschlossen, druckt nicht).  Grau und nicht wählbar sind: SD 1157/267 (nicht vorgesehen, die zweite Papierbahn wird nicht nachgebildet), SD 1152/257 Typenrad (in Vorbereitung).  Ein Wechsel legt den Drucker neu an (Rückfrage); das Blatt wird dabei geleert.
+* **Druckertyp.**  Wählbar sind SD 1157/264, K6316 (IFSS und V.24) K6313 (V.24) sowie K6311 (V.24, Hardware aus dem ROM erschlossen).  Grau und nicht wählbar sind: SD 1157/267 (nicht vorgesehen, die zweite Papierbahn wird nicht nachgebildet), SD 1152/257 Typenrad (in Vorbereitung).  Ein Wechsel legt den Drucker neu an (Rückfrage); das Blatt wird dabei geleert.
 * **ROM-Fassung.**  *repariert* ist die Vorgabe.  Im Original-Abzug des SD-1157-EPROMs ist vermutlich ein Bit gekippt (Byte 0D34H): der Eingabepuffer leert sich nie, und über die Schnittstelle bleibt der Drucker nach dem ersten Zeichen stehen.  Die reparierte Fassung ändert nur dieses eine Byte.  *Original-Abzug* ist der unveränderte Abzug (der Selbsttest läuft damit).
 * **Schnittstelle.**  Der Schalterblock des Druckers wählt, ob die Firmware die Schnittstelle *IFSS* oder *V.24* benutzt.  Ein Wechsel startet den Drucker neu.
 * **Tempo.**  Rechengeschwindigkeit gegenüber dem echten Drucker.
