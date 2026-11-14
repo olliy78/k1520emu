@@ -402,3 +402,21 @@ Gesperrt bleibt: SD 1152/257, K6314 (Abzüge liegen vor, aber nicht im Auftrag),
 * K6311 ohne Schaltplan: Hypothesen statt Befunde; Falschmeldungen schlimmer als Lücken.
 * 16-KiB-/32-KiB-Fassungen brauchen evtl. eine zweite Platinenvariante (neue Elektronik) — dann zwei Speicherpläne im Kern, nicht einen aufgeweichten.
 * Defekte/unvollständige Abzüge (`33538511`, `30835207`) dürfen nicht Vorgabe werden und laufen u. U. nicht an — kein Emulatorfehler suchen, bevor die Güte geprüft ist.
+
+### 11.5  Stand WP8a (2026-11-14) — Befund, Entscheidungen für WP8c–e
+
+Volltext: `doc/printer/k6313/hardware.md`, `firmware_diff.md`, `doc/EPROMS/K6311|K6313/README.md`.  Festgelegt:
+
+* **K6311 und K6313 teilen eine E/A-Karte (7CH–FBH), der K6316 hat eine andere (80H–AFH)** — keine gemeinsame Adresse.  Die CCB hat **keinen Dekoder**, jeder Baustein hängt mit /CE an einer Leitung A2…A7
+  (SIO 7C, PIO BC, PIO DC, CTC EC, CTC F4, PIO F8).  → **Eigene Karte `K6313Ccb`, die K6316-Karte wird nicht aufgeweicht** (Revision des Satzes „trägt den K6313 fast vollständig" aus §2.1: Druckwerk, Taktierung
+  und Firmware-Wurzel ja, E/A-Karte und Kassettenlogik nein).
+* **Zwei Speicherpläne** (kein dritter): *kurz* (10 KiB; K6311 8 KiB) ROM 0000–27FFH, RAM 3800H, Stack 3C00H; *lang* (16 KiB) ROM 0000–3FFFH, RAM F000–F7FFH, Stack F800H.  `5c53a001` (Etikett 32k) läuft auf *lang*.
+* **Güte-Änderungen gegenüber dem ersten Entwurf:** `30835207` = `unbekannt` (nicht „nur 10k": Daten bis 3FFFH); `36539211` trägt innen die Kennung 4.65-3-92/10 (K6314) und eine Nullfläche; `3b834000` mit 1126 Byte Nullen; `33538511` defekt (0800–0FFF = FF).
+  Nie Vorgabe: diese vier und `5c53a001`.  **Die Kennung `F ZS x nn PS` bei 27F8H/3FF8H prüft der Katalog-Wächter automatisch gegen den Dateinamen.**
+* **Reihenfolge der Abzüge:** `33538013` (Vorgabe K6313, kurz), dann `33538513`, `33538028`, `33830803`, `53538500`; lang: `37239503` (nur Centronics, kein SIO), dann `30835007`; K6311 zuletzt.
+* **Zeichengenerator K6313:** 9-Byte-Zellen (9×9-Raster) bei ≈2380H–26BFH (kurz), Ländertabellen 16 B bei 2130H (K6311: 2220H); lang nicht ermittelt → eigenes Orakel (WP8d), kein K6316-Modell mit 8 Byte.
+* **Offen [?]:** Pläne der V.24/IFSS/IFSP-Kassette und des 10-KiB-Speichermoduls fehlen (SIO-Adressen nur aus der Firmware; Kassettenkennung `PE1` = D104 B4: Centronics 1, V.24 0); Tastenmatrix-Kreuzungspunkte; Centronics-Tor B;
+  Haubenkontakt; Interruptketten-Reihenfolge (Drahtlesung).  K6311: alles aus dem ROM erschlossen (`firmware_diff.md` §6), `BC–BF` dort Baudwahl-Eingang [?].
+* Der Forum-Hinweis „Pin B8/A15" ist im Plan des 16-KiB-Moduls nicht belegbar; die Umschaltung ROM/RAM ist die Viertel-Dekodierung über A13/A14.
+
+**WP8c-Zuschnitt:** Typ `k6313` (Schlüssel `k6313`, ROM `33538013`, Schnittstelle V.24 über SIO 7CH; IFSS/Centronics-Kassette erst nach WP8d), Speicherplan *kurz*, `K6313Ccb`-Karte, Druckwerk/Papierweg wiederverwendet.
