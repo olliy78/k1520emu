@@ -24,6 +24,9 @@
 #include <iterator>
 
 #if defined(_WIN32)
+#  define NOMINMAX
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
 #  include <fcntl.h>
 #  include <io.h>
 #  include <sys/stat.h>
@@ -102,8 +105,14 @@ bool sperrdateiExklusivAnlegen(const std::string& pfad, long pid) {
 
 bool prozessLebt(long pid) {
 #if defined(_WIN32)
-    (void)pid;
-    return true;
+    if (pid <= 0) return false;
+    // Prozess gibt es noch, solange er sich oeffnen laesst oder der Zugriff nur verweigert wird.
+    HANDLE h = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(pid));
+    if (!h) return ::GetLastError() == ERROR_ACCESS_DENIED;
+    DWORD code = 0;
+    const bool lebt = ::GetExitCodeProcess(h, &code) && code == STILL_ACTIVE;
+    ::CloseHandle(h);
+    return lebt;
 #else
     if (pid <= 0) return false;
     return ::kill(static_cast<pid_t>(pid), 0) == 0 || errno != ESRCH;
