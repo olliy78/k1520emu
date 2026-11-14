@@ -74,6 +74,10 @@ k1520_add_test(mc80_mbi SRC cards/test_mc80_mbi.cpp LIBS k1520_mc80_2x_karten LA
 k1520_add_test(sd1157_steuerung SRC cards/test_sd1157_steuerung.cpp LIBS k1520_printer_karten
                LABELS "${_lbl};fach_drucker"
                DEFS "SD1157_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/SD1157\"")
+# K6313 (Entwurf 49, WP8c): CCB — Speicherplan kurz, E/A eine Leitung tief, Tastenmatrix/DIL (Waehlcode x Zeile), Sensoren
+k1520_add_test(k6313_ccb SRC cards/test_k6313_ccb.cpp LIBS k1520_printer_karten
+               LABELS "${_lbl};fach_drucker"
+               DEFS "K6313_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/K6313\"")
 # K3528 der K8915 Gen 2: Speicherbild je A8H-Wert, /MEMDI (doc/design/24_k8915_varianten.md R3, AP-V4)
 k1520_add_test(k3528 SRC cards/test_k3528.cpp      LIBS k1520_k3528 LABELS "${_lbl}")
 # PFS K3820 (16 × 2708), von keiner Maschine benutzt (doc/design/24_k8915_varianten.md AP-V11)

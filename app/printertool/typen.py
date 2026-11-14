@@ -62,6 +62,13 @@ class Typbeschreibung:
     hat_online_schalter: bool = True
     #: Vorsteckschacht mit Beleg als eigenem Blatt (K6316, Bahn 1 des Kerns; hardware.md §11).
     hat_vorsteck: bool = False
+    #: DIL-Schalter: erster Kern-Schalter, Anzahl, Vorgabemaske (Bit i = i-ter Schalter der Gruppe), Titel der Gruppe.
+    dil_basis: int = 16
+    dil_anzahl: int = 16
+    dil_vorgabe: int = 0
+    dil_titel: str = "DIL-Schalter S11 - S26 (Ein = geschlossen)"
+    #: Zeile unter dem Bedienfeld mit dem Stand der Nachbildung (K6313: Hardware aus der Firmware abgelesen).
+    stand_hinweis: str = ""
 
 
 SD1157_264 = Typbeschreibung(
@@ -157,13 +164,73 @@ def _k6316(schluessel: str, titel: str, kern: str, schnittstelle: str, namen: Tu
 K6316_IFSS = _k6316("k6316-ifss", "K6316 (IFSS)", "k6316-ifss", "ifss", ("IFSS", "V.24"))
 K6316_V24 = _k6316("k6316-v24", "K6316 (V.24)", "k6316-v24", "v24", ("IFSS", "V.24"))
 
+# ── K6313 (WP8c, Entwurf 49 §11): CCB ohne E/A-Dekoder, V.24-Kassette, 14 DIL-Paare in der Matrix 4 x 8 ──────────────────────────
+# Beschriftung: Handbuch/Servicehandbuch (hardware.md §5.1).  Hinter dem Text steht, wie sicher die ZELLE der Matrix ist:
+# [F] = aus der Firmware abgelesen (Auswertung im ROM), [?] = aus dem Muster der Matrix geschlossen, nicht belegt.
+_K6313_DIL_TEXT = {
+    (5, 1): "5-1 Haubenkontakt: muss OFF bleiben (Service).  Zelle [?].",
+    (5, 2): "5-2 nicht benutzt.  Die Firmware verlangt beim Einschalten 5-2 = ON, 5-1 = OFF (Zeile 2/3 der Spalte 3, ROM 018CH) [?: Zelle aus dem Muster].",
+    (6, 1): "6-1 Papierendekontakt: OFF wirksam, ON nicht wirksam [F].",
+    (6, 2): "6-2 Summer: OFF wirksam, ON nicht wirksam.  Zelle [?]; die Nachbildung hat keinen Summer.",
+    (7, 1): "7-1 automatische Zeilenschaltung: ON = LF bei CR.  Zelle [?].",
+    (7, 2): "7-2 automatischer Wagenruecklauf: OFF = CR bei LF.  Zelle [?].",
+    (8, 1): "8-1 Zeichensatz (Tabelle 1 des Handbuchs) [F].", (8, 2): "8-2 Zeichensatz (Tabelle 1) [F].",
+    (9, 1): "9-1 Zeichensatz (Tabelle 1) [F].", (9, 2): "9-2 Zeichensatz (9-2 ON = US ASCII mit Yen) [F].",
+    (10, 1): "10-1 Schriftart (Tabelle 2: Pica/Elite/komprimiert/Fett).  Zelle [?].", (10, 2): "10-2 Schriftart (Tabelle 2).  Zelle [?].",
+    (11, 1): "11-1 Nulldarstellung: OFF = 0, ON = Ø [F].", (11, 2): "11-2 Zeilenabstand: OFF = 1/6 Zoll, ON = 1/8 Zoll [F].",
+    (12, 1): "12-1 Formatlaenge (Tabelle 3: 12/11/6/5,5 Zoll) [F].", (12, 2): "12-2 Formatlaenge (Tabelle 3) [F].",
+    (13, 1): "13-1 1 Zoll Papiervorschub ueber die Falzkante: OFF wirksam, ON nicht wirksam [F].",
+    (13, 2): "13-2 Steuercodes kompatibel zu EPSON (ON).  Zelle [?].",
+    (14, 1): "14-1 nicht benutzt (V.24-Kassette).  Zelle [?].",
+    (14, 2): "14-2 Baudrate (mit 15-1, 15-2): 9600 aus aus aus, 4800 aus ein aus, 2400 ein ein aus, 1200 aus aus ein, 600 ein aus ein, 300 aus ein ein, 200 ein aus aus, 150 ein ein ein [F].",
+    (15, 1): "15-1 Baudrate (siehe 14-2) [F].", (15, 2): "15-2 Baudrate (siehe 14-2) [F].",
+    (16, 1): "16-1 Paritaet: OFF mit, ON ohne [F].", (16, 2): "16-2 Paritaet: OFF ungerade, ON gerade [F].",
+    (17, 1): "17-1 Protokoll: OFF DTR, ON XON/XOFF [F].",
+    (17, 2): "17-2 DTR: RTS Ein/Aus; XON/XOFF: Duplex/Halbduplex [F].",
+    (18, 1): "18-1 Datenbits: OFF 7, ON 8 [F].", (18, 2): "18-2 Stopbits: OFF mindestens 1, ON mindestens 2 [F].",
+}
+# Kern-Schalter 32..59 = 5-1, 5-2, 6-1 ... 18-2 (k1520_api.h K1520_PRINTER_SW_K6313_DIL_BASIS)
+_K6313_DIL = tuple(Taste(f"d{p}_{n}", f"{p}-{n}", _K6313_DIL_TEXT[(p, n)], "rastend", 32 + (p - 5) * 2 + (n - 1))
+                   for p in range(5, 19) for n in (1, 2))
+#: Vorgabe: 5-2 ON (Normalstellung beim Einschalten [?]) und 13-2 ON (EPSON), Rest OFF.
+_K6313_DIL_VORGABE = (1 << 1) | (1 << ((13 - 5) * 2 + 1))
+
+K6313 = Typbeschreibung(
+    schluessel="k6313",
+    titel="K6313 (V.24)",
+    kern_maschine="k6313",
+    tasten=(
+        Taste("t1", "ON/OFF LINE", "Taste ON/OFF LINE: schaltet zwischen ON LINE und OFF LINE um (LED ON LINE).  Zeile 4 der Tastenspalte [?]; "
+              "ON/OFF LINE loescht LON (ROM 02B6H) [F].", "taster", 21),
+        Taste("t2", "LF \u25B2", "Taste LINE FEED vorwaerts (gehalten: Dauervorschub).  Zeile 2 der Tastenspalte [?].  Beim Netz-Ein gehalten: "
+              "Testfunktion der Einschalttasten (Zuordnung der drei Tasten zu den Tests: [?]).", "taster", 22),
+        Taste("t3", "LF \u25BC", "Taste LINE FEED rueckwaerts (Zeile 1 der Tastenspalte [?]).  Beim Netz-Ein gehalten: Testfunktion.",
+              "taster", 23),
+        Taste("t4", "FF", "Taste FORM FEED (Zeile 3 der Tastenspalte [?]).  Beim Netz-Ein gehalten: Testfunktion.", "taster", 24),
+        Taste("papier", "Papier da", "Endlospapier eingelegt.  Aus = Papierende (LED PE; Polaritaet des Papierendekontakts [?]).",
+              "rastend", 3),
+    ),
+    lampen=(
+        Lampe("POW", "#37d34a", "POW: der Drucker ist eingeschaltet.", None),
+        Lampe("ON LINE", "#e6c229", "ON LINE: der Drucker ist bereit und nimmt Daten an (D104 A6).", 0),
+        Lampe("ERR", "#e53935", "ERR: Fehler (D105 A4; Polaritaet [?]).", 1),
+        Lampe("PE", "#e6c229", "PE: Papierende.", 3),
+    ),
+    schnittstellen=("IFSS", "V.24"),
+    hat_rom_wahl=False, schnittstelle_fest="v24", hat_online_schalter=False,
+    dil=_K6313_DIL, dil_basis=32, dil_anzahl=28, dil_vorgabe=_K6313_DIL_VORGABE,
+    dil_titel="DIL-Schalter 5-1 bis 18-2 (ON = geschlossen)",
+    stand_hinweis="Hardware aus der Firmware erschlossen (Fassung kurz, V.24-Kassette): die Belegung der Tasten- und DIL-Matrix ist am ROM "
+                  "abgelesen, nicht an einem Plan; mit [?] gekennzeichnete Angaben sind Annahmen.  Das Druckbild ist noch nicht gegen ein "
+                  "Orakel geprueft.",
+)
+
 #: Die waehlbaren Typen (in der Reihenfolge des Auswahlfelds).
-TYPEN = (SD1157_264, K6316_IFSS, K6316_V24)
+TYPEN = (SD1157_264, K6316_IFSS, K6316_V24, K6313)
 
 #: Typen, die der Entwurf kennt, der Kern aber noch nicht faehrt: (Schluessel, Anzeige, Begruendung).
 GESPERRT = (
     ("sd1157-267", "SD 1157/267", "Nicht vorgesehen (zweite Papierbahn wird nicht nachgebildet)."),
-    ("k6313", "K6313", "Für den K6313 liegt kein EPROM-Abzug vor."),
     ("sd1152-257", "SD 1152/257 (Typenrad)", "In Vorbereitung."),
 )
 
@@ -191,6 +258,8 @@ def konfig_text(schnittstelle: str = "ifss", rom: str = "repariert", beschreibun
     ``romdatei`` (Pfad aus dem ROM-Katalog) hat Vorrang vor dem eingebetteten Abbild; ohne Katalog bleibt
     am SD 1157 ``rom=`` (Alias) als Rueckfall.  Ein Komma im Pfad trennt die Liste und ist nicht darstellbar."""
     zusatz = f",romdatei={romdatei}" if romdatei and "," not in romdatei else ""
+    if beschreibung is not None and beschreibung.schluessel == "k6313":
+        return f"dil={int(dil) & ((1 << beschreibung.dil_anzahl) - 1)}{zusatz}"
     if beschreibung is not None and beschreibung.betriebsart_id is not None:
         betriebsart = betriebsart if betriebsart in ("aufwickeln", "schneiden", "endlos") else "endlos"
         return f"betriebsart={betriebsart},dil={int(dil) & 0xFFFF}{zusatz}"

@@ -13,12 +13,14 @@ const char* PrinterMachine::typName(Config::Typ t)
         case Config::Typ::Sd1157_264: return "SD 1157/264";
         case Config::Typ::K6316_Ifss: return "K6316 (IFSS)";
         case Config::Typ::K6316_V24:  return "K6316 (V.24)";
+        case Config::Typ::K6313_V24:  return "K6313 (V.24)";
     }
     return "Drucker ?";
 }
 
 namespace {
-static_assert(Sd1157Steuerung::CPU_HZ == K6316Steuerung::CPU_HZ, "beide Drucker laufen mit 2,4576 MHz");
+static_assert(Sd1157Steuerung::CPU_HZ == K6316Steuerung::CPU_HZ && Sd1157Steuerung::CPU_HZ == K6313Ccb::CPU_HZ,
+              "alle Drucker laufen mit 2,4576 MHz");
 
 std::unique_ptr<DruckerSteuerung> neueSteuerung(const PrinterMachine::Config& cfg, K1520Bus& bus)
 {
@@ -32,6 +34,8 @@ std::unique_ptr<DruckerSteuerung> neueSteuerung(const PrinterMachine::Config& cf
                                                                                : K6316Steuerung::Config::Schnittstelle::Ifss;
             return std::make_unique<K6316Steuerung>(bus, c);
         }
+        case PrinterMachine::Config::Typ::K6313_V24:
+            return std::make_unique<K6313Ccb>(bus, cfg.k6313);
     }
     throw std::invalid_argument("unbekannter Druckertyp");
 }
@@ -42,6 +46,7 @@ PrinterMachine::PrinterMachine(const Config& cfg)
 {
     sd1157_ = dynamic_cast<Sd1157Steuerung*>(steuerung_.get());
     k6316_  = dynamic_cast<K6316Steuerung*>(steuerung_.get());
+    k6313_  = dynamic_cast<K6313Ccb*>(steuerung_.get());
     steuerung_->attachToBus(bus_);
     // Kette mit der Steuerung als einziger Karte (CTC, PIO, SIO stehen in ihr, Reihenfolge dort).
     bus_.setInterruptChain({&steuerung_->unterbrechung()});

@@ -30,6 +30,10 @@ Das Blatt lässt sich mit dem Mausrad rollen (das beendet *Blatt folgen*) und mi
 
 Das ist das Verhalten der Original-Firmware, kein Fehler des Emulators.  Die Firmware wertet TEST nur aus, wenn sie **offline eingeschaltet** wurde: also **ONLINE ausschalten, dann *Neustart***, danach TEST drücken.  Schaltet man ONLINE nur im Betrieb aus, bleibt die ONLINE-Lampe an, PV1/PV2 wirken, TEST nicht.  Unter dem Bedienfeld erscheint dann ein Hinweis mit dem Knopf *Neustart jetzt*.  Ebenso liest die Firmware die Tasten *6 lpi* und *ONLINE* für die Lampe nur beim Einschalten.
 
+### K6313: Stand der Nachbildung
+
+Der K6313 läuft mit seiner Original-Firmware (Fassung kurz, V.24-Kassette) bis in die Grundstellung: Wagen synchronisiert, ON LINE leuchtet.  **Die Hardware ist aus der Firmware erschlossen**, nicht aus einem vollständigen Plan; Angaben mit [?] in den Hinweistexten der Tasten und DIL-Schalter sind Annahmen.  Die Einschalt-Testfunktionen (Taste beim Netz-Ein gehalten) laufen noch nicht an, ein Druckbild gibt es noch nicht; IFSS und Centronics fehlen.  Die DIL-Schalter 5-1…18-2 liegen in einer Matrix; 5-2 muss EIN bleiben, sonst startet die Firmware nicht im Normalpfad.
+
 ### K6316: Einschalttests und Vorsteckbeleg
 
 Beim K6316 wertet die Firmware die Tasten beim Einschalten erst **nach der Synchronisation** aus (etwa 8 Sekunden).  Die Taste also so lange halten:
@@ -42,7 +46,7 @@ Die Lage der Lichtschranken zur Druckzeile ist aus der Firmware erschlossen, nic
 
 ## Einstellungen
 
-* **Druckertyp.**  Wählbar sind SD 1157/264 sowie K6316 (IFSS und V.24).  Grau und nicht wählbar sind: SD 1157/267 (nicht vorgesehen, die zweite Papierbahn wird nicht nachgebildet), K6313 (kein EPROM-Abzug vorhanden), SD 1152/257 Typenrad (in Vorbereitung).  Ein Wechsel legt den Drucker neu an (Rückfrage); das Blatt wird dabei geleert.
+* **Druckertyp.**  Wählbar sind SD 1157/264, K6316 (IFSS und V.24) sowie K6313 (V.24).  Grau und nicht wählbar sind: SD 1157/267 (nicht vorgesehen, die zweite Papierbahn wird nicht nachgebildet), SD 1152/257 Typenrad (in Vorbereitung).  Ein Wechsel legt den Drucker neu an (Rückfrage); das Blatt wird dabei geleert.
 * **ROM-Fassung.**  *repariert* ist die Vorgabe.  Im Original-Abzug des SD-1157-EPROMs ist vermutlich ein Bit gekippt (Byte 0D34H): der Eingabepuffer leert sich nie, und über die Schnittstelle bleibt der Drucker nach dem ersten Zeichen stehen.  Die reparierte Fassung ändert nur dieses eine Byte.  *Original-Abzug* ist der unveränderte Abzug (der Selbsttest läuft damit).
 * **Schnittstelle.**  Der Schalterblock des Druckers wählt, ob die Firmware die Schnittstelle *IFSS* oder *V.24* benutzt.  Ein Wechsel startet den Drucker neu.
 * **Tempo.**  Rechengeschwindigkeit gegenüber dem echten Drucker.

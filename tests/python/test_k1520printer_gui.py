@@ -219,15 +219,16 @@ def test_typauswahl_sperrt_alle_unfertigen_typen(fenster, monkeypatch):
     e = fenster.einst_drucker
     items = {e.typ.itemData(i): e.typ.model().item(i) for i in range(e.typ.count())}
     assert items["sd1157"].isEnabled() and items["k6316-ifss"].isEnabled() and items["k6316-v24"].isEnabled()
-    gesperrt = {"sd1157-267", "k6313", "sd1152-257"}
+    assert items["k6313"].isEnabled()
+    gesperrt = {"sd1157-267", "sd1152-257"}
     assert gesperrt <= set(items)
     for s in gesperrt:
         assert not items[s].isEnabled() and items[s].toolTip()
     # Die Wahl eines gesperrten Typs aendert nichts und fragt nicht einmal (conftest laesst jede Frage scheitern)
     emu = fenster.emu
-    e.typ.setCurrentIndex(e.typ.findData("k6313"))
+    e.typ.setCurrentIndex(e.typ.findData("sd1152-257"))
     assert fenster.emu is emu and e.typ.currentData() == "sd1157"
-    assert "EPROM" in e.sperrgrund("k6313") and "Nicht vorgesehen" in e.sperrgrund("sd1157-267")
+    assert "In Vorbereitung" in e.sperrgrund("sd1152-257") and "Nicht vorgesehen" in e.sperrgrund("sd1157-267")
 
 
 def test_rom_und_schnittstellenwechsel_legen_neu_an_nach_rueckfrage(fenster, monkeypatch):
@@ -275,7 +276,8 @@ def test_konfiguration_rundlauf(fenster, tmp_path):
     # Die mitgelieferte Vorgabe ist lesbar und kennt den Drucker
     assert konfig.standard()["general"]["model"] == "sd1157"
     assert konfig.zoll_waehlbar(7) == 12 and konfig.tempo_waehlbar("x") == 1.0
-    assert typen.typ("k6313").schluessel == "sd1157"          # gesperrt/unbekannt -> Vorgabe
+    assert typen.typ("sd1152-257").schluessel == "sd1157"     # gesperrt/unbekannt -> Vorgabe
+    assert typen.typ("k6313").schluessel == "k6313"
 
 
 # ─── Ausgabe: PDF und Druck ──────────────────────────────────────────────────
@@ -524,6 +526,29 @@ def test_k6316_typwahl_baut_bedienfeld_dil_und_betriebsart(fenster, monkeypatch)
     lauf(fenster, 3000, schritt=20000, aktualisieren_jeden=100)
     assert fenster.emu.printer_lamp(K.DRUCKER_LAMPE_ONLINE) == 1 and fenster.emu.printer_lamp(K.DRUCKER_LAMPE_H4) == 1
     assert fenster.emu.printer_lamp(K.DRUCKER_LAMPE_FEHLER) == 0
+
+
+def test_k6313_typwahl_baut_bedienfeld_und_dil_matrix(fenster, monkeypatch):
+    e = fenster.einst_drucker
+    monkeypatch.setattr(QMessageBox, "question", staticmethod(lambda *a, **k: QMessageBox.Yes))
+    e.typ.setCurrentIndex(e.typ.findData("k6313"))
+    fenster.takt.stop()
+    assert fenster.beschreibung.schluessel == "k6313" and fenster.emu.machine == "k6313"
+    b = fenster.bedienfeld
+    for n in ("t1", "t2", "t3", "t4", "papier") + tuple(f"d{p}_{n}" for p in range(5, 19) for n in (1, 2)):
+        assert b.knopf(n) is not None
+    for l in ("POW", "ON LINE", "ERR", "PE"):
+        assert b.lampe(l) is not None
+    assert not fenster.act_online.isEnabled()
+    # Vorgabe 5-2 und 13-2 ON; ein DIL-Schalter erreicht den Kern und die Konfiguration
+    assert fenster.emu.printer_switch_get(K.DRUCKER_SW_K6313_DIL_BASIS + 1) == 1
+    b.knopf("d14_2").click()
+    bit = (14 - 5) * 2 + 1
+    assert fenster.emu.printer_switch_get(K.DRUCKER_SW_K6313_DIL_BASIS + bit) == 1
+    assert fenster.konfig_lesen()["printer"]["dil"] >> bit & 1 == 1
+    lauf(fenster, 3000, schritt=20000, aktualisieren_jeden=100)
+    assert fenster.emu.printer_lamp(K.DRUCKER_LAMPE_ONLINE) == 1 and fenster.emu.printer_lamp(K.DRUCKER_LAMPE_FEHLER) == 0
+    assert fenster.emu.printer_lamp(K.DRUCKER_LAMPE_POW) == 1
 
 
 def test_k6316_selbsttest_druckt_ueber_die_taste_s5(fenster, monkeypatch):

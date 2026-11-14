@@ -394,6 +394,8 @@ und nicht ausgebaut; insbesondere schreibt `Nadeldruckwerk::feuere` weiter nur a
 
 **Stand WP8b (2026-11-14): fertig** — `data/drucker_roms.yaml` (SD 1157 repariert/original, K6316 IFSS/V.24), `romdatei=` im Kern, `app/paths.py`/`app/printertool/rom_katalog.py`, Feld „EPROM“ (nur bei > 1 Eintrag), `printer.rom.<typ>`, Paket, Wächter `DruckerRomKatalog.*`; Vorgaben unverändert, K6311/K6313 noch nicht im Katalog; Merkposten Nr. 31.
 
+**Stand WP8c (2026-11-14): Grundstellung erreicht, Selbsttest hängt** — `K6313Ccb` (`core/cards/printer/k6313_ccb.*`), Typ `k6313` (C-ABI Typ 3, `typen.py`, `boot_trace`/`k1520dbg --machine k6313`), Katalog (33538013 Vorgabe + 4), Merkposten Nr. 32.  Firmware 33538013 synchronisiert den Wagen, ON LINE an, DTR/Papierende über SIO-Kanal B; Tastenmatrix aus dem ROM abgelesen.  Die Einschalt-Testfunktionen laufen nicht an: CTC D101 Kanal 1/2 (Zählbetrieb) bekommen keine CLK/TRG-Impulse (Verdrahtung unbelegt), es wird keine Nadel geschrieben — Aufgabe für WP8d.
+
 Reihenfolge: **WP8a ‖ WP8b** (a nur lesend/Doku, b baut) → WP8c → WP8d → WP8e.  Je AP Doku + Test + Commit, **nicht pushen**; Bau-Agenten nacheinander (gemeinsames `build/`).
 Gesperrt bleibt: SD 1152/257, K6314 (Abzüge liegen vor, aber nicht im Auftrag), 32-KiB-Fassungen, solange WP8a keinen Speicherplan dafür belegt.
 

@@ -38,6 +38,7 @@ REGELN = [
     # ── EPROM-Abzuege der Drucker liegen unter doc/, gehen aber in den Katalog (vor der Doku-Regel) ──
     ("doc/EPROMS/SD1157/**", ("fach_drucker",), "SD 1157 EPROM-Abzuege", False),
     ("doc/EPROMS/K6316/**", ("fach_drucker",), "K6316 EPROM-Abzuege", False),
+    ("doc/EPROMS/K6313/**", ("fach_drucker",), "K6313 EPROM-Abzuege", False),
     # ── nur Doku: nichts ────────────────────────────────────────────────
     ("**/*.md", (), "Doku", False),
     ("doc/**", (), "Doku", False),

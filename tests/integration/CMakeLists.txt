@@ -459,3 +459,8 @@ k1520_add_test(k6316 SRC test_k6316.cpp
                      LIBS k1520_printer k1520_logger
                      LABELS "${_lbl};fach_drucker" TIMEOUT 600 DEFS LOG_LEVEL=2
                      "K6316_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/K6316\"")
+
+# K6313 (Entwurf 49, WP8c): Original-ROM 33538013 bis in die Grundstellung (Wagen, Lampen, DTR ueber Kanal B); kein Druckbild-Orakel (WP8d)
+k1520_add_test(k6313 SRC test_k6313.cpp
+                     LIBS k1520_printer k1520_logger
+                     LABELS "${_lbl};fach_drucker" TIMEOUT 600 DEFS LOG_LEVEL=2)

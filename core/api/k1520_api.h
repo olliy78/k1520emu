@@ -275,13 +275,15 @@ K1520_API K1520Handle k1520_create_mc80(int variante, const char* konfig);
  *        `k1520_mem_read`/`k1520_io_read` (CPU-Sicht des Druckers).
  *
  * @param typ     0 = SD 1157/264.  1 = K6316 (IFSS), 2 = K6316 (V.24): der Typ waehlt Schnittstellenmodul und
- *                Firmwaresatz.  Alles andere → NULL mit Grund.
+ *                Firmwaresatz.  3 = K6313 (V.24-Kassette, Speicherplan "kurz" ROM 0000H-27FFH, RAM 3800H, E/A 7CH-FBH; WP8c).
+ *                Alles andere → NULL mit Grund.
  * @param konfig  Schluessel=Wert-Liste, durch Komma getrennt (NULL/"" = Vorgabe); Schluessel
  *                SD 1157: `schnittstelle` (`ifss` | `v24`: Wahl am Schalterblock PIO 3 A.0), `rom` (`repariert` | `original`).
  *                Beide Typen: `romdatei` (Pfad eines ROM-Satzes: SD 1157 10 624 B = 0000H-297FH, K6316 10 240 B = fuenf
  *                Chips lueckenlos; hat Vorrang vor dem eingebetteten Abbild und vor `rom`; Pfad ohne Komma; Entwurf 49 §11.2).
  *                K6316: `betriebsart` (`aufwickeln` | `schneiden` | `endlos`), `dil` (Maske der geschlossenen
  *                DIL-Schalter, Bit 0 = S11 ... Bit 15 = S26).
+ *                K6313: `dil` (Maske, Bit 0 = 5-1, Bit 1 = 5-2, ... Bit 27 = 18-2), `romdatei` (10 240 B wie K6316).
  *                Unbekannte Schluessel/Werte → NULL, Grund in k1520_last_init_error.
  * k1520_machine_type() = 7.  `k1520_create(K1520_MACHINE_PRINTER)` = SD 1157/264.
  */
@@ -305,6 +307,12 @@ K1520_API K1520Handle k1520_create_printer(int typ, const char* konfig);
 #define K1520_PRINTER_KEY_K6316_S3 13
 #define K1520_PRINTER_KEY_K6316_S4 14
 #define K1520_PRINTER_KEY_K6316_S5 15
+/* K6313 (nur dort, WP8c): Tasten 1..4 = ON/OFF LINE, LINE FEED vor, LINE FEED zurueck, FORM FEED (Zuordnung zu den Matrixzeilen
+ * aus der Firmware, hardware.md §5); beim Netz-Ein gehalten starten LF/LF/FF die Testfunktionen. */
+#define K1520_PRINTER_KEY_K6313_T1 21
+#define K1520_PRINTER_KEY_K6313_T2 22
+#define K1520_PRINTER_KEY_K6313_T3 23
+#define K1520_PRINTER_KEY_K6313_T4 24
 /** Schalter (k1520_printer_switch / _get). */
 #define K1520_PRINTER_SW_ONLINE 0   /* 1 = online (Taste ONLINE: Pegel) */
 #define K1520_PRINTER_SW_KOPF   1   /* 1 = Kopf dauernd angeschwenkt */
@@ -316,6 +324,8 @@ K1520_API K1520Handle k1520_create_printer(int typ, const char* konfig);
 #define K1520_PRINTER_SW_BELEG_OBEN   6   /* 1 = Papier vor der oberen Lichtschranke des Vorsteckschachts (FSO) */
 #define K1520_PRINTER_SW_BELEG_UNTEN  7   /* 1 = Papier vor der unteren Lichtschranke (FSU) */
 #define K1520_PRINTER_SW_DIL_BASIS    16  /* K6316: DIL-Schalter S11..S26 = 16..31, 1 = Ein (geschlossen) */
+/* nur K6313: DIL-Schalter 5-1, 5-2, 6-1 ... 18-2 = 32..59 (Index (paar-5)*2 + (n-1)), 1 = ON; ausserdem SW_PAPIER */
+#define K1520_PRINTER_SW_K6313_DIL_BASIS 32
 /* nur SD 1157 (Schalter am Geraet, die die Firmware liest): */
 #define K1520_PRINTER_SW_FORMULAR1    8   /* Formularlaenge Bahn 1 (BCH.5..4): 0 = 4", 1 = 6", 2 = 8", 3 = 12" */
 #define K1520_PRINTER_SW_FORMULAR2    9   /* Formularlaenge Bahn 2 (BCH.7..6) */
@@ -328,6 +338,8 @@ K1520_API K1520Handle k1520_create_printer(int typ, const char* konfig);
 #define K1520_PRINTER_LAMP_TEST   2
 #define K1520_PRINTER_LAMP_PAPIER 3
 #define K1520_PRINTER_LAMP_H4     4
+/* K6313: ONLINE = ON LINE, FEHLER = ERR, PAPIER = PE, dazu POW (Netz) */
+#define K1520_PRINTER_LAMP_POW    5
 
 /** Blattgroesse in Pixeln: *breite fest, *hoehe waechst.  1 = ok, 0 = kein Drucker/keine Bahn.
  *  Bahn 0 = Endlospapier; K6316: Bahn 1 = der Vorsteckbeleg (erst nach dem ersten k1520_printer_beleg_insert, bleibt nach dem

@@ -447,6 +447,20 @@ def test_printer_sd1157_can_be_created_and_runs_its_rom():
     assert handle, _lib.k1520_last_init_error()
     _lib.k1520_destroy(K1520Handle(handle))
 
+    h3 = _lib.k1520_create_printer(3, b"dil=0x3")               # K6313 (WP8c): 5-1, 5-2 ON
+    assert h3, _lib.k1520_last_init_error()
+    try:
+        h3 = K1520Handle(h3)
+        assert _lib.k1520_machine_type(h3) == 7
+        assert _lib.k1520_printer_switch_get(h3, 32) == 1 and _lib.k1520_printer_switch_get(h3, 33) == 1
+        assert _lib.k1520_printer_switch_get(h3, 34) == 0
+        assert _lib.k1520_printer_lamp(h3, 5) == 1               # POW
+        assert _lib.k1520_printer_key(h3, 21, 1) == 1 and _lib.k1520_printer_key(h3, 11, 1) == 0
+        assert _lib.k1520_run(h3, 200_000) > 0
+    finally:
+        _lib.k1520_destroy(h3)
+    assert not _lib.k1520_create_printer(3, b"betriebsart=endlos")   # K6316-Schluessel gilt nicht am K6313
+
     for typ in (1, 2):                                          # K6316: IFSS / V.24 (WP2a)
         h6 = _lib.k1520_create_printer(typ, b"betriebsart=schneiden,dil=0x8")
         assert h6, _lib.k1520_last_init_error()

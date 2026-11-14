@@ -25,8 +25,19 @@
 namespace {
 
 // E/A-Namen nach doc/printer/sd1157/hardware.md §4.
-const char* portName(uint8_t p, bool k6316 = false) {
-    if (k6316) {
+const char* portName(uint8_t p, int fam = 0) {   // fam: 0 SD 1157, 1 K6316, 2 K6313
+    if (fam == 2) {
+        // K6313: CCB, eine Adressleitung tief, doc/printer/k6313/hardware.md §2.2
+        if (p >= 0x7C && p <= 0x7F) return (p & 2) ? ((p & 1) ? "SIO Steuer B (DTR/RTS)" : "SIO Steuer A (V.24)")
+                                                    : ((p & 1) ? "SIO Daten B" : "SIO Daten A (V.24)");
+        if (p >= 0xBC && p <= 0xBF) return "PIO D1 Centronics-Kassette (nicht bestueckt)";
+        if (p >= 0xDC && p <= 0xDF) return "PIO D105 (Tastenmatrix, Nadeln 1-8, LED ERR)";
+        if (p >= 0xEC && p <= 0xEF) return "CTC D102 (Kanal 2 = Baudtakt)";
+        if (p >= 0xF4 && p <= 0xF7) return "CTC D101 (Kanal 0 = Wagentakt, 2 = CMT)";
+        if (p >= 0xF8 && p <= 0xFB) return "PIO D104 (Wagen-/Formularmotor, PE, TDS, LON, Nadel 9)";
+        return "";
+    }
+    if (fam == 1) {
         // K6316: Decoder D8, doc/printer/k6316/hardware.md §2
         if (p >= 0x80 && p <= 0x83) return "PIO D12 (Papiermotor, Lichtschranken, Wagenmotor, /G1, MHA, PE)";
         if (p >= 0x84 && p <= 0x87) return "CTC D5";
@@ -56,14 +67,28 @@ const char* portName(uint8_t p, bool k6316 = false) {
 int bootTraceSd1157(const K8915TraceOpts& o, const prnlst::Listing& prn, int k6316)
 {
     PrinterMachine::Config cfg;
-    if (k6316) cfg.typ = k6316 == 2 ? PrinterMachine::Config::Typ::K6316_V24 : PrinterMachine::Config::Typ::K6316_Ifss;
+    if (k6316 == 3) cfg.typ = PrinterMachine::Config::Typ::K6313_V24;   // 3 = K6313 (WP8c)
+    else if (k6316) cfg.typ = k6316 == 2 ? PrinterMachine::Config::Typ::K6316_V24 : PrinterMachine::Config::Typ::K6316_Ifss;
+    if (!o.rom_path.empty()) {   // --rom <Datei>: ROM-Satz statt des eingebetteten (K6313/K6316)
+        std::vector<uint8_t> d;
+        if (FILE* f = fopen(o.rom_path.c_str(), "rb")) {
+            int ch; while ((ch = fgetc(f)) != EOF) d.push_back(static_cast<uint8_t>(ch));
+            fclose(f);
+        }
+        if (d.empty()) { fprintf(stderr, "FEHLER: --rom '%s' nicht lesbar\n", o.rom_path.c_str()); return 2; }
+        (k6316 == 3 ? cfg.k6313.rom_extern : k6316 ? cfg.k6316.rom_extern : cfg.sd1157.rom_extern) = std::move(d);
+    }
+    if (k6316 == 3 && o.dil >= 0) cfg.k6313.dil = static_cast<uint32_t>(o.dil);
     PrinterMachine m(cfg);
-    // Je Geraet eine Steuerung: `st` (SD 1157) bzw. `k6` (K6316); gemeinsam sind CPU, Druckwerk und SIO-Mitschrift.
+    // Je Geraet eine Steuerung: `sd` (SD 1157), `k6` (K6316) bzw. `k3` (K6313); gemeinsam sind CPU, Druckwerk und SIO-Mitschrift.
     Sd1157Steuerung* sd = k6316 ? nullptr : &m.sd1157();
-    K6316Steuerung*  k6 = k6316 ? &m.k6316() : nullptr;
-    auto sioAus = [&](int kanal) -> const std::string& { return sd ? sd->sioAusgabe(kanal) : k6->sioAusgabe(kanal); };
-    auto lampeOn = [&]() { return sd ? sd->lampeOnline() : k6->lampe(5); };
-    auto lampeErr = [&]() { return sd ? sd->lampeFehler() : k6->lampe(2); };
+    K6316Steuerung*  k6 = (k6316 == 1 || k6316 == 2) ? &m.k6316() : nullptr;
+    K6313Ccb*        k3 = k6316 == 3 ? &m.k6313() : nullptr;
+    auto sioAus = [&](int kanal) -> const std::string& { return sd ? sd->sioAusgabe(kanal) : k3 ? k3->sioAusgabe(kanal) : k6->sioAusgabe(kanal); };
+    auto lampeOn = [&]() { return sd ? sd->lampeOnline() : k3 ? k3->lampe(1) : k6->lampe(5); };
+    auto lampeErr = [&]() { return sd ? sd->lampeFehler() : k3 ? k3->lampe(3) : k6->lampe(2); };
+    // Tasten, die beim Netz-Ein gehalten werden (--keys, K6313: 1..4 = ON/OFF LINE, LF vor, LF zurueck, FF)
+    if (k3) for (char c : o.keys) if (c >= '1' && c <= '4') k3->setTaste(c - '0', true);
     auto rd = [&](uint16_t a) { return m.memReadDebug(a); };
     auto prnTail = [&](uint16_t a) -> std::string {
         const std::string* s = prn.find(a);
@@ -221,7 +246,7 @@ int bootTraceSd1157(const K8915TraceOpts& o, const prnlst::Listing& prn, int k63
         for (uint16_t w : o.watchio) if ((w & 0xFF) == p) gewuenscht = true;
         if (!gewuenscht) return;
         char t[200], k[24];
-        snprintf(t, sizeof t, "%s (%02XH)=%02X  %s", isRead ? "IN " : "OUT", p, data, portName(p));
+        snprintf(t, sizeof t, "%s (%02XH)=%02X  %s", isRead ? "IN " : "OUT", p, data, portName(p, k6316 == 3 ? 2 : k6316 ? 1 : 0));
         snprintf(k, sizeof k, "P%c%02X%02X%04X", isRead ? 'r' : 'w', p, data, pc);
         event(k, t, pc);
     });
@@ -260,6 +285,8 @@ int bootTraceSd1157(const K8915TraceOpts& o, const prnlst::Listing& prn, int k63
         if (k6)
             fprintf(stderr, "             H1 TEST %d, H3 PAPIER %d, H4 BEREIT %d; Schnitte %d\n", k6->lampe(1), k6->lampe(3),
                     k6->lampe(4), k6->schnitte());
+        if (k3)
+            fprintf(stderr, "             POW %d, PE %d; Nadeln zuletzt %03X\n", k3->lampe(2), k3->lampe(4), k3->nadeln());
         fprintf(stderr, "Wagen:       Position %d, %s  PV-Schritte Bahn 1/2: %u/%u\n",
                 druck.wagen().position(), druck.wagen().laeuft() ? "laeuft" : "steht",
                 (unsigned)druck.papier(0).schritte(), (unsigned)(druck.bahnen() > 1 ? druck.papier(1).schritte() : 0u));
@@ -267,6 +294,9 @@ int bootTraceSd1157(const K8915TraceOpts& o, const prnlst::Listing& prn, int k63
             fprintf(stderr, "Ausgaenge:   2A=%02X 2B=%02X 1A=%02X 1B=%02X  Nadeln BEH=%02X BFH=%02X\n",
                     sd->portAusgabe(2, 0), sd->portAusgabe(2, 1), sd->portAusgabe(1, 0), sd->portAusgabe(1, 1),
                     sd->nad18(), sd->nad9());
+        else if (k3)
+            fprintf(stderr, "Ausgaenge:   D104 A/B=%02X/%02X D105 A/B=%02X/%02X (Pinpegel), Matrixspalte %d\n",
+                    k3->portAusgabe(104, 0), k3->portAusgabe(104, 1), k3->portAusgabe(105, 0), k3->portAusgabe(105, 1), k3->matrixSpalte());
         else
             fprintf(stderr, "Ausgaenge:   D11 A/B=%02X/%02X D12 A/B=%02X/%02X D14 A/B=%02X/%02X (Pinpegel)\n",
                     k6->portAusgabe(11, 0), k6->portAusgabe(11, 1), k6->portAusgabe(12, 0), k6->portAusgabe(12, 1),
@@ -283,7 +313,7 @@ int bootTraceSd1157(const K8915TraceOpts& o, const prnlst::Listing& prn, int k63
         for (int p = 0; p < 256; ++p)
             if (io_rd[p] || io_wr[p])
                 fprintf(stderr, "  port 0x%02X : rd=%-9llu wr=%-9llu %s\n", p,
-                        (unsigned long long)io_rd[p], (unsigned long long)io_wr[p], portName(static_cast<uint8_t>(p), k6316 != 0));
+                        (unsigned long long)io_rd[p], (unsigned long long)io_wr[p], portName(static_cast<uint8_t>(p), k6316 == 3 ? 2 : k6316 ? 1 : 0));
 
         std::vector<std::pair<uint32_t, uint16_t>> hs;
         for (auto& kv : hist) hs.push_back({kv.second, kv.first});
@@ -328,7 +358,7 @@ int bootTraceSd1157(const K8915TraceOpts& o, const prnlst::Listing& prn, int k63
             "{\"machine\":\"%s\",\"stall\":%s,\"cycles\":%llu,\"final_pc\":\"0x%04X\","
             "\"online_lampe\":%s,\"fehler_lampe\":%s,\"wagen\":%d,\"lauf\":%s,"
             "\"instr\":%llu,\"events\":%ld,\"ints\":%ld,",
-            k6316 ? (k6316 == 2 ? "k6316-v24" : "k6316") : "sd1157", stillstand ? "true" : "false", (unsigned long long)cycles, m.cpuPC(),
+            k6316 == 3 ? "k6313" : k6316 ? (k6316 == 2 ? "k6316-v24" : "k6316") : "sd1157", stillstand ? "true" : "false", (unsigned long long)cycles, m.cpuPC(),
             lampeOn() ? "true" : "false", lampeErr() ? "true" : "false",
             druck.wagen().position(), druck.wagen().laeuft() ? "true" : "false",
             (unsigned long long)instr, ev_total, ints);

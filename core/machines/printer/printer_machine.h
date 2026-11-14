@@ -18,6 +18,7 @@
 #pragma once
 #include "core/bus/k1520_bus.h"
 #include "core/cards/printer/drucker_steuerung.h"
+#include "core/cards/printer/k6313_ccb.h"
 #include "core/cards/printer/k6316_steuerung.h"
 #include "core/cards/printer/sd1157_steuerung.h"
 #include "core/machines/machine.h"
@@ -33,12 +34,14 @@ class PrinterMachine : public K1520Machine {
 public:
     struct Config {
         /// Druckertyp; bei `K6316_*` bestimmt der Typ das Schnittstellenmodul (und damit den Firmwaresatz).
-        enum class Typ { Sd1157_264, K6316_Ifss, K6316_V24 };
+        enum class Typ { Sd1157_264, K6316_Ifss, K6316_V24, K6313_V24 };
         Typ typ = Typ::Sd1157_264;
         /// Aufbau des SD 1157 (DIP-Schalter, Interface-Wahl, Ruhelage der Tasten).
         Sd1157Steuerung::Config sd1157;
         /// Aufbau des K6316 (DIL-Schalter, Betriebsart, Mechanik); `schnittstelle` folgt dem Typ.
         K6316Steuerung::Config k6316;
+        /// Aufbau des K6313 (WP8c; Fassung "kurz", Kassette V.24): DIL-Schalter, ROM, Mechanik.
+        K6313Ccb::Config k6313;
     };
 
     static constexpr uint32_t CPU_HZ = Sd1157Steuerung::CPU_HZ;   // gleicher Takt am K6316 (static_assert in der .cpp)
@@ -118,9 +121,11 @@ public:
     std::string lastError() const override { return ""; }
 
     bool istK6316() const { return k6316_ != nullptr; }
-    /// Die Steuerung des gewaehlten Geraets (@ref istK6316); die jeweils andere Zugriffsfunktion darf nicht gerufen werden.
+    bool istK6313() const { return k6313_ != nullptr; }
+    /// Die Steuerung des gewaehlten Geraets (@ref istK6316/@ref istK6313); die jeweils andere Zugriffsfunktion darf nicht gerufen werden.
     Sd1157Steuerung& sd1157() { return *sd1157_; }
     K6316Steuerung&  k6316() { return *k6316_; }
+    K6313Ccb&        k6313() { return *k6313_; }
     DruckerSteuerung& steuerung() { return *steuerung_; }
     Nadeldruckwerk& druck() { return steuerung_->druck(); }
     Z80& cpu() { return steuerung_->cpu(); }
@@ -144,6 +149,7 @@ private:
     std::unique_ptr<DruckerSteuerung> steuerung_;   // Besitzer: eine der beiden Karten, ueber sd1157_/k6316_ typisiert
     Sd1157Steuerung* sd1157_ = nullptr;
     K6316Steuerung*  k6316_ = nullptr;
+    K6313Ccb*        k6313_ = nullptr;
     k1520::serial::SerialHub hub_{k1520::serial::PHI_NENN};   // nach steuerung_: stirbt zuerst (haelt Anschluss-Referenzen)
     uint64_t serial_naechst_ = 0;   ///< naechster Blick der Wandler (Taktzahl)
 

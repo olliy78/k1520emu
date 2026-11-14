@@ -394,14 +394,16 @@ K1520Handle k1520_create_printer(int typ, const char* konfig) {
         case 0: cfg.typ = PrinterMachine::Config::Typ::Sd1157_264; break;
         case 1: cfg.typ = PrinterMachine::Config::Typ::K6316_Ifss; break;
         case 2: cfg.typ = PrinterMachine::Config::Typ::K6316_V24; break;
+        case 3: cfg.typ = PrinterMachine::Config::Typ::K6313_V24; break;
         default:
             g_init_error = "Unbekannter Druckertyp " + std::to_string(typ) +
-                           " (0 = SD 1157/264, 1 = K6316 IFSS, 2 = K6316 V.24)";
+                           " (0 = SD 1157/264, 1 = K6316 IFSS, 2 = K6316 V.24, 3 = K6313 V.24)";
             return nullptr;
     }
     // Schluessel=Wert-Liste wie beim MC80.  SD 1157: `schnittstelle`, `rom`.  K6316: `betriebsart`, `dil`
     // (das Schnittstellenmodul folgt dem Typ, es gibt kein ROM zu waehlen).
-    const bool k6316 = typ != 0;
+    const bool k6313 = typ == 3;           // K6313 (WP8c): Schluessel `dil` (28 Schalter), `romdatei`
+    const bool k6316 = typ == 1 || typ == 2;
     const std::string text = konfig ? konfig : "";
     size_t pos = 0;
     while (pos < text.size()) {
@@ -413,18 +415,20 @@ K1520Handle k1520_create_printer(int typ, const char* konfig) {
         const size_t gl = teil.find('=');
         const std::string key = teil.substr(0, gl);
         const std::string val = gl == std::string::npos ? "" : teil.substr(gl + 1);
-        if (!k6316 && key == "schnittstelle" && (val == "ifss" || val == "v24")) {
+        const bool sd1157 = !k6316 && !k6313;
+        if (sd1157 && key == "schnittstelle" && (val == "ifss" || val == "v24")) {
             cfg.sd1157.schnittstelle = val == "v24" ? Sd1157Steuerung::Config::Schnittstelle::V24
                                                     : Sd1157Steuerung::Config::Schnittstelle::Ifss;
-        } else if (!k6316 && key == "rom" && (val == "original" || val == "repariert")) {
+        } else if (sd1157 && key == "rom" && (val == "original" || val == "repariert")) {
             cfg.sd1157.rom_repariert = val == "repariert";
-        } else if (!k6316 && key == "rom") {
+        } else if (sd1157 && key == "rom") {
             g_init_error = "Drucker: rom = " + val + " unbekannt (original | repariert)";
             return nullptr;
         } else if (key == "romdatei") {
             // ROM-Satz aus einer Datei (Entwurf 49 §11.2; der Katalog gehoert in die Oberflaeche, der Kern kennt nur den Pfad).
             // Genau die Laenge des Speicherplans; der Pfad darf kein Komma enthalten (Trenner der Liste).
-            const size_t soll = k6316 ? static_cast<size_t>(K6316Steuerung::ROM_ENDE)
+            const size_t soll = k6313 ? static_cast<size_t>(K6313Ccb::ROM_ENDE)
+                              : k6316 ? static_cast<size_t>(K6316Steuerung::ROM_ENDE)
                                       : static_cast<size_t>(Sd1157Steuerung::ROM_ENDE);
             std::ifstream f(std::filesystem::u8path(val), std::ios::binary);
             std::vector<uint8_t> daten((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
@@ -435,12 +439,12 @@ K1520Handle k1520_create_printer(int typ, const char* konfig) {
             }
             if (daten.size() != soll) {
                 g_init_error = "Drucker: romdatei '" + val + "' hat " + std::to_string(daten.size()) + " Bytes, erwartet " +
-                               std::to_string(soll) + (k6316 ? " (fuenf Chips zu 2 KiB lueckenlos, 0000H-27FFH)"
+                               std::to_string(soll) + ((k6316 || k6313) ? " (fuenf Chips zu 2 KiB lueckenlos, 0000H-27FFH)"
                                                               : " (0000H-297FH)");
                 return nullptr;
             }
-            (k6316 ? cfg.k6316.rom_extern : cfg.sd1157.rom_extern) = std::move(daten);
-        } else if (!k6316 && key == "schnittstelle") {
+            (k6313 ? cfg.k6313.rom_extern : k6316 ? cfg.k6316.rom_extern : cfg.sd1157.rom_extern) = std::move(daten);
+        } else if (sd1157 && key == "schnittstelle") {
             g_init_error = "Drucker: schnittstelle = " + val + " unbekannt (ifss | v24)";
             return nullptr;
         } else if (k6316 && key == "betriebsart") {
@@ -449,6 +453,14 @@ K1520Handle k1520_create_printer(int typ, const char* konfig) {
             else if (val == "endlos") cfg.k6316.betriebsart = K6316Steuerung::Betriebsart::Endlos;
             else {
                 g_init_error = "Drucker: betriebsart = " + val + " unbekannt (aufwickeln | schneiden | endlos)";
+                return nullptr;
+            }
+        } else if (k6313 && key == "dil") {
+            // Maske der geschlossenen DIL-Schalter, Bit 0 = 5-1, Bit 1 = 5-2, ... Bit 27 = 18-2 (K6313Ccb::dilIndex)
+            try {
+                cfg.k6313.dil = static_cast<uint32_t>(std::stoul(val, nullptr, 0)) & ((1u << K6313Ccb::DIL_ANZAHL) - 1);
+            } catch (const std::exception&) {
+                g_init_error = "Drucker: dil = " + val + " ist keine Zahl";
                 return nullptr;
             }
         } else if (k6316 && key == "dil") {
@@ -461,7 +473,8 @@ K1520Handle k1520_create_printer(int typ, const char* konfig) {
             }
         } else {
             g_init_error = "Drucker: unbekannter Schluessel '" + key + "'" +
-                           (k6316 ? " fuer den K6316 (betriebsart | dil | romdatei)" : " fuer den SD 1157 (schnittstelle | rom | romdatei)");
+                           (k6313 ? " fuer den K6313 (dil | romdatei)"
+                            : k6316 ? " fuer den K6316 (betriebsart | dil | romdatei)" : " fuer den SD 1157 (schnittstelle | rom | romdatei)");
             return nullptr;
         }
     }
@@ -548,6 +561,11 @@ int k1520_printer_geometry(K1520Handle h, int* x_je_zoll, int* y_je_zoll, int* b
 int k1520_printer_key(K1520Handle h, int taste, int gedrueckt) {
     auto* p = printerOf(h);
     if (!p) return 0;
+    if (p->istK6313()) {
+        if (taste < K1520_PRINTER_KEY_K6313_T1 || taste > K1520_PRINTER_KEY_K6313_T4) return 0;
+        p->k6313().setTaste(taste - K1520_PRINTER_KEY_K6313_T1 + 1, gedrueckt != 0);
+        return 1;
+    }
     if (p->istK6316()) {
         if (taste < K1520_PRINTER_KEY_K6316_S1 || taste > K1520_PRINTER_KEY_K6316_S5) return 0;
         p->k6316().setTaste(taste - K1520_PRINTER_KEY_K6316_S1 + 1, gedrueckt != 0);
@@ -565,6 +583,16 @@ int k1520_printer_key(K1520Handle h, int taste, int gedrueckt) {
 int k1520_printer_switch(K1520Handle h, int schalter, int wert) {
     auto* p = printerOf(h);
     if (!p) return 0;
+    if (p->istK6313()) {
+        K6313Ccb& st = p->k6313();
+        if (schalter >= K1520_PRINTER_SW_K6313_DIL_BASIS && schalter < K1520_PRINTER_SW_K6313_DIL_BASIS + K6313Ccb::DIL_ANZAHL) {
+            const int i = schalter - K1520_PRINTER_SW_K6313_DIL_BASIS;
+            st.setDil(5 + i / 2, 1 + i % 2, wert != 0);
+            return 1;
+        }
+        if (schalter == K1520_PRINTER_SW_PAPIER) { st.setPapierDa(wert != 0); return 1; }
+        return 0;
+    }
     if (p->istK6316()) {
         K6316Steuerung& st = p->k6316();
         if (schalter >= K1520_PRINTER_SW_DIL_BASIS && schalter < K1520_PRINTER_SW_DIL_BASIS + 16) {
@@ -603,6 +631,14 @@ int k1520_printer_switch(K1520Handle h, int schalter, int wert) {
 int k1520_printer_switch_get(K1520Handle h, int schalter) {
     auto* p = printerOf(h);
     if (!p) return -1;
+    if (p->istK6313()) {
+        const K6313Ccb& st = p->k6313();
+        if (schalter >= K1520_PRINTER_SW_K6313_DIL_BASIS && schalter < K1520_PRINTER_SW_K6313_DIL_BASIS + K6313Ccb::DIL_ANZAHL) {
+            const int i = schalter - K1520_PRINTER_SW_K6313_DIL_BASIS;
+            return st.dil(5 + i / 2, 1 + i % 2) ? 1 : 0;
+        }
+        return schalter == K1520_PRINTER_SW_PAPIER ? (st.papierDa() ? 1 : 0) : -1;
+    }
     if (p->istK6316()) {
         const K6316Steuerung& st = p->k6316();
         if (schalter >= K1520_PRINTER_SW_DIL_BASIS && schalter < K1520_PRINTER_SW_DIL_BASIS + 16)
@@ -636,6 +672,16 @@ int k1520_printer_switch_get(K1520Handle h, int schalter) {
 int k1520_printer_lamp(K1520Handle h, int lampe) {
     auto* p = printerOf(h);
     if (!p) return -1;
+    if (p->istK6313()) {
+        const K6313Ccb& st = p->k6313();
+        switch (lampe) {
+            case K1520_PRINTER_LAMP_ONLINE: return st.lampe(1) ? 1 : 0;
+            case K1520_PRINTER_LAMP_FEHLER: return st.lampe(3) ? 1 : 0;
+            case K1520_PRINTER_LAMP_PAPIER: return st.lampe(4) ? 1 : 0;
+            case K1520_PRINTER_LAMP_POW:    return st.lampe(2) ? 1 : 0;
+            default: return -1;
+        }
+    }
     if (p->istK6316()) {
         const K6316Steuerung& st = p->k6316();
         switch (lampe) {

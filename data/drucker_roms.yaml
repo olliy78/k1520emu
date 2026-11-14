@@ -65,3 +65,70 @@ eintraege:
     hinweis: "Fünf EPROMs zu 2 KiB (v24/V1.BIN bis V5.BIN) lückenlos hintereinander, 0000H-27FFH."
     vorgabe: true
     aliases: []
+  # K6313 (Entwurf 49 §11, WP8c): Fassung "kurz" (10 KiB, ROM 0000H-27FFH, RAM 3800H), Kassette V.24.  Dateien: doc/EPROMS/K6313/README.md.
+  # Geprueft ist nur 33538013 (Grundstellung, WP8c); die anderen vier laufen auf demselben Speicherplan, sind aber nicht einzeln gefahren.
+  - schluessel: k6313-33538013
+    typ: k6313
+    titel: "3.35-3-80/13 V24/CL/CEN EPS INT."
+    pgm: "3.35-3-80/13, Kennung 38033513"
+    datei: K6313/33538013.bin
+    groesse: 10240
+    md5: 860295a3999aa5fbec45a33419b52970
+    schnittstellen: [v24]
+    zeichensatz: im ROM (EPSON, international)
+    guete: ok
+    hinweis: "Vorgabe.  Fuenf EPROMs zu 2 KiB.  Am Kern laeuft die V.24-Kassette; IFSS/Centronics fehlen noch."
+    vorgabe: true
+    aliases: []
+  - schluessel: k6313-33538513
+    typ: k6313
+    titel: "3.35-3-85/13 V24/CL/CEN EPS INT./1715"
+    pgm: "3.35-3-85/13, Kennung 38533513"
+    datei: K6313/33538513.bin
+    groesse: 10240
+    md5: 67539a9786298e136f8e800f2ed1b0e3
+    schnittstellen: [v24]
+    zeichensatz: im ROM (EPSON, international/1715)
+    guete: ok
+    hinweis: "113 Byte Unterschied zu 33538013.  Nicht einzeln geprueft."
+    vorgabe: false
+    aliases: []
+  - schluessel: k6313-33538028
+    typ: k6313
+    titel: "3.35-3-80/28 HCD 80 V24/CEN INT."
+    pgm: "3.35-3-80/28, Kennung 38033528"
+    datei: K6313/33538028.bin
+    groesse: 10240
+    md5: 4e78d5980b1a2d0122e9b098495abea8
+    schnittstellen: [v24]
+    zeichensatz: im ROM (HCD 80)
+    guete: ok
+    hinweis: "Anderer Programmzweig (7009 Byte Unterschied).  Nicht einzeln geprueft."
+    vorgabe: false
+    aliases: []
+  - schluessel: k6313-33830803
+    typ: k6313
+    titel: "3.38-3-08/03 HCD 80 V24/CL/IFSP US ASCII/KYR"
+    pgm: "3.38-3-08/03, Kennung 30833803"
+    datei: K6313/33830803.bin
+    groesse: 10240
+    md5: 7996f20e27902c770d0a3ef7a0b0bc6e
+    schnittstellen: [v24]
+    zeichensatz: im ROM (US ASCII/Kyrillisch)
+    guete: ok
+    hinweis: "IFSP-Fassung: der Parallelweg fehlt im Kern.  Nicht einzeln geprueft."
+    vorgabe: false
+    aliases: []
+  - schluessel: k6313-53538500
+    typ: k6313
+    titel: "5.35-3-85/00 V24/CL/CEN EPS INT./1715 (neue Platine)"
+    pgm: "5.35-3-85/00, Kennung 38553500"
+    datei: K6313/53538500.bin
+    groesse: 10240
+    md5: 76f34de73992e88a7267fa95480754a1
+    schnittstellen: [v24]
+    zeichensatz: im ROM (EPSON, international/1715)
+    guete: ok
+    hinweis: "Neue Platine, 10-KiB-Zuschnitt.  Nicht einzeln geprueft."
+    vorgabe: false
+    aliases: []

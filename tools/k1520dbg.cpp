@@ -221,7 +221,7 @@ int main(int argc, char** argv){
     // original writable (writes persist); `--read-only`/`--ro` mounts write-protected.
     enum { MOUNT_COW=0, MOUNT_RW=1, MOUNT_RO=2 } mount_mode = MOUNT_COW;
     bool start_console = false;   // --console: sofort in den Konsolenmodus (§9)
-    dbgm::Art art = dbgm::Art::A5120;   // --machine a5120|k8915|k8915-g2|prg710|prg710-1|pc1715|pc1715w|p8000|p8000-16|mc80[-30|-31|-21|-22]|sd1157|k6316|k6316-v24 (Vorgabe a5120)
+    dbgm::Art art = dbgm::Art::A5120;   // --machine a5120|k8915|k8915-g2|prg710|prg710-1|pc1715|pc1715w|p8000|p8000-16|mc80[-30|-31|-21|-22]|sd1157|k6316|k6316-v24|k6313 (Vorgabe a5120)
     int mc80_spe = 1;             // --spe 1|2: Zahl der SPE 2 am MC80 (AP M8)
     bool skip_selftest = false;   // --skip-selftest: K8915 ohne ROM-Selbsttest (wie ein Warmstart)
     const char* em_opt = nullptr; // --em none|em064|em256: A5120.16 mit Erweiterungsmodul
@@ -257,7 +257,7 @@ int main(int argc, char** argv){
     for (int i=1;i<argc;++i){
         if (!strcmp(argv[i],"--machine") && i+1<argc){
             if (!dbgm::parseMachine(argv[++i], art)){
-                fprintf(stderr,"unbekannte Maschine '%s' (a5120 | k8915 | k8915-g2 | prg710 | prg710-1 | pc1715 | pc1715w | p8000 | p8000-16 | mc80 | mc80-30 | mc80-21 | mc80-22 | sd1157 | k6316 | k6316-v24)\n",argv[i]); return 2; } }
+                fprintf(stderr,"unbekannte Maschine '%s' (a5120 | k8915 | k8915-g2 | prg710 | prg710-1 | pc1715 | pc1715w | p8000 | p8000-16 | mc80 | mc80-30 | mc80-21 | mc80-22 | sd1157 | k6316 | k6316-v24 | k6313)\n",argv[i]); return 2; } }
         else if (!strcmp(argv[i],"--spe") && i+1<argc){ mc80_spe=atoi(argv[++i]);
             if (mc80_spe<1 || mc80_spe>2){ fprintf(stderr,"--spe: 1 oder 2\n"); return 2; } }
         else if (!strcmp(argv[i],"--skip-selftest")) skip_selftest=true;
@@ -1591,6 +1591,12 @@ int main(int argc, char** argv){
                 rcpfx(), rc(m.cpuCycles()), rel_armed?" (rel)":"");
             return;
         }
+        if (KS && m.printer()->istK6313()){   // K6313: Lampen, Wagen, Papier, Matrixspalte
+            K6313Ccb& k=m.printer()->k6313();
+            fprintf(stderr,"  state: ONLINE=%d POW=%d ERR=%d PE=%d wagen=%d papier=%d spalte=%d  %c-cyc=%lld%s\n", k.lampe(1),k.lampe(2),k.lampe(3),k.lampe(4),
+                k.druck().wagen().position(), k.druck().papier(0).lage(), k.matrixSpalte(), rcpfx(), rc(m.cpuCycles()), rel_armed?" (rel)":"");
+            return;
+        }
         if (KS && m.printer()->istK6316()){   // K6316: Lampen H1..H5, Wagen, Papier
             K6316Steuerung& k=m.printer()->k6316();
             fprintf(stderr,"  state: H1..H5=%d%d%d%d%d wagen=%d papier=%d schnitte=%d  %c-cyc=%lld%s\n", k.lampe(1),k.lampe(2),k.lampe(3),k.lampe(4),k.lampe(5),
@@ -1910,6 +1916,20 @@ int main(int argc, char** argv){
                     k.waitMke?1:0,k.waitSchreibBytes,(unsigned long long)k.waitSpuren);
             fprintf(stderr,"  Takte=%llu\n",(unsigned long long)m.machineCycles());
             rst38Hint();
+            return;
+        }
+        if (KS && m.printer()->istK6313()){   // K6313: Lampen, Wagen, Papier, Nadeln
+            K6313Ccb& k=m.printer()->k6313();
+            uint16_t pc=m.cpuPC();
+            if (json){
+                fprintf(stderr,"\n{\"machine\":\"k6313\",\"pc\":\"0x%04X\",\"online\":%d,\"pow\":%d,\"err\":%d,\"pe\":%d,\"wagen\":%d,\"papier\":%d,"
+                  "\"nadeln\":\"0x%03X\"}\n", pc, k.lampe(1),k.lampe(2),k.lampe(3),k.lampe(4),
+                  k.druck().wagen().position(), k.druck().papier(0).lage(), (unsigned)k.nadeln());
+                return;
+            }
+            fprintf(stderr,"  PC=%04X  ON LINE=%d POW=%d ERR=%d PE=%d  wagen=%d papier=%d  Matrixspalte=%d\n  SIO gesendet: A (V.24) %zu, B %zu Zeichen\n",
+                pc,k.lampe(1),k.lampe(2),k.lampe(3),k.lampe(4),k.druck().wagen().position(),k.druck().papier(0).lage(),k.matrixSpalte(),
+                k.sioAusgabe(0).size(),k.sioAusgabe(1).size());
             return;
         }
         if (KS && m.printer()->istK6316()){   // K6316: Lampen H1..H5, Wagen, Papier, Nadeln, Schnitte
@@ -3845,6 +3865,13 @@ int main(int argc, char** argv){
                 "\"i\":\"0x%02X\",\"r\":\"0x%02X\",\"iff1\":%s,\"cyc\":%llu,\"rom\":true,\"machine\":\"%s\"}\n",
                 z.PC,z.SP,z.AF,z.BC,z.DE,z.HL,z.IX,z.IY,z.I,z.R, z.IFF1?"true":"false",
                 (unsigned long long)m.cpuCycles(), m.name()); }
+        else if (cmd=="rj" && KS && m.printer()->istK6313()){ const Z80& z=m.cpuDebug(); K6313Ccb& k=m.printer()->k6313();
+            fprintf(stderr,"\n{\"pc\":\"0x%04X\",\"sp\":\"0x%04X\",\"af\":\"0x%04X\",\"bc\":\"0x%04X\","
+                "\"de\":\"0x%04X\",\"hl\":\"0x%04X\",\"ix\":\"0x%04X\",\"iy\":\"0x%04X\","
+                "\"i\":\"0x%02X\",\"r\":\"0x%02X\",\"iff1\":%s,\"cyc\":%llu,\"rom\":true,"
+                "\"machine\":\"k6313\",\"wagen\":%d,\"online\":%s}\n",
+                z.PC,z.SP,z.AF,z.BC,z.DE,z.HL,z.IX,z.IY,z.I,z.R, z.IFF1?"true":"false",
+                (unsigned long long)m.cpuCycles(), k.druck().wagen().position(), k.lampe(1)?"true":"false"); }
         else if (cmd=="rj" && KS && m.printer()->istK6316()){ const Z80& z=m.cpuDebug(); K6316Steuerung& k=m.printer()->k6316();
             fprintf(stderr,"\n{\"pc\":\"0x%04X\",\"sp\":\"0x%04X\",\"af\":\"0x%04X\",\"bc\":\"0x%04X\","
                 "\"de\":\"0x%04X\",\"hl\":\"0x%04X\",\"ix\":\"0x%04X\",\"iy\":\"0x%04X\","
@@ -4179,6 +4206,11 @@ int main(int argc, char** argv){
                 for(auto& v: var_watch){ uint16_t a=std::get<1>(v);
                     if(std::get<2>(v)) fprintf(stderr,"  %-14s [%04X] = %04X\n",std::get<0>(v).c_str(),a,wd(a));
                     else               fprintf(stderr,"  %-14s [%04X] = %02X\n",std::get<0>(v).c_str(),a,m.memReadDebug(a)); } }
+            else if (KS && m.printer()->istK6313()){   // K6313: Lampen, Wagen, DIL-Nibbles und Tastenzellen (RAM 3849H..384CH)
+                K6313Ccb& k=m.printer()->k6313();
+                fprintf(stderr,"  ONLINE=%d POW=%d ERR=%d PE=%d wagen=%d  SP=%04X  DIL-Nibbles [3849..384C]=%02X %02X %02X %02X  Phasenmuster [3824]=%02X\n  (vars -f <datei> | vars add <name> <addr> [w] | vars clear)\n",
+                        k.lampe(1),k.lampe(2),k.lampe(3),k.lampe(4), k.druck().wagen().position(), m.cpuSP(),
+                        m.memReadDebug(0x3849), m.memReadDebug(0x384A), m.memReadDebug(0x384B), m.memReadDebug(0x384C), m.memReadDebug(0x3824)); }
             else if (KS && m.printer()->istK6316()){   // K6316: Lampen, Wagen, IX-Flags (RAM 3824H..)
                 K6316Steuerung& k=m.printer()->k6316();
                 fprintf(stderr,"  H1..H5=%d%d%d%d%d wagen=%d  SP=%04X  Betriebsart (IX+102)=%02X Flags IX+98=%02X IX+78=%02X IX+79=%02X\n  (vars -f <datei> | vars add <name> <addr> [w] | vars clear)\n",
@@ -4228,6 +4260,23 @@ int main(int argc, char** argv){
             else fprintf(stderr,"  [03F8]done=%02X  DPB: [D1B2]=%04X [D1B4]=%04X [D1B8]=%04X [D1BE]=%04X [D1CD]=%04X\n"
                                 "  (vars -f <datei> | vars add <name> <addr> [w] | vars clear)\n",
                     m.memReadDebug(0x03F8),wd(0xD1B2),wd(0xD1B4),wd(0xD1B8),wd(0xD1BE),wd(0xD1CD)); }
+        else if (cmd=="dev" && KS && m.printer()->istK6313()){   // K6313: CTC D101/D102, PIO D104/D105, SIO
+            K6313Ccb& k=m.printer()->k6313();
+            auto Y=[&](bool b){ return b?"1":"0"; };
+            auto showCtc=[&](const char* name, const Z80CTC::DebugState& c){
+                fprintf(stderr,"  CTC (%s)  vecBase=%02X  IEI=%s IEO=%s\n",name,c.vecBase,Y(c.iei),Y(c.ieo));
+                for(int i=0;i<4;++i){ auto& ch=c.ch[i];
+                    fprintf(stderr,"    ch%d ctl=%02X TC=%02X cnt=%-3d run=%s  INT(en=%s pend=%s ius=%s iei=%s)\n",
+                        i,ch.control,ch.timeConst,ch.counter,Y(ch.running),Y(ch.intEn),Y(ch.intPending),Y(ch.ius),Y(ch.iei)); } };
+            auto showPio=[&](const char* name, const Z80PIO::DebugState& p){
+                fprintf(stderr,"  %s  IEI=%s IEO=%s\n",name,Y(p.iei),Y(p.ieo));
+                for(int i=0;i<2;++i){ auto& pt=p.port[i];
+                    fprintf(stderr,"    %c mode=%u out=%02X in=%02X dir=%02X vec=%02X  INT(en=%s pend=%s ius=%s iei=%s)\n",
+                        i?'B':'A',pt.mode,pt.out,pt.in,pt.dir,pt.vector,Y(pt.ie),Y(pt.pending),Y(pt.ius),Y(pt.iei)); } };
+            showCtc("D101, F4H-F7H",k.ctc101().debugState()); showCtc("D102, ECH-EFH",k.ctc102().debugState());
+            showPio("PIO D104, F8H-FBH",k.pio104().debugState()); showPio("PIO D105, DCH-DFH",k.pio105().debugState());
+            fprintf(stderr,"  Pinpegel D104 A/B=%02X/%02X D105 A/B=%02X/%02X  Matrixspalte %d  DIL-Maske %07X\n",
+                k.portAusgabe(104,0),k.portAusgabe(104,1),k.portAusgabe(105,0),k.portAusgabe(105,1),k.matrixSpalte(),(unsigned)k.dilMaske()); }
         else if (cmd=="dev" && KS && m.printer()->istK6316()){   // K6316: CTC D5/D10, PIO D12/D14/D11
             K6316Steuerung& k=m.printer()->k6316();
             auto Y=[&](bool b){ return b?"1":"0"; };
@@ -4546,6 +4595,13 @@ int main(int argc, char** argv){
                         default: snprintf(q,sizeof q,"leer"); }
                     fprintf(stderr,"    %X      %04X-%04X    %02X   %-8s  %X    %s\n",n,(n<<12),(n<<12)|0x0FFF,a,her,sp.seite(n),q);
                 }
+            }
+            else if (KS && m.printer()->istK6313()){   // K6313: festes Speicherbild (doc/printer/k6313/hardware.md §2)
+                fprintf(stderr,"  0000-27FF  ROM, 5 x 2716 (Fassung \"kurz\")\n"
+                               "  2800-37FF  unbelegt (liest FFH)\n"
+                               "  3800-3BFF  RAM 1 KiB, IX=3824H, SP=3C00H\n"
+                               "  E/A (jeder Baustein an einer Leitung A2-A7 tief): 7CH-7FH SIO (A = V.24-Daten), BCH-BFH Centronics-PIO (nicht bestueckt),\n"
+                               "       DCH-DFH PIO D105 (Matrix, Nadeln 1-8), ECH-EFH CTC D102, F4H-F7H CTC D101, F8H-FBH PIO D104 (Motoren, Sensoren)\n");
             }
             else if (KS && m.printer()->istK6316()){   // K6316: festes Speicherbild (doc/printer/k6316/hardware.md §2)
                 fprintf(stderr,"  0000-27FF  ROM, 5 x 2716 (I1..I5 bzw. V1..V5)\n"

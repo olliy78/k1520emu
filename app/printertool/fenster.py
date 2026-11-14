@@ -292,9 +292,9 @@ class PrinterWindow(QMainWindow):
         self._schnittstelle = dr.get("schnittstelle") if dr.get("schnittstelle") in ("ifss", "v24") else "ifss"
         self._betriebsart = dr.get("betriebsart") if dr.get("betriebsart") in ("aufwickeln", "schneiden", "endlos") else "endlos"
         try:
-            self._dil = int(dr.get("dil", 0)) & 0xFFFF
+            self._dil = int(dr.get("dil", self.beschreibung.dil_vorgabe)) & ((1 << self.beschreibung.dil_anzahl) - 1)
         except (TypeError, ValueError):
-            self._dil = 0
+            self._dil = self.beschreibung.dil_vorgabe
         self._tempo = konfig.tempo_waehlbar(allg.get("speed", 1.0))
         self._formular_zoll = konfig.zoll_waehlbar(dr.get("formular_zoll", 12))
         self._netz = True
@@ -488,6 +488,8 @@ class PrinterWindow(QMainWindow):
         zustand = self.seriell.zustand_lesen()
         self.takt.stop()
         self.seriell.alles_beenden()
+        if beschreibung is not None and beschreibung is not self.beschreibung:
+            self._dil = beschreibung.dil_vorgabe   # die Schalter eines anderen Typs haben eine andere Bedeutung
         self.beschreibung = beschreibung or self.beschreibung
         if rom:
             self._rom_je_typ[self.beschreibung.schluessel] = rom
@@ -631,8 +633,8 @@ class PrinterWindow(QMainWindow):
             return
         an = bool(an)
         self.emu.printer_switch(kern_id, an)
-        if K.DRUCKER_SW_DIL_BASIS <= kern_id < K.DRUCKER_SW_DIL_BASIS + 16:
-            bit = 1 << (kern_id - K.DRUCKER_SW_DIL_BASIS)
+        if self.beschreibung.dil_basis <= kern_id < self.beschreibung.dil_basis + self.beschreibung.dil_anzahl:
+            bit = 1 << (kern_id - self.beschreibung.dil_basis)
             self._dil = (self._dil | bit) if an else (self._dil & ~bit)
         if kern_id == K.DRUCKER_SW_ONLINE:
             self._online_spiegeln(an)

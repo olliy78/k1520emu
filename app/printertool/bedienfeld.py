@@ -99,7 +99,7 @@ class Bedienfeld(QWidget):
             bl.addWidget(self.betriebsart)
             lay.addWidget(bg)
         if b.dil:
-            dg = QGroupBox("DIL-Schalter S11 - S26 (Ein = geschlossen)")
+            dg = QGroupBox(b.dil_titel)
             dl = QGridLayout(dg)
             for i, t in enumerate(b.dil):
                 knopf = QPushButton(t.text)
@@ -116,6 +116,8 @@ class Bedienfeld(QWidget):
         self.hinweise.setWordWrap(True)
         self.hinweise.setTextFormat(Qt.RichText)
         text = [f"<b>{t.text}:</b> {t.hinweis}" for t in b.tasten if t.hinweis]
+        if b.stand_hinweis:
+            text.append(b.stand_hinweis)
         self.hinweise.setText("<small>" + "<br>".join(text) + "</small>")
         lay.addWidget(self.hinweise)
 

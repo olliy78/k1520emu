@@ -44,6 +44,17 @@ def test_DruckerRomKatalog_K6316_Satz_ist_die_Aneinanderreihung_der_Chips(eintra
         assert (PROJECT_ROOT / "doc" / "EPROMS" / e.datei).read_bytes() == roh
 
 
+def test_DruckerRomKatalog_K6313_Kennung_im_ROM_stimmt_mit_dem_Dateinamen(eintraege):
+    # Dateiname x nn F ZS PS; die Firmware traegt F ZS x nn PS als ASCII bei 27F8H (doc/EPROMS/K6313/README.md)
+    liste = rk.fuer_typ("k6313", eintraege)
+    assert len(liste) >= 1 and rk.vorgabe("k6313", eintraege).schluessel == "k6313-33538013"
+    for e in liste:
+        n = Path(e.datei).stem
+        roh = (PROJECT_ROOT / "doc" / "EPROMS" / e.datei).read_bytes()
+        assert roh[0x27F8:0x2800].decode("ascii") == n[3] + n[4:6] + n[0] + n[1:3] + n[6:8], e.schluessel
+        assert e.guete == "ok" and len(roh) == 10240
+
+
 def test_DruckerRomKatalog_genau_eine_Vorgabe_je_Typ(eintraege):
     for t in rk.TYPEN:
         assert len([e for e in rk.fuer_typ(t, eintraege) if e.vorgabe]) == 1, t
@@ -66,7 +77,7 @@ def test_DruckerRomKatalog_Aliase_der_alten_Schluessel(eintraege):
     (lambda d: d["eintraege"][0].update(vorgabe=False), "0 Vorgaben"),
     (lambda d: d["eintraege"][0].update(md5="XYZ"), "md5"),
     (lambda d: d["eintraege"][0].update(guete="prima"), "guete"),
-    (lambda d: d["eintraege"][0].update(typ="k6313"), "typ"),
+    (lambda d: d["eintraege"][0].update(typ="k9999"), "typ"),
     (lambda d: d["eintraege"][0].update(datei="../x.rom"), "relativ"),
     (lambda d: d["eintraege"][1].update(aliases=["repariert"]), "Alias"),
     (lambda d: d["eintraege"][0].pop("md5"), "'md5' fehlt"),
@@ -139,6 +150,16 @@ def test_DruckerRomKatalog_romdatei_liefert_dieselben_Bytes_wie_das_eingebettete
             assert _byte(lib, h_neu, adr) == _byte(lib, h_alt, adr) == roh[adr]
         lib.k1520_destroy(h_alt)
         lib.k1520_destroy(h_neu)
+    # K6313: Vorgabe-Abzug aus Datei == eingebettet
+    e = rk.vorgabe("k6313", eintraege)
+    lib, h_alt = _drucker(3, "")
+    _, h_neu = _drucker(3, f"romdatei={ordner / e.datei}")
+    assert h_alt and h_neu
+    roh = (ordner / e.datei).read_bytes()
+    for adr in (0x0000, 0x0801, 0x1234, 0x27F8, 0x27FF):
+        assert _byte(lib, h_neu, adr) == _byte(lib, h_alt, adr) == roh[adr]
+    lib.k1520_destroy(h_alt)
+    lib.k1520_destroy(h_neu)
     # K6316: Satz aus Datei == eingebettet
     for typ, schluessel in ((1, "k6316-ifss"), (2, "k6316-v24")):
         e = next(x for x in eintraege if x.schluessel == schluessel)
@@ -165,7 +186,8 @@ def test_DruckerRomKatalog_romdatei_hat_Vorrang_und_laeuft_wirklich_aus_der_Date
 
 @pytest.mark.parametrize("typ, groesse, fragment", [(0, 100, "100 Bytes, erwartet 10624"),
                                                     (1, 10624, "10624 Bytes, erwartet 10240"),
-                                                    (2, 0, "nicht lesbar oder leer")])
+                                                    (2, 0, "nicht lesbar oder leer"),
+                                                    (3, 100, "100 Bytes, erwartet 10240")])
 def test_DruckerRomKatalog_romdatei_falsche_Laenge_klare_Meldung(tmp_path, typ, groesse, fragment):
     from app.core_binding import k1520 as K
     p = tmp_path / "falsch.rom"
