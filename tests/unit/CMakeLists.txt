@@ -132,6 +132,8 @@ k1520_add_test(raf   SRC cards/test_raf.cpp        LIBS k1520_raf k1520_z80 LABE
 # GIDE-IDE-Karte mit echtem Z80 (Entwurf 50 AP G2)
 k1520_add_test(gide  SRC cards/test_gide.cpp       LIBS k1520_gide k1520_z80 LABELS "${_lbl}")
 k1520_add_test(gide_rtc SRC cards/test_gide_rtc.cpp LIBS k1520_gide k1520_z80 LABELS "${_lbl}")
+# SOUND-Karte K1520: AY + CTC (Entwurf 51 AP S3)
+k1520_add_test(sound_k1520 SRC cards/test_sound_k1520.cpp LIBS k1520_sound_k1520 LABELS "${_lbl}")
 # GUN-USB (Z80-PIO + VDIP1) mit echtem Z80 (Entwurf 50 AP U2)
 k1520_add_test(gun_usb SRC cards/test_gun_usb.cpp LIBS k1520_gun_usb k1520_z80 LABELS "${_lbl}")
 # KCNet-Netzkarte (Z80-PIO + ATmega-Modell + W5100) mit echtem Z80 (Entwurf 50 AP N2, Protokoll 50a)

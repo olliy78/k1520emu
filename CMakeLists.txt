@@ -408,6 +408,11 @@ if(BUILD_K1520)
     target_link_libraries(k1520_gide PUBLIC k1520_bus k1520_logger k1520_ata k1520_p8000_rtc)
     target_include_directories(k1520_gide PUBLIC ${CMAKE_SOURCE_DIR})
 
+    # SOUND-Karte K1520: AY-3-8910 + CTC (Entwurf 51 AP S3); von audio nur die Schnittstelle TonSenke
+    add_library(k1520_sound_k1520 STATIC core/cards/sound_k1520/sound_k1520.cpp)
+    target_link_libraries(k1520_sound_k1520 PUBLIC k1520_bus k1520_ctc k1520_ay38910 k1520_audio k1520_logger)
+    target_include_directories(k1520_sound_k1520 PUBLIC ${CMAKE_SOURCE_DIR})
+
     # GUN-USB: Z80-PIO + VDIP1 (Entwurf 50 AP U2)
     add_library(k1520_gun_usb STATIC core/cards/gun_usb/gun_usb.cpp)
     target_link_libraries(k1520_gun_usb PUBLIC k1520_bus k1520_logger k1520_pio k1520_vdip)
