@@ -13,10 +13,12 @@
  * - Block-Maps (`key: wert`) und Block-Listen (`- eintrag`)
  * - Flow-Maps `{ a: 1, b: 2 }` und Flow-Listen `[a, b, c]` (einzeilig, verschachtelbar)
  * - Skalare: bare, `'einfach'`, `"doppelt"` (mit `\"`/`\\`-Escapes)
+ * - Blockskalar `schluessel: |` (Zeilen roh, Einrueckung der ersten Zeile abgezogen, jede Zeile mit '\n'
+ *   abgeschlossen; ohne `|-`/`|2`) — fuer grosse Textbloecke wie die Intel-HEX-Daten von `data/drucker_roms.yaml`
  *
  * ### Nicht unterstuetzt (jeweils Ladefehler mit Zeilennummer)
  * - Anchors/Aliases (`&a` / `*a`), Merge-Keys (`<<:`)
- * - mehrzeilige Skalare (`|`, `>`), mehrere Dokumente (`---`), Tags (`!!str`)
+ * - gefaltete Skalare (`>`) und `|`-Zusaetze, mehrere Dokumente (`---`), Tags (`!!str`)
  * - komplexe Keys (`? …`), Tabs als Einrueckung, doppelte Keys in derselben Map
  *
  * @see doc/K1520_architecture.md §8.6.2

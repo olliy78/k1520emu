@@ -249,7 +249,8 @@ TEST(YamlLite, Fehler_DoppelterSchluessel) {
  */
 TEST(YamlLite, Fehler_NichtUnterstuetzteKonstrukte) {
     EXPECT_NE(parseFail("basis: &anker\n").message.find("Anchors"), std::string::npos);
-    EXPECT_NE(parseFail("text: |\n").message.find("mehrzeilige"), std::string::npos);
+    EXPECT_NE(parseFail("text: |\n").message.find("mehrzeilige"), std::string::npos);   // `|` ohne Inhalt
+    EXPECT_NE(parseFail("text: >\n  a\n").message.find("mehrzeilige"), std::string::npos);
     EXPECT_NE(parseFail("---\na: 1\n").message.find("Dokumenttrenner"), std::string::npos);
 }
 
@@ -281,4 +282,19 @@ TEST(YamlLite, Fehler_ZeileOhneDoppelpunkt) {
 TEST(YamlLite, LeereDatei_LiefertNullKnoten) {
     auto n = parseOk("# nur ein Kommentar\n\n");
     EXPECT_TRUE(n.isNull());
+}
+
+/**
+ * @test YamlLite/Blockskalar_Literal
+ * @brief `key: |` sammelt die eingerueckten Folgezeilen roh (auch mit `#` und `:`), bis eine Zeile mit kleinerer Einrueckung folgt.
+ * @par Kriterium  Wert = Zeilen mit '\n', Einrueckung abgezogen; Folgekey und Zeilennummern bleiben richtig.
+ */
+TEST(YamlLite, Blockskalar_Literal) {
+    auto n = parseOk("eintraege:\n  - name: a\n    daten: |\n      :10 # kein Kommentar\n\n        x: y\n      :00\n    rest: 7\n  - name: b\n");
+    const yaml::Node& e0 = n.find("eintraege")->items[0];
+    EXPECT_EQ(e0.find("daten")->scalar, ":10 # kein Kommentar\n\n  x: y\n:00\n");
+    EXPECT_EQ(e0.find("rest")->scalar, "7");
+    EXPECT_EQ(n.find("eintraege")->items[1].find("name")->scalar, "b");
+    EXPECT_EQ(n.find("eintraege")->items[1].find("name")->line, 9);
+    EXPECT_FALSE(parseFail("a: |\n    x\n  y\n").message.empty());   // zweite Zeile weniger eingerueckt als die erste
 }

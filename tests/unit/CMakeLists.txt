@@ -78,6 +78,10 @@ k1520_add_test(sd1157_steuerung SRC cards/test_sd1157_steuerung.cpp LIBS k1520_p
 k1520_add_test(k6313_ccb SRC cards/test_k6313_ccb.cpp LIBS k1520_printer_karten
                LABELS "${_lbl};fach_drucker"
                DEFS "K6313_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/K6313\"")
+# Drucker-ROM-Katalog (Entwurf 49 §12, WP9): data/drucker_roms.yaml (Metadaten + Intel-HEX), Leser, Schema, Pruefsummen, Negativtests
+k1520_add_test(drucker_rom_katalog SRC cards/test_drucker_rom_katalog.cpp LIBS k1520_printer_roms
+               LABELS "${_lbl};fach_drucker"
+               DEFS "DRUCKER_ROMS_YAML=\"${CMAKE_SOURCE_DIR}/data/drucker_roms.yaml\"")
 # K3528 der K8915 Gen 2: Speicherbild je A8H-Wert, /MEMDI (doc/design/24_k8915_varianten.md R3, AP-V4)
 k1520_add_test(k3528 SRC cards/test_k3528.cpp      LIBS k1520_k3528 LABELS "${_lbl}")
 # PFS K3820 (16 × 2708), von keiner Maschine benutzt (doc/design/24_k8915_varianten.md AP-V11)

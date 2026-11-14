@@ -604,8 +604,17 @@ if(BUILD_K1520)
         core/cards/printer/k6313_ccb.cpp)
     target_link_libraries(k1520_printer_karten PUBLIC k1520_druckwerk k1520_z80 k1520_ctc k1520_pio k1520_sio k1520_bus k1520_logger k1520_serial)
     target_include_directories(k1520_printer_karten PUBLIC ${CMAKE_SOURCE_DIR})
+    # ROM-Katalog der Drucker (WP9, Entwurf 49 §12): data/drucker_roms.yaml (Metadaten + Intel-HEX), gelesen ueber yaml_lite.
+    # K1520_PRINTER_ROMS_DEFAULT: Fallback-Fundort im Quellbaum wie K1520_FORMATS_DEFAULT; Release-Bauten setzen ihn leer
+    # (sonst traegt jedes Binaerabbild den Pfad des Baurechners; Waechter py_packaging).  ${CMAKE_DL_LIBS}: dladdr (Modulverzeichnis).
+    set(K1520_PRINTER_ROMS_DEFAULT "${CMAKE_SOURCE_DIR}/data/drucker_roms.yaml"
+        CACHE FILEPATH "Fallback-Pfad der drucker_roms.yaml")
+    add_library(k1520_printer_roms STATIC core/machines/printer/drucker_rom_katalog.cpp)
+    target_link_libraries(k1520_printer_roms PUBLIC k1520_util ${CMAKE_DL_LIBS})
+    target_include_directories(k1520_printer_roms PUBLIC ${CMAKE_SOURCE_DIR})
+    target_compile_definitions(k1520_printer_roms PRIVATE K1520_PRINTER_ROMS_DEFAULT="${K1520_PRINTER_ROMS_DEFAULT}")
     add_library(k1520_printer STATIC core/machines/printer/printer_machine.cpp)
-    target_link_libraries(k1520_printer PUBLIC k1520_printer_karten k1520_raf k1520_k6022 k1520_k5020 k1520_floppy2 k1520_bus k1520_logger k1520_serial)
+    target_link_libraries(k1520_printer PUBLIC k1520_printer_roms k1520_printer_karten k1520_raf k1520_k6022 k1520_k5020 k1520_floppy2 k1520_bus k1520_logger k1520_serial)
     target_include_directories(k1520_printer PUBLIC ${CMAKE_SOURCE_DIR})
 
     # P8000 (doc/design/25_p8000.md §10, AP P7a): 8-Bit-Seite (Karte8 + Floppy8 + Kern-Terminal)
