@@ -94,3 +94,38 @@ TEST(K6311Esc, ZeichenbreitenfolgenDesIsoSatzesKenntDiesesRomNicht)
     ASSERT_EQ(b.size(), 1u);
     EXPECT_EQ(vergleichePunkte(bl, erwartet(r, "KHAGEDORN", Schrift::Normal), b[0].first, b[0].second).fehler, "") << "das K erscheint als Zeichen";
 }
+
+TEST(K6311Esc, SelbsttestUeberDenIfssAbzug13325212KennungUndZeichenumlauf)
+{
+    // wie am V.24-Abzug (K6311Modul.Selbsttest...): ON LINE aus (Taste 1), dann TEST (D105 A4, Taste 2) im Offline-Zustand; der 8-KiB-Abzug traegt die Kennung bei
+    // 1FF8H statt 27F8H (Zeichenzellen ab 1D00H), die Kennungszeile (8 Zeichen, ohne das RLD-Zeichen des 10-KiB-Abzugs) aus 1FFBH-1FFDH, 1FF8H-1FFAH, 1FFEH-1FFFH
+    const auto r = rom(K6311_ABZUG_DIR, "13325212");
+    ASSERT_EQ(r.size(), 8192u);
+    PrinterMachine::Config c;
+    c.k6313.rom_extern = r;
+    k6313test::Lauf l(c, Typ::K6311_Ifss);
+    l.fahre(20'000'000);
+    l.st().setTaste(1, true);
+    l.fahre(3'000'000);
+    l.st().setTaste(1, false);
+    l.fahre(6'000'000);
+    ASSERT_FALSE(l.st().lampe(1)) << "OFF LINE";
+    l.st().setTaste(2, true);
+    l.fahre(60'000'000);
+    l.st().setTaste(2, false);
+    const Blattmodell& bl = l.m->druck().blatt(0);
+    const auto b = baender(bl);
+    ASSERT_GE(b.size(), 8u);
+    std::string kennung;
+    for (int a : {0x1FFB, 0x1FFC, 0x1FFD, 0x1FF8, 0x1FF9, 0x1FFA}) kennung += static_cast<char>(r[static_cast<size_t>(a)]);
+    kennung += static_cast<char>(r[0x1FFE]);
+    kennung += static_cast<char>(r[0x1FFF]);
+    EXPECT_EQ(kennung, "13325212") << "= Etikett 1.33-2-52/12";
+    EXPECT_EQ(vergleichePunkte(bl, erwartet(r, kennung, Schrift::Normal), b[0].first, b[0].second).fehler, "") << "Kennungszeile";
+    for (size_t i = 1; i < 8; ++i) {
+        std::string z;
+        int a = 0x20 + static_cast<int>(i) - 1;
+        for (int n = 0; n < 80; ++n) { ++a; if (a == 0x7F) a = 0x20; z += static_cast<char>(a); }
+        EXPECT_EQ(vergleichePunkte(bl, erwartet(r, z, Schrift::Normal), b[i].first, b[i].second).fehler, "") << "Selbsttest-Zeile " << i;
+    }
+}

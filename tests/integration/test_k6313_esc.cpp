@@ -244,3 +244,63 @@ TEST(K6313Esc, GegenprobeDasOrakelUnterscheidetDieSchriftarten)
         }
     }
 }
+
+// ─── Hexdump (FORM FEED + LINE FEED vor beim Netz-Ein, Handbuch 1.4.5) ───────
+
+namespace {
+std::string hexText(const std::string& daten)
+{
+    std::string h;
+    for (char c : daten) { char b[8]; std::snprintf(b, sizeof b, "%02X ", static_cast<uint8_t>(c)); h += b; }
+    return h;
+}
+
+/// Hexdump-Lauf: Tasten LF vor (2) + FF (4) beim Netz-Ein, @p daten senden, dann ON/OFF LINE (der Rest des Druckpuffers wird gedruckt).
+std::unique_ptr<Lauf> hexdumpLauf(const std::string& abzug, const std::string& daten)
+{
+    auto l = std::make_unique<Lauf>(konfig(abzug));
+    l->st().setTaste(2, true);
+    l->st().setTaste(4, true);
+    l->fahre(30'000'000);
+    l->st().setTaste(2, false);
+    l->st().setTaste(4, false);
+    l->m->serialHub()->wandler(1).anbinden();
+    l->fahre(1'000'000);
+    l->sende(1, daten);
+    l->fahre(20'000'000);
+    l->st().setTaste(1, true);
+    l->fahre(3'000'000);
+    l->st().setTaste(1, false);
+    l->fahre(60'000'000);
+    return l;
+}
+}  // namespace
+
+TEST(K6313Esc, IsoHexdumpBeispielDesHandbuchsESC4mHexDump)
+{
+    // ISO-Ergaenzung S. 1: "ESC [ 4 m HEX - DUMP CR LF" ergibt im Hexdump "1B 5B 34 6D 48 45 58 20 2D 20 44 55 4D 50 0D 0A"; gedruckt wird in 12 Zeichen je Zoll (Elite-Teilung)
+    const auto r = rom(K6313_ABZUG_DIR, "30835007");
+    const std::string daten = "\x1b[4mHEX - DUMP\r\n";
+    auto l = hexdumpLauf("30835007", daten);
+    const Blattmodell& bl = l->m->druck().blatt(0);
+    const auto b = baender(bl);
+    ASSERT_EQ(b.size(), 1u);
+    EXPECT_EQ(hexText(daten), "1B 5B 34 6D 48 45 58 20 2D 20 44 55 4D 50 0D 0A ");
+    EXPECT_EQ(vergleicheHuelle(bl, erwartet3(r, hexText(daten), Schrift{Modus::Elite, false}), b[0].first, b[0].second), "");
+    EXPECT_NE(vergleicheHuelle(bl, erwartet3(r, hexText(daten), Schrift{}), b[0].first, b[0].second), "") << "Gegenprobe: nicht Pica";
+}
+
+TEST(K6313Esc, EpsonHexdumpDrucktZweiunddreissigByteJeZeile)
+{
+    // Handbuch: "Der Druck erfolgt nur, wenn der Druckpuffer voll ist" - 128 Byte = vier Zeilen zu 32 Byte (Elite-Teilung)
+    const auto r = rom(K6313_ABZUG_DIR, "33538013");
+    std::string daten;
+    for (int i = 0; i < 47; ++i) daten += i % 10 == 0 ? "HEX-DUMP " : "0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ ";
+    daten += "\r\n";
+    auto l = hexdumpLauf("33538013", daten);
+    const Blattmodell& bl = l->m->druck().blatt(0);
+    const auto b = baender(bl);
+    ASSERT_GE(b.size(), 4u);
+    for (size_t k = 0; k < 4; ++k)
+        EXPECT_EQ(vergleicheHuelle(bl, erwartet3(r, hexText(daten.substr(32 * k, 32)), Schrift{Modus::Elite, false}), b[k].first, b[k].second), "") << "Zeile " << k;
+}

@@ -122,10 +122,10 @@ TEST(K6313Lang, ErreichtDieGrundstellungMitStapelUndVektortabelleBeiF000)
 }
 namespace {
 /// Selbsttest mit LINE FEED vor (Kennungszeile + Zeichenumlauf) bzw. zurueck (ohne Kennung) des Abzugs @p name gegen das Orakel.
-void selbsttest(const char* name, const std::string& kennung, bool mit_kennung)
+void selbsttest(const char* name, const std::string& kennung, bool mit_kennung, Typ typ = Typ::K6313_V24)
 {
     const auto& r = abzug(name);
-    Lauf l(konfig(name));
+    Lauf l(konfig(name), typ);
     l.st().setTaste(mit_kennung ? 2 : 3, true);   // LINE FEED vor / zurueck beim Netz-Ein gehalten (Matrix wie am 10-KiB-Abzug; dieselbe Firmwarefamilie)
     const uint64_t z = l.m->totalCycles() + 80'000'000;
     while (l.m->druck().kopf().anschlaege() == 0 && l.m->totalCycles() < z) l.m->run(2000);
@@ -164,6 +164,15 @@ TEST(K6313Lang, DerZweiteDeutscheAbzug30835207DrucktSelbsttestWieDerErste)
     // Liste: "nur 10k beschrieben" - Messung dagegen (Daten bis 3FFFH, Kennung 35230807 bei 3FF8H); er laeuft auf demselben Plan "lang"
     selbsttest("30835207", "30835207", true);
     selbsttest("30835207", "", false);
+}
+
+TEST(K6313Lang, SelbsttestAnDerIfssKassetteWieAmV24)
+{
+    // Der Selbsttest haengt nicht an der Schnittstelle (Tasten beim Netz-Ein, kein SIO-Zugriff): mit gesteckter IFSS-Kassette druckt er dasselbe Blatt
+    selbsttest("30835007", "30835007", true, Typ::K6313_Ifss);
+    selbsttest("30835007", "", false, Typ::K6313_Ifss);
+    selbsttest("33538013", "33538013", true, Typ::K6313_Ifss);
+    selbsttest("33538013", "", false, Typ::K6313_Ifss);
 }
 
 namespace {
