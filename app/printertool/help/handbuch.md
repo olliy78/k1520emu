@@ -50,7 +50,7 @@ Zum K6311 (Vorläufer des K6313) gibt es **keinen Schaltplan und kein Handbuch**
 
 Nicht nachgebildet bzw. nicht gegen ein Orakel geprüft: Centronics, Summer sowie die ESC-Folgen (Fettdruck, Unterstreichen, Schriftarten): sie lösen in der Firmware etwas aus, das Druckbild ist aber nicht belegt.
 
-**K6311 (IFSS):** der einzige IFSS-Abzug ist 13325212 (nur 8 KiB; der Emulator füllt den leeren fünften ROM-Sockel mit FFH auf, der Abzug liest dort nie).  Er benutzt den SIO-Kanal B mit festem Format (9600 Bd, 7 Bit, Parität ungerade, ein Stoppbit) und keine Steuerleitungen.  Text über IFSS druckt Punkt für Punkt wie der Zeichengenerator im ROM; nationale Zeichen (Ersatztabelle) und der Selbsttest sind für diesen Abzug nicht geprüft.
+**K6311 (IFSS):** der einzige IFSS-Abzug ist 13325212 (nur 8 KiB; der Emulator füllt den leeren fünften ROM-Sockel mit FFH auf, der Abzug liest dort nie).  Er benutzt den SIO-Kanal B mit festem Format (9600 Bd, 7 Bit, Parität ungerade, ein Stoppbit) und keine Steuerleitungen.  Text über IFSS druckt Punkt für Punkt wie der Zeichengenerator im ROM; nationale Zeichen (Ersatztabelle) sind für diesen Abzug nicht geprüft; der Selbsttest (Kennungszeile und Zeichenumlauf) stimmt Punkt für Punkt.
 
 ### K6313: Stand der Nachbildung
 

@@ -96,24 +96,33 @@ inline Punkte3 erwartet3(const std::vector<uint8_t>& rom, const std::string& tex
     return p;
 }
 
-/// Vergleich mit Hülle: die Lage eines Punkts ist auf ein Pixel genau (das Kopfmodell interpoliert zwischen den Motorschritten); ein erwarteter Punkt
+/// Vergleich mit Huelle: die Lage eines Punkts ist auf ein Pixel genau (das Kopfmodell interpoliert zwischen den Motorschritten); ein erwarteter Punkt
 /// belegt die Pixel [X+1, X+3) sicher und hoechstens [X-1, X+5) (Punktbreite 4).  Je Nadelzeile: sichere Pixel muessen gedruckt sein, Gedrucktes muss in der
 /// Huelle liegen.  Senkrecht gilt der Nadelabstand 3 exakt (Ursprung aus dem ersten Pixel).  Ursprung in x frei (+-6 Pixel um den Fund).
 /// Rueckgabe "" = gleich; @p ursprung_x liefert den besten Ursprung.
-inline std::string vergleicheHuelle(const Blattmodell& b, const Punkte3& exp, int ya, int yb, int* ursprung_x = nullptr)
+inline std::string vergleicheHuelleOy(const Blattmodell& b, const Punkte3& exp, int oy, int* ursprung_x = nullptr)
 {
     if (exp.empty()) return "leer";
-    int nmin = 99, nmax = 0, ex3 = 1 << 30;
-    for (auto& q : exp) { nmin = std::min(nmin, q.second); nmax = std::max(nmax, q.second); ex3 = std::min(ex3, q.first); }
-    const int oy = ya - NADEL * (nmin - 1);
-    if (yb - 1 != oy + NADEL * (nmax - 1) + 1) return "Hoehe: Band " + std::to_string(ya) + ".." + std::to_string(yb) + ", erwartet Nadeln " + std::to_string(nmin) + ".." + std::to_string(nmax);
-    // gedruckte Pixel je Nadelzeile (obere Pixelzeile des Punkts)
+    int ex3 = 1 << 30;
+    for (auto& q : exp) ex3 = std::min(ex3, q.first);
+    // gedruckte Pixel je Nadelzeile (obere Pixelzeile des Punkts), alle neun Nadeln; Zeilen zwischen den Nadeln (y mod 3 = 2) und ueber/unter der Zeile muessen leer sein
     int ax = 1 << 30;
     std::vector<std::set<int>> akt(10);
-    for (int n = nmin; n <= nmax; ++n)
+    for (int n = 1; n <= 9; ++n)
         for (int x = 0; x < b.breite(); ++x)
             if (b.punkt(x, oy + NADEL * (n - 1))) { akt[static_cast<size_t>(n)].insert(x); ax = std::min(ax, x); }
     if (ax == (1 << 30)) return "leer";
+    std::string rest;
+    for (int y = oy - 4; y < oy + NADEL * 8 + 8; ++y) {
+        if (y < 0 || y >= b.hoehe()) continue;
+        const int rel = y - oy;
+        const bool nadelzeile = rel >= 0 && rel % NADEL == 0 && rel / NADEL < 9;
+        const bool nadelzeile2 = rel >= 1 && (rel - 1) % NADEL == 0 && (rel - 1) / NADEL < 9;   // zweite Pixelzeile des Punkts (Punkthoehe 2)
+        if (nadelzeile || nadelzeile2) continue;
+        for (int x = 0; x < b.breite(); ++x) if (b.punkt(x, y)) { rest = "Pixel ausserhalb der Nadelzeilen bei (" + std::to_string(x) + "," + std::to_string(y) + ")"; break; }
+        if (!rest.empty()) break;
+    }
+    if (!rest.empty()) return rest;
     std::string beste;
     size_t beste_fehler = SIZE_MAX;
     int beste_ox = 0;
@@ -126,7 +135,7 @@ inline std::string vergleicheHuelle(const Blattmodell& b, const Punkte3& exp, in
         }
         size_t fehler = 0;
         std::string msg;
-        for (int n = nmin; n <= nmax; ++n) {
+        for (int n = 1; n <= 9; ++n) {
             int k = 0;
             for (int x : sicher[static_cast<size_t>(n)]) if (!akt[static_cast<size_t>(n)].count(x)) { ++fehler; if (k++ < 3) msg += " fehlt(x" + std::to_string(x - ox) + ",n" + std::to_string(n) + ")"; }
             k = 0;
@@ -136,6 +145,17 @@ inline std::string vergleicheHuelle(const Blattmodell& b, const Punkte3& exp, in
     }
     if (ursprung_x) *ursprung_x = beste_ox;
     return beste;
+}
+
+/// Wie @ref vergleicheHuelleOy mit dem Band [ya, yb) einer Zeile: Nadel 1 liegt bei ya - 3 * (kleinste erwartete Nadel - 1); die Hoehe des Bands muss zu den Nadeln passen.
+inline std::string vergleicheHuelle(const Blattmodell& b, const Punkte3& exp, int ya, int yb, int* ursprung_x = nullptr)
+{
+    if (exp.empty()) return "leer";
+    int nmin = 99, nmax = 0;
+    for (auto& q : exp) { nmin = std::min(nmin, q.second); nmax = std::max(nmax, q.second); }
+    const int oy = ya - NADEL * (nmin - 1);
+    if (yb - 1 != oy + NADEL * (nmax - 1) + 1) return "Hoehe: Band " + std::to_string(ya) + ".." + std::to_string(yb) + ", erwartet Nadeln " + std::to_string(nmin) + ".." + std::to_string(nmax);
+    return vergleicheHuelleOy(b, exp, oy, ursprung_x);
 }
 
 }  // namespace k6313test

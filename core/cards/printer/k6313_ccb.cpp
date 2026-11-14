@@ -234,6 +234,8 @@ void K6313Ccb::reset()
     cmt_beobachtet_ = false;
     cmtBeobachten();   // Kanal 2 steht nach dem Reset im Ruhezustand: D115 transparent
     nadeln_aktiv_ = 0;
+    summer_pegel_ = false;
+    summer_flanken_ = 0;
     g1_ = druck_.wagen().rueckmeldung().g1;
     sio_aus_[0].clear();
     sio_aus_[1].clear();
@@ -298,6 +300,11 @@ void K6313Ccb::ausgaengeAuswerten()
     if (neu) druck_.feuere(neu, true);
     const bool g1 = druck_.wagen().rueckmeldung().g1;
     if (g1 != g1_) g1_ = g1;
+    // Summer: D104 B6 als Ausgang (Betriebsart 3, Richtungsbit 0) - die Firmware toggelt ihn aus der Summer-ISR (siehe summerFlanken)
+    if (s104.port[1].mode == 3 && !(s104.port[1].dir & 0x40)) {
+        const bool pegel = (b104 & 0x40) != 0;
+        if (pegel != summer_pegel_) { summer_pegel_ = pegel; ++summer_flanken_; }
+    }
 }
 
 // Phasenregister D115 (DL175): /CM1...4 -> /CMA1...4 mit der steigenden Flanke von CMT = D101 ZC/TO2 [S:4].  Laeuft Kanal 2 als Zeitgeber

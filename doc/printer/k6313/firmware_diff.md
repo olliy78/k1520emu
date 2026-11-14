@@ -91,7 +91,7 @@ SIO/PIO-Kassette bei 10–1E, PIO D104 bei 20/22) ist in K6311 und K6313 gleich.
 * **K6313 10 KiB** `[E]` (Stand WP8a, überholt): **9-Byte-Zellen** (9×9-Raster, `[H]`: „7 × 9 Punkte + 2 × 9 für Unterlängen"), Daten im Bereich `2380H…26BFH` (z. B. 'A' = `E1 DF B7 7F F7 7F B7 DF E1`, invertiert wie im K6316,
   Bit 0 = Nadel schlägt an), danach FF-Lauf bis `27F7H`; **16-Byte-Ersatztabellen** je Land bei `2130H` (`#$@[\]^`{|}~()<>` für US) — K6311 bei `2220H`.  Index der Tabelle = DIL 8-1…9-2 (`(3884H)`).
   Das 16-Byte-Modell des K6316 passt **nicht**; das Zellenformat, die Spaltenreihenfolge und die Zeilenzuordnung sind nicht nachgebildet (`[?]`, Orakel nötig).
-* **K6313 16 KiB:** Lage des Generators nicht ermittelt (Tabelle `#$@[…` nicht als zusammenhängende Zeile auffindbar); die Nullfläche `25ACH…2A7DH` in `36539211` und das Fehlen der 10-KiB-Tabellenstruktur
+* **K6313 16 KiB (WP8h, ermittelt):** Zellen 12 Byte ab 2C90H + 12 * Code (Zweitsatz 3584H), siehe Merkposten drucker.md Nr. 37.  (Stand WP8a, überholt:) Lage des Generators nicht ermittelt (Tabelle `#$@[…` nicht als zusammenhängende Zeile auffindbar); die Nullfläche `25ACH…2A7DH` in `36539211` und das Fehlen der 10-KiB-Tabellenstruktur
   deuten auf eine andere Anordnung `[?]`.
 
 ## 6  K6311 (ohne Schaltplan — **alles `[?]`**, nur aus den fünf Abzügen erschlossen)

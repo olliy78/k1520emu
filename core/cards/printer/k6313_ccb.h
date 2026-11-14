@@ -221,6 +221,11 @@ public:
     int  matrixSpalte() const { return (pio105_.pinsA(0) >> 5) & 7; }
     const std::string& sioAusgabe(int kanal) const { return sio_aus_[kanal & 1]; }
     uint64_t baudTakte() const;
+    /// Summer (WP8h-e, nur K6313): die Firmware toggelt D104 B6 aus der ISR 058EH (CTC D102 Kanal 3, Zeitgeber 97H/80H = 2048 Takte je Flanke) fuer BEL (360 Flanken)
+    /// und Papierende (3600 Flanken = 3 s) [F: ROM 0554H-058EH, 33538013]; hier nur die Beobachtung - Pegel und Zahl der Flanken seit dem Netz-Ein.  Der Plan nennt
+    /// die Ansteuerleitung des Summers nicht [?] (hardware.md §6): dass B6 den Summer treibt, ist aus dem Firmwareablauf und den 3 s des Handbuchs geschlossen.
+    bool summerPegel() const { return summer_pegel_; }
+    uint64_t summerFlanken() const { return summer_flanken_; }
 
     /// Matrix: Schalter/Taste je (Waehlcode, Zeile).  >= 0: DIL-Index; -1 .. -4: Taste 1...4 (-nr); 0x7F: nicht belegt.
     /// Ablesung und Sicherheit je Zelle: siehe k6313_ccb.cpp.
@@ -264,6 +269,8 @@ private:
     bool home_ = false;              ///< K6311: Heimatsensor des Wagens (D104 B0)
     bool tor_offen_ = false;         ///< K6311: Nadelfreigabe (D105 A1 low)
     bool eingang_neu_ = false;
+    bool summer_pegel_ = false;
+    uint64_t summer_flanken_ = 0;
 
     bool iei_in_ = false;
     bool ieo_ = true;

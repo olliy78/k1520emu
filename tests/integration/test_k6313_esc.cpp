@@ -304,3 +304,80 @@ TEST(K6313Esc, EpsonHexdumpDrucktZweiunddreissigByteJeZeile)
     for (size_t k = 0; k < 4; ++k)
         EXPECT_EQ(vergleicheHuelle(bl, erwartet3(r, hexText(daten.substr(32 * k, 32)), Schrift{Modus::Elite, false}), b[k].first, b[k].second), "") << "Zeile " << k;
 }
+
+
+// ─── Summer und /PC-Freigabe (WP8h-d/e) ──────────────────────────────────────
+
+TEST(K6313Esc, SummerBelUndPapierendeAusDerFirmwareabfolge)
+{
+    // ROM 0554H: BEL = 360 Flanken, Papierende (0559H) = 3600 Flanken; die Summer-ISR 058EH toggelt D104 B6 je CTC-D102-Kanal-3-Ablauf (97H/80H: 16 * 128 = 2048 Takte).
+    // 3600 * 2048 Takte / 2,4576 MHz = 3,0 s - das "3 s lang" des Handbuchs (Papierende), 360 * 2048 = 0,3 s fuer BEL.
+    Lauf l(konfig("33538013"));
+    l.bereit();
+    EXPECT_EQ(l.st().summerFlanken(), 0u);
+    l.sende(1, "\x07");
+    const uint64_t t0 = l.m->totalCycles();
+    l.fahre(1'500'000);   // 0,61 s: BEL (0,3 s) ist vorbei
+    const uint64_t bel = l.st().summerFlanken();
+    EXPECT_NEAR(static_cast<double>(bel), 360.0, 4.0) << "Takte seit BEL: " << (l.m->totalCycles() - t0);
+    l.st().setPapierDa(false);
+    l.fahre(10'000'000);   // 4 s
+    const uint64_t pe = l.st().summerFlanken() - bel;
+    EXPECT_NEAR(static_cast<double>(pe), 3600.0, 40.0);
+    // BEL laesst sich ueber DIL 6-2 sperren ("Summer wirksam" OFF / "nicht wirksam" ON)
+    PrinterMachine::Config c = konfig("33538013");
+    c.k6313.dil |= 1u << K6313Ccb::dilIndex(6, 2);
+    Lauf s(c);
+    s.bereit();
+    s.sende(1, "\x07");
+    s.fahre(3'000'000);
+    EXPECT_EQ(s.st().summerFlanken(), 0u) << "DIL 6-2 ON: Summer nicht wirksam";
+}
+
+TEST(K6313Esc, DieNadelfreigabePcHatAmAltenUndAmNeuenRomEntgegengesetztePolaritaet)
+{
+    // D104 B2 (/PC) gibt am Plan die Nadelendstufen frei [S:4, ?]; die Firmware 33538013 schlaegt nur mit B2 = 1, 53538500 (neue Platine) nur mit B2 = 0.
+    // Der Emulator modelliert /PC nicht (Polaritaet je Platine unbekannt [?]); 53538500 schlaegt deshalb beim Netz-Ein zweimal an (Fremdpunkte, Merkposten Nr. 37 (d)).
+    struct F { const char* abzug; int freigabe; };
+    for (const F& f : {F{"33538013", 1}, F{"53538500", 0}}) {
+        Lauf l(konfig(f.abzug));
+        uint64_t z = 0, letzte = 0;
+        int mit = 0, ohne = 0;
+        bool gesendet = false;
+        while (z < 40'000'000) {
+            l.m->run(20);
+            z += 20;
+            const uint64_t a = l.m->druck().kopf().anschlaege();
+            if (a != letzte) {
+                letzte = a;
+                if (z > 1'000'000) (((l.st().portAusgabe(104, 1) >> 2) & 1) == f.freigabe ? mit : ohne)++;
+            }
+            if (z > 30'000'000 && !gesendet) { l.m->serialHub()->wandler(1).anbinden(); l.sende(1, "!!\r\n!!\r\n"); gesendet = true; }
+        }
+        EXPECT_GT(mit, 0) << f.abzug;
+        EXPECT_EQ(ohne, 0) << f.abzug << ": kein Nadelanschlag mit der anderen Stellung von /PC";
+    }
+}
+
+TEST(K6313Esc, NeuePlatine53538500DruckStimmtAbDerZweitenZeileMitDemOrakelUeberein)
+{
+    // Die erste Zeile nach dem Netz-Ein traegt Fremdpunkte (Nadelanschlaege beim Anlauf bei x ~ 1190, /PC nicht modelliert); die 94 Zeichenzeilen
+    // zu je zwei Zeichen (21H-5CH, 60 Zeilen) stimmen Punkt fuer Punkt (Huellenorakel, senkrecht exakt)
+    const auto r = rom(K6313_ABZUG_DIR, "53538500");
+    Lauf l(konfig("53538500"));
+    l.bereit();
+    std::string t;
+    for (int c = 0x21; c <= 0x5C; ++c) { t += static_cast<char>(c); t += static_cast<char>(c); t += "\r\n"; }   // 60 Zeilen: vor dem Formularvorschub bei 12 Zoll
+    l.sende(1, t);
+    l.fahre(300'000'000);
+    const Blattmodell& bl = l.m->druck().blatt(0);
+    const auto b = baender(bl);
+    EXPECT_GE(b.size(), 58u);
+    // Zeile k (0-basiert) liegt auf Papierlage 1 + 36 k (rand_oben_y 36): die Zeichen duerfen mehrere Baender bilden, deshalb feste Zeilenlage statt Baender
+    for (int k = 0; k < 60; ++k) {
+        const int c = 0x21 + k;
+        const std::string m = vergleicheHuelleOy(bl, erwartet3(r, std::string(2, static_cast<char>(c)), Schrift{}), 37 + 36 * k);
+        if (k == 0) EXPECT_NE(m, "") << "Zeile 0 traegt die Fremdpunkte des Anlaufs (Grenze, siehe Merkposten Nr. 37)";
+        else EXPECT_EQ(m, "") << "Zeichen " << c;
+    }
+}

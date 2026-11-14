@@ -129,7 +129,7 @@ eintraege:
     schnittstellen: [v24]
     zeichensatz: im ROM (EPSON, international/1715)
     guete: ok
-    hinweis: "Neue Platine, 10-KiB-Zuschnitt.  Achtung: das Druckbild stimmt (auch am V.24) nicht Punkt fuer Punkt mit dem Orakel des K6313 ueberein (Zeile 1 um eine Spalte versetzt), Ursache offen [?]."
+    hinweis: "Neue Platine, 10-KiB-Zuschnitt.  Alle Zeichen drucken Punkt fuer Punkt wie am alten Abzug ab der zweiten Zeile; die erste Zeile nach dem Netz-Ein traegt Fremdpunkte (die Firmware schlaegt beim Anlauf zweimal an, die Nadelfreigabe /PC ist nicht nachgebildet; die Polaritaet von /PC ist an der neuen Platine umgekehrt) [?]."
     vorgabe: false
     aliases: []
   # 16-KiB-Fassung "lang" (WP8h, Merkposten Nr. 37): ROM 0000H-3FFFH, RAM F000H-F7FFH, Stapel F800H; die Karte erkennt sie an der Dateilaenge (16384).

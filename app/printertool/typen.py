@@ -200,10 +200,11 @@ _K6313_BASIS = dict(
         Taste("t1", "ON/OFF LINE", "Taste ON/OFF LINE: schaltet zwischen ON LINE und OFF LINE um (LED ON LINE).  Zeile 4 der Tastenspalte [?]; "
               "ON/OFF LINE loescht LON (ROM 02B6H) [F].", "taster", 21),
         Taste("t2", "LF \u25B2", "Taste LINE FEED vorwaerts (gehalten: Dauervorschub).  Zeile 2 der Tastenspalte [?].  Beim Netz-Ein gehalten: "
-              "Testfunktion der Einschalttasten (Zuordnung der drei Tasten zu den Tests: [?]).", "taster", 22),
-        Taste("t3", "LF \u25BC", "Taste LINE FEED rueckwaerts (Zeile 1 der Tastenspalte [?]).  Beim Netz-Ein gehalten: Testfunktion.",
+              "Selbsttest mit Kennungszeile (LF vorwaerts beim Netz-Ein gehalten, am ROM belegt).  Zusammen mit FF beim Netz-Ein gehalten: "
+              "Hexdump (jedes empfangene Byte als Hexzahl, Handbuch 1.4.5).", "taster", 22),
+        Taste("t3", "LF \u25BC", "Taste LINE FEED rueckwaerts (Zeile 1 der Tastenspalte [?]).  Beim Netz-Ein gehalten: Selbsttest ohne Kennungszeile.",
               "taster", 23),
-        Taste("t4", "FF", "Taste FORM FEED (Zeile 3 der Tastenspalte [?]).  Beim Netz-Ein gehalten: Testfunktion.", "taster", 24),
+        Taste("t4", "FF", "Taste FORM FEED (Zeile 3 der Tastenspalte [?]).  Beim Netz-Ein zusammen mit LF vorwaerts gehalten: Hexdump.", "taster", 24),
         Taste("papier", "Papier da", "Endlospapier eingelegt.  Aus = Papierende (LED PE; Polaritaet des Papierendekontakts [?]).",
               "rastend", 3),
     ),
@@ -219,7 +220,8 @@ _K6313_BASIS = dict(
     dil_titel="DIL-Schalter 5-1 bis 18-2 (ON = geschlossen)",
     stand_hinweis="Hardware aus der Firmware erschlossen (Fassung kurz, V.24-Kassette): die Belegung der Tasten- und DIL-Matrix ist am ROM "
                   "abgelesen, nicht an einem Plan; mit [?] gekennzeichnete Angaben sind Annahmen.  Das Druckbild (Text ueber die Schnittstelle, "
-                  "Selbsttest) stimmt Punkt fuer Punkt mit dem Zeichengenerator im ROM ueberein.",
+                  "Selbsttest, Fett, Breit, Elite, komprimiert, Unterstreichen) stimmt Punkt fuer Punkt mit dem Zeichengenerator im ROM ueberein; Abzuege mit 16 KiB "
+                  "(30835007, 30835207) laufen im Speicherplan lang (RAM bei F000H).  Nicht belegt: Schraeg-, Hoch-/Tiefschrift, Doppeldruck.",
 )
 K6313 = Typbeschreibung(schluessel="k6313", titel="K6313 (V.24)", kern_maschine="k6313", schnittstelle_fest="v24", **_K6313_BASIS)
 #: IFSS-Kassette (WP8g, Merkposten Nr. 36): dieselbe Karte und dieselben Abzuege (Stromschleife-Etikett "CL"), die Daten laufen ueber SIO-Kanal A wie am
