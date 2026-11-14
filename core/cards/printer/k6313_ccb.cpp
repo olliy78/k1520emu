@@ -5,10 +5,11 @@
  */
 
 #include "core/cards/printer/k6313_ccb.h"
-#include "core/cards/printer/rom_k6311_12128062.h"
-#include "core/cards/printer/rom_k6313_33538013.h"
 #include "core/logger.h"
 #include "core/serial/sio_format.h"
+
+#include <stdexcept>
+#include <string>
 
 namespace {
 // E/A-Adressen: jeder Baustein an einer Adressleitung A2...A7 (hardware.md §2.2)
@@ -168,6 +169,10 @@ K6313Ccb::K6313Ccb(K1520Bus& bus, const Config& cfg)
     if (!cfg_.k6311 && cfg_.rom_extern.size() == ROM_ENDE_LANG) cfg_.lang = true;   // 16-KiB-Abzug: Speicherplan "lang"
     if (cfg_.lang && cfg_.rom_extern.size() != ROM_ENDE_LANG) cfg_.rom_extern.assign(ROM_ENDE_LANG, 0xFF);   // ohne Abzug nichts zu fahren (Aufrufer pruefen)
     if (cfg_.k6311 && cfg_.rom_extern.size() == ROM_ENDE_8K) cfg_.rom_extern.resize(ROM_ENDE, 0xFF);   // vier Chips: der fuenfte Sockel liest FFH [?]
+    // Das ROM kommt vom Aufrufer (PrinterMachine aus dem Katalog data/drucker_roms.yaml, WP9): kein eingebettetes Abbild mehr.
+    if (cfg_.rom_extern.size() != (cfg_.lang ? ROM_ENDE_LANG : ROM_ENDE))
+        throw std::invalid_argument("K6313/K6311: Config::rom_extern hat " + std::to_string(cfg_.rom_extern.size()) + " Bytes, erwartet " +
+                                    std::to_string(cfg_.lang ? ROM_ENDE_LANG : ROM_ENDE) + " (ROM-Satz aus dem Katalog)");
     pio104_.setModus3Flanke(true);
     pio105_.setModus3Flanke(true);
     // offene Eingangsbits lesen 0 (Zeilen der Tastenmatrix: Taste/Schalter legen die gewaehlte Spalte darauf, Firmware 02D0H: gedrueckt = 1)
@@ -426,7 +431,7 @@ uint8_t K6313Ccb::memRead(uint16_t a)
         if (a >= RAM_LANG_BASIS && a < RAM_LANG_BASIS + RAM_LANG_GROESSE) return ram_[a - RAM_LANG_BASIS];
         return 0xFF;
     }
-    if (a < ROM_ENDE) return !cfg_.rom_extern.empty() ? cfg_.rom_extern[a] : cfg_.k6311 ? K6311_ROM_12128062[a] : K6313_ROM_33538013[a];
+    if (a < ROM_ENDE) return cfg_.rom_extern[a];
     if (a >= RAM_BASIS && a < RAM_BASIS + RAM_GROESSE) return ram_[a - RAM_BASIS];
     if (a >= RAM2_BASIS && a < RAM2_BASIS + RAM_GROESSE) return ram_[RAM_GROESSE + (a - RAM2_BASIS)];
     return 0xFF;

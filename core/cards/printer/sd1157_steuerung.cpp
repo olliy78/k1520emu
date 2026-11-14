@@ -5,11 +5,12 @@
  */
 
 #include "core/cards/printer/sd1157_steuerung.h"
-#include "core/cards/printer/rom_sd1157.h"
-#include "core/cards/printer/rom_sd1157_repariert.h"
 #include "core/cards/printer/rom_sd1157_zg.h"
 #include "core/logger.h"
 #include "core/serial/sio_format.h"
+
+#include <stdexcept>
+#include <string>
 
 namespace {
 // E/A-Adressen, hardware.md §4
@@ -155,6 +156,10 @@ Sd1157Steuerung::Sd1157Steuerung(K1520Bus& bus, const Config& cfg)
     : bus_(bus), cfg_(cfg), online_(cfg.online), lpi6_(cfg.lpi6), kopf_dauernd_(cfg.kopf_dauernd),
       druck_(druckParameter(cfg), neuerWagen(cfg), cfg.papier)
 {
+    // Das ROM kommt vom Aufrufer (PrinterMachine aus dem Katalog data/drucker_roms.yaml, WP9): kein eingebettetes Abbild mehr.
+    if (cfg_.rom_extern.size() != ROM_ENDE)
+        throw std::invalid_argument("SD 1157: Config::rom_extern hat " + std::to_string(cfg_.rom_extern.size()) + " Bytes, erwartet " +
+                                    std::to_string(ROM_ENDE) + " (ROM-Satz aus dem Katalog)");
     // Modus-3-Interrupts der PIOs sind EREIGNISSE (U855 §6.4: Uebergang Nichterfuellung -> Erfuellung), kein Pegel.
     // Ohne das loest jede Pegelauffrischung (eingaengeSetzen) bei /LR = 0 erneut den Randinterrupt aus; er setzt
     // die Spaltenzaehler (kpz = 7, h' = 6) mitten im Auslauf und nach jedem Papiervorschub zurueck, und der
@@ -389,8 +394,7 @@ void Sd1157Steuerung::ioWrite(uint8_t port, uint8_t data)
 uint8_t Sd1157Steuerung::memRead(uint16_t a)
 {
     if (a < ROM_ENDE) {
-        if (!cfg_.rom_extern.empty()) return cfg_.rom_extern[a];
-        return cfg_.rom_repariert ? SD1157_ROM_REPARIERT[a] : SD1157_ROM[a];
+        return cfg_.rom_extern[a];
     }
     if (a < RAM1_BASIS) return 0xFF;                       // 2980H–2BFFH unbelegt [?] §14 Nr. 14
     if (a < ZG1_BASIS) return ram1_[a - RAM1_BASIS];

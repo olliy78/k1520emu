@@ -17,7 +17,7 @@
 #include <string>
 #include <vector>
 
-#include "core/cards/printer/rom_sd1157.h"
+#include "tests/support/drucker_rom.h"
 #include "core/cards/printer/rom_sd1157_zg.h"
 #include "core/cards/printer/sd1157_steuerung.h"
 
@@ -103,7 +103,12 @@ std::vector<uint8_t> dateiBytes(const std::string& name)
 struct Karte {
     K1520Bus bus;
     Sd1157Steuerung st;
-    explicit Karte(const Sd1157Steuerung::Config& cfg = {}) : st(bus, cfg) {
+    // Das ROM kommt aus dem Katalog (WP9): rom_repariert waehlt die Fassung, wenn die Config keinen Satz mitbringt.
+    static Sd1157Steuerung::Config mitRom(Sd1157Steuerung::Config c) {
+        if (c.rom_extern.empty()) c.rom_extern = k1520test::druckerRom("sd1157", c.rom_repariert ? "sd1157-repariert" : "sd1157-original");
+        return c;
+    }
+    explicit Karte(const Sd1157Steuerung::Config& cfg = {}) : st(bus, mitRom(cfg)) {
         st.attachToBus(bus);
         bus.setInterruptChain({&st});
         st.powerOn();
@@ -123,17 +128,18 @@ struct Karte {
 TEST(Sd1157Karte, RomAbbildHatDieMd5AusDemReadme)
 {
     ASSERT_FALSE(md5AusReadme("1157.rom").empty());
-    EXPECT_EQ(sizeof(SD1157_ROM), 10624u);   // 0000H–297FH
-    EXPECT_EQ(md5Hex(SD1157_ROM, sizeof(SD1157_ROM)), md5AusReadme("1157.rom"));
+    const auto rom = k1520test::druckerRom("sd1157", "sd1157-original");
+    EXPECT_EQ(rom.size(), 10624u);   // 0000H–297FH
+    EXPECT_EQ(md5Hex(rom.data(), rom.size()), md5AusReadme("1157.rom"));
     EXPECT_EQ(sizeof(SD1157_ZG1), 1024u);
     EXPECT_EQ(md5Hex(SD1157_ZG1, sizeof(SD1157_ZG1)), md5AusReadme("1157zg.rom"));
 }
 
-TEST(Sd1157Karte, EingebettetesAbbildIstDieDateiUnveraendert)
+TEST(Sd1157Karte, KatalogAbbildIstDieDateiUnveraendertUndDerZeichengeneratorEingebettet)
 {
     const auto rom = dateiBytes("1157.rom");
-    ASSERT_EQ(rom.size(), sizeof(SD1157_ROM));
-    EXPECT_TRUE(std::equal(rom.begin(), rom.end(), SD1157_ROM));
+    ASSERT_EQ(rom.size(), 10624u);
+    EXPECT_EQ(rom, k1520test::druckerRom("sd1157", "sd1157-original"));
     const auto zg = dateiBytes("1157zg.rom");
     ASSERT_EQ(zg.size(), sizeof(SD1157_ZG1));
     EXPECT_TRUE(std::equal(zg.begin(), zg.end(), SD1157_ZG1));
@@ -164,9 +170,10 @@ TEST(Sd1157Karte, DieVorgabeIstDerRepariertAbzugUnterscheidetSichNurInByte0D34H)
 TEST(Sd1157Karte, RomLiegtAuf0000BisFFFFH297FUndIstNichtBeschreibbar)
 {
     Karte k;
-    EXPECT_EQ(k.rd(0x0000), SD1157_ROM[0]);          // IM 2 / LD A,2CH (sy00)
+    const auto rom = k1520test::druckerRom("sd1157");
+    EXPECT_EQ(k.rd(0x0000), rom[0]);                 // IM 2 / LD A,2CH (sy00)
     EXPECT_EQ(k.rd(0x0000), 0xED);                   // IM 2 = ED 5E
-    EXPECT_EQ(k.rd(0x297F), SD1157_ROM[0x297F]);
+    EXPECT_EQ(k.rd(0x297F), rom[0x297F]);
     EXPECT_EQ(k.rd(0x0066), 0xC3);                   // NMI-Vektor: JP 0433H
     const uint8_t alt = k.rd(0x0100);
     k.wr(0x0100, static_cast<uint8_t>(alt ^ 0xFF));

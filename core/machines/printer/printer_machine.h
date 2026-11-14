@@ -22,6 +22,7 @@
 #include "core/cards/printer/k6316_steuerung.h"
 #include "core/cards/printer/sd1157_steuerung.h"
 #include "core/machines/machine.h"
+#include "core/machines/printer/drucker_rom_katalog.h"
 #include "core/serial/hub.h"
 #include <atomic>
 #include <functional>
@@ -52,6 +53,8 @@ public:
     ~PrinterMachine() override;
 
     static const char* typName(Config::Typ t);
+    /// Typschluessel im ROM-Katalog (`data/drucker_roms.yaml`): sd1157 | k6316-ifss | k6316-v24 | k6313 | k6311 | k6313-ifss | k6311-ifss.
+    static const char* katalogTyp(Config::Typ t);
 
     // ─── Lebenslauf ──────────────────────────────────────────────────────────
     void powerOn() override;

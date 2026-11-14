@@ -404,11 +404,13 @@ K1520Handle k1520_create_printer(int typ, const char* konfig) {
             return nullptr;
     }
     // Schluessel=Wert-Liste wie beim MC80.  SD 1157: `schnittstelle`, `rom`.  K6316: `betriebsart`, `dil`
-    // (das Schnittstellenmodul folgt dem Typ, es gibt kein ROM zu waehlen).
-    const bool k6311 = typ == 4 || typ == 6;          // K6311 (WP8e, Hardware nur aus dem ROM erschlossen [?]): `schalter_baud`, `schalter_format`, `romdatei`
-    const bool k6313 = typ == 3 || typ == 5 || k6311;  // K6313 (WP8c): Schluessel `dil` (28 Schalter), `romdatei`; der K6311 nutzt dieselbe Karte
+    // (das Schnittstellenmodul folgt dem Typ).  `rom=<Schluessel|Alias>` fuer alle Typen aus dem ROM-Katalog.
+    const bool k6311 = typ == 4 || typ == 6;          // K6311 (WP8e, Hardware nur aus dem ROM erschlossen [?]): `schalter_baud`, `schalter_format`, `rom`
+    const bool k6313 = typ == 3 || typ == 5 || k6311;  // K6313 (WP8c): Schluessel `dil` (28 Schalter), `rom`; der K6311 nutzt dieselbe Karte
     const bool k6316 = typ == 1 || typ == 2;
     const std::string text = konfig ? konfig : "";
+    std::string romWahl;
+    bool romGesetzt = false;
     size_t pos = 0;
     while (pos < text.size()) {
         size_t ende = text.find(',', pos);
@@ -423,35 +425,11 @@ K1520Handle k1520_create_printer(int typ, const char* konfig) {
         if (sd1157 && key == "schnittstelle" && (val == "ifss" || val == "v24")) {
             cfg.sd1157.schnittstelle = val == "v24" ? Sd1157Steuerung::Config::Schnittstelle::V24
                                                     : Sd1157Steuerung::Config::Schnittstelle::Ifss;
-        } else if (sd1157 && key == "rom" && (val == "original" || val == "repariert")) {
-            cfg.sd1157.rom_repariert = val == "repariert";
-        } else if (sd1157 && key == "rom") {
-            g_init_error = "Drucker: rom = " + val + " unbekannt (original | repariert)";
-            return nullptr;
-        } else if (key == "romdatei") {
-            // ROM-Satz aus einer Datei (Entwurf 49 §11.2; der Katalog gehoert in die Oberflaeche, der Kern kennt nur den Pfad).
-            // Genau die Laenge des Speicherplans; der Pfad darf kein Komma enthalten (Trenner der Liste).
-            const size_t soll = k6313 ? static_cast<size_t>(K6313Ccb::ROM_ENDE)
-                              : k6316 ? static_cast<size_t>(K6316Steuerung::ROM_ENDE)
-                                      : static_cast<size_t>(Sd1157Steuerung::ROM_ENDE);
-            std::ifstream f(std::filesystem::u8path(val), std::ios::binary);
-            std::vector<uint8_t> daten((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-            if (!f && !f.eof()) daten.clear();
-            if (daten.empty()) {
-                g_init_error = "Drucker: romdatei '" + val + "' nicht lesbar oder leer";
-                return nullptr;
-            }
-            if (k6313 && !k6311 && daten.size() == static_cast<size_t>(K6313Ccb::ROM_ENDE_LANG)) {
-                // 16 KiB (ein 27128, WP8h): Speicherplan "lang" (ROM 0000H-3FFFH, RAM F000H), die Karte erkennt ihn an der Laenge
-            } else if (k6311 && daten.size() == static_cast<size_t>(K6313Ccb::ROM_ENDE_8K)) {
-                // vier Chips zu 2 KiB (13120012, 13325212): die Karte fuellt den fuenften Sockel mit FFH auf (WP8g)
-            } else if (daten.size() != soll) {
-                g_init_error = "Drucker: romdatei '" + val + "' hat " + std::to_string(daten.size()) + " Bytes, erwartet " +
-                               std::to_string(soll) + ((k6316 || k6313) ? (k6311 ? " (fuenf Chips zu 2 KiB lueckenlos, 0000H-27FFH; K6311 auch 8192 = vier Chips)" : " (fuenf Chips zu 2 KiB lueckenlos, 0000H-27FFH; K6313 auch 16384 = ein 27128)")
-                                                              : " (0000H-297FH)");
-                return nullptr;
-            }
-            (k6313 ? cfg.k6313.rom_extern : k6316 ? cfg.k6316.rom_extern : cfg.sd1157.rom_extern) = std::move(daten);
+        } else if (key == "rom") {
+            // ROM-Satz aus dem Katalog data/drucker_roms.yaml (WP9, Entwurf 49 §12): Schluessel oder Alias des Typs.
+            // Ohne `rom=` nimmt PrinterMachine die Vorgabe des Typs.  Laengen/Aufteilung je Typ prueft schon der Leser des Katalogs.
+            romWahl = val;
+            romGesetzt = true;
         } else if (sd1157 && key == "schnittstelle") {
             g_init_error = "Drucker: schnittstelle = " + val + " unbekannt (ifss | v24)";
             return nullptr;
@@ -491,11 +469,25 @@ K1520Handle k1520_create_printer(int typ, const char* konfig) {
             }
         } else {
             g_init_error = "Drucker: unbekannter Schluessel '" + key + "'" +
-                           (k6311 ? " fuer den K6311 (schalter_baud | schalter_format | romdatei)"
-                            : k6313 ? " fuer den K6313 (dil | romdatei)"
-                            : k6316 ? " fuer den K6316 (betriebsart | dil | romdatei)" : " fuer den SD 1157 (schnittstelle | rom | romdatei)");
+                           (k6311 ? " fuer den K6311 (schalter_baud | schalter_format | rom)"
+                            : k6313 ? " fuer den K6313 (dil | rom)"
+                            : k6316 ? " fuer den K6316 (betriebsart | dil | rom)" : " fuer den SD 1157 (schnittstelle | rom)") +
+                           (key == "romdatei" ? "; romdatei= entfaellt, rom=<Schluessel> aus data/drucker_roms.yaml waehlen" : "");
             return nullptr;
         }
+    }
+    if (romGesetzt) {
+        const auto kat = DruckerRomKatalog::gemeinsam();
+        if (!kat->ok()) { g_init_error = kat->fehler(); return nullptr; }
+        const std::string ktyp = PrinterMachine::katalogTyp(cfg.typ);
+        const DruckerRomEintrag* e = kat->finde(ktyp, romWahl);
+        if (!e || !e->daten) {
+            std::string erlaubt;
+            for (const auto* x : kat->fuerTyp(ktyp)) erlaubt += (erlaubt.empty() ? "" : " | ") + x->schluessel;
+            g_init_error = "Drucker: rom = " + romWahl + " unbekannt fuer Typ " + ktyp + " (" + erlaubt + ")";
+            return nullptr;
+        }
+        (k6313 ? cfg.k6313.rom_extern : k6316 ? cfg.k6316.rom_extern : cfg.sd1157.rom_extern) = *e->daten;
     }
     setup_logging();
     try {

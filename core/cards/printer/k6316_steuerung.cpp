@@ -5,10 +5,11 @@
  */
 
 #include "core/cards/printer/k6316_steuerung.h"
-#include "core/cards/printer/rom_k6316_ifss.h"
-#include "core/cards/printer/rom_k6316_v24.h"
 #include "core/logger.h"
 #include "core/serial/sio_format.h"
+
+#include <stdexcept>
+#include <string>
 
 namespace {
 // E/A-Adressen (Decoder D8, hardware.md §2)
@@ -143,6 +144,10 @@ K6316Steuerung::K6316Steuerung(K1520Bus& bus, const Config& cfg)
       pe_(!cfg.papier_da), dil_(cfg.dil),
       druck_(druckParameter(cfg), std::make_unique<SchrittWagen>(cfg.wagen), cfg.papier), vorsteck_(cfg.papier), beleg_(cfg.beleg)
 {
+    // Das ROM kommt vom Aufrufer (PrinterMachine aus dem Katalog data/drucker_roms.yaml, WP9): kein eingebettetes Abbild mehr.
+    if (cfg_.rom_extern.size() != ROM_ENDE)
+        throw std::invalid_argument("K6316: Config::rom_extern hat " + std::to_string(cfg_.rom_extern.size()) + " Bytes, erwartet " +
+                                    std::to_string(ROM_ENDE) + " (ROM-Satz aus dem Katalog)");
     // Modus-3-Interrupts der PIOs sind Ereignisse (wie am SD 1157, merkposten/drucker.md Nr. 5)
     pio11_.setModus3Flanke(true);
     pio12_.setModus3Flanke(true);
@@ -428,8 +433,7 @@ void K6316Steuerung::ioWrite(uint8_t port, uint8_t data)
 uint8_t K6316Steuerung::memRead(uint16_t a)
 {
     if (a < ROM_ENDE) {
-        if (!cfg_.rom_extern.empty()) return cfg_.rom_extern[a];
-        return cfg_.schnittstelle == Config::Schnittstelle::V24 ? K6316_ROM_V24[a] : K6316_ROM_IFSS[a];
+        return cfg_.rom_extern[a];
     }
     if (a >= RAM_BASIS && a < RAM_BASIS + RAM_GROESSE) return ram_[a - RAM_BASIS];
     return 0xFF;

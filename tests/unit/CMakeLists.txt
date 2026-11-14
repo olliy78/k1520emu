@@ -71,11 +71,11 @@ k1520_add_test(mc80_asp SRC cards/test_mc80_asp.cpp LIBS k1520_mc80_karten LABEL
 k1520_add_test(mc80_dpl SRC cards/test_mc80_dpl.cpp LIBS k1520_mc80_2x_karten LABELS "${_lbl}")
 k1520_add_test(mc80_mbi SRC cards/test_mc80_mbi.cpp LIBS k1520_mc80_2x_karten LABELS "${_lbl}")
 # SD 1157 (Entwurf 49, WP1): Steuerung des Seriendruckers — Speicherkarte, ROM-MD5, E/A-Tore, Wagen-Platzhalter, Kette
-k1520_add_test(sd1157_steuerung SRC cards/test_sd1157_steuerung.cpp LIBS k1520_printer_karten
+k1520_add_test(sd1157_steuerung SRC cards/test_sd1157_steuerung.cpp LIBS k1520_printer_karten k1520_printer_roms
                LABELS "${_lbl};fach_drucker"
                DEFS "SD1157_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/SD1157\"")
 # K6313 (Entwurf 49, WP8c): CCB — Speicherplan kurz, E/A eine Leitung tief, Tastenmatrix/DIL (Waehlcode x Zeile), Sensoren
-k1520_add_test(k6313_ccb SRC cards/test_k6313_ccb.cpp LIBS k1520_printer_karten
+k1520_add_test(k6313_ccb SRC cards/test_k6313_ccb.cpp LIBS k1520_printer_karten k1520_printer_roms
                LABELS "${_lbl};fach_drucker"
                DEFS "K6313_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/K6313\"")
 # Drucker-ROM-Katalog (Entwurf 49 §12, WP9): data/drucker_roms.yaml (Metadaten + Intel-HEX), Leser, Schema, Pruefsummen, Negativtests

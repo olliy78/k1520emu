@@ -14,7 +14,7 @@
 #include <vector>
 
 #include "core/cards/printer/k6313_ccb.h"
-#include "core/cards/printer/rom_k6313_33538013.h"
+#include "tests/support/drucker_rom.h"
 
 #ifndef K6313_ABZUG_DIR
 #error "K6313_ABZUG_DIR fehlt (tests/unit/CMakeLists.txt)"
@@ -25,7 +25,12 @@ namespace {
 struct Karte {
     K1520Bus bus;
     K6313Ccb ccb;
-    explicit Karte(const K6313Ccb::Config& c = {}) : ccb(bus, c)
+    static K6313Ccb::Config mitRom(K6313Ccb::Config c)
+    {
+        if (c.rom_extern.empty()) c.rom_extern = k1520test::druckerRom("k6313");   // Vorgabe 33538013 (WP9: aus dem Katalog)
+        return c;
+    }
+    explicit Karte(const K6313Ccb::Config& c = {}) : ccb(bus, mitRom(c))
     {
         ccb.attachToBus(bus);
         ccb.powerOn();
@@ -51,12 +56,11 @@ std::vector<uint8_t> lies(const std::string& pfad)
 
 }  // namespace
 
-TEST(K6313Ccb, EingebettetesRomIstDerAbzug33538013)
+TEST(K6313Ccb, KatalogVorgabeIstDerAbzug33538013)
 {
     const auto r = lies(std::string(K6313_ABZUG_DIR) + "/33538013.bin");
     ASSERT_EQ(r.size(), 10240u);
-    ASSERT_EQ(sizeof K6313_ROM_33538013, r.size());
-    for (size_t i = 0; i < r.size(); ++i) ASSERT_EQ(K6313_ROM_33538013[i], r[i]) << i;
+    ASSERT_EQ(k1520test::druckerRom("k6313"), r);
     // ASCII-Kennung F ZS x nn PS am ROM-Ende: 3.35-3-80/13 -> "38033513" (README, Abschnitt Etikett und Kennung)
     EXPECT_EQ(std::string(r.begin() + 0x27F8, r.begin() + 0x2800), "38033513");
 }
@@ -64,7 +68,8 @@ TEST(K6313Ccb, EingebettetesRomIstDerAbzug33538013)
 TEST(K6313Ccb, SpeicherplanKurzRom0000Ram3000Und3800)
 {
     Karte k;
-    for (int a = 0; a < 0x2800; a += 0x1F) EXPECT_EQ(k.bus.memRead(static_cast<uint16_t>(a)), K6313_ROM_33538013[a]) << a;
+    const auto rom = k1520test::druckerRom("k6313");
+    for (int a = 0; a < 0x2800; a += 0x1F) EXPECT_EQ(k.bus.memRead(static_cast<uint16_t>(a)), rom[a]) << a;
     EXPECT_EQ(k.bus.memRead(0x2800), 0xFF);   // unbelegt
     EXPECT_EQ(k.bus.memRead(0x37FF), 0xFF);
     k.bus.memWrite(0x3800, 0xA5);
@@ -82,7 +87,7 @@ TEST(K6313Ccb, SpeicherplanKurzRom0000Ram3000Und3800)
     EXPECT_EQ(k.bus.memRead(0x3400), 0xFF);
     EXPECT_EQ(k.bus.memRead(0x2FFF), 0xFF);
     k.bus.memWrite(0x0100, 0x00);
-    EXPECT_EQ(k.bus.memRead(0x0100), K6313_ROM_33538013[0x100]) << "ROM ist nicht beschreibbar";
+    EXPECT_EQ(k.bus.memRead(0x0100), rom[0x100]) << "ROM ist nicht beschreibbar";
 }
 
 TEST(K6313Ccb, RomAusDateiHatVorrang)

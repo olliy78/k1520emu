@@ -77,8 +77,9 @@ public:
     static constexpr int dilIndex(int paar, int n) { return (paar - 5) * 2 + (n - 1); }
 
     struct Config {
-        /// ROM-Satz aus einer Datei (`romdatei=`): genau `ROM_ENDE` Bytes (K6311: auch `ROM_ENDE_8K`, der Rest liest FFH - leere fuenfte Fassung,
-        /// der IFSS-Abzug 13325212 greift nie darauf zu).  Leer = eingebettetes 33538013.
+        /// ROM-Satz (WP9, Entwurf 49 §12) aus dem Katalog `data/drucker_roms.yaml`: genau `ROM_ENDE` Bytes (K6311: auch `ROM_ENDE_8K`, der Rest
+        /// liest FFH - leere fuenfte Fassung, der IFSS-Abzug 13325212 greift nie darauf zu; K6313: auch 16 KiB = Plan "lang").  Kein eingebettetes
+        /// Abbild mehr: die Karte wirft bei falscher Laenge; `PrinterMachine` fuellt ein leeres Feld aus der Vorgabe des Typs.
         std::vector<uint8_t> rom_extern;
         /// DIL-Schalter (siehe @ref dilIndex).  Vorgabe: 5-2 ON und 13-2 ON — ohne 5-2 verlaesst die Firmware beim Einschalten den
         /// Normalpfad (Lesen 018CH: Spalte 3, Zeilen 2/3 muessen 1/0 sein, [F]); 13-2 ON = EPSON-Steuercodes (`ESC`), Beispiel des

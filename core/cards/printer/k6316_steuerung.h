@@ -60,8 +60,8 @@ public:
     struct Config {
         enum class Schnittstelle { Ifss, V24 };
         Schnittstelle schnittstelle = Schnittstelle::Ifss;   ///< Modul = Firmwaresatz = SIO-Kanal
-        /// ROM-Satz aus einer Datei (`romdatei=`, Entwurf 49 §11.2): die fuenf Chips lueckenlos, genau `ROM_ENDE` Bytes.
-        /// Leer = eingebetteter Satz je `schnittstelle`; nicht leer hat Vorrang.
+        /// ROM-Satz (WP9, Entwurf 49 §12): die fuenf Chips lueckenlos, genau `ROM_ENDE` Bytes, aus dem Katalog `data/drucker_roms.yaml`.
+        /// Kein eingebettetes Abbild mehr (die Karte wirft bei falscher Laenge); `PrinterMachine` fuellt ein leeres Feld je `schnittstelle`.
         std::vector<uint8_t> rom_extern;
         /// DIL-Schalter S11–S26: Bit i = S(11+i) geschlossen (Ein).  Auslieferungszustand: alle Aus (Handbuch 5.8.2:
         /// „Aus entspricht Nichtbestueckung des Schalterblocks“).

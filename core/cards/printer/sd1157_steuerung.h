@@ -65,11 +65,12 @@ public:
     /// DIP-Schalter, Steckbruecken, Tasten-Ruhelage: Aufbau des Geraets zur Bauzeit (§4.1, §5.4).
     struct Config {
         enum class Schnittstelle { Ifss, V24 };
-        /// ROM-Abzug: der Original-Abzug (`1157.rom`) leert den SIO-Eingabepuffer nie (Byte 0D34H = 2BH statt 0BH, [?] Bitkipp,
-        /// doc/EPROMS/SD1157/README.md); `true` = `1157_repariert.rom` (nur 0D34H = 0BH), Vorgabe.
+        /// Auswahl der ROM-Fassung, wenn `rom_extern` leer ist: der Original-Abzug (`1157.rom`) leert den SIO-Eingabepuffer nie
+        /// (Byte 0D34H = 2BH statt 0BH, [?] Bitkipp, doc/EPROMS/SD1157/README.md); `true` = `1157_repariert.rom` (nur 0D34H = 0BH),
+        /// Vorgabe.  Die Karte selbst liest nur `rom_extern`; `PrinterMachine` holt den Satz aus dem Katalog (`sd1157-repariert|-original`).
         bool rom_repariert = true;
-        /// ROM-Satz aus einer Datei (Konfigurationsschluessel `romdatei=`, Entwurf 49 §11.2): genau `ROM_ENDE` Bytes ab 0000H.
-        /// Leer = das eingebettete Abbild (`rom_repariert`); nicht leer hat Vorrang.  Die Laenge prueft der Aufrufer (C-ABI).
+        /// ROM-Satz (WP9, Entwurf 49 §12): genau `ROM_ENDE` Bytes ab 0000H, aus dem Katalog `data/drucker_roms.yaml`.  Die Karte hat
+        /// kein eingebettetes Abbild mehr und wirft bei falscher Laenge; `PrinterMachine` fuellt ihn bei leerem Feld aus der Vorgabe.
         std::vector<uint8_t> rom_extern;
         Schnittstelle schnittstelle = Schnittstelle::Ifss;   ///< 3A.0: 0 = IFSS (SIO B), 1 = V.24 (SIO A) §5.4
         // PIO 3 A, Schalter des V.24-Betriebs (§5.4); Vorgaben [?]
