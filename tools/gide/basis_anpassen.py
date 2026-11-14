@@ -8,7 +8,7 @@ Die Gast-Software der Zusatzkarten (tools/gide/README.md) hat die Portadresse fe
 Die Karten selbst haben eine frei einstellbare Basis (Jumper); dieses Werkzeug schreibt die
 Port-Operanden der .COM-Dateien um, damit die Software zur gesteckten Karte passt.
 
-  usb  BASIS   UTools (USB, UDIR, UGET, UPUT)      Original DCh..DFh; BASIS = Vielfaches von 4
+  usb  BASIS   UTools 1.8 (USB, UDIR, UGET, UPUT, URUN, UBACKUP, URESTORE)   Original D0h..D3h; BASIS = Vielfaches von 4
   net  BASIS   KCNet (CPMN1587, TFTP1287)          Original C0h..C3h; BASIS = Vielfaches von 4
   gidn BASIS   Kingstener-Treiber (GIDN)           Original 50h;      BASIS = Vielfaches von 10h
 
@@ -24,8 +24,8 @@ Die Stellen sind aus den Binaerdateien belegt, nicht geraten:
     (Hochnibble); mit GIDE EQU 90h uebersetzt entsteht byteweise dasselbe wie das Umschreiben hier.
   * net: Treiberblock 0109..028E, in CPMN1587 und TFTP1287 byteidentisch (doc/design/50a_kcnet_protokoll.md §0);
     ausser den Operanden unten kommt in der ganzen Datei kein Zugriff auf C0h..C3h vor (disassembliert).
-  * usb: die E/A-Zugriffe stehen im gemeinsamen Teil (USBINC.Z80), in allen vier Programmen an denselben
-    16 Stellen.
+  * usb: UTools 1.8 tragen die PIO-Basis als EIN Byte im Konfigurationsblock am Programmanfang (0188H, umgeben von
+    50H und 01H; alle Zugriffe rechnen daraus).  Nachweis: am Emulator auf 84H und 8CH gelaufen (KartenBeigaben.*).
 Eine Datei, die an diesen Stellen nicht das erwartete Original traegt, wird abgelehnt.
 """
 import argparse
@@ -35,14 +35,20 @@ import sys
 HIER = os.path.dirname(os.path.abspath(__file__))
 FREMD = os.path.join(HIER, 'fremd')
 
-# Stellen = Dateiversatz des OPERANDEN; Zahl = Abstand zur Originalbasis
-USB_STELLEN = {137: 3, 141: 3, 145: 3, 149: 1, 153: 2, 157: 2, 159: 0, 300: 1, 320: 1, 363: 1, 365: 0, 370: 1,
+# UTools 1.8: Konfigurationsblock 0186H..0189H = 00 50 <Basis> 01 (Dateiversatz = Adresse - 100H)
+USB_BASIS_VERSATZ = 0x88
+USB_DATEIEN = ('usb.com', 'udir.com', 'uget.com', 'uput.com', 'urun.com', 'ubackup.com', 'urestore.com')
+USB_ORIGINAL = 0xD0
+
+# UTools 1.4 (alte Fassung, nur noch fuer den PC 1715W: UTools 1.8 bleiben dort stumm): 16 Port-Operanden, Original DCh
+USB14_STELLEN = {137: 3, 141: 3, 145: 3, 149: 1, 153: 2, 157: 2, 159: 0, 300: 1, 320: 1, 363: 1, 365: 0, 370: 1,
                376: 0, 379: 1, 387: 1, 391: 1}
-USB_DATEIEN = ('usb.com', 'udir.com', 'uget.com', 'uput.com')
-USB_ORIGINAL = 0xDC
+USB14_DATEIEN = ('usb.com', 'udir.com', 'uget.com', 'uput.com')
+USB14_ORIGINAL = 0xDC
 # Opcode vor dem Operanden: IN A,(n) = DBh, OUT (n),A = D3h
-USB_OPCODES = {137: 0xD3, 141: 0xD3, 145: 0xD3, 149: 0xD3, 153: 0xD3, 157: 0xD3, 159: 0xDB, 300: 0xDB, 320: 0xDB,
+USB14_OPCODES = {137: 0xD3, 141: 0xD3, 145: 0xD3, 149: 0xD3, 153: 0xD3, 157: 0xD3, 159: 0xDB, 300: 0xDB, 320: 0xDB,
                363: 0xD3, 365: 0xDB, 370: 0xD3, 376: 0xD3, 379: 0xDB, 387: 0xD3, 391: 0xD3}
+
 
 # Ladeadresse 0100H -> Dateiversatz = Adresse - 100H.  Operandadressen: 10B 11A 11C 14D 14F 155 15A 1F0 1F7 202
 NET_STELLEN = {0x10B - 0x100 + 0: 2, 0x11A - 0x100: 0, 0x11C - 0x100: 1, 0x14D - 0x100: 0, 0x14F - 0x100: 1,
@@ -85,8 +91,16 @@ def _umschreiben(daten, stellen, opcodes, original, basis, modulo, name):
 
 
 def usb(daten, basis, name='USB'):
-    """UTools-Programm @p daten (Original DCh) auf @p basis umschreiben."""
-    return _umschreiben(daten, USB_STELLEN, USB_OPCODES, USB_ORIGINAL, basis, 4, name)
+    """UTools-1.8-Programm @p daten (Original D0h) auf @p basis umschreiben (ein Byte im Konfigurationsblock)."""
+    if basis % 4 or not 0 <= basis <= 0xFC:
+        raise Fehler(f'Basis {basis:02X}h muss ein Vielfaches von 4 unter 100h sein')
+    o = USB_BASIS_VERSATZ
+    if len(daten) <= o + 1 or daten[o - 1] != 0x50 or daten[o] != USB_ORIGINAL or daten[o + 1] != 0x01:
+        raise Fehler(f'{name}: im Konfigurationsblock (Versatz {o:#x}) steht nicht das erwartete Original '
+                     f'(50h D0h 01h) - falsche Datei?')
+    out = bytearray(daten)
+    out[o] = basis
+    return bytes(out)
 
 
 def net(daten, basis, name='KCNet'):
@@ -111,8 +125,18 @@ def _lies(*teile):
         return f.read()
 
 
+def usb14(daten, basis, name='USB'):
+    """UTools-1.4-Programm @p daten (Original DCh) auf @p basis umschreiben (nur PC 1715W)."""
+    return _umschreiben(daten, USB14_STELLEN, USB14_OPCODES, USB14_ORIGINAL, basis, 4, name)
+
+
+def usb14_satz(basis):
+    """{DateiName: Bytes} der vier UTools 1.4 fuer @p basis."""
+    return {n.upper(): usb14(_lies(FREMD, 'utools14', n), basis, n) for n in USB14_DATEIEN}
+
+
 def usb_satz(basis):
-    """{DateiName: Bytes} der vier UTools fuer @p basis (Namen GROSS, wie auf der Diskette)."""
+    """{DateiName: Bytes} der sieben UTools fuer @p basis (Namen GROSS, wie auf der Diskette)."""
     return {n.upper(): usb(_lies(FREMD, 'utools', n), basis, n) for n in USB_DATEIEN}
 
 

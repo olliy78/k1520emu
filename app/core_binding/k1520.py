@@ -1033,7 +1033,7 @@ A5120_AUSFUEHRUNG_MASCHINE = {"a5120-alt": "alt", "a5120-kmbg": "kmbg"}
 # Lade-ROM und Tastatur des A5120 fuer k1520_create_a5120_konfig (doc/a5120_alt/bcu.md, Modell
 # „BCU 880“): "v06" liest Zylinder 1 (BCU-Disketten „SYL auf Spur 1“).  "vorgabe" = die Tastatur
 # der Ausfuehrung (neu: K7637, alt/kmbg: K7636).
-A5120_LADEROME = {"v09_2": 0, "v09_1": 1, "v06": 2}
+A5120_LADEROME = {"v09_2": 0, "v09_1": 1, "v06": 2, "ul4": 3}
 A5120_TASTATUREN = {"vorgabe": 0, "k7637": 1, "k7636": 2}
 # Einzeloptionen des A5120 fuer K1520Emulator(konfig={...}) (Entwurf 33 N4); die Werte sind die
 # des Konfigurationstexts von k1520_create_a5120_text.  Schluessel "ausfuehrung" ist die Huelle
@@ -1044,7 +1044,7 @@ A5120_KONFIG_WERTE = {
     "bildschirm": ("k7024", "k7023", "beide"),
     "schalter": ("k7024", "k7023"),
     "tastatur": ("k7637", "k7636"),
-    "laderom": ("v09_2", "v09_1", "v06"),
+    "laderom": ("v09_2", "v09_1", "v06", "ul4"),
     "kassette": ("0", "1"),
     "em": ("none", "em064", "em256", "em1024"),
     # K3521.30 (N10b): "aus" oder die Startadresse als 4-stellige Hex-Zahl im 4-KB-Raster;
