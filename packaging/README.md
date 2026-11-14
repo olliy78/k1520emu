@@ -35,6 +35,8 @@ verhandelbar:
 * `-DK1520_FORMATS_DEFAULT=` — leert den einkompilierten Fallback-Pfad des
   Formatkatalogs.  Bliebe er gesetzt, trüge jede ausgelieferte Bibliothek den
   absoluten Pfad des Baurechners als Suchkandidaten mit sich herum.
+* `-DK1520_PRINTER_ROMS_DEFAULT=` — dasselbe für den Drucker-ROM-Katalog
+  `drucker_roms.yaml` (eine Datei mit den ROM-Daten als Intel-HEX, `share/k1520emu/`).
 * `-static-libstdc++ -static-libgcc` — die Bibliothek soll auch dort laden, wo
   eine ältere libstdc++ steht.  Die glibc-Untergrenze kommt dagegen vom
   Baurechner: für Veröffentlichungen auf einer alten Baseline bauen

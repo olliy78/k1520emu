@@ -79,6 +79,7 @@ REGELN = [
     ("app/printertool/**", ("fach_drucker",), "Drucker-Oberflaeche", False),
     ("data/default_config_printer.yaml", ("fach_drucker",), "Drucker-Vorgabe", False),
     ("data/drucker_roms.yaml", ("fach_drucker",), "Drucker-EPROM-Katalog", False),
+    ("tools/drucker_roms_bauen.py", ("fach_drucker",), "Erzeugung des Drucker-EPROM-Katalogs", False),
     ("run_k1520printer.sh", ("fach_drucker",), "Drucker-Starter", False),
     ("tools/sertest/**", ("fach_serial",), "SERTEST", False),
     # ── Diskette ────────────────────────────────────────────────────────

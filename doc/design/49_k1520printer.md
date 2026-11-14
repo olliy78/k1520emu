@@ -305,8 +305,7 @@ Wächter: `test_der_drucker_ist_in_allen_paketwegen` u. a. in `py_packaging`/`py
   = Prüfsumme des Punktmusters eines definierten Ausschnitts, dazu ein ASCII-Abzug im Fehlerfall.
 * Python: `py_c_api` (C-ABI ↔ ctypes mechanisch), `py_k1520printer_gui` (Blatt wächst, Kopfmarker, Taster/LEDs, Typauswahl, PDF-Punkte
   zählen statt „Datei existiert", QPrinter mit Ersatz).  Umlautfreiheit im Code (`py_keine_umlaute`).
-* EPROM-Abzüge sind Eingaben, keine Fixtures zum Ändern; Tests lesen sie aus `doc/EPROMS/` bzw. eingebettet als `*_data.h`
-  (`tools/eprom_to_h.py`, wie bei den Rechnern).
+* EPROM-Abzüge sind Eingaben, keine Fixtures zum Ändern; Tests lesen die Orakel aus `doc/EPROMS/`, die Karten bekommen ihr ROM seit WP9 aus dem Katalog `data/drucker_roms.yaml` (§12; nur der ZG1 des SD 1157 ist noch eingebettet).
 
 ## 7  Umsetzung mit Agenten
 
@@ -479,3 +478,7 @@ dazu Pfadauflösung, `romdatei=` und ein Wächter, der alles gegeneinander prüf
 | **WP9** | Erzeugung `data/drucker_roms.yaml` aus den bisherigen Einträgen + `.bin` (Skript `tools/drucker_roms_bauen.py`, einmalig/nachvollziehbar, NICHT Laufzeit), Kernleser samt Suchpfad, `rom=<Schlüssel>`, C-ABI-Abfrage + `py_c_api`/ctypes, Umbau Steuerungen/`PrinterMachine` auf Katalog-Bytes, Entfernen von `romdatei=`, `rom_*.h`, `k6316_*.rom`, `rom_katalog.py`, ROM-Pfaden in `paths.py` und Paketkopie, GUI-Auswahl über die C-ABI, Wächter wie oben, `tools/test_auswahl.py`, Merkposten, Handbuch/Entwurf | `cpp-coder` (Sonnet) |
 
 Reihenfolge: nach dem laufenden `test-merge` (gemeinsames `build/`); danach erneut `test-merge`.  Vor Beginn gelesen werden: Merkposten Nr. 31–37.  **Verhalten unverändert:** Druckbild-Wächter (Orakel, alle K6316/K6313/K6311/SD-1157-Fälle) müssen unverändert grün bleiben — sie sind die Gegenprobe, dass die Bytes aus der YAML dieselben sind wie die aus den `.bin`.
+
+**Stand WP9 (2026-11-14): fertig** — `data/drucker_roms.yaml` trägt die ROM-Daten als Intel-HEX (496 184 B, 19 Einträge, 5 per `daten_von`), erzeugt mit `tools/drucker_roms_bauen.py`; Kernleser `DruckerRomKatalog` (`core/machines/printer/`, Suchpfad Umgebung → `share/k1520emu` → `K1520_PRINTER_ROMS_DEFAULT` → `data/`), `rom=<Schlüssel|Alias>`,
+`romdatei=`/`rom_*.h` (außer ZG1)/`k6316_*.rom`/`rom_katalog.py`/ROM-Pfade in `app/paths.py`/Paketkopie der `.bin` entfallen, C-ABI `k1520_printer_rom_*`, Feld „EPROM“ aus der C-ABI, `yaml_lite` mit Blockskalar `|` (Ladezeit 3,1 ms), Wächter `DruckerRomKatalog.*` (unit), `py_drucker_rom_katalog`
+(u. a. Herkunft byteweise gegen die `.bin`, Kennung gegen den Namen, manipulierte Prüfsumme meldet Zeile und Eintrag), `YamlLite.Blockskalar_Literal`; alle Druckbild-Wächter unverändert grün.  Merkposten Nr. 38.

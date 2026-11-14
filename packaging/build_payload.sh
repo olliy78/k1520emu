@@ -399,6 +399,7 @@ info "K1520-Emulator $VERSION fuer $PLATFORM"
 # verteilbares Paket entscheidend:
 #
 #   K1520_FORMATS_DEFAULT=""  — sonst steht der absolute Pfad des BAURECHNERS
+#   K1520_PRINTER_ROMS_DEFAULT="" (Drucker-ROM-Katalog, WP9)
 #                               als Kandidat in der Bibliothek.
 #   -static-libstdc++         — die Bibliothek soll auch auf Systemen mit
 #   -static-libgcc              aelterer/neuerer libstdc++ laden.
@@ -444,14 +445,14 @@ if [ "$SKIP_BUILD" = no ]; then
     if ist_windows; then
         cmake -S "$REPO" -B "$BUILD_DIR" \
             -DCMAKE_BUILD_TYPE=Release -DLOG_LEVEL=3 \
-            -DK1520_FORMATS_DEFAULT= -DBUILD_K1520_TESTS=OFF \
+            -DK1520_FORMATS_DEFAULT= -DK1520_PRINTER_ROMS_DEFAULT= -DBUILD_K1520_TESTS=OFF \
             "-DK1520_VERSION_VOLL=$VERSION" \
             $LAUFZEIT_ARGS \
             >/dev/null || die "cmake-Konfiguration fehlgeschlagen"
     else
         cmake -S "$REPO" -B "$BUILD_DIR" \
             -DCMAKE_BUILD_TYPE=Release -DLOG_LEVEL=3 \
-            -DK1520_FORMATS_DEFAULT= -DBUILD_K1520_TESTS=OFF \
+            -DK1520_FORMATS_DEFAULT= -DK1520_PRINTER_ROMS_DEFAULT= -DBUILD_K1520_TESTS=OFF \
             "-DK1520_VERSION_VOLL=$VERSION" \
             -DCMAKE_SHARED_LINKER_FLAGS="-static-libstdc++ -static-libgcc" \
             >/dev/null || die "cmake-Konfiguration fehlgeschlagen"
@@ -574,17 +575,10 @@ cp "$REPO/data/bootsektor.yaml" "$STAGE/payload/share/k1520emu/bootsektor.yaml" 
 mkdir -p "$STAGE/payload/share/k1520emu/bootsektoren"
 cp "$REPO"/data/bootsektoren/*.bin "$STAGE/payload/share/k1520emu/bootsektoren/" \
     || die "data/bootsektoren/*.bin fehlen"
-# EPROM-Katalog der Drucker (Entwurf 49 §11.2): Katalog + die im Katalog genannten Dateien unter
-# eproms/ (app/paths.py::printer_roms_file / printer_eproms_dir suchen share/k1520emu/ vor data/ bzw. doc/EPROMS/).
-# Die Dateinamen stehen im Katalog (`datei:`, relativ); hier wird genau das kopiert, was er nennt.
+# ROM-Katalog der Drucker (Entwurf 49 §12, WP9): EINE Datei, die die ROM-Daten selbst als Intel-HEX traegt; der Kern liest sie
+# (share/k1520emu/ vor data/, Umgebung K1520_PRINTER_ROMS).  Keine .bin im Paket - die liegen als Herkunftsbeleg nur unter doc/EPROMS/.
 cp "$REPO/data/drucker_roms.yaml" "$STAGE/payload/share/k1520emu/drucker_roms.yaml" \
     || die "data/drucker_roms.yaml fehlt"
-mkdir -p "$STAGE/payload/share/k1520emu/eproms"
-for _rom in $(sed -n 's/^ *datei: *//p' "$REPO/data/drucker_roms.yaml"); do
-    mkdir -p "$STAGE/payload/share/k1520emu/eproms/$(dirname "$_rom")"
-    cp "$REPO/doc/EPROMS/$_rom" "$STAGE/payload/share/k1520emu/eproms/$_rom" \
-        || die "EPROM-Datei fehlt: doc/EPROMS/$_rom (Katalog data/drucker_roms.yaml)"
-done
 # Auslieferungskonfiguration: der Zustand nach der Erstinstallation und das Ziel
 # von *Ansicht > Standard zuruecksetzen* (app/config_io.py::standard_konfiguration)
 # — je Programm eine (A5120, K8915, PRG710, PC1715, P8000 und MC80 Emulator; app/profil.py) plus K1520 Printer (kein Profil, app/printertool/konfig.py).

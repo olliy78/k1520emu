@@ -1437,12 +1437,8 @@ def test_payload_enthaelt_alles_zum_starten(payload):
         "payload/share/k1520emu/default_config_pc1715.yaml",
         "payload/share/k1520emu/default_config_p8000.yaml",
         "payload/share/k1520emu/default_config_mc80.yaml",
-        # EPROM-Katalog der Drucker samt den Dateien, die er nennt (Entwurf 49 §11.2).
+        # ROM-Katalog der Drucker: EINE Datei mit Intel-HEX-Daten, vom Kern gelesen (Entwurf 49 §12, WP9) - keine .bin daneben.
         "payload/share/k1520emu/drucker_roms.yaml",
-        "payload/share/k1520emu/eproms/SD1157/1157_repariert.rom",
-        "payload/share/k1520emu/eproms/SD1157/1157.rom",
-        "payload/share/k1520emu/eproms/K6316/k6316_ifss.rom",
-        "payload/share/k1520emu/eproms/K6316/k6316_v24.rom",
         "payload/share/icons/a5120emu.svg",
         # k1520DiskTool: Bibliothek, Kommandozeile, Oberflaeche, Starter.
         # Ohne diese Zeilen laege app/disktool/ zwar im Paket (die ganze app/-
@@ -1524,7 +1520,7 @@ def test_paket_traegt_keinen_pfad_des_baurechners(tmp_path):
     """
     build = tmp_path / "build"
     cfg = _sh("cmake", "-S", str(PROJECT_ROOT), "-B", str(build),
-              "-DCMAKE_BUILD_TYPE=Release", "-DK1520_FORMATS_DEFAULT=",
+              "-DCMAKE_BUILD_TYPE=Release", "-DK1520_FORMATS_DEFAULT=", "-DK1520_PRINTER_ROMS_DEFAULT=",
               # -O0: geprueft wird, was an Zeichenketten im Binaerabbild steht, und das haengt
               # nicht an der Optimierung.  -O3 kostete gut 100 s Rechenzeit je Lauf; der echte
               # Release-Bau (release.yml, Rauchtest "kein Baurechner-Pfad") prueft es zusaetzlich.
@@ -1536,6 +1532,7 @@ def test_paket_traegt_keinen_pfad_des_baurechners(tmp_path):
 
     roh = (build / "libk1520core.so").read_bytes()
     assert bytes(str(PROJECT_ROOT / "data" / "formats.yaml"), "utf-8") not in roh
+    assert bytes(str(PROJECT_ROOT / "data" / "drucker_roms.yaml"), "utf-8") not in roh   # K1520_PRINTER_ROMS_DEFAULT (WP9)
 
     # AP-E4l: ROM-/Zeichengeneratordaten beider Maschinen sind einkompiliert
     # (`*_data.h`), es darf also weder ein Quellbaumpfad hinzukommen noch der
@@ -1871,12 +1868,11 @@ def test_der_drucker_ist_in_allen_paketwegen():
     assert "QtPrintSupport" in _slim().BINDINGS_KEEP
     # Die Vorgabedatei, die der Drucker beim Start sucht, gibt es im Quellbaum.
     assert (PROJECT_ROOT / "data" / "default_config_printer.yaml").is_file()
-    # EPROM-Katalog (WP8b): Katalog + jede genannte Datei kommen ins Paket (share/k1520emu/eproms/).
-    assert "drucker_roms.yaml" in bp and "share/k1520emu/eproms" in bp
-    import yaml
-    katalog = yaml.safe_load((PROJECT_ROOT / "data" / "drucker_roms.yaml").read_text(encoding="utf-8"))
-    for e in katalog["eintraege"]:
-        assert (PROJECT_ROOT / "doc" / "EPROMS" / e["datei"]).is_file(), e["datei"]
+    # ROM-Katalog (WP9): nur die EINE YAML kommt ins Paket (Daten als Intel-HEX), keine .bin daneben, und der Release-Bau
+    # leert den Fallbackpfad des Kerns.
+    assert "drucker_roms.yaml" in bp and "share/k1520emu/eproms" not in bp
+    assert bp.count("-DK1520_PRINTER_ROMS_DEFAULT=") == 2, "beide Release-cmake-Aufrufe muessen den Quellbaumpfad leeren"
+    assert (PROJECT_ROOT / "data" / "drucker_roms.yaml").is_file()
 
 
 def test_kermit_cli_name_im_installationslayout(tmp_path):
