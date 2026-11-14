@@ -347,7 +347,7 @@ Entschieden 2026-11-05: **SD 1157 zuerst** lauffähig, K6316 danach; K6316 mit *
 
 ## 10  Nicht im Umfang
 
-Centronics/IFSP-Module, Farbdruck, SD 1157/269 (Grafik), Netzwerkdruckprotokolle (LPD/IPP), virtueller CUPS-Drucker des Wirtssystems.
+Centronics/IFSP-Module (auch K6313/K6311, Festlegung 2026-11-15, §11.6), Farbdruck, SD 1157/269 (Grafik), Netzwerkdruckprotokolle (LPD/IPP), virtueller CUPS-Drucker des Wirtssystems.
 
 **SD 1157/267 mit zweiter Papierbahn (Festlegung des Anwenders, 2026-11-06):** wird nicht umgesetzt — sehr selten verwendetes Merkmal.  Der Typ bleibt in der Oberfläche sichtbar gesperrt
 (`typen.GESPERRT`, „nicht vorgesehen"), PV2 ohne Wirkung.  Was der Kern dafür schon trägt (Papierweg mit Bahnindex, Formularlänge 2, `SW_FORMULAR2`) bleibt, wird aber nicht weiterverfolgt
@@ -425,3 +425,18 @@ Volltext: `doc/printer/k6313/hardware.md`, `firmware_diff.md`, `doc/EPROMS/K6311
 * Der Forum-Hinweis „Pin B8/A15" ist im Plan des 16-KiB-Moduls nicht belegbar; die Umschaltung ROM/RAM ist die Viertel-Dekodierung über A13/A14.
 
 **WP8c-Zuschnitt:** Typ `k6313` (Schlüssel `k6313`, ROM `33538013`, Schnittstelle V.24 über SIO 7CH; IFSS/Centronics-Kassette erst nach WP8d), Speicherplan *kurz*, `K6313Ccb`-Karte, Druckwerk/Papierweg wiederverwendet.
+
+### 11.6  Festlegung des Anwenders 2026-11-15: Umfang und Ziel
+
+* **Centronics wird nicht umgesetzt** (der Anwender hat die Schnittstelle nicht, nichts zum Prüfen) — in §10 aufgenommen: Abzüge, die nur Centronics bedienen (`37239503`, `12228062`), bleiben außerhalb des Katalogs.
+  Maßgeblich sind **V.24 und IFSS**.
+* **Ziel: alle gelisteten Drucker drucken tatsächlich voll funktionsfähig** (Selbsttest, Text, Schriftarten/ESC-Folgen, Papierweg, Bedienfeld) — „läuft an" genügt nicht; was ohne Beleg nicht erreichbar ist, wird als [?] ausgewiesen statt geraten.
+* **Neue Arbeitspakete:**
+
+| AP | Inhalt | Agent |
+|---|---|---|
+| **WP8f** | K6311 druckt: Wagen-Zwei-Bit-Code (D104 A4/A5) auf `SchrittWagen`, Formularmuster (F9H), Nadelports (DDH/DEH/DFH), Rückmeldungen, Tasten/Lampen aus den ROM-Auswertungen; Orakel gegen den ROM-Zeichengenerator; `K6311Modul.GrenzeDie…` ersetzen | `cpp-coder` (Sonnet) |
+| **WP8g** | IFSS am K6313/K6311 (SIO-Kanal/Kassettenkennung laut hardware.md/ROM), Wächter über den Wandler wie K6316 | `cpp-coder` |
+| **WP8h** | K6313-Vollständigkeit: ESC-Folgen (Elite, Breit, Fett, Unterstrich…) mit Orakeln, Nadelpolarität, Summer; 16-KiB-Fassung (Speicherplan *lang*) für Abzüge mit V.24/IFSS (`30835007` zuerst, Prüfung der Kassettenkennung) | `cpp-coder` |
+
+Reihenfolge WP8f → WP8g → WP8h (gemeinsames `build/`), je AP Doku + Test + Commit; `test-merge` am Ende.
