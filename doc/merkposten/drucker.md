@@ -2,7 +2,7 @@
 
 Gilt für `core/peripherals/druckwerk/`, `core/cards/printer/`, `core/machines/printer/`, `k1520_printer_*` in der C-ABI und den Debugger-Befehl `blatt`.
 Entwurf und Stand: `doc/design/49_k1520printer.md` (§5a/§5b); Hardware des SD 1157 aus der Firmware: `doc/printer/sd1157/hardware.md`.
-Stand 2026-11-06 (WP3/WP2b, WP4 Anschluss, Textdruck/Fluss/ROM-Reparatur, WP2a/WP6a K6316 ab Nr. 20).
+Stand 2026-11-15 (WP3/WP2b, WP4 Anschluss, Textdruck/Fluss/ROM-Reparatur, WP2a/WP6a K6316 ab Nr. 20, Vorsteckbeleg Nr. 30, ROM-Katalog Nr. 31/38, K6313 Nr. 32/33/36/37, K6311 Nr. 34/35).
 
 1. **Das Druckwerk kennt kein Gerät, kein PDF, kein Qt.**  `Blattmodell` und `Nadelkopf` wissen nichts vom SD 1157; die Steuerung gibt Pegel rein (`Wagen::eingang`,
    `Papierweg::ausgaenge`) und löst den Anschlag aus.  Alles in Maschinentakten.  Wächter `Blattmodell.*`, `Nadelkopf.*`, `Papierweg.*`, `GeregelterWagen.*`, `Nadeldruckwerk.*`
