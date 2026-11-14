@@ -16,6 +16,7 @@
 #include <sstream>
 
 #include "core/machines/printer/drucker_rom_katalog.h"
+#include "core/util/os_compat.h"
 
 namespace {
 
@@ -85,9 +86,9 @@ TEST(DruckerRomKatalog, AusgelieferterKatalogIstInOrdnung)
 /// Zusammenspiel Suchpfad: Umgebung gesetzt => nur dort suchen, kein stiller Rueckfall; fehlende Datei = klare Meldung.
 TEST(DruckerRomKatalog, UmgebungOhneDateiMeldetKlarUndFaelltNichtZurueck)
 {
-    ::setenv("K1520_PRINTER_ROMS", "/gibt/es/nicht/drucker_roms.yaml", 1);
+    k1520::os::setEnv("K1520_PRINTER_ROMS", "/gibt/es/nicht/drucker_roms.yaml");
     auto k = DruckerRomKatalog::gemeinsam();
-    ::unsetenv("K1520_PRINTER_ROMS");
+    k1520::os::unsetEnv("K1520_PRINTER_ROMS");
     EXPECT_FALSE(k->ok());
     EXPECT_NE(k->fehler().find("nicht gefunden"), std::string::npos) << k->fehler();
     EXPECT_NE(k->fehler().find("/gibt/es/nicht"), std::string::npos);
