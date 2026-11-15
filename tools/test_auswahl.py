@@ -25,7 +25,7 @@ ALLE = "*"  # Sonderwert: alle Fachgebiete (= alle langsamen Faelle)
 
 # Fachgebiete (muessen mit den Labels in tests/ uebereinstimmen; Waechter prueft es).
 FACHER = ("fach_floppy", "fach_serial", "fach_kermit", "fach_p8000", "fach_wega",
-          "fach_rtc", "fach_a5120", "fach_k8915", "fach_pc1715", "fach_prg710")
+          "fach_rtc", "fach_a5120", "fach_k8915", "fach_pc1715", "fach_prg710", "fach_sound")
 LANGSAME_LABELS = ("format_integration", "format_matrix", "wega_install")
 
 _P8 = ("fach_p8000", "fach_wega")
@@ -64,6 +64,7 @@ REGELN = [
     ("core/primitives/z8.*", ("fach_k8915", "fach_prg710") + _P8, "Z8 (Tastatur-/Terminalfirmware)", True),
     ("core/primitives/z8/**", ("fach_k8915", "fach_prg710") + _P8, "Z8", True),
     ("core/primitives/upd765*", ("fach_pc1715",), "uPD765", True),
+    ("core/primitives/ay38910*", ("fach_sound",), "AY-3-8910", True),
     ("core/primitives/**", ALLE, "gemeinsamer Baustein", True),
     # ── Serie / Kermit ──────────────────────────────────────────────────
     ("core/serial/**", ("fach_serial", "fach_kermit"), "serielle Schnittstellen", True),
@@ -141,12 +142,17 @@ REGELN = [
     ("tools/em256/**", ("fach_a5120",), "EM256-Programme", False),
     ("tools/bcu_a5120/**", ("fach_a5120",), "BCU", False),
     ("tools/cpm_bau.py", ("fach_a5120", "fach_kermit", "fach_serial"), "CP/M-Bau", False),
+    ("core/cards/sound_k1520/**", ("fach_sound",), "SOUND-Karte K1520", True),
+    ("core/audio/**", ("fach_sound",), "Tonausgabe/WAV", True),
+    ("tools/sound/**", ("fach_sound",), "SOUND-Gastsoftware", False),
+    ("tests/fixtures/sound/**", ("fach_sound",), "SOUND-Fixtures", False),
     # ── Unbekanntes unter core/: alles ──────────────────────────────────
     ("core/**", ALLE, "unbekannter Pfad unter core/ (sicherheitshalber alles)", True),
     # ── Tests: nach Dateiname ───────────────────────────────────────────
     ("tests/system/test_p8000_*", _P8, "P8000-Systemtest", True),
     ("tests/system/test_*kermit*", ("fach_kermit",), "Kermit-Systemtest", True),
     ("tests/system/test_sertest*", ("fach_serial",), "SERTEST-Systemtest", True),
+    ("tests/system/test_sound*", ("fach_sound",), "SOUND-Systemtest", True),
     ("tests/system/**", ALLE, "Systemtest (Zuordnung unbekannt)", True),
     ("tests/fixtures/**", ("fach_floppy", "fach_kermit"), "Fixtures", False),
     ("tests/**/*.cpp", (), "Test (schnelle Spur)", True),
