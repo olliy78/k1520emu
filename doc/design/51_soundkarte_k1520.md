@@ -91,7 +91,7 @@ liegt deshalb in der Mitte (auf beiden Seiten).  Welche, legt die Kanalzuordnung
 Emulator **Stereo ACB** (ursprünglich ABC, Anwenderentscheid 2026-11-14; nach dem Hörvergleich 2026-11-15 auf ACB umgestellt, §7a), wählbar ABC und Mono.
 Kanalzuordnung über steckbare Widerstände + Schiebeschalter S8: **ABC** (A links, B Mitte, C rechts) oder
 **ACB** (A links, B rechts, C Mitte); Seitenkanal 10 kΩ, Mittelkanal 22 kΩ auf beide Seiten
-(Gewicht Mitte ≈ 10/22 ≈ 0,45 je Seite).  JP4 = Mono.  C16/C17 (1 nF, optional) = Tiefpass.  Verstärker
+(Gewicht Mitte ≈ 10/22 ≈ 0,45 je Seite).  JP4 = Mono.  C16/C17 (1 nF, optional) = Tiefpass; nach Plan ≈ 23–37 kHz (kaum hörbar), im Emulator bewusst **8 kHz** (Anwenderentscheid 2026-11-15).  Verstärker
 PAM8403, Line-Out — beides ohne Einfluss auf das Modell außer der Lautstärke.
 
 ### 3.5 AY-3-8910 — was nachgebaut wird (Datenblatt)

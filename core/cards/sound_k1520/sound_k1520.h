@@ -54,9 +54,10 @@ public:
 
     /// Gewicht des Mittelkanals je Seite: 10k (Seite) / 22k (Mitte).
     static constexpr float MITTE_GEWICHT = 10.0f / 22.0f;
-    /// Grenzfrequenz des Tiefpasses.  C16/C17 = 1 nF, der wirksame Widerstand haengt von der
-    /// Bestueckung des Mischers ab (Unterlagen unklar) - Annahme [?]: ~5 kHz.
-    static constexpr float TIEFPASS_HZ = 5000.0f;
+    /// Grenzfrequenz des zuschaltbaren Tiefpasses "C16/C17": 8 kHz (Anwenderentscheid 2026-11-15).
+    /// Nach dem Schaltplan V2 laegen 1 nF an etwa 4-7 kOhm (Mischwiderstaende, Lastpoti) bei 23-37 kHz und
+    /// waeren kaum hoerbar; der Emulator nimmt bewusst einen hoerbaren Wert (doc/merkposten/sound.md).
+    static constexpr float TIEFPASS_HZ = 8000.0f;
     /// Grenzfrequenz des Gleichanteilfilters (AY liefert nur 0..1).
     static constexpr float HOCHPASS_HZ = 15.0f;
 

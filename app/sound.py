@@ -63,7 +63,7 @@ TIPP_TAKT = (
     "Brücke JP2 auch den vollen Quarztakt oder den Systemtakt der Maschine nehmen — dann hier diese Frequenz "
     "eintragen.  Ein höherer Takt lässt Lieder höher klingen.  Die Änderung wirkt sofort.")
 TIPP_KANAL = "Zuordnung der drei AY-Kanäle zu links/rechts: Stereo ACB (Vorgabe), Stereo ABC oder Mono."
-TIPP_TIEFPASS = "Die Kondensatoren C16/C17 der Karte sind bestückt: der Ton klingt dumpfer."
+TIPP_TIEFPASS = "Tiefpass 8 kHz zuschalten (Kondensatoren C16/C17): Höhen werden gedämpft, der Ton klingt weicher."
 TIPP_KASKADE = (
     "Hardwarebrücken der CTC-Kanäle der Karte: der Ausgang ZC/TO eines Kanals speist den Takteingang "
     "des nächsten.")
