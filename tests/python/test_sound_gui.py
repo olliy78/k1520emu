@@ -326,3 +326,37 @@ def test_kaskadenhaken_wirken_ohne_neuaufbau_am_ctc(qapp, monkeypatch):
         assert aufrufe == [] and w.emulator._sound_cfg["kaskade"] == 0
     finally:
         _zu(w, qapp)
+
+
+@pytest.mark.parametrize("maschine", ["a5120", "k8915", "prg710", "pc1715", "mc80"])
+def test_auslieferung_hat_einen_soundabschnitt_mit_vorgaben(maschine):
+    # Ohne Abschnitt in der Vorgabedatei liesse *Standard zuruecksetzen* die Karte unangetastet
+    # (fehlender Abschnitt = nicht anfassen) -- der AY-Takt sprang dann nicht zurueck.
+    from app import config_io, profil, sound
+    s = config_io.standard_konfiguration(profil.profil(maschine))["general"]["sound"]
+    assert s["enabled"] is False and "basis" not in s          # Basis = Vorauswahl des Rechners
+    z = sound.normalize(s, 0x38)
+    assert z == sound.vorgabe(0x38)
+
+
+def test_zuruecksetzen_stellt_die_soundkarte_auf_die_vorgabe(qapp, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    from app import sound
+    monkeypatch.setattr(QMessageBox, "question", staticmethod(lambda *a, **k: QMessageBox.Yes))
+    w = _fenster(qapp, "a5120")
+    try:
+        g = w.settings_widget.sound_gruppe
+        g.karte_box.setChecked(True)
+        qapp.processEvents()
+        g.ay_takt_edit.setText("2,4576")
+        g.ay_takt_edit.editingFinished.emit()
+        g.tiefpass_box.setChecked(True)
+        qapp.processEvents()
+        assert w._sound["ay_takt_hz"] == 2_457_600
+        w._standard_zuruecksetzen()
+        qapp.processEvents()
+        assert w._sound == sound.vorgabe(0x38)
+        assert g.ay_takt_edit.text() == "1,789772" and not g.tiefpass_box.isChecked()
+        assert not g.karte_box.isChecked() and not w.emulator.sound_present()
+    finally:
+        _zu(w, qapp)

@@ -71,6 +71,15 @@ general:
     basis: '28'
     nur_loopback: false
     link: true
+  # SOUND-Karte K1520 (app/sound.py, Entwurf 51): ab Werk nicht gesteckt; ohne basis gilt die Vorauswahl
+  # des Rechners (38H, PC 1715W E0H).  ay_takt_hz = 3 579 545 Hz / 2 (Stueckliste).
+  sound:
+    enabled: false
+    chip: ay8910
+    ay_takt_hz: 1789772
+    kanal: acb
+    tiefpass: false
+    kaskade: [false, false, false]
   # Modell: prg710 (K7609) oder prg710-1 (K7672).
   model: prg710
   # Lochstreifen (ADA K6022, SIF1000) gesteckt? doc/design/23_lochstreifen.md §7.
