@@ -1,6 +1,6 @@
 # 51 — SOUND-Karte K1520 (AY-3-8910/8912 + CTC) mit Tonausgabe
 
-Stand: 2026-11-14, **Entwurf, nichts umgesetzt; Fragen F1–F4 beantwortet, Gastsoftware im Repo (`tools/sound/fremd/`).**  Recherche: Forum robotrontechnik.de Thread 14846
+Stand: 2026-11-15, **S0–S8 umgesetzt** (Zweig `sound`); offen S9a (Beigaben, PC-1715-Vorauswahl auf 38H), S10, S9, Hörvergleich des Anwenders (`out/sound/stctest1_emu.wav` ↔ `stctest1_original.mp3`).  Recherche: Forum robotrontechnik.de Thread 14846
 („SOUND-Karte für K1520", 2017/18), Beschreibung `SOUND-K1520V2-Beschreibung.pdf` (Stand 13.02.2018) und
 Gastsoftware `SKTEST4_BC/` aus `~/projects/robotron/rowikla/`.
 **Grundsatz (Anwenderentscheid 2026-11-14): keine Fremdsoftware.**  Der Chip wird nach Datenblatt
@@ -42,8 +42,9 @@ Lautsprecher anderer Maschinen kann dieselbe Strecke benutzen (nicht Teil dieses
 | `PLAYSTC.COM` + `SONG.STC` | spielt eine STC-Datei von Diskette (`PLAYSTC B:SONG.STC`) | **Demo 2 auf der Diskette** |
 | `CPMSTCPL`/`CPMPT3PL` 1.0.5 + `SNDINIT2` | Player für STC/PT3 **vom USB-Stick** (GIDE/USB bzw. GUN), Einstellungen in `SOUND.INI` | AP S10: mit der emulierten GUN-USB spielt er Lieder aus einem Wirtsordner |
 
-Die CP/A-/SCPX-Fassungen setzen I = F7H und Vektor D8H voraus; **PC-1715-Fassungen** benutzen Karte an
-**E0H** und Vektor F7F0H (eigenes ZIP).  K8915 (Interruptsäule FFB0H) nur über die USB-Player mit
+Die CP/A-/SCPX-Fassungen setzen I = F7H und Vektor D8H voraus; die **PC-1715-Fassungen** benutzen ebenfalls
+Karte an **38H**, nur Vektor F7F0H (eigenes ZIP; Befund S7 am Quelltext `AYBASE EQU 038H`).  E0H am PC 1715
+stammt nur aus der `SOUND.INI`-Tabelle des USB-Players (Daniels Gerät).  K8915 (Interruptsäule FFB0H) nur über die USB-Player mit
 `SOUND.INI` (`SNDINIT2`-Tabelle: K8915 `38 2.46 b0ff d0`, A5120 `38 2.46 d8f7 d0`, PC 1715 CP/A
 `E0 2.46 f0f7 d0`, PC 1715 SCP `E0 2.46 20f7 d0`).
 
@@ -173,7 +174,7 @@ core/cards/sound_k1520/             Karte: Dekodierung, AY + CTC, Mischer ABC/AC
 Alle mit `zusatzkartenSteckbar()` (A5120 inkl. .16, A5130, K8924, K8915 V3/V2, PRG 710/-1, PC 1715
 mechanisch wie GIDE, MC80 prüfen); P8000 nicht.  Belegung je Maschine in S0 am Bus prüfen
 (`ioBesitzer`); bekannt frei am A5120/K8924 (Unterlagen).  Interruptsäule ist Gastsache (CP/A: F7D8H).
-**Vorauswahl der Oberfläche:** 38H, am **PC 1715 und PC 1715W E0H** (PC 1715: so die Gastsoftware; 1715W: 38H–3FH belegt, Befund S0), MC80.2x 38H (E0H dort belegt) — dort kollidiert
+**Vorauswahl der Oberfläche:** 38H überall (auch PC 1715 — so die Gastsoftware, Befund S7), nur am **PC 1715W E0H** (38H–3FH belegt, Befund S0), MC80.2x 38H (E0H dort belegt).  Am PC 1715W kollidiert
 sie mit der Lochstreifenkarte K6022 (E0H–E7H fest); beide zugleich meldet der Kern als Konflikt, wie
 GIDE/K5020 (gewollt, Basis von Hand ändern).
 
