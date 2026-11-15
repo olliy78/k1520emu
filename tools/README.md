@@ -88,6 +88,7 @@ Sie bilden die Innereien von `k1520dbg` und `boot_trace` und sind **einzeln gete
 | **`z80_disasm2.py`** | **Der** Z80-Disassembler: Listing (`--org`, `--entry`, `--label`) und `--format mac` = assemblierbarer M80-Quelltext aus Abzug + Kartendatei (`--karte`) — [z80_disasm.md](z80_disasm.md). Wächter `tests/python/test_z80_disasm.py` |
 | `disasm_difftest.py` | Regressionswächter: `z80_disasm2.py` gegen das `z80dis`-Paket. Vor jedem Umbau der Disassembler-Engine laufen lassen |
 | `eprom_to_h.py` | EPROM-Binärdatei → committetes C-Array (`*_data.h`) |
+| `drucker_roms_bauen.py` | Einmalwerkzeug: baut `data/drucker_roms.yaml` (Metadaten + Intel-HEX) aus den Abzügen unter `doc/EPROMS/` (WP9, Merkposten drucker.md Nr. 38) |
 | `img_to_hfe.py` | Rohes `.img` → HFE-v1-Diskettenabbild |
 | `fb_ocr.py` | Framebuffer-OCR: zerlegt den 640×288-Puffer der K7024 wieder in Text. Benutzt von `tests/python/test_gui_smoke.py` |
 | `capture_format_menus.py` | Greift die FORMAT.COM-Formatmenüs je Laufwerkstyp live aus dem Emulator ab (Grundlage der Format-Matrix) |

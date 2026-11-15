@@ -75,6 +75,10 @@ if (K1520_PYTEST_PYTHON AND _k1520_pydeps EQUAL 0)
         set_tests_properties(py_${_mod} PROPERTIES
             LABELS "python;fast" TIMEOUT 300
             ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+        # Die Druckeroberflaeche gehoert zum Fachgebiet Drucker (tools/test_auswahl.py: app/printertool/**).
+        if (_mod MATCHES "^(k1520printer|drucker)")
+            set_tests_properties(py_${_mod} PROPERTIES LABELS "python;fast;fach_drucker")
+        endif()
     endforeach()
 
     list(LENGTH _py_modules _py_n)

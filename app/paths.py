@@ -807,6 +807,7 @@ def describe() -> str:
         f"Formatkatalog:     {fmt if fmt else 'NICHT GEFUNDEN (der Kern sucht weiter selbst)'}",
         f"Bootabbilder:      {boot_kat if boot_kat else 'NICHT GEFUNDEN'}"
         f" (+ {bootsektor_user_file()}, falls vorhanden)",
+        "Drucker-ROMs:      vom Kern gelesen (K1520_PRINTER_ROMS | share/k1520emu | data/drucker_roms.yaml)",
         f"Disketten (Paket): {bundled if bundled else '—'}",
         f"Disketten (Nutzer):{user_disks_dir()}",
         f"Dateien (DiskTool):{user_files_dir()}",

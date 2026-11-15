@@ -98,7 +98,7 @@ def test_unbuilt_machine_type_is_refused_with_a_reason():
     """
     from app.core_binding.k1520 import _lib, K1520Handle
 
-    for typ in (7,):
+    for typ in (8,):
         assert not _lib.k1520_create(typ), typ
         grund = _lib.k1520_last_init_error().decode()
         assert "nicht implementiert" in grund, grund
@@ -422,6 +422,210 @@ def test_mc80_can_be_created_and_reports_its_type():
                                     (3, b"spe=1", b"MC80.2x")):
         assert not _lib.k1520_create_mc80(variante, konfig)
         assert grund in _lib.k1520_last_init_error()
+
+
+def test_printer_sd1157_can_be_created_and_runs_its_rom():
+    """`k1520_create_printer` (Entwurf 49, WP1): der SD 1157 liefert eine Maschine vom Typ 7 ohne Bild,
+    das Original-ROM laeuft an; K6316 (noch nicht gebaut), unbekannte Typen und Schluessel → NULL mit Grund."""
+    from app.core_binding.k1520 import _lib, K1520Handle, K1520Emulator
+
+    for konfig in (None, b"schnittstelle=ifss", b"schnittstelle=v24"):
+        handle = _lib.k1520_create_printer(0, konfig)
+        assert handle, _lib.k1520_last_init_error()
+        h = K1520Handle(handle)
+        try:
+            assert _lib.k1520_machine_type(h) == 7
+            assert (_lib.k1520_fb_width(h), _lib.k1520_fb_height(h)) == (0, 0)
+            assert _lib.k1520_mem_read(h, 0x0000) == 0xED      # IM 2 (sy00)
+            assert _lib.k1520_mem_read(h, 0x3400) == 0xFF      # ZG2 nicht bestueckt
+            assert _lib.k1520_run(h, 200_000) > 0
+            assert _lib.k1520_mem_read(h, 0x2C28 - 2) in range(256)   # RAM erreichbar
+        finally:
+            _lib.k1520_destroy(h)
+
+    handle = _lib.k1520_create(7)                               # Vorgabe = SD 1157/264
+    assert handle, _lib.k1520_last_init_error()
+    _lib.k1520_destroy(K1520Handle(handle))
+
+    h3 = _lib.k1520_create_printer(3, b"dil=0x3")               # K6313 (WP8c): 5-1, 5-2 ON
+    assert h3, _lib.k1520_last_init_error()
+    try:
+        h3 = K1520Handle(h3)
+        assert _lib.k1520_machine_type(h3) == 7
+        assert _lib.k1520_printer_switch_get(h3, 32) == 1 and _lib.k1520_printer_switch_get(h3, 33) == 1
+        assert _lib.k1520_printer_switch_get(h3, 34) == 0
+        assert _lib.k1520_printer_lamp(h3, 5) == 1               # POW
+        assert _lib.k1520_printer_key(h3, 21, 1) == 1 and _lib.k1520_printer_key(h3, 11, 1) == 0
+        assert _lib.k1520_run(h3, 200_000) > 0
+    finally:
+        _lib.k1520_destroy(h3)
+    assert not _lib.k1520_create_printer(3, b"betriebsart=endlos")   # K6316-Schluessel gilt nicht am K6313
+
+    h11 = _lib.k1520_create_printer(4, b"schalter_baud=0xBF,schalter_format=0x3F")   # K6311 (WP8e): Hardware nur aus dem ROM erschlossen [?]
+    assert h11, _lib.k1520_last_init_error()
+    try:
+        h11 = K1520Handle(h11)
+        assert _lib.k1520_machine_type(h11) == 7
+        assert _lib.k1520_printer_lamp(h11, 5) == 1                                   # POW
+        assert _lib.k1520_printer_lamp(h11, 3) == -1                                  # PE-Lampe: das ROM schreibt keine
+        assert _lib.k1520_printer_key(h11, 21, 1) == 1 and _lib.k1520_printer_key(h11, 24, 1) == 1   # WP8f: Tasten ON LINE ... D105 A6
+        assert _lib.k1520_printer_key(h11, 21, 0) == 1 and _lib.k1520_printer_key(h11, 25, 1) == 0
+        assert _lib.k1520_printer_switch_get(h11, 32) == -1 and _lib.k1520_printer_switch(h11, 32, 1) == 0   # keine DIL-Schalter
+        assert _lib.k1520_printer_switch_get(h11, 3) == 1                             # Papier da (D104 A6 = 0)
+        assert _lib.k1520_run(h11, 200_000) > 0
+        for _ in range(100):                                                          # bis ON LINE (D105 A2): ~20 Mio. Takte
+            _lib.k1520_run(h11, 300_000)
+            if _lib.k1520_printer_lamp(h11, 0) == 1:
+                break
+        assert _lib.k1520_printer_lamp(h11, 0) == 1 and _lib.k1520_printer_lamp(h11, 1) == 0   # ON LINE an, ERR aus
+    finally:
+        _lib.k1520_destroy(h11)
+    assert not _lib.k1520_create_printer(4, b"dil=0x3")                # K6313-Schluessel gilt nicht am K6311
+    assert not _lib.k1520_create_printer(4, b"schalter_baud=300")      # > 255
+    assert not _lib.k1520_create_printer(3, b"schalter_baud=1")        # nur am K6311
+
+    for typ in (1, 2):                                          # K6316: IFSS / V.24 (WP2a)
+        h6 = _lib.k1520_create_printer(typ, b"betriebsart=schneiden,dil=0x8")
+        assert h6, _lib.k1520_last_init_error()
+        try:
+            h6 = K1520Handle(h6)
+            assert _lib.k1520_machine_type(h6) == 7
+            assert _lib.k1520_printer_switch_get(h6, 5) == 1    # SW_BETRIEBSART: Schneiden
+            assert _lib.k1520_printer_switch_get(h6, 16 + 3) == 1   # SW_DIL_BASIS + (S14 - S11)
+            assert _lib.k1520_printer_switch_get(h6, 16) == 0
+            assert _lib.k1520_printer_lamp(h6, 4) == 1          # H4 BEREIT
+            assert _lib.k1520_run(h6, 200_000) > 0
+            # Vorsteckbeleg (hardware.md §11): Bahn 1 des Blatts gibt es erst nach dem ersten Einlegen
+            c = ctypes
+            w, hh = c.c_int(), c.c_int()
+            assert _lib.k1520_printer_sheet_size(h6, 1, c.byref(w), c.byref(hh)) == 0
+            assert _lib.k1520_printer_sheet_version(h6, 1) == 0
+            assert _lib.k1520_printer_beleg_insert(h6, 0, 148) == 0          # unsinniges Mass
+            assert _lib.k1520_printer_beleg_insert(h6, 210, 148) == 1
+            assert _lib.k1520_printer_beleg_insert(h6, 210, 148) == 0        # es liegt schon einer im Schacht
+            ein, u, lg, bp, xl, dy = (c.c_int() for _ in range(6))
+            assert _lib.k1520_printer_beleg_state(h6, *(c.byref(v) for v in (ein, u, lg, bp, xl, dy))) == 1
+            assert (ein.value, lg.value, bp.value) == (1, 893, 1748) and 0 < u.value < 36 and dy.value == -1
+            assert _lib.k1520_printer_switch_get(h6, 6) == 1 and _lib.k1520_printer_switch_get(h6, 7) == 0   # FSO an, FSU aus
+            assert _lib.k1520_printer_sheet_size(h6, 1, c.byref(w), c.byref(hh)) == 1
+            assert (w.value, hh.value) == (1748, 2 * 893)
+            v1 = _lib.k1520_printer_sheet_version(h6, 1)
+            assert _lib.k1520_printer_beleg_remove(h6) == 1
+            assert _lib.k1520_printer_switch_get(h6, 6) == 0
+            assert _lib.k1520_printer_beleg_state(h6, c.byref(ein), None, None, None, None, None) == 1 and ein.value == 0
+            assert _lib.k1520_printer_sheet_size(h6, 1, c.byref(w), c.byref(hh)) == 1   # das Blatt bleibt
+            assert _lib.k1520_printer_beleg_insert(h6, 100, 100) == 1
+            assert _lib.k1520_printer_sheet_version(h6, 1) > v1                          # waechst ueber den Wechsel hinweg
+        finally:
+            _lib.k1520_destroy(h6)
+
+    for typ, konfig, grund in ((1, b"rom=original", b"unbekannt"), (9, None, b"Druckertyp"),
+                               (0, b"schnittstelle=x", b"schnittstelle"), (0, b"vis=1", b"vis")):
+        assert not _lib.k1520_create_printer(typ, konfig)
+        assert grund in _lib.k1520_last_init_error()
+
+    emu = K1520Emulator(machine="sd1157")
+    try:
+        assert emu.machine == "sd1157"
+    finally:
+        del emu
+
+
+def test_printer_sheet_keys_lamps_and_switches_through_the_c_api():
+    """`k1520_printer_*` (Entwurf 49, WP3): der SD 1157 druckt seinen Selbsttest auf ein Blatt im Kern, das die
+    GUI zeilenweise liest; Tasten/Schalter/Lampen gehen ueber dieselbe Schnittstelle.  Andere Maschinen: 0 / -1."""
+    from app.core_binding.k1520 import _lib, K1520Handle
+
+    c = ctypes
+    SW_ONLINE, SW_KOPF, SW_LPI6, SW_PAPIER = 0, 1, 2, 3
+    KEY_PV1, KEY_TEST = 1, 3
+    LAMP_ONLINE, LAMP_FEHLER = 0, 1
+
+    handle = _lib.k1520_create_printer(0, None)
+    assert handle, _lib.k1520_last_init_error()
+    h = K1520Handle(handle)
+    try:
+        # Raster und Blattgroesse vor dem Druck
+        xz, yz, bahnen = c.c_int(), c.c_int(), c.c_int()
+        assert _lib.k1520_printer_geometry(h, c.byref(xz), c.byref(yz), c.byref(bahnen)) == 1
+        assert (xz.value, yz.value, bahnen.value) == (200, 144, 1)
+        breite, hoehe = c.c_int(), c.c_int()
+        assert _lib.k1520_printer_sheet_size(h, 0, c.byref(breite), c.byref(hoehe)) == 1
+        assert breite.value == 3000
+        assert _lib.k1520_printer_sheet_size(h, 1, c.byref(breite), c.byref(hoehe)) == 0     # Einbahndrucker
+        assert _lib.k1520_printer_beleg_insert(h, 210, 148) == 0                              # Vorsteckbeleg gibt es nur am K6316
+        assert _lib.k1520_printer_beleg_remove(h) == 0
+        assert _lib.k1520_printer_beleg_state(h, None, None, None, None, None, None) == 0
+        v0 = _lib.k1520_printer_sheet_version(h, 0)
+
+        # Schalter und Lampen
+        assert _lib.k1520_printer_switch_get(h, SW_ONLINE) == 1
+        assert _lib.k1520_printer_switch_get(h, SW_LPI6) == 1
+        assert _lib.k1520_printer_switch_get(h, SW_PAPIER) == 1
+        assert _lib.k1520_printer_switch_get(h, SW_KOPF) == 0
+        assert _lib.k1520_printer_switch_get(h, 99) == -1
+        assert _lib.k1520_printer_lamp(h, 99) == -1
+        assert _lib.k1520_printer_switch(h, 99, 1) == 0
+        assert _lib.k1520_printer_key(h, 99, 1) == 0
+
+        # offline einschalten, Grundstellung abwarten, TEST druecken
+        assert _lib.k1520_printer_switch(h, SW_ONLINE, 0) == 1
+        assert _lib.k1520_printer_switch_get(h, SW_ONLINE) == 0
+        for _ in range(250):
+            _lib.k1520_run(h, 20000)
+        assert _lib.k1520_printer_lamp(h, LAMP_ONLINE) == 0          # offline gestartet
+        assert _lib.k1520_printer_lamp(h, LAMP_FEHLER) == 0
+        assert _lib.k1520_printer_key(h, KEY_TEST, 1) == 1
+        for _ in range(500):
+            _lib.k1520_run(h, 20000)
+        x, y, lauf = c.c_int(), c.c_int(), c.c_int()
+        assert _lib.k1520_printer_head(h, c.byref(x), c.byref(y), c.byref(lauf)) == 1
+        assert y.value >= 36
+
+        assert _lib.k1520_printer_sheet_version(h, 0) > v0
+        assert _lib.k1520_printer_sheet_size(h, 0, c.byref(breite), c.byref(hoehe)) == 1
+        assert hoehe.value >= 60 + 17
+        zb = (breite.value + 7) // 8
+        # Zeile 62 (Nadel 2 der ersten Textzeile bei y0 = 36 + 8 * 3 = 60): das 'S' von SERIENDRUCKER beginnt bei Takt 80
+        # = Pixel 160 und hat in Spalte 0 die Nadeln 2, 3 und 6 (Glyphe 26H low-aktiv, hardware.md §3).
+        puffer = (c.c_uint8 * (zb * 18))()
+        n = _lib.k1520_printer_sheet_rows(h, 0, 60, 18, c.cast(puffer, c.c_void_p), zb * 18)
+        assert n == 18
+        def punkt(px, zeile):
+            return bool(puffer[(zeile - 60) * zb + px // 8] & (0x80 >> (px % 8)))
+        assert punkt(160, 62) and punkt(161, 62)                  # Nadel 2
+        assert punkt(160, 64) and punkt(160, 70)                  # Nadel 3, Nadel 6
+        assert not punkt(160, 60) and not punkt(160, 66)          # Nadel 1 und 4 nicht
+        assert not punkt(158, 62) and not punkt(0, 62)
+        # Puffer zu klein / Bereich hinter dem Blatt
+        assert _lib.k1520_printer_sheet_rows(h, 0, 60, 18, c.cast(puffer, c.c_void_p), zb * 2) == 2
+        assert _lib.k1520_printer_sheet_rows(h, 0, hoehe.value + 5, 3, c.cast(puffer, c.c_void_p), zb * 18) == 0
+
+        # Blatt leeren: Version steigt, Hoehe faellt auf den Papierstand zurueck
+        v1 = _lib.k1520_printer_sheet_version(h, 0)
+        assert _lib.k1520_printer_sheet_clear(h) == 1
+        assert _lib.k1520_printer_sheet_version(h, 0) > v1
+        assert _lib.k1520_printer_key(h, KEY_TEST, 0) == 1
+    finally:
+        _lib.k1520_destroy(h)
+
+    # kein Drucker: 0 bzw. -1, kein Absturz
+    m = _lib.k1520_create_mc80(0, None)
+    assert m, _lib.k1520_last_init_error()
+    hm = K1520Handle(m)
+    try:
+        assert _lib.k1520_printer_geometry(hm, None, None, None) == 0
+        assert _lib.k1520_printer_sheet_size(hm, 0, None, None) == 0
+        assert _lib.k1520_printer_sheet_version(hm, 0) == 0
+        assert _lib.k1520_printer_sheet_clear(hm) == 0
+        assert _lib.k1520_printer_beleg_insert(hm, 210, 148) == 0
+        assert _lib.k1520_printer_head(hm, None, None, None) == 0
+        assert _lib.k1520_printer_key(hm, KEY_PV1, 1) == 0
+        assert _lib.k1520_printer_switch(hm, SW_ONLINE, 1) == 0
+        assert _lib.k1520_printer_switch_get(hm, SW_ONLINE) == -1
+        assert _lib.k1520_printer_lamp(hm, LAMP_ONLINE) == -1
+    finally:
+        _lib.k1520_destroy(hm)
 
 
 def test_mc80_2x_through_the_c_abi():

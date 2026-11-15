@@ -1,0 +1,174 @@
+.heNV - Einsatz Seriendrucker SD 1157 an SKR - Reg.-Nr. 1258/4/H/9
+.op
+Einsatú   eineó  Seriendruckeró  SÄ  115·  aî  eineí  Systeí  deò 
+                    Kleinrechentechnië (SKR)
+
+Zuò  Komplettierunç eineò vorhandeneî SKR-Anlagå (SW¬  NSW©  odeò 
+aló Ersatú f}ò eineî defekteî Druckeò (NSW¬  Et-Probleme©  steheî 
+Kosten- unä  leistungsg}nstiç Seriendruckeò SÄ 115· voî  Robotroî 
+zuò Verf}gung®  Dieså sinä jedocè f}ò BÃ unä ESEÒ vorgesehen® Beé 
+deò  Anwendunç  miô SKÒ kommô eó zõ undefinierteî  Zust{ndeî  beé 
+auftretendeî  Fehlerî  (Fehlerbehandlungsprozedur)®   Desweitereî 
+weicht der Zeichenvorrat zu schon bestehenden Programmen ab.
+
+L|sung:         Anpassunç  bzw®  [nderunç deó Mikropogrammeó  auæ 
+                deò  SÄ 115· Speicherplattå  (Z-Nr®  56-264-6702© 
+                zur Arbeit mit SKR.
+
+Arbeitsmittel:  1. Programmierger{t f}r EPROM's (U555, 2708)
+                2. B}rocomputer BC A5120
+
+Hilfsmittel:    Programmieradapteò    zuí    Programmiereî    deò 
+                eingel|teten EPROM's.
+
+Diå Anleitunç zuí Baõ deó Programmieradapteró liegô vor® (Aufwanä 
+ca® 40.- Í Materiaì unä ca® 5è Az.)
+Daó  ben|tigtå Programí kanî auæ Minifolienspeicheò ií SCP-Formaô 
+(16*25¶ Bytes© }bergebeî werden.
+Beé Lieferunç deò Speicherplatinå isô eiî Programmiereî beé H]Ò ² 
+m|glich.
+Miô  deò  beschriebeneî Anpassunç kanî deò SÄ 115· aî  vorhandenå 
+SKÒ angeschlosseî werden.
+
+.paŠ[nderungen am Mikroprogramm des Seriendruckers 1157
+
+Diå  [nderunç ií Mikroprogramí erlaubô deî Anschluş deó  Druckeró 
+aî SKÒ miô IFSÓ unä V2´ Schnittstellen® Daó Mikroprogramí isô nuò 
+f}ò  diå Seriendruckeò SÄ 115· deó Typó 26´ unä 267¬  abeò  nichô 
+f}ò deî Tyğ 26¹ (graphic© geeignet® 
+
+Folgendå  [nderungeî  wurdeî  gegen}beò deí  alteî  Mikroprogramí 
+gemacht:
+
+ - Daó  ]bertragungsprotokolì aî deò IFSÓ Schnittstellå wurdå voî 
+   960° Baud¬  · Biô miô ungeradeò Parit{ô iî 960° Baud¬  ¸  Bit¬ 
+   ohnå Parit{t ge{ndert.
+
+ - Nacè  deí Einschalteî wareî keinå  TAB-Markeî  gesetzt¬  dieså 
+   werdeî  jetzô f}ò diå ersteî 13² Zeicheî iî Modulo-¸ Abst{ndeî 
+   eingestellt.
+
+ - Beé ]bertragungsfehlerî odeò beé falscheò Programmierunç (ESC-
+   Sequenzen© sendetå deò Druckeò daó Steuerzeicheî DC´ unä  war
+   tetå  auæ einå Abfragå deó Fehlerzustandeó odeò eiî R}cksetzeî 
+   durcè  deî  Rechner®  Dieså Fehleò werdeî  jetzô  voí  Druckeò 
+   ignorierô  (beé ]bertragungsfehlerî wirä eiî '?§ gedruckô  unä 
+   beé  falscheî  ESC-Sequenzeî werdeî dieså ingoriert)®  Aî  deî 
+   Rechneò wirä keinå Fehlermeldunç mehò gesendet® 
+.paŠBefehlsliste SD 1157 (hexadezimale Darstellung der Codierung)
+
+NUL     00                 Leerbefehl
+HTS     1B 48              Horizontaltabulatormarken setzen
+HTC     1B 5B 33 67        Horizontaltabulatormarken l|schen
+HT      09                 Horizontaltabulation
+HPRV    1B 5B 3n...3m 61   Horizontalpositionierunç relativ¬ 
+                           vorw{rts
+HPRR    1B 5B 3n...3m 71   Horizontalpositionierunç relativ¬
+                           r}ckw{rts
+HPA     1B 5B 3n...3m 60   Horizontalpositionierunç absolut
+CR      0D                 Wagenr}cklauf
+BS      08                 R}ckschritt
+NL      1B 45              neue Zeile
+6LPI    1B 5B 30 20 4C     6 Zeilen pro Zoll
+8LPI    1B 5B 35 20 4C     8 Zeilen pro Zoll
+LF1     0A                 Zeilenvorschub, linke Bahn
+LF2     11                 Zeilenvorschub, rechte Bahn
+VTS1    1B 4A              Vertikaltabulationsmarken f}r linke 
+                           Bahn setzen
+VTS2    1B 51              Vertikaltabulationsmarken f}r rechte 
+                           Bahn setzen
+VTC1    1B 5B 34 67        Vertikaltabulationsmarken f}r linke 
+                           Bahn l|schen
+VTC2    1B 5B 35 67        Vertikaltabulationsmarken f}r rechte 
+                           Bahn l|schen
+VT1     0B                 Vertikaltabulation, linke Bahn
+VT2     12                 Vertikaltabulation, rechte Bahn
+VPRV1   1B 5B 3n...3m 65   Vertikalpositionierung relativ, 
+                           vorw{rts, linke Bahn
+VPRV2   1B 5B 3n...3m 76   Vertikalpositionierung relativ, 
+                           vorw{rts, rechte Bahn
+VPRR1   1B 5B 3n...3m 75   Vertikalpositionierung relativ, 
+                           r}ckw{rts, linke Bahn 
+VPRR2   1B 5B 3n...3m 72   Vertikalpositionierung relativ, 
+                           r}ckw{rts, rechte Bahn
+VPA1    1B 5B 3n...3m 64   Vertikalpositionierung absolut, 
+                           linke Bahn 
+VPA2    1B 5B 3n...3m 74   Vertikalpositionierung absolut, 
+                           rechte Bahn
+LPF1    1B 5B 3n...3m 7D   Formularl{nge, linke Bahn
+LPF2    1B 5B 3n...3m 7E   Formularl{nge, rechte Bahn
+FF1     0C                 Formularvorschub, linke Bahn 
+FF2     13                 Formularvorschub, rechte Bahn
+LLFS1   1B 5B 3n...3m 7A   Formularendezeile linke Bahn setzen
+LLFS2   1B 5B 3n...3m 7B   Formularendezeile rechte Bahn setzen
+LLFC1   1B 30              Formularendezeile linke Bahn l|schen
+LLFC2   1B 31              Formularendezeile rechte Bahn l|schen
+ZLB     1B 35              Zeilenschaltbefehl f}r Konteneinzug
+KAB     1B 34              Kartenauswurf f}r Konteneinzug
+BDE     1B 5B 31 6D        Breitdruck ein
+SDE     1B 5B 33 6D        Schr{gdruck ein
+NDR     1B 5B 30 6D        Normaldruck
+SO      0E                 Umschalten auf zweiten Zeichensatz
+SLZE    1B 39              Sichtbarmachung letzte Zeile ein
+SLZA    1B 38              Sichtbarmachung letzte Zeile aus
+DEL     7F                 R}cksetzen des Ger{tes
+DA      1B 5B 30 63        Sende-Ger{tekennung
+DSR     1B 5B 35 6E        Sende-Status
+STX     02                 Start des Textes
+ETX     03                 Ende des TextesŠ                       V 24-Schnittstelle
+Leitungen
+
+V24        DIN         EIA         
+TGL 29077  66020       RS-232-C    Signalbeschreibung
+_____________________________________________________________________
+
+101        E1          AA          Protective Ground
+102        E2          AB          Signal Ground
+103        D1          BA          Transmitted Data
+104        D2          BB          Received Data
+105        S2          CA          Request to Send
+106  *1    M2          CB          Clear to Send
+107  *2    M2          CC          Data Set Ready
+108.2      S1.2        CD          Data Terminal Ready
+10¹  *3    Mµ          CÆ          Receivå Linå Signaì Detectoò
+
+*1 Wenî  daó Signaì voí Steuerger{ô nichô vorhandeî ist¬  muş  aí 
+   Interfaceanschlu~ Leitung 105 mit 106 verbunden werden.
+   (A 05 / B 06).
+
+*2 Wenî  daó Signaì voí Steuerger{ô nichô vorhandeî ist¬  muş  aí 
+   Interfaceanschluş Leitunç 10· miô 108.² verbundeî werdeî (Á 0µ 
+   ¯ Â 06)®  Diå Br}ckå x12¹ auæ deò STÅ 670³ daræ nichô best}ckô 
+   sein.
+
+*3 Wenî  daó  Signaì voí Steuerger{ô nichô  vorhandeî  ist¬  wirä 
+   Br}cke x130 nicht best}ckt.
+
+- Steuerzeichenº  DC±  Freigabå f}ò n{chstå Zeichen}bertragunç (XON)
+                  DC3  Sperre f}r Zeichen}bertragung (XOFF)
+                  STX  Start des Textes (zum Drucker)
+                  ETX  Ende des Textes (zum Drucker)
+                  ACK  positive Antwort (vom Drucker)
+                  NAK  negative Antwort (vom Drucker)
+.paŠBeschreibung des Programmieradapters:
+
+Deò  Programmieradapteò erm|glichô daó Programmiereî deò  EPROM'ó 
+auæ  deò  Speicherleiterkartå (Z.-Nr.:56-264-6702-7©  ohnå  dieså 
+ausl|teî zõ m}ssen® Dadurcè kanî einå eventuellå Besch{digunç deò 
+Speicherschaltkreiså   unä  deò  Leiterplattå  durcè  daó   sonsô 
+notwendigå  ausl|teî  deò  Bauelementå  vermiedeî   werden®   Deò 
+Programmieradapteò    kanî    aî    eiî    bereitó    vorhandeneó 
+Programmierger{ô   f}ò   EPROM'ó   deó  Typó   U55µ   odeò   270¸ 
+angeschlosseî    werdeî   unä   erlaubô   somiô   eiî   einfacheó 
+Programmieren der 12 EPROM's. 
+Deò  Programmieradapteò bestehô auó eineí Zweiebenenschalteò  miô 
+1² Schaltstellungen¬  eineí 5¸ pol®  unä eineí 9° pol® indirekteí 
+Steckverbindeò deò diå Verbindunç zuò EPROM-Platinå herstellô unä 
+1²  Widerst{ndeî diå aló Pull-up'ó aî deî Chip-Selecô  Eingaengeî 
+deò EPROM'ó liegen®  Durcè eineî EPROM-Sockeì miô Kabeì wirä  diå 
+Verbindunç   zwischeî  Programmierger{ô  unä   Programmieradapteò 
+hergestellt.
+Diå  EPROM'ó werdeî nacheinandeò programmiert¬  wobeé diå  Anwahì 
+deó  zõ  programmierendeî EPROM'ó durcè verdreheî  deó  Schalteró 
+erfolgt.
+

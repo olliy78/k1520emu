@@ -1,0 +1,5151 @@
+
+	title	Programm fuer robotron 1157 Drucker 
+	subttl	 Copyright (c) 1984-1986 by JDE
+;
+; Jonny Jonas mme Hue13
+; Version 1.00      10-Sep-84
+; letzte Aenderung: 24-Apr-86
+;
+; Programm hat folgende Aenderungen:
+; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+; Automatisch vereinbarte modulo 8 TAB's fuer die ersten 132 Zeichen .
+; Uebergehen von Fehlerzustaenden, die durch falsche ESC-Sequenzen oder
+; andere Bedienfehler hervorgerufen wurden.
+;
+; Vereinbarungen:
+; ~~~~~~~~~~~~~~~
+;
+dc1	equ	11h
+dc3	equ	13h
+dc4	equ	11h		; in DC1 geaendert
+esc	equ	1bh
+;
+; I/O Adressen
+; ~~~~~~~~~~~~
+;
+v24d	equ	7ch		; sio daten a v24
+ifssd	equ	v24d+1		; sio daten b ifss
+v24c	equ	v24d+2		; sio contr a v24
+ifssc	equ	v24d+3		; sio contr b ifss
+;
+ctc0	equ	0dch		; ctc kanal 0 baudrate sio
+ctc1	equ	ctc0+1		; ctc kanal 1
+ctc2	equ	ctc0+2		; ctc kanal 2
+ctc3	equ	ctc0+3		; ctc kanal 3
+;
+p1ad	equ	0f4h		; pio1 daten a
+p1bd	equ	p1ad+1		; pio1 daten b
+p1ac	equ	p1ad+2		; pio1 contr a
+p1bc	equ	p1ad+3		; pio1 contr b
+;
+p2ad	equ	0f8h		; pio2 daten a
+p2bd	equ	p2ad+1		; pio2 daten b
+p2ac	equ	p2ad+2		; pio2 contr a
+p2bc	equ	p2ad+3		; pio2 contr b
+;
+p3ad	equ	0ech		; pio3 daten a
+p3bd	equ	p3ad+1		; pio3 daten b
+p3ac	equ	p3ad+2		; pio3 contr a
+p3bc	equ	p3ad+3		; pio3 contr b
+;
+nad18	equ	0beh		; Nadelimpule Nadel 1-8
+nad9	equ	0bfh		; Nadelimpule Nadel 9
+;
+	if1
+	.printx	-PASS1-
+	else
+	.printx	-PASS2-
+	endif
+;
+; Memory Adressen
+; ~~~~~~~~~~~~~~~
+;
+ram1	equ	2c00h		; 1k byte system
+stack	equ	ram1+28h
+m2c3c	equ	ram1+3ch	; 2
+m2c3e	equ	ram1+3eh	; 6
+m2c44	equ	ram1+44h	; 3
+m2c47	equ	ram1+47h	; 6
+m2c4d	equ	ram1+4dh	; 3
+mbytes	equ	ram1+50h	; 32	
+m2c71	equ	ram1+71h	; 9
+m2c7a	equ	ram1+7ah	; 4
+ipzf	equ	ram1+7eh	; 2
+ipzl	equ	ram1+80h	; 13
+flenl	equ	ram1+8dh	; 33
+flenr	equ	ram1+0aeh	; 6
+m2cb4	equ	ram1+0b4h	; 16
+m2cc4	equ	ram1+0c4h	; 2
+m2cc6	equ	ram1+0c6h	; 2
+m2cc8	equ	ram1+0c8h	; 8
+tabmr	equ	ram1+0d0h	; 16
+;				  Interrupt Adressen
+isa00	equ	ram1+0e0h	; ctc kanal 0 unbenutzt
+isa02	equ	ram1+0e2h	; ctc kanal 1
+isa04	equ	ram1+0e4h	; ctc kanal 2
+isa06	equ	ram1+0e6h	; ctc kanal 3
+isa08	equ	ram1+0e8h	; 
+isa0a	equ	ram1+0eah	; 
+isa0c	equ	ram1+0ech	; 
+isa0e	equ	ram1+0eeh	; 
+isa10	equ	ram1+0f0h	; sio-ifss sender leer
+isa12	equ	ram1+0f2h	; sio-ifss ext-stat. (unbenutzt)
+isa14	equ	ram1+0f4h	; sio-ifss empfaenger
+isa16	equ	ram1+0f6h	; sio-ifss error
+isa18	equ	ram1+0f8h	; sio-v24 sender leer
+isa1a	equ	ram1+0fah	; sio-v24 ext-stat.
+isa1c	equ	ram1+0fch	; sio-v24 empfaenger, parallel-ss
+isa1e	equ	ram1+0feh	; sio-v24 error, parallel-ss
+;
+m2d00	equ	ram1+100h	; 9
+zspei1	equ	ram1+109h	; 2e7fh-2d09h
+zspei2	equ	ram1+27fh	; 2fffh-2e7fh
+;
+azg1	equ	3000h		; anfang zeicheng. 1
+azg2	equ	3400h		; anfang zeicheng. 2
+ezg2	equ	azg2+1023
+konst1	equ	azg1+300h	; ausschrift im testmodus
+m335f	equ	azg1+35fh
+m3363	equ	azg1+363h
+m3366	equ	azg1+366h
+m336a	equ	azg1+36ah
+siobuf	equ	3800h
+siolen	equ	1024
+;
+	.z80
+	aseg
+	org	100h
+	.phase	0
+	page
+;
+; Initialisieren RAM und I/O Ports
+;
+sy00:	im	2
+	ld	a,2ch		; Interrupt Vector
+	ld	i,a
+	jr	sy01
+;
+rst8:	ds	3,0ffh
+;
+sy01:	ld	sp,stack
+	jr	sy02
+;
+rst10:	ds	3,0ffh
+;
+sy02:	ld	ix,mbytes	; initialisieren sys ctc, sys pio's
+	ld	a,0e0h		; interruptvector fuer
+	out	(ctc0),a
+	ld	a,17h		; kein int,zeitg,/16,pos fla,selbst,+zk,reset
+	jp	sy03
+;
+rst20:	ds	3,0ffh
+;
+; PIO's und CTC's initialisieren
+;
+sy03:	out	(ctc0),a
+	ld	a,0cfh
+	out	(p2ac),a
+	ld	a,29h
+	out	(p2ac),a
+	ld	a,0b7h
+	out	(p2ac),a
+	ld	a,0feh		; Int. Vector
+	out	(p2ac),a
+	ld	a,0e8h
+	out	(p2ac),a
+	ld	a,0cfh
+	out	(p2bc),a
+	ld	a,1
+	out	(p2bc),a
+	ld	a,0b7h
+	out	(p2bc),a
+	ld	a,0feh
+	out	(p2bc),a
+	ld	a,0eah
+	out	(p2bc),a
+	ld	a,0cfh
+	out	(p1ac),a
+	ld	a,30h
+	out	(p1ac),a
+	ld	a,97h
+	out	(p1ac),a
+	ld	a,0cfh
+	out	(p1ac),a
+	ld	a,0ech
+	out	(p1ac),a
+	ld	a,0cfh
+	jp	sy040
+;
+nmic:	jp	nmi		; bei farbbandhavarie + spannungsausfall
+;
+sy040:	out	(p1bc),a
+	ld	a,31h
+	out	(p1bc),a
+	ld	a,97h
+	out	(p1bc),a
+	ld	a,0cfh
+	out	(p1bc),a
+	ld	a,0eeh
+	out	(p1bc),a
+	ld	a,8fh
+	out	(p3ac),a
+	ld	a,87h
+	out	(p3ac),a
+	ld	a,0fch
+	out	(p3ac),a
+	ld	a,0cfh
+	out	(p3bc),a
+	ld	a,0ffh
+	out	(p3bc),a
+	ld	a,87h
+	out	(p3bc),a
+	ld	a,0feh
+	out	(p3bc),a
+	in	a,(p3bd)
+	bit	0,a		; ser/par
+	jp	nz,sy10		; kein ser. interface
+;
+; SIO Interface initialisieren
+;
+; PIO auf Interface fuer Schalterabfrage
+;
+	ld	a,7		; disable interrupt
+	out	(p3ac),a
+	out	(p3bc),a
+	ld	a,0cfh		; bit mode
+	out	(p3ac),a
+	ld	a,0ffh		; alles eingaenge
+	out	(p3ac),a
+	in	a,(p3ad)
+	bit	0,a
+	jp	z,sy09		; interface ifss
+;
+; V24 Interface initialisierung
+;
+	ld	b,0
+	in	a,(p3ad)
+	bit	4,a		; parity switch
+	jr	z,sy04		; nein
+	set	0,b		; parity enable bit fuer sio
+	bit	3,a		; odd/even parity switch
+	jr	z,sy04		; odd parity
+	set	1,b		; even parity bit setzen
+sy04:	bit	1,a		; stop bits 01=1
+	jr	z,sy05		; 10=1 1/2
+	set	2,b		; 11=2
+sy05:	bit	2,a
+	jr	z,sy06
+	set	3,b
+sy06:	set	6,b		; x16 taktrate
+	ld	a,4		; sio-register 4
+	out	(v24c),a
+	ld	a,b		; bits fuer register 4
+	out	(v24c),a
+	ld	a,3		; sio-register 3
+	out	(v24c),a
+	in	a,(06fh)	; switch pack 3
+	bit	5,a		; 7/8 bits
+	jr	nz,sy08		; 8-bits
+	ld	a,61h		; 7-bit,auto enable,rx enable
+	out	(v24c),a
+	ld	a,5		; sio-register 5
+	out	(v24c),a
+	ld	a,28h		; tx enable,7-bit
+sy07:	out	(v24c),a
+	ld	a,2		; sio-register 2
+	out	(ifssc),a
+	ld	a,0f0h		; interruptvector
+	out	(ifssc),a
+	ld	a,1		; sio-register 1
+	out	(v24c),a
+	ld	a,17h		; int bei jedem,int frei,veraend. vect.
+	out	(v24c),a
+	ld	a,1		; sio-register 1
+	out	(ifssc),a
+	ld	a,4		; veranderl. vector
+	out	(ifssc),a
+	ld	hl,isiote	; interruptvektoren v24
+	ld	(isa18),hl	; senderbuffer-leer-int.
+	ld	hl,serest
+	ld	(isa1a),hl	; ext-status-int.
+	ld	hl,serinp
+	ld	(isa1c),hl	; empfaenger-int.
+	ld	hl,errint
+	ld	(isa1e),hl	; error-int.
+	jr	sy10
+;
+sy08:	ld	a,0e1h
+	out	(v24c),a
+	ld	a,5		; sio-register 5
+	out	(v24c),a
+	ld	a,68h		; sendefreigabe,8-bit
+	jr	sy07
+;
+; IFSS Interface initialisierung
+;
+sy09:	ld	a,4		; sio-register 4
+	out	(ifssc),a
+	ld	a,44h		; 1-stop,x16 taktrate
+	out	(ifssc),a
+	ld	a,3		; sio-register 3
+	out	(ifssc),a
+	ld	a,0c1h		; rx enable,8-bit
+	out	(ifssc),a
+	ld	a,5		; sio-register 5
+	out	(ifssc),a
+	ld	a,68h		; tx enable,8-bit
+	out	(ifssc),a
+	ld	a,2		; sio-register 2
+	out	(ifssc),a
+	ld	a,0f0h		; interruptvector
+	out	(ifssc),a
+	ld	a,1		; sio-register 1
+	out	(ifssc),a
+	ld	a,16h		; tx int enable,veraen.vect.,int bei jedem
+	out	(ifssc),a
+	ld	hl,serinp	; interruptvektoren ifss
+	ld	(isa14),hl	; empfaenger-int.
+	ld	hl,errint
+	ld	(isa16),hl	; error-int.
+	ld	hl,isiote
+	ld	(isa10),hl	; senderbuffer-leer-int.
+sy10:	ld	hl,ictc1	; interruptvektoren system
+	ld	(isa02),hl	; sys-ctc-kanal 1
+	ld	hl,ictc2a
+	ld	(isa04),hl	; sys-ctc-kanal 2
+	ld	hl,ictc3
+	ld	(isa06),hl	; sys-ctc-kanal 3
+	ld	hl,m1a0d
+	ld	(isa08),hl
+	ld	hl,m098d	; Interrupt linker Rand, Papiervorschub 1
+	ld	(isa0c),hl
+	ld	hl,m1a3d
+	ld	(isa0a),hl
+	ld	hl,m09ce	; Interrupt rechter Rand, Papiervorschub 2
+	ld	(isa0e),hl
+	in	a,(p3bd)
+	bit	0,a		; ser/par
+	jr	z,sy11		; ser. interface
+;
+; Interruptvectoren fuer PIO Interface
+;
+	ld	hl,iparc
+	ld	(isa1c),hl
+	ld	hl,ipard
+	ld	(isa1e),hl
+;
+; Arbeitszellen und TAB's einstellen
+;
+sy11:	ld	(ix+27h),0
+	ld	iy,tabmr
+	sub	a
+	ld	b,0a4h		; 00->(2c3c-2cdf)
+	ld	hl,m2c3c
+sy12:	ld	m,a
+	inc	hl
+	djnz	sy12
+	ld	(ix+2bh),2ch	; tab register
+	ld	(ix+2ah),low tabmr+15
+	ld	hl,ttbl		; modulo 8 tabs eintragen
+	ld	de,tabmr
+	ld	bc,16
+	ldir
+	di
+	ld	a,10h		; vorwaerts
+	out	(p2ad),a
+	ld	a,18h		; farbbandmotor ein, fehlerlampe aus
+	out	(p2bd),a
+	ld	a,8		; richtung fur pv1, pv2
+	out	(p1bd),a
+	out	(p1ad),a
+	ld	(ix+3ch),52h
+	ld	(ix+5dh),52h
+;
+; Abfrage der Formularlaengeneinstellungen
+;
+	ld	de,60h
+	ld	b,2
+	in	a,(0bch)	; 8212-system formlaenge links einstellen
+	bit	4,a		; bit 4 5 laenge
+	jr	z,sy13		;     0 0 4"
+	inc	b		;     0 1 6"
+sy13:	bit	5,a		;     1 0 8"
+	jr	z,sy14		;     1 1 12"
+	sla	b
+sy14:	ld	hl,0
+sy15:	add	hl,de
+	djnz	sy15
+	ld	(flenl),hl	; formlaenge links speichern
+	ld	hl,0		; formlaenge rechts ermitteln
+	ld	b,2
+	bit	6,a		; bit 6 7 laenge
+	jr	z,sy16		;     0 0 4"
+	inc	b		;     0 1 6"
+sy16:	bit	7,a		;     1 0 8"
+	jr	z,sy17		;     1 1 12"
+	sla	b
+sy17:	add	hl,de
+	djnz	sy17
+	ld	(flenr),hl	; formlaenge rechts speichern
+	ld	a,1		; kanalreset
+	out	(ctc0),a
+	res	7,d
+	exx
+	res	7,d
+	exx
+sy18:	ld	b,1		; baudrate (bei ifss=9600,bei v24 nach switch)
+	in	a,(p3ad)
+	bit	0,a
+	jr	z,sy21		; IFSS Interface
+;
+; Baudrate fuer V24 Interface einstellen
+;
+	bit	5,a		; baudrate von schaltern
+	jr	z,sy19
+	inc	b
+sy19:	bit	6,a
+	jr	z,sy20
+	sla	b
+	sla	b
+sy20:	bit	7,a
+	jr	z,sy21
+	sla	b
+	sla	b
+	sla	b
+	sla	b
+;
+sy21:	ld	(ix+0ech),b	; baudrate zwischenspeichern
+	ld	a,0b7h		; int frei,zeitgeber,:256,+zk,reset
+	out	(ctc1),a
+	ld	a,0ffh		; zk=255
+	out	(ctc1),a
+	ld	(ix+10h),0ch
+	set	5,(ix+5)
+sy22:	ei
+	bit	5,(ix+5)
+	jr	nz,sy22
+sy23:	in	a,(p2bd)
+	bit	3,a		; /tf
+	jr	z,sy26		; techn. fehler
+	bit	6,(ix+5)	; mb syn
+	jr	nz,sy32		; mb syn=1
+	in	a,(p2ad)
+	bit	3,a		; /vk
+	jr	z,sy28		; vorwarnkontakt geschl.
+sy24:	in	a,(p2ad)
+	res	4,a		; rueckwaerts
+	out	(p2ad),a
+	ld	(ix+0eh),0ffh
+	jr	sy29
+;
+sy25:	in	a,(p2ad)
+	set	6,a		; lfg=1
+	out	(p2ad),a
+	set	6,(ix+5)
+	jp	hp04
+;
+sy26:	in	a,(p3bd)
+	bit	1,a		; taste online
+	jr	z,sy27		; offline
+	di
+	halt
+;
+sy27:	set	4,(ix+8)	; mb dc4=1
+	jp	m0b93
+;
+sy28:	in	a,(p2ad)
+	set	4,a		; vorwaerts
+	out	(p2ad),a
+	ld	(ix+0eh),1eh
+sy29:	in	a,(p2ad)
+	set	2,a		; vtab=1 tabgeschw.
+	out	(p2ad),a
+	bit	3,(ix+5)
+	jr	nz,sy25		; mb asl=1
+	di
+	in	a,(p2ad)
+	set	6,a		; lfg=1
+	out	(p2ad),a
+	in	a,(p2ad)
+	res	6,a		; lfg=0
+	out	(p2ad),a
+	set	3,(ix+5)	; mb asl=1
+sy30:	in	a,(p2ad)
+	bit	5,a		; lauf
+	jr	nz,sy30		; lauf=1
+	jp	sy18		; lauf=0
+;
+sy31:	push	bc
+	ld	(ix+3bh),0ah	; zeitkonstante
+	call	zs00		; zeitschleife
+	pop	bc
+	call	hp91
+	set	0,(ix+2)
+	jp	hp04
+;
+sy32:	in	a,(p1ad)
+	bit	5,a		; /lr
+	jr	nz,sy24		; rand nicht erreicht
+	bit	1,(ix+5)	; mb apv
+	jr	nz,sy31		; mb apv=1
+	bit	0,(ix+2)	; mb slz sichtbarmachen letzte zeile
+	jp	z,m0b53		; mb slz=0
+	in	a,(p3bd)
+	bit	5,a		; zfv
+	jr	nz,sy33
+	bit	2,(ix+0ch)
+	jp	z,m2781
+	in	a,(p3bd)
+	bit	7,a
+	jp	nz,m2781
+	ld	(ix+0ch),10h
+sy33:	sub	a
+	ld	(ix+0dh),a
+	ld	(ix+0fh),a
+	push	bc
+	ld	b,5
+	ld	hl,mbytes+1
+sy34:	ld	m,a
+	inc	hl
+	djnz	sy34
+	pop	bc
+	in	a,(0bch)	; 8212-system
+	bit	1,a		; taste 6/8 lpi
+	jp	z,sy39		; 8 lpi
+	set	0,(ix+34h)	; mb za61=1
+	set	0,(ix+55h)	; mb za62=1
+	ld	(ix+41h),4
+	ld	(ix+62h),4
+sy35:	ld	(ix+28h),28h
+	ld	(ix+29h),32h
+	exx
+	ld	d,0
+	exx
+	in	a,(p3bd)
+	bit	1,a		; taste online
+	jr	nz,sy40		; offline
+	in	a,(0bch)	; 8212-system
+	bit	0,a		; /pe
+	jr	z,sy41		; papierende
+	res	7,(ix+5)	; mb off=0
+	in	a,(p2ad)
+	set	1,a		; a0-i=1 onlinelampe
+	out	(p2ad),a
+	in	a,(p2bd)
+	set	7,a		; ac-i=1
+	out	(p2bd),a
+sy36:	in	a,(p2bd)
+	set	6,a		; ifg=1
+	out	(p2bd),a
+	set	3,(ix+9)
+	set	4,(ix+9)
+sy37:	ld	(ix+8),1
+	ld	(ix+0bh),0
+	ld	hl,zspei1
+	ld	(ix+0ah),20h
+	in	a,(0bch)	; 8212-system
+	bit	3,a		; bda breite ausf.
+	jr	z,sy38
+	set	6,(ix+0ah)
+sy38:	in	a,(0bch)	; 8212-system
+	bit	0,a		; /pe
+	jp	nz,hp00		; kein papierende
+	set	2,(ix+0ah)	; zmb pe=1
+	set	2,(ix+0bh)	; mzmb pe=1
+	set	4,(ix+8)	; mb dc4=1
+	jp	hp00
+;
+sy39:	res	0,(ix+34h)
+	res	0,(ix+55h)
+	ld	(ix+41h),3
+	ld	(ix+62h),3
+	jr	sy35
+;
+sy40:	set	7,(ix+5)	; mb off=1
+	jr	sy37
+;
+sy41:	set	5,(ix+7)	; mb ape=1
+	jr	sy36
+;
+ttbl:	db	8,16,24,32	; modulo 8 Tabs fuer 132 Zeichen
+	db	40,48,56,64
+	db	72,80,88,96
+	db	104,112,120,128
+;-----------------------------------------------------------------------------
+hp00:	di
+	in	a,(p2ad)
+	bit	6,a		; lfg
+	jr	nz,hp03		; lfg=1
+	bit	5,a		; lauf
+	jr	nz,hp04		; lauf=1
+	res	1,(ix+7)	; mb rkbl=0
+	bit	3,(ix+5)	; mb asl
+	jp	nz,m051a	; mb asl=1
+	bit	6,(ix+3ah)	; mb pva
+	jr	nz,hp04		; mb pva1=1
+	bit	6,(ix+5bh)	; mb pva2
+	jr	nz,hp04		; mb pva2=1
+	bit	0,(ix+0ch)	; mb zfl
+	jr	nz,hp04		; mb zfl=1
+	bit	4,(ix+5)	; mb bkas
+	jr	nz,hp04		; mb bkas=1
+	in	a,(p2bd)
+	bit	3,a		; /tf
+	jp	z,m0b93		; technischer fehler
+	bit	0,(ix+7)
+	jr	z,hp02		; smrf=0
+	bit	5,(ix+5)
+	jr	nz,hp04		; mb kber=1
+	jp	m077a		; einl. dr. n. smrf
+;
+hp02:	ld	a,(ix+10h)	; kberz in akku
+	sub	3
+	jp	p,hp04		; kberz>02
+	ld	a,15h		; ctc-k0
+	out	(ctc0),a
+	ld	a,(ix+0ech)	; ohne abbruch starten
+	out	(ctc0),a
+	jp	m24b5		; abfrage pv
+;
+hp03:	bit	0,(ix+7)	; mb smrf
+	jr	nz,hp04		; mb smrf=1
+	bit	6,(ix+5)	; mb syn
+	jr	nz,hp04		; mb syn=1
+	bit	5,a		; lauf
+	jr	z,nmi		; nmi bei lauf=0
+hp04:	in	a,(p2bd)
+	bit	3,a		; /tf
+	jr	nz,hp05		; kein techn. fehler
+	bit	1,(ix+0ah)	; zmb hv
+	jr	nz,hp05		; zmb hv=1
+	call	hpv1		; up hv
+hp05:	ei
+	jp	hp00
+;
+nmi:	ld	ix,mbytes	; beginn nmi-interrupt
+	ld	a,7		; interruptfreigabe fuer pio 1+2 sperren
+	out	(p2ac),a
+	out	(p2bc),a
+	out	(p1ac),a
+	out	(p1bc),a
+	ld	sp,stack-8	; -----------
+	ld	hl,nmi1		; interrupt-
+	ld	(stack-8),hl	; prioritaets-
+	ld	(stack-6),hl	; kette
+	ld	(stack-4),hl	; inaktivieren
+	ld	hl,m0450
+	ld	(stack-2),hl	; -------------
+nmi1:	reti
+;
+m0450:	ld	(ix+6),0	; mbyte 6=00
+	ld	a,(ix+5)	; -------------------
+	and	80h		; m-byte 5 maskiert loeschen
+	ld	(ix+5),a	; -------------------
+	in	a,(p2bd)
+	and	0c1h		; dtfg,kas,fgdifma,/ltf=0
+	out	(p2bd),a
+	in	a,(p2ad)
+	res	6,a		; lfg=0
+	out	(p2ad),a
+	call	zs00		; up zeitschleife
+	call	hpv1		; up havarie
+	jp	hp00
+;
+hpv1:	ld	ix,mbytes	; up havarie:
+	set	1,(ix+0ah)	; zmb hv=1
+hpv2:	push	af		; up ape papierende
+	in	a,(p2bd)
+	and	0c9h		; dtfg,kas,fgdifma=0
+	out	(p2bd),a
+	in	a,(p2ad)
+	res	6,a		; lfg=0
+	out	(p2ad),a
+	in	a,(p1ad)
+	and	3bh		; xpfg1,zb1,ftb=0
+	out	(p1ad),a
+	in	a,(p1bd)
+	and	3bh		; xpfg2,zb2,fsb=0
+	out	(p1bd),a
+	ld	ix,mbytes	; ix in gst
+	res	6,(ix+3ah)	; mb pva1=0
+	res	6,(ix+5bh)	; mb pva2=0
+	res	0,(ix+0ch)	; mb zfl=0 
+	bit	7,(ix+5)	; mb off
+	jr	nz,m04d0	; mb off=1
+	in	a,(p2bd)
+	set	6,a		; ifg=1
+	out	(p2bd),a
+	in	a,(p2ad)
+	res	7,a		; a3-i=0 (zspnl=0)
+	out	(p2ad),a
+	sub	a		; -------------------
+	ld	(ix+32h),a	; par-register
+	ld	(ix+33h),a
+	ld	(ix+53h),a	; loeschen
+	ld	(ix+54h),a	; -------------------
+	in	a,(p3bd)
+	bit	0,a		; ser/par
+	jr	z,m04da		; ser. interface
+	in	a,(p2ad)
+	res	1,a		; a0-i=0 onlinelampe
+	out	(p2ad),a
+	pop	af
+	ei
+	ret
+;
+m04d0:	bit	6,(ix+7)	; mb test=1
+	jr	nz,m04d8
+	pop	af
+	ret
+;
+m04d8:	di
+	halt
+;
+m04da:	ld	(ix+2),0	; mb esc,cs1,zwz,par1,par2=0
+	bit	1,(ix+8)
+	jr	z,m04f8		; mb dc1=0
+	in	a,(p3ad)
+	bit	0,a
+	ld	a,dc3
+	jr	nz,m04f4	; s v24=1
+	out	(ifssd),a
+m04ee:	ld	(ix+8),79h	; m-byte 8 maskiert loeschen
+	jr	m0507
+;
+m04f4:	out	(v24d),a
+	jr	m04ee
+;
+m04f8:	push	hl
+	ld	hl,37ffh
+	ld	(ipzf),hl
+	ld	(ipzl),hl
+	pop	hl
+	ld	(ix+8),11h	; m-byte 8 maskiert loeschen
+m0507:	ld	a,3		; empfaengerfreigabe
+	out	(ifssc),a
+	ld	a,41h		; einschalten
+	out	(ifssc),a
+	ld	a,17h		; ctc-k0 fuer baudrate
+	out	(ctc0),a
+	ld	a,(ix+0ech)	; starten
+	out	(ctc0),a
+	pop	af
+	ret
+;
+m051a:	ld	a,0b7h		; ksw-kber
+	out	(ctc1),a
+	ld	a,0ffh		; zk-kber
+	out	(ctc1),a
+	ld	(ix+10h),6	; kberz=06
+	set	5,(ix+5)	; mb kberz=1
+	res	3,(ix+5)	; mb asl=0
+	in	a,(p2ad)
+	res	2,a		; vtab=0
+	out	(p2ad),a
+	bit	4,(ix+7)
+	jr	nz,hp01		; mb del=1
+	bit	0,(ix+7)
+	jr	nz,hp01		; mb smrf=1
+	bit	4,(ix+3)
+	jr	nz,hp01		; mb zspv=1
+	bit	6,(ix+5)
+	jr	nz,hp01		; mb syn=1
+	bit	7,(ix+5)
+	jr	nz,hp01		; mb off=1
+	bit	6,(ix+7)
+	jr	nz,hp01		; mb test=1
+	bit	0,(ix+3)
+	jr	nz,hp01		; mb pvoz=1
+	in	a,(p2ad)
+	set	1,a		; a0-i=aktiv onlinelampe
+	out	(p2ad),a
+	res	7,(ix+5)	; mb off=0
+	in	a,(p3bd)
+	bit	1,a		; taste online
+	jr	nz,hp01		; offline
+	in	a,(p2bd)
+	set	6,a		; ifg=aktiv
+	set	7,a		; ac-i=aktiv
+	out	(p2bd),a
+hp01:	jp	hp04
+;
+m0579:	call	zf53		; up zf-start
+	bit	0,(ix+0ch)
+	jr	nz,hp01		; mb zfl=1
+	bit	5,(ix+5)
+	jr	nz,hp01		; mb kber=1
+	in	a,(p2bd)
+	bit	6,a		; ifg
+	jp	nz,m0b93	; ifg=1
+	bit	6,(ix+5)	; mb syn
+	jp	nz,sy23		; mb syn=1
+	bit	4,(ix+3)	; mb zspv
+	jp	nz,m0755	; mb zspv=1
+m059d:	bit	4,(ix+7)	; mb del
+	jp	nz,m0646	; mb del=1
+	bit	7,(ix+5)	; mb off
+	jr	nz,m05ee	; mb off=1
+	in	a,(p2bd)
+	bit	7,a		; ac-i
+	jp	nz,m0640	; ac-i=1
+	jr	m0620		; ac-i=0
+;
+m05b3:	set	7,(ix+5)	; mb off=1
+	in	a,(p2ad)
+	res	1,a		; a0-1=inaktiv onlinelampe
+	out	(p2ad),a
+	in	a,(p2bd)
+	and	3fh		; ifg=0 u.ac=inaktiv
+	out	(p2bd),a
+	bit	7,(ix+1)	; mb at1
+	jp	nz,m064a	; mb at1=1
+	bit	6,(ix+1)	; mb at2
+	jr	nz,m064a	; mb at2=1
+	in	a,(p3bd)
+	bit	2,a		; taste pv1
+	jp	z,ta00		; tpv1=1 papiervorschub links
+	bit	3,a		; taste pv2
+	jp	z,ta50		; tpv2=1 papiervorschub rechts
+	bit	6,a		; taste test
+	jr	nz,m0646	; ttest=0
+	set	6,(ix+7)	; mb test=1
+	in	a,(0bch)	; 8212-system
+	bit	0,a		; /pe
+	call	z,hpv2		; pe=1
+	jp	hpt0		; ttest=1
+;
+m05ee:	bit	6,(ix+7)	; mb test
+	jp	nz,hpt1		; mb test=1
+	in	a,(p3bd)
+	bit	1,a		; taste online
+	jr	nz,m05b3	; offline
+m05fb:	in	a,(0bch)	; 8212-system
+	bit	0,a		; /pe
+	jr	z,m060b		; pe=1
+	res	2,(ix+0ah)	; zmb pe=0
+	res	5,(ix+7)	; mb ape=0
+	jr	m061a
+;
+m060b:	bit	7,(ix+5)
+	jp	z,hp04		; mb off=0
+	set	2,(ix+0ah)	; zmb pe=1
+	set	5,(ix+7)	; mb ape=1
+m061a:	bit	0,(ix+3)
+	jr	nz,m0646	; mb pvoz=1
+m0620:	res	7,(ix+5)	; mb off=0
+	in	a,(p3bd)
+	bit	1,a		; taste online
+	jp	nz,m0646	; offline
+	in	a,(p2ad)
+	set	1,a		; a0-i=aktiv onlinelampe
+	out	(p2ad),a
+	in	a,(p2bd)
+	set	6,a		; ifg=1
+	set	7,a		; ac-i=aktiv
+	out	(p2bd),a
+	set	3,(ix+9)	; mb fg108.2=1
+	jp	hp04
+;
+m0640:	in	a,(p2bd)
+	set	6,a		; ifg=1
+	out	(p2bd),a
+m0646:	bit	7,(ix+1)	; mb at1
+m064a:	jp	nz,m0717	; mb at1=1
+	bit	6,(ix+1)	; mb at2
+	jr	nz,m064a	; mb at2=1
+	in	a,(p2ad)
+	res	7,a		; a3-i=inaktiv
+	out	(p2ad),a
+	sub	a
+	cp	(ix+32h)
+	jp	nz,hp15		; parl1#0
+	cp	(ix+33h)
+	jp	nz,hp15		; parh1#0
+	cp	(ix+53h)
+	jp	nz,hp15		; parl2#0
+	cp	(ix+54h)
+	jp	nz,hp15		; parh2#0
+	cp	(ix+0eeh)
+	jp	nz,hp15		; zfar11#0
+	cp	(ix+0f7h)
+	jp	nz,hp15		; zfar21#0
+	bit	6,(ix+7)
+	jr	nz,m06cc	; mb test=1
+	bit	4,(ix+7)
+	jr	nz,m06f2	; mb del=1
+	in	a,(p3bd)
+	bit	1,a		; taste online
+	jr	z,m06c0		; online
+	bit	2,a		; taste pv1
+	jp	z,ta00		; tpv1=aktiv papiervorschub links
+	bit	3,a		; taste pv2
+	jp	z,ta50		; tpv2=aktiv papiervorschub rechts
+m069a:	bit	1,(ix+5)	; mb apv
+	jr	nz,hp70		; mb apv=1
+	bit	1,(ix+6)	; mb zkst
+	jr	nz,hp70		; mb zkst=1
+	ld	a,0b7h		; ksw f. zk
+	out	(ctc1),a
+	ld	a,0ffh		; zk fuer zk
+	out	(ctc1),a
+	ld	(ix+13h),28h	; zkz/kas
+	ld	(ix+6),22h	; mb zkst/apv1=1
+	bit	7,(ix+5)
+	jp	nz,m05b3	; mb off=1
+	jp	m05fb		; mb off=0
+;
+m06c0:	in	a,(p2bd)
+	set	7,a		; ac-i aktiv
+	out	(p2bd),a
+	set	3,(ix+9)	; mb fg108.2=1
+	jr	m069a
+;
+m06cc:	in	a,(p3bd)
+	bit	6,a		; taste test
+	jp	nz,sy00		; ende testprogramm
+	ld	(ix+0eh),0ffh	; tabz=255
+	set	3,(ix+5)	; mb asl=1
+	in	a,(p2ad)
+	set	4,a		; vw=1 vorwaerts
+	out	(p2ad),a
+	in	a,(p1bd)
+	bit	5,a		; /rr rechter rand
+	in	a,(p2ad)
+	jr	nz,m06eb	; rr=0
+	res	4,a		; vw=0
+m06eb:	set	6,a		; lfg=1
+	out	(p2ad),a
+	jp	hp04
+;
+m06f2:	bit	1,(ix+5)
+	jp	z,sy00		; mb apv=0
+	call	hp91		; up apv2
+hp70:	jp	hp04
+;
+hp15:	bit	1,(ix+6)
+	jr	nz,hp70		; mb zkst=1
+	ld	a,0b7h		; ksw zk
+	out	(ctc1),a
+	ld	a,0ffh		; zk f. zk
+	out	(ctc1),a
+	ld	(ix+13h),8	; zkz/pv
+	ld	(ix+6),0ah	; mb zkst/pv=1
+	jr	hp70
+;
+m0717:	in	a,(p2ad)
+	set	7,a		; a3-i=1
+	out	(p2ad),a
+	bit	1,(ix+5)	; mb apv
+	jr	z,m0737		; mb apv=0
+	bit	1,(ix+6)	; mb zkst
+	jr	nz,hp70		; mb zkst=1
+	ld	a,0b7h		; ksw zk
+	out	(ctc1),a
+	ld	a,64h		; zk zk/pv-ber
+	out	(ctc1),a
+	ld	(ix+6),12h	; mb zkst/apv2=1
+	jr	hp70
+;
+m0737:	bit	1,(ix+6)
+	jr	nz,hp70		; mb zkst=1
+	ld	a,0b7h		; ksw zk
+	out	(ctc1),a
+	ld	a,0ffh		; zk zk/dr
+	out	(ctc1),a
+	in	a,(p3bd)
+	bit	0,a		; ser/par
+	jr	z,m074f		; ifss=1
+	ld	(ix+13h),8	; zkz f.dr
+m074f:	ld	(ix+6),2	; zkst=1
+	jr	hp70
+;
+m0755:	bit	1,(ix+5)	; mb apv
+	jr	nz,m0717	; mb apv=1
+	bit	0,(ix+3)	; mb pvoz
+	jr	z,m077a		; mb pvoz=0
+	res	0,(ix+3)	; mb pvoz=0
+	bit	2,(ix+6)	; mb zkdr
+	jr	nz,m076f	; mb zkdr=1
+	res	4,(ix+3)	; mb zspv=0
+m076f:	di
+	ld	ix,mbytes+3	; beginn uebernahme pzw-reg. in paf-reg.
+	call	if47		; up reg-versch.
+	jp	hp00
+;
+m077a:	in	a,(p1bd)
+	bit	0,a		; ina
+	jp	nz,zf12		; ina vorhanden
+	res	1,(ix+6)	; mb zkst=0
+	exx
+	ld	d,0		; markierungsbyte fuer druck loeschen
+	push	de
+	exx
+	sub	a		; 00 in akku
+	cp	(ix+32h)
+	jp	nz,hpf0		; parl 1#0
+	cp	(ix+33h)
+	jp	nz,hpf0		; parh1#0
+	cp	(ix+53h)
+	jp	nz,hpf0		; parl2#0
+	cp	(ix+54h)
+	jp	nz,hpf0		; parh2#0
+	cp	(ix+0eeh)
+	jp	nz,hpf0		; zfar11#0
+	cp	(ix+0f7h)
+	jp	nz,hpf0		; zfar21#0
+	ld	a,(ix+1)	; m-byte 1 in akku
+	bit	7,a
+	jr	z,m07bd		; mb at1=0
+	bit	6,a
+	jr	z,m07bd		; mb at2=0
+	jp	hpf0		; beide at-marken gesetzt
+;
+m07bd:	bit	0,(ix+2)
+	jp	z,hpf0		; mb slz=0 -->optimierung
+m07c4:	bit	2,(ix+5)
+	jr	z,m07dd		; mb spk=0
+	exx
+	res	2,(ix+5)	; mb spk=0
+	ld	a,2		; -------------
+m07d1:	dec	h
+	bit	7,h		; spaltenrueck-
+	jr	z,m07d9
+	ld	h,9
+	dec	c		; korrektur
+m07d9:	dec	a
+	jr	nz,m07d1	; um 2
+	exx			; -------------
+m07dd:	bit	3,(ix+4)
+	jp	nz,m08b5	; mb zspl2=1
+	ld	(ix+28h),27h	; ztsw1-gst
+	ld	h,(ix+1bh)	; zspa1 in
+	ld	l,(ix+1ah)	; sazl
+	exx
+	push	hl
+	ld	l,(ix+14h)	; kpat1 in l"-reg:
+m07f3:	ld	d,0
+	ld	e,c		; kpz in e"-reg.
+	ld	h,0
+	cp	a
+	sbc	hl,de		; kpat1(2)-kpz
+	ld	(ix+18h),l	; res in rsp
+	jp	c,m0881		; kpz>kpat1(2)
+	ld	e,5
+	sbc	hl,de		; res-05
+	pop	hl
+	pop	de
+	jp	c,m0867		; kpz-kpat1(2)<5
+	ld	a,(ix+18h)	; dif.kpz-kpat1(2)
+	dec	a		; -1
+	ld	(ix+0eh),a	; in tabz
+	res	2,d		; rwd=0
+	in	a,(p2ad)
+	set	4,a		; vw=1 vorwaerts
+m0817:	out	(p2ad),a
+	exx
+	in	a,(p2bd)
+	bit	2,a		; kas
+	jr	nz,m0837	; kas=1
+	set	2,a		; kas=1
+	out	(p2bd),a
+	set	4,(ix+5)	; mb bkas=1
+	ld	a,0b7h		; ksw f.kas
+	out	(ctc1),a
+	ld	a,0ffh		; zk kas
+	out	(ctc1),a
+	ld	(ix+10h),1	; kberz f. kas
+	jp	hp04
+;
+m0837:	exx
+	call	hp56
+	bit	0,(ix+7)
+	jp	z,m076f		; einl.dr.b.mb smrf=0
+	res	0,(ix+7)	; mb smrf=0
+	jp	hp00		; einl.dr.b.smrf=1
+;
+hp56:	ld	b,5		; drspz=05
+	exx
+	ld	a,(ix+0eh)	; tabz in akku
+	bit	7,a
+	jr	nz,m0858	; tabz>128
+	sub	14h
+	jp	m,m085e		; tabz<20
+m0858:	in	a,(p2ad)
+	set	2,a		; vtab=1
+	out	(p2ad),a
+m085e:	in	a,(p2ad)
+	set	6,a		; lfg=1
+	out	(p2ad),a
+	ret
+;
+m0865:	pop	hl
+	pop	de
+m0867:	ld	(ix+0eh),14h	; tabz=20
+m086b:	set	2,d		; rwd=1
+	in	a,(p2ad)
+	res	4,a		; vw=0 rueckwaerts
+m0871:	out	(p2ad),a
+	set	3,(ix+5)	; mb asl=1
+	set	1,(ix+7)	; mb rkbl=1
+	call	hp56
+	jp	hp04
+;
+m0881:	cp	a
+	ld	h,0
+	ld	l,c		; kpz in l"
+	bit	3,(ix+4)
+	jr	nz,m0890	; mb zspl2=1
+	ld	e,(ix+14h)	; kpat1 in e"
+	jr	m0893
+;
+m0890:	ld	e,(ix+15h)	; kpat2 in e"
+m0893:	sbc	hl,de		; kpz-kpat1(2)
+	ld	(ix+18h),l	; res in rsp
+	cp	a
+	ld	e,0eh
+	sbc	hl,de		; rsp-14
+	jp	c,m0865		; rsp+6<20
+	ld	l,(ix+18h)	; kpz-kpat1(2)
+	ld	e,6		; +06
+	add	hl,de		; in
+	ld	(ix+0eh),l	; tabz
+	pop	hl
+	pop	de
+	ld	a,h
+	or	a
+	jr	nz,m086b	; spz#0
+	dec	(ix+0eh)	; tabz-1
+	jr	m086b
+;
+m08b5:	ld	(ix+29h),31h	; ztsw2-gst
+	ld	h,(ix+1dh)	; zspa2 in
+	ld	l,(ix+1ch)	; sazl
+	exx
+	push	hl
+	ld	l,(ix+15h)	; kpat2 in l"-reg.
+	jp	m07f3
+;
+m08c7:	ld	a,(ix+14h)	; kpat1 in akku
+	srl	a		; kpat1/2
+	ld	b,(ix+16h)	; kpet1 in b
+	jr	m08df
+;
+hpf0:	bit	3,(ix+4)
+	jr	z,m08c7		; mb zspl2=0
+	ld	a,(ix+15h)	; kpat2 in akku
+	srl	a		; kpat2/2
+	ld	b,(ix+17h)	; kpet2 in b
+m08df:	srl	b		; kpet1,2/2
+	add	a,b		; (kpat1,2+kpet1,2)/2
+	ld	(ix+19h),a	; m in msp
+	ld	h,0
+	ld	d,h
+	ld	l,a		; m in l
+	ld	e,(ix+12h)	; kpz in e
+	cp	a
+	sbc	hl,de		; m-kpz
+	jp	nc,m07c4	; m>kpz
+	bit	2,(ix+5)
+	jr	nz,m090f	; mb spk=1
+	exx
+	set	2,(ix+5)	; mb spk=1
+	ld	a,2		; --------------
+m08ff:	inc	h		; spalten-
+	bit	3,h
+	jr	z,m090b
+	bit	1,h		; korrektur
+	jr	z,m090b
+	ld	h,0
+	inc	c		; um 2
+m090b:	dec	a
+	jr	nz,m08ff
+	exx			; --------------
+m090f:	bit	3,(ix+4)
+	jp	nz,m0981	; mb zspl2=1
+	ld	h,(ix+1fh)	; zspe1 in
+	ld	l,(ix+1eh)	; sazl
+	exx
+	ld	e,(ix+16h)	; kpet1 in e"-reg
+m0920:	push	hl
+	ld	d,0
+	ld	l,c		; kpz in l"-reg
+	ld	h,d
+	cp	a
+	sbc	hl,de		; kpz-eti(2)
+	ld	(ix+18h),l	; res in rsp
+	jp	c,m0956		; et1(2)>kpz
+	ld	e,5
+	sbc	hl,de		; [kpz-et1(2)]-05
+	pop	hl
+	pop	de
+	jr	c,m0949		; kpz-et1(2)<5
+	ld	l,(ix+18h)	; res
+	dec	l		; -01
+	ld	(ix+0eh),l	; in tabz
+	set	2,d		; mb rwd=1
+	in	a,(p2ad)
+	res	4,a		; vw=0
+	jp	m0817
+;
+m0947:	pop	hl
+	pop	de
+m0949:	ld	(ix+0eh),14h	; tabz=20
+m094d:	res	2,d		; rwd=0
+	in	a,(p2ad)
+	set	4,a		; vw=1
+	jp	m0871
+;
+m0956:	cp	a
+	ld	h,0
+	ld	e,c		; kpz in e"
+	bit	3,(ix+4)
+	jr	nz,m0965	; mb zspl2=1
+	ld	l,(ix+16h)	; kpet1 in l"
+	jr	m0968
+;
+m0965:	ld	l,(ix+17h)	; kpet2 in l"
+m0968:	sbc	hl,de		; kpet1(2)-kpz
+	ld	(ix+18h),l	; res in rsp
+	cp	a
+	ld	e,0eh
+	sbc	hl,de
+	jr	c,m0947		; kpet1(2)-kpz+<20
+	ld	l,(ix+18h)
+	ld	e,6
+	add	hl,de		; rsp+06
+	ld	(ix+0eh),l	; res in tabz
+	pop	hl
+	pop	de
+	jr	m094d
+;
+m0981:	ld	h,(ix+21h)	; zspe2 in
+	ld	l,(ix+20h)	; sazl
+	exx
+	ld	e,(ix+17h)	; kpet2 in e"-reg
+	jr	m0920
+;
+; Interrupt linker Rand, Papiervorschub 1
+;
+m098d:	push	af
+	in	a,(p1ad)
+	bit	2,a		; xpfg1
+	jp	nz,pt00		; int pzs1 (xpfg1=1)
+	exx
+	bit	6,(ix+5)	; mb syn
+	jr	nz,m09a1	; mb syn=1
+	ld	a,c
+	cp	7
+	jr	z,m09a7		; kpz=07
+m09a1:	ld	bc,307h		; 7 in kpz, drspz=3
+	ld	h,6		; 6 in spz
+m09a7:	in	a,(p2ad)
+	bit	5,a		; lauf
+	jr	z,m09c9		; lauf=0
+	in	a,(p2ad)
+	bit	4,a		; vw
+	jr	nz,m09bd	; vw=1
+m09b3:	bit	3,(ix+5)
+	jp	nz,m09f8	; mb asl=1
+	jp	nmi		; havarie
+m09bd:	bit	0,(ix+7)
+	jr	nz,m09f8	; mb smrf=1
+	jr	m09c9
+;
+m09c5:	ld	(ix+0eh),7	; 07 in tabz
+m09c9:	exx
+	pop	af
+	ei
+	reti
+;
+; Interrupt rechter Rand, Papiervorschub 2
+;
+m09ce:	push	af
+	in	a,(p1bd)
+	bit	2,a		; xpfg2
+	jp	nz,pt50		; int pzs2 (xpfg2=1)
+	exx
+	in	a,(0bch)	; 8212-system
+	bit	3,a		; bda
+	ld	a,c
+	jr	z,m09f0		; bda=0 schmaler drucker
+	cp	220		; ;
+	jr	z,m09e4		; ;kpz=220
+	ld	c,220		; 220 in kpz
+m09e4:	in	a,(p2ad)
+	bit	5,a		; lauf
+	jr	z,m09c9		; lauf=0
+	bit	4,a		; vw
+	jr	z,m09bd		; vw=0
+	jr	m09b3		; vw=1
+;
+m09f0:	cp	142		; ;
+	jr	z,m09e4		; ;kpz=142
+	ld	c,142		; 142 in kpz
+	jr	m09e4
+;
+m09f8:	push	hl
+	push	de
+	ld	d,0
+	ld	h,d
+	ld	e,8
+	ld	l,(ix+0eh)	; tabz in l-reg.
+	cp	a
+	sbc	hl,de		; tabz-08
+	pop	de
+	pop	hl
+	jp	m,m09c9		; tabz<7
+	jp	m09c5
+;
+m0a0d:	bit	3,(ix+4)	; beg up zspu
+	jr	z,m0a2d		; mb zspl2=0
+	res	6,(ix+1)	; mb at2=0
+	res	4,(ix+1)	; mb et2=0
+	res	3,(ix+4)	; mb zspl2=0
+	bit	7,(ix+1)
+	jr	z,m0a3f		; mb at1=0
+m0a25:	ld	hl,zspei2	; st-adr.zsp2
+	ld	(ix+29h),32h	; ztsw2-gst
+	ret
+;
+m0a2d:	res	7,(ix+1)	; mb at1=0
+	res	5,(ix+1)	; mb et1=0
+	set	3,(ix+4)	; mb zspl2=1
+	bit	6,(ix+1)
+	jr	z,m0a25		; mb at2=0
+m0a3f:	ld	hl,zspei1	; st-adr.zsp1
+	ld	(ix+28h),28h	; ztsw1-gst
+	ret
+;
+; Interrupt Controlport PIO Interface
+;
+iparc:	push	af		;; int. par. interface
+	in	a,(p2bd)
+	bit	3,a		;; /tf
+	jp	z,iparc2	;; techn. fehler
+	bit	5,(ix+7)	;; mb ape
+	jp	nz,iparc2	;; mb ape=1
+	bit	6,a		;; ifg
+	jp	z,iparc1	;; ifg=0
+	in	a,(p3bd)
+	bit	1,a		;; taste online
+	jr	nz,iparc1	;; offline
+	in	a,(p2bd)
+	set	7,a		;; ac-i=aktiv
+	out	(p2bd),a
+iparc1:	pop	af
+	ei
+	reti
+;
+iparc2:	in	a,(p2ad)
+	res	1,a		;; a0-i=inaktiv onlinelampe
+	out	(p2ad),a
+	in	a,(p2bd)
+	set	6,a		;; ifg=1
+	out	(p2bd),a
+	jr	iparc1
+;
+; Interrupt von CTC1
+;
+m0a79:	dec	(ix+10h)	;; kberz-1
+	jr	m0a86
+;
+m0a7e:	res	5,(ix+5)	;; mb kber=0
+m0a82:	ld	a,13h		;; abbruch
+	out	(ctc1),a
+m0a86:	pop	af
+	ei
+	reti
+;
+ictc1:	push	af		;; int kas/kber sys-ctc-kanal 1 interrupt
+	bit	1,(ix+6)
+	jr	nz,ictc11	;; mb zkst=1
+	ld	a,(ix+10h)	;; kberz in akku
+	or	a
+	jr	nz,m0a79	;; kberz>0
+	bit	4,(ix+5)
+	jr	z,m0a7e		;; mb bkas=0
+	res	4,(ix+5)	;; mb bkas=0
+	jr	m0a82
+;
+ictc11:	ld	a,(ix+13h)	;; zkz in akku
+	or	a
+	jp	nz,m0b1f	;; zkz>0
+	ld	a,(ix+6)	;; mbyte 6 in akku
+	bit	6,a
+	jp	nz,m0d70	;; mb zkip=1
+	bit	7,a
+	jp	nz,m0b09	;; mb zk due-e=1
+	bit	3,a
+	jp	nz,m0b30	;; mb zkpv=1
+	bit	5,a
+	jp	nz,m0b45	;; mb zkapv1=1
+	bit	4,a
+	jr	nz,m0b10	;; mb zkapv2=2
+	in	a,(p2bd)
+	res	6,a		;; ifg=0
+	out	(p2bd),a
+	set	0,(ix+1)	;; mb hprw=1
+	ld	(ix+6),4	;; mb zkdr=1
+	call	ze00		;; up ze
+	set	4,(ix+3)	;; mb zspv=1
+	sub	a		;; 00 in a
+	cp	(ix+32h)
+	jr	nz,hp43		;; parl1#0
+	cp	(ix+33h)
+	jr	nz,hp43		;; parh1#0
+	cp	(ix+53h)
+	jr	nz,hp43		;; parl2#0
+	cp	(ix+54h)
+	jr	nz,hp43		;; parh2#0
+	cp	(ix+0eeh)
+	jr	nz,hp43		;; zfar11#0
+	cp	(ix+0f7h)
+	jr	nz,hp43		;; zfar21#0
+	ld	a,(ix+1)	;; mbyte 1 in akku
+	bit	7,a
+	jr	z,m0b15		;; mb at1=0
+	bit	6,a
+	jr	z,m0b19		;; mb at1=1,mb at2=0
+ictc12:	jp	m0a7e		;; mb at1,2=1
+;
+m0b09:	set	0,(ix+4)	; mb due-e=1
+	jp	m0b3b
+;
+m0b10:	call	hp91		; up apv2
+	jr	ictc12
+;
+m0b15:	bit	6,a
+	jr	z,ictc12	; mb at1,2=0
+m0b19:	set	0,(ix+3)	; mb pvoz=1
+	jr	ictc12
+;
+m0b1f:	dec	(ix+13h)	; zkz-1
+	pop	af
+	ei
+	reti
+;
+hp43:	set	0,(ix+3)	; mb pvoz=1
+	set	0,(ix+5)	; mb parv=1
+	jr	ictc12
+;
+m0b30:	call	if47		; up regversch.
+	di
+	ld	ix,mbytes+3
+	call	if47		; up reg-versch. (pzw in paf)
+m0b3b:	ld	(ix+6),0	; m-byte 6=00
+	res	0,(ix+3)	; mb pv0z=0
+	jr	ictc12
+;
+m0b45:	in	a,(p2bd)
+	res	2,a		; kas=0 kopfanschw.
+	res	4,a		; fma=0 farbbandmotor
+	out	(p2bd),a
+	bit	0,(ix+2)	; mb slz
+	jr	z,m0b6c		; mb slz=0
+m0b53:	ld	(ix+38h),18h	; pafl1=24
+	in	a,(0bch)	; 8212-system
+	bit	2,a		; einbahn dr.
+	jr	nz,m0b61	; ebd=1
+	ld	(ix+59h),18h	; pafl2=24
+m0b61:	set	1,(ix+5)	; mb apv=1
+	bit	6,(ix+5)	; mb syn
+	jp	nz,hp04		; mb syn=1
+m0b6c:	ld	(ix+6),0	; m-byte zk=00
+	jr	ictc12
+;
+hp91:	push	af		; up apv2 (formularrueckzug in druckposition
+	ld	(ix+6),0	; m-byte zk=00
+	res	1,(ix+5)	; mb apv=0
+	ld	(ix+38h),18h	; pafl1=24
+	in	a,(0bch)	; 8212-system
+	bit	2,a		; einbahn dr.
+	jr	nz,m0b89	; ebd=1
+	ld	(ix+59h),18h	; pafl2=24
+m0b89:	set	1,(ix+3ah)	; mb rpr1=1
+	set	1,(ix+5bh)	; mb rpr2=1
+	pop	af
+	ret
+;
+m0b93:	in	a,(p3bd)
+	bit	0,a		; ser/par
+	jr	nz,m0bbf	; kein ser.interface
+	bit	5,(ix+8)
+	jp	nz,m0cf6	; mb ipv=1
+	bit	6,(ix+8)
+	jr	z,m0bcc		; mb ipnl=0
+	bit	1,(ix+6)
+	jr	nz,m0bcc	; mb zkst=1
+	ld	a,0b7h		; ksw zk
+	out	(ctc1),a
+	ld	a,0ffh
+	out	(ctc1),a
+	ld	(ix+13h),8	; zkz=08
+	ld	(ix+6),42h	; mb zkst und zkip=1
+	jp	hp04
+;
+m0bbf:	in	a,(p2bd)
+	bit	3,a		; /tf
+	jp	nz,m0646	; kein techn. fehler
+	jp	hp04		; techn. fehler
+;
+m0bc9:	jp	m0c78
+;
+m0bcc:	bit	1,(ix+8)
+	jr	nz,m0bc9	; mb dc1=1
+	bit	1,(ix+0ah)
+	jr	nz,m0c04	; zmb hv=1
+	in	a,(p2ad)
+	bit	7,a		; a3-i
+	jr	nz,m0bc9	; a3-i=aktiv
+	sub	a		; ------------------
+	cp	(ix+32h)
+	jr	nz,m0bc9
+	cp	(ix+33h)
+	jr	nz,m0bc9	; par-register # 0
+	cp	(ix+53h)
+	jr	nz,m0bc9
+	cp	(ix+54h)
+	jr	nz,m0bc9	; --------------------
+	cp	(ix+0eeh)
+	jr	nz,m0bc9	; zf-register # 0
+	cp	(ix+0f7h)
+	jr	nz,m0bc9	; --------------------
+	in	a,(p3bd)
+	bit	1,a		; taste online
+	jp	nz,m0c78	; offline
+m0c04:	ld	a,3		; empfaengerfreigabe
+	out	(ifssc),a
+	ld	a,41h
+	out	(ifssc),a
+	bit	0,(ix+8)
+	jp	z,hp04		; mb sfg=0
+	bit	4,(ix+8)
+	jp	nz,m0cd2	; mb dc4=1
+	in	a,(p3ad)
+	bit	0,a
+	jr	z,m0c8c		; ifss
+m0c20:	bit	5,(ix+9)
+	jr	nz,m0c43	; mb 108.2=1
+	bit	3,(ix+9)
+	jp	z,hp04		; mb fg108.2=0
+	in	a,(06fh)	; switch-pack 3
+	bit	3,a
+	jr	z,m0c82		; duplex
+	ld	a,5		; register 5
+	out	(v24c),a
+	ld	a,0a8h		; 108.2=aktiv,105=inaktiv
+	out	(v24c),a
+m0c3b:	set	5,(ix+9)	; mb 108.2=1
+	res	3,(ix+9)	; mb fg108.2=0
+m0c43:	in	a,(06fh)	; switch-pack 3
+	bit	1,a
+	jr	nz,m0c65	; s opr=1
+	bit	4,a
+	jr	z,m0c92		; s ext=0
+	bit	4,(ix+9)
+	jr	z,m0cc2		; mb ext=0
+	ld	a,5		; register 5
+	out	(v24c),a
+	ld	a,0aah		; 105 aktiv
+	out	(v24c),a
+	bit	4,(ix+8)
+	jr	nz,m0cac	; mb dc4=1
+	ld	a,6		; sonst ACK senden
+	out	(v24d),a
+m0c65:	set	1,(ix+8)	; mb dc1=1
+m0c69:	res	3,(ix+8)	; mb dc3=0
+	push	hl
+	ld	hl,37ffh	; grundstellung
+	ld	(ipzf),hl	; in ipzf
+	ld	(ipzl),hl	; und ipzl schreiben
+	pop	hl
+m0c78:	bit	1,(ix+0ah)
+	jp	nz,hp04		; zmb hv=1
+	jp	m0646
+;
+m0c82:	ld	a,5
+	out	(v24c),a
+	ld	a,0aah		; 108.2 und 105 aktiv
+	out	(v24c),a
+	jr	m0c3b
+;
+m0c8c:	ld	a,dc1		; dc1 senden
+	out	(ifssd),a
+	jr	m0c65
+;
+m0c92:	ld	a,5		; reg. 5
+	out	(v24c),a
+	ld	a,0aah		; 105 aktiv
+	out	(v24c),a
+	bit	4,(ix+8)
+	jr	nz,sdc4		; mb dc4=1
+	ld	a,dc1		; dc1 senden
+	out	(v24d),a
+	jr	m0c65
+;
+sdc4:	ld	a,dc4		; dc4 senden
+	out	(v24d),a
+	jr	m0c65
+;
+m0cac:	ld	a,15h		; nak senden
+	out	(v24d),a
+	ld	a,(ix+0ah)	; zustandsregister
+	and	66h		; maskiert
+	ld	(ix+0ah),a	; loeschen
+	ld	a,(ix+0bh)	; mod.zustandsregister
+	and	0ch		; maskiert
+	ld	(ix+0bh),a	; loeschen
+	jr	m0c65
+;
+m0cc2:	in	a,(06fh)	; switch-pack 3
+	bit	3,a
+	jr	z,m0c65		; duplex
+	ld	a,5
+	out	(v24c),a
+	ld	a,0a8h		; 105 inaktiv
+	out	(v24c),a
+	jr	m0c65
+;
+m0cd2:	res	4,(ix+8)	;- dc4 bit ruecksetzen
+	in	a,(p3ad)
+	bit	0,a
+	jr	nz,m0cde	; v24
+	ld	a,dc4		; dc4 senden
+	out	(ifssd),a
+	jr	m0c65
+;
+m0cde:	in	a,(06fh)	; switch-pack 3
+	bit	1,a
+	jp	z,m0c20		; s opr=0
+	bit	5,(ix+7)
+	jp	nz,m0c69	; mb ape=1
+	bit	1,(ix+0ah)
+	jp	z,m0c20		; mb hv=1
+	jp	m0c69
+;
+; Zeichen aus Inputbuffer holen
+;
+m0cf6:	ld	a,(ix+31h)	; ipzl h-teil
+	cp	(ix+2fh)	; ipzf h-teil
+	jr	c,m0d06		; ipzl<ipzf
+	ld	a,(ix+30h)	; ipzl l-teil
+	cp	(ix+2eh)	; ipzf l-teil
+	jr	nc,m0d3e	; ipzl=ipzf
+m0d06:	bit	0,(ix+4)
+	jr	z,m0d22		; mb due-e=0
+	res	1,(ix+8)	; mb dc1=0
+	inc	(ix+30h)	; ipzl l-teil+1
+	jr	nz,m0d18	; ipzl#0
+	inc	(ix+31h)	; ipzl h-teil+1
+m0d18:	push	hl
+	ld	hl,(ipzl)	; adresse fuer ipzl in hl
+	ld	a,m		; ip-byte in akku
+	pop	hl
+	ei
+	jp	if03		; Zeichen ausgeben
+;
+m0d22:	bit	1,(ix+6)
+	jp	nz,hp04		; mb zkst=1
+	ld	a,0b7h
+	out	(ctc1),a
+	ld	a,19h		; ctc-zeit=2,56ms
+	out	(ctc1),a
+	ld	a,(ix+0ech)	; zk-register
+	ld	(ix+13h),a	; zkr in zkz
+	ld	(ix+6),82h	; mb zkdue-e und mb zkst=1
+	jp	hp04
+;
+m0d3e:	res	6,(ix+8)	; mb ipnl=0
+	res	5,(ix+8)	; mb ipv=0
+	res	0,(ix+4)	; mb due-e=0
+	ld	a,3
+	out	(ifssc),a
+	ld	a,40h		; empfaengerfreigabe
+	out	(ifssc),a
+	ld	a,(ix+0ah)
+	and	9fh
+	or	a
+	jr	nz,m0d62	; fehlerstatus
+	bit	1,(ix+0bh)
+	jp	z,m0646		; nullstatus
+m0d62:	set	4,(ix+8)	; mb dc4=1
+	bit	1,(ix+0ah)
+	jp	nz,hp04		; zmb hv=1
+	jp	m0646
+;
+	ds	30,0
+;
+m0d70:	in	a,(p3ad)
+	bit	0,a
+	jr	nz,m0d87	; s v24=1
+	ld	a,dc3		; dc3 senden
+	out	(ifssd),a
+m0d7a:	ld	a,(ix+8)
+	res	1,a		; mb dc1=0
+	or	28h		; mb dc3=1,mb ipv=1
+	ld	(ix+8),a
+	jp	m0b3b
+;
+m0d87:	in	a,(06fh)	; switch-pack 3
+	bit	1,a
+	jr	nz,m0da3	; s opr=1
+	bit	4,a
+	jr	z,m0dbb		; s etx=0
+	bit	3,a
+	jr	nz,m0db1	; s hdupl=1
+	ld	a,5
+	out	(v24c),a
+	ld	a,2ah		; 108.2 inaktiv
+	out	(v24c),a
+	res	5,(ix+9)	; mb 108.2=0
+	jr	m0d7a
+;
+m0da3:	ld	a,5
+	out	(v24c),a
+	ld	a,28h		; 108.2 inaktiv
+	out	(v24c),a
+	res	5,(ix+9)	; mb 108.2=0
+	jr	m0d7a
+;
+m0db1:	ld	a,5
+	out	(v24c),a
+	ld	a,0aah		; 105 aktiv
+	out	(v24c),a
+	jr	m0d7a
+;
+m0dbb:	ld	a,5
+	out	(v24c),a
+	ld	a,0aah		; 105 aktiv
+	out	(v24c),a
+	ld	a,dc3		; dc3 senden
+	out	(v24d),a
+	jr	m0d7a
+;
+; SIO Daten Interrupt
+;
+serinp:	push	af		; int ipf(fehlerfreies datenint.)
+	res	4,(ix+9)	; mb etx=0
+	ld	a,(ix+2fh)	; ipzf h-teil in akku
+	cp	3bh
+	jr	c,seri1		; ipzf<absoluter endwert
+	ld	a,(ix+2eh)	; ipzf l-teil in akku
+	cp	0ffh
+	jr	nc,seri10	; ipzf=absoluter endwert
+seri1:	in	a,(p3ad)
+	bit	0,a
+	jr	nz,seri9	; s v24=1
+	in	a,(ifssd)
+seri2:	res	7,a		; 7-bit-code
+	cp	2
+	jr	z,seri3		; stx
+	cp	3
+	jr	z,seri7		; etx
+	inc	(ix+2eh)	; ipzf l-teil +1
+	jr	nz,seri4	; ipzf l-teil#0
+	inc	(ix+2fh)	; ipzf h-teil+1
+seri4:	push	hl
+	ld	hl,(ipzf)	; adresse fuer ipzf in hl
+	ld	m,a		; datenbyte in ip
+	pop	hl
+	set	6,(ix+8)	; mb ipnl=1
+	bit	1,(ix+6)
+	jr	z,seri3		; mb zkst=0
+	ld	a,13h		; abbruch
+	out	(ctc1),a
+	ld	(ix+6),0	; m-byte zk=00
+seri3:	ld	a,(ix+2fh)	; ipzf h-teil
+	cp	3bh
+	jr	c,seri8		; ipzf<endwert mit vorhalt
+	ld	a,(ix+2eh)	; ipzf l-teil
+	cp	0f5h
+	jr	c,seri8		; ipzf<endwert mit vorhalt
+seri5:	set	5,(ix+8)	; mb ipv=1
+	bit	3,(ix+8)
+	jr	nz,seri6	; mb dc3=1
+	set	3,(ix+8)	; mb dc3=1
+	res	1,(ix+8)	; mb dc1=0
+	in	a,(p3ad)
+	bit	0,a
+	jr	nz,seri14	; s v24=1
+	ld	a,dc3		; dc3 senden
+	out	(ifssd),a
+seri6:	pop	af
+	ei
+	reti
+;
+seri7:	set	4,(ix+9)	; mb etx=1
+	jr	seri5
+;
+seri8:	in	a,(p3bd)
+	bit	1,a		; taste online
+	jr	z,seri6		; online
+	jr	seri5		; offline
+;
+seri9:	in	a,(v24d)
+	jr	seri2
+;
+seri10:	set	7,(ix+8)	; mb ipuel=1
+	set	1,(ix+0bh)	; mzmb uef=1
+	in	a,(p3ad)
+	bit	0,a
+	jr	nz,seri13	; s v24=1
+	in	a,(ifssd)
+seri11:	set	4,(ix+8)	; mb dc4=1
+seri12:	ld	a,5
+	out	(v24c),a
+	ld	a,28h		; 108.2 u.105 inaktiv
+	out	(v24c),a
+	res	5,(ix+9)	; mb 108.2=0
+	jr	seri6
+;
+seri13:	in	a,(v24d)
+	jr	seri11
+;
+seri14:	in	a,(06fh)	; switch-pack 3
+	bit	1,a
+	jr	nz,seri12	; s opr=1
+	bit	4,a
+	jr	nz,seri15	; s etx=1
+	ld	a,5
+	out	(v24c),a
+	ld	a,0aah		; 108.2 u.105 aktiv
+	out	(v24c),a
+	ld	a,dc3		; dc3 senden
+	out	(v24d),a
+	jp	seri6
+;
+seri15:	bit	4,(ix+9)
+	jp	nz,seri6	; mb etx=1
+	in	a,(06fh)	; switch-pack 3
+	bit	3,a
+	jr	nz,seri16	; s hdupl=1
+	ld	a,5
+	out	(v24c),a
+	ld	a,2ah		; 108.2 inaktiv
+	out	(v24c),a
+	res	5,(ix+9)	; mb 108.2=0
+	jp	seri6
+;
+seri16:	ld	a,5
+	out	(v24c),a
+	ld	a,0aah		; 105 aktiv
+	out	(v24c),a
+	jp	seri6
+;
+; SIO Fehlerinterrupt
+;
+errint:	push	af		; int ipff (fehlerinterrupt)
+	in	a,(p3ad)
+	bit	0,a
+	ld	a,30h		; kommando 6 senden
+	jp	nz,erint5	; s v24=1
+	out	(ifssc),a	; bei ifss
+erint1:	ld	a,(ix+2fh)	; ipzf h-teil
+	cp	3bh
+	jr	c,erint2	; ipzf<absoluter endwert
+	ld	a,(ix+2eh)	; ipzf l-teil
+	cp	0ffh
+	jr	nc,seri10	; ipzf=absoluter endwert
+erint2:	set	1,(ix+0bh)	; mzmb uef=1
+	in	a,(p3ad)
+	bit	0,a
+	jr	nz,erint4	; s v24=1
+	in	a,(ifssd)	; fehlerhaftes Zeichen lesen
+erint3:	ld	a,'?'		; "?" in akku
+	jp	seri2
+;
+erint4:	in	a,(v24d)
+	jr	erint3
+;
+erint5:	out	(v24c),a	; kommando 6 senden
+	jp	erint1
+;
+; SIO Extern Status Interrupt
+;
+serest:	push	af		; beg. interrupt ext.status
+	ld	a,10h		; kommando 2 senden
+	out	(v24c),a
+	xor	a
+	out	(v24c),a
+	in	a,(v24c)
+	bit	7,a
+	jr	nz,serex2	; break
+	bit	4,a
+	jr	nz,serex1	; 107 inaktiv
+	set	6,(ix+9)	; mb 107=1
+	jp	seri6
+;
+serex1:	bit	6,(ix+9)
+	jp	z,seri6		; mb 107=0
+	set	3,(ix+9)	; mb fg108.2=1
+	res	6,(ix+9)	; mb 107=0
+	jp	seri6
+;
+serex2:	set	7,(ix+9)	; mb break=1
+	jp	seri5
+;
+; Self-Test Mode
+;
+hpt0:	bit	7,(ix+7)
+	jp	nz,sy00		; mb teste=1
+	push	hl
+	ld	hl,konst1	; anfangsadresse
+	ld	(ix+25h),h	; der konstantentabelle
+	ld	(ix+24h),l	; abspeichern
+	pop	hl
+hpt1:	push	hl
+	ld	h,(ix+25h)	; aspth
+	bit	7,h
+	jr	nz,hpt7		; bit 7h=1
+	ld	l,(ix+24h)	; asptl
+	ld	a,m		; tbyte in a
+	cp	0ffh
+	jr	z,hpt3		; tbyte =ff ende teststring
+	bit	7,a
+	jr	nz,hpt10	; bit 7=1
+	inc	hl		; neuen
+hpt2:	ld	(ix+25h),h	; aspt-wert
+	ld	(ix+24h),l	; abspeichern
+	pop	hl
+	jr	hpt5
+;
+hpt3:	pop	hl		; ende zyklus
+	in	a,(p3bd)
+	bit	6,a		; taste test
+	jr	z,hpt6		; ttest=1
+hpt4:	bit	7,(ix+7)
+	jp	nz,m0646	; mb teste =1
+	set	7,(ix+7)	; mb teste =1
+	in	a,(0bch)	; 8212-system
+	bit	2,a		; ebd
+	jr	nz,formf1	; ebd=1
+	ld	a,13h		; bef.ff2 in a
+hpt5:	jp	if03		; ausgeben
+;
+hpt6:	in	a,(p3bd)
+	bit	1,a		; taste online
+	jr	z,hpt4		; online
+	bit	5,(ix+7)
+	call	nz,hpv2		; mb ape=1
+	jr	hpt0
+;
+formf1:	ld	a,0ch		; bef.ff1 in a
+	jr	hpt5
+;
+hpt7:	ld	a,(ix+24h)
+	bit	3,(ix+1)
+	jr	nz,hpt8		; mb sof=1
+	cp	'_'
+	jr	z,hpt11		; tbyte=5f
+	cp	'~'
+	jr	z,hpt12		; tbyte=7e
+	jr	hpt10
+;
+hpt8:	cp	'?'
+	jr	z,hpt13
+	cp	'~'
+	jr	nz,hpt10
+hpt9:	ld	hl,m336a
+	jr	hpt2
+;
+hpt10:	res	7,a
+	set	7,h
+	ld	l,a		; byte speichern
+	inc	l
+	jr	hpt2
+;
+hpt11:	ld	hl,m335f	; aspt laden
+	jr	hpt2
+;
+hpt12:	ld	hl,ezg2		; ende 2. zeicheng.
+	ld	a,m
+	or	a
+	ld	a,7eh
+	jr	nz,hpt9		; 2.zg nicht bestueckt
+	ld	hl,m3363	; aspt laden
+	jr	hpt2
+;
+hpt13:	ld	hl,m3366	; aspt laden
+	jr	hpt2
+;
+; Interrupt von PIO Interface
+;
+ipard:	ei			; datenuebernahme von par. interface
+	in	a,(p2bd)
+	bit	3,a		; /tf
+	jr	z,m1009		; techn. fehler
+	res	7,a		; ac-i=inaktiv
+	out	(p2bd),a
+	in	a,(p3ad)	; daten holen
+if03:	push	de		; Drucken Zeichen in A
+	ld	e,a		; in e-register
+	bit	1,(ix+6)	; mb zkst
+	jr	z,m0fdb		; mb zkst=0
+	ld	a,13h		; ksw f.
+	out	(ctc1),a
+	ld	(ix+6),0	; mbyte zk=00
+m0fdb:	res	7,e		; 7-bit code
+	ld	a,e
+	bit	7,(ix+2)
+	jr	z,befa1		; mb esc=0
+	bit	6,(ix+2)
+	jp	z,m1101		; mb csi=0
+	bit	4,(ix+2)
+	jp	nz,nxtpar	; mb par1=1
+	and	70h		; zeichen der
+	cp	30h		; 3.spalte ?
+	jr	nz,beferr	; ub
+	set	4,(ix+2)	; mb par1=1
+	ld	a,e
+	and	0fh		; h-tetr.loesch.
+	ld	(ix+26h),a	; parameter in parameter-register
+	sub	0ah
+	jr	nc,beferr	; ub
+befnop:	jp	befe0
+;
+m1009:	set	1,(ix+0ah)	; zmb hv=1
+	jr	befnop		; zust.meldung
+;
+befesc:	set	7,(ix+2)	; mb esc=1
+	jr	befnop
+;
+befa1:	and	01100000b
+	or	a
+	ld	a,e
+	jp	nz,nobef	; druckbares Zeichen
+	or	a
+	jr	z,befnop	; nop
+	cp	esc
+	jr	z,befesc	; esc
+	cp	0eh
+	jr	z,befso		; so
+	cp	0fh
+	jp	z,befsi		; si
+	cp	0dh
+	jp	z,befcr		; cr
+	cp	8
+	jr	z,befbs		; bs
+	cp	9
+	jp	z,befht		; ht
+	cp	0ah
+	jp	z,beflf1	; lf1
+	cp	0bh
+	jp	z,befvt1	; vt1
+	cp	0ch
+	jp	z,befff1	; ff1
+	in	a,(0bch)	; 8212-system
+	bit	2,a		; einbahndrucker
+	jr	nz,beferr	; unerl. bef. bei ebd
+	ld	a,e		; befehle fuer 2. druckbahn
+	cp	11h
+	jp	z,beflf2	; lf2
+	cp	12h
+	jp	z,befvt2	; vt2
+	cp	13h
+	jp	z,befff2	; ff2
+beferr:	set	4,(ix+0ah)	; zmb ub=1
+	ld	a,(ix+2)
+	and	7		; mb esc,csi,zwz,par1,par2=0
+	ld	(ix+2),a
+befe1:	jp	befe0
+;
+befso:	push	bc
+	ld	bc,ezg2		; ende zeichengenerator 2
+	ld	a,(bc)
+	or	a
+	pop	bc
+	jr	nz,beferr	; 2. zeicheng. nicht bestueckt
+	jp	zg2on
+;
+befbs:	call	m1083		; up parameter
+	jp	hprr		; hprr
+;
+m1083:	ld	(ix+26h),1	; 01 in parameter-register
+	bit	1,(ix+1)
+	ret	z		; mb bdrf=0
+	inc	(ix+26h)	; parameter-register+1
+	ret
+;
+m1090:	set	2,(ix+4)	; mb fof=1
+	set	3,(ix+0ah)	; zmb fof=1
+	jr	befe1		; zust.meldung
+;
+m109a:	set	0,(ix+1)	; mb hprw=1
+	call	m14a5
+	ld	(ix+0fh),0	; dpz=00
+	res	2,(ix+4)	; mb fof=0
+	ld	iy,tabmr	; tab-marken-register-grundstellung
+	ret
+;
+befcr:	call	m109a		; up cr
+	jr	befe1
+;
+befht:	push	de		; beg.ht-befehl
+	push	hl		; abarbeitung
+	ld	d,0
+	ld	h,d
+	ld	l,(ix+0fh)	; dpz in l
+	ld	e,(iy)		; tabmr in e
+	cp	a
+	sbc	hl,de		; dpz-tabmr
+	pop	hl
+	pop	de
+	jp	p,befht3	; dpz>tabmr
+befht1:	call	m1330		; up lzbd
+befht2:	push	de
+	push	hl
+	ld	d,0
+	ld	h,d
+	ld	l,(ix+0fh)	; dpz in l
+	ld	e,(iy)		; tabmr in e
+	cp	a
+	sbc	hl,de		; dpz-tabmr
+	pop	hl
+	pop	de
+	jr	z,befht4	; dpz=tabmr
+	jp	m,befht1	; dpz<tabmr
+befht3:	ld	(m2cc4),iy	; iy-reg abbild.
+	ld	a,(m2cc4)	; l-teil in akku
+	cp	0dfh
+	jr	z,m1090		; ztabm=16
+	inc	iy		; n.tabmr akt
+	jr	befht2
+;
+befht4:	call	befht5		; up bdrhp
+	inc	iy		; n.tabm akt.
+	jr	m110a
+;
+befht5:	bit	7,(ix+3)	; up bdrhp
+	ret	z		; mb bdrhp1=0
+	inc	hl		; sazf+1
+	ld	m,8ch		; bu in zsp
+	res	7,(ix+3)	; mb bdrhp1=0
+	ret
+;
+m1101:	cp	'['
+	jp	nz,m1641	; 2-byte-befehl
+	set	6,(ix+2)	; mb csi=1
+m110a:	jp	befe0
+;
+nobef:	cp	' '
+	jr	nz,nobef1	; kein space
+	call	m1083		; up parameter
+	jp	hprv		; hprv
+;
+m1117:	bit	6,(ix+1)
+	jp	nz,m11ad	; mb at2=1
+	set	6,(ix+1)	; mb at2=1
+	inc	hl		; sazf+1
+	ld	m,83h		; at in zsp
+	ld	a,(ix+0fh)
+	add	a,8		; dpz +08
+	ld	(ix+15h),a	; kpat2
+	inc	hl
+	ld	(ix+1ch),l	; zspa2
+	ld	(ix+1dh),h	; laden
+	dec	hl
+	jr	m118f
+;
+befdel:	in	a,(p2bd)
+	bit	3,a		; /tf
+	jr	z,m110a		; techn. fehler
+	res	6,a		; ifg=0
+	out	(p2bd),a
+	set	4,(ix+7)	; mb del=1
+	jr	m110a
+;
+nobef1:	cp	7fh
+	jr	z,befdel	; delete
+	in	a,(p2bd)
+	bit	3,a		; /tf
+	jr	z,m110a		; techn. fehler
+	bit	5,(ix+7)	; mb ape
+	jr	nz,m110a	; mb ape=1
+	call	m13ab		; up fo
+	bit	2,(ix+4)	; mb fof
+	jr	nz,m110a	; mb fof=1
+	in	a,(p2ad)
+	set	7,a		; a3-i=aktiv
+	out	(p2ad),a
+	in	a,(p2bd)
+	set	4,a		; fma=1 farbbandmotor
+	out	(p2bd),a
+	bit	4,(ix+4)	; mb zspf2
+	jr	nz,m1117	; mb zspf2=1
+	bit	7,(ix+1)	; mb at1
+	jr	nz,m11ad	; mb at1=1
+	set	7,(ix+1)	; mb at1=1
+	inc	hl		; sazf+1
+	ld	m,83h		; at in zsp
+	ld	a,(ix+0fh)
+	add	a,8		; dpz+8
+	ld	(ix+14h),a	; kpat1
+	inc	hl
+	ld	(ix+1ah),l	; zspa1
+	ld	(ix+1bh),h	; laden
+	dec	hl
+m118f:	call	if47		; up reg-versch.
+	res	5,(ix+3)	; mb ze=0
+	res	0,(ix+1)	; mb hprw=0
+	bit	2,(ix+1)
+	jp	z,m1256		; mb sdrf=0
+	inc	hl
+	ld	m,88h		; su in zsp
+m11a4:	bit	3,(ix+1)
+	jr	z,m11ad		; mb soe=0
+	inc	hl
+	ld	m,8eh		; cu in zsp
+m11ad:	res	6,(ix+3)	; mb bdrhp2=0
+	bit	2,(ix+2)
+	jr	z,m121a		; mb sp=0
+	res	2,(ix+2)	; mb sp=0
+	ld	a,(ix+0dh)	; lsz in akku
+	bit	7,a
+	jr	nz,m11c7	; lsz>128
+	sub	14h
+	jp	m,m121a		; lsz<20
+m11c7:	bit	1,(ix+2)
+	jr	z,m11d4		; mb lzsdr=0
+	res	1,(ix+2)	; mb lzsdr=0
+	dec	(ix+0dh)	; slz-1
+m11d4:	ld	l,(ix+22h)	; sp-adr in
+	ld	h,(ix+23h)	; sazf
+	inc	hl		; sazf+1
+	ld	m,89h		; ht in zsp
+	bit	1,(ix+1)
+	jr	z,m11ea		; mb bdrf=0
+	inc	hl		; sazf+1
+	ld	m,8ch		; bu in zsp
+	res	1,(ix+3)	; mb bu=0
+m11ea:	bit	4,(ix+4)
+	jr	nz,m1245	; mb zspf2=1
+	push	hl
+	ld	l,(ix+28h)	; lade lsz
+	ld	h,2ch		; in akt
+	ld	a,(ix+0dh)	; tabsw1
+	ld	m,a
+	inc	l		; ztsw1
+	ld	(ix+28h),l	; akt
+	pop	hl
+m11ff:	bit	2,(ix+3)
+	jr	z,m1208		; mb su=0
+	inc	hl		; sazf+1
+	ld	m,88h		; su in zsp
+m1208:	bit	1,(ix+3)
+	jr	z,m1211		; mb bu=0
+	inc	hl
+	ld	m,8ch		; bu in zsp
+m1211:	bit	3,(ix+3)
+	jr	z,m121a		; mb cu=0
+	inc	hl
+	ld	m,8eh		; cu in zsp
+m121a:	ld	a,(ix+3)
+	and	0f1h		; mb bu,su,cu=0
+	ld	(ix+3),a
+	ld	(ix+0dh),0	; lsz=00
+	res	1,(ix+2)	; mb lzsdr=0
+	inc	hl		; zeichen
+	ld	m,e		; in zsp
+	inc	(ix+0fh)	; dpz +1
+	bit	2,(ix+1)
+	jr	z,m1239		; mb sdrf=0
+	set	1,(ix+2)	; mb lzsdr=1
+m1239:	bit	1,(ix+1)
+	jr	z,m1242		; mb bdrf=0
+	inc	(ix+0fh)	; dpz+1
+m1242:	jp	befe0
+;
+m1245:	push	hl		; -----
+	ld	l,(ix+29h)	; lade lsz
+	ld	h,2ch		; in akt.
+	ld	a,(ix+0dh)	; tabsw 2
+	ld	m,a		; --------
+	inc	l		; ztsw 2
+	ld	(ix+29h),l	; akt.
+	pop	hl
+	jr	m11ff
+;
+m1256:	bit	1,(ix+1)
+	jr	z,m125f		; mb bdrf=0
+	inc	hl
+	ld	m,8ch		; bu in zsp
+m125f:	jp	m11a4
+;
+if47:	ld	a,(ix+34h)	; up reg-versch.
+	ld	(ix+37h),a	; --------------
+	ld	a,(ix+33h)	; lade
+	ld	(ix+36h),a
+	ld	a,(ix+32h)	; pv-quell-
+	ld	(ix+35h),a
+	ld	a,(ix+55h)	; register
+	ld	(ix+58h),a	; in
+	and	1
+	ld	(ix+55h),a
+	ld	(ix+34h),a	; pv-ziel-
+	ld	a,(ix+54h)
+	ld	(ix+57h),a	; register
+	ld	a,(ix+53h)
+	ld	(ix+56h),a	; --------------
+	ld	a,(ix+0eeh)	; ----------------
+	ld	(ix+0f1h),a	; lade
+	ld	a,(ix+0efh)
+	ld	(ix+0f2h),a	; zf-quell-
+	ld	a,(ix+0f0h)	; register
+	ld	(ix+0f3h),a
+	ld	a,(ix+0f7h)	; in
+	ld	(ix+0fah),a
+	ld	a,(ix+0f8h)	; zf-ziel-
+	ld	(ix+0fbh),a	; register
+	ld	a,(ix+0f9h)
+	ld	(ix+0fch),a	; ----------------
+	sub	a		; --------------
+	ld	(ix+33h),a	; pv-quell-
+	ld	(ix+32h),a	; register
+	ld	(ix+54h),a	; loeschen
+	ld	(ix+53h),a	; --------------
+	ld	(ix+0eeh),a	; ----------------
+	ld	(ix+0efh),a	; zf-
+	ld	(ix+0f0h),a	; quell-
+	ld	(ix+0f7h),a	; register
+	ld	(ix+0f8h),a	; loeschen
+	ld	(ix+0f9h),a	; ----------------
+	ld	ix,mbytes	; gst ix-reg.
+	ret
+;
+hts:	ld	a,(ix+2ah)	; H-TAB setzen
+	cp	0dfh
+	jr	z,m1307		; 16 tabm gesetzt, keine weiteren moeglich
+	ld	iy,(m2c7a)	; akt.tabmr.
+	ld	a,(ix+0fh)	; tabm.
+	ld	(iy),a		; setzen
+	inc	iy		; tabm-reg.inc
+	inc	(ix+2ah)	; zhts akt.
+	jr	befe0
+;
+m12ee:	ld	iy,tabmr	; htl:tabmr-gst
+	ld	(ix+2ah),0d0h	; zhts-gst
+	ld	a,16
+m12f8:	ld	(iy),0		; alle 16
+	inc	iy		; tabmr
+	dec	a		; loeschen
+	jr	nz,m12f8
+	ld	iy,tabmr	; tabmr-gst
+	jr	befe0
+;
+m1307:	set	0,(ix+0ah)	; bfab in zmr
+befe0:	pop	de
+	bit	6,(ix+7)
+	jp	nz,hp04		; mb test=1
+	in	a,(p3bd)
+	bit	0,a		; ser/par
+	jr	z,m1326		; ifss=1
+	ld	a,(ix+0ah)
+	out	(p3ad),a
+	and	0e2h		; maskiert
+	ld	(ix+0ah),a	; loeschen
+	ei
+	reti
+;
+m1326:	in	a,(p2bd)
+	bit	6,a		; ifg
+	jp	z,hp04		; ifg=0
+	jp	m0cf6		; ifg=1
+;
+m1330:	bit	1,(ix+1)	; up lzbd
+	jr	z,m1347		; mb bdrf=0
+	bit	7,(ix+3)
+	jr	nz,m1347	; mb bdrhp=1
+	inc	hl		; sazf+1
+	ld	m,8ch		; bu in zsp
+	set	7,(ix+3)	; mb bdrhp1=1
+	set	6,(ix+3)	; mb bdrhp2=1
+m1347:	bit	4,(ix+4)	; beginn up lz
+	jr	nz,m1387	; mb zspf2=1
+	bit	7,(ix+1)
+	jr	z,m1371		; mb at1=0
+	bit	2,(ix+2)
+	jr	nz,m1371	; mb sp=1
+	set	2,(ix+2)	; mb sp=1
+	bit	2,(ix+1)
+	ld	a,(ix+0fh)	; dpz in akku
+	jr	nz,m1383	; mb sdrf=1
+	add	a,7		; dpz+7
+m1368:	ld	(ix+16h),a	; in kpet1-reg.
+m136b:	ld	(ix+22h),l	; sazf
+	ld	(ix+23h),h	; in spalz
+m1371:	call	m13ab		; up fo
+	bit	2,(ix+4)
+	ret	nz		; mb fof=1
+	inc	(ix+0dh)	; lsz+1
+	inc	hl		; sazf+1
+	ld	m,20h		; lz in zsp
+	inc	(ix+0fh)	; dpz+1
+	ret
+;
+m1383:	add	a,8		; et1 fuer sdr
+	jr	m1368
+;
+m1387:	bit	6,(ix+1)
+	jr	z,m1371		; mb at2=0
+	bit	2,(ix+2)
+	jr	nz,m1371	; mb sp=1
+	set	2,(ix+2)	; mb sp=1
+	bit	2,(ix+1)
+	ld	a,(ix+0fh)	; dpz in akku
+	jr	nz,m13a7	; mb sdrf=1
+	add	a,7		; dpz+7
+m13a2:	ld	(ix+17h),a	; in kpet2-reg.
+	jr	m136b
+;
+m13a7:	add	a,8		; et2 fuer sdr
+	jr	m13a2
+;
+m13ab:	in	a,(0bch)	; 8212-system beginn up fo
+	bit	3,a		; breite ausf.
+	jr	nz,m13ee	; bda=1
+	bit	1,(ix+1)	; mb bdrf
+	jr	nz,m13cb	; mb bdrf=1
+	bit	2,(ix+1)	; mb sdrf
+	jr	nz,m13cb	; mb sdrf=1
+	ld	a,(ix+0fh)	; dpz druckpositionszaehler
+	cp	84h
+	jr	nc,m13e1	; >131 zeichen
+m13c4:	bit	2,(ix+4)
+	jr	nz,m13e5	; mb fof=1
+	ret
+;
+m13cb:	bit	7,(ix+0fh)	; druckpositionszaehler
+	jr	z,m13c4		; dpz<128
+	in	a,(0bch)	; 8212-system
+	bit	3,a		; breite ausf.
+	ld	a,(ix+0fh)	; druckpositionsz. in akku
+	res	7,a		; pos. 0-127
+	jr	nz,m13ea	; bda=1
+	cp	3
+m13de:	jp	m,m13c4		; dpz<131(209)
+m13e1:	set	2,(ix+4)	; mb fof=1
+m13e5:	set	3,(ix+0ah)	; fof in zm-reg
+	ret
+;
+m13ea:	cp	81		; pruef 209.
+	jr	m13de
+;
+m13ee:	bit	1,(ix+1)	; mb bdrf
+	jr	nz,m13cb	; mb bdrf=1
+	bit	2,(ix+1)	; mb sdrf
+	jr	nz,m13cb	; mb sdrf=1
+	ld	a,(ix+0fh)	; druckpositionsz. in akku
+	cp	0d2h
+	jr	nc,m13e1	; >209 zeichen
+	jr	m13c4
+;
+hprr:	set	0,(ix+1)	; mb hprw=1
+	ld	iy,tabmr	; tabmr-gst
+	call	m14a5		; up zspk
+	push	de
+	push	hl
+	ld	h,0
+	ld	d,h
+	ld	e,(ix+26h)	; sw in e
+	ld	l,(ix+0fh)	; dpz in l
+	cp	a
+	sbc	hl,de		; dpz-sw
+	ld	(ix+0fh),l	; res in dpz
+	pop	hl
+	pop	de
+	jp	m,m1090		; res<0
+m149e:	jp	befe0
+;
+hprv:	push	de		; hor. pos. rel. vorw.
+	push	hl
+	ld	d,0
+	ld	h,d
+	ld	e,(ix+26h)	; sw in e
+	ld	l,(ix+0fh)	; dpz in l
+	add	hl,de		; dpz+sw
+	ld	(ix+26h),l	; res in dpr
+m141f:	ld	l,(ix+26h)	; dpr in l
+	ld	e,(ix+0fh)	; dpz in e
+	cp	a
+	sbc	hl,de		; dpr-dpz
+	pop	hl
+	pop	de
+	jr	z,m143c		; dpr=dpz
+	bit	2,(ix+4)
+	jr	nz,m143c	; mb fof=1
+	call	m1330		; up lzbd
+	push	de
+	push	hl
+	ld	d,0
+	ld	h,d
+	jr	m141f
+;
+m143c:	call	m13ab		; up fo
+	call	befht5		; up bdrhp
+	jr	m149e		; zust-meldung
+;
+hpabs:	push	de		; hor. pos. absolut
+	push	hl
+	ld	d,0
+	ld	h,d
+	in	a,(0bch)	; 8212-system
+	bit	3,a		; bda
+	jr	nz,m145c	; bda=1
+	ld	l,131
+m1451:	cp	a
+	sbc	hl,de
+	jp	p,m1460		; kein fof
+	pop	hl
+	pop	de
+	jp	m1090		; fof
+;
+m145c:	ld	l,209
+	jr	m1451
+;
+m1460:	res	2,(ix+4)	; mb fof=0
+	ld	d,0
+	ld	h,d
+	ld	e,(ix+0fh)	; dpz in e
+	ld	l,(ix+26h)	; dpr in l
+	cp	a
+	sbc	hl,de		; dpr-dpz
+	jp	p,m141f		; dpr>dpz
+	pop	hl
+	pop	de
+	set	0,(ix+1)	; mb hprw=1
+	ld	iy,tabmr	; tabmr-gst
+	call	m14a5		; up zspk
+	ld	a,(ix+26h)	; dpr in
+	ld	(ix+0fh),a	; dpz
+	jr	m149e
+;
+m14a1:	res	0,(ix+1)	; up pvb- mb hprw=0
+m14a5:	bit	5,(ix+3)	; up zspk
+	jr	z,m14e4		; mb ze=0
+	bit	0,(ix+1)
+	ret	nz		; mb hprw=1
+	bit	2,(ix+1)
+	jr	z,m14bd		; mb sdrf=0
+	res	2,(ix+1)	; mb sdrf=0
+	inc	(ix+0fh)	; dpz +1
+m14bd:	res	1,(ix+1)	; mb bdrf=0
+	bit	4,(ix+4)	; mb zspf2
+	jr	z,m14d1		; mb zspf2=0
+	bit	6,(ix+1)	; mb at2
+	ret	nz		; mb at2=1
+	ld	hl,zspei2	; anfangsadresse fuer zsp2
+	jr	m14d9
+;
+m14d1:	bit	7,(ix+1)	; mb at1
+	ret	nz		; mb at1=1
+	ld	hl,zspei1	; anfangsadresse fuer zsp1
+m14d9:	ld	a,(ix+1)
+	and	0c0h
+	ret	nz		; mb at1 oder at2 =1
+	set	0,(ix+3)	; mb pvoz=1
+	ret
+;
+m14e4:	bit	4,(ix+4)
+	jr	nz,m150b	; mb zspf2=1
+	bit	7,(ix+1)
+	jp	nz,ze00		; mb at1=1
+	ld	hl,zspei1	; anfagsadresse fuer zsp1
+m14f9:	res	1,(ix+1)	; mb bdrf=0
+	res	2,(ix+1)	; mb sdrf=0
+	bit	0,(ix+1)	; mb hprw
+	ret	nz		; mb hprw=1
+	set	0,(ix+3)	; mb pvoz=1
+	ret
+;
+m150b:	bit	6,(ix+1)	; mb at2
+	jp	nz,ze00		; mb at2=1
+	ld	hl,zspei2	; anfangsadresse fuer zsp2
+	jr	m14f9
+;
+slze:	set	0,(ix+2)	; mb slz=1
+	jr	slza1
+;
+slza:	res	0,(ix+2)	; mb slz=0
+slza1:	jp	befe0
+;
+da:	ld	a,(ix+26h)	; dpr-register in akku
+	or	a
+	jp	nz,beferr	; ub
+	ld	(ix+27h),0e0h	; da-befehl vor ausgabe von esc
+da1:	ld	a,5
+	out	(v24c),a
+	ld	a,0aah		; 108.2 und 105 aktiv
+	out	(v24c),a
+	ld	a,esc
+	out	(v24d),a
+	out	(ifssd),a
+da2:	ld	a,(ix+27h)
+	or	a
+	jr	nz,da2		; warten auf ende geraetek. o. zustansmeldung
+	jr	slza1		; geraetek. o.zust.meld.komplett uebertragen
+;
+dsr:	res	4,(ix+8)	; mb dc4=0
+	ld	a,(ix+26h)
+	cp	5		; esc [5n
+	jp	nz,beferr	; ub
+	ld	a,(ix+0ah)
+	and	19h
+	jr	z,dsr1		; zmb bfab o.fof od ub nicht gesetzt
+	set	4,(ix+0bh)	; operationsfehler in mod.zustandsreg.
+dsr1:	ld	a,(ix+0ah)
+	bit	1,a
+	jr	z,dsr2		; zmb hv=0
+	set	3,(ix+0bh)	; havarie in mod.zustandsregister
+dsr2:	bit	2,a
+	jr	z,dsr3		; zmb pe=0
+	set	2,(ix+0bh)	; papierende in mod.zustandsregister
+dsr3:	ld	(ix+27h),0c0h	; dsr-befehl vor ausgabe von esc
+	jr	da1
+;
+nxtpar:	bit	5,(ix+2)
+	jp	nz,m16b3	; mb zwz=1
+	and	70h
+	cp	'0'
+	ld	a,e
+	jp	z,m1693		; z.d.3.spalte
+	bit	3,(ix+2)
+	jr	nz,m1590	; mb par2=1
+	cp	' '
+	jp	z,m163a		; zwz
+m1590:	ld	a,(ix+2)
+	and	2fh		; mb esc,csi,par1=0
+	ld	(ix+2),a
+	bit	3,a
+	ld	a,e
+	jr	nz,m15b6	; mb par2=1
+	cp	'g'
+	jr	z,m160c		; tc-befehl
+	cp	'm'
+	jp	z,m1626		; schriftartbefehl
+	in	a,(p3bd)
+	bit	0,a		; ser/par
+	ld	a,e
+	jr	nz,m15b6	; ifss=0
+	cp	'c'
+	jp	z,da		; da-befehl
+	cp	'n'
+	jr	z,dsr		; dsr-befehl
+m15b6:	res	3,(ix+2)	; mb par2=0
+	ld	e,(ix+26h)	; parameter in e-reg
+	cp	'a'
+	jp	z,hprv		; hprv
+	cp	'q'
+	jp	z,hprr		; hprr
+	cp	'`'
+	jp	z,hpabs		; hpa
+	cp	'e'
+	jp	z,m20c2		; vprv1
+	cp	'u'
+	jp	z,m20be		; vprr1
+	cp	'd'
+	jp	z,m20d7		; vpa1
+	cp	'z'
+	jp	z,m22c0		; llfs1
+	cp	'}'
+	jp	z,m2291		; lpf1
+	ld	e,a
+	in	a,(0bch)	; 8212-system
+	bit	2,a		; ebd
+	jr	nz,m1609	; ub bei ebd
+	ld	a,e
+	ld	e,(ix+26h)	; parameter.in e-reg.
+	cp	'v'
+	jp	z,m20cf		; vprv2
+	cp	'r'
+	jp	z,m20bb		; vprr2
+	cp	't'
+	jp	z,m20d4		; vpa2
+	cp	'{'
+	jp	z,m22bd		; llfs2
+	cp	'~'
+	jp	z,m228e		; lpf2
+m1609:	jp	beferr		; ub
+;
+m160c:	ld	a,(ix+26h)	; parameter in akku
+	cp	3
+	jp	z,m12ee		; htc
+	cp	4
+	jp	z,m2277		; vtc1
+	cp	5
+	jr	nz,m1609	; ub
+	in	a,(0bch)	; 8212-system
+	bit	2,a		; ebd
+	jr	nz,m1609	; ub bei ebd
+	jp	m2274		; vtc2
+;
+m1626:	ld	a,(ix+26h)	; parameter in akku
+	or	a
+	jp	z,m1816		; norm.schrift
+	cp	1
+	jp	z,m17c0		; bde
+	cp	3
+	jp	z,m1844		; sde
+	jr	m1609		; ub
+;
+m163a:	set	5,(ix+2)	; mb zwz=1
+	jp	befe0
+;
+m1641:	res	7,(ix+2)	; mb esc=0
+	cp	'H'
+	jp	z,hts		; hts
+	cp	'J'
+	jp	z,vts1		; vts1
+	cp	'0'
+	jp	z,llfc1		; llfc1
+	cp	'4'
+	jp	z,k1161		; ftb/kab
+	cp	'5'
+	jp	z,k1161		; zb1/zlb
+	cp	'6'
+	jp	z,k1161		; zb2
+	cp	'7'
+	jp	z,m1307		; fsb
+	cp	'8'
+	jp	z,slza		; slza
+	cp	'9'
+	jp	z,slze		; slze
+	cp	'E'
+	jr	z,nl		; new line
+	in	a,(0bch)	; 8212-system
+	bit	2,a		; ebd
+	jr	nz,m1687	; ub bei ebd
+	ld	a,e
+	cp	'Q'
+	jp	z,vts2		; vts2
+	cp	'1'
+	jp	z,llfc2		; llfc2
+m1687:	jp	beferr		; ub
+;
+nl:	call	m14a1		; up pvb
+	call	m109a		; up cr
+	jp	beflf1		; lf1
+;
+m1693:	and	0fh		; gueltiges
+	ld	e,a		; zeichen der
+	sub	0ah		; 3.spalte
+	jr	nc,m1687	; ub
+	set	3,(ix+2)	; mb par2=1
+	push	bc		; ---------
+	ld	b,9		; alter
+	ld	a,(ix+26h)	; parameter
+	ld	c,a		; mal
+m16a5:	add	a,c		; 10
+	jr	c,m16ae		; plus
+	djnz	m16a5		; neuer
+	add	a,e		; parameter
+	ld	(ix+26h),a	; in
+m16ae:	pop	bc		; parameter-reg
+	jr	nc,m16d2	; ---------
+	jr	m1687		; ub
+;
+m16b3:	cp	'L'
+	jr	nz,m1687	; ub 
+	ld	a,(ix+2)
+	and	0fh		; mb esc,csi,zwz,par1=0
+	ld	(ix+2),a
+	ld	a,(ix+26h)	; parameter in akku
+	or	a
+	jr	z,m16d5		; 6lpi
+	cp	5
+	jr	nz,m1687	; ub
+	res	0,(ix+34h)	; mb za6=0 bahn1
+	res	0,(ix+55h)	; mb za6=0 bahn2
+m16d2:	jp	befe0
+;
+m16d5:	set	0,(ix+34h)	; mb za6=1 bahn1
+	set	0,(ix+55h)	; mb za6=1 bahn2
+	jr	m16d2
+;-----------------------------------------------------------------------------
+isiote:	push	af		; int. sio-sendebuffer leer
+	ld	a,28h		; reset sender int. pending
+	out	(v24c),a
+	out	(ifssc),a
+	ld	a,(ix+27h)	; sendesteuerregister in akku
+	or	a
+	jr	z,ist4		; sendesteuerregister =0
+	cp	0e0h
+	jr	z,ist6		; "csi" senden
+	cp	0a0h
+	jr	z,ist7		; abfrage druckertype
+	cp	60h
+	jr	z,ist12		; "da" senden
+	cp	0c0h
+	jr	z,ist6		; "csi" senden
+	cp	80h
+	jr	z,ist13		; zustandsabfrage
+	ld	a,'n'
+ist1:	out	(v24d),a	; ausgeben
+	out	(ifssd),a
+ist2:	res	6,(ix+27h)	; bit 6 im ssr = 0
+	res	0,(ix+8)	; mb sfg=0
+ist3:	pop	af
+	ei
+	reti
+;
+ist4:	in	a,(06fh)	; switch-pack 3
+	bit	3,a
+	jr	z,ist5		; s hdupl=0
+	ld	a,5
+	out	(v24c),a
+	ld	a,0a8h		; 105 inaktiv
+	out	(v24c),a
+ist5:	set	0,(ix+8)	; mb sfg=1
+	jr	ist3
+;
+ist6:	ld	a,'['		; "csi" in akku
+	jr	ist1
+;
+ist7:	in	a,(0bch)	; 8212-system
+	bit	2,a		; ebd
+	jr	z,ist10		; 2-bahniger drucker
+	bit	3,a		; bda
+	jr	nz,ist11	; breite druckerausfuehrung
+	ld	a,'4'		; druckerkennzeichnung senden
+ist8:	out	(v24d),a
+	out	(ifssd),a
+ist9:	set	6,(ix+27h)	; sendesteuerregister
+	res	7,(ix+27h)	; aktualisieren
+	jr	ist3
+;
+ist10:	ld	a,'6'		; druckerkennzeichnung senden
+	jr	ist8
+;
+ist11:	ld	a,'5'		; druckerkennzeichnung senden
+	jr	ist8
+;
+ist12:	ld	a,'c'		; "da" in akku
+	ld	(ix+27h),0	; sendesteuerregister loeschen
+	jr	ist1
+;
+ist13:	ld	a,(ix+0bh)
+	or	a
+	jr	z,ist15		; modifiziertes zustandsregister=00
+	bit	1,a
+	jr	nz,ist16	; uebertragungsfehler
+	bit	2,a
+	jr	nz,ist20	; papierende
+	bit	3,a
+	jr	nz,ist19	; havarie
+	ld	a,'4'		; "operationsfehler" senden
+	out	(v24d),a
+	out	(ifssd),a
+	res	2,(ix+4)	; mb fof=0
+	res	4,(ix+0bh)	; mzsr4=0
+ist14:	ld	a,(ix+0ah)	; zustandsregister
+	and	0e6h		; maskiert
+	ld	(ix+0ah),a	; loeschen
+	jr	ist9
+;
+ist15:	ld	a,'0'		; nullstatus senden
+	jr	ist8
+;
+ist16:	ld	a,'1'		; uebertragungsfehler senden
+	out	(v24d),a
+	out	(ifssd),a
+	res	1,(ix+0bh)	; mb uef=0
+	jr	ist18
+;
+ist17:	ld	a,'2'		; papierende senden
+	out	(v24d),a
+	out	(ifssd),a
+ist18:	ld	a,(ix+0bh)
+	or	a
+	jr	z,ist14		; modifiziertes zustandsregister =00
+	jp	ist2
+;
+ist19:	ld	a,'3'		; "hv" senden
+	out	(v24d),a
+	out	(ifssd),a
+	res	3,(ix+0bh)	; mb hv =0
+	jr	ist18
+;
+ist20:	res	2,(ix+0bh)	; mzsr2=0
+	in	a,(0bch)	; 8212-system
+	bit	0,a		; /pe
+	jr	z,ist17		; pe=1
+	res	2,(ix+0ah)	; zmb pe=0
+	res	5,(ix+7)	; mb ape=0
+	jr	ist13
+;-----------------------------------------------------------------------------
+m17c0:	push	hl
+	ld	hl,mbytes+1
+	bit	1,m
+	jr	nz,m1800
+	set	1,m
+	bit	2,m
+	jr	z,m1821
+	res	2,m
+	inc	(ix+0fh)
+	inc	hl
+	bit	2,m
+	jr	z,m1804
+	inc	(ix+0dh)
+m17db:	dec	hl
+	bit	4,(ix+4)
+	jr	nz,m1808
+	bit	7,m
+	jr	z,m1800
+m17e6:	inc	hl
+	bit	2,m
+	jr	z,m17f8
+	inc	hl
+	bit	1,m
+	jr	z,m180e
+	res	1,m
+m17f2:	bit	2,m
+	jr	z,m1812
+	res	2,m
+m17f8:	pop	hl
+	inc	hl
+	ld	m,88h
+m17fc:	inc	hl
+	ld	m,8ch
+	push	hl
+m1800:	pop	hl
+	jp	befe0
+;
+m1804:	res	1,m
+	jr	m17db
+;
+m1808:	bit	6,m
+	jr	z,m1800
+	jr	m17e6
+;
+m180e:	set	1,m
+	jr	m17f2
+;
+m1812:	set	2,m
+	jr	m17f8
+;
+m1816:	push	hl
+	ld	hl,mbytes+1
+	bit	1,m
+	jr	z,m188a
+	res	1,m
+m1821:	bit	4,(ix+4)
+	jr	nz,m183a
+	bit	7,m
+	jr	z,m1800
+m182b:	inc	hl
+	bit	2,m
+	jr	z,m1837
+	inc	hl
+	bit	1,m
+	jr	z,m1840
+	res	1,m
+m1837:	pop	hl
+	jr	m17fc
+;
+m183a:	bit	6,m
+	jr	z,m1800
+	jr	m182b
+;
+m1840:	set	1,m
+	jr	m1837
+;
+m1844:	push	hl
+	ld	hl,mbytes+1
+	bit	2,m
+	jr	nz,m1878
+	set	2,m
+	bit	1,m
+	jr	z,m18a0
+	res	1,m
+	bit	4,(ix+4)
+	jr	nz,m187c
+	bit	7,m
+	jr	z,m1878
+m185e:	inc	hl
+	bit	2,m
+	jr	z,m1870
+	inc	hl
+	bit	1,m
+	jr	z,m1882
+	res	1,m
+m186a:	bit	2,m
+	jr	z,m1886
+	res	2,m
+m1870:	pop	hl
+	inc	hl
+	ld	m,8ch
+m1874:	inc	hl
+	ld	m,88h
+	push	hl
+m1878:	pop	hl
+	jp	befe0
+;
+m187c:	bit	6,m
+	jr	z,m1878
+	jr	m185e
+;
+m1882:	set	1,m
+	jr	m186a
+;
+m1886:	set	2,m
+	jr	m1870
+;
+m188a:	bit	2,m
+	jr	z,m1878
+	res	2,m
+	inc	(ix+0fh)
+	inc	hl
+	bit	2,m
+	jr	z,m189d
+	inc	(ix+0dh)
+	jr	m189f
+;
+m189d:	res	1,m
+m189f:	dec	hl
+m18a0:	bit	4,(ix+4)
+	jr	z,m18b9
+	bit	6,m
+	jr	z,m1878
+m18aa:	inc	hl
+	bit	2,m
+	jr	z,m18b6
+	inc	hl
+	bit	2,m
+	jr	z,m18bf
+	res	2,m
+m18b6:	pop	hl
+	jr	m1874
+;
+m18b9:	bit	7,m
+	jr	z,m1878
+	jr	m18aa
+;
+m18bf:	set	2,m
+	jr	m18b6
+;
+zg2on:	push	hl
+	ld	hl,mbytes+1
+	bit	3,m
+	jr	nz,m18e8	; 2. zeichengenerator breits angewaehlt
+	set	3,m
+m18cd:	bit	4,(ix+4)
+	jr	z,m18f0
+	bit	6,m
+	jr	z,m18e8
+m18d7:	inc	hl
+	bit	2,m
+	jr	z,m18e3
+	inc	hl
+	bit	3,m
+	jr	z,m18ec
+	res	3,m
+m18e3:	pop	hl
+	inc	hl
+	ld	m,8eh
+	push	hl
+m18e8:	pop	hl
+	jp	befe0
+;
+m18ec:	set	3,m
+	jr	m18e3
+;
+m18f0:	bit	7,m
+	jr	z,m18e8
+	jr	m18d7
+;
+befsi:	push	hl
+	ld	hl,mbytes+1
+	bit	3,m
+	jr	z,m18e8
+	res	3,m
+	jr	m18cd
+;
+m1902:	bit	2,(ix+3)
+	jr	nz,m1948
+	jr	m194b
+;
+m190a:	bit	1,(ix+3)
+	jr	nz,m1961
+	jr	m196a
+;
+m1912:	bit	3,(ix+3)
+	jr	nz,m1976
+	jr	m1979
+;
+ze00:	bit	5,(ix+3)
+	ret	nz
+	bit	2,(ix+2)
+	jr	z,m192f
+	ld	l,(ix+22h)
+	ld	h,(ix+23h)
+	ld	(ix+0dh),0
+m192f:	bit	2,(ix+1)
+	jr	z,m1902
+	inc	(ix+0fh)
+	bit	0,(ix+1)
+	jr	nz,m1942
+	res	2,(ix+1)
+m1942:	bit	2,(ix+3)
+	jr	nz,m194b
+m1948:	inc	hl
+	ld	m,88h
+m194b:	bit	1,(ix+1)
+	jr	z,m190a
+	bit	0,(ix+1)
+	jr	nz,m195b
+	res	1,(ix+1)
+m195b:	bit	1,(ix+3)
+	jr	nz,m196a
+m1961:	bit	6,(ix+3)
+	jr	nz,m196a
+	inc	hl
+	ld	m,8ch
+m196a:	bit	3,(ix+1)
+	jr	z,m1912
+	bit	3,(ix+3)
+	jr	nz,m1979
+m1976:	inc	hl
+	ld	m,8eh
+m1979:	inc	hl
+	ld	m,83h
+	ld	a,(ix+0fh)
+	add	a,7
+	bit	4,(ix+4)
+	jr	nz,m19d3
+	bit	2,(ix+2)
+	jr	nz,m1990
+	ld	(ix+16h),a
+m1990:	dec	hl
+	ld	(ix+1eh),l
+	ld	(ix+1fh),h
+	set	5,(ix+1)
+	ld	hl,zspei2
+	bit	6,(ix+1)
+	jr	nz,m19a8
+	ld	(ix+29h),32h
+m19a8:	set	4,(ix+4)
+	bit	4,(ix+1)
+	jr	nz,m19fe
+m19b2:	bit	0,(ix+3)
+	jr	nz,m19fe
+	ld	a,(ix+3)
+	and	61h
+	or	20h
+m19bf:	ld	(ix+3),a
+	res	2,(ix+4)
+	res	2,(ix+2)
+	bit	2,(ix+1)
+	ret	z
+	dec	(ix+0fh)
+	ret
+;
+m19d3:	bit	2,(ix+2)
+	jr	nz,m19dc
+	ld	(ix+17h),a
+m19dc:	dec	hl
+	ld	(ix+20h),l
+	ld	(ix+21h),h
+	set	4,(ix+1)
+	ld	hl,zspei1
+	bit	7,(ix+1)
+	jr	nz,m19f4
+	ld	(ix+28h),28h
+m19f4:	res	4,(ix+4)
+	bit	5,(ix+1)
+	jr	z,m19b2
+m19fe:	in	a,(p2bd)
+	res	6,a		; ifg=0
+	out	(p2bd),a
+	ld	a,(ix+3)
+	and	71h
+	or	30h
+	jr	m19bf
+;
+m1a0d:	push	af
+	ld	a,17h
+	out	(ctc0),a
+	ld	a,17h
+	out	(ctc0),a
+	in	a,(p2bd)
+	set	5,a		; fgdi=1 freig.-sign. druckimp.
+	out	(p2bd),a
+	res	5,a		; fgdi=0 freig.-sign. druckimp.
+	out	(p2bd),a
+	exx
+	set	5,d
+	ld	a,h
+	cp	9
+	jr	nz,m1a61
+	ld	h,0
+	ld	b,9
+	inc	c
+m1a2e:	ld	(ix+12h),c
+m1a31:	in	a,(p2ad)
+	bit	6,a		; lfg
+	call	nz,m1a69	; lfg=1
+	exx
+	pop	af
+	ei
+	reti
+;
+m1a3d:	push	af
+	ld	a,17h
+	out	(ctc0),a
+	ld	a,17h
+	out	(ctc0),a
+	in	a,(p2bd)
+	set	5,a		; fgdi=1 freig.-sign. druckimp.
+	out	(p2bd),a
+	res	5,a		; fgdi=0 freig.-sign. druckimp.
+	out	(p2bd),a
+	exx
+	res	5,d
+	ld	a,h
+	or	a
+	jr	nz,m1a65
+	ld	h,9
+	ld	b,9
+	dec	c
+	jr	m1a2e
+;
+m1a61:	inc	h
+	jr	m1a31
+;
+m1a65:	dec	h
+	jr	m1a31
+;
+m1a69:	bit	7,(ix+4)
+	jr	z,m1a77
+	exx
+	res	7,(ix+4)
+	jp	m1c98
+;
+m1a77:	bit	6,(ix+4)
+	jr	z,m1a8e
+	res	6,(ix+4)
+	bit	2,d
+	push	de
+	push	hl
+	ld	d,0
+	ld	h,d
+	jp	nz,m1d38
+	jp	m1ce2
+;
+m1a8e:	inc	b
+	ld	a,b
+	cp	0ah
+	jr	nz,m1a96
+	ld	b,0
+m1a96:	bit	7,d
+	jr	z,m1aba
+m1a9b:	bit	2,d
+	jr	z,m1aad
+	bit	4,d
+	jp	nz,m1fd8
+	bit	3,d
+	jp	z,m1f5f
+	jp	m1f87
+;
+m1aad:	bit	4,d
+	jp	nz,m1de9
+	bit	3,d
+	jp	nz,m1d95
+	jp	m1d5b
+;
+m1aba:	ld	a,(ix+0eh)
+	or	a
+	jp	nz,m1b18
+	ld	a,b
+	or	a
+	jr	z,m1ada
+	cp	7
+	jp	z,m1bd9
+	cp	9
+	ret	nz
+	set	7,d
+	in	a,(p2bd)
+	set	1,a		; dtfg=1 drucktaktfreigabe
+	out	(p2bd),a
+	jr	m1a9b
+;
+m1ada:	bit	7,d
+	ret	nz
+	in	a,(p1bd)
+	bit	5,a		; /rr
+	jr	z,m1ae7		; rechter rand erreicht
+	in	a,(p1ad)
+	bit	5,a		; /lr
+m1ae7:	call	z,hpv1		; linker rand erreicht
+	ret
+;
+m1aeb:	ld	a,0ffh
+	out	(nad18),a	; nadelimpulse nadel 1-8
+	out	(nad9),a	; nadelimpulse nadel 9
+	ld	e,a
+	ld	d,a
+	exx
+	bit	4,d
+	ret	z
+	set	1,d
+	push	hl
+	ld	hl,m2d00
+m1afd:	ld	m,0ffh
+	inc	l
+	ld	a,l
+	cp	0ah
+	jr	nz,m1afd
+	pop	hl
+	ld	(ix+2dh),2dh
+	bit	2,d
+	jr	nz,m1b13
+	ld	(ix+2ch),3
+	ret
+;
+m1b13:	ld	(ix+2ch),9
+	ret
+;
+m1b18:	ld	a,b
+	cp	5
+	jr	z,m1b2d
+	bit	2,(ix+7)
+	ret	z
+	res	2,(ix+7)
+	in	a,(p2ad)
+	res	6,a		; lfg=0
+	out	(p2ad),a
+	ret
+;
+m1b2d:	bit	0,(ix+7)
+	jr	nz,m1b46
+	bit	1,(ix+7)
+	jr	nz,m1b46	; mb rkbl=1
+	in	a,(p2ad)
+	and	10h		; richtungsbit ausmask.
+	ld	e,a
+	ld	a,d
+	rrca
+	and	10h
+	cp	e
+	jr	nz,m1b95
+m1b46:	dec	(ix+0eh)
+	ld	a,(ix+0eh)
+	bit	7,a
+	jr	nz,m1b55
+	sub	14h
+	jp	m,m1b5f
+m1b55:	in	a,(p2ad)
+	set	2,a		; vtab=1
+	out	(p2ad),a
+	set	1,(ix+7)	; mb rkbl=1
+m1b5f:	bit	3,(ix+5)
+	jr	z,m1b85		; mb asl=0
+	set	1,(ix+7)	; mb rkbl=1
+	in	a,(p2ad)
+	bit	2,a		; vtab
+	jr	z,m1b7d		; vtab=0
+	ld	a,(ix+0eh)
+	bit	7,a
+	ret	nz
+	sub	7
+	ret	p
+m1b78:	set	2,(ix+7)
+	ret
+;
+m1b7d:	ld	a,(ix+0eh)
+	sub	2
+	ret	p
+	jr	m1b78
+;
+m1b85:	ld	a,(ix+0eh)
+	bit	7,a
+	ret	nz
+	sub	10h
+	ret	p
+	in	a,(p2ad)
+	res	2,a		; vtab=0
+	out	(p2ad),a
+	ret
+;
+m1b95:	bit	6,(ix+5)
+	jr	z,m1ba5
+	ld	(ix+0eh),0ffh
+	set	1,(ix+7)	; mb rkbl=1
+	jr	m1bad
+;
+m1ba5:	set	0,(ix+7)
+	ld	(ix+0eh),8
+m1bad:	set	3,(ix+5)	; mb asl=1
+	ret
+;
+m1bb2:	push	af
+	ld	a,60h
+	rld
+	rra
+	ld	b,a
+	ld	a,m
+	rra
+	ld	c,a
+	exx
+	bit	0,d
+	exx
+	jr	nz,m1bd0
+m1bc2:	dec	b
+	in	a,(p2ad)
+	bit	4,a		; vw
+	jr	nz,m1bd6	; vw=1
+	dec	hl
+	ld	a,c
+	add	a,6
+	ld	c,a
+	pop	af
+	ret
+;
+m1bd0:	ld	a,b
+	add	a,4
+	ld	b,a
+	jr	m1bc2
+;
+m1bd6:	inc	hl
+	pop	af
+	ret
+;
+m1bd9:	exx
+m1bda:	ld	a,m
+	and	60h
+	jr	nz,m1c0a
+	ld	a,m
+	exx
+	cp	83h
+	jp	z,m1c86
+	cp	88h
+	jr	z,m1c65
+	cp	8ch
+	jr	z,m1c57
+	cp	8eh
+	jr	z,m1c49
+	cp	89h
+	jr	z,m1c10
+	set	1,(ix+4)
+m1bff:	bit	2,d
+	exx
+	jr	nz,m1c07
+	inc	hl
+	jr	m1bda
+;
+m1c07:	dec	hl
+	jr	m1bda
+;
+m1c0a:	call	m1bb2
+	jp	m1aeb
+;
+m1c10:	bit	3,(ix+4)
+	jr	nz,m1c27
+	bit	2,d
+	jr	z,m1c1f
+	dec	(ix+28h)
+	jr	m1c22
+;
+m1c1f:	inc	(ix+28h)
+m1c22:	ld	l,(ix+28h)
+	jr	m1c36
+;
+m1c27:	bit	2,d
+	jr	z,m1c30
+	dec	(ix+29h)
+	jr	m1c33
+;
+m1c30:	inc	(ix+29h)
+m1c33:	ld	l,(ix+29h)
+m1c36:	push	hl
+	ld	h,2ch
+	ld	a,m
+	ld	(ix+0eh),a
+	pop	hl
+	bit	2,d
+	exx
+	jr	nz,m1c46
+	inc	hl
+	exx
+	ret
+;
+m1c46:	dec	hl
+	exx
+	ret
+;
+m1c49:	bit	0,d
+	jr	z,m1c52
+	res	0,d
+	jr	m1bff
+;
+m1c52:	set	0,d
+	jr	m1bff
+;
+m1c57:	bit	3,d
+	jr	z,m1c60
+	res	3,d
+	jr	m1bff
+;
+m1c60:	set	3,d
+	jr	m1bff
+;
+m1c65:	bit	4,d
+	jr	z,m1c81
+	res	4,d
+	jr	m1bff
+;
+m1c6e:	exx
+	res	2,(ix+6)
+	bit	0,(ix+5)
+	ret	z
+	res	0,(ix+5)
+	set	0,(ix+3)
+	ret
+;
+m1c81:	set	4,d
+	jp	m1bff
+;
+m1c86:	exx
+	call	m0a0d
+	set	3,(ix+5)	; mb asl=1
+	res	4,(ix+3)
+	exx
+	set	7,(ix+4)
+	ret
+;
+m1c98:	ld	(ix+0eh),7
+	bit	2,(ix+6)
+	jr	nz,m1c6e
+	bit	3,(ix+4)
+	jr	z,m1cfc
+	ld	a,(ix+15h)
+	srl	a
+	ld	b,(ix+17h)
+	srl	b
+	add	a,b
+	exx
+	ld	(ix+19h),a
+	bit	2,d
+	jr	nz,m1d15
+	ld	a,(ix+16h)
+m1cc0:	push	de
+	push	hl
+	ld	d,0
+	ld	h,d
+	ld	e,a
+	ld	l,0fh
+	add	hl,de
+	ld	e,l
+	ld	l,(ix+19h)
+	cp	a
+	sbc	hl,de
+	jr	nc,m1cd7
+m1cd3:	set	6,(ix+4)
+m1cd7:	pop	hl
+	pop	de
+	ret
+;
+m1cda:	ld	l,(ix+17h)
+	ld	e,(ix+16h)
+	jr	m1cee
+;
+m1ce2:	bit	3,(ix+4)
+	jr	nz,m1cda
+	ld	l,(ix+16h)
+	ld	e,(ix+17h)
+m1cee:	cp	a
+	sbc	hl,de
+	jr	c,m1cf9
+	ld	e,7
+	add	hl,de
+	ld	(ix+0eh),l
+m1cf9:	pop	hl
+	pop	de
+	ret
+;
+m1cfc:	ld	a,(ix+14h)
+	srl	a
+	ld	b,(ix+16h)
+	srl	b
+	add	a,b
+	exx
+	ld	(ix+19h),a
+	bit	2,d
+	jr	nz,m1d15
+	ld	a,(ix+17h)
+	jr	m1cc0
+;
+m1d15:	push	de
+	push	hl
+	ld	d,0
+	ld	h,d
+	ld	e,(ix+19h)
+	ld	l,0fh
+	add	hl,de
+	bit	3,(ix+4)
+	jr	nz,m1d2c
+	ld	e,(ix+15h)
+	jr	m1d2f
+;
+m1d2c:	ld	e,(ix+14h)
+m1d2f:	cp	a
+	sbc	hl,de
+	jp	nc,m1cd3
+	jr	m1d50
+;
+m1d38:	bit	3,(ix+4)
+	jr	nz,m1d53
+	ld	l,(ix+15h)
+	ld	e,(ix+14h)
+m1d44:	cp	a
+	sbc	hl,de
+	jp	m,m1d50
+	ld	e,7
+	add	hl,de
+	ld	(ix+0eh),l
+m1d50:	pop	hl
+	pop	de
+	ret
+;
+m1d53:	ld	l,(ix+14h)
+	ld	e,(ix+15h)
+	jr	m1d44
+;
+m1d5b:	exx
+	ld	a,c
+	and	7
+	jr	nz,m1d6b
+	ld	a,c
+	add	a,7
+	ld	c,a
+	ld	a,(bc)
+	ld	e,a
+	ld	a,c
+	sub	7
+	ld	c,a
+m1d6b:	ld	a,c
+	and	7
+	cp	7
+	jr	z,m1d7d
+	ld	a,(bc)		; bitmuster holen
+	out	(nad18),a	; nadelimpulse nadel 1-8
+	sla	e		; muster fuer nadel 9 in e
+	ld	a,e
+	out	(nad9),a	; nadelimpulse nadel 9
+	inc	bc
+	exx
+	ret
+;
+m1d7d:	exx
+	ld	a,b
+	cp	7
+	jr	z,m1d8a
+	ld	a,0ffh		; nadeln aus
+	out	(nad18),a	; nadelimpulse nadel 1-8
+	out	(nad9),a	; nadelimpulse nadel 9
+	ret
+;
+m1d8a:	res	7,d
+	in	a,(p2bd)
+	res	1,a		; dtfg=0 drucktaktfreigabe
+	out	(p2bd),a
+	jp	m1bd9
+;
+m1d95:	exx
+	ld	a,c
+	and	7
+	jr	nz,m1da5
+	ld	a,c
+	add	a,7
+	ld	c,a
+	ld	a,(bc)
+	ld	e,a
+	ld	a,c
+	sub	7
+	ld	c,a
+m1da5:	exx
+	bit	0,b
+	jr	z,m1dc8
+	exx
+	ld	a,c
+	and	7
+	cp	7
+	jr	z,m1dcf
+	ld	a,(bc)
+	and	d
+	out	(nad18),a	; nadelimpulse nadeln 1-8
+	ld	a,(bc)
+	ld	d,a
+	inc	bc
+m1db9:	ld	a,e
+	or	3fh
+	cp	0ffh
+	jr	z,m1dde
+	ld	a,7fh		; /ni9=0
+m1dc2:	out	(nad9),a	; nadelimpulse nadel 9
+	rlc	e
+	exx
+	ret
+;
+m1dc8:	ld	a,0ffh		; nadeln zurueck
+	out	(nad18),a	; nadelimpulse nadel 1-8
+	out	(nad9),a	; nadelimpulse nadel 9
+	ret
+;
+m1dcf:	exx
+	ld	a,b
+	cp	5
+	jr	nz,m1de2
+	res	7,d
+	in	a,(p2bd)
+	res	1,a		; dtfg=0 drucktaktfreigabe
+	out	(p2bd),a
+	ret
+;
+m1dde:	ld	a,0ffh
+	jr	m1dc2
+;
+m1de2:	exx
+	ld	a,d
+	out	(nad18),a	; nadelimpulse nadel 1-8
+	jr	m1db9
+;
+m1de9:	push	hl
+	ld	h,(ix+2dh)
+	ld	l,(ix+2ch)
+	exx
+	ld	a,c
+	and	7
+	jr	nz,m1e00
+	ld	a,c
+	add	a,7
+	ld	c,a
+	ld	a,(bc)
+	ld	e,a
+	ld	a,c
+	sub	7
+	ld	c,a
+m1e00:	exx
+	ld	a,l
+	sub	0ah
+	jp	m,m1e1b
+	jp	nz,m1efa
+	add	a,9
+	ld	l,a
+	ld	a,m
+	out	(nad18),a	; nadelimpulse nadel 1-8
+	ld	a,l
+	add	a,2
+	ld	l,a
+	ld	a,0ffh		; nadeln nicht betaetigen
+	out	(nad9),a	; nadelimpulse nadel 9
+	jp	m1f0c
+;
+m1e1b:	exx
+m1e1c:	ld	a,(bc)
+	exx
+	ld	e,a
+m1e1f:	bit	7,e
+	jp	z,m1eae
+	set	7,m
+m1e26:	inc	l
+	ld	a,l
+	sub	0ah
+	jr	nz,m1e2d
+	ld	l,a
+m1e2d:	bit	6,e
+	jp	z,m1eb3
+	set	6,m
+m1e34:	inc	l
+	ld	a,l
+	sub	0ah
+	jr	nz,m1e3b
+	ld	l,a
+m1e3b:	bit	5,e
+	jp	z,m1eb8
+	set	5,m
+m1e42:	inc	l
+	ld	a,l
+	sub	0ah
+	jr	nz,m1e49
+	ld	l,a
+m1e49:	bit	4,e
+	jp	z,m1ebd
+	set	4,m
+m1e50:	inc	l
+	ld	a,l
+	sub	0ah
+	jr	nz,m1e57
+	ld	l,a
+m1e57:	bit	3,e
+	jp	z,m1ec2
+	set	3,m
+m1e5e:	inc	l
+	ld	a,l
+	sub	0ah
+	jr	nz,m1e65
+	ld	l,a
+m1e65:	bit	2,e
+	jp	z,m1ec7
+	set	2,m
+m1e6c:	inc	l
+	ld	a,l
+	sub	0ah
+	jr	nz,m1e73
+	ld	l,a
+m1e73:	bit	1,e
+	jp	z,m1ecc
+	set	1,m
+m1e7a:	inc	l
+	ld	a,l
+	sub	0ah
+	jr	nz,m1e81
+	ld	l,a
+m1e81:	bit	0,e
+	jp	z,m1ed1
+	set	0,m
+m1e88:	inc	l
+	ld	a,l
+	sub	0ah
+	jp	nz,m1f47
+	ld	l,a
+	jp	m1f47
+;
+m1e93:	inc	l
+	ld	a,m
+	out	(nad18),a	; nadelimpulse nadel 1-8
+	ld	a,l
+	add	a,2
+	ld	l,a
+	exx
+	rlc	e
+	ld	a,e
+	out	(nad9),a	; nadelimpulse nadel 9
+	ld	a,c
+	and	7
+	cp	7
+	jr	z,m1ed6
+	inc	bc
+	exx
+	jr	m1f0c
+;
+m1eae:	res	7,m
+	jp	m1e26
+;
+m1eb3:	res	6,m
+	jp	m1e34
+;
+m1eb8:	res	5,m
+	jp	m1e42
+;
+m1ebd:	res	4,m
+	jp	m1e50
+;
+m1ec2:	res	3,m
+	jp	m1e5e
+;
+m1ec7:	res	2,m
+	jp	m1e6c
+;
+m1ecc:	res	1,m
+	jr	m1e7a
+;
+m1ed1:	res	0,m
+	jr	m1e88
+;
+m1ed6:	exx
+	ld	a,l
+	add	a,0bh
+	ld	l,a
+	cp	14h
+	jr	nz,m1f0c
+m1ee0:	res	7,d
+	in	a,(p2bd)
+	res	1,a		; dtfg=0 drucktaktfreigabe
+	out	(p2bd),a
+	ld	a,13h
+	out	(ctc0),a
+	ld	a,l
+	sub	14h
+	ld	l,a
+m1ef0:	ld	m,0ffh
+	inc	hl
+	ld	a,l
+	cp	0ah
+	jr	nz,m1ef0
+	jr	m1f0c
+;
+m1efa:	dec	a
+	ld	l,a
+	sub	2
+	jp	p,m1f14
+	ld	a,m
+	out	(nad18),a	; nadelimpulse nadeln 1-8
+	ld	a,l
+	sub	1
+	jr	z,m1f23
+	add	a,0dh
+	ld	l,a
+m1f0c:	ld	(ix+2dh),h
+	ld	(ix+2ch),l
+	pop	hl
+	ret
+;
+m1f14:	exx
+	ld	a,c
+	and	7
+	cp	7
+	jr	z,m1f1f
+	jp	m1e1c
+;
+m1f1f:	exx
+	jp	m1e1f
+;
+m1f23:	exx
+m1f24:	bit	7,m
+	jr	nz,m1f34
+	exx
+	ld	a,l
+	add	a,0dh
+	ld	l,a
+	exx
+	call	m1bb2
+	exx
+	jr	m1f0c
+;
+m1f34:	ld	a,m
+	cp	8eh
+	jr	z,m1f4f
+	exx
+	ld	a,l
+	add	a,0dh
+	ld	l,a
+	ld	e,0ffh
+	exx
+	ld	e,0ffh
+	exx
+	jr	m1f0c
+;
+m1f47:	bit	2,d
+	jp	z,m1e93
+	jp	m2000
+;
+m1f4f:	exx
+	bit	0,d
+	jr	z,m1f5b
+	res	0,d
+m1f56:	exx
+	inc	hl
+	jr	m1f24
+;
+m1f5b:	set	0,d
+	jr	m1f56
+;
+m1f5f:	exx
+	ld	a,c
+	and	7
+	cp	6
+	jr	nz,m1f6b
+	inc	c
+	ld	a,(bc)
+	ld	e,a
+	dec	c
+m1f6b:	ld	a,c
+	and	7
+	cp	7
+	jp	z,m1d7d
+	ld	a,(bc)
+	out	(nad18),a	; nadelimpulse nadeln 1-8
+	bit	0,e
+	jr	nz,m1f83
+	ld	a,7fh
+m1f7c:	out	(nad9),a	; nadelimpulse nadel 9
+	rrc	e
+	dec	bc
+	exx
+	ret
+;
+m1f83:	ld	a,0ffh
+	jr	m1f7c
+;
+m1f87:	exx
+	ld	a,c
+	and	7
+	cp	6
+	jr	nz,m1f93
+	inc	c
+	ld	a,(bc)
+	ld	e,a
+	dec	c
+m1f93:	exx
+	bit	0,b
+	jp	z,m1dc8
+	exx
+	ld	a,c
+	and	7
+	cp	7
+	jr	z,m1fc7
+	ld	a,c
+	and	7
+	cp	6
+	jr	nz,m1fb1
+	exx
+	ld	a,b
+	cp	9
+	exx
+	jr	nz,m1fb1
+	exx
+	ret
+;
+m1fb1:	ld	a,(bc)
+	and	d
+	out	(nad18),a	; nadelimpulse nadeln 1-8
+	ld	a,(bc)
+	ld	d,a
+	dec	bc
+m1fb8:	ld	a,e
+	or	7eh
+	cp	0ffh
+	jr	z,m1fd4
+	ld	a,7fh
+m1fc1:	out	(nad9),a	; nadelimpulse nadel 9
+	rrc	e
+	exx
+	ret
+;
+m1fc7:	exx
+	ld	a,b
+	cp	7
+	jp	z,m1d8a
+	exx
+	ld	a,d
+	out	(nad18),a	; nadelimpulse nadeln 1-8
+	jr	m1fb8
+;
+m1fd4:	ld	a,0ffh
+	jr	m1fc1
+;
+m1fd8:	push	hl
+	ld	h,(ix+2dh)
+	ld	l,(ix+2ch)
+	exx
+	ld	a,c
+	and	7
+	cp	6
+	jr	nz,m1fee
+	exx
+	bit	1,d
+	jr	nz,m2025
+	exx
+m1fee:	ld	a,c
+	and	7
+	cp	7
+	jr	z,m2046
+	exx
+	res	1,d
+	exx
+m1ffa:	ld	a,(bc)
+	exx
+	ld	e,a
+	jp	m1e1f
+;
+m2000:	dec	l
+	ld	a,m
+	out	(nad18),a	; nadelimpulse nadeln 1-8
+	ld	a,l
+	add	a,2
+	ld	l,a
+	exx
+	cp	3
+	jr	nz,m200f
+	ld	e,0ffh
+m200f:	bit	0,e
+	jr	nz,m2030
+	ld	a,7fh
+m2015:	out	(nad9),a	; nadelimpulse nadel 9
+	rrc	e
+	ld	a,c
+	and	7
+	cp	7
+	jr	z,m2034
+	dec	bc
+	exx
+	jp	m1f0c
+;
+m2025:	ld	a,b
+	cp	1
+	exx
+	jr	z,m1ffa
+	exx
+	jp	m1f0c
+;
+m2030:	ld	a,0ffh
+	jr	m2015
+;
+m2034:	exx
+	ld	a,l
+	cp	3
+	jr	nz,m2040
+	add	a,11h
+	ld	l,a
+	jp	m1ee0
+;
+m2040:	sub	3
+	ld	l,a
+	jp	m1f0c
+;
+m2046:	exx
+	ld	a,l
+	cp	2
+	jr	nz,m2065
+	ld	a,b
+	cp	5
+	jr	z,m2065
+	ld	a,l
+	add	a,7
+	ld	l,a
+	ld	a,m
+	out	(nad18),a	; nadelimpulse nadel 1-8
+	dec	l
+	exx
+	inc	bc
+	ld	a,c
+	add	a,7
+	ld	c,a
+	ld	a,(bc)
+	ld	e,a
+	exx
+	jp	m1f0c
+;
+m2065:	ld	a,l
+	sub	7
+	jp	m,m2085
+	ld	a,m
+	out	(nad18),a	; nadelimpulse nadeln 1-8
+	exx
+	bit	0,e
+	jr	nz,m208b
+	ld	a,7fh
+m2075:	out	(nad9),a	; nadelimpulse nadel 9
+	rrc	e
+	exx
+	dec	l
+	ld	a,l
+	cp	6
+	exx
+	jr	z,m209a
+	exx
+	jp	m1f0c
+;
+m2085:	add	a,0ah
+	ld	l,a
+	jp	m1e1f
+;
+m208b:	ld	a,0ffh
+	jr	m2075
+;
+m208f:	ld	a,m
+	cp	8eh
+	jr	z,m20aa
+	exx
+	ld	e,0ffh
+	jp	m1f0c
+;
+m209a:	ld	a,m
+	and	70h
+	jr	z,m208f
+	call	m1bb2
+	exx
+	ld	a,l
+	add	a,3
+	ld	l,a
+	jp	m1f0c
+;
+m20aa:	exx
+	bit	0,d
+	jr	z,m20b7
+	res	0,d
+m20b2:	exx
+	dec	hl
+	jr	m209a
+;
+m20b7:	set	0,d
+	jr	m20b2
+;
+m20bb:	call	m248b
+m20be:	set	5,(ix+34h)
+m20c2:	call	m2414
+	call	m2420
+m20c8:	ld	d,h
+	ld	e,l
+m20ca:	ld	b,d
+	ld	c,e
+	jp	m21c4
+;
+m20cf:	call	m248b
+	jr	m20c2
+;
+m20d4:	call	m248b
+m20d7:	call	m2414
+	call	m2420
+	ld	bc,3
+	bit	0,(ix+34h)
+	jr	z,m20e7
+	inc	bc
+m20e7:	add	hl,bc
+	ex	de,hl
+	ld	h,(ix+3eh)
+	ld	l,(ix+3dh)
+	sub	a
+	sbc	hl,de
+	jr	c,m2108
+	ex	de,hl
+	ld	d,(ix+42h)
+	ld	e,(ix+41h)
+	sbc	hl,de
+	jr	nc,m20c8
+	set	5,(ix+34h)
+	call	m2431
+	jr	m20ca
+;
+m2108:	call	m24a1
+	call	m2495
+	call	m14a1
+m2111:	call	m13e1
+	jp	befe0
+;
+beflf2:	call	m248b
+beflf1:	call	m2414
+	ld	d,0
+	ld	e,6
+	bit	0,(ix+34h)
+	jr	z,m20ca
+	ld	e,8
+	jr	m20ca
+;
+befff2:	call	m248b
+befff1:	call	m2414
+	ld	h,(ix+3eh)
+	ld	l,(ix+3dh)
+	ld	d,(ix+42h)
+	ld	e,(ix+41h)
+	sbc	hl,de
+	ld	de,3
+	bit	0,(ix+34h)
+	jr	z,m2149
+	inc	de
+m2149:	add	hl,de
+m214a:	jp	m20c8
+;
+befvt2:	call	m248b
+befvt1:	call	m2414
+	ld	(ix+3bh),0	; zk zeitschleife
+	ld	bc,m2cb4
+	bit	3,(ix+34h)
+	jr	nz,m2162
+	ld	c,93h
+m2162:	ld	a,(bc)
+	bit	7,a
+	jr	z,m21a1
+	res	7,a
+	ld	h,a
+	inc	bc
+	ld	a,(bc)
+	ld	l,a
+	ld	d,(ix+42h)
+	ld	e,(ix+41h)
+	sub	a
+	sbc	hl,de
+	jr	z,m217a
+	jr	nc,m214a
+m217a:	inc	(ix+3bh)
+	inc	bc
+	bit	3,(ix+3bh)
+	jr	z,m2162
+m2184:	ld	h,(ix+3eh)
+	ld	l,(ix+3dh)
+	ld	d,(ix+42h)
+	ld	e,(ix+41h)
+	sub	a
+	sbc	hl,de
+	ld	b,(ix+43h)
+	res	7,b
+	cp	b
+	jr	z,m21aa
+	ld	c,(ix+44h)
+m219e:	add	hl,bc
+	jr	m214a
+;
+m21a1:	sub	a
+	cp	(ix+3bh)
+	jp	z,m2108
+	jr	m2184
+;
+m21aa:	ld	c,(ix+44h)
+	cp	c
+	jr	nz,m219e
+	ld	d,(ix+40h)
+	ld	e,(ix+3fh)
+	add	hl,de
+	ld	d,h
+	ld	e,l
+	ld	(ix+42h),0
+	ld	(ix+41h),0
+	jr	m21e7
+;
+m21c4:	ld	h,(ix+42h)
+	ld	l,(ix+41h)
+	bit	5,(ix+34h)
+	jr	nz,m220d
+m21d0:	add	hl,de
+	push	hl
+	ex	de,hl
+	ld	h,(ix+3eh)
+	ld	l,(ix+3dh)
+	sub	a
+	sbc	hl,de
+	jr	c,m2228
+	pop	hl
+m21df:	ld	(ix+42h),h
+	ld	(ix+41h),l
+	ld	d,b
+	ld	e,c
+m21e7:	call	m243b
+	res	5,(ix+34h)
+	call	m2495
+	bit	7,(ix+34h)
+	jp	nz,m24b5
+	call	m24a1
+	call	m14a1
+	bit	7,(ix+7)
+	jr	z,m220a
+	ld	a,13h		; Befehl FF2
+	cp	e
+	jp	z,formf1
+m220a:	jp	befe0
+;
+m220d:	sub	a
+	sbc	hl,de
+	jr	nc,m21df
+	call	m2431
+	push	de
+	ld	d,(ix+40h)
+	ld	e,(ix+3fh)
+	call	m243b
+	pop	de
+	ld	h,(ix+3eh)
+	ld	l,(ix+3dh)
+	jr	m220d
+;
+m2228:	call	m2431
+	pop	hl
+	push	de
+	ld	d,(ix+40h)
+	ld	e,(ix+3fh)
+	call	m243b
+	pop	de
+	ld	hl,sy00
+	jr	m21d0
+;
+vts2:	call	m248b
+vts1:	call	m2414
+	ld	d,(ix+42h)
+	ld	e,(ix+41h)
+	ld	b,8
+	ld	hl,m2cb4
+	bit	3,(ix+34h)
+	jr	nz,m2255
+	ld	l,93h
+m2255:	bit	7,m
+	jr	z,m2266
+	inc	hl
+	inc	hl
+	djnz	m2255
+	call	m24a1
+	call	m2495
+	jp	m1307
+;
+m2266:	set	7,d
+	ld	m,d
+	inc	hl
+	ld	m,e
+m226b:	call	m24a1
+	call	m2495
+	jp	befe0
+;
+m2274:	call	m248b
+m2277:	call	m2414
+m227a:	ld	hl,m2cb4
+	bit	3,(ix+34h)
+	jr	nz,m2285
+	ld	l,93h
+m2285:	sub	a
+	ld	b,10h
+m2288:	ld	m,a
+	inc	hl
+	djnz	m2288
+	jr	m226b
+;
+m228e:	call	m248b
+m2291:	call	m2414
+	sub	a
+	cp	e
+	jp	z,m2351
+	call	m2420
+	ld	(ix+3eh),h
+	ld	(ix+3dh),l
+	ld	(ix+40h),0
+	ld	(ix+3fh),0
+	ld	(ix+42h),0
+	ld	(ix+41h),3
+	bit	0,(ix+34h)
+	jr	z,m227a
+	inc	(ix+41h)
+	jr	m227a
+;
+m22bd:	call	m248b
+m22c0:	call	m2414
+	sub	a
+	cp	e
+	jp	z,m2351
+	call	m2420
+	ld	bc,3
+	bit	0,(ix+34h)
+	jr	z,m22d5
+	inc	bc
+m22d5:	ex	de,hl
+	ld	h,(ix+3eh)
+	ld	l,(ix+3dh)
+	sbc	hl,de
+	jr	c,m2351
+	push	de
+	push	hl
+	ex	de,hl
+	ld	d,(ix+42h)
+	ld	e,(ix+41h)
+	sbc	hl,de
+	jr	nc,m230b
+	ld	h,(ix+3eh)
+	ld	l,(ix+3dh)
+	sub	a
+	sbc	hl,de
+	add	hl,bc
+	ld	d,h
+	ld	e,l
+	call	m243b
+	ld	d,(ix+40h)
+	ld	e,(ix+3fh)
+	call	m243b
+	ld	(ix+42h),b
+	ld	(ix+41h),c
+m230b:	pop	hl
+	ld	d,(ix+40h)
+	ld	e,(ix+3fh)
+	add	hl,de
+	ld	(ix+40h),h
+	ld	(ix+3fh),l
+	pop	hl
+	ld	(ix+3eh),h
+	ld	(ix+3dh),l
+	ld	(ix+3bh),0
+	ld	bc,m2cb4
+	bit	3,(ix+34h)
+	jr	nz,m232f
+	ld	c,93h
+m232f:	ld	a,(bc)
+	bit	7,a
+	jp	z,m226b
+	ld	d,a
+	inc	bc
+	ld	a,(bc)
+	ld	e,a
+	sub	a
+	push	hl
+	sbc	hl,de
+	jr	nc,m2343
+	ld	(bc),a
+	dec	bc
+	ld	(bc),a
+	inc	bc
+m2343:	pop	hl
+	inc	(ix+3bh)
+	bit	3,(ix+3bh)
+	jp	nz,m226b
+	inc	bc
+	jr	m232f
+;
+m2351:	call	m2495
+	call	m24a1
+	jp	m2111
+;
+llfc2:	call	m248b
+llfc1:	call	m2414
+	ld	h,(ix+3eh)
+	ld	l,(ix+3dh)
+	ld	d,(ix+40h)
+	ld	e,(ix+3fh)
+	add	hl,de
+	ld	(ix+3eh),h
+	ld	(ix+3dh),l
+	ld	(ix+40h),0
+	ld	(ix+3fh),0
+	jp	m226b
+;
+ta00:	ld	(ix+3bh),6	; papiervorschub links (tpv1)
+	call	zs00		; zeitschleife tastenentprellung
+	in	a,(p3bd)
+	bit	2,a		; taste pv1
+	jp	nz,m059d	; taste nicht mehr gedrueckt
+	ld	a,0b7h
+	out	(ctc2),a
+	ld	a,0ffh		; zk
+	out	(ctc2),a
+	ei
+	ld	(ix+3bh),0
+m2399:	bit	7,(ix+34h)
+	jp	nz,befff1
+	in	a,(p3bd)
+	bit	2,a		; taste pv1
+	jr	z,m2399		; gedrueckt
+	ld	a,33h
+	out	(ctc2),a
+	set	7,(ix+34h)
+	jp	beflf1
+;
+m23b1:	ei
+	in	a,(p3bd)
+	bit	2,a		; taste pv1
+	jr	z,m23b1		; gedrueckt
+	res	7,(ix+34h)
+	di
+	jp	hp04
+;
+ta50:	ld	(ix+3bh),6	; papiervorschub rechts (taste pv2)
+	call	zs00		; zeitschleife tastenentprellung
+	in	a,(p3bd)
+	bit	3,a		; taste pv2
+	jp	nz,m059d	; nicht mehr gedrueckt
+	ld	a,0b7h
+	out	(ctc3),a
+	ld	a,0ffh
+	out	(ctc3),a
+	ei
+	ld	(ix+5ch),0
+m23db:	bit	7,(ix+55h)
+	jp	nz,befff2
+	in	a,(p3bd)
+	bit	3,a		; taste pv2
+	jr	z,m23db		; gedrueckt
+	ld	a,33h
+	out	(ctc3),a
+	set	7,(ix+55h)
+	jp	beflf2
+;
+m23f3:	call	m24a1
+m23f6:	ei
+	in	a,(p3bd)
+	bit	3,a		; taste pv2
+	jr	z,m23f6		; gedrueckt
+	res	7,(ix+55h)
+	di
+	jp	hp04
+;
+zs00:	sub	a		; zeitschleife (zeitkonstante in (ix+3bh))
+zs01:	ld	b,0ffh
+zs02:	nop
+	djnz	zs02
+	dec	(ix+3bh)	; zk=zk-1
+	cp	(ix+3bh)	; zk=0 ?
+	jr	nz,zs01		; nein
+	ret
+;
+m2414:	ld	(m2cc4),bc
+	ld	(m2cc6),de
+	ld	(m2cc8),hl
+	ret
+;
+m2420:	sub	a
+	ld	d,a
+	ld	h,a
+	ld	l,e
+	ld	b,2
+	bit	0,(ix+34h)
+	jr	z,m242d
+	inc	b
+m242d:	add	hl,de
+	djnz	m242d
+	ret
+;
+m2431:	ld	a,l
+	neg
+	ld	e,a
+	ld	a,h
+	cpl
+	ld	d,a
+	ret	c
+	inc	d
+	ret
+;
+m243b:	sub	a
+	ld	a,(ix+34h)
+	bit	7,a
+	jr	nz,m2473
+	ld	h,(ix+33h)
+	ld	l,(ix+32h)
+m2449:	bit	5,a
+	jr	nz,m247b
+	bit	1,a
+	jr	z,m247f
+m2451:	sbc	hl,de
+	jr	nc,m2480
+	call	m2431
+	res	1,(ix+34h)
+	bit	5,(ix+34h)
+	jr	z,m2466
+	set	1,(ix+34h)
+m2466:	bit	7,(ix+34h)
+	jr	nz,m2484
+	ld	(ix+33h),d
+	ld	(ix+32h),e
+	ret
+;
+m2473:	ld	h,(ix+39h)
+	ld	l,(ix+38h)
+	jr	m2449
+;
+m247b:	bit	1,a
+	jr	z,m2451
+m247f:	add	hl,de
+m2480:	ld	d,h
+	ld	e,l
+	jr	m2466
+;
+m2484:	ld	(ix+39h),d
+	ld	(ix+38h),e
+	ret
+;
+m248b:	di
+	ld	ix,m2c71
+	set	3,(ix+34h)
+	ret
+;
+m2495:	ld	hl,(m2cc8)
+	ld	de,(m2cc6)
+	ld	bc,(m2cc4)
+	ret
+;
+m24a1:	res	3,(ix+34h)
+	ld	ix,mbytes
+	bit	7,(ix+34h)
+	ret	nz
+	bit	7,(ix+55h)
+	ret	nz
+	ei
+	ret
+;
+m24b5:	sub	a
+	cp	(ix+38h)
+	jr	z,m251c
+m24bb:	set	6,(ix+3ah)	; mb pva1=1
+	in	a,(p3bd)
+	bit	4,a		; taste kopfanschwenken
+	jr	nz,m24cb	; kopf staendig angeschwenkt
+	in	a,(p2bd)
+	res	2,a		; kas=0 kopfanschwenksignal
+	out	(p2bd),a
+m24cb:	bit	1,(ix+3ah)
+	jr	z,m24ea
+	bit	3,(ix+34h)
+	jr	nz,m253d
+	in	a,(p1ad)
+	res	3,a		; xpwv1=0 richtung papiervorschub
+	out	(p1ad),a
+m24dd:	ld	a,(ix+38h)
+	add	a,4
+	ld	(ix+38h),a
+	jr	nc,m24ea
+	inc	(ix+39h)
+m24ea:	bit	3,(ix+34h)
+	jr	nz,m2545
+	ld	a,97h
+	out	(p1ac),a
+	ld	a,0efh
+	out	(p1ac),a
+	in	a,(p1ad)
+	set	2,a		; xpfg1=1 papiervorschubsignal 1
+	out	(p1ad),a
+m24fe:	set	2,(ix+3ah)
+	ld	a,0b7h
+	bit	3,(ix+34h)
+	jr	nz,m2555
+	out	(ctc2),a
+	ld	a,44h
+	out	(ctc2),a
+	bit	7,(ix+34h)
+	jp	nz,m23b1
+m2517:	call	m248b
+	jr	m24b5
+;
+m251c:	cp	(ix+39h)
+	jr	nz,m24bb
+	ld	(ix+3ah),0
+	bit	3,(ix+34h)
+	jr	z,m2517
+	res	3,(ix+34h)
+	ld	ix,mbytes
+	bit	6,(ix+3ah)
+	jp	z,m0579		; mb pva1=0
+	jp	hp04
+;
+m253d:	in	a,(p1bd)
+	res	3,a		; xpwv2=0 richtung papiervorschub 2
+	out	(p1bd),a
+	jr	m24dd
+;
+m2545:	ld	a,97h
+	out	(p1bc),a
+	ld	a,0efh
+	out	(p1bc),a
+	in	a,(p1bd)
+	set	2,a		; xpfg2=1 papiervorschubsignal 2
+	out	(p1bd),a
+	jr	m24fe
+;
+m2555:	out	(ctc3),a
+	ld	a,44h
+	out	(ctc3),a
+	bit	7,(ix+34h)
+	jp	nz,m23f3
+	res	3,(ix+34h)
+	ld	ix,mbytes
+	jp	hp04
+;
+pt50:	call	m248b
+	ld	a,33h
+	out	(ctc3),a
+	bit	5,(ix+0e6h)
+	jr	nz,m25b1
+	jr	m2588
+;
+pt00:	ld	a,33h
+	out	(ctc2),a
+	ei
+	bit	5,(ix+7)
+	jr	nz,m25b1	; mb ape=1
+m2588:	in	a,(0bch)	; 8212-system
+	bit	0,a		; /pe
+	jr	nz,m25f8	; pe=0
+	bit	1,(ix+3ah)	; rpr1
+	jr	nz,m2608	; rpr1=1
+	dec	(ix+3ch)
+	bit	3,(ix+34h)
+	jr	z,m260d
+	set	2,(ix+0e9h)
+m25a1:	sub	a
+	cp	(ix+3ch)
+	jr	nz,m25b1
+	bit	3,(ix+34h)
+	jr	z,m2613
+	set	5,(ix+0e6h)
+m25b1:	sub	a
+	cp	(ix+38h)
+	jr	z,m2619
+	dec	(ix+38h)
+m25ba:	cp	(ix+39h)
+	jr	nz,m2622
+	ld	a,(ix+38h)
+	and	0feh
+	jr	nz,m2622
+	sub	a
+	cp	(ix+38h)
+	jr	nz,m2639
+	bit	3,(ix+34h)
+	jr	nz,m2647
+	in	a,(p1ad)
+	res	2,a		; xpfg1=0 papiervorschubsignal 1
+	out	(p1ad),a
+m25d8:	res	2,(ix+3ah)
+	bit	1,(ix+3ah)
+	jr	nz,m25e6
+	set	4,(ix+3ah)
+m25e6:	bit	3,(ix+34h)
+	jp	nz,m2672
+	ld	a,0b7h
+	out	(ctc2),a
+	ld	a,64h
+	out	(ctc2),a
+	pop	af
+	reti
+;
+m25f8:	ld	(ix+3ch),52h
+	bit	3,(ix+34h)
+	jr	nz,m264f
+	res	5,(ix+7)	; mb ape=0
+	jr	m25b1
+;
+m2608:	inc	(ix+3ch)
+	jr	m25b1
+;
+m260d:	set	2,(ix+0ah)
+	jr	m25a1
+;
+m2613:	set	5,(ix+7)	; mb ape=1
+	jr	m25b1
+;
+m2619:	dec	(ix+39h)
+	ld	(ix+38h),0ffh
+	jr	m25ba
+;
+m2622:	bit	3,(ix+34h)
+	jr	nz,m2656
+	in	a,(p1ad)
+	set	1,a		; frh1=1 frequenzhochlaufs. 1
+	out	(p1ad),a
+m262e:	ld	a,0b7h
+	out	(ctc2),a
+	ld	a,44h
+	out	(ctc2),a
+	pop	af
+	reti
+;
+m2639:	bit	3,(ix+34h)
+	jr	nz,m266a
+	in	a,(p1ad)
+	res	1,a		; frh1=0 frequenzhochlaufs. 1
+	out	(p1ad),a
+	jr	m262e
+;
+m2647:	in	a,(p1bd)
+	res	2,a		; xpfg2=0 papiervorschubsignal 2
+	out	(p1bd),a
+	jr	m25d8
+;
+m264f:	res	5,(ix+0e6h)
+	jp	m25b1
+;
+m2656:	in	a,(p1bd)
+	set	1,a		; ina=1
+	out	(p1bd),a
+m265c:	call	m24a1
+m265f:	ld	a,0b7h
+	out	(ctc3),a
+	ld	a,44h
+	out	(ctc3),a
+	pop	af
+	reti
+;
+m266a:	in	a,(p1bd)
+	res	1,a		; ina=0
+	out	(p1bd),a
+	jr	m265c
+;
+m2672:	call	m24a1
+	ld	a,0b7h
+	out	(ctc3),a
+	ld	a,64h
+	out	(ctc3),a
+	pop	af
+	reti
+;
+ictc2a:	push	af		; sys-ctc-kanal 2 interrupt-rout.
+	bit	6,(ix+3ah)
+	jp	z,m2721		; mb pva1=0
+	ld	a,33h
+	out	(ctc2),a
+	bit	4,(ix+3ah)
+	jr	nz,m26f3
+	bit	2,(ix+3ah)
+	jr	nz,m26b4
+	ei
+	in	a,(p1ad)
+	set	3,a		; xpwv1=1 richtung papiervorschub 1
+	out	(p1ad),a
+	ld	(ix+38h),4
+	res	1,(ix+3ah)
+	set	2,(ix+3ah)
+	in	a,(p1ad)
+	set	2,a		; xpfg1=1 papiervorschubsignal 1
+	out	(p1ad),a
+	jp	m262e
+;
+m26b4:	in	a,(p2bd)
+	res	3,a		; /tf=0 technischer fehler lampe
+	out	(p2bd),a
+	call	hpv1
+	pop	af
+	reti
+;-----------------------------------------------------------------------------
+ictc3:	push	af		; sys-ctc-kanal 3 interrupt-rout.
+	bit	6,(ix+5bh)
+	jr	z,m2736
+	ld	a,33h
+	out	(ctc3),a
+	bit	4,(ix+5bh)
+	jr	nz,m270a
+	bit	2,(ix+5bh)
+	jr	nz,m26b4
+	ei
+	in	a,(p1bd)
+	set	3,a		; xpwv2=1 richtung papiervorschub 2
+	out	(p1bd),a
+	ld	(ix+59h),4
+	res	1,(ix+5bh)
+	set	2,(ix+5bh)
+	in	a,(p1bd)
+	set	2,a		; xpfg2=1 papiervorschubsignal 2
+	out	(p1bd),a
+	jp	m265f
+;
+m26f3:	ld	(ix+3ah),0
+	ld	a,97h
+	out	(p1ac),a
+	ld	a,0cfh
+	out	(p1ac),a
+	bit	5,(ix+7)
+	call	nz,hpv2		; mb ape=1
+	ei
+	pop	af
+	reti
+;
+m270a:	ld	(ix+5bh),0
+	ld	a,97h
+	out	(p1bc),a
+	ld	a,0cfh
+	out	(p1bc),a
+	bit	5,(ix+7)
+	call	nz,hpv2		; mb ape=1
+	ei
+	pop	af
+	reti
+;
+m2721:	inc	(ix+3bh)
+	bit	5,(ix+3bh)
+	jr	z,m2732
+	set	7,(ix+34h)
+	ld	a,33h
+	out	(ctc2),a
+m2732:	pop	af
+	ei
+	reti
+;
+m2736:	inc	(ix+5ch)
+	bit	5,(ix+5ch)
+	jr	z,m2732
+	set	7,(ix+55h)
+	ld	a,33h
+	out	(ctc3),a
+	jr	m2732
+;
+k1161:	bit	4,(ix+0ch)	; karteneinzug 1161 bedienen
+	jr	z,m277e
+	push	hl
+	ld	hl,m2c3e
+	sla	m
+	jr	c,m2772
+m2757:	set	0,m
+	inc	hl
+	sla	m
+	bit	1,a
+	jr	z,m2762
+	set	0,m
+m2762:	inc	hl
+	sla	m
+	bit	0,a
+	jr	z,m276b
+	set	0,m
+m276b:	pop	hl
+	call	m14a1
+	jp	befe0
+;
+m2772:	rr	m
+	ld	hl,m2c47
+	sla	m
+	jr	nc,m2757
+	rr	m
+	pop	hl
+m277e:	jp	m1307
+;
+m2781:	in	a,(p1bd)
+	bit	0,a		; ina
+	jr	nz,zf12		; ina=1
+	in	a,(p1ad)
+	set	7,a		; ftb=1 (kab=1)
+	out	(p1ad),a
+	call	m2846
+m2790:	set	0,(ix+0ch)
+	jp	hp04
+;
+zf12:	in	a,(p2bd)
+	res	2,a		; kas=0 kopfanschwenksignal
+	out	(p2bd),a
+	call	m2860
+	jr	m2790
+;
+ictc2b:	push	af
+	ld	a,33h
+	out	(ctc2),a
+	in	a,(p1ad)
+	and	3fh		; zb1=0,ftb=0 (zlb=0,kab=0)
+	out	(p1ad),a
+	in	a,(p1bd)
+	and	3fh		; zb2=0,fsb=0
+	out	(p1bd),a
+	bit	0,a
+	jr	z,m27be
+	call	m2860
+m27ba:	pop	af
+	ei
+	reti
+;
+m27be:	call	m2857
+	res	0,(ix+0ch)
+	res	1,(ix+0ch)
+	bit	6,(ix+5)
+	jr	z,m27d5
+	set	2,(ix+0ch)
+	jr	m27ba
+;
+m27d5:	set	0,(ix+0ah)
+	call	zf53
+	jr	m27ba
+;
+ictc2c:	push	af
+	dec	(ix+0edh)
+	jr	nz,m27f4
+	ld	a,33h
+	out	(ctc2),a
+	in	a,(p2bd)
+	res	3,a		; /tf=0 technischer fehler lampe
+	out	(p2bd),a
+	call	hpv1
+	pop	af
+	reti
+;
+m27f4:	ld	a,(ix+0edh)
+	sub	0f3h
+	jr	nc,m281d
+	bit	3,(ix+0ch)
+	jr	nz,m2814
+	jr	m281d
+;
+m2803:	push	af
+	res	0,(ix+0ch)
+	bit	6,(ix+5)
+	jr	nz,m2821
+	bit	1,(ix+0ch)
+	jr	z,m2825
+m2814:	call	zf53
+	bit	0,(ix+0ch)
+	jr	z,m2825
+m281d:	pop	af
+	ei
+	reti
+;
+m2821:	set	2,(ix+0ch)
+m2825:	res	1,(ix+0ch)
+	ld	a,33h
+	out	(ctc2),a
+	ld	(ix+0edh),0
+	call	m2857
+	ld	a,97h
+	out	(p1bc),a
+	ld	a,0cfh
+	out	(p1bc),a
+	push	hl
+	ld	hl,m09ce
+	ld	(isa0e),hl
+	pop	hl
+	jr	m281d
+;
+m2846:	push	hl
+	ld	hl,ictc2b
+	ld	(isa04),hl
+	pop	hl
+	ld	a,0b7h
+	out	(ctc2),a
+	ld	a,0c0h
+	out	(ctc2),a
+	ret
+;
+m2857:	push	hl
+	ld	hl,ictc2a
+	ld	(isa04),hl
+	pop	hl
+	ret
+;
+m2860:	push	hl
+	ld	hl,ictc2c
+	ld	(isa04),hl
+	ld	hl,m2803
+	ld	(isa0e),hl
+	pop	hl
+	ld	a,97h
+	out	(p1bc),a
+	ld	a,0feh
+	out	(p1bc),a
+	ld	a,0b7h
+	out	(ctc2),a
+	ld	a,0ffh
+	out	(ctc2),a
+	ld	(ix+0edh),0ffh
+	ret
+;
+zf53:	in	a,(p2bd)
+	bit	3,a		; /tf
+	ret	z		; technischer fehler
+	sub	a
+	push	hl
+	ld	hl,m2c44
+	cp	m
+	jr	z,m28d9
+m2890:	ld	a,(ix+0edh)
+	sub	0f3h
+	jr	nc,m28e1
+	res	3,(ix+0ch)
+m289b:	sla	m
+	inc	hl
+	jr	c,m28a9
+	sla	m
+	inc	hl
+	sla	m
+	dec	hl
+	dec	hl
+	jr	m289b
+;
+m28a9:	sla	m
+	inc	hl
+	jr	c,m28cf
+	sla	m
+	in	a,(p1ad)
+	jr	c,m28cb
+	set	7,a		; ftb=1 (kab=1)
+m28b6:	out	(p1ad),a
+m28b8:	in	a,(p2bd)
+	res	2,a		; kas=0 kopfanschwenksignal
+	out	(p2bd),a
+	set	1,(ix+0ch)
+	set	0,(ix+0ch)
+	call	m2846
+	pop	hl
+	ret
+;
+m28cb:	set	6,a
+	jr	m28b6
+;
+m28cf:	sla	m
+	in	a,(p1bd)
+	set	6,a		; zb2=1
+	out	(p1bd),a
+	jr	m28b8
+;
+m28d9:	ld	hl,m2c4d
+	cp	m
+	jr	nz,m2890
+	pop	hl
+	ret
+;
+m28e1:	set	3,(ix+0ch)
+	set	0,(ix+0ch)
+	pop	hl
+	ret
+;
+	end
+   

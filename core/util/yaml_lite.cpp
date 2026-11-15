@@ -225,8 +225,8 @@ bool parseInlineValue(const std::string& value, int line, Node& out, Error& err)
 
     if (value[0] == '&' || value[0] == '*')
         { err.line = line; err.message = "Anchors/Aliases werden nicht unterstuetzt"; return false; }
-    if (value[0] == '|' || value[0] == '>')
-        { err.line = line; err.message = "mehrzeilige Skalare werden nicht unterstuetzt"; return false; }
+    if (value[0] == '|' || value[0] == '>')   // `key: |` faengt parse() ab; hier bleibt `>`, `|-` usw.
+        { err.line = line; err.message = "mehrzeilige Skalare werden nur als '|' unterstuetzt"; return false; }
     if (value[0] == '!')
         { err.line = line; err.message = "Tags werden nicht unterstuetzt"; return false; }
 
@@ -254,6 +254,8 @@ struct Line {
     int         indent = 0;
     std::string text;
     int         no     = 0;
+    bool        literal = false;   ///< Wert ist ein `|`-Blockskalar (Inhalt in `block`)
+    std::string block;             ///< Inhalt des Blockskalars, Zeilen mit '\n' abgeschlossen
 };
 
 struct BlockParser {
@@ -331,7 +333,7 @@ bool BlockParser::parseMap(int indent, Node& out) {
     out.line = lines[pos].no;
 
     while (pos < lines.size() && lines[pos].indent == indent) {
-        const Line& l = lines[pos];
+        Line& l = lines[pos];
         if (isListItem(l.text))
             return fail(l.no, "Listeneintrag '-' innerhalb einer Map erwartet einen Schluessel");
 
@@ -346,10 +348,17 @@ bool BlockParser::parseMap(int indent, Node& out) {
         for (const auto& e : out.entries)
             if (e.first == key) return fail(line, "doppelter Schluessel '" + key + "'");
 
+        const bool literal = l.literal;
+        std::string block  = literal ? std::move(l.block) : std::string();
         ++pos;
 
         Node val;
-        if (value.empty()) {
+        if (literal) {
+            // `|`-Blockskalar: der Inhalt wurde beim Zerlegen roh eingesammelt.
+            val.type   = NodeType::Scalar;
+            val.line   = line;
+            val.scalar = std::move(block);
+        } else if (value.empty()) {
             // Verschachtelter Block (tiefer eingerueckt) oder leerer Wert.
             if (pos < lines.size() && lines[pos].indent > indent) {
                 if (!parseBlock(lines[pos].indent, val)) return false;
@@ -402,7 +411,51 @@ bool parse(const std::string& text, Node& out, Error& err) {
             err.message = "Dokumenttrenner ('---') werden nicht unterstuetzt";
             return false;
         }
-        bp.lines.push_back({static_cast<int>(ind), body, no});
+        Line zeile{static_cast<int>(ind), body, no, false, {}};
+
+        // `schluessel: |` (Blockskalar, "literal"): die Folgezeilen, die tiefer eingerueckt sind
+        // (oder leer), gehoeren roh zum Wert - `#` und `:` darin bedeuten nichts.  Fuer Intel-HEX-Bloecke
+        // (data/drucker_roms.yaml, ~0,5 MB) gedacht; `>` und Zusaetze (`|-`, `|2`) bleiben unterstuetzt-nicht.
+        if (const size_t colon = findKeyColon(body);
+            colon != std::string::npos && trim(body.substr(colon + 1)) == "|") {
+            zeile.literal = true;
+            std::string next;
+            int         blockInd  = -1;
+            int         letzteNr  = no;      // Nummer der zuletzt verbrauchten Zeile
+            std::string leere;               // aufgelaufene Leerzeilen (nur gueltig, wenn danach noch Inhalt kommt)
+            while (true) {
+                const std::streampos vor = is.tellg();
+                if (!std::getline(is, next)) break;
+                if (!next.empty() && next.back() == '\r') next.pop_back();
+                size_t ni = 0;
+                while (ni < next.size() && next[ni] == ' ') ++ni;
+                const bool leerZeile = ni == next.size();
+                if (!leerZeile && (next[ni] == '\t' || ni <= ind)) {
+                    is.clear();
+                    is.seekg(vor);   // Ende des Blocks: diese Zeile gehoert dem normalen Zerleger
+                    break;
+                }
+                ++letzteNr;
+                if (leerZeile) { leere += '\n'; continue; }
+                if (blockInd < 0) blockInd = static_cast<int>(ni);
+                if (static_cast<int>(ni) < blockInd) {
+                    err.line = letzteNr;
+                    err.message = "Blockskalar: Zeile weniger eingerueckt als die erste Zeile des Blocks";
+                    return false;
+                }
+                zeile.block += leere;
+                leere.clear();
+                zeile.block.append(next, static_cast<size_t>(blockInd), std::string::npos);
+                zeile.block += '\n';
+            }
+            if (blockInd < 0) {
+                err.line = no;
+                err.message = "Blockskalar '|' ohne Inhalt (mehrzeiliger Skalar braucht eingerueckte Folgezeilen)";
+                return false;
+            }
+            no = letzteNr;
+                    }
+        bp.lines.push_back(std::move(zeile));
     }
 
     if (bp.lines.empty()) { out = Node{}; return true; }  // leere Datei = Null

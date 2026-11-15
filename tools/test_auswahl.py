@@ -25,7 +25,7 @@ ALLE = "*"  # Sonderwert: alle Fachgebiete (= alle langsamen Faelle)
 
 # Fachgebiete (muessen mit den Labels in tests/ uebereinstimmen; Waechter prueft es).
 FACHER = ("fach_floppy", "fach_serial", "fach_kermit", "fach_p8000", "fach_wega",
-          "fach_rtc", "fach_a5120", "fach_k8915", "fach_pc1715", "fach_prg710", "fach_sound")
+          "fach_rtc", "fach_a5120", "fach_k8915", "fach_pc1715", "fach_prg710", "fach_drucker", "fach_sound")
 LANGSAME_LABELS = ("format_integration", "format_matrix", "wega_install")
 
 _P8 = ("fach_p8000", "fach_wega")
@@ -35,6 +35,11 @@ _FLOPPY_WEIT = ("fach_floppy", "fach_kermit", "fach_p8000", "fach_wega")
 # (Muster, Fachgebiete oder ALLE, Begruendung, win?)  `**` = beliebig tief, `*` = ein Namensteil.
 # win=None: aus dem Pfad ableiten (C++/CMake -> ja).
 REGELN = [
+    # ── EPROM-Abzuege der Drucker liegen unter doc/, gehen aber in den Katalog (vor der Doku-Regel) ──
+    ("doc/EPROMS/SD1157/**", ("fach_drucker",), "SD 1157 EPROM-Abzuege", False),
+    ("doc/EPROMS/K6316/**", ("fach_drucker",), "K6316 EPROM-Abzuege", False),
+    ("doc/EPROMS/K6313/**", ("fach_drucker",), "K6313 EPROM-Abzuege", False),
+    ("doc/EPROMS/K6311/**", ("fach_drucker",), "K6311 EPROM-Abzuege", False),
     # ── nur Doku: nichts ────────────────────────────────────────────────
     ("**/*.md", (), "Doku", False),
     ("doc/**", (), "Doku", False),
@@ -74,6 +79,11 @@ REGELN = [
     ("tools/kermit80/**", ("fach_kermit",), "Kermit-80", False),
     ("tools/k1520kermit*", ("fach_kermit",), "Kermit-CLI", True),
     ("app/kermittool/**", (), "Kermit-Oberflaeche", False),
+    ("app/printertool/**", ("fach_drucker",), "Drucker-Oberflaeche", False),
+    ("data/default_config_printer.yaml", ("fach_drucker",), "Drucker-Vorgabe", False),
+    ("data/drucker_roms.yaml", ("fach_drucker",), "Drucker-EPROM-Katalog", False),
+    ("tools/drucker_roms_bauen.py", ("fach_drucker",), "Erzeugung des Drucker-EPROM-Katalogs", False),
+    ("run_k1520printer.sh", ("fach_drucker",), "Drucker-Starter", False),
     ("tools/sertest/**", ("fach_serial",), "SERTEST", False),
     # ── Diskette ────────────────────────────────────────────────────────
     ("core/peripherals/floppy_drive/**", _FLOPPY_WEIT, "Diskettenlaufwerk/-medium", True),
@@ -105,6 +115,9 @@ REGELN = [
     ("core/machines/pc1715/**", ("fach_pc1715",), "PC 1715", True),
     ("core/machines/prg710/**", ("fach_prg710",), "PRG 710", True),
     ("core/machines/mc80/**", (), "MC80 (keine langsamen Faelle)", True),
+    ("core/machines/printer/**", ("fach_drucker",), "Drucker (PrinterMachine)", True),
+    ("core/cards/printer/**", ("fach_drucker",), "Drucker-Karten (SD 1157)", True),
+    ("core/peripherals/druckwerk/**", ("fach_drucker",), "Druckwerk (Blatt, Wagen, Papier, Kopf)", True),
     ("core/cards/k8025/**", ("fach_a5120", "fach_serial"), "K8025", True),
     ("core/cards/k7028/**", ("fach_k8915", "fach_serial"), "K7028", True),
     ("core/cards/k2521/**", ("fach_k8915", "fach_prg710"), "K2521", True),
@@ -167,7 +180,9 @@ REGELN = [
     ("tools/*.h", (), "Werkzeug (schnelle Spur)", True),
     ("tools/**", (), "Werkzeug (schnelle Spur)", False),
     ("data/**", (), "Daten (schnelle Spur)", False),
-    ("*", (), "unbekannter Pfad ausserhalb core/ (nur `test`)", False),
+    (".github/**", (), "CI-Ablauf (faehrt dieselben dev.sh-Befehle)", False),
+    # `**` statt `*`: `*` deckt nur EINEN Namensteil, ein verschachtelter Pfad fiel sonst durch.
+    ("**", (), "unbekannter Pfad ausserhalb core/ (nur `test`)", False),
 ]
 
 _cache = {}
@@ -197,7 +212,7 @@ def regel_fuer(pfad):
             if win is None:
                 win = False
             return muster, facher, grund, win
-    raise AssertionError(pfad)  # "*" faengt alles
+    raise AssertionError(pfad)  # "**" faengt alles
 
 
 def plan(dateien, alles=False):

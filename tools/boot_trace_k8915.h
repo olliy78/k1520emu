@@ -44,7 +44,9 @@ struct K8915TraceOpts {
     bool        skip_selftest = false;  ///< JP bei 0000H/0005H in Bank 1 (wie ein Warmstart)
     bool        auto_cr = true;         ///< nach „* Coldstart *“ einmal CR tippen
     long long   stall = 30'000'000;     ///< so lange ohne Bildaenderung/Ereignis = Stillstand
-    std::string keys;                   ///< --keys (PRG): Tasten, `<ET>` = ET1/Return; je Block bei Stillstand
+    std::string keys;                   ///< --keys (PRG): Tasten, `<ET>` = ET1/Return; je Block bei Stillstand; K6313: Ziffern 1..4 = beim Netz-Ein gehaltene Tasten
+    std::string rom_path;               ///< --rom <datei> (Drucker K6313/K6316/SD 1157): ROM-Satz statt des eingebetteten
+    long long   dil = -1;               ///< --dil <maske> (K6313): DIL-Schalter (Bit 0 = 5-1 ... Bit 27 = 18-2); -1 = Vorgabe
     std::string events_path;            ///< --events <datei> (sonst stderr)
     long        events_cap = 3000;      ///< hoechstens so viele Protokollzeilen
     untilcond::UntilCond until;

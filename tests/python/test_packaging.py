@@ -30,7 +30,7 @@ from conftest import PROJECT_ROOT, ausgelieferte_diskette, requires_core
 
 PACKAGING = PROJECT_ROOT / "packaging"
 SCRIPTS = ["install.sh", "uninstall.sh", "build_payload.sh", "launcher.sh",
-           "disktool_launcher.sh", "kermit_launcher.sh", "lib/common.sh"]
+           "disktool_launcher.sh", "kermit_launcher.sh", "printer_launcher.sh", "lib/common.sh"]
 # Frisch geschlankt sind es ~146 MB OHNE Disketten (§8 des Entwurfs).  Mit der Vorgabeauswahl
 # kamen die P8000-WEGA-Saetze dazu (~13 MB, seit 2026-10-11) und K1520 Kermit (~2,4 MB,
 # AP K9); gemessen 2026-10-20: 179 MB.  Die alte Schranke 160 war dadurch unbemerkt
@@ -104,6 +104,7 @@ def test_disktool_launcher_hat_den_platzhalter():
     ("launcher.sh", "app/main.py"),
     ("disktool_launcher.sh", "app/disktool/main.py"),
     ("kermit_launcher.sh", "app/kermittool/main.py"),
+    ("printer_launcher.sh", "app/printertool/main.py"),
 ])
 def test_starter_haben_ihre_platzhalter(starter, einstieg):
     """@ROOT@/@DATEN@ setzt der Installer ein — bleibt einer stehen, startet nichts.
@@ -156,6 +157,7 @@ def test_lock_nagelt_mit_hashes_fest():
     ("mc80emu.desktop.in", "mc80emu"),
     ("k1520disktool.desktop.in", "k1520disktool"),
     ("k1520kermit.desktop.in", "k1520kermit"),
+    ("k1520printer.desktop.in", "k1520printer"),
 ])
 def test_desktop_eintrag_ist_gueltig(datei, starter):
     text = (PACKAGING / datei).read_text(encoding="utf-8")
@@ -566,6 +568,7 @@ def test_dokumentenordner_shell_und_python_stimmen_ueberein(tmp_path, aufbau):
     ("prg710emu.desktop.in", "prg710emu"),
     ("k1520disktool.desktop.in", "k1520disktool"),
     ("k1520kermit.desktop.in", "k1520kermit"),
+    ("k1520printer.desktop.in", "k1520printer"),
 ])
 def test_desktop_exec_ist_gequotet(datei, starter):
     """Ein Pfad mit Leerzeichen macht ein ungequotetes ``Exec=`` unbrauchbar."""
@@ -780,7 +783,7 @@ def test_cmd_starter_sind_reines_ascii():
     stuende damit ausgerechnet in der Fehlermeldung, die ein Anwender zu sehen
     bekommt, wenn etwas schiefgeht.
     """
-    for name in ("launcher.cmd", "disktool_launcher.cmd", "kermit_launcher.cmd"):
+    for name in ("launcher.cmd", "disktool_launcher.cmd", "kermit_launcher.cmd", "printer_launcher.cmd"):
         text = (PACKAGING / name).read_bytes()
         unerlaubt = [b for b in text if b > 0x7F]
         assert not unerlaubt, (
@@ -1085,6 +1088,7 @@ def test_iss_baut_die_adresse_aus_den_pins():
     ("launcher.cmd", r"app\main.py"),
     ("disktool_launcher.cmd", r"app\disktool\main.py"),
     ("kermit_launcher.cmd", r"app\kermittool\main.py"),
+    ("printer_launcher.cmd", r"app\printertool\main.py"),
 ])
 def test_windows_starter_haben_ihre_platzhalter(starter, einstieg):
     """Wie bei den .sh-Startern: beide Platzhalter, sonst startet nichts."""
@@ -1188,7 +1192,7 @@ def test_windows_starter_nennen_kein_verschwundenes_skript():
     fehlt — ein Hinweis auf eine Datei, die es nicht mehr gibt, schickt ihn in
     die Irre.
     """
-    for name in ("launcher.cmd", "disktool_launcher.cmd", "kermit_launcher.cmd"):
+    for name in ("launcher.cmd", "disktool_launcher.cmd", "kermit_launcher.cmd", "printer_launcher.cmd"):
         text = (PACKAGING / name).read_text(encoding="utf-8")
         assert "install.ps1" not in text, f"{name} verweist noch auf install.ps1"
 
@@ -1471,6 +1475,8 @@ def test_payload_enthaelt_alles_zum_starten(payload):
         "payload/share/k1520emu/default_config_pc1715.yaml",
         "payload/share/k1520emu/default_config_p8000.yaml",
         "payload/share/k1520emu/default_config_mc80.yaml",
+        # ROM-Katalog der Drucker: EINE Datei mit Intel-HEX-Daten, vom Kern gelesen (Entwurf 49 §12, WP9) - keine .bin daneben.
+        "payload/share/k1520emu/drucker_roms.yaml",
         "payload/share/icons/a5120emu.svg",
         # k1520DiskTool: Bibliothek, Kommandozeile, Oberflaeche, Starter.
         # Ohne diese Zeilen laege app/disktool/ zwar im Paket (die ganze app/-
@@ -1495,6 +1501,11 @@ def test_payload_enthaelt_alles_zum_starten(payload):
         "payload/app/kermittool/help/handbuch.md",
         "payload/app/kermittool/ui/main_window.py",
         "kermit_launcher.sh", "k1520kermit.desktop.in",
+        # K1520 Printer (WP7): Oberflaeche samt Handbuch, Vorgabedatei, Starter, Eintrag.
+        "payload/app/printertool/main.py",
+        "payload/app/printertool/help/handbuch.md",
+        "payload/share/k1520emu/default_config_printer.yaml",
+        "printer_launcher.sh", "k1520printer.desktop.in",
     ]:
         assert (stage / pflicht).exists(), f"{pflicht} fehlt im Paket"
 
@@ -1547,7 +1558,7 @@ def test_paket_traegt_keinen_pfad_des_baurechners(tmp_path):
     """
     build = tmp_path / "build"
     cfg = _sh("cmake", "-S", str(PROJECT_ROOT), "-B", str(build),
-              "-DCMAKE_BUILD_TYPE=Release", "-DK1520_FORMATS_DEFAULT=",
+              "-DCMAKE_BUILD_TYPE=Release", "-DK1520_FORMATS_DEFAULT=", "-DK1520_PRINTER_ROMS_DEFAULT=",
               # -O0: geprueft wird, was an Zeichenketten im Binaerabbild steht, und das haengt
               # nicht an der Optimierung.  -O3 kostete gut 100 s Rechenzeit je Lauf; der echte
               # Release-Bau (release.yml, Rauchtest "kein Baurechner-Pfad") prueft es zusaetzlich.
@@ -1559,6 +1570,7 @@ def test_paket_traegt_keinen_pfad_des_baurechners(tmp_path):
 
     roh = (build / "libk1520core.so").read_bytes()
     assert bytes(str(PROJECT_ROOT / "data" / "formats.yaml"), "utf-8") not in roh
+    assert bytes(str(PROJECT_ROOT / "data" / "drucker_roms.yaml"), "utf-8") not in roh   # K1520_PRINTER_ROMS_DEFAULT (WP9)
 
     # AP-E4l: ROM-/Zeichengeneratordaten beider Maschinen sind einkompiliert
     # (`*_data.h`), es darf also weder ein Quellbaumpfad hinzukommen noch der
@@ -1637,6 +1649,10 @@ def test_installation_laeuft_durch_und_startet(tmp_path):
     assert (heim / ".local" / "share" / "applications" / "mc80emu.desktop").is_file()
     # K1520 Kermit (AP K9): Starter, Kommandozeile, Eintrag, Verweise — und der
     # Rauchtest hat die Bibliothek geladen und nach ihrer Fassung gefragt.
+    assert os.access(ziel / "bin" / "k1520printer", os.X_OK)
+    assert (heim / ".local" / "share" / "applications" / "k1520printer.desktop").is_file()
+    assert (heim / ".local" / "bin" / "k1520printer").is_symlink()
+    assert "Printer" in inst.stdout, "Rauchtest hat das Druckerfenster nicht gebaut"
     assert os.access(ziel / "bin" / "k1520kermit", os.X_OK)
     assert os.access(ziel / "bin" / "k1520kermit-cli", os.X_OK)
     assert (heim / ".local" / "share" / "applications" / "k1520kermit.desktop").is_file()
@@ -1725,10 +1741,11 @@ def test_installation_laeuft_durch_und_startet(tmp_path):
                             capture_output=True, text=True, env=umgebung, timeout=300)
     assert deinst.returncode == 0, deinst.stderr
     assert not ziel.exists(), "Deinstallieren fand die Installation nicht"
-    for rest in ("k1520kermit", "k1520kermit-cli"):
+    for rest in ("k1520kermit", "k1520kermit-cli", "k1520printer"):
         assert not os.path.lexists(heim / ".local" / "bin" / rest), \
             f"Deinstallieren liess den Verweis {rest} liegen"
     assert not (heim / ".local" / "share" / "applications" / "k1520kermit.desktop").exists()
+    assert not (heim / ".local" / "share" / "applications" / "k1520printer.desktop").exists()
     assert any(nutzer_disks.rglob("*.hfe")), "Deinstallieren hat Anwenderdisketten gelöscht"
     assert not (heim / ".local" / "bin" / "python3.12").exists(), \
         "uv hat einen Python-Symlink im PATH des Anwenders hinterlassen"
@@ -1816,7 +1833,7 @@ def test_deinstallieren_raeumt_nach_inhalt_nicht_nach_namensliste():
     un = (PACKAGING / "uninstall.sh").read_text(encoding="utf-8")
     assert "entferne_menue_eintraege" in un and "entferne_installation" in un
     inst = (PACKAGING / "install.sh").read_text(encoding="utf-8")
-    assert 'WERKZEUGE="k1520disktool k1520kermit"' in inst
+    assert 'WERKZEUGE="k1520disktool k1520kermit k1520printer"' in inst
     assert 'exec sh "$SELF_DIR/uninstall.sh"' in inst, "--uninstall ruft uninstall.sh nicht mehr"
 
 
@@ -1841,7 +1858,7 @@ def test_kermit_ist_in_allen_paketwegen():
     assert "libk1520kermit.so" in common and "k1520kermit.dll" in common
 
     inst = (PACKAGING / "install.sh").read_text(encoding="utf-8")
-    assert 'WERKZEUGE="k1520disktool k1520kermit"' in inst
+    assert 'WERKZEUGE="k1520disktool k1520kermit k1520printer"' in inst
     assert 'KONSOLENWERKZEUGE="k1520dbg k1520disktool-cli k1520kermit-cli"' in inst
     assert 'ersetze_platzhalter "$SELF_DIR/kermit_launcher.sh"' in inst
     assert '> "$PREFIX/bin/k1520kermit"' in inst
@@ -1863,6 +1880,40 @@ def test_kermit_ist_in_allen_paketwegen():
     assert "k1520k_[a-z0-9_]+" in win
     assert "--target k1520core k1520disk k1520kermit" in win
     assert "kermit_launcher.cmd" in win and "kermit_launcher.sh" in win
+
+
+def test_der_drucker_ist_in_allen_paketwegen():
+    """K1520 Printer (WP7): Starter, Vorgabedatei, Plugin ``printsupport/``, Rauchtests.
+
+    Er hat KEINE eigene Bibliothek und keine Kommandozeile — gesucht wird nur, was es gibt;
+    das Plugin ist der teure Punkt (ohne es zeigt ``QPrintDialog`` im Paket keinen Drucker)."""
+    bp = (PACKAGING / "build_payload.sh").read_text(encoding="utf-8")
+    assert "default_config_printer.yaml" in bp, "Vorgabedatei fehlt in der Liste der Auslieferungskonfigurationen"
+    assert "printer_launcher.sh" in bp and "printer_launcher.cmd" in bp and "k1520printer.desktop.in" in bp
+    assert "app/printertool/main.py" in bp and "app/printertool/help/handbuch.md" in bp
+    inst = (PACKAGING / "install.sh").read_text(encoding="utf-8")
+    assert 'ersetze_platzhalter "$SELF_DIR/printer_launcher.sh"' in inst
+    assert '> "$PREFIX/bin/k1520printer"' in inst and "k1520printer.desktop.in" in inst
+    assert "PrinterWindow" in inst and '(7, "Drucker")' in inst
+    iss = (PACKAGING / "k1520emu.iss").read_text(encoding="utf-8")
+    assert 'printer_launcher.cmd";   Flags: dontcopy' in iss, "Vorlage muss dontcopy sein (PrepareToInstall)"
+    assert r"{app}\bin\k1520printer.cmd" in iss
+    assert r"{app}\app\printertool\main.py" in iss and 'Name: "{group}\\K1520 Printer"' in iss
+    assert "PrinterWindow" in iss and '(7, "Drucker")' in iss
+    rel = (PROJECT_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    assert rel.count('(7, "Drucker")') == 2, "beide Release-Jobs muessen den Drucker erzeugen"
+    win = (PROJECT_ROOT / ".github" / "workflows" / "windows-ci.yml").read_text(encoding="utf-8")
+    assert "printer_launcher.cmd" in win and "printer_launcher.sh" in win
+    # Das Qt-Plugin fuer den Systemdruck bleibt beim Schlankmachen erhalten.
+    assert "printsupport" in _slim().PLUGINS_KEEP
+    assert "QtPrintSupport" in _slim().BINDINGS_KEEP
+    # Die Vorgabedatei, die der Drucker beim Start sucht, gibt es im Quellbaum.
+    assert (PROJECT_ROOT / "data" / "default_config_printer.yaml").is_file()
+    # ROM-Katalog (WP9): nur die EINE YAML kommt ins Paket (Daten als Intel-HEX), keine .bin daneben, und der Release-Bau
+    # leert den Fallbackpfad des Kerns.
+    assert "drucker_roms.yaml" in bp and "share/k1520emu/eproms" not in bp
+    assert bp.count("-DK1520_PRINTER_ROMS_DEFAULT=") == 2, "beide Release-cmake-Aufrufe muessen den Quellbaumpfad leeren"
+    assert (PROJECT_ROOT / "data" / "drucker_roms.yaml").is_file()
 
 
 def test_kermit_cli_name_im_installationslayout(tmp_path):

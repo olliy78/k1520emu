@@ -72,6 +72,18 @@ k1520_add_test(mc80_asp SRC cards/test_mc80_asp.cpp LIBS k1520_mc80_karten LABEL
 # Magnetbandinterface MBI (EFH, Schreib-/Leseweg ueber das Schieberegister) samt E/A-Senke
 k1520_add_test(mc80_dpl SRC cards/test_mc80_dpl.cpp LIBS k1520_mc80_2x_karten LABELS "${_lbl}")
 k1520_add_test(mc80_mbi SRC cards/test_mc80_mbi.cpp LIBS k1520_mc80_2x_karten LABELS "${_lbl}")
+# SD 1157 (Entwurf 49, WP1): Steuerung des Seriendruckers — Speicherkarte, ROM-MD5, E/A-Tore, Wagen-Platzhalter, Kette
+k1520_add_test(sd1157_steuerung SRC cards/test_sd1157_steuerung.cpp LIBS k1520_printer_karten k1520_printer_roms
+               LABELS "${_lbl};fach_drucker"
+               DEFS "SD1157_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/SD1157\"")
+# K6313 (Entwurf 49, WP8c): CCB — Speicherplan kurz, E/A eine Leitung tief, Tastenmatrix/DIL (Waehlcode x Zeile), Sensoren
+k1520_add_test(k6313_ccb SRC cards/test_k6313_ccb.cpp LIBS k1520_printer_karten k1520_printer_roms
+               LABELS "${_lbl};fach_drucker"
+               DEFS "K6313_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/K6313\"")
+# Drucker-ROM-Katalog (Entwurf 49 §12, WP9): data/drucker_roms.yaml (Metadaten + Intel-HEX), Leser, Schema, Pruefsummen, Negativtests
+k1520_add_test(drucker_rom_katalog SRC cards/test_drucker_rom_katalog.cpp LIBS k1520_printer_roms
+               LABELS "${_lbl};fach_drucker"
+               DEFS "DRUCKER_ROMS_YAML=\"${CMAKE_SOURCE_DIR}/data/drucker_roms.yaml\"")
 # K3528 der K8915 Gen 2: Speicherbild je A8H-Wert, /MEMDI (doc/design/24_k8915_varianten.md R3, AP-V4)
 k1520_add_test(k3528 SRC cards/test_k3528.cpp      LIBS k1520_k3528 LABELS "${_lbl}")
 # PFS K3820 (16 × 2708), von keiner Maschine benutzt (doc/design/24_k8915_varianten.md AP-V11)
@@ -141,6 +153,11 @@ k1520_add_test(gun_net SRC cards/test_gun_net.cpp LIBS k1520_gun_net k1520_z80 L
 
 # ── core/peripherals/ ────────────────────────────────────────────────────────
 # MC80.3x-Tastatur auf Zeichenebene (AP M3, doc/mc80/egos.md §3)
+# Druckwerk (Entwurf 49, WP3): Blattmodell, Nadelkopf, Papierweg, geregelter Wagen, Zusammenspiel
+foreach(_dw blattmodell nadelkopf papierweg geregelter_wagen nadeldruckwerk vorsteckbeleg)
+    k1520_add_test(druckwerk_${_dw} SRC peripherals/druckwerk/test_${_dw}.cpp LIBS k1520_druckwerk
+                   LABELS "${_lbl};fach_drucker")
+endforeach()
 k1520_add_test(mc80_tastatur SRC peripherals/test_mc80_tastatur.cpp LIBS k1520_mc80_karten LABELS "${_lbl}")
 k1520_add_test(k7637          SRC peripherals/test_k7637.cpp
                               LIBS k1520_k7637 k1520_sio k1520_bus LABELS "${_lbl}")

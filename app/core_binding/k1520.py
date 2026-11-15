@@ -430,6 +430,97 @@ _lib.k1520_create_p8000_terminal.restype = K1520Handle
 #   variante 0 = MC80.30 (alles andere ausser 3/4 → NULL), 3/4 = .21/.22 (konfig muss NULL sein); sonst "spe=1|2"
 _lib.k1520_create_mc80.argtypes = [ctypes.c_int, ctypes.c_char_p]
 _lib.k1520_create_mc80.restype = K1520Handle
+# k1520_create_printer(typ, konfig) -> K1520Handle   (Entwurf 49, WP1)
+#   typ 0 = SD 1157/264 (1/2 = K6316 IFSS/V.24: noch nicht gebaut → NULL); konfig "schnittstelle=ifss|v24" oder NULL
+_lib.k1520_create_printer.argtypes = [ctypes.c_int, ctypes.c_char_p]
+_lib.k1520_create_printer.restype = K1520Handle
+
+# Drucker: Blatt, Kopf, Bedienfeld (Entwurf 49, WP3).  Rueckgaben: 1/0 bzw. 0/1/-1 (kein Drucker).
+# Blattzeilen: (breite+7)/8 Bytes, Bit 7 des ersten Bytes = linkester Punkt.
+_lib.k1520_printer_sheet_size.argtypes = [K1520Handle, ctypes.c_int, ctypes.POINTER(ctypes.c_int),
+                                          ctypes.POINTER(ctypes.c_int)]
+_lib.k1520_printer_sheet_size.restype = ctypes.c_int
+_lib.k1520_printer_sheet_version.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_printer_sheet_version.restype = ctypes.c_uint64
+_lib.k1520_printer_sheet_rows.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                                          ctypes.c_void_p, ctypes.c_int]
+_lib.k1520_printer_sheet_rows.restype = ctypes.c_int
+_lib.k1520_printer_sheet_cuts.argtypes = [K1520Handle, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.c_int]
+_lib.k1520_printer_sheet_cuts.restype = ctypes.c_int
+_lib.k1520_printer_sheet_clear.argtypes = [K1520Handle]
+_lib.k1520_printer_sheet_clear.restype = ctypes.c_int
+_lib.k1520_printer_head.argtypes = [K1520Handle, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int),
+                                    ctypes.POINTER(ctypes.c_int)]
+_lib.k1520_printer_head.restype = ctypes.c_int
+_lib.k1520_printer_geometry.argtypes = [K1520Handle, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int),
+                                        ctypes.POINTER(ctypes.c_int)]
+_lib.k1520_printer_geometry.restype = ctypes.c_int
+_lib.k1520_printer_key.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_int]
+_lib.k1520_printer_key.restype = ctypes.c_int
+_lib.k1520_printer_switch.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_int]
+_lib.k1520_printer_switch.restype = ctypes.c_int
+_lib.k1520_printer_switch_get.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_printer_switch_get.restype = ctypes.c_int
+_lib.k1520_printer_lamp.argtypes = [K1520Handle, ctypes.c_int]
+_lib.k1520_printer_lamp.restype = ctypes.c_int
+# K6316: Vorsteckbeleg als eigenes Blatt (Bahn 1 der k1520_printer_sheet_*; hardware.md §11)
+_lib.k1520_printer_beleg_insert.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_int]
+_lib.k1520_printer_beleg_insert.restype = ctypes.c_int
+_lib.k1520_printer_beleg_remove.argtypes = [K1520Handle]
+_lib.k1520_printer_beleg_remove.restype = ctypes.c_int
+_lib.k1520_printer_beleg_state.argtypes = [K1520Handle] + [ctypes.POINTER(ctypes.c_int)] * 6
+_lib.k1520_printer_beleg_state.restype = ctypes.c_int
+
+# ROM-Katalog der Drucker (WP9): vom Kern gelesen, die Oberflaeche liest nichts selbst
+_lib.k1520_printer_rom_count.argtypes = []
+_lib.k1520_printer_rom_count.restype = ctypes.c_int
+_lib.k1520_printer_rom_error.argtypes = []
+_lib.k1520_printer_rom_error.restype = ctypes.c_char_p
+_lib.k1520_printer_rom_info.argtypes = [ctypes.c_int, ctypes.c_int]
+_lib.k1520_printer_rom_info.restype = ctypes.c_char_p
+
+
+@dataclass(frozen=True)
+class DruckerRom:
+    """Ein Eintrag des ROM-Katalogs der Drucker (``data/drucker_roms.yaml``), vom Kern gelesen (WP9)."""
+    schluessel: str
+    typ: str
+    titel: str
+    pgm: str
+    schnittstellen: tuple
+    zeichensatz: str
+    guete: str
+    hinweis: str
+    vorgabe: bool
+    aliases: tuple
+    herkunft: str
+    groesse: int
+
+
+def drucker_roms_fehler() -> str:
+    """Fehlertext des Katalogs ("" = in Ordnung)."""
+    t = _lib.k1520_printer_rom_error()
+    return t.decode("utf-8", "replace") if t else ""
+
+
+def drucker_roms() -> list:
+    """Alle Eintraege des ROM-Katalogs in Dateireihenfolge; leer, wenn der Kern den Katalog nicht lesen kann
+    (Grund: :func:`drucker_roms_fehler`).  Die Oberflaeche liest die Datei NICHT selbst."""
+    n = _lib.k1520_printer_rom_count()
+    if n <= 0:
+        return []
+
+    def feld(i: int, f: int) -> str:
+        t = _lib.k1520_printer_rom_info(i, f)
+        return t.decode("utf-8", "replace") if t else ""
+
+    def liste(t: str) -> tuple:
+        return tuple(x for x in t.split(",") if x)
+
+    return [DruckerRom(schluessel=feld(i, 0), typ=feld(i, 1), titel=feld(i, 2), pgm=feld(i, 3),
+                       schnittstellen=liste(feld(i, 4)), zeichensatz=feld(i, 5), guete=feld(i, 6),
+                       hinweis=feld(i, 7), vorgabe=feld(i, 8) == "1", aliases=liste(feld(i, 9)),
+                       herkunft=feld(i, 10), groesse=int(feld(i, 11) or 0)) for i in range(n)]
 
 # P8000-Terminals (k1520_term_*; andere Maschinen: 0 / -1 / False)
 _lib.k1520_term_count.argtypes = [K1520Handle]
@@ -968,7 +1059,7 @@ def _utf8(path) -> bytes:
 # Maschinentypen (K1520MachineType in core/api/k1520_api.h) — Name → Wert.
 MACHINE_TYPES = {"a5120": 0, "a5120-alt": 0, "a5120-kmbg": 0, "prg710": 1, "prg710-1": 1, "k8915": 2, "k8915-g2": 2, "pc1715": 3,
                  "pc1715-k7221": 3, "pc1715w": 3, "p8000": 4, "p8000-terminal": 5,
-                 "mc80": 6, "mc80-21": 6, "mc80-22": 6}
+                 "mc80": 6, "mc80-21": 6, "mc80-22": 6, "sd1157": 7, "k6316-ifss": 7, "k6316-v24": 7, "k6313": 7, "k6311": 7, "k6313-ifss": 7, "k6311-ifss": 7}
 # (Variante, Bildschirm) fuer k1520_create_pc1715: Variante 0 = PC 1715, 1 = PC 1715W (AP-W3);
 # Bildschirm 0 = K7222 80×24, 1 = K7221 64×16 (am 1715W abgelehnt).
 # AP-6: waehlbare ROM-Fassungen → Parameter von k1520_create_pc1715_ex.
@@ -1049,6 +1140,23 @@ PRG_VARIANTEN = {"prg710": 0, "prg710-1": 1}
 MC80_VARIANTEN = {"mc80": 0, "mc80-21": 3, "mc80-22": 4}
 #: Die Varianten des MC80.2x (Bild 528 × 256, 32 × 8 Zeichen, Tastatur als Matrix, MBI).
 MC80_2X = ("mc80-21", "mc80-22")
+# Druckertyp fuer k1520_create_printer (Entwurf 49): SD 1157/264, K6316 (Modul IFSS bzw. V.24) K6313 (V.24, WP8c), K6311 (V.24, WP8e, Hardware nur aus dem ROM erschlossen)
+# und deren IFSS-Fassungen (WP8g, Typ 5/6).
+DRUCKER_TYPEN = {"sd1157": 0, "k6316-ifss": 1, "k6316-v24": 2, "k6313": 3, "k6311": 4, "k6313-ifss": 5, "k6311-ifss": 6}
+# Tasten, Schalter und Lampen des Druckers (k1520_printer_key/_switch/_lamp, Werte wie in k1520_api.h).
+DRUCKER_TASTE_PV1, DRUCKER_TASTE_PV2, DRUCKER_TASTE_TEST = 1, 2, 3
+DRUCKER_SW_ONLINE, DRUCKER_SW_KOPF, DRUCKER_SW_LPI6, DRUCKER_SW_PAPIER = 0, 1, 2, 3
+DRUCKER_LAMPE_ONLINE, DRUCKER_LAMPE_FEHLER = 0, 1
+# K6316 (nur dort): Tasten S1..S5, weitere Schalter, Lampen (H5 = ONLINE, H2 = FEHLER, dazu TEST = H1, PAPIER = H3, H4 BEREIT)
+DRUCKER_TASTE_S1, DRUCKER_TASTE_S2, DRUCKER_TASTE_S3, DRUCKER_TASTE_S4, DRUCKER_TASTE_S5 = 11, 12, 13, 14, 15
+DRUCKER_SW_HAUBE, DRUCKER_SW_BETRIEBSART, DRUCKER_SW_BELEG_OBEN, DRUCKER_SW_BELEG_UNTEN = 4, 5, 6, 7
+DRUCKER_SW_DIL_BASIS = 16                  # S11..S26 = 16..31
+DRUCKER_SW_FORMULAR1, DRUCKER_SW_FORMULAR2, DRUCKER_SW_BLOCK_6F, DRUCKER_SW_BLOCK_3A = 8, 9, 10, 11   # SD 1157
+DRUCKER_LAMPE_TEST, DRUCKER_LAMPE_PAPIER, DRUCKER_LAMPE_H4 = 2, 3, 4
+# K6313 (WP8c): Tasten 1..4 (ON/OFF LINE, LF vor, LF zurueck, FF), DIL-Schalter 5-1..18-2 = 32..59, Lampe POW
+DRUCKER_TASTE_K6313_T1, DRUCKER_TASTE_K6313_T2, DRUCKER_TASTE_K6313_T3, DRUCKER_TASTE_K6313_T4 = 21, 22, 23, 24
+DRUCKER_SW_K6313_DIL_BASIS = 32
+DRUCKER_LAMPE_POW = 5
 # Bauform fuer k1520_create_k8915 (doc/design/24_k8915_varianten.md R5); "k8915" bleibt V3.
 K8915_GENERATIONEN = {"k8915": 0, "k8915-g2": 1}
 
@@ -1308,7 +1416,8 @@ class K1520Emulator:
                  tastatur: Optional[str] = None, p8000: Optional[dict] = None,
                  ausfuehrung: Optional[str] = None, spe=1, pcmc=False, laderom: Optional[str] = None,
                  konfig: Optional[dict] = None, aup: bool = False,
-                 aup_sonder: bool = False, gide=None, usb=None, net=None, sound=None):
+                 aup_sonder: bool = False, gide=None, usb=None, net=None, sound=None,
+                 drucker: Optional[str] = None):
         """Initialize emulator instance.
 
         Args:
@@ -1320,7 +1429,8 @@ class K1520Emulator:
             machine: ``"a5120"`` (Vorgabe), ``"k8915"``, ``"k8915-g2"`` (K8915 Gen 2), ``"prg710"`` oder
                 ``"prg710-1"``, ``"pc1715"``, ``"pc1715-k7221"`` (PC 1715 mit dem
                 Bildschirm K7221, 64×16), ``"pc1715w"``, ``"mc80"`` (MC80.30) oder
-                ``"mc80-21"``/``"mc80-22"`` — siehe :data:`MACHINE_TYPES`.
+                ``"mc80-21"``/``"mc80-22"``, ``"sd1157"`` (Drucker SD 1157/264, Entwurf 49 — noch ohne
+                Druckwerk) — siehe :data:`MACHINE_TYPES`.
             zeichensatz: nur PC 1715 — Bestückung der ZG-EPROMs, ``"deutsch"``
                 (S619 + S602, Vorgabe), ``"polnisch"`` oder ``"kyrillisch"``; beim
                 ``"pc1715w"`` ohne Wirkung (der Satz kommt von Diskette).
@@ -1484,6 +1594,10 @@ class K1520Emulator:
             elif machine == "p8000-terminal":
                 teile = [f"{k}={v}" for k, v in (p8000 or {}).items()]
                 handle = _lib.k1520_create_p8000_terminal(",".join(teile).encode("utf-8"))
+            elif machine in DRUCKER_TYPEN:
+                # drucker = Konfigurationstext des Kerns ("schnittstelle=ifss|v24,rom=original|repariert")
+                handle = _lib.k1520_create_printer(DRUCKER_TYPEN[machine],
+                                                   drucker.encode("ascii") if drucker else None)
             elif machine in MC80_VARIANTEN:
                 # Der MC80.2x kennt keinen Konfigurationstext (k1520_create_mc80 lehnt ihn ab).
                 if machine in MC80_2X:
@@ -2965,6 +3079,92 @@ class K1520Emulator:
                  for i in range(VRAM_COLS * VRAM_ROWS)]
         return "\n".join("".join(chars[r * VRAM_COLS:(r + 1) * VRAM_COLS])
                           for r in range(VRAM_ROWS))
+
+    # ─── Drucker (Entwurf 49, WP3/WP5): Blatt, Kopf, Bedienfeld ───────────────
+
+    def printer_geometry(self) -> Optional[tuple]:
+        """(Pixel je Zoll in x, Pixel je Zoll in y, Bahnen); ``None`` ohne Drucker."""
+        x, y, b = ctypes.c_int(), ctypes.c_int(), ctypes.c_int()
+        if not _lib.k1520_printer_geometry(self._handle, ctypes.byref(x), ctypes.byref(y), ctypes.byref(b)):
+            return None
+        return (x.value, y.value, b.value)
+
+    def printer_sheet_size(self, bahn: int = 0) -> Optional[tuple]:
+        """(Breite, Hoehe) des Blatts in Pixeln; die Hoehe waechst.  ``None`` ohne Bahn."""
+        w, h = ctypes.c_int(), ctypes.c_int()
+        if not _lib.k1520_printer_sheet_size(self._handle, bahn, ctypes.byref(w), ctypes.byref(h)):
+            return None
+        return (w.value, h.value)
+
+    def printer_sheet_version(self, bahn: int = 0) -> int:
+        """Versionszaehler des Blatts (aendert sich bei jedem Punkt, Wachstum und Leeren)."""
+        return int(_lib.k1520_printer_sheet_version(self._handle, bahn))
+
+    def printer_sheet_rows(self, y0: int, n: int, bahn: int = 0) -> bytes:
+        """Bis zu ``n`` Zeilen ab ``y0``, je ``(Breite+7)//8`` Byte, Bit 7 = linkester Punkt.
+        Leer, wenn es die Zeilen nicht gibt."""
+        groesse = self.printer_sheet_size(bahn)
+        if groesse is None or n <= 0:
+            return b""
+        zb = (groesse[0] + 7) // 8
+        puffer = (ctypes.c_uint8 * (zb * n))()
+        got = int(_lib.k1520_printer_sheet_rows(self._handle, bahn, y0, n,
+                                                ctypes.cast(puffer, ctypes.c_void_p), zb * n))
+        return bytes(puffer[:got * zb]) if got > 0 else b""
+
+    def printer_sheet_cuts(self, bahn: int = 0) -> list:
+        """Zeilen der Schnitte (K6316, Schneideinrichtung) auf dem Blatt."""
+        n = int(_lib.k1520_printer_sheet_cuts(self._handle, bahn, None, 0))
+        if n <= 0:
+            return []
+        puffer = (ctypes.c_int * n)()
+        _lib.k1520_printer_sheet_cuts(self._handle, bahn, puffer, n)
+        return list(puffer)
+
+    def printer_sheet_clear(self) -> bool:
+        return bool(_lib.k1520_printer_sheet_clear(self._handle))
+
+    def printer_head(self) -> Optional[tuple]:
+        """(x in Blattpixeln, y-Zeile der Nadel 1, laeuft 0/1); ``None`` ohne Drucker."""
+        x, y, lauf = ctypes.c_int(), ctypes.c_int(), ctypes.c_int()
+        if not _lib.k1520_printer_head(self._handle, ctypes.byref(x), ctypes.byref(y), ctypes.byref(lauf)):
+            return None
+        return (x.value, y.value, lauf.value)
+
+    def printer_key(self, taste: int, gedrueckt: bool) -> bool:
+        return bool(_lib.k1520_printer_key(self._handle, taste, 1 if gedrueckt else 0))
+
+    def printer_switch(self, schalter: int, wert: bool) -> bool:
+        return bool(_lib.k1520_printer_switch(self._handle, schalter, 1 if wert else 0))
+
+    def printer_switch_value(self, schalter: int, wert: int) -> bool:
+        """Schalter mit Zahlenwert (Formularlaenge 0..3, Betriebsart 0..2, Schalterbloecke als Byte)."""
+        return bool(_lib.k1520_printer_switch(self._handle, schalter, int(wert)))
+
+    def printer_switch_get(self, schalter: int) -> int:
+        """0/1, -1 = unbekannt/kein Drucker."""
+        return int(_lib.k1520_printer_switch_get(self._handle, schalter))
+
+    def printer_lamp(self, lampe: int) -> int:
+        """0/1, -1 = unbekannt/kein Drucker."""
+        return int(_lib.k1520_printer_lamp(self._handle, lampe))
+
+    def printer_beleg_insert(self, laenge_mm: int, breite_mm: int) -> bool:
+        """K6316: Beleg in den Vorsteckschacht stecken (Blatt = Bahn 1).  False = kein K6316, schon belegt, unsinniges Mass."""
+        return bool(_lib.k1520_printer_beleg_insert(self._handle, int(laenge_mm), int(breite_mm)))
+
+    def printer_beleg_remove(self) -> bool:
+        """K6316: Beleg aus dem Schacht nehmen (das Blatt der Bahn 1 bleibt)."""
+        return bool(_lib.k1520_printer_beleg_remove(self._handle))
+
+    def printer_beleg_state(self) -> Optional[dict]:
+        """K6316: ``eingelegt``, ``u`` (Vorsteckschritte hinter FSO), ``laenge`` (Schritte), ``breite_px``, ``x_links``,
+        ``druck_y`` (-1 = nicht unter der Druckzeile); ``None`` ohne K6316."""
+        werte = [ctypes.c_int() for _ in range(6)]
+        if not _lib.k1520_printer_beleg_state(self._handle, *[ctypes.byref(w) for w in werte]):
+            return None
+        namen = ("eingelegt", "u", "laenge", "breite_px", "x_links", "druck_y")
+        return {n: w.value for n, w in zip(namen, werte)}
 
     # ─── Serielle Schnittstellen nach aussen (Entwurf 19 §8) ──────────────────
 

@@ -349,6 +349,7 @@ class MainWindow(QMainWindow):
         m.addAction(self.act_emulator)
         m.addAction(self.act_k8915emu)
         m.addAction(self.act_kermit)
+        m.addAction(self.act_printer)
 
         m = leiste.addMenu("&Hilfe")
         m.addAction(self.act_hilfe)
@@ -3245,6 +3246,14 @@ class MainWindow(QMainWindow):
             programme.programm_starten(programme.KERMIT)
         except RuntimeError as e:
             QMessageBox.warning(self, "K1520 Kermit", str(e))
+
+    def _printer_starten(self) -> None:
+        """K1520 Printer als eigenes Programm daneben öffnen."""
+        from app import programme
+        try:
+            programme.programm_starten(programme.PRINTER)
+        except RuntimeError as e:
+            QMessageBox.warning(self, "K1520 Printer", str(e))
 
     def _k8915emu_starten(self) -> None:
         """Den K8915 Emulator daneben öffnen (siehe :meth:`_emulator_starten`)."""

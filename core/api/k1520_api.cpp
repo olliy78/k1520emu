@@ -9,6 +9,7 @@
 #include "core/machines/p8000/p8000_terminal_machine.h"
 #include "core/machines/mc80/mc80.h"
 #include "core/machines/mc80/mc80_2x.h"
+#include "core/machines/printer/printer_machine.h"
 #include "core/machines/machine.h"
 #include "core/peripherals/k7637/k7637.h"
 #include "core/logger.h"
@@ -97,11 +98,12 @@ K1520Handle k1520_create_configured(K1520MachineType type,
     }
     if (type == K1520_MACHINE_P8000_TERMINAL) return k1520_create_p8000_terminal(nullptr);
     if (type == K1520_MACHINE_MC80) return k1520_create_mc80(0, nullptr);
+    if (type == K1520_MACHINE_PRINTER) return k1520_create_printer(0, nullptr);
     g_init_error.clear();
     if (type != K1520_MACHINE_A5120 && type != K1520_MACHINE_K8915) {
         // Kein stilles NULL: die Oberflaeche soll sagen koennen, warum.
         g_init_error = "Maschinentyp " + std::to_string(static_cast<int>(type)) +
-                       " ist noch nicht implementiert (nur A5120, K8915, PRG710, PC1715, P8000, P8000-Terminal, MC80)";
+                       " ist noch nicht implementiert (nur A5120, K8915, PRG710, PC1715, P8000, P8000-Terminal, MC80, Drucker)";
         return nullptr;
     }
 
@@ -383,6 +385,400 @@ K1520Handle k1520_create_mc80(int variante, const char* konfig) {
         g_init_error = e.what();
         return nullptr;
     }
+}
+
+K1520Handle k1520_create_printer(int typ, const char* konfig) {
+    g_init_error.clear();
+    PrinterMachine::Config cfg;
+    switch (typ) {
+        case 0: cfg.typ = PrinterMachine::Config::Typ::Sd1157_264; break;
+        case 1: cfg.typ = PrinterMachine::Config::Typ::K6316_Ifss; break;
+        case 2: cfg.typ = PrinterMachine::Config::Typ::K6316_V24; break;
+        case 3: cfg.typ = PrinterMachine::Config::Typ::K6313_V24; break;
+        case 4: cfg.typ = PrinterMachine::Config::Typ::K6311_V24; break;
+        case 5: cfg.typ = PrinterMachine::Config::Typ::K6313_Ifss; break;
+        case 6: cfg.typ = PrinterMachine::Config::Typ::K6311_Ifss; break;
+        default:
+            g_init_error = "Unbekannter Druckertyp " + std::to_string(typ) +
+                           " (0 = SD 1157/264, 1 = K6316 IFSS, 2 = K6316 V.24, 3 = K6313 V.24, 4 = K6311 V.24, 5 = K6313 IFSS, 6 = K6311 IFSS)";
+            return nullptr;
+    }
+    // Schluessel=Wert-Liste wie beim MC80.  SD 1157: `schnittstelle`, `rom`.  K6316: `betriebsart`, `dil`
+    // (das Schnittstellenmodul folgt dem Typ).  `rom=<Schluessel|Alias>` fuer alle Typen aus dem ROM-Katalog.
+    const bool k6311 = typ == 4 || typ == 6;          // K6311 (WP8e, Hardware nur aus dem ROM erschlossen [?]): `schalter_baud`, `schalter_format`, `rom`
+    const bool k6313 = typ == 3 || typ == 5 || k6311;  // K6313 (WP8c): Schluessel `dil` (28 Schalter), `rom`; der K6311 nutzt dieselbe Karte
+    const bool k6316 = typ == 1 || typ == 2;
+    const std::string text = konfig ? konfig : "";
+    std::string romWahl;
+    bool romGesetzt = false;
+    size_t pos = 0;
+    while (pos < text.size()) {
+        size_t ende = text.find(',', pos);
+        if (ende == std::string::npos) ende = text.size();
+        const std::string teil = text.substr(pos, ende - pos);
+        pos = ende + 1;
+        if (teil.empty()) continue;
+        const size_t gl = teil.find('=');
+        const std::string key = teil.substr(0, gl);
+        const std::string val = gl == std::string::npos ? "" : teil.substr(gl + 1);
+        const bool sd1157 = !k6316 && !k6313;
+        if (sd1157 && key == "schnittstelle" && (val == "ifss" || val == "v24")) {
+            cfg.sd1157.schnittstelle = val == "v24" ? Sd1157Steuerung::Config::Schnittstelle::V24
+                                                    : Sd1157Steuerung::Config::Schnittstelle::Ifss;
+        } else if (key == "rom") {
+            // ROM-Satz aus dem Katalog data/drucker_roms.yaml (WP9, Entwurf 49 §12): Schluessel oder Alias des Typs.
+            // Ohne `rom=` nimmt PrinterMachine die Vorgabe des Typs.  Laengen/Aufteilung je Typ prueft schon der Leser des Katalogs.
+            romWahl = val;
+            romGesetzt = true;
+        } else if (sd1157 && key == "schnittstelle") {
+            g_init_error = "Drucker: schnittstelle = " + val + " unbekannt (ifss | v24)";
+            return nullptr;
+        } else if (k6316 && key == "betriebsart") {
+            if (val == "aufwickeln") cfg.k6316.betriebsart = K6316Steuerung::Betriebsart::Aufwickeln;
+            else if (val == "schneiden") cfg.k6316.betriebsart = K6316Steuerung::Betriebsart::Schneiden;
+            else if (val == "endlos") cfg.k6316.betriebsart = K6316Steuerung::Betriebsart::Endlos;
+            else {
+                g_init_error = "Drucker: betriebsart = " + val + " unbekannt (aufwickeln | schneiden | endlos)";
+                return nullptr;
+            }
+        } else if (k6311 && (key == "schalter_baud" || key == "schalter_format")) {
+            // BCH/BDH des K6311 (Bitbedeutung: K6313Ccb::Config)
+            try {
+                const unsigned long v = std::stoul(val, nullptr, 0);
+                if (v > 0xFF) throw std::out_of_range("0..255");
+                (key == "schalter_baud" ? cfg.k6313.schalter_baud : cfg.k6313.schalter_format) = static_cast<uint8_t>(v);
+            } catch (const std::exception&) {
+                g_init_error = "Drucker: " + key + " = " + val + " ist keine Zahl 0..255";
+                return nullptr;
+            }
+        } else if (k6313 && !k6311 && key == "dil") {
+            // Maske der geschlossenen DIL-Schalter, Bit 0 = 5-1, Bit 1 = 5-2, ... Bit 27 = 18-2 (K6313Ccb::dilIndex)
+            try {
+                cfg.k6313.dil = static_cast<uint32_t>(std::stoul(val, nullptr, 0)) & ((1u << K6313Ccb::DIL_ANZAHL) - 1);
+            } catch (const std::exception&) {
+                g_init_error = "Drucker: dil = " + val + " ist keine Zahl";
+                return nullptr;
+            }
+        } else if (k6316 && key == "dil") {
+            // Maske der geschlossenen DIL-Schalter, Bit 0 = S11 ... Bit 15 = S26 (dezimal oder 0x..)
+            try {
+                cfg.k6316.dil = static_cast<uint16_t>(std::stoul(val, nullptr, 0));
+            } catch (const std::exception&) {
+                g_init_error = "Drucker: dil = " + val + " ist keine Zahl";
+                return nullptr;
+            }
+        } else {
+            g_init_error = "Drucker: unbekannter Schluessel '" + key + "'" +
+                           (k6311 ? " fuer den K6311 (schalter_baud | schalter_format | rom)"
+                            : k6313 ? " fuer den K6313 (dil | rom)"
+                            : k6316 ? " fuer den K6316 (betriebsart | dil | rom)" : " fuer den SD 1157 (schnittstelle | rom)") +
+                           (key == "romdatei" ? "; romdatei= entfaellt, rom=<Schluessel> aus data/drucker_roms.yaml waehlen" : "");
+            return nullptr;
+        }
+    }
+    if (romGesetzt) {
+        const auto kat = DruckerRomKatalog::gemeinsam();
+        if (!kat->ok()) { g_init_error = kat->fehler(); return nullptr; }
+        const std::string ktyp = PrinterMachine::katalogTyp(cfg.typ);
+        const DruckerRomEintrag* e = kat->finde(ktyp, romWahl);
+        if (!e || !e->daten) {
+            std::string erlaubt;
+            for (const auto* x : kat->fuerTyp(ktyp)) erlaubt += (erlaubt.empty() ? "" : " | ") + x->schluessel;
+            g_init_error = "Drucker: rom = " + romWahl + " unbekannt fuer Typ " + ktyp + " (" + erlaubt + ")";
+            return nullptr;
+        }
+        (k6313 ? cfg.k6313.rom_extern : k6316 ? cfg.k6316.rom_extern : cfg.sd1157.rom_extern) = *e->daten;
+    }
+    setup_logging();
+    try {
+        K1520Machine* m = new PrinterMachine(cfg);   // Handle = K1520Machine* (s. toMachine)
+        return m;
+    } catch (const std::exception& e) {
+        g_init_error = e.what();
+        return nullptr;
+    }
+}
+
+// ─── Drucker: ROM-Katalog (WP9, Entwurf 49 §12) ───────────────────────────────
+
+int k1520_printer_rom_count(void) {
+    const auto kat = DruckerRomKatalog::gemeinsam();
+    return kat->ok() ? static_cast<int>(kat->eintraege().size()) : -1;
+}
+
+const char* k1520_printer_rom_error(void) {
+    static thread_local std::string puffer;
+    puffer = DruckerRomKatalog::gemeinsam()->fehler();
+    return puffer.c_str();
+}
+
+const char* k1520_printer_rom_info(int index, int feld) {
+    static thread_local std::string puffer;
+    puffer.clear();
+    const auto kat = DruckerRomKatalog::gemeinsam();
+    if (!kat->ok() || index < 0 || static_cast<size_t>(index) >= kat->eintraege().size()) return puffer.c_str();
+    const DruckerRomEintrag& e = kat->eintraege()[static_cast<size_t>(index)];
+    auto komma = [](const std::vector<std::string>& v) {
+        std::string s;
+        for (const auto& x : v) s += (s.empty() ? "" : ",") + x;
+        return s;
+    };
+    switch (feld) {
+        case K1520_PROM_SCHLUESSEL: puffer = e.schluessel; break;
+        case K1520_PROM_TYP: puffer = e.typ; break;
+        case K1520_PROM_TITEL: puffer = e.titel; break;
+        case K1520_PROM_PGM: puffer = e.pgm; break;
+        case K1520_PROM_SCHNITTSTELLEN: puffer = komma(e.schnittstellen); break;
+        case K1520_PROM_ZEICHENSATZ: puffer = e.zeichensatz; break;
+        case K1520_PROM_GUETE: puffer = e.guete; break;
+        case K1520_PROM_HINWEIS: puffer = e.hinweis; break;
+        case K1520_PROM_VORGABE: puffer = e.vorgabe ? "1" : "0"; break;
+        case K1520_PROM_ALIASES: puffer = komma(e.aliases); break;
+        case K1520_PROM_HERKUNFT: puffer = e.herkunft; break;
+        case K1520_PROM_GROESSE: puffer = std::to_string(e.daten ? e.daten->size() : 0); break;
+        default: break;
+    }
+    return puffer.c_str();
+}
+
+// ─── Drucker: Blatt, Kopf, Bedienfeld (Entwurf 49, WP3) ──────────────────────
+
+static PrinterMachine* printerOf(K1520Handle h) {
+    return h ? dynamic_cast<PrinterMachine*>(toMachine(h)) : nullptr;
+}
+
+// Blatt einer "Bahn": 0 = Endlospapier; K6316 zusaetzlich 1 = der Beleg im Vorsteckschacht (nach dem ersten Einlegen vorhanden).
+static const Blattmodell* printerBlatt(PrinterMachine* p, int bahn) {
+    if (!p || bahn < 0) return nullptr;
+    if (bahn < p->druck().bahnen()) return &p->druck().blatt(bahn);
+    if (bahn == 1 && p->istK6316() && p->k6316().beleg_modell().hatBlatt()) return &p->k6316().belegBlatt();
+    return nullptr;
+}
+
+int k1520_printer_sheet_size(K1520Handle h, int bahn, int* breite, int* hoehe) {
+    const Blattmodell* b = printerBlatt(printerOf(h), bahn);
+    if (!b) return 0;
+    if (breite) *breite = b->breite();
+    if (hoehe) *hoehe = b->hoehe();
+    return 1;
+}
+
+uint64_t k1520_printer_sheet_version(K1520Handle h, int bahn) {
+    auto* p = printerOf(h);
+    if (p && bahn == 1 && p->istK6316() && p->k6316().beleg_modell().hatBlatt()) return p->k6316().beleg_modell().version();
+    const Blattmodell* b = printerBlatt(p, bahn);
+    return b ? b->version() : 0;
+}
+
+int k1520_printer_sheet_rows(K1520Handle h, int bahn, int y0, int n, uint8_t* buf, int cap) {
+    const Blattmodell* b = printerBlatt(printerOf(h), bahn);
+    if (!b || !buf || cap <= 0) return 0;
+    return b->lies(y0, n, buf, static_cast<size_t>(cap));
+}
+
+int k1520_printer_sheet_cuts(K1520Handle h, int bahn, int* y, int cap) {
+    const Blattmodell* b = printerBlatt(printerOf(h), bahn);
+    if (!b) return 0;
+    const std::vector<int>& s = b->schnitte();
+    for (int i = 0; y && i < cap && i < static_cast<int>(s.size()); ++i) y[i] = s[static_cast<size_t>(i)];
+    return static_cast<int>(s.size());
+}
+
+int k1520_printer_sheet_clear(K1520Handle h) {
+    auto* p = printerOf(h);
+    if (!p) return 0;
+    p->druck().blattLeeren();
+    return 1;
+}
+
+int k1520_printer_head(K1520Handle h, int* x_pixel, int* y_zeile, int* lauf) {
+    auto* p = printerOf(h);
+    if (!p) return 0;
+    const Nadeldruckwerk& d = p->druck();
+    if (x_pixel) *x_pixel = d.kopfXPixel();
+    if (y_zeile) *y_zeile = d.papierY(0);
+    if (lauf) *lauf = d.wagen().laeuft() ? 1 : 0;
+    return 1;
+}
+
+int k1520_printer_geometry(K1520Handle h, int* x_je_zoll, int* y_je_zoll, int* bahnen) {
+    auto* p = printerOf(h);
+    if (!p) return 0;
+    const Nadeldruckwerk& d = p->druck();
+    if (x_je_zoll) *x_je_zoll = d.parameter().takte_je_zoll * d.parameter().x_je_takt;
+    if (y_je_zoll) *y_je_zoll = d.parameter().y_je_zoll;
+    if (bahnen) *bahnen = d.bahnen();
+    return 1;
+}
+
+int k1520_printer_key(K1520Handle h, int taste, int gedrueckt) {
+    auto* p = printerOf(h);
+    if (!p) return 0;
+    // K6311 (WP8f): Tasten 21..24 = ON LINE (D104 A2), D105 A4, A5, A6 - aus dem ROM erschlossen [?], Zuordnung in K6313Ccb::eingaengeSetzen6311
+    if (p->istK6313()) {
+        if (taste < K1520_PRINTER_KEY_K6313_T1 || taste > K1520_PRINTER_KEY_K6313_T4) return 0;
+        p->k6313().setTaste(taste - K1520_PRINTER_KEY_K6313_T1 + 1, gedrueckt != 0);
+        return 1;
+    }
+    if (p->istK6316()) {
+        if (taste < K1520_PRINTER_KEY_K6316_S1 || taste > K1520_PRINTER_KEY_K6316_S5) return 0;
+        p->k6316().setTaste(taste - K1520_PRINTER_KEY_K6316_S1 + 1, gedrueckt != 0);
+        return 1;
+    }
+    Sd1157Steuerung& st = p->sd1157();
+    switch (taste) {
+        case K1520_PRINTER_KEY_PV1:  st.setTastePV1(gedrueckt != 0); return 1;
+        case K1520_PRINTER_KEY_PV2:  st.setTastePV2(gedrueckt != 0); return 1;
+        case K1520_PRINTER_KEY_TEST: st.setTasteTest(gedrueckt != 0); return 1;
+        default: return 0;
+    }
+}
+
+int k1520_printer_switch(K1520Handle h, int schalter, int wert) {
+    auto* p = printerOf(h);
+    if (!p) return 0;
+    if (p->istK6313()) {
+        K6313Ccb& st = p->k6313();
+        if (!p->istK6311() && schalter >= K1520_PRINTER_SW_K6313_DIL_BASIS && schalter < K1520_PRINTER_SW_K6313_DIL_BASIS + K6313Ccb::DIL_ANZAHL) {
+            const int i = schalter - K1520_PRINTER_SW_K6313_DIL_BASIS;
+            st.setDil(5 + i / 2, 1 + i % 2, wert != 0);
+            return 1;
+        }
+        if (schalter == K1520_PRINTER_SW_PAPIER) { st.setPapierDa(wert != 0); return 1; }   // K6311: D104 A6 [?]
+        return 0;
+    }
+    if (p->istK6316()) {
+        K6316Steuerung& st = p->k6316();
+        if (schalter >= K1520_PRINTER_SW_DIL_BASIS && schalter < K1520_PRINTER_SW_DIL_BASIS + 16) {
+            st.setDil(11 + schalter - K1520_PRINTER_SW_DIL_BASIS, wert != 0);
+            return 1;
+        }
+        switch (schalter) {
+            case K1520_PRINTER_SW_KOPF:   st.setKopf(wert != 0); return 1;
+            case K1520_PRINTER_SW_PAPIER: st.setPapierDa(wert != 0); return 1;
+            case K1520_PRINTER_SW_HAUBE:  st.setHaube(wert != 0); return 1;
+            case K1520_PRINTER_SW_BETRIEBSART:
+                if (wert < 0 || wert > 2) return 0;
+                st.setBetriebsart(wert == 0 ? K6316Steuerung::Betriebsart::Aufwickeln
+                                  : wert == 1 ? K6316Steuerung::Betriebsart::Schneiden
+                                              : K6316Steuerung::Betriebsart::Endlos);
+                return 1;
+            case K1520_PRINTER_SW_BELEG_OBEN:  st.setBeleg(wert != 0, st.fsu()); return 1;
+            case K1520_PRINTER_SW_BELEG_UNTEN: st.setBeleg(st.fso(), wert != 0); return 1;
+            default: return 0;
+        }
+    }
+    Sd1157Steuerung& st = p->sd1157();
+    switch (schalter) {
+        case K1520_PRINTER_SW_ONLINE: st.setOnline(wert != 0); return 1;
+        case K1520_PRINTER_SW_KOPF:   st.setKopf(wert != 0); return 1;
+        case K1520_PRINTER_SW_LPI6:   st.setLpi6(wert != 0); return 1;
+        case K1520_PRINTER_SW_PAPIER: st.setPapierDa(wert != 0); return 1;
+        case K1520_PRINTER_SW_FORMULAR1: if (wert < 0 || wert > 3) return 0; st.setFormular(1, static_cast<uint8_t>(wert)); return 1;
+        case K1520_PRINTER_SW_FORMULAR2: if (wert < 0 || wert > 3) return 0; st.setFormular(2, static_cast<uint8_t>(wert)); return 1;
+        case K1520_PRINTER_SW_BLOCK_6F:  st.setSchalter6f(static_cast<uint8_t>(wert)); return 1;
+        case K1520_PRINTER_SW_BLOCK_3A:  st.setSchalter3a(static_cast<uint8_t>(wert)); return 1;
+        default: return 0;
+    }
+}
+
+int k1520_printer_switch_get(K1520Handle h, int schalter) {
+    auto* p = printerOf(h);
+    if (!p) return -1;
+    if (p->istK6313()) {
+        const K6313Ccb& st = p->k6313();
+        if (!p->istK6311() && schalter >= K1520_PRINTER_SW_K6313_DIL_BASIS && schalter < K1520_PRINTER_SW_K6313_DIL_BASIS + K6313Ccb::DIL_ANZAHL) {
+            const int i = schalter - K1520_PRINTER_SW_K6313_DIL_BASIS;
+            return st.dil(5 + i / 2, 1 + i % 2) ? 1 : 0;
+        }
+        return schalter == K1520_PRINTER_SW_PAPIER ? (st.papierDa() ? 1 : 0) : -1;
+    }
+    if (p->istK6316()) {
+        const K6316Steuerung& st = p->k6316();
+        if (schalter >= K1520_PRINTER_SW_DIL_BASIS && schalter < K1520_PRINTER_SW_DIL_BASIS + 16)
+            return st.dil(11 + schalter - K1520_PRINTER_SW_DIL_BASIS) ? 1 : 0;
+        switch (schalter) {
+            case K1520_PRINTER_SW_KOPF:   return st.kopf() ? 1 : 0;
+            case K1520_PRINTER_SW_PAPIER: return st.papierDa() ? 1 : 0;
+            case K1520_PRINTER_SW_HAUBE:  return st.haube() ? 1 : 0;
+            case K1520_PRINTER_SW_BETRIEBSART:
+                return st.betriebsart() == K6316Steuerung::Betriebsart::Aufwickeln ? 0
+                       : st.betriebsart() == K6316Steuerung::Betriebsart::Schneiden ? 1 : 2;
+            case K1520_PRINTER_SW_BELEG_OBEN:  return st.fso() ? 1 : 0;
+            case K1520_PRINTER_SW_BELEG_UNTEN: return st.fsu() ? 1 : 0;
+            default: return -1;
+        }
+    }
+    const Sd1157Steuerung& st = p->sd1157();
+    switch (schalter) {
+        case K1520_PRINTER_SW_ONLINE: return st.online() ? 1 : 0;
+        case K1520_PRINTER_SW_KOPF:   return st.kopf() ? 1 : 0;
+        case K1520_PRINTER_SW_LPI6:   return st.lpi6() ? 1 : 0;
+        case K1520_PRINTER_SW_PAPIER: return st.papierDa() ? 1 : 0;
+        case K1520_PRINTER_SW_FORMULAR1: return st.config().formular_bahn1;
+        case K1520_PRINTER_SW_FORMULAR2: return st.config().formular_bahn2;
+        case K1520_PRINTER_SW_BLOCK_6F:  return st.config().schalter_6f;
+        case K1520_PRINTER_SW_BLOCK_3A:  return st.schalter3a();
+        default: return -1;
+    }
+}
+
+int k1520_printer_lamp(K1520Handle h, int lampe) {
+    auto* p = printerOf(h);
+    if (!p) return -1;
+    if (p->istK6313()) {
+        const K6313Ccb& st = p->k6313();
+        switch (lampe) {
+            case K1520_PRINTER_LAMP_ONLINE: return st.lampe(1) ? 1 : 0;   // K6311: D105 A2 [?]
+            case K1520_PRINTER_LAMP_FEHLER: return st.lampe(3) ? 1 : 0;   // K6311: D105 A3 [?]
+            case K1520_PRINTER_LAMP_PAPIER: return p->istK6311() ? -1 : st.lampe(4) ? 1 : 0;   // K6311: das ROM schreibt keine PE-Lampe
+            case K1520_PRINTER_LAMP_POW:    return st.lampe(2) ? 1 : 0;
+            default: return -1;
+        }
+    }
+    if (p->istK6316()) {
+        const K6316Steuerung& st = p->k6316();
+        switch (lampe) {
+            case K1520_PRINTER_LAMP_ONLINE: return st.lampe(5) ? 1 : 0;   // H5
+            case K1520_PRINTER_LAMP_FEHLER: return st.lampe(2) ? 1 : 0;   // H2
+            case K1520_PRINTER_LAMP_TEST:   return st.lampe(1) ? 1 : 0;   // H1
+            case K1520_PRINTER_LAMP_PAPIER: return st.lampe(3) ? 1 : 0;   // H3
+            case K1520_PRINTER_LAMP_H4:     return st.lampe(4) ? 1 : 0;   // H4
+            default: return -1;
+        }
+    }
+    const Sd1157Steuerung& st = p->sd1157();
+    switch (lampe) {
+        case K1520_PRINTER_LAMP_ONLINE: return st.lampeOnline() ? 1 : 0;
+        case K1520_PRINTER_LAMP_FEHLER: return st.lampeFehler() ? 1 : 0;
+        default: return -1;
+    }
+}
+
+int k1520_printer_beleg_insert(K1520Handle h, int laenge_mm, int breite_mm) {
+    auto* p = printerOf(h);
+    if (!p || !p->istK6316()) return 0;
+    return p->k6316().belegEinlegen(laenge_mm, breite_mm) ? 1 : 0;
+}
+
+int k1520_printer_beleg_remove(K1520Handle h) {
+    auto* p = printerOf(h);
+    if (!p || !p->istK6316()) return 0;
+    p->k6316().belegEntnehmen();
+    return 1;
+}
+
+int k1520_printer_beleg_state(K1520Handle h, int* eingelegt, int* u, int* laenge, int* breite_px, int* x_links, int* druck_y) {
+    auto* p = printerOf(h);
+    if (!p || !p->istK6316()) return 0;
+    const Vorsteckbeleg& b = p->k6316().beleg_modell();
+    if (eingelegt) *eingelegt = b.eingelegt() ? 1 : 0;
+    if (u) *u = b.u();
+    if (laenge) *laenge = b.laenge();
+    if (breite_px) *breite_px = b.breitePixel();
+    if (x_links) *x_links = b.xLinks();
+    if (druck_y) *druck_y = b.unterDruckzeile() ? b.druckzeileY() : -1;
+    return 1;
 }
 
 K1520Handle k1520_create_p8000(const char* konfig) {

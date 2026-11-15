@@ -208,6 +208,12 @@ k1520_add_test(mc80_segmente SRC test_mc80_segmente.cpp
                           LIBS k1520_mc80 k1520_logger
                           LABELS "${_lbl}" DEFS LOG_LEVEL=2)
 
+# SD 1157 (Entwurf 49, WP1): das Original-ROM laeuft an — Stapel 2C28H, CTC, Vektortabelle 2CE0H, Wagenfahrt
+# bis zum linken Rand, Anfangs-PV, Online-Lampe, DC1, Leerlaufschleife; Maschinenkennung 7, K6316 abgewiesen.
+k1520_add_test(sd1157_rom SRC test_sd1157_rom.cpp
+                          LIBS k1520_printer k1520_logger
+                          LABELS "${_lbl};fach_drucker" DEFS LOG_LEVEL=2)
+
 # MC80.21/.22 (AP M11, doc/mc80/hardware_2x.md): BSYS meldet sich ueber die DPL, Tasten ueber die
 # Matrix, Programm ueber die MBI auf die Kassette und zurueck.
 k1520_add_test(mc80_2x SRC test_mc80_2x.cpp
@@ -498,6 +504,58 @@ k1520_add_test(sound_maschinen SRC test_sound_maschinen.cpp
                                LIBS k1520_a5120 k1520_k8915 k1520_prg710 k1520_pc1715 k1520_mc80 k1520_p8000 k1520_sound_k1520 k1520_logger k1520_testsupport
                                LABELS "${_lbl}" DEFS LOG_LEVEL=2)
 
+# SD 1157 (Entwurf 49, WP3): druckt seinen Selbsttest auf das Blatt im Kern — Druckbild gegen ein unabhaengiges
+# Orakel aus 1157zg.rom, Vor-/Rueckwaertsdruck, Zeilenabstand, Formularvorschub, Anfangsvorschub, Tasten, Papierende.
+k1520_add_test(sd1157_druck SRC test_sd1157_druck.cpp
+                            LIBS k1520_printer k1520_logger
+                            LABELS "${_lbl};fach_drucker" DEFS LOG_LEVEL=2
+                            "SD1157_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/SD1157\"")
+
+# SD 1157 (Entwurf 49, WP4/WP6b): Text ueber die SIO (SerialAnschluss/SerialHub) wird mit dem Original-ROM gedruckt —
+# Orakel aus 1157zg.rom (tests/support/sd1157_orakel.h), Fluss DC1/DC3, Steuerfolgen, Geraetekennung, Papierende,
+# Online/Offline zur Laufzeit, Rundlauf ueber Loopback-Telnet (Port 0).
+k1520_add_test(sd1157_text SRC test_sd1157_text.cpp
+                           LIBS k1520_printer k1520_serial k1520_logger
+                           LABELS "${_lbl};fach_drucker" TIMEOUT 300 DEFS LOG_LEVEL=2
+                           "SD1157_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/SD1157\"")
+
+# K6316 (Entwurf 49, WP2a/WP6a): Original-ROM beider Module bis in die Grundstellung, Selbsttest und Text ueber die SIO gegen ein
+# Orakel aus dem Zeichengenerator im ROM (tests/support/k6316_orakel.h), Betriebsarten/Schnitt, Papierende, Diodenmatrix.
+k1520_add_test(k6316 SRC test_k6316.cpp
+                     LIBS k1520_printer k1520_logger
+                     LABELS "${_lbl};fach_drucker" TIMEOUT 600 DEFS LOG_LEVEL=2
+                     "K6316_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/K6316\"")
+
+# K6313 (Entwurf 49, WP8c/WP8d): Original-ROM 33538013 bis in die Grundstellung (Wagen, Lampen, DTR ueber Kanal B), Selbsttest und Text
+# ueber V.24 gegen ein Orakel aus dem Zeichengenerator im ROM (tests/support/k6313_orakel.h)
+k1520_add_test(k6313 SRC test_k6313.cpp
+                     LIBS k1520_printer k1520_serial k1520_logger
+                     LABELS "${_lbl};fach_drucker" TIMEOUT 600 DEFS LOG_LEVEL=2
+                     "K6313_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/K6313\"")
+
+# K6313 Fassung "lang" (WP8h, 16 KiB, ROM 0000H-3FFFH, RAM F000H): 30835007 (ISO, V.24/IFSS), Selbsttest, ESC-Folgen, Hexdump
+k1520_add_test(k6313_lang SRC test_k6313_lang.cpp
+                     LIBS k1520_printer k1520_serial k1520_logger
+                     LABELS "${_lbl};fach_drucker" TIMEOUT 600 DEFS LOG_LEVEL=2
+                     "K6313_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/K6313\"")
+
+# K6313 Schriftarten und Steuerfolgen (WP8h-a): EPSON (33538013) und ISO (30835007) gegen das Orakel k6313_orakel_esc.h, Zeilenabstand, FF, Formularlaenge
+k1520_add_test(k6313_esc SRC test_k6313_esc.cpp
+                     LIBS k1520_printer k1520_serial k1520_logger
+                     LABELS "${_lbl};fach_drucker" TIMEOUT 600 DEFS LOG_LEVEL=2
+                     "K6313_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/K6313\"")
+
+# K6311 (Entwurf 49, WP8e): Hardware nur aus dem ROM 12128062 erschlossen [?] (kein Plan); Grundlauf, BCH/BDH, Grenzen (Merkposten Nr. 34)
+k1520_add_test(k6311 SRC test_k6311.cpp
+                     LIBS k1520_printer k1520_serial k1520_logger
+                     LABELS "${_lbl};fach_drucker" TIMEOUT 600 DEFS LOG_LEVEL=2
+                     "K6311_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/K6311\"")
+
+# K6311 Schriftarten (WP8h-a): Breit und Unterstreichen am ROM 12128062 gegen das Orakel k6311_orakel_esc.h
+k1520_add_test(k6311_esc SRC test_k6311_esc.cpp
+                     LIBS k1520_printer k1520_serial k1520_logger
+                     LABELS "${_lbl};fach_drucker" TIMEOUT 600 DEFS LOG_LEVEL=2
+                     "K6311_ABZUG_DIR=\"${CMAKE_SOURCE_DIR}/doc/EPROMS/K6311\"")
 # KCNet (Entwurf 50 AP N2): stecken je Maschine, doppelt, zu spaet, Tore belegt (RAF 88H/89H, ZRE-Tore)
 k1520_add_test(gun_net_maschinen SRC test_gun_net_maschinen.cpp
                                  LIBS k1520_a5120 k1520_k8915 k1520_prg710 k1520_pc1715 k1520_mc80 k1520_gun_net k1520_logger k1520_testsupport

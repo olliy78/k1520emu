@@ -764,6 +764,18 @@ PC-Gegenstelle (`app/pcmc.py`, Kasten `app/ui/pcmc_widget.py`, Aktion *Maschine 
 nur an der ASP-CTC, EPROM-Segmente, Kassettentakt-Annahmen, MC80.2x-Zeitmodell und RETI-Verteilung, offene Fragen).
 Plan: `doc/design/31_mc80.md`.
 
+## Druckeremulator `k1520printer` (Zweig `feature/issue-28-k1520printer`, WP0-WP9 erledigt, Stand 2026-11-14)
+
+Hardware-Emulator der Nadeldrucker mit **Original-Firmware** (kein Textfilter, das Blatt entsteht Punkt fuer Punkt): **SD 1157/264**, **K6316** (IFSS/V.24), **K6313** (V.24/IFSS, auch die
+16-KiB-Fassungen) und **K6311** (V.24/IFSS, Hardware nur aus dem ROM erschlossen [?]).  Gesperrt: SD 1157/267 (zweite Bahn), SD 1152/257 Typenrad; Centronics/IFSP nicht umgesetzt.
+Kern `core/machines/printer/` + `core/cards/printer/` + `core/peripherals/druckwerk/` (C-ABI `k1520_printer_*`), Oberflaeche **`app/printertool/`** (`bash run_k1520printer.sh`, eigenes Fenster
+statt `main_window.py`, `k1520printer.yaml`, Kurzhandbuch `app/printertool/help/handbuch.md`), Blatt-Widget, Bedienfeld aus `typen.py`, PDF/System-Druck, Telnet/RFC 2217 ueber den
+vorhandenen Schnittstellen-Reiter.  **ROM-Katalog = EINE Datei `data/drucker_roms.yaml`** (Metadaten + Intel-HEX, vom KERN gelesen, `rom=<Schluessel|Alias>`, Suchpfad
+`K1520_PRINTER_ROMS` -> `share/k1520emu` -> `data/`; Release-Bauten leeren `K1520_PRINTER_ROMS_DEFAULT`; fehlt/defekt = Drucker startet nicht, kein Rueckfall); die `.bin` unter `doc/EPROMS/`
+sind nur Beleg.  **Vor Arbeiten daran: `doc/merkposten/drucker.md` lesen** (Nr. 10 TEST nur nach Offline-Neustart, Nr. 17 repariertes ROM, Nr. 19 Oberflaeche, Nr. 33-37 K6313/K6311 samt
+Belegen und offenen [?], Nr. 38 ROM-Katalog); Entwurf `doc/design/49_k1520printer.md` (§11 K6313/K6311, §12 Katalog), Unterlagen `doc/printer/`.  Waechter `py_k1520printer_gui`,
+`py_drucker_rom_katalog`, `DruckerRomKatalog.*`, Fach `fach_drucker`.
+
 ## SIOS 1526 (Zweig `SIOS1526`, Stand 2026-10-30)
 
 > **/IEO sperrt bei IUS (2026-10-30):** `getIEO()` von CTC/PIO/SIO ist low, solange ein Kanal anfordert ODER in Bedienung ist; RETI geht nur an den ersten Baustein in Bedienung (`InterruptSlave::inService()`). Nicht aufweichen (Wächter `RetiChain.*`, `SiosMonitor.ZweitesCalNachProgrammende`); zweites CAL und SGEN laufen seither.

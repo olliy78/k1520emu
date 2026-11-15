@@ -35,6 +35,8 @@ verhandelbar:
 * `-DK1520_FORMATS_DEFAULT=` — leert den einkompilierten Fallback-Pfad des
   Formatkatalogs.  Bliebe er gesetzt, trüge jede ausgelieferte Bibliothek den
   absoluten Pfad des Baurechners als Suchkandidaten mit sich herum.
+* `-DK1520_PRINTER_ROMS_DEFAULT=` — dasselbe für den Drucker-ROM-Katalog
+  `drucker_roms.yaml` (eine Datei mit den ROM-Daten als Intel-HEX, `share/k1520emu/`).
 * `-static-libstdc++ -static-libgcc` — die Bibliothek soll auch dort laden, wo
   eine ältere libstdc++ steht.  Die glibc-Untergrenze kommt dagegen vom
   Baurechner: für Veröffentlichungen auf einer alten Baseline bauen
@@ -121,7 +123,7 @@ Laufzeit (`dlopen`, keine Bauabhängigkeit); fehlt sie oder gibt es kein Ausgabe
 | `install.sh` | Bootstrap-Installer Linux/macOS (liegt im Paket, läuft beim Anwender) |
 | `k1520emu.iss` | Windows-Installationsprogramm (Inno Setup ≥ 6.5). Es **installiert selbst** — laden, auspacken, Laufzeitumgebung, Schlankmachen, Starter, Rauchtest, Deinstallieren; kein PowerShell beteiligt (Guards in `tests/python/test_packaging.py`) |
 | `python_pins.txt` | gepinnter Python für das Windows-Setup: Fassung, Größe, SHA256 (`build_payload.sh --refresh-python`) |
-| `launcher.cmd`, `disktool_launcher.cmd`, `kermit_launcher.cmd` | Windows-Starter; die Startmenü-Verknüpfung zeigt dagegen direkt auf `pythonw.exe`, sonst öffnet sich ein Konsolenfenster |
+| `launcher.cmd`, `disktool_launcher.cmd`, `kermit_launcher.cmd`, `printer_launcher.cmd` | Windows-Starter; die Startmenü-Verknüpfung zeigt dagegen direkt auf `pythonw.exe`, sonst öffnet sich ein Konsolenfenster |
 | `launcher.sh` | Startskript-Vorlage; `@ROOT@` wird beim Installieren ersetzt. EINE Vorlage für alle sechs Emulatoren (`bin/a5120emu`, `bin/k8915emu`, `bin/prg710emu`, `bin/pc1715emu`, `bin/p8000emu`, `bin/mc80emu`): der Name, unter dem der Starter aufgerufen wird, wählt das Programmprofil (`k8915emu*` ⇒ `--machine k8915`, `prg710emu*` ⇒ `--machine prg710`, `pc1715emu*` ⇒ `--machine pc1715`, `p8000emu*` ⇒ `--machine p8000`, `mc80emu*` ⇒ `--machine mc80`); `launcher.cmd` ebenso über `%~n0` |
 | `slim.py` | wirft nach dem Installieren heraus, was nie geladen wird (~400 → ~146 MB) |
 | `lib/common.sh` | gemeinsame Bausteine: Meldungen, Plattform, Download, `ensure_uv`, Inventar, `entferne_menue_eintraege` |
@@ -134,7 +136,7 @@ Laufzeit (`dlopen`, keine Bauabhängigkeit); fehlt sie oder gibt es kein Ausgabe
 | `p8000emu.desktop.in` | Startmenü-Eintrag „P8000 Emulator" (gleiches Symbol) |
 | `mc80emu.desktop.in` | Startmenü-Eintrag „MC80 Emulator" (gleiches Symbol) |
 | `k1520disktool.desktop.in`, `k1520kermit.desktop.in` | Startmenü-Einträge „k1520DiskTool" / „K1520 Kermit" (gleiches Symbol) |
-| `disktool_launcher.sh`, `kermit_launcher.sh` | Starter-Vorlagen der beiden Nicht-Emulator-Programme (je EIGENE Vorlage; die Kommandozeilen liegen als `bin/k1520disktool-cli` bzw. `bin/k1520kermit-cli` daneben, denn `bin/k1520kermit` ist der Starter der Oberfläche) |
+| `disktool_launcher.sh`, `kermit_launcher.sh`, `printer_launcher.sh` | Starter-Vorlagen der Nicht-Emulator-Programme (je EIGENE Vorlage; `k1520printer` hat keine Kommandozeile; die Kommandozeilen liegen als `bin/k1520disktool-cli` bzw. `bin/k1520kermit-cli` daneben, denn `bin/k1520kermit` ist der Starter der Oberfläche) |
 | `icon.svg` | Symbol |
 | `paket_readme.md` | wird als `README.md` **ins Paket** gelegt (Anwendertext) |
 

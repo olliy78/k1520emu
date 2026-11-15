@@ -412,6 +412,7 @@ info "K1520-Emulator $VERSION fuer $PLATFORM"
 # verteilbares Paket entscheidend:
 #
 #   K1520_FORMATS_DEFAULT=""  — sonst steht der absolute Pfad des BAURECHNERS
+#   K1520_PRINTER_ROMS_DEFAULT="" (Drucker-ROM-Katalog, WP9)
 #                               als Kandidat in der Bibliothek.
 #   -static-libstdc++         — die Bibliothek soll auch auf Systemen mit
 #   -static-libgcc              aelterer/neuerer libstdc++ laden.
@@ -457,14 +458,14 @@ if [ "$SKIP_BUILD" = no ]; then
     if ist_windows; then
         cmake -S "$REPO" -B "$BUILD_DIR" \
             -DCMAKE_BUILD_TYPE=Release -DLOG_LEVEL=3 \
-            -DK1520_FORMATS_DEFAULT= -DBUILD_K1520_TESTS=OFF \
+            -DK1520_FORMATS_DEFAULT= -DK1520_PRINTER_ROMS_DEFAULT= -DBUILD_K1520_TESTS=OFF \
             "-DK1520_VERSION_VOLL=$VERSION" \
             $LAUFZEIT_ARGS \
             >/dev/null || die "cmake-Konfiguration fehlgeschlagen"
     else
         cmake -S "$REPO" -B "$BUILD_DIR" \
             -DCMAKE_BUILD_TYPE=Release -DLOG_LEVEL=3 \
-            -DK1520_FORMATS_DEFAULT= -DBUILD_K1520_TESTS=OFF \
+            -DK1520_FORMATS_DEFAULT= -DK1520_PRINTER_ROMS_DEFAULT= -DBUILD_K1520_TESTS=OFF \
             "-DK1520_VERSION_VOLL=$VERSION" \
             -DCMAKE_SHARED_LINKER_FLAGS="-static-libstdc++ -static-libgcc" \
             >/dev/null || die "cmake-Konfiguration fehlgeschlagen"
@@ -591,6 +592,10 @@ cp "$REPO/tools/sound/fremd/README.md" "$STAGE/payload/share/doc/lizenzen/sound_
     || die "app/kermittool/main.py fehlt in der Payload"
 [ -f "$STAGE/payload/app/kermittool/help/handbuch.md" ] \
     || die "app/kermittool/help/handbuch.md fehlt in der Payload"
+[ -f "$STAGE/payload/app/printertool/main.py" ] \
+    || die "app/printertool/main.py fehlt in der Payload"
+[ -f "$STAGE/payload/app/printertool/help/handbuch.md" ] \
+    || die "app/printertool/help/handbuch.md fehlt in der Payload"
 
 cp "$REPO/data/formats.yaml" "$STAGE/payload/share/k1520emu/formats.yaml"
 # Hinterlegte Bootabbilder des DiskTools (Ticket #25): Katalog + die .bin daneben in
@@ -600,10 +605,14 @@ cp "$REPO/data/bootsektor.yaml" "$STAGE/payload/share/k1520emu/bootsektor.yaml" 
 mkdir -p "$STAGE/payload/share/k1520emu/bootsektoren"
 cp "$REPO"/data/bootsektoren/*.bin "$STAGE/payload/share/k1520emu/bootsektoren/" \
     || die "data/bootsektoren/*.bin fehlen"
+# ROM-Katalog der Drucker (Entwurf 49 §12, WP9): EINE Datei, die die ROM-Daten selbst als Intel-HEX traegt; der Kern liest sie
+# (share/k1520emu/ vor data/, Umgebung K1520_PRINTER_ROMS).  Keine .bin im Paket - die liegen als Herkunftsbeleg nur unter doc/EPROMS/.
+cp "$REPO/data/drucker_roms.yaml" "$STAGE/payload/share/k1520emu/drucker_roms.yaml" \
+    || die "data/drucker_roms.yaml fehlt"
 # Auslieferungskonfiguration: der Zustand nach der Erstinstallation und das Ziel
 # von *Ansicht > Standard zuruecksetzen* (app/config_io.py::standard_konfiguration)
-# — je Programm eine (A5120, K8915, PRG710, PC1715, P8000 und MC80 Emulator; app/profil.py).
-for _vorgabe in default_config_a5120.yaml default_config_k8915.yaml default_config_prg710.yaml default_config_pc1715.yaml default_config_p8000.yaml default_config_mc80.yaml; do
+# — je Programm eine (A5120, K8915, PRG710, PC1715, P8000 und MC80 Emulator; app/profil.py) plus K1520 Printer (kein Profil, app/printertool/konfig.py).
+for _vorgabe in default_config_a5120.yaml default_config_k8915.yaml default_config_prg710.yaml default_config_pc1715.yaml default_config_p8000.yaml default_config_mc80.yaml default_config_printer.yaml; do
     cp "$REPO/data/$_vorgabe" "$STAGE/payload/share/k1520emu/$_vorgabe" \
         || die "Auslieferungskonfiguration fehlt: data/$_vorgabe"
 done
@@ -693,6 +702,7 @@ if ist_windows; then
     cp "$SELF_DIR/launcher.cmd"           "$STAGE/launcher.cmd"
     cp "$SELF_DIR/disktool_launcher.cmd"  "$STAGE/disktool_launcher.cmd"
     cp "$SELF_DIR/kermit_launcher.cmd"    "$STAGE/kermit_launcher.cmd"
+    cp "$SELF_DIR/printer_launcher.cmd"   "$STAGE/printer_launcher.cmd"
     # Die Werkzeug-Eingabeaufforderung.  Sie traegt die Endung `.in` im
     # Quellbaum, weil sie erst beim Einrichten ausgefuellt wird — im Paket
     # heisst sie wie die uebrigen Vorlagen (der Assistent holt sie ueber
@@ -709,6 +719,8 @@ else
     cp "$SELF_DIR/k1520disktool.desktop.in" "$STAGE/k1520disktool.desktop.in"
     cp "$SELF_DIR/kermit_launcher.sh"       "$STAGE/kermit_launcher.sh"
     cp "$SELF_DIR/k1520kermit.desktop.in"   "$STAGE/k1520kermit.desktop.in"
+    cp "$SELF_DIR/printer_launcher.sh"      "$STAGE/printer_launcher.sh"
+    cp "$SELF_DIR/k1520printer.desktop.in"  "$STAGE/k1520printer.desktop.in"
     cp "$SELF_DIR/a5120emu.desktop.in"      "$STAGE/a5120emu.desktop.in"
     cp "$SELF_DIR/k8915emu.desktop.in"      "$STAGE/k8915emu.desktop.in"
     cp "$SELF_DIR/prg710emu.desktop.in"     "$STAGE/prg710emu.desktop.in"

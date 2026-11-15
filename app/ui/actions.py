@@ -180,6 +180,10 @@ _SPEC: List[Tuple] = [
      "K1520 Kermit öffnen — Dateien mit der WEGA (P8000) oder einem anderen Kermit über Telnet/RFC 2217 "
      "austauschen; es läuft neben diesem Programm weiter",
      "_kermit_starten", False),
+    ("printer", "K1520 &Printer starten", None, None,
+     "K1520 Printer öffnen — den Nadeldrucker SD 1157 oder K6316 nachbilden; die Druckerschnittstelle des "
+     "Rechners wird per Telnet mit ihm verbunden; es läuft neben diesem Programm weiter",
+     "_printer_starten", False),
     # Der jeweils andere Emulator — dasselbe Programm mit dem anderen Profil.
     ("k8915emu", "K&8915 Emulator starten", None, None,
      "Den K8915 Emulator öffnen — ein eigenes Programm mit eigener "
@@ -254,6 +258,7 @@ KURZ = {
     "standard": "Standard",
     "disktool": "DiskTool",
     "kermit": "Kermit",
+    "printer": "Drucker",
     "konsole": "Konsole",
     "hilfe": "Hilfe",
 }

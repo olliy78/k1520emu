@@ -144,6 +144,13 @@ Die mitgelieferte WEGA-3.1-Platte (`p8000_wega31/`, im Beispielordner) trägt de
 Benutzer `kermit` samt C-Kermit; Einrichtung und Bedienung stehen im Handbuch
 des Programms (F1) und in `share/doc/k1520kermit.md`.
 
+Ein viertes Programm ist **K1520 Printer**, ein Druckeremulator mit Original-Firmware
+(SD 1157, K6316, K6313, K6311). Ein Rechner-Emulator schickt seine Druckerausgabe über
+Telnet oder RFC 2217 (Vorgabe: IFSS auf `127.0.0.1:5000`); das Blatt lässt sich als PDF
+speichern oder drucken. Startmenü-Eintrag „K1520 Printer" oder `k1520printer`. Die
+EPROM-Sätze stehen im Katalog `share/k1520emu/drucker_roms.yaml` und werden im Programm
+je Typ gewählt; Bedienung im Handbuch des Programms (F1).
+
 ### Echte Disketten am Greaseweazle
 
 Beide Programme können statt einer Datei ein **echtes Laufwerk** benutzen, wenn ein

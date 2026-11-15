@@ -43,6 +43,11 @@ def plan(*dateien):
     ("core/machines/k8915/k8915.cpp", "fach_k8915"),
     ("core/machines/pc1715/pc1715.cpp", "fach_pc1715"),
     ("core/machines/prg710/prg710.cpp", "fach_prg710"),
+    ("core/machines/printer/printer_machine.cpp", "fach_drucker"),
+    ("core/cards/printer/sd1157_steuerung.cpp", "fach_drucker"),
+    ("core/peripherals/druckwerk/blattmodell.cpp", "fach_drucker"),
+    ("app/printertool/fenster.py", "fach_drucker"),
+    ("data/default_config_printer.yaml", "fach_drucker"),
 ])
 def test_je_bereich_das_fachgebiet(pfad, fach):
     p = plan(pfad)

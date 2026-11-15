@@ -53,7 +53,9 @@ MASCHINEN="a5120emu k8915emu prg710emu pc1715emu p8000emu mc80emu"
 # (doc/design/13_k1520disktool.md).  Wie bei den Maschinen gilt: ein neuer Name
 # gehoert hier hinein UND braucht eine <name>.desktop.in.
 # `k1520kermit` (AP K9, Entwurf 36) tauscht Dateien mit der WEGA (P8000) aus.
-WERKZEUGE="k1520disktool k1520kermit"
+# `k1520printer` (WP7, Entwurf 49) ist der Drucker-Emulator: ein Programm auf dem Kern, ohne eigene
+# Bibliothek und ohne Kommandozeile.
+WERKZEUGE="k1520disktool k1520kermit k1520printer"
 
 # Werkzeuge OHNE Oberflaeche: sie bekommen einen Verweis in ~/.local/bin, aber
 # keinen Startmenue-Eintrag und kein Symbol.  `k1520dbg` ist der Debugger — ein
@@ -514,6 +516,10 @@ ersetze_platzhalter "$SELF_DIR/kermit_launcher.sh" "$PREFIX" "$DATEN" > "$PREFIX
 chmod +x "$PREFIX/bin/k1520kermit"
 [ -f "$PREFIX/bin/k1520kermit-cli" ] && chmod +x "$PREFIX/bin/k1520kermit-cli"
 
+# K1520 Printer: eigene Vorlage (der Name waehlt hier kein Profil), nutzt libk1520core.
+ersetze_platzhalter "$SELF_DIR/printer_launcher.sh" "$PREFIX" "$DATEN" > "$PREFIX/bin/k1520printer"
+chmod +x "$PREFIX/bin/k1520printer"
+
 # ── Startmenue-Eintraege und Starter in ~/.local/bin ─────────────────────────
 #
 # Wird ERST NACH dem bestandenen Rauchtest gerufen (siehe unten): ein Eintrag fuer
@@ -559,6 +565,10 @@ lege_menue_eintraege_an() {
     ersetze_platzhalter "$SELF_DIR/k1520kermit.desktop.in" "$PREFIX" \
         > "$APPDIR/k1520kermit.desktop"
 
+    ln -sf "$PREFIX/bin/k1520printer" "$BINDIR/k1520printer"
+    ersetze_platzhalter "$SELF_DIR/k1520printer.desktop.in" "$PREFIX" \
+        > "$APPDIR/k1520printer.desktop"
+
     # Die Konsolenwerkzeuge: nur ein Verweis, kein Eintrag im Startmenue.  Ein
     # Debugger, der per Doppelklick startet, oeffnete ein Fenster, das mangels
     # Diskette sofort wieder zuginge (§10a.2 des Entwurfs).
@@ -569,7 +579,7 @@ lege_menue_eintraege_an() {
     if have update-desktop-database; then
         update-desktop-database "$APPDIR" >/dev/null 2>&1 || true
     fi
-    ok "Startmenue-Eintraege und $BINDIR/{a5120emu,k8915emu,prg710emu,pc1715emu,p8000emu,mc80emu,k1520disktool,k1520kermit}"
+    ok "Startmenue-Eintraege und $BINDIR/{a5120emu,k8915emu,prg710emu,pc1715emu,p8000emu,mc80emu,k1520disktool,k1520kermit,k1520printer}"
     case ":$PATH:" in
         *":$BINDIR:"*) ;;
         *) warn "$BINDIR liegt nicht im PATH — der Emulator startet trotzdem ueber das Startmenue" ;;
@@ -627,12 +637,12 @@ if lib.k1520_version().decode() != version.fassung():
 lib.k1520_create.argtypes = [ctypes.c_int]
 lib.k1520_create.restype = ctypes.c_void_p
 lib.k1520_destroy.argtypes = [ctypes.c_void_p]
-for _nr, _name in ((0, "A5120"), (1, "PRG710"), (2, "K8915"), (3, "PC1715"), (4, "P8000"), (5, "P8000-Terminal"), (6, "MC80")):
+for _nr, _name in ((0, "A5120"), (1, "PRG710"), (2, "K8915"), (3, "PC1715"), (4, "P8000"), (5, "P8000-Terminal"), (6, "MC80"), (7, "Drucker")):
     _h = lib.k1520_create(_nr)
     if not _h:
         sys.exit(_name + ": k1520_create schlug fehl")
     lib.k1520_destroy(_h)
-print("     Maschinen:  A5120, PRG710, K8915, PC1715, P8000, P8000-Terminal, MC80")
+print("     Maschinen:  A5120, PRG710, K8915, PC1715, P8000, P8000-Terminal, MC80, Drucker")
 
 import PySide6
 print("     PySide6:   ", PySide6.__version__)
@@ -667,7 +677,11 @@ fenster = MainWindow(profil=_profil.profil("p8000"))
 fenster.close()
 fenster = MainWindow(profil=_profil.profil("mc80"))
 fenster.close()
-print("     Oberflaeche: baut auf (A5120, K8915, PRG710, PC1715, P8000, MC80)")
+# K1520 Printer: Fenster samt Qt-Druckunterstuetzung; die Konfiguration geht in einen Wegwerfordner.
+import os, tempfile
+from app.printertool.fenster import PrinterWindow
+PrinterWindow(konfig_daten={}, konfig_pfad=os.path.join(tempfile.mkdtemp(), "p.yaml"), autostart=False).close()
+print("     Oberflaeche: baut auf (A5120, K8915, PRG710, PC1715, P8000, MC80, Printer)")
 PYEOF
 # Der Kern legt beim Erzeugen einer Maschine ein Protokoll unter `logs/` im
 # ARBEITSVERZEICHNIS an (k1520_api.cpp) — das ist hier die frische Installation.

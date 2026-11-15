@@ -1221,6 +1221,7 @@ class MainWindow(QMainWindow):
         tools_menu = menu_bar.addMenu("&Werkzeuge")
         tools_menu.addAction(self.act_disktool)
         tools_menu.addAction(self.act_kermit)
+        tools_menu.addAction(self.act_printer)
         if hasattr(self, "act_terminal"):       # nur P8000: dieselbe Aktion wie im Menue Maschine
             tools_menu.addAction(self.act_terminal)
         # Der jeweils andere Emulator (dasselbe Programm, anderes Profil).
@@ -3681,6 +3682,13 @@ class MainWindow(QMainWindow):
             programme.programm_starten(programme.KERMIT)
         except RuntimeError as e:
             QMessageBox.warning(self, "K1520 Kermit", str(e))
+
+    def _printer_starten(self):
+        """K1520 Printer als eigenständiges Programm daneben öffnen (eigener Prozess)."""
+        try:
+            programme.programm_starten(programme.PRINTER)
+        except RuntimeError as e:
+            QMessageBox.warning(self, "K1520 Printer", str(e))
 
     def _emulator_starten(self, maschine: str):
         """Einen der ANDEREN Emulatoren starten (A5120, K8915, PRG710).

@@ -8,11 +8,40 @@
 #include <chrono>
 #include <system_error>
 
+#if defined(_WIN32)
+#  define NOMINMAX
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
+#endif
+
 namespace fs = std::filesystem;
 
 namespace k1520 {
 
 namespace {
+
+/// Zeitstempel einer Datei ODER eines Verzeichnisses setzen.  Unter Windows kann `std::filesystem::last_write_time`
+/// kein Verzeichnis beschreiben (MinGW oeffnet ohne FILE_FLAG_BACKUP_SEMANTICS -> "Permission denied"), deshalb
+/// dort direkt ueber `SetFileTime`.
+void stempelSetzen(const fs::path& p, fs::file_time_type t, std::error_code& ec) {
+#if defined(_WIN32)
+    using namespace std::chrono;
+    const auto sys = system_clock::now() + duration_cast<system_clock::duration>(t - fs::file_time_type::clock::now());
+    const int64_t ns100 = duration_cast<nanoseconds>(sys.time_since_epoch()).count() / 100 + 116444736000000000LL;
+    FILETIME ft;
+    ft.dwLowDateTime = static_cast<DWORD>(static_cast<uint64_t>(ns100) & 0xFFFFFFFFu);
+    ft.dwHighDateTime = static_cast<DWORD>(static_cast<uint64_t>(ns100) >> 32);
+    HANDLE h = ::CreateFileW(p.c_str(), FILE_WRITE_ATTRIBUTES,
+                             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
+                             FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+    if (h == INVALID_HANDLE_VALUE) { ec = std::error_code(static_cast<int>(::GetLastError()), std::system_category()); return; }
+    if (!::SetFileTime(h, nullptr, nullptr, &ft))
+        ec = std::error_code(static_cast<int>(::GetLastError()), std::system_category());
+    ::CloseHandle(h);
+#else
+    fs::last_write_time(p, t, ec);
+#endif
+}
 
 constexpr uint8_t CR = 0x0D;
 
@@ -167,7 +196,10 @@ bool VdipStick::dosZuZeit(uint32_t dos, fs::file_time_type& t) {
     const int64_t s = tageAusDatum(y, m, d) * 86400 + h * 3600 + mi * 60 + s2 * 2;
     const auto nf = fs::file_time_type::clock::now();
     const auto ns = system_clock::now();
-    t = nf + duration_cast<fs::file_time_type::duration>(system_clock::time_point(seconds(s)) - ns);
+    // +0,5 s Vorhalt: Dateisysteme, die den Stempel auf ganze Sekunden ABSCHNEIDEN (gesehen unter wine), machten aus
+    // "ns/nf um Nanosekunden verjuengt" sonst eine Sekunde zu frueh.  DOS-Sekunden sind gerade, zeitZuDos rundet auf
+    // ganze Sekunden: s+0,5 -> s+1 -> /2 ergibt wieder s/2.
+    t = nf + duration_cast<fs::file_time_type::duration>(system_clock::time_point(milliseconds(s * 1000 + 500)) - ns);
     return true;
 }
 
@@ -305,7 +337,7 @@ VdipFehler VdipStick::mkd(const std::string& name, bool stempel, uint32_t dos) {
     fs::create_directory(dir / norm, ec);
     if (ec) return VdipFehler::CommandFailed;
     fs::file_time_type t;
-    if (stempel && dosZuZeit(dos, t)) fs::last_write_time(dir / norm, t, ec);
+    if (stempel && dosZuZeit(dos, t)) stempelSetzen(dir / norm, t, ec);
     return VdipFehler::Ok;
 }
 
@@ -476,7 +508,7 @@ void VdipStick::schliesseDatei() {
     if (offenSchreiben_ && offenStempel_) {
         fs::file_time_type t;
         std::error_code ec;
-        if (dosZuZeit(offenDos_, t)) fs::last_write_time(offenPfad_, t, ec);
+        if (dosZuZeit(offenDos_, t)) stempelSetzen(offenPfad_, t, ec);
     }
     offenName_.clear();
     offenPfad_.clear();

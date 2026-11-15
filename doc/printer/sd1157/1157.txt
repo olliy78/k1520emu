@@ -1,0 +1,177 @@
+NV - Einsatz Seriendrucker SD 1157 an SKR - Reg.-Nr. 1258/4/H/9
+
+Einsatz   eines  Seriendruckers  SD  1157  an  einem  System  der 
+                    Kleinrechentechnik (SKR)
+
+Zur  Komplettierung einer vorhandenen SKR-Anlage (SW,  NSW)  oder 
+als Ersatz für einen defekten Drucker (NSW,  Et-Probleme)  stehen 
+Kosten- und  leistungsgünstig Seriendrucker SD 1157 von  Robotron 
+zur Verfügung.  Diese sind jedoch für BC und ESER vorgesehen. Bei 
+der  Anwendung  mit SKR kommt es zu undefinierten  Zuständen  bei 
+auftretenden  Fehlern  (Fehlerbehandlungsprozedur).   Desweiteren 
+weicht der Zeichenvorrat zu schon bestehenden Programmen ab.
+
+Lösung:         Anpassung  bzw.  Änderung des Mikropogrammes  auf 
+                der  SD 1157 Speicherplatte  (Z-Nr.  56-264-6702) 
+                zur Arbeit mit SKR.
+
+Arbeitsmittel:  1. Programmiergerät für EPROM's (U555, 2708)
+                2. Bürocomputer BC A5120
+
+Hilfsmittel:    Programmieradapter    zum    Programmieren    der 
+                eingelöteten EPROM's.
+
+Die Anleitung zum Bau des Programmieradapters liegt vor. (Aufwand 
+ca. 40.- M Material und ca. 5h Az.)
+Das  benötigte Programm kann auf Minifolienspeicher im SCP-Format 
+(16*256 Bytes) übergeben werden.
+Bei Lieferung der Speicherplatine ist ein Programmieren bei HÜR 2 
+möglich.
+Mit  der  beschriebenen Anpassung kann der SD 1157 an  vorhandene 
+SKR angeschlossen werden.
+
+
+Änderungen am Mikroprogramm des Seriendruckers 1157
+
+Die  Änderung im Mikroprogramm erlaubt den Anschluß des  Druckers 
+an SKR mit IFSS und V24 Schnittstellen. Das Mikroprogramm ist nur 
+für  die Seriendrucker SD 1157 des Typs 264 und 267,  aber  nicht 
+für den Typ 269 (graphic) geeignet. 
+
+Folgende  Änderungen  wurden  gegenüber dem  alten  Mikroprogramm 
+gemacht:
+
+ - Das  Übertragungsprotokoll an der IFSS Schnittstelle wurde von 
+   9600 Baud,  7 Bit mit ungerader Parität in 9600 Baud,  8  Bit, 
+   ohne Parität geändert.
+
+ - Nach  dem Einschalten waren keine  TAB-Marken  gesetzt,  diese 
+   werden  jetzt für die ersten 132 Zeichen in Modulo-8 Abständen 
+   eingestellt.
+
+ - Bei Übertragungsfehlern oder bei falscher Programmierung (ESC-
+   Sequenzen) sendete der Drucker das Steuerzeichen DC4 und  war
+   tete  auf eine Abfrage des Fehlerzustandes oder ein Rücksetzen 
+   durch  den  Rechner.  Diese Fehler werden  jetzt  vom  Drucker 
+   ignoriert  (bei Übertragungsfehlern wird ein '?' gedruckt  und 
+   bei  falschen  ESC-Sequenzen werden diese ingoriert).  An  den 
+   Rechner wird keine Fehlermeldung mehr gesendet. 
+
+Befehlsliste SD 1157 (hexadezimale Darstellung der Codierung)
+
+NUL     00                 Leerbefehl
+HTS     1B 48              Horizontaltabulatormarken setzen
+HTC     1B 5B 33 67        Horizontaltabulatormarken löschen
+HT      09                 Horizontaltabulation
+HPRV    1B 5B 3n...3m 61   Horizontalpositionierung relativ, 
+                           vorwärts
+HPRR    1B 5B 3n...3m 71   Horizontalpositionierung relativ,
+                           rückwärts
+HPA     1B 5B 3n...3m 60   Horizontalpositionierung absolut
+CR      0D                 Wagenrücklauf
+BS      08                 Rückschritt
+NL      1B 45              neue Zeile
+6LPI    1B 5B 30 20 4C     6 Zeilen pro Zoll
+8LPI    1B 5B 35 20 4C     8 Zeilen pro Zoll
+LF1     0A                 Zeilenvorschub, linke Bahn
+LF2     11                 Zeilenvorschub, rechte Bahn
+VTS1    1B 4A              Vertikaltabulationsmarken für linke 
+                           Bahn setzen
+VTS2    1B 51              Vertikaltabulationsmarken für rechte 
+                           Bahn setzen
+VTC1    1B 5B 34 67        Vertikaltabulationsmarken für linke 
+                           Bahn löschen
+VTC2    1B 5B 35 67        Vertikaltabulationsmarken für rechte 
+                           Bahn löschen
+VT1     0B                 Vertikaltabulation, linke Bahn
+VT2     12                 Vertikaltabulation, rechte Bahn
+VPRV1   1B 5B 3n...3m 65   Vertikalpositionierung relativ, 
+                           vorwärts, linke Bahn
+VPRV2   1B 5B 3n...3m 76   Vertikalpositionierung relativ, 
+                           vorwärts, rechte Bahn
+VPRR1   1B 5B 3n...3m 75   Vertikalpositionierung relativ, 
+                           rückwärts, linke Bahn 
+VPRR2   1B 5B 3n...3m 72   Vertikalpositionierung relativ, 
+                           rückwärts, rechte Bahn
+VPA1    1B 5B 3n...3m 64   Vertikalpositionierung absolut, 
+                           linke Bahn 
+VPA2    1B 5B 3n...3m 74   Vertikalpositionierung absolut, 
+                           rechte Bahn
+LPF1    1B 5B 3n...3m 7D   Formularlänge, linke Bahn
+LPF2    1B 5B 3n...3m 7E   Formularlänge, rechte Bahn
+FF1     0C                 Formularvorschub, linke Bahn 
+FF2     13                 Formularvorschub, rechte Bahn
+LLFS1   1B 5B 3n...3m 7A   Formularendezeile linke Bahn setzen
+LLFS2   1B 5B 3n...3m 7B   Formularendezeile rechte Bahn setzen
+LLFC1   1B 30              Formularendezeile linke Bahn löschen
+LLFC2   1B 31              Formularendezeile rechte Bahn löschen
+ZLB     1B 35              Zeilenschaltbefehl für Konteneinzug
+KAB     1B 34              Kartenauswurf für Konteneinzug
+BDE     1B 5B 31 6D        Breitdruck ein
+SDE     1B 5B 33 6D        Schrägdruck ein
+NDR     1B 5B 30 6D        Normaldruck
+SO      0E                 Umschalten auf zweiten Zeichensatz
+SLZE    1B 39              Sichtbarmachung letzte Zeile ein
+SLZA    1B 38              Sichtbarmachung letzte Zeile aus
+DEL     7F                 Rücksetzen des Gerätes
+DA      1B 5B 30 63        Sende-Gerätekennung
+DSR     1B 5B 35 6E        Sende-Status
+STX     02                 Start des Textes
+ETX     03                 Ende des Textes
+                       V 24-Schnittstelle
+Leitungen
+
+V24        DIN         EIA         
+TGL 29077  66020       RS-232-C    Signalbeschreibung
+_____________________________________________________________________
+
+101        E1          AA          Protective Ground
+102        E2          AB          Signal Ground
+103        D1          BA          Transmitted Data
+104        D2          BB          Received Data
+105        S2          CA          Request to Send
+106  *1    M2          CB          Clear to Send
+107  *2    M2          CC          Data Set Ready
+108.2      S1.2        CD          Data Terminal Ready
+109  *3    M5          CF          Receive Line Signal Detector
+
+*1 Wenn  das Signal vom Steuergerät nicht vorhanden ist,  muß  am 
+   Interfaceanschluß Leitung 105 mit 106 verbunden werden.
+   (A 05 / B 06).
+
+*2 Wenn  das Signal vom Steuergerät nicht vorhanden ist,  muß  am 
+   Interfaceanschluß Leitung 107 mit 108.2 verbunden werden (A 05 
+   / B 06).  Die Brücke x129 auf der STE 6703 darf nicht bestückt 
+   sein.
+
+*3 Wenn  das  Signal vom Steuergerät nicht  vorhanden  ist,  wird 
+   Brücke x130 nicht bestückt.
+
+- Steuerzeichen:  DC1  Freigabe für nächste Zeichenübertragung (XON)
+                  DC3  Sperre für Zeichenübertragung (XOFF)
+                  STX  Start des Textes (zum Drucker)
+                  ETX  Ende des Textes (zum Drucker)
+                  ACK  positive Antwort (vom Drucker)
+                  NAK  negative Antwort (vom Drucker)
+
+Beschreibung des Programmieradapters:
+
+Der  Programmieradapter ermöglicht das Programmieren der  EPROM's 
+auf  der  Speicherleiterkarte (Z.-Nr.:56-264-6702-7)  ohne  diese 
+auslöten zu müssen. Dadurch kann eine eventuelle Beschädigung der 
+Speicherschaltkreise   und  der  Leiterplatte  durch  das   sonst 
+notwendige  auslöten  der  Bauelemente  vermieden   werden.   Der 
+Programmieradapter    kann    an    ein    bereits    vorhandenes 
+Programmiergerät   für   EPROM's   des  Typs   U555   oder   2708 
+angeschlossen    werden   und   erlaubt   somit   ein   einfaches 
+Programmieren der 12 EPROM's. 
+Der  Programmieradapter besteht aus einem Zweiebenenschalter  mit 
+12 Schaltstellungen,  einem 58 pol.  und einem 90 pol. indirektem 
+Steckverbinder der die Verbindung zur EPROM-Platine herstellt und 
+12  Widerständen die als Pull-up's an den Chip-Select  Eingaengen 
+der EPROM's liegen.  Durch einen EPROM-Sockel mit Kabel wird  die 
+Verbindung   zwischen  Programmiergerät  und   Programmieradapter 
+hergestellt.
+Die  EPROM's werden nacheinander programmiert,  wobei die  Anwahl 
+des  zu  programmierenden EPROM's durch verdrehen  des  Schalters 
+erfolgt.

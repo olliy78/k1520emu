@@ -463,12 +463,12 @@ jobs:
           # laedt der Assistent Python selbst (uv legt einen Junction an, den
           # der OneDrive-Filtertreiber verweigert — os error 448), uv ist dort
           # also gar nicht mehr beteiligt.  `install.ps1` gibt es nicht mehr.
-          for verboten in install.sh launcher.sh disktool_launcher.sh kermit_launcher.sh lib install.ps1 uv_pins.txt; do
+          for verboten in install.sh launcher.sh disktool_launcher.sh kermit_launcher.sh printer_launcher.sh lib install.ps1 uv_pins.txt; do
               if [ -e "$paket/$verboten" ]; then
                   echo "FEHLER: $verboten gehoert nicht ins Windows-Paket" >&2; exit 1
               fi
           done
-          for noetig in launcher.cmd disktool_launcher.cmd kermit_launcher.cmd k1520dbg.cmd slim.py requirements.lock; do
+          for noetig in launcher.cmd disktool_launcher.cmd kermit_launcher.cmd printer_launcher.cmd k1520dbg.cmd slim.py requirements.lock; do
               [ -f "$paket/$noetig" ] || { echo "FEHLER: $noetig fehlt" >&2; exit 1; }
           done
           # Die Greaseweazle-Anbindung liegt als fertiges wheel BEI der Payload,

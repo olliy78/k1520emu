@@ -332,6 +332,16 @@ werden, und ihn nur an der **einen** abschalten, die man braucht. Weil der Zusta
 Schalters gemerkt wird, kommt die Meldung dann bei jedem Kaltstart wieder; wer das nicht
 will, setzt den Loop vor dem Rückstellen wieder und schaltet ihn nach dem Start ab.
 
+### Einen Drucker anschließen
+
+Den Nadeldrucker liefert das Schwesterprogramm **K1520 Printer** (*Werkzeuge ▸ K1520 Printer starten*, unter
+Linux auch `k1520printer`): die Original-Firmware des SD 1157 oder K6316 läuft darin, das Blatt entsteht
+Punkt für Punkt und lässt sich als PDF sichern oder drucken.  Der Drucker lauscht als **Telnet-Server auf
+`127.0.0.1:5000`** (IFSS; V.24 auf 5001).  Im Rechner-Emulator stellt man die Druckerschnittstelle
+(A5120: *Drucker*, K8915: *Drucker/IFSS1*) im Reiter *Schnittstellen* auf **Telnet**, Rolle **Client**,
+Host `127.0.0.1`, Port `5000`, und schaltet sie ein.  Der Drucker bremst mit DC1/DC3 selbst; Näheres im
+Handbuch von K1520 Printer.
+
 ### Telnet — Terminalprogramme und Rechner im Netz
 
 **Telnet** ist das einfachste Protokoll, um Zeichen über eine Netzverbindung zu
@@ -2042,6 +2052,8 @@ gehören und dieselben Disketten anfassen:
   weiter; das Diskettenwerkzeug hat sein eigenes Handbuch.
 * **K1520 Kermit starten** — Dateiaustausch mit der WEGA oder einem anderen Kermit über Telnet
   oder RFC 2217 (Client und Server); eigenes Programm mit eigenem Handbuch.
+* **K1520 Printer starten** — der Nadeldrucker-Emulator (SD 1157, K6316); eigenes Programm mit eigenem
+  Handbuch (siehe „Einen Drucker anschließen“ im Kapitel „Serielle Schnittstellen“).
 * **Werkzeugkonsole öffnen** — ein Konsolenfenster, in dem der Debugger
   `k1520dbg` und die Kommandozeile des DiskTool **ohne Pfadangabe** laufen. Es
   steht bereits im Diskettenordner, und beim Öffnen steht ein Beispielaufruf

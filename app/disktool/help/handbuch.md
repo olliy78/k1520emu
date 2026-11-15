@@ -1482,6 +1482,9 @@ Diskettenwerkzeug weiter.
 *K1520 Kermit starten* öffnet das Kermit-Werkzeug: Dateien mit der WEGA des P8000-Emulators
 (oder einem anderen Kermit) über Telnet bzw. RFC 2217 austauschen. Es hat ein eigenes Handbuch.
 
+*K1520 Printer starten* öffnet den Nadeldrucker-Emulator (SD 1157, K6316), ebenfalls als eigenes Programm mit
+eigenem Handbuch.
+
 Beide Emulatoren lesen dieselbe Datei, aber jedes für sich. Hat die Diskette hier
 ungespeicherte Änderungen, wird vor dem Start danach gefragt — der Emulator
 sieht sonst den Stand der **Datei**, nicht den auf dem Bildschirm. Und umgekehrt:

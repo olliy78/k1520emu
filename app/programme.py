@@ -1,7 +1,7 @@
 """Die Nachbarprogramme starten — DiskTool, Emulator, Werkzeugkonsole.
 
-Die Installation bringt zehn Programme mit, die dieselben Disketten anfassen:
-die acht Oberflächen (``a5120emu``, ``k8915emu``, ``prg710emu``, ``pc1715emu``, ``p8000emu``, ``mc80emu``, ``k1520DiskTool`` und ``K1520 Kermit``) und die
+Die Installation bringt elf Programme mit, die dieselben Disketten anfassen:
+die neun Oberflächen (``a5120emu``, ``k8915emu``, ``prg710emu``, ``pc1715emu``, ``p8000emu``, ``mc80emu``, ``k1520DiskTool``, ``K1520 Kermit`` und ``K1520 Printer``) und die
 beiden Konsolenwerkzeuge (``k1520dbg``, ``k1520disktool-cli``).  Wer eines davon offen
 hat, braucht regelmässig ein zweites — deshalb kann jede Oberfläche die andere
 aufrufen, und der Emulator zusätzlich eine **Eingabeaufforderung**, in der die
@@ -50,6 +50,7 @@ P8000EMU = "p8000emu"
 MC80EMU = "mc80emu"
 DISKTOOL = "disktool"
 KERMIT = "kermit"
+PRINTER = "printer"
 
 #: (Skript unterhalb der Wurzel, Anzeigename, feste Argumente) je Kennung.  Der
 #: K8915 Emulator ist DASSELBE Skript mit einem anderen Programmprofil
@@ -63,6 +64,7 @@ _PROGRAMME = {
     MC80EMU: ("app/main.py", "mc80emu", ("--machine", "mc80")),
     DISKTOOL: ("app/disktool/main.py", "k1520DiskTool", ()),
     KERMIT: ("app/kermittool/main.py", "K1520 Kermit", ()),
+    PRINTER: ("app/printertool/main.py", "K1520 Printer", ()),
 }
 
 #: Kennung des Emulators je Maschinenname des Programmprofils.
