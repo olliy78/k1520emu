@@ -319,7 +319,19 @@ Der Orchestrator (Opus) prüft nach S1 und S2 die Abnahmen selbst (Klang hören 
 | F1 | Gastsoftware ins Repo und auf die Systemdisketten? | **ja** (2026-11-14) → `tools/sound/fremd/`, AP S9a |
 | F2 | Welche Demos? | `STCTEST1` (Hintergrundlied) und `PLAYSTC` + `SONG.STC`, dazu `SKTEST4` und `TGCPM` als Prüfprogramme; USB-Player als S10 |
 | F3 | Schaltplan V2 auswerten? | nur bei Unklarheiten.  Bisher keine: das Rücklesen an Basis+0 ist durch die Gastsoftware belegt, der Rest steht in der Beschreibung V2 |
-| F4 | Kanalzuordnung? | **Stereo ABC** als Vorgabe (echtes Stereo, B in der Mitte), ACB/Mono wählbar |
+| F4 | Kanalzuordnung? | ursprünglich ABC; **nach dem Hörvergleich (2026-11-15) Vorgabe ACB** (C in der Mitte), ABC/Mono wählbar — siehe §7a |
+
+## 7a. Hörvergleich mit `STCTEST1.mp3` (2026-11-15)
+
+- Der Anwender vermisste im Emulator eine Glockenspur (Sechzehntel) links, rechts nur leise.  Registerspur: Kanal A spielt
+  mit der **Hardware-Hüllkurve als Wellenform** (R8 = 10H, R13 = 10 Dreieck, EP 36–48), B mit abklingenden Pegeln,
+  **C ist die Glockenspur** (Pegel 11).  Bandenergien und Links/Rechts-Verhältnis der Aufnahme passen zu **ACB**, nicht zu
+  ABC — die Aufnahme ist mit C in der Mitte entstanden.  → **Vorgabe ACB**.
+- Die Aufnahme klingt um den Faktor 1,152 tiefer (Abgleich über verschobene Log-Spektren, links wie rechts gleich) → der AY der
+  aufgenommenen Karte lief mit ≈ 1,555 MHz; mit `quarz_hz = 3 110 000` stimmt die Tonhöhe auf 1,000.  Vorgabe bleibt
+  1,79 MHz (Stückliste, TGCPM rechnet damit).  Tempo der Aufnahme 3 % schneller (Rechner mit höherem Systemtakt).
+- Die Aufnahme hat Übersprechen zwischen den Kanälen, Rauschen und 50/150-Hz-Brumm (Aufnahmekette) — nach Anwender so lassen.
+- Höreindruck des Anwenders: „kommt dem Original schon sehr nah".
 
 ## 8. Risiken
 
