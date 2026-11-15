@@ -16,7 +16,7 @@ Karte gelten, wenn man sie spaeter steckt)::
         chip: ay8910            # ay8910 | ay8912
         takt: quarz_halbe       # quarz_halbe = Quarz/2 (1,79 MHz) | quarz | system
         quarz_hz: 3579545
-        kanal: abc              # abc | acb | mono
+        kanal: acb              # acb (Vorgabe) | abc | mono
         tiefpass: false         # C16/C17 bestueckt
         kaskade: [false, false, false]   # TO0->TR1, TO1->TR2, TO2->TR3
       lautstaerke: 80           # Prozent
@@ -39,7 +39,7 @@ LAUTSTAERKE_VORGABE = 80
 #: (Konfigurationswert, Anzeige)
 CHIPS = (("ay8910", "AY-3-8910"), ("ay8912", "AY-3-8912"))
 TAKTE = (("quarz_halbe", "Quarz/2 = 1,79 MHz"), ("quarz", "Quarz"), ("system", "Systemtakt"))
-KANAELE = (("abc", "Stereo ABC"), ("acb", "Stereo ACB"), ("mono", "Mono"))
+KANAELE = (("acb", "Stereo ACB"), ("abc", "Stereo ABC"), ("mono", "Mono"))
 QUARZ_VORGABE = 3_579_545
 #: Anzeige der drei Kaskadenbruecken (Bit 0..2)
 KASKADEN = ("TO0 → TR1", "TO1 → TR2", "TO2 → TR3")
@@ -59,7 +59,7 @@ TIPP_TAKT = (
     "Takt des AY (Brücke JP2): Quarz/2 (Vorgabe, 1,79 MHz), Quarz oder Systemtakt der Maschine.  "
     "Ein Wechsel schaltet die Maschine aus und neu ein.")
 TIPP_QUARZ = "Frequenz des Quarzes der Karte in Hertz (Vorgabe 3 579 545)."
-TIPP_KANAL = "Zuordnung der drei AY-Kanäle zu links/rechts: Stereo ABC, Stereo ACB oder Mono."
+TIPP_KANAL = "Zuordnung der drei AY-Kanäle zu links/rechts: Stereo ACB (Vorgabe), Stereo ABC oder Mono."
 TIPP_TIEFPASS = "Die Kondensatoren C16/C17 der Karte sind bestückt: der Ton klingt dumpfer."
 TIPP_KASKADE = (
     "Hardwarebrücken der CTC-Kanäle der Karte: der Ausgang ZC/TO eines Kanals speist den Takteingang "
@@ -94,7 +94,7 @@ def basis_lesen(wert, vorgabe: int) -> int:
 
 def vorgabe(basis_vorgabe: int) -> dict:
     return {"enabled": False, "basis": int(basis_vorgabe), "chip": "ay8910", "takt": "quarz_halbe",
-            "quarz_hz": QUARZ_VORGABE, "kanal": "abc", "tiefpass": False, "kaskade": 0}
+            "quarz_hz": QUARZ_VORGABE, "kanal": "acb", "tiefpass": False, "kaskade": 0}
 
 
 def normalize(wert, basis_vorgabe: int, alt: Optional[dict] = None) -> dict:
@@ -107,7 +107,7 @@ def normalize(wert, basis_vorgabe: int, alt: Optional[dict] = None) -> dict:
     z["chip"] = _wahl(wert.get("chip"), CHIPS, "ay8910")
     z["takt"] = _wahl(wert.get("takt"), TAKTE, "quarz_halbe")
     z["quarz_hz"] = _hz_lesen(wert.get("quarz_hz"))
-    z["kanal"] = _wahl(wert.get("kanal"), KANAELE, "abc")
+    z["kanal"] = _wahl(wert.get("kanal"), KANAELE, "acb")
     z["tiefpass"] = wert.get("tiefpass") is True
     z["kaskade"] = _maske(wert.get("kaskade"))
     return z

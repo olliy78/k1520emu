@@ -140,6 +140,14 @@ void SoundK1520::ayNachrechnen() {
     }
 }
 
+namespace {
+/// Feste Aussteuerung nach Mischung und Filtern (Anwenderwunsch: kein Clipping).  Herleitung: die Mischung liegt
+/// nach der Skalierung in [0,1]; der Gleichanteilfilter y = x - x1 + c*y1 (0 < c < 1) liefert fuer x in [0,1]
+/// |y| <= 1 (schlimmster Fall: Sprung von 0 auf 1 nach langer Stille); Tiefpass (einpolig) und Kastenfilter
+/// ueberschwingen nicht.  Damit ist die Spitze <= 0,7071 = -3 dBFS mathematisch garantiert, fuer Stereo wie Mono.
+constexpr float AUSSTEUERUNG = 0.7071f;
+}  // namespace
+
 void SoundK1520::mischen(const Ay38910::Abtastwert* w, size_t n) {
     puffer_.resize(n * 2);
     const float k = MITTE_GEWICHT;
@@ -158,7 +166,9 @@ void SoundK1520::mischen(const Ay38910::Abtastwert* w, size_t n) {
             const float y = v - x1_[s] + hp_koef_ * y1_[s];   // Gleichanteil weg
             x1_[s] = v;
             y1_[s] = y;
-            puffer_[2 * i + s] = y;
+            // Reserve + letzte Sicherung: nie ueber [-1,1] hinaus (ein Ueberlauf waere ein Knall)
+            const float z = y * AUSSTEUERUNG;
+            puffer_[2 * i + s] = z > 1.0f ? 1.0f : (z < -1.0f ? -1.0f : z);
         }
     }
     if (senke_) senke_->schreibe(puffer_.data(), n);

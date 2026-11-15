@@ -4,7 +4,7 @@
  *
  *   --sound[=basis]            Karte stecken (Basis hex/dez, Vorgabe 38H; PC 1715/1715W E0H)
  *   --sound-takt=quarz|halb|system   Chiptakt (Vorgabe halb)
- *   --sound-kanal=abc|acb|mono       Mischer (Vorgabe abc)
+ *   --sound-kanal=abc|acb|mono       Mischer (Vorgabe acb)
  *   --sound-chip=8910|8912
  *   --wav=DATEI                WAV-Mitschrift ab dem Stecken bis zum Programmende (nur mit --sound)
  *
@@ -21,7 +21,7 @@ struct SoundOpts {
     bool an = false;            ///< --sound (oder eine der Unteroptionen)
     int basis = -1;             ///< -1 = Vorgabe der Maschine
     std::string takt = "halb";  ///< quarz | halb | system
-    std::string kanal = "abc";  ///< abc | acb | mono
+    std::string kanal = "acb";  ///< acb | abc | mono
     std::string chip = "8910";  ///< 8910 | 8912
     std::string wav;            ///< "" = keine Mitschrift
     std::string fehler;         ///< erster Optionsfehler (Wert unbekannt)

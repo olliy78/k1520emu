@@ -284,3 +284,12 @@ TEST(TonAusgabe, LautstaerkeWirdBegrenzt) {
     a.stumm(true);
     EXPECT_TRUE(a.stumm());
 }
+
+// Ueberlauf waere ein Knall: zuS16 begrenzt (Anwenderwunsch kein Clipping, Merkposten sound.md Nr. 16).
+TEST(WavSchreiber, ZuS16BegrenztStattUeberzulaufen) {
+    using k1520::audio::WavSchreiber;
+    EXPECT_EQ(WavSchreiber::zuS16(1.5f), 32767);
+    EXPECT_EQ(WavSchreiber::zuS16(-1.5f), -32767);
+    EXPECT_EQ(WavSchreiber::zuS16(1.0f), 32767);
+    EXPECT_EQ(WavSchreiber::zuS16(0.0f), 0);
+}

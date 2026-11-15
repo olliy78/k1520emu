@@ -574,6 +574,10 @@ cp "$REPO/tools/gide/uhr/uhr.com" "$STAGE/payload/share/k1520emu/karten_software
     || die "tools/gide/uhr/uhr.com fehlt"
 cp "$REPO/tools/gide/README.md" "$STAGE/payload/share/k1520emu/karten_software/HERKUNFT.md"
 cp "$REPO/tools/gide/README.md" "$STAGE/payload/share/doc/lizenzen/karten_software-HERKUNFT.md"
+# SOUND-Karte (Entwurf 51, S9a): die Gastprogramme liegen NUR auf den Systemdisketten (Vorauswahl 38H fuer alle, keine Umschreibung noetig),
+# daher reist nur die Herkunftstabelle mit.
+cp "$REPO/tools/sound/fremd/README.md" "$STAGE/payload/share/doc/lizenzen/sound_software-HERKUNFT.md" \
+    || die "tools/sound/fremd/README.md fehlt"
 
 # GUI ohne Bytecode-Reste des Entwicklungsrechners (--exclude MUSS vor dem
 # Pfad stehen, sonst wirkt es bei GNU tar nicht)

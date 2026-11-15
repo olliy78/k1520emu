@@ -65,6 +65,8 @@ REGELN = [
     ("core/primitives/z8/**", ("fach_k8915", "fach_prg710") + _P8, "Z8", True),
     ("core/primitives/upd765*", ("fach_pc1715",), "uPD765", True),
     ("core/primitives/ay38910*", ("fach_sound",), "AY-3-8910", True),
+    ("tools/sound_opts.h", ("fach_sound",), "SOUND-Optionen boot_trace/k1520dbg", True),
+    ("app/sound.py", ("fach_sound",), "SOUND-Oberflaechenlogik", False),
     ("core/primitives/**", ALLE, "gemeinsamer Baustein", True),
     # ── Serie / Kermit ──────────────────────────────────────────────────
     ("core/serial/**", ("fach_serial", "fach_kermit"), "serielle Schnittstellen", True),

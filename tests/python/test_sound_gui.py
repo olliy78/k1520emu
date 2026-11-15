@@ -61,7 +61,7 @@ def test_abschnitt_nur_an_steckplatzfaehigen_profilen(qapp, maschine):
         assert g.basis_combo.count() == 32                       # Vielfache von 8
         assert g.chip_combo.currentData() == "ay8910"
         assert g.takt_combo.currentData() == "quarz_halbe" and g.quarz_spin.value() == 3_579_545
-        assert g.kanal_combo.currentData() == "abc" and not g.tiefpass_box.isChecked()
+        assert g.kanal_combo.currentData() == "acb" and not g.tiefpass_box.isChecked()
         assert [b.isChecked() for b in g.kaskade_boxen] == [False] * 3
         assert [b.text() for b in g.kaskade_boxen] == ["TO0 → TR1", "TO1 → TR2", "TO2 → TR3"]
     finally:

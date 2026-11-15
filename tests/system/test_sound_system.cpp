@@ -297,7 +297,7 @@ void liedPruefen(S& s) {
 
 }  // namespace
 
-// 1) TGCPM: Takt B, Ton Kanal A -> 1 kHz (Periode 6FH bei 1,79 MHz = 1007,8 Hz), nur linker Kanal (ABC).
+// 1) TGCPM: Takt B, Ton Kanal A -> 1 kHz (Periode 6FH bei 1,79 MHz = 1007,8 Hz), nur linker Kanal (A liegt in ACB wie in ABC links).
 TEST(SoundSystem, A5120_Cpa_TGCPM_Ton1kHzNurLinks) {
     k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::WARN);
     k1520::os::setEnv("K1520_AUDIO", "stumm");
@@ -318,7 +318,7 @@ TEST(SoundSystem, A5120_Cpa_TGCPM_Ton1kHzNurLinks) {
     std::printf("[S7] TGCPM: %.1f Hz, RMS links %.0f rechts %.0f\n", me.hz, me.eff_l, me.eff_r);
     EXPECT_NEAR(me.hz, 1007.8, 1007.8 * 0.01);
     EXPECT_GT(me.eff_l, kNichtStill);
-    EXPECT_LT(me.eff_r, me.eff_l * 0.1) << "Kanal A liegt in Stellung ABC nur links";
+    EXPECT_LT(me.eff_r, me.eff_l * 0.1) << "Kanal A liegt in ACB (wie in ABC) nur links";
 }
 
 // 2) SKTEST4 `B`, Menue 4: Lied ueber CTC-Interrupt.

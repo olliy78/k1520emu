@@ -445,7 +445,7 @@ MC80; nicht am P8000.  Basis hex oder dezimal, Vielfaches von 8, Vorgabe **38H**
 | Option | Wirkung |
 |--------|---------|
 | `--sound-takt=quarz\|halb\|system` | Chiptakt: Quarz, Quarz/2 (Vorgabe) oder Systemtakt |
-| `--sound-kanal=abc\|acb\|mono` | Mischer (Vorgabe `abc`) |
+| `--sound-kanal=abc\|acb\|mono` | Mischer (Vorgabe `acb`) |
 | `--sound-chip=8910\|8912` | AY-Variante (Vorgabe 8910) |
 | `--wav=DATEI` | WAV-Mitschrift (48 kHz, Stereo, Maschinenzeit) ab dem Stecken bis zum Programmende; ohne `--sound` Fehler |
 

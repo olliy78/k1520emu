@@ -1,6 +1,6 @@
 # 51 — SOUND-Karte K1520 (AY-3-8910/8912 + CTC) mit Tonausgabe
 
-Stand: 2026-11-15, **S0–S8 umgesetzt** (Zweig `sound`); offen S9a (Beigaben, PC-1715-Vorauswahl auf 38H), S10, S9, Hörvergleich des Anwenders (`out/sound/stctest1_emu.wav` ↔ `stctest1_original.mp3`).  Recherche: Forum robotrontechnik.de Thread 14846
+Stand: 2026-11-15, **S0–S9 und S9a fertig** (Zweig `sound`; Vorgabe ACB seit dem Hörvergleich §7a); **S10 (USB-Player) optional offen**.  Merkposten `doc/merkposten/sound.md`.  Recherche: Forum robotrontechnik.de Thread 14846
 („SOUND-Karte für K1520", 2017/18), Beschreibung `SOUND-K1520V2-Beschreibung.pdf` (Stand 13.02.2018) und
 Gastsoftware `SKTEST4_BC/` aus `~/projects/robotron/rowikla/`.
 **Grundsatz (Anwenderentscheid 2026-11-14): keine Fremdsoftware.**  Der Chip wird nach Datenblatt
@@ -88,7 +88,7 @@ Vektor D8H, I = F7H unter CP/A/SCPX.
 
 Die Karte gibt **echtes Stereo** aus (links/rechts getrennt); der AY hat aber drei Stimmen, eine davon
 liegt deshalb in der Mitte (auf beiden Seiten).  Welche, legt die Kanalzuordnung fest — Vorgabe im
-Emulator **Stereo ABC** (Anwenderentscheid 2026-11-14), wählbar ACB und Mono.
+Emulator **Stereo ACB** (ursprünglich ABC, Anwenderentscheid 2026-11-14; nach dem Hörvergleich 2026-11-15 auf ACB umgestellt, §7a), wählbar ABC und Mono.
 Kanalzuordnung über steckbare Widerstände + Schiebeschalter S8: **ABC** (A links, B Mitte, C rechts) oder
 **ACB** (A links, B rechts, C Mitte); Seitenkanal 10 kΩ, Mittelkanal 22 kΩ auf beide Seiten
 (Gewicht Mitte ≈ 10/22 ≈ 0,45 je Seite).  JP4 = Mono.  C16/C17 (1 nF, optional) = Tiefpass.  Verstärker
@@ -159,7 +159,7 @@ core/cards/sound_k1520/             Karte: Dekodierung, AY + CTC, Mischer ABC/AC
 - `K1520Machine::installSound(const SoundK1520::Config&)`, `soundK1520()`, `soundFehler()`,
   `soundEinketten()` (CTC hinten in die Interruptkette, wie `gunUsbEinketten`), `soundTakt`/`soundReset`.
 - `SoundK1520::Config`: `basis` (38H), `chip` (8910|8912), `takt` (Quarz|QuarzHalbe|System),
-  `quarz_hz` (3 579 545), `kanal` (ABC|ACB|Mono), `tiefpass` (bool), `kaskade` (Bits TO0→TR1 …).
+  `quarz_hz` (3 579 545), `kanal` (ACB|ABC|Mono; Vorgabe ACB, §7a), `tiefpass` (bool), `kaskade` (Bits TO0→TR1 …).
 - C-ABI (additiv): `k1520_sound_install(h, basis, chip, takt, quarz_hz, kanal, tiefpass, kaskade)`,
   `k1520_sound_fehler`, `k1520_sound_regs(h, uint8_t[16])`;
   `k1520_audio_start(h)/_stop`, `k1520_audio_lautstaerke(h, float)`, `k1520_audio_stumm(h, int)`,

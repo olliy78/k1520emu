@@ -4,6 +4,7 @@
  *        Mischer ABC/ACB/Mono, Taktumrechnung, Senke.
  */
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 #include <vector>
@@ -151,8 +152,13 @@ TEST(SoundK1520, KaskadeTo0NachTr1ZaehltNulldurchgaenge) {
     EXPECT_NEAR(mit, 255 - 10, 1);           // Jumper TO0->TR1: zehn Zaehlimpulse
 }
 
+TEST(SoundK1520, VorgabeKanalzuordnungIstAcb) {   // Entwurf 51 7a: Anwenderentscheid nach dem Hoervergleich
+    EXPECT_EQ(SoundK1520::Config{}.kanal, SoundK1520::Kanal::ACB);
+}
+
 TEST(SoundK1520, MischerAbcNurAIstNurLinks) {
-    Rig g; g.k.setzeSenke(&g.s);
+    SoundK1520::Config c; c.kanal = SoundK1520::Kanal::ABC;
+    Rig g(c); g.k.setzeSenke(&g.s);
     g.ton(0, 32);
     g.laufe(uint64_t(SYS * 0.3));
     ASSERT_GT(g.s.l.size(), 10000u);
@@ -170,7 +176,8 @@ TEST(SoundK1520, MischerAcbNurAIstNurLinks) {
 }
 
 TEST(SoundK1520, MischerAbcNurBIstMitte) {
-    Rig g; g.k.setzeSenke(&g.s);
+    SoundK1520::Config c; c.kanal = SoundK1520::Kanal::ABC;
+    Rig g(c); g.k.setzeSenke(&g.s);
     g.ton(1, 32);
     g.laufe(uint64_t(SYS * 0.3));
     const double l = rms(g.s.l, 5000), r = rms(g.s.r, 5000);
@@ -286,3 +293,33 @@ TEST(SoundK1520, ResetIstStill) {
     EXPECT_LT(rms(g.s.l, ab), 1e-4);
     EXPECT_LT(rms(g.s.r, ab), 1e-4);
 }
+
+// Kein Clipping (Anwenderwunsch): schlimmster Fall = drei volle Kanaele, Gleichspannung (Ton aus, Rauschen aus) nach
+// langer Stille, danach Rechteck mit grosser Periode und Huellkurvenform 13; Spitze <= 0,7071 (-3 dBFS).
+namespace {
+void pruefeSpitze(SoundK1520::Kanal kanal) {
+    SoundK1520::Config c; c.kanal = kanal;
+    Rig g(c); g.k.setzeSenke(&g.s);
+    g.laufe(uint64_t(SYS * 1.0));                       // lange Stille: Hochpass eingeschwungen auf 0
+    g.ayReg(7, 0x3F);                                   // alles aus
+    for (int k = 0; k < 3; ++k) g.ayReg(8 + k, 0x0F);   // Gleichspannung voll: Sprung 0 -> 1
+    g.laufe(uint64_t(SYS * 0.3));
+    for (int k = 0; k < 3; ++k) { g.ayReg(k * 2, 0xFF); g.ayReg(k * 2 + 1, 0x0F); }
+    g.ayReg(7, 0x38);                                   // Rechteck, Periode gross
+    g.laufe(uint64_t(SYS * 0.5));
+    for (int k = 0; k < 3; ++k) g.ayReg(8 + k, 0x10);   // Huellkurve
+    g.ayReg(11, 0x20); g.ayReg(12, 0x00);
+    g.ayReg(13, 13);
+    g.laufe(uint64_t(SYS * 0.5));
+    ASSERT_GT(g.s.l.size(), 10000u);
+    float m = 0;
+    for (float v : g.s.l) m = std::max(m, std::fabs(v));
+    for (float v : g.s.r) m = std::max(m, std::fabs(v));
+    EXPECT_GT(m, 0.3f) << "Probe zu leise, sagt nichts";
+    EXPECT_LE(m, 0.7072f);
+}
+}  // namespace
+
+TEST(SoundK1520, SpitzeAbcHoechstensMinus3dBFS) { pruefeSpitze(SoundK1520::Kanal::ABC); }
+TEST(SoundK1520, SpitzeAcbHoechstensMinus3dBFS) { pruefeSpitze(SoundK1520::Kanal::ACB); }
+TEST(SoundK1520, SpitzeMonoHoechstensMinus3dBFS) { pruefeSpitze(SoundK1520::Kanal::Mono); }

@@ -53,3 +53,4 @@ Die Trennlinie ist **Stolperdraht gegen Archäologie**:
 Neue Erkenntnisse zu einem dieser vier Teilsysteme kommen also **hierher**, nicht in
 `CLAUDE.md`. Wächst ein Abschnitt in `CLAUDE.md` erneut über etwa eine Bildschirmseite,
 gehört auch er hierher.
+| `sound.md` | `core/cards/sound_k1520/` + `core/primitives/ay38910.*` + `core/audio/`, `installSound`, `k1520_sound_*`/`k1520_audio_*`, `--sound`/`--wav`, Befehl `ay`, `app/sound.py` — SOUND-Karte K1520 (AY-3-8910 + CTC) und Tonausgabe (Entwurf 51, direkt hier angelegt; `CLAUDE.md` trägt nur den Kurzabsatz) |

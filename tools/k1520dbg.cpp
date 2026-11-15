@@ -3269,7 +3269,7 @@ int main(int argc, char** argv){
               "    Zeigt R0-R15 (hex), Latch, je Kanal A/B/C Tonperiode + Frequenz (Chiptakt/(16*TP), TP 0 = 1),\n"
               "    Ton/Rauschen an/aus (R7), Pegel bzw. Huellkurve, Rauschperiode, Huellkurvenperiode EP\n"
               "    (Durchlauf = 256*EP/Chiptakt), Form R13 als ASCII, aktuelle Huellkurvenstufe, Port A/B, CTC 0-3.\n"
-              "    Stecken: --sound[=basis] [--sound-takt=quarz|halb|system] [--sound-kanal=abc|acb|mono]\n"
+              "    Stecken: --sound[=basis] [--sound-takt=quarz|halb|system] [--sound-kanal=acb|abc|mono]\n"
               "             [--sound-chip=8910|8912] [--wav=DATEI]   (Vorgabe 38H, PC 1715/1715W E0H)\n");
         }
         else if ((cmd=="help"||cmd=="h"||cmd=="?") && t.size()>1 &&

@@ -1581,7 +1581,8 @@ PRG 710/-1, PC 1715/1715W und MC80 stecken (nicht in den P8000) und ist ab Werk 
 * **Chip** — AY-3-8910 (zwei 8-Bit-Tore A und B) oder AY-3-8912 (nur Tor A).
 * **AY-Takt** — *Quarz/2 = 1,79 MHz* (Vorgabe, Brücke JP2), *Quarz* oder *Systemtakt*; dazu die **Quarzfrequenz**
   in Hertz (Vorgabe 3 579 545).
-* **Kanäle** — *Stereo ABC* (Vorgabe), *Stereo ACB* oder *Mono*.
+* **Kanäle** — *Stereo ACB* (Vorgabe: A links, B rechts, C in der Mitte), *Stereo ABC* (A links, B Mitte, C rechts) oder *Mono*.
+* **Aussteuerung** — die Karte wird mit 3 dB Reserve ausgegeben (kein Übersteuern); die Lautstärke im Menü schwächt nur ab.
 * **Tiefpass C16/C17** — nachgebildet sind die bestückten Kondensatoren: der Ton klingt dumpfer (ab Werk aus).
 * **CTC-Kaskade** — drei Haken für die Brücken `TO0 → TR1`, `TO1 → TR2`, `TO2 → TR3` (ab Werk aus).
 

@@ -1555,7 +1555,7 @@ class K1520Emulator:
             try:
                 werte = (_SOUND_CHIP[str(sd.get("chip", "ay8910")).lower()],
                          _SOUND_TAKT[str(sd.get("takt", "quarz_halbe")).lower()],
-                         _SOUND_KANAL[str(sd.get("kanal", "abc")).lower()])
+                         _SOUND_KANAL[str(sd.get("kanal", "acb")).lower()])
             except KeyError as e:
                 _lib.k1520_destroy(handle)
                 self._handle = None

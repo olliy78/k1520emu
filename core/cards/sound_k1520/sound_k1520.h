@@ -46,7 +46,7 @@ public:
         Ay38910::Variante chip = Ay38910::Variante::AY8910;
         Takt takt = Takt::QuarzHalbe;                      ///< JP2: Q1, Q1/2 (empfohlen) oder Systemtakt
         uint32_t quarz_hz = 3579545;                       ///< bestueckter Quarz
-        Kanal kanal = Kanal::ABC;                          ///< S8/JP4
+        Kanal kanal = Kanal::ACB;                          ///< S8/JP4; Vorgabe ACB nach Hoervergleich (Entwurf 51 7a)
         bool tiefpass = false;                             ///< C16/C17 bestueckt
         uint8_t kaskade = 0;                               ///< Bit0 TO0->TR1, Bit1 TO1->TR2, Bit2 TO2->TR3
         uint32_t systemtakt_hz = 2457600;                  ///< Takt der Maschine (CTC-Takt)
