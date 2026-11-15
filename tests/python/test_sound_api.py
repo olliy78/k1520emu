@@ -138,6 +138,9 @@ def test_sound_umstellen_aendert_den_takt_ohne_neue_maschine(tmp_path):
     assert _wav_hz(w1) == pytest.approx(1007.8, rel=0.005)
     assert _wav_hz(w2) == pytest.approx(2015.6, rel=0.005)
     emu.sound_umstellen(kanal="mono", tiefpass=True)   # nicht genannte Schluessel (takt) bleiben
+    emu.sound_umstellen(tiefpass=3000)                 # Zahl = Grenzfrequenz in Hz
+    emu.sound_umstellen(tiefpass=False)
+    assert emu._sound_cfg["tiefpass"] is False
     assert emu._sound_cfg["takt"] == "quarz" and emu._sound_cfg["quarz_hz"] == 3_579_545
 
 
@@ -168,3 +171,12 @@ def test_audio_tempo_haelt_die_tonhoehe(tmp_path):
         assert w.getnframes() == pytest.approx(48000 * 1.2, rel=0.03)   # 48000 je WIRTSsekunde
     emu.audio_tempo(0.0)         # unbegrenzt: Maschinenzeit, kein Absturz
     _fahre(emu, 0.1)
+
+
+def test_tiefpass_als_zahl_beim_stecken_und_kaskade_vorgabe():
+    emu = _emu(machine="a5120", sound={"tiefpass": 12000})
+    assert emu.sound_present()
+    emu2 = _emu(machine="a5120", sound=True)
+    assert emu2.sound_present()
+    emu2.sound_umstellen(tiefpass=True)
+    emu2.sound_umstellen(tiefpass=24000, kaskade=0)

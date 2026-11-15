@@ -47,17 +47,18 @@ public:
         Takt takt = Takt::QuarzHalbe;                      ///< JP2: Q1, Q1/2 (empfohlen) oder Systemtakt
         uint32_t quarz_hz = 3579545;                       ///< bestueckter Quarz
         Kanal kanal = Kanal::ACB;                          ///< S8/JP4; Vorgabe ACB nach Hoervergleich (Entwurf 51 7a)
-        bool tiefpass = false;                             ///< C16/C17 bestueckt
-        uint8_t kaskade = 0;                               ///< Bit0 TO0->TR1, Bit1 TO1->TR2, Bit2 TO2->TR3
+        uint32_t tiefpass_hz = 0;                          ///< C16/C17: Grenzfrequenz des einpoligen Tiefpasses, 0 = aus
+        uint8_t kaskade = 7;                               ///< Bit0 TO0->TR1, Bit1 TO1->TR2, Bit2 TO2->TR3 (ab Werk alle gesteckt, SKTEST4 Menue 3)
         uint32_t systemtakt_hz = 2457600;                  ///< Takt der Maschine (CTC-Takt)
     };
 
     /// Gewicht des Mittelkanals je Seite: 10k (Seite) / 22k (Mitte).
     static constexpr float MITTE_GEWICHT = 10.0f / 22.0f;
-    /// Grenzfrequenz des zuschaltbaren Tiefpasses "C16/C17": 8 kHz (Anwenderentscheid 2026-11-15).
+    /// Grenzfrequenz des zuschaltbaren Tiefpasses "C16/C17" in der Altbedeutung "an" (C-ABI 1, Python True): 8 kHz
+    /// (Anwenderentscheid 2026-11-15); einstellbar ist jede Frequenz ueber Config::tiefpass_hz.
     /// Nach dem Schaltplan V2 laegen 1 nF an etwa 4-7 kOhm (Mischwiderstaende, Lastpoti) bei 23-37 kHz und
     /// waeren kaum hoerbar; der Emulator nimmt bewusst einen hoerbaren Wert (doc/merkposten/sound.md).
-    static constexpr float TIEFPASS_HZ = 8000.0f;
+    static constexpr uint32_t TIEFPASS_HZ = 8000;
     /// Grenzfrequenz des Gleichanteilfilters (AY liefert nur 0..1).
     static constexpr float HOCHPASS_HZ = 15.0f;
 
@@ -131,6 +132,7 @@ private:
 
     // Mischer/Filter
     float hp_koef_ = 0, tp_koef_ = 0;
+    void tiefpassSetzen(uint32_t hz);
     float x1_[2] = {0, 0}, y1_[2] = {0, 0}, tp_[2] = {0, 0};
     std::vector<float> puffer_;
 };

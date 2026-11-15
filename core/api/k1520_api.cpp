@@ -2872,7 +2872,7 @@ int k1520_sound_install(K1520Handle h, int basis, int chip, int takt, uint32_t q
     c.quarz_hz = quarz_hz;
     c.kanal = kanal == 0 ? k1520::SoundK1520::Kanal::ABC
             : kanal == 1 ? k1520::SoundK1520::Kanal::ACB : k1520::SoundK1520::Kanal::Mono;
-    c.tiefpass = tiefpass != 0;
+    c.tiefpass_hz = tiefpass <= 0 ? 0u : tiefpass == 1 ? k1520::SoundK1520::TIEFPASS_HZ : static_cast<uint32_t>(tiefpass);
     c.kaskade = static_cast<uint8_t>(kaskade & 7);
     K1520Machine* m = toMachine(h);
     if (!m->installSound(c)) { sound_fehler = m->soundFehler(); return 0; }
@@ -2897,7 +2897,7 @@ int k1520_sound_umstellen(K1520Handle h, int chip, int takt, uint32_t quarz_hz, 
     c.quarz_hz = quarz_hz;
     c.kanal = kanal == 0 ? k1520::SoundK1520::Kanal::ABC
             : kanal == 1 ? k1520::SoundK1520::Kanal::ACB : k1520::SoundK1520::Kanal::Mono;
-    c.tiefpass = tiefpass != 0;
+    c.tiefpass_hz = tiefpass <= 0 ? 0u : tiefpass == 1 ? k1520::SoundK1520::TIEFPASS_HZ : static_cast<uint32_t>(tiefpass);
     c.kaskade = static_cast<uint8_t>(kaskade & 7);
     if (!m->soundUmstellen(c)) { sound_fehler = m->soundFehler(); return 0; }
     return 1;

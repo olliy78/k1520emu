@@ -16,8 +16,8 @@ Karte gelten, wenn man sie spaeter steckt)::
         chip: ay8910            # ay8910 | ay8912
         ay_takt_hz: 1789772     # Takt am AY in Hz (= Quarz 3 579 545 / 2, Stueckliste)
         kanal: acb              # acb (Vorgabe) | abc | mono
-        tiefpass: false         # C16/C17 bestueckt
-        kaskade: [false, false, false]   # TO0->TR1, TO1->TR2, TO2->TR3
+        tiefpass_hz: 0          # C16/C17: Grenzfrequenz in Hz, 0 = aus (alt: ``tiefpass: true`` = 8000)
+        kaskade: [true, true, true]      # TO0->TR1, TO1->TR2, TO2->TR3 (ab Werk gesteckt)
       lautstaerke: 80           # Prozent
       stumm: false
 
@@ -44,6 +44,11 @@ AY_TAKT_VORGABE = QUARZ_VORGABE // 2
 AY_TAKT_MIN, AY_TAKT_MAX = 500_000, 4_000_000
 #: Nenntakt, wenn die Umrechnung eines alten ``takt: system`` keinen Maschinentakt kennt
 NENNTAKT_VORGABE = 2_457_600
+#: Wahl des Tiefpasses C16/C17 in Hz (0 = aus); die Grenze 8 kHz entspricht dem alten Haken
+TIEFPASS_WERTE = (0, 3000, 4000, 5000, 6000, 8000, 10000, 12000, 16000, 20000, 24000)
+TIEFPASS_ALT_AN = 8000
+#: Vorgabe der Kaskade: alle drei Bruecken gesteckt (SKTEST4 Menue 3 haengt sonst)
+KASKADE_VORGABE = 7
 #: Anzeige der drei Kaskadenbruecken (Bit 0..2)
 KASKADEN = ("TO0 → TR1", "TO1 → TR2", "TO2 → TR3")
 
@@ -63,10 +68,12 @@ TIPP_TAKT = (
     "Brücke JP2 auch den vollen Quarztakt oder den Systemtakt der Maschine nehmen — dann hier diese Frequenz "
     "eintragen.  Ein höherer Takt lässt Lieder höher klingen.  Die Änderung wirkt sofort.")
 TIPP_KANAL = "Zuordnung der drei AY-Kanäle zu links/rechts: Stereo ACB (Vorgabe), Stereo ABC oder Mono."
-TIPP_TIEFPASS = "Tiefpass 8 kHz zuschalten (Kondensatoren C16/C17): Höhen werden gedämpft, der Ton klingt weicher."
+TIPP_TIEFPASS = (
+    "Tiefpass (Kondensatoren C16/C17): dämpft die Höhen, je tiefer die Grenzfrequenz, desto weicher klingt der Ton.  "
+    "Je nach Geschmack; der Ausgang filtert ohnehin bei 8 kHz gegen Aliasing, Werte darüber wirken kaum.")
 TIPP_KASKADE = (
     "Hardwarebrücken der CTC-Kanäle der Karte: der Ausgang ZC/TO eines Kanals speist den Takteingang "
-    "des nächsten.")
+    "des nächsten.  Ab Werk alle drei gesteckt (Testprogramme wie SKTEST4 setzen das voraus).")
 
 
 def _ay_takt_lesen(wert, vorgabe: int = AY_TAKT_VORGABE) -> int:
@@ -98,7 +105,19 @@ def _wahl(wert, tabelle, vorgabe: str) -> str:
     return w if w in {k for k, _ in tabelle} else vorgabe
 
 
-def _maske(wert, vorgabe: int = 0) -> int:
+def tiefpass_lesen(wert: dict, vorgabe: int = 0) -> int:
+    """Tiefpass in Hz aus einem Abschnitt: ``tiefpass_hz``; alter Schluessel ``tiefpass`` (true = 8000, false = aus)."""
+    if "tiefpass_hz" in wert:
+        n = wert.get("tiefpass_hz")
+        if isinstance(n, bool) or not isinstance(n, int):
+            return vorgabe
+        return n if n == 0 or 1000 <= n <= 48000 else vorgabe
+    if "tiefpass" in wert:
+        return TIEFPASS_ALT_AN if wert.get("tiefpass") is True else 0
+    return vorgabe
+
+
+def _maske(wert, vorgabe: int = KASKADE_VORGABE) -> int:
     """Kaskade aus der Konfiguration (Liste aus drei Wahrheitswerten) als Bitmaske."""
     if not isinstance(wert, (list, tuple)) or len(wert) != 3:
         return vorgabe
@@ -111,7 +130,8 @@ def basis_lesen(wert, vorgabe: int) -> int:
 
 def vorgabe(basis_vorgabe: int) -> dict:
     return {"enabled": False, "basis": int(basis_vorgabe), "chip": "ay8910",
-            "ay_takt_hz": AY_TAKT_VORGABE, "kanal": "acb", "tiefpass": False, "kaskade": 0}
+            "ay_takt_hz": AY_TAKT_VORGABE, "kanal": "acb", "tiefpass_hz": 0,
+            "kaskade": KASKADE_VORGABE}
 
 
 def normalize(wert, basis_vorgabe: int, alt: Optional[dict] = None, nenntakt_hz: int = NENNTAKT_VORGABE) -> dict:
@@ -129,7 +149,7 @@ def normalize(wert, basis_vorgabe: int, alt: Optional[dict] = None, nenntakt_hz:
     else:
         z["ay_takt_hz"] = AY_TAKT_VORGABE
     z["kanal"] = _wahl(wert.get("kanal"), KANAELE, "acb")
-    z["tiefpass"] = wert.get("tiefpass") is True
+    z["tiefpass_hz"] = tiefpass_lesen(wert)
     z["kaskade"] = _maske(wert.get("kaskade"))
     return z
 
@@ -138,7 +158,7 @@ def fuer_konfig(zustand: dict) -> dict:
     return {"enabled": bool(zustand["enabled"]),
             "basis": f"{int(zustand['basis']) & 0xFF:02X}",
             "chip": zustand["chip"], "ay_takt_hz": int(zustand["ay_takt_hz"]),
-            "kanal": zustand["kanal"], "tiefpass": bool(zustand["tiefpass"]),
+            "kanal": zustand["kanal"], "tiefpass_hz": int(zustand["tiefpass_hz"]),
             "kaskade": [bool(int(zustand["kaskade"]) >> i & 1) for i in range(3)]}
 
 
@@ -147,7 +167,7 @@ def kern_param(zustand: dict) -> Optional[dict]:
     if not zustand.get("enabled"):
         return None
     return {"basis": int(zustand["basis"]), "chip": zustand["chip"], "ay_takt_hz": int(zustand["ay_takt_hz"]),
-            "kanal": zustand["kanal"], "tiefpass": bool(zustand["tiefpass"]), "kaskade": int(zustand["kaskade"])}
+            "kanal": zustand["kanal"], "tiefpass": int(zustand["tiefpass_hz"]), "kaskade": int(zustand["kaskade"])}
 
 
 def lautstaerke_lesen(wert) -> int:

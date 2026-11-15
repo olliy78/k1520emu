@@ -163,7 +163,7 @@ core/cards/sound_k1520/             Karte: Dekodierung, AY + CTC, Mischer ABC/AC
 - `K1520Machine::installSound(const SoundK1520::Config&)`, `soundK1520()`, `soundFehler()`,
   `soundEinketten()` (CTC hinten in die Interruptkette, wie `gunUsbEinketten`), `soundTakt`/`soundReset`.
 - `SoundK1520::Config`: `basis` (38H), `chip` (8910|8912), `takt` (Quarz|QuarzHalbe|System),
-  `quarz_hz` (3 579 545), `kanal` (ACB|ABC|Mono; Vorgabe ACB, §7a), `tiefpass` (bool), `kaskade` (Bits TO0→TR1 …).
+  `quarz_hz` (3 579 545), `kanal` (ACB|ABC|Mono; Vorgabe ACB, §7a), `tiefpass_hz` (uint32, 0 = aus; C-ABI-Parameter `tiefpass`: 0 aus, 1 = 8000 Hz, >= 1000 = Hz), `kaskade` (Bits TO0→TR1 …; Vorgabe 7, alle gesteckt).
 - C-ABI (additiv): `k1520_sound_install(h, basis, chip, takt, quarz_hz, kanal, tiefpass, kaskade)`,
   `k1520_sound_fehler`, `k1520_sound_regs(h, uint8_t[16])`;
   `k1520_audio_start(h)/_stop`, `k1520_audio_lautstaerke(h, float)`, `k1520_audio_stumm(h, int)`,

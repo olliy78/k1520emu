@@ -138,7 +138,7 @@ TEST(SoundK1520, CtcKanal0Liefert50InterruptsJeSekunde) {
 
 TEST(SoundK1520, KaskadeTo0NachTr1ZaehltNulldurchgaenge) {
     auto lauf = [](uint8_t kaskade) {
-        SoundK1520::Config c; c.kaskade = kaskade;
+        SoundK1520::Config c; c.kaskade = kaskade;   // ausdruecklich, die Vorgabe ist 7
         Rig g(c);
         g.bus.ioWrite(0x3D, 0x47);   // Kanal 1: Zaehler, TC folgt
         g.bus.ioWrite(0x3D, 0xFF);
@@ -223,14 +223,38 @@ TEST(SoundK1520, DreiVolleKanaeleUebersteuernNicht) {
 }
 
 TEST(SoundK1520, TiefpassDaempftHoheToene) {
-    auto pegel = [](bool tp) {
-        SoundK1520::Config c; c.tiefpass = tp;
+    auto pegel = [](uint32_t hz) {
+        SoundK1520::Config c; c.tiefpass_hz = hz;
         Rig g(c); g.k.setzeSenke(&g.s);
         g.ton(0, 4);                        // ~11 kHz
         g.laufe(uint64_t(SYS * 0.2));
         return rms(g.s.l, 3000);
     };
-    EXPECT_LT(pegel(true), pegel(false) * 0.6);
+    const double aus = pegel(0);
+    EXPECT_LT(pegel(SoundK1520::TIEFPASS_HZ), aus * 0.6);
+    EXPECT_LT(pegel(3000), pegel(12000)) << "tiefere Grenzfrequenz daempft staerker";
+    EXPECT_LT(pegel(3000), aus * 0.4);
+    EXPECT_NEAR(pegel(0), aus, 1e-9) << "aus = ungefiltert";
+}
+
+TEST(SoundK1520, TiefpassUmstellenImLauf) {
+    Rig g; g.k.setzeSenke(&g.s);
+    g.ton(0, 4);
+    g.laufe(uint64_t(SYS * 0.2));
+    const size_t n1 = g.s.l.size();
+    auto c = g.k.config(); c.tiefpass_hz = 3000;
+    ASSERT_TRUE(g.k.umstellen(c));
+    EXPECT_EQ(g.k.config().tiefpass_hz, 3000u);
+    g.laufe(uint64_t(SYS * 0.2));
+    const std::vector<float> vorher(g.s.l.begin() + 3000, g.s.l.begin() + n1);
+    const std::vector<float> nachher(g.s.l.begin() + n1 + 3000, g.s.l.end());
+    EXPECT_LT(rms(nachher, 0), rms(vorher, 0) * 0.4);
+    c.tiefpass_hz = 0;
+    ASSERT_TRUE(g.k.umstellen(c));
+}
+
+TEST(SoundK1520, KaskadeIstAbWerkGestecktSieben) {
+    EXPECT_EQ(SoundK1520::Config{}.kaskade, 7);
 }
 
 TEST(SoundK1520, QuarzHalbeTaktLiefertRichtigeFrequenz) {

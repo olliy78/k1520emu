@@ -80,8 +80,8 @@ general:
     chip: ay8910
     ay_takt_hz: 1789772
     kanal: acb
-    tiefpass: false
-    kaskade: [false, false, false]
+    tiefpass_hz: 0
+    kaskade: [true, true, true]
   model: a5120
   # Lochstreifen (ADA K6022, SIF1000) gesteckt? doc/design/23_lochstreifen.md §7.
   ptape: false

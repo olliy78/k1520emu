@@ -61,8 +61,24 @@ def test_abschnitt_nur_an_steckplatzfaehigen_profilen(qapp, maschine):
         assert g.basis_combo.count() == 32                       # Vielfache von 8
         assert g.chip_combo.currentData() == "ay8910"
         assert g.zustand()["ay_takt_hz"] == 1_789_772
-        assert g.kanal_combo.currentData() == "acb" and not g.tiefpass_box.isChecked()
-        assert [b.isChecked() for b in g.kaskade_boxen] == [False] * 3
+        assert g.kanal_combo.currentData() == "acb" and g.tiefpass_combo.currentData() == 0
+        assert g.tiefpass_combo.count() == 11
+        assert [g.tiefpass_combo.itemData(i) for i in range(11)] == [0, 3000, 4000, 5000, 6000, 8000, 10000, 12000,
+                                                                      16000, 20000, 24000]
+        assert g.tiefpass_combo.itemText(0) == "aus" and g.tiefpass_combo.itemText(1) == "3 kHz"
+        assert [b.isChecked() for b in g.kaskade_boxen] == [True] * 3     # ab Werk gesteckt (SKTEST4 Menue 3)
+        assert g.zustand()["kaskade"] == 7
+        # Kaskade steht in einer EIGENEN Zeile (eigenes Layout) unter der Tiefpass-Zeile
+        from PySide6.QtWidgets import QHBoxLayout
+        zeilen = [g.form.itemAt(i).layout() for i in range(g.form.count())
+                  if isinstance(g.form.itemAt(i).layout(), QHBoxLayout)]
+
+        def zeile_von(widget):
+            return next(i for i, lay in enumerate(zeilen)
+                        if any(lay.itemAt(k).widget() is widget for k in range(lay.count())))
+        assert zeile_von(g.kaskade_boxen[0]) == zeile_von(g.tiefpass_combo) + 1
+        assert zeile_von(g.kaskade_boxen[0]) == zeile_von(g.kaskade_boxen[2])
+        assert zeile_von(g.kaskade_boxen[0]) != zeile_von(g.tiefpass_combo)
         assert [b.text() for b in g.kaskade_boxen] == ["TO0 → TR1", "TO1 → TR2", "TO2 → TR3"]
     finally:
         _zu(w, qapp)
@@ -93,8 +109,9 @@ def test_stecken_aendert_die_maschine_und_die_konfiguration_haelt_es(qapp):
         g.kanal_combo.setCurrentIndex(g.kanal_combo.findData("mono"))
         g.ay_takt_edit.setText("3,579545")
         g.ay_takt_edit.editingFinished.emit()
-        g.tiefpass_box.setChecked(True)
-        g.kaskade_boxen[1].setChecked(True)
+        g.tiefpass_combo.setCurrentIndex(g.tiefpass_combo.findData(3000))
+        g.kaskade_boxen[0].setChecked(False)
+        g.kaskade_boxen[2].setChecked(False)
         g.karte_box.setChecked(True)
         qapp.processEvents()
         assert w.emulator.sound_present()
@@ -107,7 +124,7 @@ def test_stecken_aendert_die_maschine_und_die_konfiguration_haelt_es(qapp):
     datei = Path(config_io.default_config_dir()) / profil.profil("a5120").konfig_datei
     general = yaml.safe_load(datei.read_text(encoding="utf-8"))["general"]
     assert general["sound"] == {"enabled": True, "basis": "38", "chip": "ay8912",
-                                "ay_takt_hz": 3579545, "kanal": "mono", "tiefpass": True,
+                                "ay_takt_hz": 3579545, "kanal": "mono", "tiefpass_hz": 3000,
                                 "kaskade": [False, True, False]}
     assert general["lautstaerke"] == 35 and general["stumm"] is True
     w2 = _fenster(qapp, "a5120")
@@ -259,8 +276,9 @@ def test_takt_aenderung_baut_nicht_neu_auf_basiswechsel_schon(qapp, monkeypatch)
         w._sound_fehler = ""
         for combo, wert in ((g.chip_combo, "ay8912"), (g.kanal_combo, "mono")):
             combo.setCurrentIndex(combo.findData(wert))
-        g.tiefpass_box.setChecked(True)
-        g.kaskade_boxen[0].setChecked(True)
+        g.tiefpass_combo.setCurrentIndex(g.tiefpass_combo.findData(3000))
+        g.kaskade_boxen[1].setChecked(False)
+        g.kaskade_boxen[2].setChecked(False)
         g.ay_takt_edit.setText("3,0")
         g.ay_takt_edit.editingFinished.emit()
         qapp.processEvents()
@@ -317,13 +335,18 @@ def test_kaskadenhaken_wirken_ohne_neuaufbau_am_ctc(qapp, monkeypatch):
         orig = w._apply_drive_types
         monkeypatch.setattr(w, "_apply_drive_types", lambda *a, **k: (aufrufe.append(1), orig(*a, **k))[1])
         handle = w.emulator._handle
-        g.kaskade_boxen[0].setChecked(True)
-        qapp.processEvents()
-        assert aufrufe == [] and w.emulator._handle == handle
-        assert w.emulator._sound_cfg["kaskade"] == 1
         g.kaskade_boxen[0].setChecked(False)
         qapp.processEvents()
-        assert aufrufe == [] and w.emulator._sound_cfg["kaskade"] == 0
+        assert aufrufe == [] and w.emulator._handle == handle
+        assert w.emulator._sound_cfg["kaskade"] == 6
+        g.kaskade_boxen[0].setChecked(True)
+        qapp.processEvents()
+        assert aufrufe == [] and w.emulator._sound_cfg["kaskade"] == 7
+        # Tiefpass-Auswahl: ebenfalls live, ohne Neuaufbau
+        g.tiefpass_combo.setCurrentIndex(g.tiefpass_combo.findData(12000))
+        qapp.processEvents()
+        assert aufrufe == [] and w.emulator._handle == handle
+        assert w.emulator._sound_cfg["tiefpass"] == 12000 and w._sound["tiefpass_hz"] == 12000
     finally:
         _zu(w, qapp)
 
@@ -350,13 +373,34 @@ def test_zuruecksetzen_stellt_die_soundkarte_auf_die_vorgabe(qapp, monkeypatch):
         qapp.processEvents()
         g.ay_takt_edit.setText("2,4576")
         g.ay_takt_edit.editingFinished.emit()
-        g.tiefpass_box.setChecked(True)
+        g.tiefpass_combo.setCurrentIndex(g.tiefpass_combo.findData(3000))
+        g.kaskade_boxen[0].setChecked(False)
         qapp.processEvents()
         assert w._sound["ay_takt_hz"] == 2_457_600
         w._standard_zuruecksetzen()
         qapp.processEvents()
         assert w._sound == sound.vorgabe(0x38)
-        assert g.ay_takt_edit.text() == "1,789772" and not g.tiefpass_box.isChecked()
+        assert g.ay_takt_edit.text() == "1,789772" and g.tiefpass_combo.currentData() == 0
+        assert [b.isChecked() for b in g.kaskade_boxen] == [True] * 3
         assert not g.karte_box.isChecked() and not w.emulator.sound_present()
     finally:
         _zu(w, qapp)
+
+
+def test_alter_tiefpass_schluessel_wird_umgerechnet_und_nicht_mehr_geschrieben():
+    from app import sound
+    assert sound.normalize({"tiefpass": True}, 0x38)["tiefpass_hz"] == 8000
+    assert sound.normalize({"tiefpass": False}, 0x38)["tiefpass_hz"] == 0
+    assert sound.normalize({"tiefpass": True, "tiefpass_hz": 4000}, 0x38)["tiefpass_hz"] == 4000
+    assert sound.normalize({"tiefpass_hz": "viel"}, 0x38)["tiefpass_hz"] == 0
+    k = sound.fuer_konfig(sound.normalize({"enabled": True, "tiefpass": True}, 0x38))
+    assert k["tiefpass_hz"] == 8000 and "tiefpass" not in k
+    assert sound.kern_param(sound.normalize({"enabled": True, "tiefpass_hz": 5000}, 0x38))["tiefpass"] == 5000
+
+
+def test_kaskade_vorgabe_ist_sieben_eine_gespeicherte_wahl_bleibt():
+    from app import sound
+    assert sound.vorgabe(0x38)["kaskade"] == 7
+    assert sound.normalize({"enabled": True}, 0x38)["kaskade"] == 7             # Schluessel fehlt: Vorgabe
+    assert sound.normalize({"kaskade": [False, False, False]}, 0x38)["kaskade"] == 0   # ausdrueckliche Wahl bleibt
+    assert sound.normalize({"kaskade": [True, False, False]}, 0x38)["kaskade"] == 1

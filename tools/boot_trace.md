@@ -447,6 +447,7 @@ MC80; nicht am P8000.  Basis hex oder dezimal, Vielfaches von 8, Vorgabe **38H**
 | `--sound-takt=quarz\|halb\|system` | Chiptakt: Quarz, Quarz/2 (Vorgabe) oder Systemtakt |
 | `--sound-kanal=abc\|acb\|mono` | Mischer (Vorgabe `acb`) |
 | `--sound-chip=8910\|8912` | AY-Variante (Vorgabe 8910) |
+| `--sound-kaskade=0..7` | CTC-Brücken TO0→TR1 (1), TO1→TR2 (2), TO2→TR3 (4); Vorgabe 7 = alle gesteckt |
 | `--wav=DATEI` | WAV-Mitschrift (48 kHz, Stereo, Maschinenzeit) ab dem Stecken bis zum Programmende; ohne `--sound` Fehler |
 
 Die Tonausgabe an den Wirt wird **nicht** gestartet.  Am Ende meldet `boot_trace` auf stderr

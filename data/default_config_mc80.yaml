@@ -53,8 +53,8 @@ general:
     chip: ay8910
     ay_takt_hz: 1789772
     kanal: acb
-    tiefpass: false
-    kaskade: [false, false, false]
+    tiefpass_hz: 0
+    kaskade: [true, true, true]
   # Modell: mc80 (MC80.30), mc80-21 oder mc80-22 (MC80.21/.22: Oszilloskop-Bild, BSYS).
   # Das Kassettenlaufwerk ist an allen Modellen fest eingebaut.
   model: mc80

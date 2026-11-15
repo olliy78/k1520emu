@@ -22,7 +22,7 @@ SoundK1520::SoundK1520(const Config& cfg)
     if (cfg.systemtakt_hz == 0 || cfg.quarz_hz == 0) throw std::invalid_argument("SoundK1520: Takt 0");
     taktBruch(cfg);
     hp_koef_ = static_cast<float>(std::exp(-2.0 * PI * HOCHPASS_HZ / audio::kAbtastrate));
-    tp_koef_ = static_cast<float>(1.0 - std::exp(-2.0 * PI * TIEFPASS_HZ / audio::kAbtastrate));
+    tiefpassSetzen(cfg.tiefpass_hz);
 
     kaskadeSetzen(cfg.kaskade);
 }
@@ -53,6 +53,10 @@ void SoundK1520::setzeTempo(double f) {
     acc_ = 0;
 }
 
+void SoundK1520::tiefpassSetzen(uint32_t hz) {
+    tp_koef_ = hz ? static_cast<float>(1.0 - std::exp(-2.0 * PI * double(hz) / audio::kAbtastrate)) : 0.0f;
+}
+
 void SoundK1520::kaskadeSetzen(uint8_t maske) {
     // Kaskaden TO0->TR1 usw.; Maske nur fuer verdrahtete Kanaele (jeder maskierte Kanal ist teurer)
     const uint8_t k = maske & 7;
@@ -75,7 +79,8 @@ bool SoundK1520::umstellen(const Config& neu, std::string* grund) {
     cfg_.quarz_hz = neu.quarz_hz;
     cfg_.chip = neu.chip;
     cfg_.kanal = neu.kanal;
-    cfg_.tiefpass = neu.tiefpass;
+    cfg_.tiefpass_hz = neu.tiefpass_hz;
+    tiefpassSetzen(neu.tiefpass_hz);
     cfg_.kaskade = neu.kaskade & 7;
     taktBruch(cfg_);
     acc_ = 0;   // Bruchrest gehoerte zum alten Teiler (< 1 Chiptakt)
@@ -211,7 +216,7 @@ void SoundK1520::mischen(const Ay38910::Abtastwert* w, size_t n) {
         const float x[2] = {l * skala, r * skala};
         for (int s = 0; s < 2; ++s) {
             float v = x[s];
-            if (cfg_.tiefpass) { tp_[s] += tp_koef_ * (v - tp_[s]); v = tp_[s]; }
+            if (cfg_.tiefpass_hz) { tp_[s] += tp_koef_ * (v - tp_[s]); v = tp_[s]; }
             const float y = v - x1_[s] + hp_koef_ * y1_[s];   // Gleichanteil weg
             x1_[s] = v;
             y1_[s] = y;

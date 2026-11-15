@@ -1594,8 +1594,8 @@ PRG 710/-1, PC 1715/1715W und MC80 stecken (nicht in den P8000) und ist ab Werk 
   (ein höherer Takt lässt Lieder höher klingen).
 * **Kanäle** — *Stereo ACB* (Vorgabe: A links, B rechts, C in der Mitte), *Stereo ABC* (A links, B Mitte, C rechts) oder *Mono*.
 * **Aussteuerung** — die Karte wird mit 3 dB Reserve ausgegeben (kein Übersteuern); die Lautstärke im Menü schwächt nur ab.
-* **Tiefpass C16/C17** — schaltet einen Tiefpass mit **8 kHz** Grenzfrequenz zu: Höhen (Schlagzeug, Rauschen) werden gedämpft, der Ton klingt weicher (ab Werk aus). Auf der echten Karte wirken die beiden 1-nF-Kondensatoren schwächer; der Emulator nimmt bewusst einen hörbaren Wert.
-* **CTC-Kaskade** — drei Haken für die Brücken `TO0 → TR1`, `TO1 → TR2`, `TO2 → TR3` (ab Werk aus).
+* **Tiefpass** — Auswahlfeld mit *aus* und den Grenzfrequenzen 3, 4, 5, 6, 8, 10, 12, 16, 20 und 24 kHz (Kondensatoren C16/C17, einpolig; ab Werk aus). Je tiefer die Grenze, desto stärker werden Höhen (Schlagzeug, Rauschen) gedämpft und desto weicher klingt der Ton — wählen Sie **je nach Geschmack**. Auf der echten Karte wirken die beiden 1-nF-Kondensatoren schwächer; der Emulator bietet bewusst hörbare Werte. Der Ausgang filtert ohnehin bei etwa 8 kHz gegen Aliasing (Störtöne), deshalb wirken Werte darüber kaum.
+* **CTC-Kaskade** — in einer eigenen Zeile drei Haken für die Brücken `TO0 → TR1`, `TO1 → TR2`, `TO2 → TR3`. Ab Werk sind **alle drei gesteckt**, wie es Testprogramme erwarten: `SKTEST4` Menü 3 (Test der kaskadierten CTC-Kanäle) wartet auf den ersten Zählimpuls von Kanal 3 und bleibt ohne die Brücken hängen. Wer die Kaskade nicht braucht, kann sie abwählen; eine gespeicherte Wahl bleibt, wie sie ist.
 
 Änderungen an AY-Takt, Chip, Kanälen, Tiefpass und Kaskade wirken sofort; nur Stecken/Ziehen und die Basis bauen die Maschine neu auf.
 

@@ -190,10 +190,12 @@ struct Sys {
     }
 
     /// Karte stecken (Basis @p basis), Zaehler einhaengen.  Vor dem ersten Lauf.
-    bool karte(uint8_t basis) {
+    /// @p irqZaehlen = false: die Karte bleibt unberuehrt (der Zaehlrueckruf wuerde die Kaskade der Karte ersetzen).
+    bool karte(uint8_t basis, bool irqZaehlen = true) {
         SoundK1520::Config c;
         c.basis = basis;                      // Takt Q1/2 (Vorgabe), ABC
         if (!f.m.installSound(c)) return false;
+        if (!irqZaehlen) return true;
         auto n = irq;
         f.m.soundK1520()->ctc().setZCTOCallback([n](int kanal, bool pegel) { if (kanal == 0 && pegel) ++*n; }, 0x01);
         return true;
@@ -231,10 +233,10 @@ Messung messe(Sys<PcFahrer>& s, uint64_t a, uint64_t b) {
 constexpr double kNichtStill = 500.0;
 
 /// A5120 + CP/A (Fixture ohne Uhr): bis zum Prompt.
-void bootCpa(Sys<A5120Fahrer>& s) {
+void bootCpa(Sys<A5120Fahrer>& s, bool irqZaehlen = true) {
     ASSERT_EQ(aufspielen(s.disk.path(), kA5120Dateien), "");
     ASSERT_TRUE(s.f.m.mountDisk(0, s.disk.path(), "cpa780", /*wp=*/false)) << s.f.m.lastError();
-    ASSERT_TRUE(s.karte(0x38)) << s.f.m.soundFehler();
+    ASSERT_TRUE(s.karte(0x38, irqZaehlen)) << s.f.m.soundFehler();
     s.f.m.powerOn();
     ASSERT_TRUE(k1520test::runSmallUntilVisible(s.f.m, "A>", 90'000'000)) << s.f.bild();
     s.f.laufe(2'000'000);
@@ -264,9 +266,9 @@ void bootPc(Sys<PcFahrer>& s) {
     ASSERT_TRUE(s.wavAn("sound_system_pc1715.wav")) << s.f.m.audioFehler();
 }
 
-/// SKTEST4 bis zum laufenden Lied (Menue 4): Hinweisseite, Takt B, Test 4.
+/// SKTEST4 bis zum Testmenue: Hinweisseite, Takt B.
 template <class S>
-void sktestLied(S& s) {
+void sktestMenue(S& s) {
     s.f.zeile("SKTEST4");
     ASSERT_TRUE(s.f.bis("STANDARD IO-ADRESSE", 20'000'000)) << s.f.bild();
     s.f.laufe(2'000'000);
@@ -276,6 +278,12 @@ void sktestLied(S& s) {
     s.f.tippe("b");                                            // 1,79 MHz (Periode 6FH)
     ASSERT_TRUE(s.f.bis("AUSWAHL DES TESTS", 5'000'000)) << s.f.bild();
     s.f.laufe(1'000'000);
+}
+
+/// SKTEST4 bis zum laufenden Lied (Menue 4): Hinweisseite, Takt B, Test 4.
+template <class S>
+void sktestLied(S& s) {
+    sktestMenue(s);
     s.f.tippe("4");                                            // Lied ueber CTC-Interrupt
     ASSERT_TRUE(s.f.bis("Song wird gespielt", 20'000'000)) << s.f.bild();
 }
@@ -329,6 +337,31 @@ TEST(SoundSystem, A5120_Cpa_SKTEST4_LiedMitCtcInterrupt) {
     bootCpa(s);
     sktestLied(s);
     liedPruefen(s);
+}
+
+// 2b) SKTEST4 `B`, Menue 3: kaskadierte CTC-Kanaele.  Das Programm wartet auf den ersten Zaehlimpuls von Kanal 3 und
+// fragt die Taste "0" erst DANACH ab -- ohne die drei Kaskadenbruecken haengt es.  Die Karte kommt mit der Vorgabe
+// (alle Bruecken gesteckt) in die Maschine, nichts wird umgestellt.
+TEST(SoundSystem, A5120_Cpa_SKTEST4_Menue3KaskadeHaengtNichtMitVorgabe) {
+    k1520::logging::Logger::instance().setBaseLevel(k1520::logging::Level::WARN);
+    k1520::os::setEnv("K1520_AUDIO", "stumm");
+    Sys<A5120Fahrer> s("cpa_cpa780_k5601_noclock.hfe", "k1520_sound_sktest4.hfe");
+    bootCpa(s, /*irqZaehlen=*/false);
+    ASSERT_EQ(s.f.m.soundK1520()->config().kaskade, 7);
+    s.f.zeile("SKTEST4");
+    ASSERT_TRUE(s.f.bis("STANDARD IO-ADRESSE", 20'000'000)) << s.f.bild();
+    s.f.laufe(2'000'000);
+    s.f.tippe("x");
+    ASSERT_TRUE(s.f.bis("AUSWAHL DER TAKTFREQUENZ", 5'000'000)) << s.f.bild();
+    s.f.laufe(1'000'000);
+    s.f.tippe("b");
+    ASSERT_TRUE(s.f.bis("AUSWAHL DES TESTS", 5'000'000)) << s.f.bild();
+    s.f.laufe(1'000'000);
+    s.f.tippe("3");
+    ASSERT_TRUE(s.f.bis("GELESENES BYTE", 20'000'000)) << s.f.bild();
+    s.sekunden(3.0);                                           // Kanal 3 zaehlt etwa 2 Hz
+    s.f.tippe("0");                                            // nur nach dem ersten Impuls wird die Taste gelesen
+    EXPECT_TRUE(s.f.bis("AUSWAHL DES TESTS", 20'000'000)) << "Menue 3 haengt (Kaskade nicht gesteckt?)\n" << s.f.bild();
 }
 
 // 3) STCTEST1: Lied im Hintergrund, Prompt kommt zurueck, DIR bedienbar, waehrenddessen nicht still.

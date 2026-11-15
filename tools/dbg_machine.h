@@ -196,6 +196,7 @@ inline bool steckeSound(K1520Machine& m, const SoundOpts& o, bool pc, std::strin
     c.kanal = o.kanal == "abc" ? k1520::SoundK1520::Kanal::ABC
             : o.kanal == "mono" ? k1520::SoundK1520::Kanal::Mono : k1520::SoundK1520::Kanal::ACB;
     c.chip = o.chip == "8912" ? Ay38910::Variante::AY8912 : Ay38910::Variante::AY8910;
+    c.kaskade = static_cast<uint8_t>(o.kaskade);
     if (o.basis >= 0 && (o.basis & 7)) { err = "Basis muss ein Vielfaches von 8 sein"; return false; }
     if (!m.installSound(c)) { err = m.soundFehler(); return false; }
     if (!o.wav.empty() && !m.audioWavStart(o.wav)) { err = "WAV: " + m.audioFehler(); return false; }

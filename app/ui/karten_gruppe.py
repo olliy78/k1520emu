@@ -264,24 +264,32 @@ class SoundGruppe(KartenGruppe):
         z2.addStretch(1)
         self.form.addRow("", z2)
 
-        self.tiefpass_box = QCheckBox("Tiefpass C16/C17", self)
-        self.tiefpass_box.setToolTip(sound.TIPP_TIEFPASS)
-        self.kaskade_boxen = []
+        self.tiefpass_combo = QComboBox(self)
+        for hz in sound.TIEFPASS_WERTE:
+            self.tiefpass_combo.addItem("aus" if hz == 0 else f"{hz // 1000} kHz", hz)
+        self.tiefpass_combo.setToolTip(sound.TIPP_TIEFPASS)
         z3 = QHBoxLayout()
-        z3.addWidget(self.tiefpass_box)
-        z3.addWidget(QLabel("CTC-Kaskade:", self))
+        z3.addWidget(QLabel("Tiefpass:", self))
+        z3.addWidget(self.tiefpass_combo)
+        z3.addStretch(1)
+        self.form.addRow("", z3)
+
+        # Kaskade in EINER EIGENEN Zeile (drei Haken), damit der Kasten nicht zu breit wird
+        self.kaskade_boxen = []
+        z4 = QHBoxLayout()
+        z4.addWidget(QLabel("CTC-Kaskade:", self))
         for text in sound.KASKADEN:
             b = QCheckBox(text, self)
             b.setToolTip(sound.TIPP_KASKADE)
             self.kaskade_boxen.append(b)
-            z3.addWidget(b)
-        z3.addStretch(1)
-        self.form.addRow("", z3)
+            z4.addWidget(b)
+        z4.addStretch(1)
+        self.form.addRow("", z4)
         self._fehlerzeile()
 
-        for w in (self.karte_box, self.tiefpass_box, *self.kaskade_boxen):
+        for w in (self.karte_box, *self.kaskade_boxen):
             w.toggled.connect(self._aenderung)
-        for w in (self.basis_combo, self.chip_combo, self.kanal_combo):
+        for w in (self.basis_combo, self.chip_combo, self.kanal_combo, self.tiefpass_combo):
             w.currentIndexChanged.connect(self._aenderung)
         self.ay_takt_edit.editingFinished.connect(self._ay_takt_fertig)
         self.set_zustand(sound.vorgabe(self._basis_vorgabe))
@@ -292,7 +300,7 @@ class SoundGruppe(KartenGruppe):
                 "chip": self.chip_combo.currentData(),
                 "ay_takt_hz": self._ay_takt_hz,
                 "kanal": self.kanal_combo.currentData(),
-                "tiefpass": self.tiefpass_box.isChecked(),
+                "tiefpass_hz": int(self.tiefpass_combo.currentData()),
                 "kaskade": sum(1 << i for i, b in enumerate(self.kaskade_boxen) if b.isChecked())}
 
     def set_zustand(self, z: dict, fehler: str = "", gesteckt=None) -> None:
@@ -303,8 +311,10 @@ class SoundGruppe(KartenGruppe):
             i = combo.findData(z.get(schl))
             combo.setCurrentIndex(i if i >= 0 else 0)
         self._ay_takt_setzen(int(z.get("ay_takt_hz", sound.AY_TAKT_VORGABE)))
-        self.tiefpass_box.setChecked(z.get("tiefpass") is True)
-        maske = int(z.get("kaskade", 0))
+        hz = int(z.get("tiefpass_hz", 0))
+        nah = min(sound.TIEFPASS_WERTE, key=lambda w: abs(w - hz))   # nicht in der Liste: der naechste Wert
+        self.tiefpass_combo.setCurrentIndex(self.tiefpass_combo.findData(nah))
+        maske = int(z.get("kaskade", sound.KASKADE_VORGABE))
         for i, b in enumerate(self.kaskade_boxen):
             b.setChecked(bool(maske >> i & 1))
         self._guard = False
