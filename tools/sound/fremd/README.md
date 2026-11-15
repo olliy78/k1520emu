@@ -17,3 +17,18 @@ Entwurf: `doc/design/51_soundkarte_k1520.md`.  Die Dateien unter `original/` sin
 
 Autoren: Daniel Auerbach (Karte, SNDINIT2), Rolf Weidlich „WeRo" (AYPLAY.INC, Player), Klaus Wilfling „KW"
 (CP/A-/SCPX-Anpassungen), Heiko Poppe „HP", J. Markwardt (PC-1715-Interrupttabelle).
+
+## Auf den Systemdisketten (AP S9a)
+
+Entpackt und unverändert (Länge wie im Archiv) liegen die Programme in `a5120/` und `pc1715/` (einzige Quelle
+für Diskettenbau **und** `SoundSystem.*`-Tests; `sound_karten.py` vergleicht sie mit den Archiven).  Gebaut wird
+über die Bauskripte der Disketten (`tools/gide/karten.py::dateien` mischt `tools/sound/sound_karten.py` ein);
+auf der Diskette sind die Dateien wie bei CP/M üblich mit 00 auf 128-B-Sätze aufgefüllt.  Wächter `cli_sound_beigaben`.
+
+| Satz | auf welchen Disketten |
+|------|-----------------------|
+| `a5120/` TGCPM, SKTEST4 (rowikla-Bau), STCTEST1, PLAYSTC, SONG.STC | `disks/a5120_cpa/a5120_cpa_k5601_system.hfe`, `disks/a5120_scpx17/a5120_scpx17_k5601_system.hfe` |
+| `pc1715/` dieselben fünf Namen, PC-1715-Fassungen | `disks/pc1715_cpa1715/pc1715_cpa1715_system.hfe` |
+
+Nicht auf Disketten: K8915, PRG 710/-1, MC80, PC 1715 SCP/1715W (keine Gastsoftware dafür bekannt bzw. nicht verlangt);
+USB-Player (`CPM*PL`, SOUND.INI) folgen mit S9b.

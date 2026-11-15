@@ -1576,7 +1576,7 @@ PRG 710/-1, PC 1715/1715W und MC80 stecken (nicht in den P8000) und ist ab Werk 
 *Einstellungen ▸ Allgemein ▸ Soundkarte* (flache Zeilen):
 
 * **Soundkarte stecken** und **E/A-Basis** — acht Tore ab der Basis (Vielfache von 8). Vorgewählt ist **38H**,
-  am **PC 1715 und PC 1715W E0H** (die Lage der Gastsoftware; am MC80.2x kollidiert E0H mit der Lochstreifenkarte).
+  am **PC 1715W E0H** (dort sind 38H–3FH belegt; die Gastsoftware des PC 1715 benutzt 38H, am PC 1715 steckt die Karte deshalb auch auf 38H und die Lochstreifenkarte E0H daneben).
   Belegte Basen sind im Auswahlfeld markiert und nicht wählbar. Ein Wechsel baut die Maschine neu auf.
 * **Chip** — AY-3-8910 (zwei 8-Bit-Tore A und B) oder AY-3-8912 (nur Tor A).
 * **AY-Takt** — *Quarz/2 = 1,79 MHz* (Vorgabe, Brücke JP2), *Quarz* oder *Systemtakt*; dazu die **Quarzfrequenz**
@@ -1606,7 +1606,7 @@ Unter Linux spielt der Emulator über **ALSA** (`libasound.so.2` wird beim Start
 der Emulator hat keine Tonausgabe bekommen — meist fehlt die ALSA-Bibliothek, ein Tongerät ist belegt oder es gibt
 keines. Der Mitschnitt funktioniert trotzdem.
 
-**Gastsoftware** (liegt später auf den Systemdisketten): `TGCPM` (kleinster Rauchtest, 1-kHz-Ton auf A/B/C),
+**Gastsoftware** (liegt auf den Systemdisketten **A5120 CP/A**, **A5120 SCPX 1.7** und **PC 1715 CP/A 1715**; die Fassungen des PC 1715 sind eigene Bauten für dessen Interrupttabelle): `TGCPM` (kleinster Rauchtest, 1-kHz-Ton auf A/B/C),
 `SKTEST4` (Komponententest: AY, Ports, kaskadierte CTC, CTC-Interrupt, Lied — fragt zuerst den AY-Takt ab; die
 Wahl muss zur Einstellung passen), `STCTEST1` (spielt ein eingebautes Lied im Hintergrund, der Prompt bleibt
 bedienbar) und `PLAYSTC` (`PLAYSTC B:SONG.STC` spielt eine STC-Datei von Diskette). Die Programme suchen die Karte

@@ -145,7 +145,6 @@ REGELN = [
     ("core/cards/sound_k1520/**", ("fach_sound",), "SOUND-Karte K1520", True),
     ("core/audio/**", ("fach_sound",), "Tonausgabe/WAV", True),
     ("tools/sound/**", ("fach_sound",), "SOUND-Gastsoftware", False),
-    ("tests/fixtures/sound/**", ("fach_sound",), "SOUND-Fixtures", False),
     # ── Unbekanntes unter core/: alles ──────────────────────────────────
     ("core/**", ALLE, "unbekannter Pfad unter core/ (sicherheitshalber alles)", True),
     # ── Tests: nach Dateiname ───────────────────────────────────────────

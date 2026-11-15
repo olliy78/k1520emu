@@ -161,9 +161,10 @@ class Programmprofil:
     net_basis_vorgabe: int = 0xC0
     net_basis_modell: Tuple[Tuple[str, int], ...] = ()
     #: SOUND-Karte K1520 (`app/sound.py`, Entwurf 51): Zeilen unter *Einstellungen ▸ Allgemein*, ausser am
-    #: P8000 (kein K1520-Bus).  Vorauswahl 38H; PC 1715/1715W E0H (Lage der Gastsoftware, 38H–3FH belegt).
+    #: P8000 (kein K1520-Bus).  Vorauswahl 38H; PC 1715W E0H (38H–3FH belegt, ``sound_basis_modell``).
     sound_wahl: bool = True
     sound_basis_vorgabe: int = 0x38
+    sound_basis_modell: Tuple[Tuple[str, int], ...] = ()
     #: Hinweise, die der Laufwerkskasten beim Einlegen eines ``.cqm`` zeigt (Hinweiszeile,
     #: kein Meldungsfenster): was CopyQM an DIESEM Rechner unbrauchbar macht.  Leer = keine.
     cqm_hinweise: Tuple[str, ...] = ()
@@ -206,7 +207,7 @@ class Programmprofil:
         if karte == "gide":
             return self.gide_basis_vorgabe
         if karte == "sound":
-            return self.sound_basis_vorgabe
+            return dict(self.sound_basis_modell).get(modell or self.standard_modell(), self.sound_basis_vorgabe)
         tabelle = self.usb_basis_modell if karte == "usb" else self.net_basis_modell if karte == "net" else None
         if tabelle is None:
             raise ValueError(f"unbekannte Karte {karte!r}")
@@ -735,7 +736,7 @@ PC1715 = Programmprofil(
              ("pc1715w", "pc1715w", None, "PC 1715W (SCP 3.0, 256 KB, 80 × 24)",
               "pc1715")),
     modell_takte=(("pc1715w", 3_993_600, "3,9936 MHz"),),
-    sound_basis_vorgabe=0xE0,       # PC 1715/1715W: Lage der Gastsoftware (1715W: 38H–3FH belegt)
+    sound_basis_modell=(("pc1715w", 0xE0),),   # 1715W: 38H–3FH belegt; der PC 1715 hat die Lage der Gastsoftware (38H)
     # ROM-Varianten, die technisch etwas aendern (AP-6): die ZG-EPROMs der ZRE (nur PC 1715;
     # der 1715W laedt seinen Satz von Diskette) und das Tastatur-ROM (beide).
     hardware=(

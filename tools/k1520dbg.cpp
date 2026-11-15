@@ -459,7 +459,7 @@ int main(int argc, char** argv){
       if (!dbgm::steckeGide(m.base(), gide_opt, gide_basis, gide_image, err)){ fprintf(stderr,"--gide: %s\n",err.c_str()); return 2; }
       if (!dbgm::steckeUsb(m.base(), usb_opt, usb_basis, usb_dir, err)){ fprintf(stderr,"--usb: %s\n",err.c_str()); return 2; }
       if (!dbgm::steckeNet(m.base(), net_opt, net_basis, err)){ fprintf(stderr,"--net: %s\n",err.c_str()); return 2; }
-      if (!dbgm::steckeSound(m.base(), sound_opt, m.pc1715()!=nullptr, err)){ fprintf(stderr,"--sound: %s\n",err.c_str()); return 2; }
+      if (!dbgm::steckeSound(m.base(), sound_opt, m.pc1715()!=nullptr && m.pc1715()->istW(), err)){ fprintf(stderr,"--sound: %s\n",err.c_str()); return 2; }
       if (m.base().k6022()) {
           if (!ptape_in.empty() && !m.base().k6022()->bandEinlegenDatei(ptape_in, err)){ fprintf(stderr,"--ptape-in: %s\n",err.c_str()); return 2; }
           if (!ptape_out.empty() && !m.base().k6022()->stanzerBinden(ptape_out, K6022::Format::Roh, err)){ fprintf(stderr,"--ptape-out: %s\n",err.c_str()); return 2; } } }

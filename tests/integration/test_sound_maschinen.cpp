@@ -121,7 +121,7 @@ TEST_F(SoundMaschine, Bestueckung_Prg710) {
         return std::make_unique<Prg710Machine>(c);
     }, 0x38);
 }
-TEST_F(SoundMaschine, Bestueckung_Pc1715) { pruefeBestueckung([] { return std::make_unique<Pc1715Machine>(); }, 0xE0); }
+TEST_F(SoundMaschine, Bestueckung_Pc1715) { pruefeBestueckung([] { return std::make_unique<Pc1715Machine>(); }, 0x38); }
 TEST_F(SoundMaschine, Bestueckung_Pc1715W) {
     pruefeBestueckung([] {
         Pc1715Machine::Config c;

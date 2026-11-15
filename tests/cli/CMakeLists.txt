@@ -135,6 +135,14 @@ add_test(NAME cli_karten_beigaben
 set_tests_properties(cli_karten_beigaben PROPERTIES
     TIMEOUT 180 LABELS "cli;fast")
 
+# Waechter „die Systemdisketten tragen die Gastsoftware der SOUND-Karte“ (tools/sound/fremd/README.md): A5120 CP/A + SCPX
+# und PC 1715 CP/A tragen TGCPM/SKTEST4/STCTEST1/PLAYSTC/SONG.STC bytegleich; die entpackten Quellen gleichen den Archiven.
+add_test(NAME cli_sound_beigaben
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/sound/sound_karten.py"
+            --check --tool "$<TARGET_FILE:k1520disktool>" ${_beigaben_emulator})
+set_tests_properties(cli_sound_beigaben PROPERTIES
+    TIMEOUT 180 LABELS "cli;fast;fach_sound")
+
 # Waechter „UHR.COM ist aus tools/gide/uhr/src gebaut“ (nur mit CP/M-Werkzeugkette, sonst uebersprungen, Rueckgabe 77).
 # Neu bauen: python3 tools/gide/uhr/build.py
 add_test(NAME cli_uhr_com

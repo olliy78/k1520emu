@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 """
-karten.py  -  Gast-Software der Hardwareoptionen (GIDE, RTC, USB, Netz) je Rechner/Betriebssystem
+karten.py  -  Gast-Software der Hardwareoptionen (GIDE, RTC, USB, Netz; SOUND eingemischt aus tools/sound) je Rechner/Betriebssystem
 ================================================================================================
 
 Was auf welche Systemdiskette gehoert, steht HIER (eine Wahrheit); die Bauskripte der Disketten
@@ -25,6 +25,9 @@ import sys
 HIER = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HIER)
 import basis_anpassen as ba  # noqa: E402
+
+sys.path.insert(0, os.path.join(os.path.dirname(HIER), 'sound'))
+import sound_karten  # noqa: E402  (SOUND-Karte, Entwurf 51 S9a: eigene Quellen, hier nur eingemischt)
 
 FREMD = os.path.join(HIER, 'fremd')
 UHR_COM = os.path.join(HIER, 'uhr', 'uhr.com')
@@ -208,6 +211,7 @@ def dateien(schluessel):
         d['CPMNET.COM'] = n['CPMN1587.COM']
         d['TFTP.COM'] = n['TFTP1287.COM']
         d['NETZ.TXT'] = cpm_text(_netz_text(r))
+    d.update(sound_karten.dateien(schluessel))     # TGCPM/SKTEST4/STCTEST1/PLAYSTC/SONG.STC (tools/sound)
     return d
 
 

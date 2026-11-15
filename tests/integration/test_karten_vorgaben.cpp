@@ -172,7 +172,7 @@ void alleKarten(M& m, Z80& cpu, Basen b, std::function<void()> nachEin = {}) {
         EXPECT_FALSE(m.installK5020());
         EXPECT_NE(m.k5020Fehler().find("belegt"), std::string::npos) << m.k5020Fehler();
     }
-    // SOUND-Karte (Entwurf 51 S4): 38H, am PC 1715/1715W E0H; E0H..E7H teilt sie sich mit der K6022 -> dort Konflikt (gewollt)
+    // SOUND-Karte (Entwurf 51 S4): 38H, am PC 1715W E0H; E0H..E7H teilt sie sich dort mit der K6022 -> Konflikt (gewollt)
     k1520::SoundK1520::Config sc;
     sc.basis = b.sound;
     ASSERT_TRUE(m.installSound(sc)) << m.soundFehler();
@@ -220,7 +220,8 @@ void alleKarten(M& m, Z80& cpu, Basen b, std::function<void()> nachEin = {}) {
 
 constexpr Basen kA5120{0xD0, 0x84, 0xC0, true, 0x38};     // A5120 (alle Modelle, auch .16): K5020 liegt auf 30H
 constexpr Basen kD0{0xD0, 0x84, 0xC0, false, 0x38};   // K8915 V3: K5020 auf D0H..D7H
-constexpr Basen kPc{0xD0, 0x84, 0xC0, false, 0xE0};   // PC 1715/1715W: K5020 auf D0H..D7H; SOUND E0H (1715W: 38H..3FH belegt)
+constexpr Basen kPc{0xD0, 0x84, 0xC0, false, 0x38};   // PC 1715: K5020 auf D0H..D7H; SOUND 38H (Lage der Gastsoftware)
+constexpr Basen kPcW{0xD0, 0x84, 0xC0, false, 0xE0};  // PC 1715W: SOUND E0H (38H..3FH belegt)
 constexpr Basen kGen2{0xD0, 0x8C, 0xC0, false, 0x38};     // K8915 Gen 2: 80H..87H gehoeren der K2521
 constexpr Basen kPrg{0x90, 0x8C, 0x28, true, 0x38};       // PRG 710/-1: 80H..87H K2521, C0H..C3H ATP-Zusatz, EPROMmer D0H..D4H
 
@@ -268,5 +269,5 @@ TEST_F(KartenVorgaben, Pc1715W) {
     Pc1715Machine::Config c;
     c.variante = Pc1715Machine::Config::Variante::Pc1715W;
     Pc1715Machine m(c);
-    alleKarten(m, m.zre().cpu(), kPc);
+    alleKarten(m, m.zre().cpu(), kPcW);
 }

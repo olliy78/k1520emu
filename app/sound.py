@@ -12,7 +12,7 @@ Karte gelten, wenn man sie spaeter steckt)::
     general:
       sound:
         enabled: false          # Karte gesteckt?  (Vorgabe aus)
-        basis: '38'             # E/A-Basis, Vielfaches von 8, Hex (PC 1715/1715W: E0)
+        basis: '38'             # E/A-Basis, Vielfaches von 8, Hex (PC 1715W: E0)
         chip: ay8910            # ay8910 | ay8912
         takt: quarz_halbe       # quarz_halbe = Quarz/2 (1,79 MHz) | quarz | system
         quarz_hz: 3579545
@@ -52,8 +52,8 @@ TIPP_KARTE = (
     "Echtzeit (Takt 1×).  Ein Wechsel schaltet die Maschine aus und neu ein.")
 TIPP_CHIP = "AY-3-8910 hat zwei 8-Bit-Tore (A und B); der AY-3-8912 nur eines (A)."
 TIPP_BASIS = (
-    "E/A-Basis der acht Tore der Karte (Vielfache von 8).  Vorgewählt ist 38H, am PC 1715 und PC 1715W "
-    "E0H (die Lage der Gastsoftware).  Belegte Einträge sind markiert und nicht wählbar.  Ein Wechsel "
+    "E/A-Basis der acht Tore der Karte (Vielfache von 8).  Vorgewählt ist 38H, am PC 1715W "
+    "E0H (dort sind 38H–3FH belegt).  Belegte Einträge sind markiert und nicht wählbar.  Ein Wechsel "
     "schaltet die Maschine aus und neu ein.")
 TIPP_TAKT = (
     "Takt des AY (Brücke JP2): Quarz/2 (Vorgabe, 1,79 MHz), Quarz oder Systemtakt der Maschine.  "

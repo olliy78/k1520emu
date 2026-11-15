@@ -16,7 +16,7 @@ from conftest import requires_core
 pytestmark = requires_core
 
 MIT_KARTE = ["a5120", "k8915", "prg710", "pc1715", "mc80"]
-BASIS = {"a5120": 0x38, "k8915": 0x38, "prg710": 0x38, "pc1715": 0xE0, "mc80": 0x38}
+BASIS = {"a5120": 0x38, "k8915": 0x38, "prg710": 0x38, "pc1715": 0x38, "mc80": 0x38}
 
 
 @pytest.fixture(autouse=True)
@@ -71,7 +71,7 @@ def test_abschnitt_nur_an_steckplatzfaehigen_profilen(qapp, maschine):
 def test_pc1715w_nimmt_die_vorauswahl_e0(qapp):
     from app import profil
     p = profil.profil("pc1715")
-    assert p.karten_vorauswahl("sound", "pc1715w") == 0xE0 == p.karten_vorauswahl("sound", "pc1715")
+    assert p.karten_vorauswahl("sound", "pc1715w") == 0xE0 and p.karten_vorauswahl("sound", "pc1715") == 0x38
     w = _fenster(qapp, "pc1715")
     try:
         w.settings_widget.model_combo.setCurrentIndex(w.settings_widget.model_combo.findData("pc1715w"))

@@ -5,7 +5,7 @@
  *        der Archive benutzt 38H/3CH, nur der Interruptvektor ist ein anderer, F7F0H; E0H ist die Vorgabe der
  *        USB-Player mit SOUND.INI, nicht dieser Programme).
  *
- * Die Programme (`tests/fixtures/sound/`, bytegleich aus den Archiven in `tools/sound/fremd/original/`)
+ * Die Programme (`tools/sound/fremd/{a5120,pc1715}/`, bytegleich aus den Archiven in `tools/sound/fremd/original/`)
  * werden mit dem DiskTool auf KOPIEN der Systemdisketten gespielt (`TempDisk`), der Rechner bootet,
  * die Programme werden ueber die Tastatur bedient.  Gemessen wird die WAV-Mitschrift der Karte
  * (Maschinenzeit, 48 kHz) und die Zahl der CTC-Interrupts der Karte je Sekunde Maschinenzeit.
@@ -76,8 +76,8 @@ std::string aufspielen(const std::string& pfad, const std::vector<Datei>& dateie
 }
 
 const std::vector<Datei> kA5120Dateien = {
-    {"TGCPM.COM", "TGCPM.COM"},     {"SKTEST4.COM", "SKTEST4.COM"}, {"STCTEST1.COM", "STCTEST1.COM"},
-    {"PLAYSTC.COM", "PLAYSTC.COM"}, {"SONG.STC", "SONG.STC"},
+    {"a5120/TGCPM.COM", "TGCPM.COM"},     {"a5120/SKTEST4.COM", "SKTEST4.COM"}, {"a5120/STCTEST1.COM", "STCTEST1.COM"},
+    {"a5120/PLAYSTC.COM", "PLAYSTC.COM"}, {"a5120/SONG.STC", "SONG.STC"},
 };
 const std::vector<Datei> kPcDateien = {
     {"pc1715/SKTEST4.COM", "SKTEST4.COM"}, {"pc1715/STCTEST1.COM", "STCTEST1.COM"},

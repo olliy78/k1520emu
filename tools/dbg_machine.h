@@ -173,7 +173,7 @@ inline std::string usbText(const k1520::GunUsb& g) {
 
 /**
  * @brief Steckt die SOUND-Karte (`--sound...`, Entwurf 51 AP S6) in @p m, wenn @p o.an, und startet die WAV-Mitschrift.
- *        Basis ohne Wert: 38H, am PC 1715/1715W (@p pc) E0H.  Die Tonausgabe an den Wirt wird NICHT gestartet.
+ *        Basis ohne Wert: 38H, am PC 1715W (@p pc) E0H (38H-3FH belegt).  Die Tonausgabe an den Wirt wird NICHT gestartet.
  */
 inline bool steckeSound(K1520Machine& m, const SoundOpts& o, bool pc, std::string& err) {
     if (!o.fehler.empty()) { err = o.fehler; return false; }

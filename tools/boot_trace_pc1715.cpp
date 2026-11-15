@@ -115,7 +115,7 @@ int bootTracePc1715(const K8915TraceOpts& o, const prnlst::Listing& prn, bool w)
     if (w) cfg.variante = Pc1715Machine::Config::Variante::Pc1715W;
     Pc1715Machine m(cfg);
     { std::string err;
-      if (!dbgm::steckeSound(m, o.sound, true, err)) { fprintf(stderr, "--sound: %s\n", err.c_str()); return 2; } }
+      if (!dbgm::steckeSound(m, o.sound, w, err)) { fprintf(stderr, "--sound: %s\n", err.c_str()); return 2; } }
     dbgm::WavWaechter wav_waechter(m, o.sound);
     const int cols = m.zre().textCols(), rows = m.zre().maxZeilen();   // + CP/A-Statuszeile
     auto rd = [&](uint16_t a) { return m.memReadDebug(a); };

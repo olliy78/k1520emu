@@ -5,7 +5,7 @@ Zum Hoeren/Vergleichen mit `STCTEST1.mp3` (Aufnahme der echten Karte, im ZIP
 `tools/sound/fremd/original/K1520_SOUND_BC.zip` unter `STCTEST1/Quelle STCTEST1/`).
 
 Ablauf: Kopie der CP/A-Systemdiskette (`tests/fixtures/disks/cpa_cpa780_k5601_noclock.hfe`) in einem
-Temp-Ordner, `STCTEST1.COM` (`tests/fixtures/sound/`) mit dem DiskTool daraufschreiben, booten, WAV-Mitschrift
+Temp-Ordner, `STCTEST1.COM` (`tools/sound/fremd/a5120/`) mit dem DiskTool daraufschreiben, booten, WAV-Mitschrift
 starten (Maschinenzeit, 48 kHz Stereo, kein Wirtsgeraet), `STCTEST1` + Return tippen und laufen, bis das Lied
 (2 Wiederholungen) zu Ende ist (alle AY-Lautstaerkeregister R8-R10 zwei Sekunden lang 0).
 
@@ -35,7 +35,7 @@ def main() -> int:
         platte = Path(tmp) / "cpa.hfe"
         shutil.copyfile(WURZEL / "tests/fixtures/disks/cpa_cpa780_k5601_noclock.hfe", platte)
         r = subprocess.run([str(WURZEL / "tools/dev.sh"), "tool", "k1520disktool", "put", str(platte),
-                            str(WURZEL / "tests/fixtures/sound/STCTEST1.COM"), "--no-backup"],
+                            str(WURZEL / "tools/sound/fremd/a5120/STCTEST1.COM"), "--no-backup"],
                            capture_output=True, text=True)
         if r.returncode != 0:
             print("DiskTool put:", r.stdout, r.stderr, file=sys.stderr)
