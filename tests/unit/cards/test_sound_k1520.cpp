@@ -323,3 +323,129 @@ void pruefeSpitze(SoundK1520::Kanal kanal) {
 TEST(SoundK1520, SpitzeAbcHoechstensMinus3dBFS) { pruefeSpitze(SoundK1520::Kanal::ABC); }
 TEST(SoundK1520, SpitzeAcbHoechstensMinus3dBFS) { pruefeSpitze(SoundK1520::Kanal::ACB); }
 TEST(SoundK1520, SpitzeMonoHoechstensMinus3dBFS) { pruefeSpitze(SoundK1520::Kanal::Mono); }
+
+// ---- Umstellung im Lauf (Entwurf 51, Merkposten sound.md Nr. 17) ----
+
+namespace {
+/// Frequenz der Nulldurchgaenge im Abschnitt [von, bis) des linken Kanals.
+double freqAbschnitt(const std::vector<float>& l, size_t von, size_t bis) {
+    int n = 0; size_t erst = 0, letzt = 0;
+    for (size_t i = von + 1; i < bis && i < l.size(); ++i)
+        if (l[i - 1] < 0 && l[i] >= 0) { if (!n) erst = i; letzt = i; ++n; }
+    return n > 2 ? (n - 1) / ((letzt - erst) / 48000.0) : 0.0;
+}
+}  // namespace
+
+TEST(SoundK1520, UmstellenTaktwechselImLaufVerdoppeltDieTonfrequenz) {
+    Rig g; g.k.setzeSenke(&g.s);           // QuarzHalbe
+    g.ton(0, 0x6F);
+    g.laufe(uint64_t(SYS));
+    const size_t n1 = g.s.l.size();
+    const uint64_t chipVorher = g.k.ay().takt();
+    SoundK1520::Config c = g.k.config();
+    c.takt = SoundK1520::Takt::Quarz;
+    std::string grund;
+    ASSERT_TRUE(g.k.umstellen(c, &grund)) << grund;
+    EXPECT_GE(g.k.ay().takt(), chipVorher) << "Chipzeit monoton";
+    g.laufe(uint64_t(SYS));
+    const double f1 = freqAbschnitt(g.s.l, 4800, n1 - 100);
+    const double f2 = freqAbschnitt(g.s.l, n1 + 4800, g.s.l.size());
+    ASSERT_GT(f1, 0.0);
+    ASSERT_GT(f2, 0.0);
+    EXPECT_NEAR(f2 / f1, 2.0, 0.02);
+    // Rueckweg
+    c.takt = SoundK1520::Takt::QuarzHalbe;
+    ASSERT_TRUE(g.k.umstellen(c));
+    const size_t n2 = g.s.l.size();
+    g.laufe(uint64_t(SYS));
+    EXPECT_NEAR(freqAbschnitt(g.s.l, n2 + 4800, g.s.l.size()), f1, f1 * 0.01);
+    // Gleich viele Abtastwerte je Maschinensekunde in jedem Takt
+    EXPECT_NEAR(double(g.s.l.size()), 3.0 * 48000, 400);
+}
+
+TEST(SoundK1520, UmstellenKanalwechselAbcNachMonoWirkt) {
+    SoundK1520::Config c; c.kanal = SoundK1520::Kanal::ABC;
+    Rig g(c); g.k.setzeSenke(&g.s);
+    g.ton(0, 0x40);                        // nur A: in ABC nur links
+    g.laufe(uint64_t(SYS * 0.2));
+    const size_t n = g.s.l.size();
+    EXPECT_LT(rms(g.s.r, 3000), 1e-4);
+    c.kanal = SoundK1520::Kanal::Mono;
+    ASSERT_TRUE(g.k.umstellen(c));
+    g.laufe(uint64_t(SYS * 0.2));
+    std::vector<float> r2(g.s.r.begin() + n + 2000, g.s.r.end());
+    EXPECT_GT(rms(r2, 0), 0.01);           // Mono: A auch rechts
+}
+
+TEST(SoundK1520, UmstellenKaskadeAnUndAusImLauf) {
+    auto lauf = [](SoundK1520& k, Rig& g) {
+        g.bus.ioWrite(0x3D, 0x47);   // Kanal 1: Zaehler, TC folgt
+        g.bus.ioWrite(0x3D, 0xFF);
+        g.bus.ioWrite(0x3C, 0x05);   // Kanal 0: Zeitgeber, Vorteiler 16
+        g.bus.ioWrite(0x3C, 10);
+        const int vor = k.ctc().getCount(1);
+        g.laufe(1700);
+        return vor - k.ctc().getCount(1);
+    };
+    Rig g;
+    ASSERT_TRUE(g.k.umstellen([&] { auto c = g.k.config(); c.kaskade = 1; return c; }()));
+    EXPECT_NEAR(lauf(g.k, g), 10, 1);
+    auto c = g.k.config(); c.kaskade = 0;
+    ASSERT_TRUE(g.k.umstellen(c));
+    g.bus.ioWrite(0x3D, 0x47); g.bus.ioWrite(0x3D, 0xFF);
+    const int vor = g.k.ctc().getCount(1);
+    g.laufe(1700);
+    EXPECT_EQ(g.k.ctc().getCount(1), vor) << "Kaskade aus: kein Zaehlimpuls mehr";
+}
+
+TEST(SoundK1520, UmstellenChipwechselBehaeltRegister) {
+    Rig g;
+    g.ayReg(14, 0x55);
+    g.ton(0, 0x40);
+    auto c = g.k.config(); c.chip = Ay38910::Variante::AY8912;
+    ASSERT_TRUE(g.k.umstellen(c));
+    EXPECT_EQ(g.k.ay().reg(14), 0x55);
+    EXPECT_EQ(g.k.ay().reg(8), 0x0F);
+    EXPECT_EQ(g.k.ay().variante(), Ay38910::Variante::AY8912);
+}
+
+TEST(SoundK1520, UmstellenMitAndererBasisOderSystemtaktIstFalse) {
+    Rig g;
+    auto c = g.k.config(); c.basis = 0x40;
+    std::string grund;
+    EXPECT_FALSE(g.k.umstellen(c, &grund));
+    EXPECT_NE(grund.find("Basis"), std::string::npos);
+    c = g.k.config(); c.systemtakt_hz = 1000000;
+    EXPECT_FALSE(g.k.umstellen(c, &grund));
+    EXPECT_EQ(g.k.config().basis, 0x38);
+}
+
+TEST(SoundK1520, TempoZweiHaeltTonhoeheUndHalbiertAbtastwerte) {
+    auto lauf = [](double f, size_t& n, double& hz) {
+        Rig g; g.k.setzeSenke(&g.s);
+        g.k.setzeTempo(f);
+        g.ton(0, 0x6F);
+        g.laufe(uint64_t(SYS));                 // 1 s MASCHINENzeit
+        n = g.s.l.size();
+        hz = freqAbschnitt(g.s.l, 4800 / size_t(f), n);   // Abtastwerte: Frequenz je Wirtssekunde
+        return g.k.ay().takt();
+    };
+    size_t n1 = 0, n2 = 0; double f1 = 0, f2 = 0;
+    const uint64_t c1 = lauf(1.0, n1, f1);
+    const uint64_t c2 = lauf(2.0, n2, f2);
+    EXPECT_NEAR(double(n2), n1 / 2.0, 200);                  // halb so viele Abtastwerte je Maschinensekunde
+    EXPECT_NEAR(double(c2), c1 / 2.0, c1 * 0.001);           // halb so viele Chiptakte
+    // je Wirtssekunde (= 0,5 Maschinensekunden) gleich viele Werte, Tonhoehe in Werten gemessen gleich
+    ASSERT_GT(f1, 0.0);
+    EXPECT_NEAR(f2, f1, f1 * 0.01);
+    // Umschalten im Lauf: Chipzeit monoton, danach halbe Rate
+    Rig g; g.k.setzeSenke(&g.s);
+    g.ton(0, 0x6F);
+    g.laufe(uint64_t(SYS / 2));
+    const uint64_t vor = g.k.ay().takt();
+    g.k.setzeTempo(2.0);
+    EXPECT_GE(g.k.ay().takt(), vor);
+    const size_t n = g.s.l.size();
+    g.laufe(uint64_t(SYS));
+    EXPECT_NEAR(double(g.s.l.size() - n), 24000.0, 200);
+}

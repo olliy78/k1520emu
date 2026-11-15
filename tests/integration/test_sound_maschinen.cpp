@@ -142,6 +142,32 @@ TEST_F(SoundMaschine, Pc1715W_38HIstBelegt) {
     EXPECT_NE(m.soundFehler().find("PC1715W"), std::string::npos) << m.soundFehler();
 }
 
+// Umstellen im Lauf: ohne Karte false mit Grund; mit Karte wirkt es ohne Neuaufbau, Basis bleibt fest.
+TEST_F(SoundMaschine, SoundUmstellenOhneKarte) {
+    A5120Machine m;
+    EXPECT_FALSE(m.soundUmstellen(cfg(0x38)));
+    EXPECT_NE(m.soundFehler().find("Keine SOUND-Karte"), std::string::npos) << m.soundFehler();
+}
+
+TEST_F(SoundMaschine, SoundUmstellenImLauf) {
+    A5120Machine m;
+    ASSERT_TRUE(m.installSound(cfg(0x38)));
+    m.powerOn();
+    m.run(1000);
+    k1520::SoundK1520* vor = m.soundK1520();
+    SoundK1520::Config c = cfg(0x38);
+    c.takt = SoundK1520::Takt::System;
+    c.kanal = SoundK1520::Kanal::Mono;
+    ASSERT_TRUE(m.soundUmstellen(c)) << m.soundFehler();
+    EXPECT_EQ(m.soundK1520(), vor);
+    EXPECT_EQ(m.soundK1520()->config().takt, SoundK1520::Takt::System);
+    EXPECT_EQ(m.soundK1520()->config().systemtakt_hz, m.nenntaktHz());
+    EXPECT_EQ(m.soundK1520()->ay().chipTakt(), m.nenntaktHz());
+    EXPECT_FALSE(m.soundUmstellen(cfg(0x40)));
+    EXPECT_NE(m.soundFehler().find("Basis"), std::string::npos) << m.soundFehler();
+    m.run(1000);
+}
+
 // P8000: kein K1520-Steckplatz.
 TEST_F(SoundMaschine, P8000LehntAb) {
     P8000Machine m;

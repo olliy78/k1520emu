@@ -86,6 +86,18 @@ public:
     /// Nur den Zeitstand fuer taktgenaue AY-Schreibzugriffe nachziehen (kein CTC-Takt).
     void zeitStand(uint64_t total);
 
+    /// Stellt Takt-Art, Quarz, Chip, Kanalzuordnung, Tiefpass und Kaskade IM LAUF um (JP2/S8/Bestueckung), ohne
+    /// Bus-Neuanmeldung.  Basis und systemtakt_hz muessen gleich bleiben (sonst false, Grund in @p grund).
+    /// Der AY rechnet zuerst mit den ALTEN Werten bis zum Stand nach; Chipzeit bleibt monoton, Filterzustand bleibt.
+    bool umstellen(const Config& neu, std::string* grund = nullptr);
+
+    /// Tempo-Faktor der Maschine (1.0 = Echtzeit).  Der AY hat einen eigenen Quarz und laeuft in ECHTER Zeit: bei
+    /// Faktor f vergehen je Maschinentakt nur ay_hz/(systemtakt_hz*f) Chiptakte, je Wirtssekunde entstehen also
+    /// weiter 48000 Abtastwerte und die Tonhoehe bleibt (die Musik wird nur schneller).  Wie umstellen():
+    /// erst mit dem alten Faktor nachrechnen, dann umschalten, Chipzeit monoton.  f <= 0 wird wie 1.0 behandelt.
+    void setzeTempo(double f);
+    double tempo() const { return tempo_milli_ / 1000.0; }
+
     // ---- Ausgabe ----
     /// nullptr = keine Senke (nur Register nachfuehren).  Auch zur Laufzeit umschaltbar.
     void setzeSenke(audio::TonSenke* senke);
@@ -101,6 +113,11 @@ public:
 private:
     void ayNachrechnen();     ///< Chip bis chip_ticks_ rechnen, Abtastwerte abholen, mischen, schreiben
     void mischen(const Ay38910::Abtastwert* w, size_t n);
+
+    void taktBruch(const Config& c);
+    void vorNachrechnen();
+    uint32_t tempo_milli_ = 1000;   ///< Tempo-Faktor in Tausendstel (Bruch bleibt ganzzahlig, driftfrei)
+    void kaskadeSetzen(uint8_t maske);
 
     Config cfg_;
     Z80CTC ctc_;

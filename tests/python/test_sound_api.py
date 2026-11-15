@@ -100,3 +100,71 @@ def test_audio_status_nach_start_stumm():
     emu.audio_echtzeit(False)
     emu.audio_stop()
     assert emu.audio_status() == "aus"
+
+
+def _wav_hz(pfad):
+    import struct
+    with wave.open(str(pfad), "rb") as w:
+        roh = w.readframes(w.getnframes())
+    n = len(roh) // 4
+    links = struct.unpack("<" + "hh" * n, roh)[0::2][9600:]
+    mittel = sum(links) / len(links)
+    nd = [i for i in range(1, len(links)) if links[i - 1] < mittel <= links[i]]
+    assert len(nd) > 100, "kein Ton in der WAV"
+    return (len(nd) - 1) * 48000.0 / (nd[-1] - nd[0])
+
+
+def _fahre(emu, sekunden):
+    takt = int(emu.nenntakt_hz() * sekunden)
+    gefahren = 0
+    while gefahren < takt:
+        gefahren += emu.run(100_000)
+
+
+def test_sound_umstellen_aendert_den_takt_ohne_neue_maschine(tmp_path):
+    emu = _emu(machine="a5120", sound={})          # Quarz/2
+    for reg, wert in ((0, 111), (1, 0), (7, 0x3E), (8, 15)):
+        assert emu.sound_reg_write(reg, wert)
+    handle = emu._handle
+    w1, w2 = tmp_path / "a.wav", tmp_path / "b.wav"
+    assert emu.audio_wav_start(w1), emu.audio_fehler()
+    _fahre(emu, 1.2)
+    emu.audio_wav_stop()
+    emu.sound_umstellen(ay_takt_hz=3_579_545)    # Lauf geht weiter, Register bleiben
+    assert emu._handle == handle and emu.sound_regs()[8] == 15
+    assert emu.audio_wav_start(w2), emu.audio_fehler()
+    _fahre(emu, 1.2)
+    emu.audio_wav_stop()
+    assert _wav_hz(w1) == pytest.approx(1007.8, rel=0.005)
+    assert _wav_hz(w2) == pytest.approx(2015.6, rel=0.005)
+    emu.sound_umstellen(kanal="mono", tiefpass=True)   # nicht genannte Schluessel (takt) bleiben
+    assert emu._sound_cfg["takt"] == "quarz" and emu._sound_cfg["quarz_hz"] == 3_579_545
+
+
+def test_sound_umstellen_fehler():
+    emu = _emu(machine="a5120", sound={})
+    with pytest.raises(ValueError):
+        emu.sound_umstellen(basis=0x40)
+    with pytest.raises(ValueError):
+        emu.sound_umstellen(takt="gibtsnicht")
+    with pytest.raises(ValueError):
+        emu.sound_umstellen(quarz_hz=0)
+    ohne = _emu(machine="a5120")
+    with pytest.raises(ValueError, match="SOUND"):
+        ohne.sound_umstellen(takt="quarz")
+
+
+def test_audio_tempo_haelt_die_tonhoehe(tmp_path):
+    emu = _emu(machine="a5120", sound={})
+    for reg, wert in ((0, 111), (1, 0), (7, 0x3E), (8, 15)):
+        assert emu.sound_reg_write(reg, wert)
+    emu.audio_tempo(2.0)
+    wav = tmp_path / "t2.wav"
+    assert emu.audio_wav_start(wav), emu.audio_fehler()
+    _fahre(emu, 2.4)            # 1,2 s Wirtszeit bei Faktor 2
+    emu.audio_wav_stop()
+    assert _wav_hz(wav) == pytest.approx(1007.8, rel=0.005)
+    with wave.open(str(wav), "rb") as w:
+        assert w.getnframes() == pytest.approx(48000 * 1.2, rel=0.03)   # 48000 je WIRTSsekunde
+    emu.audio_tempo(0.0)         # unbegrenzt: Maschinenzeit, kein Absturz
+    _fahre(emu, 0.1)

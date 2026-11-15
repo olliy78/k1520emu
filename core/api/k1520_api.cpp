@@ -2879,6 +2879,30 @@ int k1520_sound_install(K1520Handle h, int basis, int chip, int takt, uint32_t q
     return 1;
 }
 
+int k1520_sound_umstellen(K1520Handle h, int chip, int takt, uint32_t quarz_hz, int kanal, int tiefpass,
+                          int kaskade) {
+    sound_fehler.clear();
+    if (!h) { sound_fehler = "kein Handle"; return 0; }
+    if (chip < 0 || chip > 1 || takt < 0 || takt > 2 || kanal < 0 || kanal > 2) {
+        sound_fehler = "SOUND: chip/takt/kanal ausserhalb des Bereichs";
+        return 0;
+    }
+    K1520Machine* m = toMachine(h);
+    const k1520::SoundK1520* k = m->soundK1520();
+    if (!k) { sound_fehler = "Keine SOUND-Karte gesteckt"; return 0; }
+    k1520::SoundK1520::Config c = k->config();   // Basis bleibt
+    c.chip = chip == 1 ? Ay38910::Variante::AY8912 : Ay38910::Variante::AY8910;
+    c.takt = takt == 0 ? k1520::SoundK1520::Takt::Quarz
+           : takt == 1 ? k1520::SoundK1520::Takt::QuarzHalbe : k1520::SoundK1520::Takt::System;
+    c.quarz_hz = quarz_hz;
+    c.kanal = kanal == 0 ? k1520::SoundK1520::Kanal::ABC
+            : kanal == 1 ? k1520::SoundK1520::Kanal::ACB : k1520::SoundK1520::Kanal::Mono;
+    c.tiefpass = tiefpass != 0;
+    c.kaskade = static_cast<uint8_t>(kaskade & 7);
+    if (!m->soundUmstellen(c)) { sound_fehler = m->soundFehler(); return 0; }
+    return 1;
+}
+
 const char* k1520_sound_fehler(K1520Handle) { return sound_fehler.c_str(); }
 
 int k1520_sound_present(K1520Handle h) { return h && toMachine(h)->soundK1520() ? 1 : 0; }
@@ -2911,6 +2935,7 @@ void k1520_audio_stop(K1520Handle h) { if (h) toMachine(h)->audioStop(); }
 void k1520_audio_lautstaerke(K1520Handle h, float v) { if (h) toMachine(h)->audioLautstaerke(v); }
 void k1520_audio_stumm(K1520Handle h, int stumm) { if (h) toMachine(h)->audioStumm(stumm != 0); }
 void k1520_audio_echtzeit(K1520Handle h, int an) { if (h) toMachine(h)->audioEchtzeit(an != 0); }
+void k1520_audio_tempo(K1520Handle h, double faktor) { if (h) toMachine(h)->audioTempo(faktor); }
 
 int k1520_audio_status(K1520Handle h) {
     using S = k1520::audio::TonAusgabe::Status;

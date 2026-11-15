@@ -1587,20 +1587,25 @@ PRG 710/-1, PC 1715/1715W und MC80 stecken (nicht in den P8000) und ist ab Werk 
 
 * **Soundkarte stecken** und **E/A-Basis** — acht Tore ab der Basis (Vielfache von 8). Vorgewählt ist **38H**,
   am **PC 1715W E0H** (dort sind 38H–3FH belegt; die Gastsoftware des PC 1715 benutzt 38H, am PC 1715 steckt die Karte deshalb auch auf 38H und die Lochstreifenkarte E0H daneben).
-  Belegte Basen sind im Auswahlfeld markiert und nicht wählbar. Ein Wechsel baut die Maschine neu auf.
+  Belegte Basen sind im Auswahlfeld markiert und nicht wählbar.
 * **Chip** — AY-3-8910 (zwei 8-Bit-Tore A und B) oder AY-3-8912 (nur Tor A).
-* **AY-Takt** — *Quarz/2 = 1,79 MHz* (Vorgabe, Brücke JP2), *Quarz* oder *Systemtakt*; dazu die **Quarzfrequenz**
-  in Hertz (Vorgabe 3 579 545).
+* **AY-Takt** — Vorgabe 1,79 MHz (Quarz 3,579545 MHz halbiert, so die Stückliste); Eingabe in MHz mit Komma. Die echte Karte kann
+  per Brücke JP2 auch den vollen Quarztakt oder den Systemtakt nehmen — dann hier die entsprechende Frequenz eintragen
+  (ein höherer Takt lässt Lieder höher klingen).
 * **Kanäle** — *Stereo ACB* (Vorgabe: A links, B rechts, C in der Mitte), *Stereo ABC* (A links, B Mitte, C rechts) oder *Mono*.
 * **Aussteuerung** — die Karte wird mit 3 dB Reserve ausgegeben (kein Übersteuern); die Lautstärke im Menü schwächt nur ab.
 * **Tiefpass C16/C17** — nachgebildet sind die bestückten Kondensatoren: der Ton klingt dumpfer (ab Werk aus).
 * **CTC-Kaskade** — drei Haken für die Brücken `TO0 → TR1`, `TO1 → TR2`, `TO2 → TR3` (ab Werk aus).
 
+Änderungen an AY-Takt, Chip, Kanälen, Tiefpass und Kaskade wirken sofort; nur Stecken/Ziehen und die Basis bauen die Maschine neu auf.
+
 Sie liegt wie die anderen Steckkarten in der Konfiguration (`general.sound`, dazu `general.lautstaerke` und
 `general.stumm`).
 
-**Ton hören.** Gehört wird nur bei **Echtzeit** (Takt `1×`); bei schnellerem Takt ist die Wirtsausgabe stumm,
-damit nichts nachhallt. Das Menü *Maschine* hat drei Einträge, alle **ohne Tastenkürzel** und nur mit gesteckter Karte
+**Ton hören.** Der AY hat einen eigenen Quarz und läuft in **echter Zeit**: bei höherem Takt (`2×`, `5×` …) bleibt die
+Tonhöhe gleich, die Musik wird nur schneller, weil der Gast die Register entsprechend öfter schreibt. Bei *unbegrenzt* ist die
+Wirtsausgabe stumm. Schafft der Wirtsrechner den eingestellten Faktor nicht, läuft der Tonpuffer leer und es gibt Aussetzer —
+dann den Faktor senken. Die WAV-Mitschrift folgt derselben Zeitumrechnung (sie zeichnet auf, was man hört). Das Menü *Maschine* hat drei Einträge, alle **ohne Tastenkürzel** und nur mit gesteckter Karte
 bedienbar: **Ton stumm** (Haken), **Lautstärke…** (kleiner Regler, wirkt sofort) und **Ton mitschneiden…**
 (schreibt eine WAV-Datei, 48 kHz Stereo; der Mitschnitt läuft in jedem Tempo und auch bei stummer Ausgabe;
 noch einmal gewählt beendet er sich). Die Statuszeile zeigt bei gesteckter Karte das Feld **Ton**:
@@ -1608,7 +1613,7 @@ noch einmal gewählt beendet er sich). Die Statuszeile zeigt bei gesteckter Kart
 | Anzeige | Bedeutung |
 |---------|-----------|
 | `Ton: hörbar` | die Ausgabe läuft |
-| `Ton: stumm` | stummgeschaltet, oder nicht in Echtzeit, oder kein Gerät (der Tooltip nennt den Grund) |
+| `Ton: stumm` | stummgeschaltet, oder Tempo unbegrenzt, oder kein Gerät (der Tooltip nennt den Grund) |
 | `Ton: kein Gerät` | der Wirtsrechner hat kein Ausgabegerät geöffnet; der Tooltip nennt den Grund |
 | `Ton: aus` | die Ausgabe ist nicht gestartet |
 
@@ -1625,12 +1630,12 @@ für die Karte, dazu das Lied `SONG.STC`. Sie stammen von den Entwicklern der Ka
 eigene Bauten für die Interrupttabelle des PC 1715. Für K8915, PRG 710, MC80 und PC 1715W gibt es keine Programme.
 
 **Bevor Sie anfangen:** Karte stecken (*Einstellungen ▸ Allgemein ▸ Soundkarte*), die Basis auf der Vorgabe
-**38H** lassen und mit Takt `1×` (Echtzeit) laufen. Alle Programme sprechen die Karte fest auf 38H/39H (AY) und 3CH–3FH
+**38H** lassen und mit Takt `1×` laufen (Töne gehen auch schneller, die Lieder dann ebenfalls). Alle Programme sprechen die Karte fest auf 38H/39H (AY) und 3CH–3FH
 (CTC) an; an einer anderen Basis bleiben sie stumm. Die Programme mit Interrupt setzen die Interrupttabelle
 von CP/A bzw. SCPX voraus (A5120: Vektor F7D8H; PC 1715: F7F0H).
 
 **Takt abfragen.** `TGCPM` und `SKTEST4` fragen zuerst nach dem AY-Takt, weil sie die Tonhöhe daraus errechnen.
-Bei der Vorgabe (*Quarz/2 = 1,79 MHz*) ist **`B`** die richtige Antwort.
+Bei der Vorgabe (*AY-Takt 1,79 MHz*) ist **`B`** die richtige Antwort.
 
 | Programm | Aufruf | Was es tut |
 |----------|--------|------------|
@@ -1647,7 +1652,7 @@ Seite wirklich klingt, hängt an der Kanalzuordnung der Karte (Schiebeschalter S
 *Stereo ACB* liegt A links, B rechts und C in der Mitte. Die Beschriftung im Programm ist deshalb nur ein Hinweis.
 
 **Mitschneiden.** *Maschine ▸ Ton mitschneiden…* schreibt alles, was die Karte ausgibt, in eine WAV-Datei —
-auch dann, wenn der Wirtsrechner keine Tonausgabe hat oder schneller als Echtzeit gerechnet wird.
+auch dann, wenn der Wirtsrechner keine Tonausgabe hat (bei unbegrenztem Tempo in Maschinenzeit).
 
 ## Lochstreifen
 

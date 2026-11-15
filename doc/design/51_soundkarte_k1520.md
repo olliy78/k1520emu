@@ -142,9 +142,13 @@ core/cards/sound_k1520/             Karte: Dekodierung, AY + CTC, Mischer ABC/AC
 3. **Der Kern rechnet, die Ausgabe holt.**  Der Emulationsfaden schreibt in den Ringpuffer, der
    Ausgabefaden (im Kern, C++) liest daraus — **ohne Kernsperre** und ohne Python.  Die Oberfläche
    schaltet nur ein/aus, Lautstärke, stumm.
-4. **Nur bei Echtzeit hörbar.**  Bei Faktor ≠ 1,0 (schneller/unbegrenzt) ist die Wirtsausgabe stumm und
-   der Ringpuffer verwirft (kein Rückstau, kein Nachhall).  Die WAV-Mitschrift läuft in jedem Tempo
-   (Maschinenzeit, deterministisch).
+4. **Hörbar bei jedem Tempo-Faktor f > 0 (geändert 2026-11-15).**  Der AY hat einen eigenen Quarz und läuft in ECHTER Zeit:
+   die Karte rechnet die Chipzeit um, je Maschinentakt vergehen `ay_hz/(systemtakt_hz·f)` Chiptakte (ganzzahliger Bruch, driftfrei;
+   beim Umschalten erst mit dem alten Faktor nachrechnen, Chipzeit monoton).  Je Wirtssekunde entstehen so wieder 48000
+   Abtastwerte, die Füllstandregelung bleibt im Gleichgewicht, die Tonhöhe bleibt, die Musik wird schneller (der Gast schreibt
+   die Register öfter).  `f == 0` (unbegrenzt) = Wirtsausgabe stumm, Puffer verwirft, AY rechnet in Maschinenzeit.  Die
+   WAV-Mitschrift folgt derselben Umrechnung (sie zeichnet auf, was man hört).  Grenze: schafft der Wirt f nicht, läuft der Puffer
+   leer (Aussetzer).  Schnittstelle: `SoundK1520::setzeTempo`, `K1520Machine::audioTempo`, `k1520_audio_tempo` (`k1520_audio_echtzeit` ist Hülle).
 5. **Gleichlauf** bei Echtzeit: Füllstand-Regelung (Ziel ≈ 60 ms); über Ziel+X ein Wert verworfen, unter
    Ziel−X einer verdoppelt; Unterlauf = Stille, nie Blockieren des Emulationsfadens.
 6. **Ohne Gerät läuft alles.**  Fehlt `libasound.so.2` / kein Ausgabegerät: Ausgabe „stumm", ein Satz im

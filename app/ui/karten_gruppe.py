@@ -10,7 +10,7 @@ wirkt auf den Kern und zeigt Kernfehler an.  Die Gruppen kennen den Kern nicht.
 
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFileDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QSpinBox, QWidget,
@@ -250,21 +250,18 @@ class SoundGruppe(KartenGruppe):
         z1.addWidget(self.kanal_combo, 1)
         self.form.addRow("", z1)
 
-        self.takt_combo = QComboBox(self)
-        for wert, text in sound.TAKTE:
-            self.takt_combo.addItem(text, wert)
-        self.takt_combo.setToolTip(sound.TIPP_TAKT)
-        self.quarz_spin = QSpinBox(self)
-        self.quarz_spin.setRange(100_000, 20_000_000)
-        self.quarz_spin.setSingleStep(1000)
-        self.quarz_spin.setGroupSeparatorShown(True)
-        self.quarz_spin.setSuffix(" Hz")
-        self.quarz_spin.setToolTip(sound.TIPP_QUARZ)
+        # EIN Frequenzfeld statt Brueckenauswahl (JP2): wer den vollen Quarz oder den Systemtakt braucht, traegt die
+        # Frequenz ein.  Einheit MHz mit Komma.  (Kein QDoubleSpinBox: die CRT-Tests zaehlen alle des Kastens.)
+        self.ay_takt_edit = QLineEdit(self)
+        self.ay_takt_edit.setMaximumWidth(110)
+        self.ay_takt_edit.setAlignment(Qt.AlignRight)
+        self.ay_takt_edit.setToolTip(sound.TIPP_TAKT)
+        self._ay_takt_hz = sound.AY_TAKT_VORGABE
         z2 = QHBoxLayout()
         z2.addWidget(QLabel("AY-Takt:", self))
-        z2.addWidget(self.takt_combo)
-        z2.addWidget(QLabel("Quarz:", self))
-        z2.addWidget(self.quarz_spin, 1)
+        z2.addWidget(self.ay_takt_edit)
+        z2.addWidget(QLabel("MHz", self))
+        z2.addStretch(1)
         self.form.addRow("", z2)
 
         self.tiefpass_box = QCheckBox("Tiefpass C16/C17", self)
@@ -284,17 +281,16 @@ class SoundGruppe(KartenGruppe):
 
         for w in (self.karte_box, self.tiefpass_box, *self.kaskade_boxen):
             w.toggled.connect(self._aenderung)
-        for w in (self.basis_combo, self.chip_combo, self.kanal_combo, self.takt_combo):
+        for w in (self.basis_combo, self.chip_combo, self.kanal_combo):
             w.currentIndexChanged.connect(self._aenderung)
-        self.quarz_spin.editingFinished.connect(self._aenderung)
+        self.ay_takt_edit.editingFinished.connect(self._ay_takt_fertig)
         self.set_zustand(sound.vorgabe(self._basis_vorgabe))
 
     def zustand(self) -> dict:
         return {"enabled": self.karte_box.isChecked(),
                 "basis": int(self.basis_combo.currentData()),
                 "chip": self.chip_combo.currentData(),
-                "takt": self.takt_combo.currentData(),
-                "quarz_hz": int(self.quarz_spin.value()),
+                "ay_takt_hz": self._ay_takt_hz,
                 "kanal": self.kanal_combo.currentData(),
                 "tiefpass": self.tiefpass_box.isChecked(),
                 "kaskade": sum(1 << i for i, b in enumerate(self.kaskade_boxen) if b.isChecked())}
@@ -303,10 +299,10 @@ class SoundGruppe(KartenGruppe):
         self._guard = True
         self.karte_box.setChecked(bool(z.get("enabled")))
         self._basis_setzen(z)
-        for combo, schl in ((self.chip_combo, "chip"), (self.takt_combo, "takt"), (self.kanal_combo, "kanal")):
+        for combo, schl in ((self.chip_combo, "chip"), (self.kanal_combo, "kanal")):
             i = combo.findData(z.get(schl))
             combo.setCurrentIndex(i if i >= 0 else 0)
-        self.quarz_spin.setValue(int(z.get("quarz_hz", sound.QUARZ_VORGABE)))
+        self._ay_takt_setzen(int(z.get("ay_takt_hz", sound.AY_TAKT_VORGABE)))
         self.tiefpass_box.setChecked(z.get("tiefpass") is True)
         maske = int(z.get("kaskade", 0))
         for i, b in enumerate(self.kaskade_boxen):
@@ -315,6 +311,20 @@ class SoundGruppe(KartenGruppe):
         if gesteckt is not None:
             self._gesteckt = bool(gesteckt)
         self.set_fehler(fehler)
+
+    def _ay_takt_setzen(self, hz: int) -> None:
+        """Wert uebernehmen (in den Bereich geklemmt) und als MHz mit Komma anzeigen."""
+        self._ay_takt_hz = min(max(int(hz), sound.AY_TAKT_MIN), sound.AY_TAKT_MAX)
+        self.ay_takt_edit.setText(f"{self._ay_takt_hz / 1e6:.6f}".replace(".", ","))
+
+    def _ay_takt_fertig(self) -> None:
+        """Eingabe in MHz (Komma oder Punkt); Unlesbares stellt den alten Wert wieder her."""
+        try:
+            hz = int(round(float(self.ay_takt_edit.text().strip().replace(",", ".")) * 1e6))
+        except ValueError:
+            hz = self._ay_takt_hz
+        self._ay_takt_setzen(hz)
+        self._aenderung()
 
     def _aenderung(self, *_args) -> None:
         if not self._guard:

@@ -20,21 +20,70 @@ SoundK1520::SoundK1520(const Config& cfg)
                     : cfg.takt == Takt::Quarz ? cfg.quarz_hz : cfg.quarz_hz / 2) {
     if (cfg.basis & 7) throw std::invalid_argument("SoundK1520: basis muss ein Vielfaches von 8 sein");
     if (cfg.systemtakt_hz == 0 || cfg.quarz_hz == 0) throw std::invalid_argument("SoundK1520: Takt 0");
-    switch (cfg.takt) {
-        case Takt::System:     num_ = 1;           den_ = 1; break;
-        case Takt::Quarz:      num_ = cfg.quarz_hz; den_ = cfg.systemtakt_hz; break;
-        case Takt::QuarzHalbe: num_ = cfg.quarz_hz; den_ = 2ull * cfg.systemtakt_hz; break;
-    }
+    taktBruch(cfg);
     hp_koef_ = static_cast<float>(std::exp(-2.0 * PI * HOCHPASS_HZ / audio::kAbtastrate));
     tp_koef_ = static_cast<float>(1.0 - std::exp(-2.0 * PI * TIEFPASS_HZ / audio::kAbtastrate));
 
+    kaskadeSetzen(cfg.kaskade);
+}
+
+void SoundK1520::taktBruch(const Config& c) {
+    // Chiptakte je Maschinentakt = ay_hz / (systemtakt * f); f = tempo_milli_/1000 (Bruch, ohne Drift)
+    uint64_t ay_num, ay_den;
+    switch (c.takt) {
+        case Takt::System:     ay_num = c.systemtakt_hz; ay_den = 1; break;
+        case Takt::Quarz:      ay_num = c.quarz_hz;      ay_den = 1; break;
+        default:               ay_num = c.quarz_hz;      ay_den = 2; break;
+    }
+    num_ = ay_num * 1000ull;
+    den_ = ay_den * uint64_t(c.systemtakt_hz) * tempo_milli_;
+}
+
+void SoundK1520::vorNachrechnen() {
+    // Mit den ALTEN Einstellungen bis zum Stand nachrechnen (Abtastwerte mit altem Mischer abliefern)
+    if (senke_) ayNachrechnen(); else ay_.rechneBis(chip_ticks_);
+}
+
+void SoundK1520::setzeTempo(double f) {
+    const uint32_t m = f > 0.0 ? uint32_t(std::min(std::max(f * 1000.0 + 0.5, 1.0), 1.0e6)) : 1000u;
+    if (m == tempo_milli_) return;
+    vorNachrechnen();
+    tempo_milli_ = m;
+    taktBruch(cfg_);
+    acc_ = 0;
+}
+
+void SoundK1520::kaskadeSetzen(uint8_t maske) {
     // Kaskaden TO0->TR1 usw.; Maske nur fuer verdrahtete Kanaele (jeder maskierte Kanal ist teurer)
-    const uint8_t k = cfg.kaskade & 7;
+    const uint8_t k = maske & 7;
     if (k) {
         ctc_.setZCTOCallback([this, k](int kanal, bool pegel) {
             if (kanal >= 0 && kanal < 3 && ((k >> kanal) & 1)) ctc_.clkTrg(kanal + 1, pegel);
         }, k);
+    } else {
+        ctc_.setZCTOCallback(nullptr, 0);
     }
+}
+
+bool SoundK1520::umstellen(const Config& neu, std::string* grund) {
+    auto fehler = [&](const char* t) { if (grund) *grund = t; return false; };
+    if (neu.basis != cfg_.basis) return fehler("SOUND: Basis laesst sich nur durch Neuaufbau aendern");
+    if (neu.systemtakt_hz != cfg_.systemtakt_hz) return fehler("SOUND: Systemtakt laesst sich nicht umstellen");
+    if (neu.quarz_hz == 0) return fehler("SOUND: Quarz 0");
+    vorNachrechnen();
+    cfg_.takt = neu.takt;
+    cfg_.quarz_hz = neu.quarz_hz;
+    cfg_.chip = neu.chip;
+    cfg_.kanal = neu.kanal;
+    cfg_.tiefpass = neu.tiefpass;
+    cfg_.kaskade = neu.kaskade & 7;
+    taktBruch(cfg_);
+    acc_ = 0;   // Bruchrest gehoerte zum alten Teiler (< 1 Chiptakt)
+    ay_.setzeTakt(neu.takt == Takt::System ? neu.systemtakt_hz
+                  : neu.takt == Takt::Quarz ? neu.quarz_hz : neu.quarz_hz / 2);
+    ay_.setzeVariante(neu.chip);
+    kaskadeSetzen(cfg_.kaskade);
+    return true;
 }
 
 uint8_t SoundK1520::ioRead(uint8_t port) {
@@ -87,7 +136,7 @@ void SoundK1520::zeitStand(uint64_t total) {
     }
     const uint64_t delta = total - last_total_;
     last_total_ = total;
-    if (num_ == den_) {                 // Systemtakt: 1:1
+    if (num_ == den_) {                 // 1:1
         chip_ticks_ += delta;
     } else {
         acc_ += delta * num_;           // delta ist klein (Befehle/Laufscheibe), kein Ueberlauf
