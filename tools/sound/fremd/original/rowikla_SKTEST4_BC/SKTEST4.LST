@@ -1,0 +1,1400 @@
+00000h                                                           ;TESTPROGRAMM SOUND-K1520 mit AY-3-8910/12 und CTC
+00000h                                                           ;Version für A5120/K8924 u.ä.
+00000h                                                           ;-------------------------------------------------
+00000h                                                           ;WERO 09/2017
+00000h                                                           ;ERZEUGT CA. 1KHZ RECHTECK BEI 1,75 / 1,79 /2 MHZ AY-TAKT
+00000h                                                           ;FÜR EXAKTE ODER ANDERE TONHÖHE GGF. DEN REGISTERWERT 
+00000h                                                           ;"7DH" BEI HÖHE A, /B, /C VARIIEREN!
+00000h                                                           ;-------------------------------------------------
+00000h                                                           ;Version 1.2.0.4 für CP/A, SCPX
+00000h                                                           ;KW 19.11.2017
+00000h                                                           ;
+00000h                                                           ;Anpassung an K1520-Soundkarte mit CTC unter NANOS EPOS 
+00000h                                                           ;- Auswahl AY-Taktfrequenz
+00000h                                                           ;- Test Tonausgabe, Geräusche  
+00000h                                                           ;- Test parallele AY-Port(s)  Eingabe und Ausgabe
+00000h                                                           ;- Test CTC  (alle Kanäle kaskadiert)
+00000h                                                           ;- Test AY-SOUND über CTC-Interrupt
+00000h                                                           ;   Anpassung der AYPLAY.INC an den jeweiligen Rechner notwendig!!!!
+00000h                                                           ;   speziell die Adresse Interruptsäule, da I-Register bei manchen Rechner
+00000h                                                           ;   nicht verändert werden darf !!!
+00000h                                                           ;-------------------------------------------------
+00000h                                                           ;kleine Routinen (CP/M Aufrufe) vom Heiko Poppe verwendet
+00000h                                                           ;-------------------------------------------------
+00000h                                                           ;ANPASSEN AN JEWEILIGES RECHNERSYSTEM:
+00000h                                                           ;
+00000h            AYBASE:               EQU       038H           ;BASISADRESSE AY-3
+00000h            CTCBASE:              EQU       AYBASE+4       ;BASISADRESSE CTC Kanal 0
+00000h                                            
+00000h            START:                EQU       100H           ;PROGRAMMSTART
+00000h            WORK:                 EQU       START+10H      ;BEGINN ARBEITSZELLEN (50h)
+00000h            PLAYER:               EQU       WORK+50H       ;BEGINN PLAYER-ENGINE (480h)
+00000h            PROGGI:               EQU       PLAYER+480H    ;PROGRAMMBEGINN
+00000h            RAUS:                 EQU       0              ;RÜCKSPRUMG ZUM OS
+00000h            WDH:                  EQU       WORK+2         ;WIEDERHOLUNGEN
+00000h                                            
+00000h            ANZ_WDH:              EQU       2              ;ANZAHL WIEDERHOLUNGEN
+00000h                                            
+00000h                                                           ;(ANGEGEBENE WERTE GÜLTIG FÜR CP/M)
+00000h            BDOS:                 EQU       5              ;BDOS Aufruf
+00000h            ESC:                  EQU       1BH
+00000h            CONOUT:               EQU       02H            ;ein Zeichen ausgeben (E)
+00000h            ZKOUT:                EQU       09H            ;Ausgabe Zeichenkette (DE), Ende mit $
+00000h                                                           ;-------------------------------------------------
+00000h                                  ORG       START          ;Anfang CP/M
+00100h C3D905                           JP        START0
+00103h                                                           ;0103h...0107h          ;FREI
+00103h                                                           ;0108h...010Fh          ;INTERRUPTTABELLE CTC
+00103h                                                           ;0108h IN INCLUDE EINTRAGEN!       
+00103h                                                           ;-------------------------------------------------
+00103h 0000000000                       ORG       WORK           ;ARBEITSZELLEN, BEZÜGE:
+00110h                                                           ;WORK                   ;WORD, ÜBERGABE ANFANGSADESSE SONG
+00110h                                                           ;WORK+2                 ;BYTE, ÜBERGABE ANZAHL ABSPIELE
+00110h                                                           ;(1...255, 0 BEI SONGENDE)
+00110h                                                           ;-------------------------------------------------
+00110h 0000000000                       ORG       PLAYER         ;BEZÜGE:
+00160h                                                           ;PLAYER+0               ;SONG LADEN+ABSPIELEN
+00160h                                                           ;PLAYER+3               ;GERÄUSCH ABSPIELEN
+00160h                                                           ;PLAYER+6               ;SOUND AUS
+00160h                                                           ;-------------------------------------------------
+00160h                                  INCLUDE   AYPBC.INC      ;AY-PLAYER-ENGINE
+00160h                                                           ;#################################################
+00160h                                                           ;INCLUDE-FILE "PLAYER-ENGINE"
+00160h                                                           ;FÜR STC-PLAYER MIT AY-3-8910 
+00160h                                                           ;Version für A5120 / K8924 u.ä.
+00160h                                                           ;#################################################
+00160h                                                           ;-------------------------------------------------
+00160h                                                           ;ORIGINAL-VERÖFFENTLICHUNGEN:
+00160h                                                           ;"MUSIK-TÜRKLINGEL MIT DEM AUDIO-COPROZESSOR AY8910"
+00160h                                                           ;MAGAZIN 'RADIO', 1998/6, S. 42 + 43 (RUSSISCH)
+00160h                                                           ;http://www.radioman-portal.ru/magazin/radio/1998/6.php
+00160h                                                           ;
+00160h                                                           ;ABSPIELROUTINE FÜR ZX81 MIT AY-3-8910-ADAPTER
+00160h                                                           ;http://www.sinclairzxworld.com/viewtopic.php?t=528&start=100
+00160h                                                           ;-------------------------------------------------
+00160h                                                           ;PRINZIP CTC-TEIL: ENTWICKLERTEAM "M066"
+00160h                                                           ;BEARBEITUNG, INCLUDE UND DOKU: WERO 10/2017
+00160h                                                           ;ASSEMBLER: ASIDE
+00160h                                                           ;-------------------------------------------------
+00160h                                                           ;VERSION 1.1:
+00160h                                                           ;* ISR GEÄNDERT
+00160h                                                           ;* ARBEITSZELLEN STC-PLAYER VOR START GELÖSCHT
+00160h                                                           ;* MISCHERBITS PORTREGISTER: BEI SONG-START/ENDE AUF EINGABE
+00160h                                                           ;VERSION 1.2:
+00160h                                                           ;* MISCHERBIST PORTREGISTER: BLEIBEN IMMER UNANGETASTET
+00160h                                                           ;-------------------------------------------------
+00160h                                                           ;Anpassungen an K1520-SOUND-Karte 
+00160h                                                           ;Bastelsystem mit ZRE K2526 unter CP/A, SCPX 
+00160h                                                           ;SOUND-CTC Interruptsäule-F7D8h I=F7h, IV=D8h
+00160h                                                           ;IO-Adresse der SOUND-Karte = 38h
+00160h                                                           ;SOUND-Karten CTC Kanal 0 als 20ms Zeitgeber
+00160h                                                           ;Version 1.2.13
+00160h                                                           ;KW 19.11.2017 (Klaus Wilfling)
+00160h                                                           ;
+00160h                                                           ;-------------------------------------------------
+00160h                                                           ;ANFORDERUNGEN AN HAUPTPROGRAMM:
+00160h                                                           ;* MUSS ARBEITSZELLENBEGINN MIT LABEL 'WORK' DEFINIEREN!
+00160h                                                           ;* DARF LABELS X0001...X0087 NICHT BENUTZEN
+00160h                                                           ;HARDWAREBEZÜGE-----------------------------------
+00160h                                                           ;* EA-ADRESSEN ANPASSEN:
+00160h                                                           ;
+00160h            X0001:                EQU       #38            ;AY-BASISADRESSE  (K1520/SOUND)
+00160h            X0002:                EQU       #3C            ;CTC-BASISADRESSE (K1520/SOUND)
+00160h                                                           ;
+00160h                                                           ;Adresse der Interruptsäule für SOUND-CTC 
+00160h                                                           ;für CP/A und bei SCPX auf 0F7D8h, IM2 , I-Register F7h
+00160h                                                           ;
+00160h            X0003:                EQU       #F7D8          ;INTERRUPTTABELLE (K1520 -CP/A, SCPX)
+00160h                                                           ;
+00160h                                                           ;
+00160h                                                           ; Variante 1:* CTC K0+K1 KASKADIERT UND MIT 500KHZ AN TRG0 GETAKTET
+00160h                                                           ; Variante 2:* CTC K0 als Zeitgeber verwendet, Systemtakt 2,4576 MHz --> 50Hz
+00160h                                                           ;* CTC-PROGRAMMIERUNG BEI BEDARF ANPASSEN!
+00160h                                                           ;
+00160h                                                           ;-------------------------------------------------
+00160h                                                           ;PLAYER-AREBEITSZELLEN AB WORK
+00160h            X0004:                EQU       WORK           ;WORD   ;WORK     ABLAGE LIEDANFANG   
+00160h            X0005:                EQU       X0004+2        ;BYTE   ;WORK+#02 ABLAGE ANZAHL SONG-WIEDERHOLUNGEN 
+00160h            X0006:                EQU       X0005+1        ;WORD   ;WORK+#03 POSITIONS-ZEIEGR
+00160h            X0007:                EQU       X0006+2        ;WORD   ;WORK+#05 ORNAMENT-ZEIGER      
+00160h            X0008:                EQU       X0007+2        ;WORD   ;WORK+#07 PATTERN-ZEIGER       
+00160h            X0009:                EQU       X0008+2        ;WORD   ;WORK+#09 POINTER 1. SAMPLE NR       
+00160h            X0010:                EQU       X0009+2        ;BYTE   ;WORK+#0B GLOBAL DELAY SONG  
+00160h            X0011:                EQU       X0010+1        ;BYTE   ;WORK+#0C GLOBAL DELAY WORK
+00160h            X0012:                EQU       X0011+1        ;BYTE   ;WORK+#0D ANZAHL  PATTERN IM SONG 
+00160h            X0013:                EQU       X0012+1        ;WORD   ;WORK+#0E ADRESSE PATTERN KANAL A 
+00160h            X0014:                EQU       X0013+2        ;WORD   ;WORK+#10 ADRESSE PATTERN KANAL B
+00160h            X0015:                EQU       X0014+2        ;WORD   ;WORK+#12 ADRESSE PATTERN KANAL C
+00160h            X0016:                EQU       X0015+2        ;BYTE   ;WORK+#14 ENDEMARKE (FF)
+00160h            X0017:                EQU       X0016+1        ;WORD   ;WORK+#15
+00160h                                                           ;KANAL A------------------------------------------
+00160h            X0018:                EQU       X0017+2        ;BYTE   ;WORK+#17 INDEX A
+00160h                                                           ;BYTE   ;WORK+#18 NOTENNNUMMER
+00160h                                                           ;BYTE   ;WORK+#19 PAUSE ZWISCHEN NOTEN
+00160h            X0019:                EQU       X0018+3        ;WORD   ;WORK+#1A SAMPLEADRESSE
+00160h            X0020:                EQU       X0019+2        ;WORD   ;WORK+#1C ORNAMENTADRESSE
+00160h            X0021:                EQU       X0020+2        ;3XBYTE ;WORK+#1E 
+00160h                                                           ;KANAL B------------------------------------------
+00160h            X0022:                EQU       X0021+3        ;BYTE   ;WORK+#21 INDEX B
+00160h                                                           ;BYTE   ;WORK+#22 NOTENNNUMMER
+00160h                                                           ;BYTE   ;WORK+#23 PAUSE ZWISCHEN NOTEN
+00160h            X0023:                EQU       X0022+3        ;WORD   ;WORK+#24 SAMPLEADRESSE
+00160h            X0024:                EQU       X0023+2        ;WORD   ;WORK+#26 ORNAMENTADRESSE
+00160h            X0025:                EQU       X0024+2        ;3XBYTE ;WORK+#28
+00160h                                                           ;KANAL C------------------------------------------
+00160h            X0026:                EQU       X0025+3        ;BYTE   ;WORK+#2B INDEX C
+00160h                                                           ;BYTE   ;WORK+#2C NOTENNNUMMER
+00160h                                                           ;BYTE   ;WORK+#2D PAUSE ZWISCHEN NOTEN
+00160h            X0027:                EQU       X0026+3        ;WORD   ;WORK+#2E SAMPLEADRESSE
+00160h            X0028:                EQU       X0027+2        ;WORD   ;WORK+#30 ORNAMENTADRESSE
+00160h            X0029:                EQU       X0028+2        ;3XBYTE ;WORK+#32
+00160h                                                           ;-------------------------------------------------
+00160h            X0030:                EQU       X0029+3        ;BYTE   ;WORK+#35 ABGESPIELTE PATTERNANZAHL
+00160h            X0031:                EQU       X0030+1        ;BYTE   ;WORK+#36 AKTUELLE PATTERNNUMMER
+00160h                                                           ;-------------------------------------------------
+00160h                                                           ;AUSZUGEBENDER BLOCK MIT AY3-PROGRAMMIERWERTEN
+00160h            X0032:                EQU       X0031+1        ;BYTE   ;WORK+#37 REG. 0=TONHÖHE KANAL A FEIN
+00160h                                                           ;BYTE   ;WORK+#38 REG. 1=TONHÖHE KANAL A GROB
+00160h            X0033:                EQU       X0032+2        ;BYTE   ;WORK+#39 REG. 2=TONHÖHE KANAL B FEIN
+00160h                                                           ;BYTE   ;WORK+#3A REG. 3=TONHÖHE KANAL B GROB
+00160h            X0034:                EQU       X0033+2        ;BYTE   ;WORK+#3B REG. 4=TONHÖHE KANAL C FEIN
+00160h                                                           ;BYTE   ;WORK+#3C REG. 5=TONHÖHE KANAL C GROB
+00160h            X0035:                EQU       X0034+2        ;BYTE   ;WORK+#3D REG. 6=TONHÖHE RAUSCHEN
+00160h            X0036:                EQU       X0035+1        ;BYTE   ;WORK+#3E REG. 7=MISCHER             
+00160h            X0037:                EQU       X0036+1        ;BYTE   ;WORK+#3F REG. 8=LAUTSTÄRKE KANAL A  
+00160h            X0038:                EQU       X0037+1        ;BYTE   ;WORK+#40 REG. 9=LAUTSTÄRKE KANAL B  
+00160h            X0039:                EQU       X0038+1        ;BYTE   ;WORK+#41 REG.10=LAUTSTÄRKE KANAL C  
+00160h            X0040:                EQU       X0039+1        ;BYTE   ;WORK+#42 REG.11=DAUER HÜLLKURVE FEIN
+00160h                                                           ;BYTE   ;WORK+#43 REG.12=DAUER HÜLLKURVE GROB    
+00160h            X0041:                EQU       X0040+2        ;BYTE   ;WORK+#44 REG.13=FORM HÜLLKURVE   
+00160h            X0042:                EQU       X0041+1        ;WORD   ;WORK+#45 EFFEKT1
+00160h            X0043:                EQU       X0042+2        ;BYTE   ;WORK+#47 EFFEKT2
+00160h                                                           ;
+00160h                                                           ;LETZTE ARBEITSZELLE: WORK+#47 = 00C7 BEI BEGINN AUF 0080
+00160h                                                           ;-------------------------------------------------
+00160h                                                           ;PROGRAMMANFANG PROG 
+00160h                                                           ;-------------------------------------------------
+00160h C39401                           JP        X0048          ;CALL PROG   = SONG LADEN+ABSPIELEN
+00163h C37D01                           JP        X0045          ;CALL PROG+3 = GERÄUSCH LADEN+ABSPIELEN
+00166h C38201                           JP        X0046          ;CALL PROG+6 = SOUND OFF   
+00169h 000000                           DEFS      3,0            ;RESERVE
+0016Ch 000000                           DEFS      3,0            ;RESERVE       
+0016Fh                                                           ;REGISTERWERTE FUER "ALLES AUS"-------------------
+0016Fh 0000000000 X0044:                DEFB      #00,#00,#00,#00,#00,#00,#00
+00176h FF00000000                       DEFB      #FF,#00,#00,#00,#00,#00,#01
+0017Dh                                                           ;GERÄUSCH LADEN+ABSPIELEN-------------------------
+0017Dh 2A1001     X0045:                LD        HL,(X0004)     ;TABELLE REGISTERWERTE
+00180h 1807                             JR        X0047
+00182h                                            
+00182h                                                           ;#############################################################        
+00182h                                                           ;Variante 1: UP "SOUND STOPPEN"-------------------------------
+00182h                                                           ;; X0046:  ;CTC-INTERRUPT K1 AUS, GGF ANPASSEN!
+00182h                                                           ;;        LD      A,#43           ;STEUERWORT (INT AUS)
+00182h                                                           ;;        OUT     (X0002+1),A     ;CTC K1   
+00182h                                                           ;;        
+00182h                                            
+00182h                                                           ;Variante 2: UP "SOUND STOPPEN"-------------------------------
+00182h            X0046:                                         ;CTC-INTERRUPT K0 AUS, GGF ANPASSEN!
+00182h 3E43                             LD        A,#43          ;STEUERWORT (INT AUS)
+00184h D33C                             OUT       (X0002),A      ;CTC K0   
+00186h 216F01                           LD        HL,X0044       ;REGISTERWERTE FUER ANHALTEN
+00189h                                                           ;##############################################################
+00189h                                            
+00189h 114701     X0047:                LD        DE,X0032       ;
+0018Ch 010E00                           LD        BC,14          ;14 REGISTERWERTE
+0018Fh EDB0                             LDIR                     ;UMLADEN
+00191h C3E304                           JP        X0084          ;IN AY3 SCHREIBEN
+00194h                                                           ;-------------------------------------------------
+00194h                                                           ;SONGDATEN LADEN, CTC PROGRAMMIEREN, STARTEN
+00194h F3         X0048:                DI        
+00195h 3E0A                             LD        A,#0A
+00197h 325501                           LD        (X0042),A      ;STARTWERT EFFEKT1
+0019Ah AF                               XOR       A
+0019Bh 325701                           LD        (X0043),A      ;STARTWERT EFFEKT2 
+0019Eh 3D                               DEC       A              ;FF
+0019Fh 322401                           LD        (X0016),A      ;1. ENDE-WERT SETZEN!   
+001A2h                                                           ;KOPFDATEN DES LIEDES AUSLESEN------------
+001A2h 2A1001                           LD        HL,(X0004)     ;LIEDANFANG
+001A5h 7E                               LD        A,(HL)         ;1. ZEICHEN = "GLOBAL DELAY"
+001A6h 321B01                           LD        (X0010),A      ;ABLEGEN
+001A9h 23                               INC       HL             ;POSITIONSZEIGER
+001AAh CD8F02                           CALL      X0055          ;HOLEN =>DE
+001ADh 1A                               LD        A,(DE)         ;ANZAHL PATTERN IM SONG
+001AEh 13                               INC       DE             ;DE=ADR. 1. PATTERNNNUMMER
+001AFh 3C                               INC       A              ;+1
+001B0h 321D01                           LD        (X0012),A      ;ANZAHL PATTERN IM SONG + 1 ABLEGEN
+001B3h ED531301                         LD        (X0006),DE     ;ADRESSE 1. PATTERNNUMMER
+001B7h                                            
+001B7h CD8F02                           CALL      X0055          ;ORNAMENTZEIGER HOLEN
+001BAh ED531501                         LD        (X0007),DE     ;ABLEGEN
+001BEh D5                               PUSH      DE             ;MERKEN
+001BFh                                            
+001BFh CD8F02                           CALL      X0055          ;PATTERNZEIGER HOLEN
+001C2h ED531701                         LD        (X0008),DE     ;ABLEGEN
+001C6h                                            
+001C6h 211B00                           LD        HL,#001B       ;OFFSET 1. SAMPLENUMMER
+001C9h CD9402                           CALL      X0056          ;+LIEDANFANG
+001CCh EB                               EX        DE,HL          ;HL=ABSOLUTADRESSE RAM
+001CDh 221901                           LD        (X0009),HL     ;ABLEGEN
+001D0h                                            
+001D0h 212401                           LD        HL,X0016       ;DORT FF,00
+001D3h 221E01                           LD        (X0013),HL
+001D6h                                            
+001D6h 212501                           LD        HL,X0017       ;BEREICH
+001D9h 112601                           LD        DE,X0017+1
+001DCh 012C00                           LD        BC,#002C
+001DFh 70                               LD        (HL),B         ;LÖSCHEN
+001E0h EDB0                             LDIR      
+001E2h E1                               POP       HL             ;AB HL=ORNAMENTZEIGER, 
+001E3h                                                           ;JEDES ORNAMENT IST 33 BYTES LANG
+001E3h 012100                           LD        BC,#0021       ;IN 33ER SCHRITTEN
+001E6h AF                               XOR       A              ;00
+001E7h CD8A02                           CALL      X0054          ;SUCHEN
+001EAh 3D                               DEC       A
+001EBh 322E01                           LD        (X0021),A      ;#FF = ENDE ORNAMENT SETZEN
+001EEh 323801                           LD        (X0025),A      ;#FF
+001F1h 324201                           LD        (X0029),A      ;#FF
+001F4h 3E01                             LD        A,#01
+001F6h 321C01                           LD        (X0011),A      ;STARTWERT GLOBAL DELAY WORK
+001F9h 23                               INC       HL
+001FAh 222C01                           LD        (X0020),HL
+001FDh 223601                           LD        (X0024),HL
+00200h 224001                           LD        (X0028),HL
+00203h CDE304                           CALL      X0084          ;REGISTER BESCHREIBEN
+00206h                                            
+00206h                                                           ;;       ;#########################################
+00206h                                                           ;; Variante 1:     50-HZ-INTERRUPT PER CTC ERZEUGEN:
+00206h                                                           ;;       ;CTC ALS ZÄHLER PROGRAMMIEREN, 500 KHZ EINGANG
+00206h                                                           ;;       ;MIN. K0+K1 KASKADIERT 500kHz/80/125 = 50Hz
+00206h                                                           ;;       ;BEI BEDARF ANPASSEN!
+00206h                                                           ;;       LD      HL,X0049        ;ADR. PLAYERROUTINE
+00206h                                                           ;;       LD      (X0003+2),HL    ;ALS INTERRUPT-ADRESSE  K1
+00206h                                                           ;;       LD      A,LO X0003      ;IV (01)C8
+00206h                                                           ;;       OUT     (X0002),A       ;K0
+00206h                                                           ;;       LD      A,#47           ;STEUERWORT, KEIN INT
+00206h                                                           ;;       OUT     (X0002),A       ;K0   
+00206h                                                           ;;       LD      A,#50           ;ZK=80
+00206h                                                           ;;       OUT     (X0002),A      
+00206h                                                           ;;       LD      A,#C7           ;STEUERWORT, INT!
+00206h                                                           ;;       OUT     (X0002+1),A     ;K1   
+00206h                                                           ;;       LD      A,#7D           ;ZK=125
+00206h                                                           ;;       OUT     (X0002+1),A  
+00206h                                                           ;;       ;#########################################
+00206h                                                           ;;       EI                      ;SOUND ON!
+00206h                                                           ;;       RET
+00206h                                            
+00206h                                                           ;#########################################
+00206h                                                           ; Variante 2:     50-HZ-INTERRUPT PER CTC ERZEUGEN:
+00206h                                                           ;CTC ALS ZEITGEBER PROGRAMMIEREN, 2,5476 MHZ SYSTEMTAKT
+00206h                                                           ;NUR K0 BENUTZT, 2,5476MHz/256/192 = 50Hz
+00206h                                                           ;BEI BEDARF ANPASSEN!
+00206h F3                               DI        
+00207h 211B02                           LD        HL,X0049       ;ADR. PLAYERROUTINE
+0020Ah 22D8F7                           LD        (X0003),HL     ;ALS INTERRUPT-ADRESSE  K0
+0020Dh 3ED8                             LD        A,LO X0003     ;IV (HI=F7) LO=D8
+0020Fh D33C                             OUT       (X0002),A      ;K0
+00211h 3EA7                             LD        A,#A7          ;STEUERWORT, MIT INT , VT 256
+00213h D33C                             OUT       (X0002),A      ;K0   
+00215h 3EC0                             LD        A,#C0          ;ZK=192
+00217h D33C                             OUT       (X0002),A
+00219h                                                           ;#########################################
+00219h FB                               EI                       ;SOUND ON!
+0021Ah C9                               RET       
+0021Bh                                                           ;-------------------------------------------------
+0021Bh                                                           ;ROUTINE WIRD ALLER 1/50 SEKUNDEN AUFGERUFEN UND 
+0021Bh                                                           ;VERANLASST 1 PROGRAMMIERUNG DES AY-3-8910 
+0021Bh FDE5       X0049:                PUSH      IY
+0021Dh E5                               PUSH      HL
+0021Eh D5                               PUSH      DE
+0021Fh C5                               PUSH      BC
+00220h F5                               PUSH      AF
+00221h CD3602                           CALL      X0051          ;1XAY PROGRAMMIEREN
+00224h 3A1201                           LD        A,(X0005)      ;WIEDERHOLUNG SONG?
+00227h B7                               OR        A              ;FERTIG?
+00228h 2003                             JR        NZ,X0050       ;NEIN
+0022Ah CD8201                           CALL      X0046          ;JA: CTC-INTERRUPT AUS!
+0022Dh F1         X0050:                POP       AF
+0022Eh C1                               POP       BC
+0022Fh D1                               POP       DE
+00230h E1                               POP       HL
+00231h FDE1                             POP       IY
+00233h FB                               EI        
+00234h ED4D                             RETI      
+00236h                                                           ;-----------------------------------------------------
+00236h 3A1C01     X0051:                LD        A,(X0011)      ;GLOBAL DELAY WORK (IN INTERRUPTS)
+00239h 3D                               DEC       A              ;VERRINGERN
+0023Ah 321C01                           LD        (X0011),A      ;ABLEGEN
+0023Dh C21004                           JP        NZ,X0078       ;ARBEITSBEREICH FÜLLEN
+00240h                                            
+00240h 3A1B01                           LD        A,(X0010)      ;GLOBAL DELAY
+00243h 321C01                           LD        (X0011),A      ;WORK NEU LADEN
+00246h                                            
+00246h FD212701                         LD        IY,X0018       ;INDEX KANAL A
+0024Ah CD1B03                           CALL      X0062          ;TEST, OB ETWAS AUSZUGEBEN
+0024Dh F26102                           JP        P,X0052        ;NEIN!
+00250h                                            
+00250h                                                           ;KANAL A VERARBEITEN----------------------
+00250h 2A1E01                           LD        HL,(X0013)     ;ADRESSE PATTERN KANAL A
+00253h 7E                               LD        A,(HL)
+00254h 3C                               INC       A              ;WAR FF? (ENDE PATTERN)
+00255h CCD102                           CALL      Z,X0060        ;JA: NÄCHSTE PATTERN-NR./-DATEN HOLEN 
+00258h 2A1E01                           LD        HL,(X0013)     ;ADRESSE PATTERN KANAL A
+0025Bh CD2603                           CALL      X0063          ;AUSWERTUNG PATTERNBYTE
+0025Eh 221E01                           LD        (X0013),HL
+00261h                                                           ;KANAL B VERARBEITEN----------------------
+00261h FD213101   X0052:                LD        IY,X0022       ;INDEX KANAL B
+00265h CD1B03                           CALL      X0062          ;TEST, OB ETWAS AUSZUGEBEN
+00268h F27402                           JP        P,X0053        ;NEIN
+0026Bh 2A2001                           LD        HL,(X0014)     ;ADRESSE PATTERN KANAL B
+0026Eh CD2603                           CALL      X0063          ;AUSWERTUNG PATTERNBYTE
+00271h 222001                           LD        (X0014),HL
+00274h                                                           ;KANAL C VERARBEITEN----------------------
+00274h FD213B01   X0053:                LD        IY,X0026       ;INDEX KANAL C
+00278h CD1B03                           CALL      X0062          ;TEST, OB ETWAS AUSZUGEBEN
+0027Bh F21004                           JP        P,X0078        ;ARBEITSBEREICH FÜLLEN
+0027Eh 2A2201                           LD        HL,(X0015)     ;ADRESSE PATTERN KANAL C
+00281h CD2603                           CALL      X0063          ;AUSWERTUNG PATTERNBYTE
+00284h 222201                           LD        (X0015),HL
+00287h C31004                           JP        X0078          ;ARBEITSBEREICH FÜLLEN
+0028Ah                                                           ;-------------------------------------------------
+0028Ah BE         X0054:                CP        (HL)           ;SUCHEN
+0028Bh C8                               RET       Z
+0028Ch 09                               ADD       HL,BC
+0028Dh 18FB                             JR        X0054
+0028Fh                                                           ;-------------------------------------------------
+0028Fh 5E         X0055:                LD        E,(HL)
+00290h 23                               INC       HL
+00291h 56                               LD        D,(HL)         ;POINTER DEREFERENZIEREN
+00292h 23                               INC       HL
+00293h EB                               EX        DE,HL          ;HL=POINTER
+00294h ED4B1001   X0056:                LD        BC,(X0004)     ;
+00298h 09                               ADD       HL,BC          ;=> ABS. POSI DES BEREICHS IM RAM
+00299h EB                               EX        DE,HL          ;DE=
+0029Ah C9                               RET       
+0029Bh                                                           ;SAMPLE-ANALYSE-----------------------------------
+0029Bh 1600       X0057:                LD        D,0
+0029Dh 5F                               LD        E,A
+0029Eh 87                               ADD       A,A
+0029Fh 83                               ADD       A,E
+002A0h 5F                               LD        E,A
+002A1h FD19                             ADD       IY,DE
+002A3h FD7E01                           LD        A,(IY+1)       ;NOTENNUMMER HOLEN
+002A6h CB7F                             BIT       7,A
+002A8h 0E10                             LD        C,#10
+002AAh 2001                             JR        NZ,X0058
+002ACh 4A                               LD        C,D
+002ADh CB77       X0058:                BIT       6,A
+002AFh 0602                             LD        B,#02
+002B1h 2001                             JR        NZ,X0059
+002B3h 42                               LD        B,D
+002B4h E61F       X0059:                AND       #1F
+002B6h 67                               LD        H,A
+002B7h FD5E02                           LD        E,(IY+2)
+002BAh FD7E00                           LD        A,(IY+0)
+002BDh F5                               PUSH      AF
+002BEh E6F0                             AND       #F0
+002C0h 0F                               RRCA      
+002C1h 0F                               RRCA      
+002C2h 0F                               RRCA      
+002C3h 0F                               RRCA      
+002C4h 57                               LD        D,A
+002C5h F1                               POP       AF
+002C6h E60F                             AND       #0F
+002C8h 6F                               LD        L,A
+002C9h FDCB016E                         BIT       5,(IY+1)       ;NOTENNUMMER >20H
+002CDh C8                               RET       Z              ;JA
+002CEh CBE2                             SET       4,D
+002D0h C9                               RET       
+002D1h                                                           ;NÄCHSTES PATTERN AUFBEREITEN---------------------
+002D1h 3A4501     X0060:                LD        A,(X0030)      ;BISHER GESPIELTE PATTERNANZAHL
+002D4h 4F                               LD        C,A            ;MERKEN
+002D5h 211D01                           LD        HL,X0012       ;ADRESSE PATTERNANZAHL IM SONG
+002D8h BE                               CP        (HL)           ;LETZTES PATTERN ERREICHT?
+002D9h 3809                             JR        C,X0061        ;NEIN
+002DBh                                                           ;HIER IST SONG ZUENDE, LETZTES PATTERN WURDE GESPIELT!
+002DBh                                                           ;WENN SONG NICHT WIEDERHOLT WERDEN SOLL:
+002DBh                                                           ;X0005 AUSWERTEN!
+002DBh 3A1201                           LD        A,(X0005)      ;WIEDERHOLUNGEN
+002DEh 3D                               DEC       A
+002DFh 321201                           LD        (X0005),A
+002E2h                                                           ;-----------------------------------------
+002E2h AF                               XOR       A              ;JA
+002E3h 4F                               LD        C,A            ;
+002E4h 3C         X0061:                INC       A              ;NÄCHSTE PATTERN-NR. 
+002E5h 324501                           LD        (X0030),A      ;ABLEGEN 
+002E8h 69                               LD        L,C
+002E9h 2600                             LD        H,0            ;HL=LFD. PATTERN 
+002EBh 29                               ADD       HL,HL          ;*2
+002ECh ED5B1301                         LD        DE,(X0006)     ;+ANFANG PATTERN-LISTE   
+002F0h 19                               ADD       HL,DE          ;=ADRESSE PATTERNNUMMER 
+002F1h 4E                               LD        C,(HL)         ;NR. HOLEN
+002F2h 23                               INC       HL             ;
+002F3h 7E                               LD        A,(HL)         ;EFFEKT
+002F4h 325701                           LD        (X0043),A      ;ABLEGEN 
+002F7h 79                               LD        A,C            ;ZU SPIELENDE PATTERN-NR.
+002F8h 324601                           LD        (X0031),A      ;NUMMER ABLEGEN
+002FBh                                            
+002FBh 2A1701                           LD        HL,(X0008)     ;IN PATTERNTABELLE
+002FEh 010700                           LD        BC,#0007       ;IN 7ER SCHRITTEN
+00301h CD8A02                           CALL      X0054          ;PATTERN-NUMMER SUCHEN
+00304h                                            
+00304h 23                               INC       HL             ;OFFSET PATTERNDATEN A
+00305h CD8F02                           CALL      X0055          ;DEREFERENZIEREN UND ECHTADRESSE HOLEN
+00308h ED531E01                         LD        (X0013),DE     ;PATTERN KANAL A
+0030Ch CD8F02                           CALL      X0055
+0030Fh ED532001                         LD        (X0014),DE     ;PATTERN KANAL B
+00313h CD8F02                           CALL      X0055
+00316h ED532201                         LD        (X0015),DE     ;PATTERN KANAL C
+0031Ah C9                               RET       
+0031Bh                                                           ;-------------------------------------------------
+0031Bh FD3502     X0062:                DEC       (IY+2)         ;ENDEMARKE FF ERREICHT?
+0031Eh F0                               RET       P              ;JA
+0031Fh FD7EFF                           LD        A,(IY-1)       ;
+00322h FD7702                           LD        (IY+2),A       ;NEUER ENDEWERT
+00325h C9                               RET       
+00326h                                                           ;PRÜFT PATTERNWERT UND VERANLASST AKTIVITÄT-------
+00326h 7E         X0063:                LD        A,(HL)
+00327h FE60                             CP        #60            ;60...6F?
+00329h 3821                             JR        C,X0064        ;NEIN, KLEINER => NOTENNUMMER 00...5F
+0032Bh FE70                             CP        #70            ;70...7F?
+0032Dh 382A                             JR        C,X0066        ;NEIN, KLEINER => SAMPLENUMMER 60...6F
+0032Fh FE80                             CP        #80            ;KOMMANDO
+00331h 3846                             JR        C,X0070        ;NEIN, KLEINER => ORNAMENTNUMMER 70...7F 
+00333h 283B                             JR        Z,X0067        ;80= PAUSE
+00335h FE81                             CP        #81            ;LEERE NOTE?
+00337h 281E                             JR        Z,X0065        ;JA, WEITER ZUR NÄCHSTEN POSI
+00339h FE82                             CP        #82            ;82= SPERREN?
+0033Bh 2839                             JR        Z,X0069        ;JA, SPERREN HÜLLKURVE UND ORNAMENT
+0033Dh FE8F                             CP        #8F            ;
+0033Fh 3853                             JR        C,X0072        ;KLEINER => HÜLLKURVENWERT 83...8E
+00341h D6A1                             SUB       #A1            ;A1...FE => PAUSE ZWISCHEN NOTEN
+00343h FD7702                           LD        (IY+2),A       ;0...5D
+00346h FD77FF                           LD        (IY-1),A
+00349h 23                               INC       HL             ;NÄCHSTEN WERT
+0034Ah 18DA                             JR        X0063          ;TESTEN
+0034Ch                                                           ;NOTENNUMMER--------------------------------------
+0034Ch FD7701     X0064:                LD        (IY+1),A       ;NOTENNUMMER ABLEGEN
+0034Fh FD360000                         LD        (IY+0),0
+00353h FD360720                         LD        (IY+7),#20     ;KEIN ENDE
+00357h 23         X0065:                INC       HL             ;LEERE NOTE
+00358h C9                               RET       
+00359h                                                           ;SAMPLENUMMER-------------------------------------
+00359h D660       X0066:                SUB       #60
+0035Bh E5                               PUSH      HL
+0035Ch 016300                           LD        BC,#0063       ;IN 63H-SCHRITTEN
+0035Fh 2A1901                           LD        HL,(X0009)     ;AB SAMPLENUMMER
+00362h CD8A02                           CALL      X0054          ;SUCHEN
+00365h 23                               INC       HL
+00366h FD7503                           LD        (IY+3),L       ;SAMPLEADRESSE ABLEGEN
+00369h FD7404                           LD        (IY+4),H
+0036Ch E1                               POP       HL
+0036Dh 23                               INC       HL
+0036Eh 18B6                             JR        X0063          ;PATTERNTEST
+00370h                                                           ;-------------------------------------------------
+00370h 23         X0067:                INC       HL             ;NÄCHSTE POSI
+00371h FD3607FF   X0068:                LD        (IY+7),#FF     ;ENDE MARKIEREN
+00375h C9                               RET       
+00376h                                                           ;-------------------------------------------------
+00376h AF         X0069:                XOR       A              ;HÜLLKURVE+ORNAMENT AUS
+00377h 1802                             JR        X0071
+00379h                                                           ;-------------------------------------------------
+00379h D670       X0070:                SUB       #70            ;A= 0...F = ORNAMENT
+0037Bh E5         X0071:                PUSH      HL
+0037Ch 012100                           LD        BC,#0021       ;IN 21H-SCHRITTEN
+0037Fh 2A1501                           LD        HL,(X0007)     ;AB ORNAMENTS POINTER
+00382h CD8A02                           CALL      X0054          ;SUCHEN
+00385h 23                               INC       HL
+00386h FD7505                           LD        (IY+5),L       ;ORNAMENTADRESSE ABLEGEN
+00389h FD7406                           LD        (IY+6),H
+0038Ch FD36FE00                         LD        (IY-2),0
+00390h E1                               POP       HL
+00391h 23                               INC       HL
+00392h 1892                             JR        X0063          ;PATTERNTEST
+00394h                                                           ;HÜLLKURVE----------------------------------------
+00394h D680       X0072:                SUB       #80            ;A=0...F
+00396h 325401                           LD        (X0041),A      ;FORM HÜLLKURVE
+00399h 23                               INC       HL
+0039Ah 7E                               LD        A,(HL)
+0039Bh 23                               INC       HL
+0039Ch 325201                           LD        (X0040),A      ;DAUER HÜLLKURVE FEIN
+0039Fh FD36FE01                         LD        (IY-2),1
+003A3h E5                               PUSH      HL
+003A4h AF                               XOR       A              ;00
+003A5h 012100                           LD        BC,#0021       ;IM 33ER ABSTAND
+003A8h 2A1501                           LD        HL,(X0007)     ;AB ORNAMENT-POINTER
+003ABh CD8A02                           CALL      X0054          ;SUCHEN
+003AEh 23                               INC       HL
+003AFh FD7505                           LD        (IY+5),L       ;ORNAMENTADRESSE ABLEGEN
+003B2h FD7406                           LD        (IY+6),H
+003B5h E1                               POP       HL
+003B6h C32603                           JP        X0063          ;PATTERNTEST
+003B9h                                                           ;TEST AUF WIEDERHOLUNGEN--------------------------
+003B9h FD7E07     X0073:                LD        A,(IY+7)       ;ENDE (FF)?
+003BCh 3C                               INC       A
+003BDh C8                               RET       Z              ;JA
+003BEh 3D                               DEC       A
+003BFh 3D                               DEC       A
+003C0h FD7707                           LD        (IY+7),A
+003C3h F5                               PUSH      AF
+003C4h FD7E00                           LD        A,(IY+0)
+003C7h 4F                               LD        C,A
+003C8h 3C                               INC       A
+003C9h E61F                             AND       #1F
+003CBh FD7700                           LD        (IY+0),A
+003CEh F1                               POP       AF
+003CFh C0                               RET       NZ
+003D0h FD5E03                           LD        E,(IY+3)       ;SAMPLEADRESSE HOLEN
+003D3h FD5604                           LD        D,(IY+4)
+003D6h 216000                           LD        HL,#0060
+003D9h 19                               ADD       HL,DE
+003DAh 7E                               LD        A,(HL)
+003DBh 3D                               DEC       A
+003DCh FA7103                           JP        M,X0068
+003DFh 4F                               LD        C,A
+003E0h 3C                               INC       A
+003E1h E61F                             AND       #1F
+003E3h FD7700                           LD        (IY+0),A
+003E6h 23                               INC       HL
+003E7h 7E                               LD        A,(HL)
+003E8h 3C                               INC       A
+003E9h FD7707                           LD        (IY+7),A
+003ECh C9                               RET       
+003EDh                                                           ;-------------------------------------------------
+003EDh 79         X0074:                LD        A,C
+003EEh B7                               OR        A
+003EFh C0                               RET       NZ
+003F0h 7C                               LD        A,H
+003F1h 324D01                           LD        (X0035),A
+003F4h C9                               RET       
+003F5h                                                           ;-------------------------------------------------
+003F5h FD7E07     X0075:                LD        A,(IY+7)       ;ENDE (FF) ?
+003F8h 3C                               INC       A
+003F9h C8                               RET       Z              ;JA
+003FAh FD7EFE                           LD        A,(IY-2)
+003FDh B7                               OR        A
+003FEh C8                               RET       Z
+003FFh FE02                             CP        #02
+00401h 2806                             JR        Z,X0076
+00403h FD36FE02                         LD        (IY-2),#02
+00407h 1804                             JR        X0077
+00409h AF         X0076:                XOR       A              ;HÜLLKURVE
+0040Ah 325401                           LD        (X0041),A      ;FORM 0
+0040Dh CBE6       X0077:                SET       4,(HL)
+0040Fh C9                               RET       
+00410h                                                           ;ARBEITSBEREICH AUFBAUEN--------------------------
+00410h FD212701   X0078:                LD        IY,X0018       ;INDEX
+00414h CDB903                           CALL      X0073          ;TEST AUF WIEDERHOLUNGEN
+00417h 79                               LD        A,C
+00418h 325501                           LD        (X0042),A      ;EFFEKT ABLEGEN
+0041Bh FD2A2A01                         LD        IY,(X0019)
+0041Fh CD9B02                           CALL      X0057          ;SAMPLE-ANALYSE
+00422h 79                               LD        A,C
+00423h B0                               OR        B
+00424h 0F                               RRCA      
+00425h 324E01                           LD        (X0036),A      ;MISCHER
+00428h FD212701                         LD        IY,X0018
+0042Ch FD7E07                           LD        A,(IY+7)       ;ENDE (FF)?
+0042Fh 3C                               INC       A
+00430h 2809                             JR        Z,X0079        ;JA!
+00432h CDED03                           CALL      X0074
+00435h CDB004                           CALL      X0082
+00438h 224701                           LD        (X0032),HL     ;TONHÖHE A SETZEN
+0043Bh 214F01     X0079:                LD        HL,X0037       ;LAUTSTÄRKE A
+0043Eh 77                               LD        (HL),A         ;SETZEN
+0043Fh CDF503                           CALL      X0075
+00442h                                                           ;KANAL B----------------------------------
+00442h FD213101                         LD        IY,X0022       ;INDEX
+00446h CDB903                           CALL      X0073          ;TEST AUF WIEDERHOLUNGEN
+00449h FD7E07                           LD        A,(IY+7)       ;ENDE (FF)?
+0044Ch 3C                               INC       A
+0044Dh 2820                             JR        Z,X0080        ;JA!
+0044Fh 79                               LD        A,C
+00450h 325501                           LD        (X0042),A      ;EFFEKT ABLEGEN
+00453h FD2A3401                         LD        IY,(X0023)
+00457h CD9B02                           CALL      X0057          ;SAMPLE-ANALYSE
+0045Ah 3A4E01                           LD        A,(X0036)      ;MISCHER
+0045Dh B1                               OR        C
+0045Eh B0                               OR        B
+0045Fh 324E01                           LD        (X0036),A      ;MISCHER
+00462h CDED03                           CALL      X0074
+00465h FD213101                         LD        IY,X0022       ;INDEX
+00469h CDB004                           CALL      X0082
+0046Ch 224901                           LD        (X0033),HL     ;TONHÖHE B SETZEN
+0046Fh 215001     X0080:                LD        HL,X0038       ;LAUTSTÄRKE B
+00472h 77                               LD        (HL),A         ;SETZEN
+00473h CDF503                           CALL      X0075
+00476h                                                           ;KANAL C----------------------------------
+00476h FD213B01                         LD        IY,X0026
+0047Ah CDB903                           CALL      X0073          ;TEST AUF WIEDERHOLUNGEN
+0047Dh FD7E07                           LD        A,(IY+7)       ;ENDE (FF)?
+00480h 3C                               INC       A
+00481h 2824                             JR        Z,X0081        ;JA
+00483h 79                               LD        A,C
+00484h 325501                           LD        (X0042),A      ;EFFEKT ABLEGEN
+00487h FD2A3E01                         LD        IY,(X0027)
+0048Bh CD9B02                           CALL      X0057          ;SAMPLE-ANALYSE
+0048Eh 3A4E01                           LD        A,(X0036)      ;MISCHER
+00491h CB01                             RLC       C
+00493h CB00                             RLC       B
+00495h B0                               OR        B
+00496h B1                               OR        C
+00497h 324E01                           LD        (X0036),A      ;MISCHER
+0049Ah CDED03                           CALL      X0074
+0049Dh FD213B01                         LD        IY,X0026
+004A1h CDB004                           CALL      X0082          ;
+004A4h 224B01                           LD        (X0034),HL     ;TONHÖHE C SETZEN
+004A7h 215101     X0081:                LD        HL,X0039       ;LAUTSTÄRKE C
+004AAh 77                               LD        (HL),A         ;SETZEN
+004ABh CDF503                           CALL      X0075
+004AEh 1833                             JR        X0084          ;REGISTER SCHREIBEN
+004B0h                                                           ;EFFEKT-------------------------------------------
+004B0h 7D         X0082:                LD        A,L
+004B1h F5                               PUSH      AF
+004B2h D5                               PUSH      DE
+004B3h FD6E05                           LD        L,(IY+5)       ;ORNAMENTADRESSE HOLEN
+004B6h FD6606                           LD        H,(IY+6)
+004B9h ED5B5501                         LD        DE,(X0042)     ;EFFEKT1 (ANZAHL MOD.)
+004BDh 19                               ADD       HL,DE          ;
+004BEh FD7E01                           LD        A,(IY+1)       ;NOTENNUMMER HOLEN
+004C1h 86                               ADD       A,(HL)
+004C2h C5                               PUSH      BC
+004C3h 47                               LD        B,A
+004C4h 3A5701                           LD        A,(X0043)
+004C7h 80                               ADD       A,B
+004C8h C1                               POP       BC
+004C9h 87                               ADD       A,A            ;*2
+004CAh 5F                               LD        E,A
+004CBh 1600                             LD        D,0            ;DE=
+004CDh 210E05                           LD        HL,X0087       ;LISTE NOTENFREQUENZEN
+004D0h 19                               ADD       HL,DE          ;POSITION AKT. NOTENFREQUENZ 
+004D1h 5E                               LD        E,(HL)
+004D2h 23                               INC       HL
+004D3h 56                               LD        D,(HL)
+004D4h EB                               EX        DE,HL          ;HL=NOTENFREQUENZ SELBST
+004D5h D1                               POP       DE
+004D6h F1                               POP       AF
+004D7h CB62                             BIT       4,D
+004D9h 2804                             JR        Z,X0083
+004DBh CBA2                             RES       4,D
+004DDh 19                               ADD       HL,DE
+004DEh C9                               RET       
+004DFh A7         X0083:                AND       A
+004E0h ED52                             SBC       HL,DE
+004E2h C9                               RET       
+004E3h                                                           ;-------------------------------------------------
+004E3h                                                           ;AY3-REGISTER PROGRAMMIEREN, JEWEILS 13 ODER 10 BYTES
+004E3h                                                           ;ENTHÄLT DER ZIELWERT FÜR REGISTER 13 (HÜLLKURVENFORM)
+004E3h                                                           ;EINE 00, SO WIRD DIE BISHERIGE HÜLLKURVE (DAUER+FORM)
+004E3h                                                           ;BEIBEHALTEN,D.H. ES WERDEN NUR 10 REGISTER BESCHRIEBEN
+004E3h                                                           ;
+004E3h            X0084:                                         ;MISCHER-REGISTER: PORTZUSTAENDE AUSLESEN+SICHERN:
+004E3h 3E07                             LD        A,7            ;MISCHER
+004E5h D338                             OUT       (X0001),A      ;ADRESSIEREN
+004E7h DB38                             IN        A,(X0001)      ;UND AUSLESEN
+004E9h E6C0                             AND       A,#C0          ;NUR PORTBITS
+004EBh 4F                               LD        C,A            ;MERKEN
+004ECh 3A4E01                           LD        A,(X0036)      ;MISCHER-INHALT AUS PUFFER
+004EFh E63F                             AND       A,#3F          ;NUR RAUSCHEN+TON-BITS
+004F1h B1                               OR        C              ;+ALTE PORTSBITS
+004F2h 324E01                           LD        (X0036),A      ;ALS NEUER MISCHERPUFFER
+004F5h                                                           ; 
+004F5h 215401                           LD        HL,X0041       ;BEREICHSANFANG (RÜCKWÄRTS)
+004F8h AF                               XOR       A
+004F9h B6                               OR        (HL)           ;ANFANG=0?
+004FAh 3E0D                             LD        A,#0D          ;AB REGISTER 13
+004FCh 2005                             JR        NZ,X0085       ;NEIN 
+004FEh D603                             SUB       03H            ;JA=> AB REGISTER 10 (OHNE HÜLLKURVE)
+00500h 2B                               DEC       HL
+00501h 2B                               DEC       HL
+00502h 2B                               DEC       HL
+00503h            X0085:                                         ;KOMMT MIT A=REGISTERNUMMER 13 ODER 10
+00503h 0E39                             LD        C,X0001+1      ;"REGISTERINHALT SCHREIBEN"
+00505h D338       X0086:                OUT       (X0001),A      ;REGISTER AUSWÄHLEN
+00507h EDAB                             OUTD                     ;BYTE AUF (HL) IN AKT. REG. SCHREIBEN
+00509h 3D                               DEC       A              ;NÄCHSTES REGISTER (RÜCKWÄRTS)
+0050Ah F20505                           JP        P,X0086        ;BIS REGISTER 0
+0050Dh C9                               RET       
+0050Eh                                                           ;LISTE NOTENFREQUENZEN----------------------------
+0050Eh F80E100E60 X0087:                DEFW      #0EF8,#0E10,#0D60,#0C80
+00516h D80B280B88                       DEFW      #0BD8,#0B28,#0A88,#09F0
+0051Eh 6009E00858                       DEFW      #0960,#08E0,#0858,#07E0
+00526h 7C070807B0                       DEFW      #077C,#0708,#06B0,#0640
+0052Eh EC05940544                       DEFW      #05EC,#0594,#0544,#04F8
+00536h B00470042C                       DEFW      #04B0,#0470,#042C,#03F0
+0053Eh BE03840358                       DEFW      #03BE,#0384,#0358,#0320
+00546h F602CA02A2                       DEFW      #02F6,#02CA,#02A2,#027C
+0054Eh 5802380216                       DEFW      #0258,#0238,#0216,#01F8
+00556h DF01C201AC                       DEFW      #01DF,#01C2,#01AC,#0190
+0055Eh 7B01650151                       DEFW      #017B,#0165,#0151,#013E
+00566h 2C011C010B                       DEFW      #012C,#011C,#010B,#00FC
+0056Eh EF00E100D6                       DEFW      #00EF,#00E1,#00D6,#00C8
+00576h BD00B200A8                       DEFW      #00BD,#00B2,#00A8,#009F
+0057Eh 96008E0085                       DEFW      #0096,#008E,#0085,#007E
+00586h 770070006B                       DEFW      #0077,#0070,#006B,#0064
+0058Eh 5E00590054                       DEFW      #005E,#0059,#0054,#004F
+00596h 4B00470042                       DEFW      #004B,#0047,#0042,#003F
+0059Eh 3B00380035                       DEFW      #003B,#0038,#0035,#0032
+005A6h 2F002C002A                       DEFW      #002F,#002C,#002A,#0027
+005AEh 2500230021                       DEFW      #0025,#0023,#0021,#001F
+005B6h 1D001C001A                       DEFW      #001D,#001C,#001A,#0019
+005BEh 1700160015                       DEFW      #0017,#0016,#0015,#0013
+005C6h 1200110010                       DEFW      #0012,#0011,#0010,#000F
+005CEh                                                           ;-------------------------------------------------
+005CEh 454E444520                       DEFM      "ENDE ENGINE"
+005D9h                                                           ;
+005D9h 113F09     START0:               LD        DE,TEXTU
+005DCh CD3608                           CALL      DISP_STR       ;Zeichenkette ausgeben
+005DFh 11CB09                           LD        DE,TEXT0
+005E2h CD3608                           CALL      DISP_STR
+005E5h CD0208                           CALL      KBWAIT         ;Taste - Zeichen in A
+005E8h                                                           ;
+005E8h                                                           ;AY-Takt wählen
+005E8h 113F09     START1:               LD        DE,TEXTU
+005EBh CD3608                           CALL      DISP_STR
+005EEh 11E90A                           LD        DE,TEXT1
+005F1h CD3608                           CALL      DISP_STR       ;Zeichenkette ausgeben
+005F4h CD0208                           CALL      KBWAIT         ;Taste - Zeichen in A
+005F7h 066D                             LD        B,06DH         ;1,75MHz AY-Takt 
+005F9h FE41                             CP        "A"
+005FBh 281B                             JR        Z,TASET
+005FDh FE61                             CP        "a"
+005FFh 2817                             JR        Z,TASET
+00601h 066F                             LD        B,06FH         ;1,79MHz AY-Takt
+00603h FE42                             CP        "B"
+00605h 2811                             JR        Z,TASET
+00607h FE62                             CP        "b"
+00609h 280D                             JR        Z,TASET
+0060Bh 067D                             LD        B,07DH         ;2,00MHz AY-Takt
+0060Dh FE43                             CP        "C"
+0060Fh 2807                             JR        Z,TASET
+00611h FE63                             CP        "c"
+00613h 2803                             JR        Z,TASET
+00615h C2E805                           JP        NZ,START1
+00618h 78         TASET:                LD        A,B            ;Wert in Registertabelle schreiben
+00619h 323111                           LD        (TONA),A
+0061Ch 324111                           LD        (TONB+2),A
+0061Fh 325111                           LD        (TONC+4),A
+00622h 326911                           LD        (HUBI),A
+00625h 113F09     START2:               LD        DE,TEXTU
+00628h CD3608                           CALL      DISP_STR
+0062Bh 11440B                           LD        DE,TEXT2
+0062Eh CD3608                           CALL      DISP_STR       ;Zeichenkette ausgeben
+00631h CD0208                           CALL      KBWAIT         ;Taste - Zeichen in A
+00634h FE31                             CP        "1"            ;Taste "1"?
+00636h CC5006                           CALL      Z,AYT          ;ja => 
+00639h FE32                             CP        "2"
+0063Bh CCCA06                           CALL      Z,AYPPT
+0063Eh FE33                             CP        "3"
+00640h CC9907                           CALL      Z,CTCT
+00643h FE34                             CP        "4"
+00645h CCE307                           CALL      Z,AYINT
+00648h FE30                             CP        "0"
+0064Ah CA0000                           JP        Z,RAUS         ;zurück zum OS
+0064Dh C22506                           JP        NZ,START2
+00650h                                                           ;        
+00650h                                                           ;Tonausgabemenü
+00650h 111E0C     AYT:                  LD        DE,TEXT3
+00653h CD3608                           CALL      DISP_STR       ;Zeichenkette ausgeben
+00656h CD0208                           CALL      KBWAIT         ;Taste - Zeichen in A
+00659h 213111                           LD        HL,TONA        ;ADRESSE REGISTERWERTE
+0065Ch 221001                           LD        (WORK),HL
+0065Fh FE41                             CP        "A"            ;TASTE "A"?
+00661h CC6301                           CALL      Z,PLAYER+3     ;JA => TON STARTEN
+00664h FE61                             CP        "a"
+00666h CC6301                           CALL      Z,PLAYER+3
+00669h 213F11                           LD        HL,TONB
+0066Ch 221001                           LD        (WORK),HL
+0066Fh FE42                             CP        "B"
+00671h CC6301                           CALL      Z,PLAYER+3
+00674h FE62                             CP        "b"
+00676h CC6301                           CALL      Z,PLAYER+3
+00679h 214D11                           LD        HL,TONC
+0067Ch 221001                           LD        (WORK),HL
+0067Fh FE43                             CP        "C"
+00681h CC6301                           CALL      Z,PLAYER+3
+00684h FE63                             CP        "c"
+00686h CC6301                           CALL      Z,PLAYER+3
+00689h 216911                           LD        HL,HUBI
+0068Ch 221001                           LD        (WORK),HL
+0068Fh FE48                             CP        "H"
+00691h CC6301                           CALL      Z,PLAYER+3
+00694h FE68                             CP        "h"
+00696h CC6301                           CALL      Z,PLAYER+3
+00699h 217711                           LD        HL,MEER
+0069Ch 221001                           LD        (WORK),HL
+0069Fh FE4D                             CP        "M"
+006A1h CC6301                           CALL      Z,PLAYER+3
+006A4h FE6D                             CP        "m"
+006A6h CC6301                           CALL      Z,PLAYER+3
+006A9h 218511                           LD        HL,SCHUSS
+006ACh 221001                           LD        (WORK),HL
+006AFh FE53                             CP        "S"
+006B1h CC6301                           CALL      Z,PLAYER+3
+006B4h FE73                             CP        "s"
+006B6h CC6301                           CALL      Z,PLAYER+3
+006B9h 215B11                           LD        HL,AUS
+006BCh 221001                           LD        (WORK),HL
+006BFh FE30                             CP        "0"
+006C1h 2802                             JR        Z,AYT1
+006C3h 208B                             JR        NZ,AYT
+006C5h CD6301     AYT1:                 CALL      PLAYER+3       ;AY AUS!
+006C8h AF                               XOR       A
+006C9h C9                               RET       
+006CAh                                                           ;-------------------------------------------------        
+006CAh                                                           ;Test Parallel Port(s) vom AY Chip
+006CAh 11520D     AYPPT:                LD        DE,TEXT4
+006CDh CD3608                           CALL      DISP_STR       ;Zeichenkette ausgeben
+006D0h CD0208                           CALL      KBWAIT         ;Taste - Zeichen in A
+006D3h FE31                             CP        "1"            ;Taste "1"?
+006D5h CCEF06                           CALL      Z,PPAW         ;ja => 
+006D8h FE32                             CP        "2"
+006DAh CC2C07                           CALL      Z,PPAR
+006DDh FE33                             CP        "3"
+006DFh CC4407                           CALL      Z,PPBW
+006E2h FE34                             CP        "4"
+006E4h CC8107                           CALL      Z,PPBR
+006E7h FE30                             CP        "0"
+006E9h 2802                             JR        Z,AYPPT1       ;zurück
+006EBh 20DD                             JR        NZ,AYPPT
+006EDh AF         AYPPT1:               XOR       A
+006EEh C9                               RET       
+006EFh                                                           ;
+006EFh                                                           ;IO-PortA 
+006EFh                                                           ;Register7 Bit6 =0 > Port Eingabe
+006EFh                                                           ;Register7 Bit6 =1 > Port Ausgabe
+006EFh                                                           ;IO-PortB
+006EFh                                                           ;Register7 Bit7 =0 > Port Eingabe
+006EFh                                                           ;Register7 Bit7 =1 > Port Ausgabe
+006EFh                                                           ;
+006EFh                                                           ;Register 14 (E) und 15 (F) speichert Daten die von CPU geschrieben wurden
+006EFh                                                           ;IO Ports haben Pullup Widerstände (60k..600k)
+006EFh                                                           ;
+006EFh 0E38       PPAW:                 LD        C,AYBASE
+006F1h 3E07                             LD        A,07H          ;Register 7
+006F3h ED79                             OUT       (C),A
+006F5h 0C                               INC       C              ;aybase+1
+006F6h 3E40                             LD        A,01000000B    ;bit6=1... PortA=Ausgabe
+006F8h ED79                             OUT       (C),A
+006FAh 0D                               DEC       C              ;aybase
+006FBh 3E0E                             LD        A,0EH          ;Register 14 
+006FDh ED79                             OUT       (C),A          ;an aybase
+006FFh 0C                               INC       C              ;aybase+1
+00700h 3E55       PPAW1:                LD        A,055H         ;Testmuster 01010101b
+00702h ED79                             OUT       (C),A          ;an aybase+1
+00704h CDDD08                           CALL      OUTX
+00707h CD2E09                           CALL      WARTEN
+0070Ah 3EAA                             LD        A,0AAH         ;Testmuster 10101010b
+0070Ch ED79                             OUT       (C),A          ;an aybase+1
+0070Eh CDDD08                           CALL      OUTX           ;als HEX-Wert ausgeben
+00711h CD2E09                           CALL      WARTEN
+00714h CD2008                           CALL      KBDS
+00717h FE30                             CP        "0"            ;bis Taste "0" gedrückt
+00719h 20E5                             JR        NZ,PPAW1
+0071Bh 0E38                             LD        C,AYBASE
+0071Dh 3E07                             LD        A,07H          ;Register 7
+0071Fh ED79                             OUT       (C),A
+00721h 0C                               INC       C              ;aybase+1
+00722h 3E00                             LD        A,00000000B    ;bit6=0... PortA=Eingabe
+00724h ED79                             OUT       (C),A
+00726h 3E82                             LD        A,082H         ;Cursor an
+00728h CDEF08                           CALL      PRINT
+0072Bh C9                               RET       
+0072Ch                                            
+0072Ch 0E38       PPAR:                 LD        C,AYBASE
+0072Eh 3E0E                             LD        A,0EH          ;Register 14  
+00730h ED79                             OUT       (C),A
+00732h ED78       PPAR1:                IN        A,(C)          ;lesen
+00734h CDDD08                           CALL      OUTX           ;als HEX-Wert ausgeben
+00737h CD2008                           CALL      KBDS
+0073Ah FE30                             CP        "0"            ;bis Taste "0" gedrückt
+0073Ch 20F4                             JR        NZ,PPAR1
+0073Eh 3E82                             LD        A,082H         ;Cursor an
+00740h CDEF08                           CALL      PRINT
+00743h C9                               RET       
+00744h                                            
+00744h 0E38       PPBW:                 LD        C,AYBASE
+00746h 3E07                             LD        A,07H          ;Register 7
+00748h ED79                             OUT       (C),A
+0074Ah 0C                               INC       C              ;aybase+1
+0074Bh 3E80                             LD        A,10000000B    ;bit7=1... PortB=Ausgabe
+0074Dh ED79                             OUT       (C),A
+0074Fh 0D                               DEC       C              ;aybase
+00750h 3E0F                             LD        A,0FH          ;Register 15 
+00752h ED79                             OUT       (C),A          ;an aybase
+00754h 0C                               INC       C              ;aybase+1
+00755h 3E55       PPBW1:                LD        A,055H         ;Testmuster 01010101b
+00757h ED79                             OUT       (C),A          ;an aybase+1
+00759h CDDD08                           CALL      OUTX
+0075Ch CD2E09                           CALL      WARTEN
+0075Fh 3EAA                             LD        A,0AAH         ;Testmuster 10101010b
+00761h ED79                             OUT       (C),A          ;an aybase+1
+00763h CDDD08                           CALL      OUTX           ;als HEX-Wert ausgeben
+00766h CD2E09                           CALL      WARTEN
+00769h CD2008                           CALL      KBDS
+0076Ch FE30                             CP        "0"            ;bis Taste "0" gedrückt
+0076Eh 20E5                             JR        NZ,PPBW1
+00770h 0E38                             LD        C,AYBASE
+00772h 3E07                             LD        A,07H          ;Register 7
+00774h ED79                             OUT       (C),A
+00776h 0C                               INC       C              ;aybase+1
+00777h 3E00                             LD        A,00000000B    ;bit6=0... PortA=Eingabe
+00779h ED79                             OUT       (C),A
+0077Bh 3E82                             LD        A,082H         ;Cursor an
+0077Dh CDEF08                           CALL      PRINT
+00780h C9                               RET       
+00781h                                            
+00781h 0E38       PPBR:                 LD        C,AYBASE
+00783h 3E0F                             LD        A,0FH          ;Register 15 
+00785h ED79                             OUT       (C),A
+00787h ED78       PPBR1:                IN        A,(C)          ;lesen
+00789h CDDD08                           CALL      OUTX           ;als HEX-Wert ausgeben
+0078Ch CD2008                           CALL      KBDS
+0078Fh FE30                             CP        "0"            ;bis Taste "0" gedrückt
+00791h 20F4                             JR        NZ,PPBR1
+00793h 3E82                             LD        A,082H         ;Cursor an
+00795h CDEF08                           CALL      PRINT
+00798h C9                               RET       
+00799h                                                           ;-------------------------------------------------   
+00799h                                                           ;Test der CTC   (kaskadiert)
+00799h                                                           ;Kanal 0 als Zeitgeber 
+00799h                                                           ;Kanal 1 2 3 als Zähler
+00799h                                                           ;Kanal 3 Zählerstand wird angezeigt (Rückwärtszähler)
+00799h                                                           ;
+00799h 11DF0E     CTCT:                 LD        DE,TEXT5
+0079Ch CD3608                           CALL      DISP_STR       ;Zeichenkette ausgeben
+0079Fh 0E3C                             LD        C,CTCBASE      ;Kanal 0
+007A1h                                            
+007A1h                                                           ;Kanal 0 als Zeitgeber
+007A1h 3E07                             LD        A,00000111B    ;VT16
+007A3h ED79                             OUT       (C),A
+007A5h 3EFF                             LD        A,0FFH
+007A7h ED79                             OUT       (C),A          ;Kanal 0
+007A9h                                                           ;ca. 600 Hz
+007A9h                                            
+007A9h                                                           ;Kanal 1 als Zähler
+007A9h 0C                               INC       C              ;Kanal 1
+007AAh 3E5D                             LD        A,01011101B
+007ACh ED79                             OUT       (C),A
+007AEh 3E3C                             LD        A,60
+007B0h ED79                             OUT       (C),A          ;Kanal 1
+007B2h                                                           ;ca. 10Hz
+007B2h                                            
+007B2h                                                           ;Kanal 2 als Zähler
+007B2h 0C                               INC       C              ;Kanal 2
+007B3h 3E5D                             LD        A,01011101B
+007B5h ED79                             OUT       (C),A
+007B7h 3E05                             LD        A,05
+007B9h ED79                             OUT       (C),A          ;Kanal 2
+007BBh                                                           ;ca. 2Hz
+007BBh                                            
+007BBh 0C                               INC       C              ;Kanal 3
+007BCh 3E57                             LD        A,57H          ;0101 1101 CTC initialisieren
+007BEh                                                           ;Int. sperre, Zähler,
+007BEh ED79                             OUT       (C),A          ;Kanal 3
+007C0h 3EFF                             LD        A,0FFH         ;ZK 255 setzen
+007C2h ED79                             OUT       (C),A          ;von da an rückwärts zählen
+007C4h ED78       CTCT1:                IN        A,(C)          ;Zählerstand lesen
+007C6h FEFF                             CP        0FFH           ;erster Impuls gekommen
+007C8h 28FA                             JR        Z,CTCT1        ;nein -> warten
+007CAh ED78       CTCT2:                IN        A,(C)          ;Zählerstand lesen
+007CCh CDDD08                           CALL      OUTX           ;als HEX Wert ausgeben
+007CFh F5                               PUSH      AF
+007D0h CD2008                           CALL      KBDS           ;bis Taste "0" gedrückt
+007D3h FE30                             CP        "0"
+007D5h 2805                             JR        Z,CTCT3
+007D7h F1                               POP       AF
+007D8h FEFF                             CP        0FFH
+007DAh 20EE                             JR        NZ,CTCT2
+007DCh F1         CTCT3:                POP       AF
+007DDh 3E82                             LD        A,082H         ;Cursor an
+007DFh CDEF08                           CALL      PRINT
+007E2h C9                               RET       
+007E3h                                                           ;
+007E3h                                                           ;-------------------------------------------------
+007E3h                                                           ;Test AY-SOUND über Interruptroutine
+007E3h                                                           ;Anpassung der AYPLAY.INC an den jeweiligen Rechner notwendig!!!!
+007E3h                                                           ;speziell die Adresse Interruptsäule, da I-Register bei manchen Rechner
+007E3h                                                           ;nicht verändert werden darf
+007E3h                                                           ;
+007E3h 110F10     AYINT:                LD        DE,TEXT6
+007E6h CD3608                           CALL      DISP_STR       ;Zeichenkette ausgeben
+007E9h                                                           ;SONG LADEN, SPIELEN, STOPPEN:
+007E9h 219311                           LD        HL,SONG        ;ANFANGSADRESSE SONG
+007ECh 221001                           LD        (WORK),HL      ;ÜBERGEBEN
+007EFh 3E02                             LD        A,2            ;ANZAHL ABSPIELE (Z.B. 2x)
+007F1h 321201                           LD        (WORK+2),A     ;ÜBERGEBEN
+007F4h CD6001                           CALL      PLAYER         ;SONG ABSPIELEN
+007F7h                                                           ;...SONG LÄUFT SELSTBSTÄNDIG WEITER!
+007F7h CD2008     AYINT1:               CALL      KBDS
+007FAh FE30                             CP        "0"            ;bis Taste "0" gedrückt
+007FCh 20F9                             JR        NZ,AYINT1
+007FEh CD6601                           CALL      PLAYER+6       ;SONG VORZEITIG STOPPEN 
+00801h C9                               RET                      ;RÜCKKEHR ZUM OS
+00802h                                                           ;
+00802h                                                           ;--------------------------------------------------
+00802h                                                           ;UNTERPROGRAMME:  (nicht alle verwendet)
+00802h                                                           ;--------------------------------------------------
+00802h                                                           ;
+00802h                                                           ;Tastaturabfrage (wartet)
+00802h                                                           ; OUTPUT: Zeichen in A und auf BS
+00802h C5         KBWAIT:               PUSH      BC
+00803h D5                               PUSH      DE
+00804h E5                               PUSH      HL
+00805h 0E06       KBWAIT1:              LD        C,6            ;zeichenübernahme in a
+00807h 1EFF                             LD        E,0FFH         ;direkte konsolen e/a
+00809h CD0500                           CALL      BDOS           ;bdos
+0080Ch FE00                             CP        0
+0080Eh 28F5                             JR        Z,KBWAIT1
+00810h E1                               POP       HL
+00811h D1                               POP       DE
+00812h C1                               POP       BC
+00813h C9                               RET       
+00814h                                                           ;
+00814h                                                           ;Tastaturabfrage
+00814h                                                           ; OUTPUT: Zeichen in A und auf BS
+00814h E5         KBD:                  PUSH      HL
+00815h D5                               PUSH      DE
+00816h C5                               PUSH      BC
+00817h 0E01                             LD        C,1            ;Konsoleneingabe
+00819h CD0500                           CALL      BDOS
+0081Ch C1                               POP       BC
+0081Dh D1                               POP       DE
+0081Eh E1                               POP       HL
+0081Fh C9                               RET       
+00820h                                                           ;
+00820h                                                           ;Tastaturabfrage ohne Cursor
+00820h                                                           ; OUTPUT: Zeichen in A und auf BS
+00820h E5         KBDS:                 PUSH      HL
+00821h D5                               PUSH      DE
+00822h C5                               PUSH      BC
+00823h 0E06                             LD        C,6            ;Konsoleneingabe
+00825h 1EFF                             LD        E,0FFH
+00827h CD0500                           CALL      BDOS
+0082Ah C1                               POP       BC
+0082Bh D1                               POP       DE
+0082Ch E1                               POP       HL
+0082Dh C9                               RET       
+0082Eh                                                           ;
+0082Eh                                                           ;UP Zeichen über conout ausgeben
+0082Eh                                                           ;Zeichen in E
+0082Eh F5         CCONOUT:              PUSH      AF
+0082Fh 0E02                             LD        C,2            ;conout
+00831h CD0500                           CALL      BDOS
+00834h F1                               POP       AF
+00835h C9                               RET       
+00836h                                                           ;
+00836h                                                           ;UP Zeichenkette ausgeben
+00836h                                                           ;Anfangsadresse in DE
+00836h                                                           ;Ende mit "$" = 024h
+00836h E5         DISP_STR:             PUSH      HL
+00837h D5                               PUSH      DE
+00838h C5                               PUSH      BC
+00839h F5                               PUSH      AF
+0083Ah 0E09                             LD        C,9            ;zeichenkette ausgeben
+0083Ch CD0500                           CALL      BDOS           ;bdos
+0083Fh F1                               POP       AF
+00840h C1                               POP       BC
+00841h D1                               POP       DE
+00842h E1                               POP       HL
+00843h C9                               RET       
+00844h                                                           ;
+00844h                                                           ;Cursor positionieren
+00844h                                                           ; IN: HL = Cursorposition (H = Zeile, L = Spalte)
+00844h F5         CSET:                 PUSH      AF
+00845h C5                               PUSH      BC
+00846h E5                               PUSH      HL
+00847h 7C                               LD        A,H
+00848h F680                             OR        80H
+0084Ah 322A11                           LD        (ZEIPOS),A
+0084Dh 7D                               LD        A,L
+0084Eh F680                             OR        80H
+00850h 322B11                           LD        (SPAPOS),A
+00853h 112911                           LD        DE,PUNKT1
+00856h 0E09                             LD        C,ZKOUT
+00858h CD0500                           CALL      BDOS
+0085Bh E1                               POP       HL
+0085Ch C1                               POP       BC
+0085Dh F1                               POP       AF
+0085Eh C9                               RET       
+0085Fh                                                           ;
+0085Fh                                                           ;ASCII-Zeichen aus Eingabe in Hexwert
+0085Fh                                                           ; DE = Beginn Zeichenkette
+0085Fh                                                           ; HL = Ergebnis Hex-Wert
+0085Fh 2600       INHEX:                LD        H,0
+00861h CD8208                           CALL      ASHEX
+00864h 17                               RLA       
+00865h 17                               RLA       
+00866h 17                               RLA       
+00867h 17                               RLA       
+00868h E6F0                             AND       0F0H
+0086Ah 67                               LD        H,A
+0086Bh CD8208                           CALL      ASHEX
+0086Eh B4                               OR        H
+0086Fh 67                               LD        H,A
+00870h 2E00       INHX2:                LD        L,0
+00872h CD8208                           CALL      ASHEX
+00875h 17                               RLA       
+00876h 17                               RLA       
+00877h 17                               RLA       
+00878h 17                               RLA       
+00879h E6F0                             AND       0F0H
+0087Bh 6F                               LD        L,A
+0087Ch CD8208     INHX1:                CALL      ASHEX
+0087Fh B5                               OR        L
+00880h 6F                               LD        L,A
+00881h C9                               RET       
+00882h                                                           ;
+00882h                                                           ;ASCII zu HEX
+00882h                                                           ; DE = Zeiger auf Zeichen
+00882h 1A         ASHEX:                LD        A,(DE)
+00883h 13                               INC       DE
+00884h D630                             SUB       30H
+00886h FE0A                             CP        0AH
+00888h D8                               RET       C
+00889h D607                             SUB       7
+0088Bh C9                               RET       
+0088Ch                                                           ;
+0088Ch                                                           ;Akku dezimal anzeigen
+0088Ch                                                           ; A = Zahl
+0088Ch E5         ADEZ:                 PUSH      HL
+0088Dh 6F                               LD        L,A
+0088Eh 2600                             LD        H,0
+00890h CD9508                           CALL      HLDEZ
+00893h E1                               POP       HL
+00894h C9                               RET       
+00895h                                                           ;
+00895h                                                           ;HL dezimal anzeigen, fuehrende Nullen weglassen
+00895h                                                           ; HL = Zahl
+00895h E5         HLDEZ:                PUSH      HL
+00896h D5                               PUSH      DE
+00897h 110000                           LD        DE,0
+0089Ah C5         HLDZ1:                PUSH      BC
+0089Bh F5                               PUSH      AF
+0089Ch 011027                           LD        BC,10000       ;Zehntausender
+0089Fh CDBF08                           CALL      DEZ
+008A2h 01E803                           LD        BC,1000        ;Tausender
+008A5h CDBF08                           CALL      DEZ
+008A8h 016400                           LD        BC,100
+008ABh CDBF08                           CALL      DEZ            ;Hunderter
+008AEh 010A00                           LD        BC,10
+008B1h CDBF08                           CALL      DEZ            ;Zehner
+008B4h 7D                               LD        A,L
+008B5h C630                             ADD       A,'0'
+008B7h CD1F09                           CALL      OCHR           ;Einer
+008BAh F1                               POP       AF
+008BBh C1                               POP       BC
+008BCh D1                               POP       DE
+008BDh E1                               POP       HL
+008BEh C9                               RET       
+008BFh                                                           ;
+008BFh 3E30       DEZ:                  LD        A,'0'
+008C1h A7         DEZ1:                 AND       A
+008C2h ED42                             SBC       HL,BC
+008C4h 3803                             JR        C,DEZ2         ;keine weiteren Teile
+008C6h 3C                               INC       A
+008C7h 18F8                             JR        DEZ1
+008C9h 09         DEZ2:                 ADD       HL,BC
+008CAh FE30                             CP        '0'
+008CCh 200A                             JR        NZ,DEZ3        ;Ziffer ungleich '0'
+008CEh 14                               INC       D
+008CFh 15                               DEC       D
+008D0h 2006                             JR        NZ,DEZ3        ;Anzeige laeuft
+008D2h 1C                               INC       E
+008D3h 1D                               DEC       E
+008D4h C8                               RET       Z              ;fuehrende Nullen weglassen
+008D5h 3E20                             LD        A,' '          ;oder durch SPC ersetzen
+008D7h 15                               DEC       D
+008D8h CD1F09     DEZ3:                 CALL      OCHR
+008DBh 14                               INC       D
+008DCh C9                               RET       
+008DDh                                                           ;
+008DDh                                                           ;Ausgabe eines Byte als HEX an Position
+008DDh                                                           ; A = Byte an Position Z=10, SP=18
+008DDh F5         OUTX:                 PUSH      AF
+008DEh 3E83                             LD        A,083H         ;Cursor aus
+008E0h CDEF08                           CALL      PRINT
+008E3h F1                               POP       AF
+008E4h 260A                             LD        H,10           ;Zeile
+008E6h 2E12                             LD        L,18           ;Spalte 
+008E8h CD4408                           CALL      CSET
+008EBh CDFF08                           CALL      OUTA
+008EEh                                                           ;push af
+008EEh                                                           ;ld   a,082h          ;Cursor an
+008EEh                                                           ;call print
+008EEh                                                           ;pop  af         
+008EEh C9                               RET       
+008EFh                                                           ;
+008EFh                                                           ;Ausgabe Zeichen 
+008EFh                                                           ; A = Zeichen                                                           
+008EFh 322F11     PRINT:                LD        (GCHAR),A      ;Zeichen
+008F2h D5                               PUSH      DE
+008F3h C5                               PUSH      BC
+008F4h 112F11                           LD        DE,GCHAR       ;Textzeichen
+008F7h 0E09                             LD        C,ZKOUT        ;Zeichenkette ausgeben
+008F9h CD0500                           CALL      BDOS
+008FCh C1                               POP       BC
+008FDh D1                               POP       DE
+008FEh C9                               RET       
+008FFh                                                           ;
+008FFh                                                           ;Ausgabe von A als HEX-Wert
+008FFh F5         OUTA:                 PUSH      AF
+00900h 1F                               RRA       
+00901h 1F                               RRA       
+00902h 1F                               RRA       
+00903h 1F                               RRA       
+00904h CD0809                           CALL      AHEXO
+00907h F1                               POP       AF
+00908h E60F       AHEXO:                AND       0FH
+0090Ah C690                             ADD       A,90H
+0090Ch 27                               DAA       
+0090Dh CE40                             ADC       A,40H
+0090Fh 27                               DAA       
+00910h CD1F09                           CALL      OCHR
+00913h C9                               RET       
+00914h                                                           ;
+00914h                                                           ;Ausgabe von HL als HEX-Wert
+00914h F5         OUTHL:                PUSH      AF
+00915h 7C                               LD        A,H
+00916h CDFF08                           CALL      OUTA
+00919h 7D                               LD        A,L
+0091Ah CDFF08                           CALL      OUTA
+0091Dh F1                               POP       AF
+0091Eh C9                               RET       
+0091Fh                                                           ;
+0091Fh                                                           ;Ausgabe eines Zeichens aus A
+0091Fh E5         OCHR:                 PUSH      HL
+00920h D5                               PUSH      DE
+00921h C5                               PUSH      BC
+00922h F5                               PUSH      AF
+00923h 5F                               LD        E,A
+00924h 0E02                             LD        C,CONOUT
+00926h CD0500                           CALL      BDOS
+00929h F1                               POP       AF
+0092Ah C1                               POP       BC
+0092Bh D1                               POP       DE
+0092Ch E1                               POP       HL
+0092Dh C9                               RET       
+0092Eh                                            
+0092Eh                                                           ;UP Warteschleife
+0092Eh F5         WARTEN:               PUSH      AF
+0092Fh C5                               PUSH      BC
+00930h D5                               PUSH      DE
+00931h E5                               PUSH      HL
+00932h 01FFFF                           LD        BC,0FFFFH
+00935h 0B         WARTEN1:              DEC       BC
+00936h 78                               LD        A,B
+00937h B1                               OR        C
+00938h 20FB                             JR        NZ,WARTEN1
+0093Ah E1                               POP       HL
+0093Bh D1                               POP       DE
+0093Ch C1                               POP       BC
+0093Dh F1                               POP       AF
+0093Eh C9                               RET       
+0093Fh                                                           ;
+0093Fh                                                           ;--------------------------------------------------
+0093Fh 0C         TEXTU:                DEFB      0CH
+00940h 2A20544553                       DEFM      "* TEST SOUND-K1520 MIT AY-3-8910 UND CTC  *",0DH,0AH
+0096Dh 2A20205665                       DEFM      "*  Version 1.2.0.4  -  WERO, KW 10/2017    *",0DH,0AH
+0099Bh 2D2D2D2D2D                       DEFM      "-------------------------------------------",0DH,0AH,0DH,0AH,024H
+009CBh                                            
+009CBh 5354414E44 TEXT0:                DEFM      "STANDARD IO-ADRESSE: 38h - JP1.. A6,A7 gesteckt",0DH,0AH,0DH,0AH
+009FEh 41592D436F                       DEFM      "AY-Control  = 38h",0DH,0AH
+00A11h 41592D4461                       DEFM      "AY-Data     = 39h",0DH,0AH
+00A24h 4354432D4B                       DEFM      "CTC-Kanal 0 = 3Ch",0DH,0AH
+00A37h 435443204B                       DEFM      "CTC Kanal 1 = 3Dh",0DH,0AH
+00A4Ah 435443204B                       DEFM      "CTC Kanal 2 = 3Eh",0DH,0AH
+00A5Dh 435443204B                       DEFM      "CTC Kanal 3 = 3Fh",0DH,0AH,0DH,0AH
+00A72h 5749434854                       DEFM      "WICHTIG bei 'AY Sound mit CTC Interrupt testen:'",0DH,0AH
+00AA4h 496E746572                       DEFM      "Interruptsaeule liegt bei F7D8h (CPA, SCPX )",0DH,0AH,0DH,0AH
+00AD4h 5745495445                       DEFM      "WEITER mit Taste....",024H
+00AE9h                                            
+00AE9h 4155535741 TEXT1:                DEFM      "AUSWAHL DER TAKTFREQUENZ DES AY-CHIP:",0DH,0AH,0DH,0AH
+00B12h 2020413D20                       DEFM      "  A= 1,75MHz",0DH,0AH
+00B20h 2020423D20                       DEFM      "  B= 1,79MHz",0DH,0AH
+00B2Eh 2020433D20                       DEFM      "  C= 2,00MHz",0DH,0AH,0DH,0AH
+00B3Eh 5741484C3F                       DEFM      "WAHL?",024H
+00B44h                                                           ;
+00B44h 4155535741 TEXT2:                DEFM      "AUSWAHL DES TESTS:",0DH,0AH,0DH,0AH
+00B5Ah 2020313D20                       DEFM      "  1= Testton / Geraeusch AY-3-8910 ausgeben",0DH,0AH
+00B87h 2020323D20                       DEFM      "  2= Parallel-PORT(s) vom AY CHIP testen",0DH,0AH
+00BB1h 2020333D20                       DEFM      "  3= CTC (kaskadierte Kanaele) testen",0DH,0AH
+00BD8h 2020343D20                       DEFM      "  4= AY Sound mit CTC Interrupt testen ",0DH,0AH
+00C01h 2020303D20                       DEFM      "  0= Zurueck zum OS",0DH,0AH,0DH,0AH
+00C18h 5741484C3F                       DEFM      "WAHL?",024H
+00C1Eh                                                           ;        
+00C1Eh 0C         TEXT3:                DEFB      0CH
+00C1Fh 2A20544553                       DEFM      "* TESTTON AY-3-8910 : RECHTECK CA. 1 KHZ *",0DH,0AH
+00C4Bh 4C41555453                       DEFM      "LAUTSTAERKE: MAXIMAL",0DH,0AH
+00C61h 2D2D2D2D2D                       DEFM      "------------------------------------------",0DH,0AH
+00C8Dh 2020413D20                       DEFM      "  A= RECHTS",0DH,0AH
+00C9Ah 2020423D20                       DEFM      "  B= BEIDE",0DH,0AH
+00CA6h 2020433D20                       DEFM      "  C= LINKS",0DH,0AH,0DH,0AH
+00CB4h 2A20544553                       DEFM      "* TEST SOUNDEFFEKTE *",0DH,0AH
+00CCBh 2D2D2D2D2D                       DEFM      "------------------------------------------",0DH,0AH
+00CF7h 2020483D20                       DEFM      "  H= HUBSCHRAUBER",0DH,0AH
+00D0Ah 20204D3D20                       DEFM      "  M= MEERESRAUSCHEN",0DH,0AH
+00D1Fh 2020533D20                       DEFM      "  S= SCHUSS",0DH,0AH,0DH,0AH
+00D2Eh 2020303D20                       DEFM      "  0= Zurueck zum Testmenue",0DH,0AH,0DH,0AH
+00D4Ch 5741484C3F                       DEFM      "WAHL?",024H
+00D52h                                                           ;
+00D52h 0C         TEXT4:                DEFB      0CH
+00D53h 2A20544553                       DEFM      "* TEST DER/DES IO-PORT(S) VOM AY-3-8910/8912 *",0DH,0AH
+00D83h 2D2D2D2D2D                       DEFM      "-----------------------------------------------------",0DH,0AH,0AH,0DH
+00DBCh 2020313D20                       DEFM      "  1= PORT A: 55h/AAh wird abwechselnd auf PORT A ausgegeben",0DH,0AH
+00DF9h 2020323D20                       DEFM      "  2= PORT A: Lesen... ",0DH,0AH
+00E11h 2020333D20                       DEFM      "  3= PORT B: 55h/AAh wird abwechselnd auf PORT B ausgegeben (nur AY-3-8910)",0DH,0AH
+00E5Eh 2020343D20                       DEFM      "  4= PORT B: Lesen...                                       (nur AY-3-8910)",0DH,0AH,0DH,0AH
+00EADh 2020303D20                       DEFM      "  0= Zurueck zum Testmenue",0DH,0AH,0DH,0AH
+00ECBh 202020414E                       DEFM      "   ANZEIGE BYTE:   ",024H
+00EDFh                                                           ;
+00EDFh 0C         TEXT5:                DEFB      0CH
+00EE0h 2A20544553                       DEFM      "* TEST VON CTC KANAL 0-3 auf der SOUND-K1520 *",0DH,0AH
+00F10h 2D2D2D2D2D                       DEFM      "-----------------------------------------------",0DH,0AH,0AH,0DH
+00F43h 2020435443                       DEFM      "  CTC Kanal 0 arbeitet als Zeitgeber",0DH,0AH
+00F69h 20204B616E                       DEFM      "  Kanal 1 2 3 arbeiten als Zaehler",0DH,0AH
+00F8Dh 20204B616E                       DEFM      "  Kanal 0->1->2->3 kaskadiert",0DH,0AH
+00FACh 20205A6165                       DEFM      "  Zaehlerstand Kanal 3 wird gelesen (ca. 2Hz)",0DH,0AH,0AH,0DH
+00FDDh 2020303D20                       DEFM      "  0= Zurueck zum Testmenue",0DH,0AH,0DH,0AH
+00FFBh 2047454C45                       DEFM      " GELESENES BYTE:   ",024H
+0100Fh                                                           ;
+0100Fh 0C         TEXT6:                DEFB      0CH
+01010h 2A20544553                       DEFM      "* TESTSONG AY-3-8910 MIT CTC INTERRUPT *",0DH,0AH
+0103Ah 2D2D2D2D2D                       DEFM      "----------------------------------------",0DH,0AH,0DH,0AH
+01066h 50726F6772                       DEFM      "Programmteil funktioniert nur, wenn der Interruptbetrieb",0DH,0AH
+010A0h 64656D2052                       DEFM      "dem Rechner angepasst wurde (A5120/K8924 mit CPA,SCPX)",0DH,0AH,0DH,0AH
+010DAh 3E3E3E3E20                       DEFM      ">>>> Song wird gespielt :-) <<<< ",0DH,0AH,0DH,0AH
+010FFh 5461737465                       DEFM      "Taste  0= Abbruch! Zurueck zum Testmenue"
+01127h 24                               DEFM      024H
+01128h                                                           ;
+01128h 00         CTCMERK:              DEFB      0
+01129h                                                           ;
+01129h 1B         PUNKT1:               DEFB      ESC
+0112Ah 80         ZEIPOS:               DEFB      80H            ;Zeile+80h
+0112Bh 80         SPAPOS:               DEFB      80H            ;Spalte+80h
+0112Ch 24                               DEFB      '$'
+0112Dh                                                           ;
+0112Dh 1B         GRAFZ:                DEFB      ESC            ;Ausgabe Grafikzeichen
+0112Eh 5F                               DEFB      5FH            ;Grafikzeichen folgt
+0112Fh 00         GCHAR:                DEFB      0              ;Grafikzeichen
+01130h 24                               DEFB      '$'
+01131h                                                           ;
+01131h                                                           ;--------------------------------------------------
+01131h                                                           ;ACHTUNG!!! REGISTER 7 ... Bit 7 und Bit 6 auf 0 (Ports auf Eingabe)
+01131h                                                           ; 
+01131h                                                           ;FÜR AY-TAKT=2 MHZ: REGISTERWERT #7D FÜR CA. 1KHZ
+01131h                                                           ;REGISTER       0     1   2   3   4   5   6   7    8   9   A   B   C   D
+01131h                                                           ;               -HÖHEA-   -HÖHEB- -HÖHEC- R MIX   LA  LB  LC  HDF HDG HKF
+01131h 7D00000000 TONA:                 DEFB      7DH,0,0,0,0,0,0,0FEH,0FH,0,0,0,0,0
+0113Fh 00007D0000 TONB:                 DEFB      0,0,7DH,0,0,0,0,0FDH,0,0FH,0,0,0,0
+0114Dh 000000007D TONC:                 DEFB      0,0,0,0,7DH,0,0,0FBH,0,0,0FH,0,0,0
+0115Bh 0000000000 AUS:                  DEFB      0,0,0,0,0,0,0,0FFH,0,0,0,0,0,0
+01169h                                                           ;
+01169h                                                           ;AUCH ALS GERÄUSCHGENERATOR ZU BENUTZEN, BEISPIELE:
+01169h 6F00000000 HUBI:                 DEFB      6FH,0,0,0,0,0,1EH,0F6H,10H,0,0,2CH,1,0EH
+01177h 0000000000 MEER:                 DEFB      0,0,0,0,0,0,14H,0CFH,0,10H,08H,0,32H,0EH
+01185h 0000000000 SCHUSS:               DEFB      0,0,0,0,0,0,14H,0EFH,0,10H,0,0,1FH,01H
+01193h                                                           ;--------------------------------------------------
+01193h                                                           ;
+01193h            SONG:                           
+01193h 07A701B201                       INCLUDEBINARY MUSIC.STC  ;HIER ABZUSPIELENDEN SONG EINBINDEN      
+01582h                                                           ;END

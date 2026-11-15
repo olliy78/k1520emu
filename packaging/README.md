@@ -109,6 +109,12 @@ Der ganze Lauf steckt im Job `paket` von `.github/workflows/windows-ci.yml`
 Schlankmachen prüfen, deinstallieren, und dabei nachsehen, dass eine fremde
 Datei im Zielordner überlebt.
 
+## Ton (SOUND-Karte)
+
+Die Tonausgabe braucht keine zusätzliche Python-Abhängigkeit. Unter **Linux** lädt der Kern `libasound.so.2` zur
+Laufzeit (`dlopen`, keine Bauabhängigkeit); fehlt sie oder gibt es kein Ausgabegerät, bleibt der Ton stumm
+(Grund in der Statuszeile), alles andere läuft. Unter Windows genügt `winmm`. `K1520_AUDIO=stumm` erzwingt Stille.
+
 ## Dateien
 
 | Datei | Rolle |

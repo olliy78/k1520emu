@@ -423,6 +423,7 @@ int main(int argc, char** argv) {
         else if (!strcmp(argv[i], "--ptape")) { ptape_opt = true; k8o.ptape = true; }
         else if (dbgm::parseGideOpt(argv[i], gide_basis)) { gide_opt = true; k8o.gide = true; k8o.gide_basis = gide_basis; }
         else if (!strcmp(argv[i], "--gide-image") && i+1 < argc) { gide_opt = true; k8o.gide = true; gide_image = k8o.gide_image = argv[++i]; }
+        else if (k8o.sound.parse(argv[i])) { }   // --sound[=basis] / --sound-takt/-kanal/-chip / --wav (Entwurf 51 S6)
         else if (dbgm::parseNetOpt(argv[i], net_basis)) { net_opt = true; k8o.net = true; k8o.net_basis = net_basis; }
         else if (dbgm::parseUsbOpt(argv[i], usb_basis)) { usb_opt = true; k8o.usb = true; k8o.usb_basis = usb_basis; }
         else if (!strcmp(argv[i], "--usb-dir") && i+1 < argc) { usb_opt = true; k8o.usb = true; usb_dir = k8o.usb_dir = argv[++i]; }
@@ -725,7 +726,9 @@ int main(int argc, char** argv) {
       if (!dbgm::steckeK5020(machine, tape_opt, tape1_opt, tape2_opt, err)) { fprintf(stderr, "--tape: %s\n", err.c_str()); return 2; }
       if (!dbgm::steckeGide(machine, gide_opt, gide_basis, gide_image, err)) { fprintf(stderr, "--gide: %s\n", err.c_str()); return 2; }
       if (!dbgm::steckeUsb(machine, usb_opt, usb_basis, usb_dir, err)) { fprintf(stderr, "--usb: %s\n", err.c_str()); return 2; }
-      if (!dbgm::steckeNet(machine, net_opt, net_basis, err)) { fprintf(stderr, "--net: %s\n", err.c_str()); return 2; } }
+      if (!dbgm::steckeNet(machine, net_opt, net_basis, err)) { fprintf(stderr, "--net: %s\n", err.c_str()); return 2; }
+      if (!dbgm::steckeSound(machine, k8o.sound, false, err)) { fprintf(stderr, "--sound: %s\n", err.c_str()); return 2; } }
+    dbgm::WavWaechter wav_waechter(machine, k8o.sound);   // stoppt die WAV-Mitschrift bei jedem Rueckkehrweg
     if (bedien_opt && !machine.setSicherheitsstecker(bedien_opt)) { fprintf(stderr, "--sicherheitsstecker: 0..6, nur mit K7637\n"); return 2; }
     machine.powerOn();
 

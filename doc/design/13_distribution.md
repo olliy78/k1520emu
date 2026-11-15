@@ -940,6 +940,15 @@ mit eigenem Starter und Startmenü-Eintrag.  Verdrahtet:
 - **Nicht lokal belegt:** Inno-Setup-Lauf und MSVC (`windows-ci.yml`, `release.yml`) — nur
   die CI; lokal `tools/dev.sh win` für die MinGW-Seite.
 
+### 10d. SOUND-Karte im Paket (AP S9, 2026-11-15)
+
+Keine neue Python-Abhängigkeit, keine neue Bibliothek im Paket. **Zur Laufzeit** braucht die Tonausgabe unter Linux
+`libasound.so.2` (per `dlopen` geladen, nicht gelinkt — das Paket läuft damit auch auf Rechnern ohne ALSA, dann stumm
+mit Grund in der Statuszeile); unter Windows `winmm` (Systembestandteil). Die Gastprogramme der Karte (`SKTEST4`,
+`STCTEST1`, `PLAYSTC`, `TGCPM`) liegen nur auf den Systemdisketten `a5120_cpa`, `a5120_scpx17` und `pc1715_cpa1715`
+(alle in `DISKS_DEFAULT`); `tools/sound/fremd/` selbst kommt nicht mit, nur die Herkunftstabelle
+(`share/doc/lizenzen/sound_software-HERKUNFT.md`).
+
 ---
 
 ## 11. Offene Punkte

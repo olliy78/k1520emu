@@ -646,6 +646,20 @@ Maschinenvorgabe = Vorauswahl der Oberfläche (`app/profil.py`: GIDE **D0H** (Ba
 **Pfad-Sandbox** (nur 8.3, nie ausserhalb, Symlinks unsichtbar; Wächter `VdipPfadflucht.*`) — **nie aufweichen**.  UTools (Fremdsoftware, Weitergabe freigegeben) seit 2026-11-11 im Repo (`tools/gide/fremd/utools`), `GunUsbSystem.*` überspringt sich ohne die lokale Kopie.  **Netz** (KCNet = Z80-PIO + ATmega-Verhaltensmodell + W5100: `core/cards/gun_net/`, `core/peripherals/w5100/`; Rechnerprotokoll aus den Gastprogrammen rekonstruiert, `doc/design/50a_kcnet_protokoll.md`): `installGunNet`, C-ABI `k1520_net_*`, `--net[=basis]`; Basis frei (GUN 88H, K1520-Netzkarte C0H/28H).  Das Modell benutzt die Netzanbindung des Wirts, **ohne Loopback-Beschränkung** (Entscheidung des Anwenders, Filter `Richtlinie::frage` optional); Tests nur Loopback/Port 0.  `TFTP1287.COM`/`CPMN1587.COM` laufen unverändert (seit 2026-11-11 im Repo, `GunNetSystem.*` benutzt weiter die lokale Kopie).  GUI (G6/U3/N3) steht.  **Gast-Software auf den Systemdisketten (2026-11-11, Anwenderentscheidung, Lizenz/Weitergabe UNGEKLÄRT):** `tools/gide/` (`README.md` = Herkunftstabelle, `karten.py` = was auf welche Diskette gehört, `basis_anpassen.py` = Port-Operanden umschreiben, `uhr/` = eigenes `UHR.COM`); neun Systemdisketten (A5120 CP/A+SCPX, K8915, PRG 710/-1, PC 1715 ×3, PC 1715W) tragen sie passend zur Oberflächen-Vorauswahl; Wächter `KartenBeigaben.*` (ohne Skip), `py_karten_software`, `cli_karten_beigaben`, `cli_uhr_com`.  **GIDE-CP/A + Boot von der Platte (2026-11-14):** Lade-ROM `ul4` (`K2526::Laderom::UL4`, Urlader K2526UL4 von K. Wilfling: Diskette, dann GIDE **D0H** fest im ROM) und `disks/a5120_cpa_gide/` (CP/A mit GIDE-Treiber im BIOS, fertige bootfähige 256-MB-Platte im Poppe-Layout), gebaut mit der CPA_Workbench-Variante `gide_a5120`; Wächter `py_cpa_gide`, Merkposten `doc/merkposten/gide_cpa.md`.
 **Vor Arbeiten daran: `doc/merkposten/gun.md` lesen**; Entwurf `doc/design/50_gun_gide.md`.
 
+## SOUND-Karte K1520 (AY-3-8910 + CTC, Entwurf 51)
+
+Steckbare SOUND-Karte K1520 V2 (nie von Robotron gefertigt) mit **AY-3-8910/8912** (eigener Nachbau nach Datenblatt, keine Fremdsoftware im Kern) und eigener
+**Z80-CTC** als Option in allen Maschinen mit Steckplatz (P8000 nicht), Vorgabe überall **aus**.  Karte `core/cards/sound_k1520/`, Chip `core/primitives/ay38910.*`,
+**Tonstrecke `core/audio/`** (Ringpuffer, WAV-Mitschrift, ALSA per `dlopen`/`waveOut`/stumm), gesteckt über `K1520Machine::installSound` **nach dem Anlegen, vor dem
+ersten Lauf** (C-ABI `k1520_sound_*`/`k1520_audio_*`, Python `K1520Emulator(sound={...})`, `--sound[=basis]`/`--wav` in `boot_trace`/`k1520dbg`, Befehl `ay`, Oberfläche
+*Einstellungen ▸ Allgemein ▸ Soundkarte* + *Maschine ▸ Ton*, kein Kürzel).  Festgelegt: **Maschinenzeit** (48 kHz, Kastenfilter gegen Aliasing), der Emulationsfaden
+schiebt in einen sperrfreien Ringpuffer **ohne Kernsperre**, **hörbar nur bei Echtzeit** (WAV in jedem Tempo), ohne Gerät/`libasound.so.2` läuft alles stumm mit Grund,
+nicht im Save-State; Basis im Kern frei (Vielfaches von 8), Vorauswahl **38H**, **PC 1715W E0H**; **Kanalzuordnung Vorgabe ACB** (nach dem Hörvergleich mit der Aufnahme der
+echten Karte, ABC/Mono wählbar); A5120-Nenntakt 2 457 600.  Gastsoftware (`SKTEST4`, `STCTEST1`, `PLAYSTC`, `TGCPM`) liegt in `tools/sound/fremd/` und auf den
+Systemdisketten A5120 CP/A+SCPX und PC 1715 CP/A (`tools/sound/sound_karten.py`).  Wächter `SoundK1520.*`, `Ay38910.*`, `SoundSystem.*`, `py_sound_api`, `py_sound_gui`,
+`cli_sound_beigaben`; Label `fach_sound`.
+**Vor Arbeiten daran: `doc/merkposten/sound.md` lesen**; Entwurf `doc/design/51_soundkarte_k1520.md`.
+
 ## Lochstreifen K6022/SIF1000 (alle Maschinen; PC 1715 nur mechanisch)
 
 ADA K6022 (Leser daro 1210, Stanzer daro 1215) als steckbare Option auf **E/A E0H–E7H**

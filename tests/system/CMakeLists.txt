@@ -46,6 +46,16 @@ k1520_add_test(disktool_udos_roundtrip SRC test_disktool_udos_roundtrip.cpp
                                        LIBS ${_libs} k1520_fs
                                        LABELS "${_lbl};fach_floppy;fach_a5120" DEFS LOG_LEVEL=2 TIMEOUT 600)
 
+# SOUND-Karte K1520 mit der ORIGINAL-Gastsoftware (doc/design/51_soundkarte_k1520.md AP S7): TGCPM, SKTEST4,
+# STCTEST1, PLAYSTC unter CP/A und SCPX (A5120, Karte 38H) und SKTEST4 unter CP/A 1715 (Karte ebenfalls 38H);
+# Messung an der WAV-Mitschrift und an den CTC-Interrupts der Karte.  Programme: tools/sound/fremd/{a5120,pc1715}/ (dieselben Dateien wie auf den Systemdisketten).
+# Je Fall nur 2-5 s (Release): KEIN Langsam-Label, laeuft in `tools/dev.sh test`; `fach_sound` fuer test-merge.
+k1520_add_test(sound_system SRC test_sound_system.cpp
+                            LIBS k1520_a5120 k1520_pc1715 k1520_sound_k1520 k1520_floppy k1520_logger k1520_testsupport k1520_fs
+                            LABELS "system;fast;fach_sound" DEFS LOG_LEVEL=2
+                            K1520_SOUND_FIXTURES="${CMAKE_SOURCE_DIR}/tools/sound/fremd"
+                            TIMEOUT 120)
+
 # HARDY-Hardware-Testprogramm: der „Rechner"-Test laeuft clean durch (Waechter
 # fuer den /MEMDI- + BS-PIO-Bus-Strobe-Fix).
 k1520_add_test(hardy     SRC test_hardy.cpp     LIBS ${_libs}

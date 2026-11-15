@@ -143,6 +143,7 @@ void Prg710Machine::interruptKetteSetzen()
     }
     if (gun_usb_) bus_.appendInterruptChain(&gun_usb_->pio());   // GUN-USB (AP U2): hinten, am Geraet unbelegt [?]
     if (gun_net_) bus_.appendInterruptChain(&gun_net_->pio());   // KCNet (AP N2): hinten, am Geraet unbelegt [?]
+    if (sound_) bus_.appendInterruptChain(&sound_->ctc());       // SOUND-Karte (Entwurf 51 S4): hinten
 }
 
 std::vector<k1520::serial::SerialAnschluss*> Prg710Machine::serielleAnschluesse()
@@ -169,6 +170,7 @@ void Prg710Machine::resetHardware()
     gideReset();             // GIDE (gesteckt?): LH, Platte; Medium bleibt
     gunUsbReset();           // GUN-USB (gesteckt?): PIO, VDIP1; Stick bleibt
     gunNetReset();           // KCNet (gesteckt?): PIO, Automat, W5100
+    soundReset();             // SOUND-Karte (gesteckt?): AY und CTC
     fs_.reset();
     rafReset();              // RAF (gesteckt?): nur das Latch sperrt, der Inhalt bleibt
     hub_.gastZurueckgesetzt();
@@ -191,6 +193,7 @@ void Prg710Machine::powerOn()
     gidePowerOn();
     gunUsbPowerOn();
     gunNetPowerOn();
+    soundPowerOn();
     resetHardware();
     LOG_INFO("PRG710", "Netz ein: Abbildung aus, ROM bei 0000H");
 }
@@ -277,6 +280,7 @@ int Prg710Machine::run(int max_cycles)
         dirty |= k5020Takt(used);   // Kassette (gesteckt?)
         gideTakt(total_cycles_);   // GIDE (gesteckt?): Platte und RTC in Maschinenzeit
         gunNetTakt(total_cycles_);   // KCNet (gesteckt?): Kommando 03 in Maschinenzeit
+        dirty = soundTakt(used, total_cycles_) || dirty;   // SOUND-Karte (gesteckt?): CTC-Takt + AY-Zeit
         dirty |= fs_.clockTick(used);
         dirty |= atp_.clockTick(used);   // ATP-Zusatz (gesteckt?): Kanalschleife der SIO C0H–C3H
         if (total_cycles_ >= serial_naechst_) {

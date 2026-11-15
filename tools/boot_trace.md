@@ -436,6 +436,25 @@ So lässt sich ein Treiber-/Boot-Lauf mit RAM-Floppe verfolgen (`--watchio 0x88,
 Inhalt ansehen nach dem Lauf im Debugger (`k1520dbg --raf …`, Befehl `raf`, §11c dort).
 Unbekannter Typ → Exit 2. Wächter: `cli_bt_raf`, `cli_bt_raf_k8915`, `cli_bt_raf_typ`.
 
+## 10b. SOUND-Karte K1520 (`--sound`, `--wav`)
+
+`--sound[=basis]` steckt vor dem ersten Lauf die SOUND-Karte (AY-3-8910/8912 + eigene CTC,
+`doc/design/51_soundkarte_k1520.md`) — an A5120 (auch `.16`), K8915, PRG 710/-1, PC 1715/1715W und
+MC80; nicht am P8000.  Basis hex oder dezimal, Vielfaches von 8, Vorgabe **38H** (PC 1715/1715W: **E0H**).
+
+| Option | Wirkung |
+|--------|---------|
+| `--sound-takt=quarz\|halb\|system` | Chiptakt: Quarz, Quarz/2 (Vorgabe) oder Systemtakt |
+| `--sound-kanal=abc\|acb\|mono` | Mischer (Vorgabe `acb`) |
+| `--sound-chip=8910\|8912` | AY-Variante (Vorgabe 8910) |
+| `--wav=DATEI` | WAV-Mitschrift (48 kHz, Stereo, Maschinenzeit) ab dem Stecken bis zum Programmende; ohne `--sound` Fehler |
+
+Die Tonausgabe an den Wirt wird **nicht** gestartet.  Am Ende meldet `boot_trace` auf stderr
+`--wav: <n> Frames (48000 Hz, 2 Kanaele) geschrieben`.  Fehler beim Stecken (Tor belegt, Basis
+kein Vielfaches von 8, unbekannter Optionswert, Datei nicht schreibbar) → Meldung `--sound: …`, Exit 2.
+Register ansehen: `k1520dbg --sound …`, Befehl `ay` (§11g dort).  Wächter: `cli_bt_sound_wav`,
+`cli_bt_sound_wav_ohne_karte`.
+
 ## 10a. Lochstreifen (`--ptape`)
 
 `--ptape` steckt die ADA K6022 (Lochbandstanzer E0H–E3H, -leser E4H–E7H;

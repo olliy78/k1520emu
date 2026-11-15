@@ -243,6 +243,7 @@ int main(int argc, char** argv){
     const char* aup_alpha_opt = nullptr;   // --aup-alpha led|ohne|mit
     bool aup_sonder_opt = false;           // --aup-sonder: Sonderschnittstelle (N10d)
     bool gide_opt = false; int gide_basis = -1; std::string gide_image;   // --gide[=basis] / --gide-image
+    SoundOpts sound_opt;   // --sound[=basis] / --sound-takt/-kanal/-chip / --wav
     bool usb_opt = false; int usb_basis = -1; std::string usb_dir;   // --usb[=basis] / --usb-dir
     bool net_opt = false; int net_basis = -1;   // --net[=basis]: KCNet-Netzkarte
     const char* raf_opt = nullptr; // --raf none|raf128|raf512|raf2m: RAM-Floppy auf 88H/89H
@@ -304,6 +305,7 @@ int main(int argc, char** argv){
         else if (!strcmp(argv[i],"--ptape")) ptape_opt=true;
         else if (dbgm::parseGideOpt(argv[i],gide_basis)) gide_opt=true;
         else if (!strcmp(argv[i],"--gide-image") && i+1<argc) { gide_opt=true; gide_image=argv[++i]; }
+        else if (sound_opt.parse(argv[i])) {}
         else if (dbgm::parseUsbOpt(argv[i],usb_basis)) usb_opt=true;
         else if (dbgm::parseNetOpt(argv[i],net_basis)) net_opt=true;
         else if (!strcmp(argv[i],"--usb-dir") && i+1<argc) { usb_opt=true; usb_dir=argv[++i]; }
@@ -457,10 +459,12 @@ int main(int argc, char** argv){
       if (!dbgm::steckeGide(m.base(), gide_opt, gide_basis, gide_image, err)){ fprintf(stderr,"--gide: %s\n",err.c_str()); return 2; }
       if (!dbgm::steckeUsb(m.base(), usb_opt, usb_basis, usb_dir, err)){ fprintf(stderr,"--usb: %s\n",err.c_str()); return 2; }
       if (!dbgm::steckeNet(m.base(), net_opt, net_basis, err)){ fprintf(stderr,"--net: %s\n",err.c_str()); return 2; }
+      if (!dbgm::steckeSound(m.base(), sound_opt, m.pc1715()!=nullptr && m.pc1715()->istW(), err)){ fprintf(stderr,"--sound: %s\n",err.c_str()); return 2; }
       if (m.base().k6022()) {
           if (!ptape_in.empty() && !m.base().k6022()->bandEinlegenDatei(ptape_in, err)){ fprintf(stderr,"--ptape-in: %s\n",err.c_str()); return 2; }
           if (!ptape_out.empty() && !m.base().k6022()->stanzerBinden(ptape_out, K6022::Format::Roh, err)){ fprintf(stderr,"--ptape-out: %s\n",err.c_str()); return 2; } } }
     m.powerOn();
+    dbgm::WavWaechter wav_waechter(m.base(), sound_opt);   // --wav: stoppt beim Programmende
     const bool K8 = m.einCpu();      // eine CPU: K8915 ODER PRG (keine ZVE2/Snapshots)
     const bool K89 = m.isK8915();
     const bool KP = m.isPrg();       // PRG 710 / 710-1
@@ -3338,6 +3342,15 @@ int main(int argc, char** argv){
         if (cmd=="q"||cmd=="quit") break;
         // §0.4 topic help: `help floppy` / `help dualcpu` — the two recipes that were
         // the least discoverable (this session cost 8+ runs for want of them).
+        else if ((cmd=="help"||cmd=="h"||cmd=="?") && t.size()>1 && t[1]=="ay"){
+            fprintf(stderr,
+              "  ay        (mit --sound) SOUND-Karte K1520: AY-3-8910/8912 und Karten-CTC, ohne Nebenwirkung\n"
+              "    Zeigt R0-R15 (hex), Latch, je Kanal A/B/C Tonperiode + Frequenz (Chiptakt/(16*TP), TP 0 = 1),\n"
+              "    Ton/Rauschen an/aus (R7), Pegel bzw. Huellkurve, Rauschperiode, Huellkurvenperiode EP\n"
+              "    (Durchlauf = 256*EP/Chiptakt), Form R13 als ASCII, aktuelle Huellkurvenstufe, Port A/B, CTC 0-3.\n"
+              "    Stecken: --sound[=basis] [--sound-takt=quarz|halb|system] [--sound-kanal=acb|abc|mono]\n"
+              "             [--sound-chip=8910|8912] [--wav=DATEI]   (Vorgabe 38H, PC 1715/1715W E0H)\n");
+        }
         else if ((cmd=="help"||cmd=="h"||cmd=="?") && t.size()>1 &&
                  (t[1]=="floppy"||t[1]=="disk"||t[1]=="k5122")){
             fprintf(stderr,
@@ -3509,6 +3522,7 @@ int main(int argc, char** argv){
               "  KASSETTE tape     (mit --tape) K5020: Karte, je Geraet Kassette/Seite/Kopf/Bloecke/Bindung\n"
               "          tape <1|2> [A|B]       Blockliste einer Seite;  tape <1|2> <A|B> <i>  Rohbytes von Block i\n"
               "  GIDE    gide      (mit --gide) Basis, LH, letzter Befehl, Zaehler, Platte, Task-File (ohne Nebenwirkung), RTC\n"
+              "  SOUND   ay        (mit --sound) AY-Register, Kanaele (Tonperiode/Hz, Pegel), Huellkurve, Ports, Karten-CTC (ohne Nebenwirkung)\n"
               "  GUN-USB usb       (mit --usb) Basis, Stick, Zaehler, Ausgabe-FIFO, PIO-Zustand (ohne Nebenwirkung)\n"
               "  KCNet   net       (mit --net) Basis, Version, Link, Zaehler, W5100-Sockets (SR, Ziel, Wirtsport), PIO (ohne Nebenwirkung)\n"
               "  RAF     raf       (mit --raf) Typ, Kapazitaet, Latch, gesperrt, Sektor aus dem Latch\n"
@@ -4813,6 +4827,19 @@ int main(int argc, char** argv){
             k1520::GunNet* g = m.base().gunNet();
             if (!g) fprintf(stderr,"  keine KCNet-Karte gesteckt (--net[=basis])\n");
             else fputs(dbgm::netText(*g).c_str(), stderr);
+        }
+        else if (cmd=="ay"){   // SOUND-K1520 (--sound): AY-Register, Kanaele, Huellkurve, Ports, Karten-CTC (ohne Nebenwirkung)
+            const k1520::SoundK1520* k = m.base().soundK1520();
+            if (!k) fprintf(stderr,"  keine SOUND-Karte gesteckt (--sound[=basis] [--sound-takt=..] [--sound-kanal=..] [--sound-chip=..] [--wav=DATEI])\n");
+            else {
+                fputs(dbgm::soundText(*k).c_str(), stderr);
+                const Z80CTC::DebugState c = k->ctc().debugState();
+                auto Y=[&](bool b){ return b?"1":"0"; };
+                fprintf(stderr,"  CTC (Karte, %02XH-%02XH)  vecBase=%02X  IEI=%s IEO=%s\n",k->config().basis+4,k->config().basis+7,c.vecBase,Y(c.iei),Y(c.ieo));
+                for(int i=0;i<4;++i){ auto& ch=c.ch[i];
+                    fprintf(stderr,"    ch%d ctl=%02X TC=%02X cnt=%-3d run=%s  INT(en=%s pend=%s ius=%s iei=%s)\n",
+                        i,ch.control,ch.timeConst,ch.counter,Y(ch.running),Y(ch.intEn),Y(ch.intPending),Y(ch.ius),Y(ch.iei)); }
+            }
         }
         else if (cmd=="gide"){   // GIDE (--gide): Basis, LH, letzter Befehl, Zaehler, Platte, Task-File, RTC (ohne Nebenwirkung)
             const k1520::Gide* g = m.base().gide();

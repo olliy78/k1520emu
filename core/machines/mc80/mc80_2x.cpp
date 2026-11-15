@@ -98,6 +98,7 @@ void Mc80_2xMachine::powerOn()
     gidePowerOn();
     gunUsbPowerOn();
     gunNetPowerOn();
+    soundPowerOn();
     total_cycles_ = 0;
     {
         std::lock_guard<std::mutex> l(tasten_mtx_);
@@ -125,6 +126,7 @@ void Mc80_2xMachine::resetHardware()
     gideReset();             // GIDE (gesteckt?): LH, Platte; Medium bleibt
     gunUsbReset();           // GUN-USB (gesteckt?): PIO, VDIP1; Stick bleibt
     gunNetReset();           // KCNet (gesteckt?): PIO, Automat, W5100
+    soundReset();             // SOUND-Karte (gesteckt?): AY und CTC
     rafReset();
     bus_.clearNMI();
     bus_.releaseINT();
@@ -158,6 +160,7 @@ int Mc80_2xMachine::run(int max_cycles)
         dirty |= k5020Takt(used);
         gideTakt(total_cycles_);   // GIDE (gesteckt?): Platte und RTC in Maschinenzeit
         gunNetTakt(total_cycles_);   // KCNet (gesteckt?): Kommando 03 in Maschinenzeit
+        dirty = soundTakt(used, total_cycles_) || dirty;   // SOUND-Karte (gesteckt?): CTC-Takt + AY-Zeit
         if (dirty) bus_.markIntDirty();
     }
     mbi_.autoFlush();

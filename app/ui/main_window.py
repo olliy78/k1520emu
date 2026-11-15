@@ -29,7 +29,8 @@ import time
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QMessageBox, QDockWidget, QMenu, QFileDialog,
-    QScrollArea, QToolBar, QToolButton, QVBoxLayout, QStackedWidget, QLabel
+    QScrollArea, QToolBar, QToolButton, QVBoxLayout, QStackedWidget, QLabel,
+    QDialog, QDialogButtonBox, QSlider
 )
 from PySide6.QtCore import Qt, QTimer, QSize, QByteArray, QEvent
 from PySide6.QtGui import QAction, QActionGroup, QGuiApplication, QIcon
@@ -68,6 +69,7 @@ from app import raf
 from app import gide
 from app import kartenwahl
 from app import netz
+from app import sound
 from app import usb
 from app import rtc
 from app import k3521
@@ -153,6 +155,13 @@ class MainWindow(QMainWindow):
         self._net = netz.vorgabe(self.profil.karten_vorauswahl("net", self._model))
         self._net_fehler = ""
         self._net_zaehler = None
+        # SOUND-Karte K1520 (`app/sound.py`, Entwurf 51 AP S8): dasselbe Muster; Lautstaerke/Stumm gelten
+        # fuer die Wirtsausgabe und werden auch ohne Karte gemerkt.  ``_wav_aktiv`` = Mitschnitt laeuft.
+        self._sound = sound.vorgabe(self.profil.karten_vorauswahl("sound", self._model))
+        self._sound_fehler = ""
+        self._lautstaerke = sound.LAUTSTAERKE_VORGABE
+        self._ton_stumm = False
+        self._wav_aktiv = False
         # AUP 062-8531 (Entwurf 33 N10e): Option, Vorgabe aus; Sonderschnittstelle und die
         # Annahme zur Alpha-Tabelle (led|ohne|mit) gehoeren dazu.
         self._aup = False
@@ -170,7 +179,7 @@ class MainWindow(QMainWindow):
             raise
 
         # Emulator loop parameters.
-        # The A5120 U880 runs at ~2.45 MHz (matches the core's K5122 cpu_hz default).
+        # The A5120 U880 runs at 2.4576 MHz (the core nenntaktHz()).
         # To emulate at real time we must execute cpu_hz * frame_interval cycles per
         # frame — with a 20 ms tick that is 49000 cycles, NOT the old 10000 (which ran
         # the machine at only 0.2x speed, so a boot that takes ~13.8M cycles dragged on
@@ -275,6 +284,7 @@ class MainWindow(QMainWindow):
         self.settings_widget.usbChanged.connect(self._on_usb_changed)
         self.settings_widget.usbStickGewuenscht.connect(self._on_usb_stick)
         self.settings_widget.netChanged.connect(self._on_net_changed)
+        self.settings_widget.soundChanged.connect(self._on_sound_changed)
         self.settings_widget.rafChanged.connect(self._on_raf_selected)
         self.settings_widget.rtcStellenGewuenscht.connect(self._on_rtc_stellen)
         self.settings_widget.rafStandbyChanged.connect(self._on_raf_standby_changed)
@@ -342,6 +352,7 @@ class MainWindow(QMainWindow):
         # die Disketten bewusst OHNE `disk_mounted` ein (es ist keine
         # Nutzeraktion), sonst stuende dort bis zum ersten Sekundentakt „leer".
         self._update_drive_status()
+        self._sound_anzeigen()
 
         # Cold start with the restored disks present, then begin running.
         self._einschalten()
@@ -1152,6 +1163,11 @@ class MainWindow(QMainWindow):
             emu_menu.addAction(self.act_speicherabzug_laden)
             emu_menu.addAction(self.act_pcmc)
             emu_menu.addAction(self.act_text_kopieren)
+        if hasattr(self, "act_ton_stumm"):       # Tonausgabe der SOUND-Karte (alle ausser P8000)
+            emu_menu.addSeparator()
+            emu_menu.addAction(self.act_ton_stumm)
+            emu_menu.addAction(self.act_ton_lautstaerke)
+            emu_menu.addAction(self.act_ton_mitschnitt)
         if self.eprom_dock is not None:          # nur im Profil mit EPROMmer
             emu_menu.addSeparator()
             eprom_menu = emu_menu.addMenu("E&PROMmer")
@@ -1408,6 +1424,10 @@ class MainWindow(QMainWindow):
             general[gide.SCHLUESSEL] = gide.fuer_konfig(self._gide)
             general[usb.SCHLUESSEL] = usb.fuer_konfig(self._usb)
             general[netz.SCHLUESSEL] = netz.fuer_konfig(self._net)
+        if self.profil.sound_wahl:
+            general[sound.SCHLUESSEL] = sound.fuer_konfig(self._sound)
+            general[sound.SCHLUESSEL_LAUTSTAERKE] = int(self._lautstaerke)
+            general[sound.SCHLUESSEL_STUMM] = bool(self._ton_stumm)
         if self.profil.aup_wahl:
             general["aup"] = bool(self._aup)
             general["aup_sonder"] = bool(self._aup and self._aup_sonder)
@@ -1720,6 +1740,18 @@ class MainWindow(QMainWindow):
                 self._net_fehler = ""
             self.settings_widget.set_usb_value(self._usb)
             self.settings_widget.set_net_value(self._net)
+            # SOUND-Karte: fehlender Abschnitt = nicht anfassen; Lautstaerke/Stumm wirken sofort.
+            if self.profil.sound_wahl:
+                if sound.SCHLUESSEL in general:
+                    self._sound = sound.normalize(general.get(sound.SCHLUESSEL),
+                                                  self.profil.karten_vorauswahl("sound", self._model))
+                    self._sound_fehler = ""
+                if sound.SCHLUESSEL_LAUTSTAERKE in general:
+                    self._lautstaerke = sound.lautstaerke_lesen(general.get(sound.SCHLUESSEL_LAUTSTAERKE))
+                if sound.SCHLUESSEL_STUMM in general:
+                    self._ton_stumm = general.get(sound.SCHLUESSEL_STUMM) is True
+                self.settings_widget.set_sound_value(self._sound)
+                self._ton_aktionen_setzen()
             # AUP: dasselbe (fehlend = aus; Sonderschnittstelle/Alpha nur mit gesteckter AUP).
             self._aup = general.get("aup") is True and self.profil.aup_wahl
             self._aup_sonder = self._aup and general.get("aup_sonder") is True
@@ -2169,6 +2201,7 @@ class MainWindow(QMainWindow):
         self._update_gide()
         self._update_usb()
         self._update_net()
+        self._update_ton()
         for feld in self.status_widget.felder():
             drive = feld.drive
             lampe = self.status_widget.lampe(drive)
@@ -2318,6 +2351,7 @@ class MainWindow(QMainWindow):
         die Maschine langsamer, nicht die Oberfläche."""
         self.speed_factor = float(speed)
         self.run_timer.set_tempo(self.CPU_HZ, self.speed_factor)
+        self._ton_echtzeit_melden()
         # Die Statuszeile nennt den eingestellten Takt — sie darf nicht bis zum
         # naechsten Sekundentakt hinterherhinken.
         if getattr(self, "status_widget", None) is not None:
@@ -2513,12 +2547,26 @@ class MainWindow(QMainWindow):
         else:
             einzel = {"em": self.profil.modell_em(self._model, self._hardware),
                       "tape": bool(self._tape)}
+        snd = [sound.kern_param(self._sound) if self.profil.sound_wahl else None]
+
         def bauen(gide_param, usb_param, net_param):
             return K1520Emulator(types, machine=self.profil.modell_maschine(self._model),
                                  raf=raf.core_param(self._raf) if self.profil.raf_wahl else None,
                                  ptape=bool(self._ptape), gide=gide_param, usb=usb_param, net=net_param,
-                                 **einzel, **kern)
+                                 sound=snd[0], **einzel, **kern)
 
+        self._sound_fehler = ""
+        if snd[0] is not None:
+            # Die SOUND-Karte allein probebauen: scheitert sie (Basis belegt u. a.), faellt sie mit dem
+            # Grund weg, die Maschine laeuft ohne sie -- statt dass die Fehlerrueckfaelle der drei
+            # anderen Karten ihretwegen alle verwerfen.
+            try:
+                bauen(None, None, None)
+            except ValueError as e:
+                self._sound_fehler = f"Soundkarte nicht gesteckt: {e}"
+                self._sound = {**self._sound, "enabled": False}
+                snd[0] = None
+                self.statusBar().showMessage(self._sound_fehler, 10000)
         emu = self._karten_bauen(bauen)
         # Die Tastatur hat ihren eigenen Quarz — bei 10 × Rechnertakt darf sie
         # nicht zehnmal so frueh wiederholen (core/peripherals/tasten_uhr.h).
@@ -2528,6 +2576,7 @@ class MainWindow(QMainWindow):
         self._raf_frisch = True
         self._raf_laden(emu)
         self._k3521_binden(emu)
+        self._ton_anwenden(emu)
         return emu
 
     def _gide_kern_zustand(self):
@@ -2538,11 +2587,13 @@ class MainWindow(QMainWindow):
 
     def _karten_kern_zustand(self):
         """Was an den Steckkarten am Kern haengt (Neuaufbau noetig bei Aenderung) -- GIDE, USB, Netz."""
+        snd = tuple(sorted(sound.kern_param(self._sound).items())) if (
+            self.profil.sound_wahl and self._sound["enabled"]) else None
         if not self.profil.erweiterungskarten:
-            return None
+            return snd
         u = (self._usb["basis"],) if self._usb["enabled"] else None
         n = (self._net["basis"], self._net["nur_loopback"]) if self._net["enabled"] else None
-        return (self._gide_kern_zustand(), u, n)
+        return (self._gide_kern_zustand(), u, n, snd)
 
     def _karten_bauen(self, bauen):
         """Maschine mit den gesteckten Karten GIDE, USB und Netz bauen -- ein Fehler des Kerns stuerzt NICHT ab.
@@ -2666,6 +2717,7 @@ class MainWindow(QMainWindow):
         Dialog gewaehlten Karten aus :mod:`app.kartenwahl`."""
         if not self.profil.erweiterungskarten:
             return
+        self._sound_basis_beschriften()
         gewaehlt = {"gide": self._gide, "usb": self._usb, "net": self._net}
         gruppen = {"gide": self.settings_widget.gide_gruppe, "usb": self.settings_widget.usb_gruppe,
                    "net": self.settings_widget.netz_gruppe}
@@ -2673,10 +2725,31 @@ class MainWindow(QMainWindow):
             andere = {x: int(z["basis"]) for x, z in gewaehlt.items() if x != k and z["enabled"]}
             gruppen[k].set_basen(kartenwahl.eintraege(art, self.emulator.io_owner, andere))
 
+    def _sound_basis_beschriften(self) -> None:
+        """Auswahlfeld der Basis der SOUND-Karte: Besitzer aus dem Kern, Kollisionen mit den im Dialog
+        gewaehlten Erweiterungskarten aus :mod:`app.kartenwahl`."""
+        if not self.profil.sound_wahl:
+            return
+        andere = {}
+        if self.profil.erweiterungskarten:
+            andere = {k: int(z["basis"]) for k, z in
+                      (("gide", self._gide), ("usb", self._usb), ("net", self._net)) if z["enabled"]}
+        self.settings_widget.sound_gruppe.set_basen(
+            kartenwahl.eintraege(kartenwahl.SOUND, self.emulator.io_owner, andere))
+
+    def _sound_anzeigen(self) -> None:
+        """Gruppe, Aktionen und Statuszeile an die laufende Maschine angleichen (nach jedem Neuaufbau)."""
+        if not self.profil.sound_wahl:
+            return
+        self.settings_widget.set_sound_value(self._sound, self._sound_fehler, self._sound_gesteckt())
+        self._sound_basis_beschriften()
+        self._ton_aktionen_setzen()
+        self._update_ton()
+
     def _karten_basis_nachziehen(self, modell_alt: str) -> None:
         """Nach einem Modellwechsel: eine Basis, die noch die Vorauswahl des alten Modells ist, folgt der
         des neuen (K8915 V3 -> V2: USB 84H -> 8CH).  Eine vom Anwender gewaehlte bleibt."""
-        for schl, z in (("usb", self._usb), ("net", self._net)):
+        for schl, z in (("usb", self._usb), ("net", self._net), ("sound", self._sound)):
             if z["basis"] == self.profil.karten_vorauswahl(schl, modell_alt):
                 z["basis"] = self.profil.karten_vorauswahl(schl, self._model)
 
@@ -2891,6 +2964,171 @@ class MainWindow(QMainWindow):
         self.settings_widget.netz_gruppe.set_zaehler(
             f"{st['kommandos']} Kommandos ({st['fehlerkommandos']} Fehler), "
             f"{st['bytes_zur_karte']} Byte zur Karte, {st['bytes_zum_gast']} Byte zum Rechner")
+
+    # ── SOUND-Karte K1520 (Entwurf 51, AP S8) ────────────────────────────────
+
+    def _sound_gesteckt(self) -> bool:
+        return bool(self.profil.sound_wahl and self.emulator.sound_present())
+
+    def _on_sound_changed(self, neu: dict):
+        """Eingaben der Soundkarten-Gruppe: jede Aenderung der Bestueckung baut die Maschine neu."""
+        neu = dict(neu)
+        alt = self._sound
+        if neu == alt:
+            return
+        if neu["enabled"] or alt["enabled"]:
+            if not self._eprom_rueckfrage("Wechsel der Soundkarte"):
+                self.settings_widget.set_sound_value(alt, self._sound_fehler, self._sound_gesteckt())
+                return
+            self._sound = neu
+            self._apply_drive_types(self._drive_types, cold_restart=True)
+            self._schedule_autosave()
+            return
+        self._sound = neu                      # beide aus: nur die gemerkte Wahl aendert sich
+        self._sound_basis_beschriften()
+        self._schedule_autosave()
+
+    def _ton_anwenden(self, emu) -> None:
+        """Lautstaerke, Stumm und Echtzeit an die Maschine *emu* geben und die Wirtsausgabe starten
+        (nur mit gesteckter Karte).  Aufruf nach jedem Neuaufbau und bei Aenderungen."""
+        if not self.profil.sound_wahl:
+            return
+        try:
+            with kern_sperre():
+                if not emu.sound_present():
+                    return
+                emu.audio_lautstaerke(self._lautstaerke / 100.0)
+                emu.audio_stumm(self._ton_stumm)
+                emu.audio_echtzeit(self._ton_echtzeit())
+                emu.audio_start()
+        except Exception as e:           # kein Ton darf die Maschine nicht kosten
+            print(f"[sound] {e}")
+
+    def _ton_echtzeit(self) -> bool:
+        """Hoerbar nur bei Faktor 1,0 (Entwurf 51 §4.1 Nr. 4)."""
+        return abs(float(getattr(self, "speed_factor", 1.0)) - 1.0) < 1e-9
+
+    def _ton_echtzeit_melden(self) -> None:
+        """Beim Tempowechsel dem Kern sagen, ob jetzt Echtzeit herrscht."""
+        try:
+            if self.profil.sound_wahl and self.emulator.sound_present():
+                with kern_sperre():
+                    self.emulator.audio_echtzeit(self._ton_echtzeit())
+        except Exception as e:
+            print(f"[sound] {e}")
+
+    def _ton_aktionen_setzen(self) -> None:
+        """Haken von „Ton stumm" nachfuehren (ohne Signal) und die Tonaktionen nur mit Karte freigeben."""
+        a = getattr(self, "act_ton_stumm", None)
+        if a is None:
+            return
+        gesteckt = self._sound_gesteckt()
+        a.blockSignals(True)
+        a.setChecked(bool(self._ton_stumm))
+        a.blockSignals(False)
+        grund = "" if gesteckt else "  (Nur mit gesteckter Soundkarte: Einstellungen ▸ Allgemein ▸ Soundkarte)"
+        for n in ("ton_stumm", "ton_lautstaerke", "ton_mitschnitt"):
+            x = getattr(self, f"act_{n}")
+            x.setEnabled(gesteckt)
+            if not hasattr(x, "_tipp_basis"):
+                x._tipp_basis = x.toolTip()
+            x.setToolTip(x._tipp_basis + grund)
+        self.act_ton_mitschnitt.setText("Ton Mitschnitt &beenden" if self._wav_aktiv
+                                        else "Ton &mitschneiden…")
+
+    def _on_ton_stumm(self, an: bool):
+        """Menü *Maschine ▸ Ton stumm* (rastend)."""
+        self._ton_stumm = bool(an)
+        try:
+            if self._sound_gesteckt():
+                with kern_sperre():
+                    self.emulator.audio_stumm(self._ton_stumm)
+        except Exception as e:
+            print(f"[sound] {e}")
+        self._update_ton()
+        self._schedule_autosave()
+
+    def _lautstaerke_setzen(self, prozent: int) -> None:
+        """Lautstaerke 0–100 % setzen, an den Kern geben und merken."""
+        self._lautstaerke = max(0, min(100, int(prozent)))
+        try:
+            if self._sound_gesteckt():
+                with kern_sperre():
+                    self.emulator.audio_lautstaerke(self._lautstaerke / 100.0)
+        except Exception as e:
+            print(f"[sound] {e}")
+        self._schedule_autosave()
+
+    def _lautstaerke_dialog(self):
+        """Menü *Maschine ▸ Lautstärke…*: kleiner Regler, wirkt beim Ziehen sofort; Abbrechen stellt zurueck."""
+        alt = self._lautstaerke
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Lautstärke")
+        lay = QVBoxLayout(dlg)
+        wert = QLabel(f"{alt} %", dlg)
+        regler = QSlider(Qt.Horizontal, dlg)
+        regler.setRange(0, 100)
+        regler.setValue(alt)
+        regler.setMinimumWidth(260)
+
+        def geaendert(v: int):
+            wert.setText(f"{v} %")
+            self._lautstaerke_setzen(v)
+        regler.valueChanged.connect(geaendert)
+        lay.addWidget(regler)
+        lay.addWidget(wert, 0, Qt.AlignHCenter)
+        knoepfe = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, dlg)
+        knoepfe.accepted.connect(dlg.accept)
+        knoepfe.rejected.connect(dlg.reject)
+        lay.addWidget(knoepfe)
+        if dlg.exec() != QDialog.Accepted:
+            self._lautstaerke_setzen(alt)
+
+    def _wav_beenden(self) -> None:
+        """Mitschnitt beenden (Maschine wird getauscht oder Aktion gedrueckt)."""
+        if not self._wav_aktiv:
+            return
+        self._wav_aktiv = False
+        try:
+            with kern_sperre():
+                self.emulator.audio_wav_stop()
+        except Exception as e:
+            print(f"[sound] {e}")
+
+    def _ton_mitschnitt(self):
+        """Menü *Maschine ▸ Ton mitschneiden…*: WAV-Datei waehlen und starten; noch einmal = beenden."""
+        if self._wav_aktiv:
+            self._wav_beenden()
+            self.statusBar().showMessage("Tonmitschnitt beendet", 4000)
+        elif self._sound_gesteckt():
+            start = os.path.join(paths.user_disks_dir(), "ton.wav")
+            pfad, _ = QFileDialog.getSaveFileName(self, "Ton mitschneiden", start, "WAV-Datei (*.wav)")
+            if pfad:
+                if not pfad.lower().endswith(".wav"):
+                    pfad += ".wav"
+                with kern_sperre():
+                    ok = self.emulator.audio_wav_start(pfad)
+                if ok:
+                    self._wav_aktiv = True
+                    self.statusBar().showMessage(f"Tonmitschnitt läuft: {pfad}", 6000)
+                else:
+                    self.statusBar().showMessage(f"Mitschnitt nicht gestartet: {self.emulator.audio_fehler()}", 8000)
+        self._ton_aktionen_setzen()
+
+    def _update_ton(self) -> None:
+        """Feld „Ton: …" der Statuszeile (nur mit gesteckter Karte)."""
+        feld = self.status_widget.ton
+        if not self._sound_gesteckt():
+            feld.zeige("", "")
+            return
+        status = self.emulator.audio_status()
+        fehler = self.emulator.audio_fehler()
+        tipp = fehler or {
+            "aus": "Tonausgabe nicht gestartet",
+            "stumm": "Tonausgabe stumm" + ("" if self._ton_stumm else " (kein Gerät oder nicht in Echtzeit)"),
+            "hoerbar": "Tonausgabe läuft (nur bei Takt 1×)",
+            "kein_geraet": "kein Ausgabegerät"}.get(status, "")
+        feld.zeige(f"Ton: {sound.STATUS_TEXT.get(status, status)}", tipp)
 
     def _gide_rtc_aktiv(self) -> bool:
         """Steckt eine GIDE MIT Uhr in der laufenden Maschine?"""
@@ -3310,6 +3548,9 @@ class MainWindow(QMainWindow):
                 self._usb = {**self._usb, "enabled": self._usb_gesteckt()}
                 self._net = {**self._net, "enabled": self._net_gesteckt()}
             self._karten_anzeigen()
+            if self.profil.sound_wahl:
+                self._sound = {**self._sound, "enabled": self._sound_gesteckt()}
+            self._sound_anzeigen()
             self._ptape = bool(self.emulator.ptape_installed())
             self.settings_widget.set_ptape_value(self._ptape)
             self._tape = bool(self.emulator.tape_installed())
@@ -3340,7 +3581,9 @@ class MainWindow(QMainWindow):
         self.kassette_widget.sichern()
         self.aup_widget.alle_loslassen()
 
+        self._wav_beenden()
         try:
+            self.emulator.audio_stop()
             self.emulator.stop()
         except Exception:
             pass
@@ -3382,6 +3625,7 @@ class MainWindow(QMainWindow):
         self.status_widget.set_nenntakt(nenntakt)
         self.settings_widget.set_raf_value(self._raf)       # dito
         self._karten_anzeigen()
+        self._sound_anzeigen()
         self.settings_widget.set_ptape_value(self._ptape)   # dito
         self._lochstreifen_kasten()
         self.settings_widget.set_tape_value(self._tape)

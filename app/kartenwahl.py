@@ -71,7 +71,13 @@ USB = KartenArt("usb", "USB", 4, "GUN-USB", 0, 4, {0x84: "GUN"})
 NETZ = KartenArt("net", "Netz", 4, "KCNet", 0, 4,
                  {0xC0: "K1520-Netzkarte", 0x28: "K1520-Netzkarte", 0x88: "GUN"})
 
+#: SOUND-Karte K1520 (AY + CTC): acht Tore ab Basis (Vielfache von 8).  Steht NICHT in :data:`ARTEN`
+#: (das sind die Karten der Gruppe „Erweiterungskarten"; die SOUND-Karte hat auch der MC80), wird aber
+#: in der Konfliktpruefung mitgerechnet (:data:`ALLE`).
+SOUND = KartenArt("sound", "SOUND", 8, "SOUND-K1520", 0, 8)
+
 ARTEN = {a.schluessel: a for a in (GIDE, USB, NETZ)}
+ALLE = {**ARTEN, SOUND.schluessel: SOUND}
 
 #: Der Besitzer-Abfrager: Port -> Name des Geraets am Bus (``""`` = frei), z. B. ``emulator.io_owner``.
 Besitzer = Callable[[int], str]
@@ -98,10 +104,10 @@ def konflikt_mit_anderen(art: KartenArt, basis: int, andere: Optional[Dict[str, 
     """
     mine = set(art.tore(basis))
     for schl, b in (andere or {}).items():
-        if schl == art.schluessel or schl not in ARTEN:
+        if schl == art.schluessel or schl not in ALLE:
             continue
-        if mine & set(ARTEN[schl].tore(b)):
-            return ARTEN[schl].titel
+        if mine & set(ALLE[schl].tore(b)):
+            return ALLE[schl].titel
     return ""
 
 

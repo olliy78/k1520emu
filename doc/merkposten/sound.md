@@ -1,0 +1,58 @@
+<!-- Angelegt 2026-11-15 (AP S9, Entwurf 51).  Gilt WIE CLAUDE.md, sobald an der SOUND-Karte oder der Tonstrecke gearbeitet wird.
+     Begruendung: doc/merkposten/README.md -->
+
+# SOUND-Karte K1520 (AY-3-8910 + CTC) und Tonstrecke — Merkposten
+
+**SOUND-Karte K1520 V2** (Auerbach/Wilfling/Weidlich, nie von Robotron gefertigt) als **steckbare Option** in allen Maschinen mit
+Steckplatz (A5120 auch .16, A5130, K8924, K8915 V3/Gen 2, PRG 710/-1, PC 1715/1715W, MC80.3x/.2x; P8000 nicht), Vorgabe überall **aus**.
+Karte `core/cards/sound_k1520/` (`SoundK1520`), Chip `core/primitives/ay38910.*`, Tonstrecke `core/audio/` (Ringpuffer, WAV, ALSA/waveOut/stumm).
+Bestückung `K1520Machine::installSound(SoundK1520::Config)` nach dem Anlegen, vor dem ersten `run()`/`reset()`; C-ABI `k1520_sound_*`/`k1520_audio_*`,
+Python `K1520Emulator(sound={...})`, `--sound[=basis]`/`--wav` in `boot_trace`/`k1520dbg`, Debugger-Befehl `ay`, Oberfläche *Einstellungen ▸ Allgemein ▸
+Soundkarte* (`app/sound.py`, `general.sound`).  Entwurf, Quellen, Befunde S0/S7: **`doc/design/51_soundkarte_k1520.md`**.
+**Grundsatz (Anwenderentscheid 2026-11-14): keine Fremdsoftware im Kern** — der AY ist ein eigener Nachbau nach Datenblatt, die Ausgabe eigener Code
+(kein ayumi, kein MAME, kein QtMultimedia, kein miniaudio).
+
+## Festlegungen, die man nicht aufweichen darf
+
+| # | Festlegung | Wächter |
+|---|------------|---------|
+| 1 | **Maschinenzeit.**  Der AY erzeugt 48 kHz in Maschinentakten (`soundTakt(used, total_cycles_)`, GIDE-Muster); Registerschreibzugriffe wirken taktgenau („lazy catch-up": vor jedem Schreiben rechnet der Chip bis zum aktuellen Takt nach).  `takt()` muss in der Laufschleife jeder Maschine laufen, sonst ist die Karte stumm und die CTC steht. | `Ay38910.OhneAusgabeNurRegisterNachfuehren`, `SoundMaschine.A5120_CtcLiefert50Hz`, `SoundMaschine.K8915_CtcLiefert50Hz` |
+| 2 | **Kein Aliasing:** der Chip rechnet auf dem Raster Takt/8, je Ausgabewert wird über alle Schritte **gemittelt** (Kastenfilter) plus Vorfilter (8 kHz), danach Gleichanteilfilter und optional Tiefpass C16/C17.  Nie einzelne Werte herauspicken. | `Ay38910.AliasingProbe`, `SoundK1520.TiefpassDaempftHoheToene` |
+| 3 | **Chipmodell:** Lesemasken aller 16 Register, Abwahl bei Adresse ≥ 16, Ports mit Pull-up (offen = FFH), AY-3-8912 nur Port A, Periode 0 = 1, Rauschen 17-Bit-LFSR, R13-Schreiben startet die Hüllkurve neu, logarithmische Pegeltabelle (Messwerte, keine Fremdcode-Übernahme), `/RESET` = alles 0 und stumm. | `Ay38910.*` (je Punkt ein Fall: `LesemaskenAllerRegister`, `AbwahlAbSechzehn`, `PortsEingangAusgangPullup`, `Variante8912NurPortA`, `HuellkurvenFormen`, `HuellkurvenPeriodeUndNeustart`, `PegeltabelleLogarithmisch`, `ResetIstStill`) |
+| 4 | **Tore:** Basis = Vielfaches von 8 (sonst Ablehnung, Basis im Kern frei); Basis+0 lesen = gewähltes Register (`AYPBC.INC` liest R7 zurück), +0 schreiben = Registeradresse, +1 schreiben = Register (+1 lesen = FFH), +2/+3 frei, +4…+7 = CTC Kanal 0…3.  Der Bus reicht den **absoluten** Port durch, die Karte rechnet `port - basis`.  Alle 8 Tore anmelden. | `SoundK1520.ToreBelegtUndFrei`, `BasisKeinVielfachesVon8WirdAbgelehnt`, `TorPlusEinsLesenIstFF`, `R7RuecklesenWieAypbcInc` |
+| 5 | **Karten-CTC:** Takt = Systemtakt der Maschine; 50 Hz mit Steuerwort A7H/Zeitkonstante C0H bei 2,4576 MHz; Kaskade TO0→TR1 usw. nur über Jumper (**Kanalmaske nur auf verdrahtete TO**, sonst verlässt der Kanal den schnellen Pfad); in der Interruptkette hinten (`soundEinketten`; am PRG 710 wird die Kette in `interruptKetteSetzen()` neu gebaut — dort mitführen). | `SoundK1520.CtcKanal0Liefert50InterruptsJeSekunde`, `KaskadeTo0NachTr1ZaehltNulldurchgaenge` |
+| 6 | **Basen je Maschine** (Vorauswahl der Oberfläche): **38H** überall, auch am PC 1715 (so die Gastsoftware, Befund S7); **PC 1715W E0H** (38H–3FH dort durch `PC1715W-E/A` belegt, der Kern meldet das als `belegtGrund`); MC80.2x 38H (E0H dort belegt).  Am PC 1715W kollidiert E0H mit der Lochstreifenkarte K6022 (E0H–E7H fest) — beide zugleich meldet der Kern als Konflikt (gewollt, Basis von Hand ändern). | `SoundMaschine.Bestueckung_*`, `SoundMaschine.Pc1715W_38HIstBelegt`, `SoundMaschine.P8000LehntAb`, `py_sound_gui` (`test_pc1715w_nimmt_die_vorauswahl_e0`), `py_karten_vorauswahl` |
+| 7 | **Der Emulationsfaden schiebt, die Ausgabe holt — ohne Kernsperre.**  Ringpuffer einseitig sperrfrei (ein Erzeuger, ein Verbraucher), Ausgabefaden im Kern (C++), kein Python, kein Aufruf über die Kernsperre.  Die Oberfläche schaltet nur ein/aus, stumm, Lautstärke.  Ringpuffer und Faden gehören **nicht** der Karte, sondern einem eigenen Objekt, das vor der Karte stirbt (Faden zuerst anhalten).  Eine Senke hängt **nur bei Bedarf** (Ton an oder WAV läuft); sonst rechnet der AY nur die Register nach. | `Ringpuffer.FadentestKeineVerlusteReihenfolgeErhalten`, `SoundMaschine.SenkeNurBeiBedarf`, `SoundK1520.OhneSenkeKeineAbtastwerte` |
+| 8 | **Hörbar nur bei Echtzeit** (Faktor 1,0): bei jedem anderen Tempo ist die Wirtsausgabe stumm und der Puffer verwirft ohne Rückstau.  Der Faktor ist nur Python bekannt → die Oberfläche meldet ihn bei jedem `set_tempo` über `k1520_audio_echtzeit`.  **Die WAV-Mitschrift läuft in jedem Tempo** (Maschinenzeit, deterministisch). | `TonAusgabe.OhneEchtzeitVerwirftDerPufferNichtsStauend`, `TonAusgabe.WavLaeuftUnabhaengigVomGeraetUndVomTempo`, `py_sound_gui` (`test_tempowechsel_meldet_echtzeit_an_den_kern`) |
+| 9 | **Füllstandregelung** (Ziel ≈ 60 ms): über dem Ziel wird ein Wert verworfen, darunter einer verdoppelt; Unterlauf = Stille, **nie Blockieren des Emulationsfadens**. | `FuellstandRegler.VerwirftDarueberVerdoppeltDarunter`, `Ringpuffer.UnterlaufLiefertWenigerUndBleibtStabil` |
+| 10 | **Ohne Gerät läuft alles.**  Fehlt `libasound.so.2` oder ein Ausgabegerät: Ausgabe „stumm", ein Satz Grund (`k1520_audio_fehler`), keine Ausnahme, kein Meldungsfenster.  **ALSA wird per `dlopen` geladen, ohne Bauabhängigkeit** (keine Header/Bibliothek zum Bauen nötig); unter Windows `waveOut` (winmm); `K1520_AUDIO=stumm` erzwingt die stumme Ausgabe (Tests/CI).  Alsa-Pfad über Umgebungsvariable umbiegbar (Test). | `TonAusgabe.AlsaBibliothekFehltLiefertGrundStattAbsturz`, `TonAusgabe.AlsaBibliothekUeberUmgebungsvariable`, `TonAusgabe.UmgebungsvariableWaehltStumm`, `py_sound_api` (`test_audio_status_nach_start_stumm`) |
+| 11 | **Kein Tastenkürzel** für Ton an/aus/Lautstärke/Mitschnitt (die Kürzeltabelle des Handbuchs ist ein Vertrag); Statuszeile „Ton: aus/stumm/hörbar/kein Gerät" nur mit Karte; Aktionen nur mit Karte bedienbar. | `py_sound_gui` (`test_tonaktionen_ohne_kuerzel_und_nur_mit_karte_bedienbar`, `test_statuszeile_zeigt_den_ton_nur_mit_karte`), Kürzel-Wächter der Oberfläche |
+| 12 | **Nicht im Save-State** (wie GIDE/K5020); nach dem Laden ist der Chip zurückgesetzt.  Vorgabe aus; ein fehlender `general.sound`-Abschnitt heisst „nicht anfassen", ein kaputter Einzelwert fällt auf die Vorgabe zurück. | `py_sound_gui` (`test_fehlender_abschnitt_und_kaputte_werte_fallen_auf_die_vorgabe`) |
+| 13 | **Kanalzuordnung: Vorgabe ACB** (A links, B rechts, C Mitte; Seitenkanal 1, Mitte 10/22 ≈ 0,45 je Seite), ABC (B Mitte) und Mono wählbar.  Anwenderentscheid nach dem Hörvergleich mit der Aufnahme `STCTEST1.mp3` (Entwurf 51 §7a): die Aufnahme ist mit C in der Mitte entstanden.  Eine gespeicherte Konfiguration mit ausdrücklich `abc` bleibt `abc` (nur die Vorgabe änderte sich).  Tests, die ABC voraussetzen, setzen es ausdrücklich. | `SoundK1520.VorgabeKanalzuordnungIstAcb`, `SoundK1520.MischerAbc*`/`MischerAcb*`/`MonoBeideSeitenGleich`, `py_sound_gui` |
+| 14 | **A5120-Nenntakt 2 457 600 Hz** im Profil (`app/profil.py`, `app/takt.py`) = Kernwert (`K1520Machine::nenntaktHz()`); vorher 2 450 000 → Tonhöhe ≈ 5 Cent daneben.  Gilt für alle Profile: Profilwert = `nenntaktHz()` des Kerns. | `py_sound_gui` (`test_takt_des_a5120_entspricht_dem_kern`) |
+| 15 | **Systemtest mit der ORIGINAL-Gastsoftware** (liegt im Repo, kein Skip): `TGCPM` (1 kHz, Kanal A nur links — gilt in ABC wie in ACB), `SKTEST4` (CTC-Interrupt ≈ 50/s + Lied), `STCTEST1` (Lied im Hintergrund, `DIR` bleibt bedienbar), `PLAYSTC SONG.STC`; A5120 CP/A, SCPX, PC 1715 CP/A.  Messung an der WAV-Mitschrift. | `SoundSystem.*` (`fach_sound`, ~2–5 s je Fall, laufen in `tools/dev.sh test`) |
+| 16 | **Kein Clipping: Spitze mathematisch ≤ −3 dBFS.**  Nach Mischung und Filtern ein fester Faktor `AUSSTEUERUNG = 0.7071f` (Stereo wie Mono): die Mischung liegt in [0,1], der Gleichanteilfilter liefert für x ∈ [0,1] |y| ≤ 1 (Sprung nach langer Stille), Tief-/Kastenfilter überschwingen nicht → Spitze ≤ 0,707.  Dahinter harte Begrenzung auf [−1,1] in der Karte; `WavSchreiber::zuS16` und die Ausgabe (Lautstärke auf [0,1] begrenzt) begrenzen statt überzulaufen.  Die Lautstärke im Menü schwächt nur ab.  Den Faktor nicht entfernen (der Anwender sah vorher −1,3 dBFS im roten Bereich). | `SoundK1520.SpitzeAbc/Acb/MonoHoechstensMinus3dBFS`, `WavSchreiber.ZuS16BegrenztStattUeberzulaufen`, `TonAusgabe.LautstaerkeWirdBegrenzt` |
+
+## Gastsoftware und Disketten
+
+`tools/sound/fremd/` (Herkunftstabelle `README.md`; Weitergabe vom Anwender 2026-11-14 freigegeben, Entscheid, kein Rechtsbefund).  Die CP/A-/SCPX-Fassungen
+(A5120/K8924) setzen **I = F7H und Vektor D8H (F7D8H…F7DEH)** voraus, die PC-1715-Fassungen ebenfalls Karte an **38H**, aber **Vektor F7F0H** (eigenes ZIP).
+`E0H` am PC 1715 steht nur in der `SOUND.INI`-Tabelle der USB-Player (Gerät von Daniel Auerbach) — nicht verwechseln.  Auf den Systemdisketten (Zusammenstellung
+nur in `tools/sound/sound_karten.py`; wer eine Beigabe oder die Vorauswahl ändert, baut die Disketten neu): `a5120_cpa`, `a5120_scpx17`, `pc1715_cpa1715`
+(`SKTEST4`, `STCTEST1`, `PLAYSTC`, `SONG.STC`, `TGCPM`).  Wächter `cli_sound_beigaben` (liest jede Diskette mit `k1520disktool` und vergleicht bytegleich), `SoundSystem.*`.
+Im Paket reist nur die Herkunftstabelle (`share/doc/lizenzen/sound_software-HERKUNFT.md`), die Programme liegen auf den Disketten.  USB-Player `CPMSTCPL`/`CPMPT3PL` (AP S10) bewusst offen.
+
+## Hörvergleich (Entwurf 51 §7a, 2026-11-15)
+
+- Aufnahme der echten Karte klingt um 1,152 tiefer: der AY dort lief mit ≈ 1,555 MHz (`quarz_hz = 3 110 000` stimmt auf 1,000).  **Vorgabe bleibt 1,79 MHz**
+  (Stückliste; `TGCPM` rechnet damit) — nicht „korrigieren".  Tempo der Aufnahme 3 % schneller (Rechner mit höherem Systemtakt).
+- Übersprechen, Rauschen und 50/150-Hz-Brumm der Aufnahme stammen aus der **Aufnahmekette**, nicht nachbilden (Anwender: so lassen).
+- Werkzeug `tools/sound/stctest1_wav.py` erzeugt die Vergleichs-WAV; Höreindruck des Anwenders: „kommt dem Original schon sehr nah".
+
+## Offen
+
+- **S10** (USB-Player `CPMSTCPL`/`CPMPT3PL` + `SNDINIT2` mit `SOUND.INI` je Rechner): optional, nicht begonnen.  K8915/PRG/MC80/1715W haben keine Gastsoftware auf den Disketten.
+- **Gerätevergleich:** Pegeltabelle aus veröffentlichten Messungen, kein Gegenhören an Hardware außer der Aufnahme `STCTEST1.mp3`.
+- **`tools/dev.sh win` (wine): vier rote Fälle, die NICHT vom Zweig `sound` stammen** (Code seit 2026-11-10/11 unverändert, Befund AP S9, 2026-11-15):
+  `VdipGeraet.DirtDatumUndZeit`, `VdipGeraet.OpwMitDatumsstempelEnthaeltCrByte`, `VdipGeraet.MkdMitDatum`, `GidePlatteSperre.VerwaisteSperreWirdUebernommenUndGeloest`.
+  Nur Hinweis; die Ursache liegt bei VDIP-Datum/Zeit bzw. der Sperrdatei unter wine, nicht in der SOUND-Karte.

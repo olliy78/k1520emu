@@ -13,10 +13,10 @@ from __future__ import annotations
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFileDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QWidget,
+    QPushButton, QSpinBox, QWidget,
 )
 
-from app import kartenwahl, netz, usb
+from app import kartenwahl, netz, sound, usb
 
 
 class KartenGruppe(QWidget):
@@ -222,3 +222,100 @@ class NetzGruppe(KartenGruppe):
         self._knoepfe()
         if not self._guard:
             self.netChanged.emit(self.zustand())
+
+
+class SoundGruppe(KartenGruppe):
+    """SOUND-Karte K1520: Kaestchen, Chip, Basis, AY-Takt, Quarz, Kanalzuordnung, Tiefpass, CTC-Kaskade."""
+
+    #: Zustand (:func:`app.sound.normalize`) nach einer Eingabe des Anwenders.
+    soundChanged = Signal(dict)
+
+    def __init__(self, basis_vorgabe: int, parent=None):
+        super().__init__("Soundkarte", "Soundkarte stecken", kartenwahl.SOUND, basis_vorgabe,
+                         sound.TIPP_KARTE, sound.TIPP_BASIS, parent)
+        # Bestueckung: aus / AY-3-8910 / AY-3-8912 -- das Kaestchen "stecken" bleibt (wie bei den
+        # Schwesterkarten), der Chip steht in der Zeile darunter.
+        self.chip_combo = QComboBox(self)
+        for wert, text in sound.CHIPS:
+            self.chip_combo.addItem(text, wert)
+        self.chip_combo.setToolTip(sound.TIPP_CHIP)
+        self.kanal_combo = QComboBox(self)
+        for wert, text in sound.KANAELE:
+            self.kanal_combo.addItem(text, wert)
+        self.kanal_combo.setToolTip(sound.TIPP_KANAL)
+        z1 = QHBoxLayout()
+        z1.addWidget(QLabel("Chip:", self))
+        z1.addWidget(self.chip_combo)
+        z1.addWidget(QLabel("Kanäle:", self))
+        z1.addWidget(self.kanal_combo, 1)
+        self.form.addRow("", z1)
+
+        self.takt_combo = QComboBox(self)
+        for wert, text in sound.TAKTE:
+            self.takt_combo.addItem(text, wert)
+        self.takt_combo.setToolTip(sound.TIPP_TAKT)
+        self.quarz_spin = QSpinBox(self)
+        self.quarz_spin.setRange(100_000, 20_000_000)
+        self.quarz_spin.setSingleStep(1000)
+        self.quarz_spin.setGroupSeparatorShown(True)
+        self.quarz_spin.setSuffix(" Hz")
+        self.quarz_spin.setToolTip(sound.TIPP_QUARZ)
+        z2 = QHBoxLayout()
+        z2.addWidget(QLabel("AY-Takt:", self))
+        z2.addWidget(self.takt_combo)
+        z2.addWidget(QLabel("Quarz:", self))
+        z2.addWidget(self.quarz_spin, 1)
+        self.form.addRow("", z2)
+
+        self.tiefpass_box = QCheckBox("Tiefpass C16/C17", self)
+        self.tiefpass_box.setToolTip(sound.TIPP_TIEFPASS)
+        self.kaskade_boxen = []
+        z3 = QHBoxLayout()
+        z3.addWidget(self.tiefpass_box)
+        z3.addWidget(QLabel("CTC-Kaskade:", self))
+        for text in sound.KASKADEN:
+            b = QCheckBox(text, self)
+            b.setToolTip(sound.TIPP_KASKADE)
+            self.kaskade_boxen.append(b)
+            z3.addWidget(b)
+        z3.addStretch(1)
+        self.form.addRow("", z3)
+        self._fehlerzeile()
+
+        for w in (self.karte_box, self.tiefpass_box, *self.kaskade_boxen):
+            w.toggled.connect(self._aenderung)
+        for w in (self.basis_combo, self.chip_combo, self.kanal_combo, self.takt_combo):
+            w.currentIndexChanged.connect(self._aenderung)
+        self.quarz_spin.editingFinished.connect(self._aenderung)
+        self.set_zustand(sound.vorgabe(self._basis_vorgabe))
+
+    def zustand(self) -> dict:
+        return {"enabled": self.karte_box.isChecked(),
+                "basis": int(self.basis_combo.currentData()),
+                "chip": self.chip_combo.currentData(),
+                "takt": self.takt_combo.currentData(),
+                "quarz_hz": int(self.quarz_spin.value()),
+                "kanal": self.kanal_combo.currentData(),
+                "tiefpass": self.tiefpass_box.isChecked(),
+                "kaskade": sum(1 << i for i, b in enumerate(self.kaskade_boxen) if b.isChecked())}
+
+    def set_zustand(self, z: dict, fehler: str = "", gesteckt=None) -> None:
+        self._guard = True
+        self.karte_box.setChecked(bool(z.get("enabled")))
+        self._basis_setzen(z)
+        for combo, schl in ((self.chip_combo, "chip"), (self.takt_combo, "takt"), (self.kanal_combo, "kanal")):
+            i = combo.findData(z.get(schl))
+            combo.setCurrentIndex(i if i >= 0 else 0)
+        self.quarz_spin.setValue(int(z.get("quarz_hz", sound.QUARZ_VORGABE)))
+        self.tiefpass_box.setChecked(z.get("tiefpass") is True)
+        maske = int(z.get("kaskade", 0))
+        for i, b in enumerate(self.kaskade_boxen):
+            b.setChecked(bool(maske >> i & 1))
+        self._guard = False
+        if gesteckt is not None:
+            self._gesteckt = bool(gesteckt)
+        self.set_fehler(fehler)
+
+    def _aenderung(self, *_args) -> None:
+        if not self._guard:
+            self.soundChanged.emit(self.zustand())

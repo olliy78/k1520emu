@@ -1,6 +1,6 @@
 """Der Takt der emulierten Maschine — eine Stelle für Zahl und Beschriftung.
 
-Der A5120 läuft mit **2,45 MHz** (U880), der K8915 mit **2,4576 MHz** — der
+Der A5120 und der K8915 laufen mit **2,4576 MHz** (U880) — der
 Nenntakt steht im Programmprofil (`app/profil.py`), die Voreinstellung der
 Funktionen hier ist der A5120.  Die Oberfläche bietet diesen Nenntakt
 und ein paar Vielfache davon an; damit Auswahlfeld
@@ -16,11 +16,11 @@ auf die schnellste Stufe ab).
 
 from __future__ import annotations
 
-#: Nenntakt des A5120 in Hertz (deckt sich mit der Vorgabe des Kerns fuer die K5122).
-NENNTAKT_HZ = 2_450_000
+#: Nenntakt des A5120 in Hertz (= ``nenntakt_hz()`` des Kerns; bis AP S8 stand hier gerundet 2,45 MHz).
+NENNTAKT_HZ = 2_457_600
 
 #: Derselbe Wert, wie er dem Anwender gezeigt wird.
-NENNTAKT_TEXT = "2,45 MHz"
+NENNTAKT_TEXT = "2,4576 MHz"
 
 #: Angebotene Faktoren, in der Reihenfolge des Auswahlfelds.
 STUFEN = (1.0, 2.0, 5.0, 10.0)
@@ -39,7 +39,7 @@ def stufe(faktor) -> float:
 
 
 def beschriftung(faktor: float, nenntakt: str = NENNTAKT_TEXT) -> str:
-    """„2,45 MHz", „10 × 2,45 MHz" oder „unbegrenzt" (*nenntakt* aus dem Profil)."""
+    """„2,4576 MHz", „10 × 2,4576 MHz" oder „unbegrenzt" (*nenntakt* aus dem Profil)."""
     faktor = float(faktor)
     if faktor <= 0.0:
         return "unbegrenzt"

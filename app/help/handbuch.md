@@ -92,9 +92,9 @@ gemerkt.
 ## Die Statuszeile lesen
 
 **Takt** — der eingestellte Takt der Maschine, wortgleich mit dem Auswahlfeld
-unter *Einstellungen ▸ Allgemein*: `2,45 MHz` (Echtzeit), `2 × 2,45 MHz`,
-`5 × 2,45 MHz` oder `10 × 2,45 MHz`. Was der Wirtsrechner davon
-tatsächlich hält, steht im **Tooltip** („Gemessen: 9,8 × 2,45 MHz") — samt dem
+unter *Einstellungen ▸ Allgemein*: `2,4576 MHz` (Echtzeit), `2 × 2,4576 MHz`,
+`5 × 2,4576 MHz` oder `10 × 2,4576 MHz`. Was der Wirtsrechner davon
+tatsächlich hält, steht im **Tooltip** („Gemessen: 9,8 × 2,4576 MHz") — samt dem
 Hinweis, wenn er nicht mitkommt. Als Anzeige taugte der gemessene Wert nicht:
 er schwankt von Sekunde zu Sekunde und liest sich wie ein Fehler, wo keiner ist.
 
@@ -618,11 +618,11 @@ ein Tester immer mit `SERTEST ENDE FEHLER` — das ist richtig so.
 
 ## Der Takt der Maschine
 
-*Einstellungen ▸ Allgemein ▸ Takt*: `2,45 MHz` — das ist der Takt des echten
-A5120 — sowie `2 ×`, `5 ×` und `10 × 2,45 MHz`.  Schafft der Wirtsrechner eine Stufe
+*Einstellungen ▸ Allgemein ▸ Takt*: `2,4576 MHz` — das ist der Takt des echten
+A5120 — sowie `2 ×`, `5 ×` und `10 × 2,4576 MHz`.  Schafft der Wirtsrechner eine Stufe
 nicht, läuft die Maschine so schnell er kann; die Oberfläche bleibt bedienbar.
 
-`2,45 MHz` ist das, was die Uhr des Gastsystems erwartet — sie zählt Taktzyklen
+`2,4576 MHz` ist das, was die Uhr des Gastsystems erwartet — sie zählt Taktzyklen
 und geht bei jedem Vielfachen entsprechend falsch. Schneller ist gut, um einen
 Kaltstart abzukürzen; wer die Uhr braucht, bleibt beim Nenntakt.
 
@@ -1577,6 +1577,78 @@ passen** — die Programme suchen die Karte an einer festen Adresse: die Diskett
 Gast eingetragene Adresse wertet der Emulator nicht aus, er benutzt die Netzverbindung des Rechners).
 Gemerkt wird alles in der Konfiguration (`general.net`).
 
+## Die SOUND-Karte
+
+Die **SOUND-Karte K1520** trägt einen Tonbaustein **AY-3-8910** (oder AY-3-8912) mit drei Tonkanälen und
+einem Geräuschgenerator, dazu eine **CTC** für Zeitsteuerung und Interrupts. Sie lässt sich in A5120, K8915,
+PRG 710/-1, PC 1715/1715W und MC80 stecken (nicht in den P8000) und ist ab Werk **aus**.
+
+*Einstellungen ▸ Allgemein ▸ Soundkarte* (flache Zeilen):
+
+* **Soundkarte stecken** und **E/A-Basis** — acht Tore ab der Basis (Vielfache von 8). Vorgewählt ist **38H**,
+  am **PC 1715W E0H** (dort sind 38H–3FH belegt; die Gastsoftware des PC 1715 benutzt 38H, am PC 1715 steckt die Karte deshalb auch auf 38H und die Lochstreifenkarte E0H daneben).
+  Belegte Basen sind im Auswahlfeld markiert und nicht wählbar. Ein Wechsel baut die Maschine neu auf.
+* **Chip** — AY-3-8910 (zwei 8-Bit-Tore A und B) oder AY-3-8912 (nur Tor A).
+* **AY-Takt** — *Quarz/2 = 1,79 MHz* (Vorgabe, Brücke JP2), *Quarz* oder *Systemtakt*; dazu die **Quarzfrequenz**
+  in Hertz (Vorgabe 3 579 545).
+* **Kanäle** — *Stereo ACB* (Vorgabe: A links, B rechts, C in der Mitte), *Stereo ABC* (A links, B Mitte, C rechts) oder *Mono*.
+* **Aussteuerung** — die Karte wird mit 3 dB Reserve ausgegeben (kein Übersteuern); die Lautstärke im Menü schwächt nur ab.
+* **Tiefpass C16/C17** — nachgebildet sind die bestückten Kondensatoren: der Ton klingt dumpfer (ab Werk aus).
+* **CTC-Kaskade** — drei Haken für die Brücken `TO0 → TR1`, `TO1 → TR2`, `TO2 → TR3` (ab Werk aus).
+
+Sie liegt wie die anderen Steckkarten in der Konfiguration (`general.sound`, dazu `general.lautstaerke` und
+`general.stumm`).
+
+**Ton hören.** Gehört wird nur bei **Echtzeit** (Takt `1×`); bei schnellerem Takt ist die Wirtsausgabe stumm,
+damit nichts nachhallt. Das Menü *Maschine* hat drei Einträge, alle **ohne Tastenkürzel** und nur mit gesteckter Karte
+bedienbar: **Ton stumm** (Haken), **Lautstärke…** (kleiner Regler, wirkt sofort) und **Ton mitschneiden…**
+(schreibt eine WAV-Datei, 48 kHz Stereo; der Mitschnitt läuft in jedem Tempo und auch bei stummer Ausgabe;
+noch einmal gewählt beendet er sich). Die Statuszeile zeigt bei gesteckter Karte das Feld **Ton**:
+
+| Anzeige | Bedeutung |
+|---------|-----------|
+| `Ton: hörbar` | die Ausgabe läuft |
+| `Ton: stumm` | stummgeschaltet, oder nicht in Echtzeit, oder kein Gerät (der Tooltip nennt den Grund) |
+| `Ton: kein Gerät` | der Wirtsrechner hat kein Ausgabegerät geöffnet; der Tooltip nennt den Grund |
+| `Ton: aus` | die Ausgabe ist nicht gestartet |
+
+Unter Linux spielt der Emulator über **ALSA** (`libasound.so.2` wird beim Start geladen; fehlt sie, bleibt es bei
+„kein Gerät“ und die Maschine läuft ungestört weiter), unter Windows über **waveOut**. „Kein Gerät“ heißt also:
+der Emulator hat keine Tonausgabe bekommen — meist fehlt die ALSA-Bibliothek, ein Tongerät ist belegt oder es gibt
+keines. Der Mitschnitt funktioniert trotzdem.
+
+### Die beigelegten Programme
+
+Auf den Systemdisketten **A5120 CP/A**, **A5120 SCPX 1.7** und **PC 1715 CP/A 1715** liegen vier Programme
+für die Karte, dazu das Lied `SONG.STC`. Sie stammen von den Entwicklern der Karte (Daniel Auerbach, Rolf Weidlich
+„WeRo“, Klaus Wilfling; Stand 2017) und sind unverändert übernommen. Die Fassungen auf der PC-1715-Diskette sind
+eigene Bauten für die Interrupttabelle des PC 1715. Für K8915, PRG 710, MC80 und PC 1715W gibt es keine Programme.
+
+**Bevor Sie anfangen:** Karte stecken (*Einstellungen ▸ Allgemein ▸ Soundkarte*), die Basis auf der Vorgabe
+**38H** lassen und mit Takt `1×` (Echtzeit) laufen. Alle Programme sprechen die Karte fest auf 38H/39H (AY) und 3CH–3FH
+(CTC) an; an einer anderen Basis bleiben sie stumm. Die Programme mit Interrupt setzen die Interrupttabelle
+von CP/A bzw. SCPX voraus (A5120: Vektor F7D8H; PC 1715: F7F0H).
+
+**Takt abfragen.** `TGCPM` und `SKTEST4` fragen zuerst nach dem AY-Takt, weil sie die Tonhöhe daraus errechnen.
+Bei der Vorgabe (*Quarz/2 = 1,79 MHz*) ist **`B`** die richtige Antwort.
+
+| Programm | Aufruf | Was es tut |
+|----------|--------|------------|
+| `TGCPM` | `TGCPM` | Kleinster Test ohne CTC und Interrupt: nach der Taktwahl ein Rechteckton von etwa 1 kHz auf einem Kanal (`A`, `B`, `C`), Geräusche (`H` Hubschrauber, `M` Meeresrauschen, `S` Schuss), `0` schaltet aus. |
+| `SKTEST4` | `SKTEST4` | Prüfprogramm für alle Teile der Karte. Erst eine Übersicht der Adressen (beliebige Taste), dann der Takt, dann das Menü: `1` Testton/Geräusche wie bei `TGCPM`, `2` die Tore A/B des AY (Ausgabe 55H/AAH bzw. Lesen; offene Eingänge lesen FFH), `3` die CTC mit kaskadierten Kanälen, `4` ein Lied über den 50-Hz-Interrupt der Karten-CTC, `0` zurück zum Betriebssystem. |
+| `STCTEST1` | `STCTEST1` | Spielt ein eingebautes Lied zweimal **im Hintergrund**: der Prompt kommt zurück, `DIR` und andere eingebaute Befehle gehen weiter. Ein anderes Programm sollte man währenddessen nicht starten — es überschreibt die Abspielroutine ab 100H (das Lied bleibt dann womöglich auf einem Dauerton stehen). |
+| `PLAYSTC` | `PLAYSTC SONG.STC` oder `PLAYSTC B:LIED.STC` | Spielt eine Lieddatei im STC-Format (*Sound Tracker Compiled*, ZX-Spectrum-Format) von Diskette, einmal, im Hintergrund. Die Endung `.STC` muss angegeben werden. Abbrechen geht nur mit **Rückstellen** — oder abwarten. |
+
+**Weitere Lieder.** STC-Dateien gibt es zahlreich im Netz (Sammlungen von ZX-Spectrum-Musik). Mit dem **DiskTool**
+auf eine Diskette kopieren und mit `PLAYSTC` abspielen. Die Tonhöhen dieser Lieder passen zum AY-Takt 1,79 MHz.
+
+**Kanäle links und rechts.** `TGCPM` und `SKTEST4` beschriften die Kanäle mit „A = RECHTS, C = LINKS“. Welche
+Seite wirklich klingt, hängt an der Kanalzuordnung der Karte (Schiebeschalter S8, hier *Kanäle*): bei der Vorgabe
+*Stereo ACB* liegt A links, B rechts und C in der Mitte. Die Beschriftung im Programm ist deshalb nur ein Hinweis.
+
+**Mitschneiden.** *Maschine ▸ Ton mitschneiden…* schreibt alles, was die Karte ausgibt, in eine WAV-Datei —
+auch dann, wenn der Wirtsrechner keine Tonausgabe hat oder schneller als Echtzeit gerechnet wird.
+
 ## Lochstreifen
 
 *Einstellungen ▸ Allgemein ▸ Lochstreifen (SIF1000, K6022)* steckt die
@@ -1907,7 +1979,7 @@ Alles, was man einstellt, landet fortlaufend in
 kann also den A5120 mit drei Laufwerken und sichtbarer Tastatur und den K8915 mit
 zwei Laufwerken ohne Tastatur nebeneinander führen. Gemerkt werden Bildröhre,
 Takt, Modell, RAM-Disk (samt Stand-by), Lochstreifen-Karte samt Leser- und
-Stanzerdatei, Kassetten-Karte samt den Dateien beider Laufwerke, IDE-Karte GIDE samt Abbild, USB- und Netzwerkkarte, Laufwerksbestückung, eingelegte Disketten, die seriellen Schnittstellen
+Stanzerdatei, Kassetten-Karte samt den Dateien beider Laufwerke, IDE-Karte GIDE samt Abbild, USB- und Netzwerkkarte, Soundkarte samt Lautstärke und Stumm, Laufwerksbestückung, eingelegte Disketten, die seriellen Schnittstellen
 (samt dem, was lief), Größe und Lage des Fensters
 (auch „maximiert"), die Lage und Breite der Kästen samt der Trennlinien
 dazwischen, und der Inhalt der Symbolleiste.

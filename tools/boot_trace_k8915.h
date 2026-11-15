@@ -11,6 +11,7 @@
  */
 #pragma once
 #include "tools/prn_listing.h"
+#include "tools/sound_opts.h"
 #include "tools/until_cond.h"
 #include <cstdint>
 #include <string>
@@ -32,6 +33,7 @@ struct K8915TraceOpts {
     std::string usb_dir;         ///< --usb-dir: Wirtsverzeichnis des Sticks
     bool        net = false;     ///< --net[=basis]: KCNet-Netzkarte stecken
     int         net_basis = -1;  ///< -1 = Vorgabe 88H
+    SoundOpts   sound;           ///< --sound[=basis], --sound-takt/-kanal/-chip, --wav (Entwurf 51 S6)
     std::string disk;            ///< Diskettenpfad (leer = keine)
     std::string mount_path;      ///< tatsaechlich zu mountender Pfad (COW-Kopie o. ae.)
     bool        write_protect = false;
