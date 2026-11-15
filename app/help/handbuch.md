@@ -1607,11 +1607,37 @@ Unter Linux spielt der Emulator über **ALSA** (`libasound.so.2` wird beim Start
 der Emulator hat keine Tonausgabe bekommen — meist fehlt die ALSA-Bibliothek, ein Tongerät ist belegt oder es gibt
 keines. Der Mitschnitt funktioniert trotzdem.
 
-**Gastsoftware** (liegt auf den Systemdisketten **A5120 CP/A**, **A5120 SCPX 1.7** und **PC 1715 CP/A 1715**; die Fassungen des PC 1715 sind eigene Bauten für dessen Interrupttabelle): `TGCPM` (kleinster Rauchtest, 1-kHz-Ton auf A/B/C),
-`SKTEST4` (Komponententest: AY, Ports, kaskadierte CTC, CTC-Interrupt, Lied — fragt zuerst den AY-Takt ab; die
-Wahl muss zur Einstellung passen), `STCTEST1` (spielt ein eingebautes Lied im Hintergrund, der Prompt bleibt
-bedienbar) und `PLAYSTC` (`PLAYSTC B:SONG.STC` spielt eine STC-Datei von Diskette). Die Programme suchen die Karte
-an einer festen Basis: die Vorauswahl der Oberfläche passt dazu.
+### Die beigelegten Programme
+
+Auf den Systemdisketten **A5120 CP/A**, **A5120 SCPX 1.7** und **PC 1715 CP/A 1715** liegen vier Programme
+für die Karte, dazu das Lied `SONG.STC`. Sie stammen von den Entwicklern der Karte (Daniel Auerbach, Rolf Weidlich
+„WeRo“, Klaus Wilfling; Stand 2017) und sind unverändert übernommen. Die Fassungen auf der PC-1715-Diskette sind
+eigene Bauten für die Interrupttabelle des PC 1715. Für K8915, PRG 710, MC80 und PC 1715W gibt es keine Programme.
+
+**Bevor Sie anfangen:** Karte stecken (*Einstellungen ▸ Allgemein ▸ Soundkarte*), die Basis auf der Vorgabe
+**38H** lassen und mit Takt `1×` (Echtzeit) laufen. Alle Programme sprechen die Karte fest auf 38H/39H (AY) und 3CH–3FH
+(CTC) an; an einer anderen Basis bleiben sie stumm. Die Programme mit Interrupt setzen die Interrupttabelle
+von CP/A bzw. SCPX voraus (A5120: Vektor F7D8H; PC 1715: F7F0H).
+
+**Takt abfragen.** `TGCPM` und `SKTEST4` fragen zuerst nach dem AY-Takt, weil sie die Tonhöhe daraus errechnen.
+Bei der Vorgabe (*Quarz/2 = 1,79 MHz*) ist **`B`** die richtige Antwort.
+
+| Programm | Aufruf | Was es tut |
+|----------|--------|------------|
+| `TGCPM` | `TGCPM` | Kleinster Test ohne CTC und Interrupt: nach der Taktwahl ein Rechteckton von etwa 1 kHz auf einem Kanal (`A`, `B`, `C`), Geräusche (`H` Hubschrauber, `M` Meeresrauschen, `S` Schuss), `0` schaltet aus. |
+| `SKTEST4` | `SKTEST4` | Prüfprogramm für alle Teile der Karte. Erst eine Übersicht der Adressen (beliebige Taste), dann der Takt, dann das Menü: `1` Testton/Geräusche wie bei `TGCPM`, `2` die Tore A/B des AY (Ausgabe 55H/AAH bzw. Lesen; offene Eingänge lesen FFH), `3` die CTC mit kaskadierten Kanälen, `4` ein Lied über den 50-Hz-Interrupt der Karten-CTC, `0` zurück zum Betriebssystem. |
+| `STCTEST1` | `STCTEST1` | Spielt ein eingebautes Lied zweimal **im Hintergrund**: der Prompt kommt zurück, `DIR` und andere eingebaute Befehle gehen weiter. Ein anderes Programm sollte man währenddessen nicht starten — es überschreibt die Abspielroutine ab 100H (das Lied bleibt dann womöglich auf einem Dauerton stehen). |
+| `PLAYSTC` | `PLAYSTC SONG.STC` oder `PLAYSTC B:LIED.STC` | Spielt eine Lieddatei im STC-Format (*Sound Tracker Compiled*, ZX-Spectrum-Format) von Diskette, einmal, im Hintergrund. Die Endung `.STC` muss angegeben werden. Abbrechen geht nur mit **Rückstellen** — oder abwarten. |
+
+**Weitere Lieder.** STC-Dateien gibt es zahlreich im Netz (Sammlungen von ZX-Spectrum-Musik). Mit dem **DiskTool**
+auf eine Diskette kopieren und mit `PLAYSTC` abspielen. Die Tonhöhen dieser Lieder passen zum AY-Takt 1,79 MHz.
+
+**Kanäle links und rechts.** `TGCPM` und `SKTEST4` beschriften die Kanäle mit „A = RECHTS, C = LINKS“. Welche
+Seite wirklich klingt, hängt an der Kanalzuordnung der Karte (Schiebeschalter S8, hier *Kanäle*): bei der Vorgabe
+*Stereo ACB* liegt A links, B rechts und C in der Mitte. Die Beschriftung im Programm ist deshalb nur ein Hinweis.
+
+**Mitschneiden.** *Maschine ▸ Ton mitschneiden…* schreibt alles, was die Karte ausgibt, in eine WAV-Datei —
+auch dann, wenn der Wirtsrechner keine Tonausgabe hat oder schneller als Echtzeit gerechnet wird.
 
 ## Lochstreifen
 
