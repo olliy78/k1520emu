@@ -124,6 +124,17 @@ _SPEC: List[Tuple] = [
      "Den Text des Terminalbildes (80 × 24, nicht gerendert) in die Zwischenablage kopieren",
      "_text_kopieren", False),
 
+    # Tonausgabe der SOUND-Karte (alle Profile ausser P8000; nur mit gesteckter Karte bedienbar).
+    # KEIN Kuerzel (die Kuerzeltabelle des Handbuchs ist ein Vertrag).
+    ("ton_stumm", "Ton &stumm", None, None,
+     "Die Tonausgabe der Soundkarte stummschalten (die Karte läuft weiter, auch der Mitschnitt)",
+     "_on_ton_stumm", True),
+    ("ton_lautstaerke", "&Lautstärke…", None, None,
+     "Lautstärke der Tonausgabe einstellen (0–100 %)", "_lautstaerke_dialog", False),
+    ("ton_mitschnitt", "Ton &mitschneiden…", None, None,
+     "Den Ton der Soundkarte als WAV-Datei mitschneiden (48 kHz Stereo, in jedem Tempo); "
+     "noch einmal wählen beendet den Mitschnitt", "_ton_mitschnitt", False),
+
     # ── EPROMmer (nur PRG 710, AP-P7c) ──────────────────────────────────────
     # Der virtuelle Sockel der ATP 590068 (doc/prg710/eprommer.md).  KEIN Kuerzel:
     # jedes Strg+Umschalt+… muesste in die Kuerzeltabelle des Handbuchs (ein Vertrag).
@@ -231,6 +242,9 @@ KURZ = {
     "verbindung": "Verbindung",
     "terminal": "Terminal",
     "text_kopieren": "Text kopieren",
+    "ton_stumm": "Stumm",
+    "ton_lautstaerke": "Lautstärke",
+    "ton_mitschnitt": "Mitschnitt",
     "eprom_einlegen": "PROM",
     "eprom_leer": "Leer",
     "eprom_speichern": "Sichern",
@@ -264,6 +278,9 @@ NUR_FUER = {
     "verbindung": ("p8000",),
     "terminal": ("p8000",),
     "text_kopieren": ("p8000", "mc80"),
+    "ton_stumm": ("a5120", "k8915", "prg710", "pc1715", "mc80"),     # SOUND-Karte (nicht P8000)
+    "ton_lautstaerke": ("a5120", "k8915", "prg710", "pc1715", "mc80"),
+    "ton_mitschnitt": ("a5120", "k8915", "prg710", "pc1715", "mc80"),
     "speicherabzug_laden": ("mc80",),    # Speicherabzug laden (AP M6)
     "pcmc": ("mc80",),                   # PCMC-Gegenstelle (Issue #24)
     # Die jeweils ANDEREN Emulatoren.
@@ -299,6 +316,7 @@ REIHENFOLGE: List = [
     "einlegen", "auswerfen",
     None,
     "sicherheitsstecker", "schluessel_anwender", "schluessel_admin", "stand_speichern", "stand_laden", "verbindung", "terminal", "text_kopieren", "speicherabzug_laden", "pcmc",
+    "ton_stumm", "ton_lautstaerke", "ton_mitschnitt",
     None,
     "dock_drives", "dock_settings", "dock_screen", "dock_keyboard", "dock_eprom",
     None,

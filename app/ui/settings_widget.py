@@ -31,7 +31,7 @@ from PySide6.QtGui import QColor
 from app.ui.screen_widget import CRTParams
 from app.ui.bildschirm_schalter import BildschirmSchalter
 from app.ui.gide_gruppe import GideGruppe, GideRtcGruppe
-from app.ui.karten_gruppe import NetzGruppe, UsbGruppe
+from app.ui.karten_gruppe import NetzGruppe, SoundGruppe, UsbGruppe
 from app import drive_types as dt
 from app import profil as profile
 from app import takt
@@ -95,10 +95,11 @@ class SettingsWidget(QWidget):
     usbChanged = Signal(dict)
     usbStickGewuenscht = Signal(bool)
     netChanged = Signal(dict)
+    soundChanged = Signal(dict)
 
     #: (Beschriftung, Faktor).  Die Stufen
     #: stehen in :mod:`app.takt`, damit Auswahlfeld und Statuszeile dasselbe
-    #: sagen: der Nenntakt des A5120 (2,45 MHz) und seine Vielfachen.  Das
+    #: sagen: der Nenntakt des A5120 (2,4576 MHz) und seine Vielfachen.  Das
     #: Profil des K8915 bekommt seine eigene Liste (2,4576 MHz), siehe __init__.
     SPEED_OPTIONS = takt.auswahl()
 
@@ -530,6 +531,14 @@ class SettingsWidget(QWidget):
             form.addRow(self.karten_box)
         else:
             self.karten_box.setVisible(False)      # P8000/MC80: keine Karte, keine Zeilen
+        # SOUND-Karte K1520 (AP S8): eigene Zeile ausserhalb der Gruppe „Erweiterungskarten", weil sie
+        # auch der MC80 hat; nur der P8000 (kein K1520-Bus) blendet sie aus.
+        self.sound_gruppe = SoundGruppe(self.profil.karten_vorauswahl("sound"), inner)
+        self.sound_gruppe.soundChanged.connect(self.soundChanged)
+        if self.profil.sound_wahl:
+            form.addRow(self.sound_gruppe)
+        else:
+            self.sound_gruppe.setVisible(False)
 
         # Mitschrift des Terminals (nur Profil mit Terminal): Dateiname + Ordnerknopf.
         self.mitschrift_edit = QLineEdit(inner)
@@ -760,6 +769,9 @@ class SettingsWidget(QWidget):
 
     def set_net_value(self, zustand: dict, fehler: str = "", gesteckt=None) -> None:
         self.netz_gruppe.set_zustand(zustand, fehler, gesteckt)
+
+    def set_sound_value(self, zustand: dict, fehler: str = "", gesteckt=None) -> None:
+        self.sound_gruppe.set_zustand(zustand, fehler, gesteckt)
 
     # ── RAM-Disk (RAF) ───────────────────────────────────────────────────────
 

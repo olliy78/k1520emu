@@ -385,13 +385,13 @@ def test_status_bar_shows_the_configured_clock_not_the_measured_one(window):
     window._update_status()
 
     assert window.status_widget.takt.text() == f"Takt: {takt.beschriftung(10.0)}"
-    assert "10 × 2,45 MHz" in window.status_widget.takt.text()
+    assert "10 × 2,4576 MHz" in window.status_widget.takt.text()
     tooltip = window.status_widget.takt.toolTip()
-    assert "Gemessen: 1,0 × 2,45 MHz" in tooltip
+    assert "Gemessen: 1,0 × 2,4576 MHz" in tooltip
     assert "kommt nicht mit" in tooltip
 
     window._apply_speed(1.0)
-    assert window.status_widget.takt.text() == "Takt: 2,45 MHz"
+    assert window.status_widget.takt.text() == "Takt: 2,4576 MHz"
 
 
 def test_clock_labels_are_the_same_in_the_dropdown_and_the_status_bar(window):
@@ -401,8 +401,8 @@ def test_clock_labels_are_the_same_in_the_dropdown_and_the_status_bar(window):
     im_feld = [window.settings_widget.speed_combo.itemText(i)
                for i in range(window.settings_widget.speed_combo.count())]
     assert im_feld == [b for b, _ in takt.auswahl()]
-    assert im_feld == ["2,45 MHz", "2 × 2,45 MHz", "5 × 2,45 MHz",
-                       "10 × 2,45 MHz"], "kein „unbegrenzt“ mehr (2026-10-09)"
+    assert im_feld == ["2,4576 MHz", "2 × 2,4576 MHz", "5 × 2,4576 MHz",
+                       "10 × 2,4576 MHz"], "kein „unbegrenzt“ mehr (2026-10-09)"
 
     for beschriftung, faktor in takt.auswahl():
         window.status_widget.set_takt(faktor)

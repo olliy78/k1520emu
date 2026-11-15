@@ -92,9 +92,9 @@ gemerkt.
 ## Die Statuszeile lesen
 
 **Takt** — der eingestellte Takt der Maschine, wortgleich mit dem Auswahlfeld
-unter *Einstellungen ▸ Allgemein*: `2,45 MHz` (Echtzeit), `2 × 2,45 MHz`,
-`5 × 2,45 MHz` oder `10 × 2,45 MHz`. Was der Wirtsrechner davon
-tatsächlich hält, steht im **Tooltip** („Gemessen: 9,8 × 2,45 MHz") — samt dem
+unter *Einstellungen ▸ Allgemein*: `2,4576 MHz` (Echtzeit), `2 × 2,4576 MHz`,
+`5 × 2,4576 MHz` oder `10 × 2,4576 MHz`. Was der Wirtsrechner davon
+tatsächlich hält, steht im **Tooltip** („Gemessen: 9,8 × 2,4576 MHz") — samt dem
 Hinweis, wenn er nicht mitkommt. Als Anzeige taugte der gemessene Wert nicht:
 er schwankt von Sekunde zu Sekunde und liest sich wie ein Fehler, wo keiner ist.
 
@@ -608,11 +608,11 @@ ein Tester immer mit `SERTEST ENDE FEHLER` — das ist richtig so.
 
 ## Der Takt der Maschine
 
-*Einstellungen ▸ Allgemein ▸ Takt*: `2,45 MHz` — das ist der Takt des echten
-A5120 — sowie `2 ×`, `5 ×` und `10 × 2,45 MHz`.  Schafft der Wirtsrechner eine Stufe
+*Einstellungen ▸ Allgemein ▸ Takt*: `2,4576 MHz` — das ist der Takt des echten
+A5120 — sowie `2 ×`, `5 ×` und `10 × 2,4576 MHz`.  Schafft der Wirtsrechner eine Stufe
 nicht, läuft die Maschine so schnell er kann; die Oberfläche bleibt bedienbar.
 
-`2,45 MHz` ist das, was die Uhr des Gastsystems erwartet — sie zählt Taktzyklen
+`2,4576 MHz` ist das, was die Uhr des Gastsystems erwartet — sie zählt Taktzyklen
 und geht bei jedem Vielfachen entsprechend falsch. Schneller ist gut, um einen
 Kaltstart abzukürzen; wer die Uhr braucht, bleibt beim Nenntakt.
 
@@ -1567,6 +1567,51 @@ passen** — die Programme suchen die Karte an einer festen Adresse: die Diskett
 Gast eingetragene Adresse wertet der Emulator nicht aus, er benutzt die Netzverbindung des Rechners).
 Gemerkt wird alles in der Konfiguration (`general.net`).
 
+## Die SOUND-Karte
+
+Die **SOUND-Karte K1520** trägt einen Tonbaustein **AY-3-8910** (oder AY-3-8912) mit drei Tonkanälen und
+einem Geräuschgenerator, dazu eine **CTC** für Zeitsteuerung und Interrupts. Sie lässt sich in A5120, K8915,
+PRG 710/-1, PC 1715/1715W und MC80 stecken (nicht in den P8000) und ist ab Werk **aus**.
+
+*Einstellungen ▸ Allgemein ▸ Soundkarte* (flache Zeilen):
+
+* **Soundkarte stecken** und **E/A-Basis** — acht Tore ab der Basis (Vielfache von 8). Vorgewählt ist **38H**,
+  am **PC 1715 und PC 1715W E0H** (die Lage der Gastsoftware; am MC80.2x kollidiert E0H mit der Lochstreifenkarte).
+  Belegte Basen sind im Auswahlfeld markiert und nicht wählbar. Ein Wechsel baut die Maschine neu auf.
+* **Chip** — AY-3-8910 (zwei 8-Bit-Tore A und B) oder AY-3-8912 (nur Tor A).
+* **AY-Takt** — *Quarz/2 = 1,79 MHz* (Vorgabe, Brücke JP2), *Quarz* oder *Systemtakt*; dazu die **Quarzfrequenz**
+  in Hertz (Vorgabe 3 579 545).
+* **Kanäle** — *Stereo ABC* (Vorgabe), *Stereo ACB* oder *Mono*.
+* **Tiefpass C16/C17** — nachgebildet sind die bestückten Kondensatoren: der Ton klingt dumpfer (ab Werk aus).
+* **CTC-Kaskade** — drei Haken für die Brücken `TO0 → TR1`, `TO1 → TR2`, `TO2 → TR3` (ab Werk aus).
+
+Sie liegt wie die anderen Steckkarten in der Konfiguration (`general.sound`, dazu `general.lautstaerke` und
+`general.stumm`).
+
+**Ton hören.** Gehört wird nur bei **Echtzeit** (Takt `1×`); bei schnellerem Takt ist die Wirtsausgabe stumm,
+damit nichts nachhallt. Das Menü *Maschine* hat drei Einträge, alle **ohne Tastenkürzel** und nur mit gesteckter Karte
+bedienbar: **Ton stumm** (Haken), **Lautstärke…** (kleiner Regler, wirkt sofort) und **Ton mitschneiden…**
+(schreibt eine WAV-Datei, 48 kHz Stereo; der Mitschnitt läuft in jedem Tempo und auch bei stummer Ausgabe;
+noch einmal gewählt beendet er sich). Die Statuszeile zeigt bei gesteckter Karte das Feld **Ton**:
+
+| Anzeige | Bedeutung |
+|---------|-----------|
+| `Ton: hörbar` | die Ausgabe läuft |
+| `Ton: stumm` | stummgeschaltet, oder nicht in Echtzeit, oder kein Gerät (der Tooltip nennt den Grund) |
+| `Ton: kein Gerät` | der Wirtsrechner hat kein Ausgabegerät geöffnet; der Tooltip nennt den Grund |
+| `Ton: aus` | die Ausgabe ist nicht gestartet |
+
+Unter Linux spielt der Emulator über **ALSA** (`libasound.so.2` wird beim Start geladen; fehlt sie, bleibt es bei
+„kein Gerät“ und die Maschine läuft ungestört weiter), unter Windows über **waveOut**. „Kein Gerät“ heißt also:
+der Emulator hat keine Tonausgabe bekommen — meist fehlt die ALSA-Bibliothek, ein Tongerät ist belegt oder es gibt
+keines. Der Mitschnitt funktioniert trotzdem.
+
+**Gastsoftware** (liegt später auf den Systemdisketten): `TGCPM` (kleinster Rauchtest, 1-kHz-Ton auf A/B/C),
+`SKTEST4` (Komponententest: AY, Ports, kaskadierte CTC, CTC-Interrupt, Lied — fragt zuerst den AY-Takt ab; die
+Wahl muss zur Einstellung passen), `STCTEST1` (spielt ein eingebautes Lied im Hintergrund, der Prompt bleibt
+bedienbar) und `PLAYSTC` (`PLAYSTC B:SONG.STC` spielt eine STC-Datei von Diskette). Die Programme suchen die Karte
+an einer festen Basis: die Vorauswahl der Oberfläche passt dazu.
+
 ## Lochstreifen
 
 *Einstellungen ▸ Allgemein ▸ Lochstreifen (SIF1000, K6022)* steckt die
@@ -1897,7 +1942,7 @@ Alles, was man einstellt, landet fortlaufend in
 kann also den A5120 mit drei Laufwerken und sichtbarer Tastatur und den K8915 mit
 zwei Laufwerken ohne Tastatur nebeneinander führen. Gemerkt werden Bildröhre,
 Takt, Modell, RAM-Disk (samt Stand-by), Lochstreifen-Karte samt Leser- und
-Stanzerdatei, Kassetten-Karte samt den Dateien beider Laufwerke, IDE-Karte GIDE samt Abbild, USB- und Netzwerkkarte, Laufwerksbestückung, eingelegte Disketten, die seriellen Schnittstellen
+Stanzerdatei, Kassetten-Karte samt den Dateien beider Laufwerke, IDE-Karte GIDE samt Abbild, USB- und Netzwerkkarte, Soundkarte samt Lautstärke und Stumm, Laufwerksbestückung, eingelegte Disketten, die seriellen Schnittstellen
 (samt dem, was lief), Größe und Lage des Fensters
 (auch „maximiert"), die Lage und Breite der Kästen samt der Trennlinien
 dazwischen, und der Inhalt der Symbolleiste.
