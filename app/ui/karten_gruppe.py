@@ -233,19 +233,14 @@ class SoundGruppe(KartenGruppe):
     def __init__(self, basis_vorgabe: int, parent=None):
         super().__init__("Soundkarte", "Soundkarte stecken", kartenwahl.SOUND, basis_vorgabe,
                          sound.TIPP_KARTE, sound.TIPP_BASIS, parent)
-        # Bestueckung: aus / AY-3-8910 / AY-3-8912 -- das Kaestchen "stecken" bleibt (wie bei den
-        # Schwesterkarten), der Chip steht in der Zeile darunter.
-        self.chip_combo = QComboBox(self)
-        for wert, text in sound.CHIPS:
-            self.chip_combo.addItem(text, wert)
-        self.chip_combo.setToolTip(sound.TIPP_CHIP)
+        # Chip: immer AY-3-8910 (Anwenderentscheid 2026-11-16).  Der AY-3-8912 klingt gleich und unterscheidet sich
+        # nur durch das fehlende Tor B -- offene Pins lesen beim 8910 ohnehin FFH, fuer Programme ist das nicht
+        # zu unterscheiden.  Kern/C-ABI/Python kennen die Variante weiter.
         self.kanal_combo = QComboBox(self)
         for wert, text in sound.KANAELE:
             self.kanal_combo.addItem(text, wert)
         self.kanal_combo.setToolTip(sound.TIPP_KANAL)
         z1 = QHBoxLayout()
-        z1.addWidget(QLabel("Chip:", self))
-        z1.addWidget(self.chip_combo)
         z1.addWidget(QLabel("Kanäle:", self))
         z1.addWidget(self.kanal_combo, 1)
         self.form.addRow("", z1)
@@ -289,7 +284,7 @@ class SoundGruppe(KartenGruppe):
 
         for w in (self.karte_box, *self.kaskade_boxen):
             w.toggled.connect(self._aenderung)
-        for w in (self.basis_combo, self.chip_combo, self.kanal_combo, self.tiefpass_combo):
+        for w in (self.basis_combo, self.kanal_combo, self.tiefpass_combo):
             w.currentIndexChanged.connect(self._aenderung)
         self.ay_takt_edit.editingFinished.connect(self._ay_takt_fertig)
         self.set_zustand(sound.vorgabe(self._basis_vorgabe))
@@ -297,7 +292,7 @@ class SoundGruppe(KartenGruppe):
     def zustand(self) -> dict:
         return {"enabled": self.karte_box.isChecked(),
                 "basis": int(self.basis_combo.currentData()),
-                "chip": self.chip_combo.currentData(),
+                "chip": "ay8910",
                 "ay_takt_hz": self._ay_takt_hz,
                 "kanal": self.kanal_combo.currentData(),
                 "tiefpass_hz": int(self.tiefpass_combo.currentData()),
@@ -307,7 +302,7 @@ class SoundGruppe(KartenGruppe):
         self._guard = True
         self.karte_box.setChecked(bool(z.get("enabled")))
         self._basis_setzen(z)
-        for combo, schl in ((self.chip_combo, "chip"), (self.kanal_combo, "kanal")):
+        for combo, schl in ((self.kanal_combo, "kanal"),):
             i = combo.findData(z.get(schl))
             combo.setCurrentIndex(i if i >= 0 else 0)
         self._ay_takt_setzen(int(z.get("ay_takt_hz", sound.AY_TAKT_VORGABE)))

@@ -59,7 +59,7 @@ def test_abschnitt_nur_an_steckplatzfaehigen_profilen(qapp, maschine):
         assert not g.karte_box.isChecked() and not w.emulator.sound_present()
         assert g.basis_combo.currentData() == BASIS[maschine]
         assert g.basis_combo.count() == 32                       # Vielfache von 8
-        assert g.chip_combo.currentData() == "ay8910"
+        assert g.zustand()["chip"] == "ay8910"
         assert g.zustand()["ay_takt_hz"] == 1_789_772
         assert g.kanal_combo.currentData() == "acb" and g.tiefpass_combo.currentData() == 24000
         assert g.tiefpass_combo.count() == 4
@@ -104,7 +104,7 @@ def test_stecken_aendert_die_maschine_und_die_konfiguration_haelt_es(qapp):
     w = _fenster(qapp, "a5120")
     try:
         g = w.settings_widget.sound_gruppe
-        g.chip_combo.setCurrentIndex(g.chip_combo.findData("ay8912"))
+        assert not hasattr(g, "chip_combo")             # keine Chipwahl in der Oberflaeche (immer AY-3-8910)
         g.kanal_combo.setCurrentIndex(g.kanal_combo.findData("mono"))
         g.ay_takt_edit.setText("3,579545")
         g.ay_takt_edit.editingFinished.emit()
@@ -114,7 +114,7 @@ def test_stecken_aendert_die_maschine_und_die_konfiguration_haelt_es(qapp):
         g.karte_box.setChecked(True)
         qapp.processEvents()
         assert w.emulator.sound_present()
-        assert w._sound["chip"] == "ay8912" and w._sound["kaskade"] == 2
+        assert w._sound["chip"] == "ay8910" and w._sound["kaskade"] == 2
         w._lautstaerke_setzen(35)
         w.act_ton_stumm.setChecked(True)
         w._autosave_now()
@@ -122,14 +122,15 @@ def test_stecken_aendert_die_maschine_und_die_konfiguration_haelt_es(qapp):
         _zu(w, qapp)
     datei = Path(config_io.default_config_dir()) / profil.profil("a5120").konfig_datei
     general = yaml.safe_load(datei.read_text(encoding="utf-8"))["general"]
-    assert general["sound"] == {"enabled": True, "basis": "38", "chip": "ay8912",
+    assert general["sound"] == {"enabled": True, "basis": "38", "chip": "ay8910",
                                 "ay_takt_hz": 3579545, "kanal": "mono", "tiefpass_hz": 3000,
                                 "kaskade": [False, True, False]}
     assert general["lautstaerke"] == 35 and general["stumm"] is True
     w2 = _fenster(qapp, "a5120")
     try:
         assert w2.emulator.sound_present() and w2.act_ton_stumm.isChecked()
-        assert w2.settings_widget.sound_gruppe.chip_combo.currentData() == "ay8912"
+        from app import sound
+        assert sound.normalize({"enabled": True, "chip": "ay8912"}, 0x38)["chip"] == "ay8910"
         assert w2._lautstaerke == 35
         regs = w2.emulator.sound_regs()
         assert regs is not None and len(regs) == 16
@@ -273,7 +274,7 @@ def test_takt_aenderung_baut_nicht_neu_auf_basiswechsel_schon(qapp, monkeypatch)
         orig = w._apply_drive_types
         monkeypatch.setattr(w, "_apply_drive_types", lambda *a, **k: (aufrufe.append(1), orig(*a, **k))[1])
         w._sound_fehler = ""
-        for combo, wert in ((g.chip_combo, "ay8912"), (g.kanal_combo, "mono")):
+        for combo, wert in ((g.kanal_combo, "mono"),):
             combo.setCurrentIndex(combo.findData(wert))
         g.tiefpass_combo.setCurrentIndex(g.tiefpass_combo.findData(3000))
         g.kaskade_boxen[1].setChecked(False)

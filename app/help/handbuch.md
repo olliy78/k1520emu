@@ -1579,7 +1579,7 @@ Gemerkt wird alles in der Konfiguration (`general.net`).
 
 ## Die SOUND-Karte
 
-Die **SOUND-Karte K1520** trägt einen Tonbaustein **AY-3-8910** (oder AY-3-8912) mit drei Tonkanälen und
+Die **SOUND-Karte K1520** trägt einen Tonbaustein **AY-3-8910** mit drei Tonkanälen und
 einem Geräuschgenerator, dazu eine **CTC** für Zeitsteuerung und Interrupts. Sie lässt sich in A5120, K8915,
 PRG 710/-1, PC 1715/1715W und MC80 stecken (nicht in den P8000) und ist ab Werk **aus**.
 
@@ -1588,7 +1588,6 @@ PRG 710/-1, PC 1715/1715W und MC80 stecken (nicht in den P8000) und ist ab Werk 
 * **Soundkarte stecken** und **E/A-Basis** — acht Tore ab der Basis (Vielfache von 8). Vorgewählt ist **38H**,
   am **PC 1715W E0H** (dort sind 38H–3FH belegt; die Gastsoftware des PC 1715 benutzt 38H, am PC 1715 steckt die Karte deshalb auch auf 38H und die Lochstreifenkarte E0H daneben).
   Belegte Basen sind im Auswahlfeld markiert und nicht wählbar.
-* **Chip** — AY-3-8910 (zwei 8-Bit-Tore A und B) oder AY-3-8912 (nur Tor A).
 * **AY-Takt** — Vorgabe 1,79 MHz (Quarz 3,579545 MHz halbiert, so die Stückliste); Eingabe in MHz mit Komma. Die echte Karte kann
   per Brücke JP2 auch den vollen Quarztakt oder den Systemtakt nehmen — dann hier die entsprechende Frequenz eintragen
   (ein höherer Takt lässt Lieder höher klingen).

@@ -13,7 +13,7 @@ Karte gelten, wenn man sie spaeter steckt)::
       sound:
         enabled: false          # Karte gesteckt?  (Vorgabe aus)
         basis: '38'             # E/A-Basis, Vielfaches von 8, Hex (PC 1715W: E0)
-        chip: ay8910            # ay8910 | ay8912
+        chip: ay8910            # immer ay8910 (Oberflaeche ohne Wahl)
         ay_takt_hz: 1789772     # Takt am AY in Hz (= Quarz 3 579 545 / 2, Stueckliste)
         kanal: acb              # acb (Vorgabe) | abc | mono
         tiefpass_hz: 24000      # C16/C17: Grenzfrequenz in Hz (3000|8000|16000|24000), 24000 = ungefiltert (alt: ``tiefpass: true`` = 8000)
@@ -36,7 +36,6 @@ SCHLUESSEL_STUMM = "stumm"
 LAUTSTAERKE_VORGABE = 80
 
 #: (Konfigurationswert, Anzeige)
-CHIPS = (("ay8910", "AY-3-8910"), ("ay8912", "AY-3-8912"))
 KANAELE = (("acb", "Stereo ACB"), ("abc", "Stereo ABC"), ("mono", "Mono"))
 QUARZ_VORGABE = 3_579_545
 #: Vorgabe des AY-Takts: Quarz halbiert (Stueckliste, JP2 Q1/2)
@@ -59,7 +58,6 @@ STATUS_TEXT = {"aus": "aus", "stumm": "stumm", "hoerbar": "hörbar", "kein_gerae
 TIPP_KARTE = (
     "Steckt die SOUND-Karte K1520 (Tonbaustein AY-3-8910/8912 mit CTC).  Hörbar ist sie bei "
     "jedem Takt außer „unbegrenzt“ (der AY läuft in echter Zeit).  Ein Wechsel schaltet die Maschine aus und neu ein.")
-TIPP_CHIP = "AY-3-8910 hat zwei 8-Bit-Tore (A und B); der AY-3-8912 nur eines (A)."
 TIPP_BASIS = (
     "E/A-Basis der acht Tore der Karte (Vielfache von 8).  Vorgewählt ist 38H, am PC 1715W "
     "E0H (dort sind 38H–3FH belegt).  Belegte Einträge sind markiert und nicht wählbar.  Ein Wechsel "
@@ -145,7 +143,7 @@ def normalize(wert, basis_vorgabe: int, alt: Optional[dict] = None, nenntakt_hz:
         return z
     z["enabled"] = wert.get("enabled") is True
     z["basis"] = basis_lesen(wert.get("basis", z["basis"]), basis_vorgabe)
-    z["chip"] = _wahl(wert.get("chip"), CHIPS, "ay8910")
+    z["chip"] = "ay8910"            # Oberflaeche: immer AY-3-8910 (ein alter Eintrag "ay8912" wird nicht uebernommen)
     if "ay_takt_hz" in wert:
         z["ay_takt_hz"] = _ay_takt_lesen(wert.get("ay_takt_hz"))
     elif "takt" in wert or "quarz_hz" in wert:      # alter Eintrag: umrechnen, nicht mehr schreiben
