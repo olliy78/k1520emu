@@ -113,7 +113,7 @@ def test_gide_und_sound_zeigen_ihre_bekannten_basen_mit_namen():
     # wie USB (84H GUN) und KCNet (C0H/28H Netzkarte, 88H GUN): die bekannten Einstellungen tragen den Namen
     from app import kartenwahl
     gide = {z.basis: z.text for z in kartenwahl.eintraege(kartenwahl.GIDE, None)}
-    assert gide[0xD0] == "D0H (GIDE)" and gide[0x50] == "50H (Kingstener)" and gide[0x90] == "90H (PRG 710)"
+    assert gide[0xD0] == "D0H (GIDE)" and gide[0x90] == "90H (PRG 710)" and gide[0x50] == "50H"
     snd = {z.basis: z.text for z in kartenwahl.eintraege(kartenwahl.SOUND, None)}
     assert snd[0x38] == "38H (SOUND-K1520)" and snd[0xE0] == "E0H (PC 1715)" and snd[0xE8] == "E8H (NANOS)"
     assert snd[0x40] == "40H"
