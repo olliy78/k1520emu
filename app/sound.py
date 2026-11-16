@@ -16,7 +16,7 @@ Karte gelten, wenn man sie spaeter steckt)::
         chip: ay8910            # ay8910 | ay8912
         ay_takt_hz: 1789772     # Takt am AY in Hz (= Quarz 3 579 545 / 2, Stueckliste)
         kanal: acb              # acb (Vorgabe) | abc | mono
-        tiefpass_hz: 0          # C16/C17: Grenzfrequenz in Hz, 0 = aus (alt: ``tiefpass: true`` = 8000)
+        tiefpass_hz: 24000      # C16/C17: Grenzfrequenz in Hz (3000|8000|16000|24000), 24000 = ungefiltert (alt: ``tiefpass: true`` = 8000)
         kaskade: [true, true, true]      # TO0->TR1, TO1->TR2, TO2->TR3 (ab Werk gesteckt)
       lautstaerke: 80           # Prozent
       stumm: false
@@ -44,8 +44,9 @@ AY_TAKT_VORGABE = QUARZ_VORGABE // 2
 AY_TAKT_MIN, AY_TAKT_MAX = 500_000, 4_000_000
 #: Nenntakt, wenn die Umrechnung eines alten ``takt: system`` keinen Maschinentakt kennt
 NENNTAKT_VORGABE = 2_457_600
-#: Wahl des Tiefpasses C16/C17 in Hz (0 = aus); die Grenze 8 kHz entspricht dem alten Haken
-TIEFPASS_WERTE = (0, 3000, 4000, 5000, 6000, 8000, 10000, 12000, 16000, 20000, 24000)
+#: Wahl des Tiefpasses C16/C17 in Hz; die Grenze 8 kHz entspricht dem alten Haken, 24 kHz = ungefiltert
+TIEFPASS_WERTE = (3000, 8000, 16000, 24000)
+TIEFPASS_VORGABE = 24000
 TIEFPASS_ALT_AN = 8000
 #: Vorgabe der Kaskade: alle drei Bruecken gesteckt (SKTEST4 Menue 3 haengt sonst)
 KASKADE_VORGABE = 7
@@ -69,8 +70,8 @@ TIPP_TAKT = (
     "eintragen.  Ein höherer Takt lässt Lieder höher klingen.  Die Änderung wirkt sofort.")
 TIPP_KANAL = "Zuordnung der drei AY-Kanäle zu links/rechts: Stereo ACB (Vorgabe), Stereo ABC oder Mono."
 TIPP_TIEFPASS = (
-    "Tiefpass (Kondensatoren C16/C17): dämpft die Höhen, je tiefer die Grenzfrequenz, desto weicher klingt der Ton.  "
-    "Je nach Geschmack; der Ausgang filtert ohnehin bei 8 kHz gegen Aliasing, Werte darüber wirken kaum.")
+    "Tiefpass (Kondensatoren C16/C17): dämpft die Höhen steil (24 dB je Oktave), je tiefer die Grenzfrequenz, desto weicher klingt der Ton.  "
+    "24 kHz = ungefiltert (Vorgabe).  Der Ausgang dämpft ohnehin oberhalb von etwa 8 kHz gegen Aliasing, 16 und 24 kHz klingen deshalb fast gleich.")
 TIPP_KASKADE = (
     "Hardwarebrücken der CTC-Kanäle der Karte: der Ausgang ZC/TO eines Kanals speist den Takteingang "
     "des nächsten.  Ab Werk alle drei gesteckt (Testprogramme wie SKTEST4 setzen das voraus).")
@@ -105,16 +106,19 @@ def _wahl(wert, tabelle, vorgabe: str) -> str:
     return w if w in {k for k, _ in tabelle} else vorgabe
 
 
-def tiefpass_lesen(wert: dict, vorgabe: int = 0) -> int:
-    """Tiefpass in Hz aus einem Abschnitt: ``tiefpass_hz``; alter Schluessel ``tiefpass`` (true = 8000, false = aus)."""
-    if "tiefpass_hz" in wert:
-        n = wert.get("tiefpass_hz")
-        if isinstance(n, bool) or not isinstance(n, int):
-            return vorgabe
-        return n if n == 0 or 1000 <= n <= 48000 else vorgabe
-    if "tiefpass" in wert:
-        return TIEFPASS_ALT_AN if wert.get("tiefpass") is True else 0
-    return vorgabe
+def tiefpass_lesen(wert: dict, vorgabe: int = TIEFPASS_VORGABE) -> int:
+    """Tiefpass in Hz aus einem Abschnitt: ``tiefpass_hz``; alter Schluessel ``tiefpass`` (true = 8000, false = 24000).
+
+    Fehlend/kaputt/0/false = Vorgabe (24000, ungefiltert), true = 8000, jeder andere Wert der naechste der vier Stufen."""
+    # alter Schluessel ``tiefpass`` kennt nur Wahrheitswerte (andere Werte dort = Vorgabe)
+    n = wert.get("tiefpass_hz") if "tiefpass_hz" in wert else wert.get("tiefpass", None)
+    if "tiefpass_hz" not in wert and n is not True:
+        return vorgabe
+    if n is True:
+        return TIEFPASS_ALT_AN
+    if isinstance(n, bool) or not isinstance(n, int) or n <= 0:
+        return vorgabe
+    return min(TIEFPASS_WERTE, key=lambda w: abs(w - n))
 
 
 def _maske(wert, vorgabe: int = KASKADE_VORGABE) -> int:
@@ -130,7 +134,7 @@ def basis_lesen(wert, vorgabe: int) -> int:
 
 def vorgabe(basis_vorgabe: int) -> dict:
     return {"enabled": False, "basis": int(basis_vorgabe), "chip": "ay8910",
-            "ay_takt_hz": AY_TAKT_VORGABE, "kanal": "acb", "tiefpass_hz": 0,
+            "ay_takt_hz": AY_TAKT_VORGABE, "kanal": "acb", "tiefpass_hz": TIEFPASS_VORGABE,
             "kaskade": KASKADE_VORGABE}
 
 

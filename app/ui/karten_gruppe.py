@@ -266,7 +266,7 @@ class SoundGruppe(KartenGruppe):
 
         self.tiefpass_combo = QComboBox(self)
         for hz in sound.TIEFPASS_WERTE:
-            self.tiefpass_combo.addItem("aus" if hz == 0 else f"{hz // 1000} kHz", hz)
+            self.tiefpass_combo.addItem(f"{hz // 1000} kHz (ungefiltert)" if hz == 24000 else f"{hz // 1000} kHz", hz)
         self.tiefpass_combo.setToolTip(sound.TIPP_TIEFPASS)
         z3 = QHBoxLayout()
         z3.addWidget(QLabel("Tiefpass:", self))
@@ -311,7 +311,7 @@ class SoundGruppe(KartenGruppe):
             i = combo.findData(z.get(schl))
             combo.setCurrentIndex(i if i >= 0 else 0)
         self._ay_takt_setzen(int(z.get("ay_takt_hz", sound.AY_TAKT_VORGABE)))
-        hz = int(z.get("tiefpass_hz", 0))
+        hz = int(z.get("tiefpass_hz", sound.TIEFPASS_VORGABE))
         nah = min(sound.TIEFPASS_WERTE, key=lambda w: abs(w - hz))   # nicht in der Liste: der naechste Wert
         self.tiefpass_combo.setCurrentIndex(self.tiefpass_combo.findData(nah))
         maske = int(z.get("kaskade", sound.KASKADE_VORGABE))

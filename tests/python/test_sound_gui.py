@@ -61,11 +61,10 @@ def test_abschnitt_nur_an_steckplatzfaehigen_profilen(qapp, maschine):
         assert g.basis_combo.count() == 32                       # Vielfache von 8
         assert g.chip_combo.currentData() == "ay8910"
         assert g.zustand()["ay_takt_hz"] == 1_789_772
-        assert g.kanal_combo.currentData() == "acb" and g.tiefpass_combo.currentData() == 0
-        assert g.tiefpass_combo.count() == 11
-        assert [g.tiefpass_combo.itemData(i) for i in range(11)] == [0, 3000, 4000, 5000, 6000, 8000, 10000, 12000,
-                                                                      16000, 20000, 24000]
-        assert g.tiefpass_combo.itemText(0) == "aus" and g.tiefpass_combo.itemText(1) == "3 kHz"
+        assert g.kanal_combo.currentData() == "acb" and g.tiefpass_combo.currentData() == 24000
+        assert g.tiefpass_combo.count() == 4
+        assert [g.tiefpass_combo.itemData(i) for i in range(4)] == [3000, 8000, 16000, 24000]
+        assert [g.tiefpass_combo.itemText(i) for i in range(4)] == ["3 kHz", "8 kHz", "16 kHz", "24 kHz (ungefiltert)"]
         assert [b.isChecked() for b in g.kaskade_boxen] == [True] * 3     # ab Werk gesteckt (SKTEST4 Menue 3)
         assert g.zustand()["kaskade"] == 7
         # Kaskade steht in einer EIGENEN Zeile (eigenes Layout) unter der Tiefpass-Zeile
@@ -343,10 +342,10 @@ def test_kaskadenhaken_wirken_ohne_neuaufbau_am_ctc(qapp, monkeypatch):
         qapp.processEvents()
         assert aufrufe == [] and w.emulator._sound_cfg["kaskade"] == 7
         # Tiefpass-Auswahl: ebenfalls live, ohne Neuaufbau
-        g.tiefpass_combo.setCurrentIndex(g.tiefpass_combo.findData(12000))
+        g.tiefpass_combo.setCurrentIndex(g.tiefpass_combo.findData(16000))
         qapp.processEvents()
         assert aufrufe == [] and w.emulator._handle == handle
-        assert w.emulator._sound_cfg["tiefpass"] == 12000 and w._sound["tiefpass_hz"] == 12000
+        assert w.emulator._sound_cfg["tiefpass"] == 16000 and w._sound["tiefpass_hz"] == 16000
     finally:
         _zu(w, qapp)
 
@@ -380,7 +379,7 @@ def test_zuruecksetzen_stellt_die_soundkarte_auf_die_vorgabe(qapp, monkeypatch):
         w._standard_zuruecksetzen()
         qapp.processEvents()
         assert w._sound == sound.vorgabe(0x38)
-        assert g.ay_takt_edit.text() == "1,789772" and g.tiefpass_combo.currentData() == 0
+        assert g.ay_takt_edit.text() == "1,789772" and g.tiefpass_combo.currentData() == 24000
         assert [b.isChecked() for b in g.kaskade_boxen] == [True] * 3
         assert not g.karte_box.isChecked() and not w.emulator.sound_present()
     finally:
@@ -390,12 +389,18 @@ def test_zuruecksetzen_stellt_die_soundkarte_auf_die_vorgabe(qapp, monkeypatch):
 def test_alter_tiefpass_schluessel_wird_umgerechnet_und_nicht_mehr_geschrieben():
     from app import sound
     assert sound.normalize({"tiefpass": True}, 0x38)["tiefpass_hz"] == 8000
-    assert sound.normalize({"tiefpass": False}, 0x38)["tiefpass_hz"] == 0
-    assert sound.normalize({"tiefpass": True, "tiefpass_hz": 4000}, 0x38)["tiefpass_hz"] == 4000
-    assert sound.normalize({"tiefpass_hz": "viel"}, 0x38)["tiefpass_hz"] == 0
+    assert sound.normalize({"tiefpass": False}, 0x38)["tiefpass_hz"] == 24000
+    assert sound.normalize({}, 0x38)["tiefpass_hz"] == 24000                       # fehlend
+    assert sound.normalize({"tiefpass_hz": 0}, 0x38)["tiefpass_hz"] == 24000
+    assert sound.normalize({"tiefpass_hz": False}, 0x38)["tiefpass_hz"] == 24000
+    assert sound.normalize({"tiefpass_hz": True}, 0x38)["tiefpass_hz"] == 8000
+    assert sound.normalize({"tiefpass": True, "tiefpass_hz": 4000}, 0x38)["tiefpass_hz"] == 3000   # naechster Wert
+    assert sound.normalize({"tiefpass_hz": 12500}, 0x38)["tiefpass_hz"] == 16000
+    assert sound.normalize({"tiefpass_hz": 21000}, 0x38)["tiefpass_hz"] == 24000
+    assert sound.normalize({"tiefpass_hz": "viel"}, 0x38)["tiefpass_hz"] == 24000
     k = sound.fuer_konfig(sound.normalize({"enabled": True, "tiefpass": True}, 0x38))
     assert k["tiefpass_hz"] == 8000 and "tiefpass" not in k
-    assert sound.kern_param(sound.normalize({"enabled": True, "tiefpass_hz": 5000}, 0x38))["tiefpass"] == 5000
+    assert sound.kern_param(sound.normalize({"enabled": True, "tiefpass_hz": 5000}, 0x38))["tiefpass"] == 3000
 
 
 def test_kaskade_vorgabe_ist_sieben_eine_gespeicherte_wahl_bleibt():

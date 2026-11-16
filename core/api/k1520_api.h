@@ -1367,8 +1367,8 @@ enum {
 
 /** @brief Steckt die SOUND-Karte.  @p basis = erstes Tor (Vielfaches von 8, Vorauswahl 0x38), @p chip 0 = AY-3-8910,
  *  1 = AY-3-8912, @p takt 0 = Quarz, 1 = Quarz/2, 2 = Systemtakt, @p quarz_hz bestueckter Quarz (3579545),
- *  @p kanal 0 = ABC, 1 = ACB, 2 = Mono, @p tiefpass = Tiefpass C16/C17: 0 = aus, 1 = an mit 8000 Hz (Altbedeutung),
- *  >= 1000 = Grenzfrequenz in Hz (einpolig, live umstellbar), @p kaskade Bit0 TO0->TR1, Bit1 TO1->TR2,
+ *  @p kanal 0 = ABC, 1 = ACB, 2 = Mono, @p tiefpass = Tiefpass C16/C17: 0 = ueberbrueckt (ungefiltert), 1 = 8000 Hz (Altbedeutung),
+ *  >= 1000 = Grenzfrequenz in Hz (Butterworth 4. Ordnung, 24 dB/Okt.; ab 21,6 kHz ueberbrueckt; Vorgabe der Karte 24000; live umstellbar), @p kaskade Bit0 TO0->TR1, Bit1 TO1->TR2,
  *  Bit2 TO2->TR3 (die Vorgabe der Karte im Kern ist 7, die Python-Bindung reicht sie durch).  @return 1 = gesteckt, 0 = Fehler (zu spaet, doppelt, Tor belegt, Basis ungueltig, P8000),
  *  Grund in k1520_sound_fehler. */
 K1520_API int         k1520_sound_install(K1520Handle h, int basis, int chip, int takt, uint32_t quarz_hz, int kanal,

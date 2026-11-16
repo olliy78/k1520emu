@@ -53,8 +53,43 @@ void SoundK1520::setzeTempo(double f) {
     acc_ = 0;
 }
 
+namespace {
+/// Feste Aussteuerung nach Mischung und Filtern (Anwenderwunsch: kein Clipping, Spitze <= 0,7071 = -3 dBFS), fuer ALLE
+/// Stufen gleich, damit das Umschalten des Tiefpasses keinen Pegelsprung macht.  Herleitung: die Mischung liegt in
+/// [0,1]; Tiefpass und Gleichanteilfilter sind linear, mit ihrer Impulsantwort g (Summe 0) gilt |y| <= B =
+/// max(Summe g+, Summe g-).  B gemessen (1 s Impulsantwort, Hochpass 15 Hz, 48 kHz): ueberbrueckt 1,000; 3 kHz 1,125;
+/// 8 kHz 1,193; 16 kHz 1,423 (Butterworth 4. Ordnung ueberschwingt).  0,495 * 1,423 = 0,7046 <= 0,7071 fuer alle vier
+/// Stufen.  Zwischenwerte ueber die C-ABI (bis 21,6 kHz, B bis ~1,72) sichert nur die harte Begrenzung.
+constexpr float AUSSTEUERUNG = 0.495f;
+}  // namespace
+
 void SoundK1520::tiefpassSetzen(uint32_t hz) {
-    tp_koef_ = hz ? static_cast<float>(1.0 - std::exp(-2.0 * PI * double(hz) / audio::kAbtastrate)) : 0.0f;
+    // Butterworth 4. Ordnung = zwei Biquads mit Guete Q = 1/(2 sin(pi/8)) und 1/(2 sin(3 pi/8)); bilineare
+    // Transformation mit Vorverzerrung K = tan(pi fc / fs).  Ab 0,45 * fs wird ueberbrueckt (bilinear waere nahe
+    // Nyquist entartet; 24 kHz = ungefiltert).  Die Biquads laufen auch ueberbrueckt mit (Grenze 0,45 * fs), damit ihr
+    // Zustand dem Signal folgt.
+    // Umschalten im Lauf: der bisherige Filter (Koeffizienten + Zustand) laeuft UEBERBLEND_WERTE Ausgabewerte weiter
+    // und wird linear in den neuen uebergeblendet -- neue Koeffizienten auf einen fremden Zustand gaeben sonst einen
+    // hoerbaren Sprung.  Der neue Filter startet mit dem Zustand des alten.
+    if (tp_initialisiert_) {
+        for (int i = 0; i < 2; ++i) tp_alt_bq_[i] = tp_bq_[i];
+        std::copy(&tp_z_[0][0][0], &tp_z_[0][0][0] + 8, &tp_alt_z_[0][0][0]);
+        tp_alt_aktiv_ = tp_aktiv_;
+        tp_blend_ = UEBERBLEND_WERTE;
+    }
+    tp_initialisiert_ = true;
+    tp_aktiv_ = hz != 0 && double(hz) < 0.45 * audio::kAbtastrate;
+    const double fc = tp_aktiv_ ? double(hz) : 0.45 * audio::kAbtastrate;
+    const double K = std::tan(PI * fc / audio::kAbtastrate);
+    const double qs[2] = {1.0 / (2.0 * std::sin(PI / 8.0)), 1.0 / (2.0 * std::sin(3.0 * PI / 8.0))};
+    for (int i = 0; i < 2; ++i) {
+        const double n = 1.0 / (1.0 + K / qs[i] + K * K);
+        tp_bq_[i].b0 = float(K * K * n);
+        tp_bq_[i].b1 = float(2.0 * K * K * n);
+        tp_bq_[i].b2 = float(K * K * n);
+        tp_bq_[i].a1 = float(2.0 * (K * K - 1.0) * n);
+        tp_bq_[i].a2 = float((1.0 - K / qs[i] + K * K) * n);
+    }
 }
 
 void SoundK1520::kaskadeSetzen(uint8_t maske) {
@@ -130,7 +165,8 @@ void SoundK1520::attachToBus(K1520Bus& bus) {
 void SoundK1520::reset() {
     ay_.reset();
     ctc_.reset();
-    for (int i = 0; i < 2; ++i) x1_[i] = y1_[i] = tp_[i] = 0;
+    for (int i = 0; i < 2; ++i) { x1_[i] = y1_[i] = 0; for (auto& a : tp_z_[i]) a[0] = a[1] = 0; }
+    tp_blend_ = 0;
 }
 
 void SoundK1520::zeitStand(uint64_t total) {
@@ -194,13 +230,16 @@ void SoundK1520::ayNachrechnen() {
     }
 }
 
-namespace {
-/// Feste Aussteuerung nach Mischung und Filtern (Anwenderwunsch: kein Clipping).  Herleitung: die Mischung liegt
-/// nach der Skalierung in [0,1]; der Gleichanteilfilter y = x - x1 + c*y1 (0 < c < 1) liefert fuer x in [0,1]
-/// |y| <= 1 (schlimmster Fall: Sprung von 0 auf 1 nach langer Stille); Tiefpass (einpolig) und Kastenfilter
-/// ueberschwingen nicht.  Damit ist die Spitze <= 0,7071 = -3 dBFS mathematisch garantiert, fuer Stereo wie Mono.
-constexpr float AUSSTEUERUNG = 0.7071f;
-}  // namespace
+
+float SoundK1520::biquadsRechnen(const Biquad* bq, float (*z)[2], float f) {
+    for (int q = 0; q < 2; ++q) {                  // Direktform II transponiert
+        const float o = bq[q].b0 * f + z[q][0];
+        z[q][0] = bq[q].b1 * f - bq[q].a1 * o + z[q][1];
+        z[q][1] = bq[q].b2 * f - bq[q].a2 * o;
+        f = o;
+    }
+    return f;
+}
 
 void SoundK1520::mischen(const Ay38910::Abtastwert* w, size_t n) {
     puffer_.resize(n * 2);
@@ -215,8 +254,15 @@ void SoundK1520::mischen(const Ay38910::Abtastwert* w, size_t n) {
         }
         const float x[2] = {l * skala, r * skala};
         for (int s = 0; s < 2; ++s) {
-            float v = x[s];
-            if (cfg_.tiefpass_hz) { tp_[s] += tp_koef_ * (v - tp_[s]); v = tp_[s]; }
+            const float roh = x[s];
+            const float f = biquadsRechnen(tp_bq_, tp_z_[s], roh);
+            float v = tp_aktiv_ ? f : roh;
+            if (tp_blend_ > 0) {                                  // Ueberblenden vom alten Filter
+                const float fa = biquadsRechnen(tp_alt_bq_, tp_alt_z_[s], roh);
+                const float va = tp_alt_aktiv_ ? fa : roh;
+                const float a = float(tp_blend_) / float(UEBERBLEND_WERTE);
+                v = a * va + (1.0f - a) * v;
+            }
             const float y = v - x1_[s] + hp_koef_ * y1_[s];   // Gleichanteil weg
             x1_[s] = v;
             y1_[s] = y;
@@ -224,6 +270,7 @@ void SoundK1520::mischen(const Ay38910::Abtastwert* w, size_t n) {
             const float z = y * AUSSTEUERUNG;
             puffer_[2 * i + s] = z > 1.0f ? 1.0f : (z < -1.0f ? -1.0f : z);
         }
+        if (tp_blend_ > 0) --tp_blend_;
     }
     if (senke_) senke_->schreibe(puffer_.data(), n);
 }

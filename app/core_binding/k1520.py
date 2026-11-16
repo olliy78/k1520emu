@@ -1413,7 +1413,7 @@ def classify_host(host: str) -> int:
 # ════════════════════════════════════════════════════════════════════════════
 
 def _sound_tiefpass(wert) -> int:
-    """Tiefpass der SOUND-Karte als C-ABI-Wert: False/None = 0 (aus), True = 8000 Hz, Zahl = Grenzfrequenz in Hz."""
+    """Tiefpass der SOUND-Karte als C-ABI-Wert: False/None = 0 (ueberbrueckt), True = 8000 Hz, Zahl = Grenzfrequenz in Hz."""
     if wert is None or wert is False:
         return 0
     if wert is True:
@@ -1485,7 +1485,7 @@ class K1520Emulator:
             sound: SOUND-Karte K1520 (AY-3-8910/8912 + CTC) stecken (an jeder Maschine ausser P8000) —
                 ``None``/``False`` = ohne, ``True``/``{}`` = Vorgaben, sonst ein dict mit ``basis`` (0x38),
                 ``chip`` ("ay8910"|"ay8912"), ``takt`` ("quarz"|"quarz_halbe"|"system"), ``quarz_hz`` (3579545),
-                ``kanal`` ("abc"|"acb"|"mono"), ``tiefpass`` (False = aus, True = 8000 Hz oder eine Grenzfrequenz in Hz) und
+                ``kanal`` ("abc"|"acb"|"mono"), ``tiefpass`` (Vorgabe 24000 = ungefiltert; False = ueberbrueckt, True = 8000 Hz oder eine Grenzfrequenz in Hz) und
                 ``kaskade`` (Bits 0..2, Vorgabe 7 = alle drei Brücken gesteckt).
                 Direkt nach dem Anlegen gesteckt; Fehler → ValueError.
             usb: GUN-USB (Z80-PIO + VDIP1, Wirtsverzeichnis als Stick) stecken (an jeder Maschine ausser
@@ -1700,7 +1700,7 @@ class K1520Emulator:
             self._sound_cfg = dict(sd)
             if not _lib.k1520_sound_install(handle, int(sd.get("basis", 0x38)), werte[0], werte[1],
                                             int(sd.get("quarz_hz", 3579545)), werte[2],
-                                            _sound_tiefpass(sd.get("tiefpass", False)), int(sd.get("kaskade", 7))):
+                                            _sound_tiefpass(sd.get("tiefpass", 24000)), int(sd.get("kaskade", 7))):
                 reason = _lib.k1520_sound_fehler(handle)
                 reason = reason.decode("utf-8", "replace") if reason else ""
                 _lib.k1520_destroy(handle)
@@ -2826,7 +2826,7 @@ class K1520Emulator:
         except KeyError as e:
             raise ValueError(f"SOUND: unbekannte Option {e}") from None
         if not _lib.k1520_sound_umstellen(self._handle, werte[0], werte[1], int(cfg.get("quarz_hz", 3579545)),
-                                          werte[2], _sound_tiefpass(cfg.get("tiefpass", False)),
+                                          werte[2], _sound_tiefpass(cfg.get("tiefpass", 24000)),
                                           int(cfg.get("kaskade", 7))):
             reason = _lib.k1520_sound_fehler(self._handle)
             raise ValueError((reason.decode("utf-8", "replace") if reason else "") or "SOUND nicht umstellbar")

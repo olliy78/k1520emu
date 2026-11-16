@@ -91,7 +91,7 @@ liegt deshalb in der Mitte (auf beiden Seiten).  Welche, legt die Kanalzuordnung
 Emulator **Stereo ACB** (ursprünglich ABC, Anwenderentscheid 2026-11-14; nach dem Hörvergleich 2026-11-15 auf ACB umgestellt, §7a), wählbar ABC und Mono.
 Kanalzuordnung über steckbare Widerstände + Schiebeschalter S8: **ABC** (A links, B Mitte, C rechts) oder
 **ACB** (A links, B rechts, C Mitte); Seitenkanal 10 kΩ, Mittelkanal 22 kΩ auf beide Seiten
-(Gewicht Mitte ≈ 10/22 ≈ 0,45 je Seite).  JP4 = Mono.  C16/C17 (1 nF, optional) = Tiefpass; nach Plan ≈ 23–37 kHz (kaum hörbar), im Emulator bewusst **8 kHz** (Anwenderentscheid 2026-11-15).  Verstärker
+(Gewicht Mitte ≈ 10/22 ≈ 0,45 je Seite).  JP4 = Mono.  C16/C17 (1 nF, optional) = Tiefpass; nach Plan ≈ 23–37 kHz (kaum hörbar), im Emulator bewusst hörbare Stufen 3/8/16/24 kHz, Butterworth 4. Ordnung, Vorgabe 24 kHz = ungefiltert (Anwenderentscheid 2026-11-16, Merkposten Nr. 18).  Verstärker
 PAM8403, Line-Out — beides ohne Einfluss auf das Modell außer der Lautstärke.
 
 ### 3.5 AY-3-8910 — was nachgebaut wird (Datenblatt)
@@ -163,7 +163,7 @@ core/cards/sound_k1520/             Karte: Dekodierung, AY + CTC, Mischer ABC/AC
 - `K1520Machine::installSound(const SoundK1520::Config&)`, `soundK1520()`, `soundFehler()`,
   `soundEinketten()` (CTC hinten in die Interruptkette, wie `gunUsbEinketten`), `soundTakt`/`soundReset`.
 - `SoundK1520::Config`: `basis` (38H), `chip` (8910|8912), `takt` (Quarz|QuarzHalbe|System),
-  `quarz_hz` (3 579 545), `kanal` (ACB|ABC|Mono; Vorgabe ACB, §7a), `tiefpass_hz` (uint32, 0 = aus; C-ABI-Parameter `tiefpass`: 0 aus, 1 = 8000 Hz, >= 1000 = Hz), `kaskade` (Bits TO0→TR1 …; Vorgabe 7, alle gesteckt).
+  `quarz_hz` (3 579 545), `kanal` (ACB|ABC|Mono; Vorgabe ACB, §7a), `tiefpass_hz` (uint32, Vorgabe 24000 = ungefiltert, Stufen 3000/8000/16000/24000; C-ABI-Parameter `tiefpass`: 0 überbrückt, 1 = 8000 Hz, >= 1000 = Hz), `kaskade` (Bits TO0→TR1 …; Vorgabe 7, alle gesteckt).
 - C-ABI (additiv): `k1520_sound_install(h, basis, chip, takt, quarz_hz, kanal, tiefpass, kaskade)`,
   `k1520_sound_fehler`, `k1520_sound_regs(h, uint8_t[16])`;
   `k1520_audio_start(h)/_stop`, `k1520_audio_lautstaerke(h, float)`, `k1520_audio_stumm(h, int)`,

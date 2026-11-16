@@ -78,7 +78,7 @@ general:
     chip: ay8910
     ay_takt_hz: 1789772
     kanal: acb
-    tiefpass_hz: 0
+    tiefpass_hz: 24000
     kaskade: [true, true, true]
   # Modell: pc1715 (Bildschirm K7222, 80 x 24) oder pc1715-k7221 (K7221, 64 x 16).
   model: pc1715

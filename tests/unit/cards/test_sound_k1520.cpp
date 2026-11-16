@@ -222,24 +222,42 @@ TEST(SoundK1520, DreiVolleKanaeleUebersteuernNicht) {
     for (float v : g.s.l) ASSERT_LE(std::fabs(v), 1.0f);
 }
 
-TEST(SoundK1520, TiefpassDaempftHoheToene) {
-    auto pegel = [](uint32_t hz) {
-        SoundK1520::Config c; c.tiefpass_hz = hz;
-        Rig g(c); g.k.setzeSenke(&g.s);
-        g.ton(0, 4);                        // ~11 kHz
-        g.laufe(uint64_t(SYS * 0.2));
-        return rms(g.s.l, 3000);
-    };
-    const double aus = pegel(0);
-    EXPECT_LT(pegel(SoundK1520::TIEFPASS_HZ), aus * 0.6);
-    EXPECT_LT(pegel(3000), pegel(12000)) << "tiefere Grenzfrequenz daempft staerker";
-    EXPECT_LT(pegel(3000), aus * 0.4);
-    EXPECT_NEAR(pegel(0), aus, 1e-9) << "aus = ungefiltert";
+namespace {
+/// Effektivwert eines Rechtecktons (Periodenwert n, ca. 111860/n Hz) bei Tiefpass hz.
+double tonPegel(uint32_t hz, int n) {
+    SoundK1520::Config c; c.tiefpass_hz = hz;
+    Rig g(c); g.k.setzeSenke(&g.s);
+    g.ton(0, n);
+    g.laufe(uint64_t(SYS * 0.3));
+    return rms(g.s.l, 5000);
+}
+}  // namespace
+
+TEST(SoundK1520, TiefpassVorgabeIst24kHzUeberbrueckt) {
+    EXPECT_EQ(SoundK1520::Config{}.tiefpass_hz, 24000u);
+    EXPECT_DOUBLE_EQ(tonPegel(24000, 19), tonPegel(0, 19)) << "24 kHz = 0 = ungefiltert, bit-identisch";
+    EXPECT_DOUBLE_EQ(tonPegel(24000, 112), tonPegel(0, 112));
+}
+
+TEST(SoundK1520, TiefpassSteilDaempftBei2fcMindestens20dB) {
+    // 6 kHz (N=19, ~5887 Hz) gegen 1 kHz (N=112, ~999 Hz) bei fc = 3 kHz: 6 kHz = 2 fc
+    const double hoch = tonPegel(3000, 19), tief = tonPegel(3000, 112);
+    EXPECT_LT(hoch, tief * 0.1) << "mindestens 20 dB";
+    // gleiche Rechnung fuer 8 kHz: 16 kHz (N=7, ~15980 Hz) gegen 2 kHz (N=56)
+    EXPECT_LT(tonPegel(8000, 7), tonPegel(8000, 56) * 0.1);
+    EXPECT_LT(tonPegel(3000, 19), tonPegel(24000, 19) * 0.1);
+}
+
+TEST(SoundK1520, TiefpassDurchlassBeiViertelGrenzfrequenz) {
+    // fc/4 = 750 Hz bei 3 kHz (N=149 ~ 751 Hz): innerhalb 1 dB (Faktor 0,891)
+    const double mit = tonPegel(3000, 149), ohne = tonPegel(24000, 149);
+    EXPECT_GT(mit, ohne * 0.891);
+    EXPECT_LT(mit, ohne * 1.12);
 }
 
 TEST(SoundK1520, TiefpassUmstellenImLauf) {
     Rig g; g.k.setzeSenke(&g.s);
-    g.ton(0, 4);
+    g.ton(0, 19);
     g.laufe(uint64_t(SYS * 0.2));
     const size_t n1 = g.s.l.size();
     auto c = g.k.config(); c.tiefpass_hz = 3000;
@@ -248,9 +266,33 @@ TEST(SoundK1520, TiefpassUmstellenImLauf) {
     g.laufe(uint64_t(SYS * 0.2));
     const std::vector<float> vorher(g.s.l.begin() + 3000, g.s.l.begin() + n1);
     const std::vector<float> nachher(g.s.l.begin() + n1 + 3000, g.s.l.end());
-    EXPECT_LT(rms(nachher, 0), rms(vorher, 0) * 0.4);
-    c.tiefpass_hz = 0;
+    EXPECT_LT(rms(nachher, 0), rms(vorher, 0) * 0.1);
+    c.tiefpass_hz = 24000;
     ASSERT_TRUE(g.k.umstellen(c));
+}
+
+TEST(SoundK1520, TiefpassUmstellenOhneSprung) {
+    // 1 kHz-Rechteck, bei 24 kHz (ungefiltert) -> 3 kHz -> 8 kHz umstellen: kein Schritt zwischen Nachbarwerten,
+    // der groesser waere als die Kanten des ungefilterten Tons selbst.
+    Rig g; g.k.setzeSenke(&g.s);
+    g.ton(0, 112);
+    g.laufe(uint64_t(SYS * 0.3));
+    const size_t n1 = g.s.l.size();
+    auto c = g.k.config();
+    c.tiefpass_hz = 3000; ASSERT_TRUE(g.k.umstellen(c));
+    g.laufe(uint64_t(SYS * 0.1));
+    const size_t n2 = g.s.l.size();
+    c.tiefpass_hz = 8000; ASSERT_TRUE(g.k.umstellen(c));
+    g.laufe(uint64_t(SYS * 0.1));
+    auto maxSchritt = [&](size_t von, size_t bis) {
+        float m = 0;
+        for (size_t i = von + 1; i < bis; ++i) m = std::max(m, std::fabs(g.s.l[i] - g.s.l[i - 1]));
+        return m;
+    };
+    const float kante = maxSchritt(5000, n1);
+    EXPECT_GT(kante, 0.05f);
+    EXPECT_LE(maxSchritt(n1 - 2, n1 + 2000), kante * 1.05f);
+    EXPECT_LE(maxSchritt(n2 - 2, n2 + 2000), kante * 1.05f);
 }
 
 TEST(SoundK1520, KaskadeIstAbWerkGestecktSieben) {
@@ -321,8 +363,8 @@ TEST(SoundK1520, ResetIstStill) {
 // Kein Clipping (Anwenderwunsch): schlimmster Fall = drei volle Kanaele, Gleichspannung (Ton aus, Rauschen aus) nach
 // langer Stille, danach Rechteck mit grosser Periode und Huellkurvenform 13; Spitze <= 0,7071 (-3 dBFS).
 namespace {
-void pruefeSpitze(SoundK1520::Kanal kanal) {
-    SoundK1520::Config c; c.kanal = kanal;
+void pruefeSpitze(SoundK1520::Kanal kanal, uint32_t tiefpass_hz) {
+    SoundK1520::Config c; c.kanal = kanal; c.tiefpass_hz = tiefpass_hz;
     Rig g(c); g.k.setzeSenke(&g.s);
     g.laufe(uint64_t(SYS * 1.0));                       // lange Stille: Hochpass eingeschwungen auf 0
     g.ayReg(7, 0x3F);                                   // alles aus
@@ -344,9 +386,15 @@ void pruefeSpitze(SoundK1520::Kanal kanal) {
 }
 }  // namespace
 
-TEST(SoundK1520, SpitzeAbcHoechstensMinus3dBFS) { pruefeSpitze(SoundK1520::Kanal::ABC); }
-TEST(SoundK1520, SpitzeAcbHoechstensMinus3dBFS) { pruefeSpitze(SoundK1520::Kanal::ACB); }
-TEST(SoundK1520, SpitzeMonoHoechstensMinus3dBFS) { pruefeSpitze(SoundK1520::Kanal::Mono); }
+TEST(SoundK1520, SpitzeAbcHoechstensMinus3dBFS) {
+    for (uint32_t hz : {3000u, 8000u, 16000u, 24000u}) { SCOPED_TRACE(hz); pruefeSpitze(SoundK1520::Kanal::ABC, hz); }
+}
+TEST(SoundK1520, SpitzeAcbHoechstensMinus3dBFS) {
+    for (uint32_t hz : {3000u, 8000u, 16000u, 24000u}) { SCOPED_TRACE(hz); pruefeSpitze(SoundK1520::Kanal::ACB, hz); }
+}
+TEST(SoundK1520, SpitzeMonoHoechstensMinus3dBFS) {
+    for (uint32_t hz : {3000u, 8000u, 16000u, 24000u}) { SCOPED_TRACE(hz); pruefeSpitze(SoundK1520::Kanal::Mono, hz); }
+}
 
 // ---- Umstellung im Lauf (Entwurf 51, Merkposten sound.md Nr. 17) ----
 

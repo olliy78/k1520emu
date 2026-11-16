@@ -47,7 +47,7 @@ public:
         Takt takt = Takt::QuarzHalbe;                      ///< JP2: Q1, Q1/2 (empfohlen) oder Systemtakt
         uint32_t quarz_hz = 3579545;                       ///< bestueckter Quarz
         Kanal kanal = Kanal::ACB;                          ///< S8/JP4; Vorgabe ACB nach Hoervergleich (Entwurf 51 7a)
-        uint32_t tiefpass_hz = 0;                          ///< C16/C17: Grenzfrequenz des einpoligen Tiefpasses, 0 = aus
+        uint32_t tiefpass_hz = 24000;                      ///< C16/C17: Grenzfrequenz des Tiefpasses (Butterworth 4. Ordnung, 24 dB/Okt.); 0 oder >= 0,45 * Abtastrate = ueberbrueckt
         uint8_t kaskade = 7;                               ///< Bit0 TO0->TR1, Bit1 TO1->TR2, Bit2 TO2->TR3 (ab Werk alle gesteckt, SKTEST4 Menue 3)
         uint32_t systemtakt_hz = 2457600;                  ///< Takt der Maschine (CTC-Takt)
     };
@@ -131,9 +131,21 @@ private:
     uint64_t last_total_ = 0, chip_ticks_ = 0, acc_ = 0;
 
     // Mischer/Filter
-    float hp_koef_ = 0, tp_koef_ = 0;
+    float hp_koef_ = 0;
     void tiefpassSetzen(uint32_t hz);
-    float x1_[2] = {0, 0}, y1_[2] = {0, 0}, tp_[2] = {0, 0};
+    // Tiefpass: Butterworth 4. Ordnung = zwei Biquads (Direktform II transponiert), je Stereoseite eigener Zustand
+    struct Biquad { float b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0; };
+    Biquad tp_bq_[2];
+    bool tp_aktiv_ = false;
+    float tp_z_[2][2][2] = {};   // [Seite][Abschnitt][z1,z2]
+    // Ueberblenden beim Umschalten im Lauf (10 ms): bisheriger Filter laeuft mit, Gewicht faellt linear auf 0
+    static constexpr int UEBERBLEND_WERTE = 480;
+    Biquad tp_alt_bq_[2];
+    float tp_alt_z_[2][2][2] = {};
+    bool tp_alt_aktiv_ = false, tp_initialisiert_ = false;
+    int tp_blend_ = 0;
+    static float biquadsRechnen(const Biquad* bq, float (*z)[2], float f);
+    float x1_[2] = {0, 0}, y1_[2] = {0, 0};
     std::vector<float> puffer_;
 };
 
