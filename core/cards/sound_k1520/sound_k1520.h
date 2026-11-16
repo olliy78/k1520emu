@@ -47,16 +47,18 @@ public:
         Takt takt = Takt::QuarzHalbe;                      ///< JP2: Q1, Q1/2 (empfohlen) oder Systemtakt
         uint32_t quarz_hz = 3579545;                       ///< bestueckter Quarz
         Kanal kanal = Kanal::ACB;                          ///< S8/JP4; Vorgabe ACB nach Hoervergleich (Entwurf 51 7a)
-        bool tiefpass = false;                             ///< C16/C17 bestueckt
-        uint8_t kaskade = 0;                               ///< Bit0 TO0->TR1, Bit1 TO1->TR2, Bit2 TO2->TR3
+        uint32_t tiefpass_hz = 24000;                      ///< C16/C17: Grenzfrequenz des Tiefpasses (Butterworth 4. Ordnung, 24 dB/Okt.); 0 oder >= 0,45 * Abtastrate = ueberbrueckt
+        uint8_t kaskade = 7;                               ///< Bit0 TO0->TR1, Bit1 TO1->TR2, Bit2 TO2->TR3 (ab Werk alle gesteckt, SKTEST4 Menue 3)
         uint32_t systemtakt_hz = 2457600;                  ///< Takt der Maschine (CTC-Takt)
     };
 
     /// Gewicht des Mittelkanals je Seite: 10k (Seite) / 22k (Mitte).
     static constexpr float MITTE_GEWICHT = 10.0f / 22.0f;
-    /// Grenzfrequenz des Tiefpasses.  C16/C17 = 1 nF, der wirksame Widerstand haengt von der
-    /// Bestueckung des Mischers ab (Unterlagen unklar) - Annahme [?]: ~5 kHz.
-    static constexpr float TIEFPASS_HZ = 5000.0f;
+    /// Grenzfrequenz des zuschaltbaren Tiefpasses "C16/C17" in der Altbedeutung "an" (C-ABI 1, Python True): 8 kHz
+    /// (Anwenderentscheid 2026-11-15); einstellbar ist jede Frequenz ueber Config::tiefpass_hz.
+    /// Nach dem Schaltplan V2 laegen 1 nF an etwa 4-7 kOhm (Mischwiderstaende, Lastpoti) bei 23-37 kHz und
+    /// waeren kaum hoerbar; der Emulator nimmt bewusst einen hoerbaren Wert (doc/merkposten/sound.md).
+    static constexpr uint32_t TIEFPASS_HZ = 8000;
     /// Grenzfrequenz des Gleichanteilfilters (AY liefert nur 0..1).
     static constexpr float HOCHPASS_HZ = 15.0f;
 
@@ -86,6 +88,18 @@ public:
     /// Nur den Zeitstand fuer taktgenaue AY-Schreibzugriffe nachziehen (kein CTC-Takt).
     void zeitStand(uint64_t total);
 
+    /// Stellt Takt-Art, Quarz, Chip, Kanalzuordnung, Tiefpass und Kaskade IM LAUF um (JP2/S8/Bestueckung), ohne
+    /// Bus-Neuanmeldung.  Basis und systemtakt_hz muessen gleich bleiben (sonst false, Grund in @p grund).
+    /// Der AY rechnet zuerst mit den ALTEN Werten bis zum Stand nach; Chipzeit bleibt monoton, Filterzustand bleibt.
+    bool umstellen(const Config& neu, std::string* grund = nullptr);
+
+    /// Tempo-Faktor der Maschine (1.0 = Echtzeit).  Der AY hat einen eigenen Quarz und laeuft in ECHTER Zeit: bei
+    /// Faktor f vergehen je Maschinentakt nur ay_hz/(systemtakt_hz*f) Chiptakte, je Wirtssekunde entstehen also
+    /// weiter 48000 Abtastwerte und die Tonhoehe bleibt (die Musik wird nur schneller).  Wie umstellen():
+    /// erst mit dem alten Faktor nachrechnen, dann umschalten, Chipzeit monoton.  f <= 0 wird wie 1.0 behandelt.
+    void setzeTempo(double f);
+    double tempo() const { return tempo_milli_ / 1000.0; }
+
     // ---- Ausgabe ----
     /// nullptr = keine Senke (nur Register nachfuehren).  Auch zur Laufzeit umschaltbar.
     void setzeSenke(audio::TonSenke* senke);
@@ -102,6 +116,11 @@ private:
     void ayNachrechnen();     ///< Chip bis chip_ticks_ rechnen, Abtastwerte abholen, mischen, schreiben
     void mischen(const Ay38910::Abtastwert* w, size_t n);
 
+    void taktBruch(const Config& c);
+    void vorNachrechnen();
+    uint32_t tempo_milli_ = 1000;   ///< Tempo-Faktor in Tausendstel (Bruch bleibt ganzzahlig, driftfrei)
+    void kaskadeSetzen(uint8_t maske);
+
     Config cfg_;
     Z80CTC ctc_;
     Ay38910 ay_;
@@ -112,8 +131,21 @@ private:
     uint64_t last_total_ = 0, chip_ticks_ = 0, acc_ = 0;
 
     // Mischer/Filter
-    float hp_koef_ = 0, tp_koef_ = 0;
-    float x1_[2] = {0, 0}, y1_[2] = {0, 0}, tp_[2] = {0, 0};
+    float hp_koef_ = 0;
+    void tiefpassSetzen(uint32_t hz);
+    // Tiefpass: Butterworth 4. Ordnung = zwei Biquads (Direktform II transponiert), je Stereoseite eigener Zustand
+    struct Biquad { float b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0; };
+    Biquad tp_bq_[2];
+    bool tp_aktiv_ = false;
+    float tp_z_[2][2][2] = {};   // [Seite][Abschnitt][z1,z2]
+    // Ueberblenden beim Umschalten im Lauf (10 ms): bisheriger Filter laeuft mit, Gewicht faellt linear auf 0
+    static constexpr int UEBERBLEND_WERTE = 480;
+    Biquad tp_alt_bq_[2];
+    float tp_alt_z_[2][2][2] = {};
+    bool tp_alt_aktiv_ = false, tp_initialisiert_ = false;
+    int tp_blend_ = 0;
+    static float biquadsRechnen(const Biquad* bq, float (*z)[2], float f);
+    float x1_[2] = {0, 0}, y1_[2] = {0, 0};
     std::vector<float> puffer_;
 };
 

@@ -73,6 +73,11 @@ public:
     /// Vorfilters (zwei einpolige Stufen) auf dem Raster; 0 = aus.
     void ausgabeEin(uint32_t rate, float tiefpassHz = 0.0f);
     void ausgabeAus();
+    /// Chiptakt im Lauf umstellen (JP2).  Chipzeit (rasterNr_) bleibt monoton; die Ausgabewert-Grenzen werden auf
+    /// die neue Rasterdauer neu ausgerichtet (angefangener Wert verfaellt), Filterzustaende bleiben.
+    void setzeTakt(uint32_t takt);
+    /// Chipvariante im Lauf wechseln: Register bleiben, nur die Port-B-Pins entfallen/erscheinen (8912 ohne Port B).
+    void setzeVariante(Variante v) { variante_ = v; }
     bool ausgabeAktiv() const { return rate_ != 0; }
     size_t abholbereit() const { return fertig_.size(); }
     /// Holt bis zu max fertige Abtastwerte ab; liefert die Anzahl.
@@ -117,6 +122,7 @@ private:
     // Ausgabe
     uint32_t rate_ = 0;
     float tpKoef_ = 0.0f;
+    float tpHz_ = 0.0f;   ///< Vorfilter-Grenzfrequenz (fuer setzeTakt)
     std::array<std::array<float, 2>, 3> tpZ_{};
     std::array<double, 3> summe_{};
     uint64_t abtastNr_ = 0;

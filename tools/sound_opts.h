@@ -6,6 +6,7 @@
  *   --sound-takt=quarz|halb|system   Chiptakt (Vorgabe halb)
  *   --sound-kanal=abc|acb|mono       Mischer (Vorgabe acb)
  *   --sound-chip=8910|8912
+ *   --sound-kaskade=0..7             CTC-Bruecken TO0->TR1 (1), TO1->TR2 (2), TO2->TR3 (4); Vorgabe 7 (alle gesteckt)
  *   --wav=DATEI                WAV-Mitschrift ab dem Stecken bis zum Programmende (nur mit --sound)
  *
  * Header ohne Abhaengigkeiten, damit auch @ref K8915TraceOpts ihn tragen kann.
@@ -23,6 +24,7 @@ struct SoundOpts {
     std::string takt = "halb";  ///< quarz | halb | system
     std::string kanal = "acb";  ///< acb | abc | mono
     std::string chip = "8910";  ///< 8910 | 8912
+    int kaskade = 7;            ///< Bruecken-Maske 0..7 (Vorgabe: alle drei gesteckt)
     std::string wav;            ///< "" = keine Mitschrift
     std::string fehler;         ///< erster Optionsfehler (Wert unbekannt)
 
@@ -49,6 +51,14 @@ struct SoundOpts {
         if (wert("--sound-takt=", takt, {"quarz", "halb", "system"})) return true;
         if (wert("--sound-kanal=", kanal, {"abc", "acb", "mono"})) return true;
         if (wert("--sound-chip=", chip, {"8910", "8912"})) return true;
+        if (!strncmp(arg, "--sound-kaskade=", 16)) {
+            an = true;
+            char* ende = nullptr;
+            const long v = strtol(arg + 16, &ende, 0);
+            if (!*(arg + 16) || *ende || v < 0 || v > 7) { if (fehler.empty()) fehler = "--sound-kaskade: Wert 0..7 erwartet"; }
+            else kaskade = static_cast<int>(v);
+            return true;
+        }
         if (!strncmp(arg, "--wav=", 6)) { wav = arg + 6; return true; }
         return false;
     }

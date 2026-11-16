@@ -531,6 +531,18 @@ public:
         soundSenkeNachfuehren();
         return true;
     }
+    /**
+     * @brief Stellt die gesteckte SOUND-Karte im Lauf um (Takt, Quarz, Chip, Kanaele, Tiefpass, Kaskade; Basis bleibt).
+     *        cfg.systemtakt_hz wird wie bei installSound aus dem Maschinentakt gesetzt.
+     * @return false mit Grund in @ref soundFehler: keine Karte, Basis abweichend, Quarz 0.
+     */
+    bool soundUmstellen(const k1520::SoundK1520::Config& cfg) {
+        sound_fehler_.clear();
+        if (!sound_) { sound_fehler_ = "Keine SOUND-Karte gesteckt"; return false; }
+        k1520::SoundK1520::Config c = cfg;
+        c.systemtakt_hz = nenntaktHz();
+        return sound_->umstellen(c, &sound_fehler_);
+    }
     /** @brief Die gesteckte SOUND-Karte (nullptr = keine). */
     k1520::SoundK1520*       soundK1520()       { return sound_.get(); }
     const k1520::SoundK1520* soundK1520() const { return sound_.get(); }
@@ -558,7 +570,16 @@ public:
     }
     void audioLautstaerke(float v) { if (ton_) ton_->lautstaerke(v); }
     void audioStumm(bool s) { if (ton_) { ton_->stumm(s); soundSenkeNachfuehren(); } }
-    void audioEchtzeit(bool e) { if (ton_) { ton_->echtzeit(e); soundSenkeNachfuehren(); } }
+    /**
+     * @brief Tempo-Faktor der Maschine (Oberflaeche, bei jedem Tempowechsel).  f > 0: Ausgabe hoerbar, der AY laeuft in
+     *        echter Zeit (SoundK1520::setzeTempo; die WAV-Mitschrift folgt derselben Umrechnung); f == 0 (unbegrenzt):
+     *        Wirtsausgabe stumm und der Puffer verwirft, der AY rechnet in Maschinenzeit (wie Faktor 1).
+     */
+    void audioTempo(double f) {
+        if (sound_) sound_->setzeTempo(f > 0.0 ? f : 1.0);
+        if (ton_) { ton_->echtzeit(f > 0.0); soundSenkeNachfuehren(); }
+    }
+    void audioEchtzeit(bool e) { audioTempo(e ? 1.0 : 0.0); }
     k1520::audio::TonAusgabe::Status audioStatus() const {
         return ton_ ? ton_->status() : k1520::audio::TonAusgabe::Status::Aus;
     }

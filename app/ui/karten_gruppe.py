@@ -10,7 +10,7 @@ wirkt auf den Kern und zeigt Kernfehler an.  Die Gruppen kennen den Kern nicht.
 
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFileDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QSpinBox, QWidget,
@@ -233,88 +233,101 @@ class SoundGruppe(KartenGruppe):
     def __init__(self, basis_vorgabe: int, parent=None):
         super().__init__("Soundkarte", "Soundkarte stecken", kartenwahl.SOUND, basis_vorgabe,
                          sound.TIPP_KARTE, sound.TIPP_BASIS, parent)
-        # Bestueckung: aus / AY-3-8910 / AY-3-8912 -- das Kaestchen "stecken" bleibt (wie bei den
-        # Schwesterkarten), der Chip steht in der Zeile darunter.
-        self.chip_combo = QComboBox(self)
-        for wert, text in sound.CHIPS:
-            self.chip_combo.addItem(text, wert)
-        self.chip_combo.setToolTip(sound.TIPP_CHIP)
+        # Chip: immer AY-3-8910 (Anwenderentscheid 2026-11-16).  Der AY-3-8912 klingt gleich und unterscheidet sich
+        # nur durch das fehlende Tor B -- offene Pins lesen beim 8910 ohnehin FFH, fuer Programme ist das nicht
+        # zu unterscheiden.  Kern/C-ABI/Python kennen die Variante weiter.
         self.kanal_combo = QComboBox(self)
         for wert, text in sound.KANAELE:
             self.kanal_combo.addItem(text, wert)
         self.kanal_combo.setToolTip(sound.TIPP_KANAL)
-        z1 = QHBoxLayout()
-        z1.addWidget(QLabel("Chip:", self))
-        z1.addWidget(self.chip_combo)
-        z1.addWidget(QLabel("Kanäle:", self))
-        z1.addWidget(self.kanal_combo, 1)
-        self.form.addRow("", z1)
 
-        self.takt_combo = QComboBox(self)
-        for wert, text in sound.TAKTE:
-            self.takt_combo.addItem(text, wert)
-        self.takt_combo.setToolTip(sound.TIPP_TAKT)
-        self.quarz_spin = QSpinBox(self)
-        self.quarz_spin.setRange(100_000, 20_000_000)
-        self.quarz_spin.setSingleStep(1000)
-        self.quarz_spin.setGroupSeparatorShown(True)
-        self.quarz_spin.setSuffix(" Hz")
-        self.quarz_spin.setToolTip(sound.TIPP_QUARZ)
+        # EIN Frequenzfeld statt Brueckenauswahl (JP2): wer den vollen Quarz oder den Systemtakt braucht, traegt die
+        # Frequenz ein.  Einheit MHz mit Komma.  (Kein QDoubleSpinBox: die CRT-Tests zaehlen alle des Kastens.)
+        self.ay_takt_edit = QLineEdit(self)
+        self.ay_takt_edit.setMaximumWidth(110)
+        self.ay_takt_edit.setAlignment(Qt.AlignRight)
+        self.ay_takt_edit.setToolTip(sound.TIPP_TAKT)
+        self._ay_takt_hz = sound.AY_TAKT_VORGABE
         z2 = QHBoxLayout()
         z2.addWidget(QLabel("AY-Takt:", self))
-        z2.addWidget(self.takt_combo)
-        z2.addWidget(QLabel("Quarz:", self))
-        z2.addWidget(self.quarz_spin, 1)
+        z2.addWidget(self.ay_takt_edit)
+        z2.addWidget(QLabel("MHz", self))
+        z2.addSpacing(12)
+        z2.addWidget(QLabel("Kanäle:", self))          # rechts neben dem Takt: eine Zeile weniger
+        z2.addWidget(self.kanal_combo, 1)
         self.form.addRow("", z2)
 
-        self.tiefpass_box = QCheckBox("Tiefpass C16/C17", self)
-        self.tiefpass_box.setToolTip(sound.TIPP_TIEFPASS)
-        self.kaskade_boxen = []
+        self.tiefpass_combo = QComboBox(self)
+        for hz in sound.TIEFPASS_WERTE:
+            self.tiefpass_combo.addItem(f"{hz // 1000} kHz (ungefiltert)" if hz == 24000 else f"{hz // 1000} kHz", hz)
+        self.tiefpass_combo.setToolTip(sound.TIPP_TIEFPASS)
         z3 = QHBoxLayout()
-        z3.addWidget(self.tiefpass_box)
-        z3.addWidget(QLabel("CTC-Kaskade:", self))
+        z3.addWidget(QLabel("Tiefpass:", self))
+        z3.addWidget(self.tiefpass_combo)
+        z3.addStretch(1)
+        self.form.addRow("", z3)
+
+        # Kaskade in EINER EIGENEN Zeile (drei Haken), damit der Kasten nicht zu breit wird
+        self.kaskade_boxen = []
+        z4 = QHBoxLayout()
+        z4.addWidget(QLabel("CTC-Kaskade:", self))
         for text in sound.KASKADEN:
             b = QCheckBox(text, self)
             b.setToolTip(sound.TIPP_KASKADE)
             self.kaskade_boxen.append(b)
-            z3.addWidget(b)
-        z3.addStretch(1)
-        self.form.addRow("", z3)
+            z4.addWidget(b)
+        z4.addStretch(1)
+        self.form.addRow("", z4)
         self._fehlerzeile()
 
-        for w in (self.karte_box, self.tiefpass_box, *self.kaskade_boxen):
+        for w in (self.karte_box, *self.kaskade_boxen):
             w.toggled.connect(self._aenderung)
-        for w in (self.basis_combo, self.chip_combo, self.kanal_combo, self.takt_combo):
+        for w in (self.basis_combo, self.kanal_combo, self.tiefpass_combo):
             w.currentIndexChanged.connect(self._aenderung)
-        self.quarz_spin.editingFinished.connect(self._aenderung)
+        self.ay_takt_edit.editingFinished.connect(self._ay_takt_fertig)
         self.set_zustand(sound.vorgabe(self._basis_vorgabe))
 
     def zustand(self) -> dict:
         return {"enabled": self.karte_box.isChecked(),
                 "basis": int(self.basis_combo.currentData()),
-                "chip": self.chip_combo.currentData(),
-                "takt": self.takt_combo.currentData(),
-                "quarz_hz": int(self.quarz_spin.value()),
+                "chip": "ay8910",
+                "ay_takt_hz": self._ay_takt_hz,
                 "kanal": self.kanal_combo.currentData(),
-                "tiefpass": self.tiefpass_box.isChecked(),
+                "tiefpass_hz": int(self.tiefpass_combo.currentData()),
                 "kaskade": sum(1 << i for i, b in enumerate(self.kaskade_boxen) if b.isChecked())}
 
     def set_zustand(self, z: dict, fehler: str = "", gesteckt=None) -> None:
         self._guard = True
         self.karte_box.setChecked(bool(z.get("enabled")))
         self._basis_setzen(z)
-        for combo, schl in ((self.chip_combo, "chip"), (self.takt_combo, "takt"), (self.kanal_combo, "kanal")):
+        for combo, schl in ((self.kanal_combo, "kanal"),):
             i = combo.findData(z.get(schl))
             combo.setCurrentIndex(i if i >= 0 else 0)
-        self.quarz_spin.setValue(int(z.get("quarz_hz", sound.QUARZ_VORGABE)))
-        self.tiefpass_box.setChecked(z.get("tiefpass") is True)
-        maske = int(z.get("kaskade", 0))
+        self._ay_takt_setzen(int(z.get("ay_takt_hz", sound.AY_TAKT_VORGABE)))
+        hz = int(z.get("tiefpass_hz", sound.TIEFPASS_VORGABE))
+        nah = min(sound.TIEFPASS_WERTE, key=lambda w: abs(w - hz))   # nicht in der Liste: der naechste Wert
+        self.tiefpass_combo.setCurrentIndex(self.tiefpass_combo.findData(nah))
+        maske = int(z.get("kaskade", sound.KASKADE_VORGABE))
         for i, b in enumerate(self.kaskade_boxen):
             b.setChecked(bool(maske >> i & 1))
         self._guard = False
         if gesteckt is not None:
             self._gesteckt = bool(gesteckt)
         self.set_fehler(fehler)
+
+    def _ay_takt_setzen(self, hz: int) -> None:
+        """Wert uebernehmen (in den Bereich geklemmt) und als MHz mit Komma anzeigen."""
+        self._ay_takt_hz = min(max(int(hz), sound.AY_TAKT_MIN), sound.AY_TAKT_MAX)
+        self.ay_takt_edit.setText(f"{self._ay_takt_hz / 1e6:.6f}".replace(".", ","))
+
+    def _ay_takt_fertig(self) -> None:
+        """Eingabe in MHz (Komma oder Punkt); Unlesbares stellt den alten Wert wieder her."""
+        try:
+            hz = int(round(float(self.ay_takt_edit.text().strip().replace(",", ".")) * 1e6))
+        except ValueError:
+            hz = self._ay_takt_hz
+        self._ay_takt_setzen(hz)
+        self._aenderung()
 
     def _aenderung(self, *_args) -> None:
         if not self._guard:

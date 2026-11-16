@@ -138,7 +138,7 @@ TEST(SoundK1520, CtcKanal0Liefert50InterruptsJeSekunde) {
 
 TEST(SoundK1520, KaskadeTo0NachTr1ZaehltNulldurchgaenge) {
     auto lauf = [](uint8_t kaskade) {
-        SoundK1520::Config c; c.kaskade = kaskade;
+        SoundK1520::Config c; c.kaskade = kaskade;   // ausdruecklich, die Vorgabe ist 7
         Rig g(c);
         g.bus.ioWrite(0x3D, 0x47);   // Kanal 1: Zaehler, TC folgt
         g.bus.ioWrite(0x3D, 0xFF);
@@ -222,15 +222,81 @@ TEST(SoundK1520, DreiVolleKanaeleUebersteuernNicht) {
     for (float v : g.s.l) ASSERT_LE(std::fabs(v), 1.0f);
 }
 
-TEST(SoundK1520, TiefpassDaempftHoheToene) {
-    auto pegel = [](bool tp) {
-        SoundK1520::Config c; c.tiefpass = tp;
-        Rig g(c); g.k.setzeSenke(&g.s);
-        g.ton(0, 4);                        // ~11 kHz
-        g.laufe(uint64_t(SYS * 0.2));
-        return rms(g.s.l, 3000);
+namespace {
+/// Effektivwert eines Rechtecktons (Periodenwert n, ca. 111860/n Hz) bei Tiefpass hz.
+double tonPegel(uint32_t hz, int n) {
+    SoundK1520::Config c; c.tiefpass_hz = hz;
+    Rig g(c); g.k.setzeSenke(&g.s);
+    g.ton(0, n);
+    g.laufe(uint64_t(SYS * 0.3));
+    return rms(g.s.l, 5000);
+}
+}  // namespace
+
+TEST(SoundK1520, TiefpassVorgabeIst24kHzUeberbrueckt) {
+    EXPECT_EQ(SoundK1520::Config{}.tiefpass_hz, 24000u);
+    EXPECT_DOUBLE_EQ(tonPegel(24000, 19), tonPegel(0, 19)) << "24 kHz = 0 = ungefiltert, bit-identisch";
+    EXPECT_DOUBLE_EQ(tonPegel(24000, 112), tonPegel(0, 112));
+}
+
+TEST(SoundK1520, TiefpassSteilDaempftBei2fcMindestens20dB) {
+    // 6 kHz (N=19, ~5887 Hz) gegen 1 kHz (N=112, ~999 Hz) bei fc = 3 kHz: 6 kHz = 2 fc
+    const double hoch = tonPegel(3000, 19), tief = tonPegel(3000, 112);
+    EXPECT_LT(hoch, tief * 0.1) << "mindestens 20 dB";
+    // gleiche Rechnung fuer 8 kHz: 16 kHz (N=7, ~15980 Hz) gegen 2 kHz (N=56)
+    EXPECT_LT(tonPegel(8000, 7), tonPegel(8000, 56) * 0.1);
+    EXPECT_LT(tonPegel(3000, 19), tonPegel(24000, 19) * 0.1);
+}
+
+TEST(SoundK1520, TiefpassDurchlassBeiViertelGrenzfrequenz) {
+    // fc/4 = 750 Hz bei 3 kHz (N=149 ~ 751 Hz): innerhalb 1 dB (Faktor 0,891)
+    const double mit = tonPegel(3000, 149), ohne = tonPegel(24000, 149);
+    EXPECT_GT(mit, ohne * 0.891);
+    EXPECT_LT(mit, ohne * 1.12);
+}
+
+TEST(SoundK1520, TiefpassUmstellenImLauf) {
+    Rig g; g.k.setzeSenke(&g.s);
+    g.ton(0, 19);
+    g.laufe(uint64_t(SYS * 0.2));
+    const size_t n1 = g.s.l.size();
+    auto c = g.k.config(); c.tiefpass_hz = 3000;
+    ASSERT_TRUE(g.k.umstellen(c));
+    EXPECT_EQ(g.k.config().tiefpass_hz, 3000u);
+    g.laufe(uint64_t(SYS * 0.2));
+    const std::vector<float> vorher(g.s.l.begin() + 3000, g.s.l.begin() + n1);
+    const std::vector<float> nachher(g.s.l.begin() + n1 + 3000, g.s.l.end());
+    EXPECT_LT(rms(nachher, 0), rms(vorher, 0) * 0.1);
+    c.tiefpass_hz = 24000;
+    ASSERT_TRUE(g.k.umstellen(c));
+}
+
+TEST(SoundK1520, TiefpassUmstellenOhneSprung) {
+    // 1 kHz-Rechteck, bei 24 kHz (ungefiltert) -> 3 kHz -> 8 kHz umstellen: kein Schritt zwischen Nachbarwerten,
+    // der groesser waere als die Kanten des ungefilterten Tons selbst.
+    Rig g; g.k.setzeSenke(&g.s);
+    g.ton(0, 112);
+    g.laufe(uint64_t(SYS * 0.3));
+    const size_t n1 = g.s.l.size();
+    auto c = g.k.config();
+    c.tiefpass_hz = 3000; ASSERT_TRUE(g.k.umstellen(c));
+    g.laufe(uint64_t(SYS * 0.1));
+    const size_t n2 = g.s.l.size();
+    c.tiefpass_hz = 8000; ASSERT_TRUE(g.k.umstellen(c));
+    g.laufe(uint64_t(SYS * 0.1));
+    auto maxSchritt = [&](size_t von, size_t bis) {
+        float m = 0;
+        for (size_t i = von + 1; i < bis; ++i) m = std::max(m, std::fabs(g.s.l[i] - g.s.l[i - 1]));
+        return m;
     };
-    EXPECT_LT(pegel(true), pegel(false) * 0.6);
+    const float kante = maxSchritt(5000, n1);
+    EXPECT_GT(kante, 0.05f);
+    EXPECT_LE(maxSchritt(n1 - 2, n1 + 2000), kante * 1.05f);
+    EXPECT_LE(maxSchritt(n2 - 2, n2 + 2000), kante * 1.05f);
+}
+
+TEST(SoundK1520, KaskadeIstAbWerkGestecktSieben) {
+    EXPECT_EQ(SoundK1520::Config{}.kaskade, 7);
 }
 
 TEST(SoundK1520, QuarzHalbeTaktLiefertRichtigeFrequenz) {
@@ -297,8 +363,8 @@ TEST(SoundK1520, ResetIstStill) {
 // Kein Clipping (Anwenderwunsch): schlimmster Fall = drei volle Kanaele, Gleichspannung (Ton aus, Rauschen aus) nach
 // langer Stille, danach Rechteck mit grosser Periode und Huellkurvenform 13; Spitze <= 0,7071 (-3 dBFS).
 namespace {
-void pruefeSpitze(SoundK1520::Kanal kanal) {
-    SoundK1520::Config c; c.kanal = kanal;
+void pruefeSpitze(SoundK1520::Kanal kanal, uint32_t tiefpass_hz) {
+    SoundK1520::Config c; c.kanal = kanal; c.tiefpass_hz = tiefpass_hz;
     Rig g(c); g.k.setzeSenke(&g.s);
     g.laufe(uint64_t(SYS * 1.0));                       // lange Stille: Hochpass eingeschwungen auf 0
     g.ayReg(7, 0x3F);                                   // alles aus
@@ -320,6 +386,138 @@ void pruefeSpitze(SoundK1520::Kanal kanal) {
 }
 }  // namespace
 
-TEST(SoundK1520, SpitzeAbcHoechstensMinus3dBFS) { pruefeSpitze(SoundK1520::Kanal::ABC); }
-TEST(SoundK1520, SpitzeAcbHoechstensMinus3dBFS) { pruefeSpitze(SoundK1520::Kanal::ACB); }
-TEST(SoundK1520, SpitzeMonoHoechstensMinus3dBFS) { pruefeSpitze(SoundK1520::Kanal::Mono); }
+TEST(SoundK1520, SpitzeAbcHoechstensMinus3dBFS) {
+    for (uint32_t hz : {3000u, 8000u, 16000u, 24000u}) { SCOPED_TRACE(hz); pruefeSpitze(SoundK1520::Kanal::ABC, hz); }
+}
+TEST(SoundK1520, SpitzeAcbHoechstensMinus3dBFS) {
+    for (uint32_t hz : {3000u, 8000u, 16000u, 24000u}) { SCOPED_TRACE(hz); pruefeSpitze(SoundK1520::Kanal::ACB, hz); }
+}
+TEST(SoundK1520, SpitzeMonoHoechstensMinus3dBFS) {
+    for (uint32_t hz : {3000u, 8000u, 16000u, 24000u}) { SCOPED_TRACE(hz); pruefeSpitze(SoundK1520::Kanal::Mono, hz); }
+}
+
+// ---- Umstellung im Lauf (Entwurf 51, Merkposten sound.md Nr. 17) ----
+
+namespace {
+/// Frequenz der Nulldurchgaenge im Abschnitt [von, bis) des linken Kanals.
+double freqAbschnitt(const std::vector<float>& l, size_t von, size_t bis) {
+    int n = 0; size_t erst = 0, letzt = 0;
+    for (size_t i = von + 1; i < bis && i < l.size(); ++i)
+        if (l[i - 1] < 0 && l[i] >= 0) { if (!n) erst = i; letzt = i; ++n; }
+    return n > 2 ? (n - 1) / ((letzt - erst) / 48000.0) : 0.0;
+}
+}  // namespace
+
+TEST(SoundK1520, UmstellenTaktwechselImLaufVerdoppeltDieTonfrequenz) {
+    Rig g; g.k.setzeSenke(&g.s);           // QuarzHalbe
+    g.ton(0, 0x6F);
+    g.laufe(uint64_t(SYS));
+    const size_t n1 = g.s.l.size();
+    const uint64_t chipVorher = g.k.ay().takt();
+    SoundK1520::Config c = g.k.config();
+    c.takt = SoundK1520::Takt::Quarz;
+    std::string grund;
+    ASSERT_TRUE(g.k.umstellen(c, &grund)) << grund;
+    EXPECT_GE(g.k.ay().takt(), chipVorher) << "Chipzeit monoton";
+    g.laufe(uint64_t(SYS));
+    const double f1 = freqAbschnitt(g.s.l, 4800, n1 - 100);
+    const double f2 = freqAbschnitt(g.s.l, n1 + 4800, g.s.l.size());
+    ASSERT_GT(f1, 0.0);
+    ASSERT_GT(f2, 0.0);
+    EXPECT_NEAR(f2 / f1, 2.0, 0.02);
+    // Rueckweg
+    c.takt = SoundK1520::Takt::QuarzHalbe;
+    ASSERT_TRUE(g.k.umstellen(c));
+    const size_t n2 = g.s.l.size();
+    g.laufe(uint64_t(SYS));
+    EXPECT_NEAR(freqAbschnitt(g.s.l, n2 + 4800, g.s.l.size()), f1, f1 * 0.01);
+    // Gleich viele Abtastwerte je Maschinensekunde in jedem Takt
+    EXPECT_NEAR(double(g.s.l.size()), 3.0 * 48000, 400);
+}
+
+TEST(SoundK1520, UmstellenKanalwechselAbcNachMonoWirkt) {
+    SoundK1520::Config c; c.kanal = SoundK1520::Kanal::ABC;
+    Rig g(c); g.k.setzeSenke(&g.s);
+    g.ton(0, 0x40);                        // nur A: in ABC nur links
+    g.laufe(uint64_t(SYS * 0.2));
+    const size_t n = g.s.l.size();
+    EXPECT_LT(rms(g.s.r, 3000), 1e-4);
+    c.kanal = SoundK1520::Kanal::Mono;
+    ASSERT_TRUE(g.k.umstellen(c));
+    g.laufe(uint64_t(SYS * 0.2));
+    std::vector<float> r2(g.s.r.begin() + n + 2000, g.s.r.end());
+    EXPECT_GT(rms(r2, 0), 0.01);           // Mono: A auch rechts
+}
+
+TEST(SoundK1520, UmstellenKaskadeAnUndAusImLauf) {
+    auto lauf = [](SoundK1520& k, Rig& g) {
+        g.bus.ioWrite(0x3D, 0x47);   // Kanal 1: Zaehler, TC folgt
+        g.bus.ioWrite(0x3D, 0xFF);
+        g.bus.ioWrite(0x3C, 0x05);   // Kanal 0: Zeitgeber, Vorteiler 16
+        g.bus.ioWrite(0x3C, 10);
+        const int vor = k.ctc().getCount(1);
+        g.laufe(1700);
+        return vor - k.ctc().getCount(1);
+    };
+    Rig g;
+    ASSERT_TRUE(g.k.umstellen([&] { auto c = g.k.config(); c.kaskade = 1; return c; }()));
+    EXPECT_NEAR(lauf(g.k, g), 10, 1);
+    auto c = g.k.config(); c.kaskade = 0;
+    ASSERT_TRUE(g.k.umstellen(c));
+    g.bus.ioWrite(0x3D, 0x47); g.bus.ioWrite(0x3D, 0xFF);
+    const int vor = g.k.ctc().getCount(1);
+    g.laufe(1700);
+    EXPECT_EQ(g.k.ctc().getCount(1), vor) << "Kaskade aus: kein Zaehlimpuls mehr";
+}
+
+TEST(SoundK1520, UmstellenChipwechselBehaeltRegister) {
+    Rig g;
+    g.ayReg(14, 0x55);
+    g.ton(0, 0x40);
+    auto c = g.k.config(); c.chip = Ay38910::Variante::AY8912;
+    ASSERT_TRUE(g.k.umstellen(c));
+    EXPECT_EQ(g.k.ay().reg(14), 0x55);
+    EXPECT_EQ(g.k.ay().reg(8), 0x0F);
+    EXPECT_EQ(g.k.ay().variante(), Ay38910::Variante::AY8912);
+}
+
+TEST(SoundK1520, UmstellenMitAndererBasisOderSystemtaktIstFalse) {
+    Rig g;
+    auto c = g.k.config(); c.basis = 0x40;
+    std::string grund;
+    EXPECT_FALSE(g.k.umstellen(c, &grund));
+    EXPECT_NE(grund.find("Basis"), std::string::npos);
+    c = g.k.config(); c.systemtakt_hz = 1000000;
+    EXPECT_FALSE(g.k.umstellen(c, &grund));
+    EXPECT_EQ(g.k.config().basis, 0x38);
+}
+
+TEST(SoundK1520, TempoZweiHaeltTonhoeheUndHalbiertAbtastwerte) {
+    auto lauf = [](double f, size_t& n, double& hz) {
+        Rig g; g.k.setzeSenke(&g.s);
+        g.k.setzeTempo(f);
+        g.ton(0, 0x6F);
+        g.laufe(uint64_t(SYS));                 // 1 s MASCHINENzeit
+        n = g.s.l.size();
+        hz = freqAbschnitt(g.s.l, 4800 / size_t(f), n);   // Abtastwerte: Frequenz je Wirtssekunde
+        return g.k.ay().takt();
+    };
+    size_t n1 = 0, n2 = 0; double f1 = 0, f2 = 0;
+    const uint64_t c1 = lauf(1.0, n1, f1);
+    const uint64_t c2 = lauf(2.0, n2, f2);
+    EXPECT_NEAR(double(n2), n1 / 2.0, 200);                  // halb so viele Abtastwerte je Maschinensekunde
+    EXPECT_NEAR(double(c2), c1 / 2.0, c1 * 0.001);           // halb so viele Chiptakte
+    // je Wirtssekunde (= 0,5 Maschinensekunden) gleich viele Werte, Tonhoehe in Werten gemessen gleich
+    ASSERT_GT(f1, 0.0);
+    EXPECT_NEAR(f2, f1, f1 * 0.01);
+    // Umschalten im Lauf: Chipzeit monoton, danach halbe Rate
+    Rig g; g.k.setzeSenke(&g.s);
+    g.ton(0, 0x6F);
+    g.laufe(uint64_t(SYS / 2));
+    const uint64_t vor = g.k.ay().takt();
+    g.k.setzeTempo(2.0);
+    EXPECT_GE(g.k.ay().takt(), vor);
+    const size_t n = g.s.l.size();
+    g.laufe(uint64_t(SYS));
+    EXPECT_NEAR(double(g.s.l.size() - n), 24000.0, 200);
+}

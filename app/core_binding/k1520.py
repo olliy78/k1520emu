@@ -764,6 +764,9 @@ _lib.k1520_net_w5100_read.restype = ctypes.c_int
 _lib.k1520_sound_install.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint32,
                                      ctypes.c_int, ctypes.c_int, ctypes.c_int]
 _lib.k1520_sound_install.restype = ctypes.c_int
+_lib.k1520_sound_umstellen.argtypes = [K1520Handle, ctypes.c_int, ctypes.c_int, ctypes.c_uint32, ctypes.c_int,
+                                       ctypes.c_int, ctypes.c_int]
+_lib.k1520_sound_umstellen.restype = ctypes.c_int
 _lib.k1520_sound_fehler.argtypes = [K1520Handle]
 _lib.k1520_sound_fehler.restype = ctypes.c_char_p
 _lib.k1520_sound_present.argtypes = [K1520Handle]
@@ -786,6 +789,8 @@ _lib.k1520_audio_stumm.argtypes = [K1520Handle, ctypes.c_int]
 _lib.k1520_audio_stumm.restype = None
 _lib.k1520_audio_echtzeit.argtypes = [K1520Handle, ctypes.c_int]
 _lib.k1520_audio_echtzeit.restype = None
+_lib.k1520_audio_tempo.argtypes = [K1520Handle, ctypes.c_double]
+_lib.k1520_audio_tempo.restype = None
 _lib.k1520_audio_status.argtypes = [K1520Handle]
 _lib.k1520_audio_status.restype = ctypes.c_int
 _lib.k1520_audio_fehler.argtypes = [K1520Handle]
@@ -1407,6 +1412,23 @@ def classify_host(host: str) -> int:
 # K1520 Emulator Python Class
 # ════════════════════════════════════════════════════════════════════════════
 
+def _sound_tiefpass(wert) -> int:
+    """Tiefpass der SOUND-Karte als C-ABI-Wert: False/None = 0 (ueberbrueckt), True = 8000 Hz, Zahl = Grenzfrequenz in Hz."""
+    if wert is None or wert is False:
+        return 0
+    if wert is True:
+        return 8000
+    return max(0, int(wert))
+
+
+def _sound_ay_takt(d: dict) -> dict:
+    """``ay_takt_hz`` (Frequenz am AY in Hz) ist die Kurzschreibweise fuer ``takt="quarz"`` mit ``quarz_hz`` = AY-Takt."""
+    if "ay_takt_hz" in d:
+        d["takt"] = "quarz"
+        d["quarz_hz"] = int(d.pop("ay_takt_hz"))
+    return d
+
+
 class K1520Emulator:
     """Python wrapper for K1520 A5120 emulator."""
     
@@ -1463,7 +1485,8 @@ class K1520Emulator:
             sound: SOUND-Karte K1520 (AY-3-8910/8912 + CTC) stecken (an jeder Maschine ausser P8000) —
                 ``None``/``False`` = ohne, ``True``/``{}`` = Vorgaben, sonst ein dict mit ``basis`` (0x38),
                 ``chip`` ("ay8910"|"ay8912"), ``takt`` ("quarz"|"quarz_halbe"|"system"), ``quarz_hz`` (3579545),
-                ``kanal`` ("abc"|"acb"|"mono"), ``tiefpass`` (bool) und ``kaskade`` (Bits 0..2).
+                ``kanal`` ("abc"|"acb"|"mono"), ``tiefpass`` (Vorgabe 24000 = ungefiltert; False = ueberbrueckt, True = 8000 Hz oder eine Grenzfrequenz in Hz) und
+                ``kaskade`` (Bits 0..2, Vorgabe 7 = alle drei Brücken gesteckt).
                 Direkt nach dem Anlegen gesteckt; Fehler → ValueError.
             usb: GUN-USB (Z80-PIO + VDIP1, Wirtsverzeichnis als Stick) stecken (an jeder Maschine ausser
                 P8000; am K8915/PRG 710 ist die Vorgabe-Basis 0x84 von der ZRE belegt) — ``None``/``False``
@@ -1665,7 +1688,7 @@ class K1520Emulator:
                 self._handle = None
                 raise ValueError(reason or "KCNet nicht steckbar")
         if sound is not None and sound is not False:
-            sd = {} if sound is True else dict(sound)
+            sd = {} if sound is True else _sound_ay_takt(dict(sound))
             try:
                 werte = (_SOUND_CHIP[str(sd.get("chip", "ay8910")).lower()],
                          _SOUND_TAKT[str(sd.get("takt", "quarz_halbe")).lower()],
@@ -1674,9 +1697,10 @@ class K1520Emulator:
                 _lib.k1520_destroy(handle)
                 self._handle = None
                 raise ValueError(f"SOUND: unbekannte Option {e}") from None
+            self._sound_cfg = dict(sd)
             if not _lib.k1520_sound_install(handle, int(sd.get("basis", 0x38)), werte[0], werte[1],
                                             int(sd.get("quarz_hz", 3579545)), werte[2],
-                                            1 if sd.get("tiefpass", False) else 0, int(sd.get("kaskade", 0))):
+                                            _sound_tiefpass(sd.get("tiefpass", 24000)), int(sd.get("kaskade", 7))):
                 reason = _lib.k1520_sound_fehler(handle)
                 reason = reason.decode("utf-8", "replace") if reason else ""
                 _lib.k1520_destroy(handle)
@@ -2786,6 +2810,28 @@ class K1520Emulator:
         """True, wenn die SOUND-Karte gesteckt ist (``K1520Emulator(sound=...)``)."""
         return bool(_lib.k1520_sound_present(self._handle))
 
+    def sound_umstellen(self, **opts) -> None:
+        """Stellt die gesteckte SOUND-Karte im Lauf um (kein Neuaufbau).  Schluessel und Werte wie beim
+        ``sound``-Dict von ``K1520Emulator``; nicht genannte Schluessel behalten ihren Stand.  ``basis`` laesst
+        sich nicht aendern.  Der Stand wird hier gemerkt (die C-ABI hat keinen Getter; nur dieser Weg und das
+        Stecken veraendern die Konfiguration).  ``ValueError`` mit Grund bei Fehler."""
+        if "basis" in opts:
+            raise ValueError("SOUND: die Basis laesst sich nur durch Neuaufbau aendern")
+        cfg = dict(getattr(self, "_sound_cfg", None) or {})
+        cfg.update(_sound_ay_takt(dict(opts)))
+        try:
+            werte = (_SOUND_CHIP[str(cfg.get("chip", "ay8910")).lower()],
+                     _SOUND_TAKT[str(cfg.get("takt", "quarz_halbe")).lower()],
+                     _SOUND_KANAL[str(cfg.get("kanal", "acb")).lower()])
+        except KeyError as e:
+            raise ValueError(f"SOUND: unbekannte Option {e}") from None
+        if not _lib.k1520_sound_umstellen(self._handle, werte[0], werte[1], int(cfg.get("quarz_hz", 3579545)),
+                                          werte[2], _sound_tiefpass(cfg.get("tiefpass", 24000)),
+                                          int(cfg.get("kaskade", 7))):
+            reason = _lib.k1520_sound_fehler(self._handle)
+            raise ValueError((reason.decode("utf-8", "replace") if reason else "") or "SOUND nicht umstellbar")
+        self._sound_cfg = cfg
+
     def sound_regs(self) -> Optional[list]:
         """Die 16 AY-Register (Rohwerte) oder ``None`` ohne Karte."""
         puffer = (ctypes.c_uint8 * 16)()
@@ -2820,6 +2866,10 @@ class K1520Emulator:
 
     def audio_echtzeit(self, an: bool) -> None:
         _lib.k1520_audio_echtzeit(self._handle, 1 if an else 0)
+
+    def audio_tempo(self, faktor: float) -> None:
+        """Tempo-Faktor an die Tonstrecke (1.0 = Echtzeit, >1 schneller: Tonhoehe bleibt, 0 = unbegrenzt = stumm)."""
+        _lib.k1520_audio_tempo(self._handle, float(faktor))
 
     def audio_status(self) -> str:
         """``"aus"`` | ``"stumm"`` | ``"hoerbar"`` | ``"kein_geraet"``."""

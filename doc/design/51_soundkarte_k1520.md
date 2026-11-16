@@ -91,7 +91,7 @@ liegt deshalb in der Mitte (auf beiden Seiten).  Welche, legt die Kanalzuordnung
 Emulator **Stereo ACB** (ursprünglich ABC, Anwenderentscheid 2026-11-14; nach dem Hörvergleich 2026-11-15 auf ACB umgestellt, §7a), wählbar ABC und Mono.
 Kanalzuordnung über steckbare Widerstände + Schiebeschalter S8: **ABC** (A links, B Mitte, C rechts) oder
 **ACB** (A links, B rechts, C Mitte); Seitenkanal 10 kΩ, Mittelkanal 22 kΩ auf beide Seiten
-(Gewicht Mitte ≈ 10/22 ≈ 0,45 je Seite).  JP4 = Mono.  C16/C17 (1 nF, optional) = Tiefpass.  Verstärker
+(Gewicht Mitte ≈ 10/22 ≈ 0,45 je Seite).  JP4 = Mono.  C16/C17 (1 nF, optional) = Tiefpass; nach Plan ≈ 23–37 kHz (kaum hörbar), im Emulator bewusst hörbare Stufen 3/8/16/24 kHz, Butterworth 4. Ordnung, Vorgabe 24 kHz = ungefiltert (Anwenderentscheid 2026-11-16, Merkposten Nr. 18).  Verstärker
 PAM8403, Line-Out — beides ohne Einfluss auf das Modell außer der Lautstärke.
 
 ### 3.5 AY-3-8910 — was nachgebaut wird (Datenblatt)
@@ -142,9 +142,13 @@ core/cards/sound_k1520/             Karte: Dekodierung, AY + CTC, Mischer ABC/AC
 3. **Der Kern rechnet, die Ausgabe holt.**  Der Emulationsfaden schreibt in den Ringpuffer, der
    Ausgabefaden (im Kern, C++) liest daraus — **ohne Kernsperre** und ohne Python.  Die Oberfläche
    schaltet nur ein/aus, Lautstärke, stumm.
-4. **Nur bei Echtzeit hörbar.**  Bei Faktor ≠ 1,0 (schneller/unbegrenzt) ist die Wirtsausgabe stumm und
-   der Ringpuffer verwirft (kein Rückstau, kein Nachhall).  Die WAV-Mitschrift läuft in jedem Tempo
-   (Maschinenzeit, deterministisch).
+4. **Hörbar bei jedem Tempo-Faktor f > 0 (geändert 2026-11-15).**  Der AY hat einen eigenen Quarz und läuft in ECHTER Zeit:
+   die Karte rechnet die Chipzeit um, je Maschinentakt vergehen `ay_hz/(systemtakt_hz·f)` Chiptakte (ganzzahliger Bruch, driftfrei;
+   beim Umschalten erst mit dem alten Faktor nachrechnen, Chipzeit monoton).  Je Wirtssekunde entstehen so wieder 48000
+   Abtastwerte, die Füllstandregelung bleibt im Gleichgewicht, die Tonhöhe bleibt, die Musik wird schneller (der Gast schreibt
+   die Register öfter).  `f == 0` (unbegrenzt) = Wirtsausgabe stumm, Puffer verwirft, AY rechnet in Maschinenzeit.  Die
+   WAV-Mitschrift folgt derselben Umrechnung (sie zeichnet auf, was man hört).  Grenze: schafft der Wirt f nicht, läuft der Puffer
+   leer (Aussetzer).  Schnittstelle: `SoundK1520::setzeTempo`, `K1520Machine::audioTempo`, `k1520_audio_tempo` (`k1520_audio_echtzeit` ist Hülle).
 5. **Gleichlauf** bei Echtzeit: Füllstand-Regelung (Ziel ≈ 60 ms); über Ziel+X ein Wert verworfen, unter
    Ziel−X einer verdoppelt; Unterlauf = Stille, nie Blockieren des Emulationsfadens.
 6. **Ohne Gerät läuft alles.**  Fehlt `libasound.so.2` / kein Ausgabegerät: Ausgabe „stumm", ein Satz im
@@ -159,7 +163,7 @@ core/cards/sound_k1520/             Karte: Dekodierung, AY + CTC, Mischer ABC/AC
 - `K1520Machine::installSound(const SoundK1520::Config&)`, `soundK1520()`, `soundFehler()`,
   `soundEinketten()` (CTC hinten in die Interruptkette, wie `gunUsbEinketten`), `soundTakt`/`soundReset`.
 - `SoundK1520::Config`: `basis` (38H), `chip` (8910|8912), `takt` (Quarz|QuarzHalbe|System),
-  `quarz_hz` (3 579 545), `kanal` (ACB|ABC|Mono; Vorgabe ACB, §7a), `tiefpass` (bool), `kaskade` (Bits TO0→TR1 …).
+  `quarz_hz` (3 579 545), `kanal` (ACB|ABC|Mono; Vorgabe ACB, §7a), `tiefpass_hz` (uint32, Vorgabe 24000 = ungefiltert, Stufen 3000/8000/16000/24000; C-ABI-Parameter `tiefpass`: 0 überbrückt, 1 = 8000 Hz, >= 1000 = Hz), `kaskade` (Bits TO0→TR1 …; Vorgabe 7, alle gesteckt).
 - C-ABI (additiv): `k1520_sound_install(h, basis, chip, takt, quarz_hz, kanal, tiefpass, kaskade)`,
   `k1520_sound_fehler`, `k1520_sound_regs(h, uint8_t[16])`;
   `k1520_audio_start(h)/_stop`, `k1520_audio_lautstaerke(h, float)`, `k1520_audio_stumm(h, int)`,

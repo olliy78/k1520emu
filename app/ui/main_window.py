@@ -1743,8 +1743,13 @@ class MainWindow(QMainWindow):
             # SOUND-Karte: fehlender Abschnitt = nicht anfassen; Lautstaerke/Stumm wirken sofort.
             if self.profil.sound_wahl:
                 if sound.SCHLUESSEL in general:
+                    try:
+                        nenn = int(self.emulator.nenntakt_hz())      # fuer ein altes ``takt: system``
+                    except Exception:  # noqa: BLE001 - Ersatzmaschinen der Tests
+                        nenn = sound.NENNTAKT_VORGABE
                     self._sound = sound.normalize(general.get(sound.SCHLUESSEL),
-                                                  self.profil.karten_vorauswahl("sound", self._model))
+                                                  self.profil.karten_vorauswahl("sound", self._model),
+                                                  nenntakt_hz=nenn)
                     self._sound_fehler = ""
                 if sound.SCHLUESSEL_LAUTSTAERKE in general:
                     self._lautstaerke = sound.lautstaerke_lesen(general.get(sound.SCHLUESSEL_LAUTSTAERKE))
@@ -2587,8 +2592,8 @@ class MainWindow(QMainWindow):
 
     def _karten_kern_zustand(self):
         """Was an den Steckkarten am Kern haengt (Neuaufbau noetig bei Aenderung) -- GIDE, USB, Netz."""
-        snd = tuple(sorted(sound.kern_param(self._sound).items())) if (
-            self.profil.sound_wahl and self._sound["enabled"]) else None
+        # nur die Basis: Takt, Chip, Kanaele, Tiefpass und Kaskade wirken live (sound_umstellen), kein Neuaufbau
+        snd = (int(self._sound["basis"]),) if (self.profil.sound_wahl and self._sound["enabled"]) else None
         if not self.profil.erweiterungskarten:
             return snd
         u = (self._usb["basis"],) if self._usb["enabled"] else None
@@ -2971,10 +2976,25 @@ class MainWindow(QMainWindow):
         return bool(self.profil.sound_wahl and self.emulator.sound_present())
 
     def _on_sound_changed(self, neu: dict):
-        """Eingaben der Soundkarten-Gruppe: jede Aenderung der Bestueckung baut die Maschine neu."""
+        """Eingaben der Soundkarten-Gruppe: Stecken/Ziehen und Basis bauen die Maschine neu auf, alles andere
+        (Takt, Quarz, Chip, Kanaele, Tiefpass, Kaskade) wirkt sofort an der laufenden Maschine."""
         neu = dict(neu)
         alt = self._sound
         if neu == alt:
+            return
+        if (neu["enabled"] and alt["enabled"] and neu["basis"] == alt["basis"] and self._sound_gesteckt()):
+            param = sound.kern_param(neu)
+            param.pop("basis")
+            try:
+                self.emulator.sound_umstellen(**param)
+            except ValueError as e:
+                self._sound_fehler = f"Soundkarte nicht umstellbar: {e}"
+                self.settings_widget.set_sound_value(alt, self._sound_fehler, True)
+                return
+            self._sound_fehler = ""
+            self._sound = neu
+            self.settings_widget.set_sound_value(neu, "", True)
+            self._schedule_autosave()
             return
         if neu["enabled"] or alt["enabled"]:
             if not self._eprom_rueckfrage("Wechsel der Soundkarte"):
@@ -2999,21 +3019,21 @@ class MainWindow(QMainWindow):
                     return
                 emu.audio_lautstaerke(self._lautstaerke / 100.0)
                 emu.audio_stumm(self._ton_stumm)
-                emu.audio_echtzeit(self._ton_echtzeit())
+                emu.audio_tempo(self._ton_tempo())
                 emu.audio_start()
         except Exception as e:           # kein Ton darf die Maschine nicht kosten
             print(f"[sound] {e}")
 
-    def _ton_echtzeit(self) -> bool:
-        """Hoerbar nur bei Faktor 1,0 (Entwurf 51 §4.1 Nr. 4)."""
-        return abs(float(getattr(self, "speed_factor", 1.0)) - 1.0) < 1e-9
+    def _ton_tempo(self) -> float:
+        """Faktor fuer die Tonstrecke: hoerbar bei jedem Faktor > 0 (der AY laeuft in echter Zeit), 0 = unbegrenzt."""
+        return max(0.0, float(getattr(self, "speed_factor", 1.0)))
 
     def _ton_echtzeit_melden(self) -> None:
-        """Beim Tempowechsel dem Kern sagen, ob jetzt Echtzeit herrscht."""
+        """Beim Tempowechsel dem Kern den Faktor melden."""
         try:
             if self.profil.sound_wahl and self.emulator.sound_present():
                 with kern_sperre():
-                    self.emulator.audio_echtzeit(self._ton_echtzeit())
+                    self.emulator.audio_tempo(self._ton_tempo())
         except Exception as e:
             print(f"[sound] {e}")
 
@@ -3125,7 +3145,7 @@ class MainWindow(QMainWindow):
         fehler = self.emulator.audio_fehler()
         tipp = fehler or {
             "aus": "Tonausgabe nicht gestartet",
-            "stumm": "Tonausgabe stumm" + ("" if self._ton_stumm else " (kein Gerät oder nicht in Echtzeit)"),
+            "stumm": "Tonausgabe stumm" + ("" if self._ton_stumm else " (kein Gerät oder unbegrenztes Tempo)"),
             "hoerbar": "Tonausgabe läuft (nur bei Takt 1×)",
             "kein_geraet": "kein Ausgabegerät"}.get(status, "")
         feld.zeige(f"Ton: {sound.STATUS_TEXT.get(status, status)}", tipp)

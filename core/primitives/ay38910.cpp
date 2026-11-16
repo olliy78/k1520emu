@@ -182,11 +182,25 @@ void Ay38910::ausgabeEin(uint32_t rate, float tiefpassHz) {
     fertig_.clear();
     // Abtastzaehler auf die aktuelle Chipzeit ausrichten
     abtastNr_ = rate ? static_cast<uint64_t>(std::ceil(rasterNr_ * (8.0 * rate) / takt_)) : 0;
+    tpHz_ = tiefpassHz;
     if (tiefpassHz > 0.0f) {
         const double fs = takt_ / 8.0;
         tpKoef_ = static_cast<float>(1.0 - std::exp(-2.0 * 3.14159265358979 * tiefpassHz / fs));
     } else {
         tpKoef_ = 0.0f;
+    }
+}
+
+void Ay38910::setzeTakt(uint32_t takt) {
+    if (takt == 0 || takt == takt_) return;
+    takt_ = takt;
+    if (rate_ != 0) {
+        summe_ = {0, 0, 0};
+        abtastNr_ = static_cast<uint64_t>(std::ceil(rasterNr_ * (8.0 * rate_) / takt_));
+        if (tpHz_ > 0.0f) {
+            const double fs = takt_ / 8.0;
+            tpKoef_ = static_cast<float>(1.0 - std::exp(-2.0 * 3.14159265358979 * tpHz_ / fs));
+        }
     }
 }
 
