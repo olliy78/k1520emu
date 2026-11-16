@@ -240,10 +240,6 @@ class SoundGruppe(KartenGruppe):
         for wert, text in sound.KANAELE:
             self.kanal_combo.addItem(text, wert)
         self.kanal_combo.setToolTip(sound.TIPP_KANAL)
-        z1 = QHBoxLayout()
-        z1.addWidget(QLabel("Kanäle:", self))
-        z1.addWidget(self.kanal_combo, 1)
-        self.form.addRow("", z1)
 
         # EIN Frequenzfeld statt Brueckenauswahl (JP2): wer den vollen Quarz oder den Systemtakt braucht, traegt die
         # Frequenz ein.  Einheit MHz mit Komma.  (Kein QDoubleSpinBox: die CRT-Tests zaehlen alle des Kastens.)
@@ -256,7 +252,9 @@ class SoundGruppe(KartenGruppe):
         z2.addWidget(QLabel("AY-Takt:", self))
         z2.addWidget(self.ay_takt_edit)
         z2.addWidget(QLabel("MHz", self))
-        z2.addStretch(1)
+        z2.addSpacing(12)
+        z2.addWidget(QLabel("Kanäle:", self))          # rechts neben dem Takt: eine Zeile weniger
+        z2.addWidget(self.kanal_combo, 1)
         self.form.addRow("", z2)
 
         self.tiefpass_combo = QComboBox(self)

@@ -64,7 +64,9 @@ class KartenArt:
 
 
 #: IDE-Karte GIDE: Basis = Hochnibble-Jumper, belegt Basis+4 .. Basis+0FH.
-GIDE = KartenArt("gide", "GIDE", 0x10, "GIDE", 4, 12)
+#: Hervorgehoben: D0H = Basis der Gemeinschafts-Software und des Urladers UL4, 50H = Kingstener-Treiber (GIDN_50H),
+#: 90H = Vorauswahl am PRG 710 (dort liegt der EPROMmer auf D0H..D4H).
+GIDE = KartenArt("gide", "GIDE", 0x10, "GIDE", 4, 12, {0xD0: "GIDE", 0x50: "Kingstener", 0x90: "PRG 710"})
 #: GUN-USB: vier Tore; GUN fest 84H, sonst frei (Vielfache von 4).
 USB = KartenArt("usb", "USB", 4, "GUN-USB", 0, 4, {0x84: "GUN"})
 #: KCNet-Netzkarte: vier Tore; K1520-Netzkarte per Jumper C0H oder 28H, GUN fest 88H.
@@ -74,7 +76,9 @@ NETZ = KartenArt("net", "Netz", 4, "KCNet", 0, 4,
 #: SOUND-Karte K1520 (AY + CTC): acht Tore ab Basis (Vielfache von 8).  Steht NICHT in :data:`ARTEN`
 #: (das sind die Karten der Gruppe „Erweiterungskarten"; die SOUND-Karte hat auch der MC80), wird aber
 #: in der Konfliktpruefung mitgerechnet (:data:`ALLE`).
-SOUND = KartenArt("sound", "SOUND", 8, "SOUND-K1520", 0, 8)
+#: Hervorgehoben: 38H = Standard der Karte und aller Programme, E0H = PC 1715 (SOUND.INI des USB-Players),
+#: E8H = NANOS unter EPOS 3.x.
+SOUND = KartenArt("sound", "SOUND", 8, "SOUND-K1520", 0, 8, {0x38: "SOUND-K1520", 0xE0: "PC 1715", 0xE8: "NANOS"})
 
 ARTEN = {a.schluessel: a for a in (GIDE, USB, NETZ)}
 ALLE = {**ARTEN, SOUND.schluessel: SOUND}

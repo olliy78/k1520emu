@@ -87,7 +87,7 @@ def test_besitzerabfrage_und_kandidatenliste():
     assert emu.io_owner(999) == ""
     zeilen = {z.basis: z for z in kartenwahl.eintraege(kartenwahl.GIDE, emu.io_owner)}
     assert len(zeilen) == 16
-    assert "K5020" in zeilen[0xD0].belegt and zeilen[0xD0].text.startswith("D0H (belegt: K5020")
+    assert "K5020" in zeilen[0xD0].belegt and zeilen[0xD0].text.startswith("D0H (GIDE) (belegt: K5020")
     assert zeilen[0x90].belegt == ""                        # die eigenen Tore zaehlen nicht
     assert zeilen[0x80].belegt == "RAF"                     # Basis 80H belegt 84H..8FH, darin 88H/89H
     usb = {z.basis: z for z in kartenwahl.eintraege(kartenwahl.USB, emu.io_owner)}
@@ -107,3 +107,13 @@ def test_konflikt_zwischen_gewaehlten_karten():
     assert k.konflikt_mit_anderen(k.NETZ, 0xC0, {"net": 0xC0}) == ""          # sich selbst nie
     z = {e.basis: e for e in k.eintraege(k.GIDE, None, {"usb": 0x84})}
     assert z[0x80].belegt == "USB" and "belegt: USB" in z[0x80].text and z[0x90].belegt == ""
+
+
+def test_gide_und_sound_zeigen_ihre_bekannten_basen_mit_namen():
+    # wie USB (84H GUN) und KCNet (C0H/28H Netzkarte, 88H GUN): die bekannten Einstellungen tragen den Namen
+    from app import kartenwahl
+    gide = {z.basis: z.text for z in kartenwahl.eintraege(kartenwahl.GIDE, None)}
+    assert gide[0xD0] == "D0H (GIDE)" and gide[0x50] == "50H (Kingstener)" and gide[0x90] == "90H (PRG 710)"
+    snd = {z.basis: z.text for z in kartenwahl.eintraege(kartenwahl.SOUND, None)}
+    assert snd[0x38] == "38H (SOUND-K1520)" and snd[0xE0] == "E0H (PC 1715)" and snd[0xE8] == "E8H (NANOS)"
+    assert snd[0x40] == "40H"
